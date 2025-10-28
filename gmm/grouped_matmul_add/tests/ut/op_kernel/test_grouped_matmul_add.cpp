@@ -31,11 +31,6 @@ protected:
 
 TEST_F(grouped_matmul_add_test, test_case_bf16)
 {
-    system(
-        "cp -rf "
-        "./grouped_matmul_add/grouped_matmul_add_data ./");
-    system("chmod -R 755 ./grouped_matmul_add_data/");
-    system("cd ./grouped_matmul_add_data/ && python3 gen_data.py 'bf16' '2' '345' '1280' '567'");
     AscendC::SetKernelMode(KernelMode::MIX_MODE);
     size_t xSize = 1280 * 345 * sizeof(half);
     size_t weightSize = 1280 * 567 * sizeof(half);
@@ -84,11 +79,6 @@ TEST_F(grouped_matmul_add_test, test_case_bf16)
     tilingData->mmTilingData.dbL0A = true;
     tilingData->mmTilingData.dbL0B = true;
     tilingData->mmTilingData.dbL0C = false;
-
-    ReadFile("./grouped_matmul_add_data/x.bin", xSize, x, xSize);
-    ReadFile("./grouped_matmul_add_data/weight.bin", weightSize, weight, weightSize);
-    ReadFile("./grouped_matmul_add_data/groupedList.bin", groupedListSize, groupedList, groupedListSize);
-    ReadFile("./grouped_matmul_add_data/y.bin", ySize, y, ySize);
 
     ICPU_SET_TILING_KEY(1);
     ICPU_RUN_KF(grouped_matmul_add, blockDim, x, weight, groupedList, y, y, workspace, tiling);
@@ -103,11 +93,6 @@ TEST_F(grouped_matmul_add_test, test_case_bf16)
 
 TEST_F(grouped_matmul_add_test, test_case_fp16)
 {
-    system(
-        "cp -rf "
-        "./grouped_matmul_add/grouped_matmul_add_data ./");
-    system("chmod -R 755 ./grouped_matmul_add_data/");
-    system("cd ./grouped_matmul_add_data/ && python3 gen_data.py 'fp16' '2' '345' '1280' '567'");
     AscendC::SetKernelMode(KernelMode::MIX_MODE);
     size_t xSize = 1280 * 345 * sizeof(half);
     size_t weightSize = 1280 * 567 * sizeof(half);
@@ -157,10 +142,6 @@ TEST_F(grouped_matmul_add_test, test_case_fp16)
     tilingData->mmTilingData.dbL0B = true;
     tilingData->mmTilingData.dbL0C = false;
 
-    ReadFile("./grouped_matmul_add_data/x.bin", xSize, x, xSize);
-    ReadFile("./grouped_matmul_add_data/weight.bin", weightSize, weight, weightSize);
-    ReadFile("./grouped_matmul_add_data/groupedList.bin", groupedListSize, groupedList, groupedListSize);
-    ReadFile("./grouped_matmul_add_data/y.bin", ySize, y, ySize);
 
     ICPU_SET_TILING_KEY(0);
     ICPU_RUN_KF(grouped_matmul_add, blockDim, x, weight, groupedList, y, y, workspace, tiling);
