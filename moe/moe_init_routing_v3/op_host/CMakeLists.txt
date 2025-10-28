@@ -9,21 +9,21 @@
 # ----------------------------------------------------------------------------
 
 message(STATUS "=== Debug: start ops.moe.moe_init_routing_v3.op_host.CMakeLists.txt ")
-#add_modules_sources(OPTYPE moe_init_routing_v3 ACLNNTYPE aclnn_exclude)
+
 if (BUILD_OPEN_PROJECT)
+    message(STATUS "=== Debug: BUILD is BUILD_OPEN_PROJECT")
     target_sources(op_host_aclnnExc PRIVATE
         moe_init_routing_v3_def.cpp
     )
-    if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
-        add_ops_compile_options(
-                OP_NAME MoeInitRoutingV3
-                OPTIONS --cce-auto-sync=on
-                        -Wno-deprecated-declarations
-                        -Werror
-        )
-    else() # custom
-        add_modules_sources(OPTYPE moe_init_routing_v3 ACLNNTYPE aclnn_exclude)
-    endif()
-else() # 回黄host
+    add_ops_compile_options(
+            OP_NAME MoeInitRoutingV3
+            OPTIONS --cce-auto-sync=on
+                    -Wno-deprecated-declarations
+                    -Werror
+    )
+endif()
+
+if(NOT BUILD_OPS_RTY_KERNEL)
+    message(STATUS "=== Debug: BUILD is NOT BUILD_OPS_RTY_KERNEL")
     add_modules_sources(OPTYPE moe_init_routing_v3 ACLNNTYPE aclnn_exclude)
 endif()

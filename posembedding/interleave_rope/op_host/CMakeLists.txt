@@ -9,9 +9,21 @@
 # ----------------------------------------------------------------------------
 
 message(STATUS "=== Debug: start ops.posembedding.interleave_rope.op_host.CMakeLists.txt ")
+
 if (BUILD_OPEN_PROJECT)
+    message(STATUS "=== Debug: BUILD is BUILD_OPEN_PROJECT")
     target_sources(op_host_aclnnInner PRIVATE
         interleave_rope_def.cpp
     )
+    add_ops_compile_options(
+            OP_NAME InterleaveRope
+            OPTIONS --cce-auto-sync=on
+                    -Wno-deprecated-declarations
+                    -Werror
+    )
 endif()
-add_modules_sources(OPTYPE interleave_rope ACLNNTYPE aclnn_inner)
+
+if(NOT BUILD_OPS_RTY_KERNEL)
+    message(STATUS "=== Debug: BUILD is NOT BUILD_OPS_RTY_KERNEL")
+    add_modules_sources(OPTYPE interleave_rope ACLNNTYPE aclnn_inner)
+endif()
