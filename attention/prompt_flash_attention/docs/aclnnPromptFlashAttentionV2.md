@@ -514,7 +514,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
   - 输入属性限制：关于seqlen的传入长度有以下规则：当传入长度为1时，所有Batch将使用相同的seqlen；当传入长度大于或等于Batch数量时，将取seqlen的前Batch个数值；其他长度的传入将不被支持。
   - 输入数据类型限制：
     - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持INT64。
-    - Atlas 推理系列加速卡产品：仅支持nullptr。
+    - Atlas 推理系列加速卡产品：数据类型支持INT64。
   
 - deqScale1，deqScale2输入，功能使用限制如下：
   

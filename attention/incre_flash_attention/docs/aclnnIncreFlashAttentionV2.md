@@ -269,7 +269,7 @@ aclnnStatus aclnnIncreFlashAttentionV2(
       <td>FLOAT16、BFLOAT16、INT8</td>
       <td>ND</td>
       <td><ul><li>(B, N, S, D)</li><li>(B, S, N, D)</li><li>(B, S, H)</li></ul></td>
-      <td>×</td>
+      <td>-</td>
     </tr>
     <tr>
       <td>workspaceSize</td>

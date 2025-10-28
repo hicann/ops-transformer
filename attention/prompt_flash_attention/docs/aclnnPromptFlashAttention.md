@@ -427,7 +427,7 @@ aclnnStatus aclnnPromptFlashAttention(
   - 输入值域限制：该入参中每个batch中的有效Sequence Length应该不大于query中对应batch的Sequence Length。
   - 输入数据类型限制：
     - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持INT64。
-    - Atlas 推理系列加速卡产品：仅支持nullptr。
+    - Atlas 推理系列加速卡产品：数据类型支持INT64。
 - preTokens输入，功能使用限制如下：
   - 输入数据类型限制：
     - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持INT64。

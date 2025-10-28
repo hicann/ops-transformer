@@ -10,7 +10,10 @@
 
 ##  功能说明
 
-- 算子功能：对于自回归（Auto-regressive）的语言模型，随着新词的生成，推理输入长度不断增大。在原来全量推理的基础上**实现增量推理**，query的S轴固定为1，key和value是经过KV Cache后，将之前推理过的state信息，叠加在一起，每个Batch对应S轴的实际长度可能不一样，输入的数据是经过padding后的固定长度数据。支持**量化，位置编码，page attention，kv cache反量化和kv左Padding特性。**
+- 算子功能：兼容（[aclnnIncreFlashAttentionV3](aclnnIncreFlashAttentionV3.md)）接口功能，在其基础上新增**kv左Padding特性。**
+
+  对于自回归（Auto-regressive）的语言模型，随着新词的生成，推理输入长度不断增大。在原来全量推理的基础上**实现增量推理**，query的S轴固定为1，key和value是经过KV Cache后，将之前推理过的state信息，叠加在一起，每个Batch对应S轴的实际长度可能不一样，输入的数据是经过padding后的固定长度数据。
+
   相比全量场景的FlashAttention算子（[PromptFlashAttention](../../prompt_flash_attention/README.md)），增量推理的流程与正常全量推理并不完全等价，不过增量推理的精度并无明显劣化。
   
   
@@ -333,7 +336,7 @@ aclnnStatus aclnnIncreFlashAttentionV4(
         <td>FLOAT16、BFLOAT16、INT8</td>
         <td>ND</td>
         <td><ul><li>(B, N, S, D)</li><li>(B, S, N, D)</li><li>(B, S, H)</li></ul></td>
-        <td>×</td>
+        <td>-</td>
       </tr>
       <tr>
         <td>workspaceSize</td>
