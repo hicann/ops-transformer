@@ -24,7 +24,7 @@
 namespace MoeDistributeCombineAddRmsNormImpl {
 constexpr uint8_t BUFFER_NUM = 2;                       // 多buf
 constexpr uint8_t BUFFER_SINGLE = 1;
-constexpr uint8_t MAX_UB_SIZE = 170 * 1024;
+constexpr uint32_t MAX_UB_SIZE = 170U * 1024U;
 constexpr uint32_t STATE_OFFSET = 32U;                  // 状态空间偏移地址
 constexpr uint32_t STATE_SIZE = 1024UL * 1024UL; // 1M
 constexpr uint32_t UB_ALIGN = 32U;                      // UB按32字节对齐
