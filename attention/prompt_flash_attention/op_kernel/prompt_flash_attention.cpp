@@ -32,7 +32,6 @@
 #include "prompt_flash_attention_var_len_score_sab_baseapi.h"
 #include "prompt_flash_attention_empty_tensor.h"
 #else
-#include "unpad_flash_attention_common.h"
 #include "prompt_attention_prefill.h"
 #include "prompt_flash_attention_s1s2_bns1_x310_base.h"
 #include "prompt_flash_attention_s1s2_bns1_x310.h"
