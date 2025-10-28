@@ -301,8 +301,7 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
   </tbody>
   </table>
 
-  - <term>Atlas训练系列产品</term>：不支持BFLOAT16
-  - <term>Atlas推理系列产品</term>：不支持BFLOAT16
+  - <term>Atlas 推理系列产品</term>：不支持BFLOAT16
 
 - **返回值：**
 

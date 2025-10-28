@@ -135,8 +135,7 @@
 | layout     | 属性     | 表示输入张量的布局格式 | int64：1-BSND、2-SBND、3-BNSD | - |
 | rotary_mode| 属性     | 公式中的旋转模式       | string："half"、"interleave"、"quarter"模式 | - |
 
-- <term>Atlas训练系列产品</term>：不支持BFLOAT16
-- <term>Atlas推理系列产品</term>：不支持BFLOAT16
+- <term>Atlas 推理系列产品</term>：不支持BFLOAT16
 
 
 ## 约束说明

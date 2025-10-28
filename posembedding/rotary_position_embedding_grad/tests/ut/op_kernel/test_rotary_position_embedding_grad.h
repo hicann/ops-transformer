@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
- #ifndef _ROTARY_POSITION_EMBEDDING_GRAD_TILING_H_
+#ifndef _ROTARY_POSITION_EMBEDDING_GRAD_TILING_H_
 #define _ROTARY_POSITION_EMBEDDING_GRAD_TILING_H_
 
 #include "kernel_tiling/kernel_tiling.h"
@@ -22,7 +22,7 @@
 
 #define __aicore__
 
-struct RopeHalfGradParams {
+struct RopeHalfGradUTParams {
     int64_t layout;
     int64_t xShapeSize;
     int64_t cosShapeSize;
@@ -54,7 +54,7 @@ struct RopeHalfGradParams {
     uint64_t stridePadInner;
 };
 
-struct RopeInterleavedGradParams {
+struct RopeInterleavedGradUTParams {
     uint64_t batchSize = 1;
     uint64_t seqLen = 64;
     uint64_t numHeads = 2;
@@ -80,18 +80,18 @@ struct RopeInterleavedGradParams {
     uint64_t layout = 0;
 };
 
-struct RotaryPositionEmbeddingGradTilingData {
-    RopeHalfGradParams ropeHalfGradParams;
-    RopeInterleavedGradParams ropeInterleavedGradParams;
+struct RotaryPositionEmbeddingGradUTTilingData {
+    RopeHalfGradUTParams ropeHalfGradParams;
+    RopeInterleavedGradUTParams ropeInterleavedGradParams;
 };
 
 inline void InitRotaryPositionEmbeddingGradTilingData(
-    uint8_t* tiling, RotaryPositionEmbeddingGradTilingData* const_data)
+    uint8_t* tiling, RotaryPositionEmbeddingGradUTTilingData* const_data)
 {
-    memcpy(const_data, tiling, sizeof(RotaryPositionEmbeddingGradTilingData));
+    memcpy(const_data, tiling, sizeof(RotaryPositionEmbeddingGradUTTilingData));
 }
 
 #define GET_TILING_DATA(tilingData, tilingPointer)    \
-    RotaryPositionEmbeddingGradTilingData tilingData; \
+    RotaryPositionEmbeddingGradUTTilingData tilingData; \
     InitRotaryPositionEmbeddingGradTilingData(tilingPointer, &tilingData)
 #endif
