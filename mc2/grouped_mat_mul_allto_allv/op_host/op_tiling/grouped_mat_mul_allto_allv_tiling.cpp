@@ -533,7 +533,24 @@ static void SetHcclTiling(const gert::TilingContext* context, GroupedMatMulAllto
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE(C_INNER_DEBUG, "GetAttrs returned nullptr!"), return );
     auto groupEpPtr = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
-    Mc2CcTilingConfig hcclCcTilingConfig(groupEpPtr, alltoAllvCmd, alltoAllvConfig);
+
+    const uint32_t alltoAllvReduceType = 0u;
+    auto outputDataType = context->GetOutputDesc(OUTPUT_Y_INDEX)->GetDataType();
+    auto inputDataType = context->GetInputDesc(GMM_X_INDEX)->GetDataType();
+    OP_TILING_CHECK(
+        mc2tiling::HCCL_DATA_TYPE.find(outputDataType) == mc2tiling::HCCL_DATA_TYPE.end(),
+        OP_LOGE(C_INNER_DEBUG, "%s is Unsupported outputdata type!", Ops::Base::ToString(outputDataType).c_str()),
+        return );
+    OP_TILING_CHECK(
+        mc2tiling::HCCL_DATA_TYPE.find(inputDataType) == mc2tiling::HCCL_DATA_TYPE.end(),
+        OP_LOGE(C_INNER_DEBUG, "%s is Unsupported inputdata type!", Ops::Base::ToString(inputDataType).c_str()),
+        return );   
+
+    auto alltoAllvDstDataType = static_cast<uint8_t>(mc2tiling::HCCL_DATA_TYPE.find(outputDataType)->second);
+    auto alltoAllvSrcDataType = static_cast<uint8_t>(mc2tiling::HCCL_DATA_TYPE.find(inputDataType)->second);
+
+    Mc2CcTilingConfig hcclCcTilingConfig(groupEpPtr, alltoAllvCmd, alltoAllvConfig, 
+                                         alltoAllvReduceType, alltoAllvDstDataType, alltoAllvSrcDataType);
     hcclCcTilingConfig.GetTiling(tilingData->hcclInitTiling);
     hcclCcTilingConfig.GetTiling(tilingData->alltoAllvCcTiling);
     return;
