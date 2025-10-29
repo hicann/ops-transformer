@@ -80,20 +80,20 @@ constexpr int SYNC_MODE_ALL_CUBE = 0x0;
 constexpr int SYNC_MODE_CUBE_VEC = 0x2;
 constexpr int SYNC_MODE_ALL_VEC = 0x0;
 
-constexpr int FINISH_MM_CQ = 0x1;
-constexpr int FINISH_MM_CKVKR = 0x1;
-constexpr int FINISH_MM_QCQR = 0x1;
-constexpr int FINISH_MM_QR = 0x2; // 算力分组场景
-constexpr int FINISH_MM_QC = 0x1; // 算力分组场景
-constexpr int FINISH_MM_ALL = 0x0;
+constexpr int FINISH_MM_CQ = 0x6;
+constexpr int FINISH_MM_CKVKR = 0x6;
+constexpr int FINISH_MM_QCQR = 0x6;
+constexpr int FINISH_MM_QR = 0x8; // 算力分组场景
+constexpr int FINISH_MM_QC = 0x6; // 算力分组场景
+constexpr int FINISH_MM_ALL = 0x7;
 
-constexpr int FINISH_VEC_RMSNORM_CQ = 0x1;
-constexpr int FINISH_VEC_DEQUANT_QC = 0x1;
-constexpr int FINISH_VEC_ALL = 0x0;
+constexpr int FINISH_VEC_RMSNORM_CQ = 0x6;
+constexpr int FINISH_VEC_DEQUANT_QC = 0x6;
+constexpr int FINISH_VEC_ALL = 0x7;
 
-constexpr int FINISH_MM_QCQR_SPLIT_N = 0X1;
-constexpr int FINISH_VEC_DEQUANT_QC_SPLIT_N = 0X1;
-constexpr int FINISH_MM_QN_SPLIT_N = 0X1;
+constexpr int FINISH_MM_QCQR_SPLIT_N = 0X6;
+constexpr int FINISH_VEC_DEQUANT_QC_SPLIT_N = 0X6;
+constexpr int FINISH_MM_QN_SPLIT_N = 0X6;
 
 #ifdef ENABLE_DUMP_DATA
 #define DO_DUMP_DATA(srcTensor, id, len) AscendC::DumpTensor(srcTensor, id, len)
