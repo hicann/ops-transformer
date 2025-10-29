@@ -343,7 +343,12 @@ static int64_t GetDim0(const gert::InferShapeContext* context, bool isXTranspose
     } else {
         for (size_t idx = 0; idx < numX; ++idx) {
             const gert::Shape* xShape = context->GetDynamicInputShape(GMM_INDEX_IN_X, idx);
-            dim0 += (xShape == nullptr ? 0 : xShape->GetDim(0));
+            int64_t tmpDim0 = (xShape == nullptr ? 0 : xShape->GetDim(0));
+            if(tmpDim0 >= 0) {
+                dim0 += tmpDim0;
+            } else {
+                return tmpDim0;
+            }
         }
     }
 
