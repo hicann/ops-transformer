@@ -997,7 +997,7 @@ bool IFATiling::IsFlashDecode(uint32_t coreNum, IfaPerfMode perfMode)
         }
     }
     if (balanceModeFlag_) {
-        uint32_t tndFDCoreArrLen = tilingDataMla_.tndSplitCoreParams.get_tndFDCoreArrLen();
+        uint32_t tndFDCoreArrLen = tilingDataMla_->tndSplitCoreParams.get_tndFDCoreArrLen();
         return tndFDCoreArrLen > 0U;
     }
     if (pageAttentionFlag_ && socVersion_ == IfaSocVersion::SOC_ASCEND_910B &&

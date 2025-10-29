@@ -15,8 +15,8 @@
 
 #ifndef FUSED_INFER_ATTENTION_SCORE_TILING_INDEX_H
 #define FUSED_INFER_ATTENTION_SCORE_TILING_INDEX_H
-#include "../../prompt_flash_attention/op_host/prompt_flash_attention_tiling.h"
-#include "../../incre_flash_attention/op_host/incre_flash_attention_tiling.h"
+#include "../../prompt_flash_attention/op_kernel/prompt_flash_attention_tiling_data.h"
+#include "../../incre_flash_attention/op_kernel/incre_flash_attention_tiling.h"
 #include "register/tilingdata_base.h"
 
 namespace optiling {

@@ -13,7 +13,6 @@
  * \brief
  */
 
-#include "../../incre_flash_attention/op_host/incre_flash_attention_tiling.h"
 #include <numeric>
 #include <algorithm>
 #include <vector>
@@ -25,6 +24,11 @@
 #include "log/error_code.h"
 #include "err/ops_err.h"
 #include "register/op_def_registry.h"
+#include <register/tilingdata_base.h>
+#include <tiling/tiling_api.h>
+#include "../op_kernel/incre_flash_attention_template_tiling_key.h"
+#include "../../incre_flash_attention/op_kernel/incre_flash_attention_tiling.h"
+#include "../../prompt_flash_attention/op_host/prompt_flash_attention_tiling_compile_info.h"
 
 using namespace ge;
 using namespace AscendC;
@@ -1860,9 +1864,9 @@ void IFATiling::GetSeqTilingInfo(const int64_t *actualSeqKv,
 
 void IFATiling::FillBalancedSplitCoreInfo(const TilingIndexes &tilingIdx, BalancedSplitTilingInfo &tilingInfo)
 {
-    uint32_t *coreBEnd = tilingDataMla_.increFlashAttentionCoreParams.get_coreBEnd();
-    uint32_t *coreS1OuterEnd = tilingDataMla_.increFlashAttentionCoreParams.get_coreS1OuterEnd();
-    uint32_t *coreS2End = tilingDataMla_.increFlashAttentionCoreParams.get_coreS2End();
+    uint32_t *coreBEnd = tilingDataMla_->increFlashAttentionCoreParams.get_coreBEnd();
+    uint32_t *coreS1OuterEnd = tilingDataMla_->increFlashAttentionCoreParams.get_coreS1OuterEnd();
+    uint32_t *coreS2End = tilingDataMla_->increFlashAttentionCoreParams.get_coreS2End();
 
     coreBEnd[tilingInfo.currCoreIdx] = tilingIdx.bIdx;
     coreS1OuterEnd[tilingInfo.currCoreIdx] = tilingIdx.s1Idx;
@@ -1874,7 +1878,7 @@ void IFATiling::FillBalancedSplitCoreInfo(const TilingIndexes &tilingIdx, Balanc
 void IFATiling::EndSplitForCurrentCore(const TilingIndexes &tilingIdx,
     const SeqTilingInfo &seqTilingInfo, uint32_t &currKvSplitPart, BalancedSplitTilingInfo &tilingInfo)
 {
-    uint32_t *balanceFDCoreStartKVSplitNum = tilingDataMla_.tndSplitCoreParams.get_balanceFDCoreStartKVSplitNum();
+    uint32_t *balanceFDCoreStartKVSplitNum = tilingDataMla_->tndSplitCoreParams.get_balanceFDCoreStartKVSplitNum();
     tilingInfo.accumS2Length += 1U;
     // 更新当前核的End分核信息
     FillBalancedSplitCoreInfo(tilingIdx, tilingInfo);
@@ -1890,10 +1894,10 @@ void IFATiling::EndSplitForCurrentCore(const TilingIndexes &tilingIdx,
 void IFATiling::SplitBalancedForEachHead(
     uint32_t bIdx, const SeqTilingInfo &seqTilingInfo, BalancedSplitTilingInfo &tilingInfo)
 {
-    uint32_t *balanceFDCoreBArr = tilingDataMla_.tndSplitCoreParams.get_balanceFDCoreBArr();
-    uint32_t *balanceFDCoreS1Arr = tilingDataMla_.tndSplitCoreParams.get_balanceFDCoreS1Arr();
-    uint32_t *balanceFDCoreKVSplitArr = tilingDataMla_.tndSplitCoreParams.get_balanceFDCoreKVSplitArr();
-    uint32_t *balanceFDCoreStartKVSplitNum = tilingDataMla_.tndSplitCoreParams.get_balanceFDCoreStartKVSplitNum();
+    uint32_t *balanceFDCoreBArr = tilingDataMla_->tndSplitCoreParams.get_balanceFDCoreBArr();
+    uint32_t *balanceFDCoreS1Arr = tilingDataMla_->tndSplitCoreParams.get_balanceFDCoreS1Arr();
+    uint32_t *balanceFDCoreKVSplitArr = tilingDataMla_->tndSplitCoreParams.get_balanceFDCoreKVSplitArr();
+    uint32_t *balanceFDCoreStartKVSplitNum = tilingDataMla_->tndSplitCoreParams.get_balanceFDCoreStartKVSplitNum();
     balanceFDCoreStartKVSplitNum[0] = 0U;
 
     for (uint32_t s1OuterIdx = 0U; s1OuterIdx < seqTilingInfo.s1OuterNum[bIdx]; s1OuterIdx++) {
@@ -1967,7 +1971,7 @@ ge::graphStatus IFATiling::SplitBalanced()
     }
 
     usedCoreNum_ = tilingInfo.currCoreIdx;
-    tilingDataMla_.tndSplitCoreParams.set_tndFDCoreArrLen(tilingInfo.tndFDCoreArrLen);
+    tilingDataMla_->tndSplitCoreParams.set_tndFDCoreArrLen(tilingInfo.tndFDCoreArrLen);
     OP_LOGI(context_->opName, "usedCoreNum_:%u", usedCoreNum_);
     OP_LOGI(context_->opName, "tnd FD Core Array Length:%u", tilingInfo.tndFDCoreArrLen);
     OP_LOGI(context_->opName, "max Kv Split Part:%u", tilingInfo.maxKvSplitPart);
@@ -2729,19 +2733,19 @@ void IFATiling::AdjustPABmm2Tiling() const
     uint32_t targetBaseK = 128U;
     if (targetBaseK < blockSize_) {
         while ((blockSize_ % targetBaseK != 0U) ||
-               (targetBaseK * tilingData_->bmm2TilingData.get_baseN() * sizeof(float) > L0B_SIZE)) {
+               (targetBaseK * tilingData_->bmm2TilingData.baseN * sizeof(float) > L0B_SIZE)) {
             targetBaseK /=
                 2U; // 2:不断减半，确保1个base块不会跨block拷贝，已校验过blockSize_16/32对齐，因此targetBaseK最小值为16/32
         }
     } else {
         uint32_t tmpBaseK = increGcd(targetBaseK, blockSize_);
-        while (tmpBaseK * tilingData_->bmm2TilingData.get_baseN() * sizeof(float) > L0B_SIZE) {
+        while (tmpBaseK * tilingData_->bmm2TilingData.baseN * sizeof(float) > L0B_SIZE) {
             tmpBaseK /= 2U; // 2: 不断减半，确保base块大小在LOB有效范围内
         }
         targetBaseK = tmpBaseK;
     }
     // mm api不支持通过 SetFixSplit 设置baseK，需要直接配置tiling结构体
-    tilingData_->bmm2TilingData.set_baseK(targetBaseK);
+    tilingData_->bmm2TilingData.baseK = targetBaseK;
     OP_LOGD(context_->opName, "PA is enabled, blockSize is %u, bmm2 baseK is adjusted to %u", blockSize_,
               targetBaseK);
 }
@@ -2873,24 +2877,24 @@ ge::graphStatus IFATiling::FillTilingMla()
 
 void IFATiling::FillTilingBaseParamsMla()
 {
-    tilingDataMla_.baseParams.set_batchSize(batchSize_);
-    tilingDataMla_.baseParams.set_seqSize(sMax_);
-    tilingDataMla_.baseParams.set_qSeqSize(qSeqSize_);
-    tilingDataMla_.baseParams.set_blockSize(blockSize_);
-    tilingDataMla_.baseParams.set_maxBlockNumPerBatch(maxBlockNumPerBatch_);
-    tilingDataMla_.baseParams.set_scaleValue(scaleValue_);
-    tilingDataMla_.baseParams.set_nNumOfQInOneGroup(numHeads_ / numKvHeads_);
-    tilingDataMla_.baseParams.set_actualLenQDims(actualLenQDims_);
-    tilingDataMla_.baseParams.set_actualLenDims(actualLenDims_);
-    tilingDataMla_.baseParams.set_attenMaskFlag(attenMaskFlag_ ? 1 : 0);
-    tilingDataMla_.baseParams.set_attenMaskSize(attenMaskSize_);
-    tilingDataMla_.baseParams.set_outputLayout(static_cast<uint32_t>(outputLayout_));
+    tilingDataMla_->baseParams.set_batchSize(batchSize_);
+    tilingDataMla_->baseParams.set_seqSize(sMax_);
+    tilingDataMla_->baseParams.set_qSeqSize(qSeqSize_);
+    tilingDataMla_->baseParams.set_blockSize(blockSize_);
+    tilingDataMla_->baseParams.set_maxBlockNumPerBatch(maxBlockNumPerBatch_);
+    tilingDataMla_->baseParams.set_scaleValue(scaleValue_);
+    tilingDataMla_->baseParams.set_nNumOfQInOneGroup(numHeads_ / numKvHeads_);
+    tilingDataMla_->baseParams.set_actualLenQDims(actualLenQDims_);
+    tilingDataMla_->baseParams.set_actualLenDims(actualLenDims_);
+    tilingDataMla_->baseParams.set_attenMaskFlag(attenMaskFlag_ ? 1 : 0);
+    tilingDataMla_->baseParams.set_attenMaskSize(attenMaskSize_);
+    tilingDataMla_->baseParams.set_outputLayout(static_cast<uint32_t>(outputLayout_));
 }
 
 // for flash decode
 void IFATiling::FillTilingSplitKVMla()
 {
-    tilingDataMla_.splitKVParams.set_s2(kvSplitPart_);
+    tilingDataMla_->splitKVParams.set_s2(kvSplitPart_);
     uint32_t sInnerLoopSize_ = (maxActualseq_ + (kvSplitPart_ - 1U)) / kvSplitPart_;
     if (pageAttentionFlag_) {
         sInnerLoopSize_ = Align(sInnerLoopSize_, blockSize_);
@@ -2900,39 +2904,39 @@ void IFATiling::FillTilingSplitKVMla()
     if (inputKvType_ == ge::DT_INT4) {
         sInnerLoopSize_ = Align(sInnerLoopSize_, 2U);
     }
-    tilingDataMla_.splitKVParams.set_sInnerLoopSize(sInnerLoopSize_);
+    tilingDataMla_->splitKVParams.set_sInnerLoopSize(sInnerLoopSize_);
     if (balanceModeFlag_) {
-        tilingDataMla_.splitKVParams.set_accumOutSize(aicNum_ * 2U * numKvHeads_ * FIA_BALANCE_SG_BASIC_SIZE * headDimAlign_);   // 每个核可能有头规约和尾规约，一共两份规约信息
-        tilingDataMla_.splitKVParams.set_logSumExpSize(2U * aicNum_ * 2U * numKvHeads_ * FIA_BALANCE_SG_BASIC_SIZE *  // 每个核可能有头规约和尾规约，一共两份规约信息;sum + max
+        tilingDataMla_->splitKVParams.set_accumOutSize(aicNum_ * 2U * numKvHeads_ * FIA_BALANCE_SG_BASIC_SIZE * headDimAlign_);   // 每个核可能有头规约和尾规约，一共两份规约信息
+        tilingDataMla_->splitKVParams.set_logSumExpSize(2U * aicNum_ * 2U * numKvHeads_ * FIA_BALANCE_SG_BASIC_SIZE *  // 每个核可能有头规约和尾规约，一共两份规约信息;sum + max
                                                     (BYTE_BLOCK / blockTypeSize_));
     } else {
-        tilingDataMla_.splitKVParams.set_accumOutSize(batchSizeQ_ * numHeads_ * kvSplitPart_ * headDimAlign_);
-        tilingDataMla_.splitKVParams.set_logSumExpSize(2U * batchSizeQ_ * numHeads_ * kvSplitPart_ *
+        tilingDataMla_->splitKVParams.set_accumOutSize(batchSizeQ_ * numHeads_ * kvSplitPart_ * headDimAlign_);
+        tilingDataMla_->splitKVParams.set_logSumExpSize(2U * batchSizeQ_ * numHeads_ * kvSplitPart_ *
                                                     (BYTE_BLOCK / blockTypeSize_)); // 2: sum + max
     }
     if (!splitKVFlag_) {
-        tilingDataMla_.splitKVParams.set_s2(0);
+        tilingDataMla_->splitKVParams.set_s2(0);
     }
 }
 
 void IFATiling::FillTilingCoreParamsMla()
 {
-    uint32_t *coreStartIdx = tilingDataMla_.increFlashAttentionCoreParams.get_coreSidxEnd();
+    uint32_t *coreStartIdx = tilingDataMla_->increFlashAttentionCoreParams.get_coreSidxEnd();
     memcpy_s(coreStartIdx, MAX_AIC_CORE_NUM * sizeof(uint32_t), startIdxEachCore_, MAX_AIC_CORE_NUM * sizeof(uint32_t));
 }
 
 void IFATiling::FillTilingSingleCoreParamsMla()
 {
-    tilingDataMla_.increFlashAttentionSingleCoreParams.set_singleProcessSInnerSize(sInnerSize_);
-    tilingDataMla_.increFlashAttentionSingleCoreParams.set_usedCoreNum(usedCoreNum_);
-    tilingDataMla_.increFlashAttentionSingleCoreParams.set_groupSplitSize(groupSplitSize_);
-    tilingDataMla_.increFlashAttentionSingleCoreParams.set_s1SplitSize(s1SplitSize_);
+    tilingDataMla_->increFlashAttentionSingleCoreParams.set_singleProcessSInnerSize(sInnerSize_);
+    tilingDataMla_->increFlashAttentionSingleCoreParams.set_usedCoreNum(usedCoreNum_);
+    tilingDataMla_->increFlashAttentionSingleCoreParams.set_groupSplitSize(groupSplitSize_);
+    tilingDataMla_->increFlashAttentionSingleCoreParams.set_s1SplitSize(s1SplitSize_);
 }
 
 void IFATiling::FillTilingSingleCoreTensorSizeMla()
 {
-    tilingDataMla_.increFlashAttentionSingleCoreTensorSize.set_mmResUbSize(mmResUbSize_);
-    tilingDataMla_.increFlashAttentionSingleCoreTensorSize.set_bmm2ResUbSize(bmm2ResUbSize_);
+    tilingDataMla_->increFlashAttentionSingleCoreTensorSize.set_mmResUbSize(mmResUbSize_);
+    tilingDataMla_->increFlashAttentionSingleCoreTensorSize.set_bmm2ResUbSize(bmm2ResUbSize_);
 }
 
 bool IFATiling::GetMatmulType(ge::DataType getype, matmul_tiling::DataType *mmType) const
@@ -3077,7 +3081,7 @@ ge::graphStatus IFATiling::GenTilingKey() const
     uint8_t outputVal = 0U;
     uint8_t originVal = 0U;
     uint8_t splitKvVal = kvSplit_ > 0U ? 1U : 0U;
-    uint8_t paVal = pageAttentionFlag_ == true ? 1U * 2U : 0U;
+    uint8_t paVal = pageAttentionFlag_ == true ? 1U : 0U;
     uint8_t antiquantModeVal = antiquantMode_ == PER_TOKEN_MODE ? 1U * 4U : 0U;
     uint64_t modeVal = sysPrefixFlag_ ? 2U : 1U;
     if(atbRunFlag_){
@@ -3115,16 +3119,18 @@ ge::graphStatus IFATiling::GenTilingKey() const
     if (ropeFlag_ && quantFlag_) {
         originVal = outputVal; // 此处应该获取ROPE的类型，需要修改
     }
-
-    uint64_t baseOffset =
-        modeVal * IFA_TILINGKEYOFFSET + (static_cast<uint64_t>(perfMode_)) * IFA_PERF_MODE_TILINGKEYOFFSET;
-    if (antiquantMode_ == PER_TOKEN_MODE || antiquantMode_ == PER_CHANNEL_MODE){
-        context_->tilingKey = baseOffset + IFA_GET_TILINGKEY(layoutVal, inputQVal, inputKvVal, outputVal, originVal,
-            (paVal + splitKvVal + antiquantModeVal), 0, kvLayoutInfo.kvLayoutVal, kvLayoutInfo.amlaMode, balanceMode);
-    } else {
-        context_->tilingKey = baseOffset + IFA_GET_TILINGKEY(layoutVal, inputQVal, inputKvVal, outputVal, originVal,
-            (paVal + splitKvVal), antiquantMode_, kvLayoutInfo.kvLayoutVal, kvLayoutInfo.amlaMode, balanceMode);
-    }
+    if((modeVal == 1 && perfMode_ == IfaPerfMode::BMM_ALL_BY_VEC) ||
+       (modeVal == 1 && perfMode_ == IfaPerfMode::NORMAL) ||
+       (modeVal == 1 && perfMode_ == IfaPerfMode::C1_V1) ||
+       (modeVal == 2) ||
+       (modeVal == 1 && perfMode_ == IfaPerfMode::CUBE_VIEW_MM)){
+            kvLayoutInfo.kvLayoutVal = 1U;
+       }
+    context_->tilingKey = GET_TPL_TILING_KEY(static_cast<uint8_t>(inputQVal),
+            static_cast<uint8_t>(inputKvVal), static_cast<uint8_t>(outputVal), static_cast<uint8_t>(paVal), static_cast<uint8_t>(layoutVal),
+            static_cast<uint8_t>(kvLayoutInfo.kvLayoutVal), static_cast<uint8_t>(splitKvVal), 0, 
+            static_cast<uint8_t>(antiquantMode_), static_cast<uint8_t>(originVal), static_cast<uint8_t>(kvLayoutInfo.amlaMode),
+            static_cast<uint8_t>(balanceMode), static_cast<uint8_t>(modeVal), static_cast<uint8_t>(perfMode_), 0, 0, 1);
 
     OP_LOGI(context_->opName, "IFA tilingKey: %lu.", context_->tilingKey);
 
@@ -3339,11 +3345,11 @@ ge::graphStatus IFATiling::ConvertContext(gert::TilingContext &context, IncreFla
 }
 
 ge::graphStatus IFATiling::RunBigKernelTiling(IncreFlashAttentionContext &context,
-                                              IncreFlashAttentionTilingDataV2 &tilingData, bool isWorkspace)
+                                              IncreFlashAttentionTilingDataV2* tilingData, bool isWorkspace)
 {
     this->context_ = &context;
-    this->tilingData_ = &tilingData.tilingBase;
-    this->tilingDataPrefix_ = &tilingData.tilingPrefix;
+    this->tilingData_ = &(tilingData->tilingBase);
+    this->tilingDataPrefix_ = &(tilingData->tilingPrefix);
     this->isWorkspace_ = isWorkspace;
 
     if ((this->context_->actualSeqLengths.tensor && !this->context_->actualSeqLengths.tensor->GetData<int64_t>()) ||
@@ -3379,24 +3385,6 @@ ge::graphStatus IFATiling::RunBigKernelTiling(IncreFlashAttentionContext &contex
 ge::graphStatus IFATiling::IncreFlashAttentionSetTilingData(gert::TilingContext &context,
                                                             IncreFlashAttentionTilingDataV2 &tilingData)
 {
-    OP_CHECK_IF(context.GetRawTilingData() == nullptr,
-               OPS_REPORT_VECTOR_INNER_ERR(context.GetNodeName(), "RawTilingData got from GE context is nullptr."),
-               return GRAPH_FAILED);
-
-    if (ropeFlag_) {
-        tilingDataMla_.SaveToBuffer(context.GetRawTilingData()->GetData(), context.GetRawTilingData()->GetCapacity());
-        context.GetRawTilingData()->SetDataSize(tilingDataMla_.GetDataSize());
-        return ge::GRAPH_SUCCESS;
-    }
-
-    if (atbRunFlag_ && pageAttentionFlag_) {
-        ifaTilingAtbData.SaveToBuffer(context.GetRawTilingData()->GetData(), context.GetRawTilingData()->GetCapacity());
-        context.GetRawTilingData()->SetDataSize(ifaTilingAtbData.GetDataSize());
-    } else {
-        tilingData.SaveToBuffer(context.GetRawTilingData()->GetData(), context.GetRawTilingData()->GetCapacity());
-        context.GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
-    }
-
     return ge::GRAPH_SUCCESS;
 }
 
@@ -3413,12 +3401,12 @@ std::string DataTypeToSerialString(ge::DataType type)
 
 template <typename T>
 ge::graphStatus IfaStartSimpleTiling(T& tilingType, IncreFlashAttentionContext &ifaContext,
-                                     IncreFlashAttentionTilingDataV2 &ifaTilingData, gert::TilingContext *context)
+                                     IncreFlashAttentionTilingDataV2* ifaTilingData, gert::TilingContext *context)
 {
+    tilingType.geContext_ = context;
     if (tilingType.RunBigKernelTiling(ifaContext, ifaTilingData) == ge::SUCCESS) {
         context->SetTilingKey(ifaContext.tilingKey);
         context->SetBlockDim(ifaContext.blockDim);
-        tilingType.IncreFlashAttentionSetTilingData(*context, ifaTilingData);
         return ge::GRAPH_SUCCESS;
     }
     return ge::GRAPH_FAILED;
@@ -3443,7 +3431,7 @@ void TilingGetTempCompileInfo(platform_ascendc::PlatformAscendC &ascendcPlatform
 }
 
 ge::graphStatus TilingIncreFlashAttentionAdapter(gert::TilingContext *context, IncreFlashAttentionContext &ifaContext,
-                                                 IncreFlashAttentionTilingDataV2 &ifaTilingData)
+                                                 IncreFlashAttentionTilingDataV2* ifaTilingData)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr,
@@ -3753,8 +3741,8 @@ ge::graphStatus IFATiling::AtbTilingProcess()
 {
     pageAttentionFlag_ = context_->blockTable.tensor != nullptr;
     if (pageAttentionFlag_) {
-        this->tilingDataBase_ = &ifaTilingAtbData.tilingBase;
-        this->tilingDataCore_ = &ifaTilingAtbData.tilingPerCore;
+        this->tilingDataBase_ = &(ifaTilingAtbData->tilingBase);
+        this->tilingDataCore_ = &(ifaTilingAtbData->tilingPerCore);
     }
 
     if (CheckBaseInputsNull() != ge::SUCCESS || AtbTilingCheck() != ge::SUCCESS || AtbParamGet() != ge::SUCCESS ||
@@ -3783,7 +3771,8 @@ IFA_EXTERN_C ge::graphStatus TilingIncreFlashAttention(gert::TilingContext *cont
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("IncreFlashAttention", "Context is nullptr."),
                return ge::GRAPH_FAILED);
-    IncreFlashAttentionTilingDataV2 tilingData;
+    IncreFlashAttentionTilingDataV2* tilingData;
+    tilingData = context->GetTilingData<IncreFlashAttentionTilingDataV2>();
     IncreFlashAttentionContext ifaContext {};
     if (IFATiling::ConvertContext(*context, ifaContext) != ge::GRAPH_SUCCESS) {
         OP_LOGE(context->GetNodeName(), "Error occurred while converting tilingContext to ifa context");

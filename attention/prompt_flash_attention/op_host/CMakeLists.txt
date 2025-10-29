@@ -24,6 +24,14 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
     set(prompt_flash_attention_depends attention/common PARENT_SCOPE)
 else()
     add_modules_sources(OPTYPE prompt_flash_attention ACLNNTYPE aclnn_inner)
+    add_ops_compile_options(
+        OP_NAME PromptFlashAttention
+        OPTIONS --cce-auto-sync=off
+                -Wno-deprecated-declarations
+                -Werror
+                -mllvm -cce-vf-remove-membar=false
+                -mllvm -cce-aicore-hoist-movemask=false
+    )
 endif()
 
 if(NOT BUILD_OPS_RTY_KERNEL) #

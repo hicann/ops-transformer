@@ -16,6 +16,7 @@
 #define KERNEL_DATA_COPY_TRANSPOSE_H
 
 #include "kernel_operator.h"
+#include "prompt_flash_attention_tiling_data.h"
 using namespace AscendC;
 
 enum class CopyTransposeType {

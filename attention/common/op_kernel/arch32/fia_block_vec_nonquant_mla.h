@@ -53,7 +53,7 @@ public:
     __aicore__ inline void ProcessVec2L(const AttentionCommon::RunInfo &info);
     __aicore__ inline void InitBuffers(TPipe *pipe);
     __aicore__ inline void InitParams(const struct AttentionCommon::ConstInfo &constInfo,
-                                      const FusedInferAttentionScoreTilingData *__restrict tilingData);
+                                      const optiling::FusedInferAttentionScoreTilingData *__restrict tilingData);
     __aicore__ inline void InitMm2ResInt32GmGlobalTensor(GlobalTensor<int32_t> mm2ResInt32Gm);
     __aicore__ inline void InitVec1GlobalTensor(GlobalTensor<MM1_OUT_T> mm1ResGm, GlobalTensor<KV_T> vec1ResGm,
                                                 GlobalTensor<bool> attenMaskBoolGm,
@@ -204,7 +204,7 @@ private:
     // attention mask
     uint32_t attenMaskSizeAlign = 0U;
 
-    const FusedInferAttentionScoreTilingData *__restrict tilingData = nullptr;
+    const optiling::FusedInferAttentionScoreTilingData *__restrict tilingData = nullptr;
 };
 
 template <typename FIAT> __aicore__ inline void FiaBlockVecNonQuantMla<FIAT>::InitBuffers(TPipe *pipe)
@@ -246,7 +246,7 @@ template <typename FIAT> __aicore__ inline void FiaBlockVecNonQuantMla<FIAT>::In
 template <typename FIAT>
 __aicore__ inline void
 FiaBlockVecNonQuantMla<FIAT>::InitParams(const struct AttentionCommon::ConstInfo &constInfo,
-                                                 const FusedInferAttentionScoreTilingData *__restrict tilingData)
+                                                 const optiling::FusedInferAttentionScoreTilingData *__restrict tilingData)
 {
     this->constInfo = constInfo;
     this->tilingData = tilingData;
@@ -310,7 +310,7 @@ template <typename FIAT> __aicore__ inline void FiaBlockVecNonQuantMla<FIAT>::Fr
 template <typename FIAT> __aicore__ inline void FiaBlockVecNonQuantMla<FIAT>::InitSoftmaxDefaultBuffer()
 {
     Duplicate(softmaxMaxDefaultUb, SOFTMAX_MIN_NUM, SOFTMAX_TMP_BUFFER_OFFSET / sizeof(T));
-    Duplicate(softmaxSumDefaultUb, FLOAT_ZERO, SOFTMAX_TMP_BUFFER_OFFSET / sizeof(T));
+    Duplicate(softmaxSumDefaultUb, AttentionCommon::ConstInfo::FLOAT_ZERO, SOFTMAX_TMP_BUFFER_OFFSET / sizeof(T));
 }
 
 template <typename FIAT>
@@ -703,13 +703,13 @@ __aicore__ inline void FiaBlockVecNonQuantMla<FIAT>::AmlaVecCompute(
     uint32_t PreSoftmaxOutOffset = prOutIdx * SOFTMAX_TMP_BUFFER_OFFSET / sizeof(T) + baseOffset;
     // n(i) - n(i-1)
     if (info.isFirstSInnerLoop) {
-        Duplicate(nUpdateTmp, FLOAT_ZERO, calCount); // n1=n0
+        Duplicate(nUpdateTmp, AttentionCommon::ConstInfo::FLOAT_ZERO, calCount); // n1=n0
     } else {
         Sub(nUpdateTmp, nTmp, nValueUb[PreSoftmaxOutOffset], calCount);
     }
     AscendC::PipeBarrier<PIPE_V>();
     // update n(i), DataCopy not support when calCount is not align 32B, so use Adds
-    Adds(nValueUb[softmaxOutOffset], nTmp, FLOAT_ZERO, calCount);
+    Adds(nValueUb[softmaxOutOffset], nTmp, AttentionCommon::ConstInfo::FLOAT_ZERO, calCount);
     AscendC::PipeBarrier<PIPE_V>();
 
     // update softmax res
@@ -749,7 +749,7 @@ __aicore__ inline void FiaBlockVecNonQuantMla<FIAT>::AmlaVecCompute(
     }
     AscendC::PipeBarrier<PIPE_V>();
 
-    Adds(cofValueUb[softmaxOutOffset], tmpCofUb, FLOAT_ZERO, calCount); // store cof(i)
+    Adds(cofValueUb[softmaxOutOffset], tmpCofUb, AttentionCommon::ConstInfo::FLOAT_ZERO, calCount); // store cof(i)
     Adds(epsUb, epsUb, (T)(-1.0), calCount); // cof(i - 1) / cof(i) - 1
     AscendC::PipeBarrier<PIPE_V>();
     Muls(epsUb, epsUb, (T)1.5, calCount); // (cof(i - 1) - cof(i)) / cof(i) * 1.5
@@ -790,7 +790,7 @@ FiaBlockVecNonQuantMla<FIAT>::DealInvalidRowsBelow(const AttentionCommon::RunInf
             if (i + gNum > dealRowCount) {
                 gNum = dealRowCount - i;
             }
-            Duplicate(attenOutUb[i * columnCount], static_cast<RT>(FLOAT_ZERO), columnCount * gNum);
+            Duplicate(attenOutUb[i * columnCount], static_cast<RT>(AttentionCommon::ConstInfo::FLOAT_ZERO), columnCount * gNum);
             i += gNum;
             s1++;
             gIdx = 0;
@@ -826,7 +826,7 @@ FiaBlockVecNonQuantMla<FIAT>::DealInvalidRows(const AttentionCommon::RunInfo &in
                 if (i + s1Num > dealRowCount) {
                     s1Num = dealRowCount - i;
                 }
-                Duplicate(attenOutUb[i * columnCount], static_cast<RT>(FLOAT_ZERO), columnCount * s1Num);
+                Duplicate(attenOutUb[i * columnCount], static_cast<RT>(AttentionCommon::ConstInfo::FLOAT_ZERO), columnCount * s1Num);
             }
             i += info.actS1Size - s1;
             s1 = 0;
@@ -842,7 +842,7 @@ FiaBlockVecNonQuantMla<FIAT>::DealInvalidRows(const AttentionCommon::RunInfo &in
             if (i + gNum > dealRowCount) {
                 gNum = dealRowCount - i;
             }
-            Duplicate(attenOutUb[i * columnCount], static_cast<RT>(FLOAT_ZERO), columnCount * gNum);
+            Duplicate(attenOutUb[i * columnCount], static_cast<RT>(AttentionCommon::ConstInfo::FLOAT_ZERO), columnCount * gNum);
             i += gNum;
             s1++;
             gIdx = 0;
@@ -1254,7 +1254,7 @@ FiaBlockVecNonQuantMla<FIAT>::DealBmm2ResBaseBlock(const AttentionCommon::RunInf
     LocalTensor<uint8_t> cmpMaskUb = absBmm2ResUb.template ReinterpretCast<uint8_t>();
     CompareScalar(cmpMaskUb, absBmm2ResUb, (T)1e10, CMPMODE::LE, vec2ComputeSize);
     AscendC::PipeBarrier<PIPE_V>();
-    Select(tmpBmm2ResUb, cmpMaskUb, tmpBmm2ResUb, FLOAT_ZERO, SELMODE::VSEL_TENSOR_SCALAR_MODE, vec2ComputeSize);
+    Select(tmpBmm2ResUb, cmpMaskUb, tmpBmm2ResUb, AttentionCommon::ConstInfo::FLOAT_ZERO, SELMODE::VSEL_TENSOR_SCALAR_MODE, vec2ComputeSize);
     AscendC::PipeBarrier<PIPE_V>();
 
     uint32_t baseOffset = mSplitInfo.nBufferStartM / 2 + startRow;

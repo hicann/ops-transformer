@@ -31,10 +31,14 @@
 #include "prompt_flash_attention_s1s2_bns1_mla_baseapi.h"
 #include "prompt_flash_attention_var_len_score_sab_baseapi.h"
 #include "prompt_flash_attention_empty_tensor.h"
+#include "prompt_flash_attention_tiling_data.h"
+#include "prompt_flash_attention_template_tiling_key.h"
 #else
 #include "prompt_attention_prefill.h"
 #include "prompt_flash_attention_s1s2_bns1_x310_base.h"
 #include "prompt_flash_attention_s1s2_bns1_x310.h"
+#include "prompt_flash_attention_tiling_data.h"
+#include "prompt_flash_attention_template_tiling_key.h"
 #endif
 
 #define INVOKE_PFA_GENERAL_OP_IMPL(templateClass, ...)                                                                  \
@@ -177,596 +181,461 @@ constexpr uint32_t FLOATBYTENUM = 8;
 constexpr uint32_t FLOAT16BYTENUM = 16;
 constexpr uint32_t INT8BYTENUM = 32;
 
-extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
-                                                             __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask,
-                                                             __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
-                                                             __gm__ uint8_t* deq_scale1, __gm__ uint8_t* quant_scale1,
-                                                             __gm__ uint8_t* deq_scale2, __gm__ uint8_t* quant_scale2,
-                                                             __gm__ uint8_t* quant_offset2, __gm__ uint8_t* antiquant_scale, __gm__ uint8_t* antiquant_offset,
-                                                             __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
-                                                             __gm__ uint8_t* key_antiquant_scale, __gm__ uint8_t* key_antiquant_offset,
-                                                             __gm__ uint8_t* value_antiquant_scale, __gm__ uint8_t* value_antiquant_offset,
-                                                             __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
-                                                             __gm__ uint8_t * queryRope, __gm__ uint8_t * keyRope, __gm__ uint8_t* learnableSink,
-                                                             __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-                                                             __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
+template<uint8_t Q_T, uint8_t KV_T, uint16_t OUT_T, uint8_t PAGE_ATTENTIOND, uint16_t LAYOUT_T,  uint16_t KV_LAYOUT_T, uint16_t FLASH_DECODE,
+            uint8_t ENABLE_PREFIX, uint8_t M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE, uint8_t M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T, uint8_t M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA,  uint16_t M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE, 
+                uint16_t M_FIAFLAG_P_MMTYPETMP_I_MODEVAL,   uint8_t P_CVDIFF_BASE_FLAG,
+                uint8_t P_CVDIFF_MLA_FLAG,  uint8_t P_TEMPLATE_VERSION, uint8_t TEMPLATE_MODE>
+__global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                                        __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask,
+                                                        __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+                                                        __gm__ uint8_t* deq_scale1, __gm__ uint8_t* quant_scale1,
+                                                        __gm__ uint8_t* deq_scale2, __gm__ uint8_t* quant_scale2,
+                                                        __gm__ uint8_t* quant_offset2, __gm__ uint8_t* antiquant_scale, __gm__ uint8_t* antiquant_offset,
+                                                        __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+                                                        __gm__ uint8_t* key_antiquant_scale, __gm__ uint8_t* key_antiquant_offset,
+                                                        __gm__ uint8_t* value_antiquant_scale, __gm__ uint8_t* value_antiquant_offset,
+                                                        __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
+                                                        __gm__ uint8_t * queryRope, __gm__ uint8_t * keyRope, __gm__ uint8_t* learnableSink,
+                                                        __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
+                                                        __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     {
     #if (__CCE_AICORE__ > 200)
+        // bit 2
+        using Q_DTYPE = std::conditional_t<Q_T == 0, half,
+                        std::conditional_t<Q_T == 1, bfloat16_t,
+                        std::conditional_t<Q_T == 2, int8_t,
+                        std::conditional_t<Q_T == 6, half, half>>>>; // 默认回退
+
+        constexpr OptimizationMode PRECISION_TYPE = (Q_T == 0) ? OptimizationMode::HighPerformance :
+                                                    (Q_T == 6) ? OptimizationMode::HighPrecision : OptimizationMode::HighPerformance;
+        // bit 4
+        using OUT_DTYPE = std::conditional_t<OUT_T == 0, half,
+                          std::conditional_t<OUT_T == 1, bfloat16_t,
+                          std::conditional_t<OUT_T == 2, int8_t, half>>>; // 默认回退
+        // bit 5
+        constexpr PFALayout LAYOUT_DTYPE = (LAYOUT_T == 0) ? PFALayout::BNSD :
+                                           (LAYOUT_T == 1) ? PFALayout::BSH : PFALayout::BNSD;
+        // bit 6
+        constexpr MatMulType MATMUL_TYPE = (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) ? MatMulType::MM_MDL :
+                                           (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 1) ? MatMulType::MM_NORM :
+                                           (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 2) ? MatMulType::MM_IBSHARE_NORM : MatMulType::MM_MDL;
+
+        // bit 7
+        constexpr MmPolicyType PA_TYPE = (PAGE_ATTENTIOND == 0) ? MmPolicyType::NORMAL :
+                                         (PAGE_ATTENTIOND == 1) ? MmPolicyType::PA_ND :
+                                         (PAGE_ATTENTIOND == 2) ? MmPolicyType::PA_NZ : MmPolicyType::NORMAL;
+
+        // bit 8-2
+        constexpr MsdMode MSD_TYPE = (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) ? MsdMode::MSD_OFF :
+                                     (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 1) ? MsdMode::MSD_ON : MsdMode::MSD_OFF;
+        // bit 8-1
+        constexpr bool PREFIX_MODE = (ENABLE_PREFIX == 0) ? false :
+                                     (ENABLE_PREFIX == 1) ? true : false;
+        #ifndef FIA_PFA
+        REGISTER_TILING_DEFAULT(PromptFlashAttentionTilingData);
+        #endif
         GET_TILING_DATA_MEMBER(PromptFlashAttentionTilingData, promptAttentionBaseParams, baseParams, tiling);
         auto maskByteNum = baseParams.maskTypeByteNum;
     
         __gm__ uint8_t* user = GetUserWorkspace(workspace);
         KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
-        #if (ORIG_DTYPE_QUERY == DT_FLOAT16) && (ORIG_DTYPE_KEY != DT_INT4)
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_TAIL_NEWTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_NEWTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_BNSD_NEWTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_BNSD_NEWTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_BASICAPI_BASE_API_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_BASICAPI_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_BASICAPI_MLA_CUBEVECTORDIFF_NEWTILING);
-            #if TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_TAIL_NEWTILING
-                // Non-BNSD layout, split NS no tail
-                if (maskByteNum == FLOAT16BYTENUM) {
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSNoTail, half, half, CubeFormat::ND, half);
+        if constexpr ((Q_T == 0 || Q_T == 6) && (KV_T != 1)){
+            if constexpr ((Q_T == 0) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 0)
+                && (KV_T == 0) && (P_TEMPLATE_VERSION == 1)){
+                if constexpr ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1)){
+                    // Non-BNSD layout, split NS no tail
+                    if (maskByteNum == FLOAT16BYTENUM) {
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSNoTail, Q_DTYPE, half, CubeFormat::ND, OUT_DTYPE);
+                    }
+                    else {
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSNoTail, Q_DTYPE, bool, CubeFormat::ND, OUT_DTYPE);
+                    }
                 }
-                else {
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSNoTail, half, bool, CubeFormat::ND, half);
+                else if ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 1) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1)){
+                    // Non-BNSD layout, split NS with tail
+                    if (maskByteNum == FLOAT16BYTENUM) {
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSTail, Q_DTYPE, half, CubeFormat::ND, OUT_DTYPE);
+                    }
+                    else {
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSTail, Q_DTYPE, bool, CubeFormat::ND, OUT_DTYPE);
+                    }
                 }
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_NEWTILING
-                // Non-BNSD layout, split NS with tail
-                if (maskByteNum == FLOAT16BYTENUM) {
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSTail, half, half, CubeFormat::ND, half);
+                else if ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 5) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1)){
+                    // BNSD layout, split NS no tail
+                    if (maskByteNum == FLOAT16BYTENUM) {
+                        INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDNoTail, Q_DTYPE, half, CubeFormat::ND, OUT_DTYPE);
+                    }
+                    else {
+                        INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDNoTail, Q_DTYPE, bool, CubeFormat::ND, OUT_DTYPE);
+                    }
                 }
-                else {
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSTail, half, bool, CubeFormat::ND, half);
+                else if ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 6) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1)){
+                    // BNSD layout, split NS with tail
+                    if (maskByteNum == FLOAT16BYTENUM) {
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDTail, Q_DTYPE, half, CubeFormat::ND, OUT_DTYPE);
+                    }
+                    else {
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDTail, Q_DTYPE, bool, CubeFormat::ND, OUT_DTYPE);
+                    }
                 }
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_BNSD_NEWTILING
-                // BNSD layout, split NS no tail
-                if (maskByteNum == FLOAT16BYTENUM) {
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDNoTail, half, half, CubeFormat::ND,
-                                            half);
-                }
-                else {
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDNoTail, half, bool, CubeFormat::ND,
-                                            half);
-                }
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_BNSD_NEWTILING
-                // BNSD layout, split NS with tail
-                if (maskByteNum == FLOAT16BYTENUM) {
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDTail, half, half, CubeFormat::ND, half);
-                }
-                else {
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDTail, half, bool, CubeFormat::ND, half);
-                }
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
+            }   
+            if constexpr ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 0) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (OUT_T == 0) && (LAYOUT_T == 1) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 0)    
+                && (KV_T == 0) && (P_TEMPLATE_VERSION == 1)){
                 // no anti-quant path for CVDIFF-BSH, half in half out
                 if (maskByteNum == FLOAT16BYTENUM) {
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, half>);
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, half>);
                 } else {
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool>);
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool>);
                 }
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
+            }
+            else if ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 0) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 0)   
+                && (KV_T == 0) && (P_TEMPLATE_VERSION == 1)){
                 // no anti-quant path for CVDIFF-BNSD, half in half out
                 if (maskByteNum == FLOAT16BYTENUM) {
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, half>);
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, half>);
                 } else {
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, uint8_t>);
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, uint8_t>);
                 }
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_BASICAPI_BASE_API_CUBEVECTORDIFF_NEWTILING
+            }
+            else if ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 0) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 4) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_BASE_FLAG == 2) && (P_CVDIFF_MLA_FLAG == 0)   
+                && (KV_T == 0) && (P_TEMPLATE_VERSION == 2)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", PromptFlashAttentionBaseApiTilingData);
                 INVOKE_PFA_GENERAL_OP_IMPL_BASE_API(PromptFlashAttentionBaseApiHighPrecisionNoMask, PFAHighPrecisionBaseType<PromptFlashAttentionBaseApiTilingData, float, half, half, half, half, float>);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_BASICAPI_CUBEVECTORDIFF_NEWTILING
-                INVOKE_PFA_GENERAL_OP_IMPL_BASE_API(PromptFlashAttentionBaseApiHighPerformance, PFATypeNew<PromptFlashAttentionBaseApiTilingData, half, half, half, half, half, float, half>);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_BASICAPI_MLA_CUBEVECTORDIFF_NEWTILING
+            }
+            else if ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 0) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 4) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 0)   
+                && (KV_T == 0) && (P_TEMPLATE_VERSION == 2)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", PromptFlashAttentionBaseApiTilingData);
+                INVOKE_PFA_GENERAL_OP_IMPL_BASE_API(PromptFlashAttentionBaseApiHighPerformance, PFATypeNew<PromptFlashAttentionBaseApiTilingData, Q_DTYPE, half, OUT_DTYPE, half, half, float, half>);
+            }
+            else if ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 0) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 4) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 1)   
+                && (KV_T == 0) && (P_TEMPLATE_VERSION == 2)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", PromptFlashAttentionBaseApiTilingData);
                 INVOKE_PFA_GENERAL_OP_IMPL_MLA(PromptFlashAttentionBaseMLA, PFAMLAType<PromptFlashAttentionBaseApiTilingData>);
-            #endif
-    
-            #if (ORIG_DTYPE_QUERY == DT_FLOAT16) && (ORIG_DTYPE_KEY != DT_INT4) && (ORIG_DTYPE_ATTENTION_OUT == DT_FLOAT16)
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_NORMAL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_NORMAL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_NORMAL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_NORMAL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP8_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP8_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP8_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP8_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_BASICAPI_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_BASICAPI_MLA_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                #if TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout HighPrecision
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, half, OptimizationMode::HighPrecision>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout HighPrecision, enable PA
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, half, OptimizationMode::HighPrecision, MatMulType::MM_PA>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix BSH layout HighPrecision
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, half, OptimizationMode::HighPrecision, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout HighPrecision, enable L1 reuse
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, half, OptimizationMode::HighPrecision, MatMulType::MM_IBSHARE_NORM>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout HighPrecision
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, half, OptimizationMode::HighPrecision>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout HighPrecision, enable PA
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, half, OptimizationMode::HighPrecision, MatMulType::MM_PA>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix BNSD layout HighPrecision
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, half, OptimizationMode::HighPrecision, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout HighPrecision
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, OptimizationMode::HighPrecision>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix BSH layout HighPrecision
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, OptimizationMode::HighPrecision, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout HighPrecision
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, OptimizationMode::HighPrecision>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix BNSD layout HighPrecision
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, OptimizationMode::HighPrecision, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_NORMAL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout HighPrecision
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, half, OptimizationMode::HighPrecision, MatMulType::MM_NORM>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_NORMAL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix BNSD layout HighPrecision
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, half, OptimizationMode::HighPrecision, MatMulType::MM_NORM, true>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout HighPrecision
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, half, OptimizationMode::HighPrecision, MatMulType::MM_IBSHARE_NORM>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    // no anti-quant path for CVDIFF-BSH, half in half out, enable PA
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, half, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_CUBEVECTORDIFF_NEWTILING
-                    // no anti-quant path for CVDIFF-BSH, half in half out, enable L1 reuse
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, uint8_t, half, half, OptimizationMode::HighPerformance, MatMulType::MM_IBSHARE_NORM>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix no anti-quant path for CVDIFF-BSH, half in half out
-                    if (maskByteNum == FLOAT16BYTENUM) {
-                        INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, half, half, half, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-                    } else {
-                        INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, half, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
+            }
+            if constexpr ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 0 || Q_T == 6) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0 || M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (OUT_T == 0)   
+                && (LAYOUT_T == 0 || LAYOUT_T == 1) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 || M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 1 || M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 2 || M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 4) && (PAGE_ATTENTIOND == 0 || PAGE_ATTENTIOND == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1)   
+                && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0 || M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 1) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 0 || P_CVDIFF_MLA_FLAG == 1) && (KV_T == 0 || KV_T == 4 || KV_T == 8) && (P_TEMPLATE_VERSION == 1 || P_TEMPLATE_VERSION == 2)){
+                if constexpr ((P_TEMPLATE_VERSION == 1) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2)){   
+                    if constexpr ((KV_T == 0) && (PAGE_ATTENTIOND == 0) && (Q_T == 6) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_MLA_FLAG == 0) && (P_TEMPLATE_VERSION == 1) 
+                    && ((LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 0) || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 1) || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 1 && ENABLE_PREFIX == 0) 
+                    || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 1 && ENABLE_PREFIX == 1) || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 2 && ENABLE_PREFIX == 0) || (LAYOUT_T == 1 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 0) 
+                    || (LAYOUT_T == 1 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 1) || (LAYOUT_T == 1 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 2 && ENABLE_PREFIX == 0))){
+                        INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, half, OptimizationMode::HighPrecision, MATMUL_TYPE, PREFIX_MODE, MsdMode::MSD_OFF>);
                     }
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // anti-quant path for CVDIFF-BSH, half in half out
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix anti-quant path for CVDIFF-BSH, half in half out
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix no anti-quant path for CVDIFF-BNSD, half in half out
-                    if (maskByteNum == FLOAT16BYTENUM) {
-                        INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, half, half, half, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-                    } else {
-                        INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, uint8_t, half, half, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
+                    else if ((KV_T == 0) && (PAGE_ATTENTIOND == 1) && (Q_T == 6) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_MLA_FLAG == 0) && (P_TEMPLATE_VERSION == 1) 
+                    && ((LAYOUT_T == 1 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 0) || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 0))){
+                        INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, half, OptimizationMode::HighPrecision, MatMulType::MM_PA>);
                     }
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_NORMAL_CUBEVECTORDIFF_NEWTILING
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, uint8_t, half, half, OptimizationMode::HighPerformance, MatMulType::MM_NORM>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    // no anti-quant path for CVDIFF-BNSD, half in half out, enable PA
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, uint8_t, half, half, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_NORMAL_CUBEVECTORDIFF_NEWTILING  // enable prefix
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, uint8_t, half, half, OptimizationMode::HighPerformance, MatMulType::MM_NORM, true>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_CUBEVECTORDIFF_NEWTILING
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, uint8_t, half, half, OptimizationMode::HighPerformance, MatMulType::MM_IBSHARE_NORM>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // anti-quant path for CVDIFF-BNSD, half in half out
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix anti-quant path for CVDIFF-BNSD, half in half out
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVFP8_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING  // enable prefix, enable MSD
-                    // BSH layout fp16 cvdiff
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, OptimizationMode::HighPrecision, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QFP16_KVFP8_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout fp16 cvdiff
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, OptimizationMode::HighPrecision, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QFP16_KVFP8_OUTFP16_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout fp16 cvdiff
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, OptimizationMode::HighPrecision, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QFP16_KVFP8_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout fp16 cvdiff
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, OptimizationMode::HighPrecision, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_BASICAPI_CUBEVECTORDIFF_NEWTILING
-                    INVOKE_PFA_GENERAL_OP_IMPL_BASE_API(PromptFlashAttentionBaseApiHighPrecisionV, PFATypeNew<PromptFlashAttentionBaseApiTilingData, half, half, half, float, half, float, half, OptimizationMode::HighPrecision>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPRECISION_BASICAPI_MLA_CUBEVECTORDIFF_NEWTILING
-                    INVOKE_PFA_GENERAL_OP_IMPL_MLA(PromptFlashAttentionBaseMLAHighPrecision, PFAHighPrecisionMLAType<PromptFlashAttentionBaseApiTilingData, half, false>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTFP16_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_PA_ANTIQUANT>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t>);
-                #endif
-            #endif
-    
-            #if (ORIG_DTYPE_QUERY == DT_FLOAT16) && (ORIG_DTYPE_KEY != DT_INT4) && (ORIG_DTYPE_ATTENTION_OUT == DT_INT8)
-                TILING_KEY_IS(QFP16_KVFP16_OUTINT8_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTINT8_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTINT8_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTINT8_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTINT8_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVINT8_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP8_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP8_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP8_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QFP16_KVFP8_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                #if TILING_KEY_VAR == QFP16_KVFP16_OUTINT8_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // no anti-quant path for CVDIFF-BSH, half in int8 out
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTINT8_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    // no anti-quant path for CVDIFF-BSH, half in int8 out, enable PA
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, half, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTINT8_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix no anti-quant path for CVDIFF-BSH, half in int8 out
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, half, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTINT8_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // anti-quant path for CVDIFF-BSH, half in int8 out
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTINT8_BSH_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix anti-quant path for CVDIFF-BSH, half in int8 out
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // no anti-quant path for CVDIFF-BNSD, half in int8 out
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    // no anti-quant path for CVDIFF-BNSD, half in int8 out, enable PA
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, half, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix no anti-quant path for CVDIFF-BNSD, half in int8 out
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, half, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // anti-quant path for CVDIFF-BNSD, half in int8 out
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix anti-quant path for CVDIFF-BNSD, half in int8 out
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // no anti-quant path for CVDIFF-BSH, half in int8 out
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, half, OptimizationMode::HighPrecision>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    // no anti-quant path for CVDIFF-BSH, half in int8 out, enable PA
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, half, OptimizationMode::HighPrecision, MatMulType::MM_PA>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix no anti-quant path for CVDIFF-BSH, half in int8 out
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, half, OptimizationMode::HighPrecision, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // anti-quant path for CVDIFF-BSH, half in int8 out
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t, OptimizationMode::HighPrecision>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix anti-quant path for CVDIFF-BSH, half in int8 out
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t, OptimizationMode::HighPrecision, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // no anti-quant path for CVDIFF-BNSD, half in int8 out
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, half, OptimizationMode::HighPrecision>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    // no anti-quant path for CVDIFF-BNSD, half in int8 out, enable PA
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, half, OptimizationMode::HighPrecision, MatMulType::MM_PA>);
-                #elif TILING_KEY_VAR == QFP16_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix no anti-quant path for CVDIFF-BNSD, half in int8 out
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, half, OptimizationMode::HighPrecision, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // anti-quant path for CVDIFF-BNSD, half in int8 out
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, OptimizationMode::HighPrecision>);
-                #elif TILING_KEY_VAR == QFP16_KVINT8_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING
-                    // Prefix anti-quant path for CVDIFF-BNSD, half in int8 out
-                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, OptimizationMode::HighPrecision, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QFP16_KVFP8_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING  // enable prefix, enable MSD
-                    // BSH layout fp16 in int8 out cvdiff
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t, OptimizationMode::HighPrecision, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QFP16_KVFP8_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout fp16 in int8 out cvdiff
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, OptimizationMode::HighPrecision, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QFP16_KVFP8_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout fp16 in int8 out cvdiff, enable MSD
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t, OptimizationMode::HighPrecision, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QFP16_KVFP8_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout fp16 in int8 out cvdiff, enable MSD
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, OptimizationMode::HighPrecision, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
-                #endif
-            #endif
-        #endif
-        #if (ORIG_DTYPE_QUERY == DT_BF16) && (ORIG_DTYPE_KEY != DT_INT4)
-            TILING_KEY_IS(QBF16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_TAIL_NEWTILING);
-            TILING_KEY_IS(QBF16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_NEWTILING);
-            TILING_KEY_IS(QBF16_KVFP16_OUTFP16_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_BNSD_NEWTILING);
-            TILING_KEY_IS(QBF16_KVFP16_OUTFP16_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_BNSD_NEWTILING);
-            TILING_KEY_IS(QBF16_KVFP16_OUTBF16_BNSD_HIGHPERFORMANCE_BASICAPI_BASE_API_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QBF16_KVFP16_OUTBF16_BNSD_HIGHPERFORMANCE_BASICAPI_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QBF16_KVFP16_OUTBF16_BNSD_HIGHPERFORMANCE_BASICAPI_MLA_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_TND_HIGHPERFORMANCE_MDL_TAIL_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_TND_ENABLEATTNETIONMASK_VALUED192_HIGHPERFORMANCE_MDL_NOTAIL_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_TND_HIGHPERFORMANCE_MDL_CUBEVECTORDIFF_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_TND_ENABLEATTNETIONMASK_HIGHPERFORMANCE_MDL_NOTAIL_CUBEVECTORDIFF_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_NTD_TND_HIGHPERFORMANCE_MDL_CUBEVECTORDIFF_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_NTD_TND_ENABLEATTNETIONMASK_HIGHPERFORMANCE_MDL_NOTAIL_CUBEVECTORDIFF_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_TND_HIGHPERFORMANCE_PA_ND_MDL_CUBEVECTORDIFF_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_TND_ENABLEATTNETIONMASK_HIGHPERFORMANCE_PA_ND_MDL_NOTAIL_CUBEVECTORDIFF_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_NTD_TND_HIGHPERFORMANCE_PA_ND_MDL_CUBEVECTORDIFF_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_NTD_TND_ENABLEATTNETIONMASK_HIGHPERFORMANCE_PA_ND_MDL_NOTAIL_CUBEVECTORDIFF_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_TND_HIGHPERFORMANCE_PA_NZ_MDL_CUBEVECTORDIFF_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_TND_ENABLEATTNETIONMASK_HIGHPERFORMANCE_PA_NZ_MDL_NOTAIL_CUBEVECTORDIFF_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_NTD_TND_HIGHPERFORMANCE_PA_NZ_MDL_CUBEVECTORDIFF_OLDTILING);
-            TILING_KEY_IS(QFP16_KVFP16_OUTFP16_NTD_TND_ENABLEATTNETIONMASK_HIGHPERFORMANCE_PA_NZ_MDL_NOTAIL_CUBEVECTORDIFF_OLDTILING);
-            #if TILING_KEY_VAR == QBF16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_TAIL_NEWTILING
+                    else if ((KV_T == 8) && (PAGE_ATTENTIOND == 0) && (Q_T == 6) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_MLA_FLAG == 0) && (P_TEMPLATE_VERSION == 1) 
+                    && ((LAYOUT_T == 1 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 0) || (LAYOUT_T == 1 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 1) 
+                    || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 0) || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 1))){
+                        INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPrecision, MATMUL_TYPE, PREFIX_MODE, MsdMode::MSD_OFF>);
+                    }
+                    else if ((KV_T == 4)  && (PAGE_ATTENTIOND == 0) && (Q_T == 6) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 1) && (P_CVDIFF_MLA_FLAG == 0) && (P_TEMPLATE_VERSION == 1) 
+                    && ((LAYOUT_T == 1 && ENABLE_PREFIX == 1) || (LAYOUT_T == 0 && ENABLE_PREFIX == 1) || (LAYOUT_T == 0 && ENABLE_PREFIX == 0) || (LAYOUT_T == 1 && ENABLE_PREFIX == 0))){
+                        INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPrecision, MATMUL_TYPE, PREFIX_MODE, MSD_TYPE>);
+                    }
+                    else if( (KV_T == 0) && (PAGE_ATTENTIOND == 0) && (Q_T == 0) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 1) 
+                    && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_MLA_FLAG == 0) && (P_TEMPLATE_VERSION == 1)){
+                        if (maskByteNum == FLOAT16BYTENUM) {
+                            INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, half, OUT_DTYPE, half, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
+                        } else {
+                            INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, uint8_t, OUT_DTYPE, half, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
+                        }
+                    }
+                    else if ((KV_T == 0) && (PAGE_ATTENTIOND == 0) && (Q_T == 0) && (OUT_T == 0) && (LAYOUT_T == 1) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 1) 
+                    && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_MLA_FLAG == 0) && (P_TEMPLATE_VERSION == 1)){
+                        if (maskByteNum == FLOAT16BYTENUM) {
+                            INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, half, OUT_DTYPE, half, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
+                        } else {
+                            INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, half, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
+                        }
+                    }
+                    else if ((KV_T == 0) && (PAGE_ATTENTIOND == 0) && (Q_T == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_MLA_FLAG == 0) && (P_TEMPLATE_VERSION == 1) 
+                    && ((LAYOUT_T == 1 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 2 && ENABLE_PREFIX == 0) || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 1 && ENABLE_PREFIX == 0) 
+                    || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 1 && ENABLE_PREFIX == 1) || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 2 && ENABLE_PREFIX == 0))){
+                        INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, uint8_t, OUT_DTYPE, half, OptimizationMode::HighPerformance, MATMUL_TYPE, PREFIX_MODE, MsdMode::MSD_OFF>);
+                    }
+                    else if ((KV_T == 0) && (PAGE_ATTENTIOND == 1) && (Q_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (ENABLE_PREFIX == 0) 
+                    && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_MLA_FLAG == 0) && (P_TEMPLATE_VERSION == 1)){
+                        INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, uint8_t, OUT_DTYPE, half, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
+                    }
+                    else if ((KV_T == 0) && (PAGE_ATTENTIOND == 1) && (Q_T == 0) && (LAYOUT_T == 1) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (ENABLE_PREFIX == 0) 
+                    && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_MLA_FLAG == 0) && (P_TEMPLATE_VERSION == 1)){
+                        INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, half, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
+                    }
+                    else if ((KV_T == 8) && (PAGE_ATTENTIOND == 0) && (Q_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_MLA_FLAG == 0) && (P_TEMPLATE_VERSION == 1) 
+                    && ((LAYOUT_T == 0 && ENABLE_PREFIX == 0) || (LAYOUT_T == 0 && ENABLE_PREFIX == 1) || (LAYOUT_T == 1 && ENABLE_PREFIX == 0) ||(LAYOUT_T == 1 && ENABLE_PREFIX == 1))){
+                        INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPerformance, MATMUL_TYPE, PREFIX_MODE, MsdMode::MSD_OFF>);
+                    }
+                    else if ((KV_T == 8) && (PAGE_ATTENTIOND == 1) && (Q_T == 0) && (LAYOUT_T == 1) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (ENABLE_PREFIX == 0) 
+                    && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_MLA_FLAG == 0) && (P_TEMPLATE_VERSION == 1)){
+                        INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_PA_ANTIQUANT>);
+                    }
+                    else if ((KV_T == 8) && (PAGE_ATTENTIOND == 1) && (Q_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (ENABLE_PREFIX == 0) 
+                    && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_MLA_FLAG == 0) && (P_TEMPLATE_VERSION == 1)){
+                        INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, int8_t>);
+                    }
+                }   
+                else if ((P_TEMPLATE_VERSION == 2) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 0) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE) && (OUT_T == 0)   
+                && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 4) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_MLA_FLAG == 0 || P_CVDIFF_MLA_FLAG == 1) && (KV_T == 0)){
+                    if (P_CVDIFF_MLA_FLAG == 0){
+                        REGISTER_TILING_FOR_TILINGKEY("TRUE", PromptFlashAttentionBaseApiTilingData);
+                        INVOKE_PFA_GENERAL_OP_IMPL_BASE_API(PromptFlashAttentionBaseApiHighPrecisionV, PFATypeNew<PromptFlashAttentionBaseApiTilingData, Q_DTYPE, half, OUT_DTYPE, float, half, float, half, OptimizationMode::HighPrecision>);
+                    }
+                    else if (P_CVDIFF_MLA_FLAG == 1){
+                        REGISTER_TILING_FOR_TILINGKEY("TRUE", PromptFlashAttentionBaseApiTilingData);
+                        INVOKE_PFA_GENERAL_OP_IMPL_MLA(PromptFlashAttentionBaseMLAHighPrecision, PFAHighPrecisionMLAType<PromptFlashAttentionBaseApiTilingData, half, false>);
+                    }
+                }
+            }
+
+            if constexpr ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 0 || Q_T == 6) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (OUT_T == 2)   
+                && (LAYOUT_T == 0 || LAYOUT_T == 1) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0 || PAGE_ATTENTIOND == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1)   
+                && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0 || M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 1) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 0) && (KV_T == 0 || KV_T == 4 || KV_T == 8) && (P_TEMPLATE_VERSION == 1)){
+                if constexpr ((Q_T == 0 || Q_T == 6) && (KV_T == 0) && (PAGE_ATTENTIOND == 0) && (LAYOUT_T == 0 || LAYOUT_T == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0)){
+                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, half, PRECISION_TYPE, MATMUL_TYPE, PREFIX_MODE, MsdMode::MSD_OFF>);
+                }
+                else if ((Q_T == 0 || Q_T == 6) && (KV_T == 0) && (PAGE_ATTENTIOND == 1) && (LAYOUT_T == 0 || LAYOUT_T == 1) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0)){
+                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, half, PRECISION_TYPE, MatMulType::MM_PA, PREFIX_MODE, MsdMode::MSD_OFF>);
+                }
+                else if ((Q_T == 0 || Q_T == 6) && (KV_T == 8) && (PAGE_ATTENTIOND == 0) && (LAYOUT_T == 0 || LAYOUT_T == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0)){
+                    INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, int8_t, PRECISION_TYPE, MATMUL_TYPE, PREFIX_MODE, MsdMode::MSD_OFF>);
+                }
+                else if ((Q_T == 6) && (KV_T == 4) && (PAGE_ATTENTIOND == 0) && (LAYOUT_T == 0 || LAYOUT_T == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 1)){
+                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPrecision, MATMUL_TYPE, PREFIX_MODE, MSD_TYPE>);
+                }
+            }
+        }
+            if constexpr ((Q_T == 0 || Q_T == 1) && (KV_T != 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 0 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 1 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 5 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 6 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 3)     
+                && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0 || M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 0 || Q_T == 1) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0 || M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (OUT_T == 0 || OUT_T == 1 || OUT_T == 2)                   
+                && (LAYOUT_T == 0 || LAYOUT_T == 1) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 || M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 4) && (PAGE_ATTENTIOND == 0 || PAGE_ATTENTIOND == 1 || PAGE_ATTENTIOND == 2) && (ENABLE_PREFIX == 0)       
+                && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_BASE_FLAG == 0 || P_CVDIFF_BASE_FLAG == 2) && (P_CVDIFF_MLA_FLAG == 0 || P_CVDIFF_MLA_FLAG == 1) && (KV_T == 0) && (P_TEMPLATE_VERSION == 1 || P_TEMPLATE_VERSION == 2 || P_TEMPLATE_VERSION == 4)){
+            if constexpr ((P_TEMPLATE_VERSION == 1) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 0) && (Q_T == 1) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
                 // Non-BNSD layout, split NS no tail
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSNoTail, bfloat16_t, bool, CubeFormat::ND, bfloat16_t);
-            #elif TILING_KEY_VAR == QBF16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_NEWTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 1) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 1) && (Q_T == 1) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
                 // Non-BNSD layout, split NS with tail
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSTail, bfloat16_t, bool, CubeFormat::ND, bfloat16_t);
-            #elif TILING_KEY_VAR == QBF16_KVFP16_OUTFP16_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_BNSD_NEWTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 1) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 5) && (Q_T == 1) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
                 // BNSD layout, split NS no tail
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDNoTail, bfloat16_t, bool, CubeFormat::ND, bfloat16_t);
-            #elif TILING_KEY_VAR == QBF16_KVFP16_OUTFP16_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_BNSD_NEWTILING
-                // BNSD layout, split NS with tail
+            }
+            else if ((P_TEMPLATE_VERSION == 1) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 6) && (Q_T == 1) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                    // BNSD layout, split NS with tail
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDTail, bfloat16_t, bool, CubeFormat::ND, bfloat16_t);
-            #elif TILING_KEY_VAR == QBF16_KVFP16_OUTBF16_BNSD_HIGHPERFORMANCE_BASICAPI_BASE_API_CUBEVECTORDIFF_NEWTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 2) && (P_CVDIFF_MLA_FLAG == 0) && (P_CVDIFF_BASE_FLAG == 2) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 1) && (OUT_T == 1) && (LAYOUT_T == 0) 
+            && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 4) && (PAGE_ATTENTIOND == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", PromptFlashAttentionBaseApiTilingData);
                 INVOKE_PFA_GENERAL_OP_IMPL_BASE_API(PromptFlashAttentionBaseApiHighPrecisionNoMask, PFAHighPrecisionBaseType<PromptFlashAttentionBaseApiTilingData, float, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, float>);
-            #elif TILING_KEY_VAR == QBF16_KVFP16_OUTBF16_BNSD_HIGHPERFORMANCE_BASICAPI_CUBEVECTORDIFF_NEWTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 2) && (P_CVDIFF_MLA_FLAG == 0) && (P_CVDIFF_BASE_FLAG == 0) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 1) && (OUT_T == 1) && (LAYOUT_T == 0) 
+            && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 4) && (PAGE_ATTENTIOND == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", PromptFlashAttentionBaseApiTilingData);
                 INVOKE_PFA_GENERAL_OP_IMPL_BASE_API(PromptFlashAttentionBaseApiHighPrecisionV,
                                                     PFATypeNew<PromptFlashAttentionBaseApiTilingData, bfloat16_t, bfloat16_t, bfloat16_t, float, bfloat16_t, float, bfloat16_t, OptimizationMode::HighPrecision>);
-            #elif TILING_KEY_VAR == QBF16_KVFP16_OUTBF16_BNSD_HIGHPERFORMANCE_BASICAPI_MLA_CUBEVECTORDIFF_NEWTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 2) && (P_CVDIFF_MLA_FLAG == 1) && (P_CVDIFF_BASE_FLAG == 0) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 1) && (OUT_T == 1) && (LAYOUT_T == 0) 
+            && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 4) && (PAGE_ATTENTIOND == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", PromptFlashAttentionBaseApiTilingData);
                 INVOKE_PFA_GENERAL_OP_IMPL_MLA(PromptFlashAttentionBaseMLAHighPrecision, PFAHighPrecisionMLAType<PromptFlashAttentionBaseApiTilingData, bfloat16_t, true>);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_TND_HIGHPERFORMANCE_MDL_TAIL_OLDTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (PAGE_ATTENTIOND == 0) && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
                 INVOKE_PFA_GENERAL_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameAB, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
                                                         LayOutTypeEnum::LAYOUT_TND, true, bfloat16_t, float);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_TND_ENABLEATTNETIONMASK_VALUED192_HIGHPERFORMANCE_MDL_NOTAIL_OLDTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 1) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (PAGE_ATTENTIOND == 0) && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
                 INVOKE_PFA_GENERAL_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameAB, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
                                                         LayOutTypeEnum::LAYOUT_TND, false, bfloat16_t, float);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_TND_HIGHPERFORMANCE_MDL_CUBEVECTORDIFF_OLDTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (LAYOUT_T == 0) && (PAGE_ATTENTIOND == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
                 INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
                                                         LayOutTypeEnum::LAYOUT_TND, true, bfloat16_t, float, CubeFormat::NZ,
                                                         MmPolicyType::NORMAL, false);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_TND_ENABLEATTNETIONMASK_HIGHPERFORMANCE_MDL_NOTAIL_CUBEVECTORDIFF_OLDTILING
-                INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
-                                                        LayOutTypeEnum::LAYOUT_TND, false, bfloat16_t, float, CubeFormat::NZ,
-                                                        MmPolicyType::NORMAL, false);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_NTD_TND_HIGHPERFORMANCE_MDL_CUBEVECTORDIFF_OLDTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (LAYOUT_T == 1) && (PAGE_ATTENTIOND == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
                 INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
                                                         LayOutTypeEnum::LAYOUT_NTD_TND, true, bfloat16_t, float, CubeFormat::NZ,
                                                         MmPolicyType::NORMAL, false);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_NTD_TND_ENABLEATTNETIONMASK_HIGHPERFORMANCE_MDL_NOTAIL_CUBEVECTORDIFF_OLDTILING
-                INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
-                                                        LayOutTypeEnum::LAYOUT_NTD_TND, false, bfloat16_t, float, CubeFormat::NZ,
-                                                        MmPolicyType::NORMAL, false);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_TND_HIGHPERFORMANCE_PA_ND_MDL_CUBEVECTORDIFF_OLDTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (LAYOUT_T == 0) && (PAGE_ATTENTIOND == 1) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
                 INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
                                                         LayOutTypeEnum::LAYOUT_TND, true, bfloat16_t, float, CubeFormat::NZ,
                                                         MmPolicyType::PA_ND, true);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_TND_ENABLEATTNETIONMASK_HIGHPERFORMANCE_PA_ND_MDL_NOTAIL_CUBEVECTORDIFF_OLDTILING
-                INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
-                                                        LayOutTypeEnum::LAYOUT_TND, false, bfloat16_t, float, CubeFormat::NZ,
-                                                        MmPolicyType::PA_ND, true);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_NTD_TND_HIGHPERFORMANCE_PA_ND_MDL_CUBEVECTORDIFF_OLDTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (LAYOUT_T == 1) && (PAGE_ATTENTIOND == 1) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
                 INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
                                                         LayOutTypeEnum::LAYOUT_NTD_TND, true, bfloat16_t, float, CubeFormat::NZ,
                                                         MmPolicyType::PA_ND, true);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_NTD_TND_ENABLEATTNETIONMASK_HIGHPERFORMANCE_PA_ND_MDL_NOTAIL_CUBEVECTORDIFF_OLDTILING
-                INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
-                                                        LayOutTypeEnum::LAYOUT_NTD_TND, false, bfloat16_t, float, CubeFormat::NZ,
-                                                        MmPolicyType::PA_ND, true);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_TND_HIGHPERFORMANCE_PA_NZ_MDL_CUBEVECTORDIFF_OLDTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (LAYOUT_T == 0) && (PAGE_ATTENTIOND == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
                 INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
                                                         LayOutTypeEnum::LAYOUT_TND, true, bfloat16_t, float, CubeFormat::NZ,
                                                         MmPolicyType::PA_NZ, true);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_TND_ENABLEATTNETIONMASK_HIGHPERFORMANCE_PA_NZ_MDL_NOTAIL_CUBEVECTORDIFF_OLDTILING
-                INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
-                                                        LayOutTypeEnum::LAYOUT_TND, false, bfloat16_t, float, CubeFormat::NZ,
-                                                        MmPolicyType::PA_NZ, true);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_NTD_TND_HIGHPERFORMANCE_PA_NZ_MDL_CUBEVECTORDIFF_OLDTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (LAYOUT_T == 1) && (PAGE_ATTENTIOND == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
                 INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
                                                         LayOutTypeEnum::LAYOUT_NTD_TND, true, bfloat16_t, float, CubeFormat::NZ,
                                                         MmPolicyType::PA_NZ, true);
-            #elif TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_NTD_TND_ENABLEATTNETIONMASK_HIGHPERFORMANCE_PA_NZ_MDL_NOTAIL_CUBEVECTORDIFF_OLDTILING
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 3) && (LAYOUT_T == 0) && (PAGE_ATTENTIOND == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
+                INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
+                                                        LayOutTypeEnum::LAYOUT_TND, false, bfloat16_t, float, CubeFormat::NZ,
+                                                        MmPolicyType::NORMAL, false);
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 3) && (LAYOUT_T == 1) && (PAGE_ATTENTIOND == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
+                INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
+                                                        LayOutTypeEnum::LAYOUT_NTD_TND, false, bfloat16_t, float, CubeFormat::NZ,
+                                                        MmPolicyType::NORMAL, false);
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 3) && (LAYOUT_T == 0) && (PAGE_ATTENTIOND == 1) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
+                INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
+                                                        LayOutTypeEnum::LAYOUT_TND, false, bfloat16_t, float, CubeFormat::NZ,
+                                                        MmPolicyType::PA_ND, true);
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 3) && (LAYOUT_T == 1) && (PAGE_ATTENTIOND == 1) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
+                INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
+                                                        LayOutTypeEnum::LAYOUT_NTD_TND, false, bfloat16_t, float, CubeFormat::NZ,
+                                                        MmPolicyType::PA_ND, true);
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 3) && (LAYOUT_T == 0) && (PAGE_ATTENTIOND == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
+                INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
+                                                        LayOutTypeEnum::LAYOUT_TND, false, bfloat16_t, float, CubeFormat::NZ,
+                                                        MmPolicyType::PA_NZ, true);
+            }
+            else if ((P_TEMPLATE_VERSION == 4) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 3) && (LAYOUT_T == 1) && (PAGE_ATTENTIOND == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0) && (Q_T == 0) && (OUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) 
+            && (P_CVDIFF_BASE_FLAG == 0)  && (P_CVDIFF_MLA_FLAG == 0)){
+                REGISTER_TILING_FOR_TILINGKEY("TRUE", MLAGeneralTilingData);
                 INVOKE_PFA_NO_KFC_MLA_OP_IMPL_VAR_LEN(PromptFlashAttentionVarLenScoreSameABBaseApi, MLAGeneralTilingData, ImplModeEnum::AA_HIGH_PRECISION,
                                                         LayOutTypeEnum::LAYOUT_NTD_TND, false, bfloat16_t, float, CubeFormat::NZ,
                                                         MmPolicyType::PA_NZ, true);
-            #endif
-    
-            #if (ORIG_DTYPE_QUERY == DT_BF16) && (ORIG_DTYPE_KEY != DT_INT4) && (ORIG_DTYPE_ATTENTION_OUT == DT_BF16)
-                TILING_KEY_IS(QBF16_KVFP16_OUTBF16_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP16_OUTBF16_BSH_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP16_OUTBF16_BSH_HIGHPRECISION_HIGHLEVELAPI_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP16_OUTBF16_BSH_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP16_OUTBF16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP16_OUTBF16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP16_OUTBF16_BNSD_HIGHPRECISION_HIGHLEVELAPI_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP16_OUTBF16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP8_OUTBF16_BSH_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP8_OUTBF16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP8_OUTBF16_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP8_OUTBF16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                #if TILING_KEY_VAR == QBF16_KVFP16_OUTBF16_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout bf16 cvdiff
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, bfloat16_t>);
-                #elif TILING_KEY_VAR == QBF16_KVFP16_OUTBF16_BSH_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout bf16 cvdiff, enable PA
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, bfloat16_t, bfloat16_t, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
-                #elif TILING_KEY_VAR == QBF16_KVFP16_OUTBF16_BSH_HIGHPRECISION_HIGHLEVELAPI_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout bf16 cvdiff, enable L1 reuse
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, bfloat16_t, bfloat16_t, OptimizationMode::HighPerformance, MatMulType::MM_IBSHARE_NORM>);
-                #elif TILING_KEY_VAR == QBF16_KVFP16_OUTBF16_BSH_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING  // enable prefix
-                    // BSH layout bf16 cvdiff
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, bfloat16_t, bfloat16_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QBF16_KVFP16_OUTBF16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout bf16 cvdiff
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, bfloat16_t>);
-                #elif TILING_KEY_VAR == QBF16_KVFP16_OUTBF16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout bf16 cvdiff, enable PA
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, bfloat16_t, bfloat16_t, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
-                #elif TILING_KEY_VAR == QBF16_KVFP16_OUTBF16_BNSD_HIGHPRECISION_HIGHLEVELAPI_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout bf16 cvdiff, enable L1 reuse
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, bfloat16_t, bfloat16_t, OptimizationMode::HighPerformance, MatMulType::MM_IBSHARE_NORM>);
-                #elif TILING_KEY_VAR == QBF16_KVFP16_OUTBF16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING  // enable prefix
-                    // BNSD layout bf16 cvdiff
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, bfloat16_t, bfloat16_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QBF16_KVFP8_OUTBF16_BSH_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING  // enable prefix, enable MSD
-                    // BSH layout bf16 cvdiff
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, bfloat16_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QBF16_KVFP8_OUTBF16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING  // enable prefix, enable MSD
-                    // BNSD layout bf16 cvdiff
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, bfloat16_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QBF16_KVFP8_OUTBF16_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout bf16 cvdiff
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, bfloat16_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QBF16_KVFP8_OUTBF16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout bf16 cvdiff
-                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, bfloat16_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
-                #endif
-    
-            #endif
-    
-            #if (ORIG_DTYPE_QUERY == DT_BF16) && (ORIG_DTYPE_KEY != DT_INT4) && (ORIG_DTYPE_ATTENTION_OUT == DT_INT8)
-                TILING_KEY_IS(QBF16_KVFP16_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP16_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP16_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP8_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP8_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP8_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                TILING_KEY_IS(QBF16_KVFP8_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-                #if TILING_KEY_VAR == QBF16_KVFP16_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout bf16 in int8 out cvdiff
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, int8_t>);
-                #elif TILING_KEY_VAR == QBF16_KVFP16_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout bf16 in int8 out cvdiff, enable PA
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, int8_t, bfloat16_t, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
-                #elif TILING_KEY_VAR == QBF16_KVFP16_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING  // enable prefix
-                    // BSH layout bf16 in int8 out cvdiff
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, int8_t, bfloat16_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QBF16_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout bf16 in int8 out cvdiff
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, int8_t>);
-                #elif TILING_KEY_VAR == QBF16_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout bf16 in int8 out cvdiff, enable PA
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, int8_t, bfloat16_t, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
-                #elif TILING_KEY_VAR == QBF16_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING  // enable prefix
-                    // BNSD layout bf16 in int8 out cvdiff
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, int8_t, bfloat16_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-                #elif TILING_KEY_VAR == QBF16_KVFP8_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING  // enable prefix, enable MSD, enable MSD
-                    // BSH layout bf16 in int8 out cvdiff
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, int8_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QBF16_KVFP8_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MSD_MDL_CUBEVECTORDIFF_NEWTILING  // enable prefix, enable MSD
-                    // BNSD layout bf16 in int8 out cvdiff
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, int8_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QBF16_KVFP8_OUTINT8_BSH_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BSH layout bf16 in int8 out cvdiff, enable MSD
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, int8_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
-                #elif TILING_KEY_VAR == QBF16_KVFP8_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                    // BNSD layout bf16 in int8 out cvdiff, enable MSD
-                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, int8_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
-                #endif
-            #endif
-        #endif
-        #if (ORIG_DTYPE_QUERY == DT_INT8) && (ORIG_DTYPE_ATTENTION_OUT == DT_INT8) && (ORIG_DTYPE_KEY != DT_INT4)
-            TILING_KEY_IS(QINT8_KVFP16_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_TAIL_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTINT8_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_BNSD_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTINT8_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_BNSD_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTINT8_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_BNSD_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTINT8_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_BNSD_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTINT8_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_BNSD_NEWTILING);
-            #if TILING_KEY_VAR == QINT8_KVFP16_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_TAIL_NEWTILING
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionBNSTillingNSNoTail, int8_t, bool, CubeFormat::ND, int8_t);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTINT8_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_NEWTILING
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionBNSTillingNSTail, int8_t, bool, CubeFormat::ND, int8_t);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTINT8_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_BNSD_NEWTILING
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDNoTail, int8_t, bool, CubeFormat::ND, int8_t);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTINT8_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_BNSD_NEWTILING
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDTail, int8_t, bool, CubeFormat::ND, int8_t);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, int8_t, bool, int8_t>);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING  // enable PA
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, int8_t, bool, int8_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTINT8_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING  // enable prefix
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, int8_t, bool, int8_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTINT8_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_BNSD_NEWTILING
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, int8_t, bool, int8_t>);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTINT8_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_BNSD_NEWTILING  // enable PA
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, int8_t, bool, int8_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTINT8_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_BNSD_NEWTILING  // enable prefix
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, int8_t, bool, int8_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-            #endif
-        #endif
-        #if (ORIG_DTYPE_QUERY == DT_INT8) && (ORIG_DTYPE_ATTENTION_OUT == DT_FLOAT16) && (ORIG_DTYPE_KEY != DT_INT4)
-            TILING_KEY_IS(QINT8_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_TAIL_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTFP16_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_BNSD_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTFP16_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_BNSD_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTFP16_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_BNSD_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTFP16_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_BNSD_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING);
-            TILING_KEY_IS(QINT8_KVFP16_OUTFP16_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_BNSD_NEWTILING);
-            #if TILING_KEY_VAR == QINT8_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_TAIL_NEWTILING
+            }
+
+            if constexpr ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 1) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (OUT_T == 1)   
+                && (LAYOUT_T == 0 || LAYOUT_T == 1) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 || M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 2) && (PAGE_ATTENTIOND == 0 || PAGE_ATTENTIOND == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1)   
+                && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0 || M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 1) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 0) && (KV_T == 0 || KV_T == 4) && (P_TEMPLATE_VERSION == 1)){
+                if constexpr ((KV_T == 0) && (PAGE_ATTENTIOND == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) 
+                && ((LAYOUT_T == 1 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 0) || (LAYOUT_T == 1 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 2 && ENABLE_PREFIX == 0) || (LAYOUT_T == 1 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 1) 
+                || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 0) || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 2 && ENABLE_PREFIX == 0) || (LAYOUT_T == 0 && M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0 && ENABLE_PREFIX == 1))){
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, bfloat16_t, OptimizationMode::HighPerformance, MATMUL_TYPE, PREFIX_MODE, MSD_TYPE>);
+                }
+                else if ((KV_T == 0) && (PAGE_ATTENTIOND == 1) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) 
+                && ((LAYOUT_T == 1  && ENABLE_PREFIX == 0) || (LAYOUT_T == 0  && ENABLE_PREFIX == 0))){
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, bfloat16_t, OptimizationMode::HighPerformance, MatMulType::MM_PA, PREFIX_MODE, MSD_TYPE>);
+                }
+                else if ((KV_T == 4) && (PAGE_ATTENTIOND == 0) && (LAYOUT_T == 0 || LAYOUT_T == 1) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 1)){
+                    INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPerformance, MATMUL_TYPE, PREFIX_MODE, MSD_TYPE>);
+                }   
+            }
+
+            if constexpr ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 1) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (OUT_T == 2)   
+                && (LAYOUT_T == 0 || LAYOUT_T == 1) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0 || PAGE_ATTENTIOND == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1)   
+                && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0 || M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 1) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 0) && (KV_T == 0 || KV_T == 4) && (P_TEMPLATE_VERSION == 1)){
+                if constexpr ((KV_T == 0) && (PAGE_ATTENTIOND == 0) && (LAYOUT_T == 0 || LAYOUT_T == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0)){
+                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, bfloat16_t, OptimizationMode::HighPerformance, MATMUL_TYPE, PREFIX_MODE, MSD_TYPE>);
+                }
+                else if ((KV_T == 0) && (PAGE_ATTENTIOND == 1) && (LAYOUT_T == 0 || LAYOUT_T == 1) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0)){
+                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, bfloat16_t, OptimizationMode::HighPerformance, MatMulType::MM_PA, PREFIX_MODE, MSD_TYPE>);
+                }
+                else if ((KV_T == 4) && (PAGE_ATTENTIOND == 0) && (LAYOUT_T == 0 || LAYOUT_T == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 1)){
+                    INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<LAYOUT_DTYPE, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPerformance, MATMUL_TYPE, PREFIX_MODE, MSD_TYPE>);
+                }
+            }
+        }
+        if constexpr ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 0 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 1 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 5 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 6 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 7)    
+                && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0 || M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 2) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0 || M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (OUT_T == 2)   
+                && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0 || PAGE_ATTENTIOND == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1)   
+                && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 0) && (KV_T == 0) && (P_TEMPLATE_VERSION == 1)){
+            if constexpr ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 0) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0)){
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionBNSTillingNSNoTail, Q_DTYPE, bool, CubeFormat::ND, OUT_DTYPE);
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 1) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0)){
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionBNSTillingNSTail, Q_DTYPE, bool, CubeFormat::ND, OUT_DTYPE);
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 5) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0)){
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDNoTail, Q_DTYPE, bool, CubeFormat::ND, OUT_DTYPE);
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 6) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0)){
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDTail, Q_DTYPE, bool, CubeFormat::ND, OUT_DTYPE);
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) &&  (PAGE_ATTENTIOND == 0) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T ==2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1)){
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPerformance, MATMUL_TYPE, PREFIX_MODE>);
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (PAGE_ATTENTIOND == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T ==2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (ENABLE_PREFIX == 0)){
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, Q_DTYPE, bool, int8_t, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1)  && (PAGE_ATTENTIOND == 0) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T ==7) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1)){
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPerformance, MATMUL_TYPE, PREFIX_MODE>);
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1)  && (PAGE_ATTENTIOND == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T ==7) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (ENABLE_PREFIX == 0)){
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
+            }
+        }
+        if constexpr ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 0 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 1 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 2 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 5 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 6 || M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 7) 
+                && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 0 || M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (Q_T == 2) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0 || M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) && (OUT_T == 0)   
+                && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0 || PAGE_ATTENTIOND == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1)   
+                && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 0) && (KV_T == 0) && (P_TEMPLATE_VERSION == 1)){
+            if constexpr ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 0) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0)){
                 INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionBNSTillingNSNoTail, int8_t, bool, CubeFormat::ND, half);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_NEWTILING
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 1) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0)){
                 INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionBNSTillingNSTail, int8_t, bool, CubeFormat::ND, half);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTFP16_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_BNSD_NEWTILING
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 5) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0)){
                 INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDNoTail, int8_t, bool, CubeFormat::ND, half);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTFP16_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_NOTAIL_BNSD_NEWTILING
+            }  
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 6) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0)){
                 INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionBNSTillingNSWithBNSDTail, int8_t, bool, CubeFormat::ND, half);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_NEWTILING
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, int8_t, bool, half>);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_NEWTILING  // enable PA
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, int8_t, bool, half, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTFP16_HIGHPRECISION_HIGHLEVELAPI_MDL_CUBEVECTORDIFF_BNSD_NEWTILING
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, int8_t, bool, half>);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTFP16_HIGHPRECISION_HIGHLEVELAPI_PA_ND_MDL_CUBEVECTORDIFF_BNSD_NEWTILING  // enable PA
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, int8_t, bool, half, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTFP16_BNSD_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_NEWTILING  // enable prefix
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, int8_t, bool, half, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-            #elif TILING_KEY_VAR == QINT8_KVFP16_OUTFP16_HIGHPRECISION_HIGHLEVELAPI_PREFIX_MDL_CUBEVECTORDIFF_BNSD_NEWTILING  // enable prefix
-                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, int8_t, bool, half, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, true>);
-            #endif
-        #endif
-        TILING_KEY_IS(QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_TAIL_EMPTYKVTILINGKEY);
-        #if TILING_KEY_VAR == QFP16_KVFP16_OUTFP16_BNSD_HIGHPERFORMANCE_HIGHLEVELAPI_MDL_TAIL_EMPTYKVTILINGKEY
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) &&  (PAGE_ATTENTIOND == 0) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T ==2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1)){
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPerformance, MATMUL_TYPE, PREFIX_MODE>);
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) &&  (PAGE_ATTENTIOND == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T ==2) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (ENABLE_PREFIX == 0)){
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) &&  (PAGE_ATTENTIOND == 0) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T ==7) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (ENABLE_PREFIX == 0 || ENABLE_PREFIX == 1)){
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_MDL, PREFIX_MODE>);
+            }
+            else if ((M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 1) &&  (PAGE_ATTENTIOND == 1) && (M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T ==7) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 1) && (ENABLE_PREFIX == 0)){
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, Q_DTYPE, bool, OUT_DTYPE, int8_t, OptimizationMode::HighPerformance, MatMulType::MM_PA>);
+            }
+        }
+        if constexpr ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 0) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 2) && (Q_T == 0) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 0) && (OUT_T == 0) && (LAYOUT_T == 0) && (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 0)   
+            && (KV_T == 0) && (P_TEMPLATE_VERSION == 1)){
             // kv is empty tensor, return zero output
             TPipe tPipe;
             INVOKE_PFA_TILING_DATA(tiling);
@@ -774,44 +643,55 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             op.Init(attentionOut, tiling_data, &tPipe);
             op.Process();
             return;
-        #endif
+        }
     #else
+        #ifndef FIA_PFA
+        REGISTER_TILING_DEFAULT(PromptFlashAttentionTilingData);
+        #endif
         GET_TILING_DATA_MEMBER(PromptFlashAttentionTilingData, promptAttentionBaseParams, baseParams, tiling);
         auto maskByteNum = baseParams.maskTypeByteNum;
-    
+
         __gm__ uint8_t* user = GetUserWorkspace(workspace);
         KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
-        TILING_KEY_IS(QINT8_KVFP16_OUTBF16_BSH_HIGHLEVELAPI_MDL_310TILING);
-        TILING_KEY_IS(QINT8_KVFP16_OUTINT8_BSH_HIGHLEVELAPI_MDL_310TILING);
-        TILING_KEY_IS(QINT8_KVFP16_OUTBF16_HIGHLEVELAPI_MDL_NOTAIL_CUBEVECTORDIFF_BNSD_310TILING);
-        TILING_KEY_IS(QINT8_KVFP16_OUTINT8_HIGHLEVELAPI_MDL_NOTAIL_CUBEVECTORDIFF_BNSD_310TILING);
-        TILING_KEY_IS(QFP4E1M2_KVFP16_OUTBF16_HIGHLEVELAPI_MDL_NOTAIL_CUBEVECTORDIFF_BNSD_310TILING);
-        TILING_KEY_IS(QFP4E1M2_KVFP16_OUTINT8_HIGHLEVELAPI_MDL_NOTAIL_CUBEVECTORDIFF_BNSD_310TILING);
-        #if TILING_KEY_VAR == QINT8_KVFP16_OUTBF16_BSH_HIGHLEVELAPI_MDL_310TILING
-            INVOKE_PFA_NEW_GQA_OP_IMPL(PromptAttentionPrefill, PFATypeNZ<PFALayoutNZ::BNSD, half, int8_t>, PrecType::BMM1_FP16_EXP_FP32);//高性能
-        #elif TILING_KEY_VAR == QINT8_KVFP16_OUTINT8_BSH_HIGHLEVELAPI_MDL_310TILING
-            INVOKE_PFA_NEW_GQA_OP_IMPL(PromptAttentionPrefill, PFATypeNZ<PFALayoutNZ::BSH, half, int8_t>, PrecType::BMM1_FP16_EXP_FP32);//高性能
-        #elif TILING_KEY_VAR == QINT8_KVFP16_OUTBF16_HIGHLEVELAPI_MDL_NOTAIL_CUBEVECTORDIFF_BNSD_310TILING
-            INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X310, PFATypeNZ<PFALayoutNZ::BNSD, half, int8_t, half>);
-        #elif TILING_KEY_VAR == QINT8_KVFP16_OUTINT8_HIGHLEVELAPI_MDL_NOTAIL_CUBEVECTORDIFF_BNSD_310TILING
-            INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X310, PFATypeNZ<PFALayoutNZ::BSH, half, int8_t, half>);
-        #elif TILING_KEY_VAR == QFP4E1M2_KVFP16_OUTBF16_HIGHLEVELAPI_MDL_NOTAIL_CUBEVECTORDIFF_BNSD_310TILING
-            INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X310, PFATypeNZ<PFALayoutNZ::BNSD, half, int8_t, half, half, ModeNZ::HighPrecisionNZ>);
-        #elif TILING_KEY_VAR == QFP4E1M2_KVFP16_OUTINT8_HIGHLEVELAPI_MDL_NOTAIL_CUBEVECTORDIFF_BNSD_310TILING
-            INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X310, PFATypeNZ<PFALayoutNZ::BSH, half, int8_t, half, half, ModeNZ::HighPrecisionNZ>);
-        #endif
+        if constexpr( (M_FIAFLAG_P_MMTYPETMP_I_MODEVAL == 0) && (PAGE_ATTENTIOND == 0) && (ENABLE_PREFIX == 0) && (M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE == 0) && (P_CVDIFF_BASE_FLAG == 0) && (P_CVDIFF_MLA_FLAG == 0)   
+            && (KV_T == 0) && (P_TEMPLATE_VERSION == 1)){
+            if constexpr ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 8) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 8) && (Q_T == 2) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 2) && (OUT_T == 1) && (LAYOUT_T == 1)){
+                INVOKE_PFA_NEW_GQA_OP_IMPL(PromptAttentionPrefill, PFATypeNZ<PFALayoutNZ::BNSD, half, int8_t>, PrecType::BMM1_FP16_EXP_FP32);//高性能
+            }
+            else if ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 8) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 8) && (Q_T == 2) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 2) && (OUT_T == 2) && (LAYOUT_T == 1)){
+                INVOKE_PFA_NEW_GQA_OP_IMPL(PromptAttentionPrefill, PFATypeNZ<PFALayoutNZ::BSH, half, int8_t>, PrecType::BMM1_FP16_EXP_FP32);//高性能
+            }
+            else if ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 8) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 8) && (Q_T == 2) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 2) && (OUT_T == 1) && (LAYOUT_T == 0)){
+                INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X310, PFATypeNZ<PFALayoutNZ::BNSD, half, int8_t, half>);
+            }
+            else if ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 8) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 8) && (Q_T == 2) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 2) && (OUT_T == 2) && (LAYOUT_T == 0)){
+                INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X310, PFATypeNZ<PFALayoutNZ::BSH, half, int8_t, half>);
+            }
+            else if ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 8) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 8) && (Q_T == 8) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 2) && (OUT_T == 1) && (LAYOUT_T == 0)){
+                INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X310, PFATypeNZ<PFALayoutNZ::BNSD, half, int8_t, half, half, ModeNZ::HighPrecisionNZ>);
+            }
+            else if ((M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T == 8) && (M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA == 8) && (Q_T == 8) && (M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE == 2) && (OUT_T == 2) && (LAYOUT_T == 0)){
+                INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X310, PFATypeNZ<PFALayoutNZ::BSH, half, int8_t, half, half, ModeNZ::HighPrecisionNZ>);
+            }
+        }
     #endif
     }    
 }
 
-extern "C" __global__ __aicore__ void prompt_flash_attention(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
-                                                             __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask,
-                                                             __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
-                                                             __gm__ uint8_t* deq_scale1, __gm__ uint8_t* quant_scale1,
-                                                             __gm__ uint8_t* deq_scale2, __gm__ uint8_t* quant_scale2,
-                                                             __gm__ uint8_t* quant_offset2, __gm__ uint8_t* attentionOut,
-                                                             __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
+template<uint8_t Q_T, uint8_t KV_T, uint8_t OUT_T, uint8_t PAGE_ATTENTIOND, uint8_t LAYOUT_T, uint16_t KV_LAYOUT_T, uint16_t FLASH_DECODE, uint8_t ENABLE_PREFIX,
+            uint8_t M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE, uint8_t M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T, uint8_t M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA, uint8_t M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE,
+            uint8_t M_FIAFLAG_P_MMTYPETMP_I_MODEVAL, uint8_t P_CVDIFF_BASE_FLAG, uint8_t P_CVDIFF_MLA_FLAG, uint8_t P_TEMPLATE_VERSION, uint8_t TEMPLATE_MODE>
+__global__ __aicore__ void prompt_flash_attention(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                            __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask,
+                                            __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+                                            __gm__ uint8_t* deq_scale1, __gm__ uint8_t* quant_scale1,
+                                            __gm__ uint8_t* deq_scale2, __gm__ uint8_t* quant_scale2,
+                                            __gm__ uint8_t* quant_offset2, __gm__ uint8_t* attentionOut,
+                                            __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
-    prompt_flash_attention_FIAS(query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKV, deq_scale1, quant_scale1, deq_scale2, quant_scale2,
+        prompt_flash_attention_FIAS<Q_T, KV_T, OUT_T, PAGE_ATTENTIOND, LAYOUT_T, KV_LAYOUT_T, FLASH_DECODE, ENABLE_PREFIX, M_Q_QUANTMODE_P_MSD_MODE_I_ANTIQUANTMODE,
+                                    M_OUTLAYOUT_P_TAIL_MODE_I_ORIGIN_T, M_K_QUANTMODE_P_NEWTILINGFLAG_I_AMLA, M_V_QUANTMODE_P_PRECISION_MODE_I_BALANCE,
+                                    M_FIAFLAG_P_MMTYPETMP_I_MODEVAL, P_CVDIFF_BASE_FLAG, P_CVDIFF_MLA_FLAG, P_TEMPLATE_VERSION, TEMPLATE_MODE>
+           (query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKV, deq_scale1, quant_scale1, deq_scale2, quant_scale2,
                                 quant_offset2, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, attentionOut, nullptr, workspace, tiling);
 }

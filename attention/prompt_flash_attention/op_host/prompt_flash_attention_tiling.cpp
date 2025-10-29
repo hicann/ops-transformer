@@ -21,7 +21,9 @@
 #include "tiling_base/data_copy_transpose_tiling.h"
 #include "log/log.h"
 #include "err/ops_err.h"
+#include "../../prompt_flash_attention/op_kernel/prompt_flash_attention_tiling_data.h"
 #include "../../prompt_flash_attention/op_host/prompt_flash_attention_tiling.h"
+#include "../../prompt_flash_attention/op_kernel/prompt_flash_attention_template_tiling_key.h"
 
 #include <cstdint>
 #include <sys/types.h>
@@ -197,6 +199,25 @@ constexpr int64_t BYTES_PER_KB_HOST_TILING = 1024;
 constexpr int64_t ATTEN_MASK_S2_SIZE_DEFAULT_HOST_TILING = 2048;
 constexpr int64_t S1_VEC2_BASE_8_HOST_TILING = 8;
 constexpr int64_t S1_VEC2_MULTIPLIER_2_HOST_TILING = 2;
+
+// tilingkey mode
+uint8_t g_tail = 7;             // 第0位
+uint8_t g_newTiling = 0;        // 第1位
+uint8_t g_qT = 0;               // 第2位 
+uint8_t g_precisionMode = 0;    // 第3位         
+uint8_t g_outT = 0;             // 第4位
+uint8_t g_layoutT = 0;          // 第5位
+uint8_t g_mmType = 0;           // 第6位
+uint8_t g_pageAttention = 0;    //第7位
+uint8_t g_enablePrefix = 0;     // 第8-1位
+uint8_t g_msdMode = 0;          // 第8-2位
+uint8_t g_cvdiffBase = 0;       //第9位
+uint8_t g_cvdiffMla = 0;        //第10位
+uint8_t g_kvT = 0;              // 第11位
+uint8_t g_templateVersion = 0;  //第18位
+uint8_t g_kvlayoutT = 0;
+uint8_t g_flashDecode = 0;
+uint8_t g_templateMode = 2;
 
 inline int32_t ConvertValueToIndexMM(int32_t val, int32_t idxBound)
 {
@@ -438,7 +459,7 @@ void PromptFlashAttentionTiling::UpdateTilingKeyFlag(ContextParamsForPFATiling& 
     if ((queryDtype == ge::DT_FLOAT16) && (kvDtype == ge::DT_INT8) && !(enableMsd)) {
         binaryFlag += 8UL;    // 4bit flag bit, the leftmost side indicates whether to perform inverse quantization operation, with a corresponding value of 2**3 = 8, and the remaining 3bit is reserved
     }
-    tilingKey += (binaryFlag * 100000000000UL); // If inverse quantization is performed, tilingKey should increase by 8*100000000000.
+    g_kvT += (binaryFlag * 1); // If inverse quantization is performed, tilingKey should increase by 8*100000000000.
     return;
 }
 
@@ -460,7 +481,7 @@ bool PromptFlashAttentionTiling::GetApiTmpSize(const uint32_t sOuterFactor, cons
     return false;
 }
 
-size_t PromptFlashAttentionTiling::GetPFAWorkSpaceSize(PromptFlashAttentionTilingData& tilingData)
+size_t PromptFlashAttentionTiling::GetPFAWorkSpaceSize(PromptFlashAttentionTilingData* tilingData)
 {
     size_t sysWorkspaceSize, workspaceSize;
     const uint64_t defaultSysWorkspaceSize910B = 16U * 1024U * 1024U;
@@ -468,13 +489,13 @@ size_t PromptFlashAttentionTiling::GetPFAWorkSpaceSize(PromptFlashAttentionTilin
         sysWorkspaceSize = defaultSysWorkspaceSize;  // sys workspace size default value
         return sysWorkspaceSize;
     } else { // 910b
-        uint64_t maxSpmSize = tilingData.promptAttentionTensorSizeRect.get_spmTmpSize();
+        uint64_t maxSpmSize = tilingData->promptAttentionTensorSizeRect.get_spmTmpSize();
         sysWorkspaceSize = defaultSysWorkspaceSize910B;  // sys workspace size default value
         if (tilingMod == TilingMod::CVDIFF) {
-            int64_t mm1ResSize = tilingData.promptAttentionSingleCoreParams.get_singleProcessSOuterSize() * \
-                                 tilingData.promptAttentionSingleCoreParams.get_singleProcessSInnerSize();
-            int64_t mm2ResSize = tilingData.promptAttentionSingleCoreParams.get_singleProcessSOuterSize() * \
-                                 tilingData.promptAttentionBaseParams.get_headSize();
+            int64_t mm1ResSize = tilingData->promptAttentionSingleCoreParams.get_singleProcessSOuterSize() * \
+                                 tilingData->promptAttentionSingleCoreParams.get_singleProcessSInnerSize();
+            int64_t mm2ResSize = tilingData->promptAttentionSingleCoreParams.get_singleProcessSOuterSize() * \
+                                 tilingData->promptAttentionBaseParams.get_headSize();
 
             int64_t mdsExpandNumber = MSD_HIGH_PERFORMANCE_EXPEND_NUM;
             if (innerPrecise == static_cast<decltype(innerPrecise)>(HIGH_PRECISION)) {
@@ -489,8 +510,8 @@ size_t PromptFlashAttentionTiling::GetPFAWorkSpaceSize(PromptFlashAttentionTilin
             }
 
             if (enableKvAntiquant) {
-                int32_t KvAntiquantSize = tilingData.promptAttentionSingleCoreParams.get_singleProcessSInnerSize() * \
-                                 tilingData.promptAttentionBaseParams.get_alignedHeadSize();
+                int32_t KvAntiquantSize = tilingData->promptAttentionSingleCoreParams.get_singleProcessSInnerSize() * \
+                                 tilingData->promptAttentionBaseParams.get_alignedHeadSize();
                 workspaceSize += static_cast<uint64_t>(coreNum) * dataTypeSize * static_cast<uint64_t>(KvAntiquantSize) * 2U;  // key value, 2 is used to ensure alignment
             }
             if (enablePA) {
@@ -498,18 +519,18 @@ size_t PromptFlashAttentionTiling::GetPFAWorkSpaceSize(PromptFlashAttentionTilin
             }
 
             if (enableMsd) {
-                workspaceSize = workspaceSize + static_cast<uint64_t>(coreNum) * mdsExpandNumber * tilingData.promptAttentionBaseParams.get_seqSize() * tilingData.promptAttentionBaseParams.get_headSize();
+                workspaceSize = workspaceSize + static_cast<uint64_t>(coreNum) * mdsExpandNumber * tilingData->promptAttentionBaseParams.get_seqSize() * tilingData->promptAttentionBaseParams.get_headSize();
             }
          } else {
             if ((splitS2 == 1U) && (splitD == 1U)) {
                 workspaceSize = sysWorkspaceSize + static_cast<uint64_t>(coreNum) * softmaxDataTypeSize * (maxSpmSize + \
-                    NUM_2 * tilingData.promptAttentionTensorSizeRect.get_mmResUbSize() * // 2 : 2 mm ub
-                    tilingData.promptAttentionSingleCoreParams.get_multiSmaxsInnerLoopTimes());
+                    NUM_2 * tilingData->promptAttentionTensorSizeRect.get_mmResUbSize() * // 2 : 2 mm ub
+                    tilingData->promptAttentionSingleCoreParams.get_multiSmaxsInnerLoopTimes());
             } else {
                 workspaceSize = sysWorkspaceSize + static_cast<uint64_t>(coreNum) * softmaxDataTypeSize * (maxSpmSize + \
-                    tilingData.promptAttentionTensorSizeRect.get_bmm2ResUbSize() + \
-                    tilingData.promptAttentionTensorSizeRect.get_mmResUbSize() * \
-                    tilingData.promptAttentionSingleCoreParams.get_multiSmaxsInnerLoopTimes());
+                    tilingData->promptAttentionTensorSizeRect.get_bmm2ResUbSize() + \
+                    tilingData->promptAttentionTensorSizeRect.get_mmResUbSize() * \
+                    tilingData->promptAttentionSingleCoreParams.get_multiSmaxsInnerLoopTimes());
             }
         }
         return workspaceSize;
@@ -533,77 +554,121 @@ size_t PromptFlashAttentionTiling::GetPFABaseApiWorkSpaceSize(uint32_t& blockDim
 }
 
 ge::graphStatus PromptFlashAttentionTiling::TilingGetTilingKeyAttentionAscendC(uint64_t& tilingKey,
-    ContextParamsForPFATiling& contextKeyParams, bool useNewTiling, PromptFlashAttentionTilingData &tilingData) {
+    ContextParamsForPFATiling& contextKeyParams, bool useNewTiling, PromptFlashAttentionTilingData* tilingData) {
     auto inputDataType = contextKeyParams.inputDataType;  // input q
     auto attenMaskElemType = contextKeyParams.maskDataType;
     auto outputDataType = contextKeyParams.outputDataType;  // output tensor
-    tilingData.promptAttentionBaseParams.set_attenMaskElemType(attenMaskElemType);
+    tilingData->promptAttentionBaseParams.set_attenMaskElemType(attenMaskElemType);
 
     if (curShortSocName == platform_ascendc::SocVersion::ASCEND310P) {
-        tilingKey = 12288U; // 12288: 310p tiling
+        g_tail = 8;
+        g_newTiling = 8;
+        g_qT = 2;
+        g_precisionMode = 2;
+        g_outT = 1;
+        g_layoutT = 0;
+        g_mmType = 0;
+        g_pageAttention = 0;
+        g_enablePrefix = 0;
+        g_msdMode = 0;
+        g_cvdiffBase = 0;
+        g_cvdiffMla = 0;
+        g_kvT = 0;
+        g_templateVersion = 0;
         if (inputLayout != InputLayout::BNSD) {
-            tilingKey += tiling_key_10000U;
+            g_outT += 1;
         }  // 10000 : BSH/BSND 22288
         if ((inputDataType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) {
-            tilingKey += 600U;
+            g_precisionMode += 6;
         } // innerPrecise 0, add 600
 
         return ge::GRAPH_SUCCESS;
     }
-    tilingKey = 0U;
+    g_tail = 0;
+    g_newTiling = 0;
+    g_qT = 0;
+    g_precisionMode = 0;
+    g_outT = 0;
+    g_layoutT = 0;
+    g_mmType = 0;
+    g_pageAttention = 0;
+    g_enablePrefix = 0;
+    g_msdMode = 0;
+    g_cvdiffBase = 0;
+    g_cvdiffMla = 0;
+    g_kvT = 0;
+    g_templateVersion = 0;
     // If not in CV diff template,when there is a tail block, tilingKey should increase by 1.
     if (!((tilingMod == TilingMod::CVDIFF) || (isSOuterNoTail && isSInnerNoTail && isDNoTail))) {
-        tilingKey += 1U;
+        g_tail += 1;
     }
     if (inputDataType == ge::DT_BF16) {
-        tilingKey += 100U;
+        g_qT += 1;
     } // When the input qkv is BF16, add 100.
     if (inputDataType == ge::DT_INT8) {
-        tilingKey += 200U;
+        g_qT += 2;
     } // When the input qkv is INT8, add 200.
     if (tilingMod == TilingMod::CVDIFF) {
-        tilingKey += 1002U;
+        g_precisionMode += 1;
+        g_tail += 2;
     } // 1002: Add 1000 when using CV diff; Without distinguishing between tail and no tail, add 2 uniformly.
     if (outputDataType == ge::DT_INT8 ) {
-        tilingKey += tiling_key_20000U;
+        g_outT += 2;
     } // When output is INT8, add 20000.
 
     if (!useNewTiling) {
         return ge::GRAPH_SUCCESS; // The old template does not consider NSD differences, only 0, 1, 100, 101
     }
 
-    tilingKey += 10U; // New Template 10、11、15、16、110、111、115、116.
-    tilingKey += (inputLayout == InputLayout::BNSD) || (inputLayout == InputLayout::NSD) ? 5U : 0U;
+    g_newTiling += 1;   // New Template 10、11、15、16、110、111、115、116.
+    g_tail += (inputLayout == InputLayout::BNSD) || (inputLayout == InputLayout::NSD) ? 5U : 0U;
 
     // The KV cache inverse quantization for CV diff currently only handles the case where Q in the CV diff template is FP16.
     if ((inputDataType == ge::DT_FLOAT16 || inputDataType == ge::DT_BF16) && (tilingMod == TilingMod::CVDIFF)) {
-        tilingKey = 1012U;    // 1012：CV diff, +1000; new_tiling, +10; not distinguishing between tail and total, +2.
-        tilingKey += ((inputDataType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) || (enableMsd && contextKeyParams.inputDataType == ge::DT_FLOAT16 && contextKeyParams.kDataType == ge::DT_INT8) ? 600U : 0U;  // fp16 high precision mode, regarded as a type 600.
-        tilingKey += (inputDataType == ge::DT_BF16) ? 100U : 0U;    // 100: bf16
-        tilingKey += (outputDataType == ge::DT_BF16) ? tiling_key_10000U : 0U; // When the output dtype is bf16, tilingKey should increase by 10000.
-        tilingKey += (outputDataType == ge::DT_INT8) ? tiling_key_20000U : 0U; // 20000: The situation of outputDataType == ge::DT_INT8
+        g_tail = 2;
+        g_newTiling = 1;
+        g_qT = 0;
+        g_precisionMode = 1;
+        g_outT = 0;
+        g_layoutT = 0;
+        g_mmType = 0;
+        g_pageAttention = 0;
+        g_enablePrefix = 0;
+        g_msdMode = 0;
+        g_cvdiffBase = 0;
+        g_cvdiffMla = 0;
+        g_kvT = 0;
+        g_templateVersion = 0;
+
+        g_qT += ((inputDataType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) || (enableMsd && contextKeyParams.inputDataType == ge::DT_FLOAT16 && contextKeyParams.kDataType == ge::DT_INT8) ? 6 : 0;    // fp16 high precision mode, regarded as a type 600.
+        g_qT += (inputDataType == ge::DT_BF16) ? 1 : 0;     // 100: bf16
+        g_outT += (outputDataType == ge::DT_BF16) ? 1 : 0;  // When the output dtype is bf16, tilingKey should increase by 10000.
+        g_outT += (outputDataType == ge::DT_INT8) ? 2 : 0;  // 20000: The situation of outputDataType == ge::DT_INT8
         if ((inputLayout == InputLayout::BSH) || (inputLayout == InputLayout::SH) || (inputLayout == InputLayout::BSND)) {
-            tilingKey += 100000U;
+            g_layoutT += 1;
         }   // When the inputLayout is BSH, SH or BSND, plus 100000.
         if ((splitCoreMode != SplitCoreMode::SPLIT_NBS_CUBE && splitCoreMode != SplitCoreMode::SPLIT_ONEN_CUBE) && enableMatmulNorm) {
-            tilingKey += 1000000U;
+            g_mmType += 1;
         }  // Only enable matmul tiling optimization, do not enable l1reuse, add 1000000, mutually exclusive with the following situation of 2000000.
         if ((splitCoreMode == SplitCoreMode::SPLIT_NBS_CUBE || splitCoreMode == SplitCoreMode::SPLIT_ONEN_CUBE)) {
-            tilingKey += 2000000U;
+            g_mmType += 2;
         }   // l1reuse defaults to enabling matmul tiling optimization, with an additional 2000000, which is mutually exclusive from the 1000000 situation mentioned above.
         UpdateTilingKeyFlag(contextKeyParams, tilingKey);         // Determine whether to perform inverse quantization and generate a binary number by combining it with the remaining reserved bits, and take its decimal representation.
     }
 
     if (enablePA) {
-        tilingKey += 10000000U;  // 10000000: the situation of PA
+        g_pageAttention += 1;  // 10000000: the situation of PA
     }
 
     if (isKVHasPrefix) {
-        tilingKey += 100000000U;  // 100000000: the situation of prefix
+        g_enablePrefix += 1;    // 100000000: the situation of prefix
+        g_msdMode += 0;
     }
 
     if (enableMsd) {
-        tilingKey += 400200000000U;  // 400200000000: for msd
+        g_enablePrefix += 0;    // 400200000000: for msd
+        g_msdMode += 1;
+        g_kvT += 4;
     }
 
     return ge::GRAPH_SUCCESS;
@@ -616,51 +681,77 @@ ge::graphStatus PromptFlashAttentionTiling::TilingGetBaseApiTilingKeyAttentionAs
     auto outputDataType = contextKeyParams.outputDataType;  // output tensor
 
     if (curShortSocName == platform_ascendc::SocVersion::ASCEND310P) {
-        tilingKey = 12288U; // 12288: 310p tiling
+        g_tail = 8;
+        g_newTiling = 8;
+        g_qT = 2;
+        g_precisionMode = 2;
+        g_outT = 1;
+        g_layoutT = 0;
+        g_mmType = 0;
+        g_pageAttention = 0;
+        g_enablePrefix = 0;
+        g_msdMode = 0;
+        g_cvdiffBase = 0;
+        g_cvdiffMla = 0;
+        g_kvT = 0;
+        g_templateVersion = 0;
         if (inputLayout != InputLayout::BNSD) {
-            tilingKey += tiling_key_10000U;
+            g_precisionMode += 1;
         }  // 10000 : BSH/BSND 22288
         if ((inputDataType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) {
-            tilingKey += 600U;
+            g_qT += 6;
         } // innerPrecise 0, add 600
         if (atbRunFlag_) {
-            tilingKey += 100000U;
+            g_outT += 1;
         }
         return ge::GRAPH_SUCCESS;
     } else {
-        tilingKey = 12U;
+        g_tail = 2;
+        g_newTiling = 1;
+        g_qT = 0;
+        g_precisionMode = 0;
+        g_outT = 0;
+        g_layoutT = 0;
+        g_mmType = 0;
+        g_pageAttention = 0;
+        g_enablePrefix = 0;
+        g_msdMode = 0;
+        g_cvdiffBase = 0;
+        g_cvdiffMla = 0;
+        g_kvT = 0;
+        g_templateVersion = 0;
         BENCHMARK_TILING_KEY = BENCHMARK_TILING_KEY_4;
-        tilingKey += (inputDataType == ge::DT_BF16) ? 100U : 0U;
-        tilingKey += (inputDataType == ge::DT_INT8) ? 200U : 0U;
+        g_qT += (inputDataType == ge::DT_BF16) ? 1 : 0;
+        g_qT += (inputDataType == ge::DT_BF16) ? 2 : 0;
         if (innerPrecise == static_cast<decltype(innerPrecise)>(HIGH_PERFORMANCE)) {
-            tilingKey += 1000U;
+            g_precisionMode += 1;
         }
-        tilingKey += (outputDataType == ge::DT_BF16) ? tiling_key_10000U : 0U;
-        tilingKey += (outputDataType == ge::DT_INT8) ? tiling_key_20000U : 0U;
+        g_outT += (outputDataType == ge::DT_BF16) ? 1 : 0;
+        g_outT += (outputDataType == ge::DT_INT8) ? 2 : 0;
         if (tilingMod == TilingMod::CVDIFF_BASE_API && innerPrecise == HIGH_PRECISION && !contextKeyParams.pseShift
             && !contextKeyParams.deqScale1Shape && !contextKeyParams.deqScale2Shape
             && !contextKeyParams.scale1Shape && !contextKeyParams.scale2Shape
             && !contextKeyParams.offset2Shape) {
-            tilingKey += 2000000000U;
+            g_cvdiffBase += 2;
         }
         if (tilingMod == TilingMod::CVDIFF_MLA) {
-            tilingKey += 10000000000U;
+            g_cvdiffMla += 1;
         }
-        tilingKey += (kDataType == ge::DT_INT8 && vDataType == ge::DT_INT8) ? 100000000000U : 0U;
+        g_kvT += (kDataType == ge::DT_INT8 && vDataType == ge::DT_INT8) ? 1 : 0;
     }
     return ge::GRAPH_SUCCESS;
 }
 
 
 void PromptFlashAttentionTiling::PromptFlashAttentionSplitNS(ContextParamsForPFATiling& contextKeyParams,
-                                            PromptFlashAttentionTilingData& tilingData,
+                                            PromptFlashAttentionTilingData* tilingData,
                                             uint32_t curCoreNum, std::vector<int64_t>& actualSeqLengths) {
     if (contextKeyParams.fromTilingSink != 0U) {
         return;
     }
-    PromptAttentionSingleCoreParams* singleCoreParams = &tilingData.promptAttentionSingleCoreParams;
-    PromptAttentionBaseParams* baseParams = &tilingData.promptAttentionBaseParams;
-    PromptAttentionSeqParams* seqParams = &tilingData.promptAttentionSeqParams;
+    PromptAttentionSingleCoreParams* singleCoreParams = &tilingData->promptAttentionSingleCoreParams;
+    PromptAttentionBaseParams* baseParams = &tilingData->promptAttentionBaseParams;
+    PromptAttentionSeqParams* seqParams = &tilingData->promptAttentionSeqParams;
 
     uint32_t arrayLen = baseParams->get_dimNumOfseq();
 
@@ -726,9 +817,9 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSplitNS(ContextParamsForPFA
 }
 
 void PromptFlashAttentionTiling::PromptFlashAttentionInitOutputSplit(uint64_t totalSize,
-    PromptFlashAttentionTilingData &tilingData, uint32_t curCoreNum)
+    PromptFlashAttentionTilingData* tilingData, uint32_t curCoreNum)
 {
-    PromptAttentionInitOutputParams *initParams = &tilingData.promptAttentionInitOutputParams;
+    PromptAttentionInitOutputParams *initParams = &tilingData->promptAttentionInitOutputParams;
 
     uint32_t singleCoreSize = (static_cast<uint32_t>(totalSize) + curCoreNum - 1U) / (curCoreNum); // Upward rounding, coreNum has been verified to be non-zero when obtained.
 
@@ -741,21 +832,21 @@ void PromptFlashAttentionTiling::PromptFlashAttentionInitOutputSplit(uint64_t to
 }
 
 void PromptFlashAttentionTiling::PromptFlashAttentionInitSoftmaxLseOutputSplit(uint64_t totalSize,
-    PromptFlashAttentionTilingData &tilingData)
+    PromptFlashAttentionTilingData* tilingData)
 {
-    PromptAttentionInitOutputParams *initParams = &tilingData.promptAttentionInitOutputParams;
+    PromptAttentionInitOutputParams *initParams = &tilingData->promptAttentionInitOutputParams;
     initParams->set_totalSoftMaxLseOutputSize(totalSize);
 }
 
 void PromptFlashAttentionTiling::PromptFlashAttentionSplitNSNew(
-    ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData,
+    ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData* tilingData,
     uint32_t curCoreNum, std::vector<int64_t>& actualSeqLengths, std::vector<int64_t>& actualSeqLengthsKV, int64_t actualSharedPrefixLen, bool useBalanceTiling) {
     if (contextKeyParams.fromTilingSink != 0U) {
         return;
     }
-    PromptAttentionSingleCoreParams* singleCoreParams = &tilingData.promptAttentionSingleCoreParams;
-    PromptAttentionBaseParams* baseParams = &tilingData.promptAttentionBaseParams;
-    PromptAttentionSeqParams* seqParams = &tilingData.promptAttentionSeqParams;
+    PromptAttentionSingleCoreParams* singleCoreParams = &tilingData->promptAttentionSingleCoreParams;
+    PromptAttentionBaseParams* baseParams = &tilingData->promptAttentionBaseParams;
+    PromptAttentionSeqParams* seqParams = &tilingData->promptAttentionSeqParams;
 
     uint32_t arrayLen = baseParams->get_dimNumOfseq();
     uint32_t sOuterSize = singleCoreParams->get_singleProcessSOuterSize();
@@ -892,9 +983,9 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSplitNSNew(
     singleCoreParams->set_actualCoreNums(actualCoreNums);
 }
 
-void PromptFlashAttentionTiling::GetPreNextTokensLeftUp(PromptFlashAttentionTilingData& tilingData,
+void PromptFlashAttentionTiling::GetPreNextTokensLeftUp(PromptFlashAttentionTilingData* tilingData,
     uint32_t actualSeqLength, uint32_t actualSeqLengthKV, int64_t& preTokensLeftUp, int64_t& nextTokensLeftUp) {
-    PromptAttentionBaseParams* baseParams = &tilingData.promptAttentionBaseParams;
+    PromptAttentionBaseParams* baseParams = &tilingData->promptAttentionBaseParams;
     int64_t sparsePreTokens = baseParams->get_preTokens();
     int64_t sparseNextTokens = baseParams->get_nextTokens();
     if (baseParams->get_sparseMode() == SPARSE_MODE_RIGHT_DOWN) {
@@ -909,8 +1000,8 @@ void PromptFlashAttentionTiling::GetPreNextTokensLeftUp(PromptFlashAttentionTili
     }
 }
 
-void PromptFlashAttentionTiling::SetSplitCoreMode(PromptFlashAttentionTilingData& tilingData, uint32_t sOuterFactor) {
-    PromptAttentionBaseParams* baseParams = &tilingData.promptAttentionBaseParams;
+void PromptFlashAttentionTiling::SetSplitCoreMode(PromptFlashAttentionTilingData* tilingData, uint32_t sOuterFactor) {
+    PromptAttentionBaseParams* baseParams = &tilingData->promptAttentionBaseParams;
 
     uint32_t actualSeqLength = baseParams->get_seqSize();
     uint32_t actualSeqLengthKV = baseParams->get_seqInnerSize();
@@ -944,7 +1035,7 @@ void PromptFlashAttentionTiling::SetSplitCoreMode(PromptFlashAttentionTilingData
     }
     bool enableOneNByCubeSeqMode = actualSeqLength >= seq16K && (b * n >= 12U);  // 12 : b * n should be more than 12.
     bool enableNBSByCubeSeqMode = actualSeqLength >= seq3K && (b * n * sOuterLoopByCube >= coreNum);
-    bool noBalance = static_cast<uint32_t>((baseParams->get_headNumRatio()) != 1 || b != 1 || tilingData.promptAttentionInitOutputParams.get_needInit()) ||
+    bool noBalance = static_cast<uint32_t>((baseParams->get_headNumRatio()) != 1 || b != 1 || tilingData->promptAttentionInitOutputParams.get_needInit()) ||
                      (actualSeqLength >= seq8K && contextKeyParamsPtr->attentionMask == nullptr);
     if (baseCond && enableOneNByCubeToken && enableOneNByCubeSeqMode) {
         splitCoreMode = SplitCoreMode::SPLIT_ONEN_CUBE;
@@ -953,11 +1044,11 @@ void PromptFlashAttentionTiling::SetSplitCoreMode(PromptFlashAttentionTilingData
     }
 }
 
-void PromptFlashAttentionTiling::PromptFlashAttentionSplitSeqOneN(PromptFlashAttentionTilingData& tilingData,
+void PromptFlashAttentionTiling::PromptFlashAttentionSplitSeqOneN(PromptFlashAttentionTilingData* tilingData,
                                                                   uint32_t curCoreNum, bool isVectorCore) {
-    PromptAttentionBaseParams* baseParams = &tilingData.promptAttentionBaseParams;
-    PromptAttentionSingleCoreParams* singleCoreParams = &tilingData.promptAttentionSingleCoreParams;
-    PromptAttentionSeqParams* seqParams = &tilingData.promptAttentionSeqParams;
+    PromptAttentionBaseParams* baseParams = &tilingData->promptAttentionBaseParams;
+    PromptAttentionSingleCoreParams* singleCoreParams = &tilingData->promptAttentionSingleCoreParams;
+    PromptAttentionSeqParams* seqParams = &tilingData->promptAttentionSeqParams;
 
     uint32_t actualSeqLength = baseParams->get_seqSize();
     uint32_t actualSeqLengthKV = baseParams->get_seqInnerSize();
@@ -1021,14 +1112,14 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSplitSeqOneN(PromptFlashAtt
     singleCoreParams->set_actualCoreNums(actualCoreNums);
 }
 
-bool PromptFlashAttentionTiling::EnableMTE2BmmPipe(PromptFlashAttentionTilingData& tilingData,
-                                                   matmul_tiling::MatmulApiTiling& bmm, TCubeTiling& bmmTilingData,
+bool PromptFlashAttentionTiling::EnableMTE2BmmPipe(PromptFlashAttentionTilingData* tilingData,
+                                                   matmul_tiling::MatmulApiTiling& bmm, AscendC::tiling::TCubeTiling& bmmTilingData,
                                                    uint32_t sOuterFactor, uint32_t sInnerFactor) {
-    if (tilingData.promptAttentionBaseParams.get_seqSize() > 16) { // When the size is greater than 16, use xiaoe speculative inference.
+    if (tilingData->promptAttentionBaseParams.get_seqSize() > 16) { // When the size is greater than 16, use xiaoe speculative inference.
         return true;
     }
     uint32_t baseK = 32U;
-    uint32_t head_size = tilingData.promptAttentionBaseParams.get_headSize();
+    uint32_t head_size = tilingData->promptAttentionBaseParams.get_headSize();
     if(head_size%baseK != 0U) {
         return true;
     }
@@ -1047,10 +1138,10 @@ bool PromptFlashAttentionTiling::EnableMTE2BmmPipe(PromptFlashAttentionTilingDat
     return res;
 }
 
-void PromptFlashAttentionTiling::EnableBmmDoubleBuffer(TCubeTiling& bmmTilingData) {
-    if ((bmmTilingData.get_depthA1() == 1) && (bmmTilingData.get_depthB1() == 1)) {
-        bmmTilingData.set_depthA1(2); // 2 : depthA1
-        bmmTilingData.set_depthB1(2); // 2 : depthB1
+void PromptFlashAttentionTiling::EnableBmmDoubleBuffer(AscendC::tiling::TCubeTiling& bmmTilingData) {
+    if ((bmmTilingData.depthA1 == 1) && (bmmTilingData.depthB1 == 1)) {
+        bmmTilingData.depthA1 = 2; // 2 : depthA1
+        bmmTilingData.depthB1 = 2; // 2 : depthB1
     }
 }
 
@@ -1105,8 +1196,8 @@ ge::graphStatus PromptFlashAttentionTiling::CheckKeyValueParamsConsistency(const
     return ge::GRAPH_SUCCESS;
 }
 
-bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm1(PromptFlashAttentionTilingData& tilingData,
-    TCubeTiling& bmm1TilingData,  int64_t l1SizeRemain, int64_t l0CSize,
+bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm1(PromptFlashAttentionTilingData* tilingData,
+    AscendC::tiling::TCubeTiling& bmm1TilingData,  int64_t l1SizeRemain, int64_t l0CSize,
     uint32_t sOuterFactor, uint32_t sInnerFactor, bool allGM, bool autoBaseMNK) {
     int32_t ret = 0;
     matmul_tiling::MatmulApiTiling bmm1(ascendPlatformInfo);
@@ -1121,42 +1212,42 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm1(PromptFlashAttent
         bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm1InputType, true);
         bmm1.SetCType(cPosition, matmul_tiling::CubeFormat::ND, bmm1OutputType);
     }
-    ret = bmm1.SetShape(sOuterFactor, sInnerFactor, tilingData.promptAttentionBaseParams.get_headSize());
+    ret = bmm1.SetShape(sOuterFactor, sInnerFactor, tilingData->promptAttentionBaseParams.get_headSize());
     OP_CHECK_IF(ret != 0,
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "bmm1 SetShape failed, ret = %d!", ret),
                     return false);
-    int32_t ratio = tilingData.promptAttentionBaseParams.get_headNumRatio();
+    int32_t ratio = tilingData->promptAttentionBaseParams.get_headNumRatio();
     if (ratio == 0) {
         return false;
     }
-    int32_t strideQ = tilingData.promptAttentionBaseParams.get_headSize() *
-                        tilingData.promptAttentionBaseParams.get_headNumSize();
+    int32_t strideQ = tilingData->promptAttentionBaseParams.get_headSize() *
+                        tilingData->promptAttentionBaseParams.get_headNumSize();
     int32_t strideK = strideQ / ratio;
     if ((inputLayout == InputLayout::BSH) || (inputLayout == InputLayout::SH) ||
         (inputLayout == InputLayout::BSND)) {
-        bmm1.SetOrgShape(tilingData.promptAttentionBaseParams.get_seqSize(),
-                    tilingData.promptAttentionBaseParams.get_seqInnerSize(),
+        bmm1.SetOrgShape(tilingData->promptAttentionBaseParams.get_seqSize(),
+                    tilingData->promptAttentionBaseParams.get_seqInnerSize(),
                     strideQ, strideK);
 
         if (enableKvAntiquant) {
-            bmm1.SetOrgShape(tilingData.promptAttentionBaseParams.get_seqSize(),
-                             tilingData.promptAttentionBaseParams.get_seqInnerSize(),
-                             strideQ, tilingData.promptAttentionBaseParams.get_headSize());
+            bmm1.SetOrgShape(tilingData->promptAttentionBaseParams.get_seqSize(),
+                             tilingData->promptAttentionBaseParams.get_seqInnerSize(),
+                             strideQ, tilingData->promptAttentionBaseParams.get_headSize());
         } else if (enableMsd) {
             // Left input BNSD, right input BSH
-            bmm1.SetOrgShape(tilingData.promptAttentionBaseParams.get_seqSize(),
-                             tilingData.promptAttentionBaseParams.get_seqInnerSize(),
-                             tilingData.promptAttentionBaseParams.get_headSize(), strideK);
+            bmm1.SetOrgShape(tilingData->promptAttentionBaseParams.get_seqSize(),
+                             tilingData->promptAttentionBaseParams.get_seqInnerSize(),
+                             tilingData->promptAttentionBaseParams.get_headSize(), strideK);
         }
     } else if ((inputLayout == InputLayout::BNSD) || (inputLayout == InputLayout::NSD)) {
         if (enablePA && PAlayoutType == 1U) {  // The left matrix of PA is BNSD, and the right matrix is BSH.
-            bmm1.SetOrgShape(tilingData.promptAttentionBaseParams.get_seqSize(),
-                     tilingData.promptAttentionBaseParams.get_seqInnerSize(),
-                     tilingData.promptAttentionBaseParams.get_headSize(), strideK);
+            bmm1.SetOrgShape(tilingData->promptAttentionBaseParams.get_seqSize(),
+                     tilingData->promptAttentionBaseParams.get_seqInnerSize(),
+                     tilingData->promptAttentionBaseParams.get_headSize(), strideK);
         } else {
-            bmm1.SetOrgShape(tilingData.promptAttentionBaseParams.get_seqSize(),
-                     tilingData.promptAttentionBaseParams.get_seqInnerSize(),
-                     tilingData.promptAttentionBaseParams.get_headSize());
+            bmm1.SetOrgShape(tilingData->promptAttentionBaseParams.get_seqSize(),
+                     tilingData->promptAttentionBaseParams.get_seqInnerSize(),
+                     tilingData->promptAttentionBaseParams.get_headSize());
         }
     }
 
@@ -1212,11 +1303,11 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm1(PromptFlashAttent
                     l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, autoBaseMNK, ret),
                     return false);
 
-    bmm1TilingData.set_shareMode(0);
-    bmm1TilingData.set_shareL1Size(l1SizeRemain);
-    bmm1TilingData.set_shareL0CSize(l0CSize);
+    bmm1TilingData.shareMode = 0;
+    bmm1TilingData.shareL1Size = l1SizeRemain;
+    bmm1TilingData.shareL0CSize = l0CSize;
     if (curShortSocName != platform_ascendc::SocVersion::ASCEND310P) {
-        bmm1TilingData.set_shareUbSize(0);
+        bmm1TilingData.shareUbSize = 0;
         EnableBmmDoubleBuffer(bmm1TilingData); // Open the double buffer for BMM1 calculation, and BMM1's MTE2 can be bound.
     }
 
@@ -1243,27 +1334,27 @@ void PromptFlashAttentionTiling::GetMatMulType(matmul_tiling::DataType &mmInputT
     }
 }
 
-bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm2(PromptFlashAttentionTilingData& tilingData,
-    TCubeTiling& bmm2TilingData,  int64_t l1SizeRemain, int64_t l0CSize,
+bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm2(PromptFlashAttentionTilingData* tilingData,
+    AscendC::tiling::TCubeTiling& bmm2TilingData,  int64_t l1SizeRemain, int64_t l0CSize,
     uint32_t sOuterFactor, uint32_t sInnerFactor, uint32_t dSplitFactor, bool allGM, bool autoBaseMNK) {
     int32_t ret = 0;
     matmul_tiling::MatmulApiTiling bmm2(ascendPlatformInfo);
     if (curShortSocName == platform_ascendc::SocVersion::ASCEND310P) {
         PromptFlashAttention310PSetBmm2(bmm2);
-        ret = bmm2.SetShape(sOuterFactor, tilingData.promptAttentionBaseParams.get_headSize(), sInnerFactor);
+        ret = bmm2.SetShape(sOuterFactor, tilingData->promptAttentionBaseParams.get_headSize(), sInnerFactor);
         if ((inputLayout == InputLayout::BSH) || (inputLayout == InputLayout::BSND)) {
-            int32_t ratio = tilingData.promptAttentionBaseParams.get_headNumRatio();
+            int32_t ratio = tilingData->promptAttentionBaseParams.get_headNumRatio();
             if (ratio == 0) {
                 return false;
             }
-            int32_t strideQ = tilingData.promptAttentionBaseParams.get_headSize() *
-                            tilingData.promptAttentionBaseParams.get_headNumSize();
+            int32_t strideQ = tilingData->promptAttentionBaseParams.get_headSize() *
+                            tilingData->promptAttentionBaseParams.get_headNumSize();
             int32_t strideV = strideQ / ratio;
             bmm2.SetOrgShape(sOuterFactor, strideV, sInnerFactor,
-                            tilingData.promptAttentionBaseParams.get_seqInnerSize());
+                            tilingData->promptAttentionBaseParams.get_seqInnerSize());
         } else if ((inputLayout == InputLayout::BNSD) || (inputLayout == InputLayout::NSD)) { // M, N, KA, KB
-            bmm2.SetOrgShape(sOuterFactor, tilingData.promptAttentionBaseParams.get_headSize(), sInnerFactor,
-                            tilingData.promptAttentionBaseParams.get_seqInnerSize());
+            bmm2.SetOrgShape(sOuterFactor, tilingData->promptAttentionBaseParams.get_headSize(), sInnerFactor,
+                            tilingData->promptAttentionBaseParams.get_seqInnerSize());
         }
     } else { // This is for 910B.
         matmul_tiling::DataType bmm2InputType = matmul_tiling::DataType::DT_FLOAT16;
@@ -1273,44 +1364,44 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm2(PromptFlashAttent
             bmm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm2InputType, false);
             bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm2InputType, false);
             bmm2.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm2OutputType);
-            ret = bmm2.SetShape(sOuterFactor, tilingData.promptAttentionBaseParams.get_headSize(),
-                            tilingData.promptAttentionBaseParams.get_seqInnerSize());
+            ret = bmm2.SetShape(sOuterFactor, tilingData->promptAttentionBaseParams.get_headSize(),
+                            tilingData->promptAttentionBaseParams.get_seqInnerSize());
         } else {
             matmul_tiling::TPosition aPosition = allGM ? matmul_tiling::TPosition::GM : matmul_tiling::TPosition::TSCM;
             matmul_tiling::TPosition cPosition = allGM ? matmul_tiling::TPosition::GM : matmul_tiling::TPosition::VECCALC;
             bmm2.SetAType(aPosition, matmul_tiling::CubeFormat::NZ, bmm2InputType, false);
             bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm2InputType, false);
             bmm2.SetCType(cPosition, matmul_tiling::CubeFormat::ND_ALIGN, bmm2OutputType);
-            ret = bmm2.SetShape(sOuterFactor, tilingData.promptAttentionBaseParams.get_headSize(), sInnerFactor);
+            ret = bmm2.SetShape(sOuterFactor, tilingData->promptAttentionBaseParams.get_headSize(), sInnerFactor);
         }
     OP_CHECK_IF(ret != 0,
                 OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "bmm2 set SetShape failed, sOuterFactor = %u, sInnerFactor = %u, ret = %d!",
                 sOuterFactor, sInnerFactor, ret),
                 return false);
-    int32_t ratio = tilingData.promptAttentionBaseParams.get_headNumRatio();
+    int32_t ratio = tilingData->promptAttentionBaseParams.get_headNumRatio();
     if (ratio == 0) {
         return false;
     }
-    int32_t strideQ = tilingData.promptAttentionBaseParams.get_headSize() *
-                    tilingData.promptAttentionBaseParams.get_headNumSize();
+    int32_t strideQ = tilingData->promptAttentionBaseParams.get_headSize() *
+                    tilingData->promptAttentionBaseParams.get_headNumSize();
     int32_t strideV = strideQ / ratio;
         if ((inputLayout == InputLayout::BSH) || (inputLayout == InputLayout::BSND) ||
             (inputLayout == InputLayout::SH)) {
-            bmm2.SetOrgShape(tilingData.promptAttentionBaseParams.get_seqSize(), strideV,
-                            tilingData.promptAttentionBaseParams.get_seqInnerSize());
+            bmm2.SetOrgShape(tilingData->promptAttentionBaseParams.get_seqSize(), strideV,
+                            tilingData->promptAttentionBaseParams.get_seqInnerSize());
             if (enableKvAntiquant) {
-                bmm2.SetOrgShape(tilingData.promptAttentionBaseParams.get_seqSize(),
-                                 tilingData.promptAttentionBaseParams.get_headSize(),
-                                 tilingData.promptAttentionBaseParams.get_seqInnerSize());
+                bmm2.SetOrgShape(tilingData->promptAttentionBaseParams.get_seqSize(),
+                                 tilingData->promptAttentionBaseParams.get_headSize(),
+                                 tilingData->promptAttentionBaseParams.get_seqInnerSize());
             }
         } else if ((inputLayout == InputLayout::BNSD) || (inputLayout == InputLayout::NSD)) {
             if (enablePA && PAlayoutType == 1U) {  // The left matrix of PA is BNSD, and the right matrix is of PA is BSH.
-                bmm2.SetOrgShape(tilingData.promptAttentionBaseParams.get_seqSize(), strideV,
-                            tilingData.promptAttentionBaseParams.get_seqInnerSize());
+                bmm2.SetOrgShape(tilingData->promptAttentionBaseParams.get_seqSize(), strideV,
+                            tilingData->promptAttentionBaseParams.get_seqInnerSize());
             } else {
-                bmm2.SetOrgShape(tilingData.promptAttentionBaseParams.get_seqSize(),
-                            tilingData.promptAttentionBaseParams.get_headSize(),
-                            tilingData.promptAttentionBaseParams.get_seqInnerSize());
+                bmm2.SetOrgShape(tilingData->promptAttentionBaseParams.get_seqSize(),
+                            tilingData->promptAttentionBaseParams.get_headSize(),
+                            tilingData->promptAttentionBaseParams.get_seqInnerSize());
             }
         }
     }
@@ -1328,7 +1419,7 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm2(PromptFlashAttent
     if (autoBaseMNK) {
         if (enableMatmulNorm || splitCoreMode == SplitCoreMode::SPLIT_NBS_CUBE || splitCoreMode == SplitCoreMode::SPLIT_ONEN_CUBE) {
             uint32_t baseM = std::min(uint32_t(128), sOuterFactor);
-            uint32_t baseN = std::min(uint32_t(128), tilingData.promptAttentionBaseParams.get_headSize());
+            uint32_t baseN = std::min(uint32_t(128), tilingData->promptAttentionBaseParams.get_headSize());
             uint32_t baseK = 128U;
             ret = bmm2.SetFixSplit(baseM, baseN, baseK);
             OP_CHECK_IF(ret != 0,
@@ -1340,7 +1431,7 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm2(PromptFlashAttent
         if ((isDNoTail) || (splitS2 == 0U) || (splitD == 1U)) {
             ret = bmm2.SetFixSplit(sOuterFactor, dSplitFactor);
         } else {
-            ret = bmm2.SetFixSplit(sOuterFactor, tilingData.promptAttentionBaseParams.get_alignedHeadSize());
+            ret = bmm2.SetFixSplit(sOuterFactor, tilingData->promptAttentionBaseParams.get_alignedHeadSize());
         }
         OP_CHECK_IF(ret != 0,
                    OPS_REPORT_VECTOR_INNER_ERR("PromptFlashAttention", "bmm2 SetFixSplit failed, ret = %d!", ret),
@@ -1351,24 +1442,24 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm2(PromptFlashAttent
                 OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "bmm2 set GetTiling failed, l1SizeRemain = %ld, l0CSize = %ld, sOuterFactor = %u, sInnerFactor = %u, autoBaseMNK = %d, ret = %d!",
                 l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, autoBaseMNK, ret),
                 return false);
-    bmm2TilingData.set_shareMode(0);
-    bmm2TilingData.set_shareL1Size(l1SizeRemain);
-    bmm2TilingData.set_shareL0CSize(l0CSize);
+    bmm2TilingData.shareMode = 0;
+    bmm2TilingData.shareL1Size = l1SizeRemain;
+    bmm2TilingData.shareL0CSize = l0CSize;
     OP_CHECK_IF(ret != 0,
                 OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "bmm2 set shareL0CSize failed, l1SizeRemain = %ld, l0CSize = %ld, sOuterFactor = %u, sInnerFactor = %u, autoBaseMNK = %d, ret = %d!",
                 l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, autoBaseMNK, ret),
                 return false);
     if (curShortSocName != platform_ascendc::SocVersion::ASCEND310P) {
-         bmm2TilingData.set_shareUbSize(0);
+        bmm2TilingData.shareUbSize = 0;
     }
     return true;
 }
 
 void PromptFlashAttentionTiling::PromptFlashAttentionSetTensorSize(
-    PromptFlashAttentionTilingData& tilingData,
+    PromptFlashAttentionTilingData* tilingData,
     PromptAttentionSingleCoreTensorSize& tensorSize,
     uint32_t sOuterFactor, uint32_t sInnerFactor) {
-    if (tilingData.promptAttentionBaseParams.get_useMask() == 0U && usePseShift == 0U) {
+    if (tilingData->promptAttentionBaseParams.get_useMask() == 0U && usePseShift == 0U) {
         // In scenarios where attentionMask is not configured and there is no pse, UB memory for attentionMask can be saved
         // But 2 BYTE_BLOCK (32BYTE) UB memory needs to be reserved for Bmm2UpdateDiv
         tensorSize.set_attenMaskUbSize(sOuterFactor * BYTE_BLOCK * NUM_2 / softmaxDataTypeSize);
@@ -1383,7 +1474,7 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSetTensorSize(
     }
 
     if (enableMsd){
-        if (tilingData.promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
+        if (tilingData->promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
             tensorSize.set_mmResUbSize(COMPUTELINE_FOR_BIG_D * sInnerFactor * 2); // 2:double buffer
         } else {
             tensorSize.set_mmResUbSize(CVDIFF_SMALL_QS_THRESHOLDS * CVDIFF_MSD_BUFFER_SIZE_1024B / sizeof(int32_t));
@@ -1398,17 +1489,17 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSetTensorSize(
     if (enableMsd) {
         tensorSize.set_softmaxExpSize(MSD_UB_BASE_WIDTH * ONE_BLK_SIZE_PFA);
     } else {
-        tensorSize.set_softmaxExpSize(sOuterFactor * tilingData.promptAttentionBaseParams.get_softmaxTypeByteNum());
+        tensorSize.set_softmaxExpSize(sOuterFactor * tilingData->promptAttentionBaseParams.get_softmaxTypeByteNum());
     }
     tensorSize.set_softmaxValueSize(sOuterFactor * sInnerFactor);
     if (enableMsd) {
-        if (tilingData.promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
-            tensorSize.set_bmm2ResUbSize(MAX_COMPUTELINES * tilingData.promptAttentionBaseParams.get_alignedHeadSize());
+        if (tilingData->promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
+            tensorSize.set_bmm2ResUbSize(MAX_COMPUTELINES * tilingData->promptAttentionBaseParams.get_alignedHeadSize());
         } else {
              tensorSize.set_bmm2ResUbSize(MSD_UB_BASE_WIDTH * MSD_UB_HEGHT);
         }
      } else {
-        tensorSize.set_bmm2ResUbSize(sOuterFactor * tilingData.promptAttentionBaseParams.get_alignedHeadSize());
+        tensorSize.set_bmm2ResUbSize(sOuterFactor * tilingData->promptAttentionBaseParams.get_alignedHeadSize());
     }
     tensorSize.set_tmpMMResBmm2PreUbSize(std::max(tensorSize.get_mmResUbSize(), tensorSize.get_bmm2ResUbSize()));
     tensorSize.set_tmpSoftmaxBmm2UbSize(SOFTMAX_BUFFER_NUM * tensorSize.get_softmaxMaxSize());
@@ -1419,7 +1510,7 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSetTensorSize(
     }
     // 310P needs tscm buf
     if (curShortSocName == platform_ascendc::SocVersion::ASCEND310P) {
-        tensorSize.set_scmTmpSize(tilingData.promptAttentionBaseParams.get_headSize() * std::max(sOuterFactor, sInnerFactor));
+        tensorSize.set_scmTmpSize(tilingData->promptAttentionBaseParams.get_headSize() * std::max(sOuterFactor, sInnerFactor));
         tensorSize.set_softmaxMaxSize(sOuterFactor * (BYTE_BLOCK / softmaxDataTypeNZ_));
     } else {
         if (enableMsd) {
@@ -1428,7 +1519,7 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSetTensorSize(
             tensorSize.set_softmaxMaxSize(sOuterFactor * (BYTE_BLOCK / sizeof(float)));
         }
     }
-    if (tilingData.promptAttentionBaseParams.get_maskTypeByteNum() == (BYTE_BLOCK / BOOLSIZE)) {
+    if (tilingData->promptAttentionBaseParams.get_maskTypeByteNum() == (BYTE_BLOCK / BOOLSIZE)) {
         tensorSize.set_selectSpaceUbSize(GetSelectWithBytesMaskMinTmpSize(Shape({sOuterFactor, sInnerFactor}), Shape({1}), 1,
             Shape({sOuterFactor, sInnerFactor}), 1, false));
     } else {
@@ -1436,27 +1527,27 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSetTensorSize(
     }
 }
 
-int64_t PromptFlashAttentionTiling::PromptFlashAttentionSetMsdUbSize(PromptFlashAttentionTilingData& tilingData, PromptAttentionSingleCoreTensorSize& tensorSize, int32_t sInnerFactorTmp) const
+int64_t PromptFlashAttentionTiling::PromptFlashAttentionSetMsdUbSize(PromptFlashAttentionTilingData* tilingData, PromptAttentionSingleCoreTensorSize& tensorSize, int32_t sInnerFactorTmp) const
 {
     int64_t msdUbSize =  0;
     if (enableMsd) {
-        if (tilingData.promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
+        if (tilingData->promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
             int64_t msdTmpMmBufferSize = std::max(COMPUTELINE_FOR_BIG_D * sInnerFactorTmp * sizeof(float),
-                                                  MAX_COMPUTELINES * tilingData.promptAttentionBaseParams.get_headSize() * sizeof(float)); // 2:double buffer
-            tensorSize.set_msdInQueueSize(MAX_COMPUTELINES * tilingData.promptAttentionBaseParams.get_headSize() * FLOAT16SIZE);
+                                                  MAX_COMPUTELINES * tilingData->promptAttentionBaseParams.get_headSize() * sizeof(float)); // 2:double buffer
+            tensorSize.set_msdInQueueSize(MAX_COMPUTELINES * tilingData->promptAttentionBaseParams.get_headSize() * FLOAT16SIZE);
             tensorSize.set_msdQRowSumBuffSize(MAX_COMPUTELINES * 8 * sizeof(float)); // 8:param of ub
             tensorSize.set_msdAMaxTmpBuffSize(MAX_COMPUTELINES * 8 * sizeof(float)); // 8:param of ub
             tensorSize.set_msdAMaxResBuffSize(MAX_COMPUTELINES * 8 * sizeof(float)); // 8:param of ub
             tensorSize.set_msdSoftmaxResAmaxBuffSize(MAX_COMPUTELINES * 8 * sizeof(float)); // 8:param of ub
             tensorSize.set_msdSoftmaxRowSumScaleBuffSize(MAX_COMPUTELINES * 8 * sizeof(float)); // 8:param of ub
-            tensorSize.set_msdScaleBuffSize(tilingData.promptAttentionBaseParams.get_headSize() * sizeof(float));
-            tensorSize.set_msdOffsetBuffSize(tilingData.promptAttentionBaseParams.get_headSize() * sizeof(float));
+            tensorSize.set_msdScaleBuffSize(tilingData->promptAttentionBaseParams.get_headSize() * sizeof(float));
+            tensorSize.set_msdOffsetBuffSize(tilingData->promptAttentionBaseParams.get_headSize() * sizeof(float));
             tensorSize.set_msdTmpMm1BuffSize(msdTmpMmBufferSize);
             tensorSize.set_msdTmpMm2BuffSize(msdTmpMmBufferSize);
             tensorSize.set_msdOutQueueSize(msdTmpMmBufferSize / 2); // 2:half of msdOutQueueSize
 
             int64_t computeLines = COMPUTELINE_FOR_BIG_D;
-            tilingData.promptAttentionTensorSizeRect.set_msdComputeLines(computeLines);
+            tilingData->promptAttentionTensorSizeRect.set_msdComputeLines(computeLines);
         } else {
             tensorSize.set_msdInQueueSize(CVDIFF_SINNER_FACTOR_DEFAULT * MSD_UB_INQUEUE);
             tensorSize.set_msdQRowSumBuffSize(CVDIFF_MSD_BUFFER_SIZE_512B);
@@ -1481,18 +1572,18 @@ int64_t PromptFlashAttentionTiling::PromptFlashAttentionSetMsdUbSize(PromptFlash
     return msdUbSize;
 }
 
-uint32_t PromptFlashAttentionTiling::CalculateL1SizeUsed(PromptFlashAttentionTilingData& tilingData, const uint32_t typeByteSize)
+uint32_t PromptFlashAttentionTiling::CalculateL1SizeUsed(PromptFlashAttentionTilingData* tilingData, const uint32_t typeByteSize)
 {
     if (curShortSocName == platform_ascendc::SocVersion::ASCEND310P) {
-        return (typeByteSize * tilingData.promptAttentionTensorSizeRect.get_scmTmpSize() * 3); // 3：Two extra tscm buffers are needed for a1, b1 or b1, b2.
+        return (typeByteSize * tilingData->promptAttentionTensorSizeRect.get_scmTmpSize() * 3); // 3：Two extra tscm buffers are needed for a1, b1 or b1, b2.
     }
     if (curShortSocName == platform_ascendc::SocVersion::ASCEND910B) {
-        return (typeByteSize * tilingData.promptAttentionTensorSizeRect.get_scmTmpSize());
+        return (typeByteSize * tilingData->promptAttentionTensorSizeRect.get_scmTmpSize());
     }
     return 0;
 }
 
-bool PromptFlashAttentionTiling::PromptFlashAttentionCheckArgsLegal(PromptFlashAttentionTilingData& tilingData,
+bool PromptFlashAttentionTiling::PromptFlashAttentionCheckArgsLegal(PromptFlashAttentionTilingData* tilingData,
     int64_t ubSize, int64_t l1Size, int64_t l0CSize, uint32_t typeByteSize,
     uint32_t& sOuterFactor, uint32_t sInnerFactor,
     bool& updateDiv, uint32_t maskTypeSize, uint32_t dSplitFactor) {
@@ -1512,9 +1603,9 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckArgsLegal(PromptFlashA
     int64_t pseShiftBufferSize = 0;
     int64_t msdUbSize = 0;
 
-    PromptFlashAttentionSetTensorSize(tilingData, tilingData.promptAttentionTensorSizeRect,
+    PromptFlashAttentionSetTensorSize(tilingData, tilingData->promptAttentionTensorSizeRect,
                                         sOuterFactor, sInnerFactor);
-    msdUbSize = PromptFlashAttentionSetMsdUbSize(tilingData, tilingData.promptAttentionTensorSizeRect, static_cast<int32_t>(sInnerFactor));
+    msdUbSize = PromptFlashAttentionSetMsdUbSize(tilingData, tilingData->promptAttentionTensorSizeRect, static_cast<int32_t>(sInnerFactor));
     int32_t l1SizeRemain = l1Size - CalculateL1SizeUsed(tilingData, typeByteSize);
     if (l1SizeRemain < 0) {
         updateDiv = true;
@@ -1522,18 +1613,18 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckArgsLegal(PromptFlashA
         return res;
     }
 
-    res = (PromptFlashAttentionCheckBmm1(tilingData, tilingData.bmm1TilingDataRect,
+    res = (PromptFlashAttentionCheckBmm1(tilingData, tilingData->bmm1TilingDataRect,
         l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor)) &&
-        (PromptFlashAttentionCheckBmm2(tilingData, tilingData.bmm2TilingDataRect,
+        (PromptFlashAttentionCheckBmm2(tilingData, tilingData->bmm2TilingDataRect,
         l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, dSplitFactor));
 
     OP_CHECK_IF(res == false,
                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "PromptFlashAttentionCheckBmm1 or PromptFlashAttentionCheckBmm2 failed."),
                return false);
 
-    queueBufferSize = tilingData.promptAttentionTensorSizeRect.get_attenMaskUbSize();
+    queueBufferSize = tilingData->promptAttentionTensorSizeRect.get_attenMaskUbSize();
 
-    pseShiftBufferSize = tilingData.promptAttentionTensorSizeRect.get_pseShiftUbSize();
+    pseShiftBufferSize = tilingData->promptAttentionTensorSizeRect.get_pseShiftUbSize();
 
     pseMaskMaxSize = std::max(maskTypeSize, pseShiftElemSize);
 
@@ -1546,42 +1637,42 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckArgsLegal(PromptFlashA
         matmul_tiling::SysTilingTempBufSize mm1bufSize, mm2bufSize;
         int32_t getBufRes;
         apiTmpSize = GetApiTmpSize(sOuterFactor, sInnerFactor, typeByteSize);
-        getBufRes = MatmulGetTmpBufSize(tilingData.bmm1TilingDataRect, mm1bufSize);
-        getBufRes += MatmulGetTmpBufSize(tilingData.bmm2TilingDataRect, mm2bufSize);
+        getBufRes = MatmulGetTmpBufSizeV2(tilingData->bmm1TilingDataRect, mm1bufSize);
+        getBufRes += MatmulGetTmpBufSizeV2(tilingData->bmm2TilingDataRect, mm2bufSize);
         if (getBufRes < 0) {
             updateDiv = true;
             res = false;
             return res;
         }
         ubSizeRemain = ubSize - (apiTmpSize +
-                    tilingData.promptAttentionTensorSizeRect.get_mmResUbSize() +
-                    tilingData.promptAttentionTensorSizeRect.get_bmm2ResUbSize() * 2 + // 2:2 mm2 ub
-                    SOFTMAX_BUFFER_NUM * tilingData.promptAttentionTensorSizeRect.get_softmaxExpSize()) *
-                    typeByteSize - tilingData.promptAttentionTensorSizeRect.get_softmaxExpSize() * 4 - queueBufferSize * maskTypeSize * 2;    // 4: Multiply the obtained softmaxExpSize by 4, 2: Multiply maskTypeSize by 2
-        tilingData.promptAttentionTensorSizeRect.set_tmpSoftMaxV2Size((ubSizeRemain + apiTmpSize) / UB_ALIGN * UB_ALIGN);
-        tilingData.promptAttentionTensorSizeRect.set_mm1TmpUbSize(mm1bufSize.ubSize);
-        tilingData.promptAttentionTensorSizeRect.set_mm2TmpUbSize(mm2bufSize.ubSize);
+                    tilingData->promptAttentionTensorSizeRect.get_mmResUbSize() +
+                    tilingData->promptAttentionTensorSizeRect.get_bmm2ResUbSize() * 2 + // 2:2 mm2 ub
+                    SOFTMAX_BUFFER_NUM * tilingData->promptAttentionTensorSizeRect.get_softmaxExpSize()) *
+                    typeByteSize - tilingData->promptAttentionTensorSizeRect.get_softmaxExpSize() * 4 - queueBufferSize * maskTypeSize * 2;    // 4: Multiply the obtained softmaxExpSize by 4, 2: Multiply maskTypeSize by 2
+        tilingData->promptAttentionTensorSizeRect.set_tmpSoftMaxV2Size((ubSizeRemain + apiTmpSize) / UB_ALIGN * UB_ALIGN);
+        tilingData->promptAttentionTensorSizeRect.set_mm1TmpUbSize(mm1bufSize.ubSize);
+        tilingData->promptAttentionTensorSizeRect.set_mm2TmpUbSize(mm2bufSize.ubSize);
     } else {
         apiTmpSize = std::max(softmaxTmpSize, softmaxFlashTmpSize);
         if ((splitS2 == 1U) && (splitD == 1U)) {
-            ubSizeRemain = ubSize - apiTmpSize - (tilingData.promptAttentionTensorSizeRect.get_mmResUbSize() * SPLIT_DOUBLE_UB +
-                                    tilingData.promptAttentionTensorSizeRect.get_softmaxValueSize() +
-                                    SOFTMAX_BUFFER_NUM * tilingData.promptAttentionTensorSizeRect.get_softmaxExpSize()) *
+            ubSizeRemain = ubSize - apiTmpSize - (tilingData->promptAttentionTensorSizeRect.get_mmResUbSize() * SPLIT_DOUBLE_UB +
+                                    tilingData->promptAttentionTensorSizeRect.get_softmaxValueSize() +
+                                    SOFTMAX_BUFFER_NUM * tilingData->promptAttentionTensorSizeRect.get_softmaxExpSize()) *
                                     typeByteSize - (queueBufferSize * pseMaskMaxSize) -
-                                    tilingData.promptAttentionTensorSizeRect.get_selectSpaceUbSize() -
+                                    tilingData->promptAttentionTensorSizeRect.get_selectSpaceUbSize() -
                                     pseShiftBufferSize * pseShiftCastSize - msdUbSize;
         } else if ((splitS2 == 1U) && (splitD == 0U)) {
-            ubSizeRemain = ubSize - apiTmpSize - (tilingData.promptAttentionTensorSizeRect.get_mmResUbSize() +
-                                    tilingData.promptAttentionTensorSizeRect.get_bmm2ResUbSize() * NUM_2 + // 2:2 mm2 ub
-                                    SOFTMAX_BUFFER_NUM * tilingData.promptAttentionTensorSizeRect.get_softmaxExpSize()) *
+            ubSizeRemain = ubSize - apiTmpSize - (tilingData->promptAttentionTensorSizeRect.get_mmResUbSize() +
+                                    tilingData->promptAttentionTensorSizeRect.get_bmm2ResUbSize() * NUM_2 + // 2:2 mm2 ub
+                                    SOFTMAX_BUFFER_NUM * tilingData->promptAttentionTensorSizeRect.get_softmaxExpSize()) *
                                     typeByteSize - (queueBufferSize * pseMaskMaxSize) -
-                                    tilingData.promptAttentionTensorSizeRect.get_selectSpaceUbSize() -
+                                    tilingData->promptAttentionTensorSizeRect.get_selectSpaceUbSize() -
                                     pseShiftBufferSize * pseShiftCastSize - msdUbSize;
         } else {
-            ubSizeRemain = ubSize - apiTmpSize - (tilingData.promptAttentionTensorSizeRect.get_mmResUbSize() +
-                                    SPLIT_DOUBLE_UB * tilingData.promptAttentionTensorSizeRect.get_softmaxExpSize()) *
+            ubSizeRemain = ubSize - apiTmpSize - (tilingData->promptAttentionTensorSizeRect.get_mmResUbSize() +
+                                    SPLIT_DOUBLE_UB * tilingData->promptAttentionTensorSizeRect.get_softmaxExpSize()) *
                                     typeByteSize - (queueBufferSize * pseMaskMaxSize) -
-                                    tilingData.promptAttentionTensorSizeRect.get_selectSpaceUbSize() -
+                                    tilingData->promptAttentionTensorSizeRect.get_selectSpaceUbSize() -
                                     pseShiftBufferSize * pseShiftCastSize - msdUbSize;
         }
     }
@@ -1595,7 +1686,7 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckArgsLegal(PromptFlashA
     return res;
 }
 
-ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionApiTiling(PromptFlashAttentionTilingData& tilingData,
+ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionApiTiling(PromptFlashAttentionTilingData* tilingData,
     uint32_t typeSize,  uint32_t sOuterFactor, uint32_t softmaxSInnerFactor, uint32_t softmaxSOuterFactor) {
     auto softmaxShapeRect = Shape({softmaxSOuterFactor, softmaxSInnerFactor});
 
@@ -1605,38 +1696,30 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionApiTiling(Prompt
             return ge::GRAPH_FAILED;
         }
         SoftMaxFlashV2TilingFunc(softmaxShapeRect, softmaxDataTypeNZ_, softmaxDataTypeNZ_, (ubSizeRemain + apiTmpSize) / UB_ALIGN * UB_ALIGN,
-            tilingData.softmaxTilingDataRect, true);
+            tilingData->softmaxTilingDataRect, true);
     } else {
-        SoftMaxTilingFunc(softmaxShapeRect, sizeof(float), ubSizeRemain + apiTmpSize, tilingData.softmaxTilingDataRect);
+        SoftMaxTilingFunc(softmaxShapeRect, sizeof(float), ubSizeRemain + apiTmpSize, tilingData->softmaxTilingDataRect);
         SoftMaxFlashV2TilingFunc(softmaxShapeRect, softmaxDataTypeSize, sizeof(float), ubSizeRemain + apiTmpSize,
-            tilingData.softmaxFlashTilingDataRect, true, true);
+            tilingData->softmaxFlashTilingDataRect, true, true);
     }
 
     auto transposeSrcShapeRect = Shape({1, 1, sOuterFactor,
-                                      tilingData.promptAttentionBaseParams.get_headSize()});
-    auto transposeDstShape = Shape({tilingData.promptAttentionBaseParams.get_batchSize(),
-                                      tilingData.promptAttentionBaseParams.get_headNumSize(),
-                                      tilingData.promptAttentionBaseParams.get_seqSize(),
-                                      tilingData.promptAttentionBaseParams.get_headSize() *
-                                      tilingData.promptAttentionBaseParams.get_headNumSize()});
+                                      tilingData->promptAttentionBaseParams.get_headSize()});
+    auto transposeDstShape = Shape({tilingData->promptAttentionBaseParams.get_batchSize(),
+                                      tilingData->promptAttentionBaseParams.get_headNumSize(),
+                                      tilingData->promptAttentionBaseParams.get_seqSize(),
+                                      tilingData->promptAttentionBaseParams.get_headSize() *
+                                      tilingData->promptAttentionBaseParams.get_headNumSize()});
 
-    GetDataCopyTransposeTiling(transposeDstShape, transposeSrcShapeRect, typeSize, tilingData.transposeTilingDataRect);
+    tilingData->transposeTilingDataRect.GetDataCopyTransposeTiling(tilingData->promptAttentionBaseParams.get_batchSize(), tilingData->promptAttentionBaseParams.get_headNumSize(),
+                                                                  tilingData->promptAttentionBaseParams.get_seqSize(), tilingData->promptAttentionBaseParams.get_headSize() * tilingData->promptAttentionBaseParams.get_headNumSize(),
+                                                                  1, 1, sOuterFactor, tilingData->promptAttentionBaseParams.get_headSize(),
+                                                                  typeSize);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionSetTilingData(gert::TilingContext* context,
-    PromptFlashAttentionTilingData& tilingData) {
-    if (atbRunFlag_) {
-        baseApiTilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
-        context->GetRawTilingData()->SetDataSize(baseApiTilingData.GetDataSize());
-    } else if (mlaRunFlag_) {
-        mlaTilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
-        context->GetRawTilingData()->SetDataSize(mlaTilingData.GetDataSize());
-    } else {
-        tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
-        context->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
-    }
-
+    PromptFlashAttentionTilingData* tilingData) {
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1736,7 +1819,7 @@ bool PromptFlashAttentionTiling::CheckInputDimAndHeadNum(ContextParamsForPFATili
 
 bool PromptFlashAttentionTiling::SetTilingHeadNumRatio(ContextParamsForPFATiling& contextKeyParams,
                                                        const int32_t* numQueryHeads, const int32_t* numKeyValueHeads,
-                                                       PromptFlashAttentionTilingData& tilingData) {
+                                                       PromptFlashAttentionTilingData* tilingData) {
     const int32_t nQ = *numQueryHeads;
     const int32_t nKV = *numKeyValueHeads;
 
@@ -1750,7 +1833,7 @@ bool PromptFlashAttentionTiling::SetTilingHeadNumRatio(ContextParamsForPFATiling
     }
 
     if (nKV == 0) { // Detected that nKV is the default value, which means that the customer did not pass in.
-        tilingData.promptAttentionBaseParams.set_headNumRatio(1);
+        tilingData->promptAttentionBaseParams.set_headNumRatio(1);
         return true;
     }
 
@@ -1762,7 +1845,7 @@ bool PromptFlashAttentionTiling::SetTilingHeadNumRatio(ContextParamsForPFATiling
             OP_LOGE(contextKeyParams.opName, "numHeads / numKeyValueHeads = %d, cannot be larger than 64", nQ / nKV);
             return false;
         }
-        tilingData.promptAttentionBaseParams.set_headNumRatio(nQ / nKV);
+        tilingData->promptAttentionBaseParams.set_headNumRatio(nQ / nKV);
         return true;
     }
 }
@@ -1795,7 +1878,7 @@ bool PromptFlashAttentionTiling::CheckBaseApiNonEmptyShapeExceptions(ContextPara
 
 bool PromptFlashAttentionTiling::CheckActualSeqLength(ContextParamsForPFATiling& contextKeyParams, uint32_t b, uint32_t sQ, uint32_t sKV,
                                                       const gert::Tensor* actualSeqLenQ, const gert::Tensor* actualSeqLenKV,
-                                                      InputLayout inLayout, PromptFlashAttentionTilingData& tilingData) {
+                                                      InputLayout inLayout, PromptFlashAttentionTilingData* tilingData) {
     if (contextKeyParams.fromTilingSink != 0U) {
         return true;
     }
@@ -1821,8 +1904,8 @@ bool PromptFlashAttentionTiling::CheckActualSeqLength(ContextParamsForPFATiling&
         return true;
     }
     // Pass the length of actSeqlen to kernel.
-    tilingData.promptAttentionBaseParams.set_actualSeqLengthsSize(actualLenDimsQ);
-    tilingData.promptAttentionBaseParams.set_actualSeqLengthsKVSize(actualLenDimsKV);
+    tilingData->promptAttentionBaseParams.set_actualSeqLengthsSize(actualLenDimsQ);
+    tilingData->promptAttentionBaseParams.set_actualSeqLengthsKVSize(actualLenDimsKV);
 
     if (inputActualSeqQ) {   // check the length of actual_seq_lengthsQ, whether is 1 or batch size
         OP_CHECK_IF(actualLenDimsQ < b && actualLenDimsQ > actualLenDimsQMin,
@@ -2418,8 +2501,8 @@ bool PromptFlashAttentionTiling::CheckAttenMaskShape(ContextParamsForPFATiling& 
     return true;
 }
 
-bool PromptFlashAttentionTiling::CheckPAAntiquantSupportScenarios(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData) {
-    OP_CHECK_IF(!tilingData.promptAttentionBaseParams.get_isAntiPerchannel(),
+bool PromptFlashAttentionTiling::CheckPAAntiquantSupportScenarios(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData* tilingData) {
+    OP_CHECK_IF(!tilingData->promptAttentionBaseParams.get_isAntiPerchannel(),
         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "not support antiquant when blockTable is not null and antiquant mode is not perchannel"), return false);
     OP_CHECK_IF(contextKeyParams.inputDataType != ge::DT_FLOAT16 || contextKeyParams.kDataType != ge::DT_INT8,
         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "not support antiquant when q(%s) is not fp16 or kv(%s) is not int8", 
@@ -2506,9 +2589,9 @@ bool PromptFlashAttentionTiling::CheckPerchannelBSNDParamsShape(ContextParamsFor
 
 bool PromptFlashAttentionTiling::CheckAntiquantParamsShape(ContextParamsForPFATiling& contextKeyParams, const gert::StorageShape* antiquantScaleShape,
                                                            const gert::StorageShape* antiquantOffsetShape, const uint32_t n, const uint32_t d, const uint32_t h,
-                                                           PromptFlashAttentionTilingData& tilingData) {
+                                                           PromptFlashAttentionTilingData* tilingData) {
     if (antiquantScaleShape != nullptr && antiquantScaleShape->GetStorageShape().GetDimNum() == 1) {
-        tilingData.promptAttentionBaseParams.set_isAntiPerchannel(0);
+        tilingData->promptAttentionBaseParams.set_isAntiPerchannel(0);
         OP_CHECK_IF(antiquantScaleShape->GetStorageShape().GetDim(0) != 2,
             OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "antiquant scale dim[0] = %ld, but it should be 2 under Per-Tensor mode!", antiquantScaleShape->GetStorageShape().GetDim(0)),
             return false);
@@ -2516,7 +2599,7 @@ bool PromptFlashAttentionTiling::CheckAntiquantParamsShape(ContextParamsForPFATi
             OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "antiquant offset dim[0] = %ld, but it should be 2 under Per-Tensor mode!", antiquantOffsetShape->GetStorageShape().GetDim(0)),
             return false);
     } else {
-        tilingData.promptAttentionBaseParams.set_isAntiPerchannel(1);
+        tilingData->promptAttentionBaseParams.set_isAntiPerchannel(1);
         if (contextKeyParams.blockTable != nullptr) {
             OP_CHECK_IF(contextKeyParams.keyAntiquantMode == nullptr || contextKeyParams.valueAntiquantMode == nullptr,
                 OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "k v antiquant mode is nullptr"),
@@ -2614,9 +2697,9 @@ ge::graphStatus PromptFlashAttentionTiling::CheckPostQuantParams(const ContextPa
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PromptFlashAttentionTiling::AdjustBasicBlock(PromptFlashAttentionTilingData& tilingData,
+ge::graphStatus PromptFlashAttentionTiling::AdjustBasicBlock(PromptFlashAttentionTilingData* tilingData,
                                                              uint32_t& sOuterFactor) {
-    PromptAttentionBaseParams* baseParams = &tilingData.promptAttentionBaseParams;
+    PromptAttentionBaseParams* baseParams = &tilingData->promptAttentionBaseParams;
     uint32_t headNumSize = baseParams->get_headNumSize();
     if (headNumSize == 0U) {
         return ge::GRAPH_FAILED;
@@ -3461,27 +3544,27 @@ bool PromptFlashAttentionTiling::SetMatMulTiling(int64_t tmpS1BasicBlock, int64_
         return false;
     }
 
-    if (mlaTilingData.bmm1TilingData.get_baseK() >= mlaTilingData.bmm1TilingData.get_singleCoreK() &&
-        mlaTilingData.bmm1TilingData.get_depthA1() == BMM1_DEPTH_A1_2) {
-        mlaTilingData.bmm1TilingData.set_depthA1(BMM1_DEPTH_A1_3);
+    if (mlaTilingData.bmm1TilingData.baseK >= mlaTilingData.bmm1TilingData.singleCoreK &&
+        mlaTilingData.bmm1TilingData.depthA1 == BMM1_DEPTH_A1_2) {
+        mlaTilingData.bmm1TilingData.depthA1 = BMM1_DEPTH_A1_3;
     }
 
     // 当D > 128，由于L0 DB开启的限制，在设置tiling时把baseK切小，在MatmulPolicy中仍然按照不切K搬运
     if (!InputLayoutIsTNDLike()) {
-        mlaTilingData.bmm1TilingData.set_baseK(AlignUp(dSize / NUM_2, FRACTAL_NUM));
+        mlaTilingData.bmm1TilingData.baseK = AlignUp(dSize / NUM_2, FRACTAL_NUM);
     }
 
-    mlaTilingData.bmm1TilingData.set_shareMode(0);
-    mlaTilingData.bmm1TilingData.set_shareL1Size(ascendPlatformInfo.l1Size);
-    mlaTilingData.bmm1TilingData.set_shareL0CSize(ascendPlatformInfo.l0CSize);
+    mlaTilingData.bmm1TilingData.shareMode = 0;
+    mlaTilingData.bmm1TilingData.shareL1Size = ascendPlatformInfo.l1Size;
+    mlaTilingData.bmm1TilingData.shareL0CSize = ascendPlatformInfo.l0CSize;
 
     if (bmm2.GetTiling(mlaTilingData.bmm2TilingData) == -1) {
         return false;
     }
 
-    mlaTilingData.bmm2TilingData.set_shareMode(0);
-    mlaTilingData.bmm2TilingData.set_shareL1Size(ascendPlatformInfo.l1Size);
-    mlaTilingData.bmm2TilingData.set_shareL0CSize(ascendPlatformInfo.l0CSize);
+    mlaTilingData.bmm2TilingData.shareMode = 0;
+    mlaTilingData.bmm2TilingData.shareL1Size = ascendPlatformInfo.l1Size;
+    mlaTilingData.bmm2TilingData.shareL0CSize = ascendPlatformInfo.l0CSize;
     return true;
 }
 
@@ -3812,7 +3895,7 @@ ge::graphStatus PromptFlashAttentionTiling::CheckVarLenPreNextToken(ContextParam
 ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(ContextParamsForPFATiling& contextKeyParams,
                                             uint64_t& tilingKey,
                                             uint32_t& blockDimToBeSet,
-                                            PromptFlashAttentionTilingData& tilingData) {
+                                            PromptFlashAttentionTilingData* tilingData) {
     uint64_t l0CSize;
     uint64_t l1Size;
     uint64_t ubSize;
@@ -3918,9 +4001,9 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     }
     // Determine if the bit1 bit of innerPrecise requires invalid correction.
     if ((innerPrecise >> 1U) & 1U) {
-        tilingData.promptAttentionBaseParams.set_isRowInvalid(1U);
+        tilingData->promptAttentionBaseParams.set_isRowInvalid(1U);
     } else {
-        tilingData.promptAttentionBaseParams.set_isRowInvalid(0U);
+        tilingData->promptAttentionBaseParams.set_isRowInvalid(0U);
     }
     // Determine the bit0 bit of innerPrecise, high-performance or high-precision mode.
     if (innerPrecise != APPROXIMATE_COMPUTATION) {
@@ -3992,10 +4075,10 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     softmaxTypeByteNum = BYTE_BLOCK / softmaxDataTypeSize;
     maskTypeByteNum = BYTE_BLOCK / maskElemSize;
 
-    tilingData.promptAttentionBaseParams.set_maskTypeByteNum(maskTypeByteNum);
-    tilingData.promptAttentionBaseParams.set_softmaxTypeByteNum(softmaxTypeByteNum);
-    tilingData.promptAttentionBaseParams.set_outputTypeByteNum(outputTypeByteNum);
-    tilingData.promptAttentionBaseParams.set_typeByteNum(typeByteNum);
+    tilingData->promptAttentionBaseParams.set_maskTypeByteNum(maskTypeByteNum);
+    tilingData->promptAttentionBaseParams.set_softmaxTypeByteNum(softmaxTypeByteNum);
+    tilingData->promptAttentionBaseParams.set_outputTypeByteNum(outputTypeByteNum);
+    tilingData->promptAttentionBaseParams.set_typeByteNum(typeByteNum);
     // Get different shape.
     const gert::StorageShape* queryShape = contextKeyParams.queryInputShape;
     const gert::StorageShape* keyShape = contextKeyParams.keyInputShape;
@@ -4015,8 +4098,8 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     uint32_t deqScaleTypeFlag = (contextKeyParams.deqScaleType == DT_UINT64) ? 0U : 1U;
     uint32_t deqScale2TypeFlag = (contextKeyParams.deqScale2Type == DT_UINT64) ? 0U : 1U;
 
-    tilingData.promptAttentionBaseParams.set_deqScaleFlag(deqScaleTypeFlag);
-    tilingData.promptAttentionBaseParams.set_deqScale2Flag(deqScale2TypeFlag);
+    tilingData->promptAttentionBaseParams.set_deqScaleFlag(deqScaleTypeFlag);
+    tilingData->promptAttentionBaseParams.set_deqScale2Flag(deqScale2TypeFlag);
 
     OP_CHECK_IF(((contextKeyParams.inputDataType == ge::DT_INT8) && (contextKeyParams.outputDataType == ge::DT_FLOAT16) && ((contextKeyParams.scale2Shape != nullptr) || (contextKeyParams.offset2Shape != nullptr))),
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
@@ -4089,7 +4172,20 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     // In the scene of entering the image, there may be a situation where out is an empty tensor. Here, out is empty and size 0 is processed, which is equivalent to doing nothing and returning directly.
     if ((keyShape->GetStorageShape().GetShapeSize() == 0) || (valueShape->GetStorageShape().GetShapeSize() == 0) ||
         (outShape->GetStorageShape().GetShapeSize() == 0) || (contextKeyParams.emptyTensor == 1)) {
-        tilingKey = EMPTY_KV_TILING_KEY;
+        g_tail = 0;
+        g_newTiling = 2;
+        g_qT = 0;
+        g_precisionMode = 0;
+        g_outT = 0;
+        g_layoutT = 0;
+        g_mmType = 0;
+        g_pageAttention = 0;
+        g_enablePrefix = 0;
+        g_msdMode = 0;
+        g_cvdiffBase = 0;
+        g_cvdiffMla = 0;
+        g_kvT = 0;
+        g_templateVersion = 0;
         OP_CHECK_IF(GetAndCheckEmptyQueryShape(contextKeyParams, queryShape) == ge::GRAPH_FAILED,
                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "GetAndCheckEmptyQueryShape failed."),
                    return ge::GRAPH_FAILED);
@@ -4097,9 +4193,9 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "when input or output is empty tensor, input datatype should not be int8."),
                    return ge::GRAPH_FAILED);
         PromptFlashAttentionInitOutputSplit(outShape->GetStorageShape().GetShapeSize(), tilingData, coreNum);
-        tilingData.promptAttentionInitOutputParams.set_needInit(1);
+        tilingData->promptAttentionInitOutputParams.set_needInit(1);
         // core need to be full
-        PromptAttentionInitOutputParams *initParams = &tilingData.promptAttentionInitOutputParams;
+        PromptAttentionInitOutputParams *initParams = &tilingData->promptAttentionInitOutputParams;
         uint32_t singleCoreSize = initParams->get_singleCoreSize();
         uint32_t actualCore = (singleCoreSize > 0) ? (outShape->GetStorageShape().GetShapeSize() + singleCoreSize - 1) / singleCoreSize : coreNum;
         blockDimToBeSet = ascendcPlatform.CalcTschBlockDim(actualCore, aicNum, coreNum);
@@ -4109,10 +4205,10 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
         workspace[0] = sysWorkspaceSize;
         return ge::GRAPH_SUCCESS;
     }
-    tilingData.promptAttentionBaseParams.set_useMask(1);
+    tilingData->promptAttentionBaseParams.set_useMask(1);
     if (((attenMaskShape != nullptr) && (attenMaskShape->GetStorageShape().GetShapeSize() == 0))
         || (attenMaskShape == nullptr)) {
-        tilingData.promptAttentionBaseParams.set_useMask(0);
+        tilingData->promptAttentionBaseParams.set_useMask(0);
     }
 
     if (inputType == ge::DT_INT8) {
@@ -4192,7 +4288,7 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
         OP_CHECK_IF((s > 65536) || (seqInnerSize > 65536),
                         OPS_REPORT_VECTOR_INNER_ERR("GetBasicShape310P", "310P not support Qs or KVs lager than 65536,Qs = %u, Kvs = %u", s, seqInnerSize),
                         return ge::GRAPH_FAILED);
-        OP_CHECK_IF((tilingData.promptAttentionBaseParams.get_useMask()!= 0 && (s % 16 != 0 || seqInnerSize % 16 != 0 || s != seqInnerSize)),
+        OP_CHECK_IF((tilingData->promptAttentionBaseParams.get_useMask()!= 0 && (s % 16 != 0 || seqInnerSize % 16 != 0 || s != seqInnerSize)),
                         OPS_REPORT_VECTOR_INNER_ERR("GetBasicShape310P", "attention mask must be NULL, when Qs,Kvs is unAlign or Qs is not equal to Kvs, Qs = %u, Kvs = %u", s, seqInnerSize),
                         return ge::GRAPH_FAILED);
         OP_CHECK_IF(((*preTokens < static_cast<int32_t>(s)) || (*nextTokens < static_cast<int32_t>(seqInnerSize) && *nextTokens != 0)),
@@ -4349,24 +4445,24 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
         OP_CHECK_IF((actualSharedPrefixLen > prefixSeqInnerSize),
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "actualSharedPrefixLen(%u) must be in range[0, %u]!", actualSharedPrefixLen, prefixSeqInnerSize),
                     return ge::GRAPH_FAILED);
-        tilingData.promptAttentionBaseParams.set_isActualSharedPrefixLenNull(0);
+        tilingData->promptAttentionBaseParams.set_isActualSharedPrefixLenNull(0);
     } else {
-        tilingData.promptAttentionBaseParams.set_isActualSharedPrefixLenNull(1);
+        tilingData->promptAttentionBaseParams.set_isActualSharedPrefixLenNull(1);
         actualSharedPrefixLen = prefixSeqInnerSize;
     }
-    tilingData.promptAttentionBaseParams.set_prefixSeqInnerSize(prefixSeqInnerSize);
+    tilingData->promptAttentionBaseParams.set_prefixSeqInnerSize(prefixSeqInnerSize);
 
     if (isKVHasPrefix) {
         OP_CHECK_IF((bPreifx != 1),
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "prefix batch num(%u) only support 1!", bPreifx),
                     return ge::GRAPH_FAILED);
         if (inputLayout == InputLayout::BSH) {
-            OP_CHECK_IF((hPreifx != h / tilingData.promptAttentionBaseParams.get_headNumRatio()),
-                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "prefix H(%u) should be same with KV H(%u)!", hPreifx, h / tilingData.promptAttentionBaseParams.get_headNumRatio()),
+            OP_CHECK_IF((hPreifx != h / tilingData->promptAttentionBaseParams.get_headNumRatio()),
+                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "prefix H(%u) should be same with KV H(%u)!", hPreifx, h / tilingData->promptAttentionBaseParams.get_headNumRatio()),
                         return ge::GRAPH_FAILED);
         } else {
-            OP_CHECK_IF((nPreifx != (*n) / tilingData.promptAttentionBaseParams.get_headNumRatio()) || (dPreifx != h / (*n)),
-                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "prefix N(%u) and D(%u) should be same with KV N(%u) and D(%u)!", nPreifx, dPreifx, (*n) / tilingData.promptAttentionBaseParams.get_headNumRatio(), h / (*n)),
+            OP_CHECK_IF((nPreifx != (*n) / tilingData->promptAttentionBaseParams.get_headNumRatio()) || (dPreifx != h / (*n)),
+                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "prefix N(%u) and D(%u) should be same with KV N(%u) and D(%u)!", nPreifx, dPreifx, (*n) / tilingData->promptAttentionBaseParams.get_headNumRatio(), h / (*n)),
                         return ge::GRAPH_FAILED);
         }
     }
@@ -4407,18 +4503,18 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
             if (!CheckPASparseMode(contextKeyParams)) {
                 return ge::GRAPH_FAILED;
             }
-            if (!CheckPAWhenBaseApi(contextKeyParams, tempData, tempDataKV, static_cast<int32_t>(*n), static_cast<int32_t>(h), static_cast<int32_t>(tilingData.promptAttentionBaseParams.get_headNumRatio()))) {
+            if (!CheckPAWhenBaseApi(contextKeyParams, tempData, tempDataKV, static_cast<int32_t>(*n), static_cast<int32_t>(h), static_cast<int32_t>(tilingData->promptAttentionBaseParams.get_headNumRatio()))) {
                 return ge::GRAPH_FAILED;
             }
         } else {
-            if (!CheckPATypeAndShape(contextKeyParams, tempDataKV, static_cast<int32_t>(b), static_cast<int32_t>(*n), static_cast<int32_t>(h), static_cast<int32_t>(tilingData.promptAttentionBaseParams.get_headNumRatio()))) {
+            if (!CheckPATypeAndShape(contextKeyParams, tempDataKV, static_cast<int32_t>(b), static_cast<int32_t>(*n), static_cast<int32_t>(h), static_cast<int32_t>(tilingData->promptAttentionBaseParams.get_headNumRatio()))) {
                 return ge::GRAPH_FAILED;
             }
         }
     } else {
         tmpS2 = seqInnerSize;
     }
-    tilingData.promptAttentionBaseParams.set_PAlayoutType(PAlayoutType);
+    tilingData->promptAttentionBaseParams.set_PAlayoutType(PAlayoutType);
 
     if (!CheckAttenMaskShape(contextKeyParams, sparseMode, attenMaskShape, s, tmpS2 + actualSharedPrefixLen, b)) {
         return ge::GRAPH_FAILED;
@@ -4444,7 +4540,7 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
 
         if (((attenMaskShape != nullptr) && (attenMaskShape->GetStorageShape().GetShapeSize() == 0))
             || (attenMaskShape == nullptr)) {
-            tilingData.promptAttentionBaseParams.set_useMask(0); // for sparse check rule 5
+            tilingData->promptAttentionBaseParams.set_useMask(0); // for sparse check rule 5
         }
     }
 
@@ -4698,61 +4794,61 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                     return ge::GRAPH_FAILED);
 
     // Perchannel judgment to be adapted, maintain the existing logic firstly.
-    tilingData.promptAttentionBaseParams.set_isQuant2Perchannel(0);
-    tilingData.promptAttentionBaseParams.set_isQuant2BF16(0);
-    tilingData.promptAttentionBaseParams.set_isQuant2FP16(0);
+    tilingData->promptAttentionBaseParams.set_isQuant2Perchannel(0);
+    tilingData->promptAttentionBaseParams.set_isQuant2BF16(0);
+    tilingData->promptAttentionBaseParams.set_isQuant2FP16(0);
     if (outputType == ge::DT_INT8) {
         if (quantScale2Shape->GetStorageShape().GetShapeSize() > 1) {
-            tilingData.promptAttentionBaseParams.set_isQuant2Perchannel(1);
+            tilingData->promptAttentionBaseParams.set_isQuant2Perchannel(1);
         }
         if (contextKeyParams.quantScale2Type == ge::DT_BF16) {
-            tilingData.promptAttentionBaseParams.set_isQuant2BF16(1);
+            tilingData->promptAttentionBaseParams.set_isQuant2BF16(1);
         }
         if (contextKeyParams.quantScale2Type == ge::DT_FLOAT16 && contextKeyParams.hasKeyAntiquantScale && contextKeyParams.hasValueAntiquantScale){
-            tilingData.promptAttentionBaseParams.set_isQuant2FP16(1);
+            tilingData->promptAttentionBaseParams.set_isQuant2FP16(1);
         }
     }
 
     if ((curShortSocName == platform_ascendc::SocVersion::ASCEND310P )&& softmaxDataTypeNZ_ == FLOAT16SIZE) {
         sparseModeVal = 99; // 99: 310p temporarily uses the sparse field to indicate whether to adopt an approximate calculation scheme
     }
-    tilingData.promptAttentionBaseParams.set_dimNumOfseq(lenDims);
-    tilingData.promptAttentionBaseParams.set_scaleValue(*scaleValue);
-    tilingData.promptAttentionBaseParams.set_headSize(hDivN);
+    tilingData->promptAttentionBaseParams.set_dimNumOfseq(lenDims);
+    tilingData->promptAttentionBaseParams.set_scaleValue(*scaleValue);
+    tilingData->promptAttentionBaseParams.set_headSize(hDivN);
     if (enablePA) {
-        tilingData.promptAttentionBaseParams.set_blockSize(*curBlockSize);
+        tilingData->promptAttentionBaseParams.set_blockSize(*curBlockSize);
     } else {
-        tilingData.promptAttentionBaseParams.set_blockSize(BLOCK_SIZE_BASE);
+        tilingData->promptAttentionBaseParams.set_blockSize(BLOCK_SIZE_BASE);
     }
-    tilingData.promptAttentionBaseParams.set_blockTableDim2(blockTableDim2);
-    tilingData.promptAttentionBaseParams.set_PABlockNumSum(PABlockNumSum);
-    tilingData.promptAttentionBaseParams.set_seqInnerSize(tmpS2);
-    tilingData.promptAttentionBaseParams.set_seqSize(s);
-    tilingData.promptAttentionBaseParams.set_headNumSize(*n);
-    tilingData.promptAttentionBaseParams.set_batchSize(lenDims);
+    tilingData->promptAttentionBaseParams.set_blockTableDim2(blockTableDim2);
+    tilingData->promptAttentionBaseParams.set_PABlockNumSum(PABlockNumSum);
+    tilingData->promptAttentionBaseParams.set_seqInnerSize(tmpS2);
+    tilingData->promptAttentionBaseParams.set_seqSize(s);
+    tilingData->promptAttentionBaseParams.set_headNumSize(*n);
+    tilingData->promptAttentionBaseParams.set_batchSize(lenDims);
 
-    tilingData.promptAttentionBaseParams.set_preTokens(sparsePreTokens);
-    tilingData.promptAttentionBaseParams.set_nextTokens(sparseNextTokens);
-    tilingData.promptAttentionBaseParams.set_sparseMode(static_cast<uint32_t>(sparseModeVal));
-    tilingData.promptAttentionBaseParams.set_isLayoutSH(isLayoutSH);
-    tilingData.promptAttentionBaseParams.set_isActualSeqLengthsNull(isActualSeqLengthsNull);
-    tilingData.promptAttentionBaseParams.set_isActualSeqLengthsKVNull(isActualSeqLengthsKVNull);
-    tilingData.promptAttentionSingleCoreParams.set_attenMaskBatch(attenMaskBatch);
-    tilingData.promptAttentionInitOutputParams.set_needInit(needInit);
+    tilingData->promptAttentionBaseParams.set_preTokens(sparsePreTokens);
+    tilingData->promptAttentionBaseParams.set_nextTokens(sparseNextTokens);
+    tilingData->promptAttentionBaseParams.set_sparseMode(static_cast<uint32_t>(sparseModeVal));
+    tilingData->promptAttentionBaseParams.set_isLayoutSH(isLayoutSH);
+    tilingData->promptAttentionBaseParams.set_isActualSeqLengthsNull(isActualSeqLengthsNull);
+    tilingData->promptAttentionBaseParams.set_isActualSeqLengthsKVNull(isActualSeqLengthsKVNull);
+    tilingData->promptAttentionSingleCoreParams.set_attenMaskBatch(attenMaskBatch);
+    tilingData->promptAttentionInitOutputParams.set_needInit(needInit);
 
-    uint32_t originHeadSize = tilingData.promptAttentionBaseParams.get_headSize();
+    uint32_t originHeadSize = tilingData->promptAttentionBaseParams.get_headSize();
     uint32_t blockElementCnt = BYTE_BLOCK / dataTypeSize;
     if (originHeadSize % blockElementCnt != 0) { // Determine if D is aligned with 32B, using fp16 type with 16 elements.
-        tilingData.promptAttentionBaseParams.set_alignedHeadSize(((
+        tilingData->promptAttentionBaseParams.set_alignedHeadSize(((
             originHeadSize + blockElementCnt - 1) / blockElementCnt) * blockElementCnt);
         isDNoTail = false;
     } else {
-        tilingData.promptAttentionBaseParams.set_alignedHeadSize(originHeadSize);
+        tilingData->promptAttentionBaseParams.set_alignedHeadSize(originHeadSize);
     }
 
     // Check the kv antiquant parameters and the shapes of scale and offset.
-    uint32_t nKV = *n / tilingData.promptAttentionBaseParams.get_headNumRatio();
-    uint32_t hKV = h / tilingData.promptAttentionBaseParams.get_headNumRatio();
+    uint32_t nKV = *n / tilingData->promptAttentionBaseParams.get_headNumRatio();
+    uint32_t hKV = h / tilingData->promptAttentionBaseParams.get_headNumRatio();
     if (enableKvAntiquant && !CheckAntiquantParamsShape(contextKeyParams, antiquantScaleShape, antiquantOffsetShape, nKV, hDivN, hKV, tilingData)) {
         return ge::GRAPH_FAILED;
     }
@@ -4768,7 +4864,7 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     bool useBalanceTiling = true;
     bool noInputActualSeqKV = contextKeyParams.fromTilingSink == 0 ? ((actualLenDimsKV == 0) || (tempDataKV == nullptr) || (tempDataKV->GetData<int64_t>() == nullptr)) : true;
     if ((inputLayout != InputLayout::BNSD) && (inputLayout != InputLayout::NSD)
-        && (tilingData.promptAttentionBaseParams.get_headNumRatio() == 1)
+        && (tilingData->promptAttentionBaseParams.get_headNumRatio() == 1)
         && (lenDims == 1)
         && (!iskvdiff)
         && ((*n % coreNum == 0) && (tmpS2 < CVDIFF_S2_THRESHOLDS))
@@ -4783,12 +4879,12 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     if ((needInit == 1U) || (lenDims != 1U)) {
         useBalanceTiling = false;
     }
-    if (tilingData.promptAttentionBaseParams.get_headNumRatio() != 1) {
+    if (tilingData->promptAttentionBaseParams.get_headNumRatio() != 1) {
         useBalanceTiling = false;
     }
     OP_LOGI(contextKeyParams.opName,
               "Tiling Info: b is %u, bKV is %u, n is %d, numKeyValueHeads is %d, s1 is %u, s2 is %u, h is %u, d is %u, headNumRatio = %u",
-              b, bKV, *n, *numKeyValueHeads, s, tmpS2, h, hDivN, tilingData.promptAttentionBaseParams.get_headNumRatio());
+              b, bKV, *n, *numKeyValueHeads, s, tmpS2, h, hDivN, tilingData->promptAttentionBaseParams.get_headNumRatio());
     OP_LOGI(contextKeyParams.opName,
               "inputLayout is %d, innerPrecise is %lu, "
               "scaleValue is %f, preTokens is %ld, nextTokens is %ld",
@@ -4964,8 +5060,10 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
         auto transposeSrcShape = ge::Shape({coreParams.get_bBaseSize(), 1, std::min(s1BasicBlock, alignedS1),
                                             coreParams.get_gBaseSize() * std::min(dBasicBlock, alignedD)});
         auto transposeDstShape = ge::Shape({b, *n, s, *n * hDivN});
-        GetDataCopyTransposeTiling(transposeDstShape, transposeSrcShape, dataTypeSize, mlaTilingData.transposeTilingData);
-
+        mlaTilingData.transposeTilingData.GetDataCopyTransposeTiling(coreParams.get_bBaseSize(), 1, std::min(s1BasicBlock, alignedS1),
+                                                                     coreParams.get_gBaseSize() * std::min(dBasicBlock, alignedD),
+                                                                     b, *n, s, *n * hDivN,
+                                                                     dataTypeSize);
         auto &tensorSizeParams = mlaTilingData.PFAtensorSizeParams;
         size_t *workspaces = contextKeyParams.workspaceSize;
         int64_t bmm1Bytes = coreParams.get_nRatio() * tensorSizeParams.get_bmm1ResUbSize() * softmaxDataTypeSize;
@@ -4976,25 +5074,80 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
         mlaRunFlag_ = true;
         if (valueD <= D_SIZE_128) { // valueD <= 128 && base api
             if (attenMaskShape == nullptr) {
-                tilingKey = BENCHMARK_TILING_KEY_3;
+                g_tail = 3;
+                g_newTiling = 0;
+                g_qT = 0;
+                g_precisionMode = 0;
+                g_outT = 0;
+                g_layoutT = 0;
+                g_mmType = 0;
+                g_pageAttention = 0;
+                g_enablePrefix = 0;
+                g_msdMode = 0;
+                g_cvdiffBase = 0;
+                g_cvdiffMla = 0;
+                g_kvT = 0;
+                g_templateVersion = 3;
             } else {
-                tilingKey = BENCHMARK_TILING_KEY_2;
+                //tilingKey = BENCHMARK_TILING_KEY_2;// 正常赋初始值
+                g_tail = 2;
+                g_newTiling = 0;
+                g_qT = 0;
+                g_precisionMode = 0;
+                g_outT = 0;
+                g_layoutT = 0;
+                g_mmType = 0;
+                g_pageAttention = 0;
+                g_enablePrefix = 0;
+                g_msdMode = 0;
+                g_cvdiffBase = 0;
+                g_cvdiffMla = 0;
+                g_kvT = 0;
+                g_templateVersion = 3;
             }
         } else { // valueD = 192
             if (attenMaskShape == nullptr) {
-                tilingKey = BENCHMARK_TILING_KEY_1;
+                //tilingKey = BENCHMARK_TILING_KEY_1;// 正常赋初始值
+                g_tail = 1;
+                g_newTiling = 0;
+                g_qT = 0;
+                g_precisionMode = 0;
+                g_outT = 0;
+                g_layoutT = 0;
+                g_mmType = 0;
+                g_pageAttention = 0;
+                g_enablePrefix = 0;
+                g_msdMode = 0;
+                g_cvdiffBase = 0;
+                g_cvdiffMla = 0;
+                g_kvT = 0;
+                g_templateVersion = 3;
             } else {
-                tilingKey = BENCHMARK_TILING_KEY_0;
+                //tilingKey = BENCHMARK_TILING_KEY_0;// 正常赋初始值
+                g_tail = 0;
+                g_newTiling = 0;
+                g_qT = 0;
+                g_precisionMode = 0;
+                g_outT = 0;
+                g_layoutT = 0;
+                g_mmType = 0;
+                g_pageAttention = 0;
+                g_enablePrefix = 0;
+                g_msdMode = 0;
+                g_cvdiffBase = 0;
+                g_cvdiffMla = 0;
+                g_kvT = 0;
+                g_templateVersion = 3;
             }
         }
         if (enablePA) {
             if (inputKvLayout == InputLayout::NZ) {
-                tilingKey += KVCACHE_NZ_TILING_KEY;
+                g_pageAttention += 2;
             } else if (inputKvLayout == InputLayout::BNBD || inputKvLayout == InputLayout::BBH) {
-                tilingKey += KVCACHE_ND_TILING_KEY;
+                g_pageAttention += 1;
             }
         }
-        tilingKey += static_cast<uint32_t>((static_cast<int32_t>(inputLayout) - static_cast<int32_t>(InputLayout::TND)) * INPUT_LAYOUT_TILING_KEY_FACTOR_HOST_TILING);
+        g_layoutT += static_cast<uint32_t>((static_cast<int32_t>(inputLayout) - static_cast<int32_t>(InputLayout::TND)));
         blockDimToBeSet = CalcTschBlockDim(mlaTilingData.PFAmultiCoreParams.get_coreNum(), aicNum, aivNum);
         return ge::GRAPH_SUCCESS;
     }
@@ -5023,30 +5176,30 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
 
     uint32_t isKvContinuous = contextKeyParams.isKvContinuous;
     uint32_t fromFused = contextKeyParams.fromFused;
-    tilingData.promptAttentionSingleCoreParams.set_singleProcessSOuterSize(sOuterFactor);
-    tilingData.promptAttentionSingleCoreParams.set_singleProcessSInnerSize(sInnerFactor);
-    tilingData.promptAttentionBaseParams.set_splitS2(splitS2);
-    tilingData.promptAttentionBaseParams.set_splitD(splitD);
-    tilingData.promptAttentionBaseParams.set_softmaxOuterSize(softmaxSOuterFactor);
-    tilingData.promptAttentionBaseParams.set_usePseShift(usePseShift);
-    tilingData.promptAttentionBaseParams.set_pseShiftTypeByteNum(pseShiftTypeByteNum);
-    tilingData.promptAttentionBaseParams.set_pseMaskMaxSize(pseMaskMaxSize);
-    tilingData.promptAttentionSingleCoreParams.set_pseShiftBatch(pseShiftBatch);
-    tilingData.promptAttentionBaseParams.set_pseShiftS1Size(pseShiftS1);
-    tilingData.promptAttentionBaseParams.set_pseShiftS2Size(pseShiftS2);
-    tilingData.promptAttentionBaseParams.set_isKvContinuous(isKvContinuous);
-    tilingData.promptAttentionBaseParams.set_isQHasLeftPadding(contextKeyParams.queryPaddingSize != nullptr ? 1 : 0);
-    tilingData.promptAttentionBaseParams.set_isKVHasLeftPadding(contextKeyParams.kvPaddingSize != nullptr ? 1 : 0);
-    tilingData.promptAttentionBaseParams.set_fromFused((fromFused == FROM_FUSED_FLAG) ? 1 : 0);
-    tilingData.promptAttentionBaseParams.set_isBSNDOut(contextKeyParams.isBSNDOut);
-    tilingData.promptAttentionBaseParams.set_isSoftMaxLseEnable(contextKeyParams.isSoftMaxLseEnable);
+    tilingData->promptAttentionSingleCoreParams.set_singleProcessSOuterSize(sOuterFactor);
+    tilingData->promptAttentionSingleCoreParams.set_singleProcessSInnerSize(sInnerFactor);
+    tilingData->promptAttentionBaseParams.set_splitS2(splitS2);
+    tilingData->promptAttentionBaseParams.set_splitD(splitD);
+    tilingData->promptAttentionBaseParams.set_softmaxOuterSize(softmaxSOuterFactor);
+    tilingData->promptAttentionBaseParams.set_usePseShift(usePseShift);
+    tilingData->promptAttentionBaseParams.set_pseShiftTypeByteNum(pseShiftTypeByteNum);
+    tilingData->promptAttentionBaseParams.set_pseMaskMaxSize(pseMaskMaxSize);
+    tilingData->promptAttentionSingleCoreParams.set_pseShiftBatch(pseShiftBatch);
+    tilingData->promptAttentionBaseParams.set_pseShiftS1Size(pseShiftS1);
+    tilingData->promptAttentionBaseParams.set_pseShiftS2Size(pseShiftS2);
+    tilingData->promptAttentionBaseParams.set_isKvContinuous(isKvContinuous);
+    tilingData->promptAttentionBaseParams.set_isQHasLeftPadding(contextKeyParams.queryPaddingSize != nullptr ? 1 : 0);
+    tilingData->promptAttentionBaseParams.set_isKVHasLeftPadding(contextKeyParams.kvPaddingSize != nullptr ? 1 : 0);
+    tilingData->promptAttentionBaseParams.set_fromFused((fromFused == FROM_FUSED_FLAG) ? 1 : 0);
+    tilingData->promptAttentionBaseParams.set_isBSNDOut(contextKeyParams.isBSNDOut);
+    tilingData->promptAttentionBaseParams.set_isSoftMaxLseEnable(contextKeyParams.isSoftMaxLseEnable);
 
     // Compute tiling data.
     if (splitCoreMode == SplitCoreMode::SPLIT_ONEN_CUBE) {  // Enable N split kernel mode from the perspective of cube in long sequence scenes.
-        tilingData.promptAttentionInitOutputParams.set_isOneN(1);
+        tilingData->promptAttentionInitOutputParams.set_isOneN(1);
         PromptFlashAttentionSplitSeqOneN(tilingData, coreNum, false);
     } else {
-        tilingData.promptAttentionInitOutputParams.set_isOneN(0);
+        tilingData->promptAttentionInitOutputParams.set_isOneN(0);
         if (useNewTiling) {
             PromptFlashAttentionSplitNSNew(contextKeyParams, tilingData, coreNum, actualSeqLengths, actualSeqLengthsKV, actualSharedPrefixLen, useBalanceTiling);
         } else {
@@ -5262,26 +5415,26 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                     return ge::GRAPH_FAILED);
 
         if((contextKeyParams.KeyAntiquantOffsetShape != nullptr) && (contextKeyParams.valueAntiquantOffsetShape != nullptr)) {
-            tilingData.promptAttentionBaseParams.set_hasKeyAntiquantOffset(1);
+            tilingData->promptAttentionBaseParams.set_hasKeyAntiquantOffset(1);
         } else {
-            tilingData.promptAttentionBaseParams.set_hasKeyAntiquantOffset(0);
+            tilingData->promptAttentionBaseParams.set_hasKeyAntiquantOffset(0);
         }
 
         if(contextKeyParams.keyAntiquantMode != nullptr) {
-            tilingData.promptAttentionBaseParams.set_keyAntiquantMode(keyAntiquantModeMsd);
+            tilingData->promptAttentionBaseParams.set_keyAntiquantMode(keyAntiquantModeMsd);
         } else {
-            tilingData.promptAttentionBaseParams.set_keyAntiquantMode(0);
+            tilingData->promptAttentionBaseParams.set_keyAntiquantMode(0);
         }
 
         if(contextKeyParams.valueAntiquantMode != nullptr) {
-            tilingData.promptAttentionBaseParams.set_valueAntiquantMode(valueAntiquantModeMsd);
+            tilingData->promptAttentionBaseParams.set_valueAntiquantMode(valueAntiquantModeMsd);
         } else {
-            tilingData.promptAttentionBaseParams.set_valueAntiquantMode(0);
+            tilingData->promptAttentionBaseParams.set_valueAntiquantMode(0);
         }
 
-        OP_CHECK_IF((tilingData.promptAttentionBaseParams.get_keyAntiquantMode() != tilingData.promptAttentionBaseParams.get_valueAntiquantMode()),
+        OP_CHECK_IF((tilingData->promptAttentionBaseParams.get_keyAntiquantMode() != tilingData->promptAttentionBaseParams.get_valueAntiquantMode()),
                          OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "the key's quant mode(%ld) != the value's quant mode(%ld) ",
-                         tilingData.promptAttentionBaseParams.get_keyAntiquantMode(), tilingData.promptAttentionBaseParams.get_valueAntiquantMode()),
+                         tilingData->promptAttentionBaseParams.get_keyAntiquantMode(), tilingData->promptAttentionBaseParams.get_valueAntiquantMode()),
                          return ge::GRAPH_FAILED);
     }
 
@@ -5291,11 +5444,37 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                             return tilingRet);
 
     if ((splitS2 == 1U) && (splitD == 1U)) {
-        tilingKey = DSPLIT_S2_D_TILING_KEY;
+        g_tail = 0;
+        g_newTiling = 0;
+        g_qT = 4;
+        g_precisionMode = 0;
+        g_outT = 0;
+        g_layoutT = 0;
+        g_mmType = 0;
+        g_pageAttention = 0;
+        g_enablePrefix = 0;
+        g_msdMode = 0;
+        g_cvdiffBase = 0;
+        g_cvdiffMla = 0;
+        g_kvT = 0;
+        g_templateVersion = 0;
     }
 
     if ((splitS2 == 0U) && (splitD == 1U)) {
-        tilingKey = DSPLIT_S2_TILING_KEY;
+        g_tail = 0;
+        g_newTiling = 0;
+        g_qT = 3;
+        g_precisionMode = 0;
+        g_outT = 0;
+        g_layoutT = 0;
+        g_mmType = 0;
+        g_pageAttention = 0;
+        g_enablePrefix = 0;
+        g_msdMode = 0;
+        g_cvdiffBase = 0;
+        g_cvdiffMla = 0;
+        g_kvT = 0;
+        g_templateVersion = 0;
     }
     tilingRet = PromptFlashAttentionApiTiling(tilingData, outputDataTypeSize, sOuterFactor, softmaxSInnerFactor, softmaxSOuterFactor);
     OP_CHECK_IF(tilingRet != ge::GRAPH_SUCCESS,
@@ -5306,12 +5485,16 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
 
     size_t* workspaces = contextKeyParams.workspaceSize;
     workspaces[0] = GetPFAWorkSpaceSize(tilingData);
+    g_templateVersion += 1;
+    tilingKey = GET_TPL_TILING_KEY(static_cast<int>(g_qT), static_cast<int>(g_kvT), static_cast<int>(g_outT), static_cast<int>(g_pageAttention), static_cast<int>(g_layoutT),
+                                   static_cast<int>(g_kvlayoutT), static_cast<int>(g_flashDecode), static_cast<int>(g_enablePrefix), static_cast<int>(g_msdMode), static_cast<int>(g_tail), static_cast<int>(g_newTiling), static_cast<int>(g_precisionMode),
+                                   static_cast<int>(g_mmType), static_cast<int>(g_cvdiffBase), static_cast<int>(g_cvdiffMla), static_cast<int>(g_templateVersion), static_cast<int>(g_templateMode));
     OP_LOGI(contextKeyParams.opName, "The Tiling key is %lu", tilingKey);
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PromptFlashAttentionTiling::CheckIOType(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, int32_t& outputDataTypeSize) {
+ge::graphStatus PromptFlashAttentionTiling::CheckIOType(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData* tilingData, int32_t& outputDataTypeSize) {
     outputType = contextKeyParams.outputDataType;
     inputType = contextKeyParams.inputDataType;
     intputKeyType = contextKeyParams.kDataType;
@@ -5339,10 +5522,10 @@ ge::graphStatus PromptFlashAttentionTiling::CheckIOType(ContextParamsForPFATilin
 
     if (contextKeyParams.hasKeyAntiquantScale || contextKeyParams.hasValueAntiquantScale) {
         enableMsd = true;
-        tilingData.promptAttentionBaseParams.set_isMsd(1);
+        tilingData->promptAttentionBaseParams.set_isMsd(1);
     } else{
         enableMsd = false;
-        tilingData.promptAttentionBaseParams.set_isMsd(0);
+        tilingData->promptAttentionBaseParams.set_isMsd(0);
         OP_CHECK_IF(inputType == ge::DT_BF16 && contextKeyParams.kDataType == ge::DT_INT8,
                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "The key's dequant scale and the value's dequant scale should not be null, when data type of query is bf16 and data type of key/value is int8"),
                    return ge::GRAPH_FAILED);
@@ -5493,7 +5676,7 @@ ge::graphStatus PromptFlashAttentionTiling::CheckD(ContextParamsForPFATiling& co
 }
 
 ge::graphStatus PromptFlashAttentionTiling::CheckMaskType(ContextParamsForPFATiling &contextKeyParams,
-                                                          PromptFlashAttentionTilingData &tilingData,
+                                                          PromptFlashAttentionTilingData* tilingData,
                                                           uint32_t &maskElemSize) {
     if (contextKeyParams.attentionMask != nullptr) {
         auto maskDataType = contextKeyParams.maskDataType;
@@ -5531,7 +5714,7 @@ ge::graphStatus PromptFlashAttentionTiling::CheckMaskType(ContextParamsForPFATil
                        g_strDataTypePfa.at(ValidPfaDataType(maskDataType)).c_str()),
                    return ge::GRAPH_FAILED);
         // FP16 mask type does not support invalid line correction.
-        OP_CHECK_IF((maskDataType == ge::DT_FLOAT16 && tilingData.promptAttentionBaseParams.get_isRowInvalid()),
+        OP_CHECK_IF((maskDataType == ge::DT_FLOAT16 && tilingData->promptAttentionBaseParams.get_isRowInvalid()),
                    OPS_REPORT_VECTOR_INNER_ERR(
                        contextKeyParams.opName,
                        "invalid maskType dtype[%s], maskType should not be float16 when innerPrecise = 2 or 3",
@@ -5795,7 +5978,7 @@ ge::graphStatus PromptFlashAttentionTiling::CheckBaseApiPse(ContextParamsForPFAT
     return ge::GRAPH_SUCCESS;
 }
 
-void PromptFlashAttentionTiling::SetMaskSize(const gert::StorageShape* attenMaskShape, PromptFlashAttentionTilingData& tilingData) {
+void PromptFlashAttentionTiling::SetMaskSize(const gert::StorageShape* attenMaskShape, PromptFlashAttentionTilingData* tilingData) {
     auto maskKVsSize = 2048; // 2048 : default the last frist dim.
     auto maskQsSize = 2048; // 2048 : default the last second dim.
     if (attenMaskShape != nullptr) {
@@ -5803,8 +5986,8 @@ void PromptFlashAttentionTiling::SetMaskSize(const gert::StorageShape* attenMask
         maskQsSize = attenMaskShape->GetStorageShape().GetDim(attenMaskShape->GetStorageShape().GetDimNum() - 2); // 2: last second dim
     }
 
-    tilingData.promptAttentionBaseParams.set_maskKVsSize(maskKVsSize);
-    tilingData.promptAttentionBaseParams.set_maskQsSize(maskQsSize);
+    tilingData->promptAttentionBaseParams.set_maskKVsSize(maskKVsSize);
+    tilingData->promptAttentionBaseParams.set_maskQsSize(maskQsSize);
 }
 
 ge::graphStatus PromptFlashAttentionTiling::CheckShape(ContextParamsForPFATiling& contextKeyParams, const gert::StorageShape* queryShape,
@@ -6073,7 +6256,7 @@ void PromptFlashAttentionTiling::InferTilingMod(const ContextParamsForPFATiling&
 ge::graphStatus PromptFlashAttentionTiling::AdjustCVTiling(uint32_t hDivN, uint32_t n, int64_t middleActualSeqLengths,
                                                            int64_t ubSize, int64_t l1Size, int64_t l0CSize,
                                                            uint32_t maskElemSize, uint32_t& sOuterFactor,
-                                                           uint32_t& sInnerFactor, PromptFlashAttentionTilingData& tilingData)
+                                                           uint32_t& sInnerFactor, PromptFlashAttentionTilingData* tilingData)
 {
     // D is not split, S2 is fixed and cut into 128 sizes, S1 adjusts the size for splitting
     uint32_t minFactor = 128U;       // Souter
@@ -6083,7 +6266,7 @@ ge::graphStatus PromptFlashAttentionTiling::AdjustCVTiling(uint32_t hDivN, uint3
     // 310P involves nz2nd conversion, and currently cannot arbitrarily increase the basic block size
     if (curShortSocName != platform_ascendc::SocVersion::ASCEND310P) {
         const uint32_t littleDLimit = 64;
-        if ((tilingData.promptAttentionBaseParams.get_useMask() == 0) && (hDivN <= littleDLimit)) {
+        if ((tilingData->promptAttentionBaseParams.get_useMask() == 0) && (hDivN <= littleDLimit)) {
             // If attentionMask is not configured, it can save UB space for softmax calculation
             // In this scenario, when d is relatively small, the size of the basic block Sinner can be adjusted to 256 to improve computational performance
             rectangleFactor = 256;
@@ -6103,8 +6286,8 @@ ge::graphStatus PromptFlashAttentionTiling::AdjustCVTiling(uint32_t hDivN, uint3
     }
     minFactor = rectangleQueue.front();
     if (curShortSocName == platform_ascendc::SocVersion::ASCEND310P) {
-        minFactor = std::min(minFactor, (tilingData.promptAttentionBaseParams.get_seqSize() + 16 - 1) / 16 * 16); // Round up to an integer multiple of 16
-        rectangleFactor = std::min(rectangleFactor, (tilingData.promptAttentionBaseParams.get_seqInnerSize() + 16 - 1) / 16 * 16); // Round up to an integer multiple of 16
+        minFactor = std::min(minFactor, (tilingData->promptAttentionBaseParams.get_seqSize() + 16 - 1) / 16 * 16); // Round up to an integer multiple of 16
+        rectangleFactor = std::min(rectangleFactor, (tilingData->promptAttentionBaseParams.get_seqInnerSize() + 16 - 1) / 16 * 16); // Round up to an integer multiple of 16
     }
 
     while (true) {
@@ -6127,7 +6310,7 @@ ge::graphStatus PromptFlashAttentionTiling::AdjustCVTiling(uint32_t hDivN, uint3
 }
 
 ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionCVDiffSetTensorSize(
-    PromptFlashAttentionTilingData& tilingData,
+    PromptFlashAttentionTilingData* tilingData,
     PromptAttentionSingleCoreTensorSize& tensorSize, uint32_t sOuterFactor,
     uint32_t sInnerFactor, uint32_t softmaxSOuterFactor)
 {
@@ -6139,7 +6322,7 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionCVDiffSetTensorS
 
     tensorSize.set_attenMaskUbSize(softmaxSOuterFactor * sInnerFactor);
     if(enableMsd){
-        if (tilingData.promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
+        if (tilingData->promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
             tensorSize.set_mmResUbSize(COMPUTELINE_FOR_BIG_D * sInnerFactor * 2); // 2:double buffer
         } else {
             tensorSize.set_mmResUbSize(CVDIFF_SMALL_QS_THRESHOLDS * CVDIFF_MSD_BUFFER_SIZE_1024B / sizeof(int32_t)); // for msd
@@ -6154,25 +6337,25 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionCVDiffSetTensorS
         tensorSize.set_softmaxExpSize(MSD_UB_BASE_WIDTH * ONE_BLK_SIZE_PFA);
         tensorSize.set_softmaxMaxSize(MSD_UB_BASE_WIDTH * ONE_BLK_SIZE_PFA);
     } else {
-        tensorSize.set_softmaxExpSize(sOuterFactor * tilingData.promptAttentionBaseParams.get_softmaxTypeByteNum());
+        tensorSize.set_softmaxExpSize(sOuterFactor * tilingData->promptAttentionBaseParams.get_softmaxTypeByteNum());
         tensorSize.set_softmaxMaxSize(sOuterFactor * (BYTE_BLOCK / sizeof(float)));
     }
 
     tensorSize.set_softmaxSumSize(tensorSize.get_softmaxMaxSize());
     tensorSize.set_softmaxValueSize(sOuterFactor * sInnerFactor);
     if (enableMsd) {
-        if (tilingData.promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
-            tensorSize.set_bmm2ResUbSize(MAX_COMPUTELINES * tilingData.promptAttentionBaseParams.get_alignedHeadSize()); // for big d of msd
+        if (tilingData->promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
+            tensorSize.set_bmm2ResUbSize(MAX_COMPUTELINES * tilingData->promptAttentionBaseParams.get_alignedHeadSize()); // for big d of msd
         } else {
             tensorSize.set_bmm2ResUbSize(MSD_UB_BASE_WIDTH * MSD_UB_HEGHT);
         }
     } else {
-        tensorSize.set_bmm2ResUbSize(sOuterFactor * tilingData.promptAttentionBaseParams.get_alignedHeadSize());
+        tensorSize.set_bmm2ResUbSize(sOuterFactor * tilingData->promptAttentionBaseParams.get_alignedHeadSize());
     }
     tensorSize.set_tmpMMResBmm2PreUbSize(std::max(tensorSize.get_mmResUbSize(), tensorSize.get_bmm2ResUbSize()));
     tensorSize.set_tmpSoftmaxBmm2UbSize(SOFTMAX_BUFFER_NUM * tensorSize.get_softmaxMaxSize());
 
-    if (tilingData.promptAttentionBaseParams.get_maskTypeByteNum() == (BYTE_BLOCK / BOOLSIZE)) {
+    if (tilingData->promptAttentionBaseParams.get_maskTypeByteNum() == (BYTE_BLOCK / BOOLSIZE)) {
         tensorSize.set_selectSpaceUbSize(
             GetSelectWithBytesMaskMinTmpSize(Shape({softmaxSOuterFactor, sInnerFactor}), Shape({1}), 1,
             Shape({softmaxSOuterFactor, sInnerFactor}), 1, false));
@@ -6182,7 +6365,7 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionCVDiffSetTensorS
     return ge::GRAPH_SUCCESS;
 }
 
-bool PromptFlashAttentionTiling::PromptFlashAttentionComputeCVDiffParams(PromptFlashAttentionTilingData& tilingData,
+bool PromptFlashAttentionTiling::PromptFlashAttentionComputeCVDiffParams(PromptFlashAttentionTilingData* tilingData,
     int64_t ubSize, int64_t l1Size, int64_t l0CSize, uint32_t typeByteSize,
     uint32_t& sOuterFactor, uint32_t &sInnerFactor, uint32_t maskTypeSize, uint32_t &softmaxSOuterFactor)
 {
@@ -6206,14 +6389,14 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionComputeCVDiffParams(PromptF
         int32_t sKvAntiquantFactor = sInnerFactor;
         uint32_t kvAntiquantApiSizeMax = 0;
         uint32_t kvAntiquantApiSize = 0;
-        auto srcShape = Shape({sKvAntiquantFactor, tilingData.promptAttentionBaseParams.get_alignedHeadSize()});
-        auto scaleShape = Shape({1, tilingData.promptAttentionBaseParams.get_alignedHeadSize()});
+        auto srcShape = Shape({sKvAntiquantFactor, tilingData->promptAttentionBaseParams.get_alignedHeadSize()});
+        auto scaleShape = Shape({1, tilingData->promptAttentionBaseParams.get_alignedHeadSize()});
         int64_t ubSizeRemainTmp = ubSizeRemain;
         do {
-            srcShape = Shape({sKvAntiquantFactor, tilingData.promptAttentionBaseParams.get_alignedHeadSize()});
+            srcShape = Shape({sKvAntiquantFactor, tilingData->promptAttentionBaseParams.get_alignedHeadSize()});
             GetAscendAntiQuantMaxMinTmpSize(srcShape, scaleShape, false, ge::DT_INT8, inputType, kvAntiquantApiSizeMax, kvAntiquantApiSize);
-            ubSizeRemain = ubSizeRemainTmp - kvAntiquantApiSize - tilingData.promptAttentionBaseParams.get_alignedHeadSize() * 2 * FLOAT16SIZE - // scale offset fp16, 2 is used for alignment
-                (sKvAntiquantFactor * tilingData.promptAttentionBaseParams.get_alignedHeadSize() * (INT8SIZE + FLOAT16SIZE) * 1);   // Input/output
+            ubSizeRemain = ubSizeRemainTmp - kvAntiquantApiSize - tilingData->promptAttentionBaseParams.get_alignedHeadSize() * 2 * FLOAT16SIZE - // scale offset fp16, 2 is used for alignment
+                (sKvAntiquantFactor * tilingData->promptAttentionBaseParams.get_alignedHeadSize() * (INT8SIZE + FLOAT16SIZE) * 1);   // Input/output
             if (ubSizeRemain < 0) {
                 sKvAntiquantFactor -= 1;
             }
@@ -6221,19 +6404,19 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionComputeCVDiffParams(PromptF
         OP_CHECK_IF(sKvAntiquantFactor <= 0,
                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "cannot find valid sKvAntiquantFactor!"),
                         return false);
-        tilingData.promptAttentionTensorSizeRect.set_kvAntiquantUbSize(sKvAntiquantFactor * tilingData.promptAttentionBaseParams.get_alignedHeadSize());
-        tilingData.promptAttentionSingleCoreParams.set_kvAntiquantSInnerSize(sKvAntiquantFactor);
+        tilingData->promptAttentionTensorSizeRect.set_kvAntiquantUbSize(sKvAntiquantFactor * tilingData->promptAttentionBaseParams.get_alignedHeadSize());
+        tilingData->promptAttentionSingleCoreParams.set_kvAntiquantSInnerSize(sKvAntiquantFactor);
     }
 
     const uint32_t dSplitFactorBmm2 = 128U;
     SetSplitCoreMode(tilingData, sOuterFactor);
-    res = PromptFlashAttentionCheckBmm1(tilingData, tilingData.bmm1TilingDataRect,
+    res = PromptFlashAttentionCheckBmm1(tilingData, tilingData->bmm1TilingDataRect,
             l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, true, true);
     OP_CHECK_IF(res == false,
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "PromptFlashAttentionCheckBmm1 failed!"),
                     return false);
 
-    res = PromptFlashAttentionCheckBmm2(tilingData, tilingData.bmm2TilingDataRect,
+    res = PromptFlashAttentionCheckBmm2(tilingData, tilingData->bmm2TilingDataRect,
             l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, dSplitFactorBmm2, true, true);
     OP_CHECK_IF(res == false,
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "PromptFlashAttentionCheckBmm2 failed!"),
@@ -6242,7 +6425,7 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionComputeCVDiffParams(PromptF
     return true;
 }
 
-bool PromptFlashAttentionTiling::FindOptimalTilingSouter(PromptFlashAttentionTilingData& tilingData,
+bool PromptFlashAttentionTiling::FindOptimalTilingSouter(PromptFlashAttentionTilingData* tilingData,
     uint32_t& sOuterFactor, uint32_t &sInnerFactor, uint32_t &softmaxSOuterFactor,
     int64_t ubSize, uint32_t typeByteSize, uint32_t maskTypeSize)
 {
@@ -6271,12 +6454,12 @@ bool PromptFlashAttentionTiling::FindOptimalTilingSouter(PromptFlashAttentionTil
 
     uint32_t kvAntiquantApiSizeMax = 0U;
     uint32_t kvAntiquantApiSize = 0U;
-    auto srcShape = Shape({1, tilingData.promptAttentionBaseParams.get_alignedHeadSize()});
-    auto scaleShape = Shape({1, tilingData.promptAttentionBaseParams.get_alignedHeadSize()});
+    auto srcShape = Shape({1, tilingData->promptAttentionBaseParams.get_alignedHeadSize()});
+    auto scaleShape = Shape({1, tilingData->promptAttentionBaseParams.get_alignedHeadSize()});
     GetAscendAntiQuantMaxMinTmpSize(srcShape, scaleShape, false, ge::DT_INT8, inputType, kvAntiquantApiSizeMax, kvAntiquantApiSize);
     // Minimum antiquant ub: api + scale offset + input/output only processes one line at a time
-    int64_t minAntiquantUbSizeNeed = kvAntiquantApiSize + tilingData.promptAttentionBaseParams.get_alignedHeadSize() * 2 * FLOAT16SIZE + // scale offset fp16
-                tilingData.promptAttentionBaseParams.get_alignedHeadSize() * (INT8SIZE + FLOAT16SIZE); // Input int8 and output fp16
+    int64_t minAntiquantUbSizeNeed = kvAntiquantApiSize + tilingData->promptAttentionBaseParams.get_alignedHeadSize() * 2 * FLOAT16SIZE + // scale offset fp16
+                tilingData->promptAttentionBaseParams.get_alignedHeadSize() * (INT8SIZE + FLOAT16SIZE); // Input int8 and output fp16
 
     // lse extra ub size
     int64_t lseUbSize = contextKeyParamsPtr->isSoftMaxLseEnable ? 256 : 0;      // only the first 2 elements are valid
@@ -6299,22 +6482,22 @@ bool PromptFlashAttentionTiling::FindOptimalTilingSouter(PromptFlashAttentionTil
             softmaxSOuterFactorTmp = static_cast<int32_t>(softmaxSOuterFactor);
             continue;
         }
-        if (PromptFlashAttentionCVDiffSetTensorSize(tilingData, tilingData.promptAttentionTensorSizeRect,
+        if (PromptFlashAttentionCVDiffSetTensorSize(tilingData, tilingData->promptAttentionTensorSizeRect,
                                                 sOuterFactorTmp, sInnerFactorTmp, softmaxSOuterFactorTmp) != ge::GRAPH_SUCCESS) {
             return false;
         }
 
-        int64_t msdUbSize = PromptFlashAttentionSetMsdUbSize(tilingData, tilingData.promptAttentionTensorSizeRect, sInnerFactorTmp);
-        queueBufferSize = tilingData.promptAttentionTensorSizeRect.get_attenMaskUbSize();
-        pseShiftBufferSize = tilingData.promptAttentionTensorSizeRect.get_pseShiftUbSize();
+        int64_t msdUbSize = PromptFlashAttentionSetMsdUbSize(tilingData, tilingData->promptAttentionTensorSizeRect, sInnerFactorTmp);
+        queueBufferSize = tilingData->promptAttentionTensorSizeRect.get_attenMaskUbSize();
+        pseShiftBufferSize = tilingData->promptAttentionTensorSizeRect.get_pseShiftUbSize();
         apiTmpSize = std::max(softmaxTmpSize, softmaxFlashTmpSize);
 
         int64_t maskBmm2ShareSize = std::max(int64_t(queueBufferSize * pseMaskMaxSize),
-            int64_t(tilingData.promptAttentionTensorSizeRect.get_bmm2ResUbSize() * typeByteSize));
-        ubSizeRemain = ubSize - apiTmpSize - (tilingData.promptAttentionTensorSizeRect.get_mmResUbSize() * NUM_2 + // 2:2 mm ub
-                    tilingData.promptAttentionTensorSizeRect.get_bmm2ResUbSize() +       // bmm2ResPrev resident in UB
-                    SOFTMAX_BUFFER_NUM * tilingData.promptAttentionTensorSizeRect.get_softmaxExpSize()) *
-                    typeByteSize - maskBmm2ShareSize - tilingData.promptAttentionTensorSizeRect.get_selectSpaceUbSize() -
+            int64_t(tilingData->promptAttentionTensorSizeRect.get_bmm2ResUbSize() * typeByteSize));
+        ubSizeRemain = ubSize - apiTmpSize - (tilingData->promptAttentionTensorSizeRect.get_mmResUbSize() * NUM_2 + // 2:2 mm ub
+                    tilingData->promptAttentionTensorSizeRect.get_bmm2ResUbSize() +       // bmm2ResPrev resident in UB
+                    SOFTMAX_BUFFER_NUM * tilingData->promptAttentionTensorSizeRect.get_softmaxExpSize()) *
+                    typeByteSize - maskBmm2ShareSize - tilingData->promptAttentionTensorSizeRect.get_selectSpaceUbSize() -
                     pseShiftBufferSize * pseShiftCastSize - msdUbSize - lseUbSize;
         if ((ubSizeRemain <= 0) || (enableKvAntiquant && ubSizeRemain < minAntiquantUbSizeNeed)) {
             sOuterFactorTmp -= sOuterFactorStep;
@@ -6332,7 +6515,7 @@ bool PromptFlashAttentionTiling::FindOptimalTilingSouter(PromptFlashAttentionTil
     return true;
 }
 
-bool PromptFlashAttentionTiling::FindOptimalTilingBasicBLock(PromptFlashAttentionTilingData& tilingData,
+bool PromptFlashAttentionTiling::FindOptimalTilingBasicBLock(PromptFlashAttentionTilingData* tilingData,
     uint32_t& sOuterFactor, uint32_t &sInnerFactor, uint32_t &softmaxSOuterFactor,
     int64_t ubSize, uint32_t typeByteSize, uint32_t maskTypeSize)
 {
@@ -6360,30 +6543,30 @@ bool PromptFlashAttentionTiling::FindOptimalTilingBasicBLock(PromptFlashAttentio
         pseShiftCastSize = FLOAT32SIZE;   // In the case of high-precision effectiveness or bf16, pse needs to do a cast and apply for ub
     }
     if (enablePA) {
-        sInnerFactorStep = tilingData.promptAttentionBaseParams.get_blockSize();
+        sInnerFactorStep = tilingData->promptAttentionBaseParams.get_blockSize();
     }
     uint32_t kvAntiquantApiSizeMax = 0U;
     uint32_t kvAntiquantApiSize = 0U;
-    auto srcShape = Shape({1, tilingData.promptAttentionBaseParams.get_alignedHeadSize()});
-    auto scaleShape = Shape({1, tilingData.promptAttentionBaseParams.get_alignedHeadSize()});
+    auto srcShape = Shape({1, tilingData->promptAttentionBaseParams.get_alignedHeadSize()});
+    auto scaleShape = Shape({1, tilingData->promptAttentionBaseParams.get_alignedHeadSize()});
     GetAscendAntiQuantMaxMinTmpSize(srcShape, scaleShape, false, ge::DT_INT8, inputType, kvAntiquantApiSizeMax, kvAntiquantApiSize);
     // Minimum antiquant ub: api + scale offset + input/output only processes one line at a time
-    int64_t minAntiquantUbSizeNeed = kvAntiquantApiSize + tilingData.promptAttentionBaseParams.get_alignedHeadSize() * 2 * FLOAT16SIZE + // scale offset fp16
-                tilingData.promptAttentionBaseParams.get_alignedHeadSize() * (INT8SIZE + FLOAT16SIZE); // Input int8, Output fp16
+    int64_t minAntiquantUbSizeNeed = kvAntiquantApiSize + tilingData->promptAttentionBaseParams.get_alignedHeadSize() * 2 * FLOAT16SIZE + // scale offset fp16
+                tilingData->promptAttentionBaseParams.get_alignedHeadSize() * (INT8SIZE + FLOAT16SIZE); // Input int8, Output fp16
 
     // post quant perchannel ub size
     int64_t postQuantUbSize = 0;
-    if (tilingData.promptAttentionBaseParams.get_isQuant2Perchannel() == 1) {
+    if (tilingData->promptAttentionBaseParams.get_isQuant2Perchannel() == 1) {
         uint32_t floatSize = 4;
         uint32_t bf16Size = 2;
-        postQuantUbSize = 2 * floatSize * tilingData.promptAttentionBaseParams.get_headSize();     // 2: scale2, offset2
-        if (tilingData.promptAttentionBaseParams.get_isQuant2BF16() == 1 || tilingData.promptAttentionBaseParams.get_isQuant2FP16() == 1) {
-            postQuantUbSize += 2 * bf16Size * tilingData.promptAttentionBaseParams.get_headSize(); // 2: scale2, offset2
+        postQuantUbSize = 2 * floatSize * tilingData->promptAttentionBaseParams.get_headSize();     // 2: scale2, offset2
+        if (tilingData->promptAttentionBaseParams.get_isQuant2BF16() == 1 || tilingData->promptAttentionBaseParams.get_isQuant2FP16() == 1) {
+            postQuantUbSize += 2 * bf16Size * tilingData->promptAttentionBaseParams.get_headSize(); // 2: scale2, offset2
         }
     }
 
     // AscendQuant reserves ub space
-    auto postQuantSrcShape = Shape({sOuterFactor, tilingData.promptAttentionBaseParams.get_alignedHeadSize()});
+    auto postQuantSrcShape = Shape({sOuterFactor, tilingData->promptAttentionBaseParams.get_alignedHeadSize()});
     uint32_t bmm2ResTypeSize = (((inputType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) || (inputType == ge::DT_BF16)) ? FLOAT32SIZE : FLOAT16SIZE;
     uint32_t postQuantApiSizeMax = 0U;
     uint32_t postQuantApiSizeMin = 0U;
@@ -6409,28 +6592,28 @@ bool PromptFlashAttentionTiling::FindOptimalTilingBasicBLock(PromptFlashAttentio
                 continue;
             }
 
-            if (PromptFlashAttentionCVDiffSetTensorSize(tilingData, tilingData.promptAttentionTensorSizeRect,
+            if (PromptFlashAttentionCVDiffSetTensorSize(tilingData, tilingData->promptAttentionTensorSizeRect,
                                                     sOuterFactorTmp, sInnerFactorTmp, softmaxSOuterFactorTmp) != ge::GRAPH_SUCCESS) {
                 return false;
             }
 
-            msdUbSize = PromptFlashAttentionSetMsdUbSize(tilingData, tilingData.promptAttentionTensorSizeRect, sInnerFactorTmp);
+            msdUbSize = PromptFlashAttentionSetMsdUbSize(tilingData, tilingData->promptAttentionTensorSizeRect, sInnerFactorTmp);
 
-            queueBufferSize = tilingData.promptAttentionTensorSizeRect.get_attenMaskUbSize();
-            pseShiftBufferSize = tilingData.promptAttentionTensorSizeRect.get_pseShiftUbSize();
+            queueBufferSize = tilingData->promptAttentionTensorSizeRect.get_attenMaskUbSize();
+            pseShiftBufferSize = tilingData->promptAttentionTensorSizeRect.get_pseShiftUbSize();
             apiTmpSize = std::max(softmaxTmpSize, softmaxFlashTmpSize);
 
             if (outputType == ge::DT_INT8) {
-                postQuantSrcShape = Shape({sOuterFactorTmp, tilingData.promptAttentionBaseParams.get_alignedHeadSize()});
+                postQuantSrcShape = Shape({sOuterFactorTmp, tilingData->promptAttentionBaseParams.get_alignedHeadSize()});
                 GetAscendQuantMaxMinTmpSize(postQuantSrcShape, bmm2ResTypeSize, postQuantApiSizeMax, postQuantApiSizeMin);
             }
 
             int64_t maskBmm2ShareSize = std::max(int64_t(queueBufferSize * pseMaskMaxSize),
-                int64_t(tilingData.promptAttentionTensorSizeRect.get_bmm2ResUbSize() * typeByteSize));
-            ubSizeRemain = ubSize - apiTmpSize - (tilingData.promptAttentionTensorSizeRect.get_mmResUbSize() * NUM_2 +  // 2:2 mm ub
-                        tilingData.promptAttentionTensorSizeRect.get_bmm2ResUbSize() +       // bmm2ResPrev resident in UB
-                        SOFTMAX_BUFFER_NUM * tilingData.promptAttentionTensorSizeRect.get_softmaxExpSize()) *
-                        typeByteSize - maskBmm2ShareSize - tilingData.promptAttentionTensorSizeRect.get_selectSpaceUbSize() -
+                int64_t(tilingData->promptAttentionTensorSizeRect.get_bmm2ResUbSize() * typeByteSize));
+            ubSizeRemain = ubSize - apiTmpSize - (tilingData->promptAttentionTensorSizeRect.get_mmResUbSize() * NUM_2 +  // 2:2 mm ub
+                        tilingData->promptAttentionTensorSizeRect.get_bmm2ResUbSize() +       // bmm2ResPrev resident in UB
+                        SOFTMAX_BUFFER_NUM * tilingData->promptAttentionTensorSizeRect.get_softmaxExpSize()) *
+                        typeByteSize - maskBmm2ShareSize - tilingData->promptAttentionTensorSizeRect.get_selectSpaceUbSize() -
                         pseShiftBufferSize * pseShiftCastSize - postQuantUbSize - postQuantApiSizeMin - msdUbSize - lseUbSize;
             if (ubSizeRemain <= 0 || (enableKvAntiquant && ubSizeRemain < minAntiquantUbSizeNeed)) {
                 sInnerFactorTmp -= sInnerFactorStep;
@@ -6456,14 +6639,14 @@ bool PromptFlashAttentionTiling::FindOptimalTilingBasicBLock(PromptFlashAttentio
 
 ge::graphStatus PromptFlashAttentionTiling::AdjustCVTilingCVDiff(int64_t ubSize, int64_t l1Size, int64_t l0CSize,
     uint32_t maskElemSize, uint32_t& sOuterFactor, uint32_t& sInnerFactor, uint32_t& softmaxSOuterFactor,
-    PromptFlashAttentionTilingData& tilingData)
+    PromptFlashAttentionTilingData* tilingData)
 {
     // New softmax tiling strategy, unified big tiling for mm1 mm2 (e.g. mm1=256x512, mm2=256xhead_size), softmax calculates multiple long tiling based on the UB space by horizontally cutting the big tiling into multiple long tiling (e.g. softmax=32x512).
     // Softmax calculates multiple long tiling based on the UB space by horizontally slicing big tiling (e.g. softmax=32x512).
     uint32_t minFactor = CVDIFF_SOUTER_FACTOR_DEFAULT;
     uint32_t rectangleFactor = CVDIFF_SINNER_FACTOR_DEFAULT;
     const uint32_t softmaxUbSize = CVDIFF_MM1RES_UB_SIZE;
-    if ((tilingData.promptAttentionBaseParams.get_seqInnerSize() <= CVDIFF_SMALL_KV_THRESHOLDS) && (inputType != ge::DT_INT8)) {
+    if ((tilingData->promptAttentionBaseParams.get_seqInnerSize() <= CVDIFF_SMALL_KV_THRESHOLDS) && (inputType != ge::DT_INT8)) {
         rectangleFactor = CVDIFF_SINNER_FACTOR_SMALL_KVS;
     }
 
@@ -6471,15 +6654,15 @@ ge::graphStatus PromptFlashAttentionTiling::AdjustCVTilingCVDiff(int64_t ubSize,
 
     if (((inputType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) ||
         (inputType == ge::DT_BF16)) {  // When high-precision mode or BF16 takes effect, adjust the starting tiling block.
-        if (tilingData.promptAttentionBaseParams.get_alignedHeadSize() >= 200) {           // D: [200, ...)
+        if (tilingData->promptAttentionBaseParams.get_alignedHeadSize() >= 200) {           // D: [200, ...)
             minFactor = 64U;            // 64:  Adjust the size of the basic block Souter to 64.
             rectangleFactor = 512U;     // 512: Adjust the size of the basic block Sinner to 512.
             softmaxSOuterFactor = 8U;   // 8:   Adjust softmaxSOuter to 8.
-        } else if (tilingData.promptAttentionBaseParams.get_alignedHeadSize() >= 128) {    // D: [128, 200)
+        } else if (tilingData->promptAttentionBaseParams.get_alignedHeadSize() >= 128) {    // D: [128, 200)
             minFactor = 128U;           // 128: Adjust the size of the basic block Souter to 128.
             rectangleFactor = 512U;     // 512: Adjust the size of the basic block Sinner to 512.
             softmaxSOuterFactor = 8U;   // 8:   Adjust softmaxSOuter to 8
-        } else if (tilingData.promptAttentionBaseParams.get_alignedHeadSize() >= 32) {     // D: [32, 128)
+        } else if (tilingData->promptAttentionBaseParams.get_alignedHeadSize() >= 32) {     // D: [32, 128)
             minFactor = 128U;           // 128: Adjust the size of the basic block Souter to 128.
             rectangleFactor = 512U;     // 512: Adjust the size of the basic block Sinner to 512.
             softmaxSOuterFactor = 16U;  // 16:  Adjust softmaxSOuter to 16.
@@ -6492,10 +6675,10 @@ ge::graphStatus PromptFlashAttentionTiling::AdjustCVTilingCVDiff(int64_t ubSize,
     if (enablePA) {
         minFactor = 64;  // In the PA scenario, Souter starts cutting from 64 and tries to ensure that Sinner does not cut, so that Single is a multiple of blockSize
     }
-    if (tilingData.promptAttentionBaseParams.get_seqSize() <= CVDIFF_SMALL_QS_THRESHOLDS) {   // Minimum basic block size.
+    if (tilingData->promptAttentionBaseParams.get_seqSize() <= CVDIFF_SMALL_QS_THRESHOLDS) {   // Minimum basic block size.
         minFactor = CVDIFF_SMALL_QS_THRESHOLDS;  // Reduce S1 to avoid unnecessary calculation of mm1
-        if ((tilingData.promptAttentionBaseParams.get_seqInnerSize() > CVDIFF_SINNER_FACTOR_SMALL_QS)
-            && (tilingData.promptAttentionBaseParams.get_useMask() == 0)) {   // Only in scenes without masks can it be set to 2048.
+        if ((tilingData->promptAttentionBaseParams.get_seqInnerSize() > CVDIFF_SINNER_FACTOR_SMALL_QS)
+            && (tilingData->promptAttentionBaseParams.get_useMask() == 0)) {   // Only in scenes without masks can it be set to 2048.
             if (enableMsd) {
                 rectangleFactor = CVDIFF_SINNER_FACTOR_DEFAULT;
             } else {
@@ -6505,13 +6688,13 @@ ge::graphStatus PromptFlashAttentionTiling::AdjustCVTilingCVDiff(int64_t ubSize,
         softmaxSOuterFactor = softmaxUbSize / rectangleFactor;
 
         // Reduce softmaxouter to the true souter.
-        if ( tilingData.promptAttentionBaseParams.get_seqSize() < softmaxSOuterFactor) {
-            softmaxSOuterFactor = tilingData.promptAttentionBaseParams.get_seqSize();
+        if ( tilingData->promptAttentionBaseParams.get_seqSize() < softmaxSOuterFactor) {
+            softmaxSOuterFactor = tilingData->promptAttentionBaseParams.get_seqSize();
         }
     }
 
     if (enableKvAntiquant) {
-        uint32_t sInnerMax = 1024 * 256 / tilingData.promptAttentionBaseParams.get_alignedHeadSize();   // The increase in workspace should not exceed 50M
+        uint32_t sInnerMax = 1024 * 256 / tilingData->promptAttentionBaseParams.get_alignedHeadSize();   // The increase in workspace should not exceed 50M
         sInnerMax = (sInnerMax + THIRTY_ONE) / UB_ALIGN * UB_ALIGN;
         rectangleFactor = rectangleFactor > sInnerMax ? sInnerMax : rectangleFactor;
         softmaxSOuterFactor = softmaxUbSize / rectangleFactor;
@@ -6539,7 +6722,7 @@ PFA_EXTERN_C ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* con
         return ge::GRAPH_FAILED;
     }
 
-    PromptFlashAttentionTilingData tilingData;
+    PromptFlashAttentionTilingData* tilingData = context->GetTilingData<PromptFlashAttentionTilingData>();
     OP_CHECK_IF(memset_s(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity(),
                0, context->GetRawTilingData()->GetCapacity()) != EOK,
                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "fail to memset tiling data"),
@@ -6554,7 +6737,6 @@ PFA_EXTERN_C ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* con
     PromptFlashAttentionTiling flashTiling(nullptr);
 
     ret = flashTiling.RunBigKernelTilingWithParams(contextParamsForPFATiling, tilingKey, blockDimToBeSet, tilingData);
-    tilingKey += BENCHMARK_TILING_KEY;
     context->SetTilingKey(tilingKey);
     context->SetBlockDim(blockDimToBeSet);
     flashTiling.PromptFlashAttentionSetTilingData(context, tilingData);
