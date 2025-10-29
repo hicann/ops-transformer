@@ -73,6 +73,27 @@ TEST_F(moe_token_unpermute_with_routing_map_grad_test, test_bf16_prob_not_none)
 
     MoeTokenUnpermuteWithRoutingMapGradTilingData* tilingDatafromBin =
         reinterpret_cast<MoeTokenUnpermuteWithRoutingMapGradTilingData*>(tiling);
+    tilingDatafromBin->tokensNum = 30;
+    tilingDatafromBin->topK = 1;
+    tilingDatafromBin->capacity = 0;
+    tilingDatafromBin->numExpert = 8;
+    tilingDatafromBin->hiddenSize = 8;
+    tilingDatafromBin->numOutTokens = 30;
+    tilingDatafromBin->formerCoreNum = 30;
+    tilingDatafromBin->tailCoreNum = 10;
+    tilingDatafromBin->tokenNumEachCore = 1;
+    tilingDatafromBin->tokenNumTailCore = 0;
+    tilingDatafromBin->rowIdMapEachCore = 1;
+    tilingDatafromBin->rowIdMapTailCore = 0;
+    tilingDatafromBin->hiddenSizeAlign = 16;
+    tilingDatafromBin->hiddenSizeLoopTimes = 1;
+    tilingDatafromBin->hiddenSizeLoopTimesAlign = 0;
+    tilingDatafromBin->hiddenSizeTail = 8;
+    tilingDatafromBin->inputReserveNum = 0;
+    tilingDatafromBin->indicesReserveNum = 1;
+    tilingDatafromBin->indicesReserveNumAlign = 16;
+    tilingDatafromBin->numExpertAlign = 32;
+    tilingDatafromBin->totalUbSize = 196352;
 
     ICPU_SET_TILING_KEY(1);
     ICPU_RUN_KF(
@@ -126,7 +147,27 @@ TEST_F(moe_token_unpermute_with_routing_map_grad_test, test_bf16_prob_none_pad_f
 
     MoeTokenUnpermuteWithRoutingMapGradTilingData* tilingDatafromBin =
         reinterpret_cast<MoeTokenUnpermuteWithRoutingMapGradTilingData*>(tiling);
-
+    tilingDatafromBin->tokensNum = 30;
+    tilingDatafromBin->topK = 1;
+    tilingDatafromBin->capacity = 0;
+    tilingDatafromBin->numExpert = 0;
+    tilingDatafromBin->hiddenSize = 8;
+    tilingDatafromBin->numOutTokens = 30;
+    tilingDatafromBin->formerCoreNum = 30;
+    tilingDatafromBin->tailCoreNum = 10;
+    tilingDatafromBin->tokenNumEachCore = 0;
+    tilingDatafromBin->tokenNumTailCore = 0;
+    tilingDatafromBin->rowIdMapEachCore = 1;
+    tilingDatafromBin->rowIdMapTailCore = 0;
+    tilingDatafromBin->hiddenSizeAlign = 16;
+    tilingDatafromBin->hiddenSizeLoopTimes = 1;
+    tilingDatafromBin->hiddenSizeLoopTimesAlign = 0;
+    tilingDatafromBin->hiddenSizeTail = 8;
+    tilingDatafromBin->inputReserveNum = 1;
+    tilingDatafromBin->indicesReserveNum = 1;
+    tilingDatafromBin->indicesReserveNumAlign = 0;
+    tilingDatafromBin->numExpertAlign = 0;
+    tilingDatafromBin->totalUbSize = 196352;
     ICPU_SET_TILING_KEY(0);
     ICPU_RUN_KF(
         moe_token_unpermute_with_routing_map_grad, blockDim, unpermutedTokensGrad, outIndex, permuteTokenId, routingMap,
@@ -179,7 +220,27 @@ TEST_F(moe_token_unpermute_with_routing_map_grad_test, test_bf16_prob_none_pad_t
 
     MoeTokenUnpermuteWithRoutingMapGradTilingData* tilingDatafromBin =
         reinterpret_cast<MoeTokenUnpermuteWithRoutingMapGradTilingData*>(tiling);
-
+    tilingDatafromBin->tokensNum = 30;
+    tilingDatafromBin->topK = 0;
+    tilingDatafromBin->capacity = 0;
+    tilingDatafromBin->numExpert = 0;
+    tilingDatafromBin->hiddenSize = 8;
+    tilingDatafromBin->numOutTokens = 30;
+    tilingDatafromBin->formerCoreNum = 30;
+    tilingDatafromBin->tailCoreNum = 10;
+    tilingDatafromBin->tokenNumEachCore = 0;
+    tilingDatafromBin->tokenNumTailCore = 0;
+    tilingDatafromBin->rowIdMapEachCore = 1;
+    tilingDatafromBin->rowIdMapTailCore = 0;
+    tilingDatafromBin->hiddenSizeAlign = 16;
+    tilingDatafromBin->hiddenSizeLoopTimes = 1;
+    tilingDatafromBin->hiddenSizeLoopTimesAlign = 0;
+    tilingDatafromBin->hiddenSizeTail = 8;
+    tilingDatafromBin->inputReserveNum = 1;
+    tilingDatafromBin->indicesReserveNum = 1;
+    tilingDatafromBin->indicesReserveNumAlign = 0;
+    tilingDatafromBin->numExpertAlign = 0;
+    tilingDatafromBin->totalUbSize = 196352;
     ICPU_SET_TILING_KEY(10);
     ICPU_RUN_KF(
         moe_token_unpermute_with_routing_map_grad, blockDim, unpermutedTokensGrad, outIndex, permuteTokenId, routingMap,
