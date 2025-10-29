@@ -54,13 +54,6 @@ TEST_F(moe_finalize_routing_v2_grad_test, test_case_10001_001)
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataByteSize);
     uint32_t blockDim = 48;
-    system(
-        "cp -r "
-        "../../../../../../../ops/transformer/moe_finalize_routing_v2_grad/tests/ut/op_kernel"
-        "moe_finalize_routing_v2_grad_data ./");
-    system("chmod -R 755 ./moe_finalize_routing_v2_grad_data/");
-    system("cd ./moe_finalize_routing_v2_grad_data/ && rm -rf ./*bin");
-    system("cd ./moe_finalize_routing_v2_grad_data/ && python3 gen_data.py 5 8 1 False False 0 0 0 0 float32 int32");
 
     char* path_ = get_current_dir_name();
     string path(path_);
@@ -82,10 +75,6 @@ TEST_F(moe_finalize_routing_v2_grad_test, test_case_10001_001)
     tilingData->hiddenLastPart = 0;
     tilingData->tilingKey = 10001;
 
-    ReadFile(path + "/moe_finalize_routing_v2_grad_data/grad_y.bin", gradYByteSize, gradY, gradYByteSize);
-    ReadFile(
-        path + "/moe_finalize_routing_v2_grad_data/expanded_row_idx.bin", expandedRowIdxByteSize, expandedRowIdx,
-        expandedRowIdxByteSize);
     ICPU_SET_TILING_KEY(10001);
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_RUN_KF(
@@ -116,14 +105,6 @@ TEST_F(moe_finalize_routing_v2_grad_test, test_case_10002_001)
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataByteSize);
     uint32_t blockDim = 48;
-    system(
-        "cp -r "
-        "../../../../../../../ops/transformer/moe_finalize_routing_v2_grad/tests/ut/op_kernel/"
-        "moe_finalize_routing_v2_grad_data ./");
-    system("chmod -R 755 ./moe_finalize_routing_v2_grad_data/");
-    system("cd ./moe_finalize_routing_v2_grad_data/ && rm -rf ./*bin");
-    system(
-        "cd ./moe_finalize_routing_v2_grad_data/ && python3 gen_data.py 5 262144 1 False False 0 0 0 0 float32 int32");
 
     char* path_ = get_current_dir_name();
     string path(path_);
@@ -145,10 +126,6 @@ TEST_F(moe_finalize_routing_v2_grad_test, test_case_10002_001)
     tilingData->hiddenLastPart = 16744;
     tilingData->tilingKey = 10002;
 
-    ReadFile(path + "/moe_finalize_routing_v2_grad_data/grad_y.bin", gradYByteSize, gradY, gradYByteSize);
-    ReadFile(
-        path + "/moe_finalize_routing_v2_grad_data/expanded_row_idx.bin", expandedRowIdxByteSize, expandedRowIdx,
-        expandedRowIdxByteSize);
     ICPU_SET_TILING_KEY(10002);
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_RUN_KF(
@@ -187,13 +164,6 @@ TEST_F(moe_finalize_routing_v2_grad_test, test_case_20001_001)
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataByteSize);
     uint32_t blockDim = 48;
-    system(
-        "cp -r "
-        "../../../../../../../ops/transformer/moe_finalize_routing_v2_grad/tests/ut/op_kernel/"
-        "moe_finalize_routing_v2_grad_data ./");
-    system("chmod -R 755 ./moe_finalize_routing_v2_grad_data/");
-    system("cd ./moe_finalize_routing_v2_grad_data/ && rm -rf ./*bin");
-    system("cd ./moe_finalize_routing_v2_grad_data/ && python3 gen_data.py 5 8 3 True True 0 0 0 0 float32 int32");
 
     char* path_ = get_current_dir_name();
     string path(path_);
@@ -215,16 +185,6 @@ TEST_F(moe_finalize_routing_v2_grad_test, test_case_20001_001)
     tilingData->hiddenLastPart = 0;
     tilingData->tilingKey = 20001;
 
-    ReadFile(path + "/moe_finalize_routing_v2_grad_data/grad_y.bin", gradYByteSize, gradY, gradYByteSize);
-    ReadFile(
-        path + "/moe_finalize_routing_v2_grad_data/expanded_row_idx.bin", expandedRowIdxByteSize, expandedRowIdx,
-        expandedRowIdxByteSize);
-    ReadFile(
-        path + "/moe_finalize_routing_v2_grad_data/expanded_x.bin", expandedXByteSize, expandedX, expandedXByteSize);
-    ReadFile(path + "/moe_finalize_routing_v2_grad_data/scales.bin", scalesByteSize, scales, scalesByteSize);
-    ReadFile(
-        path + "/moe_finalize_routing_v2_grad_data/expert_idx.bin", expertIdxByteSize, expertIdx, expertIdxByteSize);
-    ReadFile(path + "/moe_finalize_routing_v2_grad_data/bias.bin", biasByteSize, bias, biasByteSize);
     ICPU_SET_TILING_KEY(20001);
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_RUN_KF(
@@ -267,13 +227,6 @@ TEST_F(moe_finalize_routing_v2_grad_test, test_case_20002_001)
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataByteSize);
     uint32_t blockDim = 48;
-    system(
-        "cp -r "
-        "../../../../../../../ops/transformer/moe_finalize_routing_v2_grad/tests/ut/op_kernel/"
-        "moe_finalize_routing_v2_grad_data ./");
-    system("chmod -R 755 ./moe_finalize_routing_v2_grad_data/");
-    system("cd ./moe_finalize_routing_v2_grad_data/ && rm -rf ./*bin");
-    system("cd ./moe_finalize_routing_v2_grad_data/ && python3 gen_data.py 5 262144 3 True True 0 0 0 0 float32 int32");
 
     char* path_ = get_current_dir_name();
     string path(path_);
@@ -288,23 +241,14 @@ TEST_F(moe_finalize_routing_v2_grad_test, test_case_20002_001)
     tilingData->computeModCoreNum = 5;
     tilingData->dropPadMode = 0;
     tilingData->topK = 3;
-    tilingData->hidden = 262144;
+    tilingData->hidden = 2621;
     tilingData->expandedXDim0 = 5;
     tilingData->hiddenPrePart = 9808;
     tilingData->hiddenInnerLoops = 26;
     tilingData->hiddenLastPart = 7136;
     tilingData->tilingKey = 20002;
+    tilingData->hiddenPrePart = 8000;
 
-    ReadFile(path + "/moe_finalize_routing_v2_grad_data/grad_y.bin", gradYByteSize, gradY, gradYByteSize);
-    ReadFile(
-        path + "/moe_finalize_routing_v2_grad_data/expanded_row_idx.bin", expandedRowIdxByteSize, expandedRowIdx,
-        expandedRowIdxByteSize);
-    ReadFile(
-        path + "/moe_finalize_routing_v2_grad_data/expanded_x.bin", expandedXByteSize, expandedX, expandedXByteSize);
-    ReadFile(path + "/moe_finalize_routing_v2_grad_data/scales.bin", scalesByteSize, scales, scalesByteSize);
-    ReadFile(
-        path + "/moe_finalize_routing_v2_grad_data/expert_idx.bin", expertIdxByteSize, expertIdx, expertIdxByteSize);
-    ReadFile(path + "/moe_finalize_routing_v2_grad_data/bias.bin", biasByteSize, bias, biasByteSize);
     ICPU_SET_TILING_KEY(20001);
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     ICPU_RUN_KF(

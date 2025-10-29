@@ -68,8 +68,8 @@ TEST_F(MoeFinalizeRoutingV2GradProto, dtype_infer)
                 .NodeInputTd(3, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
                 .NodeInputTd(4, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
                 .NodeInputTd(5, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                .NodeOutputTd(0, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                .NodeOutputTd(1, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
                 .InputDataTypes({&input_ref1, &input_ref2, &input_ref1, &input_ref1, &input_ref2, &input_ref1})
                 .OutputDataTypes({&output_ref, &output_ref})
                 .Build();
@@ -95,7 +95,7 @@ TEST_F(MoeFinalizeRoutingV2GradProto, invalid_shape_infer_0)
     },
     {}
     );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{-2}, {-2}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{ 15, 8 }, { 5, 1 }};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -114,7 +114,7 @@ TEST_F(MoeFinalizeRoutingV2GradProto, shape_infer_option_param_shape_invalid)
     },
     {}
     );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{-2}, {-2}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{ 15, 8 }, { 5, 3 }};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -140,7 +140,7 @@ TEST_F(MoeFinalizeRoutingV2GradProto, shape_infer_set_drop_mode_on)
         {"active_num",Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
     }
     );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{15, 8}, {5, 3}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{ 1, 1, 8 }, {5, 3}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 

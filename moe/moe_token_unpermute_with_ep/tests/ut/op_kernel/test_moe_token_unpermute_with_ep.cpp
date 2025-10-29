@@ -67,6 +67,11 @@ TEST_F(moe_token_unpermute_with_ep_test, test_prob_none_bf16)
     char* path_ = get_current_dir_name();
     string path(path_);
 
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->buffer_num = 1;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->hidden_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->tokens_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->top_k = 5;
+
     MoeTokenUnpermuteWithEpTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling);
 
     ICPU_SET_TILING_KEY(0);
@@ -104,6 +109,11 @@ TEST_F(moe_token_unpermute_with_ep_test, test_bf16)
 
     char* path_ = get_current_dir_name();
     string path(path_);
+
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->buffer_num = 1;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->hidden_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->tokens_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->top_k = 5;
 
     MoeTokenUnpermuteWithEpTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling);
 
@@ -143,6 +153,11 @@ TEST_F(moe_token_unpermute_with_ep_test, test_prob_none_fp16)
     char* path_ = get_current_dir_name();
     string path(path_);
 
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->buffer_num = 1;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->hidden_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->tokens_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->top_k = 5;
+
     MoeTokenUnpermuteWithEpTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling);
 
     ICPU_SET_TILING_KEY(2);
@@ -181,6 +196,11 @@ TEST_F(moe_token_unpermute_with_ep_test, test_fp16)
     char* path_ = get_current_dir_name();
     string path(path_);
 
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->buffer_num = 1;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->hidden_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->tokens_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->top_k = 5;
+
     MoeTokenUnpermuteWithEpTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling);
 
     ICPU_SET_TILING_KEY(3);
@@ -216,6 +236,11 @@ TEST_F(moe_token_unpermute_with_ep_test, test_prob_none_fp32)
 
     char* path_ = get_current_dir_name();
     string path(path_);
+
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->buffer_num = 1;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->hidden_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->tokens_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->top_k = 5;
 
     MoeTokenUnpermuteWithEpTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling);
 
@@ -253,6 +278,11 @@ TEST_F(moe_token_unpermute_with_ep_test, test_fp32)
 
     char* path_ = get_current_dir_name();
     string path(path_);
+
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->buffer_num = 1;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->hidden_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->tokens_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->top_k = 5;
 
     MoeTokenUnpermuteWithEpTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling);
 
@@ -292,6 +322,11 @@ TEST_F(moe_token_unpermute_with_ep_test, test_mix_bf16_fp16)
     char* path_ = get_current_dir_name();
     string path(path_);
 
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->buffer_num = 1;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->hidden_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->tokens_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->top_k = 5;
+
     MoeTokenUnpermuteWithEpTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling);
 
     ICPU_SET_TILING_KEY(17);
@@ -329,6 +364,11 @@ TEST_F(moe_token_unpermute_with_ep_test, test_mix_bf16_fp32)
 
     char* path_ = get_current_dir_name();
     string path(path_);
+
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->buffer_num = 1;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->hidden_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->tokens_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->top_k = 5;
 
     MoeTokenUnpermuteWithEpTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling);
 
@@ -368,6 +408,11 @@ TEST_F(moe_token_unpermute_with_ep_test, test_mix_fp16_bf16)
     char* path_ = get_current_dir_name();
     string path(path_);
 
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->buffer_num = 1;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->hidden_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->tokens_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->top_k = 5;
+
     MoeTokenUnpermuteWithEpTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling);
 
     ICPU_SET_TILING_KEY(11);
@@ -405,6 +450,11 @@ TEST_F(moe_token_unpermute_with_ep_test, test_mix_fp16_fp32)
 
     char* path_ = get_current_dir_name();
     string path(path_);
+
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->buffer_num = 1;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->hidden_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->tokens_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->top_k = 5;
 
     MoeTokenUnpermuteWithEpTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling);
 
@@ -444,6 +494,11 @@ TEST_F(moe_token_unpermute_with_ep_test, test_mix_fp32_bf16)
     char* path_ = get_current_dir_name();
     string path(path_);
 
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->buffer_num = 1;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->hidden_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->tokens_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->top_k = 5;
+
     MoeTokenUnpermuteWithEpTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling);
 
     ICPU_SET_TILING_KEY(13);
@@ -481,6 +536,11 @@ TEST_F(moe_token_unpermute_with_ep_test, test_mix_fp32_fp16)
 
     char* path_ = get_current_dir_name();
     string path(path_);
+
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->buffer_num = 1;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->hidden_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->tokens_splited_length = 512;
+    reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling)->top_k = 5;
 
     MoeTokenUnpermuteWithEpTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithEpTilingData*>(tiling);
 
