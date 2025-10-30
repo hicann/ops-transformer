@@ -33,6 +33,10 @@ constexpr uint8_t COMM_TP_IDX = 1;
 // 先写死这个偏移，如果TP固定为2，可直接往起始数据偏移开始读写
 constexpr uint64_t WIN_STATE_OFFSET = 500UL * 1024UL;
 constexpr uint64_t STATE_WIN_OFFSET = 950UL * 1024UL;
+constexpr uint64_t STATE_CHECK_OFFSET = 1000UL * 1024UL;
+constexpr uint64_t TIMEOUT_DETECTION_THRESHOLD = 50000UL;
+constexpr uint64_t CYCLES_PER_US = 50UL;
+constexpr uint64_t TIMEOUT_DETECTION_TX_UNITS = 8UL;
 constexpr uint32_t TP_STATE_SIZE = 100U * 1024U;
 constexpr uint32_t WORKSPACE_ELEMENT_OFFSET = 512U;
 constexpr uint64_t WIN_ADDR_ALIGN = 512UL;
@@ -76,6 +80,8 @@ private:
     __aicore__ inline void LocalWindowCopy();
     __aicore__ inline void TokenActiveMaskCal();
     __aicore__ inline void ExpertActiveMaskCal();
+    __aicore__ inline void TimeOutDetection();
+    __aicore__ inline void WaitDispatchClearStatus();
     __aicore__ inline void CalValidBSCnt(LocalTensor<bool> maskStrideTensor);
     __aicore__ inline void CalValidExpIdx(LocalTensor<bool> maskInputTensor);
     __aicore__ inline void GenerateGatherMaskTensor(uint32_t maskCnt);
@@ -85,7 +91,7 @@ private:
     __aicore__ inline void QuantProcess(uint32_t expertIndex);
     __aicore__ inline void SetStatus();
     __aicore__ inline void BufferInit();
-    __aicore__ inline void InitElasticInfo(GM_ADDR elasticInfo, const MoeDistributeDispatchV2TilingData *tilingData);
+    __aicore__ inline void InitElasticInfo(bool isWaitDispatch = false);
     __aicore__ inline void WaitDispatch();
     __aicore__ inline void GetCumSum(LocalTensor<int32_t> &outLocal, uint32_t totalCount);
     __aicore__ inline void AllGatherSetStatusAndWait();
@@ -275,19 +281,21 @@ private:
 };
 
 template <TemplateMC2TypeClass>
-__aicore__ inline void MoeDistributeDispatchV2<TemplateMC2TypeFunc>::InitElasticInfo(GM_ADDR elasticInfo, const MoeDistributeDispatchV2TilingData *tilingData)
+__aicore__ inline void MoeDistributeDispatchV2<TemplateMC2TypeFunc>::InitElasticInfo(bool isWaitDispatch)
 {
     uint32_t elasticInfoSize = (ELASTIC_INFO_OFFSET + RANK_LIST_NUM * epWorldSizeOriginal_)*sizeof(int32_t);
     uint32_t elasticInfoSizeAlign = Ceil(elasticInfoSize, UB_ALIGN) * UB_ALIGN;
     tpipe_->InitBuffer(elasticInfoBuf_, elasticInfoSizeAlign);
-    totalUsedUB_ += elasticInfoSizeAlign;
+    if (!isWaitDispatch) {
+        totalUsedUB_ += elasticInfoSizeAlign;
+    }
     elasticInfoTensor_ = elasticInfoBuf_.Get<int32_t>();
     DataCopyExtParams elasticInfoParams = {1U, static_cast<uint32_t>((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * epWorldSizeOriginal_) * sizeof(int32_t)), 0U, 0U, 0U};
     DataCopyPadExtParams<int32_t> elasticInfoCopyPadParams{false, 0U, 0U, 0U};
     DataCopyPad(elasticInfoTensor_, elasticInfoGMTensor_, elasticInfoParams, elasticInfoCopyPadParams);
     SyncFunc<AscendC::HardEvent::MTE2_S>();
     isScalingDownFlag_ = elasticInfoTensor_.GetValue(0);
-    if (isScalingDownFlag_) {
+    if (!isWaitDispatch && isScalingDownFlag_) {
         epWorldSize_ = elasticInfoTensor_.GetValue(EP_WORLD_SIZE_IDX);
         sharedExpertRankNum_ = elasticInfoTensor_.GetValue(SHARE_RANK_NUM_IDX);
         moeExpertNum_ = elasticInfoTensor_.GetValue(MOE_NUM_IDX);
@@ -323,7 +331,7 @@ __aicore__ inline void MoeDistributeDispatchV2<TemplateMC2TypeFunc>::Init(
     moeExpertNum_ = tilingData->moeDistributeDispatchV2Info.moeExpertNum;
     elasticInfoGMTensor_.SetGlobalBuffer((__gm__ int32_t*)(elasticInfo));
     if (hasElasticInfoFlag_) {
-        InitElasticInfo(elasticInfo, tilingData);
+        InitElasticInfo(false);
     }
 
     if (epRankId_ < sharedExpertRankNum_) {
@@ -1110,6 +1118,39 @@ __aicore__ inline void MoeDistributeDispatchV2<TemplateMC2TypeFunc>::BufferInit(
 }
 
 template <TemplateMC2TypeClass>
+__aicore__ inline void MoeDistributeDispatchV2<TemplateMC2TypeFunc>::TimeOutDetection()
+{
+    uint32_t toRankId;
+    GlobalTensor<float> timeoutCheckGMTensor;
+    for (uint32_t index = startStatusIndex_; index < startStatusIndex_ + recStatusNumPerCore_; index++) {
+        if (isScalingDownFlag_) {
+            toRankId = elasticInfoTensor_.GetValue(ELASTIC_INFO_OFFSET + epWorldSizeOriginal_ + index % epWorldSize_);
+        } else {
+            toRankId = index % epWorldSize_;
+        }
+        GM_ADDR timeoutCheckGM = (__gm__ uint8_t*)(GetWindStateAddrByRankId(COMM_EP_IDX, toRankId)
+            + STATE_CHECK_OFFSET);
+        timeoutCheckGMTensor.SetGlobalBuffer((__gm__ float*)(timeoutCheckGM));
+        DataCopy<float>(timeoutCheckGMTensor, statusFp32Tensor_, TIMEOUT_DETECTION_TX_UNITS);
+    }
+}
+
+template <TemplateMC2TypeClass>
+__aicore__ inline void MoeDistributeDispatchV2<TemplateMC2TypeFunc>::WaitDispatchClearStatus()
+{
+    SyncFunc<AscendC::HardEvent::MTE3_S>();
+    DataCopyParams intriOutParams{static_cast<uint16_t>(recStatusNumPerCore_), 1, 0, 0};
+    uint64_t duplicateMask[2] = { 0x101010101010101, 0 }; // 一次性操作256字节，也是64个int32_t，每8个数将首个设置为0
+    LocalTensor<int32_t> cleanStateTensor = waitStatusBuf_.Get<int32_t>();
+    SyncFunc<AscendC::HardEvent::S_V>();
+    Duplicate<int32_t>(cleanStateTensor, 0, duplicateMask, Ceil(recStatusNumPerCore_, 8), 1, 8);
+    SyncFunc<AscendC::HardEvent::V_MTE3>();
+    DataCopy(windowInstatusFp32Tensor_[startStatusIndex_ * stateOffset_ / sizeof(float)],
+             cleanStateTensor.ReinterpretCast<float>(), intriOutParams);
+    SyncFunc<AscendC::HardEvent::MTE3_S>();
+}
+
+template <TemplateMC2TypeClass>
 __aicore__ inline void MoeDistributeDispatchV2<TemplateMC2TypeFunc>::WaitDispatch()
 {
     BufferInit();
@@ -1129,6 +1170,11 @@ __aicore__ inline void MoeDistributeDispatchV2<TemplateMC2TypeFunc>::WaitDispatc
     float compareTarget = sumTarget_ * recStatusNumPerCore_;
     float sumOfFlag = static_cast<float>(-1.0);
     DataCopyParams intriParams{static_cast<uint16_t>(recStatusNumPerCore_), 1, 0, 0};
+    if (isScalingDownFlag_) {
+        InitElasticInfo(true);
+    }
+    uint64_t timeoutCheckStart = static_cast<uint64_t>(GetSystemCycle());
+    uint64_t timeoutCheckEnd, timeoutCheckDuration;
     SyncFunc<AscendC::HardEvent::S_V>();
     while (sumOfFlag != compareTarget) {
         DataCopy(statusFp32Tensor_, windowInstatusFp32Tensor_[startStatusIndex_ * stateOffset_ / sizeof(float)], intriParams);
@@ -1136,18 +1182,14 @@ __aicore__ inline void MoeDistributeDispatchV2<TemplateMC2TypeFunc>::WaitDispatc
         ReduceSum(statusSumOutTensor, statusFp32Tensor_, gatherMaskOutTensor, mask, recStatusNumPerCore_, 1);
         SyncFunc<AscendC::HardEvent::V_S>();
         sumOfFlag = statusSumOutTensor.GetValue(0);
+        timeoutCheckEnd = static_cast<uint64_t>(GetSystemCycle());
+        timeoutCheckDuration = (timeoutCheckEnd - timeoutCheckStart) / CYCLES_PER_US;
+        if (timeoutCheckDuration > TIMEOUT_DETECTION_THRESHOLD) {
+            TimeOutDetection();
+        }
     }
     // 清状态
-    SyncFunc<AscendC::HardEvent::MTE3_S>();
-    DataCopyParams intriOutParams{static_cast<uint16_t>(recStatusNumPerCore_), 1, 0, 0};
-    uint64_t duplicateMask[2] = { 0x101010101010101, 0 }; // 一次性操作256字节，也是64个int32_t，每8个数将首个设置为0
-    LocalTensor<int32_t> cleanStateTensor = waitStatusBuf_.Get<int32_t>();
-    SyncFunc<AscendC::HardEvent::S_V>();
-    Duplicate<int32_t>(cleanStateTensor, 0, duplicateMask, Ceil(recStatusNumPerCore_, 8), 1, 8);
-    SyncFunc<AscendC::HardEvent::V_MTE3>();
-    DataCopy(windowInstatusFp32Tensor_[startStatusIndex_ * stateOffset_ / sizeof(float)],
-             cleanStateTensor.ReinterpretCast<float>(), intriOutParams);
-    SyncFunc<AscendC::HardEvent::MTE3_S>();
+    WaitDispatchClearStatus();
 
     // 核间同步token cnt
     SyncCntOnCore(gatherMaskOutTensor, gatherTmpTensor, statusSumOutTensor);

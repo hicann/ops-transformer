@@ -31,6 +31,10 @@ constexpr uint8_t TP_DOMAIN = 1;
 constexpr uint32_t FLOAT_PER_UB_ALIGN = 8U;
 constexpr uint64_t WIN_STATE_OFFSET = 500UL * 1024UL;
 constexpr uint64_t STATE_WIN_OFFSET = 975UL * 1024UL;   // 预留48*512内存
+constexpr uint64_t STATE_CHECK_OFFSET = 1000UL * 1024UL;
+constexpr uint64_t TIMEOUT_DETECTION_THRESHOLD = 50000UL;
+constexpr uint64_t CYCLES_PER_US = 50UL;
+constexpr uint64_t TIMEOUT_DETECTION_TX_UNITS = 8UL;
 constexpr uint32_t EXPAND_IDX_INFO = 3U;                // expand_idx是按3元组保存信息，分别为rank_id token_id topk_id
 constexpr uint32_t ALIGNED_LEN = 256U;                  // blockReduceMax中，最多支持连续256字节数据参与计算
 constexpr float SCALE_PARAM = 127.0;                    // 计算量化参数所需的缩放倍数
@@ -77,6 +81,7 @@ private:
                                               GM_ADDR constExpertV, GM_ADDR XOut);
     __aicore__ inline void InitAttrs(const MoeDistributeCombineV2TilingData *tilingData);
     __aicore__ inline void InitElasticInfo(uint32_t &sharedExpertRankNum);
+    __aicore__ inline void InitElasticInfoTensor();
     __aicore__ inline void InitInt8Quant();
     __aicore__ inline void AlltoAllBuffInitAndMaskCal();
     __aicore__ inline void ReduceScatterTrans();
@@ -526,6 +531,19 @@ __aicore__ inline void MoeDistributeCombineV2<TemplateMC2TypeFunc>::Init(
 }
 
 template <TemplateMC2TypeClass>
+__aicore__ inline void MoeDistributeCombineV2<TemplateMC2TypeFunc>::InitElasticInfoTensor()
+{
+    uint32_t elasticInfoSize = (ELASTIC_INFO_OFFSET + RANK_LIST_NUM * epWorldSizeOriginal_) * static_cast<uint32_t>(sizeof(uint32_t));
+    uint32_t elasticInfoSizeAlign = Ceil(elasticInfoSize, UB_ALIGN) * UB_ALIGN;
+    tpipe_->InitBuffer(elasticInfoBuf_, elasticInfoSizeAlign);
+    elasticInfoTensor_ = elasticInfoBuf_.Get<int32_t>();
+    DataCopyExtParams elasticInfoParams = {1U, static_cast<uint32_t>((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * epWorldSizeOriginal_) * sizeof(int32_t)), 0U, 0U, 0U};
+    DataCopyPadExtParams<int32_t> elasticInfoCopyPadParams{false, 0U, 0U, 0U};
+    DataCopyPad(elasticInfoTensor_, elasticInfoGM_, elasticInfoParams, elasticInfoCopyPadParams);
+    SyncFunc<AscendC::HardEvent::MTE2_S>();
+}
+
+template <TemplateMC2TypeClass>
 __aicore__ inline void MoeDistributeCombineV2<TemplateMC2TypeFunc>::BuffInit()
 {
     tpipe_->Reset();
@@ -559,14 +577,7 @@ __aicore__ inline void MoeDistributeCombineV2<TemplateMC2TypeFunc>::BuffInit()
             Duplicate(absFloatTensor_, float(0), hFloatAlign256Cnt); // 统一写0
         }
         if (isScalingDownFlag_) {
-            uint32_t elasticInfoSize = (ELASTIC_INFO_OFFSET + RANK_LIST_NUM * epWorldSizeOriginal_) * static_cast<uint32_t>(sizeof(uint32_t));
-            uint32_t elasticInfoSizeAlign = Ceil(elasticInfoSize, UB_ALIGN) * UB_ALIGN;
-            tpipe_->InitBuffer(elasticInfoBuf_, elasticInfoSizeAlign);
-            elasticInfoTensor_ = elasticInfoBuf_.Get<int32_t>();
-            DataCopyExtParams elasticInfoParams = {1U, static_cast<uint32_t>((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * epWorldSizeOriginal_) * sizeof(int32_t)), 0U, 0U, 0U};
-            DataCopyPadExtParams<int32_t> elasticInfoCopyPadParams{false, 0U, 0U, 0U};
-            DataCopyPad(elasticInfoTensor_, elasticInfoGM_, elasticInfoParams, elasticInfoCopyPadParams);
-            SyncFunc<AscendC::HardEvent::MTE2_S>();
+            InitElasticInfoTensor();
         }
     }
     tpipe_->InitBuffer(indexCountsBuf_, sendCntNum_ * EXPAND_IDX_INFO * sizeof(int32_t));
@@ -983,6 +994,13 @@ __aicore__ inline void MoeDistributeCombineV2<TemplateMC2TypeFunc>::WaitDispatch
     float minTarget = target - (float)0.5;
     float maxTarget = target + (float)0.5;
     SumParams sumParams{1, copyCount, copyCount};
+    if (isScalingDownFlag_) {
+        InitElasticInfoTensor();
+    }
+    uint64_t timeoutCheckStart = static_cast<uint64_t>(GetSystemCycle());
+    uint64_t timeoutCheckEnd;
+    uint64_t timeoutCheckDuration;
+    uint32_t toRankId;
     LocalTensor<float> stateTensor = stateBuf_.Get<float>();
     while ((localState < minTarget) || (localState > maxTarget)) {
         SyncFunc<AscendC::HardEvent::S_MTE2>();
@@ -991,6 +1009,22 @@ __aicore__ inline void MoeDistributeCombineV2<TemplateMC2TypeFunc>::WaitDispatch
         Sum(stateTensor, stateTensor, sumParams);
         SyncFunc<AscendC::HardEvent::V_S>();
         localState = stateTensor(0);
+        timeoutCheckEnd = static_cast<uint64_t>(GetSystemCycle());
+        timeoutCheckDuration = (timeoutCheckEnd - timeoutCheckStart) / CYCLES_PER_US;
+        if (timeoutCheckDuration > TIMEOUT_DETECTION_THRESHOLD) {
+            GlobalTensor<float> timeoutCheckGMTensor;
+            for (uint32_t index = 0; index < epWorldSize_; index++) {
+                if (isScalingDownFlag_) {
+                    toRankId = elasticInfoTensor_.GetValue(ELASTIC_INFO_OFFSET + epWorldSizeOriginal_ + index);
+                } else {
+                    toRankId = index;
+                }
+                GM_ADDR timeoutCheckGM = (__gm__ uint8_t*)(GetWinStateAddrByRankId(toRankId, EP_DOMAIN)
+                    + STATE_CHECK_OFFSET);
+                timeoutCheckGMTensor.SetGlobalBuffer((__gm__ float*)(timeoutCheckGM));
+                DataCopy<float>(timeoutCheckGMTensor, stateTensor, TIMEOUT_DETECTION_TX_UNITS);
+            }
+        }
     }
     SyncFunc<AscendC::HardEvent::S_MTE3>();
     DataCopy<float>(stateGMTensor, stateResetTensor_, copyCount);
