@@ -47,8 +47,8 @@ def gen_golden_data_simple(num_rows, k, hidden_size, e, c, drop_pad_mode, active
     num_rows = int(num_rows)
     k = int(k)
     hidden_size = int(hidden_size)
-
-    input_dtype = DTYPE.get(dtype, np.float)
+    active_num = int(hidden_size)
+    input_dtype = DTYPE.get(dtype, np.float32)
     output_dtype = input_dtype if (dtype != "bfloat16") else tf.bfloat16.as_numpy_dtype
 
     expand_n = active_num if (active_num > 0) else num_rows * k
@@ -66,7 +66,7 @@ def gen_golden_data_simple(num_rows, k, hidden_size, e, c, drop_pad_mode, active
         else:
             input_grad_expanded_x = np.random.uniform(0, 1, size=(expand_n, hidden_size)).astype(input_dtype)
 
-    grad_x = moe_init_routing_v2_grad(input_grad_expanded_x, input_expanded_row_idx, num_rows, k, hidden_sizee, e, c, drop_pad_mode, active_num)
+    grad_x = moe_init_routing_v2_grad(input_grad_expanded_x, input_expanded_row_idx, num_rows, k, hidden_size, e, c, drop_pad_mode, active_num)
     grad_x = grad_x.astype(output_dtype)
 
     input_grad_expanded_x.tofile("./input_expanded_x.bin")

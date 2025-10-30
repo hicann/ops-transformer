@@ -78,7 +78,7 @@ TEST_F(moe_init_routing_test, test_case_0)
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(workspace_FileSize);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_FileSize);
 
-    system("cp -r moe_init_routing_data ./");
+    system("cp -r ../../../../../moe/moe_init_routing/tests/ut/op_kernel/moe_init_routing_data ./");
     system("chmod -R 755 ./moe_init_routing_data/");
     system("cd ./moe_init_routing_data/ && rm -rf ./*bin");
     system("cd ./moe_init_routing_data/ && python3 gen_data.py 8 2 5120 8 float32");
@@ -140,7 +140,7 @@ TEST_F(moe_init_routing_test, test_case_1)
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(workspace_FileSize);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_FileSize);
 
-    system("cp -r /moe_init_routing_data ./");
+    system("cp -r ../../../../../moe/moe_init_routing/tests/ut/op_kernel/moe_init_routing_data ./");
     system("chmod -R 755 ./moe_init_routing_data/");
     system("cd ./moe_init_routing_data/ && rm -rf ./*bin");
     system("cd ./moe_init_routing_data/ && python3 gen_data.py 8 2 5120 8 float32");
@@ -202,7 +202,7 @@ TEST_F(moe_init_routing_test, test_case_2)
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(workspace_FileSize);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_FileSize);
 
-    system("cp -r moe_init_routing_data ./");
+    system("cp -r ../../../../../moe/moe_init_routing/tests/ut/op_kernel/moe_init_routing_data ./");
     system("chmod -R 755 ./moe_init_routing_data/");
     system("cd ./moe_init_routing_data/ && rm -rf ./*bin");
     system("cd ./moe_init_routing_data/ && python3 gen_data.py 8 2 5120 8 float32");
@@ -253,7 +253,7 @@ TEST_F(moe_init_routing_test, test_case_3)
     size_t expandedExpertIdx_FileSize = num_rows * k * sizeof(int32_t);
     size_t workspace_FileSize =
         num_rows * k * sizeof(float) * 2 * 3 + blockDim * 32 * 2 + num_rows * k * sizeof(int32_t) + 16781184;
-    size_t tiling_FileSize = 48 * sizeof(int64_t);
+    size_t tiling_FileSize = 200 * sizeof(int64_t);
 
     uint8_t* x = (uint8_t*)AscendC::GmAlloc(x_FileSize);
     uint8_t* expertIdx = (uint8_t*)AscendC::GmAlloc(expertIdx_FileSize);
@@ -264,7 +264,7 @@ TEST_F(moe_init_routing_test, test_case_3)
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(workspace_FileSize);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_FileSize);
 
-    system("cp -r moe_init_routing_data ./");
+    system("cp -r ../../../../../moe/moe_init_routing/tests/ut/op_kernel/moe_init_routing_data ./");
     system("chmod -R 755 ./moe_init_routing_data/");
     system("cd ./moe_init_routing_data/ && rm -rf ./*bin");
     system("cd ./moe_init_routing_data/ && python3 gen_data.py 8 2 5120 8 float32");

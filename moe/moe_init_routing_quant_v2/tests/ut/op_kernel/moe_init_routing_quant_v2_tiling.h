@@ -125,6 +125,8 @@ struct MoeInitRoutingQuantV2TilingData {
   int64_t expertTokensCountOrCumsumFlag = 0;
   int64_t expertTokensBeforeCapacityFlag = 0;
   int64_t smoothType = 0;
+  int64_t histWithRegBase = 0;
+  int64_t tmpData = 0;
   InnerMoeV2VBSComputeTilingData vbsComputeParamsOp;
   InnerMoeV2VMSMiddleComputeTilingData vmsMiddleComputeParamsOp;
   InnerMoeV2SortOutComputeTilingData sortOutComputeParamsOp;

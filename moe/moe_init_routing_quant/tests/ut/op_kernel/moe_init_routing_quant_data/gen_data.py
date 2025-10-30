@@ -49,6 +49,8 @@ def gen_golden_data_simple(num_rows, k, hidden_size, active_rows, scale, offset,
     k = int(k)
     hidden_size = int(hidden_size)
     active_rows = int(active_rows)
+    scale = float(scale)
+    offset = float(offset)
 
     input_x = np.random.uniform(-1, 100, [num_rows, hidden_size]).astype(dtype)
     input_rowIdx = np.arange(num_rows * k).reshape([k, num_rows]).transpose(1, 0).astype("int32")

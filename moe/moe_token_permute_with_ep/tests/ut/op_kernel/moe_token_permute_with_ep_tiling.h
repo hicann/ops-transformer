@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef _MOE_TOKEN_PERMUTE_TILING_H_
-#define _MOE_TOKEN_PERMUTE_TILING_H_
+#ifndef _MOE_TOKEN_PERMUTE_WITH_EP_TILING_H_
+#define _MOE_TOKEN_PERMUTE_WITH_EP_TILING_H_
 
 #include "kernel_tiling/kernel_tiling.h"
 
@@ -21,8 +21,7 @@
 #define __CCE_UT_TEST__
 
 #define __aicore__
-
-struct PermuteVBSComputeTilingData {
+struct PermuteVBSComputeTilingEPData {
     int64_t needCoreNum = 1;
     int64_t perCoreElements = 8;
     int64_t perCoreLoops = 1;
@@ -36,21 +35,22 @@ struct PermuteVBSComputeTilingData {
     int64_t lastCoreWSindex = 0;
 };
 
-struct PermuteVMSMiddleComputeTilingData {
+struct PermuteVMSMiddleComputeTilingEPData {
     int64_t needCoreNum = 0;
 };
 
-struct PermuteSortOutComputeTilingData {
+struct PermuteSortOutComputeTilingEPData {
     int64_t oneLoopMaxElements = 1024;
 };
 
-struct IndexCopyComputeTilingData {
+struct IndexMixCopyComputeTilingData {
     int64_t needCoreNum = 4;
     int64_t frontCoreNum = 4;
     int64_t tailCoreNum = 0;
     int64_t coreCalcNum = 1;
     int64_t coreCalcTail = 0;
     int64_t oneTokenBtypeSize = 6;
+    int64_t oneProbBtypeSize = 6;
     int64_t onceIndicesTokenMoveTimes = 2;
     int64_t onceUbTokenNums = 2454;
     int64_t onceIndicesTokenNums = 4908;
@@ -67,22 +67,27 @@ struct IndexCopyComputeTilingData {
     int64_t frontLastonceIndicesTokenMoveTimes = 1;
     int64_t frontLastIndicesLastTokenNums = 1;
     int64_t numOutTokens = 8;
+    int64_t start = 0;
+    int64_t end = 8;
     int64_t tokenUB = 78528;
     int64_t indicesUB = 9824;
+    int64_t probsUB = 32;
 };
 
-struct MoeTokenPermuteTilingData {
+struct MoeTokenPermuteWithEpTilingData {
     int64_t coreNum = 1;
     int64_t n = 4;
     int64_t cols = 3;
     int64_t colsAlign = 16;
     int64_t topK = 2;
-    PermuteVBSComputeTilingData vbsComputeParamsOp;
-    PermuteVMSMiddleComputeTilingData vmsMiddleComputeParamsOp;
-    PermuteSortOutComputeTilingData sortOutComputeParamsOp;
-    IndexCopyComputeTilingData indexCopyComputeParamsOp;
+    PermuteVBSComputeTilingEPData vbsComputeParamsOp;
+    PermuteVMSMiddleComputeTilingEPData vmsMiddleComputeParamsOp;
+    PermuteSortOutComputeTilingEPData sortOutComputeParamsOp;
+    IndexMixCopyComputeTilingData indexCopyComputeParamsOp;
 };
 
+
 #define GET_TILING_DATA(tilingData, tilingPointer) \
-    MoeTokenPermuteTilingData tilingData;
+    MoeTokenPermuteWithEpTilingData tilingData;
 #endif
+

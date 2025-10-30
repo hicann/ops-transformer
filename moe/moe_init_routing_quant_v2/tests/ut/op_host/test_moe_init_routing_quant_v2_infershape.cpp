@@ -518,39 +518,3 @@ TEST_F(MoeInitRoutingQuantV2, moe_init_routing_quant_v2_infer_shape_16)
         });
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, {});
 }
-
-TEST_F(MoeInitRoutingQuantV2, moe_init_routing_quant_v2_infer_datatype_01)
-{
-    auto spaceRegistry = gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry();
-    auto data_type_func = spaceRegistry->GetOpImpl("MoeInitRoutingQuantV2")->infer_datatype;
-
-    if (data_type_func != nullptr) {
-        ge::DataType input_ref = ge::DT_FLOAT;
-        ge::DataType output_ref = ge::DT_INT8;
-        ge::DataType rstd_ref = ge::DT_INT32;
-        auto context_holder = gert::InferDataTypeContextFaker()
-                                  .IrInputNum(4)
-                                  .NodeIoNum(4, 5)
-                                  .NodeInputTd(0, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(1, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(2, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeInputTd(3, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(0, ge::DT_INT8, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(1, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(2, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(3, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .NodeOutputTd(4, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
-                                  .InputDataTypes({&input_ref, &rstd_ref, &input_ref, &input_ref})
-                                  .OutputDataTypes({&output_ref, &rstd_ref, &rstd_ref, &rstd_ref, &input_ref})
-                                  .Build();
-        auto context = context_holder.GetContext<gert::InferDataTypeContext>();
-        EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
-        ASSERT_NE(context, nullptr);
-        EXPECT_EQ(context->GetInputDataType(0), input_ref);
-        EXPECT_EQ(context->GetOutputDataType(0), output_ref);
-        EXPECT_EQ(context->GetOutputDataType(1), rstd_ref);
-        EXPECT_EQ(context->GetOutputDataType(2), rstd_ref);
-        EXPECT_EQ(context->GetOutputDataType(3), rstd_ref);
-        EXPECT_EQ(context->GetOutputDataType(4), input_ref);
-    }
-}

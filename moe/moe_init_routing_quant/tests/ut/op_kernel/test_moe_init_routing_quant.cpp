@@ -68,9 +68,9 @@ TEST_F(moe_init_routing_quant_test, test_case_0) {
   size_t expandedExpertIdx_FileSize = num_rows * k * sizeof(int32_t);
   size_t workspace_FileSize =
       num_rows * k * sizeof(float) * 2 * 3 + blockDim * 32 * 2 + num_rows * k * sizeof(int32_t) + 16781184;
-  size_t tiling_FileSize = 48 * sizeof(int64_t);
-  uint8_t* x = (uint8_t*)AscendC::GmAlloc(x_FileSize);
+  size_t tiling_FileSize = 48 * sizeof(int64_t) + 2 * sizeof(float);
 
+  uint8_t* x = (uint8_t*)AscendC::GmAlloc(x_FileSize);
   uint8_t* expertIdx = (uint8_t*)AscendC::GmAlloc(expertIdx_FileSize);
   uint8_t* rowIdx = (uint8_t*)AscendC::GmAlloc(rowIdx_FileSize);
   uint8_t* expandedX = (uint8_t*)AscendC::GmAlloc(expandedX_FileSize);
@@ -78,14 +78,14 @@ TEST_F(moe_init_routing_quant_test, test_case_0) {
   uint8_t* expandedExpertIdx = (uint8_t*)AscendC::GmAlloc(expandedExpertIdx_FileSize);
   uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(workspace_FileSize);
   uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_FileSize);
+
   system(
       "cp -r "
-      "./moe_init_routing_quant_data ./");
+      "../../../../../moe/moe_init_routing_quant/tests/ut/op_kernel/moe_init_routing_quant_data ./");
   system("chmod -R 755 ./moe_init_routing_quant_data/");
   system("cd ./moe_init_routing_quant_data/ && rm -rf ./*bin");
   system("cd ./moe_init_routing_quant_data/ && python3 gen_data.py 8 2 5120 8 0 0 float32");
   system("cd ./moe_init_routing_quant_data/ && python3 gen_tiling.py case0");
-
   char* path_ = get_current_dir_name();
   string path(path_);
   ReadFile(path + "/moe_init_routing_quant_data/input_x.bin", x_FileSize, x, x_FileSize);
@@ -97,7 +97,6 @@ TEST_F(moe_init_routing_quant_test, test_case_0) {
   ICPU_SET_TILING_KEY(tilingKey);
   ICPU_RUN_KF(moe_init_routing_quant, blockDim, x, rowIdx, expertIdx, expandedX, expandedRowIdx, expandedExpertIdx,
               workspace, tiling);
-
   AscendC::GmFree((void*)x);
   AscendC::GmFree((void*)expertIdx);
   AscendC::GmFree((void*)rowIdx);
@@ -140,7 +139,7 @@ TEST_F(moe_init_routing_quant_test, test_case_1) {
 
   system(
       "cp -r "
-      "./moe_init_routing_quant_data ./");
+      "../../../../../moe/moe_init_routing_quant/tests/ut/op_kernel/moe_init_routing_quant_data ./");
   system("chmod -R 755 ./moe_init_routing_quant_data/");
   system("cd ./moe_init_routing_quant_data/ && rm -rf ./*bin");
   system("cd ./moe_init_routing_quant_data/ && python3 gen_data.py 8 2 5120 8 0 0 float32");
@@ -200,7 +199,7 @@ TEST_F(moe_init_routing_quant_test, test_case_2) {
 
   system(
       "cp -r "
-      "./moe_init_routing_quant_data ./");
+      "../../../../../moe/moe_init_routing_quant/tests/ut/op_kernel/moe_init_routing_quant_data ./");
   system("chmod -R 755 ./moe_init_routing_quant_data/");
   system("cd ./moe_init_routing_quant_data/ && rm -rf ./*bin");
   system("cd ./moe_init_routing_quant_data/ && python3 gen_data.py 8 2 5120 8 0 0 float32");
@@ -260,7 +259,7 @@ TEST_F(moe_init_routing_quant_test, test_case_3) {
 
   system(
       "cp -r "
-      "./moe_init_routing_quant_data ./");
+      "../../../../../moe/moe_init_routing_quant/tests/ut/op_kernel/moe_init_routing_quant_data ./");
   system("chmod -R 755 ./moe_init_routing_quant_data/");
   system("cd ./moe_init_routing_quant_data/ && rm -rf ./*bin");
   system("cd ./moe_init_routing_quant_data/ && python3 gen_data.py 8 2 5120 8 0 0 float32");
@@ -277,7 +276,6 @@ TEST_F(moe_init_routing_quant_test, test_case_3) {
   ICPU_SET_TILING_KEY(tilingKey);
   ICPU_RUN_KF(moe_init_routing_quant, blockDim, x, rowIdx, expertIdx, expandedX, expandedRowIdx, expandedExpertIdx,
               workspace, tiling);
-
   AscendC::GmFree((void*)x);
   AscendC::GmFree((void*)expertIdx);
   AscendC::GmFree((void*)rowIdx);

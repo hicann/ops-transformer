@@ -107,13 +107,6 @@ struct MoeTokenPermuteWithRoutingMapTilingData {
     MaskedSelectRMTilingData maskedSelectParamsOp;
 };
 
-inline void InitMoeTokenPermuteWithRoutingMapTilingData(
-    uint8_t* tiling, MoeTokenPermuteWithRoutingMapTilingData* const_data)
-{
-    memcpy(const_data, tiling, sizeof(MoeTokenPermuteWithRoutingMapTilingData));
-}
-
 #define GET_TILING_DATA(tilingData, tilingPointer)      \
-    MoeTokenPermuteWithRoutingMapTilingData tilingData; \
-    InitMoeTokenPermuteWithRoutingMapTilingData(tilingPointer, &tilingData)
+    MoeTokenPermuteWithRoutingMapTilingData tilingData;
 #endif

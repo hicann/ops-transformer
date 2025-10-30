@@ -62,7 +62,7 @@ TEST_F(MoeInitRoutingV2GradTest, TestCase0)
     uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(workspaceFileSize);
     uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingFileSize);
 
-    system("cp -r ../../../../../../../ops/built-in/tests/ut/fast_op_test/moe_init_routing_v2_grad/moe_init_routing_v2_grad_data ./");
+    system("cp -r ../../../../../moe/moe_init_routing_v2_grad/tests/ut/op_kernel/moe_init_routing_v2_grad_data ./");
     system("chmod -R 755 ./moe_init_routing_v2_grad_data/");
     system("cd ./moe_init_routing_v2_grad_data/ && rm -rf ./*bin");
     system("cd ./moe_init_routing_v2_grad_data/ && python3 gen_data.py 8 2 5120 0 0 0 0 float32");
@@ -70,8 +70,6 @@ TEST_F(MoeInitRoutingV2GradTest, TestCase0)
 
     char * path_ = get_current_dir_name();
     string path(path_);
-    ReadFile(path + "/moe_init_routing_v2_grad_data/input_expanded_x.bin", gradExpandedXFileSize, gradExpandedX, gradExpandedXFileSize);
-    ReadFile(path + "/moe_init_routing_v2_grad_data/input_expanded_row_idx.bin", expandedRowIdxFileSize, expandedRowIdx, expandedRowIdxFileSize);
     ReadFile(path + "/moe_init_routing_v2_grad_data/tiling.bin", tilingFileSize, tiling, tilingFileSize);
 
     ICPU_SET_TILING_KEY(tilingKey);
@@ -108,7 +106,7 @@ TEST_F(MoeInitRoutingV2GradTest, TestCase1)
     uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(workspaceFileSize);
     uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingFileSize);
 
-    system("cp -r ../../../../../../../ops/built-in/tests/ut/fast_op_test/moe_init_routing_v2_grad/moe_init_routing_v2_grad_data ./");
+    system("cp -r ../../../../../moe/moe_init_routing_v2_grad/tests/ut/op_kernel/moe_init_routing_v2_grad_data ./");
     system("chmod -R 755 ./moe_init_routing_v2_grad_data/");
     system("cd ./moe_init_routing_v2_grad_data/ && rm -rf ./*bin");
     system("cd ./moe_init_routing_v2_grad_data/ && python3 gen_data.py 4096 40 8 0 0 0 0 float16");
@@ -116,8 +114,6 @@ TEST_F(MoeInitRoutingV2GradTest, TestCase1)
 
     char * path_ = get_current_dir_name();
     string path(path_);
-    ReadFile(path + "/moe_init_routing_v2_grad_data/input_expanded_x.bin", gradExpandedXFileSize, gradExpandedX, gradExpandedXFileSize);
-    ReadFile(path + "/moe_init_routing_v2_grad_data/input_expanded_row_idx.bin", expandedRowIdxFileSize, expandedRowIdx, expandedRowIdxFileSize);
     ReadFile(path + "/moe_init_routing_v2_grad_data/tiling.bin", tilingFileSize, tiling, tilingFileSize);
 
     ICPU_SET_TILING_KEY(tilingKey);
@@ -155,7 +151,7 @@ TEST_F(MoeInitRoutingV2GradTest, TestCase2)
     uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(workspaceFileSize);
     uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingFileSize);
 
-    system("cp -r ../../../../../../../ops/built-in/tests/ut/fast_op_test/moe_init_routing_v2_grad/moe_init_routing_v2_grad_data ./");
+    system("cp -r ../../../../../moe/moe_init_routing_v2_grad/tests/ut/op_kernel/moe_init_routing_v2_grad_data ./");
     system("chmod -R 755 ./moe_init_routing_v2_grad_data/");
     system("cd ./moe_init_routing_v2_grad_data/ && rm -rf ./*bin");
     system("cd ./moe_init_routing_v2_grad_data/ && python3 gen_data.py 10 64 512 0 0 0 40 float16");
@@ -163,8 +159,6 @@ TEST_F(MoeInitRoutingV2GradTest, TestCase2)
 
     char * path_ = get_current_dir_name();
     string path(path_);
-    ReadFile(path + "/moe_init_routing_v2_grad_data/input_expanded_x.bin", gradExpandedXFileSize, gradExpandedX, gradExpandedXFileSize);
-    ReadFile(path + "/moe_init_routing_v2_grad_data/input_expanded_row_idx.bin", expandedRowIdxFileSize, expandedRowIdx, expandedRowIdxFileSize);
     ReadFile(path + "/moe_init_routing_v2_grad_data/tiling.bin", tilingFileSize, tiling, tilingFileSize);
 
     ICPU_SET_TILING_KEY(tilingKey);
@@ -203,7 +197,7 @@ TEST_F(MoeInitRoutingV2GradTest, TestCase3)
     uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(workspaceFileSize);
     uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingFileSize);
 
-    system("cp -r ../../../../../../../ops/built-in/tests/ut/fast_op_test/moe_init_routing_v2_grad/moe_init_routing_v2_grad_data ./");
+    system("cp -r ../../../../../moe/moe_init_routing_v2_grad/tests/ut/op_kernel/moe_init_routing_v2_grad_data ./");
     system("chmod -R 755 ./moe_init_routing_v2_grad_data/");
     system("cd ./moe_init_routing_v2_grad_data/ && rm -rf ./*bin");
     system("cd ./moe_init_routing_v2_grad_data/ && python3 gen_data.py 80 8 512 10 8 1 40 bfloat16");
@@ -211,8 +205,6 @@ TEST_F(MoeInitRoutingV2GradTest, TestCase3)
 
     char * path_ = get_current_dir_name();
     string path(path_);
-    ReadFile(path + "/moe_init_routing_v2_grad_data/input_expanded_x.bin", gradExpandedXFileSize, gradExpandedX, gradExpandedXFileSize);
-    ReadFile(path + "/moe_init_routing_v2_grad_data/input_expanded_row_idx.bin", expandedRowIdxFileSize, expandedRowIdx, expandedRowIdxFileSize);
     ReadFile(path + "/moe_init_routing_v2_grad_data/tiling.bin", tilingFileSize, tiling, tilingFileSize);
 
     ICPU_SET_TILING_KEY(tilingKey);

@@ -77,7 +77,7 @@ static void ExeTestCase(const MoeInitRoutingV2GradInfo ioInfo, ge::graphStatus t
 
     /* do infershape */
     EXPECT_EQ(inferShapeFunc(contextHolder.GetContext()), testCaseResult);
-    EXPECT_EQ(ToVector(yStorageShape.GetOriginShape()), ioInfo.expectOutShape);
+    EXPECT_EQ(ToVector(*contextHolder.GetContext()->GetOutputShape(0)), ioInfo.expectOutShape);
 }
 
 TEST_F(MoeInitRoutingV2GradInferShape, moe_init_routing_v2_grad_infershape_0)

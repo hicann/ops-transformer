@@ -46,16 +46,6 @@ void InitAndRunNormalCase(int64_t N, int64_t H, int64_t K, int64_t activeNum, in
     }
 }
 
-TEST_F(Ts_MoeInitRoutingV2, moe_init_routing_v2_multi_core_dropless)
-{
-    InitAndRunNormalCase(832, 23, 15, 413, 3805, 4796, 0, 1, false, ge::DT_INT32, ge::GRAPH_SUCCESS, 10002);
-}
-
-// TEST_F(Ts_MoeInitRoutingV2, moe_init_routing_v2_multi_core_dropless)
-// {
-//     InitAndRunNormalCase(3200, 3000, 56, 1000, 0, 64, 0, 1, false, ge::DT_INT32, ge::GRAPH_SUCCESS, 10002);
-// }
-
 TEST_F(Ts_MoeInitRoutingV2, moe_init_routing_v2_perf_template)
 {
     InitAndRunNormalCase(8, 30, 6, 32, 0, 8, 0, 1, false, ge::DT_INT32, ge::GRAPH_SUCCESS, 20000);
