@@ -25,7 +25,7 @@ TEST_F(Ts_NsaCompressAttention, nsa_compress_attention_normal_case)
                 AttenMaskShapeType::S1_S2, TopkMaskShapeType::S1_S2, ge::DT_BOOL, ge::DT_BOOL, {65536}, {4096}, {1024}};
     cs.mOpInfo.mExp.mTilingKey = 10000000000000001124UL;
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     cs.Init();
     ASSERT_TRUE(cs.Run());
 }
@@ -37,7 +37,7 @@ TEST_F(Ts_NsaCompressAttention, nsa_compress_attention_normal_case_1)
                 AttenMaskShapeType::S1_S2, TopkMaskShapeType::S1_S2, ge::DT_BOOL, ge::DT_BOOL, {65536}, {4096}, {1024}};
     cs.mOpInfo.mExp.mTilingKey = 10000000000000001124UL;
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     cs.Init();
     ASSERT_TRUE(cs.Run());
 }

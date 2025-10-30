@@ -39,7 +39,7 @@ NsaSelectedAttentionCase InitCase(int64_t pB, int64_t pN2, int64_t pG, int64_t p
     if (expResult == ge::GRAPH_SUCCESS) {
         cs.mOpInfo.mExp.mTilingKey = tilingKey;
         cs.mOpInfo.mCtr.mRunTiling = true;
-        cs.mOpInfo.mCtr.mRunKernel = false;
+        cs.mOpInfo.mCtr.mRunKernel = true;
     } else {
         cs.mOpInfo.mExp.mSuccess = false;
         cs.mOpInfo.mCtr.mRunTiling = true;
@@ -72,7 +72,7 @@ NsaSelectedAttentionCase InitCase(int64_t pB, int64_t pN2, int64_t pG, int64_t p
     if (expResult == ge::GRAPH_SUCCESS) {
         cs.mOpInfo.mExp.mTilingKey = tilingKey;
         cs.mOpInfo.mCtr.mRunTiling = true;
-        cs.mOpInfo.mCtr.mRunKernel = false;
+        cs.mOpInfo.mCtr.mRunKernel = true;
     } else {
         cs.mOpInfo.mExp.mSuccess = false;
         cs.mOpInfo.mCtr.mRunTiling = true;
