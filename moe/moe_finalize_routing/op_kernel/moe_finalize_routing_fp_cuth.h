@@ -406,7 +406,9 @@ __aicore__ inline void MoeFinalizeRoutingFpCuth<T>::Compute(int64_t nLoopIdx, in
     WaitFlag<HardEvent::V_S>(EVENT_ID1);
     WaitFlag<HardEvent::V_S>(EVENT_ID2);
     WaitFlag<HardEvent::V_S>(EVENT_ID3);
+#ifndef __CCE_KT_TEST__
     SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
+#endif
     outQueue_.EnQue(outLocal);
     expertForSourceRowQueue_.FreeTensor(expertForSourceRowLocal);
     scalesQueue_.FreeTensor(scalesLocal);
@@ -421,7 +423,9 @@ __aicore__ inline void MoeFinalizeRoutingFpCuth<T>::CopyOut(int64_t nLoopIdx, in
 {
     LocalTensor<T> outLocal = outQueue_.DeQue<T>();
     DataCopyParams copyParams{1, static_cast<uint16_t>(dataLen * sizeof(T)), 0, 0};
+#ifndef __CCE_KT_TEST__
     WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
+#endif
     DataCopyPad(gmOut_[nLoopIdx / (cutNumH_ + 1) * H_ + bias], outLocal, copyParams);
     outQueue_.FreeTensor(outLocal);
 }

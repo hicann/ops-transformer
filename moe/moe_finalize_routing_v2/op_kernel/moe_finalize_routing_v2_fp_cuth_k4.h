@@ -505,8 +505,9 @@ __aicore__ inline void MoeFinalizeRoutingV2FpCuthK4<T, ISBIASEXIST>::Compute(
     Add(outLocal[0], outLocal[0], expandedPermutedTmpUbDb2, dataLen);
     PipeBarrier<PIPE_V>();
     Add(outLocal[0], outLocal[0], expandedPermutedTmpUbDb3, dataLen);
+#ifndef __CCE_KT_TEST__
     SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
-
+#endif
     outQueue_.EnQue(outLocal);
     if constexpr (ISBIASEXIST) {
         expertForSourceRowQueue_.FreeTensor(expertForSourceRowLocal);
@@ -526,7 +527,9 @@ __aicore__ inline void MoeFinalizeRoutingV2FpCuthK4<T, ISBIASEXIST>::CopyOut(
 {
     LocalTensor<T> outLocal = outQueue_.DeQue<T>();
     DataCopyParams copyParams{1, static_cast<uint16_t>(dataLen * sizeof(T)), 0, 0};
+#ifndef __CCE_KT_TEST__
     WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
+#endif
     DataCopyPad(gmOut_[nLoopIdx / (tilingData_.hSliceNum + 1) * tilingData_.H + bias], outLocal, copyParams);
     outQueue_.FreeTensor(outLocal);
 }

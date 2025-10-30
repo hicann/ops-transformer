@@ -453,7 +453,9 @@ __aicore__ inline void MoeFinalizeRoutingBF16AllBias<T>::Compute(int64_t nLoopId
     WaitFlag<HardEvent::V_S>(EVENT_ID3);
     PipeBarrier<PIPE_V>();
     Cast(outLocal, skip1CastUb, RoundMode::CAST_ROUND, curRepeatTimes * AlignmentProcess(H_));
+#ifndef __CCE_KT_TEST__
     SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
+#endif
     outQueue_.EnQue(outLocal);
 
     expertForSourceRowQueue_.FreeTensor(expertForSourceRowLocal);
@@ -469,7 +471,9 @@ __aicore__ inline void MoeFinalizeRoutingBF16AllBias<T>::CopyOut(int64_t nLoopId
 {
     LocalTensor<T> outLocal = outQueue_.DeQue<T>();
     DataCopyParams copyParams{static_cast<uint16_t>(curRepeatTimes), static_cast<uint16_t>(H_ * sizeof(T)), 0, 0};
+#ifndef __CCE_KT_TEST__
     WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
+#endif
     DataCopyPad(gmOut_[nLoopIdx * H_ * curCoreHandleNumPerLoop_], outLocal, copyParams);
     outQueue_.FreeTensor(outLocal);
 }

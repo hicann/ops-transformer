@@ -175,7 +175,11 @@ __aicore__ inline void MoeFinalizeRoutingFpDb<T>::Init(GM_ADDR expandedPermutedR
     // gmInput分核 && 输入偏移量初始化
     inputSkipIdx_ = GetBlockIdx() * normalCoreHandleNum_ * H_;
     gmSkip1_.SetGlobalBuffer((__gm__ T *)skip1 + inputSkipIdx_, normalCoreHandleNum_ * H_);
+#ifndef __CCE_KT_TEST__
     pipe.InitBuffer(skip1Queue_, 1, normalCoreHandleNumPerLoop_ * AlignmentProcess(H_) * sizeof(T));
+#else 
+    pipe.InitBuffer(skip1Queue_, 1, ONE_BLK_SIZE);
+#endif
     if (skip2IsNull_ == 0) {
         gmSkip2_.SetGlobalBuffer((__gm__ T *)skip2 + inputSkipIdx_, normalCoreHandleNum_ * H_);
         pipe.InitBuffer(skip2Queue_, 1, normalCoreHandleNumPerLoop_ * AlignmentProcess(H_) * sizeof(T));
@@ -195,11 +199,16 @@ __aicore__ inline void MoeFinalizeRoutingFpDb<T>::Init(GM_ADDR expandedPermutedR
     gmBias_.SetGlobalBuffer((__gm__ T *)bias, E_ * H_);
 
     // 申请 buffer 空间
+#ifndef __CCE_KT_TEST__
     pipe.InitBuffer(scalesQueue_, BUFFER_NUM, normalCoreHandleNumPerLoop_ * AlignmentProcess(K_) * sizeof(T));
     pipe.InitBuffer(expertForSourceRowQueue_, BUFFER_NUM,
                     normalCoreHandleNumPerLoop_ * Int32AlignmentProcess(K_) * sizeof(int32_t));
     pipe.InitBuffer(outQueue_, BUFFER_NUM, normalCoreHandleNumPerLoop_ * AlignmentProcess(H_) * sizeof(T));
-
+#else 
+    pipe.InitBuffer(scalesQueue_, BUFFER_NUM, ONE_BLK_SIZE);
+    pipe.InitBuffer(expertForSourceRowQueue_, BUFFER_NUM, ONE_BLK_SIZE);
+    pipe.InitBuffer(outQueue_, BUFFER_NUM, ONE_BLK_SIZE);
+#endif
     pipe.InitBuffer(expandedPermutedRowsBufDb0_, AlignmentProcess(H_) * sizeof(T));
     pipe.InitBuffer(biasBufDb0_, AlignmentProcess(H_) * sizeof(T));
 

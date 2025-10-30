@@ -505,7 +505,9 @@ __aicore__ inline void MoeFinalizeRoutingV2FpCuth<T, ISBIASEXIST>::Compute(
     WaitFlag<HardEvent::V_S>(EVENT_ID1);
     WaitFlag<HardEvent::V_S>(EVENT_ID2);
     WaitFlag<HardEvent::V_S>(EVENT_ID3);
+#ifndef __CCE_KT_TEST__
     SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
+#endif
     outQueue_.EnQue(outLocal);
 
     if constexpr (ISBIASEXIST) {
@@ -526,7 +528,9 @@ __aicore__ inline void MoeFinalizeRoutingV2FpCuth<T, ISBIASEXIST>::CopyOut(
 {
     LocalTensor<T> outLocal = outQueue_.DeQue<T>();
     DataCopyParams copyParams{1, static_cast<uint16_t>(dataLen * sizeof(T)), 0, 0};
+#ifndef __CCE_KT_TEST__
     WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
+#endif
     DataCopyPad(gmOut_[nLoopIdx / (tilingData_.hSliceNum + 1) * tilingData_.H + bias], outLocal, copyParams);
     outQueue_.FreeTensor(outLocal);
 }
