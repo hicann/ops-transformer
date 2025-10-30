@@ -2809,6 +2809,37 @@ const auto Tc_MlaProlog_Case = ::testing::Values(
                       {},                                             /* quantScaleCkv */
                       {},                                             /* quantScaleCkr */
                       {})                                             /* smoothScalesCq */
-              )
+              ),
+       // 非量化kernel
+       MlaPrologCase("MlaProlog_Tc_049", true,                    /* CaseName, Enable */
+       "",                                                     /* DebugInfo */
+       OpInfo(ControlInfo(true, true),                        /* RunTiling, RunKernel */
+              ExpectInfo(true,                                 /* ExpectSuccess */
+                            17,        /* ExpectTilingKey */
+                            24)), /* ExpectTilingBlockDim */
+       MlaPrologParam(8, 8, 32, 7168, 1536, 512, 32, 128, 64,             /* T, B, S, He, Hcq, Hckv, N, D, Dr */
+                     1024, 1, 128, 64,                                   /* Skv, Nkv, BlockSize, BlockNum */
+                     CacheModeType::PA_BSND,                         /* CacheModeType */
+                     0.00001f, 0.00001f,                             /* rmsnormEpsilonCq, rmsnormEpsilonCkv */
+                     {Tensor("tokenX", {8, 7168}, "1", ge::DataType::DT_BF16, ge::FORMAT_ND, Tensor::TensorType::REQUIRED_INPUT)},                                             /* tokenX */
+                     {},                                             /* weightDq */
+                     {},                                             /* weightUqQr */
+                     {},                                             /* weightUk */
+                     {},                                             /* weightDkvKr */
+                     {},                                             /* rmsnormGammaCq */
+                     {},                                             /* rmsnormGammaCkv */
+                     {},                                             /* ropeSin */
+                     {},                                             /* ropeCos */
+                     {},                                             /* cacheIndex */
+                     {},                                             /* kvCache */
+                     {},                                             /* krCache */
+                     {},                                             /* dequantScaleX */
+                     {},                                             /* dequantScaleWDq */
+                     {},                                             /* dequantScaleWUqQr */
+                     {},                                             /* dequantScaleWDkvKr */
+                     {},                                             /* quantScaleCkv */
+                     {},                                             /* quantScaleCkr */
+                     {})                                             /* smoothScalesCq */
+       )
 );
 INSTANTIATE_TEST_SUITE_P(MlaProlog, Ts_MlaProlog_Ascend910B2_tc, Tc_MlaProlog_Case);

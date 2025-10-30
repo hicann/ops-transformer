@@ -87,6 +87,7 @@
 -   B、S、T、Skv值允许一个或多个取0，即Shape与B、S、T、Skv值相关的入参允许传入空Tensor，其余入参不支持传入空Tensor。
     - 如果B、S、T取值为0，则query、query_rope输出空Tensor，kv_cache、kr_cache不做更新。
     - 如果Skv取值为0，则query、query_rope正常计算，kv_cache、kr_cache不做更新，即输出空Tensor。
+- weight_dq，weight_uq_qr，weight_dkv_kr在不转置的情况下各个维度的表示：（k，n）。
 -  aclnnMlaProlog接口支持场景：
     <table style="table-layout: auto;" border="1">
       <tr>
