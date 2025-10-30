@@ -38,10 +38,10 @@ TEST_F(GroupedMatmulSwigluQuantInferShape_TEST, grouped_matmul_swiglu_quant_infe
         "GroupedMatmulSwigluQuant",
         {
             {{{1024, 256}, {16, 256}}, ge::DT_INT8, ge::FORMAT_ND},           // x
-            {{{16, 256, 4096}, {16, 256, 4096}}, ge::DT_INT4, ge::FORMAT_ND}, // weight
-            {{{16, 512}, {16, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},            // weightScale
+            {{{16, 256, 4096}, {16, 256, 4096}}, ge::DT_INT8, ge::FORMAT_ND}, // weight
+            {{{16, 4096}, {16, 4096}}, ge::DT_FLOAT, ge::FORMAT_ND},          // weightScale
             {{{1024}, {1024}}, ge::DT_FLOAT, ge::FORMAT_ND},                  // xscale
-            {{{16, 4096}, {16, 4096}}, ge::DT_FLOAT, ge::FORMAT_ND},          // weightAssistMatrix
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                          // weightAssistMatrix
             {{{16}, {16}}, ge::DT_FLOAT, ge::FORMAT_ND},                      // groupList
         },
         {
@@ -61,7 +61,7 @@ TEST_F(GroupedMatmulSwigluQuantInferShape_TEST, grouped_matmul_swiglu_quant_infe
         {
             {{{1024, 256}, {16, 256}}, ge::DT_INT8, ge::FORMAT_ND},           // x
             {{{16, 256, 4096}, {16, 256, 4096}}, ge::DT_INT4, ge::FORMAT_ND}, // weight
-            {{{16, 512}, {16, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},            // weightScale
+            {{{16, 4096}, {16, 4096}}, ge::DT_FLOAT, ge::FORMAT_ND},            // weightScale
             {{{1024}, {1024}}, ge::DT_FLOAT, ge::FORMAT_ND},                  // xscale
             {{{16, 4096}, {16, 4096}}, ge::DT_FLOAT, ge::FORMAT_ND},          // weightAssistMatrix
             {{{16}, {16}}, ge::DT_FLOAT, ge::FORMAT_ND},                      // groupList
@@ -83,7 +83,7 @@ TEST_F(GroupedMatmulSwigluQuantInferShape_TEST, grouped_matmul_swiglu_quant_infe
         {
             {{{1024, 256}, {16, 256}}, ge::DT_INT8, ge::FORMAT_ND},           // x
             {{{16, 256, 4096}, {16, 256, 4096}}, ge::DT_INT4, ge::FORMAT_ND}, // weight
-            {{{16, 512}, {16, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},            // weightScale
+            {{{16, 4, 4096}, {16, 4, 4096}}, ge::DT_FLOAT, ge::FORMAT_ND},    // weightScale
             {{{1024}, {1024}}, ge::DT_FLOAT, ge::FORMAT_ND},                  // xscale
             {{{16, 4096}, {16, 4096}}, ge::DT_FLOAT, ge::FORMAT_ND},          // weightAssistMatrix
             {{{16}, {16}}, ge::DT_FLOAT, ge::FORMAT_ND},                      // groupList
