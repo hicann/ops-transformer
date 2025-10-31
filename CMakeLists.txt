@@ -43,10 +43,16 @@ endif()
 
 #外部传参
 if(NOT ${CMAKE_BUILD_MODE} STREQUAL "FALSE")
+  if(ENABLE_DEBUG)
+    set(CMAKE_BUILD_MODE "${CMAKE_BUILD_MODE} -g")
+  endif()
   set(COMPILE_OP_MODE ${CMAKE_BUILD_MODE})
 else()
   if(ENABLE_TEST)
     set(COMPILE_OP_MODE "-O0 -g")
+  endif()
+  if(ENABLE_DEBUG)
+    set(CMAKE_BUILD_MODE "-g")
   endif()
 endif()
 

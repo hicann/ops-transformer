@@ -40,6 +40,7 @@ ENABLE_EXPERIMENTAL=FALSE
 ASCEND_SOC_UNITS="ascend910b"
 SUPPORT_COMPUTE_UNIT_SHORT=("ascend910b" "ascend910_93" "ascend910_95" "ascend310p" "ascend910")
 CMAKE_BUILD_MODE=""
+ENABLE_DEBUG=FALSE
 BUILD_LIBS=()
 OP_API_UT=FALSE
 OP_HOST_UT=FALSE
@@ -830,12 +831,11 @@ while [[ $# -gt 0 ]]; do
         shift 1
         ;;
     --debug)
-        CMAKE_BUILD_MODE="${CMAKE_BUILD_MODE} -g"
+        ENABLE_DEBUG=TRUE
         shift
         ;;
     -O[0-3])
-        build_mode=$1
-        CMAKE_BUILD_MODE="${CMAKE_BUILD_MODE} ${build_mode}"
+        CMAKE_BUILD_MODE=$1
         shift
         ;;
     --genop=*)
@@ -981,7 +981,11 @@ if [ "${HOST_TILING}" == "true" ];then
     CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_HOST_TILING=ON"
 fi
 
-if [ -n "${CMAKE_BUILD_MODE}"] && [ "${CMAKE_BUILD_MODE}" != "" ];then
+if [ "${ENABLE_DEBUG}" == "TRUE" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_DEBUG=ON"
+fi
+
+if [ -n "${CMAKE_BUILD_MODE}" ];then
     CUSTOM_OPTION="${CUSTOM_OPTION} -DCMAKE_BUILD_MODE=${CMAKE_BUILD_MODE}"
 fi
 
