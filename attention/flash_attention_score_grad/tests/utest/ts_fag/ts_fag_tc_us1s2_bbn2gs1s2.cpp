@@ -14,8 +14,7 @@
  */
 
 #include "ts_fag.h"
-#include "tests/utils/log.h"
-#include "tiling/fa/tiling_data.h"
+#include "../../../op_kernel/flash_attention_score_grad.cpp"
 
 class FagCaseUs1s2Bbn2gs1s2 : public FagCase {
 public:
@@ -27,6 +26,16 @@ public:
                           const FaParam &param, bool chkTilingData = true, uint32_t isSparseValue = 1)
         : FagCase(name, enable, dbgInfo, reverse, param, FagCase::kTemplatePriority_Us1s2_Bbn2gs1s2),
           mChkTilingData(chkTilingData), mIsSparseValue(isSparseValue)
+    {
+    }
+
+    FagCaseUs1s2Bbn2gs1s2(const char *name, bool enable, const char *dbgInfo, 
+                          const std::function<void(FAG_INPUT_DTYPE)>& templatekeyKernelFunc,
+                          const OpInfoWithSocversion &reverse,
+                          const FaParam &param, bool chkTilingData = true, uint32_t isSparseValue = 1)
+        : FagCase(name, enable, dbgInfo, templatekeyKernelFunc, reverse, param, 
+                  FagCase::kTemplatePriority_Us1s2_Bbn2gs1s2), mChkTilingData(chkTilingData), 
+                  mIsSparseValue(isSparseValue)
     {
     }
 
@@ -113,79 +122,11 @@ TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2, Tc_BatchCase)
 }
 
 const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
-    FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_000", true,                    /* CaseName, Enable */
-                          "",                                                     /* DebugInfo */
-                          OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
-                                 ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000101003434UL,               /* ExpectTilingKey */
-                                            ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-                          FaParam(2, 40, 2, 2048, 2048, 128,                      /* B, N2, G, S1, S2, D */
-                                  ge::DataType::DT_FLOAT16, LayoutType::BSH,      /* Dtype, Layout */
-                                  0.08838f, 0.8f, 65504, 0,          /* Scale, KeepProb, PreTokens, NxtTokens */
-                                  1, 0,                              /* InnerPrecise, SparseMode */
-                                  PseShapeType::NONE,                /* PseShapeType */
-                                  DropMaskShapeType::B_N1_S1_S2DIV8, /* DropMaskShapeType */
-                                  PaddingMaskShapeType::S1_S2,       /* PaddingMaskShapeType */
-                                  AttenMaskShapeType::S1_S2,         /* AttentionMaskShapeType */
-                                  ge::DataType::DT_BOOL,             /* AttentionMaskDtype */
-                                  PrefixShapeType::NONE)             /* PrefixShapeType */
-                          ),
-    FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_001", true,                    /* CaseName, Enable */
-                          "",                                                     /* DebugInfo */
-                          OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
-                                 ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000101003434UL,               /* ExpectTilingKey */
-                                            ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-                          FaParam(2, 40, 2, 2048, 2048, 128,                      /* B, N2, G, S1, S2, D */
-                                  ge::DataType::DT_FLOAT16, LayoutType::BSH,      /* Dtype, Layout */
-                                  0.08838f, 0.8f, 65504, 0,          /* Scale, KeepProb, PreTokens, NxtTokens */
-                                  1, 0,                              /* InnerPrecise, SparseMode */
-                                  PseShapeType::NONE,                /* PseShapeType */
-                                  DropMaskShapeType::B_N1_S1_S2DIV8, /* DropMaskShapeType */
-                                  PaddingMaskShapeType::S1_S2,       /* PaddingMaskShapeType */
-                                  AttenMaskShapeType::B_1_S1_S2,     /* AttentionMaskShapeType */
-                                  ge::DataType::DT_BOOL,             /* AttentionMaskDtype */
-                                  PrefixShapeType::NONE)             /* PrefixShapeType */
-                          ),
-    FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_002", true,                    /* CaseName, Enable */
-                          "",                                                     /* DebugInfo */
-                          OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
-                                 ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000101003434UL,               /* ExpectTilingKey */
-                                            ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-                          FaParam(2, 40, 1, 2048, 2048, 128,                      /* B, N2, G, S1, S2, D */
-                                  ge::DataType::DT_FLOAT16, LayoutType::BSH,      /* Dtype, Layout */
-                                  0.08838f, 0.8f, 65504, 0,          /* Scale, KeepProb, PreTokens, NxtTokens */
-                                  1, 0,                              /* InnerPrecise, SparseMode */
-                                  PseShapeType::NONE,                /* PseShapeType */
-                                  DropMaskShapeType::B_N1_S1_S2DIV8, /* DropMaskShapeType */
-                                  PaddingMaskShapeType::S1_S2,       /* PaddingMaskShapeType */
-                                  AttenMaskShapeType::B_N1_S1_S2,    /* AttentionMaskShapeType */
-                                  ge::DataType::DT_BOOL,             /* AttentionMaskDtype */
-                                  PrefixShapeType::NONE)             /* PrefixShapeType */
-                          ),
-    FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_003", true,                    /* CaseName, Enable */
-                          "",                                                     /* DebugInfo */
-                          OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
-                                 ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111012434UL,               /* ExpectTilingKey */
-                                            ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-                          FaParam(2, 40, 3, 2048, 2048, 128,                      /* B, N2, G, S1, S2, D */
-                                  ge::DataType::DT_BF16, LayoutType::SBH,         /* Dtype, Layout */
-                                  0.08838f, 0.8f, 65504, 0,          /* Scale, KeepProb, PreTokens, NxtTokens */
-                                  0, 0,                              /* InnerPrecise, SparseMode */
-                                  PseShapeType::B_N1_1_S2,           /* PseShapeType */
-                                  DropMaskShapeType::B_N1_S1_S2DIV8, /* DropMaskShapeType */
-                                  PaddingMaskShapeType::S1_S2,       /* PaddingMaskShapeType */
-                                  AttenMaskShapeType::B_1_S1_S2,     /* AttentionMaskShapeType */
-                                  ge::DataType::DT_BOOL,             /* AttentionMaskDtype */
-                                  PrefixShapeType::NONE)             /* PrefixShapeType */
-                          ),
     FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_004", true,                    /* CaseName, Enable */
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111001434UL,               /* ExpectTilingKey */
+                                            234890292UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 2, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BSND,       /* Dtype, Layout */
@@ -202,7 +143,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111001434UL,               /* ExpectTilingKey */
+                                            234890292UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 2, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BSND,       /* Dtype, Layout */
@@ -219,7 +160,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111001434UL,               /* ExpectTilingKey */
+                                            234890292UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 2, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BSND,       /* Dtype, Layout */
@@ -236,7 +177,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111021434UL,               /* ExpectTilingKey */
+                                            234955828UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
@@ -269,74 +210,6 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                                   ge::DataType::DT_BOOL,             /* AttentionMaskDtype */
                                   PrefixShapeType::NONE)             /* PrefixShapeType */
                           ),
-    FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_009", true,                    /* CaseName, Enable */
-                          "",                                                     /* DebugInfo */
-                          OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
-                                 ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000101003434UL,               /* ExpectTilingKey */
-                                            ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-                          FaParam(2, 40, 2, 2048, 128, 64,                        /* B, N2, G, S1, S2, D */
-                                  ge::DataType::DT_FLOAT16, LayoutType::BSH,      /* Dtype, Layout */
-                                  0.08838f, 0.8f, 65504, 0,          /* Scale, KeepProb, PreTokens, NxtTokens */
-                                  1, 0,                              /* InnerPrecise, SparseMode */
-                                  PseShapeType::NONE,                /* PseShapeType */
-                                  DropMaskShapeType::B_N1_S1_S2DIV8, /* DropMaskShapeType */
-                                  PaddingMaskShapeType::S1_S2,       /* PaddingMaskShapeType */
-                                  AttenMaskShapeType::S1_S2,         /* AttentionMaskShapeType */
-                                  ge::DataType::DT_BOOL,             /* AttentionMaskDtype */
-                                  PrefixShapeType::NONE)             /* PrefixShapeType */
-                          ),
-    FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_010", true,                    /* CaseName, Enable */
-                          "",                                                     /* DebugInfo */
-                          OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
-                                 ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000101003434UL,               /* ExpectTilingKey */
-                                            ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-                          FaParam(2, 40, 2, 2048, 256, 64,                        /* B, N2, G, S1, S2, D */
-                                  ge::DataType::DT_FLOAT16, LayoutType::BSH,      /* Dtype, Layout */
-                                  0.08838f, 0.8f, 65504, 0,          /* Scale, KeepProb, PreTokens, NxtTokens */
-                                  1, 0,                              /* InnerPrecise, SparseMode */
-                                  PseShapeType::NONE,                /* PseShapeType */
-                                  DropMaskShapeType::B_N1_S1_S2DIV8, /* DropMaskShapeType */
-                                  PaddingMaskShapeType::S1_S2,       /* PaddingMaskShapeType */
-                                  AttenMaskShapeType::S1_S2,         /* AttentionMaskShapeType */
-                                  ge::DataType::DT_BOOL,             /* AttentionMaskDtype */
-                                  PrefixShapeType::NONE)             /* PrefixShapeType */
-                          ),
-    FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_011", true,                    /* CaseName, Enable */
-                          "",                                                     /* DebugInfo */
-                          OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
-                                 ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000101003434UL,               /* ExpectTilingKey */
-                                            ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-                          FaParam(2, 40, 1, 2048, 2048, 128,                      /* B, N2, G, S1, S2, D */
-                                  ge::DataType::DT_FLOAT16, LayoutType::BSH,      /* Dtype, Layout */
-                                  0.08838f, 0.8f, 100, 100,          /* Scale, KeepProb, PreTokens, NxtTokens */
-                                  1, 4,                              /* InnerPrecise, SparseMode */
-                                  PseShapeType::NONE,                /* PseShapeType */
-                                  DropMaskShapeType::B_N1_S1_S2DIV8, /* DropMaskShapeType */
-                                  PaddingMaskShapeType::S1_S2,       /* PaddingMaskShapeType */
-                                  AttenMaskShapeType::SPARSE,        /* AttentionMaskShapeType */
-                                  ge::DataType::DT_BOOL,             /* AttentionMaskDtype */
-                                  PrefixShapeType::NONE)             /* PrefixShapeType */
-                          ),
-    FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_012", true,                    /* CaseName, Enable */
-                          "",                                                     /* DebugInfo */
-                          OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
-                                 ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000101003434UL,               /* ExpectTilingKey */
-                                            ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-                          FaParam(2, 40, 1, 2048, 1024, 128,                      /* B, N2, G, S1, S2, D */
-                                  ge::DataType::DT_FLOAT16, LayoutType::BSH,      /* Dtype, Layout */
-                                  0.08838f, 0.8f, 100, 100,          /* Scale, KeepProb, PreTokens, NxtTokens */
-                                  1, 4,                              /* InnerPrecise, SparseMode */
-                                  PseShapeType::NONE,                /* PseShapeType */
-                                  DropMaskShapeType::B_N1_S1_S2DIV8, /* DropMaskShapeType */
-                                  PaddingMaskShapeType::S1_S2,       /* PaddingMaskShapeType */
-                                  AttenMaskShapeType::SPARSE,        /* AttentionMaskShapeType */
-                                  ge::DataType::DT_BOOL,             /* AttentionMaskDtype */
-                                  PrefixShapeType::NONE)             /* PrefixShapeType */
-                          ),
     FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_013", true,                    /* CaseName, Enable */
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
@@ -358,7 +231,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111021434UL,               /* ExpectTilingKey */
+                                            234955828UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
@@ -376,7 +249,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111021434UL,               /* ExpectTilingKey */
+                                            234955828UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
@@ -393,7 +266,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111021434UL,               /* ExpectTilingKey */
+                                            234955828UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
@@ -410,7 +283,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111021434UL,               /* ExpectTilingKey */
+                                            234955828UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
@@ -428,7 +301,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111021434UL,               /* ExpectTilingKey */
+                                            234955828UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
@@ -445,7 +318,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111021434UL,               /* ExpectTilingKey */
+                                            234955828UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
@@ -460,9 +333,11 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           ),
     FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_020", true,                    /* CaseName, Enable */
                           "",                                                     /* DebugInfo */
+                          [](FAG_KERNEL_PARAM_){
+                            ::flash_attention_score_grad<4, 3, 4, 0, 1, 2, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0>(FAG_INPUT_PARAMS);},
                           OpInfoWithSocversion(ControlInfo(true, RunKernelNotInPr),             /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111021434UL,               /* ExpectTilingKey */
+                                            234955828UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 1, 128, 128, 128,                         /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
@@ -480,7 +355,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111021434UL,               /* ExpectTilingKey */
+                                            234955828UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
@@ -497,7 +372,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000111021434UL,               /* ExpectTilingKey */
+                                            234955828UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 2, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
@@ -514,7 +389,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000101001434UL,               /* ExpectTilingKey */
+                                            167781428UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(4, 10, 1, 2048, 1024, 128,                      /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BSH,        /* Dtype, Layout */
@@ -534,7 +409,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           "",                                                     /* DebugInfo */
                           OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                                            10000000000101001434UL,               /* ExpectTilingKey */
+                                            167781428UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 40, 1, 2048, 2048, 128,                      /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BSH,        /* Dtype, Layout */
@@ -735,9 +610,9 @@ TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2s, Tc_BatchCase)
 const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCases = ::testing::Values(
     FagCaseUs1s2Bbn2gs1s2s("Fag_Us1s2Bbn2gs1s2_Case_026", true,                    /* CaseName, Enable */
                           "",                                                     /* DebugInfo */
-                          OpInfoWithSocversion(ControlInfo(true, true),                        /* RunTiling, RunKernel */
+                          OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                                  ExpectInfoWithSocversion(true,                                /* ExpectSuccess */
-                                            10000000000000021434UL,               /* ExpectTilingKey */
+                                            74804UL,               /* ExpectTilingKey */
                                             ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(1, 1, 1, 1024, 1, 64,                           /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */

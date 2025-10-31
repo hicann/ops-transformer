@@ -25,29 +25,6 @@ TEST_P(Ts_Fag_Ascend910B2_PseInnerGenerate, Tc_Fag_PseInnerGenerate_Case)
 
 const auto Tc_Fag_PseInnerGenerate_Case = ::testing::Values(
 
-    FagCase("Fag_PseInnerGenerate_Case_000", true,                  /* CaseName, Enable */
-            "",                                                     /* DebugInfo */
-            OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
-                   ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                              ExpectInfoWithSocversion::kInvalidTilingKey,        /* ExpectTilingKey */
-                              ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(2, 16, 1, 256, 256, 32,                         /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT16, LayoutType::BNSD,     /* Dtype, Layout */
-                    0.08838f, 0.9f, 65536, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
-                    0, 0, 3,                                        /* InnerPrecise, Sparsemode, pseType */
-                    PseShapeType::SLOPE_N1,                         /* PseShapeType */
-                    DropMaskShapeType::B_N1_S1_S2,                  /* DropMaskShapeType */
-                    PaddingMaskShapeType::NONE,                     /* PaddingMaskShapeType */
-                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType*/
-                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype*/
-                    PrefixShapeType::NONE,                          /* PrefixShapeType */
-                    {},                                             /* PrefixTensorData */
-                    {},                                             /* ActualSeqQLenList */
-                    {},                                             /* ActualSeqKVLenList */
-                    {1},                                            /* qStartIdxTensorData */
-                    {2}),                                           /* kvStartIdxTensorData */
-            FagCase::kTemplatePriority_Us1s2_Bbn2gs1s2              /* TilingTemplatePriority */
-            ),
     FagCase("Fag_PseInnerGenerate_Case_001", true,                  /* CaseName, Enable */
             "",                                                     /* DebugInfo */
             OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */

@@ -23,7 +23,7 @@
 #include "tiling/fa/tiling_data.h"
 #include "tiling/fa/tiling_stub.h"
 #include "tiling_base/tiling_templates_registry.h"
-#include "../../../op_kernel/flash_attention_score.cpp"
+#include "../../../op_kernel/flash_attention_score_grad.cpp"
 
 /**
  * 以下函数声明需要保持与 CMakeList.txt 中调用 OpsTest_Level2_AddOp 函数时 KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT
@@ -102,9 +102,9 @@ ASCENDC_EXTERN_C ge::graphStatus FlashAttentionScoreGradTilingFuncStub(gert::Til
 using namespace ops::adv::tests::fa;
 using TensorIntf = ops::adv::tests::utils::TensorIntf;
 
-bool RunTemplateFlashAttention(std::function<void(FAS_INPUT_DTYPE)> func,
-                       uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
-                       std::vector<TensorIntf *> &outputs, uint8_t *workspace, uint8_t *tilingData)
+bool RunTemplateFlashAttentionGrad(std::function<void(FAG_INPUT_DTYPE)> func,
+                           uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
+                           std::vector<TensorIntf *> &outputs, uint8_t *workspace, uint8_t *tilingData)
 {
     // Kernel 运行
     ICPU_SET_TILING_KEY(tilingKey);
@@ -112,24 +112,33 @@ bool RunTemplateFlashAttention(std::function<void(FAS_INPUT_DTYPE)> func,
                 inputs[0]->GetDevData(),  // query
                 inputs[1]->GetDevData(),  // key
                 inputs[2]->GetDevData(),  // value
-                inputs[3]->GetDevData(),  // pse
-                inputs[4]->GetDevData(),  // dropMask
-                inputs[5]->GetDevData(),  // paddingMask
-                inputs[6]->GetDevData(),  // attenMask
-                inputs[7]->GetDevData(),  // prefix
-                inputs[8]->GetDevData(),  // actSeqQLens
-                inputs[9]->GetDevData(),  // actSeqKVLens
-                inputs[10]->GetDevData(), // qStartIdx
-                inputs[11]->GetDevData(), // kvStartIdx
-                inputs[12]->GetDevData(), // deqScaleQ
-                inputs[13]->GetDevData(), // deqScaleK
-                inputs[14]->GetDevData(), // deqScaleV
-                inputs[15]->GetDevData(), // queryRope
-                inputs[16]->GetDevData(), // keyRope
-                outputs[0]->GetDevData(), // softmaxMax
-                outputs[1]->GetDevData(), // softmaxSum
-                outputs[2]->GetDevData(), // softmaxRes
-                outputs[3]->GetDevData(), // attenRes
+                inputs[3]->GetDevData(),  // dy
+                inputs[4]->GetDevData(),  // pse
+                inputs[5]->GetDevData(),  // dropMask
+                inputs[6]->GetDevData(),  // paddingMask
+                inputs[7]->GetDevData(),  // attenMask
+                inputs[8]->GetDevData(),  // softmaxMax
+                inputs[9]->GetDevData(),  // softmaxSum
+                inputs[10]->GetDevData(), // softMaxRes
+                inputs[11]->GetDevData(), // attenRes
+                inputs[12]->GetDevData(), // prefix
+                inputs[13]->GetDevData(), // actualSeqQLen
+                inputs[14]->GetDevData(), // actualSeqKvLen
+                inputs[15]->GetDevData(), // qStartIdx
+                inputs[16]->GetDevData(), // kvStartIdx
+                inputs[17]->GetDevData(), // deqScaleQ
+                inputs[18]->GetDevData(), // deqScaleK
+                inputs[19]->GetDevData(), // deqScaleV
+                inputs[20]->GetDevData(), // deqScaleDy
+                inputs[21]->GetDevData(), // deqScaleO
+                inputs[22]->GetDevData(), // queryRope
+                inputs[23]->GetDevData(), // keyRope
+                outputs[0]->GetDevData(), // dq
+                outputs[1]->GetDevData(), // dk
+                outputs[2]->GetDevData(), // dv
+                outputs[3]->GetDevData(), // dpse
+                outputs[4]->GetDevData(), // dq_rope
+                outputs[5]->GetDevData(), // dk_rope
                 workspace, tilingData);
     return true;
 }
@@ -213,8 +222,8 @@ FaCase::FaCase() : FaCase("Undefined", true, "", OpInfoWithSocversion(), OpInfoW
 
 FaCase::FaCase(const char *name, bool enable, const char *dbgInfo, OpInfoWithSocversion forward, OpInfoWithSocversion reverse, FaParam param,
                int32_t tilingTemplatePriority)
-        : CaseWithSocversion(name, enable, dbgInfo, tilingTemplatePriority), mForward(std::move(forward)), mReverse(std::move(reverse))
-        , mParam(std::move(param))
+    : CaseWithSocversion(name, enable, dbgInfo, tilingTemplatePriority), mForward(std::move(forward)), mReverse(std::move(reverse)),
+      mParam(std::move(param))
 {
     mForward.mName = "FlashAttentionScore";
     mReverse.mName = "FlashAttentionScoreGrad";
@@ -223,10 +232,10 @@ FaCase::FaCase(const char *name, bool enable, const char *dbgInfo, OpInfoWithSoc
     mFagOriginTilingFuncName = "TilingFlashAttentionGradScore";
 }
 
-FaCase::FaCase(const char *name, bool enable, const char *dbgInfo, const std::function<void(FAS_INPUT_DTYPE)>& templatekeyKernelFunc,
+FaCase::FaCase(const char *name, bool enable, const char *dbgInfo, const std::function<void(FAG_INPUT_DTYPE)>& templatekeyKernelFunc,
         OpInfoWithSocversion forward, OpInfoWithSocversion reverse, FaParam param, int32_t tilingTemplatePriority)
-        : CaseWithSocversion(name, enable, dbgInfo, tilingTemplatePriority), mForward(std::move(forward)), mReverse(std::move(reverse))
-        , mParam(std::move(param))
+    : CaseWithSocversion(name, enable, dbgInfo, tilingTemplatePriority), mForward(std::move(forward)), mReverse(std::move(reverse)),
+      mParam(std::move(param))
 {
     mForward.mName = "FlashAttentionScore";
     mReverse.mName = "FlashAttentionScoreGrad";
@@ -234,7 +243,7 @@ FaCase::FaCase(const char *name, bool enable, const char *dbgInfo, const std::fu
     mFasOriginTilingFuncName = "TilingFlashAttentionScore";
     mFagOriginTilingFuncName = "TilingFlashAttentionGradScore";
 
-    mFasKernelTemplateFunc = templatekeyKernelFunc;
+    mFagKernelTemplateFunc = templatekeyKernelFunc;
 }
 
 bool FaCase::Run()
@@ -247,6 +256,14 @@ bool FaCase::Run()
         return false;
     }
     if (!mForward.ProcessKernel(mName)) {
+        return false;
+    }
+#endif
+#ifdef TESTS_UT_OPS_TEST_FAG
+    if (!mReverse.ProcessTiling(mName, this->socVersion)) {
+        return false;
+    }
+    if (!mReverse.ProcessKernel(mName)) {
         return false;
     }
 #endif
@@ -298,10 +315,6 @@ bool FaCase::InitOpInfoCtx()
     rst = rst && mForwardCtx.SetTilingDataMaxSize(2456); /* 2456 FlashAttentionScore 最大 TilingData 大小 */
     rst = rst && mForwardCtx.SetKernelRunCbf(RunFlashAttention);
     rst = rst && mForwardCtx.SetKernelMainFunc((void *)nullptr);
-    if (mFasKernelTemplateFunc) {
-        rst = rst && mForwardCtx.SetKernelRunTemplateCbf(RunTemplateFlashAttention);
-        rst = rst && mForwardCtx.SetKernelTemplateMainFunc(mFasKernelTemplateFunc);
-    }
     rst = rst && mForward.SetContext(&mForwardCtx);
     rst = rst && mReverseCtx.SetOpName(mReverse.mName.c_str());
     rst = rst && mReverseCtx.SetDeterministic(mReverse.mCtr.mDeterministic);
@@ -324,7 +337,11 @@ bool FaCase::InitOpInfoCtx()
                                        {"pse_type", mParam.pseType}});
     rst = rst && mReverseCtx.SetTilingDataMaxSize(2560); /* 2560 FlashAttentionScoreGrad 最大 TilingData 大小 */
     rst = rst && mReverseCtx.SetKernelRunCbf(RunFlashAttentionGrad);
-    rst = rst && mReverseCtx.SetKernelMainFunc((void *)mFagKernelFunc);
+    rst = rst && mReverseCtx.SetKernelMainFunc((void *)nullptr);
+    if (mFagKernelTemplateFunc) {
+        rst = rst && mReverseCtx.SetKernelRunTemplateCbf(RunTemplateFlashAttentionGrad);
+        rst = rst && mReverseCtx.SetKernelTemplateMainFunc(mFagKernelTemplateFunc);
+    }
     rst = rst && mReverse.SetContext(&mReverseCtx);
     return rst;
 }

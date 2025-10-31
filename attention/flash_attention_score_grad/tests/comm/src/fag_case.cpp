@@ -28,6 +28,14 @@ FagCase::FagCase(const char *name, bool enable, const char *dbgInfo, OpInfoWithS
 {
 }
 
+FagCase::FagCase(const char *name, bool enable, const char *dbgInfo, 
+                 const std::function<void(FAG_INPUT_DTYPE)>& templatekeyKernelFunc, OpInfoWithSocversion reverse, 
+                 FaParam param, int32_t tilingTemplatePriority)
+    : FaCase(name, enable, dbgInfo, templatekeyKernelFunc, OpInfoWithSocversion(), 
+             std::move(reverse), std::move(param), tilingTemplatePriority)
+{
+}
+
 bool FagCase::Run()
 {
     if (!mEnable) {

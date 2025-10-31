@@ -44,11 +44,12 @@ set(_FA_OpTilingPrivateIncludesExt
 
 file(GLOB _FAG_OpKernelTilingDataDefH_def "${OPS_TRANSFORMER_DIR}/attention/flash_attention_score_grad/op_host/flash_attention_score_grad_tiling*_def.h")
 set(_FA_OpKernelTilingDataDefH
+        # 公共
+        ${OPS_TRANSFORMER_DIR}/common/include/tiling_base/data_copy_transpose_tiling_def.h
         # FAS
         ${OPS_TRANSFORMER_DIR}/attention/flash_attention_score/op_kernel/flash_attention_score_tiling.h
         # FAG
         ${OPS_TRANSFORMER_DIR}/attention/flash_attention_score_grad/op_kernel/flash_attention_score_grad_tiling.h
-        ${OPS_TRANSFORMER_DIR}/attention/flash_attention_score_grad/op_host/flash_attention_score_grad_tiling_common.h
         ${_FAG_OpKernelTilingDataDefH_def}
 )
 
@@ -59,9 +60,9 @@ set(_FA_OpKernelPrivateIncludesExt
 )
 
 set(_FA_OpKernelPrivateCompileDefinitionsExt
-        KernelCtrlParam flash_attention_score fp16 ORIG_DTYPE_QUERY=DT_FLOAT16 DTYPE_DQ=half       KFC_L1_RESERVER_SIZE=0
-        KernelCtrlParam flash_attention_score bf16 ORIG_DTYPE_QUERY=DT_BF16    DTYPE_DQ=bfloat16_t KFC_L1_RESERVER_SIZE=0
-        KernelCtrlParam flash_attention_score fp32 ORIG_DTYPE_QUERY=DT_FLOAT   DTYPE_DQ=float      KFC_L1_RESERVER_SIZE=0
+        KernelCtrlParam flash_attention_score_grad fp16 ORIG_DTYPE_QUERY=DT_FLOAT16 DTYPE_DQ=half       KFC_L1_RESERVER_SIZE=0
+        KernelCtrlParam flash_attention_score_grad bf16 ORIG_DTYPE_QUERY=DT_BF16    DTYPE_DQ=bfloat16_t KFC_L1_RESERVER_SIZE=0
+        KernelCtrlParam flash_attention_score_grad fp32 ORIG_DTYPE_QUERY=DT_FLOAT   DTYPE_DQ=float      KFC_L1_RESERVER_SIZE=0
 )
 set(_FA_UTestCommonPrivateIncludeExt
         ${OPBASE_INC_DIRS}
@@ -90,18 +91,18 @@ list(APPEND _FA_UTestAclnnSourcesExtForce ${_Src1} ${_Src2})
 set(_FA_UTestCompileDefinitions)
 
 list(APPEND _FA_OpKernelSourcesExt
-        ${OPS_TRANSFORMER_DIR}/attention/flash_attention_score/op_kernel/flash_attention_score.cpp
+        ${OPS_TRANSFORMER_DIR}/attention/flash_attention_score_grad/op_kernel/flash_attention_score_grad.cpp
 )
 
-file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/ts_fas/*.cc")
-file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/ts_fas/*.cpp")
+file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/ts_fag/*.cc")
+file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/ts_fag/*.cpp")
 list(APPEND _FA_UTestSourcesExtForce ${_Src1} ${_Src2})
 
-file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn/ts_fas/*.cc")
-file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn/ts_fas/*.cpp")
+file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn/ts_fag/*.cc")
+file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn/ts_fag/*.cpp")
 list(APPEND _FA_UTestAclnnSourcesExtForce ${_Src1} ${_Src2})
 
-list(APPEND _FA_UTestCompileDefinitions TESTS_UT_OPS_TEST_FAS)
+list(APPEND _FA_UTestCompileDefinitions TESTS_UT_OPS_TEST_FAG)
 
 OpsTest_Level2_AddOp(
         SUB_SYSTEM                                transformer

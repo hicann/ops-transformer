@@ -14,6 +14,7 @@
  */
 
 #include "ts_fag.h"
+#include "../../../op_kernel/flash_attention_score_grad.cpp"
 
 TEST_F(Ts_Fag_Ascend910B2, Tc_Us1s2Bbn2_IllegalAttenMaskShape_001)
 {
@@ -135,7 +136,7 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                              10000001100010002134UL,               /* ExpectTilingKey */
+                              293617972UL,               /* ExpectTilingKey */
                               ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(1, 1, 1, 257, 257, 72,                         /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_BF16, LayoutType::BSH,        /* Dtype, Layout */
@@ -153,7 +154,7 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                              10000001100010002134UL,               /* ExpectTilingKey */
+                              293617972UL,               /* ExpectTilingKey */
                               ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(1, 1, 1, 257, 257, 88,                         /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_BF16, LayoutType::BSH,        /* Dtype, Layout */
@@ -171,7 +172,7 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                              10000001000010002134UL,               /* ExpectTilingKey */
+                              276840756UL,               /* ExpectTilingKey */
                               ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(1, 1, 1, 507, 507, 128,                         /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_BF16, LayoutType::BSH,        /* Dtype, Layout */
@@ -189,7 +190,7 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfoWithSocversion(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                              10000000001100011134UL,               /* ExpectTilingKey */
+                              201367860UL,               /* ExpectTilingKey */
                               ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(128, 18, 1, 34, 34, 16,                         /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT, LayoutType::SBH,        /* Dtype, Layout */
@@ -205,9 +206,11 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
             ),
     FagCase("Fag_Us1s2Bbn2_Case_fuzz_000", true,                         /* CaseName, Enable */
             "",                                                     /* DebugInfo */
+            [](FAG_KERNEL_PARAM_){
+              ::flash_attention_score_grad<4, 3, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0>(FAG_INPUT_PARAMS);},
             OpInfoWithSocversion(ControlInfo(true, true),                        /* RunTiling, RunKernel */
                    ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
-                              10000000001000011134UL,               /* ExpectTilingKey */
+                              134258996UL,               /* ExpectTilingKey */
                               ExpectInfoWithSocversion::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(1, 1, 1, 1, 256, 72,                         /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT, LayoutType::SBH,        /* Dtype, Layout */
@@ -241,6 +244,8 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
             ),
     FagCase("Fag_Us1s2Bbn2_Case_002", true,                         /* CaseName, Enable */
             "",                                                     /* DebugInfo */
+            [](FAG_KERNEL_PARAM_){
+              ::flash_attention_score_grad<4, 3, 1, 0, 0, 2, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0>(FAG_INPUT_PARAMS);},
             OpInfoWithSocversion(ControlInfo(true, RunKernelNotInPr),             /* RunTiling, RunKernel */
                    ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
                               ExpectInfoWithSocversion::kInvalidTilingKey,        /* ExpectTilingKey */
@@ -259,6 +264,8 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
             ),
     FagCase("Fag_Us1s2Bbn2_Case_004", true,                         /* CaseName, Enable */
             "",                                                     /* DebugInfo */
+            [](FAG_KERNEL_PARAM_){
+              ::flash_attention_score_grad<4, 3, 1, 0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0>(FAG_INPUT_PARAMS);},
             OpInfoWithSocversion(ControlInfo(true, RunKernelNotInPr),             /* RunTiling, RunKernel */
                    ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
                               ExpectInfoWithSocversion::kInvalidTilingKey,        /* ExpectTilingKey */
@@ -277,6 +284,8 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
             ),
     FagCase("Fag_Us1s2Bbn2_Case_005", true,                         /* CaseName, Enable */
             "",                                                     /* DebugInfo */
+            [](FAG_KERNEL_PARAM_){
+              ::flash_attention_score_grad<4, 3, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0>(FAG_INPUT_PARAMS);},
             OpInfoWithSocversion(ControlInfo(true, RunKernelNotInPr),             /* RunTiling, RunKernel */
                    ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
                               ExpectInfoWithSocversion::kInvalidTilingKey,        /* ExpectTilingKey */
@@ -293,8 +302,10 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
                     PrefixShapeType::NONE),                         /* PrefixShapeType */
             FagCase::kTemplatePriority_Us1s2_Bbn2                   /* TilingTemplatePriority */
             ),
-    FagCase("Fag_Us1s2Bbn2_Case_006", true,                         /* CaseName, Enable */
+    FagCase("Fag_Us1s2Bbn2_Case_006", true,                         /* CaseName, Enable */         // 192938292
             "",                                                     /* DebugInfo */
+            [](FAG_KERNEL_PARAM_){
+              ::flash_attention_score_grad<4, 3, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0>(FAG_INPUT_PARAMS);},
             OpInfoWithSocversion(ControlInfo(true, RunKernelNotInPr),             /* RunTiling, RunKernel */
                    ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
                               ExpectInfoWithSocversion::kInvalidTilingKey,        /* ExpectTilingKey */
@@ -349,6 +360,8 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
             ),
     FagCase("Fag_Us1s2Bbn2_Case_009", true,                         /* CaseName, Enable */
             "",                                                     /* DebugInfo */
+            [](FAG_KERNEL_PARAM_){
+              ::flash_attention_score_grad<4, 3, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0>(FAG_INPUT_PARAMS);},
             OpInfoWithSocversion(ControlInfo(true, true),             /* RunTiling, RunKernel */
                    ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
                               ExpectInfoWithSocversion::kInvalidTilingKey,        /* ExpectTilingKey */
@@ -367,6 +380,8 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
             ),
     FagCase("Fag_Us1s2Bbn2_Case_010", true,                         /* CaseName, Enable */
             "",                                                     /* DebugInfo */
+            [](FAG_KERNEL_PARAM_){
+              ::flash_attention_score_grad<4, 3, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0>(FAG_INPUT_PARAMS);},
             OpInfoWithSocversion(ControlInfo(true, true),             /* RunTiling, RunKernel */
                    ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
                               ExpectInfoWithSocversion::kInvalidTilingKey,        /* ExpectTilingKey */
@@ -385,6 +400,8 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
             ),
     FagCase("Fag_Us1s2Bbn2_Case_011", true,                         /* CaseName, Enable */
             "",                                                     /* DebugInfo */
+            [](FAG_KERNEL_PARAM_){
+              ::flash_attention_score_grad<4, 3, 1, 0, 0, 2, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0>(FAG_INPUT_PARAMS);},
             OpInfoWithSocversion(ControlInfo(true, true),             /* RunTiling, RunKernel */
                    ExpectInfoWithSocversion(true,                                 /* ExpectSuccess */
                               ExpectInfoWithSocversion::kInvalidTilingKey,        /* ExpectTilingKey */

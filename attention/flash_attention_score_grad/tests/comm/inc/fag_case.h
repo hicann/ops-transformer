@@ -14,6 +14,7 @@
  */
 
 #include "fa_case.h"
+#include "../../../op_kernel/flash_attention_score_grad_tiling.h"
 
 namespace ops::adv::tests::fag {
 
@@ -31,6 +32,9 @@ public:
     FagCase();
     FagCase(const char *name, bool enable, const char *dbgInfo, OpInfoWithSocversion reverse, FaParam param,
             int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
+    FagCase(const char *name, bool enable, const char *dbgInfo, 
+            const std::function<void(FAG_INPUT_DTYPE)>& templatekeyKernelFunc, OpInfoWithSocversion reverse, 
+            FaParam param, int32_t tilingTemplatePriority);
 
     bool Run() override;
 };
