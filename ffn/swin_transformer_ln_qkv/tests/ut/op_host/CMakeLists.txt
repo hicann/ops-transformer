@@ -1,3 +1,4 @@
+#
 # This program is free software, you can redistribute it and/or modify.
 # Copyright (c) 2025 Huawei Technologies Co., Ltd.
 # This file is a part of the CANN Open Software.
@@ -7,18 +8,14 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ======================================================================================================================
 
-if (BUILD_OPEN_PROJECT)
-    target_sources(op_host_aclnn PRIVATE
-        swin_transformer_ln_qkv_def.cpp
-    )
-    add_ops_compile_options(
-            OP_NAME SwinTransformerLnQKV
-            OPTIONS --cce-auto-sync=on
-                    -Wno-deprecated-declarations
-                    -Werror
-    )
+if(UT_TEST_ALL OR OP_HOST_UT)
+    add_modules_ut_sources(UT_NAME ${OP_TILING_MODULE_NAME} MODE PRIVATE DIR ${CMAKE_CURRENT_SOURCE_DIR})
+    add_modules_ut_sources(UT_NAME ${OP_INFERSHAPE_MODULE_NAME} MODE PRIVATE DIR ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
-if(NOT BUILD_OPS_RTY_KERNEL)
-    add_modules_sources(OPTYPE swin_transformer_ln_qkv ACLNNTYPE aclnn)  
-endif()
+file(GLOB CURRENT_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*)
+foreach(SUB_DIR ${CURRENT_DIRS})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${SUB_DIR}/CMakeLists.txt")
+        add_subdirectory(${SUB_DIR})
+    endif()
+endforeach()

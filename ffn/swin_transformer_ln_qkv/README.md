@@ -100,5 +100,11 @@
 - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持FLOAT16。
 
 ## 约束说明
-- 当前不支持用户直接调用
+无
+
+## 调用说明
+
+| 调用方式   | 样例代码           | 说明                                         |
+| ---------------- | --------------------------- | --------------------------------------------------- |
+| 图模式 | [test_geir_swin_transformer_ln_qkv](examples/test_geir_swin_transformer_ln_qkv.cpp)  | 通过[算子IR](op_graph/swin_transformer_ln_qkv_proto.h)构图方式调用SwinTransformerLnQKV算子。         |
 

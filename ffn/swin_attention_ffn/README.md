@@ -76,10 +76,13 @@
 </tbody>
 </table>
 
-
-
 ## 约束说明
+无
 
-当前不支持用户直接调用
+## 调用说明
+
+| 调用方式   | 样例代码           | 说明                                         |
+| ---------------- | --------------------------- | --------------------------------------------------- |
+| 图模式 | [test_geir_swin_attention_ffn](examples/test_geir_swin_attention_ffn.cpp)  | 通过[算子IR](op_graph/swin_attention_ffn_proto.h)构图方式调用SwinAttentionFFN算子。         |
 
 

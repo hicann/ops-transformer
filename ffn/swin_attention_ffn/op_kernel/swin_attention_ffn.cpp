@@ -47,7 +47,7 @@ protected:
     LocalTensor<X3_TYPE> xLocal;
     LocalTensor<Y_TYPE> zLocal;
     LocalTensor<Y_TYPE> tmpLocal;
-    TQue<QuePosition::VECCALC, 1> inQueueTmp;
+    TQue<QuePosition::VECIN, 1> inQueueTmp;
     TQue<QuePosition::VECIN, 1> inQueueX;
     TQue<QuePosition::VECOUT, 1> outQueueZ;
 
@@ -412,7 +412,9 @@ __aicore__ inline void KernelBatchMatmul<X1_TYPE, X2_TYPE, X3_TYPE, BIAS_TYPE, Y
     DataCopy(dGlobal[offsetD], zLocal[dataNumPerLoop * 3 / 4 + tpBlockSize / 2], outDCParams4);
     outQueueZ.FreeTensor(zLocal);
 }
-
+#ifdef __CCE_KT_TEST__
+    REGISTER_TILING_DEFAULT(SwinAttentionFFNTilingData);
+#endif
 extern "C" __global__ __aicore__ void swin_attention_ffn(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR x3, GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling)
 {
     TPipe tPipe;

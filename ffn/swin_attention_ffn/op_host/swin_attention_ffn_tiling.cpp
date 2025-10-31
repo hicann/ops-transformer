@@ -178,7 +178,6 @@ ge::graphStatus SAFFNTilingComp::SAFFNTilingProc(gert::TilingContext *context) {
     bmm.SetShape(m, n, k);
     bmm.SetOrgShape(m, n, k);
     bmm.SetBias(true);
-    bmm.SetBufferSpace(uint32_t(l1Size), uint32_t(l0cSize), uint32_t(ubSize));
     bmm.SetTraverse(MatrixTraverse::FIRSTN);
 
     bmm.GetTiling(tiling.bmmTilingData);

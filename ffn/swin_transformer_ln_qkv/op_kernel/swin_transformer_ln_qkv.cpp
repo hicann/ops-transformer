@@ -357,7 +357,9 @@ private:
     uint32_t outputQkvBaseLen;
     uint32_t stackBufferSize = 0;
 };
-
+#ifdef __CCE_KT_TEST__
+    REGISTER_TILING_DEFAULT(SwinTransformerLnQKVTilingData);
+#endif
 extern "C" __global__ __aicore__ void swin_transformer_ln_qkv(GM_ADDR inputX, GM_ADDR gamma, GM_ADDR beta,
     GM_ADDR weight, GM_ADDR bias, GM_ADDR query_output, GM_ADDR key_output, GM_ADDR value_output, GM_ADDR workspace,
     GM_ADDR tiling)

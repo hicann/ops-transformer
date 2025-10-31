@@ -7,21 +7,10 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ======================================================================================================================
 
-
-if (BUILD_OPEN_PROJECT)
-    target_sources(op_host_aclnn PRIVATE
-        swin_transformer_ln_qkv_quant_def.cpp
-    )
-    if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
-        add_ops_compile_options(
-                OP_NAME SwinTransformerLnQkvQuant
-                OPTIONS --cce-auto-sync=on
-                        -Wno-deprecated-declarations
-                        -Werror
-        )
-    else() # custom
-        add_modules_sources(OPTYPE swin_transformer_ln_qkv_quant ACLNNTYPE aclnn)
+file(GLOB CURRENT_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*)
+message(STATUS "=== Debug: CURRENT_DIRS =${CURRENT_DIRS} ")
+foreach(SUB_DIR ${CURRENT_DIRS})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${SUB_DIR}/CMakeLists.txt")
+        add_subdirectory(${SUB_DIR})
     endif()
-else() # 回黄host
-    add_modules_sources(OPTYPE swin_transformer_ln_qkv_quant ACLNNTYPE aclnn)  
-endif()
+endforeach()
