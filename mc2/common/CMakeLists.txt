@@ -13,15 +13,6 @@
      add_tiling_modules()
      target_sources(${OPHOST_NAME}_tiling_obj PRIVATE ${OPTILING_SRCS})
    endif()
-   file(GLOB OPGRAPH_SRCS
-     src/mc2_moe_utils.cpp
-     src/mc2_common_infershape.cpp
-     src/mc2_hcom_topo_info.cpp
-     )
-   if(OPGRAPH_SRCS)
-     add_graph_plugin_modules()
-     target_sources(${GRAPH_PLUGIN_NAME}_obj PRIVATE ${OPGRAPH_SRCS})
-   endif()
    if(NOT ENABLE_BUILT_IN)
     file(GLOB OPPROTO_SRCS
      src/mc2_moe_utils.cpp
