@@ -14,7 +14,7 @@
     - m轴分组：$k_i$、$n_i$各组相同，$m_i$可以不相同。
     - k轴分组：$m_i$、$n_i$各组相同，$k_i$可以不相同。
 
-    相较于[GroupedMatmulV4](./docs/GroupedMatmulV4.md)接口，**此接口新增：**
+    相较于[GroupedMatmulV4](./docs/aclnnGroupedMatmulV4.md)接口，**此接口新增：**
     - 可选参数tuningConfigOptional，调优参数。数组中第一个值表示各个专家处理的token数的预期值，算子tiling时会按照该预期值进行最优tiling。
       - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>： 支持此参数。
 
@@ -245,7 +245,7 @@
       | 量化   | INT4    | INT4 (ND/NZ)    | null         | UINT64 | null       | null           | null            | FLOAT/null    | INT64     | null            | null                 | null               | FLOAT16/BFLOAT16|
 
     - x和weight中每一组tensor的最后一维大小都应小于65536。$x_i$的最后一维指当x不转置时$x_i$的K轴或当x转置时$x_i$的M轴。$weight_i$的最后一维指当weight不转置时$weight_i$的N轴或当weight转置时$weight_i$的K轴。
-    - x和weight若需要转置，转置对应的tensor必须[非连续](common/非连续的Tensor.md)。
+    - x和weight若需要转置，转置对应的tensor必须非连续。
     - 伪量化场景shape约束：
       - 伪量化场景下，若weight的类型为INT8，仅支持perchannel模式；若weight的类型为INT4，对称量化支持perchannel和pergroup两种模式。若为pergroup，pergroup数G或$G_i$必须要能整除对应的$k_i$。若weight为多tensor，定义pergroup长度$s_i = k_i / G_i$，要求所有$s_i(i=1,2,...g)$都相等。非对称量化支持perchannel模式。
       - 伪量化场景下若weight的类型为INT4，则weight中每一组tensor的最后一维大小都应是偶数。$weight_i$的最后一维指weight不转置时$weight_i$的N轴或当weight转置时$weight_i$的K轴。并且在pergroup场景下，当weight转置时，要求pergroup长度$s_i$是偶数。
@@ -300,4 +300,4 @@
 
 | 调用方式      | 调用样例                 | 说明                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
-| aclnn调用 | [test_aclnn_grouped_matmul](examples/test_aclnn_grouped_matmul.cpp) | 通过接口方式调用[GroupedMatmul](docs/GroupedMatmul.md)算子。 |
+| aclnn调用 | [test_aclnn_grouped_matmul](examples/test_aclnn_grouped_matmul.cpp) | 通过接口方式调用[GroupedMatmul](docs/aclnnGroupedMatmulV5.md)算子。 |
