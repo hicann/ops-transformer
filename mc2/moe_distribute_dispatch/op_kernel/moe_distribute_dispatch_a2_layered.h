@@ -38,7 +38,7 @@ public:
     constexpr static uint32_t UB_32B_ALIGN = 32;
     constexpr static uint32_t EXP_TOKEN_COUNT_FLAG_CNT = UB_32B_ALIGN / sizeof(int32_t);  // 8
     constexpr static uint32_t TBUF_SIZE = 190 * 1024;
-    constexpr static uint32_t IPC_MAGIC_OFFSET = 2 * 1024 * 1024 - 64 * 32;
+    constexpr static uint32_t IPC_MAGIC_OFFSET = 2 * 1024 * 1024 - 128 * 32;
     constexpr static uint32_t IPC_FLAG_OFFSET = 1 * 1024 * 1024;
     constexpr static uint32_t IPC_TOKEN_CNT_OFFSET = 2 * 1024 * 1024;
     constexpr static uint32_t IPC_DATA_OFFSET = 4 * 1024 * 1024;
@@ -86,7 +86,6 @@ private:
     __aicore__ inline void CleanUp();
 
     __aicore__ inline uint32_t GetExpRank(uint32_t expertId);
-    __aicore__ inline int64_t MergeMagicWithValue(int32_t magic, int32_t value);
     __aicore__ inline void QuantProcess(uint32_t sendTokenNum, LocalTensor<XType> xTokenLt,
                                         LocalTensor<float> tokenCastLt);
     __aicore__ inline uint32_t GetArrivedTokenInfo(uint32_t serverIdx, uint32_t tokenIdx, bool justExpInfo,
@@ -179,7 +178,7 @@ private:
     uint32_t scaleLenInStruct_{0};
     uint32_t flagLenInStruct_{0};
     uint32_t flagOffsetInStruct_{0};
-    int32_t magicVal_{0};
+    uint64_t magicVal_{0};
 
     uint64_t combineInnerCntOffset;
     uint64_t combineInnerCntIndexOffset;
@@ -327,15 +326,15 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     }
 
     // 每次调用magic++,用来区分不同轮次
-    LocalTensor<int32_t> tempLocal = tBuf.Get<int32_t>();
-    GlobalTensor<int32_t> magicGt;
-    magicGt.SetGlobalBuffer((__gm__ int32_t*)(shareAddrs[rankId_ % SERVER_RANK_SIZE] + IPC_MAGIC_OFFSET) +
-        aivId_ * EXP_TOKEN_COUNT_FLAG_CNT);
-    DataCopy(tempLocal, magicGt, EXP_TOKEN_COUNT_FLAG_CNT);
+    LocalTensor<uint64_t> tempLocal = tBuf.Get<uint64_t>();
+    GlobalTensor<uint64_t> magicGt;
+    magicGt.SetGlobalBuffer((__gm__ uint64_t*)(shareAddrs[rankId_ % SERVER_RANK_SIZE] + IPC_MAGIC_OFFSET) +
+        aivId_ * UB_32B_ALIGN / sizeof(uint64_t));
+    DataCopy(tempLocal, magicGt, UB_32B_ALIGN / sizeof(uint64_t));
     PipeBarrier<PIPE_ALL>();
     tempLocal(0) += 1;
     magicVal_ = tempLocal(0);
-    DataCopy(magicGt, tempLocal, EXP_TOKEN_COUNT_FLAG_CNT);
+    DataCopy(magicGt, tempLocal, UB_32B_ALIGN / sizeof(uint64_t));
     PipeBarrier<PIPE_ALL>();
 }
 
@@ -926,13 +925,6 @@ GetExpRank(uint32_t expertId)
 }
 
 template <TemplateMC2TypeA2layeredClass>
-__aicore__ inline int64_t MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFunc>::
-MergeMagicWithValue(int32_t magic, int32_t value)
-{
-    return (static_cast<int64_t>(magic) << 32) | static_cast<int64_t>(value);
-}
-
-template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFunc>::SetIpcFlag(int32_t flagVal)
 {
     if (aivId_ >= SERVER_RANK_SIZE) {
@@ -940,11 +932,11 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     }
     uint32_t destRankIdx = aivId_;
     uint32_t localRankId = rankId_ % SERVER_RANK_SIZE;
-    GlobalTensor<int64_t> globalSet;
-    globalSet.SetGlobalBuffer((__gm__ int64_t*)(shareAddrs[destRankIdx] + IPC_FLAG_OFFSET) +
+    GlobalTensor<uint64_t> globalSet;
+    globalSet.SetGlobalBuffer((__gm__ uint64_t*)(shareAddrs[destRankIdx] + IPC_FLAG_OFFSET) +
         localRankId * B64_PER_BLOCK);
-    LocalTensor<int64_t> localSet = tBuf.GetWithOffset<int64_t>(B64_PER_BLOCK, 0);
-    int64_t setVal = MergeMagicWithValue(magicVal_, flagVal);
+    LocalTensor<uint64_t> localSet = tBuf.GetWithOffset<uint64_t>(B64_PER_BLOCK, 0);
+    uint64_t setVal = magicVal_;
     localSet.SetValue(0, setVal);
     SyncFunc<AscendC::HardEvent::S_MTE3>();
     DataCopy(globalSet, localSet, B64_PER_BLOCK);
@@ -954,23 +946,23 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFunc>::WaitIpcFlag(int32_t flagVal)
 {
-    int64_t waitVal = MergeMagicWithValue(magicVal_, flagVal);
+    uint64_t waitVal = magicVal_;
     if (aivId_ >= SERVER_RANK_SIZE) {
         return;
     }
-    LocalTensor<int64_t> localWait = tBuf.GetWithOffset<int64_t>(B64_PER_BLOCK, 0);
+    LocalTensor<uint64_t> localWait = tBuf.GetWithOffset<uint64_t>(B64_PER_BLOCK, 0);
     bool isSync = true;
     uint32_t destRankIdx = aivId_;
     uint32_t localRankId = rankId_ % SERVER_RANK_SIZE;
-    GlobalTensor<int64_t> flagIpcGt;
-    flagIpcGt.SetGlobalBuffer((__gm__ int64_t*)(shareAddrs[localRankId] + IPC_FLAG_OFFSET) +
+    GlobalTensor<uint64_t> flagIpcGt;
+    flagIpcGt.SetGlobalBuffer((__gm__ uint64_t*)(shareAddrs[localRankId] + IPC_FLAG_OFFSET) +
         destRankIdx * B64_PER_BLOCK);
     PipeBarrier<PIPE_ALL>();
     do {
         DataCopy(localWait, flagIpcGt, B64_PER_BLOCK);
         SyncFunc<AscendC::HardEvent::MTE2_S>();
         // 当有core未达到checkValue的阶段时，继续等待
-        int64_t tempVal = localWait.GetValue(0);
+        uint64_t tempVal = localWait.GetValue(0);
         if (tempVal >= waitVal) {
             break;
         }
@@ -1127,7 +1119,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
             if (targetExpId < expStartId || targetExpId >= expEndId) {
                 continue;
             }
-                
+
             uint32_t targetRankId = GetExpRank(targetExpId);
             uint32_t localExpIdx = targetExpId % (localMoeExpertNum_ * SERVER_RANK_SIZE);
             uint32_t targetTokenIdx = (uint32_t)(tokenNumPerExp(localExpIdx * EXP_TOKEN_COUNT_FLAG_CNT));

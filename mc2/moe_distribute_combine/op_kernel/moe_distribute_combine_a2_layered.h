@@ -70,6 +70,10 @@ public:
     constexpr static uint32_t TBUF_TEMP_OFFSET = 0U;
     constexpr static uint32_t IPC_REDUCE_USED_CORE_NUM = 32U; // 拉起远端IPC和机内reduce需要的核数
     constexpr static uint32_t WEIGHT_VALUE_NUM = 16U; // token(h * sizeof(bf/fp16)) + scale(32B) = (h + 16) * 2B
+    constexpr static uint64_t GM2IPC_SYNC_FLAG = 12345ULL;
+    constexpr static uint64_t RDMA_TOKEN_ARRIVED_FLAG = 123ULL;
+    constexpr static uint64_t RDMA_TOKEN_END_FLAG = 321ULL;
+
     template <AscendC::HardEvent event>
     __aicore__ inline void SyncFunc()
     {
@@ -153,10 +157,10 @@ private:
     GM_ADDR countOuterGM_;
 
     GlobalTensor<int32_t> shareAddrGlobal_;
-    GlobalTensor<int64_t> shareFlagGlobal_;
+    GlobalTensor<uint64_t> shareFlagGlobal_;
     GlobalTensor<ExpandXType> shareMemGlobal_;
     GlobalTensor<ExpandXType> dstshareMemGlobal_;
-    GlobalTensor<int32_t> magicGlobal_;
+    GlobalTensor<uint64_t> magicGlobal_;
     GlobalTensor<int32_t> offsetInnerGlobal_;
     GlobalTensor<int16_t> countInnerGlobal_;
     GlobalTensor<int32_t> offsetOuterGlobal_;
@@ -215,7 +219,7 @@ private:
     uint32_t offsetIndex{0};
     uint32_t maxLocalBs{0};
     uint32_t stepCoreNum{0};
-    int32_t magicValue{0};
+    uint64_t magicValue{0};
     LocalTensor<int32_t> offsetReduceLocal_;
     LocalTensor<int32_t> countReduceLocal_;
     LocalTensor<uint64_t> ubLocal;
@@ -453,8 +457,8 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
         shareAddreRank[i] = reinterpret_cast<uint64_t>(
             RDMA_DATA_SIZE + hccl_.GetWindowsInAddr(rankId_ / SERVER_RANK_SIZE * SERVER_RANK_SIZE + i));
     }
-    magicGlobal_.SetGlobalBuffer((__gm__ int32_t*)(shareAddreRank[rankId_ % SERVER_RANK_SIZE]));
-    magicValue = magicGlobal_.GetValue(MAGIC_OFFSET / sizeof(int32_t));
+    magicGlobal_.SetGlobalBuffer((__gm__ uint64_t*)(shareAddreRank[rankId_ % SERVER_RANK_SIZE]));
+    magicValue = magicGlobal_.GetValue(MAGIC_OFFSET / sizeof(uint64_t));
     PipeBarrier<PIPE_ALL>();
 }
 
@@ -554,9 +558,9 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
     SyncAll<true>();
     if (coreIdx_ < SERVER_RANK_SIZE) {
         uint64_t targetAddr = shareAddreRank[coreIdx_ % SERVER_RANK_SIZE];
-        shareFlagGlobal_.SetGlobalBuffer((__gm__ int64_t *)targetAddr);
-        LocalTensor<int64_t> inUb = statusBuf_.Get<int64_t>();
-        inUb(0) = 12345 + magicValue;
+        shareFlagGlobal_.SetGlobalBuffer((__gm__ uint64_t *)targetAddr);
+        LocalTensor<uint64_t> inUb = statusBuf_.Get<uint64_t>();
+        inUb(0) = GM2IPC_SYNC_FLAG + magicValue;
         uint32_t flagOffset = rankId_ % SERVER_RANK_SIZE;
         PipeBarrier<PIPE_ALL>();
         DataCopy(shareFlagGlobal_[flagOffset * 4], inUb, 4);  // *4是因为单次拷贝256byte = 4*int64
@@ -571,16 +575,16 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 {
     ///***
     uint32_t stepCoreNum_ = SERVER_RANK_SIZE;
-    shareFlagGlobal_.SetGlobalBuffer((__gm__ int64_t *)shareAddreRank[rankId_ % SERVER_RANK_SIZE]);
+    shareFlagGlobal_.SetGlobalBuffer((__gm__ uint64_t *)shareAddreRank[rankId_ % SERVER_RANK_SIZE]);
     // 只要8个core分别wait 来自8卡的flag，然后sync一下 再进行流水
 
     if (coreIdx_ < stepCoreNum_){
-        LocalTensor<int64_t> inUb = statusBuf_.Get<int64_t>();
+        LocalTensor<uint64_t> inUb = statusBuf_.Get<uint64_t>();
         uint32_t waitFlagAddr = coreIdx_ % stepCoreNum_;
         while (true) {
             DataCopy(inUb, shareFlagGlobal_[waitFlagAddr * 4], 4);
             PipeBarrier<PIPE_ALL>();
-            if (inUb(0) >= (12345 + magicValue)) {
+            if (inUb(0) >= (GM2IPC_SYNC_FLAG + magicValue)) {
                 break;
             }
         }
@@ -661,8 +665,8 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
                                    serverId_ * rankSizeOnWin_ * SERVER_RANK_SIZE);
     scaleOutWindow_.SetGlobalBuffer((__gm__ ExpandXType*)rdmaAddr); // 16bit
     localOutWindow_.SetGlobalBuffer((__gm__ ExpandXType*)rdmaAddr);
-    LocalTensor<int64_t> rdmaFlagLocal = statusBuf_.Get<int64_t>();
-    rdmaFlagLocal(0) = 123 + magicValue;
+    LocalTensor<uint64_t> rdmaFlagLocal = statusBuf_.Get<uint64_t>();
+    rdmaFlagLocal(0) = RDMA_TOKEN_ARRIVED_FLAG + magicValue;
     PipeBarrier<PIPE_ALL>();
     int offsetPre = 0;
     offsetIndex = 0U;
@@ -796,7 +800,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
         }
     }
     PipeBarrier<PIPE_ALL>();
-    rdmaFlagLocal(0) = 321 + magicValue;
+    rdmaFlagLocal(0) = RDMA_TOKEN_END_FLAG + magicValue;
     tokenOffset = coreNumPerServer * processTokenNum + coreIdx_ % coreNumPerServer;
     DataCopy(shareFlagGlobal_[(serverId_ + 1) * 1024 + tokenOffset * 4], rdmaFlagLocal, 4);
     SyncAll<true>();
@@ -805,7 +809,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::AlltoAllServerDispatch()
 {
-    LocalTensor<int64_t> checkRdmaLocal = statusBuf_.Get<int64_t>();
+    LocalTensor<uint64_t> checkRdmaLocal = statusBuf_.Get<uint64_t>();
     LocalTensor<ExpandXTransType> tmpLowUb_ = tBuf.Get<ExpandXTransType>();
     uint32_t checkServer = coreIdx_ - stepCoreNum;
     GlobalTensor<ExpandXTransType> aivSrcGlobal;
@@ -837,10 +841,10 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
             while (true) {
                 DataCopy(checkRdmaLocal[64], shareFlagGlobal_[(checkServer + 1) * 1024 + copySum * 4], 4);
                 PipeBarrier<PIPE_ALL>();
-                if (checkRdmaLocal.GetValue(64) == (123 + magicValue)) {
+                if (checkRdmaLocal.GetValue(64) == (RDMA_TOKEN_ARRIVED_FLAG + magicValue)) {
                     copySum++;
                     break;
-                } else if(checkRdmaLocal.GetValue(64) == (321 + magicValue) || copySum == maxLocalBs){
+                } else if(checkRdmaLocal.GetValue(64) == (RDMA_TOKEN_END_FLAG + magicValue) || copySum == maxLocalBs){
                     stopFlag = true;
                     break;
                 }
@@ -1130,10 +1134,10 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
             SyncAll<true>();
         }
         if (coreIdx_ == 0U) {
-            magicGlobal_.SetValue(MAGIC_OFFSET / sizeof(int32_t), magicValue + 1);
+            magicGlobal_.SetValue(MAGIC_OFFSET / sizeof(uint64_t), magicValue + 1);
             PipeBarrier<PIPE_ALL>();
-            AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE,
-                AscendC::DcciDst::CACHELINE_OUT>(magicGlobal_[MAGIC_OFFSET / sizeof(int32_t)]);
+            AscendC::DataCacheCleanAndInvalid<uint64_t, AscendC::CacheLine::SINGLE_CACHE_LINE,
+                AscendC::DcciDst::CACHELINE_OUT>(magicGlobal_[MAGIC_OFFSET / sizeof(uint64_t)]);
             bufferIdGlobal_(0) = bufferId_ ^ 1;
             PipeBarrier<PIPE_ALL>();
             AscendC::DataCacheCleanAndInvalid<uint32_t, AscendC::CacheLine::SINGLE_CACHE_LINE,
