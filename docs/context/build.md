@@ -10,7 +10,7 @@ build.sh是本项目的构建脚本，默认在项目根目录下，作用是将
    参考[环境准备](./quick_op_invocation.md#环境准备)完成环境变量配置。
    ```bash
    # 默认路径安装，以root用户为例
-   source /usr/local/Ascend/set_env.sh
+   source /usr/local/Ascend/ascend-toolkit/set_env.sh
    ```
 2. **构建命令格式**
 
