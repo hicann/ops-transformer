@@ -76,9 +76,53 @@ TEST_F(moe_token_unpermute_with_routing_map_test, test_non_pad_fp16) {
 
   MoeTokenUnpermuteWithRoutingMapTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithRoutingMapTilingData*>(tiling);
 
+  tilingDatafromBin->hidden_size = 7168;
+  tilingDatafromBin->top_k = 8;
+  tilingDatafromBin->num_out_tokens = 32768;
+  tilingDatafromBin->hidden_splited_length = 7168;
+  tilingDatafromBin->hidden_splited_num = 1;
+  tilingDatafromBin->hidden_splited_remain = 0;
+  tilingDatafromBin->tokens_core_length = 8;
+  tilingDatafromBin->tokens_core_remain = 0;
+  tilingDatafromBin->tokens_splited_length = 8;
+  tilingDatafromBin->tokens_splited_num = 1;
+  tilingDatafromBin->tokens_splited_remain = 0;
+  tilingDatafromBin->used_core_num = 64;
+  tilingDatafromBin->buffer_num = 4;
+
+  // 嵌套结构体 maskedSelectParamsOp 的赋值
+  tilingDatafromBin->maskedSelectParamsOp.formerNum = 1;
+  tilingDatafromBin->maskedSelectParamsOp.formerLength = 512;
+  tilingDatafromBin->maskedSelectParamsOp.formertileNum = 1;
+  tilingDatafromBin->maskedSelectParamsOp.formertileLength = 512;
+  tilingDatafromBin->maskedSelectParamsOp.formerlasttileLength = 512;
+  tilingDatafromBin->maskedSelectParamsOp.tailNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.taillasttileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tokenNum = 512;
+  tilingDatafromBin->maskedSelectParamsOp.needCoreNum = 1;
+
+  // 嵌套结构体 moeTokenUnpermuteWithRoutingMapPadTilingData 的赋值
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.core_num_use = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_experts = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.capacity = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_each_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_last_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_each_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_last_loop = 0;
+
   ICPU_SET_TILING_KEY(0);
   ICPU_RUN_KF(moe_token_unpermute_with_routing_map, blockDim, permutedTokens, sortedIndices,
-              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, tiling);
+              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, (uint8_t*)tilingDatafromBin);
 
   AscendC::GmFree(permutedTokens);
   AscendC::GmFree(sortedIndices);
@@ -126,12 +170,55 @@ TEST_F(moe_token_unpermute_with_routing_map_test, test_non_pad_fp32) {
 
   char* path_ = get_current_dir_name();
   string path(path_);
-
   MoeTokenUnpermuteWithRoutingMapTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithRoutingMapTilingData*>(tiling);
+
+  tilingDatafromBin->hidden_size = 7168;
+  tilingDatafromBin->top_k = 8;
+  tilingDatafromBin->num_out_tokens = 32768;
+  tilingDatafromBin->hidden_splited_length = 7168;
+  tilingDatafromBin->hidden_splited_num = 1;
+  tilingDatafromBin->hidden_splited_remain = 0;
+  tilingDatafromBin->tokens_core_length = 8;
+  tilingDatafromBin->tokens_core_remain = 0;
+  tilingDatafromBin->tokens_splited_length = 8;
+  tilingDatafromBin->tokens_splited_num = 1;
+  tilingDatafromBin->tokens_splited_remain = 0;
+  tilingDatafromBin->used_core_num = 64;
+  tilingDatafromBin->buffer_num = 4;
+
+  // 嵌套结构体 maskedSelectParamsOp 的赋值
+  tilingDatafromBin->maskedSelectParamsOp.formerNum = 1;
+  tilingDatafromBin->maskedSelectParamsOp.formerLength = 512;
+  tilingDatafromBin->maskedSelectParamsOp.formertileNum = 1;
+  tilingDatafromBin->maskedSelectParamsOp.formertileLength = 512;
+  tilingDatafromBin->maskedSelectParamsOp.formerlasttileLength = 512;
+  tilingDatafromBin->maskedSelectParamsOp.tailNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.taillasttileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tokenNum = 512;
+  tilingDatafromBin->maskedSelectParamsOp.needCoreNum = 1;
+
+  // 嵌套结构体 moeTokenUnpermuteWithRoutingMapPadTilingData 的赋值
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.core_num_use = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_experts = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.capacity = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_each_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_last_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_each_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_last_loop = 0;
 
   ICPU_SET_TILING_KEY(0);
   ICPU_RUN_KF(moe_token_unpermute_with_routing_map, blockDim, permutedTokens, sortedIndices,
-              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, tiling);
+              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, (uint8_t*)tilingDatafromBin);
 
   AscendC::GmFree(permutedTokens);
   AscendC::GmFree(sortedIndices);
@@ -179,12 +266,55 @@ TEST_F(moe_token_unpermute_with_routing_map_test, test_non_pad_bf16) {
 
   char* path_ = get_current_dir_name();
   string path(path_);
-
   MoeTokenUnpermuteWithRoutingMapTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithRoutingMapTilingData*>(tiling);
+
+  tilingDatafromBin->hidden_size = 7168;
+  tilingDatafromBin->top_k = 8;
+  tilingDatafromBin->num_out_tokens = 32768;
+  tilingDatafromBin->hidden_splited_length = 7168;
+  tilingDatafromBin->hidden_splited_num = 1;
+  tilingDatafromBin->hidden_splited_remain = 0;
+  tilingDatafromBin->tokens_core_length = 8;
+  tilingDatafromBin->tokens_core_remain = 0;
+  tilingDatafromBin->tokens_splited_length = 8;
+  tilingDatafromBin->tokens_splited_num = 1;
+  tilingDatafromBin->tokens_splited_remain = 0;
+  tilingDatafromBin->used_core_num = 64;
+  tilingDatafromBin->buffer_num = 4;
+
+  // 嵌套结构体 maskedSelectParamsOp 的赋值
+  tilingDatafromBin->maskedSelectParamsOp.formerNum = 1;
+  tilingDatafromBin->maskedSelectParamsOp.formerLength = 512;
+  tilingDatafromBin->maskedSelectParamsOp.formertileNum = 1;
+  tilingDatafromBin->maskedSelectParamsOp.formertileLength = 512;
+  tilingDatafromBin->maskedSelectParamsOp.formerlasttileLength = 512;
+  tilingDatafromBin->maskedSelectParamsOp.tailNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.taillasttileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tokenNum = 512;
+  tilingDatafromBin->maskedSelectParamsOp.needCoreNum = 1;
+
+  // 嵌套结构体 moeTokenUnpermuteWithRoutingMapPadTilingData 的赋值
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.core_num_use = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_experts = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.capacity = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_each_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_last_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_each_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_last_loop = 0;
 
   ICPU_SET_TILING_KEY(0);
   ICPU_RUN_KF(moe_token_unpermute_with_routing_map, blockDim, permutedTokens, sortedIndices,
-              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, tiling);
+              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, (uint8_t*)tilingDatafromBin);
 
   AscendC::GmFree(permutedTokens);
   AscendC::GmFree(sortedIndices);
@@ -229,16 +359,59 @@ TEST_F(moe_token_unpermute_with_routing_map_test, test_non_pad_fp16_probs) {
 
   uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
   uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
-  uint32_t blockDim = 48;
+  uint32_t blockDim = 32;
 
   char* path_ = get_current_dir_name();
   string path(path_);
-
   MoeTokenUnpermuteWithRoutingMapTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithRoutingMapTilingData*>(tiling);
+
+  tilingDatafromBin->hidden_size = 7168;
+  tilingDatafromBin->top_k = 8;
+  tilingDatafromBin->num_out_tokens = 32768;
+  tilingDatafromBin->hidden_splited_length = 7168;
+  tilingDatafromBin->hidden_splited_num = 1;
+  tilingDatafromBin->hidden_splited_remain = 0;
+  tilingDatafromBin->tokens_core_length = 64;
+  tilingDatafromBin->tokens_core_remain = 0;
+  tilingDatafromBin->tokens_splited_length = 64;
+  tilingDatafromBin->tokens_splited_num = 1;
+  tilingDatafromBin->tokens_splited_remain = 0;
+  tilingDatafromBin->used_core_num = 4;
+  tilingDatafromBin->buffer_num = 4;
+
+  // 嵌套结构体 maskedSelectParamsOp 的赋值
+  tilingDatafromBin->maskedSelectParamsOp.formerNum = 64;
+  tilingDatafromBin->maskedSelectParamsOp.formerLength = 458752;
+  tilingDatafromBin->maskedSelectParamsOp.formertileNum = 112;
+  tilingDatafromBin->maskedSelectParamsOp.formertileLength = 4096;
+  tilingDatafromBin->maskedSelectParamsOp.formerlasttileLength = 4096;
+  tilingDatafromBin->maskedSelectParamsOp.tailNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.taillasttileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tokenNum = 4096;
+  tilingDatafromBin->maskedSelectParamsOp.needCoreNum = 4;
+
+  // 嵌套结构体 moeTokenUnpermuteWithRoutingMapPadTilingData 的赋值
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.core_num_use = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_experts = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.capacity = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_each_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_last_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_each_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_last_loop = 0;
 
   ICPU_SET_TILING_KEY(1);
   ICPU_RUN_KF(moe_token_unpermute_with_routing_map, blockDim, permutedTokens, sortedIndices,
-              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, tiling);
+              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, (uint8_t*)tilingDatafromBin);
 
   AscendC::GmFree(permutedTokens);
   AscendC::GmFree(sortedIndices);
@@ -282,16 +455,59 @@ TEST_F(moe_token_unpermute_with_routing_map_test, test_non_pad_fp32_probs) {
 
   uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
   uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
-  uint32_t blockDim = 48;
+  uint32_t blockDim = 32;
 
   char* path_ = get_current_dir_name();
   string path(path_);
-
   MoeTokenUnpermuteWithRoutingMapTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithRoutingMapTilingData*>(tiling);
+
+  tilingDatafromBin->hidden_size = 7168;
+  tilingDatafromBin->top_k = 8;
+  tilingDatafromBin->num_out_tokens = 32768;
+  tilingDatafromBin->hidden_splited_length = 7168;
+  tilingDatafromBin->hidden_splited_num = 1;
+  tilingDatafromBin->hidden_splited_remain = 0;
+  tilingDatafromBin->tokens_core_length = 64;
+  tilingDatafromBin->tokens_core_remain = 0;
+  tilingDatafromBin->tokens_splited_length = 64;
+  tilingDatafromBin->tokens_splited_num = 1;
+  tilingDatafromBin->tokens_splited_remain = 0;
+  tilingDatafromBin->used_core_num = 4;
+  tilingDatafromBin->buffer_num = 4;
+
+  // 嵌套结构体 maskedSelectParamsOp 的赋值
+  tilingDatafromBin->maskedSelectParamsOp.formerNum = 64;
+  tilingDatafromBin->maskedSelectParamsOp.formerLength = 458752;
+  tilingDatafromBin->maskedSelectParamsOp.formertileNum = 112;
+  tilingDatafromBin->maskedSelectParamsOp.formertileLength = 4096;
+  tilingDatafromBin->maskedSelectParamsOp.formerlasttileLength = 4096;
+  tilingDatafromBin->maskedSelectParamsOp.tailNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.taillasttileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tokenNum = 4096;
+  tilingDatafromBin->maskedSelectParamsOp.needCoreNum = 4;
+
+  // 嵌套结构体 moeTokenUnpermuteWithRoutingMapPadTilingData 的赋值
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.core_num_use = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_experts = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.capacity = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_each_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_last_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_each_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_last_loop = 0;
 
   ICPU_SET_TILING_KEY(1);
   ICPU_RUN_KF(moe_token_unpermute_with_routing_map, blockDim, permutedTokens, sortedIndices,
-              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, tiling);
+              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, (uint8_t*)tilingDatafromBin);
 
   AscendC::GmFree(permutedTokens);
   AscendC::GmFree(sortedIndices);
@@ -335,16 +551,59 @@ TEST_F(moe_token_unpermute_with_routing_map_test, test_non_pad_bf16_probs) {
 
   uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 1024 * 1024);
   uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
-  uint32_t blockDim = 48;
+  uint32_t blockDim = 32;
 
   char* path_ = get_current_dir_name();
   string path(path_);
-
   MoeTokenUnpermuteWithRoutingMapTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithRoutingMapTilingData*>(tiling);
+
+  tilingDatafromBin->hidden_size = 7168;
+  tilingDatafromBin->top_k = 8;
+  tilingDatafromBin->num_out_tokens = 32768;
+  tilingDatafromBin->hidden_splited_length = 7168;
+  tilingDatafromBin->hidden_splited_num = 1;
+  tilingDatafromBin->hidden_splited_remain = 0;
+  tilingDatafromBin->tokens_core_length = 64;
+  tilingDatafromBin->tokens_core_remain = 0;
+  tilingDatafromBin->tokens_splited_length = 64;
+  tilingDatafromBin->tokens_splited_num = 1;
+  tilingDatafromBin->tokens_splited_remain = 0;
+  tilingDatafromBin->used_core_num = 4;
+  tilingDatafromBin->buffer_num = 4;
+
+  // 嵌套结构体 maskedSelectParamsOp 的赋值
+  tilingDatafromBin->maskedSelectParamsOp.formerNum = 64;
+  tilingDatafromBin->maskedSelectParamsOp.formerLength = 458752;
+  tilingDatafromBin->maskedSelectParamsOp.formertileNum = 112;
+  tilingDatafromBin->maskedSelectParamsOp.formertileLength = 4096;
+  tilingDatafromBin->maskedSelectParamsOp.formerlasttileLength = 4096;
+  tilingDatafromBin->maskedSelectParamsOp.tailNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.taillasttileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tokenNum = 4096;
+  tilingDatafromBin->maskedSelectParamsOp.needCoreNum = 4;
+
+  // 嵌套结构体 moeTokenUnpermuteWithRoutingMapPadTilingData 的赋值
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.core_num_use = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_experts = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.capacity = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_front_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_each_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_last_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_each_loop = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_last_loop = 0;
 
   ICPU_SET_TILING_KEY(1);
   ICPU_RUN_KF(moe_token_unpermute_with_routing_map, blockDim, permutedTokens, sortedIndices,
-              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, tiling);
+              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, (uint8_t*)tilingDatafromBin);
 
   AscendC::GmFree(permutedTokens);
   AscendC::GmFree(sortedIndices);
@@ -397,9 +656,53 @@ TEST_F(moe_token_unpermute_with_routing_map_test, test_pad_fp32) {
 
   MoeTokenUnpermuteWithRoutingMapTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithRoutingMapTilingData*>(tiling);
 
+  tilingDatafromBin->hidden_size = 0;
+  tilingDatafromBin->top_k = 0;
+  tilingDatafromBin->num_out_tokens = 0;
+  tilingDatafromBin->hidden_splited_length = 0;
+  tilingDatafromBin->hidden_splited_num = 0;
+  tilingDatafromBin->hidden_splited_remain = 0;
+  tilingDatafromBin->tokens_core_length = 0;
+  tilingDatafromBin->tokens_core_remain = 0;
+  tilingDatafromBin->tokens_splited_length = 0;
+  tilingDatafromBin->tokens_splited_num = 0;
+  tilingDatafromBin->tokens_splited_remain = 0;
+  tilingDatafromBin->used_core_num = 0;
+  tilingDatafromBin->buffer_num = 0;
+
+  // 嵌套结构体 maskedSelectParamsOp 的赋值
+  tilingDatafromBin->maskedSelectParamsOp.formerNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.formerLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.formertileNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.formertileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.formerlasttileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.taillasttileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tokenNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.needCoreNum = 0;
+
+  // 嵌套结构体 moeTokenUnpermuteWithRoutingMapPadTilingData 的赋值
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.core_num_use = 64;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens = 4096;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_experts = 256;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.capacity = 1;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.front_core = 64;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_front_core = 1;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_front_core = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_each_loop = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_last_loop = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_tail_core = 1;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_tail_core = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_each_loop = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_last_loop = 4;
+
   ICPU_SET_TILING_KEY(1000);
   ICPU_RUN_KF(moe_token_unpermute_with_routing_map, blockDim, permutedTokens, sortedIndices,
-              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, tiling);
+              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, (uint8_t*)tilingDatafromBin);
 
   AscendC::GmFree(permutedTokens);
   AscendC::GmFree(sortedIndices);
@@ -448,12 +751,56 @@ TEST_F(moe_token_unpermute_with_routing_map_test, test_pad_fp16) {
 
   char* path_ = get_current_dir_name();
   string path(path_);
-
+  
   MoeTokenUnpermuteWithRoutingMapTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithRoutingMapTilingData*>(tiling);
+
+  tilingDatafromBin->hidden_size = 0;
+  tilingDatafromBin->top_k = 0;
+  tilingDatafromBin->num_out_tokens = 0;
+  tilingDatafromBin->hidden_splited_length = 0;
+  tilingDatafromBin->hidden_splited_num = 0;
+  tilingDatafromBin->hidden_splited_remain = 0;
+  tilingDatafromBin->tokens_core_length = 0;
+  tilingDatafromBin->tokens_core_remain = 0;
+  tilingDatafromBin->tokens_splited_length = 0;
+  tilingDatafromBin->tokens_splited_num = 0;
+  tilingDatafromBin->tokens_splited_remain = 0;
+  tilingDatafromBin->used_core_num = 0;
+  tilingDatafromBin->buffer_num = 0;
+
+  // 嵌套结构体 maskedSelectParamsOp 的赋值
+  tilingDatafromBin->maskedSelectParamsOp.formerNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.formerLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.formertileNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.formertileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.formerlasttileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.taillasttileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tokenNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.needCoreNum = 0;
+
+  // 嵌套结构体 moeTokenUnpermuteWithRoutingMapPadTilingData 的赋值
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.core_num_use = 64;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens = 4096;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_experts = 256;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.capacity = 1;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.front_core = 64;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_front_core = 1;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_front_core = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_each_loop = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_last_loop = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_tail_core = 1;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_tail_core = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_each_loop = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_last_loop = 4;
 
   ICPU_SET_TILING_KEY(1000);
   ICPU_RUN_KF(moe_token_unpermute_with_routing_map, blockDim, permutedTokens, sortedIndices,
-              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, tiling);
+              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, (uint8_t*)tilingDatafromBin);
 
   AscendC::GmFree(permutedTokens);
   AscendC::GmFree(sortedIndices);
@@ -506,9 +853,53 @@ TEST_F(moe_token_unpermute_with_routing_map_test, test_pad_bf16) {
 
   MoeTokenUnpermuteWithRoutingMapTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteWithRoutingMapTilingData*>(tiling);
 
+  tilingDatafromBin->hidden_size = 0;
+  tilingDatafromBin->top_k = 0;
+  tilingDatafromBin->num_out_tokens = 0;
+  tilingDatafromBin->hidden_splited_length = 0;
+  tilingDatafromBin->hidden_splited_num = 0;
+  tilingDatafromBin->hidden_splited_remain = 0;
+  tilingDatafromBin->tokens_core_length = 0;
+  tilingDatafromBin->tokens_core_remain = 0;
+  tilingDatafromBin->tokens_splited_length = 0;
+  tilingDatafromBin->tokens_splited_num = 0;
+  tilingDatafromBin->tokens_splited_remain = 0;
+  tilingDatafromBin->used_core_num = 0;
+  tilingDatafromBin->buffer_num = 0;
+
+  // 嵌套结构体 maskedSelectParamsOp 的赋值
+  tilingDatafromBin->maskedSelectParamsOp.formerNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.formerLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.formertileNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.formertileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.formerlasttileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tailtileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.taillasttileLength = 0;
+  tilingDatafromBin->maskedSelectParamsOp.tokenNum = 0;
+  tilingDatafromBin->maskedSelectParamsOp.needCoreNum = 0;
+
+  // 嵌套结构体 moeTokenUnpermuteWithRoutingMapPadTilingData 的赋值
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.core_num_use = 64;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens = 4096;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_experts = 256;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.capacity = 1;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.front_core = 64;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_front_core = 1;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_front_core = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_each_loop = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_front_core_last_loop = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.tail_core = 0;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.loop_time_each_tail_core = 1;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_each_tail_core = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_each_loop = 4;
+  tilingDatafromBin->moeTokenUnpermuteWithRoutingMapPadTilingData.num_tokens_tail_core_last_loop = 4;
+
   ICPU_SET_TILING_KEY(1000);
   ICPU_RUN_KF(moe_token_unpermute_with_routing_map, blockDim, permutedTokens, sortedIndices,
-              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, tiling);
+              routingMap, probs, unpermutedTokens, outIndex, permuteTokenId, permuteProbs, workspace, (uint8_t*)tilingDatafromBin);
 
   AscendC::GmFree(permutedTokens);
   AscendC::GmFree(sortedIndices);

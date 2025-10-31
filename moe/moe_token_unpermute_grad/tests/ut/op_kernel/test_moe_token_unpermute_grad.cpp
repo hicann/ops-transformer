@@ -126,7 +126,6 @@ TEST_F(moe_token_unpermute_grad_test, test_case_prob_not_none_bf16_fp32)
     string path(path_);
 
     MoeTokenUnpermuteGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteGradTilingData*>(tiling);
-
     ICPU_SET_TILING_KEY(1);
     ICPU_RUN_KF(
         moe_token_unpermute_grad, blockDim, permuted_tokens, unpermuted_output_d, sorted_indices, probs,
@@ -349,15 +348,6 @@ TEST_F(moe_token_unpermute_grad_test, test_case_prob_not_none_fp32_bf16)
 
 TEST_F(moe_token_unpermute_grad_test, test_case_prob_none_bf16)
 {
-    system(
-        "cp -rf "
-        "../../../../../../../ops/built-in/tests/ut/fast_op_test/moe_token_unpermute_grad/gen_data "
-        "./");
-    system("chmod -R 755 ./gen_data/");
-    // token_num, topk, hiddensize, dtype, flag
-    system("cd ./gen_data/ && python3 gen_data.py 10 3 64 bfloat16_t bfloat16_t False");
-    system("cd ./moe_token_unpermute_grad_data/ && python3 gen_tiling.py case1");
-
     size_t permutedTokensByteSize = 10 * 3 * 64 * sizeof(bfloat16_t);
     size_t unpermutedOutputDByteSize = 10 * 64 * sizeof(bfloat16_t);
     size_t sortedIndicesByteSize = 10 * 3 * sizeof(int32_t);
@@ -379,9 +369,26 @@ TEST_F(moe_token_unpermute_grad_test, test_case_prob_none_bf16)
 
     char* path_ = get_current_dir_name();
     string path(path_);
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
     MoeTokenUnpermuteGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteGradTilingData*>(tiling);
-
+    tilingDatafromBin->tokensNum = 10;
+    tilingDatafromBin->topK = 1;
+    tilingDatafromBin->hiddenSize = 64;
+    tilingDatafromBin->numOutTokens = 10;
+    tilingDatafromBin->formerCoreNum = 10;
+    tilingDatafromBin->tailCoreNum = 38;
+    tilingDatafromBin->tokenNumEachCore = 1;
+    tilingDatafromBin->tokenNumTailCore = 0;
+    tilingDatafromBin->rowIdMapEachCore = 1;
+    tilingDatafromBin->rowIdMapTailCore = 0;
+    tilingDatafromBin->hiddenSizeAlign = 64;
+    tilingDatafromBin->hiddenSizeLoopTimes = 1;
+    tilingDatafromBin->hiddenSizeTail = 64;
+    tilingDatafromBin->inputReserveNum = 1;
+    tilingDatafromBin->indicesReserveNum = 1;
+    tilingDatafromBin->indicesReserveNumAlign = 16;
+    tilingDatafromBin->totalUbSize = 196352;
     ICPU_SET_TILING_KEY(0);
     ICPU_RUN_KF(
         moe_token_unpermute_grad, blockDim, permuted_tokens, unpermuted_output_d, sorted_indices, probs,
@@ -400,15 +407,6 @@ TEST_F(moe_token_unpermute_grad_test, test_case_prob_none_bf16)
 
 TEST_F(moe_token_unpermute_grad_test, test_case_prob_none_fp16)
 {
-    system(
-        "cp -rf "
-        "../../../../../../../ops/built-in/tests/ut/fast_op_test/moe_token_unpermute_grad/gen_data "
-        "./");
-    system("chmod -R 755 ./gen_data/");
-    // token_num, topk, hiddensize, dtype, flag
-    system("cd ./gen_data/ && python3 gen_data.py 10 3 64 float16 float16 False");
-    system("cd ./moe_token_unpermute_grad_data/ && python3 gen_tiling.py case1");
-
     size_t permutedTokensByteSize = 10 * 3 * 64 * sizeof(half);
     size_t unpermutedOutputDByteSize = 10 * 64 * sizeof(half);
     size_t sortedIndicesByteSize = 10 * 3 * sizeof(int32_t);
@@ -430,8 +428,26 @@ TEST_F(moe_token_unpermute_grad_test, test_case_prob_none_fp16)
 
     char* path_ = get_current_dir_name();
     string path(path_);
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
     MoeTokenUnpermuteGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteGradTilingData*>(tiling);
+    tilingDatafromBin->tokensNum = 10;
+    tilingDatafromBin->topK = 1;
+    tilingDatafromBin->hiddenSize = 64;
+    tilingDatafromBin->numOutTokens = 10;
+    tilingDatafromBin->formerCoreNum = 10;
+    tilingDatafromBin->tailCoreNum = 38;
+    tilingDatafromBin->tokenNumEachCore = 1;
+    tilingDatafromBin->tokenNumTailCore = 0;
+    tilingDatafromBin->rowIdMapEachCore = 1;
+    tilingDatafromBin->rowIdMapTailCore = 0;
+    tilingDatafromBin->hiddenSizeAlign = 64;
+    tilingDatafromBin->hiddenSizeLoopTimes = 1;
+    tilingDatafromBin->hiddenSizeTail = 64;
+    tilingDatafromBin->inputReserveNum = 1;
+    tilingDatafromBin->indicesReserveNum = 1;
+    tilingDatafromBin->indicesReserveNumAlign = 16;
+    tilingDatafromBin->totalUbSize = 196352;
 
     ICPU_SET_TILING_KEY(0);
     ICPU_RUN_KF(
@@ -451,15 +467,6 @@ TEST_F(moe_token_unpermute_grad_test, test_case_prob_none_fp16)
 
 TEST_F(moe_token_unpermute_grad_test, test_case_prob_none_fp32)
 {
-    system(
-        "cp -rf "
-        "../../../../../../../ops/built-in/tests/ut/fast_op_test/moe_token_unpermute_grad/gen_data "
-        "./");
-    system("chmod -R 755 ./gen_data/");
-    // token_num, topk, hiddensize, dtype, flag
-    system("cd ./gen_data/ && python3 gen_data.py 10 3 64 float32 float32 False");
-    system("cd ./moe_token_unpermute_grad_data/ && python3 gen_tiling.py case1");
-
     size_t permutedTokensByteSize = 10 * 3 * 64 * sizeof(float);
     size_t unpermutedOutputDByteSize = 10 * 64 * sizeof(float);
     size_t sortedIndicesByteSize = 10 * 3 * sizeof(int32_t);
@@ -481,8 +488,26 @@ TEST_F(moe_token_unpermute_grad_test, test_case_prob_none_fp32)
 
     char* path_ = get_current_dir_name();
     string path(path_);
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
     MoeTokenUnpermuteGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenUnpermuteGradTilingData*>(tiling);
+    tilingDatafromBin->tokensNum = 10;
+    tilingDatafromBin->topK = 1;
+    tilingDatafromBin->hiddenSize = 64;
+    tilingDatafromBin->numOutTokens = 10;
+    tilingDatafromBin->formerCoreNum = 10;
+    tilingDatafromBin->tailCoreNum = 38;
+    tilingDatafromBin->tokenNumEachCore = 1;
+    tilingDatafromBin->tokenNumTailCore = 0;
+    tilingDatafromBin->rowIdMapEachCore = 1;
+    tilingDatafromBin->rowIdMapTailCore = 0;
+    tilingDatafromBin->hiddenSizeAlign = 64;
+    tilingDatafromBin->hiddenSizeLoopTimes = 1;
+    tilingDatafromBin->hiddenSizeTail = 64;
+    tilingDatafromBin->inputReserveNum = 1;
+    tilingDatafromBin->indicesReserveNum = 1;
+    tilingDatafromBin->indicesReserveNumAlign = 16;
+    tilingDatafromBin->totalUbSize = 196352;
 
     ICPU_SET_TILING_KEY(0);
     ICPU_RUN_KF(

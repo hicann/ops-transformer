@@ -216,9 +216,7 @@ public:
         }
         uint64_t alignNum = DATA_ALIGN / sizeof(half);       // 256/<8>=32
         tileLengthAlign = (tileLength + alignNum - 1) / alignNum * alignNum;
-
         offsetGlobal.SetGlobalBuffer((__gm__ int32_t*)workspace, blockDim);
-
         pipe->InitBuffer(inQueueX, BUFFER_NUM, this->tileLengthAlign * sizeof(T));
         pipe->InitBuffer(inQueueMask, BUFFER_NUM, this->tileLengthAlign * sizeof(uint8_t));
         pipe->InitBuffer(outQueueY, BUFFER_NUM, this->tileLengthAlign * sizeof(T));
@@ -403,11 +401,15 @@ __aicore__ inline void GatherResult(LocalTensor<T>& dstLocal, const LocalTensor<
         } else if constexpr (IS_4_BYTES_TYPE) {
             uint32_t mask = count;
             LocalTensor<uint32_t> bitMask = bitMaskLocal.ReinterpretCast<uint32_t>();
+#ifndef __CCE_KT_TEST__
             GatherMask(dstLocal, srcLocal, bitMask, true, mask, params, rsvdCnt);
+#endif
         } else if constexpr (IS_2_BYTES_TYPE) {
             uint32_t mask = count;
             LocalTensor<uint16_t> bitMask = bitMaskLocal.ReinterpretCast<uint16_t>();
+#ifndef __CCE_KT_TEST__
             GatherMask(dstLocal, srcLocal, bitMask, true, mask, params, rsvdCnt);//rsvdCnt 最终有效元素个数
+#endif
         } else {
             uint32_t mask = count;
             LocalTensor<half> xCastLocal = xCastBuf.Get<half>();
@@ -416,7 +418,9 @@ __aicore__ inline void GatherResult(LocalTensor<T>& dstLocal, const LocalTensor<
             Cast(xCastLocal, srcLocal, RoundMode::CAST_NONE, count);
             PipeBarrier<PIPE_V>();
             LocalTensor<uint16_t> bitMask = bitMaskLocal.ReinterpretCast<uint16_t>();
+#ifndef __CCE_KT_TEST__
             GatherMask(yCastLocal, xCastLocal, bitMask, true, mask, params, rsvdCnt);
+#endif
             Cast(dstLocal, yCastLocal, RoundMode::CAST_NONE, rsvdCnt);
         }
     }
