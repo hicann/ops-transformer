@@ -614,7 +614,7 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV2GetWorkspaceSize(
     int64_t nextTokens = 65536;
     int64_t headNum = 1;
     int64_t innerPrecise = 0;
-    int64_t sparseMod = 0;
+    int64_t sparseMode = 0;
     int64_t pseType = 1;
 
     char layOut[5] = {'T', 'N', 'D', 0};
@@ -627,7 +627,7 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV2GetWorkspaceSize(
     ret = aclnnFlashAttentionVarLenScoreV2GetWorkspaceSize(
               q, k, v, pse, dropMask, padding, attenmask, prefix, acSeqQLen, acSeqKvLen, qStartIdx, kvStartIdx,
               scaleValue, keepProb, preTokens, nextTokens, headNum, layOut, innerPrecise,
-              sparseMod, pseType, softmaxMax, softmaxSum, softmaxOut, attentionOut, &workspaceSize, &executor);
+              sparseMode, pseType, softmaxMax, softmaxSum, softmaxOut, attentionOut, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFlashAttentionVarLenScoreV2GetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 

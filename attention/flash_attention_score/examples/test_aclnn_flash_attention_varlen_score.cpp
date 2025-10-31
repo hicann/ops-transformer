@@ -174,7 +174,7 @@ int main() {
   int64_t nextTokens = INT32_MAX;
   int64_t headNum = 1;
   int64_t innerPrecise = 0;
-  int64_t sparseMod = 0;
+  int64_t sparseMode = 0;
 
   char layOut[5] = {'T', 'N', 'D', 0};
   char softmaxOutLayout[] = "same_as_input";
@@ -187,7 +187,7 @@ int main() {
   ret = aclnnFlashAttentionVarLenScoreV4GetWorkspaceSize(
             q, k, v, pse, dropMask, padding, attenmask, prefix, acSeqQLen, acSeqKvLen,
             scaleValue, keepProb, preTokens, nextTokens, headNum, layOut, innerPrecise,
-            sparseMod, softmaxOutLayout, softmaxMax, softmaxSum, softmaxOut, attentionOut, &workspaceSize, &executor);
+            sparseMode, softmaxOutLayout, softmaxMax, softmaxSum, softmaxOut, attentionOut, &workspaceSize, &executor);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFlashAttentionVarLenScoreV4GetWorkspaceSize failed. ERROR: %d\n", ret);
             return ret);
 

@@ -172,7 +172,7 @@ int main() {
   int64_t nextTokens = INT32_MAX;
   int64_t headNum = 1;
   int64_t innerPrecise = 0;
-  int64_t sparseMod = 0; 
+  int64_t sparseMode = 0;
   int64_t pseType = 1;
   char layOut[5] = {'S', 'B', 'H', 0};
   
@@ -184,7 +184,7 @@ int main() {
   ret = aclnnFlashAttentionScoreV2GetWorkspaceSize(
             q, k, v, pse, dropMask, padding, attenmask, prefix, qStartIdx, kvStartIdx, scaleValue,
             keepProb, preTokens, nextTokens, headNum, layOut, innerPrecise,
-            sparseMod, pseType, softmaxMax, softmaxSum, softmaxOut, attentionOut, &workspaceSize, &executor);
+            sparseMode, pseType, softmaxMax, softmaxSum, softmaxOut, attentionOut, &workspaceSize, &executor);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFlashAttentionScoreV2GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
   
   // 根据第一段接口计算出的workspaceSize申请device内存

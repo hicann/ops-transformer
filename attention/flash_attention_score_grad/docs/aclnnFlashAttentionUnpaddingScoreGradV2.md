@@ -744,7 +744,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV2(
     int64_t nextTokens = 65536;
     int64_t headNum = 1;
     int64_t innerPrecise = 0;
-    int64_t sparseMod = 0;
+    int64_t sparseMode = 0;
     int64_t pseType = 1;
     char layOut[5] = {'T', 'N', 'D', 0};
 
@@ -755,7 +755,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV2(
     // 调用aclnnFlashAttentionUnpaddingScoreGradV2第一段接口
     ret = aclnnFlashAttentionUnpaddingScoreGradV2GetWorkspaceSize(q, k, v, dx, pse, dropMask, padding,
               attenmask, softmaxMax, softmaxSum, softmaxIn, attentionIn, prefix, acSeqQLen, acSeqKvLen, qStartIdx, kvStartIdx,
-              scaleValue, keepProb, preTokens, nextTokens, headNum, layOut, innerPrecise, sparseMod, pseType,
+              scaleValue, keepProb, preTokens, nextTokens, headNum, layOut, innerPrecise, sparseMode, pseType,
               dq, dk, dv, dpse, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFlashAttentionUnpaddingScoreGradV2GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 
