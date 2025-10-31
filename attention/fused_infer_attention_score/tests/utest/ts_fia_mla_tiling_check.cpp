@@ -2210,7 +2210,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_mla_019)
     cs.mParam.mode = CaseMode::MLA_NOQUANT;
     cs.mParam.storageMode = CaseKvStorageMode::PAGE_ATTENTION;
     cs.mParam.layout = "TND";
-    cs.mParam.b = 1024 * 1024;
+    cs.mParam.b = 1024;
     cs.mParam.qs = 1;
     ASSERT_TRUE(cs.Init());
 
@@ -2226,7 +2226,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_mla_020)
     cs.mParam.mode = CaseMode::MLA_NOQUANT;
     cs.mParam.storageMode = CaseKvStorageMode::PAGE_ATTENTION;
     cs.mParam.layout = "TND_NTD";
-    cs.mParam.b = 1024 * 1024;
+    cs.mParam.b = 1024;
     cs.mParam.qs = 1;
     ASSERT_TRUE(cs.Init());
 

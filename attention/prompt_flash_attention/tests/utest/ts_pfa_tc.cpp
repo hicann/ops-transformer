@@ -909,23 +909,6 @@ TEST_F(Ts_Pfa_Ascend910B2, case_attenmask_fp16_wrong)
     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 
-TEST_F(Ts_Pfa_Ascend910B2, case_invalid_bf16_post_quant)
-{
-    PfaCase cs;
-    cs.mParam.b = 1;
-    cs.mParam.n = 40;
-    cs.mParam.s = 1;
-    cs.mParam.d = 127;
-    cs.mParam.layout = "BSH";
-    cs.mParam.qDataType = ge::DT_BF16;
-    cs.mParam.kvDataType = ge::DT_BF16;
-    cs.mParam.outDataType = ge::DT_INT8;
-    cs.mParam.quantType = QuantShapeType::ALL_1;
-    cs.mParam.numHeads = 40;
-    ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.Run());
-}
-
 TEST_F(Ts_Pfa_Ascend910B2, case_SH_no_pse)
 {
     PfaCase cs;

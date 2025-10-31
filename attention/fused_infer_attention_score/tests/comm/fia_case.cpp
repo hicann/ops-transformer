@@ -19,7 +19,9 @@
 #include "tests/utils/log.h"
 #include "tests/utils/platform.h"
 #include "tiling/fia/tiling_data.h"
+#include "tiling/fia/tiling_stub.h"
 #include "tiling_base/tiling_base.h"
+#include "../../op_kernel/fused_infer_attention_score.cpp"
 
 /**
  * 以下函数声明需要保持与 CMakeList.txt 中调用 OpsTest_Level2_AddOp 函数时 KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT
@@ -38,7 +40,7 @@
 
 typedef void(*FiaKernelFunc) FIA_KERNEL_PARAM;
 
-extern "C" __global__ __aicore__ void fused_infer_attention_score FIA_KERNEL_PARAM;
+// extern "C" __global__ __aicore__ void fused_infer_attention_score FIA_KERNEL_PARAM;
 
 using namespace ops::adv::tests::fia;
 using TensorIntf = ops::adv::tests::utils::TensorIntf;
@@ -46,6 +48,21 @@ using Case = ops::adv::tests::utils::Case;
 using Platform = ops::adv::tests::utils::Platform;
 using Tensor = ops::adv::tests::utils::Tensor;
 using TensorList = ops::adv::tests::utils::TensorList;
+
+bool RunTemplateFusedInferAttentionScore(std::function<void(FIA_INPUT_DTYPE)> func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
+                                 std::vector<TensorIntf *> &outputs, uint8_t *workspace, uint8_t *tilingData)
+{
+    // Kernel 运行
+    ICPU_SET_TILING_KEY(tilingKey);
+    ICPU_RUN_KF(func, blockDim, inputs[0]->GetDevData(), inputs[1]->GetDevData(), inputs[2]->GetDevData(),
+                inputs[3]->GetDevData(), inputs[4]->GetDevData(), inputs[5]->GetDevData(), inputs[6]->GetDevData(),
+                inputs[7]->GetDevData(), inputs[8]->GetDevData(), inputs[9]->GetDevData(), inputs[10]->GetDevData(),
+                inputs[11]->GetDevData(), inputs[12]->GetDevData(), inputs[13]->GetDevData(), inputs[14]->GetDevData(),
+                inputs[15]->GetDevData(), inputs[16]->GetDevData(), inputs[17]->GetDevData(), inputs[18]->GetDevData(),
+                inputs[19]->GetDevData(), inputs[20]->GetDevData(), inputs[21]->GetDevData(), inputs[22]->GetDevData(),
+                inputs[23]->GetDevData(), outputs[0]->GetDevData(), outputs[1]->GetDevData(), workspace, tilingData);
+    return true;
+}
 
 bool RunFusedInferAttentionScore(void *func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
                                  std::vector<TensorIntf *> &outputs, uint8_t *workspace, uint8_t *tilingData)
@@ -415,7 +432,11 @@ bool FiaCase::InitOpInfo()
 
     #ifdef SUPPORT_KERNEL
         rst = rst && mCtx.SetKernelRunCbf(RunFusedInferAttentionScore);
-        rst = rst && mCtx.SetKernelMainFunc((void *)fused_infer_attention_score);
+        rst = rst && mCtx.SetKernelMainFunc((void *)nullptr);
+        if (FiaKernelTemplateFunc) {
+            rst = rst && mReverseCtx.SetKernelRunTemplateCbf(RunTemplateFusedInferAttentionScore);
+            rst = rst && mReverseCtx.SetKernelTemplateMainFunc(FiaKernelTemplateFunc);
+        }
     #endif
     rst = rst && mOpInfo.SetContext(&mCtx);
     auto* platform = Platform::GetGlobalPlatform();
@@ -451,6 +472,15 @@ bool FiaCase::Run()
         return false;
     }
     return true;
+}
+
+FiaCase::FiaCase(const char *name, bool enable, const char *dbgInfo, 
+                 const std::function<void(FIA_INPUT_DTYPE)>& templatekeyKernelFunc,
+                 OpInfo fia, Param param)
+    : Case(name, enable, dbgInfo), mOpInfo(std::move(fia)), mParam(std::move(param))
+{
+    this->mOpInfo.mName = "FusedInferAttentionScore";
+    FiaKernelTemplateFunc = templatekeyKernelFunc;
 }
 
 FiaCase::FiaCase(const char *name, bool enable, const char *dbgInfo, OpInfo fia, Param param)

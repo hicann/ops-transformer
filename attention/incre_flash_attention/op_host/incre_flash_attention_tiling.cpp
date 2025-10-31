@@ -2593,6 +2593,7 @@ uint32_t IFATiling::CalcUnbalanceFDParamNums() const
 ge::graphStatus IFATiling::FillTiling()
 {
     if (ropeFlag_) {
+        tilingDataMla_ = geContext_->GetTilingData<IncreFlashAttentionTilingDataMla>();
         return FillTilingMla();
     }
     FillTilingBaseParams();
@@ -3741,6 +3742,7 @@ ge::graphStatus IFATiling::AtbTilingProcess()
 {
     pageAttentionFlag_ = context_->blockTable.tensor != nullptr;
     if (pageAttentionFlag_) {
+        ifaTilingAtbData = geContext_->GetTilingData<IncreFlashAttentionTilingAtbDataV2>();
         this->tilingDataBase_ = &(ifaTilingAtbData->tilingBase);
         this->tilingDataCore_ = &(ifaTilingAtbData->tilingPerCore);
     }

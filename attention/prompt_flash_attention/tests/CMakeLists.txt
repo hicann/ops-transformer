@@ -18,8 +18,7 @@ set(_PFA_TilingSourcesExt
 )
 
 set(_PFA_KernelTilingDataDefH
-        ${OPS_TRANSFORMER_DIR}/common/include/tiling_base/data_copy_transpose_tiling_def.h
-        ${CMAKE_SOURCE_DIR}/attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling.h
+        ${CMAKE_SOURCE_DIR}/attention/prompt_flash_attention/op_kernel/prompt_flash_attention_tiling_data.h
 )
 
 set(_PFA_UTestCommonPrivateIncludeExt

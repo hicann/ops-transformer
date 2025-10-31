@@ -80,7 +80,7 @@ TEST_F(Ts_Ifa_Ascend910B2, case_atten_mask)
     cs.mParam.layout = "BNSD";
     cs.mParam.attenMaskType = AttenMaskShapeType::B_N_1_S;
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;

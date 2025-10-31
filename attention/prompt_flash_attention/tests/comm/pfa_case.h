@@ -16,18 +16,49 @@
 
 #include <vector>
 #include <cstdint>
+#include <functional>
+#include <utility>
+#include <tikicpulib.h>
+#include <graph/utils/type_utils.h>
+#include <exe_graph/runtime/tiling_context.h>
+#include <register/op_impl_registry.h>
 #include "graph/types.h"
 #include "tests/utils/case.h"
 #include "tests/utils/op_info.h"
 #include "tests/utils/context.h"
 #include "tests/utils/tensor.h"
-#include <exe_graph/runtime/tiling_context.h>
-#include <register/op_impl_registry.h>
+#include "tests/utils/context_with_template_tilingkey.h"
+#include "tests/utils/log.h"
+#include "tests/utils/platform.h"
+#include "tiling/pfa/tiling_data.h"
+#include "tiling/pfa/tiling_stub.h"
+#include "../../op_kernel/prompt_flash_attention_tiling_data.h"
+#define __NPU_HOST__
+
+#define PFA_KERNEL_PARAM_                                                                     \
+     uint8_t * query,  uint8_t * key,  uint8_t * value,  uint8_t * pseShift,                  \
+     uint8_t * attenMask,  uint8_t * actualSeqLengths,  uint8_t * actualSeqLengthsKV,         \
+     uint8_t * deq_scale1,  uint8_t * quant_scale1,  uint8_t * deq_scale2,                    \
+     uint8_t * quant_scale2,  uint8_t * quant_offset2,  uint8_t * learnableSink,              \
+     uint8_t * attentionOut,  uint8_t * workspace,  uint8_t * tiling
+
+#define PFA_INPUT_DTYPE                                        \
+    uint8_t *, uint8_t *, uint8_t *, uint8_t *, uint8_t *,     \
+    uint8_t *, uint8_t *, uint8_t *, uint8_t *, uint8_t *,     \
+    uint8_t *, uint8_t *, uint8_t *, uint8_t *, uint8_t *,     \
+    uint8_t *
+
+
+#define PFA_INPUT_PARAMS                                                                     \
+    query, key, value, pseShift, attenMask, actualSeqLengths,                                \
+    actualSeqLengthsKV, deq_scale1, quant_scale1, deq_scale2, quant_scale2,                  \
+    quant_offset2, learnableSink, attentionOut, workspace, tiling
 
 namespace ops::adv::tests::pfa {
 class PfaCase : public ops::adv::tests::utils::Case {
     using OpInfo = ops::adv::tests::utils::OpInfo;
     using Context = ops::adv::tests::utils::Context;
+    using ContextWithTemplateTilingKey = ops::adv::tests::utils::ContextWithTemplateTilingKey<PFA_INPUT_DTYPE>;
     using Tensor = ops::adv::tests::utils::Tensor;
 
 public:
@@ -92,11 +123,15 @@ public:
     Tensor query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKV, deqScale1, quantScale1,
         deqScale2, quantScale2, quantOffset2, learnableSink, attentionOut;
     OpInfo mOpInfo;
-    Context mCtx;
+    ContextWithTemplateTilingKey mCtx;
     Param mParam;
     gert::OpImplRegisterV2::TilingKernelFunc pfaTilingFunc = nullptr;
+    std::function<void(PFA_INPUT_DTYPE)> mPfaKernelTemplateFunc;
     PfaCase();
     PfaCase(const char *name, bool enable, const char *dbgInfo, OpInfo mOpInfo, Param param);
+    PfaCase(const char *name, bool enable, const char *dbgInfo,
+           const std::function<void(PFA_INPUT_DTYPE)>& templatekeyKernelFunc,
+           OpInfo mOpInfo, Param param);
     bool Run() override;
     bool InitParam() override;
     bool InitOpInfo() override;

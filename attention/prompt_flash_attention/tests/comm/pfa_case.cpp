@@ -20,6 +20,8 @@
 #include "tests/utils/log.h"
 #include "tests/utils/platform.h"
 #include "tiling/pfa/tiling_data.h"
+#include "tiling/pfa/tiling_stub.h"
+#include "../../op_kernel/prompt_flash_attention.cpp"
 
 /**
  * 以下函数声明需要保持与 CMakeList.txt 中调用 OpsTest_Level2_AddOp 函数时 KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT
@@ -35,12 +37,25 @@
 
 typedef void(*PfaKernelFunc) PFA_KERNEL_PARAM;
 
-extern "C" __global__ __aicore__ void prompt_flash_attention PFA_KERNEL_PARAM;
+// extern "C" __global__ __aicore__ void prompt_flash_attention PFA_KERNEL_PARAM;
 
 using namespace ops::adv::tests::pfa;
 using Tensor = ops::adv::tests::utils::TensorIntf;
 using Case = ops::adv::tests::utils::Case;
 using Platform = ops::adv::tests::utils::Platform;
+
+bool RunTemplatePromptFlashAttention(std::function<void(PFA_INPUT_DTYPE)> func,
+                           uint64_t tilingKey, int64_t blockDim, std::vector<Tensor *> &inputs,
+                           std::vector<Tensor *> &outputs, uint8_t *workspace, uint8_t *tilingData)
+{
+    // Kernel 运行
+    ICPU_SET_TILING_KEY(tilingKey);
+    ICPU_RUN_KF(func, blockDim, inputs[0]->GetDevData(), inputs[1]->GetDevData(), inputs[2]->GetDevData(),
+                inputs[3]->GetDevData(), inputs[4]->GetDevData(), inputs[5]->GetDevData(), inputs[6]->GetDevData(),
+                inputs[7]->GetDevData(), inputs[8]->GetDevData(), inputs[9]->GetDevData(), inputs[10]->GetDevData(),
+                inputs[11]->GetDevData(), inputs[12]->GetDevData(), outputs[0]->GetDevData(), workspace, tilingData);
+    return true;
+}
 
 bool RunPromptFlashAttention(void *func, uint64_t tilingKey, int64_t blockDim, std::vector<Tensor *> &inputs,
                              std::vector<Tensor *> &outputs, uint8_t *workspace, uint8_t *tilingData)
@@ -151,7 +166,11 @@ bool PfaCase::InitOpInfo()
                                 {"block_size", mParam.blockSize}});
     #ifdef SUPPORT_KERNEL
         rst = rst && mCtx.SetKernelRunCbf(RunPromptFlashAttention);
-        rst = rst && mCtx.SetKernelMainFunc((void *)prompt_flash_attention);
+        rst = rst && mCtx.SetKernelMainFunc((void *)nullptr);
+        if(this->mPfaKernelTemplateFunc){
+            rst = rst && mCtx.SetKernelRunTemplateCbf(RunTemplatePromptFlashAttention);
+            rst = rst && mCtx.SetKernelTemplateMainFunc(this->mPfaKernelTemplateFunc);
+        }
     #endif
     rst = rst && mOpInfo.SetContext(&mCtx);
     auto* platform = Platform::GetGlobalPlatform();
@@ -186,6 +205,15 @@ bool PfaCase::Run()
         return false;
     }
     return true;
+}
+
+PfaCase::PfaCase(const char *name, bool enable, const char *dbgInfo,
+           const std::function<void(PFA_INPUT_DTYPE)>& templatekeyKernelFunc,
+           OpInfo prompt, Param param)
+    : Case(name, enable, dbgInfo), mOpInfo(std::move(prompt)), mParam(std::move(param))
+{
+    this->mOpInfo.mName = "PromptFlashAttention";
+    this->mPfaKernelTemplateFunc = templatekeyKernelFunc;
 }
 
 PfaCase::PfaCase(const char *name, bool enable, const char *dbgInfo, OpInfo prompt, Param param)

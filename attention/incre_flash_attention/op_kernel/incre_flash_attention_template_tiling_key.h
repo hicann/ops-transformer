@@ -14,6 +14,7 @@
  */
 
 #pragma once
+#ifndef FIA_ENABLE_MLA
 #include "ascendc/host_api/tiling/template_argument.h"
 // #include "incre_flash_attention_tiling.h"
 
@@ -1586,4 +1587,5 @@ ASCENDC_TPL_SEL(
     )
 #endif
 );
+#endif
 #endif

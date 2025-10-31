@@ -13,7 +13,7 @@
  * \brief
  */
 #pragma once
-
+#ifndef FIA_ENABLE_MLA
 #include "ascendc/host_api/tiling/template_argument.h"
 
 #define ASCENDC_TPL_5_BW 5
@@ -3074,3 +3074,4 @@ ASCENDC_TPL_ARGS_DECL(PromptAttention,
                 ASCENDC_TPL_TILING_STRUCT_SEL(PromptFlashAttentionTilingData)
             )
 );
+#endif

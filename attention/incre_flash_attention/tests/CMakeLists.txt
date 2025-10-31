@@ -22,8 +22,8 @@ set(_IFA_TilingSourcesExt
 
 set(_IFA_KernelTilingDataDefH
         ${OPS_TRANSFORMER_DIR}/common/include/tiling_base/data_copy_transpose_tiling_def.h
-        ${CMAKE_SOURCE_DIR}/attention/incre_flash_attention/op_host/incre_flash_attention_tiling.h
-        ${CMAKE_SOURCE_DIR}/attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling.h
+        ${CMAKE_SOURCE_DIR}/attention/incre_flash_attention/op_kernel/incre_flash_attention_tiling.h
+        ${CMAKE_SOURCE_DIR}/attention/prompt_flash_attention/op_kernel/prompt_flash_attention_tiling_data.h
 )
 
 set(_IFA_TargetPrivateLinkLibrariesExt)

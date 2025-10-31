@@ -364,6 +364,8 @@ class Process:
             def_src += "#include \"{}\"\n".format(data_file.name)
             def_src += \
                 ("\n"
+                 "#include \"securec.h\""
+                 "\n"
                  "#undef GET_TILING_DATA_WITH_STRUCT\n"
                  "#define GET_TILING_DATA_WITH_STRUCT(tiling_struct, tiling_data, tiling_arg) \\\n"
                  "tiling_struct tiling_data;                                                  \\\n"

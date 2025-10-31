@@ -3632,7 +3632,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_GetBmm1Tiling_139)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
@@ -3650,7 +3650,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_GetBmm1Tiling_140)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
@@ -3668,7 +3668,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_GetBmm1Tiling_141)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
@@ -3686,7 +3686,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_GetBmm1Tiling_142)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
@@ -3704,7 +3704,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_GetBmm2Tiling_143)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
@@ -3722,7 +3722,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_GetBmm2Tiling_144)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
@@ -3892,7 +3892,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ConvertContext_152)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
@@ -3910,7 +3910,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ConvertContext_153)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
@@ -3928,7 +3928,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ConvertContext_154)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
@@ -3946,7 +3946,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_DataTypeToSerialString_155)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
@@ -3964,7 +3964,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_DataTypeToSerialString_156)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;

@@ -20,7 +20,9 @@
 #include "tests/utils/log.h"
 #include "tests/utils/platform.h"
 #include "tiling/ifa/tiling_data.h"
+#include "tiling/ifa/tiling_stub.h"
 #include "tiling_base/tiling_base.h"
+#include "../../op_kernel/incre_flash_attention_tiling.h"
 
 /**
  * 以下函数声明需要保持与 CMakeList.txt 中调用 OpsTest_Level2_AddOp 函数时 KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT
@@ -37,18 +39,23 @@
 
 typedef void(*IfaKernelFunc) IFA_KERNEL_PARAM;
 
-extern "C" __global__ __aicore__ void incre_flash_attention_fp16_fp16 IFA_KERNEL_PARAM;
-
-extern "C" __global__ __aicore__ void incre_flash_attention_fp16_int8 IFA_KERNEL_PARAM;
-
-extern "C" __global__ __aicore__ void incre_flash_attention_bf16_bf16 IFA_KERNEL_PARAM;
-
-extern "C" __global__ __aicore__ void incre_flash_attention_bf16_int8 IFA_KERNEL_PARAM;
-
 using namespace ops::adv::tests::ifa;
 using TensorIntf = ops::adv::tests::utils::TensorIntf;
 using Case = ops::adv::tests::utils::Case;
 using Platform = ops::adv::tests::utils::Platform;
+
+bool RunTemplateIncreFlashAttention(std::function<void(IFA_INPUT_DTYPE)> func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
+                            std::vector<TensorIntf *> &outputs, uint8_t *workspace, uint8_t *tilingData)
+{
+    // Kernel 运行
+    ICPU_SET_TILING_KEY(tilingKey);
+    ICPU_RUN_KF(func, blockDim, inputs[0]->GetDevData(), inputs[1]->GetDevData(), inputs[2]->GetDevData(),
+                inputs[3]->GetDevData(), inputs[4]->GetDevData(), inputs[5]->GetDevData(), inputs[6]->GetDevData(),
+                inputs[7]->GetDevData(), inputs[8]->GetDevData(), inputs[9]->GetDevData(), inputs[10]->GetDevData(),
+                inputs[11]->GetDevData(), inputs[12]->GetDevData(), inputs[13]->GetDevData(), inputs[14]->GetDevData(),
+                outputs[0]->GetDevData(), workspace, tilingData);
+    return true;
+}
 
 bool RunIncreFlashAttention(void *func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
                             std::vector<TensorIntf *> &outputs, uint8_t *workspace, uint8_t *tilingData)
@@ -166,20 +173,6 @@ bool IfaCase::InitParam()
 
 bool IfaCase::InitOpInfo()
 {
-    auto *ifaKernelFunc = (void *)incre_flash_attention_fp16_fp16;
-
-    if (mParam.qDataType == ge::DataType::DT_FLOAT16) {
-        if (mParam.outDataType == ge::DataType::DT_INT8) {
-            ifaKernelFunc = (void *)incre_flash_attention_fp16_int8;
-        }
-    } else if (mParam.qDataType == ge::DataType::DT_BF16) {
-        if (mParam.outDataType == ge::DataType::DT_INT8) {
-            ifaKernelFunc = (void *)incre_flash_attention_bf16_int8;
-        } else {
-            ifaKernelFunc = (void *)incre_flash_attention_bf16_bf16;
-        }
-    }
-
     bool rst = mCtx.SetOpName("IncreFlashAttention");
     rst = rst && mCtx.SetDeterministic(false);
     rst = rst && mCtx.SetInputs({&query, &key, &value, &pseShift, &attenMask, &actualSeqLengths, &deqScale1,
@@ -194,7 +187,11 @@ bool IfaCase::InitOpInfo()
                                 {"inner_precise", mParam.innerPrecise}});
     rst = rst && mCtx.SetKernelRunCbf(RunIncreFlashAttention);
     rst = rst && mCtx.SetTilingDataMaxSize(3000); // 3000 : max tilingDataLen
-    rst = rst && mCtx.SetKernelMainFunc(ifaKernelFunc);
+    rst = rst && mCtx.SetKernelMainFunc((void *)nullptr);
+    if (IfaKernelTemplateFunc) {
+        rst = rst && mCtx.SetKernelRunTemplateCbf(RunTemplateIncreFlashAttention);
+        rst = rst && mCtx.SetKernelTemplateMainFunc(IfaKernelTemplateFunc);
+    }
     rst = rst && mOpInfo.SetContext(&mCtx);
 
     auto *platform = Platform::GetGlobalPlatform();
@@ -230,6 +227,15 @@ bool IfaCase::Run()
         return false;
     }
     return true;
+}
+
+IfaCase::IfaCase(const char *name, bool enable, const char *dbgInfo, 
+            const std::function<void(IFA_INPUT_DTYPE)>& templatekeyKernelFunc,
+            OpInfo incre, Param param)
+    : Case(name, enable, dbgInfo), mOpInfo(std::move(incre)), mParam(std::move(param))
+{
+    this->mOpInfo.mName = "IncreFlashAttention";
+    IfaKernelTemplateFunc = templatekeyKernelFunc;
 }
 
 IfaCase::IfaCase(const char *name, bool enable, const char *dbgInfo, OpInfo incre, Param param)

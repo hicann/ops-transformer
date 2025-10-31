@@ -17,13 +17,56 @@
 #include <vector>
 #include <cstdint>
 #include "graph/types.h"
+#include <functional>
+#include <utility>
+#include <tikicpulib.h>
+#include <graph/utils/type_utils.h>
+#include <exe_graph/runtime/tiling_context.h>
+#include <register/op_impl_registry.h>
 #include "tests/utils/case.h"
 #include "tests/utils/op_info.h"
 #include "tests/utils/context.h"
 #include "tests/utils/tensor.h"
 #include "tests/utils/tensor_list.h"
-#include <exe_graph/runtime/tiling_context.h>
-#include <register/op_impl_registry.h>
+#include "tests/utils/context_with_template_tilingkey.h"
+#include "tests/utils/log.h"
+#include "tests/utils/platform.h"
+#include "tiling/fia/tiling_data.h"
+#include "tiling/fia/tiling_stub.h"
+#define __NPU_HOST__
+
+#define FIA_KERNEL_PARAM_                                                                        \
+    uint8_t * query, uint8_t * key, uint8_t * value, uint8_t * pse_shift,                        \
+    uint8_t * attenMask, uint8_t * actualSeqLengths, uint8_t * actualSeqLengthsKV,               \
+    uint8_t * deq_scale1, uint8_t * quant_scale1, uint8_t * deq_scale2,                          \
+    uint8_t * quant_scale2, uint8_t * quant_offset2, uint8_t * antiquantScale,                   \
+    uint8_t * antiquantOffset, uint8_t * blocktable, uint8_t * queryPaddingSize,                 \
+    uint8_t * kvPaddingSize, uint8_t * keyAntiquantScale, uint8_t * keyAntiquantOffset,          \
+    uint8_t * valueAntiquantScale, uint8_t * valueAntiquantOffset, uint8_t * keySharedPrefix,    \
+    uint8_t * valueSharedPrefix, uint8_t * actualSharedPrefixLen, uint8_t * attentionOut,        \
+    uint8_t * softmaxLse, uint8_t * workspace, uint8_t * tiling
+
+#define FIA_INPUT_DTYPE                                     \
+    uint8_t * , uint8_t * , uint8_t * , uint8_t * ,         \
+    uint8_t * , uint8_t * , uint8_t * ,                     \
+    uint8_t * , uint8_t * , uint8_t * ,                     \
+    uint8_t * , uint8_t * , uint8_t * ,                     \
+    uint8_t * , uint8_t * , uint8_t * ,                     \
+    uint8_t * , uint8_t * , uint8_t * ,                     \
+    uint8_t * , uint8_t * , uint8_t * ,                     \
+    uint8_t * , uint8_t * , uint8_t * ,                     \
+    uint8_t * , uint8_t * , uint8_t * 
+
+#define FIA_INPUT_PARAMS                                           \
+    query, key, value, pse_shift,                                  \
+    attenMask, actualSeqLengths, actualSeqLengthsKV,               \
+    deq_scale1, quant_scale1, deq_scale2,                          \
+    quant_scale2, quant_offset2, antiquantScale,                   \
+    antiquantOffset, blocktable, queryPaddingSize,                 \
+    kvPaddingSize, keyAntiquantScale, keyAntiquantOffset,          \
+    valueAntiquantScale, valueAntiquantOffset, keySharedPrefix,    \
+    valueSharedPrefix, actualSharedPrefixLen, attentionOut,        \
+    softmaxLse, workspace, tiling
 
 namespace ops::adv::tests::fia {
 enum class CaseMode : uint32_t {
@@ -53,6 +96,7 @@ struct ShapeParam {
 class FiaCase : public ops::adv::tests::utils::Case {
     using OpInfo = ops::adv::tests::utils::OpInfo;
     using Context = ops::adv::tests::utils::Context;
+    using ContextWithTemplateTilingKey = ops::adv::tests::utils::ContextWithTemplateTilingKey<FIA_INPUT_DTYPE>;
     using Tensor = ops::adv::tests::utils::Tensor;
     using TensorList = ops::adv::tests::utils::TensorList;
 
@@ -117,11 +161,15 @@ public:
         keySharedPrefix, valueSharedPrefix, actualSharedPrefixLen, queryRope, keyRope, 
         dequantScaleQuery, keyRopeAntiquantScale, qStartIdx, kvStartIdx, attentionOut, softmaxLse;
     OpInfo mOpInfo;
-    Context mCtx;
+    ContextWithTemplateTilingKey mCtx;
     Param mParam;
     gert::OpImplRegisterV2::TilingKernelFunc fiaTilingFunc = nullptr;
+    std::function<void(FIA_INPUT_DTYPE)> FiaKernelTemplateFunc;
     FiaCase();
     FiaCase(const char *name, bool enable, const char *dbgInfo, OpInfo incre, Param param);
+    FiaCase(const char *name, bool enable, const char *dbgInfo, 
+            const std::function<void(FIA_INPUT_DTYPE)>& templatekeyKernelFunc,
+            OpInfo incre, Param param);
     bool Run() override;
     bool IsMla() const;
     Tensor ConstructTensor(std::string name, ShapeParam shapeParam, std::string layout,
