@@ -29,6 +29,8 @@ constexpr uint32_t WEIGHT_UK_INDEX = 3;
 constexpr uint32_t ROPE_SIN_INDEX = 7;
 constexpr uint32_t KV_CACHE_INDEX = 10;
 constexpr uint32_t KR_CACHE_INDEX = 11;
+constexpr uint32_t KV_CACHE_INDEX_V3 = 9;
+constexpr uint32_t KR_CACHE_INDEX_V3 = 10;
 // output
 constexpr uint32_t QUERY_INDEX = 0;
 constexpr uint32_t QUERY_ROPE_INDEX = 1;

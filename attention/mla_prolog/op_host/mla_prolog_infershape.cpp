@@ -27,10 +27,17 @@ ge::graphStatus GetMlaPrologShapeDim(const gert::InferShapeContext* context, Mla
     OP_CHECK_NULL_WITH_CONTEXT(context, weightUkShape);
     auto ropeSinShape = context->GetRequiredInputShape(ROPE_SIN_INDEX);    // (B, S, Dr) | (T, Dr)
     OP_CHECK_NULL_WITH_CONTEXT(context, ropeSinShape);
-    auto kvCacheShape = context->GetRequiredInputShape(KV_CACHE_INDEX);    // (B, Nkv, Skv, Hckv)
-    OP_CHECK_NULL_WITH_CONTEXT(context, kvCacheShape);
-    auto krCacheShape = context->GetRequiredInputShape(KR_CACHE_INDEX);    // (B, Nkv, Skv, Dr)
-    OP_CHECK_NULL_WITH_CONTEXT(context, krCacheShape);
+    if (std::strcmp(context->GetNodeType(), "MlaPrologV3") == 0) {
+        auto kvCacheShape = context->GetRequiredInputShape(KV_CACHE_INDEX_V3);    // (B, Nkv, Skv, Hckv)
+        OP_CHECK_NULL_WITH_CONTEXT(context, kvCacheShape);
+        auto krCacheShape = context->GetRequiredInputShape(KR_CACHE_INDEX_V3);    // (B, Nkv, Skv, Dr)
+        OP_CHECK_NULL_WITH_CONTEXT(context, krCacheShape);
+    } else {
+        auto kvCacheShape = context->GetRequiredInputShape(KV_CACHE_INDEX);    // (B, Nkv, Skv, Hckv)
+        OP_CHECK_NULL_WITH_CONTEXT(context, kvCacheShape);
+        auto krCacheShape = context->GetRequiredInputShape(KR_CACHE_INDEX);    // (B, Nkv, Skv, Dr)
+        OP_CHECK_NULL_WITH_CONTEXT(context, krCacheShape);
+    }
 
     OP_CHECK_IF(((tokenXShape->GetDimNum() != DIM_NUM_3) && (tokenXShape->GetDimNum() != DIM_NUM_2)),
         OP_LOGE(context->GetNodeName(), "tokenXShape is not 2 or 3, but %zu", tokenXShape->GetDimNum()), return ge::GRAPH_FAILED);
@@ -86,8 +93,13 @@ ge::graphStatus SetMlaPrologShapeDim(const MlaProlgoProtoShapeParam &shapeParam,
         queryRopeShape->SetDim(DIM_INDEX_1, shapeParam.N);
         queryRopeShape->SetDim(DIM_INDEX_2, shapeParam.Dr);
     }
-    *kvCacheOutShape = *context->GetRequiredInputShape(KV_CACHE_INDEX);
-    *krCacheOutShape = *context->GetRequiredInputShape(KR_CACHE_INDEX);
+    if (std::strcmp(context->GetNodeType(), "MlaPrologV3") == 0) {
+        *kvCacheOutShape = *context->GetRequiredInputShape(KV_CACHE_INDEX_V3);
+        *krCacheOutShape = *context->GetRequiredInputShape(KR_CACHE_INDEX_V3);
+    } else {
+        *kvCacheOutShape = *context->GetRequiredInputShape(KV_CACHE_INDEX);
+        *krCacheOutShape = *context->GetRequiredInputShape(KR_CACHE_INDEX);
+    }
     return GRAPH_SUCCESS;
 }
 
@@ -110,9 +122,13 @@ ge::graphStatus InferDataTypeMlaProlog(gert::InferDataTypeContext* context) {
 
     context->SetOutputDataType(QUERY_INDEX, context->GetRequiredInputDataType(WEIGHT_UK_INDEX));
     context->SetOutputDataType(QUERY_ROPE_INDEX, context->GetRequiredInputDataType(WEIGHT_UK_INDEX));
-    context->SetOutputDataType(KV_CACHE_OUT_INDEX, context->GetRequiredInputDataType(KV_CACHE_INDEX));
-    context->SetOutputDataType(KR_CACHE_OUT_INDEX, context->GetRequiredInputDataType(KR_CACHE_INDEX));
-
+    if (std::strcmp(context->GetNodeType(), "MlaPrologV3") == 0) {
+        context->SetOutputDataType(KV_CACHE_OUT_INDEX, context->GetRequiredInputDataType(KV_CACHE_INDEX_V3));
+        context->SetOutputDataType(KR_CACHE_OUT_INDEX, context->GetRequiredInputDataType(KR_CACHE_INDEX_V3));
+    } else {
+        context->SetOutputDataType(KV_CACHE_OUT_INDEX, context->GetRequiredInputDataType(KV_CACHE_INDEX));
+        context->SetOutputDataType(KR_CACHE_OUT_INDEX, context->GetRequiredInputDataType(KR_CACHE_INDEX));
+    }
     return GRAPH_SUCCESS;
 }
 

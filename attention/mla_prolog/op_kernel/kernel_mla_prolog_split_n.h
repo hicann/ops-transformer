@@ -1063,10 +1063,13 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::RmsNormCq(int64_t tokenIndex,
         }
 
         uint64_t scaleOffset = curVecTokenIdx * FP32_BLOCK_ELEMENT_NUM;
-        RmsNormParam rmsNormParams ={baseParams_->reciprocalCq, // reciprocal
-            baseParams_->epsilonCq,  // epsilon
-            (uint32_t)vectorRow_, //row
-            baseParams_->headSizeCq //col
+        RmsNormParam rmsNormParams ={
+            .reciprocal = baseParams_->reciprocalCq,
+            .epsilon = baseParams_->epsilonCq,
+            .row = (uint32_t)vectorRow_,
+            .col = baseParams_->headSizeCq,
+            .scale = baseParams_->qcQrScale,
+            .isScaleEnable = baseParams_->isQcQrScaleEnable,
         };
         if constexpr (std::is_same<rmsNormCqOutputType, int8_t>::value) {
             RmsNormDynamicQuant<mmCqOutputType, rmsNormGammaType, float, rmsNormComputType>(
@@ -1109,10 +1112,12 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::RmsNormAndScatterCkv(LocalTen
     LocalTensor<uint8_t> rmsNormShareTmpUb = shareTmpUb[baseParams_->headSizeCkv].template ReinterpretCast<uint8_t>();
 
     RmsNormParam rmsNormParams ={
-        baseParams_->reciprocalCkv, // reciprocal
-        baseParams_->epsilonCkv,  // epsilon
-        (uint32_t)vectorRow_, //row
-        baseParams_->headSizeCkv //col
+        .reciprocal = baseParams_->reciprocalCkv,
+        .epsilon = baseParams_->epsilonCkv,
+        .row = (uint32_t)vectorRow_,
+        .col = baseParams_->headSizeCkv,
+        .scale = baseParams_->kcScale,
+        .isScaleEnable = baseParams_->isKcScaleEnable,
     };
 
     if constexpr (std::is_same<rmsNormCkvOutputType, int8_t>::value) {

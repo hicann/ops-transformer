@@ -64,7 +64,7 @@ ge::graphStatus MlaPrologTilingCheck::CheckDims() const
         OP_LOGE(context_.opName, "S should not be greater than %u, got %u.",
             MAX_S1_SIZE, baseShapeInfo_.s1Size),
         return ge::GRAPH_FAILED);
-    const std::set<uint32_t> supportedHeSize {7168U, 7680U};
+    const std::set<uint32_t> supportedHeSize {7168U, 7680U, 6144U};
     OP_CHECK_IF(supportedHeSize.find(baseShapeInfo_.heSize) == supportedHeSize.end(),
         OP_LOGE(context_.opName, "He allows only %s, got %u.",
             ConvertContainerToString(supportedHeSize).c_str(), baseShapeInfo_.heSize),

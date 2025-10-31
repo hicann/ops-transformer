@@ -251,6 +251,8 @@ ge::graphStatus MlaPrologTiling::ProcessBaseInputs()
     epsilonCq_ = *context_->rmsNormEspilonCq;
     reciprocalCkv_ = 1.0f / (baseShapeInfo_.hckvSize);
     epsilonCkv_ = *context_->rmsNormEspilonCkv;
+    qcQrScale_ = context_->qcQrScale ? *context_->qcQrScale : 1.0f;
+    kcScale_ = context_->kcScale ? *context_->kcScale : 1.0f;
 
     stepBatchSize_ = std::min(128U, baseShapeInfo_.tSize);
     if (baseShapeInfo_.dSize == HIGH_THROUGHPUT__D_SIZE) {
@@ -311,6 +313,10 @@ ge::graphStatus MlaPrologTiling::FillTiling()
     baseParams_->epsilonCq = epsilonCq_;
     baseParams_->reciprocalCkv = reciprocalCkv_;
     baseParams_->epsilonCkv = epsilonCkv_;
+    baseParams_->qcQrScale = qcQrScale_;
+    baseParams_->kcScale = kcScale_;
+    baseParams_->isQcQrScaleEnable = static_cast<uint16_t>(std::abs(qcQrScale_ - 1.0f) >= std::numeric_limits<float>::epsilon());
+    baseParams_->isKcScaleEnable = static_cast<uint16_t>(std::abs(kcScale_ - 1.0f) >= std::numeric_limits<float>::epsilon());
 
     return ge::GRAPH_SUCCESS;
 }
@@ -467,6 +473,14 @@ ge::graphStatus MlaPrologTiling::ConvertContext(gert::TilingContext &context, Ml
     mlaPrologContext.rmsNormEspilonCkv = attrs->GetAttrPointer<float>(RMS_NORM_EPSILON_CKV_ATTR_INDEX);
     mlaPrologContext.cacheMode = attrs->GetStr(CACHE_MODE_ATTR_INDEX);
 
+    if (strcmp(mlaPrologContext.opType, "MlaPrologV3") == 0) {
+        mlaPrologContext.qcQrScale = attrs->GetAttrPointer<float>(QC_QR_SCALE_ATTR_INDEX);
+        mlaPrologContext.kcScale = attrs->GetAttrPointer<float>(KC_SCALE_ATTR_INDEX);
+    } else {
+        mlaPrologContext.qcQrScale = nullptr;
+        mlaPrologContext.kcScale = nullptr;
+    }
+
     OP_CHECK_IF(context.GetWorkspaceSizes(1) == nullptr,
                OPS_REPORT_VECTOR_INNER_ERR(context.GetNodeName(), "workSpaceSize got from ge is nullptr"),
                return ge::GRAPH_FAILED);
@@ -494,12 +508,20 @@ void MlaPrologTiling::ConvertRequiredParams(gert::TilingContext &context, MlaPro
     mlaPrologContext.ropeSin.shape = context.GetRequiredInputShape(ROPE_SIN_INPUT_INDEX);
     mlaPrologContext.ropeCos.desc = context.GetRequiredInputDesc(ROPE_COS_INPUT_INDEX);
     mlaPrologContext.ropeCos.shape = context.GetRequiredInputShape(ROPE_COS_INPUT_INDEX);
-    mlaPrologContext.cacheIndex.desc = context.GetRequiredInputDesc(CACHE_INDEX_INPUT_INDEX);
-    mlaPrologContext.cacheIndex.shape = context.GetRequiredInputShape(CACHE_INDEX_INPUT_INDEX);
-    mlaPrologContext.kvCache.desc = context.GetRequiredInputDesc(KV_CACHE_INPUT_INDEX);
-    mlaPrologContext.kvCache.shape = context.GetRequiredInputShape(KV_CACHE_INPUT_INDEX);
-    mlaPrologContext.krCache.desc = context.GetRequiredInputDesc(KR_CACHE_INPUT_INDEX);
-    mlaPrologContext.krCache.shape = context.GetRequiredInputShape(KR_CACHE_INPUT_INDEX);
+
+    if (strcmp(mlaPrologContext.opType, "MlaPrologV3") == 0) {
+        mlaPrologContext.kvCache.desc = context.GetRequiredInputDesc(KV_CACHE_INPUT_INDEX_V3);
+        mlaPrologContext.kvCache.shape = context.GetRequiredInputShape(KV_CACHE_INPUT_INDEX_V3);
+        mlaPrologContext.krCache.desc = context.GetRequiredInputDesc(KR_CACHE_INPUT_INDEX_V3);
+        mlaPrologContext.krCache.shape = context.GetRequiredInputShape(KR_CACHE_INPUT_INDEX_V3);
+    } else {
+        mlaPrologContext.cacheIndex.desc = context.GetRequiredInputDesc(CACHE_INDEX_INPUT_INDEX);
+        mlaPrologContext.cacheIndex.shape = context.GetRequiredInputShape(CACHE_INDEX_INPUT_INDEX);
+        mlaPrologContext.kvCache.desc = context.GetRequiredInputDesc(KV_CACHE_INPUT_INDEX);
+        mlaPrologContext.kvCache.shape = context.GetRequiredInputShape(KV_CACHE_INPUT_INDEX);
+        mlaPrologContext.krCache.desc = context.GetRequiredInputDesc(KR_CACHE_INPUT_INDEX);
+        mlaPrologContext.krCache.shape = context.GetRequiredInputShape(KR_CACHE_INPUT_INDEX);
+    }
 
     mlaPrologContext.query.desc = context.GetOutputDesc(QUERY_OUTPUT_INDEX);
     mlaPrologContext.query.shape = context.GetOutputShape(QUERY_OUTPUT_INDEX);
@@ -513,6 +535,10 @@ void MlaPrologTiling::ConvertRequiredParams(gert::TilingContext &context, MlaPro
 
 void MlaPrologTiling::ConvertOptionalParams(gert::TilingContext &context, MlaPrologContext &mlaPrologContext)
 {
+    if (strcmp(mlaPrologContext.opType, "MlaPrologV3") == 0) {
+        mlaPrologContext.cacheIndex.desc = context.GetRequiredInputDesc(CACHE_INDEX_INPUT_INDEX_V3);
+        mlaPrologContext.cacheIndex.shape = context.GetRequiredInputShape(CACHE_INDEX_INPUT_INDEX_V3);
+    }
     mlaPrologContext.dequantScaleX.desc = context.GetOptionalInputDesc(DEQUANT_SCALE_X_INDEX);
     mlaPrologContext.dequantScaleX.shape = context.GetOptionalInputShape(DEQUANT_SCALE_X_INDEX);
     mlaPrologContext.dequantScaleWDq.desc = context.GetOptionalInputDesc(DEQUANT_SCALE_W_DQ_INDEX);

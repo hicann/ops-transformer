@@ -53,6 +53,10 @@ namespace optiling {
         float epsilonCq;                     // Cq计算的epsilon（数值稳定性参数）
         float reciprocalCkv;                 // 1 / headSizeCkv（headSizeCkv的倒数，用于快速计算）
         float epsilonCkv;                    // Ckv计算的epsilon（数值稳定性参数）
+        float qcQrScale;                     // query 的尺度矫正因子
+        float kcScale;                       // kv 的尺度矫正因子
+        uint16_t isQcQrScaleEnable;          // query 的尺度矫正因子是否生效（默认是1.0的时候不生效）
+        uint16_t isKcScaleEnable;            // kv 的尺度矫正因子是否生效（默认是1.0的时候不生效）
     };
 
     // 2. 完整分块数据结构体（对应 MlaPrologTilingData 宏定义，嵌套基础参数）
