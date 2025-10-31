@@ -152,6 +152,8 @@
 
 ## 约束说明
 
+- 输入query、key、value、realShiftOptional的数据类型必须一致。
+- 输入query、key、value的inputLayout必须一致。
 - 关于数据shape的约束，以inputLayout的BSND、BNSD为例（BSH、SBH下H=N\*D），其中：
     -   B：取值范围为1\~2M。带prefixOptional的时候B最大支持2K。
     -   N：取值范围为1\~256。
