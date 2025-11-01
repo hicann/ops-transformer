@@ -11,16 +11,15 @@ if (BUILD_OPEN_PROJECT)
     target_sources(op_host_aclnnExc PRIVATE
         nsa_select_attention_infer_def.cpp
     )
-endif()
-
-if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
     add_ops_compile_options(
             OP_NAME NsaSelectAttentionInfer
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
                     -Werror
     )
-else()
+endif()
+
+if (NOT BUILD_OPS_RTY_KERNEL)
     add_modules_sources(OPTYPE nsa_select_attention_infer ACLNNTYPE aclnn_exclude)
 endif()
 

@@ -12,9 +12,6 @@ set(fused_infer_attention_score_depends attention/incre_flash_attention attentio
     target_sources(op_host_aclnnInner PRIVATE
         fused_infer_attention_score_def.cpp
     )
-endif()
-
-if (BUILD_OPS_RTY_KERNEL)
     add_ops_compile_options(
         OP_NAME FusedInferAttentionScore
         OPTIONS --cce-auto-sync=off
@@ -23,12 +20,10 @@ if (BUILD_OPS_RTY_KERNEL)
                 -mllvm -cce-aicore-hoist-movemask=false
                 --op_relocatable_kernel_binary=true
     )
-else()
-
-    add_modules_sources(OPTYPE fused_infer_attention_score ACLNNTYPE aclnn_inner)
 endif()
 
 if(NOT BUILD_OPS_RTY_KERNEL) #
+    add_modules_sources(OPTYPE fused_infer_attention_score ACLNNTYPE aclnn_inner)
     add_tiling_modules()
     target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
         ../../common/op_host/fia_tiling_shape.cpp

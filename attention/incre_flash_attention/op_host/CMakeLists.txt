@@ -12,20 +12,16 @@ if (BUILD_OPEN_PROJECT)
     target_sources(op_host_aclnnInner PRIVATE
         incre_flash_attention_def.cpp
     )
-endif()
-
-if (BUILD_OPS_RTY_KERNEL)
     add_ops_compile_options(
         OP_NAME IncreFlashAttention
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
                 -Werror
     )
-else()
-    add_modules_sources(OPTYPE incre_flash_attention ACLNNTYPE aclnn_inner)
 endif()
 
 if(NOT BUILD_OPS_RTY_KERNEL) #
+    add_modules_sources(OPTYPE incre_flash_attention ACLNNTYPE aclnn_inner)
     target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
         incre_flash_attention_tiling.cpp
         incre_flash_attention_tiling_check.cpp

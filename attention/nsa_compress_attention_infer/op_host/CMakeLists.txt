@@ -11,9 +11,6 @@ if (BUILD_OPEN_PROJECT)
     target_sources(op_host_aclnnExc PRIVATE
         nsa_compress_attention_infer_def.cpp
     )
-endif()
-
-if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
     add_ops_compile_options(
             OP_NAME NsaCompressAttentionInfer
             OPTIONS --cce-auto-sync=off
@@ -21,7 +18,9 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
                     -Werror
                     -fpermissive
     )
-else()
+endif()
+
+if (NOT BUILD_OPS_RTY_KERNEL) 
     add_modules_sources(OPTYPE nsa_compress_attention_infer ACLNNTYPE aclnn_exclude)
 endif()
 
