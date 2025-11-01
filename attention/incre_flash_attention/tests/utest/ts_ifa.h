@@ -24,7 +24,9 @@ using PseShiftShapeType = IfaCase::PseShiftShapeType;
 class Ts_Ifa : public Ts<IfaCase> {};
 class Ts_Ifa_Ascend910B2 : public Ts_Ascend910B2<IfaCase> {};
 class Ts_Ifa_Ascend310P3 : public Ts_Ascend310P3<IfaCase> {};
+class Ts_Ifa_Ascend910_9591 : public Ts_Ascend910_9591<IfaCase> {};
 
 class Ts_Ifa_WithParam : public Ts_WithParam<IfaCase> {};
 class Ts_Ifa_WithParam_Ascend910B2 : public Ts_WithParam_Ascend910B2<IfaCase> {};
 class Ts_Ifa_WithParam_Ascend310P3 : public Ts_WithParam_Ascend310P3<IfaCase> {};
+class Ts_Ifa_WithParam_Ascend910_9591 : public Ts_WithParam_Ascend910_9591<IfaCase> {};
