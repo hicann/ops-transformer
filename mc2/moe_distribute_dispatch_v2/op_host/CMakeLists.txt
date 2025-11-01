@@ -13,7 +13,7 @@ if (BUILD_OPEN_PROJECT)  # custom
     )
     add_mc2_modules_sources(OPTYPE moe_distribute_dispatch_v2 ACLNNTYPE aclnn_inner)
     set(MC2_OPT ON PARENT_SCOPE)
-    set(moe_distribute_dispatch_v2_depends mc2/common mc2/3rd PARENT_SCOPE)
+    set(moe_distribute_dispatch_v2_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch PARENT_SCOPE)
 else() # 回黄host
     add_mc2_modules_sources(OPTYPE moe_distribute_dispatch_v2 ACLNNTYPE aclnn_inner) 
 endif()
