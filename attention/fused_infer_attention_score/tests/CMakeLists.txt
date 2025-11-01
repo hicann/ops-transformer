@@ -16,9 +16,12 @@ set(_FIA_TilingSourcesExt
         ${OPS_TRANSFORMER_DIR}/attention/incre_flash_attention/op_host/incre_flash_attention_tiling.cpp
         ${OPS_TRANSFORMER_DIR}/attention/incre_flash_attention/op_host/incre_flash_attention_tiling_check.cpp
         ${OPS_TRANSFORMER_DIR}/attention/incre_flash_attention/op_host/incre_flash_attention_tiling_register.cpp
+        ${OPS_TRANSFORMER_DIR}/attention/incre_flash_attention/regbase/ophost/incre_flash_attention_tiling_v2.cpp
         ${OPS_TRANSFORMER_DIR}/attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling.cpp
+        ${OPS_TRANSFORMER_DIR}/attention/prompt_flash_attention/regbase/ophost/prompt_flash_attention_tiling_v2.cpp
         ${OPS_TRANSFORMER_DIR}/attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_register.cpp
         ${OPS_TRANSFORMER_DIR}/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling.cpp
+        ${OPS_TRANSFORMER_DIR}/attention/fused_infer_attention_score/regbase/ophost/fused_infer_attention_score_tiling_v2.cpp
         ${OPS_TRANSFORMER_DIR}/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_register.cpp
         ${OPS_TRANSFORMER_DIR}/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_v3.cpp
         ${OPS_TRANSFORMER_DIR}/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_check.cpp
@@ -30,11 +33,13 @@ set(_FIA_TilingSourcesExt
         ${OPS_TRANSFORMER_DIR}/attention/common/op_host/fia_tiling_info.cpp
         ${OPS_TRANSFORMER_DIR}/attention/common/op_host/fia_tiling_shape.cpp
         ${OPS_TRANSFORMER_DIR}/attention/common/op_host/arch32/fia_tiling_nonquant_mla.cpp
+        ${OPS_TRANSFORMER_DIR}/attention/common/op_host/arch32/fia_tiling_nonquant.cpp
 )
 
 set(_FIA_KernelTilingDataDefH
-        ${CMAKE_SOURCE_DIR}/attention/incre_flash_attention/op_kernel/incre_flash_attention_tiling.h
-        ${CMAKE_SOURCE_DIR}/attention/prompt_flash_attention/op_kernel/prompt_flash_attention_tiling_data.h
+        ${OPS_TRANSFORMER_DIR}/common/include/tiling_base/data_copy_transpose_tiling_def.h
+        ${CMAKE_SOURCE_DIR}/attention/incre_flash_attention/op_host/incre_flash_attention_tiling.h
+        ${CMAKE_SOURCE_DIR}/attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling.h
 )
 set(_FIA_KernelTilingExtInclude
         ${CMAKE_SOURCE_DIR}/attention/incre_flash_attention/op_host/
@@ -58,6 +63,34 @@ aux_source_directory(${CMAKE_SOURCE_DIR}/attention/fused_infer_attention_score/o
 set(_FIA_CompileDefintions
         KernelCtrlParam incre_flash_attention,incre_flash_attention_FIAS,prompt_flash_attention,prompt_flash_attention_FIAS fia PFA_UT
 )
+
+set(_FIA_UTestSourcesExtForce)
+
+if (UT_TEST_ALL)
+        message(STATUS "+++++ DEBUG: all ut")
+        file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*.cc")
+        file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*.cpp")
+elseif(OP_HOST_UT)
+        message(STATUS "+++++ DEBUG: only host")
+        file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/op_host/*tiling.cpp")
+        file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/op_host/*infershape.cpp")
+elseif(OP_KERNEL_UT)
+        message(STATUS "+++++ DEBUG: only kernel")
+        file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/op_kernel/*kernel.cpp")
+elseif(OP_API_UT)
+        message(STATUS "+++++ DEBUG: only opapi")
+        file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/op_api/*opapi.cpp")
+endif()
+
+list(APPEND _FIA_UTestSourcesExtForce ${_Src1} ${_Src2})
+message(STATUS "+++++ DEBUG: .cpp files: ${_FIA_UTestSourcesExtForce}")
+
+if (_FIA_UTestSourcesExtForce)
+    set(UTEST_FORCE_FLAG ON)
+else()
+    set(UTEST_FORCE_FLAG OFF)
+endif()
+
 OpsTest_Level2_AddOp(
         SUB_SYSTEM                              transformer
         BRIEF                                   Fia
@@ -70,4 +103,6 @@ OpsTest_Level2_AddOp(
         UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT ${_FIA_TargetPrivateLinkLibrariesExt}
         KERNEL_PRIVATE_INCLUDES_EXT             ${_FIA_OpKernelPrivateIncludesExt}
         UTEST_COMMON_PRIVATE_INCLUDES_EXT       ${_FIA_UTestCommonPrivateIncludeExt}
+        UTEST_SOURCES_EXT                       ${_FIA_UTestSourcesExtForce}
+        UTEST_SOURCES_EXT_FORCE                 ${UTEST_FORCE_FLAG}
 )
