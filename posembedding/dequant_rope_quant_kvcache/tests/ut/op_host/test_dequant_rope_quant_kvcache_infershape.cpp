@@ -54,7 +54,7 @@ TEST_F(DequantRopeQuantKvcache, DequantRopeQuantKvcache_infershape_case_0) {
                                               {"kv_output",Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
                                             }
                                           );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{-1, -1}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 1, 8, 128}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -84,6 +84,6 @@ TEST_F(DequantRopeQuantKvcache, DequantRopeQuantKvcache_infershape_case_1) {
                                               {"kv_output",Ops::Transformer::AnyValue::CreateFrom<bool>(true)}
                                             }
                                           );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{-1, -1}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 8, 128}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }

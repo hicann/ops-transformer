@@ -40,6 +40,7 @@ protected:
 
 TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_0)
 {
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
     size_t batch = 320;
     size_t seqlen = 1;
     size_t cacheSeqlen = 1024;
@@ -81,6 +82,29 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_0)
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(workspaceFileSize);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
 
+    DequantRopeQuantKvcacheTilingData* tilingData = reinterpret_cast<DequantRopeQuantKvcacheTilingData*>(tiling);
+    tilingData->qHeadNum = 8;
+    tilingData->kvHeadNum = 1;
+    tilingData->hiddenSize = 128;
+    tilingData->hiddenSizeFp32Align = 128;
+    tilingData->hiddenSizeFp16Align = 256;
+    tilingData->hiddenSizeInt8Align = 512;
+    tilingData->OnceUBMaxS = 4;
+    tilingData->cacheSeqlen = 1024;
+    tilingData->seqlen = 320;
+    tilingData->qHiddenSize = 1024;
+    tilingData->kHiddenSize = 128;
+    tilingData->vHiddenSize = 128;
+    tilingData->realCoreNum = 64;
+    tilingData->frontCoreNum = 64;
+    tilingData->blockFactor = 5;
+    tilingData->tailCoreBlockFactor = 5;
+    tilingData->hasQuantOffset = 0;
+    tilingData->ifKVout = 0;
+    tilingData->isPA = 0;
+    tilingData->hasBias = 0;
+    tilingData->hasAS = 0;
+
     char* path_ = get_current_dir_name();
     string path(path_);
 
@@ -112,8 +136,9 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_0)
 
 TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_1)
 {
-    size_t batch = 1;
-    size_t seqlen = 320;
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
+    size_t batch = 320;
+    size_t seqlen = 1;
     size_t cacheSeqlen = 1024;
     size_t hiddensize = 128;
     size_t qHeadNum = 8;
@@ -153,6 +178,29 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_1)
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(workspaceFileSize);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
 
+    DequantRopeQuantKvcacheTilingData* tilingData = reinterpret_cast<DequantRopeQuantKvcacheTilingData*>(tiling);
+    tilingData->qHeadNum = 8;
+    tilingData->kvHeadNum = 1;
+    tilingData->hiddenSize = 128;
+    tilingData->hiddenSizeFp32Align = 128;
+    tilingData->hiddenSizeFp16Align = 256;
+    tilingData->hiddenSizeInt8Align = 512;
+    tilingData->OnceUBMaxS = 4;
+    tilingData->cacheSeqlen = 1024;
+    tilingData->seqlen = 320;
+    tilingData->qHiddenSize = 1024;
+    tilingData->kHiddenSize = 128;
+    tilingData->vHiddenSize = 128;
+    tilingData->realCoreNum = 64;
+    tilingData->frontCoreNum = 64;
+    tilingData->blockFactor = 5;
+    tilingData->tailCoreBlockFactor = 5;
+    tilingData->hasQuantOffset = 0;
+    tilingData->ifKVout = 0;
+    tilingData->isPA = 0;
+    tilingData->hasBias = 0;
+    tilingData->hasAS = 0;
+
     char* path_ = get_current_dir_name();
     string path(path_);
 
@@ -184,8 +232,9 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_1)
 
 TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_2)
 {
-    size_t batch = 1;
-    size_t seqlen = 320;
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
+    size_t batch = 320;
+    size_t seqlen = 1;
     size_t cacheSeqlen = 1024;
     size_t hiddensize = 128;
     size_t qHeadNum = 8;
@@ -195,7 +244,7 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_2)
     size_t cosFileSize = batch * seqlen * hiddensize * sizeof(half);
     size_t cacheFileSize = batch * cacheSeqlen * (kvHeadNum)*hiddensize * sizeof(int8_t);
     size_t indicesFileSize = batch * sizeof(int32_t);
-    size_t scaleFileSize = hiddensize * sizeof(int32_t);
+    size_t scaleFileSize = hiddensize * sizeof(float);
 
     size_t qFileSize = batch * seqlen * (qHeadNum)*hiddensize * sizeof(half);
     size_t kFileSize = batch * seqlen * (kvHeadNum)*hiddensize * sizeof(half);
@@ -224,6 +273,29 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_2)
     size_t tilingDataSize = sizeof(DequantRopeQuantKvcacheTilingData);
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(workspaceFileSize);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
+
+    DequantRopeQuantKvcacheTilingData* tilingData = reinterpret_cast<DequantRopeQuantKvcacheTilingData*>(tiling);
+    tilingData->qHeadNum = 8;
+    tilingData->kvHeadNum = 1;
+    tilingData->hiddenSize = 128;
+    tilingData->hiddenSizeFp32Align = 128;
+    tilingData->hiddenSizeFp16Align = 256;
+    tilingData->hiddenSizeInt8Align = 512;
+    tilingData->OnceUBMaxS = 4;
+    tilingData->cacheSeqlen = 1024;
+    tilingData->seqlen = 320;
+    tilingData->qHiddenSize = 1024;
+    tilingData->kHiddenSize = 128;
+    tilingData->vHiddenSize = 128;
+    tilingData->realCoreNum = 64;
+    tilingData->frontCoreNum = 64;
+    tilingData->blockFactor = 5;
+    tilingData->tailCoreBlockFactor = 5;
+    tilingData->hasQuantOffset = 0;
+    tilingData->ifKVout = 0;
+    tilingData->isPA = 0;
+    tilingData->hasBias = 0;
+    tilingData->hasAS = 0;
 
     char* path_ = get_current_dir_name();
     string path(path_);
@@ -256,8 +328,9 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_2)
 
 TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_3)
 {
-    size_t batch = 1;
-    size_t seqlen = 320;
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
+    size_t batch = 320;
+    size_t seqlen = 1;
     size_t cacheSeqlen = 1024;
     size_t hiddensize = 128;
     size_t qHeadNum = 8;
@@ -296,6 +369,29 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_3)
     size_t tilingDataSize = sizeof(DequantRopeQuantKvcacheTilingData);
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(workspaceFileSize);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingDataSize);
+
+    DequantRopeQuantKvcacheTilingData* tilingData = reinterpret_cast<DequantRopeQuantKvcacheTilingData*>(tiling);
+    tilingData->qHeadNum = 8;
+    tilingData->kvHeadNum = 1;
+    tilingData->hiddenSize = 128;
+    tilingData->hiddenSizeFp32Align = 128;
+    tilingData->hiddenSizeFp16Align = 256;
+    tilingData->hiddenSizeInt8Align = 512;
+    tilingData->OnceUBMaxS = 4;
+    tilingData->cacheSeqlen = 1024;
+    tilingData->seqlen = 320;
+    tilingData->qHiddenSize = 1024;
+    tilingData->kHiddenSize = 128;
+    tilingData->vHiddenSize = 128;
+    tilingData->realCoreNum = 64;
+    tilingData->frontCoreNum = 64;
+    tilingData->blockFactor = 5;
+    tilingData->tailCoreBlockFactor = 5;
+    tilingData->hasQuantOffset = 0;
+    tilingData->ifKVout = 0;
+    tilingData->isPA = 0;
+    tilingData->hasBias = 0;
+    tilingData->hasAS = 0;
 
     char* path_ = get_current_dir_name();
     string path(path_);

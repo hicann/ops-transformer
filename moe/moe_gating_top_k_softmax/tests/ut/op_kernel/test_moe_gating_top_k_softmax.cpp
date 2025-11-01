@@ -46,6 +46,7 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_float32)
     size_t outputByteSize1 = 2 * 48 * 16 * sizeof(int32_t);
     size_t tiling_data_size = sizeof(MoeGatingTopKSoftmaxEKFullLoadTilingData);
     uint32_t blockDim = 24;
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
     uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputByteSize);
     uint8_t* finished = (uint8_t*)AscendC::GmAlloc(finishedByteSize);
@@ -54,16 +55,6 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_float32)
     uint8_t* row_idx = (uint8_t*)AscendC::GmAlloc(outputByteSize1);
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 2);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);
-
-    //  system(
-    //      "cp -r "
-    //      "../../../../../../../ops/built-in/tests/ut/fast_op_test/moe_gating_top_k_softmax/moe_gating_top_k_softmax_data
-    //      "
-    //      "./");
-    //  system("chmod -R 755 ./moe_gating_top_k_softmax_data/");
-    //  system("cd ./moe_gating_top_k_softmax_data/ && rm -rf ./*bin");
-    //  system("cd ./moe_gating_top_k_softmax_data/ && python3 gen_data.py 1 80 2560 float16");
-    //  system("cd ./moe_gating_top_k_softmax_data/ && python3 gen_tiling.py case0");
 
     char* path_ = get_current_dir_name();
     string path(path_);
@@ -138,14 +129,13 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_float32)
     TopkTilingData.vreducehalfValMask5 = 0;
     TopkTilingData.vreducehalfValMask6 = 0;
     TopkTilingData.vreducehalfValMask7 = 0;
+    TopkTilingData.copyUbToUbBlockCount = 1;
     tilingDatafromBin->formerSoftmaxTilingData = SoftMaxTilingData;
     tilingDatafromBin->formerBlockTailSoftmaxTilingData = SoftMaxTilingData;
     tilingDatafromBin->tailBlockTailSoftmaxTilingData = SoftMaxTilingData;
     tilingDatafromBin->formerTopkTilingData = TopkTilingData;
     tilingDatafromBin->formerBlockTailTopkTilingData = TopkTilingData;
     tilingDatafromBin->tailBlockTailTopkTilingData = TopkTilingData;
-
-    //  ReadFile(path + "/moe_gating_top_k_softmax_data/input_x.bin", inputByteSize, x, inputByteSize);
     ICPU_SET_TILING_KEY(1);
     ICPU_RUN_KF(
         moe_gating_top_k_softmax, blockDim, x, finished, y, expert_idx, row_idx, workspace,
@@ -169,6 +159,7 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_bf16)
     size_t outputByteSize1 = 2 * 48 * 16 * sizeof(int32_t);
     size_t tiling_data_size = sizeof(MoeGatingTopKSoftmaxEKFullLoadTilingData);
     uint32_t blockDim = 24;
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
     uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputByteSize);
     uint8_t* finished = (uint8_t*)AscendC::GmAlloc(finishedByteSize);
@@ -177,16 +168,6 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_bf16)
     uint8_t* row_idx = (uint8_t*)AscendC::GmAlloc(outputByteSize1);
     uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 2);
     uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);
-
-    //  system(
-    //      "cp -r "
-    //      "../../../../../../../ops/built-in/tests/ut/fast_op_test/moe_gating_top_k_softmax/moe_gating_top_k_softmax_data
-    //      "
-    //      "./");
-    //  system("chmod -R 755 ./moe_gating_top_k_softmax_data/");
-    //  system("cd ./moe_gating_top_k_softmax_data/ && rm -rf ./*bin");
-    //  system("cd ./moe_gating_top_k_softmax_data/ && python3 gen_data.py 1 80 2560 float16");
-    //  system("cd ./moe_gating_top_k_softmax_data/ && python3 gen_tiling.py case0");
 
     char* path_ = get_current_dir_name();
     string path(path_);
@@ -261,6 +242,7 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_bf16)
     TopkTilingData.vreducehalfValMask5 = 0;
     TopkTilingData.vreducehalfValMask6 = 0;
     TopkTilingData.vreducehalfValMask7 = 0;
+    TopkTilingData.copyUbToUbBlockCount = 1;
     tilingDatafromBin->formerSoftmaxTilingData = SoftMaxTilingData;
     tilingDatafromBin->formerBlockTailSoftmaxTilingData = SoftMaxTilingData;
     tilingDatafromBin->tailBlockTailSoftmaxTilingData = SoftMaxTilingData;
@@ -268,126 +250,6 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_bf16)
     tilingDatafromBin->formerBlockTailTopkTilingData = TopkTilingData;
     tilingDatafromBin->tailBlockTailTopkTilingData = TopkTilingData;
 
-    //  ReadFile(path + "/moe_gating_top_k_softmax_data/input_x.bin", inputByteSize, x, inputByteSize);
-    ICPU_SET_TILING_KEY(5);
-    ICPU_RUN_KF(
-        moe_gating_top_k_softmax, blockDim, x, finished, y, expert_idx, row_idx, workspace,
-        (uint8_t*)(tilingDatafromBin));
-
-    AscendC::GmFree(x);
-    AscendC::GmFree(finished);
-    AscendC::GmFree(y);
-    AscendC::GmFree(expert_idx);
-    AscendC::GmFree(row_idx);
-    AscendC::GmFree(workspace);
-    AscendC::GmFree(tiling);
-    free(path_);
-}
-
-TEST_F(moe_gating_top_k_softmax_test, test_case_k_fullload_float32)
-{
-    size_t inputByteSize = 2 * 48 * 32 * sizeof(float);
-    size_t finishedByteSize = 2 * 48 * 32 * sizeof(bool);
-    size_t outputByteSize = 2 * 48 * 32 * sizeof(float);
-    size_t outputByteSize1 = 2 * 48 * 16 * sizeof(int32_t);
-    size_t tiling_data_size = sizeof(MoeGatingTopKSoftmaxEKFullLoadTilingData);
-    uint32_t blockDim = 24;
-
-    uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputByteSize);
-    uint8_t* finished = (uint8_t*)AscendC::GmAlloc(finishedByteSize);
-    uint8_t* y = (uint8_t*)AscendC::GmAlloc(outputByteSize);
-    uint8_t* expert_idx = (uint8_t*)AscendC::GmAlloc(outputByteSize1);
-    uint8_t* row_idx = (uint8_t*)AscendC::GmAlloc(outputByteSize1);
-    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16 * 2);
-    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);
-
-    //  system(
-    //      "cp -r "
-    //      "../../../../../../../ops/built-in/tests/ut/fast_op_test/moe_gating_top_k_softmax/moe_gating_top_k_softmax_data
-    //      "
-    //      "./");
-    //  system("chmod -R 755 ./moe_gating_top_k_softmax_data/");
-    //  system("cd ./moe_gating_top_k_softmax_data/ && rm -rf ./*bin");
-    //  system("cd ./moe_gating_top_k_softmax_data/ && python3 gen_data.py 1 80 2560 float16");
-    //  system("cd ./moe_gating_top_k_softmax_data/ && python3 gen_tiling.py case0");
-
-    char* path_ = get_current_dir_name();
-    string path(path_);
-
-    MoeGatingTopKSoftmaxKFullLoadTilingData* tilingDatafromBin =
-        reinterpret_cast<MoeGatingTopKSoftmaxKFullLoadTilingData*>(tiling);
-
-    SoftMaxTiling SoftMaxTilingData;
-    TopkTiling TopkTilingData;
-
-    tilingDatafromBin->tilingKey = 6;
-    tilingDatafromBin->row = 48;
-    tilingDatafromBin->col = 7749;
-    tilingDatafromBin->k = 634;
-    tilingDatafromBin->kAlign = 640;
-    tilingDatafromBin->blockNum = 24;
-    tilingDatafromBin->blockFormer = 2;
-    tilingDatafromBin->blockTail = 2;
-    tilingDatafromBin->ubLoop = 4;
-    tilingDatafromBin->ubFormer = 2560;
-    tilingDatafromBin->ubFormerAlign = 2560;
-    tilingDatafromBin->ubTail = 69;
-    tilingDatafromBin->ubTailAlign = 96;
-
-    SoftMaxTilingData.srcM = 1;
-    SoftMaxTilingData.srcK = 2560;
-    SoftMaxTilingData.srcSize = 2560;
-    SoftMaxTilingData.outMaxM = 1;
-    SoftMaxTilingData.outMaxK = 8;
-    SoftMaxTilingData.outMaxSize = 8;
-    SoftMaxTilingData.splitM = 1;
-    SoftMaxTilingData.splitK = 2560;
-    SoftMaxTilingData.splitSize = 2560;
-    SoftMaxTilingData.reduceM = 1;
-    SoftMaxTilingData.reduceK = 8;
-    SoftMaxTilingData.reduceSize = 8;
-    SoftMaxTilingData.rangeM = 1;
-    SoftMaxTilingData.tailM = 0;
-    SoftMaxTilingData.tailSplitSize = 0;
-    SoftMaxTilingData.tailReduceSize = 0;
-
-    TopkTilingData.tmpLocalSize = 12800;
-    TopkTilingData.allDataSize = 3200;
-    TopkTilingData.innerDataSize = 6400;
-    TopkTilingData.sortRepeat = 100;
-    TopkTilingData.mrgSortRepeat = 800;
-    TopkTilingData.kAlignFourBytes = 640;
-    TopkTilingData.kAlignTwoBytes = 640;
-    TopkTilingData.maskOffset = 640;
-    TopkTilingData.maskVreducev2FourBytes = 1280;
-    TopkTilingData.maskVreducev2TwoBytes = 2560;
-    TopkTilingData.mrgSortSrc1offset = 2;
-    TopkTilingData.mrgSortSrc2offset = 4;
-    TopkTilingData.mrgSortSrc3offset = 6;
-    TopkTilingData.mrgSortTwoQueueSrc1Offset = 2;
-    TopkTilingData.mrgFourQueueTailPara1 = 6400;
-    TopkTilingData.mrgFourQueueTailPara2 = 1;
-    TopkTilingData.srcIndexOffset = 0;
-    TopkTilingData.topkMrgSrc1MaskSizeOffset = 0;
-    TopkTilingData.topkNSmallSrcIndexOffset = 800;
-    TopkTilingData.vreduceValMask0 = 0;
-    TopkTilingData.vreduceValMask1 = 0;
-    TopkTilingData.vreduceIdxMask0 = 0;
-    TopkTilingData.vreduceIdxMask1 = 0;
-    TopkTilingData.vreducehalfValMask0 = 0;
-    TopkTilingData.vreducehalfValMask1 = 0;
-    TopkTilingData.vreducehalfValMask2 = 0;
-    TopkTilingData.vreducehalfValMask3 = 0;
-    TopkTilingData.vreducehalfValMask4 = 0;
-    TopkTilingData.vreducehalfValMask5 = 0;
-    TopkTilingData.vreducehalfValMask6 = 0;
-    TopkTilingData.vreducehalfValMask7 = 0;
-    tilingDatafromBin->ubFormerSoftmaxTilingData = SoftMaxTilingData;
-    tilingDatafromBin->ubTailSoftmaxTilingData = SoftMaxTilingData;
-    tilingDatafromBin->topkFormerTilingData = TopkTilingData;
-    tilingDatafromBin->topkTailTilingData = TopkTilingData;
-
-    //  ReadFile(path + "/moe_gating_top_k_softmax_data/input_x.bin", inputByteSize, x, inputByteSize);
     ICPU_SET_TILING_KEY(5);
     ICPU_RUN_KF(
         moe_gating_top_k_softmax, blockDim, x, finished, y, expert_idx, row_idx, workspace,
@@ -406,11 +268,12 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_k_fullload_float32)
 TEST_F(moe_gating_top_k_softmax_test, test_case_perf_float32_small_col_num)
 {
     size_t inputByteSize = 2 * 48 * 8 * sizeof(float);
-    size_t finishedByteSize = 2 * 48 * 8 * sizeof(bool);
+    size_t finishedByteSize = 2 * 48 * sizeof(bool);
     size_t outputByteSize = 2 * 48 * 8 * sizeof(float);
     size_t outputByteSize1 = 2 * 48 * 4 * sizeof(int32_t);
     size_t tiling_data_size = sizeof(MoeGatingTopKSoftmaxPerfTilingData);
     uint32_t blockDim = 24;
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
     uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputByteSize);
     uint8_t* finished = (uint8_t*)AscendC::GmAlloc(finishedByteSize);
@@ -426,28 +289,28 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_perf_float32_small_col_num)
     MoeGatingTopKSoftmaxPerfTilingData* tilingDatafromBin =
         reinterpret_cast<MoeGatingTopKSoftmaxPerfTilingData*>(tiling);
 
-    tilingDatafromBin->tilingKey = 1;
+    tilingDatafromBin->tilingKey = 9;
     tilingDatafromBin->row = 96;
     tilingDatafromBin->col = 8;
     tilingDatafromBin->colAlign = 32;
     tilingDatafromBin->colBytesAlign = 8;
     tilingDatafromBin->k = 4;
     tilingDatafromBin->kAlign = 8;
-    tilingDatafromBin->blockNum = 24;
-    tilingDatafromBin->blockFormer = 4;
-    tilingDatafromBin->blockTail = 4;
+    tilingDatafromBin->blockNum = 32;
+    tilingDatafromBin->blockFormer = 3;
+    tilingDatafromBin->blockTail = 3;
     tilingDatafromBin->ubLoopOfFormerBlock = 1;
     tilingDatafromBin->ubLoopOfTailBlock = 1;
-    tilingDatafromBin->ubFormer = 4;
-    tilingDatafromBin->ubTailOfFormerBlock = 4;
-    tilingDatafromBin->ubTailOfTailBlock = 4;
-    tilingDatafromBin->topKValuesMask = 4;
-    tilingDatafromBin->topKIndicesMask = 4;
-    tilingDatafromBin->bufferElemSize = 4;
+    tilingDatafromBin->ubFormer = 3;
+    tilingDatafromBin->ubTailOfFormerBlock = 3;
+    tilingDatafromBin->ubTailOfTailBlock = 3;
+    tilingDatafromBin->topKValuesMask = 85;
+    tilingDatafromBin->topKIndicesMask = 170;
+    tilingDatafromBin->bufferElemSize = 96;
 
     ICPU_SET_TILING_KEY(9);
     ICPU_RUN_KF(
-        moe_gating_top_k_softmax, blockDim, x, finished, y, expert_idx, row_idx, workspace,
+        moe_gating_top_k_softmax, blockDim, x, nullptr, y, expert_idx, row_idx, workspace,
         (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
@@ -463,11 +326,12 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_perf_float32_small_col_num)
 TEST_F(moe_gating_top_k_softmax_test, test_case_perf_float32_middle_col_num)
 {
     size_t inputByteSize = 2 * 48 * 64 * sizeof(float);
-    size_t finishedByteSize = 2 * 48 * 64 * sizeof(bool);
+    size_t finishedByteSize = 2 * 48 * sizeof(bool);
     size_t outputByteSize = 2 * 48 * 64 * sizeof(float);
     size_t outputByteSize1 = 2 * 48 * 4 * sizeof(int32_t);
     size_t tiling_data_size = sizeof(MoeGatingTopKSoftmaxPerfTilingData);
     uint32_t blockDim = 24;
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
     uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputByteSize);
     uint8_t* finished = (uint8_t*)AscendC::GmAlloc(finishedByteSize);
@@ -483,28 +347,28 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_perf_float32_middle_col_num)
     MoeGatingTopKSoftmaxPerfTilingData* tilingDatafromBin =
         reinterpret_cast<MoeGatingTopKSoftmaxPerfTilingData*>(tiling);
 
-    tilingDatafromBin->tilingKey = 1;
+    tilingDatafromBin->tilingKey = 12;
     tilingDatafromBin->row = 96;
-    tilingDatafromBin->col = 8;
-    tilingDatafromBin->colAlign = 32;
-    tilingDatafromBin->colBytesAlign = 8;
+    tilingDatafromBin->col = 64;
+    tilingDatafromBin->colAlign = 64;
+    tilingDatafromBin->colBytesAlign = 64;
     tilingDatafromBin->k = 4;
     tilingDatafromBin->kAlign = 8;
-    tilingDatafromBin->blockNum = 24;
-    tilingDatafromBin->blockFormer = 4;
-    tilingDatafromBin->blockTail = 4;
+    tilingDatafromBin->blockNum = 32;
+    tilingDatafromBin->blockFormer = 3;
+    tilingDatafromBin->blockTail = 3;
     tilingDatafromBin->ubLoopOfFormerBlock = 1;
     tilingDatafromBin->ubLoopOfTailBlock = 1;
-    tilingDatafromBin->ubFormer = 4;
-    tilingDatafromBin->ubTailOfFormerBlock = 4;
-    tilingDatafromBin->ubTailOfTailBlock = 4;
-    tilingDatafromBin->topKValuesMask = 4;
-    tilingDatafromBin->topKIndicesMask = 4;
-    tilingDatafromBin->bufferElemSize = 4;
+    tilingDatafromBin->ubFormer = 3;
+    tilingDatafromBin->ubTailOfFormerBlock = 3;
+    tilingDatafromBin->ubTailOfTailBlock = 3;
+    tilingDatafromBin->topKValuesMask = 85;
+    tilingDatafromBin->topKIndicesMask = 170;
+    tilingDatafromBin->bufferElemSize = 192;
 
     ICPU_SET_TILING_KEY(12);
     ICPU_RUN_KF(
-        moe_gating_top_k_softmax, blockDim, x, finished, y, expert_idx, row_idx, workspace,
+        moe_gating_top_k_softmax, blockDim, x, nullptr, y, expert_idx, row_idx, workspace,
         (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
@@ -525,6 +389,7 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_perf_float32_big_col_num)
     size_t outputByteSize1 = 2 * 48 * 4 * sizeof(int32_t);
     size_t tiling_data_size = sizeof(MoeGatingTopKSoftmaxPerfTilingData);
     uint32_t blockDim = 24;
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
     uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputByteSize);
     uint8_t* finished = (uint8_t*)AscendC::GmAlloc(finishedByteSize);
@@ -540,28 +405,28 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_perf_float32_big_col_num)
     MoeGatingTopKSoftmaxPerfTilingData* tilingDatafromBin =
         reinterpret_cast<MoeGatingTopKSoftmaxPerfTilingData*>(tiling);
 
-    tilingDatafromBin->tilingKey = 1;
+    tilingDatafromBin->tilingKey = 15;
     tilingDatafromBin->row = 96;
     tilingDatafromBin->col = 256;
     tilingDatafromBin->colAlign = 256;
     tilingDatafromBin->colBytesAlign = 256;
     tilingDatafromBin->k = 4;
     tilingDatafromBin->kAlign = 8;
-    tilingDatafromBin->blockNum = 24;
-    tilingDatafromBin->blockFormer = 4;
-    tilingDatafromBin->blockTail = 4;
+    tilingDatafromBin->blockNum = 32;
+    tilingDatafromBin->blockFormer = 3;
+    tilingDatafromBin->blockTail = 3;
     tilingDatafromBin->ubLoopOfFormerBlock = 1;
     tilingDatafromBin->ubLoopOfTailBlock = 1;
-    tilingDatafromBin->ubFormer = 4;
-    tilingDatafromBin->ubTailOfFormerBlock = 4;
-    tilingDatafromBin->ubTailOfTailBlock = 4;
-    tilingDatafromBin->topKValuesMask = 4;
-    tilingDatafromBin->topKIndicesMask = 4;
-    tilingDatafromBin->bufferElemSize = 4;
+    tilingDatafromBin->ubFormer = 3;
+    tilingDatafromBin->ubTailOfFormerBlock = 3;
+    tilingDatafromBin->ubTailOfTailBlock = 3;
+    tilingDatafromBin->topKValuesMask = 85;
+    tilingDatafromBin->topKIndicesMask = 170;
+    tilingDatafromBin->bufferElemSize = 768;
 
     ICPU_SET_TILING_KEY(15);
     ICPU_RUN_KF(
-        moe_gating_top_k_softmax, blockDim, x, finished, y, expert_idx, row_idx, workspace,
+        moe_gating_top_k_softmax, blockDim, x, nullptr, y, expert_idx, row_idx, workspace,
         (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
@@ -582,6 +447,7 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_perf_bfloat16_big_col_num)
     size_t outputByteSize1 = 2 * 48 * 4 * sizeof(int32_t);
     size_t tiling_data_size = sizeof(MoeGatingTopKSoftmaxPerfTilingData);
     uint32_t blockDim = 24;
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
     uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputByteSize);
     uint8_t* finished = (uint8_t*)AscendC::GmAlloc(finishedByteSize);
@@ -597,28 +463,28 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_perf_bfloat16_big_col_num)
     MoeGatingTopKSoftmaxPerfTilingData* tilingDatafromBin =
         reinterpret_cast<MoeGatingTopKSoftmaxPerfTilingData*>(tiling);
 
-    tilingDatafromBin->tilingKey = 1;
+    tilingDatafromBin->tilingKey = 17;
     tilingDatafromBin->row = 96;
     tilingDatafromBin->col = 256;
     tilingDatafromBin->colAlign = 256;
     tilingDatafromBin->colBytesAlign = 256;
     tilingDatafromBin->k = 4;
     tilingDatafromBin->kAlign = 8;
-    tilingDatafromBin->blockNum = 24;
-    tilingDatafromBin->blockFormer = 4;
-    tilingDatafromBin->blockTail = 4;
+    tilingDatafromBin->blockNum = 32;
+    tilingDatafromBin->blockFormer = 3;
+    tilingDatafromBin->blockTail = 3;
     tilingDatafromBin->ubLoopOfFormerBlock = 1;
     tilingDatafromBin->ubLoopOfTailBlock = 1;
-    tilingDatafromBin->ubFormer = 4;
-    tilingDatafromBin->ubTailOfFormerBlock = 4;
-    tilingDatafromBin->ubTailOfTailBlock = 4;
-    tilingDatafromBin->topKValuesMask = 4;
-    tilingDatafromBin->topKIndicesMask = 4;
-    tilingDatafromBin->bufferElemSize = 4;
+    tilingDatafromBin->ubFormer = 3;
+    tilingDatafromBin->ubTailOfFormerBlock = 3;
+    tilingDatafromBin->ubTailOfTailBlock = 3;
+    tilingDatafromBin->topKValuesMask = 85;
+    tilingDatafromBin->topKIndicesMask = 170;
+    tilingDatafromBin->bufferElemSize = 768;
 
     ICPU_SET_TILING_KEY(17);
     ICPU_RUN_KF(
-        moe_gating_top_k_softmax, blockDim, x, finished, y, expert_idx, row_idx, workspace,
+        moe_gating_top_k_softmax, blockDim, x, nullptr, y, expert_idx, row_idx, workspace,
         (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
@@ -639,6 +505,7 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_perf_bfloat16_middle_col_num)
     size_t outputByteSize1 = 2 * 48 * 4 * sizeof(int32_t);
     size_t tiling_data_size = sizeof(MoeGatingTopKSoftmaxPerfTilingData);
     uint32_t blockDim = 24;
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
     uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputByteSize);
     uint8_t* finished = (uint8_t*)AscendC::GmAlloc(finishedByteSize);
@@ -654,28 +521,28 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_perf_bfloat16_middle_col_num)
     MoeGatingTopKSoftmaxPerfTilingData* tilingDatafromBin =
         reinterpret_cast<MoeGatingTopKSoftmaxPerfTilingData*>(tiling);
 
-    tilingDatafromBin->tilingKey = 1;
+    tilingDatafromBin->tilingKey = 14;
     tilingDatafromBin->row = 96;
     tilingDatafromBin->col = 64;
     tilingDatafromBin->colAlign = 64;
     tilingDatafromBin->colBytesAlign = 64;
     tilingDatafromBin->k = 4;
     tilingDatafromBin->kAlign = 8;
-    tilingDatafromBin->blockNum = 24;
-    tilingDatafromBin->blockFormer = 4;
-    tilingDatafromBin->blockTail = 4;
+    tilingDatafromBin->blockNum = 32;
+    tilingDatafromBin->blockFormer = 3;
+    tilingDatafromBin->blockTail = 3;
     tilingDatafromBin->ubLoopOfFormerBlock = 1;
     tilingDatafromBin->ubLoopOfTailBlock = 1;
-    tilingDatafromBin->ubFormer = 4;
-    tilingDatafromBin->ubTailOfFormerBlock = 4;
-    tilingDatafromBin->ubTailOfTailBlock = 4;
-    tilingDatafromBin->topKValuesMask = 4;
-    tilingDatafromBin->topKIndicesMask = 4;
-    tilingDatafromBin->bufferElemSize = 4;
+    tilingDatafromBin->ubFormer = 3;
+    tilingDatafromBin->ubTailOfFormerBlock = 3;
+    tilingDatafromBin->ubTailOfTailBlock = 3;
+    tilingDatafromBin->topKValuesMask = 85;
+    tilingDatafromBin->topKIndicesMask = 170;
+    tilingDatafromBin->bufferElemSize = 192;
 
     ICPU_SET_TILING_KEY(14);
     ICPU_RUN_KF(
-        moe_gating_top_k_softmax, blockDim, x, finished, y, expert_idx, row_idx, workspace,
+        moe_gating_top_k_softmax, blockDim, x, nullptr, y, expert_idx, row_idx, workspace,
         (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);
@@ -696,6 +563,7 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_perf_bfloat16_small_col_num)
     size_t outputByteSize1 = 2 * 48 * 4 * sizeof(int32_t);
     size_t tiling_data_size = sizeof(MoeGatingTopKSoftmaxPerfTilingData);
     uint32_t blockDim = 24;
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
     uint8_t* x = (uint8_t*)AscendC::GmAlloc(inputByteSize);
     uint8_t* finished = (uint8_t*)AscendC::GmAlloc(finishedByteSize);
@@ -711,28 +579,28 @@ TEST_F(moe_gating_top_k_softmax_test, test_case_perf_bfloat16_small_col_num)
     MoeGatingTopKSoftmaxPerfTilingData* tilingDatafromBin =
         reinterpret_cast<MoeGatingTopKSoftmaxPerfTilingData*>(tiling);
 
-    tilingDatafromBin->tilingKey = 1;
+    tilingDatafromBin->tilingKey = 11;
     tilingDatafromBin->row = 96;
     tilingDatafromBin->col = 8;
     tilingDatafromBin->colAlign = 32;
     tilingDatafromBin->colBytesAlign = 8;
     tilingDatafromBin->k = 4;
     tilingDatafromBin->kAlign = 8;
-    tilingDatafromBin->blockNum = 24;
-    tilingDatafromBin->blockFormer = 4;
-    tilingDatafromBin->blockTail = 4;
+    tilingDatafromBin->blockNum = 32;
+    tilingDatafromBin->blockFormer = 3;
+    tilingDatafromBin->blockTail = 3;
     tilingDatafromBin->ubLoopOfFormerBlock = 1;
     tilingDatafromBin->ubLoopOfTailBlock = 1;
-    tilingDatafromBin->ubFormer = 4;
-    tilingDatafromBin->ubTailOfFormerBlock = 4;
-    tilingDatafromBin->ubTailOfTailBlock = 4;
-    tilingDatafromBin->topKValuesMask = 4;
-    tilingDatafromBin->topKIndicesMask = 4;
-    tilingDatafromBin->bufferElemSize = 4;
+    tilingDatafromBin->ubFormer = 3;
+    tilingDatafromBin->ubTailOfFormerBlock = 3;
+    tilingDatafromBin->ubTailOfTailBlock = 3;
+    tilingDatafromBin->topKValuesMask = 85;
+    tilingDatafromBin->topKIndicesMask = 170;
+    tilingDatafromBin->bufferElemSize = 96;
 
     ICPU_SET_TILING_KEY(11);
     ICPU_RUN_KF(
-        moe_gating_top_k_softmax, blockDim, x, finished, y, expert_idx, row_idx, workspace,
+        moe_gating_top_k_softmax, blockDim, x, nullptr, y, expert_idx, row_idx, workspace,
         (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(x);

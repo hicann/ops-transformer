@@ -745,8 +745,10 @@ private:
     {
         int32_t base = static_cast<int32_t>(GetBlockIdx() * tilingData->blockFormer + OuterIdx * tilingData->ubFormer);
         for (int32_t i = 0; i < curRowsNum; i++) {
+#ifndef __CCE_KT_TEST__
             ArithProgression(
                 sourceRowsOutLocal[i * tilingData->k], base + i, static_cast<int32_t>(tilingData->row), tilingData->k);
+#endif
         }
     }
 

@@ -35,6 +35,7 @@ struct MoeGatingTopKSoftmaxEKFullLoadTilingData {
     uint32_t ubFormer;
     uint32_t ubTailOfFormerBlock;
     uint32_t ubTailOfTailBlock;
+    uint32_t copyUbToUbBlockCount;
     SoftMaxTiling formerSoftmaxTilingData;
     SoftMaxTiling formerBlockTailSoftmaxTilingData;
     SoftMaxTiling tailBlockTailSoftmaxTilingData;

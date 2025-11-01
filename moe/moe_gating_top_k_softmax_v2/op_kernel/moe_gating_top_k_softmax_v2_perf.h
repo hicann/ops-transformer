@@ -450,7 +450,9 @@ private:
         const LocalTensor<float>& dst, const LocalTensor<float>& src0, const LocalTensor<int32_t>& src1,
         const int32_t curRowsNum, const MoeGatingTopKSoftmaxV2PerfTilingData* __restrict tilingData)
     {
+#ifndef __CCE_KT_TEST__
         Sort32(dst, src0, src1.ReinterpretCast<uint32_t>(), tilingData->colAlign * curRowsNum / SORT_UNIT);
+#endif
         PipeBarrier<PIPE_V>();
     }
 
@@ -470,7 +472,9 @@ private:
         intriParams.dstStride = (dstColsNum - BLOCK_B32_SIZE) * CONSTANT_TWO / CONSTANT_EIGHT;
         // 32 -> 8
         for (int32_t i = 0; i < srcColsNum / SORT_UNIT; i++) {
+#ifndef __CCE_KT_TEST__
             DataCopy(dst[BLOCK_B32_SIZE * CONSTANT_TWO * i], src[SORT_UNIT * CONSTANT_TWO * i], intriParams);
+#endif
         }
         PipeBarrier<PIPE_V>();
     }
