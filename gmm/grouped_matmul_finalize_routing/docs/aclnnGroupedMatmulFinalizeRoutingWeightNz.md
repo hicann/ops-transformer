@@ -183,7 +183,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
     <tr>
       <td>sharedInputOffset</td>
       <td>输入</td>
-      <td>共享专家输出的在总输出中的偏移。</td>
+      <td>共享专家输出在总输出中的偏移。</td>
       <td></td>
       <td>INT64</td>
       <td></td>
@@ -617,7 +617,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
           LOG_PRINT("result[%ld] is: %u\n", i, resultData[i]);
       }
 
-      // 6. 释放aclTensor和aclTensor，需要根据具体API的接口定义修改
+      // 6. 释放aclTensor资源，需要根据具体API的接口定义修改
       aclDestroyTensor(x);
       aclDestroyTensor(w);
       aclDestroyTensor(scale);
