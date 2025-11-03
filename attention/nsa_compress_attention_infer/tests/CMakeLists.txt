@@ -45,6 +45,21 @@ set(_ncai_OpKernelPrivateIncludesExt
         ${OPS_TRANSFORMER_DIR}/common/include/kernel
 )
 
+set(_NCAI_UTestSourcesExtForce)
+
+if (UT_TEST_ALL)
+        file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*.cc")
+        file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*.cpp")
+elseif(OP_HOST_UT)
+        file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/op_host/*tiling.cc")
+        file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/op_host/*tiling.cpp")
+elseif(OP_KERNEL_UT)
+        file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/op_kernel/*kernel.cc")
+        file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/op_kernel/*kernel.cpp")
+endif()
+
+list(APPEND _NCAI_UTestSourcesExtForce ${_Src1} ${_Src2})
+
 aux_source_directory(${CMAKE_SOURCE_DIR}/attention/nsa_compress_attention_infer/op_kernel _ncai_KernelSourcesExt)
 
 OpsTest_Level2_AddOp(
@@ -57,6 +72,8 @@ OpsTest_Level2_AddOp(
         TILING_SOURCES_EXT                      ${_ncai_TilingSourcesExt}
         TILING_PRIVATE_INCLUDES_EXT             ${_ncai_KernelTilingExtInclude}
         KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT  ${_ncai_CompileDefintions}
+        UTEST_SOURCES_EXT                       ${_NCAI_UTestSourcesExtForce}
+        UTEST_SOURCES_EXT_FORCE                 ON
         UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT ${_ncai_TargetPrivateLinkLibrariesExt}
         UTEST_COMMON_PRIVATE_INCLUDES_EXT       ${_ncai_UTestCommonPrivateIncludeExt}
 )

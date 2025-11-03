@@ -17,7 +17,7 @@
 
 using Tensor = ops::adv::tests::utils::Tensor;
 
-TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_0)
+TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_0_kernel)
 {
     constexpr uint32_t CASE1_B = 20;
     constexpr uint32_t CASE1_S2 = 4096;
@@ -60,7 +60,7 @@ TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_0)
     ASSERT_TRUE(cs.Run());
 }
 
-TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_1)
+TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_1_kernel)
 {
     constexpr uint32_t CASE2_B = 20;
     constexpr uint32_t CASE2_S2 = 2048;
@@ -104,7 +104,7 @@ TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_1)
 }
 
 // getmaxworkspace test
-TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_aclgraph)
+TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_aclgraph_kernel)
 {
     constexpr uint32_t CASE3_B = 20;
     constexpr int32_t CASE3_S2 = -1;
@@ -147,7 +147,7 @@ TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_aclgraph)
     ASSERT_TRUE(cs.Run());
 }
 
-TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_mtp)
+TEST_F(Ts_ncaInfer, case_nsa_compress_attention_infer_mtp_kernel)
 {
     constexpr uint32_t CASE4_B = 20;
     constexpr uint32_t CASE4_S1 = 2;
