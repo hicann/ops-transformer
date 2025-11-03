@@ -13,7 +13,7 @@
      add_tiling_modules()
      target_sources(${OPHOST_NAME}_tiling_obj PRIVATE ${OPTILING_SRCS})
    endif()
-   if(NOT ENABLE_BUILT_IN)
+   if(NOT ENABLE_BUILT_IN AND NOT ENABLE_TEST)
     file(GLOB OPPROTO_SRCS
      src/mc2_moe_utils.cpp
      src/mc2_common_infershape.cpp
