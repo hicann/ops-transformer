@@ -55,32 +55,35 @@ set(_NCWC_UTestCommonPrivateLinkLibrariesExt
         error_manager
 )
 
-set(_NCWC_UTestSourcesExtForce)
-file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*.cc")
-file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*.cpp")
-list(APPEND _NCWC_UTestSourcesExtForce ${_Src1} ${_Src2})
-
-set(_NCWC_UTestAclnnSourcesExtForce)
-file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn/*.cc")
-file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn/*.cpp")
-list(APPEND _NCWC_UTestAclnnSourcesExtForce ${_Src1} ${_Src2})
-
-set(_NCWC_UTestCompileDefinitions)
 
 list(APPEND _NCWC_OpKernelSourcesExt
         ${OPS_TRANSFORMER_DIR}/attention/nsa_compress_with_cache/op_kernel/nsa_compress_with_cache.cpp
 )
 
-file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*.cc")
-file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*.cpp")
+set(_NCWC_UTestSourcesExtForce)
+if (UT_TEST_ALL)
+        file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*.cc")
+        file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*.cpp")
+elseif(OP_HOST_UT)
+        file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*tiling.cc")
+        file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*tiling.cpp")
+elseif(OP_KERNEL_UT)
+        file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*kernel.cc")
+        file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*kernel.cpp")
+endif()
 list(APPEND _NCWC_UTestSourcesExtForce ${_Src1} ${_Src2})
 
-file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn/*.cc")
-file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn/*.cpp")
+set(_NCWC_UTestAclnnSourcesExtForce)
+if (OP_API_UT)
+    file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn/*.cc")
+    file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn/*.cpp")
 list(APPEND _NCWC_UTestAclnnSourcesExtForce ${_Src1} ${_Src2})
+else()
+    list(APPEND _NCWC_UTestAclnnSourcesExtForce)
+endif()
 
+set(_NCWC_UTestCompileDefinitions)
 list(APPEND _NCWC_UTestCompileDefinitions)
-
 
 OpsTest_Level2_AddOp(
         SUB_SYSTEM                                transformer
