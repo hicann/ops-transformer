@@ -16,8 +16,8 @@
 #include "tests/utest/ts.h"
 #include "nsa_select_attention_infer_case.h"
 
+using NsaSelectAttentionInferParam = ops::adv::tests::NsaSelectAttentionInfer::NsaSelectAttentionInferParam;
 using NsaSelectAttentionInferCase = ops::adv::tests::NsaSelectAttentionInfer::NsaSelectAttentionInferCase;
 
-class Ts_NsaSelectAttentionInfer
-    : public Ts<NsaSelectAttentionInferCase>
-    {};
+class Ts_NsaSelectAttentionInfer_WithParam : public Ts_WithParam {};
+class Ts_NsaSelectAttentionInfer_WithParam_Ascend910B1 : public Ts_WithParam_Ascend910B1 {};
