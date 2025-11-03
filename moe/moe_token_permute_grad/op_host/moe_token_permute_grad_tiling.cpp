@@ -99,7 +99,7 @@ static inline ge::graphStatus InputParamCheck(const gert::TilingContext *context
     return ge::GRAPH_SUCCESS;
 }
 
-static inline void Init(const gert::TilingContext *context, const int64_t topK, MoeTokenUnpermuteParam &param)
+static inline void Init(gert::TilingContext *context, const int64_t topK, MoeTokenUnpermuteParam &param)
 {
     auto ascendPlaform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     param.core.maxCoreNum = static_cast<int64_t>(ascendPlaform.GetCoreNumAiv());
@@ -129,6 +129,12 @@ static inline void Init(const gert::TilingContext *context, const int64_t topK, 
         param.input.topK = topK == -1 ? 1 : topK;
         param.input.tokensNum = safeDiv(param.input.totalLength, param.input.topK);
     }
+    size_t sysWorkspaceSize = ascendPlaform.GetLibApiWorkSpaceSize();
+    size_t *workspaces = context->GetWorkspaceSizes(1);
+
+    size_t UserWorkspaceSize = 0;
+
+    workspaces[0] = sysWorkspaceSize + UserWorkspaceSize;
 }
 
 static void SetCoreNum(MoeTokenUnpermuteParam &param)
