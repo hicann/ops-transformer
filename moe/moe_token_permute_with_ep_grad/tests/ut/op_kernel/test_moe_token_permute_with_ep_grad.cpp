@@ -36,10 +36,10 @@ class moe_token_permute_with_ep_grad_test : public testing::Test {
 };
 
 TEST_F(moe_token_permute_with_ep_grad_test, test_bf16_none_prob) {
-  system("chmod -R 755 ./gen_data/");
-  // token_num, topk, hiddensize, dtype, flag
-  system("cd ./gen_data/ && python3 gen_data.py 6144 8 5120 bfloat16_t True");
-  system("cd ./moe_token_permute_grad_data/ && python3 gen_tiling.py case0");
+  // system("chmod -R 755 ./gen_data/");
+  // // token_num, topk, hiddensize, dtype, flag
+  // system("cd ./gen_data/ && python3 gen_data.py 6144 8 5120 bfloat16_t True");
+  // system("cd ./moe_token_permute_grad_data/ && python3 gen_tiling.py case0");
 
   size_t permutedOutDByteSize = 6144 * 8 * 5120 * sizeof(bfloat16_t);
   size_t sortedIndicesByteSize = 6144 * 8 * sizeof(int32_t);
@@ -64,7 +64,10 @@ TEST_F(moe_token_permute_with_ep_grad_test, test_bf16_none_prob) {
   string path(path_);
 
   MoeTokenPermuteWithEpGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenPermuteWithEpGradTilingData*>(tiling);
-
+  tilingDatafromBin->top_k=1;
+  tilingDatafromBin->hidden_splited_length=1;
+  tilingDatafromBin->tokens_splited_length=1;
+  tilingDatafromBin->buffer_num=1;
   ICPU_SET_TILING_KEY(0);
   ICPU_RUN_KF(moe_token_permute_with_ep_grad, blockDim, permuted_output_d, sorted_indices, probs, input_grad, input_probs_grad, workspace, tiling);
 
@@ -107,7 +110,10 @@ TEST_F(moe_token_permute_with_ep_grad_test, test_bf16_with_prob) {
   string path(path_);
 
   MoeTokenPermuteWithEpGradTilingData* tilingDatafromBin = reinterpret_cast<MoeTokenPermuteWithEpGradTilingData*>(tiling);
-
+  tilingDatafromBin->top_k=1;
+  tilingDatafromBin->hidden_splited_length=1;
+  tilingDatafromBin->tokens_splited_length=1;
+  tilingDatafromBin->buffer_num=1;
   ICPU_SET_TILING_KEY(1);
   ICPU_RUN_KF(moe_token_permute_with_ep_grad, blockDim, permuted_output_d, sorted_indices, probs, input_grad, input_probs_grad, workspace, tiling);
 

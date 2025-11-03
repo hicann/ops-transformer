@@ -47,7 +47,7 @@ TEST_F(MoeTokenPermuteWithEpGradInferShape, MoeTokenPermuteWithEpGrad_infershape
         {{"num_topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
          {"range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(range)},
          {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
-    std::vector<std::vector<int64_t>> expectOutputShape = {{6144, 5120}, {6}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{6144, 5120}, {}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
