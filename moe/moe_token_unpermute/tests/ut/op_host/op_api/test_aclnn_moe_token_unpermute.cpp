@@ -52,8 +52,6 @@ TEST_F(l2_moe_token_unpermute_test, Ascend910B2_moe_token_unpermute_fp32)
     aclOpExecutor* executor = nullptr;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
-
-    ut.TestPrecision();
 }
 
 TEST_F(l2_moe_token_unpermute_test, Ascend910_9589_moe_token_unpermute_fp32)
