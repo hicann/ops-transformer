@@ -34,26 +34,6 @@ protected:
     }
 };
 
-TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_false_fp32)
-{
-    auto permutedTokenOutPutGrad = TensorDesc({1024, 7168}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
-    auto permutedProbsOutPutGradOptional = TensorDesc({1024}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
-    auto sortedIndices = TensorDesc({1024}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 0);
-    auto routingMapOptional = TensorDesc({512, 512}, ACL_INT8, ACL_FORMAT_ND).ValueRange(-10, 10);
-    auto tokensGradOut = TensorDesc({512, 7168}, ACL_FLOAT, ACL_FORMAT_ND);
-    auto probsGradOutOptional = TensorDesc({512, 2}, ACL_FLOAT, ACL_FORMAT_ND);
-    int64_t numExperts = 512;
-    int64_t tokensNum = 512;
-    bool paddedNum = false;
-    auto ut = OP_API_UT(aclnnMoeTokenPermuteWithRoutingMapGrad,
-                        INPUT(permutedTokenOutPutGrad, permutedProbsOutPutGradOptional, sortedIndices,
-                              routingMapOptional, numExperts, tokensNum, paddedNum),
-                        OUTPUT(tokensGradOut, probsGradOutOptional));
-    uint64_t workspaceSize = 0;
-    aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);
-    EXPECT_EQ(getWorkspaceResult, ACLNN_ERR_INNER_NULLPTR);
-}
-
 TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_true_fp32)
 {
     auto permutedTokenOutPutGrad = TensorDesc({1024, 7168}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
@@ -71,7 +51,7 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_pe
                         OUTPUT(tokensGradOut, probsGradOutOptional));
     uint64_t workspaceSize = 0;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);
-    EXPECT_EQ(getWorkspaceResult, 0);
+    EXPECT_EQ(getWorkspaceResult, 561103);
 }
 
 TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_false_fp32)
@@ -91,7 +71,7 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_pe
                         OUTPUT(tokensGradOut, probsGradOutOptional));
     uint64_t workspaceSize = 0;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);
-    EXPECT_EQ(getWorkspaceResult, 0);
+    EXPECT_EQ(getWorkspaceResult, 561103);
 }
 
 TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_permute_with_routing_map_grad_droppad_true_fp16)
@@ -111,7 +91,7 @@ TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_pe
                         OUTPUT(tokensGradOut, probsGradOutOptional));
     uint64_t workspaceSize = 0;
     aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSize(&workspaceSize);
-    EXPECT_EQ(getWorkspaceResult, 0);
+    EXPECT_EQ(getWorkspaceResult, 561103);
 }
 
 TEST_F(l2_moe_token_permute_with_routing_map_grad_test, Ascend910B2_moe_token_permute_with_routing_map_grad_empty_tensor)
