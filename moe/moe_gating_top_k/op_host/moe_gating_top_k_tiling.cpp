@@ -139,9 +139,9 @@ private:
 
 ge::graphStatus MoeGatingTopKTilingBase::CheckInputShape()
 {
-    size_t xDimNnum = xShape_->GetDimNum();
-    OP_CHECK_IF(xDimNnum != X_INPUT_DIMS,
-                OP_LOGE(context_, "The dim number of x is: %zu, but should be %zu.", xDimNnum, X_INPUT_DIMS),
+    size_t xDimNum = xShape_->GetDimNum();
+    OP_CHECK_IF(xDimNum != X_INPUT_DIMS,
+                OP_LOGE(context_, "The dim number of x is: %zu, but should be %zu.", xDimNum, X_INPUT_DIMS),
                 return ge::GRAPH_FAILED);
 
     // 通过输入获取rows 和 expertCount
@@ -151,9 +151,9 @@ ge::graphStatus MoeGatingTopKTilingBase::CheckInputShape()
     moeGatingTopKTilingData_.set_expertCount(expertCount_);
     if (biasShape_ != nullptr) {
         addBias_ = 1;
-        size_t biasDimNnum = biasShape_->GetDimNum();
-        OP_CHECK_IF(biasDimNnum != BIAS_INPUT_DIMS,
-                    OP_LOGE(context_, "The dim number of bias is: %zu, but should be %zu.", biasDimNnum, BIAS_INPUT_DIMS),
+        size_t biasDimNum = biasShape_->GetDimNum();
+        OP_CHECK_IF(biasDimNum != BIAS_INPUT_DIMS,
+                    OP_LOGE(context_, "The dim number of bias is: %zu, but should be %zu.", biasDimNum, BIAS_INPUT_DIMS),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(
             biasShape_->GetDim(0) != expertCount_,
@@ -213,14 +213,14 @@ ge::graphStatus MoeGatingTopKTilingBase::CheckAttr()
         groupSelectMode_ == GROUP_SELECT_MODE_SUM && perGroupExpertCount_ < 2,
         OP_LOGE(context_,
              "group expert count is: %ld, if group select mode is: %ld, group expert count should be greater than 1.",
-             groupSelectMode_, perGroupExpertCount_),
+             perGroupExpertCount_, groupSelectMode_),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(k_ > kGroup_ * perGroupExpertCount_,
                 OP_LOGE(context_, "k is: %ld, but should be smaller than %ld.", k_, kGroup_ * perGroupExpertCount_),
                 return ge::GRAPH_FAILED);
     int64_t groupExpertCountAlign = Ops::Base::CeilAlign(perGroupExpertCount_, 32L);
     if (groupCount_ != 1 && groupCount_ != expertCount_ && kGroup_ != groupCount_) {
-        // 非分组场景下才需要校验对齐后的数量
+        // 分组场景下才需要校验对齐后的数量
         OP_CHECK_IF(groupCount_ * groupExpertCountAlign > MAX_EXPERT_COUNT,
                     OP_LOGE(context_, "group count * group expert count align is: %ld, but should not greater than %ld.",
                          groupCount_ * groupExpertCountAlign, MAX_EXPERT_COUNT),
@@ -248,7 +248,7 @@ ge::graphStatus MoeGatingTopKTilingBase::GetShapeAttrsInfo()
     OP_CHECK_NULL_WITH_CONTEXT(context_, yShapePtr);
     yShape_ = &yShapePtr->GetStorageShape();
     auto expertIdxPtr = context_->GetOutputShape(EXPERT_IDX_OUTPUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, yShapePtr);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, expertIdxPtr);
     expertIdxShape_ = &expertIdxPtr->GetStorageShape();
     auto outPtr = context_->GetOutputShape(OUT_OUTPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, outPtr);

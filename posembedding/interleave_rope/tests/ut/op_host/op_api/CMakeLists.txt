@@ -8,20 +8,8 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ----------------------------------------------------------------------------
 
-message(STATUS "=== Debug: start ops.moe.moe_gating_top_k.op_host.CMakeLists.txt")
+message(STATUS "=== Debug: target_sources add test_interleave_rope")
 
-if (BUILD_OPEN_PROJECT)
-    target_sources(op_host_aclnn PRIVATE
-        moe_gating_top_k_def.cpp
-    )
-    add_ops_compile_options(
-            OP_NAME MoeGatingTopK
-            OPTIONS --cce-auto-sync=on
-                    -Wno-deprecated-declarations
-                    -Werror
-    )
-endif()
-
-if(NOT BUILD_OPS_RTY_KERNEL)
-    add_modules_sources(OPTYPE moe_gating_top_k ACLNNTYPE aclnn)
+if(UT_TEST_ALL OR OP_API_UT)
+    add_modules_ut_sources(UT_NAME ${OP_API_MODULE_NAME} MODE PRIVATE DIR ${CMAKE_CURRENT_SOURCE_DIR})
 endif()

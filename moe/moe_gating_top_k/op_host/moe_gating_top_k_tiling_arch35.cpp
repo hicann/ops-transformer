@@ -9,7 +9,7 @@
  */
 
 /* !
- * \file moe_gating_top_k_tiling_ar35.cpp
+ * \file moe_gating_top_k_tiling_arch35.cpp
  * \brief
  */
 
@@ -98,6 +98,7 @@ private:
     ge::graphStatus CheckInputShape();
     ge::graphStatus CheckAttr();
     ge::graphStatus CheckOutShape();
+    void CalTmpBufUbSize();
     void SplitRows();
     void Tiling4GatherOutComputeSplitK();
 
@@ -129,9 +130,9 @@ private:
 
 ge::graphStatus MoeGatingTopKTilingRegbase::CheckInputShape()
 {
-    size_t xDimNnum = xShape_->GetDimNum();
-    OP_CHECK_IF(xDimNnum != X_INPUT_DIMS,
-                OP_LOGE(context_, "The number of x dim is: %zu, but should be %zu.", xDimNnum, X_INPUT_DIMS),
+    size_t xDimNum = xShape_->GetDimNum();
+    OP_CHECK_IF(xDimNum != X_INPUT_DIMS,
+                OP_LOGE(context_, "The dim number of x is: %zu, but should be %zu.", xDimNum, X_INPUT_DIMS),
                 return ge::GRAPH_FAILED);
 
     // 通过输入获取rows 和 expertCount
@@ -146,9 +147,9 @@ ge::graphStatus MoeGatingTopKTilingRegbase::CheckInputShape()
 
     if (biasShape_ != nullptr) {
         addBias_ = 1;
-        size_t biasDimNnum = biasShape_->GetDimNum();
-        OP_CHECK_IF(biasDimNnum != BIAS_INPUT_DIMS,
-                    OP_LOGE(context_, "The number of bias dim is: %zu, but should be %zu.", biasDimNnum, BIAS_INPUT_DIMS),
+        size_t biasDimNum = biasShape_->GetDimNum();
+        OP_CHECK_IF(biasDimNum != BIAS_INPUT_DIMS,
+                    OP_LOGE(context_, "The number of bias dim is: %zu, but should be %zu.", biasDimNum, BIAS_INPUT_DIMS),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(biasShape_->GetDim(0) != expertCount_,
                     OP_LOGE(context_, "The first dim of bias is: %ld, but should be expert num: %ld.",
@@ -178,9 +179,10 @@ ge::graphStatus MoeGatingTopKTilingRegbase::CheckAttr()
                 return ge::GRAPH_FAILED);
 
     int64_t groupExpertCount = expertCount_ / groupCount_;
-    int64_t groupExpertCountAlign = Ops::Base::CeilAlign(groupExpertCount, 32l);
+    int64_t groupExpertCountAlign = Ops::Base::CeilAlign(groupExpertCount, 32L);
     moeGatingTopKTilingData_.set_perGroupExpertCount(expertCount_ / groupCount_);
     moeGatingTopKTilingData_.set_perGroupExpertCountAlign(groupExpertCountAlign);
+
     OP_CHECK_IF(groupCount_ * groupExpertCountAlign > MAX_EXPERT_COUNT,
                 OP_LOGE(context_, "group count * group expert count align is: %ld, but should not greater than %ld.",
                      groupCount_ * groupExpertCountAlign, MAX_EXPERT_COUNT),
@@ -191,20 +193,27 @@ ge::graphStatus MoeGatingTopKTilingRegbase::CheckAttr()
                      kGroup_ * groupExpertCount, k_),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(groupExpertCount < 2,
-                OP_LOGE(context_, "per group expert count is: %ld, but should not less than 2.", groupExpertCount),
+    OP_CHECK_IF(groupExpertCount < 1,
+                OP_LOGE(context_, "per group expert count is: %ld, but should be greater than 0.", groupExpertCount),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(groupSelectMode_ != GROUP_SELECT_MODE_SUM,
-                OP_LOGE(context_, "group_select_mode is: %ld, but currently only supports %ld.", groupSelectMode_,
-                     GROUP_SELECT_MODE_SUM),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        groupSelectMode_ != GROUP_SELECT_MODE_SUM && groupSelectMode_ != GROUP_SELECT_MODE_MAX,
+        OP_LOGE(context_, "group select mode is: %ld, but currently only support %ld and %ld.", groupSelectMode_,
+            GROUP_SELECT_MODE_SUM, GROUP_SELECT_MODE_MAX),
+            return ge::GRAPH_FAILED);
+    OP_CHECK_IF(groupSelectMode_ == GROUP_SELECT_MODE_SUM && groupExpertCount < 2,
+        OP_LOGE(context_,
+             "group expert count is: %ld, if group select mode is: %ld, group expert count should be greater than 1.",
+             groupExpertCount, groupSelectMode_),
+        return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(renorm_ != RENORM_NO,
                 OP_LOGE(context_, "renorm is: %ld, but currently only support %ld.", renorm_, RENORM_NO),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(normType_ != NORM_TYPE_SIGMOID,
-                OP_LOGE(context_, "norm_type is: %ld, but currently only support %ld.", normType_, NORM_TYPE_SIGMOID),
+    OP_CHECK_IF(normType_ != NORM_TYPE_SOFTMAX && normType_ != NORM_TYPE_SIGMOID,
+                OP_LOGE(context_, "norm type is: %ld, but currently only support %ld and %ld.", normType_,
+                        NORM_TYPE_SOFTMAX, NORM_TYPE_SIGMOID),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(outFlag_ != 0, OP_LOGE(context_, "out_flag is: True, but currently only support False."),
@@ -220,7 +229,7 @@ ge::graphStatus MoeGatingTopKTilingRegbase::GetShapeAttrsInfo()
     auto xShapePtr = context_->GetInputShape(X_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, xShapePtr);
     xShape_ = &xShapePtr->GetStorageShape();
-    auto biasShapePtr = context_->GetInputShape(BIAS_INPUT_INDEX);
+    auto biasShapePtr = context_->GetOptionalInputShape(BIAS_INPUT_INDEX);
     biasShape_ = biasShapePtr == nullptr ? nullptr : &biasShapePtr->GetStorageShape();
 
     // 获取输出shape
@@ -244,8 +253,7 @@ ge::graphStatus MoeGatingTopKTilingRegbase::GetShapeAttrsInfo()
              ge::TypeUtils::DataTypeToSerialString(xDtype).c_str()),
         return ge::GRAPH_FAILED);
 
-    auto bias = context_->GetOptionalInputShape(BIAS_INPUT_INDEX);
-    if (bias != nullptr) {
+    if (biasShapePtr != nullptr) {
         auto biasDtype = context_->GetOptionalInputDesc(BIAS_INPUT_INDEX)->GetDataType();
         OP_CHECK_IF((biasDtype != xDtype),
                     OP_LOGE(context_, "bias dtype %s not equal x dtype %s, please check.",
@@ -410,6 +418,14 @@ ge::graphStatus MoeGatingTopKTilingRegbase::CheckOutShape()
     return ge::GRAPH_SUCCESS;
 }
 
+void MoeGatingTopKTilingRegbase::CalTmpBufUbSize() {
+    std::vector<int64_t> shape_vec = {groupCount_ * moeGatingTopKTilingData_.get_perGroupExpertCountAlign()};
+    ge::Shape softmaxShape(shape_vec);
+
+    uint32_t softmaxTmpSize = AscendC::GetSoftMaxMaxTmpSize(softmaxShape, sizeof(float), true);
+    AscendC::SoftMaxTilingFunc(softmaxShape, sizeof(float), softmaxTmpSize, moeGatingTopKTilingData_.softmaxTilingData);
+}
+
 void MoeGatingTopKTilingRegbase::SplitRows()
 {
     int64_t perCoreRows = Ops::Base::CeilDiv(rows_, static_cast<int64_t>(aicoreParams_.blockDim));
@@ -451,6 +467,7 @@ ge::graphStatus MoeGatingTopKTilingRegbase::DoOpTiling()
         return ret;
     }
 
+    CalTmpBufUbSize();
     SplitRows();
     return ge::GRAPH_SUCCESS;
 }

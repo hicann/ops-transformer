@@ -48,7 +48,6 @@ namespace ge {
    * Warning: THIS FUNCTION IS EXPERIMENTAL. Please do not use.
    *
    * - Ascend 910_95 AI Processor:
-   * The attribute group_select_mode can only be 1 now.
    * The attribute norm_type can only be 1 now.
    * The attribute out_flag can only be false now.
    */
@@ -66,7 +65,7 @@ REG_OP(MoeGatingTopK)
     .ATTR(norm_type, Int, 0)
     .ATTR(out_flag, Bool, false)
     .ATTR(routed_scaling_factor, Float, 1.0)
-    .ATTR(eps, Float, 1e-20)
+    .ATTR(eps, Float, 1e-20f)
     .OP_END_FACTORY_REG(MoeGatingTopK)
 
 } // namespace ge

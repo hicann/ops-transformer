@@ -159,6 +159,7 @@ static inline bool CheckShape(  const aclTensor *x,
                  return false);
     }
 
+    (void)offsetOptional;
     return true;
 }
 
