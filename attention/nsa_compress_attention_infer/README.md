@@ -117,3 +117,9 @@
   * 仅支持paged attention。
   * 仅支持selectBlockSize取值为16的整数倍，最大支持到128。
   * selectBlockCount上限满足selectBlockCount*selectBlockSize<=MaxKvSeqlen，MaxKvSeqlen=Max(actualSelKvSeqLenOptional)。
+
+## 调用说明
+
+| 调用方式  | 样例代码                                                                | 说明                                                                                          |
+| ----------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| aclnn接口 | [test_aclnn_nsa_compress_attention_infer](./examples/test_aclnn_nsa_compress_attention_infer.cpp) | 通过[`aclnnNsaCompressAttentionInfer`](./docs/aclnnNsaCompressAttentionInfer.md)接口方式调用NsaCompressAttentionInfer算子。 |

@@ -97,3 +97,9 @@ $$
 * blockTableOptional的值不超过blockNum，否则会发生越界。
 * actSeqLenOptional的值不应该超过序列最大长度。
 * headNum<=64，且headNum>50时headNum%2=0。
+
+## 调用说明
+
+| 调用方式  | 样例代码                                                                | 说明                                                                                          |
+| ----------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| aclnn接口 | [test_aclnn_nsa_compress_with_cache](./examples/test_aclnn_nsa_compress_with_cache.cpp) | 通过[`aclnnNsaCompressWithCache`](./docs/aclnnNsaCompressWithCache.md)接口方式调用NsaCompressWithCache算子。 |

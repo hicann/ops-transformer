@@ -486,7 +486,7 @@ int main() {
                       size * sizeof(aclFloat16), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t i = heads_dim * heads_num - 16; i < heads_dim * heads_num + 16; i++) {
-        printf("outputCache[%d]:%f\n", i, aclFloat16ToFloat(resultData[i]));
+        printf("outputCache[%ld]:%f\n", i, aclFloat16ToFloat(resultData[i]));
     }
     // 6. 释放aclTensor，需要根据具体API的接口定义修改
     aclDestroyTensor(input);
