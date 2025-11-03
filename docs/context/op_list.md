@@ -26,7 +26,6 @@
 | ffn         | [ffn](../../ffn/ffn/README.md) | AI Core | 提供MoeFFN和FFN的计算功能 |
 | ffn         | [swin_attention_ffn](../../ffn/swin_attention_ffn/README.md) | AI Core | 全量推理场景的FlashAttention算子 |
 | ffn         | [swin_transformer_ln_qkv](../../ffn/swin_transformer_ln_qkv/README.md) | AI Core | 完成fp16权重场景下的Swin Transformer 网络模型的Q、K、V 的计算 |
-| ffn         | [swin_transformer_ln_qkv_quant](../../ffn/swin_transformer_ln_qkv_quant/README.md) | AI Core | Swin Transformer 网络模型 完成 Q、K、V 的计算 |
 | gmm         | [grouped_matmul](../../gmm/grouped_matmul/README.md) | AI Core | 实现分组矩阵乘计算。 |
 | gmm         | [grouped_matmul_add](../../gmm/grouped_matmul_add/README.md) | AI Core | 实现分组矩阵乘计算，每组矩阵乘的维度大小可以不同。 |
 | gmm         | [grouped_matmul_finalize_routing](../../gmm/grouped_matmul_finalize_routing/README.md) | AI Core | GroupedMatmul和MoeFinalizeRouting的融合算子，GroupedMatmul计算后的输出按照索引做combine动作 |
