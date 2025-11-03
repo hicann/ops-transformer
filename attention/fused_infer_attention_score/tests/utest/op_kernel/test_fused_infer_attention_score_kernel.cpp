@@ -8,12 +8,11 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 /*!
- * \file ts_fia_tiling.cpp
+ * \file test_fused_infer_attention_score_kernel.cpp
  * \brief FusedInferAttentionScore用例.
  */
 
 #include "ts_fia.h"
-
 
 TEST_F(Ts_Fia_Ascend910B1, case_SetL2CacheFlag_001)
 {
@@ -30,7 +29,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_SetL2CacheFlag_001)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -52,7 +51,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_002)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -72,7 +71,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_003)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {cs.mParam.b, cs.mParam.n, 1, cs.mParam.d}, "BNSD", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -94,7 +93,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_004)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -115,7 +114,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_005)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -135,7 +134,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_006)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
 
     ASSERT_TRUE(cs.Init());
     cs.mOpInfo.mExp.mSuccess = false;
@@ -156,7 +155,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_007)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
 
     cs.query = Tensor("query", {cs.mParam.b, 1, cs.mParam.n * cs.mParam.d + 1}, "BSH", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
     cs.key = TensorList("key", {cs.mParam.b, cs.mParam.s, cs.mParam.kvNumHeads}, "BSH", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -181,7 +180,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_008)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
 
     ASSERT_TRUE(cs.Init());
     cs.mOpInfo.mExp.mSuccess = false;
@@ -201,7 +200,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_009)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
 
     ASSERT_TRUE(cs.Init());
     cs.mOpInfo.mExp.mSuccess = false;
@@ -223,7 +222,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_010)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
 
     ASSERT_TRUE(cs.Init());
     cs.mOpInfo.mExp.mSuccess = false;
@@ -243,7 +242,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_011)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
     cs.queryRope = Tensor("queryRope", {32, 32, 2, 64}, "BNSD", ge::DT_FLOAT16, ge::FORMAT_ND);
     cs.mOpInfo.mExp.mSuccess = false;
@@ -263,7 +262,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_012)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
     cs.keyRope = Tensor("keyRope", {32, 32, 2, 64}, "BNSD", ge::DT_FLOAT16, ge::FORMAT_ND);
     cs.mOpInfo.mExp.mSuccess = false;
@@ -285,7 +284,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_013)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {cs.mParam.t, cs.mParam.n, cs.mParam.d}, "TND", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -311,7 +310,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_014)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -333,7 +332,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_015)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {cs.mParam.t, cs.mParam.n, cs.mParam.d}, "TND", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -359,7 +358,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_016)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {cs.mParam.t, cs.mParam.n, cs.mParam.d}, "TND", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -389,7 +388,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_017)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
     
     cs.queryRope = Tensor("queryRope", {1, 128, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -418,7 +417,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_018)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
     
     cs.queryRope = Tensor("queryRope", {1, 128, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -444,7 +443,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_019)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {cs.mParam.t, cs.mParam.n, cs.mParam.d}, "TND", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -475,7 +474,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_020)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {cs.mParam.t, cs.mParam.n, cs.mParam.d}, "TND", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -506,7 +505,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_021)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {1, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -533,7 +532,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_022)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {1, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -560,7 +559,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_023)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {1, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -586,7 +585,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_024)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {1, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -614,7 +613,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_025)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {1, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -645,7 +644,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_026)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {1, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -676,7 +675,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_027)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {1, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -707,7 +706,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_028)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {1, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -739,7 +738,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_029)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {1, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -766,7 +765,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_030)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {2, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -793,7 +792,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_031)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {cs.mParam.t, cs.mParam.n, cs.mParam.d}, "TND", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -826,7 +825,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_032)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {cs.mParam.t, cs.mParam.n, cs.mParam.d}, "TND", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -857,7 +856,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_033)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {4, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -884,7 +883,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_034)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {4, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -911,7 +910,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_035)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {4, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -938,7 +937,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_036)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {4, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -965,7 +964,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_037)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {4, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -992,7 +991,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_QKVPreProcess_038)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {4, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1015,7 +1014,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_InputAttrsPreProcess_039)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
 
     cs.mParam.innerPrecise = 2;
     ASSERT_TRUE(cs.Init());
@@ -1037,7 +1036,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_InputAttrsPreProcess_040)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
 
     cs.mParam.actualSeqLengthKV = {1};
     cs.mParam.kDataType = ge::DataType::DT_INT4;
@@ -1062,7 +1061,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_InputAttrsPreProcess_041)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
 
     cs.mParam.actualSeqLengthKV = {1};
     ASSERT_TRUE(cs.Init());
@@ -1089,7 +1088,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_InputAttrsPreProcess_042)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {4, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1116,7 +1115,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessPageAttentionFlag_043)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {3, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1144,7 +1143,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessPageAttentionFlag_044)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.blocktable = Tensor("blockTable", {3, 512, 32, 64}, "BSND", ge::DT_INT32, ge::FORMAT_ND);
@@ -1169,7 +1168,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_KvShapePostProcess_045)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {3, 32, 1, 64}, "BNSD", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1198,7 +1197,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_KvShapePostProcess_046)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {3, 32, 1, 64}, "BNSD", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1227,7 +1226,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessPageAttentionFlag_047)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {3, 32, 1, 64}, "BNSD", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1255,7 +1254,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_InitInOutMode_048)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1278,7 +1277,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessActualSeqLen_050)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {cs.mParam.t, cs.mParam.n, cs.mParam.d}, "TND", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -1309,7 +1308,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessActualSeqLen_051)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.actualSeqLengths = Tensor("actualSeqLengths", {1, 0}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1336,7 +1335,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessActualSeqLen_052)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {3, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1362,7 +1361,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessActualSeqLen_053)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {3, 32, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1388,7 +1387,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessActualSeqLen_054)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {3, 32, 1, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1416,7 +1415,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessActualSeqLen_055)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {3, 32, 1, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1443,7 +1442,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessActualSeqLen_056)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {3, 32, 1, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1470,7 +1469,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessActualSeqLen_057)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.queryRope = Tensor("queryRope", {3, 32, 1, 64}, "TND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -1494,7 +1493,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant1_058)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.deqScale1 = Tensor("deqScale1", {1}, "B", ge::DataType::DT_INT64, ge::FORMAT_ND);
@@ -1517,7 +1516,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant1_059)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.quantScale1 = Tensor("quantScale1", {1}, "B", ge::DataType::DT_INT64, ge::FORMAT_ND);
@@ -1540,7 +1539,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant1_060)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.deqScale2 = Tensor("deqScale2", {1}, "B", ge::DataType::DT_INT64, ge::FORMAT_ND);
@@ -1564,7 +1563,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckQueryQuantParam4FullQuant1_061)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1587,7 +1586,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckQueryQuantParam4FullQuant1_062)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1610,7 +1609,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckQueryQuantParam4FullQuant1_063)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1633,7 +1632,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckQueryQuantParam4FullQuant1_064)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1656,7 +1655,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckQueryQuantParam4FullQuant1_065)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1679,7 +1678,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckQueryQuantParam4FullQuant1_066)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1702,7 +1701,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVQuantParam4FullQuant_067)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1724,7 +1723,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVQuantParam4FullQuant_068)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1746,7 +1745,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_069)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1768,7 +1767,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_070)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1790,7 +1789,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_071)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1812,7 +1811,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_072)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1834,7 +1833,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_073)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1856,7 +1855,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_074)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1878,7 +1877,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_075)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1900,7 +1899,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_076)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1922,7 +1921,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_077)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1944,7 +1943,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_078)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1966,7 +1965,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_079)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -1988,7 +1987,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_080)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -2010,7 +2009,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_081)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -2032,7 +2031,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_082)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -2054,7 +2053,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_083)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -2076,7 +2075,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant_084)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -2100,7 +2099,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant2Dtype_085)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -2123,7 +2122,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant2Dtype_086)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -2146,7 +2145,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant2Dtype_087)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.quantScale2 = Tensor("quantScale2", {2, 2, 2, 2, 2}, "5", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -2171,7 +2170,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant2Dtype_088)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.quantScale2 = Tensor("quantScale2", {2, 2, 2, 2, 2}, "5", ge::DT_BF16, ge::FORMAT_ND);
@@ -2198,7 +2197,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant2Dtype_089)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.quantScale2 = Tensor("quantScale2", {2, 2, 2, 2, 2}, "5", ge::DT_BF16, ge::FORMAT_ND);
@@ -2225,7 +2224,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant2Dtype_090)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.quantScale2 = Tensor("quantScale2", {2, 2, 2, 2, 2}, "5", ge::DT_BF16, ge::FORMAT_ND);
@@ -2248,7 +2247,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant2Dtype_091)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.quantScale2 = Tensor("quantScale2", {2, 2, 2, 2, 2}, "5", ge::DT_BF16, ge::FORMAT_ND);
@@ -2271,7 +2270,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant2Dtype_092)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.quantOffset2 = Tensor("quantOffset2", {2, 2, 2, 2, 2}, "5", ge::DT_BF16, ge::FORMAT_ND);
@@ -2298,7 +2297,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant2_093)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.quantScale2 = Tensor("quantScale2", {2, 2, 2, 2, 2}, "5", ge::DT_BF16, ge::FORMAT_ND);
@@ -2326,7 +2325,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessQuant2_094)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.quantScale2 = Tensor("quantScale2", {2, 2, 2, 2, 2}, "5", ge::DT_BF16, ge::FORMAT_ND);
@@ -2357,7 +2356,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantParamsShapeInPagedAttention_095)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {1}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2389,7 +2388,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantParamsShapeInPagedAttention_096)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {3}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2421,7 +2420,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantParamsShapeInPagedAttention_097)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {3, 1}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2453,7 +2452,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantParamsShapeInPagedAttention_098)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {1}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2485,7 +2484,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantParamsShapeInPagedAttention_099)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {3, 1}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2517,7 +2516,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantMode_100)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {3, 1}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2549,7 +2548,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantPerToken_101)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {3, 128, 128}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2581,7 +2580,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantPerToken_102)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {1, 128, 128}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2613,7 +2612,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantPerToken_103)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {1, 3, 1}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2645,7 +2644,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantPerToken_104)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {1, 3}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2677,7 +2676,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantPerToken_105)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {3, 1}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2709,7 +2708,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantPerToken_106)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {3}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2739,7 +2738,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantParaShapeLegal_107)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {1}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2769,7 +2768,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckKVAntiQuantParaShapeLegal_108)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {1, 1, 1, 1, 1}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -2798,7 +2797,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckAntiQuantParamKeyType_109)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {1, 1, 1, 1, 1}, "B", ge::DataType::DT_INT8, ge::FORMAT_ND);
@@ -2826,7 +2825,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckAntiQuantParamKeyType_110)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {1, 1, 1, 1, 1}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -2856,7 +2855,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckAntiQuantParamValueType_111)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {1, 1, 1, 1, 1}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -2886,7 +2885,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_CheckAntiQuantParamValueType_112)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {1, 1, 1, 1, 1}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -2914,7 +2913,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_113)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.antiquantScale = Tensor("antiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -2939,7 +2938,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_114)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.antiquantOffset = Tensor("antiquantOffset", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -2964,7 +2963,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_115)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -2989,7 +2988,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_116)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantOffset = Tensor("keyAntiquantOffset", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -3014,7 +3013,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_117)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.valueAntiquantScale = Tensor("valueAntiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -3039,7 +3038,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_118)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.valueAntiquantOffset = Tensor("valueAntiquantOffset", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -3064,7 +3063,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_119)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyRopeAntiquantScale = Tensor("keyRopeAntiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -3090,7 +3089,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_120)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.antiquantScale = Tensor("antiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -3117,7 +3116,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_121)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.antiquantScale = Tensor("antiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -3144,7 +3143,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_122)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.antiquantScale = Tensor("antiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -3171,7 +3170,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_123)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.antiquantScale = Tensor("antiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -3199,7 +3198,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_124)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.antiquantScale = Tensor("antiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -3233,7 +3232,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_125)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.antiquantScale = Tensor("antiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -3268,7 +3267,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_126)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.antiquantScale = Tensor("antiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -3301,7 +3300,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_127)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.antiquantScale = Tensor("antiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -3332,7 +3331,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_128)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.antiquantScale = Tensor("antiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -3361,7 +3360,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessAntiQuant_129)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.antiquantScale = Tensor("antiquantScale", {2, 512}, "B", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
@@ -3387,7 +3386,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessBlockTable_130)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.blocktable = Tensor("blockTable", {32, 2}, "BNSD", ge::DT_INT32, ge::FORMAT_ND);
@@ -3412,7 +3411,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessBlockTable_131)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.blocktable = Tensor("blockTable", {32, 2}, "BNSD", ge::DT_INT32, ge::FORMAT_ND);
@@ -3433,7 +3432,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessSharedPrefixLen_132)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {4, 1, 10}, "BSH", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -3460,7 +3459,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessSharedPrefixLen_133)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {4, 1, 10}, "BSH", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -3489,7 +3488,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessSharedPrefixLen_134)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {4, 1, 10}, "BSH", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -3519,7 +3518,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessSharedPrefixLen_135)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {4, 1, 10}, "BSH", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -3547,7 +3546,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessSharedPrefixLen_136)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {4, 1, 10}, "BSH", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -3575,7 +3574,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessSharedPrefixLen_137)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.query = Tensor("query", {4, 1, 10}, "BSH", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -3610,7 +3609,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_ProcessSharedPrefixLen_138)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.keyAntiquantScale = Tensor("keyAntiquantScale", {1, 3, 128}, "B", ge::DataType::DT_FLOAT, ge::FORMAT_ND);
@@ -3632,8 +3631,8 @@ TEST_F(Ts_Fia_Ascend910B1, case_GetBmm1Tiling_139)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 103000000000000000; // expected tiling key
-    cs.mOpInfo.mExp.mTilingBlockDim = 20;           // expected block dim
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
+    cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
     ASSERT_TRUE(cs.Init());
@@ -3650,8 +3649,8 @@ TEST_F(Ts_Fia_Ascend910B1, case_GetBmm1Tiling_140)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 103000000000000000; // expected tiling key
-    cs.mOpInfo.mExp.mTilingBlockDim = 20;           // expected block dim
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
+    cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
     ASSERT_TRUE(cs.Init());
@@ -3668,8 +3667,8 @@ TEST_F(Ts_Fia_Ascend910B1, case_GetBmm1Tiling_141)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 103000000000000000; // expected tiling key
-    cs.mOpInfo.mExp.mTilingBlockDim = 20;           // expected block dim
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
+    cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
     ASSERT_TRUE(cs.Init());
@@ -3686,8 +3685,8 @@ TEST_F(Ts_Fia_Ascend910B1, case_GetBmm1Tiling_142)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 103000000000000000; // expected tiling key
-    cs.mOpInfo.mExp.mTilingBlockDim = 20;           // expected block dim
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
+    cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
     ASSERT_TRUE(cs.Init());
@@ -3704,8 +3703,8 @@ TEST_F(Ts_Fia_Ascend910B1, case_GetBmm2Tiling_143)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 103000000000000000; // expected tiling key
-    cs.mOpInfo.mExp.mTilingBlockDim = 20;           // expected block dim
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
+    cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
     ASSERT_TRUE(cs.Init());
@@ -3722,8 +3721,8 @@ TEST_F(Ts_Fia_Ascend910B1, case_GetBmm2Tiling_144)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 103000000000000000; // expected tiling key
-    cs.mOpInfo.mExp.mTilingBlockDim = 20;           // expected block dim
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
+    cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
     ASSERT_TRUE(cs.Init());
@@ -3744,7 +3743,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_FillTilingBmm_145)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -3766,7 +3765,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_FillTilingBmm_146)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
 
     cs.mOpInfo.mExp.mSuccess = false;
@@ -3789,7 +3788,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_GenTilingKey_147)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
     cs.query = Tensor("query", {1, 1, 1, 512}, "BSND", ge::DT_FLOAT16, ge::FORMAT_ND);
     cs.key = TensorList("key", {1, 128, 1, 512}, "BSND", ge::DT_FLOAT16, ge::FORMAT_ND);
@@ -3815,7 +3814,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_GenTilingKey_148)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
     cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
@@ -3835,7 +3834,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_GenTilingKey_149)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
     cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
@@ -3856,7 +3855,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_GenTilingKey_150)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
     cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
@@ -3876,7 +3875,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_GenTilingKey_151)
     cs.mOpInfo.mExp.mTilingKey = 11000000000100000; // expected tiling key
     cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
-    cs.mOpInfo.mCtr.mRunKernel = false;
+    cs.mOpInfo.mCtr.mRunKernel = true;
     ASSERT_TRUE(cs.Init());
     cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
@@ -3892,8 +3891,8 @@ TEST_F(Ts_Fia_Ascend910B1, case_ConvertContext_152)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 103000000000000000; // expected tiling key
-    cs.mOpInfo.mExp.mTilingBlockDim = 20;           // expected block dim
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
+    cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
     ASSERT_TRUE(cs.Init());
@@ -3910,8 +3909,8 @@ TEST_F(Ts_Fia_Ascend910B1, case_ConvertContext_153)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 103000000000000000; // expected tiling key
-    cs.mOpInfo.mExp.mTilingBlockDim = 20;           // expected block dim
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
+    cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
     ASSERT_TRUE(cs.Init());
@@ -3928,8 +3927,8 @@ TEST_F(Ts_Fia_Ascend910B1, case_ConvertContext_154)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 103000000000000000; // expected tiling key
-    cs.mOpInfo.mExp.mTilingBlockDim = 20;           // expected block dim
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
+    cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
     ASSERT_TRUE(cs.Init());
@@ -3946,8 +3945,8 @@ TEST_F(Ts_Fia_Ascend910B1, case_DataTypeToSerialString_155)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 103000000000000000; // expected tiling key
-    cs.mOpInfo.mExp.mTilingBlockDim = 20;           // expected block dim
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
+    cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
     ASSERT_TRUE(cs.Init());
@@ -3964,8 +3963,8 @@ TEST_F(Ts_Fia_Ascend910B1, case_DataTypeToSerialString_156)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.numHeads = 20;
-    cs.mOpInfo.mExp.mTilingKey = 103000000000000000; // expected tiling key
-    cs.mOpInfo.mExp.mTilingBlockDim = 20;           // expected block dim
+    cs.mOpInfo.mExp.mTilingKey = 283948879052800; // expected tiling key
+    cs.mOpInfo.mExp.mTilingBlockDim = 24;           // expected block dim
     cs.mOpInfo.mCtr.mRunTiling = true;
     cs.mOpInfo.mCtr.mRunKernel = false;
     ASSERT_TRUE(cs.Init());

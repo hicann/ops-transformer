@@ -5,7 +5,6 @@
 |:----------------------------|:-----------:|
 |<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
 |<term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>|      √     |
-|Atlas 推理系列加速卡产品|   √     |
 
 ## 功能说明
 
@@ -505,11 +504,7 @@ aclnnStatus aclnnPromptFlashAttentionV3(
       - sparse模式仅支持sparse=0且不传mask，或sparse=3且传入mask。
       - 当sparse=3时，要求每个batch单独的actualSeqLengths < actualSeqLengthsKv。
       
-  - <term>Atlas 推理系列加速卡产品</term>：
-      - 支持B轴小于等于128；支持N轴小于等于256；支持S轴小于等于65535（64k）, Q_S或KV_S非128对齐，Q_S和KV_S不等长的场景不支持配置atten_mask；支持D轴小于等于512。
-      
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：数据类型支持FLOAT16、BFLOAT16、INT8。
-  - <term>Atlas 推理系列加速卡产品</term>：数据类型仅支持FLOAT16。
   
 - pseShift功能使用限制如下：
   
@@ -518,14 +513,12 @@ aclnnStatus aclnnPromptFlashAttentionV3(
   - 对于pseShift的KV_S为非32对齐的场景，建议padding到32字节来提高性能，多余部分的填充值不做要求。如不使用该功能时可传入nullptr。
 
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：数据类型支持FLOAT16、BFLOAT16，且在pseShift为FLOAT16类型时，要求此时的query为FLOAT16或INT8类型，而在pseShift为BFLOAT16类型时，要求此时的query为BFLOAT16类型。在query、key、value为FLOAT16且pseShift存在的情况下，默认走高精度模式，对应的限制继承自高精度模式的限制。
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持nullptr。
 
 - attenMask功能使用限制如下：
   
   - 对于attenMask的KV_S为非32对齐的场景，建议padding到32对齐来提高性能，多余部分填充成1。
   - 通常建议shape输入Q_S, KV_S; B, Q_S, KV_S; 1, Q_S, KV_S; B, 1, Q_S, KV_S; 1, 1, Q_S, KV_S，其中Q_S为query的shape中的S，KV_S为key和value的shape中的S。
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：数据类型支持BOOL、INT8和UINT8。
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持BOOL。
 
 - actualSeqLengths，actualSeqLengthsKv输入，功能使用限制如下：
   
@@ -534,31 +527,25 @@ aclnnStatus aclnnPromptFlashAttentionV3(
   - 关于seqlen的传入长度有以下规则：当传入长度为1时，所有Batch将使用相同的seqlen；当传入长度大于或等于Batch数量时，将取seqlen的前Batch个数值；其他长度的传入将不被支持。
   - 当query的inputLayout为TND时，该入参必须传入，且以该入参元素的数量作为Batch值。该入参中每个元素的值表示当前Batch与之前所有Batch的Sequence Length和，因此后一个元素的值必须大于等于前一个元素的值，且不能出现负值。
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：数据类型支持INT64，支持TND格式。
-  - <term>Atlas 推理系列加速卡产品</term>：数据类型支持INT64。
   
 - deqScale1，deqScale2输入，功能使用限制如下：
   
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：数据类型支持UINT64、FLOAT32。
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持nullptr。
   
 - quantScale1输入，功能使用限制如下：
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：数据类型支持FLOAT32。
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持nullptr。
   
 - quantScale2，quantOffset2输入，功能使用限制如下：
   
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：数据类型支持FLOAT32和BFLOAT16。
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持nullptr。
   
 - preTokens输入，功能使用限制如下：
   
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：数据类型支持INT64。
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持取值2147483647。
   
 - nextTokens输入，功能使用限制如下：
   
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：数据类型支持INT64。
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持取值0和2147483647。
   
 - inputLayout输入，功能使用限制如下：
   
@@ -569,7 +556,6 @@ aclnnStatus aclnnPromptFlashAttentionV3(
   
   - 需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64，且在BSND、BNSD、BNSD_BSND场景下，需要与shape中的key/value的N轴shape值相同，否则报错。
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：数据类型支持INT64。
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持取值0。
   
 - sparseMode输入，功能使用限制如下：
   
@@ -581,7 +567,6 @@ aclnnStatus aclnnPromptFlashAttentionV3(
     - sparseMode为4时，代表band模式的mask，需要传入优化后的attenmask矩阵（2048*2048）。
     - sparseMode为5、6、7、8时，分别代表prefix、global、dilated、block_local，**均暂不支持**。用户不特意指定时建议传入0。
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：当inputLayout为TND时，sparseMode仅支持取值0、3。
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持取值0。
   
 - innerPrecise输入，功能使用限制如下：
   
@@ -628,7 +613,6 @@ aclnnStatus aclnnPromptFlashAttentionV3(
   
   - 当inputLayout为BNSD_BSND时，输入query的shape是BNSD，输出shape为BSND；其余情况该入参的shape需要与入参query的shape保持一致。
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：数据类型支持FLOAT16、BFLOAT16、INT8。
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持FLOAT16。
   
 - int8量化相关入参数量与输入、输出数据格式的综合限制：
   

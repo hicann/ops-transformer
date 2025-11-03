@@ -6,7 +6,6 @@
 |:----------------------------|:-----------:|
 |<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
 |<term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>|      √     |
-|Atlas 推理系列加速卡产品|    √    |
 
 ##  功能说明
 
@@ -113,10 +112,6 @@
 - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：
   - 支持B轴小于等于65536，N轴小于等于256，D轴小于等于512。
   - numHeads与numKeyValueHeads的比值不能大于64。
-- Atlas 推理系列加速卡产品：
-  - 支持B轴小于等于256，N轴小于等于256，D轴小于等于512，key、value的S轴小于等于65536。
-  - query、key、value和ttentionOut数据类型仅支持FLOAT16。
-  - 在数据排布格式为BNSD时，需要满足numHeads与numKeyValueHeads的比值不大于8，其他情况仅支持取值0；
 - INT8量化相关入参数量与输入、输出数据格式的综合限制：
   - query、key、value输入为FLOAT16，输出为INT8的场景：入参quantScale2必填，quantOffset2可选，不能传入dequantScale1、quantScale1、dequantScale2（即为nullptr）参数。
 

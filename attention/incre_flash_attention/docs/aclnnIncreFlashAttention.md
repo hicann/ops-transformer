@@ -6,7 +6,6 @@
 |:----------------------------|:-----------:|
 |<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
 |<term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>|      √     |
-|Atlas 推理系列加速卡产品|    √    |
 
 ##  功能说明
 
@@ -325,11 +324,6 @@ aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/conte
   - 支持B轴小于等于65536，N轴小于等于256，D轴小于等于512。
   - query数据类型支持FLOAT16、BFLOAT16，attentionOut、key和value数据类型支持FLOAT16、INT8、BFLOAT16。
   - numKeyValueHeads数据类型支持INT64。
-- <term>Atlas 推理系列加速卡产品</term>：
-  - 支持B轴小于等于256，N轴小于等于256，D轴小于等于512。
-  - 支持key、value的S轴小于等于65536。
-  - query、key、value和attentionOut数据类型仅支持FLOAT16。
-  - numKeyValueHeads仅支持取值0。
 - 非连续场景下，参数key、value的tensorlist中tensor的个数等于query的B（由于tensorlist限制，非连续场景下B需要小于等于256）。shape除S外需要完全一致，且batch只能为1。
 - 参数query中的N和numHeads值相等，key、value的N和numKeyValueHeads值相等，并且numHeads是numKeyValueHeads的倍数关系，并且numHeads与numKeyValueHeads的比值不能大于64。
 - 仅支持query的S轴等于1。

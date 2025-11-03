@@ -41,7 +41,6 @@
 1. C+V模板：对应文件名incre_flash_attention_split_Bbn2s2_Us2.h, IFA 基础模板, 支持绝大多数输入场景, 计算时同时使能VectorCore 和 CubeCore, matmul计算放在CubeCore执行; matmul计算为调用AscendC提供的高阶API;
 2. All-Vector模板：对应文件名incre_flash_attention_allvec_new.h, 对C+V模板的补充, 主流程与C+V模板基本一致, matmul计算由vector实现,  降低Cube启动和CV通信开销, 对于部分输入类型有更好的性能表现;支持场景：
 
-- <term>Atlas 推理系列加速卡产品</term>：全部使用该模板。
 - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：非PA, 非GQA, 且Q、KV 、Output类型全部为FP16 。
 3. matmul基础API模板: 对应文件名incre_flash_attention_preload.h, 为了优化性能, 基于C+V模板使用AscendC提供的matmul基础API对matmul部分重写。在C+V模板的基础上主要做了如下改动：
 - 切换编程视角。C+V模板使用基于VEC的编程视角, 1个VEC需要处理1次matmul的全部计算结果;本模板使用基于CUBE的编程视角, 1次matmul的计算结果会被切分为2份, 2个VEC分别处理1份。

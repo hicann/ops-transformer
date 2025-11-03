@@ -6,7 +6,6 @@
 |:----------------------------|:-----------:|
 |<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
 |<term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>|      √     |
-|Atlas 推理系列加速卡产品|   √     |
 
 ## 功能说明
 
@@ -405,37 +404,26 @@ aclnnStatus aclnnPromptFlashAttention(
         - 数据类型仅支持BFLOAT16;
         - sparse模式仅支持sparse=0且不传mask，或sparse=3且传入mask；
         - 当sparse=3时，要求每个batch单独的actualSeqLengths < actualSeqLengthsKv。
-    - Atlas 推理系列加速卡产品：
-        - 支持B轴小于等于128；
-        - 支持N轴小于等于256；
-        - 支持S轴小于等于65535(64k), Q_S或KV_S非128对齐，Q_S和KV_S不等长的场景不支持配置atten_mask；
-        - 支持D轴小于等于512。
   - 输入数据类型限制：
     - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持FLOAT16、BFLOAT16。
-    - Atlas 推理系列加速卡产品：数据类型仅支持FLOAT16。
 - pseShift功能使用限制如下：
   - 输入数据类型限制：
     - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持FLOAT16、BFLOAT16。
-    - Atlas 推理系列加速卡产品：仅支持nullptr。
 - attenMask功能使用限制如下：
   - 输入shape限制：通常建议shape输入Q_S, KV_S; B, Q_S, KV_S; 1, Q_S, KV_S; B, 1, Q_S, KV_S; 1, 1, Q_S, KV_S，其中Q_S为query的shape中的S，KV_S为key和value的shape中的S。
   - 输入数据类型限制：
     - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持BOOL、INT8、UINT8。
-    - Atlas 推理系列加速卡产品：仅支持BOOL。
   - 其他限制：对于attenMask的KV_S为非32对齐的场景，建议padding到32对齐来提高性能，多余部分填充成1。
 - actualSeqLengths输入，功能使用限制如下：
   - 输入值域限制：该入参中每个batch中的有效Sequence Length应该不大于query中对应batch的Sequence Length。
   - 输入数据类型限制：
     - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持INT64。
-    - Atlas 推理系列加速卡产品：数据类型支持INT64。
 - preTokens输入，功能使用限制如下：
   - 输入数据类型限制：
     - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持INT64。
-    - Atlas 推理系列加速卡产品：仅支持取值2147483647。
 - nextTokens输入，功能使用限制如下：
   - 输入数据类型限制：
     - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持INT64。
-    - Atlas 推理系列加速卡产品：仅支持取值0和2147483647。
 - inputLayout输入，功能使用限制如下：
   - 输入数据类型限制：
     - 当前支持BSH、BSND、BNSD、BNSD_BSND（输入为BNSD时，输出格式为BSND）。用户不特意指定时建议传入"BSH"。
@@ -443,12 +431,10 @@ aclnnStatus aclnnPromptFlashAttention(
   - 输入属性限制：需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64，且在BSND、BNSD、BNSD_BSND场景下，需要与shape中的key/value的N轴shape值相同，否则报错。
   - 输入数据类型限制：
     - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持INT64。
-    - Atlas 推理系列加速卡产品：仅支持取值0。
 - attentionOut输出，功能使用限制如下：
   - shape限制：当inputLayout为BNSD_BSND时，输入query的shape是BNSD，输出shape为BSND；其余情况该入参的shape需要与入参query的shape保持一致。
   - 数据类型限制：
     - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持FLOAT16、BFLOAT16、INT8。
-    - Atlas 推理系列加速卡产品：仅支持FLOAT16。
 
 ## 调用示例
 

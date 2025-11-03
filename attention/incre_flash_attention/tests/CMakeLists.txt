@@ -16,16 +16,14 @@ set(_IFA_TilingSourcesExt
         ${OPS_TRANSFORMER_DIR}/attention/incre_flash_attention/op_host/incre_flash_attention_tiling.cpp
         ${OPS_TRANSFORMER_DIR}/attention/incre_flash_attention/op_host/incre_flash_attention_tiling_check.cpp
         ${OPS_TRANSFORMER_DIR}/attention/incre_flash_attention/op_host/incre_flash_attention_tiling_register.cpp
-        ${OPS_TRANSFORMER_DIR}/attention/incre_flash_attention/regbase/ophost/incre_flash_attention_tiling_v2.cpp
         ${OPS_TRANSFORMER_DIR}/attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling.cpp
-        ${OPS_TRANSFORMER_DIR}/attention/prompt_flash_attention/regbase/ophost/prompt_flash_attention_tiling_v2.cpp
         ${OPS_TRANSFORMER_DIR}/attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_register.cpp
 )
 
 set(_IFA_KernelTilingDataDefH
         ${OPS_TRANSFORMER_DIR}/common/include/tiling_base/data_copy_transpose_tiling_def.h
-        ${CMAKE_SOURCE_DIR}/attention/incre_flash_attention/op_host/incre_flash_attention_tiling.h
-        ${CMAKE_SOURCE_DIR}/attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling.h
+        ${CMAKE_SOURCE_DIR}/attention/incre_flash_attention/op_kernel/incre_flash_attention_tiling.h
+        ${CMAKE_SOURCE_DIR}/attention/prompt_flash_attention/op_kernel/prompt_flash_attention_tiling_data.h
 )
 
 set(_IFA_TargetPrivateLinkLibrariesExt)
