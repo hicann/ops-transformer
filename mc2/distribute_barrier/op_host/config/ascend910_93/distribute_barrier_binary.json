@@ -14,6 +14,28 @@
               -2
             ],
             "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "time_out",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "elastic_info",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
           }
         ],
         "outputs": [
@@ -51,6 +73,28 @@
             "dtype": "float16",
             "format": "ND",
             "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "time_out",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "elastic_info",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
             "shape": [
               -2
             ],
@@ -96,6 +140,28 @@
               -2
             ],
             "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "time_out",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "elastic_info",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
           }
         ],
         "outputs": [
@@ -133,6 +199,28 @@
             "dtype": "bool",
             "format": "ND",
             "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "time_out",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "elastic_info",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
             "shape": [
               -2
             ],
@@ -178,6 +266,28 @@
               -2
             ],
             "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "time_out",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "elastic_info",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
           }
         ],
         "outputs": [
@@ -215,6 +325,28 @@
             "dtype": "int16",
             "format": "ND",
             "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "time_out",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "elastic_info",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
             "shape": [
               -2
             ],
@@ -260,6 +392,28 @@
               -2
             ],
             "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "time_out",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "elastic_info",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
           }
         ],
         "outputs": [
@@ -297,6 +451,28 @@
             "dtype": "int64",
             "format": "ND",
             "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "time_out",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "elastic_info",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
             "shape": [
               -2
             ],
@@ -342,6 +518,28 @@
               -2
             ],
             "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "time_out",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "elastic_info",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
           }
         ],
         "outputs": [
@@ -379,6 +577,28 @@
             "dtype": "uint16",
             "format": "ND",
             "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "time_out",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "elastic_info",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
             "shape": [
               -2
             ],
@@ -424,6 +644,28 @@
               -2
             ],
             "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "time_out",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "elastic_info",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
           }
         ],
         "outputs": [
@@ -461,6 +703,28 @@
             "dtype": "uint64",
             "format": "ND",
             "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "time_out",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "elastic_info",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
             "shape": [
               -2
             ],

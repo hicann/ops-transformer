@@ -20,15 +20,15 @@
 using namespace AscendC;
 using namespace DistributeBarrierImpl;
 
-extern "C" __global__ __aicore__ void distribute_barrier(GM_ADDR xRef, GM_ADDR xRefOut, GM_ADDR workspaceGM, GM_ADDR tilingGM)
-{
-    REGISTER_TILING_DEFAULT(DistributeBarrierTilingData);
-    TPipe pipe;
+extern "C" __global__ __aicore__ void distribute_barrier(GM_ADDR xRef, GM_ADDR timeOut, GM_ADDR elasticInfo,
+                                                         GM_ADDR xRefOut, GM_ADDR workspaceGM, GM_ADDR tilingGM) {
+  REGISTER_TILING_DEFAULT(DistributeBarrierTilingData);
+  TPipe pipe;
 
-    if (TILING_KEY_IS(10000)) {
-        GET_TILING_DATA_WITH_STRUCT(DistributeBarrierTilingData, tilingData, tilingGM);
-        DistributeBarrier<DTYPE_X_REF> op;
-        op.Init(workspaceGM, &pipe, &tilingData);
-        op.Process();
-    }
+  if (TILING_KEY_IS(10000)) {
+    GET_TILING_DATA_WITH_STRUCT(DistributeBarrierTilingData, tilingData, tilingGM);
+    DistributeBarrier<DTYPE_X_REF> op;
+    op.Init(timeOut, elasticInfo, workspaceGM, &pipe, &tilingData);
+    op.Process();
+  }
 }

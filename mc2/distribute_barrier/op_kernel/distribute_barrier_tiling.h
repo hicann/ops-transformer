@@ -23,6 +23,8 @@ struct DistributeBarrierInfo {
     uint32_t aivNum;                     // aivNum
     uint64_t totalUbSize;
     uint64_t totalWinSize;
+    bool isInputTimeOut;
+    bool isInputElasticInfo;
 };
 
 struct DistributeBarrierTilingData {

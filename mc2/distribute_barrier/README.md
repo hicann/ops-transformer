@@ -25,7 +25,7 @@
  <thead>
   <tr>
    <th>参数名</th>
-   <th>输入/输出/属性</th>
+   <th>输入/输出</th>
    <th>描述</th>
    <th>数据类型</th>
    <th>数据格式</th>
@@ -38,6 +38,21 @@
    <td>BFLOAT16, FLOAT16、FLOAT32、BOOL、INT8、INT16、INT32、INT64、UINT8、UINT16、UINT32、UINT64</td>
    <td>ND</td>
   </tr>
+  <tr>
+   <td>timeOutOptional</td>
+   <td>输入</td>
+   <td>超时时间设置，如果在此时间内无响应，则认为超时。</td>
+   <td>INT32</td>
+   <td>ND</td>
+  </tr>
+  <tr>
+   <td>elasticInfoOptional</td>
+   <td>输入</td>
+   <td>EP通信域动态缩容信息：<br><term>Atlas A2系列产品</term>：不支持，传空指针；<br><term>Atlas A3系列产品</term>：1D Tensor（shape <code>4 + 2 * epWoldSize,</code>），INT32类型，前4位为缩容配置，后2*epWoldSize为rank映射表。</td>
+   <td>INT32</td>
+   <td>ND（支持非连续Tensor）</td>
+  </tr>
+  <tr>
   <tr>
    <td>group</td>
    <td>输入</td>
@@ -65,6 +80,7 @@
 - 使用场景说明：
     - 在需要进行全卡同步的网络模型中调用该算子，可以屏蔽快慢卡引入的性能波动问题，协助分析性能。
     - 可以连续调用，入图时，需将上个算子的输入、下个算子的输出作为入参传入接口。
+    - 当使能elasticInfo时，要确保Dispatch/Combine也传入了此参数，并且此elasticInfo与Dispatch/Combine中的elasticInfo保持一致。
 
 ## 调用说明
 
