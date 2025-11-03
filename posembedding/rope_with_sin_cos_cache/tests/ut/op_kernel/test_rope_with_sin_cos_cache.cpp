@@ -1,3 +1,13 @@
+/**
+ * This program is free software, you can redistribute it and/or modify.
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This file is a part of the CANN Open Software.
+ * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
 #include <array>
 #include <vector>
 #include <iostream>
@@ -33,8 +43,7 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_bf16)
 {
     system(
         "cp -rf "
-        "./rope_with_sin_cos_cache_data "
-        "./");
+        "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
     system("chmod -R 755 ./rope_with_sin_cos_cache_data/");
     system("cd ./rope_with_sin_cos_cache_data/ && python3 gen_data.py '48' '2' '4' '128' '128' 'bf16' ");
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
@@ -113,10 +122,9 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_fp32)
 {
     system(
         "cp -rf "
-        "../rope_with_sin_cos_cache_data "
-        "./");
+        "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
     system("chmod -R 755 ./rope_with_sin_cos_cache_data/");
-    system("cd ./rope_with_sin_cos_cache_data/ && python3 gen_data.py '48' '2' '4' '128' '128' 'bf16' ");
+    system("cd ./rope_with_sin_cos_cache_data/ && python3 gen_data.py '48' '2' '4' '128' '128' 'fp32' ");
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     uint64_t numTokens = 48;
     uint64_t numQHeads = 2;
@@ -125,11 +133,11 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_fp32)
     uint64_t rotaryDim = 128;
 
     size_t positionSize = numTokens * sizeof(int64_t);
-    size_t querySize = numTokens * numQHeads * headSize * sizeof(half);
-    size_t keySize = numTokens * numKHeads * headSize * sizeof(half);
-    size_t cosSinCacheSize = numTokens * rotaryDim * sizeof(half);
-    size_t queryOutSize = numTokens * numQHeads * headSize * sizeof(half);
-    size_t keyOutSize = numTokens * numKHeads * headSize * sizeof(half);
+    size_t querySize = numTokens * numQHeads * headSize * sizeof(float);
+    size_t keySize = numTokens * numKHeads * headSize * sizeof(float);
+    size_t cosSinCacheSize = numTokens * rotaryDim * sizeof(float);
+    size_t queryOutSize = numTokens * numQHeads * headSize * sizeof(float);
+    size_t keyOutSize = numTokens * numKHeads * headSize * sizeof(float);
 
     size_t tilingSize = sizeof(RopeWithSinCosCacheTilingData);
 
@@ -193,10 +201,9 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_fp16)
 {
     system(
         "cp -rf "
-        "../rope_with_sin_cos_cache_data "
-        "./");
+        "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
     system("chmod -R 755 ./rope_with_sin_cos_cache_data/");
-    system("cd ./rope_with_sin_cos_cache_data/ && python3 gen_data.py '48' '2' '4' '128' '128' 'bf16' ");
+    system("cd ./rope_with_sin_cos_cache_data/ && python3 gen_data.py '48' '2' '4' '128' '128' 'fp16' ");
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
     uint64_t numTokens = 48;
     uint64_t numQHeads = 2;
@@ -273,8 +280,7 @@ TEST_F(rope_with_sin_cos_cache_test, test_case_fp32_2)
 {
     system(
         "cp -rf "
-        "../rope_with_sin_cos_cache_data "
-        "./");
+        "../../../../../posembedding/rope_with_sin_cos_cache/tests/ut/op_kernel/rope_with_sin_cos_cache_data ./");
     system("chmod -R 755 ./rope_with_sin_cos_cache_data/");
     system("cd ./rope_with_sin_cos_cache_data/ && python3 gen_data.py '48' '2' '4' '128' '128' 'fp32' ");
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
