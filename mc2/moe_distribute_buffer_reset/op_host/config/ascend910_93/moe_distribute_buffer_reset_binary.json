@@ -1,0 +1,39 @@
+{
+    "op_type": "MoeDistributeBufferReset",
+    "op_list": [
+        {
+            "bin_filename": "MoeDistributeBufferReset_int32",
+            "inputs": [
+            {
+              "name": "elastic_info",
+              "index": 0,
+              "dtype": "int32",
+              "format": "ND",
+              "paramType": "required",
+              "shape": [
+                -2
+              ],
+              "format_match_mode": "FormatAgnostic"
+            }
+          ],
+          "outputs":[],
+          "attrs": [
+            {
+              "name": "group_ep",
+              "dtype": "string",
+              "value": ""
+            },
+            {
+              "name": "ep_world_size",
+              "dtype": "int",
+              "value": 0
+            },
+            {
+              "name": "need_sync",
+              "dtype": "int",
+              "value": 0
+            }
+            ]
+        }
+    ]
+}

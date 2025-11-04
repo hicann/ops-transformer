@@ -342,6 +342,7 @@ function(add_ops_src_copy)
         "allto_allv_grouped_mat_mul;"
         "allto_all_all_gather_batch_mat_mul;"
         "distribute_barrier;"
+        "moe_distribute_buffer_reset;"
         "moe_distribute_combine_add_rms_norm;"
         "moe_distribute_dispatch;"
         "moe_distribute_combine;"

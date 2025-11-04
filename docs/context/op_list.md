@@ -40,6 +40,7 @@
 | mc2         | [matmul_all_reduce](../../mc2/matmul_all_reduce/README.md) | AI Core | 完成MatMul计算与AllReduce通信融合 |
 | mc2         | [matmul_all_reduce_add_rms_norm](../../mc2/matmul_all_reduce_add_rms_norm/README.md) | AI Core | 完成mm + all_reduce + add + rms_norm计算 |
 | mc2         | [matmul_reduce_scatter](../../mc2/matmul_reduce_scatter/README.md) | AI Core | 完成mm + reduce_scatter_base计算 |
+| mc2         | [moe_distribute_buffer_reset](../../mc2/moe_distribute_buffer_reset/README.md) | AI Core | 故障检测流程中，对EP通信域做数据区与状态区的清理 |
 | mc2         | [moe_distribute_combine](../../mc2/moe_distribute_combine/README.md) | AI Core | 当存在TP域通信时，先进行ReduceScatterV通信，再进行AlltoAllV通信，最后将接收的数据整合（乘权重再相加）；当不存在TP域通信时，进行AlltoAllV通信，最后将接收的数据整合（乘权重再相加）|
 | mc2         | [moe_distribute_combine_add_rms_norm](../../mc2/moe_distribute_combine_add_rms_norm/README.md) | AI Core | 当存在TP域通信时，先进行ReduceScatterV通信，再进行AlltoAllV通信，最后将接收的数据整合（乘权重再相加）；当不存在TP域通信时，进行AlltoAllV通信，最后将接收的数据整合（乘权重再相加），之后完成Add + RmsNorm融合 |
 | mc2         | [moe_distribute_combine_v2](../../mc2/moe_distribute_combine_v2/README.md) | AI Core | 当存在TP域通信时，先进行ReduceScatterV通信，再进行AlltoAllV通信，最后将接收的数据整合（乘权重再相加）；当不存在TP域通信时，进行AlltoAllV通信，最后将接收的数据整合（乘权重再相加） |
