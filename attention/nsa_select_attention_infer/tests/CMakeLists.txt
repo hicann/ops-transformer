@@ -7,9 +7,9 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ======================================================================================================================
 
-########################################################################################################################
 
-#调用编译方法, 生成对应编译目标
+########################################################################################################################
+# 调用编译方法, 生成对应编译目标
 ########################################################################################################################
 
 set(_NSA_SELECT_ATTENTION_INFER_TilingSourcesExt
@@ -53,9 +53,9 @@ list(APPEND _NCWC_OpKernelSourcesExt
 )
 
 if (UT_TEST_ALL)
-        message(STATUS "+++++ DEBUG: all ut")\
-        file(GLOB_RECURSE _Src1 "${CMAKE_SOURCE_DIR}/tests/utest/*.cc")\
-        file(GLOB_RECURSE _Src2 "${CMAKE_SOURCE_DIR}/tests/utest/*.cpp")
+        message(STATUS "+++++ DEBUG: all ut")
+        file(GLOB_RECURSE _Src1 "${CMAKE_SOURCE_DIR}/attention/nsa_select_attention_infer/tests/utest/*.cc")
+        file(GLOB_RECURSE _Src2 "${CMAKE_SOURCE_DIR}/attention/nsa_select_attention_infer/tests/utest/*.cpp")
 elseif(OP_HOST_UT)
         message(STATUS "+++++ DEBUG: only host :${CMAKE_SOURCE_DIR},${OPS_TRANSFORMER_DIR}")
         file(GLOB_RECURSE _Src1 "${CMAKE_SOURCE_DIR}/attention/nsa_select_attention_infer/tests/utest/*tiling.cc")
@@ -69,10 +69,11 @@ list(APPEND _NCWC_UTestSourcesExtForce ${_Src1} ${_Src2})
 message(STATUS "+++++ DEBUG: .cpp files: ${_NCWC_UTestSourcesExtForce}")
 
 list(APPEND _NCWC_UTestCompileDefinitions)
+
 OpsTest_Level2_AddOp(
         SUB_SYSTEM                              transformer
         BRIEF                                   NsaSelectAttentionInfer
-        SNAKE                                   nsa_select_attention_infer 
+        SNAKE                                   nsa_select_attention_infer
         TILING_SOURCES_EXT                      ${_NSA_SELECT_ATTENTION_INFER_TilingSourcesExt}
         TILING_PRIVATE_INCLUDES_EXT             ${_NsaSelectedAttention_TilingPrivateIncludesExt}
         KERNEL_SOURCES_EXT                      ${_NCWC_OpKernelSourcesExt}
@@ -80,7 +81,7 @@ OpsTest_Level2_AddOp(
         UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT ${_NSA_SELECT_ATTENTION_INFER_TargetPrivateLinkLibrariesExt}
         KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT  ${_NSA_SELECT_ATTENTION_INFER_CompileDefintions}
         UTEST_COMMON_PRIVATE_INCLUDES_EXT       ${_NSA_SELECT_ATTENTION_INFER_UTestCommonPrivateIncludeExt}
-        UTEST_SOURCES_EXT                       ${_NCWC_UTestSourcesExtForce} 
+        UTEST_SOURCES_EXT                       ${_NCWC_UTestSourcesExtForce}
         UTEST_SOURCES_EXT_FORCE                   ON
         UTEST_COMMON_PRIVATE_COMPILE_DEFINITIONS  ${_NCWC_UTestCompileDefinitions}
         UTEST_PRIVATE_COMPILE_DEFINITIONS         ${_NCWC_UTestCompileDefinitions}
