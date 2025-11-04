@@ -20,7 +20,6 @@
 #include "acl/acl.h"
 #include "hccl/hccl.h"
 #include "../op_host/op_api/aclnn_allto_allv_grouped_mat_mul.h"
-#include<unistd.h>
 
 #define CHECK_RET(cond, return_expr)                                                                                   \
     do {                                                                                                               \
@@ -183,7 +182,7 @@ int LaunchOneThreadAlltoAllvGmm(Args &args)
     ret = aclrtSynchronizeStreamWithTimeout(args.stream, 10000000);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSynchronizeStreamWithTimeout failed. ret = %d \n", ret);
               return ret);
-
+    LOG_PRINT("[INFO] device_%d aclnnAlltoAllvGroupedMatMul execute successfully.\n", args.rankId);
     // 释放device资源，需要根据具体API的接口定义修改
     if (args.rankId == 0) {
         size_t size = A * H * sizeof(int16_t);
@@ -283,5 +282,5 @@ int main(int argc, char *argv[])
         threads[rankId]->join();
     }
     aclFinalize();
-    _exit(0);
+    return 0;
 }

@@ -22,7 +22,6 @@
 #include "../op_host/op_api/aclnn_moe_update_expert.h"
 #include "../../moe_distribute_dispatch_v2/op_host/op_api/aclnn_moe_distribute_dispatch_v2.h"
 #include "../../moe_distribute_combine_add_rms_norm/op_host/op_api/aclnn_moe_distribute_combine_add_rms_norm.h"
-#include<unistd.h>
 
 #define CHECK_RET(cond, return_expr) \
     do {                             \
@@ -570,5 +569,5 @@ int main(int argc, char *argv[])
     aclFinalize();
     LOG_PRINT("[INFO] aclFinalize success\n");
 
-    _exit(0);
+    return 0;
 }

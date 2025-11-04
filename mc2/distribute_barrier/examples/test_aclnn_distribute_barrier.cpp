@@ -22,7 +22,6 @@
 #include "../../moe_distribute_dispatch_v2/op_host/op_api/aclnn_moe_distribute_dispatch_v2.h"
 #include "../op_host/op_api/aclnn_distribute_barrier.h"
 #include "../../moe_distribute_combine_v2/op_host/op_api/aclnn_moe_distribute_combine_v2.h"
-#include<unistd.h>
 
 #define CHECK_RET(cond, return_expr)                                                                                   \
     do {                                                                                                               \
@@ -300,7 +299,7 @@ int LaunchOneProcessDispatchAndCombine(Args &args)
     ret = aclrtSynchronizeStreamWithTimeout(args.combineStream, 10000);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSynchronizeStreamWithTimeout failed. ret = %d \n", ret);
               return ret);
-    LOG_PRINT("[INFO] device_%d aclnnMoeDistributeDispatchV2 and aclnnMoeDistributeCombineV2                      \
+    LOG_PRINT("[INFO] device_%d aclnnDistributeBarrier, aclnnMoeDistributeDispatchV2 and aclnnMoeDistributeCombineV2                      \
                execute successfully.\n",
               args.rankId);
 
@@ -473,5 +472,5 @@ int main(int argc, char *argv[])
     aclFinalize();
     LOG_PRINT("[INFO] aclFinalize success\n");
 
-    _exit(0);
+    return 0;
 }

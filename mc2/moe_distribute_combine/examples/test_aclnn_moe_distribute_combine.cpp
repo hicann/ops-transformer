@@ -21,7 +21,6 @@
 #include "hccl/hccl.h"
 #include "../../moe_distribute_dispatch/op_host/op_api/aclnn_moe_distribute_dispatch.h"
 #include "../op_host/op_api/aclnn_moe_distribute_combine.h"
-#include<unistd.h>
 
 #define CHECK_RET(cond, return_expr) \
     do {                             \
@@ -443,5 +442,5 @@ int main(int argc, char *argv[])
     }
     aclFinalize();
     LOG_PRINT("[INFO] aclFinalize success\n");
-    _exit(0);
+    return 0;
 }
