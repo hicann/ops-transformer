@@ -36,7 +36,7 @@ graph LR
 ##  前提条件
 **1. 环境部署**
 
-开发算子前，请参考[环境准备](./quick_op_invocation.md#环境准备)完成环境搭建。
+开发算子前，请参考[环境准备](../invocation/quick_op_invocation.md#环境准备)完成环境搭建。
 
 **2. 算子设计**
 
@@ -523,7 +523,7 @@ __aicore__ inline void AddExample<T>::CopyOut(int32_t progress)
 
 1. 在`examples/add_example/op_host`目录新建`config/${soc_version}`文件夹，用于存放配置文件。
 
-2. 在`${soc_version}`目录新建json文件，命名为`${op_name}_binary.json`，用于描述算子相关信息，包括算子输入、输出、shape、data type、format等信息，完整定义请参考[add_example_binary.json](../../examples/add_example/op_host/config/ascend910b/add_example_binary.json)。
+2. 在`${soc_version}`目录新建json文件，命名为`${op_name}_binary.json`，用于描述算子相关信息，包括二进制文件名称(命名无要求，当前是以`${op_type}`_哈希码命名)及算子输入、输出、shape、data type、format等信息，完整定义请参考[add_example_binary.json](../../examples/add_example/op_host/config/ascend910b/add_example_binary.json)。
 
 3. 在`${soc_version}`目录新建ini文件，命名为`${op_name}_simplified_key.ini`，与二进制匹配逻辑相关，默认是0，示例参考[add_example_simplified_key.ini](../../examples/add_example/op_host/config/ascend910b/add_example_simplified_key.ini)。
 
@@ -539,7 +539,7 @@ __aicore__ inline void AddExample<T>::CopyOut(int32_t progress)
 
     以`AddExample`算子为例，假设开发交付件在`examples`目录，完整代码参见[add_example](../../examples/add_example)目录。
 
-    进入项目根目录，执行如下编译命令（命令介绍参见[build参数说明](./build.md)）：
+    进入项目根目录，执行如下编译命令：
 
     ```bash
     # 编译指定算子，如--ops=add_example
@@ -625,7 +625,7 @@ __aicore__ inline void AddExample<T>::CopyOut(int32_t progress)
 
 ## 算子验证
 
-开发好的算子完成编译部署后，可通过aclnn方式验证功能，方法请参考[算子调用方式](./op_invocation.md)。
+开发好的算子完成编译部署后，可通过aclnn方式验证功能，方法请参考[算子调用方式](../invocation/op_invocation.md)。
 
 ## 附录
 自定义算子如需运行图模式，不需要[aclnn适配](#aclnn适配)，做如下交付件适配：

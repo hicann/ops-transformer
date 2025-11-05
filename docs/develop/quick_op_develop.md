@@ -6,7 +6,7 @@
 
 ## 算子列表
 
-[算子列表](./op_list.md)
+[算子列表](../op_list.md)
 
 ## 开发指南
 
@@ -14,4 +14,4 @@
 
 - 若自定义算子运行在AI Core上，其开发过程和涉及的交付件如下：
 
-    [AI Core算子开发指南](./aicore_develop_guide.md)
+    [AI Core算子开发指南](../develop/aicore_develop_guide.md)
