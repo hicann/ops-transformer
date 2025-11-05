@@ -1,0 +1,39 @@
+{
+    "op_type": "ElasticReceivableTest",
+    "op_list": [
+        {
+            "bin_filename": "ElasticReceivableTest_INT32",
+            "inputs": [
+                {
+                    "name": "dst_rank",
+                    "index": 0,
+                    "dtype": "int32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [
+                        -2
+                    ],
+                    "format_match_mode": "FormatAgnostic"
+                }
+            ],
+            "outputs": [],
+            "attrs": [
+                {
+                    "name": "group",
+                    "dtype": "string",
+                    "value": ""
+                },
+                {
+                    "name": "world_size",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "rank_num",
+                    "dtype": "int",
+                    "value": 0
+                }
+            ]
+        }
+    ]
+}
