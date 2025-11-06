@@ -18,6 +18,7 @@
 #include "register/op_impl_registry.h"
 #include "tiling_base/tiling_templates_registry.h"
 #include "err/ops_err.h"
+#include "../../op_kernel/grouped_matmul_tiling_key.h"
 using namespace Ops::Transformer::OpTiling;
 using namespace ge;
 using namespace AscendC;
@@ -465,7 +466,7 @@ void GMMTiling::DivideUbAndSetWorkspaceAntiquant(size_t* workspaces, const uint3
         CeilDiv(CeilDiv(maxM_, groupNum_), baseM_) * CeilDiv(maxN_, baseN_);
       bool goodCubeUtility = dimMN * (xDType_ == ge::DT_BF16 ? 2 : 1) >= static_cast<int32_t>(aicNum * 0.4);  // 0.4: a factor, in practice.
       antiquantPerformance_ =
-        goodCubeUtility && static_cast<int64_t>(minK_) * baseN_ * aicNum >= ANTIQUANT_PERFORMANCE_THRESHOLD;
+        goodCubeUtility && static_cast<int64_t>(minK_) * baseN_ * static_cast<int64_t>(aicNum) >= ANTIQUANT_PERFORMANCE_THRESHOLD && !transposeWeight_;
       uint32_t maxUbBaseN = static_cast<uint32_t>(BEST_UB_BASEN);
       if (transposeWeight_) {
         maxUbBaseN = baseN_;
@@ -671,7 +672,7 @@ ge::graphStatus GMMTiling::SetWorkspscesPerTokenQuant(const uint32_t aicNum, siz
   return ge::GRAPH_SUCCESS;
 }
 
-void GMMTiling::StaticTilingProcess(gert::TilingContext *context) {
+bool GMMTiling::StaticTilingProcess(gert::TilingContext *context) {
   // cond.1 A8W8
   // cond.2 singleX-singleW-singleY scenario
   // cond.3 without bias
@@ -679,10 +680,6 @@ void GMMTiling::StaticTilingProcess(gert::TilingContext *context) {
   // cond.5 no pretiling
   // cond.6 only support typeM
   // cond.7 tilingdata corresponds to expected value
-  if (context->GetTilingKey() == TILING_KEY_QUANT_2VECTOR || context->GetTilingKey() == TILING_KEY_QUANT_2VECTOR_TRANS_W) {
-    // static Tiling默认是vector 1:1 , 所以1:2场景不走 StaticTiling
-    return;
-  }
   if ((xDType_ != ge::DT_INT8 || weightDtype_ != ge::DT_INT8) ||
       (isSingleX_ == 0 || isSingleWeight_ == 0 || isSingleY_ == 0) ||
       hasBias_ ||
@@ -690,24 +687,20 @@ void GMMTiling::StaticTilingProcess(gert::TilingContext *context) {
       tilingData.gmmBaseParams.get_isPreTiling() != 0 ||
       tilingData.gmmBaseParams.get_groupType() != 0 ||
       !CheckTilingMatchStaticValue()) {
-    return;
+    return false;
   }
   // cond.8 only support milan platform
   auto compileInfoPtr = context->GetCompileInfo<GMMCompileInfo>();
-  OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "CompileInfoPtr is nullptr."), return);
+  OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "CompileInfoPtr is nullptr."), return false);
   if (!(compileInfoPtr->socVersion == platform_ascendc::SocVersion::ASCEND910B ||
         compileInfoPtr->socVersion == platform_ascendc::SocVersion::ASCEND910_93)) {
-    return;
+    return false;
   }
-  bool isMixCore = yDtype_ == ge::DT_BF16 || yDtype_ == ge::DT_FLOAT16;
-  bool isSparseM = groupListType_ == GROUPLIST_TYPE_SPARSE_M;
-  uint64_t staticTilingKey = GenGmmStaticTilingKey(transposeWeight_, isSparseM, isMixCore);
-  // tilingkey 13-20 is occupied by static tiling now
-  staticTilingKey = staticTilingKey + TILING_KEY_STATIC_TILING_OFFSET;
-  context->SetTilingKey(staticTilingKey);
+
   tilingData.gmmBaseParams.set_m(tilingData.mmTilingData.get_M());
   tilingData.gmmBaseParams.set_n(tilingData.mmTilingData.get_N());
   tilingData.gmmBaseParams.set_k(tilingData.mmTilingData.get_Ka());
+  return true;
 }
 
 bool GMMTiling::CheckTilingMatchStaticValue() {
@@ -729,10 +722,6 @@ bool GMMTiling::CheckTilingMatchStaticValue() {
         return true;
   }
   return false;
-}
-
-uint64_t GMMTiling::GenGmmStaticTilingKey(bool transB, bool isSparseM, bool isMixCore) {
-  return RecursiveSum(transB, isSparseM, isMixCore);
 }
 
 ge::graphStatus GMMTiling::RunFusionKernelTiling(gert::TilingContext* context) {
@@ -765,8 +754,7 @@ ge::graphStatus GMMTiling::RunFusionKernelTiling(gert::TilingContext* context) {
   tilingData.gmmBaseParams.set_workspaceSize(workspacesSize_);
   tilingData.mmTilingData.set_usedCoreNum(usedCoreNum_);  // usedCoreNum is ai_core num
   tilingData.gmmBaseParams.set_coreNum(usedCoreNum_);  // ai cube number
-  GMMSetTilingKey(context);  // set tilingkey
-  StaticTilingProcess(context); // for static tiling scenario
+  GMMSetTplTilingKey(context);
   tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
   context->SetBlockDim(usedCoreNum_);  // block dim is the number of aicube
   context->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
@@ -883,53 +871,76 @@ int64_t GMMTiling::GMMGetBS(const gert::Shape &xShape) const {
     return bs;
 }
 
-void GMMTiling::GMMSetTilingKey(gert::TilingContext* context) const {
-    bool transposeXSupportDtype = (weightDtype_ == ge::DT_FLOAT16 || weightDtype_ == ge::DT_BF16 ||
-                                   weightDtype_ == ge::DT_FLOAT);
-    if (groupListType_ == GROUP_LIST_SPARSE_M) {
-      if (!transposeWeight_) {
-        context->SetTilingKey(TILING_KEY_A8W8_SPARSE_M);
-      } else {
-        context->SetTilingKey(TILING_KEY_A8W8_SPARSE_M_TRANS_W);
-      }
-      return;
-    }
+uint32_t GMMTiling::GetTplDataType(const ge::DataType &dtype) {
+  static const std::map<ge::DataType, uint32_t> dtype_map = {
+    {ge::DT_INT4, GMM_TPL_INT4},
+    {ge::DT_INT8, GMM_TPL_INT8},
+    {ge::DT_FLOAT16, GMM_TPL_FLOAT16},
+    {ge::DT_BF16, GMM_TPL_BF16},
+    {ge::DT_INT32, GMM_TPL_INT32},
+    {ge::DT_FLOAT, GMM_TPL_FLOAT}
+  };
+  auto it = dtype_map.find(dtype);
+  if (it != dtype_map.end()) {
+    return it->second;
+  }
+  return GMM_TPL_INVALID;
+}
+
+void GMMTiling::GMMSetTplTilingKey(gert::TilingContext* context) {
+  uint32_t isStaticTilingApi = 0;
+  uint32_t a8w4KernelTemplate = GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_NONE;
+  uint32_t a16w8KernelTemplate = GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_NONE;
+  uint32_t aivAicRatio = GROUPED_MATMUL_AIV_AIC_RATIO_1;
+
+  if (isA8W4FakeA8W8_) {
+    a8w4KernelTemplate = static_cast<uint32_t>(GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_PERCHANNEL_ANTIQUANT);
+  }
+
+  if ((xDType_ == ge::DT_FLOAT16 || xDType_ == ge::DT_BF16) && weightDtype_ == ge::DT_INT8) {
+    a16w8KernelTemplate = static_cast<uint32_t>(GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_ANTIQUANT);
     if (isA16W8Msd_) {
-      context->SetScheduleMode(1);  // set as batchmod for template using SyncAll
-      context->SetTilingKey(transposeWeight_ ? TILING_KEY_A16W8_MSD_TRANS_W : TILING_KEY_A16W8_MSD);
-      return;
+      a16w8KernelTemplate = static_cast<uint32_t>(GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_MSD);
     }
-    if (isA8W4FakeA8W8_) {
-      context->SetTilingKey(TILING_KEY_A8W4_FAKE_A8W8);
-      return;
+  }
+
+  if (isA4W4_ || antiquantPerformance_) {
+    aivAicRatio = static_cast<uint32_t>(GROUPED_MATMUL_AIV_AIC_RATIO_2);
+  } else if (isA8W8_) {
+    if (actType_ == ACT_TYPE_GELU ||
+        ((maxK_ <= DOUBLE_VECTOT_THRESHOLD_K_LOWER || maxK_ >= DOUBLE_VECTOT_THRESHOLD_K_UPPER) &&
+         tuningConfig_ >= SMALL_TUNING_CONFIG_THRESHOLD &&
+         perTokenOrPerGroupSize_ > 0U)) {
+        aivAicRatio = static_cast<uint32_t>(GROUPED_MATMUL_AIV_AIC_RATIO_2);
+    } else if (yDtype_ == ge::DT_INT8 || yDtype_ == ge::DT_INT32) {
+      aivAicRatio = static_cast<uint32_t>(GROUPED_MATMUL_CUBE_ONLY);
     }
-    if (isA8W8_) {
-      if(actType_ == ACT_TYPE_GELU
-          || ((maxK_ <= DOUBLE_VECTOT_THRESHOLD_K_LOWER || maxK_ >= DOUBLE_VECTOT_THRESHOLD_K_UPPER)
-          && tuningConfig_ >= SMALL_TUNING_CONFIG_THRESHOLD
-          && perTokenOrPerGroupSize_ > 0U)) {
-        if (transposeWeight_) {
-          context->SetTilingKey(TILING_KEY_QUANT_2VECTOR_TRANS_W);
-        } else {
-          context->SetTilingKey(TILING_KEY_QUANT_2VECTOR);
-        }
-        return;
-      }
-    }
-    if (isA4W4_) {
-      context->SetTilingKey(TILING_KEY_QUANT_2VECTOR);
-      return;
-    }
-    if (transposeWeight_) {
-      context->SetTilingKey(TILING_KEY_TRANS_W);
-    } else if (transposeX_ && transposeXSupportDtype) {
-      context->SetTilingKey(TILING_KEY_TRANS_X);
-    } else if (antiquantPerformance_) {
-      context->SetTilingKey(TILING_KEY_ANTIQUANT_PERFORMANCE);
-      context->SetScheduleMode(1);  // set as batchmod for template using SyncAll
-    } else {
-      context->SetTilingKey(TILING_KEY);
-    }
+  } else if (!transposeX_ && xDType_ == weightDtype_ && (xDType_ == ge::DT_FLOAT16 || xDType_ == ge::DT_BF16 || xDType_ == ge::DT_FLOAT)) {
+    aivAicRatio = static_cast<uint32_t>(GROUPED_MATMUL_CUBE_ONLY);
+  }
+
+  if (a8w4KernelTemplate == GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_NONE &&
+      a16w8KernelTemplate == GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_NONE &&
+      aivAicRatio != GROUPED_MATMUL_AIV_AIC_RATIO_2 &&
+      StaticTilingProcess(context)) {
+    isStaticTilingApi = 1U;
+  }
+
+  const uint64_t tilingKey = GET_TPL_TILING_KEY(GetTplDataType(xDType_),
+                                                GetTplDataType(weightDtype_),
+                                                GetTplDataType(yDtype_),
+                                                transposeX_? 1UL : 0UL,
+                                                transposeWeight_? 1UL : 0UL,
+                                                groupListType_,
+                                                isStaticTilingApi,
+                                                a8w4KernelTemplate,
+                                                a16w8KernelTemplate,
+                                                aivAicRatio);
+  context->SetTilingKey(tilingKey);
+
+  if (isA16W8Msd_ || antiquantPerformance_) {
+    context->SetScheduleMode(1);  // set as batchmod for template using SyncAll
+  }
 }
 
 ge::graphStatus GMMTiling::GMMGetAttrs(const gert::TilingContext* context) {
@@ -1408,6 +1419,12 @@ static void PrintA8W4HPTiling(gert::TilingContext* context, A8W4HPTiling *data)
 }
 
 ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext* context, const GMMCompileInfo* compileInfoPtr) {
+      auto yDesc = context->GetOutputDesc(Y_INDEX);
+      OP_CHECK_NULL_WITH_CONTEXT(context, yDesc);
+      uint32_t yDtype = GMM_TPL_FLOAT16;
+      if (yDesc->GetDataType() == ge::DT_BF16) {
+        yDtype = static_cast<uint32_t>(GMM_TPL_BF16);
+      }
       GMMTilingData tilingDataA8W4;
       auto w0Desc = context->GetDynamicInputDesc(WEIGHT_INDEX, 0);
       auto wFormat0 = static_cast<ge::Format>(ge::GetPrimaryFormat(w0Desc->GetStorageFormat()));
@@ -1514,8 +1531,6 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext* context, const GMMCom
         tilingDataA8W4.hpTilingData.set_szUb(szUB);
         tilingDataA8W4.hpTilingData.set_szL0A(szL0A);
         tilingDataA8W4.hpTilingData.set_szL0C(szL0C);
-        auto yDesc = context->GetOutputDesc(Y_INDEX);
-        OP_CHECK_NULL_WITH_CONTEXT(context, yDesc);
         auto yDtypeLocal = yDesc->GetDataType();
         if (yDtypeLocal == ge::DT_FLOAT16) {
           tilingDataA8W4.hpTilingData.set_output_type(0);
@@ -1529,7 +1544,11 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext* context, const GMMCom
                                TWO * static_cast<size_t>(SixteenAlign(M, true)) * sizeof(float);
 
         context->SetScheduleMode(1); // set as batchmod for template using SyncAll
-        context->SetTilingKey(TILING_KEY_A8W4_AUTOTILING_A8W4);
+        context->SetTilingKey(GET_TPL_TILING_KEY(GMM_TPL_INT8, GMM_TPL_INT4, yDtype, 0, 0,
+                                                 GROUPED_MATMUL_GROUP_LIST_TYPE_COUNT, 0,
+                                                 GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_AUTOTILING,
+                                                 GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_NONE,
+                                                 GROUPED_MATMUL_AIV_AIC_RATIO_2));
 
         size_t *workspaces = context->GetWorkspaceSizes(1); // get second variable
         workspaces[0] = SYS_WORKSPACE_SIZE;                 // default size
@@ -1628,7 +1647,11 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext* context, const GMMCom
             if (mm.GetTiling(tilingDataA8W4.mmTilingData) == -1) {
               return ge::GRAPH_FAILED;
             }
-            context->SetTilingKey(TILING_KEY_A8W4);
+            context->SetTilingKey(GET_TPL_TILING_KEY(GMM_TPL_INT8, GMM_TPL_INT4, yDtype, 0, 0,
+                                                     GROUPED_MATMUL_GROUP_LIST_TYPE_COUNT, 0,
+                                                     GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_PERGROUP_ANTIQUANT,
+                                                     GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_NONE,
+                                                     GROUPED_MATMUL_AIV_AIC_RATIO_2));
             tilingDataA8W4.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
             context->GetRawTilingData()->SetDataSize(tilingDataA8W4.GetDataSize());
 
@@ -1693,12 +1716,15 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext* context, const GMMCom
           }
           OP_LOGI(context->GetNodeName(), "GMM_tiling: baseM is %u, baseK is %u, baseN is %u.", A8W4_MSD_BASE_M, A8W4_MSD_BASE_K, A8W4_MSD_BASE_N);
           context->SetScheduleMode(1);  // set as batchmod for template using SyncAll
+          uint32_t a8w4KernelTemplate = GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_MSD_API_DEQUANT;
           if (is_in_a8w4_white_list) {
-            context->SetTilingKey(TILING_KEY_A8W4_MSD_NEW);
-          } else {
-            context->SetTilingKey(TILING_KEY_A8W4_MSD);
+            a8w4KernelTemplate = static_cast<uint32_t>(GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_MSD_VECTOR_DEQUANT);
           }
-
+          context->SetTilingKey(GET_TPL_TILING_KEY(GMM_TPL_INT8, GMM_TPL_INT4, yDtype, 0, 0,
+                                                   GROUPED_MATMUL_GROUP_LIST_TYPE_COUNT, 0,
+                                                   a8w4KernelTemplate,
+                                                   GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_NONE,
+                                                   GROUPED_MATMUL_AIV_AIC_RATIO_2));
           tilingDataA8W4.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
           context->GetRawTilingData()->SetDataSize(tilingDataA8W4.GetDataSize());
 

@@ -42,19 +42,19 @@ using ops::adv::tests::utils::WriteFile;
 
 using GroupedMatmulKernelFunc = void(*) GROUPEDMATMUL_KERNEL_PARAM;
 
-extern "C" __global__ __aicore__ void grouped_matmul_fp16 GROUPEDMATMUL_KERNEL_PARAM;
-extern "C" __global__ __aicore__ void grouped_matmul_bf16 GROUPEDMATMUL_KERNEL_PARAM;
-extern "C" __global__ __aicore__ void grouped_matmul_fp32 GROUPEDMATMUL_KERNEL_PARAM;
-extern "C" __global__ __aicore__ void grouped_matmul_quant_int8 GROUPEDMATMUL_KERNEL_PARAM;
-extern "C" __global__ __aicore__ void grouped_matmul_quant_bf16 GROUPEDMATMUL_KERNEL_PARAM;
-extern "C" __global__ __aicore__ void grouped_matmul_quant_fp16 GROUPEDMATMUL_KERNEL_PARAM;
-extern "C" __global__ __aicore__ void grouped_matmul_quant_int32 GROUPEDMATMUL_KERNEL_PARAM;
-extern "C" __global__ __aicore__ void grouped_matmul_a16w8_bf16 GROUPEDMATMUL_KERNEL_PARAM;
-extern "C" __global__ __aicore__ void grouped_matmul_a16w8_fp16 GROUPEDMATMUL_KERNEL_PARAM;
-extern "C" __global__ __aicore__ void grouped_matmul_a16w4_bf16 GROUPEDMATMUL_KERNEL_PARAM;
-extern "C" __global__ __aicore__ void grouped_matmul_a16w4_fp16 GROUPEDMATMUL_KERNEL_PARAM;
-extern "C" __global__ __aicore__ void grouped_matmul_a8w4_msd GROUPEDMATMUL_KERNEL_PARAM;
-extern "C" __global__ __aicore__ void grouped_matmul_a4w4 GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_fp16 GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_bf16 GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_fp32 GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_quant_int8 GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_quant_bf16 GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_quant_fp16 GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_quant_int32 GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_a16w8_bf16 GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_a16w8_fp16 GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_a16w4_bf16 GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_a16w4_fp16 GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_a8w4_msd GROUPEDMATMUL_KERNEL_PARAM;
+__global__ __aicore__ void grouped_matmul_a4w4 GROUPEDMATMUL_KERNEL_PARAM;
 
 
 using namespace ops::adv::tests::grouped_matmul;
@@ -93,6 +93,28 @@ bool RunGroupedMatmul(void *func, uint64_t tilingKey, int64_t blockDim, std::vec
                 inputs[static_cast<int>(KernelParams::PER_TOKEN_SCALE)]->GetDevData(),
                 output[0]->GetDevData(),
                 workspace, tilingData);
+    return true;
+}
+
+bool RunTemplateGroupedMatmul(std::function<void(GMM_INPUT_DTYPE)> func, uint64_t tilingKey,
+                              int64_t blockDim, std::vector<TensorIntf *> &inputs,
+                              std::vector<TensorIntf *> &output, uint8_t *workspace, uint8_t *tilingData)
+{
+    (void)blockDim;
+    // Kernel 运行
+    ICPU_SET_TILING_KEY(tilingKey);
+    // ICPU_RUN_KF(func, blockDim,
+    //             inputs[static_cast<int>(KernelParams::X)]->GetDevData(),
+    //             inputs[static_cast<int>(KernelParams::WEIGHT)]->GetDevData(),
+    //             inputs[static_cast<int>(KernelParams::BIAS)]->GetDevData(),
+    //             inputs[static_cast<int>(KernelParams::SCALE)]->GetDevData(),
+    //             inputs[static_cast<int>(KernelParams::OFFSET)]->GetDevData(),
+    //             inputs[static_cast<int>(KernelParams::ANTIQUANT_SCALE)]->GetDevData(),
+    //             inputs[static_cast<int>(KernelParams::ANTIQUANT_OFFSET)]->GetDevData(),
+    //             inputs[static_cast<int>(KernelParams::GROUP_LIST)]->GetDevData(),
+    //             inputs[static_cast<int>(KernelParams::PER_TOKEN_SCALE)]->GetDevData(),
+    //             output[0]->GetDevData(),
+    //             workspace, tilingData);
     return true;
 }
 
@@ -148,54 +170,55 @@ bool GroupedMatmulCase::InitParam()
     return true;
 }
 
-void *GetGroupedMatmulKernelFunc(Param& mParam) {
-    auto *groupedMatmulKernelFunc = (void *)grouped_matmul_fp16;
-    if (mParam.mTensorLists["x"].GetDataType() == mParam.mTensorLists["weight"].GetDataType()) {
-        if (mParam.mTensorLists["weight"].GetDataType() == ge::DataType::DT_INT8) { //量化
-            if (mParam.mTensorLists["y"].GetDataType() == ge::DataType::DT_INT8) {
-                groupedMatmulKernelFunc = (void *)grouped_matmul_quant_int8;
-            } else if (mParam.mTensorLists["y"].GetDataType() == ge::DataType::DT_FLOAT16) {
-                groupedMatmulKernelFunc = (void *)grouped_matmul_quant_fp16;
-            } else if (mParam.mTensorLists["y"].GetDataType() == ge::DataType::DT_BF16) {
-                groupedMatmulKernelFunc = (void *)grouped_matmul_quant_bf16;
-            } else {
-                groupedMatmulKernelFunc = (void *)grouped_matmul_quant_int32;
-            }
-        } else if (mParam.mTensorLists["x"].GetDataType() == ge::DataType::DT_INT4) {
-            groupedMatmulKernelFunc = (void *)grouped_matmul_a4w4;
-        } else {//非量化
-            if (mParam.mTensorLists["weight"].GetDataType() == ge::DataType::DT_FLOAT16) {
-                groupedMatmulKernelFunc = (void *)grouped_matmul_fp16;
-            } else if (mParam.mTensorLists["weight"].GetDataType() == ge::DataType::DT_BF16) {
-                groupedMatmulKernelFunc = (void *)grouped_matmul_bf16;
-            } else {
-                groupedMatmulKernelFunc = (void *)grouped_matmul_fp32;
-            }
-        }
-    } else {//伪量化
-        if (mParam.mTensorLists["weight"].GetDataType() == ge::DataType::DT_INT8) {
-            if (mParam.mTensorLists["x"].GetDataType() == ge::DataType::DT_FLOAT16) {
-                groupedMatmulKernelFunc = (void *)grouped_matmul_a16w8_fp16;
-            } else {
-                groupedMatmulKernelFunc = (void *)grouped_matmul_a16w8_bf16;
-            }
-        } else {
-            if (mParam.mTensorLists["x"].GetDataType() == ge::DataType::DT_INT8 && mParam.mTensorLists["weight"].GetDataType() == ge::DataType::DT_INT4) {
-                groupedMatmulKernelFunc = (void *)grouped_matmul_a8w4_msd;
-            }
-            else if (mParam.mTensorLists["x"].GetDataType() == ge::DataType::DT_FLOAT16) {
-                groupedMatmulKernelFunc = (void *)grouped_matmul_a16w4_fp16;
-            } else {
-                groupedMatmulKernelFunc = (void *)grouped_matmul_a16w4_bf16;
-            }
-        }
-    }
-    return groupedMatmulKernelFunc;
-}
+// void *GetGroupedMatmulKernelFunc(Param& mParam) {
+//     auto *groupedMatmulKernelFunc = (void *)grouped_matmul_fp16;
+//     if (mParam.mTensorLists["x"].GetDataType() == mParam.mTensorLists["weight"].GetDataType()) {
+//         if (mParam.mTensorLists["weight"].GetDataType() == ge::DataType::DT_INT8) { //量化
+//             if (mParam.mTensorLists["y"].GetDataType() == ge::DataType::DT_INT8) {
+//                 groupedMatmulKernelFunc = (void *)grouped_matmul_quant_int8;
+//             } else if (mParam.mTensorLists["y"].GetDataType() == ge::DataType::DT_FLOAT16) {
+//                 groupedMatmulKernelFunc = (void *)grouped_matmul_quant_fp16;
+//             } else if (mParam.mTensorLists["y"].GetDataType() == ge::DataType::DT_BF16) {
+//                 groupedMatmulKernelFunc = (void *)grouped_matmul_quant_bf16;
+//             } else {
+//                 groupedMatmulKernelFunc = (void *)grouped_matmul_quant_int32;
+//             }
+//         } else if (mParam.mTensorLists["x"].GetDataType() == ge::DataType::DT_INT4) {
+//             groupedMatmulKernelFunc = (void *)grouped_matmul_a4w4;
+//         } else {//非量化
+//             if (mParam.mTensorLists["weight"].GetDataType() == ge::DataType::DT_FLOAT16) {
+//                 groupedMatmulKernelFunc = (void *)grouped_matmul_fp16;
+//             } else if (mParam.mTensorLists["weight"].GetDataType() == ge::DataType::DT_BF16) {
+//                 groupedMatmulKernelFunc = (void *)grouped_matmul_bf16;
+//             } else {
+//                 groupedMatmulKernelFunc = (void *)grouped_matmul_fp32;
+//             }
+//         }
+//     } else {//伪量化
+//         if (mParam.mTensorLists["weight"].GetDataType() == ge::DataType::DT_INT8) {
+//             if (mParam.mTensorLists["x"].GetDataType() == ge::DataType::DT_FLOAT16) {
+//                 groupedMatmulKernelFunc = (void *)grouped_matmul_a16w8_fp16;
+//             } else {
+//                 groupedMatmulKernelFunc = (void *)grouped_matmul_a16w8_bf16;
+//             }
+//         } else {
+//             if (mParam.mTensorLists["x"].GetDataType() == ge::DataType::DT_INT8 && mParam.mTensorLists["weight"].GetDataType() == ge::DataType::DT_INT4) {
+//                 groupedMatmulKernelFunc = (void *)grouped_matmul_a8w4_msd;
+//             }
+//             else if (mParam.mTensorLists["x"].GetDataType() == ge::DataType::DT_FLOAT16) {
+//                 groupedMatmulKernelFunc = (void *)grouped_matmul_a16w4_fp16;
+//             } else {
+//                 groupedMatmulKernelFunc = (void *)grouped_matmul_a16w4_bf16;
+//             }
+//         }
+//     }
+//     return groupedMatmulKernelFunc;
+// }
+std::function<void(GROUPEDMATMUL_KERNEL_PARAM)> groupedMatmulKernelTemplateFunc;
 
 bool GroupedMatmulCase::InitOpInfo()
 {
-    auto *groupedMatmulKernelFunc = GetGroupedMatmulKernelFunc(mParam);
+    // auto *groupedMatmulKernelFunc = GetGroupedMatmulKernelFunc(mParam);
     bool rst = mCtx.SetOpName(mOpInfo.mName.c_str());
     rst = rst && mCtx.SetDeterministic(mOpInfo.mCtr.mDeterministic);
     rst = rst && mCtx.SetInputs({&mParam.mTensorLists["x"], &mParam.mTensorLists["weight"], &mParam.mTensorLists["bias"],
@@ -212,8 +235,10 @@ bool GroupedMatmulCase::InitOpInfo()
                                 {"act_type", mParam.mActType},
                                 {"tuning_config", mParam.mTuningConfig}
                                 });
-    rst = rst && mCtx.SetKernelRunCbf(RunGroupedMatmul);
-    rst = rst && mCtx.SetKernelMainFunc((void *)groupedMatmulKernelFunc);
+    // rst = rst && mCtx.SetKernelRunCbf(RunGroupedMatmul);
+    // rst = rst && mCtx.SetKernelMainFunc((void *)groupedMatmulKernelFunc);
+    rst = rst && mCtx.SetKernelRunTemplateCbf(RunTemplateGroupedMatmul);
+    rst = rst && mCtx.SetKernelTemplateMainFunc(groupedMatmulKernelTemplateFunc);
     rst = rst && mOpInfo.SetContext(&mCtx);
     return rst;
 }

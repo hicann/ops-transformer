@@ -22,6 +22,7 @@
 #include "tests/utils/case.h"
 #include "tests/utils/tensor.h"
 #include "tests/utils/context.h"
+#include "tests/utils/context_with_template_tilingkey.h"
 #include "tests/utils/op_info.h"
 #include "grouped_matmul_param.h"
 
@@ -31,10 +32,17 @@ using ops::adv::tests::grouped_matmul::Param;
 using ops::adv::tests::utils::Context;
 using ops::adv::tests::utils::OpInfo;
 
+#define GMM_INPUT_DTYPE                                                \
+    uint8_t *, uint8_t *, uint8_t *, uint8_t *,                        \
+    uint8_t *, uint8_t *, uint8_t *, uint8_t *,                        \
+    uint8_t *, uint8_t *, uint8_t *, uint8_t *
+
 class GroupedMatmulCase : public ops::adv::tests::utils::Case {
 public:
+    using ContextWithTemplateTilingKey = ops::adv::tests::utils::ContextWithTemplateTilingKey<GMM_INPUT_DTYPE>;
     OpInfo mOpInfo;
-    Context mCtx;
+    // Context mCtx;
+    ContextWithTemplateTilingKey mCtx;
     Param mParam;
 
 public:
