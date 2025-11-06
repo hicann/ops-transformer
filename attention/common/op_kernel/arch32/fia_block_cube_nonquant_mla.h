@@ -738,13 +738,13 @@ __aicore__ inline void FiaBlockCubeNonQuantMla<FIAT>::ComputeMm2(const Attention
                     aL1Tensor = mm2B.GetTensor<Q_T>();
                     mm2B.Wait<HardEvent::MTE1_MTE2>();
                     CopyInMm2AToL1(aL1Tensor, info, mSplitInfo.nBufferStartM + mL1 * M_L1_SPLIT_SIZE, mL1Size, kL1Size,
-                                   256 * k1); // zhj zhj
+                                   256 * k1);
                     mm2B.Set<HardEvent::MTE2_MTE1>();
                     mm2B.Wait<HardEvent::MTE2_MTE1>();
 #else
                     WaitFlag<HardEvent::MTE1_MTE2>(mte21QPIds[ka]);
                     CopyInMm2AToL1(aL1Tensor, info, mSplitInfo.nBufferStartM + mL1 * M_L1_SPLIT_SIZE, mL1Size, kL1Size,
-                                   256 * k1); // zhj zhj
+                                   256 * k1);
                     SetFlag<HardEvent::MTE2_MTE1>(mte21QPIds[ka]);
                     WaitFlag<HardEvent::MTE2_MTE1>(mte21QPIds[ka]);
 #endif
