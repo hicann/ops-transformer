@@ -160,7 +160,7 @@
 
 | 调用方式 | 调用样例                                                                   | 说明                                                             |
 |--------------|------------------------------------------------------------------------|----------------------------------------------------------------|
-| aclnn调用 | [test_aclnn_apply_rotary_pos_emb.cpp](./examples/eager_mode/test_aclnn_apply_rotary_pos_emb.cpp) | 通过[aclnnApplyRotaryPosEmb](./docs/aclnnApplyRotaryPosEmb.md)接口方式调用ApplyRotaryPosEmb算子。    |
-| aclnn调用 | [test_aclnn_apply_rotary_pos_emb_v2.cpp](./examples/eager_mode/test_aclnn_apply_rotary_pos_emb_v2.cpp) | 通过[aclnnApplyRotaryPosEmbV2](./docs/aclnnApplyRotaryPosEmbV2.md)接口方式调用ApplyRotaryPosEmb算子。    |
+| aclnn调用 | [test_aclnn_apply_rotary_pos_emb.cpp](examples/test_aclnn_apply_rotary_pos_emb.cpp) | 通过[aclnnApplyRotaryPosEmb](./docs/aclnnApplyRotaryPosEmb.md)接口方式调用ApplyRotaryPosEmb算子。    |
+| aclnn调用 | [test_aclnn_apply_rotary_pos_emb_v2.cpp](examples/test_aclnn_apply_rotary_pos_emb_v2.cpp) | 通过[aclnnApplyRotaryPosEmbV2](./docs/aclnnApplyRotaryPosEmbV2.md)接口方式调用ApplyRotaryPosEmb算子。    |
 
 

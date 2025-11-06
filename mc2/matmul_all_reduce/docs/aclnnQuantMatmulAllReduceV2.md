@@ -10,7 +10,7 @@
 
 ## 功能说明
 
-- **算子功能**：aclnnQuantMatmulAllReduceV2接口是对aclnnQuantMatmulAllReduce接口的功能扩展，新增支持pertensor量化方式。aclnnQuantMatmulAllReduceV2共支持pertensor、perchannel、pertoken[量化方式](common/量化介绍.md)。
+- **算子功能**：aclnnQuantMatmulAllReduceV2接口是对aclnnQuantMatmulAllReduce接口的功能扩展，新增支持pertensor量化方式。aclnnQuantMatmulAllReduceV2共支持pertensor、perchannel、pertoken[量化方式](../../../docs/context/量化介绍.md)。
 
 - **计算公式**：
 

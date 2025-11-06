@@ -437,7 +437,7 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV2GetWorkspaceSize(
     | pseType     | 含义                              |      备注   |
     | ----------- | --------------------------------- | ----------|
     | 0           | 外部传入pse 先mul再add              | - |
-    | 1           | 外部传入pse 先add再mul              | 跟[FlashAttentionUnpaddingScoreGrad](./aclnnFlashAttentionUnpaddingScoreGrad.md)实现一致。 |
+    | 1           | 外部传入pse 先add再mul              | 跟[FlashAttentionUnpaddingScoreGrad](../../flash_attention_score_grad/docs/aclnnFlashAttentionUnpaddingScoreGrad.md)实现一致。 |
     | 2           | 内部生成pse 先mul再add              | - |
     | 3           | 内部生成pse 先mul再add再sqrt         | - |
 - sparseMode: 当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量；sparseMode配置为1、2、3、5时，用户配置的preTokens、nextTokens不会生效；sparseMode配置为0、4时，须保证attenMaskOptional与preTokens、nextTokens的范围一致。用户不特意指定时建议传入0。sparse不同模式的详细说明请参见[sparse模式说明](../../../docs/context/sparse_mode参数说明.md)。

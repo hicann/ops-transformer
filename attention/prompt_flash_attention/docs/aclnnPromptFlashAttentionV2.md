@@ -9,7 +9,7 @@
 
 ## 功能说明
 
--   算子功能：全量推理场景的FlashAttention算子，相较于[aclnnPromptFlashAttention](PromptFlashAttention.md)接口，此接口新增了支持sparse优化、支持actualSeqLengthsKv优化、支持int8量化功能。
+-   算子功能：全量推理场景的FlashAttention算子，相较于[aclnnPromptFlashAttention](aclnnPromptFlashAttention.md)接口，此接口新增了支持sparse优化、支持actualSeqLengthsKv优化、支持int8量化功能。
 -   计算公式：
 
     self-attention（自注意力）利用输入样本自身的关系构建了一种注意力模型。其原理是假设有一个长度为$n$的输入样本序列$x$，$x$的每个元素都是一个$d$维向量，可以将每个$d$维向量看作一个token embedding，将这样一条序列经过3个权重矩阵变换得到3个维度为$n*d$的矩阵。

@@ -276,4 +276,4 @@
 
 | 调用方式   | 样例代码           | 说明                                         |
 | ---------------- | --------------------------- | --------------------------------------------------- |
-| aclnn接口  | [test_aclnn_matmul_all_reduce.cpp](./examples/test_aclnn_matmul_all_reduce.cpp) | 通过[aclnnMatMulAllReduce](./docs/aclnnMatMulAllReduce.md)接口方式调用MatMulAllReduce算子。 |
+| aclnn接口  | [test_aclnn_matmul_all_reduce.cpp](./examples/test_aclnn_matmul_all_reduce.cpp) | 通过[aclnnMatMulAllReduce](docs/aclnnMatmulAllReduce.md)接口方式调用MatMulAllReduce算子。 |

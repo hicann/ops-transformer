@@ -12,7 +12,7 @@
 
 ## 功能说明
 
-- 算子功能：训练场景下计算注意力的反向输出，即[FlashAttentionVarLenScoreV4](./aclnnFlashAttentionVarLenScoreV4.md)的反向计算。该接口相较于[FlashAttentionUnpaddingScoreGrad](./aclnnFlashAttentionUnpaddingScoreGrad.md)接口，新增softmaxInLayout参数。
+- 算子功能：训练场景下计算注意力的反向输出，即[FlashAttentionVarLenScoreV4](../../flash_attention_score/docs/aclnnFlashAttentionVarLenScoreV4.md)的反向计算。该接口相较于[FlashAttentionUnpaddingScoreGrad](./aclnnFlashAttentionUnpaddingScoreGrad.md)接口，新增softmaxInLayout参数。
   - 当输入softmaxSumOut和softmaxMaxOut的shape和实际数据排布均为TND格式时，softmaxInLayout需要配置为"same_as_input"。
   - 当输入softmaxSumOut和softmaxMaxOut的shape为TND但实际数据排布均为NTD格式时，softmaxInLayout需要配置为""。
   - 原有FlashAttentionVarLenScore接口的softmaxSumOut和softmaxMaxOut的输出格式为NTD，FlashAttentionVarLenScoreV4接口允许传入字符串类型参数softmaxOutLayout，来控制是否输出Shape和数据排布均为TND格式的softmaxSumOut和softmaxMaxOut。

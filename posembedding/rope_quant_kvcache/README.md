@@ -145,4 +145,4 @@
 
 | 调用方式      | 调用样例                 | 说明                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
-| 图模式调用 | [test_geir_rope_quant_kvcache](examples/test_geir_rope_quant_kvcache.cpp) | 通过图模式方式调用算子。 |
+| 图模式调用 | [test_geir_rope_quant_kvcache](./examples/test_geir_rope_quant_kvcache.cpp) | 通过图模式方式调用算子。 |

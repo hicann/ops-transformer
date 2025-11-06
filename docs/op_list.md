@@ -1,7 +1,7 @@
 # 算子列表
 
 > 说明：
-> - **算子目录**：目录名为算子名小写下划线形式，每个目录承载该算子所有交付件，包括代码实现、examples、文档等，目录介绍参见[项目目录](dir_structure.md)。
+> - **算子目录**：目录名为算子名小写下划线形式，每个目录承载该算子所有交付件，包括代码实现、examples、文档等，目录介绍参见[项目目录](context/dir_structure.md)。
 
 
 项目提供的所有算子分类和算子列表如下：
@@ -54,12 +54,12 @@
 | moe         | [moe_gating_top_k](../moe/moe_gating_top_k/README.md) | AI Core | MoE计算中，对输入x做Sigmoid计算，对计算结果分组进行排序，最后根据分组排序的结果选取前k个专家 |
 | moe         | [moe_gating_top_k_softmax](../moe/moe_gating_top_k_softmax/README.md) | AI Core | MoE计算中，对x的输出做Softmax计算，取topk操作。 |
 | moe         | [moe_gating_top_k_softmax_v2](../moe/moe_gating_top_k_softmax_v2/README.md) | AI Core | MoE计算中，如果renorm=0，先对x的输出做Softmax计算，再取topk操作；如果renorm=1，先对x的输出做topk操作，再进行Softmax操作 |
-| moe         | [moe_init_routing](../moe/moe_init_routing/README.md) | AI Core | MoE的routing计算，根据[aclnnMoeGatingTopKSoftmax](aclnnMoeGatingTopKSoftmax.md)的计算结果做routing处理 |
-| moe         | [moe_init_routing_quant](../moe/moe_init_routing_quant/README.md) | AI Core | MoE的routing计算，根据[aclnnMoeInitRoutingQuantSoftmax](aclnnMoeInitRoutingQuantSoftmax.md)的计算结果做routing处理，并对结果进行量化 |
-| moe         | [moe_init_routing_quant_v2](../moe/moe_init_routing_quant_v2/README.md) | AI Core | MoE的routing计算，根据[aclnnMoeGatingTopKSoftmaxV2](aclnnMoeGatingTopKSoftmaxV2.md)的计算结果做routing处理 |
+| moe         | [moe_init_routing](../moe/moe_init_routing/README.md) | AI Core | MoE的routing计算，根据[aclnnMoeGatingTopKSoftmax](../moe/moe_gating_top_k_softmax/docs/aclnnMoeGatingTopKSoftmax.md)的计算结果做routing处理 |
+| moe         | [moe_init_routing_quant](../moe/moe_init_routing_quant/README.md) | AI Core | MoE的routing计算，根据[aclnnMoeGatingTopKSoftmax](../moe/moe_gating_top_k_softmax/docs/aclnnMoeGatingTopKSoftmax.md)的计算结果做routing处理，并对结果进行量化 |
+| moe         | [moe_init_routing_quant_v2](../moe/moe_init_routing_quant_v2/README.md) | AI Core | MoE的routing计算，根据[aclnnMoeGatingTopKSoftmaxV2](../moe/moe_gating_top_k_softmax_v2/docs/aclnnMoeGatingTopKSoftmaxV2.md)的计算结果做routing处理 |
 | moe         | [moe_init_routing_v2](../moe/moe_init_routing_v2/README.md) | AI Core | 以MoeGatingTopKSoftmax算子的输出x和expert_idx作为输入，并输出Routing矩阵expanded_x等结果供后续计算使用 |
-| moe         | [moe_init_routing_v2_grad](../moe/moe_init_routing_v2_grad/README.md) | AI Core | [aclnnMoeInitRoutingV2](aclnnMoeInitRoutingV2.md)的反向传播，完成tokens的加权求和 |
-| moe         | [moe_init_routing_v3](../moe/moe_init_routing_v3/README.md) | AI Core | MoE的routing计算，根据[aclnnMoeGatingTopKSoftmaxV2](../moe_gating_top_k_softmax_v2/readme.md)的计算结果做routing处理，支持不量化和动态量化模式 |
+| moe         | [moe_init_routing_v2_grad](../moe/moe_init_routing_v2_grad/README.md) | AI Core | [aclnnMoeInitRoutingV2](../moe/moe_init_routing_v2/docs/aclnnMoeInitRoutingV2.md)的反向传播，完成tokens的加权求和 |
+| moe         | [moe_init_routing_v3](../moe/moe_init_routing_v3/README.md) | AI Core | MoE的routing计算，根据[aclnnMoeGatingTopKSoftmaxV2](README.md)的计算结果做routing处理，支持不量化和动态量化模式 |
 | moe         | [moe_re_routing](../moe/moe_re_routing/README.md) | AI Core | MoE网络中，进行AlltoAll操作从其他卡上拿到需要算的token后，将token按照专家顺序重新排列 |
 | moe         | [moe_token_permute](../moe/moe_token_permute/README.md) | AI Core | MoE的permute计算，根据索引indices将tokens广播并排序 |
 | moe         | [moe_token_permute_grad](../moe/moe_token_permute_grad/README.md) | AI Core | aclnnMoeTokenPermute的反向传播计算 |

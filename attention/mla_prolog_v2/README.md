@@ -492,4 +492,4 @@
 </tbody></table>
 
 <!-- ## 参考资源
-[MlaProlog算子设计原理](../../../docs/common/MlaProlog算子设计介绍.md) -->
+[MlaProlog算子设计原理](../mla_prolog/docs/MlaProlog算子设计介绍.md) -->

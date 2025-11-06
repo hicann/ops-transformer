@@ -12,7 +12,7 @@
 
 ## 功能说明
 
--   算子功能：训练场景下计算注意力的反向输出，即[aclnnFlashAttentionVarLenScore](aclnnFlashAttentionVarLenScore.md)的反向计算。
+-   算子功能：训练场景下计算注意力的反向输出，即[aclnnFlashAttentionVarLenScore](../../flash_attention_score/docs/aclnnFlashAttentionVarLenScore.md)的反向计算。
 -   计算公式：
 
     已知注意力的正向计算公式为：

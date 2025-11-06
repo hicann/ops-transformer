@@ -120,7 +120,7 @@
     ```
     - --soc：\$\{soc\_version\}表示NPU型号。Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件使用"ascend910b"（默认），Atlas A3 训练系列产品/Atlas A3 推理系列产品使用"ascend910_93"。
     - --vendor_name（可选）：\$\{vendor\_name\}表示构建的自定义算子包名，默认名为custom。
-    - --ops（可选）：\$\{op\_list\}表示待编译算子，不指定时默认编译所有算子（参见[算子列表](./op_list.md)）。格式形如"apply_rotary_pos_emb,rope_quant_kvcache,..."，多算子之间用英文逗号","分隔。
+    - --ops（可选）：\$\{op\_list\}表示待编译算子，不指定时默认编译所有算子（参见[算子列表](../op_list.md)）。格式形如"apply_rotary_pos_emb,rope_quant_kvcache,..."，多算子之间用英文逗号","分隔。
 
     说明：若\$\{vendor\_name\}和\$\{op\_list\}都不传入编译的是built-in包；若编译所有算子的自定义算子包，需传入\$\{vendor\_name\}。
      
@@ -168,9 +168,9 @@
 
 ## 本地验证 
 
-通过项目根目录build.sh脚本，可快速调用算子和UT用例，验证项目功能是否正常，build参数介绍参见[build参数说明](./build.md)。
+通过项目根目录build.sh脚本，可快速调用算子和UT用例，验证项目功能是否正常，build参数介绍参见[build参数说明](../context/build.md)。
 
-目前算子支持API方式（aclnn接口）和图模式调用，**推荐aclnn调用**，项目可调用算子参见[算子列表](./op_list.md)，算子对应的aclnn接口参见[aclnn接口列表](./op_api_list.md)。
+目前算子支持API方式（aclnn接口）和图模式调用，**推荐aclnn调用**，项目可调用算子参见[算子列表](../op_list.md)，算子对应的aclnn接口参见[aclnn接口列表](../op_api_list.md)。
 
 - **执行算子样例**
   
@@ -181,7 +181,7 @@
         # bash build.sh --run_example flash_attention_score eager
         ```
         
-        - \$\{op\}：表示待执行算子（参见[算子列表](./op_list.md)），算子名小写下划线形式，如flash_attention_score。            
+        - \$\{op\}：表示待执行算子（参见[算子列表](../op_list.md)），算子名小写下划线形式，如flash_attention_score。            
         - \$\{mode\}：表示算子执行模式，目前支持eager（aclnn调用）、graph（图模式调用）。
         
     - 完成自定义算子包安装后，执行命令如下：

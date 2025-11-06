@@ -10,7 +10,7 @@
 
 ## 功能说明
 
-- **算子功能**：aclnnQuantMatmulAllReduceV3接口是对aclnnQuantMatmulAllReduceV2接口的功能扩展, 新增支持低比特通信：matmul的计算结果依次进行all_to_all通信、reduceSum计算、allgather通信、dequant反量化，代替先dequant和pertoken计算、再all_reduce通信的原流程。支持pertensor、perchannel、pertoken[量化方式](common/量化介绍.md)。
+- **算子功能**：aclnnQuantMatmulAllReduceV3接口是对aclnnQuantMatmulAllReduceV2接口的功能扩展, 新增支持低比特通信：matmul的计算结果依次进行all_to_all通信、reduceSum计算、allgather通信、dequant反量化，代替先dequant和pertoken计算、再all_reduce通信的原流程。支持pertensor、perchannel、pertoken[量化方式](../../../docs/context/量化介绍.md)。
 
 - **计算公式**：
 
