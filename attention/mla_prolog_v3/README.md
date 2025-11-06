@@ -12,6 +12,7 @@
 |<term>Atlas 200I/300/500 推理产品</term>|      ×     |
 ## 功能说明
 -  **算子功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为四路，首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后得到$q^N$；第二路乘以$W^{QR}$后经过旋转位置编码（ROPE）得到$q^R$；第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后传入Cache中得到$k^C$；第四路是输入$x$乘以$W^{KR}$后经过旋转位置编码后传入另一个Cache中得到$k^R$。
+算子实现部分复用[mla_prolog](../mla_prolog/README.md)。
 -  **计算公式**：
 
     RmsNorm公式
