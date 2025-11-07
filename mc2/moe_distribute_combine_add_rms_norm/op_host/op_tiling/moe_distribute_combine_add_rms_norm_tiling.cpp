@@ -491,12 +491,19 @@ static bool CheckTensorDim(gert::TilingContext *context, const char *nodeName, c
 // 校验数据类型
 static bool CheckTensorDataType(const gert::TilingContext *context, const char *nodeName, const bool isActiveMask, const bool hasElasticInfo)
 {
+    auto expandXDesc = context->GetInputDesc(EXPAND_X_INDEX);
+    OP_TILING_CHECK(expandXDesc == nullptr, OP_LOGE(nodeName, "expandxDesc is null."), return false);
+    OP_TILING_CHECK((expandXDesc->GetDataType() != ge::DT_BF16),
+        OP_LOGE(nodeName, "expandX dataType is invalid, dataType should be bf16, but is %s",
+        Ops::Base::ToString(expandXDesc->GetDataType()).c_str()), return false);
+        
     auto oriXDesc = context->GetOptionalInputDesc(ORI_X_INDEX);
     if (oriXDesc != nullptr) {
         OP_TILING_CHECK(
-            (oriXDesc->GetDataType() != ge::DT_BF16),
+            (oriXDesc->GetDataType() != expandXDesc->GetDataType()),
             OP_LOGE(
-                nodeName, "ori_x dataType is invalid, dataType should be bf16, but is %s",
+                nodeName, "ori_x dataType is invalid, dataType should be same as expandX dataType as %s, but now is %s",
+                Ops::Base::ToString(expandXDesc->GetDataType()).c_str(),
                 Ops::Base::ToString(oriXDesc->GetDataType()).c_str()),
             return false);
     }
@@ -504,9 +511,10 @@ static bool CheckTensorDataType(const gert::TilingContext *context, const char *
     auto constExpertAlpha1Desc = context->GetOptionalInputDesc(CONST_EXPERT_ALPHA_1_INDEX);
     if (constExpertAlpha1Desc != nullptr) {
         OP_TILING_CHECK(
-            (constExpertAlpha1Desc->GetDataType() != ge::DT_BF16),
+            (constExpertAlpha1Desc->GetDataType() != expandXDesc->GetDataType()),
             OP_LOGE(
-                nodeName, "const_expert_alpha_1 dataType is invalid, dataType should be bf16, but is %s",
+                nodeName, "const_expert_alpha_1 dataType is invalid, dataType should be same as expandX dataType as %s, but now is %s",
+                Ops::Base::ToString(expandXDesc->GetDataType()).c_str(),
                 Ops::Base::ToString(constExpertAlpha1Desc->GetDataType()).c_str()),
             return false);
     }
@@ -514,9 +522,10 @@ static bool CheckTensorDataType(const gert::TilingContext *context, const char *
     auto constExpertAlpha2Desc = context->GetOptionalInputDesc(CONST_EXPERT_ALPHA_2_INDEX);
     if (constExpertAlpha2Desc != nullptr) {
         OP_TILING_CHECK(
-            (constExpertAlpha2Desc->GetDataType() != ge::DT_BF16),
+            (constExpertAlpha2Desc->GetDataType() != expandXDesc->GetDataType()),
             OP_LOGE(
-                nodeName, "const_expert_alpha_2 dataType is invalid, dataType should be bf16, but is %s",
+                nodeName, "const_expert_alpha_2 dataType is invalid, dataType should be same as expandX dataType as %s, but now is %s",
+                Ops::Base::ToString(expandXDesc->GetDataType()).c_str(),
                 Ops::Base::ToString(constExpertAlpha2Desc->GetDataType()).c_str()),
             return false);
     }
@@ -524,18 +533,14 @@ static bool CheckTensorDataType(const gert::TilingContext *context, const char *
     auto constExpertVDesc = context->GetOptionalInputDesc(CONST_EXPERT_V_INDEX);
     if (constExpertVDesc != nullptr) {
         OP_TILING_CHECK(
-            (constExpertVDesc->GetDataType() != ge::DT_BF16),
+            (constExpertVDesc->GetDataType() != expandXDesc->GetDataType()),
             OP_LOGE(
-                nodeName, "const_expert_v dataType is invalid, dataType should be bf16, but is %s",
+                nodeName, "const_expert_v dataType is invalid, dataType should be same as expandX dataType as %s, but now is %s",
+                Ops::Base::ToString(expandXDesc->GetDataType()).c_str(),
                 Ops::Base::ToString(constExpertVDesc->GetDataType()).c_str()),
             return false);
     }
 
-    auto expandXDesc = context->GetInputDesc(EXPAND_X_INDEX);
-    OP_TILING_CHECK(expandXDesc == nullptr, OP_LOGE(nodeName, "expandxDesc is null."), return false);
-    OP_TILING_CHECK((expandXDesc->GetDataType() != ge::DT_BF16) && (expandXDesc->GetDataType() != ge::DT_FLOAT16),
-        OP_LOGE(nodeName, "expandX dataType is invalid, dataType should be bf16, but is %s",
-        Ops::Base::ToString(expandXDesc->GetDataType()).c_str()), return false);
     auto expertIdsDesc = context->GetInputDesc(EXPERT_IDS_INDEX);
     OP_TILING_CHECK(expertIdsDesc == nullptr, OP_LOGE(nodeName, "expertIdsDesc is null."), return false);
     OP_TILING_CHECK((expertIdsDesc->GetDataType() != ge::DT_INT32), OP_LOGE(nodeName, "expertIds dataType is invalid, "
