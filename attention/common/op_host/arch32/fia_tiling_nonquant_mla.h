@@ -61,6 +61,7 @@ private:
     uint32_t CalcFlashDecodeParamNums(const uint32_t coreNum) const;
     uint64_t CalcNormalWorkspaceSize(uint32_t coreNum, int64_t mm1ResSize, int64_t mm2ResSize, uint32_t mBaseSize) const;
     uint64_t CalcFlashDecodeWorkspace(const uint32_t coreNum) const;
+    void CalcScheduleMode();
     void CalcWorkspaceSize();
     void CalcMaxWorkspaceSize();
     void CalcBlockDim(uint32_t coreNum);
@@ -87,6 +88,7 @@ private:
     // set info to context
     FusedInferAttentionScoreTilingData *tilingData_ = GetContext()->GetTilingData<FusedInferAttentionScoreTilingData>();
     uint32_t blockDim_{0};
+    ScheduleMode scheduleMode_{ScheduleMode::NORMAL_MODE};
     uint64_t workspaceSize_{0};
     uint64_t tilingKey_{0};
 
