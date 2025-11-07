@@ -467,7 +467,7 @@ build_lib() {
     mkdir -p "${BUILD_PATH}"
   fi
 
-  cd "${BUILD_PATH}" && cmake .. -DENABLE_BUILT_IN=ON
+  cd "${BUILD_PATH}" && cmake .. ${CUSTOM_OPTION} -DENABLE_BUILT_IN=ON
 
   for lib in "${BUILD_LIBS[@]}"; do
     echo "Building target ${lib}"

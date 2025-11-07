@@ -48,14 +48,14 @@
 
     根据产品型号和环境架构，下载对应`cann-${soc_name}-opp_legacy-${cann_version}-linux-${arch}.run`包，下载链接如下：
 
-    - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：[legacy x86_64包](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/community/8.5.0.alpha001/cann-910b-opp_legacy-8.5.0.alpha001-linux-86_64.run)、[legacy aarch64包](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/community/8.5.0.alpha001/cann-910b-opp_legacy-8.5.0.alpha001-linux-aarch64.run)。
-    - Atlas A3 训练系列产品/Atlas A3 推理系列产品：[legacy x86_64包](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/community/8.5.0.alpha001/cann-910_93-opp_legacy-8.5.0.alpha001-linux-x86_64.run)、[legacy aarch64包](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/community/8.5.0.alpha001/cann-910_93-opp_legacy-8.5.0.alpha001-linux-aarch64.run)。
+    - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：[legacy x86_64包](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/community/8.5.0.alpha001/cann-910b-ops-legacy_8.5.0.alpha001_linux-86_64.run)、[legacy aarch64包](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/community/8.5.0.alpha001/cann-910b-ops-legacy_8.5.0.alpha001_linux-aarch64.run)。
+    - Atlas A3 训练系列产品/Atlas A3 推理系列产品：[legacy x86_64包](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/community/8.5.0.alpha001/cann-910_93-ops-legacy_8.5.0.alpha001_linux-x86_64.run)、[legacy aarch64包](https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN/community/8.5.0.alpha001/cann-910_93-ops-legacy_8.5.0.alpha001_linux-aarch64.run)。
 
     ```bash
     # 确保安装包具有可执行权限
-    chmod +x cann-${soc_name}-opp_legacy-${cann_version}-linux-${arch}.run
+    chmod +x cann-${soc_name}-ops-legacy_${cann_version}_linux-${arch}.run
     # 安装命令
-    ./cann-${soc_name}-opp_legacy-${cann_version}-linux-${arch}.run --full --install-path=${install_path}
+    ./cann-${soc_name}-ops-legacy_${cann_version}_linux-${arch}.run --full --install-path=${install_path}
     ```
     - \$\{soc\_name\}：表示NPU型号名称，即\$\{soc\_version\}删除“ascend”后剩余的内容。
 
@@ -136,7 +136,7 @@
     ./cann-ops-transformer-${vendor_name}_linux-${arch}.run
     ```
     
-    自定义算子包安装路径为`${ASCEND_HOME_PATH}/opp/vendors`，\$\{ASCEND\_HOME\_PATH\}已通过环境变量配置，表示CANN toolkit包安装路径，一般为\$\{install\_path\}/latest。注意自定义算子包不支持卸载。
+    自定义算子包安装路径为`${ASCEND_HOME_PATH}/opp/vendors`，\$\{ASCEND\_HOME\_PATH\}已通过环境变量配置，表示CANN toolkit包安装路径，一般为\$\{install\_path\}/latest/opp。注意自定义算子包不支持卸载。
 
 ### ops-transformer包
 
