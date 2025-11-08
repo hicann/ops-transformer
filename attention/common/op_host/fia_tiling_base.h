@@ -33,12 +33,6 @@ namespace optiling {
 
 class TilingInfo {};
 
-enum class ScheduleMode : uint32_t {
-    NORMAL_MODE = 0,
-    BATCH_MODE = 1,
-    SYNC_MODE = 2
-};
-
 class FiaTilingBase {
 public:
     FiaTilingBase() = default;
@@ -102,11 +96,6 @@ protected:
         context_->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
 
         return ge::GRAPH_SUCCESS;
-    }
-
-    [[nodiscard]] ge::graphStatus SetScheduleMode(ScheduleMode scheduleMode) const
-    {
-        return context_->SetScheduleMode(static_cast<uint32_t>(scheduleMode));
     }
 
     template <typename T>
