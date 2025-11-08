@@ -103,7 +103,7 @@ template <TemplateMC2TypeClass>
 __aicore__ inline void ElasticReceivableTest<TemplateMC2TypeFunc>::ComputeRankPerAiv(int32_t targetRankIndex)
 {
     // 分核计算
-    sendRankNum_ = rankNum_ / aivNum_; // 每个aiv需要处理的专家数
+    sendRankNum_ = rankNum_ / aivNum_; // 每个aiv需要处理的卡数
     uint32_t remainderRankNum = rankNum_ % aivNum_;
     startRankId_ = sendRankNum_ * aivId_ + targetRankIndex * rankNum_; // 每个aiv发送的起始rankid
     if (aivId_ < remainderRankNum) { // 前remainderRankNum个aiv需要多发1个卡的数据
