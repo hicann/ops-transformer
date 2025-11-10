@@ -86,7 +86,7 @@
 
     ```bash
    # 默认路径安装，以root用户为例（非root用户，将/usr/local替换为${HOME}）
-   source /usr/local/Ascend/ascend-toolkit/set_env.sh
+   source /usr/local/Ascend/set_env.sh
    # 指定路径安装
    # source ${install_path}/set_env.sh
     ```
