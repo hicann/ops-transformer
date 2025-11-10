@@ -231,7 +231,7 @@ aclnnStatus aclnnDistributeBarrierV2(
     - 动态缩容功能不支持在TP并行场景下使能。
 
 - 参数一致性约束：
-  - 使能`elasticInfoOptional`时，需确保DispatchV2、CombineV2系列算子也使能此参数，并且其取值与对应的`elasticInfoOptional`参数保持一致。
+  - 使能`elasticInfoOptional`时，需确保`aclnnMoeDistributeDispatchV3`与`aclnnMoeDistributeCombineV3`或`aclnnMoeDistributeCombineAddRmsNormV2`也使能此参数，并且其取值与对应的`elasticInfoOptional`参数保持一致。
 ## 调用示例
 
 - 文件准备：    

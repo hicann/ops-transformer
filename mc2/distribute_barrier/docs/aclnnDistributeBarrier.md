@@ -256,9 +256,6 @@ aclnnStatus aclnnDistributeBarrier(
         char hcomTpName[128] = {0};
         ret = HcclGetCommName(args.hcclTpComm, hcomTpName);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetTpCommName failed, ret %d\n", ret); return -1);
-        LOG_PRINT("[INFO] rank = %d, hcomEpName = %s, hcomTpName = %s, hcomEpBarrierName = %s, dispatchStream = %p, combineStream = %p, \
-                  context = %p\n", args.rankId, hcomEpName, hcomTpName, hcomEpBarrierName, args.dispatchStream, args.barrierStream, \
-                  args.combineStream, args.context);
     
         int64_t Bs = 8;
         int64_t H = 7168;
