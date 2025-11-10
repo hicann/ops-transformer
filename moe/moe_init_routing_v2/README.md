@@ -9,7 +9,7 @@
 
 ## 功能说明
 
-- 算子功能：该算子对应MoE（Mixture of Experts，混合专家模型）中的**Routing计算**，以MoeGatingTopKSoftmax算子的输出x和expert_idx作为输入，并输出Routing矩阵expanded_x等结果供后续计算使用。本接口针对V1接口（MoeInitRouting，源码未开放）做了如下功能变更，请根据实际情况选择合适的接口：
+- 算子功能：该算子对应MoE（Mixture of Experts，混合专家模型）中的**Routing计算**，以MoeGatingTopKSoftmax算子的输出x和expertIdx作为输入，并输出Routing矩阵expanded_x等结果供后续计算使用。本接口针对V1接口（MoeInitRouting，源码未开放）做了如下功能变更，请根据实际情况选择合适的接口：
 
     - 新增Drop模式，在该模式下输出内容会将每个专家需要处理的Token个数对齐为expertCapacity个，超过expertCapacity个的Token会被Drop，不足的会用0填充。
     - 新增Dropless模式下expertTokensCountOrCumsumOut可选输出，输出每个专家需要处理的累积Token个数（Cumsum），或每个专家需要处理的Token数（Count）。
@@ -52,21 +52,16 @@
     $$
 ## 参数说明
 
-<table style="undefined;table-layout: fixed; width: 1576px"><colgroup>
-  <col style="width: 170px">
-  <col style="width: 170px">
-  <col style="width: 312px">
-  <col style="width: 213px">
-  <col style="width: 100px">
-  </colgroup>
+<table style="table-layout: auto; width: 100%">
   <thead>
     <tr>
-      <th>参数名</th>
-      <th>输入/输出/属性</th>
-      <th>描述</th>
-      <th>数据类型</th>
-      <th>数据格式</th>
-    </tr></thead>
+      <th style="white-space: nowrap">参数名</th>
+      <th style="white-space: nowrap">输入/输出/属性</th>
+      <th style="white-space: nowrap">描述</th>
+      <th style="white-space: nowrap">数据类型</th>
+      <th style="white-space: nowrap">数据格式</th>
+    </tr>
+  </thead>
   <tbody>
     <tr>
       <td>x</td>
@@ -84,35 +79,35 @@
     </tr>
     <tr>
       <td>activeNum</td>
-      <td>输入</td>
+      <td>属性</td>
       <td>表示是否为Active场景。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
     <tr>
       <td>expertCapacity</td>
-      <td>输入</td>
+      <td>属性</td>
       <td>表示每个专家能够处理的tokens数。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
     <tr>
       <td>expertNum</td>
-      <td>输入</td>
+      <td>属性</td>
       <td>表示专家数，值范围大于等于0。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
     <tr>
       <td>dropPadMode</td>
-      <td>输入</td>
+      <td>属性</td>
       <td>表示是否为Drop/Pad场景。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
     <tr>
       <td>expertTokensCountOrCumsumFlag</td>
-      <td>输入</td>
+      <td>属性</td>
       <td>取值为0、1和2。
         0：表示不输出expertTokensCountOrCumsumOut。
         1：表示输出的值为各个专家处理的token数量的累计值。
@@ -122,7 +117,7 @@
     </tr>
     <tr>
       <td>expertTokensBeforeCapacityFlag</td>
-      <td>输入</td>
+      <td>属性</td>
       <td>取值为false和true。
         false：表示不输出expertTokensBeforeCapacityOut。
         true：表示输出的值为在drop之前各个专家处理的token数量。</td>

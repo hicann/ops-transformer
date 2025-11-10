@@ -36,11 +36,11 @@
   如果cacheModeOptional为contiguous则：
   
   $$
-  kCacheRef[i][indice[i]]=quantK[i]
+  kCacheRef[i][indices[i]]=quantK[i]
   $$
   
   $$
-  vCacheRef[i][indice[i]]=quantV[i]
+  vCacheRef[i][indices[i]]=quantV[i]
   $$
   
   如果cacheModeOptional为page则：
@@ -131,7 +131,7 @@
     <tr>
       <td style="white-space: nowrap">offsetKOptional</td>
       <td style="white-space: nowrap">可选输入</td>
-      <td style="white-space: nowrap">公式中的输入`offsetKoptional`用于量化k的offset因子，Device侧的aclTensor。</td>
+      <td style="white-space: nowrap">公式中的输入`offsetKOptional`用于量化k的offset因子，Device侧的aclTensor。</td>
       <td style="white-space: nowrap">FLOAT</td>
       <td style="white-space: nowrap">ND</td>
     </tr>

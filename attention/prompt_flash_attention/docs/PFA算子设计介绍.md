@@ -30,7 +30,7 @@
 1. 根据产品形态划分的通用能力模板：
 （1）A2/A3场景通用能力模板，支持Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件/Atlas A3 训练系列产品/Atlas A3 推理系列产品。
 
-2. 根据特定业务场景开发模板：
+1. 根据特定业务场景开发模板：
 （1）针对MLA场景，开发MLA基础API模板。
 （2）在A2/A3环境，针对独立接口，图模式且D非32对齐场景，支持特殊模板实现。
 （3）对于输入的key/value/attentionOut矩阵某一轴维度为0，提供空Tensor模板。
@@ -55,7 +55,7 @@ Tiling操作的目的是为了找到一种更高效的NPU执行方式，原始�
 
  根据硬件架构特征，AI Core分成AIC和AIV两个独立的核，AIC和AIV核拥有自己独立的Scalar计算单元，能够独立加载自己的代码段，单独执行。AIC和AIV分离的架构可以使得AIC和AIV并行执行。AIC和AIV之间数据交互的通路是L2和GM（Global Memory，DDR内存），两者之间的交互次数对性能影响是比较大的，同时由于AIC和AIV算力差异，两者需要使用不同的基本块大小，本着尽量减少AIC和AIV通信次数和发挥最大算力的原则，CVtiling分离策略应运而生，可以有效地减少CV通信次数，同时根据不同单元的buffer特征，选择不同的基本块进行计算，从而提升算子性能。
 
- 对于PromptFlashAttention算子，Vector计算涉及多个输入、输出、中间计算结果、double-buffer设计等，需要将buffer分配成多份，最优分配方案中最大一份为32KB，由于Vector计算使用的数据类型是float32，因此Vector的tiling基本块为8 * 1024。为了充分发挥Cube的算力，在CV之间一轮计算的数据量进行了1:16的配比，又由于Cube侧的输入数据类型是float16，输出是float32，Cube的基本块为128 * 128，所以通过nRation=8配比出128 * 1024的数据量。伪码如下：
+ 对于PromptFlashAttention算子，Vector计算涉及多个输入、输出、中间计算结果、double-buffer设计等，需要将buffer分配成多份，最优分配方案中最大一份为32KB，由于Vector计算使用的数据类型是float32，因此Vector的tiling基本块为8 * 1024。为了充分发挥Cube的算力，在CV之间一轮计算的数据量进行了1:16的配比，又由于Cube侧的输入数据类型是float16，输出是float32，Cube的基本块为128 * 128，所以通过nRation=8配比出128 * 1024的数据量。
 
 ### 2.2 tilingkey设计
 

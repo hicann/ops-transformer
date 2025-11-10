@@ -77,7 +77,7 @@
     <tr>
       <td>paddedMode</td>
       <td>属性</td>
-      <td>paddedMode为true时表示indices已被填充为代表每个专家选中的token索引，此时不对indices进行排序。目前仅支持paddedMode为false。。</td>
+      <td>paddedMode为true时表示indices已被填充为代表每个专家选中的token索引，此时不对indices进行排序。目前仅支持paddedMode为false。</td>
       <td>BOOL</td>
       <td>-</td>
     </tr>

@@ -9,15 +9,14 @@
 
 ## 功能说明
 
-
 - 算子功能：完成AllGather通信与MatMul计算融合。
 - 计算公式：
 
     $$
-    y=allgather(x1)@x2+bias
+    y=AllGather(x1)@x2+bias
     $$
     $$
-    gatherOut=allgather(x1)
+    gatherOut=AllGather(x1)
     $$
 ## 参数说明
 
@@ -69,7 +68,7 @@
     <tr>
       <td>gather_out</td>
       <td>输出</td>
-      <td>公式中的输出gather_out。</td>
+      <td>公式中的输出gatherOut。</td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
     </tr>
@@ -125,7 +124,7 @@
   </tbody></table>
 
 ## 约束说明
-* 当前版本中，输入x1为2维，其shape为(m, k)。x2必须是2维，其shape为(k, n)，轴满足mm算子入参要求，k轴相等，且k轴取值范围为[256, 65535)。
+* 当前版本中，输入x1为2维，其shape为(m, k)。x2必须是2维，其shape为(k, n)，轴满足MM算子入参要求，k轴相等，且k轴取值范围为[256, 65535)。
 * x1/x2支持的空tensor场景，m和n可以为空，k不可为空，且需要满足以下条件：
     * m为空，k不为空，n不为空；
     * m不为空，k不为空，n为空；
@@ -137,11 +136,11 @@
 * gather_index当前版本仅支持输入0。
 * commTurn当前版本仅支持输入0。
 * <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：
-    * 支持2、4、8卡，并且仅支持hccs链路all mesh组网。
+    * 支持2、4、8卡，并且仅支持HCCS链路all mesh组网。
     * 一个模型中的通算融合MC2算子，仅支持相同通信域。
 * <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
-    * 支持2、4、8、16、32卡，并且仅支持hccs链路double ring组网。
-    * 支持2、4、8、16、32、64卡，并且仅支持hccs链路all mesh组网。
+    * 支持2、4、8、16、32卡，并且仅支持HCCS链路double ring组网。
+    * 支持2、4、8、16、32、64卡，并且仅支持HCCS链路all mesh组网。
 ## 调用说明
 
 

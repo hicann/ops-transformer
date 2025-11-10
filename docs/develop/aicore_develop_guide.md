@@ -349,7 +349,6 @@ ASCENDC_TPL_SEL(
     // 组合1：样例只区分数据类型，故这里只有一个选项
     ASCENDC_TPL_ARGS_SEL(
         ASCENDC_TPL_UINT_SEL(schMode, ASCENDC_TPL_UI_LIST, ELEMENTWISE_TPL_SCH_MODE_0, ELEMENTWISE_TPL_SCH_MODE_1)));
-#endif
 ```
 
 如需实现复杂参数组合完成分支选择（涉及多TilingKey场景），请参考[《Ascend C算子开发》](https://hiascend.com/document/redirect/CannCommunityOpdevAscendC)中"算子实现 > Host侧Tiling实现 >  Tiling模板编程"。

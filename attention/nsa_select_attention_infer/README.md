@@ -67,7 +67,7 @@
       <tr>
         <td style="white-space: nowrap;">topkIndices</td>
         <td>输入</td>
-        <td>公式里的topK索引。</td>
+        <td>公式里的topk索引。</td>
         <td>INT32</td>
         <td>ND</td>
       </tr>
@@ -98,7 +98,7 @@
   - 仅支持paged attention。
   - 仅支持selectBlockSize取值为16的整数倍，最大支持到128。
   - selectBlockCount上限满足selectBlockCount * selectBlockSize <= MaxKvSeqlen，MaxKvSeqlen = Max(actualSelKvSeqLenOptional)。
-  
+
 # 调用说明
 
 | 调用方式  | 样例代码                                                                | 说明                                                                                          |

@@ -13,19 +13,19 @@
 
 - 算子功能：训练场景下，使用FlashAttention算法实现self-attention（自注意力）的计算：
 
-    -   psetype=1时，需要先add再mul。
-    -   psetype≠1时，需要先mul再add。
+    -   pseType=1时，需要先add再mul。
+    -   pseType≠1时，需要先mul再add。
 
 - 计算公式：
 
   注意力的正向计算公式如下：
 
-    - psetype=1时，公式如下：
+    - pseType=1时，公式如下：
       $$
       attention\_out = Dropout(Softmax(Mask(scale*(pse+query*key^T), atten\_mask)), keep\_prob)*value
       $$
 
-    - psetype≠1时，公式如下：
+    - pseType≠1时，公式如下：
       $$
       attention\_out=Dropout(Softmax(Mask(scale*(query*key^T) + pse),atten\_mask),keep\_prob)*value
       $$
@@ -141,7 +141,7 @@
       <td>ND</td>
     </tr>
     <tr>
-      <td>attentionOutOut</td>
+      <td>attentionOut</td>
       <td>输出</td>
       <td>公式中的attention_out。</td>
       <td>BFLOAT16、FLOAT16、FLOAT</td>
@@ -155,7 +155,7 @@
 - 输入query、key、value、realShiftOptional的数据类型必须一致。
 - 输入query、key、value的inputLayout必须一致。
 - 关于数据shape的约束，以inputLayout的BSND、BNSD为例（BSH、SBH下H=N\*D），其中：
-    -   B：取值范围为1\~2M。带prefixOptional的时候B最大支持2K。
+    -   B：取值范围为1\~2M。当prefixOptional的时候B最大支持2K。
     -   N：取值范围为1\~256。
     -   S：取值范围为1\~1M。
     -   D：取值范围为1\~512。

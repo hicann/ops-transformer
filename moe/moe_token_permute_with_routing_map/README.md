@@ -9,11 +9,12 @@
 
 ## 功能说明
 
-算子功能：MoE的permute计算，将token和expert的标签作为routingMap传入，根据routingMaps将tokens和可选probsOptional广播后排序。
+算子功能：MoE的permute计算，将token和expert的标签作为routingMap传入，根据routingMap将tokens和可选probsOptional广播后排序。
 
 计算公式：
   tokens\_num 为routingMap的第0维大小，expert\_num为routingMap的第1维大小。
-  dropAndPad为`false`时
+ 
+ 1.dropAndPad为`false`时：
   
   $$
   expertIndex=arrange(tokens\_num).expand(expert\_num,-1)
@@ -43,7 +44,7 @@
   permuteProbsOutOptional=probsOptional.T.maskedselect(routingMap.T)
   $$
   
-  dropAndPad为`true`时
+2.dropAndPad为`true`时：
   $$
   capacity = numOutTokens // expert\_num
   $$
@@ -56,21 +57,21 @@
   $$
   
   $$
-  permutedTokensOut = tokens.index_select(0, sorted_indices)
+  permutedTokensOut = tokens.index_select(0, sortedIndicesOut)
   $$
   
-  如果probs不是`none`时
+- 如果probs不是`none`时：
   
   $$
-  robs\_T\_1D = probsOptional.T.view(-1)
-  $$
-  
-  $$
-  indices\_dim0 = arange(num\_experts)
+  probs\_T\_1D = probsOptional.T.view(-1)
   $$
   
   $$
-  indices\_dim1 = sorted_indices.view(expert\_num, capacity)
+  indices\_dim0 = arange(expert\_num)
+  $$
+  
+  $$
+  indices\_dim1 = sortedIndicesOut.view(expert\_num, capacity)
   $$
   
   $$
@@ -83,21 +84,16 @@
 
 ## 参数说明
 
-<table style="undefined;table-layout: fixed; width: 1576px"> <colgroup>
- <col style="width: 170px">
- <col style="width: 170px">
- <col style="width: 800px">
- <col style="width: 800px">
- <col style="width: 200px">
- </colgroup>
- <thead>
-  <tr>
-   <th>参数名</th>
-   <th>输入/输出</th>
-   <th>描述</th>
-   <th>数据类型</th>
-   <th>数据格式</th>
-  </tr></thead>
+<table style="table-layout: auto; width: 100%">
+  <thead>
+    <tr>
+      <th style="white-space: nowrap">参数名</th>
+      <th style="white-space: nowrap">输入/输出/属性</th>
+      <th style="white-space: nowrap">描述</th>
+      <th style="white-space: nowrap">数据类型</th>
+      <th style="white-space: nowrap">数据格式</th>
+    </tr>
+  </thead>
  <tbody>
   <tr>
    <td>tokens</td>
@@ -161,7 +157,8 @@
 
 ## 约束说明
 
- - tokens_num和experts_num要求小于`16777215`，pad模式为false时routingMap 中 每行为1或true的个数固定且小于`512`。
+ - tokens_num和expert_num要求小于`16777215`。
+ - pad模式为false时routingMap中每行为1或true的个数固定且小于`512`。
  
 ## 调用说明
 

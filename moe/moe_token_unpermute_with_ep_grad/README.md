@@ -35,7 +35,7 @@
   $$
   
   $$
-  permutedTokensGradOut[sortedIndices[i]] = ((unpermutedTokensGrad.unsqueeze(1) * probs.unsqueeze(-1)).reshape(-1, hiddensize))[i]
+  permutedTokensGradOut[sortedIndices[i]] = ((unpermutedTokensGrad.unsqueeze(1) * probs.unsqueeze(-1)).reshape(-1, hiddenSize))[i]
   $$
 - probs为None：
   
@@ -45,21 +45,16 @@
 
 ## 参数说明
 
-<table style="undefined;table-layout: fixed; width: 1576px"><colgroup>
-  <col style="width: 170px">
-  <col style="width: 170px">
-  <col style="width: 312px">
-  <col style="width: 213px">
-  <col style="width: 100px">
-  </colgroup>
+<table style="table-layout: auto; width: 100%">
   <thead>
     <tr>
-      <th>参数名</th>
-      <th>输入/输出/属性</th>
-      <th>描述</th>
-      <th>数据类型</th>
-      <th>数据格式</th>
-    </tr></thead>
+      <th style="white-space: nowrap">参数名</th>
+      <th style="white-space: nowrap">输入/输出/属性</th>
+      <th style="white-space: nowrap">描述</th>
+      <th style="white-space: nowrap">数据类型</th>
+      <th style="white-space: nowrap">数据格式</th>
+    </tr>
+  </thead>
   <tbody>
     <tr>
       <td>unpermutedTokensGrad</td>
@@ -135,7 +130,7 @@
 
 ## 约束说明
 
-topkNum <= 512
+-   topkNum <= 512。
 
 ## 调用说明
 

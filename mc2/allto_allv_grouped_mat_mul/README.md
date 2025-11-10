@@ -94,6 +94,7 @@
   <tr>
    <td>epWorldSize</td>
    <td>输入</td>
+   <td>ep通信域size：支持8、16、32、64。</td>
    <td>INT64</td>
    <td>ND</td>
   </tr>

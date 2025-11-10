@@ -16,7 +16,7 @@
 
 - 计算公式：
 
-    根据传入的topkIndice对keyIn和value选取数量为selectedBlockCount个大小为selectedBlockSize的数据重排，公式如下：
+    根据传入的topkIndices对key和value选取数量为selectedBlockCount个大小为selectedBlockSize的数据重排，公式如下：
 
     $$
     selectedKey = Gather(key, topkIndices[i]),0<=i<selectedBlockCount \\

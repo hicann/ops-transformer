@@ -9,7 +9,7 @@
 
 ## 功能说明
 
-- 算子功能：对输入张量的尾轴进行切分，划分为q、k、vOut，对q、k进行旋转位置编码，生成qOut与kOut，之后对kOut与vOut进行量化。
+- 算子功能：对输入张量的尾轴进行切分，划分为q、k、v，对q、k进行旋转位置编码，生成q与k，之后对k与v进行量化并按照indices更新到kCacheRef和vCacheRef上。
 
 ## 参数说明
 
@@ -103,14 +103,14 @@
     <tr>
       <td style="white-space: nowrap">q</td>
       <td style="white-space: nowrap">输出</td>
-      <td style="white-space: nowrap">切分出的q。</td>
+      <td style="white-space: nowrap">切分出的q执行旋转位置编码后的结果。</td>
       <td style="white-space: nowrap">FLOAT16</td>
       <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
       <td style="white-space: nowrap">k</td>
       <td style="white-space: nowrap">输出</td>
-      <td style="white-space: nowrap">切分出的k。</td>
+      <td style="white-space: nowrap">切分出的k执行旋转位置编码后的结果。</td>
       <td style="white-space: nowrap">FLOAT16</td>
       <td style="white-space: nowrap">ND</td>
     </tr>
@@ -124,14 +124,14 @@
     <tr>
       <td style="white-space: nowrap">k_cache</td>
       <td style="white-space: nowrap">输出</td>
-      <td style="white-space: nowrap">量化后的kOut。</td>
+      <td style="white-space: nowrap">切分出的k执行旋转位置编码并量化后的结果。</td>
       <td style="white-space: nowrap">INT8</td>
       <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
       <td style="white-space: nowrap">v_cache</td>
       <td style="white-space: nowrap">输出</td>
-      <td style="white-space: nowrap">量化后的vOut。</td>
+      <td style="white-space: nowrap">切分出的v量化后的结果。</td>
       <td style="white-space: nowrap">INT8</td>
       <td style="white-space: nowrap">ND</td>
     </tr>

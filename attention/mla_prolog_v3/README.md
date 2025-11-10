@@ -114,18 +114,18 @@
         - dequant_scale_x的shape为(T, 1)
         - query的shape为(T, N, Hckv)
         - query_rope的shape为(T, N, Dr)
-        - 全量化场景下，dequantScaleQNopeOutOptional的shape为(T, N, 1)，其他场景下为(1)
+        - 全量化场景下，dequant_scale_q_nope的shape为(T, N, 1)，其他场景下为(1)
     - 若token_x的维度不采用BS合轴，即(B, S, He)
         - rope_sin和rope_cos的shape为(B, S, Dr)
         - cache_index的shape为(B, S)
         - dequant_scale_x的shape为(B*S, 1)
         - query的shape为(B, S, N, Hckv)
         - query_rope的shape为(B, S, N, Dr)
-        - 全量化场景下，dequantScaleQNopeOutOptional的shape为(B*S, N, 1)，其他场景下为(1)
+        - 全量化场景下，dequant_scale_q_nope的shape为(B*S, N, 1)，其他场景下为(1)
     -   B、S、T、Skv值允许一个或多个取0，即Shape与B、S、T、Skv值相关的入参允许传入空Tensor，其余入参不支持传入空Tensor。
         - 如果B、S、T取值为0，则query、query_rope输出空Tensor，kv_cache、kr_cache不做更新。
-        - 如果Skv取值为0，则query、query_rope、dequantScaleQNopeOutOptional正常计算，kv_cache、kr_cache不做更新，即输出空Tensor。
-
+        - 如果Skv取值为0，则query、query_rope、dequant_scale_q_nope正常计算，kv_cache、kr_cache不做更新，即输出空Tensor。
+- weight_dq，weight_uq_qr，weight_dkv_kr在不转置的情况下各个维度的表示：（k，n）。
 -  aclnnMlaPrologV3WeightNz接口支持场景：
     <table style="table-layout: auto;" border="1">
       <tr>

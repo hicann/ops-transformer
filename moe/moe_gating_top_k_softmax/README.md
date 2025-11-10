@@ -30,21 +30,16 @@
 
 ## 参数说明
 
-<table style="undefined;table-layout: fixed; width: 1576px"><colgroup>
-  <col style="width: 170px">
-  <col style="width: 170px">
-  <col style="width: 312px">
-  <col style="width: 213px">
-  <col style="width: 100px">
-  </colgroup>
+<table style="table-layout: auto; width: 100%">
   <thead>
     <tr>
-      <th>参数名</th>
-      <th>输入/输出/属性</th>
-      <th>描述</th>
-      <th>数据类型</th>
-      <th>数据格式</th>
-    </tr></thead>
+      <th style="white-space: nowrap">参数名</th>
+      <th style="white-space: nowrap">输入/输出/属性</th>
+      <th style="white-space: nowrap">描述</th>
+      <th style="white-space: nowrap">数据类型</th>
+      <th style="white-space: nowrap">数据格式</th>
+    </tr>
+  </thead>
   <tbody>
     <tr>
       <td>x</td>
@@ -62,7 +57,7 @@
     </tr>
     <tr>
       <td>k</td>
-      <td>输入</td>
+      <td>属性</td>
       <td>公式中的`k`，表示topk的k值。</td>
       <td>INT64</td>
       <td>-</td>
@@ -70,14 +65,14 @@
     <tr>
       <td>yOut</td>
       <td>输出</td>
-      <td>公式中的`yOut`，表示对x做softmax后取topk值的索引，即专家的序号。</td>
+      <td>公式中的`yOut`，表示softmax的topk结果。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>expertIdxOut</td>
       <td>输出</td>
-      <td>公式中的`expertIdxOut`，表示对x做softmax后取topk值的索引，即专家的序号。</td>
+      <td>公式中的`expertIdxOut`，表示topk的indices结果即对应的专家序号。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -92,8 +87,8 @@
 
 ## 约束说明
 
-k的值不大于1024。
-x和finishedOptional的每一维大小应不大于int32的最大值2147483647。
+-   k的值不大于1024。
+-   x和finishedOptional的每一维大小应不大于int32的最大值2147483647。
 
 ## 调用说明
 

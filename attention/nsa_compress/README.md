@@ -12,7 +12,7 @@
 
 ## 功能说明
 
-- 算子功能：训练场景下，使用NSA Compress算法减轻long-context的注意力计算，实现在KV序列维度进行压缩。
+- 算子功能：训练场景下，使用Nsa Compress算法减轻long-context的注意力计算，实现在KV序列维度进行压缩。
 
 - 计算公式：
 

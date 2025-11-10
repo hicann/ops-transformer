@@ -87,21 +87,16 @@
 
 ## 参数说明
 
-<table style="undefined;table-layout: fixed; width: 1576px"><colgroup>
-  <col style="width: 170px">
-  <col style="width: 170px">
-  <col style="width: 312px">
-  <col style="width: 213px">
-  <col style="width: 100px">
-  </colgroup>
+<table style="table-layout: auto; width: 100%">
   <thead>
     <tr>
-      <th>参数名</th>
-      <th>输入/输出/属性</th>
-      <th>描述</th>
-      <th>数据类型</th>
-      <th>数据格式</th>
-    </tr></thead>
+      <th style="white-space: nowrap">参数名</th>
+      <th style="white-space: nowrap">输入/输出/属性</th>
+      <th style="white-space: nowrap">描述</th>
+      <th style="white-space: nowrap">数据类型</th>
+      <th style="white-space: nowrap">数据格式</th>
+    </tr>
+  </thead>
   <tbody>
     <tr>
       <td>permutedTokens</td>
@@ -127,7 +122,7 @@
     <tr>
       <td>probsOptional</td>
       <td>可选输入</td>
-      <td>代表对应位置的Token被对应专家处理后的结果在最终结果中的权重，对应公式中的`probsOptional`。</td>
+      <td>代表对应位置的Token被对应专家处理后的结果在最终结果中的权重，对应公式中的`probs`。</td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
       <td>ND</td>
     </tr>
@@ -177,7 +172,7 @@
 
 ## 约束说明
 
-  topkNum <= 512, paddedMode为false时routingMap中每行为1或true的个数固定且小于`512`。
+-   topkNum <= 512, paddedMode为false时routingMap中每行为1或true的个数固定且小于`512`。
 
 ## 调用说明
 

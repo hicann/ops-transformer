@@ -282,5 +282,3 @@ $$
 | 调用方式  | 样例代码                                  | 说明                                                     |
 | :--------: | :----------------------------------------: | :-------------------------------------------------------: |
 | aclnn接口 | [test_aclnn_moe_distribute_dispatch_v2.cpp](./examples/test_aclnn_moe_distribute_dispatch_v2.cpp) | 通过[aclnnMoeDistributeDispatchV2](./docs/aclnnMoeDistributeDispatchV2.md)接口方式调用moe_distribute_dispatch_v2算子。 |
-
-

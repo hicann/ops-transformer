@@ -6,7 +6,7 @@
 
 按照FlashAttention反向计算流程实现，整体计算流程如下：
 
-1. 重计算p，$p = SimpledSoftmax(Mask(Matmul(query, key^T) + pse) * scale)$，本步骤重计算了fa流程中的softmax结果p，计算结果保存的ub中。
+1. 重计算p，$p = SimpledSoftmax(Mask(Matmul(query, key^T) + pse\_shift) * scale)$，本步骤重计算了fa流程中的softmax结果p，计算结果保存的ub中。
 2. 计算dp，$dp = Dropout(Matmul(dy, value^T))$，该计算包含matmul计算和dropout计算，matmul计算中，左矩阵为dy，右矩阵为转置后的value。
 3. 计算ds，$ds = p * Sub(dp, FlashSoftmaxGrad(dy, attention\_in))$，本计算中，FlashSoftmaxGrad计算的入参为dy、正向输出attention\_in，该结果与dp做减操作，最终的结果与p相乘得到结果ds。
 4. 计算dq，$dq = Matmul(ds, key) * scale$，本计算将ds结果与key做matmul计算，并将结果与scale相乘得到结果dq。

@@ -33,7 +33,7 @@
 - **Combine操作**负责整合各专家输出的计算结果，执行加权求和，并通过逆向的AllToAllV通信将处理后的Token数据恢复至原始位置，完成整个分布式专家计算的协同与整合。
 
 #### 1.2.2 技术优势
-Dispatch/Combine操作本质上是计算与通信的紧密结合。通算融合算子相较于传统的AlltoAllV通信实现了以下突破：
+Dispatch/Combine操作本质上是计算与通信的紧密结合。通算融合算子相较于传统的AllToAllV通信实现了以下突破：
 - 将路由计算等Host侧逻辑下沉至Device侧，彻底消除Host与Device间的同步开销；
 - 实现Combine操作中部分计算与AllToAllV通信的流水并行，有效掩盖计算与通信耗时。
 
@@ -80,7 +80,7 @@ MoeDistributeDispatch算子的实现方案构建了一个完整的数据分发�
 
 索引计算围绕expertIds输入矩阵展开，该矩阵维度为BS×K，其中expertIds(i,j)表示第i个Token被分配给第j个专家的索引。Combine算子需要Dispatch算子提供expandIdx输出，该矩阵同样为BS×K维度，expandIdx(i,j)表示在全局视角下，第i个Token是发送给专家expertIds(i,j)的第几个Token。
 
-Token重排操作旨在优化通信效率。由于每次通信下发均存在固定时间开销，为最小化下发次数，需要将发送至同一rank的数据在HBM内存中连续存放。该操作本质上是实现MoePermute功能。
+Token重排操作旨在优化通信效率。由于每次通信下发均存在固定时间开销，为最小化下发次数，需要将发送至同一rank的数据在GM内存中连续存放。该操作本质上是实现MoePermute功能。
 
 #### 2.2.2 实现方案
 
@@ -98,7 +98,7 @@ Token重排操作旨在优化通信效率。由于每次通信下发均存在固
 遍历expertIds矩阵，对于每个元素expertIds(i,j)：
 
 1. 目标专家索引 = expertIds(i,j)
-2. 目标rank索引 = Ceil(expertIds(i,j) / localExpertNum)
+2. 目标rank索引 = ceil(expertIds(i,j) / localExpertNum)
 3. 专家在目标rank上的局部索引 = expertIds(i,j) % localExpertNum
 4. expandIdx(i,j) = sendStatus(目标rank索引, 专家局部索引)
 5. 更新sendStatus(目标rank索引, 专家局部索引)++
@@ -107,8 +107,8 @@ Token重排操作旨在优化通信效率。由于每次通信下发均存在固
 
 构建专家Token数量前缀和数组expertCumsum，确定Token重排位置需要三个参数：
 
-1. 目标rank索引 = Ceil(expertIds(i,j) / localExpertNum)
-2. 前置专家Token总数 = expertCumsum(expertIds(i,j)) - expertCumsum(Ceil(expertIds(i,j)/localExpertNum) × localExpertNum)
+1. 目标rank索引 = ceil(expertIds(i,j) / localExpertNum)
+2. 前置专家Token总数 = expertCumsum(expertIds(i,j)) - expertCumsum(ceil(expertIds(i,j)/localExpertNum) × localExpertNum)
 3. Token在目标专家中的序号 = expandIdx(i,j)
 
 通过上述参数计算得到重排后的确切位置。
@@ -189,7 +189,7 @@ participant "Rank B" as RankB
 note over RankA, RankB: 所有节点使用单缓冲区
 
 == Rank A Dispatch阶段 ==
-RankA -> WinA: 读取数据(进行中)
+RankA -> WinA: 读取数据（进行中）
 RankA -> WinA: 后处理操作
 
 == Rank B Combine阶段 ==
@@ -279,7 +279,7 @@ WindowsIn和WindowsOut是由HCCL管理的GM内存区域，统称为HCCLBUFFER，
 - **专家1**：发送至rank 1的Token数量 = sendCounts(1,1) - sendCounts(1,0) = 8 - 3 = 5
 
 #### 数据起始位置计算
-在expandX缓冲区中，Token按顺序存储，起始索引为为0。
+在expandX缓冲区中，Token按顺序存储，起始索引为0。
 - **专家0**：起始位置索引 = sendCounts(0,0) = 1，对应expandX缓冲区中索引为1的Token（即第2个Token）。由于Token数量为0，无需读取数据。
 - **专家1**：起始位置索引 = sendCounts(1,0) = 3，对应expandX缓冲区中索引为3的Token（即第4个Token）。从此位置开始读取5个连续Token。
 
@@ -337,7 +337,7 @@ Token重排完成后进入数据发送阶段，采用BatchWrite接口进行通�
 | UINT32 | remoteRankId | 该通信任务发送数据的目的卡卡号 |
 
 **使用原则**：
-- BatchWrite缺乏内置同步机制，需要开发者通过自己实现同步机制确保数据接收完整性
+- BatchWrite缺乏内置同步机制，需要开发者实现同步机制确保数据接收完整性
 - 通信任务下发次数直接影响性能
 
 ### 3.3.2 实现方案
@@ -351,7 +351,7 @@ Token重排完成后进入数据发送阶段，采用BatchWrite接口进行通�
 - 在发送数据尾部添加特殊Flag标记
 - 接收端采用分核循环等待策略：
   - 将worldSize个rank平均分配给各计算核
-  - 每个核负责若干rank的接收状态监控
+  - 每个核负责若干rank的接收状态查询
   - 轮询Flag值直至刷新为特定标识，确认数据接收完成
 
 **WindowsOut 发送缓冲区**

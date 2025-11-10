@@ -22,4 +22,4 @@
 ## 算子开发样例
 |样例目录| 	样例介绍	           |算子开发|算子调用 |
 |---|------------------|---|---|
-| add_example | 	实现两个张量相加功能的算子。	 | 算子端到端开发过程参见[AI Core算子开发指南。](../docs/develop/aicore_develop_guide.md) |调用样例参见[examples](./add_example/examples/)|
+| add_example | 	实现两个张量相加功能的算子。	 | 算子端到端开发过程参见[AI Core算子开发指南](../docs/develop/aicore_develop_guide.md)。 |调用样例参见[examples](./add_example/examples/)|

@@ -77,15 +77,15 @@ int main()
     ret = aclrtSynchronizeStream(stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
-    // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
+    // 7. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
     PrintOutResult(outShape, &outDeviceAddr);
 
-    // 7. 释放aclTensor，需要根据具体API的接口定义修改
+    // 8. 释放aclTensor，需要根据具体API的接口定义修改
     aclDestroyTensor(selfX);
     aclDestroyTensor(selfY);
     aclDestroyTensor(out);
 
-    // 8. 释放device资源
+    // 9. 释放device资源
     aclrtFree(selfXDeviceAddr);
     aclrtFree(selfYDeviceAddr);
     aclrtFree(outDeviceAddr);
@@ -95,7 +95,7 @@ int main()
     aclrtDestroyStream(stream);
     aclrtResetDevice(deviceId);
 
-    // 9. acl去初始化
+    // 10. acl去初始化
     aclFinalize();
     return 0;
 }

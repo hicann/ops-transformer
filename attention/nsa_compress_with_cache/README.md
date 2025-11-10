@@ -19,7 +19,7 @@
 
 $$
 compressIdx=(s-compressBlockSize)/stride\\ 
-ouputCacheRef[slotMapping[i]] = input[compressIdx*stride : compressIdx*stride+compressBlockSize]*weight[:]
+outputCacheRef[slotMapping[i]] = input[compressIdx*stride : compressIdx*stride+compressBlockSize]*weight[:]
 $$
 
 ## 参数说明
@@ -76,7 +76,7 @@ $$
     <td class="tg-0pky">ND</td>
   </tr>
   <tr>
-    <td class="tg-0pky">ouputCacheRef</td>
+    <td class="tg-0pky">outputCacheRef</td>
     <td class="tg-0pky">输入/输出</td>
     <td class="tg-0pky">输出的cache。</td>
     <td class="tg-0pky">BFLOAT16、FLOAT16</td>
@@ -87,7 +87,7 @@ $$
 ## 约束说明
 
 * input和weight满足broadcast关系，input的第三维大小与weight的第二维大小相等。
-* compressBlockSize、compressStride必须是16的整数倍，且compressBlockSize>=compressStride，compressBlockSize<=64。
+* compressBlockSize、stride必须是16的整数倍，且compressBlockSize>=stride，compressBlockSize<=64。
 * actSeqLenType目前仅支持取值1。
 * layoutOptional取值可以是BSH、SBH、BSND、BNSD、TND，但是不会生效。
 * pageBlockSize只能是64或者128。

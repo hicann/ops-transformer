@@ -13,18 +13,18 @@
 
 - 算子功能：训练场景下计算注意力的反向输出，即FlashAttentionScore的反向计算：
 
-  - psetype=1时，需要先add再mul。
-  - psetype≠1时，需要先mul再add。
+  - pseType=1时，需要先add再mul。
+  - pseType≠1时，需要先mul再add。
 
 - 计算公式：
 
   已知注意力的正向计算公式为：
-  - psetype=1时，公式如下：
+  - pseType=1时，公式如下：
 
     $$
     Y=Dropout(Softmax(Mask(\frac{QK^T+pse}{\sqrt{d}}),atten\_mask),keep\_prob)V
     $$
-  - psetype≠1时，公式如下：
+  - pseType≠1时，公式如下：
 
     $$
     Y=Dropout(Softmax(Mask(\frac{QK^T}{\sqrt{d}}+pse),atten\_mask),keep\_prob)V
@@ -116,7 +116,7 @@
       <td>dropMaskOptional</td>
       <td>可选输入</td>
       <td>公式中的Dropout，表示数据丢弃掩码。取值为1代表保留该数据，为0代表丢弃该数据。</td>
-      <td>UNIT8</td>
+      <td>UINT8</td>
       <td>ND</td>
     </tr>
     <tr>
@@ -212,7 +212,7 @@
 - 输入query、key、value、pseShiftOptional的数据类型必须一致。
 - 输入query、key、value、dy的inputLayout必须一致。
 - 关于数据shape的约束，以inputLayout的BSND、BNSD为例（BSH、SBH下H=N\*D），其中：
-  -   B：取值范围为1\~2M。带prefixOptional的时候B最大支持2K。
+  -   B：取值范围为1\~2M。当prefixOptional的时候B最大支持2K。
   -   N：取值范围为1\~256。
   -   S：取值范围为1\~1M。
   -   D：取值范围为1\~512。

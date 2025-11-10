@@ -20,7 +20,7 @@ P_{cmp} = Softmax(query*key^T) \\
 $$
 
 $$
-attentionOut = Softmax(atten\_mask(scale*query*key^T, atten\_mask)))*value
+attentionOut = Softmax(atten\_mask(scale*query*key^T, atten\_mask))*value
 $$
 
 $$
@@ -74,7 +74,7 @@ NsaCompressAttention输入query、key、value的数据排布格式支持从多�
 - compressStride：16对齐，支持到64。
 - selectBlockSize：16对齐，支持到128。
 - selectBlockCount：支持[1~32]。`selectBlockCount <= min(SelSkv)`。
-- actualSeqQLenOptional, actualCmpSeqKvLenOptional, actualSelSeqKvLenOptional需要是前缀和模式；且TND格式下必须传入。
+- actualSelSeqKvLenOptional需要是前缀和模式；且TND格式下必须传入。
 - 由于UB限制，CmpSkv需要满足以下约束：`CmpSkv <= 14000`。
 - `SelSkv = CeilDiv(CmpSkv, selectBlockSize // compressStride)`。
 - layoutOptional目前仅支持TND。

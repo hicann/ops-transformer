@@ -9,18 +9,21 @@
 
 ## 功能说明
 
-- 算子功能：MoE计算中，对输入x做Sigmoid计算，对计算结果分组进行排序，最后根据分组排序的结果选取前k个专家。
+- 算子功能：MoE计算中，对输入x做Sigmoid或者SoftMax计算，对计算结果分组进行排序，最后根据分组排序的结果选取前k个专家。
 - 计算公式：
 
-   对输入做sigmoid：
+    对输入做Sigmoid或者SoftMax：
     $$
-    normOut=sigmoid(x)
+    if normType==1:
+        normOut=Sigmoid(x)
+    else:
+        normOut=SoftMax(x)
     $$
     如果bias不为空：
     $$
     normOut = normOut + bias
     $$
-    对计算结果按照groupCount进行分组，每组按照topk2的sum值对group进行排序，取前kGroup个组：
+    对计算结果按照groupCount进行分组，每组按照groupSelectMode取max或topk2的sum值对group进行排序，取前kGroup个组：
     $$
     groupOut, groupId = TopK(ReduceSum(TopK(Split(normOut, groupCount), k=2, dim=-1), dim=-1),k=kGroup)
     $$
@@ -81,7 +84,7 @@
     <tr>
       <td>groupCount</td>
       <td>输入</td>
-      <td>分组的总个数，对应公式中的`groupCount`</td>
+      <td>分组的总个数，对应公式中的`groupCount`。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -114,7 +117,7 @@
       <td>ND</td>
     </tr>
     <tr>
-      <td>outOut</td>
+      <td>normOut</td>
       <td>输出</td>
       <td>norm计算的输出结果，对应公式中的`normOut`。</td>
       <td>FLOAT32</td>
@@ -158,8 +161,12 @@
   * 输入值域限制：
       * 要求1 <= k <= x_shape[-1] / groupCount * kGroup。
       * 要求1 <= kGroup <= groupCount，并且kGroup * x_shape[-1] / groupCount的值要大于等于k。
-      * 要求groupCount > 0，x_shape[-1]能够被groupCount整除且整除后的结果大于2，并且整除的结果按照32个数对齐后乘groupCount的结果不大于2048。
+      * 要求groupCount > 0，x_shape[-1]能够被groupCount整除且整除后的结果大于groupSelectMode，并且整除的结果按照32个数对齐后乘groupCount的结果不大于2048。
       * renorm仅支持0，表示先进行norm操作，再计算topk。
+  * 其他限制：
+      * groupSelectMode取值0和1，0表示使用最大值对group进行排序, 1表示使用topk2的sum值对group进行排序。
+      * normType取值0和1，0表示使用Softmax函数，1表示使用Sigmoid函数。
+      * outFlag取值true和false，true表示输出，false表示不输出。
 
 ## 调用说明
 

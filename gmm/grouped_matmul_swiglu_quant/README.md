@@ -27,7 +27,7 @@
     * $offset∈\mathbb{R}^{E  \times N}$：per-channel非对称反量化的偏移，E是专家个数，N是输出维度。
     * $w\_scale∈\mathbb{R}^{E \times N}$：分组权重矩阵（右矩阵）的逐通道缩放因子，E是专家个数，N是输出维度。
     * $x\_scale∈\mathbb{R}^{M}$：输入矩阵（左矩阵）的逐 token缩放因子，M是总token 数。
-    * $grouplist∈\mathbb{N}^{E}$：前缀和的分组索引列表。
+    * $groupList∈\mathbb{N}^{E}$：前缀和的分组索引列表。
   - **输出**：
     
     * $Q∈\mathbb{Z_8}^{M \times N / 2}$：量化后的输出矩阵。
@@ -47,14 +47,14 @@
       >
       >第3个右矩阵`W[3,:,:]`，对应索引位置[4,6)的token`x[4:6]`（共6-4=2个token），对应`x_scale[4:6]`、`w_scale[3]`、`bias[3]`、`offset[3]`、`Q[4:6]`、`Q_scale[4:6]`、`Q_offset[4:6]`；
       >
-      >请注意：grouplist中未指定的部分将不会参与更新。
+      >请注意：groupList中未指定的部分将不会参与更新。
       >例如groupList=[12,14,18]，X的shape为[30，:]。
       >
       >则第一个输出Q的shape为[30，:]，其中Q[18:，：]的部分不会进行更新和初始化，其中数据为显存空间申请时的原数据。
       >
       >同理，第二个输出Q的shape为[30]，其中Q\_scale[18:]的部分不会进行更新或初始化，其中数据为显存空间申请时的原数据。
       >
-      >即输出的Q[:grouplist[-1],:]和Q\_scale[:grouplist[-1]]为有效数据部分。
+      >即输出的Q[:groupList[-1],:]和Q\_scale[:groupList[-1]]为有效数据部分。
 
     - 2.根据分组确定的入参进行如下计算：
 
@@ -140,7 +140,7 @@
 <tr>
 <td style="white-space: nowrap">groupList</td>
 <td style="white-space: nowrap">输入</td>
-<td style="white-space: nowrap">指示每个分组参与计算的Token个数，公式中的grouplist。</td>
+<td style="white-space: nowrap">指示每个分组参与计算的Token个数，公式中的groupList。</td>
 <td style="white-space: nowrap">INT64</td>
 <td style="white-space: nowrap">ND</td>
 </tr>

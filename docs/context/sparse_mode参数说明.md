@@ -65,7 +65,7 @@ $QK^T$矩阵在attenMask为True的位置会被遮蔽，效果如下：
   attenMaskOptional应传入矩阵示意如下：
   ![原理图](../figures/attenmask矩阵.png)
   
-- sparseModeOptional为6时，代表prefix压缩场景，即prefix场景时，attenMask为优化后的压缩下三角+矩形的矩阵（3072*2048）：其中上半部分[2048，2048]的下三角矩阵，下半部分为[1024,2048]的矩形矩阵，矩形矩阵左半部分全0，右半部分全1，attenMaskOptional应传入矩阵示意如下。该场景下忽略preTokensOptional、nextTokensOptional取值。
+- sparseModeOptional为6时，代表prefix压缩场景，即prefix场景时，attenMask为优化后的压缩下三角+矩形的矩阵（3072*2048）：其中上半部分[2048，2048]的下三角矩阵，下半部分为[1024,2048]的矩形矩阵，矩形矩阵左半部分全0，右半部分全1，attenMaskOptional应传入矩阵示意如下。该场景下忽略preTokensOptional、nextTokensOptional取值，Masked $QK^T$矩阵参考sparse_mode=5的场景。
   ![原理图](../figures/sparsemode为6遮挡矩阵.png)
   
 - sparseModeOptional为7时，表示varlen且为长序列外切场景（即长序列在模型脚本中进行多卡切query的sequence length）；用户需要确保外切前为使用sparseModeOptional 3的场景；当前mode下用户需要设置preTokensOptional和nextTokensOptional（起点为右下顶点），且需要保证参数正确，否则会存在精度问题。
@@ -92,7 +92,7 @@ $QK^T$矩阵在attenMask为True的位置会被遮蔽，效果如下：
     ![原理图](../figures/sparsemode为8遮挡矩阵.png)
 
   **说明**：
-    - sparseModeOptional=8，band表示的是第一个非空tensor的Batch的sparse类型；如果只有一个batch，用户需按照band模式的要求来配置参数；sparseModeOptional=8时，用户需要输入2048x2048的下三角mask作为该融合算子的输入。
+    - sparseModeOptional=8，band表示的是第一个非空tensor的Batch的sparse类型；如果只有一个batch，用户需按照band模式的要求来配置参数；用户需要输入2048x2048的下三角mask作为该融合算子的输入。
     - 基于sparseModeOptional=2进行外切产生的band模式的sparse的参数应符合以下条件：
        - preTokensOptional >= first_Skv。
        - nextTokensOptional >= first_Sq - first_Skv，根据实际情况进行配置。
