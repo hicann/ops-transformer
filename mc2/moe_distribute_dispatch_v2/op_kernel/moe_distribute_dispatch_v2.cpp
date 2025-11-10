@@ -17,10 +17,12 @@
 #include "../moe_distribute_dispatch/moe_distribute_dispatch_a2.h"
 #include "../moe_distribute_dispatch/moe_distribute_dispatch_a2_layered.h"
 #include "../moe_distribute_dispatch/moe_distribute_dispatch_a2_layered_aicpu.h"
+#include "moe_distribute_dispatch_v2_full_mesh.h"
 #include "moe_distribute_dispatch_v2.h"
 
 using namespace MoeDistributeDispatchV2Impl;
 using namespace MoeDistributeDispatchA2Impl;
+using namespace MoeDistributeDispatchV2FullMeshImpl;
 
 using namespace AscendC;
 /*
@@ -32,7 +34,8 @@ using namespace AscendC;
 *     0: 无, 1: 有
 * 第3位（百位）：是否做tp域allgather:
 *     0: 不做, 1: 做
-* 第4位（千位）：无实际意义；
+* 第4位（千位）：是否走fullmesh_v2模板:
+*     0: 不做, 1: 做
 * 第5位（万位）：无实际意义
 */
 
@@ -57,6 +60,14 @@ extern "C" __global__ __aicore__ void moe_distribute_dispatch_v2(
     if (TILING_KEY_IS(10100)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchV2TilingData, tilingData, tilingGM);
         MoeDistributeDispatchV2<DTYPE_X, DTYPE_EXPAND_X, false, false, false, true> op;
+        op.Init(x,expertIds, scales, xActiveMask, elasticInfo, expandXOut, dynamicScalesOut, assistInfoOut, expertTokenNumsOut,
+            epSendCountsOut, tpSendCountsOut, workspaceGM, &pipe, &tilingData);
+        op.Process();
+        return;
+    }
+    if (TILING_KEY_IS(11000)) { // fullMesh高性能模板
+        GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchV2TilingData, tilingData, tilingGM);
+        MoeDistributeDispatchV2FullMesh<DTYPE_X, DTYPE_EXPAND_X, false, false, false, false> op;
         op.Init(x,expertIds, scales, xActiveMask, elasticInfo, expandXOut, dynamicScalesOut, assistInfoOut, expertTokenNumsOut,
             epSendCountsOut, tpSendCountsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
@@ -134,7 +145,30 @@ extern "C" __global__ __aicore__ void moe_distribute_dispatch_v2(
         op.Process();
         return;
     }
-
+    if (TILING_KEY_IS(11011)) { // fullMesh高性能模板
+        GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchV2TilingData, tilingData, tilingGM);
+        MoeDistributeDispatchV2FullMesh<DTYPE_X, DTYPE_EXPAND_X, true, false, false, false> op;
+        op.Init(x,expertIds, scales, xActiveMask, elasticInfo, expandXOut, dynamicScalesOut, assistInfoOut, expertTokenNumsOut,
+            epSendCountsOut, tpSendCountsOut, workspaceGM, &pipe, &tilingData);
+        op.Process();
+        return;
+    }
+    if (TILING_KEY_IS(11002)) { // fullMesh高性能模板
+        GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchV2TilingData, tilingData, tilingGM);
+        MoeDistributeDispatchV2FullMesh<DTYPE_X, DTYPE_EXPAND_X, false, true, false, false> op;
+        op.Init(x,expertIds, scales, xActiveMask, elasticInfo, expandXOut, dynamicScalesOut, assistInfoOut, expertTokenNumsOut,
+            epSendCountsOut, tpSendCountsOut, workspaceGM, &pipe, &tilingData);
+        op.Process();
+        return;
+    }
+    if (TILING_KEY_IS(11012)) { // fullMesh高性能模板
+        GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchV2TilingData, tilingData, tilingGM);
+        MoeDistributeDispatchV2FullMesh<DTYPE_X, DTYPE_EXPAND_X, false, true, true, false> op;
+        op.Init(x,expertIds, scales, xActiveMask, elasticInfo, expandXOut, dynamicScalesOut, assistInfoOut, expertTokenNumsOut,
+            epSendCountsOut, tpSendCountsOut, workspaceGM, &pipe, &tilingData);
+        op.Process();
+        return;
+    }
     if (TILING_KEY_IS(2000001002)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchA2TilingData, tilingData, tilingGM);
         MoeDistributeDispatchA2<DTYPE_X, DTYPE_EXPAND_X, false, true, false> op;
