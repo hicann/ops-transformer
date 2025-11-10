@@ -578,6 +578,7 @@ __aicore__ inline void AddExample<T>::CopyOut(int32_t progress)
     ├── op_api
     │   ├── include
     │   │   ├── aclnn_add_example.h                              # aclnn头文件
+    │   │   └── aclnn_ops_transformer_${vendor_name}.h           # aclnn汇总头文件    
     │   └── lib
     │       └── libcust_opapi.so                                 # 算子aclnn接口动态库
     ├── op_impl

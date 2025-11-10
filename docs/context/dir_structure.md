@@ -11,6 +11,8 @@
 
 ```
 ├── cmake                                               # 项目工程编译目录
+│   ├── aclnn_ops_transfomer.h.in                       # aclnn汇总头文件模板
+│   └── ...
 ├── common                                              # 项目公共头文件和公共代码
 │   ├── CMakeLists.txt
 │   ├── inc                                             # 公共头文件目录
