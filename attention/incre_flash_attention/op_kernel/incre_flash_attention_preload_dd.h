@@ -2415,6 +2415,7 @@ IncreFlashAttentionAttenPreloadDD<IFAT>::DealAntiqBmm2ResBaseBlock(ExtraInfo& in
     if (info.s2Idx > 0) {
         LocalTensor<half> bmm2ResPreUb = inputBuf2.Get<half>();
         WaitFlag<AscendC::HardEvent::V_MTE2>(SYNC_INPUT_BUF2_FLAG);
+        PipeBarrier<PIPE_V>();
         DataCopy(bmm2ResPreUb, vec2ResUb, dealRowCount * columnCount);
         PipeBarrier<PIPE_V>();
         uint32_t idx = info.loop % PRE_LOAD_NUM_DD;
