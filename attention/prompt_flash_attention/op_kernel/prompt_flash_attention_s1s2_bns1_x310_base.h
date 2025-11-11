@@ -23,6 +23,8 @@
 
 using namespace matmul;
 constexpr uint32_t BATCH_NUM_MAX_NZ = 128;
+constexpr int32_t MAX_REPEATS_PER_BATCH = 255; // max repeatTime in InitConstValue
+constexpr int32_t REPEAT_DATASIZE_EACH_TIME = 512; // processing a fixed amount of data per iteration
 constexpr static uint32_t NEGATIVE_MIN_VAULE_FP32 = 0xFF7FFFFF;
 constexpr static uint32_t NEGATIVE_MIN_VAULE_FP16 = 0xC61C4000;
 
@@ -952,8 +954,14 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::CopyND2NZOnTh
     int32_t calcWidth = width / BLOCK_CUBE; // cube block numbers that do not need to be pad zero
     int32_t calcHeightAlign = (height + BLOCK_CUBE - 1) / BLOCK_CUBE;
     if (height % BLOCK_CUBE != 0) {
-        int32_t repeat = calcWidth * calcHeightAlign;
-        Duplicate<mmOutputType>(dst, static_cast<mmOutputType>(0), repeat);
+        int32_t totalRepeat = calcWidth * calcHeightAlign;
+        int32_t initConstRepeatTimes = (totalRepeat + MAX_REPEATS_PER_BATCH - 1) / MAX_REPEATS_PER_BATCH;
+        for (int32_t i = 0; i < initConstRepeatTimes; i++) {
+            uint16_t curRepeat = (i == initConstRepeatTimes - 1) ?
+                static_cast<uint16_t>(totalRepeat - i * MAX_REPEATS_PER_BATCH) : static_cast<uint16_t>(MAX_REPEATS_PER_BATCH);
+            InitConstValue(dst[i * MAX_REPEATS_PER_BATCH * REPEAT_DATASIZE_EACH_TIME / sizeof(mmOutputType)],
+                {static_cast<uint16_t>(curRepeat), 0, 0, 0});
+        }
         PipeBarrier<PIPE_MTE2>();
     }
     // gCol unaligned ,can not use dma copy repeat stride
