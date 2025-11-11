@@ -6,19 +6,20 @@
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ======================================================================================================================
+add_op_to_compiled_list()
 
 if (BUILD_OPEN_PROJECT)
     target_sources(op_host_aclnnInner PRIVATE
         prompt_flash_attention_def.cpp
     )
-    add_ops_compile_options(
-        OP_NAME PromptFlashAttention
-        OPTIONS --cce-auto-sync=off
-                -Wno-deprecated-declarations
-                -Werror
-                -mllvm -cce-aicore-hoist-movemask=false
-    )
-    set(prompt_flash_attention_depends attention/common PARENT_SCOPE)
+add_ops_compile_options(
+    OP_NAME PromptFlashAttention
+    OPTIONS --cce-auto-sync=off
+            -Wno-deprecated-declarations
+            -Werror
+            -mllvm -cce-aicore-hoist-movemask=false
+)
+    set(prompt_flash_attention_depends attention/common CACHE INTERNAL "Dependencies for prompt_flash_attention")
 endif()
 
 if(NOT BUILD_OPS_RTY_KERNEL) #

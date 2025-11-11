@@ -287,7 +287,7 @@ macro(add_modules_sources)
         if (OPDEF_SRCS)
           target_sources(${OPHOST_NAME}_opdef_${AclnnType}_obj INTERFACE ${OPDEF_SRCS})
         endif()
-      elseif(${AclnnType} STREQUAL "no_need_alcnn")
+      elseif(${AclnnType} STREQUAL "no_need_aclnn")
         message(STATUS "aicpu or host aicpu no need aclnn.")
       else()
         message(FATAL_ERROR "ACLNN TYPE UNSPPORTED, ONLY SUPPORT aclnn/aclnn_inner/aclnn_exclude")
@@ -385,7 +385,7 @@ macro(add_mc2_modules_sources)
         if (OPDEF_SRCS)
           target_sources(${OPHOST_NAME}_opdef_${AclnnType}_obj INTERFACE ${OPDEF_SRCS})
         endif()
-      elseif(${AclnnType} STREQUAL "no_need_alcnn")
+      elseif(${AclnnType} STREQUAL "no_need_aclnn")
         message(STATUS "aicpu or host aicpu no need aclnn.")
       else()
         message(FATAL_ERROR "ACLNN TYPE UNSPPORTED, ONLY SUPPORT aclnn/aclnn_inner/aclnn_exclude")
@@ -400,6 +400,37 @@ macro(add_mc2_modules_sources)
       "example: add_modules_sources(OPTYPE add ACLNNTYPE aclnn_exclude)"
       )
     endif()
+  endif()
+endmacro()
+
+# useage: add_graph_plugin_sources()
+macro(add_graph_plugin_sources)
+  set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
+  # 获取算子层级目录名称，判断是否编译该算子
+  get_filename_component(PARENT_DIR ${SOURCE_DIR} DIRECTORY)
+  get_filename_component(OP_NAME ${PARENT_DIR} NAME)
+  if(DEFINED ASCEND_OP_NAME
+     AND NOT "${ASCEND_OP_NAME}" STREQUAL ""
+     AND NOT "${ASCEND_OP_NAME}" STREQUAL "all"
+     AND NOT "${ASCEND_OP_NAME}" STREQUAL "ALL"
+    )
+    if(NOT ${OP_NAME} IN_LIST ASCEND_OP_NAME)
+      return()
+    endif()
+  endif()
+
+  file(GLOB GRAPH_PLUGIN_SRCS 
+      ${SOURCE_DIR}/*_graph_plugin*.cpp
+  )
+  if(GRAPH_PLUGIN_SRCS)
+    add_graph_plugin_modules()
+    target_sources(${GRAPH_PLUGIN_NAME}_obj PRIVATE ${GRAPH_PLUGIN_SRCS})
+  endif()
+
+  file(GLOB GRAPH_PLUGIN_PROTO_HEADERS ${SOURCE_DIR}/*_proto*.h)
+  if(GRAPH_PLUGIN_PROTO_HEADERS)
+    target_sources(${GRAPH_PLUGIN_NAME}_proto_headers INTERFACE ${GRAPH_PLUGIN_PROTO_HEADERS})
   endif()
 endmacro()
 

@@ -225,6 +225,9 @@ endif ()
 
 add_subdirectory(common)
 
+set(OP_LIST)
+set(OP_DIR_LIST)
+op_add_subdirectory(OP_LIST OP_DIR_LIST)
 
 if (BUILD_OPEN_PROJECT)
     if (ENABLE_TEST)
@@ -232,13 +235,15 @@ if (BUILD_OPEN_PROJECT)
         set(OP_UT_DIR_LIST)
         op_add_ut_subdirectory(OP_UT_LIST OP_UT_DIR_LIST)
         foreach (OP_UT_LIST ${OP_UT_DIR_LIST})
-            add_subdirectory(${OP_UT_LIST}/tests)
+            # 仅通过op_add_subdirectory添加的算子目录，需要在这里add tests
+            if(OP_UT_LIST IN_LIST OP_DIR_LIST)
+                add_subdirectory(${OP_UT_LIST}/tests)
+            endif()
         endforeach ()
 
         if (TESTS_UT_OPS_TEST)
             add_subdirectory(tests/ut/framework_special)
             add_definitions(-Wno-builtin-macro-redefined)
-            OpsTest_AddLaunch()
         endif()
 
         if (UT_TEST_ALL OR OP_HOST_UT OR OP_API_UT OR OP_KERNEL_UT OR OP_GRAPH_UT)
@@ -250,9 +255,6 @@ if (BUILD_OPEN_PROJECT)
    endif ()
 endif ()
 
-set(OP_LIST)
-set(OP_DIR_LIST)
-op_add_subdirectory(OP_LIST OP_DIR_LIST)
 
 foreach (OP_DIR ${OP_DIR_LIST})
     if (EXISTS "${OP_DIR}/op_host")
@@ -265,7 +267,30 @@ foreach (OP_DIR ${OP_DIR_LIST})
     endif()
 endforeach ()
 
-if (DEFINED MC2_OPT AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/mc2/common/CMakeLists.txt AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/mc2/3rd/CMakeLists.txt AND NOT ENABLE_TEST)
+add_subdirectory(attention)
+if("${ASCEND_OP_NAME}" STREQUAL "add_example")
+    add_subdirectory(examples)
+endif()
+
+list(APPEND OP_LIST ${COMPILED_OPS})
+list(APPEND OP_DIR_LIST ${COMPILED_OP_DIRS})
+
+if(ENABLE_TEST)
+    foreach (OP_DIR ${OP_DIR_LIST})
+        file(READ "${OP_DIR}/tests/CMakeLists.txt" CML_CONTENT)
+        if (CML_CONTENT MATCHES "OpsTest_Level2_AddOp")
+            set(UTEST_FRAMEWORK_OLD TRUE CACHE BOOL "UTEST_FRAMEWORK_OLD" FORCE)
+        else()
+            set(UTEST_FRAMEWORK_NEW TRUE CACHE BOOL "UTEST_FRAMEWORK_NEW" FORCE)
+        endif()
+    endforeach()
+    if(TESTS_UT_OPS_TEST)
+        OpsTest_AddLaunch()
+    endif()
+endif()
+
+
+if (DEFINED MC2_OPT AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/mc2/common/CMakeLists.txt AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/mc2/3rd/CMakeLists.txt)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mc2/common)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mc2/3rd)
 endif()
@@ -275,12 +300,21 @@ op_add_depend_directory(
         OP_LIST ${OP_LIST}
         OP_DIR_LIST OP_DEPEND_DIR_LIST
 )
+
+# 仅针对被依赖的算子重新add_subdirectory
 foreach (OP_DEPEND_DIR ${OP_DEPEND_DIR_LIST})
-    if (EXISTS "${OP_DEPEND_DIR}/op_host")
-        add_subdirectory(${OP_DEPEND_DIR}/op_host)
-    else()
-        add_subdirectory(${OP_DEPEND_DIR})
+    get_filename_component(SUB_DIR ${OP_DEPEND_DIR} NAME)
+    if ("${ASCEND_OP_NAME}" STREQUAL "all" OR "${ASCEND_OP_NAME}" STREQUAL "ALL")
+        break()
     endif()
+    if (NOT ${SUB_DIR} IN_LIST ASCEND_OP_NAME)
+        list(APPEND ASCEND_OP_NAME ${SUB_DIR})
+        if (EXISTS "${OP_DEPEND_DIR}/op_host")
+            add_subdirectory(${OP_DEPEND_DIR}/op_host)
+        else()
+            add_subdirectory(${OP_DEPEND_DIR})
+        endif()
+    endif ()
 endforeach ()
 
 # ------------------------------------------------ aclnn ------------------------------------------------
@@ -615,7 +649,15 @@ foreach (op_dir ${OP_DIR_LIST})
         file(GLOB KERNEL_FILES
             ${op_dir}/op_kernel/*.cpp
             ${op_dir}/op_kernel/*.h
-    )
+            ${op_dir}/op_kernel/arch32/*.cpp
+            ${op_dir}/op_kernel/arch32/*.h
+        )
+        if (EXISTS "${op_dir}/op_kernel/arch35")
+            install(DIRECTORY ${op_dir}/op_kernel/arch35
+                DESTINATION ${IMPL_INSTALL_DIR}/ascendc/${_op_name}
+                OPTIONAL
+            )
+        endif()
     else()
         file(GLOB KERNEL_FILES
             ${op_dir}/*.cpp

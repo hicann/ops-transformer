@@ -6,6 +6,7 @@
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ======================================================================================================================
+add_op_to_compiled_list()
 
 if (BUILD_OPEN_PROJECT)
     target_sources(op_host_aclnnInner PRIVATE
@@ -20,7 +21,7 @@ if (BUILD_OPS_RTY_KERNEL)
                     -Wno-deprecated-declarations
                     -Werror
     )
-    set(flash_attention_score_grad_depends attention/common PARENT_SCOPE)
+    set(flash_attention_score_grad_depends attention/common CACHE INTERNAL "Dependencies for flash_attention_score_grad")
 else()
     add_ops_compile_options(
             OP_NAME FlashAttentionScoreGrad

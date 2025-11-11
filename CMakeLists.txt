@@ -218,6 +218,16 @@ if (NOT BUILD_OPS_RTY_KERNEL)
     add_subdirectory(posembedding)
 endif()
 
+if(NOT DEFINED COMPILED_OPS)
+    set(COMPILED_OPS ${COMPILED_OPS} CACHE STRING "Comp")
+    set(COMPILED_OPS CACHE STRING "Compiled Ops" FORCE)
+set(COMPILED_OP_DIRS CACHE STRING "Compiled Ops Dirs" FORCE)
+endif()
+
+if(NOT DEFINED COMPILED_OP_DIRS)
+    set(COMPILED_OP_DIRS CACHE STRING "Compiled Ops Dirs" FORCE)
+endif()
+
 set(OP_LIST)
 set(OP_DIR_LIST)
 op_add_subdirectory(OP_LIST OP_DIR_LIST)
@@ -238,6 +248,11 @@ list(APPEND OP_DIR_LIST ${CMAKE_CURRENT_SOURCE_DIR}/moe/moe_token_unpermute_with
 add_subdirectory(ffn)
 list(APPEND OP_LIST "ffn")
 list(APPEND OP_DIR_LIST ${CMAKE_CURRENT_SOURCE_DIR}/ffn/ffn)
+add_subdirectory(attention)
+list(APPEND OP_LIST ${COMPILED_OPS})
+list(REMOVE_DUPLICATES OP_LIST)
+list(APPEND OP_DIR_LIST ${COMPILED_OP_DIRS})
+list(REMOVE_DUPLICATES OP_DIR_LIST)
 
 set(OP_DEPEND_DIR_LIST)
 op_add_depend_directory(

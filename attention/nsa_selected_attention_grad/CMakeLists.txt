@@ -7,47 +7,12 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ======================================================================================================================
 
-add_ops_compile_options(
-        OP_NAME NsaSelectedAttentionGrad
-        OPTIONS --cce-auto-sync=off
-                -Wno-deprecated-declarations
-                -Werror
-)
-
-target_sources(op_host_aclnnExc PRIVATE
-        op_host/nsa_selected_attention_grad_def.cpp
-)
-
-target_sources(opapi PRIVATE
-        op_host/nsa_selected_attention_grad.cpp
-        op_host/aclnn_nsa_selected_attention_grad.cpp
-)
-
-if (NOT BUILD_OPEN_PROJECT)
-    target_sources(aclnn_ops_train PRIVATE
-        op_host/nsa_selected_attention_grad.cpp
-        op_host/aclnn_nsa_selected_attention_grad.cpp
-    )
-
-    target_sources(aclnn_ops_infer PRIVATE
-        op_host/nsa_selected_attention_grad.cpp
-        op_host/aclnn_nsa_selected_attention_grad.cpp
-    )
-endif ()
-
-target_sources(optiling PRIVATE
-        op_host/nsa_selected_attention_grad_tiling.cpp
-        op_host/nsa_selected_attention_grad_tiling_common.cpp
-        op_host/nsa_selected_attention_grad_tiling_bs1.cpp
-        op_host/nsa_selected_attention_grad_tiling_bs1_basic.cpp
-)
-
-target_sources(opsproto PRIVATE
-        op_host/nsa_selected_attention_grad_infershape.cpp
-)
-
-file(GLOB _NsaSelectedAttentionGrad_Aclnn_header "${CMAKE_CURRENT_SOURCE_DIR}/op_host/aclnn_*.h")
-
-install(FILES ${_NsaSelectedAttentionGrad_Aclnn_header}
-        DESTINATION ${ACLNN_INC_INSTALL_DIR} OPTIONAL
-)
+file(GLOB CURRENT_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*)
+if(NOT ENABLE_TEST AND NOT BENCHMARK)
+    list(REMOVE_ITEM CURRENT_DIRS tests)
+endif()
+foreach(SUB_DIR ${CURRENT_DIRS})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${SUB_DIR}/CMakeLists.txt")
+        add_subdirectory(${SUB_DIR})
+    endif()
+endforeach()

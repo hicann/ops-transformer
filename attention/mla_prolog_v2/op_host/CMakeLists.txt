@@ -7,9 +7,10 @@
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ----------------------------------------------------------------------------
+add_op_to_compiled_list()
 
 if (BUILD_OPEN_PROJECT)
-    set(mla_prolog_v2_depends attention/mla_prolog PARENT_SCOPE)
+    set(mla_prolog_v2_depends attention/mla_prolog CACHE INTERNAL "Dependencies for mla_prolog_v2")
     target_sources(op_host_aclnnInner PRIVATE
         mla_prolog_v2_def.cpp
     )

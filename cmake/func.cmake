@@ -56,9 +56,7 @@ if(ENABLE_EXPERIMENTAL)
     else()
         file(GLOB OP_HOST_CMAKE_FILES 
         "${CMAKE_CURRENT_SOURCE_DIR}/gmm/**/op_host/CMakeLists.txt"
-        "${CMAKE_CURRENT_SOURCE_DIR}/attention/**/op_host/CMakeLists.txt"
         "${CMAKE_CURRENT_SOURCE_DIR}/gmm/**/CMakeLists.txt"
-        "${CMAKE_CURRENT_SOURCE_DIR}/attention/**/CMakeLists.txt"
         )
         if(BUILD_OPEN_PROJECT AND (NOT BUILD_OPS_RTY_KERNEL))
             file(GLOB CANNDEV_OPS_HOST_CMAKE_FILES 
@@ -116,6 +114,15 @@ if(ENABLE_EXPERIMENTAL)
     set(${OP_LIST} ${_OP_LIST} PARENT_SCOPE)
     set(${OP_DIR_LIST} ${_OP_DIR_LIST} PARENT_SCOPE)
 endfunction()
+
+macro(add_op_to_compiled_list)
+    get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
+    get_filename_component(OP_NAME ${PARENT_DIR} NAME)
+    # 记录全局的COMPILED_OPS和COMPILED_OP_DIRS，其中COMPILED_OP_DIRS只记录到算子名，例如moe/moe_token_permute_with_routing_map_grad
+    set(COMPILED_OPS ${COMPILED_OPS} ${OP_NAME} CACHE STRING "Compiled Ops" FORCE)
+    set(COMPILED_OP_DIRS ${COMPILED_OP_DIRS} ${PARENT_DIR} CACHE STRING "Compiled Ops Dirs" FORCE)
+endmacro()
+
 
 function(op_add_depend_directory)
     cmake_parse_arguments(DEP "" "OP_DIR_LIST" "OP_LIST" ${ARGN})

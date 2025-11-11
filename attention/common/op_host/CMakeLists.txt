@@ -6,21 +6,8 @@
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ======================================================================================================================
-add_op_to_compiled_list()
 
-if (BUILD_OPEN_PROJECT)
-    target_sources(op_host_aclnnExc PRIVATE
-        nsa_selected_attention_def.cpp
-    )
-endif()
-
-if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
-    add_ops_compile_options(
-        OP_NAME NSASelectedAttention
-        OPTIONS --cce-auto-sync=off
-                -Wno-deprecated-declarations
-                -Werror
-    )
+if (BUILD_OPS_RTY_KERNEL)
 else()
-    add_modules_sources(OPTYPE nsa_selected_attention ACLNNTYPE aclnn_exclude)
+    add_modules_sources(OPTYPE common ACLNNTYPE no_need_aclnn)
 endif()
