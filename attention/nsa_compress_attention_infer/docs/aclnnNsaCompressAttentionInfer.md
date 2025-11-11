@@ -18,7 +18,8 @@
   P_{cmp}= Softmax(scale * query · key^T) \\
   attentionOut = P_{cmp} · value\\
   P_{slc}[j] = \sum\limits_{m=0}^{l'/d -1} \sum\limits_{n = 0}^{l/d -1} P_{cmp} [l'/d * j -m - n]\\
-  P_{slc'} = \sum\limits_{h=1}^{H}  P_{slc} ^h\\
+  P_{slc'} = \sum\limits_{g=1}^{G}  P_{slc} ^g,\quad 
+  \text{其中 } G = \text{GroupSize（分组大小），即：} G = \frac{\text{numHeads}}{\text{numKeyValueHeads}} \\
   topkIndices = topk(P_{slc'})\\
   $$
 
