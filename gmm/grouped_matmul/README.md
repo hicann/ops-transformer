@@ -14,10 +14,6 @@
     - m轴分组：$k_i$、$n_i$各组相同，$m_i$可以不相同。
     - k轴分组：$m_i$、$n_i$各组相同，$k_i$可以不相同。
 
-    相较于[GroupedMatmulV4](./docs/aclnnGroupedMatmulV4.md)接口，**此接口新增：**
-    - 可选参数tuningConfigOptional，调优参数。数组中第一个值表示各个专家处理的token数的预期值，算子tiling时会按照该预期值进行最优tiling。
-      - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>： 支持此参数。
-
 -   计算公式：
     - **非量化场景：**
     $$
