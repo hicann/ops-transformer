@@ -485,67 +485,103 @@ function process_soc_input(){
     ASCEND_SOC_UNITS="${value_part//,/;}"
 }
 
-function process_genop() {
+  process_genop() {
     local opt_name=$1
     local genop_value=$2
 
     if [[ "$opt_name" == "genop" ]]; then
       ENABLE_GENOP=TRUE
+    elif [[ "$opt_name" == "genop_aicpu" ]]; then
+      ENABLE_GENOP_AICPU=TRUE
     else
-      help_info "genop"
+      usage "genop"
       exit 1
     fi
 
-    if [[ "$genop_value" != *"/"* ]] || [[ "$genop_value" == *"/"*"/"* ]]; then
-      help_info "$opt_name"
+    if [[ "$genop_value" != *"/"* ]] || [[ "$genop_value" == *"/" ]]; then
+      usage "$opt_name"
       exit 1
     fi
 
-    GENOP_TYPE=$(echo "$genop_value" | cut -d'/' -f1)
-    GENOP_NAME=$(echo "$genop_value" | cut -d'/' -f2)
-}
+    GENOP_NAME=${genop_value##*/}
+    local remaining=${genop_value%/*}
 
-function gen_op() {
+    if [[ "$remaining" != *"/"* ]]; then
+      GENOP_TYPE=$remaining
+      GENOP_BASE=${BASE_PATH}
+    else
+      GENOP_TYPE=${remaining##*/}
+      GENOP_BASE=${remaining%/*}
+      if [[ ! "$GENOP_BASE" =~ ^/ && ! "$GENOP_BASE" =~ ^[a-zA-Z]: ]]; then
+        GENOP_BASE="${BASE_PATH}/${GENOP_BASE}"
+      fi
+    fi
+  }
+
+gen_op() {
   if [[ -z "$GENOP_NAME" ]] || [[ -z "$GENOP_TYPE" ]]; then
     echo "Error: op_class or op_name is not set."
-    help_info "genop"
+    usage "genop"
   fi
 
   echo $dotted_line
   echo "Start to create the initial directory for ${GENOP_NAME} under ${GENOP_TYPE}"
 
-  if [ ! -d "${GENOP_TYPE}" ]; then
-    mkdir -p "${GENOP_TYPE}"
-    cp examples/CMakeLists.txt "${GENOP_TYPE}/CMakeLists.txt"
-    sed -i '/list(APPEND OP_DIR_LIST ${CMAKE_CURRENT_SOURCE_DIR}\/ffn\/ffn)/a add_subdirectory('"${GENOP_TYPE}"')' CMakeLists.txt
+  # 检查 python 或 python3 是否存在
+  local python_cmd=""
+  if command -v python3 &> /dev/null; then
+      python_cmd="python3"
+  elif command -v python &> /dev/null; then
+      python_cmd="python"
   fi
-
-  BASE_DIR=${GENOP_TYPE}/${GENOP_NAME}
-  mkdir -p "${BASE_DIR}"
-
-  cp -r examples/add_example/* "${BASE_DIR}/"
-
-  rm -rf "${BASE_DIR}/examples"
-  rm -rf "${BASE_DIR}/op_host/config"
-
-  for file in $(find "${BASE_DIR}" -name "*.h" -o -name "*.cpp"); do
-    head -n 14 "$file" >"${file}.tmp"
-    cat "${file}.tmp" >"$file"
-    rm "${file}.tmp"
-  done
-
-  for file in $(find "${BASE_DIR}" -type f); do
-    sed -i "s/add_example/${GENOP_NAME}/g" "$file"
-  done
-
-  cd ${BASE_DIR}
-  for file in $(find ./ -name "add_example*"); do
-    new_file=$(echo "$file" | sed "s/add_example/${GENOP_NAME}/g")
-    mv "$file" "$new_file"
-  done
-
-  echo "Create the initial directory for ${GENOP_NAME} under ${GENOP_TYPE} success"
+  
+  if [ -n "${python_cmd}" ]; then
+    ${python_cmd} "${BASE_PATH}/scripts/opgen/opgen_standalone.py" -t ${GENOP_TYPE} -n ${GENOP_NAME} -p ${GENOP_BASE}
+    return $?
+  fi
 }
+
+# function gen_op() {
+#   if [[ -z "$GENOP_NAME" ]] || [[ -z "$GENOP_TYPE" ]]; then
+#     echo "Error: op_class or op_name is not set."
+#     help_info "genop"
+#   fi
+
+#   echo $dotted_line
+#   echo "Start to create the initial directory for ${GENOP_NAME} under ${GENOP_TYPE}"
+
+#   if [ ! -d "${GENOP_TYPE}" ]; then
+#     mkdir -p "${GENOP_TYPE}"
+#     cp examples/CMakeLists.txt "${GENOP_TYPE}/CMakeLists.txt"
+#     sed -i '/list(APPEND OP_DIR_LIST ${CMAKE_CURRENT_SOURCE_DIR}\/ffn\/ffn)/a add_subdirectory('"${GENOP_TYPE}"')' CMakeLists.txt
+#   fi
+
+#   BASE_DIR=${GENOP_TYPE}/${GENOP_NAME}
+#   mkdir -p "${BASE_DIR}"
+
+#   cp -r examples/add_example/* "${BASE_DIR}/"
+
+#   rm -rf "${BASE_DIR}/examples"
+#   rm -rf "${BASE_DIR}/op_host/config"
+
+#   for file in $(find "${BASE_DIR}" -name "*.h" -o -name "*.cpp"); do
+#     head -n 14 "$file" >"${file}.tmp"
+#     cat "${file}.tmp" >"$file"
+#     rm "${file}.tmp"
+#   done
+
+#   for file in $(find "${BASE_DIR}" -type f); do
+#     sed -i "s/add_example/${GENOP_NAME}/g" "$file"
+#   done
+
+#   cd ${BASE_DIR}
+#   for file in $(find ./ -name "add_example*"); do
+#     new_file=$(echo "$file" | sed "s/add_example/${GENOP_NAME}/g")
+#     mv "$file" "$new_file"
+#   done
+
+#   echo "Create the initial directory for ${GENOP_NAME} under ${GENOP_TYPE} success"
+# }
 
 
 set_ut_mode() {
