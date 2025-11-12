@@ -17,7 +17,7 @@
     $$
     
     $$
-    out(i,j)=x1_{i,j}+x2Optional_{i,j}+\sum_{k=0}^{K}(scales_{i,k}*(expandedX_{expandedRowIdx_{i+k*num_rows},j}+bias_{expertid,j}))
+    out(i,j)=x1_{i,j}+x2Optional_{i,j}+\sum_{k=0}^{K}(scales_{i,k}*(expandedX_{expandedRowIdx_{i+k*num\_rows},j}+bias_{expertid,j}))
     $$
 
 ## 参数说明
@@ -41,58 +41,58 @@
     <tr>
       <td>expandedX</td>
       <td>输入</td>
-      <td>公式中的`expandedX` ，MoE的FFN输出。</td>
+      <td>公式中的`expandedX` ，MoE的FFN输出，shape支持[NUM_ROWS*K, H]。</td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>x1</td>
       <td>输入</td>
-      <td>公式中的`x1`。</td>
+      <td>公式中的`x1`，shape要求与out一致。</td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
-      <td>-</td>
+      <td>ND</td>
     </tr>
     <tr>
       <td>x2Optional</td>
       <td>输入</td>
-      <td>公式中的`x2Optional`。</td>
+      <td>公式中的`x2Optional`，shape要求与out一致。</td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
-      <td>-</td>
+      <td>ND</td>
     </tr>
     <tr>
       <td>bias</td>
       <td>输入</td>
-      <td>公式中的`bias`。</td>
+      <td>公式中的`bias`，shape支持[E, H]。</td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
-      <td>-</td>
+      <td>ND</td>
     </tr>
     <tr>
       <td>scales</td>
       <td>输入</td>
-      <td>公式中的`scales`。</td>
+      <td>公式中的`scales`，shape支持[NUM_ROWS, K]。</td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
-      <td>-</td>
+      <td>ND</td>
     </tr>
     <tr>
       <td>expandedRowIdx</td>
       <td>输入</td>
-      <td>公式中的`expandedRowIdx`。</td>
+      <td>公式中的`expandedRowIdx`，shape支持[NUM_ROWS, K]。</td>
       <td>INT32</td>
-      <td>-</td>
+      <td>ND</td>
     </tr>
     <tr>
       <td>expandedExpertIdx</td>
       <td>输入</td>
-      <td>公式中的`expandedExpertIdx`。</td>
+      <td>公式中的`expandedExpertIdx`，shape支持[NUM_ROWS, K]。</td>
       <td>INT32</td>
-      <td>-</td>
+      <td>ND</td>
     </tr>
     <tr>
       <td>out</td>
       <td>输出</td>
-      <td>公式中的`out`。</td>
+      <td>公式中的`out`，shape支持[NUM_ROWS, h]。</td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
-      <td>-</td>
+      <td>ND</td>
     </tr>
   </tbody></table>
 
