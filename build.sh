@@ -705,6 +705,31 @@ while [[ $# -gt 0 ]]; do
         ;;
     -f|--changed_list)
         PR_CHANGED_FILES="$2"
+        ENABLE_SMOKE=TRUE
+        PKG_MODE="cust"
+        VENDOR="custom"     
+        shift 2
+        ;;
+    --PR_UT)
+        PR_CHANGED_FILES="$2"
+        ENABLE_TEST=TRUE 
+        shift 2
+        ;;
+    --PR_PKG)
+        PR_CHANGED_FILES="$2"
+        ops_names=$(python3 "$CURRENT_DIR"/cmake/scripts/parse_changed_files.py -c "$CURRENT_DIR"/classify_rule.yaml -f "$PR_CHANGED_FILES" get_related_ut)
+        echo "Operators that need custom package compilation:$ops_names"
+        if [ -z "${ops_names}" ];then
+            log "Info: No custom packages to build for this PR."
+            ops_names="incre_flash_attention"
+            #exit 0
+        fi 
+        ops_names="${ops_names%;}"
+        ops_names="${ops_names//;/,}"
+        ascend_op_name="$ops_names"
+        ENABLE_BUILD_PKG=TRUE
+        ENABLE_BUILT_CUSTOM=TRUE
+        ENABLE_BUILT_IN=FALSE
         shift 2
         ;;
     --parent_job)
@@ -913,14 +938,20 @@ fi
 if [ -n "${TEST}" ];then
     if [ -n "${PR_CHANGED_FILES}" ];then
         TEST=$(python3 "$CURRENT_DIR"/cmake/scripts/parse_changed_files.py -c "$CURRENT_DIR"/classify_rule.yaml -f "$PR_CHANGED_FILES" get_related_ut)
-        if [ -z "${TEST}" ]; then
+        echo "Operators that need to run UT: $TEST"
+        if [ -z "${TEST}" ];then
             log "Info: This PR didn't trigger any UTest."
-            exit 200
+            TEST="incre_flash_attention"
+            #exit 0
+        fi
+        if [ "$TEST" != "all" ];then
+            TEST="${TEST%;}"
+            TEST="${TEST//;/,}"
+            CUSTOM_OPTION="${CUSTOM_OPTION} -DASCEND_OP_NAME=${TEST}"
         fi
         CUSTOM_OPTION="${CUSTOM_OPTION} -DTESTS_UT_OPS_TEST_CI_PR=ON"
     fi
     CUSTOM_OPTION="${CUSTOM_OPTION} -DTESTS_UT_OPS_TEST=${TEST}"
-
     if [ "${CLANG}" == "true" ];then
         CLANG_C_COMPILER="$(which clang)"
         if [ ! -f "${CLANG_C_COMPILER}" ];then
@@ -1113,6 +1144,81 @@ function build_pkg_for_single_soc() {
 
 if [[ "$ENABLE_GENOP" == "TRUE" ]]; then
     gen_op
+fi
+
+function build_example_group_eager()
+{
+    local example_name="$1"
+    EXAMPLE_MODE_GROUP="eager"
+    log "Start to run example,name:${example_name} mode:${EXAMPLE_MODE_GROUP}"
+    echo -e "\033[1;33m  RUNNING OPERATOR: \033[1;32m${example_name}\033[0m"
+    if [ ! -d "${BUILD_PATH}" ]; then
+    	mkdir -p ${BUILD_PATH}
+    fi
+    # 清理CMake缓存
+    # clean_cmake_cache
+    clean
+    cd "${BUILD_PATH}"
+    if [[ "${EXAMPLE_MODE_GROUP}" == "eager" ]]; then
+        files=$(find ../ -path "*/${example_name}/examples/*" -name test_aclnn_*.cpp)
+        if [ -z "$files" ]; then
+            echo "ERROR: ${example_name} do not have eager example"
+            exit 1
+        fi
+        for file in $files; do
+            echo "Start compile and run example file: $file"
+            if [[ "${PKG_MODE}" == "" ]]; then
+                if [[ "${ascend_compute_unit}" == "ascend910_93" ]]; then
+                    g++ ${file} -DASCEND910_93 -I ${INCLUDE_PATH} -I ${ACLNN_INCLUDE_PATH} -I ${EAGER_INCLUDE_OPP_ACLNNOP_PATH} -L ${EAGER_LIBRARY_OPP_PATH} -L ${EAGER_LIBRARY_PATH} -lopapi -lopapi_transformer -lascendcl -lnnopbase -lpthread -lhccl -o test_aclnn_${example_name}
+                else
+                    g++ ${file} -I ${INCLUDE_PATH} -I ${ACLNN_INCLUDE_PATH} -I ${EAGER_INCLUDE_OPP_ACLNNOP_PATH} -L ${EAGER_LIBRARY_OPP_PATH} -L ${EAGER_LIBRARY_PATH} -lopapi -lopapi_transformer -lascendcl -lnnopbase -lpthread -lhccl -o test_aclnn_${example_name}
+                fi
+            elif [[ "${PKG_MODE}" == "cust" ]]; then
+    
+                echo "pkg_mode:${PKG_MODE} vendor_name:${VENDOR}"
+                export CUST_LIBRARY_PATH="${ASCEND_OPP_PATH}/vendors/${VENDOR}_transformer/op_api/lib"     # 仅自定义算子需要
+                export CUST_INCLUDE_PATH="${ASCEND_OPP_PATH}/vendors/${VENDOR}_transformer/op_api/include" # 仅自定义算子需要
+                ABSOLUTE_MC2_PATH=$(realpath ${BUILD_PATH}/../mc2)
+                REAL_FILE_PATH=$(realpath "$file")
+                MC2_APPEND_INCLUDE_AND_LIBRARY=""
+                if [[ "$REAL_FILE_PATH" == "${ABSOLUTE_MC2_PATH}"* ]]; then
+                    MC2_APPEND_INCLUDE_AND_LIBRARY="-I ${EAGER_INCLUDE_OPP_ACLNNOP_PATH} -lpthread -lhccl"
+                fi
+                g++ ${file} -I ${INCLUDE_PATH} -I ${CUST_INCLUDE_PATH} -L ${CUST_LIBRARY_PATH} -L ${EAGER_LIBRARY_PATH} -lcust_opapi -lascendcl -lnnopbase ${MC2_APPEND_INCLUDE_AND_LIBRARY} -o test_aclnn_${example_name} -Wl,-rpath=${CUST_LIBRARY_PATH}
+            else
+                echo "Error: pkg_mode(${PKG_MODE}) must be cust."
+                help_info "run_example"
+                exit 1
+            fi
+            ./test_aclnn_${example_name}
+        done
+    else
+        echo "Error: This script only supports 'eager' mode."
+        exit 1
+    fi
+
+}
+
+# 冒烟任务只跑examples
+function process_ci_smoke_with_changed_list()
+{
+    TEST=$(python3 "$CURRENT_DIR"/cmake/scripts/parse_changed_files.py -c "$CURRENT_DIR"/classify_rule.yaml -f "$PR_CHANGED_FILES" get_related_examples)
+    echo "Operators that need to run examples: $TEST"
+    if [[ -z "$TEST" ]];then
+        echo "No related unit tests found. Skipping CI test execution."
+        TEST="incre_flash_attention"
+    fi
+    IFS=';' read -ra OPS_ARRAY <<< "$TEST"
+    for op in "${OPS_ARRAY[@]}";do
+        op=$(echo "$op" | xargs)
+        echo "Running example test for operator: $op"
+        if [[ -n "$op" ]];then
+            build_example_group_eager "$op"
+        fi
+    done
+}
+if [[ "$ENABLE_SMOKE" == "TRUE" ]]; then
+    process_ci_smoke_with_changed_list
 fi
 
 cd ${BUILD_DIR}

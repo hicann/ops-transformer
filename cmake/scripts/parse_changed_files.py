@@ -29,10 +29,14 @@ class Module:
         self.src_exclude_files: List[Path] = []
         self.tests_ut_ops_test_src_files: List[Path] = []
         self.tests_ut_ops_test_src_exclude_files: List[Path] = []
-        self.tests_ut_ops_test_options: List[str] = []
+        self.tests_ut_ops_test_options: List[str] = []       
+        self.options: List[str] = []
 
     @staticmethod
     def _add_str_cfg(src, dst: List[str]):
+        # 检查输入参数的有效性
+        if src is None:
+            return True
         if isinstance(src, str):
             src = [src]
         for s in src:
@@ -49,12 +53,14 @@ class Module:
             return False
         if not self._check():
             return False
+        if not self._update_options(desc=desc):
+            return False
         return True
 
     def get_test_ut_ops_test_options(self, f: Path) -> List[str]:
 
         def is_excluded(e_f: Path):
-            for e in self.src_exclude_files + self.tests_ut_ops_test_src_exclude_files:
+            for e in self.src_exclude_files:
                 try:
                     if e_f.relative_to(e):
                         return True
@@ -63,22 +69,26 @@ class Module:
             return False
 
         related_options: List[str] = []
-        for s in self.src_files + self.tests_ut_ops_test_src_files:
+        for s in self.src_files:
             if is_excluded(e_f=f):
                 continue
             try:
                 if f.relative_to(s):
                     # 当同一个修改文件需要触发多个 Options 时, 需要把这些 Options 全部添加
-                    related_options.extend(self.tests_ut_ops_test_options)
+                    related_options.extend(self.options)
             except ValueError:
                 continue
         # 关联 Options 去重
         related_options = list(set(related_options))
         return related_options
 
+    def get_test_example_ops_test_options(self, f: Path) -> List[str]:
+        return self.get_test_ut_ops_test_options(f)
+
     def print_details(self):
         dbg_str = (f"Name={self.name} SrcLen={len(self.src_files)} "
                    f"TestUtOpsTestSrcLen={len(self.tests_ut_ops_test_src_files)} "
+                   f"TestUtOpsTestOptions={self.options} "
                    f"TestUtOpsTestOptions={self.tests_ut_ops_test_options}")
         logging.debug(dbg_str)
 
@@ -109,6 +119,10 @@ class Module:
                 if not self._update_ut(desc=sub_desc):
                     return False
         return True
+    
+    def _update_options(self, desc: Dict[str, Any]) -> bool:
+        options = desc.get('options', [])
+        return self._add_str_cfg(src=options, dst=self.options)
 
     def _update_ut(self, desc: Dict[str, Any]) -> bool:
         for sub_name, sub_desc in desc.items():
@@ -138,6 +152,31 @@ class Parser:
 
     _Modules: List[Module] = []         # 保存规则文件(classify_rule)内设置的模块列表
     _ChangedPaths: List[Path] = []      # 修改文件列表文件(changed_file)内设置的修改文件列表
+
+    @staticmethod
+    def main() -> str:
+        # 参数注册
+        ps = argparse.ArgumentParser(description="Parse changed files", epilog="Best Regards!")
+        ps.add_argument("-c", "--classify", required=True, nargs=1, type=Path, help="classify_rule.yaml")
+        ps.add_argument("-f", "--file", required=True, nargs=1, type=Path, help="changed files desc file.")
+        # 子命令行
+        sub_ps = ps.add_subparsers(help="Sub-Command")
+        p_ut = sub_ps.add_parser('get_related_ut', help="Get related ut.")
+        p_ut.set_defaults(func=Parser.get_related_ut)
+        p_st = sub_ps.add_parser('get_related_st', help="Get related st.")
+        p_st.set_defaults(func=Parser.get_related_st)
+        p_examples = sub_ps.add_parser('get_related_examples', help="Get related examples.")
+        p_examples.set_defaults(func=Parser.get_related_examples)
+        # 处理
+        args = ps.parse_args()
+        logging.debug(args)
+        if not Parser.parse_classify_file(file=Path(args.classify[0])):
+            return ""
+        if not Parser.parse_changed_file(file=Path(args.file[0])):
+            return ""
+        Parser.print_details()
+        rst = args.func()
+        return rst
 
     @classmethod
     def print_details(cls):
@@ -203,8 +242,31 @@ class Parser:
         return ""
 
     @classmethod
+    def get_ops_test_option_lst(cls) -> List[str]:
+        ops_test_option_lst: List[str] = []
+        for p in cls._ChangedPaths:
+            for m in cls._Modules:
+                new_options = m.get_test_example_ops_test_options(f=p)
+                for opt in new_options:
+                    if opt not in ops_test_option_lst:
+                        ops_test_option_lst.append(opt)
+                        logging.info("TESTS_RUN_EXAMPLE_OPS_TEST [%s] is trigger!", opt)
+        return ops_test_option_lst
+
+    @classmethod
     def get_related_examples(cls) -> str:
-        return ""
+        ops_test_option_lst = cls.get_ops_test_option_lst()
+        if len(ops_test_option_lst) == 0:
+            logging.info("Don't trigger any target.")
+            return ""
+        ops_test_examples_str: str = ""
+        if "all" in ops_test_option_lst:
+            ops_test_examples_str = "all"
+        else:
+            for opt in ops_test_option_lst:
+                ops_test_examples_str += f"{opt};"
+        ops_test_examples_str = f"{ops_test_examples_str}"
+        return ops_test_examples_str
 
     @classmethod
     def _parse_classify_item(cls, name: str, desc: Optional[Dict[str, Any]] = None) -> bool:
@@ -222,30 +284,6 @@ class Parser:
                 return False
         return True
 
-    @staticmethod
-    def main() -> str:
-        # 参数注册
-        ps = argparse.ArgumentParser(description="Parse changed files", epilog="Best Regards!")
-        ps.add_argument("-c", "--classify", required=True, nargs=1, type=Path, help="classify_rule.yaml")
-        ps.add_argument("-f", "--file", required=True, nargs=1, type=Path, help="changed files desc file.")
-        # 子命令行
-        sub_ps = ps.add_subparsers(help="Sub-Command")
-        p_ut = sub_ps.add_parser('get_related_ut', help="Get related ut.")
-        p_ut.set_defaults(func=Parser.get_related_ut)
-        p_st = sub_ps.add_parser('get_related_st', help="Get related st.")
-        p_st.set_defaults(func=Parser.get_related_st)
-        p_examples = sub_ps.add_parser('get_related_examples', help="Get related examples.")
-        p_examples.set_defaults(func=Parser.get_related_examples)
-        # 处理
-        args = ps.parse_args()
-        logging.debug(args)
-        if not Parser.parse_classify_file(file=Path(args.classify[0])):
-            return ""
-        if not Parser.parse_changed_file(file=Path(args.file[0])):
-            return ""
-        Parser.print_details()
-        rst = args.func()
-        return rst
 
 
 if __name__ == '__main__':
