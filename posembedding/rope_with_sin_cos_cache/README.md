@@ -92,6 +92,14 @@
     $$
 
     $$
+    o1[i] = x1[i] * cos[i] - x2[i] * sin[i]
+    $$
+
+    $$
+    o2[i] = x2[i] * cos[i] + x1[i] * sin[i]
+    $$
+    
+    $$
     queryRot = torch.stack((o1, o2), dim=-1)
     $$
 
@@ -147,6 +155,14 @@
     $$
 
     $$
+    o1[i] = x1[i] * cos[i] - x2[i] * sin[i]
+    $$
+
+    $$
+    o2[i] = x2[i] * cos[i] + x1[i] * sin[i]
+    $$
+
+    $$
     queryRot = torch.stack((o1, o2), dim=-1)
     $$
 
@@ -182,7 +198,7 @@
     <tr>
       <td style="white-space: nowrap">keyIn</td>
       <td style="white-space: nowrap">输入</td>
-      <td style="white-space: nowrap">Device侧的aclTensor，表示要执行旋转位置编码的第二个张量，公式中的`key`。</td>
+      <td style="white-space: nowrap">Device侧的aclTensor，表示要执行旋转位置编码的第二个张量。</td>
       <td style="white-space: nowrap">BFLOAT16、FLOAT16、FLOAT32</td>
       <td style="white-space: nowrap">ND</td>
     </tr>
