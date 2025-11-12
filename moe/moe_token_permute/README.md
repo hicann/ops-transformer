@@ -18,11 +18,11 @@
     $$
   
     $$
-    sortedIndicesOut=argSort(sortedIndices)
+    sortedIndicesOut=argSort(sortedIndicesFirst)
     $$
   
     $$
-    permuteTokens[sortedIndices[i]]=tokens[i//topK]
+    permuteTokens[sortedIndicesFirst[i]]=tokens[i//topK]
     $$
   
   - paddedMode为`true`时
