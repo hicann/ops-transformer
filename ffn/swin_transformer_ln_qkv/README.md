@@ -19,7 +19,7 @@
     (Q,K,V)=((Layernorm(inputX)).transpose() * weight).transpose().split()
     $$  
 
-  其中，weight 是 Q、K、V 三个矩阵权重的拼接。
+  其中，weight 是 Q、K、V 三个矩阵权重在列方向拼接的结果。
 ## 参数说明
 
 <table style="undefined;table-layout: fixed; width: 900px"><colgroup>
@@ -41,56 +41,56 @@
   <tr>
     <td>inputX</td>
     <td>输入</td>
-    <td>公式中的输入Q。</td>
+    <td>输入带计算权重的矩阵x。</td>
     <td>FLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>gamma</td>
     <td>输入</td>
-    <td>公式中的输入K。</td>
+    <td>代表归一化的缩放参数，代表偏移量。</td>
     <td>FLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>beta</td>
     <td>输入</td>
-    <td>公式中的输入V。</td>
+    <td>代表归一化的缩放参数，代表缩放比例。</td>
     <td>FLOAT16、BFLOAT16、INT8</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>weight</td>
     <td>输入</td>
-    <td>公式中的输入V。</td>
+    <td>代表Q、K、V 三个矩阵权重在列方向拼接的结果。</td>
     <td>FLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>bias</td>
     <td>输入</td>
-    <td>公式中的输入V。</td>
+    <td>代表矩阵乘的偏置量。</td>
     <td>FLOAT16</td>
     <td>ND</td>
   </tr> 
   <tr>
     <td>query_output</td>
     <td>输出</td>
-    <td>公式中的输出。</td>
+    <td>公式中的输出Q。</td>
     <td>FLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>key_output</td>
     <td>输出</td>
-    <td>公式中的输出。</td>
+    <td>公式中的输出K。</td>
     <td>FLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>value_output</td>
     <td>输出</td>
-    <td>公式中的输出。</td>
+    <td>公式中的输出V。</td>
     <td>FLOAT16</td>
     <td>ND</td>
   </tr> 

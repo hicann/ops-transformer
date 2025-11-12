@@ -20,20 +20,28 @@
      y_i=x_i\times weight_i + bias_i
     $$
 
-    - **量化场景（无perTokenScaleOptional）：**
+    - **量化场景（无per_token_scale）：**
     $$
       y_i=(x_i\times weight_i) * scale_i + offset_i
     $$
-      - x为INT8，bias为INT32
-      $$
-        y_i=(x_i\times weight_i + bias_i) * scale_i + offset_i
-      $$
 
-    - **量化场景（有perTokenScaleOptional）：**
+    <ul style="margin-left: 40px;">
+    <li>x为INT8，bias为INT32</li>
+    </ul>
+
+    $$
+      y_i=(x_i\times weight_i + bias_i) * scale_i + offset_i
+    $$
+
+    - **量化场景（有per_token_scale）：**
     $$
      y_i=(x_i\times weight_i) * scale_i * per\_token\_scale_i
     $$
-      - x为INT8，bias为INT32
+
+    <ul style="margin-left: 40px;">
+    <li>x为INT8，bias为INT32</li>
+    </ul>
+
       $$
         y_i=(x_i\times weight_i + bias_i) * scale_i * per\_token\_scale_i
       $$
@@ -68,117 +76,117 @@
     <tr>
       <td style="white-space: nowrap">x</td>
       <td style="white-space: nowrap">输入</td>
-      <td style="white-space: nowrap">公式中的输入`x`。</td>
-      <td style="white-space: nowrap">FLOAT<sup>1</sup>、FLOAT16、INT16<sup>1</sup>、INT8、INT4<sup>1</sup>、BFLOAT16、FLOAT8_E5M2<sup>2</sup>、FLOAT8_E4M3FN<sup>2</sup>、HIFLOAT8<sup>2</sup></td>
+      <td style="white-space: nowrap">代表输入的激活矩阵。</td>
+      <td style="white-space: nowrap">FLOAT、FLOAT16、INT16、INT8、INT4、BFLOAT16、FLOAT8_E5M2<sup>1</sup>、FLOAT8_E4M3FN<sup>1</sup>、HIFLOAT8<sup>1</sup></td>
       <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
       <td style="white-space: nowrap">weight</td>
       <td style="white-space: nowrap">输入</td>
-      <td style="white-space: nowrap">公式中的`weight`。</td>
-      <td style="white-space: nowrap">FLOAT<sup>1</sup>、FLOAT16、INT16<sup>1</sup>、INT8、INT4、BFLOAT16、FLOAT8_E5M2<sup>2</sup>、FLOAT8_E4M3FN<sup>2</sup>、HIFLOAT8<sup>2</sup></td>
+      <td style="white-space: nowrap">代表输入的权重矩阵</td>
+      <td style="white-space: nowrap">FLOAT、FLOAT16、INT16、INT8、INT4、BFLOAT16、FLOAT8_E5M2<sup>1</sup>、FLOAT8_E4M3FN<sup>1</sup>、HIFLOAT8<sup>1</sup></td>
       <td style="white-space: nowrap">ND/NZ</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">biasOptional</td>
+      <td style="white-space: nowrap">bias</td>
       <td style="white-space: nowrap">可选输入</td>
-      <td style="white-space: nowrap">公式中的`bias`。</td>
-      <td style="white-space: nowrap">FLOAT、FLOAT16、INT32、BFLOAT16<sup>2</sup></td>
+      <td style="white-space: nowrap">代表偏置矩阵。</td>
+      <td style="white-space: nowrap">FLOAT、FLOAT16、INT32、BFLOAT16<sup>1</sup></td>
       <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">scaleOptional</td>
+      <td style="white-space: nowrap">scale</td>
       <td style="white-space: nowrap">可选输入</td>
-      <td style="white-space: nowrap">公式中的`scale`，代表量化参数中的缩放因子。</td>
-      <td style="white-space: nowrap">FLOAT、UINT64、BFLOAT16、FLOAT8_E8M0<sup>2</sup>、INT64<sup>2</sup></td>
+      <td style="white-space: nowrap">代表量化参数中的缩放因子。</td>
+      <td style="white-space: nowrap">FLOAT、UINT64、BFLOAT16、FLOAT8_E8M0<sup>1</sup>、INT64<sup>1</sup></td>
       <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">offsetOptional</td>
+      <td style="white-space: nowrap">offset</td>
       <td style="white-space: nowrap">可选输入</td>
-      <td style="white-space: nowrap">公式中的`offset`，代表量化参数中的偏移量。</td>
+      <td style="white-space: nowrap">代表量化参数中的偏移量。</td>
       <td style="white-space: nowrap">FLOAT</td>
       <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">antiquantScaleOptional</td>
+      <td style="white-space: nowrap">antiquant_scale</td>
       <td style="white-space: nowrap">可选输入</td>
-      <td style="white-space: nowrap">公式中的`antiquant_scale`，代表伪量化参数中的缩放因子。</td>
+      <td style="white-space: nowrap">代表伪量化参数中的缩放因子。</td>
       <td style="white-space: nowrap">FLOAT16、BFLOAT16</td>
       <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">antiquantOffsetOptional</td>
+      <td style="white-space: nowrap">antiquant_offset</td>
       <td style="white-space: nowrap">可选输入</td>
-      <td style="white-space: nowrap">公式中的`antiquant_offset`，代表伪量化参数中的缩放因子。</td>
+      <td style="white-space: nowrap">代表伪量化参数中的缩放因子。</td>
       <td style="white-space: nowrap">FLOAT16、BFLOAT16</td>
       <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">perTokenScaleOptional</td>
+      <td style="white-space: nowrap">per_token_scale</td>
       <td style="white-space: nowrap">可选输入</td>
-      <td style="white-space: nowrap">公式中的`per_token_scale`，代表量化参数中的由x量化引入的缩放因子。</td>
-      <td style="white-space: nowrap">FLOAT、FLOAT8_E8M0<sup>2</sup></td>
+      <td style="white-space: nowrap">代表量化参数中的由x量化引入的缩放因子。</td>
+      <td style="white-space: nowrap">FLOAT、FLOAT8_E8M0<sup>1</sup></td>
       <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">groupListOptional</td>
+      <td style="white-space: nowrap">group_list</td>
       <td style="white-space: nowrap">可选输入</td>
       <td style="white-space: nowrap">代表输入和输出分组轴方向的matmul大小分布。</td>
       <td style="white-space: nowrap">INT64</td>
       <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">activationInputOptional</td>
+      <td style="white-space: nowrap">activation_input</td>
       <td style="white-space: nowrap">可选输入</td>
       <td style="white-space: nowrap">代表激活函数的反向输入，当前只支持传入nullptr。</td>
       <td style="white-space: nowrap">-</td>
       <td style="white-space: nowrap">-</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">activationQuantScaleOptional</td>
+      <td style="white-space: nowrap">activation_quant_scale</td>
       <td style="white-space: nowrap">可选输入</td>
       <td style="white-space: nowrap">当前只支持传入nullptr。</td>
       <td style="white-space: nowrap">-</td>
       <td style="white-space: nowrap">-</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">activationQuantOffsetOptional</td>
+      <td style="white-space: nowrap">activation_quant_offset</td>
       <td style="white-space: nowrap">可选输入</td>
       <td style="white-space: nowrap">当前只支持传入nullptr。</td>
       <td style="white-space: nowrap">-</td>
       <td style="white-space: nowrap">-</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">splitItem</td>
+      <td style="white-space: nowrap">split_item</td>
       <td style="white-space: nowrap">属性</td>
       <td style="white-space: nowrap">代表输出是否要做tensor切分。</td>
       <td style="white-space: nowrap">INT64</td>
       <td style="white-space: nowrap">-</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">groupType</td>
+      <td style="white-space: nowrap">group_type</td>
       <td style="white-space: nowrap">属性</td>
       <td style="white-space: nowrap">代表需要分组的轴。</td>
       <td style="white-space: nowrap">INT64</td>
       <td style="white-space: nowrap">-</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">groupListType</td>
+      <td style="white-space: nowrap">group_list_type</td>
       <td style="white-space: nowrap">属性</td>
-      <td style="white-space: nowrap">代表groupList输入的分组方式。</td>
+      <td style="white-space: nowrap">代表group_list输入的分组方式。</td>
       <td style="white-space: nowrap">INT64</td>
       <td style="white-space: nowrap">-</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">actType</td>
+      <td style="white-space: nowrap">act_type</td>
       <td style="white-space: nowrap">属性</td>
       <td style="white-space: nowrap">代表激活函数类型。</td>
       <td style="white-space: nowrap">INT64</td>
       <td style="white-space: nowrap">-</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">tuningConfigOptional</td>
+      <td style="white-space: nowrap">tuning_config</td>
       <td style="white-space: nowrap">可选输入</td>
       <td style="white-space: nowrap">代表各个专家处理的token数的预期值，用于优化tiling。</td>
       <td style="white-space: nowrap">INT64</td>
@@ -188,18 +196,18 @@
       <td style="white-space: nowrap">out</td>
       <td style="white-space: nowrap">输出</td>
       <td style="white-space: nowrap">公式中的输出`y`。</td>
-      <td style="white-space: nowrap">FLOAT、FLOAT16、INT32<sup>1</sup>、INT8<sup>1</sup>、BFLOAT16</td>
+      <td style="white-space: nowrap">FLOAT、FLOAT16、INT32、INT8、BFLOAT16</td>
       <td style="white-space: nowrap">-</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">activationFeatureOutOptional</td>
+      <td style="white-space: nowrap">activation_feature_out</td>
       <td style="white-space: nowrap">输出</td>
       <td style="white-space: nowrap">激活函数的输入数据，当前只支持传入nullptr。</td>
       <td style="white-space: nowrap">-</td>
       <td style="white-space: nowrap">-</td>
     </tr>
     <tr>
-      <td style="white-space: nowrap">dynQuantScaleOutOptional</td>
+      <td style="white-space: nowrap">dyn_quant_scale_out</td>
       <td style="white-space: nowrap">输出</td>
       <td style="white-space: nowrap">当前只支持传入nullptr。</td>
       <td style="white-space: nowrap">-</td>
@@ -211,17 +219,17 @@
 
 - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
   
-  - 上表数据类型列中的角标“2”代表该系列不支持的数据类型。
+  - 上表数据类型列中的角标“1”代表该系列不支持的数据类型。
   - 不支持FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8、FLOAT8_E8M0类型。
-  - 输入参数biasOptional不支持BFLOAT16。
-  - 输入参数scaleOptional不支持INT64类型。
+  - 输入参数bias不支持BFLOAT16。
+  - 输入参数scale不支持INT64类型。
 
 
 ## 约束说明
   - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
     - 输入数据类型和格式如下说明（1.除weight外，其余格式都为ND；2.groupList是否传值与使用场景有关，具体请参考<a href="#groupType-constraints">groupType支持场景</a>约束）：
 
-      |  类型  |    x    |    weight       |  bias        | scale  | offset     | antiquantScale | antiquantOffset | perTokenScale | groupList | activationInput | activationQuantScale | activationQuantOffset | out     |
+      |  类型  |    x    |    weight       |  bias        | scale  | offset     | antiquant_scale | antiquant_offset | per_token_scale | group_list | activation_input | activation_quant_scale | activation_quant_offset | out     |
       |--------|---------|----------------|--------------|--------|------------|----------------|-----------------|---------------|-----------|-----------------|----------------------|-----------------------|---------|
       | 非量化 | FLOAT   | FLOAT (ND)      | FLOAT/null   | null   | null       | null           | null            | null          | INT64     | null            | null                 | null                  | FLOAT   |
       | 非量化 | FLOAT16 | FLOAT16 (ND/NZ) | FLOAT16/null | null   | null       | null           | null            | null          | INT64     | null            | null                 | null                  | FLOAT16 |
@@ -245,7 +253,7 @@
     - 伪量化场景shape约束：
       - 伪量化场景下，若weight的类型为INT8，仅支持perchannel模式；若weight的类型为INT4，对称量化支持perchannel和pergroup两种模式。若为pergroup，pergroup数G或$G_i$必须要能整除对应的$k_i$。若weight为多tensor，定义pergroup长度$s_i = k_i / G_i$，要求所有$s_i(i=1,2,...g)$都相等。非对称量化支持perchannel模式。
       - 伪量化场景下若weight的类型为INT4，则weight中每一组tensor的最后一维大小都应是偶数。$weight_i$的最后一维指weight不转置时$weight_i$的N轴或当weight转置时$weight_i$的K轴。并且在pergroup场景下，当weight转置时，要求pergroup长度$s_i$是偶数。
-      - 伪量化参数antiquantScaleOptional和antiquantOffsetOptional的shape要满足下表（其中g为matmul组数，G为pergroup数，$G_i$为第i个tensor的pergroup数）：
+      - 伪量化参数antiquant_scale和antiquant_offset的shape要满足下表（其中g为matmul组数，G为pergroup数，$G_i$为第i个tensor的pergroup数）：
           | 使用场景 | 子场景 | shape限制 |
           |:---------:|:-------:| :-------|
           | 伪量化perchannel | weight单 | $[g, n]$|
@@ -255,41 +263,41 @@
       - x为INT8、weight为INT4场景支持对称量化和非对称量化：
         - 对称量化场景：
           - 该场景下输出out的dtype为BFLOAT16或FLOAT16。
-          - 该场景下offsetOptional为空。
-          - 该场景下仅支持count模式（算子不会检查groupListType的值），k要求为quantGroupSize的整数倍，且要求k <= 18432。其中quantGroupSize为k方向上pergroup量化长度，当前支持quantGroupSize=256。
+          - 该场景下offset为空。
+          - 该场景下仅支持count模式（即group_list中数值的总和应小于等于x中tensor的第一维。算子不会检查group_list_type的值，会认为group_list_type=1），k要求为quantGroupSize的整数倍，且要求k <= 18432。其中quantGroupSize为k方向上pergroup量化长度，当前支持quantGroupSize=256。
           - 该场景下scale为pergroup与perchannel离线融合后的结果，shape要求为$[e, quantGroupNum, n]$，其中$quantGroupNum=k \div quantGroupSize$。
           - Bias为计算过程中离线计算的辅助结果，值要求为$8\times weight \times scale$，并在第1维累加，shape要求为$[e, n]$。
           - 该场景下要求n为8的整数倍。
         - 非对称量化场景：
           - 该场景下输出out的dtype为FLOAT16。
-          - 该场景下仅支持count模式（算子不会检查groupListType的值）。
+          - 该场景下仅支持count模式（即group_list中数值的总和应小于等于x中tensor的第一维。算子不会检查group_list_type的值，会认为group_list_type=1）。
           - 该场景下{k, n}要求为{7168, 4096}或者{2048, 7168}。
           - scale为pergroup与perchannel离线融合后的结果，shape要求为$[e, 1, n]$。
-          - 该场景下offsetOptional不为空。非对称量化offsetOptional为计算过程中离线计算辅助结果，即$antiquantOffset \times scale$，shape要求为$[e, 1, n]$，dtype为FLOAT32。
+          - 该场景下offset不为空。非对称量化offset为计算过程中离线计算辅助结果，即$antiquant_offset \times scale$，shape要求为$[e, 1, n]$，dtype为FLOAT32。
           - Bias为计算过程中离线计算的辅助结果，值要求为$8\times weight \times scale$，并在第1维累加，shape要求为$[e, n]$。
           - 该场景下要求n为8的整数倍。
     - 量化场景下，若weight的类型为INT4，需满足以下约束（其中g为matmul组数，G为k轴被pergroup划分后的组数）：
       - weight的数据格式为ND时，要求n为8的整数倍。
       - 支持perchannel和pergroup量化。perchannel场景的scale的shape需为$[g, n]$，pergroup场景需为$[g, G, n]$。
       - pergroup场景下，$G$必须要能整除$k$，且$k/G$需为偶数。
-      - 该场景仅支持groupType=0(x,weight,y均为单tensor)，actType=0，groupListType=0/1。
+      - 该场景仅支持group_type=0(x,weight,y均为单tensor)，act_type=0，group_list_type=0/1。
       - 该场景不支持weight转置。
 
-    - 仅量化场景 (per-token)、反量化场景支持激活函数计算。
+    - 仅量化场景 (pertoken)、反量化场景支持激活函数计算。
 
-    - <a id="groupType-constraints"></a>不同groupType支持场景：
-      - 伪量化仅支持groupType为-1和0场景。
-      - 量化仅支持groupType为0场景。
+    - <a id="groupType-constraints"></a>不同group_type支持场景：
+      - 伪量化仅支持group_type为-1和0场景。
+      - 量化仅支持group_type为0场景。
       - x、weight、y的输入类型为aclTensorList，表示一个aclTensor类型的数组对象。下面表格支持场景用"单"表示由一个aclTensor组成的aclTensorList，"多"表示由多个aclTensor组成的aclTensorList。例如"单多单"，分别表示x为单tensor、weight为多tensor、y为单tensor。
 
-      | groupType | 支持场景 | splitItem| groupListOptional | 转置 | 其余场景限制 |
+      | group_type | 支持场景 | split_item| group_list | 转置 | 其余场景限制 |
       |:---------:|:-------:|:--------:|:------------------|:--------| :-------|
-      | -1 | 多多多 | 0/1 | groupListOptional必须传空 | 1）x不支持转置<br>2）支持weight转置，但weight的tensorList中每个tensor是否转置需保持统一| 1）x中tensor要求维度一致，支持2-6维，weight中tensor需为2维，y中tensor维度和x保持一致 |
-      | 0 | 单单单 | 2/3 | 1）必须传groupListOptional<br>2）当groupListType为0时，最后一个值应小于等于x中tensor的第一维；当groupListType为1时，数值的总和应小于等于x中tensor的第一维；当groupListType为2时，第二列数值的总和应小于等于x中tensor的第一维<br>3）groupListOptional第1维最大支持1024，即最多支持1024个group |1）x不支持转置<br>2）支持weight转置，A8W4与A4W4场景不支持weight转置 |1）weight中tensor需为3维，x，y中tensor需为2维|
-      | 0 | 单多单 | 2/3 | 1）必须传groupListOptional<br>2）当groupListType为0时，最后一个值应小于等于x中tensor的第一维；当groupListType为1时，数值的总和应小于等于x中tensor的第一维；当groupListType为2时，第二列数值的总和应小于等于x中tensor的第一维<br>3）groupListOptional第1维最大支持128，即最多支持128个group|1）x不支持转置<br>2）支持weight转置，但weight的tensorList中每个tensor是否转置需保持统一 |1）x，weight，y中tensor需为2维<br>2）weight中每个tensor的N轴必须相等 |
-      | 0 | 多多单 | 2/3 | 1）groupListOptional可选<br>2）若传入groupListOptional，当groupListType为0时，groupListOptional的差值需与x中tensor的第一维一一对应；当groupListType为1时，groupListOptional的数值需与x中tensor的第一维一一对应；当groupListType为2时，groupListOptional第二列的数值需与x中tensor的第一维一一对应<br>3）groupListOptional第1维最大支持128，即最多支持128个group |1）x不支持转置<br> 2）支持weight转置，但weight的tensorList中每个tensor是否转置需保持统一| 1）x，weight，y中tensor需为2维<br>2）weight中每个tensor的N轴必须相等 |
-      | 2 | 单单单 | 2/3 | 1）必须传groupListOptional<br>2）当groupListType为0时，最后一个值应小于等于x中tensor的第二维；当groupListType为1时，数值的总和与x应小于等于tensor的第二维；当groupListType为2时，第二列数值的总和应小于等于x中tensor的第二维<br>3）groupListOptional第1维最大支持1024， 即最多支持1024个group | 1）x必须转置<br>2）weight不能转置 |1）x，weight中tensor需为2维，y中tensor需为3维<br>2）bias必须传空|
-      | 2 | 单多多 | 0/1 | groupListOptional必须传空 | 1）x必须转置<br>2）weight不能转置<br>| 1）x，weight，y中tensor需为2维<br>2）weight长度最大支持128，即最多支持128个group<br>3）原始shape中weight每个tensor的第一维之和不应超过x第一维<br>4）bias必须传空 |
+      | -1 | 多多多 | 0/1 | group_list必须传空 | 1）x不支持转置<br>2）支持weight转置，但weight的tensorList中每个tensor是否转置需保持统一| 1）x中tensor要求维度一致，支持2-6维，weight中tensor需为2维，y中tensor维度和x保持一致 |
+      | 0 | 单单单 | 2/3 | 1）必须传group_list<br>2）当group_list_type为0时，最后一个值应小于等于x中tensor的第一维；当group_list_type为1时，数值的总和应小于等于x中tensor的第一维；当group_list_type为2时，第二列数值的总和应小于等于x中tensor的第一维<br>3）group_list第1维最大支持1024，即最多支持1024个group |1）x不支持转置<br>2）支持weight转置，A8W4与A4W4场景不支持weight转置 |1）weight中tensor需为3维，x，y中tensor需为2维|
+      | 0 | 单多单 | 2/3 | 1）必须传group_list<br>2）当group_list_type为0时，最后一个值应小于等于x中tensor的第一维；当group_list_type为1时，数值的总和应小于等于x中tensor的第一维；当group_list_type为2时，第二列数值的总和应小于等于x中tensor的第一维<br>3）group_list第1维最大支持128，即最多支持128个group|1）x不支持转置<br>2）支持weight转置，但weight的tensorList中每个tensor是否转置需保持统一 |1）x，weight，y中tensor需为2维<br>2）weight中每个tensor的N轴必须相等 |
+      | 0 | 多多单 | 2/3 | 1）group_list可选<br>2）若传入group_list，当group_list_type为0时，group_list的差值需与x中tensor的第一维一一对应；当group_list_type为1时，group_list的数值需与x中tensor的第一维一一对应；当group_list_type为2时，group_list第二列的数值需与x中tensor的第一维一一对应<br>3）group_list第1维最大支持128，即最多支持128个group |1）x不支持转置<br> 2）支持weight转置，但weight的tensorList中每个tensor是否转置需保持统一| 1）x，weight，y中tensor需为2维<br>2）weight中每个tensor的N轴必须相等 |
+      | 2 | 单单单 | 2/3 | 1）必须传group_list<br>2）当group_list_type为0时，最后一个值应小于等于x中tensor的第二维；当group_list_type为1时，数值的总和与x应小于等于tensor的第二维；当group_list_type为2时，第二列数值的总和应小于等于x中tensor的第二维<br>3）group_list第1维最大支持1024， 即最多支持1024个group | 1）x必须转置<br>2）weight不能转置 |1）x，weight中tensor需为2维，y中tensor需为3维<br>2）bias必须传空|
+      | 2 | 单多多 | 0/1 | group_list必须传空 | 1）x必须转置<br>2）weight不能转置<br>| 1）x，weight，y中tensor需为2维<br>2）weight长度最大支持128，即最多支持128个group<br>3）原始shape中weight每个tensor的第一维之和不应超过x第一维<br>4）bias必须传空 |
 
 
 ## 调用说明

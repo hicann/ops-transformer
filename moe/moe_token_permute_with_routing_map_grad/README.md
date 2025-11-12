@@ -114,14 +114,14 @@ $$
   <tr>
    <td>tokensGradOut</td>
    <td>输出</td>
-   <td>输入permutedTokens的梯度。</td>
+   <td>permutedTokens的梯度。</td>
    <td>BFLOAT16、FLOAT16、FLOAT32</td>
    <td>ND</td>
   </tr>
   <tr>
    <td>probsGradOutOptional</td>
    <td>输出</td>
-   <td>输入probs的梯度，可选输出。</td>
+   <td>permutedProbs的梯度，可选输出。</td>
    <td>BFLOAT16、FLOAT16、FLOAT32</td>
    <td>ND</td>
   </tr>

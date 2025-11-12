@@ -165,14 +165,14 @@
     输入张量cos和sin的shape必须完全相同.
     - half模式：
       - B，N < 1000;
-      - 当x为BNSD时，cos、sin支持11SD、B1SD、BNSD
-      - 当x为BSND时，cos、sin支持1S1D、BS1D、BSND
-      - 当x为SBND时，cos、sin支持S11D、SB1D、SBND
+      - 当x为(B, N, S, D)时，cos、sin支持(1, 1, S, D)、(B, 1, S, D)、(B, N, S, D)
+      - 当x为(B, S, N, D)时，cos、sin支持(1, S, 1, D)、(B, S, 1, D)、(B, S, N, D)
+      - 当x为(S, B, N, D)时，cos、sin支持(S, 1, 1, D)、(S, B, 1, D)、(S, B, N, D)
     - interleave模式：
       - B * N < 1000
-      - 当x为BNSD时，cos、sin支持11SD
-      - 当x为BSND时，cos、sin支持1S1D
-      - 当x为SBND时，cos、sin支持S11D
+      - 当x为(B, N, S, D)时，cos、sin支持(1, 1, S, D)
+      - 当x为(B, S, N, D)时，cos、sin支持(1, S, 1, D)
+      - 当x为(S, B, N, D)时，cos、sin支持(S, 1, 1, D)
 
 ## 调用说明
 

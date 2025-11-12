@@ -41,28 +41,28 @@
   <tr>
     <td>x1</td>
     <td>输入</td>
-    <td>公式中的输入Q。</td>
+    <td>表示输入的左矩阵。</td>
     <td>FLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>x2</td>
     <td>输入</td>
-    <td>公式中的输入K。</td>
+    <td>表示输入的右矩阵。</td>
     <td>FLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>bias</td>
     <td>输入</td>
-    <td>公式中的输入V。</td>
+    <td>表示偏置量。</td>
     <td>FLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>x3</td>
     <td>输入</td>
-    <td>公式中的输入V。</td>
+    <td>与矩阵乘结果累加的矩阵。</td>
     <td>FLOAT16</td>
     <td>ND</td>
   </tr>  

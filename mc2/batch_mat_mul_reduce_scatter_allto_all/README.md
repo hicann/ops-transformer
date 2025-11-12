@@ -112,18 +112,18 @@ $$
 
 ## 约束说明
 
-因为集合通信及BatchMatMul计算所需，输入输出shape需满足以下数学关系：（其中ep=epWorldSize，tp=tpWorldSize）
+因为集合通信及BatchMatMul计算所需，输入输出shape需满足以下数学关系：（其中ep=epWorldSize，tp=tpWorldSize，E表示专家数，C表示Capacity即一个专家里的token数，H表示每个token的长度，M表示tensor的高）
 - 按H轴进行ReduceScatter场景，即yShardType为0场景：
-  - x: (E/ep, ep*C, M/tp) 
-  - weight：(E/ep, M/tp, H)
-  - biasOptional：非空指针情况下，三维时为(E/ep, 1, H/tp)，两维时为(E/ep, H/tp)
-  - y：(E, C, H/tp)
+  - x: $(E/ep, ep*C, M/tp)$
+  - weight：$(E/ep, M/tp, H)$
+  - biasOptional：非空指针情况下，三维时为$(E/ep, 1, H/tp)$，两维时为$(E/ep, H/tp)$
+  - y：$(E, C, H/tp)$
 
 - 按C轴进行ReduceScatter场景，即yShardType为1场景：
-  - x: (E/ep, ep*tp\*C/tp, M/tp)
-  - weight：(E/ep, M/tp, H)
-  - biasOptional：非空指针情况下，三维时为(E/ep, 1, H)，两维时为(E/ep, H)
-  - y：(E, C/tp, H)
+  - x: $(E/ep, ep*tp*C/tp, M/tp)$
+  - weight：$(E/ep, M/tp, H)$
+  - biasOptional：非空指针情况下，三维时为$(E/ep, 1, H)$，两维时为$(E/ep, H)$
+  - y：$(E, C/tp, H)$
 
 - 数据关系说明：
   - 比如x.size(0)等于E/tp，y.size(0)等于E，则表示，y.size(0) = ep*x.size(0)，y.size(0)是ep的整数倍；其他关系类似。
