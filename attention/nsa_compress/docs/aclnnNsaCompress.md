@@ -16,7 +16,7 @@
 
 - 计算公式：
 
-    Nsa Compress正向计算公式如下：
+    NSA Compress正向计算公式如下：
 $$
 \tilde{K}_t^{\text{cmp}} = f_K^{\text{cmp}}(k_{:t}) = \left\{ \varphi(k_{id+1:id+l}) \bigg| 0 \leq i \leq \left\lfloor \frac{t-l}{d} \right\rfloor \right\}
 $$
@@ -313,8 +313,7 @@ aclnnStatus aclnnNsaCompress(
 
   通过aclnn单算子调用示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/context/编译与运行样例.md)。
 
-  ```c++
-
+```c++
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"
@@ -516,4 +515,4 @@ int main()
 
     return 0;
 }
-  ```
+```

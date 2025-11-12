@@ -249,8 +249,6 @@
 ## 约束说明
 
 - queryIn、keyIn、cosSinCache只支持2维shape输入。
-- numQHeads支持范围: 1~32。
-- numKHeads支持范围: 1~32。
 - headSize支持范围: 16~128。数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数。
 - rotaryDim支持范围: 16~128，始终小于等于headSize。数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数。
 - 当输入tensor positions中值域超过cosSinCache的0维maxSeqLen，会有越界报错。

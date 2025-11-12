@@ -43,7 +43,7 @@
   <tr>
    <td>eplbTable</td>
    <td>输入</td>
-   <td>逻辑专家到物理专家的映射表，外部调用者需保证输入Tensor的值正确；world_size张卡，每张卡部署place_per_rank个路由专家实例，共world_size*place_per_rank个实例；每行第一列为行号对应逻辑专家部署的实例数count（取值范围[1, world_size]），每行[1, count]列为对应的实例编号（取值范围[0, world_size*place_per_rank)，有效实例编号不可重复）；Device侧的aclTensor，要求为2D Tensor，shape为 (moeExperNum, F)；支持非连续的Tensor。</td>
+   <td>逻辑专家到物理专家的映射表，外部调用者需保证输入Tensor的值正确；world_size张卡，每张卡部署place_per_rank个路由专家实例，共world_size*place_per_rank个实例；每行第一列为行号对应逻辑专家部署的实例数count（取值范围[1, world_size]），每行[1, count]列为对应的实例编号（取值范围[0, world_size*place_per_rank)，有效实例编号不可重复）；Device侧的aclTensor，要求为2D Tensor，shape为 (moeExpertNum, F)；支持非连续的Tensor。</td>
    <td>INT32</td>
    <td>ND</td>
   </tr>
@@ -108,7 +108,7 @@
 
 ## 约束说明
 
-- aclnnMoeUpdateExpert接口必须与aclnnMoeDistributeDispatchV2及aclnnMoeDistributeCombineV2或aclnnMoeDistributeCombineAddRmsNorm接口配套使用，调用顺序为aclnnUpdateExpert，aclnnMoeDistributeDispatchV2，aclnnMoeDistributeCombineV2或aclnnMoeDistributeCombineAddRmsNorm，具体参考调用示例。
+- aclnnMoeUpdateExpert接口必须与aclnnMoeDistributeDispatchV2及aclnnMoeDistributeCombineV2或aclnnMoeDistributeCombineAddRmsNorm接口配套使用，调用顺序为aclnnMoeUpdateExpert，aclnnMoeDistributeDispatchV2，aclnnMoeDistributeCombineV2或aclnnMoeDistributeCombineAddRmsNorm，具体参考调用示例。
 
 - 调用接口过程中使用的worldSize、moeExpertNum参数取值所有卡需保持一致，网络中不同层中也需保持一致，且和aclnnMoeDistributeDispatchV2,aclnnMoeDistributeCombineV2或aclnnMoeDistributeCombineAddRmsNorm对应参数也保持一致。
 
