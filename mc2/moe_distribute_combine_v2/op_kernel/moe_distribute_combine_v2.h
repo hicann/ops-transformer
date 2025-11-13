@@ -17,10 +17,18 @@
 
 #include "kernel_operator.h"
 #include "kernel_tiling/kernel_tiling.h"
-#include "../moe_distribute_dispatch/moe_distribute_base.h"
 #include "moe_distribute_combine_v2_tiling.h"
+
+#if __has_include("../moe_distribute_dispatch/moe_distribute_base.h")
+#include "../moe_distribute_dispatch/moe_distribute_base.h"
 #include "../moe_distribute_dispatch/check_winsize.h"
 #include "../moe_distribute_dispatch_v2/moe_distribute_v2_base.h"
+#else
+#include "../../moe_distribute_dispatch/op_kernel/moe_distribute_base.h"
+#include "../../moe_distribute_dispatch/op_kernel/check_winsize.h"
+#include "../../moe_distribute_dispatch_v2/op_kernel/moe_distribute_v2_base.h"
+#endif
+
 namespace MoeDistributeCombineV2Impl {
 constexpr uint8_t BUFFER_NUM = 2;                        // 多buf
 constexpr uint32_t STATE_OFFSET = 32U;                  // 状态空间偏移地址

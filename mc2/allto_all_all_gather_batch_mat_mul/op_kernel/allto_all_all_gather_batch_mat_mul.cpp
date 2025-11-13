@@ -49,6 +49,9 @@ using DT_BIAS = float;
 extern "C" __global__ __aicore__ void allto_all_all_gather_batch_mat_mul(GM_ADDR xGM, GM_ADDR weightGM, GM_ADDR biasGM, GM_ADDR y1GM,
                                                                          GM_ADDR y2GM, GM_ADDR y3GM, GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
+    #ifdef __CCE_KT_TEST__
+        REGISTER_TILING_DEFAULT(AlltoAllAllGatherBatchMatMulTilingData);
+    #endif
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     GET_TILING_DATA(tilingData, tilingGM);
 /*

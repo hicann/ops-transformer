@@ -16,7 +16,12 @@
 #define MATMUL_REDUCE_SCATTER_TILING_H
 
 #include "kernel_tiling/kernel_tiling.h"
+
+#if __has_include("../../common/inc/kernel/mc2_tiling_struct.h")
+#include "../../common/inc/kernel/mc2_tiling_struct.h"
+#else
 #include "../common/inc/kernel/mc2_tiling_struct.h"
+#endif
 
 struct ReduceScatterSoc {
     uint32_t commAlg;

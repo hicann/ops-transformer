@@ -16,9 +16,15 @@
 #define MATMUL_REDUCE_SCATTER_BASE_H
 
 #include "lib/matmul_intf.h"
-#include "../common/inc/kernel/mc2_nd_to_nz.h"
 #include "reduce_scatter_nd_to_nz.h"
+
+#if __has_include("../../common/inc/kernel/mc2_nd_to_nz.h")
+#include "../../common/inc/kernel/mc2_nd_to_nz.h"
+#include "../../common/inc/kernel/mc2_matmul_compute.h"
+#else
+#include "../common/inc/kernel/mc2_nd_to_nz.h"
 #include "../common/inc/kernel/mc2_matmul_compute.h"
+#endif
 
 namespace AscendC {
 constexpr uint8_t MC2_DEBUG_ONLY_CUBE = 1;  // 只计算不通信

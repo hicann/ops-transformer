@@ -17,9 +17,15 @@
 
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
+#include "add_rms_norm_kernel.h"
+
+#if __has_include("../../matmul_all_reduce/op_kernel/common.h")
+#include "../../matmul_all_reduce/op_kernel/common.h"
+#include "../../matmul_all_reduce/op_kernel/matmul_all_reduce_910_general.h"
+#else
 #include "../matmul_all_reduce/common.h"
 #include "../matmul_all_reduce/matmul_all_reduce_910_general.h"
-#include "add_rms_norm_kernel.h"
+#endif
 
 namespace MatmulAllReduceAddRmsNormImpl {
 using namespace AscendC;

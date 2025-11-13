@@ -23,13 +23,24 @@ using DTYPE_Y = DTYPE_RESIDUAL;
 
 #include "common.h"
 #if defined(MC2_QUANT)
-#include "../matmul_all_reduce_add_rms_norm/mm_allreduce_add_rms_norm_quant.h"
+    #if __has_include("../../matmul_all_reduce_add_rms_norm/op_kernel/mm_allreduce_add_rms_norm_quant.h")
+    #include "../../matmul_all_reduce_add_rms_norm/op_kernel/mm_allreduce_add_rms_norm_quant.h"
+    #else
+    #include "../matmul_all_reduce_add_rms_norm/mm_allreduce_add_rms_norm_quant.h"
+    #endif
 #elif defined(MC2_WEIGHT_QUANT)
-#include "../matmul_all_reduce_add_rms_norm/mm_allreduce_add_rms_norm_weight_quant.h"
+    #if __has_include("../../matmul_all_reduce_add_rms_norm/op_kernel/mm_allreduce_add_rms_norm_weight_quant.h")
+    #include "../../matmul_all_reduce_add_rms_norm/op_kernel/mm_allreduce_add_rms_norm_weight_quant.h"
+    #else
+    #include "../matmul_all_reduce_add_rms_norm/mm_allreduce_add_rms_norm_weight_quant.h"
+    #endif
 #else
-#include "../matmul_all_reduce_add_rms_norm/mm_allreduce_add_rms_norm_910_general.h"
+    #if __has_include("../../matmul_all_reduce_add_rms_norm/op_kernel/mm_allreduce_add_rms_norm_910_general.h")
+    #include "../../matmul_all_reduce_add_rms_norm/op_kernel/mm_allreduce_add_rms_norm_910_general.h"
+    #else
+    #include "../matmul_all_reduce_add_rms_norm/mm_allreduce_add_rms_norm_910_general.h"
+    #endif
 #endif
-
 namespace MatmulAllReduceAddRmsNormImpl {}
 
 using namespace AscendC;
@@ -39,6 +50,10 @@ extern "C" __global__ __aicore__ void inplace_matmul_all_reduce_add_rms_norm(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR residualGM, GM_ADDR gammaGM, GM_ADDR antiquantScaleGM,
     GM_ADDR antiquantOffsetGM, GM_ADDR dequantGM, GM_ADDR yGM, GM_ADDR normOutGM, GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
+    #ifdef __CCE_KT_TEST__
+        REGISTER_TILING_DEFAULT(MatmulAllReduceAddRmsNormTilingData);
+    #endif
+
     if (workspaceGM == nullptr) {
         return;
     }

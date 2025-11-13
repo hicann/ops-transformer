@@ -18,7 +18,12 @@
 
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
+
+#if __has_include("../3rd/batch_mat_mul_v3/op_kernel/batch_mat_mul_v3.h")
 #include "../3rd/batch_mat_mul_v3/op_kernel/batch_mat_mul_v3.h"
+#else
+#include "../../3rd/batch_mat_mul_v3/op_kernel/batch_mat_mul_v3.h"
+#endif
 
 constexpr uint32_t MAX_HCCL_HANDLE = 32U;
 constexpr uint32_t SIZE_OF_FLOAT32 = 4U;

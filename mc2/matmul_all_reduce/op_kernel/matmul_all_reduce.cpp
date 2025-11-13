@@ -101,6 +101,10 @@ extern "C" __global__ __aicore__ void matmul_all_reduce(
     GM_ADDR dequantGM, GM_ADDR pertokenGM, GM_ADDR commQuantScale1GM, GM_ADDR commQuantScale2GM, GM_ADDR cGM,
     GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
+    #ifdef __CCE_KT_TEST__
+        REGISTER_TILING_DEFAULT(MatmulAllReduce910TilingData);
+    #endif
+    
     if (workspaceGM == nullptr) {
         return;
     }

@@ -40,6 +40,9 @@ struct BMMRSATAType { // Batch_Mat_Mul_Reduce_Scatter_All_to_All_Type
 extern "C" __global__ __aicore__ void batch_mat_mul_reduce_scatter_allto_all(GM_ADDR xGM, GM_ADDR weightGM,
                                                                              GM_ADDR biasGM, GM_ADDR yGM,
                                                                              GM_ADDR workspaceGM, GM_ADDR tilingGM) {
+    #ifdef __CCE_KT_TEST__
+        REGISTER_TILING_DEFAULT(BatchMatMulReduceScatterAlltoAllTilingData);
+    #endif
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2); // 强制kernelCV核配比1:2
     if (workspaceGM == nullptr) {return;}
     GM_ADDR userWorkspace = GetUserWorkspace(workspaceGM);

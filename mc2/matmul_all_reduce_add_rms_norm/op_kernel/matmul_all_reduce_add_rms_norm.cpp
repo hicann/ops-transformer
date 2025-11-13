@@ -15,7 +15,11 @@
 
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
+#if __has_include("../../matmul_all_reduce/op_kernel/common.h")
+#include "../../matmul_all_reduce/op_kernel/common.h"
+#else
 #include "../matmul_all_reduce/common.h"
+#endif
 
 #if defined(MC2_QUANT)
 #include "mm_allreduce_add_rms_norm_quant.h"
@@ -34,6 +38,10 @@ extern "C" __global__ __aicore__ void matmul_all_reduce_add_rms_norm(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR residualGM, GM_ADDR gammaGM, GM_ADDR antiquantScaleGM,
     GM_ADDR antiquantOffsetGM, GM_ADDR dequantGM, GM_ADDR yGM, GM_ADDR normOutGM, GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
+    #ifdef __CCE_KT_TEST__
+        REGISTER_TILING_DEFAULT(MatmulAllReduceAddRmsNormTilingData);
+    #endif
+    
     if (workspaceGM == nullptr) {
         return;
     }
