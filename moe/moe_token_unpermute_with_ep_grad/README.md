@@ -40,7 +40,7 @@
 - probs为None：
   
   $$
-  permutedTokensGradOut[sortedIndices[i]] = unpermutedOutputGrad[i]
+  permutedTokensGradOut[sortedIndices[i]] = unpermutedTokensGrad[i]
   $$
 
 ## 参数说明
