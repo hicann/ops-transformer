@@ -26,12 +26,12 @@
 
 ## 参数说明
 
-<table style="undefined;table-layout: fixed; width: 1576px"> <colgroup>
- <col style="width: 170px">
- <col style="width: 170px">
- <col style="width: 800px">
- <col style="width: 800px">
- <col style="width: 200px">
+<table style="undefined;table-layout: fixed; width: 1392px"> <colgroup>
+ <col style="width: 120px">
+ <col style="width: 120px">
+ <col style="width: 160px">
+ <col style="width: 150px">
+ <col style="width: 80px">
  </colgroup>
  <thead>
   <tr>
@@ -73,14 +73,14 @@
   <tr>
    <td>mmXOptional</td>
    <td>输入</td>
-   <td>可选输入，共享专家MatMul计算中的左矩阵，需与mmWeightOptional同时传入/为nullptr，数据类型与gmmX保持一致，支持2维，shape为(BS, H2)。</td>
+   <td>可选输入，共享专家MatMul计算中的左矩阵，需与mmWeightOptional同时传入或同为nullptr，数据类型与gmmX保持一致，支持2维，shape为(BS, H2)。</td>
    <td>FLOAT16、BFLOAT16</td>
    <td>ND</td>
   </tr>
   <tr>
    <td>mmWeightOptional</td>
    <td>输入</td>
-   <td>可选输入，共享专家MatMul计算中的右矩阵，需与mmXOptional同时传入/为nullptr，数据类型与gmmX保持一致，支持2维，shape为(H2, N2)。</td>
+   <td>可选输入，共享专家MatMul计算中的右矩阵，需与mmXOptional同时传入或同为nullptr，数据类型与gmmX保持一致，支持2维，shape为(H2, N2)。</td>
    <td>FLOAT16、BFLOAT16</td>
    <td>ND</td>
   </tr>
@@ -94,6 +94,7 @@
   <tr>
    <td>epWorldSize</td>
    <td>输入</td>
+   <td>ep通信域size：<br><term>Atlas A3系列产品</term>支持8、16、32、64。</td>
    <td>INT64</td>
    <td>ND</td>
   </tr>

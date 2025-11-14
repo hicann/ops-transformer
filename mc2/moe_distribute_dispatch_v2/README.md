@@ -23,9 +23,7 @@ $$
 - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：该算子必须与`MoeDistributeCombineV2`配套使用。
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：该算子必须与`MoeDistributeCombineV2`或`MoeDistributeCombineAddRmsNorm`配套使用。
 
-> 说明：
->
-> `MoeDistributeCombineV2`、`MoeDistributeCombineAddRmsNorm`算子在后续文档中统称为`CombineV2`系列算子。
+> 说明：aclnnMoeDistributeCombineV2、aclnnMoeDistributeCombineAddRmsNorm算子在后续文档中统称为CombineV2系列算子。
 
 相较于`MoeDistributeDispatch`算子，该算子变更如下：
 
@@ -36,12 +34,11 @@ $$
 
 ## 参数说明
 
-<table style="undefined;table-layout: fixed; width: 1500px">
- <colgroup>
- <col style="width: 190px">
- <col style="width: 130px">
- <col style="width: 900px">
- <col style="width: 200px">
+<table style="undefined;table-layout: fixed; width: 1392px"> <colgroup>
+ <col style="width: 120px">
+ <col style="width: 120px">
+ <col style="width: 160px">
+ <col style="width: 150px">
  <col style="width: 80px">
  </colgroup>
  <thead>

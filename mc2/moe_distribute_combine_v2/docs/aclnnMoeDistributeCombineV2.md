@@ -76,13 +76,12 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
 ### 参数说明
 
-<table style="undefined;table-layout: fixed; width: 1576px">
- <colgroup>
-  <col style="width: 170px">
-  <col style="width: 170px">
-  <col style="width: 800px">
-  <col style="width: 800px">
-  <col style="width: 200px">
+<table style="undefined;table-layout: fixed; width: 1392px"> <colgroup>
+ <col style="width: 120px">
+ <col style="width: 120px">
+ <col style="width: 160px">
+ <col style="width: 150px">
+ <col style="width: 80px">
  </colgroup>
  <thead>
   <tr>
@@ -309,7 +308,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
 - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>：
     - 不支持共享专家场景。
-    - epSendCounts 的shape为 (moeExpertNum + 2 * globalBs * K * serverNum, )，前moeExpertNum个数表示从EP通信域各卡接收的token数，2 * globalBs * K * serverNum存储机间机内通信前combine可提前做reduce的token个数和通信区偏移，globalBs=0时按Bs * epWorldSize计算。
+    - epSendCounts 的shape为 (moeExpertNum + 2 * globalBs * K * serverNum, )，前moeExpertNum个数表示从EP通信域各卡接收的token数，后2 * globalBs * K * serverNum个数用于存储机间/机内通信前，combine可提前做reduce的token个数和通信区偏移，globalBs=0时按Bs * epWorldSize计算。
     - 当前不支持TP域通信。
     - xActiveMaskOptional 要求为1D Tensor，shape为 (BS, )；true需排在false前（例：{true, false, true}非法）。
     - exapndScalesOptional 要求为1D Tensor，shape为 (A, )。
@@ -348,11 +347,10 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
 第一段接口完成入参校验，出现以下场景时报错：
 
-<table style="undefined;table-layout: fixed; width: 1576px">
- <colgroup>
-  <col style="width: 170px">
-  <col style="width: 170px">
-  <col style="width: 400px">
+<table style="undefined;table-layout: fixed; width: 1180px"> <colgroup>
+ <col style="width: 250px">
+ <col style="width: 130px">
+ <col style="width: 800px">
  </colgroup>
  <thead>
   <tr>
@@ -384,11 +382,10 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
 ### 参数说明
 
-<table style="undefined;table-layout: fixed; width: 1576px">
- <colgroup>
-  <col style="width: 170px">
-  <col style="width: 170px">
-  <col style="width: 800px">
+<table style="undefined;table-layout: fixed; width: 1180px"> <colgroup>
+ <col style="width: 250px">
+ <col style="width: 130px">
+ <col style="width: 800px">
  </colgroup>
  <thead>
   <tr>
@@ -406,7 +403,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
   <tr>
    <td>workspaceSize</td>
    <td>输入</td>
-   <td>在Device侧申请的workspace大小，由第一段接口`aclnnMoeDistributeCombineV2GetWorkspaceSize`获取。</td>
+   <td>在Device侧申请的workspace大小，由第一段接口<code>aclnnMoeDistributeCombineV2GetWorkspaceSize</code>>获取。</td>
   </tr>
   <tr>
    <td>executor</td>

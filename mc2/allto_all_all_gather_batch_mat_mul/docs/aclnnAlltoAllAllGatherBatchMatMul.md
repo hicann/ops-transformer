@@ -60,12 +60,12 @@ aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(
 
 **参数说明**
 
-<table style="undefined;table-layout: fixed; width: 1576px"> <colgroup>
- <col style="width: 170px">
- <col style="width: 170px">
- <col style="width: 800px">
- <col style="width: 800px">
- <col style="width: 200px">
+<table style="undefined;table-layout: fixed; width: 1392px"> <colgroup>
+ <col style="width: 120px">
+ <col style="width: 120px">
+ <col style="width: 160px">
+ <col style="width: 150px">
+ <col style="width: 80px">
  </colgroup>
  <thead>
   <tr>
@@ -179,10 +179,10 @@ aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(
 **返回值**
 第一段接口完成入参校验，出现以下场景时报错：
 
-<table style="undefined;table-layout: fixed; width: 1576px"> <colgroup>
- <col style="width: 170px">
- <col style="width: 170px">
- <col style="width: 400px">
+<table style="undefined;table-layout: fixed; width: 1180px"> <colgroup>
+ <col style="width: 250px">
+ <col style="width: 130px">
+ <col style="width: 800px">
  </colgroup>
  <thead>
   <tr>
@@ -207,9 +207,9 @@ aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(
 
 **参数说明**
 
-<table style="undefined;table-layout: fixed; width: 1576px"> <colgroup>
- <col style="width: 170px">
- <col style="width: 170px">
+<table style="undefined;table-layout: fixed; width: 1180px"> <colgroup>
+ <col style="width: 250px">
+ <col style="width: 130px">
  <col style="width: 800px">
  </colgroup>
  <thead>
@@ -227,7 +227,7 @@ aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(
   <tr>
    <td>workspaceSize</td>
    <td>输入</td>
-   <td>在Device侧申请的workspace大小，由第一段接口aclnnAlltoAllAllGatherBatchMatMulGetWorkspaceSize获取。</td>
+   <td>在Device侧申请的workspace大小，由第一段接口<code>aclnnAlltoAllAllGatherBatchMatMulGetWorkspaceSize</code>获取。</td>
   </tr>
   <tr>
    <td>executor</td>

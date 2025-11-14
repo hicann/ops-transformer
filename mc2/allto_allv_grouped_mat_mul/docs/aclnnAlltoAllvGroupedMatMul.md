@@ -61,12 +61,12 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
 
 **参数说明**
 
-<table style="undefined;table-layout: fixed; width: 1576px"> <colgroup>
- <col style="width: 170px">
- <col style="width: 170px">
- <col style="width: 800px">
- <col style="width: 800px">
- <col style="width: 200px">
+<table style="undefined;table-layout: fixed; width: 1392px"> <colgroup>
+ <col style="width: 120px">
+ <col style="width: 120px">
+ <col style="width: 160px">
+ <col style="width: 150px">
+ <col style="width: 80px">
  </colgroup>
  <thead>
   <tr>
@@ -108,14 +108,14 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
   <tr>
    <td>mmXOptional</td>
    <td>输入</td>
-   <td>可选输入，共享专家MatMul计算中的左矩阵，需与mmWeightOptional同时传入/为nullptr，数据类型与gmmX保持一致，支持2维，shape为(BS, H2)。</td>
+   <td>可选输入，共享专家MatMul计算中的左矩阵，需与mmWeightOptional同时传入或同为nullptr，数据类型与gmmX保持一致，支持2维，shape为(BS, H2)。</td>
    <td>FLOAT16、BFLOAT16</td>
    <td>ND</td>
   </tr>
   <tr>
    <td>mmWeightOptional</td>
    <td>输入</td>
-   <td>可选输入，共享专家MatMul计算中的右矩阵，需与mmXOptional同时传入/为nullptr，数据类型与gmmX保持一致，支持2维，shape为(H2, N2)。</td>
+   <td>可选输入，共享专家MatMul计算中的右矩阵，需与mmXOptional同时传入或同为nullptr，数据类型与gmmX保持一致，支持2维，shape为(H2, N2)。</td>
    <td>FLOAT16、BFLOAT16</td>
    <td>ND</td>
   </tr>
@@ -208,10 +208,10 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
 **返回值**
 第一段接口完成入参校验，出现以下场景时报错：
 
-<table style="undefined;table-layout: fixed; width: 1576px"> <colgroup>
- <col style="width: 170px">
- <col style="width: 170px">
- <col style="width: 400px">
+<table style="undefined;table-layout: fixed; width: 1180px"> <colgroup>
+ <col style="width: 250px">
+ <col style="width: 130px">
+ <col style="width: 800px">
  </colgroup>
  <thead>
   <tr>
@@ -237,9 +237,9 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
 
 **参数说明**
 
-<table style="undefined;table-layout: fixed; width: 1576px"> <colgroup>
- <col style="width: 170px">
- <col style="width: 170px">
+<table style="undefined;table-layout: fixed; width: 1180px"> <colgroup>
+ <col style="width: 250px">
+ <col style="width: 130px">
  <col style="width: 800px">
  </colgroup>
  <thead>
@@ -257,7 +257,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMul(
   <tr>
    <td>workspaceSize</td>
    <td>输入</td>
-   <td>在Device侧申请的workspace大小，由第一段接口aclnnAlltoAllvGroupedMatMulGetWorkspaceSize获取。</td>
+   <td>在Device侧申请的workspace大小，由第一段接口<code>aclnnAlltoAllvGroupedMatMulGetWorkspaceSize</code>获取。</td>
   </tr>
   <tr>
    <td>executor</td>
