@@ -135,9 +135,6 @@
 | layout     | 属性     | 表示输入张量的布局格式 | int64：1-BSND、2-SBND、3-BNSD | - |
 | rotary_mode| 属性     | 公式中的旋转模式       | string："half"、"interleave"、"quarter"模式 | - |
 
-- <term>Atlas 推理系列产品</term>：不支持BFLOAT16
-
-
 ## 约束说明
 
     - 输入张量query、key、cos、sin只支持4维的shape，layout只支持1-BSND，且4个输入shape的前2维和最后一维必须相等，cos和sin的shape第3维必须等于1，输入shape最后一维必须等于128。

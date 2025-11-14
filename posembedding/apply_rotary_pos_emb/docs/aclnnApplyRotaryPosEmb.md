@@ -196,8 +196,6 @@ aclnnStatus aclnnApplyRotaryPosEmb(
   </tbody>
   </table>
 
-  - <term>Atlas 推理系列产品</term>：不支持BFLOAT16
-
 - **返回值：**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/context/aclnn返回码.md)。

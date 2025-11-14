@@ -12,7 +12,7 @@
 #include <array>
 #include <float.h>
 #include "gtest/gtest.h"
-#include "../../../../op_host/op_api/aclnn_rotary_position_embedding.h"
+#include "../../../../op_host/op_api/aclnn_apply_rotary_pos_emb.h"
 #include "opdev/platform.h"
 #include "op_api_ut_common/tensor_desc.h"
 #include "op_api_ut_common/scalar_desc.h"
@@ -20,28 +20,29 @@
 
 using namespace std;
 
-class l2_rotary_position_embedding_test : public testing::Test {
+class l2_apply_rotary_pos_emb_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        cout << "l2_rotary_position_embedding_test SetUp" << endl;
+        cout << "l2_apply_rotary_pos_emb_test SetUp" << endl;
     }
 
     static void TearDownTestCase()
     {
-        cout << "l2_rotary_position_embedding_test TearDown" << endl;
+        cout << "l2_apply_rotary_pos_emb_test TearDown" << endl;
     }
 };
 
 // dtype fp32
-TEST_F(l2_rotary_position_embedding_test, Ascend910B2_rotary_position_embedding_fp32)
+TEST_F(l2_apply_rotary_pos_emb_test, Ascend910B2_apply_rotary_pos_emb_fp32)
 {
-    auto x = TensorDesc({8, 1, 1, 64}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
-    auto cos = TensorDesc({1, 1, 1, 64}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 8);
-    auto sin = TensorDesc({1, 1, 1, 64}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 8);
-    int64_t mode = 2;
-    auto out = TensorDesc({8, 1, 1, 64}, ACL_FLOAT, ACL_FORMAT_ND);
-    auto ut = OP_API_UT(aclnnRotaryPositionEmbedding, INPUT(x, cos, sin, mode), OUTPUT(out));
+    auto query = TensorDesc({24, 1, 11, 128}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
+    auto key = TensorDesc({24, 1, 1, 128}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-10, 10);
+    auto cos = TensorDesc({24, 1, 1, 128}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 8);
+    auto sin = TensorDesc({24, 1, 1, 128}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 8);
+    int64_t layout = 1;
+    string rotary_mode = "half";
+    auto ut = OP_API_UT(aclnnApplyRotaryPosEmb, INPUT(query, key, cos, sin, layout), OUTPUT());
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
 }

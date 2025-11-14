@@ -234,11 +234,7 @@ __aicore__ inline void ARPESmall<T1, T2>::Process(const ApplyRotaryPosEmbTilingD
     if (blockIdx >= tilingData->useCoreNum) {
         return;
     }
-    if (blockIdx == tilingData->useCoreNum - 1) {
-        ProcessPerCore(tilingData);
-    } else {
-        ProcessPerCore(tilingData);
-    }
+    ProcessPerCore(tilingData);
 }
 
 } // namespace ApplyRotaryPosEmb

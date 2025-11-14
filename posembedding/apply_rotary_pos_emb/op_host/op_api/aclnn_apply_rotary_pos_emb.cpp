@@ -24,7 +24,7 @@ aclnnStatus aclnnApplyRotaryPosEmbGetWorkspaceSize(
     aclTensor* queryRef, aclTensor* keyRef, const aclTensor* cos, const aclTensor* sin, int64_t layout,
     uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    static char* defaultRotaryMode = (char*)"half";
+    static char defaultRotaryMode[] = "half";
     aclnnStatus ret = aclnnInnerApplyRotaryPosEmbGetWorkspaceSize(
         queryRef, keyRef, cos, sin, layout, defaultRotaryMode, workspaceSize, executor);
     return ret;
