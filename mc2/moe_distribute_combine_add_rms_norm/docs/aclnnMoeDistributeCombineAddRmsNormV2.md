@@ -718,7 +718,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
         std::vector<int64_t> expandIdxShape{A * 128};
         std::vector<int64_t> expertTokenNumsShape{localExpertNum};
         std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};
-        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};
+        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};
         std::vector<int64_t> expandScalesShape{A};
         std::vector<int64_t> residualXShape{BS, 1, H};
         std::vector<int64_t> sharedExpertXShape{BS, 1, H};

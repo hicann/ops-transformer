@@ -458,8 +458,8 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
     #include <vector>
     #include "acl/acl.h"
     #include "hccl/hccl.h"
-    #include "../op_host/op_api/aclnn_moe_distribute_dispatch_v2.h"
-    #include "../../moe_distribute_combine_v2/op_host/op_api/aclnn_moe_distribute_combine_v2.h"
+    #include "aclnnop/aclnn_moe_distribute_dispatch_v2.h"
+    #include "aclnnop/aclnn_moe_distribute_combine_v2.h"
     #include <unistd.h>
 
     #define CHECK_RET(cond, return_expr) \
@@ -587,7 +587,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
         std::vector<int64_t> expandIdxShape{A * 128};
         std::vector<int64_t> expertTokenNumsShape{localExpertNum};
         std::vector<int64_t> epRecvCountsShape{TP_WORLD_SIZE * localExpertNum * EP_WORLD_SIZE};
-        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE * localExpertNum};
+        std::vector<int64_t> tpRecvCountsShape{TP_WORLD_SIZE};
         std::vector<int64_t> expandScalesShape{A};
 
         int64_t xShapeSize = GetShapeSize(xShape);
