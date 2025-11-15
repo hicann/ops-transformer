@@ -22,8 +22,8 @@
 #include "log/log.h"
 
 namespace optiling {
-constexpr uint64_t BEST_L1_PARTA = 256 * 1024;
-constexpr uint64_t BEST_L1_PARTB = 128 * 1024;
+constexpr uint64_t BEST_L1_PARTA = 128UL * 1024UL;
+constexpr uint64_t BEST_L1_PARTB = 256UL * 1024UL;
 constexpr int32_t BEST_BASEN = 256;
 constexpr int32_t MAX_BASEM = 256;
 constexpr uint32_t DATATYPE_SIZE = 2;
@@ -31,7 +31,7 @@ constexpr uint32_t FP32_DATATYPE_SIZE = 4;
 constexpr uint64_t TILING_KEY_DEFAULT_FP16 = 0;
 constexpr uint64_t TILING_KEY_DEFAULT_BF16 = 1;
 constexpr uint64_t DOUBLE_BUFFER_L0A_L0B = 2;
-constexpr uint64_t DOUBLE_BUFFER_STEPKA_STEPKB = 2;
+constexpr uint32_t DOUBLE_BUFFER_STEPKA_STEPKB = 2U;
 constexpr int32_t MAX_TENSOR_CONT = 128;
 constexpr int64_t INDEX_GROUP_LIST = 2;
 constexpr size_t INDEX_IN_X = 0;
@@ -50,9 +50,9 @@ constexpr int32_t AIC_AIV_RATION = 2;
 static inline uint32_t SixteenAlign(uint32_t a, bool up = false)
 {
     if (up) {
-        a += 15; // 15: 16 bytes up-align
+        a += 15U; // 15: 16 bytes up-align
     }
-    return a & ~15; // ~15: 16 bytes down-align
+    return a & ~15U; // ~15: 16 bytes down-align
 };
 
 static ge::graphStatus CalTCubeTiling(
@@ -90,8 +90,8 @@ static ge::graphStatus CalTCubeTiling(
             productMK);
         return ge::GRAPH_FAILED;
     }
-    uint32_t mmStepKa = (BEST_L1_PARTB >> 1) / (static_cast<uint32_t>(productMK) * DATATYPE_SIZE);
-    uint32_t mmStepKb = (BEST_L1_PARTA >> 1) / (static_cast<uint32_t>(productNK) * DATATYPE_SIZE);
+    uint32_t mmStepKa = (BEST_L1_PARTA >> 1) / (productMK * static_cast<uint64_t>(DATATYPE_SIZE));
+    uint32_t mmStepKb = (BEST_L1_PARTB >> 1) / (productNK * static_cast<uint64_t>(DATATYPE_SIZE));
     if (mmStepKa > mmStepKb) {
         mmStepKa = mmStepKa / mmStepKb * mmStepKb;
     } else if (mmStepKa < mmStepKb) {
@@ -115,27 +115,31 @@ static ge::graphStatus CalMmTiling(
     gert::TilingContext* context, GroupedMatmulAddTilingData& tiling, int32_t m, int32_t k, int32_t n)
 {
     int32_t baseN = BEST_BASEN;
-    int32_t baseK, baseM, maxM;
-    uint64_t l0_A_size, l0_B_size, l0_C_size;
+    int32_t baseK = 0;
+    int32_t baseM = 0;
+    int32_t maxM = 0;
+    uint64_t l0_A_size = 0;
+    uint64_t l0_B_size = 0;
+    uint64_t l0_C_size = 0;
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     // 先根据 baseN 和 L0_B的大小确定baseK
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_B, l0_B_size);
     baseK = static_cast<int32_t>(
         (l0_B_size / DOUBLE_BUFFER_L0A_L0B) / static_cast<uint64_t>(baseN * static_cast<int32_t>(DATATYPE_SIZE)));
-    baseK = static_cast<int32_t>(SixteenAlign(baseK));
+    baseK = static_cast<int32_t>(SixteenAlign(static_cast<uint32_t>(baseK)));
     // L0_C大小会限制 BaseM
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, l0_C_size);
     uint32_t maxBaseM = static_cast<uint32_t>(l0_C_size / static_cast<uint64_t>(baseN * FP32_DATATYPE_SIZE));
     // L0_A大小会限制 BaseM
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, l0_A_size);
-    baseM = std::min<uint32_t>((l0_A_size / DOUBLE_BUFFER_L0A_L0B) / (baseK * DATATYPE_SIZE), maxBaseM);
+    baseM = std::min<uint32_t>(static_cast<uint32_t>((l0_A_size / DOUBLE_BUFFER_L0A_L0B)) / (static_cast<uint32_t>(baseK) * DATATYPE_SIZE), maxBaseM);
     auto xShape = context->GetInputShape(0)->GetOriginShape();
     maxM = xShape.GetDim(xShape.GetDimNum() - 1);
     if (baseM > maxM) {
-        baseM = static_cast<int32_t>(SixteenAlign(maxM, true));
+        baseM = static_cast<int32_t>(SixteenAlign(static_cast<uint32_t>(maxM), true));
     } else {
-        baseM = static_cast<int32_t>(SixteenAlign(baseM));
+        baseM = static_cast<int32_t>(SixteenAlign(static_cast<uint32_t>(baseM)));
     }
     if (baseM > MAX_BASEM) {
         baseM = MAX_BASEM;
@@ -238,10 +242,9 @@ static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext* context)
         OP_LOGE(context->GetNodeName(), "GroupedMatmulAdd TilingCheck4GroupedMatmulAdd error"),
         return ge::GRAPH_FAILED);
 
-    int64_t m, n, k;
-    m = xShape.GetDim(DIM1);
-    k = xShape.GetDim(DIM0);
-    n = wShape.GetDim(DIM1);
+    int64_t m = xShape.GetDim(DIM1);
+    int64_t k = xShape.GetDim(DIM0);
+    int64_t n = wShape.GetDim(DIM1);
 
     // 先设置最大核数
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
@@ -276,7 +279,7 @@ static ge::graphStatus Tiling4GroupedMatmulAdd(gert::TilingContext* context)
     auto baseN = tiling.mmTilingData.get_baseN();
     uint32_t userWorkspaceSize = baseM * baseN * FP32_DATATYPE_SIZE * aicNum * AIC_AIV_RATION;
     size_t* workspaces = context->GetWorkspaceSizes(1);
-    workspaces[0] = sysWorkspaceSize + userWorkspaceSize;
+    workspaces[0] = static_cast<size_t>(sysWorkspaceSize + userWorkspaceSize);
 
     PrintInfo(context, tiling);
 
