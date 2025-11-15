@@ -11,7 +11,7 @@
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"
-#include "aclnnop/level2/aclnn_rope_with_sin_cos_cache.h"
+#include "aclnnop/aclnn_rope_with_sin_cos_cache.h"
 #include <iostream>
 
 #define CHECK_RET(cond, return_expr)                                           \
@@ -213,7 +213,7 @@ int main() {
   aclDestroyTensor(queryOut);
   aclDestroyTensor(keyOut);
 
-  // 7. 释放device资源
+  // 7. 释放device资源 
   aclrtFree(positionsDeviceAddr);
   aclrtFree(queryInDeviceAddr);
   aclrtFree(keyInDeviceAddr);
