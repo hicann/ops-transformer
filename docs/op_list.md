@@ -19,7 +19,7 @@
 | attention   | [nsa_compress_attention_infer](../attention/nsa_compress_attention_infer/README.md) | AI Core | 实现Native Sparse Attention推理过程中，Compress Attention的计算 |
 | attention   | [nsa_compress_grad](../attention/nsa_compress_grad/README.md) | AI Core | aclnnNsaCompress算子的反向计算 |
 | attention   | [nsa_compress_with_cache](../attention/nsa_compress_with_cache/README.md) | AI Core | 实现Native-Sparse-Attention推理阶段的KV压缩 |
-| attention   | [nsa_select_attention_infer](../attention/nsa_select_attention_infer/README.md) | AI Core | 实现Native Sparse Attention推理过程中，Selected Attention的计算 |
+| attention   | [nsa_selected_attention_infer](../attention/nsa_selected_attention_infer/README.md) | AI Core | 实现Native Sparse Attention推理过程中，Selected Attention的计算 |
 | attention   | [nsa_selected_attention](../attention/nsa_selected_attention/README.md) | AI Core | 训练场景下，实现NativeSparseAttention算法中selected-attention（选择注意力）的计算 |
 | attention   | [nsa_selected_attention_grad](../attention/nsa_selected_attention_grad/README.md) | AI Core | 根据topkIndices对key和value选取大小为selectedBlockSize的数据重排，接着进行训练场景下计算注意力的反向输出 |
 | attention   | [prompt_flash_attention](../attention/prompt_flash_attention/README.md) | AI Core | 全量推理场景的FlashAttention算子 |
