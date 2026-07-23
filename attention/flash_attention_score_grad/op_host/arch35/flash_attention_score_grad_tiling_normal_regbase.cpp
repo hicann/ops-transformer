@@ -461,6 +461,10 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::DoOpTiling()
     tndBaseInfo.isTndSwizzle = fBaseParams.enableSwizzle && fBaseParams.layoutType == INPUT_FORMAT_TND &&
                                templateSupportCond && fBaseParams.b < TND_SWIZZLE_PREFIX_NUM &&
                                !tndBaseInfo.isSeqExistZero && fBaseParams.tailZeroCount == 0;
+    fBaseParams.isSmallSD = IsSmallSDEligible(fBaseParams, tndBaseInfo) && IsSmallSDProfitable(fBaseParams);
+    if (fBaseParams.isSmallSD) {
+        ApplySmallSDTilingPolicy(fBaseParams, tndBaseInfo);
+    }
     OP_LOGI(context_, "isExceedL2Cache=[%d], sparseType=[%d], enableSwizzle=[%d], isTndSwizzle = [%d], isNzOut = [%d].",
             static_cast<int>(isExceedL2Cache), static_cast<int>(fBaseParams.sparseType),
             static_cast<int>(fBaseParams.enableSwizzle), tndBaseInfo.isTndSwizzle, fBaseParams.isNzOut);
@@ -1304,6 +1308,14 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::GetWorkspaceSize()
     size_t *workspaces = context_->GetWorkspaceSizes(1);
     size_t workspaceSize = 0;
     workspaceSize = RESERVED_WORKSPACE_SIZE;
+    if (fBaseParams.isSmallSD) {
+        postTilingData_->set_dqWorkSpaceOffset(workspaceSize);
+        postTilingData_->set_dkWorkSpaceOffset(workspaceSize);
+        postTilingData_->set_dvWorkSpaceOffset(workspaceSize);
+        workspaceSize += WORKSPACE_BUFFER;
+        workspaces[0] = workspaceSize;
+        return ge::GRAPH_SUCCESS;
+    }
     int64_t qSize =
         ((fBaseParams.b * fBaseParams.n1 - 1) * fBaseParams.s1 + AlignTo(fBaseParams.s1, ALIGN128)) * fBaseParams.d;
     int64_t kSize =
@@ -1448,14 +1460,15 @@ uint64_t FlashAttentionScoreGradTilingNormalRegbase::GetTilingKey() const
         context_,
         "splitAxis[%d], inputDtype[%d], isTnd[%d], dropValue[%d], pseValue[%d], attenMaskCfg[%d], s1TemplateType[%d], "
         "s2TemplateType[%d], dTemplateType[%u], isDeterministic[%d], nEqual[%d], isBn2MultiBlk[%d], dNoEqual[%d], "
-        "hasRope[%d], outDtype[%d], isNzOut[%d], isTndSwizzle[%d], isRegbasePlatformValue[%d]",
+        "hasRope[%d], outDtype[%d], isNzOut[%d], isTndSwizzle[%d], isSmallSD[%d], isRegbasePlatformValue[%d]",
         static_cast<int>(splitAxis), static_cast<int>(fBaseParams.inputDtype), isTnd, static_cast<int>(dropValue),
         static_cast<int>(pseValue), static_cast<int>(attenMaskCfg), static_cast<int>(fBaseParams.s1TemplateType),
         static_cast<int>(fBaseParams.s2TemplateType), static_cast<uint32_t>(fBaseParams.dTemplateType),
         static_cast<int>(fBaseParams.deterSparseType), static_cast<int>(isDeterNEqual),
         static_cast<int>(fBaseParams.isBn2MultiBlk), dNoEqual, static_cast<int>(fBaseParams.hasRope),
         static_cast<int>(fBaseParams.outDtype), static_cast<int>(fBaseParams.isNzOut),
-        static_cast<uint8_t>(tndBaseInfo.isTndSwizzle), static_cast<int>(isRegbasePlatformValue));
+        static_cast<uint8_t>(tndBaseInfo.isTndSwizzle), static_cast<int>(fBaseParams.isSmallSD),
+        static_cast<int>(isRegbasePlatformValue));
 
     uint64_t tilingKey = GET_TPL_TILING_KEY(
         0, static_cast<uint8_t>(splitAxis), static_cast<uint8_t>(fBaseParams.inputDtype), static_cast<uint8_t>(isTnd),
@@ -1465,7 +1478,8 @@ uint64_t FlashAttentionScoreGradTilingNormalRegbase::GetTilingKey() const
         static_cast<uint8_t>(isDeterNEqual), static_cast<uint8_t>(fBaseParams.isBn2MultiBlk),
         static_cast<uint8_t>(dNoEqual), static_cast<uint8_t>(fBaseParams.hasRope),
         static_cast<uint8_t>(fBaseParams.outDtype), static_cast<uint8_t>(fBaseParams.isNzOut),
-        static_cast<uint8_t>(tndBaseInfo.isTndSwizzle), static_cast<uint8_t>(isRegbasePlatformValue));
+        static_cast<uint8_t>(tndBaseInfo.isTndSwizzle), static_cast<uint8_t>(fBaseParams.isSmallSD),
+        static_cast<uint8_t>(isRegbasePlatformValue));
 
     OP_LOGI(context_, "FAGTiling S1s2Bn2gs1s2 DoTiling success, tiling is %lu.", tilingKey);
     return tilingKey;
@@ -1834,6 +1848,86 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitTilingData()
     return ge::GRAPH_SUCCESS;
 }
 
+void FlashAttentionScoreGradTilingNormalRegbase::SaveSmallSDTilingData()
+{
+    if (!fBaseParams.isSmallSD || smallSDTilingData_ == nullptr) {
+        return;
+    }
+
+    smallSDTilingData_->baseParam.set_maxS1(static_cast<uint32_t>(fBaseParams.s1));
+    smallSDTilingData_->baseParam.set_maxS2(static_cast<uint32_t>(fBaseParams.s2));
+    smallSDTilingData_->baseParam.set_actualD(static_cast<uint32_t>(fBaseParams.d));
+    smallSDTilingData_->baseParam.set_n2Size(static_cast<uint32_t>(fBaseParams.n2));
+    smallSDTilingData_->baseParam.set_usedCoreNum(static_cast<uint32_t>(fBaseParams.blockOuter));
+    smallSDTilingData_->baseParam.set_layoutType(fBaseParams.layoutType);
+    smallSDTilingData_->baseParam.set_tndMaxSumLayout(fBaseParams.tndMaxSumLayout);
+    smallSDTilingData_->baseParam.set_s2Align16(static_cast<uint32_t>(AlignTo<int64_t>(fBaseParams.s2, FP16_C0_SIZE)));
+    smallSDTilingData_->baseParam.set_scaleValue(fBaseParams.scaleValue);
+
+    uint64_t qPrefixOffset = 0;
+    uint64_t kPrefixOffset = 0;
+    uint64_t qDvPrefixOffset = 0;
+    uint64_t kDvPrefixOffset = 0;
+    uint64_t s2PrefixSize = 0;
+    if (fBaseParams.layoutType == INPUT_FORMAT_TND) {
+        uint64_t qPrefix = 0;
+        uint64_t kPrefix = 0;
+        const auto validBatch = static_cast<size_t>(fBaseParams.b - fBaseParams.tailZeroCount);
+        for (size_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
+            const uint64_t qLen = static_cast<uint64_t>(fBaseParams.actualSeqQlen[batchIdx]);
+            const uint64_t kLen = static_cast<uint64_t>(fBaseParams.actualSeqKvlen[batchIdx]);
+            const uint64_t n2G = static_cast<uint64_t>(fBaseParams.n2 * fBaseParams.g);
+            const uint64_t n2D = static_cast<uint64_t>(fBaseParams.n2 * fBaseParams.d);
+            const uint64_t n2Dv = static_cast<uint64_t>(fBaseParams.n2 * fBaseParams.d1);
+            const uint64_t n2GD = n2G * static_cast<uint64_t>(fBaseParams.d);
+            const uint64_t n2GDv = n2G * static_cast<uint64_t>(fBaseParams.d1);
+            for (uint32_t coreIdx = 0; coreIdx < CORE_LIST_NUM; ++coreIdx) {
+                if (tndBaseInfo.tndStartBIdx[coreIdx] == batchIdx) {
+                    qPrefixOffset = qPrefix * n2GD;
+                    kPrefixOffset = kPrefix * n2D;
+                    qDvPrefixOffset = qPrefix * n2GDv;
+                    kDvPrefixOffset = kPrefix * n2Dv;
+                    s2PrefixSize = kPrefix;
+                    smallSDTilingData_->tndCoreParam[coreIdx].set_qPrefixOffset(qPrefixOffset);
+                    smallSDTilingData_->tndCoreParam[coreIdx].set_kPrefixOffset(kPrefixOffset);
+                    smallSDTilingData_->tndCoreParam[coreIdx].set_qDvPrefixOffset(qDvPrefixOffset);
+                    smallSDTilingData_->tndCoreParam[coreIdx].set_kDvPrefixOffset(kDvPrefixOffset);
+                    smallSDTilingData_->tndCoreParam[coreIdx].set_s2PrefixSize(s2PrefixSize);
+                }
+            }
+            qPrefix += qLen;
+            kPrefix += kLen;
+        }
+    }
+
+    for (uint32_t coreIdx = 0; coreIdx < MAX_CORE_NUM; ++coreIdx) {
+        const uint32_t blockStart = static_cast<uint32_t>(fBaseParams.blockStarts[coreIdx]);
+        const uint32_t blockEnd = static_cast<uint32_t>(fBaseParams.blockEnds[coreIdx]);
+        const uint32_t groupCount = blockEnd > blockStart ? blockEnd - blockStart : 0;
+        smallSDTilingData_->coreTaskParam[coreIdx].set_blockStart(blockStart);
+        smallSDTilingData_->coreTaskParam[coreIdx].set_blockEnd(blockEnd);
+        smallSDTilingData_->coreTaskParam[coreIdx].set_groupCount(groupCount);
+        smallSDTilingData_->coreTaskParam[coreIdx].set_reserved(0);
+
+        smallSDTilingData_->tndCoreParam[coreIdx].set_startBatchIdx(
+            static_cast<uint32_t>(tndBaseInfo.tndStartBIdx[coreIdx]));
+        const uint64_t baseTaskPrefix = tndBaseInfo.tndPrefixSum[coreIdx] *
+                                        static_cast<uint64_t>(fBaseParams.n2 * fBaseParams.g);
+        smallSDTilingData_->tndCoreParam[coreIdx].set_baseTaskPrefix(baseTaskPrefix);
+        smallSDTilingData_->tndCoreParam[coreIdx].set_startN2Idx(
+            blockStart >= baseTaskPrefix ? static_cast<uint32_t>(blockStart - baseTaskPrefix) : 0);
+        smallSDTilingData_->tndCoreParam[coreIdx].set_attenPrefixOffset(tndBaseInfo.tndS1S2PrefixSum[coreIdx]);
+        smallSDTilingData_->tndCoreParam[coreIdx].set_attenAlignPrefixOffset(tndBaseInfo.tndS1S2AlignPrefixSum[coreIdx]);
+        if (fBaseParams.layoutType != INPUT_FORMAT_TND) {
+            smallSDTilingData_->tndCoreParam[coreIdx].set_qPrefixOffset(0);
+            smallSDTilingData_->tndCoreParam[coreIdx].set_kPrefixOffset(0);
+            smallSDTilingData_->tndCoreParam[coreIdx].set_qDvPrefixOffset(0);
+            smallSDTilingData_->tndCoreParam[coreIdx].set_kDvPrefixOffset(0);
+            smallSDTilingData_->tndCoreParam[coreIdx].set_s2PrefixSize(0);
+        }
+    }
+}
+
 ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::SaveToTilingData()
 {
     s1s2BNGS1S2BaseParams_->set_coreNum(fBaseParams.coreNum);
@@ -1940,6 +2034,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::SaveToTilingData()
         tndParam_->set_tndS1S2AlignPrefixSum(tndBaseInfo.tndS1S2AlignPrefixSum);
         tndParam_->set_tndPrefixSum(tndBaseInfo.tndPrefixSum);
     }
+    SaveSmallSDTilingData();
     return ge::GRAPH_SUCCESS;
 }
 

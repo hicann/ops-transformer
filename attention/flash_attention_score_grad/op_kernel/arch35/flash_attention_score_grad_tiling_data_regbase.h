@@ -17,6 +17,8 @@
 #define FLASH_ATTENTION_SCORE_GRAD_TILING_DATA_REGBASE_H_
 
 #include <cstdint>
+#include <cstddef>
+#include <type_traits>
 
 namespace optiling {
 namespace fag {
@@ -607,6 +609,99 @@ public:
     }
 };
 
+class SmallSDCoreTaskParamRegbase {
+public:
+    uint32_t blockStart;
+    uint32_t blockEnd;
+    uint32_t groupCount;
+    uint32_t reserved;
+
+    uint32_t get_blockStart() const { return blockStart; }
+    uint32_t get_blockEnd() const { return blockEnd; }
+    uint32_t get_groupCount() const { return groupCount; }
+
+    void set_blockStart(uint32_t val) { blockStart = val; }
+    void set_blockEnd(uint32_t val) { blockEnd = val; }
+    void set_groupCount(uint32_t val) { groupCount = val; }
+    void set_reserved(uint32_t val) { reserved = val; }
+};
+
+class SmallSDTndCoreParamRegbase {
+public:
+    uint32_t startBatchIdx;
+    uint32_t startN2Idx;
+    uint64_t baseTaskPrefix;
+    uint64_t qPrefixOffset;
+    uint64_t kPrefixOffset;
+    uint64_t qDvPrefixOffset;
+    uint64_t kDvPrefixOffset;
+    uint64_t attenPrefixOffset;
+    uint64_t attenAlignPrefixOffset;
+    uint64_t s2PrefixSize;
+
+    uint32_t get_startBatchIdx() const { return startBatchIdx; }
+    uint32_t get_startN2Idx() const { return startN2Idx; }
+    uint64_t get_baseTaskPrefix() const { return baseTaskPrefix; }
+    uint64_t get_qPrefixOffset() const { return qPrefixOffset; }
+    uint64_t get_kPrefixOffset() const { return kPrefixOffset; }
+    uint64_t get_qDvPrefixOffset() const { return qDvPrefixOffset; }
+    uint64_t get_kDvPrefixOffset() const { return kDvPrefixOffset; }
+    uint64_t get_attenPrefixOffset() const { return attenPrefixOffset; }
+    uint64_t get_attenAlignPrefixOffset() const { return attenAlignPrefixOffset; }
+    uint64_t get_s2PrefixSize() const { return s2PrefixSize; }
+
+    void set_startBatchIdx(uint32_t val) { startBatchIdx = val; }
+    void set_startN2Idx(uint32_t val) { startN2Idx = val; }
+    void set_baseTaskPrefix(uint64_t val) { baseTaskPrefix = val; }
+    void set_qPrefixOffset(uint64_t val) { qPrefixOffset = val; }
+    void set_kPrefixOffset(uint64_t val) { kPrefixOffset = val; }
+    void set_qDvPrefixOffset(uint64_t val) { qDvPrefixOffset = val; }
+    void set_kDvPrefixOffset(uint64_t val) { kDvPrefixOffset = val; }
+    void set_attenPrefixOffset(uint64_t val) { attenPrefixOffset = val; }
+    void set_attenAlignPrefixOffset(uint64_t val) { attenAlignPrefixOffset = val; }
+    void set_s2PrefixSize(uint64_t val) { s2PrefixSize = val; }
+};
+
+class SmallSDBaseParamRegbase {
+public:
+    uint32_t maxS1;
+    uint32_t maxS2;
+    uint32_t actualD;
+    uint32_t n2Size;
+    uint32_t usedCoreNum;
+    uint32_t layoutType;
+    uint32_t tndMaxSumLayout;
+    uint32_t s2Align16;
+    float scaleValue;
+
+    uint32_t get_maxS1() const { return maxS1; }
+    uint32_t get_maxS2() const { return maxS2; }
+    uint32_t get_actualD() const { return actualD; }
+    uint32_t get_n2Size() const { return n2Size; }
+    uint32_t get_usedCoreNum() const { return usedCoreNum; }
+    uint32_t get_layoutType() const { return layoutType; }
+    uint32_t get_tndMaxSumLayout() const { return tndMaxSumLayout; }
+    uint32_t get_s2Align16() const { return s2Align16; }
+    float get_scaleValue() const { return scaleValue; }
+
+    void set_maxS1(uint32_t val) { maxS1 = val; }
+    void set_maxS2(uint32_t val) { maxS2 = val; }
+    void set_actualD(uint32_t val) { actualD = val; }
+    void set_n2Size(uint32_t val) { n2Size = val; }
+    void set_usedCoreNum(uint32_t val) { usedCoreNum = val; }
+    void set_layoutType(uint32_t val) { layoutType = val; }
+    void set_tndMaxSumLayout(uint32_t val) { tndMaxSumLayout = val; }
+    void set_s2Align16(uint32_t val) { s2Align16 = val; }
+    void set_scaleValue(float val) { scaleValue = val; }
+};
+
+class SmallSDTilingDataRegbase {
+public:
+    SmallSDBaseParamRegbase baseParam;
+    SmallSDCoreTaskParamRegbase coreTaskParam[MAX_CORE_NUM];
+    SmallSDTndCoreParamRegbase tndCoreParam[MAX_CORE_NUM];
+};
+
 template<const bool isDeter = false, const bool isNewDeter = false,
     const bool isTnd = false, const bool isTndSwizzle = false>
 class FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase {
@@ -620,6 +715,7 @@ public:
     typename std::conditional<isNewDeter, DeterParamRegbase, std::nullptr_t>::type deterParam;
     typename std::conditional<!isNewDeter && isTnd, TndParamRegbase, std::nullptr_t>::type tndParam;
     typename std::conditional<isTndSwizzle, TndSwizzleParamRegbase, std::nullptr_t>::type tndSwizzleParam;
+    SmallSDTilingDataRegbase smallSDTilingData;
 };
 }  // namespace fag
 }  // namespace optiling

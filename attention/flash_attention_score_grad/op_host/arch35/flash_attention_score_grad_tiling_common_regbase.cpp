@@ -1648,6 +1648,83 @@ void SetSplitAxis(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbas
     }
 }
 
+bool IsSmallSDEligible(const FuzzyBaseInfoParamsRegbase& fBaseParams, const TndBaseInfo& tndBaseInfo)
+{
+    const bool isSupportedDtype = fBaseParams.queryType == ge::DT_FLOAT16 || fBaseParams.queryType == ge::DT_BF16;
+    const bool isSameOutputDtype =
+        (fBaseParams.queryType == ge::DT_FLOAT16 && fBaseParams.outDtype == DtypeEnum::FLOAT16_PRECISION) ||
+        (fBaseParams.queryType == ge::DT_BF16 && fBaseParams.outDtype == DtypeEnum::BFLOAT16);
+    const bool isSupportedLayout = fBaseParams.layoutType == INPUT_FORMAT_BS2N2GD ||
+                                   fBaseParams.layoutType == INPUT_FORMAT_S2BN2GD ||
+                                   fBaseParams.layoutType == INPUT_FORMAT_BN2GS2D ||
+                                   fBaseParams.layoutType == INPUT_FORMAT_TND;
+    const bool noOptionalFeature = fBaseParams.keepProb >= 1 && fBaseParams.pseOptional != NORMAL_TENSOR &&
+                                   fBaseParams.attenMaskOptional == EMPTY_TENSOR && !fBaseParams.dropMaskOuter &&
+                                   fBaseParams.sinkOptional != NORMAL_TENSOR && !fBaseParams.hasRope;
+    const bool fixedOwnership = fBaseParams.n1 == fBaseParams.n2 && fBaseParams.g == 1 &&
+                                fBaseParams.d == fBaseParams.d1 && fBaseParams.d > 0 &&
+                                fBaseParams.d <= static_cast<int64_t>(ConstAxisTemplateNum::NUM128);
+    const bool noRemap = fBaseParams.sparseType == static_cast<uint8_t>(SparseType::DENSE) &&
+                         fBaseParams.tailZeroCount == 0 &&
+                         fBaseParams.deterSparseType == static_cast<uint32_t>(DeterSparseType::NO_DETER) &&
+                         !fBaseParams.isDeterministic;
+    const bool singleSTile = fBaseParams.s1Outer == 1 && fBaseParams.s2Outer == 1;
+    if (!(isSupportedDtype && isSameOutputDtype && isSupportedLayout && noOptionalFeature && fixedOwnership && noRemap &&
+          singleSTile && fBaseParams.splitAxis == SplitAxisEnum::BN2)) {
+        return false;
+    }
+
+    if (fBaseParams.layoutType != INPUT_FORMAT_TND) {
+        return fBaseParams.s1 > 0 && fBaseParams.s1 < static_cast<int64_t>(ConstAxisTemplateNum::NUM128) &&
+               fBaseParams.s2 > 0 && fBaseParams.s2 < static_cast<int64_t>(ConstAxisTemplateNum::NUM128);
+    }
+
+    const int64_t validBatch = fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount);
+    if (validBatch <= 0 || tndBaseInfo.isSeqExistZero ||
+        fBaseParams.actualSeqQlen.size() < static_cast<size_t>(validBatch) ||
+        fBaseParams.actualSeqKvlen.size() < static_cast<size_t>(validBatch)) {
+        return false;
+    }
+    for (int64_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
+        const int64_t actualS1 = fBaseParams.actualSeqQlen[batchIdx];
+        const int64_t actualS2 = fBaseParams.actualSeqKvlen[batchIdx];
+        if (actualS1 <= 0 || actualS1 >= static_cast<int64_t>(ConstAxisTemplateNum::NUM128) ||
+            actualS2 <= 0 || actualS2 >= static_cast<int64_t>(ConstAxisTemplateNum::NUM128)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool IsSmallSDProfitable(const FuzzyBaseInfoParamsRegbase& fBaseParams)
+{
+    // Keep the first coding slice behavior unchanged while reserving an explicit profitability gate.
+    // Profiling-based whitelist/threshold logic can be added here without expanding tiling key fields.
+    const int64_t validBatch = fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount);
+    return validBatch > 0 && fBaseParams.n2 > 0 && fBaseParams.g == 1;
+}
+
+void ApplySmallSDTilingPolicy(FuzzyBaseInfoParamsRegbase& fBaseParams, TndBaseInfo& tndBaseInfo)
+{
+    fBaseParams.s1TemplateType = ConstAxisTemplateNum::NUM128;
+    fBaseParams.s2TemplateType = ConstAxisTemplateNum::NUM128;
+    fBaseParams.dTemplateType = fBaseParams.d <= static_cast<int64_t>(ConstAxisTemplateNum::NUM64) ?
+                                ConstAxisTemplateNum::NUM64 : ConstAxisTemplateNum::NUM128;
+    fBaseParams.s1Outer = 1;
+    fBaseParams.s2Outer = 1;
+    fBaseParams.s1CvInner = fBaseParams.s1;
+    fBaseParams.cvS2Inner = fBaseParams.s2;
+    fBaseParams.s1Tail = fBaseParams.s1;
+    fBaseParams.s1CvTail = fBaseParams.s1;
+    fBaseParams.s2Tail = fBaseParams.s2;
+    fBaseParams.s2CvTail = fBaseParams.s2;
+    fBaseParams.isBn2MultiBlk = false;
+    fBaseParams.isNzOut = false;
+    fBaseParams.enablePreSfmg = false;
+    fBaseParams.enableSwizzle = false;
+    tndBaseInfo.isTndSwizzle = false;
+}
+
 void DetermineMode(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     // 当前fp16都走高精度

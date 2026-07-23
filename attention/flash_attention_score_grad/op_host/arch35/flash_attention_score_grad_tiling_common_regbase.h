@@ -478,6 +478,7 @@ struct FuzzyBaseInfoParamsRegbase { // 频繁使用的基础参数
     int64_t qStartIdx;
     int64_t kvStartIdx;
     bool enableSwizzle = false;
+    bool isSmallSD = false;
     uint32_t sinkOptional = 0;
     uint64_t sinkSize = 0;
     uint64_t s1SinkOuter = 0;
@@ -600,6 +601,9 @@ ge::graphStatus ProcessPseInfo(const gert::TilingContext *context_, FuzzyBaseInf
 void SetPseLayout(FuzzyBaseInfoParamsRegbase& fBaseParams);
 bool SetSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams);
 void SetSplitAxis(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams);
+bool IsSmallSDEligible(const FuzzyBaseInfoParamsRegbase& fBaseParams, const TndBaseInfo& tndBaseInfo);
+bool IsSmallSDProfitable(const FuzzyBaseInfoParamsRegbase& fBaseParams);
+void ApplySmallSDTilingPolicy(FuzzyBaseInfoParamsRegbase& fBaseParams, TndBaseInfo& tndBaseInfo);
 void DetermineMode(FuzzyBaseInfoParamsRegbase& fBaseParams);
 bool SupportTrans2BS2N2GD(const FuzzyBaseInfoParamsRegbase& fBaseParams);
 ge::graphStatus SetAttenMaskShapeType(FuzzyBaseInfoParamsRegbase& fBaseParams, const gert::StorageShape *attenMaskShape, size_t dimNum);

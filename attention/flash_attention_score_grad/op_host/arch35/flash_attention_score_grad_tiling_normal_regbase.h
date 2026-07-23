@@ -32,6 +32,7 @@ namespace fag {
         preTilingData_ = &tilingData->preTilingData;                                                                   \
         postTilingData_ = &tilingData->postTilingData;                                                                 \
         tndParam_ = &tilingData->tndParam;                                                                             \
+        smallSDTilingData_ = &tilingData->smallSDTilingData;                                                           \
     } while (0)
 
 #define BASE_TILING_DATA_COMMON_ASSIGN(tilingData)                                                                     \
@@ -41,6 +42,7 @@ namespace fag {
         s1s2BNGS1S2BlockNumList_ = &tilingData->s1s2BNGS1S2BlockNumList;                                               \
         preTilingData_ = &tilingData->preTilingData;                                                                   \
         postTilingData_ = &tilingData->postTilingData;                                                                 \
+        smallSDTilingData_ = &tilingData->smallSDTilingData;                                                           \
     } while (0)
 
 class FlashAttentionScoreGradTilingNormalRegbase : public TilingBaseClass {
@@ -59,6 +61,7 @@ public:
     DeterParamRegbase *deterParam = nullptr;
     TndParamRegbase *tndParam_ = nullptr;
     TndSwizzleParamRegbase *tndSwizzleParam_ = nullptr;
+    SmallSDTilingDataRegbase *smallSDTilingData_ = nullptr;
 
 protected:
     bool IsCapable() override;
@@ -90,6 +93,7 @@ protected:
     uint64_t DoPreSfmgTiling();
     void DoPostTiling();
     ge::graphStatus SaveToTilingData();
+    void SaveSmallSDTilingData();
     ge::graphStatus GetSparsePrefixBlockInfo();
     virtual ge::graphStatus GetSparseUnpadBlockInfo(){};
     virtual bool GetBlockInfoOfBNS4TND(){};

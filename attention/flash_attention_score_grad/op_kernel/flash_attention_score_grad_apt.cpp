@@ -35,7 +35,7 @@ using namespace AscendC;
 template <uint8_t IsEmptyTensor, uint8_t SplitAxis, uint8_t InputDType, bool IsTnd, bool IsDrop, bool IsPse,
           bool IsAttenMask, uint16_t S1TemplateNum, uint16_t S2TemplateNum, uint16_t DTemplateNum, uint8_t DeterType,
           bool IsNEqual, bool IsBn2MultiBlk, bool IsDNoEqual, bool IsRope, uint8_t OutDType, bool IsNzOut,
-          bool IsTndSwizzle, bool IsRegbase>
+          bool IsTndSwizzle, bool IsSmallSD, bool IsRegbase>
 __global__ __aicore__ void flash_attention_score_grad(
     __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *dy, __gm__ uint8_t *pse_shift,
     __gm__ uint8_t *drop_mask, __gm__ uint8_t *padding_mask, __gm__ uint8_t *atten_mask, __gm__ uint8_t *softmax_max,
@@ -75,7 +75,7 @@ __global__ __aicore__ void flash_attention_score_grad(
         return;
     } else {
         RegbaseFAG<SplitAxis, InputDType, IsTnd, IsDrop, IsPse, IsAttenMask, S1TemplateNum, S2TemplateNum, DTemplateNum, DeterType, IsNEqual, IsBn2MultiBlk,
-            IsDNoEqual, IsRope, OutDType, IsNzOut, IsTndSwizzle, IsRegbase>(
+            IsDNoEqual, IsRope, OutDType, IsNzOut, IsTndSwizzle, IsSmallSD, IsRegbase>(
                 query, key, value, dy, pse_shift, drop_mask, padding_mask, atten_mask, softmax_max, softmax_sum,
                 softmax_in, attention_in, prefix, actual_seq_qlen, actual_seq_kvlen,
                 deqScaleQ, deqScaleK, deqScaleV, deqScaleDy, dsScale, pScale, queryRope, keyRope, sink,
