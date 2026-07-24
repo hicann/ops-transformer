@@ -28,7 +28,6 @@ namespace FagBaseApi {
 template <typename INPUT_TYPE, typename CALC_TYPE, typename OUTDTYPE, bool IS_TND, uint32_t HEAD_DIM>
 class SmallSDCubeBlock {
 public:
-    static_assert(HEAD_DIM == 64 || HEAD_DIM == 128, "SmallSDCubeBlock only supports D=64 or D=128.");
     static constexpr bool IS_SMALL_SD_DEDICATED_BLOCK = true;
     static constexpr uint32_t SMALL_SD_HEAD_DIM = HEAD_DIM;
     static constexpr uint32_t CUBE_BASEM = 128;

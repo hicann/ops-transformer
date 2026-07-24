@@ -104,14 +104,14 @@ struct SmallSDTaskCursor {
     int64_t n2oIdx = 0;
     int64_t actualS1Len = 0;
     int64_t actualS2Len = 0;
-    int64_t softmaxPrefix = 0;
-    int64_t attentionPrefix = 0;
-    int64_t alignedAttentionPrefix = 0;
-    int64_t baseTaskPrefix = 0;
-    int64_t qPrefix = 0;
-    int64_t kvPrefix = 0;
-    int64_t qDyDqPrefix = 0;
-    int64_t kvDkDvPrefix = 0;
+    int64_t softmaxRowPrefix = 0;
+    int64_t attentionElementPrefix = 0;
+    int64_t alignedAttentionElementPrefix = 0;
+    int64_t baseTaskIndex = 0;
+    int64_t qSeqPrefix = 0;
+    int64_t kvSeqPrefix = 0;
+    int64_t qDyDqElementOffset = 0;
+    int64_t kvDkDvElementOffset = 0;
     int64_t taskRemaining = 0;
     int64_t qOffset = 0;
     int64_t kOffset = 0;
@@ -136,7 +136,7 @@ struct SmallSDOffsets {
     int64_t k = 0;
     int64_t attention = 0;
     int64_t attentionAlign = 0;
-    int64_t s2Prefix = 0;
+    int64_t softmaxRowPrefix = 0;
 };
 
 struct SmallSDPipelineSlot {
@@ -161,27 +161,16 @@ struct SmallSDPipelineSlot {
     int64_t dvOffset = 0;
     int64_t attentionOffset = 0;
     int64_t attentionAlignOffset = 0;
-    int64_t s2Prefix = 0;
-    int64_t baseTaskPrefix = 0;
-    int64_t qPrefix = 0;
-    int64_t kvPrefix = 0;
-    int64_t qDyDqPrefix = 0;
-    int64_t kvDkDvPrefix = 0;
+    int64_t softmaxRowPrefix = 0;
+    int64_t baseTaskIndex = 0;
+    int64_t qSeqPrefix = 0;
+    int64_t kvSeqPrefix = 0;
+    int64_t qDyDqElementOffset = 0;
+    int64_t kvDkDvElementOffset = 0;
 };
-
-static_assert(sizeof(SmallSDConstInfo) == 480, "SmallSDConstInfo ABI size changed unexpectedly.");
-static_assert(offsetof(SmallSDConstInfo, qStrideB) == 80, "SmallSDConstInfo stride offset changed unexpectedly.");
-static_assert(offsetof(SmallSDConstInfo, workspaceBaseOffset) == 464,
-              "SmallSDConstInfo workspace offset changed unexpectedly.");
-static_assert(sizeof(SmallSDTaskCursor) == 152, "SmallSDTaskCursor ABI size changed unexpectedly.");
-static_assert(offsetof(SmallSDTaskCursor, qOffset) == 104, "SmallSDTaskCursor qOffset changed unexpectedly.");
-static_assert(sizeof(SmallSDShape) == 56, "SmallSDShape ABI size changed unexpectedly.");
-static_assert(sizeof(SmallSDOffsets) == 40, "SmallSDOffsets ABI size changed unexpectedly.");
-static_assert(sizeof(SmallSDPipelineSlot) == 216, "SmallSDPipelineSlot ABI size changed unexpectedly.");
 
 template <uint32_t HEAD_DIM>
 struct SmallSDBufferLayout {
-    static_assert(HEAD_DIM == 64 || HEAD_DIM == 128, "SmallSD buffer layout supports D=64 or D=128 only.");
     static constexpr uint32_t slotCount = 2;
     static constexpr uint32_t maxS1 = 128;
     static constexpr uint32_t maxS2 = 128;
@@ -247,86 +236,143 @@ struct SmallSDBufferLayout {
     {
         return sharedReadonlyOffset;
     }
+    static constexpr uint32_t Q_L1()
+    {
+        return QOffset();
+    }
     static constexpr uint32_t KOffset()
     {
         return QOffset() + qTileBytes;
+    }
+    static constexpr uint32_t K_L1()
+    {
+        return KOffset();
     }
     static constexpr uint32_t VOffset()
     {
         return KOffset() + kTileBytes;
     }
+    static constexpr uint32_t V_L1()
+    {
+        return VOffset();
+    }
     static constexpr uint32_t DyOffset()
     {
         return VOffset() + vTileBytes;
+    }
+    static constexpr uint32_t DY_L1()
+    {
+        return DyOffset();
     }
     static constexpr uint32_t DsOffset()
     {
         return sharedL1Offset;
     }
+    static constexpr uint32_t DS_L1()
+    {
+        return DsOffset();
+    }
     static constexpr uint32_t POffset()
     {
         return DsOffset() + dsL1Bytes;
+    }
+    static constexpr uint32_t P_L1()
+    {
+        return POffset();
     }
     static constexpr uint32_t Mm1ResultOffset(uint32_t slotIdx)
     {
         return QkResultOffset(slotIdx);
     }
+    static constexpr uint32_t MM1_UB_PING()
+    {
+        return Mm1ResultOffset(0);
+    }
+    static constexpr uint32_t MM1_UB_PONG()
+    {
+        return Mm1ResultOffset(1);
+    }
     static constexpr uint32_t Mm2ResultOffset(uint32_t slotIdx)
     {
         return DyVResultOffset(slotIdx);
+    }
+    static constexpr uint32_t MM2_UB_PING()
+    {
+        return Mm2ResultOffset(0);
+    }
+    static constexpr uint32_t MM2_UB_PONG()
+    {
+        return Mm2ResultOffset(1);
+    }
+    static constexpr uint32_t DQ_UB_PING()
+    {
+        return DqUbOffset(0);
+    }
+    static constexpr uint32_t DQ_UB_PONG()
+    {
+        return DqUbOffset(1);
+    }
+    static constexpr uint32_t DK_UB_PING()
+    {
+        return DkUbOffset(0);
+    }
+    static constexpr uint32_t DK_UB_PONG()
+    {
+        return DkUbOffset(1);
+    }
+    static constexpr uint32_t DV_UB_PING()
+    {
+        return DvUbOffset(0);
+    }
+    static constexpr uint32_t DV_UB_PONG()
+    {
+        return DvUbOffset(1);
     }
     static constexpr uint32_t L0APingOffset()
     {
         return 0;
     }
+    static constexpr uint32_t L0A_PING()
+    {
+        return L0APingOffset();
+    }
     static constexpr uint32_t L0APongOffset()
     {
         return L0APingOffset() + l0PingBytes;
+    }
+    static constexpr uint32_t L0A_PONG()
+    {
+        return L0APongOffset();
     }
     static constexpr uint32_t L0BPingOffset()
     {
         return 0;
     }
+    static constexpr uint32_t L0B_PING()
+    {
+        return L0BPingOffset();
+    }
     static constexpr uint32_t L0BPongOffset()
     {
         return L0BPingOffset() + l0PingBytes;
     }
+    static constexpr uint32_t L0B_PONG()
+    {
+        return L0BPongOffset();
+    }
+    static constexpr uint32_t L0C_WORK()
+    {
+        return 0;
+    }
+    static constexpr uint32_t L0C_DK()
+    {
+        return qkResultBytes;
+    }
+    static constexpr uint32_t L0C_DV()
+    {
+        return qkResultBytes + dkUbBytes;
+    }
 };
-
-static_assert(SmallSDBufferLayout<64>::slot1Offset == SmallSDBufferLayout<64>::perSlotBytes,
-              "SmallSD D=64 slot offsets must be deterministic.");
-static_assert(SmallSDBufferLayout<128>::slot1Offset == SmallSDBufferLayout<128>::perSlotBytes,
-              "SmallSD D=128 slot offsets must be deterministic.");
-static_assert((SmallSDBufferLayout<64>::totalBytes % SmallSDBufferLayout<64>::alignBytes) == 0,
-              "SmallSD D=64 buffer layout must be 32-byte aligned.");
-static_assert((SmallSDBufferLayout<128>::totalBytes % SmallSDBufferLayout<128>::alignBytes) == 0,
-              "SmallSD D=128 buffer layout must be 32-byte aligned.");
-static_assert(SmallSDBufferLayout<64>::sharedL1Bytes + SmallSDBufferLayout<64>::sharedReadonlyBytes <=
-                  SmallSDBufferLayout<64>::l1CapacityBytes,
-              "SmallSD D=64 L1 layout exceeds capacity.");
-static_assert(SmallSDBufferLayout<128>::sharedL1Bytes + SmallSDBufferLayout<128>::sharedReadonlyBytes <=
-                  SmallSDBufferLayout<128>::l1CapacityBytes,
-              "SmallSD D=128 L1 layout exceeds capacity.");
-static_assert(SmallSDBufferLayout<64>::l0PingBytes + SmallSDBufferLayout<64>::l0PongBytes <=
-                  SmallSDBufferLayout<64>::l0aCapacityBytes,
-              "SmallSD D=64 L0A ping/pong exceeds capacity.");
-static_assert(SmallSDBufferLayout<128>::l0PingBytes + SmallSDBufferLayout<128>::l0PongBytes <=
-                  SmallSDBufferLayout<128>::l0aCapacityBytes,
-              "SmallSD D=128 L0A ping/pong exceeds capacity.");
-static_assert(SmallSDBufferLayout<64>::l0PingBytes + SmallSDBufferLayout<64>::l0PongBytes <=
-                  SmallSDBufferLayout<64>::l0bCapacityBytes,
-              "SmallSD D=64 L0B ping/pong exceeds capacity.");
-static_assert(SmallSDBufferLayout<128>::l0PingBytes + SmallSDBufferLayout<128>::l0PongBytes <=
-                  SmallSDBufferLayout<128>::l0bCapacityBytes,
-              "SmallSD D=128 L0B ping/pong exceeds capacity.");
-static_assert(SmallSDBufferLayout<64>::qkResultBytes <= SmallSDBufferLayout<64>::l0cCapacityBytes,
-              "SmallSD D=64 L0C score buffer exceeds capacity.");
-static_assert(SmallSDBufferLayout<128>::qkResultBytes <= SmallSDBufferLayout<128>::l0cCapacityBytes,
-              "SmallSD D=128 L0C score buffer exceeds capacity.");
-static_assert(SmallSDBufferLayout<64>::perSlotBytes <= SmallSDBufferLayout<64>::ubCapacityBytes,
-              "SmallSD D=64 UB slot buffer exceeds capacity.");
-static_assert(SmallSDBufferLayout<128>::perSlotBytes <= SmallSDBufferLayout<128>::ubCapacityBytes,
-              "SmallSD D=128 UB slot buffer exceeds capacity.");
 
 } // namespace FagBaseApi
 

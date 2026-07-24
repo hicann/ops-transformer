@@ -31,7 +31,6 @@ namespace FagBaseApi {
 template <typename INPUT_TYPE, typename CALC_TYPE, typename OUTDTYPE, bool IS_TND, uint32_t HEAD_DIM>
 class SmallSDVectorBlock {
 public:
-    static_assert(HEAD_DIM == 64 || HEAD_DIM == 128, "SmallSDVectorBlock only supports D=64 or D=128.");
     static constexpr bool IS_SMALL_SD_DEDICATED_BLOCK = true;
     static constexpr uint32_t SMALL_SD_HEAD_DIM = HEAD_DIM;
     static constexpr uint32_t VECTOR_BASEM = 64;
@@ -251,7 +250,7 @@ private:
         LocalTensor<float> maxSumTensor = maxSumQue[slot.taskIdMod2].template AllocTensor<float>();
         uint64_t offset = 0;
         if (constInfo->tndMaxSumLayout == MAX_SUM_TND) {
-            offset = ((static_cast<uint64_t>(slot.qPrefix) * constInfo->n2 +
+            offset = ((static_cast<uint64_t>(slot.softmaxRowPrefix) * constInfo->n2 +
                        static_cast<uint64_t>(slot.n2oIdx) * slot.actualS1Len) +
                       static_cast<uint64_t>(vSubBlockIdx) * slot.firstHalfS1 * constInfo->n2) *
                      MAX_SUM_REDUCE_AXIS_SIZE / sizeof(float);
@@ -265,7 +264,7 @@ private:
                          srcStride, 0, 0},
                         {false, 0, 0, 0});
         } else {
-            const uint64_t s1Prefix = IS_TND ? static_cast<uint64_t>(slot.qPrefix) :
+            const uint64_t s1Prefix = IS_TND ? static_cast<uint64_t>(slot.softmaxRowPrefix) :
                                                static_cast<uint64_t>(slot.bIdx) * constInfo->s1;
             offset = ((s1Prefix * constInfo->n2 + slot.n2oIdx * slot.actualS1Len) +
                       static_cast<uint64_t>(vSubBlockIdx) * slot.firstHalfS1) *

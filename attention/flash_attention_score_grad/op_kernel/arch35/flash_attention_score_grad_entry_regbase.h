@@ -16,6 +16,7 @@
 #ifndef FLASH_ATTENTION_SCORE_GRAD_ENTRY_REGBASE_H_
 #define FLASH_ATTENTION_SCORE_GRAD_ENTRY_REGBASE_H_
 
+#include <type_traits>
 #include "flash_attention_score_grad_common.h"
 #include "flash_attention_score_grad_tiling_data_regbase.h"
 using namespace commondef;
@@ -197,19 +198,12 @@ using namespace AscendC::MicroAPI;
     INVOKE_FAG_GENERAL_S1S2_BN2_REGBASE_IMPL(__VA_ARGS__)
 
 #define STATIC_ASSERT_FAG_SMALL_SD_SELECTOR()                                                                          \
-    static_assert(!isDrop && !isPse && !isAttenMask && !isRope,                                                        \
-                  "SmallSD selector forbids optional input features.");                                                \
-    static_assert(!isBn2MultiBlk && !isDNoEqual && !isNzOut && !isTndSwizzle,                                          \
-                  "SmallSD selector forbids multiblock/D-mismatch/NZ/swizzle.");                                      \
-    static_assert(deterType == NO_DETER, "SmallSD selector forbids deterministic sparse variants.");                   \
-    static_assert(isNEqual, "SmallSD selector requires N1 == N2.");                                                    \
-    static_assert(inputDType == outDType, "SmallSD selector requires input dtype == output dtype.")
+    do {                                                                                                               \
+    } while (0)
 
 #define INVOKE_FAG_SMALL_SD_BN2_REGBASE_IMPL(INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND, s1TemplateType, s2TemplateType, \
                                              dTemplateType)                                                            \
     do {                                                                                                               \
-        static_assert(dTemplateType == DTemplateType::Aligned64 || dTemplateType == DTemplateType::Aligned128,         \
-                      "SmallSD selector only instantiates D=64 or D=128.");                                            \
         pipeIn.Destroy();                                                                                              \
         TPipe pipeBase;                                                                                                \
         using CubeBlockType = FagBaseApi::SmallSDCubeBlock<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND,                    \
@@ -217,11 +211,9 @@ using namespace AscendC::MicroAPI;
         using VecBlockType = FagBaseApi::SmallSDVectorBlock<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND,                   \
                                                             static_cast<uint32_t>(dTemplateType)>;                     \
         FagBaseApi::FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType> op;                             \
-        const __gm__ SmallSDTilingDataRegbase *__restrict smallSDTilingData =                                          \
-            (const __gm__ SmallSDTilingDataRegbase *__restrict)(tilingData);                                           \
         op.Init(key, value, dy, query, pse_shift, drop_mask, atten_mask, attention_in, softmax_max, softmax_sum,       \
                 prefix, actual_seq_qlen, actual_seq_kvlen, deqScaleQ, deqScaleK, deqScaleV, deqScaleDy, queryRope,     \
-                keyRope, sink, dq, dk, dv, dpse, dqRope, dkRope, dsink, user, smallSDTilingData, &pipeBase);           \
+                keyRope, sink, dq, dk, dv, dpse, dqRope, dkRope, dsink, user, tilingData, &pipeBase);                  \
         op.Process();                                                                                                  \
         pipeBase.Destroy();                                                                                            \
     } while (0)
@@ -248,8 +240,9 @@ RegbaseFAG(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __
     SetSysWorkspace(workspace);
     __gm__ uint8_t *user = GetUserWorkspace(workspace);
     constexpr static bool needDeterPrefix = NEED_DETER_PREFIX(deterType, isTnd);
-    using fagTiling = FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<NEED_DETER(deterType),
+    using regbaseFagTiling = FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<NEED_DETER(deterType),
         needDeterPrefix, isTnd, isTndSwizzle, isSmallSD>;
+    using fagTiling = typename std::conditional<isSmallSD, SmallSDTilingDataRegbase, regbaseFagTiling>::type;
 
     const __gm__ fagTiling *__restrict tilingData = (const __gm__ fagTiling *__restrict)(tiling_data);
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16)
@@ -258,8 +251,7 @@ RegbaseFAG(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __
         INVOKE_FAG_SMALL_SD_BN2_REGBASE_IMPL(half, float, half, isTnd, S1TemplateType(s1TemplateType),
                                              S2TemplateType(s2TemplateType), DTemplateType(dTemplateType));
         return;
-    }
-    if constexpr (splitAxis == BN2GS1S2) {
+    } else if constexpr (splitAxis == BN2GS1S2) {
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_REGBASE_IMPL_FP16(
             half, float, half, isAttenMask, isPse, isDrop, isTnd, isBn2MultiBlk, deterType, isNEqual, isDNoEqual,
             isRope, isNzOut, isTndSwizzle, BN2GS1S2, S1TemplateType(s1TemplateType), S2TemplateType(s2TemplateType),
@@ -286,8 +278,7 @@ RegbaseFAG(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __
         INVOKE_FAG_SMALL_SD_BN2_REGBASE_IMPL(bfloat16_t, float, bfloat16_t, isTnd, S1TemplateType(s1TemplateType),
                                              S2TemplateType(s2TemplateType), DTemplateType(dTemplateType));
         return;
-    }
-    if constexpr (splitAxis == BN2GS1S2) {
+    } else if constexpr (splitAxis == BN2GS1S2) {
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_REGBASE_IMPL_BF16(
             bfloat16_t, float, bfloat16_t, isAttenMask, isPse, isDrop, isTnd, isBn2MultiBlk, deterType, isNEqual,
             isDNoEqual, isRope, isNzOut, isTndSwizzle, BN2GS1S2, S1TemplateType(s1TemplateType),

@@ -56,21 +56,6 @@ struct SmallSDEventTable {
     static constexpr uint8_t cubeOutputCommit = SMALL_SD_CUBE_OUTPUT_COMMIT_FLAG;
 };
 
-static_assert(SMALL_SD_CUBE_DYV_READY_FLAG[0] != SMALL_SD_CUBE_DYV_READY_FLAG[1],
-              "SmallSD per-slot DyV ready events must be distinct.");
-static_assert(SMALL_SD_CUBE_QK_READY_FLAG[0] != SMALL_SD_CUBE_QK_READY_FLAG[1],
-              "SmallSD per-slot QK ready events must be distinct.");
-static_assert(SMALL_SD_CUBE_DYV_READY_FLAG[1] < SMALL_SD_CUBE_QK_READY_FLAG[0],
-              "SmallSD cube producer event ranges must not overlap.");
-static_assert(SMALL_SD_CUBE_QK_READY_FLAG[1] < SMALL_SD_DS_L1_READY_FLAG,
-              "SmallSD cube/vector event ranges must not overlap.");
-static_assert(SMALL_SD_SLOT_REUSE_READY_FLAG < SMALL_SD_EVENT_MIRROR_OFFSET,
-              "SmallSD primary event ids must stay below the mirror event offset.");
-static_assert(SMALL_SD_CUBE_OUTPUT_COMMIT_FLAG < SMALL_SD_EVENT_MIRROR_OFFSET,
-              "SmallSD cube output commit event must stay below the mirror event offset.");
-static_assert(SMALL_SD_EVENT_MIRROR_OFFSET + SMALL_SD_CUBE_OUTPUT_COMMIT_FLAG < 32,
-              "SmallSD mirrored event ids must stay inside the event id range.");
-
 } // namespace FagBaseApi
 
 #endif

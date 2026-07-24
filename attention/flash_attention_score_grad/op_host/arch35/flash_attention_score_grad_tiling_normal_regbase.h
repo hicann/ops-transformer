@@ -128,7 +128,7 @@ protected:
     void InitSmallSDFixedDerivedState();
     ge::graphStatus BuildSmallSDCoreRanges();
     ge::graphStatus BuildSmallSDTndCoreParams();
-    void FillSmallSDBaseParam();
+    ge::graphStatus FillSmallSDBaseParam();
     void SetSmallSDWorkspace();
     bool ValidateSmallSDInvariant() const;
     ge::graphStatus InitSmallSDTilingData();

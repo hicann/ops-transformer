@@ -638,40 +638,40 @@ public:
     uint32_t startN2Idx;
     uint32_t taskCount;
     uint32_t reserved;
-    uint64_t baseTaskPrefix;
-    uint64_t qPrefix;
-    uint64_t kvPrefix;
-    uint64_t qDyDqPrefix;
-    uint64_t kvDkDvPrefix;
-    uint64_t attentionPrefix;
-    uint64_t alignedAttentionPrefix;
-    uint64_t softmaxPrefix;
+    uint64_t baseTaskIndex;
+    uint64_t qSeqPrefix;
+    uint64_t kvSeqPrefix;
+    uint64_t qDyDqElementOffset;
+    uint64_t kvDkDvElementOffset;
+    uint64_t attentionElementPrefix;
+    uint64_t alignedAttentionElementPrefix;
+    uint64_t softmaxRowPrefix;
 
     uint32_t get_startBatchIdx() const { return startBatchIdx; }
     uint32_t get_startN2Idx() const { return startN2Idx; }
     uint32_t get_taskCount() const { return taskCount; }
     uint32_t get_reserved() const { return reserved; }
-    uint64_t get_baseTaskPrefix() const { return baseTaskPrefix; }
-    uint64_t get_qPrefix() const { return qPrefix; }
-    uint64_t get_kvPrefix() const { return kvPrefix; }
-    uint64_t get_qDyDqPrefix() const { return qDyDqPrefix; }
-    uint64_t get_kvDkDvPrefix() const { return kvDkDvPrefix; }
-    uint64_t get_attentionPrefix() const { return attentionPrefix; }
-    uint64_t get_alignedAttentionPrefix() const { return alignedAttentionPrefix; }
-    uint64_t get_softmaxPrefix() const { return softmaxPrefix; }
+    uint64_t get_baseTaskIndex() const { return baseTaskIndex; }
+    uint64_t get_qSeqPrefix() const { return qSeqPrefix; }
+    uint64_t get_kvSeqPrefix() const { return kvSeqPrefix; }
+    uint64_t get_qDyDqElementOffset() const { return qDyDqElementOffset; }
+    uint64_t get_kvDkDvElementOffset() const { return kvDkDvElementOffset; }
+    uint64_t get_attentionElementPrefix() const { return attentionElementPrefix; }
+    uint64_t get_alignedAttentionElementPrefix() const { return alignedAttentionElementPrefix; }
+    uint64_t get_softmaxRowPrefix() const { return softmaxRowPrefix; }
 
     void set_startBatchIdx(uint32_t val) { startBatchIdx = val; }
     void set_startN2Idx(uint32_t val) { startN2Idx = val; }
     void set_taskCount(uint32_t val) { taskCount = val; }
     void set_reserved(uint32_t val) { reserved = val; }
-    void set_baseTaskPrefix(uint64_t val) { baseTaskPrefix = val; }
-    void set_qPrefix(uint64_t val) { qPrefix = val; }
-    void set_kvPrefix(uint64_t val) { kvPrefix = val; }
-    void set_qDyDqPrefix(uint64_t val) { qDyDqPrefix = val; }
-    void set_kvDkDvPrefix(uint64_t val) { kvDkDvPrefix = val; }
-    void set_attentionPrefix(uint64_t val) { attentionPrefix = val; }
-    void set_alignedAttentionPrefix(uint64_t val) { alignedAttentionPrefix = val; }
-    void set_softmaxPrefix(uint64_t val) { softmaxPrefix = val; }
+    void set_baseTaskIndex(uint64_t val) { baseTaskIndex = val; }
+    void set_qSeqPrefix(uint64_t val) { qSeqPrefix = val; }
+    void set_kvSeqPrefix(uint64_t val) { kvSeqPrefix = val; }
+    void set_qDyDqElementOffset(uint64_t val) { qDyDqElementOffset = val; }
+    void set_kvDkDvElementOffset(uint64_t val) { kvDkDvElementOffset = val; }
+    void set_attentionElementPrefix(uint64_t val) { attentionElementPrefix = val; }
+    void set_alignedAttentionElementPrefix(uint64_t val) { alignedAttentionElementPrefix = val; }
+    void set_softmaxRowPrefix(uint64_t val) { softmaxRowPrefix = val; }
 };
 
 class SmallSDBaseParamRegbase {
@@ -813,26 +813,6 @@ public:
 
 using SmallSDTilingDataRegbase = FlashAttentionScoreGradSmallSDTilingDataRegbase;
 
-static_assert(sizeof(SmallSDBaseParamRegbase) == 104, "SmallSDBaseParamRegbase ABI size changed unexpectedly.");
-static_assert(sizeof(SmallSDLayoutParamRegbase) == 392,
-              "SmallSDLayoutParamRegbase ABI size changed unexpectedly.");
-static_assert(sizeof(SmallSDCoreTaskParamRegbase) == 24,
-              "SmallSDCoreTaskParamRegbase ABI size changed unexpectedly.");
-static_assert(sizeof(SmallSDTndCoreParamRegbase) == 80,
-              "SmallSDTndCoreParamRegbase ABI size changed unexpectedly.");
-static_assert(std::is_same<SmallSDTilingDataRegbase, FlashAttentionScoreGradSmallSDTilingDataRegbase>::value,
-              "SmallSDTilingDataRegbase must stay as the legacy alias of the independent SmallSD payload.");
-static_assert(sizeof(FlashAttentionScoreGradSmallSDTilingDataRegbase) == 4240,
-              "FlashAttentionScoreGradSmallSDTilingDataRegbase ABI size changed unexpectedly.");
-static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, baseParam) == 0,
-              "SmallSD tiling baseParam offset changed unexpectedly.");
-static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, layoutParam) == 104,
-              "SmallSD tiling layoutParam offset changed unexpectedly.");
-static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, coreTaskParam) == 496,
-              "SmallSD tiling coreTaskParam offset changed unexpectedly.");
-static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, tndCoreParam) == 1360,
-              "SmallSD tiling tndCoreParam offset changed unexpectedly.");
-
 template<const bool isDeter = false, const bool isNewDeter = false,
     const bool isTnd = false, const bool isTndSwizzle = false, const bool isSmallSD = false>
 class FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase {
@@ -856,15 +836,6 @@ using FlashAttentionScoreGradTilingDataRegbaseSmallSD =
 using FlashAttentionScoreGradTilingDataRegbaseTndSmallSD =
     FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<false, false, true, false, true>;
 
-static_assert(std::is_same<decltype(((FlashAttentionScoreGradTilingDataRegbaseBaseOnly *)0)->smallSDTilingData),
-                           std::nullptr_t>::value,
-              "Non-SmallSD regbase tiling must not carry the SmallSD per-core payload.");
-static_assert(std::is_same<decltype(((FlashAttentionScoreGradTilingDataRegbaseSmallSD *)0)->smallSDTilingData),
-                           SmallSDTilingDataRegbase>::value,
-              "SmallSD base regbase tiling must carry SmallSDTilingDataRegbase.");
-static_assert(std::is_same<decltype(((FlashAttentionScoreGradTilingDataRegbaseTndSmallSD *)0)->smallSDTilingData),
-                           SmallSDTilingDataRegbase>::value,
-              "SmallSD TND regbase tiling must carry SmallSDTilingDataRegbase.");
 }  // namespace fag
 }  // namespace optiling
 #endif

@@ -16,12 +16,44 @@
 #include "op_host/tiling_templates_registry.h"
 #include "op_host/tiling_type.h"
 #include "err/ops_err.h"
+#include <limits>
+#include <vector>
 
 using namespace Ops::Transformer::OpTiling;
 
 using namespace optiling::fag;
 namespace optiling {
 namespace fag {
+
+bool SafeAddU64(uint64_t lhs, uint64_t rhs, uint64_t &result)
+{
+    if (lhs > std::numeric_limits<uint64_t>::max() - rhs) {
+        return false;
+    }
+    result = lhs + rhs;
+    return true;
+}
+
+bool SafeMulU64(uint64_t lhs, uint64_t rhs, uint64_t &result)
+{
+    if (lhs != 0 && rhs > std::numeric_limits<uint64_t>::max() / lhs) {
+        return false;
+    }
+    result = lhs * rhs;
+    return true;
+}
+
+bool SafeMulAddU64(uint64_t lhs, uint64_t rhs, uint64_t add, uint64_t &result)
+{
+    uint64_t mulResult = 0;
+    return SafeMulU64(lhs, rhs, mulResult) && SafeAddU64(mulResult, add, result);
+}
+
+template <typename T, size_t N>
+constexpr size_t SmallSDArraySize(const T (&)[N])
+{
+    return N;
+}
 
 bool IsSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape)
 {
@@ -1884,21 +1916,12 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitSmallSDTilingDat
     tndParam_ = nullptr;
     tndSwizzleParam_ = nullptr;
     smallSDTilingData_ = nullptr;
-    if (fBaseParams.layoutType == INPUT_FORMAT_TND) {
-        auto *tilingData = this->context_->GetTilingData<FagSmallSDTilingWithTemplateFFTF>();
-        if (tilingData == nullptr) {
-            OP_LOGE("InitSmallSDTilingData", "Get SmallSD TND tiling data failed.");
-            return ge::GRAPH_FAILED;
-        }
-        smallSDTilingData_ = tilingData;
-    } else {
-        auto *tilingData = this->context_->GetTilingData<FagSmallSDTilingWithTemplateFFFF>();
-        if (tilingData == nullptr) {
-            OP_LOGE("InitSmallSDTilingData", "Get SmallSD base tiling data failed.");
-            return ge::GRAPH_FAILED;
-        }
-        smallSDTilingData_ = tilingData;
+    auto *tilingData = this->context_->GetTilingData<SmallSDTilingDataRegbase>();
+    if (tilingData == nullptr) {
+        OP_LOGE("InitSmallSDTilingData", "Get SmallSD tiling data failed.");
+        return ge::GRAPH_FAILED;
     }
+    smallSDTilingData_ = tilingData;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -2058,14 +2081,14 @@ void FlashAttentionScoreGradTilingNormalRegbase::ClearSmallSDScratch()
         smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_startN2Idx(0);
         smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_taskCount(0);
         smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_reserved(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_baseTaskPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qDyDqPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvDkDvPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_attentionPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_alignedAttentionPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_softmaxPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_baseTaskIndex(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qSeqPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvSeqPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qDyDqElementOffset(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvDkDvElementOffset(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_attentionElementPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_alignedAttentionElementPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_softmaxRowPrefix(0);
     }
 }
 
@@ -2100,7 +2123,7 @@ void FlashAttentionScoreGradTilingNormalRegbase::InitSmallSDFixedDerivedState()
         tndBaseInfo.tndPrefixSum[idx] = 0;
         tndBaseInfo.tndPrefixValidSum[idx] = 0;
     }
-    for (uint32_t idx = 0; idx < 32; ++idx) {
+    for (uint32_t idx = 0; idx < SmallSDArraySize(fBaseParams.dqIsNeedDeter); ++idx) {
         fBaseParams.dqIsNeedDeter[idx] = 0;
         fBaseParams.dkDvIsNeedDeter[idx] = 0;
     }
@@ -2109,7 +2132,7 @@ void FlashAttentionScoreGradTilingNormalRegbase::InitSmallSDFixedDerivedState()
         tndBaseInfo.tndSwizzleS1S2PrefixSum[idx] = 0;
         tndBaseInfo.tndSwizzleS1S2AlignPrefixSum[idx] = 0;
     }
-    for (uint32_t idx = 0; idx < 132; ++idx) {
+    for (uint32_t idx = 0; idx < SmallSDArraySize(fBaseParams.deterPrefix); ++idx) {
         fBaseParams.deterPrefix[idx] = 0;
         fBaseParams.deterPrefixAlign[idx] = 0;
         fBaseParams.deterPrefix0[idx] = 0;
@@ -2125,7 +2148,11 @@ void FlashAttentionScoreGradTilingNormalRegbase::InitSmallSDFixedDerivedState()
 ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDCoreRanges()
 {
     const uint64_t validBatch = static_cast<uint64_t>(fBaseParams.b);
-    const uint64_t validTaskCount = validBatch * static_cast<uint64_t>(fBaseParams.n2);
+    uint64_t validTaskCount = 0;
+    if (!SafeMulU64(validBatch, static_cast<uint64_t>(fBaseParams.n2), validTaskCount)) {
+        OP_LOGI(context_, "SmallSD core range overflow, validBatch[%lu], n2[%ld].", validBatch, fBaseParams.n2);
+        return ge::GRAPH_PARAM_INVALID;
+    }
     if (validTaskCount == 0 || fBaseParams.aicNum == 0 || validTaskCount > 0xFFFFFFFFULL) {
         OP_LOGI(context_, "SmallSD core range invalid, validTaskCount[%lu], aicNum[%lu].",
                 validTaskCount, fBaseParams.aicNum);
@@ -2172,15 +2199,7 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDCoreRang
 ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDTndCoreParams()
 {
     const bool isTnd = fBaseParams.layoutType == INPUT_FORMAT_TND;
-    uint64_t qPrefix = 0;
-    uint64_t kvPrefix = 0;
-    uint64_t attentionPrefix = 0;
-    uint64_t alignedAttentionPrefix = 0;
-    uint32_t nextCoreIdx = 0;
     const uint64_t n2 = static_cast<uint64_t>(fBaseParams.n2);
-    const uint64_t n2G = n2 * static_cast<uint64_t>(fBaseParams.g);
-    const uint64_t n2D = n2 * static_cast<uint64_t>(fBaseParams.d);
-    const uint64_t n2GD = n2G * static_cast<uint64_t>(fBaseParams.d);
     const uint32_t validBatch = static_cast<uint32_t>(fBaseParams.b);
 
     for (uint32_t coreIdx = 0; coreIdx < MAX_CORE_NUM; ++coreIdx) {
@@ -2188,14 +2207,14 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDTndCoreP
         smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_startN2Idx(0);
         smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_taskCount(0);
         smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_reserved(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_baseTaskPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qDyDqPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvDkDvPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_attentionPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_alignedAttentionPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_softmaxPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_baseTaskIndex(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qSeqPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvSeqPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qDyDqElementOffset(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvDkDvElementOffset(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_attentionElementPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_alignedAttentionElementPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_softmaxRowPrefix(0);
     }
     if (!isTnd) {
         return ge::GRAPH_SUCCESS;
@@ -2205,6 +2224,23 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDTndCoreP
         return ge::GRAPH_PARAM_INVALID;
     }
 
+    uint64_t n2G = 0;
+    uint64_t n2D = 0;
+    uint64_t n2Dv = 0;
+    uint64_t n2GD = 0;
+    uint64_t n2GDv = 0;
+    if (!SafeMulU64(n2, static_cast<uint64_t>(fBaseParams.g), n2G) ||
+        !SafeMulU64(n2, static_cast<uint64_t>(fBaseParams.d), n2D) ||
+        !SafeMulU64(n2, static_cast<uint64_t>(fBaseParams.d1), n2Dv) ||
+        !SafeMulU64(n2G, static_cast<uint64_t>(fBaseParams.d), n2GD) ||
+        !SafeMulU64(n2G, static_cast<uint64_t>(fBaseParams.d1), n2GDv)) {
+        return ge::GRAPH_PARAM_INVALID;
+    }
+
+    std::vector<uint64_t> qSeqPrefix(validBatch + 1, 0);
+    std::vector<uint64_t> kvSeqPrefix(validBatch + 1, 0);
+    std::vector<uint64_t> attentionElementPrefix(validBatch + 1, 0);
+    std::vector<uint64_t> alignedAttentionElementPrefix(validBatch + 1, 0);
     for (uint32_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
         const int64_t qLenSigned = fBaseParams.actualSeqQlen[batchIdx];
         const int64_t kvLenSigned = fBaseParams.actualSeqKvlen[batchIdx];
@@ -2216,46 +2252,105 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDTndCoreP
         if (qLen == 0 || kvLen == 0 || qLen >= 128 || kvLen >= 128) {
             return ge::GRAPH_PARAM_INVALID;
         }
-        const uint64_t baseTaskPrefix = static_cast<uint64_t>(batchIdx) * n2;
-        const uint64_t batchTaskEnd = baseTaskPrefix + n2;
-        while (nextCoreIdx < smallSDUsedCoreNum_ &&
-               smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart() < batchTaskEnd) {
-            const uint32_t blockStart = smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart();
-            const uint32_t groupCount = smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_groupCount();
-            if (groupCount == 0) {
-                ++nextCoreIdx;
-                continue;
-            }
-            if (static_cast<uint64_t>(blockStart) < baseTaskPrefix) {
-                return ge::GRAPH_PARAM_INVALID;
-            }
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_startBatchIdx(batchIdx);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_startN2Idx(
-                static_cast<uint32_t>(static_cast<uint64_t>(blockStart) - baseTaskPrefix));
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_taskCount(groupCount);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_reserved(0);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_baseTaskPrefix(baseTaskPrefix);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_qPrefix(qPrefix);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_kvPrefix(kvPrefix);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_qDyDqPrefix(qPrefix * n2GD);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_kvDkDvPrefix(kvPrefix * n2D);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_attentionPrefix(attentionPrefix);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_alignedAttentionPrefix(alignedAttentionPrefix);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_softmaxPrefix(qPrefix);
-            ++nextCoreIdx;
+        uint64_t batchAttentionElements = 0;
+        uint64_t batchAlignedAttentionElements = 0;
+        if (!SafeMulU64(qLen, kvLen, batchAttentionElements) ||
+            !SafeMulU64(qLen, static_cast<uint64_t>(AlignTo<int64_t>(kvLen, FP16_C0_SIZE)),
+                        batchAlignedAttentionElements) ||
+            !SafeAddU64(qSeqPrefix[batchIdx], qLen, qSeqPrefix[batchIdx + 1]) ||
+            !SafeAddU64(kvSeqPrefix[batchIdx], kvLen, kvSeqPrefix[batchIdx + 1]) ||
+            !SafeAddU64(attentionElementPrefix[batchIdx], batchAttentionElements,
+                        attentionElementPrefix[batchIdx + 1]) ||
+            !SafeAddU64(alignedAttentionElementPrefix[batchIdx], batchAlignedAttentionElements,
+                        alignedAttentionElementPrefix[batchIdx + 1])) {
+            return ge::GRAPH_PARAM_INVALID;
         }
-        qPrefix += qLen;
-        kvPrefix += kvLen;
-        attentionPrefix += qLen * kvLen;
-        alignedAttentionPrefix += qLen * static_cast<uint64_t>(AlignTo<int64_t>(kvLen, FP16_C0_SIZE));
     }
-    return nextCoreIdx == smallSDUsedCoreNum_ ? ge::GRAPH_SUCCESS : ge::GRAPH_PARAM_INVALID;
+
+    for (uint32_t coreIdx = 0; coreIdx < smallSDUsedCoreNum_; ++coreIdx) {
+        const auto &coreParam = smallSDTilingDataScratch_.coreTaskParam[coreIdx];
+        const uint32_t groupCount = coreParam.get_groupCount();
+        const uint32_t batchIdx = coreParam.get_startBatchIdx();
+        const uint32_t startN2Idx = coreParam.get_startN2Idx();
+        if (groupCount == 0 || batchIdx >= validBatch || startN2Idx >= fBaseParams.n2) {
+            return ge::GRAPH_PARAM_INVALID;
+        }
+        uint64_t baseTaskIndex = 0;
+        uint64_t qDyDqElementOffset = 0;
+        uint64_t kvDkDvElementOffset = 0;
+        uint64_t qDvElementOffset = 0;
+        uint64_t kvDvElementOffset = 0;
+        if (!SafeMulU64(static_cast<uint64_t>(batchIdx), n2, baseTaskIndex) ||
+            !SafeMulU64(qSeqPrefix[batchIdx], n2GD, qDyDqElementOffset) ||
+            !SafeMulU64(kvSeqPrefix[batchIdx], n2D, kvDkDvElementOffset) ||
+            !SafeMulU64(qSeqPrefix[batchIdx], n2GDv, qDvElementOffset) ||
+            !SafeMulU64(kvSeqPrefix[batchIdx], n2Dv, kvDvElementOffset)) {
+            return ge::GRAPH_PARAM_INVALID;
+        }
+        (void)qDvElementOffset;
+        (void)kvDvElementOffset;
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_startBatchIdx(batchIdx);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_startN2Idx(startN2Idx);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_taskCount(groupCount);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_reserved(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_baseTaskIndex(baseTaskIndex);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qSeqPrefix(qSeqPrefix[batchIdx]);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvSeqPrefix(kvSeqPrefix[batchIdx]);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qDyDqElementOffset(qDyDqElementOffset);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvDkDvElementOffset(kvDkDvElementOffset);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_attentionElementPrefix(attentionElementPrefix[batchIdx]);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_alignedAttentionElementPrefix(
+            alignedAttentionElementPrefix[batchIdx]);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_softmaxRowPrefix(qSeqPrefix[batchIdx]);
+    }
+    return ge::GRAPH_SUCCESS;
 }
 
-void FlashAttentionScoreGradTilingNormalRegbase::FillSmallSDBaseParam()
+ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::FillSmallSDBaseParam()
 {
+    if (fBaseParams.b < static_cast<int64_t>(fBaseParams.tailZeroCount)) {
+        return ge::GRAPH_PARAM_INVALID;
+    }
     auto &baseParam = smallSDTilingDataScratch_.baseParam;
-    baseParam.set_bSize(static_cast<uint32_t>(fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount)));
+    const uint64_t validB = static_cast<uint64_t>(fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount));
+    const uint64_t b = static_cast<uint64_t>(fBaseParams.b);
+    const uint64_t n2 = static_cast<uint64_t>(fBaseParams.n2);
+    const uint64_t g = static_cast<uint64_t>(fBaseParams.g);
+    const uint64_t s1 = static_cast<uint64_t>(fBaseParams.s1);
+    const uint64_t s2 = static_cast<uint64_t>(fBaseParams.s2);
+    const uint64_t d = static_cast<uint64_t>(fBaseParams.d);
+    const uint64_t dv = static_cast<uint64_t>(fBaseParams.d1);
+    const uint64_t inputElemBytes = static_cast<uint64_t>(sizeof(uint16_t));
+    const uint64_t calcElemBytes = static_cast<uint64_t>(sizeof(float));
+    const uint64_t outputElemBytes = static_cast<uint64_t>(sizeof(uint16_t));
+    const uint64_t s2Align16 = static_cast<uint64_t>(AlignTo<int64_t>(fBaseParams.s2, FP16_C0_SIZE));
+
+    uint64_t n2G = 0;
+    uint64_t gD = 0;
+    uint64_t n2D = 0;
+    uint64_t n2Dv = 0;
+    uint64_t n2GD = 0;
+    uint64_t n2GDv = 0;
+    uint64_t s1D = 0;
+    uint64_t s2D = 0;
+    uint64_t s2Dv = 0;
+    uint64_t s1S2 = 0;
+    uint64_t attentionStrideB = 0;
+    uint64_t softmaxStrideB = 0;
+    uint64_t workspaceEnd = 0;
+    if (!SafeMulU64(n2, g, n2G) || !SafeMulU64(g, d, gD) || !SafeMulU64(n2, d, n2D) ||
+        !SafeMulU64(n2, dv, n2Dv) || !SafeMulU64(n2G, d, n2GD) || !SafeMulU64(s1, d, s1D) ||
+        !SafeMulU64(n2G, dv, n2GDv) || !SafeMulU64(s2, d, s2D) || !SafeMulU64(s2, dv, s2Dv) ||
+        !SafeMulU64(s1, s2, s1S2) ||
+        !SafeMulU64(n2, s1S2, attentionStrideB) || !SafeMulU64(n2, s1, softmaxStrideB) ||
+        !SafeAddU64(RESERVED_WORKSPACE_SIZE, static_cast<uint64_t>(smallSDWorkspaceSize_), workspaceEnd)) {
+        OP_LOGI(context_, "SmallSD base/layout parameter overflow.");
+        return ge::GRAPH_PARAM_INVALID;
+    }
+    (void)workspaceEnd;
+    (void)n2GDv;
+
+    baseParam.set_bSize(static_cast<uint32_t>(validB));
     baseParam.set_n1Size(static_cast<uint32_t>(fBaseParams.n1));
     baseParam.set_n2Size(static_cast<uint32_t>(fBaseParams.n2));
     baseParam.set_gSize(static_cast<uint32_t>(fBaseParams.g));
@@ -2273,68 +2368,59 @@ void FlashAttentionScoreGradTilingNormalRegbase::FillSmallSDBaseParam()
     baseParam.set_validTaskCount(smallSDValidTaskCount_);
     baseParam.set_isTnd(fBaseParams.layoutType == INPUT_FORMAT_TND ? 1U : 0U);
     baseParam.set_isSingleTask(smallSDValidTaskCount_ == 1U ? 1U : 0U);
-    baseParam.set_s2Align16(static_cast<uint32_t>(AlignTo<int64_t>(fBaseParams.s2, FP16_C0_SIZE)));
+    baseParam.set_s2Align16(static_cast<uint32_t>(s2Align16));
     baseParam.set_workspaceBaseOffset(RESERVED_WORKSPACE_SIZE);
     baseParam.set_workspaceSize(static_cast<uint64_t>(smallSDWorkspaceSize_));
     baseParam.set_scaleValue(fBaseParams.scaleValue);
 
     auto &layoutParam = smallSDTilingDataScratch_.layoutParam;
-    const uint64_t b = static_cast<uint64_t>(fBaseParams.b);
-    const uint64_t n2 = static_cast<uint64_t>(fBaseParams.n2);
-    const uint64_t g = static_cast<uint64_t>(fBaseParams.g);
-    const uint64_t s1 = static_cast<uint64_t>(fBaseParams.s1);
-    const uint64_t s2 = static_cast<uint64_t>(fBaseParams.s2);
-    const uint64_t d = static_cast<uint64_t>(fBaseParams.d);
-    const uint64_t dv = static_cast<uint64_t>(fBaseParams.d1);
-    const uint64_t n2G = n2 * g;
-    const uint64_t gD = g * d;
-    const uint64_t s1D = s1 * d;
-    const uint64_t s2D = s2 * d;
-    const uint64_t s2Dv = s2 * dv;
-    const uint64_t inputElemBytes = static_cast<uint64_t>(sizeof(uint16_t));
-    const uint64_t calcElemBytes = static_cast<uint64_t>(sizeof(float));
-    const uint64_t outputElemBytes = static_cast<uint64_t>(sizeof(uint16_t));
 
     if (fBaseParams.layoutType == INPUT_FORMAT_TND) {
         layoutParam.qStrideB = 0;
         layoutParam.qStrideN2 = gD;
-        layoutParam.qStrideS = n2G * d;
+        layoutParam.qStrideS = n2GD;
         layoutParam.kStrideB = 0;
         layoutParam.kStrideN2 = d;
-        layoutParam.kStrideS = n2 * d;
+        layoutParam.kStrideS = n2D;
         layoutParam.vStrideB = 0;
         layoutParam.vStrideN2 = dv;
-        layoutParam.vStrideS = n2 * dv;
+        layoutParam.vStrideS = n2Dv;
     } else if (fBaseParams.layoutType == INPUT_FORMAT_BN2GS2D) {
-        layoutParam.qStrideB = n2G * s1D;
-        layoutParam.qStrideN2 = g * s1D;
+        if (!SafeMulU64(n2G, s1D, layoutParam.qStrideB) ||
+            !SafeMulU64(g, s1D, layoutParam.qStrideN2) ||
+            !SafeMulU64(n2, s2D, layoutParam.kStrideB) ||
+            !SafeMulU64(n2, s2Dv, layoutParam.vStrideB)) {
+            return ge::GRAPH_PARAM_INVALID;
+        }
         layoutParam.qStrideS = d;
-        layoutParam.kStrideB = n2 * s2D;
         layoutParam.kStrideN2 = s2D;
         layoutParam.kStrideS = d;
-        layoutParam.vStrideB = n2 * s2Dv;
         layoutParam.vStrideN2 = s2Dv;
         layoutParam.vStrideS = dv;
     } else if (fBaseParams.layoutType == INPUT_FORMAT_S2BN2GD) {
-        layoutParam.qStrideB = n2G * d;
+        if (!SafeMulU64(b, n2GD, layoutParam.qStrideS) ||
+            !SafeMulU64(b, n2D, layoutParam.kStrideS) ||
+            !SafeMulU64(b, n2Dv, layoutParam.vStrideS)) {
+            return ge::GRAPH_PARAM_INVALID;
+        }
+        layoutParam.qStrideB = n2GD;
         layoutParam.qStrideN2 = gD;
-        layoutParam.qStrideS = b * n2G * d;
-        layoutParam.kStrideB = n2 * d;
+        layoutParam.kStrideB = n2D;
         layoutParam.kStrideN2 = d;
-        layoutParam.kStrideS = b * n2 * d;
-        layoutParam.vStrideB = n2 * dv;
+        layoutParam.vStrideB = n2Dv;
         layoutParam.vStrideN2 = dv;
-        layoutParam.vStrideS = b * n2 * dv;
     } else {
-        layoutParam.qStrideB = n2G * s1D;
+        if (!SafeMulU64(n2G, s1D, layoutParam.qStrideB) ||
+            !SafeMulU64(n2, s2D, layoutParam.kStrideB) ||
+            !SafeMulU64(n2, s2Dv, layoutParam.vStrideB)) {
+            return ge::GRAPH_PARAM_INVALID;
+        }
         layoutParam.qStrideN2 = gD;
-        layoutParam.qStrideS = n2G * d;
-        layoutParam.kStrideB = n2 * s2D;
+        layoutParam.qStrideS = n2GD;
         layoutParam.kStrideN2 = d;
-        layoutParam.kStrideS = n2 * d;
-        layoutParam.vStrideB = n2 * s2Dv;
+        layoutParam.kStrideS = n2D;
         layoutParam.vStrideN2 = dv;
-        layoutParam.vStrideS = n2 * dv;
+        layoutParam.vStrideS = n2Dv;
     }
     layoutParam.dyStrideB = layoutParam.qStrideB;
     layoutParam.dyStrideN2 = layoutParam.qStrideN2;
@@ -2348,40 +2434,43 @@ void FlashAttentionScoreGradTilingNormalRegbase::FillSmallSDBaseParam()
     layoutParam.dvStrideB = layoutParam.vStrideB;
     layoutParam.dvStrideN2 = layoutParam.vStrideN2;
     layoutParam.dvStrideS = layoutParam.vStrideS;
-    layoutParam.attentionStrideB = n2 * s1 * s2;
-    layoutParam.attentionStrideN2 = s1 * s2;
+    layoutParam.attentionStrideB = attentionStrideB;
+    layoutParam.attentionStrideN2 = s1S2;
     layoutParam.attentionStrideS = s2;
-    layoutParam.softmaxStrideB = n2 * s1;
+    layoutParam.softmaxStrideB = softmaxStrideB;
     layoutParam.softmaxStrideN2 = s1;
     layoutParam.softmaxStrideS = 1;
-    layoutParam.qMatrixElements = s1 * d;
-    layoutParam.kMatrixElements = s2 * d;
-    layoutParam.vMatrixElements = s2 * dv;
-    layoutParam.dyMatrixElements = s1 * d;
-    layoutParam.dqMatrixElements = s1 * d;
-    layoutParam.dkMatrixElements = s2 * d;
-    layoutParam.dvMatrixElements = s2 * dv;
-    layoutParam.cubeResultElements = s1 * s2;
-    layoutParam.vectorTempElements = s1 * s2;
-    layoutParam.qMatrixBytes = layoutParam.qMatrixElements * inputElemBytes;
-    layoutParam.kMatrixBytes = layoutParam.kMatrixElements * inputElemBytes;
-    layoutParam.vMatrixBytes = layoutParam.vMatrixElements * inputElemBytes;
-    layoutParam.dyMatrixBytes = layoutParam.dyMatrixElements * inputElemBytes;
-    layoutParam.dqMatrixBytes = layoutParam.dqMatrixElements * outputElemBytes;
-    layoutParam.dkMatrixBytes = layoutParam.dkMatrixElements * outputElemBytes;
-    layoutParam.dvMatrixBytes = layoutParam.dvMatrixElements * outputElemBytes;
-    layoutParam.cubeResultBytes = layoutParam.cubeResultElements * calcElemBytes;
-    layoutParam.vectorTempBytes = layoutParam.vectorTempElements * calcElemBytes;
+    layoutParam.qMatrixElements = s1D;
+    layoutParam.kMatrixElements = s2D;
+    layoutParam.vMatrixElements = s2Dv;
+    layoutParam.dyMatrixElements = s1D;
+    layoutParam.dqMatrixElements = s1D;
+    layoutParam.dkMatrixElements = s2D;
+    layoutParam.dvMatrixElements = s2Dv;
+    layoutParam.cubeResultElements = s1S2;
+    layoutParam.vectorTempElements = s1S2;
+    if (!SafeMulU64(layoutParam.qMatrixElements, inputElemBytes, layoutParam.qMatrixBytes) ||
+        !SafeMulU64(layoutParam.kMatrixElements, inputElemBytes, layoutParam.kMatrixBytes) ||
+        !SafeMulU64(layoutParam.vMatrixElements, inputElemBytes, layoutParam.vMatrixBytes) ||
+        !SafeMulU64(layoutParam.dyMatrixElements, inputElemBytes, layoutParam.dyMatrixBytes) ||
+        !SafeMulU64(layoutParam.dqMatrixElements, outputElemBytes, layoutParam.dqMatrixBytes) ||
+        !SafeMulU64(layoutParam.dkMatrixElements, outputElemBytes, layoutParam.dkMatrixBytes) ||
+        !SafeMulU64(layoutParam.dvMatrixElements, outputElemBytes, layoutParam.dvMatrixBytes) ||
+        !SafeMulU64(layoutParam.cubeResultElements, calcElemBytes, layoutParam.cubeResultBytes) ||
+        !SafeMulU64(layoutParam.vectorTempElements, calcElemBytes, layoutParam.vectorTempBytes)) {
+        return ge::GRAPH_PARAM_INVALID;
+    }
     layoutParam.dTemplateCapacity = static_cast<uint32_t>(
         fBaseParams.d <= static_cast<int64_t>(ConstAxisTemplateNum::NUM64) ?
             ConstAxisTemplateNum::NUM64 : ConstAxisTemplateNum::NUM128);
     layoutParam.s1Size = static_cast<uint32_t>(s1);
     layoutParam.s2Size = static_cast<uint32_t>(s2);
-    layoutParam.s2Align16 = static_cast<uint32_t>(AlignTo<int64_t>(fBaseParams.s2, FP16_C0_SIZE));
+    layoutParam.s2Align16 = static_cast<uint32_t>(s2Align16);
     layoutParam.aivFirstHalfS1 = static_cast<uint32_t>((fBaseParams.s1 + 1) >> 1);
     layoutParam.aivHalfS1 = layoutParam.aivFirstHalfS1;
     layoutParam.aivFirstHalfS2 = static_cast<uint32_t>((fBaseParams.s2 + 1) >> 1);
     layoutParam.aivHalfS2 = layoutParam.aivFirstHalfS2;
+    return ge::GRAPH_SUCCESS;
 }
 
 void FlashAttentionScoreGradTilingNormalRegbase::SetSmallSDWorkspace()
@@ -2435,21 +2524,26 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
     }
     if (fBaseParams.layoutType == INPUT_FORMAT_TND) {
         const auto validBatch = static_cast<size_t>(fBaseParams.b);
+        uint64_t expectedTaskCount = 0;
+        uint64_t n2G = 0;
+        uint64_t n2D = 0;
+        uint64_t n2GD = 0;
         if (fBaseParams.tailZeroCount != 0 || fBaseParams.sValueZeroUnderTND || tndBaseInfo.isSeqExistZero ||
             fBaseParams.actualSeqQlen.size() < validBatch || fBaseParams.actualSeqKvlen.size() < validBatch ||
-            smallSDValidTaskCount_ != static_cast<uint64_t>(fBaseParams.b) * static_cast<uint64_t>(fBaseParams.n2)) {
+            !SafeMulU64(static_cast<uint64_t>(fBaseParams.b), static_cast<uint64_t>(fBaseParams.n2),
+                        expectedTaskCount) ||
+            smallSDValidTaskCount_ != expectedTaskCount ||
+            !SafeMulU64(static_cast<uint64_t>(fBaseParams.n2), static_cast<uint64_t>(fBaseParams.g), n2G) ||
+            !SafeMulU64(static_cast<uint64_t>(fBaseParams.n2), static_cast<uint64_t>(fBaseParams.d), n2D) ||
+            !SafeMulU64(n2G, static_cast<uint64_t>(fBaseParams.d), n2GD)) {
             return false;
         }
-        uint64_t qPrefix = 0;
-        uint64_t kvPrefix = 0;
-        uint64_t attentionPrefix = 0;
-        uint64_t alignedAttentionPrefix = 0;
         const uint64_t n2 = static_cast<uint64_t>(fBaseParams.n2);
-        const uint64_t n2G = n2 * static_cast<uint64_t>(fBaseParams.g);
-        const uint64_t n2D = n2 * static_cast<uint64_t>(fBaseParams.d);
-        const uint64_t n2GD = n2G * static_cast<uint64_t>(fBaseParams.d);
-        uint32_t nextCoreIdx = 0;
-        for (uint32_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
+        std::vector<uint64_t> qSeqPrefix(validBatch + 1, 0);
+        std::vector<uint64_t> kvSeqPrefix(validBatch + 1, 0);
+        std::vector<uint64_t> attentionElementPrefix(validBatch + 1, 0);
+        std::vector<uint64_t> alignedAttentionElementPrefix(validBatch + 1, 0);
+        for (size_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
             const int64_t qLenSigned = fBaseParams.actualSeqQlen[batchIdx];
             const int64_t kvLenSigned = fBaseParams.actualSeqKvlen[batchIdx];
             if (qLenSigned <= 0 || kvLenSigned <= 0) {
@@ -2460,53 +2554,63 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
             if (qLen == 0 || kvLen == 0 || qLen >= 128 || kvLen >= 128) {
                 return false;
             }
-            const uint64_t baseTaskPrefix = static_cast<uint64_t>(batchIdx) * n2;
-            const uint64_t batchTaskEnd = baseTaskPrefix + n2;
-            while (nextCoreIdx < smallSDUsedCoreNum_ &&
-                   smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart() <
-                       batchTaskEnd) {
-                const auto &tndParam = smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx];
-                const uint32_t blockStart = smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart();
-                const uint32_t groupCount = smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_groupCount();
-                if (static_cast<uint64_t>(blockStart) < baseTaskPrefix) {
-                    return false;
-                }
-                if (tndParam.get_startBatchIdx() != batchIdx ||
-                    tndParam.get_startN2Idx() !=
-                        static_cast<uint32_t>(static_cast<uint64_t>(blockStart) - baseTaskPrefix) ||
-                    tndParam.get_taskCount() != groupCount || tndParam.get_reserved() != 0 ||
-                    tndParam.get_baseTaskPrefix() != baseTaskPrefix ||
-                    tndParam.get_qPrefix() != qPrefix || tndParam.get_kvPrefix() != kvPrefix ||
-                    tndParam.get_qDyDqPrefix() != qPrefix * n2GD ||
-                    tndParam.get_kvDkDvPrefix() != kvPrefix * n2D ||
-                    tndParam.get_attentionPrefix() != attentionPrefix ||
-                    tndParam.get_alignedAttentionPrefix() != alignedAttentionPrefix ||
-                    tndParam.get_softmaxPrefix() != qPrefix) {
-                    return false;
-                }
-                ++nextCoreIdx;
+            uint64_t batchAttentionElements = 0;
+            uint64_t batchAlignedAttentionElements = 0;
+            if (!SafeMulU64(qLen, kvLen, batchAttentionElements) ||
+                !SafeMulU64(qLen, static_cast<uint64_t>(AlignTo<int64_t>(kvLen, FP16_C0_SIZE)),
+                            batchAlignedAttentionElements) ||
+                !SafeAddU64(qSeqPrefix[batchIdx], qLen, qSeqPrefix[batchIdx + 1]) ||
+                !SafeAddU64(kvSeqPrefix[batchIdx], kvLen, kvSeqPrefix[batchIdx + 1]) ||
+                !SafeAddU64(attentionElementPrefix[batchIdx], batchAttentionElements,
+                            attentionElementPrefix[batchIdx + 1]) ||
+                !SafeAddU64(alignedAttentionElementPrefix[batchIdx], batchAlignedAttentionElements,
+                            alignedAttentionElementPrefix[batchIdx + 1])) {
+                return false;
             }
-            qPrefix += static_cast<uint64_t>(qLen);
-            kvPrefix += static_cast<uint64_t>(kvLen);
-            attentionPrefix += static_cast<uint64_t>(qLen) * static_cast<uint64_t>(kvLen);
-            alignedAttentionPrefix += static_cast<uint64_t>(qLen) *
-                                      static_cast<uint64_t>(AlignTo<int64_t>(kvLen, FP16_C0_SIZE));
         }
-        if (qPrefix > static_cast<uint64_t>(fBaseParams.t1) || kvPrefix > static_cast<uint64_t>(fBaseParams.t2) ||
-            attentionPrefix > static_cast<uint64_t>(fBaseParams.sumS1S2Product)) {
-            return false;
+        for (uint32_t coreIdx = 0; coreIdx < smallSDUsedCoreNum_; ++coreIdx) {
+            const auto &coreParam = smallSDTilingDataScratch_.coreTaskParam[coreIdx];
+            const auto &tndParam = smallSDTilingDataScratch_.tndCoreParam[coreIdx];
+            const uint32_t blockStart = coreParam.get_blockStart();
+            const uint32_t groupCount = coreParam.get_groupCount();
+            const uint32_t batchIdx = coreParam.get_startBatchIdx();
+            const uint32_t startN2Idx = coreParam.get_startN2Idx();
+            uint64_t baseTaskIndex = 0;
+            uint64_t qDyDqElementOffset = 0;
+            uint64_t kvDkDvElementOffset = 0;
+            if (batchIdx >= validBatch || startN2Idx >= fBaseParams.n2 ||
+                !SafeMulU64(static_cast<uint64_t>(batchIdx), n2, baseTaskIndex) ||
+                !SafeMulU64(qSeqPrefix[batchIdx], n2GD, qDyDqElementOffset) ||
+                !SafeMulU64(kvSeqPrefix[batchIdx], n2D, kvDkDvElementOffset)) {
+                return false;
+            }
+            if (tndParam.get_startBatchIdx() != batchIdx || tndParam.get_startN2Idx() != startN2Idx ||
+                tndParam.get_taskCount() != groupCount || tndParam.get_reserved() != 0 ||
+                tndParam.get_baseTaskIndex() != baseTaskIndex ||
+                tndParam.get_qSeqPrefix() != qSeqPrefix[batchIdx] ||
+                tndParam.get_kvSeqPrefix() != kvSeqPrefix[batchIdx] ||
+                tndParam.get_qDyDqElementOffset() != qDyDqElementOffset ||
+                tndParam.get_kvDkDvElementOffset() != kvDkDvElementOffset ||
+                tndParam.get_attentionElementPrefix() != attentionElementPrefix[batchIdx] ||
+                tndParam.get_alignedAttentionElementPrefix() != alignedAttentionElementPrefix[batchIdx] ||
+                tndParam.get_softmaxRowPrefix() != qSeqPrefix[batchIdx] ||
+                tndParam.get_baseTaskIndex() != blockStart - startN2Idx) {
+                return false;
+            }
         }
-        if (nextCoreIdx != smallSDUsedCoreNum_) {
+        if (qSeqPrefix[validBatch] > static_cast<uint64_t>(fBaseParams.t1) ||
+            kvSeqPrefix[validBatch] > static_cast<uint64_t>(fBaseParams.t2) ||
+            attentionElementPrefix[validBatch] > static_cast<uint64_t>(fBaseParams.sumS1S2Product)) {
             return false;
         }
         for (uint32_t coreIdx = smallSDUsedCoreNum_; coreIdx < MAX_CORE_NUM; ++coreIdx) {
             const auto &tndParam = smallSDTilingDataScratch_.tndCoreParam[coreIdx];
             if (tndParam.get_startBatchIdx() != 0 || tndParam.get_startN2Idx() != 0 ||
                 tndParam.get_taskCount() != 0 || tndParam.get_reserved() != 0 ||
-                tndParam.get_baseTaskPrefix() != 0 || tndParam.get_qPrefix() != 0 ||
-                tndParam.get_kvPrefix() != 0 || tndParam.get_qDyDqPrefix() != 0 ||
-                tndParam.get_kvDkDvPrefix() != 0 || tndParam.get_attentionPrefix() != 0 ||
-                tndParam.get_alignedAttentionPrefix() != 0 || tndParam.get_softmaxPrefix() != 0) {
+                tndParam.get_baseTaskIndex() != 0 || tndParam.get_qSeqPrefix() != 0 ||
+                tndParam.get_kvSeqPrefix() != 0 || tndParam.get_qDyDqElementOffset() != 0 ||
+                tndParam.get_kvDkDvElementOffset() != 0 || tndParam.get_attentionElementPrefix() != 0 ||
+                tndParam.get_alignedAttentionElementPrefix() != 0 || tndParam.get_softmaxRowPrefix() != 0) {
                 return false;
             }
         }
@@ -2538,7 +2642,11 @@ FlashAttentionScoreGradTilingNormalRegbase::FinalizeSmallSDTiling()
         return {ret == ge::GRAPH_PARAM_INVALID ? SmallSDFinalizeStatus::FALLBACK : SmallSDFinalizeStatus::ERROR, ret};
     }
     SetSmallSDWorkspace();
-    FillSmallSDBaseParam();
+    ret = FillSmallSDBaseParam();
+    if (ret != ge::GRAPH_SUCCESS) {
+        rollbackToRegBase();
+        return {ret == ge::GRAPH_PARAM_INVALID ? SmallSDFinalizeStatus::FALLBACK : SmallSDFinalizeStatus::ERROR, ret};
+    }
     if (!ValidateSmallSDInvariant()) {
         OP_LOGI(context_, "SmallSD invariant check failed, fallback to RegBase normal path.");
         rollbackToRegBase();
