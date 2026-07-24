@@ -193,12 +193,6 @@ ge::graphStatus MQSMLATilingCheck::CheckSoftmaxLse() const
                 "The dtype of softmax_lse must be FLOAT");
             return ge::GRAPH_FAILED;
         }
-    } else {
-        OP_CHECK_IF(opParamInfo_.softmaxLse.shape != nullptr &&
-            opParamInfo_.softmaxLse.shape->GetStorageShape().GetShapeSize() != 0,
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "softmaxLse",
-                "When return_softmax_lse is false, softmax_lse tensor must be empty tensor"),
-            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -344,7 +338,6 @@ ge::graphStatus MQSMLATilingCheck::CheckActualSeqLensDType()
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "sequsedOriKv",
             MQSMLADataTypeToSerialString(opParamInfo_.sequsedOriKv.desc->GetDataType()).c_str(),
             "sequsedOriKv's dtype should be DT_INT32");
-        
             return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
