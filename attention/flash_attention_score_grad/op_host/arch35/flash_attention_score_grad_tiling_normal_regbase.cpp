@@ -434,6 +434,8 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::DoOpTiling()
     DetermineMode(fBaseParams);
     fBaseParams.isSmallSD = IsSmallSDEligible(fBaseParams, tndBaseInfo) && IsSmallSDProfitable(fBaseParams);
     if (fBaseParams.isSmallSD) {
+        const auto savedFBaseParams = fBaseParams;
+        const auto savedTndBaseInfo = tndBaseInfo;
         auto ret = FinalizeSmallSDTiling();
         if (ret == ge::GRAPH_SUCCESS) {
             return ge::GRAPH_SUCCESS;
@@ -441,6 +443,8 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::DoOpTiling()
         if (ret != ge::GRAPH_PARAM_INVALID) {
             return ret;
         }
+        fBaseParams = savedFBaseParams;
+        tndBaseInfo = savedTndBaseInfo;
         fBaseParams.isSmallSD = false;
         ResetSmallSDDerivedState(true);
     }
@@ -1459,9 +1463,10 @@ uint64_t FlashAttentionScoreGradTilingNormalRegbase::GetTilingKey() const
     auto isRegbasePlatformValue = OptionEnum::ENABLE;
     auto isTnd = (fBaseParams.layoutType == INPUT_FORMAT_TND);
     auto splitAxis = fBaseParams.splitAxis;
-    bool isDeterNEqual = fBaseParams.deterSparseType != static_cast<uint32_t>(DeterSparseType::DETER_OLD) &&
-                         fBaseParams.deterSparseType != static_cast<uint32_t>(DeterSparseType::NO_DETER) &&
-                         fBaseParams.g == 1;
+    bool isDeterNEqual = fBaseParams.isSmallSD ||
+                         (fBaseParams.deterSparseType != static_cast<uint32_t>(DeterSparseType::DETER_OLD) &&
+                          fBaseParams.deterSparseType != static_cast<uint32_t>(DeterSparseType::NO_DETER) &&
+                          fBaseParams.g == 1);
     OP_LOGI(
         context_,
         "splitAxis[%d], inputDtype[%d], isTnd[%d], dropValue[%d], pseValue[%d], attenMaskCfg[%d], s1TemplateType[%d], "
@@ -1961,11 +1966,25 @@ void FlashAttentionScoreGradTilingNormalRegbase::ResetSmallSDDerivedState(bool f
     tndBaseInfo.isTndSwizzle = false;
 }
 
+uint32_t FlashAttentionScoreGradTilingNormalRegbase::GetSmallSDTndActiveBatchCount() const
+{
+    if (fBaseParams.layoutType != INPUT_FORMAT_TND) {
+        return static_cast<uint32_t>(fBaseParams.b);
+    }
+    uint32_t activeBatchCount = 0;
+    const uint32_t validBatch = static_cast<uint32_t>(fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount));
+    for (uint32_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
+        if (fBaseParams.actualSeqQlen[batchIdx] > 0 && fBaseParams.actualSeqKvlen[batchIdx] > 0) {
+            ++activeBatchCount;
+        }
+    }
+    return activeBatchCount;
+}
+
 ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDCoreRanges()
 {
     const uint64_t validBatch = static_cast<uint64_t>(
-        fBaseParams.layoutType == INPUT_FORMAT_TND ? fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount) :
-                                                     fBaseParams.b);
+        fBaseParams.layoutType == INPUT_FORMAT_TND ? GetSmallSDTndActiveBatchCount() : fBaseParams.b);
     const uint64_t validTaskCount = validBatch * static_cast<uint64_t>(fBaseParams.n2);
     if (validTaskCount == 0 || fBaseParams.aicNum == 0 || validTaskCount > 0xFFFFFFFFULL) {
         OP_LOGI(context_, "SmallSD core range invalid, validTaskCount[%lu], aicNum[%lu].",
@@ -2021,6 +2040,7 @@ void FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDTndCoreParams()
     const uint64_t n2GD = n2G * static_cast<uint64_t>(fBaseParams.d);
     const uint64_t n2GDv = n2G * static_cast<uint64_t>(fBaseParams.d1);
     const uint32_t validBatch = static_cast<uint32_t>(fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount));
+    uint64_t compactTaskPrefix = 0;
 
     for (uint32_t coreIdx = 0; coreIdx < MAX_CORE_NUM; ++coreIdx) {
         smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_startBatchIdx(0);
@@ -2039,16 +2059,27 @@ void FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDTndCoreParams()
     }
 
     for (uint32_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
+        const uint64_t qLen = static_cast<uint64_t>(fBaseParams.actualSeqQlen[batchIdx]);
+        const uint64_t kLen = static_cast<uint64_t>(fBaseParams.actualSeqKvlen[batchIdx]);
+        const bool hasTask = qLen > 0 && kLen > 0;
+        if (!hasTask) {
+            qPrefix += qLen;
+            kPrefix += kLen;
+            attentionPrefix += qLen * kLen;
+            alignedAttentionPrefix += qLen * static_cast<uint64_t>(AlignTo<int64_t>(kLen, FP16_C0_SIZE));
+            continue;
+        }
         while (nextCoreIdx < smallSDUsedCoreNum_ &&
-               smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart() < (batchIdx + 1U) * n2) {
+               smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart() < compactTaskPrefix + n2) {
             const uint32_t blockStart = smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart();
             if (smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_groupCount() == 0) {
                 ++nextCoreIdx;
                 continue;
             }
             smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_startBatchIdx(batchIdx);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_startN2Idx(blockStart - batchIdx * n2);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_baseTaskPrefix(batchIdx * n2);
+            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_startN2Idx(
+                static_cast<uint32_t>(static_cast<uint64_t>(blockStart) - compactTaskPrefix));
+            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_baseTaskPrefix(compactTaskPrefix);
             smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_qPrefixOffset(qPrefix * n2GD);
             smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_kPrefixOffset(kPrefix * n2D);
             smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_qDvPrefixOffset(qPrefix * n2GDv);
@@ -2058,8 +2089,7 @@ void FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDTndCoreParams()
             smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_s2PrefixSize(kPrefix);
             ++nextCoreIdx;
         }
-        const uint64_t qLen = static_cast<uint64_t>(fBaseParams.actualSeqQlen[batchIdx]);
-        const uint64_t kLen = static_cast<uint64_t>(fBaseParams.actualSeqKvlen[batchIdx]);
+        compactTaskPrefix += n2;
         qPrefix += qLen;
         kPrefix += kLen;
         attentionPrefix += qLen * kLen;
@@ -2115,8 +2145,7 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
         fBaseParams.attenMaskOptional != EMPTY_TENSOR || fBaseParams.dropMaskOuter ||
         fBaseParams.sinkOptional == NORMAL_TENSOR || fBaseParams.hasRope || fBaseParams.isDeterministic ||
         fBaseParams.isBn2MultiBlk || fBaseParams.isNzOut || fBaseParams.d1 != fBaseParams.d ||
-        tndBaseInfo.isTndSwizzle || fBaseParams.enableSwizzle || fBaseParams.tailZeroCount != 0 ||
-        fBaseParams.enablePreSfmg) {
+        tndBaseInfo.isTndSwizzle || fBaseParams.enableSwizzle || fBaseParams.enablePreSfmg) {
         return false;
     }
     if (smallSDUsedCoreNum_ == 0 || smallSDUsedCoreNum_ > fBaseParams.aicNum || smallSDValidTaskCount_ == 0) {
@@ -2156,20 +2185,28 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
         const uint64_t n2GD = n2G * static_cast<uint64_t>(fBaseParams.d);
         const uint64_t n2GDv = n2G * static_cast<uint64_t>(fBaseParams.d1);
         uint32_t nextCoreIdx = 0;
+        uint64_t compactTaskPrefix = 0;
         for (uint32_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
             const int64_t qLen = fBaseParams.actualSeqQlen[batchIdx];
             const int64_t kLen = fBaseParams.actualSeqKvlen[batchIdx];
-            if (qLen <= 0 || kLen <= 0 || qLen > 128 || kLen > 128) {
+            if (qLen < 0 || kLen < 0 || qLen > 128 || kLen > 128) {
                 return false;
+            }
+            if (qLen == 0 || kLen == 0) {
+                if (qLen != 0 || kLen != 0) {
+                    return false;
+                }
+                continue;
             }
             while (nextCoreIdx < smallSDUsedCoreNum_ &&
                    smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart() <
-                       (batchIdx + 1U) * static_cast<uint32_t>(fBaseParams.n2)) {
+                       compactTaskPrefix + n2) {
                 const auto &tndParam = smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx];
                 const uint32_t blockStart = smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart();
                 if (tndParam.get_startBatchIdx() != batchIdx ||
-                    tndParam.get_startN2Idx() != blockStart - batchIdx * static_cast<uint32_t>(fBaseParams.n2) ||
-                    tndParam.get_baseTaskPrefix() != batchIdx * static_cast<uint32_t>(fBaseParams.n2) ||
+                    tndParam.get_startN2Idx() !=
+                        static_cast<uint32_t>(static_cast<uint64_t>(blockStart) - compactTaskPrefix) ||
+                    tndParam.get_baseTaskPrefix() != compactTaskPrefix ||
                     tndParam.get_qPrefixOffset() != qPrefix * n2GD ||
                     tndParam.get_kPrefixOffset() != kPrefix * n2D ||
                     tndParam.get_qDvPrefixOffset() != qPrefix * n2GDv ||
@@ -2181,6 +2218,7 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
                 }
                 ++nextCoreIdx;
             }
+            compactTaskPrefix += n2;
             qPrefix += static_cast<uint64_t>(qLen);
             kPrefix += static_cast<uint64_t>(kLen);
             attentionPrefix += static_cast<uint64_t>(qLen) * static_cast<uint64_t>(kLen);

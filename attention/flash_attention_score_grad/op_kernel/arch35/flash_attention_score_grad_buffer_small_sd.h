@@ -48,22 +48,30 @@ struct SmallSDConstInfo {
     uint32_t isTnd = 0;
     uint32_t isSingleTask = 0;
     uint32_t s2Align16 = 0;
+    uint32_t tndMaxSumLayout = 0;
     float scale = 1.0f;
 
     uint64_t qStrideB = 0;
     uint64_t qStrideN2 = 0;
+    uint64_t qStrideS = 0;
     uint64_t kStrideB = 0;
     uint64_t kStrideN2 = 0;
+    uint64_t kStrideS = 0;
     uint64_t vStrideB = 0;
     uint64_t vStrideN2 = 0;
+    uint64_t vStrideS = 0;
     uint64_t dyStrideB = 0;
     uint64_t dyStrideN2 = 0;
+    uint64_t dyStrideS = 0;
     uint64_t dqStrideB = 0;
     uint64_t dqStrideN2 = 0;
+    uint64_t dqStrideS = 0;
     uint64_t dkStrideB = 0;
     uint64_t dkStrideN2 = 0;
+    uint64_t dkStrideS = 0;
     uint64_t dvStrideB = 0;
     uint64_t dvStrideN2 = 0;
+    uint64_t dvStrideS = 0;
 
     uint64_t qMatrixBytes = 0;
     uint64_t kMatrixBytes = 0;
@@ -136,6 +144,11 @@ struct SmallSDPipelineSlot {
     int64_t vecCoreOffset = 0;
     int64_t qOffset = 0;
     int64_t kOffset = 0;
+    int64_t vOffset = 0;
+    int64_t dyOffset = 0;
+    int64_t dqOffset = 0;
+    int64_t dkOffset = 0;
+    int64_t dvOffset = 0;
     int64_t attentionOffset = 0;
     int64_t attentionAlignOffset = 0;
     int64_t s2Prefix = 0;
@@ -150,16 +163,16 @@ struct SmallSDPipelineSlot {
     SmallSDSlotState state = SmallSDSlotState::EMPTY;
 };
 
-static_assert(sizeof(SmallSDConstInfo) == 272, "SmallSDConstInfo ABI size changed unexpectedly.");
-static_assert(offsetof(SmallSDConstInfo, qStrideB) == 72, "SmallSDConstInfo stride offset changed unexpectedly.");
-static_assert(offsetof(SmallSDConstInfo, workspaceBaseOffset) == 256,
+static_assert(sizeof(SmallSDConstInfo) == 336, "SmallSDConstInfo ABI size changed unexpectedly.");
+static_assert(offsetof(SmallSDConstInfo, qStrideB) == 80, "SmallSDConstInfo stride offset changed unexpectedly.");
+static_assert(offsetof(SmallSDConstInfo, workspaceBaseOffset) == 320,
               "SmallSDConstInfo workspace offset changed unexpectedly.");
 static_assert(sizeof(SmallSDTaskCursor) == 168, "SmallSDTaskCursor ABI size changed unexpectedly.");
 static_assert(offsetof(SmallSDTaskCursor, qOffset) == 120, "SmallSDTaskCursor qOffset changed unexpectedly.");
 static_assert(sizeof(SmallSDShape) == 56, "SmallSDShape ABI size changed unexpectedly.");
 static_assert(sizeof(SmallSDOffsets) == 40, "SmallSDOffsets ABI size changed unexpectedly.");
-static_assert(sizeof(SmallSDPipelineSlot) == 208, "SmallSDPipelineSlot ABI size changed unexpectedly.");
-static_assert(offsetof(SmallSDPipelineSlot, state) == 200, "SmallSDPipelineSlot state offset changed unexpectedly.");
+static_assert(sizeof(SmallSDPipelineSlot) == 248, "SmallSDPipelineSlot ABI size changed unexpectedly.");
+static_assert(offsetof(SmallSDPipelineSlot, state) == 240, "SmallSDPipelineSlot state offset changed unexpectedly.");
 
 template <uint32_t HEAD_DIM>
 struct SmallSDBufferLayout {

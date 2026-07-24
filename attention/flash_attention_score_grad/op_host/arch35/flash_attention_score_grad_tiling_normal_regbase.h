@@ -96,6 +96,7 @@ protected:
     void SaveSmallSDTilingData();
     ge::graphStatus FinalizeSmallSDTiling();
     void ResetSmallSDDerivedState(bool forFallback = false);
+    uint32_t GetSmallSDTndActiveBatchCount() const;
     ge::graphStatus BuildSmallSDCoreRanges();
     void BuildSmallSDTndCoreParams();
     void FillSmallSDBaseParam();

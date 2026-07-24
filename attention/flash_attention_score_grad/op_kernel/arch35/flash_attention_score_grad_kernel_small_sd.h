@@ -17,12 +17,11 @@
 #define FLASH_ATTENTION_SCORE_GRAD_KERNEL_SMALL_SD_H
 
 #include "flash_attention_score_grad_common.h"
-#include "flash_attention_score_grad_block_cube.h"
-#include "flash_attention_score_grad_block_vec.h"
 #include "flash_attention_score_grad_buffer_small_sd.h"
 #include "flash_attention_score_grad_event_small_sd.h"
 #include "flash_attention_score_grad_kernel_base.h"
 #include "cube_api/mutex_buffer.h"
+#include "cube_api/mutex_buffers_policy.h"
 #include "flash_attention_score_grad_tiling_data_regbase.h"
 
 namespace FagBaseApi {
@@ -75,8 +74,9 @@ public:
 private:
     __aicore__ inline const optiling::fag::SmallSDTilingDataRegbase &GetSmallSDTilingData() const;
     __aicore__ inline void InitSmallSDBlocks(GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR query,
-                                             GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR dq, GM_ADDR dk,
+                                             GM_ADDR y, GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR dq, GM_ADDR dk,
                                              GM_ADDR dv, GM_ADDR workspace, TPipe *pipeIn);
+    __aicore__ inline void InitSmallSDSharedBuffers(TPipe *pipeIn);
     __aicore__ inline void InitTaskCursorSmallSD(SmallSDTaskCursor &cursor, int64_t index);
     __aicore__ inline void AdvanceTaskCursor(SmallSDTaskCursor &cursor);
     __aicore__ inline void SetCursorGmOffsetSmallSD(SmallSDTaskCursor &cursor);
@@ -93,6 +93,11 @@ private:
     __aicore__ inline void ProcessMultipleTasks(SmallSDTaskCursor &cursor, int64_t taskCount);
 
     SmallSDConstInfo smallSDConstInfo;
+    TBuf<> smallSDMm1ResBuf[2];
+    TBuf<> smallSDMm2ResBuf[2];
+    MutexBufferManager<BufferType::L1> smallSDL1BufferManager;
+    MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC> smallSDDsL1Buf;
+    MutexBuffersPolicySingleBuffer<BufferType::L1, SyncType::NO_SYNC> smallSDPL1Buf;
     int64_t cachedTndBatchIdx = -1;
     int64_t cachedTndS1Len = 0;
     int64_t cachedTndS2Len = 0;
@@ -109,7 +114,6 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     (void)pseShift;
     (void)dropMask;
     (void)attenMask;
-    (void)y;
     (void)prefixN;
     (void)deqScaleQ;
     (void)deqScaleK;
@@ -141,16 +145,36 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     this->actualSeqQlenAddr = actualSeqQlen;
     this->actualSeqKvlenAddr = actualSeqKvlen;
 
-    InitSmallSDBlocks(key, value, dy, query, softmaxMax, softmaxSum, dq, dk, dv, workspace, pipeIn);
+    InitSmallSDSharedBuffers(pipeIn);
+    InitSmallSDBlocks(key, value, dy, query, y, softmaxMax, softmaxSum, dq, dk, dv, workspace, pipeIn);
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::InitSmallSDSharedBuffers(
+    TPipe *pipeIn)
+{
+    static constexpr uint32_t SMALL_SD_VECTOR_BASEM = 64;
+    static constexpr uint32_t SCORE_UB_BYTES = SMALL_SD_VECTOR_BASEM * 128 * sizeof(CALC_TYPE);
+    static constexpr uint32_t GRAD_UB_BYTES = SMALL_SD_VECTOR_BASEM * BaseClass::HEAD_DIM_ALIGN * sizeof(CALC_TYPE);
+    static constexpr uint32_t DS_P_L1_BYTES = 128 * 128 * sizeof(INPUT_TYPE);
+    smallSDL1BufferManager.Init(pipeIn, L1_MAX_SIZE);
+    smallSDDsL1Buf.Init(smallSDL1BufferManager, DS_P_L1_BYTES);
+    smallSDPL1Buf.Init(smallSDL1BufferManager, DS_P_L1_BYTES);
+    pipeIn->InitBuffer(smallSDMm1ResBuf[0], SCORE_UB_BYTES > GRAD_UB_BYTES ? SCORE_UB_BYTES : GRAD_UB_BYTES);
+    pipeIn->InitBuffer(smallSDMm1ResBuf[1], SCORE_UB_BYTES > GRAD_UB_BYTES ? SCORE_UB_BYTES : GRAD_UB_BYTES);
+    pipeIn->InitBuffer(smallSDMm2ResBuf[0], SCORE_UB_BYTES > GRAD_UB_BYTES ? SCORE_UB_BYTES : GRAD_UB_BYTES);
+    pipeIn->InitBuffer(smallSDMm2ResBuf[1], SCORE_UB_BYTES > GRAD_UB_BYTES ? SCORE_UB_BYTES : GRAD_UB_BYTES);
 }
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::InitSmallSDBlocks(
-    GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR query, GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR dq,
+    GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR query, GM_ADDR y, GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR dq,
     GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace, TPipe *pipeIn)
 {
-    this->cubeBlock.Init(query, key, value, dy, dq, dk, dv, workspace, pipeIn, &smallSDConstInfo);
-    this->vecBlock.Init(softmaxMax, softmaxSum, dq, dk, dv, workspace, pipeIn, &smallSDConstInfo);
+    this->cubeBlock.Init(query, key, value, dy, dq, dk, dv, workspace, pipeIn, &smallSDConstInfo, smallSDMm1ResBuf,
+                         smallSDMm2ResBuf, &smallSDL1BufferManager, &smallSDDsL1Buf, &smallSDPL1Buf);
+    this->vecBlock.Init(value, dy, y, softmaxMax, softmaxSum, dq, dk, dv, workspace, pipeIn, &smallSDConstInfo,
+                        this->vSubBlockIdx, smallSDMm1ResBuf, smallSDMm2ResBuf, &smallSDDsL1Buf, &smallSDPL1Buf);
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -184,6 +208,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     smallSDConstInfo.isTnd = baseParam.isTnd;
     smallSDConstInfo.isSingleTask = baseParam.isSingleTask;
     smallSDConstInfo.s2Align16 = baseParam.s2Align16;
+    smallSDConstInfo.tndMaxSumLayout = baseParam.tndMaxSumLayout;
     smallSDConstInfo.scale = baseParam.scaleValue;
     smallSDConstInfo.workspaceBaseOffset = baseParam.workspaceBaseOffset;
     smallSDConstInfo.workspaceSize = baseParam.workspaceSize;
@@ -199,40 +224,58 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     if constexpr (IS_TND) {
         smallSDConstInfo.qStrideB = 0;
         smallSDConstInfo.qStrideN2 = gD;
+        smallSDConstInfo.qStrideS = n2G * smallSDConstInfo.d;
         smallSDConstInfo.kStrideB = 0;
         smallSDConstInfo.kStrideN2 = smallSDConstInfo.d;
+        smallSDConstInfo.kStrideS = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.d;
         smallSDConstInfo.vStrideB = 0;
         smallSDConstInfo.vStrideN2 = smallSDConstInfo.dv;
+        smallSDConstInfo.vStrideS = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.dv;
     } else if (smallSDConstInfo.layout == BNGSD) {
         smallSDConstInfo.qStrideB = n2G * s1D;
         smallSDConstInfo.qStrideN2 = static_cast<uint64_t>(smallSDConstInfo.g) * s1D;
+        smallSDConstInfo.qStrideS = smallSDConstInfo.d;
         smallSDConstInfo.kStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * s2D;
         smallSDConstInfo.kStrideN2 = s2D;
+        smallSDConstInfo.kStrideS = smallSDConstInfo.d;
         smallSDConstInfo.vStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * s2Dv;
         smallSDConstInfo.vStrideN2 = s2Dv;
+        smallSDConstInfo.vStrideS = smallSDConstInfo.dv;
     } else if (smallSDConstInfo.layout == SBNGD) {
         smallSDConstInfo.qStrideB = n2G * smallSDConstInfo.d;
         smallSDConstInfo.qStrideN2 = gD;
+        smallSDConstInfo.qStrideS = static_cast<uint64_t>(smallSDConstInfo.b) * n2G * smallSDConstInfo.d;
         smallSDConstInfo.kStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.d;
         smallSDConstInfo.kStrideN2 = smallSDConstInfo.d;
+        smallSDConstInfo.kStrideS =
+            static_cast<uint64_t>(smallSDConstInfo.b) * smallSDConstInfo.n2 * smallSDConstInfo.d;
         smallSDConstInfo.vStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.dv;
         smallSDConstInfo.vStrideN2 = smallSDConstInfo.dv;
+        smallSDConstInfo.vStrideS =
+            static_cast<uint64_t>(smallSDConstInfo.b) * smallSDConstInfo.n2 * smallSDConstInfo.dv;
     } else {
         smallSDConstInfo.qStrideB = n2G * s1D;
         smallSDConstInfo.qStrideN2 = gD;
+        smallSDConstInfo.qStrideS = n2G * smallSDConstInfo.d;
         smallSDConstInfo.kStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * s2D;
         smallSDConstInfo.kStrideN2 = smallSDConstInfo.d;
+        smallSDConstInfo.kStrideS = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.d;
         smallSDConstInfo.vStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * s2Dv;
         smallSDConstInfo.vStrideN2 = smallSDConstInfo.dv;
+        smallSDConstInfo.vStrideS = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.dv;
     }
     smallSDConstInfo.dyStrideB = smallSDConstInfo.qStrideB;
     smallSDConstInfo.dyStrideN2 = smallSDConstInfo.qStrideN2;
+    smallSDConstInfo.dyStrideS = smallSDConstInfo.qStrideS;
     smallSDConstInfo.dqStrideB = smallSDConstInfo.qStrideB;
     smallSDConstInfo.dqStrideN2 = smallSDConstInfo.qStrideN2;
+    smallSDConstInfo.dqStrideS = smallSDConstInfo.qStrideS;
     smallSDConstInfo.dkStrideB = smallSDConstInfo.kStrideB;
     smallSDConstInfo.dkStrideN2 = smallSDConstInfo.kStrideN2;
+    smallSDConstInfo.dkStrideS = smallSDConstInfo.kStrideS;
     smallSDConstInfo.dvStrideB = smallSDConstInfo.vStrideB;
     smallSDConstInfo.dvStrideN2 = smallSDConstInfo.vStrideN2;
+    smallSDConstInfo.dvStrideS = smallSDConstInfo.vStrideS;
 
     smallSDConstInfo.qMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.d *
                                     sizeof(INPUT_TYPE);
@@ -292,8 +335,11 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     const uint64_t n2Dv = n2 * smallSDConstInfo.dv;
     const uint64_t n2GD = n2G * smallSDConstInfo.d;
     const uint64_t n2GDv = n2G * smallSDConstInfo.dv;
+    const bool hasTask = actualS1Len > 0 && actualS2Len > 0;
     this->curBatchIdx++;
-    this->curBatchTotalBaseIdx += n2G;
+    if (hasTask) {
+        this->curBatchTotalBaseIdx += n2G;
+    }
     this->curBatchTotalS1BOffset += actualS1Len * n2GD;
     this->curBatchTotalS2BOffset += actualS2Len * n2D;
     this->curBatchTotalS1BOffsetForDv += actualS1Len * n2GDv;
@@ -403,6 +449,14 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     if constexpr (IS_TND) {
         AdvanceTndBatchPrefixSmallSD(cursor.actualS1Len, cursor.actualS2Len);
         ReadTndSeqLenSmallSD(cursor.bIdx, cursor.actualS1Len, cursor.actualS2Len);
+        while (cursor.bIdx < smallSDConstInfo.b && cursor.actualS1Len == 0 && cursor.actualS2Len == 0) {
+            AdvanceTndBatchPrefixSmallSD(cursor.actualS1Len, cursor.actualS2Len);
+            cursor.bIdx = this->curBatchIdx;
+            if (cursor.bIdx >= smallSDConstInfo.b) {
+                break;
+            }
+            ReadTndSeqLenSmallSD(cursor.bIdx, cursor.actualS1Len, cursor.actualS2Len);
+        }
         LoadTndCursorPrefixSmallSD(cursor);
         SetCursorGmOffsetSmallSD(cursor);
     } else {
@@ -471,6 +525,11 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     slot.s2AlignedSize = shape.s2Align16;
     slot.qOffset = offsets.q;
     slot.kOffset = offsets.k;
+    slot.vOffset = offsets.k;
+    slot.dyOffset = offsets.q;
+    slot.dqOffset = offsets.q;
+    slot.dkOffset = offsets.k;
+    slot.dvOffset = offsets.k;
     slot.attentionOffset = offsets.attention;
     slot.attentionAlignOffset = offsets.attentionAlign;
     slot.s2Prefix = offsets.s2Prefix;
@@ -499,8 +558,6 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     SmallSDPipelineSlot &slot,
     bool needWaitL1Reusable)
 {
-    static_assert(BaseClass::IS_DQ_WRITE_UB, "SmallSD expects DQ to be written through UB.");
-    static_assert(BaseClass::IS_DK_WRITE_UB, "SmallSD expects DK to be written through UB.");
     if (slot.state != SmallSDSlotState::READY_FOR_VECTOR) {
         return;
     }
@@ -520,11 +577,9 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     if (slot.state != SmallSDSlotState::VECTOR_INFLIGHT) {
         return;
     }
-    if constexpr (BaseClass::IS_DK_WRITE_UB) {
-        if ASCEND_IS_AIC {
-            CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(SMALL_SD_SLOT_REUSE_READY_FLAG);
-            CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(16 + SMALL_SD_SLOT_REUSE_READY_FLAG);
-        }
+    if ASCEND_IS_AIC {
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(SMALL_SD_SLOT_REUSE_READY_FLAG);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(SMALL_SD_EVENT_MIRROR_OFFSET + SMALL_SD_SLOT_REUSE_READY_FLAG);
     }
     slot.state = SmallSDSlotState::REUSABLE;
 }

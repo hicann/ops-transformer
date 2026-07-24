@@ -202,7 +202,8 @@ using namespace AscendC::MicroAPI;
     static_assert(!isBn2MultiBlk && !isDNoEqual && !isNzOut && !isTndSwizzle,                                          \
                   "SmallSD selector forbids multiblock/D-mismatch/NZ/swizzle.");                                      \
     static_assert(deterType == NO_DETER, "SmallSD selector forbids deterministic sparse variants.");                   \
-    static_assert(isNEqual, "SmallSD selector requires N1 == N2.")
+    static_assert(isNEqual, "SmallSD selector requires N1 == N2.");                                                    \
+    static_assert(inputDType == outDType, "SmallSD selector requires input dtype == output dtype.")
 
 #define INVOKE_FAG_SMALL_SD_BN2_REGBASE_IMPL(INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND, s1TemplateType, s2TemplateType, \
                                              dTemplateType)                                                            \
@@ -212,9 +213,9 @@ using namespace AscendC::MicroAPI;
         pipeIn.Destroy();                                                                                              \
         TPipe pipeBase;                                                                                                \
         using CubeBlockType = FagBaseApi::SmallSDCubeBlock<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND,                    \
-                                                           static_cast<uint32_t>(dTemplateType), 0>;                   \
+                                                           static_cast<uint32_t>(dTemplateType)>;                      \
         using VecBlockType = FagBaseApi::SmallSDVectorBlock<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND,                   \
-                                                            static_cast<uint32_t>(dTemplateType), 0>;                  \
+                                                            static_cast<uint32_t>(dTemplateType)>;                     \
         FagBaseApi::FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType> op;                             \
         op.Init(key, value, dy, query, pse_shift, drop_mask, atten_mask, attention_in, softmax_max, softmax_sum,       \
                 prefix, actual_seq_qlen, actual_seq_kvlen, deqScaleQ, deqScaleK, deqScaleV, deqScaleDy, queryRope,     \

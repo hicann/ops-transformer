@@ -734,13 +734,6 @@ public:
     void set_scaleValue(float val) { scaleValue = val; }
 };
 
-class SmallSDTilingDataRegbase {
-public:
-    SmallSDBaseParamRegbase baseParam;
-    SmallSDCoreTaskParamRegbase coreTaskParam[MAX_CORE_NUM];
-    SmallSDTndCoreParamRegbase tndCoreParam[MAX_CORE_NUM];
-};
-
 class FlashAttentionScoreGradSmallSDTilingDataRegbase {
 public:
     SmallSDBaseParamRegbase baseParam;
@@ -748,11 +741,15 @@ public:
     SmallSDTndCoreParamRegbase tndCoreParam[MAX_CORE_NUM];
 };
 
+using SmallSDTilingDataRegbase = FlashAttentionScoreGradSmallSDTilingDataRegbase;
+
 static_assert(sizeof(SmallSDBaseParamRegbase) == 104, "SmallSDBaseParamRegbase ABI size changed unexpectedly.");
 static_assert(sizeof(SmallSDCoreTaskParamRegbase) == 16,
               "SmallSDCoreTaskParamRegbase ABI size changed unexpectedly.");
 static_assert(sizeof(SmallSDTndCoreParamRegbase) == 72,
               "SmallSDTndCoreParamRegbase ABI size changed unexpectedly.");
+static_assert(std::is_same<SmallSDTilingDataRegbase, FlashAttentionScoreGradSmallSDTilingDataRegbase>::value,
+              "SmallSDTilingDataRegbase must stay as the legacy alias of the independent SmallSD payload.");
 static_assert(sizeof(FlashAttentionScoreGradSmallSDTilingDataRegbase) == 3272,
               "FlashAttentionScoreGradSmallSDTilingDataRegbase ABI size changed unexpectedly.");
 static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, baseParam) == 0,
