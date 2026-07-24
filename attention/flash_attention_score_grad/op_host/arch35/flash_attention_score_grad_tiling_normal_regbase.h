@@ -92,11 +92,42 @@ protected:
     void DoPostTiling();
     ge::graphStatus SaveToTilingData();
     void SaveSmallSDTilingData();
-    ge::graphStatus FinalizeSmallSDTiling();
-    void ResetSmallSDDerivedState(bool forFallback = false);
-    uint32_t GetSmallSDTndActiveBatchCount() const;
+    enum class SmallSDFinalizeStatus {
+        SUCCESS,
+        FALLBACK,
+        ERROR
+    };
+    struct SmallSDFinalizeResult {
+        SmallSDFinalizeStatus status;
+        ge::graphStatus ret;
+    };
+    struct SmallSDHostStateSnapshot {
+        FuzzyBaseInfoParamsRegbase fBaseParams;
+        TndBaseInfo tndBaseInfo;
+        SmallSDTilingDataRegbase smallSDTilingDataScratch;
+        uint32_t smallSDValidTaskCount;
+        uint32_t smallSDUsedCoreNum;
+        uint32_t smallSDTailCoreTaskCount;
+        size_t smallSDWorkspaceSize;
+        bool smallSDFinalized;
+        FlashAttentionScoreGradS1S2BNGS1S2BaseParamsRegbase *s1s2BNGS1S2BaseParams;
+        FlashAttentionScoreGradS1S2BNGS1S2SplitCoreParamsRegbase *s1s2BNGS1S2SplitCoreParams;
+        BlockNumListParamsRegbase *s1s2BNGS1S2BlockNumList;
+        PreParamsRegbase *preTilingData;
+        PostParamsRegbase *postTilingData;
+        BaseDeterParamRegbase *baseDeterParam;
+        DeterParamRegbase *deterParam;
+        TndParamRegbase *tndParam;
+        TndSwizzleParamRegbase *tndSwizzleParam;
+        SmallSDTilingDataRegbase *smallSDTilingData;
+    };
+    SmallSDFinalizeResult FinalizeSmallSDTiling();
+    SmallSDHostStateSnapshot CaptureSmallSDHostState() const;
+    void RestoreSmallSDHostState(const SmallSDHostStateSnapshot &snapshot);
+    void ClearSmallSDScratch();
+    void InitSmallSDFixedDerivedState();
     ge::graphStatus BuildSmallSDCoreRanges();
-    void BuildSmallSDTndCoreParams();
+    ge::graphStatus BuildSmallSDTndCoreParams();
     void FillSmallSDBaseParam();
     void SetSmallSDWorkspace();
     bool ValidateSmallSDInvariant() const;

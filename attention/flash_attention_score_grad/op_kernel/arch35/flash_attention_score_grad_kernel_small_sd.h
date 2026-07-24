@@ -34,6 +34,7 @@ namespace FagBaseApi {
 // - SMALL_SD_DQ_UB_READY_FLAG / SMALL_SD_DK_UB_READY_FLAG: DQ/DK UB ready for cast/writeback.
 // - SMALL_SD_DS_L1_REUSABLE_FLAG / SMALL_SD_P_L1_REUSABLE_FLAG: shared L1 buffers reusable.
 // - SMALL_SD_SLOT_REUSE_READY_FLAG: DK UB writeback completed, the two-slot buffer is reusable.
+// - SMALL_SD_CUBE_OUTPUT_COMMIT_FLAG: Cube-side DV Fixpipe output has been drained before Process returns.
 // SmallSD is entered only by the arch35 regbase key with:
 // FP16/BF16, BN2, G=1, N1=N2, D==Dv, 0<S1/S2<128, 0<D<=128,
 // no optional feature, no deterministic path, no NZ output, and no swizzle/remap.
@@ -122,14 +123,14 @@ private:
     uint32_t cBlockIdx = 0;
     uint32_t vSubBlockIdx = 0;
     int64_t curBatchIdx = 0;
-    int64_t curBatchTotalBaseIdx = 0;
-    int64_t curBatchTotalS1BOffset = 0;
-    int64_t curBatchTotalS1BOffsetForDv = 0;
-    int64_t curBatchTotalS2BOffset = 0;
-    int64_t curBatchTotalS2BOffsetForDv = 0;
-    int64_t curBatchTotalS1S2SizeAlign = 0;
-    int64_t curBatchTotalS1S2Size = 0;
-    int64_t curBatchTotalS2Size = 0;
+    int64_t curBaseTaskPrefix = 0;
+    int64_t curQPrefix = 0;
+    int64_t curKvPrefix = 0;
+    int64_t curQDyDqPrefix = 0;
+    int64_t curKvDkDvPrefix = 0;
+    int64_t curAttentionPrefix = 0;
+    int64_t curAlignedAttentionPrefix = 0;
+    int64_t curSoftmaxPrefix = 0;
     CubeBlockType cubeBlock;
     VecBlockType vecBlock;
     TBuf<> smallSDMm1ResBuf[2];
@@ -343,14 +344,14 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         actualS2Len = cachedTndS2Len;
         return;
     }
-    __gm__ int64_t *actualSeqQlen = (__gm__ int64_t *)actualSeqQlenAddr;
-    __gm__ int64_t *actualSeqKvlen = (__gm__ int64_t *)actualSeqKvlenAddr;
+    __gm__ int64_t *actualSeqQCumEnd = (__gm__ int64_t *)actualSeqQlenAddr;
+    __gm__ int64_t *actualSeqKvCumEnd = (__gm__ int64_t *)actualSeqKvlenAddr;
     if (batchIdx == 0) {
-        actualS1Len = actualSeqQlen[0];
-        actualS2Len = actualSeqKvlen[0];
+        actualS1Len = actualSeqQCumEnd[0];
+        actualS2Len = actualSeqKvCumEnd[0];
     } else {
-        actualS1Len = actualSeqQlen[batchIdx] - actualSeqQlen[batchIdx - 1];
-        actualS2Len = actualSeqKvlen[batchIdx] - actualSeqKvlen[batchIdx - 1];
+        actualS1Len = actualSeqQCumEnd[batchIdx] - actualSeqQCumEnd[batchIdx - 1];
+        actualS2Len = actualSeqKvCumEnd[batchIdx] - actualSeqKvCumEnd[batchIdx - 1];
     }
     cachedTndBatchIdx = batchIdx;
     cachedTndS1Len = actualS1Len;
@@ -364,21 +365,16 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     const uint64_t n2 = smallSDConstInfo.n2;
     const uint64_t n2G = n2 * smallSDConstInfo.g;
     const uint64_t n2D = n2 * smallSDConstInfo.d;
-    const uint64_t n2Dv = n2 * smallSDConstInfo.dv;
     const uint64_t n2GD = n2G * smallSDConstInfo.d;
-    const uint64_t n2GDv = n2G * smallSDConstInfo.dv;
-    const bool hasTask = actualS1Len > 0 && actualS2Len > 0;
+    curBaseTaskPrefix += n2;
+    curQPrefix += actualS1Len;
+    curKvPrefix += actualS2Len;
+    curQDyDqPrefix += actualS1Len * n2GD;
+    curKvDkDvPrefix += actualS2Len * n2D;
+    curAttentionPrefix += actualS1Len * actualS2Len;
+    curAlignedAttentionPrefix += actualS1Len * AlignTo16(actualS2Len);
+    curSoftmaxPrefix += actualS1Len;
     curBatchIdx++;
-    if (hasTask) {
-        curBatchTotalBaseIdx += n2G;
-    }
-    curBatchTotalS1BOffset += actualS1Len * n2GD;
-    curBatchTotalS2BOffset += actualS2Len * n2D;
-    curBatchTotalS1BOffsetForDv += actualS1Len * n2GDv;
-    curBatchTotalS2BOffsetForDv += actualS2Len * n2Dv;
-    curBatchTotalS1S2SizeAlign += actualS1Len * AlignTo16(actualS2Len);
-    curBatchTotalS1S2Size += actualS1Len * actualS2Len;
-    curBatchTotalS2Size += actualS2Len;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -387,8 +383,8 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
 {
     // The initial SmallSD host route guarantees G == 1; GQA needs a separate cursor/accumulation extension.
     if constexpr (IS_TND) {
-        cursor.qOffset = cursor.lastBatchTotalS1BOffset + cursor.n2oIdx * smallSDConstInfo.qStrideN2;
-        cursor.kOffset = cursor.lastBatchTotalS2BOffset + cursor.n2oIdx * smallSDConstInfo.kStrideN2;
+        cursor.qOffset = cursor.qDyDqPrefix + cursor.n2oIdx * smallSDConstInfo.qStrideN2;
+        cursor.kOffset = cursor.kvDkDvPrefix + cursor.n2oIdx * smallSDConstInfo.kStrideN2;
         cursor.qTaskStride = smallSDConstInfo.qStrideN2;
         cursor.kTaskStride = smallSDConstInfo.kStrideN2;
         cursor.qBatchGap = 0;
@@ -414,17 +410,14 @@ template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::LoadTndCursorPrefixSmallSD(
     SmallSDTaskCursor &cursor)
 {
-    cursor.lastBatchTotalBaseIdx = curBatchTotalBaseIdx;
-    cursor.lastBatchTotalS1BOffset = curBatchTotalS1BOffset;
-    cursor.lastBatchTotalS2BOffset = curBatchTotalS2BOffset;
-    cursor.lastBatchTotalS1BOffsetForDv = curBatchTotalS1BOffsetForDv;
-    cursor.lastBatchTotalS2BOffsetForDv = curBatchTotalS2BOffsetForDv;
-    cursor.lastBatchTotalS1S2SizeAlign = curBatchTotalS1S2SizeAlign;
-    cursor.lastBatchTotalS1S2Size = curBatchTotalS1S2Size;
-    cursor.lastBatchTotalS2Size = curBatchTotalS2Size;
-    cursor.s2SizeAcc = cursor.lastBatchTotalS2Size;
-    cursor.b1SSOffsetAlign = cursor.lastBatchTotalS1S2SizeAlign;
-    cursor.b1SSOffset = cursor.lastBatchTotalS1S2Size;
+    cursor.baseTaskPrefix = curBaseTaskPrefix;
+    cursor.qPrefix = curQPrefix;
+    cursor.kvPrefix = curKvPrefix;
+    cursor.qDyDqPrefix = curQDyDqPrefix;
+    cursor.kvDkDvPrefix = curKvDkDvPrefix;
+    cursor.softmaxPrefix = curSoftmaxPrefix;
+    cursor.alignedAttentionPrefix = curAlignedAttentionPrefix;
+    cursor.attentionPrefix = curAttentionPrefix;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -446,9 +439,9 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         cursor.n2oIdx = index - cursor.bIdx * smallSDConstInfo.n2;
         cursor.actualS1Len = smallSDConstInfo.s1;
         cursor.actualS2Len = smallSDConstInfo.s2;
-        cursor.s2SizeAcc = cursor.bIdx * smallSDConstInfo.s2;
-        cursor.b1SSOffset = cursor.bIdx * smallSDConstInfo.s1 * smallSDConstInfo.s2;
-        cursor.b1SSOffsetAlign =
+        cursor.softmaxPrefix = cursor.bIdx * smallSDConstInfo.s2;
+        cursor.attentionPrefix = cursor.bIdx * smallSDConstInfo.s1 * smallSDConstInfo.s2;
+        cursor.alignedAttentionPrefix =
             cursor.bIdx * smallSDConstInfo.s1 * AlignTo16(smallSDConstInfo.s2);
     }
     SetCursorGmOffsetSmallSD(cursor);
@@ -470,6 +463,9 @@ template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::AdvanceTaskCursor(
     SmallSDTaskCursor &cursor)
 {
+    if (cursor.taskRemaining > 0) {
+        cursor.taskRemaining--;
+    }
     cursor.n2oIdx++;
     if (cursor.n2oIdx < smallSDConstInfo.n2) {
         cursor.qOffset += cursor.qTaskStride;
@@ -477,27 +473,20 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         return;
     }
     cursor.n2oIdx = 0;
-    cursor.bIdx++;
 
     if constexpr (IS_TND) {
         AdvanceTndBatchPrefixSmallSD(cursor.actualS1Len, cursor.actualS2Len);
+        cursor.bIdx = curBatchIdx;
         ReadTndSeqLenSmallSD(cursor.bIdx, cursor.actualS1Len, cursor.actualS2Len);
-        while (cursor.bIdx < smallSDConstInfo.b && cursor.actualS1Len == 0 && cursor.actualS2Len == 0) {
-            AdvanceTndBatchPrefixSmallSD(cursor.actualS1Len, cursor.actualS2Len);
-            cursor.bIdx = curBatchIdx;
-            if (cursor.bIdx >= smallSDConstInfo.b) {
-                break;
-            }
-            ReadTndSeqLenSmallSD(cursor.bIdx, cursor.actualS1Len, cursor.actualS2Len);
-        }
         LoadTndCursorPrefixSmallSD(cursor);
         SetCursorGmOffsetSmallSD(cursor);
     } else {
+        cursor.bIdx++;
         cursor.qOffset += cursor.qTaskStride + cursor.qBatchGap;
         cursor.kOffset += cursor.kTaskStride + cursor.kBatchGap;
-        cursor.s2SizeAcc += smallSDConstInfo.s2;
-        cursor.b1SSOffset += smallSDConstInfo.s1 * smallSDConstInfo.s2;
-        cursor.b1SSOffsetAlign += smallSDConstInfo.s1 * AlignTo16(smallSDConstInfo.s2);
+        cursor.softmaxPrefix += smallSDConstInfo.s2;
+        cursor.attentionPrefix += smallSDConstInfo.s1 * smallSDConstInfo.s2;
+        cursor.alignedAttentionPrefix += smallSDConstInfo.s1 * AlignTo16(smallSDConstInfo.s2);
     }
 }
 
@@ -531,9 +520,9 @@ FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::MakeOffsetsSm
     SmallSDOffsets offsets;
     offsets.q = cursor.qOffset;
     offsets.k = cursor.kOffset;
-    offsets.attention = cursor.b1SSOffset;
-    offsets.attentionAlign = cursor.b1SSOffsetAlign;
-    offsets.s2Prefix = cursor.s2SizeAcc;
+    offsets.attention = cursor.attentionPrefix;
+    offsets.attentionAlign = cursor.alignedAttentionPrefix;
+    offsets.s2Prefix = cursor.softmaxPrefix;
     return offsets;
 }
 
@@ -567,14 +556,11 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     slot.attentionAlignOffset = offsets.attentionAlign;
     slot.s2Prefix = offsets.s2Prefix;
     if constexpr (IS_TND) {
-        slot.lastBatchTotalBaseIdx = cursor.lastBatchTotalBaseIdx;
-        slot.lastBatchTotalS1BOffset = cursor.lastBatchTotalS1BOffset;
-        slot.lastBatchTotalS2BOffset = cursor.lastBatchTotalS2BOffset;
-        slot.lastBatchTotalS1BOffsetForDv = cursor.lastBatchTotalS1BOffsetForDv;
-        slot.lastBatchTotalS2BOffsetForDv = cursor.lastBatchTotalS2BOffsetForDv;
-        slot.lastBatchTotalS1S2SizeAlign = cursor.lastBatchTotalS1S2SizeAlign;
-        slot.lastBatchTotalS1S2Size = cursor.lastBatchTotalS1S2Size;
-        slot.lastBatchTotalS2Size = cursor.lastBatchTotalS2Size;
+        slot.baseTaskPrefix = cursor.baseTaskPrefix;
+        slot.qPrefix = cursor.qPrefix;
+        slot.kvPrefix = cursor.kvPrefix;
+        slot.qDyDqPrefix = cursor.qDyDqPrefix;
+        slot.kvDkDvPrefix = cursor.kvDkDvPrefix;
     }
     if ASCEND_IS_AIV {
         slot.halfS1 = shape.halfS1;
@@ -683,26 +669,31 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     const auto &coreTask =
         GetSmallSDTilingData().coreTaskParam[cBlockIdx];
     const int64_t blockStart = coreTask.blockStart;
-    const int64_t groupCount = coreTask.groupCount;
+    int64_t groupCount = coreTask.groupCount;
     if (groupCount <= 0) {
         return;
     }
     if constexpr (IS_TND) {
         const auto &tndCore =
             GetSmallSDTilingData().tndCoreParam[cBlockIdx];
+        groupCount = tndCore.taskCount;
         curBatchIdx = tndCore.startBatchIdx;
-        curBatchTotalBaseIdx = tndCore.baseTaskPrefix;
-        curBatchTotalS1BOffset = tndCore.qPrefixOffset;
-        curBatchTotalS2BOffset = tndCore.kPrefixOffset;
-        curBatchTotalS1BOffsetForDv = tndCore.qDvPrefixOffset;
-        curBatchTotalS2BOffsetForDv = tndCore.kDvPrefixOffset;
-        curBatchTotalS1S2SizeAlign = tndCore.attenAlignPrefixOffset;
-        curBatchTotalS1S2Size = tndCore.attenPrefixOffset;
-        curBatchTotalS2Size = tndCore.s2PrefixSize;
+        curBaseTaskPrefix = tndCore.baseTaskPrefix;
+        curQPrefix = tndCore.qPrefix;
+        curKvPrefix = tndCore.kvPrefix;
+        curQDyDqPrefix = tndCore.qDyDqPrefix;
+        curKvDkDvPrefix = tndCore.kvDkDvPrefix;
+        curAttentionPrefix = tndCore.attentionPrefix;
+        curAlignedAttentionPrefix = tndCore.alignedAttentionPrefix;
+        curSoftmaxPrefix = tndCore.softmaxPrefix;
         cachedTndBatchIdx = -1;
+        if (groupCount <= 0) {
+            return;
+        }
     }
     SmallSDTaskCursor cursor;
     InitTaskCursorSmallSD(cursor, blockStart);
+    cursor.taskRemaining = groupCount;
 
     if (groupCount == 1) {
         ProcessSingleTask(cursor);

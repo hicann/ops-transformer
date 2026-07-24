@@ -264,8 +264,7 @@ private:
                          srcStride, 0, 0},
                         {false, 0, 0, 0});
         } else {
-            const uint64_t s1Prefix = IS_TND ? static_cast<uint64_t>(slot.lastBatchTotalS1BOffset) /
-                                                   (static_cast<uint64_t>(constInfo->n2) * constInfo->d) :
+            const uint64_t s1Prefix = IS_TND ? static_cast<uint64_t>(slot.qPrefix) :
                                                static_cast<uint64_t>(slot.bIdx) * constInfo->s1;
             offset = ((s1Prefix * constInfo->n2 + slot.n2oIdx * slot.actualS1Len) +
                       static_cast<uint64_t>(vSubBlockIdx) * slot.firstHalfS1) *

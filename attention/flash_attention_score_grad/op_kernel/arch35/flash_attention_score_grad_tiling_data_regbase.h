@@ -630,36 +630,42 @@ class SmallSDTndCoreParamRegbase {
 public:
     uint32_t startBatchIdx;
     uint32_t startN2Idx;
+    uint32_t taskCount;
+    uint32_t reserved;
     uint64_t baseTaskPrefix;
-    uint64_t qPrefixOffset;
-    uint64_t kPrefixOffset;
-    uint64_t qDvPrefixOffset;
-    uint64_t kDvPrefixOffset;
-    uint64_t attenPrefixOffset;
-    uint64_t attenAlignPrefixOffset;
-    uint64_t s2PrefixSize;
+    uint64_t qPrefix;
+    uint64_t kvPrefix;
+    uint64_t qDyDqPrefix;
+    uint64_t kvDkDvPrefix;
+    uint64_t attentionPrefix;
+    uint64_t alignedAttentionPrefix;
+    uint64_t softmaxPrefix;
 
     uint32_t get_startBatchIdx() const { return startBatchIdx; }
     uint32_t get_startN2Idx() const { return startN2Idx; }
+    uint32_t get_taskCount() const { return taskCount; }
+    uint32_t get_reserved() const { return reserved; }
     uint64_t get_baseTaskPrefix() const { return baseTaskPrefix; }
-    uint64_t get_qPrefixOffset() const { return qPrefixOffset; }
-    uint64_t get_kPrefixOffset() const { return kPrefixOffset; }
-    uint64_t get_qDvPrefixOffset() const { return qDvPrefixOffset; }
-    uint64_t get_kDvPrefixOffset() const { return kDvPrefixOffset; }
-    uint64_t get_attenPrefixOffset() const { return attenPrefixOffset; }
-    uint64_t get_attenAlignPrefixOffset() const { return attenAlignPrefixOffset; }
-    uint64_t get_s2PrefixSize() const { return s2PrefixSize; }
+    uint64_t get_qPrefix() const { return qPrefix; }
+    uint64_t get_kvPrefix() const { return kvPrefix; }
+    uint64_t get_qDyDqPrefix() const { return qDyDqPrefix; }
+    uint64_t get_kvDkDvPrefix() const { return kvDkDvPrefix; }
+    uint64_t get_attentionPrefix() const { return attentionPrefix; }
+    uint64_t get_alignedAttentionPrefix() const { return alignedAttentionPrefix; }
+    uint64_t get_softmaxPrefix() const { return softmaxPrefix; }
 
     void set_startBatchIdx(uint32_t val) { startBatchIdx = val; }
     void set_startN2Idx(uint32_t val) { startN2Idx = val; }
+    void set_taskCount(uint32_t val) { taskCount = val; }
+    void set_reserved(uint32_t val) { reserved = val; }
     void set_baseTaskPrefix(uint64_t val) { baseTaskPrefix = val; }
-    void set_qPrefixOffset(uint64_t val) { qPrefixOffset = val; }
-    void set_kPrefixOffset(uint64_t val) { kPrefixOffset = val; }
-    void set_qDvPrefixOffset(uint64_t val) { qDvPrefixOffset = val; }
-    void set_kDvPrefixOffset(uint64_t val) { kDvPrefixOffset = val; }
-    void set_attenPrefixOffset(uint64_t val) { attenPrefixOffset = val; }
-    void set_attenAlignPrefixOffset(uint64_t val) { attenAlignPrefixOffset = val; }
-    void set_s2PrefixSize(uint64_t val) { s2PrefixSize = val; }
+    void set_qPrefix(uint64_t val) { qPrefix = val; }
+    void set_kvPrefix(uint64_t val) { kvPrefix = val; }
+    void set_qDyDqPrefix(uint64_t val) { qDyDqPrefix = val; }
+    void set_kvDkDvPrefix(uint64_t val) { kvDkDvPrefix = val; }
+    void set_attentionPrefix(uint64_t val) { attentionPrefix = val; }
+    void set_alignedAttentionPrefix(uint64_t val) { alignedAttentionPrefix = val; }
+    void set_softmaxPrefix(uint64_t val) { softmaxPrefix = val; }
 };
 
 class SmallSDBaseParamRegbase {
@@ -746,11 +752,11 @@ using SmallSDTilingDataRegbase = FlashAttentionScoreGradSmallSDTilingDataRegbase
 static_assert(sizeof(SmallSDBaseParamRegbase) == 104, "SmallSDBaseParamRegbase ABI size changed unexpectedly.");
 static_assert(sizeof(SmallSDCoreTaskParamRegbase) == 16,
               "SmallSDCoreTaskParamRegbase ABI size changed unexpectedly.");
-static_assert(sizeof(SmallSDTndCoreParamRegbase) == 72,
+static_assert(sizeof(SmallSDTndCoreParamRegbase) == 80,
               "SmallSDTndCoreParamRegbase ABI size changed unexpectedly.");
 static_assert(std::is_same<SmallSDTilingDataRegbase, FlashAttentionScoreGradSmallSDTilingDataRegbase>::value,
               "SmallSDTilingDataRegbase must stay as the legacy alias of the independent SmallSD payload.");
-static_assert(sizeof(FlashAttentionScoreGradSmallSDTilingDataRegbase) == 3272,
+static_assert(sizeof(FlashAttentionScoreGradSmallSDTilingDataRegbase) == 3560,
               "FlashAttentionScoreGradSmallSDTilingDataRegbase ABI size changed unexpectedly.");
 static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, baseParam) == 0,
               "SmallSD tiling baseParam offset changed unexpectedly.");

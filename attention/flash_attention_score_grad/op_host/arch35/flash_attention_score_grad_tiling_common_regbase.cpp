@@ -1650,7 +1650,6 @@ void SetSplitAxis(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbas
 
 bool IsSmallSDEligible(const FuzzyBaseInfoParamsRegbase& fBaseParams, const TndBaseInfo& tndBaseInfo)
 {
-    (void)tndBaseInfo;
     const bool isSupportedDtype = fBaseParams.queryType == ge::DT_FLOAT16 || fBaseParams.queryType == ge::DT_BF16;
     const bool isSameOutputDtype =
         (fBaseParams.queryType == ge::DT_FLOAT16 && fBaseParams.outDtype == DtypeEnum::FLOAT16_PRECISION) ||
@@ -1666,9 +1665,8 @@ bool IsSmallSDEligible(const FuzzyBaseInfoParamsRegbase& fBaseParams, const TndB
                                 fBaseParams.d == fBaseParams.d1 &&
                                 (fBaseParams.d == static_cast<int64_t>(ConstAxisTemplateNum::NUM64) ||
                                  fBaseParams.d == static_cast<int64_t>(ConstAxisTemplateNum::NUM128));
-    const bool noRemap = fBaseParams.sparseType == static_cast<uint8_t>(SparseType::DENSE) &&
-                         fBaseParams.deterSparseType == static_cast<uint32_t>(DeterSparseType::NO_DETER) &&
-                         !fBaseParams.isDeterministic;
+    const bool noRemap = fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::NO_MASK) &&
+                         !fBaseParams.isDeterministic && fBaseParams.tailZeroCount == 0;
     const bool singleSTile = fBaseParams.s1Outer == 1 && fBaseParams.s2Outer == 1;
     if (!(isSupportedDtype && isSameOutputDtype && isSupportedLayout && noOptionalFeature && fixedOwnership && noRemap &&
           singleSTile && fBaseParams.splitAxis == SplitAxisEnum::BN2)) {
@@ -1680,28 +1678,22 @@ bool IsSmallSDEligible(const FuzzyBaseInfoParamsRegbase& fBaseParams, const TndB
                fBaseParams.s2 > 0 && fBaseParams.s2 <= static_cast<int64_t>(ConstAxisTemplateNum::NUM128);
     }
 
-    const int64_t validBatch = fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount);
-    if (validBatch <= 0 || fBaseParams.actualSeqQlen.size() < static_cast<size_t>(validBatch) ||
+    const int64_t validBatch = fBaseParams.b;
+    if (validBatch <= 0 || fBaseParams.sValueZeroUnderTND || tndBaseInfo.isSeqExistZero ||
+        fBaseParams.actualSeqQlen.size() < static_cast<size_t>(validBatch) ||
         fBaseParams.actualSeqKvlen.size() < static_cast<size_t>(validBatch)) {
         return false;
     }
-    int64_t activeBatchCount = 0;
     for (int64_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
-        const int64_t actualS1 = fBaseParams.actualSeqQlen[batchIdx];
-        const int64_t actualS2 = fBaseParams.actualSeqKvlen[batchIdx];
-        if (actualS1 < 0 || actualS1 > static_cast<int64_t>(ConstAxisTemplateNum::NUM128) ||
-            actualS2 < 0 || actualS2 > static_cast<int64_t>(ConstAxisTemplateNum::NUM128)) {
+        const int64_t actualS1Len = fBaseParams.actualSeqQlen[batchIdx];
+        const int64_t actualS2Len = fBaseParams.actualSeqKvlen[batchIdx];
+        if (actualS1Len <= 0 || actualS2Len <= 0 ||
+            actualS1Len >= static_cast<int64_t>(ConstAxisTemplateNum::NUM128) ||
+            actualS2Len >= static_cast<int64_t>(ConstAxisTemplateNum::NUM128)) {
             return false;
         }
-        if (actualS1 == 0 || actualS2 == 0) {
-            if (actualS1 != 0 || actualS2 != 0) {
-                return false;
-            }
-            continue;
-        }
-        ++activeBatchCount;
     }
-    return activeBatchCount > 0;
+    return true;
 }
 
 bool IsSmallSDProfitable(const FuzzyBaseInfoParamsRegbase& fBaseParams)
@@ -1711,13 +1703,7 @@ bool IsSmallSDProfitable(const FuzzyBaseInfoParamsRegbase& fBaseParams)
     if (fBaseParams.layoutType != INPUT_FORMAT_TND) {
         return fBaseParams.b > 0 && fBaseParams.n2 > 0 && fBaseParams.g == 1;
     }
-    const int64_t validBatch = fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount);
-    int64_t activeBatchCount = 0;
-    for (int64_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
-        activeBatchCount +=
-            (fBaseParams.actualSeqQlen[batchIdx] > 0 && fBaseParams.actualSeqKvlen[batchIdx] > 0) ? 1 : 0;
-    }
-    return activeBatchCount > 0 && fBaseParams.n2 > 0 && fBaseParams.g == 1;
+    return fBaseParams.b > 0 && fBaseParams.n2 > 0 && fBaseParams.g == 1 && fBaseParams.tailZeroCount == 0;
 }
 
 void ApplySmallSDTilingPolicy(FuzzyBaseInfoParamsRegbase& fBaseParams, TndBaseInfo& tndBaseInfo)
@@ -1728,6 +1714,8 @@ void ApplySmallSDTilingPolicy(FuzzyBaseInfoParamsRegbase& fBaseParams, TndBaseIn
                                 ConstAxisTemplateNum::NUM64 : ConstAxisTemplateNum::NUM128;
     fBaseParams.s1Outer = 1;
     fBaseParams.s2Outer = 1;
+    fBaseParams.s1Inner = fBaseParams.s1;
+    fBaseParams.s2Inner = fBaseParams.s2;
     fBaseParams.s1CvInner = fBaseParams.s1;
     fBaseParams.cvS2Inner = fBaseParams.s2;
     fBaseParams.s1Tail = fBaseParams.s1;

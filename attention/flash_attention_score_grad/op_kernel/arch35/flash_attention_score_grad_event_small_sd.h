@@ -22,11 +22,13 @@ namespace FagBaseApi {
 
 // SmallSD fixed DAG sync table.
 //
-// Primary ids are consumed/produced by AIV subblock 0.  AIV subblock 1 uses the
-// same semantic event plus SMALL_SD_EVENT_MIRROR_OFFSET, so AIC can wait for both
-// vector consumers before reusing shared slot resources.  The numeric primary ids
-// intentionally mirror the generic regbase allocation to keep cross-core resources
-// unchanged, but the SmallSD path uses these semantic aliases only.
+// For AIV-owned events, primary ids are consumed/produced by subblock 0 and
+// subblock 1 uses the same semantic event plus SMALL_SD_EVENT_MIRROR_OFFSET, so
+// AIC can wait for both vector consumers before reusing shared slot resources.
+// AIC-only events, such as SMALL_SD_CUBE_OUTPUT_COMMIT_FLAG, use only the primary
+// id.  The numeric primary ids intentionally mirror the generic regbase allocation
+// to keep cross-core resources unchanged, but the SmallSD path uses these semantic
+// aliases only.
 constexpr uint8_t SMALL_SD_EVENT_MIRROR_OFFSET = 16;
 constexpr uint8_t SMALL_SD_CUBE_DYV_READY_FLAG[2] = {0, 1};
 constexpr uint8_t SMALL_SD_CUBE_QK_READY_FLAG[2] = {2, 3};

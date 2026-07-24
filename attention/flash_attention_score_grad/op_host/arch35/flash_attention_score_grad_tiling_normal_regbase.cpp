@@ -432,21 +432,14 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::DoOpTiling()
     SetSplitAxis(context_, fBaseParams);
     DoSplit();
     DetermineMode(fBaseParams);
-    fBaseParams.isSmallSD = IsSmallSDEligible(fBaseParams, tndBaseInfo) && IsSmallSDProfitable(fBaseParams);
-    if (fBaseParams.isSmallSD) {
-        const auto savedFBaseParams = fBaseParams;
-        const auto savedTndBaseInfo = tndBaseInfo;
-        auto ret = FinalizeSmallSDTiling();
-        if (ret == ge::GRAPH_SUCCESS) {
+    if (IsSmallSDEligible(fBaseParams, tndBaseInfo) && IsSmallSDProfitable(fBaseParams)) {
+        const auto smallSDResult = FinalizeSmallSDTiling();
+        if (smallSDResult.status == SmallSDFinalizeStatus::SUCCESS) {
             return ge::GRAPH_SUCCESS;
         }
-        if (ret != ge::GRAPH_PARAM_INVALID) {
-            return ret;
+        if (smallSDResult.status == SmallSDFinalizeStatus::ERROR) {
+            return smallSDResult.ret;
         }
-        fBaseParams = savedFBaseParams;
-        tndBaseInfo = savedTndBaseInfo;
-        fBaseParams.isSmallSD = false;
-        ResetSmallSDDerivedState(true);
     }
 
     auto ret = DoSparse();
@@ -1322,8 +1315,12 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::GetWorkspaceSize()
     size_t *workspaces = context_->GetWorkspaceSizes(1);
     size_t workspaceSize = 0;
     workspaceSize = RESERVED_WORKSPACE_SIZE;
-    if (fBaseParams.isSmallSD) {
-        workspaces[0] = smallSDWorkspaceSize_ == 0 ? RESERVED_WORKSPACE_SIZE + WORKSPACE_BUFFER : smallSDWorkspaceSize_;
+    if (fBaseParams.isSmallSD || smallSDFinalized_) {
+        OP_CHECK_IF(!fBaseParams.isSmallSD || !smallSDFinalized_ || smallSDWorkspaceSize_ == 0,
+                    OP_LOGE("FlashAttentionScoreGradTilingNormalRegbase",
+                            "SmallSD workspace requested before atomic finalize commit."),
+                    return ge::GRAPH_FAILED);
+        workspaces[0] = smallSDWorkspaceSize_;
         return ge::GRAPH_SUCCESS;
     }
     int64_t qSize =
@@ -1507,9 +1504,11 @@ std::tuple<uint32_t, uint32_t, uint32_t> FlashAttentionScoreGradTilingNormalRegb
 
 ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::PostTiling()
 {
-    if (fBaseParams.isSmallSD) {
-        OP_CHECK_IF(!smallSDFinalized_, OP_LOGE("FlashAttentionScoreGradTilingNormalRegbase",
-                    "SmallSD PostTiling entered before finalize."), return ge::GRAPH_FAILED);
+    if (fBaseParams.isSmallSD || smallSDFinalized_) {
+        OP_CHECK_IF(!fBaseParams.isSmallSD || !smallSDFinalized_,
+                    OP_LOGE("FlashAttentionScoreGradTilingNormalRegbase",
+                            "SmallSD PostTiling entered before atomic finalize commit."),
+                    return ge::GRAPH_FAILED);
         const auto numBlocks = CalcTschBlockDim(smallSDUsedCoreNum_ * AICV_RATIO_DEFAULT,
                                                 fBaseParams.aicNum, fBaseParams.coreNum);
         OP_CHECK_IF(numBlocks == 0,
@@ -1930,18 +1929,119 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitSmallSDTilingDat
     return ge::GRAPH_SUCCESS;
 }
 
-void FlashAttentionScoreGradTilingNormalRegbase::ResetSmallSDDerivedState(bool forFallback)
+FlashAttentionScoreGradTilingNormalRegbase::SmallSDHostStateSnapshot
+FlashAttentionScoreGradTilingNormalRegbase::CaptureSmallSDHostState() const
+{
+    SmallSDHostStateSnapshot snapshot {
+        fBaseParams,
+        tndBaseInfo,
+        smallSDTilingDataScratch_,
+        smallSDValidTaskCount_,
+        smallSDUsedCoreNum_,
+        smallSDTailCoreTaskCount_,
+        smallSDWorkspaceSize_,
+        smallSDFinalized_,
+        s1s2BNGS1S2BaseParams_,
+        s1s2BNGS1S2SplitCoreParams_,
+        s1s2BNGS1S2BlockNumList_,
+        preTilingData_,
+        postTilingData_,
+        baseDeterParam_,
+        deterParam,
+        tndParam_,
+        tndSwizzleParam_,
+        smallSDTilingData_
+    };
+    return snapshot;
+}
+
+void FlashAttentionScoreGradTilingNormalRegbase::RestoreSmallSDHostState(const SmallSDHostStateSnapshot &snapshot)
+{
+    fBaseParams = snapshot.fBaseParams;
+    tndBaseInfo = snapshot.tndBaseInfo;
+    smallSDTilingDataScratch_ = snapshot.smallSDTilingDataScratch;
+    smallSDValidTaskCount_ = snapshot.smallSDValidTaskCount;
+    smallSDUsedCoreNum_ = snapshot.smallSDUsedCoreNum;
+    smallSDTailCoreTaskCount_ = snapshot.smallSDTailCoreTaskCount;
+    smallSDWorkspaceSize_ = snapshot.smallSDWorkspaceSize;
+    smallSDFinalized_ = snapshot.smallSDFinalized;
+    s1s2BNGS1S2BaseParams_ = snapshot.s1s2BNGS1S2BaseParams;
+    s1s2BNGS1S2SplitCoreParams_ = snapshot.s1s2BNGS1S2SplitCoreParams;
+    s1s2BNGS1S2BlockNumList_ = snapshot.s1s2BNGS1S2BlockNumList;
+    preTilingData_ = snapshot.preTilingData;
+    postTilingData_ = snapshot.postTilingData;
+    baseDeterParam_ = snapshot.baseDeterParam;
+    deterParam = snapshot.deterParam;
+    tndParam_ = snapshot.tndParam;
+    tndSwizzleParam_ = snapshot.tndSwizzleParam;
+    smallSDTilingData_ = snapshot.smallSDTilingData;
+}
+
+void FlashAttentionScoreGradTilingNormalRegbase::ClearSmallSDScratch()
 {
     smallSDFinalized_ = false;
     smallSDValidTaskCount_ = 0;
     smallSDUsedCoreNum_ = 0;
     smallSDTailCoreTaskCount_ = 0;
     smallSDWorkspaceSize_ = 0;
-    smallSDTilingDataScratch_ = SmallSDTilingDataRegbase {};
-    if (forFallback) {
-        return;
-    }
+    s1s2BNGS1S2BaseParams_ = nullptr;
+    s1s2BNGS1S2SplitCoreParams_ = nullptr;
+    s1s2BNGS1S2BlockNumList_ = nullptr;
+    preTilingData_ = nullptr;
+    postTilingData_ = nullptr;
+    baseDeterParam_ = nullptr;
+    deterParam = nullptr;
+    tndParam_ = nullptr;
+    tndSwizzleParam_ = nullptr;
+    smallSDTilingData_ = nullptr;
 
+    auto &baseParam = smallSDTilingDataScratch_.baseParam;
+    baseParam.set_bSize(0);
+    baseParam.set_n1Size(0);
+    baseParam.set_n2Size(0);
+    baseParam.set_gSize(0);
+    baseParam.set_maxS1(0);
+    baseParam.set_maxS2(0);
+    baseParam.set_actualD(0);
+    baseParam.set_actualDv(0);
+    baseParam.set_usedCoreNum(0);
+    baseParam.set_layoutType(0);
+    baseParam.set_inputDtype(0);
+    baseParam.set_outputDtype(0);
+    baseParam.set_calcTypeSize(0);
+    baseParam.set_tndMaxSumLayout(0);
+    baseParam.set_sparseMode(0);
+    baseParam.set_validTaskCount(0);
+    baseParam.set_isTnd(0);
+    baseParam.set_isSingleTask(0);
+    baseParam.set_s2Align16(0);
+    baseParam.set_workspaceBaseOffset(0);
+    baseParam.set_workspaceSize(0);
+    baseParam.set_scaleValue(0.0f);
+
+    for (uint32_t coreIdx = 0; coreIdx < MAX_CORE_NUM; ++coreIdx) {
+        smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_blockStart(0);
+        smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_blockEnd(0);
+        smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_groupCount(0);
+        smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_reserved(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_startBatchIdx(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_startN2Idx(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_taskCount(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_reserved(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_baseTaskPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qDyDqPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvDkDvPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_attentionPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_alignedAttentionPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_softmaxPrefix(0);
+    }
+}
+
+void FlashAttentionScoreGradTilingNormalRegbase::InitSmallSDFixedDerivedState()
+{
+    fBaseParams.isSmallSD = false;
     fBaseParams.enablePreSfmg = false;
     fBaseParams.isBn2MultiBlk = false;
     fBaseParams.isNzOut = false;
@@ -1956,12 +2056,11 @@ void FlashAttentionScoreGradTilingNormalRegbase::ResetSmallSDDerivedState(bool f
     fBaseParams.coreDivide = false;
     fBaseParams.maxValidBBLen = 0;
     fBaseParams.blockFactor = 0;
+    fBaseParams.blockOuter = 0;
 
     for (uint32_t idx = 0; idx < CORE_LIST_NUM; ++idx) {
         fBaseParams.blockStarts[idx] = 0;
         fBaseParams.blockEnds[idx] = 0;
-        fBaseParams.dqIsNeedDeter[idx] = 0;
-        fBaseParams.dkDvIsNeedDeter[idx] = 0;
         fBaseParams.startNeedSyncRound[idx] = 0;
         fBaseParams.endNeedSyncRound[idx] = 0;
         fBaseParams.separateDkOffset[idx] = 0;
@@ -1970,6 +2069,10 @@ void FlashAttentionScoreGradTilingNormalRegbase::ResetSmallSDDerivedState(bool f
         tndBaseInfo.tndS1S2AlignPrefixSum[idx] = 0;
         tndBaseInfo.tndPrefixSum[idx] = 0;
         tndBaseInfo.tndPrefixValidSum[idx] = 0;
+    }
+    for (uint32_t idx = 0; idx < 32; ++idx) {
+        fBaseParams.dqIsNeedDeter[idx] = 0;
+        fBaseParams.dkDvIsNeedDeter[idx] = 0;
     }
     for (uint32_t idx = 0; idx < TND_SWIZZLE_PREFIX_NUM; ++idx) {
         tndBaseInfo.tndS2BlockPrefixSum[idx] = 0;
@@ -1984,27 +2087,14 @@ void FlashAttentionScoreGradTilingNormalRegbase::ResetSmallSDDerivedState(bool f
         fBaseParams.deterPrefix2[idx] = 0;
     }
     tndBaseInfo.isTndSwizzle = false;
-}
-
-uint32_t FlashAttentionScoreGradTilingNormalRegbase::GetSmallSDTndActiveBatchCount() const
-{
-    if (fBaseParams.layoutType != INPUT_FORMAT_TND) {
-        return static_cast<uint32_t>(fBaseParams.b);
-    }
-    uint32_t activeBatchCount = 0;
-    const uint32_t validBatch = static_cast<uint32_t>(fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount));
-    for (uint32_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
-        if (fBaseParams.actualSeqQlen[batchIdx] > 0 && fBaseParams.actualSeqKvlen[batchIdx] > 0) {
-            ++activeBatchCount;
-        }
-    }
-    return activeBatchCount;
+    tndBaseInfo.isS1GreaterThanS2 = false;
+    tndBaseInfo.isS1LessThanS2 = false;
+    tndBaseInfo.isSeqExistZero = false;
 }
 
 ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDCoreRanges()
 {
-    const uint64_t validBatch = static_cast<uint64_t>(
-        fBaseParams.layoutType == INPUT_FORMAT_TND ? GetSmallSDTndActiveBatchCount() : fBaseParams.b);
+    const uint64_t validBatch = static_cast<uint64_t>(fBaseParams.b);
     const uint64_t validTaskCount = validBatch * static_cast<uint64_t>(fBaseParams.n2);
     if (validTaskCount == 0 || fBaseParams.aicNum == 0 || validTaskCount > 0xFFFFFFFFULL) {
         OP_LOGI(context_, "SmallSD core range invalid, validTaskCount[%lu], aicNum[%lu].",
@@ -2045,76 +2135,87 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDCoreRang
     return ge::GRAPH_SUCCESS;
 }
 
-void FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDTndCoreParams()
+ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDTndCoreParams()
 {
     const bool isTnd = fBaseParams.layoutType == INPUT_FORMAT_TND;
     uint64_t qPrefix = 0;
-    uint64_t kPrefix = 0;
+    uint64_t kvPrefix = 0;
     uint64_t attentionPrefix = 0;
     uint64_t alignedAttentionPrefix = 0;
     uint32_t nextCoreIdx = 0;
     const uint64_t n2 = static_cast<uint64_t>(fBaseParams.n2);
     const uint64_t n2G = n2 * static_cast<uint64_t>(fBaseParams.g);
     const uint64_t n2D = n2 * static_cast<uint64_t>(fBaseParams.d);
-    const uint64_t n2Dv = n2 * static_cast<uint64_t>(fBaseParams.d1);
     const uint64_t n2GD = n2G * static_cast<uint64_t>(fBaseParams.d);
-    const uint64_t n2GDv = n2G * static_cast<uint64_t>(fBaseParams.d1);
-    const uint32_t validBatch = static_cast<uint32_t>(fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount));
-    uint64_t compactTaskPrefix = 0;
+    const uint32_t validBatch = static_cast<uint32_t>(fBaseParams.b);
 
     for (uint32_t coreIdx = 0; coreIdx < MAX_CORE_NUM; ++coreIdx) {
         smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_startBatchIdx(0);
         smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_startN2Idx(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_taskCount(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_reserved(0);
         smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_baseTaskPrefix(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qPrefixOffset(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kPrefixOffset(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qDvPrefixOffset(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kDvPrefixOffset(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_attenPrefixOffset(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_attenAlignPrefixOffset(0);
-        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_s2PrefixSize(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_qDyDqPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_kvDkDvPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_attentionPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_alignedAttentionPrefix(0);
+        smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_softmaxPrefix(0);
     }
     if (!isTnd) {
-        return;
+        return ge::GRAPH_SUCCESS;
+    }
+    if (fBaseParams.tailZeroCount != 0 || fBaseParams.sValueZeroUnderTND || tndBaseInfo.isSeqExistZero ||
+        fBaseParams.actualSeqQlen.size() < validBatch || fBaseParams.actualSeqKvlen.size() < validBatch) {
+        return ge::GRAPH_PARAM_INVALID;
     }
 
     for (uint32_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
-        const uint64_t qLen = static_cast<uint64_t>(fBaseParams.actualSeqQlen[batchIdx]);
-        const uint64_t kLen = static_cast<uint64_t>(fBaseParams.actualSeqKvlen[batchIdx]);
-        const bool hasTask = qLen > 0 && kLen > 0;
-        if (!hasTask) {
-            qPrefix += qLen;
-            kPrefix += kLen;
-            attentionPrefix += qLen * kLen;
-            alignedAttentionPrefix += qLen * static_cast<uint64_t>(AlignTo<int64_t>(kLen, FP16_C0_SIZE));
-            continue;
+        const int64_t qLenSigned = fBaseParams.actualSeqQlen[batchIdx];
+        const int64_t kvLenSigned = fBaseParams.actualSeqKvlen[batchIdx];
+        if (qLenSigned <= 0 || kvLenSigned <= 0) {
+            return ge::GRAPH_PARAM_INVALID;
         }
+        const uint64_t qLen = static_cast<uint64_t>(qLenSigned);
+        const uint64_t kvLen = static_cast<uint64_t>(kvLenSigned);
+        if (qLen == 0 || kvLen == 0 || qLen >= 128 || kvLen >= 128) {
+            return ge::GRAPH_PARAM_INVALID;
+        }
+        const uint64_t baseTaskPrefix = static_cast<uint64_t>(batchIdx) * n2;
+        const uint64_t batchTaskEnd = baseTaskPrefix + n2;
         while (nextCoreIdx < smallSDUsedCoreNum_ &&
-               smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart() < compactTaskPrefix + n2) {
+               smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart() < batchTaskEnd) {
             const uint32_t blockStart = smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart();
-            if (smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_groupCount() == 0) {
+            const uint32_t groupCount = smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_groupCount();
+            if (groupCount == 0) {
                 ++nextCoreIdx;
                 continue;
             }
+            if (static_cast<uint64_t>(blockStart) < baseTaskPrefix) {
+                return ge::GRAPH_PARAM_INVALID;
+            }
             smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_startBatchIdx(batchIdx);
             smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_startN2Idx(
-                static_cast<uint32_t>(static_cast<uint64_t>(blockStart) - compactTaskPrefix));
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_baseTaskPrefix(compactTaskPrefix);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_qPrefixOffset(qPrefix * n2GD);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_kPrefixOffset(kPrefix * n2D);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_qDvPrefixOffset(qPrefix * n2GDv);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_kDvPrefixOffset(kPrefix * n2Dv);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_attenPrefixOffset(attentionPrefix);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_attenAlignPrefixOffset(alignedAttentionPrefix);
-            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_s2PrefixSize(kPrefix);
+                static_cast<uint32_t>(static_cast<uint64_t>(blockStart) - baseTaskPrefix));
+            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_taskCount(groupCount);
+            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_reserved(0);
+            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_baseTaskPrefix(baseTaskPrefix);
+            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_qPrefix(qPrefix);
+            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_kvPrefix(kvPrefix);
+            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_qDyDqPrefix(qPrefix * n2GD);
+            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_kvDkDvPrefix(kvPrefix * n2D);
+            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_attentionPrefix(attentionPrefix);
+            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_alignedAttentionPrefix(alignedAttentionPrefix);
+            smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx].set_softmaxPrefix(qPrefix);
             ++nextCoreIdx;
         }
-        compactTaskPrefix += n2;
         qPrefix += qLen;
-        kPrefix += kLen;
-        attentionPrefix += qLen * kLen;
-        alignedAttentionPrefix += qLen * static_cast<uint64_t>(AlignTo<int64_t>(kLen, FP16_C0_SIZE));
+        kvPrefix += kvLen;
+        attentionPrefix += qLen * kvLen;
+        alignedAttentionPrefix += qLen * static_cast<uint64_t>(AlignTo<int64_t>(kvLen, FP16_C0_SIZE));
     }
+    return nextCoreIdx == smallSDUsedCoreNum_ ? ge::GRAPH_SUCCESS : ge::GRAPH_PARAM_INVALID;
 }
 
 void FlashAttentionScoreGradTilingNormalRegbase::FillSmallSDBaseParam()
@@ -2165,7 +2266,8 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
         fBaseParams.attenMaskOptional != EMPTY_TENSOR || fBaseParams.dropMaskOuter ||
         fBaseParams.sinkOptional == NORMAL_TENSOR || fBaseParams.hasRope || fBaseParams.isDeterministic ||
         fBaseParams.isBn2MultiBlk || fBaseParams.isNzOut || fBaseParams.d1 != fBaseParams.d ||
-        tndBaseInfo.isTndSwizzle || fBaseParams.enableSwizzle || fBaseParams.enablePreSfmg) {
+        tndBaseInfo.isTndSwizzle || fBaseParams.enableSwizzle || fBaseParams.enablePreSfmg ||
+        fBaseParams.tailZeroCount != 0 || fBaseParams.sparseMode != static_cast<uint32_t>(SparseMode::NO_MASK)) {
         return false;
     }
     if (smallSDUsedCoreNum_ == 0 || smallSDUsedCoreNum_ > fBaseParams.aicNum || smallSDValidTaskCount_ == 0) {
@@ -2190,62 +2292,65 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
         return false;
     }
     if (fBaseParams.layoutType == INPUT_FORMAT_TND) {
-        const auto validBatch = static_cast<size_t>(fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount));
-        if (fBaseParams.actualSeqQlen.size() < validBatch || fBaseParams.actualSeqKvlen.size() < validBatch) {
+        const auto validBatch = static_cast<size_t>(fBaseParams.b);
+        if (fBaseParams.tailZeroCount != 0 || fBaseParams.sValueZeroUnderTND || tndBaseInfo.isSeqExistZero ||
+            fBaseParams.actualSeqQlen.size() < validBatch || fBaseParams.actualSeqKvlen.size() < validBatch ||
+            smallSDValidTaskCount_ != static_cast<uint64_t>(fBaseParams.b) * static_cast<uint64_t>(fBaseParams.n2)) {
             return false;
         }
         uint64_t qPrefix = 0;
-        uint64_t kPrefix = 0;
+        uint64_t kvPrefix = 0;
         uint64_t attentionPrefix = 0;
         uint64_t alignedAttentionPrefix = 0;
         const uint64_t n2 = static_cast<uint64_t>(fBaseParams.n2);
         const uint64_t n2G = n2 * static_cast<uint64_t>(fBaseParams.g);
         const uint64_t n2D = n2 * static_cast<uint64_t>(fBaseParams.d);
-        const uint64_t n2Dv = n2 * static_cast<uint64_t>(fBaseParams.d1);
         const uint64_t n2GD = n2G * static_cast<uint64_t>(fBaseParams.d);
-        const uint64_t n2GDv = n2G * static_cast<uint64_t>(fBaseParams.d1);
         uint32_t nextCoreIdx = 0;
-        uint64_t compactTaskPrefix = 0;
         for (uint32_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
-            const int64_t qLen = fBaseParams.actualSeqQlen[batchIdx];
-            const int64_t kLen = fBaseParams.actualSeqKvlen[batchIdx];
-            if (qLen < 0 || kLen < 0 || qLen > 128 || kLen > 128) {
+            const int64_t qLenSigned = fBaseParams.actualSeqQlen[batchIdx];
+            const int64_t kvLenSigned = fBaseParams.actualSeqKvlen[batchIdx];
+            if (qLenSigned <= 0 || kvLenSigned <= 0) {
                 return false;
             }
-            if (qLen == 0 || kLen == 0) {
-                if (qLen != 0 || kLen != 0) {
-                    return false;
-                }
-                continue;
+            const uint64_t qLen = static_cast<uint64_t>(qLenSigned);
+            const uint64_t kvLen = static_cast<uint64_t>(kvLenSigned);
+            if (qLen == 0 || kvLen == 0 || qLen >= 128 || kvLen >= 128) {
+                return false;
             }
+            const uint64_t baseTaskPrefix = static_cast<uint64_t>(batchIdx) * n2;
+            const uint64_t batchTaskEnd = baseTaskPrefix + n2;
             while (nextCoreIdx < smallSDUsedCoreNum_ &&
                    smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart() <
-                       compactTaskPrefix + n2) {
+                       batchTaskEnd) {
                 const auto &tndParam = smallSDTilingDataScratch_.tndCoreParam[nextCoreIdx];
                 const uint32_t blockStart = smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_blockStart();
+                const uint32_t groupCount = smallSDTilingDataScratch_.coreTaskParam[nextCoreIdx].get_groupCount();
+                if (static_cast<uint64_t>(blockStart) < baseTaskPrefix) {
+                    return false;
+                }
                 if (tndParam.get_startBatchIdx() != batchIdx ||
                     tndParam.get_startN2Idx() !=
-                        static_cast<uint32_t>(static_cast<uint64_t>(blockStart) - compactTaskPrefix) ||
-                    tndParam.get_baseTaskPrefix() != compactTaskPrefix ||
-                    tndParam.get_qPrefixOffset() != qPrefix * n2GD ||
-                    tndParam.get_kPrefixOffset() != kPrefix * n2D ||
-                    tndParam.get_qDvPrefixOffset() != qPrefix * n2GDv ||
-                    tndParam.get_kDvPrefixOffset() != kPrefix * n2Dv ||
-                    tndParam.get_attenPrefixOffset() != attentionPrefix ||
-                    tndParam.get_attenAlignPrefixOffset() != alignedAttentionPrefix ||
-                    tndParam.get_s2PrefixSize() != kPrefix) {
+                        static_cast<uint32_t>(static_cast<uint64_t>(blockStart) - baseTaskPrefix) ||
+                    tndParam.get_taskCount() != groupCount || tndParam.get_reserved() != 0 ||
+                    tndParam.get_baseTaskPrefix() != baseTaskPrefix ||
+                    tndParam.get_qPrefix() != qPrefix || tndParam.get_kvPrefix() != kvPrefix ||
+                    tndParam.get_qDyDqPrefix() != qPrefix * n2GD ||
+                    tndParam.get_kvDkDvPrefix() != kvPrefix * n2D ||
+                    tndParam.get_attentionPrefix() != attentionPrefix ||
+                    tndParam.get_alignedAttentionPrefix() != alignedAttentionPrefix ||
+                    tndParam.get_softmaxPrefix() != qPrefix) {
                     return false;
                 }
                 ++nextCoreIdx;
             }
-            compactTaskPrefix += n2;
             qPrefix += static_cast<uint64_t>(qLen);
-            kPrefix += static_cast<uint64_t>(kLen);
-            attentionPrefix += static_cast<uint64_t>(qLen) * static_cast<uint64_t>(kLen);
+            kvPrefix += static_cast<uint64_t>(kvLen);
+            attentionPrefix += static_cast<uint64_t>(qLen) * static_cast<uint64_t>(kvLen);
             alignedAttentionPrefix += static_cast<uint64_t>(qLen) *
-                                      static_cast<uint64_t>(AlignTo<int64_t>(kLen, FP16_C0_SIZE));
+                                      static_cast<uint64_t>(AlignTo<int64_t>(kvLen, FP16_C0_SIZE));
         }
-        if (qPrefix > static_cast<uint64_t>(fBaseParams.t1) || kPrefix > static_cast<uint64_t>(fBaseParams.t2) ||
+        if (qPrefix > static_cast<uint64_t>(fBaseParams.t1) || kvPrefix > static_cast<uint64_t>(fBaseParams.t2) ||
             attentionPrefix > static_cast<uint64_t>(fBaseParams.sumS1S2Product)) {
             return false;
         }
@@ -2255,10 +2360,11 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
         for (uint32_t coreIdx = smallSDUsedCoreNum_; coreIdx < MAX_CORE_NUM; ++coreIdx) {
             const auto &tndParam = smallSDTilingDataScratch_.tndCoreParam[coreIdx];
             if (tndParam.get_startBatchIdx() != 0 || tndParam.get_startN2Idx() != 0 ||
-                tndParam.get_baseTaskPrefix() != 0 || tndParam.get_qPrefixOffset() != 0 ||
-                tndParam.get_kPrefixOffset() != 0 || tndParam.get_qDvPrefixOffset() != 0 ||
-                tndParam.get_kDvPrefixOffset() != 0 || tndParam.get_attenPrefixOffset() != 0 ||
-                tndParam.get_attenAlignPrefixOffset() != 0 || tndParam.get_s2PrefixSize() != 0) {
+                tndParam.get_taskCount() != 0 || tndParam.get_reserved() != 0 ||
+                tndParam.get_baseTaskPrefix() != 0 || tndParam.get_qPrefix() != 0 ||
+                tndParam.get_kvPrefix() != 0 || tndParam.get_qDyDqPrefix() != 0 ||
+                tndParam.get_kvDkDvPrefix() != 0 || tndParam.get_attentionPrefix() != 0 ||
+                tndParam.get_alignedAttentionPrefix() != 0 || tndParam.get_softmaxPrefix() != 0) {
                 return false;
             }
         }
@@ -2267,28 +2373,44 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
            smallSDWorkspaceSize_ >= RESERVED_WORKSPACE_SIZE;
 }
 
-ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::FinalizeSmallSDTiling()
+FlashAttentionScoreGradTilingNormalRegbase::SmallSDFinalizeResult
+FlashAttentionScoreGradTilingNormalRegbase::FinalizeSmallSDTiling()
 {
+    const auto snapshot = CaptureSmallSDHostState();
+    const auto rollbackToRegBase = [this, &snapshot]() {
+        RestoreSmallSDHostState(snapshot);
+        fBaseParams.isSmallSD = false;
+    };
+
+    ClearSmallSDScratch();
     ApplySmallSDTilingPolicy(fBaseParams, tndBaseInfo);
-    ResetSmallSDDerivedState(false);
+    InitSmallSDFixedDerivedState();
     auto ret = BuildSmallSDCoreRanges();
     if (ret != ge::GRAPH_SUCCESS) {
-        return ret;
+        rollbackToRegBase();
+        return {ret == ge::GRAPH_PARAM_INVALID ? SmallSDFinalizeStatus::FALLBACK : SmallSDFinalizeStatus::ERROR, ret};
     }
-    BuildSmallSDTndCoreParams();
+    ret = BuildSmallSDTndCoreParams();
+    if (ret != ge::GRAPH_SUCCESS) {
+        rollbackToRegBase();
+        return {ret == ge::GRAPH_PARAM_INVALID ? SmallSDFinalizeStatus::FALLBACK : SmallSDFinalizeStatus::ERROR, ret};
+    }
     SetSmallSDWorkspace();
     FillSmallSDBaseParam();
     if (!ValidateSmallSDInvariant()) {
         OP_LOGI(context_, "SmallSD invariant check failed, fallback to RegBase normal path.");
-        return ge::GRAPH_PARAM_INVALID;
+        rollbackToRegBase();
+        return {SmallSDFinalizeStatus::FALLBACK, ge::GRAPH_PARAM_INVALID};
     }
     ret = InitSmallSDTilingData();
     if (ret != ge::GRAPH_SUCCESS) {
-        return ret;
+        rollbackToRegBase();
+        return {SmallSDFinalizeStatus::ERROR, ret};
     }
+    fBaseParams.isSmallSD = true;
     SaveSmallSDTilingData();
     smallSDFinalized_ = true;
-    return ge::GRAPH_SUCCESS;
+    return {SmallSDFinalizeStatus::SUCCESS, ge::GRAPH_SUCCESS};
 }
 
 void FlashAttentionScoreGradTilingNormalRegbase::SaveSmallSDTilingData()
