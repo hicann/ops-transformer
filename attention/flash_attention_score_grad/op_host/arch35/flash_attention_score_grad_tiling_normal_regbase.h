@@ -32,7 +32,6 @@ namespace fag {
         preTilingData_ = &tilingData->preTilingData;                                                                   \
         postTilingData_ = &tilingData->postTilingData;                                                                 \
         tndParam_ = &tilingData->tndParam;                                                                             \
-        smallSDTilingData_ = &tilingData->smallSDTilingData;                                                           \
     } while (0)
 
 #define BASE_TILING_DATA_COMMON_ASSIGN(tilingData)                                                                     \
@@ -42,7 +41,6 @@ namespace fag {
         s1s2BNGS1S2BlockNumList_ = &tilingData->s1s2BNGS1S2BlockNumList;                                               \
         preTilingData_ = &tilingData->preTilingData;                                                                   \
         postTilingData_ = &tilingData->postTilingData;                                                                 \
-        smallSDTilingData_ = &tilingData->smallSDTilingData;                                                           \
     } while (0)
 
 class FlashAttentionScoreGradTilingNormalRegbase : public TilingBaseClass {

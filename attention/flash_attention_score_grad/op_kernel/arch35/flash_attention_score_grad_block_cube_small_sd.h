@@ -78,13 +78,11 @@ public:
 
     __aicore__ inline void IssueQkAndDyV(SmallSDPipelineSlot &slot)
     {
-        slot.state = SmallSDSlotState::CUBE_INFLIGHT;
         if ASCEND_IS_AIC {
             LoadSmallSDInputs(slot);
             MatmulQKOrGradStage(slot);
             CommitCubeResultToSlot(slot);
         }
-        slot.state = SmallSDSlotState::READY_FOR_VECTOR;
     }
 
     __aicore__ inline void IssueDqDkDv(SmallSDPipelineSlot &slot)
@@ -155,6 +153,14 @@ public:
             CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(SMALL_SD_DS_L1_REUSABLE_FLAG + SMALL_SD_EVENT_MIRROR_OFFSET);
             CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(SMALL_SD_P_L1_REUSABLE_FLAG);
             CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(SMALL_SD_P_L1_REUSABLE_FLAG + SMALL_SD_EVENT_MIRROR_OFFSET);
+        }
+    }
+
+    __aicore__ inline void WaitOutputCommitComplete()
+    {
+        if ASCEND_IS_AIC {
+            CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SMALL_SD_CUBE_OUTPUT_COMMIT_FLAG);
+            CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(SMALL_SD_CUBE_OUTPUT_COMMIT_FLAG);
         }
     }
 

@@ -76,8 +76,8 @@ public:
     {
         const int64_t taskMod2 = slot.taskIdMod2;
         if ASCEND_IS_AIV {
-            CrossCoreWaitFlag<SYNC_MODE, PIPE_V>(SMALL_SD_CUBE_QK_READY_FLAG[taskMod2]);
-            CrossCoreWaitFlag<SYNC_MODE, PIPE_V>(SMALL_SD_CUBE_DYV_READY_FLAG[taskMod2]);
+            CrossCoreWaitFlag<SYNC_MODE, PIPE_V>(GetSubBlockEvent(SMALL_SD_CUBE_QK_READY_FLAG[taskMod2]));
+            CrossCoreWaitFlag<SYNC_MODE, PIPE_V>(GetSubBlockEvent(SMALL_SD_CUBE_DYV_READY_FLAG[taskMod2]));
         }
     }
 
@@ -154,10 +154,8 @@ public:
     {
         if ASCEND_IS_AIV {
             if (needWaitL1Reusable) {
-                CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE3>(SMALL_SD_DS_L1_REUSABLE_FLAG);
-                CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE3>(SMALL_SD_DS_L1_REUSABLE_FLAG + SMALL_SD_EVENT_MIRROR_OFFSET);
-                CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE3>(SMALL_SD_P_L1_REUSABLE_FLAG);
-                CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE3>(SMALL_SD_P_L1_REUSABLE_FLAG + SMALL_SD_EVENT_MIRROR_OFFSET);
+                CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE3>(GetSubBlockEvent(SMALL_SD_DS_L1_REUSABLE_FLAG));
+                CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE3>(GetSubBlockEvent(SMALL_SD_P_L1_REUSABLE_FLAG));
             }
         }
     }
@@ -166,10 +164,8 @@ public:
     {
         (void)slot;
         if ASCEND_IS_AIV {
-            CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SMALL_SD_DS_L1_READY_FLAG);
-            CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SMALL_SD_DS_L1_READY_FLAG + SMALL_SD_EVENT_MIRROR_OFFSET);
-            CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SMALL_SD_P_L1_READY_FLAG);
-            CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SMALL_SD_P_L1_READY_FLAG + SMALL_SD_EVENT_MIRROR_OFFSET);
+            CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(GetSubBlockEvent(SMALL_SD_DS_L1_READY_FLAG));
+            CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(GetSubBlockEvent(SMALL_SD_P_L1_READY_FLAG));
         }
     }
 
@@ -177,8 +173,8 @@ public:
     {
         (void)slot;
         if ASCEND_IS_AIV {
-            CrossCoreWaitFlag<SYNC_MODE, PIPE_V>(SMALL_SD_DQ_UB_READY_FLAG);
-            CrossCoreWaitFlag<SYNC_MODE, PIPE_V>(SMALL_SD_DK_UB_READY_FLAG);
+            CrossCoreWaitFlag<SYNC_MODE, PIPE_V>(GetSubBlockEvent(SMALL_SD_DQ_UB_READY_FLAG));
+            CrossCoreWaitFlag<SYNC_MODE, PIPE_V>(GetSubBlockEvent(SMALL_SD_DK_UB_READY_FLAG));
         }
     }
 
@@ -188,12 +184,24 @@ public:
         CommitOneGrad<DK_IDX>(mm2ResBuf[slot.taskIdMod2].template Get<CALC_TYPE>(), slot);
         // DV is produced directly by Cube into GM in the SmallSD minimal data path.
         if ASCEND_IS_AIV {
-            CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SMALL_SD_SLOT_REUSE_READY_FLAG);
-            CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SMALL_SD_SLOT_REUSE_READY_FLAG + SMALL_SD_EVENT_MIRROR_OFFSET);
+            PipeBarrier<PIPE_MTE3>();
+            CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(GetSubBlockEvent(SMALL_SD_SLOT_REUSE_READY_FLAG));
+        }
+    }
+
+    __aicore__ inline void WaitOutputCommitComplete()
+    {
+        if ASCEND_IS_AIV {
+            PipeBarrier<PIPE_MTE3>();
         }
     }
 
 private:
+    __aicore__ inline uint8_t GetSubBlockEvent(uint8_t eventId) const
+    {
+        return eventId + static_cast<uint8_t>(vSubBlockIdx * SMALL_SD_EVENT_MIRROR_OFFSET);
+    }
+
     __aicore__ inline uint64_t GetQLikeRowGmOffset(const SmallSDPipelineSlot &slot, uint64_t baseOffset,
                                                    uint64_t rowStride) const
     {

@@ -760,7 +760,7 @@ static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, tndCoreP
               "SmallSD tiling tndCoreParam offset changed unexpectedly.");
 
 template<const bool isDeter = false, const bool isNewDeter = false,
-    const bool isTnd = false, const bool isTndSwizzle = false>
+    const bool isTnd = false, const bool isTndSwizzle = false, const bool isSmallSD = false>
 class FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase {
 public:
     FlashAttentionScoreGradS1S2BNGS1S2BaseParamsRegbase s1s2BNGS1S2BaseParams;
@@ -772,8 +772,25 @@ public:
     typename std::conditional<isNewDeter, DeterParamRegbase, std::nullptr_t>::type deterParam;
     typename std::conditional<!isNewDeter && isTnd, TndParamRegbase, std::nullptr_t>::type tndParam;
     typename std::conditional<isTndSwizzle, TndSwizzleParamRegbase, std::nullptr_t>::type tndSwizzleParam;
-    SmallSDTilingDataRegbase smallSDTilingData;
+    typename std::conditional<isSmallSD, SmallSDTilingDataRegbase, std::nullptr_t>::type smallSDTilingData;
 };
+
+using FlashAttentionScoreGradTilingDataRegbaseBaseOnly =
+    FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<false, false, false, false, false>;
+using FlashAttentionScoreGradTilingDataRegbaseSmallSD =
+    FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<false, false, false, false, true>;
+using FlashAttentionScoreGradTilingDataRegbaseTndSmallSD =
+    FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<false, false, true, false, true>;
+
+static_assert(std::is_same<decltype(((FlashAttentionScoreGradTilingDataRegbaseBaseOnly *)0)->smallSDTilingData),
+                           std::nullptr_t>::value,
+              "Non-SmallSD regbase tiling must not carry the SmallSD per-core payload.");
+static_assert(std::is_same<decltype(((FlashAttentionScoreGradTilingDataRegbaseSmallSD *)0)->smallSDTilingData),
+                           SmallSDTilingDataRegbase>::value,
+              "SmallSD base regbase tiling must carry SmallSDTilingDataRegbase.");
+static_assert(std::is_same<decltype(((FlashAttentionScoreGradTilingDataRegbaseTndSmallSD *)0)->smallSDTilingData),
+                           SmallSDTilingDataRegbase>::value,
+              "SmallSD TND regbase tiling must carry SmallSDTilingDataRegbase.");
 }  // namespace fag
 }  // namespace optiling
 #endif

@@ -1875,9 +1875,18 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitTilingData()
 
 ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitSmallSDTilingData()
 {
+    s1s2BNGS1S2BaseParams_ = nullptr;
+    s1s2BNGS1S2SplitCoreParams_ = nullptr;
+    s1s2BNGS1S2BlockNumList_ = nullptr;
+    preTilingData_ = nullptr;
+    postTilingData_ = nullptr;
+    baseDeterParam_ = nullptr;
+    deterParam = nullptr;
+    tndParam_ = nullptr;
+    tndSwizzleParam_ = nullptr;
     smallSDTilingData_ = nullptr;
     if (fBaseParams.layoutType == INPUT_FORMAT_TND) {
-        auto *tilingData = this->context_->GetTilingData<FagTilingWithTemplateFFTF>();
+        auto *tilingData = this->context_->GetTilingData<FagSmallSDTilingWithTemplateFFTF>();
         if (tilingData == nullptr) {
             OP_LOGE("InitSmallSDTilingData", "Get SmallSD TND tiling data failed.");
             return ge::GRAPH_FAILED;
@@ -1890,9 +1899,15 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitSmallSDTilingDat
         tilingData->postTilingData.set_dropMaskGmOffset(0);
         tilingData->postTilingData.set_sfmgWorkSpaceOffset(0);
         tilingData->postTilingData.set_dsinkWorkSpaceOffset(0);
+        s1s2BNGS1S2BaseParams_ = &tilingData->s1s2BNGS1S2BaseParams;
+        s1s2BNGS1S2SplitCoreParams_ = &tilingData->s1s2BNGS1S2SplitCoreParams;
+        s1s2BNGS1S2BlockNumList_ = &tilingData->s1s2BNGS1S2BlockNumList;
+        preTilingData_ = &tilingData->preTilingData;
+        postTilingData_ = &tilingData->postTilingData;
+        tndParam_ = &tilingData->tndParam;
         smallSDTilingData_ = &tilingData->smallSDTilingData;
     } else {
-        auto *tilingData = this->context_->GetTilingData<FagTilingWithTemplateFFFF>();
+        auto *tilingData = this->context_->GetTilingData<FagSmallSDTilingWithTemplateFFFF>();
         if (tilingData == nullptr) {
             OP_LOGE("InitSmallSDTilingData", "Get SmallSD base tiling data failed.");
             return ge::GRAPH_FAILED;
@@ -1905,6 +1920,11 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitSmallSDTilingDat
         tilingData->postTilingData.set_dropMaskGmOffset(0);
         tilingData->postTilingData.set_sfmgWorkSpaceOffset(0);
         tilingData->postTilingData.set_dsinkWorkSpaceOffset(0);
+        s1s2BNGS1S2BaseParams_ = &tilingData->s1s2BNGS1S2BaseParams;
+        s1s2BNGS1S2SplitCoreParams_ = &tilingData->s1s2BNGS1S2SplitCoreParams;
+        s1s2BNGS1S2BlockNumList_ = &tilingData->s1s2BNGS1S2BlockNumList;
+        preTilingData_ = &tilingData->preTilingData;
+        postTilingData_ = &tilingData->postTilingData;
         smallSDTilingData_ = &tilingData->smallSDTilingData;
     }
     return ge::GRAPH_SUCCESS;
@@ -2229,6 +2249,19 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
             attentionPrefix > static_cast<uint64_t>(fBaseParams.sumS1S2Product)) {
             return false;
         }
+        if (nextCoreIdx != smallSDUsedCoreNum_) {
+            return false;
+        }
+        for (uint32_t coreIdx = smallSDUsedCoreNum_; coreIdx < MAX_CORE_NUM; ++coreIdx) {
+            const auto &tndParam = smallSDTilingDataScratch_.tndCoreParam[coreIdx];
+            if (tndParam.get_startBatchIdx() != 0 || tndParam.get_startN2Idx() != 0 ||
+                tndParam.get_baseTaskPrefix() != 0 || tndParam.get_qPrefixOffset() != 0 ||
+                tndParam.get_kPrefixOffset() != 0 || tndParam.get_qDvPrefixOffset() != 0 ||
+                tndParam.get_kDvPrefixOffset() != 0 || tndParam.get_attenPrefixOffset() != 0 ||
+                tndParam.get_attenAlignPrefixOffset() != 0 || tndParam.get_s2PrefixSize() != 0) {
+                return false;
+            }
+        }
     }
     return smallSDTilingDataScratch_.baseParam.get_workspaceBaseOffset() >= RESERVED_WORKSPACE_SIZE &&
            smallSDWorkspaceSize_ >= RESERVED_WORKSPACE_SIZE;
@@ -2236,13 +2269,9 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
 
 ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::FinalizeSmallSDTiling()
 {
-    auto ret = InitSmallSDTilingData();
-    if (ret != ge::GRAPH_SUCCESS) {
-        return ret;
-    }
     ApplySmallSDTilingPolicy(fBaseParams, tndBaseInfo);
     ResetSmallSDDerivedState(false);
-    ret = BuildSmallSDCoreRanges();
+    auto ret = BuildSmallSDCoreRanges();
     if (ret != ge::GRAPH_SUCCESS) {
         return ret;
     }
@@ -2252,6 +2281,10 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::FinalizeSmallSDTilin
     if (!ValidateSmallSDInvariant()) {
         OP_LOGI(context_, "SmallSD invariant check failed, fallback to RegBase normal path.");
         return ge::GRAPH_PARAM_INVALID;
+    }
+    ret = InitSmallSDTilingData();
+    if (ret != ge::GRAPH_SUCCESS) {
+        return ret;
     }
     SaveSmallSDTilingData();
     smallSDFinalized_ = true;
@@ -2268,6 +2301,15 @@ void FlashAttentionScoreGradTilingNormalRegbase::SaveSmallSDTilingData()
 
 ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::SaveToTilingData()
 {
+    if (fBaseParams.isSmallSD) {
+        if (!smallSDFinalized_ || smallSDTilingData_ == nullptr) {
+            OP_LOGE("SaveToTilingData", "SmallSD tiling data is not finalized.");
+            return ge::GRAPH_FAILED;
+        }
+        SaveSmallSDTilingData();
+        return ge::GRAPH_SUCCESS;
+    }
+
     s1s2BNGS1S2BaseParams_->set_coreNum(fBaseParams.coreNum);
     // set tilingdata baseinfo
     s1s2BNGS1S2BaseParams_->set_b(fBaseParams.b - fBaseParams.tailZeroCount);

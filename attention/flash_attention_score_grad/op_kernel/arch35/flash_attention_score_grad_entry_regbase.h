@@ -247,7 +247,7 @@ RegbaseFAG(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __
     __gm__ uint8_t *user = GetUserWorkspace(workspace);
     constexpr static bool needDeterPrefix = NEED_DETER_PREFIX(deterType, isTnd);
     using fagTiling = FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<NEED_DETER(deterType),
-        needDeterPrefix, isTnd, isTndSwizzle>;
+        needDeterPrefix, isTnd, isTndSwizzle, isSmallSD>;
     size_t offset = (size_t)(&((fagTiling *)0)->s1s2BNGS1S2BaseParams);
 
     const __gm__ fagTiling *__restrict tilingData = (const __gm__ fagTiling *__restrict)(tiling_data + offset);

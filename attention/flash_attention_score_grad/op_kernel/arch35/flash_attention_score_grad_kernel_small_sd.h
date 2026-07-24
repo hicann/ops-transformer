@@ -19,7 +19,6 @@
 #include "flash_attention_score_grad_common.h"
 #include "flash_attention_score_grad_buffer_small_sd.h"
 #include "flash_attention_score_grad_event_small_sd.h"
-#include "flash_attention_score_grad_kernel_base.h"
 #include "cube_api/mutex_buffer.h"
 #include "cube_api/mutex_buffers_policy.h"
 #include "flash_attention_score_grad_tiling_data_regbase.h"
@@ -38,26 +37,48 @@ namespace FagBaseApi {
 // SmallSD is entered only by the arch35 regbase key with:
 // FP16/BF16, BN2, G=1, N1=N2, D==Dv, 0<S1/S2<128, 0<D<=128,
 // no optional feature, no deterministic path, no NZ output, and no swizzle/remap.
-// L0A/L0B double buffering is still provided by the existing CubeBlock implementation;
-// this class trims scalar-heavy scheduling, validity search, and generic offset helpers.
+// L0A/L0B double buffering is owned by SmallSDCubeBlock; this class trims scalar-heavy scheduling,
+// validity search, and generic offset helpers from the SmallSD runtime path.
 template <typename CubeBlockType, typename VecBlockType>
-class FlashAttentionScoreGradKernelSmallSD
-    : public FlashAttentionScoreGradKernelBase<FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>,
-                                               CubeBlockType, VecBlockType> {
+class FlashAttentionScoreGradKernelSmallSD {
 public:
-    ARGS_TRAITS;
+    using INPUT_TYPE = typename CubeBlockTraits<CubeBlockType>::INPUT_TYPE_TRAITS;
+    using CALC_TYPE = typename CubeBlockTraits<CubeBlockType>::CALC_TYPE_TRAITS;
+    using OUTDTYPE = typename CubeBlockTraits<CubeBlockType>::OUTDTYPE_TRAITS;
+    static constexpr bool IS_ATTEN_MASK = CubeBlockTraits<CubeBlockType>::IS_ATTEN_MASKTraits;
+    static constexpr bool IS_PSE = CubeBlockTraits<CubeBlockType>::IS_PSETraits;
+    static constexpr bool IS_DROP = CubeBlockTraits<CubeBlockType>::IS_DROPTraits;
+    static constexpr bool IS_TND = CubeBlockTraits<CubeBlockType>::IS_TNDTraits;
+    static constexpr bool IS_BN2_MULTIBLK = CubeBlockTraits<CubeBlockType>::IS_BN2_MULTIBLKTraits;
+    static constexpr uint8_t DETER_SPARSE_TYPE = CubeBlockTraits<CubeBlockType>::DETER_SPARSE_TYPETraits;
+    static constexpr bool IS_N_EQUAL = CubeBlockTraits<CubeBlockType>::IS_N_EQUALTraits;
+    static constexpr bool IS_D_NO_EQUAL = CubeBlockTraits<CubeBlockType>::IS_D_NO_EQUALTraits;
+    static constexpr bool IS_ROPE = CubeBlockTraits<CubeBlockType>::IS_ROPETraits;
+    static constexpr bool IS_NZ_OUT = CubeBlockTraits<CubeBlockType>::IS_NZ_OUTTraits;
+    static constexpr bool IS_TND_SWIZZLE = CubeBlockTraits<CubeBlockType>::IS_TND_SWIZZLETraits;
+    static constexpr uint8_t SPLIT_AXIS = CubeBlockTraits<CubeBlockType>::SPLIT_AXISTraits;
+    static constexpr S1TemplateType s1TemplateType = CubeBlockTraits<CubeBlockType>::s1TemplateTypeTraits;
+    static constexpr S2TemplateType s2TemplateType = CubeBlockTraits<CubeBlockType>::s2TemplateTypeTraits;
+    static constexpr DTemplateType dTemplateType = CubeBlockTraits<CubeBlockType>::dTemplateTypeTraits;
+    static constexpr bool IS_FP32_INPUT = IsSameType<INPUT_TYPE, float>::value;
+    static constexpr uint32_t CUBE_BASEM = static_cast<uint32_t>(s1TemplateType);
+    static constexpr uint32_t CUBE_BASEN = static_cast<uint32_t>(s2TemplateType);
+    static constexpr uint32_t HEAD_DIM_ALIGN = static_cast<uint32_t>(dTemplateType);
+    using SmallSDFagTilingType =
+        const __gm__ optiling::fag::FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<
+            NEED_DETER(DETER_SPARSE_TYPE), NEED_DETER_PREFIX(DETER_SPARSE_TYPE, IS_TND), IS_TND, IS_TND_SWIZZLE,
+            true> *__restrict;
+
     static_assert(SPLIT_AXIS == BN2, "SmallSD only supports BN2 split axis.");
     static_assert(!IS_ATTEN_MASK && !IS_PSE && !IS_DROP && !IS_ROPE, "SmallSD does not support optional features.");
     static_assert(!IS_BN2_MULTIBLK && !IS_D_NO_EQUAL && !IS_NZ_OUT && !IS_TND_SWIZZLE,
                   "SmallSD expects simple BN2 ownership without multiblock/swizzle/NZ/D mismatch.");
     static_assert(DETER_SPARSE_TYPE == NO_DETER, "SmallSD only supports non-deterministic dense ownership.");
-    using BaseClass = FlashAttentionScoreGradKernelBase<FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>,
-                                                        CubeBlockType, VecBlockType>;
-    static_assert(!BaseClass::IS_FP32_INPUT, "SmallSD only supports FP16/BF16 input.");
-    static_assert(BaseClass::CUBE_BASEM == static_cast<uint32_t>(S1TemplateType::Aligned128) &&
-                      BaseClass::CUBE_BASEN == static_cast<uint32_t>(S2TemplateType::Aligned128),
+    static_assert(!IS_FP32_INPUT, "SmallSD only supports FP16/BF16 input.");
+    static_assert(CUBE_BASEM == static_cast<uint32_t>(S1TemplateType::Aligned128) &&
+                      CUBE_BASEN == static_cast<uint32_t>(S2TemplateType::Aligned128),
                   "SmallSD reuses the existing 128x128 S tile only.");
-    static_assert(BaseClass::HEAD_DIM_ALIGN <= static_cast<uint32_t>(DTemplateType::Aligned128),
+    static_assert(HEAD_DIM_ALIGN <= static_cast<uint32_t>(DTemplateType::Aligned128),
                   "SmallSD only supports D template <= 128.");
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR query, GM_ADDR pseShift,
                                 GM_ADDR dropMask, GM_ADDR attenMask, GM_ADDR y, GM_ADDR softmaxMax, GM_ADDR softmaxSum,
@@ -65,7 +86,7 @@ public:
                                 GM_ADDR deqScaleK, GM_ADDR deqScaleV, GM_ADDR deqScaleDy, GM_ADDR queryRope,
                                 GM_ADDR keyRope, GM_ADDR sink, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dpse,
                                 GM_ADDR dqRope, GM_ADDR dkRope, GM_ADDR dsink, GM_ADDR workspace,
-                                FagTilingType ordTilingData, TPipe *pipeIn);
+                                SmallSDFagTilingType ordTilingData, TPipe *pipeIn);
     __aicore__ inline void Process();
     __aicore__ inline void ReadTndSeqLenSmallSD(int64_t batchIdx, int64_t &actualS1Len, int64_t &actualS2Len);
     __aicore__ inline void AdvanceTndBatchPrefixSmallSD(int64_t actualS1Len, int64_t actualS2Len);
@@ -89,10 +110,28 @@ private:
     __aicore__ inline void ConsumeVector(SmallSDPipelineSlot &slot, bool needWaitL1Reusable);
     __aicore__ inline void WaitSlotReusable(SmallSDPipelineSlot &slot);
     __aicore__ inline void DrainPipeline(SmallSDPipelineSlot (&slots)[2], int64_t lastSlotIdx, int64_t taskCount);
+    __aicore__ inline void WaitOutputCommitComplete();
     __aicore__ inline void ProcessSingleTask(SmallSDTaskCursor &cursor);
     __aicore__ inline void ProcessMultipleTasks(SmallSDTaskCursor &cursor, int64_t taskCount);
 
     SmallSDConstInfo smallSDConstInfo;
+    SmallSDFagTilingType tilingData = nullptr;
+    GM_ADDR actualSeqQlenAddr = nullptr;
+    GM_ADDR actualSeqKvlenAddr = nullptr;
+    uint32_t vBlockIdx = 0;
+    uint32_t cBlockIdx = 0;
+    uint32_t vSubBlockIdx = 0;
+    int64_t curBatchIdx = 0;
+    int64_t curBatchTotalBaseIdx = 0;
+    int64_t curBatchTotalS1BOffset = 0;
+    int64_t curBatchTotalS1BOffsetForDv = 0;
+    int64_t curBatchTotalS2BOffset = 0;
+    int64_t curBatchTotalS2BOffsetForDv = 0;
+    int64_t curBatchTotalS1S2SizeAlign = 0;
+    int64_t curBatchTotalS1S2Size = 0;
+    int64_t curBatchTotalS2Size = 0;
+    CubeBlockType cubeBlock;
+    VecBlockType vecBlock;
     TBuf<> smallSDMm1ResBuf[2];
     TBuf<> smallSDMm2ResBuf[2];
     MutexBufferManager<BufferType::L1> smallSDL1BufferManager;
@@ -109,7 +148,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     GM_ADDR y, GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR prefixN, GM_ADDR actualSeqQlen, GM_ADDR actualSeqKvlen,
     GM_ADDR deqScaleQ, GM_ADDR deqScaleK, GM_ADDR deqScaleV, GM_ADDR deqScaleDy, GM_ADDR queryRope, GM_ADDR keyRope,
     GM_ADDR sink, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv, GM_ADDR dpse, GM_ADDR dqRope, GM_ADDR dkRope, GM_ADDR dsink,
-    GM_ADDR workspace, FagTilingType ordTilingData, TPipe *pipeIn)
+    GM_ADDR workspace, SmallSDFagTilingType ordTilingData, TPipe *pipeIn)
 {
     (void)pseShift;
     (void)dropMask;
@@ -128,22 +167,18 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     (void)dsink;
 
     if ASCEND_IS_AIV {
-        this->vBlockIdx = GetBlockIdx();
-        this->cBlockIdx = this->vBlockIdx / CV_CORE_RATIO;
-        this->vSubBlockIdx = GetSubBlockIdx();
+        vBlockIdx = GetBlockIdx();
+        cBlockIdx = vBlockIdx / CV_CORE_RATIO;
+        vSubBlockIdx = GetSubBlockIdx();
     } else {
-        this->cBlockIdx = GetBlockIdx();
+        cBlockIdx = GetBlockIdx();
     }
-    this->tilingData = ordTilingData;
-    this->pipe = pipeIn;
+    tilingData = ordTilingData;
 
     SetSmallSDConstInfo();
-    this->actualCalcS1Token = 0;
-    this->actualCalcS2Token = 0;
 
-    this->prefixNAddr = prefixN;
-    this->actualSeqQlenAddr = actualSeqQlen;
-    this->actualSeqKvlenAddr = actualSeqKvlen;
+    actualSeqQlenAddr = actualSeqQlen;
+    actualSeqKvlenAddr = actualSeqKvlen;
 
     InitSmallSDSharedBuffers(pipeIn);
     InitSmallSDBlocks(key, value, dy, query, y, softmaxMax, softmaxSum, dq, dk, dv, workspace, pipeIn);
@@ -155,7 +190,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
 {
     static constexpr uint32_t SMALL_SD_VECTOR_BASEM = 64;
     static constexpr uint32_t SCORE_UB_BYTES = SMALL_SD_VECTOR_BASEM * 128 * sizeof(CALC_TYPE);
-    static constexpr uint32_t GRAD_UB_BYTES = SMALL_SD_VECTOR_BASEM * BaseClass::HEAD_DIM_ALIGN * sizeof(CALC_TYPE);
+    static constexpr uint32_t GRAD_UB_BYTES = SMALL_SD_VECTOR_BASEM * HEAD_DIM_ALIGN * sizeof(CALC_TYPE);
     static constexpr uint32_t DS_P_L1_BYTES = 128 * 128 * sizeof(INPUT_TYPE);
     smallSDL1BufferManager.Init(pipeIn, L1_MAX_SIZE);
     smallSDDsL1Buf.Init(smallSDL1BufferManager, DS_P_L1_BYTES);
@@ -171,20 +206,17 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR query, GM_ADDR y, GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR dq,
     GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace, TPipe *pipeIn)
 {
-    this->cubeBlock.Init(query, key, value, dy, dq, dk, dv, workspace, pipeIn, &smallSDConstInfo, smallSDMm1ResBuf,
-                         smallSDMm2ResBuf, &smallSDL1BufferManager, &smallSDDsL1Buf, &smallSDPL1Buf);
-    this->vecBlock.Init(value, dy, y, softmaxMax, softmaxSum, dq, dk, dv, workspace, pipeIn, &smallSDConstInfo,
-                        this->vSubBlockIdx, smallSDMm1ResBuf, smallSDMm2ResBuf, &smallSDDsL1Buf, &smallSDPL1Buf);
+    cubeBlock.Init(query, key, value, dy, dq, dk, dv, workspace, pipeIn, &smallSDConstInfo, smallSDMm1ResBuf,
+                   smallSDMm2ResBuf, &smallSDL1BufferManager, &smallSDDsL1Buf, &smallSDPL1Buf);
+    vecBlock.Init(value, dy, y, softmaxMax, softmaxSum, dq, dk, dv, workspace, pipeIn, &smallSDConstInfo,
+                  vSubBlockIdx, smallSDMm1ResBuf, smallSDMm2ResBuf, &smallSDDsL1Buf, &smallSDPL1Buf);
 }
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline const optiling::fag::SmallSDTilingDataRegbase &
 FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::GetSmallSDTilingData() const
 {
-    // Transition seam: today SmallSD payload is embedded in the generic regbase tiling data.
-    // When Host/Entry switch to FlashAttentionScoreGradSmallSDTilingDataRegbase, this accessor is the only
-    // Kernel-side read boundary that needs to change.
-    return this->tilingData->smallSDTilingData;
+    return tilingData->smallSDTilingData;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -311,8 +343,8 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         actualS2Len = cachedTndS2Len;
         return;
     }
-    __gm__ int64_t *actualSeqQlen = (__gm__ int64_t *)this->actualSeqQlenAddr;
-    __gm__ int64_t *actualSeqKvlen = (__gm__ int64_t *)this->actualSeqKvlenAddr;
+    __gm__ int64_t *actualSeqQlen = (__gm__ int64_t *)actualSeqQlenAddr;
+    __gm__ int64_t *actualSeqKvlen = (__gm__ int64_t *)actualSeqKvlenAddr;
     if (batchIdx == 0) {
         actualS1Len = actualSeqQlen[0];
         actualS2Len = actualSeqKvlen[0];
@@ -336,17 +368,17 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     const uint64_t n2GD = n2G * smallSDConstInfo.d;
     const uint64_t n2GDv = n2G * smallSDConstInfo.dv;
     const bool hasTask = actualS1Len > 0 && actualS2Len > 0;
-    this->curBatchIdx++;
+    curBatchIdx++;
     if (hasTask) {
-        this->curBatchTotalBaseIdx += n2G;
+        curBatchTotalBaseIdx += n2G;
     }
-    this->curBatchTotalS1BOffset += actualS1Len * n2GD;
-    this->curBatchTotalS2BOffset += actualS2Len * n2D;
-    this->curBatchTotalS1BOffsetForDv += actualS1Len * n2GDv;
-    this->curBatchTotalS2BOffsetForDv += actualS2Len * n2Dv;
-    this->curBatchTotalS1S2SizeAlign += actualS1Len * AlignTo16(actualS2Len);
-    this->curBatchTotalS1S2Size += actualS1Len * actualS2Len;
-    this->curBatchTotalS2Size += actualS2Len;
+    curBatchTotalS1BOffset += actualS1Len * n2GD;
+    curBatchTotalS2BOffset += actualS2Len * n2D;
+    curBatchTotalS1BOffsetForDv += actualS1Len * n2GDv;
+    curBatchTotalS2BOffsetForDv += actualS2Len * n2Dv;
+    curBatchTotalS1S2SizeAlign += actualS1Len * AlignTo16(actualS2Len);
+    curBatchTotalS1S2Size += actualS1Len * actualS2Len;
+    curBatchTotalS2Size += actualS2Len;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -382,14 +414,14 @@ template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::LoadTndCursorPrefixSmallSD(
     SmallSDTaskCursor &cursor)
 {
-    cursor.lastBatchTotalBaseIdx = this->curBatchTotalBaseIdx;
-    cursor.lastBatchTotalS1BOffset = this->curBatchTotalS1BOffset;
-    cursor.lastBatchTotalS2BOffset = this->curBatchTotalS2BOffset;
-    cursor.lastBatchTotalS1BOffsetForDv = this->curBatchTotalS1BOffsetForDv;
-    cursor.lastBatchTotalS2BOffsetForDv = this->curBatchTotalS2BOffsetForDv;
-    cursor.lastBatchTotalS1S2SizeAlign = this->curBatchTotalS1S2SizeAlign;
-    cursor.lastBatchTotalS1S2Size = this->curBatchTotalS1S2Size;
-    cursor.lastBatchTotalS2Size = this->curBatchTotalS2Size;
+    cursor.lastBatchTotalBaseIdx = curBatchTotalBaseIdx;
+    cursor.lastBatchTotalS1BOffset = curBatchTotalS1BOffset;
+    cursor.lastBatchTotalS2BOffset = curBatchTotalS2BOffset;
+    cursor.lastBatchTotalS1BOffsetForDv = curBatchTotalS1BOffsetForDv;
+    cursor.lastBatchTotalS2BOffsetForDv = curBatchTotalS2BOffsetForDv;
+    cursor.lastBatchTotalS1S2SizeAlign = curBatchTotalS1S2SizeAlign;
+    cursor.lastBatchTotalS1S2Size = curBatchTotalS1S2Size;
+    cursor.lastBatchTotalS2Size = curBatchTotalS2Size;
     cursor.s2SizeAcc = cursor.lastBatchTotalS2Size;
     cursor.b1SSOffsetAlign = cursor.lastBatchTotalS1S2SizeAlign;
     cursor.b1SSOffset = cursor.lastBatchTotalS1S2Size;
@@ -402,7 +434,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
 {
     if constexpr (IS_TND) {
         const auto &tndCore =
-            GetSmallSDTilingData().tndCoreParam[this->cBlockIdx];
+            GetSmallSDTilingData().tndCoreParam[cBlockIdx];
         const int64_t bIdx = tndCore.startBatchIdx;
         ReadTndSeqLenSmallSD(bIdx, cursor.actualS1Len, cursor.actualS2Len);
         cursor.bIdx = bIdx;
@@ -430,7 +462,8 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         return;
     }
     slot.state = SmallSDSlotState::CUBE_INFLIGHT;
-    this->cubeBlock.IssueQkAndDyV(slot);
+    cubeBlock.IssueQkAndDyV(slot);
+    slot.state = SmallSDSlotState::READY_FOR_VECTOR;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -451,7 +484,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         ReadTndSeqLenSmallSD(cursor.bIdx, cursor.actualS1Len, cursor.actualS2Len);
         while (cursor.bIdx < smallSDConstInfo.b && cursor.actualS1Len == 0 && cursor.actualS2Len == 0) {
             AdvanceTndBatchPrefixSmallSD(cursor.actualS1Len, cursor.actualS2Len);
-            cursor.bIdx = this->curBatchIdx;
+            cursor.bIdx = curBatchIdx;
             if (cursor.bIdx >= smallSDConstInfo.b) {
                 break;
             }
@@ -482,7 +515,7 @@ FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::MakeShapeSmal
         shape.firstHalfS1 = shape.halfS1;
         shape.halfS2 = (shape.s2 + 1) >> 1;
         shape.firstHalfS2 = shape.halfS2;
-        if (this->vSubBlockIdx == 1) {
+        if (vSubBlockIdx == 1) {
             shape.halfS1 = shape.s1 - shape.halfS1;
             shape.halfS2 = shape.s2 - shape.halfS2;
         }
@@ -548,7 +581,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         slot.firstHalfS1 = shape.firstHalfS1;
         slot.halfS2 = shape.halfS2;
         slot.firstHalfS2 = shape.firstHalfS2;
-        slot.vecCoreOffset = this->vSubBlockIdx * shape.firstHalfS1;
+        slot.vecCoreOffset = vSubBlockIdx * shape.firstHalfS1;
     }
     slot.state = SmallSDSlotState::PREPARED;
 }
@@ -562,9 +595,9 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         return;
     }
     slot.state = SmallSDSlotState::VECTOR_INFLIGHT;
-    this->vecBlock.ProduceDsAndP(slot, needWaitL1Reusable);
-    this->cubeBlock.IssueDqDkDv(slot);
-    this->vecBlock.FinalizeGradOutput(slot);
+    vecBlock.ProduceDsAndP(slot, needWaitL1Reusable);
+    cubeBlock.IssueDqDkDv(slot);
+    vecBlock.FinalizeGradOutput(slot);
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -592,11 +625,17 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     if (taskCount <= 0) {
         return;
     }
-    this->isLastLoop = true;
     WaitSlotReusable(slots[lastSlotIdx ^ 1]);
     const bool needWaitL1Reusable = taskCount > 1;
     ConsumeVector(slots[lastSlotIdx], needWaitL1Reusable);
     WaitSlotReusable(slots[lastSlotIdx]);
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::WaitOutputCommitComplete()
+{
+    cubeBlock.WaitOutputCommitComplete();
+    vecBlock.WaitOutputCommitComplete();
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -606,9 +645,9 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     SmallSDPipelineSlot slot;
     PrepareSlot(slot, cursor, 0);
     IssueCube(slot);
-    this->isLastLoop = true;
     ConsumeVector(slot, false);
     WaitSlotReusable(slot);
+    WaitOutputCommitComplete();
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -623,7 +662,6 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     AdvanceTaskCursor(cursor);
 
     for (int64_t taskId = 1; taskId < taskCount; ++taskId) {
-        this->isLastLoop = false;
         const int64_t fillSlotIdx = taskId & 1;
         const int64_t consumeSlotIdx = fillSlotIdx ^ 1;
         WaitSlotReusable(slots[fillSlotIdx]);
@@ -636,13 +674,14 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     }
 
     DrainPipeline(slots, (taskCount - 1) & 1, taskCount);
+    WaitOutputCommitComplete();
 }
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::Process()
 {
     const auto &coreTask =
-        GetSmallSDTilingData().coreTaskParam[this->cBlockIdx];
+        GetSmallSDTilingData().coreTaskParam[cBlockIdx];
     const int64_t blockStart = coreTask.blockStart;
     const int64_t groupCount = coreTask.groupCount;
     if (groupCount <= 0) {
@@ -650,16 +689,16 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     }
     if constexpr (IS_TND) {
         const auto &tndCore =
-            GetSmallSDTilingData().tndCoreParam[this->cBlockIdx];
-        this->curBatchIdx = tndCore.startBatchIdx;
-        this->curBatchTotalBaseIdx = tndCore.baseTaskPrefix;
-        this->curBatchTotalS1BOffset = tndCore.qPrefixOffset;
-        this->curBatchTotalS2BOffset = tndCore.kPrefixOffset;
-        this->curBatchTotalS1BOffsetForDv = tndCore.qDvPrefixOffset;
-        this->curBatchTotalS2BOffsetForDv = tndCore.kDvPrefixOffset;
-        this->curBatchTotalS1S2SizeAlign = tndCore.attenAlignPrefixOffset;
-        this->curBatchTotalS1S2Size = tndCore.attenPrefixOffset;
-        this->curBatchTotalS2Size = tndCore.s2PrefixSize;
+            GetSmallSDTilingData().tndCoreParam[cBlockIdx];
+        curBatchIdx = tndCore.startBatchIdx;
+        curBatchTotalBaseIdx = tndCore.baseTaskPrefix;
+        curBatchTotalS1BOffset = tndCore.qPrefixOffset;
+        curBatchTotalS2BOffset = tndCore.kPrefixOffset;
+        curBatchTotalS1BOffsetForDv = tndCore.qDvPrefixOffset;
+        curBatchTotalS2BOffsetForDv = tndCore.kDvPrefixOffset;
+        curBatchTotalS1S2SizeAlign = tndCore.attenAlignPrefixOffset;
+        curBatchTotalS1S2Size = tndCore.attenPrefixOffset;
+        curBatchTotalS2Size = tndCore.s2PrefixSize;
         cachedTndBatchIdx = -1;
     }
     SmallSDTaskCursor cursor;

@@ -20,9 +20,13 @@
 
 namespace FagBaseApi {
 
-// SmallSD fixed DAG sync table. The numeric ids intentionally mirror the generic
-// regbase allocation to keep cross-core resources unchanged, but the SmallSD path
-// uses these semantic aliases only.
+// SmallSD fixed DAG sync table.
+//
+// Primary ids are consumed/produced by AIV subblock 0.  AIV subblock 1 uses the
+// same semantic event plus SMALL_SD_EVENT_MIRROR_OFFSET, so AIC can wait for both
+// vector consumers before reusing shared slot resources.  The numeric primary ids
+// intentionally mirror the generic regbase allocation to keep cross-core resources
+// unchanged, but the SmallSD path uses these semantic aliases only.
 constexpr uint8_t SMALL_SD_EVENT_MIRROR_OFFSET = 16;
 constexpr uint8_t SMALL_SD_CUBE_DYV_READY_FLAG[2] = {0, 1};
 constexpr uint8_t SMALL_SD_CUBE_QK_READY_FLAG[2] = {2, 3};
@@ -33,6 +37,7 @@ constexpr uint8_t SMALL_SD_DK_UB_READY_FLAG = 7;
 constexpr uint8_t SMALL_SD_DS_L1_REUSABLE_FLAG = 8;
 constexpr uint8_t SMALL_SD_P_L1_REUSABLE_FLAG = 9;
 constexpr uint8_t SMALL_SD_SLOT_REUSE_READY_FLAG = 10;
+constexpr uint8_t SMALL_SD_CUBE_OUTPUT_COMMIT_FLAG = 11;
 
 struct SmallSDEventTable {
     static constexpr uint8_t cubeDyVReady0 = SMALL_SD_CUBE_DYV_READY_FLAG[0];
@@ -46,6 +51,7 @@ struct SmallSDEventTable {
     static constexpr uint8_t dsL1Reusable = SMALL_SD_DS_L1_REUSABLE_FLAG;
     static constexpr uint8_t pL1Reusable = SMALL_SD_P_L1_REUSABLE_FLAG;
     static constexpr uint8_t slotReuseReady = SMALL_SD_SLOT_REUSE_READY_FLAG;
+    static constexpr uint8_t cubeOutputCommit = SMALL_SD_CUBE_OUTPUT_COMMIT_FLAG;
 };
 
 static_assert(SMALL_SD_CUBE_DYV_READY_FLAG[0] != SMALL_SD_CUBE_DYV_READY_FLAG[1],
@@ -58,6 +64,10 @@ static_assert(SMALL_SD_CUBE_QK_READY_FLAG[1] < SMALL_SD_DS_L1_READY_FLAG,
               "SmallSD cube/vector event ranges must not overlap.");
 static_assert(SMALL_SD_SLOT_REUSE_READY_FLAG < SMALL_SD_EVENT_MIRROR_OFFSET,
               "SmallSD primary event ids must stay below the mirror event offset.");
+static_assert(SMALL_SD_CUBE_OUTPUT_COMMIT_FLAG < SMALL_SD_EVENT_MIRROR_OFFSET,
+              "SmallSD cube output commit event must stay below the mirror event offset.");
+static_assert(SMALL_SD_EVENT_MIRROR_OFFSET + SMALL_SD_CUBE_OUTPUT_COMMIT_FLAG < 32,
+              "SmallSD mirrored event ids must stay inside the event id range.");
 
 } // namespace FagBaseApi
 
