@@ -5,7 +5,7 @@
 基于pytest测试框架，实现Recurrent_gated_delta_rule算子的功能验证：
 
 - **CPU侧**：复现算子功能用以生成golden数据
-- **NPU侧**：通过torch_npu进行算子直调获取实际数据
+- **NPU侧**：通过TorchNPU进行算子直调获取实际数据
 - **精度对比**：进行CPU与NPU结果的精度对比验证算子功能
 
 ## 当前实现范围
@@ -35,7 +35,7 @@
 
 #### 前置要求
 
-1. torch_npu安装包下载路径（需及时更换为最新版本）：[torch_npu安装教程](https://gitcode.com/Ascend/pytorch)
+1. TorchNPU安装包下载路径（需及时更换为最新版本）：[TorchNPU安装教程](https://gitcode.com/Ascend/pytorch)
 2. 完成环境安装和环境变量配置，具体操作请参考：[ops-transformer](../../../../README.md)
 
 #### custom包调用

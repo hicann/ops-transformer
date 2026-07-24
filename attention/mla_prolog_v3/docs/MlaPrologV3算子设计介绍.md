@@ -418,8 +418,7 @@ PA场景
   - 假设Query中Token/序列长度为S1，cacheIndex中第二维的某个具体数值代表了本轮计算得到的KVCache要更新到KVCache的第几行；如图中的11代表要更新到第11行的位置，该位置位于Block2。
   - 图3 KVCacheScatter操作（PA场景-ND格式）
   ![KVCacheScatter_PA_ND](../../../docs/zh/figures/KVCacheScatter_PA_ND.jpg)
-- KVCache使用NZ格式存储，其更新流程如图4所示。数据分形格式的介绍可以参考官网指南-[数据排布格式
-](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/80RC3alpha003/devguide/opdevg/ascendcopdevg/atlas_ascendc_10_0104.html)。
+- KVCache使用NZ格式存储，其更新流程如图4所示。数据分形格式的介绍可以参考官网指南-[数据排布格式](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/80RC3alpha003/devguide/opdevg/ascendcopdevg/atlas_ascendc_10_0104.html)。
   - 当前按NZ格式存储KVCache时，是将整个Block存储成NZ格式；小块内是以行为主(Row Major)的排布，形状如Z字型；块与块之间是以列为主的排布，形状如N字形。将完整的H(Hidden States)按32B长度的小块进行分块后，在ND格式下连续存储的小块，在NZ格式下需要跳$32B * BlockSize$存储，即需要设置stride为$32B * BlockSize$。
   - 图4 KVCacheScatter操作（PA场景-NZ格式）
   ![PA_NZ](../../../docs/zh/figures/PA_NZ.jpg)

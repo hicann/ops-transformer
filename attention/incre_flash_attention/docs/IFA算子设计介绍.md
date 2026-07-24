@@ -71,7 +71,7 @@ c. AIC和AIV之间处理的数据量要符合其对应的算力，避免AIC或AI
 
 IFA算子包含B、N2(key和value的N)、G(query_N/kv_N)、S1(query的S)、S2(key和value的S)共5个轴，  S1轴固定为1,不参与切分。G轴只在Vector计算时切块,  BN2S2切分逻辑如下：
 
-- 核间：数据外切是为了最大限度的利用多个Core并行工作，通常先按照BN2分核,即将BN2个SD块分配到多个核上,每个核计算一定数量的SD块,当BN2小于阈值时（0.4 * 总核数）,需再对S2轴进行外切（SplitKV份）,总块数为BN2 * SplitKv,每个核分配一定数量的子块,当所有子块计算完成后,再进行规约,即FlashDecode流程。
+- 核间：数据外切是为了最大限度的利用多个Core并行工作，通常先按照BN2分核,即将BN2个SD块分配到多个核上,每个核计算一定数量的SD块,当BN2小于阈值时（0.4 *总核数）,需再对S2轴进行外切（SplitKV份）,总块数为BN2* SplitKv,每个核分配一定数量的子块,当所有子块计算完成后,再进行规约,即FlashDecode流程。
 
 - 核内：由于单core缓存有限，需根据设定的缓存大小,对S2轴或KV子块的S2轴进行切分,此即FlashAttention过程。
 
@@ -151,7 +151,7 @@ A矩阵为FP16/BF16类型，  B矩阵为int8类型。
 IFA场景下， A矩阵较小,可以通过变换A矩阵来适配B矩阵,基本流程：
 
 1. 矩阵A进入Vector展开成多行，每行An均用int8格式存储;
-2. 将这些An打包成新的矩阵AA计算CC = AA * B （按int8 * int8 = int32来计算）;
+2. 将这些An打包成新的矩阵AA计算CC = AA *B （按int8* int8 = int32来计算）;
 3. 对MatMul结果CC进行Reduce操作得到C。
 
 #### PageAttention

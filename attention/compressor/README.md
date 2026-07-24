@@ -98,7 +98,7 @@
 - 输入shape限制：
     - wkv支持输入shape[coff* D,H]
     - wgate支持输入shape[coff* D,H]
-    - state\_cache支持输入shape[block_num,block_size,2* coff* D]，要求block_num>0，cache_mode=2时，需要满足block_size >= coff * cmp_ratio + S - 1。
+    - state\_cache支持输入shape[block_num,block_size,2*coff* D]，要求block_num>0，cache_mode=2时，需要满足block_size >= coff * cmp_ratio + S - 1。
     - ape支持输入shape[cmp_ratio,coff* D]
     - start\_pos支持输入shape[B,]
     - 若x的维度采用BS合轴，即x的输入shape为[T,H]

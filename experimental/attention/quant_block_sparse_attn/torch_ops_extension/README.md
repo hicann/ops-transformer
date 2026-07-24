@@ -1,7 +1,7 @@
-# quant_block_sparse_attn — PyTorch 接入层 (PTA / torch_ops_extension)
+# quant_block_sparse_attn — PyTorch 接入层 (TorchNPU/ torch_ops_extension)
 
 将 `quant_block_sparse_attn` 算子桥接到 PyTorch，注册为 `torch.ops.custom.npu_quant_block_sparse_attn`
-（同时挂载到 `torch_npu.npu_quant_block_sparse_attn`），底层调用 ACLNN 接口 `aclnnQuantBlockSparseAttn`。
+（同时挂载到 `TorchNPU.npu_quant_block_sparse_attn`），底层调用 ACLNN 接口 `aclnnQuantBlockSparseAttn`。
 
 > 结构与配置对齐参考实现 `ops_adv_open/torch_ops_extension`：编译式 `NpuExtension`
 > （`custom_ops.custom_ops_lib`）+ `TORCH_LIBRARY`/`TORCH_LIBRARY_IMPL` + `EXEC_NPU_CMD_V1`。
@@ -15,7 +15,7 @@ torch_ops_extension/
 ├── build_and_install.sh        # 构建 wheel 并 pip 安装
 ├── README.md
 └── custom_ops/
-    ├── __init__.py             # 导入 custom_ops_lib(.so) + converter，并挂载到 torch_npu
+    ├── __init__.py             # 导入 custom_ops_lib(.so) + converter，并挂载到 TorchNPU
     ├── csrc/
     │   ├── ops_def_registration.cpp     # TORCH_LIBRARY(custom): npu_quant_block_sparse_attn schema
     │   ├── ops_common.h / ops_common.cpp # EXEC_NPU_CMD_V1 / ConvertType 基础设施（拷贝）
@@ -28,7 +28,7 @@ torch_ops_extension/
 ## 前置条件
 
 - Linux；Python 3.8+；GCC 9.4.0+
-- PyTorch >= 2.6.0 与匹配版本的 `torch_npu`
+- PyTorch >= 2.6.0 与匹配版本的 `TorchNPU`
 - Ascend CANN Toolkit（`ASCEND_HOME_PATH` 已设置）
 - 已部署 `aclnnQuantBlockSparseAttn` 算子包，运行时可经
   `ASCEND_CUSTOM_OPP_PATH` / `ASCEND_OPP_PATH` 检索到 `libcust_opapi.so`

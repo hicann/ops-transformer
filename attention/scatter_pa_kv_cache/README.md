@@ -19,7 +19,7 @@
 
   - 场景一：
 
-    ```
+    ```python
     key:[batch * seq_len, num_head, k_head_size]
     value:[batch * seq_len, num_head, v_head_size]
     keyCache:[num_blocks, num_head * k_head_size // last_dim_k, block_size, last_dim_k]/[num_blocks, num_head, k_head_size // last_dim_k, block_size, last_dim_k]
@@ -35,7 +35,7 @@
     
   - 场景二：
 
-    ```
+    ```python
     key:[batch * seq_len, num_head, k_head_size]
     value:[batch * seq_len, num_head, v_head_size]
     keyCache:[num_blocks, block_size, num_head, k_head_size]
@@ -49,7 +49,7 @@
 
   - 场景三：
 
-    ```
+    ```python
     key:[batch, seq_len, num_head, k_head_size]
     value:[batch, seq_len, num_head, v_head_size]
     keyCache:[num_blocks, block_size, 1, k_head_size]
@@ -63,7 +63,7 @@
 
   - 场景四：
 
-    ```
+    ```python
     key:[num_tokens, num_head, k_head_size]
     value:[num_tokens, num_head, v_head_size]
     keyCache:[num_blocks, block_size, 1, k_head_size]
@@ -77,7 +77,7 @@
 
   - 场景五：
 
-    ```
+    ```python
     key:[num_tokens, num_head, k_head_size]
     value:[num_tokens, num_head, v_head_size]
     keyCache:[num_blocks, block_size, 1, k_head_size]
@@ -92,7 +92,7 @@
 
   - 场景六：
 
-    ```
+    ```python
     key:[batch * seq_len, num_head, k_head_size]
     value:[]
     keyCache:[num_blocks, block_size, num_head, k_head_size]
@@ -104,7 +104,7 @@
 
   - 场景七：
 
-    ```
+    ```python
     key:[num_tokens, num_head, k_head_size]
     value:[num_tokens, num_head, v_head_size]
     keyCache:[num_blocks, num_head, block_size, k_head_size]
@@ -240,7 +240,7 @@
       * 当key和value都是4维时，seqLensOptional是一维，且seqLensOptional的值等于key的第一维为batch（对应场景三）。
       * 当key和value是3维且存在seqLensOptional时，seqLensOptional中所有值的和等于key的第一维为num_blocks（对应场景四、五）。
       * seqLensOptional和compressLensOptional里面的每个元素值必须满足公式：reduceSum(seqLensOptional[i] - compressLensOptional[i]) <= num_blocks * block_size（对应场景三、四、五）。
-      * block_size * k_head_size和block_size * v_head_size必须小于UINT32_MAX（对应场景七）。
+      * block_size *k_head_size和block_size* v_head_size必须小于UINT32_MAX（对应场景七）。
   * 输入属性限制：
       * key、value、keyCacheRef、valueCacheRef的数据类型必须一致。
       * 当cacheModeOptional为“PA_NZ”时key、keyCacheRef和value、valueCacheRef的数据类可以不一致。

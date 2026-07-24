@@ -1,14 +1,12 @@
 # sparse_flash_attention pytest测试框架
 
-
-
 ## 功能说明
 
 基于pytest测试框架，实现sparse_flash_attention算子的功能验证：
 
--   **CPU侧**：复现算子功能用以生成golden数据
--   **NPU侧**：通过`torch_npu.npu_sparse_flash_attention`进行算子直调获取实际数据；传入`sinks`时由上层接口调用`aclnnSparseFlashAttentionV2`，不传入`sinks`时调用`aclnnSparseFlashAttention`
--   **精度对比**：进行CPU与NPU结果的精度对比验证算子功能
+- **CPU侧**：复现算子功能用以生成golden数据
+- **NPU侧**：通过`torch_npu.npu_sparse_flash_attention`进行算子直调获取实际数据；传入`sinks`时由上层接口调用`aclnnSparseFlashAttentionV2`，不传入`sinks`时调用`aclnnSparseFlashAttention`
+- **精度对比**：进行CPU与NPU结果的精度对比验证算子功能
 
 支持三条主流程：
 
@@ -16,8 +14,6 @@
 - `batch_save`：从Excel读取参数，生成包含CPU golden的`.pt`用例文件。
 - `gen_excel_from_paramset`：从paramset生成Excel文件。
 - `batch_exec`：从已有`.pt`文件批量回放执行NPU算子并对比精度。
-
-
 
 ## 当前实现范围
 
@@ -51,38 +47,34 @@
 #### 前置要求
 
 1. 完成环境安装和环境变量配置，具体操作请参考：[环境部署](../../../../docs/zh/install/quick_install.md)
-2. torch_npu安装包下载路径（需及时更换为最新版本）：[Attention融合算子Experimental使用说明](../../../../experimental/attention/Attention融合算子Experimental使用说明.md)
+2. TorchNPU安装包下载路径（需及时更换为最新版本）：[Attention融合算子Experimental使用说明](../../../../experimental/attention/Attention融合算子Experimental使用说明.md)
 
 #### custom包调用
 
 支持custom包调用
-
-
 
 ## 文件结构
 
 ```text
 pytest/
 ├── README.md
-├── pytest.ini			# 创建测试标记
-├── test_run.sh			# 执行脚本
-├── check_valid_param.py			# 参数约束拦截
-├── sparse_flash_attention_golden.py		# tensor转换/cpu侧算子golden实现
-├── sparse_flash_attention_paramset.py		# 单用例入参配置
-├── result_compare_method.py		# 输出精度对比
-├── utils.py			# 参数解析/cpu npu执行入口
-├── test_sparse_flash_attention_single.py	# 单用例运行主程序
-├── test_sparse_flash_attention_batch.py	# 从pt文件批量执行NPU测试
+├── pytest.ini   # 创建测试标记
+├── test_run.sh   # 执行脚本
+├── check_valid_param.py   # 参数约束拦截
+├── sparse_flash_attention_golden.py  # tensor转换/cpu侧算子golden实现
+├── sparse_flash_attention_paramset.py  # 单用例入参配置
+├── result_compare_method.py  # 输出精度对比
+├── utils.py   # 参数解析/cpu npu执行入口
+├── test_sparse_flash_attention_single.py # 单用例运行主程序
+├── test_sparse_flash_attention_batch.py # 从pt文件批量执行NPU测试
 └── batch/
-    ├── sparse_flash_attention_process.py	# npu接口
-    ├── test_sparse_flash_attention_pt_save.py		# 从Excel批量生成pt文件
-    ├── gen_excel_from_paramset.py	# 从paramset生成Excel文件
+    ├── sparse_flash_attention_process.py # npu接口
+    ├── test_sparse_flash_attention_pt_save.py  # 从Excel批量生成pt文件
+    ├── gen_excel_from_paramset.py # 从paramset生成Excel文件
     └── excel/
-        ├── example.xlsx		# 示例Excel用例文件
-        └── .gitkeep			# 目录占位符
+        ├── example.xlsx  # 示例Excel用例文件
+        └── .gitkeep   # 目录占位符
 ```
-
-
 
 ## 使用方法
 
@@ -163,8 +155,6 @@ bash test_run.sh batch_exec -P ./custom_pt_dir/       # 执行指定目录下所
 | Testcase_Prefix | layout_query | layout_kv | q_type | kv_type | B | T1 | T2 | S1 | S2 | N1 | N2 | D | K | scale_value | sparse_block_size | rope_head_dim | sparse_mode | attention_mode | return_softmax_lse | use_sinks | block_size | block_num | actual_seq_q | actual_seq_kv | range_query | range_key | range_query_rope | range_key_rope | range_sinks |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | bsnd_basic | BSND | BSND | torch.float16 | torch.float16 | 1 |  |  | 5 | 128 | 8 | 1 | 512 | 16 | 0.041666666666666664 | 1 | 64 | 0 | 2 | True | True |  |  | [4] | [4] | [-10.0, 100.0] | [5.0, 100.0] |  |  | [-0.2, 0.2] |
-
-
 
 ## 结果文件
 

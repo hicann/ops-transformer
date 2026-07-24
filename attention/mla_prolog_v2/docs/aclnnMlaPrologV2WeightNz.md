@@ -701,6 +701,7 @@ aclnnStatus aclnnMlaPrologV2WeightNz(
       - B、S、T、Skv值允许一个或多个取0，即Shape与B、S、T、Skv值相关的入参允许传入空Tensor，其余入参不支持传入空Tensor。
           - 如果B、S、T取值为0，则queryOut、queryRopeOut输出空Tensor，kvCacheRef、krCacheRef不做更新。
           - 如果Skv取值为0，则queryOut、queryRopeOut、dequantScaleQNopeOutOptional正常计算，kvCacheRef、krCacheRef不做更新，即输出空Tensor。
+
 </details>
 
   <details>
@@ -754,6 +755,7 @@ aclnnStatus aclnnMlaPrologV2WeightNz(
   <summary><a id="SupportScenes"></a>不同量化场景参数的dtype与shape约束</summary>
 
   - 在不同量化场景下，参数的dtype和shape组合需要满足如下条件：
+
   <div style="overflow-x: auto; width: 100%;">
   <table style="table-layout: auto;" border="1">
     <tr>

@@ -1,7 +1,7 @@
-# stem_indexer — PyTorch 接入层 (PTA / torch_ops_extension)
+# stem_indexer — PyTorch 接入层 (TorchNPU/ torch_ops_extension)
 
 将 `stem_indexer` 算子桥接到 PyTorch，注册为 `torch.ops.custom.npu_stem_indexer`
-（同时挂载到 `torch_npu.npu_stem_indexer`），底层调用 ACLNN 接口 `aclnnStemIndexer`；
+（同时挂载到 `TorchNPU.npu_stem_indexer`），底层调用 ACLNN 接口 `aclnnStemIndexer`；
 元数据接口 `npu_stem_indexer_metadata` 调用 `aclnnStemIndexerMetadata`。
 
 > 结构与配置对齐参考实现 `quant_block_sparse_attn/torch_ops_extension`：编译式 `NpuExtension`
@@ -16,7 +16,7 @@ torch_ops_extension/
 ├── build_and_install.sh        # 构建 wheel 并 pip 安装
 ├── README.md
 └── custom_ops/
-    ├── __init__.py             # 导入 custom_ops_lib(.so) + converter，并挂载到 torch_npu
+    ├── __init__.py             # 导入 custom_ops_lib(.so) + converter，并挂载到 TorchNPU
     ├── csrc/
     │   ├── ops_def_registration.cpp     # TORCH_LIBRARY(custom): npu_stem_indexer(_metadata) schema
     │   ├── ops_common.h / ops_common.cpp # EXEC_NPU_CMD_V1 / ConvertType 基础设施（拷贝）
@@ -31,7 +31,7 @@ torch_ops_extension/
 ## 前置条件
 
 - Linux；Python 3.8+；GCC 9.4.0+
-- PyTorch >= 2.6.0 与匹配版本的 `torch_npu`
+- PyTorch >= 2.6.0 与匹配版本的 `TorchNPU`
 - Ascend CANN Toolkit（`ASCEND_HOME_PATH` 已设置）
 - 已部署 `aclnnStemIndexer` / `aclnnStemIndexerMetadata` 算子包，运行时可经
   `ASCEND_CUSTOM_OPP_PATH` / `ASCEND_OPP_PATH` 检索到 `libcust_opapi.so`
@@ -66,7 +66,7 @@ sparse_indices, sparse_seq_len = torch.ops.custom.npu_stem_indexer(
     k_block_num_rate_large=0.1, k_block_num_bias_large=30,
     num_prompt_tokens=num_prompt_tokens, metadata=metadata,
 )
-# 也可：torch_npu.npu_stem_indexer(...)
+# 也可：TorchNPU.npu_stem_indexer(...)
 ```
 
 ### 与 stem_indexer pytest 集成

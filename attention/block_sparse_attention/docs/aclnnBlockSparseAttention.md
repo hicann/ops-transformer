@@ -22,6 +22,7 @@
   $$
 
   BlockSparseAttention输入query、key、value的数据排布格式支持从多种维度排布解读，可通过qInputLayout和kvInputLayout传入。
+
   - B：表示输入样本批量大小（Batch）
   - T：B和S合轴紧密排列的长度（Total tokens）
   - S：表示输入样本序列长度（Seq-Length）
@@ -30,6 +31,7 @@
   - D：表示隐藏层最小的单元尺寸，需满足D=H/N（Head-Dim）
 
   当前支持的布局：
+
   - qInputLayout: "TND" "BNSD" "BSND"
   - kvInputLayout: "TND" "BNSD" "BSND"
 

@@ -8,7 +8,7 @@
     - gcc >= 9.0.0
     - torch\_npu >=2.7.0
 
-2. 安装torch与torch_npu包
+2. 安装torch与TorchNPU包
 
    根据实际环境，下载对应torch包并安装：`torch-${torch_version}+cpu-${python_version}-linux_${arch}.whl`下载链接为：[官网地址](http://download.pytorch.org/whl/torch)
 
@@ -18,7 +18,7 @@
     pip install torch-${torch_version}+cpu-${python_version}-linux_${arch}.whl
     ```
 
-   根据实际环境，安装对应torch-npu包：`torch_npu-${torch_version}-${python_version}-linux_${arch}.whl`下载链接为：[官网地址](https://gitcode.com/Ascend/pytorch/releases)
+   根据实际环境，安装对应TorchNPU包：`torch_npu-${torch_version}-${python_version}-linux_${arch}.whl`下载链接为：[官网地址](https://gitcode.com/Ascend/pytorch/releases)
 
    安装命令如下：
 

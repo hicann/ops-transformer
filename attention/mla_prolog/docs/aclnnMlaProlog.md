@@ -700,6 +700,7 @@ aclnnStatus aclnnMlaProlog(
   <summary><a id="specialConstraint"></a>特殊约束</summary>
 
   - weight_dq，weight_uq_qr，weight_dkv_kr在不转置的情况下各个维度的表示：（k, n）。
+
   </details>
 
   <details>

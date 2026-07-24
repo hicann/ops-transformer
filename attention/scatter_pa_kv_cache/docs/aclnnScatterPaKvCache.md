@@ -20,7 +20,7 @@
 - 输入输出支持以下场景：
   - 场景一：
 
-    ```
+    ```python
     key:[batch * seq_len, num_head, k_head_size]
     value:[batch * seq_len, num_head, v_head_size]
     keyCache:[num_blocks, num_head * k_head_size // last_dim_k, block_size, last_dim_k]/[num_blocks, num_head, k_head_size // last_dim_k, block_size, last_dim_k]
@@ -36,7 +36,7 @@
 
   - 场景二：
 
-    ```
+    ```python
     key:[batch * seq_len, num_head, k_head_size]
     value:[batch * seq_len, num_head, v_head_size]
     keyCache:[num_blocks, block_size, num_head, k_head_size]
@@ -50,7 +50,7 @@
 
   - 场景三：
 
-    ```
+    ```python
     key:[batch, seq_len, num_head, k_head_size]
     value:[batch, seq_len, num_head, v_head_size]
     keyCache:[num_blocks, block_size, 1, k_head_size]
@@ -64,7 +64,7 @@
 
   - 场景四：
 
-    ```
+    ```python
     key:[num_tokens, num_head, k_head_size]
     value:[num_tokens, num_head, v_head_size]
     keyCache:[num_blocks, block_size, 1, k_head_size]
@@ -78,7 +78,7 @@
 
   - 场景五：
 
-    ```
+    ```python
     key:[num_tokens, num_head, k_head_size]
     value:[num_tokens, num_head, v_head_size]
     keyCache:[num_blocks, block_size, 1, k_head_size]
@@ -93,7 +93,7 @@
 
   - 场景六：
 
-    ```
+    ```python
     key:[batch * seq_len, num_head, k_head_size]
     value:[]
     keyCache:[num_blocks, block_size, num_head, k_head_size]
@@ -105,7 +105,7 @@
 
   - 场景七：
 
-    ```
+    ```python
     key:[num_tokens, num_head, k_head_size]
     value:[num_tokens, num_head, v_head_size]
     keyCache:[num_blocks, num_head, block_size, k_head_size]
@@ -424,8 +424,8 @@ aclnnStatus aclnnScatterPaKvCache(
 - 当cacheModeOptional为“PA_NZ”时，keyCacheRef和valueCacheRef的倒数第二维必须小于UINT16_MAX（对应场景一）。
 - k_head_size和v_head_size必须32字节对齐（对应场景七）。
 - num_head必须小于4095（对应场景七）。
-- block_size * k_head_size和block_size * v_head_size必须小于UINT32_MAX（对应场景七）。
-- （num_head * k_head_size + num_head * v_head_size） * sizeof(dtype_key)必须小于196608（对应场景七）。
+- block_size *k_head_size和block_size* v_head_size必须小于UINT32_MAX（对应场景七）。
+- （num_head *k_head_size + num_head* v_head_size） * sizeof(dtype_key)必须小于196608（对应场景七）。
 
 ## 调用示例
 

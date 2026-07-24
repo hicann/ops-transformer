@@ -72,7 +72,7 @@ python test.py
 > 1. `ASCEND_HOME_PATH`环境变量已正确设置
 > 2. Bisheng编译器已安装并可用
 > 3. CMake版本为3.16或更高
-> 4. torch及torch_npu已安装并可用
+> 4. torch及TorchNPU已安装并可用
 
 ## 💻 实战示例：AllGatherMatmul优化
 

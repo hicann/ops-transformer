@@ -401,7 +401,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV3(
         <td>-</td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
-        <td>[BNSD]、[BSND]、[BSH]、[SBH]	</td>
+        <td>[BNSD]、[BSND]、[BSH]、[SBH] </td>
         <td>√</td>
       </tr>
       <tr>
@@ -411,7 +411,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV3(
         <td>-</td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
-        <td>[BNSD]、[BSND]、[BSH]、[SBH]	</td>
+        <td>[BNSD]、[BSND]、[BSH]、[SBH] </td>
         <td>√</td>
       </tr>
       <tr>
@@ -421,7 +421,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV3(
         <td>-</td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
-        <td>[BNSD]、[BSND]、[BSH]、[SBH]	</td>
+        <td>[BNSD]、[BSND]、[BSH]、[SBH] </td>
         <td>√</td>
       </tr>
       <tr>

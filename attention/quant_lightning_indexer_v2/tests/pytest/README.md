@@ -1,8 +1,11 @@
 # quant_lightning_indexer_v2算子测试框架
+
 ## 功能说明
+
 基于pytest测试框架，实现quant_lightning_indexer_v2算子的功能验证：
+
 - **CPU侧**：复现算子功能用以生成golden数据
-- **NPU侧**：通过torch_npu进行算子直调获取实际数据
+- **NPU侧**：通过TorchNPU进行算子直调获取实际数据
 - **精度对比**：进行CPU与NPU结果的精度对比验证算子功能
 - **双模式执行隔离**：支持直接pytest多进程执行和shell层进程隔离两种批量模式
 - **PT 复跑模式**：`batch -P <目录>` 直接执行已有 PT；增加 `-E` 才会先生成 PT
@@ -11,6 +14,7 @@
 - **运行模式切换**：支持eager直接调用和graph（torch.compile + torchair）两种算子调用模式
 
 ## 当前实现范围
+
 ### 参数限制
 
 - **数据格式**:
@@ -29,16 +33,20 @@
 ### 环境配置
 
 #### 前置要求
-1、 确认torch_npu为最新版本
+
+1、 确认TorchNPU为最新版本
 2、 激活CANN包和自定义算子包
 3、 graph模式需要安装torchair编译器后端
 
 #### custom包调用
+
 支持custom包调用
 
 ## 文件结构
+
 #### pytest文件结构说明
-- test_run.sh                                  # 执行脚本，支持single/batch/batch_exec
+
+- test_run.sh                                  # 执行脚本，支持single/batch/batch_exec三种命令
 - batch_isolated_run.sh                        # 批量隔离执行脚本（shell层进程隔离+msprof性能采集）
 - quant_lightning_indexer_v2_golden.py         # cpu侧算子golden实现
 - quant_lightning_indexer_v2_acl_graph.py      # graph模式torchair后端实现
@@ -48,15 +56,16 @@
 - pytest.ini                                   # 创建测试标记
 
 单用例测试：
+
 - test_quant_lightning_indexer_v2_single.py    # pytest测试单用例运行主程序
 - test_quant_lightning_indexer_v2_paramset.py  # 单用例入参配置，按芯片型号自动选择用例
 
 批量测试：
+
 - test_quant_lightning_indexer_v2_batch.py     # 用例批量测试主程序并生成excel文件保存结果
 - ./batch/quant_lightning_indexer_v2_pt_loadprocess.py   # 读取pt文件并调用算子获取npu输出
 - ./batch/quant_lightning_indexer_v2_pt_save.py          # 读取excel表格批量生成用例pt文件
 - ./batch/list_pt_from_excel.py                           # 从Excel提取Testcase_Name并按名匹配pt文件（batch_exec模式用）
-
 
 ## 架构说明
 
@@ -68,14 +77,17 @@
 - 结果表会先落盘；index 或 return value 精度结果为 `Failed` 时，pytest 随后以非零状态退出
 
 ## 使用方法
+
 在pytest文件夹路径下执行：
 
 ### 运行测试用例
+
 #### 单用例调测
+
 1、手动配置test_quant_lightning_indexer_v2_paramset.py的ENABLED_PARAMS参数
 
-2、执行指令。默认生成 `single_result.xlsx`；`--save-pt` 使用 paramset 配置名命名，
-同一配置展开多个组合时追加三位序号，保存的正是本次执行的数据：
+2、执行指令：
+
 ``` bash
 bash test_run.sh single
 bash test_run.sh single --save-pt ./single_pt -O ./result/single.xlsx
@@ -84,11 +96,17 @@ bash test_run.sh single -M graph --save-pt ./single_pt
 
 #### 用例的批量生成与测试
 
+##### 方式A：test_run.sh 批量执行
+
+1、excel路径下存放用例excel表格
+
 `-P` 同时指定 PT 的保存目录和读取目录，默认是当前 pytest 目录下的 `pt_path`。
 
 ##### 直接执行已有 PT
 
 不传 `-E` 时不读取 Excel、不重新生成 PT，只执行 NPU 和 compare：
+
+3、执行指令：
 
 ``` bash
 bash test_run.sh batch -P ./pt_path
@@ -98,11 +116,22 @@ bash test_run.sh batch -P ./pt_path -I 3,1,5-7             # 按自然排序后�
 bash test_run.sh batch -P ./pt_path -M graph
 ```
 
-`-C` 和 `-I` 不能同时使用。序号从 1 开始；未指定时按文件名自然排序，`case_2.pt` 位于 `case_10.pt` 前。
+4、配置区默认值：
 
-##### 从 Excel 生成 PT 后执行
+| 变量 | 默认值 | 命令行参数 | 说明 |
+|---|---|---|---|
+| DEFAULT_EXCEL | `./excel/test_cases.xlsx` | `-E` | Excel 用例表格路径（**必须指定具体文件名**，不支持通配符如 `./excel/*`） |
+| DEFAULT_PT_PATH | `./pt_path` | `-P` | pt 文件存放目录 |
+| （无） | `Sheet1` | `-S` | Excel Sheet 页名 |
+| （无） | `eager` | `-M` | 运行模式（eager/graph） |
+
+#### 根据 Excel 表格筛选已有 pt 批量执行（batch_exec 模式）
+>
+> 仅重新执行 NPU 测试和精度对比，不重新生成 pt 文件。适用于已有 pt 文件、只需更新精度结果的场景。
 
 增加 `-E` 后，脚本先把 Excel 用例生成到 `-P`，再从同一个目录执行：
+
+2、执行指令：
 
 ``` bash
 bash test_run.sh batch -E ./excel/test_cases.xlsx -P ./pt_path
@@ -110,36 +139,54 @@ bash test_run.sh batch -E ./excel/test_cases.xlsx -S Sheet1 -P ./pt_path
 bash test_run.sh batch -E ./excel/test_cases.xlsx -P ./pt_path -O ./result/batch.xlsx
 ```
 
-`-E` 必须是具体 Excel 文件，不能使用 `./excel/*` 这类通配路径。默认 Sheet 是 `Sheet1`，
-默认运行模式是 `eager`，默认结果文件是当前 pytest 目录下的 `result.xlsx`。
+3、执行流程：
 
-##### 按 Excel 名单筛选已有 PT
+- 从 Excel 表格读取 `Testcase_Name` 列
+- 按 `<Testcase_Name>.pt` 在 pt_path 下匹配对应的 .pt 文件
+- 仅对匹配到的 .pt 文件执行 NPU 测试和精度对比
+- 生成 `result.xlsx` 测试结果表格
+- 如果 Excel 中某条用例无对应的 .pt 文件，会输出警告并跳过该用例
 
-`batch_exec` 不生成 PT，只按 Excel 的 `Testcase_Name` 在 `-P` 中筛选已有文件：
+4、与 `batch` 模式的区别：
 
-``` bash
-bash test_run.sh batch_exec -E ./excel/test_cases.xlsx -P ./pt_path
-bash test_run.sh batch_exec -E ./excel/test_cases.xlsx -S Sheet1 -P ./pt_path -M graph
-```
+|  | `batch` | `batch_exec` |
+|---|---|---|
+| pt 生成 | 每次重新生成 | 跳过 |
+| 执行速度 | 较慢（含 pt 生成） | 较快 |
+| 适用场景 | 首次运行 / 参数变更 | 精度复测 / 仅 NPU 结果更新 |
 
-Excel 中没有对应 PT 的用例会告警并跳过。`batch_exec` 必须显式指定 `-E`；如不需要 Excel
-筛选，直接使用 `batch -P ./pt_path`。
+##### 方式B：手工分步执行
 
-#### 手工分步执行
 1、生成pt文件：
+
 ``` bash
 python3 batch/quant_lightning_indexer_v2_pt_save.py excel/test_cases.xlsx pt_path
 python3 batch/quant_lightning_indexer_v2_pt_save.py excel/test_cases.xlsx pt_path --sheet Sheet1  # 指定 Sheet 页
 ```
 
-2、通过环境变量指定目录后执行测试，不再修改测试源码：
+2、替换测试脚本路径：
+
 ``` bash
 QLIV2_TESTCASE_DIR=pt_path QLIV2_RESULT_PATH=result.xlsx \
 python3 -m pytest -rA -s test_quant_lightning_indexer_v2_batch.py -v -m ci
 ```
 
-#### 批量隔离执行（推荐用于性能采集）
+3、执行测试：
+
+``` bash
+python3 -m pytest -rA -s test_quant_lightning_indexer_v2_batch.py -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning
+```
+
+4、恢复测试脚本：
+
+``` bash
+cp test_quant_lightning_indexer_v2_batch.py.bak test_quant_lightning_indexer_v2_batch.py
+```
+
+##### 方式C：批量隔离执行（推荐用于性能采集）
+
 对每条用例单独拉起一个pytest进程，实现进程间完全隔离，避免单条用例崩溃影响其他用例。
+
 ``` bash
 bash batch_isolated_run.sh ./pt_path 0         # 不采集性能
 bash batch_isolated_run.sh ./pt_path 1         # 采集性能（挂载msprof）
@@ -188,6 +235,7 @@ bash batch_isolated_run.sh ./pt_path 1 graph   # graph模式 + 性能采集
 | output_idx_offset | None/str | `None` 或列表字符串 |
 
 **注意事项**：
+
 - `dequant_dtype`：Ascend950仅支持`FP32`，Ascend910_93支持`FP16`
 - `cmp_ratio > 1`且`sparse_mode != 0`时，`cmp_residual_k`必填（长度=batch_size的列表）
 - `return_value=1`时，`output_idx_offset`需提供有效值

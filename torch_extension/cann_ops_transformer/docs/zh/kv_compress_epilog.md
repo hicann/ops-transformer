@@ -84,7 +84,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>quant_mode</td>
         <td>str</td>
         <td>可选</td>
-        <td>量化模式（字符串，大小写不敏感；PTA 内部经枚举映射为算子侧 int）。默认值<code>"fp8_e8m0"</code>。三种模式中 <code>"fp8_bf16"</code> 与 <code>"fp8_e8m0"</code> 为同一种 per-group FP8 量化方法（nope/rope 整体逐组动态量化为 FP8(e4m3) 并打包进 uint8），仅 scale 表示不同。可选值与含义：
+        <td>量化模式（字符串，大小写不敏感；TorchNPU内部经枚举映射为算子侧 int）。默认值<code>"fp8_e8m0"</code>。三种模式中 <code>"fp8_bf16"</code> 与 <code>"fp8_e8m0"</code> 为同一种 per-group FP8 量化方法（nope/rope 整体逐组动态量化为 FP8(e4m3) 并打包进 uint8），仅 scale 表示不同。可选值与含义：
             <ul>
                 <li><code>"fp8_bf16"</code>(内部 0)：per-group FP8 量化，组大小由 quant_group_size 决定（内核固定按 64），每组一个 <b>bf16</b> scale。</li>
                 <li><code>"fp8_e8m0"</code>(内部 1)：per-group FP8 量化，每组一个 <b>e8m0</b>(2 的幂指数) scale，即 MX-FP8 微缩放。</li>

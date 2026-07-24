@@ -532,6 +532,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     - 支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparse_block_size整除block_size
 - 参数sinks仅支持Ascend 950PR/Ascend 950DT。
+
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。

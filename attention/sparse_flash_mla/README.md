@@ -1,6 +1,7 @@
 # SparseFlashMla
 
 ## 产品支持情况
+
 | 产品                                                         | 是否支持 |
 | :------------------------------------------------------------ | :------: |
 |<term>Ascend 950PR/Ascend 950DT</term>                        | √  |
@@ -11,6 +12,7 @@
 |<term>Atlas 训练系列产品</term>                                | ×  |
 
 ## 功能说明
+
 - 算子功能：
 
   `SparseFlashMla`算子旨在完成以下公式描述的Attention计算，支持SWA（Sliding Window Attention）、CSA（Compressed Sparse Attention）、HCA（Heavily Compressed Attention）三类Attention计算场景。调用时需要使用`SparseFlashMlaMetadata`生成的任务列表`metadata`。
@@ -265,6 +267,7 @@
 </table>
 
 ## 约束说明
+
 - 该接口支持训练、推理场景下使用。
 - 该接口支持aclgraph模式。
 - 该接口当前支持三种计算场景：SWA（Sliding Window Attention）场景仅传入`ori_kv`；CSA（Compressed Sparse Attention）场景传入`ori_kv`、`cmp_kv`及`cmp_sparse_indices`；HCA（Heavily Compressed Attention）场景传入`ori_kv`及`cmp_kv`。

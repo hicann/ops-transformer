@@ -98,7 +98,7 @@ pytests/
 
 | 依赖 | 说明 |
 |------|------|
-| `torch_npu` | PyTorch NPU扩展 |
+| `TorchNPU` | PyTorch NPU扩展 |
 | `cann_ops_transformer` | 提供`flash_attn`和`flash_attn_metadata` |
 
 ### GPU模式(可选)
@@ -150,6 +150,7 @@ python test_flash_attn.py --case_id TND_05 --meta_only
 ```
 
 输出包含：
+
 - **Header**— `sectionNum`、`isFD`、`mBaseSize`、`s2BaseSize`
 - **FA Metadata**—每个section的36个AIC core分核信息(BN2/M/S2的start/end)
 - **FD Metadata**—活跃AIV core归约任务(仅M_NUM > 0)
@@ -434,6 +435,7 @@ flash_attn_inputs = (
 ### Q1: `ModuleNotFoundError: No module named 'cann_ops_transformer'`
 
 NPU模式需要安装`cann_ops_transformer`，或改用GPU模式：
+
 ```bash
 python test_flash_attn.py --case_id BASE_01 --use_gpu
 ```
@@ -441,6 +443,7 @@ python test_flash_attn.py --case_id BASE_01 --use_gpu
 ### Q2: TND case精度异常
 
 检查`cu_seqlens_q`格式（必须包含前导0，长度 = batch + 1）：
+
 ```python
 "cu_seqlens_q": [[0, 64, 128, 192]],  # 3个batch，各64 token
 ```
@@ -448,6 +451,7 @@ python test_flash_attn.py --case_id BASE_01 --use_gpu
 ### Q3: TND case kernel挂死
 
 确认`max_seqlen_q`/`max_seqlen_kv`正确传入。TND layout下kernel需要实际的max值：
+
 ```bash
 python test_flash_attn.py --case_id TND_05 --meta_only  # 先检查metadata
 ```
@@ -455,6 +459,7 @@ python test_flash_attn.py --case_id TND_05 --meta_only  # 先检查metadata
 ### Q4: PA case `block_size`报错
 
 不同后端对`block_size`有不同约束，请查阅对应后端的官方文档确认具体限制：
+
 - GPU端参考`flash_attn`库文档
 - NPU端参考`flash_attn`算子文档
 

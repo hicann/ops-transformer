@@ -62,9 +62,9 @@
 -   单算子模式调用
     ```python
     import torch
-    import torch_npu
+    import TorchNPU
     import numpy as np
-    import custom_ops   # 注册 torch.ops.custom.npu_stem_indexer(_metadata) 并挂载到 torch_npu
+    import custom_ops   # 注册 torch.ops.custom.npu_stem_indexer(_metadata) 并挂载到 TorchNPU
 
     b = 4
     q_heads = 64

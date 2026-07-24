@@ -1,14 +1,12 @@
 # kv_quant_sparse_flash_attention pytest测试框架
 
-
-
 ## 功能说明
 
 基于pytest测试框架，实现kv_quant_sparse_flash_attention算子的功能验证：
 
--   **CPU侧**：复现算子功能用以生成golden数据
--   **NPU侧**：通过torch_npu进行算子直调获取实际数据
--   **精度对比**：进行CPU与NPU结果的精度对比验证算子功能
+- **CPU侧**：复现算子功能用以生成golden数据
+- **NPU侧**：通过TorchNPU进行算子直调获取实际数据
+- **精度对比**：进行CPU与NPU结果的精度对比验证算子功能
 
 支持三条主流程：
 
@@ -16,8 +14,6 @@
 - `batch_save`：从Excel读取参数，生成包含CPU golden的`.pt`用例文件。
 - `gen_excel_from_paramset`：从paramset生成Excel文件。
 - `batch_exec`：从已有`.pt`文件批量回放执行NPU算子并对比精度。
-
-
 
 ## 当前实现范围
 
@@ -50,38 +46,34 @@
 #### 前置要求
 
 1. 完成环境安装和环境变量配置，具体操作请参考：[环境部署](../../../../docs/zh/install/quick_install.md)
-2. torch_npu安装包下载路径（需及时更换为最新版本）：[Attention融合算子Experimental使用说明](../../../../experimental/attention/Attention融合算子Experimental使用说明.md)
+2. TorchNPU安装包下载路径（需及时更换为最新版本）：[Attention融合算子Experimental使用说明](../../../../experimental/attention/Attention融合算子Experimental使用说明.md)
 
 #### custom包调用
 
 支持custom包调用
-
-
 
 ## 文件结构
 
 ```text
 pytest/
 ├── README.md
-├── pytest.ini			# 创建测试标记
-├── test_run.sh			# 执行脚本
-├── check_valid_param.py			# 参数约束拦截
-├── kv_quant_sparse_flash_attention_golden.py		# tensor转换/cpu侧算子golden实现
-├── kv_quant_sparse_flash_attention_paramset.py		# 单用例入参配置
-├── result_compare_method.py		# 输出精度对比
-├── utils.py			# 参数解析/cpu npu执行入口
-├── test_kv_quant_sparse_flash_attention_single.py	# 单用例运行主程序
-├── test_kv_quant_sparse_flash_attention_batch.py	# 从pt文件批量执行NPU测试
+├── pytest.ini   # 创建测试标记
+├── test_run.sh   # 执行脚本
+├── check_valid_param.py   # 参数约束拦截
+├── kv_quant_sparse_flash_attention_golden.py  # tensor转换/cpu侧算子golden实现
+├── kv_quant_sparse_flash_attention_paramset.py  # 单用例入参配置
+├── result_compare_method.py  # 输出精度对比
+├── utils.py   # 参数解析/cpu npu执行入口
+├── test_kv_quant_sparse_flash_attention_single.py # 单用例运行主程序
+├── test_kv_quant_sparse_flash_attention_batch.py # 从pt文件批量执行NPU测试
 └── batch/
-    ├── kv_quant_sparse_flash_attention_process.py	# npu接口
-    ├── test_kv_quant_sparse_flash_attention_pt_save.py		# 从Excel批量生成pt文件
-    ├── gen_excel_from_paramset.py	# 从paramset生成Excel文件
+    ├── kv_quant_sparse_flash_attention_process.py # npu接口
+    ├── test_kv_quant_sparse_flash_attention_pt_save.py  # 从Excel批量生成pt文件
+    ├── gen_excel_from_paramset.py # 从paramset生成Excel文件
     └── excel/
-        ├── example.xlsx		# 示例Excel用例文件
-        └── gen_example_xlsx.py		# 生成示例Excel的脚本
+        ├── example.xlsx  # 示例Excel用例文件
+        └── gen_example_xlsx.py  # 生成示例Excel的脚本
 ```
-
-
 
 ## 使用方法
 
@@ -162,8 +154,6 @@ bash test_run.sh batch_exec -P ./custom_pt_dir/       # 执行指定目录下所
 | Testcase_Prefix | Testcase_Number | layout_query | layout_kv | q_type | kv_dtype | B | S1 | S2 | N1 | N2 | D | K | scale_value | key_quant_mode | value_quant_mode | sparse_block_size | tile_size | rope_head_dim | sparse_mode | attention_mode | quant_scale_repo_mode | block_size | block_num | actual_seq_q | actual_seq_kv |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | tnd_sample | 1 | TND | TND | torch.bfloat16 | hifloat8 | 2 | 8 | 8 | 16 | 1 | 512 | 4 | 0.04166666666666666 | 2 | 2 | 1 | 128 | 64 | 3 | 2 | 1 | 256 |  | [5,8] | [6,8] |
-
-
 
 ## 结果文件
 

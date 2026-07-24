@@ -29,7 +29,6 @@
 
   Chunked Gated Delta Rule是GDR的chunk版实现([参考论文](https://arxiv.org/abs/2412.06464))，它通过将输入序列切块，实现了一定的并行效果，在长上下文场景其计算效率相对Recurrent Gated Delta Rule更高，适用于prefill阶段。输入一个长度为L的序列，该算子可以计算出每一步的输出 $o_t, t \in \{1, 2, .., L\}$ 以及最终的状态矩阵 $S_L$。
 
-
 ## 参数说明
 
 <table style="undefined;table-layout: fixed; width: 900px"><colgroup>

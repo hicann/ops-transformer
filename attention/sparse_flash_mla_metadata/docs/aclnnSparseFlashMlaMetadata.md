@@ -614,7 +614,6 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
   - `cmpResidualKvOptional`为`aclnnSparseFlashMlaMetadata`和`aclnnSparseFlashMla`的可选输入，在CSA、HCA、cmpRatio不等于1且cmpMaskMode为3场景必传，用于恢复cmp侧mask使用的压缩前长度。
   - 该算子为AICPU算子，在Host侧CPU上执行，不占用NPU计算资源。
 
-
 ## 调用示例
 
 调用示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。

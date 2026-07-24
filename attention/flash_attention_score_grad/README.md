@@ -25,6 +25,7 @@
     $$
     Y=Dropout(Softmax(Mask(\frac{QK^T+pse}{\sqrt{d}}),atten\_mask),keep\_prob)V
     $$
+
   - pseType≠1时，公式如下：
 
     $$

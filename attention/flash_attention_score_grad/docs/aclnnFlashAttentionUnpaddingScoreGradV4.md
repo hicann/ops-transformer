@@ -526,7 +526,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV4(
 - pseShiftOptional：如果Sq大于1024且每个batch的Sq与Skv等长且是sparseMode为0、2、3的下三角掩码场景，可开启alibi位置编码压缩，此时只需要输入原始PSE最后1024行进行内存优化，即alibi_compress = ori_pse[:, :, -1024:, :]，具体如下：
   - 参数每个batch不相同时，shape为BNHSkv(H=1024)。
   - 每个batch相同时，shape为1NHSkv(H=1024)。
-  - TND场景下，每个batch段内部仍按[N, Sq_i, Skv_i]生成，但存储与传参时统一flatten。若第i个batch段的真实query长度为Sq_i、真实key/value长度为Skv_i，则该段PSE元素个数为N * Sq_i * Skv_i，整段PSE总长度pseTotalLen为sum_i(N * Sq_i * Skv_i)。
+  - TND场景下，每个batch段内部仍按[N, Sq_i, Skv_i]生成，但存储与传参时统一flatten。若第i个batch段的真实query长度为Sq_i、真实key/value长度为Skv_i，则该段PSE元素个数为N *Sq_i* Skv_i，整段PSE总长度pseTotalLen为sum_i(N *Sq_i* Skv_i)。
   - 如不使用该参数可传入nullptr。
 - sparseMode的约束如下:
   - 当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量；

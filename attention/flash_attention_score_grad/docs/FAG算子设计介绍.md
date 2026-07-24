@@ -30,7 +30,7 @@ Tiling操作的目的是为了找到一种更高效的NPU执行方式，原始�
 
 <term>Atlas A2训练系列产品</term>芯片AIC和AIV分离的架构可以使得AIC和AIV并行执行。AIC和AIV之间数据交互的通路是L2和GM（Global Memory，高带宽存储器），两者之间的交互次数对性能影响是比较大的，同时由于AIC和AIV算力差异，两者需要使用不同的基本块大小，本着尽量减少AIC和AIV通信次数和发挥最大算力的原则，CVtiling分离策略应运而生，可以有效地减少CV通信次数，同时根据不同单元的buffer特征，选择不同的基本块进行计算，从而提升算子性能。
 
- 对于FAG算子，Vector计算涉及多个输入、输出、中间计算结果、double-buffer设计等，需要将buffer分配成多份，最优分配方案中最大一份为32KB，由于Vector计算使用的数据类型是float32，因此Vector的tiling基本块为8 * 1024。为了充分发挥Cube的算力，在CV之间一轮计算的数据量进行了1:16的配比，又由于Cube侧的输入数据类型是float16，输出是float32，Cube的基本块为128 * 128，所以通过nRatio=8配比出128 * 1024的数据量。伪代码如下：
+ 对于FAG算子，Vector计算涉及多个输入、输出、中间计算结果、double-buffer设计等，需要将buffer分配成多份，最优分配方案中最大一份为32KB，由于Vector计算使用的数据类型是float32，因此Vector的tiling基本块为8 *1024。为了充分发挥Cube的算力，在CV之间一轮计算的数据量进行了1:16的配比，又由于Cube侧的输入数据类型是float16，输出是float32，Cube的基本块为128* 128，所以通过nRatio=8配比出128 * 1024的数据量。伪代码如下：
 
 ```c++
 // C-Tiling: (S1_c_i,D)x(D,S2_c_i) => (S1_c_i, S2_c_i):(128,1024)
@@ -53,7 +53,7 @@ for S1_c_i/S1_v_i=128/8:
 
 Ascend 950PR/Ascend 950DT同样是AIC和AIV分离的架构，保留了AIC AIV并行执行特性，同时新增了AIC和AIV之间的高速数据交互通路L0C->UB和UB->L1。降低了CV之间交互的成本，流水并行度更高，且相比于<term>Atlas A2训练系列产品</term>复杂的tiling切块策略，在950上仅使用一种基本块就可以获得较好的性能。
 
- 对于FAG算子，Vector计算涉及多个输入、输出、中间计算结果、double-buffer设计等，需要将buffer分配成多份，最优分配方案中最大一份为32KB，由于Vector计算使用的数据类型是float32，因此Vector的tiling基本块为64 * 128，由于Cube与Vector核数为1：2的数量比，为了充分利用cube核的算力，Cube侧考虑采用128 * 128的基本块，即每个cube核计算完128 * 128的数据后，均分给两个vector核处理。伪代码如下：
+ 对于FAG算子，Vector计算涉及多个输入、输出、中间计算结果、double-buffer设计等，需要将buffer分配成多份，最优分配方案中最大一份为32KB，由于Vector计算使用的数据类型是float32，因此Vector的tiling基本块为64 *128，由于Cube与Vector核数为1：2的数量比，为了充分利用cube核的算力，Cube侧考虑采用128* 128的基本块，即每个cube核计算完128 * 128的数据后，均分给两个vector核处理。伪代码如下：
 
 ```c++
 // C-Tiling: (S1_i,D)x(D,S2_i) => (S1_i, S2_i):(128,128)
@@ -65,7 +65,7 @@ fixp_l0c_to_ub(S1_i / 2,S2_i); => v0: 64*128, v1: 64*128 // 通过CV通路L0C->U
 // V侧Vector计算
 Vector(S1_i / 2,S2_i)       // 进行Vector计算
 copy_ub_to_l1(S1_i/2*S2_i)  // Vector计算结束，得到输出数据，通过CV通路UB->L1，两个v核数据聚合拷贝到L1上
-Bmm((S1_i,S2_i)*(S2_i,D));	// dq，最终结果输出到workspace
+Bmm((S1_i,S2_i)*(S2_i,D)); // dq，最终结果输出到workspace
 Bmm((S2_i,S1_i)*(S1_i,D));  // dkv，最终结果输出到workspace
 ```
 
@@ -285,13 +285,13 @@ N1 * G * alignedS1 * alignedS2 <= bestBasicBlockNum。 </td>
     >
     >    kernel代码：ops-transformer-dev/attention/flash_attention_score_grad/op_kernel/flash_attention_score_grad_s1s2_bn2.h
     >
-    >    条件：(S1 < 1024) && (S2 < 1024)  && (B * N2 * 2 > CoreNum || G == 1)
+    >    条件：(S1 < 1024) && (S2 < 1024)  && (B *N2* 2 > CoreNum || G == 1)
     >
     >    依据：S1和S2都比较小，且B和N2比较大的时候，这时候把B和N2用于分核，核内不切分N2.i，循环N2.i次进行Cube和Vector计算。
     >
     > 
     >
-    > 3. 核间切分B、N2.o轴，核内切分N2.i、G、S1、S2轴，该模板是为了优化G * S1 * S2都比较小的场景时的性能，把N2轴切分到核内，并且在核内也切分N2.i轴，用于加速Vector计算。相比于模板2,模板3会更复杂一些，模板3在核内计算中也切分了N2.i轴，让每次的计算量更大。
+    > 3. 核间切分B、N2.o轴，核内切分N2.i、G、S1、S2轴，该模板是为了优化G *S1* S2都比较小的场景时的性能，把N2轴切分到核内，并且在核内也切分N2.i轴，用于加速Vector计算。相比于模板2,模板3会更复杂一些，模板3在核内计算中也切分了N2.i轴，让每次的计算量更大。
     >
     >    tiling代码文件：ops-transformer-dev/attention/flash_attention_score_grad/op_host/flash_attention_score_grad_tiling_ngs1s2_bn.cpp
     >
@@ -299,13 +299,13 @@ N1 * G * alignedS1 * alignedS2 <= bestBasicBlockNum。 </td>
     >
     >    kernel代码：FlashAttentionScoreGradUngs1s2Bbn
     >
-    >    条件：G * S1 * S2 <= 32KB && G = 1 && S2 < 1536
+    >    条件：G *S1* S2 <= 32KB && G = 1 && S2 < 1536
     >
-    >    依据：当G * S1 * S2小于32KB时，可以通过把N2轴切分一部分到核内，让CV基本块更大，同时在Vector核内，把N2.i的也进行切分，让单次Vector的计算量更大，提升Vector利用率。
+    >    依据：当G *S1* S2小于32KB时，可以通过把N2轴切分一部分到核内，让CV基本块更大，同时在Vector核内，把N2.i的也进行切分，让单次Vector的计算量更大，提升Vector利用率。
     >
     > 
     >
-    > 4. 核间切分B轴，核内计算B.i 、N2、 G、S1、S2轴，该模板是为了优化N2 * G * S1 * S2比较小时的性能
+    > 4. 核间切分B轴，核内计算B.i 、N2、 G、S1、S2轴，该模板是为了优化N2 *G* S1 * S2比较小时的性能
     >
     >    tiling代码文件：ops-transformer-dev/attention/flash_attention_score_grad/op_host/flash_attention_score_grad_tiling_bngs1s2_b.cpp
     >
@@ -313,14 +313,14 @@ N1 * G * alignedS1 * alignedS2 <= bestBasicBlockNum。 </td>
     >
     >    kernel代码：FlashAttentionScoreGradUngs1s2Bbn
     >
-    >    条件：N2 * G * S1 * S2 <= 64 * 128
+    >    条件：N2 *G* S1 *S2 <= 64* 128
     >
-    >    依据：如果希望单纯的把B.i放入CV基本块中，那么内层轴N2 * G * S1 * S2就需要足够小，一般是根据这个只小于64KB的话，Bmm1和Bmm2的数据量一般不会超过L1的一半，那么B轴切分时有意义的，否则单个Matmul就把L1用满，多个Matmul之间的数据搬入没有办法和计算并行。
+    >    依据：如果希望单纯的把B.i放入CV基本块中，那么内层轴N2 *G* S1 * S2就需要足够小，一般是根据这个只小于64KB的话，Bmm1和Bmm2的数据量一般不会超过L1的一半，那么B轴切分时有意义的，否则单个Matmul就把L1用满，多个Matmul之间的数据搬入没有办法和计算并行。
 
   - **<term>Ascend 950PR/Ascend 950DT</term>**  
   FAG算子的模板划分如下，以下模板，序号越大，模板的优先级越高，序号1的模板是泛化模板（支持所有shape），虽然存在多个模板，但在实现时仅存在两个模板文件，一个是确定性计算另一个是非确定性计算模板，其中非确定性计算模板包含了BN2，BN2S2，BN2GS1S2三种切分模板，在代码中通过模板参数隔离各自的实现逻辑：
 
-    >    1. 核间切分B、N2、G、S1、S2轴模板：
+    > 1. 核间切分B、N2、G、S1、S2轴模板：
     >
     >       tiling代码文件：ops-transformer-dev/attention/common/op_host/arch-310/flash_attention_score_grad_tiling_s1s2_bn2gs1s2_regbase.cpp
     >
@@ -331,7 +331,7 @@ N1 * G * alignedS1 * alignedS2 <= bestBasicBlockNum。 </td>
     >       条件：支持所有shape，其他模板如果不支持，就会走到这个模板
     >       依据：这个模板按照最通用的做法，可以支持所有的Shape。但是在部分场景下性能不是最优，此时根据不同场景判断路由到以下其他特化模板。
     >
-    >    2. 核间切分B、N2轴模板：
+    > 2. 核间切分B、N2轴模板：
     >
     >       tiling代码文件：ops-transformer-dev/attention/common/op_host/arch-310/flash_attention_score_grad_tiling_s1s2_bn2gs1s2_regbase.cpp
     >
@@ -342,7 +342,7 @@ N1 * G * alignedS1 * alignedS2 <= bestBasicBlockNum。 </td>
     >       条件：S1<=128 and S2 <= 128 and G=1，非FP32。
     >       依据：S1<=128 and S2 <= 128 and G=1时，不存在多核切分S1S2轴，即不存在多核累加，可以省去前置GM清零和后置cast和musl计算，性能更优。
     >
-    >    3. 核间切分B、N2、S2轴模板：
+    > 3. 核间切分B、N2、S2轴模板：
     >
     >       tiling代码文件：ops-transformer-dev/attention/common/op_host/arch-310/flash_attention_score_grad_tiling_s1s2_bn2gs1s2_regbase.cpp
     >
@@ -350,10 +350,10 @@ N1 * G * alignedS1 * alignedS2 <= bestBasicBlockNum。 </td>
     >
     >       kernel代码：ops-transformer-dev/attention/common/op_kernel/arch-310/flash_attention_score_grad_kernel.h
     >
-    >       条件：非FP32，TND，B * N2 * S2 > cubeCoreNum and  G = 1。
-    >       依据：B * N2 * S2 > cubeCoreNum and  G = 1场景，dk和dv的计算无需多核累加，可以省去前置dk dv GM清零和后置cast和musl计算，性能更优。
+    >       条件：非FP32，TND，B *N2* S2 > cubeCoreNum and  G = 1。
+    >       依据：B *N2* S2 > cubeCoreNum and  G = 1场景，dk和dv的计算无需多核累加，可以省去前置dk dv GM清零和后置cast和musl计算，性能更优。
     >
-    >    4. 确定性计算模板
+    > 4. 确定性计算模板
     >
     >       tiling代码文件：ops-transformer-dev/attention/common/op_host/arch-310/flash_attention_score_grad_tiling_s1s2_bn2gs1s2_regbase.cpp
     >

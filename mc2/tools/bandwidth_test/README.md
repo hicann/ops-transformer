@@ -15,7 +15,7 @@
 
 - Python 3.8+
 - PyTorch
-- torch_npu
+- TorchNPU
 - npu_ops_transformer
 - pandas, numpy
 

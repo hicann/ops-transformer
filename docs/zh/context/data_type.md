@@ -1,6 +1,6 @@
 # 数据类型
 
-通过**aclCreateTensor**接口创建aclTensor时，支持的全量数据类型参见[《acl API（C）》](https://hiascend.com/document/redirect/CannCommunityCppApi)中“数据类型及其操作接口>aclDataType”。
+通过**aclCreateTensor**接口创建aclTensor时，支持的全量数据类型参见[《Runtime运行时API》](https://hiascend.com/document/redirect/CannCommunityRuntimeApi)中“数据类型及其操作接口>aclDataType”。
 两段式接口参数说明时，为了方便描述，支持的数据类型将采用如下简写形式。
 
 **表1**  数据类型简写表

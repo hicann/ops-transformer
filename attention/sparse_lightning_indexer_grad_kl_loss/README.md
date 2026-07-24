@@ -372,6 +372,7 @@
     <term>Ascend 950PR/Ascend 950DT</term>：N1额外支持48，Nidx1额外支持24，二者仅允许(48,24)组合，禁止其余数值配对。
 
     <term>Ascend 950PR/Ascend 950DT</term>：B、S1、S2均支持泛化。
+
 ## 调用说明
 
 | 调用方式           | 调用样例                                                                                    | 说明                                                                                                  |

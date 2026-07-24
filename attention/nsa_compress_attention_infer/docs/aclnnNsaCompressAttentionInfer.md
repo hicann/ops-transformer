@@ -142,7 +142,7 @@ aclnnStatus aclnnNsaCompressAttentionInfer(
         <ul style="list-style-type: circle;">
           <li>value的N和numKeyValueHeads值相等。</li>
           <li>value的D(H/numKeyValueHeads)和output的D值相等。</li>
-  	  <li>value的D轴小于等于128。</li>
+     <li>value的D轴小于等于128。</li>
           <li>value中的blockSize和pageBlockSize值相等。</li>
           <li>value的S轴小于等于8192。</li>
         </ul>

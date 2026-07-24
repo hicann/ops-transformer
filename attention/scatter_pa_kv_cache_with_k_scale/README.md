@@ -18,7 +18,7 @@
 - 输入输出支持以下场景：
   - 场景一：
 
-    ```
+    ```python
     key:[batch * seq_len, num_head, head_size]
     value:[batch * seq_len, num_head, head_size]
     key_cache:[num_blocks, num_head, block_size, head_size]
@@ -35,7 +35,7 @@
 
     对于每个token（i ∈ [0, num_tokens)）和每个头（j ∈ [0, num_head)）：
 
-    ```
+    ```python
     block_idx = slot_mapping[i] // block_size
     block_offset = slot_mapping[i] % block_size
 

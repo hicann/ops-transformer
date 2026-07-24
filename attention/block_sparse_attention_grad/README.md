@@ -86,6 +86,7 @@ BlockSparseAttentionGrad输入dout、query、key、value, attentionOut的数据�
 
 - <term>Atlas A2 训练产品</term>、<term>Atlas A3 训练产品</term>:
 不支持"BSND"。
+
 </ul>
 
 ## 参数说明
@@ -373,7 +374,6 @@ BlockSparseAttentionGrad输入dout、query、key、value, attentionOut的数据�
 
   - <term>Ascend 950PR/Ascend 950DT</term>：当qInputLayout或kvInputLayout 为 非"TND"时，会忽略这两个入参。
 * 不支持确定性计算场景。
-
 
 </ul>
 

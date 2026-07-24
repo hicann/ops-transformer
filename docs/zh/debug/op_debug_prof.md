@@ -25,7 +25,7 @@
 
 * **aclnn异常错误信息获取**
 
-   通过aclGetRecentErrMsg接口（参见[《acl API（C）》](https://hiascend.com/document/redirect/CannCommunityCppApi)）获取aclnn接口调用过程中的异常信息，使用方法如下：
+   通过aclGetRecentErrMsg接口（参见[《Runtime运行时API》](https://hiascend.com/document/redirect/CannCommunityRuntimeApi)）获取aclnn接口调用过程中的异常信息，使用方法如下：
 
    ```cpp
    printf(aclGetRecentErrMsg());

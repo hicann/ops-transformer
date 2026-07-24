@@ -15,7 +15,7 @@
 - gcc 9.4.0+
 - python 3.8+
 - torch>=2.6.0
-- 对应版本的[torch_npu](https://gitcode.com/Ascend/pytorch/releases)
+- 对应版本的[TorchNPU](https://gitcode.com/Ascend/pytorch/releases)
 
 ## 安装步骤 | Installation Steps
 

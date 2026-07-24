@@ -6,7 +6,7 @@
 
 1. **[前提条件](../README.md)**：参考项目README完成环境准备和源码下载，此处不再赘述。快速入门场景**推荐CANNLab或Docker部署**，操作简单。
 
-   > **说明**：CANNLab或Docker环境默认提供最新商发版CANN包；如需体验master分支最新能力，可手动搭建环境。
+   > **说明**：CANNLab或Docker环境默认提供最新最新版本CANN包；如需体验master分支最新能力，可手动搭建环境。
 
 2. **[编译运行](#一编译运行)**：编译自定义算子包并安装，实现快速调用算子。
 
@@ -24,7 +24,11 @@
 
 - CANNLab云开发环境：
 
-   默认提供最新版本CANN包配套的项目源码，资源一般在`/mnt/workspace/gitCode`目录下，请进入目标分支源码目录。
+   默认提供最新最新版本CANN包配套的项目源码，进入源码目录，\$\{gitCode\_id\}替换为开发者个人gitCode账号。
+
+   ```bash
+   cd /mnt/workspace/gitCode/${gitCode_id}/ops-transformer
+   ```
 
 - 非CANNLab云开发环境：
 

@@ -13,9 +13,9 @@
 
 ## 功能说明
 
--   算子功能：计算`SparseFlashMla`训练场景下注意力的反向输出，支持Sliding Window Attention、Compressed Attention以及Sparse Compressed Attention。
+- 算子功能：计算`SparseFlashMla`训练场景下注意力的反向输出，支持Sliding Window Attention、Compressed Attention以及Sparse Compressed Attention。
 
--   计算公式：
+- 计算公式：
 
     阶段一：根据不同cmp_ratio场景，对输入ori_kv与cmp_kv进行选择
 
@@ -64,7 +64,6 @@
     $$
     dSinks = ReduceSum(-P \text{ }\times\text{ } dP \text{ }\times\text{ } SimpleSoftmax(sinks, lse), dim=-1)
     $$
-
 
 ## 参数说明
 

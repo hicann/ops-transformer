@@ -20,7 +20,7 @@
 - 计算公式：
   - 场景一：
 
-    ```
+    ```python
     key:[batch * seq_len, num_head, k_head_size]
     keyCache:[num_blocks, block_size, num_head, k_head_size]
     slotMapping:[batch * seq_len]
@@ -33,7 +33,7 @@
 
   - 场景二：
 
-    ```
+    ```python
     key:[batch, seq_len, num_head, k_head_size]
     keyCache:[num_blocks, block_size, 1, k_head_size]
     slotMapping:[batch, num_head]
@@ -53,7 +53,7 @@
 
   - 场景三：
 
-    ```
+    ```python
     key:[batch, seq_len, num_head, k_head_size]
     keyCache:[num_blocks, block_size, 1, k_head_size]
     slotMapping:[batch, num_head]

@@ -2,13 +2,13 @@
 
 ## 1. 环境准备
 
-### 1.1 安装CANN / PyTorch + torch-npu
+### 1.1 安装CANN / PyTorch + TorchNPU
 
 参考根目录README.md，或使用项目根目录下的安装脚本：
 
 ```bash
 bash install_cann_950.sh    # 安装CANN 9.1.0 + 950 ops
-bash install_torch_npu.sh   # 安装PyTorch + torch-npu
+bash install_torch_npu.sh   # 安装PyTorch + TorchNPU
 ```
 参考docs/zh/install/compile.md，编译experimental并安装自定义算子包。
 
@@ -152,4 +152,4 @@ fia_fullquant_mxfp8_test/
 |------|------|------|
 | `Unsupported Q scale layout` | q_scale_layout值不合法 | 只支持`"AUTO"` / `"TND"` / `"N2TGD"` |
 | `libhccl.so not found` | 未source CANN环境变量 | `source /home/user/Ascend/cann/set_env.sh` |
-| `No module named 'torch_npu'` | 未安装torch-npu | `bash install_torch_npu.sh` |
+| `No module named 'torch_npu'` | 未安装TorchNPU | `bash install_torch_npu.sh` |

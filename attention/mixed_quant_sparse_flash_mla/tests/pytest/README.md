@@ -1,11 +1,15 @@
 # mixed_quant_sparse_flash_mla算子测试框架
+
 ## 功能说明
+
 基于pytest测试框架，实现mixed_quant_sparse_flash_mla算子的功能验证：
+
 - **CPU侧**：复现算子功能用以生成golden数据
-- **NPU侧**：通过torch_npu进行算子直调、图模式调用获取实际数据
+- **NPU侧**：通过TorchNPU进行算子直调、图模式调用获取实际数据
 - **精度对比**：进行CPU与NPU结果的精度对比验证算子功能
 
 ## 当前实现范围
+
 ### 参数限制
 
 - **数据格式**:
@@ -15,38 +19,49 @@
 ### 环境配置
 
 #### 前置要求
-1、 确认torch_npu为最新版本
+
+1、 确认TorchNPU为最新版本
 
 #### custom包调用
+
 支持custom包调用
 
 ## 文件结构
+
 #### pytest文件结构说明
+
 - test_run.sh                                               # 用例执行脚本
 - mixed_quant_sparse_flash_mla_golden.py                   # 算子入参处理及cpu侧golden实现
 - result_compare_method.py                                  # cpu golden与npu结果精度对比脚本
 - pytest.ini                                                # 创建测试标记
 
 单用例测试：
+
 - test_mixed_quant_sparse_flash_mla_single.py              # pytest测试单用例运行主程序
 - mixed_quant_sparse_flash_mla_paramset.py                 # 单用例入参数配置
 
 批量测试：
+
 - test_mixed_quant_sparse_flash_mla_batch.py               # 用例批量测试主程序，读取pt用例并获取npu输出，结果保存至excel文件
 - ./batch/test_mixed_quant_sparse_flash_mla_pt_save.py     # 读取excel表格批量生成用例pt文件
 - ./batch/mixed_quant_sparse_flash_mla_process.py          # 调用算子接口获取npu输出
 
 ## 使用方法
+
 在pytest文件夹路径下执行：
 
 ### 运行测试用例
+
 #### 单用例测试
+
 1、手动配置mixed_quant_sparse_flash_mla_paramset.py的参数
 
 2、执行指令：
+
 ``` bash
 bash test_run.sh single
 ```
+
 #### 批量测试
 
 支持三种批量测试模式，均可通过选项指定excel文件、sheet名、pt保存目录：
@@ -67,6 +82,7 @@ bash test_run.sh single
 | `--keep-pt` | 执行完成后保留pt文件 | 默认清理 | 仅batch |
 
 ##### 使用示例
+
 ``` bash
 # batch_save：只生成pt文件
 bash test_run.sh batch_save

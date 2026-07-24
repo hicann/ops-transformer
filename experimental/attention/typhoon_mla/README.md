@@ -29,8 +29,8 @@ typhoon_mla/
 
 * CATLASS v1.0.0
 * CANN toolkit 
-* CANN-NNAL (required for torch_npu absorb baseline)
-* Torch & torch_npu
+* CANN-NNAL (required for TorchNPU absorb baseline)
+* Torch & TorchNPU
 
 ### Build & compile
 

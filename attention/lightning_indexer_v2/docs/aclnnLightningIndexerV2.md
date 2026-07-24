@@ -142,7 +142,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>(B+1,)</td>
     <td>x</td>
     </tr>
-	<tr>
+    <tr>
     <td>sequsedQOptional（aclTensor*）</td>
     <td>输入</td>
     <td>不同Batch中q的真实使用长度。</td>
@@ -152,7 +152,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>(B,)</td>
     <td>x</td>
     </tr>
-	<tr>
+    <tr>
     <td>sequsedKOptional（aclTensor*）</td>
     <td>输入</td>
     <td>不同Batch中k的真实使用长度。</td>
@@ -162,7 +162,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>(B,)</td>
     <td>x</td>
     </tr>
-	<tr>
+    <tr>
     <td>cmpResidualKOptional（aclTensor*）</td>
     <td>输入</td>
     <td>表示k压缩前token数量除以cmpRatio的余数。</td>
@@ -182,7 +182,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>shape支持(B,S2_max/block_size)</td>
     <td>x</td>
     </tr>
-	<tr>
+    <tr>
     <td>outputIdxOffsetOptional（aclTensor*）</td>
     <td>输入</td>
     <td>表示topK结果输出索引所需要加上的偏移。</td>
@@ -192,129 +192,129 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>(B,)</td>
     <td>x</td>
     </tr>
-	<tr>
-	<td>metadataOptional（aclTensor*）</td>
-	<td>输入</td>
-	<td>QuantLightningIndexerV2Metadata算子传入的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。</td>
-	<td><ul><li>不支持空tensor。</li><li>block_size取值为16的整数倍，最大支持到1024。</li></ul></td>
-	<td>INT32</td>
-	<td>ND</td>
-  <td>shape支持(B,S2_max/block_size)</td>
-	<td>x</td>
-  </tr>
-  <tr>
-  <td>topk（int64_t）</td>
-  <td>输入</td>
-  <td>topK阶段需要保留的block数量。</td>
-  <td><ul><li>当前支持[1, 8192]。</li></ul></td>
-  <td>INT64</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  </tr>
-  <tr>
-  <td>maxSeqlenQ（int64_t）</td>
-  <td>输入</td>
-  <td>q的最大序列长度。</td>
-  <td><ul><li>当前支持[-1]或大于等于[0]。</li><li>-1表示任意可能长度。</li><li>建议值是-1。</li></ul>
-  </td>
-  <td>INT64</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  </tr>
-  <tr>
-  <td>layoutQ（char*）</td>
-  <td>输入</td>
-  <td>用于标识输入q的数据排布格式。</td>
-  <td><ul><li>当前支持BSND、TND。</li><li>建议值是BSND。</li></ul></td>
-  <td>STRING</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  </tr>
-  <tr>
-  <td>layoutK（char*）</td>
-  <td>输入</td>
-  <td>用于标识输入k的数据排布格式。</td>
-  <td><ul><li>当前支持PA_BBND、BSND、TND。</li><li>建议值是BSND。</li></ul></td>
-  <td>STRING</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  </tr>
-  <tr>
-  <td>maskMode（int64_t）</td>
-  <td>输入</td>
-  <td>表示mask的模式。</td>
-  <td><ul><li>mask_mode为0时，代表defaultMask模式。</li><li>mask_mode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。</li><li>建议值是0。</li></ul></td>
-  <td>INT64</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  </tr>
-  <tr>
-  <td>cmpRatio（int64_t）</td>
-  <td>输入</td>
-  <td>用于稀疏计算，表示k的压缩倍数。</td>
-  <td><ul><li>支持1/4/128。</li><li>建议值是1。</li></ul></td>
-  <td>INT64</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  </tr>
-  <tr>
-  <td>returnValue（int64_t）</td>
-  <td>输入</td>
-  <td>代表是否需要返回Indices对应的Values值。</td>
-  <td><ul><li>0代表不返回，1代表返回值。</li><li>建议值是0。</li></ul></td>
-  <td>INT64</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  </tr>
-  <tr>
-  <td>sparseIndices（aclTensor*）</td>
-  <td>输出</td>
-  <td>公式中的Indices输出。</td>
-  <td>不支持空tensor。</td>
-  <td>INT32</td>
-  <td>ND</td>
-  <td><ul><li>layout_q为"BSND"时输出shape为[B, S1, N2, topk]。</li><li>layout_q为"TND"时输出shape为[T1, N2, topk]。</li></ul></td>
-  <td>x</td>
-  </tr>
-  <tr>
-  <td>sparseValues（aclTensor*）</td>
-  <td>输出</td>
-  <td>公式中的Indices对应的Values输出。</td>
-  <td>不支持空tensor。</td>
-  <td>FLOAT</td>
-  <td>ND</td>
-  <td><ul><li>layout_q为"BSND"时输出shape为[B, S1, N2, topk]。</li><li>layout_q为"TND"时输出shape为[T1, N2, topk]。</li></ul></td>
-  <td>x</td>
-  </tr>
-  <tr>
-  <td>workspaceSize（uint64_t*）</td>
-  <td>输出</td>
-  <td>返回需要在Device侧申请的workspace大小。</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  </tr>
-  <tr>
-  <td>executor（aclOpExecutor**）</td>
-  <td>输出</td>
-  <td>返回op执行器，包含了算子计算流程。</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  <td>-</td>
-  </tr>
-  </tbody>
-   </table>
+    <tr>
+    <td>metadataOptional（aclTensor*）</td>
+    <td>输入</td>
+    <td>QuantLightningIndexerV2Metadata算子传入的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。</td>
+    <td><ul><li>不支持空tensor。</li><li>block_size取值为16的整数倍，最大支持到1024。</li></ul></td>
+    <td>INT32</td>
+    <td>ND</td>
+    <td>shape支持(B,S2_max/block_size)</td>
+    <td>x</td>
+    </tr>
+    <tr>
+    <td>topk（int64_t）</td>
+    <td>输入</td>
+    <td>topK阶段需要保留的block数量。</td>
+    <td><ul><li>当前支持[1, 8192]。</li></ul></td>
+    <td>INT64</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    </tr>
+    <tr>
+    <td>maxSeqlenQ（int64_t）</td>
+    <td>输入</td>
+    <td>q的最大序列长度。</td>
+    <td><ul><li>当前支持[-1]或大于等于[0]。</li><li>-1表示任意可能长度。</li><li>建议值是-1。</li></ul>
+    </td>
+    <td>INT64</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    </tr>
+    <tr>
+    <td>layoutQ（char*）</td>
+    <td>输入</td>
+    <td>用于标识输入q的数据排布格式。</td>
+    <td><ul><li>当前支持BSND、TND。</li><li>建议值是BSND。</li></ul></td>
+    <td>STRING</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    </tr>
+    <tr>
+    <td>layoutK（char*）</td>
+    <td>输入</td>
+    <td>用于标识输入k的数据排布格式。</td>
+    <td><ul><li>当前支持PA_BBND、BSND、TND。</li><li>建议值是BSND。</li></ul></td>
+    <td>STRING</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    </tr>
+    <tr>
+    <td>maskMode（int64_t）</td>
+    <td>输入</td>
+    <td>表示mask的模式。</td>
+    <td><ul><li>mask_mode为0时，代表defaultMask模式。</li><li>mask_mode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。</li><li>建议值是0。</li></ul></td>
+    <td>INT64</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    </tr>
+    <tr>
+    <td>cmpRatio（int64_t）</td>
+    <td>输入</td>
+    <td>用于稀疏计算，表示k的压缩倍数。</td>
+    <td><ul><li>支持1/4/128。</li><li>建议值是1。</li></ul></td>
+    <td>INT64</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    </tr>
+    <tr>
+    <td>returnValue（int64_t）</td>
+    <td>输入</td>
+    <td>代表是否需要返回Indices对应的Values值。</td>
+    <td><ul><li>0代表不返回，1代表返回值。</li><li>建议值是0。</li></ul></td>
+    <td>INT64</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    </tr>
+    <tr>
+    <td>sparseIndices（aclTensor*）</td>
+    <td>输出</td>
+    <td>公式中的Indices输出。</td>
+    <td>不支持空tensor。</td>
+    <td>INT32</td>
+    <td>ND</td>
+    <td><ul><li>layout_q为"BSND"时输出shape为[B, S1, N2, topk]。</li><li>layout_q为"TND"时输出shape为[T1, N2, topk]。</li></ul></td>
+    <td>x</td>
+    </tr>
+    <tr>
+    <td>sparseValues（aclTensor*）</td>
+    <td>输出</td>
+    <td>公式中的Indices对应的Values输出。</td>
+    <td>不支持空tensor。</td>
+    <td>FLOAT</td>
+    <td>ND</td>
+    <td><ul><li>layout_q为"BSND"时输出shape为[B, S1, N2, topk]。</li><li>layout_q为"TND"时输出shape为[T1, N2, topk]。</li></ul></td>
+    <td>x</td>
+    </tr>
+    <tr>
+    <td>workspaceSize（uint64_t*）</td>
+    <td>输出</td>
+    <td>返回需要在Device侧申请的workspace大小。</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    </tr>
+    <tr>
+    <td>executor（aclOpExecutor**）</td>
+    <td>输出</td>
+    <td>返回op执行器，包含了算子计算流程。</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    </tr>
+    </tbody>
+    </table>
 
   - q、k、w、q_descale、k_descale参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
   - 使用S1和S2分别表示q和k的输入样本序列长度，N1和N2分别表示q和k对应的多头数，k表示最后选取的索引个数。参数q中的D和参数k中的D值相等为128。T1和T2分别表示q和k的输入样本序列长度的累加和。

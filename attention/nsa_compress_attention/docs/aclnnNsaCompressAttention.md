@@ -13,7 +13,7 @@
 
 ## 功能说明
 
-- **算子功能**：NSA中compress attention以及select topk索引计算。论文：https://arxiv.org/pdf/2502.11089
+- **算子功能**：NSA中compress attention以及select topk索引计算。论文：<https://arxiv.org/pdf/2502.11089>
 
 - **计算公式**：压缩block大小：$l$，select block大小：$l'$，压缩stride大小：$d$
 

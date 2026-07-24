@@ -425,7 +425,7 @@ aclnnStatus aclnnFlashAttentionVarLenScore(
 - realShiftOptional：如果Sq大于1024且每个batch的Sq与Skv等长且是sparseMode为0、2、3的下三角掩码场景，可开启alibi位置编码压缩，此时只需要输入原始pse最后1024行进行内存优化，即alibi_compress = ori_pse[:, :, -1024:, :]，具体如下：
   - 参数每个batch不相同时，shape为BNHSkv(H=1024)。
   - 每个batch相同时，shape为1NHSkv(H=1024)。
-  - TND场景下，每个batch段内部仍按[N, Sq_i, Skv_i]生成，但存储与传参时统一flatten。若第i个batch段的真实query长度为Sq_i、真实key/value长度为Skv_i，则该段PSE元素个数为N * Sq_i * Skv_i，整段PSE总长度pseTotalLen为sum_i(N * Sq_i * Skv_i)。
+  - TND场景下，每个batch段内部仍按[N, Sq_i, Skv_i]生成，但存储与传参时统一flatten。若第i个batch段的真实query长度为Sq_i、真实key/value长度为Skv_i，则该段PSE元素个数为N *Sq_i* Skv_i，整段PSE总长度pseTotalLen为sum_i(N *Sq_i* Skv_i)。
   - 如不使用该参数可传入nullptr。
 - innerPrecise：当前0、1为保留配置值，2为开启无效行计算，其功能是避免在计算过程中存在整行mask进而导致精度有损失，但是该配置会导致性能下降。如果算子可判断出存在无效行场景，会自动开启无效行计算，例如sparseMode为3，Sq > Skv场景。
 - sparseMode的约束如下:

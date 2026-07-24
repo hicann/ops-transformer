@@ -86,20 +86,20 @@ void Process() {
     loops = compute_step_this_core(); //计算当前core的循环次数
     // 
     for (i = 0; i < loops; i++) {
-        updateCurrentStepSize(i, stepSize, allTokenSize); 	//刷新当前轮的计算的M轴大小
+        updateCurrentStepSize(i, stepSize, allTokenSize);  //刷新当前轮的计算的M轴大小
   
         if ASCEND_IS_AIC {
       
             MatmulCq(tokenXOffset, weightDqOffset, cqResOffset);
-            CrossCoreSetFlag<0x2, PIPE_FIX>(SYNC_MMCQ_NORMSCQ_FLG);     	//cube与vector同步
+            CrossCoreSetFlag<0x2, PIPE_FIX>(SYNC_MMCQ_NORMSCQ_FLG);      //cube与vector同步
 
             MatmulCkvKr(tokenXOffset, weightDkvKrOffset, ckvKrResOffset);
-            CrossCoreSetFlag<0x2, PIPE_FIX>(SYNC_MMCKVKR_NORMROPE_FLG);	 	//cube与vector同步
+            CrossCoreSetFlag<0x2, PIPE_FIX>(SYNC_MMCKVKR_NORMROPE_FLG);   //cube与vector同步
 
-            CrossCoreWaitFlag(SYNC_MMCQ_NORMSCQ_FLG);                  		// MatmulQcQr依赖RmsNormCq的输出，需要插入CV核间同步
+            CrossCoreWaitFlag(SYNC_MMCQ_NORMSCQ_FLG);                    // MatmulQcQr依赖RmsNormCq的输出，需要插入CV核间同步
       
             MatmulQcQr(weightUqQrOffset, qcQrResOffset);
-            CrossCoreSetFlag<0x2, PIPE_FIX>(SYNC_MMQCQR_ROPEQR_FLG);		//cube与vector同步
+            CrossCoreSetFlag<0x2, PIPE_FIX>(SYNC_MMQCQR_ROPEQR_FLG);  //cube与vector同步
 
 
             // 由于MatmulQn和MatmulQcQr的分核策略不一样，MatmulQn又依赖MatmulQcQr的输出
@@ -115,9 +115,9 @@ void Process() {
       
             GetSinCos(tokenIndex);
 
-      CrossCoreWaitFlag(SYNC_MMCQ_NORMSCQ_FLG);								// wait MatmulCq
+      CrossCoreWaitFlag(SYNC_MMCQ_NORMSCQ_FLG);        // wait MatmulCq
       
-      CrossCoreSetFlag<0x0, PIPE_MTE3>(SYNC_ALL_VECTOR_FLG);				
+      CrossCoreSetFlag<0x0, PIPE_MTE3>(SYNC_ALL_VECTOR_FLG);    
       CrossCoreWaitFlag(SYNC_ALL_VECTOR_FLG);
       
             RmsNormCq(rmsNormCqOffset);
@@ -127,20 +127,20 @@ void Process() {
       CrossCoreSetFlag<0x0, PIPE_MTE3>(SYNC_ALL_VECTOR_FLG);
       CrossCoreWaitFlag(SYNC_ALL_VECTOR_FLG);
 
-      CrossCoreSetFlag<0x2, PIPE_MTE3>(SYNC_MMCQ_NORMSCQ_FLG);				// 保障MatmulQcQr等RmsNormCq
+      CrossCoreSetFlag<0x2, PIPE_MTE3>(SYNC_MMCQ_NORMSCQ_FLG);    // 保障MatmulQcQr等RmsNormCq
 
 
-      CrossCoreWaitFlag(SYNC_MMCKVKR_NORMROPE_FLG);							    // wait MatmulCkvKr
+      CrossCoreWaitFlag(SYNC_MMCKVKR_NORMROPE_FLG);           // wait MatmulCkvKr
 
-      CrossCoreSetFlag<0x0, PIPE_MTE3>(SYNC_ALL_VECTOR_FLG);				
+      CrossCoreSetFlag<0x0, PIPE_MTE3>(SYNC_ALL_VECTOR_FLG);    
       CrossCoreWaitFlag(SYNC_ALL_VECTOR_FLG);
       RmsNormRopeScatterCkvKr(tokenIndex, rmsNormCkvOffset, ropeKrOffset);
 
-      CrossCoreWaitFlag(SYNC_MMQCQR_ROPEQR_FLG);								// wait MatmulQcQr
+      CrossCoreWaitFlag(SYNC_MMQCQR_ROPEQR_FLG);        // wait MatmulQcQr
 
-      CrossCoreSetFlag<0x0, PIPE_MTE3>(SYNC_ALL_VECTOR_FLG);				
+      CrossCoreSetFlag<0x0, PIPE_MTE3>(SYNC_ALL_VECTOR_FLG);    
       CrossCoreWaitFlag(SYNC_ALL_VECTOR_FLG);
-      RopeQr(ropeQrOffset, ropeQrResOffset);				 
+      RopeQr(ropeQrOffset, ropeQrResOffset);     
         }
     }
 }
@@ -419,8 +419,7 @@ PA场景
   - 假设Query中Token/序列长度为S1，cacheIndex中第二维的某个具体数值代表了本轮计算得到的KVCache要更新到KVCache的第几行；如图中的11代表要更新到第11行的位置，该位置位于Block2。
   - 图3 KVCacheScatter操作（PA场景-ND格式）
   ![KVCacheScatter_PA_ND](../../../docs/zh/figures/KVCacheScatter_PA_ND.jpg)
-- KVCache使用NZ格式存储，其更新流程如图4所示。数据分形格式的介绍可以参考官网指南-[数据排布格式
-](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/80RC3alpha003/devguide/opdevg/ascendcopdevg/atlas_ascendc_10_0104.html)。
+- KVCache使用NZ格式存储，其更新流程如图4所示。数据分形格式的介绍可以参考官网指南-[数据排布格式](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/80RC3alpha003/devguide/opdevg/ascendcopdevg/atlas_ascendc_10_0104.html)。
   - 当前按NZ格式存储KVCache时，是将整个Block存储成NZ格式；小块内是以行为主(Row Major)的排布，形状如Z字型；块与块之间是以列为主的排布，形状如N字形。将完整的H(Hidden States)按32B长度的小块进行分块后，在ND格式下连续存储的小块，在NZ格式下需要跳$32B * BlockSize$存储，即需要设置stride为$32B * BlockSize$。
   - 图4 KVCacheScatter操作（PA场景-NZ格式）
   ![PA_NZ](../../../docs/zh/figures/PA_NZ.jpg)

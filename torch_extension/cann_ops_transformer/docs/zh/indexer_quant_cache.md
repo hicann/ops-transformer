@@ -82,7 +82,7 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
         <td>quant_mode</td>
         <td>str</td>
         <td>可选</td>
-        <td>量化模式（字符串，大小写不敏感；PTA 内部经枚举映射为算子侧 int）。默认值<code>"fp8"</code>。可选值与含义：
+        <td>量化模式（字符串，大小写不敏感；TorchNPU内部经枚举映射为算子侧 int）。默认值<code>"fp8"</code>。可选值与含义：
             <ul>
                 <li><code>"mxfp8"</code>(内部 0)：MX-FP8 微缩放量化，x 每 32 个元素一组，输出 FP8(e4m3/e5m2)，每组一个 e8m0(2 的幂指数) scale，cache_scale 为 FLOAT8_E8M0。</li>
                 <li><code>"fp8"</code>(内部 1)：逐 token 动态 FP8 量化，整行（headDim）一组，输出 FP8(e4m3/e5m2)，每行一个 float32 scale（scaleCol=1），cache_scale 为 FLOAT。</li>

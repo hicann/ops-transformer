@@ -439,7 +439,7 @@
     - conv_states必须是3维[..., K-1, dim]，第0维大小不固定且大于等于batch，同时大于等于cache_indices总维度大小。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cu_seq_len范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G]。
+    - cu_seq_len范围[batch, 1024 *1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64* batch, 4G]。
     - batch范围[1, 256]，maxNumBlocks范围[1, 1024]。
     - max_query_len > 8。
   - prefill和decode混合场景：
@@ -448,7 +448,7 @@
     - conv_states必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于batch，同时大于等于cache_indices总维度大小。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cu_seq_len范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G]。
+    - cu_seq_len范围[batch, 1024 *1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64* batch, 4G]。
     - batch范围[1, 256]，maxNumBlocks范围[1, 1024]。
     - max_query_len > 8。
   - decode场景（变长序列）：
