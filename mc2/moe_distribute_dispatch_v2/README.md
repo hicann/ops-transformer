@@ -329,14 +329,14 @@ $$
     * 不支持常量专家场景，不支持`constExpertNum`，使用默认值即可。
 * <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
     * commAlg支持""，"fullmesh_v1"，"fullmesh_v2", "hierarchy"三种输入方式。""：默认值，不开启fullmesh_v2模板；"fullmesh_v1"：不开启fullmesh_v2模板；"fullmesh_v2"：开启fullmesh_v2模板，不支持在各卡`BS`不一致、输入xActiveMask和特殊专家场景下开启；"hierarchy": 开启跨超模板，仅支持共享专家为0的场景，且不支持可变BS、二维mask、特殊专家、performanceInfo场景。
-    * `expertScalesOptional`当`commAlg`="hierarchy"场景时，要求为2D Tensor，shape为(BS, K)；当`commAlg`=""、"fullmesh_v1"、"fullmesh_v2"场景时，可传有效Tensor、空指针或空Tensor，有效Tensor为2D Tensor，shape为(BS, K)，传空指针或空Tensor时`expertScalesOptional`无效。
+    * `expertScalesOptional`当`commAlg`="hierarchy"场景时，要求为2D Tensor，shape为(BS, K)；当`commAlg`=""、"fullmesh_v1"、"fullmesh_v2"场景时，可传有效Tensor或空指针，有效Tensor为2D Tensor，shape为(BS, K)，传空指针时`expertScalesOptional`无效，不支持空Tensor。
     * epWorldSize取值范围[2, 768]；当commAlg="hierarchy"场景时，取值范围为[16, 256]，且为16的整数倍。
     * moeExpertNum取值范围(0, 1024]；当commAlg="hierarchy"场景时，取值范围为(0, 512]。
-    * `expandScalesOut`当`commAlg`="hierarchy"场景时，要求为1D Tensor，shape为(A,)；当`commAlg`=""、"fullmesh_v1"、"fullmesh_v2"场景时支持该输出，`expertScalesOptional`传空指针或空Tensor时该输出无效。
+    * `expandScalesOut`当`commAlg`="hierarchy"场景时，要求为1D Tensor，shape为(A,)；当`commAlg`=""、"fullmesh_v1"、"fullmesh_v2"场景时支持该输出，`expertScalesOptional`传空指针时该输出无效。
 * <term>Ascend 950DT</term>：
     * 仅支持EP域，无TP域，不支持`groupTp`、`tpWorldSize`、`tpRankId`属性，且`tpRecvCounts`输出无有效内容。
-    * `expertScalesOptional`可传有效Tensor、空指针或空Tensor，有效Tensor为2D Tensor，shape为(BS, K)，传空指针或空Tensor时`expertScalesOptional`无效。
-    * 支持`expandScalesOut`输出，`expertScalesOptional`传空指针或空Tensor时该输出无效。
+    * `expertScalesOptional`可传有效Tensor或空指针，有效Tensor为2D Tensor，shape为(BS, K)，传空指针时`expertScalesOptional`无效，不支持空Tensor。
+    * 支持`expandScalesOut`输出，`expertScalesOptional`传空指针时该输出无效。
 
 ## 约束说明
 

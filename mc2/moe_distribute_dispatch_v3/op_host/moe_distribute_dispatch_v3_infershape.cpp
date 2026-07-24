@@ -72,19 +72,6 @@ static constexpr uint32_t VERSION_SIZE = 32;
 const std::set<std::string> PLATFORM_A2 = {"Ascend910B"};
 const std::set<std::string> NPUARCH_A5 = {std::to_string(static_cast<uint32_t>(NpuArch::DAV_3510))};
 
-static bool IsPresentTensorShape(const gert::Shape *shape)
-{
-    if (shape == nullptr) {
-        return false;
-    }
-    for (size_t i = 0; i < shape->GetDimNum(); ++i) {
-        if (shape->GetDim(i) == 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
 static bool IsTargetSocVersionInfershape(const char *nodeName, const std::set<std::string> &targetPlatform)
 {
     char versionValVersion[VERSION_SIZE];
@@ -160,7 +147,7 @@ static ge::graphStatus InferShapeMoeDistributeDispatchV3(gert::InferShapeContext
     OPS_CHECK_NULL_WITH_CONTEXT(context, expertIdsShape);
     const gert::Shape *scalesShape = context->GetOptionalInputShape(DISPATCH_INPUT_SCALES_IDX_INDEX);
     const gert::Shape *expertScalesShape = context->GetOptionalInputShape(DISPATCH_INPUT_EXPERT_SCALES_IDX_INDEX);
-    bool hasExpertScales = IsPresentTensorShape(expertScalesShape);
+    bool hasExpertScales = (expertScalesShape != nullptr);
     const gert::Shape *elasticInfoShape = context->GetOptionalInputShape(DISPATCH_INPUT_ELASTIC_INFO_IDX_INDEX);
 
     gert::Shape *expandXShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_X_INDEX);

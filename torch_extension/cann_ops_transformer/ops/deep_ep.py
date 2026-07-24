@@ -460,7 +460,9 @@ class MoeDistributeBuffer:
             "Ascend910B": "kfc",
             "Ascend910_93": "kfc",
             "Ascend950": "channel"
-        })
+        },
+        customCclBufferSize=ccl_buffer_size,
+        )
         self.context = self._ctx_manager.create_context()
         self.ccl_buffer_size = self._ctx_manager.ccl_buffer_size
 
