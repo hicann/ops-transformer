@@ -70,7 +70,7 @@ struct Mc2Msg {               // 同aicpu_hccl_def KFCTilingData
     uint16_t notifyBeginCnt; // notift write value的使用个数
     uint16_t notifyEndCnt;   // notift write value的使用个数
     uint8_t useBufferType;   // recvBuf类型
-    uint8_t funID;           // funtion ID
+    uint8_t funID;           // function ID
     uint8_t dataType;        // hccl 数据类型
     uint8_t groupNum;        // groupNum
 
