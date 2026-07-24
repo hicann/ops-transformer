@@ -50,7 +50,6 @@ constexpr uint32_t ZERO_UINT = 0;
 constexpr float ONE = 1;
 constexpr int32_t SECOND_LOOP = 2;
 constexpr int32_t HALf_INTERVAL = 2;
-constexpr int32_t MAX_REAPEAT = 255;
 constexpr int32_t DIM_NUM = 2;
 constexpr int32_t NDDMA_DIM = 5;
 
