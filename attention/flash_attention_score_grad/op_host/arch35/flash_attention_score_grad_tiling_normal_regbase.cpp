@@ -2486,7 +2486,8 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
         (fBaseParams.queryType == ge::DT_BF16 && fBaseParams.outDtype == DtypeEnum::BFLOAT16);
     if (!isSupportedDtype || !isSameOutputDtype || fBaseParams.splitAxis != SplitAxisEnum::BN2 ||
         fBaseParams.n1 != fBaseParams.n2 || fBaseParams.g != 1 || fBaseParams.d != fBaseParams.d1 ||
-        (fBaseParams.d != 64 && fBaseParams.d != 128) || fBaseParams.s1 > 128 || fBaseParams.s2 > 128 ||
+        fBaseParams.d <= 0 || fBaseParams.d >= static_cast<int64_t>(ConstAxisTemplateNum::NUM128) ||
+        fBaseParams.s1 > 128 || fBaseParams.s2 > 128 ||
         fBaseParams.s1Outer != 1 || fBaseParams.s2Outer != 1) {
         return false;
     }

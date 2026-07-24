@@ -36,7 +36,7 @@ namespace FagBaseApi {
 // - SMALL_SD_SLOT_REUSE_READY_FLAG: DK UB writeback completed, the two-slot buffer is reusable.
 // - SMALL_SD_CUBE_OUTPUT_COMMIT_FLAG: Cube-side DV Fixpipe output has been drained before Process returns.
 // SmallSD is entered only by the arch35 regbase key with:
-// FP16/BF16, BN2, G=1, N1=N2, D==Dv, 0<S1/S2<128, 0<D<=128,
+// FP16/BF16, BN2, G=1, N1=N2, D==Dv, 0<S1/S2<128, 0<D<128,
 // no optional feature, no deterministic path, no NZ output, and no swizzle/remap.
 // L0A/L0B double buffering is owned by SmallSDCubeBlock; this class trims scalar-heavy scheduling,
 // validity search, and generic offset helpers from the SmallSD runtime path.

@@ -1662,9 +1662,8 @@ bool IsSmallSDEligible(const FuzzyBaseInfoParamsRegbase& fBaseParams, const TndB
                                    fBaseParams.attenMaskOptional == EMPTY_TENSOR && !fBaseParams.dropMaskOuter &&
                                    fBaseParams.sinkOptional != NORMAL_TENSOR && !fBaseParams.hasRope;
     const bool fixedOwnership = fBaseParams.n1 == fBaseParams.n2 && fBaseParams.g == 1 &&
-                                fBaseParams.d == fBaseParams.d1 &&
-                                (fBaseParams.d == static_cast<int64_t>(ConstAxisTemplateNum::NUM64) ||
-                                 fBaseParams.d == static_cast<int64_t>(ConstAxisTemplateNum::NUM128));
+                                fBaseParams.d == fBaseParams.d1 && fBaseParams.d > 0 &&
+                                fBaseParams.d < static_cast<int64_t>(ConstAxisTemplateNum::NUM128);
     const bool noRemap = fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::NO_MASK) &&
                          !fBaseParams.isDeterministic && fBaseParams.tailZeroCount == 0;
     const bool singleSTile = fBaseParams.s1Outer == 1 && fBaseParams.s2Outer == 1;
