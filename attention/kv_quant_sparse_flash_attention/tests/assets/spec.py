@@ -35,11 +35,11 @@ class KvQuantSparseFlashAttentionSpec:
     golden = golden_module.cpu_kv_quant_sparse_flash_attention
     customize_inputs = inputs_module.generate_kv_quant_inputs
     tolerance = {
-        "float16": {"standard": "IsClose", "rtol": 0.001, "ptol": 0.005, "atol": 0.02},
-        "bfloat16": {"standard": "IsClose", "rtol": 0.001, "ptol": 0.005, "atol": 0.02},
+        "float16": {"standard": "stat_rel_err"},
+        "bfloat16": {"standard": "stat_rel_err"},
     }
 
 
 __spec__ = {
-    "torch_npu.npu_kv_quant_sparse_flash_attention": KvQuantSparseFlashAttentionSpec,
+    "torch_npu.npu_kv_quant_sparse_flash_attention": "KvQuantSparseFlashAttentionSpec",
 }

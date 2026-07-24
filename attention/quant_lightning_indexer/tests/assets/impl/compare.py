@@ -14,10 +14,8 @@
 
 import numpy as np
 
-# Keep thresholds aligned with the proven TTK v2 TopKIndicesComparison policy.
-_TOPK_REL_TOL = 0.01
-_TOPK_ABS_TOL = 0.001
-_TOPK_FAIL_RATIO = 0.002
+# Match the pytest boundary-score policy for non-identical TopK index sets.
+_TOPK_REL_TOL = 0.0001
 _VALUE_RTOL = 0.005
 _VALUE_ATOL = 0.000025
 _VALUE_FAIL_RATIO = 0.05
@@ -49,8 +47,7 @@ def score_relative_diff(score, boundary):
 
 
 def is_score_close_to_boundary(score, boundary):
-    score_diff = abs(float(score) - float(boundary))
-    return score_diff <= _TOPK_ABS_TOL or score_relative_diff(score, boundary) <= _TOPK_REL_TOL
+    return score_relative_diff(score, boundary) <= _TOPK_REL_TOL
 
 
 def row_score_diff_to_boundary(output_indices, golden_indices, score_row):
@@ -152,7 +149,7 @@ def topk_index_compare(npu_out, golden_out, scores):
 
     precision = (golden.size - len(diff_indices)) / golden.size * 100
     fail_ratio = len(diff_indices) / golden.size
-    passed = failed_rows == 0 or fail_ratio <= _TOPK_FAIL_RATIO
+    passed = failed_rows == 0
     error_info = None
     if failed_rows:
         verdict = "tolerated" if passed else "failed"
@@ -174,8 +171,6 @@ def topk_index_compare(npu_out, golden_out, scores):
             "diff_positions": len(diff_indices),
             "fail_ratio": fail_ratio,
             "topk_rel_tol": _TOPK_REL_TOL,
-            "topk_abs_tol": _TOPK_ABS_TOL,
-            "topk_fail_ratio": _TOPK_FAIL_RATIO,
             "max_failed_abs_score_diff": max_failed_abs_diff,
             "max_failed_rel_score_diff": max_failed_rel_diff,
         },

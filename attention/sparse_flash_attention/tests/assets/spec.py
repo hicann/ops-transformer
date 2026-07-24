@@ -35,11 +35,11 @@ class SparseFlashAttentionSpec:
     golden = golden_module.cpu_sparse_flash_attention
     customize_inputs = inputs_module.generate_valid_sparse_indices
     tolerance = {
-        "float16": {"standard": "IsClose", "rtol": 0.005, "ptol": 0.005, "atol": 0.000025},
-        "bfloat16": {"standard": "IsClose", "rtol": 0.0078125, "ptol": 0.005, "atol": 0.0001},
+        "float16": {"standard": "stat_rel_err"},
+        "bfloat16": {"standard": "stat_rel_err"},
     }
 
 
 __spec__ = {
-    "torch_npu.npu_sparse_flash_attention": SparseFlashAttentionSpec,
+    "torch_npu.npu_sparse_flash_attention": "SparseFlashAttentionSpec",
 }
