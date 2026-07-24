@@ -31,13 +31,14 @@ using namespace AscendC;
 using namespace MegaMoeImpl;
 #endif
 
-template<uint8_t DispatchQuantMode, uint8_t DispatchQuantOutType, uint8_t CombineQuantOutType, uint8_t CommModeType>
-__global__ __aicore__ void mega_moe(
-    GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1, GM_ADDR weight2,
-    GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR bias1, GM_ADDR bias2, GM_ADDR xActiveMask,
-    GM_ADDR scales, GM_ADDR sharedWeight1, GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1,
-    GM_ADDR sharedWeightScales2, GM_ADDR sharedBias1, GM_ADDR sharedBias2, GM_ADDR yOut,
-    GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, GM_ADDR tilingGM)
+template <uint8_t DispatchQuantMode, uint8_t DispatchQuantOutType, uint8_t CombineQuantOutType, uint8_t CommModeType,
+          bool TopkWeightsPrefetch>
+__global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1,
+                                    GM_ADDR weight2, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR bias1,
+                                    GM_ADDR bias2, GM_ADDR xActiveMask, GM_ADDR scales, GM_ADDR sharedWeight1,
+                                    GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2,
+                                    GM_ADDR sharedBias1, GM_ADDR sharedBias2, GM_ADDR yOut, GM_ADDR expertTokenNumsOut,
+                                    GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     InitSocState();
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
@@ -50,19 +51,22 @@ __global__ __aicore__ void mega_moe(
     defined(ORIG_DTYPE_WEIGHT2) && (ORIG_DTYPE_WEIGHT2 == ORIG_DTYPE_WEIGHT1)
     if constexpr (CommModeType == TILINGKEY_TPL_MTE) {
         if constexpr (DispatchQuantMode == DISPATCH_QUANT_MODE_MXFP) {
-            MegaMoe<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType, CombineQuantOutType> op;
+            MegaMoe<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType, CombineQuantOutType,
+                    TopkWeightsPrefetch>
+                op;
             op.Init(context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2,
-                    scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2,
-                    yOut, expertTokenNumsOut, workspaceGM, &tilingData);
+                    scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
+                    expertTokenNumsOut, workspaceGM, &tilingData);
             op.Process();
         }
     } else if constexpr (CommModeType == TILINGKEY_TPL_URMA) {
         if constexpr (DispatchQuantMode == DISPATCH_QUANT_MODE_MXFP) {
             MegaMoeLayered<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType,
-                           CombineQuantOutType> op;
+                           CombineQuantOutType>
+                op;
             op.Init(context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2,
-                    scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2,
-                    yOut, expertTokenNumsOut, workspaceGM, &tilingData);
+                    scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
+                    expertTokenNumsOut, workspaceGM, &tilingData);
             op.Process();
         }
     }

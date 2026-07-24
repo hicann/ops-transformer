@@ -30,7 +30,7 @@
 using namespace AscendC;
 
 namespace MegaMoeCombineImpl {
-constexpr uint32_t COMBINE_SEND_ADDR = 140 * 1024U; // triple tensor 在 UB 中的起始地址
+constexpr uint32_t COMBINE_SEND_ADDR = 140 * 1024U; // metaInfo tensor 在 UB 中的起始地址
 constexpr uint32_t rankIdIndex = 0;
 constexpr uint32_t tokenIdxIndex = 1;
 constexpr uint32_t topkIdxIndex = 2;
@@ -40,7 +40,7 @@ constexpr uint32_t tokenActualLenIndex = 5;
 constexpr uint32_t flagIndex = 7;
 
 template <typename ElementMMadOut2, typename BlockShape>
-__aicore__ inline void CombineTokens(uint32_t mLoc, uint32_t nLoc, uint32_t n, LocalTensor<int32_t> &tripleTensor,
+__aicore__ inline void CombineTokens(uint32_t mLoc, uint32_t nLoc, uint32_t n, LocalTensor<int32_t> &metaInfoTensor,
                                      LocalTensor<ElementMMadOut2> &l0cOutUbGMM2, BlockShape &actualBlockShape,
                                      const Params &params)
 {
@@ -53,9 +53,9 @@ __aicore__ inline void CombineTokens(uint32_t mLoc, uint32_t nLoc, uint32_t n, L
     AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(0);
     AscendC::WaitFlag<AscendC::HardEvent::MTE2_S>(0);
     for (int32_t tileIdx = 0; tileIdx < lenTile; ++tileIdx) {
-        uint32_t toRankId = tripleTensor.GetValue(tileIdx * 8);
-        uint32_t tokenIdx = tripleTensor.GetValue(tileIdx * 8 + 1);
-        uint32_t topkIdx = tripleTensor.GetValue(tileIdx * 8 + 2);
+        uint32_t toRankId = metaInfoTensor.GetValue(tileIdx * 8);
+        uint32_t tokenIdx = metaInfoTensor.GetValue(tileIdx * 8 + 1);
+        uint32_t topkIdx = metaInfoTensor.GetValue(tileIdx * 8 + 2);
         gmRemoteD.SetGlobalBuffer(
             reinterpret_cast<__gm__ ElementMMadOut2 *>(GetRankWinAddrWithOffset(toRankId, gmRemoteBaseOffset)));
         uint64_t gmDstOffset = (static_cast<uint64_t>(tokenIdx) * params.tilingData->topK + topkIdx) * n + nLoc;
@@ -66,7 +66,7 @@ __aicore__ inline void CombineTokens(uint32_t mLoc, uint32_t nLoc, uint32_t n, L
 
 template <typename ElementMMadOut2, typename BlockShape>
 __aicore__ inline void
-CombineTokensLayered(uint32_t mLoc, uint32_t nLoc, uint32_t n, LocalTensor<int32_t> &tripleTensor,
+CombineTokensLayered(uint32_t mLoc, uint32_t nLoc, uint32_t n, LocalTensor<int32_t> &metaInfoTensor,
                      LocalTensor<ElementMMadOut2> &l0cOutUbGMM2, BlockShape &actualBlockShape, const Params &params)
 {
     int32_t lenTile = Get<M_VALUE>(actualBlockShape);
@@ -77,10 +77,10 @@ CombineTokensLayered(uint32_t mLoc, uint32_t nLoc, uint32_t n, LocalTensor<int32
     uint32_t maxDataSizePerToken =
         Ops::Base::CeilDiv(static_cast<int64_t>(params.tilingData->h), (int64_t)MegaMoeImpl::L1_TILE_N) *
         (ALIGN_32 + maxDataLengthPerBlock);
-    LocalTensor<int32_t> tripleTempTensor =
+    LocalTensor<int32_t> metaInfoTempTensor =
         LocalTensor<int32_t>(TPosition::VECCALC, COMBINE_SEND_ADDR, ALIGN_32 / sizeof(int32_t));
     AscendC::GlobalTensor<ElementMMadOut2> gmLocalD;
-    AscendC::GlobalTensor<int32_t> gmLocalDTriple;
+    AscendC::GlobalTensor<int32_t> gmLocalDMetaInfo;
     AscendC::DataCopyExtParams ub2GmParams{1, 0, 0, 0, 0};
     ub2GmParams.blockCount = 1;
     ub2GmParams.blockLen = actualDataLength;
@@ -88,9 +88,9 @@ CombineTokensLayered(uint32_t mLoc, uint32_t nLoc, uint32_t n, LocalTensor<int32
     AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(0);
     AscendC::WaitFlag<AscendC::HardEvent::MTE2_S>(0);
     for (int32_t tileIdx = 0; tileIdx < lenTile; ++tileIdx) {
-        uint32_t toRankId = tripleTensor.GetValue(tileIdx * 8);
-        uint32_t tokenIdx = tripleTensor.GetValue(tileIdx * 8 + 1);
-        uint32_t topkIdx = tripleTensor.GetValue(tileIdx * 8 + 2);
+        uint32_t toRankId = metaInfoTensor.GetValue(tileIdx * 8);
+        uint32_t tokenIdx = metaInfoTensor.GetValue(tileIdx * 8 + 1);
+        uint32_t topkIdx = metaInfoTensor.GetValue(tileIdx * 8 + 2);
         if (toRankId == params.combineCommParams.rankId) {
             uint64_t gmDstOffset = (tokenIdx * params.tilingData->topK + topkIdx) * n + nLoc;
             GM_ADDR localAddr = (GM_ADDR)(params.peermemInfo.combineSendPtr + gmDstOffset * sizeof(ElementMMadOut2));
@@ -98,13 +98,13 @@ CombineTokensLayered(uint32_t mLoc, uint32_t nLoc, uint32_t n, LocalTensor<int32
             AscendC::DataCopyPad(gmLocalD, l0cOutUbGMM2[tileIdx * Get<N_VALUE>(actualBlockShape)], ub2GmParams);
             continue;
         }
-        tripleTempTensor.SetValue(rankIdIndex, toRankId);
-        tripleTempTensor.SetValue(tokenIdxIndex, tokenIdx);
-        tripleTempTensor.SetValue(topkIdxIndex, topkIdx);
-        tripleTempTensor.SetValue(blockLenIndex, nLoc);
-        tripleTempTensor.SetValue(tokenLenIndex, n);
-        tripleTempTensor.SetValue(tokenActualLenIndex, actualDataLength);
-        tripleTempTensor.SetValue(flagIndex, 1); // 标记为已处理
+        metaInfoTempTensor.SetValue(rankIdIndex, toRankId);
+        metaInfoTempTensor.SetValue(tokenIdxIndex, tokenIdx);
+        metaInfoTempTensor.SetValue(topkIdxIndex, topkIdx);
+        metaInfoTempTensor.SetValue(blockLenIndex, nLoc);
+        metaInfoTempTensor.SetValue(tokenLenIndex, n);
+        metaInfoTempTensor.SetValue(tokenActualLenIndex, actualDataLength);
+        metaInfoTempTensor.SetValue(flagIndex, 1); // 标记为已处理
         __gm__ int32_t *notifyAddr =
             (__gm__ int32_t *)(params.workspaceInfo.combineCommNotifyPtr + toRankId * sizeof(int32_t));
         GM_ADDR dataAddr = params.workspaceInfo.combineCommDataPtr + static_cast<uint64_t>(toRankId) *
@@ -119,9 +119,9 @@ CombineTokensLayered(uint32_t mLoc, uint32_t nLoc, uint32_t n, LocalTensor<int32
         AscendC::DataCopyPad(gmLocalD, l0cOutUbGMM2[tileIdx * Get<N_VALUE>(actualBlockShape)], ub2GmParams);
         AscendC::PipeBarrier<PIPE_MTE3>();
         // 三元组区: 紧跟数据之后
-        gmLocalDTriple.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(
+        gmLocalDMetaInfo.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(
             dataAddr + cnt * (maxDataLengthPerBlock + ALIGN_32) + maxDataLengthPerBlock));
-        AscendC::DataCopy(gmLocalDTriple, tripleTempTensor, ALIGN_32 / sizeof(int32_t));
+        AscendC::DataCopy(gmLocalDMetaInfo, metaInfoTempTensor, ALIGN_32 / sizeof(int32_t));
         AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(0);
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(0);
     }
@@ -168,7 +168,7 @@ ComputeRecvTokenCounts(uint32_t startRankId, uint32_t endRankId, uint32_t rankId
 }
 
 // =============================================
-// PollNotifyAndSendData: 轮询 notify 计数, 读取 triple 并 URMA 发送数据
+// PollNotifyAndSendData: 轮询 notify 计数, 读取 metaInfo 并 URMA 发送数据
 // initialCompletedRank: Phase 1 已完成的 rank 数 (本卡 + 0-token)
 // =============================================
 template <typename ElementMMadOut2>
@@ -179,7 +179,7 @@ PollNotifyAndSendData(uint32_t startRankId, uint32_t initialCompletedRank, uint3
 {
     uint32_t completedRank = initialCompletedRank;
     uint32_t rankIndex = 0;
-    AscendC::GlobalTensor<int32_t> gmLocalDTriple;
+    AscendC::GlobalTensor<int32_t> gmLocalDMetaInfo;
     uint64_t gmRemoteBaseOffset = params.peermemInfo.combineSendPtr - params.peermemInfo.rankSyncInWorldPtr;
 
     while (completedRank < processRankNum) {
@@ -202,8 +202,8 @@ PollNotifyAndSendData(uint32_t startRankId, uint32_t initialCompletedRank, uint3
                                    static_cast<uint64_t>(rankIndex + startRankId) * maxDataSizePerToken *
                                        params.tilingData->bs * params.tilingData->expertPerRank +
                                    slotIdx * (maxDataLengthPerBlock + ALIGN_32);
-                gmLocalDTriple.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(dataAddr + maxDataLengthPerBlock));
-                AscendC::DataCopy(sendTensor, gmLocalDTriple, 8);
+                gmLocalDMetaInfo.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(dataAddr + maxDataLengthPerBlock));
+                AscendC::DataCopy(sendTensor, gmLocalDMetaInfo, 8);
                 SyncFuncStatic<AscendC::HardEvent::MTE2_S, SYNC_EVENT_ID2>();
                 if (sendTensor.GetValue(flagIndex) == 1) {
                     uint32_t toRankId = sendTensor.GetValue(rankIdIndex);
@@ -220,7 +220,7 @@ PollNotifyAndSendData(uint32_t startRankId, uint32_t initialCompletedRank, uint3
                     // 标记已处理, 避免重复发送
                     sendTensor.SetValue(flagIndex, 0);
                     SyncFuncStatic<AscendC::HardEvent::S_MTE3, SYNC_EVENT_ID2>();
-                    AscendC::DataCopy(gmLocalDTriple, sendTensor, 8);
+                    AscendC::DataCopy(gmLocalDMetaInfo, sendTensor, 8);
                     SyncFuncStatic<AscendC::HardEvent::MTE3_MTE2, SYNC_EVENT_ID2>();
                     needCnt--;
                 }
@@ -418,13 +418,13 @@ __aicore__ inline void DeQuantMxFp8(LocalTensor<XType> &inLocal, LocalTensor<flo
 // =============================================
 template <typename QuantOutType>
 __aicore__ inline void CombineQuantizedTokens(uint32_t batchStart, uint32_t curRows, uint32_t n, uint32_t nScale,
-                                              uint32_t groupIdx, uint32_t rankId, LocalTensor<int32_t> &tripleTensor,
+                                              uint32_t groupIdx, uint32_t rankId, LocalTensor<int32_t> &metaInfoTensor,
                                               LocalTensor<QuantOutType> &ubQuant, const Params &params)
 {
     int64_t quantTokenSize = n + nScale;
-    uint32_t toRankId = tripleTensor.GetValue(batchStart * TRIPLE_SIZE + RANK_ID);
-    uint32_t tokenIdx = tripleTensor.GetValue(batchStart * TRIPLE_SIZE + TOKEN_ID);
-    uint32_t topkIdx = tripleTensor.GetValue(batchStart * TRIPLE_SIZE + TOPK_INDEX);
+    uint32_t toRankId = metaInfoTensor.GetValue(batchStart * META_INFO_SIZE + RANK_ID);
+    uint32_t tokenIdx = metaInfoTensor.GetValue(batchStart * META_INFO_SIZE + TOKEN_ID);
+    uint32_t topkIdx = metaInfoTensor.GetValue(batchStart * META_INFO_SIZE + TOPK_INDEX);
 
     AscendC::GlobalTensor<QuantOutType> gmRemoteD;
     uint64_t gmRemoteOffset = params.peermemInfo.combineSendPtr - params.peermemInfo.rankSyncInWorldPtr;
@@ -443,7 +443,7 @@ __aicore__ inline void CombineQuantizedTokens(uint32_t batchStart, uint32_t curR
 template <uint8_t QuantMode, typename T>
 __aicore__ inline void CombineTokenGroup(uint32_t tokenStart, uint32_t tokenCount, uint32_t n, uint32_t groupIdx,
                                          uint32_t rankId, GM_ADDR gmm2OutAddr, const Params &params,
-                                         LocalTensor<int32_t> &tripleTensor, int64_t ubTensorSize, int64_t offset,
+                                         LocalTensor<int32_t> &metaInfoTensor, int64_t ubTensorSize, int64_t offset,
                                          uint32_t quantTokenSizeBytes)
 {
     LocalTensor<T> combineUbTensor(TPosition::VECIN, offset, ubTensorSize);
@@ -479,7 +479,7 @@ __aicore__ inline void CombineTokenGroup(uint32_t tokenStart, uint32_t tokenCoun
 
         // MTE3: send to GM
         LocalTensor<Fp8Type> ubQuantDataFp8 = ubQuantData.template ReinterpretCast<Fp8Type>();
-        CombineQuantizedTokens<Fp8Type>(i, 1, n, nScale, groupIdx, rankId, tripleTensor, ubQuantDataFp8, params);
+        CombineQuantizedTokens<Fp8Type>(i, 1, n, nScale, groupIdx, rankId, metaInfoTensor, ubQuantDataFp8, params);
     }
 
     // Wait for all MTE3 operations to complete

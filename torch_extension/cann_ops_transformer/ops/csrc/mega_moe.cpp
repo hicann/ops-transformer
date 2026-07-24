@@ -19,22 +19,19 @@ const int DIM_TWO = 2;
 std::tuple<at::Tensor, at::Tensor>
 NpuMegaMoe(const at::Tensor &context, const at::Tensor &x, const at::Tensor &topkIds, const at::Tensor &topkWeights,
            const std::vector<at::Tensor> &weight1, const std::vector<at::Tensor> &weight2, int64_t moeExpertNum,
-           int64_t epWorldSize, int64_t cclBufferSize,
-           const c10::optional<std::vector<at::Tensor>> &weightScales1,
+           int64_t epWorldSize, int64_t cclBufferSize, const c10::optional<std::vector<at::Tensor>> &weightScales1,
            const c10::optional<std::vector<at::Tensor>> &weightScales2,
            const c10::optional<std::vector<at::Tensor>> &bias1, const c10::optional<std::vector<at::Tensor>> &bias2,
-           const c10::optional<at::Tensor> &xActiveMask,
-           const c10::optional<std::vector<at::Tensor>> &sharedWeight1,
+           const c10::optional<at::Tensor> &xActiveMask, const c10::optional<std::vector<at::Tensor>> &sharedWeight1,
            const c10::optional<std::vector<at::Tensor>> &sharedWeight2,
            const c10::optional<std::vector<at::Tensor>> &sharedWeightScales1,
            const c10::optional<std::vector<at::Tensor>> &sharedWeightScales2,
            const c10::optional<std::vector<at::Tensor>> &sharedBias1,
-           const c10::optional<std::vector<at::Tensor>> &sharedBias2,
-           int64_t maxRecvTokenNum, int64_t dispatchQuantMode,
-           int64_t combineQuantMode, std::string commAlg, int64_t numMaxTokensPerRank, std::string activation,
-           c10::optional<float> activationClamp, c10::optional<int64_t> dispatchQuantOutDtype,
+           const c10::optional<std::vector<at::Tensor>> &sharedBias2, int64_t maxRecvTokenNum,
+           int64_t dispatchQuantMode, int64_t combineQuantMode, std::string commAlg, int64_t numMaxTokensPerRank,
+           std::string activation, c10::optional<float> activationClamp, c10::optional<int64_t> dispatchQuantOutDtype,
            c10::optional<int64_t> weight1Type, c10::optional<int64_t> weight2Type, c10::optional<int64_t> topoType,
-           c10::optional<int64_t> rankNumPerServer)
+           c10::optional<int64_t> rankNumPerServer, int64_t topkWeightsType)
 {
     TORCH_CHECK((epWorldSize > 0), "The ep_world_sizes should be greater than 0, current is: ", epWorldSize);
     TORCH_CHECK((x.dim() == DIM_TWO) && (topkIds.dim() == DIM_TWO), "The x and topk_ids should be 2D");
@@ -128,13 +125,11 @@ NpuMegaMoe(const at::Tensor &context, const at::Tensor &x, const at::Tensor &top
     TensorListWrapper sharedBias2Wrapper = {sharedBias2Ref, aclDataType::ACL_FLOAT};
 
     ACLNN_CMD(aclnnMegaMoe, context, x, topkIds, topkWeights, weight1Wrapper, weight2Wrapper, weightScales1Wrapper,
-              weightScales2Wrapper, bias1Wrapper, bias2Wrapper, xActiveMask,
-              sharedWeight1Wrapper, sharedWeight2Wrapper, sharedWeightScales1Wrapper,
-              sharedWeightScales2Wrapper, sharedBias1Wrapper, sharedBias2Wrapper,
-              moeExpertNum, epWorldSize, cclBufferSize,
-              maxRecvTokenNum, dispatchQuantMode, dispatchQuantResultType, combineQuantMode, commAlgPtr,
-              numMaxTokensPerRank, activationPtr, activationClampValue, topoTypeValue, rankNumPerServerValue, y,
-              expertTokenNums);
+              weightScales2Wrapper, bias1Wrapper, bias2Wrapper, xActiveMask, sharedWeight1Wrapper, sharedWeight2Wrapper,
+              sharedWeightScales1Wrapper, sharedWeightScales2Wrapper, sharedBias1Wrapper, sharedBias2Wrapper,
+              moeExpertNum, epWorldSize, cclBufferSize, maxRecvTokenNum, dispatchQuantMode, dispatchQuantResultType,
+              combineQuantMode, commAlgPtr, numMaxTokensPerRank, activationPtr, activationClampValue, topoTypeValue,
+              rankNumPerServerValue, topkWeightsType, y, expertTokenNums);
 
     return std::tie(y, expertTokenNums);
 }
@@ -211,7 +206,7 @@ int64_t CalcLeastCclBufferSizeA3(int64_t h, int64_t epWorldSize, bool isQuantRou
 
 // A5 half-buffer minimum size (MB). Ported 1:1 from the original Python implementation.
 int64_t CalcHalfBufferSizeMBA5(int64_t epWorldSize, int64_t moeExpertNum, int64_t numMaxTokensPerRank, int64_t numTopk,
-                               int64_t hidden)
+                               int64_t hidden, int64_t topkWeightsType)
 {
     int64_t expertPerRank = moeExpertNum / epWorldSize;
 
@@ -228,6 +223,10 @@ int64_t CalcHalfBufferSizeMBA5(int64_t epWorldSize, int64_t moeExpertNum, int64_
     int64_t mxScaleNum = (hidden + 31) / 32;
     int64_t dataBytes = CeilAlign(hidden, 256);
     int64_t tokenBytes = CeilAlign(dataBytes + mxScaleNum, 32);
+    if (topkWeightsType == 1) {
+        int64_t weightBytes = CeilAlign(numTopk * static_cast<int64_t>(sizeof(float)), 32);
+        tokenBytes = CeilAlign(tokenBytes + weightBytes, 32);
+    }
     int64_t quantTokenScaleSize = CeilAlign(numMaxTokensPerRank * tokenBytes, 512);
 
     // combine_send_size
@@ -242,7 +241,7 @@ int64_t CalcHalfBufferSizeMBA5(int64_t epWorldSize, int64_t moeExpertNum, int64_
 int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64_t numMaxTokensPerRank, int64_t numTopk,
                                 int64_t hidden, int64_t maxRecvTokenNum, int64_t dispatchQuantMode,
                                 c10::optional<int64_t> dispatchQuantOutDtype, int64_t combineQuantMode,
-                                std::string commAlg)
+                                std::string commAlg, int64_t topkWeightsType)
 {
     const char *socName = aclrtGetSocName();
     bool isA2 = (socName != nullptr && std::strstr(socName, "Ascend910B") != nullptr);
@@ -282,7 +281,7 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
                 moeExpertNum);
     TORCH_CHECK(numTopk >= 1 && numTopk <= 32, "num_topk only support in [1, 32], but got ", numTopk);
 
-    return CalcHalfBufferSizeMBA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden);
+    return CalcHalfBufferSizeMBA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, topkWeightsType);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)

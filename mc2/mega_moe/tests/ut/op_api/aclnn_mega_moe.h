@@ -61,6 +61,8 @@ extern "C" {
  * 计算可选输入，int。每个Rank最大可接收Token数，默认值为0表示所有卡的token数相同且为当前bs（x的dim0）。
  * @param [in] activation: 计算可选输入，str。激活函数类型，支持"swiglu"、"gelu"、"silu"、"relu"等，默认值为"swiglu"。
  * @param [in] activationClamp: 计算可选输入，float。激活函数截断值，默认值为float最大值。
+ * @param [in] topoType: 计算可选输入，int。通信拓扑类型，默认值为0。
+ * @param [in] topkWeightsType: 计算可选输入，int。权重前移模式，0=不开启（默认），1=开启权重前移。
  * @param [out] yOut: 计算输出，Tensor，必选输出，数据类型bfloat16，仅支持2维，数据格式支持ND。
  *                    计算输出结果，与输入x shape相同。
  * @param [out] expertTokenNumsOut: 计算输出，Tensor，必选输出，数据类型int32，仅支持1维，数据格式支持ND。
@@ -80,8 +82,8 @@ ACLNN_API aclnnStatus aclnnMegaMoeGetWorkspaceSize(
     const aclTensorList *sharedBias2Optional, int64_t moeExpertNum, int64_t epWorldSize, int64_t cclBufferSize,
     int64_t maxRecvTokenNum, int64_t dispatchQuantMode, int64_t dispatchQuantOutDtype, int64_t combineQuantMode,
     const char *commAlg, int64_t numMaxTokensPerRank, const char *activation, float activationClamp, int64_t topoType,
-    int64_t rankNumPerServer, aclTensor *yOut, aclTensor *expertTokenNumsOut, uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    int64_t rankNumPerServer, int64_t topkWeightsType, aclTensor *yOut, aclTensor *expertTokenNumsOut,
+    uint64_t *workspaceSize, aclOpExecutor **executor);
 
 /**
  * @brief aclnnMegaMoe的第二段接口，用于执行计算。

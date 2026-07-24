@@ -175,6 +175,7 @@ public:
         this->Attr("weight1_interleave").AttrType(OPTIONAL).Int(0);
         this->Attr("topo_type").AttrType(OPTIONAL).Int(0);
         this->Attr("rank_num_per_server").AttrType(OPTIONAL).Int(2); // 最少2个rank
+        this->Attr("topk_weights_type").AttrType(OPTIONAL).Int(0);
 
         OpAICoreConfig aicore_config;
         aicore_config.DynamicCompileStaticFlag(true)

@@ -77,6 +77,8 @@ TEST_F(MegaMoeArch35TilingTest, H4096_BS128_FP8E4M3FN)
             {"transpose_weight2", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"weight1_interleave", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"topo_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"rank_num_per_server", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"topk_weights_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         },
         &compileInfo);
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 4}};
@@ -133,6 +135,8 @@ TEST_F(MegaMoeArch35TilingTest, H5120_BS256_FP8E5M2)
             {"transpose_weight2", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"weight1_interleave", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"topo_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"rank_num_per_server", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"topk_weights_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         },
         &compileInfo);
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
@@ -189,6 +193,8 @@ TEST_F(MegaMoeArch35TilingTest, H7168_BS512)
             {"transpose_weight2", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"weight1_interleave", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"topo_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"rank_num_per_server", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"topk_weights_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         },
         &compileInfo);
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 2}};
@@ -245,6 +251,8 @@ TEST_F(MegaMoeArch35TilingTest, DifferentNConfig)
             {"transpose_weight2", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"weight1_interleave", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"topo_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"rank_num_per_server", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"topk_weights_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         },
         &compileInfo);
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 4}};
