@@ -238,7 +238,7 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
   B = 1
   S = 1024
   N = 4
-  C = 1280
+  C = 4096
 
   x = torch.randn(B, S, N, C, dtype=torch.bfloat16).npu()
   phi = torch.randn(N * N + 2 * N, N * C, dtype=torch.float32).npu()
@@ -249,9 +249,8 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
   numIters = 20
   hcEps = 1e-6
   normEps = 1e-6
-  outFlag = True  # 需要反向时设置为True
 
   hin, hPost, hRes = mhc_pre_sinkhorn(
-    x, phi, alpha, bias, hcMult, numIters, hcEps, normEps, outFlag
+    x, phi, alpha, bias, hcMult, numIters, hcEps, normEps
   )
   ```
