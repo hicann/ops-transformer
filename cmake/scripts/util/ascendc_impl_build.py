@@ -342,9 +342,12 @@ PYPTO_COMPILE_OP_API = """
 
 # Extra import appended to the wrapper head for pypto ops (kept out of the default head so non-pypto
 # builds / environments without pypto_pro are unaffected).
-PYPTO_IMPORT_HEADER = (
-    "from pypto_pro.runtime.opc.pypto_compile import pypto_compile_op\n"
-)
+PYPTO_IMPORT_HEADER = """
+from unittest.mock import MagicMock as _PyptoMagicMock
+sys.modules["torch"] = _PyptoMagicMock(name="torch")
+sys.modules["torch_npu"] = _PyptoMagicMock(name="torch_npu")
+from pypto_pro.runtime.opc.pypto_compile import pypto_compile_op
+"""
 
 SUP_API = """
 def {}({}{}):

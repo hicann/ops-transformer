@@ -24,6 +24,14 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
+
+
+def _install_build_only_torch_stub():
+    """Stub runtime-only dependencies that binary codegen does not use."""
+    sys.modules["torch"] = MagicMock(name="torch")
+    sys.modules["torch_npu"] = MagicMock(name="torch_npu")
+
 
 # soc (ASCEND_COMPUTE_UNIT, lowercased) -> pypto arch token used by PYPTO_JIT_ARCH.
 _ARCH_MAP = {
@@ -36,6 +44,7 @@ _ARCH_MAP = {
 def _load_kernels(py_file: Path):
     """Import the kernel module and return all @pl.jit kernel objects defined in it."""
     sys.path.insert(0, str(py_file.parent))
+    _install_build_only_torch_stub()
 
     import pypto_pro.runtime.opc.pypto_compile as pto_compile
     from pypto_pro.runtime.jit import _TileJitKernel
