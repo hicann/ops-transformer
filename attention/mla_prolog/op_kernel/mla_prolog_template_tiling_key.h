@@ -58,13 +58,14 @@ ASCENDC_TPL_ARGS_DECL(
     // bit:4-5 场景标识：0-FP16(预留) 1-BF16  2-量化场景
     ASCENDC_TPL_UINT_DECL(SCENARIO, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2),
     // bit:6-11 量化场景：0-非量化 1-MMQcQr量化 2-MMQcQr量化+KVcache量化 3-MMcqCkvKr量化+MMQcQr量化
-    // 4-MMCqCkvkr量化+MMQcQr量化+KVcache量化 5-MMQcQr量化+KVcache pertile量化
-    // 6-MMCqCkvkr量化+MMQcQr量化+KVcache pertile量化
+    // 4-MMCqCkvkr量化+MMQcQr量化+KVcache量化 5-MMQcQr量化+KVcache pertoken-pergroup量化
+    // 6-MMCqCkvkr量化+MMQcQr量化+KVcache pertoken-pergroup量化
     // 7-Mxfp8量化+MMCqCkvkr量化+MMQcQr量化 8-Mxfp8量化+MMCqCkvkr量化+MMQcQr量化+KVcache量化
-    // 9-Mxfp8量化+MMCqCkvkr量化+MMQcQr量化+KVcache pertile量化
+    // 9-Mxfp8量化+MMCqCkvkr量化+MMQcQr量化+KVcache pertoken-pergroup量化
     // 10-fp8量化+MMcqCkvKr量化+MMQcQr量化 11-fp8量化+MMCqCkvkr量化+MMQcQr量化+KVcache量化
     // 12-hif8量化+MMcqCkvKr量化+MMQcQr量化 13-hif8量化+MMCqCkvkr量化+MMQcQr量化+KVcache量化
-    // 14-fp8量化+MMcqCkvKr量化+MMQcQr量化+KVcache pertile量化 15-hif8量化+MMCqCkvkr量化+MMQcQr量化+KVcache pertile量化
+    // 14-fp8量化+MMcqCkvKr量化+MMQcQr量化+KVcache pertoken-pergroup量化
+    // 15-hif8量化+MMCqCkvkr量化+MMQcQr量化+KVcache pertoken-pergroup量化
     ASCENDC_TPL_UINT_DECL(QUANT_MODE, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
                           13, 14, 15),
     // bit:12 反量化使能：0-关闭 1-开启
@@ -342,7 +343,7 @@ ASCENDC_TPL_SEL(
 #endif
 
 #if MLA_PROLOG_VERSION == -1 || MLA_PROLOG_VERSION == 3
-// -------------------------- 半量化kv pertile量化 --------------------------
+// -------------------------- 半量化kv pertoken-pergroup量化 --------------------------
 #if ORIG_DTYPE_TOKEN_X == -1 || ORIG_DTYPE_WEIGHT_UQ_QR == -1 || ORIG_DTYPE_KV_CACHE == -1 || \
     (ORIG_DTYPE_TOKEN_X == DT_BF16 && ORIG_DTYPE_WEIGHT_UQ_QR == DT_INT8 && ORIG_DTYPE_KV_CACHE == DT_INT8)
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(CACHE_MODE, ASCENDC_TPL_UI_LIST, 1),
@@ -368,7 +369,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
 
-// -------------------------- 全量化kv pertile量化 --------------------------
+// -------------------------- 全量化kv pertoken-pergroup量化 --------------------------
 #if ORIG_DTYPE_TOKEN_X == -1 || ORIG_DTYPE_WEIGHT_UQ_QR == -1 || ORIG_DTYPE_KV_CACHE == -1 || \
     ORIG_DTYPE_QUERY == -1 || \
     (ORIG_DTYPE_TOKEN_X == DT_INT8 && ORIG_DTYPE_WEIGHT_UQ_QR == DT_INT8 && ORIG_DTYPE_KV_CACHE == DT_INT8 && \
@@ -420,7 +421,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
 
-// -------------------------- Mxfp8全量化kv pertile量化 --------------------------
+// -------------------------- Mxfp8全量化kv pertoken-pergroup量化 --------------------------
 #if ORIG_DTYPE_TOKEN_X == -1 || ORIG_DTYPE_WEIGHT_UQ_QR == -1 || ORIG_DTYPE_KV_CACHE == -1 || \
     ORIG_DTYPE_DEQUANT_SCALE_X == -1 || \
     (ORIG_DTYPE_TOKEN_X == DT_FLOAT8_E4M3FN && ORIG_DTYPE_WEIGHT_UQ_QR == DT_FLOAT8_E4M3FN && \
@@ -591,7 +592,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
 
-// -------------------------- fp8全量化kv pertile量化 --------------------------
+// -------------------------- fp8全量化kv pertoken-pergroup量化 --------------------------
 #if ORIG_DTYPE_TOKEN_X == -1 || ORIG_DTYPE_WEIGHT_UQ_QR == -1 || ORIG_DTYPE_KV_CACHE == -1 || \
     ORIG_DTYPE_QUERY == -1 || ORIG_DTYPE_DEQUANT_SCALE_X == -1 || \
     (ORIG_DTYPE_TOKEN_X == DT_FLOAT8_E4M3FN && ORIG_DTYPE_WEIGHT_UQ_QR == DT_FLOAT8_E4M3FN && \
@@ -619,7 +620,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
 
-// -------------------------- hif8全量化kv pertile量化 --------------------------
+// -------------------------- hif8全量化kv pertoken-pergroup量化 --------------------------
 #if ORIG_DTYPE_TOKEN_X == -1 || ORIG_DTYPE_WEIGHT_UQ_QR == -1 || ORIG_DTYPE_KV_CACHE == -1 || \
     ORIG_DTYPE_QUERY == -1 || ORIG_DTYPE_DEQUANT_SCALE_X == -1 || \
     (ORIG_DTYPE_TOKEN_X == DT_HIFLOAT8 && ORIG_DTYPE_WEIGHT_UQ_QR == DT_HIFLOAT8 && \

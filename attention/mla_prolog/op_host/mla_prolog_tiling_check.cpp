@@ -57,7 +57,7 @@ std::string ConvertContainerToString(const C &container, Func func = ElemToStrin
 }
 
 template <typename C, typename Func = std::string (*)(const typename C::value_type &)>
-std::string ConvertContainerToStringV3(const C &container, Func func = ElemToString<typename C::value_type>)
+std::string ConvertShapeToString(const C &container, Func func = ElemToString<typename C::value_type>)
 {
     if (container.empty() || func == nullptr) {
         return "[]";
@@ -70,6 +70,29 @@ std::string ConvertContainerToStringV3(const C &container, Func func = ElemToStr
         }
         ss << func(elem);
         isFirst = false;
+    }
+    return ss.str();
+}
+
+template <typename C, typename Func = std::string (*)(const typename C::value_type &)>
+std::string ConvertContainerToStringV3(const C &container, Func func = ElemToString<typename C::value_type>)
+{
+    if (container.empty() || func == nullptr) {
+        return "[]";
+    }
+    std::stringstream ss;
+    const size_t total = container.size();
+    size_t idx = 0;
+    for (const auto &elem : container) {
+        if (idx > 0) {
+            if (idx == total - 1) {
+                ss << " or ";
+            } else {
+                ss << ", ";
+            }
+        }
+        ss << func(elem);
+        ++idx;
     }
     return ss.str();
 }
@@ -107,43 +130,43 @@ bool MlaPrologTilingCheck::CheckAttrsRange() const
             const std::unordered_set<uint32_t> supportedWeightQuantMode{0U, 1U, 2U, 3U, 4U, 5U};
             OP_CHECK_IF(supportedWeightQuantMode.find(*context_.weightQuantMode) == supportedWeightQuantMode.end(),
                         OP_LOGE_FOR_INVALID_VALUE(context_.opName, "WeightQuantMode",
-                                                  std::to_string(*context_.weightQuantMode), "{0, 1, 2, 3, 4, 5}"),
+                                                  std::to_string(*context_.weightQuantMode), "0, 1, 2, 3, 4 or 5"),
                         return false);
         } else {
             const std::unordered_set<uint32_t> supportedWeightQuantMode{0U, 1U, 2U};
             OP_CHECK_IF(supportedWeightQuantMode.find(*context_.weightQuantMode) == supportedWeightQuantMode.end(),
                         OP_LOGE_FOR_INVALID_VALUE(context_.opName, "WeightQuantMode",
-                                                  std::to_string(*context_.weightQuantMode), "{0, 1, 2}"),
+                                                  std::to_string(*context_.weightQuantMode), "0, 1 or 2"),
                         return false);
         }
 
         const std::unordered_set<uint32_t> supportedKvQuantMode{0U, 1U, 2U, 3U};
         OP_CHECK_IF(supportedKvQuantMode.find(*context_.kvQuantMode) == supportedKvQuantMode.end(),
                     OP_LOGE_FOR_INVALID_VALUE(context_.opName, "KvQuantMode", std::to_string(*context_.kvQuantMode),
-                                              "{0, 1, 2, 3}"),
+                                              "0, 1, 2 or 3"),
                     return false);
 
         const std::unordered_set<uint32_t> supportedQueryQuantMode{0U, 1U};
         OP_CHECK_IF(supportedQueryQuantMode.find(*context_.queryQuantMode) == supportedQueryQuantMode.end(),
                     OP_LOGE_FOR_INVALID_VALUE(context_.opName, "QueryQuantMode",
-                                              std::to_string(*context_.queryQuantMode), "{0, 1}"),
+                                              std::to_string(*context_.queryQuantMode), "0 or 1"),
                     return false);
 
         const std::unordered_set<uint32_t> supportedCkvkrRepoMode{0U, 1U};
         OP_CHECK_IF(supportedCkvkrRepoMode.find(*context_.ckvkrRepoMode) == supportedCkvkrRepoMode.end(),
                     OP_LOGE_FOR_INVALID_VALUE(context_.opName, "CkvkrRepoMode", std::to_string(*context_.ckvkrRepoMode),
-                                              "{0, 1}"),
+                                              "0 or 1"),
                     return false);
 
         const std::unordered_set<uint32_t> supportedQuantScaleRepoMode{0U, 1U};
         OP_CHECK_IF(supportedQuantScaleRepoMode.find(*context_.quantScaleRepoMode) == supportedQuantScaleRepoMode.end(),
                     OP_LOGE_FOR_INVALID_VALUE(context_.opName, "QuantScaleRepoMode",
-                                              std::to_string(*context_.quantScaleRepoMode), "{0, 1}"),
+                                              std::to_string(*context_.quantScaleRepoMode), "0 or 1"),
                     return false);
 
         const std::unordered_set<uint32_t> supportedTileSize{128U};
         OP_CHECK_IF(supportedTileSize.find(*context_.tileSize) == supportedTileSize.end(),
-                    OP_LOGE_FOR_INVALID_VALUE(context_.opName, "TileSize", std::to_string(*context_.tileSize), "{128}"),
+                    OP_LOGE_FOR_INVALID_VALUE(context_.opName, "TileSize", std::to_string(*context_.tileSize), "128"),
                     return false);
     }
     return true;
@@ -325,7 +348,8 @@ ge::graphStatus MlaPrologTilingCheck::CheckDtileSize() const
             if (*(context_.kvQuantMode) == static_cast<int>(KV_QUANT_MODE::PER_TILE)) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     context_.opName, "dtileSize", std::to_string(baseShapeInfo_.dtileSize),
-                    "when kvQuantMode is PER_TILE, dtileSize allows only " + std::to_string(supportedDtileSize));
+                    "when kvQuantMode is pertoken-pergroup, dtileSize allows only " +
+                    std::to_string(supportedDtileSize));
             } else {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     context_.opName, "dtileSize", std::to_string(baseShapeInfo_.dtileSize),
@@ -933,7 +957,7 @@ ge::graphStatus MlaPrologTilingCheck::CheckParamByScenario()
             }
             if (expectedParam.shape != it.second.shape) {
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                    context_.opName, it.first, ConvertContainerToStringV3(it.second.shape),
+                    context_.opName, it.first, ConvertShapeToString(it.second.shape),
                     "this parameter requires shape " + ConvertContainerToString(expectedParam.shape) +
                         " under current configuration");
             }
@@ -958,7 +982,7 @@ void MlaPrologTilingCheck::CheckRepoMode(bool isPertile, ge::graphStatus &isCorr
 {
     auto expectedCkvkr = isPertile ? CKVKR_REPO_MODE::COMBINE : CKVKR_REPO_MODE::DIVIDE;
     auto expectedQuantScale = isPertile ? QUANT_SCALE_REPO_MODE::COMBINE : QUANT_SCALE_REPO_MODE::DIVIDE;
-    std::string desc = isPertile ? "pertile" : "non-pertile";
+    std::string desc = isPertile ? "pertoken-pergroup" : "non-pertoken-pergroup";
     std::string name = isPertile ? "COMBINE" : "DIVIDE";
 
     if (*(context_.ckvkrRepoMode) != static_cast<int>(expectedCkvkr)) {
@@ -1242,7 +1266,7 @@ ge::graphStatus MlaPrologTilingCheck::CheckCacheMode() const
         (std::strncmp(context_.cacheMode, CACHE_MODE_PA_BLK_NZ, CACHE_MODE_LEN) == 0)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             context_.opName, "cacheMode", std::string(context_.cacheMode),
-            "When pertile quant mode, cacheMode cannot be {PA_NZ, PA_BLK_BSND, PA_BLK_NZ}");
+            "When pertoken-pergroup quant mode, cacheMode cannot be {PA_NZ, PA_BLK_BSND, PA_BLK_NZ}");
         return ge::GRAPH_FAILED;
     }
 

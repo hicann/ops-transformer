@@ -554,14 +554,14 @@ ge::graphStatus MlaPrologTiling::CalcWorkSpace()
                       static_cast<size_t>(NUM_BYTES_INT32);
     workspaceSize_ += static_cast<size_t>(stepBatchSize_) * static_cast<size_t>(baseShapeInfo_.nSize) *
                       static_cast<size_t>(baseShapeInfo_.dSize) * mm3Mult * static_cast<size_t>(NUM_BYTES_BF16);
-    // SplitM非pertile量化场景下 mmQcQrResDequant使用两份workspace
+    // SplitM非pertoken-pergroup量化场景下 mmQcQrResDequant使用两份workspace
     if (scenarioInfo_.splitMFlag_ == 1U &&
         (scenarioInfo_.quantMode_ == QUANT_MODE::MXFP8_FULL_QUANT_KV_NO_QUANT ||
         scenarioInfo_.quantMode_ == QUANT_MODE::MXFP8_FULL_QUANT_KV_QUANT_PER_TENSOR)) {
         workspaceSize_ += static_cast<size_t>(stepBatchSize_) * static_cast<size_t>(baseShapeInfo_.nSize) *
                           static_cast<size_t>(baseShapeInfo_.dSize) * mm3Mult * static_cast<size_t>(NUM_BYTES_BF16);
     }
-    
+
     if (enableGroupComputeOpt_ || enableDequantOpt_) {
         workspaceSize_ += static_cast<size_t>(stepBatchSize_) * dequantScaleMult * static_cast<size_t>(BLOCK_SIZE);
     }

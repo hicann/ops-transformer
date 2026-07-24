@@ -108,8 +108,18 @@ bool CheckWeightQuantModeValidity(int64_t weightQuantMode)
     }
     if (supportedWeightQuantMode.find(weightQuantMode) == supportedWeightQuantMode.end()) {
         std::string supportedStr;
+        size_t total = supportedWeightQuantMode.size();
+        size_t idx = 0;
         for (auto mode : supportedWeightQuantMode) {
-            supportedStr += std::to_string(mode) + ", ";
+            if (idx > 0) {
+                if (idx == total - 1) {
+                    supportedStr += " or ";
+                } else {
+                    supportedStr += ", ";
+                }
+            }
+            supportedStr += std::to_string(mode);
+            idx++;
         }
         if (!supportedStr.empty()) {
             supportedStr.pop_back();
@@ -142,8 +152,19 @@ bool CheckKvCacheQuantModeValidity(int64_t weightQuantMode, int64_t kvCacheQuant
     }
     if (it->second.find(kvCacheQuantMode) == it->second.end()) {
         std::string supportedStr;
-        for (auto mode : it->second) {
-            supportedStr += std::to_string(mode) + ", ";
+        const auto& modes = it->second;
+        size_t total = modes.size();
+        size_t idx = 0;
+        for (auto mode : modes) {
+            if (idx > 0) {
+                if (idx == total - 1) {
+                    supportedStr += " or ";
+                } else {
+                    supportedStr += ", ";
+                }
+            }
+            supportedStr += std::to_string(mode);
+            idx++;
         }
         if (!supportedStr.empty()) {
             supportedStr.pop_back();
@@ -161,7 +182,7 @@ bool CheckQueryQuantModeValidity(int64_t queryQuantMode)
 {
     std::set<int64_t> supportedQueryQuantMode = {0LL, 1LL};
     if (supportedQueryQuantMode.find(queryQuantMode) == supportedQueryQuantMode.end()) {
-        OP_LOGE_FOR_INVALID_VALUE("MlaPrologV3", "queryQuantMode", std::to_string(queryQuantMode), "0, 1");
+        OP_LOGE_FOR_INVALID_VALUE("MlaPrologV3", "queryQuantMode", std::to_string(queryQuantMode), "0 or 1");
         return false;
     }
     return true;
