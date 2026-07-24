@@ -1,0 +1,168 @@
+name: codecheck_action
+
+on:
+  workflow_call:
+    inputs:
+      precommit_image_version:
+        required: true
+        type: string
+      codecheck_image_version:
+        required: true
+        type: string
+
+
+jobs:
+  JOB_precommit:
+    name: CodeCheck_precommit
+    steps:
+      -
+        name: Checkout
+        identifier: process_checkout
+        uses: checkout
+        with:
+          ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+          token: ${{secrets.GIT_TOKEN}}
+      -
+        name: download
+        uses: obs-download
+        with:
+          endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
+          bucket: "ascend-ci"
+          key: "${{ env.obs_path }}/pr_filelist_precommit.txt"
+          path: ${{ steps.process_checkout.outputs.path }}
+      -
+        name: precommit
+        identifier: precommit
+        uses: cann/.gitcode/actions/precommit@master
+        with:
+          merge_id: ${{ env.MERGE_ID }}
+          repo_name: ${{ env.repo_name }}
+          workspace: ${{ steps.process_checkout.outputs.path }}
+      -
+        name: upload
+        uses: obs-upload
+        with:
+          endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
+          bucket: "ascend-ci"
+          access-key: ${{secrets.AK}}
+          secret-key: ${{secrets.SK}}
+          artifact-path: "${{ steps.process_checkout.outputs.path }}/pre-commit*.txt"
+          object-prefix: ${{ env.obs_path }}/
+    if: "${{ default() }}"
+    runs-on: [dedicate-hosted, x64, small]
+    container:
+      image: swr.cn-north-4.myhuaweicloud.com/ci_cann/${{ inputs.precommit_image_version }}
+  JOB_check_pr:
+    name: CodeCheck_check-pr
+    steps:
+      -
+        name: Checkout
+        identifier: process_checkout
+        uses: checkout
+        with:
+          ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+          token: ${{secrets.GIT_TOKEN}}
+      -
+        name: download
+        uses: obs-download
+        with:
+          endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
+          bucket: "ascend-ci"
+          key: |
+            ${{ env.obs_path }}/pr_filelist.txt
+            ${{ env.obs_path }}/pr_filelist_mod.txt
+          path: ${{ steps.process_checkout.outputs.path }}
+      -
+        name: check-pr
+        identifier: check-pr
+        uses: cann/.gitcode/actions/check-pr@master
+        with:
+          repo_name: ${{ env.repo_name }}
+          workspace: ${{ steps.process_checkout.outputs.path }}
+    runs-on: [dedicate-hosted, x64, small]
+    container:
+      image: swr.cn-north-4.myhuaweicloud.com/ci_cann/${{ inputs.codecheck_image_version }}
+  JOB_sca:
+    name: SCA
+    steps:
+      -
+        name: Checkout
+        identifier: process_checkout
+        uses: checkout
+        with:
+          ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+          token: ${{secrets.GIT_TOKEN}}
+          path: "./runner"
+      -
+        name: Checkout
+        uses: checkout
+        with:
+          repository: ${{ vars.CI_PATH }}
+          ref: refs/heads/master
+          path: "./runner/CI"
+      -
+        name: sca
+        run: |
+          cd ${{ steps.process_checkout.outputs.path }}
+          cd CI/scripts
+          python3 codescan_gitcode.py --access_key ${{secrets.SCA_AK}} --secret_access_key ${{secrets.SCA_SK}} --access_key_get ${{secrets.SCA_AK_GET}} --secret_access_key_get ${{secrets.SCA_SK_GET}} --org_name ${org_name} --pr_id ${MERGE_ID} --repo ${repo_name} --commit_id ${{ atomgit.event.pull_request.merge_commit_sha }}
+    if: "${{ default() }}"
+    runs-on: [dedicate-hosted, x64, small]
+    container:
+      image: swr.cn-north-4.myhuaweicloud.com/ci_cann/${{ inputs.codecheck_image_version }}
+  JOB_antiposion:
+    name: Antipoison
+    steps:
+      -
+        name: Checkout
+        identifier: process_checkout
+        uses: checkout
+        with:
+          ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+          token: ${{secrets.GIT_TOKEN}}
+          path: "./runner"
+      -
+        name: Checkout
+        uses: checkout
+        with:
+          repository: ${{ vars.CI_PATH }}
+          ref: refs/heads/master
+          path: "./runner/CI"
+      -
+        name: antiposion
+        run: |
+          cd ${{ steps.process_checkout.outputs.path }}
+          cd CI/scripts
+          python3 anti_virus_gitcode.py --access_key ${{secrets.ANTI_AK}} --secret_access_key ${{secrets.ANTI_SK}} --access_key_get ${{secrets.ANTI_AK_GET}} --secret_access_key_get ${{secrets.ANTI_SK_GET}} --org_name ${org_name} --pr_id ${MERGE_ID} --repo ${repo_name} --commit_id ${{ atomgit.event.pull_request.merge_commit_sha }}
+    if: "${{ default() }}"
+    runs-on: [dedicate-hosted, x64, small]
+    container:
+      image: swr.cn-north-4.myhuaweicloud.com/ci_cann/${{ inputs.codecheck_image_version }}
+  JOB_codecheck:
+    name: CodeCheck
+    steps:
+      -
+        name: Checkout
+        identifier: process_checkout
+        uses: checkout
+        with:
+          ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+          token: ${{secrets.GIT_TOKEN}}
+          path: "./runner"
+      -
+        name: Checkout
+        uses: checkout
+        with:
+          repository: ${{ vars.CI_PATH }}
+          ref: refs/heads/master
+          path: "./runner/CI"
+      -
+        name: codecheck
+        run: |
+          cd ${{ steps.process_checkout.outputs.path }}
+          cd CI/scripts
+          python3 codecheck_gitcode.py --access_key ${{secrets.CODECHECK_AK}} --secret_access_key ${{secrets.CODECHECK_SK}} --access_key_get ${{secrets.CODECHECK_AK_GET}} --secret_access_key_get ${{secrets.CODECHECK_SK_GET}} --org_name ${org_name} --pr_id ${MERGE_ID} --repo ${repo_name} --commit_id ${{ atomgit.event.pull_request.merge_commit_sha }}
+    if: "${{ default() }}"
+    runs-on: [dedicate-hosted, x64, small]
+    container:
+      image: swr.cn-north-4.myhuaweicloud.com/ci_cann/${{ inputs.codecheck_image_version }}
