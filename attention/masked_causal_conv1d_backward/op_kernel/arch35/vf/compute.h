@@ -41,8 +41,8 @@ constexpr uint32_t B32_REP_SIZE = REGSIZE / sizeof(float); // 64 floats per vect
 
 template <typename T>
 __simd_vf__ void GradXAndWeightNoTail(__ubuf__ T *goAddr, __ubuf__ T *wAddr, __ubuf__ T *inAddr, __ubuf__ T *giAddr,
-                                          __ubuf__ float *p0Addr, __ubuf__ float *p1Addr, __ubuf__ float *p2Addr,
-                                          uint32_t sMain, uint32_t dimLen)
+                                      __ubuf__ float *p0Addr, __ubuf__ float *p1Addr, __ubuf__ float *p2Addr,
+                                      uint32_t sMain, uint32_t dimLen)
 {
     MicroAPI::MaskReg fullMask = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
     uint32_t dimLoopNum = dimLen / B32_REP_SIZE;
@@ -133,9 +133,9 @@ __simd_vf__ void GradXAndWeightNoTail(__ubuf__ T *goAddr, __ubuf__ T *wAddr, __u
 }
 
 template <typename T>
-__simd_vf__ void GradXAndWeightWithTail(__ubuf__ T *goAddr, __ubuf__ T *wAddr, __ubuf__ T *inAddr,
-                                            __ubuf__ T *giAddr, __ubuf__ float *p0Addr, __ubuf__ float *p1Addr,
-                                            __ubuf__ float *p2Addr, uint32_t sMain, uint32_t dimLen)
+__simd_vf__ void GradXAndWeightWithTail(__ubuf__ T *goAddr, __ubuf__ T *wAddr, __ubuf__ T *inAddr, __ubuf__ T *giAddr,
+                                        __ubuf__ float *p0Addr, __ubuf__ float *p1Addr, __ubuf__ float *p2Addr,
+                                        uint32_t sMain, uint32_t dimLen)
 {
     MicroAPI::MaskReg fullMask = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::ALL>();
     uint32_t dimLoopNum = dimLen / B32_REP_SIZE;
@@ -269,8 +269,8 @@ __simd_vf__ void CastRowB32ToDT(__ubuf__ float *srcAddr, __ubuf__ T *dstAddr, ui
 
 template <typename T>
 __aicore__ inline void DoGradXWeight(LocalTensor<T> &goUb, LocalTensor<T> &wUb, LocalTensor<T> &inUb,
-                                         LocalTensor<T> &giUb, LocalTensor<float> &p0Ub, LocalTensor<float> &p1Ub,
-                                         LocalTensor<float> &p2Ub, uint32_t sLen, uint32_t dimLen)
+                                     LocalTensor<T> &giUb, LocalTensor<float> &p0Ub, LocalTensor<float> &p1Ub,
+                                     LocalTensor<float> &p2Ub, uint32_t sLen, uint32_t dimLen)
 {
     __ubuf__ T *goAddr = (__ubuf__ T *)goUb.GetPhyAddr();
     __ubuf__ T *wAddr = (__ubuf__ T *)wUb.GetPhyAddr();

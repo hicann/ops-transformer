@@ -17,7 +17,7 @@ if (BUILD_OPEN_PROJECT)
             OP_NAME MaskedCausalConv1dBackward
             COMPUTE_UNIT Ascend950PR_9599
             OPTIONS --cce-auto-sync=off
-                    -mllvm 
+                    -mllvm
                     -cce-aicore-dcci-before-kernel-end=false
                     -Wno-deprecated-declarations
                     -Werror

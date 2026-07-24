@@ -43,8 +43,7 @@ static ge::graphStatus TilingInplaceFusedCausalConv1d(gert::TilingContext *conte
     int64_t xDimNum = static_cast<int64_t>(xShape->GetOriginShape().GetDimNum());
 
     int64_t maxQueryLen = 0;
-    if (context->GetAttrs() != nullptr &&
-        context->GetAttrs()->GetInt(INPLACE_ATTR_MAX_QUERY_LEN_INDEX) != nullptr) {
+    if (context->GetAttrs() != nullptr && context->GetAttrs()->GetInt(INPLACE_ATTR_MAX_QUERY_LEN_INDEX) != nullptr) {
         maxQueryLen = *(context->GetAttrs()->GetInt(INPLACE_ATTR_MAX_QUERY_LEN_INDEX));
     }
 
@@ -55,7 +54,7 @@ static ge::graphStatus TilingInplaceFusedCausalConv1d(gert::TilingContext *conte
 
     ge::graphStatus status = ge::GRAPH_FAILED;
     if (useBH) {
-        FusedCausalConv1dCutBHTiling tilingImpl(context, true);  // isInplace=true
+        FusedCausalConv1dCutBHTiling tilingImpl(context, true); // isInplace=true
         status = tilingImpl.DoTiling();
     } else {
         FusedCausalConv1dCutBSHTiling tilingImpl(context, true); // isInplace=true

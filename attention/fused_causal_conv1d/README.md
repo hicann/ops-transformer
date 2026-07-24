@@ -42,7 +42,7 @@
     ```
 
     其中cu_seq_len为batch内所有变长序列拼接后的总长度。
-  
+
   - 场景二（prefill和decode混合场景）：
 
     ```Cpp
@@ -96,7 +96,7 @@
     其中state_len必须大于所有batch中最大的token个数加1。
 
   - 场景四（decode场景 - 固定batch）：
-  
+
     ```Cpp
     x: [batch, m+1, dim]
     weight: [K, dim]，其中K=3
@@ -488,13 +488,10 @@
   - Pangu V2 模式（conv_mode = 1）下，num_computed_tokens不能为 None。
   - 算子入参与中间计算结果，在对应数据类型（float16/bfloat16）下，数值均不会超出该类型值域范围。
   - 算子输入不支持有±inf和nan的情况。
-  
+
   ## 调用说明
-  
+
   | 调用方式  | 样例代码                                                     | 说明                                                         |
   | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
   | aclnn接口 | [test_aclnn_fused_causal_conv1d](./examples/test_aclnn_fused_causal_conv1d.cpp) | 通过[aclnnFusedCausalConv1d](./docs/aclnnFusedCausalConv1d.md)调用FusedCausalConv1d算子 |
   | 图模式 | - | 通过[算子IR](./op_graph/fused_causal_conv1d_proto.h)构图方式调用FusedCausalConv1d算子 |
-
-
-  

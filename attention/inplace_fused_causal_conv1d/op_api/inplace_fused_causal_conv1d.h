@@ -19,11 +19,10 @@ bool InplaceFusedCausalConv1d(aclTensor *x, const aclTensor *weight, aclTensor *
                               const aclTensor *queryStartLoc, const aclTensor *cacheIndices,
                               const aclTensor *initialStateMode, const aclTensor *bias,
                               const aclTensor *numAcceptedTokens, const aclTensor *numComputedTokens,
-                              const aclTensor *blockIdxFirstScheduledToken,
-                              const aclTensor *blockIdxLastScheduledToken, const aclTensor *initialStateIdx,
-                              int64_t activationMode, int64_t padSlotId, int64_t runMode, int64_t maxQueryLen,
-                              int64_t residualConnection, int64_t blockSize, int64_t convMode,
-                              aclOpExecutor *executor);
+                              const aclTensor *blockIdxFirstScheduledToken, const aclTensor *blockIdxLastScheduledToken,
+                              const aclTensor *initialStateIdx, int64_t activationMode, int64_t padSlotId,
+                              int64_t runMode, int64_t maxQueryLen, int64_t residualConnection, int64_t blockSize,
+                              int64_t convMode, aclOpExecutor *executor);
 } // namespace l0op
 
 #endif // OP_API_INC_LEVEL0_INPLACE_FUSED_CAUSAL_CONV1D_L0OP_H_

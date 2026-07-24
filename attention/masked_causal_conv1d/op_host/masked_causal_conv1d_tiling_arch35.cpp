@@ -87,8 +87,8 @@ ge::graphStatus MaskedCausalConv1dTilingArch35::GetInputShapes()
     OP_CHECK_NULL_WITH_CONTEXT(context_, context_->GetInputShape(INPUT_X_INDEX));
     xShape_ = context_->GetInputShape(INPUT_X_INDEX)->GetOriginShape();
     if (xShape_.GetDimNum() != X_EXPECTED_NDIM) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "x",
-            std::to_string(xShape_.GetDimNum()) + "D", "The shape of x must be 3D");
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            context_->GetNodeName(), "x", std::to_string(xShape_.GetDimNum()) + "D", "The shape of x must be 3D");
         return ge::GRAPH_FAILED;
     }
     S_ = static_cast<uint64_t>(xShape_.GetDim(DIM_0));
@@ -115,8 +115,8 @@ ge::graphStatus MaskedCausalConv1dTilingArch35::GetInputDtypes()
     xType_ = context_->GetInputDesc(INPUT_X_INDEX)->GetDataType();
     if (xType_ != ge::DataType::DT_FLOAT16 && xType_ != ge::DataType::DT_BF16) {
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "x",
-            ge::TypeUtils::DataTypeToSerialString(xType_).c_str(),
-            "The dtype of x must be within the range [float16, bfloat16]");
+                                              ge::TypeUtils::DataTypeToSerialString(xType_).c_str(),
+                                              "The dtype of x must be within the range [float16, bfloat16]");
         return ge::GRAPH_FAILED;
     }
     xDtypeSize_ = GetSizeByDataType(xType_);
@@ -125,10 +125,10 @@ ge::graphStatus MaskedCausalConv1dTilingArch35::GetInputDtypes()
     OP_CHECK_NULL_WITH_CONTEXT(context_, context_->GetInputDesc(INPUT_WEIGHT_INDEX));
     ge::DataType weightType = context_->GetInputDesc(INPUT_WEIGHT_INDEX)->GetDataType();
     if (weightType != xType_) {
-        std::string incorrectDtypes = ge::TypeUtils::DataTypeToSerialString(xType_) + " and " +
-                                      ge::TypeUtils::DataTypeToSerialString(weightType);
-        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context_->GetNodeName(), "x and weight",
-            incorrectDtypes.c_str(), "The dtypes of x and weight must be the same");
+        std::string incorrectDtypes =
+            ge::TypeUtils::DataTypeToSerialString(xType_) + " and " + ge::TypeUtils::DataTypeToSerialString(weightType);
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context_->GetNodeName(), "x and weight", incorrectDtypes.c_str(),
+                                               "The dtypes of x and weight must be the same");
         return ge::GRAPH_FAILED;
     }
 
@@ -139,8 +139,8 @@ ge::graphStatus MaskedCausalConv1dTilingArch35::GetInputDtypes()
             ge::DataType maskType = maskDesc->GetDataType();
             if (maskType != ge::DataType::DT_BOOL) {
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "mask",
-                    ge::TypeUtils::DataTypeToSerialString(maskType).c_str(),
-                    "The dtype of mask must be BOOL");
+                                                      ge::TypeUtils::DataTypeToSerialString(maskType).c_str(),
+                                                      "The dtype of mask must be BOOL");
                 return ge::GRAPH_FAILED;
             }
         }
@@ -153,55 +153,54 @@ ge::graphStatus MaskedCausalConv1dTilingArch35::GetInputDtypes()
 ge::graphStatus MaskedCausalConv1dTilingArch35::CheckInputParams()
 {
     if (S_ == 0 || B_ == 0 || H_ == 0) {
-        std::string incorrectShape = "[" + std::to_string(S_) + ", " + std::to_string(B_) + ", " +
-                                     std::to_string(H_) + "]";
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x",
-            incorrectShape.c_str(), "All dimensions of this parameter must be greater than 0");
+        std::string incorrectShape =
+            "[" + std::to_string(S_) + ", " + std::to_string(B_) + ", " + std::to_string(H_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", incorrectShape.c_str(),
+                                              "All dimensions of this parameter must be greater than 0");
         return ge::GRAPH_FAILED;
     }
     if (static_cast<int64_t>(H_) < H_MIN || static_cast<int64_t>(H_) > H_MAX) {
-        std::string incorrectShape = "[" + std::to_string(S_) + ", " + std::to_string(B_) + ", " +
-                                     std::to_string(H_) + "]";
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x",
-            incorrectShape.c_str(), "Shape [2] of this parameter must be within the range [384, 24576]");
+        std::string incorrectShape =
+            "[" + std::to_string(S_) + ", " + std::to_string(B_) + ", " + std::to_string(H_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", incorrectShape.c_str(),
+                                              "Shape [2] of this parameter must be within the range [384, 24576]");
         return ge::GRAPH_FAILED;
     }
     if (static_cast<int64_t>(B_) * static_cast<int64_t>(S_) > BS_MAX) {
-        std::string incorrectShape = "[" + std::to_string(S_) + ", " + std::to_string(B_) + ", " +
-                                     std::to_string(H_) + "]";
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x",
-            incorrectShape.c_str(), "The following constraint must be met: shape [0] * shape [1] <= 524288");
+        std::string incorrectShape =
+            "[" + std::to_string(S_) + ", " + std::to_string(B_) + ", " + std::to_string(H_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", incorrectShape.c_str(),
+                                              "The following constraint must be met: shape [0] * shape [1] <= 524288");
         return ge::GRAPH_FAILED;
     }
     if (H_ % hReg_ != 0) {
-        std::string incorrectShape = "[" + std::to_string(S_) + ", " + std::to_string(B_) + ", " +
-                                     std::to_string(H_) + "]";
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x",
-            incorrectShape.c_str(), "Shape [2] of this parameter must be exactly divided by hReg (64)");
+        std::string incorrectShape =
+            "[" + std::to_string(S_) + ", " + std::to_string(B_) + ", " + std::to_string(H_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", incorrectShape.c_str(),
+                                              "Shape [2] of this parameter must be exactly divided by hReg (64)");
         return ge::GRAPH_FAILED;
     }
 
     // weight shape: [K, H], K must equal CONV_WINDOW_SIZE, H must equal x's H
     if (weightShape_.GetDimNum() != 2) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "weight",
-            std::to_string(weightShape_.GetDimNum()) + "D", "The shape of weight must be 2D");
+                                                 std::to_string(weightShape_.GetDimNum()) + "D",
+                                                 "The shape of weight must be 2D");
         return ge::GRAPH_FAILED;
     }
     uint64_t wK = static_cast<uint64_t>(weightShape_.GetDim(DIM_0));
     if (wK != CONV_WINDOW_SIZE) {
-        std::string incorrectShape = "[" + std::to_string(wK) + ", " +
-                                     std::to_string(weightShape_.GetDim(DIM_1)) + "]";
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "weight",
-            incorrectShape.c_str(), "Shape [0] of this parameter must be equal to 3");
+        std::string incorrectShape = "[" + std::to_string(wK) + ", " + std::to_string(weightShape_.GetDim(DIM_1)) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "weight", incorrectShape.c_str(),
+                                              "Shape [0] of this parameter must be equal to 3");
         return ge::GRAPH_FAILED;
     }
     uint64_t wH = static_cast<uint64_t>(weightShape_.GetDim(DIM_1));
     if (wH != H_) {
         std::string incorrectShapes = "[" + std::to_string(wK) + ", " + std::to_string(wH) + "] and [" +
-                                      std::to_string(S_) + ", " + std::to_string(B_) + ", " +
-                                      std::to_string(H_) + "]";
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "weight and x",
-            incorrectShapes.c_str(), "Shape [1] of weight must be equal to shape [2] of x");
+                                      std::to_string(S_) + ", " + std::to_string(B_) + ", " + std::to_string(H_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "weight and x", incorrectShapes.c_str(),
+                                               "Shape [1] of weight must be equal to shape [2] of x");
         return ge::GRAPH_FAILED;
     }
 
@@ -209,25 +208,26 @@ ge::graphStatus MaskedCausalConv1dTilingArch35::CheckInputParams()
     if (isMaskNone_ == 0) {
         if (maskShape_.GetDimNum() != 2) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "mask",
-                std::to_string(maskShape_.GetDimNum()) + "D", "The shape of mask must be 2D");
+                                                     std::to_string(maskShape_.GetDimNum()) + "D",
+                                                     "The shape of mask must be 2D");
             return ge::GRAPH_FAILED;
         }
         uint64_t mB = static_cast<uint64_t>(maskShape_.GetDim(DIM_0));
         uint64_t mS = static_cast<uint64_t>(maskShape_.GetDim(DIM_1));
         if (mB != B_) {
             std::string incorrectShapes = "[" + std::to_string(mB) + ", " + std::to_string(mS) + "] and [" +
-                                          std::to_string(S_) + ", " + std::to_string(B_) + ", " +
-                                          std::to_string(H_) + "]";
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "mask and x",
-                incorrectShapes.c_str(), "Shape [0] of mask must be equal to shape [1] of x");
+                                          std::to_string(S_) + ", " + std::to_string(B_) + ", " + std::to_string(H_) +
+                                          "]";
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "mask and x", incorrectShapes.c_str(),
+                                                   "Shape [0] of mask must be equal to shape [1] of x");
             return ge::GRAPH_FAILED;
         }
         if (mS != S_) {
             std::string incorrectShapes = "[" + std::to_string(mB) + ", " + std::to_string(mS) + "] and [" +
-                                          std::to_string(S_) + ", " + std::to_string(B_) + ", " +
-                                          std::to_string(H_) + "]";
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "mask and x",
-                incorrectShapes.c_str(), "Shape [1] of mask must be equal to shape [0] of x");
+                                          std::to_string(S_) + ", " + std::to_string(B_) + ", " + std::to_string(H_) +
+                                          "]";
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "mask and x", incorrectShapes.c_str(),
+                                                   "Shape [1] of mask must be equal to shape [0] of x");
             return ge::GRAPH_FAILED;
         }
     }

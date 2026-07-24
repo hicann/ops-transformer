@@ -940,8 +940,7 @@ __aicore__ inline void FusedCausalConv1dCutBSH<T>::Compute(uint32_t curBsStart, 
                 RefreshApcState(curBatch, batchLen);
                 if (apcState_.nBlockToFill > 0) {
                     int32_t B = static_cast<int32_t>(blockSize_);
-                    int32_t firstBdy =
-                        apcState_.lastFull - (apcState_.nBlockToFill - 1) * B;
+                    int32_t firstBdy = apcState_.lastFull - (apcState_.nBlockToFill - 1) * B;
                     deferForPrefix = (firstBdy > 0 && firstBdy < static_cast<int32_t>(K - 1));
                 }
             }
@@ -1063,7 +1062,7 @@ FusedCausalConv1dCutBSH<T>::WriteCacheToStates(LocalTensor<T> &cacheLocal, Local
     if (cFromCache > 0) {
         uint32_t cacheRowStart = cachedStateLen - cFromCache;
         DataCopyExtParams wcp{static_cast<uint16_t>(cFromCache), static_cast<uint16_t>(dimBlocks * ALIGN_BYTES), 0,
-                                cacheSkipBlocks * ALIGN_BYTES, 0};
+                              cacheSkipBlocks * ALIGN_BYTES, 0};
         DataCopyPad(cacheStatesGM_[csBase], cacheLocal[cacheRowStart * dimSize], wcp);
     }
 
@@ -1221,8 +1220,7 @@ __aicore__ inline void FusedCausalConv1dCutBSH<T>::ExecuteDeferredRunningCache()
     if (cFromCache > 0) {
         if (!m.useZeroCache) {
             uint32_t srcRowOff = m.cachedStateLen - cFromCache;
-            uint64_t cacheSrcOff =
-                (uint64_t)writeCIdx * cacheStride0_ + (uint64_t)srcRowOff * cacheStride1_ + dimStart;
+            uint64_t cacheSrcOff = (uint64_t)writeCIdx * cacheStride0_ + (uint64_t)srcRowOff * cacheStride1_ + dimStart;
             DataCopyExtParams rcp{static_cast<uint16_t>(cFromCache), static_cast<uint16_t>(rowBlocks * ALIGN_BYTES),
                                   cacheSkip * ALIGN_BYTES, 0, 0};
             DataCopyPad(tmpBuf, cacheStatesGM_[cacheSrcOff], rcp, padParams);

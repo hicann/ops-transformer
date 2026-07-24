@@ -12,7 +12,7 @@
  * \file inplace_fused_causal_conv1d_apt.cpp
  * \brief InplaceFusedCausalConv1d kernel entry point (reuses FusedCausalConv1d kernel implementations)
  */
- 
+
 #if __has_include("../../fused_causal_conv1d/op_kernel/arch35/fused_causal_conv1d_cut_bsh.h")
 #include "../../fused_causal_conv1d/op_kernel/arch35/fused_causal_conv1d_cut_bsh.h"
 #include "../../fused_causal_conv1d/op_kernel/arch35/fused_causal_conv1d_cut_bh.h"

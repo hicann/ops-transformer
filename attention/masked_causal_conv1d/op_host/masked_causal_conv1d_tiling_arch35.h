@@ -64,7 +64,7 @@ private:
     uint64_t S_ = 0, B_ = 0, H_ = 0;
     ge::DataType xType_;
     uint32_t xDtypeSize_ = 0;
-    uint64_t hReg_ = 64;  // 128 / xDtypeSize_: min H granularity (bf16/fp16→64, fp32→32)
+    uint64_t hReg_ = 64; // 128 / xDtypeSize_: min H granularity (bf16/fp16→64, fp32→32)
 
     // Mask None flag
     int64_t isMaskNone_ = 0;

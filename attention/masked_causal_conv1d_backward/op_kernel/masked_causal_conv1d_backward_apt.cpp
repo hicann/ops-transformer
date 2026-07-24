@@ -25,9 +25,8 @@ using MaskedCausalConv1dBackwardArch35Tiling::MaskedCausalConv1dBackwardTilingDa
 using MaskedCausalConv1dBackwardKernelNS::MaskedCausalConv1dBackward;
 
 extern "C" __global__ __aicore__ void masked_causal_conv1d_backward(GM_ADDR grad_y, GM_ADDR x, GM_ADDR weight,
-                                                                    GM_ADDR mask, GM_ADDR grad_x,
-                                                                    GM_ADDR grad_weight, GM_ADDR workspace,
-                                                                    GM_ADDR tiling)
+                                                                    GM_ADDR mask, GM_ADDR grad_x, GM_ADDR grad_weight,
+                                                                    GM_ADDR workspace, GM_ADDR tiling)
 {
     if (g_coreType == AIC) {
         return;

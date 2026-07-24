@@ -54,7 +54,7 @@ aclnnStatus FusedCausalConv1dCommonProcess(const aclTensor *x, const aclTensor *
     CHECK_COND(weightFinal != nullptr, ACLNN_ERR_PARAM_NULLPTR, "Contiguous weight failed.");
 
     // Optional tensors: contiguous if non-null
-    auto ensureContiguous = [&](const aclTensor *t) -> const aclTensor* {
+    auto ensureContiguous = [&](const aclTensor *t) -> const aclTensor * {
         if (t == nullptr) {
             return nullptr;
         }
@@ -71,11 +71,11 @@ aclnnStatus FusedCausalConv1dCommonProcess(const aclTensor *x, const aclTensor *
     const aclTensor *blockIdxLastFinal = ensureContiguous(blockIdxLastScheduledToken);
     const aclTensor *initialStateIdxFinal = ensureContiguous(initialStateIdx);
 
-    bool ok = l0op::FusedCausalConv1d(xFinal, weightFinal, convStatesFinal, queryStartLocFinal, cacheIndicesFinal,
-                                      initialStateModeFinal, biasFinal, numAcceptedTokensFinal, numComputedTokensFinal,
-                                      blockIdxFirstFinal, blockIdxLastFinal, initialStateIdxFinal, activationMode,
-                                      padSlotId, runMode, maxQueryLen, residualConnection, blockSize, convMode,
-                                      y, uniqueExecutor.get());
+    bool ok =
+        l0op::FusedCausalConv1d(xFinal, weightFinal, convStatesFinal, queryStartLocFinal, cacheIndicesFinal,
+                                initialStateModeFinal, biasFinal, numAcceptedTokensFinal, numComputedTokensFinal,
+                                blockIdxFirstFinal, blockIdxLastFinal, initialStateIdxFinal, activationMode, padSlotId,
+                                runMode, maxQueryLen, residualConnection, blockSize, convMode, y, uniqueExecutor.get());
     CHECK_RET(ok, ACLNN_ERR_INNER_TILING_ERROR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();

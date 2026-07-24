@@ -37,10 +37,7 @@ public:
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
 
-        this->Output("y")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16})
-            .FormatList({ge::FORMAT_ND});
+        this->Output("y").ParamType(REQUIRED).DataType({ge::DT_FLOAT16, ge::DT_BF16}).FormatList({ge::FORMAT_ND});
 
         OpAICoreConfig config_950;
         config_950.DynamicCompileStaticFlag(true)

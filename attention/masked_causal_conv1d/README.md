@@ -16,7 +16,7 @@
 - 算子功能：对hidden层的token之间进行带mask的因果一维分组卷积操作。
 
 - 计算公式：
-  
+
   假设输入x和输出y的shape是[S, B, H]，卷积权重weight的shape是[W, H]，i和j分别表示S和B轴的索引，那么输出将被表示为：
 
   $$

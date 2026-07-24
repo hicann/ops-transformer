@@ -72,8 +72,8 @@ struct FusedCausalConv1dCutBHTilingData {
     int64_t maxQueryLen;
 
     // ---- dimRemainder（last dim core）相关参数 ----
-    int64_t dimRemainderElems;       // dim % 128，最后一个 dim 核额外处理的余数元素数（0 表示无余数）
-    int64_t lastCoreloopNumDim;      // 最后一个 dim 核的 dim 方向循环次数
+    int64_t dimRemainderElems;  // dim % 128，最后一个 dim 核额外处理的余数元素数（0 表示无余数）
+    int64_t lastCoreloopNumDim; // 最后一个 dim 核的 dim 方向循环次数
     int64_t lastCoreubMainFactorDim; // 最后一个 dim 核的 UB 主块 dim 大小
     int64_t lastCoreubTailFactorDim; // 最后一个 dim 核的 UB 尾块 dim 大小
 };
