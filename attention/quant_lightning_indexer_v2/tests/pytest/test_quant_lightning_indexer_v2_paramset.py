@@ -842,25 +842,34 @@ TEST_PARAMS = {
 # 按需选择要启用的测试参数（例如默认启用所有）
 properties = torch.npu.get_device_properties()
 if "Ascend910_93" in properties.name:
-    ENABLED_PARAMS = [TEST_PARAMS["quant_li_default_a3"]]
+    ENABLED_PARAMSETS = [
+        ("quant_li_default_a3", TEST_PARAMS["quant_li_default_a3"]),
+    ]
 elif "Ascend950" in properties.name:
-    ENABLED_PARAMS = [TEST_PARAMS["quant_li_default_a5_v2"],
-                      TEST_PARAMS["quant_li_default_a5_v3"],
-                      TEST_PARAMS["quant_li_default_a5_v4"],
-                      TEST_PARAMS["quant_li_default_a5_v5"],
-                      TEST_PARAMS["quant_li_default_a5_v6"],
-                      TEST_PARAMS["quant_li_default_a5_v7"],
-                      TEST_PARAMS["quant_li_default_a5_v8"],
-                      # 白盒测试用例
-                      TEST_PARAMS["wb_ld_rv0_bsnd_pa"],
-                      TEST_PARAMS["wb_nold_rv1_bsnd_pa"],
-                      TEST_PARAMS["wb_ld_rv1_tnd_pa"],
-                      TEST_PARAMS["wb_ld_rv1_tnd_tnd"],
-                      TEST_PARAMS["wb_ld_rv1_bsnd_bsnd"],
-                      TEST_PARAMS["wb_ld_rv1_hifp8"],
-                      TEST_PARAMS["wb_ld_rv1_g32"],
-                      TEST_PARAMS["wb_ld_rv1_sparse1"],
-                      TEST_PARAMS["wb_ld_rv1_block16"],
-                      TEST_PARAMS["wb_ld_rv1_block1024"],
-                      TEST_PARAMS["wb_ld_rv1_sparse2048"],
-                      TEST_PARAMS["wb_nold_rv0_bsnd_pa"]]
+    ENABLED_PARAMSETS = [
+        (name, TEST_PARAMS[name])
+        for name in (
+            "quant_li_default_a5_v2",
+            "quant_li_default_a5_v3",
+            "quant_li_default_a5_v4",
+            "quant_li_default_a5_v5",
+            "quant_li_default_a5_v6",
+            "quant_li_default_a5_v7",
+            "quant_li_default_a5_v8",
+            # 白盒测试用例
+            "wb_ld_rv0_bsnd_pa",
+            "wb_nold_rv1_bsnd_pa",
+            "wb_ld_rv1_tnd_pa",
+            "wb_ld_rv1_tnd_tnd",
+            "wb_ld_rv1_bsnd_bsnd",
+            "wb_ld_rv1_hifp8",
+            "wb_ld_rv1_g32",
+            "wb_ld_rv1_sparse1",
+            "wb_ld_rv1_block16",
+            "wb_ld_rv1_block1024",
+            "wb_ld_rv1_sparse2048",
+            "wb_nold_rv0_bsnd_pa",
+        )
+    ]
+
+ENABLED_PARAMS = [params for _, params in ENABLED_PARAMSETS]

@@ -22,8 +22,7 @@ import numpy as np
 import math
 import os
 import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor, as_completed
-import concurrent
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 TEST_INPUT_PATH = "pt_path"
 pt_dir = TEST_INPUT_PATH
 result_path = Path('result.xlsx')  # 或使用传入的result_path
@@ -151,9 +150,9 @@ def liv2(testcase_files):   # 初始化参数和tensor
 def test_liv2(testcase_files):   # 初始化参数和tensor
     if is_isolated_mode:
         # 批量隔离模式：shell 层已通过独立 pytest 进程提供进程隔离，内部使用线程池即可
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        with ThreadPoolExecutor(max_workers=1) as executor:
             futures = executor.submit(liv2, testcase_files)
-            for future in concurrent.futures.as_completed([futures]):
+            for future in as_completed([futures]):
                 try:
                     result = future.result()
                 except Exception as e:
@@ -169,4 +168,3 @@ def test_liv2(testcase_files):   # 初始化参数和tensor
                     result = future.result()
                 except Exception as e:
                     pytest.fail(f"❌ 当前用例子进程执行失败：{e}")
-

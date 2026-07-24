@@ -130,7 +130,7 @@ def test_liv2_process(filepath, device_id=0):
 def test_liv2_process_graph(filepath, device_id=0):
     """
     graph 模式：从 .pt 文件加载 pre-computed tensor，走 torch.compile + torchair 后端执行算子，
-    跳过 liv2_output_single(is_batch=True) 的随机数据重新生成和 CPU golden 重算。
+    跳过 generate_liv2_test_data 的随机数据重新生成和 CPU golden 重算。
     与 eager 模式共用相同的 .pt 数据，仅算子调用路径不同（compile vs eager）。
     """
     import lightning_indexer_v2_acl_graph

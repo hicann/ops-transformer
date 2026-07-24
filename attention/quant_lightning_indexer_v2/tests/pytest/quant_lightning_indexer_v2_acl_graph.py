@@ -52,7 +52,7 @@ class QLIV2Network(nn.Module):
 def _qliv2_prepare_tensors_and_metadata(params, tensor_dict):
     """
     统一处理 tensor 准备和 metadata 构造（共用逻辑）。
-    兼容两个来源：qliv2_output_single(is_batch=True) 返回值(已在NPU) 和 .pt文件加载(在CPU)。
+    兼容两个来源：generate_qliv2_test_data 返回值和 .pt 文件加载，二者都在 CPU。
     """
     qk_dtype = params[10]
 
@@ -174,7 +174,7 @@ def qliv2_output_acl_graph(params):
     graph 模式入口（single 用例使用）：即时生成随机 tensor + CPU golden，再走 torch.compile 执行。
     """
     print("acl_graph")
-    tensor_dict = quant_lightning_indexer_v2_golden.qliv2_output_single(params, is_batch=True)
+    tensor_dict = quant_lightning_indexer_v2_golden.generate_qliv2_test_data(params)
     cpu_result = tensor_dict["cpu_result"]
     topk_value = tensor_dict["topk_value"]
     cpu_topk_value = tensor_dict["cpu_topk_value"]
@@ -188,7 +188,7 @@ def qliv2_output_acl_graph(params):
 def qliv2_output_acl_graph_from_pt(params, tensor_dict):
     """
     graph 模式入口（batch 用例使用）：从 .pt 文件加载 pre-computed tensor，走 torch.compile 执行。
-    跳过 qliv2_output_single(is_batch=True) 的随机数据重新生成和 CPU golden 重算。
+    跳过 generate_qliv2_test_data 的随机数据重新生成和 CPU golden 重算。
     """
     cpu_result = tensor_dict["cpu_result"]
     topk_value = tensor_dict["topk_value"]

@@ -870,9 +870,9 @@ def liv2_output_single(params, is_batch = False, split_s1 = DEFAULT_SPLIT_S1, s1
                 else:
                     for i_n in range(k_head_num):
                         key[cur_block_id, :, i_n, :] = key_expand[i_batch, i_n, block_start_pos:block_start_pos+block_size,:]
-        properties = torch.npu.get_device_properties() 
+        properties = torch.npu.get_device_properties()
         blockFusion = None 
-        if "Ascend950" in properties.name and DISCONTINUOUS_KEYS: 
+        if "Ascend950" in properties.name and DISCONTINUOUS_KEYS:
             key_stride = 10  # 0轴非连续增加stride 
             bytes_per_token = head_dim + key_stride # 整个非连续的长度 
             blockFusion = torch.zeros((block_num, block_size * k_head_num * bytes_per_token), dtype=qk_dtype) 
@@ -974,3 +974,8 @@ def liv2_output_single(params, is_batch = False, split_s1 = DEFAULT_SPLIT_S1, s1
         torch.npu.synchronize()
         npu_topk_value, _ = npu_topk_value.sort(dim=-1, descending=True)
         return cpu_result, npu_result, topk_value, cpu_topk_value, npu_topk_value
+
+
+def generate_liv2_test_data(params, split_s1=DEFAULT_SPLIT_S1, s1size=DEFAULT_S1SIZE):
+    """Generate LI_V2 inputs and CPU golden without executing metadata or the main op."""
+    return liv2_output_single(params, is_batch=True, split_s1=split_s1, s1size=s1size)

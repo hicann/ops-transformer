@@ -11,12 +11,21 @@
 # -----------------------------------------------------------------------------------------------------------
 
 import itertools
+import os
+from pathlib import Path
+
 import torch
 import torch_npu
-from test_quant_lightning_indexer_v2_paramset import ENABLED_PARAMS
+from test_quant_lightning_indexer_v2_paramset import ENABLED_PARAMSETS
 import result_compare_method
 import quant_lightning_indexer_v2_golden
 import pytest
+from batch import quant_lightning_indexer_v2_pt_loadprocess
+from qliv2_test_utils import QliV2ResultWriter, ensure_comparison_passed
+
+
+SAVE_PT_DIR = os.environ.get("QLIV2_SINGLE_SAVE_PT_DIR", "").strip()
+RESULT_PATH = os.environ.get("QLIV2_SINGLE_RESULT_PATH", "").strip()
 
 param_names = [
     "batch_size", "q_seq", "k_seq", "q_t_size", "k_t_size", "q_head_num", "k_head_num","head_dim",
@@ -28,10 +37,17 @@ param_names = [
 ]
 
 param_combinations = []
-for params in ENABLED_PARAMS:
+for paramset_name, params in ENABLED_PARAMSETS:
     param_values = [params.get(name, ["eager"]) for name in param_names]
-    for combo in itertools.product(*param_values):
-        param_combinations.append(dict(zip(param_names, combo)))
+    combinations = list(itertools.product(*param_values))
+    for combo_index, combo in enumerate(combinations, start=1):
+        param_dict = dict(zip(param_names, combo))
+        param_dict["case_name"] = (
+            paramset_name
+            if len(combinations) == 1
+            else f"{paramset_name}_{combo_index:03d}"
+        )
+        param_combinations.append(param_dict)
 
 
 @pytest.mark.ci
@@ -69,7 +85,7 @@ def test_qliv2(param_combinations):   # Init params and tensors
     cmp_ratio = param_combinations['cmp_ratio']
     return_value = param_combinations['return_value']
     output_idx_offset = param_combinations['output_idx_offset']
-    run_mode = param_combinations['run_mode']
+    run_mode = os.environ.get("QLIV2_RUN_MODE", param_combinations['run_mode']).strip().lower()
     torch_npu.npu.set_device(0)
     test_data = batch_size, q_seq, k_seq, q_t_size, k_t_size, q_head_num, k_head_num, head_dim, block_size,\
                 block_num, qk_dtype, dequant_dtype, actual_seq_dtype, cu_seqlens_q, cu_seqlens_k, seqused_q,\
@@ -77,12 +93,35 @@ def test_qliv2(param_combinations):   # Init params and tensors
                 sparse_mode, query_datarange, key_datarange, weights_datarange, q_scale_datarange,\
                 k_scale_datarange, cmp_ratio, return_value, output_idx_offset
 
-    # Get CPU golden and NPU result
-    if run_mode == "eager":
-        cpu_result, npu_result, topk_value, cpu_topk_value, npu_topk_value = quant_lightning_indexer_v2_golden.qliv2_output_single(test_data)
+    case_name = QliV2ResultWriter.case_name(
+        test_data,
+        explicit_name=param_combinations["case_name"],
+    )
+    if SAVE_PT_DIR:
+        case_data = quant_lightning_indexer_v2_golden.generate_qliv2_test_data(test_data)
+        case_path = Path(SAVE_PT_DIR) / f"{case_name}.pt"
+        case_path.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(case_data, case_path)
+        print(f"当前用例 PT 已保存: {case_path}")
+        if run_mode == "eager":
+            cpu_result, npu_result, topk_value, cpu_topk_value, npu_topk_value, \
+                output_idx_offset, _ = quant_lightning_indexer_v2_pt_loadprocess.test_qliv2_process(
+                    case_path, device_id=0
+                )
+        elif run_mode == "graph":
+            cpu_result, npu_result, topk_value, cpu_topk_value, npu_topk_value, \
+                output_idx_offset, _ = quant_lightning_indexer_v2_pt_loadprocess.test_qliv2_process_graph(
+                    case_path, device_id=0
+                )
+        else:
+            raise ValueError(f"unsupported run_mode: {run_mode}")
+    elif run_mode == "eager":
+        cpu_result, npu_result, topk_value, cpu_topk_value, npu_topk_value = \
+            quant_lightning_indexer_v2_golden.qliv2_output_single(test_data)
     elif run_mode == "graph":
         import quant_lightning_indexer_v2_acl_graph
-        cpu_result, npu_result, topk_value, cpu_topk_value, npu_topk_value = quant_lightning_indexer_v2_acl_graph.qliv2_output_acl_graph(test_data)
+        cpu_result, npu_result, topk_value, cpu_topk_value, npu_topk_value = \
+            quant_lightning_indexer_v2_acl_graph.qliv2_output_acl_graph(test_data)
     else:
         raise ValueError(f"unsupported run_mode: {run_mode}")
     # print("npu_result", npu_result)
@@ -91,7 +130,29 @@ def test_qliv2(param_combinations):   # Init params and tensors
     result, fulfill_percent = result_compare_method.check_result(cpu_result, npu_result, topk_value, output_idx_offset, test_data, cpu_topk_value, npu_topk_value)
     print("result", result)
     print("result", fulfill_percent)
+    result_return_value = "N/A"
+    fulfill_precent_return_value = 0
     if return_value:
         result_return_value, fulfill_precent_return_value = result_compare_method.check_result_return_value(cpu_topk_value, npu_topk_value, test_data)
         print(f"result_return_value: {result_return_value}")
         print(f"result_return_value: {fulfill_precent_return_value}")
+
+    if RESULT_PATH:
+        row = QliV2ResultWriter.row(
+            case_name,
+            test_data,
+            result,
+            fulfill_percent,
+            result_return_value,
+            fulfill_precent_return_value,
+        )
+        QliV2ResultWriter.append(RESULT_PATH, row)
+        print(f"当前用例结果已写入: {RESULT_PATH}")
+
+    ensure_comparison_passed(
+        case_name,
+        result,
+        fulfill_percent,
+        result_return_value,
+        fulfill_precent_return_value,
+    )

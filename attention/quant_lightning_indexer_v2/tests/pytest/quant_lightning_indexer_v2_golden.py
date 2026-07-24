@@ -1283,6 +1283,11 @@ def qliv2_output_single(params, is_batch = False, split_s1 = DEFAULT_SPLIT_S1, s
         torch.npu.synchronize()
         npu_topk_value, _ = npu_topk_value.sort(dim=-1, descending=True)
         return cpu_result, npu_result, topk_value, cpu_topk_value, npu_topk_value
+
+
+def generate_qliv2_test_data(params, split_s1=DEFAULT_SPLIT_S1, s1size=DEFAULT_S1SIZE):
+    """Generate QLI_V2 inputs and CPU golden without executing metadata or the main op."""
+    return qliv2_output_single(params, is_batch=True, split_s1=split_s1, s1size=s1size)
     
 
 def fp32_ta_round_to_hif8(fraction32_int, hif8_bits_num, exponent):

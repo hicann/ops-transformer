@@ -12,7 +12,7 @@
 
 import os
 from functools import partial
-from lightning_indexer_v2_golden import *
+from lightning_indexer_v2_golden import generate_liv2_test_data
 import pandas as pd
 import numpy as np
 import torch
@@ -116,7 +116,7 @@ def save_test_case(test_cases, file_path):
     for idx, case in enumerate(test_cases):
         try:
             case_name = case[0]
-            output_tensors = liv2_output_single(case[1:], True)
+            output_tensors = generate_liv2_test_data(case[1:])
             # 生成文件名
             input_filename = f"{case_name}.pt"
             input_filepath = os.path.join(file_path, input_filename)
@@ -142,4 +142,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
