@@ -560,8 +560,6 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorFormat(const gert::TilingCont
         OP_LOGE_FOR_INVALID_FORMAT(nodeName, "epRecvCounts", fmtStr.c_str(), "ND");
         return false;
     }
-
-
     return true;
 }
 
