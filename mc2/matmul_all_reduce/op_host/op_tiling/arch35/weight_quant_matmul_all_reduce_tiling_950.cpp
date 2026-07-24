@@ -17,7 +17,7 @@
 
 #include "weight_quant_matmul_all_reduce_tiling_950.h"
 #include "common/utils/op_mc2.h"
-#include "mc2/matmul_all_reduce/op_kernel/matmul_all_reduce_apt_tiling_key.h"
+#include "mc2/matmul_all_reduce/op_kernel/arch35/matmul_all_reduce_apt_tiling_key.h"
 #include "all_reduce_fit_balance_tiling.h"
 #include "mc2_comm_utils.h"
 

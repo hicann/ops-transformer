@@ -22,8 +22,8 @@
 #endif
 #include "../common.h"
 #include "matmul_all_reduce_add_x3.h"
-#include "weight_quant_matmul_all_reduce_tiling_data.h"
-#include "unquant_matmul_all_reduce_tiling_data.h"
+#include "../weight_quant_matmul_all_reduce_tiling_data.h"
+#include "../unquant_matmul_all_reduce_tiling_data.h"
 
 constexpr uint32_t EMPTY_TENSOR_BIAS_UB_FACTOR = 1;
 

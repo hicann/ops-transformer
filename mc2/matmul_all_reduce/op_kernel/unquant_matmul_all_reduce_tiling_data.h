@@ -19,8 +19,8 @@
 #include "kernel_tiling/kernel_tiling.h"
 
 #ifdef __CCE_KT_TEST__
-#include "../../../common/op_kernel/mc2_tiling_struct.h"
-#include "../../../3rd/mat_mul_v3/op_kernel/mat_mul_v3_tiling_data.h"
+#include "../../common/op_kernel/mc2_tiling_struct.h"
+#include "../../3rd/mat_mul_v3/op_kernel/mat_mul_v3_tiling_data.h"
 #else
 #include "../../common/op_kernel/mc2_tiling_struct.h"
 #include "../../3rd/mat_mul_v3/op_kernel/mat_mul_v3_tiling_data.h"

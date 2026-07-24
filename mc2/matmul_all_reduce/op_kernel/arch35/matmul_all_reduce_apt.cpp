@@ -21,7 +21,7 @@
 #include "lib/matmul_intf.h"
 #include "../common.h"
 #include "matmul_all_reduce_empty_tensor_k_general.h"
-#include "../matmul_all_reduce_apt_tiling_key.h"
+#include "matmul_all_reduce_apt_tiling_key.h"
 
 // david非量化
 #if ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && ((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16)))

@@ -17,9 +17,9 @@
 #define MATMUL_ALL_REDUCE_TILING_KEY_H
 
 #include "ascendc/host_api/tiling/template_argument.h"
-#include "arch22/quant_matmul_all_reduce_tiling_data.h"
-#include "arch22/unquant_matmul_all_reduce_tiling_data.h"
-#include "arch22/weight_quant_matmul_all_reduce_tiling_data.h"
+#include "quant_matmul_all_reduce_tiling_data.h"
+#include "unquant_matmul_all_reduce_tiling_data.h"
+#include "weight_quant_matmul_all_reduce_tiling_data.h"
 
 // AICORE_TYPE
 #define ASCEND_910B 0

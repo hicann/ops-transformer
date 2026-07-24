@@ -23,7 +23,7 @@
 #include "../matmul_all_reduce_tiling_key.h"
 
 #ifdef MC2_QUANT
-#include "quant_matmul_all_reduce_tiling_data.h"
+#include "../quant_matmul_all_reduce_tiling_data.h"
 #include "matmul_all_reduce_quant.h"
 #include "matmul_all_reduce_quant_pertoken_comm_int8.h"
 #ifdef MC2_QUANT_FP16
@@ -35,10 +35,10 @@
 #include "matmul_all_reduce_empty_tensor_k_general.h"
 #ifdef MC2_WEIGHT_QUANT
 #include "matmul_all_reduce_weight_quant.h"
-#include "weight_quant_matmul_all_reduce_tiling_data.h"
+#include "../weight_quant_matmul_all_reduce_tiling_data.h"
 #else // 非量化
 #include "matmul_all_reduce_910_general.h"
-#include "unquant_matmul_all_reduce_tiling_data.h"
+#include "../unquant_matmul_all_reduce_tiling_data.h"
 #endif // MC2_WEIGHT_QUANT
 #endif // MC2_QUANT
 

@@ -20,7 +20,7 @@
 #include <cstring>
 
 #include "kernel_tiling/kernel_tiling.h"
-#include "../../../op_kernel/arch22/weight_quant_matmul_all_reduce_tiling_data.h"
+#include "../../../op_kernel/weight_quant_matmul_all_reduce_tiling_data.h"
 #ifdef __CCE_KT_TEST__
 #include "kernel_operator.h"
 #endif

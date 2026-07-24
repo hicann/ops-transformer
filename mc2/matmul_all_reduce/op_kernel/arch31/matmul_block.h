@@ -14,7 +14,7 @@
  */
 #ifndef MC2_MATMUL_BLOCK_H
 #define MC2_MATMUL_BLOCK_H
-#include "../arch22/unquant_matmul_all_reduce_tiling_data.h"
+#include "../unquant_matmul_all_reduce_tiling_data.h"
 
 namespace AscendC {
 

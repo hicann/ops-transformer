@@ -17,7 +17,7 @@
 #define MATMUL_ALL_REDUCE_APT_TILING_KEY_H
 
 #include "ascendc/host_api/tiling/template_argument.h"
-#include "arch35/matmul_all_reduce_tiling_struct_ar35.h"
+#include "matmul_all_reduce_tiling_struct_ar35.h"
 // APT_MM_TYPE
 #define MMTYPE_FP_NULL_TENSOR 0
 #define MMTYPE_FP_MM 1

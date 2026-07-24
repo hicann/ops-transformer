@@ -22,7 +22,7 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "weight_quant_batch_matmul_v2_tiling.h"
 #include "quant_batch_matmul_v3_tiling_def.h"
-#include "../../../op_kernel/arch22/unquant_matmul_all_reduce_tiling_data.h"
+#include "../../../op_kernel/unquant_matmul_all_reduce_tiling_data.h"
 #if __has_include("../../../../common/utils/hccl_stub.h")
 #include "../../../../../tests/ut/framework_normal/common/hccl_stub.h"
 #endif

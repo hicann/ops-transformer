@@ -23,9 +23,9 @@
 #include "lib/matmul_intf.h"
 #include "../common.h"
 #include "matmul_all_reduce_add_x3.h"
-#include "unquant_matmul_all_reduce_tiling_data.h"
-#include "weight_quant_matmul_all_reduce_tiling_data.h"
-#include "quant_matmul_all_reduce_tiling_data.h"
+#include "../unquant_matmul_all_reduce_tiling_data.h"
+#include "../weight_quant_matmul_all_reduce_tiling_data.h"
+#include "../quant_matmul_all_reduce_tiling_data.h"
 
 namespace MatmulAllReduceImpl {
 using namespace AscendC;

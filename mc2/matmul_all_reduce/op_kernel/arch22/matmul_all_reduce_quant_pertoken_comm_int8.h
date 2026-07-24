@@ -32,7 +32,7 @@
 #include "matmul_all_reduce_quant_perchannel.h"
 #include "matmul_all_reduce_dequant_perchannel.h"
 #include "matmul_all_reduce_quant_reduce_sum.h"
-#include "quant_matmul_all_reduce_tiling_data.h"
+#include "../quant_matmul_all_reduce_tiling_data.h"
 
 constexpr uint32_t MAX_HANDLE_ID_NUM = 16;
 constexpr uint32_t NUM_TWO_PERTOKEN = 2;

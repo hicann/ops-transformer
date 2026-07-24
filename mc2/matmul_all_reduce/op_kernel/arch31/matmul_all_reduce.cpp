@@ -31,14 +31,14 @@
 #include "matmul_all_reduce_quant_bmm.h"
 // 310p归一化weightNZ非量化
 #elif (ORIG_DTYPE_X1 != DT_INT8 && ORIG_DTYPE_X2 != DT_INT8 && FORMAT_X2 != FORMAT_ND)
-#include "../arch22/unquant_matmul_all_reduce_tiling_data.h" // 300I DUO复用A2 tilingData
+#include "../unquant_matmul_all_reduce_tiling_data.h" // 300I DUO复用A2 tilingData
 #include "matmul_all_reduce_unquant_310.h"
 // 310p weightNZ伪量化
 #elif (ORIG_DTYPE_X1 != DT_INT8 && (ORIG_DTYPE_X2 == DT_INT8) && FORMAT_X2 != FORMAT_ND)
-#include "../arch22/weight_quant_matmul_all_reduce_tiling_data.h" // 300I DUO复用A2 tilingData
+#include "../weight_quant_matmul_all_reduce_tiling_data.h" // 300I DUO复用A2 tilingData
 #include "matmul_all_reduce_weight_quant_310.h"
 #else
-#include "../arch22/quant_matmul_all_reduce_tiling_data.h" // 300I DUO复用A2 tilingData
+#include "../quant_matmul_all_reduce_tiling_data.h" // 300I DUO复用A2 tilingData
 #include "matmul_all_reduce_310_general.h"
 #endif // ORIG_DTYPE_X1 == DT_INT8 && ORIG_DTYPE_X2 == DT_INT8
 

@@ -28,7 +28,7 @@
 #endif
 #include "mm_allreduce.h"
 #include "../../../3rd/weight_quant_batch_matmul_v2/op_kernel/weight_quant_batch_matmul_v2_weight_nz_performance.h"
-#include "../arch22/weight_quant_matmul_all_reduce_tiling_data.h"
+#include "../weight_quant_matmul_all_reduce_tiling_data.h"
 
 namespace MatmulAllReduceImpl {
 using namespace AscendC;

@@ -16,7 +16,7 @@
 #define WEIGHT_QUANT_MATMUL_ALL_REDUCE_TILING_H
 #include "../matmul_all_reduce_tiling_base.h"
 #include "../../../op_kernel/matmul_all_reduce_tiling_key.h"
-#include "../../../op_kernel/arch22/weight_quant_matmul_all_reduce_tiling_data.h"
+#include "../../../op_kernel/weight_quant_matmul_all_reduce_tiling_data.h"
 #include "weight_quant_batch_matmul_v2/op_host/op_tiling/weight_quant_batch_matmul_v2_tiling_custom.h"
 
 namespace optiling {

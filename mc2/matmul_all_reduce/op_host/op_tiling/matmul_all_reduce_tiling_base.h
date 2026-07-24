@@ -31,10 +31,9 @@
 #include "context_transfer.h"
 #include "op_host/tiling_base.h"
 #include "op_host/tiling_templates_registry.h"
-#include "../../op_kernel/arch22/unquant_matmul_all_reduce_tiling_data.h"
-#include "../../op_kernel/arch22/weight_quant_matmul_all_reduce_tiling_data.h"
-#include "../../op_kernel/arch22/quant_matmul_all_reduce_tiling_data.h"
-#include "../../op_kernel/arch35/matmul_all_reduce_tiling_struct_ar35.h"
+#include "../../op_kernel/unquant_matmul_all_reduce_tiling_data.h"
+#include "../../op_kernel/weight_quant_matmul_all_reduce_tiling_data.h"
+#include "../../op_kernel/quant_matmul_all_reduce_tiling_data.h"
 
 namespace optiling {
 

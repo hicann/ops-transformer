@@ -20,7 +20,7 @@
 #include <cstring>
 
 #include "kernel_tiling/kernel_tiling.h"
-#include "../../../op_kernel/arch22/quant_matmul_all_reduce_tiling_data.h"
+#include "../../../op_kernel/quant_matmul_all_reduce_tiling_data.h"
 
 constexpr uint16_t MAX_TENSOR_CONT = 256;
 constexpr uint16_t MAX_CORE_CONT = 64;
