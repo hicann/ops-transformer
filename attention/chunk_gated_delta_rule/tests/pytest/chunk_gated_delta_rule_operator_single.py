@@ -28,7 +28,7 @@ def run_precision_test(params, pt_path=""):
         is_contiguous,
     ) = params
     print(f"params = {params}")
-    run_chunk_gated_delta_rule_eager(
+    ret = run_chunk_gated_delta_rule_eager(
         B,
         seqlen,
         nk,
@@ -42,3 +42,4 @@ def run_precision_test(params, pt_path=""):
         is_contiguous=is_contiguous,
         pt_path=pt_path,
     )
+    assert ret, "precision check failed"

@@ -574,7 +574,6 @@ def run_chunk_gated_delta_rule_eager(
         )
         ret = False
 
-    print("PASSED" if ret else "FAILED")
     return ret
 
 

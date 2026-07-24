@@ -65,6 +65,10 @@ def pytest_runtest_makereport(item, call):
     _RESULT_ROWS.append(row)
 
 
+def pytest_runtest_logfinish(nodeid, location):
+    print(flush=True)
+
+
 def pytest_sessionfinish(session, exitstatus):
     csv_file = os.environ.get("CSV_FILE", "")
     if not csv_file or not _RESULT_ROWS:
