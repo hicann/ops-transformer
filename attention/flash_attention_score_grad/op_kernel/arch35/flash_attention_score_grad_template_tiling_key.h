@@ -36,9 +36,9 @@ using FagTilingWithTemplateFFTT =
 using FagTilingWithTemplateFFTF =
     optiling::fag::FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<false, false, true, false>;
 using FagSmallSDTilingWithTemplateFFFF =
-    optiling::fag::FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<false, false, false, false, true>;
+    optiling::fag::SmallSDTilingDataRegbase;
 using FagSmallSDTilingWithTemplateFFTF =
-    optiling::fag::FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<false, false, true, false, true>;
+    optiling::fag::SmallSDTilingDataRegbase;
 
 using FagTilingWithTemplateTFFF =
     optiling::fag::FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<true, false, false, false>;

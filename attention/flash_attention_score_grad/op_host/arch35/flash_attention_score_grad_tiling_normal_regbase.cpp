@@ -1890,41 +1890,14 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::InitSmallSDTilingDat
             OP_LOGE("InitSmallSDTilingData", "Get SmallSD TND tiling data failed.");
             return ge::GRAPH_FAILED;
         }
-        tilingData->s1s2BNGS1S2BaseParams.set_enablePreSfmg(false);
-        tilingData->s1s2BNGS1S2BaseParams.set_sinkOptional(EMPTY_TENSOR);
-        tilingData->postTilingData.set_dqWorkSpaceOffset(0);
-        tilingData->postTilingData.set_dkWorkSpaceOffset(0);
-        tilingData->postTilingData.set_dvWorkSpaceOffset(0);
-        tilingData->postTilingData.set_dropMaskGmOffset(0);
-        tilingData->postTilingData.set_sfmgWorkSpaceOffset(0);
-        tilingData->postTilingData.set_dsinkWorkSpaceOffset(0);
-        s1s2BNGS1S2BaseParams_ = &tilingData->s1s2BNGS1S2BaseParams;
-        s1s2BNGS1S2SplitCoreParams_ = &tilingData->s1s2BNGS1S2SplitCoreParams;
-        s1s2BNGS1S2BlockNumList_ = &tilingData->s1s2BNGS1S2BlockNumList;
-        preTilingData_ = &tilingData->preTilingData;
-        postTilingData_ = &tilingData->postTilingData;
-        tndParam_ = &tilingData->tndParam;
-        smallSDTilingData_ = &tilingData->smallSDTilingData;
+        smallSDTilingData_ = tilingData;
     } else {
         auto *tilingData = this->context_->GetTilingData<FagSmallSDTilingWithTemplateFFFF>();
         if (tilingData == nullptr) {
             OP_LOGE("InitSmallSDTilingData", "Get SmallSD base tiling data failed.");
             return ge::GRAPH_FAILED;
         }
-        tilingData->s1s2BNGS1S2BaseParams.set_enablePreSfmg(false);
-        tilingData->s1s2BNGS1S2BaseParams.set_sinkOptional(EMPTY_TENSOR);
-        tilingData->postTilingData.set_dqWorkSpaceOffset(0);
-        tilingData->postTilingData.set_dkWorkSpaceOffset(0);
-        tilingData->postTilingData.set_dvWorkSpaceOffset(0);
-        tilingData->postTilingData.set_dropMaskGmOffset(0);
-        tilingData->postTilingData.set_sfmgWorkSpaceOffset(0);
-        tilingData->postTilingData.set_dsinkWorkSpaceOffset(0);
-        s1s2BNGS1S2BaseParams_ = &tilingData->s1s2BNGS1S2BaseParams;
-        s1s2BNGS1S2SplitCoreParams_ = &tilingData->s1s2BNGS1S2SplitCoreParams;
-        s1s2BNGS1S2BlockNumList_ = &tilingData->s1s2BNGS1S2BlockNumList;
-        preTilingData_ = &tilingData->preTilingData;
-        postTilingData_ = &tilingData->postTilingData;
-        smallSDTilingData_ = &tilingData->smallSDTilingData;
+        smallSDTilingData_ = tilingData;
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -2019,10 +1992,67 @@ void FlashAttentionScoreGradTilingNormalRegbase::ClearSmallSDScratch()
     baseParam.set_workspaceSize(0);
     baseParam.set_scaleValue(0.0f);
 
+    auto &layoutParam = smallSDTilingDataScratch_.layoutParam;
+    layoutParam.qStrideB = 0;
+    layoutParam.qStrideN2 = 0;
+    layoutParam.qStrideS = 0;
+    layoutParam.kStrideB = 0;
+    layoutParam.kStrideN2 = 0;
+    layoutParam.kStrideS = 0;
+    layoutParam.vStrideB = 0;
+    layoutParam.vStrideN2 = 0;
+    layoutParam.vStrideS = 0;
+    layoutParam.dyStrideB = 0;
+    layoutParam.dyStrideN2 = 0;
+    layoutParam.dyStrideS = 0;
+    layoutParam.dqStrideB = 0;
+    layoutParam.dqStrideN2 = 0;
+    layoutParam.dqStrideS = 0;
+    layoutParam.dkStrideB = 0;
+    layoutParam.dkStrideN2 = 0;
+    layoutParam.dkStrideS = 0;
+    layoutParam.dvStrideB = 0;
+    layoutParam.dvStrideN2 = 0;
+    layoutParam.dvStrideS = 0;
+    layoutParam.attentionStrideB = 0;
+    layoutParam.attentionStrideN2 = 0;
+    layoutParam.attentionStrideS = 0;
+    layoutParam.softmaxStrideB = 0;
+    layoutParam.softmaxStrideN2 = 0;
+    layoutParam.softmaxStrideS = 0;
+    layoutParam.qMatrixElements = 0;
+    layoutParam.kMatrixElements = 0;
+    layoutParam.vMatrixElements = 0;
+    layoutParam.dyMatrixElements = 0;
+    layoutParam.dqMatrixElements = 0;
+    layoutParam.dkMatrixElements = 0;
+    layoutParam.dvMatrixElements = 0;
+    layoutParam.cubeResultElements = 0;
+    layoutParam.vectorTempElements = 0;
+    layoutParam.qMatrixBytes = 0;
+    layoutParam.kMatrixBytes = 0;
+    layoutParam.vMatrixBytes = 0;
+    layoutParam.dyMatrixBytes = 0;
+    layoutParam.dqMatrixBytes = 0;
+    layoutParam.dkMatrixBytes = 0;
+    layoutParam.dvMatrixBytes = 0;
+    layoutParam.cubeResultBytes = 0;
+    layoutParam.vectorTempBytes = 0;
+    layoutParam.dTemplateCapacity = 0;
+    layoutParam.s1Size = 0;
+    layoutParam.s2Size = 0;
+    layoutParam.s2Align16 = 0;
+    layoutParam.aivHalfS1 = 0;
+    layoutParam.aivFirstHalfS1 = 0;
+    layoutParam.aivHalfS2 = 0;
+    layoutParam.aivFirstHalfS2 = 0;
+
     for (uint32_t coreIdx = 0; coreIdx < MAX_CORE_NUM; ++coreIdx) {
         smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_blockStart(0);
         smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_blockEnd(0);
         smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_groupCount(0);
+        smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_startBatchIdx(0);
+        smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_startN2Idx(0);
         smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_reserved(0);
         smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_startBatchIdx(0);
         smallSDTilingDataScratch_.tndCoreParam[coreIdx].set_startN2Idx(0);
@@ -2121,6 +2151,10 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::BuildSmallSDCoreRang
         smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_blockStart(blockStart);
         smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_blockEnd(blockEnd);
         smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_groupCount(groupCount);
+        smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_startBatchIdx(
+            fBaseParams.n2 == 0 ? 0 : blockStart / static_cast<uint32_t>(fBaseParams.n2));
+        smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_startN2Idx(
+            fBaseParams.n2 == 0 ? 0 : blockStart % static_cast<uint32_t>(fBaseParams.n2));
         smallSDTilingDataScratch_.coreTaskParam[coreIdx].set_reserved(0);
         if (coreIdx < CORE_LIST_NUM) {
             fBaseParams.blockStarts[coreIdx] = blockStart;
@@ -2243,6 +2277,111 @@ void FlashAttentionScoreGradTilingNormalRegbase::FillSmallSDBaseParam()
     baseParam.set_workspaceBaseOffset(RESERVED_WORKSPACE_SIZE);
     baseParam.set_workspaceSize(static_cast<uint64_t>(smallSDWorkspaceSize_));
     baseParam.set_scaleValue(fBaseParams.scaleValue);
+
+    auto &layoutParam = smallSDTilingDataScratch_.layoutParam;
+    const uint64_t b = static_cast<uint64_t>(fBaseParams.b);
+    const uint64_t n2 = static_cast<uint64_t>(fBaseParams.n2);
+    const uint64_t g = static_cast<uint64_t>(fBaseParams.g);
+    const uint64_t s1 = static_cast<uint64_t>(fBaseParams.s1);
+    const uint64_t s2 = static_cast<uint64_t>(fBaseParams.s2);
+    const uint64_t d = static_cast<uint64_t>(fBaseParams.d);
+    const uint64_t dv = static_cast<uint64_t>(fBaseParams.d1);
+    const uint64_t n2G = n2 * g;
+    const uint64_t gD = g * d;
+    const uint64_t s1D = s1 * d;
+    const uint64_t s2D = s2 * d;
+    const uint64_t s2Dv = s2 * dv;
+    const uint64_t inputElemBytes = static_cast<uint64_t>(sizeof(uint16_t));
+    const uint64_t calcElemBytes = static_cast<uint64_t>(sizeof(float));
+    const uint64_t outputElemBytes = static_cast<uint64_t>(sizeof(uint16_t));
+
+    if (fBaseParams.layoutType == INPUT_FORMAT_TND) {
+        layoutParam.qStrideB = 0;
+        layoutParam.qStrideN2 = gD;
+        layoutParam.qStrideS = n2G * d;
+        layoutParam.kStrideB = 0;
+        layoutParam.kStrideN2 = d;
+        layoutParam.kStrideS = n2 * d;
+        layoutParam.vStrideB = 0;
+        layoutParam.vStrideN2 = dv;
+        layoutParam.vStrideS = n2 * dv;
+    } else if (fBaseParams.layoutType == INPUT_FORMAT_BN2GS2D) {
+        layoutParam.qStrideB = n2G * s1D;
+        layoutParam.qStrideN2 = g * s1D;
+        layoutParam.qStrideS = d;
+        layoutParam.kStrideB = n2 * s2D;
+        layoutParam.kStrideN2 = s2D;
+        layoutParam.kStrideS = d;
+        layoutParam.vStrideB = n2 * s2Dv;
+        layoutParam.vStrideN2 = s2Dv;
+        layoutParam.vStrideS = dv;
+    } else if (fBaseParams.layoutType == INPUT_FORMAT_S2BN2GD) {
+        layoutParam.qStrideB = n2G * d;
+        layoutParam.qStrideN2 = gD;
+        layoutParam.qStrideS = b * n2G * d;
+        layoutParam.kStrideB = n2 * d;
+        layoutParam.kStrideN2 = d;
+        layoutParam.kStrideS = b * n2 * d;
+        layoutParam.vStrideB = n2 * dv;
+        layoutParam.vStrideN2 = dv;
+        layoutParam.vStrideS = b * n2 * dv;
+    } else {
+        layoutParam.qStrideB = n2G * s1D;
+        layoutParam.qStrideN2 = gD;
+        layoutParam.qStrideS = n2G * d;
+        layoutParam.kStrideB = n2 * s2D;
+        layoutParam.kStrideN2 = d;
+        layoutParam.kStrideS = n2 * d;
+        layoutParam.vStrideB = n2 * s2Dv;
+        layoutParam.vStrideN2 = dv;
+        layoutParam.vStrideS = n2 * dv;
+    }
+    layoutParam.dyStrideB = layoutParam.qStrideB;
+    layoutParam.dyStrideN2 = layoutParam.qStrideN2;
+    layoutParam.dyStrideS = layoutParam.qStrideS;
+    layoutParam.dqStrideB = layoutParam.qStrideB;
+    layoutParam.dqStrideN2 = layoutParam.qStrideN2;
+    layoutParam.dqStrideS = layoutParam.qStrideS;
+    layoutParam.dkStrideB = layoutParam.kStrideB;
+    layoutParam.dkStrideN2 = layoutParam.kStrideN2;
+    layoutParam.dkStrideS = layoutParam.kStrideS;
+    layoutParam.dvStrideB = layoutParam.vStrideB;
+    layoutParam.dvStrideN2 = layoutParam.vStrideN2;
+    layoutParam.dvStrideS = layoutParam.vStrideS;
+    layoutParam.attentionStrideB = n2 * s1 * s2;
+    layoutParam.attentionStrideN2 = s1 * s2;
+    layoutParam.attentionStrideS = s2;
+    layoutParam.softmaxStrideB = n2 * s1;
+    layoutParam.softmaxStrideN2 = s1;
+    layoutParam.softmaxStrideS = 1;
+    layoutParam.qMatrixElements = s1 * d;
+    layoutParam.kMatrixElements = s2 * d;
+    layoutParam.vMatrixElements = s2 * dv;
+    layoutParam.dyMatrixElements = s1 * d;
+    layoutParam.dqMatrixElements = s1 * d;
+    layoutParam.dkMatrixElements = s2 * d;
+    layoutParam.dvMatrixElements = s2 * dv;
+    layoutParam.cubeResultElements = s1 * s2;
+    layoutParam.vectorTempElements = s1 * s2;
+    layoutParam.qMatrixBytes = layoutParam.qMatrixElements * inputElemBytes;
+    layoutParam.kMatrixBytes = layoutParam.kMatrixElements * inputElemBytes;
+    layoutParam.vMatrixBytes = layoutParam.vMatrixElements * inputElemBytes;
+    layoutParam.dyMatrixBytes = layoutParam.dyMatrixElements * inputElemBytes;
+    layoutParam.dqMatrixBytes = layoutParam.dqMatrixElements * outputElemBytes;
+    layoutParam.dkMatrixBytes = layoutParam.dkMatrixElements * outputElemBytes;
+    layoutParam.dvMatrixBytes = layoutParam.dvMatrixElements * outputElemBytes;
+    layoutParam.cubeResultBytes = layoutParam.cubeResultElements * calcElemBytes;
+    layoutParam.vectorTempBytes = layoutParam.vectorTempElements * calcElemBytes;
+    layoutParam.dTemplateCapacity = static_cast<uint32_t>(
+        fBaseParams.d <= static_cast<int64_t>(ConstAxisTemplateNum::NUM64) ?
+            ConstAxisTemplateNum::NUM64 : ConstAxisTemplateNum::NUM128);
+    layoutParam.s1Size = static_cast<uint32_t>(s1);
+    layoutParam.s2Size = static_cast<uint32_t>(s2);
+    layoutParam.s2Align16 = static_cast<uint32_t>(AlignTo<int64_t>(fBaseParams.s2, FP16_C0_SIZE));
+    layoutParam.aivFirstHalfS1 = static_cast<uint32_t>((fBaseParams.s1 + 1) >> 1);
+    layoutParam.aivHalfS1 = layoutParam.aivFirstHalfS1;
+    layoutParam.aivFirstHalfS2 = static_cast<uint32_t>((fBaseParams.s2 + 1) >> 1);
+    layoutParam.aivHalfS2 = layoutParam.aivFirstHalfS2;
 }
 
 void FlashAttentionScoreGradTilingNormalRegbase::SetSmallSDWorkspace()
@@ -2279,12 +2418,15 @@ bool FlashAttentionScoreGradTilingNormalRegbase::ValidateSmallSDInvariant() cons
         if (coreIdx < smallSDUsedCoreNum_) {
             if (coreParam.get_blockStart() != expectedStart || coreParam.get_blockEnd() <= coreParam.get_blockStart() ||
                 coreParam.get_blockEnd() > smallSDValidTaskCount_ ||
-                coreParam.get_groupCount() != coreParam.get_blockEnd() - coreParam.get_blockStart()) {
+                coreParam.get_groupCount() != coreParam.get_blockEnd() - coreParam.get_blockStart() ||
+                coreParam.get_startBatchIdx() != coreParam.get_blockStart() / static_cast<uint32_t>(fBaseParams.n2) ||
+                coreParam.get_startN2Idx() != coreParam.get_blockStart() % static_cast<uint32_t>(fBaseParams.n2)) {
                 return false;
             }
             expectedStart = coreParam.get_blockEnd();
         } else if (coreParam.get_blockStart() != 0 || coreParam.get_blockEnd() != 0 ||
-                   coreParam.get_groupCount() != 0) {
+                   coreParam.get_groupCount() != 0 || coreParam.get_startBatchIdx() != 0 ||
+                   coreParam.get_startN2Idx() != 0) {
             return false;
         }
     }

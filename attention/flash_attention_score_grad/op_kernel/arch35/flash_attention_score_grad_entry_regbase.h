@@ -217,9 +217,11 @@ using namespace AscendC::MicroAPI;
         using VecBlockType = FagBaseApi::SmallSDVectorBlock<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND,                   \
                                                             static_cast<uint32_t>(dTemplateType)>;                     \
         FagBaseApi::FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType> op;                             \
+        const __gm__ SmallSDTilingDataRegbase *__restrict smallSDTilingData =                                          \
+            (const __gm__ SmallSDTilingDataRegbase *__restrict)(tilingData);                                           \
         op.Init(key, value, dy, query, pse_shift, drop_mask, atten_mask, attention_in, softmax_max, softmax_sum,       \
                 prefix, actual_seq_qlen, actual_seq_kvlen, deqScaleQ, deqScaleK, deqScaleV, deqScaleDy, queryRope,     \
-                keyRope, sink, dq, dk, dv, dpse, dqRope, dkRope, dsink, user, tilingData, &pipeBase);                  \
+                keyRope, sink, dq, dk, dv, dpse, dqRope, dkRope, dsink, user, smallSDTilingData, &pipeBase);           \
         op.Process();                                                                                                  \
         pipeBase.Destroy();                                                                                            \
     } while (0)
@@ -248,9 +250,8 @@ RegbaseFAG(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __
     constexpr static bool needDeterPrefix = NEED_DETER_PREFIX(deterType, isTnd);
     using fagTiling = FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<NEED_DETER(deterType),
         needDeterPrefix, isTnd, isTndSwizzle, isSmallSD>;
-    size_t offset = (size_t)(&((fagTiling *)0)->s1s2BNGS1S2BaseParams);
 
-    const __gm__ fagTiling *__restrict tilingData = (const __gm__ fagTiling *__restrict)(tiling_data + offset);
+    const __gm__ fagTiling *__restrict tilingData = (const __gm__ fagTiling *__restrict)(tiling_data);
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16)
     if constexpr (isSmallSD && splitAxis == BN2) {
         STATIC_ASSERT_FAG_SMALL_SD_SELECTOR();

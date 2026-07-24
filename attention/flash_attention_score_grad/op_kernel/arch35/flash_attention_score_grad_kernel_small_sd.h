@@ -65,10 +65,7 @@ public:
     static constexpr uint32_t CUBE_BASEM = static_cast<uint32_t>(s1TemplateType);
     static constexpr uint32_t CUBE_BASEN = static_cast<uint32_t>(s2TemplateType);
     static constexpr uint32_t HEAD_DIM_ALIGN = static_cast<uint32_t>(dTemplateType);
-    using SmallSDFagTilingType =
-        const __gm__ optiling::fag::FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<
-            NEED_DETER(DETER_SPARSE_TYPE), NEED_DETER_PREFIX(DETER_SPARSE_TYPE, IS_TND), IS_TND, IS_TND_SWIZZLE,
-            true> *__restrict;
+    using SmallSDFagTilingType = const __gm__ optiling::fag::SmallSDTilingDataRegbase *__restrict;
 
     static_assert(SPLIT_AXIS == BN2, "SmallSD only supports BN2 split axis.");
     static_assert(!IS_ATTEN_MASK && !IS_PSE && !IS_DROP && !IS_ROPE, "SmallSD does not support optional features.");
@@ -79,8 +76,9 @@ public:
     static_assert(CUBE_BASEM == static_cast<uint32_t>(S1TemplateType::Aligned128) &&
                       CUBE_BASEN == static_cast<uint32_t>(S2TemplateType::Aligned128),
                   "SmallSD reuses the existing 128x128 S tile only.");
-    static_assert(HEAD_DIM_ALIGN <= static_cast<uint32_t>(DTemplateType::Aligned128),
-                  "SmallSD only supports D template <= 128.");
+    static_assert(HEAD_DIM_ALIGN == static_cast<uint32_t>(DTemplateType::Aligned64) ||
+                      HEAD_DIM_ALIGN == static_cast<uint32_t>(DTemplateType::Aligned128),
+                  "SmallSD only supports D template 64/128.");
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR query, GM_ADDR pseShift,
                                 GM_ADDR dropMask, GM_ADDR attenMask, GM_ADDR y, GM_ADDR softmaxMax, GM_ADDR softmaxSum,
                                 GM_ADDR prefixN, GM_ADDR actualSeqQlen, GM_ADDR actualSeqKvlen, GM_ADDR deqScaleQ,
@@ -217,7 +215,7 @@ template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline const optiling::fag::SmallSDTilingDataRegbase &
 FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::GetSmallSDTilingData() const
 {
-    return tilingData->smallSDTilingData;
+    return *tilingData;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -246,87 +244,57 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     smallSDConstInfo.workspaceBaseOffset = baseParam.workspaceBaseOffset;
     smallSDConstInfo.workspaceSize = baseParam.workspaceSize;
 
-    const uint64_t gD = static_cast<uint64_t>(smallSDConstInfo.g) * smallSDConstInfo.d;
-    const uint64_t gDv = static_cast<uint64_t>(smallSDConstInfo.g) * smallSDConstInfo.dv;
-    const uint64_t s1D = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.d;
-    const uint64_t s2D = static_cast<uint64_t>(smallSDConstInfo.s2) * smallSDConstInfo.d;
-    const uint64_t s1Dv = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.dv;
-    const uint64_t s2Dv = static_cast<uint64_t>(smallSDConstInfo.s2) * smallSDConstInfo.dv;
-    const uint64_t n2G = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.g;
-
-    if constexpr (IS_TND) {
-        smallSDConstInfo.qStrideB = 0;
-        smallSDConstInfo.qStrideN2 = gD;
-        smallSDConstInfo.qStrideS = n2G * smallSDConstInfo.d;
-        smallSDConstInfo.kStrideB = 0;
-        smallSDConstInfo.kStrideN2 = smallSDConstInfo.d;
-        smallSDConstInfo.kStrideS = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.d;
-        smallSDConstInfo.vStrideB = 0;
-        smallSDConstInfo.vStrideN2 = smallSDConstInfo.dv;
-        smallSDConstInfo.vStrideS = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.dv;
-    } else if (smallSDConstInfo.layout == BNGSD) {
-        smallSDConstInfo.qStrideB = n2G * s1D;
-        smallSDConstInfo.qStrideN2 = static_cast<uint64_t>(smallSDConstInfo.g) * s1D;
-        smallSDConstInfo.qStrideS = smallSDConstInfo.d;
-        smallSDConstInfo.kStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * s2D;
-        smallSDConstInfo.kStrideN2 = s2D;
-        smallSDConstInfo.kStrideS = smallSDConstInfo.d;
-        smallSDConstInfo.vStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * s2Dv;
-        smallSDConstInfo.vStrideN2 = s2Dv;
-        smallSDConstInfo.vStrideS = smallSDConstInfo.dv;
-    } else if (smallSDConstInfo.layout == SBNGD) {
-        smallSDConstInfo.qStrideB = n2G * smallSDConstInfo.d;
-        smallSDConstInfo.qStrideN2 = gD;
-        smallSDConstInfo.qStrideS = static_cast<uint64_t>(smallSDConstInfo.b) * n2G * smallSDConstInfo.d;
-        smallSDConstInfo.kStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.d;
-        smallSDConstInfo.kStrideN2 = smallSDConstInfo.d;
-        smallSDConstInfo.kStrideS =
-            static_cast<uint64_t>(smallSDConstInfo.b) * smallSDConstInfo.n2 * smallSDConstInfo.d;
-        smallSDConstInfo.vStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.dv;
-        smallSDConstInfo.vStrideN2 = smallSDConstInfo.dv;
-        smallSDConstInfo.vStrideS =
-            static_cast<uint64_t>(smallSDConstInfo.b) * smallSDConstInfo.n2 * smallSDConstInfo.dv;
-    } else {
-        smallSDConstInfo.qStrideB = n2G * s1D;
-        smallSDConstInfo.qStrideN2 = gD;
-        smallSDConstInfo.qStrideS = n2G * smallSDConstInfo.d;
-        smallSDConstInfo.kStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * s2D;
-        smallSDConstInfo.kStrideN2 = smallSDConstInfo.d;
-        smallSDConstInfo.kStrideS = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.d;
-        smallSDConstInfo.vStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * s2Dv;
-        smallSDConstInfo.vStrideN2 = smallSDConstInfo.dv;
-        smallSDConstInfo.vStrideS = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.dv;
-    }
-    smallSDConstInfo.dyStrideB = smallSDConstInfo.qStrideB;
-    smallSDConstInfo.dyStrideN2 = smallSDConstInfo.qStrideN2;
-    smallSDConstInfo.dyStrideS = smallSDConstInfo.qStrideS;
-    smallSDConstInfo.dqStrideB = smallSDConstInfo.qStrideB;
-    smallSDConstInfo.dqStrideN2 = smallSDConstInfo.qStrideN2;
-    smallSDConstInfo.dqStrideS = smallSDConstInfo.qStrideS;
-    smallSDConstInfo.dkStrideB = smallSDConstInfo.kStrideB;
-    smallSDConstInfo.dkStrideN2 = smallSDConstInfo.kStrideN2;
-    smallSDConstInfo.dkStrideS = smallSDConstInfo.kStrideS;
-    smallSDConstInfo.dvStrideB = smallSDConstInfo.vStrideB;
-    smallSDConstInfo.dvStrideN2 = smallSDConstInfo.vStrideN2;
-    smallSDConstInfo.dvStrideS = smallSDConstInfo.vStrideS;
-
-    smallSDConstInfo.qMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.d *
-                                    sizeof(INPUT_TYPE);
-    smallSDConstInfo.kMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s2) * smallSDConstInfo.d *
-                                    sizeof(INPUT_TYPE);
-    smallSDConstInfo.vMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s2) * smallSDConstInfo.dv *
-                                    sizeof(INPUT_TYPE);
-    smallSDConstInfo.dyMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.d *
-                                     sizeof(INPUT_TYPE);
-    smallSDConstInfo.dqMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.d *
-                                     sizeof(OUTDTYPE);
-    smallSDConstInfo.dkMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s2) * smallSDConstInfo.d *
-                                     sizeof(OUTDTYPE);
-    smallSDConstInfo.dvMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s2) * smallSDConstInfo.dv *
-                                     sizeof(OUTDTYPE);
-    smallSDConstInfo.cubeResultBytes = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.s2 *
-                                       sizeof(CALC_TYPE);
-    smallSDConstInfo.vectorTempBytes = smallSDConstInfo.cubeResultBytes;
+    const auto &layoutParam = GetSmallSDTilingData().layoutParam;
+    smallSDConstInfo.qStrideB = layoutParam.qStrideB;
+    smallSDConstInfo.qStrideN2 = layoutParam.qStrideN2;
+    smallSDConstInfo.qStrideS = layoutParam.qStrideS;
+    smallSDConstInfo.kStrideB = layoutParam.kStrideB;
+    smallSDConstInfo.kStrideN2 = layoutParam.kStrideN2;
+    smallSDConstInfo.kStrideS = layoutParam.kStrideS;
+    smallSDConstInfo.vStrideB = layoutParam.vStrideB;
+    smallSDConstInfo.vStrideN2 = layoutParam.vStrideN2;
+    smallSDConstInfo.vStrideS = layoutParam.vStrideS;
+    smallSDConstInfo.dyStrideB = layoutParam.dyStrideB;
+    smallSDConstInfo.dyStrideN2 = layoutParam.dyStrideN2;
+    smallSDConstInfo.dyStrideS = layoutParam.dyStrideS;
+    smallSDConstInfo.dqStrideB = layoutParam.dqStrideB;
+    smallSDConstInfo.dqStrideN2 = layoutParam.dqStrideN2;
+    smallSDConstInfo.dqStrideS = layoutParam.dqStrideS;
+    smallSDConstInfo.dkStrideB = layoutParam.dkStrideB;
+    smallSDConstInfo.dkStrideN2 = layoutParam.dkStrideN2;
+    smallSDConstInfo.dkStrideS = layoutParam.dkStrideS;
+    smallSDConstInfo.dvStrideB = layoutParam.dvStrideB;
+    smallSDConstInfo.dvStrideN2 = layoutParam.dvStrideN2;
+    smallSDConstInfo.dvStrideS = layoutParam.dvStrideS;
+    smallSDConstInfo.attentionStrideB = layoutParam.attentionStrideB;
+    smallSDConstInfo.attentionStrideN2 = layoutParam.attentionStrideN2;
+    smallSDConstInfo.attentionStrideS = layoutParam.attentionStrideS;
+    smallSDConstInfo.softmaxStrideB = layoutParam.softmaxStrideB;
+    smallSDConstInfo.softmaxStrideN2 = layoutParam.softmaxStrideN2;
+    smallSDConstInfo.softmaxStrideS = layoutParam.softmaxStrideS;
+    smallSDConstInfo.qMatrixElements = layoutParam.qMatrixElements;
+    smallSDConstInfo.kMatrixElements = layoutParam.kMatrixElements;
+    smallSDConstInfo.vMatrixElements = layoutParam.vMatrixElements;
+    smallSDConstInfo.dyMatrixElements = layoutParam.dyMatrixElements;
+    smallSDConstInfo.dqMatrixElements = layoutParam.dqMatrixElements;
+    smallSDConstInfo.dkMatrixElements = layoutParam.dkMatrixElements;
+    smallSDConstInfo.dvMatrixElements = layoutParam.dvMatrixElements;
+    smallSDConstInfo.cubeResultElements = layoutParam.cubeResultElements;
+    smallSDConstInfo.vectorTempElements = layoutParam.vectorTempElements;
+    smallSDConstInfo.qMatrixBytes = layoutParam.qMatrixBytes;
+    smallSDConstInfo.kMatrixBytes = layoutParam.kMatrixBytes;
+    smallSDConstInfo.vMatrixBytes = layoutParam.vMatrixBytes;
+    smallSDConstInfo.dyMatrixBytes = layoutParam.dyMatrixBytes;
+    smallSDConstInfo.dqMatrixBytes = layoutParam.dqMatrixBytes;
+    smallSDConstInfo.dkMatrixBytes = layoutParam.dkMatrixBytes;
+    smallSDConstInfo.dvMatrixBytes = layoutParam.dvMatrixBytes;
+    smallSDConstInfo.cubeResultBytes = layoutParam.cubeResultBytes;
+    smallSDConstInfo.vectorTempBytes = layoutParam.vectorTempBytes;
+    smallSDConstInfo.dTemplateCapacity = layoutParam.dTemplateCapacity;
+    smallSDConstInfo.aivHalfS1 = layoutParam.aivHalfS1;
+    smallSDConstInfo.aivFirstHalfS1 = layoutParam.aivFirstHalfS1;
+    smallSDConstInfo.aivHalfS2 = layoutParam.aivHalfS2;
+    smallSDConstInfo.aivFirstHalfS2 = layoutParam.aivFirstHalfS2;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -394,15 +362,10 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         cursor.kOffset = cursor.bIdx * smallSDConstInfo.kStrideB + cursor.n2oIdx * smallSDConstInfo.kStrideN2;
         cursor.qTaskStride = smallSDConstInfo.qStrideN2;
         cursor.kTaskStride = smallSDConstInfo.kStrideN2;
-        if (smallSDConstInfo.layout == BNGSD || smallSDConstInfo.layout == SBNGD) {
-            cursor.qBatchGap = 0;
-            cursor.kBatchGap = 0;
-        } else {
-            cursor.qBatchGap = smallSDConstInfo.qStrideB -
-                               static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.qStrideN2;
-            cursor.kBatchGap = smallSDConstInfo.kStrideB -
-                               static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.kStrideN2;
-        }
+        cursor.qBatchGap = smallSDConstInfo.qStrideB -
+                           static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.qStrideN2;
+        cursor.kBatchGap = smallSDConstInfo.kStrideB -
+                           static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.kStrideN2;
     }
 }
 
@@ -435,8 +398,10 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         cursor.n2oIdx = tndCore.startN2Idx;
         LoadTndCursorPrefixSmallSD(cursor);
     } else {
-        cursor.bIdx = index / smallSDConstInfo.n2;
-        cursor.n2oIdx = index - cursor.bIdx * smallSDConstInfo.n2;
+        (void)index;
+        const auto &coreTask = GetSmallSDTilingData().coreTaskParam[cBlockIdx];
+        cursor.bIdx = coreTask.startBatchIdx;
+        cursor.n2oIdx = coreTask.startN2Idx;
         cursor.actualS1Len = smallSDConstInfo.s1;
         cursor.actualS2Len = smallSDConstInfo.s2;
         cursor.softmaxPrefix = cursor.bIdx * smallSDConstInfo.s2;
@@ -451,12 +416,7 @@ template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::IssueCube(
     SmallSDPipelineSlot &slot)
 {
-    if (slot.state != SmallSDSlotState::PREPARED) {
-        return;
-    }
-    slot.state = SmallSDSlotState::CUBE_INFLIGHT;
     cubeBlock.IssueQkAndDyV(slot);
-    slot.state = SmallSDSlotState::READY_FOR_VECTOR;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -532,9 +492,6 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     const SmallSDTaskCursor &cursor,
     int64_t taskId)
 {
-    if (slot.state != SmallSDSlotState::EMPTY && slot.state != SmallSDSlotState::REUSABLE) {
-        return;
-    }
     const SmallSDShape shape = MakeShapeSmallSD(cursor);
     const SmallSDOffsets offsets = MakeOffsetsSmallSD(cursor);
 
@@ -569,7 +526,6 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         slot.firstHalfS2 = shape.firstHalfS2;
         slot.vecCoreOffset = vSubBlockIdx * shape.firstHalfS1;
     }
-    slot.state = SmallSDSlotState::PREPARED;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -577,10 +533,6 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     SmallSDPipelineSlot &slot,
     bool needWaitL1Reusable)
 {
-    if (slot.state != SmallSDSlotState::READY_FOR_VECTOR) {
-        return;
-    }
-    slot.state = SmallSDSlotState::VECTOR_INFLIGHT;
     vecBlock.ProduceDsAndP(slot, needWaitL1Reusable);
     cubeBlock.IssueDqDkDv(slot);
     vecBlock.FinalizeGradOutput(slot);
@@ -590,17 +542,14 @@ template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::WaitSlotReusable(
     SmallSDPipelineSlot &slot)
 {
-    if (slot.state == SmallSDSlotState::EMPTY || slot.state == SmallSDSlotState::REUSABLE) {
-        return;
-    }
-    if (slot.state != SmallSDSlotState::VECTOR_INFLIGHT) {
+    if (slot.taskId < 0) {
         return;
     }
     if ASCEND_IS_AIC {
         CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(SMALL_SD_SLOT_REUSE_READY_FLAG);
         CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(SMALL_SD_EVENT_MIRROR_OFFSET + SMALL_SD_SLOT_REUSE_READY_FLAG);
     }
-    slot.state = SmallSDSlotState::REUSABLE;
+    slot.taskId = -1;
 }
 
 template <typename CubeBlockType, typename VecBlockType>

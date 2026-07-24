@@ -251,7 +251,8 @@ private:
         LocalTensor<float> maxSumTensor = maxSumQue[slot.taskIdMod2].template AllocTensor<float>();
         uint64_t offset = 0;
         if (constInfo->tndMaxSumLayout == MAX_SUM_TND) {
-            offset = ((slot.qOffset / constInfo->d) +
+            offset = ((static_cast<uint64_t>(slot.qPrefix) * constInfo->n2 +
+                       static_cast<uint64_t>(slot.n2oIdx) * slot.actualS1Len) +
                       static_cast<uint64_t>(vSubBlockIdx) * slot.firstHalfS1 * constInfo->n2) *
                      MAX_SUM_REDUCE_AXIS_SIZE / sizeof(float);
             const uint32_t srcStride = constInfo->n2 * MAX_SUM_REDUCE_AXIS_SIZE - MAX_SUM_REDUCE_AXIS_SIZE;

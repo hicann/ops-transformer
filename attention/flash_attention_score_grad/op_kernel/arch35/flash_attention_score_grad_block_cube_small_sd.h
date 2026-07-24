@@ -19,7 +19,7 @@
 #include "flash_attention_score_grad_common.h"
 #include "flash_attention_score_grad_buffer_small_sd.h"
 #include "flash_attention_score_grad_event_small_sd.h"
-#include "cube_api/matmul.h"
+#include "flash_attention_score_grad_matmul_small_sd.h"
 #include "cube_api/mutex_buffers_policy.h"
 #include "../../../common/op_kernel/FixpipeOut.h"
 
@@ -215,21 +215,12 @@ private:
         dyL1Buffer.LockCons();
         vL1Buffer.LockCons();
         MutexBuffer<BufferType::L0C, SyncType::INNER_CORE_SYNC> l0cBuffer = l0cBuf.Get();
-        MMParam param = {
-            static_cast<uint32_t>(slot.actualS1Len),
-            static_cast<uint32_t>(slot.actualS2Len),
-            static_cast<uint32_t>(constInfo->dv),
-            false,
-            true,
-            true,
-            true,
-            UNITFLAG_EN_OUTER_LAST
-        };
-        MatmulFullMutex<INPUT_TYPE, INPUT_TYPE, CALC_TYPE, CUBE_BASEM, CUBE_BASEN,
-                        SMALL_SD_L0_SINGLE_BUFFER_SIZE / CUBE_BASEN / sizeof(INPUT_TYPE),
-                        ABLayout::MK, ABLayout::KN>(
-            dyL1Buffer.template GetTensor<INPUT_TYPE>(), vL1Buffer.template GetTensor<INPUT_TYPE>(), l0aBuf, l0bBuf,
-            l0cBuffer.GetTensor<CALC_TYPE>(), param);
+        SmallSDMmadDyV<INPUT_TYPE, CALC_TYPE, CUBE_BASEM, CUBE_BASEN,
+                       SMALL_SD_L0_SINGLE_BUFFER_SIZE / CUBE_BASEN / sizeof(INPUT_TYPE)>(
+            dyL1Buffer.template GetTensor<INPUT_TYPE>(), vL1Buffer.template GetTensor<INPUT_TYPE>(),
+            l0aBuf, l0bBuf, l0cBuffer.GetTensor<CALC_TYPE>(),
+            static_cast<uint32_t>(slot.actualS1Len), static_cast<uint32_t>(slot.actualS2Len),
+            static_cast<uint32_t>(constInfo->dv));
         FixpipeScoreToUb(dstTensor, l0cBuffer.GetTensor<CALC_TYPE>(), slot.actualS1Len, slot.actualS2Len);
         vL1Buffer.UnlockCons();
         dyL1Buffer.UnlockCons();
@@ -252,21 +243,12 @@ private:
         qL1Buffer.LockCons();
         kL1Buffer.LockCons();
         MutexBuffer<BufferType::L0C, SyncType::INNER_CORE_SYNC> l0cBuffer = l0cBuf.Get();
-        MMParam param = {
-            static_cast<uint32_t>(slot.actualS1Len),
-            static_cast<uint32_t>(slot.actualS2Len),
-            static_cast<uint32_t>(constInfo->d),
-            false,
-            true,
-            true,
-            true,
-            UNITFLAG_EN_OUTER_LAST
-        };
-        MatmulFullMutex<INPUT_TYPE, INPUT_TYPE, CALC_TYPE, CUBE_BASEM, CUBE_BASEN,
-                        SMALL_SD_L0_SINGLE_BUFFER_SIZE / CUBE_BASEN / sizeof(INPUT_TYPE),
-                        ABLayout::MK, ABLayout::KN>(
-            qL1Buffer.template GetTensor<INPUT_TYPE>(), kL1Buffer.template GetTensor<INPUT_TYPE>(), l0aBuf, l0bBuf,
-            l0cBuffer.GetTensor<CALC_TYPE>(), param);
+        SmallSDMmadQK<INPUT_TYPE, CALC_TYPE, CUBE_BASEM, CUBE_BASEN,
+                      SMALL_SD_L0_SINGLE_BUFFER_SIZE / CUBE_BASEN / sizeof(INPUT_TYPE)>(
+            qL1Buffer.template GetTensor<INPUT_TYPE>(), kL1Buffer.template GetTensor<INPUT_TYPE>(),
+            l0aBuf, l0bBuf, l0cBuffer.GetTensor<CALC_TYPE>(),
+            static_cast<uint32_t>(slot.actualS1Len), static_cast<uint32_t>(slot.actualS2Len),
+            static_cast<uint32_t>(constInfo->d));
         FixpipeScoreToUb(dstTensor, l0cBuffer.GetTensor<CALC_TYPE>(), slot.actualS1Len, slot.actualS2Len);
         kL1Buffer.UnlockCons();
         qL1Buffer.UnlockCons();
@@ -283,20 +265,11 @@ private:
         kL1Buffer.UnlockProd();
         kL1Buffer.LockCons();
         MutexBuffer<BufferType::L0C, SyncType::INNER_CORE_SYNC> l0cBuffer = l0cBuf.Get();
-        MMParam param = {
-            static_cast<uint32_t>(slot.actualS1Len),
-            static_cast<uint32_t>(constInfo->d),
-            static_cast<uint32_t>(slot.actualS2Len),
-            false,
-            false,
-            true,
-            true,
-            UNITFLAG_EN_OUTER_LAST
-        };
-        MatmulFullMutex<INPUT_TYPE, INPUT_TYPE, CALC_TYPE, CUBE_BASEM, CUBE_BASEN, CUBE_BASEN,
-                        ABLayout::MK, ABLayout::KN>(
-            dsL1Buffer.template GetTensor<INPUT_TYPE>(), kL1Buffer.template GetTensor<INPUT_TYPE>(), l0aBuf, l0bBuf,
-            l0cBuffer.GetTensor<CALC_TYPE>(), param);
+        SmallSDMmadDsK<INPUT_TYPE, CALC_TYPE, CUBE_BASEM, CUBE_BASEN>(
+            dsL1Buffer.template GetTensor<INPUT_TYPE>(), kL1Buffer.template GetTensor<INPUT_TYPE>(),
+            l0aBuf, l0bBuf, l0cBuffer.GetTensor<CALC_TYPE>(),
+            static_cast<uint32_t>(slot.actualS1Len), static_cast<uint32_t>(constInfo->d),
+            static_cast<uint32_t>(slot.actualS2Len));
         FixpipeDqDkToUb(dstTensor, l0cBuffer.GetTensor<CALC_TYPE>(), slot.actualS1Len, constInfo->d);
         kL1Buffer.UnlockCons();
     }
@@ -312,20 +285,11 @@ private:
         qL1Buffer.UnlockProd();
         qL1Buffer.LockCons();
         MutexBuffer<BufferType::L0C, SyncType::INNER_CORE_SYNC> l0cBuffer = l0cBuf.Get();
-        MMParam param = {
-            static_cast<uint32_t>(slot.actualS2Len),
-            static_cast<uint32_t>(constInfo->d),
-            static_cast<uint32_t>(slot.actualS1Len),
-            true,
-            false,
-            true,
-            true,
-            UNITFLAG_EN_OUTER_LAST
-        };
-        MatmulFullMutex<INPUT_TYPE, INPUT_TYPE, CALC_TYPE, CUBE_BASEM, CUBE_BASEN, CUBE_BASEN,
-                        ABLayout::MK, ABLayout::KN>(
-            dsL1Buffer.template GetTensor<INPUT_TYPE>(), qL1Buffer.template GetTensor<INPUT_TYPE>(), l0aBuf, l0bBuf,
-            l0cBuffer.GetTensor<CALC_TYPE>(), param);
+        SmallSDMmadDsTQ<INPUT_TYPE, CALC_TYPE, CUBE_BASEM, CUBE_BASEN>(
+            dsL1Buffer.template GetTensor<INPUT_TYPE>(), qL1Buffer.template GetTensor<INPUT_TYPE>(),
+            l0aBuf, l0bBuf, l0cBuffer.GetTensor<CALC_TYPE>(),
+            static_cast<uint32_t>(slot.actualS2Len), static_cast<uint32_t>(constInfo->d),
+            static_cast<uint32_t>(slot.actualS1Len));
         FixpipeDqDkToUb(dstTensor, l0cBuffer.GetTensor<CALC_TYPE>(), slot.actualS2Len, constInfo->d);
         qL1Buffer.UnlockCons();
     }
@@ -341,20 +305,11 @@ private:
         dyL1Buffer.UnlockProd();
         dyL1Buffer.LockCons();
         MutexBuffer<BufferType::L0C, SyncType::INNER_CORE_SYNC> l0cBuffer = l0cBuf.Get();
-        MMParam param = {
-            static_cast<uint32_t>(slot.actualS2Len),
-            static_cast<uint32_t>(constInfo->dv),
-            static_cast<uint32_t>(slot.actualS1Len),
-            true,
-            false,
-            true,
-            true,
-            UNITFLAG_EN_OUTER_LAST
-        };
-        MatmulFullMutex<INPUT_TYPE, INPUT_TYPE, CALC_TYPE, CUBE_BASEM, CUBE_BASEN, CUBE_BASEN,
-                        ABLayout::MK, ABLayout::KN>(
-            pL1Buffer.template GetTensor<INPUT_TYPE>(), dyL1Buffer.template GetTensor<INPUT_TYPE>(), l0aBuf, l0bBuf,
-            l0cBuffer.GetTensor<CALC_TYPE>(), param);
+        SmallSDMmadPTDy<INPUT_TYPE, CALC_TYPE, CUBE_BASEM, CUBE_BASEN>(
+            pL1Buffer.template GetTensor<INPUT_TYPE>(), dyL1Buffer.template GetTensor<INPUT_TYPE>(),
+            l0aBuf, l0bBuf, l0cBuffer.GetTensor<CALC_TYPE>(),
+            static_cast<uint32_t>(slot.actualS2Len), static_cast<uint32_t>(constInfo->dv),
+            static_cast<uint32_t>(slot.actualS1Len));
         FixpipeDvToGm(dstGm, l0cBuffer.GetTensor<CALC_TYPE>(), slot);
         dyL1Buffer.UnlockCons();
     }

@@ -614,15 +614,21 @@ public:
     uint32_t blockStart;
     uint32_t blockEnd;
     uint32_t groupCount;
+    uint32_t startBatchIdx;
+    uint32_t startN2Idx;
     uint32_t reserved;
 
     uint32_t get_blockStart() const { return blockStart; }
     uint32_t get_blockEnd() const { return blockEnd; }
     uint32_t get_groupCount() const { return groupCount; }
+    uint32_t get_startBatchIdx() const { return startBatchIdx; }
+    uint32_t get_startN2Idx() const { return startN2Idx; }
 
     void set_blockStart(uint32_t val) { blockStart = val; }
     void set_blockEnd(uint32_t val) { blockEnd = val; }
     void set_groupCount(uint32_t val) { groupCount = val; }
+    void set_startBatchIdx(uint32_t val) { startBatchIdx = val; }
+    void set_startN2Idx(uint32_t val) { startN2Idx = val; }
     void set_reserved(uint32_t val) { reserved = val; }
 };
 
@@ -740,9 +746,67 @@ public:
     void set_scaleValue(float val) { scaleValue = val; }
 };
 
+class SmallSDLayoutParamRegbase {
+public:
+    uint64_t qStrideB;
+    uint64_t qStrideN2;
+    uint64_t qStrideS;
+    uint64_t kStrideB;
+    uint64_t kStrideN2;
+    uint64_t kStrideS;
+    uint64_t vStrideB;
+    uint64_t vStrideN2;
+    uint64_t vStrideS;
+    uint64_t dyStrideB;
+    uint64_t dyStrideN2;
+    uint64_t dyStrideS;
+    uint64_t dqStrideB;
+    uint64_t dqStrideN2;
+    uint64_t dqStrideS;
+    uint64_t dkStrideB;
+    uint64_t dkStrideN2;
+    uint64_t dkStrideS;
+    uint64_t dvStrideB;
+    uint64_t dvStrideN2;
+    uint64_t dvStrideS;
+    uint64_t attentionStrideB;
+    uint64_t attentionStrideN2;
+    uint64_t attentionStrideS;
+    uint64_t softmaxStrideB;
+    uint64_t softmaxStrideN2;
+    uint64_t softmaxStrideS;
+    uint64_t qMatrixElements;
+    uint64_t kMatrixElements;
+    uint64_t vMatrixElements;
+    uint64_t dyMatrixElements;
+    uint64_t dqMatrixElements;
+    uint64_t dkMatrixElements;
+    uint64_t dvMatrixElements;
+    uint64_t cubeResultElements;
+    uint64_t vectorTempElements;
+    uint64_t qMatrixBytes;
+    uint64_t kMatrixBytes;
+    uint64_t vMatrixBytes;
+    uint64_t dyMatrixBytes;
+    uint64_t dqMatrixBytes;
+    uint64_t dkMatrixBytes;
+    uint64_t dvMatrixBytes;
+    uint64_t cubeResultBytes;
+    uint64_t vectorTempBytes;
+    uint32_t dTemplateCapacity;
+    uint32_t s1Size;
+    uint32_t s2Size;
+    uint32_t s2Align16;
+    uint32_t aivHalfS1;
+    uint32_t aivFirstHalfS1;
+    uint32_t aivHalfS2;
+    uint32_t aivFirstHalfS2;
+};
+
 class FlashAttentionScoreGradSmallSDTilingDataRegbase {
 public:
     SmallSDBaseParamRegbase baseParam;
+    SmallSDLayoutParamRegbase layoutParam;
     SmallSDCoreTaskParamRegbase coreTaskParam[MAX_CORE_NUM];
     SmallSDTndCoreParamRegbase tndCoreParam[MAX_CORE_NUM];
 };
@@ -750,19 +814,23 @@ public:
 using SmallSDTilingDataRegbase = FlashAttentionScoreGradSmallSDTilingDataRegbase;
 
 static_assert(sizeof(SmallSDBaseParamRegbase) == 104, "SmallSDBaseParamRegbase ABI size changed unexpectedly.");
-static_assert(sizeof(SmallSDCoreTaskParamRegbase) == 16,
+static_assert(sizeof(SmallSDLayoutParamRegbase) == 392,
+              "SmallSDLayoutParamRegbase ABI size changed unexpectedly.");
+static_assert(sizeof(SmallSDCoreTaskParamRegbase) == 24,
               "SmallSDCoreTaskParamRegbase ABI size changed unexpectedly.");
 static_assert(sizeof(SmallSDTndCoreParamRegbase) == 80,
               "SmallSDTndCoreParamRegbase ABI size changed unexpectedly.");
 static_assert(std::is_same<SmallSDTilingDataRegbase, FlashAttentionScoreGradSmallSDTilingDataRegbase>::value,
               "SmallSDTilingDataRegbase must stay as the legacy alias of the independent SmallSD payload.");
-static_assert(sizeof(FlashAttentionScoreGradSmallSDTilingDataRegbase) == 3560,
+static_assert(sizeof(FlashAttentionScoreGradSmallSDTilingDataRegbase) == 4240,
               "FlashAttentionScoreGradSmallSDTilingDataRegbase ABI size changed unexpectedly.");
 static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, baseParam) == 0,
               "SmallSD tiling baseParam offset changed unexpectedly.");
-static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, coreTaskParam) == 104,
+static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, layoutParam) == 104,
+              "SmallSD tiling layoutParam offset changed unexpectedly.");
+static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, coreTaskParam) == 496,
               "SmallSD tiling coreTaskParam offset changed unexpectedly.");
-static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, tndCoreParam) == 680,
+static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, tndCoreParam) == 1360,
               "SmallSD tiling tndCoreParam offset changed unexpectedly.");
 
 template<const bool isDeter = false, const bool isNewDeter = false,

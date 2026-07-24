@@ -21,15 +21,6 @@
 
 namespace FagBaseApi {
 
-enum class SmallSDSlotState : uint8_t {
-    EMPTY = 0,
-    PREPARED,
-    CUBE_INFLIGHT,
-    READY_FOR_VECTOR,
-    VECTOR_INFLIGHT,
-    REUSABLE
-};
-
 struct SmallSDConstInfo {
     uint32_t b = 0;
     uint32_t n1 = 0;
@@ -72,7 +63,22 @@ struct SmallSDConstInfo {
     uint64_t dvStrideB = 0;
     uint64_t dvStrideN2 = 0;
     uint64_t dvStrideS = 0;
+    uint64_t attentionStrideB = 0;
+    uint64_t attentionStrideN2 = 0;
+    uint64_t attentionStrideS = 0;
+    uint64_t softmaxStrideB = 0;
+    uint64_t softmaxStrideN2 = 0;
+    uint64_t softmaxStrideS = 0;
 
+    uint64_t qMatrixElements = 0;
+    uint64_t kMatrixElements = 0;
+    uint64_t vMatrixElements = 0;
+    uint64_t dyMatrixElements = 0;
+    uint64_t dqMatrixElements = 0;
+    uint64_t dkMatrixElements = 0;
+    uint64_t dvMatrixElements = 0;
+    uint64_t cubeResultElements = 0;
+    uint64_t vectorTempElements = 0;
     uint64_t qMatrixBytes = 0;
     uint64_t kMatrixBytes = 0;
     uint64_t vMatrixBytes = 0;
@@ -82,6 +88,12 @@ struct SmallSDConstInfo {
     uint64_t dvMatrixBytes = 0;
     uint64_t cubeResultBytes = 0;
     uint64_t vectorTempBytes = 0;
+    uint32_t dTemplateCapacity = 0;
+    uint32_t aivHalfS1 = 0;
+    uint32_t aivFirstHalfS1 = 0;
+    uint32_t aivHalfS2 = 0;
+    uint32_t aivFirstHalfS2 = 0;
+    uint32_t reserved = 0;
 
     uint64_t workspaceBaseOffset = 0;
     uint64_t workspaceSize = 0;
@@ -155,19 +167,17 @@ struct SmallSDPipelineSlot {
     int64_t kvPrefix = 0;
     int64_t qDyDqPrefix = 0;
     int64_t kvDkDvPrefix = 0;
-    SmallSDSlotState state = SmallSDSlotState::EMPTY;
 };
 
-static_assert(sizeof(SmallSDConstInfo) == 336, "SmallSDConstInfo ABI size changed unexpectedly.");
+static_assert(sizeof(SmallSDConstInfo) == 480, "SmallSDConstInfo ABI size changed unexpectedly.");
 static_assert(offsetof(SmallSDConstInfo, qStrideB) == 80, "SmallSDConstInfo stride offset changed unexpectedly.");
-static_assert(offsetof(SmallSDConstInfo, workspaceBaseOffset) == 320,
+static_assert(offsetof(SmallSDConstInfo, workspaceBaseOffset) == 464,
               "SmallSDConstInfo workspace offset changed unexpectedly.");
 static_assert(sizeof(SmallSDTaskCursor) == 152, "SmallSDTaskCursor ABI size changed unexpectedly.");
 static_assert(offsetof(SmallSDTaskCursor, qOffset) == 104, "SmallSDTaskCursor qOffset changed unexpectedly.");
 static_assert(sizeof(SmallSDShape) == 56, "SmallSDShape ABI size changed unexpectedly.");
 static_assert(sizeof(SmallSDOffsets) == 40, "SmallSDOffsets ABI size changed unexpectedly.");
-static_assert(sizeof(SmallSDPipelineSlot) == 224, "SmallSDPipelineSlot ABI size changed unexpectedly.");
-static_assert(offsetof(SmallSDPipelineSlot, state) == 216, "SmallSDPipelineSlot state offset changed unexpectedly.");
+static_assert(sizeof(SmallSDPipelineSlot) == 216, "SmallSDPipelineSlot ABI size changed unexpectedly.");
 
 template <uint32_t HEAD_DIM>
 struct SmallSDBufferLayout {
@@ -178,6 +188,11 @@ struct SmallSDBufferLayout {
     static constexpr uint32_t alignBytes = 32;
     static constexpr uint32_t inputElemBytes = 2;
     static constexpr uint32_t calcElemBytes = 4;
+    static constexpr uint32_t l1CapacityBytes = 1024 * 1024;
+    static constexpr uint32_t l0aCapacityBytes = 64 * 1024;
+    static constexpr uint32_t l0bCapacityBytes = 64 * 1024;
+    static constexpr uint32_t l0cCapacityBytes = 256 * 1024;
+    static constexpr uint32_t ubCapacityBytes = 512 * 1024;
 
     static constexpr uint32_t qTileBytes = maxS1 * HEAD_DIM * inputElemBytes;
     static constexpr uint32_t kTileBytes = maxS2 * HEAD_DIM * inputElemBytes;
@@ -191,6 +206,8 @@ struct SmallSDBufferLayout {
     static constexpr uint32_t dkUbBytes = maxS2 * HEAD_DIM * calcElemBytes;
     static constexpr uint32_t dvUbBytes = maxS2 * HEAD_DIM * calcElemBytes;
     static constexpr uint32_t vectorTempBytes = maxS1 * maxS2 * calcElemBytes;
+    static constexpr uint32_t l0PingBytes = 32 * 1024;
+    static constexpr uint32_t l0PongBytes = 32 * 1024;
 
     static constexpr uint32_t perSlotBytes =
         qkResultBytes + dyvResultBytes + dqUbBytes + dkUbBytes + dvUbBytes + vectorTempBytes;
@@ -226,6 +243,54 @@ struct SmallSDBufferLayout {
     {
         return DvUbOffset(slotIdx) + dvUbBytes;
     }
+    static constexpr uint32_t QOffset()
+    {
+        return sharedReadonlyOffset;
+    }
+    static constexpr uint32_t KOffset()
+    {
+        return QOffset() + qTileBytes;
+    }
+    static constexpr uint32_t VOffset()
+    {
+        return KOffset() + kTileBytes;
+    }
+    static constexpr uint32_t DyOffset()
+    {
+        return VOffset() + vTileBytes;
+    }
+    static constexpr uint32_t DsOffset()
+    {
+        return sharedL1Offset;
+    }
+    static constexpr uint32_t POffset()
+    {
+        return DsOffset() + dsL1Bytes;
+    }
+    static constexpr uint32_t Mm1ResultOffset(uint32_t slotIdx)
+    {
+        return QkResultOffset(slotIdx);
+    }
+    static constexpr uint32_t Mm2ResultOffset(uint32_t slotIdx)
+    {
+        return DyVResultOffset(slotIdx);
+    }
+    static constexpr uint32_t L0APingOffset()
+    {
+        return 0;
+    }
+    static constexpr uint32_t L0APongOffset()
+    {
+        return L0APingOffset() + l0PingBytes;
+    }
+    static constexpr uint32_t L0BPingOffset()
+    {
+        return 0;
+    }
+    static constexpr uint32_t L0BPongOffset()
+    {
+        return L0BPingOffset() + l0PingBytes;
+    }
 };
 
 static_assert(SmallSDBufferLayout<64>::slot1Offset == SmallSDBufferLayout<64>::perSlotBytes,
@@ -236,6 +301,32 @@ static_assert((SmallSDBufferLayout<64>::totalBytes % SmallSDBufferLayout<64>::al
               "SmallSD D=64 buffer layout must be 32-byte aligned.");
 static_assert((SmallSDBufferLayout<128>::totalBytes % SmallSDBufferLayout<128>::alignBytes) == 0,
               "SmallSD D=128 buffer layout must be 32-byte aligned.");
+static_assert(SmallSDBufferLayout<64>::sharedL1Bytes + SmallSDBufferLayout<64>::sharedReadonlyBytes <=
+                  SmallSDBufferLayout<64>::l1CapacityBytes,
+              "SmallSD D=64 L1 layout exceeds capacity.");
+static_assert(SmallSDBufferLayout<128>::sharedL1Bytes + SmallSDBufferLayout<128>::sharedReadonlyBytes <=
+                  SmallSDBufferLayout<128>::l1CapacityBytes,
+              "SmallSD D=128 L1 layout exceeds capacity.");
+static_assert(SmallSDBufferLayout<64>::l0PingBytes + SmallSDBufferLayout<64>::l0PongBytes <=
+                  SmallSDBufferLayout<64>::l0aCapacityBytes,
+              "SmallSD D=64 L0A ping/pong exceeds capacity.");
+static_assert(SmallSDBufferLayout<128>::l0PingBytes + SmallSDBufferLayout<128>::l0PongBytes <=
+                  SmallSDBufferLayout<128>::l0aCapacityBytes,
+              "SmallSD D=128 L0A ping/pong exceeds capacity.");
+static_assert(SmallSDBufferLayout<64>::l0PingBytes + SmallSDBufferLayout<64>::l0PongBytes <=
+                  SmallSDBufferLayout<64>::l0bCapacityBytes,
+              "SmallSD D=64 L0B ping/pong exceeds capacity.");
+static_assert(SmallSDBufferLayout<128>::l0PingBytes + SmallSDBufferLayout<128>::l0PongBytes <=
+                  SmallSDBufferLayout<128>::l0bCapacityBytes,
+              "SmallSD D=128 L0B ping/pong exceeds capacity.");
+static_assert(SmallSDBufferLayout<64>::qkResultBytes <= SmallSDBufferLayout<64>::l0cCapacityBytes,
+              "SmallSD D=64 L0C score buffer exceeds capacity.");
+static_assert(SmallSDBufferLayout<128>::qkResultBytes <= SmallSDBufferLayout<128>::l0cCapacityBytes,
+              "SmallSD D=128 L0C score buffer exceeds capacity.");
+static_assert(SmallSDBufferLayout<64>::perSlotBytes <= SmallSDBufferLayout<64>::ubCapacityBytes,
+              "SmallSD D=64 UB slot buffer exceeds capacity.");
+static_assert(SmallSDBufferLayout<128>::perSlotBytes <= SmallSDBufferLayout<128>::ubCapacityBytes,
+              "SmallSD D=128 UB slot buffer exceeds capacity.");
 
 } // namespace FagBaseApi
 
