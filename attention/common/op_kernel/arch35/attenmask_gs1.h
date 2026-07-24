@@ -320,7 +320,11 @@ __aicore__ inline void AttentionmaskCopyInForGsLayout(LocalTensor<T> &attenMaskU
     int32_t s1StartIdx = info.gs1StartIdx % info.s1Size;
     int32_t s1EndIdx = (info.gs1StartIdx + info.gs1dealNum - 1) % info.s1Size + 1;
     uint32_t attenMaskS2Stride = AttentionCommon::Align(info.s2dealNum, 32U) + 32 * info.attenMaskDstStride;
-    if (info.gs1dealNum <= info.s1Size) {
+    uint32_t headS1Count = (s1StartIdx == 0) ? 0 : (info.s1Size - s1StartIdx);
+    // midGCount: gs1dealNum 跨 G 边界时，中间完整 s1Size 行的重复次数
+    uint32_t midGCount = (info.gs1dealNum > headS1Count) ? (info.gs1dealNum - headS1Count) / info.s1Size : 0;
+    // 无完整G（midGCount==0）时，模板写入会超出 buffer 边界，改为走 if 分支直接从 GM 拷贝
+    if (info.gs1dealNum <= info.s1Size || midGCount == 0) {
         if (s1StartIdx + info.gs1dealNum > info.s1Size) {
             AttentionmaskDataCopy(attenMaskUb, srcGmAddr, info, s1StartIdx, info.s1Size, isPre);
             LocalTensor<T> attenMaskSecUb = attenMaskUb[(info.s1Size - s1StartIdx) * attenMaskS2Stride];
@@ -332,10 +336,8 @@ __aicore__ inline void AttentionmaskCopyInForGsLayout(LocalTensor<T> &attenMaskU
         SetFlag<HardEvent::MTE2_V>(enQueEvtID);
         WaitFlag<HardEvent::MTE2_V>(enQueEvtID);
     } else {
-        uint32_t headS1Count = info.s1Size - s1StartIdx;
-        uint32_t remainRowCount = info.gs1dealNum - headS1Count;
-        uint32_t midGCount = remainRowCount / info.s1Size;
-        uint32_t tailS1Size = remainRowCount % info.s1Size;
+        // 有完整G：先从GM拷贝一个完整G到UB作为模板，再用UB→UB DataCopy填充head/mid/tail
+        uint32_t tailS1Size = (info.gs1dealNum - headS1Count) % info.s1Size;
 
         // 第一块完整的mask
         LocalTensor<T> attenMaskSecUb = attenMaskUb[headS1Count * attenMaskS2Stride];
@@ -346,7 +348,9 @@ __aicore__ inline void AttentionmaskCopyInForGsLayout(LocalTensor<T> &attenMaskU
 
         // TODO，待优化，后续改成VF
         // head
-        DataCopy(attenMaskUb, attenMaskUb[info.s1Size * attenMaskS2Stride], headS1Count * attenMaskS2Stride);
+        if (headS1Count > 0) {
+            DataCopy(attenMaskUb, attenMaskUb[info.s1Size * attenMaskS2Stride], headS1Count * attenMaskS2Stride);
+        }
         // mid
         for (uint32_t i = 1; i < midGCount; i++) {
             DataCopy(attenMaskUb[(headS1Count + i * info.s1Size) * attenMaskS2Stride], attenMaskSecUb,

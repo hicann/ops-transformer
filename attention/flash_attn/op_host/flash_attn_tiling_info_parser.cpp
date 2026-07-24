@@ -48,6 +48,7 @@ ge::graphStatus FaInfoParser::GetEmptyTensorFlag()
         checkEmptyTensor(opParamInfo_.value.shape, VALUE_NAME) ||
         checkEmptyTensor(opParamInfo_.attnOut.shape, ATTN_OUT_NAME)) {
         emptyTensorFlag_ = true;
+        return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -573,7 +574,7 @@ ge::graphStatus FaInfoParser::Parse(FaTilingInfo &faInfo)
     }
     GetKvStorageMode();
     if (emptyTensorFlag_) {
-        return ge::GRAPH_SUCCESS;
+        return ge::GRAPH_FAILED;
     }
     if (ge::GRAPH_SUCCESS != ParseAxisInfo()) {
         return ge::GRAPH_FAILED;
