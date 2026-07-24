@@ -80,7 +80,7 @@ public:
     __aicore__ inline void SetSmallSDConstInfo();
 
 private:
-    __aicore__ inline const optiling::fag::SmallSDTilingDataRegbase &GetSmallSDTilingData() const;
+    __aicore__ inline SmallSDFagTilingType GetSmallSDTilingData() const;
     __aicore__ inline void InitSmallSDBlocks(GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR query,
                                              GM_ADDR y, GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR dq, GM_ADDR dk,
                                              GM_ADDR dv, GM_ADDR workspace, TPipe *pipeIn);
@@ -200,16 +200,16 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline const optiling::fag::SmallSDTilingDataRegbase &
+__aicore__ inline typename FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SmallSDFagTilingType
 FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::GetSmallSDTilingData() const
 {
-    return *tilingData;
+    return tilingData;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::BuildSmallSDConstInfo()
 {
-    const auto &baseParam = GetSmallSDTilingData().baseParam;
+    const auto &baseParam = GetSmallSDTilingData()->baseParam;
     smallSDConstInfo.b = baseParam.bSize;
     smallSDConstInfo.n1 = baseParam.n1Size;
     smallSDConstInfo.n2 = baseParam.n2Size;
@@ -232,7 +232,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     smallSDConstInfo.workspaceBaseOffset = baseParam.workspaceBaseOffset;
     smallSDConstInfo.workspaceSize = baseParam.workspaceSize;
 
-    const auto &layoutParam = GetSmallSDTilingData().layoutParam;
+    const auto &layoutParam = GetSmallSDTilingData()->layoutParam;
     smallSDConstInfo.qStrideB = layoutParam.qStrideB;
     smallSDConstInfo.qStrideN2 = layoutParam.qStrideN2;
     smallSDConstInfo.qStrideS = layoutParam.qStrideS;
@@ -378,7 +378,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
 {
     if constexpr (IS_TND) {
         const auto &tndCore =
-            GetSmallSDTilingData().tndCoreParam[cBlockIdx];
+            GetSmallSDTilingData()->tndCoreParam[cBlockIdx];
         const int64_t bIdx = tndCore.startBatchIdx;
         ReadTndSeqLenSmallSD(bIdx, cursor.actualS1Len, cursor.actualS2Len);
         cursor.bIdx = bIdx;
@@ -387,7 +387,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         LoadTndCursorPrefixSmallSD(cursor);
     } else {
         (void)index;
-        const auto &coreTask = GetSmallSDTilingData().coreTaskParam[cBlockIdx];
+        const auto &coreTask = GetSmallSDTilingData()->coreTaskParam[cBlockIdx];
         cursor.bIdx = coreTask.startBatchIdx;
         cursor.n2oIdx = coreTask.startN2Idx;
         cursor.actualS1Len = smallSDConstInfo.s1;
@@ -604,7 +604,7 @@ template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::Process()
 {
     const auto &coreTask =
-        GetSmallSDTilingData().coreTaskParam[cBlockIdx];
+        GetSmallSDTilingData()->coreTaskParam[cBlockIdx];
     const int64_t blockStart = coreTask.blockStart;
     int64_t groupCount = coreTask.groupCount;
     if (groupCount <= 0) {
@@ -612,7 +612,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     }
     if constexpr (IS_TND) {
         const auto &tndCore =
-            GetSmallSDTilingData().tndCoreParam[cBlockIdx];
+            GetSmallSDTilingData()->tndCoreParam[cBlockIdx];
         groupCount = tndCore.taskCount;
         curBatchIdx = tndCore.startBatchIdx;
         curBaseTaskIndex = tndCore.baseTaskIndex;
