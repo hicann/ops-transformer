@@ -45,6 +45,12 @@ __aicore__ inline T1 CeilDiv(T1 a, T2 b)
 #define PACK_FACTOR 1U
 #endif
 
+#if !MX_QUANT_MODE && defined(ORIG_DTYPE_GMM_X_SCALE)
+#define PERTENSOR_QUANT_MODE true
+#else
+#define PERTENSOR_QUANT_MODE false
+#endif
+
 #if (ORIG_DTYPE_GMM_X == DT_FLOAT16 || ORIG_DTYPE_GMM_X == DT_BF16)
 #define X_TYPE_SIZE 2U
 #elif (ORIG_DTYPE_GMM_X == DT_INT8 || ORIG_DTYPE_GMM_X == DT_HIFLOAT8 || \

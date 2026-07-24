@@ -102,9 +102,12 @@ ge::graphStatus AlltoAllvQuantGmmTilingCommon::GetWorkspaceSize()
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(context_->GetNodeName(), "can not get workspace."),
         return ge::GRAPH_FAILED);
     const uint64_t tensorListSize = 512;
-    uint64_t groupListSize = sizeof(int64_t) * e_; // GMM计算所需的groupList GM空间大小
-    // tensorListSize为kernel侧tensorlist开辟的空间
-    workspaces[0] = libApiWorkSpaceSize_ + permuteOutSize_ + permuteScaleOutSize_ + groupListSize + tensorListSize;
+    uint64_t groupListSize = sizeof(int64_t) * e_ * epWorldSize_;
+    uint64_t aGroupOffsetTableSize = sizeof(uint64_t) * e_ * epWorldSize_;
+    uint64_t xScaleOffsetTableSize = sizeof(uint64_t) * e_ * epWorldSize_;
+    uint64_t ttScaleRepeatSize = sizeof(float) * e_ * 2;
+    workspaces[0] = libApiWorkSpaceSize_ + permuteOutSize_ + permuteScaleOutSize_ +
+        groupListSize + aGroupOffsetTableSize + xScaleOffsetTableSize + tensorListSize + ttScaleRepeatSize;
     OP_LOGD(context_->GetNodeName(), "end GetWorkspaceSize.");
     return ge::GRAPH_SUCCESS;
 }
@@ -158,9 +161,17 @@ ge::graphStatus AlltoAllvQuantGmmTilingCommon::PostTiling()
     tilingData->taskTilingInfo.epWorldSize = epWorldSize_;
     tilingData->taskTilingInfo.e = e_;
     tilingData->taskTilingInfo.ubSize = ubSize_;
-    tilingData->taskTilingInfo.mainLoopExpertNum = e_;
-    tilingData->taskTilingInfo.tailLoopExpertNum = 0;
-    tilingData->taskTilingInfo.totalLoopCount = e_;
+    tilingData->taskTilingInfo.aivCoreNum = aivCoreNum_;
+    tilingData->taskTilingInfo.aicCoreNum = aicCoreNum_;
+
+    uint32_t packFactor = (gmmXDataType_ == ge::DT_FLOAT4_E2M1) ? MXFP4_PACK_FACTOR : 1U;
+    uint32_t expertNum = CalcExpertNum(e_, epWorldSize_, bsk_, n1_, packFactor);
+    tilingData->taskTilingInfo.expertNum = expertNum;
+    tilingData->taskTilingInfo.mainLoopExpertNum = expertNum;
+    tilingData->taskTilingInfo.tailLoopExpertNum =
+        (e_ % expertNum == 0) ? 0 : static_cast<uint32_t>(e_ % expertNum);
+    tilingData->taskTilingInfo.totalLoopCount =
+        static_cast<uint32_t>((e_ + expertNum - 1) / expertNum);
     tilingData->isNeedMM = hasSharedExpertFlag_;
     for (uint32_t i = 0; i < e_ * epWorldSize_; i++) {
         tilingData->taskTilingInfo.sendCnt[i] = sendCounts[i];

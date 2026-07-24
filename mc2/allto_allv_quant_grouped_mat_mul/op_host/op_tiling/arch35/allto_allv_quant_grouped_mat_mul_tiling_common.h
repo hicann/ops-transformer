@@ -55,12 +55,51 @@ constexpr uint32_t SCALE_BATCH_THRESHOLD = 32;
 // quant mode offset
 const std::vector<uint32_t> QUANT_MODE_MAP = {0, 0, 1, 2, 4, 5, 3};
 
+constexpr uint32_t GMM_ARRAY_MAX_NUM = 128U;
+constexpr uint32_t MAX_HANDLE_ID_NUM = 64U;
+constexpr uint32_t DEFAULT_MERGED_EXPERT_NUM = 4U;
+constexpr uint64_t PER_RANK_TOTAL_MN_THRESHOLD = 20UL * 1024UL * 1024UL;
+constexpr uint32_t SMALL_EXPERT_THRESHOLD = 4U;
+constexpr uint32_t ORIGINAL_LOOP_THRESHOLD = 4U;
+constexpr uint32_t MIN_LOOP_COUNT = 2U;
+
 class AlltoAllvQuantGmmTilingCommon : public AlltoAllvQuantGmmTilingBase {
 public:
-    explicit AlltoAllvQuantGmmTilingCommon(gert::TilingContext *context) : AlltoAllvQuantGmmTilingBase(context){
-        tilingData = context->GetTilingData<QuantAlltoAllvGroupedMatmulTilingData>();
+    explicit AlltoAllvQuantGmmTilingCommon(gert::TilingContext *context) : AlltoAllvQuantGmmTilingBase(context)
+    {
+        tilingData = context_->GetTilingData<QuantAlltoAllvGroupedMatmulTilingData>();
     };
     QuantAlltoAllvGroupedMatmulTilingData *tilingData;
+
+    static uint32_t CalcExpertNum(uint64_t e, uint64_t epWorldSize, uint64_t bsk, uint64_t n1,
+                                  uint32_t packFactor = 1U)
+    {
+        if (e == 0 || e == 1) {
+            return 1U;
+        }
+        if (e <= SMALL_EXPERT_THRESHOLD) {
+            return 1U;
+        }
+        uint32_t originalLoopCount = static_cast<uint32_t>((e + DEFAULT_MERGED_EXPERT_NUM - 1U)
+            / DEFAULT_MERGED_EXPERT_NUM);
+        if (originalLoopCount <= ORIGINAL_LOOP_THRESHOLD) {
+            return DEFAULT_MERGED_EXPERT_NUM;
+        }
+
+        uint64_t perRankTokens = (epWorldSize == 0) ? bsk : bsk / epWorldSize;
+        uint64_t perRankTotalMN = (packFactor == 0) ? perRankTokens * n1
+            : perRankTokens * n1 / packFactor;
+
+        uint32_t expertNum = DEFAULT_MERGED_EXPERT_NUM;
+        if (perRankTotalMN < PER_RANK_TOTAL_MN_THRESHOLD) {
+            uint32_t upperByArray = (epWorldSize == 0) ? GMM_ARRAY_MAX_NUM
+                : static_cast<uint32_t>(GMM_ARRAY_MAX_NUM / epWorldSize);
+            uint32_t upperByLoop = static_cast<uint32_t>(e / MIN_LOOP_COUNT);
+            uint32_t upperBound = std::min({static_cast<uint32_t>(e), upperByArray, upperByLoop});
+            expertNum = std::max(upperBound, 1U);
+        }
+        return expertNum;
+    }
 
 protected:
     // Tiling base
@@ -71,11 +110,26 @@ protected:
     ge::graphStatus GetWorkspaceSize() override;
     ge::graphStatus PostTiling() override;
     // quant base
-    virtual ge::graphStatus CheckInputDtype() const {return ge::GRAPH_SUCCESS;};
-    virtual ge::graphStatus CheckScaleFormatAndDtype() const {return ge::GRAPH_SUCCESS;};
-    virtual ge::graphStatus CheckQuantMode() const {return ge::GRAPH_SUCCESS;};
-    virtual ge::graphStatus CheckScaleShape() const {return ge::GRAPH_SUCCESS;};
-    virtual ge::graphStatus DoGmmTiling(uint64_t gmmMSize) {return ge::GRAPH_SUCCESS;};
+    virtual ge::graphStatus CheckInputDtype() const
+    {
+        return ge::GRAPH_SUCCESS;
+    };
+    virtual ge::graphStatus CheckScaleFormatAndDtype() const
+    {
+        return ge::GRAPH_SUCCESS;
+    };
+    virtual ge::graphStatus CheckQuantMode() const
+    {
+        return ge::GRAPH_SUCCESS;
+    };
+    virtual ge::graphStatus CheckScaleShape() const
+    {
+        return ge::GRAPH_SUCCESS;
+    };
+    virtual ge::graphStatus DoGmmTiling(uint64_t gmmMSize)
+    {
+        return ge::GRAPH_SUCCESS;
+    };
     virtual void GetPermuteOutSize() {};
     ge::graphStatus CheckInputNotNull() const;
     ge::graphStatus SetHcclTiling() const;
@@ -85,5 +139,5 @@ protected:
     uint64_t permuteScaleOutSize_{0};
     uint64_t permuteOutSize_{0};
 };
-}  // namespace optiling
-#endif  // ALLTO_ALLV_QUANT_GROUPED_MATMUL_TILING_COMMON_H
+} // namespace optiling
+#endif // ALLTO_ALLV_QUANT_GROUPED_MATMUL_TILING_COMMON_H

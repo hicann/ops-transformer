@@ -62,10 +62,22 @@ class QuantASWBlockSch {
 public:
     __aicore__ inline QuantASWBlockSch() {}
     template <bool isGmm> __aicore__ inline void Init(const TCubeTiling *__restrict &tilingData, uint32_t blockIdx);
-    // 每一个group需要更新mm的group偏移和MNK
+    __aicore__ inline void SetRankFirstLayout(uint32_t rankDim, const __gm__ uint64_t *cGroupOffsetTableGm)
+    {
+        rankDim_ = rankDim;
+        cGroupOffsetTableGm_ = cGroupOffsetTableGm;
+    }
+    __aicore__ inline void SetAGroupOffsetTable(const __gm__ uint64_t *aGroupOffsetTableGm)
+    {
+        aGroupOffsetTableGm_ = aGroupOffsetTableGm;
+    }
+    __aicore__ inline void SetXScaleGroupOffsetTable(const __gm__ uint64_t *xScaleGroupOffsetTableGm)
+    {
+        xScaleGroupOffsetTableGm_ = xScaleGroupOffsetTableGm;
+    }
     template <bool aTrans, bool bTrans, class xType, class scaleType, CubeFormat wFormat = CubeFormat::ND>
     __aicore__ inline void UpdateGroupOffset(int32_t m, int32_t n, int32_t k, uint32_t groupIdx);
-    template <bool isGmm> __aicore__ inline void UpdateGroupParams(); // 每一个group需要更新mm的参数
+    template <bool isGmm> __aicore__ inline void UpdateGroupParams();
     __aicore__ inline void UpdateTailTile();
     template <bool isGmm> __aicore__ inline void UpdateBasicIndex(uint64_t roundIdx, bool isLastGroupRound);
     template <bool aTrans, bool bTrans, CubeFormat wFormat = CubeFormat::ND>
@@ -86,6 +98,10 @@ private:
     uint32_t blockIdx_;
     uint32_t startBlockIdx_;
     uint32_t endBlockIdx_;
+    uint32_t rankDim_ = 1U;
+    const __gm__ uint64_t *cGroupOffsetTableGm_ = nullptr;
+    const __gm__ uint64_t *aGroupOffsetTableGm_ = nullptr;
+    const __gm__ uint64_t *xScaleGroupOffsetTableGm_ = nullptr;
 };
 
 template <bool isGmm>
@@ -123,47 +139,88 @@ __aicore__ inline void QuantASWBlockSch::Init(const TCubeTiling *__restrict &til
 template <bool aTrans, bool bTrans, class xType, class scaleType, CubeFormat wFormat>
 __aicore__ inline void QuantASWBlockSch::UpdateGroupOffset(int32_t m, int32_t n, int32_t k, uint32_t groupIdx)
 {
-    // 用初始化或上个group的mm的m,k,n值更新group矩阵的偏移量。group内2维mm。
-    if (groupIdx > 0) {                             // groupIdx==0时，起始点均为0，无需计算，减少scalar
-        if constexpr (Mc2QuantUtils::IsFp4<xType>()) { // 2: fp4为半个字节
-            params_.aGroupAddrOffset += params_.m * params_.k / 2;
-            params_.bGroupAddrOffset += params_.n * params_.k / 2;
+    if (groupIdx > 0) {
+        if (aGroupOffsetTableGm_ != nullptr) {
+            params_.aGroupAddrOffset = aGroupOffsetTableGm_[groupIdx];
         } else {
-            params_.aGroupAddrOffset += params_.m * params_.k;
-            if constexpr (wFormat == CubeFormat::NZ) {
-                if constexpr (bTrans) {
-                    params_.bGroupAddrOffset += Mc2QuantUtils::CeilDiv(params_.k, Mc2QuantUtils::WEIGHTNZ_K0_32) *
-                        Mc2QuantUtils::CeilDiv(params_.n, Mc2QuantUtils::WEIGHTNZ_N0_16) * Mc2QuantUtils::WEIGHTNZ_N0_K0;
-                } else {
-                    params_.bGroupAddrOffset += Mc2QuantUtils::CeilDiv(params_.n, Mc2QuantUtils::WEIGHTNZ_N0_32) *
-                        Mc2QuantUtils::CeilDiv(params_.k, Mc2QuantUtils::WEIGHTNZ_K0_16) * Mc2QuantUtils::WEIGHTNZ_N0_K0;
-                }
+            if constexpr (Mc2QuantUtils::IsFp4<xType>()) {
+                params_.aGroupAddrOffset += params_.m * params_.k / 2;
             } else {
-                params_.bGroupAddrOffset += params_.n * params_.k;
+                params_.aGroupAddrOffset += params_.m * params_.k;
             }
         }
-        params_.cGroupAddrOffset += params_.m * params_.n;
+
+        bool isExpertBoundary = (rankDim_ <= 1U) || (groupIdx % rankDim_ == 0U);
+        if constexpr (Mc2QuantUtils::IsFp4<xType>()) {
+            if (isExpertBoundary) {
+                params_.bGroupAddrOffset += params_.n * params_.k / 2;
+            }
+        } else {
+            if constexpr (wFormat == CubeFormat::NZ) {
+                if (isExpertBoundary) {
+                    if constexpr (bTrans) {
+                        params_.bGroupAddrOffset +=
+                            Mc2QuantUtils::CeilDiv(params_.k, Mc2QuantUtils::WEIGHTNZ_K0_32) *
+                            Mc2QuantUtils::CeilDiv(params_.n, Mc2QuantUtils::WEIGHTNZ_N0_16) *
+                            Mc2QuantUtils::WEIGHTNZ_N0_K0;
+                    } else {
+                        params_.bGroupAddrOffset +=
+                            Mc2QuantUtils::CeilDiv(params_.n, Mc2QuantUtils::WEIGHTNZ_N0_32) *
+                            Mc2QuantUtils::CeilDiv(params_.k, Mc2QuantUtils::WEIGHTNZ_K0_16) *
+                            Mc2QuantUtils::WEIGHTNZ_N0_K0;
+                    }
+                }
+            } else {
+                if (isExpertBoundary) {
+                    params_.bGroupAddrOffset += params_.n * params_.k;
+                }
+            }
+        }
+
+        if (rankDim_ > 1U && cGroupOffsetTableGm_ != nullptr) {
+            params_.cGroupAddrOffset = cGroupOffsetTableGm_[groupIdx];
+        } else {
+            params_.cGroupAddrOffset += params_.m * params_.n;
+        }
+
         if constexpr (Mc2QuantUtils::IsMxType<scaleType>()) {
             uint64_t scaleK = Mc2QuantUtils::MXFP_MULTI_BASE_SIZE;
-            if constexpr (!aTrans) { // mx (m, ceil(k / 64), 2)
+            if constexpr (!aTrans) {
                 scaleK *= Mc2QuantUtils::CeilDiv(params_.k, Mc2QuantUtils::MXFP_DIVISOR_SIZE);
-                params_.xScaleGroupAddrOffset += params_.m * scaleK;
-                params_.wScaleGroupAddrOffset += params_.n * scaleK;
-            } else if constexpr (aTrans && !bTrans) { // mx (k / 64 + G, m, 2)
-                // scaleK from (k0 + k1 + k2 + ... + k_{i - 1}) / 64 + Gi, cumsum
-                // n在host侧已保证不会为0
+                if (xScaleGroupOffsetTableGm_ != nullptr) {
+                    params_.xScaleGroupAddrOffset = xScaleGroupOffsetTableGm_[groupIdx];
+                } else {
+                    params_.xScaleGroupAddrOffset += params_.m * scaleK;
+                }
+                if (isExpertBoundary) {
+                    params_.wScaleGroupAddrOffset += params_.n * scaleK;
+                }
+            } else if constexpr (aTrans && !bTrans) {
                 scaleK *= (params_.bGroupAddrOffset / params_.n / Mc2QuantUtils::MXFP_DIVISOR_SIZE + groupIdx);
                 params_.xScaleGroupAddrOffset = params_.m * scaleK;
                 params_.wScaleGroupAddrOffset = params_.n * scaleK;
             }
-        } else { // 当perChannel/perToken（重点场景）计算offset，kernel侧在perTensor场景下直接使用groupIdx偏移，减少分支判断
+        } else {
             params_.xScaleGroupAddrOffset += params_.m;
-            params_.wScaleGroupAddrOffset += params_.n;
+            if (isExpertBoundary) {
+                params_.wScaleGroupAddrOffset += params_.n;
+            }
         }
-        params_.biasGroupAddrOffset += params_.n;
+        if (isExpertBoundary) {
+            params_.biasGroupAddrOffset += params_.n;
+        }
+    } else {
+        if (rankDim_ > 1U && cGroupOffsetTableGm_ != nullptr) {
+            params_.cGroupAddrOffset = cGroupOffsetTableGm_[0];
+        }
+        if (aGroupOffsetTableGm_ != nullptr) {
+            params_.aGroupAddrOffset = aGroupOffsetTableGm_[0];
+        }
+        if (xScaleGroupOffsetTableGm_ != nullptr) {
+            params_.xScaleGroupAddrOffset = xScaleGroupOffsetTableGm_[0];
+        }
     }
 
-    // 需要kernel传参m,n,k, 兼容group_type=0,2和多tensor情况
     params_.m = m;
     params_.n = n;
     params_.k = k;

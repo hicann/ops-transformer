@@ -133,6 +133,7 @@ constexpr uint64_t MAX_K_VALUE = 8;
 constexpr uint32_t MAX_SHARED_H_SHAPE_SIZE = 12288;
 constexpr int64_t MAX_BSK_VALUE = 52428800;
 constexpr int64_t RECV_SEND_MIN = static_cast<int64_t>((2 * 1024 * 1024) / 2);         // 2M / sizeof(gmmX)
+constexpr uint32_t MAX_HCCL_HANDLE_NUM = 63;
 inline constexpr int64_t RANK_DEFAULT_NUM = -1;
 inline const std::set<int64_t> SUPPORT_RANK_SIZE{2, 4, 8, 16, 32, 64, 128};
 

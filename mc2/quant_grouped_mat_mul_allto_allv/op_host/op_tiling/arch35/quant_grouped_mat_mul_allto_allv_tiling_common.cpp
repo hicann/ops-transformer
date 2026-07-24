@@ -838,10 +838,24 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::SetTilingCommonInfo()
     gmmQTilingCommonInfoPtr->N2 = localParams_.N2;
     gmmQTilingCommonInfoPtr->epWorldSize = localParams_.epWorldSize;
     gmmQTilingCommonInfoPtr->e = localParams_.ep;
+    gmmQTilingCommonInfoPtr->aivCoreNum = static_cast<uint64_t>(localParams_.aivCoreNum);
 
-    gmmQTilingCommonInfoPtr->mainLoopExpertNum = 1;
-    gmmQTilingCommonInfoPtr->tailLoopExpertNum = 1;
-    gmmQTilingCommonInfoPtr->totalLoopCount = localParams_.ep;
+    // 动态计算 expertNum_，保证不同专家数量下通信和计算次数不超过4次
+    // expertNum_ = CeilDiv(ep, 4)，使得 totalLoopCount = CeilDiv(ep, expertNum_) <= 4
+    constexpr uint32_t TARGET_COMM_ROUNDS = 4U;
+    expertNum_ = static_cast<uint32_t>(
+        Ops::Base::CeilDiv(localParams_.ep, static_cast<uint64_t>(TARGET_COMM_ROUNDS)));
+    if (expertNum_ == 0U) {
+        expertNum_ = 1U;
+    }
+    OP_LOGD(opName_, "SetTilingCommonInfo: ep=%lu, expertNum_=%u, targetCommRounds=%u",
+            localParams_.ep, expertNum_, TARGET_COMM_ROUNDS);
+    gmmQTilingCommonInfoPtr->expertNum = expertNum_;
+    gmmQTilingCommonInfoPtr->mainLoopExpertNum = expertNum_;
+    gmmQTilingCommonInfoPtr->tailLoopExpertNum =
+        (localParams_.ep % expertNum_ == 0) ? 0 : static_cast<uint32_t>(localParams_.ep % expertNum_);
+    gmmQTilingCommonInfoPtr->totalLoopCount =
+        static_cast<uint32_t>(Ops::Base::CeilDiv(localParams_.ep, static_cast<uint64_t>(expertNum_)));
 
     return ge::GRAPH_SUCCESS;
 }
@@ -849,14 +863,23 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::SetTilingCommonInfo()
 ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::SetGmmA2avWorkspaceInfo()
 {
     constexpr uint64_t alignAddrLen = 512;
+    constexpr uint64_t tensorListSize = 512;
     auto gmmYDtypeSize = mc2tiling::GetDataTypeSize(opName_, localParams_.gmmYDtype);
     inferredInfo_.gmmResultLen = mc2tiling::AlignUp(localParams_.A * localParams_.N1 * gmmYDtypeSize, alignAddrLen);
     localTilingData_.workspaceInfo.wsGmmOutputSize = inferredInfo_.gmmResultLen;
-    // GmmComputeOp workspace 内部布局: groupList (ep * 8B) + ptrTable (4 * 32B = 128B)
-    constexpr uint64_t ptrTableSize = 128;
-    uint64_t gmmComputeWsSize = localParams_.ep * sizeof(int64_t) + ptrTableSize;
+    // GmmComputeOp workspace 内部布局:
+    //   [groupList (ep * epWorldSize * 8B)] [cGroupOffsetTable (ep * epWorldSize * 8B)]
+    //   [ptrTable (tensorListSize=512)] [TT scale repeat (sizeof(float) * ep * 2)]
+    uint64_t groupListSize = localParams_.ep * localParams_.epWorldSize * sizeof(int64_t);
+    uint64_t cGroupOffsetTableSize = localParams_.ep * localParams_.epWorldSize * sizeof(uint64_t);
+    uint64_t ttScaleRepeatSize = sizeof(float) * localParams_.ep * 2;
+    uint64_t gmmComputeWsSize = groupListSize + cGroupOffsetTableSize + tensorListSize + ttScaleRepeatSize;
     localTilingData_.workspaceInfo.wsGmmComputeWorkspaceSize = mc2tiling::AlignUp(gmmComputeWsSize, alignAddrLen);
-    localTilingData_.workspaceInfo.wsSharedGmmComputeWorkspaceSize = mc2tiling::AlignUp(gmmComputeWsSize, alignAddrLen);
+    uint64_t sharedTtScaleRepeatSize = sizeof(float) * localParams_.ep * 2;
+    uint64_t sharedGmmComputeWsSize = localParams_.ep * sizeof(int64_t) + tensorListSize + sharedTtScaleRepeatSize;
+    localTilingData_.workspaceInfo.wsSharedGmmComputeWorkspaceSize =
+        mc2tiling::AlignUp(sharedGmmComputeWsSize, alignAddrLen);
+
     workSpaceSize_ = libApiWorkSpaceSize_ + inferredInfo_.gmmResultLen +
                      localTilingData_.workspaceInfo.wsGmmComputeWorkspaceSize +
                      localTilingData_.workspaceInfo.wsSharedGmmComputeWorkspaceSize;
@@ -879,7 +902,15 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::DoQuantGMMTiling()
         }
         mMaxSize = std::max(mSize, mMaxSize);
     }
-    MC2_CHECK_LOG_RET(opName_, gmmTile.SetGroupExpertInputParameters(localParams_, mMaxSize));
+    // check expertNum
+    OP_TILING_CHECK(expertNum_ == 0,
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "expertNum_",
+            std::to_string(expertNum_).c_str(), "positive value"),
+        return ge::GRAPH_FAILED);
+    expertNum_ = Ops::Base::CeilDiv(localParams_.ep, expertNum_) > MAX_HCCL_HANDLE_NUM ?
+        Ops::Base::CeilDiv(localParams_.ep, static_cast<uint64_t>(MAX_HCCL_HANDLE_NUM)) : expertNum_;
+    MC2_CHECK_LOG_RET(opName_, gmmTile.SetGroupExpertInputParameters(localParams_, mMaxSize,
+        expertNum_));
     MC2_CHECK_LOG_RET(opName_, gmmTile.Process());
     localTilingData_.gmmBaseTiling = gmmTile.GetGmmQuantTilingAdapterData();
 

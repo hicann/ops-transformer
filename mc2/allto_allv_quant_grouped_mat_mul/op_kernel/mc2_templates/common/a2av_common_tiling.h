@@ -26,10 +26,27 @@ namespace MC2KernelTemplate {
 static constexpr uint32_t MAX_EP_RANK_SIZE = 128U;
 static constexpr uint32_t MAX_EXPERT_PER_EP = 1U;
 static constexpr uint32_t MAX_EXPERT_SIZE = 256U;
+static constexpr uint32_t MAX_EXPERT_PER_RANK = 32U;
 static constexpr uint32_t TENSOR_LIST_SIZE = 512U;
 static constexpr uint32_t SCALE_COMM_BATCH_THRESHOLD = 32U;
 static constexpr uint64_t MAX_HANDLE_ID_NUM = 64U;
 static constexpr uint64_t SCALE_ALIGNMENT_BLOCK_SIZE = 64U;
+static constexpr uint16_t MAX_BUFFER_SIZE = 65534U;
+static constexpr uint16_t PERMUTE_BUF_SIZE = 32768U;
+
+// 核间同步常量
+#if defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510
+static constexpr uint8_t SYNC_MODE_AIV_TO_AIC = 4U;
+static constexpr uint16_t SYNC_FLAG_AIV1_OFFSET = 16U;
+#else
+static constexpr uint8_t SYNC_MODE_AIV_TO_AIC = 2U;
+static constexpr uint16_t SYNC_FLAG_AIV1_OFFSET = 0U;
+#endif
+static constexpr uint8_t SYNC_MODE_AIC_BARRIER = 0U;
+static constexpr uint8_t SYNC_MODE_AIC_TO_AIV = 2U;
+static constexpr uint16_t SYNC_FLAG_ID_COMM_DONE = 8U;
+static constexpr uint16_t SYNC_FLAG_ID_AIC_BARRIER = 9U;
+static constexpr uint16_t SYNC_FLAG_ID_PERMUTE_DONE = 10U;
 
 // 类型复用声明
 using GMMQuantTilingData = Mc2GroupedMatmulTilingData::GMMQuantTilingData;
@@ -56,11 +73,14 @@ struct TaskTilingInfo {
     
     // 平台信息
     uint64_t ubSize;        // UB大小
+    uint64_t aivCoreNum;    // AIV 核数量
+    uint64_t aicCoreNum;    // AIC 核数量
 
     // 循环调度参数
-    uint32_t mainLoopExpertNum;  // 主循环每次处理的expert数量
-    uint32_t tailLoopExpertNum;  // 尾循环处理的expert数量
-    uint32_t totalLoopCount;     // 总循环次数
+    uint32_t expertNum = 1U;     // 每次GMM计算合并的专家数量（计算批大小）
+    uint32_t mainLoopExpertNum;  // 主循环每次处理的expert数量（=expertNum）
+    uint32_t tailLoopExpertNum;  // 尾循环处理的expert数量（=e%expertNum的余数）
+    uint32_t totalLoopCount;     // 总循环次数（=CeilDiv(e,expertNum))
     
     // 通信参数（对应sendCounts和recvCounts）
     int32_t sendCnt[MAX_EXPERT_SIZE];  // 每个expert的发送计数

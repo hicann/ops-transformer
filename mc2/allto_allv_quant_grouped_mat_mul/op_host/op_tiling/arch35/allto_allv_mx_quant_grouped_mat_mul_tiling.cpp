@@ -122,9 +122,13 @@ ge::graphStatus AlltoAllvMXQuantGmmTiling::CheckScaleShape() const
 ge::graphStatus AlltoAllvMXQuantGmmTiling::DoGmmTiling(uint64_t gmmxMSzie)
 {
     OP_LOGD(context_->GetNodeName(), "start DoGmmTiling.");
+    uint32_t packFactor = (gmmXDataType_ == ge::DT_FLOAT4_E2M1) ? MXFP4_PACK_FACTOR : 1U;
+    uint32_t expertNum = CalcExpertNum(e_, epWorldSize_, bsk_, n1_, packFactor);
+    uint32_t gmmGroupNum = expertNum * static_cast<uint32_t>(epWorldSize_);
     // gmm group matmul tiling
     if (gmmxMSzie != 0) {
         AlltoAllvMXQuantGmmTilingHelper gmmHelper(*this);
+        gmmHelper.SetGroupNum(gmmGroupNum);
         MC2_CHECK_LOG_RET(context_->GetNodeName(), gmmHelper.SetInputParams(gmmxMSzie, n1_, h1_, transGmmWeight_));
         MC2_CHECK_LOG_RET(context_->GetNodeName(), gmmHelper.Process());
         tilingData->gmmQuantTilingData = gmmHelper.GetAlltoAllvQuantHelperData();
@@ -486,8 +490,8 @@ ge::graphStatus AlltoAllvMXQuantGmmTiling::CheckMmScaleShape() const
 
 void AlltoAllvMXQuantGmmTiling::GetPermuteOutSize()
 {
-    // permuteout size(范围校验能够确保不溢出)
-    permuteOutSize_ = permuteOutFlag_ ? 0 : (a_ * h1_);
+    // commOutSize: 通信输出区域，kernel始终从workspace偏移0分配此空间存放通信结果
+    permuteOutSize_ = a_ * h1_;
     if (gmmXDataType_ == ge::DT_FLOAT4_E2M1) {
         // mxfp4 场景占半字节，shapesize大小除以二
         permuteOutSize_ = Ops::Base::CeilDiv(permuteOutSize_, MXFP4_PACK_FACTOR);
@@ -520,14 +524,14 @@ ge::graphStatus AlltoAllvMXQuantGmmTilingHelper::SetInputParams(uint64_t M, uint
     inputParams_.transA = 0;
     inputParams_.transB = transB;
     inputParams_.hasBias = 0;
-    inputParams_.isSingleX = 0;
-    inputParams_.isSingleW = 0;
-    inputParams_.isSingleY = 0;
+    inputParams_.isSingleX = 1;
+    inputParams_.isSingleW = 1;
+    inputParams_.isSingleY = 1;
 
     inputParams_.mSize = M;
     inputParams_.kSize = K;
     inputParams_.nSize = N;
-    inputParams_.groupNum = SINGLE_GROUP_NUM;
+    inputParams_.groupNum = gmmGroupNum_;
     inputParams_.aQuantMode = static_cast<Mc2GroupedMatmulTiling::QuantMode>(1U << QUANT_MODE_MAP[MX_MODE]);
     inputParams_.bQuantMode = static_cast<Mc2GroupedMatmulTiling::QuantMode>(1U << QUANT_MODE_MAP[MX_MODE]);
     // 是否做切分
@@ -540,7 +544,14 @@ ge::graphStatus AlltoAllvMXQuantGmmTilingHelper::SetInputParams(uint64_t M, uint
     inputParams_.scaleDtype = ge::DT_FLOAT8_E8M0;
     inputParams_.perTokenScaleDtype = ge::DT_FLOAT8_E8M0;
 
-    mList_[0] = static_cast<int32_t>(M);
+    OP_TILING_CHECK(gmmGroupNum_ > optiling::Mc2GroupedMatmul::MAX_TENSOR_CONT,
+        OP_LOGE_FOR_INVALID_VALUE(inputParams_.opName, "gmmGroupNum_",
+            std::to_string(gmmGroupNum_).c_str(),
+            (std::string("<=") + std::to_string(optiling::Mc2GroupedMatmul::MAX_TENSOR_CONT)).c_str()),
+        return ge::GRAPH_FAILED);
+    for (uint32_t i = 0; i < gmmGroupNum_; i++) {
+        mList_[i] = static_cast<int32_t>(M);
+    }
     kList_[0] = static_cast<int32_t>(K);
     nList_[0] = static_cast<int32_t>(N);
     SetKernelType();

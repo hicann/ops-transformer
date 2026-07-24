@@ -114,6 +114,7 @@ protected:
     void PrintQuantGmmA2avTilingData(QuantGmmA2avTilingData &outTilingData);
     uint32_t libApiWorkSpaceSize_{0};
     uint32_t workSpaceSize_{0};
+    uint64_t expertNum_{1};
     QuantGmmA2avTilingData localTilingData_;
     TilingInferredInfo inferredInfo_;
     QuantGmmAlltoAllvParamsInfo localParams_;

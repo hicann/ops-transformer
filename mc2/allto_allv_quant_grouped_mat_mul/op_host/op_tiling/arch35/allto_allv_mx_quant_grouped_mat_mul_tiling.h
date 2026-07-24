@@ -59,6 +59,9 @@ public:
     void Reset() override {} 
     ge::graphStatus SetInputParams(uint64_t M, uint64_t N, uint64_t K, bool transB);
     ge::graphStatus Process();
+    void SetGroupNum(uint32_t groupNum) { gmmGroupNum_ = groupNum; }
+private:
+    uint32_t gmmGroupNum_ = 1;
 };
 
 }  // namespace optiling
