@@ -34,6 +34,11 @@ private:
     bool Prepare(CpuKernelContext &ctx);
     bool BalanceSchedule(load_balance::SectionStreamKResult &splitRes);
     bool GenMetadata(load_balance::SectionStreamKResult &splitRes);
+
+    bool ParamsCheck();
+    bool CheckActualQuerySeq();
+    bool CheckActualKvSeq();
+
     bool ParamsInit();
     void InitDeviceInfo();
     void InitBaseInfo();
@@ -67,6 +72,12 @@ private:
     std::string socVersion_ = "";
     int32_t aicCoreNum_ = 36U;          // 36: default aic num
     int32_t aivCoreNum_ = 72U;          // 72: default aiv num
+
+    // BaseInfo
+    bool isActualSeqlenQAccum_ = false;
+    bool isActualSeqlenKvAccum_ = false;
+    std::vector<int64_t> actualSeqlenQ_ {};
+    std::vector<int64_t> actualSeqlenKv_ {};
 
     // SplitParams
     uint32_t groupSize_ = 0;

@@ -232,7 +232,7 @@ SectionStreamKImpl::Compute(const DeviceInfo &deviceInfo, const IBaseInfo &baseI
     if (computeContext.gridInfo.isEmpty) {
         result.emplace_back(deviceInfo.aicCoreMaxNum, deviceInfo.aivCoreMaxNum);
         result[0].usedCoreNum = 1U;
-        result[0].bN2End[0] = NumToIndex(baseInfo.GetBatchSize() * baseInfo.GetQueryHeadNum());
+        result[0].bN2End[0] = baseInfo.GetBatchSize() * baseInfo.GetQueryHeadNum();
         result[0].gS1End[0] = 0U;
         result[0].s2End[0] = 0U;
         return result;
