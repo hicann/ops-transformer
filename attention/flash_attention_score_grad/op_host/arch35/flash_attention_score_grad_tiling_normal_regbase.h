@@ -94,6 +94,14 @@ protected:
     void DoPostTiling();
     ge::graphStatus SaveToTilingData();
     void SaveSmallSDTilingData();
+    ge::graphStatus FinalizeSmallSDTiling();
+    void ResetSmallSDDerivedState(bool forFallback = false);
+    ge::graphStatus BuildSmallSDCoreRanges();
+    void BuildSmallSDTndCoreParams();
+    void FillSmallSDBaseParam();
+    void SetSmallSDWorkspace();
+    bool ValidateSmallSDInvariant() const;
+    ge::graphStatus InitSmallSDTilingData();
     ge::graphStatus GetSparsePrefixBlockInfo();
     virtual ge::graphStatus GetSparseUnpadBlockInfo(){};
     virtual bool GetBlockInfoOfBNS4TND(){};
@@ -111,6 +119,12 @@ protected:
     platform_ascendc::SocVersion socVersion;
     NpuArch npuArch = NpuArch::DAV_RESV;
     TndBaseInfo tndBaseInfo;
+    SmallSDTilingDataRegbase smallSDTilingDataScratch_{};
+    uint32_t smallSDValidTaskCount_ = 0;
+    uint32_t smallSDUsedCoreNum_ = 0;
+    uint32_t smallSDTailCoreTaskCount_ = 0;
+    size_t smallSDWorkspaceSize_ = 0;
+    bool smallSDFinalized_ = false;
 };
 
 } // namespace fag

@@ -664,34 +664,73 @@ public:
 
 class SmallSDBaseParamRegbase {
 public:
+    uint32_t bSize;
+    uint32_t n1Size;
+    uint32_t gSize;
     uint32_t maxS1;
     uint32_t maxS2;
     uint32_t actualD;
+    uint32_t actualDv;
     uint32_t n2Size;
     uint32_t usedCoreNum;
     uint32_t layoutType;
+    uint32_t inputDtype;
+    uint32_t outputDtype;
+    uint32_t calcTypeSize;
     uint32_t tndMaxSumLayout;
+    uint32_t sparseMode;
+    uint32_t validTaskCount;
+    uint32_t isTnd;
+    uint32_t isSingleTask;
     uint32_t s2Align16;
+    uint64_t workspaceBaseOffset;
+    uint64_t workspaceSize;
     float scaleValue;
 
+    uint32_t get_bSize() const { return bSize; }
+    uint32_t get_n1Size() const { return n1Size; }
+    uint32_t get_gSize() const { return gSize; }
     uint32_t get_maxS1() const { return maxS1; }
     uint32_t get_maxS2() const { return maxS2; }
     uint32_t get_actualD() const { return actualD; }
+    uint32_t get_actualDv() const { return actualDv; }
     uint32_t get_n2Size() const { return n2Size; }
     uint32_t get_usedCoreNum() const { return usedCoreNum; }
     uint32_t get_layoutType() const { return layoutType; }
+    uint32_t get_inputDtype() const { return inputDtype; }
+    uint32_t get_outputDtype() const { return outputDtype; }
+    uint32_t get_calcTypeSize() const { return calcTypeSize; }
     uint32_t get_tndMaxSumLayout() const { return tndMaxSumLayout; }
+    uint32_t get_sparseMode() const { return sparseMode; }
+    uint32_t get_validTaskCount() const { return validTaskCount; }
+    uint32_t get_isTnd() const { return isTnd; }
+    uint32_t get_isSingleTask() const { return isSingleTask; }
     uint32_t get_s2Align16() const { return s2Align16; }
+    uint64_t get_workspaceBaseOffset() const { return workspaceBaseOffset; }
+    uint64_t get_workspaceSize() const { return workspaceSize; }
     float get_scaleValue() const { return scaleValue; }
 
+    void set_bSize(uint32_t val) { bSize = val; }
+    void set_n1Size(uint32_t val) { n1Size = val; }
+    void set_gSize(uint32_t val) { gSize = val; }
     void set_maxS1(uint32_t val) { maxS1 = val; }
     void set_maxS2(uint32_t val) { maxS2 = val; }
     void set_actualD(uint32_t val) { actualD = val; }
+    void set_actualDv(uint32_t val) { actualDv = val; }
     void set_n2Size(uint32_t val) { n2Size = val; }
     void set_usedCoreNum(uint32_t val) { usedCoreNum = val; }
     void set_layoutType(uint32_t val) { layoutType = val; }
+    void set_inputDtype(uint32_t val) { inputDtype = val; }
+    void set_outputDtype(uint32_t val) { outputDtype = val; }
+    void set_calcTypeSize(uint32_t val) { calcTypeSize = val; }
     void set_tndMaxSumLayout(uint32_t val) { tndMaxSumLayout = val; }
+    void set_sparseMode(uint32_t val) { sparseMode = val; }
+    void set_validTaskCount(uint32_t val) { validTaskCount = val; }
+    void set_isTnd(uint32_t val) { isTnd = val; }
+    void set_isSingleTask(uint32_t val) { isSingleTask = val; }
     void set_s2Align16(uint32_t val) { s2Align16 = val; }
+    void set_workspaceBaseOffset(uint64_t val) { workspaceBaseOffset = val; }
+    void set_workspaceSize(uint64_t val) { workspaceSize = val; }
     void set_scaleValue(float val) { scaleValue = val; }
 };
 
@@ -701,6 +740,27 @@ public:
     SmallSDCoreTaskParamRegbase coreTaskParam[MAX_CORE_NUM];
     SmallSDTndCoreParamRegbase tndCoreParam[MAX_CORE_NUM];
 };
+
+class FlashAttentionScoreGradSmallSDTilingDataRegbase {
+public:
+    SmallSDBaseParamRegbase baseParam;
+    SmallSDCoreTaskParamRegbase coreTaskParam[MAX_CORE_NUM];
+    SmallSDTndCoreParamRegbase tndCoreParam[MAX_CORE_NUM];
+};
+
+static_assert(sizeof(SmallSDBaseParamRegbase) == 104, "SmallSDBaseParamRegbase ABI size changed unexpectedly.");
+static_assert(sizeof(SmallSDCoreTaskParamRegbase) == 16,
+              "SmallSDCoreTaskParamRegbase ABI size changed unexpectedly.");
+static_assert(sizeof(SmallSDTndCoreParamRegbase) == 72,
+              "SmallSDTndCoreParamRegbase ABI size changed unexpectedly.");
+static_assert(sizeof(FlashAttentionScoreGradSmallSDTilingDataRegbase) == 3272,
+              "FlashAttentionScoreGradSmallSDTilingDataRegbase ABI size changed unexpectedly.");
+static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, baseParam) == 0,
+              "SmallSD tiling baseParam offset changed unexpectedly.");
+static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, coreTaskParam) == 104,
+              "SmallSD tiling coreTaskParam offset changed unexpectedly.");
+static_assert(offsetof(FlashAttentionScoreGradSmallSDTilingDataRegbase, tndCoreParam) == 680,
+              "SmallSD tiling tndCoreParam offset changed unexpectedly.");
 
 template<const bool isDeter = false, const bool isNewDeter = false,
     const bool isTnd = false, const bool isTndSwizzle = false>

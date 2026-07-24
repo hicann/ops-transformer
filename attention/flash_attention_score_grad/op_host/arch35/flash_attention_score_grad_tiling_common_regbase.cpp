@@ -1662,8 +1662,9 @@ bool IsSmallSDEligible(const FuzzyBaseInfoParamsRegbase& fBaseParams, const TndB
                                    fBaseParams.attenMaskOptional == EMPTY_TENSOR && !fBaseParams.dropMaskOuter &&
                                    fBaseParams.sinkOptional != NORMAL_TENSOR && !fBaseParams.hasRope;
     const bool fixedOwnership = fBaseParams.n1 == fBaseParams.n2 && fBaseParams.g == 1 &&
-                                fBaseParams.d == fBaseParams.d1 && fBaseParams.d > 0 &&
-                                fBaseParams.d <= static_cast<int64_t>(ConstAxisTemplateNum::NUM128);
+                                fBaseParams.d == fBaseParams.d1 &&
+                                (fBaseParams.d == static_cast<int64_t>(ConstAxisTemplateNum::NUM64) ||
+                                 fBaseParams.d == static_cast<int64_t>(ConstAxisTemplateNum::NUM128));
     const bool noRemap = fBaseParams.sparseType == static_cast<uint8_t>(SparseType::DENSE) &&
                          fBaseParams.tailZeroCount == 0 &&
                          fBaseParams.deterSparseType == static_cast<uint32_t>(DeterSparseType::NO_DETER) &&
@@ -1675,8 +1676,8 @@ bool IsSmallSDEligible(const FuzzyBaseInfoParamsRegbase& fBaseParams, const TndB
     }
 
     if (fBaseParams.layoutType != INPUT_FORMAT_TND) {
-        return fBaseParams.s1 > 0 && fBaseParams.s1 < static_cast<int64_t>(ConstAxisTemplateNum::NUM128) &&
-               fBaseParams.s2 > 0 && fBaseParams.s2 < static_cast<int64_t>(ConstAxisTemplateNum::NUM128);
+        return fBaseParams.s1 > 0 && fBaseParams.s1 <= static_cast<int64_t>(ConstAxisTemplateNum::NUM128) &&
+               fBaseParams.s2 > 0 && fBaseParams.s2 <= static_cast<int64_t>(ConstAxisTemplateNum::NUM128);
     }
 
     const int64_t validBatch = fBaseParams.b - static_cast<int64_t>(fBaseParams.tailZeroCount);
@@ -1688,8 +1689,8 @@ bool IsSmallSDEligible(const FuzzyBaseInfoParamsRegbase& fBaseParams, const TndB
     for (int64_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
         const int64_t actualS1 = fBaseParams.actualSeqQlen[batchIdx];
         const int64_t actualS2 = fBaseParams.actualSeqKvlen[batchIdx];
-        if (actualS1 <= 0 || actualS1 >= static_cast<int64_t>(ConstAxisTemplateNum::NUM128) ||
-            actualS2 <= 0 || actualS2 >= static_cast<int64_t>(ConstAxisTemplateNum::NUM128)) {
+        if (actualS1 <= 0 || actualS1 > static_cast<int64_t>(ConstAxisTemplateNum::NUM128) ||
+            actualS2 <= 0 || actualS2 > static_cast<int64_t>(ConstAxisTemplateNum::NUM128)) {
             return false;
         }
     }

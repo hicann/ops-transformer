@@ -19,19 +19,23 @@
 #include "flash_attention_score_grad_common.h"
 #include "flash_attention_score_grad_block_cube.h"
 #include "flash_attention_score_grad_block_vec.h"
+#include "flash_attention_score_grad_buffer_small_sd.h"
+#include "flash_attention_score_grad_event_small_sd.h"
 #include "flash_attention_score_grad_kernel_base.h"
 #include "cube_api/mutex_buffer.h"
 #include "flash_attention_score_grad_tiling_data_regbase.h"
 
 namespace FagBaseApi {
 
-// SmallSD fixed DAG sync table:
-// - SYNC_C2_TO_V2_FLAG[task&1]: C2(QK score) ready for V2 softmax.
-// - SYNC_C1_TO_V2_FLAG[task&1]: C1(dP) ready for V2/V3.
-// - SYNC_V3_TO_C3_FLAG: dS copied to L1, C3/C4 may consume it.
-// - SYNC_V4_TO_C5_FLAG: P copied to L1, C5 may consume it.
-// - SYNC_C3_TO_V5_FLAG / SYNC_C4_TO_V6_FLAG: DQ/DK UB result ready for cast/writeback.
-// - SYNC_DETER_FIX_FLAG: previous DK UB writeback completed, next C4 can reuse mm2 result buffer.
+// SmallSD fixed DAG sync table. The numeric ids intentionally mirror the generic
+// regbase event allocation, but the SmallSD path uses its own semantic aliases:
+// - SMALL_SD_CUBE_QK_READY_FLAG[slot]: Cube QK score ready for Vector softmax.
+// - SMALL_SD_CUBE_DYV_READY_FLAG[slot]: Cube dP ready for Vector dS/P conversion.
+// - SMALL_SD_DS_L1_READY_FLAG: dS copied to L1, DQ/DK Cube may consume it.
+// - SMALL_SD_P_L1_READY_FLAG: P copied to L1, DV Cube may consume it.
+// - SMALL_SD_DQ_UB_READY_FLAG / SMALL_SD_DK_UB_READY_FLAG: DQ/DK UB ready for cast/writeback.
+// - SMALL_SD_DS_L1_REUSABLE_FLAG / SMALL_SD_P_L1_REUSABLE_FLAG: shared L1 buffers reusable.
+// - SMALL_SD_SLOT_REUSE_READY_FLAG: DK UB writeback completed, the two-slot buffer is reusable.
 // SmallSD is entered only by the arch35 regbase key with:
 // FP16/BF16, BN2, G=1, N1=N2, D==Dv, 0<S1/S2<128, 0<D<=128,
 // no optional feature, no deterministic path, no NZ output, and no swizzle/remap.
@@ -66,60 +70,29 @@ public:
     __aicore__ inline void Process();
     __aicore__ inline void ReadTndSeqLenSmallSD(int64_t batchIdx, int64_t &actualS1Len, int64_t &actualS2Len);
     __aicore__ inline void AdvanceTndBatchPrefixSmallSD(int64_t actualS1Len, int64_t actualS2Len);
-    __aicore__ inline void ComputeDqkvBn2(FagRunInfo &prevRunInfo, int64_t taskId);
+    __aicore__ inline void SetSmallSDConstInfo();
 
 private:
-    struct SmallSDTaskCursor {
-        int64_t bIdx = 0;
-        int64_t n2oIdx = 0;
-        int64_t actualS1Len = 0;
-        int64_t actualS2Len = 0;
-        int64_t s2SizeAcc = 0;
-        int64_t b1SSOffset = 0;
-        int64_t b1SSOffsetAlign = 0;
-        int64_t lastBatchTotalBaseIdx = 0;
-        int64_t lastBatchTotalS1BOffset = 0;
-        int64_t lastBatchTotalS2BOffset = 0;
-        int64_t lastBatchTotalS1BOffsetForDv = 0;
-        int64_t lastBatchTotalS2BOffsetForDv = 0;
-        int64_t lastBatchTotalS1S2SizeAlign = 0;
-        int64_t lastBatchTotalS1S2Size = 0;
-        int64_t lastBatchTotalS2Size = 0;
-        int64_t qOffset = 0;
-        int64_t kOffset = 0;
-        int64_t qTaskStride = 0;
-        int64_t kTaskStride = 0;
-        int64_t qBatchGap = 0;
-        int64_t kBatchGap = 0;
-    };
-
-    struct SmallSDShape {
-        int64_t s1 = 0;
-        int64_t s2 = 0;
-        int64_t s2Align16 = 0;
-        int64_t halfS1 = 0;
-        int64_t firstHalfS1 = 0;
-        int64_t halfS2 = 0;
-        int64_t firstHalfS2 = 0;
-    };
-
-    struct SmallSDOffsets {
-        int64_t q = 0;
-        int64_t k = 0;
-        int64_t attention = 0;
-        int64_t attentionAlign = 0;
-        int64_t s2Prefix = 0;
-    };
-
+    __aicore__ inline const optiling::fag::SmallSDTilingDataRegbase &GetSmallSDTilingData() const;
+    __aicore__ inline void InitSmallSDBlocks(GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR query,
+                                             GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR dq, GM_ADDR dk,
+                                             GM_ADDR dv, GM_ADDR workspace, TPipe *pipeIn);
     __aicore__ inline void InitTaskCursorSmallSD(SmallSDTaskCursor &cursor, int64_t index);
-    __aicore__ inline void AdvanceTaskCursorSmallSD(SmallSDTaskCursor &cursor);
+    __aicore__ inline void AdvanceTaskCursor(SmallSDTaskCursor &cursor);
     __aicore__ inline void SetCursorGmOffsetSmallSD(SmallSDTaskCursor &cursor);
     __aicore__ inline void LoadTndCursorPrefixSmallSD(SmallSDTaskCursor &cursor);
     __aicore__ inline SmallSDShape MakeShapeSmallSD(const SmallSDTaskCursor &cursor) const;
     __aicore__ inline SmallSDOffsets MakeOffsetsSmallSD(const SmallSDTaskCursor &cursor) const;
-    __aicore__ inline void SetRunInfoSmallSD(FagRunInfo &runInfo, int64_t taskId, const SmallSDTaskCursor &cursor);
-    __aicore__ inline void IssueMm12SmallSD(FagRunInfo &runInfo, int64_t taskId);
+    __aicore__ inline void BuildSmallSDConstInfo();
+    __aicore__ inline void PrepareSlot(SmallSDPipelineSlot &slot, const SmallSDTaskCursor &cursor, int64_t taskId);
+    __aicore__ inline void IssueCube(SmallSDPipelineSlot &slot);
+    __aicore__ inline void ConsumeVector(SmallSDPipelineSlot &slot, bool needWaitL1Reusable);
+    __aicore__ inline void WaitSlotReusable(SmallSDPipelineSlot &slot);
+    __aicore__ inline void DrainPipeline(SmallSDPipelineSlot (&slots)[2], int64_t lastSlotIdx, int64_t taskCount);
+    __aicore__ inline void ProcessSingleTask(SmallSDTaskCursor &cursor);
+    __aicore__ inline void ProcessMultipleTasks(SmallSDTaskCursor &cursor, int64_t taskCount);
 
+    SmallSDConstInfo smallSDConstInfo;
     int64_t cachedTndBatchIdx = -1;
     int64_t cachedTndS1Len = 0;
     int64_t cachedTndS2Len = 0;
@@ -136,7 +109,12 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     (void)pseShift;
     (void)dropMask;
     (void)attenMask;
+    (void)y;
     (void)prefixN;
+    (void)deqScaleQ;
+    (void)deqScaleK;
+    (void)deqScaleV;
+    (void)deqScaleDy;
     (void)queryRope;
     (void)keyRope;
     (void)sink;
@@ -155,29 +133,130 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     this->tilingData = ordTilingData;
     this->pipe = pipeIn;
 
-    this->SetConstInfo();
-    this->actualCalcS1Token = this->constInfo.s1Token;
-    this->actualCalcS2Token = this->constInfo.s2Token;
+    SetSmallSDConstInfo();
+    this->actualCalcS1Token = 0;
+    this->actualCalcS2Token = 0;
 
     this->prefixNAddr = prefixN;
     this->actualSeqQlenAddr = actualSeqQlen;
     this->actualSeqKvlenAddr = actualSeqKvlen;
-    this->constInfo.seqS1_addr = actualSeqQlen;
-    this->constInfo.seqS2_addr = actualSeqKvlen;
 
-    this->InitCVCommonGlobalBuffer(dq, dk, dv, deqScaleQ, deqScaleK, deqScaleV, deqScaleDy, workspace);
-    this->InitCVCommonBuffer();
+    InitSmallSDBlocks(key, value, dy, query, softmaxMax, softmaxSum, dq, dk, dv, workspace, pipeIn);
+}
 
-    this->vecBlock.SetVecBlockParams(pipeIn, this->tilingData, this->vBlockIdx, this->cBlockIdx, this->vSubBlockIdx,
-                                     this->attenMaskInfo, this->pseInfo, this->dropInfo);
-    this->vecBlock.InitUbBuffer();
-    this->vecBlock.InitGlobalBuffer(value, dy, y, pseShift, dropMask, attenMask, softmaxMax, softmaxSum, deqScaleQ,
-                                    deqScaleK, deqScaleV, deqScaleDy, dq, dk, dv, dqRope, dkRope, sink, dsink,
-                                    workspace);
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::InitSmallSDBlocks(
+    GM_ADDR key, GM_ADDR value, GM_ADDR dy, GM_ADDR query, GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR dq,
+    GM_ADDR dk, GM_ADDR dv, GM_ADDR workspace, TPipe *pipeIn)
+{
+    this->cubeBlock.Init(query, key, value, dy, dq, dk, dv, workspace, pipeIn, &smallSDConstInfo);
+    this->vecBlock.Init(softmaxMax, softmaxSum, dq, dk, dv, workspace, pipeIn, &smallSDConstInfo);
+}
 
-    this->cubeBlock.SetCubeBlockParams(pipeIn, this->tilingData, &this->l1BufferManager);
-    this->cubeBlock.InitCubeBuffer(this->constInfo);
-    this->cubeBlock.InitGlobalBuffer(query, key, value, dy, queryRope, keyRope, dq, dk, dv, workspace);
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline const optiling::fag::SmallSDTilingDataRegbase &
+FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::GetSmallSDTilingData() const
+{
+    // Transition seam: today SmallSD payload is embedded in the generic regbase tiling data.
+    // When Host/Entry switch to FlashAttentionScoreGradSmallSDTilingDataRegbase, this accessor is the only
+    // Kernel-side read boundary that needs to change.
+    return this->tilingData->smallSDTilingData;
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::BuildSmallSDConstInfo()
+{
+    const auto &baseParam = GetSmallSDTilingData().baseParam;
+    smallSDConstInfo.b = baseParam.bSize;
+    smallSDConstInfo.n1 = baseParam.n1Size;
+    smallSDConstInfo.n2 = baseParam.n2Size;
+    smallSDConstInfo.g = baseParam.gSize;
+    smallSDConstInfo.s1 = baseParam.maxS1;
+    smallSDConstInfo.s2 = baseParam.maxS2;
+    smallSDConstInfo.d = baseParam.actualD;
+    smallSDConstInfo.dv = baseParam.actualDv;
+    smallSDConstInfo.layout = baseParam.layoutType;
+    smallSDConstInfo.inputDtype = baseParam.inputDtype;
+    smallSDConstInfo.outputDtype = baseParam.outputDtype;
+    smallSDConstInfo.calcTypeSize = baseParam.calcTypeSize;
+    smallSDConstInfo.usedCoreNum = baseParam.usedCoreNum;
+    smallSDConstInfo.taskCount = baseParam.validTaskCount;
+    smallSDConstInfo.isTnd = baseParam.isTnd;
+    smallSDConstInfo.isSingleTask = baseParam.isSingleTask;
+    smallSDConstInfo.s2Align16 = baseParam.s2Align16;
+    smallSDConstInfo.scale = baseParam.scaleValue;
+    smallSDConstInfo.workspaceBaseOffset = baseParam.workspaceBaseOffset;
+    smallSDConstInfo.workspaceSize = baseParam.workspaceSize;
+
+    const uint64_t gD = static_cast<uint64_t>(smallSDConstInfo.g) * smallSDConstInfo.d;
+    const uint64_t gDv = static_cast<uint64_t>(smallSDConstInfo.g) * smallSDConstInfo.dv;
+    const uint64_t s1D = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.d;
+    const uint64_t s2D = static_cast<uint64_t>(smallSDConstInfo.s2) * smallSDConstInfo.d;
+    const uint64_t s1Dv = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.dv;
+    const uint64_t s2Dv = static_cast<uint64_t>(smallSDConstInfo.s2) * smallSDConstInfo.dv;
+    const uint64_t n2G = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.g;
+
+    if constexpr (IS_TND) {
+        smallSDConstInfo.qStrideB = 0;
+        smallSDConstInfo.qStrideN2 = gD;
+        smallSDConstInfo.kStrideB = 0;
+        smallSDConstInfo.kStrideN2 = smallSDConstInfo.d;
+        smallSDConstInfo.vStrideB = 0;
+        smallSDConstInfo.vStrideN2 = smallSDConstInfo.dv;
+    } else if (smallSDConstInfo.layout == BNGSD) {
+        smallSDConstInfo.qStrideB = n2G * s1D;
+        smallSDConstInfo.qStrideN2 = static_cast<uint64_t>(smallSDConstInfo.g) * s1D;
+        smallSDConstInfo.kStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * s2D;
+        smallSDConstInfo.kStrideN2 = s2D;
+        smallSDConstInfo.vStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * s2Dv;
+        smallSDConstInfo.vStrideN2 = s2Dv;
+    } else if (smallSDConstInfo.layout == SBNGD) {
+        smallSDConstInfo.qStrideB = n2G * smallSDConstInfo.d;
+        smallSDConstInfo.qStrideN2 = gD;
+        smallSDConstInfo.kStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.d;
+        smallSDConstInfo.kStrideN2 = smallSDConstInfo.d;
+        smallSDConstInfo.vStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.dv;
+        smallSDConstInfo.vStrideN2 = smallSDConstInfo.dv;
+    } else {
+        smallSDConstInfo.qStrideB = n2G * s1D;
+        smallSDConstInfo.qStrideN2 = gD;
+        smallSDConstInfo.kStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * s2D;
+        smallSDConstInfo.kStrideN2 = smallSDConstInfo.d;
+        smallSDConstInfo.vStrideB = static_cast<uint64_t>(smallSDConstInfo.n2) * s2Dv;
+        smallSDConstInfo.vStrideN2 = smallSDConstInfo.dv;
+    }
+    smallSDConstInfo.dyStrideB = smallSDConstInfo.qStrideB;
+    smallSDConstInfo.dyStrideN2 = smallSDConstInfo.qStrideN2;
+    smallSDConstInfo.dqStrideB = smallSDConstInfo.qStrideB;
+    smallSDConstInfo.dqStrideN2 = smallSDConstInfo.qStrideN2;
+    smallSDConstInfo.dkStrideB = smallSDConstInfo.kStrideB;
+    smallSDConstInfo.dkStrideN2 = smallSDConstInfo.kStrideN2;
+    smallSDConstInfo.dvStrideB = smallSDConstInfo.vStrideB;
+    smallSDConstInfo.dvStrideN2 = smallSDConstInfo.vStrideN2;
+
+    smallSDConstInfo.qMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.d *
+                                    sizeof(INPUT_TYPE);
+    smallSDConstInfo.kMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s2) * smallSDConstInfo.d *
+                                    sizeof(INPUT_TYPE);
+    smallSDConstInfo.vMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s2) * smallSDConstInfo.dv *
+                                    sizeof(INPUT_TYPE);
+    smallSDConstInfo.dyMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.d *
+                                     sizeof(INPUT_TYPE);
+    smallSDConstInfo.dqMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.d *
+                                     sizeof(OUTDTYPE);
+    smallSDConstInfo.dkMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s2) * smallSDConstInfo.d *
+                                     sizeof(OUTDTYPE);
+    smallSDConstInfo.dvMatrixBytes = static_cast<uint64_t>(smallSDConstInfo.s2) * smallSDConstInfo.dv *
+                                     sizeof(OUTDTYPE);
+    smallSDConstInfo.cubeResultBytes = static_cast<uint64_t>(smallSDConstInfo.s1) * smallSDConstInfo.s2 *
+                                       sizeof(CALC_TYPE);
+    smallSDConstInfo.vectorTempBytes = smallSDConstInfo.cubeResultBytes;
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SetSmallSDConstInfo()
+{
+    BuildSmallSDConstInfo();
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -207,12 +286,18 @@ template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::AdvanceTndBatchPrefixSmallSD(
     int64_t actualS1Len, int64_t actualS2Len)
 {
+    const uint64_t n2 = smallSDConstInfo.n2;
+    const uint64_t n2G = n2 * smallSDConstInfo.g;
+    const uint64_t n2D = n2 * smallSDConstInfo.d;
+    const uint64_t n2Dv = n2 * smallSDConstInfo.dv;
+    const uint64_t n2GD = n2G * smallSDConstInfo.d;
+    const uint64_t n2GDv = n2G * smallSDConstInfo.dv;
     this->curBatchIdx++;
-    this->curBatchTotalBaseIdx += this->constInfo.commonConstInfo.n2G;
-    this->curBatchTotalS1BOffset += actualS1Len * this->constInfo.commonConstInfo.n2GD;
-    this->curBatchTotalS2BOffset += actualS2Len * this->constInfo.commonConstInfo.n2D;
-    this->curBatchTotalS1BOffsetForDv += actualS1Len * this->constInfo.commonConstInfo.n2GDv;
-    this->curBatchTotalS2BOffsetForDv += actualS2Len * this->constInfo.commonConstInfo.n2Dv;
+    this->curBatchTotalBaseIdx += n2G;
+    this->curBatchTotalS1BOffset += actualS1Len * n2GD;
+    this->curBatchTotalS2BOffset += actualS2Len * n2D;
+    this->curBatchTotalS1BOffsetForDv += actualS1Len * n2GDv;
+    this->curBatchTotalS2BOffsetForDv += actualS2Len * n2Dv;
     this->curBatchTotalS1S2SizeAlign += actualS1Len * AlignTo16(actualS2Len);
     this->curBatchTotalS1S2Size += actualS1Len * actualS2Len;
     this->curBatchTotalS2Size += actualS2Len;
@@ -220,55 +305,36 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SetCursorGmOffsetSmallSD(
-    typename FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SmallSDTaskCursor &cursor)
+    SmallSDTaskCursor &cursor)
 {
     // The initial SmallSD host route guarantees G == 1; GQA needs a separate cursor/accumulation extension.
     if constexpr (IS_TND) {
-        cursor.qOffset = cursor.lastBatchTotalS1BOffset +
-                         cursor.n2oIdx * this->constInfo.commonConstInfo.gD;
-        cursor.kOffset = cursor.lastBatchTotalS2BOffset +
-                         cursor.n2oIdx * this->constInfo.commonConstInfo.dSize;
-        cursor.qTaskStride = this->constInfo.commonConstInfo.gD;
-        cursor.kTaskStride = this->constInfo.commonConstInfo.dSize;
+        cursor.qOffset = cursor.lastBatchTotalS1BOffset + cursor.n2oIdx * smallSDConstInfo.qStrideN2;
+        cursor.kOffset = cursor.lastBatchTotalS2BOffset + cursor.n2oIdx * smallSDConstInfo.kStrideN2;
+        cursor.qTaskStride = smallSDConstInfo.qStrideN2;
+        cursor.kTaskStride = smallSDConstInfo.kStrideN2;
         cursor.qBatchGap = 0;
         cursor.kBatchGap = 0;
     } else {
-        if (this->constInfo.commonConstInfo.layoutType == BNGSD) {
-            cursor.qOffset = cursor.bIdx * this->constInfo.commonConstInfo.n2GS1D +
-                             cursor.n2oIdx * this->constInfo.commonConstInfo.gS1D;
-            cursor.kOffset = cursor.bIdx * this->constInfo.commonConstInfo.n2S2D +
-                             cursor.n2oIdx * this->constInfo.commonConstInfo.s2D;
-            cursor.qTaskStride = this->constInfo.commonConstInfo.gS1D;
-            cursor.kTaskStride = this->constInfo.commonConstInfo.s2D;
-            cursor.qBatchGap = 0;
-            cursor.kBatchGap = 0;
-        } else if (this->constInfo.commonConstInfo.layoutType == SBNGD) {
-            cursor.qOffset = cursor.bIdx * this->constInfo.commonConstInfo.n2GD +
-                             cursor.n2oIdx * this->constInfo.commonConstInfo.gD;
-            cursor.kOffset = cursor.bIdx * this->constInfo.commonConstInfo.n2D +
-                             cursor.n2oIdx * this->constInfo.commonConstInfo.dSize;
-            cursor.qTaskStride = this->constInfo.commonConstInfo.gD;
-            cursor.kTaskStride = this->constInfo.commonConstInfo.dSize;
+        cursor.qOffset = cursor.bIdx * smallSDConstInfo.qStrideB + cursor.n2oIdx * smallSDConstInfo.qStrideN2;
+        cursor.kOffset = cursor.bIdx * smallSDConstInfo.kStrideB + cursor.n2oIdx * smallSDConstInfo.kStrideN2;
+        cursor.qTaskStride = smallSDConstInfo.qStrideN2;
+        cursor.kTaskStride = smallSDConstInfo.kStrideN2;
+        if (smallSDConstInfo.layout == BNGSD || smallSDConstInfo.layout == SBNGD) {
             cursor.qBatchGap = 0;
             cursor.kBatchGap = 0;
         } else {
-            cursor.qOffset = cursor.bIdx * this->constInfo.commonConstInfo.n2GS1D +
-                             cursor.n2oIdx * this->constInfo.commonConstInfo.gD;
-            cursor.kOffset = cursor.bIdx * this->constInfo.commonConstInfo.n2S2D +
-                             cursor.n2oIdx * this->constInfo.commonConstInfo.dSize;
-            cursor.qTaskStride = this->constInfo.commonConstInfo.gD;
-            cursor.kTaskStride = this->constInfo.commonConstInfo.dSize;
-            cursor.qBatchGap = this->constInfo.commonConstInfo.n2GS1D -
-                               this->constInfo.commonConstInfo.n2G * this->constInfo.commonConstInfo.gD;
-            cursor.kBatchGap = this->constInfo.commonConstInfo.n2S2D -
-                               this->constInfo.n2Size * this->constInfo.commonConstInfo.dSize;
+            cursor.qBatchGap = smallSDConstInfo.qStrideB -
+                               static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.qStrideN2;
+            cursor.kBatchGap = smallSDConstInfo.kStrideB -
+                               static_cast<uint64_t>(smallSDConstInfo.n2) * smallSDConstInfo.kStrideN2;
         }
     }
 }
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::LoadTndCursorPrefixSmallSD(
-    typename FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SmallSDTaskCursor &cursor)
+    SmallSDTaskCursor &cursor)
 {
     cursor.lastBatchTotalBaseIdx = this->curBatchTotalBaseIdx;
     cursor.lastBatchTotalS1BOffset = this->curBatchTotalS1BOffset;
@@ -285,12 +351,12 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::InitTaskCursorSmallSD(
-    typename FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SmallSDTaskCursor &cursor,
+    SmallSDTaskCursor &cursor,
     int64_t index)
 {
     if constexpr (IS_TND) {
         const auto &tndCore =
-            this->tilingData->smallSDTilingData.tndCoreParam[this->cBlockIdx];
+            GetSmallSDTilingData().tndCoreParam[this->cBlockIdx];
         const int64_t bIdx = tndCore.startBatchIdx;
         ReadTndSeqLenSmallSD(bIdx, cursor.actualS1Len, cursor.actualS2Len);
         cursor.bIdx = bIdx;
@@ -298,49 +364,35 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         cursor.n2oIdx = tndCore.startN2Idx;
         LoadTndCursorPrefixSmallSD(cursor);
     } else {
-        cursor.bIdx = index / this->constInfo.n2Size;
-        cursor.n2oIdx = index - cursor.bIdx * this->constInfo.n2Size;
-        cursor.actualS1Len = this->constInfo.commonConstInfo.s1Size;
-        cursor.actualS2Len = this->constInfo.commonConstInfo.s2Size;
-        cursor.s2SizeAcc = cursor.bIdx * this->constInfo.commonConstInfo.s2Size;
-        cursor.b1SSOffset = cursor.bIdx * this->constInfo.commonConstInfo.s1S2;
+        cursor.bIdx = index / smallSDConstInfo.n2;
+        cursor.n2oIdx = index - cursor.bIdx * smallSDConstInfo.n2;
+        cursor.actualS1Len = smallSDConstInfo.s1;
+        cursor.actualS2Len = smallSDConstInfo.s2;
+        cursor.s2SizeAcc = cursor.bIdx * smallSDConstInfo.s2;
+        cursor.b1SSOffset = cursor.bIdx * smallSDConstInfo.s1 * smallSDConstInfo.s2;
         cursor.b1SSOffsetAlign =
-            cursor.bIdx * this->constInfo.commonConstInfo.s1Size *
-            AlignTo16(this->constInfo.commonConstInfo.s2Size);
+            cursor.bIdx * smallSDConstInfo.s1 * AlignTo16(smallSDConstInfo.s2);
     }
     SetCursorGmOffsetSmallSD(cursor);
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::IssueMm12SmallSD(
-    FagRunInfo &runInfo, int64_t taskId)
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::IssueCube(
+    SmallSDPipelineSlot &slot)
 {
-    const int64_t taskMod2 = runInfo.commonRunInfo.taskIdMod2;
-    LocalTensor<CALC_TYPE> mm2ResTensor =
-        this->mm2ResBuf[taskMod2].template Get<CALC_TYPE>();
-    this->cubeBlock.IterateMmQK(mm2ResTensor, this->constInfo, runInfo, this->preloadArgs);
-    if ASCEND_IS_AIC {
-        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SYNC_C2_TO_V2_FLAG[taskMod2]);
-        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SYNC_C2_TO_V2_FLAG[taskMod2]);
+    if (slot.state != SmallSDSlotState::PREPARED) {
+        return;
     }
-
-    LocalTensor<CALC_TYPE> mm1ResTensor =
-        this->mm1ResBuf[taskMod2].template Get<CALC_TYPE>();
-    this->cubeBlock.IterateMmDyV(mm1ResTensor, this->constInfo, runInfo, this->preloadArgs);
-    if ASCEND_IS_AIC {
-        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SYNC_C1_TO_V2_FLAG[taskMod2]);
-        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SYNC_C1_TO_V2_FLAG[taskMod2]);
-    }
-
-    this->vecBlock.CopyMaxSum(this->constInfo, runInfo, taskId);
+    slot.state = SmallSDSlotState::CUBE_INFLIGHT;
+    this->cubeBlock.IssueQkAndDyV(slot);
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::AdvanceTaskCursorSmallSD(
-    typename FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SmallSDTaskCursor &cursor)
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::AdvanceTaskCursor(
+    SmallSDTaskCursor &cursor)
 {
     cursor.n2oIdx++;
-    if (cursor.n2oIdx < this->constInfo.n2Size) {
+    if (cursor.n2oIdx < smallSDConstInfo.n2) {
         cursor.qOffset += cursor.qTaskStride;
         cursor.kOffset += cursor.kTaskStride;
         return;
@@ -356,17 +408,16 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     } else {
         cursor.qOffset += cursor.qTaskStride + cursor.qBatchGap;
         cursor.kOffset += cursor.kTaskStride + cursor.kBatchGap;
-        cursor.s2SizeAcc += this->constInfo.commonConstInfo.s2Size;
-        cursor.b1SSOffset += this->constInfo.commonConstInfo.s1S2;
-        cursor.b1SSOffsetAlign += this->constInfo.commonConstInfo.s1Size *
-                                  AlignTo16(this->constInfo.commonConstInfo.s2Size);
+        cursor.s2SizeAcc += smallSDConstInfo.s2;
+        cursor.b1SSOffset += smallSDConstInfo.s1 * smallSDConstInfo.s2;
+        cursor.b1SSOffsetAlign += smallSDConstInfo.s1 * AlignTo16(smallSDConstInfo.s2);
     }
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline typename FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SmallSDShape
+__aicore__ inline SmallSDShape
 FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::MakeShapeSmallSD(
-    const typename FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SmallSDTaskCursor &cursor) const
+    const SmallSDTaskCursor &cursor) const
 {
     SmallSDShape shape;
     shape.s1 = cursor.actualS1Len;
@@ -386,9 +437,9 @@ FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::MakeShapeSmal
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline typename FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SmallSDOffsets
+__aicore__ inline SmallSDOffsets
 FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::MakeOffsetsSmallSD(
-    const typename FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SmallSDTaskCursor &cursor) const
+    const SmallSDTaskCursor &cursor) const
 {
     SmallSDOffsets offsets;
     offsets.q = cursor.qOffset;
@@ -400,161 +451,143 @@ FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::MakeOffsetsSm
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SetRunInfoSmallSD(
-    FagRunInfo &runInfo, int64_t taskId,
-    const typename FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::SmallSDTaskCursor &cursor)
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::PrepareSlot(
+    SmallSDPipelineSlot &slot,
+    const SmallSDTaskCursor &cursor,
+    int64_t taskId)
 {
+    if (slot.state != SmallSDSlotState::EMPTY && slot.state != SmallSDSlotState::REUSABLE) {
+        return;
+    }
     const SmallSDShape shape = MakeShapeSmallSD(cursor);
     const SmallSDOffsets offsets = MakeOffsetsSmallSD(cursor);
 
+    slot.taskId = taskId;
+    slot.taskIdMod2 = taskId & 1;
+    slot.bIdx = cursor.bIdx;
+    slot.n2oIdx = cursor.n2oIdx;
+    slot.actualS1Len = shape.s1;
+    slot.actualS2Len = shape.s2;
+    slot.s2AlignedSize = shape.s2Align16;
+    slot.qOffset = offsets.q;
+    slot.kOffset = offsets.k;
+    slot.attentionOffset = offsets.attention;
+    slot.attentionAlignOffset = offsets.attentionAlign;
+    slot.s2Prefix = offsets.s2Prefix;
     if constexpr (IS_TND) {
-        runInfo.lastBatchTotalBaseIdx = cursor.lastBatchTotalBaseIdx;
-        runInfo.lastBatchTotalS1BOffset = cursor.lastBatchTotalS1BOffset;
-        runInfo.lastBatchTotalS2BOffset = cursor.lastBatchTotalS2BOffset;
-        runInfo.lastBatchTotalS1BOffsetForDv = cursor.lastBatchTotalS1BOffsetForDv;
-        runInfo.lastBatchTotalS2BOffsetForDv = cursor.lastBatchTotalS2BOffsetForDv;
-        runInfo.lastBatchTotalS1S2SizeAlign = cursor.lastBatchTotalS1S2SizeAlign;
-        runInfo.lastBatchTotalS1S2Size = cursor.lastBatchTotalS1S2Size;
-        runInfo.lastBatchTotalS2Size = cursor.lastBatchTotalS2Size;
-        runInfo.lastBatchIdx = cursor.bIdx;
+        slot.lastBatchTotalBaseIdx = cursor.lastBatchTotalBaseIdx;
+        slot.lastBatchTotalS1BOffset = cursor.lastBatchTotalS1BOffset;
+        slot.lastBatchTotalS2BOffset = cursor.lastBatchTotalS2BOffset;
+        slot.lastBatchTotalS1BOffsetForDv = cursor.lastBatchTotalS1BOffsetForDv;
+        slot.lastBatchTotalS2BOffsetForDv = cursor.lastBatchTotalS2BOffsetForDv;
+        slot.lastBatchTotalS1S2SizeAlign = cursor.lastBatchTotalS1S2SizeAlign;
+        slot.lastBatchTotalS1S2Size = cursor.lastBatchTotalS1S2Size;
+        slot.lastBatchTotalS2Size = cursor.lastBatchTotalS2Size;
     }
-
-    runInfo.commonRunInfo.boIdx = cursor.bIdx;
-    runInfo.commonRunInfo.n2oIdx = cursor.n2oIdx;
-    runInfo.commonRunInfo.goIdx = 0;
-    runInfo.commonRunInfo.s1oIdx = 0;
-    runInfo.s2oIdx = 0;
-    runInfo.commonRunInfo.s2SizeAcc = offsets.s2Prefix;
-    runInfo.commonRunInfo.b1SSOffsetAlign = offsets.attentionAlign;
-    runInfo.commonRunInfo.b1SSOffset = offsets.attention;
-    runInfo.commonRunInfo.queryOffset = offsets.q;
-    runInfo.dyOffset = offsets.q;
-    runInfo.commonRunInfo.keyOffset = offsets.k;
-    runInfo.commonRunInfo.valueOffset = offsets.k;
-
-    runInfo.s2CvBegin = 0;
-    runInfo.s2CvEnd = shape.s2;
-    runInfo.commonRunInfo.taskId = taskId;
-    runInfo.commonRunInfo.taskIdMod2 = taskId & 1;
-    runInfo.commonRunInfo.actualS1Size = shape.s1;
-    runInfo.commonRunInfo.actualS2Size = shape.s2;
-    runInfo.commonRunInfo.s1RealSize = shape.s1;
-    runInfo.commonRunInfo.s2RealSize = shape.s2;
-    runInfo.commonRunInfo.s2StartIdx = 0;
-    runInfo.commonRunInfo.s2AlignedSize = shape.s2Align16;
-    runInfo.commonRunInfo.b1SSAttenMaskOffset = runInfo.commonRunInfo.b1SSOffset;
-    runInfo.isS2IdxNoChange = false;
-    runInfo.isNextS2IdxNoChange = false;
-    this->preloadArgs.copyCurrent = true;
-    this->preloadArgs.copyNext = false;
-
     if ASCEND_IS_AIV {
-        runInfo.halfS2RealSize = shape.halfS2;
-        runInfo.firstHalfS2RealSize = shape.firstHalfS2;
-        runInfo.commonRunInfo.halfS1RealSize = shape.halfS1;
-        runInfo.commonRunInfo.firstHalfS1RealSize = shape.firstHalfS1;
-        runInfo.commonRunInfo.vecCoreOffset = this->vSubBlockIdx * shape.firstHalfS1;
+        slot.halfS1 = shape.halfS1;
+        slot.firstHalfS1 = shape.firstHalfS1;
+        slot.halfS2 = shape.halfS2;
+        slot.firstHalfS2 = shape.firstHalfS2;
+        slot.vecCoreOffset = this->vSubBlockIdx * shape.firstHalfS1;
     }
+    slot.state = SmallSDSlotState::PREPARED;
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::ComputeDqkvBn2(
-    FagRunInfo &prevRunInfo, int64_t taskId)
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::ConsumeVector(
+    SmallSDPipelineSlot &slot,
+    bool needWaitL1Reusable)
 {
     static_assert(BaseClass::IS_DQ_WRITE_UB, "SmallSD expects DQ to be written through UB.");
     static_assert(BaseClass::IS_DK_WRITE_UB, "SmallSD expects DK to be written through UB.");
-    const bool needWaitPrevDkv = taskId > 1;
-    const int64_t prevTaskMod2 = prevRunInfo.commonRunInfo.taskIdMod2;
+    if (slot.state != SmallSDSlotState::READY_FOR_VECTOR) {
+        return;
+    }
+    slot.state = SmallSDSlotState::VECTOR_INFLIGHT;
+    this->vecBlock.ProduceDsAndP(slot, needWaitL1Reusable);
+    this->cubeBlock.IssueDqDkDv(slot);
+    this->vecBlock.FinalizeGradOutput(slot);
+}
 
-    LocalTensor<CALC_TYPE> mm1ResTensor =
-        this->mm1ResBuf[prevTaskMod2].template Get<CALC_TYPE>();
-    LocalTensor<CALC_TYPE> mm2ResTensor =
-        this->mm2ResBuf[prevTaskMod2].template Get<CALC_TYPE>();
-    // wait mm2 result
-    if ASCEND_IS_AIV {
-        CrossCoreWaitFlag<SYNC_MODE, PIPE_V>(SYNC_C2_TO_V2_FLAG[prevTaskMod2]);
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::WaitSlotReusable(
+    SmallSDPipelineSlot &slot)
+{
+    if (slot.state == SmallSDSlotState::EMPTY || slot.state == SmallSDSlotState::REUSABLE) {
+        return;
     }
-    this->vecBlock.ProcessVec2(mm2ResTensor, this->constInfo, prevRunInfo); // v2: simpleSoftmax
-    // wait mm1 result
-    if ASCEND_IS_AIV {
-        CrossCoreWaitFlag<SYNC_MODE, PIPE_V>(SYNC_C1_TO_V2_FLAG[prevTaskMod2]);
+    if (slot.state != SmallSDSlotState::VECTOR_INFLIGHT) {
+        return;
     }
-    if ASCEND_IS_AIV {
-        if (needWaitPrevDkv) {
-            CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE3>(SYNC_C4_TO_V3_FLAG);
+    if constexpr (BaseClass::IS_DK_WRITE_UB) {
+        if ASCEND_IS_AIC {
+            CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(SMALL_SD_SLOT_REUSE_READY_FLAG);
+            CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(16 + SMALL_SD_SLOT_REUSE_READY_FLAG);
         }
     }
-    MutexBuffer<BufferType::L1, SyncType::NO_SYNC> dSL1Buffer = this->dSL1Buf.Get();
-    MutexBuffer<BufferType::L1, SyncType::NO_SYNC> pL1Buffer = this->pL1Buf.Get();
-    this->vecBlock.ProcessVec3(dSL1Buffer, mm1ResTensor, mm2ResTensor, this->constInfo,
-                               prevRunInfo); // v3: cast + nd2nz
-    if ASCEND_IS_AIV {
-        if (needWaitPrevDkv) {
-            CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE3>(SYNC_C5_TO_V4_FLAG);
+    slot.state = SmallSDSlotState::REUSABLE;
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::DrainPipeline(
+    SmallSDPipelineSlot (&slots)[2],
+    int64_t lastSlotIdx, int64_t taskCount)
+{
+    if (taskCount <= 0) {
+        return;
+    }
+    this->isLastLoop = true;
+    WaitSlotReusable(slots[lastSlotIdx ^ 1]);
+    const bool needWaitL1Reusable = taskCount > 1;
+    ConsumeVector(slots[lastSlotIdx], needWaitL1Reusable);
+    WaitSlotReusable(slots[lastSlotIdx]);
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::ProcessSingleTask(
+    SmallSDTaskCursor &cursor)
+{
+    SmallSDPipelineSlot slot;
+    PrepareSlot(slot, cursor, 0);
+    IssueCube(slot);
+    this->isLastLoop = true;
+    ConsumeVector(slot, false);
+    WaitSlotReusable(slot);
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::ProcessMultipleTasks(
+    SmallSDTaskCursor &cursor,
+    int64_t taskCount)
+{
+    SmallSDPipelineSlot slots[2];
+
+    PrepareSlot(slots[0], cursor, 0);
+    IssueCube(slots[0]);
+    AdvanceTaskCursor(cursor);
+
+    for (int64_t taskId = 1; taskId < taskCount; ++taskId) {
+        this->isLastLoop = false;
+        const int64_t fillSlotIdx = taskId & 1;
+        const int64_t consumeSlotIdx = fillSlotIdx ^ 1;
+        WaitSlotReusable(slots[fillSlotIdx]);
+        PrepareSlot(slots[fillSlotIdx], cursor, taskId);
+        IssueCube(slots[fillSlotIdx]);
+        ConsumeVector(slots[consumeSlotIdx], taskId > 1);
+        if (taskId + 1 < taskCount) {
+            AdvanceTaskCursor(cursor);
         }
     }
-    this->vecBlock.ProcessVec4(pL1Buffer, mm2ResTensor, this->constInfo, prevRunInfo); // v4: cast + nd2nz
-    if ASCEND_IS_AIV {
-        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SYNC_V3_TO_C3_FLAG); // dqk must wait ds copy completely
-        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SYNC_V4_TO_C5_FLAG); // dv must wait p copy completely
-    }
 
-    if ASCEND_IS_AIC {
-        // wait ds in ub copy to l1
-        CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(SYNC_V3_TO_C3_FLAG);
-        CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(16 + SYNC_V3_TO_C3_FLAG);
-        // wait p in ub copy to l1
-        CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(SYNC_V4_TO_C5_FLAG);
-        CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(16 + SYNC_V4_TO_C5_FLAG);
-    }
-
-    // compute dq
-    mm1ResTensor = this->mm1ResBuf[prevTaskMod2].template Get<CALC_TYPE>();
-    this->cubeBlock.template IterateMmDsK<CALC_TYPE, BaseClass::IS_DQ_WRITE_UB>(mm1ResTensor, dSL1Buffer,
-                                                                                this->constInfo, prevRunInfo); // c3
-    if ASCEND_IS_AIC {
-        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SYNC_C3_TO_V5_FLAG);
-        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SYNC_C3_TO_V5_FLAG);
-    } else {
-        CrossCoreWaitFlag<SYNC_MODE, PIPE_V>(SYNC_C3_TO_V5_FLAG);
-    }
-    this->vecBlock.template ProcessMulsAndCast<CALC_TYPE, BaseClass::IS_DQ_WRITE_UB, DQ_IDX>(
-        mm1ResTensor, this->constInfo, prevRunInfo); // v5: dq muls + cast
-
-    // compute dk
-    mm2ResTensor = this->mm2ResBuf[prevTaskMod2].template Get<CALC_TYPE>();
-    this->cubeBlock.template IterateMmDsQ<CALC_TYPE, BaseClass::IS_DK_WRITE_UB>(mm2ResTensor, dSL1Buffer,
-                                                                                this->constInfo, prevRunInfo); // c4
-    if ASCEND_IS_AIC {
-        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SYNC_C4_TO_V6_FLAG);
-        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SYNC_C4_TO_V6_FLAG);
-    } else {
-        CrossCoreWaitFlag<SYNC_MODE, PIPE_V>(SYNC_C4_TO_V6_FLAG);
-    }
-    this->vecBlock.template ProcessMulsAndCast<CALC_TYPE, BaseClass::IS_DK_WRITE_UB, DK_IDX>(
-        mm2ResTensor, this->constInfo, prevRunInfo); // v6: dk muls + cast
-    if ASCEND_IS_AIC {
-        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(SYNC_C4_TO_V3_FLAG);
-        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(16 + SYNC_C4_TO_V3_FLAG);
-    }
-    if ASCEND_IS_AIV {
-        CrossCoreSetFlag<SYNC_MODE, PIPE_V>(SYNC_DETER_FIX_FLAG);
-    }
-
-    // compute dv
-    this->cubeBlock.template IterateMmPDy<OUTDTYPE, BaseClass::IS_DV_WRITE_UB>(this->dvGm, pL1Buffer,
-                                                                               this->constInfo, prevRunInfo); // c5
-    if ASCEND_IS_AIC {
-        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(SYNC_C5_TO_V4_FLAG);
-        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(16 + SYNC_C5_TO_V4_FLAG);
-    }
+    DrainPipeline(slots, (taskCount - 1) & 1, taskCount);
 }
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType>::Process()
 {
     const auto &coreTask =
-        this->tilingData->smallSDTilingData.coreTaskParam[this->cBlockIdx];
+        GetSmallSDTilingData().coreTaskParam[this->cBlockIdx];
     const int64_t blockStart = coreTask.blockStart;
     const int64_t groupCount = coreTask.groupCount;
     if (groupCount <= 0) {
@@ -562,7 +595,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
     }
     if constexpr (IS_TND) {
         const auto &tndCore =
-            this->tilingData->smallSDTilingData.tndCoreParam[this->cBlockIdx];
+            GetSmallSDTilingData().tndCoreParam[this->cBlockIdx];
         this->curBatchIdx = tndCore.startBatchIdx;
         this->curBatchTotalBaseIdx = tndCore.baseTaskPrefix;
         this->curBatchTotalS1BOffset = tndCore.qPrefixOffset;
@@ -574,54 +607,15 @@ __aicore__ inline void FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBl
         this->curBatchTotalS2Size = tndCore.s2PrefixSize;
         cachedTndBatchIdx = -1;
     }
-    int64_t taskId = 0;
     SmallSDTaskCursor cursor;
     InitTaskCursorSmallSD(cursor, blockStart);
 
     if (groupCount == 1) {
-        constexpr int64_t singleTaskId = 0;
-        FagRunInfo runInfo;
-        SetRunInfoSmallSD(runInfo, singleTaskId, cursor);
-        IssueMm12SmallSD(runInfo, singleTaskId);
-        this->isLastLoop = true;
-        this->vecBlock.ProcessVec1(this->constInfo, runInfo); // v1: softmaxGrad
-        ComputeDqkvBn2(runInfo, singleTaskId + 1);
+        ProcessSingleTask(cursor);
         return;
     }
 
-    FagRunInfo runInfos[2]; // for cv ping pong
-    for (; taskId < groupCount; ++taskId) {
-        this->isLastLoop = false;
-        const int64_t runIdx = taskId & 1;
-        const int64_t prevIdx = runIdx ^ 1;
-        if (taskId > 0) {
-            FagRunInfo &prevRunInfo = runInfos[prevIdx];
-            this->vecBlock.ProcessVec1(this->constInfo, prevRunInfo); // v1: softmaxGrad
-            ComputeDqkvBn2(prevRunInfo, taskId);
-        }
-
-        SetRunInfoSmallSD(runInfos[runIdx], taskId, cursor);
-
-        if constexpr (BaseClass::IS_DK_WRITE_UB) {
-            if ASCEND_IS_AIC {
-                if (taskId > 1) {
-                    CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(SYNC_DETER_FIX_FLAG);
-                    CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(16 + SYNC_DETER_FIX_FLAG);
-                }
-            }
-        }
-
-        IssueMm12SmallSD(runInfos[runIdx], taskId);
-        if (taskId + 1 < groupCount) {
-            AdvanceTaskCursorSmallSD(cursor);
-        }
-    }
-
-    this->isLastLoop = true;
-    const int64_t prevIdx = (taskId + 1) & 1;
-    FagRunInfo &prevRunInfo = runInfos[prevIdx];
-    this->vecBlock.ProcessVec1(this->constInfo, prevRunInfo); // v1: softmaxGrad
-    ComputeDqkvBn2(prevRunInfo, taskId);
+    ProcessMultipleTasks(cursor, groupCount);
 }
 
 } // namespace FagBaseApi

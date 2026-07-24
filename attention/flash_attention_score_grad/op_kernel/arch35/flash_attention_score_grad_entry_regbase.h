@@ -34,6 +34,8 @@ using namespace AscendC::MicroAPI;
 
 #include "flash_attention_score_grad_block_vec.h"
 #include "flash_attention_score_grad_block_cube.h"
+#include "flash_attention_score_grad_block_vec_small_sd.h"
+#include "flash_attention_score_grad_block_cube_small_sd.h"
 #include "flash_attention_score_grad_kernel.h"
 #include "flash_attention_score_grad_kernel_small_sd.h"
 #include "flash_attention_score_grad_kernel_deter.h"
@@ -194,27 +196,25 @@ using namespace AscendC::MicroAPI;
     if (ORIG_DTYPE_QUERY == DT_FLOAT)                                                                                  \
     INVOKE_FAG_GENERAL_S1S2_BN2_REGBASE_IMPL(__VA_ARGS__)
 
+#define STATIC_ASSERT_FAG_SMALL_SD_SELECTOR()                                                                          \
+    static_assert(!isDrop && !isPse && !isAttenMask && !isRope,                                                        \
+                  "SmallSD selector forbids optional input features.");                                                \
+    static_assert(!isBn2MultiBlk && !isDNoEqual && !isNzOut && !isTndSwizzle,                                          \
+                  "SmallSD selector forbids multiblock/D-mismatch/NZ/swizzle.");                                      \
+    static_assert(deterType == NO_DETER, "SmallSD selector forbids deterministic sparse variants.");                   \
+    static_assert(isNEqual, "SmallSD selector requires N1 == N2.")
+
 #define INVOKE_FAG_SMALL_SD_BN2_REGBASE_IMPL(INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND, s1TemplateType, s2TemplateType, \
                                              dTemplateType)                                                            \
     do {                                                                                                               \
+        static_assert(dTemplateType == DTemplateType::Aligned64 || dTemplateType == DTemplateType::Aligned128,         \
+                      "SmallSD selector only instantiates D=64 or D=128.");                                            \
         pipeIn.Destroy();                                                                                              \
         TPipe pipeBase;                                                                                                \
-        using CubeBlockType = typename std::conditional<                                                               \
-            g_coreType == AscendC::AIC,                                                                                \
-            FagBaseApi::FAGBlockCube<INPUT_TYPE, CALC_TYPE, OUTDTYPE, false, false, false, IS_TND, false, NO_DETER,    \
-                                     false, false, false, false, false, BN2, s1TemplateType, s2TemplateType,           \
-                                     dTemplateType>,                                                                   \
-            FagBaseApi::FAGBlockCubeDummy<INPUT_TYPE, CALC_TYPE, OUTDTYPE, false, false, false, IS_TND, false,         \
-                                          NO_DETER, false, false, false, false, false, BN2, s1TemplateType,            \
-                                          s2TemplateType, dTemplateType>>::type;                                       \
-        using VecBlockType = typename std::conditional<                                                                \
-            g_coreType == AscendC::AIC,                                                                                \
-            FagBaseApi::FAGBlockVecDummy<INPUT_TYPE, CALC_TYPE, OUTDTYPE, false, false, false, IS_TND, false,          \
-                                         NO_DETER, false, false, false, false, false, BN2, s1TemplateType,             \
-                                         s2TemplateType, dTemplateType>,                                               \
-            FagBaseApi::FAGBlockVec<INPUT_TYPE, CALC_TYPE, OUTDTYPE, false, false, false, IS_TND, false, NO_DETER,     \
-                                    false, false, false, false, false, BN2, s1TemplateType, s2TemplateType,            \
-                                    dTemplateType>>::type;                                                             \
+        using CubeBlockType = FagBaseApi::SmallSDCubeBlock<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND,                    \
+                                                           static_cast<uint32_t>(dTemplateType), 0>;                   \
+        using VecBlockType = FagBaseApi::SmallSDVectorBlock<INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_TND,                   \
+                                                            static_cast<uint32_t>(dTemplateType), 0>;                  \
         FagBaseApi::FlashAttentionScoreGradKernelSmallSD<CubeBlockType, VecBlockType> op;                             \
         op.Init(key, value, dy, query, pse_shift, drop_mask, atten_mask, attention_in, softmax_max, softmax_sum,       \
                 prefix, actual_seq_qlen, actual_seq_kvlen, deqScaleQ, deqScaleK, deqScaleV, deqScaleDy, queryRope,     \
@@ -252,6 +252,7 @@ RegbaseFAG(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __
     const __gm__ fagTiling *__restrict tilingData = (const __gm__ fagTiling *__restrict)(tiling_data + offset);
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16)
     if constexpr (isSmallSD && splitAxis == BN2) {
+        STATIC_ASSERT_FAG_SMALL_SD_SELECTOR();
         INVOKE_FAG_SMALL_SD_BN2_REGBASE_IMPL(half, float, half, isTnd, S1TemplateType(s1TemplateType),
                                              S2TemplateType(s2TemplateType), DTemplateType(dTemplateType));
         return;
@@ -279,6 +280,7 @@ RegbaseFAG(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __
 
 #if (ORIG_DTYPE_QUERY == DT_BF16)
     if constexpr (isSmallSD && splitAxis == BN2) {
+        STATIC_ASSERT_FAG_SMALL_SD_SELECTOR();
         INVOKE_FAG_SMALL_SD_BN2_REGBASE_IMPL(bfloat16_t, float, bfloat16_t, isTnd, S1TemplateType(s1TemplateType),
                                              S2TemplateType(s2TemplateType), DTemplateType(dTemplateType));
         return;
