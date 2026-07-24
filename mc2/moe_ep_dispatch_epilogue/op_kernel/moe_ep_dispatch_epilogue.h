@@ -36,6 +36,7 @@ namespace MoeEpDispatchEpilogueImpl {
 using namespace AscendC;
 
 static constexpr uint32_t UB_ALIGN = 32U;
+static constexpr uint64_t ALIGNED_LEN_256 = 256UL;
 static constexpr uint32_t WIN_ADDR_ALIGN = 512;
 static constexpr uint32_t RECV_META_FIELDS = 4;
 static constexpr uint8_t BUFFER_NUM = 2;
@@ -72,6 +73,14 @@ private:
     __aicore__ inline GM_ADDR GetWinAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext *ctx, uint32_t rankId, uint64_t offset)
     {
         return (GM_ADDR)ctx->epHcclBuffer[rankId] + offset;
+    }
+    __aicore__ inline uint32_t ReduceSumWorkNeedSize(int32_t count, int32_t typeSize)
+    {
+        int32_t elementsPerBlock = UB_ALIGN / typeSize;
+        int32_t elementsPerRepeat = ALIGNED_LEN_256 / typeSize;
+        int32_t iter1OutputCount = (count + elementsPerRepeat - 1) / elementsPerRepeat;
+        uint32_t iter1AlignEnd = ((iter1OutputCount + elementsPerBlock - 1) / elementsPerBlock) * elementsPerBlock;
+        return iter1AlignEnd;
     }
 
     TPipe *tpipe_{nullptr};
@@ -204,7 +213,9 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     axisKAlign_ = Ceil(axisK_, ELEM_ALIGN) * ELEM_ALIGN;
     metaBytes_ = (META_TOPK_SECTION * axisKAlign_) * (uint32_t)sizeof(int32_t) + UB_ALIGN;
     uint32_t ubExpertPfxBytes = Ceil((uint32_t)(numLocalExperts_ * sizeof(int64_t)), UB_ALIGN) * UB_ALIGN;
-    tpipe_->InitBuffer(ubExpertPfxBuf_, ubExpertPfxBytes);
+    uint32_t expertReduceTmpBytes =
+        ReduceSumWorkNeedSize(static_cast<int32_t>(numLocalExperts_), sizeof(int64_t)) * sizeof(int64_t);
+    tpipe_->InitBuffer(ubExpertPfxBuf_, ubExpertPfxBytes + expertReduceTmpBytes + UB_ALIGN);
     tpipe_->InitBuffer(waitStatusBuf_, epWorldSize_ * UB_ALIGN);
     tpipe_->InitBuffer(waitSumBuf_, UB_ALIGN);
     ubExpertPfx_ = ubExpertPfxBuf_.Get<int64_t>();
@@ -271,12 +282,13 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     DataCopyExtParams expertPfxCopyParams{1U, static_cast<uint32_t>(numLocalExperts_ * sizeof(int64_t)), 0U, 0U, 0U};
     DataCopyPadExtParams<int64_t> expertPfxPadParams{false, 0U, 0U, 0};
     DataCopyPad(ubExpertPfx_, numRecvPerExpertGm_, expertPfxCopyParams, expertPfxPadParams);
-    SyncFunc<AscendC::HardEvent::MTE2_S>();
-    uint32_t expertSum = 0;
-    for (uint32_t localExpertIdx = 0; localExpertIdx < numLocalExperts_; ++localExpertIdx) {
-        expertSum += static_cast<uint32_t>(ubExpertPfx_.GetValue(localExpertIdx));
-    }
-    expertSum_ = expertSum;
+    SyncFunc<AscendC::HardEvent::MTE2_V>();
+
+    LocalTensor<int64_t> expertReduceTmp = ubExpertPfx_[ubExpertPfxBytes / sizeof(int64_t)];
+    LocalTensor<int64_t> expertSumOut = expertReduceTmp[expertReduceTmpBytes / sizeof(int64_t)];
+    ReduceSum<int64_t>(expertSumOut, ubExpertPfx_, expertReduceTmp, static_cast<int32_t>(numLocalExperts_));
+    SyncFunc<AscendC::HardEvent::V_S>();
+    expertSum_ = static_cast<uint32_t>(expertSumOut.GetValue(0));
 }
 
 template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
