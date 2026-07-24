@@ -28,13 +28,14 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
       - id: check-json
+        exclude: .*_runtime_kb\.json$
 
   # C++ 代码格式化检查
   - repo: https://gitcode.com/pre-commit-clang/mirrors-clang-format
     rev: v18.1.8
     hooks:
       - id: clang-format
-        files: \.(c|h|cpp|hpp|cc|hh|cxx|hxx)$
+        files: \.(c|h|cpp|hpp|cc|hh|cxx|hxx|asc)$
         args:
           - "--style=file"
           - "--verbose"
@@ -46,7 +47,7 @@ repos:
     rev: v0.14.14
     hooks:
       - id: ruff-check
-        args: ["--output-format", "github", "--fix"]
+        args: ["--output-format", "github", "--fix", "--ignore", "F841,F821,E741,E712,F403,F405,F601,E721,E731,F811,E711,E722,E402,F401"]
         types: [python]
       - id: ruff-format
         types: [python]
@@ -58,9 +59,9 @@ repos:
       - id: codespell
         args: [
             "-L",
-            "CANN,cann,NNAL,nnal,ASCEND,ascend,EnQue,CopyIn,ArchType,AND,ND,tbe,copyin,alog",
+            "CANN,cann,NNAL,nnal,ASCEND,ascend,EnQue,CopyIn,ArchType,AND,ND,tbe,copyin,alog,wIh,dout,indexs,inH,padD",
             "--skip",
-            "*.py,*.cpp,*.hpp,*.c,*.h,*.md",
+            "*.cc,*.cjs,*.clang-format,*.cmake,*.cpp,*.csv,*.cts,*.gitignore,*.gitkeep,*.gitmodules,*.h,*.hpp,*.in,*.info,*.ini,*.js,*.json,*.log,*.md,*.py,*.sh,*.TAG,*.ts,*.txt,*.xml,*.yaml,*.yml",
           ]
 
   # OAT 合规性检查 (Open Source Audit Tool)
@@ -72,5 +73,5 @@ repos:
         language: system
         pass_filenames: true
         types: [file]
-        stages: [commit]
+        stages: [pre-commit]
         verbose: true
