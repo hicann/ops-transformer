@@ -18,9 +18,7 @@
 
 using namespace ge;
 namespace ops {
-// infershape 公共函数
-ge::graphStatus CommonParamCheck(
-    const gert::InferShapeContext* context, const size_t isTransAIndex, const size_t isTransBIndex, CommParas& commParas)
+static ge::graphStatus CheckMatrixInputShapes(const gert::InferShapeContext* context, CommParas& commParas)
 {
     commParas.x1MatrixShape = context->GetInputShape(0);
     OPS_CHECK_NULL_WITH_CONTEXT(context, commParas.x1MatrixShape);
@@ -36,6 +34,56 @@ ge::graphStatus CommonParamCheck(
             std::to_string(commParas.x2MatrixShape->GetDimNum()) + "D", "2D");
         return ge::GRAPH_FAILED;
     }
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus ResolveRankSize(
+    const gert::InferShapeContext* context, const char* groupStr, const int64_t* rankSizeAttr, int64_t& rankSize)
+{
+    if (*rankSizeAttr <= 0) {
+#if defined(ENABLE_BUILT_IN)
+        uint32_t rankNum = 0;
+        if (Mc2Hcom::MC2HcomTopology::CommGetInstSizeByGroup(groupStr, &rankNum) != HCCL_SUCCESS || rankNum == 0) {
+            OP_LOGE(context->GetNodeName(), "Get rank size failed, group [%s], rankSize [%u]", groupStr, rankNum);
+            return ge::GRAPH_FAILED;
+        }
+        rankSize = static_cast<int64_t>(rankNum);
+#else
+        OP_LOGE(context->GetNodeName(), "Get rank size failed, rankSize [%lld]", *rankSizeAttr);
+        return ge::GRAPH_FAILED;
+#endif
+    } else {
+        rankSize = *rankSizeAttr;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+static void FillMatmulDims(CommParas& commParas, bool isTransA, bool isTransB)
+{
+    commParas.dimM = !isTransA ? commParas.x1MatrixShape->GetDim(0) : commParas.x1MatrixShape->GetDim(1);
+    commParas.dimKX1 = !isTransA ? commParas.x1MatrixShape->GetDim(1) : commParas.x1MatrixShape->GetDim(0);
+    commParas.dimKX2 = !isTransB ? commParas.x2MatrixShape->GetDim(0) : commParas.x2MatrixShape->GetDim(1);
+    commParas.dimN = !isTransB ? commParas.x2MatrixShape->GetDim(1) : commParas.x2MatrixShape->GetDim(0);
+}
+
+static ge::graphStatus CheckKDimMatch(const gert::InferShapeContext* context, const CommParas& commParas)
+{
+    if (commParas.dimKX1 != commParas.dimKX2) {
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context->GetNodeName(), "x1.k, x2.k",
+            std::to_string(commParas.dimKX1) + ", " + std::to_string(commParas.dimKX2),
+            "The values of x1.k and x2.k must be the same");
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+// infershape 公共函数
+ge::graphStatus CommonParamCheck(
+    const gert::InferShapeContext* context, const size_t isTransAIndex, const size_t isTransBIndex, CommParas& commParas)
+{
+    if (CheckMatrixInputShapes(context, commParas) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     auto attrs = context->GetAttrs();
     OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
     const bool* isTransA = attrs->GetAttrPointer<bool>(isTransAIndex);
@@ -43,41 +91,24 @@ ge::graphStatus CommonParamCheck(
     const int64_t* rankSizeAttr = attrs->GetAttrPointer<int64_t>(RANK_SIZE);
 
     const char* groupStr = attrs->GetAttrPointer<char>(GROUP);
+
     if (groupStr == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "groupStr");
         return ge::GRAPH_FAILED;
     }
-    commParas.rankSize = -1;
-    uint32_t rankNum = 0;
-    if (*rankSizeAttr <= 0) {
-        if ((Mc2Hcom::MC2HcomTopology::CommGetInstSizeByGroup(groupStr, &rankNum)) != HCCL_SUCCESS || rankNum == 0) {
-            OP_LOGE(context->GetNodeName(), "Get rank size failed, group [%s], rankSize [%u]", groupStr, rankNum);
-            return ge::GRAPH_FAILED;
-        } else {
-            commParas.rankSize = rankNum;
-        }
-        commParas.rankSize = static_cast<int64_t>(rankNum);
-    } else {
-        commParas.rankSize = *rankSizeAttr;
+
+    if (ResolveRankSize(context, groupStr, rankSizeAttr, commParas.rankSize) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
 
-    commParas.dimM = !(*isTransA) ? commParas.x1MatrixShape->GetDim(0) : commParas.x1MatrixShape->GetDim(1);
-    commParas.dimKX1 = !(*isTransA) ? commParas.x1MatrixShape->GetDim(1) : commParas.x1MatrixShape->GetDim(0);
-    commParas.dimKX2 = !(*isTransB) ? commParas.x2MatrixShape->GetDim(0) : commParas.x2MatrixShape->GetDim(1);
-    commParas.dimN = !(*isTransB) ? commParas.x2MatrixShape->GetDim(1) : commParas.x2MatrixShape->GetDim(0);
-
+    FillMatmulDims(commParas, *isTransA, *isTransB);
     OP_LOGI(
         context->GetNodeName(),
         "group = %s isTransA %d isTransB %d x1.M = [%ld] x1.K = [%ld]"
         " x2.K = [%ld] x2.N = [%ld] rankSize = [%ld].",
         groupStr, (*isTransA), (*isTransB), commParas.x1MatrixShape->GetDim(0), commParas.x1MatrixShape->GetDim(1),
         commParas.x2MatrixShape->GetDim(0), commParas.x2MatrixShape->GetDim(1), commParas.rankSize);
-    if (commParas.dimKX1 != commParas.dimKX2) {
-        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context->GetNodeName(), "x1.k, x2.k",
-            std::to_string(commParas.dimKX1) + ", " + std::to_string(commParas.dimKX2), "The values of x1.k and x2.k must be the same");
-        return ge::GRAPH_FAILED;
-    }
-    return ge::GRAPH_SUCCESS;
+    return CheckKDimMatch(context, commParas);
 }
 
 ge::graphStatus AllGatherMatmulInferYShape(gert::InferShapeContext* context, CommParas& commParas)
@@ -85,7 +116,6 @@ ge::graphStatus AllGatherMatmulInferYShape(gert::InferShapeContext* context, Com
     OP_LOGE_IF(
         CommonParamCheck(context, AG_IS_TRANS_A, AG_IS_TRANS_B, commParas) != GRAPH_SUCCESS, GRAPH_FAILED,
         context->GetNodeName(), "CommonParamCheck excute failed.");
-    // 动态shape入图时 m轴-1时，不再进行(dimM * rankSize)的处理
     if (commParas.dimM == -1) {
         commParas.rankSize = 1;
     }
@@ -145,7 +175,6 @@ ge::graphStatus InferMatmulReduceScatterCommon(gert::InferShapeContext* context)
     OP_LOGE_IF(
         CommonParamCheck(context, RS_IS_TRANS_A, RS_IS_TRANS_B, commParas) != GRAPH_SUCCESS, GRAPH_FAILED,
         context->GetNodeName(), "CommonParamCheck excute failed.");
-    // 动态shape入图时 m轴-1时，不再进行(dimM / rankSize)的处理
     if (commParas.dimM == -1) {
         commParas.rankSize = 1;
     }

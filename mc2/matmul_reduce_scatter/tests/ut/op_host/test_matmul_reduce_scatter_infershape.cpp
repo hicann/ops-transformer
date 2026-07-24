@@ -48,7 +48,7 @@ TEST_F(MatmulReduceScatterInfershape, Basic)
             {"is_trans_a", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"is_trans_b", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"comm_turn", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"rank_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}
+            {"rank_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)}
         }
     );
     Mc2Hcom::MockValues hcomTopologyMockValues {

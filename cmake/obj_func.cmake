@@ -591,6 +591,10 @@ function(add_tiling_modules)
       c_sec
     )
   endif()
+  # Supplement the existing tiling_obj with built-in package macros for C++ conditional compilation.
+  if(ENABLE_BUILT_IN AND TARGET ${OPHOST_NAME}_tiling_obj)
+    target_compile_definitions(${OPHOST_NAME}_tiling_obj PRIVATE ENABLE_BUILT_IN=1)
+  endif()
 endfunction()
 
 function(add_graph_plugin_modules)
