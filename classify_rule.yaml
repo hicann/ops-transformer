@@ -127,7 +127,7 @@ transformer-1@ops-transformer:
                 - ops/ops-transformer/attention/incre_flash_attention/examples/
                 - ops/ops-transformer/attention/flash_attn/tests/
                 - ops/ops-transformer/attention/flash_attn/examples/
-                - ops/ops-transformer/attention/flashrecurrent_gated_delta_rule_attn/tests/
+                - ops/ops-transformer/attention/recurrent_gated_delta_rule/tests/
                 - ops/ops-transformer/attention/recurrent_gated_delta_rule/examples/
                 - ops/ops-transformer/attention/recurrent_gated_delta_rule/docs/
             non_delivery: null
@@ -141,6 +141,7 @@ transformer-1@ops-transformer:
             - ops/ops-transformer/attention/flash_attn/op_host/flash_attn_tiling.h
             - ops/ops-transformer/attention/flash_attn/op_host/flash_attn_tiling_common.h
             - ops/ops-transformer/attention/flash_attn/op_host/fa_tiling_info.h
+            - ops/ops-transformer/attention/flash_attn/op_host/flash_attn_def.cpp
             - ops/ops-transformer/attention/recurrent_gated_delta_rule/op_host/recurrent_gated_delta_rule_def.cpp
 
 transformer-2@ops-transformer:

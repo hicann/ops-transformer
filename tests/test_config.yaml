@@ -476,12 +476,13 @@ attention:
       - attention/recurrent_gated_delta_rule/docs
       - attention/recurrent_gated_delta_rule/README.md
     ut_cov_exclude:
-      - attention/recurrent_gated_delta_rule
+      - attention/recurrent_gated_delta_rule/tests
     test:
       examples: True
       ut: True
     options:
       - recurrent_gated_delta_rule
+
   flash_attn:
     module: True
     src:
