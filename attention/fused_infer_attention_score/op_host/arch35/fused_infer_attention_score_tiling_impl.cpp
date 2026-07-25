@@ -103,6 +103,11 @@ void FusedInferAttentionScoreTilingImpl::SetIsIFA(const FiaTilingInfo &fiaInfo)
 
 void FusedInferAttentionScoreTilingImpl::SetGSMerge(const FiaTilingInfo &fiaInfo)
 {
+    // 非量化场景且存在公共前缀时，禁用gs1合轴
+    if (fiaInfo.quantMode == FiaQuantMode::NO_QUANT && fiaInfo.sysPrefixFlag) {
+        gsMergeFlag_ = false;
+        return;
+    }
     if (fiaInfo.mlaMode == MlaMode::ROPE_SPLIT_D512) {
         gsMergeFlag_ = true;
         return;
