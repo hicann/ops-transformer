@@ -104,7 +104,7 @@ TILING_DATA_FIELD_DEF(int64_t, ubFactor);
 TILING_DATA_FIELD_DEF(int64_t, inUbSize);
 TILING_DATA_FIELD_DEF(int64_t, outUbSize);
 TILING_DATA_FIELD_DEF(int64_t, rmsNormWspSize);
-TILING_DATA_FIELD_DEF(int64_t, cacheRowLimit);  // index 取值上界：Norm 为 Scache，PA 系为 BlockNum * BlockSize
+TILING_DATA_FIELD_DEF(int64_t, cacheRowLimit); // index 取值上界：Norm 为 Scache，PA 系为 BlockNum * BlockSize
 TILING_DATA_FIELD_DEF(float, epsilon);
 TILING_DATA_FIELD_DEF(float, reciprocal);
 END_TILING_DATA_DEF;
@@ -135,8 +135,8 @@ TILING_DATA_FIELD_DEF(int64_t, ubFactorDvLoopCountCeil);
 TILING_DATA_FIELD_DEF(int64_t, ubFactorDkTail);
 TILING_DATA_FIELD_DEF(int64_t, ubFactorDkLoopCountCeil);
 TILING_DATA_FIELD_DEF(int64_t, basicBlockLoop); // 二分累加：循环次数，折叠点左半部分的block数量
-TILING_DATA_FIELD_DEF(int64_t, mainFoldCount);  // 二分累加：折叠的块数，折叠点右半部分的block数量-1
-TILING_DATA_FIELD_DEF(int64_t, cacheRowLimit);  // index 取值上界：Norm 为 Scache，PA 系为 BlockNum * BlockSize
+TILING_DATA_FIELD_DEF(int64_t, mainFoldCount); // 二分累加：折叠的块数，折叠点右半部分的block数量-1
+TILING_DATA_FIELD_DEF(int64_t, cacheRowLimit); // index 取值上界：Norm 为 Scache，PA 系为 BlockNum * BlockSize
 TILING_DATA_FIELD_DEF(float, epsilon);
 TILING_DATA_FIELD_DEF(float, reciprocal);
 END_TILING_DATA_DEF;
@@ -153,8 +153,7 @@ struct KvRmsNormRopeCacheCompileInfo {
     int64_t ubSize = 0;
 };
 
-enum CacheMode
-{
+enum CacheMode {
     Norm = 0,
     PA = 1,
     PA_NZ = 2,
@@ -207,10 +206,12 @@ static constexpr int64_t NON_FULL_LOAD_BASE_TILING_KEY = 20000;
 
 class KvRmsNormRopeCacheTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit KvRmsNormRopeCacheTilingBase(gert::TilingContext* tillingContext) : TilingBaseClass(tillingContext)
-    {}
+    explicit KvRmsNormRopeCacheTilingBase(gert::TilingContext *tillingContext) : TilingBaseClass(tillingContext)
+    {
+    }
     ~KvRmsNormRopeCacheTilingBase() override
-    {}
+    {
+    }
 
     uint64_t coreNum_ = 0;
     uint64_t ubSize_ = 0;
@@ -240,7 +241,7 @@ public:
     int64_t cacheRowLimit_ = 0;
 
     // index 取值上界，FullLoad 与 Recompute 共用，避免两个模板对同一份 index 输入的防御口径分叉
-    bool GetCacheRowLimit(int64_t& cacheRowLimit);
+    bool GetCacheRowLimit(int64_t &cacheRowLimit);
 
 protected:
     bool IsCapable() override
@@ -268,38 +269,41 @@ protected:
     }
 
 protected:
-    std::tuple<int64_t, int64_t, int64_t, int64_t> GetShapeTuple(
-        const gert::TilingContext* context, const int64_t index = 0);
-    std::tuple<int64_t, int64_t, int64_t, int64_t> GetOptionalShapeTuple(
-        const gert::TilingContext* context, const int64_t index = 0);
-    bool IsB1SD(const gert::TilingContext* context);
-    void GetMethodeMode(const gert::TilingContext* context);
-    bool CheckKvValid(
-        const gert::TilingContext* context, int64_t batchSize, int64_t numHead, int64_t seqLen, int64_t headSize);
-    bool CheckVValid(
-        const gert::TilingContext* context, int64_t batchSize, int64_t numHead, int64_t seqLen, int64_t headSize);
-    bool CheckCosSinValid(
-        const gert::TilingContext* context, int64_t batchSize, int64_t numHead, int64_t seqLen, int64_t headSize);
-    bool CheckGammaValid(const gert::TilingContext* context, int64_t headSize);
-    bool CheckKCacheValid(
-        const gert::TilingContext* context, int64_t batchSize, int64_t numHead, int64_t cacheLen, int64_t headSize);
-    bool CheckVCacheValid(
-        const gert::TilingContext* context, int64_t batchSize, int64_t numHead, int64_t cacheLen, int64_t headSize);
-    bool CheckCacheValid(const gert::TilingContext* context, int64_t batchSize, int64_t numHead,
-        int64_t cacheLen, int64_t headSize, size_t cacheIndex, const char* cacheName);
-    bool CheckKCacheValidPA(const gert::TilingContext* context, int64_t numHead, int64_t headSize);
-    bool CheckVCacheValidPA(const gert::TilingContext* context, int64_t numHead, int64_t headSize);
-    bool CheckIndexValid(
-        const gert::TilingContext* context, int64_t batchSize, int64_t seqLen, int64_t pageSize, CacheMode mode);
-    int64_t GetQuantMode(const gert::TilingContext* context);
+    std::tuple<int64_t, int64_t, int64_t, int64_t> GetShapeTuple(const gert::TilingContext *context,
+                                                                 const int64_t index = 0);
+    std::tuple<int64_t, int64_t, int64_t, int64_t> GetOptionalShapeTuple(const gert::TilingContext *context,
+                                                                         const int64_t index = 0);
+    bool IsB1SD(const gert::TilingContext *context);
+    void GetMethodeMode(const gert::TilingContext *context);
+    bool CheckKvValid(const gert::TilingContext *context, int64_t batchSize, int64_t numHead, int64_t seqLen,
+                      int64_t headSize);
+    bool CheckVValid(const gert::TilingContext *context, int64_t batchSize, int64_t numHead, int64_t seqLen,
+                     int64_t headSize);
+    bool CheckCosSinValid(const gert::TilingContext *context, int64_t batchSize, int64_t numHead, int64_t seqLen,
+                          int64_t headSize);
+    bool CheckGammaValid(const gert::TilingContext *context, int64_t headSize);
+    bool CheckKCacheValid(const gert::TilingContext *context, int64_t batchSize, int64_t numHead, int64_t cacheLen,
+                          int64_t headSize);
+    bool CheckVCacheValid(const gert::TilingContext *context, int64_t batchSize, int64_t numHead, int64_t cacheLen,
+                          int64_t headSize);
+    bool CheckCacheValid(const gert::TilingContext *context, int64_t batchSize, int64_t numHead, int64_t cacheLen,
+                         int64_t headSize, size_t cacheIndex, const char *cacheName);
+    bool CheckKCacheValidPA(const gert::TilingContext *context, int64_t numHead, int64_t headSize);
+    bool CheckVCacheValidPA(const gert::TilingContext *context, int64_t numHead, int64_t headSize);
+    bool CheckIndexValid(const gert::TilingContext *context, int64_t batchSize, int64_t seqLen, int64_t pageSize,
+                         CacheMode mode);
+    int64_t GetQuantMode(const gert::TilingContext *context);
 };
 
 class KvRmsNormRopeCacheTilingDs : virtual public KvRmsNormRopeCacheTilingBase {
 public:
-    explicit KvRmsNormRopeCacheTilingDs(gert::TilingContext* tillingContext) : KvRmsNormRopeCacheTilingBase(tillingContext)
-    {}
+    explicit KvRmsNormRopeCacheTilingDs(gert::TilingContext *tillingContext)
+        : KvRmsNormRopeCacheTilingBase(tillingContext)
+    {
+    }
     ~KvRmsNormRopeCacheTilingDs() override
-    {}
+    {
+    }
 
 protected:
     bool IsCapable() override;
@@ -308,8 +312,8 @@ protected:
 
 protected:
     void DoOpTilingPaBlkNz();
-    bool CheckScaleValid(const gert::TilingContext* context);
-    bool CheckOffsetValid(const gert::TilingContext* context);
+    bool CheckScaleValid(const gert::TilingContext *context);
+    bool CheckOffsetValid(const gert::TilingContext *context);
 
 private:
     KvRmsNormRopeCacheTilingData tilingData_;
@@ -317,11 +321,13 @@ private:
 
 class KvRmsNormRopeCacheRegbaseFullLoadTiling : virtual public KvRmsNormRopeCacheTilingBase {
 public:
-    explicit KvRmsNormRopeCacheRegbaseFullLoadTiling(gert::TilingContext* tillingContext)
+    explicit KvRmsNormRopeCacheRegbaseFullLoadTiling(gert::TilingContext *tillingContext)
         : KvRmsNormRopeCacheTilingBase(tillingContext)
-    {}
+    {
+    }
     ~KvRmsNormRopeCacheRegbaseFullLoadTiling() override
-    {}
+    {
+    }
 
     uint64_t usedCoreNum_ = 0;
     int64_t kScaleType_ = 0;
@@ -335,9 +341,9 @@ protected:
     ge::graphStatus PostTiling() override;
 
 protected:
-    bool CheckScaleOffsetShape(const gert::StorageShape* inShape, int64_t lastDim, int64_t& brcFlag);
+    bool CheckScaleOffsetShape(const gert::StorageShape *inShape, int64_t lastDim, int64_t &brcFlag);
     bool CheckInputDtype();
-    bool CheckCacheIsQuant(ge::DataType& cacheDtype);
+    bool CheckCacheIsQuant(ge::DataType &cacheDtype);
     ge::graphStatus CheckInputShapeIsEmpty();
 
 private:
@@ -346,11 +352,13 @@ private:
 
 class KvRmsNormRopeCacheRegbaseRecomputeTiling : virtual public KvRmsNormRopeCacheTilingBase {
 public:
-    explicit KvRmsNormRopeCacheRegbaseRecomputeTiling(gert::TilingContext* tillingContext)
+    explicit KvRmsNormRopeCacheRegbaseRecomputeTiling(gert::TilingContext *tillingContext)
         : KvRmsNormRopeCacheTilingBase(tillingContext)
-    {}
+    {
+    }
     ~KvRmsNormRopeCacheRegbaseRecomputeTiling() override
-    {}
+    {
+    }
 
     uint64_t usedCoreNum_ = 0;
     int64_t kScaleType_ = 0;
@@ -359,7 +367,6 @@ public:
     int64_t vOffsetType_ = 0;
 
     int64_t GetCacheBlockElemNum(const ge::DataType cacheDtype) const;
-    bool CheckNzHalfDkAligned();
 
 protected:
     bool IsCapable() override;
@@ -367,9 +374,9 @@ protected:
     ge::graphStatus PostTiling() override;
 
 protected:
-    bool CheckScaleOffsetShape(const gert::StorageShape* inShape, int64_t lastDim, int64_t& brcFlag);
+    bool CheckScaleOffsetShape(const gert::StorageShape *inShape, int64_t lastDim, int64_t &brcFlag);
     bool CheckInputDtype();
-    bool CheckCacheIsQuant(ge::DataType& cacheDtype);
+    bool CheckCacheIsQuant(ge::DataType &cacheDtype);
     ge::graphStatus CheckInputShapeIsEmpty();
     int64_t FindNearestPower2(const int64_t value);
 
