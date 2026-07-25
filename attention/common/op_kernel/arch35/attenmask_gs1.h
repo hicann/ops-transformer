@@ -149,8 +149,8 @@ __aicore__ inline void MergeMask(LocalTensor<T> &maskNext, LocalTensor<T> &maskP
         rowNumEachLoop = regBytes / static_cast<uint16_t>(s2BaseSize);
         rowNumTimesEachLoop = 1;
     }
-    uint16_t halfS1RealSizeLoop = static_cast<uint16_t>(halfS1RealSize) + 1;
-    uint16_t loopCount = (halfS1RealSizeLoop / rowNumEachLoop) * rowNumTimesEachLoop;
+    uint16_t halfS1RealSizeLoop = static_cast<uint16_t>(halfS1RealSize);
+    uint16_t loopCount = (halfS1RealSizeLoop + rowNumEachLoop - 1) / rowNumEachLoop * rowNumTimesEachLoop;
 
     MergeBand(maskNextUb, maskPreUb, loopCount);
 }

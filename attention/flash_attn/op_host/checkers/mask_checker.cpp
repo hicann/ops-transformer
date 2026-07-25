@@ -37,7 +37,7 @@ ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const FaTilingInfo &faInfo)
                                                static_cast<int64_t>(MaskMode::CAUSAL),
                                                static_cast<int64_t>(MaskMode::BAND)};
     OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckValueSupport(static_cast<int64_t>(faInfo.maskMode), maskModeList),
-        OP_LOGE_FOR_INVALID_VALUE(faInfo.opName, "mask_mode", std::to_string(faInfo.maskMode).c_str(), "0 or 3"),
+        OP_LOGE_FOR_INVALID_VALUE(faInfo.opName, "mask_mode", std::to_string(faInfo.maskMode).c_str(), "0, 3, 4"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
