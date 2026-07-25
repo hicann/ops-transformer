@@ -467,6 +467,7 @@ def run_recurrent_gated_delta_rule_eager(
     num_accepted_tokens=None,
     block_num=None,
     data_type=torch.bfloat16,
+    state_data_type=None,
     query_datarange=[-10, 10],
     key_datarange=[-10, 10],
     value_datarange=[-10, 10],
@@ -477,6 +478,8 @@ def run_recurrent_gated_delta_rule_eager(
 ):
     torch_npu.npu.set_device(int(DEVICE_ID))
     # ======================== set input params finish ========================
+    if state_data_type is None:
+        state_data_type = data_type
     block_num = B * mtp if block_num is None else block_num
     if scale_value is None:
         scale_value = dk**-0.5
@@ -549,7 +552,7 @@ def run_recurrent_gated_delta_rule_eager(
         if has_num_accepted_tokens == True
         else None
     )
-    state = rand_range((block_num, nv, dv, dk), state_datarange, data_type)
+    state = rand_range((block_num, nv, dv, dk), state_datarange, state_data_type)
     act_seq_len = torch.tensor(actual_seq_lengths, dtype=torch.int32)
     ssm_state_indices = torch.tensor(ssm_state_indices, dtype=torch.int32)
 
@@ -621,18 +624,19 @@ def run_recurrent_gated_delta_rule_eager(
     )
 
     # 结果精度对比
-    data_type = str(npu_out.dtype)
+    out_data_type = str(npu_out.dtype)
+    state_data_type_str = str(npu_state_out.dtype)
     print(
         "--------------------------------------------------------------check result-------------------------------------------------------------"
     )
-    check_result(cpu_out, npu_out, data_type)
+    check_result(cpu_out, npu_out, out_data_type)
     print(
         "--------------------------------------------------------------check state ouput-------------------------------------------------------------"
     )
     check_result(
         cpu_state_ouput,
         npu_state_out,
-        data_type,
+        state_data_type_str,
     )
 
 

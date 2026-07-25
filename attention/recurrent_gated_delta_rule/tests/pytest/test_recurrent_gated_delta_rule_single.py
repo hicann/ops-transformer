@@ -48,6 +48,7 @@ param_names = [
     "num_accepted_tokens",
     "block_num",
     "data_type",
+    "state_data_type",
     "query_datarange",
     "key_datarange",
     "value_datarange",
@@ -76,6 +77,7 @@ for _, params in enumerate(PARAM_SET):
         params["num_accepted_tokens"],
         params["block_num"],
         params["data_type"],
+        params["state_data_type"],
         params["query_datarange"],
         params["key_datarange"],
         params["value_datarange"],
@@ -110,6 +112,7 @@ def test_recurrent_gated_delta_rule(param_combinations):
     num_accepted_tokens = param_combinations["num_accepted_tokens"]
     block_num = param_combinations["block_num"]
     data_type = param_combinations["data_type"]
+    state_data_type = param_combinations["state_data_type"]
     query_datarange = param_combinations["query_datarange"]
     key_datarange = param_combinations["key_datarange"]
     value_datarange = param_combinations["value_datarange"]
@@ -134,6 +137,7 @@ def test_recurrent_gated_delta_rule(param_combinations):
         num_accepted_tokens,
         block_num,
         data_type,
+        state_data_type,
         query_datarange,
         key_datarange,
         value_datarange,

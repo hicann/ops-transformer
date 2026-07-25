@@ -23,6 +23,7 @@ BASE_CONFIG = {
     "num_accepted_tokens": [None],
     "block_num": [None],
     "data_type": [torch.bfloat16],
+    "state_data_type": [torch.bfloat16],
     "query_datarange": [[-1, 1]],
     "key_datarange": [[-1, 1]],
     "value_datarange": [[-10, 10]],
@@ -53,6 +54,7 @@ def generate_test_cases(batch_sizes, mtps, dk, dv, **kwargs):
             "num_accepted_tokens": config["num_accepted_tokens"],
             "block_num": config["block_num"],
             "data_type": config["data_type"],
+            "state_data_type": config["state_data_type"],
             "query_datarange": config["query_datarange"],
             "key_datarange": config["key_datarange"],
             "value_datarange": config["value_datarange"],
@@ -82,6 +84,7 @@ SPECIAL_CASES = [
         "num_accepted_tokens": [None],
         "block_num": [None],
         "data_type": [torch.bfloat16],
+        "state_data_type": [torch.bfloat16],
         "query_datarange": [[-1, 1]],
         "key_datarange": [[-1, 1]],
         "value_datarange": [[-10, 10]],
@@ -106,6 +109,7 @@ SPECIAL_CASES = [
         "num_accepted_tokens": [None],
         "block_num": [None],
         "data_type": [torch.bfloat16],
+        "state_data_type": [torch.bfloat16],
         "query_datarange": [[-1, 1]],
         "key_datarange": [[-1, 1]],
         "value_datarange": [[-10, 10]],
@@ -145,6 +149,7 @@ GROUP_5 = [
         "num_accepted_tokens": [None],
         "block_num": [None],
         "data_type": [torch.bfloat16],
+        "state_data_type": [torch.bfloat16],
         "query_datarange": [[-1, 1]],
         "key_datarange": [[-1, 1]],
         "value_datarange": [[-10, 10]],
@@ -172,6 +177,7 @@ GROUP_6 = [
         "num_accepted_tokens": [None],
         "block_num": [None],
         "data_type": [torch.bfloat16],
+        "state_data_type": [torch.bfloat16],
         "query_datarange": [[-1, 1]],
         "key_datarange": [[-1, 1]],
         "value_datarange": [[-10, 10]],
@@ -182,4 +188,16 @@ GROUP_6 = [
     }
 ]
 
-ENABLED_PARAMS_RDV = GROUP_1 + GROUP_2 + GROUP_3 + GROUP_4 + GROUP_5 + GROUP_6
+
+def _gen_fp32_state_cases(cases):
+    result = []
+    for c in cases:
+        c2 = dict(c)
+        c2["state_data_type"] = [torch.float32]
+        result.append(c2)
+    return result
+
+
+_ALL_BF16_CASES = GROUP_1 + GROUP_2 + GROUP_3 + GROUP_4 + GROUP_5 + GROUP_6
+
+ENABLED_PARAMS_RDV = _ALL_BF16_CASES + _gen_fp32_state_cases(_ALL_BF16_CASES)
