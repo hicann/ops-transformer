@@ -94,7 +94,7 @@ SPECIAL_CASES = [
         "batch_size": [1],
         "mtp": [1],
         "nk": [65],
-        "nv": [64],
+        "nv": [65],
         "dk": [1],
         "dv": [1],
         "actual_seq_lengths": [None],
