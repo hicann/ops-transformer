@@ -1,0 +1,47 @@
+/**
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+/*!
+ * \file engram_fetch_grad.cpp
+ * \brief EngramFetchGrad 算子 kernel 入口
+ *
+ * 单融合 kernel，3 步:
+ * ① grad_sorted = gradFetched[perm]
+ * ② a2a(grad_sorted; sendCounts↔recvCounts) → recvGrad (用 commBuffer[peer] = a2a GM)
+ * ③ owner unique + fp32 scatter-add (recvLocalEntry, recvGrad)
+ *    → gradUniqueOut (fp32) + uniqueLocalEntryOut (int32) + numUniqueOut (int32)
+ *
+ * kernel 签名按 op 定义顺序: input0~5, output0~2, workspace, tiling
+ * input:  commContext(0), gradFetched(1), perm(2), sendCounts(3), recvCounts(4), recvLocalEntry(5), numRecv(6)
+ * output: gradUniqueOut(0), uniqueLocalEntryOut(1), numUniqueOut(2)
+ */
+
+#if ASC_DEVKIT_MAJOR >= 9
+#include "basic_api/kernel_basic_intf.h"
+#else
+#include "kernel_operator.h"
+#endif
+#include "kernel_tiling/kernel_tiling.h"
+#include "engram_fetch_grad_tiling_data.h"
+#include "engram_fetch_grad_tiling_key.h"
+#include "../../engram_fetch/op_kernel/engram_fetch_utils.h"
+
+using namespace Mc2Kernel;
+
+template <uint32_t EngramFetchGradMode>
+__global__ __aicore__ void engram_fetch_grad(GM_ADDR commContext, GM_ADDR gradFetched, GM_ADDR perm, GM_ADDR sendCounts,
+                                             GM_ADDR recvCounts, GM_ADDR recvLocalEntry, GM_ADDR numRecv,
+                                             GM_ADDR gradUniqueOut, GM_ADDR uniqueLocalEntryOut, GM_ADDR numUniqueOut,
+                                             GM_ADDR workspaceGM, GM_ADDR tilingGM)
+{
+    REGISTER_TILING_DEFAULT(EngramFetchGradTilingData);
+    GET_TILING_DATA_WITH_STRUCT(EngramFetchGradTilingData, tilingData, tilingGM);
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
+}

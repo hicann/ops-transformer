@@ -25,5 +25,9 @@ struct EngramFetchTilingData {
     int64_t hiddenBytes;
     uint32_t aivNum;
     uint64_t ubSize;
+    uint32_t rankSize;
+    int64_t numMaxTokensPerRank;
+    int64_t totalRecv;
+    int64_t commBufferSize;
 };
 #endif

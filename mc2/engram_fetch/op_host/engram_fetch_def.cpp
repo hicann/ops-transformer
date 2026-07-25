@@ -20,17 +20,27 @@ class EngramFetch : public OpDef {
 public:
     explicit EngramFetch(const char *name) : OpDef(name)
     {
-        this->Input("commContext").ParamType(REQUIRED).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
-
+        this->Input("comm_context").ParamType(REQUIRED).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
         this->Input("indices").ParamType(REQUIRED).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
+        this->Input("local_storage_addr").ParamType(OPTIONAL).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});
 
         this->Output("fetched")
             .ParamType(REQUIRED)
             .DataTypeList({ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND});
-
+        this->Output("perm_out").ParamType(OPTIONAL).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
+        this->Output("send_counts_out").ParamType(OPTIONAL).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
+        this->Output("recv_counts_out").ParamType(OPTIONAL).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
+        this->Output("recv_local_entry_out")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND});
+        this->Output("num_recv_out").ParamType(OPTIONAL).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
         this->Attr("hidden_size").AttrType(REQUIRED).Int();
         this->Attr("num_entries_per_rank").AttrType(REQUIRED).Int();
+        this->Attr("num_max_tokens_per_rank").AttrType(OPTIONAL).Int();
+        this->Attr("comm_buffer_size").AttrType(OPTIONAL).Int();
+        this->Attr("with_grad").AttrType(OPTIONAL).Int();
 
         OpAICoreConfig aicore_config_950;
         aicore_config_950.DynamicCompileStaticFlag(true)
