@@ -308,10 +308,10 @@ SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::InitCVCom
                                           tilingData->baseParams.mm5ResWorkSpaceOffset / sizeof(float));
     } else {
         int64_t mm4ResWorkSpaceOffset = tilingData->baseParams.mm4ResWorkSpaceOffset / sizeof(float) +
-                                        cBlockIdx * PROCESS_KV_SIZE * constInfo.commonConstInfo.dSize * 2;
+                                        cBlockIdx * PROCESS_KV_SIZE_NO_DETER * constInfo.commonConstInfo.dSize * 2;
         mm4ResWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm4ResWorkSpaceOffset);
         int64_t mm5ResWorkSpaceOffset = tilingData->baseParams.mm5ResWorkSpaceOffset / sizeof(float) +
-                                        cBlockIdx * PROCESS_KV_SIZE * constInfo.commonConstInfo.dSizeV * 2;
+                                        cBlockIdx * PROCESS_KV_SIZE_NO_DETER * constInfo.commonConstInfo.dSizeV * 2;
         mm5ResWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm5ResWorkSpaceOffset);
     }
 }
@@ -538,8 +538,8 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
         }
     }
     if constexpr (IsDETER) {
-        runInfo.mm4ResWsAddr = runInfo.deterTaskIdMod2 * 4096 * constInfo.dTotalSize * coreNum +
-                               cBlockIdx * 4096 * constInfo.dTotalSize +
+        runInfo.mm4ResWsAddr = runInfo.deterTaskIdMod2 * PROCESS_KV_SIZE * constInfo.dTotalSize * coreNum +
+                               cBlockIdx * PROCESS_KV_SIZE * constInfo.dTotalSize +
                                (runInfo.blkCntOffset - kvOffset) * constInfo.dTotalSize;
     } else {
         runInfo.mm4ResWsAddr = (taskId % 2) * CUBE_BASEN * constInfo.dTotalSize;

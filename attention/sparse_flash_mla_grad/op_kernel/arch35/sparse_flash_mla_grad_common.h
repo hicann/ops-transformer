@@ -21,6 +21,7 @@
 using namespace fa_base_matmul;
 
 constexpr int32_t PROCESS_KV_SIZE = 4096;
+constexpr int32_t PROCESS_KV_SIZE_NO_DETER = 128;
 constexpr uint8_t SYNC_C3_TO_V0_FLAG[2] = {7, 9};
 constexpr uint8_t SYNC_V0_TO_C1_FLAG[2] = {0, 1};
 constexpr uint8_t SYNC_C1_TO_V2_FLAG[2] = {0, 1};

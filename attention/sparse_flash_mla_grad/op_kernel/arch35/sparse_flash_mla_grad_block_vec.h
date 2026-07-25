@@ -340,12 +340,13 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ScatterAddDeter(const GlobalT
 
         int64_t maxLoops = CeilDiv(currentCoreKSize, UB_ROW_SIZE);
         int64_t tailRows = currentCoreKSize - (maxLoops - 1) * UB_ROW_SIZE;
-        int64_t currentMm4SrcOffset = runInfo.deterTaskIdMod2 * 4096 * HEAD_DIM_ALIGN * coreNum +
-                                      idx * 4096 * HEAD_DIM_ALIGN +
+        int64_t currentMm4SrcOffset = runInfo.deterTaskIdMod2 * PROCESS_KV_SIZE * HEAD_DIM_ALIGN * coreNum +
+                                      idx * PROCESS_KV_SIZE * HEAD_DIM_ALIGN +
                                       s2SrcOffset * constInfo.selectedBlockSize * HEAD_DIM_ALIGN;
-        int64_t currentMm5SrcOffset = runInfo.deterTaskIdMod2 * 4096 * constInfo.commonConstInfo.dSizeV * coreNum +
-                                      idx * 4096 * constInfo.commonConstInfo.dSizeV +
-                                      s2SrcOffset * constInfo.selectedBlockSize * constInfo.commonConstInfo.dSizeV;
+        int64_t currentMm5SrcOffset =
+            runInfo.deterTaskIdMod2 * PROCESS_KV_SIZE * constInfo.commonConstInfo.dSizeV * coreNum +
+            idx * PROCESS_KV_SIZE * constInfo.commonConstInfo.dSizeV +
+            s2SrcOffset * constInfo.selectedBlockSize * constInfo.commonConstInfo.dSizeV;
         int64_t keyOffsetWithRope = accumS2Len * constInfo.n2Size * constInfo.dTotalSize;
         if (!runInfo.isOriKV) {
             keyOffsetWithRope = accumS3Len * constInfo.n2Size * constInfo.dTotalSize;
