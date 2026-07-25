@@ -1,10 +1,12 @@
-# This program is free software, you can redistribute it and/or modify it.
+# -----------------------------------------------------------------------------------------------------------
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
-# This file is a part of the CANN Open Software.
-# Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
-# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
+# -----------------------------------------------------------------------------------------------------------
 
 import os
 
@@ -15,7 +17,7 @@ from torch_npu.testing.testcase import TestCase, run_tests
 
 import result_compare_method
 import stem_indexer_golden
-import custom_ops  # 注册 torch.ops.custom.npu_stem_indexer(_metadata)
+import custom_ops  # noqa: F401
 
 
 DEVICE_ID = int(os.environ.get("DEVICE_ID", "0"))
@@ -41,8 +43,12 @@ class TestCustomStemIndexer(TestCase):
         window_size = 4
 
         np.random.seed(0)
-        qflat = torch.tensor(np.random.uniform(-1, 1, (b, q_heads, max_qb, flatten_dim))).to(torch.bfloat16)
-        kflat = torch.tensor(np.random.uniform(-1, 1, (b, kv_heads, max_kb, flatten_dim))).to(torch.bfloat16)
+        qflat = torch.tensor(
+            np.random.uniform(-1, 1, (b, q_heads, max_qb, flatten_dim))
+        ).to(torch.bfloat16)
+        kflat = torch.tensor(
+            np.random.uniform(-1, 1, (b, kv_heads, max_kb, flatten_dim))
+        ).to(torch.bfloat16)
         vbias = torch.arange(max_kb, dtype=torch.float32).reshape(1, 1, max_kb)
         vbias = vbias.repeat(b, kv_heads, 1) * 1000.0
         q_seq_lens = torch.tensor([q_len], dtype=torch.int32)
@@ -71,7 +77,9 @@ class TestCustomStemIndexer(TestCase):
             "special_setting": "",
         }
         cpu_inputs = {"qflat": qflat, "kflat": kflat, "vbias": vbias}
-        cpu_indices, cpu_seq_len = stem_indexer_golden.stem_indexer_golden(case, cpu_inputs)
+        cpu_indices, cpu_seq_len = stem_indexer_golden.stem_indexer_golden(
+            case, cpu_inputs
+        )
 
         qflat = qflat.npu()
         kflat = kflat.npu()
@@ -103,12 +111,17 @@ class TestCustomStemIndexer(TestCase):
             "kBlockNumRateMedium=0.200000 kBlockNumBiasMedium=30 "
             "kBlockNumRateLarge=0.100000 kBlockNumBiasLarge=30 "
             f"scoreWorkspaceBytes={expected_score_workspace_bytes}",
-            flush=True
+            flush=True,
         )
 
         npu_indices, npu_seq_len = torch.ops.custom.npu_stem_indexer(
-            qflat, kflat, vbias, q_seq_lens, kv_seq_lens,
-            num_prompt_tokens=num_prompt_tokens, metadata=metadata,
+            qflat,
+            kflat,
+            vbias,
+            q_seq_lens,
+            kv_seq_lens,
+            num_prompt_tokens=num_prompt_tokens,
+            metadata=metadata,
             **stem_indexer_golden.get_call_attrs(case),
         )
         torch_npu.npu.synchronize()
@@ -120,8 +133,8 @@ class TestCustomStemIndexer(TestCase):
         torch.set_printoptions(profile="full")
         print("npu_seq_len", npu_seq_len)
         print("cpu_seq_len", cpu_seq_len)
-        print("npu_indices", npu_indices[0, 0, 0, :int(cpu_seq_len[0, 0, 0])])
-        print("cpu_indices", cpu_indices[0, 0, 0, :int(cpu_seq_len[0, 0, 0])])
+        print("npu_indices", npu_indices[0, 0, 0, : int(cpu_seq_len[0, 0, 0])])
+        print("cpu_indices", cpu_indices[0, 0, 0, : int(cpu_seq_len[0, 0, 0])])
 
         self.assertEqual(tuple(npu_seq_len.shape), tuple(cpu_seq_len.shape))
         self.assertEqual(tuple(npu_indices.shape), tuple(cpu_indices.shape))

@@ -6,6 +6,8 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 
+"""Register custom ops for torch.ops.custom and torch_npu."""
+
 import os
 import pkgutil
 import warnings
@@ -14,24 +16,20 @@ import torch
 import torch_npu
 
 # 导入so 和 python
-from . import custom_ops_lib
-from .converter import npu_stem_indexer
-from .converter import npu_stem_indexer_metadata
+from . import custom_ops_lib as custom_ops_lib
+from .converter import npu_stem_indexer as npu_stem_indexer
+from .converter import npu_stem_indexer_metadata as npu_stem_indexer_metadata
 
-__all__ = list(module for _, module, _ in pkgutil.iter_modules([os.path.dirname(__file__)]))
-
-"""
-import custom ops as torch_npu ops to support the following usage:
-'torch.ops.custom.npu_stem_indexer()'
-'torch_npu.npu_stem_indexer()'
-"""
+__all__ = list(
+    module for _, module, _ in pkgutil.iter_modules([os.path.dirname(__file__)])
+)
 
 # get torch.ops.custom module
-custom_ops_module = getattr(torch.ops, 'custom', None)
+custom_ops_module = getattr(torch.ops, "custom", None)
 
 if custom_ops_module is not None:
     for op_name in dir(custom_ops_module):
-        if op_name.startswith('_'):
+        if op_name.startswith("_"):
             # skip built-in method, such as __name__, __doc__
             continue
 
@@ -40,7 +38,9 @@ if custom_ops_module is not None:
         setattr(torch_npu, op_name, custom_op_func)
 
 else:
-    WARN_MSG = "torch.ops.custom module is not found, mount custom ops to torch_npu failed." \
-               "Calling by torch_npu.xxx for custom ops is unsupported, please use torch.ops.custom.xxx."
+    WARN_MSG = (
+        "torch.ops.custom module is not found, mount custom ops to torch_npu failed."
+        "Calling by torch_npu.xxx for custom ops is unsupported, please use torch.ops.custom.xxx."
+    )
     warnings.warn(WARN_MSG)
     warnings.filterwarnings("ignore", message=WARN_MSG)

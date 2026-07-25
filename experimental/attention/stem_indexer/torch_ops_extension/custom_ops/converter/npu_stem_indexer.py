@@ -7,19 +7,14 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 
 from typing import (
-    Any, Callable, ContextManager, Iterator, List, Literal, NamedTuple, Optional, Sequence, Tuple, TypeVar,
-    Union, overload,
+    List,
+    Optional,
 )
 
 import torch
 import torchair
-from torch import Generator, contiguous_format, inf, strided, SymInt
-from torch.types import Device, Number, _bool, _complex, _device, _dtype, _float, _int, _layout, _qscheme, _size
-from torchair._ge_concrete_graph import ge_apis as ge
-from torchair._ge_concrete_graph.fx2ge_converter import declare_supported, register_fx_node_ge_converter
-from torchair.ge._ge_graph import Tensor, TensorSpec, DataType
-from torchair._ge_concrete_graph.supported_declaration import _TypedTensor, F32, F16, F64, I32, I16, I64, I8, U8, \
-    BOOL, Support
+from torchair._ge_concrete_graph.fx2ge_converter import register_fx_node_ge_converter
+from torchair.ge._ge_graph import Tensor, TensorSpec
 from torchair.ge import attr
 
 
@@ -45,28 +40,32 @@ def convert_npu_stem_indexer(
     k_block_num_bias_medium: int = 30,
     k_block_num_rate_large: float = 0.1,
     k_block_num_bias_large: int = 30,
+    topk_score_precision: int = 1,
     meta_outputs: List[TensorSpec] = None,
 ):
     return torchair.ge.custom_op(
         "StemIndexer",
-        inputs={"qflat": qflat,
-                "kflat": kflat,
-                "vbias": vbias,
-                "q_seq_lens": q_seq_lens,
-                "kv_seq_lens": kv_seq_lens,
-                "num_prompt_tokens": num_prompt_tokens,
-                "metadata": metadata,
-               },
-        attrs={"causal": attr.Bool(causal),
-               "stem_block_size": attr.Int(stem_block_size),
-               "stem_stride": attr.Int(stem_stride),
-               "alpha": attr.Float(alpha),
-               "initial_blocks": attr.Int(initial_blocks),
-               "window_size": attr.Int(window_size),
-               "k_block_num_rate_medium": attr.Float(k_block_num_rate_medium),
-               "k_block_num_bias_medium": attr.Int(k_block_num_bias_medium),
-               "k_block_num_rate_large": attr.Float(k_block_num_rate_large),
-               "k_block_num_bias_large": attr.Int(k_block_num_bias_large),
-               },
-        outputs=['sparse_indices', 'sparse_seq_len']
+        inputs={
+            "qflat": qflat,
+            "kflat": kflat,
+            "vbias": vbias,
+            "q_seq_lens": q_seq_lens,
+            "kv_seq_lens": kv_seq_lens,
+            "num_prompt_tokens": num_prompt_tokens,
+            "metadata": metadata,
+        },
+        attrs={
+            "causal": attr.Bool(causal),
+            "stem_block_size": attr.Int(stem_block_size),
+            "stem_stride": attr.Int(stem_stride),
+            "alpha": attr.Float(alpha),
+            "initial_blocks": attr.Int(initial_blocks),
+            "window_size": attr.Int(window_size),
+            "k_block_num_rate_medium": attr.Float(k_block_num_rate_medium),
+            "k_block_num_bias_medium": attr.Int(k_block_num_bias_medium),
+            "k_block_num_rate_large": attr.Float(k_block_num_rate_large),
+            "k_block_num_bias_large": attr.Int(k_block_num_bias_large),
+            "topk_score_precision": attr.Int(topk_score_precision),
+        },
+        outputs=["sparse_indices", "sparse_seq_len"],
     )

@@ -133,12 +133,13 @@ TEST_F(StemIndexerProto, StemIndexer_inferdtype)
     ge::DataType qflatType = ge::DT_BF16;
     ge::DataType vbiasType = ge::DT_FLOAT;
     ge::DataType seqType = ge::DT_INT32;
-    auto contextHolder = gert::InferDataTypeContextFaker()
-        .NodeIoNum(7, 2)
-        .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-        .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
-        .InputDataTypes({&qflatType, &qflatType, &vbiasType, &seqType, &seqType, &seqType, &seqType})
-        .Build();
+    auto contextHolder =
+        gert::InferDataTypeContextFaker()
+            .NodeIoNum(7, 2)
+            .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+            .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+            .InputDataTypes({&qflatType, &qflatType, &vbiasType, &seqType, &seqType, &seqType, &seqType})
+            .Build();
     auto context = contextHolder.GetContext<gert::InferDataTypeContext>();
     ASSERT_NE(context, nullptr);
 

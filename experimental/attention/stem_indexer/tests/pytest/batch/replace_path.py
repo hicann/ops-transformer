@@ -16,14 +16,14 @@ import sys
 
 def replace_paths_in_test_file(test_file_path, path):
     try:
-        with fileinput.FileInput(test_file_path, inplace=True, backup='.bak') as file:
+        with fileinput.FileInput(test_file_path, inplace=True, backup=".bak") as file:
             for line in file:
-                print(line.replace('__PATH__', path), end='')
+                print(line.replace("__PATH__", path), end="")
         print(f"Replaced __PATH__ in {test_file_path}.")
     except Exception as err:
         print(f"Failed to replace path in {test_file_path}: {err}")
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     replace_paths_in_test_file(sys.argv[1], sys.argv[2])

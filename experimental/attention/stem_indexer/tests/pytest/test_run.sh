@@ -10,7 +10,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 # ====================== 配置区======================
-PATH1="./excel/*"
+PATH1="./csv/stem_indexer_cases.csv"
 PATH2="./pt_path"
 
 STEM_INDEXER_PT_SAVE_SCRIPT="./batch/stem_indexer_pt_save.py"

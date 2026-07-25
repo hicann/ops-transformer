@@ -20,21 +20,9 @@ class StemIndexer : public OpDef {
 public:
     explicit StemIndexer(const char *name) : OpDef(name)
     {
-        this->Input("qflat")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_BF16})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("kflat")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_BF16})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("vbias")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
+        this->Input("qflat").ParamType(REQUIRED).DataType({ge::DT_BF16}).FormatList({ge::FORMAT_ND}).AutoContiguous();
+        this->Input("kflat").ParamType(REQUIRED).DataType({ge::DT_BF16}).FormatList({ge::FORMAT_ND}).AutoContiguous();
+        this->Input("vbias").ParamType(REQUIRED).DataType({ge::DT_FLOAT}).FormatList({ge::FORMAT_ND}).AutoContiguous();
         this->Input("q_seq_lens")
             .ParamType(REQUIRED)
             .DataType({ge::DT_INT32})
@@ -55,14 +43,8 @@ public:
             .DataType({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
-        this->Output("sparse_indices")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_INT32})
-            .FormatList({ge::FORMAT_ND});
-        this->Output("sparse_seq_len")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_INT32})
-            .FormatList({ge::FORMAT_ND});
+        this->Output("sparse_indices").ParamType(REQUIRED).DataType({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
+        this->Output("sparse_seq_len").ParamType(REQUIRED).DataType({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
 
         this->Attr("causal").AttrType(OPTIONAL).Bool(true);
         this->Attr("stem_block_size").AttrType(OPTIONAL).Int(128);
@@ -74,6 +56,7 @@ public:
         this->Attr("k_block_num_bias_medium").AttrType(OPTIONAL).Int(30);
         this->Attr("k_block_num_rate_large").AttrType(OPTIONAL).Float(0.1f);
         this->Attr("k_block_num_bias_large").AttrType(OPTIONAL).Int(30);
+        this->Attr("topk_score_precision").AttrType(OPTIONAL).Int(1);
 
         OpAICoreConfig aicoreConfig;
         aicoreConfig.DynamicCompileStaticFlag(true)

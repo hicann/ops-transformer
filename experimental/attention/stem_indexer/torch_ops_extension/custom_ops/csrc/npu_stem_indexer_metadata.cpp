@@ -16,32 +16,34 @@ using namespace at_npu::native;
 
 constexpr int64_t STEM_INDEXER_METADATA_OUTPUT_SIZE = 2048;
 
-at::Tensor npu_stem_indexer_metadata_npu(
-    const at::Tensor &qSeqLens, const at::Tensor &kvSeqLens, int64_t qHeads, int64_t kvHeads,
-    bool causal, int64_t stemBlockSize, int64_t dimQkflat, int64_t windowSize)
+at::Tensor npu_stem_indexer_metadata_npu(const at::Tensor &qSeqLens, const at::Tensor &kvSeqLens, int64_t qHeads,
+                                         int64_t kvHeads, bool causal, int64_t stemBlockSize, int64_t dimQkflat,
+                                         int64_t windowSize)
 {
     at::Device outputDevice = qSeqLens.device();
-    at::Tensor output = torch::empty({STEM_INDEXER_METADATA_OUTPUT_SIZE},
-                                     torch::dtype(torch::kInt32).device(outputDevice));
+    at::Tensor output =
+        torch::empty({STEM_INDEXER_METADATA_OUTPUT_SIZE}, torch::dtype(torch::kInt32).device(outputDevice));
 
     // EXEC_NPU_CMD_V1 实参顺序 = 算子 IR 声明顺序（输入 -> 属性 -> 输出），与 schema 形参顺序不同
-    EXEC_NPU_CMD_V1(aclnnStemIndexerMetadata, qSeqLens, kvSeqLens, qHeads, kvHeads, causal,
-                    stemBlockSize, dimQkflat, windowSize, output);
+    EXEC_NPU_CMD_V1(aclnnStemIndexerMetadata, qSeqLens, kvSeqLens, qHeads, kvHeads, causal, stemBlockSize, dimQkflat,
+                    windowSize, output);
     return output;
 }
 
-at::Tensor npu_stem_indexer_metadata_meta(
-    const at::Tensor &qSeqLens, const at::Tensor &kvSeqLens, int64_t qHeads, int64_t kvHeads,
-    bool causal, int64_t stemBlockSize, int64_t dimQkflat, int64_t windowSize)
+at::Tensor npu_stem_indexer_metadata_meta(const at::Tensor &qSeqLens, const at::Tensor &kvSeqLens, int64_t qHeads,
+                                          int64_t kvHeads, bool causal, int64_t stemBlockSize, int64_t dimQkflat,
+                                          int64_t windowSize)
 {
     return torch::empty({STEM_INDEXER_METADATA_OUTPUT_SIZE}, qSeqLens.options().dtype(torch::kInt32));
 }
 } // namespace custom
 
-TORCH_LIBRARY_IMPL(custom, PrivateUse1, m) {
+TORCH_LIBRARY_IMPL(custom, PrivateUse1, m)
+{
     m.impl("npu_stem_indexer_metadata", &custom::npu_stem_indexer_metadata_npu);
 }
 
-TORCH_LIBRARY_IMPL(custom, Meta, m) {
+TORCH_LIBRARY_IMPL(custom, Meta, m)
+{
     m.impl("npu_stem_indexer_metadata", &custom::npu_stem_indexer_metadata_meta);
 }

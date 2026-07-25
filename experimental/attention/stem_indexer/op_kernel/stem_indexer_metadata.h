@@ -73,8 +73,10 @@ struct SliMetadata {
     SLI_METADATA_T *faMetadata; // [AIC_CORE_NUM][FA_METADATA_SIZE];
     SLI_METADATA_T *fdMetadata; // [AIV_CORE_NUM][FD_METADATA_SIZE];
     SliMetadata(void *metadataPtr)
-        : faMetadata(static_cast<SLI_METADATA_T*>(metadataPtr)),
-          fdMetadata(faMetadata + AIC_CORE_NUM * FA_METADATA_SIZE) {}
+        : faMetadata(static_cast<SLI_METADATA_T *>(metadataPtr)),
+          fdMetadata(faMetadata + AIC_CORE_NUM * FA_METADATA_SIZE)
+    {
+    }
     void SetFaMetadata(uint32_t aicIdx, uint32_t metaIdx, uint32_t val)
     {
         assert(aicIdx < AIC_CORE_NUM);

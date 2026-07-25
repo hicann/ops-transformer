@@ -1,5 +1,15 @@
 #!/bin/python
 # -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------------------------------------
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# -----------------------------------------------------------------------------------------------------------
+
 """Custom op loader for stem_indexer pytest.
 
 The StemIndexer pytest tree should not hard-code one development worktree.  This module
@@ -30,7 +40,11 @@ def _prepend_env_path(env_name, paths):
 def _append_env_path(env_name, paths):
     current = os.environ.get(env_name, "")
     current_parts = [part for part in current.split(":") if part]
-    new_parts = [str(path) for path in paths if path and path.exists() and str(path) not in current_parts]
+    new_parts = [
+        str(path)
+        for path in paths
+        if path and path.exists() and str(path) not in current_parts
+    ]
     if new_parts:
         os.environ[env_name] = ":".join(current_parts + new_parts)
 
@@ -56,11 +70,16 @@ def _load_shared_libraries(root):
     if root.is_file() and root.suffix == ".so":
         candidates = [root]
     else:
-        candidates = [Path(path) for path in glob.glob(str(root / "**" / "custom_ops_lib*.so"), recursive=True)]
+        matched_paths = glob.glob(
+            str(root / "**" / "custom_ops_lib*.so"), recursive=True
+        )
+        candidates = [Path(path) for path in matched_paths]
     for lib_path in candidates[:1]:
         try:
             torch.ops.load_library(str(lib_path))
-        except Exception as error:  # pragma: no cover - depends on local extension environment
+        except (
+            Exception
+        ) as error:  # pragma: no cover - depends on local extension environment
             _LOAD_ERRORS.append(f"{lib_path}: {error}")
 
 
@@ -79,7 +98,9 @@ def _load_python_package(root):
         module = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)
-    except Exception as error:  # pragma: no cover - depends on local extension environment
+    except (
+        Exception
+    ) as error:  # pragma: no cover - depends on local extension environment
         _LOAD_ERRORS.append(f"{init_file}: {error}")
 
 
@@ -102,14 +123,17 @@ def _load_converter(root):
             module = importlib.util.module_from_spec(spec)
             sys.modules[spec.name] = module
             spec.loader.exec_module(module)
-        except Exception as error:  # pragma: no cover - depends on local extension environment
+        except (
+            Exception
+        ) as error:  # pragma: no cover - depends on local extension environment
             _LOAD_ERRORS.append(f"{converter_file}: {error}")
 
 
 def _custom_opp_roots():
     repo_root = Path(__file__).resolve().parents[5]
     build_candidates = [
-        repo_root / "build/_CPack_Packages/Linux/External/cann-ops-transformer-custom_linux-x86_64.run"
+        repo_root
+        / "build/_CPack_Packages/Linux/External/cann-ops-transformer-custom_linux-x86_64.run"
         / "packages/vendors/custom_transformer",
     ]
     build_roots = [path for path in build_candidates if path.exists()]
@@ -125,7 +149,9 @@ def _custom_opp_roots():
 def _configure_custom_opp_paths():
     custom_opp_roots = _custom_opp_roots()
     _prepend_env_path("ASCEND_CUSTOM_OPP_PATH", custom_opp_roots)
-    _prepend_env_path("LD_LIBRARY_PATH", [root / "op_api" / "lib" for root in custom_opp_roots])
+    _prepend_env_path(
+        "LD_LIBRARY_PATH", [root / "op_api" / "lib" for root in custom_opp_roots]
+    )
 
 
 def _load_custom_ops():

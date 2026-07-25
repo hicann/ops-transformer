@@ -64,6 +64,7 @@ sparse_indices, sparse_seq_len = torch.ops.custom.npu_stem_indexer(
     initial_blocks=4, window_size=4,
     k_block_num_rate_medium=0.2, k_block_num_bias_medium=30,
     k_block_num_rate_large=0.1, k_block_num_bias_large=30,
+    topk_score_precision=1,
     num_prompt_tokens=num_prompt_tokens, metadata=metadata,
 )
 # 也可：TorchNPU.npu_stem_indexer(...)

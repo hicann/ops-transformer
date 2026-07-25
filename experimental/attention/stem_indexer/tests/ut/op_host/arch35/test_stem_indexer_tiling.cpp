@@ -33,11 +33,13 @@ using TensorDesc = gert::TilingContextPara::TensorDescription;
 using OpAttr = gert::TilingContextPara::OpAttr;
 
 constexpr int64_t EXPECTED_WORKSPACE_ASCEND950 = 29360128;
+constexpr int64_t TOPK_SCORE_PRECISION_UINT16 = 2;
+constexpr int64_t INVALID_TOPK_SCORE_PRECISION = 3;
 
 struct StemIndexerCompileInfo {};
 
-std::vector<TensorDesc> MakeValidInputs(int64_t batch = 2, int64_t qHeads = 32, int64_t kvHeads = 4,
-                                        int64_t maxQb = 8, int64_t maxKb = 16, int64_t flattenDim = 2048)
+std::vector<TensorDesc> MakeValidInputs(int64_t batch = 2, int64_t qHeads = 32, int64_t kvHeads = 4, int64_t maxQb = 8,
+                                        int64_t maxKb = 16, int64_t flattenDim = 2048)
 {
     return {
         {{{batch, qHeads, maxQb, flattenDim}, {batch, qHeads, maxQb, flattenDim}}, ge::DT_BF16, ge::FORMAT_ND},
@@ -50,8 +52,7 @@ std::vector<TensorDesc> MakeValidInputs(int64_t batch = 2, int64_t qHeads = 32, 
     };
 }
 
-std::vector<TensorDesc> MakeValidOutputs(int64_t batch = 2, int64_t qHeads = 32, int64_t maxQb = 8,
-                                         int64_t maxKb = 16)
+std::vector<TensorDesc> MakeValidOutputs(int64_t batch = 2, int64_t qHeads = 32, int64_t maxQb = 8, int64_t maxKb = 16)
 {
     return {
         {{{batch, qHeads, maxQb, maxKb}, {batch, qHeads, maxQb, maxKb}}, ge::DT_INT32, ge::FORMAT_ND},
@@ -59,7 +60,7 @@ std::vector<TensorDesc> MakeValidOutputs(int64_t batch = 2, int64_t qHeads = 32,
     };
 }
 
-std::vector<OpAttr> MakeValidAttrs(bool causal = true)
+std::vector<OpAttr> MakeValidAttrs(bool causal = true, int64_t topkScorePrecision = 1)
 {
     return {
         {"causal", Ops::Transformer::AnyValue::CreateFrom<bool>(causal)},
@@ -72,11 +73,11 @@ std::vector<OpAttr> MakeValidAttrs(bool causal = true)
         {"k_block_num_bias_medium", Ops::Transformer::AnyValue::CreateFrom<int64_t>(30)},
         {"k_block_num_rate_large", Ops::Transformer::AnyValue::CreateFrom<float>(0.1f)},
         {"k_block_num_bias_large", Ops::Transformer::AnyValue::CreateFrom<int64_t>(30)},
+        {"topk_score_precision", Ops::Transformer::AnyValue::CreateFrom<int64_t>(topkScorePrecision)},
     };
 }
 
-gert::TilingContextPara BuildTilingPara(const std::vector<TensorDesc> &inputs,
-                                        const std::vector<TensorDesc> &outputs,
+gert::TilingContextPara BuildTilingPara(const std::vector<TensorDesc> &inputs, const std::vector<TensorDesc> &outputs,
                                         const std::vector<OpAttr> &attrs)
 {
     static StemIndexerCompileInfo compileInfo;
@@ -105,8 +106,22 @@ TEST_F(StemIndexerTilingArch35, StemIndexer_950_tiling_basic)
 TEST_F(StemIndexerTilingArch35, StemIndexer_950_tiling_causal_false_q64_kv8)
 {
     ExpectTilingResult(
-        BuildTilingPara(MakeValidInputs(1, 64, 8, 4, 32), MakeValidOutputs(1, 64, 4, 32), MakeValidAttrs(false)),
+        BuildTilingPara(MakeValidInputs(1, 64, 8, 4, 32), MakeValidOutputs(1, 64, 4, 32), MakeValidAttrs(false)), true);
+}
+
+TEST_F(StemIndexerTilingArch35, StemIndexer_950_tiling_topk_score_uint16)
+{
+    ExpectTilingResult(
+        BuildTilingPara(MakeValidInputs(), MakeValidOutputs(), MakeValidAttrs(true, TOPK_SCORE_PRECISION_UINT16)),
         true);
+}
+
+TEST_F(StemIndexerTilingArch35, StemIndexer_950_tiling_topk_score_precision_invalid)
+{
+    ExpectTilingResult(BuildTilingPara(MakeValidInputs(), MakeValidOutputs(), MakeValidAttrs(true, 0)), false);
+    ExpectTilingResult(
+        BuildTilingPara(MakeValidInputs(), MakeValidOutputs(), MakeValidAttrs(true, INVALID_TOPK_SCORE_PRECISION)),
+        false);
 }
 
 TEST_F(StemIndexerTilingArch35, StemIndexer_950_tiling_qflat_dtype_invalid)

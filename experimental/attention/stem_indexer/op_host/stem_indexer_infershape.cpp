@@ -32,8 +32,7 @@ constexpr uint32_t DIM_NUM_FOUR = 4;
 
 static ge::graphStatus InferShapeStemIndexer(gert::InferShapeContext *context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE("StemIndexer", "InferShapeContext is nullptr!"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context == nullptr, OP_LOGE("StemIndexer", "InferShapeContext is nullptr!"), return ge::GRAPH_FAILED);
 
     const gert::Shape *qflatShape = context->GetInputShape(QFLAT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, qflatShape);

@@ -50,6 +50,7 @@ constexpr uint32_t ATTR_K_BLOCK_NUM_RATE_MEDIUM_INDEX = 6;
 constexpr uint32_t ATTR_K_BLOCK_NUM_BIAS_MEDIUM_INDEX = 7;
 constexpr uint32_t ATTR_K_BLOCK_NUM_RATE_LARGE_INDEX = 8;
 constexpr uint32_t ATTR_K_BLOCK_NUM_BIAS_LARGE_INDEX = 9;
+constexpr uint32_t ATTR_TOPK_SCORE_PRECISION_INDEX = 10;
 
 constexpr uint32_t DIM_IDX_ZERO = 0;
 constexpr uint32_t DIM_IDX_ONE = 1;
@@ -73,9 +74,14 @@ constexpr uint32_t KV_HEAD_NUM_8 = 8;
 constexpr uint32_t STEM_M_BASE_SIZE = 96;
 constexpr uint32_t STEM_S2_BASE_SIZE = 256;
 constexpr float ALPHA_MIN = 0.0f;
+constexpr float ALPHA_MAX = 1.0f;
 constexpr float ATTR_FLOAT_EPS = 0.000001f;
 constexpr float K_BLOCK_NUM_RATE_MEDIUM_LIMIT = 0.2f;
 constexpr float K_BLOCK_NUM_RATE_LARGE_LIMIT = 0.1f;
+constexpr uint32_t K_BLOCK_NUM_BIAS_MEDIUM_LIMIT = 30U;
+constexpr uint32_t K_BLOCK_NUM_BIAS_LARGE_LIMIT = 30U;
+constexpr int64_t TOPK_SCORE_PRECISION_UINT32 = 1;
+constexpr int64_t TOPK_SCORE_PRECISION_UINT16 = 2;
 
 BEGIN_TILING_DATA_DEF(StemIndexerTilingData)
 TILING_DATA_FIELD_DEF(uint32_t, bSize)
@@ -125,6 +131,7 @@ struct StemIndexerParaInfo {
     const int64_t *kBlockNumBiasMedium = nullptr;
     const float *kBlockNumRateLarge = nullptr;
     const int64_t *kBlockNumBiasLarge = nullptr;
+    const int64_t *topkScorePrecision = nullptr;
 };
 
 class StemIndexerTilingInfo {
@@ -147,9 +154,10 @@ public:
     uint32_t initialBlocks = INITIAL_BLOCKS_LIMIT;
     uint32_t windowSize = WINDOW_SIZE_LIMIT;
     float kBlockNumRateMedium = K_BLOCK_NUM_RATE_MEDIUM_LIMIT;
-    uint32_t kBlockNumBiasMedium = 30;
+    uint32_t kBlockNumBiasMedium = K_BLOCK_NUM_BIAS_MEDIUM_LIMIT;
     float kBlockNumRateLarge = K_BLOCK_NUM_RATE_LARGE_LIMIT;
-    uint32_t kBlockNumBiasLarge = 30;
+    uint32_t kBlockNumBiasLarge = K_BLOCK_NUM_BIAS_LARGE_LIMIT;
+    uint32_t topkScorePrecision = TOPK_SCORE_PRECISION_UINT32;
     float rSquare = 1.0f / 64.0f;
     ge::DataType inputQType = ge::DT_BF16;
     ge::DataType inputKType = ge::DT_BF16;
@@ -158,7 +166,9 @@ public:
 
 class StemIndexerInfoParser {
 public:
-    explicit StemIndexerInfoParser(gert::TilingContext *context) : context_(context) {}
+    explicit StemIndexerInfoParser(gert::TilingContext *context) : context_(context)
+    {
+    }
     ~StemIndexerInfoParser() = default;
 
     ge::graphStatus GetOpName();
@@ -203,7 +213,9 @@ private:
 
 class StemIndexerTiling {
 public:
-    explicit StemIndexerTiling(gert::TilingContext *context) : context_(context) {}
+    explicit StemIndexerTiling(gert::TilingContext *context) : context_(context)
+    {
+    }
     ge::graphStatus DoTiling(const StemIndexerTilingInfo *tilingInfo);
 
 private:
