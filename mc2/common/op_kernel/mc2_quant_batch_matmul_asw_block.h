@@ -310,7 +310,7 @@ __aicore__ inline void QuantBatchMatmulAswBlock::CalcGMOffset()
         if constexpr (bTrans) {
             offset_.offsetScale = nOffset * scaleK;
         } else {
-            offset_.offsetScale = nOffset;
+            offset_.offsetScale = nOffset * MXFP_MULTI_BASE_SIZE;
         }
     } else {
         offset_.offsetPerTokenScale = mOffset;
