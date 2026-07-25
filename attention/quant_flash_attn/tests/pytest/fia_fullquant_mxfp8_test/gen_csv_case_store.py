@@ -5,13 +5,13 @@
 # This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
-# THIS SOFTWARE IS PROVIDED ON AN "AS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 """
-  python3 gen_csv_case_store.py [--paramset fia_fullquant_mxfp8_paramset_func_rdv]
-                                [--output qfa_mxfp8.csv]
+python3 gen_csv_case_store.py [--paramset quant_flash_attn_paramset_func_rdv]
+                              [--output qfa_mxfp8.csv]
 """
 
 import argparse
@@ -34,8 +34,12 @@ def case_to_csv_row(case):
     N_q = case["N_q"]
     N_kv = case["N_kv"]
     D = case["D"]
-    cu_seqlens_q = list(case["cu_seqlens_q"]) if case["cu_seqlens_q"] is not None else []
-    cu_seqlens_kv = list(case["cu_seqlens_kv"]) if case["cu_seqlens_kv"] is not None else []
+    cu_seqlens_q = (
+        list(case["cu_seqlens_q"]) if case["cu_seqlens_q"] is not None else []
+    )
+    cu_seqlens_kv = (
+        list(case["cu_seqlens_kv"]) if case["cu_seqlens_kv"] is not None else []
+    )
     seqused_q = case["seqused_q"]
     seqused_kv = case["seqused_kv"]
     max_seqlen_q = case["max_seqlen_q"]
@@ -45,13 +49,25 @@ def case_to_csv_row(case):
     enable_lse = case["enable_lse"]
 
     # cu_seqlens → actual_seq (差分还原,用于计算 shape)
-    actual_seq_q = [cu_seqlens_q[i + 1] - cu_seqlens_q[i] for i in range(len(cu_seqlens_q) - 1)] if len(cu_seqlens_q) > 1 else [0]
-    actual_seq_kv = [cu_seqlens_kv[i + 1] - cu_seqlens_kv[i] for i in range(len(cu_seqlens_kv) - 1)] if len(cu_seqlens_kv) > 1 else [0]
+    actual_seq_q = (
+        [cu_seqlens_q[i + 1] - cu_seqlens_q[i] for i in range(len(cu_seqlens_q) - 1)]
+        if len(cu_seqlens_q) > 1
+        else [0]
+    )
+    actual_seq_kv = (
+        [cu_seqlens_kv[i + 1] - cu_seqlens_kv[i] for i in range(len(cu_seqlens_kv) - 1)]
+        if len(cu_seqlens_kv) > 1
+        else [0]
+    )
     max_sq = max(actual_seq_q) if actual_seq_q else D
     max_skv = max(actual_seq_kv) if actual_seq_kv else D
 
     num_groups = math.ceil(D / 32)
-    max_blocks = max(math.ceil(s / block_size) for s in actual_seq_kv) if actual_seq_kv and enable_pa else 0
+    max_blocks = (
+        max(math.ceil(s / block_size) for s in actual_seq_kv)
+        if actual_seq_kv and enable_pa
+        else 0
+    )
 
     shapes = [
         f"({B},{N_q},{max_sq},{D})",
@@ -59,22 +75,35 @@ def case_to_csv_row(case):
         f"({B},{N_kv},{max_skv},{D})",
         f"({B},{N_q},{max_sq},{num_groups})",
         f"({B},{N_kv},{max_skv},{num_groups})",
-        f"({B},{N_kv},{math.ceil(max_skv/32)},{D})",
+        f"({B},{N_kv},{math.ceil(max_skv / 32)},{D})",
         "(1,)",
         f"({B},{max_blocks})" if enable_pa and max_blocks > 0 else "(0,)",
     ]
     tensor_view_shapes = "(" + ",".join(f"({s})" for s in shapes) + ")"
 
-    dtypes = ["'float16'", "'float16'", "'float16'",
-              "'float32'", "'float32'", "'float32'",
-              "'float32'", "'int32'"]
+    dtypes = [
+        "'float16'",
+        "'float16'",
+        "'float16'",
+        "'float32'",
+        "'float32'",
+        "'float32'",
+        "'float32'",
+        "'int32'",
+    ]
     tensor_dtypes = "(" + ",".join(dtypes) + ")"
 
     attrs = {
-        "B": B, "N_q": N_q, "N_kv": N_kv, "D": D,
-        "cu_seqlens_q": cu_seqlens_q, "cu_seqlens_kv": cu_seqlens_kv,
-        "seqused_q": seqused_q, "seqused_kv": seqused_kv,
-        "max_seqlen_q": max_seqlen_q, "max_seqlen_kv": max_seqlen_kv,
+        "B": B,
+        "N_q": N_q,
+        "N_kv": N_kv,
+        "D": D,
+        "cu_seqlens_q": cu_seqlens_q,
+        "cu_seqlens_kv": cu_seqlens_kv,
+        "seqused_q": seqused_q,
+        "seqused_kv": seqused_kv,
+        "max_seqlen_q": max_seqlen_q,
+        "max_seqlen_kv": max_seqlen_kv,
         "enable_pa": enable_pa,
         "kv_cache_layout": case["kv_cache_layout"],
         "block_size": block_size,
@@ -98,16 +127,26 @@ def case_to_csv_row(case):
     # 所以 output_tensor_indexes 为空
     output_tensor_indexes = ""
 
-    return [name, API_NAME, tensor_view_shapes, tensor_dtypes, "",
-            attributes, output_tensor_indexes, ""]
+    return [
+        name,
+        API_NAME,
+        tensor_view_shapes,
+        tensor_dtypes,
+        "",
+        attributes,
+        output_tensor_indexes,
+        "",
+    ]
 
 
 def main():
     parser = argparse.ArgumentParser(description="paramset → TTK e2e CSV")
-    parser.add_argument("--paramset", default="fia_fullquant_mxfp8_paramset_func_rdv",
-                        help="paramset 模块名(不含.py)")
-    parser.add_argument("--output", default="qfa_mxfp8.csv",
-                        help="输出 CSV 路径")
+    parser.add_argument(
+        "--paramset",
+        default="quant_flash_attn_paramset_func_rdv",
+        help="paramset 模块名(不含.py)",
+    )
+    parser.add_argument("--output", default="qfa_mxfp8.csv", help="输出 CSV 路径")
     args = parser.parse_args()
 
     paramset_mod = __import__(args.paramset)
@@ -117,14 +156,27 @@ def main():
     if hasattr(paramset_mod, "CASES") and paramset_mod.CASES is not None:
         cases = paramset_mod.CASES
     elif hasattr(paramset_mod, "TEST_PARAMS"):
-        from fia_fullquant_mxfp8_paramset_common import expand_paramset_to_cases
+        from quant_flash_attn_paramset_common import expand_paramset_to_cases
+
         cases = expand_paramset_to_cases(paramset_mod.TEST_PARAMS)
     else:
-        raise ValueError(f"paramset module '{args.paramset}' has neither CASES nor TEST_PARAMS")
+        raise ValueError(
+            f"paramset module '{args.paramset}' has neither CASES nor TEST_PARAMS"
+        )
 
-    header = ["testcase_name", "api_name", "tensor_view_shapes", "tensor_dtypes",
-              "tensor_formats", "attributes", "output_tensor_indexes", "golden_api"]
-    out_path = args.output if os.path.isabs(args.output) else os.path.join(_HERE, args.output)
+    header = [
+        "testcase_name",
+        "api_name",
+        "tensor_view_shapes",
+        "tensor_dtypes",
+        "tensor_formats",
+        "attributes",
+        "output_tensor_indexes",
+        "golden_api",
+    ]
+    out_path = (
+        args.output if os.path.isabs(args.output) else os.path.join(_HERE, args.output)
+    )
     written = 0
     skipped = 0
     with open(out_path, "w", encoding="utf-8", newline="") as f:

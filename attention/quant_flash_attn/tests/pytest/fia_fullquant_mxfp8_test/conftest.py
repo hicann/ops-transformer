@@ -139,7 +139,9 @@ def _run_msprof_and_parse(config):
 
     results, csv_path = perf_parser.parse_prof_directory(prof_dir)
     perf_parser.print_report(results)
-    log_file = perf_parser.save_report(results, csv_path, os.path.join(cwd, "perf_output"))
+    log_file = perf_parser.save_report(
+        results, csv_path, os.path.join(cwd, "perf_output")
+    )
     print(f"[msprof] Report saved: {log_file}")
 
     _compare_baseline(config, results, tag="msprof")
@@ -159,7 +161,9 @@ def pytest_configure(config):
 
     results, csv_path = perf_parser.parse_prof_directory(prof_dir)
     perf_parser.print_report(results)
-    log_file = perf_parser.save_report(results, csv_path, os.path.join(os.getcwd(), "perf_output"))
+    log_file = perf_parser.save_report(
+        results, csv_path, os.path.join(os.getcwd(), "perf_output")
+    )
     print(f"[perf] Report saved: {log_file}")
 
     _compare_baseline(config, results, tag="perf")

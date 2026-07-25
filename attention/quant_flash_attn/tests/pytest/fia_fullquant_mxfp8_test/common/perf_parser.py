@@ -18,24 +18,27 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 
-def parse_op_summary(csv_path: str,
-                     operator_name: str = "FusedInferAttentionScore") -> List[Dict]:
+def parse_op_summary(
+    csv_path: str, operator_name: str = "FusedInferAttentionScore"
+) -> List[Dict]:
     with open(csv_path) as f:
         rows = list(csv.DictReader(f))
     entries = []
     for r in rows:
         if r["OP Type"] != operator_name:
             continue
-        entries.append({
-            "task_id": int(r["Task ID"]),
-            "start_time_us": float(r["Task Start Time(us)"]),
-            "duration_us": float(r["Task Duration(us)"]),
-            "input_shapes": r.get("Input Shapes", ""),
-            "output_shapes": r.get("Output Shapes", ""),
-            "aicore_time_us": float(r.get("aicore_time(us)", 0)),
-            "aic_total_cycles": int(r.get("aic_total_cycles", 0)),
-            "cube_utilization": float(r.get("cube_utilization(%)", 0)),
-        })
+        entries.append(
+            {
+                "task_id": int(r["Task ID"]),
+                "start_time_us": float(r["Task Start Time(us)"]),
+                "duration_us": float(r["Task Duration(us)"]),
+                "input_shapes": r.get("Input Shapes", ""),
+                "output_shapes": r.get("Output Shapes", ""),
+                "aicore_time_us": float(r.get("aicore_time(us)", 0)),
+                "aic_total_cycles": int(r.get("aic_total_cycles", 0)),
+                "cube_utilization": float(r.get("cube_utilization(%)", 0)),
+            }
+        )
     entries.sort(key=lambda x: x["start_time_us"])
     return entries
 
@@ -70,8 +73,9 @@ def find_op_summary_csv(prof_dir: str) -> Optional[Path]:
     return None
 
 
-def parse_prof_directory(prof_dir: str,
-                         operator_name: str = "FusedInferAttentionScore") -> Tuple[List[Dict], Optional[Path]]:
+def parse_prof_directory(
+    prof_dir: str, operator_name: str = "FusedInferAttentionScore"
+) -> Tuple[List[Dict], Optional[Path]]:
     csv_path = find_op_summary_csv(prof_dir)
     if csv_path is None:
         print(f"[perf] No op_summary CSV found in {prof_dir}")
@@ -99,12 +103,16 @@ def print_report(results: List[Dict]):
     print(f"{'#':>3}  {'Duration':>10} {'AI Core':>10} {'Cube%':>7}  {'Input Shapes'}")
     print("-" * 120)
     for i, r in enumerate(results):
-        print(f"{i+1:>3}  {r['duration_us']:>8.1f}us {r['aicore_time_us']:>8.1f}us {r['cube_utilization']:>6.1f}%  {r['shapes']}")
+        print(
+            f"{i + 1:>3}  {r['duration_us']:>8.1f}us {r['aicore_time_us']:>8.1f}us {r['cube_utilization']:>6.1f}%  {r['shapes']}"
+        )
     print("=" * 120)
     print(f"\nTotal: {len(results)} entries")
 
 
-def save_report(results: List[Dict], csv_path: Optional[Path], output_dir: str = ".") -> Path:
+def save_report(
+    results: List[Dict], csv_path: Optional[Path], output_dir: str = "."
+) -> Path:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -116,10 +124,14 @@ def save_report(results: List[Dict], csv_path: Optional[Path], output_dir: str =
 
     lines = []
     lines.append("=" * 120)
-    lines.append(f"{'#':>3}  {'Duration':>10} {'AI Core':>10} {'Cube%':>7}  {'Input Shapes'}")
+    lines.append(
+        f"{'#':>3}  {'Duration':>10} {'AI Core':>10} {'Cube%':>7}  {'Input Shapes'}"
+    )
     lines.append("-" * 120)
     for i, r in enumerate(results):
-        lines.append(f"{i+1:>3}  {r['duration_us']:>8.1f}us {r['aicore_time_us']:>8.1f}us {r['cube_utilization']:>6.1f}%  {r['shapes']}")
+        lines.append(
+            f"{i + 1:>3}  {r['duration_us']:>8.1f}us {r['aicore_time_us']:>8.1f}us {r['cube_utilization']:>6.1f}%  {r['shapes']}"
+        )
     lines.append("=" * 120)
     lines.append(f"\nTotal: {len(results)} entries")
 
@@ -141,32 +153,44 @@ def parse_baseline_log(log_path: str) -> List[Dict]:
     with open(path) as f:
         for line in f:
             line = line.strip()
-            if not line or line.startswith("=") or line.startswith("-") or line.startswith("#") or line.startswith("Total"):
+            if (
+                not line
+                or line.startswith("=")
+                or line.startswith("-")
+                or line.startswith("#")
+                or line.startswith("Total")
+            ):
                 continue
             m = re.match(r"\s*(\d+)\s+([\d.]+)us\s+([\d.]+)us\s+([\d.]+)%\s+(.*)", line)
             if m:
-                entries.append({
-                    "duration_us": float(m.group(2)),
-                    "aicore_time_us": float(m.group(3)),
-                    "cube_utilization": float(m.group(4)),
-                    "shapes": m.group(5).strip(),
-                })
+                entries.append(
+                    {
+                        "duration_us": float(m.group(2)),
+                        "aicore_time_us": float(m.group(3)),
+                        "cube_utilization": float(m.group(4)),
+                        "shapes": m.group(5).strip(),
+                    }
+                )
     return entries
 
 
-def compare_with_baseline(current: List[Dict], baseline: List[Dict], threshold: float = 8.0) -> List[Dict]:
+def compare_with_baseline(
+    current: List[Dict], baseline: List[Dict], threshold: float = 8.0
+) -> List[Dict]:
     baseline_by_shapes = {e["shapes"]: e for e in baseline}
     results = []
     for cur in current:
         shapes = cur["shapes"]
         base = baseline_by_shapes.get(shapes)
         if base is None:
-            results.append({
-                **cur,
-                "baseline_us": None,
-                "diff_pct": None,
-                "status": "NEW",
-            })
+            results.append(
+                {
+                    **cur,
+                    "baseline_us": None,
+                    "diff_pct": None,
+                    "status": "NEW",
+                }
+            )
             continue
 
         base_dur = base["duration_us"]
@@ -180,26 +204,36 @@ def compare_with_baseline(current: List[Dict], baseline: List[Dict], threshold: 
         else:
             status = "PASS"
 
-        results.append({
-            **cur,
-            "baseline_us": base_dur,
-            "diff_pct": diff_pct,
-            "status": status,
-        })
+        results.append(
+            {
+                **cur,
+                "baseline_us": base_dur,
+                "diff_pct": diff_pct,
+                "status": status,
+            }
+        )
     return results
 
 
 def print_comparison_report(results: List[Dict], threshold: float = 8.0):
     print()
     print("=" * 140)
-    print(f"{'#':>3}  {'Current':>10} {'Baseline':>10} {'Diff':>8} {'Status':>8}  {'Input Shapes'}")
+    print(
+        f"{'#':>3}  {'Current':>10} {'Baseline':>10} {'Diff':>8} {'Status':>8}  {'Input Shapes'}"
+    )
     print("-" * 140)
     for i, r in enumerate(results):
         cur_str = f"{r['duration_us']:>8.1f}us"
-        base_str = f"{r['baseline_us']:>8.1f}us" if r["baseline_us"] is not None else "       N/A"
-        diff_str = f"{r['diff_pct']:>+7.1f}%" if r["diff_pct"] is not None else "      N/A"
+        base_str = (
+            f"{r['baseline_us']:>8.1f}us"
+            if r["baseline_us"] is not None
+            else "       N/A"
+        )
+        diff_str = (
+            f"{r['diff_pct']:>+7.1f}%" if r["diff_pct"] is not None else "      N/A"
+        )
         status = r["status"]
-        print(f"{i+1:>3}  {cur_str} {base_str} {diff_str} {status:>8}  {r['shapes']}")
+        print(f"{i + 1:>3}  {cur_str} {base_str} {diff_str} {status:>8}  {r['shapes']}")
     print("=" * 140)
 
     failed = sum(1 for r in results if r["status"] == "FAILED")
@@ -207,8 +241,12 @@ def print_comparison_report(results: List[Dict], threshold: float = 8.0):
     improved = sum(1 for r in results if r["status"] == "IMPROVED")
     new_cases = sum(1 for r in results if r["status"] == "NEW")
 
-    print(f"\nTotal: {len(results)} entries | PASS: {passed} | FAILED: {failed} | IMPROVED: {improved} | NEW: {new_cases}")
+    print(
+        f"\nTotal: {len(results)} entries | PASS: {passed} | FAILED: {failed} | IMPROVED: {improved} | NEW: {new_cases}"
+    )
     print(f"Threshold: {threshold}%")
 
     if failed > 0:
-        print(f"\n*** PERFORMANCE REGRESSION DETECTED: {failed} case(s) exceeded {threshold}% threshold ***")
+        print(
+            f"\n*** PERFORMANCE REGRESSION DETECTED: {failed} case(s) exceeded {threshold}% threshold ***"
+        )

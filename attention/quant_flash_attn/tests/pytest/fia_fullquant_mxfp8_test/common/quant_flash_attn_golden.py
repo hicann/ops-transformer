@@ -29,6 +29,7 @@ import torch_npu
 
 try:
     from cann_ops_transformer.ops import quant_flash_attn_metadata, quant_flash_attn
+
     _HAS_NPU = True
 except ImportError as e:
     logger.warning("Failed to import cann_ops_transformer.ops: %s", e)
@@ -39,10 +40,11 @@ try:
 except ImportError:
     import sys
     import os
+
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import result_compare_method
 
-logging.basicConfig(level=logging.INFO, format='%(message)s', force=True)
+logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
@@ -51,10 +53,11 @@ logger = logging.getLogger(__name__)
 # GRAPH_PATH: 0=单算子, 7=aclgraph
 # 优先从环境变量读取，支持 GRAPH_PATH=7 python3 -m pytest ...
 import os as _os
+
 GRAPH_PATH = int(_os.environ.get("GRAPH_PATH", "0"))
 B = 1
-N_q = 1           # query heads
-N_kv = 1           # kv heads
+N_q = 1  # query heads
+N_kv = 1  # kv heads
 D = 128
 
 ENABLE_ROPE = False
@@ -81,6 +84,7 @@ def _get_seqused_q():
 def _get_seqused_kv():
     return SEQUSED_KV if SEQUSED_KV is not None else _derive_seqused(CU_SEQLENS_KV)
 
+
 ENABLE_PA = False
 BLOCK_SIZE = 512
 
@@ -106,7 +110,7 @@ ENABLE_LSE = False
 
 # e8m0fnu 最小正数: 2^(-127)，用于替换 scale 中的 0 和非有限值
 # e8m0fnu 没有 0 值语义，0 的 biased exponent 会被 NPU 解释为 NaN
-E8M0_MIN_POSITIVE = 2**(-127)
+E8M0_MIN_POSITIVE = 2 ** (-127)
 
 SEED_Q = 54
 SEED_K = 3
@@ -146,7 +150,9 @@ _EMAX_MAP = {
 
 def _validate_fp8_dtype(fp8_dtype):
     if fp8_dtype not in _EMAX_MAP:
-        raise ValueError(f"{fp8_dtype} not supported, expected one of {list(_EMAX_MAP.keys())}")
+        raise ValueError(
+            f"{fp8_dtype} not supported, expected one of {list(_EMAX_MAP.keys())}"
+        )
 
 
 def get_mxfp8_per_token_group_quant_scale(tensor, fp8_dtype, group_size=32):
@@ -164,7 +170,9 @@ def get_mxfp8_per_token_group_quant_scale(tensor, fp8_dtype, group_size=32):
     all_zero_mask = torch.all(grouped == 0, dim=-1)
     max_vals = torch.max(torch.abs(grouped), dim=-1)[0].clamp(min=1e-12)
     shared_exp = torch.floor(torch.log2(max_vals)) - emax_elem
-    return torch.where(all_zero_mask, torch.ones_like(shared_exp), 2 ** shared_exp).to(torch.float32)
+    return torch.where(all_zero_mask, torch.ones_like(shared_exp), 2**shared_exp).to(
+        torch.float32
+    )
 
 
 def get_mxfp8_per_channel_group_quant_scale(tensor, fp8_dtype, group_size=32):
@@ -182,7 +190,9 @@ def get_mxfp8_per_channel_group_quant_scale(tensor, fp8_dtype, group_size=32):
     all_zero_mask = torch.all(grouped == 0, dim=-2)
     max_vals = torch.max(torch.abs(grouped), dim=-2)[0].clamp(min=1e-12)
     shared_exp = torch.floor(torch.log2(max_vals)) - emax_elem
-    return torch.where(all_zero_mask, torch.ones_like(shared_exp), 2 ** shared_exp).to(torch.float32)
+    return torch.where(all_zero_mask, torch.ones_like(shared_exp), 2**shared_exp).to(
+        torch.float32
+    )
 
 
 def mxfp8_per_token_group_quant(tensor, quant_scale, group_size=32):
@@ -202,7 +212,7 @@ def broadcast_kv(num_heads, num_kv_heads, kv_tensor):
     B, _, S, D = kv_tensor.shape
     result = torch.zeros([B, num_heads, S, D], dtype=kv_tensor.dtype)
     for i in range(num_heads):
-        result[:, i:i + 1, :, :] = kv_tensor[:, i // factor:i // factor + 1, :, :]
+        result[:, i : i + 1, :, :] = kv_tensor[:, i // factor : i // factor + 1, :, :]
     return result
 
 
@@ -210,11 +220,16 @@ def broadcast_kv(num_heads, num_kv_heads, kv_tensor):
 # Layout 转换函数 - 数据 (Q/K/V)
 # ==============================================================================
 
+
 def convert_q_bnsd_to_layout(tensor_bnsd, seq_lens, layout, cu_seqlens=None):
     """Q/K/V BNSD → 各种 layout，支持 fp8 tensor
     cu_seqlens: TND layout 时用于偏移量放置，T=cu_seqlens[-1]；None 时按 seq_lens 顺序紧凑排列
     """
-    tensor = tensor_bnsd if isinstance(tensor_bnsd, torch.Tensor) else torch.as_tensor(tensor_bnsd)
+    tensor = (
+        tensor_bnsd
+        if isinstance(tensor_bnsd, torch.Tensor)
+        else torch.as_tensor(tensor_bnsd)
+    )
     B, N, _, D = tensor.shape
     max_org_s = max(seq_lens)
 
@@ -223,7 +238,12 @@ def convert_q_bnsd_to_layout(tensor_bnsd, seq_lens, layout, cu_seqlens=None):
     elif layout == "BSND":
         return tensor[:, :, :max_org_s, :].permute(0, 2, 1, 3).contiguous()
     elif layout == "BSH":
-        return tensor[:, :, :max_org_s, :].permute(0, 2, 1, 3).reshape(B, max_org_s, N * D).contiguous()
+        return (
+            tensor[:, :, :max_org_s, :]
+            .permute(0, 2, 1, 3)
+            .reshape(B, max_org_s, N * D)
+            .contiguous()
+        )
     elif layout == "TND":
         if cu_seqlens is not None:
             T = cu_seqlens[-1]
@@ -234,7 +254,7 @@ def convert_q_bnsd_to_layout(tensor_bnsd, seq_lens, layout, cu_seqlens=None):
                 if act_s <= 0:
                     continue
                 for n in range(N):
-                    result[offset:offset + act_s, n, :] = tensor[b, n, :act_s, :]
+                    result[offset : offset + act_s, n, :] = tensor[b, n, :act_s, :]
             return result.contiguous()
         T = sum(seq_lens)
         result = torch.zeros((T, N, D), dtype=tensor.dtype, device=tensor.device)
@@ -242,7 +262,7 @@ def convert_q_bnsd_to_layout(tensor_bnsd, seq_lens, layout, cu_seqlens=None):
         for b in range(B):
             act_s = seq_lens[b]
             for n in range(N):
-                result[t:t + act_s, n, :] = tensor[b, n, :act_s, :]
+                result[t : t + act_s, n, :] = tensor[b, n, :act_s, :]
             t += act_s
         return result.contiguous()
     else:
@@ -250,10 +270,12 @@ def convert_q_bnsd_to_layout(tensor_bnsd, seq_lens, layout, cu_seqlens=None):
 
 
 def convert_kv_bnsd_to_layout(tensor_bnsd, seq_lens, layout, cu_seqlens=None):
-    return convert_q_bnsd_to_layout(tensor_bnsd, seq_lens, layout, cu_seqlens=cu_seqlens)
+    return convert_q_bnsd_to_layout(
+        tensor_bnsd, seq_lens, layout, cu_seqlens=cu_seqlens
+    )
 
 
-def fill_tnd_padding(tensor_tnd, seq_lens, cu_seqlens, fill_value=float('inf')):
+def fill_tnd_padding(tensor_tnd, seq_lens, cu_seqlens, fill_value=float("inf")):
     """TND layout 中 cu_seqlens padding 区域（seqused[b] ~ cu_diff[b]）填充指定值
     用于 LSE: padding 位置填 inf 以匹配 NPU 行为
     """
@@ -265,7 +287,7 @@ def fill_tnd_padding(tensor_tnd, seq_lens, cu_seqlens, fill_value=float('inf')):
         offset = cu_seqlens[b]
         cu_diff = cu_seqlens[b + 1] - cu_seqlens[b]
         if cu_diff > act_s:
-            tensor_tnd[offset + act_s:offset + cu_diff] = fill_value
+            tensor_tnd[offset + act_s : offset + cu_diff] = fill_value
     return tensor_tnd
 
 
@@ -276,6 +298,7 @@ def convert_qk_rope_bnsd_to_layout(tensor_bnsd, seq_lens, layout):
 # ==============================================================================
 # Layout 转换函数 - Scale (Q/K/V)
 # ==============================================================================
+
 
 def fp32_to_e8m0fnu(tensor_fp32):
     """FP32 → e8m0fnu，提取 IEEE 754 biased exponent
@@ -296,7 +319,11 @@ def sanitize_e8m0_scale(scale, name="scale"):
     bad_count = int(bad_mask.sum().item())
     zero_count = int(zero_mask.sum().item())
     if bad_count:
-        logger.info("[WARN] %s: replace %d non-finite scale values before e8m0 packing", name, bad_count)
+        logger.info(
+            "[WARN] %s: replace %d non-finite scale values before e8m0 packing",
+            name,
+            bad_count,
+        )
         result[bad_mask] = E8M0_MIN_POSITIVE
     if zero_count:
         result[zero_mask] = E8M0_MIN_POSITIVE
@@ -308,7 +335,9 @@ def fp32_to_e8m0fnu_safe(scale, name="scale"):
     packed = fp32_to_e8m0fnu(scale_safe)
     nan_byte_count = int((packed == 0xFF).sum().item())
     if nan_byte_count:
-        raise ValueError(f"{name}: {nan_byte_count} values would become e8m0fnu NaN (0xFF)")
+        raise ValueError(
+            f"{name}: {nan_byte_count} values would become e8m0fnu NaN (0xFF)"
+        )
     return packed
 
 
@@ -349,7 +378,12 @@ def pack_v_scale_for_npu(scale_flat):
     # 奇数行 pad 用 E8M0_MIN_POSITIVE，避免 0.0 转 e8m0fnu 后变 NaN
     if Sg % 2 != 0:
         pad_shape = prefix_shape + (1, D)
-        pad = torch.full(pad_shape, E8M0_MIN_POSITIVE, dtype=scale_flat.dtype, device=scale_flat.device)
+        pad = torch.full(
+            pad_shape,
+            E8M0_MIN_POSITIVE,
+            dtype=scale_flat.dtype,
+            device=scale_flat.device,
+        )
         scale_flat = torch.cat([scale_flat, pad], dim=-2)
         Sg += 1
 
@@ -367,22 +401,30 @@ def _convert_q_scale_bnsd_to_tnd(scale_bnsd, seq_lens, cu_seqlens=None):
     Dg_half = Dg // 2
     if cu_seqlens is not None:
         T = cu_seqlens[-1]
-        result = torch.zeros((T, N, Dg_half, 2), dtype=scale_bnsd.dtype, device=scale_bnsd.device)
+        result = torch.zeros(
+            (T, N, Dg_half, 2), dtype=scale_bnsd.dtype, device=scale_bnsd.device
+        )
         for b in range(B):
             act_s = seq_lens[b]
             offset = cu_seqlens[b]
             if act_s <= 0:
                 continue
             for n in range(N):
-                result[offset:offset + act_s, n, :, :] = scale_bnsd[b, n, :act_s, :].reshape(act_s, Dg_half, 2)
+                result[offset : offset + act_s, n, :, :] = scale_bnsd[
+                    b, n, :act_s, :
+                ].reshape(act_s, Dg_half, 2)
         return result
     T = sum(seq_lens)
-    result = torch.zeros((T, N, Dg_half, 2), dtype=scale_bnsd.dtype, device=scale_bnsd.device)
+    result = torch.zeros(
+        (T, N, Dg_half, 2), dtype=scale_bnsd.dtype, device=scale_bnsd.device
+    )
     t = 0
     for b in range(B):
         act_s = seq_lens[b]
         for n in range(N):
-            result[t:t + act_s, n, :, :] = scale_bnsd[b, n, :act_s, :].reshape(act_s, Dg_half, 2)
+            result[t : t + act_s, n, :, :] = scale_bnsd[b, n, :act_s, :].reshape(
+                act_s, Dg_half, 2
+            )
         t += act_s
     return result
 
@@ -397,20 +439,32 @@ def convert_q_scale_bnsd_to_layout(scale_bnsd, seq_lens, layout, cu_seqlens=None
     if layout == "BNSD":
         return scale_bnsd[:, :, :max_org_s, :].reshape(B, N, max_org_s, Dg_half, 2)
     elif layout == "BSND":
-        return scale_bnsd[:, :, :max_org_s, :].permute(0, 2, 1, 3).reshape(B, max_org_s, N, Dg_half, 2)
+        return (
+            scale_bnsd[:, :, :max_org_s, :]
+            .permute(0, 2, 1, 3)
+            .reshape(B, max_org_s, N, Dg_half, 2)
+        )
     elif layout == "BSH":
-        return scale_bnsd[:, :, :max_org_s, :].permute(0, 2, 1, 3).reshape(B, max_org_s, N * Dg_half, 2)
+        return (
+            scale_bnsd[:, :, :max_org_s, :]
+            .permute(0, 2, 1, 3)
+            .reshape(B, max_org_s, N * Dg_half, 2)
+        )
     elif layout == "TND":
         return _convert_q_scale_bnsd_to_tnd(scale_bnsd, seq_lens, cu_seqlens=cu_seqlens)
     elif layout == "N2TGD":
-        tnd_result = _convert_q_scale_bnsd_to_tnd(scale_bnsd, seq_lens, cu_seqlens=cu_seqlens)
+        tnd_result = _convert_q_scale_bnsd_to_tnd(
+            scale_bnsd, seq_lens, cu_seqlens=cu_seqlens
+        )
         return convert_q_scale_tnd_to_n2tgd_layout(tnd_result, N_kv)
     else:
         raise ValueError(f"Unsupported layout: {layout}")
 
 
 def convert_k_scale_bnsd_to_layout(scale_bnsd, seq_lens, layout, cu_seqlens=None):
-    return convert_q_scale_bnsd_to_layout(scale_bnsd, seq_lens, layout, cu_seqlens=cu_seqlens)
+    return convert_q_scale_bnsd_to_layout(
+        scale_bnsd, seq_lens, layout, cu_seqlens=cu_seqlens
+    )
 
 
 def convert_v_scale_bnsd_to_layout(scale_bnsd, seq_lens, layout, group_size=32):
@@ -432,27 +486,52 @@ def convert_v_scale_bnsd_to_layout(scale_bnsd, seq_lens, layout, group_size=32):
     if layout == "BNSD":
         transposed = scale_bnsd[:, :, :actual_Sg, :]
         if actual_Sg % 2 != 0:
-            pad = torch.full((B, N, 1, D), E8M0_MIN_POSITIVE, dtype=transposed.dtype, device=transposed.device)
+            pad = torch.full(
+                (B, N, 1, D),
+                E8M0_MIN_POSITIVE,
+                dtype=transposed.dtype,
+                device=transposed.device,
+            )
             transposed = torch.cat([transposed, pad], dim=2)
-        result = torch.zeros((B, N, S_out, D, 2), dtype=torch.float32, device=scale_bnsd.device)
+        result = torch.zeros(
+            (B, N, S_out, D, 2), dtype=torch.float32, device=scale_bnsd.device
+        )
         result[..., 0] = transposed[..., ::2, :]
         result[..., 1] = transposed[..., 1::2, :]
         return result
     elif layout == "BSND":
         transposed = scale_bnsd[:, :, :actual_Sg, :].permute(0, 2, 1, 3)
         if actual_Sg % 2 != 0:
-            pad = torch.full((B, 1, N, D), E8M0_MIN_POSITIVE, dtype=transposed.dtype, device=transposed.device)
+            pad = torch.full(
+                (B, 1, N, D),
+                E8M0_MIN_POSITIVE,
+                dtype=transposed.dtype,
+                device=transposed.device,
+            )
             transposed = torch.cat([transposed, pad], dim=1)
-        result = torch.zeros((B, S_out, N, D, 2), dtype=torch.float32, device=scale_bnsd.device)
+        result = torch.zeros(
+            (B, S_out, N, D, 2), dtype=torch.float32, device=scale_bnsd.device
+        )
         result[..., 0] = transposed[:, ::2, :, :]
         result[..., 1] = transposed[:, 1::2, :, :]
         return result
     elif layout == "BSH":
-        transposed = scale_bnsd[:, :, :actual_Sg, :].permute(0, 2, 1, 3).reshape(B, actual_Sg, N * D)
+        transposed = (
+            scale_bnsd[:, :, :actual_Sg, :]
+            .permute(0, 2, 1, 3)
+            .reshape(B, actual_Sg, N * D)
+        )
         if actual_Sg % 2 != 0:
-            pad = torch.full((B, 1, N * D), E8M0_MIN_POSITIVE, dtype=transposed.dtype, device=transposed.device)
+            pad = torch.full(
+                (B, 1, N * D),
+                E8M0_MIN_POSITIVE,
+                dtype=transposed.dtype,
+                device=transposed.device,
+            )
             transposed = torch.cat([transposed, pad], dim=1)
-        result = torch.zeros((B, S_out, N * D, 2), dtype=torch.float32, device=scale_bnsd.device)
+        result = torch.zeros(
+            (B, S_out, N * D, 2), dtype=torch.float32, device=scale_bnsd.device
+        )
         result[..., 0] = transposed[:, ::2, :]
         result[..., 1] = transposed[:, 1::2, :]
         return result
@@ -463,7 +542,9 @@ def convert_v_scale_bnsd_to_layout(scale_bnsd, seq_lens, layout, group_size=32):
             sg_padded = sg + (sg % 2)
             Tv += sg_padded // 2
 
-        result = torch.zeros((Tv, N, D, 2), dtype=torch.float32, device=scale_bnsd.device)
+        result = torch.zeros(
+            (Tv, N, D, 2), dtype=torch.float32, device=scale_bnsd.device
+        )
         t_start = 0
         for b in range(B):
             org_seq = seq_lens[b]
@@ -476,7 +557,9 @@ def convert_v_scale_bnsd_to_layout(scale_bnsd, seq_lens, layout, group_size=32):
             for n in range(N):
                 src = scale_bnsd[b, n, :sg, :]
                 if sg % 2 != 0:
-                    pad = torch.full((1, D), E8M0_MIN_POSITIVE, dtype=src.dtype, device=src.device)
+                    pad = torch.full(
+                        (1, D), E8M0_MIN_POSITIVE, dtype=src.dtype, device=src.device
+                    )
                     src = torch.cat([src, pad], dim=0)
                 result[t_start:t_end, n, :, 0] = src[::2, :]
                 result[t_start:t_end, n, :, 1] = src[1::2, :]
@@ -506,9 +589,18 @@ def convert_q_scale_tnd_to_n2gtd_layout(tensor_tnd, num_kv_heads):
 # PA 格式转换 - mxfp8_pa_preprocessing
 # ==============================================================================
 
-def mxfp8_pa_preprocessing(tensor_bnsd, seq_lens, block_size, block_table,
-                           is_vscale=False, is_scale=False, is_rope=False,
-                           kv_layout="BnNBsD", group_size=32):
+
+def mxfp8_pa_preprocessing(
+    tensor_bnsd,
+    seq_lens,
+    block_size,
+    block_table,
+    is_vscale=False,
+    is_scale=False,
+    is_rope=False,
+    kv_layout="BnNBsD",
+    group_size=32,
+):
     """
     MXFP8 PA 预处理: BNSD → PagedAttention KV Cache
 
@@ -522,8 +614,16 @@ def mxfp8_pa_preprocessing(tensor_bnsd, seq_lens, block_size, block_table,
       - BnBsND: fp8=[Bn,Bs,N,D], Kscale=[Bn,Bs,N,D//64,2], Vscale=[Bn,Bs//64,N,D,2]
       - PA_NZ: fp8=[Bn,N,D//32,Bs,32], Kscale=[Bn,N,Bs//16,D//64,16,2], Vscale=[Bn,N,D//16,Bs//64,16,2]
     """
-    tensor_bnsd = tensor_bnsd if isinstance(tensor_bnsd, torch.Tensor) else torch.as_tensor(tensor_bnsd)
-    block_table = block_table if isinstance(block_table, torch.Tensor) else torch.as_tensor(block_table)
+    tensor_bnsd = (
+        tensor_bnsd
+        if isinstance(tensor_bnsd, torch.Tensor)
+        else torch.as_tensor(tensor_bnsd)
+    )
+    block_table = (
+        block_table
+        if isinstance(block_table, torch.Tensor)
+        else torch.as_tensor(block_table)
+    )
     B, N, S, D = tensor_bnsd.shape
 
     if is_rope and is_scale:
@@ -533,9 +633,13 @@ def mxfp8_pa_preprocessing(tensor_bnsd, seq_lens, block_size, block_table,
         if is_vscale:
             tensor_processed = convert_v_scale_to_pa(tensor_bnsd, seq_lens, group_size)
             v_scale_pack_ratio = group_size * 2
-            pack_seq_lens = [math.ceil(act_s / v_scale_pack_ratio) for act_s in seq_lens]
+            pack_seq_lens = [
+                math.ceil(act_s / v_scale_pack_ratio) for act_s in seq_lens
+            ]
             pack_block_size = math.ceil(block_size / v_scale_pack_ratio)
-            total_block_num = sum(math.ceil(act_s / pack_block_size) for act_s in pack_seq_lens)
+            total_block_num = sum(
+                math.ceil(act_s / pack_block_size) for act_s in pack_seq_lens
+            )
             out_shape = (total_block_num, N, pack_block_size, D, 2)
         else:
             if D % 2 != 0:
@@ -543,16 +647,32 @@ def mxfp8_pa_preprocessing(tensor_bnsd, seq_lens, block_size, block_table,
             tensor_processed = tensor_bnsd.reshape(B, N, S, D // 2, 2)
             pack_seq_lens = seq_lens
             pack_block_size = block_size
-            out_shape = (sum(math.ceil(act_s / block_size) for act_s in seq_lens), N, block_size, D // 2, 2)
+            out_shape = (
+                sum(math.ceil(act_s / block_size) for act_s in seq_lens),
+                N,
+                block_size,
+                D // 2,
+                2,
+            )
     else:
         tensor_processed = tensor_bnsd
         pack_seq_lens = seq_lens
         pack_block_size = block_size
-        out_shape = (sum(math.ceil(act_s / block_size) for act_s in seq_lens), N, block_size, D)
+        out_shape = (
+            sum(math.ceil(act_s / block_size) for act_s in seq_lens),
+            N,
+            block_size,
+            D,
+        )
 
     fill_value = E8M0_MIN_POSITIVE if is_scale else 0
 
-    out_cache = torch.full(out_shape, fill_value, dtype=tensor_processed.dtype, device=tensor_processed.device)
+    out_cache = torch.full(
+        out_shape,
+        fill_value,
+        dtype=tensor_processed.dtype,
+        device=tensor_processed.device,
+    )
     block_num = [math.ceil(act_s / pack_block_size) for act_s in pack_seq_lens]
     for b in range(B):
         bid_table = block_table[b]
@@ -562,7 +682,9 @@ def mxfp8_pa_preprocessing(tensor_bnsd, seq_lens, block_size, block_table,
             valid_len = min(pack_block_size, pack_seq_lens[b] - block_offset)
             if valid_len <= 0:
                 continue
-            out_cache[blockid, :, :valid_len] = tensor_processed[b, :, block_offset:block_offset + valid_len]
+            out_cache[blockid, :, :valid_len] = tensor_processed[
+                b, :, block_offset : block_offset + valid_len
+            ]
 
     if kv_layout == "BnNBsD":
         return out_cache
@@ -573,7 +695,9 @@ def mxfp8_pa_preprocessing(tensor_bnsd, seq_lens, block_size, block_table,
         if not is_scale:
             inner = 16 if is_rope else 32
             if KV_D % inner != 0:
-                raise ValueError(f"PA_NZ rope D must be divisible by {inner}, got {KV_D}")
+                raise ValueError(
+                    f"PA_NZ rope D must be divisible by {inner}, got {KV_D}"
+                )
             reshaped = out_cache.reshape(Bn, KV_N, Bs, KV_D // inner, inner)
             return reshaped.permute(0, 1, 3, 2, 4).contiguous()
         elif not is_vscale:
@@ -592,7 +716,11 @@ def convert_v_scale_to_pa(scale_bnsd, seq_lens, group_size=32):
     输入: [B, N, Sg, D], Sg = ceil(orgS/32)
     输出: [B, N, Sg//2, D, 2] (奇数行 pad 到偶数)
     """
-    scale_bnsd = scale_bnsd if isinstance(scale_bnsd, torch.Tensor) else torch.as_tensor(scale_bnsd)
+    scale_bnsd = (
+        scale_bnsd
+        if isinstance(scale_bnsd, torch.Tensor)
+        else torch.as_tensor(scale_bnsd)
+    )
     B, N, _, D = scale_bnsd.shape
     max_org_s = max(seq_lens)
     actual_Sg = math.ceil(max_org_s / group_size)
@@ -600,12 +728,19 @@ def convert_v_scale_to_pa(scale_bnsd, seq_lens, group_size=32):
     transposed = scale_bnsd[:, :, :actual_Sg, :]
 
     if actual_Sg % 2 != 0:
-        pad = torch.full((B, N, 1, D), E8M0_MIN_POSITIVE, dtype=transposed.dtype, device=transposed.device)
+        pad = torch.full(
+            (B, N, 1, D),
+            E8M0_MIN_POSITIVE,
+            dtype=transposed.dtype,
+            device=transposed.device,
+        )
         transposed = torch.cat([transposed, pad], dim=2)
         actual_Sg += 1
 
     S_out = actual_Sg // 2
-    result = torch.zeros((B, N, S_out, D, 2), dtype=torch.float32, device=scale_bnsd.device)
+    result = torch.zeros(
+        (B, N, S_out, D, 2), dtype=torch.float32, device=scale_bnsd.device
+    )
     result[..., 0] = transposed[..., ::2, :]
     result[..., 1] = transposed[..., 1::2, :]
     return result
@@ -613,24 +748,42 @@ def convert_v_scale_to_pa(scale_bnsd, seq_lens, group_size=32):
 
 def bnsd_to_pa_kv(tensor_bnsd, seq_lens, block_size, block_table, kv_layout="BnNBsD"):
     return mxfp8_pa_preprocessing(
-        tensor_bnsd, seq_lens, block_size, block_table,
-        is_scale=False, kv_layout=kv_layout
+        tensor_bnsd,
+        seq_lens,
+        block_size,
+        block_table,
+        is_scale=False,
+        kv_layout=kv_layout,
     )
 
 
-def bnsd_to_pa_kv_scale_token_group(scale_bnsd, seq_lens, block_size, block_table,
-                                      kv_layout="BnNBsD", group_size=32):
+def bnsd_to_pa_kv_scale_token_group(
+    scale_bnsd, seq_lens, block_size, block_table, kv_layout="BnNBsD", group_size=32
+):
     return mxfp8_pa_preprocessing(
-        scale_bnsd, seq_lens, block_size, block_table,
-        is_scale=True, is_vscale=False, kv_layout=kv_layout, group_size=group_size
+        scale_bnsd,
+        seq_lens,
+        block_size,
+        block_table,
+        is_scale=True,
+        is_vscale=False,
+        kv_layout=kv_layout,
+        group_size=group_size,
     )
 
 
-def bnsd_to_pa_v_scale_channel_group(scale_bnsd, seq_lens, block_size, block_table,
-                                       kv_layout="BnNBsD", group_size=32):
+def bnsd_to_pa_v_scale_channel_group(
+    scale_bnsd, seq_lens, block_size, block_table, kv_layout="BnNBsD", group_size=32
+):
     return mxfp8_pa_preprocessing(
-        scale_bnsd, seq_lens, block_size, block_table,
-        is_scale=True, is_vscale=True, kv_layout=kv_layout, group_size=group_size
+        scale_bnsd,
+        seq_lens,
+        block_size,
+        block_table,
+        is_scale=True,
+        is_vscale=True,
+        kv_layout=kv_layout,
+        group_size=group_size,
     )
 
 
@@ -646,6 +799,7 @@ def make_accum_seq(seq_lens):
 # ==============================================================================
 # 数据生成
 # ==============================================================================
+
 
 def generate_data():
     """生成 BNSD FP16 Q/K/V 并做 MXFP8 量化，使用原始序列长度"""
@@ -664,10 +818,14 @@ def generate_data():
     q_fp16 = (torch.rand(B, N_q, max_sq, D, dtype=torch.float16) * 2 - 1) * DATA_RANGE_Q
 
     torch.manual_seed(SEED_K)
-    k_fp16 = (torch.rand(B, N_kv, max_skv, D, dtype=torch.float16) * 2 - 1) * DATA_RANGE_K
+    k_fp16 = (
+        torch.rand(B, N_kv, max_skv, D, dtype=torch.float16) * 2 - 1
+    ) * DATA_RANGE_K
 
     torch.manual_seed(SEED_V)
-    v_fp16 = (torch.rand(B, N_kv, max_skv, D, dtype=torch.float16) * 2 - 1) * DATA_RANGE_V
+    v_fp16 = (
+        torch.rand(B, N_kv, max_skv, D, dtype=torch.float16) * 2 - 1
+    ) * DATA_RANGE_V
 
     qr_bf16 = None
     kr_bf16 = None
@@ -677,11 +835,22 @@ def generate_data():
         torch.manual_seed(SEED_KR)
         kr_bf16 = torch.randn(B, N_kv, max_skv, D_rope, dtype=torch.bfloat16)
 
-    logger.info("[INFO] q_fp16=%s, k_fp16=%s, v_fp16=%s", q_fp16.shape, k_fp16.shape, v_fp16.shape)
+    logger.info(
+        "[INFO] q_fp16=%s, k_fp16=%s, v_fp16=%s",
+        q_fp16.shape,
+        k_fp16.shape,
+        v_fp16.shape,
+    )
 
-    quant_scale_q = get_mxfp8_per_token_group_quant_scale(q_fp16, FP8_DTYPE, QUANT_GROUP_SIZE)
-    quant_scale_k = get_mxfp8_per_token_group_quant_scale(k_fp16, FP8_DTYPE, QUANT_GROUP_SIZE)
-    quant_scale_v = get_mxfp8_per_channel_group_quant_scale(v_fp16, FP8_DTYPE, QUANT_GROUP_SIZE)
+    quant_scale_q = get_mxfp8_per_token_group_quant_scale(
+        q_fp16, FP8_DTYPE, QUANT_GROUP_SIZE
+    )
+    quant_scale_k = get_mxfp8_per_token_group_quant_scale(
+        k_fp16, FP8_DTYPE, QUANT_GROUP_SIZE
+    )
+    quant_scale_v = get_mxfp8_per_channel_group_quant_scale(
+        v_fp16, FP8_DTYPE, QUANT_GROUP_SIZE
+    )
 
     dequant_scale_q = quant_scale_q
     dequant_scale_k = quant_scale_k
@@ -691,9 +860,21 @@ def generate_data():
     logger.info("[INFO] V scale Sg=%d, 是否奇数=%s", v_sg, v_sg % 2 != 0)
 
     fp8_max = 448.0 if FP8_DTYPE == torch.float8_e4m3fn else 57344.0
-    q_fp8 = mxfp8_per_token_group_quant(q_fp16, quant_scale_q, QUANT_GROUP_SIZE).clamp(-fp8_max, fp8_max).to(FP8_DTYPE)
-    k_fp8 = mxfp8_per_token_group_quant(k_fp16, quant_scale_k, QUANT_GROUP_SIZE).clamp(-fp8_max, fp8_max).to(FP8_DTYPE)
-    v_fp8 = mxfp8_per_channel_group_quant(v_fp16, quant_scale_v, QUANT_GROUP_SIZE).clamp(-fp8_max, fp8_max).to(FP8_DTYPE)
+    q_fp8 = (
+        mxfp8_per_token_group_quant(q_fp16, quant_scale_q, QUANT_GROUP_SIZE)
+        .clamp(-fp8_max, fp8_max)
+        .to(FP8_DTYPE)
+    )
+    k_fp8 = (
+        mxfp8_per_token_group_quant(k_fp16, quant_scale_k, QUANT_GROUP_SIZE)
+        .clamp(-fp8_max, fp8_max)
+        .to(FP8_DTYPE)
+    )
+    v_fp8 = (
+        mxfp8_per_channel_group_quant(v_fp16, quant_scale_v, QUANT_GROUP_SIZE)
+        .clamp(-fp8_max, fp8_max)
+        .to(FP8_DTYPE)
+    )
 
     block_table_torch = None
     if ENABLE_PA:
@@ -710,9 +891,18 @@ def generate_data():
 
     p_scale = torch.tensor([P_SCALE], dtype=torch.float32)
 
-    return (q_fp8, k_fp8, v_fp8,
-            dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-            qr_bf16, kr_bf16, block_table_torch)
+    return (
+        q_fp8,
+        k_fp8,
+        v_fp8,
+        dequant_scale_q,
+        dequant_scale_k,
+        v_descale,
+        p_scale,
+        qr_bf16,
+        kr_bf16,
+        block_table_torch,
+    )
 
 
 # ==============================================================================
@@ -723,6 +913,7 @@ def generate_data():
 #   Online softmax: 维护 running max (m) 和 running sum (s) 实现数值稳定
 #   TND layout 下 m 需要对齐到 ln2 的整数倍 (ceil)
 # ==============================================================================
+
 
 def _build_attention_mask(b, Sq, Skv, actual_seq_q, actual_seq_kv, sparse_mode):
     """构建全局 attention mask
@@ -747,12 +938,15 @@ def _build_attention_mask(b, Sq, Skv, actual_seq_q, actual_seq_kv, sparse_mode):
         return q_padding_mask | k_padding_mask
 
 
-def _compute_s_block(Qi, Kj, deq_scale_q_i, deq_scale_k_j, softmax_scale,
-                     Qri=None, Krj=None):
+def _compute_s_block(
+    Qi, Kj, deq_scale_q_i, deq_scale_k_j, softmax_scale, Qri=None, Krj=None
+):
     """计算单个 S block (attention score)"""
     S_ij = torch.matmul(Qi * deq_scale_q_i, (Kj * deq_scale_k_j).permute(0, 1, 3, 2))
     if Qri is not None and Krj is not None:
-        S_ij += torch.matmul(Qri.to(torch.float32), Krj.to(torch.float32).permute(0, 1, 3, 2))
+        S_ij += torch.matmul(
+            Qri.to(torch.float32), Krj.to(torch.float32).permute(0, 1, 3, 2)
+        )
     return S_ij * softmax_scale
 
 
@@ -766,7 +960,7 @@ def _online_softmax_update(S_ij, mask_j, mi, si, oi, ln_p_scale, LN2):
     6. 求 s = sum(P)
     7. P 转 FP8 再转回 FP32，模拟 NPU 侧 P 的量化损失
     """
-    S_ij = S_ij.masked_fill(mask_j, float('-inf'))
+    S_ij = S_ij.masked_fill(mask_j, float("-inf"))
 
     m_block_j, _ = torch.max(S_ij, dim=-1, keepdims=True)
     m_block_j = torch.ceil(m_block_j / LN2) * LN2
@@ -779,11 +973,20 @@ def _online_softmax_update(S_ij, mask_j, mi, si, oi, ln_p_scale, LN2):
     return m_block_j, s_block_j, P_ij_drop
 
 
-def cpu_mxfp8_golden(q_fp8, k_fp8, v_fp8,
-                     dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-                     actual_seq_q, actual_seq_kv,
-                     softmax_scale=None,
-                     qr_bf16=None, kr_bf16=None):
+def cpu_mxfp8_golden(
+    q_fp8,
+    k_fp8,
+    v_fp8,
+    dequant_scale_q,
+    dequant_scale_k,
+    v_descale,
+    p_scale,
+    actual_seq_q,
+    actual_seq_kv,
+    softmax_scale=None,
+    qr_bf16=None,
+    kr_bf16=None,
+):
     """CPU Flash Attention golden with MXFP8, C1V1C1V1C2V2 流水"""
     EPSILON = 1e-20
     LN2 = math.log(2.0)
@@ -818,15 +1021,19 @@ def cpu_mxfp8_golden(q_fp8, k_fp8, v_fp8,
     dv = v_tensor.shape[-1]
     Sq, Skv = q_tensor.shape[2], k_tensor.shape[2]
 
-    minValue = torch.tensor(-3.402823466e+38, dtype=torch.float32)
+    minValue = torch.tensor(-3.402823466e38, dtype=torch.float32)
     out = torch.zeros([b, n, Sq, dv], dtype=torch.float32)
     o_sum = torch.zeros(q_tensor.shape[:-1])[..., None]
-    o_max = torch.full(q_tensor.shape[:-1], minValue.item(), dtype=torch.float32)[..., None]
+    o_max = torch.full(q_tensor.shape[:-1], minValue.item(), dtype=torch.float32)[
+        ..., None
+    ]
 
     TILES_Q = (Sq + Q_BLOCK_SIZE - 1) // Q_BLOCK_SIZE
     TILES_KV = (Skv + K_BLOCK_SIZE - 1) // K_BLOCK_SIZE
 
-    mask_global = _build_attention_mask(b, Sq, Skv, actual_seq_q, actual_seq_kv, SPARSE_MODE)
+    mask_global = _build_attention_mask(
+        b, Sq, Skv, actual_seq_q, actual_seq_kv, SPARSE_MODE
+    )
 
     Q_BLOCKS = list(torch.split(q_tensor, Q_BLOCK_SIZE, dim=2))
     K_BLOCKS = list(torch.split(k_tensor, K_BLOCK_SIZE, dim=2))
@@ -844,11 +1051,21 @@ def cpu_mxfp8_golden(q_fp8, k_fp8, v_fp8,
     ln_p_scale = torch.tensor([math.log(p_scale)], dtype=torch.float32)
 
     # dequant_scale 按 group_size 扩展，用于逐元素反量化
-    dequant_scale_q_expanded = dequant_scale_q.repeat_interleave(QUANT_GROUP_SIZE, dim=-1)
-    dequant_scale_k_expanded = dequant_scale_k.repeat_interleave(QUANT_GROUP_SIZE, dim=-1)
+    dequant_scale_q_expanded = dequant_scale_q.repeat_interleave(
+        QUANT_GROUP_SIZE, dim=-1
+    )
+    dequant_scale_k_expanded = dequant_scale_k.repeat_interleave(
+        QUANT_GROUP_SIZE, dim=-1
+    )
     v_descale_expanded = v_descale.repeat_interleave(QUANT_GROUP_SIZE, dim=2)
 
-    logger.info("[CPU Golden] TILES_Q=%d, TILES_KV=%d, Sq=%d, Skv=%d", TILES_Q, TILES_KV, Sq, Skv)
+    logger.info(
+        "[CPU Golden] TILES_Q=%d, TILES_KV=%d, Sq=%d, Skv=%d",
+        TILES_Q,
+        TILES_KV,
+        Sq,
+        Skv,
+    )
 
     for i in range(TILES_Q):
         Qi = Q_BLOCKS[i]
@@ -868,10 +1085,13 @@ def cpu_mxfp8_golden(q_fp8, k_fp8, v_fp8,
             deq_scale_k_j = dequant_scale_k_expanded[:, :, Sk_start:Sk_end, :]
             Krj = Kr_BLOCKS[j] if Kr_BLOCKS is not None else None
 
-            S_ij = _compute_s_block(Qi, Kj, deq_scale_q_i, deq_scale_k_j, softmax_scale, Qri, Krj)
+            S_ij = _compute_s_block(
+                Qi, Kj, deq_scale_q_i, deq_scale_k_j, softmax_scale, Qri, Krj
+            )
             mask_j = mask_global[:, :, Sq_start:Sq_end, Sk_start:Sk_end]
             m_block_j, s_block_j, P_ij_drop = _online_softmax_update(
-                S_ij, mask_j, mi, si, oi, ln_p_scale, LN2)
+                S_ij, mask_j, mi, si, oi, ln_p_scale, LN2
+            )
 
             if j + 1 < TILES_KV:
                 # --- 第二个 K block (j+1) ---
@@ -881,24 +1101,33 @@ def cpu_mxfp8_golden(q_fp8, k_fp8, v_fp8,
                 deq_scale_k_j1 = dequant_scale_k_expanded[:, :, Sk1_start:Sk1_end, :]
                 Krj1 = Kr_BLOCKS[j + 1] if Kr_BLOCKS is not None else None
 
-                S_ij1 = _compute_s_block(Qi, Kj1, deq_scale_q_i, deq_scale_k_j1, softmax_scale, Qri, Krj1)
+                S_ij1 = _compute_s_block(
+                    Qi, Kj1, deq_scale_q_i, deq_scale_k_j1, softmax_scale, Qri, Krj1
+                )
                 mask_j1 = mask_global[:, :, Sq_start:Sq_end, Sk1_start:Sk1_end]
                 m_block_j1, s_block_j1, P_ij1_drop = _online_softmax_update(
-                    S_ij1, mask_j1, m_block_j, s_block_j, oi, ln_p_scale, LN2)
+                    S_ij1, mask_j1, m_block_j, s_block_j, oi, ln_p_scale, LN2
+                )
 
                 # V block: 一个 V_BLOCK_SIZE 对应两个 K_BLOCK_SIZE
                 Vj = V_BLOCKS[j // 2]
                 Sv_start = (j // 2) * V_BLOCK_SIZE
                 Sv_end = min(Sv_start + V_BLOCK_SIZE, Skv)
                 deq_scale_v_j = v_descale_expanded[:, :, Sv_start:Sv_end, :]
-                Vj_dequant = Vj * deq_scale_v_j[:, :, :Vj.shape[2], :]
+                Vj_dequant = Vj * deq_scale_v_j[:, :, : Vj.shape[2], :]
 
-                V_part1 = Vj_dequant[:, :, :Kj.shape[2], :]
-                V_part2 = Vj_dequant[:, :, Kj.shape[2]:Kj.shape[2] + Kj1.shape[2], :]
-                P_ij_Vj = torch.matmul(P_ij_drop * torch.exp(m_block_j - m_block_j1), V_part1) + torch.matmul(P_ij1_drop, V_part2)
+                V_part1 = Vj_dequant[:, :, : Kj.shape[2], :]
+                V_part2 = Vj_dequant[:, :, Kj.shape[2] : Kj.shape[2] + Kj1.shape[2], :]
+                P_ij_Vj = torch.matmul(
+                    P_ij_drop * torch.exp(m_block_j - m_block_j1), V_part1
+                ) + torch.matmul(P_ij1_drop, V_part2)
 
                 update_mul_si = torch.exp(mi - m_block_j1)
-                si_new = update_mul_si * si + s_block_j * torch.exp(m_block_j - m_block_j1) + s_block_j1
+                si_new = (
+                    update_mul_si * si
+                    + s_block_j * torch.exp(m_block_j - m_block_j1)
+                    + s_block_j1
+                )
                 o_BLOCKS[i] = update_mul_si * oi + P_ij_Vj
                 s_BLOCKS[i] = si_new
                 m_BLOCKS[i] = m_block_j1
@@ -907,8 +1136,8 @@ def cpu_mxfp8_golden(q_fp8, k_fp8, v_fp8,
                 Sv_start = j * K_BLOCK_SIZE
                 Sv_end = min(Sv_start + K_BLOCK_SIZE, Skv)
                 deq_scale_v_j = v_descale_expanded[:, :, Sv_start:Sv_end, :]
-                Vj_expanded = Vj[:, :, :Kj.shape[2], :]
-                Vj_dequant = Vj_expanded * deq_scale_v_j[:, :, :Kj.shape[2], :]
+                Vj_expanded = Vj[:, :, : Kj.shape[2], :]
+                Vj_dequant = Vj_expanded * deq_scale_v_j[:, :, : Kj.shape[2], :]
 
                 P_ij_Vj = torch.matmul(P_ij_drop, Vj_dequant)
                 update_mul_si = torch.exp(mi - m_block_j)
@@ -922,10 +1151,12 @@ def cpu_mxfp8_golden(q_fp8, k_fp8, v_fp8,
     out = out / (out_sum + EPSILON)
 
     o_max = torch.cat(m_BLOCKS, dim=2)
-    all_masked = (o_max <= minValue.item())
-    lse = torch.where(all_masked,
-                      torch.full_like(o_max, float('inf')),
-                      o_max + torch.log(out_sum + EPSILON))
+    all_masked = o_max <= minValue.item()
+    lse = torch.where(
+        all_masked,
+        torch.full_like(o_max, float("inf")),
+        o_max + torch.log(out_sum + EPSILON),
+    )
     out = torch.where(all_masked, torch.zeros_like(out), out)
     logger.info("[CPU Golden] output=%s", out.shape)
     return out, lse
@@ -938,52 +1169,112 @@ def cpu_mxfp8_golden(q_fp8, k_fp8, v_fp8,
 # 非 PA 模式: Q/K/V 均按 INPUT_LAYOUT 转换
 # ==============================================================================
 
-def _call_npu_fa_op(q, k, v, q_rope, k_rope, mask,
-                    cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, max_seqlen_q, max_seqlen_kv,
-                    dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-                    block_table, q_n, kv_n, softmax_scale,
-                    layout_q, layout_q_descale, layout_kv, layout_out, block_size, sparse_mode, out_dtype):
+
+def _call_npu_fa_op(
+    q,
+    k,
+    v,
+    q_rope,
+    k_rope,
+    mask,
+    cu_seqlens_q,
+    cu_seqlens_kv,
+    seqused_q,
+    seqused_kv,
+    max_seqlen_q,
+    max_seqlen_kv,
+    dequant_scale_q,
+    dequant_scale_k,
+    v_descale,
+    p_scale,
+    block_table,
+    q_n,
+    kv_n,
+    softmax_scale,
+    layout_q,
+    layout_q_descale,
+    layout_kv,
+    layout_out,
+    block_size,
+    sparse_mode,
+    out_dtype,
+):
     """调用 NPU 双算子 (QFA: quant_flash_attn_metadata + quant_flash_attn)"""
     if not _HAS_NPU:
-        raise ImportError("cann_ops_transformer.ops.quant_flash_attn is not available. "
-                          "Please check that cann_ops_transformer is installed and all .so are compiled.")
+        raise ImportError(
+            "cann_ops_transformer.ops.quant_flash_attn is not available. "
+            "Please check that cann_ops_transformer is installed and all .so are compiled."
+        )
 
-    cu_seqlens_q_t = torch.tensor(cu_seqlens_q, dtype=torch.int32).npu() if cu_seqlens_q is not None else None
-    cu_seqlens_kv_t = torch.tensor(cu_seqlens_kv, dtype=torch.int32).npu() if cu_seqlens_kv is not None else None
-    seqused_q_t = torch.tensor(seqused_q, dtype=torch.int32).npu() if seqused_q is not None else None
-    seqused_kv_t = torch.tensor(seqused_kv, dtype=torch.int32).npu() if seqused_kv is not None else None
+    cu_seqlens_q_t = (
+        torch.tensor(cu_seqlens_q, dtype=torch.int32).npu()
+        if cu_seqlens_q is not None
+        else None
+    )
+    cu_seqlens_kv_t = (
+        torch.tensor(cu_seqlens_kv, dtype=torch.int32).npu()
+        if cu_seqlens_kv is not None
+        else None
+    )
+    seqused_q_t = (
+        torch.tensor(seqused_q, dtype=torch.int32).npu()
+        if seqused_q is not None
+        else None
+    )
+    seqused_kv_t = (
+        torch.tensor(seqused_kv, dtype=torch.int32).npu()
+        if seqused_kv is not None
+        else None
+    )
 
-    is_tnd_q = (layout_q == "TND")
-    is_tnd_kv = (layout_kv == "TND")
+    is_tnd_q = layout_q == "TND"
+    is_tnd_kv = layout_kv == "TND"
 
     torch.npu.synchronize()
 
     metadata = quant_flash_attn_metadata(
-        num_heads_q=q_n, num_heads_kv=kv_n, head_dim=q.shape[-1], quant_mode=1,
+        num_heads_q=q_n,
+        num_heads_kv=kv_n,
+        head_dim=q.shape[-1],
+        quant_mode=1,
         cu_seqlens_q=cu_seqlens_q_t if is_tnd_q else None,
         cu_seqlens_kv=cu_seqlens_kv_t if is_tnd_kv else None,
-        seqused_q=seqused_q_t, seqused_kv=seqused_kv_t,
-        v_descale=v_descale,
+        seqused_q=seqused_q_t,
+        seqused_kv=seqused_kv_t,
+        dequant_scale_v=v_descale,
         mask_mode=sparse_mode,
-        layout_q=layout_q, layout_q_descale=layout_q_descale, layout_kv=layout_kv, layout_out=layout_out,
-        max_seqlen_q=max_seqlen_q, max_seqlen_kv=max_seqlen_kv,
+        layout_q=layout_q,
+        layout_q_descale=layout_q_descale,
+        layout_kv=layout_kv,
+        layout_out=layout_out,
+        max_seqlen_q=max_seqlen_q,
+        max_seqlen_kv=max_seqlen_kv,
     )
 
     main_kwargs = dict(
-        q=q, k=k, v=v,
-        q_descale=dequant_scale_q, k_descale=dequant_scale_k, v_descale=v_descale,
+        q=q,
+        k=k,
+        v=v,
+        q_descale=dequant_scale_q,
+        k_descale=dequant_scale_k,
+        v_descale=v_descale,
         quant_mode=1,
         block_table=block_table,
         p_scale=p_scale,
         cu_seqlens_q=cu_seqlens_q_t if is_tnd_q else None,
         cu_seqlens_kv=cu_seqlens_kv_t if is_tnd_kv else None,
-        seqused_q=seqused_q_t, seqused_kv=seqused_kv_t,
+        seqused_q=seqused_q_t,
+        seqused_kv=seqused_kv_t,
         attn_mask=mask,
         metadata=metadata,
         softmax_scale=softmax_scale,
         mask_mode=sparse_mode,
-        layout_q=layout_q, layout_q_descale=layout_q_descale, layout_kv=layout_kv, layout_out=layout_out,
-        max_seqlen_q=max_seqlen_q, max_seqlen_kv=max_seqlen_kv,
+        layout_q=layout_q,
+        layout_q_descale=layout_q_descale,
+        layout_kv=layout_kv,
+        layout_out=layout_out,
+        max_seqlen_q=max_seqlen_q,
+        max_seqlen_kv=max_seqlen_kv,
     )
     main_kwargs.update(_get_npu_fa_kwargs())
     atten_out, lse_out = quant_flash_attn(**main_kwargs)
@@ -999,39 +1290,82 @@ class Network(nn.Module):
       - q/k/v/deq_*: 已转好 layout 的 NPU tensor
       - max_seqlen_q/kv: 已计算好的标量
     """
+
     def __init__(self):
         super(Network, self).__init__()
 
-    def forward(self, q, k, v, q_rope, k_rope, mask,
-                cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv,
-                dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-                block_table, q_n, kv_n, softmax_scale,
-                layout_q, layout_q_descale, layout_kv, layout_out, block_size, sparse_mode, out_dtype,
-                max_seqlen_q, max_seqlen_kv):
+    def forward(
+        self,
+        q,
+        k,
+        v,
+        q_rope,
+        k_rope,
+        mask,
+        cu_seqlens_q,
+        cu_seqlens_kv,
+        seqused_q,
+        seqused_kv,
+        dequant_scale_q,
+        dequant_scale_k,
+        v_descale,
+        p_scale,
+        block_table,
+        q_n,
+        kv_n,
+        softmax_scale,
+        layout_q,
+        layout_q_descale,
+        layout_kv,
+        layout_out,
+        block_size,
+        sparse_mode,
+        out_dtype,
+        max_seqlen_q,
+        max_seqlen_kv,
+    ):
         metadata = quant_flash_attn_metadata(
-            num_heads_q=q_n, num_heads_kv=kv_n, head_dim=q.shape[-1], quant_mode=1,
-            cu_seqlens_q=cu_seqlens_q, cu_seqlens_kv=cu_seqlens_kv,
-            seqused_q=seqused_q, seqused_kv=seqused_kv,
+            num_heads_q=q_n,
+            num_heads_kv=kv_n,
+            head_dim=q.shape[-1],
+            quant_mode=1,
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_kv=cu_seqlens_kv,
+            seqused_q=seqused_q,
+            seqused_kv=seqused_kv,
             v_descale=v_descale,
             mask_mode=sparse_mode,
-            layout_q=layout_q, layout_q_descale=layout_q_descale, layout_kv=layout_kv, layout_out=layout_out,
-            max_seqlen_q=max_seqlen_q, max_seqlen_kv=max_seqlen_kv,
+            layout_q=layout_q,
+            layout_q_descale=layout_q_descale,
+            layout_kv=layout_kv,
+            layout_out=layout_out,
+            max_seqlen_q=max_seqlen_q,
+            max_seqlen_kv=max_seqlen_kv,
         )
         main_kwargs = dict(
-            q=q, k=k, v=v,
-            q_descale=dequant_scale_q, k_descale=dequant_scale_k, v_descale=v_descale,
+            q=q,
+            k=k,
+            v=v,
+            q_descale=dequant_scale_q,
+            k_descale=dequant_scale_k,
+            v_descale=v_descale,
             quant_mode=1,
             block_table=block_table,
             p_scale=p_scale,
             cu_seqlens_q=cu_seqlens_q,
             cu_seqlens_kv=cu_seqlens_kv,
-            seqused_q=seqused_q, seqused_kv=seqused_kv,
+            seqused_q=seqused_q,
+            seqused_kv=seqused_kv,
             attn_mask=mask,
             metadata=metadata,
             softmax_scale=softmax_scale,
             mask_mode=sparse_mode,
-            layout_q=layout_q, layout_q_descale=layout_q_descale, layout_kv=layout_kv, layout_out=layout_out,
-            max_seqlen_q=max_seqlen_q, max_seqlen_kv=max_seqlen_kv,
+            layout_q=layout_q,
+            layout_q_descale=layout_q_descale,
+            layout_kv=layout_kv,
+            layout_out=layout_out,
+            max_seqlen_q=max_seqlen_q,
+            max_seqlen_kv=max_seqlen_kv,
         )
         main_kwargs.update(_get_npu_fa_kwargs())
         atten_out, lse_out = quant_flash_attn(**main_kwargs)
@@ -1045,20 +1379,34 @@ def _build_causal_mask():
     return torch.triu(torch.ones(2048, 2048, dtype=torch.int8), diagonal=1).npu()
 
 
-def _prepare_rope_npu(qr_bf16, kr_bf16, actual_seq_q, actual_seq_kv,
-                      npu_input_layout, block_table_torch, enable_pa):
+def _prepare_rope_npu(
+    qr_bf16,
+    kr_bf16,
+    actual_seq_q,
+    actual_seq_kv,
+    npu_input_layout,
+    block_table_torch,
+    enable_pa,
+):
     """准备 rope 数据的 NPU tensor"""
     if not ENABLE_ROPE or qr_bf16 is None or kr_bf16 is None:
         if ENABLE_ROPE:
             raise ValueError("ENABLE_ROPE=True requires qr_bf16 and kr_bf16")
         return None, None
 
-    q_rope_npu = convert_qk_rope_bnsd_to_layout(qr_bf16, actual_seq_q, npu_input_layout).npu()
+    q_rope_npu = convert_qk_rope_bnsd_to_layout(
+        qr_bf16, actual_seq_q, npu_input_layout
+    ).npu()
 
     if enable_pa:
         k_rope_pa = mxfp8_pa_preprocessing(
-            kr_bf16, actual_seq_kv, BLOCK_SIZE, block_table_torch,
-            is_rope=True, kv_layout=KV_CACHE_LAYOUT)
+            kr_bf16,
+            actual_seq_kv,
+            BLOCK_SIZE,
+            block_table_torch,
+            is_rope=True,
+            kv_layout=KV_CACHE_LAYOUT,
+        )
         k_rope_npu = k_rope_pa.npu()
         if not IS_CONTIGUOUS:
             # ---- 构造krope不连续 ----
@@ -1068,17 +1416,32 @@ def _prepare_rope_npu(qr_bf16, kr_bf16, actual_seq_q, actual_seq_kv,
             k_rope_npu = double_krope[:, :, 0]  # 覆写为非连续
             logger.info(f"[NPU] k_rope is_contiguous={k_rope_npu.is_contiguous()}")
     else:
-        k_rope_npu = convert_qk_rope_bnsd_to_layout(kr_bf16, actual_seq_kv, npu_input_layout).npu()
+        k_rope_npu = convert_qk_rope_bnsd_to_layout(
+            kr_bf16, actual_seq_kv, npu_input_layout
+        ).npu()
 
     logger.info("[NPU] q_rope=%s, k_rope=%s", q_rope_npu.shape, k_rope_npu.shape)
     return q_rope_npu, k_rope_npu
 
 
-def prepare_npu_inputs(q_fp8, k_fp8, v_fp8,
-                       dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-                       cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, max_seqlen_q, max_seqlen_kv,
-                       block_table_torch=None,
-                       qr_bf16=None, kr_bf16=None):
+def prepare_npu_inputs(
+    q_fp8,
+    k_fp8,
+    v_fp8,
+    dequant_scale_q,
+    dequant_scale_k,
+    v_descale,
+    p_scale,
+    cu_seqlens_q,
+    cu_seqlens_kv,
+    seqused_q,
+    seqused_kv,
+    max_seqlen_q,
+    max_seqlen_kv,
+    block_table_torch=None,
+    qr_bf16=None,
+    kr_bf16=None,
+):
     """准备 NPU 侧入参 (layout 转换 / scale 转换 / mask / rope / block_table)，返回可直接传给
     _call_npu_fa_op 的入参字典。
 
@@ -1093,7 +1456,11 @@ def prepare_npu_inputs(q_fp8, k_fp8, v_fp8,
     """
     torch_npu.npu.set_device(int(DEVICE_ID))
 
-    softmax_scale = SOFTMAX_SCALE if SOFTMAX_SCALE is not None else 1.0 / math.sqrt(D + (D_rope if ENABLE_ROPE else 0))
+    softmax_scale = (
+        SOFTMAX_SCALE
+        if SOFTMAX_SCALE is not None
+        else 1.0 / math.sqrt(D + (D_rope if ENABLE_ROPE else 0))
+    )
 
     q_runtime_layout, q_group = resolve_q_scale_layout()
     logger.info("[NPU] Q layout: q_layout=%s, G=%d", q_runtime_layout, q_group)
@@ -1101,13 +1468,26 @@ def prepare_npu_inputs(q_fp8, k_fp8, v_fp8,
     npu_input_layout = "TND" if ENABLE_PA else INPUT_LAYOUT
     act_seqused_q = _get_seqused_q()
     act_seqused_kv = _get_seqused_kv()
-    q_npu = convert_q_bnsd_to_layout(q_fp8, act_seqused_q, npu_input_layout, cu_seqlens=CU_SEQLENS_Q).contiguous().view(FP8_DTYPE).npu()
+    q_npu = (
+        convert_q_bnsd_to_layout(
+            q_fp8, act_seqused_q, npu_input_layout, cu_seqlens=CU_SEQLENS_Q
+        )
+        .contiguous()
+        .view(FP8_DTYPE)
+        .npu()
+    )
     logger.info("[NPU %s] q=%s", npu_input_layout, q_npu.shape)
 
     q_scale_e8m0 = fp32_to_e8m0fnu_safe(
-        convert_q_scale_bnsd_to_layout(dequant_scale_q, act_seqused_q, q_runtime_layout, cu_seqlens=CU_SEQLENS_Q), "Q scale")
+        convert_q_scale_bnsd_to_layout(
+            dequant_scale_q, act_seqused_q, q_runtime_layout, cu_seqlens=CU_SEQLENS_Q
+        ),
+        "Q scale",
+    )
     deq_q_npu = q_scale_e8m0.npu()
-    logger.info("[NPU] Q scale layout=%s, shape=%s", q_runtime_layout, q_scale_e8m0.shape)
+    logger.info(
+        "[NPU] Q scale layout=%s, shape=%s", q_runtime_layout, q_scale_e8m0.shape
+    )
 
     p_scale_npu = p_scale.npu()
 
@@ -1115,15 +1495,33 @@ def prepare_npu_inputs(q_fp8, k_fp8, v_fp8,
 
     mask_arg = _build_causal_mask()
     q_rope_npu, k_rope_npu = _prepare_rope_npu(
-        qr_bf16, kr_bf16, act_seqused_q, act_seqused_kv,
-        npu_input_layout, block_table_torch, ENABLE_PA)
+        qr_bf16,
+        kr_bf16,
+        act_seqused_q,
+        act_seqused_kv,
+        npu_input_layout,
+        block_table_torch,
+        ENABLE_PA,
+    )
 
     if ENABLE_PA:
         # PA 模式: K/V 走 mxfp8_pa_preprocessing 转换为 PagedAttention KV Cache 格式
-        k_pa = mxfp8_pa_preprocessing(k_fp8, act_seqused_kv, BLOCK_SIZE, block_table_torch,
-                                       is_scale=False, kv_layout=KV_CACHE_LAYOUT)
-        v_pa = mxfp8_pa_preprocessing(v_fp8, act_seqused_kv, BLOCK_SIZE, block_table_torch,
-                                       is_scale=False, kv_layout=KV_CACHE_LAYOUT)
+        k_pa = mxfp8_pa_preprocessing(
+            k_fp8,
+            act_seqused_kv,
+            BLOCK_SIZE,
+            block_table_torch,
+            is_scale=False,
+            kv_layout=KV_CACHE_LAYOUT,
+        )
+        v_pa = mxfp8_pa_preprocessing(
+            v_fp8,
+            act_seqused_kv,
+            BLOCK_SIZE,
+            block_table_torch,
+            is_scale=False,
+            kv_layout=KV_CACHE_LAYOUT,
+        )
         k_npu = k_pa.contiguous().view(FP8_DTYPE).npu()
         v_npu = v_pa.contiguous().view(FP8_DTYPE).npu()
         if not IS_CONTIGUOUS:
@@ -1132,12 +1530,28 @@ def prepare_npu_inputs(q_fp8, k_fp8, v_fp8,
             kv_cache = kv_cache.npu()
             k_npu = kv_cache[:, :, 0]
             v_npu = kv_cache[:, :, 1]
-            logger.info(f"[NPU] key is_contiguous={k_npu.is_contiguous()}, value is_contiguous={v_npu.is_contiguous()}")
+            logger.info(
+                f"[NPU] key is_contiguous={k_npu.is_contiguous()}, value is_contiguous={v_npu.is_contiguous()}"
+            )
 
-        k_scale_pa = mxfp8_pa_preprocessing(dequant_scale_k, act_seqused_kv, BLOCK_SIZE, block_table_torch,
-                                              is_scale=True, is_vscale=False, kv_layout=KV_CACHE_LAYOUT)
-        v_scale_pa = mxfp8_pa_preprocessing(v_descale, act_seqused_kv, BLOCK_SIZE, block_table_torch,
-                                             is_scale=True, is_vscale=True, kv_layout=KV_CACHE_LAYOUT)
+        k_scale_pa = mxfp8_pa_preprocessing(
+            dequant_scale_k,
+            act_seqused_kv,
+            BLOCK_SIZE,
+            block_table_torch,
+            is_scale=True,
+            is_vscale=False,
+            kv_layout=KV_CACHE_LAYOUT,
+        )
+        v_scale_pa = mxfp8_pa_preprocessing(
+            v_descale,
+            act_seqused_kv,
+            BLOCK_SIZE,
+            block_table_torch,
+            is_scale=True,
+            is_vscale=True,
+            kv_layout=KV_CACHE_LAYOUT,
+        )
 
         k_scale_e8m0_pa = fp32_to_e8m0fnu_safe(k_scale_pa, "K PA scale")
         v_scale_e8m0_pa = fp32_to_e8m0fnu_safe(v_scale_pa, "V PA scale")
@@ -1154,70 +1568,170 @@ def prepare_npu_inputs(q_fp8, k_fp8, v_fp8,
             double_vscale = double_vscale.npu()
             deq_k_npu = double_kscale[:, :, 0]  # 覆写为非连续
             deq_v_npu = double_vscale[:, :, 0]
-            logger.info(f"[NPU] deq_k_scale is_contiguous={deq_k_npu.is_contiguous()}, deq_v_scale is_contiguous={deq_v_npu.is_contiguous()}")
+            logger.info(
+                f"[NPU] deq_k_scale is_contiguous={deq_k_npu.is_contiguous()}, deq_v_scale is_contiguous={deq_v_npu.is_contiguous()}"
+            )
 
         logger.info("[NPU PA] kv_layout=%s", KV_CACHE_LAYOUT)
         logger.info("[NPU PA] k=%s, v=%s", k_npu.shape, v_npu.shape)
         logger.info("[NPU PA] deq_k=%s, deq_v=%s", deq_k_npu.shape, deq_v_npu.shape)
 
-        block_table_npu = block_table_torch.npu() if isinstance(block_table_torch, torch.Tensor) else torch.as_tensor(block_table_torch, dtype=torch.int32).npu()
+        block_table_npu = (
+            block_table_torch.npu()
+            if isinstance(block_table_torch, torch.Tensor)
+            else torch.as_tensor(block_table_torch, dtype=torch.int32).npu()
+        )
 
         _pa_layout_kv_map = {"BnNBsD": "PA_BNBD", "PA_NZ": "PA_NZ"}
         pa_layout_kv = _pa_layout_kv_map.get(KV_CACHE_LAYOUT, "PA_BNBD")
 
         logger.info("[NPU] prepare PA inputs done.")
         return dict(
-            q=q_npu, k=k_npu, v=v_npu, q_rope=q_rope_npu, k_rope=k_rope_npu, mask=mask_arg,
-            cu_seqlens_q=cu_seqlens_q, cu_seqlens_kv=cu_seqlens_kv, seqused_q=seqused_q, seqused_kv=seqused_kv,
-            max_seqlen_q=max_seqlen_q, max_seqlen_kv=max_seqlen_kv,
-            dequant_scale_q=deq_q_npu, dequant_scale_k=deq_k_npu, v_descale=deq_v_npu, p_scale=p_scale_npu,
-            block_table=block_table_npu, q_n=N_q, kv_n=N_kv, softmax_scale=softmax_scale,
-            layout_q="TND", layout_q_descale=q_runtime_layout, layout_kv=pa_layout_kv, layout_out="TND",
-            block_size=BLOCK_SIZE, sparse_mode=SPARSE_MODE, out_dtype=out_dtype,
+            q=q_npu,
+            k=k_npu,
+            v=v_npu,
+            q_rope=q_rope_npu,
+            k_rope=k_rope_npu,
+            mask=mask_arg,
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_kv=cu_seqlens_kv,
+            seqused_q=seqused_q,
+            seqused_kv=seqused_kv,
+            max_seqlen_q=max_seqlen_q,
+            max_seqlen_kv=max_seqlen_kv,
+            dequant_scale_q=deq_q_npu,
+            dequant_scale_k=deq_k_npu,
+            v_descale=deq_v_npu,
+            p_scale=p_scale_npu,
+            block_table=block_table_npu,
+            q_n=N_q,
+            kv_n=N_kv,
+            softmax_scale=softmax_scale,
+            layout_q="TND",
+            layout_q_descale=q_runtime_layout,
+            layout_kv=pa_layout_kv,
+            layout_out="TND",
+            block_size=BLOCK_SIZE,
+            sparse_mode=SPARSE_MODE,
+            out_dtype=out_dtype,
         )
 
     # 非 PA 模式: K/V 按 INPUT_LAYOUT 转换
-    k_npu = convert_kv_bnsd_to_layout(k_fp8, act_seqused_kv, npu_input_layout, cu_seqlens=CU_SEQLENS_KV).contiguous().view(FP8_DTYPE).npu()
-    v_npu = convert_kv_bnsd_to_layout(v_fp8, act_seqused_kv, npu_input_layout, cu_seqlens=CU_SEQLENS_KV).contiguous().view(FP8_DTYPE).npu()
+    k_npu = (
+        convert_kv_bnsd_to_layout(
+            k_fp8, act_seqused_kv, npu_input_layout, cu_seqlens=CU_SEQLENS_KV
+        )
+        .contiguous()
+        .view(FP8_DTYPE)
+        .npu()
+    )
+    v_npu = (
+        convert_kv_bnsd_to_layout(
+            v_fp8, act_seqused_kv, npu_input_layout, cu_seqlens=CU_SEQLENS_KV
+        )
+        .contiguous()
+        .view(FP8_DTYPE)
+        .npu()
+    )
     logger.info("[NPU %s] k=%s, v=%s", npu_input_layout, k_npu.shape, v_npu.shape)
 
     k_scale_e8m0 = fp32_to_e8m0fnu_safe(
-        convert_k_scale_bnsd_to_layout(dequant_scale_k, act_seqused_kv, npu_input_layout, cu_seqlens=CU_SEQLENS_KV), "K scale")
+        convert_k_scale_bnsd_to_layout(
+            dequant_scale_k, act_seqused_kv, npu_input_layout, cu_seqlens=CU_SEQLENS_KV
+        ),
+        "K scale",
+    )
     v_scale_e8m0 = fp32_to_e8m0fnu_safe(
-        convert_v_scale_bnsd_to_layout(v_descale, act_seqused_kv, npu_input_layout), "V scale")
+        convert_v_scale_bnsd_to_layout(v_descale, act_seqused_kv, npu_input_layout),
+        "V scale",
+    )
     deq_k_npu = k_scale_e8m0.npu()
     deq_v_npu = v_scale_e8m0.npu()
-    logger.info("[NPU %s] K scale shape=%s, V scale shape=%s", npu_input_layout, k_scale_e8m0.shape, v_scale_e8m0.shape)
+    logger.info(
+        "[NPU %s] K scale shape=%s, V scale shape=%s",
+        npu_input_layout,
+        k_scale_e8m0.shape,
+        v_scale_e8m0.shape,
+    )
 
     logger.info("[NPU] prepare non-PA inputs done.")
     return dict(
-        q=q_npu, k=k_npu, v=v_npu, q_rope=q_rope_npu, k_rope=k_rope_npu, mask=mask_arg,
-        cu_seqlens_q=cu_seqlens_q, cu_seqlens_kv=cu_seqlens_kv, seqused_q=seqused_q, seqused_kv=seqused_kv,
-        max_seqlen_q=max_seqlen_q, max_seqlen_kv=max_seqlen_kv,
-        dequant_scale_q=deq_q_npu, dequant_scale_k=deq_k_npu, v_descale=deq_v_npu, p_scale=p_scale_npu,
-        block_table=None, q_n=N_q, kv_n=N_kv, softmax_scale=softmax_scale,
-        layout_q=npu_input_layout, layout_q_descale=q_runtime_layout, layout_kv=npu_input_layout, layout_out=npu_input_layout,
-        block_size=0, sparse_mode=SPARSE_MODE, out_dtype=out_dtype,
+        q=q_npu,
+        k=k_npu,
+        v=v_npu,
+        q_rope=q_rope_npu,
+        k_rope=k_rope_npu,
+        mask=mask_arg,
+        cu_seqlens_q=cu_seqlens_q,
+        cu_seqlens_kv=cu_seqlens_kv,
+        seqused_q=seqused_q,
+        seqused_kv=seqused_kv,
+        max_seqlen_q=max_seqlen_q,
+        max_seqlen_kv=max_seqlen_kv,
+        dequant_scale_q=deq_q_npu,
+        dequant_scale_k=deq_k_npu,
+        v_descale=deq_v_npu,
+        p_scale=p_scale_npu,
+        block_table=None,
+        q_n=N_q,
+        kv_n=N_kv,
+        softmax_scale=softmax_scale,
+        layout_q=npu_input_layout,
+        layout_q_descale=q_runtime_layout,
+        layout_kv=npu_input_layout,
+        layout_out=npu_input_layout,
+        block_size=0,
+        sparse_mode=SPARSE_MODE,
+        out_dtype=out_dtype,
     )
 
 
-def npu_mxfp8_fa(q_fp8, k_fp8, v_fp8,
-                 dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-                 cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, max_seqlen_q, max_seqlen_kv,
-                 block_table_torch=None,
-                 qr_bf16=None, kr_bf16=None):
+def npu_mxfp8_fa(
+    q_fp8,
+    k_fp8,
+    v_fp8,
+    dequant_scale_q,
+    dequant_scale_k,
+    v_descale,
+    p_scale,
+    cu_seqlens_q,
+    cu_seqlens_kv,
+    seqused_q,
+    seqused_kv,
+    max_seqlen_q,
+    max_seqlen_kv,
+    block_table_torch=None,
+    qr_bf16=None,
+    kr_bf16=None,
+):
     """调用 NPU 算子，支持 N2TGD layout
 
     正常用例入口：准备入参 → 调用算子 → 输出截断/LSE 处理。
     """
     inputs = prepare_npu_inputs(
-        q_fp8, k_fp8, v_fp8,
-        dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-        cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, max_seqlen_q, max_seqlen_kv,
+        q_fp8,
+        k_fp8,
+        v_fp8,
+        dequant_scale_q,
+        dequant_scale_k,
+        v_descale,
+        p_scale,
+        cu_seqlens_q,
+        cu_seqlens_kv,
+        seqused_q,
+        seqused_kv,
+        max_seqlen_q,
+        max_seqlen_kv,
         block_table_torch=block_table_torch,
-        qr_bf16=qr_bf16, kr_bf16=kr_bf16)
+        qr_bf16=qr_bf16,
+        kr_bf16=kr_bf16,
+    )
 
-    logger.info("[NPU] 调用 %s 模式 (GRAPH_PATH=%d)...", "PA" if ENABLE_PA else inputs["layout_q"], GRAPH_PATH)
+    logger.info(
+        "[NPU] 调用 %s 模式 (GRAPH_PATH=%d)...",
+        "PA" if ENABLE_PA else inputs["layout_q"],
+        GRAPH_PATH,
+    )
     # 通过 mxfp8_fa_torch_npu 路由，支持 GRAPH_PATH=7 (aclgraph)
     atten_out, lse_out = mxfp8_fa_torch_npu(**inputs)
 
@@ -1230,49 +1744,150 @@ def npu_mxfp8_fa(q_fp8, k_fp8, v_fp8,
     return npu_output, lse_out
 
 
-def mxfp8_fa_torch_npu(q, k, v, q_rope, k_rope, mask,
-                       cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, max_seqlen_q, max_seqlen_kv,
-                       dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-                       block_table, q_n, kv_n, softmax_scale,
-                       layout_q, layout_q_descale, layout_kv, layout_out, block_size, sparse_mode, out_dtype):
+def mxfp8_fa_torch_npu(
+    q,
+    k,
+    v,
+    q_rope,
+    k_rope,
+    mask,
+    cu_seqlens_q,
+    cu_seqlens_kv,
+    seqused_q,
+    seqused_kv,
+    max_seqlen_q,
+    max_seqlen_kv,
+    dequant_scale_q,
+    dequant_scale_k,
+    v_descale,
+    p_scale,
+    block_table,
+    q_n,
+    kv_n,
+    softmax_scale,
+    layout_q,
+    layout_q_descale,
+    layout_kv,
+    layout_out,
+    block_size,
+    sparse_mode,
+    out_dtype,
+):
     """NPU 调用入口, 支持 GRAPH_PATH=0 (单算子) 和 GRAPH_PATH=7 (aclgraph)"""
     if GRAPH_PATH == 0:
         logger.info("[NPU] 调用 QFA 单算子模式...")
         return _call_npu_fa_op(
-            q, k, v, q_rope, k_rope, mask,
-            cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, max_seqlen_q, max_seqlen_kv,
-            dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-            block_table, q_n, kv_n, softmax_scale,
-            layout_q, layout_q_descale, layout_kv, layout_out, block_size, sparse_mode, out_dtype)
+            q,
+            k,
+            v,
+            q_rope,
+            k_rope,
+            mask,
+            cu_seqlens_q,
+            cu_seqlens_kv,
+            seqused_q,
+            seqused_kv,
+            max_seqlen_q,
+            max_seqlen_kv,
+            dequant_scale_q,
+            dequant_scale_k,
+            v_descale,
+            p_scale,
+            block_table,
+            q_n,
+            kv_n,
+            softmax_scale,
+            layout_q,
+            layout_q_descale,
+            layout_kv,
+            layout_out,
+            block_size,
+            sparse_mode,
+            out_dtype,
+        )
 
     # GRAPH_PATH == 7: aclgraph
     # 预处理: list → NPU tensor (必须在编译区域之外完成)
-    cu_seqlens_q_t = torch.tensor(cu_seqlens_q, dtype=torch.int32).npu() if cu_seqlens_q is not None else None
-    cu_seqlens_kv_t = torch.tensor(cu_seqlens_kv, dtype=torch.int32).npu() if cu_seqlens_kv is not None else None
-    seqused_q_t = torch.tensor(seqused_q, dtype=torch.int32).npu() if seqused_q is not None else None
-    seqused_kv_t = torch.tensor(seqused_kv, dtype=torch.int32).npu() if seqused_kv is not None else None
+    cu_seqlens_q_t = (
+        torch.tensor(cu_seqlens_q, dtype=torch.int32).npu()
+        if cu_seqlens_q is not None
+        else None
+    )
+    cu_seqlens_kv_t = (
+        torch.tensor(cu_seqlens_kv, dtype=torch.int32).npu()
+        if cu_seqlens_kv is not None
+        else None
+    )
+    seqused_q_t = (
+        torch.tensor(seqused_q, dtype=torch.int32).npu()
+        if seqused_q is not None
+        else None
+    )
+    seqused_kv_t = (
+        torch.tensor(seqused_kv, dtype=torch.int32).npu()
+        if seqused_kv is not None
+        else None
+    )
 
     npu_mode = Network().to("npu:%s" % int(DEVICE_ID))
     with torch.no_grad():
         torch.npu.synchronize()
 
         # Network.forward 只调 torch.library op，Python 预处理结果通过参数传入
-        fa_args = (q, k, v, q_rope, k_rope, mask,
-                   cu_seqlens_q_t, cu_seqlens_kv_t, seqused_q_t, seqused_kv_t,
-                   dequant_scale_q, dequant_scale_k, v_descale, p_scale, block_table,
-                   q_n, kv_n, softmax_scale, layout_q, layout_q_descale, layout_kv, layout_out,
-                   block_size, sparse_mode, out_dtype,
-                   max_seqlen_q, max_seqlen_kv)
+        fa_args = (
+            q,
+            k,
+            v,
+            q_rope,
+            k_rope,
+            mask,
+            cu_seqlens_q_t,
+            cu_seqlens_kv_t,
+            seqused_q_t,
+            seqused_kv_t,
+            dequant_scale_q,
+            dequant_scale_k,
+            v_descale,
+            p_scale,
+            block_table,
+            q_n,
+            kv_n,
+            softmax_scale,
+            layout_q,
+            layout_q_descale,
+            layout_kv,
+            layout_out,
+            block_size,
+            sparse_mode,
+            out_dtype,
+            max_seqlen_q,
+            max_seqlen_kv,
+        )
 
         # aclgraph: 直接使用 npugraph_ex backend
         logger.info("[NPU] 调用 aclgraph (npugraph_ex)...")
         npu_backend = "npugraph_ex"
-        npu_mode = torch.compile(npu_mode, fullgraph=False, backend=npu_backend, dynamic=False)
+        npu_mode = torch.compile(
+            npu_mode, fullgraph=False, backend=npu_backend, dynamic=False
+        )
         # mark_static 标记所有 tensor 输入
-        for t in (q, k, v, q_rope, k_rope, mask,
-                  cu_seqlens_q_t, cu_seqlens_kv_t, seqused_q_t, seqused_kv_t,
-                  dequant_scale_q, dequant_scale_k, v_descale,
-                  p_scale, block_table):
+        for t in (
+            q,
+            k,
+            v,
+            q_rope,
+            k_rope,
+            mask,
+            cu_seqlens_q_t,
+            cu_seqlens_kv_t,
+            seqused_q_t,
+            seqused_kv_t,
+            dequant_scale_q,
+            dequant_scale_k,
+            v_descale,
+            p_scale,
+            block_table,
+        ):
             if t is not None:
                 torch._dynamo.mark_static(t)
         atten_out, lse_out = npu_mode(*fa_args)
@@ -1287,7 +1902,7 @@ def mxfp8_fa_torch_npu(q, k, v, q_rope, k_rope, mask,
 # Main
 # ==============================================================================
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         from . import golden_cache
     except ImportError:
@@ -1296,12 +1911,17 @@ if __name__ == '__main__':
     _VALID_MODES = {"all", "gen", "cpu", "npu", "compare"}
 
     parser = argparse.ArgumentParser(description="MXFP8 Flash Attention Golden")
-    parser.add_argument("--mode", default="all",
-                        help="执行模式，支持逗号组合: all/gen/cpu/npu/compare. 例: --mode=npu,compare")
-    parser.add_argument("--case-name", default="default",
-                        help="case 名称，用于 .pt 文件命名")
-    parser.add_argument("--cache-dir", default=None,
-                        help="缓存目录路径（默认 golden_cache/）")
+    parser.add_argument(
+        "--mode",
+        default="all",
+        help="执行模式，支持逗号组合: all/gen/cpu/npu/compare. 例: --mode=npu,compare",
+    )
+    parser.add_argument(
+        "--case-name", default="default", help="case 名称，用于 .pt 文件命名"
+    )
+    parser.add_argument(
+        "--cache-dir", default=None, help="缓存目录路径（默认 golden_cache/）"
+    )
     args = parser.parse_args()
 
     raw_parts = {m.strip() for m in args.mode.split(",") if m.strip()}
@@ -1317,26 +1937,58 @@ if __name__ == '__main__':
     logger.info("MXFP8 Flash Attention Golden  [mode=%s, case=%s]", mode, case_name)
     logger.info("输出: 逐元素表格 + 统计汇总 (PctRlt 通过率)")
     logger.info("=" * 60)
-    logger.info("场景: %s", 'PA' if ENABLE_PA else 'TND')
+    logger.info("场景: %s", "PA" if ENABLE_PA else "TND")
     logger.info("INPUT_LAYOUT=%s, Q_SCALE_LAYOUT=%s", INPUT_LAYOUT, Q_SCALE_LAYOUT)
     logger.info("KV_CACHE_LAYOUT=%s", KV_CACHE_LAYOUT)
     logger.info("B=%d, N_q=%d, N_kv=%d, D=%d", B, N_q, N_kv, D)
-    logger.info("ACTUAL_SEQ_Q=%s, ACTUAL_SEQ_KV=%s", _get_seqused_q(), _get_seqused_kv())
+    logger.info(
+        "ACTUAL_SEQ_Q=%s, ACTUAL_SEQ_KV=%s", _get_seqused_q(), _get_seqused_kv()
+    )
 
     if "gen" in mode:
         logger.info("\n[Step 1] 数据生成")
-        (q_fp8, k_fp8, v_fp8,
-         dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-         qr_bf16, kr_bf16, block_table_torch) = generate_data()
-        golden_cache.save_input(case_name, golden_cache.build_input_dict(
-            q_fp8, k_fp8, v_fp8, dequant_scale_q, dequant_scale_k, v_descale,
-            p_scale, qr_bf16, kr_bf16, block_table_torch
-        ), cache_dir=cdir)
+        (
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            dequant_scale_q,
+            dequant_scale_k,
+            v_descale,
+            p_scale,
+            qr_bf16,
+            kr_bf16,
+            block_table_torch,
+        ) = generate_data()
+        golden_cache.save_input(
+            case_name,
+            golden_cache.build_input_dict(
+                q_fp8,
+                k_fp8,
+                v_fp8,
+                dequant_scale_q,
+                dequant_scale_k,
+                v_descale,
+                p_scale,
+                qr_bf16,
+                kr_bf16,
+                block_table_torch,
+            ),
+            cache_dir=cdir,
+        )
     else:
         logger.info("\n[Step 1] 加载已保存的输入数据")
-        (q_fp8, k_fp8, v_fp8,
-         dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-         qr_bf16, kr_bf16, block_table_torch) = golden_cache.load_input(case_name, cache_dir=cdir)
+        (
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            dequant_scale_q,
+            dequant_scale_k,
+            v_descale,
+            p_scale,
+            qr_bf16,
+            kr_bf16,
+            block_table_torch,
+        ) = golden_cache.load_input(case_name, cache_dir=cdir)
 
     if "gen" in mode and not (mode & {"cpu", "npu", "compare"}):
         logger.info("\n[Done] 数据已保存，退出")
@@ -1344,10 +1996,19 @@ if __name__ == '__main__':
 
     if "cpu" in mode:
         logger.info("\n[Step 2] CPU Golden")
-        cpu_out, cpu_lse = cpu_mxfp8_golden(q_fp8, k_fp8, v_fp8,
-                                    dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-                                    _get_seqused_q(), _get_seqused_kv(),
-                                    qr_bf16, kr_bf16)
+        cpu_out, cpu_lse = cpu_mxfp8_golden(
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            dequant_scale_q,
+            dequant_scale_k,
+            v_descale,
+            p_scale,
+            _get_seqused_q(),
+            _get_seqused_kv(),
+            qr_bf16,
+            kr_bf16,
+        )
         golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
     else:
         cpu_out, cpu_lse = golden_cache.load_cpu_output(case_name, cache_dir=cdir)
@@ -1358,10 +2019,24 @@ if __name__ == '__main__':
 
     if "npu" in mode:
         logger.info("\n[Step 3] NPU 调用")
-        atten_out, lse_out = npu_mxfp8_fa(q_fp8, k_fp8, v_fp8,
-                                dequant_scale_q, dequant_scale_k, v_descale, p_scale,
-                                CU_SEQLENS_Q, CU_SEQLENS_KV, SEQUSED_Q, SEQUSED_KV, MAX_SEQLEN_Q, MAX_SEQLEN_KV,
-                                block_table_torch, qr_bf16, kr_bf16)
+        atten_out, lse_out = npu_mxfp8_fa(
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            dequant_scale_q,
+            dequant_scale_k,
+            v_descale,
+            p_scale,
+            CU_SEQLENS_Q,
+            CU_SEQLENS_KV,
+            SEQUSED_Q,
+            SEQUSED_KV,
+            MAX_SEQLEN_Q,
+            MAX_SEQLEN_KV,
+            block_table_torch,
+            qr_bf16,
+            kr_bf16,
+        )
         golden_cache.save_npu_output(case_name, atten_out, lse_out, cache_dir=cdir)
     else:
         atten_out, lse_out = golden_cache.load_npu_output(case_name, cache_dir=cdir)
@@ -1371,10 +2046,14 @@ if __name__ == '__main__':
         exit(0)
 
     logger.info("\n[Step 4] Atten OUT 精度对比")
-    cpu_tnd_torch = convert_q_bnsd_to_layout(cpu_out, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q)
+    cpu_tnd_torch = convert_q_bnsd_to_layout(
+        cpu_out, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q
+    )
     result_compare_method.check_result(cpu_tnd_torch, atten_out)
 
     if ENABLE_LSE:
         logger.info("\n[Step 5] LSE 精度对比")
-        cpu_lse_tnd_torch = convert_q_bnsd_to_layout(cpu_lse, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q)
+        cpu_lse_tnd_torch = convert_q_bnsd_to_layout(
+            cpu_lse, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q
+        )
         result_compare_method.check_result(cpu_lse_tnd_torch, lse_out)

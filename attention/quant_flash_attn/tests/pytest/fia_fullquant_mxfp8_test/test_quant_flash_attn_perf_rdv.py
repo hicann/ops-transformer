@@ -15,7 +15,7 @@ import concurrent.futures
 import pytest
 
 from common import test_runner
-import fia_fullquant_mxfp8_paramset_perf_rdv as paramset
+import quant_flash_attn_paramset_perf_rdv as paramset
 
 CASES = paramset.CASES
 SKIP_CASES = getattr(paramset, "SKIP_CASES", set())
@@ -26,7 +26,11 @@ def _build_parametrize_args():
     args = []
     for case in CASES:
         if case["name"] in SKIP_CASES:
-            args.append(pytest.param(case, marks=pytest.mark.skip(reason="execution time too long")))
+            args.append(
+                pytest.param(
+                    case, marks=pytest.mark.skip(reason="execution time too long")
+                )
+            )
         else:
             args.append(case)
     return args
@@ -34,8 +38,10 @@ def _build_parametrize_args():
 
 @pytest.mark.perf_rdv
 @pytest.mark.parametrize("params", _build_parametrize_args(), ids=CASE_IDS)
-def test_fia_fullquant_mxfp8(params, golden_mode, cache_dir):
+def test_quant_flash_attn_mxfp8(params, golden_mode, cache_dir):
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(test_runner.execute_test, params, golden_mode, cache_dir)
+        future = executor.submit(
+            test_runner.execute_test, params, golden_mode, cache_dir
+        )
         atten_result, lse_result = future.result()
     test_runner.check_results(atten_result, lse_result)
