@@ -19,7 +19,7 @@ import random
 import torch
 import torch_npu
 
-# Register sparse_flash_mla and sparse_flash_mla_metadata via PTA
+# Register sparse_flash_mla and sparse_flash_mla_metadata via TorchNPU
 TORCH_EXT_PATH = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                  '../../../../torch_extension'))
 if TORCH_EXT_PATH not in sys.path:

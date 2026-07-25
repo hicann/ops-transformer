@@ -183,7 +183,7 @@ If this block-sparse kernel is of interest, please consider merging it with the 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
 |<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件</term>|      √     |
+|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
 
 ## 功能说明
 
@@ -270,7 +270,7 @@ If this block-sparse kernel is of interest, please consider merging it with the 
 </tbody>
 </table>
 
-- Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：数据类型支持FLOAT16、BFLOAT16、INT8。
+- Atlas A2 训练系列产品/Atlas A2 推理系列产品：数据类型支持FLOAT16、BFLOAT16、INT8。
 - Atlas 推理系列加速卡产品：仅支持FLOAT16。
 
 ## 约束说明
@@ -281,7 +281,7 @@ If this block-sparse kernel is of interest, please consider merging it with the 
 
 - query，key，value输入，功能使用限制如下：
 
-  - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：
+  - Atlas A2 训练系列产品/Atlas A2 推理系列产品：
 
     - 支持B轴小于等于65536（64k），输入类型包含INT8时D轴非32对齐或输入类型为FLOAT16或BFLOAT16时D轴非16对齐时，B轴仅支持到128。
 
@@ -342,7 +342,7 @@ If this block-sparse kernel is of interest, please consider merging it with the 
       
     - 支持D轴小于等于512。inputLayout为BSH或者BSND时，要求N*D小于65535。
     
-  - Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box 异构组件：在TND场景下query，key，value输入的综合限制：
+  - Atlas A2 训练系列产品/Atlas A2 推理系列产品：在TND场景下query，key，value输入的综合限制：
     - T小于等于65536。
     - N等于8/16/32/64/128，且Q_N、K_N、V_N相等。
     - Q_D、K_D等于192，V_D等于128/192。

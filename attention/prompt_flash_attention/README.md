@@ -8,7 +8,7 @@
 |<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
 |<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
 |<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas推理系列加速卡产品</term>|      √     |
+|<term>Atlas 推理系列加速卡产品</term>|      √     |
 |<term>Atlas 训练系列产品</term>|      ×     |
 
 ## 功能说明
@@ -83,7 +83,7 @@
 </table>
 
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持FLOAT16、BFLOAT16、INT8。
-- Atlas推理系列加速卡产品：仅支持FLOAT16。
+- Atlas 推理系列加速卡产品：仅支持FLOAT16。
 
 ## 约束说明
 
@@ -162,7 +162,7 @@
     - sparse模式仅支持sparse=0且不传mask，或sparse=3且传入mask。
     - 当sparse=3时，要求每个batch单独的actualSeqLengths < actualSeqLengthsKv。
     
-  - Atlas推理系列加速卡产品：
+  - Atlas 推理系列加速卡产品：
     - 在inputLayout为BSH时，支持B轴小于等于300，其余情况B轴小于等于128；支持N轴小于等于256；支持S轴小于等于65535（64k）, Q_S或KV_S非128对齐，Q_S和KV_S不等长的场景不支持配置atten_mask；支持D轴小于等于512。
   
 - 当inputLayout为BNSD_BSND时，输入query的shape是BNSD，输出attentionOut的shape为BSND；其余情况attentionOut的shape需要与入参query的shape保持一致。

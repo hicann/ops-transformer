@@ -564,7 +564,7 @@ class TestCustomSFA(TestCase):
         sparse_seq_kv = sparse_seq_kv.to("npu:%s" % DEVICE_ID)
 
 
-        # print(f'======================== PTA eager BEGIN ========================')
+        # print(f'========================TorchNPU eager BEGIN ========================')
         sals_sfa_meta = torch_npu.npu_sparse_flash_attention_antiquant_metadata(
                     b, s1, n1, s2, n2, dn, 
                     10, 
@@ -618,9 +618,9 @@ class TestCustomSFA(TestCase):
                 else:
                     print(f"位置 {pos}: npu_out={a_val:.6f}, cpu_out={b_val:.6f}, 差值={diff_val:.6f}, diff_value_relative={diff_val_relative:.6f}")
         self.assertTrue(true_ratio > 0.99, "precision compare fail")
-        print(f'======================== PTA eager FINISH ========================')
+        print(f'========================TorchNPU eager FINISH ========================')
 
-        print(f'======================== PTA eager Graph BEGIN ========================')
+        print(f'========================TorchNPU eager Graph BEGIN ========================')
         print("sparse_indices = ", sparse_indices)
         print("block_table = ", block_table)
         npu_mode = SFAANetwork().to("npu:%s" % DEVICE_ID)
@@ -647,7 +647,7 @@ class TestCustomSFA(TestCase):
             print("cpu output:\n", cpu_out, cpu_out.shape)
             print("correct ratio of cpu vs npu is:", true_ratio * 100, "%")
         self.assertTrue(true_ratio > 0.99, "precision compare fail")
-        print(f'======================== PTA eager Graph FINISH ========================')
+        print(f'========================TorchNPU eager Graph FINISH ========================')
 
 
 if __name__ == "__main__":
