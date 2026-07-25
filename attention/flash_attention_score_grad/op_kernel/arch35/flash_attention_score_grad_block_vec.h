@@ -29,6 +29,7 @@ namespace FagBaseApi {
 constexpr uint32_t BIT_MASK_NUM = 8;
 constexpr uint32_t BIT32_ALIGN_NUM = 8;
 
+
 TEMPLATES_DEF
 class FAGBlockVec {
 private:

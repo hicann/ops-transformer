@@ -1648,6 +1648,127 @@ void SetSplitAxis(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbas
     }
 }
 
+bool IsSmallSDEligible(const FuzzyBaseInfoParamsRegbase& fBaseParams, const TndBaseInfo& tndBaseInfo)
+{
+    const bool isSupportedDtype = fBaseParams.queryType == ge::DT_FLOAT16 || fBaseParams.queryType == ge::DT_BF16;
+    const bool isSameOutputDtype =
+        (fBaseParams.queryType == ge::DT_FLOAT16 && fBaseParams.outDtype == DtypeEnum::FLOAT16_PRECISION) ||
+        (fBaseParams.queryType == ge::DT_BF16 && fBaseParams.outDtype == DtypeEnum::BFLOAT16);
+    const bool isSupportedLayout = fBaseParams.layoutType == INPUT_FORMAT_BS2N2GD ||
+                                   fBaseParams.layoutType == INPUT_FORMAT_S2BN2GD ||
+                                   fBaseParams.layoutType == INPUT_FORMAT_BN2GS2D ||
+                                   fBaseParams.layoutType == INPUT_FORMAT_TND;
+    const bool noOptionalFeature = fBaseParams.keepProb >= 1 && fBaseParams.pseOptional != NORMAL_TENSOR &&
+                                   fBaseParams.attenMaskOptional == EMPTY_TENSOR && !fBaseParams.dropMaskOuter &&
+                                   fBaseParams.sinkOptional != NORMAL_TENSOR && !fBaseParams.hasRope;
+    const bool fixedOwnership = fBaseParams.n1 == fBaseParams.n2 && fBaseParams.g == 1 &&
+                                fBaseParams.d == fBaseParams.d1 && fBaseParams.d > 0 &&
+                                fBaseParams.d < static_cast<int64_t>(ConstAxisTemplateNum::NUM128);
+    const bool noRemap = fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::NO_MASK) &&
+                         !fBaseParams.isDeterministic && fBaseParams.tailZeroCount == 0;
+    if (!(isSupportedDtype && isSameOutputDtype && isSupportedLayout && noOptionalFeature && fixedOwnership && noRemap &&
+          fBaseParams.splitAxis == SplitAxisEnum::BN2)) {
+        OP_LOGD("IsSmallSDEligible",
+                "SmallSD reject: supportedDtype[%d], sameOutputDtype[%d], supportedLayout[%d], noOptionalFeature[%d], "
+                "fixedOwnership[%d], noRemap[%d], splitAxis[%u], queryType[%d], outDtype[%u], layoutType[%u], "
+                "keepProb[%f], pseOptional[%u], attenMaskOptional[%u], dropMaskOuter[%d], sinkOptional[%u], "
+                "hasRope[%d], n1[%ld], n2[%ld], g[%ld], d[%ld], d1[%ld], sparseMode[%u], deterministic[%d], "
+                "tailZeroCount[%lu], s1[%ld], s2[%ld], b[%ld].",
+                static_cast<int>(isSupportedDtype), static_cast<int>(isSameOutputDtype),
+                static_cast<int>(isSupportedLayout), static_cast<int>(noOptionalFeature),
+                static_cast<int>(fixedOwnership), static_cast<int>(noRemap),
+                static_cast<uint32_t>(fBaseParams.splitAxis), static_cast<int>(fBaseParams.queryType),
+                static_cast<uint32_t>(fBaseParams.outDtype), fBaseParams.layoutType, fBaseParams.keepProb,
+                fBaseParams.pseOptional, fBaseParams.attenMaskOptional, static_cast<int>(fBaseParams.dropMaskOuter),
+                fBaseParams.sinkOptional, static_cast<int>(fBaseParams.hasRope), fBaseParams.n1, fBaseParams.n2,
+                fBaseParams.g, fBaseParams.d, fBaseParams.d1, fBaseParams.sparseMode,
+                static_cast<int>(fBaseParams.isDeterministic), fBaseParams.tailZeroCount, fBaseParams.s1,
+                fBaseParams.s2, fBaseParams.b);
+        return false;
+    }
+
+    if (fBaseParams.layoutType != INPUT_FORMAT_TND) {
+        const bool validNormalS = fBaseParams.s1 > 0 &&
+                                  fBaseParams.s1 <= static_cast<int64_t>(ConstAxisTemplateNum::NUM128) &&
+                                  fBaseParams.s2 > 0 &&
+                                  fBaseParams.s2 <= static_cast<int64_t>(ConstAxisTemplateNum::NUM128);
+        if (!validNormalS) {
+            OP_LOGD("IsSmallSDEligible", "SmallSD reject normal S: s1[%ld], s2[%ld].",
+                    fBaseParams.s1, fBaseParams.s2);
+        }
+        return validNormalS;
+    }
+
+    const int64_t validBatch = fBaseParams.b;
+    if (validBatch <= 0 || fBaseParams.sValueZeroUnderTND || tndBaseInfo.isSeqExistZero ||
+        fBaseParams.actualSeqQlen.size() < static_cast<size_t>(validBatch) ||
+        fBaseParams.actualSeqKvlen.size() < static_cast<size_t>(validBatch)) {
+        OP_LOGD("IsSmallSDEligible",
+                "SmallSD reject TND base: b[%ld], sValueZeroUnderTND[%d], isSeqExistZero[%d], qLenSize[%lu], "
+                "kvLenSize[%lu].",
+                validBatch, static_cast<int>(fBaseParams.sValueZeroUnderTND),
+                static_cast<int>(tndBaseInfo.isSeqExistZero), fBaseParams.actualSeqQlen.size(),
+                fBaseParams.actualSeqKvlen.size());
+        return false;
+    }
+    for (int64_t batchIdx = 0; batchIdx < validBatch; ++batchIdx) {
+        const int64_t actualS1Len = fBaseParams.actualSeqQlen[batchIdx];
+        const int64_t actualS2Len = fBaseParams.actualSeqKvlen[batchIdx];
+        if (actualS1Len <= 0 || actualS2Len <= 0 ||
+            actualS1Len >= static_cast<int64_t>(ConstAxisTemplateNum::NUM128) ||
+            actualS2Len >= static_cast<int64_t>(ConstAxisTemplateNum::NUM128)) {
+            OP_LOGD("IsSmallSDEligible", "SmallSD reject TND batch: batchIdx[%ld], actualS1Len[%ld], actualS2Len[%ld].",
+                    batchIdx, actualS1Len, actualS2Len);
+            return false;
+        }
+    }
+    return true;
+}
+
+bool IsSmallSDProfitable(const FuzzyBaseInfoParamsRegbase& fBaseParams)
+{
+    // Keep the first coding slice behavior unchanged while reserving an explicit profitability gate.
+    // Profiling-based whitelist/threshold logic can be added here without expanding tiling key fields.
+    if (fBaseParams.layoutType != INPUT_FORMAT_TND) {
+        const bool isProfitable = fBaseParams.b > 0 && fBaseParams.n2 > 0 && fBaseParams.g == 1;
+        if (!isProfitable) {
+            OP_LOGD("IsSmallSDProfitable", "SmallSD not profitable normal: b[%ld], n2[%ld], g[%ld].",
+                    fBaseParams.b, fBaseParams.n2, fBaseParams.g);
+        }
+        return isProfitable;
+    }
+    const bool isProfitable =
+        fBaseParams.b > 0 && fBaseParams.n2 > 0 && fBaseParams.g == 1 && fBaseParams.tailZeroCount == 0;
+    if (!isProfitable) {
+        OP_LOGD("IsSmallSDProfitable", "SmallSD not profitable TND: b[%ld], n2[%ld], g[%ld], tailZeroCount[%lu].",
+                fBaseParams.b, fBaseParams.n2, fBaseParams.g, fBaseParams.tailZeroCount);
+    }
+    return isProfitable;
+}
+
+void ApplySmallSDTilingPolicy(FuzzyBaseInfoParamsRegbase& fBaseParams, TndBaseInfo& tndBaseInfo)
+{
+    fBaseParams.s1TemplateType = ConstAxisTemplateNum::NUM128;
+    fBaseParams.s2TemplateType = ConstAxisTemplateNum::NUM128;
+    fBaseParams.dTemplateType = fBaseParams.d <= static_cast<int64_t>(ConstAxisTemplateNum::NUM64) ?
+                                ConstAxisTemplateNum::NUM64 : ConstAxisTemplateNum::NUM128;
+    fBaseParams.s1Outer = 1;
+    fBaseParams.s2Outer = 1;
+    fBaseParams.s1Inner = fBaseParams.s1;
+    fBaseParams.s2Inner = fBaseParams.s2;
+    fBaseParams.s1CvInner = fBaseParams.s1;
+    fBaseParams.cvS2Inner = fBaseParams.s2;
+    fBaseParams.s1Tail = fBaseParams.s1;
+    fBaseParams.s1CvTail = fBaseParams.s1;
+    fBaseParams.s2Tail = fBaseParams.s2;
+    fBaseParams.s2CvTail = fBaseParams.s2;
+    fBaseParams.isBn2MultiBlk = false;
+    fBaseParams.isNzOut = false;
+    fBaseParams.enablePreSfmg = false;
+    fBaseParams.enableSwizzle = false;
+    tndBaseInfo.isTndSwizzle = false;
+}
+
 void DetermineMode(FuzzyBaseInfoParamsRegbase& fBaseParams)
 {
     // 当前fp16都走高精度

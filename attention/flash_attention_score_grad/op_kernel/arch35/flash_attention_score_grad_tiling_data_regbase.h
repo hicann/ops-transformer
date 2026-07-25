@@ -17,6 +17,8 @@
 #define FLASH_ATTENTION_SCORE_GRAD_TILING_DATA_REGBASE_H_
 
 #include <cstdint>
+#include <cstddef>
+#include <type_traits>
 
 namespace optiling {
 namespace fag {
@@ -607,8 +609,212 @@ public:
     }
 };
 
+class SmallSDCoreTaskParamRegbase {
+public:
+    uint32_t blockStart;
+    uint32_t blockEnd;
+    uint32_t groupCount;
+    uint32_t startBatchIdx;
+    uint32_t startN2Idx;
+    uint32_t reserved;
+
+    uint32_t get_blockStart() const { return blockStart; }
+    uint32_t get_blockEnd() const { return blockEnd; }
+    uint32_t get_groupCount() const { return groupCount; }
+    uint32_t get_startBatchIdx() const { return startBatchIdx; }
+    uint32_t get_startN2Idx() const { return startN2Idx; }
+
+    void set_blockStart(uint32_t val) { blockStart = val; }
+    void set_blockEnd(uint32_t val) { blockEnd = val; }
+    void set_groupCount(uint32_t val) { groupCount = val; }
+    void set_startBatchIdx(uint32_t val) { startBatchIdx = val; }
+    void set_startN2Idx(uint32_t val) { startN2Idx = val; }
+    void set_reserved(uint32_t val) { reserved = val; }
+};
+
+class SmallSDTndCoreParamRegbase {
+public:
+    uint32_t startBatchIdx;
+    uint32_t startN2Idx;
+    uint32_t taskCount;
+    uint32_t reserved;
+    uint64_t baseTaskIndex;
+    uint64_t qSeqPrefix;
+    uint64_t kvSeqPrefix;
+    uint64_t qDyDqElementOffset;
+    uint64_t kvDkDvElementOffset;
+    uint64_t attentionElementPrefix;
+    uint64_t alignedAttentionElementPrefix;
+    uint64_t softmaxRowPrefix;
+
+    uint32_t get_startBatchIdx() const { return startBatchIdx; }
+    uint32_t get_startN2Idx() const { return startN2Idx; }
+    uint32_t get_taskCount() const { return taskCount; }
+    uint32_t get_reserved() const { return reserved; }
+    uint64_t get_baseTaskIndex() const { return baseTaskIndex; }
+    uint64_t get_qSeqPrefix() const { return qSeqPrefix; }
+    uint64_t get_kvSeqPrefix() const { return kvSeqPrefix; }
+    uint64_t get_qDyDqElementOffset() const { return qDyDqElementOffset; }
+    uint64_t get_kvDkDvElementOffset() const { return kvDkDvElementOffset; }
+    uint64_t get_attentionElementPrefix() const { return attentionElementPrefix; }
+    uint64_t get_alignedAttentionElementPrefix() const { return alignedAttentionElementPrefix; }
+    uint64_t get_softmaxRowPrefix() const { return softmaxRowPrefix; }
+
+    void set_startBatchIdx(uint32_t val) { startBatchIdx = val; }
+    void set_startN2Idx(uint32_t val) { startN2Idx = val; }
+    void set_taskCount(uint32_t val) { taskCount = val; }
+    void set_reserved(uint32_t val) { reserved = val; }
+    void set_baseTaskIndex(uint64_t val) { baseTaskIndex = val; }
+    void set_qSeqPrefix(uint64_t val) { qSeqPrefix = val; }
+    void set_kvSeqPrefix(uint64_t val) { kvSeqPrefix = val; }
+    void set_qDyDqElementOffset(uint64_t val) { qDyDqElementOffset = val; }
+    void set_kvDkDvElementOffset(uint64_t val) { kvDkDvElementOffset = val; }
+    void set_attentionElementPrefix(uint64_t val) { attentionElementPrefix = val; }
+    void set_alignedAttentionElementPrefix(uint64_t val) { alignedAttentionElementPrefix = val; }
+    void set_softmaxRowPrefix(uint64_t val) { softmaxRowPrefix = val; }
+};
+
+class SmallSDBaseParamRegbase {
+public:
+    uint32_t bSize;
+    uint32_t n1Size;
+    uint32_t gSize;
+    uint32_t maxS1;
+    uint32_t maxS2;
+    uint32_t actualD;
+    uint32_t actualDv;
+    uint32_t n2Size;
+    uint32_t usedCoreNum;
+    uint32_t layoutType;
+    uint32_t inputDtype;
+    uint32_t outputDtype;
+    uint32_t calcTypeSize;
+    uint32_t tndMaxSumLayout;
+    uint32_t sparseMode;
+    uint32_t validTaskCount;
+    uint32_t isTnd;
+    uint32_t isSingleTask;
+    uint32_t s2Align16;
+    uint64_t workspaceBaseOffset;
+    uint64_t workspaceSize;
+    float scaleValue;
+
+    uint32_t get_bSize() const { return bSize; }
+    uint32_t get_n1Size() const { return n1Size; }
+    uint32_t get_gSize() const { return gSize; }
+    uint32_t get_maxS1() const { return maxS1; }
+    uint32_t get_maxS2() const { return maxS2; }
+    uint32_t get_actualD() const { return actualD; }
+    uint32_t get_actualDv() const { return actualDv; }
+    uint32_t get_n2Size() const { return n2Size; }
+    uint32_t get_usedCoreNum() const { return usedCoreNum; }
+    uint32_t get_layoutType() const { return layoutType; }
+    uint32_t get_inputDtype() const { return inputDtype; }
+    uint32_t get_outputDtype() const { return outputDtype; }
+    uint32_t get_calcTypeSize() const { return calcTypeSize; }
+    uint32_t get_tndMaxSumLayout() const { return tndMaxSumLayout; }
+    uint32_t get_sparseMode() const { return sparseMode; }
+    uint32_t get_validTaskCount() const { return validTaskCount; }
+    uint32_t get_isTnd() const { return isTnd; }
+    uint32_t get_isSingleTask() const { return isSingleTask; }
+    uint32_t get_s2Align16() const { return s2Align16; }
+    uint64_t get_workspaceBaseOffset() const { return workspaceBaseOffset; }
+    uint64_t get_workspaceSize() const { return workspaceSize; }
+    float get_scaleValue() const { return scaleValue; }
+
+    void set_bSize(uint32_t val) { bSize = val; }
+    void set_n1Size(uint32_t val) { n1Size = val; }
+    void set_gSize(uint32_t val) { gSize = val; }
+    void set_maxS1(uint32_t val) { maxS1 = val; }
+    void set_maxS2(uint32_t val) { maxS2 = val; }
+    void set_actualD(uint32_t val) { actualD = val; }
+    void set_actualDv(uint32_t val) { actualDv = val; }
+    void set_n2Size(uint32_t val) { n2Size = val; }
+    void set_usedCoreNum(uint32_t val) { usedCoreNum = val; }
+    void set_layoutType(uint32_t val) { layoutType = val; }
+    void set_inputDtype(uint32_t val) { inputDtype = val; }
+    void set_outputDtype(uint32_t val) { outputDtype = val; }
+    void set_calcTypeSize(uint32_t val) { calcTypeSize = val; }
+    void set_tndMaxSumLayout(uint32_t val) { tndMaxSumLayout = val; }
+    void set_sparseMode(uint32_t val) { sparseMode = val; }
+    void set_validTaskCount(uint32_t val) { validTaskCount = val; }
+    void set_isTnd(uint32_t val) { isTnd = val; }
+    void set_isSingleTask(uint32_t val) { isSingleTask = val; }
+    void set_s2Align16(uint32_t val) { s2Align16 = val; }
+    void set_workspaceBaseOffset(uint64_t val) { workspaceBaseOffset = val; }
+    void set_workspaceSize(uint64_t val) { workspaceSize = val; }
+    void set_scaleValue(float val) { scaleValue = val; }
+};
+
+class SmallSDLayoutParamRegbase {
+public:
+    uint64_t qStrideB;
+    uint64_t qStrideN2;
+    uint64_t qStrideS;
+    uint64_t kStrideB;
+    uint64_t kStrideN2;
+    uint64_t kStrideS;
+    uint64_t vStrideB;
+    uint64_t vStrideN2;
+    uint64_t vStrideS;
+    uint64_t dyStrideB;
+    uint64_t dyStrideN2;
+    uint64_t dyStrideS;
+    uint64_t dqStrideB;
+    uint64_t dqStrideN2;
+    uint64_t dqStrideS;
+    uint64_t dkStrideB;
+    uint64_t dkStrideN2;
+    uint64_t dkStrideS;
+    uint64_t dvStrideB;
+    uint64_t dvStrideN2;
+    uint64_t dvStrideS;
+    uint64_t attentionStrideB;
+    uint64_t attentionStrideN2;
+    uint64_t attentionStrideS;
+    uint64_t softmaxStrideB;
+    uint64_t softmaxStrideN2;
+    uint64_t softmaxStrideS;
+    uint64_t qMatrixElements;
+    uint64_t kMatrixElements;
+    uint64_t vMatrixElements;
+    uint64_t dyMatrixElements;
+    uint64_t dqMatrixElements;
+    uint64_t dkMatrixElements;
+    uint64_t dvMatrixElements;
+    uint64_t cubeResultElements;
+    uint64_t vectorTempElements;
+    uint64_t qMatrixBytes;
+    uint64_t kMatrixBytes;
+    uint64_t vMatrixBytes;
+    uint64_t dyMatrixBytes;
+    uint64_t dqMatrixBytes;
+    uint64_t dkMatrixBytes;
+    uint64_t dvMatrixBytes;
+    uint64_t cubeResultBytes;
+    uint64_t vectorTempBytes;
+    uint32_t dTemplateCapacity;
+    uint32_t s1Size;
+    uint32_t s2Size;
+    uint32_t s2Align16;
+    uint32_t aivHalfS1;
+    uint32_t aivFirstHalfS1;
+    uint32_t aivHalfS2;
+    uint32_t aivFirstHalfS2;
+};
+
+class FlashAttentionScoreGradSmallSDTilingDataRegbase {
+public:
+    SmallSDBaseParamRegbase baseParam;
+    SmallSDLayoutParamRegbase layoutParam;
+    SmallSDCoreTaskParamRegbase coreTaskParam[MAX_CORE_NUM];
+    SmallSDTndCoreParamRegbase tndCoreParam[MAX_CORE_NUM];
+};
+
+using SmallSDTilingDataRegbase = FlashAttentionScoreGradSmallSDTilingDataRegbase;
+
 template<const bool isDeter = false, const bool isNewDeter = false,
-    const bool isTnd = false, const bool isTndSwizzle = false>
+    const bool isTnd = false, const bool isTndSwizzle = false, const bool isSmallSD = false>
 class FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase {
 public:
     FlashAttentionScoreGradS1S2BNGS1S2BaseParamsRegbase s1s2BNGS1S2BaseParams;
@@ -620,7 +826,16 @@ public:
     typename std::conditional<isNewDeter, DeterParamRegbase, std::nullptr_t>::type deterParam;
     typename std::conditional<!isNewDeter && isTnd, TndParamRegbase, std::nullptr_t>::type tndParam;
     typename std::conditional<isTndSwizzle, TndSwizzleParamRegbase, std::nullptr_t>::type tndSwizzleParam;
+    typename std::conditional<isSmallSD, SmallSDTilingDataRegbase, std::nullptr_t>::type smallSDTilingData;
 };
+
+using FlashAttentionScoreGradTilingDataRegbaseBaseOnly =
+    FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<false, false, false, false, false>;
+using FlashAttentionScoreGradTilingDataRegbaseSmallSD =
+    FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<false, false, false, false, true>;
+using FlashAttentionScoreGradTilingDataRegbaseTndSmallSD =
+    FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<false, false, true, false, true>;
+
 }  // namespace fag
 }  // namespace optiling
 #endif

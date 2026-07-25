@@ -59,6 +59,7 @@ public:
     DeterParamRegbase *deterParam = nullptr;
     TndParamRegbase *tndParam_ = nullptr;
     TndSwizzleParamRegbase *tndSwizzleParam_ = nullptr;
+    SmallSDTilingDataRegbase *smallSDTilingData_ = nullptr;
 
 protected:
     bool IsCapable() override;
@@ -90,6 +91,47 @@ protected:
     uint64_t DoPreSfmgTiling();
     void DoPostTiling();
     ge::graphStatus SaveToTilingData();
+    void SaveSmallSDTilingData();
+    enum class SmallSDFinalizeStatus {
+        SUCCESS,
+        FALLBACK,
+        ERROR
+    };
+    struct SmallSDFinalizeResult {
+        SmallSDFinalizeStatus status;
+        ge::graphStatus ret;
+    };
+    struct SmallSDHostStateSnapshot {
+        FuzzyBaseInfoParamsRegbase fBaseParams;
+        TndBaseInfo tndBaseInfo;
+        SmallSDTilingDataRegbase smallSDTilingDataScratch;
+        uint32_t smallSDValidTaskCount;
+        uint32_t smallSDUsedCoreNum;
+        uint32_t smallSDTailCoreTaskCount;
+        size_t smallSDWorkspaceSize;
+        bool smallSDFinalized;
+        FlashAttentionScoreGradS1S2BNGS1S2BaseParamsRegbase *s1s2BNGS1S2BaseParams;
+        FlashAttentionScoreGradS1S2BNGS1S2SplitCoreParamsRegbase *s1s2BNGS1S2SplitCoreParams;
+        BlockNumListParamsRegbase *s1s2BNGS1S2BlockNumList;
+        PreParamsRegbase *preTilingData;
+        PostParamsRegbase *postTilingData;
+        BaseDeterParamRegbase *baseDeterParam;
+        DeterParamRegbase *deterParam;
+        TndParamRegbase *tndParam;
+        TndSwizzleParamRegbase *tndSwizzleParam;
+        SmallSDTilingDataRegbase *smallSDTilingData;
+    };
+    SmallSDFinalizeResult FinalizeSmallSDTiling();
+    SmallSDHostStateSnapshot CaptureSmallSDHostState() const;
+    void RestoreSmallSDHostState(const SmallSDHostStateSnapshot &snapshot);
+    void ClearSmallSDScratch();
+    void InitSmallSDFixedDerivedState();
+    ge::graphStatus BuildSmallSDCoreRanges();
+    ge::graphStatus BuildSmallSDTndCoreParams();
+    ge::graphStatus FillSmallSDBaseParam();
+    void SetSmallSDWorkspace();
+    bool ValidateSmallSDInvariant() const;
+    ge::graphStatus InitSmallSDTilingData();
     ge::graphStatus GetSparsePrefixBlockInfo();
     virtual ge::graphStatus GetSparseUnpadBlockInfo(){};
     virtual bool GetBlockInfoOfBNS4TND(){};
@@ -107,6 +149,12 @@ protected:
     platform_ascendc::SocVersion socVersion;
     NpuArch npuArch = NpuArch::DAV_RESV;
     TndBaseInfo tndBaseInfo;
+    SmallSDTilingDataRegbase smallSDTilingDataScratch_{};
+    uint32_t smallSDValidTaskCount_ = 0;
+    uint32_t smallSDUsedCoreNum_ = 0;
+    uint32_t smallSDTailCoreTaskCount_ = 0;
+    size_t smallSDWorkspaceSize_ = 0;
+    bool smallSDFinalized_ = false;
 };
 
 } // namespace fag
