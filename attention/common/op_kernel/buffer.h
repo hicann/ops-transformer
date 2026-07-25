@@ -198,7 +198,9 @@ public:
                     c2pEventId_ = GetTPipePtr()->AllocEventID<BufferInfo<bufferType>::EventC2P>();
                     SetFlag<BufferInfo<bufferType>::EventC2P>(c2pEventId_);
                 } else if constexpr (syncMode == SyncMode::LOCK_UNLOCK) {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
                     mutexId_ = AllocMutexID();
+#endif
                 }
             }
         }
@@ -216,7 +218,9 @@ public:
                     c2pEventId_ = id;
                     SetFlag<BufferInfo<bufferType>::EventC2P>(c2pEventId_);
                 } else if constexpr (syncMode == SyncMode::LOCK_UNLOCK) {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
                     mutexId_ = id;
+#endif
                 }
             }
         }
@@ -235,9 +239,11 @@ public:
                         GetTPipePtr()->ReleaseEventID<BufferInfo<bufferType>::EventC2P>(c2pEventId_);
                     }
                 } else if constexpr (syncMode == SyncMode::LOCK_UNLOCK) {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
                     if constexpr (idSource == IdSource::INTERNAL) {
                         ReleaseMutexID(mutexId_);
                     }
+#endif
                 }
             }
         }
@@ -246,21 +252,25 @@ public:
     template <pipe_t pipe>
     __aicore__ inline void Lock()
     {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         if ASCEND_IS_AIC {
             if constexpr (syncType == SyncType::INNER_CORE_SYNC && syncMode == SyncMode::LOCK_UNLOCK) {
                 Mutex::Lock<pipe>(mutexId_);
             }
         }
+#endif
     }
 
     template <pipe_t pipe>
     __aicore__ inline void Unlock()
     {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         if ASCEND_IS_AIC {
             if constexpr (syncType == SyncType::INNER_CORE_SYNC && syncMode == SyncMode::LOCK_UNLOCK) {
                 Mutex::Unlock<pipe>(mutexId_);
             }
         }
+#endif
     }
 
     template <HardEvent EventType>
@@ -275,11 +285,13 @@ public:
                         WaitFlag<BufferInfo<bufferType>::EventC2P>(c2pEventId_); // 生产者等待消费者完成消费
                     }
                 } else if constexpr (syncMode == SyncMode::LOCK_UNLOCK) {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
                     if constexpr (EventType == BufferInfo<bufferType>::EventP2C) {
                         Mutex::Lock<BufferInfo<bufferType>::ConsPipe>(mutexId_); // 消费者加锁
                     } else {
                         Mutex::Lock<BufferInfo<bufferType>::ProdPipe>(mutexId_); // 生产者加锁
                     }
+#endif
                 }
             }
         }
@@ -297,11 +309,13 @@ public:
                         SetFlag<BufferInfo<bufferType>::EventC2P>(c2pEventId_); // 消费者通知生产者已完成消费
                     }
                 } else if constexpr (syncMode == SyncMode::LOCK_UNLOCK) {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
                     if constexpr (EventType == BufferInfo<bufferType>::EventP2C) {
                         Mutex::Unlock<BufferInfo<bufferType>::ProdPipe>(mutexId_); // 生产者解锁
                     } else {
                         Mutex::Unlock<BufferInfo<bufferType>::ConsPipe>(mutexId_); // 消费者解锁
                     }
+#endif
                 }
             }
         }
@@ -429,7 +443,9 @@ private:
     TEventID c2pEventId_;
     uint32_t id0_; // 用作正向同步：生产者通知消费者，或者消费者等待生产者；
     uint32_t id1_; // 用作反向同步：消费者通知生产者，或者生产者等待消费者；
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
     MutexID mutexId_;
+#endif
 };
 } // namespace fa_base_matmul
 #endif
