@@ -899,8 +899,9 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::CalcInnerSize(const FiaTilin
      */
     SetDequantBaseSize(fiaInfo);
     sInnerFactorSize_ = sInnerFactor_;
-    if (seqSize != 0U && sInnerFactor_ > seqSize) {
-        sInnerFactor_ = seqSize;
+    int64_t effectiveSeqSize = std::max(seqSize, fiaInfo.systemPrefixLen);
+    if (seqSize != 0U && sInnerFactor_ > effectiveSeqSize) {
+        sInnerFactor_ = effectiveSeqSize;
     }
     sInnerSizeAlign_ = AlignUp(sInnerFactor_, BYTE_BLOCK);  // 元素个数按照基本块大小对齐
     return ge::GRAPH_SUCCESS;
