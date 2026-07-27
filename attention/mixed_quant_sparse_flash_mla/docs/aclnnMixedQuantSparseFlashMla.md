@@ -4,8 +4,8 @@
 
 | 产品                                                     | 是否支持 |
 | :------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                   |    √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> |    ×    |
+| <term>Ascend 950PR/Ascend 950DT</term>                   |    √     |
+| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>   |    ×     |
 | <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×    |
 | <term>Atlas 200I/500 A2 推理产品</term>                  |    ×    |
 | <term>Atlas 推理系列产品</term>                          |    ×    |
@@ -428,7 +428,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>oriWinLeft（int64_t）</td>
       <td>输入</td>
       <td>q和oriKv计算中，在因果边界基础上向左多看的token数。</td>
-      <td>仅支持127。</td>
+      <td>支持-1或非负数，-1表示左侧窗口不受限。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -438,7 +438,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>oriWinRight（int64_t）</td>
       <td>输入</td>
       <td>q和oriKv计算中，在因果边界基础上向右多看的token数。</td>
-      <td>仅支持0。</td>
+      <td>支持-1或非负数，-1表示右侧窗口不受限。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -574,10 +574,10 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>quantMode不为1或2。</td>
     </tr>
     <tr>
-      <td>oriMaskMode不为4，或cmpMaskMode不为3。</td>
+      <td>oriMaskMode不为4且不为3，或cmpMaskMode不为3。</td>
     </tr>
     <tr>
-      <td>oriWinLeft不为127，或oriWinRight不为0。</td>
+      <td>oriWinLeft或oriWinRight小于-1。</td>
     </tr>
     <tr>
       <td>SWA场景cmpRatio不为1，或cmpRatio与CSA/HCA场景不匹配。</td>
@@ -644,7 +644,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
   - `metadataOptional`参数必须传入，由`aclnnMixedQuantSparseFlashMlaMetadata`算子生成，shape固定为(1024,)。
   - `cmpResidualKvOptional`为主算子和`aclnnMixedQuantSparseFlashMlaMetadata`的可选入参；传入后用于按`cmp_len * cmpRatio + residual`恢复cmp侧mask使用的压缩前长度。
   - `ropeHeadDim`仅支持64。
-  - `oriMaskMode`仅支持4，`cmpMaskMode`仅支持3，`oriWinLeft`仅支持127，`oriWinRight`仅支持0。
+  - `oriMaskMode`支持4和3，`cmpMaskMode`仅支持3，`oriWinLeft`和`oriWinRight`支持-1或非负数，-1表示对应方向不受限。
 
 - 三种Attention场景输入要求
 

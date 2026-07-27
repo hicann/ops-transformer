@@ -2,14 +2,14 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :------------------------------------------------------------ | :------: |
-|<term>Ascend 950PR/Ascend 950DT</term>                        | √  |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>        | ×  |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>        | ×  |
-|<term>Atlas 200I/500 A2 推理产品</term>                    | ×  |
-|<term>Atlas 推理系列产品</term>                                | ×  |
-|<term>Atlas 训练系列产品</term>                                | ×  |
+| 产品                                                         |  是否支持 |
+| :----------------------------------------------------------  | :------: |
+|<term>Ascend 950PR/Ascend 950DT</term>                        |     √    |
+|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>        |     ×    |
+|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>        |     ×    |
+|<term>Atlas 200I/500 A2 推理产品</term>                        |     ×    |
+|<term>Atlas 推理系列产品</term>                                |     ×    |
+|<term>Atlas 训练系列产品</term>                                |     ×    |
 
 ## 功能说明
 
@@ -284,41 +284,39 @@
 - 该接口支持aclgraph模式。
 - 该接口当前支持三种计算场景：SWA（Sliding Window Attention）场景仅传入`ori_kv`；CSA（Compressed Sparse Attention）场景传入`ori_kv`、`cmp_kv`及`cmp_sparse_indices`；HCA（Heavily Compressed Attention）场景传入`ori_kv`及`cmp_kv`。
 - 通用规格约束如下：
-  - N2仅支持1，D仅支持512。其中，`ori_kv`和`cmp_kv`的D_kv由nope、rope、scale、padding拼接而成，详见`quant_mode`。
+  - KV\_N仅支持1，D仅支持512。其中，`ori_kv`和`cmp_kv`的D_kv由nope、rope、scale、padding拼接而成，详见`quant_mode`。
   - `cmp_ratio`表示`cmp_kv`相对于压缩前KV长度的压缩倍率；仅传入`ori_kv`时，`cmp_ratio`不参与压缩KV计算，需保持默认值1；支持1到128。
-  - `ori_mask_mode`仅支持4，`cmp_mask_mode`仅支持3，`ori_win_left`仅支持127，`ori_win_right`仅支持0。
+  - `ori_mask_mode`支持0、3和4，`cmp_mask_mode`支持0和3，`ori_win_left`和`ori_win_right`支持-1或非负数，-1表示对应方向不受限。
   - `rope_head_dim`仅支持64。
   - `layout_q`和`layout_kv`组合仅支持"BSND"/"BSND"、"TND"/"TND"、"BSND"/"PA_BBND"、"TND"/"PA_BBND"；非PA_BBND场景下`layout_q`和`layout_kv`必须一致；PA_BBND场景下`block_size`支持1到1024。
   - `ori_topk_length`和`cmp_topk_length`为预留输入，全平台均不支持传入非空Tensor。
 - 当`layout_q`为TND时，功能使用限制如下：
-  - `q`的shape需要为[T1,N1,D]。
+  - `q`的shape需要为[Q\_T, Q\_N, D]。
   - `ori_sparse_indices`当前暂不支持。
   - `cmp_sparse_indices`的shape需要为[Q\_T, KV\_N, K2]，其中K2为对`cmp_kv`一次离散选取的token数。
   - `cu_seqlens_q`必须传入，输入维度为B+1，大小为参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须>=前一个元素的值且首元素必须为0。
-
 - 当`layout_q`为BSND时，功能使用限制如下：
-  - `q`的shape需要为[B, Q\_S, N1, D]。
+  - `q`的shape需要为[B, Q\_S, Q\_N, D]。
   - `ori_sparse_indices`当前暂不支持。
   - `cmp_sparse_indices`的shape需要为[B, Q\_S, KV\_N, K2]，其中K2为对`cmp_kv`一次离散选取的token数。
-
 - PageAttention场景下，功能使用限制如下：
   - `ori_kv`和`cmp_kv`的shape分别为[ori\_block\_num, ori\_block\_size, KV\_N, D]和[cmp\_block\_num, cmp\_block\_size, KV\_N, D]，其中ori\_block\_num和cmp\_block\_num为PageAttention时block总数，ori\_block\_size和cmp\_block\_size为一个block的token数，ori\_block\_size和cmp\_block\_size取值为1到1024，KV_N仅支持1。
   - `ori_block_table`和`cmp_block_table`的shape为2维，其中第一维长度为B，第二维长度不小于所有batch中最大的S2和S3对应的block数量，即S2\_max / block\_size和S3\_max / block\_size向上取整。
 - `metadata`为算子实际需要使用的分核结果，目前该参数必传，shape大小固定为[1024]。
 - `layout_kv`支持输入"BSND"、"TND"和"PA_BBND"，需满足上述`layout_q`和`layout_kv`组合约束。
   - 当输入为PA_BBND时，`seqused_ori_kv`和`ori_block_table`必须传入；当输入为BSND时，`seqused_ori_kv`可用于表达每个batch的`ori_kv`有效长度；当输入为TND时，`ori_kv`有效长度由`cu_seqlens_ori_kv`表达。
-  - 当输入为BSND时，`ori_kv`和`cmp_kv`的layout都必须为BSND，ori_kv的shape为[B, S2, N2,D]，cmp_kv的shape为[B, S3, N2,D]。
+  - 当输入为BSND时，`ori_kv`和`cmp_kv`的layout都必须为BSND，ori_kv的shape为[B, S2, KV\_N, D]，cmp_kv的shape为[B, S3, KV\_N, D]。
   - 当输入为TND时，`cu_seqlens_ori_kv`必须传入；若存在`cmp_kv`，`cu_seqlens_cmp_kv`也必须传入。
 - `return_softmax_lse`为False时返回占位Tensor；为True时返回softmax的log-sum-exp结果。
 - 除`ori_topk_length`和`cmp_topk_length`等预留输入可不传或传入空Tensor外，其余已传入Tensor不支持为空。
 - `seqused_cmp_kv`为所有`layout_kv`下的可选输入，显式传入时用于覆盖cmp侧逻辑有效长度；未传时由`cmp_kv` shape、`cu_seqlens_cmp_kv`或PA block table相关语义推导。
 - `cmp_residual_kv`为算子的可选入参；传入后用于按`cmp_len * cmp_ratio + residual`恢复cmp侧mask使用的压缩前KV长度，其中`cmp_len`优先来自显式传入的`seqused_cmp_kv`。
 - `q`、`ori_kv`、`cmp_kv`数据排布格式支持从多种维度解读，B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Hidden-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
-- Q\_S和S1表示q shape中的S，S2表示ori_kv shape中的S，S3表示cmp_kv shape中的S；Q\_N和N1表示num\_q\_heads，KV\_N和N2表示num\_ori_kv\_heads和num\_cmp_kv\_heads；Q\_T和T1表示q shape中的输入样本序列长度的累加和。
+- Q\_S表示q shape中的S，S2表示ori_kv shape中的S，S3表示cmp_kv shape中的S；Q\_N表示num\_q\_heads，KV\_N表示num\_ori_kv\_heads和num\_cmp_kv\_heads；Q\_T表示q shape中的输入样本序列长度的累加和。
 
 ## 调用说明
 
 | 调用方式  | 样例代码                                                     | 说明                                                         |
-| --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| -------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
 | aclnn API | [test_aclnn_mixed_quant_sparse_flash_mla](./examples/test_aclnn_mixed_quant_sparse_flash_mla.cpp) | 通过[aclnnMixedQuantSparseFlashMla](./docs/aclnnMixedQuantSparseFlashMla.md)调用MixedQuantSparseFlashMla算子 |
 | PyTorch API | [mixed_quant_sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/mixed_quant_sparse_flash_mla.md) | 通过`cann_ops_transformer.mixed_quant_sparse_flash_mla`调用MixedQuantSparseFlashMla算子 |

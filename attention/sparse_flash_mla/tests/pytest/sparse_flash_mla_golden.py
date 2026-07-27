@@ -153,7 +153,7 @@ class GeneralizedSFA:
         else:
             act_q = [q_bnsd.shape[2]] * B
         G = int(self.N1 / self.N2)
-        s2_base_size = 512
+        s2_base_size = 128
 
         for i_B in range(B):
             print(f"i_B = {i_B}/{B}")
@@ -274,7 +274,13 @@ class GeneralizedSFA:
                     else:
                         if self.ori_mask_mode == 4:
                             ori_threshold = cur_ori_act_kv - cur_act_q + i_S1 + 1
-                            ori_win_end = ori_threshold + self.ori_win_right
+                            if self.ori_win_right == -1:
+                                ori_win_end = cur_ori_act_kv
+                            else:
+                                ori_win_end = min(
+                                    max(ori_threshold + self.ori_win_right, 0),
+                                    cur_ori_act_kv,
+                                )
                             if self.ori_win_left == -1:
                                 ori_win_start = 0
                             else:
@@ -283,7 +289,7 @@ class GeneralizedSFA:
                                 )
                         elif self.ori_mask_mode == 3:
                             ori_threshold = cur_ori_act_kv - cur_act_q + i_S1 + 1
-                            ori_win_end = ori_threshold + self.ori_win_right
+                            ori_win_end = ori_threshold
                             ori_win_start = 0
                         elif self.ori_mask_mode == 0:
                             ori_win_start = 0

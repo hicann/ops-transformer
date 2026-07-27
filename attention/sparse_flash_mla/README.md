@@ -2,14 +2,14 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
+| 产品                                                          | 是否支持 |
 | :------------------------------------------------------------ | :------: |
-|<term>Ascend 950PR/Ascend 950DT</term>                        | √  |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>        | √  |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>        | √  |
-|<term>Atlas 200I/500 A2推理系列产品</term>                    | ×  |
-|<term>Atlas 推理系列产品</term>                                | ×  |
-|<term>Atlas 训练系列产品</term>                                | ×  |
+|<term>Ascend 950PR/Ascend 950DT</term>                         |     √    |
+|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>         |     √    |
+|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>         |     √    |
+|<term>Atlas 200I/500 A2推理系列产品</term>                      |     ×    |
+|<term>Atlas 推理系列产品</term>                                 |     ×    |
+|<term>Atlas 训练系列产品</term>                                 |     ×    |
 
 ## 功能说明
 
@@ -32,6 +32,7 @@
     其中$\tilde{K}=\tilde{V}$为基于ori_kv、cmp_kv以及cmp_ratio等入参控制的实际参与计算的 $KV$。
 
 ## 参数说明
+>
 > **说明：**<br>
 > 参数维度含义：B表示Batch Size，Q_S、ORI\_KV\_S和CMP\_KV\_S分别表示query、oriKv和cmpKv的Sequence Length，Q_N和KV_N分别表示query和key/value的Head Num，Q_T、ORI_KV_T和CMP_KV_T分别表示query、oriKv和cmpKv的Total Tokens。
 
@@ -274,13 +275,13 @@
 - 通用规格约束如下：
   - KV\_N仅支持1，D仅支持512。其中，`ori_kv`和`cmp_kv`的D_kv由nope(448)和rope(64)拼接而成。
   - `cmp_ratio`表示`cmp_kv`相对于压缩前KV长度的压缩倍率；仅传入`ori_kv`时，`cmp_ratio`不参与压缩KV计算，需保持默认值1；支持1到128。
-  - `ori_mask_mode`仅支持4，`cmp_mask_mode`仅支持3，`ori_win_left`仅支持127，`ori_win_right`仅支持0。
+  - `ori_mask_mode`、`cmp_mask_mode`、`ori_win_left`和`ori_win_right`的取值随产品型号而变化，详见“产品型号约束”。
   - PageAttention的block_size支持1到1024。
   - `layout_q`和`layout_kv`组合仅支持"BSND"/"BSND"、"TND"/"TND"、"BSND"/"PA_BBND"、"TND"/"PA_BBND"；非PA_BBND场景下`layout_q`和`layout_kv`必须一致。
   - `ori_topk_length`和`cmp_topk_length`为预留输入，全平台均不支持传入非空Tensor。
 - 产品型号约束如下：
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：Q\_N支持1、2、4、8、16、32、64、128，KV\_N只支持1；cmp_ratio在SWA场景保持默认值1，CSA支持传入4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；ori_sparse_indices当前暂不支持，cmp_sparse_indices的最后一维K2当前支持512或1024。
-  - <term>Ascend 950PR/Ascend 950DT</term>：Q\_N支持2、4、8、16、32、64、128，不支持1，KV\_N只支持1。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：Q\_N支持1、2、4、8、16、32、64、128，KV\_N只支持1；cmp_ratio在SWA场景保持默认值1，CSA支持传入4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；ori_sparse_indices当前暂不支持，cmp_sparse_indices的最后一维K2当前支持512或1024。`ori_mask_mode`仅支持4，`cmp_mask_mode`仅支持3，`ori_win_left`仅支持127，`ori_win_right`仅支持0。
+  - <term>Ascend 950PR/Ascend 950DT</term>：Q\_N支持2、4、8、16、32、64、128，不支持1，KV\_N只支持1。`ori_mask_mode`支持0、3、4，`cmp_mask_mode`支持0、3；当`ori_mask_mode`为4时，`ori_win_left`和`ori_win_right`支持-1或非负数，-1表示对应方向不受限。
 
 - 当`layout_q`为TND时，功能使用限制如下：
   - `q`的shape需要为[Q\_T, Q\_N, D]。
