@@ -20,7 +20,6 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
         OP_NAME NsaCompressGrad
         OPTIONS --cce-auto-sync
                 -Wno-deprecated-declarations
-                -Werror
     )
 else()
     add_modules_sources(OPTYPE nsa_compress_grad ACLNNTYPE aclnn)

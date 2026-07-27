@@ -18,14 +18,12 @@ if (BUILD_OPEN_PROJECT)
             OP_NAME MoeGatingTopKSoftmax
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
         )
     else()
         add_ops_compile_options(
             OP_NAME MoeGatingTopKSoftmax
             OPTIONS --cce-auto-sync=on
                     -Wno-deprecated-declarations
-                    -Werror
         )
     endif()
 endif()

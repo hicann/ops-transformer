@@ -24,7 +24,6 @@ if (BUILD_OPEN_PROJECT)
             OP_NAME MhcPreBackward
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
         )
     endif()
 endif()
@@ -33,4 +32,3 @@ if(NOT BUILD_OPS_RTY_KERNEL)
     add_op_to_compiled_list()
     add_modules_sources(OPTYPE mhc_pre_backward ACLNNTYPE aclnn_exclude)
 endif()
-

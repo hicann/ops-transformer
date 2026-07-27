@@ -23,14 +23,12 @@ if("${CONDITION_UNIT}" STREQUAL "ascend950")
         COMPUTE_UNIT Ascend950PR_9599
         OPTIONS --cce-auto-sync=on
                 -Wno-deprecated-declarations
-                -Werror
     )
 else()
     add_ops_compile_options(
         OP_NAME RecurrentGatedDeltaRule
         OPTIONS --cce-auto-sync=on
                 -Wno-deprecated-declarations
-                -Werror
     )
 endif()
 

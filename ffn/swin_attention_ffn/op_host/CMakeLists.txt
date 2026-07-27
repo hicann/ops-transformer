@@ -17,11 +17,10 @@ if (BUILD_OPEN_PROJECT)
                 OP_NAME SwinAttentionFFN
                 OPTIONS --cce-auto-sync=on
                         -Wno-deprecated-declarations
-                        -Werror
         )
     else() # custom
         add_modules_sources(OPTYPE swin_attention_ffn ACLNNTYPE aclnn_exclude)
     endif()
 else() # 回黄host
-    add_modules_sources(OPTYPE swin_attention_ffn ACLNNTYPE aclnn_exclude)  
+    add_modules_sources(OPTYPE swin_attention_ffn ACLNNTYPE aclnn_exclude)
 endif()

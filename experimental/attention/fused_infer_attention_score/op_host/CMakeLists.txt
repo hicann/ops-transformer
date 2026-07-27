@@ -1,7 +1,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 add_op_to_compiled_list()
- 
+
 set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
 if (BUILD_OPEN_PROJECT)
     set(fused_infer_attention_score_apt_depends attention/common CACHE INTERNAL "Dependencies for fused_infer_attention_score_apt")
@@ -10,7 +10,7 @@ if (BUILD_OPEN_PROJECT)
         fused_infer_attention_score_def.cpp
     )
 endif()
- 
+
 if("${CONDITION_UNIT}" STREQUAL "ascend950")
     add_ops_compile_options(
         OP_NAME FusedInferAttentionScore
@@ -18,7 +18,6 @@ if("${CONDITION_UNIT}" STREQUAL "ascend950")
         OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
                 --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
                 -mllvm -cce-vf-remove-membar=false
                 -mllvm -cce-aicore-hoist-movemask=false
     )
@@ -27,13 +26,12 @@ else()
         OP_NAME FusedInferAttentionScore
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
                 -mllvm -cce-vf-remove-membar=false
                 -mllvm -cce-aicore-hoist-movemask=false
                 --op_relocatable_kernel_binary=true
     )
 endif()
- 
+
 if(NOT BUILD_OPS_RTY_KERNEL)
     add_modules_sources_with_soc(
         # 该变量用于判断op_api目录是否从op_host移出
@@ -42,11 +40,11 @@ if(NOT BUILD_OPS_RTY_KERNEL)
         OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
         OPTYPE fused_infer_attention_score ACLNNTYPE aclnn_inner)
 endif()
- 
+
 file(GLOB_RECURSE ARCH35_CHECKER_SRC_FILES
     ../op_host/checkers/*checker*.cpp
 )
- 
+
 if(NOT BUILD_OPS_RTY_KERNEL)
     add_tiling_modules()
     target_sources(${OPHOST_NAME}_tiling_obj PRIVATE

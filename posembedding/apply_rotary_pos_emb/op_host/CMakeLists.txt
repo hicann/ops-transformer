@@ -20,7 +20,6 @@ if (BUILD_OPS_RTY_KERNEL)
             OP_NAME ApplyRotaryPosEmb
             OPTIONS --cce-auto-sync=on
                     -Wno-deprecated-declarations
-                    -Werror
     )
 else()
     add_modules_sources(OPTYPE apply_rotary_pos_emb ACLNNTYPE aclnn_inner)

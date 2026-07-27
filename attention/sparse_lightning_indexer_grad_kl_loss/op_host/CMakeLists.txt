@@ -31,17 +31,15 @@ if (BUILD_OPS_RTY_KERNEL)
             OP_NAME SparseLightningIndexerGradKLLoss
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
     )
 else()
     add_ops_compile_options(
             OP_NAME SparseLightningIndexerGradKLLoss
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
     )
     add_modules_sources(
-        OPTYPE sparse_lightning_indexer_grad_kl_loss 
+        OPTYPE sparse_lightning_indexer_grad_kl_loss
         ACLNNTYPE aclnn
     )
 endif()

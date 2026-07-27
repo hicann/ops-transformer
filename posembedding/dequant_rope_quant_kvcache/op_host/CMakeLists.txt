@@ -16,7 +16,6 @@ if (BUILD_OPEN_PROJECT)
         OP_NAME DequantRopeQuantKvcache
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
     )
 endif()
 

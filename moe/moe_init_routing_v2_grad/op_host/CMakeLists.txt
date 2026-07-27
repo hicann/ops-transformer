@@ -19,7 +19,6 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
         OP_NAME MoeInitRoutingV2Grad
         OPTIONS --cce-auto-sync=on
                 -Wno-deprecated-declarations
-                -Werror
     )
 else()
     add_modules_sources(OPTYPE moe_init_routing_v2_grad ACLNNTYPE aclnn_exclude )

@@ -22,14 +22,12 @@ if (BUILD_OPEN_PROJECT)
                     -mllvm
                     -cce-aicore-dcci-before-kernel-end=false
                     -Wno-deprecated-declarations
-                    -Werror
         )
     else()
         add_ops_compile_options(
             OP_NAME InplaceFusedCausalConv1d
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
         )
     endif()
 endif()

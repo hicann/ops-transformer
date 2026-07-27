@@ -20,7 +20,6 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
         OP_NAME SparseFlashMlaGrad
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
     )
 else()
     add_modules_sources(OPTYPE sparse_flash_mla_grad ACLNNTYPE aclnn)

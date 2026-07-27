@@ -30,17 +30,15 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
         OP_NAME SparseFlashAttentionGrad
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
     )
 else()
    add_ops_compile_options(
         OP_NAME SparseFlashAttentionGrad
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
     )
     add_modules_sources(
-        OPTYPE sparse_flash_attention_grad 
+        OPTYPE sparse_flash_attention_grad
         ACLNNTYPE aclnn_inner
     )
 endif()

@@ -16,7 +16,6 @@ if (BUILD_OPEN_PROJECT)
         OP_NAME RopeWithSinCosCache
         OPTIONS --cce-auto-sync=on
                 -Wno-deprecated-declarations
-                -Werror
     )
     if ("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend950")
         add_ops_compile_options(

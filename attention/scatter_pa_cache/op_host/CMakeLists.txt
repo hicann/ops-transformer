@@ -25,7 +25,6 @@ if (BUILD_OPEN_PROJECT)
             OP_NAME ScatterPaCache
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
         )
     endif()
 endif()

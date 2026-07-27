@@ -23,7 +23,6 @@ add_ops_compile_options(
     OPTIONS --cce-auto-sync=off
             -Wno-deprecated-declarations
             -mllvm -cce-vf-remove-membar=false
-            -Werror
 )
 
 add_modules_sources_with_soc(

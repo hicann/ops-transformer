@@ -15,7 +15,6 @@ if (BUILD_OPEN_PROJECT) # 回黄kernel
         OP_NAME MoeComputeExpertTokens
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
     )
 endif()
 

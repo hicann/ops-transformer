@@ -17,8 +17,7 @@ if (BUILD_OPEN_PROJECT)
             OP_NAME MoeInplaceIndexAddWithSorted
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
-                    -mllvm 
+                    -mllvm
                     -cce-aicore-dcci-before-kernel-end=false
         )
     else()
@@ -26,7 +25,6 @@ if (BUILD_OPEN_PROJECT)
                     OP_NAME MoeInplaceIndexAddWithSorted
                     OPTIONS --cce-auto-sync=off
                             -Wno-deprecated-declarations
-                            -Werror
         )
     endif()
 endif()

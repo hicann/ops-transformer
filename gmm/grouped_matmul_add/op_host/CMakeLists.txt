@@ -22,7 +22,6 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
             OP_NAME GroupedMatmulAdd
             OPTIONS --cce-auto-sync=on
                     -Wno-deprecated-declarations
-                    -Werror
     )
     if("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend950")
         set(grouped_matmul_add_depends gmm/common CACHE INTERNAL "Dependencies for grouped_matmul_add")

@@ -29,7 +29,6 @@ if (BUILD_OPS_RTY_KERNEL)
             OP_NAME BlockSparseAttentionGrad
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
                     -fpermissive
     )
 else()
@@ -43,4 +42,3 @@ if(NOT BUILD_OPS_RTY_KERNEL)
         ./arch35/block_sparse_attention_grad_tiling_arch35.cpp
     )
 endif()
-

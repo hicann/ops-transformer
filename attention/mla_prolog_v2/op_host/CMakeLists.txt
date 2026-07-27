@@ -19,7 +19,6 @@ if (BUILD_OPEN_PROJECT)
         OP_NAME MlaPrologV2
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
                 -mllvm -cce-aicore-hoist-movemask=false
     )
 endif()

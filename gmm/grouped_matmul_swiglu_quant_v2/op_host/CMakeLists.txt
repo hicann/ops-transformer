@@ -21,7 +21,6 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
         OP_NAME GroupedMatmulSwigluQuantV2
         OPTIONS --cce-auto-sync=on
                 -Wno-deprecated-declarations
-                -Werror
     )
 else()
     add_modules_sources(

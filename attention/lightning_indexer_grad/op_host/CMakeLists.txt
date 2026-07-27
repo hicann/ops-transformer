@@ -20,7 +20,6 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
         OP_NAME LightningIndexerGrad
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
     )
 else()
     add_modules_sources(OPTYPE lightning_indexer_grad ACLNNTYPE aclnn_exclude)

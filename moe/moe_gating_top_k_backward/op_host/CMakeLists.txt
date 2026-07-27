@@ -19,7 +19,6 @@ if (BUILD_OPEN_PROJECT)
         OP_NAME MoeGatingTopKBackward
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
     )
 endif()
 

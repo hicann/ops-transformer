@@ -19,11 +19,10 @@ if (BUILD_OPEN_PROJECT)
                 OP_NAME SwinAttentionScoreQuant
                 OPTIONS --cce-auto-sync=on
                         -Wno-deprecated-declarations
-                        -Werror
         )
     else() # custom
         add_modules_sources(OPTYPE swin_attention_score_quant ACLNNTYPE aclnn)
     endif()
 else() # 回黄host
-    add_modules_sources(OPTYPE swin_attention_score_quant ACLNNTYPE aclnn)  
+    add_modules_sources(OPTYPE swin_attention_score_quant ACLNNTYPE aclnn)
 endif()

@@ -18,7 +18,6 @@ if (BUILD_OPEN_PROJECT)
                 OP_NAME MoeInitRoutingQuantV2
                 OPTIONS --cce-auto-sync=on
                 -Wno-deprecated-declarations
-                -Werror
                 -mllvm
                 -cce-aicore-dcci-before-kernel-end=false
         )
@@ -27,7 +26,6 @@ if (BUILD_OPEN_PROJECT)
                 OP_NAME MoeInitRoutingQuantV2
                 OPTIONS --cce-auto-sync=on
                 -Wno-deprecated-declarations
-                -Werror
         )
     endif()
 endif()

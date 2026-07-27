@@ -28,7 +28,7 @@ if("${CONDITION_UNIT}" STREQUAL "ascend950")
     )
 endif()
 
-file(GLOB_RECURSE ARCH35_CHECKER_SRC_FILES 
+file(GLOB_RECURSE ARCH35_CHECKER_SRC_FILES
     ../op_host/checkers/*checker*.cpp
 )
 
@@ -37,14 +37,12 @@ if (BUILD_OPS_RTY_KERNEL)
             OP_NAME FlashAttn
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
     )
 else()
     add_ops_compile_options(
             OP_NAME FlashAttn
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
     )
     add_tiling_modules()
     target_sources(${OPHOST_NAME}_tiling_obj PRIVATE

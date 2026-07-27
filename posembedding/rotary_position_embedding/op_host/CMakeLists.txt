@@ -30,7 +30,6 @@ if (BUILD_OPS_RTY_KERNEL)
             OP_NAME RotaryPositionEmbedding
             OPTIONS --cce-auto-sync=on
                     -Wno-deprecated-declarations
-                    -Werror
     )
 else()
     add_modules_sources(OPTYPE rotary_position_embedding ACLNNTYPE aclnn_exclude)

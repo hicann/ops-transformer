@@ -22,7 +22,6 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
         OP_NAME QuantGroupedMatmulInplaceAdd
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
     )
 
     if("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend950")

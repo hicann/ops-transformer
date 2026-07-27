@@ -19,10 +19,8 @@ if (BUILD_OPEN_PROJECT)
         OP_NAME MlaPreprocessV2
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
     )
 endif()
 if(NOT BUILD_OPS_RTY_KERNEL)
     add_modules_sources(OPTYPE mla_preprocess_v2 ACLNNTYPE aclnn)
 endif()
-

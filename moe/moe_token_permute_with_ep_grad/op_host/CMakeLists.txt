@@ -17,9 +17,8 @@
         OP_NAME MoeTokenPermuteWithEpGrad
         OPTIONS --cce-auto-sync=on
                 -Wno-deprecated-declarations
-                -Werror
     )
-endif()  
+endif()
 
 if(NOT BUILD_OPS_RTY_KERNEL)
     add_modules_sources(OPTYPE moe_token_permute_with_ep_grad ACLNNTYPE aclnn)

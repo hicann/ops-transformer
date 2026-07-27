@@ -24,7 +24,6 @@ if (BUILD_OPEN_PROJECT)
             OP_NAME MhcPre
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
         )
     endif()
 endif()

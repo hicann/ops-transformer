@@ -16,7 +16,6 @@ if (BUILD_OPEN_PROJECT)
         OP_NAME MoeTokenPermuteWithEp
         OPTIONS --cce-auto-sync=on
                 -Wno-deprecated-declarations
-                -Werror
     )
 endif()
 

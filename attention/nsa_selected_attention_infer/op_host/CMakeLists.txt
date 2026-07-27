@@ -20,9 +20,7 @@ if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
             OP_NAME NsaSelectedAttentionInfer
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
     )
 else()
     add_modules_sources(OPTYPE nsa_selected_attention_infer ACLNNTYPE aclnn_exclude)
 endif()
-

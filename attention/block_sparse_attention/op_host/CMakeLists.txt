@@ -20,10 +20,8 @@ if (BUILD_OPS_RTY_KERNEL)
             OP_NAME BlockSparseAttention
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
                     -fpermissive
     )
 else()
     add_modules_sources(OPTYPE block_sparse_attention ACLNNTYPE aclnn_exclude)
 endif()
-

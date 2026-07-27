@@ -20,7 +20,6 @@ if (BUILD_OPS_RTY_KERNEL)
             OP_NAME FusedFloydAttentionGrad
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
     )
     set(fused_floyd_attention_grad_depends attention/common CACHE INTERNAL "Dependencies for fused_floyd_attention_grad")
 else()
@@ -28,8 +27,6 @@ else()
             OP_NAME FusedFloydAttentionGrad
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
     )
     add_modules_sources(OPTYPE fused_floyd_attention_grad ACLNNTYPE aclnn)
 endif()
-

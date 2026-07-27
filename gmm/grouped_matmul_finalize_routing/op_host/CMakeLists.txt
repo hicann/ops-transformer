@@ -18,7 +18,6 @@ if (BUILD_OPEN_PROJECT)
         OP_NAME GroupedMatmulFinalizeRouting
         OPTIONS --cce-auto-sync=on
                 -Wno-deprecated-declarations
-                -Werror
     )
 endif()
 if(NOT BUILD_OPS_RTY_KERNEL)

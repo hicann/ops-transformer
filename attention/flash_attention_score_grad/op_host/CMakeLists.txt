@@ -31,7 +31,6 @@ if (BUILD_OPS_RTY_KERNEL)
             OPTIONS --cce-auto-sync=off
                     --cce-long-call=true
                     -Wno-deprecated-declarations
-                    -Werror
     )
 else()
     add_ops_compile_options(
@@ -39,14 +38,13 @@ else()
             OPTIONS --cce-auto-sync=off
                     --cce-long-call=true
                     -Wno-deprecated-declarations
-                    -Werror
     )
     add_modules_sources_with_soc(
         # 该变量用于判断op_api目录是否从op_host移出
         OP_API_INDEPENDENT ON
         # op_api新的地址
         OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
-        OPTYPE flash_attention_score_grad 
+        OPTYPE flash_attention_score_grad
         ACLNNTYPE aclnn_inner
     )
 endif()

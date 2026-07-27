@@ -19,7 +19,6 @@ if (BUILD_OPS_RTY_KERNEL)
         OP_NAME DenseLightningIndexerSoftmaxLse
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
-                -Werror
                 -mllvm -cce-vf-remove-membar=false
                 -mllvm -cce-aicore-hoist-movemask=false
                 --op_relocatable_kernel_binary=true

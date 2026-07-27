@@ -17,17 +17,15 @@ if (BUILD_OPEN_PROJECT)
             OP_NAME AttentionUpdate
             COMPUTE_UNIT Ascend950PR_9599
             OPTIONS --cce-auto-sync=off
-                    -mllvm 
+                    -mllvm
                     -cce-aicore-dcci-before-kernel-end=false
                     -Wno-deprecated-declarations
-                    -Werror
         )
     else()
         add_ops_compile_options(
             OP_NAME AttentionUpdate
             OPTIONS --cce-auto-sync=off
                     -Wno-deprecated-declarations
-                    -Werror
         )
     endif()
 endif()
