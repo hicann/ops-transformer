@@ -30,6 +30,7 @@ def load_impl_module(stem):
 golden_module = load_impl_module("golden")
 inputs_module = load_impl_module("inputs")
 compare_module = load_impl_module("compare")
+graph_module = load_impl_module("graph")
 
 
 class QfaMxfp8Spec:
@@ -38,6 +39,8 @@ class QfaMxfp8Spec:
     golden = golden_module.cpu_qfa_mxfp8
     customize_inputs = inputs_module.generate_qfa_mxfp8_inputs
     compare = compare_module.compare
+
+    torch_graph = graph_module.QuantFlashAttnAclGraph
 
     tolerance = {
         "float16": {
