@@ -17,7 +17,7 @@
   import torch_npu
   import cann-ops-transformer
   ```
-  
+
 - **V版本演进说明**
 
   请注意，部分API存在多个V版本，使用时选择最高V版本即可（高版本API已兼容低版本API的所有能力）。
@@ -28,27 +28,30 @@
 
 |    接口名   |   说明     |  确定性说明（A2/A3）  | 确定性说明（Ascend 950） |
 | ----------- | ------------------- | ------------------- | ------------------- |
-|[flash_attn](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md)|FlashAttention非量化注意力计算。|-|默认支持确定性计算|
+|[causal_conv1d_fn](../../torch_extension/cann_ops_transformer/docs/zh/causal_conv1d_fn.md)| 因果一维卷积前向计算（prefill/chunk-prefill），封装aclnnCausalConv1dFn。| - | 默认支持确定性计算 |
+|[causal_conv1d_update](../../torch_extension/cann_ops_transformer/docs/zh/causal_conv1d_update.md)| 因果一维卷积状态更新（decode/update），封装aclnnCausalConv1dUpdate。 | - | 默认支持确定性计算 |
+|[compressor](../../torch_extension/cann_ops_transformer/docs/zh/compressor.md)| 将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。| 默认支持确定性计算 | 默认支持确定性计算  |
+|[flash_attn](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md)| 调用`FlashAttn`算子完成共享KV（Key和Value使用同一份输入）的非量化注意力计算，训练推理归一化。需与`flash_attn_metadata`配套使用。 | - | 默认支持确定性计算  |
+|[get_low_latency_ccl_buffer_size](../../torch_extension/cann_ops_transformer/docs/zh/get_low_latency_ccl_buffer_size.md)|计算low_latency_dispatch/low_latency_combine所需的HCCL通信buffer_size（单位MB），为MoeDistributeBuffer的静态方法，可在初始化前调用。|默认支持确定性计算|默认支持确定性计算|
 |[grouped_matmul_activation_quant](../../torch_extension/cann_ops_transformer/docs/zh/grouped_matmul_activation_quant.md)|融合GMM、激活函数和量化算子，完成分组矩阵乘、激活和量化计算，输出量化结果及量化因子。|-|默认确定性实现|
-|[lightning_indexer](../../torch_extension/cann_ops_transformer/docs/zh/lightning_indexer.md)|基于一系列操作得到每一个token对应的Top-k个位置。支持KV压缩场景。|默认确定性实现|-|
-|[lightning_indexer_metadata](../../torch_extension/cann_ops_transformer/docs/zh/lightning_indexer.md)|lightning_indexer接口的前置接口，用于计算lightning_indexer的负载均衡。|默认确定性实现|默认确定性实现|
-|[mhc_post](../../torch_extension/cann_ops_transformer/docs/zh/mhc_post.md)|实现MHC Post组件的前向计算，用于Transformer模型中多层残差连接的后处理阶段。该算子将残差矩阵变换与输出状态投影融合为单次计算，避免多次独立算子调用带来的额外开销。|默认确定性实现|-|
-|[mhc_pre_sinkhorn](../../torch_extension/cann_ops_transformer/docs/zh/mhc_pre_sinkhorn.md)|基于一系列计算得到MHC架构中hidden层的$\mathbf{H}'_{\text{res}}$和$\mathbf{H}_{\text{post}}$投影矩阵以及Attention或MLP层的输入矩阵$\mathbf{h}_{\text{in}}$。对$\mathbf{H}'_{\text{res}}$矩阵执行Sinkhorn迭代归一化变换，最终得到双随机矩阵$\mathbf{H}_{\text{res}}$；支持输出中间计算结果，用于反向梯度计算。|默认确定性实现|默认确定性实现|
-|[mixed_quant_sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/mixed_quant_sparse_flash_mla.md)|量化场景下基于共享KV完成MixedQuantSparseFlashMla稀疏注意力计算。|默认确定性实现|默认确定性实现|
-|[mixed_quant_sparse_flash_mla_metadata](../../torch_extension/cann_ops_transformer/docs/zh/mixed_quant_sparse_flash_mla.md)|mixed_quant_sparse_flash_mla接口的前置接口，用于计算mixed_quant_sparse_flash_mla的负载均衡。|-|默认确定性实现|
-|[quant_lightning_indexer_metadata](../../torch_extension/cann_ops_transformer/docs/zh/quant_lightning_indexer.md)|quant_lightning_indexer接口的前置接口，用于计算quant_lightning_indexer的负载均衡。|默认确定性实现|默认确定性实现|
-|[qkv_rms_norm_rope_cache_with_k_scale](../../torch_extension/cann_ops_transformer/docs/zh/qkv_rms_norm_rope_cache_with_k_scale.md)|融合Q/K/V拆分、Q/K RMSNorm、RoPE、共享rotation矩阵乘、FP8量化和KV Cache更新，返回更新后的cache副本。|-|默认支持确定性计算。|
-|[qkv_rms_norm_rope_cache_with_k_scale_](../../torch_extension/cann_ops_transformer/docs/zh/qkv_rms_norm_rope_cache_with_k_scale.md)|融合Q/K/V拆分、Q/K RMSNorm、RoPE、共享rotation矩阵乘、FP8量化和KV Cache原地更新。|-|默认支持确定性计算。|
-|[scatter_pa_kv_cache_with_k_scale](../../torch_extension/cann_ops_transformer/docs/zh/scatter_pa_kv_cache_with_k_scale.md)|训练场景下，更新KvCache中指定位置的key和value，同时更新key的scale值。|-|默认支持确定性计算|
-|[sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/sparse_flash_mla.md)|基于共享KV完成SparseFlashMla稀疏注意力计算。|默认确定性实现|默认确定性实现|
-|[sparse_flash_mla_metadata](../../torch_extension/cann_ops_transformer/docs/zh/sparse_flash_mla.md)|生成SparseFlashMla主算子使用的任务切分metadata。|默认支持确定性计算；默认支持batch invariance。|
-|[sparse_flash_mla_grad_metadata](../../torch_extension/cann_ops_transformer/docs/zh/sparse_flash_mla_grad.md)|sparse_flash_mla_grad接口的前置接口，用于计算sparse_flash_mla_grad的负载均衡。|-|默认确定性实现|
-|[sparse_lightning_indexer_kl_loss_grad_metadata](../../torch_extension/cann_ops_transformer/docs/zh/sparse_lightning_indexer_kl_loss_grad.md)|sparse_lightning_indexer_kl_loss_grad接口的前置接口，用于计算sparse_lightning_indexer_kl_loss_grad的负载均衡。|默认确定性实现|默认确定性实现|
-|[moe_token_permute](../../torch_extension/cann_ops_transformer/docs/zh/moe_token_permute.md)|根据专家索引扩展并排序token，Ascend 950支持MXFP8和MXFP4量化输出。|默认支持确定性计算。|
+|[indexer_quant_cache](../../torch_extension/cann_ops_transformer/docs/zh/indexer_quant_cache.md)| 在Indexer注意力机制的Epilog阶段对KV Cache进行原地动态量化压缩更新，封装aclnnIndexerQuantCache。  |-|默认确定性实现|
 |[inplace_partial_rotary_mul](../../torch_extension/cann_ops_transformer/docs/zh/inplace_partial_rotary_mul.md)|执行单路旋转位置编码的Inplace计算，直接修改输入张量，不产生新的输出张量。|默认确定性实现|默认确定性实现|
 |[inplace_partial_rotary_mul_backward](../../torch_extension/cann_ops_transformer/docs/zh/inplace_partial_rotary_mul_backward.md)|执行`inplace_partial_rotary_mul`的反向计算，对输入梯度张量执行inplace更新，切片内替换为RoPE梯度，切片外保持不变。|-|默认支持确定性计算|
-|[compressor](../../torch_extension/cann_ops_transformer/docs/zh/compressor.md)|将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。|默认支持确定性计算。|
-|[get_low_latency_ccl_buffer_size](../../torch_extension/cann_ops_transformer/docs/zh/get_low_latency_ccl_buffer_size.md)|计算low_latency_dispatch/low_latency_combine所需的HCCL通信buffer_size（单位MB），为MoeDistributeBuffer的静态方法，可在初始化前调用。|默认支持确定性计算|默认支持确定性计算|
+|[kv_compress_epilog](../../torch_extension/cann_ops_transformer/docs/zh/kv_compress_epilog.md)| 在KV Cache的Epilog阶段对cache进行原地量化压缩更新，封装aclnnKvCompressEpilog。|默认确定性实现|-|
+|[lightning_indexer](../../torch_extension/cann_ops_transformer/docs/zh/lightning_indexer.md)| 基于一系列操作得到每一个token对应的Top-k个位置。支持KV压缩场景。|默认确定性实现|-|
+|[lightning_indexer_metadata](../../torch_extension/cann_ops_transformer/docs/zh/lightning_indexer.md)| lightning_indexer接口的前置接口，用于计算lightning_indexer的负载均衡。|默认确定性实现|默认确定性实现|
 |[low_latency_dispatch](../../torch_extension/cann_ops_transformer/docs/zh/low_latency_dispatch.md)|完成MoE并行部署下token的低时延dispatch分发，支持动态量化与EP域alltoallv通信，需与low_latency_combine配套使用。|默认支持确定性计算|默认支持确定性计算|
 |[low_latency_combine](../../torch_extension/cann_ops_transformer/docs/zh/low_latency_combine.md)|与low_latency_dispatch配套，按dispatch原路返回完成token的低时延combine反向聚合；topk_weights非空时乘路由权重再相加，为None时直接相加。|默认支持确定性计算|默认支持确定性计算|
 |[mega_moe](../../torch_extension/cann_ops_transformer/docs/zh/mega_moe.md)|MoE端到端通算融合算子，将Dispatch+GroupMatmul1+SwiGLUQuant+GroupMatmul2+Combine融合为单算子；配套get_mega_moe_ccl_buffer_size、get_symm_buffer_for_mega_moe使用。|-|默认支持确定性计算|
+|[mhc_post](../../torch_extension/cann_ops_transformer/docs/zh/mhc_post.md)|实现MHC Post组件的前向计算，用于Transformer模型中多层残差连接的后处理阶段。该算子将残差矩阵变换与输出状态投影融合为单次计算，避免多次独立算子调用带来的额外开销。|默认确定性实现|-|
+|[mhc_pre_sinkhorn](../../torch_extension/cann_ops_transformer/docs/zh/mhc_pre_sinkhorn.md)|基于一系列计算得到MHC架构中hidden层的$\mathbf{H}'_{\text{res}}$和$\mathbf{H}_{\text{post}}$投影矩阵以及Attention或MLP层的输入矩阵$\mathbf{h}_{\text{in}}$。对$\mathbf{H}'_{\text{res}}$矩阵执行Sinkhorn迭代归一化变换，最终得到双随机矩阵$\mathbf{H}_{\text{res}}$；支持输出中间计算结果，用于反向梯度计算。|默认确定性实现|默认确定性实现|
+|[mixed_quant_sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/mixed_quant_sparse_flash_mla.md)|量化场景下基于共享KV完成MixedQuantSparseFlashMla稀疏注意力计算。需与`mixed_quant_sparse_flash_mla_metadata`配套使用。|默认确定性实现|默认确定性实现|
+|[moe_token_permute](../../torch_extension/cann_ops_transformer/docs/zh/moe_token_permute.md)|根据专家索引扩展并排序token。|默认支持确定性计算。|
+|[qkv_rms_norm_rope_cache_with_k_scale](../../torch_extension/cann_ops_transformer/docs/zh/qkv_rms_norm_rope_cache_with_k_scale.md)|融合Q/K/V拆分、Q/K RMSNorm、RoPE、共享rotation矩阵乘、FP8量化和KV Cache更新，返回更新后的cache副本。|-|默认支持确定性计算。|
+|[quant_flash_attn](../../torch_extension/cann_ops_transformer/docs/zh/quant_flash_attn.md)| 调用`QuantFlashAttn`算子完成MxFP8/HiF8/MxFP4量化场景下的全量化注意力计算，训练推理归一化。|默认支持确定性计算。|
+|[quant_lightning_indexer](../../torch_extension/cann_ops_transformer/docs/zh/quant_lightning_indexer.md)| 基于一系列操作得到每一个token对应的top-k个位置。|默认支持确定性计算。|
+|[quant_sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/quant_sparse_flash_mla.md)|调用`QuantSparseFlashMla`算子完成共享KV（Key和Value使用同一份输入）的稀疏注意力计算。|默认支持确定性计算。|
+|[scatter_pa_kv_cache_with_k_scale](../../torch_extension/cann_ops_transformer/docs/zh/scatter_pa_kv_cache_with_k_scale.md)|训练场景下，更新KvCache中指定位置的key和value，同时更新key的scale值。|-|默认支持确定性计算|
+|[sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/sparse_flash_mla.md)|基于共享KV完成SparseFlashMla稀疏注意力计算。需与`sparse_flash_mla_metadata`配套使用。 |默认确定性实现|默认确定性实现|
+|[sparse_flash_mla_grad](../../torch_extension/cann_ops_transformer/docs/zh/sparse_flash_mla_grad.md)|计算`SparseFlashMla`训练场景下注意力的反向输出，支持Sliding Window Attention、Compressed Attention以及Sparse Compressed Attention。需与`sparse_flash_mla_grad_metadata`配套使用。 |-|默认确定性实现|
+|[sparse_lightning_indexer_kl_loss_grad](../../torch_extension/cann_ops_transformer/docs/zh/sparse_lightning_indexer_kl_loss_grad.md)| Lightning Indexer KL Loss训练场景下的反向输出。需与`sparse_lightning_indexer_kl_loss_grad_metadata`配套使用。|默认确定性实现|默认确定性实现|

@@ -1,21 +1,33 @@
-# cann_ops_transformer.inplace_partial_rotary_mul_backward
+# inplace_partial_rotary_mul_backward
 
 ## 产品支持情况
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
-- 接口功能：
+- **接口功能**：
 
     执行局部旋转位置编码`inplace_partial_rotary_mul`的反向计算。该接口对输入`grad_output`的D维度上切片`[start, end)`区域执行旋转位置编码梯度计算，计算结果inplace写回`grad_output`。切片之外的元素保持原值不变。
 
-- 计算公式：
+- **计算公式**：
 
     interleave模式（`rotary_mode`为`"interleave"`）下，设`partial_slice=[start, end]`，被计算的局部张量为：
 
@@ -39,10 +51,11 @@
 
     $dx'$的结果inplace写回`grad_output`的`[start, end)`区间。
 
-    **说明**
-    - 该算子当前仅实现了`rotary_mode="interleave"`模式。half（0）、quarter（2）、interleave-half（3）模式暂未支持。
-    - 输入`grad_output`采用BSND维度格式，其中B（Batch）表示批量大小，S（Seq-Length）表示序列长度，N（Head-Num）表示多头数，D（Head-Dim）表示每个头的隐藏维度大小。
-    - `partial_slice`作用于输入`grad_output`的最后一维D维，取值范围为左闭右开区间`[start, end)`。
+- **说明**:
+
+  - 该算子当前仅实现了`rotary_mode="interleave"`模式。half（0）、quarter（2）、interleave-half（3）模式暂未支持。
+  - 输入`grad_output`采用BSND维度格式，其中B（Batch）表示批量大小，S（Seq-Length）表示序列长度，N（Head-Num）表示多头数，D（Head-Dim）表示每个头的隐藏维度大小。
+  - `partial_slice`作用于输入`grad_output`的最后一维D维，取值范围为左闭右开区间`[start, end)`。
 
 ## 函数原型
 
@@ -66,16 +79,15 @@ cann_ops_transformer.inplace_partial_rotary_mul_backward(grad_output, r1, r2, *,
 
 ## 约束说明
 
-- 该算子仅支持Ascend 950 AI Processor。
+- 该接口支持单算子模式和TorchAir图模式调用。
 - 该算子仅支持连续Tensor，不支持非连续Tensor。
-- **该算子当前版本仅支持 interleave 模式（`rotary_mode="interleave"`）**。half（0）、quarter（2）、interleave-half（3）模式暂未实现。
+- **该算子当前版本仅支持interleave模式（`rotary_mode="interleave"`）**。half（0）、quarter（2）、interleave-half（3）模式暂未实现。
 - 该算子不支持输入空Tensor（任意维度不能为0），不支持 `partial_slice` 的切片长度为零（即 `end == start`）的场景。
 - `grad_output`最后一维D大小不超过1024。
 - `partial_slice`必须包含两个整数，满足`start >= 0`、`end >= 0`、`end <= D`、`end - start >= 0`。
 - `partial_slice`切片长度（即`end - start`）必须为2的倍数，且必须大于0。
 - `r1`、`r2`最后一维大小必须相同，且必须等于`partial_slice`的切片长度（即`end - start`）。
-- `r1`、`r2`的shape必须与`grad_output[..., start:end]`满足广播关系，且存在如下约束：
-    - Ascend 950PR/Ascend 950DT：`r1`、`r2`的shape当前只支持BSND、B1ND、B11D、111D排布。
+- `r1`、`r2`的shape必须与`grad_output[..., start:end]`满足广播关系，且`r1`、`r2`shape当前只支持BSND、B1ND、B11D、111D排布。
 - `grad_output`、`r1`、`r2` 的各维度值必须大于0。
 
 ## 确定性计算
@@ -86,7 +98,7 @@ cann_ops_transformer.inplace_partial_rotary_mul_backward(grad_output, r1, r2, *,
 
 该算子为[inplace_partial_rotary_mul](./inplace_partial_rotary_mul.md)的反向算子，两者参数`r1`、`r2`、`rotary_mode`、`partial_slice`需保持一致。
 
-> **说明**：当正向 `inplace_partial_rotary_mul` 中 `x.requires_grad` 为 True 时，`loss.backward()` 会自动触发本算子，无需手动调用。仅在需要显式控制梯度的场景下保留手动调用路径。
+> **说明**：当正向 `inplace_partial_rotary_mul` 中 `x.requires_grad` 为True时，`loss.backward()` 会自动触发本算子，无需手动调用。仅在需要显式控制梯度的场景下保留手动调用路径。
 
 ## 调用说明
 
@@ -107,7 +119,7 @@ cann_ops_transformer.inplace_partial_rotary_mul_backward(grad_output, r1, r2, *,
     slice_start = 0
     slice_end = 64
 
-    # 前向：x 原地修改
+    # 前向：x原地修改
     x = torch.randn(B, S, N, D, device="npu", dtype=torch.float16)
     r1 = torch.randn(B, S, 1, slice_end - slice_start, device="npu", dtype=torch.float16)
     r2 = torch.randn(B, S, 1, slice_end - slice_start, device="npu", dtype=torch.float16)
@@ -120,7 +132,7 @@ cann_ops_transformer.inplace_partial_rotary_mul_backward(grad_output, r1, r2, *,
         partial_slice=[slice_start, slice_end],
     )
 
-    # 反向：grad_output 原地修改为 dx
+    # 反向：grad_output原地修改为dx
     grad_output = torch.randn_like(x)
     inplace_partial_rotary_mul_backward(
         grad_output,

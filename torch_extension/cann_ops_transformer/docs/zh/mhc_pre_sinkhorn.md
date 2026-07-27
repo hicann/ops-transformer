@@ -3,7 +3,7 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：不支持
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
@@ -11,23 +11,23 @@
 <!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
 <!-- end id3 -->
-<!-- npu="310b" id5 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
-<!-- end id5 -->
-<!-- npu="310p" id4 -->
-- <term>Atlas 推理系列产品</term>：不支持
 <!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
 <!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
 
-- 接口功能：
+- **接口功能**：
 
   基于一系列计算得到MHC架构中hidden层的$\mathbf{H}'_{\text{res}}$和$\mathbf{H}_{\text{post}}$投影矩阵以及Attention或MLP层的输入矩阵$\mathbf{h}_{\text{in}}$。对$\mathbf{H}'_{\text{res}}$矩阵执行Sinkhorn迭代归一化变换，最终得到双随机矩阵$\mathbf{H}_{\text{res}}$；支持输出中间计算结果，用于反向梯度计算。
 
-- 计算公式：
+- **计算公式**：
 
   $$
   \begin{aligned}
@@ -218,21 +218,19 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
 
 ## 约束说明
 
-- 该接口支持训练、推理场景下使用
-- 该接口支持单算子模式调用
+- 该接口支持训练、推理场景下使用。
+- 该接口支持单算子模式调用。
+- 参数约束：x、phi、alpha、bias不支持空Tensor。
 - 规格约束：
-
-  | 规格项   | 规格               | 规格说明                               |
-  | :------- | :----------------- | :------------------------------------- |
-  | numIters | 20                 | 迭代次数超出该范围会返回参数无效错误。 |
-  | N        | 4                  | 目前只支持4。                          |
-  | C        | A2/A3：128对齐，[1, 100000]；A5：4096、7168 | 尾轴C的取值与芯片版本相关：<term>Atlas A2/A3</term>需满足128对齐且取值范围为[1, 100000]；<term>Ascend 950PR/Ascend 950DT</term>仅支持4096、7168。 |
-
-- 参数约束：
-  - x不支持空Tensor。
-  - phi不支持空Tensor。
-  - alpha不支持空Tensor。
-  - bias不支持空Tensor。
+  - numIters：表示迭代次数，要求不超过20，若超出该范围会返回参数无效错误。
+  - N：目前仅支持4。
+  - C：
+    <!-- npu="A3,910b" id7 -->
+    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：要求尾轴C 128对齐，取值[1, 100000]。
+    <!-- end id7 -->
+    <!-- npu="950" id8 -->
+    - <term>Ascend 950PR/Ascend 950DT</term>：尾轴C仅支持4096、7168。
+    <!-- end id8 -->
 
 ## 确定性计算
 

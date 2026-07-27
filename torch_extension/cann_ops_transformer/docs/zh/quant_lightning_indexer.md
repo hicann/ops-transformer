@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：
+- **接口功能**：
 
   `quant_lightning_indexer_metadata`接口用于生成一个任务列表，包含每个AIcore的Attention计算任务的起止点的Batch、Head、以及Q和K的分块的索引，供后续`quant_lightning_indexer`算子使用。
 
@@ -33,7 +33,7 @@
   2. 相关性结果与`query`和`key`对应的反量化系数`query_dequant_scale`（$Scale_Q$）和`key_dequant_scale`（$Scale_K^T$）相乘，通过激活函数$ReLU$过滤无效负相关信号后，得到当前Token与所有前序Token的相关性分数向量。
   3. 将其与权重系数`weights`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$sparseIndices$，并输出对应的$sparseValues$，作为Attention的输入。
 
-- 计算公式：
+- **计算公式**：
 
   $$
   out = Top\text{-}k\left\{[1]_{1\times g}@\left[\left(W@[1]_{1\times S_{k}}\right)\odot ReLU\left(\left(Scale_Q@Scale_K^T\right)\odot\left(Q_{index}^{Quant}@{\left(K_{index}^{Quant}\right)}^T\right)\right)\right]\right\}
@@ -95,9 +95,9 @@ cann_ops_transformer.quant_lightning_indexer(
 
 ## 参数说明
 
->**说明：**<br>
+>**说明：**
 >
->- query、key、weights、query_dequant_scale、key_dequant_scale参数维度含义：B（Batch Size）表示输入样本批量大小、S1表示query的输入样本序列长度、S2表示key的输入样本序列长度、N1表示query的多头数、N2表示key的多头数、D（Head Dim）表示注意力头的维度、T1表示query的输入样本序列长度的累加和、T2表示key的输入样本序列长度的累加和、block_num表示PageAttention场景下的block总数、block_size表示PageAttention场景下每个block的token数、g表示GQA的group size（g = N1 / N2）。参数query中的D和参数key中的D值相等，当前仅支持128。
+> query、key、weights、query_dequant_scale、key_dequant_scale参数维度含义：B（Batch Size）表示输入样本批量大小、S1表示query的输入样本序列长度、S2表示key的输入样本序列长度、N1表示query的多头数、N2表示key的多头数、D（Head Dim）表示注意力头的维度、T1表示query的输入样本序列长度的累加和、T2表示key的输入样本序列长度的累加和、block_num表示PageAttention场景下的block总数、block_size表示PageAttention场景下每个block的token数、g表示GQA的group size（g = N1 / N2）。参数query中的D和参数key中的D值相等，当前仅支持128。
 
 ### quant_lightning_indexer_metadata
 
@@ -107,7 +107,7 @@ cann_ops_transformer.quant_lightning_indexer(
 | num_heads_k | int | 必选 | 表示Key的head个数，当前仅支持1。 | int32 | - |
 | head_dim | int | 必选 | 表示注意力头的维度，当前仅支持128。 | int32 | - |
 | topk | int | 必选 | 表示从Query中筛选出的关键稀疏token的个数，当前仅支持[1, 2048]。 | int32 | - |
-| quant_mode | int | 必选 | 表示量化模式。1表示Per-Token-Head FLOAT8_e4m3fn量化；2表示Per-Token-Head INT8量化；4表示Per-Tensor HIFLOAT8量化。 | int32 | - |
+| quant_mode | int | 必选 | 表示量化模式。1表示Per-Token-Head float8_e4m3fn量化；2表示Per-Token-Head int8量化；4表示Per-Tensor HIfloat8量化。 | int32 | - |
 | cu_seqlens_q | Tensor | 可选 | 表示不同Batch中Query的有效Sequence Length，仅layout_q为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。 | int32 | (B+1, ) |
 | cu_seqlens_k | Tensor | 可选 | 表示不同Batch中Key的有效Sequence Length，仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。 | int32 | (B+1, ) |
 | seqused_q | Tensor | 可选 | 表示不同Batch中Query实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。 | int32 | (B, ) |
@@ -135,8 +135,8 @@ cann_ops_transformer.quant_lightning_indexer(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
-| query | Tensor | 必选 | 公式中的量化输入$Q_{index}^{Quant}$。不支持空tensor。数据格式为ND。 | INT8、FLOAT8_e4m3fn、HIFLOAT8 | layout_q为BSND时shape为(B,S1,N1,D)；layout_q为TND时shape为(T1,N1,D) |
-| key | Tensor | 必选 | 公式中的量化输入$K_{index}^{Quant}$。不支持空tensor。数据格式为ND，仅PA_BBND场景下0轴支持非连续。PA_BBND场景下block_size取值为16的倍数，最大支持1024。 | INT8、FLOAT8_e4m3fn、HIFLOAT8 | layout_k为BSND时shape为(B,S2,N2,D)；layout_k为TND时shape为(T2,N2,D)；layout_k为PA_BBND时shape为(block_num,block_size,N2,D) |
+| query | Tensor | 必选 | 公式中的量化输入$Q_{index}^{Quant}$。不支持空tensor。数据格式为ND。 | int8、float8_e4m3fn、HIfloat8 | layout_q为BSND时shape为(B,S1,N1,D)；layout_q为TND时shape为(T1,N1,D) |
+| key | Tensor | 必选 | 公式中的量化输入$K_{index}^{Quant}$。不支持空tensor。数据格式为ND，仅PA_BBND场景下0轴支持非连续。PA_BBND场景下block_size取值为16的倍数，最大支持1024。 | int8、float8_e4m3fn、HIfloat8 | layout_k为BSND时shape为(B,S2,N2,D)；layout_k为TND时shape为(T2,N2,D)；layout_k为PA_BBND时shape为(block_num,block_size,N2,D) |
 | weights | Tensor | 必选 | 公式中的权重系数$W$。不支持空tensor。数据格式为ND。 | float16、float32 | layout_q为BSND时shape为(B,S1,N1)；layout_q为TND时shape为(T1,N1) |
 | query_dequant_scale | Tensor | 必选 | 公式中的$Scale_Q$，表示Index Query的反量化系数。不支持空tensor。数据格式为ND。 | float16、float32 | shape与weights保持一致 |
 | key_dequant_scale | Tensor | 必选 | 公式中的$Scale_K$，表示Index Key的反量化系数。不支持空tensor。数据格式为ND，仅PA_BBND场景下0轴支持非连续。 | float16、float32 | layout_k为PA_BBND时shape为(block_num,block_size,N2)；layout_k为BSND时shape为(B,S2,N2)；layout_k为TND时shape为(T2,N2)。quant_mode为4时shape必须为(1,)，表示Per-Tensor量化 |
@@ -159,13 +159,13 @@ cann_ops_transformer.quant_lightning_indexer(
 
 <!-- npu="950" id10 -->
 - <term>Ascend 950PR/Ascend 950DT</term>:
-  - query、key在quant_mode为1时支持FLOAT8_e4m3fn，quant_mode为4时支持HIFLOAT8，不支持INT8。
+  - query、key在quant_mode为1时支持float8_e4m3fn，quant_mode为4时支持HIfloat8，不支持int8。
   - weights、query_dequant_scale和key_dequant_scale支持float32，不支持float16。
   - query的N支持32或64。
 <!-- end id10 -->
 <!-- npu="A3,910b" id11 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>:
-  - query、key仅支持INT8，不支持FLOAT8_e4m3fn和HIFLOAT8。
+  - query、key仅支持int8，不支持float8_e4m3fn和HIfloat8。
   - weights、query_dequant_scale和key_dequant_scale支持float16，不支持float32。
   - query的N仅支持64。
   - layout_k仅支持PA_BBND。

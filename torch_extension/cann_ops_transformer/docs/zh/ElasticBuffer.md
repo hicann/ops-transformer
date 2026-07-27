@@ -1,0 +1,646 @@
+# ElasticBuffer
+
+## 产品支持情况
+
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
+
+## 功能说明
+
+ElasticBuffer类提供统一的分布式通信buffer管理能力：
+
+- Engram存储接口用于分布式Engram存储管理，支持将本rank的表写入host pinned共享段，以及通过RDMA从远端rank抓取Engram数据。需与 [get_engram_storage_size_hint](#get_engram_storage_size_hint静态方法) 配套使用。
+- Dispatch/Combine接口用于MoE的Expert Parallelism（EP）并行部署，支持通过[dispatch](#dispatch)将token数据分发到对应专家卡，再通过[combine](#combine)将专家输出按原路由聚合回原始序列。需与[get_moe_ep_ccl_buffer_size](#get_moe_ep_ccl_buffer_size静态方法)配套使用。
+
+## 函数原型
+
+```python
+class ElasticBuffer:
+    def __init__(
+        self,
+        group: torch.distributed.ProcessGroup,
+        *,
+        num_cpu_bytes: int = 0,
+        num_max_tokens_per_rank: Optional[int] = None,
+        hidden: Optional[int] = None,
+        num_topk: Optional[int] = None,
+    )
+
+    def engram_write(self, storage: torch.Tensor) -> None
+
+    def engram_fetch(self, indices: torch.Tensor) -> Callable[[], torch.Tensor]
+
+    def barrier(self, use_comm_stream: bool = True, with_cpu_sync: bool = False) -> None
+
+    @staticmethod
+    def get_engram_storage_size_hint(
+        num_entries: int,
+        hidden: int,
+        dtype: torch.dtype = torch.bfloat16,
+    ) -> int
+
+    def dispatch(
+        self,
+        x: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]],
+        *,
+        topk_idx: Optional[torch.Tensor] = None,
+        topk_weights: Optional[torch.Tensor] = None,
+        handle: Optional[EPHandle] = None,
+        num_experts: Optional[int] = None,
+        num_max_tokens_per_rank: Optional[int] = None,
+        expert_alignment: Optional[int] = None,
+        do_cpu_sync: Optional[bool] = None,
+    ) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]],
+               Optional[torch.Tensor], Optional[torch.Tensor], EPHandle]
+
+    def combine(
+        self,
+        x: torch.Tensor,
+        handle: EPHandle,
+        *,
+        topk_weights: Optional[torch.Tensor] = None,
+        bias: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor], None] = None,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]
+
+    @staticmethod
+    def get_moe_ep_ccl_buffer_size(
+        world_size: int,
+        num_max_tokens_per_rank: int,
+        hidden: int,
+        num_experts: int,
+        topk: int,
+    ) -> int
+
+    def destroy(self) -> None
+```
+
+## 成员函数说明
+
+### **init**
+
+**功能**：构造ElasticBuffer实例，记录Engram和Dispatch/Combine所需配置。Engram运行时资源在首次调用 [engram_write](#engram_write) 时初始化；Dispatch/Combine通信上下文在首次调用 [dispatch](#dispatch) 或 [combine](#combine) 时初始化。
+
+**输入参数**：
+
+- **group** (`torch.distributed.ProcessGroup`)：必选参数，分布式进程组，用于跨rank通信和同步。
+- <strong>*</strong>：其之前的变量是位置相关的；之后的变量是可选参数，需要使用键值对赋值，不赋值会使用默认值。
+- **num_cpu_bytes** (`int`)：可选参数，CPU buffer大小（字节），用于host pinned存储区分配。默认值为0，且必须2MB对齐。
+- **num_max_tokens_per_rank** (`int`)：可选参数，表示每张卡上的最大token数量上限。使用 [dispatch](#dispatch) 和 [combine](#combine) 时必须与 `hidden`、`num_topk` 一起指定。
+- **hidden** (`int`)：可选参数，hidden size隐藏层大小。
+- **num_topk** (`int`)：可选参数，表示选取topK个专家。
+
+**输出**：无返回值，构造ElasticBuffer实例。
+
+### engram_write
+
+**功能**：将本rank的Engram表数据写入host pinned共享内存段，使其他rank可通过RDMA读取该数据。
+
+> **host pinned共享内存段**：指通过 `aclrtMallocHost` 分配的页锁定（pinned）主机内存，并经 `aclrtHostRegisterV2` 映射后获得设备可访问地址。该内存段既可被本卡NPU直接访问，也可被远端rank的NPU通过RDMA读取，从而实现跨rank的零拷贝数据共享。其大小由构造函数的 `num_cpu_bytes` 参数指定。
+
+**计算公式**：
+
+$$HostPinnedBuf[0 : storage.nbytes()] \leftarrow storage.data()$$
+
+即通过`memcpy_s`将`storage`的数据按字节拷贝到host pinned共享内存段起始位置。拷贝前后的两次 `Barrier` 保证所有rank写入完成且对彼此可见：
+
+$$Barrier \rightarrow memcpy\_s(storage \rightarrow HostPinnedBuf) \rightarrow Barrier$$
+
+其中 `storage.nbytes() = num_entries × hidden × dtype_size`，须满足 `storage.nbytes() ≤ num_cpu_bytes`。
+
+**函数原型**：
+
+```python
+ElasticBuffer.engram_write(storage) -> None
+```
+
+**输入参数**：
+
+- **storage** (`Tensor`)：必选参数，待写入的CPU tensor，shape为 `(num_entries, hidden)`，表示有 `num_entries` 个条目，每个条目维度为 `hidden`。
+
+**输出说明**：无返回值，数据写入host pinned内存。
+
+### engram_fetch
+
+**功能**：根据输入的全局索引，通过RDMA从对应rank的host pinned共享内存中抓取对应的Engram数据。接口采用异步设计：调用后立即返回一个callable，执行该callable时阻塞等待RDMA传输完成并返回结果tensor。
+
+**计算公式**：
+
+每个全局索引按如下方式映射到目标rank和本地条目索引：
+
+$$rank\_id = \lfloor global\_idx / num\_entries \rfloor$$
+
+$$local\_idx = global\_idx \bmod num\_entries$$
+
+$$fetched[i] = EngramTable[rank\_id][local\_idx]$$
+
+其中各变量含义如下：
+
+- $global\_idx$：输入索引张量 `indices` 的元素值，取值范围 $[0, world\_size \times num\_entries)$。
+- $num\_entries$：[engram_write](#engram_write) 时各rank写入的条目数，即 `storage.size(0)`。
+- $world\_size$：通信域中的rank总数。
+- $rank\_id$：$global\_idx$ 映射到的目标rank编号，取值范围 $[0, world\_size)$。当 $rank\_id$ 为本rank时，数据直接从本地host pinned内存读取；当 $rank\_id$ 为远端rank时，通过RDMA跨卡读取。
+- $local\_idx$：目标rank内的本地条目索引，取值范围 $[0, num\_entries)$。
+- $EngramTable[rank\_id]$：目标rank通过 [engram_write](#engram_write) 写入host pinned共享内存的Engram表数据，shape为 `(num_entries, hidden)`，
+$EngramTable[rank\_id][local\_idx]$ 表示其中第 $local\_idx$ 个条目。
+- $fetched[i]$：输出张量中第 $i$ 个token对应的Engram数据，$i \in [0, num\_tokens)$，$num\_tokens$ 为 `indices` 的长度。
+
+**函数原型**：
+
+```python
+ElasticBuffer.engram_fetch(indices) -> Callable[[], Tensor]
+```
+
+**输入参数**：
+
+- **indices** (`Tensor`)：必选参数，查询索引的NPU tensor，shape为 `(num_tokens,)`，表示要抓取的条目全局索引。数据类型支持 `int32`，数据格式为 $ND$。元素取值范围需在 `[0, world_size × num_entries)`，若某一位置的元素取值超过了该范围，则返回值中该位置对应的数据为0。
+
+**输出说明**：
+
+- **wait_callable** (`Callable[[], Tensor]`)：返回一个callable，调用时阻塞至RDMA完成并返回fetched tensor。
+
+调用 `wait_callable()` 返回：
+
+- **fetched** (`Tensor`)：NPU tensor，shape为 `(num_tokens, hidden)`，数据类型与 [engram_write](#engram_write) 的 `storage.dtype` 相同，数据格式为 $ND$。
+
+### barrier
+
+**功能**：跨卡同步。
+
+**函数原型**：
+
+```python
+ElasticBuffer.barrier(use_comm_stream=True, with_cpu_sync=False) -> None
+```
+
+**输入参数**：
+
+- **use_comm_stream** (`bool`)：可选参数，表示是否使用专用通信stream执行barrier。默认值为 `True`，使用专用通信stream，barrier前后通过event同步计算流与通信流；设为 `False` 时使用当前计算stream。
+- **with_cpu_sync** (`bool`)：可选参数，表示是否在barrier前后同步设备。默认值为 `False`。设为 `True` 时，在barrier前后各调用一次 `aclrtSynchronizeDevice`，确保设备侧操作完成。
+
+**输出说明**：无返回值。
+
+### get_engram_storage_size_hint（静态方法）
+
+**功能**：计算Engram存储所需的CPU buffer大小。
+
+**计算公式**：
+
+```text
+dtype_size = elementSize(dtype)              # 如bfloat16=2, float16=2, float32=4
+hidden_size_bytes = hidden × dtype_size
+num_bytes_per_entry = Align32(hidden_size_bytes)
+num_cpu_bytes = Align2MB(num_bytes_per_entry × num_entries)
+```
+
+其中 `AlignX(value) = ((value + X - 1) / X) × X`，`/` 表示整除。`num_bytes_per_entry` 按32 字节对齐，最终结果按2MB对齐。
+
+**函数原型**：
+
+```python
+ElasticBuffer.get_engram_storage_size_hint(
+    num_entries, hidden, dtype=torch.bfloat16
+) -> int
+```
+
+**输入参数**：
+
+- **num_entries** (`int`)：必选参数，Engram storage的条目数，必须非负。
+- **hidden** (`int`)：必选参数，每个条目的隐藏层维度，必须128 数量对齐且大于0。
+- **dtype** (`torch.dtype`)：可选参数，数据类型，默认为 `torch.bfloat16`。仅在此处用于按dtype计算字节数。
+
+**输出说明**：
+
+- **num_cpu_bytes** (`int`)：CPU buffer大小（字节），用于engram_write的本地存储区，已2MB对齐。
+
+### dispatch
+
+**功能**：需与 [combine](#combine) 配套使用，完成MoE的Expert Parallelism（EP）并行部署下的token dispatch。该接口根据每个token的topK专家索引，将token数据通过EP域的alltoallv通信分发到对应的专家卡上。
+
+- 支持cached模式，即第二次dispatch时可复用第一次的handle，跳过slot分配阶段，实现更低延迟。
+- 支持指定 `num_max_tokens_per_rank` 控制接收buffer大小上限。
+
+**计算公式**：
+
+$$alltoall\_x\_out = alltoallv(x)$$
+
+$$dst\_buffer\_slot\_idx = SlotAssignment(topk\_idx)$$
+
+$$recv\_src\_metadata = MetadataAssignment(alltoall\_x\_out, topk\_idx)$$
+
+**函数原型**：
+
+```python
+ElasticBuffer.dispatch(
+    x,
+    *,
+    topk_idx=None,
+    topk_weights=None,
+    handle=None,
+    num_experts=None,
+    num_max_tokens_per_rank=None,
+    expert_alignment=None,
+    do_cpu_sync=None,
+) -> (Tensor, Tensor, Tensor, EPHandle)
+```
+
+**输入参数**：
+
+- **x** (`Tensor` 或 `Tuple[Tensor, Tensor]`)：必选参数，表示计算使用的token数据，需根据 `topk_idx` 来发送给其他卡。当传入tuple时，第一个Tensor为token数据，第二个Tensor为scales。token要求为2 维张量，shape为 `(BS, H)`，数据类型支持 `bfloat16`、`float16`、`float8_e5m2`、`float8_e4m3fn`，数据格式为 $ND$。scales要求为2 维张量，shape为 `(BS, H1)`，数据类型支持`float32`或`float8_e8m0`，数据格式为 $ND$，只在token为`float8_e5m2`、`float8_e4m3fn`数据类型时传入。
+- <strong>*</strong>：其之前的变量是位置相关的；之后的变量是可选参数，需要使用键值对赋值，不赋值会使用默认值。
+- **topk_idx** (`Tensor`)：可选参数，表示每个token的topK个专家索引，决定每个token要发给哪些专家。要求为2 维张量，shape为 `(BS, K)`，数据类型支持 `int32`，数据格式为 $ND$。张量里value取值范围为 `[0, num_experts)`。非cached模式下为必选参数，cached模式下必须为 `None`。
+- **topk_weights** (`Tensor`)：可选参数，表示每个token对应的topK专家权重。要求为2 维张量，shape为 `(BS, K)`，数据类型支持 `float32`，数据格式为 $ND$。非cached模式下为可选参数，cached模式下必须为 `None`。
+- **handle** (`EPHandle`)：可选参数，表示上一次dispatch返回的handle对象，用于cached模式。传入handle时，`topk_idx` 和 `topk_weights` 必须为 `None`，`do_cpu_sync` 必须为 `False`。默认为 `None`，即非cached模式。
+- **num_experts** (`int`)：可选参数，MoE专家总数量。取值范围 `[2, 2048]`，且满足 `num_experts % ep_world_size = 0`。非cached模式下为必选参数；cached模式下必须为 `None`。
+- **num_max_tokens_per_rank** (`int`)：可选参数，表示每张卡上的最大token数量上限，传入时覆盖ElasticBuffer初始化的值。默认使用初始化时传入的值。
+- **expert_alignment** (`int`)：可选参数，表示专家对齐数。非cached模式默认值为1；cached模式使用 `handle` 中的值。
+- **do_cpu_sync** (`bool`)：可选参数，表示是否进行CPU同步等待。非cached模式默认为 `True`，cached模式必须为 `False`。
+
+**输出说明**：
+
+- **recv_x** (`Tensor` 或 `Tuple[Tensor, Tensor]`)：表示本卡收到的token数据。Tensor shape为 `(A, H)`，数据类型与 `x` 一致，数据格式为 $ND$。经专家网络处理后，作为 [combine](#combine) 的 `x` 输入。当 `x` 输入包含scales时，输出为 `(recv_x, recv_scales)`。
+- **recv_topk_idx** (`None`)：当前版本始终为 `None`，预留参数。
+- **recv_topk_weights** (`Tensor | None`)：表示本卡收到的topK权重。仅当输入 `topk_weights` 不为 `None` 时返回，否则为 `None`。要求为1 维张量，shape为 `(A,)`，数据类型为 `float32`，数据格式为 $ND$，作为 [combine](#combine) 的 `topk_weights` 输入。
+- **handle** (`EPHandle`)：表示dispatch阶段生成的handle对象，包含slot索引、元数据等信息，需传递给 [combine](#combine) 使用。handle的属性如下：
+  - **dst_buffer_slot_idx** (`Tensor`)：slot索引，shape为 `(BS, K)`，dtype为 `int32`。
+  - **recv_src_metadata** (`Tensor`)：接收元数据，shape为 `(A, 4)`，dtype为 `int32`。
+  - **num_recv_tokens_per_rank** (`Tensor`)：各卡接收token数量，shape为 `(ep_world_size,)`，dtype为 `int32`。
+  - **num_recv_tokens_per_expert** (`Tensor`)：每个本地专家接收的token数量，shape为 `(num_local_experts,)`，dtype为 `int64`。
+  - **num_experts** (`int`)：专家总数量。
+  - **expert_alignment** (`int`)：专家对齐数。
+  - **num_max_tokens_per_rank** (`int`)：每张卡最大token数量上限。
+  - **topk_idx** (`Tensor`)：原始topK索引。
+
+### combine
+
+**功能**：需与 [dispatch](#dispatch) 配套使用，相当于按dispatch算子收集数据的路径原路返回。该接口将专家处理后的token数据根据dispatch阶段记录的元数据信息，通过逆向路由和加权聚合，将token数据组合还原为原始序列顺序。
+
+- 支持带 `topk_weights` 加权聚合和纯累加两种模式。
+- 当前版本不支持bias参数。
+
+**计算公式**：
+
+当提供 `topk_weights` 时：
+
+$$combined\_x_i = \sum_{k=0}^{K-1} topk\_weights_{i,k} \times x_{slot(i,k)}$$
+
+当不提供 `topk_weights` 时（纯累加）：
+
+$$combined\_x_i = \sum_{k=0}^{K-1} x_{slot(i,k)}$$
+
+**函数原型**：
+
+```python
+ElasticBuffer.combine(x, handle, *, topk_weights=None, bias=None) -> (Tensor, Tensor?)
+```
+
+**输入参数**：
+
+- **x** (`Tensor`)：必选参数，表示经过专家计算后的token数据，即 [dispatch](#dispatch) 输出的 `recv_x` 经过专家网络处理后的结果。要求为2 维张量，shape为 `(A, H)`，数据类型仅支持 `bfloat16`，数据格式为 $ND$。
+- **handle** (`EPHandle`)：必选参数，表示 [dispatch](#dispatch) 返回的handle对象，包含slot索引、接收元数据等信息。handle的属性参见 [dispatch](#dispatch) 输出说明。
+- <strong>*</strong>：其之前的变量是位置相关的；之后的变量是可选参数，需要使用键值对赋值，不赋值会使用默认值。
+- **topk_weights** (`Tensor`)：可选参数，表示每个token对应的topK专家权重，用于加权聚合。要求为1 维张量，shape为 `(A,)`，数据类型支持 `float32`，数据格式为 $ND$，对应 [dispatch](#dispatch) 的 `recv_topk_weights` 输出。若不提供，则进行纯累加combine，输出 `combined_topk_weights` 为 `None`。
+- **bias** (`Tensor` 或 `Tuple[Tensor, Tensor]`)：可选参数，当前版本不支持bias，传入 `None` 即可。预留支持单个bias张量或 `bias_0`、`bias_1` 双张量模式。
+
+**输出说明**：
+
+- **combined_x** (`Tensor`)：表示combine后的token数据，还原为原始序列顺序。要求为2 维张量，shape为 `(BS, H)`，数据类型为 `bfloat16`，数据格式为 $ND$，不支持非连续的Tensor。
+- **combined_topk_weights** (`Tensor | None`)：表示combine后的topK专家权重。当 `topk_weights` 输入不为 `None` 时，要求为2 维张量，shape为 `(BS, K)`，数据类型为 `float32`，数据格式为 $ND$；当 `topk_weights` 输入为 `None` 时，返回 `None`。
+
+### get_moe_ep_ccl_buffer_size（静态方法）
+
+**功能**：需与 [dispatch](#dispatch) 和 [combine](#combine) 配套使用，用于计算dispatch和combine算子所需的HCCL通信 `buffer_size` 大小（单位：MB）。该接口为静态方法，可在初始化ElasticBuffer前调用。
+
+**函数原型**：
+
+```python
+ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hidden, num_experts, topk) -> int
+```
+
+**输入参数**：
+
+- **world_size** (`int`)：必选参数，表示EP通信域的大小（即参与EP通信的卡数）。取值范围 `[2, 768]`。
+- **num_max_tokens_per_rank** (`int`)：必选参数，表示每张卡上的最大token数量上限。
+- **hidden** (`int`)：必选参数，表示hidden size隐藏层大小。取值范围 `[1024, 8192]`。
+- **num_experts** (`int`)：必选参数，MoE专家总数量，取值范围 `[2, 2048]`，且满足 `num_experts % ep_world_size = 0`。
+- **topk** (`int`)：必选参数，表示选取topK个专家，取值范围 `[1, 32]`。
+
+**输出说明**：
+
+- **ccl_buffer_size** (`int`)：计算得到的 `ccl_buffer_size` 大小，单位为MB。将该值设置为 `HCCL_BUFFSIZE` 环境变量即可满足通信域的内存需求。
+
+**计算公式**：
+
+```text
+local_experts_num = num_experts // world_size
+state_buffer_size =
+    world_size * Align512(local_experts_num * 4)
+    + 2 * world_size * 512
+    + num_max_tokens_per_rank * topk * 512
+    + world_size * 512
+
+metadata_bytes = Align32(topk * 4)
+hidden_align = Align32(hidden * 2)
+dispatch_per_slot_bytes = Align512(hidden_align + metadata_bytes * 2 + 32)
+combine_per_slot_bytes = Align512(hidden_align + 32)
+
+minimum_buffer_size =
+    state_buffer_size
+    + world_size * num_max_tokens_per_rank * dispatch_per_slot_bytes
+    + num_max_tokens_per_rank * topk * combine_per_slot_bytes
+
+ccl_buffer_size = Align2(Align1MB(minimum_buffer_size) / 1MB) / 2
+```
+
+其中 `AlignX(value) = ((value + X - 1) / X) * X`，公式中的 `/` 表示整除。
+
+### destroy
+
+**功能**：释放ElasticBuffer资源，包括host pinned内存、Engram运行时资源和Dispatch/Combine通信上下文。
+
+**输入参数**：无参数。
+
+**输出**：无返回值，资源释放完成。
+
+## 约束说明
+
+- **参数对齐约束**：
+  - `num_cpu_bytes` 必须为2MB对齐（即能被 `2 × 1024 × 1024` 整除）。
+  - `hidden` 必须为128 数量对齐。
+  - [get_engram_storage_size_hint](#get_engram_storage_size_hint静态方法) 返回值自动满足2MB对齐。
+
+- **Engram维度约束**：
+  - `storage` 必须为2 维张量。
+  - `indices` 必须为1 维张量。
+
+- **Engram dtype约束**：
+  - `storage.dtype` 仅支持 `bfloat16`、`float16`、`float32`。
+  - `indices.dtype` 必须为 `int32`。
+
+- **Engram设备约束**：
+  - `storage` 必须在CPU上。
+  - `indices` 必须在NPU上。
+
+- **Engram调用顺序约束**：
+  - 必须先调用 [engram_write](#engram_write) 至少一次，才能调用 [engram_fetch](#engram_fetch)。
+  - 同一ElasticBuffer实例上不允许并发 [engram_fetch](#engram_fetch)（需等待上次fetch的callable执行完成）。
+
+- **Engram数值约束**：
+  - `num_cpu_bytes`、`num_entries`必须非负。
+  - `hidden` 必须大于0。
+  - `storage.nbytes()` 必须小于等于 `num_cpu_bytes`。`storage.nbytes()` 表示tensor实际占用的字节数，即 `num_entries × hidden × dtype_size`（其中
+  `dtype_size` 为单个元素的字节大小，如 `bfloat16` 为2 字节、`float32` 为4 字节）。
+  - 全局条目总数 `world_size × num_entries` 必须小于2^31（int32 最大值），保证indices索引不溢出。
+
+- **Dispatch/Combine配套约束**：
+  - [dispatch](#dispatch) 和 [combine](#combine) 必须配套使用。
+  - 调用接口过程中使用的 `num_experts`、`num_max_tokens_per_rank` 参数取值所有卡需保持一致，且 [dispatch](#dispatch) 和 [combine](#combine) 对应参数也需保持一致。
+  - 当前版本不支持bias参数，`bias` 必须传入 `None`。
+  - cached模式下，`topk_idx` 和 `topk_weights` 必须为 `None`，`do_cpu_sync` 必须为 `False`；非cached模式下，`topk_idx` 为必选参数，`topk_weights` 为可选参数。
+
+- **Dispatch/Combine Shape变量说明**：
+  - `A`：表示本卡接收的最大token数量，`A = ep_world_size * num_max_tokens_per_rank * MIN(K, num_local_experts)`。
+  - `H`：表示hidden size隐藏层大小。取值范围为 `(0, 8192]`。
+  - `BS`：表示batch sequence size，即本卡的token数量。
+  - `K`：表示选取topK个专家，取值范围为 `1 ≤ K ≤ 32`。
+  - `num_local_experts`：表示本卡专家数量，`num_local_experts = num_experts / ep_world_size`，应满足 `0 < num_local_experts * ep_world_size ≤ 2048`。
+
+- **HCCL通信域缓存区大小**：
+  - 调用 [dispatch](#dispatch) 或 [combine](#combine) 前需检查 `HCCL_BUFFSIZE` 环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。
+  - 通信域缓存区大小可通过调用 [get_moe_ep_ccl_buffer_size](#get_moe_ep_ccl_buffer_size静态方法) 计算。
+  - 计算得到的 `ccl_buffer_size` 需通过环境变量 `HCCL_BUFFSIZE` 设置，每个通信域独占一组 `2 * HCCL_BUFFSIZE` 大小的内存。
+
+- **通信域约束**：
+  - Engram通信域 `world_size` 范围 `[2, 1024]`，支持多卡分布式场景。
+  - 一个模型中的 [dispatch](#dispatch) 和 [combine](#combine) 算子仅支持相同EP通信域，且该通信域中不允许有其他算子。
+
+- **特殊场景处理**：
+  - 支持 `num_entries = 0`。
+  - 支持 `num_tokens = 0`。
+  - 二进制一致：engram_write和engram_fetch全程纯数据搬运，输出与源必须逐字节相等，无任何容差。
+
+## 调用示例
+
+### Engram单算子模式调用（多卡分布式）
+
+```python
+import os
+import torch
+import torch_npu
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.multiprocessing import Process, Manager
+from cann_ops_transformer import ElasticBuffer
+
+num_entries = 10000
+hidden = 4096
+dtype = torch.bfloat16
+world_size = 2
+
+
+def set_device(rank):
+    torch_npu.npu.set_device(rank)
+    print(f"current device set: {torch_npu.npu.current_device()}")
+
+
+def init_hccl_comm(rank, world_size):
+    print(f"[INFO] device_{rank} create HCCL communication link")
+    master_ip = "127.0.0.1"
+    dist.init_process_group(
+        backend="hccl",
+        rank=rank,
+        world_size=world_size,
+        init_method=f"tcp://{master_ip}:50001",
+    )
+    print(f"device_{rank} init_process_group success")
+
+    group = dist.new_group(backend="hccl", ranks=list(range(world_size)))
+    return group
+
+
+def run_elastic_buffer(queue, rank, world_size, storage, indices):
+    print(f"{os.getpid()=}{rank=}")
+    set_device(rank)
+    group = init_hccl_comm(rank, world_size)
+
+    num_cpu_bytes = ElasticBuffer.get_engram_storage_size_hint(
+        num_entries, hidden, dtype
+    )
+    print(f"[INFO] device_{rank} num_cpu_bytes={num_cpu_bytes}")
+
+    buffer = ElasticBuffer(group, num_cpu_bytes=num_cpu_bytes)
+
+    print(f"[INFO] device_{rank} run engram_write")
+    buffer.engram_write(storage)
+
+    print(f"[INFO] device_{rank} run engram_fetch")
+    indices_npu = indices.npu()
+    wait_callable = buffer.engram_fetch(indices_npu)
+    fetched = wait_callable()
+
+    torch.npu.synchronize()
+    print(f"[INFO] device_{rank} fetched shape: {fetched.shape}")
+    buffer.destroy()
+    dist.destroy_process_group()
+
+    queue.put([rank, fetched.cpu()])
+
+
+if __name__ == "__main__":
+    storage = torch.randn(num_entries, hidden, dtype=dtype)
+    indices = torch.randint(
+        0,
+        num_entries * world_size,
+        (1000,),
+        dtype=torch.int32,
+    )
+
+    manager = Manager()
+    result_queue = manager.Queue()
+    mp.set_start_method("forkserver", force=True)
+
+    proc_list = []
+    for rank in range(world_size):
+        p = Process(
+            target=run_elastic_buffer,
+            args=(result_queue, rank, world_size, storage.clone(), indices.clone()),
+        )
+        p.start()
+        proc_list.append(p)
+
+    results = [None] * world_size
+    for _ in range(world_size):
+        rank_id, fetched = result_queue.get()
+        results[rank_id] = fetched
+        print(f"[INFO] rank_{rank_id} result collected")
+
+    for p in proc_list:
+        p.join()
+
+    if all(result is not None for result in results):
+        print("All ranks finished successfully")
+        for rank, result in enumerate(results):
+            print(f"Rank {rank} fetched shape: {result.shape}")
+    else:
+        print("[ERROR] Task failed. Please check the detailed error logs.")
+        exit(1)
+```
+
+### Dispatch/Combine单算子模式调用（多卡分布式）
+
+```python
+import os
+import torch
+import torch_npu
+import torch.distributed as dist
+from torch.multiprocessing import Process
+from cann_ops_transformer import ElasticBuffer
+
+master_ip = "127.0.0.1"
+world_size = 2
+num_experts = world_size * 4
+num_max_tokens_per_rank = 128
+hidden = 4096
+top_k = 4
+
+
+def run_dispatch_combine(rank):
+    torch_npu.npu.set_device(rank)
+    dist.init_process_group(
+        backend="hccl",
+        rank=rank,
+        world_size=world_size,
+        init_method=f"tcp://{master_ip}:50002",
+    )
+
+    group = dist.new_group(backend="hccl")
+    buffer = ElasticBuffer(
+        group,
+        num_max_tokens_per_rank=num_max_tokens_per_rank,
+        hidden=hidden,
+        num_topk=top_k,
+    )
+
+    num_tokens = 64
+    x = torch.randn(
+        num_tokens,
+        hidden,
+        dtype=torch.bfloat16,
+        device=f"npu:{rank}",
+    )
+    topk_idx = torch.randint(
+        0,
+        num_experts,
+        (num_tokens, top_k),
+        dtype=torch.int32,
+        device=f"npu:{rank}",
+    )
+    topk_weights = torch.rand(
+        num_tokens,
+        top_k,
+        dtype=torch.float32,
+        device=f"npu:{rank}",
+    )
+
+    recv_x, _, recv_topk_weights, handle = buffer.dispatch(
+        x,
+        topk_idx=topk_idx,
+        topk_weights=topk_weights,
+        num_experts=num_experts,
+    )
+    torch.npu.synchronize()
+
+    expert_output = recv_x
+    combined_x, combined_topk_weights = buffer.combine(
+        expert_output,
+        handle,
+        topk_weights=recv_topk_weights,
+    )
+
+    torch.npu.synchronize()
+    print(f"[rank {rank}] combined_x shape={combined_x.shape}, expected ({num_tokens}, {hidden})")
+    assert combined_x.shape == (num_tokens, hidden)
+    print(f"[rank {rank}] dispatch_combine PASS")
+
+    buffer.destroy()
+    dist.destroy_process_group()
+
+
+if __name__ == "__main__":
+    os.environ["HCCL_WHITELIST_DISABLE"] = "1"
+    os.environ["HCCL_BUFFSIZE"] = str(
+        ElasticBuffer.get_moe_ep_ccl_buffer_size(
+            world_size,
+            num_max_tokens_per_rank,
+            hidden,
+            num_experts,
+            top_k,
+        )
+    )
+
+    processes = []
+    for rank in range(world_size):
+        p = Process(target=run_dispatch_combine, args=(rank,))
+        p.start()
+        processes.append(p)
+
+    for p in processes:
+        p.join()
+
+    print("All processes finished.")
+```

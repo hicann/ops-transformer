@@ -1,17 +1,29 @@
-# flash_attn <a name="ZH-CN_TOPIC_0000002309174912"></a>
+# flash_attn
 
 ## 产品支持情况
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
-## 功能说明<a name="zh-cn_topic_0000002168254826_section14441124184110"></a>
+## 功能说明
 
-- 接口功能:
+- **接口功能**：
 
   `flash_attn`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`FlashAttn`算子完成共享KV（Key和Value使用同一份输入）的非量化注意力计算，训练推理归一化。
 
@@ -21,7 +33,7 @@
   2. 调用`flash_attn_metadata`生成`metadata`。
   3. 调用`flash_attn`，将上一步得到的`metadata`传入主算子。
 
-- 计算公式:
+- **计算公式**：
 
   self-attention（自注意力）利用输入样本自身的关系构建了一种注意力模型。其原理是假设有一个长度为$n$的输入样本序列$x$，$x$的每个元素都是一个$d$维向量，可以将每个$d$维向量看作一个token embedding，将这样一条序列经过3个权重矩阵变换得到3个维度为$n \times d$的矩阵。
 
@@ -53,7 +65,7 @@
   Attention = \frac{e^{S - m} \times V}{\sum e^{S-m} + e^{sink - m}}
   $$
 
-开启**return_softmax_lse**之后，返回值softmax_lse计算逻辑如下所示：
+  开启**return_softmax_lse**之后，返回值softmax_lse计算逻辑如下所示：
 
   $$
   S = \frac{QK^T}{\sqrt{d}}
@@ -72,12 +84,12 @@
 > q、k、v数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size、S（Seq-Length）表示输入样本序列长度、H（Hidden-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸headdim，且满足D=H/N、Q_T表示所有query Batch输入样本序列长度的累加和，KV_T表示所有k、v Batch输入样本序列长度的累加和。
 > Q_S表示seqlen_q，Q_N表示nheads_q，KV_S表示seqlen_kv，KV_N表示nheads_kv。
 
-## 函数原型<a name="zh-cn_topic_0000002168254826_section45077510411"></a>
+## 函数原型
 
 调用flash_attn接口之前，请先调用前置接口flash_attn_metadata，完成flash_attn负载均衡的计算。
 
 ```python
-cann_ops_transformer.ops.flash_attn_metadata(
+cann_ops_transformer.flash_attn_metadata(
     num_heads_q,
     num_heads_kv,
     head_dim,
@@ -99,7 +111,7 @@ cann_ops_transformer.ops.flash_attn_metadata(
 ```
 
 ```python
-cann_ops_transformer.ops.flash_attn(
+cann_ops_transformer.flash_attn(
     q,
     k,
     v,
@@ -124,8 +136,7 @@ cann_ops_transformer.ops.flash_attn(
 ) -> (Tensor, Tensor)
 ```
 
-## 参数说明<a name="zh-cn_topic_0000002168254826_section112637109429"></a>
-
+## 参数说明
 
 ### flash_attn_metadata
 
@@ -152,16 +163,16 @@ cann_ops_transformer.ops.flash_attn(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| q | Tensor | 必选 | 公式中的q | bfloat16/float16 | ND | <ul><li>(B, Q_S, Q_N, D)</li><li>(B, Q_N, Q_S, D)</li><li>(Q_T, Q_N, D)</li></ul>
-| k | Tensor | 必选 | 公式中的k | bfloat16/float16 | ND | <ul><li>(B, KV_S, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(KV_T, KV_N, D)</li><li>(num_blocks, block_size, KV_N, D)</li><li>(num_blocks, KV_N, block_size, D)</li></ul>
-| v | Tensor | 必选 | 公式中的v | bfloat16/float16 | ND | <ul><li>(B, KV_S, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(KV_T, KV_N, D)</li><li>(num_blocks, block_size, KV_N, D)</li><li>(num_blocks, KV_N, block_size, D)</li></ul>
-| block_table | Tensor | 可选 | 用于分块注意力计算中的块索引映射 | int32 | ND | (B, max_num_blocks_per_seq)
-| cu_seqlens_q | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,)
-| cu_seqlens_kv | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,)
-| seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,)
-| seqused_kv | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,)
-| sinks | Tensor | 可选 | 注意力汇聚（sink）参数，用于改善自注意力计算的数值稳定性 | float32 | ND | (Q_N,)
-| metadata | Tensor | 可选 | `flash_attn_metadata`生成的任务切分结果，传入后可优化调度 | int32 | ND | (max_schedule_size,)
+| q | Tensor | 必选 | 公式中的q | bfloat16/float16 | ND | <ul><li>(B, Q_S, Q_N, D)</li><li>(B, Q_N, Q_S, D)</li><li>(Q_T, Q_N, D)</li></ul> |
+| k | Tensor | 必选 | 公式中的k | bfloat16/float16 | ND | <ul><li>(B, KV_S, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(KV_T, KV_N, D)</li><li>(num_blocks, block_size, KV_N, D)</li><li>(num_blocks, KV_N, block_size, D)</li></ul> |
+| v | Tensor | 必选 | 公式中的v | bfloat16/float16 | ND | <ul><li>(B, KV_S, KV_N, D)</li><li>(B, KV_N, KV_S, D)</li><li>(KV_T, KV_N, D)</li><li>(num_blocks, block_size, KV_N, D)</li><li>(num_blocks, KV_N, block_size, D)</li></ul> |
+| block_table | Tensor | 可选 | 用于分块注意力计算中的块索引映射 | int32 | ND | (B, max_num_blocks_per_seq) |
+| cu_seqlens_q | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,) |
+| cu_seqlens_kv | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,) |
+| seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,) |
+| seqused_kv | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,) |
+| sinks | Tensor | 可选 | 注意力汇聚（sink）参数，用于改善自注意力计算的数值稳定性 | float32 | ND | (Q_N,) |
+| metadata | Tensor | 可选 | `flash_attn_metadata`生成的任务切分结果，传入后可优化调度 | int32 | ND | (max_schedule_size,) |
 | softmax_scale | float | 可选 | 可显式设置缩放因子，覆盖默认计算 | float32 | - | - |
 | mask_mode | int | 可选 | 掩码模式 | int32 | - | - |
 | attn_mask | Tensor | 可选 | 掩码矩阵 | int8 | ND | (2048, 2048)
@@ -174,31 +185,30 @@ cann_ops_transformer.ops.flash_attn(
 | layout_out | string | 可选 | 定义输出张量的布局格式 | string | - | - |
 | return_softmax_lse | bool | 可选 | 是否需要获取softmax的LSE结果 | bool | - | - |
 
-## 返回值说明<a name="zh-cn_topic_0000002168254826_section22231435517"></a>
+## 返回值说明
 
 ### flash_attn_metadata
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| metadata | Tensor | 必选 | flash_attn的任务切分数据 | int32 | ND | shape根据batch_size和num_heads_kv动态计算
+| metadata | Tensor | 必选 | flash_attn的任务切分数据 | int32 | ND | shape根据batch_size和num_heads_kv动态计算 |
 
 ### flash_attn
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| attn_out | Tensor | 必选 | flash_attn的计算输出 | bfloat16/float16 | ND | <ul><li>(B, Q_S, Q_N, D)</li><li>(B, Q_N, Q_S, D)</li><li>(Q_T, Q_N, D )</li></ul>
-| softmax_lse | Tensor | 可选 | softmax的LSE结果 | float32 | ND | <ul><li>(B, Q_N, Q_S)</li><li>(Q_N, Q_T)</li></ul>
+| attn_out | Tensor | 必选 | flash_attn的计算输出 | bfloat16/float16 | ND | <ul><li>(B, Q_S, Q_N, D)</li><li>(B, Q_N, Q_S, D)</li><li>(Q_T, Q_N, D )</li></ul> |
+| softmax_lse | Tensor | 可选 | softmax的LSE结果 | float32 | ND | <ul><li>(B, Q_N, Q_S)</li><li>(Q_N, Q_T)</li></ul> |
 
 **说明**
--   attn_out：Tensor类型，公式中的输出，数据类型支持float16、bfloat16。数据格式支持ND。限制：该输出参数的D维度与value的D保持一致，其余维度需要与入参query的shape保持一致。
--   softmax_lse：Tensor类型，ring attention算法对query乘key的结果，先取max得到softmax_max。query乘key的结果减去softmax_max，再取exp，最后取sum，得到softmax_sum，最后对softmax_sum取log，再加上softmax_max得到的结果。数据类型支持float32，return_softmax_lse为True时，一般情况下，输出shape为(B, Q_N, Q_S)的Tensor，当input_q为TND时，输出shape为(Q_N, Q_T)的Tensor；return_softmax_lse为False时，则输出shape为[1]的值为0的Tensor。
 
+- attn_out：限制：该输出参数的D维度与value的D保持一致，其余维度需要与入参query的shape保持一致。
+- softmax_lse：return_softmax_lse为True时，一般情况下，输出shape为(B, Q_N, Q_S)的Tensor，当input_q为TND时，输出shape为(Q_N, Q_T)的Tensor；return_softmax_lse为False时，则输出shape为[1]的值为0的Tensor。
 
-## 约束说明<a name="zh-cn_topic_0000002168254826_section12345537164214"></a>
+## 约束说明
 
-- 声明
-  - 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、block_table及attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
-  - flash_attn_metadata和flash_attn的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+- 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、block_table及attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+- flash_attn_metadata和flash_attn的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 
 ### 特性参数组
 
@@ -246,33 +256,35 @@ cann_ops_transformer.ops.flash_attn(
 ### 参数组约束
 
 #### 公共参数组
-- 入参为空的场景处理：
-    - 空Tensor指必选输入和输出的shape size为0,即有任意轴为0。
-    - 触发空tensor的用例将全部拦截报错。
 
-- q、k、v、attn_out校验
-<table style="undefined;table-layout: fixed; width:1625px"><colgroup>
-<col style="width: 147px">
-<col style="width: 232px">
-<col style="width: 232px">
-<col style="width: 293px">
-<col style="width: 185px">
-</colgroup>
-<thead>
-<tr>
+- 入参为空的场景处理：
+  - 空Tensor指必选输入和输出的shape size为0,即有任意轴为0。
+  - 触发空tensor的用例将全部拦截报错。
+
+- q、k、v、attn_out校验:
+
+    <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
+    <col style="width: 147px">
+    <col style="width: 232px">
+    <col style="width: 232px">
+    <col style="width: 293px">
+    <col style="width: 185px">
+    </colgroup>
+    <thead>
+    <tr>
     <th>参数</th>
     <th>单参数校验</th>
     <th>存在性校验</th>
     <th>一致性校验</th>
     <th>特性交叉校验</th>
-</tr>
-</thead>
-<tbody>
+    </tr>
+    </thead>
+    <tbody>
     <tr>
         <td>q</td>
         <td>
             <ul>
-                <li>tensor_type支持BFLOAT16和FLOAT16</li>
+                <li>tensor_type支持bfloat16和float16</li>
                 <li>BNSD -> (B, N_Q, S_Q, D)</li>
                 <li>BSND -> (B, S_Q, N_Q, D)</li>
                 <li>TND -> (T_Q, N_Q, D)</li>
@@ -308,7 +320,7 @@ cann_ops_transformer.ops.flash_attn(
         <td>k</td>
         <td rowspan="2">
             <ul>
-                <li>tensor_type支持BFLOAT16和FLOAT16</li>
+                <li>tensor_type支持bfloat16和float16</li>
                 <li>BNSD -> (B, N_KV, S_KV, D)</li>
                 <li>BSND -> (B, S_KV, N_KV, D)</li>
                 <li>TND -> (T_KV, N_KV, D)</li>
@@ -333,108 +345,109 @@ cann_ops_transformer.ops.flash_attn(
         <td>attn_out</td>
         <td>
             <ul>
-                <li>data_type支持BFLOAT16和FLOAT16</li>
+                <li>data_type支持bfloat16和float16</li>
                 <li>shape维度支持3、4</li>
             </ul>
         </td>
     </tr>
-</tbody>
-</table>
+    </tbody>
+    </table>
 
+- layout匹配关系表：
 
-layout匹配关系表：
-<table style="undefined;table-layout: fixed; width:1625px"><colgroup>
-<col style="width: 247px">
-<col style="width: 132px">
-<col style="width: 232px">
-<col style="width: 293px">
-<col style="width: 185px">
-<col style="width: 119px">
-<col style="width: 272px">
-<col style="width: 145px">
-</colgroup>
-<thead>
-<tr>
-    <th>layout_q</th>
-    <th>layout_kv</th>
-    <th>layout_out</th>
-    <th>layout_softmax_lse</th>
-</tr>
-</thead>
-<tbody>
-    <tr>
-        <td>BNSD</td>
-        <td>
-          <li>BNSD</li>
-          <li>PA_BBND</li>
-          <li>PA_BNBD</li>
-          <li>PA_NZ</li>
-        </td>
-        <td>
-          <li>BNSD</li>
-          <li>BSND</li>
-        </td>
-        <td>(B, Q_N, Q_S)</td>
-    </tr>
-    <tr>
-        <td>BSND</td>
-        <td>
-          <li>BSND</li>
-          <li>PA_BBND</li>
-          <li>PA_BNBD</li>
-          <li>PA_NZ</li>
-        </td>
-        <td>BSND</td>
-        <td>(B, Q_N, Q_S)</td>
-    </tr>
-    <tr>
-        <td>TND</td>
-        <td>
-          <li>TND</li>
-          <li>PA_BBND</li>
-          <li>PA_BNBD</li>
-          <li>PA_NZ</li>
-        </td>
-        <td>TND</td>
-        <td>(Q_N, Q_T)</td>
-    </tr>
-</tbody>
-</table>
-
-metadata校验
-<table style="undefined;table-layout: fixed; width:1625px">
-    <colgroup>
-        <col style="width: 147px">
-        <col style="width: 232px">
-        <col style="width: 232px">
-        <col style="width: 293px">
-        <col style="width: 185px">
+    <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
+    <col style="width: 247px">
+    <col style="width: 132px">
+    <col style="width: 232px">
+    <col style="width: 293px">
+    <col style="width: 185px">
+    <col style="width: 119px">
+    <col style="width: 272px">
+    <col style="width: 145px">
     </colgroup>
     <thead>
-        <tr>
-            <th>参数</th>
-            <th>单参数校验</th>
-            <th>存在性校验</th>
-            <th>一致性校验</th>
-            <th>特性交叉校验</th>
-        </tr>
+    <tr>
+        <th>layout_q</th>
+        <th>layout_kv</th>
+        <th>layout_out</th>
+        <th>layout_softmax_lse</th>
+    </tr>
     </thead>
     <tbody>
         <tr>
-            <td>metadata</td>
+            <td>BNSD</td>
             <td>
-                <ul>
-                    <li>tensor_type仅支持INT32</li>
-                    <li>shape由flash_attn_metadata动态计算</li>
-                    <li>当前不支持不传入，未传入将发出拦截报警</li>
-                </ul>
+            <li>BNSD</li>
+            <li>PA_BBND</li>
+            <li>PA_BNBD</li>
+            <li>PA_NZ</li>
             </td>
-            <td>可选参数</td>
-            <td>无</td>
-            <td>传入时需与flash_attn_metadata生成的结果一致</td>
+            <td>
+            <li>BNSD</li>
+            <li>BSND</li>
+            </td>
+            <td>(B, Q_N, Q_S)</td>
+        </tr>
+        <tr>
+            <td>BSND</td>
+            <td>
+            <li>BSND</li>
+            <li>PA_BBND</li>
+            <li>PA_BNBD</li>
+            <li>PA_NZ</li>
+            </td>
+            <td>BSND</td>
+            <td>(B, Q_N, Q_S)</td>
+        </tr>
+        <tr>
+            <td>TND</td>
+            <td>
+            <li>TND</li>
+            <li>PA_BBND</li>
+            <li>PA_BNBD</li>
+            <li>PA_NZ</li>
+            </td>
+            <td>TND</td>
+            <td>(Q_N, Q_T)</td>
         </tr>
     </tbody>
-</table>
+    </table>
+
+- metadata校验:
+
+    <table style="undefined;table-layout: fixed; width:1625px">
+        <colgroup>
+            <col style="width: 147px">
+            <col style="width: 232px">
+            <col style="width: 232px">
+            <col style="width: 293px">
+            <col style="width: 185px">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>参数</th>
+                <th>单参数校验</th>
+                <th>存在性校验</th>
+                <th>一致性校验</th>
+                <th>特性交叉校验</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>metadata</td>
+                <td>
+                    <ul>
+                        <li>tensor_type仅支持int32</li>
+                        <li>shape由flash_attn_metadata动态计算</li>
+                        <li>当前不支持不传入，未传入将发出拦截报警</li>
+                    </ul>
+                </td>
+                <td>可选参数</td>
+                <td>无</td>
+                <td>传入时需与flash_attn_metadata生成的结果一致</td>
+            </tr>
+        </tbody>
+    </table>
 
 #### Mask参数组
 
@@ -491,7 +504,7 @@ mask_mode参数解释
             <td>attn_mask</td>
             <td>
                 <ul>
-                    <li>tensor_type支持INT8</li>
+                    <li>tensor_type支持int8</li>
                     <li>tensor_shape维度为(2048, 2048)，该矩阵固定为2048*2048的下三角矩阵对角线全0</li>
                 </ul>
             </td>
@@ -537,7 +550,7 @@ mask_mode参数解释
             <td>seqused_q</td>
             <td rowspan="2">
                 <ul>
-                    <li>tensor_type支持INT32</li>
+                    <li>tensor_type支持int32</li>
                     <li>tensor_shape为(B,)</li>
                     <li>仅支持非负整数</li>
                     <li>seqused_q中的值需小于等于Q_S</li>
@@ -555,7 +568,7 @@ mask_mode参数解释
             <td>cu_seqlens_q</td>
             <td rowspan="2">
                 <ul>
-                    <li>tensor_type支持INT32</li>
+                    <li>tensor_type支持int32</li>
                     <li>tensor_shape为(B+1,)</li>
                     <li>值仅支持非负整数</li>
                     <li>其值应非递减（大于等于前一个值）排列</li>
@@ -601,6 +614,7 @@ mask_mode参数解释
 </table>
 
 #### Paged Attention参数组
+
 当block_table不为空时，开启Paged Attention
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
@@ -624,7 +638,7 @@ mask_mode参数解释
             <td>block_table</td>
             <td>
                 <ul>
-                    <li>tensor_type仅支持INT32</li>
+                    <li>tensor_type仅支持int32</li>
                     <li>tensor_shape为(B, max_num_blocks_per_seq)</li>
                     <li>值只能为正整数</li>
                     <li>1024 >= block_size >= 16，block_size % 16 == 0</li>
@@ -717,7 +731,7 @@ mask_mode参数解释
             <td>softmax_lse</td>
             <td>
                 <ul>
-                    <li>data_type仅支持FLOAT32</li>
+                    <li>data_type仅支持float32</li>
                 </ul>
             </td>
             <td>无</td>
@@ -726,9 +740,9 @@ mask_mode参数解释
     </tbody>
 </table>
 
-## 调用示例<a name="zh-cn_topic_0000002168254826_section14459801435"></a>
+## 调用示例
 
--   flash_attn_metadata + flash_attn 联合调用示例（BSND）
+- flash_attn_metadata + flash_attn联合调用示例（BSND）
 
     ```python
     import torch

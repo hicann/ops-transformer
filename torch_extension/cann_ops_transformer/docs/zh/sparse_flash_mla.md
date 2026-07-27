@@ -2,16 +2,28 @@
 
 ## 产品支持情况
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id8 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id8 -->
+<!-- npu="910" id9 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id9 -->
 
 ## 功能说明
 
-- 接口功能：
+- **接口功能**：
 
   `sparse_flash_mla_metadata`接口用于生成一个任务列表，包含每个AIcore的Attention计算任务的起止点的Batch、Head、以及Q和K的分块的索引，供后续sparse_flash_mla算子使用。
 
@@ -27,7 +39,7 @@
   2. 调用`sparse_flash_mla_metadata`生成`metadata`。
   3. 调用`sparse_flash_mla`，将上一步得到的`metadata`传入主算子。
 
-- 计算公式：
+- **计算公式**：
 
   $$
   O = \text{softmax}(Q \cdot \tilde{K}^{T} \cdot \text{softmax\_scale}) \cdot \tilde{V}
@@ -78,7 +90,6 @@ cann_ops_transformer.sparse_flash_mla_metadata(
 
 ```python
 cann_ops_transformer.sparse_flash_mla(
-cann_ops_transformer.sparse_flash_mla(
     q,
     *,
     ori_kv=None,
@@ -120,15 +131,15 @@ cann_ops_transformer.sparse_flash_mla(
 | num_heads_q | 属性 | Query head数，支持1、2、4、8、16、32、64、128。 | INT | - |
 | num_heads_kv | 属性 | KV head数，仅支持1。 | INT | - |
 | head_dim | 属性 | 每个注意力头的维度，仅支持512。 | INT | - |
-| cu_seqlens_q | 可选输入 | TND场景下`q`的累积序列长度。 | INT32 | ND |
-| cu_seqlens_ori_kv | 可选输入 | TND场景下`ori_kv`的累积序列长度。 | INT32 | ND |
-| cu_seqlens_cmp_kv | 可选输入 | TND场景下`cmp_kv`的累积序列长度。 | INT32 | ND |
-| seqused_q | 可选输入 | 不同batch中`q`实际参与计算的token数。 | INT32 | ND |
-| seqused_ori_kv | 可选输入 | 不同batch中`ori_kv`实际参与计算的token数。 | INT32 | ND |
-| seqused_cmp_kv | 可选输入 | 不同batch中`cmp_kv`实际参与计算的token数。 | INT32 | ND |
-| cmp_residual_kv | 可选输入 | 压缩KV余数，用于恢复cmp侧mask使用的压缩前KV长度。 | INT32 | ND |
-| ori_topk_length | 可选输入 | 预留输入，当前版本不支持传入非空Tensor。 | INT32 | ND |
-| cmp_topk_length | 可选输入 | 预留输入，当前版本不支持传入非空Tensor。 | INT32 | ND |
+| cu_seqlens_q | 可选输入 | TND场景下`q`的累积序列长度。 | int32 | ND |
+| cu_seqlens_ori_kv | 可选输入 | TND场景下`ori_kv`的累积序列长度。 | int32 | ND |
+| cu_seqlens_cmp_kv | 可选输入 | TND场景下`cmp_kv`的累积序列长度。 | int32 | ND |
+| seqused_q | 可选输入 | 不同batch中`q`实际参与计算的token数。 | int32 | ND |
+| seqused_ori_kv | 可选输入 | 不同batch中`ori_kv`实际参与计算的token数。 | int32 | ND |
+| seqused_cmp_kv | 可选输入 | 不同batch中`cmp_kv`实际参与计算的token数。 | int32 | ND |
+| cmp_residual_kv | 可选输入 | 压缩KV余数，用于恢复cmp侧mask使用的压缩前KV长度。 | int32 | ND |
+| ori_topk_length | 可选输入 | 预留输入，当前版本不支持传入非空Tensor。 | int32 | ND |
+| cmp_topk_length | 可选输入 | 预留输入，当前版本不支持传入非空Tensor。 | int32 | ND |
 | batch_size | 可选属性 | batch大小。默认值为0。 | INT | - |
 | max_seqlen_q | 可选属性 | 所有batch中`q`的最大有效长度。默认值为0。 | INT | - |
 | max_seqlen_ori_kv | 可选属性 | 所有batch中`ori_kv`的最大有效长度。默认值为0。 | INT | - |
@@ -144,31 +155,31 @@ cann_ops_transformer.sparse_flash_mla(
 | layout_kv | 可选属性 | 表示输入`ori_kv`和`cmp_kv`的数据排布格式，支持"BSND"、"TND"和"PA_BBND"。默认值为"BSND"。 | STRING | - |
 | has_ori_kv | 可选属性 | 表示`SparseFlashMla`主算子是否传入`ori_kv`。默认值为True。 | BOOL | - |
 | has_cmp_kv | 可选属性 | 表示`SparseFlashMla`主算子是否传入`cmp_kv`。默认值为True。 | BOOL | - |
-| metadata | 输出 | 表示`SparseFlashMla`主算子使用的任务切分结果。 | INT32 | ND |
+| metadata | 输出 | 表示`SparseFlashMla`主算子使用的任务切分结果。 | int32 | ND |
 
 ### sparse_flash_mla
 
 | 参数名 | 输入/输出/属性 | 描述 | 数据类型 | 数据格式 |
 | :--- | :--- | :--- | :--- | :--- |
-| q | 输入 | Query输入。 | FLOAT16、BFLOAT16 | ND |
-| ori_kv | 可选输入 | 原始KV输入，Key和Value共享同一份数据。 | FLOAT16、BFLOAT16 | ND |
-| cmp_kv | 可选输入 | 压缩KV输入，Key和Value共享同一份数据。 | FLOAT16、BFLOAT16 | ND |
-| ori_sparse_indices | 可选输入 | 原始KV稀疏索引，当前版本不支持传入非空Tensor。 | INT32 | ND |
-| cmp_sparse_indices | 可选输入 | 压缩KV TopK索引，无效位置填-1。 | INT32 | ND |
-| ori_block_table | 可选输入 | PageAttention场景下`ori_kv`使用的block映射表。 | INT32 | ND |
-| cmp_block_table | 可选输入 | PageAttention场景下`cmp_kv`使用的block映射表。 | INT32 | ND |
-| cu_seqlens_q | 可选输入 | TND场景下`q`的累积序列长度。 | INT32 | ND |
-| cu_seqlens_ori_kv | 可选输入 | TND场景下`ori_kv`的累积序列长度。 | INT32 | ND |
-| cu_seqlens_cmp_kv | 可选输入 | TND场景下`cmp_kv`的累积序列长度。 | INT32 | ND |
-| seqused_q | 可选输入 | 不同batch中`q`实际参与计算的token数。 | INT32 | ND |
-| seqused_ori_kv | 可选输入 | 不同batch中`ori_kv`实际参与计算的token数。 | INT32 | ND |
-| seqused_cmp_kv | 可选输入 | 不同batch中`cmp_kv`实际参与计算的token数。 | INT32 | ND |
-| cmp_residual_kv | 可选输入 | 压缩KV余数，用于恢复cmp侧mask使用的压缩前KV长度。 | INT32 | ND |
-| ori_topk_length | 可选输入 | 预留输入，当前版本不支持传入非空Tensor。 | INT32 | ND |
-| cmp_topk_length | 可选输入 | 预留输入，当前版本不支持传入非空Tensor。 | INT32 | ND |
-| sinks | 可选输入 | attention sinks输入。 | FLOAT | ND |
-| metadata | 输入 | `sparse_flash_mla_metadata`生成的任务切分结果。 | INT32 | ND |
-| softmax_scale | 可选属性 | QK矩阵乘后的缩放系数。默认值为1.0。 | FLOAT | - |
+| q | 输入 | Query输入。 | float16、bfloat16 | ND |
+| ori_kv | 可选输入 | 原始KV输入，Key和Value共享同一份数据。 | float16、bfloat16 | ND |
+| cmp_kv | 可选输入 | 压缩KV输入，Key和Value共享同一份数据。 | float16、bfloat16 | ND |
+| ori_sparse_indices | 可选输入 | 原始KV稀疏索引，当前版本不支持传入非空Tensor。 | int32 | ND |
+| cmp_sparse_indices | 可选输入 | 压缩KV TopK索引，无效位置填-1。 | int32 | ND |
+| ori_block_table | 可选输入 | PageAttention场景下`ori_kv`使用的block映射表。 | int32 | ND |
+| cmp_block_table | 可选输入 | PageAttention场景下`cmp_kv`使用的block映射表。 | int32 | ND |
+| cu_seqlens_q | 可选输入 | TND场景下`q`的累积序列长度。 | int32 | ND |
+| cu_seqlens_ori_kv | 可选输入 | TND场景下`ori_kv`的累积序列长度。 | int32 | ND |
+| cu_seqlens_cmp_kv | 可选输入 | TND场景下`cmp_kv`的累积序列长度。 | int32 | ND |
+| seqused_q | 可选输入 | 不同batch中`q`实际参与计算的token数。 | int32 | ND |
+| seqused_ori_kv | 可选输入 | 不同batch中`ori_kv`实际参与计算的token数。 | int32 | ND |
+| seqused_cmp_kv | 可选输入 | 不同batch中`cmp_kv`实际参与计算的token数。 | int32 | ND |
+| cmp_residual_kv | 可选输入 | 压缩KV余数，用于恢复cmp侧mask使用的压缩前KV长度。 | int32 | ND |
+| ori_topk_length | 可选输入 | 预留输入，当前版本不支持传入非空Tensor。 | int32 | ND |
+| cmp_topk_length | 可选输入 | 预留输入，当前版本不支持传入非空Tensor。 | int32 | ND |
+| sinks | 可选输入 | attention sinks输入。 | float | ND |
+| metadata | 输入 | `sparse_flash_mla_metadata`生成的任务切分结果。 | int32 | ND |
+| softmax_scale | 可选属性 | QK矩阵乘后的缩放系数。默认值为1.0。 | float | - |
 | cmp_ratio | 可选属性 | 表示`cmp_kv`相对于压缩前KV长度的压缩倍率，用于恢复cmp侧mask使用的压缩前KV长度；仅传入`ori_kv`时不参与压缩KV计算。支持1到128。默认值为1。 | INT | - |
 | ori_mask_mode | 可选属性 | 表示`q`和`ori_kv`计算的mask模式。<br>0: No Mask。<br>3: RightDownCausal模式。<br>4: Band模式。默认值为0。 | INT | - |
 | cmp_mask_mode | 可选属性 | 表示`q`和`cmp_kv`计算的mask模式。<br>0: No Mask。<br>3: RightDownCausal模式。默认值为0。 | INT | - |
@@ -178,8 +189,8 @@ cann_ops_transformer.sparse_flash_mla(
 | layout_kv | 可选属性 | 表示输入`ori_kv`和`cmp_kv`的数据排布格式，支持"BSND"、"TND"和"PA_BBND"。默认值为"BSND"。 | STRING | - |
 | topk_value_mode | 可选属性 | 表示TopK索引取值模式，仅支持1。默认值为1。 | INT | - |
 | return_softmax_lse | 可选属性 | 表示是否返回softmax的log-sum-exp结果。默认值为False。 | BOOL | - |
-| attention_out | 输出 | attention计算输出。 | FLOAT16、BFLOAT16 | ND |
-| softmax_lse | 输出 | softmax的log-sum-exp结果；未使能返回时为占位Tensor。 | FLOAT | ND |
+| attention_out | 输出 | attention计算输出。 | float16、bfloat16 | ND |
+| softmax_lse | 输出 | softmax的log-sum-exp结果；未使能返回时为占位Tensor。 | float | ND |
 
 ## 返回值说明
 
@@ -190,14 +201,14 @@ cann_ops_transformer.sparse_flash_mla(
 ### sparse_flash_mla
 
 - **attention_out**：`sparse_flash_mla`的第一个输出，shape和`q`一致，dtype和`q`一致。
-- **softmax_lse**：`sparse_flash_mla`的第二个输出。`return_softmax_lse=False`时返回FLOAT32标量占位Tensor；`return_softmax_lse=True`时返回FLOAT32的log-sum-exp结果。
+- **softmax_lse**：`sparse_flash_mla`的第二个输出。`return_softmax_lse=False`时返回float32标量占位Tensor；`return_softmax_lse=True`时返回float32的log-sum-exp结果。
 
 ## 约束说明
 
 - 公共约束：
   - 适用场景：该接口支持训练、推理场景下使用。
   - 调用方式：该接口支持单算子模式和TorchAir图模式调用。
-  - `q`、`ori_kv`、`cmp_kv`的数据类型必须一致，支持FLOAT16和BFLOAT16。
+  - `q`、`ori_kv`、`cmp_kv`的数据类型必须一致，支持float16和bfloat16。
   - `layout_q`和`layout_kv`组合仅支持"BSND"/"BSND"、"TND"/"TND"、"BSND"/"PA_BBND"、"TND"/"PA_BBND"；非PA_BBND场景下`layout_q`和`layout_kv`必须一致。
   - `layout_q`支持"BSND"和"TND"；`layout_q="BSND"`时，`q`必须为4维；`layout_q="TND"`时，`q`必须为3维且必须传入`cu_seqlens_q`。
   - `layout_kv`支持"BSND"、"TND"和"PA_BBND"；`layout_kv="BSND"`或`layout_kv="PA_BBND"`时，`ori_kv`和`cmp_kv`必须为4维；`layout_kv="TND"`时，`ori_kv`和`cmp_kv`必须为3维。
@@ -208,7 +219,7 @@ cann_ops_transformer.sparse_flash_mla(
   - `layout_kv="PA_BBND"`时必须传入`seqused_ori_kv`和`ori_block_table`；传入`cmp_kv`时，还必须传入`cmp_block_table`。
   - `seqused_cmp_kv`为所有`layout_kv`下的可选输入，显式传入时用于覆盖cmp侧逻辑有效长度。
   - `ori_mask_mode`及`cmp_mask_mode`所表示的mask模式的详细介绍见[sparse_mode参数说明](../../../../docs/zh/context/sparse_mode_introduction.md)。
-  - `metadata`固定为1024个INT32元素，`topk_value_mode`仅支持1，`ori_sparse_indices`、`ori_topk_length`和`cmp_topk_length`当前版本不支持传入非空Tensor。
+  - `metadata`固定为1024个int32元素，`topk_value_mode`仅支持1，`ori_sparse_indices`、`ori_topk_length`和`cmp_topk_length`当前版本不支持传入非空Tensor。
   - `ori_kv`和`cmp_kv`允许存在行间padding类非连续内存，接口会通过aclnn获取stride信息传给底层算子。
 
 - 规格约束：
@@ -219,8 +230,12 @@ cann_ops_transformer.sparse_flash_mla(
     - PageAttention的block_size支持1到1024。
 
   - 产品型号约束如下：
+    <!-- npu="950" id5 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：`num_heads_q`/`num_heads_kv`不支持1。
+    <!-- end id5 -->
+    <!-- npu="A3,910b" id6 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：cmp_ratio在SWA场景保持默认值1，CSA支持传入4，HCA支持传入128；block_size支持16的倍数，且不超过1024；ori_sparse_indices当前暂不支持，cmp_sparse_indices的最后一维压缩KV TopK长度，支持0、512、1024。默认值为0。
+    <!-- end id6 -->
   - SWA：
     - 仅传入`ori_kv`时，`cmp_ratio`不参与压缩KV计算，需保持默认值1。
     - 不传入`cmp_kv`、`cmp_sparse_indices`和`cmp_block_table`。

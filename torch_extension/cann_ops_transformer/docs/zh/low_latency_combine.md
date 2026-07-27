@@ -2,30 +2,42 @@
 
 ## 产品支持情况
 
-- <term>Ascend 950DT</term>：支持
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
-- 接口功能：
+- **接口功能**：
 
     需与[low_latency_dispatch](low_latency_dispatch.md)配套使用，相当于按low_latency_dispatch算子收集数据的路径原路返回。
-     - 支持数据整合功能，进行alltoallv通信，最后将接收的数据整合（乘权重再相加）；
-     - 支持特殊专家场景。
+  - 支持数据整合功能，进行alltoallv通信，最后将接收的数据整合（乘权重再相加）；
+  - 支持特殊专家场景。
 
-- 计算公式：
+- **计算公式**：
 
-    - 数据整合功能：
+  - 数据整合功能：
 
       $$ata\_out = AlltoAllv(expand\_x)$$
 
       $$x = Sum(topk\_weights * ata\_out + topk\_weights * shared\_expert\_x)$$
 
-    - 特殊专家场景：
+  - 特殊专家场景：
 
       零专家场景，即`zero_expert_num`不为0：
 
@@ -208,7 +220,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
         <td>zero_expert_num</td>
         <td>int</td>
         <td>可选</td>
-        <td>表示零专家的数量。取值范围[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID值是[num_experts, num_experts+zero_expert_num)。默认值为0。</td>
+        <td>表示零专家的数量。取值范围[0, MAX_int32)，MAX_int32 = 2^31 - 1，合法的零专家的ID值是[num_experts, num_experts+zero_expert_num)。默认值为0。</td>
         <td>int</td>
         <td>-</td>
     </tr>
@@ -216,7 +228,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
         <td>copy_expert_num</td>
         <td>int</td>
         <td>可选</td>
-        <td>表示拷贝专家的数量。取值范围[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID值是[num_experts+zero_expert_num, num_experts+zero_expert_num+copy_expert_num)。默认值为0。</td>
+        <td>表示拷贝专家的数量。取值范围[0, MAX_int32)，MAX_int32 = 2^31 - 1，合法的拷贝专家的ID值是[num_experts+zero_expert_num, num_experts+zero_expert_num+copy_expert_num)。默认值为0。</td>
         <td>int</td>
         <td>-</td>
     </tr>
@@ -224,7 +236,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
         <td>const_expert_num</td>
         <td>int</td>
         <td>可选</td>
-        <td>表示常量专家的数量。取值范围[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的常量专家的ID值是[num_experts+zero_expert_num+copy_expert_num, num_experts+zero_expert_num+copy_expert_num+const_expert_num)。默认值为0。</td>
+        <td>表示常量专家的数量。取值范围[0, MAX_int32)，MAX_int32 = 2^31 - 1，合法的常量专家的ID值是[num_experts+zero_expert_num+copy_expert_num, num_experts+zero_expert_num+copy_expert_num+const_expert_num)。默认值为0。</td>
         <td>int</td>
         <td>-</td>
     </tr>
@@ -298,7 +310,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
 ## 约束说明
 
 - 该接口支持推理场景下使用。
-- 该接口支持单算子模式和torchair图模式调用。
+- 该接口支持单算子模式和TorchAir图模式调用。
 - 各张量参数的list[Tensor]长度、是否转置、是否支持非连续Tensor约束如下：
 
     <table style="undefined;table-layout: fixed; width:900px"><colgroup>
@@ -398,37 +410,37 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
     </table>
 
 - 参数里Shape使用的变量如下：
-    - A：表示本卡接收的最大token数量，取值范围如下
-        - 对于共享专家，要满足A=BS\*ep_world_size\*shared_expert_num/shared_expert_rank_num。
-        - 对于MoE专家，当num_max_dispatch_tokens_per_rank为0时，要满足A >= BS\*ep_world_size \* min(local_expert_num, K)；当num_max_dispatch_tokens_per_rank不为0时，要满足A >= num_max_dispatch_tokens_per_rank \* ep_world_size \* min(local_expert_num, K)。
-    - H：表示hidden size隐藏层大小。取值范围[1024, 8192]。
-    - BS：表示待发送的token数量。取值范围为0<BS≤512。
-    - K：表示选取topK个专家，取值范围为0<K≤16，同时满足0 < K ≤ num_experts + zero_expert_num + copy_expert_num + const_expert_num。
-    - local_expert_num：表示本卡专家数量。
-        - 对于共享专家卡，local_expert_num=1。
-        - 对于MoE专家卡，local_expert_num=num_experts/(ep_world_size-shared_expert_rank_num)。
-        - 应满足0 < local_expert_num \* ep_world_size ≤ 2048。
+  - A：表示本卡接收的最大token数量，取值范围如下
+    - 对于共享专家，要满足A=BS\*ep_world_size\*shared_expert_num/shared_expert_rank_num。
+    - 对于MoE专家，当num_max_dispatch_tokens_per_rank为0时，要满足A >= BS\*ep_world_size \* min(local_expert_num, K)；当num_max_dispatch_tokens_per_rank不为0时，要满足A >= num_max_dispatch_tokens_per_rank \* ep_world_size \* min(local_expert_num, K)。
+  - H：表示hidden size隐藏层大小。取值范围[1024, 8192]。
+  - BS：表示待发送的token数量。取值范围为0<BS≤512。
+  - K：表示选取topK个专家，取值范围为0<K≤16，同时满足0 < K ≤ num_experts + zero_expert_num + copy_expert_num + const_expert_num。
+  - local_expert_num：表示本卡专家数量。
+    - 对于共享专家卡，local_expert_num=1。
+    - 对于MoE专家卡，local_expert_num=num_experts/(ep_world_size-shared_expert_rank_num)。
+    - 应满足0 < local_expert_num \* ep_world_size ≤ 2048。
 
 - `low_latency_dispatch`和`low_latency_combine`必须配套使用。
 - 在不同产品型号、不同通信算法或不同版本中，`low_latency_dispatch`的Tensor输出`assist_info_for_combine`、`ep_recv_counts`、`expand_scales`中的元素值可能不同，使用时直接将上述Tensor传给`low_latency_combine`对应参数即可，模型其他业务逻辑不应对其存在依赖。
 - 调用接口过程中使用的`group_ep`、`ep_world_size`、`num_experts`、`expert_shard_type`、`shared_expert_num`、`shared_expert_rank_num`、`num_max_dispatch_tokens_per_rank`参数取值所有卡需保持一致，`group_ep`、`ep_world_size`、`expert_shard_type`、`num_max_dispatch_tokens_per_rank`网络中不同层中也需保持一致，且和[low_latency_dispatch](low_latency_dispatch.md)对应参数也保持一致。
 - 该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
-- num_experts + zero_expert_num + copy_expert_num + const_expert_num < MAX_INT32。
+- num_experts + zero_expert_num + copy_expert_num + const_expert_num < MAX_int32。
 
 - HCCL通信域缓存区大小：
 
     调用本接口前需检查通信域缓存区大小取值是否合理，单位MB，不配置时默认为200MB。
-    - 该场景仅支持通过环境变量HCCL_BUFFSIZE配置，该环境变量按通信域粒度管理，每个通信域独占一组“2\*HCCL_BUFFSIZE”大小的内存。
-    - ep通信域内：设置大小要求 >= 2且满足>= 2 \* (local_expert_num \* max_bs \* ep_world_size \* Align512(Align32(2 \* h) + 64) + (k + shared_expert_num) \* max_bs\* Align512(2 \* h))。
-    - 其中480Align512(x) = ((x+480-1)/480)\*512,Align512(x) = ((x+512-1)/512)\*512,Align32(x) = ((x+32-1)/32)\*32。
-    - 通信域内开设大小可通过调用MoeDistributeBuffer.get_low_latency_ccl_buffer_size接口计算。
+  - 该场景仅支持通过环境变量HCCL_BUFFSIZE配置，该环境变量按通信域粒度管理，每个通信域独占一组“2\*HCCL_BUFFSIZE”大小的内存。
+  - ep通信域内：设置大小要求 >= 2且满足>= 2 \* (local_expert_num \* max_bs \* ep_world_size \* Align512(Align32(2 \* h) + 64) + (k + shared_expert_num) \* max_bs\* Align512(2 \* h))。
+  - 其中480Align512(x) = ((x+480-1)/480)\*512,Align512(x) = ((x+512-1)/512)\*512,Align32(x) = ((x+32-1)/32)\*32。
+  - 通信域内开设大小可通过调用MoeDistributeBuffer.get_low_latency_ccl_buffer_size接口计算。
 
 - 本文公式中的“/”表示整除。
 
 - 通信域使用约束：
 
-    - 一个模型中的`low_latency_dispatch`和`low_latency_combine`算子仅支持相同EP通信域，且该通信域中不允许有其他算子。
-    - 一个通信域内的节点需在一个超节点内，不支持跨超节点。
+  - 一个模型中的`low_latency_dispatch`和`low_latency_combine`算子仅支持相同EP通信域，且该通信域中不允许有其他算子。
+  - 一个通信域内的节点需在一个超节点内，不支持跨超节点。
 
 ## 确定性计算
 

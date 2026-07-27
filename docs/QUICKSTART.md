@@ -24,11 +24,7 @@
 
 - CANNLab云开发环境：
 
-   默认提供最新最新版本CANN包配套的项目源码，进入源码目录，\$\{gitCode\_id\}替换为开发者个人gitCode账号。
-
-   ```bash
-   cd /mnt/workspace/gitCode/${gitCode_id}/ops-transformer
-   ```
+   默认提供最新版本CANN包配套的项目源码，资源一般在`/mnt/workspace/gitCode`目录下，请进入目标分支源码目录。
 
 - 非CANNLab云开发环境：
 

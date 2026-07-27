@@ -1,19 +1,31 @@
-# cann_ops_transformer.indexer_quant_cache
+# indexer_quant_cache
 
 ## 产品支持情况
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
-- 接口功能：
+- **接口功能**：
 
-    在Indexer注意力机制的Epilog阶段对KV Cache进行原地动态量化压缩更新，封装aclnnIndexerQuantCache。将float16/bfloat16激活值x按量化粒度（mxfp8/mxfp4 模式每32个元素一组，fp8/hifloat8 模式整行一组）动态量化为FP8（E4M3/E5M2）或MX-FP4，并按slot_mapping将量化结果与对应scale散写到cache/cache_scale，slot_mapping中值为-1的token跳过不处理。支持 mxfp8、fp8、hifloat8、mxfp4 四种量化模式（各模式含义见参数说明 quant_mode）。
+    在Indexer注意力机制的Epilog阶段对KV Cache进行原地动态量化压缩更新，封装aclnnIndexerQuantCache。将float16/bfloat16激活值x按量化粒度（mxfp8/mxfp4 模式每32个元素一组，fp8/hifloat8 模式整行一组）动态量化为FP8（E4M3/E5M2）或MX-FP4，并按slot_mapping将量化结果与对应scale散写到cache/cache_scale，slot_mapping中值为-1的token跳过不处理。支持mxfp8、fp8、hifloat8、mxfp4 四种量化模式（各模式含义见参数说明quant_mode）。
 
 - 语义说明：
 
@@ -21,7 +33,7 @@
 
 ## 函数原型
 
-```
+```python
 cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *, quant_mode="fp8", round_scale=True, x_scale=1.0) -> None
 ```
 
@@ -51,7 +63,7 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
         <td>Tensor</td>
         <td>必选</td>
         <td>当前层的分页KV Cache，<b>仅支持四维shape</b>（num_slots = blockNum × blockSize），<b>headDim须 ≥ d</b>（MX-FP4以fp4元素计）。在<b>blockNum维支持非连续</b>（分页）。MX-FP4模式下cache为FP4（每字节打包2个fp4值）。数据格式为$ND$。</td>
-        <td>FLOAT8_E4M3FN、FLOAT8_E5M2、UINT8、FLOAT4_E2M1、FLOAT4_E1M2</td>
+        <td>float8_e4m3fn、float8_e5m2、uint8、float4_E2M1、float4_e1m2</td>
         <td>(blockNum, blockSize, 1, headDim)</td>
     </tr>
     <tr>
@@ -59,7 +71,7 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
         <td>Tensor</td>
         <td>必选</td>
         <td>每块量化的scale因子，<b>仅支持四维shape</b>，<b>scaleHeadDim须 ≥ scaleCol</b>；含HiFloat8/quant_mode=2在内的所有量化模式均校验（scaleCol取值与HiFloat8规则详见约束说明）。数据格式为$ND$。</td>
-        <td>FLOAT、FLOAT8_E8M0</td>
+        <td>float、float8_e8m0</td>
         <td>(blockNum, blockSize, 1, scaleHeadDim)</td>
     </tr>
     <tr>
@@ -67,7 +79,7 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
         <td>Tensor</td>
         <td>必选</td>
         <td>待量化的激活输入，d需满足d % 32 == 0且d ≤ 8192。数据格式为$ND$。</td>
-        <td>FLOAT16、BFLOAT16</td>
+        <td>float16、bfloat16</td>
         <td>(bs, d)</td>
     </tr>
     <tr>
@@ -75,21 +87,21 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
         <td>Tensor</td>
         <td>必选</td>
         <td>token到cache slot的索引映射，元素取值范围[-1, num_slots - 1]，-1表示跳过该token；维度需等于x的维度减1。数据格式为$ND$。</td>
-        <td>INT32</td>
+        <td>int32</td>
         <td>(bs)</td>
     </tr>
     <tr>
         <td>quant_mode</td>
         <td>str</td>
         <td>可选</td>
-        <td>量化模式（字符串，大小写不敏感；TorchNPU内部经枚举映射为算子侧 int）。默认值<code>"fp8"</code>。可选值与含义：
+        <td>量化模式（字符串，大小写不敏感；TorchNPU内部经枚举映射为算子侧int）。默认值<code>"fp8"</code>。可选值与含义：
             <ul>
-                <li><code>"mxfp8"</code>(内部 0)：MX-FP8 微缩放量化，x 每 32 个元素一组，输出 FP8(e4m3/e5m2)，每组一个 e8m0(2 的幂指数) scale，cache_scale 为 FLOAT8_E8M0。</li>
-                <li><code>"fp8"</code>(内部 1)：逐 token 动态 FP8 量化，整行（headDim）一组，输出 FP8(e4m3/e5m2)，每行一个 float32 scale（scaleCol=1），cache_scale 为 FLOAT。</li>
-                <li><code>"hifloat8"</code>(内部 2)：HiFloat8 静态量化（按 x_scale 缩放后取 HiFloat8），整行一组，cache_scale 为 FLOAT。</li>
-                <li><code>"mxfp4"</code>(内部 3)：MX-FP4 微缩放量化，x 每 32 个元素一组，输出 FP4(每字节打包 2 个值)，每组一个 e8m0 scale，cache_scale 为 FLOAT8_E8M0。</li>
+                <li><code>"mxfp8"</code>(内部0)：MX-FP8 微缩放量化，x每32 个元素一组，输出FP8(e4m3/e5m2)，每组一个e8m0(2 的幂指数) scale，cache_scale为float8_e8m0。</li>
+                <li><code>"fp8"</code>(内部1)：逐token动态FP8 量化，整行（headDim）一组，输出FP8(e4m3/e5m2)，每行一个float32 scale（scaleCol=1），cache_scale为float。</li>
+                <li><code>"hifloat8"</code>(内部2)：HiFloat8 静态量化（按x_scale缩放后取HiFloat8），整行一组，cache_scale为float。</li>
+                <li><code>"mxfp4"</code>(内部3)：MX-FP4 微缩放量化，x每32 个元素一组，输出FP4(每字节打包2 个值)，每组一个e8m0 scale，cache_scale为float8_e8m0。</li>
             </ul>
-            下文约束说明中出现的 quant_mode=0/1/2/3 指上表对应的内部 int 取值。</td>
+            下文约束说明中出现的quant_mode=0/1/2/3 指上表对应的内部int取值。</td>
         <td>STR</td>
         <td>-</td>
     </tr>
@@ -106,7 +118,7 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
         <td>float</td>
         <td>可选</td>
         <td>HiFloat8模式（quant_mode=2）下的全局scale乘数。默认值1.0。</td>
-        <td>FLOAT</td>
+        <td>float</td>
         <td>-</td>
     </tr>
 </tbody>
@@ -120,17 +132,15 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
 
 - 该接口支持推理场景下使用。
 - 该接口支持单算子模式调用。
-- 仅支持<term>Ascend 950PR/Ascend 950DT</term>。
-- cache与cache_scale的数据类型组合需与quant_mode匹配：fp8/hifloat8 模式cache_scale为FLOAT；mxfp8/mxfp4 模式cache_scale为FLOAT8_E8M0；mxfp4 模式cache为FP4（uint8打包）。
-- cache 与 cache_scale（所有量化模式，含HiFloat8）均仅支持四维shape `[blockNum, blockSize, 1, headDim]`，倒数第二维固定为1（每token一个量化向量）；num_slots = blockNum × blockSize。
+- cache与cache_scale的数据类型组合需与quant_mode匹配：fp8/hifloat8 模式cache_scale为float；mxfp8/mxfp4 模式cache_scale为float8_e8m0；mxfp4 模式cache为FP4（uint8打包）。
+- cache与cache_scale（所有量化模式，含HiFloat8）均仅支持四维shape `[blockNum, blockSize, 1, headDim]`，倒数第二维固定为1（每token一个量化向量）；num_slots = blockNum × blockSize。
 - cache/cache_scale仅在blockNum维支持非连续：各block可不紧密排布，但block内须连续。
 - headDim长度约束：
-    - cache.headDim ≥ d（MX-FP4以fp4元素计，d个fp4值占⌈d/2⌉字节）；
-    - cache_scale.headDim ≥ scaleCol，scaleCol = mxfp8/mxfp4：⌈d/32⌉；fp8/hifloat8：1；
-    - 示例：d=128、quant_mode=0 → scaleCol=4 → cache.headDim ≥ 128 且 cache_scale.headDim ≥ 4。
+  - cache.headDim ≥ d（MX-FP4以fp4元素计，d个fp4值占⌈d/2⌉字节）；
+  - cache_scale.headDim ≥ scaleCol，scaleCol = mxfp8/mxfp4：⌈d/32⌉；fp8/hifloat8：1；
+  - 示例：d=128、quant_mode=0 → scaleCol=4 → cache.headDim ≥ 128 且cache_scale.headDim ≥ 4。
 - slot_mapping的维度应等于x的维度减1，即slot_mapping为x除最后一维外的所有维度展平。
 - slot_mapping中值为-1的token会被跳过不处理；其余有效元素取值范围为[0, num_slots - 1]，且元素值应保证不重复，重复时不保证结果正确性。
-- 支持图模式（torchair）调用：经graph_convert注册的GE converter下沉为IndexerQuantCache算子，eager与图模式结果一致。
 
 ## 确定性计算
 
@@ -145,7 +155,7 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
     import torch_npu
     from cann_ops_transformer.ops import indexer_quant_cache
 
-    # cache/cache_scale 为四维 [blockNum, blockSize, 1, headDim]，num_slots = blockNum*blockSize
+    # cache/cache_scale为四维 [blockNum, blockSize, 1, headDim]，num_slots = blockNum*blockSize
     block_num, block_size, d = 128, 16, 128   # num_slots = 2048; mode1 headDim=d=128 >= d
     bs = 1024
 
@@ -161,7 +171,7 @@ cann_ops_transformer.indexer_quant_cache(cache, cache_scale, x, slot_mapping, *,
 
 - 图模式（torchair）调用
 
-    复用上面单算子示例构造的 cache/cache_scale/x/slot_mapping，用torchair后端编译后调用即可：
+    复用上面单算子示例构造的cache/cache_scale/x/slot_mapping，用torchair后端编译后调用即可：
 
     ```python
     import torchair

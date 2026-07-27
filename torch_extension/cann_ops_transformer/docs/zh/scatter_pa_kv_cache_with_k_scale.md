@@ -2,20 +2,32 @@
 
 ## 产品支持情况
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id8 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id8 -->
+<!-- npu="910" id9 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id9 -->
 
 ## 功能说明
 
-- 接口功能：
+- **接口功能**：
 
   `scatter_pa_kv_cache_with_k_scale`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`ScatterPaKvCacheWithKScale`算子完成PagedAttention场景下FP8格式的key/value及其对应key_scale的KV Cache更新。
 
-- 计算公式：
+- **计算公式**：
 
   对于每个token（i ∈ [0, num_tokens)）和每个头（j ∈ [0, num_head)）：
 
@@ -69,13 +81,13 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| key | Tensor | 必选 | 待更新的key值，当前step多个token的key。不支持空Tensor。 | FLOAT8_E5M2、FLOAT8_E4M3FN | (num_tokens, num_head, k_head_size) |
-| value | Tensor | 必选 | 待更新的value值，当前step多个token的value。不支持空Tensor。 | FLOAT8_E5M2、FLOAT8_E4M3FN | (num_tokens, num_head, v_head_size) |
+| key | Tensor | 必选 | 待更新的key值，当前step多个token的key。不支持空Tensor。 | float8_e5m2、float8_e4m3fn | (num_tokens, num_head, k_head_size) |
+| value | Tensor | 必选 | 待更新的value值，当前step多个token的value。不支持空Tensor。 | float8_e5m2、float8_e4m3fn | (num_tokens, num_head, v_head_size) |
 | key_cache | Tensor | 必选 | 需要更新的key cache，当前layer的key cache。不支持空Tensor。 | 与key保持一致 | (num_blocks, num_head, block_size, k_head_size) |
 | value_cache | Tensor | 必选 | 需要更新的value cache，当前layer的value cache。不支持空Tensor。 | 与value保持一致 | (num_blocks, num_head, block_size, v_head_size) |
-| slot_mapping | Tensor | 必选 | 每个token key或value在cache中的存储偏移。不支持空Tensor。 | INT32、INT64 | (num_tokens,) |
-| key_scale | Tensor | 必选 | 待更新的key scale值，当前step多个token的key scale，尾轴可以不连续。不支持空Tensor。 | FLOAT | (num_tokens, num_head) |
-| key_scale_cache | Tensor | 必选 | 需要更新的key scale cache，当前layer的key scale cache，最后一维为1，尾轴必须连续。不支持空Tensor。 | FLOAT | (num_blocks, num_head, block_size, 1) |
+| slot_mapping | Tensor | 必选 | 每个token key或value在cache中的存储偏移。不支持空Tensor。 | int32、int64 | (num_tokens,) |
+| key_scale | Tensor | 必选 | 待更新的key scale值，当前step多个token的key scale，尾轴可以不连续。不支持空Tensor。 | float | (num_tokens, num_head) |
+| key_scale_cache | Tensor | 必选 | 需要更新的key scale cache，当前layer的key scale cache，最后一维为1，尾轴必须连续。不支持空Tensor。 | float | (num_blocks, num_head, block_size, 1) |
 | cache_layout | str | 可选 | 表示key_cache和value_cache的内存排布格式。当传"BNBD"时，表示格式为[num_blocks, num_head, block_size, head_size]。默认值为"BNBD"。 | STRING | - |
 
 ## 返回值说明
@@ -84,22 +96,15 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | key_cache_out | Tensor | 必选 | 更新后的key cache，shape和dtype与输入key_cache相同。 | 与key保持一致 | (num_blocks, num_head, block_size, k_head_size) |
 | value_cache_out | Tensor | 必选 | 更新后的value cache，shape和dtype与输入value_cache相同。 | 与value保持一致 | (num_blocks, num_head, block_size, v_head_size) |
-| key_scale_cache_out | Tensor | 必选 | 更新后的key scale cache，shape和dtype与输入key_scale_cache相同。 | FLOAT | (num_blocks, num_head, block_size, 1) |
-
-**说明**
--   key_cache_out：Tensor类型，更新后的key cache，数据类型与key一致。数据格式支持ND。shape与输入key_cache相同。
--   value_cache_out：Tensor类型，更新后的value cache，数据类型与value一致。数据格式支持ND。shape与输入value_cache相同。
--   key_scale_cache_out：Tensor类型，更新后的key scale cache，数据类型为float32。数据格式支持ND。shape与输入key_scale_cache相同。
+| key_scale_cache_out | Tensor | 必选 | 更新后的key scale cache，shape和dtype与输入key_scale_cache相同。 | float | (num_blocks, num_head, block_size, 1) |
 
 ## 约束说明
 
-- 声明
-  - 参数slot_mapping属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
-
+- 声明：参数slot_mapping属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 - 该接口支持推理场景下使用。
 - 该接口支持单算子模式和图模式（torchair）调用。
-- key、value、key_cache、value_cache的数据类型必须一致，且必须为FLOAT8_E5M2或FLOAT8_E4M3FN。
-- key_scale和key_scale_cache的数据类型必须为FLOAT。
+- key、value、key_cache、value_cache的数据类型必须一致，且必须为float8_e5m2或float8_e4m3fn。
+- key_scale和key_scale_cache的数据类型必须为float。
 - key和value的前两维shape必须相同。
 - slot_mapping的取值范围为\[0, num_blocks\*block_size-1\]，且slot_mapping内的元素值保证不重复，重复时不保证正确性。
 - key_scale是两维tensor，shape为\[num_tokens, num_head\]，尾轴可以不连续。
@@ -110,7 +115,7 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
 
 ## 确定性计算
 
-- 默认支持确定性计算。
+默认支持确定性计算。
 
 ## 调用示例
 
@@ -131,10 +136,10 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
     num_blocks = 2       # KV cache分块总数
     block_size = 16      # 每个分块包含的token数
 
-    # FP8 dtype（float8_e5m2 与 float8_e4m3fn 均支持，此处以 e4m3fn 为例）
+    # FP8 dtype（float8_e5m2 与float8_e4m3fn均支持，此处以e4m3fn为例）
     kv_dtype = torch.float8_e4m3fn
 
-    # 构造输入：key/value 为待写入的新数据
+    # 构造输入：key/value为待写入的新数据
     key = torch.randn(num_tokens, num_head, k_head_size, dtype=torch.float32, device="npu").to(kv_dtype)
     value = torch.randn(num_tokens, num_head, v_head_size, dtype=torch.float32, device="npu").to(kv_dtype)
 
@@ -187,10 +192,10 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
     num_blocks = 2       # KV cache分块总数
     block_size = 16      # 每个分块包含的token数
 
-    # FP8 dtype（float8_e5m2 与 float8_e4m3fn 均支持，此处以 e4m3fn 为例）
+    # FP8 dtype（float8_e5m2 与float8_e4m3fn均支持，此处以e4m3fn为例）
     kv_dtype = torch.float8_e4m3fn
 
-    # 构造输入：key/value 为待写入的新数据
+    # 构造输入：key/value为待写入的新数据
     key = torch.randn(num_tokens, num_head, k_head_size, dtype=torch.float32, device="npu").to(kv_dtype)
     value = torch.randn(num_tokens, num_head, v_head_size, dtype=torch.float32, device="npu").to(kv_dtype)
 

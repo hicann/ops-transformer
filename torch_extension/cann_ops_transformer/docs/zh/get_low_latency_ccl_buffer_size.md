@@ -2,28 +2,40 @@
 
 ## 产品支持情况
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：不支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
-- 接口功能：
+- **接口功能**：
 
     需与[low_latency_dispatch](low_latency_dispatch.md)和[low_latency_combine](low_latency_combine.md)配套使用，用于计算dispatch_v3和combine_v3算子所需的HCCL通信buffer_size大小（单位：MB）。该接口为静态方法，可在初始化`MoeDistributeBuffer`前调用。
 
-- 计算公式：
+- **计算公式**：
 
-    - 计算token实际长度：
+  - 计算token实际长度：
 
         $$token\_actual\_len = Align32(hidden * max\_out\_dtype\_size) + scale\_expand\_index\_buffer$$
 
         其中max_out_dtype_size为token类型转为字节数，scale_expand_index_buffer为scale（32B）+ expand_idx（3 × 4B）
 
-    - 根据`comm_alg`计算dispatch阶段每个token所需大小：
+  - 根据`comm_alg`计算dispatch阶段每个token所需大小：
 
         若`comm_alg`为"fullmesh_v2"：
 
@@ -33,13 +45,13 @@
 
         $$token\_need\_size\_dispatch = Align512(token\_actual\_len)$$
 
-    - 计算combine阶段每个token所需大小：
+  - 计算combine阶段每个token所需大小：
 
         $$token\_need\_size\_combine = Align512(hidden * max\_out\_dtype\_size)$$
 
         其中，full_mesh_data_align为480B对齐，win_addr_align为512B对齐
 
-    - 计算ccl_buffer_size大小：
+  - 计算ccl_buffer_size大小：
 
         $$dispatch\_buffer\_size = 2 * num\_max\_dispatch\_tokens\_per\_rank * token\_need\_size\_dispatch * world\_size * local\_moe\_expert\_num$$
         $$combine\_buffer\_size = 2 * num\_max\_dispatch\_tokens\_per\_rank * token\_need\_size\_combine * (topk + num\_shared\_expert)$$

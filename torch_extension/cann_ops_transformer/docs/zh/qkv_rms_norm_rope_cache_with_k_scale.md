@@ -2,20 +2,34 @@
 
 ## 产品支持情况
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
-- 接口功能：本文档包含`qkv_rms_norm_rope_cache_with_k_scale_`和`qkv_rms_norm_rope_cache_with_k_scale`两个torch_extension接口，均封装`aclnnQkvRmsNormRopeCacheWithKScale`，用于大语言模型推理场景下的Q/K/V预处理与PagedAttention KV Cache更新。两个接口都会从融合输入`qkv`中拆分Q、K、V分量，对Q/K执行RMSNorm、RoPE和共享`rotation`矩阵乘，随后将Q/K动态量化为FP8 E4M3FN；Q分支输出`q_out`和`q_scale`，K分支按`slot_mapping`写入K Cache和K scale cache，V分支按`v_scale`缩放后量化为FP8 E4M3FN，并按`slot_mapping`写入V Cache。
+- **接口功能**：
+
+  本文档包含`qkv_rms_norm_rope_cache_with_k_scale_`和`qkv_rms_norm_rope_cache_with_k_scale`两个torch_extension接口，均封装`aclnnQkvRmsNormRopeCacheWithKScale`，用于大语言模型推理场景下的Q/K/V预处理与PagedAttention KV Cache更新。两个接口都会从融合输入`qkv`中拆分Q、K、V分量，对Q/K执行RMSNorm、RoPE和共享`rotation`矩阵乘，随后将Q/K动态量化为FP8 E4M3FN；Q分支输出`q_out`和`q_scale`，K分支按`slot_mapping`写入K Cache和K scale cache，V分支按`v_scale`缩放后量化为FP8 E4M3FN，并按`slot_mapping`写入V Cache。
   - `qkv_rms_norm_rope_cache_with_k_scale_`：原地更新调用方传入的`k_cache`、`v_cache`和`k_scale_cache`，返回`q_out`和`q_scale`。
   - `qkv_rms_norm_rope_cache_with_k_scale`：内部先拷贝`k_cache`、`v_cache`和`k_scale_cache`，再对副本执行更新，返回`q_out`、`q_scale`和更新后的三个cache；调用方传入的cache保持不变。
 
-- 计算公式：
+- **计算公式**：
 
   按`head_nums=[Nq,Nk,Nv]`从`qkv`拆分Q、K、V：
 
@@ -186,7 +200,6 @@ cann_ops_transformer.qkv_rms_norm_rope_cache_with_k_scale(
 - `cos_sin`第一维需覆盖本次调用会访问的RoPE位置。
 - `slot_mapping`取值范围应为`[0,BlockNum*BlockSize-1]`。同一次调用内多个token写入同一slot时，最终写入顺序和结果未定义。
 - 资源边界约束：`Nq+Nk <= 128`，`Nq+Nk+Nv <= 160`，`Nv <= 80`，`ceil_align(Nq,16)+ceil_align(Nk,16) <= 256`。
-- <term>Ascend 950PR/Ascend 950DT</term>：支持该接口。
 
 ## 确定性计算
 

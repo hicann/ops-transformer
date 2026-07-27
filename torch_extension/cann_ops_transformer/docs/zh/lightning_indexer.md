@@ -2,16 +2,28 @@
 
 ## 产品支持情况
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
-- 接口功能：
+- **接口功能**：
 
   `lightning_indexer_metadata`接口用于生成一个任务列表，包含每个AIcore的Attention计算任务的起止点的Batch、Head、以及Q和K的分块的索引，供后续`lightning_indexer`算子使用。
 
@@ -21,7 +33,7 @@
   2. 通过激活函数$ReLU$过滤无效负相关信号后，得到当前Token与所有前序Token的相关性分数向量。
   3. 将其与权重系数`w`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$sparseIndices$，并输出对应的$sparseValues$，作为Attention的输入。
 
-- 计算公式：
+- **计算公式**：
 
   $$
   Top-k \left\{  \left[ 1 \left] \mathop{{}}\nolimits_{{1 \times \text{ }g}}\text{@} \left[  \left( W\text{@} \left[ 1 \left] \mathop{{}}\nolimits_{{1\text{ } \times \text{ }S\mathop{{}}\nolimits_{{k}}}} \left) \text{ } \odot \text{ }ReLU \left( Q\mathop{{}}\nolimits_{{index}}\text{@}K\mathop{{}}\nolimits_{{T}}^{{index}} \left)  \left]  \right\} \right. \right. \right. \right. \right. \right. \right. \right. \right. \right.
@@ -127,11 +139,6 @@ cann_ops_transformer.lightning_indexer(
 | cmp_ratio | int | 可选 | 用于稀疏计算，表示k的压缩倍数。支持1-128，默认值为1，表示无压缩。 | int32 | - |
 | return_value | int | 可选 | 代表是否需要返回Indices对应的Values值。0代表不返回，1代表返回值，默认值为0。 | int32 | - |
 
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>:
-  - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
-  - 当前不支持sequsedQOptional、outputIdxOffsetOptional、maxSeqlenQ功能，不建议传入这些参数。
-  - 当layout_k为PA_BBND时，必须传入sequsedKOptional；当layout_k不为PA_BBND时，不支持sequsedKOptional功能，不建议传入该参数。
-
 ## 返回值说明
 
 ### lightning_indexer_metadata
@@ -150,7 +157,7 @@ cann_ops_transformer.lightning_indexer(
 ## 约束说明
 
 - 该接口支持推理场景下使用。
-- 该接口支持单算子模式和aclgraph图模式调用。
+- 该接口支持单算子模式和TorchAir（aclgraph）图模式调用。
 - lightning_indexer_metadata接口需与lightning_indexer算子配套使用。
 - B（Batch）表示输入样本批量大小。
 - 参数cu_seqlens_q、cu_seqlens_k要求其值为当前Batch与前序Batch有效token数的累加值，后一个元素的值必须大于等于前一个元素的值。
@@ -161,19 +168,23 @@ cann_ops_transformer.lightning_indexer(
 - pa_kv_cache支持0轴非连续；pa_block_size支持1~1024，满足block大小32B对齐。
 - 参数q、k的数据类型应保持一致。
 - sparse_indices无效部分填-1；sparse_values无效部分填-inf。
+<!-- npu="A3,910b" id7 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>:
   - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
   - 当前不支持sequsedQOptional、outputIdxOffsetOptional、maxSeqlenQ功能，不建议传入这些参数。
   - 当layout_k为PA_BBND时，必须传入sequsedKOptional；当layout_k不为PA_BBND时，不支持sequsedKOptional功能，不建议传入该参数。
+<!-- end id7 -->
+<!-- npu="950" id8 -->
 - <term>Ascend 950PR/Ascend 950DT</term>:
   - 当layout_q为BSND时，不支持传入cuSeqlensQOptional；当layout_k为BSND或PA_BBND时，不支持传入cuSeqlensKOptional。
-  - 当传入outputIdxOffsetOptional时，只支持大于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparseIndice值不超过INT32的最大值。
+  - 当传入outputIdxOffsetOptional时，只支持大于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparseIndice值不超过int32的最大值。
   - 当layout_q为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的query长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的query长度seqlen2时，会启用TND Padding功能，将该batch的从seqlen1 + 1到seqlen2的query输出的sparseIndices和sparseValues全部置为无效值。
   - 当传入的cmpRatio > 1且maskMode = 3时，必须传入cmpResidualKOptional，其余情况不传入。
+<!-- end id8 -->
 
 ## 确定性计算
 
-- 默认支持确定性计算。
+默认支持确定性计算。
 
 ## 调用示例
 
@@ -235,7 +246,7 @@ cann_ops_transformer.lightning_indexer(
   print(f"sparse_indices shape: {sparse_indices.shape}")
   ```
 
-- aclgraph图模式调用：
+- TorchAir（aclgraph）图模式调用：
 
   ```python
   import torch

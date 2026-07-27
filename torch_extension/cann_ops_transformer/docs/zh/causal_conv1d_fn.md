@@ -1,21 +1,33 @@
-# cann_ops_transformer.causal_conv1d_fn
+# causal_conv1d_fn
 
 ## 产品支持情况
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
-- 接口功能：
+- **接口功能**：
 
-    因果一维卷积前向计算（prefill / chunk-prefill），封装 aclnnCausalConv1dFn。沿序列维度使用缓存数据（长度为卷积核宽减1）对各序列头部进行 padding，确保输出依赖当前及历史输入；卷积完成后可选施加 SiLU 激活；计算完成后将当前序列部分数据更新到缓存。支持缓存索引（cacheIndices）、初始状态模式（initialStateMode）等特性。
+    因果一维卷积前向计算（prefill/chunk-prefill），封装aclnnCausalConv1dFn。沿序列维度使用缓存数据（长度为卷积核宽减1）对各序列头部进行padding，确保输出依赖当前及历史输入；卷积完成后可选施加SiLU激活；计算完成后将当前序列部分数据更新到缓存。支持缓存索引（cacheIndices）、初始状态模式（initialStateMode）等特性。
 
-- 计算公式：
+- **计算公式**：
 
     在每个时间步 $t$，根据当前输入 $x_t$、卷积权重 $w$ 和历史状态，计算卷积输出 $y_t$：
 
@@ -23,11 +35,12 @@
     y_t = \text{Activation}\left(\sum_{j=0}^{W-1} w_j \cdot x_{t-j} + b\right)
     $$
 
-    其中，$W$ 为卷积核宽度（支持2、3、4），$w_j$ 为卷积权重，$b$ 为偏置，$\text{Activation}$ 为激活函数（SiLU 或无激活）。
+    其中，$W$ 为卷积核宽度（支持2、3、4），$w_j$ 为卷积权重，$b$ 为偏置，$\text{Activation}$ 为激活函数（SiLU或无激活）。
 
-**说明**
-- 算子同时维护卷积状态 `conv_states`，用于在增量推理时缓存历史输入，实现高效的状态更新。
-- 模式由输入形状自动推断：x 为 3D 且 seq_len > 1 时为 prefill 模式。
+- **说明**：
+
+  - 算子同时维护卷积状态 `conv_states`，用于在增量推理时缓存历史输入，实现高效的状态更新。
+  - 模式由输入形状自动推断：x为3D且seq_len > 1 时为prefill模式。
 
 ## 函数原型
 
@@ -50,7 +63,7 @@ cann_ops_transformer.causal_conv1d_fn(
 |--------|----------|-----------|------|----------|-------------|
 | x | Tensor | 必选 | 输入序列。 | float16、bfloat16 | [batch, seq_len, dim]（固定batch）或 [cu_seq_len, dim]（变长） |
 | weight | Tensor | 必选 | 卷积权重。 | 同x | [kW, dim]，kW∈{2, 3, 4} |
-| bias | Tensor | 必选 | 卷积偏置，None 表示不使用。 | 同x | [dim] |
+| bias | Tensor | 必选 | 卷积偏置，None表示不使用。 | 同x | [dim] |
 | conv_states | Tensor | 必选 | 卷积状态缓存，计算后原地更新。 | 同x | [num_cache_lines, state_len, dim]，state_len ≥ kW-1 |
 | query_start_loc | Tensor | 必选 | 变长序列起始位置索引。变长场景必须提供，固定batch场景可传空Tensor。 | int32 | [batch+1] |
 | cache_indices | Tensor | 可选 | 缓存索引，指定每个序列对应的缓存状态在conv_states中的索引。默认None使用恒等映射。 | int32 | [batch] |
@@ -66,7 +79,7 @@ cann_ops_transformer.causal_conv1d_fn(
 
 ## 返回值说明
 
-返回卷积输出 Tensor y，shape 与 x 一致，dtype 与 x 一致。
+返回卷积输出Tensor y，shape与x一致，dtype与x一致。
 
 ## 约束说明
 

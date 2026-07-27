@@ -2,16 +2,28 @@
 
 ## 产品支持情况
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id8 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id8 -->
+<!-- npu="910" id9 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id9 -->
 
 ## 功能说明
 
-- 接口功能：
+- **接口功能**：
 
   `quant_sparse_flash_mla_metadata`接口用于生成一个任务列表，包含每个AIcore的Attention计算任务的起止点的Batch、Head、以及Q和K的分块的索引，供后续quant_sparse_flash_mla算子使用。
   `quant_sparse_flash_mla`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`QuantSparseFlashMla`算子完成共享KV（Key和Value使用同一份输入）的稀疏注意力计算。该接口支持以下三类计算模式：
@@ -26,7 +38,7 @@
   2. 调用`quant_sparse_flash_mla_metadata`生成`metadata`。
   3. 调用`quant_sparse_flash_mla`，将上一步得到的`metadata`传入主算子。
 
-- 计算公式：
+- **计算公式**：
 
   $$
   O = \text{softmax}(Q@\tilde{K}^T \cdot \text{softmax\_scale})@\tilde{V}
@@ -153,29 +165,29 @@ cann_ops_transformer.quant_sparse_flash_mla(
 
 | 参数名 | 输入/输出/属性 | 描述 | 数据类型 | 数据格式 |
 | :--- | :--- | :--- | :--- | :--- |
-| q | 输入 | Query输入。 | HIFLOAT8 | ND |
-| ori_kv | 可选输入 | 原始量化KV输入，Key和Value共享同一份数据。| HIFLOAT8 | ND |
-| cmp_kv | 可选输入 | 压缩量化KV输入，Key和Value共享同一份数据。| HIFLOAT8 | ND |
-| q_descale | 可选输入 | q对应的量化参数。 | FLOAT | ND |
-| ori_kv_descale | 可选输入 | ori_kv对应的量化参数。| FLOAT | ND |
-| cmp_kv_descale | 可选输入 | cmp_kv对应的量化参数。| FLOAT | ND |
-| ori_sparse_indices | 可选输入 | 原始KV稀疏索引，无效位置填-1。 | INT32 | ND |
-| cmp_sparse_indices | 可选输入 | 压缩KV TopK索引，无效位置填-1。 | INT32 | ND |
-| ori_block_table | 可选输入 | PageAttention场景下`ori_kv`使用的block映射表。 | INT32 | ND |
-| cmp_block_table | 可选输入 | PageAttention场景下`cmp_kv`使用的block映射表。 | INT32 | ND |
-| cu_seqlens_q | 可选输入 | TND场景下`q`的累积序列长度。 | INT32 | ND |
-| cu_seqlens_ori_kv | 可选输入 | TND场景下`ori_kv`的累积序列长度。 | INT32 | ND |
-| cu_seqlens_cmp_kv | 可选输入 | TND场景下`cmp_kv`的累积序列长度。 | INT32 | ND |
-| seqused_q | 可选输入 | 不同batch中`q`实际参与计算的token数。 | INT32 | ND |
-| seqused_ori_kv | 可选输入 | 不同batch中`ori_kv`实际参与计算的token数。 | INT32 | ND |
-| seqused_cmp_kv | 可选输入 | 不同batch中`cmp_kv`实际参与计算的token数。 | INT32 | ND |
-| cmp_residual_kv | 可选输入 | 压缩KV余数，用于恢复cmp侧mask使用的压缩前KV长度。 | INT32 | ND |
-| ori_topk_length | 可选输入 | 用于标识ori_kv sparseindices实际参与计算的长度。 | INT32 | ND |
-| cmp_topk_length | 可选输入 | 用于标识cmp_kv sparseindices实际参与计算的长度 | INT32 | ND |
-| sinks | 可选输入 | attention sinks输入。 | FLOAT | ND |
-| metadata | 输入 | `quant_sparse_flash_mla_metadata`生成的任务切分结果。 | INT32 | ND |
+| q | 输入 | Query输入。 | HIfloat8 | ND |
+| ori_kv | 可选输入 | 原始量化KV输入，Key和Value共享同一份数据。| HIfloat8 | ND |
+| cmp_kv | 可选输入 | 压缩量化KV输入，Key和Value共享同一份数据。| HIfloat8 | ND |
+| q_descale | 可选输入 | q对应的量化参数。 | float | ND |
+| ori_kv_descale | 可选输入 | ori_kv对应的量化参数。| float | ND |
+| cmp_kv_descale | 可选输入 | cmp_kv对应的量化参数。| float | ND |
+| ori_sparse_indices | 可选输入 | 原始KV稀疏索引，无效位置填-1。 | int32 | ND |
+| cmp_sparse_indices | 可选输入 | 压缩KV TopK索引，无效位置填-1。 | int32 | ND |
+| ori_block_table | 可选输入 | PageAttention场景下`ori_kv`使用的block映射表。 | int32 | ND |
+| cmp_block_table | 可选输入 | PageAttention场景下`cmp_kv`使用的block映射表。 | int32 | ND |
+| cu_seqlens_q | 可选输入 | TND场景下`q`的累积序列长度。 | int32 | ND |
+| cu_seqlens_ori_kv | 可选输入 | TND场景下`ori_kv`的累积序列长度。 | int32 | ND |
+| cu_seqlens_cmp_kv | 可选输入 | TND场景下`cmp_kv`的累积序列长度。 | int32 | ND |
+| seqused_q | 可选输入 | 不同batch中`q`实际参与计算的token数。 | int32 | ND |
+| seqused_ori_kv | 可选输入 | 不同batch中`ori_kv`实际参与计算的token数。 | int32 | ND |
+| seqused_cmp_kv | 可选输入 | 不同batch中`cmp_kv`实际参与计算的token数。 | int32 | ND |
+| cmp_residual_kv | 可选输入 | 压缩KV余数，用于恢复cmp侧mask使用的压缩前KV长度。 | int32 | ND |
+| ori_topk_length | 可选输入 | 用于标识ori_kv sparseindices实际参与计算的长度。 | int32 | ND |
+| cmp_topk_length | 可选输入 | 用于标识cmp_kv sparseindices实际参与计算的长度 | int32 | ND |
+| sinks | 可选输入 | attention sinks输入。 | float | ND |
+| metadata | 输入 | `quant_sparse_flash_mla_metadata`生成的任务切分结果。 | int32 | ND |
 | quant_mode | 必选属性 | 表示量化模式，1表示qkv为hifloat8 perTensor量化。 | INT | - |
-| softmax_scale | 可选属性 | QK矩阵乘后的缩放系数。默认值为1.0。 | FLOAT | - |
+| softmax_scale | 可选属性 | QK矩阵乘后的缩放系数。默认值为1.0。 | float | - |
 | cmp_ratio | 可选属性 | 表示`cmp_kv`相对于压缩前KV长度的压缩倍率，用于恢复cmp侧mask使用的压缩前KV长度；仅传入`ori_kv`时不参与压缩KV计算。支持1到128。默认值为1。 | INT | - |
 | ori_mask_mode | 可选属性 | 表示`q`和`ori_kv`计算的mask模式。<br>0: No Mask。<br>3: RightDownCausal模式。<br>4: Band模式。默认值为0。 | INT | - |
 | cmp_mask_mode | 可选属性 | 表示`q`和`cmp_kv`计算的mask模式。<br>0: No Mask。<br>3: RightDownCausal模式。默认值为0。 | INT | - |
@@ -185,8 +197,8 @@ cann_ops_transformer.quant_sparse_flash_mla(
 | layout_kv | 可选属性 | 表示输入`ori_kv`和`cmp_kv`的数据排布格式，支持"BSND"、"TND"和"PA_BBND"。默认值为"BSND"。 | STRING | - |
 | topk_value_mode | 可选属性 | 表示TopK索引取值模式，仅支持1。默认值为1。 | INT | - |
 | return_softmax_lse | 可选属性 | 表示是否返回softmax的log-sum-exp结果。默认值为False。 | BOOL | - |
-| attention_out | 输出 | attention计算输出。 | BFLOAT16 | ND |
-| softmax_lse | 输出 | softmax的log-sum-exp结果；未使能返回时为占位Tensor。 | FLOAT | ND |
+| attention_out | 输出 | attention计算输出。 | bfloat16 | ND |
+| softmax_lse | 输出 | softmax的log-sum-exp结果；未使能返回时为占位Tensor。 | float | ND |
 
 ## 返回值说明
 
@@ -194,12 +206,12 @@ cann_ops_transformer.quant_sparse_flash_mla(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
-| metadata | Tensor | 必选 | 每个cube核上FlashAttention计算任务的Batch、Head、以及 Q 和 K 的分块的索引，以及每个vector核上FlashDecode的规约任务索引。数据格式为ND，不支持非连续的Tensor。 | int32 | (1024, ) |
+| metadata | Tensor | 必选 | 每个cube核上FlashAttention计算任务的Batch、Head、以及Q和K的分块的索引，以及每个vector核上FlashDecode的规约任务索引。数据格式为ND，不支持非连续的Tensor。 | int32 | (1024, ) |
 
 ### quant_sparse_flash_mla
 
 - **attention_out**：`quant_sparse_flash_mla`的第一个输出，shape和`q`一致，dtype和`q`一致。
-- **softmax_lse**：`quant_sparse_flash_mla`的第二个输出。`return_softmax_lse=False`时返回FLOAT32标量占位Tensor；`return_softmax_lse=True`时返回FLOAT32的log-sum-exp结果。
+- **softmax_lse**：`quant_sparse_flash_mla`的第二个输出。`return_softmax_lse=False`时返回float32标量占位Tensor；`return_softmax_lse=True`时返回float32的log-sum-exp结果。
 
 ## 约束说明
 
@@ -216,7 +228,7 @@ cann_ops_transformer.quant_sparse_flash_mla(
 - `layout_kv="PA_BBND"`时必须传入`seqused_ori_kv`和`ori_block_table`；传入`cmp_kv`时，还必须传入`cmp_block_table`。
 - `seqused_cmp_kv`为所有`layout_kv`下的可选输入，显式传入时用于覆盖cmp侧逻辑有效长度。
 - `ori_mask_mode`及`cmp_mask_mode`所表示的mask模式的详细介绍见[sparse_mode参数说明](../../../../docs/zh/context/sparse_mode_introduction.md)。
-- `metadata`固定为1024个INT32元素，`topk_value_mode`仅支持1，`ori_sparse_indices`、`ori_topk_length`和`cmp_topk_length`当前版本不支持传入。
+- `metadata`固定为1024个int32元素，`topk_value_mode`仅支持1，`ori_sparse_indices`、`ori_topk_length`和`cmp_topk_length`当前版本不支持传入。
 - `ori_kv`和`cmp_kv`允许存在行间padding类非连续内存，接口会通过aclnn获取stride信息传给底层算子。
 
 - 规格约束：
@@ -240,11 +252,12 @@ cann_ops_transformer.quant_sparse_flash_mla(
 
 ## 确定性计算
 
-- 默认支持确定性计算
+默认支持确定性计算
 
 ## 调用说明
 
-### SWA，BSND输入，aclnn直调
+### 单算子调用模式（SWA，BSND输入）
+
 ```python
 import torch
 import torch_npu
@@ -267,7 +280,7 @@ cmp_ratio = 1  # SWA示例仅传ori_kv，cmp_ratio不参与压缩KV计算，保�
 
 seqused_q = torch.tensor([16], dtype=torch.int32, device="npu")
 seqused_ori_kv = torch.tensor([64], dtype=torch.int32, device="npu")
-q = torch.full((B, S1, N1, Dq), 8, dtype=qDtype, device="npu")  # uint8的8 等于 hifloat8的1.0
+q = torch.full((B, S1, N1, Dq), 8, dtype=qDtype, device="npu")  # uint8的8 等于hifloat8的1.0
 ori_kv = torch.full((B, S2, N2, Dkv), 8 ,dtype=kvDtype, device="npu")
 cmp_kv = None
 q_descale = torch.tensor([2.0], dtype=torch.float32, device="npu")
@@ -326,7 +339,7 @@ npu_result, _ = torch.ops.cann_ops_transformer.quant_sparse_flash_mla(
 torch.npu.synchronize()
 ```
 
-### HCA，LayoutQ BSND，LayoutKv PA_BBND输入，aclnn直调
+### 单算子调用模式（HCA，LayoutQ BSND，LayoutKv PA_BBND输入）
 
 ```python
 import torch
@@ -375,7 +388,7 @@ seqused_cmp_kv = torch.tensor([cmp_max_s2], dtype=torch.int32, device="npu")
 cmp_residual_kv = torch.tensor([S2 % cmp_ratio], dtype=torch.int32, device="npu")
 seqused_q = torch.tensor([16], dtype=torch.int32, device="npu")
 
-q = torch.full((B, S1, N1, Dq), 8, dtype=qDtype, device="npu") # uint8的8 等于 hifloat8的1.0
+q = torch.full((B, S1, N1, Dq), 8, dtype=qDtype, device="npu") # uint8的8 等于hifloat8的1.0
 ori_kv_bnsd = torch.full((B, N2, S2, Dkv), 8, dtype=kvDtype, device="npu")
 ori_kv, ori_block_table = scatter_to_pa(ori_kv_bnsd, block_size1, block_num1, ori_max_block_num_per_batch)
 
@@ -454,7 +467,8 @@ npu_result, _ = torch.ops.cann_ops_transformer.quant_sparse_flash_mla(
 torch.npu.synchronize()
 ```
 
-### CSA，TND输入，graph调用
+### 图模式调用（CSA，TND输入）
+
 ```python
 import torch
 import torch_npu
@@ -534,7 +548,7 @@ seqused_ori_kv = torch.tensor(ori_kv_seqlens, dtype=torch.int32, device="npu")
 seqused_cmp_kv = torch.tensor([s // cmp_ratio for s in ori_kv_seqlens], dtype=torch.int32, device="npu")
 cmp_residual_kv = torch.tensor([s % cmp_ratio for s in ori_kv_seqlens], dtype=torch.int32, device="npu")
 
-q = torch.full((total_q, N1, Dq), 8, dtype=qDtype, device="npu") # uint8的8 等于 hifloat8的1.0
+q = torch.full((total_q, N1, Dq), 8, dtype=qDtype, device="npu") # uint8的8 等于hifloat8的1.0
 ori_kv = torch.full((total_ori_kv, N2, Dkv), 8, dtype=kvDtype, device="npu")
 cmp_kv = torch.full((total_cmp_kv, N2, Dkv), 8, dtype=kvDtype, device="npu")
 q_descale = torch.tensor([2.0], dtype=torch.float32, device="npu")

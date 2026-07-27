@@ -1,21 +1,33 @@
-# cann_ops_transformer.kv_compress_epilog
+# kv_compress_epilog
 
 ## 产品支持情况
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
-- 接口功能：
+- **接口功能**：
 
     在KV Cache的Epilog阶段对cache进行原地量化压缩更新，封装aclnnKvCompressEpilog。将bfloat16激活值x量化压缩后，按slot_mapping散写到cache，slot_mapping中值为-1的token跳过不处理。x尾轴d的后64列为rope段、前d-64列为nope段。支持三种量化模式：
-    - `"fp8_bf16"`/`"fp8_e8m0"`（内部0/1）：逐组动态量化压缩为FP8（uint8打包），rope段保留bfloat16；两者区别仅为每组 scale 的表示（bf16 / e8m0）；
-    - `"hifloat8_fp4"`（内部2）：rope段hifloat8**静态**量化（乘x_scale后取hifloat8），nope段per-group **FLOAT4_E2M1 动态**量化（scale=组内amax/6以bfloat16写出）。
+  - `"fp8_bf16"`/`"fp8_e8m0"`（内部0/1）：逐组动态量化压缩为FP8（uint8打包），rope段保留bfloat16；两者区别仅为每组scale的表示（bf16 / e8m0）；
+  - `"hifloat8_fp4"`（内部2）：rope段hifloat8**静态**量化（乘x_scale后取hifloat8），nope段per-group **float4_E2M1 动态**量化（scale=组内amax/6以bfloat16写出）。
 
 - 语义说明：
 
@@ -23,7 +35,7 @@
 
 ## 函数原型
 
-```
+```python
 cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_size=64, quant_mode="fp8_e8m0", round_scale=True, x_scale=1.0) -> None
 ```
 
@@ -53,7 +65,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>Tensor</td>
         <td>必选</td>
         <td>当前层的分页KV Cache，<b>仅支持四维shape</b>（num_slots = blockNum × blockSize），<b>headDim须 ≥ kvCacheCol</b>（kvCacheCol计算见约束说明）。在<b>blockNum维支持非连续</b>（分页）。数据格式为$ND$。</td>
-        <td>UINT8</td>
+        <td>uint8</td>
         <td>(blockNum, blockSize, 1, headDim)</td>
     </tr>
     <tr>
@@ -61,7 +73,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>Tensor</td>
         <td>必选</td>
         <td>待量化的激活输入，d需满足d % 64 == 0且64 &lt; d ≤ 8192。数据格式为$ND$。</td>
-        <td>BFLOAT16</td>
+        <td>bfloat16</td>
         <td>(bs, d)</td>
     </tr>
     <tr>
@@ -69,7 +81,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>Tensor</td>
         <td>必选</td>
         <td>token到cache slot的索引映射，元素取值范围[-1, num_slots - 1]（num_slots = blockNum × blockSize），-1表示跳过该token；维度需等于x的维度减1。数据格式为$ND$。</td>
-        <td>INT32、INT64</td>
+        <td>int32、int64</td>
         <td>(bs)</td>
     </tr>
     <tr>
@@ -84,13 +96,13 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>quant_mode</td>
         <td>str</td>
         <td>可选</td>
-        <td>量化模式（字符串，大小写不敏感；TorchNPU内部经枚举映射为算子侧 int）。默认值<code>"fp8_e8m0"</code>。三种模式中 <code>"fp8_bf16"</code> 与 <code>"fp8_e8m0"</code> 为同一种 per-group FP8 量化方法（nope/rope 整体逐组动态量化为 FP8(e4m3) 并打包进 uint8），仅 scale 表示不同。可选值与含义：
+        <td>量化模式（字符串，大小写不敏感；TorchNPU内部经枚举映射为算子侧int）。默认值<code>"fp8_e8m0"</code>。三种模式中 <code>"fp8_bf16"</code> 与 <code>"fp8_e8m0"</code> 为同一种per-group FP8 量化方法（nope/rope整体逐组动态量化为FP8(e4m3) 并打包进uint8），仅scale表示不同。可选值与含义：
             <ul>
-                <li><code>"fp8_bf16"</code>(内部 0)：per-group FP8 量化，组大小由 quant_group_size 决定（内核固定按 64），每组一个 <b>bf16</b> scale。</li>
-                <li><code>"fp8_e8m0"</code>(内部 1)：per-group FP8 量化，每组一个 <b>e8m0</b>(2 的幂指数) scale，即 MX-FP8 微缩放。</li>
-                <li><code>"hifloat8_fp4"</code>(内部 2)：rope 段（尾轴后 64 列）HiFloat8 <b>静态</b>量化（乘 x_scale 后取 HiFloat8）；nope 段（前 d-64 列）per-group <b>FLOAT4_E2M1 动态</b>量化（scale=组内 amax/6，以 bf16 写出）。</li>
+                <li><code>"fp8_bf16"</code>(内部0)：per-group FP8 量化，组大小由quant_group_size决定（内核固定按64），每组一个 <b>bf16</b> scale。</li>
+                <li><code>"fp8_e8m0"</code>(内部1)：per-group FP8 量化，每组一个 <b>e8m0</b>(2 的幂指数) scale，即MX-FP8 微缩放。</li>
+                <li><code>"hifloat8_fp4"</code>(内部2)：rope段（尾轴后64 列）HiFloat8 <b>静态</b>量化（乘x_scale后取HiFloat8）；nope段（前d-64 列）per-group <b>float4_E2M1 动态</b>量化（scale=组内amax/6，以bf16 写出）。</li>
             </ul>
-            下文约束说明中出现的 quant_mode=0/1/2 指上表对应的内部 int 取值。</td>
+            下文约束说明中出现的quant_mode=0/1/2 指上表对应的内部int取值。</td>
         <td>STR</td>
         <td>-</td>
     </tr>
@@ -107,7 +119,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>float</td>
         <td>可选</td>
         <td>quant_mode=2时为rope段hifloat8静态量化的缩放系数；quant_mode=0/1下预留未使用。默认值1.0。</td>
-        <td>FLOAT</td>
+        <td>float</td>
         <td>-</td>
     </tr>
 </tbody>
@@ -120,20 +132,18 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
 ## 约束说明
 
 - 该接口支持推理场景下使用。
-- 该接口支持单算子模式调用。
-- 仅支持<term>Ascend 950PR/Ascend 950DT</term>。
+- 该接口支持单算子模式和TorchAir图模式调用（经graph_convert注册的GE converter下沉为KvCompressEpilog算子，eager与图模式结果一致）。
 - cache仅支持四维shape `[blockNum, blockSize, 1, headDim]`，倒数第二维固定为1（每token一个压缩向量），不支持其他维数。
 - cache仅在blockNum维支持非连续：各block可不紧密排布，但block内（blockSize、headDim维）须连续。
 - headDim约束：cache末维headDim必须 ≥ 每行写出字节数kvCacheCol = 对齐(concatCol)，concatCol按量化模式计算：
-    - quant_mode=0/1：concatCol = (d−64) + 128 + ⌈(d−64)/64⌉ × scaleBytes，scaleBytes为mode0=2、mode1=1；
-    - quant_mode=2：concatCol = 64 + (d−64)/2 + (d−64)/quant_group_size × 2；
-    - 对齐规则：quant_mode=1不补齐，kvCacheCol = concatCol；quant_mode=0/2按32B对齐，kvCacheCol = ⌈concatCol / 32⌉ × 32。
-    - 示例：d=512、quant_mode=1 → kvCacheCol=583 → headDim ≥ 583（示例中取640）。
+  - quant_mode=0/1：concatCol = (d−64) + 128 + ⌈(d−64)/64⌉ × scaleBytes，scaleBytes为mode0=2、mode1=1；
+  - quant_mode=2：concatCol = 64 + (d−64)/2 + (d−64)/quant_group_size × 2；
+  - 对齐规则：quant_mode=1不补齐，kvCacheCol = concatCol；quant_mode=0/2按32B对齐，kvCacheCol = ⌈concatCol / 32⌉ × 32。
+  - 示例：d=512、quant_mode=1 → kvCacheCol=583 → headDim ≥ 583（示例中取640）。
 - slot_mapping的维度应等于x的维度减1，即slot_mapping为x除最后一维外的所有维度展平。
 - x的最后一维（d轴）需满足d % 64 == 0且64 < d ≤ 8192，按每64个元素一组进行逐组量化。
 - quant_mode=2时，quant_group_size仅支持16/32/64，且nope段长度(d-64)需能被quant_group_size整除。
 - slot_mapping中值为-1的token会被跳过不处理；其余有效元素取值范围为[0, num_slots - 1]，且元素值应保证不重复，重复时不保证结果正确性。
-- 支持图模式（torchair）调用：经graph_convert注册的GE converter下沉为KvCompressEpilog算子，eager与图模式结果一致。
 
 ## 确定性计算
 
@@ -148,8 +158,8 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
     import torch_npu
     from cann_ops_transformer.ops import kv_compress_epilog
 
-    # cache 为四维 [blockNum, blockSize, 1, headDim]，num_slots = blockNum*blockSize
-    # headDim 须 >= kvCacheCol（d=256/quant_mode=1 时 kvCacheCol=323，取 head_dim=384 满足）
+    # cache为四维 [blockNum, blockSize, 1, headDim]，num_slots = blockNum*blockSize
+    # headDim须 >= kvCacheCol（d=256/quant_mode=1 时kvCacheCol=323，取head_dim=384 满足）
     block_num, block_size, head_dim = 128, 16, 384
     bs, d = 1024, 256
 
@@ -164,7 +174,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
 
 - 图模式（torchair）调用
 
-    复用上面单算子示例构造的 cache/x/slot_mapping，用torchair后端编译后调用即可：
+    复用上面单算子示例构造的cache/x/slot_mapping，用torchair后端编译后调用即可：
 
     ```python
     import torchair
