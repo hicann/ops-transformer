@@ -19,7 +19,6 @@ import quant_sparse_flash_mla_golden
 from batch import quant_sparse_flash_mla_process
 import pytest
 from pathlib import Path
-import multiprocessing as mp
 import utils
 import logging
 import os
@@ -27,7 +26,7 @@ import os
 pt_save_path = "qsmla_testcase"
 device_id = 0
 save_pt = False
-result_path = Path('result.xlsx')
+result_path = Path("result.xlsx")
 is_run_graph = os.environ.get("RUN_GRAPH", "0") == "1"
 
 # 日志配置
@@ -35,7 +34,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)-5s] %(filename)s:%(lineno)d %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    force=True
+    force=True,
 )
 
 param_combinations = []
@@ -76,6 +75,7 @@ for params in ENABLED_PARAMS:
         "actlen_mode": params.get("actlen_mode"),
         "S1EQS2": params.get("S1EQS2", [False]),
         "isSink": params.get("isSink", [True]),
+        "return_softmax_lse": params.get("return_softmax_lse", [False]),
     }
 
     param_names = list(param_values.keys())
@@ -86,6 +86,8 @@ for params in ENABLED_PARAMS:
         param_combinations.append(combination)
 
 case_id = 0
+
+
 def qsmla(param_combinations):
     global case_id
 
@@ -93,32 +95,68 @@ def qsmla(param_combinations):
     params = utils.fill_none_params(param_combinations)
 
     # 生成测试用例名称
-    Testcase_Name = params['Testcase_Name']
+    Testcase_Name = params["Testcase_Name"]
     if Testcase_Name is None:
-        ops_mode = 'prefill' if params['S1'] > 4 else "decode"
-        q_type_str = "BF16" if params['q_type'] == torch.bfloat16 else "FP16"
-        kv_type_str = "HIF8" if params['ori_kv_type'] == torch.uint8 else "FP8_E4M3FN"
+        ops_mode = "prefill" if params["S1"] > 4 else "decode"
+        q_type_str = "BF16" if params["q_type"] == torch.bfloat16 else "FP16"
+        kv_type_str = "HIF8" if params["ori_kv_type"] == torch.uint8 else "FP8_E4M3FN"
         Testcase_Name = f"quantSparseFlashMla_{params['template_run_mode']}_{ops_mode}_{params['layout_q']}_{q_type_str}_{params['layout_kv']}_{kv_type_str}_{params['B']}_{params['N1']}_{params['N2']}_{params['S1']}_{params['S2']}_{params['D']}_{params['K']}_{case_id:06d}"
-        params['Testcase_Name'] = Testcase_Name
+        params["Testcase_Name"] = Testcase_Name
 
     # 输入参数的合法性校验
     try:
         check_valid_param.check_valid_param(params)
     except ValueError as e:
-       pytest.skip(f"输入参数校验失败:{e}")
+        pytest.skip(f"输入参数校验失败:{e}")
 
     # 生成测试数据及golden
-    test_data = quant_sparse_flash_mla_golden.generate_and_save_testdata(params, save_pt=save_pt, save_path=pt_save_path)
+    test_data = quant_sparse_flash_mla_golden.generate_and_save_testdata(
+        params, save_pt=save_pt, save_path=pt_save_path
+    )
 
     # 获得cpu结果(真值)和算子结果（测试值）
     try:
         if is_run_graph:
-            npu_result, cpu_quant_result = quant_sparse_flash_mla_process.test_qsmla_quant_process_graph(
-                test_data, device_id=device_id)
+            npu_result, cpu_quant_result, cpu_lse, npu_lse = (
+                quant_sparse_flash_mla_process.test_qsmla_quant_process_graph(
+                    test_data, device_id=device_id
+                )
+            )
         else:
-            npu_result, cpu_quant_result = quant_sparse_flash_mla_process.test_qsmla_quant_process_ci(
-                test_data, device_id=device_id)
-        result, fulfill_percent = result_compare_method.check_result(cpu_quant_result, npu_result)
+            npu_result, cpu_quant_result, cpu_lse, npu_lse = (
+                quant_sparse_flash_mla_process.test_qsmla_quant_process_ci(
+                    test_data, device_id=device_id
+                )
+            )
+
+        # 分别校验主输出与LSE，分开保存结果
+        main_res, main_pct = result_compare_method.check_result(
+            cpu_quant_result, npu_result
+        )
+        lse_res, lse_pct = None, None
+        fail_info = []
+        min_fulfill = main_pct
+
+        if test_data["params"].get("return_softmax_lse"):
+            print("return_softmax_lse is true!!!")
+            lse_res, lse_pct = result_compare_method.check_result(cpu_lse, npu_lse)
+
+        # 主输出失败记录
+        if main_res != "PASS":
+            fail_info.append(f"MAIN_FAILED:{main_res}")
+        # LSE失败记录
+        if lse_res is not None and lse_res != "PASS":
+            fail_info.append(f"LSE_FAILED:{lse_res}")
+            min_fulfill = min(min_fulfill, lse_pct)
+
+        # 整合最终结果
+        if fail_info:
+            result = "; ".join(fail_info)
+            fulfill_percent = min_fulfill
+        else:
+            result = "PASS"
+            fulfill_percent = min_fulfill
+
     except Exception as e:
         logging.exception(e)
         result = "NPU ERROR"
@@ -126,21 +164,26 @@ def qsmla(param_combinations):
 
     case_id += 1
 
-    utils.save_result(test_data['params'], result, fulfill_percent, result_path)
+    utils.save_result(test_data["params"], result, fulfill_percent, result_path)
 
     if result in ("NPU ERROR", "Failed"):
-        pytest.fail(f"用例执行失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%")
+        pytest.fail(
+            f"用例执行失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%"
+        )
+
 
 def _gen_testcase_id(params, idx):
-    name = params.get('Testcase_Name')
+    name = params.get("Testcase_Name")
     if name is not None:
         return name
-    ops_mode = 'prefill' if params['S1'] > 4 else "decode"
-    q_type_str = "HIF8" if params['q_type'] == torch.bfloat16 else "FP16"
-    kv_type_str = "HIF8" if params['ori_kv_type'] == torch.uint8 else "FP8_E4M3FN"
+    ops_mode = "prefill" if params["S1"] > 4 else "decode"
+    q_type_str = "HIF8" if params["q_type"] == torch.bfloat16 else "FP16"
+    kv_type_str = "HIF8" if params["ori_kv_type"] == torch.uint8 else "FP8_E4M3FN"
     return f"{params['template_run_mode']}_{ops_mode}_{params['layout_q']}_{q_type_str}_{params['layout_kv']}_{kv_type_str}_B{params['B']}_S1{params['S1']}_S2{params['S2']}_D{params['D']}_K{params['K']}_{idx:06d}"
 
+
 testcase_ids = [_gen_testcase_id(p, i) for i, p in enumerate(param_combinations)]
+
 
 @pytest.mark.ci
 @pytest.mark.parametrize("param_combinations", param_combinations, ids=testcase_ids)

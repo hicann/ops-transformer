@@ -14,10 +14,10 @@ import os
 import glob
 import pandas as pd
 from pathlib import Path
-import numpy as np
 import argparse
 import shutil
 import logging
+
 
 def process_profiler_data(args):
     """
@@ -26,7 +26,9 @@ def process_profiler_data(args):
     logging.info("=============开始处理性能分析数据=============")
 
     # 检查是否存在PROF开头的文件夹
-    prof_folders = [f for f in os.listdir() if os.path.isdir(f) and f.startswith('PROF')]
+    prof_folders = [
+        f for f in os.listdir() if os.path.isdir(f) and f.startswith("PROF")
+    ]
 
     if not prof_folders:
         logging.warning("PROF文件夹不存在")
@@ -36,18 +38,22 @@ def process_profiler_data(args):
     logging.info(f"PROF path: {prof_folder}")
 
     profiler_output_path = os.path.join(prof_folder, "mindstudio_profiler_output")
-    if not os.path.exists(profiler_output_path) or not os.path.isdir(profiler_output_path):
+    if not os.path.exists(profiler_output_path) or not os.path.isdir(
+        profiler_output_path
+    ):
         logging.warning(f"在 {prof_folder} 中不存在mindstudio_profiler_output文件夹")
         return
 
     # 检查是否存在op_summary开头的表格
     op_summary_files = []
-    for ext in ['.csv']:
+    for ext in [".csv"]:
         pattern = os.path.join(profiler_output_path, f"op_summary*{ext}")
         op_summary_files.extend(glob.glob(pattern))
 
     if not op_summary_files:
-        logging.warning(f"在 {profiler_output_path} 中未找到 op_summary 开头的表格文件，直接返回")
+        logging.warning(
+            f"在 {profiler_output_path} 中未找到 op_summary 开头的表格文件，直接返回"
+        )
         return
 
     op_summary_file = op_summary_files[0]
@@ -55,7 +61,7 @@ def process_profiler_data(args):
 
     # 读取表格A (op_summary)
     try:
-        if op_summary_file.endswith('.csv'):
+        if op_summary_file.endswith(".csv"):
             df_a = pd.read_csv(op_summary_file)
 
     except Exception as e:
@@ -92,10 +98,10 @@ def process_profiler_data(args):
         df_b["perf_result"] = ""
 
         for i in range(df_b.shape[0]):
-            a_row1_idx = 2 * row_idx          # 当前case metadata性能数据
-            a_row2_idx = 2 * row_idx + 1      # 当前case qsmla性能数据
+            a_row1_idx = 2 * row_idx  # 当前case metadata性能数据
+            a_row2_idx = 2 * row_idx + 1  # 当前case qsmla性能数据
 
-            if df_b.iloc[i]["result"] != "NPU ERROR":    # NPU ERROR时跳过
+            if df_b.iloc[i]["result"] != "NPU ERROR":  # NPU ERROR时跳过
                 cur_metadata_perf = df_a.iloc[a_row1_idx][task_duration_col]
                 df_b.at[i, "metadata_duration"] = cur_metadata_perf
                 cur_qsmla_perf = df_a.iloc[a_row2_idx][task_duration_col]
@@ -121,11 +127,14 @@ def process_profiler_data(args):
             if i % 10 == 0:
                 logging.info(f"已处理 {i}/{df_b.shape[0]} 行")
 
-        logging.info(f"数据合并完成，为表格B添加了 {df_b.shape[0]} 行的 metadata_duration 和 qsmla_duration 数据")
+        logging.info(
+            f"数据合并完成，为表格B添加了 {df_b.shape[0]} 行的 metadata_duration 和 qsmla_duration 数据"
+        )
 
     except Exception as e:
         logging.warning(f"数据合并过程中出错: {e}")
         import traceback
+
         traceback.print_exc()
         return
 
@@ -134,7 +143,7 @@ def process_profiler_data(args):
     if os.path.exists(new_result_path):
         try:
             os.remove(new_result_path)
-            logging.info(f"发现历史result_perf文件，删除成功")
+            logging.info("发现历史result_perf文件，删除成功")
         except Exception as e:
             logging.warning(f"历史result_perf文件删除失败: {e}")
     try:
@@ -145,7 +154,9 @@ def process_profiler_data(args):
         logging.warning(f"保存文件失败: {e}")
         return
 
-    logging.info("=================处理完成！性能失败用例如下=================\n", perf_fail_list)
+    logging.info(
+        "=================处理完成！性能失败用例如下=================\n", perf_fail_list
+    )
 
     prof_folder = Path(prof_folder)
     if args.delete_perf_file and prof_folder.exists() and prof_folder.is_dir():
@@ -157,16 +168,42 @@ def process_profiler_data(args):
 
     return new_result_path
 
+
 # 命令行接口
 def main():
-    parser = argparse.ArgumentParser(description='处理性能数据')
-    parser.add_argument('--test_result_path', type=str, default="result.xlsx", help='结果表格路径', required=False)
-    parser.add_argument('--is_compare', type=bool, default=False, help='是否与基线表格对比', required=False)
-    parser.add_argument('--perf_golden_path', type=str, default="perf_golden.xlsx", help='性能基线数据表格路径', required=False)
-    parser.add_argument('--delete_perf_file', type=bool, default=False, help='是否删除PROF文件夹内容', required=False)
+    parser = argparse.ArgumentParser(description="处理性能数据")
+    parser.add_argument(
+        "--test_result_path",
+        type=str,
+        default="result.xlsx",
+        help="结果表格路径",
+        required=False,
+    )
+    parser.add_argument(
+        "--is_compare",
+        type=bool,
+        default=False,
+        help="是否与基线表格对比",
+        required=False,
+    )
+    parser.add_argument(
+        "--perf_golden_path",
+        type=str,
+        default="perf_golden.xlsx",
+        help="性能基线数据表格路径",
+        required=False,
+    )
+    parser.add_argument(
+        "--delete_perf_file",
+        type=bool,
+        default=False,
+        help="是否删除PROF文件夹内容",
+        required=False,
+    )
     args = parser.parse_args()
 
     process_profiler_data(args)
+
 
 if __name__ == "__main__":
     main()

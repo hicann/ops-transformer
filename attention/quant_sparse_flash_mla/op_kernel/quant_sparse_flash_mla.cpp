@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
 */
 
- /*!
+/*!
  * \file quant_sparse_flash_mla.cpp
  * \brief
  */
@@ -26,20 +26,22 @@
 
 using namespace AscendC;
 
-#define QSMLA_OP_IMPL(templateClass, tilingdataClass, ...)                                        \
-    do {                                                                                          \
-        using CubeBlockType = typename std::conditional<g_coreType == AscendC::AIC,               \
-            BaseApi::CSABlockCube<__VA_ARGS__>, BaseApi::CSABlockCubeDummy<__VA_ARGS__>>::type; \
-        using VecBlockType = typename std::conditional<g_coreType == AscendC::AIC,                \
-            BaseApi::CSABlockVecDummy<__VA_ARGS__>, BaseApi::CSABlockVec<__VA_ARGS__>>::type;   \
-        templateClass<CubeBlockType, VecBlockType> op;                                            \
-        GET_TILING_DATA_WITH_STRUCT(tilingdataClass, tilingDataIn, tiling);                       \
-        const tilingdataClass *__restrict tilingData = &tilingDataIn;                             \
-        op.Init(query, oriKV, cmpKV, qDescale, oriKVDescale, cmpKVDescale, oriSparseIndices,      \
-            cmpSparseIndices, oriBlockTable, cmpBlockTable, cuSeqlensQ, cuSeqlensOriKv,           \
-            cuSeqlensCmpKv, seqUsedQ, seqUsedOriKV, seqUsedCmpKV, cmpResidualKv, oriTopkLength,   \
-            cmpTopkLength, sinks, metadata,   attentionOut, user, tilingData, &tPipe);            \
-        op.Process();                                                                             \
+#define QSMLA_OP_IMPL(templateClass, tilingdataClass, ...)                                                             \
+    do {                                                                                                               \
+        using CubeBlockType =                                                                                          \
+            typename std::conditional<g_coreType == AscendC::AIC, BaseApi::CSABlockCube<__VA_ARGS__>,                  \
+                                      BaseApi::CSABlockCubeDummy<__VA_ARGS__>>::type;                                  \
+        using VecBlockType =                                                                                           \
+            typename std::conditional<g_coreType == AscendC::AIC, BaseApi::CSABlockVecDummy<__VA_ARGS__>,              \
+                                      BaseApi::CSABlockVec<__VA_ARGS__>>::type;                                        \
+        templateClass<CubeBlockType, VecBlockType> op;                                                                 \
+        GET_TILING_DATA_WITH_STRUCT(tilingdataClass, tilingDataIn, tiling);                                            \
+        const tilingdataClass *__restrict tilingData = &tilingDataIn;                                                  \
+        op.Init(query, oriKV, cmpKV, qDescale, oriKVDescale, cmpKVDescale, oriSparseIndices, cmpSparseIndices,         \
+                oriBlockTable, cmpBlockTable, cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, seqUsedQ, seqUsedOriKV,      \
+                seqUsedCmpKV, cmpResidualKv, oriTopkLength, cmpTopkLength, sinks, metadata, attentionOut, softmax_lse, \
+                user, tilingData, &tPipe);                                                                             \
+        op.Process();                                                                                                  \
     } while (0)
 
 template <int FLASH_DECODE, int LAYOUT_T, int KV_LAYOUT_T, int TEMPLATE_MODE, int SPLIT_G, int KV_DTYPE,
@@ -58,9 +60,9 @@ quant_sparse_flash_mla(__gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint
     TPipe tPipe;
     __gm__ uint8_t *user = GetUserWorkspace(workspace);
     if constexpr (ORIG_DTYPE_Q == DT_HIFLOAT8 && ORIG_DTYPE_ORI_KV == DT_HIFLOAT8) {
-        QSMLA_OP_IMPL(BaseApi::QuantSparseFlashMlaCsa, QuantSparseFlashMlaTilingData, hifloat8_t,
-            hifloat8_t, float, bfloat16_t, FLASH_DECODE, KV_LAYOUT_T == QSMLA_LAYOUT_PA_BBND,
-            static_cast<QSMLA_LAYOUT>(LAYOUT_T), static_cast<QSMLA_LAYOUT>(KV_LAYOUT_T),
-            static_cast<QSMLATemplateMode>(TEMPLATE_MODE), SPLIT_G, IS_VEC_S2PHYADDR);
+        QSMLA_OP_IMPL(BaseApi::QuantSparseFlashMlaCsa, QuantSparseFlashMlaTilingData, hifloat8_t, hifloat8_t, float,
+                      bfloat16_t, FLASH_DECODE, KV_LAYOUT_T == QSMLA_LAYOUT_PA_BBND,
+                      static_cast<QSMLA_LAYOUT>(LAYOUT_T), static_cast<QSMLA_LAYOUT>(KV_LAYOUT_T),
+                      static_cast<QSMLATemplateMode>(TEMPLATE_MODE), SPLIT_G, IS_VEC_S2PHYADDR);
     }
 }

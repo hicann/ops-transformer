@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------------------------------------
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
-# This program is free software, you can redistribute it and/or it under the terms and conditions of
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
@@ -13,7 +13,7 @@
 import torch
 
 TEST_PARAMS = {
-    "decode_first":{
+    "decode_first": {
         "Testcase_Name": [None],
         "layout_q": ["TND"],
         "layout_kv": ["PA_BBND"],
@@ -37,7 +37,11 @@ TEST_PARAMS = {
         "seqused_cmp_kv": [None],
         "cu_seqlens_ori_kv": [None],
         "cu_seqlens_cmp_kv": [None],
-        "cmp_residual_kv": [[0,]],
+        "cmp_residual_kv": [
+            [
+                0,
+            ]
+        ],
         "softmax_scale": [0.04419417],
         "cmp_ratio": [4],
         "ori_mask_mode": [4],
@@ -46,12 +50,12 @@ TEST_PARAMS = {
         "ori_win_right": [0],
         "quant_mode": [1],
         "template_run_mode": ["CSA"],
-        "actlen_mode":["full"],
-        "S1EQS2":[False],
-        "isSink":[True],
+        "actlen_mode": ["full"],
+        "S1EQS2": [False],
+        "isSink": [True],
+        "return_softmax_lse": [True],
     },
-
-    "prefill_first":{
+    "prefill_first": {
         "Testcase_Name": [None],
         "layout_q": ["TND"],
         "layout_kv": ["PA_BBND"],
@@ -84,11 +88,12 @@ TEST_PARAMS = {
         "ori_win_right": [0],
         "quant_mode": [1],
         "template_run_mode": ["CSA"],
-        "actlen_mode":["full"],
-        "S1EQS2":[False],
-        "isSink":[True],
+        "actlen_mode": ["full"],
+        "S1EQS2": [False],
+        "isSink": [True],
+        "return_softmax_lse": [True],
     },
-    "csa_small_prefill":{
+    "csa_small_prefill": {
         "Testcase_Name": [None],
         "layout_q": ["TND"],
         "layout_kv": ["PA_BBND"],
@@ -121,11 +126,12 @@ TEST_PARAMS = {
         "ori_win_right": [0],
         "quant_mode": [1],
         "template_run_mode": ["CSA"],
-        "actlen_mode":["full"],
-        "S1EQS2":[False],
-        "isSink":[True],
-    }
+        "actlen_mode": ["full"],
+        "S1EQS2": [False],
+        "isSink": [True],
+        "return_softmax_lse": [True],
+    },
 }
 
 ENABLED_PARAMS = [TEST_PARAMS["decode_first"]]
-#ENABLED_PARAMS = [TEST_PARAMS[key] for key in TEST_PARAMS.keys()]
+# ENABLED_PARAMS = [TEST_PARAMS[key] for key in TEST_PARAMS.keys()]
