@@ -156,7 +156,9 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::SetMc2Hcomm()
 {
     bool isUseA2APath = mc2tiling::IsUseA2APath(args_.rankDim, npuArch_);
     const uint64_t k = MatmulAllReduceTilingBase::GetKValue();
-    if (k >= QUANT_A2APATH_CRITICAL_K && mc2tiling::Is8P(args_.rankDim, npuArch_)) {
+    uint8_t commMode = GetCommMode();
+    if (commMode == Mc2Comm::COMM_MODE_CCU && k >= QUANT_A2APATH_CRITICAL_K &&
+        mc2tiling::Is8P(args_.rankDim, npuArch_)) {
         isUseA2APath = false;
     }
     OP_TILING_CHECK(mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geCType) ==
@@ -326,10 +328,11 @@ uint64_t QuantMatmulAllReduceTilingA5::GetTilingKey() const
     bool scenarioIsMXFP8 = (scenario_ == AllReduceScenario::MXFP8); // 区分MXFP8 和 FP8HIF8场景
     bool isUseA2APath = mc2tiling::IsUseA2APath(args_.rankDim, npuArch_);
     const uint64_t k = MatmulAllReduceTilingBase::GetKValue();
-    if (k >= QUANT_A2APATH_CRITICAL_K && mc2tiling::Is8P(args_.rankDim, npuArch_)) {
+    uint8_t commMode = GetCommMode();
+    if (commMode == Mc2Comm::COMM_MODE_CCU && k >= QUANT_A2APATH_CRITICAL_K &&
+        mc2tiling::Is8P(args_.rankDim, npuArch_)) {
         isUseA2APath = false;
     }
-    uint8_t commMode = GetCommMode();
     bool isA2ARSAG = (isUseA2APath && (commDtype == COMMDTPYE_DEFAULT));
     const uint64_t tilingKey =
         GET_TPL_TILING_KEY(MMTYPE_QUANT_MM, quantTPlparam_.transB, false, isA2ARSAG, commMode, SET_NOT_USE_FP_MM_TILING,
@@ -467,7 +470,9 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::GetWorkspaceSize()
                         static_cast<uint64_t>(args_.outputDtypeSize);
     bool isUseA2APath = mc2tiling::IsUseA2APath(args_.rankDim, npuArch_);
     const uint64_t k = MatmulAllReduceTilingBase::GetKValue();
-    if (k >= QUANT_A2APATH_CRITICAL_K && mc2tiling::Is8P(args_.rankDim, npuArch_)) {
+    uint8_t commMode = GetCommMode();
+    if (commMode == Mc2Comm::COMM_MODE_CCU && k >= QUANT_A2APATH_CRITICAL_K &&
+        mc2tiling::Is8P(args_.rankDim, npuArch_)) {
         isUseA2APath = false;
     }
     if (isUseA2APath && !MutableRCSTilingData().isInputCommQuantScale) {
@@ -995,15 +1000,14 @@ CutResult QuantMatmulAllReduceTilingA5::GetTilingResult()
         mCutAllreduce = allReduceTilingHccl.GetTiling();
     } else if (mc2tiling::Is8P(args_.rankDim, npuArch_)) {
         const uint64_t k = MatmulAllReduceTilingBase::GetKValue();
+        uint8_t commMode = GetCommMode();
         KernelType kernelType;
-        if (k >= QUANT_A2APATH_CRITICAL_K && !param.isInputCommQuantScale) {
+        if (commMode == Mc2Comm::COMM_MODE_CCU && k >= QUANT_A2APATH_CRITICAL_K && !param.isInputCommQuantScale) {
             kernelType = KernelType::ALL_REDUCE;
         } else {
             kernelType = KernelType::ALL_REDUCE_VIA_TWO_SHOT;
         }
-        MMAllReduceFitBalanceTiling allReduceTilingHccl(args_,
-                                                        kernelType,
-                                                        TopoType::EIGHT_P);
+        MMAllReduceFitBalanceTiling allReduceTilingHccl(args_, kernelType, TopoType::EIGHT_P);
         allReduceTilingHccl.SetIsAlign((isPerBlock_ || (scenario_ == AllReduceScenario::MXFP4) ||
                                         (scenario_ == AllReduceScenario::MXFP8) ||
                                         (param.isInputCommQuantScale == QUANT_MODE_FP8)));
