@@ -1691,7 +1691,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleShapeFP8GQA(const FiaTilingInfo
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(fiaInfo.opName, "value_antiquant_scale", actualShape.c_str(),
                                               ("In FP8 GQA fullquant scenario, "
                                                "the shape of value_antiquant_scale should be " +
-                                               expectedShape + " (N layout).")
+                                               expectedShape + " (N layout)")
                                                   .c_str());
         return ge::GRAPH_FAILED;
     }
