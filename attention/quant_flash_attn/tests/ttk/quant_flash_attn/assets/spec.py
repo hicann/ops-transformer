@@ -41,13 +41,11 @@ class QfaMxfp8Spec:
 
     tolerance = {
         "float16": {
-            "standard": "IsClose",
             "rtol": 0.005,
             "ptol": 0.005,
             "atol": 0.000025,
         },
         "bfloat16": {
-            "standard": "IsClose",
             "rtol": 0.0078125,
             "ptol": 0.005,
             "atol": 0.0001,
@@ -68,13 +66,11 @@ class QfaMetadataSpec:
 
     tolerance = {
         "float16": {
-            "standard": "IsClose",
             "rtol": 0.005,
             "ptol": 0.005,
             "atol": 0.000025,
         },
         "bfloat16": {
-            "standard": "IsClose",
             "rtol": 0.0078125,
             "ptol": 0.005,
             "atol": 0.0001,
@@ -95,13 +91,11 @@ class QfaMainSpec:
 
     tolerance = {
         "float16": {
-            "standard": "IsClose",
             "rtol": 0.005,
             "ptol": 0.005,
             "atol": 0.000025,
         },
         "bfloat16": {
-            "standard": "IsClose",
             "rtol": 0.0078125,
             "ptol": 0.005,
             "atol": 0.0001,
@@ -110,7 +104,7 @@ class QfaMainSpec:
 
 
 __spec__ = {
-    "qfa_mxfp8_wrapper.npu_qfa_mxfp8": QfaMxfp8Spec,
-    "qfa_metadata_wrapper.run_metadata": QfaMetadataSpec,
-    "qfa_main_wrapper.run_main": QfaMainSpec,
+    "qfa_mxfp8_wrapper.npu_qfa_mxfp8": "QfaMxfp8Spec",
+    "qfa_metadata_wrapper.run_metadata": "QfaMetadataSpec",
+    "qfa_main_wrapper.run_main": "QfaMainSpec",
 }
