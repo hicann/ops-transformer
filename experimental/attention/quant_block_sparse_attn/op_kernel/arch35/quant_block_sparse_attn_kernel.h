@@ -363,11 +363,12 @@ __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::
 
     if ASCEND_IS_AIV {
         auto &inputParamsRegbase = this->tilingData->inputParamsRegbase;
+        auto &paParams = this->tilingData->paParams;
         if constexpr (hasAtten) {
             attenMaskInfo.preTokens = sharedParams.preTokens;
             attenMaskInfo.nextTokens = sharedParams.nextTokens;
             attenMaskInfo.attenMaskShapeType = inputParamsRegbase.attenMaskShapeType;
-            attenMaskInfo.attenMaskS1Size = inputParamsRegbase.attenMaskS1Size;
+            attenMaskInfo.attenMaskS1Size = paParams.attenMaskS1Size;
             attenMaskInfo.attenMaskS2Size = inputParamsRegbase.attenMaskS2Size;
             attenMaskInfo.bandIndex = inputParamsRegbase.bandIndex;
         }
@@ -503,7 +504,6 @@ __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::
         this->constInfo.isPostQuantBF16 = this->sharedParams.isPostQuantBF16;
     }
     this->constInfo.isRowInvalid = this->sharedParams.isRowInvalid;
-    this->constInfo.headNumRatio = this->sharedParams.headNumRatio;
     this->constInfo.isGqa = this->sharedParams.isGqa;
     this->constInfo.isPfaGS1Merge = this->sharedParams.isPfaGS1Merge;
     this->constInfo.isKvContinuous = this->sharedParams.isKvContinuous;

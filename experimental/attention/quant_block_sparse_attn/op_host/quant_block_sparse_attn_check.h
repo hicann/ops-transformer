@@ -30,9 +30,14 @@ public:
 
 private:
     ge::graphStatus CheckDtype() const;
+    ge::graphStatus CheckFormat() const;
     ge::graphStatus CheckBlockSize() const;
+    ge::graphStatus CheckExistence() const;
     ge::graphStatus CheckShapeConsistency() const;
-    ge::graphStatus CheckMaskMode() const;
+    ge::graphStatus CheckKeyValueShape() const;
+    ge::graphStatus CheckQuantShape() const;
+    ge::graphStatus CheckActualSeqLen() const;
+    ge::graphStatus CheckAttenMask() const;
 
     const QuantBlockSparseAttnTilingInfo &tilingInfo_;
 };

@@ -139,15 +139,9 @@ ge::graphStatus QuantBlockSparseAttnInfoParser::ParseKeyValue(QuantBlockSparseAt
         return ge::GRAPH_SUCCESS;
     }
 
-    uint32_t physicalKvBlockSize = 0;
-    uint32_t kvDSize = 0;
-    if (keyShape.GetDimNum() != DIM_NUM_4 || !BSAGetDimAsU32(keyShape, DIM_PA_BLOCK_SIZE, physicalKvBlockSize) ||
-        !BSAGetDimAsU32(keyShape, DIM_PA_N, tilingInfo.n2Size) || !BSAGetDimAsU32(keyShape, DIM_KV_HEAD_DIM, kvDSize) ||
-        physicalKvBlockSize != tilingInfo.kvBlockSizeVal || kvDSize != BSA_D_SIZE) {
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            kOpName, "key", Ops::Base::ToString(keyShape),
-            "key must be 4D [blockNum, kvHeadNum, blockSize, headDim] with blockSize=" +
-                std::to_string(tilingInfo.kvBlockSizeVal) + " and headDim=" + std::to_string(BSA_D_SIZE));
+    if (!BSAGetDimAsU32(keyShape, DIM_PA_N, tilingInfo.n2Size) ||
+        !BSAGetDimAsU32(keyShape, DIM_B, tilingInfo.paBlockNumSum)) {
+        OP_LOGE(kOpName, "ParseKeyValue: failed to get n2Size/paBlockNumSum from key shape");
         return ge::GRAPH_FAILED;
     }
 
@@ -166,11 +160,6 @@ ge::graphStatus QuantBlockSparseAttnInfoParser::ParseKeyValue(QuantBlockSparseAt
     tilingInfo.qbMax = BSACeilDiv(tilingInfo.s1Size, tilingInfo.qBlockSizeVal);
 
     tilingInfo.dSizeV = BSA_D_SIZE;
-
-    if (!BSAGetDimAsU32(keyShape, DIM_B, tilingInfo.paBlockNumSum)) {
-        OP_LOGE(kOpName, "ParseKeyValue: failed to get paBlockNumSum from key dim 0");
-        return ge::GRAPH_FAILED;
-    }
 
     return ge::GRAPH_SUCCESS;
 }
@@ -387,28 +376,13 @@ ge::graphStatus QuantBlockSparseAttnInfoParser::Parse(QuantBlockSparseAttnTiling
 
     const std::string layoutKV = BSAGetStringAttr(attrs, BSA_LAYOUT_KV_ATTR_INDEX, "PA_BNSD");
     const std::string layoutSparseIndices = BSAGetStringAttr(attrs, BSA_LAYOUT_SPARSE_INDICES_ATTR_INDEX, "B_N_Qb_Kb");
-    if (layoutKV != "PA_BNSD" || layoutSparseIndices != "B_N_Qb_Kb" || tilingInfo.quantModeVal != 1U ||
-        (tilingInfo.maskModeVal != 0U && tilingInfo.maskModeVal != 3U)) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "layout_kv/layout_sparse_indices/quant_mode/mask_mode",
+    if (layoutKV != "PA_BNSD" || layoutSparseIndices != "B_N_Qb_Kb" || tilingInfo.quantModeVal != 1U) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "layout_kv/layout_sparse_indices/quant_mode",
                                               layoutKV + "/" + layoutSparseIndices + "/" +
-                                                  std::to_string(tilingInfo.quantModeVal) + "/" +
-                                                  std::to_string(tilingInfo.maskModeVal),
+                                                  std::to_string(tilingInfo.quantModeVal),
                                               "layout_kv must be PA_BNSD, layout_sparse_indices must be B_N_Qb_Kb, "
-                                              "quant_mode must be 1, mask_mode must be 0 or 3");
+                                              "quant_mode must be 1");
         return ge::GRAPH_FAILED;
-    }
-    if (tilingInfo.maskModeVal == 3U) {
-        if (opParamInfo.attenMask.shape == nullptr ||
-            opParamInfo.attenMask.shape->GetStorageShape().GetShapeSize() <= 0) {
-            OP_LOGE(kOpName, "Parse: atten_mask is required when mask_mode=3");
-            return ge::GRAPH_FAILED;
-        }
-        const gert::Shape &attenMaskShape = opParamInfo.attenMask.shape->GetStorageShape();
-        if (attenMaskShape.GetDimNum() != DIM_NUM_2) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM(kOpName, "attention_mask",
-                                         std::to_string(attenMaskShape.GetDimNum()) + "D", "2D");
-            return ge::GRAPH_FAILED;
-        }
     }
 
     if (ParseQuery(tilingInfo, queryShape, sparseIndicesShape, attrs) != ge::GRAPH_SUCCESS) {

@@ -56,33 +56,24 @@ QuantBlockSparseAttnTiling::QuantBlockSparseAttnTiling(gert::TilingContext *cont
 {
 }
 
-void QuantBlockSparseAttnTiling::FillAttrParams()
-{
-    const auto &info = *tilingInfo_;
-    auto &attrParams = tilingData_.attrParams;
-    attrParams.set_layoutQ(info.layoutQValue);
-    attrParams.set_layoutKv(BSA_LAYOUT_KV_PA_BNSD_VALUE);
-    attrParams.set_layoutSparseIndices(BSA_LAYOUT_SPARSE_B_N_QB_KB_VALUE);
-    attrParams.set_quantMode(info.quantModeVal);
-    attrParams.set_maskMode(info.maskModeVal);
-    attrParams.set_returnSoftmaxLse(info.returnSoftmaxLseVal ? 1U : 0U);
-}
-
 void QuantBlockSparseAttnTiling::FillPaParams()
 {
     const auto &info = *tilingInfo_;
     auto &paParams = tilingData_.paParams;
-    paParams.set_blockSize(info.kvBlockSizeVal);
     paParams.set_blockTableDim2(info.maxBlockNumPerBatch);
     paParams.set_paBlockNumSum(info.paBlockNumSum);
     paParams.set_paLayoutType(BSA_PA_LAYOUT_TYPE_BNBD);
+    paParams.set_kvBlockSize(info.kvBlockSizeVal);
+    paParams.set_qBlockSize(info.qBlockSizeVal);
+    paParams.set_paBlockStride(info.paBlockStrideVal);
+    paParams.set_attenMaskS1Size(static_cast<int32_t>(info.s1Size));
+    paParams.set_isRowInvalid(1U);
 }
 
 void QuantBlockSparseAttnTiling::FillSparseParams()
 {
     const auto &info = *tilingInfo_;
     auto &sparseParams = tilingData_.sparseParams;
-    sparseParams.set_gS1OuterSize(info.gS1OuterSize);
     sparseParams.set_sparseSeqLenStride(info.qbMax);
     sparseParams.set_sparseIndicesStride(info.sparseCount);
 }
@@ -99,73 +90,28 @@ void QuantBlockSparseAttnTiling::FillInputParams()
     inputParams.set_gSize(info.gSize);
     inputParams.set_s1Size(info.s1Size);
     inputParams.set_s2Size(info.s2Size);
-    inputParams.set_alignedS2(info.kbMax * info.kvBlockSizeVal);
-    inputParams.set_dSize(BSA_D_SIZE);
-    inputParams.set_dSizeV(BSA_D_SIZE);
-    inputParams.set_dSizeRope(0);
-    inputParams.set_keepProb(1.0F);
+    inputParams.set_dSize(info.dSize);
+    inputParams.set_dSizeV(info.dSizeV);
     inputParams.set_scaleValue(info.softmaxScaleVal);
     inputParams.set_preTokens(std::numeric_limits<int32_t>::max());
     inputParams.set_nextTokens(0);
-    inputParams.set_pseS1Size(0);
-    inputParams.set_pseS2Size(0);
-    inputParams.set_pseBSize(0);
-    inputParams.set_bandIndex(0);
+    inputParams.set_bandIndex(0); // 当前为起始 idx
     uint8_t layoutTypeVal = BSA_LAYOUT_TYPE_TND;
     if (info.layoutQValue == BSA_LAYOUT_Q_NTD_VALUE) {
         layoutTypeVal = BSA_LAYOUT_TYPE_NTD;
     }
     inputParams.set_layoutType(layoutTypeVal);
-    inputParams.set_pseShapeType(0);
     inputParams.set_attenMaskShapeType(2);
-    inputParams.set_attenMaskDataType(1);
     inputParams.set_attenMaskCompressMode(compatMaskMode);
-    inputParams.set_implMode(0);
-    inputParams.set_sparseType(0);
-    inputParams.set_needDropMaskOp(0);
-    inputParams.set_dropMaskOuter(0);
-    inputParams.set_pseEncodeType(0);
-    inputParams.set_tndSoftmaxOut(0);
-    inputParams.set_remain(0);
     inputParams.set_attenMaskS2Size(2048);
-    inputParams.set_pseType(0);
-    inputParams.set_rsv1(0);
-    inputParams.set_qStartIdx(0);
-    inputParams.set_kvStartIdx(0);
-    inputParams.set_s1SparseValidSize(info.s1Size);
-    inputParams.set_s2SparseValidSize(info.s2Size);
-    inputParams.set_seed(0);
-    inputParams.set_offset(0);
-    inputParams.set_keepProbUint8(255);
-    inputParams.set_pseAlibiBaseS1(0);
-    inputParams.set_pseAlibiBaseS2(0);
-    inputParams.set_deqScaleFlag(1);
-    inputParams.set_deqScale2Flag(1);
     inputParams.set_isActualSeqLengthsNull(info.opParamInfo.cuSeqlensQ.tensor == nullptr ? 1 : 0);
     inputParams.set_isActualSeqLengthsKVNull(info.opParamInfo.cuSeqlensKV.tensor == nullptr ? 1 : 0);
     inputParams.set_actualSeqLengthsSize(info.bSize);
     inputParams.set_actualSeqLengthsKVSize(info.bSize);
-    inputParams.set_isKvContinuous(1);
-    inputParams.set_fromFused(0);
-    inputParams.set_isBSNDOut(0);
-    inputParams.set_transposeLayout(0);
+    inputParams.set_isKvContinuous(1); // 稀疏算子固定设为 1
+    inputParams.set_fromFused(0);      // 融合算子标记，稀疏算子固定设为 0
     inputParams.set_isGqa(info.isGqa ? 1 : 0);
     inputParams.set_isSoftMaxLseEnable(info.returnSoftmaxLseVal ? 1 : 0);
-    inputParams.set_isActualSharedPrefixLenNull(1);
-    inputParams.set_isQHasLeftPadding(0);
-    inputParams.set_isKVHasLeftPadding(0);
-    inputParams.set_ropeHeadSize(0);
-    inputParams.set_prefixSeqInnerSize(0);
-    inputParams.set_headNumRatio(1U);
-    inputParams.set_blockSize(info.kvBlockSizeVal);
-    inputParams.set_blockTableDim2(info.maxBlockNumPerBatch);
-    inputParams.set_paBlockNumSum(info.paBlockNumSum);
-    inputParams.set_attenMaskS1Size(info.s1Size);
-    inputParams.set_paLayoutType(BSA_PA_LAYOUT_TYPE_BNBD);
-    inputParams.set_isRowInvalid(1);
-    inputParams.set_paBlockStride(info.paBlockStrideVal);
-    inputParams.set_qBlockSize(info.qBlockSizeVal);
-    inputParams.set_kvBlockSize(info.kvBlockSizeVal);
 }
 
 void QuantBlockSparseAttnTiling::FillMultiCoreParams()
@@ -173,34 +119,14 @@ void QuantBlockSparseAttnTiling::FillMultiCoreParams()
     const auto &info = *tilingInfo_;
     auto &multiCoreParams = tilingData_.multiCoreParamsRegbase;
     multiCoreParams.set_coreNum(static_cast<int32_t>(usedCoreNum_));
-    multiCoreParams.set_totalSize(static_cast<int64_t>(totalTaskNum_));
     multiCoreParams.set_s1OuterSize(info.qbMax);
-    multiCoreParams.set_splitFactorSize(0);
-    multiCoreParams.set_splitFactorTailSize(0);
 
     uint32_t bnStartIdx[BSA_CORE_SPLIT_NUM] = {};
-    int64_t sparseStartIdx[BSA_CORE_SPLIT_NUM] = {};
     for (uint32_t boundaryIdx = 0U; boundaryIdx <= usedCoreNum_; ++boundaryIdx) {
         const uint64_t taskOffset = totalTaskNum_ * boundaryIdx / usedCoreNum_;
         bnStartIdx[boundaryIdx] = static_cast<uint32_t>(taskOffset / info.gS1OuterSize);
-        sparseStartIdx[boundaryIdx] = static_cast<int64_t>(taskOffset % info.gS1OuterSize);
     }
     multiCoreParams.set_bnStartIdx(bnStartIdx);
-    multiCoreParams.set_sparseStartIdx(sparseStartIdx);
-    multiCoreParams.set_firstFullLoadS1OuterIdx(0);
-    multiCoreParams.set_splitCoreMode(0);
-    uint8_t reserve[3] = {};
-    multiCoreParams.set_reserve(reserve);
-}
-
-void QuantBlockSparseAttnTiling::FillDropmaskParams()
-{
-    auto &dropmaskParams = tilingData_.dropmaskParamsRegbase;
-    dropmaskParams.set_multiCoreFactorSize(0);
-    dropmaskParams.set_baseUbCalSize(0);
-    dropmaskParams.set_multiCoreTotalSize(0);
-    dropmaskParams.set_shapeTotalSize(0);
-    dropmaskParams.set_dropMaskAddrOffset(0);
 }
 
 void QuantBlockSparseAttnTiling::FillInitOutputParams()
@@ -212,9 +138,6 @@ void QuantBlockSparseAttnTiling::FillInitOutputParams()
     initOutputParams.set_singleCoreSize((totalOutputSize + static_cast<int64_t>(usedCoreNum_) * 2 - 1) /
                                         (static_cast<int64_t>(usedCoreNum_) * 2));
     initOutputParams.set_needInit(1);
-    initOutputParams.set_isOneN(info.n1Size == 1U ? 1 : 0);
-    uint8_t rsvd[2] = {};
-    initOutputParams.set_rsvd(rsvd);
     initOutputParams.set_totalOutputSize(totalOutputSize);
     initOutputParams.set_totalSoftMaxLseOutputSize(totalSoftmaxLseSize);
 }
@@ -233,25 +156,19 @@ void QuantBlockSparseAttnTiling::CalcWorkspaceSize()
 
 void QuantBlockSparseAttnTiling::PrintAllTilingData()
 {
-    auto &attrParams = tilingData_.attrParams;
-    OP_LOGD(kOpName, "===== AttrParams =====");
-    OP_LOGD(kOpName, "layoutQ:%u", attrParams.get_layoutQ());
-    OP_LOGD(kOpName, "layoutKv:%u", attrParams.get_layoutKv());
-    OP_LOGD(kOpName, "layoutSparseIndices:%u", attrParams.get_layoutSparseIndices());
-    OP_LOGD(kOpName, "quantMode:%u", attrParams.get_quantMode());
-    OP_LOGD(kOpName, "maskMode:%u", attrParams.get_maskMode());
-    OP_LOGD(kOpName, "returnSoftmaxLse:%u", attrParams.get_returnSoftmaxLse());
-
     auto &paParams = tilingData_.paParams;
     OP_LOGD(kOpName, "===== PaParams =====");
-    OP_LOGD(kOpName, "blockSize:%u", paParams.get_blockSize());
     OP_LOGD(kOpName, "blockTableDim2:%u", paParams.get_blockTableDim2());
     OP_LOGD(kOpName, "paBlockNumSum:%u", paParams.get_paBlockNumSum());
     OP_LOGD(kOpName, "paLayoutType:%u", paParams.get_paLayoutType());
+    OP_LOGD(kOpName, "kvBlockSize:%u", paParams.get_kvBlockSize());
+    OP_LOGD(kOpName, "qBlockSize:%u", paParams.get_qBlockSize());
+    OP_LOGD(kOpName, "paBlockStride:%u", paParams.get_paBlockStride());
+    OP_LOGD(kOpName, "attenMaskS1Size:%d", paParams.get_attenMaskS1Size());
+    OP_LOGD(kOpName, "isRowInvalid:%u", paParams.get_isRowInvalid());
 
     auto &sparseParams = tilingData_.sparseParams;
     OP_LOGD(kOpName, "===== SparseParams =====");
-    OP_LOGD(kOpName, "gS1OuterSize:%u", sparseParams.get_gS1OuterSize());
     OP_LOGD(kOpName, "sparseSeqLenStride:%u", sparseParams.get_sparseSeqLenStride());
     OP_LOGD(kOpName, "sparseIndicesStride:%u", sparseParams.get_sparseIndicesStride());
 
@@ -264,11 +181,8 @@ void QuantBlockSparseAttnTiling::PrintAllTilingData()
     OP_LOGD(kOpName, "gSize:%ld", inputParams.get_gSize());
     OP_LOGD(kOpName, "s1Size:%ld", inputParams.get_s1Size());
     OP_LOGD(kOpName, "s2Size:%ld", inputParams.get_s2Size());
-    OP_LOGD(kOpName, "alignedS2:%ld", inputParams.get_alignedS2());
     OP_LOGD(kOpName, "dSize:%ld", inputParams.get_dSize());
     OP_LOGD(kOpName, "dSizeV:%ld", inputParams.get_dSizeV());
-    OP_LOGD(kOpName, "dSizeRope:%ld", inputParams.get_dSizeRope());
-    OP_LOGD(kOpName, "keepProb:%f", inputParams.get_keepProb());
     OP_LOGD(kOpName, "scaleValue:%f", inputParams.get_scaleValue());
     OP_LOGD(kOpName, "preTokens:%ld", inputParams.get_preTokens());
     OP_LOGD(kOpName, "nextTokens:%ld", inputParams.get_nextTokens());
@@ -280,41 +194,19 @@ void QuantBlockSparseAttnTiling::PrintAllTilingData()
     OP_LOGD(kOpName, "isKvContinuous:%u", inputParams.get_isKvContinuous());
     OP_LOGD(kOpName, "isGqa:%u", inputParams.get_isGqa());
     OP_LOGD(kOpName, "isSoftMaxLseEnable:%u", inputParams.get_isSoftMaxLseEnable());
-    OP_LOGD(kOpName, "headNumRatio:%u", inputParams.get_headNumRatio());
-    OP_LOGD(kOpName, "blockSize:%d", inputParams.get_blockSize());
-    OP_LOGD(kOpName, "blockTableDim2:%d", inputParams.get_blockTableDim2());
-    OP_LOGD(kOpName, "paBlockNumSum:%d", inputParams.get_paBlockNumSum());
-    OP_LOGD(kOpName, "paLayoutType:%u", inputParams.get_paLayoutType());
-    OP_LOGD(kOpName, "qBlockSize:%u", inputParams.get_qBlockSize());
-    OP_LOGD(kOpName, "kvBlockSize:%u", inputParams.get_kvBlockSize());
 
     auto &multiCoreParams = tilingData_.multiCoreParamsRegbase;
     OP_LOGD(kOpName, "===== MultiCoreParams =====");
     OP_LOGD(kOpName, "coreNum:%d", multiCoreParams.get_coreNum());
-    OP_LOGD(kOpName, "totalSize:%ld", multiCoreParams.get_totalSize());
     OP_LOGD(kOpName, "s1OuterSize:%ld", multiCoreParams.get_s1OuterSize());
-    OP_LOGD(kOpName, "splitFactorSize:%ld", multiCoreParams.get_splitFactorSize());
-    OP_LOGD(kOpName, "splitFactorTailSize:%ld", multiCoreParams.get_splitFactorTailSize());
     for (uint32_t i = 0; i <= usedCoreNum_ && i < BSA_CORE_SPLIT_NUM; ++i) {
-        OP_LOGD(kOpName, "bnStartIdx[%u]:%u, sparseStartIdx[%u]:%ld", i, multiCoreParams.get_bnStartIdx()[i], i,
-                multiCoreParams.get_sparseStartIdx()[i]);
+        OP_LOGD(kOpName, "bnStartIdx[%u]:%u", i, multiCoreParams.get_bnStartIdx()[i]);
     }
-    OP_LOGD(kOpName, "firstFullLoadS1OuterIdx:%ld", multiCoreParams.get_firstFullLoadS1OuterIdx());
-    OP_LOGD(kOpName, "splitCoreMode:%u", multiCoreParams.get_splitCoreMode());
-
-    auto &dropmaskParams = tilingData_.dropmaskParamsRegbase;
-    OP_LOGD(kOpName, "===== DropmaskParams =====");
-    OP_LOGD(kOpName, "multiCoreFactorSize:%d", dropmaskParams.get_multiCoreFactorSize());
-    OP_LOGD(kOpName, "baseUbCalSize:%d", dropmaskParams.get_baseUbCalSize());
-    OP_LOGD(kOpName, "multiCoreTotalSize:%ld", dropmaskParams.get_multiCoreTotalSize());
-    OP_LOGD(kOpName, "shapeTotalSize:%ld", dropmaskParams.get_shapeTotalSize());
-    OP_LOGD(kOpName, "dropMaskAddrOffset:%ld", dropmaskParams.get_dropMaskAddrOffset());
 
     auto &initOutputParams = tilingData_.initOutputParams;
     OP_LOGD(kOpName, "===== InitOutputParams =====");
     OP_LOGD(kOpName, "singleCoreSize:%u", initOutputParams.get_singleCoreSize());
     OP_LOGD(kOpName, "needInit:%u", initOutputParams.get_needInit());
-    OP_LOGD(kOpName, "isOneN:%u", initOutputParams.get_isOneN());
     OP_LOGD(kOpName, "totalOutputSize:%ld", initOutputParams.get_totalOutputSize());
     OP_LOGD(kOpName, "totalSoftMaxLseOutputSize:%ld", initOutputParams.get_totalSoftMaxLseOutputSize());
 
@@ -347,12 +239,10 @@ ge::graphStatus QuantBlockSparseAttnTiling::DoOpTiling(QuantBlockSparseAttnTilin
     const uint32_t maxAicCoreNum = GetAicCoreNum(context_);
     usedCoreNum_ = static_cast<uint32_t>(std::min<uint64_t>(static_cast<uint64_t>(maxAicCoreNum), totalTaskNum_));
 
-    FillAttrParams();
     FillPaParams();
     FillSparseParams();
     FillInputParams();
     FillMultiCoreParams();
-    FillDropmaskParams();
     FillInitOutputParams();
     CalcTilingKey();
     CalcWorkspaceSize();

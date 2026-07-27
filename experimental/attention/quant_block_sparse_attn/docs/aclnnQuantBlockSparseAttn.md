@@ -124,7 +124,7 @@ torch.ops.custom.npu_quant_block_sparse_attn(
       <td>key</td>
       <td>输入</td>
       <td>PageAttention KV Cache 中的 Key。</td>
-      <td>layout_kv 仅支持 PA_BNSD。</td>
+      <td>layout_kv 仅支持 PA_BNSD。测试框架按 1D 方式传入。</td>
       <td>FLOAT8_E4M3FN</td>
       <td>ND</td>
       <td>(block_num,N2,sparse_kv_block_size,D)</td>
@@ -133,7 +133,7 @@ torch.ops.custom.npu_quant_block_sparse_attn(
       <td>value</td>
       <td>输入</td>
       <td>PageAttention KV Cache 中的 Value。</td>
-      <td>layout_kv 仅支持 PA_BNSD。</td>
+      <td>layout_kv 仅支持 PA_BNSD。测试框架按 1D 方式传入。</td>
       <td>FLOAT8_E4M3FN</td>
       <td>ND</td>
       <td>(block_num,N2,sparse_kv_block_size,D_v)</td>
@@ -151,7 +151,7 @@ torch.ops.custom.npu_quant_block_sparse_attn(
       <td>k_descale</td>
       <td>输入</td>
       <td>Key 反量化缩放因子。</td>
-      <td>PERTOKEN_PERHEAD。</td>
+      <td>PERTOKEN_PERHEAD。测试框架按 1D 方式传入。</td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>(block_num,N2,sparse_kv_block_size)</td>
