@@ -26,6 +26,10 @@ constexpr static double COMPUTE_TIME_SCALE_FACTOR = 1.43;
 constexpr static uint64_t OVERHEAD_AWARE_MAX_TILES = 3;
 constexpr static uint64_t SMALL_M_BAR_FOR_OVERHEAD = 4096;
 constexpr static uint64_t NUM_EIGHT = 8;
+// AICPU(4P/8P)场景下，定义的常量
+constexpr static double AICPU_NO_CUT_TIME_THRESHOLD_US = 80.0;
+constexpr static uint64_t AICPU_MN_RATIO_THRESHOLD = 10U;
+constexpr static uint64_t AICPU_MN_RATIO_MAX_TILE_CNT = 3U;
 
 void MatmulAlltoAllFitBalanceTiling::EstimateMMCommTime()
 {
@@ -56,6 +60,25 @@ void MatmulAlltoAllFitBalanceTiling::EstimateMMCommTime()
 
 void MatmulAlltoAllFitBalanceTiling::SetShortTileLen()
 {
+    // 通过 maxTileCnt==AICPU_MAX_TILE_CNT 识别 AICPU 模式
+    if (tilingM_.tileArgs.maxTileCnt == AICPU_MAX_TILE_CNT) {
+        double mmTime = matmulPerf_.MatmulTime(mmInfo_.mValue, 1);
+        if (quantMode_ == QuantMode::KC_QUANT) {
+            mmTime *= COMPUTE_TIME_SCALE_FACTOR;
+        }
+        if (mmTime < AICPU_NO_CUT_TIME_THRESHOLD_US ||
+            commPerf_.CommTime(mmInfo_.mValue) < AICPU_NO_CUT_TIME_THRESHOLD_US) {
+            // 短块置为总长，使基类 GetTiling 走 NoCutTiling 分支(totalLen < shortTileLen * 2)
+            tilingM_.cutRes.shortTileLen = tilingM_.totalLen;
+            tilingM_.cutRes.numShortTile = 1U;
+            return;
+        }
+        // m/n超过阈值倍，最多切分3份
+        if (mmInfo_.mValue > AICPU_MN_RATIO_THRESHOLD * mmInfo_.nValue) {
+            tilingM_.SetMaxTileCnt(AICPU_MN_RATIO_MAX_TILE_CNT);
+        }
+    }
+
     uint64_t l2UseSize = mmInfo_.mValue * mmInfo_.kValue * mmInfo_.inMatrixADtypeSize +
                          mmInfo_.kValue * mmInfo_.nValue * mmInfo_.inMatrixBDtypeSize;
     isLargerThanL2Cache_ = l2UseSize > L2_CACHE_SIZE;
