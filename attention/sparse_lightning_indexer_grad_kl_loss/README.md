@@ -31,21 +31,21 @@
    $$
 
    其中，$p$是target distribution，通过对main attention score进行所有的head的求和，然后把求和结果沿着上下文方向进行L1正则化得到。$D_{KL}$为KL散度，其表达式为：
-   
+
    $$
    D_{KL}(a||b){=}\sum_ia_i\mathrm{log}{\left(\frac{a_i}{b_i}\right)}
    $$
 
    通过求导可得Loss的梯度表达式：
-   
+
    $$
-   dI\mathop{{}}\nolimits_{{t,:}}=Softmax \left( I\mathop{{}}\nolimits_{{t,:}} \left) -p\mathop{{}}\nolimits_{{t,:}}\right. \right. 
+   dI\mathop{{}}\nolimits_{{t,:}}=Softmax \left( I\mathop{{}}\nolimits_{{t,:}} \left) -p\mathop{{}}\nolimits_{{t,:}}\right. \right.
    $$
 
    利用链式法则可以进行weights，query和key矩阵的梯度计算：
-   
+
    $$
-   dW\mathop{{}}\nolimits_{{t,:}}=dI\mathop{{}}\nolimits_{{t,:}}\text{@} \left( ReLU \left( S\mathop{{}}\nolimits_{{t,:}} \left)  \left) \mathop{{}}\nolimits^{{T}}\right. \right. \right. \right. 
+   dW\mathop{{}}\nolimits_{{t,:}}=dI\mathop{{}}\nolimits_{{t,:}}\text{@} \left( ReLU \left( S\mathop{{}}\nolimits_{{t,:}} \left)  \left) \mathop{{}}\nolimits^{{T}}\right. \right. \right. \right.
    $$
 
    $$
@@ -53,7 +53,7 @@
    $$
 
    $$
-   dK\mathop{{}}\nolimits_{{:t,:}}= \left( dS\mathop{{}}\nolimits_{{t,:}} \left) \mathop{{}}\nolimits^{{T}}@q\mathop{{}}\nolimits_{{:t,:}}\right. \right. 
+   dK\mathop{{}}\nolimits_{{:t,:}}= \left( dS\mathop{{}}\nolimits_{{t,:}} \left) \mathop{{}}\nolimits^{{T}}@q\mathop{{}}\nolimits_{{:t,:}}\right. \right.
    $$
 
    其中，S为QK矩阵softmax的结果。
@@ -68,8 +68,8 @@
     <colgroup>
         <col style="width: 170px">
         <col style="width: 170px">
-        <col style="width: 310px">  
-        <col style="width: 212px">  
+        <col style="width: 310px">
+        <col style="width: 212px">
         <col style="width: 100px">
         </colgroup>
     <thead>
@@ -150,7 +150,7 @@
         <td>MLA rope部分：Key位置编码的输出。</td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
-    </tr>    
+    </tr>
     <tr>
         <td>actualSeqLengthsQuery</td>
         <td>输入</td>
@@ -224,7 +224,7 @@
     </tbody>
 </table>
 
-- Atlas A2训练系列产品/Atlas A2推理系列产品、Atlas A3训练系列产品/Atlas A3推理系列产品：
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
   - T1支持大于等于actualSeqLengthsQuery的累加和，T2支持大于等于actualSeqLengthsKey的累加和。
 
 ## 约束说明

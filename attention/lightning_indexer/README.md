@@ -244,7 +244,7 @@
 - Ascend 950PR/Ascend 950DT：
   - query Q_N仅支持8、16、24、32、64。
   - 参数weights不支持`float32`类型。
-- Atlas A3训练系列产品/Atlas A3推理系列产品、Atlas A2训练系列产品/Atlas A2推理系列产品：
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
   - query Q_N支持小于等于64。
 
 ## 调用示例

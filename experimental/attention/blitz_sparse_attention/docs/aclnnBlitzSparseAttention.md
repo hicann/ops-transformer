@@ -5,7 +5,7 @@
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
 |<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>|      √     |
+|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
 
 ## 功能说明
 
@@ -447,7 +447,7 @@ aclnnStatus aclnnBlitzSparseAttention(
 
 - query，key，value输入，功能使用限制如下：
 
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
     - 支持B轴小于等于65536（64k），输入类型包含INT8时D轴非32对齐或输入类型为FLOAT16或BFLOAT16时D轴非16对齐时，B轴仅支持到128。
 
@@ -508,7 +508,7 @@ aclnnStatus aclnnBlitzSparseAttention(
 
     - 支持D轴小于等于512。inputLayout为BSH或者BSND时，要求N*D小于65535。
 
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>： TND场景下query，key，value输入的综合限制：
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>： TND场景下query，key，value输入的综合限制：
       - T小于等于65536。
       - N等于8/16/32/64/128，且Q_N、K_N、V_N相等。
       - Q_D、K_D等于192，V_D等于128/192。
@@ -516,7 +516,7 @@ aclnnStatus aclnnBlitzSparseAttention(
       - sparse模式仅支持sparse=0且不传mask，或sparse=3且传入mask。
       - 当sparse=3时，要求每个batch单独的actualSeqLengths < actualSeqLengthsKv。
 
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：数据类型支持FLOAT16、BFLOAT16、INT8。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT16、BFLOAT16、INT8。
 
 - pseShift功能使用限制如下：
 
@@ -524,13 +524,13 @@ aclnnStatus aclnnBlitzSparseAttention(
   - Q_S需大于等于query的S长度，KV_S需大于等于key的S长度。
   - 对于pseShift的KV_S为非32对齐的场景，建议padding到32字节来提高性能，多余部分的填充值不做要求。如不使用该功能时可传入nullptr。
 
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：数据类型支持FLOAT16、BFLOAT16，且在pseShift为FLOAT16类型时，要求此时的query为FLOAT16或INT8类型，而在pseShift为BFLOAT16类型时，要求此时的query为BFLOAT16类型。在query、key、value为FLOAT16且pseShift存在的情况下，默认走高精度模式，对应的限制继承自高精度模式的限制。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT16、BFLOAT16，且在pseShift为FLOAT16类型时，要求此时的query为FLOAT16或INT8类型，而在pseShift为BFLOAT16类型时，要求此时的query为BFLOAT16类型。在query、key、value为FLOAT16且pseShift存在的情况下，默认走高精度模式，对应的限制继承自高精度模式的限制。
 
 - attenMask功能使用限制如下：
 
   - 对于attenMask的KV_S为非32对齐的场景，建议padding到32对齐来提高性能，多余部分填充成1。
   - 通常建议shape输入Q_S, KV_S; B, Q_S, KV_S; 1, Q_S, KV_S; B, 1, Q_S, KV_S; 1, 1, Q_S, KV_S，其中Q_S为query的shape中的S，KV_S为key和value的shape中的S。
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：数据类型支持BOOL、INT8和UINT8。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持BOOL、INT8和UINT8。
 
 - actualSeqLengths，actualSeqLengthsKv输入，功能使用限制如下：
 
@@ -538,47 +538,47 @@ aclnnStatus aclnnBlitzSparseAttention(
   - 对于actualSeqLengthsKv，如果不指定序列长度，可以传入nullptr，这表示有效序列长度与key/value的shape中的S长度相同。需要注意的是，该参数中每个batch的有效序列长度不应超过key/value中对应batch的序列长度。
   - 关于seqlen的传入长度有以下规则：当传入长度为1时，所有Batch将使用相同的seqlen；当传入长度大于或等于Batch数量时，将取seqlen的前Batch个数值；其他长度的传入将不被支持。
   - 当query的inputLayout为TND时，该入参必须传入，且以该入参元素的数量作为Batch值。该入参中每个元素的值表示当前Batch与之前所有Batch的Sequence Length和，因此后一个元素的值必须大于等于前一个元素的值，且不能出现负值。
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：数据类型支持INT64，支持TND格式。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64，支持TND格式。
 
 - deqScale1，deqScale2输入，功能使用限制如下：
 
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：数据类型支持UINT64、FLOAT32。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持UINT64、FLOAT32。
 
 - quantScale1输入，功能使用限制如下：
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：数据类型支持FLOAT32。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT32。
 
 - quantScale2，quantOffset2输入，功能使用限制如下：
 
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：数据类型支持FLOAT32和BFLOAT16。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT32和BFLOAT16。
 
 - preTokens输入，功能使用限制如下：
 
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：数据类型支持INT64。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64。
 
 - nextTokens输入，功能使用限制如下：
 
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：数据类型支持INT64。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64。
 
 - inputLayout输入，功能使用限制如下：
 
   - 当前支持BSH、BSND、BNSD、BNSD_BSND（输入为BNSD时，输出格式为BSND）。用户不特意指定时建议传入"BSH"。
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：除了上述格式，还支持TND（不支持pse、全量化、后量化）。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：除了上述格式，还支持TND（不支持pse、全量化、后量化）。
 
 - numKeyValueHeads输入，功能使用限制如下：
 
   - 需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64，且在BSND、BNSD、BNSD_BSND场景下，需要与shape中的key/value的N轴shape值相同，否则报错。
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：数据类型支持INT64。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64。
 
 - sparseMode输入，功能使用限制如下：
 
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     - sparseMode为0时，代表defaultMask模式，如果attenmask未传入则不做mask操作，忽略preTokens和nextTokens（内部赋值为INT_MAX）；如果传入，则需要传入完整的attenmask矩阵（S1 * S2），表示preTokens和nextTokens之间的部分需要计算。
     - sparseMode为1时，代表allMask，必须传入完整的attenmask矩阵（S1 * S2）。
     - sparseMode为2时，代表leftUpCausal模式的mask，需要传入优化后的attenmask矩阵（2048*2048）。
     - sparseMode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景，需要传入优化后的attenmask矩阵（2048*2048）。
     - sparseMode为4时，代表band模式的mask，需要传入优化后的attenmask矩阵（2048*2048）。
     - sparseMode为5、6、7、8时，分别代表prefix、global、dilated、block_local，**均暂不支持**。用户不特意指定时建议传入0。
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：当inputLayout为TND时，sparseMode仅支持取值0、3。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：当inputLayout为TND时，sparseMode仅支持取值0、3。
 
 - innerPrecise输入，功能使用限制如下：
 
@@ -624,7 +624,7 @@ aclnnStatus aclnnBlitzSparseAttention(
 - attentionOut输出，功能使用限制如下：
 
   - 当inputLayout为BNSD_BSND时，输入query的shape是BNSD，输出shape为BSND；其余情况该入参的shape需要与入参query的shape保持一致。
-  - <term>Atlas A2 训练系列产品/Atlas 800I A2 推理产品/A200I A2 Box异构组件</term>：数据类型支持FLOAT16、BFLOAT16、INT8。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT16、BFLOAT16、INT8。
 
 - int8量化相关入参数量与输入、输出数据格式的综合限制：
 

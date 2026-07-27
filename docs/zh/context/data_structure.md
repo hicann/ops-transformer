@@ -2,7 +2,7 @@
 
 本章提供了调用CANN算子API依赖的基础数据结构，**开发者无需关注其内部实现，直接使用即可**。
 
-注意，该基础数据结构可通过[《算子加速库》](https://hiascend.com/document/redirect/CannCommercialOplist)中“公共接口”创建，如aclCreateTensor等。
+注意，该基础数据结构可通过[《算子库》](https://hiascend.com/document/redirect/CannCommunityOplist)中“公共接口”创建，如aclCreateTensor等。
 
 - **aclTensor**
 

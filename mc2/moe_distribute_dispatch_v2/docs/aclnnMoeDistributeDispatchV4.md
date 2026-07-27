@@ -30,7 +30,7 @@
     > 说明：TP域通信当前版本不再支持。
 
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：该接口必须与`aclnnMoeDistributeCombineV4`配套使用。
-- <term>Atlas A3训练系列产品/Atlas A3推理系列产品/Ascend 950DT</term>：该接口必须与`aclnnMoeDistributeCombineV4`或`aclnnMoeDistributeCombineAddRmsNormV2`配套使用。
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：该接口必须与`aclnnMoeDistributeCombineV4`或`aclnnMoeDistributeCombineAddRmsNormV2`配套使用。
 
   说明：`aclnnMoeDistributeCombineV4`、`aclnnMoeDistributeCombineAddRmsNormV2`算子在后续文档中统称为**CombineV4系列算子**。
 
@@ -630,9 +630,9 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
   | A            | 表示本卡需要分发的最大token数量，取值范围如下：<ul> <li>对于共享专家，要满足A = BS \* epWorldSize \* sharedExpertNum / sharedExpertRankNum。</li><li>对于MoE专家，当globalBS为0时，要满足A >= BS \* epWorldSize \* min(localExpertNum, K)；当globalBS非0时，要满足A >= globalBS \* min(localExpertNum, K)。</li></ul>|
   | H（hidden size） | 表示hidden size隐藏层大小。<ul><li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：(0, 10240]且为32的整数倍。</li> <li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：依commAlg取值，当commAlg="hierarchy"时，H取值范围为[1024, 7168]，且为32的整数倍；其余场景下取值范围[1024, 8192]。</li><li><term>Ascend 950DT</term>：取值范围[1024, 8192]。</li></ul> |
   | BS           | 表示本卡最终输出token数。<ul><li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：依commAlg取值，"fullmesh"取值范围为(0 < BS ≤ 256)；"hierarchy"并且驱动版本≥25.0.RC1.1时取值范围为(0 < BS ≤ 512)；</li><li><term>Atlas A3训练系列产品/Atlas A3推理系列产品</term>  ：依commAlg取值，"fullmesh_v2"和"hierarchy"取值范围为(0 < BS ≤ 256)，"fullmesh_v1"和""取值范围为(0 < BS ≤ 512)。</li><li><term>Ascend 950DT</term>：0 < BS ≤ 512。</li></ul> |
-  | K    | 表示选取topK个专家，取值范围为0 < K ≤16，且<code>0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>。<br> <term>Atlas A3训练系列产品/Atlas A3推理系列产品/Ascend 950DT</term>：当commAlg为"fullmesh_v2"时，取值范围为0 < K ≤ 12。|
+  | K    | 表示选取topK个专家，取值范围为0 < K ≤16，且<code>0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>。<br> <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：当commAlg为"fullmesh_v2"时，取值范围为0 < K ≤ 12。|
   | serverNum    | 表示服务器节点数，仅支持2、4、8。<br>Atlas A2训练系列产品/Atlas A2推理系列产品：仅该场景的shape使用了该变量。                                                  |
-  | localExpertNum |  本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，当前版本不支持TP域通信。 </li><li><term>Atlas A3训练系列产品/Atlas A3推理系列产品/Ascend 950DT</term>：应满足0 < <code>localExpertNum \* epWorldSize</code> ≤ 2048。当commAlg="hierarchy"时，需满足localExpertNum ≤ 24且 <code>localExpertNum \* epWorldSize</code> ≤ 512</li><li><term>Ascend 950DT</term>：应满足0 < <code>localExpertNum \* epWorldSize</code> ≤ 2048。</li></ul>|
+  | localExpertNum |  本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，当前版本不支持TP域通信。 </li><li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：应满足0 < <code>localExpertNum \* epWorldSize</code> ≤ 2048。当commAlg="hierarchy"时，需满足localExpertNum ≤ 24且 <code>localExpertNum \* epWorldSize</code> ≤ 512</li><li><term>Ascend 950DT</term>：应满足0 < <code>localExpertNum \* epWorldSize</code> ≤ 2048。</li></ul>|
 
 - **quantMode相关约束**：
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
@@ -693,7 +693,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
 
   - **HCCL_INTRA_PCIE_ENABLE**和**HCCL_INTRA_ROCE_ENABLE**：
       - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：该环境变量不再推荐使用，建议commAlg配置"hierarchy"。
-      - <term>Atlas A3训练系列产品/Atlas A3推理系列产品/Ascend 950DT</term>：不支持该环境变量。
+      - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：不支持该环境变量。
   - **HCCL_LOGIC_SUPERPOD_ID**
       - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：当commAlg配置"hierarchy"需根据不同的逻辑超节点配置该环境变量，例如两机分别设为`export HCCL_LOGIC_SUPERPOD_ID=0`和`export HCCL_LOGIC_SUPERPOD_ID=1`。
 

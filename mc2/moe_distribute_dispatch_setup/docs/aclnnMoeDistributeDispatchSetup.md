@@ -693,7 +693,7 @@ aclnnStatus aclnnMoeDistributeDispatchSetupTeardownCalcOutputSize(
 
 - 关于rankTable:
 
-    1. 开发者可以通过ranktable文件配置参与集合通信的NPU资源信息，详细配置请参考[《集合通信用户指南》](https://hiascend.com/document/redirect/CannCommercialHcclUg)中“通信功能开发>集群信息配置>ranktable文件配置资源信息”。
+    1. 开发者可以通过ranktable文件配置参与集合通信的NPU资源信息，详细配置请参考[《集合通信用户指南》](https://hiascend.com/document/redirect/CannCommunityHcclUg)中“通信功能开发>集群信息配置>ranktable文件配置资源信息”。
 
     2. 使用`cat /etc/hccn.conf`或者`for i in seq 0 7; do echo "===================> dev$i, NPU$((i+1))"; hccn_tool -i $i -ip -g; done`查询机器的device ip。然后参考集合通信文档填写json文件。
 

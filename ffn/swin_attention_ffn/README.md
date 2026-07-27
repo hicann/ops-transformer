@@ -29,7 +29,7 @@
     <td style="text-align: center;">×</td>
   </tr>
   <tr>
-    <td>Atlas推理系列加速卡产品</td>
+    <td>Atlas 推理系列加速卡产品</td>
     <td style="text-align: center;">×</td>
   </tr>
   <tr>
@@ -102,7 +102,7 @@
     <td>可选参数，Device侧的aclTensor，公式中的输入x3，支持输入的维度为3维[B,M,N]，其中B为batch size,[M,N]仅支持[64,128]。</td>
     <td>FLOAT16</td>
     <td>ND</td>
-  </tr>  
+  </tr>
   <tr>
     <td>y</td>
     <td>输出</td>

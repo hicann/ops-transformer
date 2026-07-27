@@ -103,7 +103,7 @@
 - 参数query中的N和numHeads值相等，key、value的N和numKeyValueHeads值相等，并且numHeads是numKeyValueHeads的倍数关系。
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：
   - 支持B轴小于等于65536，N轴小于等于256，D轴小于等于512。
-- Atlas推理系列加速卡产品：
+- Atlas 推理系列加速卡产品：
   - 支持B轴小于等于256，N轴小于等于256，D轴小于等于512，key、value的S轴小于等于65536。
   - query、key、value和attentionOut数据类型仅支持FLOAT16。
   - 在数据排布格式为BNSD时，需要满足numHeads与numKeyValueHeads的比值不大于8，其他情况仅支持取值0；

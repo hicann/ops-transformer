@@ -10,7 +10,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 #
 # This script only compiles the AscendC operator and creates a shared library file in lib directory
-# `bisheng` CLI: https://www.hiascend.com/document/detail/zh/canncommercial/800/developmentguide/opdevg/BishengCompiler/atlas_bisheng_10_0003.html
+# `bisheng` CLI: https://www.hiascend.com/document/detail/zh/cannCommunity/800/developmentguide/opdevg/BishengCompiler/atlas_bisheng_10_0003.html
 # Adapted from: https://gitee.com/ascend/mstt/tree/master/sample/pytorch_adapter
 
 # validate cann environment

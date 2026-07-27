@@ -71,7 +71,7 @@ $$
 其中，$emax$表示该类型最大正规数对应的指数部分的值。
 
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：该算子必须与`MoeDistributeCombineV2`配套使用。
-- <term>Atlas A3训练系列产品/Atlas A3推理系列产品/Ascend 950DT</term>：该算子必须与`MoeDistributeCombineV2`或`MoeDistributeCombineAddRmsNorm`配套使用。
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：该算子必须与`MoeDistributeCombineV2`或`MoeDistributeCombineAddRmsNorm`配套使用。
 
 > 说明：MoeDistributeCombineV2、MoeDistributeCombineAddRmsNorm算子在后续文档中统称为CombineV2系列算子。
 ・

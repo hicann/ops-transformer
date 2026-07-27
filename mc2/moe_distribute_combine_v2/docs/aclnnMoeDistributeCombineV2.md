@@ -568,8 +568,8 @@ aclnnStatus aclnnMoeDistributeCombineV2(
   | 变量         | 定义与取值范围                                                                 |
   | :----------- | :----------------------------------------------------------------------------- |
   | A            | 本卡需分发的最大token数，取值范围如下: <ul><li>对于共享专家，要满足<code>A = BS \* epWorldSize \* sharedExpertNum / sharedExpertRankNum</code>。</li><li>对于MoE专家，当globalBS为0时，要满足<code>A >= BS \* epWorldSize \* min(localExpertNum, K)</code>；当globalBS非0时，要满足<code>A >= globalBS \* min(localExpertNum, K)</code>。</li></ul>|
-  | H            |表示hidden size隐藏层大小:<ul><li> <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：(0, 10240]且为32的整数倍。</li><li><term>Atlas A3训练系列产品/Atlas A3推理系列产品/Ascend 950DT</term>：[1024, 8192]。 </li></ul>|
-  | BS           | 表示batch sequence size（本卡最终输出的token数量）:<ul><li> <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：依commAlg取值，"fullmesh"支持(0, 256]；"hierarchy"并且驱动版本≥25.0.RC1.1时支持(0, 512]；</li><li><term>Atlas A3训练系列产品/Atlas A3推理系列产品/Ascend 950DT</term>：0 < BS ≤512。</li></ul> |
+  | H            |表示hidden size隐藏层大小:<ul><li> <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：(0, 10240]且为32的整数倍。</li><li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：[1024, 8192]。 </li></ul>|
+  | BS           | 表示batch sequence size（本卡最终输出的token数量）:<ul><li> <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：依commAlg取值，"fullmesh"支持(0, 256]；"hierarchy"并且驱动版本≥25.0.RC1.1时支持(0, 512]；</li><li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：0 < BS ≤512。</li></ul> |
   | K            |表示选取topK个专家，取值范围为(0 < K ≤ 16)且满足(0 < K ≤ moeExpertNum)。 |
   | serverNum    | 服务器节点数:<br><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：仅该场景的shape使用了该变量，仅支持2、4、8。
   | localExpertNum | 本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，localExpertNum > 1时不支持TP通信。 </li><li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Ascend 950DT</term>：应满足0 < localExpertNum * epWorldSize ≤ 2048。</li></ul>|
@@ -587,7 +587,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
   - **HCCL_INTRA_PCIE_ENABLE和HCCL_INTRA_ROCE_ENABLE**：
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：该环境变量不再推荐使用，建议通过`commAlg`配置为"hierarchy"。
-    - <term>Atlas A3训练系列产品/Atlas A3推理系列产品/Ascend 950DT</term>：不支持该环境变量。
+    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：不支持该环境变量。
 
 - **通信域使用约束**：
   - 一个模型中的`aclnnMoeDistributeCombineV2`和`aclnnMoeDistributeDispatchV2`仅支持相同EP通信域，且该通信域中不允许有其他算子。

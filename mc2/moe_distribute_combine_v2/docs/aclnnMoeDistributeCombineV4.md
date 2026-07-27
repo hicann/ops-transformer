@@ -724,7 +724,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
 
   - **HCCL_INTRA_PCIE_ENABLE/HCCL_INTRA_ROCE_ENABLE**：
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：该环境变量不再推荐使用，建议commAlg配置"hierarchy"。
-    - <term>Atlas A3训练系列产品/Atlas A3推理系列产品/Ascend 950DT</term>：不支持该环境变量。
+    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：不支持该环境变量。
   - **HCCL_LOGIC_SUPERPOD_ID**
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：当commAlg配置"hierarchy"需根据不同的超节点配置该环境变量，例如两机分别设为`export HCCL_LOGIC_SUPERPOD_ID=0`和`export HCCL_LOGIC_SUPERPOD_ID=1`。
 

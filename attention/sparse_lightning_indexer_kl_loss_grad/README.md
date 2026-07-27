@@ -219,7 +219,7 @@
     </tbody>
 </table>
 
-- Atlas A2训练系列产品/Atlas A2推理系列产品、Atlas A3训练系列产品/Atlas A3推理系列产品：
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
   - T1支持大于等于cuSeqLensQOptional的最后一个元素，T2支持大于等于cuSeqLensKOptional的最后一个元素。
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：暂不支持seqUsedQOptional、seqUsedKOptional字段。
 
@@ -345,7 +345,7 @@
   - 参数K的支持情况:
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：K支持512、1024、2048、4096、8192。
     - <term>Ascend 950PR/Ascend 950DT</term>：K支持0~2048。
-    
+
 - 典型值
     <table style="undefined;table-layout: fixed; width: 900px"><colgroup>
         <col style="width: 100px">
