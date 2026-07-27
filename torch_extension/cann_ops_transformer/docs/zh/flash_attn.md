@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  `flash_attn`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`FlashAttn`算子完成共享KV（Key和Value使用同一份输入）的非量化注意力计算，训练推理归一化。
+  `flash_attn`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于调用`FlashAttn`算子完成共享KV（Key和Value使用同一份输入）的非量化注意力计算，训练推理归一化。
 
   `flash_attn_metadata`是`flash_attn`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AICore/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
 
