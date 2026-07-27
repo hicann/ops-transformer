@@ -146,11 +146,11 @@ ge::graphStatus QuantBmmReduceScatterTiling::CheckGroupSize() const
                                                               "The value of groupSize must be [1, 1, 32] in mx scene"),
                         return ge::GRAPH_FAILED);
     } else if (quantMode_ == mc2tiling::Mc2QuantMode::PERTENSOR_MODE) {
-        OP_TILING_CHECK(*groupSizePtr != 0,
-                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "groupSize",
-                                                              std::to_string(*groupSizePtr).c_str(),
-                                                              "The value of groupSize must be 0 in pertensor scene"),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            *groupSizePtr != 0,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "groupSize", std::to_string(*groupSizePtr).c_str(),
+                                                  "The value of groupSize must be 0 in pertensor scene"),
+            return ge::GRAPH_FAILED);
     } else if (quantMode_ == mc2tiling::Mc2QuantMode::PERBLOCK_MODE) {
         OP_TILING_CHECK(!mc2tiling::Mc2TilingUtils::InferGroupSize(shapeInfo, groupSizeM, groupSizeN, groupSizeK),
                         OP_LOGE(opName_, "Failed to execute inferGroupSize in perblock scene."),
@@ -194,39 +194,45 @@ ge::graphStatus QuantBmmReduceScatterTiling::CheckMxScaleDim(const gert::Storage
     uint64_t x2ScaleDim1 = static_cast<uint64_t>(x2ScaleShape->GetStorageShape().GetDim(1));
     uint64_t x2ScaleDim2 = static_cast<uint64_t>(x2ScaleShape->GetStorageShape().GetDim(2));
 
-    OP_TILING_CHECK(
-        (x1ScaleDim0 != x1Dim0) || (x1ScaleDim1 != x1Dim1DivMxFp8Size) || (x1ScaleDim2 != EVEN_ALIGN),
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "x1Scale",
-                                              ("(" + std::to_string(x1ScaleDim0) + ", " + std::to_string(x1ScaleDim1) +
-                                               ", " + std::to_string(x1ScaleDim2) + ")")
-                                                  .c_str(),
-                                              "The shape of x1Scale must be (x1Dim0, ceilDiv(x1Dim1, 64), EVEN_ALIGN)"),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK((x1ScaleDim0 != x1Dim0) || (x1ScaleDim1 != x1Dim1DivMxFp8Size) || (x1ScaleDim2 != EVEN_ALIGN),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName_, "x1Scale",
+                        ("(" + std::to_string(x1ScaleDim0) + ", " + std::to_string(x1ScaleDim1) + ", " +
+                         std::to_string(x1ScaleDim2) + ")")
+                            .c_str(),
+                        ("The shape of x1Scale must be (" + std::to_string(x1Dim0) + ", " +
+                         std::to_string(x1Dim1DivMxFp8Size) + ", " + std::to_string(EVEN_ALIGN) + ")")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
 
     bool isTransposeB = *context_->GetAttrs()->GetAttrPointer<bool>(TRANSPOSEB_INDEX);
     bool nIsOne = (x1Dim1 == x2Dim0) ? (x2Dim1 == 1) : (x2Dim0 == 1);
     if (!nIsOne) {
         // Transposed Scenario
         if (isTransposeB) {
-            OP_TILING_CHECK((x2ScaleDim0 != x2Dim0) || (x2ScaleDim1 != x2Dim1DivMxFp8Size) ||
-                                (x2ScaleDim2 != EVEN_ALIGN),
-                            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                                opName_, "x2Scale",
-                                ("(" + std::to_string(x2ScaleDim0) + ", " + std::to_string(x2ScaleDim1) + ", " +
-                                 std::to_string(x2ScaleDim2) + ")")
-                                    .c_str(),
-                                "The shape of x2Scale must be (x2Dim0, ceilDiv(x2Dim1, 64), EVEN_ALIGN)"),
-                            return ge::GRAPH_FAILED);
+            OP_TILING_CHECK(
+                (x2ScaleDim0 != x2Dim0) || (x2ScaleDim1 != x2Dim1DivMxFp8Size) || (x2ScaleDim2 != EVEN_ALIGN),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "x2Scale",
+                    ("(" + std::to_string(x2ScaleDim0) + ", " + std::to_string(x2ScaleDim1) + ", " +
+                     std::to_string(x2ScaleDim2) + ")")
+                        .c_str(),
+                    ("The shape of x2Scale must be (" + std::to_string(x2Dim0) + ", " +
+                     std::to_string(x2Dim1DivMxFp8Size) + ", " + std::to_string(EVEN_ALIGN) + ")")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
         } else {
-            OP_TILING_CHECK((x2ScaleDim0 != x2Dim0DivMxFp8Size) || (x2ScaleDim1 != x2Dim1) ||
-                                (x2ScaleDim2 != EVEN_ALIGN),
-                            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                                opName_, "x2Scale",
-                                ("(" + std::to_string(x2ScaleDim0) + ", " + std::to_string(x2ScaleDim1) + ", " +
-                                 std::to_string(x2ScaleDim2) + ")")
-                                    .c_str(),
-                                "The shape of x2Scale must be (ceilDiv(x2Dim0, 64), x2Dim1, EVEN_ALIGN)"),
-                            return ge::GRAPH_FAILED);
+            OP_TILING_CHECK(
+                (x2ScaleDim0 != x2Dim0DivMxFp8Size) || (x2ScaleDim1 != x2Dim1) || (x2ScaleDim2 != EVEN_ALIGN),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "x2Scale",
+                    ("(" + std::to_string(x2ScaleDim0) + ", " + std::to_string(x2ScaleDim1) + ", " +
+                     std::to_string(x2ScaleDim2) + ")")
+                        .c_str(),
+                    ("The shape of x2Scale must be (" + std::to_string(x2Dim0DivMxFp8Size) + ", " +
+                     std::to_string(x2Dim1) + ", " + std::to_string(EVEN_ALIGN) + ")")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
         }
     }
     return ge::GRAPH_SUCCESS;
@@ -246,11 +252,11 @@ bool QuantBmmReduceScatterTiling::PertensorSceneParamCheck(const gert::StorageSh
     auto biasDesc = context_->GetOptionalInputDesc(static_cast<size_t>(BIAS_INDEX));
     auto biasShape = context_->GetInputShape(static_cast<size_t>(BIAS_INDEX));
     if ((biasDesc != nullptr) && (biasShape != nullptr)) {
-        OP_TILING_CHECK(biasDesc->GetDataType() != ge::DataType::DT_FLOAT,
-                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "bias",
-                                                              Ops::Base::ToString(biasDesc->GetDataType()).c_str(),
-                                                              "The dtype of bias must be DT_FLOAT"),
-                        return false);
+        OP_TILING_CHECK(
+            biasDesc->GetDataType() != ge::DataType::DT_FLOAT,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "bias", Ops::Base::ToString(biasDesc->GetDataType()).c_str(),
+                                                  "The dtype of bias must be DT_FLOAT"),
+            return false);
         OP_TILING_CHECK(biasShape->GetStorageShape().GetDimNum() != 1,
                         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                             opName_, "bias", std::to_string(biasShape->GetStorageShape().GetDimNum()).c_str(),
@@ -289,18 +295,18 @@ bool QuantBmmReduceScatterTiling::PerblockSceneParamCheck(const gert::StorageSha
     uint64_t x2ScaleDim1 = static_cast<uint64_t>(x2ScaleShape->GetStorageShape().GetDim(1));
     uint64_t x2Dim1DivBlocksize =
         ops::CeilDiv(static_cast<uint64_t>(x2shape->GetStorageShape().GetDim(1)), PERBLOCK_SIZE);
-    OP_TILING_CHECK((x1ScaleDim0 != x1Dim0DivBlocksize) || (x1ScaleDim1 != x1Dim1DivBlocksize),
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        opName_, "x1Scale",
-                        ("(" + std::to_string(x1ScaleDim0) + ", " + std::to_string(x1ScaleDim1) + ")").c_str(),
-                        "The shape of x1Scale must be (x1Dim0DivBlocksize, x1Dim1DivBlocksize)"),
-                    return false);
-    OP_TILING_CHECK((x2ScaleDim0 != x2Dim0DivBlocksize) || (x2ScaleDim1 != x2Dim1DivBlocksize),
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        opName_, "x2Scale",
-                        ("(" + std::to_string(x2ScaleDim0) + ", " + std::to_string(x2ScaleDim1) + ")").c_str(),
-                        "The shape of x2Scale must be (x2Dim0DivBlocksize, x2Dim1DivBlocksize)"),
-                    return false);
+    OP_TILING_CHECK(
+        (x1ScaleDim0 != x1Dim0DivBlocksize) || (x1ScaleDim1 != x1Dim1DivBlocksize),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            opName_, "x1Scale", ("(" + std::to_string(x1ScaleDim0) + ", " + std::to_string(x1ScaleDim1) + ")").c_str(),
+            "The shape of x1Scale must be (x1Dim0DivBlocksize, x1Dim1DivBlocksize)"),
+        return false);
+    OP_TILING_CHECK(
+        (x2ScaleDim0 != x2Dim0DivBlocksize) || (x2ScaleDim1 != x2Dim1DivBlocksize),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            opName_, "x2Scale", ("(" + std::to_string(x2ScaleDim0) + ", " + std::to_string(x2ScaleDim1) + ")").c_str(),
+            "The shape of x2Scale must be (x2Dim0DivBlocksize, x2Dim1DivBlocksize)"),
+        return false);
     return true;
 }
 
@@ -384,16 +390,16 @@ ge::graphStatus QuantBmmReduceScatterTiling::CheckInput()
     auto x2ScaleShape = context_->GetOptionalInputShape(X2SCALE_INDEX);
     // 目前只有pertensor和perblock和mxfp场景
     SetScene();
-    OP_TILING_CHECK(((quantMode_ != mc2tiling::Mc2QuantMode::PERBLOCK_MODE) &&
-                     (quantMode_ != mc2tiling::Mc2QuantMode::PERTENSOR_MODE) &&
-                     (quantMode_ != mc2tiling::Mc2QuantMode::MXFP_MODE)),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                        opName_, "quantMode",
-                        ("x1scaleDim=" + std::to_string(x1ScaleShape->GetStorageShape().GetDimNum()) +
-                         ", x2scaleDim=" + std::to_string(x2ScaleShape->GetStorageShape().GetDimNum()))
-                            .c_str(),
-                        "The value of quantMode must be pertensor, perblock or mxfp"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        ((quantMode_ != mc2tiling::Mc2QuantMode::PERBLOCK_MODE) &&
+         (quantMode_ != mc2tiling::Mc2QuantMode::PERTENSOR_MODE) && (quantMode_ != mc2tiling::Mc2QuantMode::MXFP_MODE)),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            opName_, "quantMode",
+            ("x1scaleDim=" + std::to_string(x1ScaleShape->GetStorageShape().GetDimNum()) +
+             ", x2scaleDim=" + std::to_string(x2ScaleShape->GetStorageShape().GetDimNum()))
+                .c_str(),
+            "The value of quantMode must be pertensor, perblock or mxfp"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         ((args_.geAType == ge::DataType::DT_HIFLOAT8) && (args_.geAType != args_.geBType)),
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -465,7 +471,9 @@ void QuantBmmReduceScatterTiling::SetScene()
                         ("x1Scale=" + std::to_string(x1ScaleShape->GetStorageShape().GetDimNum()) +
                          "D, x2Scale=" + std::to_string(x2ScaleShape->GetStorageShape().GetDimNum()) + "D")
                             .c_str(),
-                        "The shapes of x1Scale and x2Scale must be the same"),
+                        "The current shape combination does not match any scenario."
+                        "(PerTensor scenario: [x1Scale=1D, x2Scale=1D]; "
+                        "PerBlock scenario: [x1Scale=2D, x2Scale=2D]; MXFP scenario: [x1Scale=3D, x2Scale=3D])"),
                     return);
 
     if ((x1ScaleShape->GetStorageShape().GetDimNum() == PERTENSOR_SCALE_DIM) &&
@@ -490,10 +498,7 @@ void QuantBmmReduceScatterTiling::SetScene()
     return;
 }
 
-bool QuantBmmReduceScatterTiling::CheckPerblockM()
-{
-    return args_.orgMValue % (PERBLOCK_SIZE * args_.rankDim) == 0;
-}
+bool QuantBmmReduceScatterTiling::CheckPerblockM() { return args_.orgMValue % (PERBLOCK_SIZE * args_.rankDim) == 0; }
 
 ge::graphStatus QuantBmmReduceScatterTiling::DoOpTiling()
 {
@@ -918,9 +923,9 @@ void QuantBmmReduceScatterHelper::PrintTilingInputParam(Mc2QuantBatchMatmulInfo 
 QuantBmmReduceScatterHelper::QuantBmmReduceScatterHelper(QuantBmmReduceScatterTiling &quantBmmReduceScatterTiling,
                                                          DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &data)
     : Mc2AdaptiveSlidingWindowTiling(quantBmmReduceScatterTiling.GetContext(), &data),
-      tilingProcesser_(quantBmmReduceScatterTiling), tilingArgs_(quantBmmReduceScatterTiling.GetArgs())
-{
-}
+      tilingProcesser_(quantBmmReduceScatterTiling),
+      tilingArgs_(quantBmmReduceScatterTiling.GetArgs())
+{}
 
 CutResult QuantBmmReduceScatterTiling::GetTilingResult()
 {
