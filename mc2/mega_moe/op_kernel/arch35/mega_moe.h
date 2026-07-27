@@ -564,10 +564,9 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ResetFlagList()
     // prefetch 路径：清理 GMM1 tile 状态位区（含 allDone slot），避免上一轮残留导致软同步误判
     if constexpr (TopkWeightsPrefetch) {
         GlobalTensor<int32_t> statusGm;
-        statusGm.SetGlobalBuffer(
-            reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.gmm1TileStatusPtr));
-        int32_t statusSlots = static_cast<int32_t>(expertPerRank_) *
-                              static_cast<int32_t>(params_.tilingData->maxTilesPerExpert) + 1;
+        statusGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.gmm1TileStatusPtr));
+        int32_t statusSlots =
+            static_cast<int32_t>(expertPerRank_) * static_cast<int32_t>(params_.tilingData->maxTilesPerExpert) + 1;
         int32_t statusCoreLen, statusCoreOffset;
         TilingByCore(statusSlots, statusCoreLen, statusCoreOffset, 1);
         for (int32_t resetElementOffset = 0; resetElementOffset < statusCoreLen;
@@ -575,10 +574,9 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ResetFlagList()
             int32_t currentBatchElementCount = statusCoreLen - resetElementOffset < resetBatchElementCount_ ?
                                                    statusCoreLen - resetElementOffset :
                                                    resetBatchElementCount_;
-            DataCopyExtParams statusCopyParams{1U,
-                static_cast<uint32_t>(currentBatchElementCount * sizeof(int32_t)), 0U, 0U, 0U};
-            DataCopyPad(statusGm[statusCoreOffset + resetElementOffset],
-                        resetTensor_, statusCopyParams);
+            DataCopyExtParams statusCopyParams{1U, static_cast<uint32_t>(currentBatchElementCount * sizeof(int32_t)),
+                                               0U, 0U, 0U};
+            DataCopyPad(statusGm[statusCoreOffset + resetElementOffset], resetTensor_, statusCopyParams);
         }
     }
 }
@@ -1922,13 +1920,14 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::GroupMatmulWithSwigluQu
         if constexpr (ENABLE_A8W4) {
             MegaMoeImpl::GroupMatmulSwigluQuantA8W4<QuantOutType, Weight1Type, bfloat16_t, QuantScaleOutType,
                                                     QuantScaleOutType, GMM1_TILE_M, EPILOGUE_TILE_M,
-                                                    TopkWeightsPrefetch, IsShared>(epilogueOp_, params_,
-                                                    state.problemShape, gmmAddrInfo, startBlockIdx_,
-                                                    vecSetSyncCom, state.expertBeforeCnt, expertIdx);
+                                                    TopkWeightsPrefetch, IsShared>(
+                epilogueOp_, params_, state.problemShape, gmmAddrInfo, startBlockIdx_, vecSetSyncCom,
+                state.expertBeforeCnt, expertIdx);
         } else {
             if (params_.tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W8_NZ ||
                 params_.tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4_NZ) {
-                // NZ format (A8W8_NZ / A4W4_NZ): isWeightNZ=true, EpilogueElementA 由 SwigluQuantOutType 自动处理类型提升
+                // NZ format (A8W8_NZ / A4W4_NZ): isWeightNZ=true, EpilogueElementA 由 SwigluQuantOutType
+                // 自动处理类型提升
                 MegaMoeImpl::GroupMatmulSwigluQuant<QuantOutType, SwigluQuantOutType, QuantOutType, bfloat16_t,
                                                     QuantScaleOutType, QuantScaleOutType, true, GMM1_TILE_M,
                                                     EPILOGUE_TILE_M, TopkWeightsPrefetch, IsShared>(
@@ -2127,6 +2126,10 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Process()
         if (subBlockIdx_ == 1) {
             ExpertTokenNumCopyOut();
         }
+    }
+    // prefetch 路径AIV1 dispatch metaInfo 操作与后续AIV0使用需要保证同步
+    if constexpr (TopkWeightsPrefetch) {
+        SyncAll<false>();
     }
 
     // 3. 本卡专家接收数据GroupMatmul2 & Combine
