@@ -164,6 +164,7 @@
 - 参数seqused_q、seqused_k要求其值表示每个Batch中的有效token数。
 - 参数cmp_residual_k需满足cmp_residual_k[i] < cmp_ratio。
 - mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../docs/zh/context/sparse_mode_introduction.md)。
+- 参数layout_k为PA_BBND时，参数seqused_k必须传入。
 
 ## 调用说明
 

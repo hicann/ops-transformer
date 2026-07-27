@@ -102,7 +102,7 @@ cann_ops_transformer.lightning_indexer(
 | num_heads_q | int | 必选 | 表示Query的head个数，当前仅支持32/64。 | int32 | - |
 | num_heads_k | int | 必选 | 表示Key的head个数，当前仅支持1。 | int32 | - |
 | head_dim | int | 必选 | 表示注意力头的维度，当前仅支持128。 | int32 | - |
-| topk | int | 必选 | 表示从Query中筛选出的关键稀疏token的个数，当前仅支持[1, 2048]。 | int32 | - |
+| topk | int | 必选 | 表示从Query中筛选出的关键稀疏token的个数，当前支持[1, 8192]。 | int32 | - |
 | cu_seqlens_q | Tensor | 可选 | 表示不同Batch中Query的有效Sequence Length，仅layout_q为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。 | int32 | (B+1, ) |
 | cu_seqlens_k | Tensor | 可选 | 表示不同Batch中Key的有效Sequence Length，仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。 | int32 | (B+1, ) |
 | seqused_q | Tensor | 可选 | 表示不同Batch中Query实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。 | int32 | (B, ) |
@@ -131,12 +131,12 @@ cann_ops_transformer.lightning_indexer(
 | cmp_residual_k | Tensor | 可选 | 表示k压缩前token数量除以cmp_ratio的余数。需要在mask_mode等于3、cmp_ratio不等于1的场景下使用。数据格式为ND。 | int32 | (B,) |
 | block_table | Tensor | 可选 | 表示PageAttention中KV存储使用的block映射表。不支持空tensor。数据格式为ND。 | int32 | (B, S2_max/block_size) |
 | output_idx_offset | Tensor | 可选 | 表示topK结果输出索引所需要加上的偏移。值必须大于0，加上偏移后topK index不能超过int32最大值。数据格式为ND。 | int32 | (B,) |
-| metadata | Tensor | 可选 | lightning_indexer_metadata算子传入的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。不支持空tensor。数据格式为ND。 | int32 | (1024,) |
+| metadata | Tensor | 可选 | 由lightning_indexer_metadata得到的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。不支持空tensor。数据格式为ND。| int32 | (1024,) |
 | max_seqlen_q | int | 可选 | q的最大序列长度。-1表示任意可能长度，默认值为-1。 | int32 | - |
 | layout_q | str | 可选 | 用于标识输入q的数据排布格式，支持BSND、TND，默认值为BSND。 | string | - |
 | layout_k | str | 可选 | 用于标识输入k的数据排布格式，支持BSND、TND、PA_BBND，默认值为BSND。 | string | - |
 | mask_mode | int | 可选 | 表示mask的模式，0代表defaultMask模式，3代表rightDownCausal模式，默认值为0。 | int32 | - |
-| cmp_ratio | int | 可选 | 用于稀疏计算，表示k的压缩倍数。支持1-128，默认值为1，表示无压缩。 | int32 | - |
+| cmp_ratio | int | 可选 | 用于稀疏计算，表示k的压缩倍数。支持1-128，默认值为4。 | int32 | - |
 | return_value | int | 可选 | 代表是否需要返回Indices对应的Values值。0代表不返回，1代表返回值，默认值为0。 | int32 | - |
 
 ## 返回值说明
@@ -164,22 +164,22 @@ cann_ops_transformer.lightning_indexer(
 - 参数seqused_q、seqused_k要求其值表示每个Batch中的有效token数。
 - 参数cmp_residual_k需满足cmp_residual_k\[i\] < cmp_ratio。
 - mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../../../docs/zh/context/sparse_mode_introduction.md)。
-- 参数q的N支持1~64，k的N支持1，headdim支持128。
 - pa_kv_cache支持0轴非连续；pa_block_size支持1~1024，满足block大小32B对齐。
 - 参数q、k的数据类型应保持一致。
 - sparse_indices无效部分填-1；sparse_values无效部分填-inf。
 <!-- npu="A3,910b" id7 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>:
   - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
-  - 当前不支持sequsedQOptional、outputIdxOffsetOptional、maxSeqlenQ功能，不建议传入这些参数。
-  - 当layout_k为PA_BBND时，必须传入sequsedKOptional；当layout_k不为PA_BBND时，不支持sequsedKOptional功能，不建议传入该参数。
+  - 当前不支持seqused_q、output_idx_offset、max_seqlen_q功能，不建议传入这些参数。
+  - 当layout_k为PA_BBND时，必须传入seqused_k；当layout_k不为PA_BBND时，不支持seqused_k功能，不建议传入该参数。
 <!-- end id7 -->
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR/Ascend 950DT</term>:
-  - 当layout_q为BSND时，不支持传入cuSeqlensQOptional；当layout_k为BSND或PA_BBND时，不支持传入cuSeqlensKOptional。
-  - 当传入outputIdxOffsetOptional时，只支持大于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparseIndice值不超过int32的最大值。
-  - 当layout_q为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的query长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的query长度seqlen2时，会启用TND Padding功能，将该batch的从seqlen1 + 1到seqlen2的query输出的sparseIndices和sparseValues全部置为无效值。
-  - 当传入的cmpRatio > 1且maskMode = 3时，必须传入cmpResidualKOptional，其余情况不传入。
+  - 当layout_q为BSND时，不支持传入cu_seqlens_q；当layout_k为BSND或PA_BBND时，不支持传入cu_seqlens_k。
+  - 当传入output_idx_offset时，只支持大于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparseIndice值不超过INT32的最大值。
+  - 当layout_q为TND时，必须传入cu_seqlens_q，如果也传入seqused_q，应保证由seqused_q传入的各个batch的query长度不超过根据cu_seqlens_q计算出的各个batch的q序列长度。当某个batch由seqused_q传入的q序列长度seqlen1小于由cu_seqlens_q计算出的query长度seqlen2时，会启用TND Padding功能，将该batch的从seqlen1 + 1到seqlen2的query输出的sparse_indices和sparse_values全部置为无效值。
+  - 当传入的cmp_ratio > 1且mask_mode = 3时，必须传入cmp_residual_k，其余情况不传入。
+  - 参数metadata必须传入。
 <!-- end id8 -->
 
 ## 确定性计算

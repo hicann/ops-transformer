@@ -117,7 +117,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
       <td>sequsedKOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中Key实际参与运算的Sequence Length。</td>
-      <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
+      <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li><li>layoutK为PA_BBND时，该参数必须传入。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
@@ -127,7 +127,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
       <td>cmpResidualKOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中cmp_kv压缩后Sequence Length的余数，配合cmpRatio实现cmp_kv部分的mask和负载计算。</td>
-      <td><ul><li>支持空Tensor。</li><li>cmpRatio不为1，且mask为3场景下必传。</li><li>shape固定为(B, )。</li></ul></td>
+      <td><ul><li>支持空Tensor。</li><li>cmpRatio不为1，且mask为3场景下必传。</li><li>shape固定为(B, )。</li><li>每个元素值都应小于传入的压缩率cmpRaio。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
