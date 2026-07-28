@@ -91,8 +91,7 @@ class FusedCausalConv1dCutBHTiling : public Ops::Transformer::OpTiling::TilingBa
 public:
     explicit FusedCausalConv1dCutBHTiling(gert::TilingContext *context, bool isInplace = false)
         : TilingBaseClass(context), isInplace_(isInplace)
-    {
-    }
+    {}
 
 protected:
     // ---- TilingBaseClass 虚函数，由框架按序调用 ----
@@ -122,6 +121,12 @@ protected:
     ge::graphStatus ValidateQueryStartLocType();
     ge::graphStatus ValidateCacheIndicesType();
     ge::graphStatus ValidateNumAcceptedTokenType();
+
+    // ---- APC 开启时的可选输入非 NULL 校验 ----
+    ge::graphStatus ValidateApcOptionalInputs();
+
+    // ---- 属性合法性校验 ----
+    ge::graphStatus ValidateAttrs();
 
     // ---- 总校验入口（依次调用上面的 Validate* 函数）----
     ge::graphStatus CheckInputParams();

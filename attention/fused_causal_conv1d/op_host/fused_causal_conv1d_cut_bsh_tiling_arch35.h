@@ -32,8 +32,7 @@ class FusedCausalConv1dCutBSHTiling : public TilingBaseClass {
 public:
     explicit FusedCausalConv1dCutBSHTiling(gert::TilingContext *context, bool isInplace = false)
         : TilingBaseClass(context), isInplace_(isInplace)
-    {
-    }
+    {}
 
 protected:
     bool IsCapable() override;
@@ -53,6 +52,9 @@ protected:
     ge::graphStatus CheckXDim();
     ge::graphStatus CheckWeightDim();
     ge::graphStatus CheckCacheStatesDim();
+    ge::graphStatus CheckCacheIndicesDim();
+    ge::graphStatus CheckApcOptionalInputs();
+    ge::graphStatus CheckAttrs();
     ge::graphStatus CheckIndexDims();
     ge::graphStatus Calculate2DTiling(); // 二维切分的tiling计算
     ge::graphStatus GetInputShapes();
@@ -100,6 +102,7 @@ private:
     // padding相关信息
     int64_t padSlotId_ = -1;
     uint64_t residualConnection_ = 0;
+    int64_t runMode_ = 0; // 0: prefill  1: decode
 
     // ===== dim方向核间切分信息 =====
     uint64_t dimCoreNum_ = 0;         // dim方向总核数
