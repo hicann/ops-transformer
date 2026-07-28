@@ -31,8 +31,8 @@ constexpr int64_t MAX_BUFFER_BACKWARD = 256 * BUFFER_NUM;
 constexpr int64_t MAX_BUFFER_FORWARD = 256 * BUFFER_NUM;
 
 
-MhcSinkhornSplitCoreInfo MhcSinkhornBaseTiling::BaseSplitCores(int64_t tSize, int64_t nSize,
-                                                               int64_t xDtypeSize, int64_t outFlag)
+MhcSinkhornSplitCoreInfo MhcSinkhornBaseTiling::BaseSplitCores(int64_t tSize, int64_t nSize, int64_t xDtypeSize,
+                                                               int64_t outFlag)
 {
     MhcSinkhornSplitCoreInfo forwardInfo;
     MhcSinkhornSplitCoreInfo backwardInfo;
@@ -86,17 +86,17 @@ void MhcSinkhornBaseTiling::BackwardSplitCore(uint64_t ubSize, int64_t totalCore
         int64_t tVlFactor = Ops::Base::FloorDiv(VL_SIZE, (8 * xDtypeSize));
         splitInfo.tUbFactor = Ops::Base::FloorAlign(splitInfo.tUbFactor, tVlFactor);
     }
-    splitInfo.tNormCoreLoop = splitInfo.tUbFactor == 0 ? 1 :
-                              Ops::Base::CeilDiv(splitInfo.tNormCore, splitInfo.tUbFactor);
-    splitInfo.tTailCoreLoop = splitInfo.tUbFactor == 0 ? 1 :
-                              Ops::Base::CeilDiv(splitInfo.tTailCore, splitInfo.tUbFactor);
+    splitInfo.tNormCoreLoop =
+        splitInfo.tUbFactor == 0 ? 1 : Ops::Base::CeilDiv(splitInfo.tNormCore, splitInfo.tUbFactor);
+    splitInfo.tTailCoreLoop =
+        splitInfo.tUbFactor == 0 ? 1 : Ops::Base::CeilDiv(splitInfo.tTailCore, splitInfo.tUbFactor);
 
     splitInfo.tUbFactorTail = splitInfo.tNormCore - (splitInfo.tNormCoreLoop - 1) * splitInfo.tUbFactor;
     splitInfo.tUbTailTail = splitInfo.tTailCore - (splitInfo.tTailCoreLoop - 1) * splitInfo.tUbFactor;
 }
 
-int64_t MhcSinkhornBaseTiling::ForwardCalOccupySize(int64_t ubFactor, int64_t nSize,
-                                                    int64_t xDtypeSize, int64_t outFlag)
+int64_t MhcSinkhornBaseTiling::ForwardCalOccupySize(int64_t ubFactor, int64_t nSize, int64_t xDtypeSize,
+                                                    int64_t outFlag)
 {
     int64_t ubBlock = static_cast<int64_t>(Ops::Base::GetUbBlockSize(context_));
     int64_t dataBlockNum = ubBlock / xDtypeSize;
@@ -112,7 +112,7 @@ int64_t MhcSinkhornBaseTiling::ForwardCalOccupySize(int64_t ubFactor, int64_t nS
 
     int64_t occupySize = (inQueSize + outQueSize + normOutSize + sumColSize) * xDtypeSize;
     if (outFlag == 1) {
-        occupySize = (inQueSize + outQueSize + normOutSize * 2 + sumColSize + sumRowSize) * xDtypeSize;
+        occupySize = (inQueSize + outQueSize + normOutSize + sumColSize + sumRowSize) * xDtypeSize;
     }
     return occupySize;
 }
@@ -125,8 +125,8 @@ void MhcSinkhornBaseTiling::ForwardSplitCore(uint64_t ubSize, int64_t totalCoreN
     splitInfo.tTailCore = tSize - splitInfo.tNormCore * (splitInfo.usedCoreNum - 1);
     auto ubSizeUsed = ubSize - MASK_BUFFER - MAX_BUFFER_FORWARD;
     auto availableUbSize = ubSizeUsed / DOUBLE_SIZE;
-    
-    splitInfo.tUbFactor = Ops::Base::CeilAlign(splitInfo.tNormCore, static_cast<int64_t>(8));
+
+    splitInfo.tUbFactor = splitInfo.tNormCore;
     int64_t occupySize = ForwardCalOccupySize(splitInfo.tUbFactor, nSize, xDtypeSize, outFlag);
     if (occupySize > availableUbSize) {
         auto onePiceSize = ForwardCalOccupySize(1, nSize, xDtypeSize, outFlag);
@@ -142,4 +142,4 @@ void MhcSinkhornBaseTiling::ForwardSplitCore(uint64_t ubSize, int64_t totalCoreN
     splitInfo.tUbTailTail = splitInfo.tTailCore - (splitInfo.tTailCoreLoop - 1) * splitInfo.tUbFactor;
 }
 
-}
+} // namespace optiling
