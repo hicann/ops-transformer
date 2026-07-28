@@ -95,25 +95,6 @@ def npu_qfa_mxfp8(
             "[WRAPPER] 使用环境变量 GRAPH_PATH=%d (覆盖 CSV graph_path)", graph_path
         )
 
-    # 从 golden_mod 取 customize_inputs 缓存的真实 FP8 数据
-    cached = getattr(golden_mod, "_cached_mxfp8_inputs", None)
-    if cached is not None:
-        (
-            q,
-            k,
-            v,
-            dequant_scale_q,
-            dequant_scale_k,
-            dequant_scale_v,
-            p_scale,
-            block_table,
-        ) = cached[:8]
-        logger.info("[WRAPPER] 使用 customize_inputs 缓存的真实 FP8 数据")
-    else:
-        logger.warning(
-            "[WRAPPER] customize_inputs 缓存为空,使用 TTK 传入的占位 tensor(可能出错)"
-        )
-
     p_scale_val = (
         float(p_scale.item()) if isinstance(p_scale, torch.Tensor) else float(p_scale)
     )
@@ -159,29 +140,78 @@ def npu_qfa_mxfp8(
         }
     )
 
+    fp8_dtype = torch.float8_e4m3fn
+    group_size = 32
+    fp8_max = 448.0
+
+    def _to_cpu(t):
+        return (
+            t.detach().cpu()
+            if isinstance(t, torch.Tensor) and t.device.type == "npu"
+            else t
+        )
+
+    q_cpu = _to_cpu(q)
+    k_cpu = _to_cpu(k)
+    v_cpu = _to_cpu(v)
+    p_scale_cpu = _to_cpu(p_scale)
+    block_table_cpu = _to_cpu(block_table)
+
+    quant_scale_q = golden_mod.get_mxfp8_per_token_group_quant_scale(
+        q_cpu, fp8_dtype, group_size
+    )
+    quant_scale_k = golden_mod.get_mxfp8_per_token_group_quant_scale(
+        k_cpu, fp8_dtype, group_size
+    )
+    quant_scale_v = golden_mod.get_mxfp8_per_channel_group_quant_scale(
+        v_cpu, fp8_dtype, group_size
+    )
+
+    q_fp8 = (
+        golden_mod.mxfp8_per_token_group_quant(q_cpu, quant_scale_q, group_size)
+        .clamp(-fp8_max, fp8_max)
+        .to(fp8_dtype)
+    )
+    k_fp8 = (
+        golden_mod.mxfp8_per_token_group_quant(k_cpu, quant_scale_k, group_size)
+        .clamp(-fp8_max, fp8_max)
+        .to(fp8_dtype)
+    )
+    v_fp8 = (
+        golden_mod.mxfp8_per_channel_group_quant(v_cpu, quant_scale_v, group_size)
+        .clamp(-fp8_max, fp8_max)
+        .to(fp8_dtype)
+    )
+
     # 调用 golden 的 npu_mxfp8_fa
     # - graph_path=0: eager 模式,直接调用 API
     # - graph_path=7: aclgraph 模式,用 npugraph_ex 编译
     logger.info("[WRAPPER] graph_path=%d, 调用 npu_mxfp8_fa", graph_path)
     try:
         atten_out, lse_out = golden_mod.npu_mxfp8_fa(
-            q,
-            k,
-            v,
-            dequant_scale_q,
-            dequant_scale_k,
-            dequant_scale_v,
-            p_scale,
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            quant_scale_q,
+            quant_scale_k,
+            quant_scale_v,
+            p_scale_cpu,
             cu_seqlens_q_list,
             cu_seqlens_kv_list,
             list(seqused_q) if seqused_q is not None else None,
             list(seqused_kv) if seqused_kv is not None else None,
             max_seqlen_q,
             max_seqlen_kv,
-            block_table if isinstance(block_table, torch.Tensor) else None,
+            block_table_cpu
+            if isinstance(block_table_cpu, torch.Tensor) and enable_pa
+            else None,
         )
     except Exception as e:
         logger.error("[WRAPPER] NPU 调用失败: %s", str(e))
         raise
 
+    if not enable_lse:
+        lse_out = None
+    elif isinstance(lse_out, torch.Tensor) and lse_out.ndim == 2:
+        lse_out = lse_out.reshape(lse_out.shape[1], lse_out.shape[0]).contiguous()
     return atten_out, lse_out

@@ -15,7 +15,6 @@ import os
 import sys
 from typing import List
 
-import numpy
 import torch
 
 _ASSETS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -86,43 +85,6 @@ def _cu_seqlens_to_actual(cu_seqlens):
     return [cu_seqlens[i + 1] - cu_seqlens[i] for i in range(len(cu_seqlens) - 1)]
 
 
-def _load_bin_tensor(path, shape, dtype_name):
-    """从 numpy raw .bin 加载 tensor：numpy.fromfile + reshape + torch 还原。
-
-    与 ttk load_numpy_data 兼容：fp8/e8m0 以 uint8 字节存储，加载后 view 为 torch fp8 dtype。
-    dtype_name 是 torch dtype 的字符串名（如 'float8_e4m3fn'、'float32'、'int32'）。
-    与 assets/impl/inputs.py 的 _load_bin_tensor 保持一致（bin 分跑共用格式）。
-    """
-    _mapping = {
-        "float32": (numpy.float32, torch.float32),
-        "int32": (numpy.int32, torch.int32),
-        "float16": (numpy.float16, torch.float16),
-        "uint8": (numpy.uint8, torch.uint8),
-        "int8": (numpy.int8, torch.int8),
-        "float8_e4m3fn": (numpy.uint8, torch.float8_e4m3fn),
-        "float8_e8m0fnu": (numpy.uint8, torch.float8_e8m0fnu),
-    }
-    if dtype_name not in _mapping:
-        raise ValueError(f"unsupported dtype_name: {dtype_name}")
-    np_load_dtype, torch_dtype = _mapping[dtype_name]
-    arr = numpy.fromfile(path, dtype=np_load_dtype).reshape(shape)
-    if torch_dtype in (torch.float8_e4m3fn, torch.float8_e8m0fnu):
-        return torch.from_numpy(arr).view(torch_dtype)
-    return torch.from_numpy(arr).to(torch_dtype)
-
-
-def _torch_to_bin(tensor, path):
-    """torch tensor → numpy raw .bin 文件（ttk load_numpy_data 兼容格式）。"""
-    if tensor is None:
-        raise ValueError(f"_torch_to_bin: tensor 为 None，无法保存到 {path}")
-    arr = tensor.detach().cpu().contiguous()
-    if arr.dtype in (torch.float8_e4m3fn, torch.float8_e8m0fnu):
-        numpy_arr = arr.view(torch.uint8).numpy()
-    else:
-        numpy_arr = arr.numpy()
-    numpy_arr.tofile(path)
-
-
 def cpu_qfa_mxfp8(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -160,44 +122,10 @@ def cpu_qfa_mxfp8(
     data_range_v: float = 1.0,
     **kwargs,
 ):
-    """CPU golden:从 golden_mod 缓存取真实 FP8 数据,调 cpu_mxfp8_golden 算参考输出。
-
-    Bin 分跑支持：
-    - `__bin_golden` 非空时（list of (path, shape, numpy_dtype)），直接从 bin 加载 golden
-      输出，跳过 CPU 计算。用于 cpu/npu 分跑：npu 侧直接用 cpu 预生成的 golden bin。
-    - `__bin_golden_out` 非空时（list of path），CPU 计算完后把 golden 输出按顺序写入
-      bin 路径。用于 cpu 侧预生成 golden bin 供 npu 侧读取。
-    """
     # csv precision_tolerances / absolute_precision 经 testcase.attributes → kwargs 传入,
     # 暂存到 golden_mod 供 compare 插件读取（ttk 不把 testcase 直接传给 custom compare）。
     golden_mod._csv_precision_tolerances = kwargs.get("precision_tolerances")
     golden_mod._csv_absolute_precision = kwargs.get("absolute_precision")
-
-    # ----- Bin 分跑路径：__bin_golden 非空时从 numpy .bin 加载 golden，跳过 CPU 计算 -----
-    # __bin_golden 是 list of (path, shape, dtype_name) 三元组（与 __bin_inputs 同格式）。
-    bin_golden = kwargs.get("__bin_golden")
-    if bin_golden:
-        loaded = []
-        for path, shape, dtype_name in bin_golden:
-            loaded.append(_load_bin_tensor(path, shape, dtype_name))
-        logger.info(
-            "[GOLDEN] loaded %d golden tensors from bin via __bin_golden", len(loaded)
-        )
-        return loaded
-
-    # 从 golden_mod 取 customize_inputs 缓存的真实 FP8 数据
-    cached = getattr(golden_mod, "_cached_mxfp8_inputs", None)
-    if cached is not None:
-        (
-            q,
-            k,
-            v,
-            dequant_scale_q,
-            dequant_scale_k,
-            dequant_scale_v,
-            p_scale,
-            block_table,
-        ) = cached[:8]
 
     # actual_seq (有效长度) 用于 CPU golden 的 attention mask 构建——必须与 NPU 侧
     # prepare_npu_inputs 里的 _actual_seq_q/kv() 取值逻辑一致：
@@ -247,13 +175,43 @@ def cpu_qfa_mxfp8(
         }
     )
 
+    fp8_dtype = torch.float8_e4m3fn
+    group_size = 32
+    fp8_max = 448.0
+
+    quant_scale_q = golden_mod.get_mxfp8_per_token_group_quant_scale(
+        q, fp8_dtype, group_size
+    )
+    quant_scale_k = golden_mod.get_mxfp8_per_token_group_quant_scale(
+        k, fp8_dtype, group_size
+    )
+    quant_scale_v = golden_mod.get_mxfp8_per_channel_group_quant_scale(
+        v, fp8_dtype, group_size
+    )
+
+    q_fp8 = (
+        golden_mod.mxfp8_per_token_group_quant(q, quant_scale_q, group_size)
+        .clamp(-fp8_max, fp8_max)
+        .to(fp8_dtype)
+    )
+    k_fp8 = (
+        golden_mod.mxfp8_per_token_group_quant(k, quant_scale_k, group_size)
+        .clamp(-fp8_max, fp8_max)
+        .to(fp8_dtype)
+    )
+    v_fp8 = (
+        golden_mod.mxfp8_per_channel_group_quant(v, quant_scale_v, group_size)
+        .clamp(-fp8_max, fp8_max)
+        .to(fp8_dtype)
+    )
+
     cpu_out, cpu_lse = golden_mod.cpu_mxfp8_golden(
-        q,
-        k,
-        v,
-        dequant_scale_q,
-        dequant_scale_k,
-        dequant_scale_v,
+        q_fp8,
+        k_fp8,
+        v_fp8,
+        quant_scale_q,
+        quant_scale_k,
+        quant_scale_v,
         p_scale,
         actual_seq_q,
         actual_seq_kv,
@@ -283,23 +241,12 @@ def cpu_qfa_mxfp8(
                 list(cu_seqlens_q),
                 fill_value=float("inf"),
             )
+
+        if cpu_lse_aligned.ndim == 3 and cpu_lse_aligned.shape[-1] == 1:
+            cpu_lse_aligned = cpu_lse_aligned.squeeze(-1).contiguous()
         result = [cpu_out_aligned, cpu_lse_aligned]
 
     else:
-        result = [cpu_out_aligned]
-
-    # ----- Bin 保存路径：__bin_golden_out 非空时按顺序写入 bin 文件 -----
-    bin_golden_out = kwargs.get("__bin_golden_out")
-    if bin_golden_out:
-        if len(bin_golden_out) != len(result):
-            raise ValueError(
-                f"__bin_golden_out 长度 {len(bin_golden_out)} 与 golden 输出数 {len(result)} 不一致"
-            )
-        for path, tensor in zip(bin_golden_out, result):
-            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-            _torch_to_bin(tensor, path)
-        logger.info(
-            "[GOLDEN] saved %d golden tensors to bin via __bin_golden_out", len(result)
-        )
+        result = [cpu_out_aligned, None]
 
     return result
