@@ -21,26 +21,26 @@ using namespace ge;
 
 namespace ops {
 
-static constexpr size_t ATTR_IDX_QUANT_MODE       = 0;
-static constexpr size_t ATTR_IDX_SOFTMAX_SCALE    = 1;
-static constexpr size_t ATTR_IDX_MASK_MODE        = 2;
-static constexpr size_t ATTR_IDX_WIN_LEFT         = 3;
-static constexpr size_t ATTR_IDX_WIN_RIGHT        = 4;
-static constexpr size_t ATTR_IDX_MAX_SEQLEN_Q     = 5;
-static constexpr size_t ATTR_IDX_MAX_SEQLEN_KV    = 6;
-static constexpr size_t ATTR_IDX_LAYOUT_Q         = 7;
+static constexpr size_t ATTR_IDX_QUANT_MODE = 0;
+static constexpr size_t ATTR_IDX_SOFTMAX_SCALE = 1;
+static constexpr size_t ATTR_IDX_MASK_MODE = 2;
+static constexpr size_t ATTR_IDX_WIN_LEFT = 3;
+static constexpr size_t ATTR_IDX_WIN_RIGHT = 4;
+static constexpr size_t ATTR_IDX_MAX_SEQLEN_Q = 5;
+static constexpr size_t ATTR_IDX_MAX_SEQLEN_KV = 6;
+static constexpr size_t ATTR_IDX_LAYOUT_Q = 7;
 static constexpr size_t ATTR_IDX_LAYOUT_Q_DESCALE = 8;
-static constexpr size_t ATTR_IDX_LAYOUT_KV        = 9;
-static constexpr size_t ATTR_IDX_LAYOUT_OUT       = 10;
-static constexpr size_t ATTR_IDX_PA_BLOCK_SIZE    = 11;
+static constexpr size_t ATTR_IDX_LAYOUT_KV = 9;
+static constexpr size_t ATTR_IDX_LAYOUT_OUT = 10;
+static constexpr size_t ATTR_IDX_PA_BLOCK_SIZE = 11;
 static constexpr size_t ATTR_IDX_RETURN_SOFTMAX_LSE = 12;
 
-static constexpr size_t INPUT_IDX_Q         = 0;
-static constexpr size_t INPUT_IDX_K         = 1;
-static constexpr size_t INPUT_IDX_V         = 2;
+static constexpr size_t INPUT_IDX_Q = 0;
+static constexpr size_t INPUT_IDX_K = 1;
+static constexpr size_t INPUT_IDX_V = 2;
 
-static constexpr size_t OUTPUT_IDX_ATTN_OUT     = 0;
-static constexpr size_t OUTPUT_IDX_SOFTMAX_LSE  = 1;
+static constexpr size_t OUTPUT_IDX_ATTN_OUT = 0;
+static constexpr size_t OUTPUT_IDX_SOFTMAX_LSE = 1;
 
 static std::string ToUpper(std::string s)
 {
@@ -67,8 +67,8 @@ ge::graphStatus InferShapeQuantFlashAttn(gert::InferShapeContext *context)
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const char *layoutQ   = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_Q);
-    const char *layoutKv  = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_KV);
+    const char *layoutQ = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_Q);
+    const char *layoutKv = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_KV);
     const char *layoutOut = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_OUT);
     OP_CHECK_NULL_WITH_CONTEXT(context, layoutQ);
     OP_CHECK_NULL_WITH_CONTEXT(context, layoutKv);
@@ -78,55 +78,55 @@ ge::graphStatus InferShapeQuantFlashAttn(gert::InferShapeContext *context)
     OP_CHECK_NULL_WITH_CONTEXT(context, returnSoftmaxLsePtr);
     bool returnSoftmaxLse = *returnSoftmaxLsePtr;
 
-    std::string layoutQStr   = ToUpper(std::string(layoutQ));
-    std::string layoutKvStr  = ToUpper(std::string(layoutKv));
+    std::string layoutQStr = ToUpper(std::string(layoutQ));
+    std::string layoutKvStr = ToUpper(std::string(layoutKv));
     std::string layoutOutStr = ToUpper(std::string(layoutOut));
 
     OP_LOGI(context, "QuantFlashAttn InferShape: layoutQ=%s, layoutKv=%s, layoutOut=%s, returnLSE=%d.",
             layoutQStr.c_str(), layoutKvStr.c_str(), layoutOutStr.c_str(), returnSoftmaxLse);
 
-    int64_t batchSize  = 1;
-    int64_t numHeadsQ  = 0;
-    int64_t seqLenQ    = 0;
-    int64_t headDim    = 0;
-    bool    isTND      = false;
+    int64_t batchSize = 1;
+    int64_t numHeadsQ = 0;
+    int64_t seqLenQ = 0;
+    int64_t headDim = 0;
+    bool isTND = false;
 
     if (layoutQStr == "BSND") {
         if (qShape->GetDimNum() != 4) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "q",
-                std::to_string(qShape->GetDimNum()).c_str(),
-                "The shape dim of q must be 4 when layout_q is BSND");
+                                                     std::to_string(qShape->GetDimNum()).c_str(),
+                                                     "The shape dim of q must be 4 when layout_q is BSND");
             return ge::GRAPH_FAILED;
         }
         batchSize = qShape->GetDim(0);
-        seqLenQ   = qShape->GetDim(1);
+        seqLenQ = qShape->GetDim(1);
         numHeadsQ = qShape->GetDim(2);
-        headDim   = qShape->GetDim(3);
+        headDim = qShape->GetDim(3);
     } else if (layoutQStr == "BNSD") {
         if (qShape->GetDimNum() != 4) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "q",
-                std::to_string(qShape->GetDimNum()).c_str(),
-                "The shape dim of q must be 4 when layout_q is BNSD");
+                                                     std::to_string(qShape->GetDimNum()).c_str(),
+                                                     "The shape dim of q must be 4 when layout_q is BNSD");
             return ge::GRAPH_FAILED;
         }
         batchSize = qShape->GetDim(0);
         numHeadsQ = qShape->GetDim(1);
-        seqLenQ   = qShape->GetDim(2);
-        headDim   = qShape->GetDim(3);
+        seqLenQ = qShape->GetDim(2);
+        headDim = qShape->GetDim(3);
     } else if (layoutQStr == "TND") {
         if (qShape->GetDimNum() != 3) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "q",
-                std::to_string(qShape->GetDimNum()).c_str(),
-                "The shape dim of q must be 3 when layout_q is TND");
+                                                     std::to_string(qShape->GetDimNum()).c_str(),
+                                                     "The shape dim of q must be 3 when layout_q is TND");
             return ge::GRAPH_FAILED;
         }
-        seqLenQ   = qShape->GetDim(0);
+        seqLenQ = qShape->GetDim(0);
         numHeadsQ = qShape->GetDim(1);
-        headDim   = qShape->GetDim(2);
-        isTND     = true;
+        headDim = qShape->GetDim(2);
+        isTND = true;
     } else {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "layout_q",
-            layoutQStr.c_str(), "The value of layout_q must be in BSND/BNSD/TND");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "layout_q", layoutQStr.c_str(),
+                                              "The value of layout_q must be in BSND/BNSD/TND");
         return ge::GRAPH_FAILED;
     }
 
@@ -166,8 +166,8 @@ ge::graphStatus InferShapeQuantFlashAttn(gert::InferShapeContext *context)
         attnOutShape->SetDim(1, numHeadsQ);
         attnOutShape->SetDim(2, headDimV);
     } else {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "layout_out",
-            layoutOutStr.c_str(), "The value of layout_out must be in BSND/BNSD/TND");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "layout_out", layoutOutStr.c_str(),
+                                              "The value of layout_out must be in BSND/BNSD/TND");
         return ge::GRAPH_FAILED;
     }
 
@@ -204,8 +204,6 @@ ge::graphStatus InferDataTypeQuantFlashAttn(gert::InferDataTypeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-IMPL_OP_INFERSHAPE(QuantFlashAttn)
-    .InferShape(InferShapeQuantFlashAttn)
-    .InferDataType(InferDataTypeQuantFlashAttn);
+IMPL_OP_INFERSHAPE(QuantFlashAttn).InferShape(InferShapeQuantFlashAttn).InferDataType(InferDataTypeQuantFlashAttn);
 
-}  // namespace ops
+} // namespace ops

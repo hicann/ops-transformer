@@ -41,7 +41,7 @@ ge::graphStatus SoftmaxLSEChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
         bool returnSoftmaxLseVal = *returnSoftmaxLse;
         OP_CHECK_IF(returnSoftmaxLseVal != false && returnSoftmaxLseVal != true,
                     OP_LOGE_FOR_INVALID_VALUE(qfaInfo.opName, RETURN_SOFTMAX_LSE_NAME.c_str(),
-                        (returnSoftmaxLseVal ? "true" : "false"), "True or False"),
+                                              (returnSoftmaxLseVal ? "true" : "false"), "True or False"),
                     return ge::GRAPH_FAILED);
     }
 
@@ -56,7 +56,7 @@ ge::graphStatus SoftmaxLSEChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
 
     OP_CHECK_IF(lseOutDesc->GetDataType() != ge::DT_FLOAT,
                 OP_LOGE_FOR_INVALID_DTYPE(qfaInfo.opName, SOFTMAX_LSE_NAME.c_str(),
-                    DataTypeToSerialString(lseOutDesc->GetDataType()).c_str(), "FLOAT32"),
+                                          DataTypeToSerialString(lseOutDesc->GetDataType()).c_str(), "FLOAT32"),
                 return ge::GRAPH_FAILED);
 
     if (ge::GRAPH_SUCCESS != CheckFormatSupport(lseOutDesc, SOFTMAX_LSE_NAME)) {
@@ -71,10 +71,11 @@ ge::graphStatus SoftmaxLSEChecker::CheckMultiPara(const QfaTilingInfo &qfaInfo)
     // 当 return_softmax_lse 为 True 时, softmax_lse 必须非空
     if (qfaInfo.softmaxLseFlag) {
         const gert::StorageShape *lseOutShape = qfaInfo.opParamInfo.lseOut.shape;
-        OP_CHECK_IF(lseOutShape == nullptr,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, SOFTMAX_LSE_NAME.c_str(), "empty",
-                        "When return_softmax_lse is True, softmax_lse cannot be empty"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            lseOutShape == nullptr,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, SOFTMAX_LSE_NAME.c_str(), "empty",
+                                                  "When return_softmax_lse is True, softmax_lse cannot be empty"),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }

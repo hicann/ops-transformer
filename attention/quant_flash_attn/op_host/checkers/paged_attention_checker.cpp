@@ -51,14 +51,13 @@ ge::graphStatus PagedAttentionChecker::CheckSingleParaBlockTable(const QfaTiling
     }
 
     const gert::CompileTimeTensorDesc *blockTableDesc = qfaInfo.opParamInfo.blockTable.desc;
-    OP_CHECK_IF(blockTableDesc == nullptr,
-                OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, "TensorDesc of block_table"),
+    OP_CHECK_IF(blockTableDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, "TensorDesc of block_table"),
                 return ge::GRAPH_FAILED);
 
     // dtype 校验
     OP_CHECK_IF(blockTableDesc->GetDataType() != ge::DT_INT32,
                 OP_LOGE_FOR_INVALID_DTYPE(qfaInfo.opName, BLOCK_TABLE_NAME.c_str(),
-                    DataTypeToSerialString(blockTableDesc->GetDataType()).c_str(), "INT32"),
+                                          DataTypeToSerialString(blockTableDesc->GetDataType()).c_str(), "INT32"),
                 return ge::GRAPH_FAILED);
 
     // format 校验: 使用基类 CheckFormatSupport (基于 GetOriginFormat + FORMAT_SUPPORT_SET)
@@ -71,7 +70,7 @@ ge::graphStatus PagedAttentionChecker::CheckSingleParaBlockTable(const QfaTiling
     size_t dimNum = shape.GetDimNum();
     OP_CHECK_IF(dimNum != DIM_NUM_2,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, BLOCK_TABLE_NAME.c_str(),
-                    (std::to_string(dimNum) + "D").c_str(), "2D"),
+                                             (std::to_string(dimNum) + "D").c_str(), "2D"),
                 return ge::GRAPH_FAILED);
 
     // shape size 校验: (B, Bn)
@@ -79,13 +78,10 @@ ge::graphStatus PagedAttentionChecker::CheckSingleParaBlockTable(const QfaTiling
     int64_t dim0 = static_cast<int64_t>(shape.GetDim(0));
     int64_t dim1 = static_cast<int64_t>(shape.GetDim(1));
     OP_CHECK_IF(dim0 != qfaInfo.bSize,
-                OP_LOGE(qfaInfo.opName,
-                        "block_table shape dim0 should be %ld (B), but got %ld.",
-                        qfaInfo.bSize, dim0),
+                OP_LOGE(qfaInfo.opName, "block_table shape dim0 should be %ld (B), but got %ld.", qfaInfo.bSize, dim0),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(dim1 != qfaInfo.maxBlockNumPerBatch,
-                OP_LOGE(qfaInfo.opName,
-                        "block_table shape dim1 should be %ld (Bn), but got %ld.",
+                OP_LOGE(qfaInfo.opName, "block_table shape dim1 should be %ld (Bn), but got %ld.",
                         qfaInfo.maxBlockNumPerBatch, dim1),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
@@ -116,29 +112,32 @@ ge::graphStatus PagedAttentionChecker::CheckFeature(const QfaTilingInfo &qfaInfo
     if (IsPageAttention(qfaInfo)) {
         // PA 场景: block_table 必须非空
         OP_CHECK_IF(blockTableTensor == nullptr,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, BLOCK_TABLE_NAME.c_str(), "empty",
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        qfaInfo.opName, BLOCK_TABLE_NAME.c_str(), "empty",
                         "When layout_kv is PA (PA_BBND/PA_BNBD/PA_NZ), block_table must not be empty"),
                     return ge::GRAPH_FAILED);
 
         // PA 场景: 必须传入 seqused_kv
         const gert::Tensor *sequsedKvTensor = qfaInfo.opParamInfo.sequsedKv.tensor;
-        OP_CHECK_IF(sequsedKvTensor == nullptr,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, SEQUSED_KV_NAME.c_str(), "empty",
-                        "When PagedAttention is enabled, seqused_kv must be provided"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            sequsedKvTensor == nullptr,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, SEQUSED_KV_NAME.c_str(), "empty",
+                                                  "When PagedAttention is enabled, seqused_kv must be provided"),
+            return ge::GRAPH_FAILED);
 
         // MxFP8 场景: blockSize 仅支持 512 或 1024
         if (qfaInfo.quantMode == QfaQuantMode::MXFP8_FP32) {
             OP_CHECK_IF(qfaInfo.blockSize != 512 && qfaInfo.blockSize != 1024,
-                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, "block_size",
-                            std::to_string(qfaInfo.blockSize).c_str(),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            qfaInfo.opName, "block_size", std::to_string(qfaInfo.blockSize).c_str(),
                             "When quant_mode is MxFP8, block_size must be 512 or 1024"),
                         return ge::GRAPH_FAILED);
         }
     } else {
         // 非 PA 场景: block_table 不应传入
         OP_CHECK_IF(blockTableTensor != nullptr,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, BLOCK_TABLE_NAME.c_str(), "provided",
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        qfaInfo.opName, BLOCK_TABLE_NAME.c_str(), "provided",
                         "When layout_kv is not PA (PA_BBND/PA_BNBD/PA_NZ), block_table must not be provided"),
                     return ge::GRAPH_FAILED);
     }

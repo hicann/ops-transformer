@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file quant_flash_attn_tiling.h
+ * \file quant_flash_attn_tiling_mxfp8.h
  * \brief QuantFlashAttn arch35 tiling implementation
  */
-#ifndef QUANT_FLASH_ATTN_TILING_IMPL_H_
-#define QUANT_FLASH_ATTN_TILING_IMPL_H_
+#ifndef QUANT_FLASH_ATTN_TILING_MXFP8_IMPL_H_
+#define QUANT_FLASH_ATTN_TILING_MXFP8_IMPL_H_
 
 #include "register/tilingdata_base.h"
 #include "exe_graph/runtime/tiling_context.h"
@@ -32,7 +32,6 @@ struct QfaTilingKeyInfo {
     bool hasAttenMask = false;
     uint64_t kvLayoutType = 0;
     bool isFd = false;
-    bool isReconstructTemp = false;
 };
 
 struct QfaPlatFormInfo {
@@ -51,9 +50,7 @@ struct QfaPlatFormInfo {
 
 class QuantFlashAttnTilingImpl : public FiaTilingBase {
 public:
-    explicit QuantFlashAttnTilingImpl(gert::TilingContext *context) : FiaTilingBase(context)
-    {
-    }
+    explicit QuantFlashAttnTilingImpl(gert::TilingContext *context) : FiaTilingBase(context) {}
     ~QuantFlashAttnTilingImpl() override = default;
 
     void InitTilingInfo(TilingInfo *tilingInfo) override;
@@ -75,7 +72,7 @@ private:
     void InitImplParam();
     void PrintAllTilingData();
     void CalcScheduleMode();
-void CalcNumBlocks(uint32_t aicNum);
+    void CalcNumBlocks(uint32_t aicNum);
     void FillTiling();
     ge::graphStatus SetTilingData(QuantFlashAttnTilingData &tilingData);
     bool CheckNeedInitOutput() const;

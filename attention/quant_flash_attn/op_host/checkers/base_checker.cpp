@@ -60,10 +60,10 @@ ge::graphStatus QfaBaseChecker::CheckFormatSupport(const gert::CompileTimeTensor
 {
     if (desc != nullptr) {
         auto format = desc->GetOriginFormat();
-        OP_CHECK_IF((FORMAT_SUPPORT_SET.find(format) == FORMAT_SUPPORT_SET.end()),
-                    OP_LOGE_FOR_INVALID_FORMAT("QuantFlashAttn", name.c_str(),
-                                               Ops::Base::ToString(format).c_str(), "ND"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            (FORMAT_SUPPORT_SET.find(format) == FORMAT_SUPPORT_SET.end()),
+            OP_LOGE_FOR_INVALID_FORMAT("QuantFlashAttn", name.c_str(), Ops::Base::ToString(format).c_str(), "ND"),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }

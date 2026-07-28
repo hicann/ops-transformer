@@ -21,12 +21,9 @@ namespace quant_flash_attn {
 std::string QfaLayoutToSerialString(QfaLayout layout)
 {
     const std::map<QfaLayout, std::string> layout2Str = {
-        {QfaLayout::BSND, "BSND"},       {QfaLayout::BNSD, "BNSD"},
-        {QfaLayout::TND, "TND"},         {QfaLayout::PA_BBND, "PA_BBND"},
-        {QfaLayout::PA_BNBD, "PA_BNBD"}, {QfaLayout::PA_NZ, "PA_NZ"},
-        {QfaLayout::LSE_BNS, "LSE_BNS"}, {QfaLayout::LSE_NT, "LSE_NT"},
-        {QfaLayout::N2TGD, "N2TGD"}
-    };
+        {QfaLayout::BSND, "BSND"},       {QfaLayout::BNSD, "BNSD"},       {QfaLayout::TND, "TND"},
+        {QfaLayout::PA_BBND, "PA_BBND"}, {QfaLayout::PA_BNBD, "PA_BNBD"}, {QfaLayout::PA_NZ, "PA_NZ"},
+        {QfaLayout::LSE_BNS, "LSE_BNS"}, {QfaLayout::LSE_NT, "LSE_NT"},   {QfaLayout::N2TGD, "N2TGD"}};
 
     if (layout2Str.find(layout) != layout2Str.end()) {
         return layout2Str.at(layout);
@@ -34,22 +31,19 @@ std::string QfaLayoutToSerialString(QfaLayout layout)
     return "UNKNOWN";
 }
 
-static const std::string QFA_AXIS_SERIAL_STRINGS[] = {
-    "B", "S", "N", "D", "H", "T", "D1", "D0", "S1", "S2", "Bn", "Bs", "CONST"
-};
+static const std::string QFA_AXIS_SERIAL_STRINGS[] = {"B",  "S",  "N",  "D",  "H",  "T",    "D1",
+                                                      "D0", "S1", "S2", "Bn", "Bs", "CONST"};
 
 std::string QfaAxisToSerialString(QfaAxis axis)
 {
     uint32_t idx = static_cast<uint32_t>(axis);
-    return (idx < sizeof(QFA_AXIS_SERIAL_STRINGS) / sizeof(QFA_AXIS_SERIAL_STRINGS[0]))
-        ? QFA_AXIS_SERIAL_STRINGS[idx] : "UNKNOWN";
+    return (idx < sizeof(QFA_AXIS_SERIAL_STRINGS) / sizeof(QFA_AXIS_SERIAL_STRINGS[0])) ? QFA_AXIS_SERIAL_STRINGS[idx] :
+                                                                                          "UNKNOWN";
 }
 
 std::string QfaQuantModeToSerialString(QfaQuantMode qfaQuantMode)
 {
-    const std::map<QfaQuantMode, std::string> quantMode2Str = {
-        {QfaQuantMode::MXFP8_FP32, "MXFP8_FP32"}
-    };
+    const std::map<QfaQuantMode, std::string> quantMode2Str = {{QfaQuantMode::MXFP8_FP32, "MXFP8_FP32"}};
 
     if (quantMode2Str.find(qfaQuantMode) != quantMode2Str.end()) {
         return quantMode2Str.at(qfaQuantMode);

@@ -77,35 +77,14 @@ public:
     std::string name_;
     std::string opName_;
 
-    size_t GetDimNum() const
-    {
-        return shape_.GetDimNum();
-    }
+    size_t GetDimNum() const { return shape_.GetDimNum(); }
 
-    bool HasShapeB() const
-    {
-        return HasAxis(QfaAxis::B);
-    }
-    bool HasShapeS() const
-    {
-        return HasAxis(QfaAxis::S);
-    }
-    bool HasShapeN() const
-    {
-        return HasAxis(QfaAxis::N);
-    }
-    bool HasShapeT() const
-    {
-        return HasAxis(QfaAxis::T);
-    }
-    bool HasShapeD1() const
-    {
-        return HasAxis(QfaAxis::D1);
-    }
-    bool HasShapeD0() const
-    {
-        return HasAxis(QfaAxis::D0);
-    }
+    bool HasShapeB() const { return HasAxis(QfaAxis::B); }
+    bool HasShapeS() const { return HasAxis(QfaAxis::S); }
+    bool HasShapeN() const { return HasAxis(QfaAxis::N); }
+    bool HasShapeT() const { return HasAxis(QfaAxis::T); }
+    bool HasShapeD1() const { return HasAxis(QfaAxis::D1); }
+    bool HasShapeD0() const { return HasAxis(QfaAxis::D0); }
     bool HasShapeD() const
     {
         if (HasAxis(QfaAxis::D)) {
@@ -117,38 +96,14 @@ public:
         return false;
     }
 
-    int64_t GetShapeB() const
-    {
-        return GetAxisNum(QfaAxis::B);
-    }
-    int64_t GetShapeS() const
-    {
-        return GetAxisNum(QfaAxis::S);
-    }
-    int64_t GetShapeN() const
-    {
-        return GetAxisNum(QfaAxis::N);
-    }
-    int64_t GetShapeBlockSize() const
-    {
-        return GetAxisNum(QfaAxis::Bs);
-    }
-    int64_t GetShapeBlockNum() const
-    {
-        return GetAxisNum(QfaAxis::Bn);
-    }
-    int64_t GetShapeT() const
-    {
-        return GetAxisNum(QfaAxis::T);
-    }
-    int64_t GetShapeD1() const
-    {
-        return GetAxisNum(QfaAxis::D1);
-    }
-    int64_t GetShapeD0() const
-    {
-        return GetAxisNum(QfaAxis::D0);
-    }
+    int64_t GetShapeB() const { return GetAxisNum(QfaAxis::B); }
+    int64_t GetShapeS() const { return GetAxisNum(QfaAxis::S); }
+    int64_t GetShapeN() const { return GetAxisNum(QfaAxis::N); }
+    int64_t GetShapeBlockSize() const { return GetAxisNum(QfaAxis::Bs); }
+    int64_t GetShapeBlockNum() const { return GetAxisNum(QfaAxis::Bn); }
+    int64_t GetShapeT() const { return GetAxisNum(QfaAxis::T); }
+    int64_t GetShapeD1() const { return GetAxisNum(QfaAxis::D1); }
+    int64_t GetShapeD0() const { return GetAxisNum(QfaAxis::D0); }
     int64_t GetShapeD() const
     {
         if (HasAxis(QfaAxis::D)) {
@@ -160,26 +115,11 @@ public:
         return invalidDimValue_;
     }
 
-    ge::graphStatus CheckHasShapeB(const std::string &funcName) const
-    {
-        return CheckHasAxis(QfaAxis::B, funcName);
-    }
-    ge::graphStatus CheckHasShapeS(const std::string &funcName) const
-    {
-        return CheckHasAxis(QfaAxis::S, funcName);
-    }
-    ge::graphStatus CheckHasShapeD(const std::string &funcName) const
-    {
-        return CheckHasAxis(QfaAxis::D, funcName);
-    }
-    ge::graphStatus CheckHasShapeN(const std::string &funcName) const
-    {
-        return CheckHasAxis(QfaAxis::N, funcName);
-    }
-    ge::graphStatus CheckHasShapeT(const std::string &funcName) const
-    {
-        return CheckHasAxis(QfaAxis::T, funcName);
-    }
+    ge::graphStatus CheckHasShapeB(const std::string &funcName) const { return CheckHasAxis(QfaAxis::B, funcName); }
+    ge::graphStatus CheckHasShapeS(const std::string &funcName) const { return CheckHasAxis(QfaAxis::S, funcName); }
+    ge::graphStatus CheckHasShapeD(const std::string &funcName) const { return CheckHasAxis(QfaAxis::D, funcName); }
+    ge::graphStatus CheckHasShapeN(const std::string &funcName) const { return CheckHasAxis(QfaAxis::N, funcName); }
+    ge::graphStatus CheckHasShapeT(const std::string &funcName) const { return CheckHasAxis(QfaAxis::T, funcName); }
     ge::graphStatus CheckHasShapeBlockSize(const std::string &funcName) const
     {
         return CheckHasAxis(QfaAxis::Bs, funcName);
@@ -212,10 +152,10 @@ public:
     std::string CompareTypeToSerialString(const QfaCompareType compareType) const;
     std::string CompareTypeToSerialSymbolString(const QfaCompareType &compareType) const;
     ge::graphStatus GetExpectedShape(gert::Shape &shapeExpected, const QfaTilingShapeCompareParam &param,
-                                      const std::string &funcName) const;
+                                     const std::string &funcName) const;
     QfaCompareType GetCompareType(const std::map<QfaAxis, QfaCompareType> &compareTypeMap, const QfaAxis &axis) const;
     ge::graphStatus GetCompareFunc(const QfaCompareType &compareType, QfaCompareFunc<int64_t> &compareFunc,
-                                    const std::string &funcName) const;
+                                   const std::string &funcName) const;
     ge::graphStatus CompareShape(QfaTilingShapeCompareParam &param, const std::string &funcName) const;
 };
 

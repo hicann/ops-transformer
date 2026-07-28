@@ -44,7 +44,7 @@ ge::graphStatus MetadataChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
     // dtype 仅支持 INT32
     OP_CHECK_IF(metadataDesc->GetDataType() != ge::DT_INT32,
                 OP_LOGE_FOR_INVALID_DTYPE(qfaInfo.opName, METADATA_NAME.c_str(),
-                    DataTypeToSerialString(metadataDesc->GetDataType()).c_str(), "INT32"),
+                                          DataTypeToSerialString(metadataDesc->GetDataType()).c_str(), "INT32"),
                 return ge::GRAPH_FAILED);
 
     // format 仅支持 ND
@@ -56,13 +56,12 @@ ge::graphStatus MetadataChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
     uint32_t dimNum = metadataTensor->GetStorageShape().GetDimNum();
     OP_CHECK_IF(dimNum != DIM_NUM_1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, METADATA_NAME.c_str(),
-                    (std::to_string(dimNum) + "D").c_str(), "1D"),
+                                             (std::to_string(dimNum) + "D").c_str(), "1D"),
                 return ge::GRAPH_FAILED);
 
     // shape dim0 必须 > 0（shape 由 quant_flash_attn_metadata 动态计算，不应为空）
     int64_t dim0 = metadataTensor->GetStorageShape().GetDim(0);
-    OP_CHECK_IF(dim0 <= 0,
-                OP_LOGE(qfaInfo.opName, "metadata shape dim0(%ld) must be greater than 0", dim0),
+    OP_CHECK_IF(dim0 <= 0, OP_LOGE(qfaInfo.opName, "metadata shape dim0(%ld) must be greater than 0", dim0),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;

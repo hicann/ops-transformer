@@ -29,36 +29,17 @@ static const std::map<QfaLayout, std::vector<QfaAxis>> QFA_LAYOUT_AXIS_MAP = {
     {QfaLayout::PA_BNBD, {QfaAxis::Bn, QfaAxis::N, QfaAxis::Bs, QfaAxis::D}},
     {QfaLayout::PA_NZ, {QfaAxis::Bn, QfaAxis::N, QfaAxis::D1, QfaAxis::Bs, QfaAxis::D0}},
     {QfaLayout::LSE_BNS, {QfaAxis::B, QfaAxis::N, QfaAxis::S1}},
-    {QfaLayout::LSE_NT, {QfaAxis::N, QfaAxis::T}}
-};
+    {QfaLayout::LSE_NT, {QfaAxis::N, QfaAxis::T}}};
 
 namespace {
 
 struct CompareFuncs {
-    static bool Equal(const int64_t &a, const int64_t &b)
-    {
-        return a == b;
-    }
-    static bool Greater(const int64_t &a, const int64_t &b)
-    {
-        return a > b;
-    }
-    static bool GreaterEqual(const int64_t &a, const int64_t &b)
-    {
-        return a >= b;
-    }
-    static bool Less(const int64_t &a, const int64_t &b)
-    {
-        return a < b;
-    }
-    static bool LessEqual(const int64_t &a, const int64_t &b)
-    {
-        return a <= b;
-    }
-    static bool NotEqual(const int64_t &a, const int64_t &b)
-    {
-        return a != b;
-    }
+    static bool Equal(const int64_t &a, const int64_t &b) { return a == b; }
+    static bool Greater(const int64_t &a, const int64_t &b) { return a > b; }
+    static bool GreaterEqual(const int64_t &a, const int64_t &b) { return a >= b; }
+    static bool Less(const int64_t &a, const int64_t &b) { return a < b; }
+    static bool LessEqual(const int64_t &a, const int64_t &b) { return a <= b; }
+    static bool NotEqual(const int64_t &a, const int64_t &b) { return a != b; }
     static bool IgnoreInput(const int64_t &a, const int64_t &b)
     {
         (void)a;
@@ -76,8 +57,7 @@ const std::map<QfaCompareType, QfaCompareFunc<int64_t>> QfaTilingShapeCompare::c
     {QfaCompareType::LESS, CompareFuncs::Less},
     {QfaCompareType::LESS_EQUAL, CompareFuncs::LessEqual},
     {QfaCompareType::NOT_EQUAL, CompareFuncs::NotEqual},
-    {QfaCompareType::IGNORE_INPUT, CompareFuncs::IgnoreInput}
-};
+    {QfaCompareType::IGNORE_INPUT, CompareFuncs::IgnoreInput}};
 
 static ge::graphStatus GetLayoutAxes(std::vector<QfaAxis> &layoutAxes, const QfaLayout &layout,
                                      const std::string &opName, const std::string &funcName)
@@ -152,11 +132,12 @@ ge::graphStatus QfaTilingShape::CheckHasAxis(const QfaAxis &axis, const std::str
 
 std::string QfaTilingShapeCompare::CompareTypeToSerialString(const QfaCompareType compareType) const
 {
-    static const std::map<QfaCompareType, std::string> typeStrMap = {
-        {QfaCompareType::EQUAL, "EQUAL"},         {QfaCompareType::GREATER, "GREATER"},
-        {QfaCompareType::GREATER_EQUAL, "GREATER_EQUAL"}, {QfaCompareType::LESS, "LESS"},
-        {QfaCompareType::LESS_EQUAL, "LESS_EQUAL"},       {QfaCompareType::NOT_EQUAL, "NOT_EQUAL"}
-    };
+    static const std::map<QfaCompareType, std::string> typeStrMap = {{QfaCompareType::EQUAL, "EQUAL"},
+                                                                     {QfaCompareType::GREATER, "GREATER"},
+                                                                     {QfaCompareType::GREATER_EQUAL, "GREATER_EQUAL"},
+                                                                     {QfaCompareType::LESS, "LESS"},
+                                                                     {QfaCompareType::LESS_EQUAL, "LESS_EQUAL"},
+                                                                     {QfaCompareType::NOT_EQUAL, "NOT_EQUAL"}};
     auto it = typeStrMap.find(compareType);
     return (it != typeStrMap.end()) ? it->second : "UNKNOWN";
 }
@@ -164,10 +145,8 @@ std::string QfaTilingShapeCompare::CompareTypeToSerialString(const QfaCompareTyp
 std::string QfaTilingShapeCompare::CompareTypeToSerialSymbolString(const QfaCompareType &compareType) const
 {
     static const std::map<QfaCompareType, std::string> symbolMap = {
-        {QfaCompareType::EQUAL, "=="},   {QfaCompareType::GREATER, ">"},
-        {QfaCompareType::GREATER_EQUAL, ">="}, {QfaCompareType::LESS, "<"},
-        {QfaCompareType::LESS_EQUAL, "<="},    {QfaCompareType::NOT_EQUAL, "!="}
-    };
+        {QfaCompareType::EQUAL, "=="}, {QfaCompareType::GREATER, ">"},     {QfaCompareType::GREATER_EQUAL, ">="},
+        {QfaCompareType::LESS, "<"},   {QfaCompareType::LESS_EQUAL, "<="}, {QfaCompareType::NOT_EQUAL, "!="}};
     auto it = symbolMap.find(compareType);
     return (it != symbolMap.end()) ? it->second : "UNKNOWN";
 }
