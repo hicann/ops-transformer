@@ -41,7 +41,7 @@
         output=ReduceScatter(\sum_{0}^{\left \lfloor \frac{k}{blockSize=128} \right \rfloor} (x1_{pr}@x2_{rq}*(x1Scale_{pr}*x2Scale_{rq})))
         $$
 
-    - 情形4：如果x1和x2数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2的mx量化场景，且不输出amaxOut，当x1的shape为(m, k)、x2的shape为(n, k)时， x1Scale的shape为(m, ceildiv(k, 64), 2)、x2Scale的shape为(n, ceildiv(k, 64), 2)时，入参x1、x2进行matmul计算和dequant计算后，再进行ReduceScatter通信。mx量化仅支持x2、x2Scale转置场景。
+    - 情形4：如果x1和x2数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2/FLOAT4_E2M1的mx量化场景，且不输出amaxOut，当x1的shape为(m, k)、x2的shape为(n, k)时， x1Scale的shape为(m, ceildiv(k, 64), 2)、x2Scale的shape为(n, ceildiv(k, 64), 2)时，入参x1、x2进行matmul计算和dequant计算后，再进行ReduceScatter通信。mx量化仅支持x2、x2Scale转置场景。
 
         $$
         output=ReduceScatter(\sum_{0}^{\left \lfloor \frac{k}{blockSize=32} \right \rfloor} (x1_{pr}@x2_{rq}*(x1Scale_{pr}*x2Scale_{rq})))
@@ -139,8 +139,8 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>x1Scale(aclTensor*)</td>
         <td>输入</td>
         <td>mm左矩阵反量化参数。</td>
-        <td><ul><li>支持传入空指针场景。</li></ul></td>
-        <td>FLOAT16、BFLOAT16、FLOAT</td>
+        <td>支持传入空指针场景。</td>
+        <td>FLOAT16、BFLOAT16、FLOAT、FLOAT8_E8M0</td>
         <td>ND</td>
         <td>1-3</td>
         <td>×</td>
@@ -150,7 +150,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>输入</td>
         <td>mm右矩阵反量化参数。</td>
         <td>支持传入空指针场景。</td>
-        <td>FLOAT16、BFLOAT16、FLOAT、INT64</td>
+        <td>FLOAT16、BFLOAT16、FLOAT、INT64、FLOAT8_E8M0</td>
         <td>ND</td>
         <td>1-3</td>
         <td>√（仅适用转置场景）</td>
@@ -238,7 +238,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     <tr>
         <td>output(aclTensor*)</td>
         <td>输出</td>
-        <td>AllGather通信与MatMul计算的结果，即计算公式中的output。</td>
+        <td>ReduceScatter通信与MatMul计算的结果，即计算公式中的output。</td>
         <td>仅当输出类型为FLOAT16、BFLOAT16时支持空Tensor。</td>
         <td>FLOAT16、BFLOAT16、FLOAT</td>
         <td>ND</td>
@@ -298,7 +298,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
             $$
             - 如果满足重新设置条件，一般情况下，当x1Scale、x2Scale输入都是2维，且数据类型都为FLOAT时，[groupSizeM，groupSizeN，groupSizeK]取值组合会推导为[128, 128, 128]，对应groupSize的值为549764202624；当x1Scale、x2Scale输入都是3维，且数据类型都为FLOAT8_E8M0时，[groupSizeM, groupSizeN, groupSizeK]取值组合会推导为[1, 1, 32]，对应groupSize的值为4295032864。
         - commMode：当前版本支持输入“ai_cpu” 或 “ccu”。
-        - output：如果x1类型为FLOAT16、BFLOAT16，则output类型与x1保持一致。如果x1类型为FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8，则数据类型支持FLOAT16、BFLOAT16、FLOAT。
+        - output：如果x1类型为FLOAT16、BFLOAT16，则output类型与x1保持一致。如果x1类型为FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1，则数据类型支持FLOAT16、BFLOAT16、FLOAT。
 
             $$
             groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32
@@ -382,7 +382,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
 - 通信约束：
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：仅支持commMode为"aiv"，且通信缓冲区大于等于200MB。
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：仅支持commMode为"aiv"，且通信缓冲区大于等于200MB。
-  - <term>Ascend 950PR/Ascend 950DT</term>：当前版本支持输入、“ai_cpu” 或 “ccu”。
+  - <term>Ascend 950PR/Ascend 950DT</term>：当前版本仅支持输入commMode为“ai_cpu” 或 “ccu”。
 
 - 确定性计算：
   - `aclnnMatmulReduceScatterV2`默认采用确定性计算实现。
@@ -397,12 +397,11 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         - m不为空，k不为空，n为空；
         - m为空，k不为空，n为空。
     - 当x1、x2的数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8/FLOAT4_E2M1时，不支持空tensor。
-    - 当x1、x2的数据类型为FLOAT16/BFLOAT16/HIFLOAT8时，x1和x2的数据类型需要保持一致。
-    - 当x1、x2的数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2时，x1和x2的数据可以为其中一种。
-    - 当x1、x2的数据类型为FLOAT4_E2M1时，x1和x2的数据类型必须保持一致（MXFP4量化场景）。
+    - 当x1、x2的数据类型为FLOAT16/BFLOAT16/HIFLOAT8/FLOAT4_E2M1时，x1和x2的数据类型需要保持一致。
+    - 当x1、x2的数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2时，x1和x2的数据类型可以为其中任意一种。
     - mx量化场景下，且x1和x2输入为FLOAT4_E2M1（MXFP4量化）时，k必须是偶数。
     - 支持2、4、8、16、32、64卡；支持CCU通信和AICPU通信，CCU仅支持单机UB域内互联，AICPU可支持跨机UB域内互联。
-    - reduceScatter集合通信数据总量不能超过16*256MB，集合通信数据总量计算方式为：m * n * sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
+    - ReduceScatter集合通信数据总量不能超过16*256MB，集合通信数据总量计算方式为：m * n * sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     - 只支持x2矩阵转置/不转置，x1矩阵仅支持不转置场景。
