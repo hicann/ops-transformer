@@ -35,29 +35,33 @@ const aclTensor *MixedQuantSparseFlashMlaMetadata(
     int64_t maxSeqlenOriKv, int64_t maxSeqlenCmpKv, int64_t oriTopk, int64_t cmpTopk, int64_t ropeHeadDim,
     int64_t cmpRatio, int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight,
     const char *layoutQOptional, const char *layoutKvOptional, bool hasOriKv, bool hasCmpKv, const char *socVersion,
-    int64_t aicCoreNum, int64_t aivCoreNum, const aclTensor *metaData, aclOpExecutor *executor)
+    int64_t aicCoreNum, int64_t aivCoreNum, bool isBatchConsistency, const aclTensor *metaData, aclOpExecutor *executor)
 {
     L0_DFX(MixedQuantSparseFlashMlaMetadata, cuSeqlensQOptional, cuSeqlensOriKvOptional, cuSeqlensCmpKvOptional,
            sequsedQOptional, sequsedOriKvOptional, sequsedCmpKvOptional, cmpResidualKvOptional, oriTopkLengthOptional,
            cmpTopkLengthOptional, numHeadsQ, numHeadsKv, headDim, quantMode, batchSize, maxSeqlenQ, maxSeqlenOriKv,
            maxSeqlenCmpKv, oriTopk, cmpTopk, ropeHeadDim, cmpRatio, oriMaskMode, cmpMaskMode, oriWinLeft, oriWinRight,
-           layoutQOptional, layoutKvOptional, hasOriKv, hasCmpKv, socVersion, aicCoreNum, aivCoreNum, metaData);
+           layoutQOptional, layoutKvOptional, hasOriKv, hasCmpKv, socVersion, aicCoreNum, aivCoreNum,
+           isBatchConsistency, metaData);
 
     static internal::AicpuTaskSpace space("MixedQuantSparseFlashMlaMetadata");
 
     auto ret = ADD_TO_LAUNCHER_LIST_AICPU(
         MixedQuantSparseFlashMlaMetadata,
-        OP_ATTR_NAMES({"num_heads_q", "num_heads_kv", "head_dim", "quant_mode", "batch_size", "max_seqlen_q",
-                       "max_seqlen_ori_kv", "max_seqlen_cmp_kv", "ori_topk", "cmp_topk", "rope_head_dim", "cmp_ratio",
-                       "ori_mask_mode", "cmp_mask_mode", "ori_win_left", "ori_win_right", "layout_q", "layout_kv",
-                       "has_ori_kv", "has_cmp_kv", "soc_version", "aic_core_num", "aiv_core_num"}),
+        OP_ATTR_NAMES({"num_heads_q",   "num_heads_kv",  "head_dim",          "quant_mode",
+                       "batch_size",    "max_seqlen_q",  "max_seqlen_ori_kv", "max_seqlen_cmp_kv",
+                       "ori_topk",      "cmp_topk",      "rope_head_dim",     "cmp_ratio",
+                       "ori_mask_mode", "cmp_mask_mode", "ori_win_left",      "ori_win_right",
+                       "layout_q",      "layout_kv",     "has_ori_kv",        "has_cmp_kv",
+                       "soc_version",   "aic_core_num",  "aiv_core_num",      "is_batch_consistency"}),
         OP_INPUT(cuSeqlensQOptional, cuSeqlensOriKvOptional, cuSeqlensCmpKvOptional, sequsedQOptional,
                  sequsedOriKvOptional, sequsedCmpKvOptional, cmpResidualKvOptional, oriTopkLengthOptional,
                  cmpTopkLengthOptional),
         OP_OUTPUT(metaData),
         OP_ATTR(numHeadsQ, numHeadsKv, headDim, quantMode, batchSize, maxSeqlenQ, maxSeqlenOriKv, maxSeqlenCmpKv,
                 oriTopk, cmpTopk, ropeHeadDim, cmpRatio, oriMaskMode, cmpMaskMode, oriWinLeft, oriWinRight,
-                layoutQOptional, layoutKvOptional, hasOriKv, hasCmpKv, socVersion, aicCoreNum, aivCoreNum));
+                layoutQOptional, layoutKvOptional, hasOriKv, hasCmpKv, socVersion, aicCoreNum, aivCoreNum,
+                isBatchConsistency));
     OP_CHECK(ret == ACL_SUCCESS,
              OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "MixedQuantSparseFlashMlaMetadata ADD_TO_LAUNCHER_LIST_AICPU failed."),
              return nullptr);
