@@ -65,6 +65,9 @@ for _, params in enumerate(ENABLED_PARAMS):
         "cu_seqlens_ori_kv",
         "cu_seqlens_cmp_kv",
         "cmp_residual_kv",
+        "q_datarange",
+        "ori_kv_datarange",
+        "cmp_kv_datarange",
         "ori_topk_length",
         "cmp_topk_length",
     ]:
@@ -143,6 +146,9 @@ for _, params in enumerate(ENABLED_PARAMS):
         "cu_seqlens_ori_kv",
         "cu_seqlens_cmp_kv",
         "cmp_residual_kv",
+        "q_datarange",
+        "ori_kv_datarange",
+        "cmp_kv_datarange",
     ]
 
     param_values = [
@@ -190,6 +196,9 @@ for _, params in enumerate(ENABLED_PARAMS):
         [normalized_params["cu_seqlens_ori_kv"]],
         [normalized_params["cu_seqlens_cmp_kv"]],
         [normalized_params["cmp_residual_kv"]],
+        [normalized_params["q_datarange"]],
+        [normalized_params["ori_kv_datarange"]],
+        [normalized_params["cmp_kv_datarange"]],
     ]
 
     # 生成所有的组合，并转换为字典列表

@@ -24,9 +24,8 @@ import logging
 DATA_RANGE_LEFT = -2
 DATA_RANGE_RIGHT = 2
 
-# hifp8FullQuant 量化参数范围
-quant_param_range_left = DATA_RANGE_LEFT / -1  # = 2.0
-quant_param_range_right = DATA_RANGE_RIGHT / 1  # = 2.0
+FP8_DATA_RANGE_LEFT = -5
+FP8_DATA_RANGE_RIGHT = 5
 
 
 class GeneralizedSFAQuant:
@@ -162,7 +161,7 @@ class GeneralizedSFAQuant:
                         logging.info(
                             f"      进度：{current_pct:.1f}% | 步数：{i_S1:>{len(str(cur_act_q))}}/{cur_act_q}"
                         )
-                    if self.ori_mask_mode != 0 and i_S1 < cur_act_q - cur_ori_act_kv:
+                    if self.ori_mask_mode == 3 and i_S1 < cur_act_q - cur_ori_act_kv:
                         attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(
                             [G, self.D], dtype=torch.float
                         )
@@ -950,38 +949,22 @@ def trans_kv_bnsd_to_tnd(kv_bnsd_npu, cu_seqlens_kv, seqused_kv, B, N2, D, kv_ty
     return kv_tnd
 
 
-def _gen_hif8_q_tensor(shape):
-    """生成 hif8FullQuant Q: float32 → hif8 uint8 → 反量化回 float32, 返回 (golden_fp32, npu_uint8, scale)"""
+def _gen_hif8_tensor(shape, data_range, scale_range):
     scale = torch.tensor(
-        [random.uniform(quant_param_range_left, quant_param_range_right)],
-        dtype=torch.float32,
-    )
-    q_ = torch.tensor(
-        np.random.uniform(DATA_RANGE_LEFT, DATA_RANGE_RIGHT, shape).astype(np.float32)
-    )
-    q_npu = torch.tensor(trans_float_tensor_to_hifuint8(q_))
-    q = torch.tensor(trans_hifuint8_tensor_to_float(q_npu))
-    return q, q_npu, scale
-
-
-def _gen_hif8_kv_tensor(B, N2, max_s2, dim):
-    """生成 hif8FullQuant KV: float32 → hif8 uint8 → 反量化回 float32, 返回 (golden_fp32, npu_uint8, scale)"""
-    scale = torch.tensor(
-        [random.uniform(quant_param_range_left, quant_param_range_right)],
+        [random.uniform(*scale_range)],
         dtype=torch.float32,
     )
 
-    # 一次性生成整个 dim 维度
-    k_bnsd_ = torch.tensor(
-        np.random.uniform(
-            DATA_RANGE_LEFT, DATA_RANGE_RIGHT, (B, N2, max_s2, dim)
-        ).astype(np.float32)
+    x = (
+        torch.rand(shape, dtype=torch.float32) * (data_range[1] - data_range[0])
+        + data_range[0]
     )
-    k_bnsd_npu = trans_float_tensor_to_hifuint8(k_bnsd_)
-    k_bnsd = torch.tensor(trans_hifuint8_tensor_to_float(k_bnsd_npu))
-    k_bnsd_npu = torch.tensor(k_bnsd_npu)
 
-    return k_bnsd, k_bnsd_npu, scale
+    x_uint8 = trans_float_tensor_to_hifuint8(x)
+    x_fp32 = torch.tensor(trans_hifuint8_tensor_to_float(x_uint8))
+    x_uint8 = torch.tensor(x_uint8)
+
+    return x_fp32, x_uint8, scale
 
 
 def _build_block_table_and_pa(
@@ -1049,6 +1032,8 @@ def gen_ori_kv(
     seqused_ori_kv,
     cu_seqlens_ori_kv,
     layout_kv="PA_BBND",
+    ori_kv_datarange=[-2, 2],
+    scale_datarange=[-1, 1],
     K1=None,
     template_run_mode=None,
     layout_q=None,
@@ -1059,8 +1044,8 @@ def gen_ori_kv(
     ori_kv_topk_mode="no",
     ori_topk_length_override=None,
 ):
-    ori_k_bnsd, ori_k_bnsd_npu, ori_kv_descale = _gen_hif8_kv_tensor(
-        B, N2, ori_max_s2, D
+    ori_k_bnsd, ori_k_bnsd_npu, ori_kv_descale = _gen_hif8_tensor(
+        (B, N2, ori_max_s2, D), ori_kv_datarange, scale_datarange
     )
 
     if layout_kv == "TND":
@@ -1150,6 +1135,8 @@ def gen_cmp_kv(
     cmp_mask_mode,
     template_run_mode,
     layout_kv="PA_BBND",
+    cmp_kv_datarange=[-2, 2],
+    scale_datarange=[-1, 1],
     cmp_kv_topk_mode="no",
     cmp_sparse_indices_mode="full",
     cmp_topk_length_override=None,
@@ -1157,8 +1144,8 @@ def gen_cmp_kv(
     if cmp_max_s2 == 0:
         return None, None, None, None, None, None
 
-    cmp_k_bnsd, cmp_k_bnsd_npu, cmp_kv_descale = _gen_hif8_kv_tensor(
-        B, N2, cmp_max_s2, D
+    cmp_k_bnsd, cmp_k_bnsd_npu, cmp_kv_descale = _gen_hif8_tensor(
+        (B, N2, cmp_max_s2, D), cmp_kv_datarange, scale_datarange
     )
 
     if layout_kv == "TND":
@@ -1185,9 +1172,12 @@ def gen_cmp_kv(
     # generate cmp_sparse_indices
     cmp_sparse_indices = None
     if template_run_mode in ("CSA", "ORI_CMP_SPARSE") and cmp_max_s2 != 0:
-        cmp_restored_len = [
-            seqused_cmp_kv[i] * cmp_ratio + cmp_residual_kv[i] for i in range(B)
-        ]
+        if cmp_residual_kv is not None:
+            cmp_restored_len = [
+                seqused_cmp_kv[i] * cmp_ratio + cmp_residual_kv[i] for i in range(B)
+            ]
+        else:
+            cmp_restored_len = [seqused_cmp_kv[i] * cmp_ratio for i in range(B)]
         if layout_q == "BSND":
             cmp_sparse_indices, cmp_topk_length = gen_sparse_indices_bsnd(
                 cmp_ratio,
@@ -1289,6 +1279,22 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
     return_softmax_lse = params.get("return_softmax_lse", False)
     quant_mode = params.get("quant_mode", False)
     isSink = params.get("isSink", True)
+    return_softmax_lse = params.get("return_softmax_lse", False)
+    q_datarange = params.get("q_datarange")
+    ori_kv_datarange = params.get("ori_kv_datarange")
+    cmp_kv_datarange = params.get("cmp_kv_datarange")
+    q_descale_datarange = [
+        q_datarange[0] / FP8_DATA_RANGE_LEFT,
+        q_datarange[1] / FP8_DATA_RANGE_RIGHT,
+    ]
+    ori_kv_descale_datarange = [
+        ori_kv_datarange[0] / FP8_DATA_RANGE_LEFT,
+        ori_kv_datarange[1] / FP8_DATA_RANGE_RIGHT,
+    ]
+    cmp_kv_descale_datarange = [
+        cmp_kv_datarange[0] / FP8_DATA_RANGE_LEFT,
+        cmp_kv_datarange[1] / FP8_DATA_RANGE_RIGHT,
+    ]
     K1 = params.get("K1")
     ori_kv_topk_mode = params.get("ori_kv_topk_mode", "no")
     cmp_kv_topk_mode = params.get("cmp_kv_topk_mode", "no")
@@ -1307,6 +1313,10 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
         if seqused_cmp_kv is not None
         else None
     )
+
+    print(q_datarange, ori_kv_datarange, cmp_kv_datarange)
+    print(params)
+
     assert quant_mode == 1, f"quant_mode only support 1, but got {quant_mode}"
     # convert topk_length override to tensor with proper shape
     if ori_topk_length_override is not None and not isinstance(
@@ -1333,9 +1343,13 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
             ).reshape(T1, N2)
     # generate q (hifp8FullQuant)
     if layout_q == "BSND":
-        q, q_npu, q_descale = _gen_hif8_q_tensor((B, S1, N1, D))
+        q, q_npu, q_descale = _gen_hif8_tensor(
+            (B, S1, N1, D), q_datarange, q_descale_datarange
+        )
     elif layout_q == "TND":
-        q, q_npu, q_descale = _gen_hif8_q_tensor((T1, N1, D))
+        q, q_npu, q_descale = _gen_hif8_tensor(
+            (T1, N1, D), q_datarange, q_descale_datarange
+        )
         if len(cu_seqlens_q) != (B + 1):
             raise ValueError(
                 f"len(cu_seqlens_q) != B + 1, which is {len(cu_seqlens_q)} != {B + 1}"
@@ -1365,8 +1379,9 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
 
     # generate sinks tensor (only when isSink=True)
     if isSink:
-        sinks = torch.tensor(
-            np.random.uniform(DATA_RANGE_LEFT / 10, DATA_RANGE_RIGHT / 10, (N1))
+        sinks = (
+            torch.rand((N1)) * (q_datarange[1] - q_datarange[0]) / 10
+            + q_datarange[0] / 10
         ).to(torch.float)
     else:
         sinks = None
@@ -1393,6 +1408,8 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
         seqused_ori_kv,
         cu_seqlens_ori_kv,
         layout_kv,
+        ori_kv_datarange,
+        ori_kv_descale_datarange,
         K1=K1,
         template_run_mode=template_run_mode,
         layout_q=layout_q,
@@ -1436,6 +1453,8 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
             cmp_mask_mode,
             template_run_mode,
             layout_kv,
+            cmp_kv_datarange,
+            cmp_kv_descale_datarange,
             cmp_kv_topk_mode=cmp_kv_topk_mode,
             cmp_sparse_indices_mode=cmp_sparse_indices_mode,
             cmp_topk_length_override=cmp_topk_length_override,
