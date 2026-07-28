@@ -13,7 +13,6 @@
  * \brief engram_fetch_wait算子arch35 kernel实现
  */
 
-
 #ifndef ENGRAM_FETCH_WAIT_ARCH35_H
 #define ENGRAM_FETCH_WAIT_ARCH35_H
 
@@ -48,6 +47,8 @@ private:
     uint32_t aivId_{0};
     uint32_t rankId_{0};
     uint32_t numRanks_{0};
+    uint32_t channelsPerRank_{1};
+
     AscendC::TBuf<> hcommBuf_;
     AscendC::Hcomm<AscendC::COMM_PROTOCOL_UBC_CTP> hcomm_;
 };
@@ -61,6 +62,10 @@ __aicore__ inline void EngramFetchWaitArch35::Init(GM_ADDR commContext, GM_ADDR 
     ctxPtr_ = (__gm__ EngramCommContext *)commContext;
     rankId_ = ctxPtr_->rankId;
     numRanks_ = ctxPtr_->rankSize;
+    channelsPerRank_ = ctxPtr_->channelsPerRank;
+    if (channelsPerRank_ == 0) {
+        channelsPerRank_ = 1;
+    }
 
     tpipe_->InitBuffer(hcommBuf_, Mc2Kernel::HCOMM_INIT_SIZE);
     AscendC::LocalTensor<uint8_t> hcommTensor = hcommBuf_.Get<uint8_t>();
@@ -71,12 +76,22 @@ __aicore__ inline void EngramFetchWaitArch35::Process()
 {
     if ASCEND_IS_AIV {
         uint32_t totalBlocks = AscendC::GetBlockNum();
-        for (uint32_t channelIdx = aivId_; channelIdx < numRanks_; channelIdx += totalBlocks) {
-            if (channelIdx == rankId_) {
-                continue;
+        if (totalBlocks >= numRanks_) {
+            auto coreAssign = GetCoreAssignment(totalBlocks, aivId_, numRanks_);
+            if (coreAssign.assignedRank != rankId_ && coreAssign.idxInRankGroup < channelsPerRank_) {
+                uint32_t globalChannelIdx = coreAssign.assignedRank * channelsPerRank_ + coreAssign.idxInRankGroup;
+                int32_t ret = hcomm_.Drain(ctxPtr_->hcommHandle[globalChannelIdx]);
+                ascendc_assert(ret == 0, "Urma drain failed, ret=%d, globalChannelIdx=%u", ret, globalChannelIdx);
             }
-            int32_t ret = hcomm_.Drain(ctxPtr_->hcommHandle[channelIdx]);
-            ascendc_assert(ret == 0, "Urma drain failed, ret=%d, channelIdx=%u", ret, channelIdx);
+        } else {
+            uint32_t startRank = (aivId_ < numRanks_) ? aivId_ : rankId_;
+            for (uint32_t ownerRank = startRank; ownerRank < numRanks_; ownerRank += totalBlocks) {
+                if (ownerRank != rankId_) {
+                    uint32_t globalChannelIdx = ownerRank * channelsPerRank_;
+                    int32_t ret = hcomm_.Drain(ctxPtr_->hcommHandle[globalChannelIdx]);
+                    ascendc_assert(ret == 0, "Urma drain failed, ret=%d, globalChannelIdx=%u", ret, globalChannelIdx);
+                }
+            }
         }
     }
 }
