@@ -587,6 +587,26 @@
     <td>训练场景下，更新KvCache中指定位置的key和value，同时更新key的scale值。</td>
   </tr>
   <tr>
+    <td>attention</td>
+    <td><a href="../../attention/dense_lightning_indexer_kl_loss_grad/README.md">dense_lightning_indexer_kl_loss_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>DenselightningIndexerKlLossGrad算子是LightningIndexer的反向算子，支持输出Loss计算所需Index部分的分数。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/dense_lightning_indexer_kl_loss_grad_metadata/README.md">dense_lightning_indexer_kl_loss_grad_metadata</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI CPU</td>
+    <td>dense_lightning_indexer_kl_loss_grad算子的前置算子，用于计算dense_lightning_indexer_kl_loss_grad的负载均衡。</td>
+  </tr>
+  <tr>
     <td>ffn</td>
     <td><a href="../../ffn/ffn/README.md">ffn</a></td>
     <td>✓</td>
