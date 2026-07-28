@@ -71,7 +71,7 @@ bool GroupedMatmulAddNoQuantTiling::Init(const gert::TilingContext *context)
     }
     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
         context->GetNodeName(), "groupType", Ops::Transformer::Gmm::FormatString("%d", groupType_).c_str(),
-        Ops::Transformer::Gmm::FormatString("The value of %s cannot be %d", "groupType", groupType_).c_str());
+        Ops::Transformer::Gmm::FormatString("The value of %s must be in %s", "groupType", "{2}").c_str());
     return false;
 }
 
@@ -94,8 +94,9 @@ bool GroupedMatmulAddNoQuantTiling::GetAttrs(const gert::TilingContext *context)
                     Ops::Transformer::Gmm::FormatString("%d, %s, %s", groupType_, transposeX_ ? "TRUE" : "FALSE",
                                                         transposeWeight_ ? "TRUE" : "FALSE")
                         .c_str(),
-                    Ops::Transformer::Gmm::FormatString("When %s is %d, the values of %s must be %s", "groupType", 2,
-                                                        "transposeX, transposeWeight", "TRUE, FALSE")
+                    Ops::Transformer::Gmm::FormatString(
+                        "The value of %s must be %s, the value of %s must be %s, the value of %s must be %s",
+                        "groupType", "2", "transposeX", "TRUE", "transposeWeight", "FALSE")
                         .c_str()),
                 return false);
 
