@@ -25,6 +25,7 @@ namespace FaVectorApi {
 constexpr uint32_t floatRepSize = 64;
 constexpr uint32_t halfRepSize = 128;
 constexpr uint32_t blockBytesU8 = 32;
+constexpr uint32_t NUM_264 = 264;
 constexpr float fp8e4m3MaxValue = 448.0f;
 constexpr float int8MaxValue = 127.0f;
 constexpr float hifp8MaxValue = 32768.0f;

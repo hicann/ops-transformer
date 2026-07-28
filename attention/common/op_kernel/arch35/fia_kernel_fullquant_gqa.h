@@ -110,13 +110,12 @@ public:
     __aicore__ inline FlashAttentionFullQuantGqaKernel()
         : cubeBlock(constInfo), vecFaBlock(constInfo), vecFdBlock(constInfo){};
     __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse,
-                                __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *blockTable,
-                                __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *dequantScaleKey,
-                                __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *pScale, __gm__ uint8_t *queryRope,
-                                __gm__ uint8_t *keyRope, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *attentionOut,
-                                __gm__ uint8_t *workspace, __gm__ uint8_t *fiaMetaData,
-                                const FullQuantTiling *__restrict tiling, TPipe *tPipe)
+                                __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKv,
+                                __gm__ uint8_t *blockTable, __gm__ uint8_t *dequantScaleQuery,
+                                __gm__ uint8_t *dequantScaleKey, __gm__ uint8_t *dequantScaleValue,
+                                __gm__ uint8_t *pScale, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
+                                __gm__ uint8_t *softmaxLse, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
+                                __gm__ uint8_t *fiaMetaData, const FullQuantTiling *__restrict tiling, TPipe *tPipe)
     {
         this->pipe = tPipe;
         this->tilingData = tiling;
@@ -139,7 +138,7 @@ public:
 
         if ASCEND_IS_AIV {
             vecFaBlock.InitVecBlock(tPipe, actualSeqLengths, actualSeqLengthsKv, pScale, blockTable, dequantScaleQuery,
-                                    dequantScaleKey, dequantScaleValue, attenMask, softmaxLse, attentionOut, workspace);
+                                    dequantScaleKey, dequantScaleValue, softmaxLse, attentionOut, workspace);
             vecFaBlock.ClearOutput();
         }
 
