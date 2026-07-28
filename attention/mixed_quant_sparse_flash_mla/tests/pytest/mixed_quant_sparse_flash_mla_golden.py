@@ -614,8 +614,6 @@ class GeneralizedSFAQuant:
                     t_start : t_start + cur_seqused, :
                 ]
             return new_tensor, [B, 1, max_s1, 1]
-        else:
-            return tensor, shape
 
     def trans_bnsd_to_target_layout(
         self, tensor, layout, cu_seqlens_q=None, seqused_q=None
@@ -847,6 +845,7 @@ def gen_sparse_indices_bsnd(
     S1,
     N2,
     K,
+    seqused_q,
     seqused_kv,
     mask_mode,
     sparse_indices_mode,
@@ -859,22 +858,29 @@ def gen_sparse_indices_bsnd(
         raise ValueError(
             f"sparse_indices_mode only support full/random, which is {sparse_indices_mode}"
         )
-    if kv_topk_mode not in ["fullK", "random"]:
+    if kv_topk_mode not in ["fullK", "random", "no"]:
         raise ValueError(
             f"kv_topk_mode only support fullK, random, which is {kv_topk_mode}"
         )
 
     # 有效索引在叠加了causal后有效tokens中选取，不足sparse_block_count，尾部填充-1
     sparse_data = torch.full((B, S1, N2, K), fill_value=-1, dtype=torch.int32)
-    topk_length = torch.zeros((B, S1, N2), dtype=torch.int32)
+
+    if topk_length_override is not None:
+        topk_length = topk_length_override
+    elif kv_topk_mode != "no":
+        topk_length = torch.zeros((B, S1, N2), dtype=torch.int32)
+    else:
+        topk_length = None
 
     for i_B in range(B):
+        cur_act_q = seqused_q[i_B]
         cur_act_kv = seqused_kv[i_B]
         for i_N2 in range(N2):
-            for i_S1 in range(S1):
+            for i_S1 in range(cur_act_q):
                 if mask_mode == 3:
                     cur_valid_s2_max = math.floor(
-                        (cur_act_kv - S1 + i_S1 + 1) / cmp_ratio
+                        (cur_act_kv - cur_act_q + i_S1 + 1) / cmp_ratio
                     )
                 elif mask_mode == 0:
                     cur_valid_s2_max = math.floor(cur_act_kv / cmp_ratio)
@@ -882,7 +888,7 @@ def gen_sparse_indices_bsnd(
                     raise ValueError(
                         f"topklen sparse mask mode only support 0 and 3, which is {mask_mode}"
                     )
-
+                cur_valid_s2_max = max(0, cur_valid_s2_max)
                 # gen sparse indices
                 if sparse_indices_mode == "random":
                     if cur_valid_s2_max > 1:
@@ -902,19 +908,16 @@ def gen_sparse_indices_bsnd(
                 ]
 
                 # gen topk length
-                if topk_length_override is not None:
-                    topk_length[i_B, i_S1, i_N2] = int(
-                        topk_length_override[i_B, i_S1, i_N2]
-                    )
-                elif kv_topk_mode == "fullK":
-                    topk_length[i_B, i_S1, i_N2] = min(cur_valid_s2_max_update, K)
-                elif kv_topk_mode == "random":
-                    if K > 1:
-                        topk_length[i_B, i_S1, i_N2] = min(
-                            torch.randint(1, K, (1, 1))[0], cur_valid_s2_max_update
-                        )
-                    else:
-                        topk_length[i_B, i_S1, i_N2] = 1
+                if topk_length is not None and topk_length_override is None:
+                    if kv_topk_mode == "fullK":
+                        topk_length[i_B, i_S1, i_N2] = min(cur_valid_s2_max_update, K)
+                    elif kv_topk_mode == "random":
+                        if K > 1:
+                            topk_length[i_B, i_S1, i_N2] = min(
+                                torch.randint(1, K, (1, 1))[0], cur_valid_s2_max_update
+                            )
+                        else:
+                            topk_length[i_B, i_S1, i_N2] = 1
 
     return sparse_data, topk_length
 
@@ -926,6 +929,7 @@ def gen_sparse_indices_tnd(
     N2,
     K,
     cu_seqlens_q,
+    seqused_q,
     seqused_ori_kv,
     mask_mode,
     sparse_indices_mode,
@@ -938,16 +942,22 @@ def gen_sparse_indices_tnd(
         raise ValueError(
             f"sparse_indices_mode only support full/random, which is {sparse_indices_mode}"
         )
-    if kv_topk_mode not in ["fullK", "random"]:
+    if kv_topk_mode not in ["fullK", "random", "no"]:
         raise ValueError(
             f"kv_topk_mode only support fullK, random, which is {kv_topk_mode}"
         )
 
     sparse_data = torch.full((T1, N2, K), fill_value=-1, dtype=torch.int32)
-    topk_length = torch.zeros((T1, N2), dtype=torch.int32)
+
+    if topk_length_override is not None:
+        topk_length = topk_length_override
+    elif kv_topk_mode != "no":
+        topk_length = torch.zeros((T1, N2), dtype=torch.int32)
+    else:
+        topk_length = None
 
     for i_B in range(B):
-        cur_act_q = cu_seqlens_q[i_B + 1] - cu_seqlens_q[i_B]
+        cur_act_q = seqused_q[i_B]
         s1_prefix = cu_seqlens_q[i_B]
         cur_act_kv = seqused_ori_kv[i_B]
         for i_N2 in range(N2):
@@ -962,7 +972,7 @@ def gen_sparse_indices_tnd(
                     raise ValueError(
                         f"ori_mask_mode only support 0 and 3, which is {mask_mode}"
                     )
-
+                cur_valid_s2_max = max(0, cur_valid_s2_max)
                 # gen sparse indices
                 if sparse_indices_mode == "random":
                     if cur_valid_s2_max > 1:
@@ -982,21 +992,18 @@ def gen_sparse_indices_tnd(
                 ]
 
                 # gen topk length
-                if topk_length_override is not None:
-                    topk_length[s1_prefix + i_S1, i_N2] = int(
-                        topk_length_override[s1_prefix + i_S1, i_N2]
-                    )
-                elif kv_topk_mode == "fullK":
-                    topk_length[s1_prefix + i_S1, i_N2] = min(
-                        cur_valid_s2_max_update, K
-                    )
-                elif kv_topk_mode == "random":
-                    if K > 1:
+                if topk_length is not None and topk_length_override is None:
+                    if kv_topk_mode == "fullK":
                         topk_length[s1_prefix + i_S1, i_N2] = min(
-                            torch.randint(1, K, (1, 1))[0], cur_valid_s2_max_update
+                            cur_valid_s2_max_update, K
                         )
-                    else:
-                        topk_length[s1_prefix + i_S1, i_N2] = 1
+                    elif kv_topk_mode == "random":
+                        if K > 1:
+                            topk_length[s1_prefix + i_S1, i_N2] = min(
+                                torch.randint(1, K, (1, 1))[0], cur_valid_s2_max_update
+                            )
+                        else:
+                            topk_length[s1_prefix + i_S1, i_N2] = 1
 
     return sparse_data, topk_length
 
@@ -1448,6 +1455,7 @@ def gen_ori_kv(
                 S1,
                 N2,
                 K1,
+                seqused_q,
                 seqused_ori_kv,
                 ori_mask_mode,
                 ori_sparse_indices_mode,
@@ -1462,6 +1470,7 @@ def gen_ori_kv(
                 N2,
                 K1,
                 cu_seqlens_q,
+                seqused_q,
                 seqused_ori_kv,
                 ori_mask_mode,
                 ori_sparse_indices_mode,
@@ -1630,6 +1639,7 @@ def gen_ori_kv_quant_2_pa(
                 S1,
                 N2,
                 K1,
+                seqused_q,
                 seqused_ori_kv,
                 ori_mask_mode,
                 ori_sparse_indices_mode,
@@ -1644,6 +1654,7 @@ def gen_ori_kv_quant_2_pa(
                 N2,
                 K1,
                 cu_seqlens_q,
+                seqused_q,
                 seqused_ori_kv,
                 ori_mask_mode,
                 ori_sparse_indices_mode,
@@ -1832,6 +1843,7 @@ def gen_cmp_kv_quant_2_pa(
                 S1,
                 N2,
                 K,
+                seqused_q,
                 seqused_ori_kv,
                 cmp_mask_mode,
                 cmp_sparse_indices_mode,
@@ -1846,6 +1858,7 @@ def gen_cmp_kv_quant_2_pa(
                 N2,
                 K,
                 cu_seqlens_q,
+                seqused_q,
                 seqused_ori_kv,
                 cmp_mask_mode,
                 cmp_sparse_indices_mode,
@@ -2045,6 +2058,7 @@ def gen_cmp_kv(
                 S1,
                 N2,
                 K,
+                seqused_q,
                 seqused_ori_kv,
                 cmp_mask_mode,
                 cmp_sparse_indices_mode,
@@ -2059,6 +2073,7 @@ def gen_cmp_kv(
                 N2,
                 K,
                 cu_seqlens_q,
+                seqused_q,
                 seqused_ori_kv,
                 cmp_mask_mode,
                 cmp_sparse_indices_mode,
@@ -2154,6 +2169,8 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
     if cmp_kv_datarange is None:
         cmp_kv_datarange = [DATA_RANGE_LEFT, DATA_RANGE_RIGHT]
 
+    if seqused_q is None:
+        raise ValueError("seqused_q must not be None")
     cu_seqlens_q = torch.tensor(cu_seqlens_q).to(torch.int32)
     seqused_q = torch.tensor(seqused_q).to(torch.int32)
     seqused_ori_kv = torch.tensor(seqused_ori_kv).to(torch.int32)
