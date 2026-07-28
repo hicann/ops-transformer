@@ -37,31 +37,82 @@ def _check_actual_seq(actual_seq, B, upper_bound, name):
 def check_valid_param(params):
     # 按 sparse_flash_attention tiling 约束校验测试参数。
     if len(params) == 21:
-        (Testcase_Name, layout_query, layout_kv, q_type,
-         B, S1, S2, N1, N2, D, K,
-         scale_value, sparse_block_size, rope_head_dim,
-         sparse_mode, attention_mode, return_softmax_lse,
-         block_size, block_num, actual_seq_q, actual_seq_kv) = params
+        (
+            Testcase_Name,
+            layout_query,
+            layout_kv,
+            q_type,
+            B,
+            S1,
+            S2,
+            N1,
+            N2,
+            D,
+            K,
+            scale_value,
+            sparse_block_size,
+            rope_head_dim,
+            sparse_mode,
+            attention_mode,
+            return_softmax_lse,
+            block_size,
+            block_num,
+            actual_seq_q,
+            actual_seq_kv,
+        ) = params
         use_sinks = False
     else:
-        (Testcase_Name, layout_query, layout_kv, q_type,
-         B, S1, S2, N1, N2, D, K,
-         scale_value, sparse_block_size, rope_head_dim,
-         sparse_mode, attention_mode, return_softmax_lse, use_sinks,
-         block_size, block_num, actual_seq_q, actual_seq_kv) = params
+        (
+            Testcase_Name,
+            layout_query,
+            layout_kv,
+            q_type,
+            B,
+            S1,
+            S2,
+            N1,
+            N2,
+            D,
+            K,
+            scale_value,
+            sparse_block_size,
+            rope_head_dim,
+            sparse_mode,
+            attention_mode,
+            return_softmax_lse,
+            use_sinks,
+            block_size,
+            block_num,
+            actual_seq_q,
+            actual_seq_kv,
+        ) = params
 
     if q_type not in SUPPORTED_Q_TYPE:
         raise ValueError(f"q_type 仅支持 torch.float16/torch.bfloat16，当前: {q_type}")
     if layout_query not in SUPPORTED_LAYOUT_QUERY:
-        raise ValueError(f"layout_query 仅支持 {sorted(SUPPORTED_LAYOUT_QUERY)}，当前: {layout_query}")
+        raise ValueError(
+            f"layout_query 仅支持 {sorted(SUPPORTED_LAYOUT_QUERY)}，当前: {layout_query}"
+        )
     if layout_kv not in SUPPORTED_LAYOUT_KV:
-        raise ValueError(f"layout_kv 仅支持 {sorted(SUPPORTED_LAYOUT_KV)}，当前: {layout_kv}")
+        raise ValueError(
+            f"layout_kv 仅支持 {sorted(SUPPORTED_LAYOUT_KV)}，当前: {layout_kv}"
+        )
     if layout_kv != "PA_BSND" and layout_kv != layout_query:
-        raise ValueError(f"非 PA_BSND 场景下 layout_kv({layout_kv}) 必须等于 layout_query({layout_query})")
+        raise ValueError(
+            f"非 PA_BSND 场景下 layout_kv({layout_kv}) 必须等于 layout_query({layout_query})"
+        )
     if use_sinks and layout_kv == "PA_BSND":
         raise ValueError("sinks 场景不支持 PA_BSND")
 
-    for name, value in (("B", B), ("S1", S1), ("S2", S2), ("N1", N1), ("N2", N2), ("D", D), ("K", K)):
+    for name, value in (
+        ("B", B),
+        ("S1", S1),
+        ("S2", S2),
+        ("N1", N1),
+        ("N2", N2),
+        ("D", D),
+        ("K", K),
+    ):
         if int(value) <= 0:
             raise ValueError(f"{name} 应大于 0，当前: {value}")
 
@@ -79,8 +130,14 @@ def check_valid_param(params):
         raise ValueError(f"attention_mode 仅支持 2，当前: {attention_mode}")
     if sparse_mode not in (0, 3):
         raise ValueError(f"sparse_mode 仅支持 0/3，当前: {sparse_mode}")
-    if sparse_block_size <= 0 or sparse_block_size > 128 or (sparse_block_size & (sparse_block_size - 1)) != 0:
-        raise ValueError(f"sparse_block_size 应在 [1, 128] 且为 2 的幂，当前: {sparse_block_size}")
+    if (
+        sparse_block_size <= 0
+        or sparse_block_size > 128
+        or (sparse_block_size & (sparse_block_size - 1)) != 0
+    ):
+        raise ValueError(
+            f"sparse_block_size 应在 [1, 128] 且为 2 的幂，当前: {sparse_block_size}"
+        )
 
     max_sparse_block_count = math.ceil(S2 / sparse_block_size)
     if K > max_sparse_block_count:
@@ -100,7 +157,9 @@ def check_valid_param(params):
         if block_size is None or int(block_size) <= 0:
             raise ValueError("PA_BSND 场景必须提供正整数 block_size")
         if block_size % 16 != 0:
-            raise ValueError(f"PA_BSND 场景 block_size 必须 16 对齐，当前: {block_size}")
+            raise ValueError(
+                f"PA_BSND 场景 block_size 必须 16 对齐，当前: {block_size}"
+            )
         if block_size % sparse_block_size != 0:
             raise ValueError(
                 f"PA_BSND 场景 block_size({block_size}) 必须被 sparse_block_size({sparse_block_size}) 整除"
@@ -110,9 +169,13 @@ def check_valid_param(params):
         if block_num is None or int(block_num) <= 0:
             raise ValueError("PA_BSND 场景必须提供正整数 block_num")
         if actual_seq_kv is not None:
-            needed_blocks = sum(math.ceil(int(seq) / block_size) for seq in actual_seq_kv)
+            needed_blocks = sum(
+                math.ceil(int(seq) / block_size) for seq in actual_seq_kv
+            )
             if block_num < needed_blocks:
-                raise ValueError(f"block_num({block_num}) 小于所需物理块数 {needed_blocks}")
+                raise ValueError(
+                    f"block_num({block_num}) 小于所需物理块数 {needed_blocks}"
+                )
     elif block_num is not None and int(block_num) <= 0:
         raise ValueError(f"block_num 若提供则应大于 0，当前: {block_num}")
 

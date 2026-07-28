@@ -13,14 +13,13 @@
 """
 Input plugin for sparse_flash_attention - generates valid sparse_indices.
 """
+
 import math
 import numpy as np
 import torch
 
 __input__ = {
-    "e2e": {
-        "torch_npu.npu_sparse_flash_attention": "generate_valid_sparse_indices"
-    }
+    "e2e": {"torch_npu.npu_sparse_flash_attention": "generate_valid_sparse_indices"}
 }
 
 
@@ -53,12 +52,18 @@ def fill_random_block_table(block_table, actual_seq_kv, block_size, block_num, s
     actual = to_list(actual_seq_kv)
     if not actual:
         actual = [shape[1] * block_size] * shape[0]
-    used_blocks = [math.ceil(max(int(actual[idx] if idx < len(actual) else actual[-1]), 0) / block_size)
-                   for idx in range(shape[0])]
+    used_blocks = [
+        math.ceil(
+            max(int(actual[idx] if idx < len(actual) else actual[-1]), 0) / block_size
+        )
+        for idx in range(shape[0])
+    ]
     required_blocks = sum(used_blocks)
     block_num = int(block_num or required_blocks)
     if required_blocks > block_num:
-        raise ValueError(f"block_table requires {required_blocks} blocks, but block_num is {block_num}")
+        raise ValueError(
+            f"block_table requires {required_blocks} blocks, but block_num is {block_num}"
+        )
 
     generator = torch.Generator(device="cpu")
     generator.manual_seed(int(seed or 0))
@@ -70,7 +75,7 @@ def fill_random_block_table(block_table, actual_seq_kv, block_size, block_num, s
     cursor = 0
     for batch_idx, blocks in enumerate(used_blocks):
         take = min(blocks, shape[1])
-        values = block_ids[cursor:cursor + take]
+        values = block_ids[cursor : cursor + take]
         if torch.is_tensor(block_table):
             table[batch_idx, :take] = values.to(device=block_table.device)
         else:
@@ -83,7 +88,12 @@ def fill_random_block_table(block_table, actual_seq_kv, block_size, block_num, s
 
 
 def align_value_with_key_for_mla(key, value):
-    if key is None or value is None or not torch.is_tensor(key) or not torch.is_tensor(value):
+    if (
+        key is None
+        or value is None
+        or not torch.is_tensor(key)
+        or not torch.is_tensor(value)
+    ):
         return
     if tuple(key.shape) != tuple(value.shape):
         return
@@ -92,27 +102,34 @@ def align_value_with_key_for_mla(key, value):
     value.copy_(key.to(dtype=value.dtype, device=value.device))
 
 
-def generate_valid_sparse_indices(query, key, value, sparse_indices, scale_value, sparse_block_size, **kwargs):
+def generate_valid_sparse_indices(
+    query, key, value, sparse_indices, scale_value, sparse_block_size, **kwargs
+):
     """Generate valid sparse_indices based on threshold (matches pytest logic)."""
     align_value_with_key_for_mla(key, value)
 
     if sparse_indices is None:
         return
 
-    layout_query = kwargs.get('layout_query', 'BSND')
-    layout_kv = kwargs.get('layout_kv', 'BSND')
-    sparse_mode = kwargs.get('sparse_mode', 0)
-    actual_seq_q = kwargs.get('actual_seq_lengths_query')
-    actual_seq_kv = kwargs.get('actual_seq_lengths_kv')
-    block_table = kwargs.get('block_table')
+    layout_query = kwargs.get("layout_query", "BSND")
+    layout_kv = kwargs.get("layout_kv", "BSND")
+    sparse_mode = kwargs.get("sparse_mode", 0)
+    actual_seq_q = kwargs.get("actual_seq_lengths_query")
+    actual_seq_kv = kwargs.get("actual_seq_lengths_kv")
+    block_table = kwargs.get("block_table")
 
-    fill_tensor_from_value(actual_seq_q, kwargs.get('actual_seq_lengths_query'))
-    fill_tensor_from_value(actual_seq_kv, kwargs.get('actual_seq_lengths_kv'))
+    fill_tensor_from_value(actual_seq_q, kwargs.get("actual_seq_lengths_query"))
+    fill_tensor_from_value(actual_seq_kv, kwargs.get("actual_seq_lengths_kv"))
     if layout_kv == "PA_BSND":
-        pa_block_size = kwargs.get('block_size') or key.shape[1]
-        pa_block_num = kwargs.get('block_num') or key.shape[0]
-        fill_random_block_table(block_table, actual_seq_kv, pa_block_size, pa_block_num,
-                                 kwargs.get('block_table_seed', 0))
+        pa_block_size = kwargs.get("block_size") or key.shape[1]
+        pa_block_num = kwargs.get("block_num") or key.shape[0]
+        fill_random_block_table(
+            block_table,
+            actual_seq_kv,
+            pa_block_size,
+            pa_block_num,
+            kwargs.get("block_table_seed", 0),
+        )
 
     actual_seq_q_list = to_list(actual_seq_q)
     actual_seq_kv_list = to_list(actual_seq_kv)
@@ -133,8 +150,12 @@ def generate_valid_sparse_indices(query, key, value, sparse_indices, scale_value
         if layout_kv == "BSND":
             default_kv = key.shape[1]
         elif layout_kv == "PA_BSND":
-            pa_block_size = kwargs.get('block_size') or key.shape[1]
-            bt_width = block_table.shape[1] if torch.is_tensor(block_table) and block_table.dim() > 1 else 1
+            pa_block_size = kwargs.get("block_size") or key.shape[1]
+            bt_width = (
+                block_table.shape[1]
+                if torch.is_tensor(block_table) and block_table.dim() > 1
+                else 1
+            )
             default_kv = pa_block_size * bt_width
         else:
             default_kv = key.shape[0]
@@ -151,19 +172,38 @@ def generate_valid_sparse_indices(query, key, value, sparse_indices, scale_value
             batch_q_lengths.append(cum_sum - prev)
             prev = cum_sum
 
-        batch_kv_lengths = actual_seq_kv_list if layout_kv == "PA_BSND" else [
-            cum_sum - prev_kv for prev_kv, cum_sum in zip([0] + actual_seq_kv_list[:-1], actual_seq_kv_list)
-        ] if layout_kv == "TND" else actual_seq_kv_list
+        batch_kv_lengths = (
+            actual_seq_kv_list
+            if layout_kv == "PA_BSND"
+            else [
+                cum_sum - prev_kv
+                for prev_kv, cum_sum in zip(
+                    [0] + actual_seq_kv_list[:-1], actual_seq_kv_list
+                )
+            ]
+            if layout_kv == "TND"
+            else actual_seq_kv_list
+        )
 
         t_offset = 0
         for b in range(B):
-            batch_seq_q = batch_q_lengths[b] if b < len(batch_q_lengths) else batch_q_lengths[0]
-            batch_seq_kv = batch_kv_lengths[b] if b < len(batch_kv_lengths) else batch_kv_lengths[0]
+            batch_seq_q = (
+                batch_q_lengths[b] if b < len(batch_q_lengths) else batch_q_lengths[0]
+            )
+            batch_seq_kv = (
+                batch_kv_lengths[b]
+                if b < len(batch_kv_lengths)
+                else batch_kv_lengths[0]
+            )
 
             for t_local in range(batch_seq_q):
                 t_global = t_offset + t_local
                 for n in range(N2):
-                    threshold = batch_seq_kv if sparse_mode == 0 else batch_seq_kv - batch_seq_q + t_local + 1
+                    threshold = (
+                        batch_seq_kv
+                        if sparse_mode == 0
+                        else batch_seq_kv - batch_seq_q + t_local + 1
+                    )
                     if threshold <= 0:
                         continue
 
@@ -178,14 +218,24 @@ def generate_valid_sparse_indices(query, key, value, sparse_indices, scale_value
 
                     topk = min(valid_blocks, K)
                     if topk > 0:
-                        sparse_indices_new[t_global, n, :topk-1] = block_indices[:topk-1] if topk > 1 else torch.tensor([])
-                        sparse_indices_new[t_global, n, topk-1] = valid_blocks - 1
+                        sparse_indices_new[t_global, n, : topk - 1] = (
+                            block_indices[: topk - 1] if topk > 1 else torch.tensor([])
+                        )
+                        sparse_indices_new[t_global, n, topk - 1] = valid_blocks - 1
 
             t_offset += batch_seq_q
     else:
         for b in range(B):
-            seq_kv = actual_seq_kv_list[b] if b < len(actual_seq_kv_list) else actual_seq_kv_list[0]
-            seq_q = actual_seq_q_list[b] if b < len(actual_seq_q_list) else actual_seq_q_list[0]
+            seq_kv = (
+                actual_seq_kv_list[b]
+                if b < len(actual_seq_kv_list)
+                else actual_seq_kv_list[0]
+            )
+            seq_q = (
+                actual_seq_q_list[b]
+                if b < len(actual_seq_q_list)
+                else actual_seq_q_list[0]
+            )
 
             for n in range(N2):
                 for s in range(S1):
@@ -204,7 +254,11 @@ def generate_valid_sparse_indices(query, key, value, sparse_indices, scale_value
 
                     topk = min(valid_blocks, K)
                     if topk > 0:
-                        sparse_indices_new[b, s, n, :topk-1] = block_indices[:topk-1] if topk > 1 else torch.tensor([])
-                        sparse_indices_new[b, s, n, topk-1] = valid_blocks - 1
+                        sparse_indices_new[b, s, n, : topk - 1] = (
+                            block_indices[: topk - 1] if topk > 1 else torch.tensor([])
+                        )
+                        sparse_indices_new[b, s, n, topk - 1] = valid_blocks - 1
 
-    sparse_indices[:] = sparse_indices_new.to(sparse_indices.dtype).to(sparse_indices.device)
+    sparse_indices[:] = sparse_indices_new.to(sparse_indices.dtype).to(
+        sparse_indices.device
+    )

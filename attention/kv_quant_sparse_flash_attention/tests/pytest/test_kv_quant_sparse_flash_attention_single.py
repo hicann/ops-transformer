@@ -23,7 +23,9 @@ RUN_NPU = True
 SAVE_PT = False
 RESULT_PATH = Path("result.xlsx")
 
-PARAMSET_FILE = os.environ.get("PARAMSET_FILE", "kv_quant_sparse_flash_attention_paramset")
+PARAMSET_FILE = os.environ.get(
+    "PARAMSET_FILE", "kv_quant_sparse_flash_attention_paramset"
+)
 ENABLED_PARAMS = utils.load_paramset(PARAMSET_FILE)
 PARAM_COMBINATION_SET = utils.combin_params(ENABLED_PARAMS)
 case_id = 0
@@ -33,7 +35,9 @@ def execute_qsfa(param_combination):
     global case_id
     params = utils.convert_param_combination_to_cs_format(param_combination)
     input_dict = kv_quant_sparse_flash_attention_golden.generate_input_tensors(params)
-    cpu_result, _, _ = kv_quant_sparse_flash_attention_golden.compute_cpu(input_dict, params)
+    cpu_result, _, _ = kv_quant_sparse_flash_attention_golden.compute_cpu(
+        input_dict, params
+    )
     test_data = {
         "Testcase_Name": params["case_name"],
         "params": params,
@@ -42,7 +46,9 @@ def execute_qsfa(param_combination):
     }
     if SAVE_PT:
         kv_quant_sparse_flash_attention_golden._save_test_case(test_data, PT_SAVE_PATH)
-    result, fulfill_percent = utils.qsfa_run_npu(test_data, testcase_name=None, device_id=DEVICE_ID, result_path=RESULT_PATH)
+    result, fulfill_percent = utils.qsfa_run_npu(
+        test_data, testcase_name=None, device_id=DEVICE_ID, result_path=RESULT_PATH
+    )
     case_id += 1
     return result, fulfill_percent, test_data
 
@@ -59,10 +65,17 @@ def test_kv_quant_sparse_flash_attention(param_combination):
                 result, fulfill_percent, test_data = future.result()
                 if result == "Failed":
                     case_name = test_data.get("Testcase_Name", "unknown")
-                    pytest.fail(f"用例名: {case_name}, 精度: {fulfill_percent:.4f}%", pytrace=False)
+                    pytest.fail(
+                        f"用例名: {case_name}, 精度: {fulfill_percent:.4f}%",
+                        pytrace=False,
+                    )
             except Exception as e:
                 params = test_data.get("params") if test_data else None
-                case_name = test_data.get("Testcase_Name", "unknown") if test_data else "unknown"
+                case_name = (
+                    test_data.get("Testcase_Name", "unknown")
+                    if test_data
+                    else "unknown"
+                )
                 if params:
                     utils.save_result(params, "Failed", "", RESULT_PATH)
                 pytest.fail(f"用例名: {case_name}, 当前用例线程执行失败")

@@ -95,7 +95,10 @@ def normalize_tnd_cumulative_seq(seq_list, total_t):
     if not seq_list:
         return [int(total_t)]
     seq_list = [int(v) for v in seq_list]
-    if all(seq_list[i] >= seq_list[i - 1] for i in range(1, len(seq_list))) and seq_list[-1] == total_t:
+    if (
+        all(seq_list[i] >= seq_list[i - 1] for i in range(1, len(seq_list)))
+        and seq_list[-1] == total_t
+    ):
         return seq_list
 
     fixed = []
@@ -145,26 +148,45 @@ def pa_to_bnsd(key_pa, block_table, actual_seq_kv, batch, block_size):
 
     num_heads = key_pa.shape[2]
     dim = key_pa.shape[3]
-    max_seq = max(actual_seq_kv) if actual_seq_kv else block_size * (block_table.shape[1] if block_table.dim() > 1 else 1)
+    max_seq = (
+        max(actual_seq_kv)
+        if actual_seq_kv
+        else block_size * (block_table.shape[1] if block_table.dim() > 1 else 1)
+    )
     out = torch.zeros((batch, max_seq, num_heads, dim), dtype=key_pa.dtype)
 
     for b_idx in range(batch):
         cur_len = actual_seq_kv[b_idx] if b_idx < len(actual_seq_kv) else max_seq
         table_width = block_table.shape[1] if block_table.dim() > 1 else 1
         for page_idx in range(table_width):
-            block_id = int(block_table[b_idx, page_idx].item()) if block_table.dim() > 1 else int(block_table[b_idx].item())
+            block_id = (
+                int(block_table[b_idx, page_idx].item())
+                if block_table.dim() > 1
+                else int(block_table[b_idx].item())
+            )
             if block_id < 0 or block_id >= key_pa.shape[0]:
                 continue
             offset = page_idx * block_size
             if offset >= cur_len:
                 break
             take = min(block_size, cur_len - offset, key_pa.shape[1])
-            out[b_idx, offset:offset + take, :, :] = key_pa[block_id, :take, :, :]
+            out[b_idx, offset : offset + take, :, :] = key_pa[block_id, :take, :, :]
     return out
 
 
-def ttk_gather_kv(k_tensor, v_tensor, sparse_indices, sparse_blocksize, sparse_blockcount,
-                   batch, n2_idx, s1_idx, curr_actual_seq, curr_actual_seq_q, sparse_mode):
+def ttk_gather_kv(
+    k_tensor,
+    v_tensor,
+    sparse_indices,
+    sparse_blocksize,
+    sparse_blockcount,
+    batch,
+    n2_idx,
+    s1_idx,
+    curr_actual_seq,
+    curr_actual_seq_q,
+    sparse_mode,
+):
     # Same semantics as pytest gatherKV, plus bounds checks for provided TTK sparse_indices.
     if sparse_mode == 0:
         threshold = int(curr_actual_seq)
@@ -174,10 +196,18 @@ def ttk_gather_kv(k_tensor, v_tensor, sparse_indices, sparse_blocksize, sparse_b
         threshold = int(curr_actual_seq)
 
     threshold = max(0, min(threshold, int(k_tensor.shape[2])))
-    valid_count = min(int(sparse_blockcount), math.ceil(threshold / int(sparse_blocksize))) if threshold > 0 else 0
+    valid_count = (
+        min(int(sparse_blockcount), math.ceil(threshold / int(sparse_blocksize)))
+        if threshold > 0
+        else 0
+    )
     sparse_positions = []
     for i in range(valid_count):
-        sparse_id = int(sparse_indices[i].item() if torch.is_tensor(sparse_indices[i]) else sparse_indices[i])
+        sparse_id = int(
+            sparse_indices[i].item()
+            if torch.is_tensor(sparse_indices[i])
+            else sparse_indices[i]
+        )
         if sparse_id == -1:
             break
         max_block_id = (threshold - 1) // int(sparse_blocksize)
@@ -189,7 +219,11 @@ def ttk_gather_kv(k_tensor, v_tensor, sparse_indices, sparse_blocksize, sparse_b
 
     if not sparse_positions:
         return True, [], []
-    return False, k_tensor[batch, n2_idx, sparse_positions, :], v_tensor[batch, n2_idx, sparse_positions, :]
+    return (
+        False,
+        k_tensor[batch, n2_idx, sparse_positions, :],
+        v_tensor[batch, n2_idx, sparse_positions, :],
+    )
 
 
 # Patch the pytest gatherKV entry at runtime. The pytest formula resolves it
@@ -240,23 +274,36 @@ def ttk_increattention_bnsd(fa_param):
             for q_idx in range(cur_q):
                 if q_idx < cur_q - cur_kv and sparse_mode != 0:
                     continue
-                q_cur = q_bnsd[batch, kv_head * group:(kv_head + 1) * group, q_idx, :]
+                q_cur = q_bnsd[batch, kv_head * group : (kv_head + 1) * group, q_idx, :]
                 sparse_cur = sparse_indices[batch, kv_head, q_idx, :]
                 empty, k_sparse, v_sparse = ttk_gather_kv(
-                    k_bnsd, v_bnsd, sparse_cur, sparse_blocksize, sparse_blockcount,
-                    batch, kv_head, q_idx, cur_kv, cur_q, sparse_mode,
+                    k_bnsd,
+                    v_bnsd,
+                    sparse_cur,
+                    sparse_blocksize,
+                    sparse_blockcount,
+                    batch,
+                    kv_head,
+                    q_idx,
+                    cur_kv,
+                    cur_q,
+                    sparse_mode,
                 )
                 if empty:
                     continue
                 score = torch.matmul(q_cur.float(), k_sparse.float().T) * scale_value
                 probs, x_max, x_sum = softmax(score)
                 if fa_param["q_dtype"] == "float16":
-                    out = torch.matmul(probs.to(torch.float16).float(), v_sparse.float())
+                    out = torch.matmul(
+                        probs.to(torch.float16).float(), v_sparse.float()
+                    )
                 elif fa_param["q_dtype"] == "bfloat16":
-                    out = torch.matmul(probs.to(torch.bfloat16).float(), v_sparse.float())
+                    out = torch.matmul(
+                        probs.to(torch.bfloat16).float(), v_sparse.float()
+                    )
                 else:
                     out = torch.matmul(probs.float(), v_sparse.float())
-                y[batch, kv_head * group:(kv_head + 1) * group, q_idx, :] = out
+                y[batch, kv_head * group : (kv_head + 1) * group, q_idx, :] = out
                 if fa_param.get("return_softmax_lse", False):
                     if fa_param["layout_query"] == "BSND":
                         softmax_max[batch, kv_head, q_idx, :] = x_max[:, 0]
@@ -267,9 +314,26 @@ def ttk_increattention_bnsd(fa_param):
     return y, softmax_max, softmax_sum
 
 
-def build_params(query, key, value, sparse_indices, scale_value, block_table, actual_q, actual_kv,
-                  query_rope, key_rope, sparse_block_size, layout_query, layout_kv,
-                  sparse_mode, attention_mode, return_softmax_lse, block_size, block_num):
+def build_params(
+    query,
+    key,
+    value,
+    sparse_indices,
+    scale_value,
+    block_table,
+    actual_q,
+    actual_kv,
+    query_rope,
+    key_rope,
+    sparse_block_size,
+    layout_query,
+    layout_kv,
+    sparse_mode,
+    attention_mode,
+    return_softmax_lse,
+    block_size,
+    block_num,
+):
     query_shape = shape_of(query)
     key_shape = shape_of(key)
     sparse_shape = shape_of(sparse_indices)
@@ -343,7 +407,10 @@ def compute_with_pytest_golden(input_tensor_dict, params, original_query_dtype):
 
     y_all, softmax_max, softmax_sum = pytest_golden._t_increattention_bnsd(fa_param)
     y_all = pytest_golden.trans_bnsd_to_layout(
-        y_all, fa_param["out_shape"], fa_param["layout_query"], fa_param["actualSeqLengths_q"]
+        y_all,
+        fa_param["out_shape"],
+        fa_param["layout_query"],
+        fa_param["actualSeqLengths_q"],
     )
 
     if not params["return_softmax_lse"]:
@@ -352,14 +419,33 @@ def compute_with_pytest_golden(input_tensor_dict, params, original_query_dtype):
     return y_all.to(original_query_dtype), softmax_max, softmax_sum
 
 
-def cpu_sparse_flash_attention(query, key, value, sparse_indices, scale_value, *,
-                               block_table=None, actual_seq_lengths_query=None,
-                               actual_seq_lengths_kv=None, query_rope=None, key_rope=None,
-                               sparse_block_size=1, layout_query="BSND", layout_kv="BSND",
-                               sparse_mode=0, pre_tokens=(1 << 63) - 1, next_tokens=(1 << 63) - 1,
-                               attention_mode=2, return_softmax_lse=False, **kwargs):
+def cpu_sparse_flash_attention(
+    query,
+    key,
+    value,
+    sparse_indices,
+    scale_value,
+    *,
+    block_table=None,
+    actual_seq_lengths_query=None,
+    actual_seq_lengths_kv=None,
+    query_rope=None,
+    key_rope=None,
+    sparse_block_size=1,
+    layout_query="BSND",
+    layout_kv="BSND",
+    sparse_mode=0,
+    pre_tokens=(1 << 63) - 1,
+    next_tokens=(1 << 63) - 1,
+    attention_mode=2,
+    return_softmax_lse=False,
+    **kwargs,
+):
     """Golden reference implementation for sparse flash attention with block-level sparse selection."""
-    del pre_tokens, next_tokens  # The pytest CPU formula models mode 0/3 sparse block selection.
+    del (
+        pre_tokens,
+        next_tokens,
+    )  # The pytest CPU formula models mode 0/3 sparse block selection.
 
     original_query_dtype = query.dtype if torch.is_tensor(query) else torch.float16
     actual_q = to_int_list(actual_seq_lengths_query)
@@ -381,38 +467,73 @@ def cpu_sparse_flash_attention(query, key, value, sparse_indices, scale_value, *
     # for signature compatibility but do not feed it into the CPU math.
     value_for_golden = key_for_golden
 
-    block_size = int(kwargs.get("block_size", key.shape[1] if layout_kv == "PA_BSND" and key is not None and key.dim() > 1 else 256))
+    block_size = int(
+        kwargs.get(
+            "block_size",
+            key.shape[1]
+            if layout_kv == "PA_BSND" and key is not None and key.dim() > 1
+            else 256,
+        )
+    )
     block_num = int(kwargs.get("block_num", key.shape[0] if key is not None else 1))
 
     if layout_kv == "PA_BSND" and key is not None and block_table is not None:
         if not actual_kv:
             table = as_cpu(block_table)
-            actual_kv = [table.shape[1] * block_size if table.dim() > 1 else key.shape[0] * block_size]
+            actual_kv = [
+                table.shape[1] * block_size
+                if table.dim() > 1
+                else key.shape[0] * block_size
+            ]
         batch = len(actual_kv)
         if key.dim() == 4:
             block_table_cpu = as_cpu(block_table)
-            key_for_golden = pa_to_bnsd(key, block_table_cpu, actual_kv, batch, block_size)
+            key_for_golden = pa_to_bnsd(
+                key, block_table_cpu, actual_kv, batch, block_size
+            )
             value_for_golden = key_for_golden
             if key_rope is not None:
-                key_rope_for_golden = pa_to_bnsd(key_rope, block_table_cpu, actual_kv, batch, block_size)
+                key_rope_for_golden = pa_to_bnsd(
+                    key_rope, block_table_cpu, actual_kv, batch, block_size
+                )
 
     if layout_kv == "PA_BSND" and block_table is not None and actual_kv:
         table = as_cpu(block_table)
-        capacity = table.shape[1] * block_size if table.dim() > 1 else block_num * block_size
+        capacity = (
+            table.shape[1] * block_size if table.dim() > 1 else block_num * block_size
+        )
         actual_kv = [min(v, capacity) for v in actual_kv]
 
     params = build_params(
-        query, key_for_golden, value_for_golden, sparse_indices, scale_value, block_table,
-        actual_q, actual_kv, query_rope, key_rope_for_golden, sparse_block_size,
-        layout_query, layout_kv, sparse_mode, attention_mode, return_softmax_lse,
-        block_size, block_num,
+        query,
+        key_for_golden,
+        value_for_golden,
+        sparse_indices,
+        scale_value,
+        block_table,
+        actual_q,
+        actual_kv,
+        query_rope,
+        key_rope_for_golden,
+        sparse_block_size,
+        layout_query,
+        layout_kv,
+        sparse_mode,
+        attention_mode,
+        return_softmax_lse,
+        block_size,
+        block_num,
     )
     cpu_input = {
         "query": to_cpu_float32_tensor(query),
         "key": to_cpu_float32_tensor(key_for_golden),
         "value": to_cpu_float32_tensor(value_for_golden),
-        "sparse_indices": as_cpu(sparse_indices).to(torch.int32) if torch.is_tensor(sparse_indices) else sparse_indices,
-        "block_table": as_cpu(block_table).to(torch.int32) if torch.is_tensor(block_table) else block_table,
+        "sparse_indices": as_cpu(sparse_indices).to(torch.int32)
+        if torch.is_tensor(sparse_indices)
+        else sparse_indices,
+        "block_table": as_cpu(block_table).to(torch.int32)
+        if torch.is_tensor(block_table)
+        else block_table,
         "query_rope": to_cpu_float32_tensor(query_rope),
         "key_rope": to_cpu_float32_tensor(key_rope_for_golden),
     }

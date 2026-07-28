@@ -7,6 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
+
 #include <cstring>
 #include "graph/types.h"
 #include "aclnn_sparse_flash_attention.h"
@@ -32,40 +33,41 @@ namespace {
 
 extern aclnnStatus aclnnInnerSparseFlashAttentionGetWorkspaceSize(
     const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *sparse_indices,
-    const aclTensor *blockTableOptional, const aclTensor *actualSeqLengthsQueryOptional, const aclTensor *actualSeqLengthsKvOptional,
-    const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional, const aclTensor *sinksOptional,
-    double scaleValue,
-    int64_t sparseBlockSizeOptional, char *layoutQueryOptional, char *layoutKvOptional,
-    int64_t sparseMode, int64_t preTokens, int64_t nextTokens, int64_t attentionMode,
-    bool returnSoftmaxLse, const aclTensor *attentionOut, const aclTensor *softmaxMax,
-    const aclTensor *softmaxSum, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor *blockTableOptional, const aclTensor *actualSeqLengthsQueryOptional,
+    const aclTensor *actualSeqLengthsKvOptional, const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
+    const aclTensor *sinksOptional, double scaleValue, int64_t sparseBlockSizeOptional, char *layoutQueryOptional,
+    char *layoutKvOptional, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, int64_t attentionMode,
+    bool returnSoftmaxLse, const aclTensor *attentionOut, const aclTensor *softmaxMax, const aclTensor *softmaxSum,
+    uint64_t *workspaceSize, aclOpExecutor **executor);
 
 extern aclnnStatus aclnnInnerSparseFlashAttention(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
-                                         const aclrtStream stream);
+                                                  const aclrtStream stream);
 
 class TensorHolder {
 public:
-    TensorHolder(const aclTensor *&output, aclDataType dataType, std::string varName) {
+    TensorHolder(const aclTensor *&output, aclDataType dataType, std::string varName)
+    {
         inner_ = nullptr;
         name_ = varName;
         if (output == nullptr) {
             std::vector<int64_t> shape = {0};
             int64_t addr = 0xff;
-            inner_ = aclCreateTensor(shape.data(), shape.size(),
-                dataType, shape.data(), 0, ACL_FORMAT_ND,
-                shape.data(), shape.size(), static_cast<void *>(&addr));
+            inner_ = aclCreateTensor(shape.data(), shape.size(), dataType, shape.data(), 0, ACL_FORMAT_ND, shape.data(),
+                                     shape.size(), static_cast<void *>(&addr));
             output = inner_;
         }
     }
 
-    ~TensorHolder() {
+    ~TensorHolder()
+    {
         if (inner_) {
             aclDestroyTensor(inner_);
             inner_ = nullptr;
         }
     }
-    
-    void CheckTensorConditionalNotNull(bool conditional) const {
+
+    void CheckTensorConditionalNotNull(bool conditional) const
+    {
         if (inner_ && conditional) {
             OP_LOGW("Check %s != nullptr failed!", name_.c_str());
         } else if (!inner_ && !conditional) {
@@ -73,9 +75,7 @@ public:
         }
     }
 
-    bool IsTensorNotNull() const {
-        return inner_ == nullptr;
-    }
+    bool IsTensorNotNull() const { return inner_ == nullptr; }
 
 private:
     const aclTensor *inner_;
@@ -83,34 +83,19 @@ private:
 };
 
 aclnnStatus aclnnSparseFlashAttentionGetWorkspaceSize(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *sparseIndices,
-    const aclTensor *blockTableOptional,
-    const aclTensor *actualSeqLengthsQueryOptional,
-    const aclTensor *actualSeqLengthsKvOptional,
-    const aclTensor *queryRopeOptional,
-    const aclTensor *keyRopeOptional,
-    double           scaleValue,
-    int64_t          sparseBlockSizeOptional,
-    char             *layoutQueryOptional,
-    char             *layoutKvOptional,
-    int64_t          sparseMode,
-    int64_t          preTokens,
-    int64_t          nextTokens,
-    int64_t          attentionMode,
-    bool             returnSoftmaxLse,
-    const aclTensor *attentionOut,
-    const aclTensor *softmaxMax,
-    const aclTensor *softmaxSum,
-    uint64_t *workspaceSize,
+    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *sparseIndices,
+    const aclTensor *blockTableOptional, const aclTensor *actualSeqLengthsQueryOptional,
+    const aclTensor *actualSeqLengthsKvOptional, const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
+    double scaleValue, int64_t sparseBlockSizeOptional, char *layoutQueryOptional, char *layoutKvOptional,
+    int64_t sparseMode, int64_t preTokens, int64_t nextTokens, int64_t attentionMode, bool returnSoftmaxLse,
+    const aclTensor *attentionOut, const aclTensor *softmaxMax, const aclTensor *softmaxSum, uint64_t *workspaceSize,
     aclOpExecutor **executor)
 {
     const aclTensor *valueTensor = (value == nullptr) ? key : value;
     if (returnSoftmaxLse) {
         if (softmaxMax == nullptr || softmaxSum == nullptr) {
-            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "when returnSoftmaxLse is true, softmaxMax and softmaxSum cannot be nullptr.");
+            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
+                    "when returnSoftmaxLse is true, softmaxMax and softmaxSum cannot be nullptr.");
             return ge::GRAPH_FAILED;
         }
     } else {
@@ -128,14 +113,14 @@ aclnnStatus aclnnSparseFlashAttentionGetWorkspaceSize(
         }
     }
     return aclnnInnerSparseFlashAttentionGetWorkspaceSize(
-        query, key, valueTensor, sparseIndices, blockTableOptional, actualSeqLengthsQueryOptional, actualSeqLengthsKvOptional, queryRopeOptional, keyRopeOptional,
-        nullptr, scaleValue, sparseBlockSizeOptional, layoutQueryOptional, layoutKvOptional, sparseMode, preTokens,
-        nextTokens, attentionMode, returnSoftmaxLse, attentionOut,
-        softmaxMax, softmaxSum, workspaceSize, executor);
+        query, key, valueTensor, sparseIndices, blockTableOptional, actualSeqLengthsQueryOptional,
+        actualSeqLengthsKvOptional, queryRopeOptional, keyRopeOptional, nullptr, scaleValue, sparseBlockSizeOptional,
+        layoutQueryOptional, layoutKvOptional, sparseMode, preTokens, nextTokens, attentionMode, returnSoftmaxLse,
+        attentionOut, softmaxMax, softmaxSum, workspaceSize, executor);
 }
 
 aclnnStatus aclnnSparseFlashAttention(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
-                                     const aclrtStream stream)
+                                      const aclrtStream stream)
 {
     return aclnnInnerSparseFlashAttention(workspace, workspaceSize, executor, stream);
 }

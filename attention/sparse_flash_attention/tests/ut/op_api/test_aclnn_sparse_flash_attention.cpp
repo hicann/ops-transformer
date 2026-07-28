@@ -7,6 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
+
 #include <memory>
 #include <vector>
 #include <array>
@@ -22,14 +23,10 @@ using namespace std;
 using namespace op;
 
 namespace {
-void DestroyAclTensor(aclTensor *tensor)
-{
-    Release(tensor);
-}
+void DestroyAclTensor(aclTensor *tensor) { Release(tensor); }
 } // namespace
 
-class sparse_flash_attention_opapi_ut : public testing::Test
-{
+class sparse_flash_attention_opapi_ut : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -37,10 +34,7 @@ protected:
         cout << "sparse_flash_attention_opapi_ut SetUp" << endl;
     }
 
-    static void TearDownTestCase()
-    {
-        cout << "sparse_flash_attention_opapi_ut TearDown" << endl;
-    }
+    static void TearDownTestCase() { cout << "sparse_flash_attention_opapi_ut TearDown" << endl; }
 };
 
 // Missing lse outputs
@@ -62,29 +56,9 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_aclnn_0)
     aclOpExecutor *executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionGetWorkspaceSize(
-        query.get(),
-        key.get(),
-        value.get(),
-        sparseIndices.get(),
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        0.0416666666666667,
-        64,
-        layoutQ,
-        layoutKv,
-        3,
-        INT64_MAX,
-        INT64_MAX,
-        0,
-        true,
-        attentionOut.get(),
-        nullptr,
-        nullptr,
-        &workspaceSize,
-        &executor);
+        query.get(), key.get(), value.get(), sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
+        0.0416666666666667, 64, layoutQ, layoutKv, 3, INT64_MAX, INT64_MAX, 0, true, attentionOut.get(), nullptr,
+        nullptr, &workspaceSize, &executor);
 
     EXPECT_NE(aclRet, ACL_SUCCESS);
     EXPECT_EQ(executor, nullptr);
@@ -107,29 +81,9 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_aclnn_1)
     aclOpExecutor *executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionGetWorkspaceSize(
-        query.get(),
-        nullptr,
-        value.get(),
-        sparseIndices.get(),
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        0.0416666666666667,
-        64,
-        layoutQ,
-        layoutKv,
-        3,
-        INT64_MAX,
-        INT64_MAX,
-        0,
-        false,
-        attentionOut.get(),
-        nullptr,
-        nullptr,
-        &workspaceSize,
-        &executor);
+        query.get(), nullptr, value.get(), sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
+        0.0416666666666667, 64, layoutQ, layoutKv, 3, INT64_MAX, INT64_MAX, 0, false, attentionOut.get(), nullptr,
+        nullptr, &workspaceSize, &executor);
 
     EXPECT_NE(aclRet, ACL_SUCCESS);
     EXPECT_EQ(executor, nullptr);
@@ -156,30 +110,9 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_a3_sinks
     aclOpExecutor *executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionV2GetWorkspaceSize(
-        query.get(),
-        key.get(),
-        value.get(),
-        sparseIndices.get(),
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        sinks.get(),
-        0.0416666666666667,
-        64,
-        layoutQ,
-        layoutKv,
-        3,
-        INT64_MAX,
-        INT64_MAX,
-        0,
-        false,
-        attentionOut.get(),
-        nullptr,
-        nullptr,
-        &workspaceSize,
-        &executor);
+        query.get(), key.get(), value.get(), sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
+        sinks.get(), 0.0416666666666667, 64, layoutQ, layoutKv, 3, INT64_MAX, INT64_MAX, 0, false, attentionOut.get(),
+        nullptr, nullptr, &workspaceSize, &executor);
 
     EXPECT_EQ(aclRet, ACLNN_ERR_RUNTIME_ERROR);
     EXPECT_EQ(executor, nullptr);
@@ -204,30 +137,9 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_a3_witho
     aclOpExecutor *executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionV2GetWorkspaceSize(
-        query.get(),
-        key.get(),
-        value.get(),
-        sparseIndices.get(),
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        0.0416666666666667,
-        64,
-        layoutQ,
-        layoutKv,
-        3,
-        INT64_MAX,
-        INT64_MAX,
-        0,
-        true,
-        attentionOut.get(),
-        nullptr,
-        nullptr,
-        &workspaceSize,
-        &executor);
+        query.get(), key.get(), value.get(), sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        0.0416666666666667, 64, layoutQ, layoutKv, 3, INT64_MAX, INT64_MAX, 0, true, attentionOut.get(), nullptr,
+        nullptr, &workspaceSize, &executor);
 
     EXPECT_NE(aclRet, ACLNN_ERR_RUNTIME_ERROR);
     EXPECT_EQ(executor, nullptr);

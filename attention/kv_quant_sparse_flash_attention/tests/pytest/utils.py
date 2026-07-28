@@ -57,8 +57,9 @@ def _parse_excel_cell_value(value):
             return _normalize_numeric_value(STR_MAP_DICT[stripped])
         if stripped in ("", "None", "none", "NULL", "null", "NaN", "nan"):
             return None
-        if ((stripped.startswith("[") and stripped.endswith("]")) or
-                (stripped.startswith("(") and stripped.endswith(")"))):
+        if (stripped.startswith("[") and stripped.endswith("]")) or (
+            stripped.startswith("(") and stripped.endswith(")")
+        ):
             try:
                 return _normalize_numeric_value(ast.literal_eval(stripped))
             except (ValueError, SyntaxError):
@@ -74,13 +75,13 @@ def load_paramset(paramset_file):
 def generate_actual_seq(S, B, layout=None, T=None):
     """
     根据S和B自动生成actual_seq。
-    
+
     参数:
         S: 序列长度上限（S1或S2）
         B: batch大小
         layout: layout类型，TND场景下采用累加和
         T: 当不为None时，将actual_seq最后一个数改为T（可传入T1或T2）
-    
+
     返回:
         actual_seq: 生成的实际序列长度列表
     """
@@ -95,7 +96,7 @@ def generate_actual_seq(S, B, layout=None, T=None):
                 seq_lengths.append(length)
                 remaining -= length
             seq_lengths.append(remaining)
-            
+
             random.shuffle(seq_lengths)
             actual_seq = []
             cumsum = 0
@@ -112,7 +113,7 @@ def generate_actual_seq(S, B, layout=None, T=None):
     else:
         seq_lengths = [random.randint(0, S) for _ in range(B)]
         actual_seq = seq_lengths
-    
+
     return actual_seq
 
 
@@ -130,16 +131,39 @@ def load_excel_test_cases(excel_file_path, sheet_name):
 
     required_columns = [
         "Testcase_Prefix",
-        "layout_query", "layout_kv", "q_type", "kv_type",
-        "B", "S1", "S2", "N1", "N2", "D", "K",
-        "scale_value", "key_quant_mode", "value_quant_mode",
-        "sparse_block_size", "tile_size", "rope_head_dim",
-        "sparse_mode", "attention_mode", "quant_scale_repo_mode",
-        "block_size", "block_num", "actual_seq_q", "actual_seq_kv",
+        "layout_query",
+        "layout_kv",
+        "q_type",
+        "kv_type",
+        "B",
+        "S1",
+        "S2",
+        "N1",
+        "N2",
+        "D",
+        "K",
+        "scale_value",
+        "key_quant_mode",
+        "value_quant_mode",
+        "sparse_block_size",
+        "tile_size",
+        "rope_head_dim",
+        "sparse_mode",
+        "attention_mode",
+        "quant_scale_repo_mode",
+        "block_size",
+        "block_num",
+        "actual_seq_q",
+        "actual_seq_kv",
     ]
-    missing_columns = [column for column in required_columns if column not in dataframe.columns]
+    missing_columns = [
+        column for column in required_columns if column not in dataframe.columns
+    ]
     if missing_columns:
-        pytest.skip(f"Missing required columns in Excel: {missing_columns}", allow_module_level=True)
+        pytest.skip(
+            f"Missing required columns in Excel: {missing_columns}",
+            allow_module_level=True,
+        )
     return [row.to_dict() for _, row in dataframe.iterrows()]
 
 
@@ -150,7 +174,9 @@ def save_result(params, result, fulfill_percent, result_path):
         "layout_query": params.get("layout_query"),
         "layout_kv": params.get("layout_kv"),
         "q_type": str(params.get("q_type")),
-        "kv_type": str(params.get("kv_type")) if params.get("kv_type") is not None else None,
+        "kv_type": str(params.get("kv_type"))
+        if params.get("kv_type") is not None
+        else None,
         "B": params.get("B"),
         "T1": params.get("T1"),
         "T2": params.get("T2"),
@@ -171,13 +197,27 @@ def save_result(params, result, fulfill_percent, result_path):
         "quant_scale_repo_mode": params.get("quant_scale_repo_mode"),
         "block_size": params.get("block_size"),
         "block_num": params.get("block_num"),
-        "actual_seq_q": str(params.get("actual_seq_q")) if params.get("actual_seq_q") is not None else None,
-        "actual_seq_kv": str(params.get("actual_seq_kv")) if params.get("actual_seq_kv") is not None else None,
-        "range_query": str(params.get("range_query")) if params.get("range_query") is not None else None,
-        "range_key": str(params.get("range_key")) if params.get("range_key") is not None else None,
-        "range_query_rope": str(params.get("range_query_rope")) if params.get("range_query_rope") is not None else None,
-        "range_key_rope": str(params.get("range_key_rope")) if params.get("range_key_rope") is not None else None,
-        "range_dequant_scale": str(params.get("range_dequant_scale")) if params.get("range_dequant_scale") is not None else None,
+        "actual_seq_q": str(params.get("actual_seq_q"))
+        if params.get("actual_seq_q") is not None
+        else None,
+        "actual_seq_kv": str(params.get("actual_seq_kv"))
+        if params.get("actual_seq_kv") is not None
+        else None,
+        "range_query": str(params.get("range_query"))
+        if params.get("range_query") is not None
+        else None,
+        "range_key": str(params.get("range_key"))
+        if params.get("range_key") is not None
+        else None,
+        "range_query_rope": str(params.get("range_query_rope"))
+        if params.get("range_query_rope") is not None
+        else None,
+        "range_key_rope": str(params.get("range_key_rope"))
+        if params.get("range_key_rope") is not None
+        else None,
+        "range_dequant_scale": str(params.get("range_dequant_scale"))
+        if params.get("range_dequant_scale") is not None
+        else None,
         "result": result,
         "fulfill_percent": fulfill_percent,
     }
@@ -194,23 +234,49 @@ def combin_params(enabled_params, pytest_paramset=True):
     param_combination_set = []
     base_param_names = [
         "Testcase_Prefix",
-        "layout_query", "layout_kv", "q_type", "kv_type",
-        "B", "T1", "T2", "S1", "S2", "N1", "N2", "D", "K",
-        "scale_value", "key_quant_mode", "value_quant_mode",
-        "sparse_block_size", "tile_size", "rope_head_dim",
-        "sparse_mode", "attention_mode", "quant_scale_repo_mode",
-        "block_size", "block_num", "actual_seq_q", "actual_seq_kv",
+        "layout_query",
+        "layout_kv",
+        "q_type",
+        "kv_type",
+        "B",
+        "T1",
+        "T2",
+        "S1",
+        "S2",
+        "N1",
+        "N2",
+        "D",
+        "K",
+        "scale_value",
+        "key_quant_mode",
+        "value_quant_mode",
+        "sparse_block_size",
+        "tile_size",
+        "rope_head_dim",
+        "sparse_mode",
+        "attention_mode",
+        "quant_scale_repo_mode",
+        "block_size",
+        "block_num",
+        "actual_seq_q",
+        "actual_seq_kv",
     ]
     range_param_names = [
-        "range_query", "range_key", "range_query_rope", "range_key_rope", "range_dequant_scale",
+        "range_query",
+        "range_key",
+        "range_query_rope",
+        "range_key_rope",
+        "range_dequant_scale",
     ]
 
     for params in enabled_params:
         current_params = {}
         for key, value in params.items():
             if key in base_param_names or key in range_param_names:
-                current_params[key] = value if pytest_paramset else [_parse_excel_cell_value(value)]
-        
+                current_params[key] = (
+                    value if pytest_paramset else [_parse_excel_cell_value(value)]
+                )
+
         param_names = base_param_names + range_param_names
         param_values = [current_params.get(name, [None]) for name in param_names]
 
@@ -245,16 +311,16 @@ def convert_param_combination_to_cs_format(param_combination):
     quant_scale_repo_mode = param_combination["quant_scale_repo_mode"]
     block_size = param_combination.get("block_size") or 256
     block_num = param_combination.get("block_num")
-    
+
     # 参数校验：TND layout 下 T 不能超过 B*S
     if layout_query == "TND" and T1 is not None:
         if T1 > B * S1:
-            raise ValueError(f"Invalid parameter: T1={T1} exceeds B*S1={B*S1}")
-    
+            raise ValueError(f"Invalid parameter: T1={T1} exceeds B*S1={B * S1}")
+
     if layout_kv == "TND" and T2 is not None:
         if T2 > B * S2:
-            raise ValueError(f"Invalid parameter: T2={T2} exceeds B*S2={B*S2}")
-    
+            raise ValueError(f"Invalid parameter: T2={T2} exceeds B*S2={B * S2}")
+
     if param_combination.get("actual_seq_q") is None:
         actual_seq_q = generate_actual_seq(S1, B, layout_query, T1)
     else:
@@ -270,34 +336,36 @@ def convert_param_combination_to_cs_format(param_combination):
 
     if layout_kv == "TND":
         T2 = actual_seq_kv[-1]
-    
+
     sparse_blockcount = int(K / sparse_block_size)
-    testcase_prefix = param_combination.get("Testcase_Prefix") or "kvQuantSparseFlashAttn"
+    testcase_prefix = (
+        param_combination.get("Testcase_Prefix") or "kvQuantSparseFlashAttn"
+    )
     testcase_number = param_combination.get("Testcase_Number") or 1
-    
+
     q_type_str = "BF16" if q_type == torch.bfloat16 else "FP16"
     testcase_name = f"{testcase_prefix}_{layout_query}_{layout_kv}_{q_type_str}_{B}_{N1}_{N2}_{S1}_{S2}_{D}_{K}_{testcase_number:06d}"
-    
+
     if layout_kv == "PA_BSND":
         block_num_per_batch = math.ceil(S2 / block_size)
     if layout_kv == "PA_BSND" and block_num is None:
         block_num = 0
         for length in actual_seq_kv:
             block_num = block_num + math.ceil(length / block_size)
-    
+
     if q_type == torch.bfloat16:
         q_dtype_str = "bf16"
     elif q_type == torch.float16:
         q_dtype_str = "fp16"
     else:
         q_dtype_str = "fp32"
-    
+
     if kv_type is None or str(kv_type) == "float8_e4m3fn":
         kv_dtype_str = "float8_e4m3fn"
     else:
         kv_dtype_str = str(kv_type)
-    if (layout_kv == "PA_BSND"):
-        if (layout_query == "BSND"):
+    if layout_kv == "PA_BSND":
+        if layout_query == "BSND":
             shape_input = {
                 "query": [B, S1, N1, D],
                 "key": [B, S2, N2, D],
@@ -305,14 +373,24 @@ def convert_param_combination_to_cs_format(param_combination):
                 "sparse_indices": [B, S1, N2, sparse_blockcount],
                 "block_table": [B, block_num_per_batch],
                 "query_cache": [B, S1, N1, D + rope_head_dim],
-                "key_cache": [block_num, block_size, N2, D + rope_head_dim * 2 + D // tile_size * 4],
-                "value_cache": [block_num, block_size, N2, D + rope_head_dim * 2 + D // tile_size * 4],
+                "key_cache": [
+                    block_num,
+                    block_size,
+                    N2,
+                    D + rope_head_dim * 2 + D // tile_size * 4,
+                ],
+                "value_cache": [
+                    block_num,
+                    block_size,
+                    N2,
+                    D + rope_head_dim * 2 + D // tile_size * 4,
+                ],
                 "query_rope": [B, S1, N1, rope_head_dim],
                 "key_rope": [B, S2, N2, rope_head_dim],
                 "dequant_scale": [B, S2, N2, D // tile_size],
                 "v_dequant_scale": [B, S2, N2, D // tile_size],
             }
-        elif (layout_query == "TND"):
+        elif layout_query == "TND":
             shape_input = {
                 "query": [T1, N1, D],
                 "key": [B, S2, N2, D],
@@ -320,8 +398,18 @@ def convert_param_combination_to_cs_format(param_combination):
                 "sparse_indices": [T1, N2, sparse_blockcount],
                 "block_table": [B, block_num_per_batch],
                 "query_cache": [T1, N1, D + rope_head_dim],
-                "key_cache": [block_num, block_size, N2, D + rope_head_dim * 2 + D // tile_size * 4],
-                "value_cache": [block_num, block_size, N2, D + rope_head_dim * 2 + D // tile_size * 4],
+                "key_cache": [
+                    block_num,
+                    block_size,
+                    N2,
+                    D + rope_head_dim * 2 + D // tile_size * 4,
+                ],
+                "value_cache": [
+                    block_num,
+                    block_size,
+                    N2,
+                    D + rope_head_dim * 2 + D // tile_size * 4,
+                ],
                 "query_rope": [T1, N1, rope_head_dim],
                 "key_rope": [B, S2, N2, rope_head_dim],
                 "dequant_scale": [B, S2, N2, D // tile_size],
@@ -329,7 +417,7 @@ def convert_param_combination_to_cs_format(param_combination):
             }
         else:
             print("Unsupported layout_query: ", layout_query)
-    elif (layout_kv == "TND"):
+    elif layout_kv == "TND":
         shape_input = {
             "query": [T1, N1, D],
             "key": [T2, N2, D],
@@ -344,7 +432,7 @@ def convert_param_combination_to_cs_format(param_combination):
             "dequant_scale": [T2, N2, D // tile_size],
             "v_dequant_scale": [T2, N2, D // tile_size],
         }
-    elif (layout_kv == "BSND"):
+    elif layout_kv == "BSND":
         shape_input = {
             "query": [B, S1, N1, D],
             "key": [B, S2, N2, D],
@@ -375,7 +463,7 @@ def convert_param_combination_to_cs_format(param_combination):
         "dequant_scale": "fp32",
         "v_dequant_scale": "fp32",
     }
-    
+
     default_range_input = {
         "query": [2, 10],
         "key": [-100, 100.0],
@@ -396,7 +484,7 @@ def convert_param_combination_to_cs_format(param_combination):
     range_input["sparse_indices"] = default_range_input["sparse_indices"]
     range_input["block_table"] = default_range_input["block_table"]
     range_input["v_dequant_scale"] = range_input["dequant_scale"]
-    
+
     params = {
         "case_name": testcase_name,
         "layout_query": layout_query,
@@ -445,14 +533,16 @@ def convert_param_combination_to_cs_format(param_combination):
         "range_key_rope": range_input["key_rope"],
         "range_dequant_scale": range_input["dequant_scale"],
     }
-    
+
     return params
 
 
 def get_np_dtype(type_str):
     type_dict = {
-        "fp32": np.float32, "fp16": np.float16,
-        "int32": np.int32, "int8": np.int8,
+        "fp32": np.float32,
+        "fp16": np.float16,
+        "int32": np.int32,
+        "int8": np.int8,
         "uint8": np.uint8,
         "bf16": tf.bfloat16.as_numpy_dtype,
         "bfloat16": tf.bfloat16.as_numpy_dtype,
@@ -462,6 +552,7 @@ def get_np_dtype(type_str):
     }
     if type_str == "float8_e4m3fn":
         from ml_dtypes import float8_e4m3fn
+
         return float8_e4m3fn
     else:
         return type_dict[type_str]
@@ -469,9 +560,15 @@ def get_np_dtype(type_str):
 
 def convert_tensor_data(data_pool, data_path, type_str, params=None):
     KNOW_NP_DTYPES = [
-        "fp32", "fp16", "int32", "int8", "uint8",
-        "bf16", "bfloat16",
-        "float32", "float16",
+        "fp32",
+        "fp16",
+        "int32",
+        "int8",
+        "uint8",
+        "bf16",
+        "bfloat16",
+        "float32",
+        "float16",
     ]
 
     np_type = data_pool.dtype
@@ -499,18 +596,24 @@ def convert_tensor_data(data_pool, data_path, type_str, params=None):
 
 def get_str_dtype(type_str):
     type_dict = {
-        torch.float32: "fp32", torch.float16: "fp16",
-        torch.int8: "int8", torch.int32: "int32",
-        torch.uint8: "uint8", torch.bfloat16: "bf16"
+        torch.float32: "fp32",
+        torch.float16: "fp16",
+        torch.int8: "int8",
+        torch.int32: "int32",
+        torch.uint8: "uint8",
+        torch.bfloat16: "bf16",
     }
     return type_dict[type_str]
 
 
 def get_torch_dtype(type_str):
     type_dict = {
-        "fp32": torch.float32, "float32": torch.float32,
-        "fp16": torch.float16, "float16": torch.float16,
-        "bf16": torch.bfloat16, "bfloat16": torch.bfloat16,
+        "fp32": torch.float32,
+        "float32": torch.float32,
+        "fp16": torch.float16,
+        "float16": torch.float16,
+        "bf16": torch.bfloat16,
+        "bfloat16": torch.bfloat16,
         "int8": torch.int8,
         "int32": torch.int32,
         "uint8": torch.uint8,
@@ -531,18 +634,22 @@ def get_tensor_dtype(tensor, input_dtype):
     return tensor_dtype
 
 
-def modify_alcnn_input_file(name: str,
-                            tensors,
-                            params: dict,
-                            data_range=None,
-                            data_dtype=None):
+def modify_alcnn_input_file(
+    name: str, tensors, params: dict, data_range=None, data_dtype=None
+):
     out_tensor = tensors
     if tensors is not None:
         data_range = data_range or [-10.0, 10.0]
         tensor_dtype = get_tensor_dtype(tensors, data_dtype)
         if torch.is_tensor(tensors):
             if tensor_dtype == "bf16":
-                out_tensor = np.array(tensors.float().detach().cpu().numpy().astype(tf.bfloat16.as_numpy_dtype))
+                out_tensor = np.array(
+                    tensors.float()
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .astype(tf.bfloat16.as_numpy_dtype)
+                )
             else:
                 out_tensor = tensors.detach().cpu().numpy()
         else:
@@ -557,13 +664,18 @@ def modify_alcnn_input_file(name: str,
 
 def qsfa_run_npu(test_data, testcase_name=None, device_id=0, result_path=None):
     from batch import kv_quant_sparse_flash_attention_process
+
     params = test_data.get("params")
     if testcase_name:
         params["Testcase_Prefix"] = testcase_name
     cpu_result = test_data["cpu_output"]
     try:
-        npu_result = kv_quant_sparse_flash_attention_process.call_npu(test_data["input"], params)
-        result, fulfill_percent = result_compare_method.check_result(cpu_result, npu_result)
+        npu_result = kv_quant_sparse_flash_attention_process.call_npu(
+            test_data["input"], params
+        )
+        result, fulfill_percent = result_compare_method.check_result(
+            cpu_result, npu_result
+        )
     except Exception:
         if result_path:
             save_result(params, "Failed", "", result_path)

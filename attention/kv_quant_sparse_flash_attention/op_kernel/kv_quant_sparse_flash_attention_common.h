@@ -31,24 +31,24 @@ enum class QSFA_LAYOUT {
 };
 
 enum class QUANT_MODE {
-    PER_CHANNEL = 0,  // GQA支持
+    PER_CHANNEL = 0,    // GQA支持
     PER_TOKEN_HEAD = 1, // GQA支持
-    PER_TILE = 2,   // MLA支持
+    PER_TILE = 2,       // MLA支持
 };
 
 enum class ATTENTION_MODE {
-    GQA_MHA = 0,  // QKV headDim相等
+    GQA_MHA = 0,    // QKV headDim相等
     MLA_NATIVE = 1, // Dn=128, Dr=64
-    MLA_ABSORB = 2,   // Dn=512, Dr=64
+    MLA_ABSORB = 2, // Dn=512, Dr=64
 };
 
 enum class QUANT_SCALE_REPO_MODE {
-    SEPARATE = 0,  // 分开存储
+    SEPARATE = 0, // 分开存储
     COMBINE = 1, // 合并存储，量化模式是PER_TOKEN_HEAD/PER_TILE时支持COMBINE模式，参数顺序为：Nope+Rope+DequantScale
 };
 
 template <typename Q_T, typename KV_T, typename OUT_T, const bool FLASH_DECODE = false,
-	  QSFA_LAYOUT LAYOUT_T = QSFA_LAYOUT::BSND, QSFA_LAYOUT KV_LAYOUT_T = QSFA_LAYOUT::BSND,
+          QSFA_LAYOUT LAYOUT_T = QSFA_LAYOUT::BSND, QSFA_LAYOUT KV_LAYOUT_T = QSFA_LAYOUT::BSND,
           const int TEMPLATE_MODE = C_TEMPLATE, typename... Args>
 struct QSFAType {
     using queryType = Q_T;
@@ -63,12 +63,14 @@ struct QSFAType {
 };
 
 // ================================Util functions==================================
-template <typename T> __aicore__ inline T QSFAAlign(T num, T rnd)
+template <typename T>
+__aicore__ inline T QSFAAlign(T num, T rnd)
 {
-    return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd) * (rnd)));
+    return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
 }
 
-template <typename T> __aicore__ inline size_t BlockAlign(size_t s)
+template <typename T>
+__aicore__ inline size_t BlockAlign(size_t s)
 {
     if constexpr (IsSameType<T, int4b_t>::value) {
         return (s + 63) / 64 * 64;
@@ -77,7 +79,8 @@ template <typename T> __aicore__ inline size_t BlockAlign(size_t s)
     return (s + n - 1) / n * n;
 }
 
-template <typename T1, typename T2> __aicore__ inline T1 Min(T1 a, T2 b)
+template <typename T1, typename T2>
+__aicore__ inline T1 Min(T1 a, T2 b)
 {
     return (a > b) ? (b) : (a);
 }
@@ -168,13 +171,13 @@ struct ConstInfo {
     uint64_t kvHeadNum;
     uint64_t headDim;
     uint64_t headDimRope;
-    uint64_t combineHeadDim; // quantScaleRepoMode为Combine模式时=headDim+headDimRope, 否则=headDim
+    uint64_t combineHeadDim;          // quantScaleRepoMode为Combine模式时=headDim+headDimRope, 否则=headDim
     uint64_t kvSeqSize = 0ULL;        // kv最大S长度
     uint64_t qSeqSize = 1ULL;         // q最大S长度
-    int64_t kvCacheBlockSize = 0;    // PA场景的block size
+    int64_t kvCacheBlockSize = 0;     // PA场景的block size
     uint32_t maxBlockNumPerBatch = 0; // PA场景的最大单batch block number
     uint32_t splitKVNum = 0U;         // S2核间切分的切分份数
-    QSFA_LAYOUT outputLayout;          // 输出的Transpose格式
+    QSFA_LAYOUT outputLayout;         // 输出的Transpose格式
     uint32_t sparseMode = 0;
     bool needInit = false;
 
@@ -183,8 +186,8 @@ struct ConstInfo {
     uint64_t combineAccumOutOffset = 0ULL;
     uint32_t actualCombineLoopSize = 0U; // FlashDecoding场景, S2在核间切分的最大份数
 
-    uint32_t actualLenDimsQ = 0U;   // query的actualSeqLength 的维度
-    uint32_t actualLenDimsKV = 0U;  // KV 的actualSeqLength 的维度
+    uint32_t actualLenDimsQ = 0U;  // query的actualSeqLength 的维度
+    uint32_t actualLenDimsKV = 0U; // KV 的actualSeqLength 的维度
 
     // TND
     uint32_t s2Start = 0U; // TND场景下，S2的起始位置

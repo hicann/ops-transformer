@@ -150,7 +150,7 @@ parse_options() {
     local excel_sheet=""
     local pt_path=""
     local paramset_file=""
-    
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -E)
@@ -171,7 +171,7 @@ parse_options() {
                 ;;
         esac
     done
-    
+
     EXCEL_PATH="$excel_path"
     EXCEL_SHEET="$excel_sheet"
     PT_PATH="$pt_path"

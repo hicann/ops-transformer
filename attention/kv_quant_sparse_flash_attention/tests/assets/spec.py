@@ -21,7 +21,9 @@ ASSET_IMPL_DIR = Path(__file__).with_name("impl")
 
 def load_impl_module(stem):
     path = ASSET_IMPL_DIR / f"{stem}.py"
-    spec = importlib.util.spec_from_file_location(f"qsfa_assets_impl_{stem}_{abs(hash(path))}", path)
+    spec = importlib.util.spec_from_file_location(
+        f"qsfa_assets_impl_{stem}_{abs(hash(path))}", path
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

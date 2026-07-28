@@ -50,9 +50,15 @@ def call_npu_eager(torch_tensor_dict, params):
         value_quant_mode=params.get("value_quant_mode", 2),
         key_dequant_scale=None,
         value_dequant_scale=None,
-        block_table=torch_tensor_dict["block_table"] if params["layout_kv"] == "PA_BSND" else None,
-        actual_seq_lengths_query=torch.tensor(params["actualseqlengths"], dtype=torch.int32).to("npu"),
-        actual_seq_lengths_kv=torch.tensor(params["actualseqlengthskv"], dtype=torch.int32).to("npu"),
+        block_table=torch_tensor_dict["block_table"]
+        if params["layout_kv"] == "PA_BSND"
+        else None,
+        actual_seq_lengths_query=torch.tensor(
+            params["actualseqlengths"], dtype=torch.int32
+        ).to("npu"),
+        actual_seq_lengths_kv=torch.tensor(
+            params["actualseqlengthskv"], dtype=torch.int32
+        ).to("npu"),
         layout_query=params.get("layout_query", "BSND"),
         layout_kv=params.get("layout_kv", "PA_BSND"),
         sparse_mode=params.get("sparsemode", 0),
@@ -63,11 +69,11 @@ def call_npu_eager(torch_tensor_dict, params):
         pre_tokens=params.get("pre_tokens", (1 << 63) - 1),
         next_tokens=params.get("next_tokens", (1 << 63) - 1),
         key_dtype=_get_kv_torch_dtype(params["dtype_input"]["key"]),
-        value_dtype=_get_kv_torch_dtype(params["dtype_input"]["value"])
+        value_dtype=_get_kv_torch_dtype(params["dtype_input"]["value"]),
     )
 
 
-def call_npu(input_tensor_dict, params):    
+def call_npu(input_tensor_dict, params):
     torch_npu.npu.set_device(0)
     torch_tensor_dict = _load_inputs_to_npu(input_tensor_dict)
     npu_result = call_npu_eager(torch_tensor_dict, params)
@@ -78,14 +84,33 @@ def call_npu(input_tensor_dict, params):
 
 
 class Network(torch.nn.Module):
-    def forward(self, query, key, value, sparse_indices,
-                scale_value, key_quant_mode, value_quant_mode,
-                key_dequant_scale, value_dequant_scale, block_table,
-                actual_seq_lengths_query, actual_seq_lengths_kv,
-                sparse_block_size, layout_query, layout_kv,
-                sparse_mode, attention_mode, quant_scale_repo_mode,
-                tile_size, rope_head_dim, key_dtype, value_dtype,
-                pre_tokens, next_tokens):
+    def forward(
+        self,
+        query,
+        key,
+        value,
+        sparse_indices,
+        scale_value,
+        key_quant_mode,
+        value_quant_mode,
+        key_dequant_scale,
+        value_dequant_scale,
+        block_table,
+        actual_seq_lengths_query,
+        actual_seq_lengths_kv,
+        sparse_block_size,
+        layout_query,
+        layout_kv,
+        sparse_mode,
+        attention_mode,
+        quant_scale_repo_mode,
+        tile_size,
+        rope_head_dim,
+        key_dtype,
+        value_dtype,
+        pre_tokens,
+        next_tokens,
+    ):
         return torch_npu.npu_kv_quant_sparse_flash_attention(
             query=query,
             key=key,
@@ -125,7 +150,9 @@ def call_npu_graph(torch_tensor_dict, params):
     config.experimental_config.tiling_schedule_optimize = True
     config.experimental_config.topology_sorting_strategy = "StableRDFS"
     npu_backend = torchair.get_npu_backend(compiler_config=config)
-    npu_model = torch.compile(npu_model, fullgraph=True, backend=npu_backend, dynamic=False)
+    npu_model = torch.compile(
+        npu_model, fullgraph=True, backend=npu_backend, dynamic=False
+    )
 
     print("npu_kv_quant_sparse_flash_attention (graph mode) ...")
     return npu_model(
@@ -139,9 +166,15 @@ def call_npu_graph(torch_tensor_dict, params):
         value_quant_mode=params.get("value_quant_mode", 2),
         key_dequant_scale=None,
         value_dequant_scale=None,
-        block_table=torch_tensor_dict["block_table"] if params["layout_kv"] == "PA_BSND" else None,
-        actual_seq_lengths_query=torch.tensor(params["actualseqlengths"], dtype=torch.int32).to("npu"),
-        actual_seq_lengths_kv=torch.tensor(params["actualseqlengthskv"], dtype=torch.int32).to("npu"),
+        block_table=torch_tensor_dict["block_table"]
+        if params["layout_kv"] == "PA_BSND"
+        else None,
+        actual_seq_lengths_query=torch.tensor(
+            params["actualseqlengths"], dtype=torch.int32
+        ).to("npu"),
+        actual_seq_lengths_kv=torch.tensor(
+            params["actualseqlengthskv"], dtype=torch.int32
+        ).to("npu"),
         layout_query=params.get("layout_query", "BSND"),
         layout_kv=params.get("layout_kv", "PA_BSND"),
         sparse_mode=params.get("sparsemode", 0),

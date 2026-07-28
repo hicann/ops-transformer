@@ -78,7 +78,7 @@
           <td>属性</td>
           <td>公式中d<sub>k</sub>开根号的倒数，代表缩放系数，作为query和key矩阵乘后Muls的scalar值。</td>
           <td>FLOAT</td>
-          <td>-</td> 
+          <td>-</td>
       </tr>
       <tr>
           <td>key_quant_mode</td>

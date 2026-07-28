@@ -18,15 +18,9 @@
 
 class KvQuantSparseFlashAttentionProto : public testing::Test {
 protected:
-    static void SetUpTestCase()
-    {
-        std::cout << "KvQuantSparseFlashAttentionProto SetUp" << std::endl;
-    }
+    static void SetUpTestCase() { std::cout << "KvQuantSparseFlashAttentionProto SetUp" << std::endl; }
 
-    static void TearDownTestCase()
-    {
-        std::cout << "KvQuantSparseFlashAttentionProto TearDown" << std::endl;
-    }
+    static void TearDownTestCase() { std::cout << "KvQuantSparseFlashAttentionProto TearDown" << std::endl; }
 };
 
 TEST_F(KvQuantSparseFlashAttentionProto, KvQuantSparseFlashAttention_infershape_0)
@@ -35,39 +29,31 @@ TEST_F(KvQuantSparseFlashAttentionProto, KvQuantSparseFlashAttention_infershape_
     int32_t actualSeqKv[] = {256, 512};
     gert::InfershapeContextPara infershapeContextPara(
         "KvQuantSparseFlashAttention",
-        {
-            {{{2, 64, 8, 576}, {2, 64, 8, 576}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{32, 16, 1, 656}, {32, 16, 1, 656}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{32, 16, 1, 656}, {32, 16, 1, 656}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{2, 32}, {2, 32}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, actualSeqQuery},
-            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, actualSeqKv}
-        },
-        {
-            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}
-        },
-        {
-            {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.044194173f)},
-            {"key_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-            {"value_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-            {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-            {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
-            {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
-            {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-            {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-            {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-            {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-            {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
-            {"rope_head_dim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)}
-        });
+        {{{{2, 64, 8, 576}, {2, 64, 8, 576}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{32, 16, 1, 656}, {32, 16, 1, 656}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{32, 16, 1, 656}, {32, 16, 1, 656}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{2, 32}, {2, 32}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, actualSeqQuery},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, actualSeqKv}},
+        {{{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}},
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.044194173f)},
+         {"key_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"value_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
+         {"rope_head_dim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {2, 64, 8, 512}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{2, 64, 8, 512}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -77,39 +63,31 @@ TEST_F(KvQuantSparseFlashAttentionProto, KvQuantSparseFlashAttention_infershape_
     int32_t actualSeqKv[] = {128, 256};
     gert::InfershapeContextPara infershapeContextPara(
         "KvQuantSparseFlashAttention",
-        {
-            {{{96, 16, 576}, {96, 16, 576}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{256, 1, 656}, {256, 1, 656}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{256, 1, 656}, {256, 1, 656}}, ge::DT_INT8, ge::FORMAT_ND},
-            {{{96, 1, 64}, {96, 1, 64}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, actualSeqQuery},
-            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, actualSeqKv}
-        },
-        {
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}
-        },
-        {
-            {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.044194173f)},
-            {"key_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-            {"value_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-            {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-            {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-            {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-            {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-            {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-            {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
-            {"rope_head_dim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)}
-        });
+        {{{{96, 16, 576}, {96, 16, 576}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{256, 1, 656}, {256, 1, 656}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{256, 1, 656}, {256, 1, 656}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{96, 1, 64}, {96, 1, 64}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, actualSeqQuery},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, actualSeqKv}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.044194173f)},
+         {"key_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"value_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
+         {"rope_head_dim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {
-        {96, 16, 512}
-    };
+    std::vector<std::vector<int64_t>> expectOutputShape = {{96, 16, 512}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -125,25 +103,24 @@ TEST_F(KvQuantSparseFlashAttentionProto, KvQuantSparseFlashAttention_inferdtype)
     ge::DataType indexType = ge::DT_INT32;
     ge::DataType scaleType = ge::DT_FLOAT;
     auto contextHolder = gert::InferDataTypeContextFaker()
-        .NodeIoNum(9, 1)
-        .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
-        .InputDataTypes({&queryType, &kvType, &kvType, &indexType, &scaleType, &scaleType, &indexType, &indexType, &indexType})
-        .NodeAttrs({
-            {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.044194173f)},
-            {"key_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-            {"value_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-            {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-            {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
-            {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
-            {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-            {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-            {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-            {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-            {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
-            {"rope_head_dim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)}
-        })
-        .Build();
+                             .NodeIoNum(9, 1)
+                             .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+                             .InputDataTypes({&queryType, &kvType, &kvType, &indexType, &scaleType, &scaleType,
+                                              &indexType, &indexType, &indexType})
+                             .NodeAttrs({{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.044194173f)},
+                                         {"key_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                         {"value_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                         {"sparse_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+                                         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+                                         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+                                         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+                                         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+                                         {"attention_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                         {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                         {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
+                                         {"rope_head_dim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)}})
+                             .Build();
     auto context = contextHolder.GetContext<gert::InferDataTypeContext>();
     ASSERT_NE(context, nullptr);
 

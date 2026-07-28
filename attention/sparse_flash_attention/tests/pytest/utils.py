@@ -57,8 +57,9 @@ def _parse_excel_cell_value(value):
             return _normalize_numeric_value(STR_MAP_DICT[stripped])
         if stripped in ("", "None", "none", "NULL", "null", "NaN", "nan"):
             return None
-        if ((stripped.startswith("[") and stripped.endswith("]")) or
-                (stripped.startswith("(") and stripped.endswith(")"))):
+        if (stripped.startswith("[") and stripped.endswith("]")) or (
+            stripped.startswith("(") and stripped.endswith(")")
+        ):
             try:
                 return _normalize_numeric_value(ast.literal_eval(stripped))
             except (ValueError, SyntaxError):
@@ -74,13 +75,13 @@ def load_paramset(paramset_file):
 def generate_actual_seq(S, B, layout=None, T=None):
     """
     根据S和B自动生成actual_seq。
-    
+
     参数:
         S: 序列长度上限（S1或S2）
         B: batch大小
         layout: layout类型，TND场景下采用累加和
         T: 当不为None时，将actual_seq最后一个数改为T
-    
+
     返回:
         actual_seq: 生成的实际序列长度列表
     """
@@ -95,7 +96,7 @@ def generate_actual_seq(S, B, layout=None, T=None):
                 seq_lengths.append(length)
                 remaining -= length
             seq_lengths.append(remaining)
-            
+
             random.shuffle(seq_lengths)
             actual_seq = []
             cumsum = 0
@@ -112,7 +113,7 @@ def generate_actual_seq(S, B, layout=None, T=None):
     else:
         seq_lengths = [random.randint(0, S) for _ in range(B)]
         actual_seq = seq_lengths
-    
+
     return actual_seq
 
 
@@ -131,26 +132,56 @@ def load_excel_test_cases(excel_file_path, sheet_name):
 
     required_columns = [
         "Testcase_Prefix",
-        "layout_query", "layout_kv", "q_type", "kv_type",
-        "B", "S1", "S2", "N1", "N2", "D", "K",
-        "scale_value", "sparse_block_size", "rope_head_dim",
-        "sparse_mode", "attention_mode", "return_softmax_lse",
-        "block_size", "block_num", "actual_seq_q", "actual_seq_kv",
+        "layout_query",
+        "layout_kv",
+        "q_type",
+        "kv_type",
+        "B",
+        "S1",
+        "S2",
+        "N1",
+        "N2",
+        "D",
+        "K",
+        "scale_value",
+        "sparse_block_size",
+        "rope_head_dim",
+        "sparse_mode",
+        "attention_mode",
+        "return_softmax_lse",
+        "block_size",
+        "block_num",
+        "actual_seq_q",
+        "actual_seq_kv",
     ]
-    missing_columns = [column for column in required_columns if column not in dataframe.columns]
+    missing_columns = [
+        column for column in required_columns if column not in dataframe.columns
+    ]
     if missing_columns:
-        pytest.skip(f"Missing required columns in Excel: {missing_columns}", allow_module_level=True)
+        pytest.skip(
+            f"Missing required columns in Excel: {missing_columns}",
+            allow_module_level=True,
+        )
     return [row.to_dict() for _, row in dataframe.iterrows()]
 
 
-def save_result(params, result, fulfill_percent, result_path, softmax_max_percent=None, softmax_sum_percent=None):
+def save_result(
+    params,
+    result,
+    fulfill_percent,
+    result_path,
+    softmax_max_percent=None,
+    softmax_sum_percent=None,
+):
     """保存测试结果，列与 example.xlsx 一致，结果文件可直接用于批量生成 pt。"""
     row_data = {
         "Testcase_Prefix": params.get("Testcase_Prefix", "sparseFlashAttn"),
         "layout_query": params.get("layout_query"),
         "layout_kv": params.get("layout_kv"),
         "q_type": str(params.get("q_type")),
-        "kv_type": str(params.get("kv_type")) if params.get("kv_type") is not None else None,
+        "kv_type": str(params.get("kv_type"))
+        if params.get("kv_type") is not None
+        else None,
         "B": params.get("B"),
         "T1": params.get("T1"),
         "T2": params.get("T2"),
@@ -167,13 +198,27 @@ def save_result(params, result, fulfill_percent, result_path, softmax_max_percen
         "attention_mode": params.get("attention_mode"),
         "block_size": params.get("block_size"),
         "block_num": params.get("block_num"),
-        "actual_seq_q": str(params.get("actual_seq_q")) if params.get("actual_seq_q") is not None else None,
-        "actual_seq_kv": str(params.get("actual_seq_kv")) if params.get("actual_seq_kv") is not None else None,
-        "range_query": str(params.get("range_query")) if params.get("range_query") is not None else None,
-        "range_key": str(params.get("range_key")) if params.get("range_key") is not None else None,
-        "range_query_rope": str(params.get("range_query_rope")) if params.get("range_query_rope") is not None else None,
-        "range_key_rope": str(params.get("range_key_rope")) if params.get("range_key_rope") is not None else None,
-        "range_sinks": str(params.get("range_sinks")) if params.get("range_sinks") is not None else None,
+        "actual_seq_q": str(params.get("actual_seq_q"))
+        if params.get("actual_seq_q") is not None
+        else None,
+        "actual_seq_kv": str(params.get("actual_seq_kv"))
+        if params.get("actual_seq_kv") is not None
+        else None,
+        "range_query": str(params.get("range_query"))
+        if params.get("range_query") is not None
+        else None,
+        "range_key": str(params.get("range_key"))
+        if params.get("range_key") is not None
+        else None,
+        "range_query_rope": str(params.get("range_query_rope"))
+        if params.get("range_query_rope") is not None
+        else None,
+        "range_key_rope": str(params.get("range_key_rope"))
+        if params.get("range_key_rope") is not None
+        else None,
+        "range_sinks": str(params.get("range_sinks"))
+        if params.get("range_sinks") is not None
+        else None,
         "use_sinks": params.get("use_sinks", False),
         "return_softmax_lse": params.get("return_softmax_lse", False),
         "result": result,
@@ -194,22 +239,47 @@ def combin_params(enabled_params, pytest_paramset=True):
     param_combination_set = []
     base_param_names = [
         "Testcase_Prefix",
-        "layout_query", "layout_kv", "q_type", "kv_type",
-        "B", "T1", "T2", "S1", "S2", "N1", "N2", "D", "K",
-        "scale_value", "sparse_block_size", "rope_head_dim",
-        "sparse_mode", "attention_mode", "return_softmax_lse", "use_sinks",
-        "block_size", "block_num", "actual_seq_q", "actual_seq_kv",
+        "layout_query",
+        "layout_kv",
+        "q_type",
+        "kv_type",
+        "B",
+        "T1",
+        "T2",
+        "S1",
+        "S2",
+        "N1",
+        "N2",
+        "D",
+        "K",
+        "scale_value",
+        "sparse_block_size",
+        "rope_head_dim",
+        "sparse_mode",
+        "attention_mode",
+        "return_softmax_lse",
+        "use_sinks",
+        "block_size",
+        "block_num",
+        "actual_seq_q",
+        "actual_seq_kv",
     ]
     range_param_names = [
-        "range_query", "range_key", "range_query_rope", "range_key_rope", "range_sinks",
+        "range_query",
+        "range_key",
+        "range_query_rope",
+        "range_key_rope",
+        "range_sinks",
     ]
 
     for params in enabled_params:
         current_params = {}
         for key, value in params.items():
             if key in base_param_names or key in range_param_names:
-                current_params[key] = value if pytest_paramset else [_parse_excel_cell_value(value)]
-        
+                current_params[key] = (
+                    value if pytest_paramset else [_parse_excel_cell_value(value)]
+                )
+
         param_names = base_param_names + range_param_names
         param_values = [current_params.get(name, [None]) for name in param_names]
 
@@ -243,16 +313,16 @@ def convert_param_combination_to_cs_format(param_combination):
     block_num = param_combination.get("block_num")
     if use_sinks and layout_kv == "PA_BSND":
         raise ValueError("sinks 场景不支持 PA_BSND")
-    
+
     # 参数校验：TND layout 下 T 不能超过 B*S
     if layout_query == "TND" and T1 is not None:
         if T1 > B * S1:
-            raise ValueError(f"Invalid parameter: T1={T1} exceeds B*S1={B*S1}")
-    
+            raise ValueError(f"Invalid parameter: T1={T1} exceeds B*S1={B * S1}")
+
     if layout_kv == "TND" and T2 is not None:
         if T2 > B * S2:
-            raise ValueError(f"Invalid parameter: T2={T2} exceeds B*S2={B*S2}")
-    
+            raise ValueError(f"Invalid parameter: T2={T2} exceeds B*S2={B * S2}")
+
     if param_combination.get("actual_seq_q") is None:
         actual_seq_q = generate_actual_seq(S1, B, layout_query, T1)
     else:
@@ -268,7 +338,7 @@ def convert_param_combination_to_cs_format(param_combination):
 
     if layout_kv == "TND":
         T2 = actual_seq_kv[-1]
-    
+
     sparse_blockcount = int(K / sparse_block_size)
     testcase_prefix = param_combination.get("Testcase_Prefix") or "sparseFlashAttn"
     testcase_number = param_combination.get("Testcase_Number") or 1
@@ -284,8 +354,8 @@ def convert_param_combination_to_cs_format(param_combination):
     q_dtype_str = "bf16" if q_type == torch.bfloat16 else "fp16"
     testcase_name = f"{testcase_prefix}_{layout_query}_{layout_kv}_{q_dtype_str}_{B}_{N1}_{N2}_{S1}_{S2}_{D}_{K}_{testcase_number:06d}"
     kv_dtype_str = "bf16" if kv_type == torch.bfloat16 else "fp16"
-    if (layout_kv == "PA_BSND"):
-        if (layout_query == "BSND"):
+    if layout_kv == "PA_BSND":
+        if layout_query == "BSND":
             shape_input = {
                 "query": [B, S1, N1, D],
                 "key": [B, S2, N2, D],
@@ -302,9 +372,9 @@ def convert_param_combination_to_cs_format(param_combination):
             shape_output = {
                 "attn_out": [B, S1, N1, D],
                 "softmax_max": [B, N2, S1, int(N1 / N2)],
-                "softmax_sum": [B, N2, S1, int(N1 / N2)]
+                "softmax_sum": [B, N2, S1, int(N1 / N2)],
             }
-        elif (layout_query == "TND"):
+        elif layout_query == "TND":
             shape_input = {
                 "query": [T1, N1, D],
                 "key": [B, S2, N2, D],
@@ -321,11 +391,11 @@ def convert_param_combination_to_cs_format(param_combination):
             shape_output = {
                 "attn_out": [T1, N1, D],
                 "softmax_max": [N2, T1, int(N1 / N2)],
-                "softmax_sum": [N2, T1, int(N1 / N2)]
+                "softmax_sum": [N2, T1, int(N1 / N2)],
             }
         else:
             print("Unsupported layout_query: ", layout_query)
-    elif (layout_kv == "TND"):
+    elif layout_kv == "TND":
         shape_input = {
             "query": [T1, N1, D],
             "key": [T2, N2, D],
@@ -342,9 +412,9 @@ def convert_param_combination_to_cs_format(param_combination):
         shape_output = {
             "attn_out": [T1, N1, D],
             "softmax_max": [N2, T1, int(N1 / N2)],
-            "softmax_sum": [N2, T1, int(N1 / N2)]
+            "softmax_sum": [N2, T1, int(N1 / N2)],
         }
-    elif (layout_kv == "BSND"):
+    elif layout_kv == "BSND":
         shape_input = {
             "query": [B, S1, N1, D],
             "key": [B, S2, N2, D],
@@ -361,7 +431,7 @@ def convert_param_combination_to_cs_format(param_combination):
         shape_output = {
             "attn_out": [B, S1, N1, D],
             "softmax_max": [B, N2, S1, int(N1 / N2)],
-            "softmax_sum": [B, N2, S1, int(N1 / N2)]
+            "softmax_sum": [B, N2, S1, int(N1 / N2)],
         }
     else:
         print("Unsupported layout_kv: ", layout_kv)
@@ -378,7 +448,7 @@ def convert_param_combination_to_cs_format(param_combination):
         "key_rope": q_dtype_str,
         "sinks": "fp32",
     }
-    
+
     default_range_input = {
         "query": [-10.0, 100.0],
         "key": [5.0, 100.0],
@@ -397,7 +467,7 @@ def convert_param_combination_to_cs_format(param_combination):
             range_input[key] = default_range_input[key]
     range_input["sparse_indices"] = default_range_input["sparse_indices"]
     range_input["block_table"] = default_range_input["block_table"]
-    
+
     params = {
         "case_name": testcase_name,
         "layout_query": layout_query,
@@ -440,7 +510,7 @@ def convert_param_combination_to_cs_format(param_combination):
         "range_key_rope": range_input["key_rope"],
         "range_sinks": range_input["sinks"],
     }
-    
+
     return params
 
 
@@ -453,26 +523,65 @@ def sfa_run_npu(test_data, testcase_name=None, device_id=0, result_path=None):
     softmax_max_percent = None
     softmax_sum_percent = None
     try:
-        npu_result = sparse_flash_attention_process.call_npu(test_data["input"], params, device_id=device_id)
+        npu_result = sparse_flash_attention_process.call_npu(
+            test_data["input"], params, device_id=device_id
+        )
         print("[compare] comparing attn_out ...")
-        result_attn_out, fulfill_percent_attn = result_compare_method.check_result(cpu_result[0], npu_result[0])
-        compare_results["attn_out"] = {"result": result_attn_out, "fulfill_percent": fulfill_percent_attn}
+        result_attn_out, fulfill_percent_attn = result_compare_method.check_result(
+            cpu_result[0], npu_result[0]
+        )
+        compare_results["attn_out"] = {
+            "result": result_attn_out,
+            "fulfill_percent": fulfill_percent_attn,
+        }
         overall_result = result_attn_out
         overall_fulfill_percent = fulfill_percent_attn
         if test_data["input"]["return_softmax_lse"]:
             print("[compare] comparing softmax_max ...")
-            result_softmax_max, fulfill_percent_max = result_compare_method.check_result(cpu_result[1], npu_result[1])
+            result_softmax_max, fulfill_percent_max = (
+                result_compare_method.check_result(cpu_result[1], npu_result[1])
+            )
             print("[compare] comparing softmax_sum ...")
-            result_softmax_sum, fulfill_percent_sum = result_compare_method.check_result(cpu_result[2], npu_result[2])
-            compare_results["softmax_max"] = {"result": result_softmax_max, "fulfill_percent": fulfill_percent_max}
-            compare_results["softmax_sum"] = {"result": result_softmax_sum, "fulfill_percent": fulfill_percent_sum}
+            result_softmax_sum, fulfill_percent_sum = (
+                result_compare_method.check_result(cpu_result[2], npu_result[2])
+            )
+            compare_results["softmax_max"] = {
+                "result": result_softmax_max,
+                "fulfill_percent": fulfill_percent_max,
+            }
+            compare_results["softmax_sum"] = {
+                "result": result_softmax_sum,
+                "fulfill_percent": fulfill_percent_sum,
+            }
             softmax_max_percent = fulfill_percent_max
             softmax_sum_percent = fulfill_percent_sum
-            overall_result = "Pass" if (result_attn_out == "Pass" and result_softmax_max == "Pass" and result_softmax_sum == "Pass") else "Failed"
+            overall_result = (
+                "Pass"
+                if (
+                    result_attn_out == "Pass"
+                    and result_softmax_max == "Pass"
+                    and result_softmax_sum == "Pass"
+                )
+                else "Failed"
+            )
     except Exception:
         if result_path:
-            save_result(params, "Failed", "", result_path, softmax_max_percent, softmax_sum_percent)
+            save_result(
+                params,
+                "Failed",
+                "",
+                result_path,
+                softmax_max_percent,
+                softmax_sum_percent,
+            )
         raise
     if result_path:
-        save_result(params, overall_result, overall_fulfill_percent, result_path, softmax_max_percent, softmax_sum_percent)
+        save_result(
+            params,
+            overall_result,
+            overall_fulfill_percent,
+            result_path,
+            softmax_max_percent,
+            softmax_sum_percent,
+        )
     return overall_result, compare_results

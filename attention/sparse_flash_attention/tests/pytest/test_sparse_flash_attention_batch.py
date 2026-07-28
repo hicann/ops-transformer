@@ -25,11 +25,11 @@ RESULT_PATH = Path("result.xlsx")
 DEVICE_ID = 0
 
 locals()["testcase_files"] = []
-if os.path.isfile(TESTCASE_PATH) and TESTCASE_PATH.endswith('.pt'):
+if os.path.isfile(TESTCASE_PATH) and TESTCASE_PATH.endswith(".pt"):
     locals()["testcase_files"] = [TESTCASE_PATH]
     print(f"指定单个 pt 文件: {TESTCASE_PATH}")
 elif os.path.isdir(TESTCASE_PATH):
-    pt_files = [f for f in os.listdir(TESTCASE_PATH) if f.endswith('.pt')]
+    pt_files = [f for f in os.listdir(TESTCASE_PATH) if f.endswith(".pt")]
     if not pt_files:
         print(f"错误: 目录中没有找到.pt文件: {TESTCASE_PATH}")
     else:
@@ -44,7 +44,12 @@ else:
 def execute_sfa(testcase_file):
     test_data = torch.load(testcase_file, map_location="cpu")
     testcase_name = os.path.basename(testcase_file).replace(".pt", "")
-    result, compare_results = utils.sfa_run_npu(test_data, testcase_name=testcase_name, device_id=DEVICE_ID, result_path=RESULT_PATH)
+    result, compare_results = utils.sfa_run_npu(
+        test_data,
+        testcase_name=testcase_name,
+        device_id=DEVICE_ID,
+        result_path=RESULT_PATH,
+    )
     return result, compare_results, test_data
 
 
@@ -60,7 +65,9 @@ def test_sparse_flash_attention_batch(testcase_file):
                 result, compare_results, test_data = completed_future.result()
                 if result == "Failed":
                     case_name = os.path.basename(testcase_file).replace(".pt", "")
-                    return_softmax_lse = test_data.get("input", {}).get("return_softmax_lse", False)
+                    return_softmax_lse = test_data.get("input", {}).get(
+                        "return_softmax_lse", False
+                    )
                     compare_items = ["attn_out"]
                     if return_softmax_lse:
                         compare_items.extend(["softmax_max", "softmax_sum"])
@@ -69,9 +76,13 @@ def test_sparse_flash_attention_batch(testcase_file):
                         item_result = compare_results.get(item, {})
                         item_status = item_result.get("result", "Unknown")
                         item_percent = item_result.get("fulfill_percent", 0.0)
-                        detail_parts.append(f"{item}: {item_status}({item_percent:.4f}%)")
+                        detail_parts.append(
+                            f"{item}: {item_status}({item_percent:.4f}%)"
+                        )
                     detail_msg = ", ".join(detail_parts)
-                    pytest.fail(f"用例名: {case_name}, 对比结果: {detail_msg}", pytrace=False)
+                    pytest.fail(
+                        f"用例名: {case_name}, 对比结果: {detail_msg}", pytrace=False
+                    )
             except Exception as error:
                 params = test_data.get("params") if test_data else None
                 case_name = os.path.basename(testcase_file).replace(".pt", "")

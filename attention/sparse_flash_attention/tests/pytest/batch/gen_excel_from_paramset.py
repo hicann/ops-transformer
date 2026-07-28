@@ -13,6 +13,7 @@
 import os
 import sys
 import pandas as pd
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 
@@ -26,12 +27,35 @@ PARAM_COMBINATION_SET = utils.combin_params(ENABLED_PARAMS, pytest_paramset=True
 
 EXCEL_COLUMNS = [
     "Testcase_Prefix",
-    "layout_query", "layout_kv", "q_type", "kv_type",
-    "B", "T1", "T2", "S1", "S2", "N1", "N2", "D", "K",
-    "scale_value", "sparse_block_size", "rope_head_dim",
-    "sparse_mode", "attention_mode", "return_softmax_lse", "use_sinks",
-    "block_size", "block_num", "actual_seq_q", "actual_seq_kv",
-    "range_query", "range_key", "range_query_rope", "range_key_rope", "range_sinks",
+    "layout_query",
+    "layout_kv",
+    "q_type",
+    "kv_type",
+    "B",
+    "T1",
+    "T2",
+    "S1",
+    "S2",
+    "N1",
+    "N2",
+    "D",
+    "K",
+    "scale_value",
+    "sparse_block_size",
+    "rope_head_dim",
+    "sparse_mode",
+    "attention_mode",
+    "return_softmax_lse",
+    "use_sinks",
+    "block_size",
+    "block_num",
+    "actual_seq_q",
+    "actual_seq_kv",
+    "range_query",
+    "range_key",
+    "range_query_rope",
+    "range_key_rope",
+    "range_sinks",
 ]
 
 
@@ -51,13 +75,13 @@ def gen_excel_from_paramset():
             value = param_combo.get(col)
             row[col] = convert_value_for_excel(value)
         rows.append(row)
-    
+
     df = pd.DataFrame(rows, columns=EXCEL_COLUMNS)
-    
+
     output_dir = os.path.dirname(EXCEL_OUTPUT_PATH)
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    
+
     df.to_excel(EXCEL_OUTPUT_PATH, index=False, sheet_name=EXCEL_SHEET)
     print(f"生成 Excel 文件: {EXCEL_OUTPUT_PATH}")
     print(f"Sheet 名称: {EXCEL_SHEET}")

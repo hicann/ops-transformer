@@ -131,7 +131,9 @@ def ttk_trans_bnsd_to_layout(tensor, shape, layout, act_q=None):
             t_end = t_start + act_s
             if act_s > 0:
                 for head_idx in range(head):
-                    output[t_start:t_end, head_idx, :] = tensor[batch_idx, head_idx, :act_s, :]
+                    output[t_start:t_end, head_idx, :] = tensor[
+                        batch_idx, head_idx, :act_s, :
+                    ]
             t_start += act_s
         return output
     return tensor
@@ -157,7 +159,9 @@ def ttk_trans_shape_to_bnsd(tensor, shape, layout, headnums, act_seq):
             t_end = t_start + act_s
             if act_s > 0:
                 for head_idx in range(head):
-                    new_tensor[batch_idx, head_idx, 0:act_s, :] = tensor[t_start:t_end, head_idx, :]
+                    new_tensor[batch_idx, head_idx, 0:act_s, :] = tensor[
+                        t_start:t_end, head_idx, :
+                    ]
             t_start += act_s
         return new_tensor, [batch, head, seq, dim]
     return tensor, shape
@@ -183,26 +187,47 @@ def ttk_pa_to_bnsd(key_pa, block_table, actual_seq_kv, batch, block_size):
             take = min(block_end - block_offset, key_pa.shape[1])
             if take <= 0:
                 continue
-            result[batch_idx, block_offset:block_offset + take, :, :] = key_pa[block_id, 0:take, :, :]
+            result[batch_idx, block_offset : block_offset + take, :, :] = key_pa[
+                block_id, 0:take, :, :
+            ]
     return result
 
 
 def ttk_unpack_packed_kv_cache(kv_packed, d_kv, rope_head_dim, tile_size):
     nope = kv_packed[..., :d_kv]
-    rope_bytes = kv_packed[..., d_kv:d_kv + rope_head_dim * 2]
-    scale_bytes = kv_packed[..., d_kv + rope_head_dim * 2:]
+    rope_bytes = kv_packed[..., d_kv : d_kv + rope_head_dim * 2]
+    scale_bytes = kv_packed[..., d_kv + rope_head_dim * 2 :]
 
-    kv_nope = trans_np_hifuint8_tensor_to_float32(nope) if nope.dtype == torch.uint8 else nope.float()
+    kv_nope = (
+        trans_np_hifuint8_tensor_to_float32(nope)
+        if nope.dtype == torch.uint8
+        else nope.float()
+    )
     kv_rope = rope_bytes.contiguous().view(torch.uint8).view(torch.bfloat16).float()
     scale_count = d_kv // tile_size
-    kv_dequant_scale = scale_bytes.contiguous().view(torch.uint8).view(torch.float32).float()
+    kv_dequant_scale = (
+        scale_bytes.contiguous().view(torch.uint8).view(torch.float32).float()
+    )
     if kv_dequant_scale.shape[-1] != scale_count:
-        kv_dequant_scale = kv_dequant_scale.reshape(*kv_dequant_scale.shape[:-1], scale_count)
+        kv_dequant_scale = kv_dequant_scale.reshape(
+            *kv_dequant_scale.shape[:-1], scale_count
+        )
     return kv_nope, kv_rope, kv_dequant_scale
 
 
-def ttk_gather_kv(k_tensor, v_tensor, sparse_indices, sparse_blocksize, sparse_blockcount,
-                   batch, n2_idx, s1_idx, curr_actual_seq, curr_actual_seq_q, sparse_mode):
+def ttk_gather_kv(
+    k_tensor,
+    v_tensor,
+    sparse_indices,
+    sparse_blocksize,
+    sparse_blockcount,
+    batch,
+    n2_idx,
+    s1_idx,
+    curr_actual_seq,
+    curr_actual_seq_q,
+    sparse_mode,
+):
     if sparse_mode == 0:
         threshold = curr_actual_seq
     elif sparse_mode == 3:
@@ -231,7 +256,11 @@ def ttk_gather_kv(k_tensor, v_tensor, sparse_indices, sparse_blocksize, sparse_b
 
     if len(s2_sparse) == 0:
         return True, [], []
-    return False, k_tensor[batch, n2_idx, s2_sparse, :], v_tensor[batch, n2_idx, s2_sparse, :]
+    return (
+        False,
+        k_tensor[batch, n2_idx, s2_sparse, :],
+        v_tensor[batch, n2_idx, s2_sparse, :],
+    )
 
 
 def compute_golden_with_provided_api_tensors(input_tensor_dict, params):
@@ -247,9 +276,15 @@ def compute_golden_with_provided_api_tensors(input_tensor_dict, params):
         return torch.zeros(out_shape, dtype=torch.float16)
 
     tensor_dtypes = params.get("tensor_dtypes") or ()
-    query_dtype = tensor_dtypes[0] if len(tensor_dtypes) > 0 else params.get("query_dtype")
-    key_dtype = params.get("key_dtype", tensor_dtypes[1] if len(tensor_dtypes) > 1 else None)
-    value_dtype = params.get("value_dtype", tensor_dtypes[2] if len(tensor_dtypes) > 2 else None)
+    query_dtype = (
+        tensor_dtypes[0] if len(tensor_dtypes) > 0 else params.get("query_dtype")
+    )
+    key_dtype = params.get(
+        "key_dtype", tensor_dtypes[1] if len(tensor_dtypes) > 1 else None
+    )
+    value_dtype = params.get(
+        "value_dtype", tensor_dtypes[2] if len(tensor_dtypes) > 2 else None
+    )
     query = ttk_to_cpu_raw(query, query_dtype)
     key = ttk_to_cpu_raw(key, key_dtype)
     value = ttk_to_cpu_raw(value, value_dtype)
@@ -259,7 +294,9 @@ def compute_golden_with_provided_api_tensors(input_tensor_dict, params):
     layout_query = params.get("layout_query", "BSND")
     layout_kv = params.get("layout_kv", "BSND")
     sparse_mode = params.get("sparse_mode", 3)
-    sparse_block_size = params.get("sparse_block_size", params.get("sparse_blocksize", 1))
+    sparse_block_size = params.get(
+        "sparse_block_size", params.get("sparse_blocksize", 1)
+    )
     tile_size = params.get("tile_size", 128)
     rope_head_dim = params.get("rope_head_dim", 64)
     scale_value = params.get("scale_value", params.get("scalevalue", 1.0))
@@ -303,24 +340,32 @@ def compute_golden_with_provided_api_tensors(input_tensor_dict, params):
         act_kv_per_batch = [act_kv_per_batch[0]] * batch
 
     q_nope = query[..., :d_kv].cpu().float()
-    q_rope = query[..., d_kv:d_kv + rope_head_dim].cpu().float()
+    q_rope = query[..., d_kv : d_kv + rope_head_dim].cpu().float()
     q_full = torch.cat([q_nope, q_rope], dim=-1)
     q_full_shape = [q_shape[0], q_shape[1], d_full] if is_tnd_q else list(q_shape)
     q_full_shape[-1] = d_full
-    q_bnsd, q_bnsd_shape = ttk_trans_shape_to_bnsd(q_full, q_full_shape, layout_query, num_heads, act_q_per_batch)
+    q_bnsd, q_bnsd_shape = ttk_trans_shape_to_bnsd(
+        q_full, q_full_shape, layout_query, num_heads, act_q_per_batch
+    )
 
     k_raw = ttk_to_cpu_raw(key)
     if is_pa:
         block_table_cpu = ttk_to_cpu_raw(block_table)
-        block_size_val = int(params.get("block_size", k_shape[1] if len(k_shape) > 1 else tile_size))
+        block_size_val = int(
+            params.get("block_size", k_shape[1] if len(k_shape) > 1 else tile_size)
+        )
         if block_table_cpu is not None:
-            k_bsnd = ttk_pa_to_bnsd(k_raw, block_table_cpu, act_kv_per_batch, batch, block_size_val)
+            k_bsnd = ttk_pa_to_bnsd(
+                k_raw, block_table_cpu, act_kv_per_batch, batch, block_size_val
+            )
         else:
             k_bsnd = k_raw.float()
     else:
         k_bsnd = k_raw
 
-    k_nope, k_rope, k_scale = ttk_unpack_packed_kv_cache(k_bsnd, d_kv, rope_head_dim, tile_size)
+    k_nope, k_rope, k_scale = ttk_unpack_packed_kv_cache(
+        k_bsnd, d_kv, rope_head_dim, tile_size
+    )
     k_full = torch.cat([k_nope, k_rope], dim=-1)
 
     if is_pa:
@@ -334,23 +379,30 @@ def compute_golden_with_provided_api_tensors(input_tensor_dict, params):
         kv_shape_for_bnsd = list(k_bsnd.shape)
         kv_shape_for_bnsd[-1] = d_full
 
-    k_bnsd, k_bnsd_shape = ttk_trans_shape_to_bnsd(k_full, kv_shape_for_bnsd, effective_kv_layout,
-                                                    num_kv_heads, act_kv_per_batch)
-    k_scale_bnsd, _ = ttk_trans_shape_to_bnsd(k_scale, list(k_scale.shape), effective_kv_layout,
-                                               num_kv_heads, act_kv_per_batch)
+    k_bnsd, k_bnsd_shape = ttk_trans_shape_to_bnsd(
+        k_full, kv_shape_for_bnsd, effective_kv_layout, num_kv_heads, act_kv_per_batch
+    )
+    k_scale_bnsd, _ = ttk_trans_shape_to_bnsd(
+        k_scale,
+        list(k_scale.shape),
+        effective_kv_layout,
+        num_kv_heads,
+        act_kv_per_batch,
+    )
 
     k_bnsd_float = k_bnsd.float()
     k_scale_bnsd_float = k_scale_bnsd.float()
-    k_bnsd_float[..., :d_kv] = (
-        k_bnsd_float[..., :d_kv] * torch.repeat_interleave(k_scale_bnsd_float, tile_size, dim=-1)
+    k_bnsd_float[..., :d_kv] = k_bnsd_float[..., :d_kv] * torch.repeat_interleave(
+        k_scale_bnsd_float, tile_size, dim=-1
     )
     # MLA-absorb QSFA tests use the dequantized K_nope slice as V.
     v_bnsd_float = k_bnsd_float[..., :d_kv].clone()
 
     si = ttk_to_cpu_raw(sparse_indices)
     if si is not None:
-        si_bnsd, si_bnsd_shape = ttk_trans_shape_to_bnsd(si, list(si.shape), layout_query, num_kv_heads,
-                                                          act_q_per_batch)
+        si_bnsd, si_bnsd_shape = ttk_trans_shape_to_bnsd(
+            si, list(si.shape), layout_query, num_kv_heads, act_q_per_batch
+        )
     else:
         si_bnsd = torch.zeros((batch, num_kv_heads, seq_q, 1), dtype=torch.int32)
         si_bnsd_shape = list(si_bnsd.shape)
@@ -362,40 +414,77 @@ def compute_golden_with_provided_api_tensors(input_tensor_dict, params):
     group = num_heads // num_kv_heads
 
     for batch_idx in range(batch):
-        batch_q_len = int(act_q_per_batch[batch_idx]) if batch_idx < len(act_q_per_batch) else seq_q
-        batch_kv_len = int(act_kv_per_batch[batch_idx]) if batch_idx < len(act_kv_per_batch) else k_bnsd_shape[2]
+        batch_q_len = (
+            int(act_q_per_batch[batch_idx])
+            if batch_idx < len(act_q_per_batch)
+            else seq_q
+        )
+        batch_kv_len = (
+            int(act_kv_per_batch[batch_idx])
+            if batch_idx < len(act_kv_per_batch)
+            else k_bnsd_shape[2]
+        )
         for n2_idx in range(num_kv_heads):
             for s1_idx in range(batch_q_len):
                 if s1_idx < batch_q_len - batch_kv_len and sparse_mode != 0:
                     continue
-                q_curr = q_bnsd[batch_idx, n2_idx * group: (n2_idx + 1) * group, s1_idx, :]
+                q_curr = q_bnsd[
+                    batch_idx, n2_idx * group : (n2_idx + 1) * group, s1_idx, :
+                ]
                 si_curr = si_bnsd[batch_idx, n2_idx, s1_idx, :]
                 empty, k_sparse, v_sparse = ttk_gather_kv(
-                    k_bnsd_float, v_bnsd_float, si_curr, sparse_block_size, sparse_blockcount,
-                    batch_idx, n2_idx, s1_idx, batch_kv_len, batch_q_len, sparse_mode)
+                    k_bnsd_float,
+                    v_bnsd_float,
+                    si_curr,
+                    sparse_block_size,
+                    sparse_blockcount,
+                    batch_idx,
+                    n2_idx,
+                    s1_idx,
+                    batch_kv_len,
+                    batch_q_len,
+                    sparse_mode,
+                )
                 if empty:
                     continue
                 bmm1 = torch.matmul(q_curr.float(), k_sparse.float().T)
                 softmax_res = softmax(bmm1 * scale_value)
                 bmm2 = torch.matmul(softmax_res.float(), v_sparse.float())
-                y[batch_idx, n2_idx * group: (n2_idx + 1) * group, s1_idx, :] = bmm2
+                y[batch_idx, n2_idx * group : (n2_idx + 1) * group, s1_idx, :] = bmm2
 
     out_shape = list(q_nope.shape)
     y_out = ttk_trans_bnsd_to_layout(y, out_shape, layout_query, act_q_per_batch)
     return y_out.to(query.dtype)
 
 
-def cpu_kv_quant_sparse_flash_attention(query, key, value, sparse_indices, scale_value,
-                                         key_quant_mode, value_quant_mode, *,
-                                         key_dequant_scale=None, value_dequant_scale=None,
-                                         block_table=None, actual_seq_lengths_query=None,
-                                         actual_seq_lengths_kv=None, sparse_block_size=1,
-                                         layout_query="BSND", layout_kv="BSND",
-                                         sparse_mode=3, pre_tokens=(1 << 63) - 1,
-                                         next_tokens=(1 << 63) - 1,
-                                         attention_mode=0, quant_scale_repo_mode=1,
-                                         tile_size=128, rope_head_dim=64,
-                                         key_dtype=None, value_dtype=None, **kwargs):
+def cpu_kv_quant_sparse_flash_attention(
+    query,
+    key,
+    value,
+    sparse_indices,
+    scale_value,
+    key_quant_mode,
+    value_quant_mode,
+    *,
+    key_dequant_scale=None,
+    value_dequant_scale=None,
+    block_table=None,
+    actual_seq_lengths_query=None,
+    actual_seq_lengths_kv=None,
+    sparse_block_size=1,
+    layout_query="BSND",
+    layout_kv="BSND",
+    sparse_mode=3,
+    pre_tokens=(1 << 63) - 1,
+    next_tokens=(1 << 63) - 1,
+    attention_mode=0,
+    quant_scale_repo_mode=1,
+    tile_size=128,
+    rope_head_dim=64,
+    key_dtype=None,
+    value_dtype=None,
+    **kwargs,
+):
     """Golden reference implementation for KV-quantized sparse flash attention with MLA-absorb support."""
     input_tensor_dict = {
         "query_cache": query,

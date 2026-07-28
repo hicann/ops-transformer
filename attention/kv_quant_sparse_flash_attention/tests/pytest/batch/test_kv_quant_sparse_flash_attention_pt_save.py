@@ -15,6 +15,7 @@ import concurrent.futures
 import pytest
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 import kv_quant_sparse_flash_attention_golden
@@ -33,7 +34,9 @@ def execute_qsfa(param_combination):
     global case_id
     params = utils.convert_param_combination_to_cs_format(param_combination)
     input_dict = kv_quant_sparse_flash_attention_golden.generate_input_tensors(params)
-    cpu_result, _, _ = kv_quant_sparse_flash_attention_golden.compute_cpu(input_dict, params)
+    cpu_result, _, _ = kv_quant_sparse_flash_attention_golden.compute_cpu(
+        input_dict, params
+    )
     test_data = {
         "Testcase_Name": params["case_name"],
         "params": params,
@@ -53,4 +56,4 @@ def test_kv_quant_sparse_flash_attention_pt_save(param_combination):
             try:
                 result = future.result()
             except Exception as e:
-                pytest.fail(f"当前用例线程执行失败")
+                pytest.fail("当前用例线程执行失败")

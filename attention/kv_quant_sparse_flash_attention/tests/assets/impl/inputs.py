@@ -11,9 +11,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 __input__ = {
-    "e2e": {
-        "torch_npu.npu_kv_quant_sparse_flash_attention": "generate_kv_quant_inputs"
-    }
+    "e2e": {"torch_npu.npu_kv_quant_sparse_flash_attention": "generate_kv_quant_inputs"}
 }
 
 import math
@@ -49,14 +47,22 @@ def write_float32_scale_bytes(packed_tensor, d_nope, rope_head_dim, scale_value=
     scale_start = d_nope + rope_head_dim * 2
     raw_bytes = packed_tensor.view(torch.uint8)
     if raw_bytes.shape[-1] > rope_start:
-        raw_bytes[..., rope_start:min(scale_start, raw_bytes.shape[-1])].zero_()
+        raw_bytes[..., rope_start : min(scale_start, raw_bytes.shape[-1])].zero_()
     if raw_bytes.shape[-1] <= scale_start:
         return
     scale_tail = raw_bytes[..., scale_start:]
-    byte_values = list(struct.pack("<f", float(scale_value))) * (scale_tail.shape[-1] // 4)
+    byte_values = list(struct.pack("<f", float(scale_value))) * (
+        scale_tail.shape[-1] // 4
+    )
     if len(byte_values) < scale_tail.shape[-1]:
         byte_values.extend([0] * (scale_tail.shape[-1] - len(byte_values)))
-    scale_tail.copy_(torch.tensor(byte_values[:scale_tail.shape[-1]], dtype=torch.uint8, device=packed_tensor.device))
+    scale_tail.copy_(
+        torch.tensor(
+            byte_values[: scale_tail.shape[-1]],
+            dtype=torch.uint8,
+            device=packed_tensor.device,
+        )
+    )
 
 
 def fill_optional_scale(scale_tensor):
@@ -65,7 +71,12 @@ def fill_optional_scale(scale_tensor):
 
 
 def copy_value_from_key(value, key):
-    if value is None or key is None or not torch.is_tensor(value) or not torch.is_tensor(key):
+    if (
+        value is None
+        or key is None
+        or not torch.is_tensor(value)
+        or not torch.is_tensor(key)
+    ):
         return
     if tuple(value.shape) != tuple(key.shape):
         return
@@ -91,12 +102,18 @@ def fill_random_block_table(block_table, actual_seq_kv, block_size, block_num, s
     actual = to_list(actual_seq_kv)
     if not actual:
         actual = [shape[1] * block_size] * shape[0]
-    used_blocks = [math.ceil(max(int(actual[idx] if idx < len(actual) else actual[-1]), 0) / block_size)
-                   for idx in range(shape[0])]
+    used_blocks = [
+        math.ceil(
+            max(int(actual[idx] if idx < len(actual) else actual[-1]), 0) / block_size
+        )
+        for idx in range(shape[0])
+    ]
     required_blocks = sum(used_blocks)
     block_num = int(block_num or required_blocks)
     if required_blocks > block_num:
-        raise ValueError(f"block_table requires {required_blocks} blocks, but block_num is {block_num}")
+        raise ValueError(
+            f"block_table requires {required_blocks} blocks, but block_num is {block_num}"
+        )
 
     generator = torch.Generator(device="cpu")
     generator.manual_seed(int(seed or 0))
@@ -108,7 +125,7 @@ def fill_random_block_table(block_table, actual_seq_kv, block_size, block_num, s
     cursor = 0
     for batch_idx, blocks in enumerate(used_blocks):
         take = min(blocks, shape[1])
-        values = block_ids[cursor:cursor + take]
+        values = block_ids[cursor : cursor + take]
         if torch.is_tensor(block_table):
             table[batch_idx, :take] = values.to(device=block_table.device)
         else:
@@ -120,36 +137,50 @@ def fill_random_block_table(block_table, actual_seq_kv, block_size, block_num, s
         block_table[...] = table.astype(block_table.dtype, copy=False)
 
 
-def generate_kv_quant_inputs(query, key, value, sparse_indices, scale_value,
-                              key_quant_mode, value_quant_mode, sparse_block_size, **kwargs):
+def generate_kv_quant_inputs(
+    query,
+    key,
+    value,
+    sparse_indices,
+    scale_value,
+    key_quant_mode,
+    value_quant_mode,
+    sparse_block_size,
+    **kwargs,
+):
     """Generate valid sparse indices and preprocess inputs for KvQuantSparseFlashAttention with KV quantization."""
     if sparse_indices is None:
         return
 
-    layout_query = kwargs.get('layout_query', 'BSND')
-    layout_kv = kwargs.get('layout_kv', 'BSND')
-    sparse_mode = kwargs.get('sparse_mode', 0)
-    actual_seq_q = kwargs.get('actual_seq_lengths_query')
-    actual_seq_kv = kwargs.get('actual_seq_lengths_kv')
-    block_table = kwargs.get('block_table')
-    tile_size = kwargs.get('tile_size', 128)
-    rope_head_dim = kwargs.get('rope_head_dim', 64)
-    d_nope = kwargs.get('d_nope', 512)
+    layout_query = kwargs.get("layout_query", "BSND")
+    layout_kv = kwargs.get("layout_kv", "BSND")
+    sparse_mode = kwargs.get("sparse_mode", 0)
+    actual_seq_q = kwargs.get("actual_seq_lengths_query")
+    actual_seq_kv = kwargs.get("actual_seq_lengths_kv")
+    block_table = kwargs.get("block_table")
+    tile_size = kwargs.get("tile_size", 128)
+    rope_head_dim = kwargs.get("rope_head_dim", 64)
+    d_nope = kwargs.get("d_nope", 512)
 
-    fill_tensor_from_value(actual_seq_q, kwargs.get('actual_seq_lengths_query'))
-    fill_tensor_from_value(actual_seq_kv, kwargs.get('actual_seq_lengths_kv'))
+    fill_tensor_from_value(actual_seq_q, kwargs.get("actual_seq_lengths_query"))
+    fill_tensor_from_value(actual_seq_kv, kwargs.get("actual_seq_lengths_kv"))
     if layout_kv == "PA_BSND":
-        pa_block_size = kwargs.get('block_size') or key.shape[1]
-        pa_block_num = kwargs.get('block_num') or key.shape[0]
-        fill_random_block_table(block_table, actual_seq_kv, pa_block_size, pa_block_num,
-                                 kwargs.get('block_table_seed', 0))
+        pa_block_size = kwargs.get("block_size") or key.shape[1]
+        pa_block_num = kwargs.get("block_num") or key.shape[0]
+        fill_random_block_table(
+            block_table,
+            actual_seq_kv,
+            pa_block_size,
+            pa_block_num,
+            kwargs.get("block_table_seed", 0),
+        )
 
     # Pytest and op docs both exercise MLA-absorb with value cloned from key.
     copy_value_from_key(value, key)
     write_float32_scale_bytes(key, d_nope, rope_head_dim, 1.0)
     write_float32_scale_bytes(value, d_nope, rope_head_dim, 1.0)
-    fill_optional_scale(kwargs.get('key_dequant_scale'))
-    fill_optional_scale(kwargs.get('value_dequant_scale'))
+    fill_optional_scale(kwargs.get("key_dequant_scale"))
+    fill_optional_scale(kwargs.get("value_dequant_scale"))
 
     act_q_list = to_list(actual_seq_q)
     act_kv_list = to_list(actual_seq_kv)
@@ -183,20 +214,38 @@ def generate_kv_quant_inputs(query, key, value, sparse_indices, scale_value,
             batch_q_lengths.append(cum_sum - prev)
             prev = cum_sum
 
-        batch_kv_lengths = act_kv_list if layout_kv == "PA_BSND" else (
-            [cum_sum - prev_kv for prev_kv, cum_sum in zip([0] + act_kv_list[:-1], act_kv_list)]
-            if layout_kv == "TND" else act_kv_list
+        batch_kv_lengths = (
+            act_kv_list
+            if layout_kv == "PA_BSND"
+            else (
+                [
+                    cum_sum - prev_kv
+                    for prev_kv, cum_sum in zip([0] + act_kv_list[:-1], act_kv_list)
+                ]
+                if layout_kv == "TND"
+                else act_kv_list
+            )
         )
 
         t_offset = 0
         for b in range(B):
-            batch_q = batch_q_lengths[b] if b < len(batch_q_lengths) else batch_q_lengths[0]
-            batch_kv = batch_kv_lengths[b] if b < len(batch_kv_lengths) else batch_kv_lengths[0]
+            batch_q = (
+                batch_q_lengths[b] if b < len(batch_q_lengths) else batch_q_lengths[0]
+            )
+            batch_kv = (
+                batch_kv_lengths[b]
+                if b < len(batch_kv_lengths)
+                else batch_kv_lengths[0]
+            )
 
             for t_local in range(batch_q):
                 t_global = t_offset + t_local
                 for n in range(N2):
-                    threshold = batch_kv if sparse_mode == 0 else batch_kv - batch_q + t_local + 1
+                    threshold = (
+                        batch_kv
+                        if sparse_mode == 0
+                        else batch_kv - batch_q + t_local + 1
+                    )
                     if threshold <= 0:
                         continue
 
@@ -212,7 +261,9 @@ def generate_kv_quant_inputs(query, key, value, sparse_indices, scale_value,
                     topk = min(valid_blocks, K)
                     if topk > 0:
                         if topk > 1:
-                            sparse_indices_new[t_global, n, :topk - 1] = block_indices[:topk - 1]
+                            sparse_indices_new[t_global, n, : topk - 1] = block_indices[
+                                : topk - 1
+                            ]
                         sparse_indices_new[t_global, n, topk - 1] = valid_blocks - 1
 
             t_offset += batch_q
@@ -239,6 +290,8 @@ def generate_kv_quant_inputs(query, key, value, sparse_indices, scale_value,
                     topk = min(valid_blocks, K)
                     if topk > 0:
                         if topk > 1:
-                            sparse_indices_new[b, s, n, :topk - 1] = block_indices[:topk - 1]
+                            sparse_indices_new[b, s, n, : topk - 1] = block_indices[
+                                : topk - 1
+                            ]
                         sparse_indices_new[b, s, n, topk - 1] = valid_blocks - 1
     copy_sparse_indices(sparse_indices, sparse_indices_new)

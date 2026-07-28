@@ -23,11 +23,11 @@ RESULT_PATH = Path("result.xlsx")
 DEVICE_ID = 0
 
 locals()["testcase_files"] = []
-if os.path.isfile(TESTCASE_PATH) and TESTCASE_PATH.endswith('.pt'):
+if os.path.isfile(TESTCASE_PATH) and TESTCASE_PATH.endswith(".pt"):
     locals()["testcase_files"] = [TESTCASE_PATH]
     print(f"指定单个 pt 文件: {TESTCASE_PATH}")
 elif os.path.isdir(TESTCASE_PATH):
-    pt_files = [f for f in os.listdir(TESTCASE_PATH) if f.endswith('.pt')]
+    pt_files = [f for f in os.listdir(TESTCASE_PATH) if f.endswith(".pt")]
     if not pt_files:
         print(f"错误: 目录中没有找到.pt文件: {TESTCASE_PATH}")
     else:
@@ -42,7 +42,12 @@ else:
 def execute_qsfa(testcase_files):
     test_data = torch.load(testcase_files, map_location="cpu")
     testcase_name = os.path.basename(testcase_files).replace(".pt", "")
-    result, fulfill_percent = utils.qsfa_run_npu(test_data, testcase_name=testcase_name, device_id=DEVICE_ID, result_path=RESULT_PATH)
+    result, fulfill_percent = utils.qsfa_run_npu(
+        test_data,
+        testcase_name=testcase_name,
+        device_id=DEVICE_ID,
+        result_path=RESULT_PATH,
+    )
     return result, fulfill_percent, test_data
 
 
@@ -58,7 +63,10 @@ def test_kv_quant_sparse_flash_attention(testcase_files):
                 result, fulfill_percent, test_data = future.result()
                 if result == "Failed":
                     case_name = os.path.basename(testcase_files).replace(".pt", "")
-                    pytest.fail(f"用例名: {case_name}, 精度: {fulfill_percent:.4f}%", pytrace=False)
+                    pytest.fail(
+                        f"用例名: {case_name}, 精度: {fulfill_percent:.4f}%",
+                        pytrace=False,
+                    )
             except Exception as e:
                 params = test_data.get("params") if test_data else None
                 case_name = os.path.basename(testcase_files).replace(".pt", "")

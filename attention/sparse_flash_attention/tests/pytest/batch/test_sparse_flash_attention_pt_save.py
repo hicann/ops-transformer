@@ -15,6 +15,7 @@ import concurrent.futures
 import pytest
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 import sparse_flash_attention_golden
@@ -53,4 +54,4 @@ def test_sparse_flash_attention_pt_save(param_combination):
             try:
                 result = future.result()
             except Exception as e:
-                pytest.fail(f"当前用例线程执行失败")
+                pytest.fail("当前用例线程执行失败")

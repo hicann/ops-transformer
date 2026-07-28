@@ -27,8 +27,8 @@ static constexpr uint32_t sparseModeThree = 3;
 static constexpr uint32_t sparseModeZero = 0;
 
 TEMPLATE_INTF
-__aicore__ inline void GetSingleCoreParam(RunParamStr& runParam, const ConstInfo &constInfo,
-    __gm__ int32_t *actualSeqQlenAddr, __gm__ int32_t * actualSeqKvlenAddr)
+__aicore__ inline void GetSingleCoreParam(RunParamStr &runParam, const ConstInfo &constInfo,
+                                          __gm__ int32_t *actualSeqQlenAddr, __gm__ int32_t *actualSeqKvlenAddr)
 {
     int32_t qsfaActualS1Size = 0;
     int32_t qsfaActualS2Size = 0;
@@ -38,14 +38,13 @@ __aicore__ inline void GetSingleCoreParam(RunParamStr& runParam, const ConstInfo
     if constexpr (LAYOUT_T == QSFA_LAYOUT::TND) {
         // actual seq length first
         if (actualSeqQlenAddr != nullptr) {
-            qsfaActualS1Size = (sIdx == 0) ? actualSeqQlenAddr[0] :
-                actualSeqQlenAddr[sIdx] - actualSeqQlenAddr[sIdx - 1];
+            qsfaActualS1Size =
+                (sIdx == 0) ? actualSeqQlenAddr[0] : actualSeqQlenAddr[sIdx] - actualSeqQlenAddr[sIdx - 1];
         } else {
             qsfaActualS1Size = constInfo.s1Size;
         }
     } else {
-        qsfaActualS1Size = (actualSeqQlenAddr == nullptr) ? constInfo.s1Size :
-            actualSeqQlenAddr[sIdx];
+        qsfaActualS1Size = (actualSeqQlenAddr == nullptr) ? constInfo.s1Size : actualSeqQlenAddr[sIdx];
     }
 
     if (constInfo.isActualLenDimsKVNull) {
@@ -55,16 +54,16 @@ __aicore__ inline void GetSingleCoreParam(RunParamStr& runParam, const ConstInfo
             if constexpr (LAYOUT_T == QSFA_LAYOUT::TND) {
                 qsfaActualS2Size = actualSeqKvlenAddr[sIdx];
             } else {
-                qsfaActualS2Size = (constInfo.actualSeqLenKVSize == actualSeqKVMin) ?
-                    actualSeqKvlenAddr[0] : actualSeqKvlenAddr[sIdx];
+                qsfaActualS2Size =
+                    (constInfo.actualSeqLenKVSize == actualSeqKVMin) ? actualSeqKvlenAddr[0] : actualSeqKvlenAddr[sIdx];
             }
         } else {
             if constexpr (LAYOUT_T == QSFA_LAYOUT::TND) {
-                qsfaActualS2Size = (sIdx == 0) ? actualSeqKvlenAddr[0] :
-                    actualSeqKvlenAddr[sIdx] - actualSeqKvlenAddr[sIdx - 1];
+                qsfaActualS2Size =
+                    (sIdx == 0) ? actualSeqKvlenAddr[0] : actualSeqKvlenAddr[sIdx] - actualSeqKvlenAddr[sIdx - 1];
             } else {
-                qsfaActualS2Size = (constInfo.actualSeqLenKVSize == actualSeqKVMin) ?
-                    actualSeqKvlenAddr[0] : actualSeqKvlenAddr[sIdx];
+                qsfaActualS2Size =
+                    (constInfo.actualSeqLenKVSize == actualSeqKVMin) ? actualSeqKvlenAddr[0] : actualSeqKvlenAddr[sIdx];
             }
         }
     }
@@ -80,23 +79,22 @@ __aicore__ inline void GetSingleCoreParam(RunParamStr& runParam, const ConstInfo
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeParamBatch(RunParamStr& runParam,
-    const ConstInfo &constInfo, __gm__ int32_t *actualSeqQlenAddr, __gm__ int32_t *actualSeqKvlenAddr)
+__aicore__ inline void ComputeParamBatch(RunParamStr &runParam, const ConstInfo &constInfo,
+                                         __gm__ int32_t *actualSeqQlenAddr, __gm__ int32_t *actualSeqKvlenAddr)
 {
     GetSingleCoreParam<TEMPLATE_INTF_ARGS>(runParam, constInfo, actualSeqQlenAddr, actualSeqKvlenAddr);
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeS1LoopInfo(RunParamStr& runParam, const ConstInfo &constInfo,
-    bool lastBN, int64_t nextGs1Idx, int64_t gS1StartIdx)
+__aicore__ inline void ComputeS1LoopInfo(RunParamStr &runParam, const ConstInfo &constInfo, bool lastBN,
+                                         int64_t nextGs1Idx, int64_t gS1StartIdx)
 {
     runParam.gs1LoopStartIdx = gS1StartIdx;
     runParam.qSNumInOneBlock = 1; // qsfa 不切G轴, 计算每个基本块可以拷贝多少行s
 
     if (runParam.nextTokensPerBatch < 0) {
         uint64_t invalidTokenCount = static_cast<uint64_t>(-(runParam.nextTokensPerBatch + 1)) + 1ULL;
-        int64_t gs1LoopStartIdx =
-            invalidTokenCount / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock;
+        int64_t gs1LoopStartIdx = invalidTokenCount / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock;
         if (gs1LoopStartIdx > gS1StartIdx) {
             runParam.gs1LoopStartIdx = gs1LoopStartIdx;
         }
@@ -117,8 +115,7 @@ __aicore__ inline void ComputeS1LoopInfo(RunParamStr& runParam, const ConstInfo 
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeSouterParam(RunParamStr& runParam, const ConstInfo &constInfo,
-    uint32_t sOuterLoopIdx)
+__aicore__ inline void ComputeSouterParam(RunParamStr &runParam, const ConstInfo &constInfo, uint32_t sOuterLoopIdx)
 {
     int64_t qsfaCubeSOuterOffset = sOuterLoopIdx * runParam.qSNumInOneBlock;
     if (runParam.actualS1Size == 0) {
@@ -154,8 +151,8 @@ __aicore__ inline void ComputeSouterParam(RunParamStr& runParam, const ConstInfo
 }
 
 TEMPLATE_INTF
-__aicore__ inline void LoopSOuterOffsetInit(RunParamStr& runParam, const ConstInfo &constInfo,
-    int32_t sIdx, __gm__ int32_t *cuSeqlensQAddr)
+__aicore__ inline void LoopSOuterOffsetInit(RunParamStr &runParam, const ConstInfo &constInfo, int32_t sIdx,
+                                            __gm__ int32_t *cuSeqlensQAddr)
 {
     if ASCEND_IS_AIV {
         int64_t qsfaSeqOffset = 0;
@@ -167,9 +164,8 @@ __aicore__ inline void LoopSOuterOffsetInit(RunParamStr& runParam, const ConstIn
 
         int64_t attentionOutSeqOffset = qsfaSeqOffset * constInfo.n2GDv;
         if constexpr (LAYOUT_T == QSFA_LAYOUT::BSND || LAYOUT_T == QSFA_LAYOUT::TND) {
-            runParam.attentionOutOffset = attentionOutSeqOffset +
-                runParam.sOuterOffset * constInfo.n2GDv + runParam.n2oIdx * constInfo.gDv +
-                runParam.goIdx * constInfo.dSizeV;
+            runParam.attentionOutOffset = attentionOutSeqOffset + runParam.sOuterOffset * constInfo.n2GDv +
+                                          runParam.n2oIdx * constInfo.gDv + runParam.goIdx * constInfo.dSizeV;
         }
         if (constInfo.subBlockIdx == 1) {
             runParam.attentionOutOffset += runParam.firstHalfMRealSize * constInfo.dSizeV;
@@ -178,28 +174,27 @@ __aicore__ inline void LoopSOuterOffsetInit(RunParamStr& runParam, const ConstIn
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeParamS1(RunParamStr& runParam, const ConstInfo &constInfo,
-    uint32_t sOuterLoopIdx, __gm__ int32_t *cuSeqlensQAddr)
+__aicore__ inline bool ComputeParamS1(RunParamStr &runParam, const ConstInfo &constInfo, uint32_t sOuterLoopIdx,
+                                      __gm__ int32_t *cuSeqlensQAddr)
 {
     if (runParam.nextTokensPerBatch < 0) {
         uint64_t invalidTokenCount = static_cast<uint64_t>(-(runParam.nextTokensPerBatch + 1)) + 1ULL;
-        if (runParam.s1oIdx <
-            invalidTokenCount / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock) {
+        if (runParam.s1oIdx < invalidTokenCount / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock) {
             return true;
         }
     }
     ComputeSouterParam<TEMPLATE_INTF_ARGS>(runParam, constInfo, sOuterLoopIdx);
-    LoopSOuterOffsetInit<TEMPLATE_INTF_ARGS>(runParam, constInfo,
-        runParam.boIdx, cuSeqlensQAddr);
+    LoopSOuterOffsetInit<TEMPLATE_INTF_ARGS>(runParam, constInfo, runParam.boIdx, cuSeqlensQAddr);
     return false;
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeLastBN(RunParamStr& runParam, __gm__ int32_t *cuSeqlensQAddr) 
+__aicore__ inline bool ComputeLastBN(RunParamStr &runParam, __gm__ int32_t *cuSeqlensQAddr)
 {
     if constexpr (LAYOUT_T == QSFA_LAYOUT::TND) {
         // TND格式下 相邻Batch中当actualSeqQlen相等时则返回true
-        if (runParam.boIdx > 0 && ((runParam.boIdx == 0 && cuSeqlensQAddr[runParam.boIdx] == 0) || (cuSeqlensQAddr[runParam.boIdx] - cuSeqlensQAddr[runParam.boIdx - 1] == 0))) {
+        if (runParam.boIdx > 0 && ((runParam.boIdx == 0 && cuSeqlensQAddr[runParam.boIdx] == 0) ||
+                                   (cuSeqlensQAddr[runParam.boIdx] - cuSeqlensQAddr[runParam.boIdx - 1] == 0))) {
             return true;
         }
     }
@@ -215,7 +210,7 @@ __aicore__ inline int64_t ClipSInnerTokenCube(int64_t qsfaSInnerToken, int64_t m
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo &constInfo)
+__aicore__ inline bool ComputeS2LoopInfo(RunParamStr &runParam, const ConstInfo &constInfo)
 {
     if (runParam.actualS2Size == 0) {
         runParam.kvLoopEndIdx = 0;
@@ -228,11 +223,12 @@ __aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo 
         runParam.s2LineStartIdx = 0;
         runParam.s2LineEndIdx = Min(runParam.actualS2Size, constInfo.sparseBlockCount);
     } else if (constInfo.sparseMode == sparseModeThree) {
-        runParam.s2LineStartIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(runParam.cubeSOuterOffset - runParam.preTokensPerBatch,
-            0, runParam.actualS2Size);
-        runParam.s2LineEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(runParam.cubeSOuterOffset + runParam.nextTokensPerBatch +
-            runParam.s1RealSize, 0, runParam.actualS2Size);
-        runParam.s2LineEndIdx = Min(runParam.s2LineEndIdx, constInfo.sparseBlockCount); // 当前LI输出的block size只可能是1
+        runParam.s2LineStartIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
+            runParam.cubeSOuterOffset - runParam.preTokensPerBatch, 0, runParam.actualS2Size);
+        runParam.s2LineEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
+            runParam.cubeSOuterOffset + runParam.nextTokensPerBatch + runParam.s1RealSize, 0, runParam.actualS2Size);
+        runParam.s2LineEndIdx =
+            Min(runParam.s2LineEndIdx, constInfo.sparseBlockCount); // 当前LI输出的block size只可能是1
     }
 
     runParam.kvLoopEndIdx = (runParam.s2LineEndIdx + qsfaS2BaseSize - 1) / qsfaS2BaseSize;
@@ -241,7 +237,7 @@ __aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo 
 }
 
 TEMPLATE_INTF
-__aicore__ inline void InitTaskParamByRun(const RunParamStr& runParam, RunInfo &runInfo)
+__aicore__ inline void InitTaskParamByRun(const RunParamStr &runParam, RunInfo &runInfo)
 {
     runInfo.boIdx = runParam.boIdx;
     runInfo.actualS1Size = runParam.actualS1Size;
@@ -253,4 +249,4 @@ __aicore__ inline void InitTaskParamByRun(const RunParamStr& runParam, RunInfo &
     runInfo.kvLoopEndIdx = runParam.kvLoopEndIdx;
 }
 
-#endif  // KV_QUANT_SPARSE_FLASH_ATTENTION_KVCACHE_H
+#endif // KV_QUANT_SPARSE_FLASH_ATTENTION_KVCACHE_H
