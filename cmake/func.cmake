@@ -534,7 +534,7 @@ function(enable_pypto_kernel op_file)
 
     message(STATUS "pypto codegen: ${op_file} -> ${_gen}")
     execute_process(
-        COMMAND ${HI_PYTHON} ${CMAKE_SOURCE_DIR}/cmake/scripts/pypto_codegen.py
+        COMMAND ${HI_PYTHON} ${OPS_ADV_DIR}/cmake/scripts/pypto_codegen.py
                 --py-file ${_py} --out-dir ${_gen}
                 --op-file ${op_file} --soc ${ASCEND_COMPUTE_UNIT}
         RESULT_VARIABLE _rc
