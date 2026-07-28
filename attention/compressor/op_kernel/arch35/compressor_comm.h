@@ -75,31 +75,18 @@ __aicore__ inline T CeilPow2(T num)
     return num;
 }
 
-enum class X_LAYOUT : std::uint8_t {
-    BSH = static_cast<std::uint8_t>(0),
-    TH = static_cast<std::uint8_t>(1)
-};
+enum class X_LAYOUT : std::uint8_t { BSH = static_cast<std::uint8_t>(0), TH = static_cast<std::uint8_t>(1) };
 
-enum class X_DTYPE : std::uint8_t {
-    BF16 = static_cast<std::uint8_t>(0),
-    FP16 = static_cast<std::uint8_t>(1)
-};
+enum class X_DTYPE : std::uint8_t { BF16 = static_cast<std::uint8_t>(0), FP16 = static_cast<std::uint8_t>(1) };
 
-enum class COFF : std::uint8_t {
-    DISABLE = static_cast<std::uint8_t>(1),
-    OVERLAP = static_cast<std::uint8_t>(2)
-};
+enum class COFF : std::uint8_t { DISABLE = static_cast<std::uint8_t>(1), OVERLAP = static_cast<std::uint8_t>(2) };
 
 enum class CACHE_MODE : std::uint8_t {
-    CONTINUOUS = static_cast<std::uint8_t>(1),
-    CYCLE = static_cast<std::uint8_t>(2)
+    LINEAR_BUFFER = static_cast<std::uint8_t>(1),
+    RING_BUFFER = static_cast<std::uint8_t>(2)
 };
 
-enum class TEMPLATE_ID : uint8_t {
-    NORMAL = 0,
-    EMPTY_X = 1,
-    FULL_LOAD = 2
-};
+enum class TEMPLATE_ID : uint8_t { NORMAL = 0, EMPTY_X = 1, FULL_LOAD = 2 };
 
 template <X_LAYOUT X_L, X_DTYPE X_T, COFF C, CACHE_MODE Cache_Mode, typename... Args>
 struct COMPType {
@@ -247,8 +234,8 @@ struct RunInfo {
 
 struct Vec1RunInfo {
     // vec相关信息，一次syncAll需处理数据的起始索引
-    uint32_t c1v1DbIdx = 0;    // vec1 doubleBuffer索引
-    uint32_t v1v2DbIdx = 0;    // v1v2 doubleBuffer索引
+    uint32_t c1v1DbIdx = 0; // vec1 doubleBuffer索引
+    uint32_t v1v2DbIdx = 0; // v1v2 doubleBuffer索引
     uint32_t bStart = 0;
     uint32_t sStart = 0;
     uint32_t dealTcNum = 0;
@@ -347,9 +334,9 @@ __aicore__ inline constexpr uint32_t RepeatElementNum()
 }
 
 // BLOCK和REPEAT的FP32元素数
-inline constexpr uint32_t FP32_BLOCK_ELEMENT_NUM = BYTE_BLOCK / sizeof(float); // 8
+inline constexpr uint32_t FP32_BLOCK_ELEMENT_NUM = BYTE_BLOCK / sizeof(float);         // 8
 inline constexpr uint32_t FP32_REPEAT_ELEMENT_NUM = REPEAT_BLOCK_BYTE / sizeof(float); // 64
-inline constexpr uint32_t REPEAT_STRIDE_NUM = REPEAT_BLOCK_BYTE / BYTE_BLOCK; // 8
+inline constexpr uint32_t REPEAT_STRIDE_NUM = REPEAT_BLOCK_BYTE / BYTE_BLOCK;          // 8
 inline constexpr uint32_t REPEAT_MAX_NUM = 255;
 inline constexpr uint32_t BRCB_NUM = 8;
 inline constexpr uint32_t MAX_R = 256;

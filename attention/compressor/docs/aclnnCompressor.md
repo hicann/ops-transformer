@@ -79,20 +79,19 @@ aclnnStatus aclnnCompressorGetWorkspaceSize(
     const aclTensor *x,
     const aclTensor *wkv,
     const aclTensor *wgate,
-    const aclTensor *stateCacheRef,
+    aclTensor       *stateCacheRef,
     const aclTensor *ape,
-    const aclTensor *stateBlockTable,
-    const aclTensor *cuSeqlens,
-    const aclTensor *seqused,
-    const aclTensor *startPos,
+    const aclTensor *stateBlockTableOptional,
+    const aclTensor *cuSeqlensOptional,
+    const aclTensor *sequsedOptional,
+    const aclTensor *startPosOptional,
     int64_t          cmpRatio,
     int64_t          coff,
     int64_t          cacheMode,
     int64_t          stateCacheStrideDim0,
-    const aclTensor *cmpKv,
-    const aclTensor *stateCache,
+    const aclTensor *cmpKvOut,
     uint64_t        *workspaceSize,
-    aclOpExecutor  **executor)
+    aclOpExecutor   **executor)
 ```
 
 ``` cpp
@@ -109,7 +108,7 @@ aclnnStatus aclnnCompressor(
 
     | 参数名                      | 输入/输出 | 描述  |  使用说明  | 数据类型       | 数据格式   | 维度（shape） | 非连续Tensor |
     |----------------------------|-----------|----------------------------------------------------------------------|----------------|------------|-|-|-|
-    | x | 输入 | 公式中的$X$，表示原始不经压缩的数据。 |  支持B=0,S=0,T=0的空Tensor。  | FLOAT16、BFLOAT16 | ND         | BS合轴：[B,S,H]、BS非合轴：[T,H]|×|
+    | x | 输入 | 公式中的$X$，表示原始不经压缩的数据。 |  支持B=0,S=0,T=0的空Tensor。  | FLOAT16、BFLOAT16 | ND         | BS合轴：[T,H]、BS非合轴：[B,S,H]|×|
     | wkv | 输入 | 公式中的$W^{KV}$，表示kv压缩权重。  |不支持空Tensor。| FLOAT16、BFLOAT16 | ND |[coff* D,H]|×|
     | wgate | 输入 | 公式中的$W^{Gate}$，表示gate压缩权重。 |不支持空Tensor。| FLOAT16、BFLOAT16 | ND |[coff* D,H]|×|
     | stateCacheRef | 输入 | 公式中的$\left[kv\_state, score\_state\right]$, 表示kv\_state和score\_state的历史数据。 |不支持空Tensor| FLOAT32     | ND         |[block_num,block_size,2*coff* D]|支持0轴非连续|
@@ -122,7 +121,7 @@ aclnnStatus aclnnCompressor(
     | coff | 可选输入 | 表示是否进行overlap数据重排。 |取值范围为[1, 2]。当coff=1时，无需进行overlap数据重排。当coff=2时，需要进行overlap数据重排。| INT32          | -         |-|-|
     | cacheMode | 可选输入 | 表示state_cache的存储模式。 |取值范围为[1, 2]；1表示连续buffer，2表示循环buffer。| INT32          | -         |-|-|
     | stateCacheStrideDim0 | 可选输入 | 表示state_cache的0轴stride。 |-| INT32     | -         |-|-|
-    | cmpKv | 输出 | 表示压缩后的数据。 |支持B=0,S=0,T=0的空Tensor。| FLOAT16、BFLOAT16         | ND          |BS合轴：[B,ceil(S/cmp_ratio),D]、BS非合轴：[min(T,T//cmp_ratio+B),D]|×|
+    | cmpKv | 输出 | 表示压缩后的数据。 |支持B=0,S=0,T=0的空Tensor。| FLOAT16、BFLOAT16         | ND          |BS合轴：[min(T,T//cmp_ratio+B),D]、BS非合轴：[B,ceil(S/cmp_ratio),D]|×|
 
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
  cacheMode不支持输入2，且不支持0轴非连续。

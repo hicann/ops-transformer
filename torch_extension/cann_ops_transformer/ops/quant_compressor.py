@@ -15,25 +15,30 @@ from cann_ops_transformer.op_builder.builder import OpBuilder
 from cann_ops_transformer.op_builder.builder import AS_LIBRARY
 
 
+class QuantMode(IntEnum):
+    A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL = 1
+
+
 class CacheMode(IntEnum):
     LINEAR_BUFFER = 1
     RING_BUFFER = 2
 
 
-class CompressorOpBuilder(OpBuilder):
+class QuantCompressorOpBuilder(OpBuilder):
     def __init__(self):
-        super(CompressorOpBuilder, self).__init__("compressor")
+        super(QuantCompressorOpBuilder, self).__init__("quant_compressor")
 
     def sources(self):
         """Path to C++ source code."""
-        return ["ops/csrc/compressor.cpp"]
+        return ["ops/csrc/quant_compressor.cpp"]
 
     def schema(self):
         """PyTorch operator signature."""
         return (
-            "compressor(Tensor x, Tensor wkv, Tensor wgate, Tensor(a!) state_cache, "
+            "quant_compressor(Tensor x, Tensor wkv, Tensor wgate, Tensor(a!) state_cache, "
             "Tensor ape, "
-            "int cmp_ratio=4, *, "
+            "int quant_mode, int cmp_ratio, *, "
+            "Tensor? x_descale=None, Tensor? wkv_descale=None, Tensor? wgate_descale=None, "
             "Tensor? state_block_table=None, Tensor? cu_seqlens=None, "
             "Tensor? seqused=None, Tensor? start_pos=None, "
             "int coff=1, int cache_mode=1) -> Tensor"
@@ -46,14 +51,18 @@ class CompressorOpBuilder(OpBuilder):
         """
 
         @impl(AS_LIBRARY, self.name, "Meta")
-        def compressor_meta(
+        def quant_compressor_meta(
             x,
             wkv,
             wgate,
             state_cache,
             ape,
-            cmp_ratio=4,
+            quant_mode,
+            cmp_ratio,
             *,
+            x_descale=None,
+            wkv_descale=None,
+            wgate_descale=None,
             state_block_table=None,
             cu_seqlens=None,
             seqused=None,
@@ -69,43 +78,52 @@ class CompressorOpBuilder(OpBuilder):
                 cmp_kv_size = (b, sr, d)
             else:
                 t = x.size(0)
-                sr = (t + cmp_ratio - 1) // cmp_ratio
+                b_size = cu_seqlens.size(0) - 1
+                sr = min(t, t // cmp_ratio + b_size)
                 cmp_kv_size = (sr, d)
 
-            return torch.empty(cmp_kv_size, dtype=x.dtype, device="meta")
+            return torch.empty(cmp_kv_size, dtype=torch.bfloat16, device="meta")
 
 
-compressor_op_builder = CompressorOpBuilder()
+quant_compressor_op_builder = QuantCompressorOpBuilder()
 
 
-@impl(AS_LIBRARY, compressor_op_builder.name, "PrivateUse1")
-def compressor(
+@impl(AS_LIBRARY, quant_compressor_op_builder.name, "PrivateUse1")
+def quant_compressor(
     x: torch.Tensor,
     wkv: torch.Tensor,
     wgate: torch.Tensor,
     state_cache: torch.Tensor,
     ape: torch.Tensor,
-    cmp_ratio: int = 4,
+    quant_mode: QuantMode,
+    cmp_ratio: int,
     *,
+    x_descale: Optional[torch.Tensor] = None,
+    wkv_descale: Optional[torch.Tensor] = None,
+    wgate_descale: Optional[torch.Tensor] = None,
     state_block_table: Optional[torch.Tensor] = None,
     cu_seqlens: Optional[torch.Tensor] = None,
     seqused: Optional[torch.Tensor] = None,
     start_pos: Optional[torch.Tensor] = None,
     coff: Optional[int] = 1,
-    cache_mode: Optional[CacheMode] = CacheMode.LINEAR_BUFFER,
+    cache_mode: CacheMode = CacheMode.LINEAR_BUFFER,
 ) -> torch.tensor:
     """
     dispatcher implementation for NPU.
     'PrivateUse1' is the combine key for custom NPU backends.
     """
-    op_module = compressor_op_builder.load()
-    return op_module.compressor(
+    op_module = quant_compressor_op_builder.load()
+    return op_module.quant_compressor(
         x,
         wkv,
         wgate,
         state_cache,
         ape,
+        quant_mode,
         cmp_ratio,
+        x_descale,
+        wkv_descale,
+        wgate_descale,
         state_block_table,
         cu_seqlens,
         seqused,
@@ -115,4 +133,5 @@ def compressor(
     )
 
 
-compressor.CacheMode = CacheMode
+quant_compressor.QuantMode = QuantMode
+quant_compressor.CacheMode = CacheMode

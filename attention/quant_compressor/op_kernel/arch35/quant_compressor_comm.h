@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file compressor_comm.h
+ * \file quant_compressor_comm.h
  * \brief
  */
 
-#ifndef COMPRESSOR_COMM_H
-#define COMPRESSOR_COMM_H
+#ifndef QUANT_COMPRESSOR_COMM_H
+#define QUANT_COMPRESSOR_COMM_H
 
 #include "kernel_operator.h"
 #include "kernel_operator_list_tensor_intf.h"
@@ -24,19 +24,14 @@
 
 using namespace AscendC;
 
-namespace Compressor {
+namespace QuantCompressor {
 template <typename T>
 __aicore__ inline T CeilDivT(T num1, T num2)
 {
     if (num2 == 0) {
         return static_cast<T>(0);
     }
-    T quotient = num1 / num2;
-    T remainder = num1 % num2;
-    if (remainder != 0 && ((num1 > 0 && num2 > 0) || (num1 < 0 && num2 < 0))) {
-        return quotient + 1;
-    }
-    return quotient;
+    return (num1 + num2 - 1) / num2;
 }
 
 template <typename T>
@@ -77,7 +72,7 @@ __aicore__ inline T CeilPow2(T num)
 
 enum class X_LAYOUT : std::uint8_t { BSH = static_cast<std::uint8_t>(0), TH = static_cast<std::uint8_t>(1) };
 
-enum class X_DTYPE : std::uint8_t { BF16 = static_cast<std::uint8_t>(0), FP16 = static_cast<std::uint8_t>(1) };
+enum class X_DTYPE : std::uint8_t { HIFP8 = static_cast<std::uint8_t>(0) };
 
 enum class COFF : std::uint8_t { DISABLE = static_cast<std::uint8_t>(1), OVERLAP = static_cast<std::uint8_t>(2) };
 
@@ -86,46 +81,17 @@ enum class CACHE_MODE : std::uint8_t {
     RING_BUFFER = static_cast<std::uint8_t>(2)
 };
 
+enum class QUANT_MODE : std::uint8_t { A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL = static_cast<std::uint8_t>(1) };
+
 enum class TEMPLATE_ID : uint8_t { NORMAL = 0, EMPTY_X = 1, FULL_LOAD = 2 };
 
-template <X_LAYOUT X_L, X_DTYPE X_T, COFF C, typename... Args>
+template <X_LAYOUT X_L, X_DTYPE X_T, COFF C, CACHE_MODE Cache_Mode, QUANT_MODE Quant_Mode, typename... Args>
 struct COMPType {
     static constexpr X_LAYOUT xLayout = X_L;
     static constexpr X_DTYPE xDtype = X_T;
     static constexpr COFF coff = C;
-};
-
-struct LoopInfo {
-    uint32_t groupSize = 0U;
-    uint32_t groupNum = 0U;
-    uint32_t coreRowIdx = 0U;
-    uint32_t coreColIdx = 0U;
-    uint32_t dLoopIdx = 0U;
-    bool isCoreRowFirst = false;
-    bool isCoreRowLast = false;
-    bool isCoreLoopFirst = false;
-    bool isCoreLoopLast = false;
-};
-
-struct Vec1SplitInfo {
-    uint32_t dealSeqStartIdx = 0;
-    uint32_t dealSeqCnt = 0;
-    uint32_t dBaseSize = 0;
-    uint32_t vec1GroupSize = 0;
-    uint32_t vec1GroupNum = 0;
-    uint32_t dealTcSize = 0;
-    uint32_t dealTcNum = 0;
-    uint32_t dealBatchNum = 0;
-    uint32_t preDealTcSize = 0;
-    uint32_t preDealBatchNum = 0;
-    uint32_t curBStart = 0;
-    uint32_t curSStart = 0;
-    uint32_t curCompressedCnt = 0;
-    uint32_t preCompressedCnt = 0;
-    uint32_t totalCompressedCnt = 0;
-    uint32_t tcSplitSize = 0;
-    uint32_t dSplitSize = 0;
-    uint32_t dLoopCount = 0;
+    static constexpr CACHE_MODE cacheMode = Cache_Mode;
+    static constexpr QUANT_MODE quantMode = Quant_Mode;
 };
 
 struct CmpBlockInfo {
@@ -204,6 +170,7 @@ struct ConstInfo {
     uint32_t sSize = 0;
     uint32_t headDim = 0;
     uint32_t cmpRatio = 0;
+
     uint64_t stateCacheStrideDim0 = 0;
 
     uint32_t curGroupIdx = 0;
@@ -218,16 +185,15 @@ struct ConstInfo {
 
     // workSpace
     uint32_t dbWorkspaceRatio = 1;
-    uint64_t mm1KvResSize = 0;
-    uint64_t mm1ScoreResSize = 0;
+    uint32_t mm1KvResSize = 0;
+    uint32_t mm1ScoreResSize = 0;
     uint32_t vec1TailCacheSize = 0;
-    uint64_t vec1ResSize = 0;
-    uint64_t mm1ResSize = 0; // 所有cube输出kv/score结果的总大小
+    uint32_t mm1ResSize = 0; // 所有cube输出kv/score结果的总大小
 
     uint32_t aiCoreIdx = 0;
     uint32_t nSize = 0;
 
-    uint64_t dbSize = 0;
+    uint32_t dbSize = 0;
 };
 
 struct RunInfo {
@@ -246,6 +212,10 @@ struct RunInfo {
     uint32_t preDealSeqCnt = 0;  // 左边需要处理的s大小
     uint32_t preFirstSeqCnt = 0; // 左边首块大小
 
+    uint32_t kStartIdx = 0;
+    uint32_t dealKSize = 0;
+    uint32_t hStart = 0;
+
     uint32_t bEnd = 0;
     uint32_t sEnd = 0;
     uint32_t bStartSeqIdx = 0;
@@ -256,13 +226,13 @@ struct RunInfo {
     uint32_t scEnd = 0;
     uint32_t dealScSize = 0;
 
+    // vec1Res offset
     uint64_t vec1ResOffset = 0;
 };
 
 struct Vec1RunInfo {
     // vec相关信息，一次syncAll需处理数据的起始索引
     uint32_t c1v1DbIdx = 0; // vec1 doubleBuffer索引
-    uint32_t v1v2DbIdx = 0; // v1v2 doubleBuffer索引
     uint32_t bStart = 0;
     uint32_t sStart = 0;
     uint32_t dealTcNum = 0;
@@ -280,6 +250,57 @@ struct MSplitInfo {
     uint64_t vec1ResOffset = 0;
 };
 
+struct BlockInfo {
+    __aicore__ inline BlockInfo(uint32_t bIdx, uint32_t sIdx, uint32_t dealSeqSize)
+        : bIdx(bIdx), sIdx(sIdx), dealSeqSize(dealSeqSize){};
+    uint32_t bIdx = 0U;
+    uint32_t sIdx = 0U;
+    uint32_t dealSeqSize = 0;
+
+    uint32_t isFirst = true;
+    uint32_t bSeqUsed = 0U;
+    uint32_t bStartPos = 0U;
+    uint32_t headHolderSeqCnt = 0U;
+    uint32_t validSeqCnt = 0U;
+    uint32_t tailHolderSeqCnt = 0U;
+    uint32_t dealTcSize = 0U;
+    uint32_t tailValidSeqCnt = 0U;
+    uint32_t compressTcSize = 0U;
+};
+
+struct LoopInfo {
+    uint32_t groupSize = 0U;
+    uint32_t groupNum = 0U;
+    uint32_t coreRowIdx = 0U;
+    uint32_t coreColIdx = 0U;
+    uint32_t dLoopIdx = 0U;
+    bool isCoreRowFirst = false;
+    bool isCoreRowLast = false;
+    bool isCoreLoopFirst = false;
+    bool isCoreLoopLast = false;
+};
+
+struct Vec1SplitInfo {
+    uint32_t dealSeqStartIdx = 0;
+    uint32_t dealSeqCnt = 0;
+    uint32_t dBaseSize = 0;
+    uint32_t vec1GroupSize = 0;
+    uint32_t vec1GroupNum = 0;
+    uint32_t dealTcSize = 0;
+    uint32_t dealTcNum = 0;
+    uint32_t dealBatchNum = 0;
+    uint32_t preDealTcSize = 0;
+    uint32_t preDealBatchNum = 0;
+    uint32_t curBStart = 0;
+    uint32_t curSStart = 0;
+    uint32_t curCompressedCnt = 0;
+    uint32_t preCompressedCnt = 0;
+    uint32_t totalCompressedCnt = 0;
+    uint32_t tcSplitSize = 0;
+    uint32_t dSplitSize = 0;
+    uint32_t dLoopCount = 0;
+};
+
 // BUFFER的字节数
 inline constexpr uint32_t BUFFER_SIZE_BYTE_32B = 32;
 inline constexpr uint32_t BUFFER_SIZE_BYTE_64B = 64;
@@ -290,12 +311,34 @@ inline constexpr uint32_t BUFFER_SIZE_BYTE_2K = 2048;
 inline constexpr uint32_t BUFFER_SIZE_BYTE_4K = 4096;
 inline constexpr uint32_t BUFFER_SIZE_BYTE_8K = 8192;
 inline constexpr uint32_t BUFFER_SIZE_BYTE_16K = 16384;
+
+// VF算子公共常量
+inline constexpr uint32_t VF_D_SIZE_8 = 8;
+inline constexpr uint32_t VF_D_SIZE_16 = 16;
+inline constexpr uint32_t VF_D_SIZE_32 = 32;
+inline constexpr uint32_t VF_D_SIZE_64 = 64;
+inline constexpr uint32_t VF_D_SIZE_128 = 128;
+inline constexpr uint32_t VF_D_SIZE_256 = 256;
+inline constexpr uint32_t VF_D_SIZE_512 = 512;
+inline constexpr uint32_t VF_FLOAT_REP_SIZE = 64;
 inline constexpr uint32_t BUFFER_SIZE_BYTE_32K = 32768;
 inline constexpr uint32_t BUFFER_SIZE_BYTE_64K = 65536;
 
 // BLOCK和REPEAT的字节数
 inline constexpr uint32_t BYTE_BLOCK = 32UL;
 inline constexpr uint32_t REPEAT_BLOCK_BYTE = 256U;
+
+template <typename C>
+__aicore__ inline constexpr uint32_t BlockElementNum()
+{
+    return (BYTE_BLOCK / sizeof(C));
+}
+
+template <typename C>
+__aicore__ inline constexpr uint32_t RepeatElementNum()
+{
+    return (REPEAT_BLOCK_BYTE / sizeof(C));
+}
 // BLOCK和REPEAT的FP32元素数
 inline constexpr uint32_t FP32_BLOCK_ELEMENT_NUM = BYTE_BLOCK / sizeof(float);         // 8
 inline constexpr uint32_t FP16_BLOCK_ELEMENT_NUM = BYTE_BLOCK / sizeof(bfloat16_t);    // 16
@@ -304,23 +347,6 @@ inline constexpr uint32_t REPEAT_STRIDE_NUM = REPEAT_BLOCK_BYTE / BYTE_BLOCK;   
 inline constexpr uint32_t REPEAT_MAX_NUM = 255;
 inline constexpr uint32_t BRCB_NUM = 8;
 inline constexpr uint32_t MAX_R = 256;
-
-inline constexpr uint32_t NZ_FRACTAL_DIM = 16;
-inline constexpr uint32_t WEIGHT_MATRIX_NUM = 2;
-inline constexpr uint32_t STATE_INTERLEAVE_FACTOR = 2;
-inline constexpr float SOFTMAX_MIN_VALUE = -2e38f;
-
-template <typename C>
-__aicore__ inline constexpr uint32_t BlockElementNum()
-{
-    return static_cast<uint32_t>(BYTE_BLOCK / sizeof(C));
-}
-
-template <typename C>
-__aicore__ inline constexpr uint32_t RepeatElementNum()
-{
-    return static_cast<uint32_t>(REPEAT_BLOCK_BYTE / sizeof(C));
-}
 
 template <typename T>
 __aicore__ inline void CopySingleMatrixNDToNZ(LocalTensor<T> l1Tensor, const GlobalTensor<T> gmTensor, uint32_t nValue,
@@ -343,6 +369,41 @@ __aicore__ inline void CopySingleMatrixNDToNZ(LocalTensor<T> l1Tensor, const Glo
     nd2nzPara.dstNzMatrixStride = 0;
     DataCopy(l1Tensor, gmTensor, nd2nzPara);
 }
+template <typename T>
+__aicore__ inline void DumpTensorForDim2(GlobalTensor<T> tensor, uint32_t desc, uint32_t dumpSize, uint32_t row,
+                                         uint32_t col)
+{
+    uint32_t array2[] = {static_cast<uint32_t>(row), static_cast<uint32_t>(col)};
+    AscendC::ShapeInfo shapeInfo(2, array2);
+    // AscendC::DumpTensor(tensor, desc, dumpSize, shapeInfo);
+}
 
-} // namespace Compressor
+template <typename T>
+__aicore__ inline void DumpTensorForDim2(LocalTensor<T> tensor, uint32_t desc, uint32_t dumpSize, uint32_t row,
+                                         uint32_t col)
+{
+    uint32_t array2[] = {static_cast<uint32_t>(row), static_cast<uint32_t>(col)};
+    AscendC::ShapeInfo shapeInfo(2, array2);
+    // AscendC::DumpTensor(tensor, desc, dumpSize, shapeInfo);
+}
+
+template <typename T>
+__aicore__ inline void DumpTensorForDim2(LocalTensor<T> tensor, uint32_t desc, uint32_t dumpSize)
+{
+    uint32_t col = 32 / sizeof(T);
+    uint32_t array2[] = {static_cast<uint32_t>(dumpSize / col), static_cast<uint32_t>(col)};
+    AscendC::ShapeInfo shapeInfo(2, array2);
+    // AscendC::DumpTensor(tensor, desc, dumpSize, shapeInfo);
+}
+
+template <typename T>
+__aicore__ inline void DumpTensorForDim2(GlobalTensor<T> tensor, uint32_t desc, uint32_t dumpSize)
+{
+    uint32_t col = 32 / sizeof(T);
+    uint32_t array2[] = {static_cast<uint32_t>(dumpSize / col), static_cast<uint32_t>(col)};
+    AscendC::ShapeInfo shapeInfo(2, array2);
+    // AscendC::DumpTensor(tensor, desc, dumpSize, shapeInfo);
+}
+
+} // namespace QuantCompressor
 #endif
