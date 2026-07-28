@@ -334,7 +334,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>quantMode（int64_t）</td>
       <td>输入</td>
       <td>表示不同量化场景</td>
-      <td>取值为0、1、-1、2、3、6、7、8、9、11、12、13、14、15、16、17（不同产品支持情况有差异，见表后描述）
+      <td>取值为0、1、-1、2、3、4、5、6、7、8、9、11、12、13、14、15、16、17（不同产品支持情况有差异，见表后描述）
         <br>0：表示静态quant场景;
         <br>1：表示动态quant场景，expandedXOut量化到INT8;
         <br>-1：表示不量化场景;
@@ -511,7 +511,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
 - **不同产品支持情况差异**
   - quantMode支持情况差异：
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持-1、0、1。
-    - <term>Ascend 950PR/Ascend 950DT</term>：支持-1、0、1、2、3、6、7、8、9、11、12、13、14、15、16、17。
+    - <term>Ascend 950PR/Ascend 950DT</term>：支持-1、0、1、2、3、4、5、6、7、8、9、11、12、13、14、15、16、17。
   - <term>Ascend 950PR/Ascend 950DT</term>仅支持如下参数的值：
     - activeNum仅支持值等于NUM_ROWS*K。
     - expertCapacity在Dropless场景下仅校验其值，不使用该参数；在DropPad场景下必须校验且取值范围为(0, NUM_ROWS]。
