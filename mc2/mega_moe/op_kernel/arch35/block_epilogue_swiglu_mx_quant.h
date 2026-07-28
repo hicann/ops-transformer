@@ -107,11 +107,11 @@ static constexpr AscendC::MicroAPI::CastTrait CAST_32_TO_82 = {
 static constexpr AscendC::MicroAPI::CastTrait CAST_32_TO_83 = {
     AscendC::MicroAPI::RegLayout::THREE, AscendC::MicroAPI::SatMode::SAT, AscendC::MicroAPI::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT};
-#define BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS                                                                 \
-    template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_,       \
+#define BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS \
+    template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_, \
               bool IsTensorList_, uint32_t TileM, uint32_t TileN, bool TopkWeightsPrefetch, bool IsInterleaved_>
-#define BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS                                                                       \
-    DataTypeOut_, DataTypeIn_, DataTypeX2Scale_, DataTypeX1Scale_, IsTensorList_, TileM, TileN, TopkWeightsPrefetch,   \
+#define BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS \
+    DataTypeOut_, DataTypeIn_, DataTypeX2Scale_, DataTypeX1Scale_, IsTensorList_, TileM, TileN, TopkWeightsPrefetch, \
         IsInterleaved_
 
 template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_,
@@ -119,9 +119,7 @@ template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_
           bool IsInterleaved_ = false>
 class BlockEpilogueSwigluMxQuant {
 public:
-    __aicore__ inline BlockEpilogueSwigluMxQuant()
-    {
-    }
+    __aicore__ inline BlockEpilogueSwigluMxQuant() {}
 
     static constexpr uint32_t MAX_TILE_M = TileM;
     static constexpr uint32_t MAX_SINGLE_MN = TileM * TileN;
@@ -204,6 +202,7 @@ private:
     GM_ADDR yGmAddr_{nullptr};
     GM_ADDR yScaleGmAddr_{nullptr};
     GM_ADDR groupFlagListGmBaseAddr_{nullptr};
+    GM_ADDR metaInfoGmAddr_{nullptr};
 
     // UB ADDR
     AscendC::LocalTensor<DataTypeIn> l0cOutUbFirst_{AscendC::TPosition::VECIN, 0, MAX_SINGLE_MN};
@@ -243,7 +242,8 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     yScaleGmAddr_ = params.yScaleGmAddr;
     groupFlagListGmBaseAddr_ = params.groupFlagListGmAddr;
     clampLimit_ = params.clampLimit;
-    metaInfoGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(params.metaInfoGmAddr));
+    metaInfoGmAddr_ = params.metaInfoGmAddr;
+    metaInfoGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(metaInfoGmAddr_));
     if constexpr (AscendC::IsSameType<DataTypeOut, fp8_e4m3fn_t>::value) {
         fpEmax_ = FP8_E4M3_MAX_EXP;
     } else if constexpr (AscendC::IsSameType<DataTypeOut, fp8_e5m2_t>::value) {
@@ -280,8 +280,8 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
 }
 
 BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void
-BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(const BlockCoord &baseOffset)
+__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(
+    const BlockCoord &baseOffset)
 {
     if constexpr (g_coreType == AscendC::AIV) {
         quantOutputGlobal_.SetGlobalBuffer((__gm__ int8_t *)yGmAddr_ + Get<Y_IDX>(baseOffset));
@@ -499,7 +499,6 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeDat
     }
     return;
 }
-
 
 BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void
