@@ -115,6 +115,7 @@ private:
     uint32_t isNAligned_ = 0;
     uint32_t isNNAligned_ = 0;
     uint32_t isDAligned_ = 0;
+    bool isHResActive_ = true;
 
     const char *opName_ = "MhcPostBackward";
     ge::DataType dtype_ = ge::DT_UNDEFINED;
@@ -138,6 +139,27 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::GetPlatformInfo()
 
 ge::graphStatus MhcPostBackwardTilingBaseArch35::GetShapeAttrsInfo()
 {
+    auto totalInputs = context_->GetComputeNodeInputNum();
+    OP_LOGI(context_, "GetShapeAttrsInfo: totalInputs=%zu", totalInputs);
+    for (size_t i = 0; i < totalInputs; i++) {
+        auto desc = context_->GetInputDesc(i);
+        auto shape = context_->GetInputShape(i);
+        if (desc == nullptr || shape == nullptr) {
+            OP_LOGI(context_, "  input[%zu]: desc=%p, shape=%p", i, desc, shape);
+        } else {
+            const auto &s = shape->GetStorageShape();
+            std::string shapeStr = "[";
+            for (size_t d = 0; d < s.GetDimNum(); d++) {
+                shapeStr += std::to_string(s.GetDim(d));
+                if (d + 1 < s.GetDimNum())
+                    shapeStr += ",";
+            }
+            shapeStr += "]";
+            OP_LOGI(context_, "  input[%zu]: dtype=%d, shape=%s, shapeSize=%ld", i,
+                    static_cast<int32_t>(desc->GetDataType()), shapeStr.c_str(), s.GetShapeSize());
+        }
+    }
+
     auto gradOutputShapePtr = context_->GetInputShape(GRAD_OUTPUT_INPUT_INDEX);
     if (gradOutputShapePtr == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "Storage shape of grad_output", "null",
@@ -145,6 +167,20 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::GetShapeAttrsInfo()
         return ge::GRAPH_FAILED;
     }
     gradOutputShape_ = &gradOutputShapePtr->GetStorageShape();
+
+    auto hResDesc = context_->GetInputDesc(H_RES_INPUT_INDEX);
+    if (hResDesc == nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "Descriptor of input tensor h_res", "null",
+                                              "h_res descriptor must not be null");
+        return ge::GRAPH_FAILED;
+    }
+    auto hResShape = context_->GetInputShape(H_RES_INPUT_INDEX);
+    if (hResShape == nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "Storage shape of input tensor h_res", "null",
+                                              "h_res shape must not be null");
+        return ge::GRAPH_FAILED;
+    }
+    isHResActive_ = hResShape->GetStorageShape().GetShapeSize() != 0;
 
     return ge::GRAPH_SUCCESS;
 }
@@ -207,9 +243,17 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeAllPositive(int64_t i
 
 ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeAllPositive()
 {
-    for (int64_t i = GRAD_OUTPUT_INPUT_INDEX; i <= H_POST_INPUT_INDEX; i++) {
+    const int64_t requiredIndices[] = {GRAD_OUTPUT_INPUT_INDEX, X_INPUT_INDEX, H_OUT_INPUT_INDEX, H_POST_INPUT_INDEX};
+    for (auto i : requiredIndices) {
         if (CheckShapeAllPositive(i) != ge::GRAPH_SUCCESS) {
             OP_LOGE(context_, "input %ld has non-positive shape", i);
+            return ge::GRAPH_FAILED;
+        }
+    }
+
+    if (isHResActive_) {
+        if (CheckShapeAllPositive(H_RES_INPUT_INDEX) != ge::GRAPH_SUCCESS) {
+            OP_LOGE(context_, "input %ld has non-positive shape", H_RES_INPUT_INDEX);
             return ge::GRAPH_FAILED;
         }
     }
@@ -370,23 +414,25 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
             return ge::GRAPH_FAILED;
         }
 
-        auto hResShapePtr = context_->GetInputShape(H_RES_INPUT_INDEX);
-        const gert::Shape *hResShape = &hResShapePtr->GetStorageShape();
-        if (hResShape->GetDimNum() != dimNum) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "Dimension count of h_res",
-                                         std::to_string(hResShape->GetDimNum()).c_str(),
-                                         std::to_string(dimNum).c_str());
-            return ge::GRAPH_FAILED;
-        }
-        if (hResShape->GetDim(0) != B || hResShape->GetDim(1) != S || hResShape->GetDim(2) != n ||
-            hResShape->GetDim(3) != n) {
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                context_->GetNodeName(), "h_res, grad_output",
-                (std::to_string(hResShape->GetDim(0)) + "," + std::to_string(hResShape->GetDim(1)) + "," +
-                 std::to_string(hResShape->GetDim(2)) + "," + std::to_string(hResShape->GetDim(3)))
-                    .c_str(),
-                "h_res shape must be (B,S,n,n)");
-            return ge::GRAPH_FAILED;
+        if (isHResActive_) {
+            auto hResShapePtr = context_->GetInputShape(H_RES_INPUT_INDEX);
+            const gert::Shape *hResShape = &hResShapePtr->GetStorageShape();
+            if (hResShape->GetDimNum() != dimNum) {
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "Dimension count of h_res",
+                                             std::to_string(hResShape->GetDimNum()).c_str(),
+                                             std::to_string(dimNum).c_str());
+                return ge::GRAPH_FAILED;
+            }
+            if (hResShape->GetDim(0) != B || hResShape->GetDim(1) != S || hResShape->GetDim(2) != n ||
+                hResShape->GetDim(3) != n) {
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context_->GetNodeName(), "h_res, grad_output",
+                    (std::to_string(hResShape->GetDim(0)) + "," + std::to_string(hResShape->GetDim(1)) + "," +
+                     std::to_string(hResShape->GetDim(2)) + "," + std::to_string(hResShape->GetDim(3)))
+                        .c_str(),
+                    "h_res shape must be (B,S,n,n)");
+                return ge::GRAPH_FAILED;
+            }
         }
 
         auto hOutShapePtr = context_->GetInputShape(H_OUT_INPUT_INDEX);
@@ -516,22 +562,24 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeConsistency()
             return ge::GRAPH_FAILED;
         }
 
-        auto hResShapePtr = context_->GetInputShape(H_RES_INPUT_INDEX);
-        const gert::Shape *hResShape = &hResShapePtr->GetStorageShape();
-        if (hResShape->GetDimNum() != dimNum) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "Dimension count of h_res",
-                                         std::to_string(hResShape->GetDimNum()).c_str(),
-                                         std::to_string(dimNum).c_str());
-            return ge::GRAPH_FAILED;
-        }
-        if (hResShape->GetDim(0) != T || hResShape->GetDim(1) != n || hResShape->GetDim(2) != n) {
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "h_res, grad_output",
-                                                   (std::to_string(hResShape->GetDim(0)) + "," +
-                                                    std::to_string(hResShape->GetDim(1)) + "," +
-                                                    std::to_string(hResShape->GetDim(2)))
-                                                       .c_str(),
-                                                   "h_res shape must be (T,n,n)");
-            return ge::GRAPH_FAILED;
+        if (isHResActive_) {
+            auto hResShapePtr = context_->GetInputShape(H_RES_INPUT_INDEX);
+            const gert::Shape *hResShape = &hResShapePtr->GetStorageShape();
+            if (hResShape->GetDimNum() != dimNum) {
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "Dimension count of h_res",
+                                             std::to_string(hResShape->GetDimNum()).c_str(),
+                                             std::to_string(dimNum).c_str());
+                return ge::GRAPH_FAILED;
+            }
+            if (hResShape->GetDim(0) != T || hResShape->GetDim(1) != n || hResShape->GetDim(2) != n) {
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "h_res, grad_output",
+                                                       (std::to_string(hResShape->GetDim(0)) + "," +
+                                                        std::to_string(hResShape->GetDim(1)) + "," +
+                                                        std::to_string(hResShape->GetDim(2)))
+                                                           .c_str(),
+                                                       "h_res shape must be (T,n,n)");
+                return ge::GRAPH_FAILED;
+            }
         }
 
         auto hOutShapePtr = context_->GetInputShape(H_OUT_INPUT_INDEX);
@@ -803,7 +851,7 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::PostTiling()
 
 uint64_t MhcPostBackwardTilingBaseArch35::GetTilingKey() const
 {
-    return GET_TPL_TILING_KEY(1);
+    return isHResActive_ ? GET_TPL_TILING_KEY(1, 1) : GET_TPL_TILING_KEY(1, 0);
 }
 
 void MhcPostBackwardTilingBaseArch35::Reset()
@@ -823,6 +871,7 @@ void MhcPostBackwardTilingBaseArch35::Reset()
     usedAic_ = 0;
     itemsPerAic_ = 0;
     remainderItemsAic_ = 0;
+    isHResActive_ = true;
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(MhcPostBackward, MhcPostBackwardTilingBaseArch35,

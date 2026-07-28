@@ -16,6 +16,8 @@
 - 接口功能：mhc_post基于一系列计算对MHC（Manifold-Constrained Hyper-Connection）架构中上一层输出$h_{t}^{out}$进行Post Mapping，对上一层的输入$x_j$进行ResMapping，然后对二者进行残差连接，得到下一层的输入$x_{l+1}$。该算子实现前述过程的反向功能。
 
 - 计算公式：
+
+  当传入hRes（hRes不为nullptr）时：
   $$
   grad\_x = H_{l}^{res} \times grad\_output\\
   grad\_h\_res = x_{l} \times {grad\_output}^{T}
@@ -24,6 +26,20 @@
   grad\_h\_out=({grad\_output} * (H_{l}^{post}.unsqueeze(-1))).sum(dim=-2)\\
   grad\_h\_post=({grad\_output} * (h_{l}^{out}.unsqueeze(-2))).sum(dim=-1)
   $$
+
+  当不传hRes（hRes为nullptr）时：
+  $$
+  grad\_x = grad\_output
+  $$
+  $$
+  grad\_h\_res = x_{l} \times {grad\_output}^{T}
+  $$
+  $$
+  grad\_h\_out=({grad\_output} * (H_{l}^{post}.unsqueeze(-1))).sum(dim=-2)\\
+  grad\_h\_post=({grad\_output} * (h_{l}^{out}.unsqueeze(-2))).sum(dim=-1)
+  $$
+
+  > 注：hRes作为可选参数（支持置为nullptr）仅在 <term>Ascend 950PR/Ascend 950DT</term> 上支持。
 
 ## 函数原型
 
@@ -112,6 +128,7 @@ aclnnStatus aclnnMhcPostBackward(
       <td>MHC的hRes变换矩阵</td>
       <td>
         <ul>
+          <li>可选参数，不传时置为nullptr</li>
           <li>不支持空Tensor</li>
         </ul>
       </td>
