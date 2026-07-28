@@ -16,6 +16,8 @@ import check_valid_param
 import quant_sparse_flash_mla_golden
 import pytest
 import os
+import pandas as pd
+from pathlib import Path
 import utils
 import concurrent.futures
 import logging
@@ -43,6 +45,14 @@ for _, params in enumerate(ENABLED_PARAMS):
         normalized_params[key] = value
     normalized_params["topk_value_mode"] = params.get("topk_value_mode", 1)
     normalized_params["return_softmax_lse"] = params.get("return_softmax_lse", False)
+    normalized_params["ori_kv_topk_mode"] = params.get("ori_kv_topk_mode") or "fullK"
+    normalized_params["cmp_kv_topk_mode"] = params.get("cmp_kv_topk_mode") or "fullK"
+    normalized_params["ori_sparse_indices_mode"] = (
+        params.get("ori_sparse_indices_mode") or "full"
+    )
+    normalized_params["cmp_sparse_indices_mode"] = (
+        params.get("cmp_sparse_indices_mode") or "full"
+    )
     isSink_raw = params.get("isSink", True)
     if isinstance(isSink_raw, str):
         isSink_raw = isSink_raw.upper() == "TRUE"
@@ -55,8 +65,35 @@ for _, params in enumerate(ENABLED_PARAMS):
         "cu_seqlens_ori_kv",
         "cu_seqlens_cmp_kv",
         "cmp_residual_kv",
+        "ori_topk_length",
+        "cmp_topk_length",
     ]:
         normalized_params[key] = utils.parse_list_param(params.get(key))
+    int_keys = [
+        "B",
+        "S1",
+        "S2",
+        "N1",
+        "N2",
+        "D",
+        "K",
+        "K1",
+        "block_num1",
+        "block_num2",
+        "block_size1",
+        "block_size2",
+        "cmp_ratio",
+        "ori_mask_mode",
+        "cmp_mask_mode",
+        "ori_win_left",
+        "ori_win_right",
+        "quant_mode",
+        "topk_value_mode",
+    ]
+    for ik in int_keys:
+        v = normalized_params.get(ik)
+        if v is not None and not isinstance(v, bool):
+            normalized_params[ik] = int(v)
     template_run_mode = normalized_params["template_run_mode"]
     if isinstance(template_run_mode, list):
         template_run_mode = template_run_mode[0]
@@ -75,6 +112,9 @@ for _, params in enumerate(ENABLED_PARAMS):
         "N2",
         "D",
         "K",
+        "K1",
+        "block_num1",
+        "block_num2",
         "block_size1",
         "block_size2",
         "softmax_scale",
@@ -90,6 +130,12 @@ for _, params in enumerate(ENABLED_PARAMS):
         "topk_value_mode",
         "return_softmax_lse",
         "isSink",
+        "ori_kv_topk_mode",
+        "cmp_kv_topk_mode",
+        "ori_sparse_indices_mode",
+        "cmp_sparse_indices_mode",
+        "ori_topk_length",
+        "cmp_topk_length",
         "seqused_q",
         "cu_seqlens_q",
         "seqused_ori_kv",
@@ -113,6 +159,9 @@ for _, params in enumerate(ENABLED_PARAMS):
         [normalized_params["N2"]],
         [normalized_params["D"]],
         [normalized_params["K"]],
+        [normalized_params.get("K1")],
+        [normalized_params.get("block_num1")],
+        [normalized_params.get("block_num2")],
         [normalized_params["block_size1"]],
         [normalized_params["block_size2"]],
         [normalized_params["softmax_scale"]],
@@ -128,6 +177,12 @@ for _, params in enumerate(ENABLED_PARAMS):
         [normalized_params["topk_value_mode"]],
         [normalized_params["return_softmax_lse"]],
         [normalized_params["isSink"]],
+        [normalized_params["ori_kv_topk_mode"]],
+        [normalized_params["cmp_kv_topk_mode"]],
+        [normalized_params["ori_sparse_indices_mode"]],
+        [normalized_params["cmp_sparse_indices_mode"]],
+        [normalized_params["ori_topk_length"]],
+        [normalized_params["cmp_topk_length"]],
         [normalized_params["seqused_q"]],
         [normalized_params["cu_seqlens_q"]],
         [normalized_params["seqused_ori_kv"]],
@@ -144,32 +199,72 @@ for _, params in enumerate(ENABLED_PARAMS):
     logging.info(param_combinations)
 
 case_id = 0
+failed_cases = []
+failed_record_path = Path("pt_save_failed.xlsx")
+
+
+def record_failed_case(param_combinations, error_msg):
+    row = {
+        "case_id": case_id,
+        "template_run_mode": param_combinations.get("template_run_mode"),
+        "layout_q": param_combinations.get("layout_q"),
+        "layout_kv": param_combinations.get("layout_kv"),
+        "B": param_combinations.get("B"),
+        "S1": param_combinations.get("S1"),
+        "S2": param_combinations.get("S2"),
+        "N1": param_combinations.get("N1"),
+        "N2": param_combinations.get("N2"),
+        "D": param_combinations.get("D"),
+        "K": param_combinations.get("K"),
+        "q_type": str(param_combinations.get("q_type")),
+        "ori_kv_type": str(param_combinations.get("ori_kv_type")),
+        "cmp_kv_type": str(param_combinations.get("cmp_kv_type")),
+        "quant_mode": param_combinations.get("quant_mode"),
+        "cmp_ratio": param_combinations.get("cmp_ratio"),
+        "ori_mask_mode": param_combinations.get("ori_mask_mode"),
+        "cmp_mask_mode": param_combinations.get("cmp_mask_mode"),
+        "isSink": param_combinations.get("isSink"),
+        "seqused_q": str(param_combinations.get("seqused_q")),
+        "seqused_ori_kv": str(param_combinations.get("seqused_ori_kv")),
+        "cmp_residual_kv": str(param_combinations.get("cmp_residual_kv")),
+        "error_msg": str(error_msg),
+    }
+    failed_cases.append(row)
+    df = pd.DataFrame(failed_cases)
+    df.to_excel(failed_record_path, index=False)
 
 
 def qsmla(param_combinations):
     global case_id
-    params = utils.fill_none_params(param_combinations)
-
-    Testcase_Name = params["Testcase_Name"]
-    if Testcase_Name is None:
-        ops_mode = "prefill" if params["S1"] > 4 else "decode"
-        q_type_str = "BF16" if params["q_type"] == torch.bfloat16 else "FP16"
-        kv_type_str = "HIF8" if params["ori_kv_type"] == torch.uint8 else "FP8_E4M3FN"
-        Testcase_Name = f"quantSparseFlashMla_{params['template_run_mode']}_{ops_mode}_{params['layout_q']}_{q_type_str}_{params['layout_kv']}_{kv_type_str}_{params['B']}_{params['N1']}_{params['N2']}_{params['S1']}_{params['S2']}_{params['D']}_{params['K']}_{case_id:06d}"
-        params["Testcase_Name"] = Testcase_Name
-    logging.info(f"input_params: {params}")
-
-    # 输入参数的合法性校验
     try:
-        check_valid_param.check_valid_param(params)
-    except ValueError as e:
-        pytest.skip(f"输入参数校验失败:{e}")
+        params = utils.fill_none_params(param_combinations)
 
-    # 生成测试数据
-    quant_sparse_flash_mla_golden.generate_and_save_testdata(
-        params, save_pt=True, save_path=save_path
-    )
-    case_id += 1
+        Testcase_Name = params["Testcase_Name"]
+        if Testcase_Name is None:
+            ops_mode = "prefill" if params["S1"] > 4 else "decode"
+            q_type_str = "BF16" if params["q_type"] == torch.bfloat16 else "FP16"
+            kv_type_str = (
+                "HIF8" if params["ori_kv_type"] == torch.uint8 else "FP8_E4M3FN"
+            )
+            Testcase_Name = f"quantSparseFlashMla_{params['template_run_mode']}_{ops_mode}_{params['layout_q']}_{q_type_str}_{params['layout_kv']}_{kv_type_str}_{params['B']}_{params['N1']}_{params['N2']}_{params['S1']}_{params['S2']}_{params['D']}_{params['K']}_{case_id:06d}"
+            params["Testcase_Name"] = Testcase_Name
+        logging.info(f"input_params: {params}")
+
+        # 输入参数的合法性校验
+        try:
+            check_valid_param.check_valid_param(params)
+        except ValueError as e:
+            pytest.skip(f"输入参数校验失败:{e}")
+
+        # 生成测试数据
+        quant_sparse_flash_mla_golden.generate_and_save_testdata(
+            params, save_pt=True, save_path=save_path
+        )
+    except Exception as e:
+        record_failed_case(param_combinations, e)
+        logging.error(f"[FAILED CASE RECORDED] case_id={case_id}, error={e}")
+    finally:
+        case_id += 1
 
 
 @pytest.mark.ci
@@ -181,6 +276,6 @@ def test_quant_sparse_flash_mla(param_combinations):  # 初始化参数和tensor
         # 等待并获取结果
         for future in concurrent.futures.as_completed([futures]):
             try:
-                future.result()
-            except Exception:
+                result = future.result()
+            except Exception as e:
                 pytest.fail("当前用例线程执行失败")

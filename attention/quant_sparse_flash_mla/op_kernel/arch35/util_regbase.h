@@ -70,6 +70,8 @@ struct RunParamStr { // 分核与切块需要使用到参数
     int64_t qSNumInOneBlock;
     int64_t oriKvLoopEndIdx;
     int64_t cmpKvLoopEndIdx;
+    uint32_t oriSparseBlockCount;
+    uint32_t cmpSparseBlockCount;
 };
 
 #define COMMON_RUN_INFO \
@@ -125,6 +127,8 @@ struct RunInfo {
     int64_t qSNumInOneBlock;
     int64_t oriKvLoopEndIdx;
     int64_t cmpKvLoopEndIdx;
+    uint32_t oriSparseBlockCount;
+    uint32_t cmpSparseBlockCount;
 };
 
 #define COMMON_CONST_INFO \
@@ -194,29 +198,34 @@ struct RunInfo {
     /* dq 或者attentionOut的Stride */ \
     int64_t attentionOutStride; \
     uint32_t aivIdx; \
-    uint8_t subBlockIdx;
+    uint8_t subBlockIdx; \
+    bool hasOriTopkLength; \
+    bool hasCmpTopkLength;
 
 #define INFER_CONST_INFO \
     /* 推理 */ \
     bool isActualLenDimsNull; /* 判断是否有actualseq */ \
     bool isSoftmaxLseEnable; \
-    uint32_t sparseBlockCount; \
-    uint32_t alignedSparseBlockCount; /* 按128对齐后的sparseBlockCount，用于kvPhyAddrGm的UB/GM buffer分配与寻址 */ \
-    uint32_t actualSeqLenSize; /* 用户输入的actualseq的长度 */ \
+    uint32_t oriSparseBlockCount; \
+    uint32_t cmpSparseBlockCount; \
+    uint32_t alignedOriSparseBlockCount; /* ori按128对齐后的sparseBlockCount */ \
+    uint32_t alignedCmpSparseBlockCount; /* cmp按128对齐后的sparseBlockCount */ \
+    uint32_t actualSeqLenSize;           /* 用户输入的actualseq的长度 */ \
     /* service mm1 mm2 pageAttention */ \
     uint32_t oriBlockSize; \
     uint32_t cmpBlockSize; \
     uint32_t paLayoutType; \
     uint32_t oriMaxBlockNumPerBatch; \
     uint32_t cmpMaxBlockNumPerBatch; \
-    uint32_t oriMaskMode; \
     int32_t oriWinLeft; \
     int32_t oriWinRight; \
     uint32_t sparseBlockSize; \
     uint32_t cmpRatio; \
     float softmaxScale; \
     uint32_t oriKvStride; \
-    uint32_t cmpKvStride;
+    uint32_t cmpKvStride; \
+    uint32_t oriMaskMode; \
+    uint32_t cmpMaskMode
 
 struct ConstInfo {
     COMMON_CONST_INFO;

@@ -18,8 +18,8 @@
 using namespace ge;
 using namespace AscendC;
 using std::map;
-using std::string;
 using std::pair;
+using std::string;
 namespace optiling {
 
 std::string QSMLADataTypeToSerialString(ge::DataType type)
@@ -36,10 +36,14 @@ std::string QSMLADataTypeToSerialString(ge::DataType type)
 std::string QSMLALayoutToSerialString(QSMLALayout layout)
 {
     switch (layout) {
-        case QSMLALayout::BSND: return "BSND";
-        case QSMLALayout::TND: return "TND";
-        case QSMLALayout::PA_BBND: return "PA_BBND";
-        default: return "UNKNOWN";
+        case QSMLALayout::BSND:
+            return "BSND";
+        case QSMLALayout::TND:
+            return "TND";
+        case QSMLALayout::PA_BBND:
+            return "PA_BBND";
+        default:
+            return "UNKNOWN";
     }
 }
 
@@ -59,17 +63,17 @@ std::string QSMLAGetShapeStr(gert::Shape shape)
 
 bool QSMLATilingCheck::HasAxis(const QSMLAAxis &axis, const QSMLALayout &layout, const gert::Shape &shape) const
 {
-    const auto& layoutIt = QSMLA_LAYOUT_AXIS_MAP.find(layout);
+    const auto &layoutIt = QSMLA_LAYOUT_AXIS_MAP.find(layout);
     if (layoutIt == QSMLA_LAYOUT_AXIS_MAP.end()) {
         return false;
     }
 
-    const std::vector<QSMLAAxis>& axes = layoutIt->second;
-    const auto& axisIt = std::find(axes.begin(), axes.end(), axis);
+    const std::vector<QSMLAAxis> &axes = layoutIt->second;
+    const auto &axisIt = std::find(axes.begin(), axes.end(), axis);
     if (axisIt == axes.end()) {
         return false;
     }
-    const auto& dimIt = QSMLA_LAYOUT_DIM_MAP.find(layout);
+    const auto &dimIt = QSMLA_LAYOUT_DIM_MAP.find(layout);
     if (dimIt == QSMLA_LAYOUT_DIM_MAP.end() || dimIt->second != shape.GetDimNum()) {
         return false;
     }
@@ -78,8 +82,8 @@ bool QSMLATilingCheck::HasAxis(const QSMLAAxis &axis, const QSMLALayout &layout,
 
 size_t QSMLATilingCheck::GetAxisIdx(const QSMLAAxis &axis, const QSMLALayout &layout) const
 {
-    const std::vector<QSMLAAxis>& axes = QSMLA_LAYOUT_AXIS_MAP.find(layout)->second;
-    const auto& axisIt = std::find(axes.begin(), axes.end(), axis);
+    const std::vector<QSMLAAxis> &axes = QSMLA_LAYOUT_AXIS_MAP.find(layout)->second;
+    const auto &axisIt = std::find(axes.begin(), axes.end(), axis);
     return std::distance(axes.begin(), axisIt);
 }
 
@@ -129,8 +133,10 @@ void QSMLATilingCheck::Init()
     oriBlockSize_ = qsmlaInfo_.oriBlockSize;
     cmpBlockSize_ = qsmlaInfo_.cmpBlockSize;
 
-    sparseBlockCount_ = qsmlaInfo_.sparseBlockCount;
     sparseBlockSize_ = qsmlaInfo_.sparseBlockSize;
+
+    oriSparseBlockCount_ = qsmlaInfo_.oriSparseBlockCount;
+    cmpSparseBlockCount_ = qsmlaInfo_.cmpSparseBlockCount;
 
     cmpRatio_ = qsmlaInfo_.cmpRatio;
     oriWinLeft_ = qsmlaInfo_.oriWinLeft;
@@ -146,16 +152,25 @@ void QSMLATilingCheck::Init()
     outputType_ = qsmlaInfo_.outputType;
 
     if (opParamInfo_.cmpKv.tensor == nullptr) {
-        perfMode_ = QSMLATemplateMode::SWA_TEMPLATE_MODE;
+        if (opParamInfo_.oriSparseIndices.tensor != nullptr) {
+            perfMode_ = QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE;
+        } else {
+            perfMode_ = QSMLATemplateMode::SWA_TEMPLATE_MODE;
+        }
     } else if (opParamInfo_.cmpSparseIndices.tensor != nullptr) {
-        perfMode_ = QSMLATemplateMode::CSA_TEMPLATE_MODE;
+        if (opParamInfo_.oriSparseIndices.tensor != nullptr) {
+            perfMode_ = QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE;
+        } else {
+            perfMode_ = QSMLATemplateMode::CSA_TEMPLATE_MODE;
+        }
     } else {
         perfMode_ = QSMLATemplateMode::HCA_TEMPLATE_MODE;
     }
 }
 
 static ge::graphStatus ValidateKvContiguous(const char *opName, const std::vector<int64_t> &strides,
-    const gert::Shape &shape, const QSMLALayout &kvLayout, const std::string &tensorName)
+                                            const gert::Shape &shape, const QSMLALayout &kvLayout,
+                                            const std::string &tensorName)
 {
     std::vector<int64_t> expectedStrides;
     const size_t dimNum = shape.GetDimNum();
@@ -180,8 +195,8 @@ static ge::graphStatus ValidateKvContiguous(const char *opName, const std::vecto
             continue;
         }
         if (strides[i] != expectedStrides[i]) {
-            OP_LOGE(opName, "%s 's expected stride[%zu]=%ld, but got %ld",
-                tensorName.c_str(), i, expectedStrides[i], strides[i]);
+            OP_LOGE(opName, "%s 's expected stride[%zu]=%ld, but got %ld", tensorName.c_str(), i, expectedStrides[i],
+                    strides[i]);
             return ge::GRAPH_FAILED;
         }
     }
@@ -191,14 +206,14 @@ static ge::graphStatus ValidateKvContiguous(const char *opName, const std::vecto
 ge::graphStatus QSMLATilingCheck::CheckKvContiguous() const
 {
     if (!qsmlaInfo_.oriKvStrides.empty()) {
-        if (ValidateKvContiguous(opName_, qsmlaInfo_.oriKvStrides,
-            qsmlaInfo_.oriKvStorageShape, kvLayout_, ORI_KV_NAME) != ge::GRAPH_SUCCESS) {
-                    return ge::GRAPH_FAILED;
-            }
+        if (ValidateKvContiguous(opName_, qsmlaInfo_.oriKvStrides, qsmlaInfo_.oriKvStorageShape, kvLayout_,
+                                 ORI_KV_NAME) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
     }
     if (!qsmlaInfo_.cmpKvStrides.empty()) {
-        if (ValidateKvContiguous(opName_, qsmlaInfo_.cmpKvStrides,
-            qsmlaInfo_.cmpKvStorageShape, kvLayout_, CMP_KV_NAME) != ge::GRAPH_SUCCESS) {
+        if (ValidateKvContiguous(opName_, qsmlaInfo_.cmpKvStrides, qsmlaInfo_.cmpKvStorageShape, kvLayout_,
+                                 CMP_KV_NAME) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
     }
@@ -209,12 +224,11 @@ ge::graphStatus QSMLATilingCheck::Process()
 {
     Init();
     if (CheckSinglePara() != ge::GRAPH_SUCCESS || CheckConsistency() != ge::GRAPH_SUCCESS ||
-        CheckParaExistence() != ge::GRAPH_SUCCESS ||
-        CheckKvContiguous() != ge::GRAPH_SUCCESS ||
+        CheckParaExistence() != ge::GRAPH_SUCCESS || CheckKvContiguous() != ge::GRAPH_SUCCESS ||
         CheckFeature() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
 
-}
+} // namespace optiling

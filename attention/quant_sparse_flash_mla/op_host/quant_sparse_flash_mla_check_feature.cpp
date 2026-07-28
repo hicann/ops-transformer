@@ -18,8 +18,8 @@
 using namespace ge;
 using namespace AscendC;
 using std::map;
-using std::string;
 using std::pair;
+using std::string;
 namespace optiling {
 
 ge::graphStatus QSMLATilingCheck::CheckFeatureWinKV() const { return ge::GRAPH_SUCCESS; }

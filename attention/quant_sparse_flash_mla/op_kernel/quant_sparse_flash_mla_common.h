@@ -28,15 +28,13 @@
 
 using namespace AscendC;
 
-enum class QSMLA_LAYOUT {
-    BSND = 0,
-    TND = 1,
-    PA_BBND = 2
-};
+enum class QSMLA_LAYOUT { BSND = 0, TND = 1, PA_BBND = 2 };
 
 enum class QSMLATemplateMode {
     SWA_TEMPLATE_MODE = 0,
     HCA_TEMPLATE_MODE = 1,
-    CSA_TEMPLATE_MODE = 2
+    CSA_TEMPLATE_MODE = 2,
+    ORI_SPARSE_TEMPLATE_MODE = 3,
+    ORI_CMP_SPARSE_TEMPLATE_MODE = 4
 };
 #endif // QUANT_SPARSE_FLASH_MLA_COMMON_H

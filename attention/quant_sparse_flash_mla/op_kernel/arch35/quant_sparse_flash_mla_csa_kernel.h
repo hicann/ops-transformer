@@ -87,13 +87,14 @@ private:
                                            __gm__ uint8_t *cmpResidualKv);
     __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV,
                                             __gm__ uint8_t *qDescale, __gm__ uint8_t *oriKVDescale,
-                                            __gm__ uint8_t *cmpKVDescale, __gm__ uint8_t *cmpSparseIndices,
-                                            __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
-                                            __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv,
-                                            __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedQ,
-                                            __gm__ uint8_t *sequsedOriKv, __gm__ uint8_t *sequsedCmpKv,
-                                            __gm__ uint8_t *cmpResidualKv, __gm__ uint8_t *sinks,
-                                            __gm__ uint8_t *workspace,
+                                            __gm__ uint8_t *cmpKVDescale, __gm__ uint8_t *oriSparseIndices,
+                                            __gm__ uint8_t *cmpSparseIndices, __gm__ uint8_t *oriBlockTable,
+                                            __gm__ uint8_t *cmpBlockTable, __gm__ uint8_t *cuSeqlensQ,
+                                            __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
+                                            __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedOriKv,
+                                            __gm__ uint8_t *sequsedCmpKv, __gm__ uint8_t *cmpResidualKv,
+                                            __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength,
+                                            __gm__ uint8_t *sinks, __gm__ uint8_t *workspace,
                                             const QuantSparseFlashMlaTilingData *__restrict tiling, TPipe *tPipe);
     __aicore__ inline void InitLocalBuffer();
     __aicore__ inline void InitMMResBuf(__gm__ uint8_t *workspace);
@@ -131,6 +132,8 @@ private:
     GlobalTensor<int32_t> actualSeqOriKvlenGm;
     GlobalTensor<int32_t> actualSeqCmpKvlenGm;
     GlobalTensor<int32_t> cmpResidualKvGm;
+    GlobalTensor<int32_t> oriTopkLengthGm;
+    GlobalTensor<int32_t> cmpTopkLengthGm;
     bool hasCuSeqlensQ = false;
     bool hasCuSeqlensOriKv = false;
     bool hasCuSeqlensCmpKv = false;
@@ -206,17 +209,22 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Init
     this->pipe = tPipe;
     this->ParseTilingData(cuSeqlensQ, sequsedQ, cuSeqlensOriKv, sequsedOriKv, cuSeqlensCmpKv, sequsedCmpKv,
                           cmpResidualKv);
-    this->InitGlobalBuffer(query, oriKV, cmpKV, qDescale, oriKVDescale, cmpKVDescale, cmpSparseIndices, oriBlockTable,
-                           cmpBlockTable, cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, sequsedQ, sequsedOriKv,
-                           sequsedCmpKv, cmpResidualKv, sinks, workspace, tiling, tPipe); // gm设置
+    this->InitGlobalBuffer(query, oriKV, cmpKV, qDescale, oriKVDescale, cmpKVDescale, oriSparseIndices,
+                           cmpSparseIndices, oriBlockTable, cmpBlockTable, cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv,
+                           sequsedQ, sequsedOriKv, sequsedCmpKv, cmpResidualKv, oriTopkLength, cmpTopkLength, sinks,
+                           workspace, tiling, tPipe); // gm设置
     vecBlock.InitVecBlock(tPipe, cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, sequsedOriKv, sequsedCmpKv, cmpResidualKv);
     vecBlock.CleanOutput(attentionOut, softmaxLse, constInfo);
     if ASCEND_IS_AIV {
-        if constexpr (TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE && IS_VEC_S2PHYADDR) {
+        if constexpr ((TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
+                       TEMPLATE_MODE == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+                       TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
+                      IS_VEC_S2PHYADDR) {
             this->vecBlock.GetKVPhyAddr(hasLoad, bN2StartIdx, bN2EndIdx, gS1StartIdx, nextGs1Idx, hasActualSeqQlen,
-                                        hasCuSeqlensQ, hasActualSeqCmpKvlen, hasCuSeqlensCmpKv, actualSeqQlenGm,
-                                        cuSeqlensQGm, actualSeqCmpKvlenGm, cuSeqlensCmpKvGm, cmpResidualKvGm, workspace,
-                                        constInfo);
+                                        hasCuSeqlensQ, hasActualSeqOriKvlen, hasCuSeqlensOriKv, actualSeqOriKvlenGm,
+                                        cuSeqlensOriKvGm, oriTopkLengthGm, hasActualSeqCmpKvlen, hasCuSeqlensCmpKv,
+                                        actualSeqCmpKvlenGm, cuSeqlensCmpKvGm, cmpTopkLengthGm, cmpResidualKvGm,
+                                        actualSeqQlenGm, cuSeqlensQGm, workspace, constInfo);
         }
     }
     /* cube侧不依赖sharedParams的scalar前置 */
@@ -252,19 +260,25 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Pars
     constInfo.s1Size = quantSparseFlashMlaBaseParams.qSeqSize;
     constInfo.s2Size = quantSparseFlashMlaBaseParams.kvSeqSize;
     constInfo.cmpS2Size = quantSparseFlashMlaBaseParams.cmpKvSeqSize;
-    constInfo.sparseBlockCount = quantSparseFlashMlaBaseParams.sparseBlockCount;
+    constInfo.oriSparseBlockCount = quantSparseFlashMlaBaseParams.oriSparseBlockCount;
+    constInfo.cmpSparseBlockCount = quantSparseFlashMlaBaseParams.cmpSparseBlockCount;
     constexpr uint32_t SPARSE_BLOCK_ALIGN_NUM = 128;
-    constInfo.alignedSparseBlockCount =
-        (constInfo.sparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) / SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
-    if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE) {
+    constInfo.alignedOriSparseBlockCount =
+        (constInfo.oriSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) / SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
+    constInfo.alignedCmpSparseBlockCount =
+        (constInfo.cmpSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) / SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
+    if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
+                  TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
         constInfo.cmpRatio = quantSparseFlashMlaBaseParams.cmpRatio;
     }
     constInfo.oriMaskMode = quantSparseFlashMlaBaseParams.oriMaskMode;
+    constInfo.cmpMaskMode = quantSparseFlashMlaBaseParams.cmpMaskMode;
     constInfo.oriWinLeft = quantSparseFlashMlaBaseParams.oriWinLeft;
     constInfo.oriWinRight = quantSparseFlashMlaBaseParams.oriWinRight;
     constInfo.softmaxScale = quantSparseFlashMlaBaseParams.softmaxScale;
     constInfo.oriKvStride = quantSparseFlashMlaBaseParams.oriKvStride;
-    if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE) {
+    if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
+                  TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
         constInfo.cmpKvStride = quantSparseFlashMlaBaseParams.cmpKvStride;
     }
     constInfo.dSize = quantSparseFlashMlaBaseParams.dSize;
@@ -277,7 +291,8 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Pars
     if constexpr (isPa) {
         constInfo.oriBlockSize = quantSparseFlashMlaBaseParams.paOriBlockSize;
         constInfo.oriMaxBlockNumPerBatch = quantSparseFlashMlaBaseParams.oriMaxBlockNumPerBatch;
-        if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE) {
+        if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
+                      TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
             constInfo.cmpBlockSize = quantSparseFlashMlaBaseParams.paCmpBlockSize;
             constInfo.cmpMaxBlockNumPerBatch = quantSparseFlashMlaBaseParams.cmpMaxBlockNumPerBatch;
         }
@@ -291,7 +306,8 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Pars
         cuSeqlensOriKvGm.SetGlobalBuffer((__gm__ int32_t *)cuSeqlensOriKv);
         hasCuSeqlensOriKv = true;
     }
-    if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE) {
+    if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
+                  TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
         if (cuSeqlensCmpKv != nullptr) {
             cuSeqlensCmpKvGm.SetGlobalBuffer((__gm__ int32_t *)cuSeqlensCmpKv);
             hasCuSeqlensCmpKv = true;
@@ -305,7 +321,8 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Pars
         actualSeqOriKvlenGm.SetGlobalBuffer((__gm__ int32_t *)sequsedOriKv);
         hasActualSeqOriKvlen = true;
     }
-    if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE) {
+    if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
+                  TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
         if (sequsedCmpKv != nullptr) {
             actualSeqCmpKvlenGm.SetGlobalBuffer((__gm__ int32_t *)sequsedCmpKv);
             hasActualSeqCmpKvlen = true;
@@ -316,36 +333,54 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Pars
     }
 
     constInfo.needInit = 0;
-    for (uint32_t bIdx = 0; bIdx < constInfo.bSize; bIdx++) {
-        int64_t s2Size = GetSeqLen(bIdx, hasActualSeqOriKvlen, hasCuSeqlensOriKv, actualSeqOriKvlenGm, cuSeqlensOriKvGm,
-                                   constInfo.s2Size);
-        int64_t s1Size =
-            GetSeqLen(bIdx, hasActualSeqQlen, hasCuSeqlensQ, actualSeqQlenGm, cuSeqlensQGm, constInfo.s1Size);
-        int64_t expectQs;
-        if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
-            expectQs = GetSeqLen(bIdx, false, hasCuSeqlensQ, actualSeqQlenGm, cuSeqlensQGm, constInfo.s1Size);
-        } else {
-            expectQs = constInfo.s1Size;
+    if (TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
+        TEMPLATE_MODE != QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE && constInfo.oriMaskMode != 0) {
+        for (uint32_t bIdx = 0; bIdx < constInfo.bSize; bIdx++) {
+            int64_t s2Size = GetSeqLen(bIdx, hasActualSeqOriKvlen, hasCuSeqlensOriKv, actualSeqOriKvlenGm,
+                                       cuSeqlensOriKvGm, constInfo.s2Size);
+            int64_t s1Size =
+                GetSeqLen(bIdx, hasActualSeqQlen, hasCuSeqlensQ, actualSeqQlenGm, cuSeqlensQGm, constInfo.s1Size);
+            int64_t expectQs;
+            if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
+                expectQs = GetSeqLen(bIdx, false, hasCuSeqlensQ, actualSeqQlenGm, cuSeqlensQGm, constInfo.s1Size);
+            } else {
+                expectQs = constInfo.s1Size;
+            }
+            if (s1Size > s2Size || s1Size < expectQs) {
+                constInfo.needInit = 1;
+                break;
+            }
         }
-        if (s1Size > s2Size || s1Size < expectQs) {
-            constInfo.needInit = 1;
-            break;
-        }
+    } else {
+        constInfo.needInit = 1;
     }
 }
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::InitGlobalBuffer(
     __gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV, __gm__ uint8_t *qDescale,
-    __gm__ uint8_t *oriKVDescale, __gm__ uint8_t *cmpKVDescale, __gm__ uint8_t *cmpSparseIndices,
-    __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable, __gm__ uint8_t *cuSeqlensQ,
-    __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedQ,
-    __gm__ uint8_t *sequsedOriKv, __gm__ uint8_t *sequsedCmpKv, __gm__ uint8_t *cmpResidualKv, __gm__ uint8_t *sinks,
-    __gm__ uint8_t *workspace, const QuantSparseFlashMlaTilingData *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t *oriKVDescale, __gm__ uint8_t *cmpKVDescale, __gm__ uint8_t *oriSparseIndices,
+    __gm__ uint8_t *cmpSparseIndices, __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
+    __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
+    __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedOriKv, __gm__ uint8_t *sequsedCmpKv, __gm__ uint8_t *cmpResidualKv,
+    __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength, __gm__ uint8_t *sinks, __gm__ uint8_t *workspace,
+    const QuantSparseFlashMlaTilingData *__restrict tiling, TPipe *tPipe)
 {
-    vecBlock.InitGlobalBuffer(oriKV, cmpKV, qDescale, oriKVDescale, cmpKVDescale, cmpSparseIndices, oriBlockTable,
-                              cmpBlockTable, sequsedQ, sinks, sequsedOriKv, sequsedCmpKv, cmpResidualKv);
+    vecBlock.InitGlobalBuffer(oriKV, cmpKV, qDescale, oriKVDescale, cmpKVDescale, oriSparseIndices, cmpSparseIndices,
+                              oriBlockTable, cmpBlockTable, sequsedQ, sinks, sequsedOriKv, sequsedCmpKv, cmpResidualKv);
     cubeBlock.InitCubeInput(cuSeqlensQ, sequsedQ, constInfo);
+    if (oriTopkLength != nullptr) {
+        constInfo.hasOriTopkLength = true;
+        oriTopkLengthGm.SetGlobalBuffer((__gm__ int32_t *)oriTopkLength);
+    } else {
+        constInfo.hasOriTopkLength = false;
+    }
+    if (cmpTopkLength != nullptr) {
+        constInfo.hasCmpTopkLength = true;
+        cmpTopkLengthGm.SetGlobalBuffer((__gm__ int32_t *)cmpTopkLength);
+    } else {
+        constInfo.hasCmpTopkLength = false;
+    }
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -522,7 +557,8 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Proc
                 this->ComputeAxisIdxByBnAndGs1(bnIdx, gS1Index, runParam);
                 bool s1NoNeedCalc =
                     ComputeParamS1<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, gS1Index, this->cuSeqlensQGm);
-                bool s2NoNeedCalc = ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(runParam, this->constInfo);
+                bool s2NoNeedCalc = ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(
+                    bnIdx, gS1Index, this->cuSeqlensQGm, oriTopkLengthGm, cmpTopkLengthGm, runParam, this->constInfo);
                 // s1和s2有任意一个不需要算, 则continue, 如果是当前核最后一次循环，则补充计算taskIdx+2的部分
                 if (s1NoNeedCalc || s2NoNeedCalc) {
                     continue;
