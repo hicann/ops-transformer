@@ -99,6 +99,7 @@ struct MoeInitRoutingV3Arch35TilingData {
     int64_t actualExpertNum{0};
     int64_t quantMode{0};
     int64_t rowIdxType{0};
+    int64_t useGatherCopy{0};
     int64_t isInputScale{0};
     int64_t isInputOffset{0};
     int64_t expertNum{0};
@@ -108,7 +109,7 @@ struct MoeInitRoutingV3Arch35TilingData {
     int64_t epFullload{0}; // 未使用
     int64_t activeNum{0};
     int64_t dropPadMode{0};
-    int64_t smoothType{0}; // 未使用
+    int64_t smoothType{0};     // 未使用
     int64_t expertCapacity{0}; // 新增：DropPad模式下的expert capacity
     MoeV3Arch35VBSComputeTilingData vbsComputeParamsOp;
     MoeV3Arch35VMSMiddleComputeTilingData vmsMiddleComputeParamsOp;

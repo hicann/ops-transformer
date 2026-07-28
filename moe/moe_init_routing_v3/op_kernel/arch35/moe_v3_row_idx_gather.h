@@ -25,8 +25,8 @@ using namespace AscendC;
 class RowIdxGather {
 public:
     __aicore__ inline RowIdxGather(){};
-    __aicore__ inline void Init(GM_ADDR expandedRowIdx, GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                TPipe *tPipe);
+    __aicore__ inline void Init(GM_ADDR expandedRowIdx, GM_ADDR workspace,
+                                const MoeInitRoutingV3Arch35TilingData *tilingData);
     __aicore__ inline void Process();
 
 private:
@@ -34,24 +34,14 @@ private:
     GlobalTensor<int32_t> sortedExpertIndicesGm_;
     GlobalTensor<int32_t> expertTotalCountGm_;
 
-    TPipe *pipe_;
-
-    TQue<QuePosition::VECIN, 1> sortedExpertIndicesInQueue_;
-    TQue<QuePosition::VECOUT, 1> copyOutQueue_;
-
-    const MoeV3Arch35ExpertTokensCountTilingData *expertTokensCountTilingData_;
     int64_t blockIdx_;
     int64_t needCoreNum_;
     int64_t perCoreElements_;
-    int64_t curCoreElements_ = 0;
-    int64_t actualExpertNum_ = 0;
+    int64_t lastCoreElements_;
+    int64_t curElements_;
 
-    int64_t loops_ = 0;
-    int64_t perLoopElements_ = 0;
-    int64_t lastLoopElements_ = 0;
-
-    int64_t perCoreElements;
-    int64_t lastCoreElements;
+    int64_t rowIdxType_ = 0;
+    int64_t useGatherCopy_ = 0;
 };
 
 __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void ComputeSimt(int64_t elements, int64_t indexBase,
@@ -66,69 +56,51 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void ComputeSimt(int
 }
 
 __aicore__ inline void RowIdxGather::Init(GM_ADDR expandedRowIdx, GM_ADDR workspace,
-                                          const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+                                          const MoeInitRoutingV3Arch35TilingData *tilingData)
 {
-    pipe_ = tPipe;
-    expertTokensCountTilingData_ = &(tilingData->expertTokensCountTilingDataOp);
     blockIdx_ = GetBlockIdx();
-    needCoreNum_ = expertTokensCountTilingData_->needCoreNum;
-    perCoreElements_ = expertTokensCountTilingData_->perCoreElements;
-    actualExpertNum_ = tilingData->actualExpertNum;
-
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx);
-    if (blockIdx_ < needCoreNum_ - 1) {
-        curCoreElements_ = perCoreElements_;
-    } else if (blockIdx_ == needCoreNum_ - 1) {
-        curCoreElements_ = expertTokensCountTilingData_->lastCoreElements;
-    }
+    needCoreNum_ = tilingData->expertTokensCountTilingDataOp.needCoreNum;
+    perCoreElements_ = tilingData->expertTokensCountTilingDataOp.perCoreElements;
+    rowIdxType_ = tilingData->rowIdxType;
+    useGatherCopy_ = tilingData->useGatherCopy;
 
     expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)workspace +
-                                            Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2 +
-                                            Align(actualExpertNum_, sizeof(int32_t)));
-    int64_t expertTotalCount_ = expertTotalCountGm_.GetValue(0);
+                                        Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2 +
+                                        Align(tilingData->actualExpertNum, sizeof(int32_t)));
+    int64_t expertTotalCount = expertTotalCountGm_.GetValue(0);
 
-    perCoreElements = Ceil(expertTotalCount_, needCoreNum_);
-    needCoreNum_ = Ceil(expertTotalCount_, perCoreElements);
-    lastCoreElements = expertTotalCount_ - (needCoreNum_ - 1) * perCoreElements;
-    int64_t perCoreLoops = Ceil(perCoreElements, expertTokensCountTilingData_->perCorePerLoopElements);
-    int64_t perCorePerLoopElements = Ceil(perCoreElements, perCoreLoops);
-    int64_t perCoreLastLoopElements = perCoreElements - (perCoreLoops - 1) * perCorePerLoopElements;
-
-    int64_t lastCoreLoops = Ceil(lastCoreElements, expertTokensCountTilingData_->perCorePerLoopElements);
-    int64_t lastCorePerLoopElements = Ceil(lastCoreElements, lastCoreLoops);
-    int64_t lastCoreLastLoopELements = lastCoreElements - (lastCoreLoops - 1) * lastCorePerLoopElements;
-
-    loops_ = perCoreLoops;
-    if (blockIdx_ == needCoreNum_ - 1) {
-        loops_ = lastCoreLoops;
-        perLoopElements_ = lastCorePerLoopElements;
-        lastLoopElements_ = lastCoreLastLoopELements;
+    perCoreElements_ = Ceil(expertTotalCount, needCoreNum_);
+    needCoreNum_ = Ceil(expertTotalCount, perCoreElements_);
+    lastCoreElements_ = expertTotalCount - (needCoreNum_ - 1) * perCoreElements_;
+    curElements_ = (blockIdx_ == needCoreNum_ - 1 ? lastCoreElements_ : perCoreElements_);
+    int64_t totalLength = Align(tilingData->n * tilingData->k, sizeof(int32_t));
+    if (useGatherCopy_ && rowIdxType_) {
+        sortedExpertIndicesGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + totalLength, totalLength);
+        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreElements_,
+                                          curElements_);
     } else {
-        loops_ = perCoreLoops;
-        perLoopElements_ = perCorePerLoopElements;
-        lastLoopElements_ = perCoreLastLoopElements;
+        sortedExpertIndicesGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + totalLength + blockIdx_ * perCoreElements_,
+                                               curElements_);
+        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, totalLength);
     }
-
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx, actualExpertNum_);
-    sortedExpertIndicesGm_.SetGlobalBuffer((__gm__ int32_t *)workspace +
-                                               Align(tilingData->n * tilingData->k, sizeof(int32_t)) +
-                                               blockIdx_ * perCoreElements,
-                                           actualExpertNum_);
-
-    pipe_->InitBuffer(sortedExpertIndicesInQueue_, 1, AlignBytes(perLoopElements_, sizeof(int32_t)));
-    pipe_->InitBuffer(copyOutQueue_, 1, AlignBytes(1, sizeof(int32_t)));
 }
 
 __aicore__ inline void RowIdxGather::Process()
 {
     if (blockIdx_ < needCoreNum_) {
-        int64_t elements = (blockIdx_ == needCoreNum_ - 1 ? lastCoreElements : perCoreElements);
-        __gm__ int32_t *sortedExpertIndicesGmAddr = (__gm__ int32_t *)sortedExpertIndicesGm_.GetPhyAddr();
         __gm__ int32_t *expandedRowIdxGmAddr = (__gm__ int32_t *)expandedRowIdxGm_.GetPhyAddr();
-        asc_vf_call<ComputeSimt>(dim3{SIMT_THREAD_NUM, 1, 1}, elements, blockIdx_ * perCoreElements,
-                                   sortedExpertIndicesGmAddr, expandedRowIdxGmAddr);
+        __gm__ int32_t *sortedExpertIndicesGmAddr = (__gm__ int32_t *)sortedExpertIndicesGm_.GetPhyAddr();
+        if (useGatherCopy_ && rowIdxType_) {
+            asc_vf_call<ComputeSimt>(dim3{SIMT_THREAD_NUM, 1, 1}, curElements_, blockIdx_ * perCoreElements_,
+                                     expandedRowIdxGmAddr, sortedExpertIndicesGmAddr);
+        } else {
+            asc_vf_call<ComputeSimt>(dim3{SIMT_THREAD_NUM, 1, 1}, curElements_, blockIdx_ * perCoreElements_,
+                                     sortedExpertIndicesGmAddr, expandedRowIdxGmAddr);
+        }
     }
-    SyncAll();
+    if (useGatherCopy_) {
+        SyncAll();
+    }
 }
 
 } // namespace MoeInitRoutingV3

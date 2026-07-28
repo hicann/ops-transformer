@@ -9,9 +9,9 @@
  */
 
 /*!
-* \file moe_v3_gather_out_mxfp8.h
-* \brief
-*/
+ * \file moe_v3_gather_out_mxfp8.h
+ * \brief
+ */
 #ifndef MOE_V3_GATHER_OUT_MXFP8_H_REGBASE
 #define MOE_V3_GATHER_OUT_MXFP8_H_REGBASE
 
@@ -25,8 +25,8 @@ template <typename T>
 class MoeV3GatherOutMxfp8 {
 public:
     __aicore__ inline MoeV3GatherOutMxfp8(){};
-    __aicore__ inline void Init(GM_ADDR xAddr, GM_ADDR unused_ScaleAddr, GM_ADDR workspace,
-                                GM_ADDR expandedRowIdxAddr, GM_ADDR expandedXAddr, GM_ADDR expandedScaleAddr,
+    __aicore__ inline void Init(GM_ADDR xAddr, GM_ADDR unused_ScaleAddr, GM_ADDR workspace, GM_ADDR expandedRowIdxAddr,
+                                GM_ADDR expandedXAddr, GM_ADDR expandedScaleAddr,
                                 const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void CopyInExpandedExpertIdx(int64_t progress);
@@ -70,6 +70,7 @@ private:
     int64_t lastLoopScaleCols_;
     int64_t indicesOffset_;
     int64_t rowIdxType_ = 0;
+    int64_t useGatherCopy_ = 0;
     int64_t isInputScale_ = 0;
     int64_t xCopyInQueueBufferNum_ = 2;
 };
@@ -84,17 +85,17 @@ __aicore__ inline void MoeV3GatherOutMxfp8<T>::InitKernelTiling(GM_ADDR workspac
     n_ = tilingData->n;
     k_ = tilingData->k;
     rowIdxType_ = tilingData->rowIdxType;
+    useGatherCopy_ = tilingData->useGatherCopy;
     isInputScale_ = tilingData->isInputScale;
 
     // core split
     int64_t actualExpertNum_ = tilingData->actualExpertNum;
-    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 +
-                                            Align(actualExpertNum_, sizeof(int32_t)),
-                                        1);
+    expertTotalCountGm_.SetGlobalBuffer(
+        (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum_, sizeof(int32_t)),
+        1);
     int64_t scanRowCount = n_ * k_;
-    if (rowIdxType_ == SCATTER) {
-        DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(
-            expertTotalCountGm_);
+    if (!useGatherCopy_) {
+        DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(expertTotalCountGm_);
         scanRowCount = expertTotalCountGm_.GetValue(0);
     }
     perCoreRow_ = Ceil(scanRowCount, tilingData->coreNum);
@@ -121,10 +122,10 @@ __aicore__ inline void MoeV3GatherOutMxfp8<T>::InitKernelTiling(GM_ADDR workspac
     lastLoopScaleCols_ = scaleCols_ - (colLoops_ - 1) * perLoopScaleCols_;
 }
 
-template <typename T >
-__aicore__ inline void MoeV3GatherOutMxfp8<T>::Init(GM_ADDR xAddr, GM_ADDR unused_ScaleAddr,
-                                                    GM_ADDR workspace, GM_ADDR expandedRowIdxAddr,
-                                                    GM_ADDR expandedXAddr, GM_ADDR expandedScaleAddr,
+template <typename T>
+__aicore__ inline void MoeV3GatherOutMxfp8<T>::Init(GM_ADDR xAddr, GM_ADDR unused_ScaleAddr, GM_ADDR workspace,
+                                                    GM_ADDR expandedRowIdxAddr, GM_ADDR expandedXAddr,
+                                                    GM_ADDR expandedScaleAddr,
                                                     const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
 {
 #if (__NPU_ARCH__ == 3510)
@@ -138,8 +139,25 @@ __aicore__ inline void MoeV3GatherOutMxfp8<T>::Init(GM_ADDR xAddr, GM_ADDR unuse
     xInGm_.SetGlobalBuffer((__gm__ uint8_t *)xAddr);
     xGscaleGm_.SetGlobalBuffer((__gm__ uint8_t *)unused_ScaleAddr);
     expandedXOutGm_.SetGlobalBuffer((__gm__ uint8_t *)expandedXAddr);
-    sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
-                                    Align(perCoreRow_, sizeof(int32_t)));
+    if (useGatherCopy_) {
+        if (rowIdxType_ == SCATTER) {
+            sortedRowIdxGm_.SetGlobalBuffer(
+                (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+                Align(perCoreRow_, sizeof(int32_t)));
+        } else {
+            sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
+                                            Align(perCoreRow_, sizeof(int32_t)));
+        }
+    } else {
+        if (rowIdxType_ == SCATTER) {
+            sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
+                                            Align(perCoreRow_, sizeof(int32_t)));
+        } else {
+            sortedRowIdxGm_.SetGlobalBuffer(
+                (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+                Align(perCoreRow_, sizeof(int32_t)));
+        }
+    }
 
     expandedScaleOutGm_.SetGlobalBuffer((__gm__ uint8_t *)expandedScaleAddr);
 
@@ -174,8 +192,7 @@ template <typename T>
 __aicore__ inline void MoeV3GatherOutMxfp8<T>::CopyScaleIn(int64_t srcIdx, int64_t colIdx, int64_t loopCols)
 {
     LocalTensor<uint8_t> scaleLocal = scaleCopyInQueue_.AllocTensor<uint8_t>();
-    DataCopyExtParams copyParams1{static_cast<uint16_t>(1), static_cast<uint32_t>(loopCols * sizeof(uint8_t)),
-                                  0, 0, 0};
+    DataCopyExtParams copyParams1{static_cast<uint16_t>(1), static_cast<uint32_t>(loopCols * sizeof(uint8_t)), 0, 0, 0};
     DataCopyPadExtParams<uint8_t> padParams1{false, 0, 0, 0};
     DataCopyPad(scaleLocal, xGscaleGm_[srcIdx * scaleCols_ + colIdx * perLoopScaleCols_], copyParams1, padParams1);
     scaleCopyInQueue_.EnQue(scaleLocal);
@@ -188,7 +205,7 @@ __aicore__ inline void MoeV3GatherOutMxfp8<T>::Process()
         currentLoopRows_ = perLoopRows_;
         for (int64_t loop = 0; loop < rowLoops_ - 1; loop++) {
             CopyInExpandedExpertIdx(loop);
-            if (rowIdxType_ == SCATTER) {
+            if (!useGatherCopy_) {
                 ScatterCopyExpandedXandMXQuant(loop);
             } else {
                 GatherCopyExpandedXandMXQuant(loop);
@@ -197,7 +214,7 @@ __aicore__ inline void MoeV3GatherOutMxfp8<T>::Process()
 
         currentLoopRows_ = lastLoopRows_;
         CopyInExpandedExpertIdx(rowLoops_ - 1);
-        if (rowIdxType_ == SCATTER) {
+        if (!useGatherCopy_) {
             ScatterCopyExpandedXandMXQuant(rowLoops_ - 1);
         } else {
             GatherCopyExpandedXandMXQuant(rowLoops_ - 1);
@@ -231,8 +248,8 @@ __aicore__ inline void MoeV3GatherOutMxfp8<T>::ScatterCopyExpandedXandMXQuant(in
 
             if (isInputScale_ == 1) {
                 LocalTensor<uint8_t> mxScaleLocal = scaleCopyInQueue_.DeQue<uint8_t>();
-                DataCopyExtParams copyScaleParams = {1, static_cast<uint32_t>(loopScaleCols * sizeof(uint8_t)),
-                                                     0, 0, 0};
+                DataCopyExtParams copyScaleParams = {1, static_cast<uint32_t>(loopScaleCols * sizeof(uint8_t)), 0, 0,
+                                                     0};
                 int64_t outScaleOffset = dstIdx * scaleCols_ + j * perLoopScaleCols_;
                 DataCopyPad<uint8_t>(expandedScaleOutGm_[outScaleOffset], mxScaleLocal, copyScaleParams);
                 scaleCopyInQueue_.FreeTensor(mxScaleLocal);
@@ -258,6 +275,19 @@ __aicore__ inline void MoeV3GatherOutMxfp8<T>::GatherCopyExpandedXandMXQuant(int
         int64_t currentLoopLastRow = (globalSortIdx + currentLoopRows_ - 1) / k_;
 
         for (int64_t row = currentLoopStartRow; row <= currentLoopLastRow; row++) {
+            bool hasValidOut = false;
+            while (curLoopRow < currentLoopRows_ && globalSortIdx / k_ == row) {
+                if (indicesLocal.GetValue(curLoopRow) >= 0) {
+                    hasValidOut = true;
+                    break;
+                }
+                curLoopRow++;
+                globalSortIdx++;
+            }
+            if (!hasValidOut) {
+                continue;
+            }
+
             SetWaitFlag<HardEvent::S_MTE2>(HardEvent::S_MTE2);
             CopyIn(row, j, loopCols);
             if (isInputScale_ == 1) {
