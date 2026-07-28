@@ -52,9 +52,7 @@ uint32_t GetAicCoreNum(gert::TilingContext *context)
 }
 } // namespace
 
-QuantBlockSparseAttnTiling::QuantBlockSparseAttnTiling(gert::TilingContext *context) : context_(context)
-{
-}
+QuantBlockSparseAttnTiling::QuantBlockSparseAttnTiling(gert::TilingContext *context) : context_(context) {}
 
 void QuantBlockSparseAttnTiling::FillPaParams()
 {
@@ -104,10 +102,10 @@ void QuantBlockSparseAttnTiling::FillInputParams()
     inputParams.set_attenMaskShapeType(2);
     inputParams.set_attenMaskCompressMode(compatMaskMode);
     inputParams.set_attenMaskS2Size(2048);
-    inputParams.set_isActualSeqLengthsNull(info.opParamInfo.cuSeqlensQ.tensor == nullptr ? 1 : 0);
-    inputParams.set_isActualSeqLengthsKVNull(info.opParamInfo.cuSeqlensKV.tensor == nullptr ? 1 : 0);
-    inputParams.set_actualSeqLengthsSize(info.bSize);
-    inputParams.set_actualSeqLengthsKVSize(info.bSize);
+    inputParams.set_isSeqUsedQlenNull(info.opParamInfo.cuSeqlensQ.tensor == nullptr ? 1 : 0);
+    inputParams.set_isSeqUsedKvlenNull(info.opParamInfo.cuSeqlensKV.tensor == nullptr ? 1 : 0);
+    inputParams.set_seqUsedQlenSize(info.bSize);
+    inputParams.set_seqUsedKvlenSize(info.bSize);
     inputParams.set_isKvContinuous(1); // 稀疏算子固定设为 1
     inputParams.set_fromFused(0);      // 融合算子标记，稀疏算子固定设为 0
     inputParams.set_isGqa(info.isGqa ? 1 : 0);
@@ -149,10 +147,7 @@ void QuantBlockSparseAttnTiling::CalcTilingKey()
                                     info.returnSoftmaxLseVal ? 1U : 0U);
 }
 
-void QuantBlockSparseAttnTiling::CalcWorkspaceSize()
-{
-    workspaceSize_ = 0;
-}
+void QuantBlockSparseAttnTiling::CalcWorkspaceSize() { workspaceSize_ = 0; }
 
 void QuantBlockSparseAttnTiling::PrintAllTilingData()
 {
@@ -189,8 +184,8 @@ void QuantBlockSparseAttnTiling::PrintAllTilingData()
     OP_LOGD(kOpName, "layoutType:%u", inputParams.get_layoutType());
     OP_LOGD(kOpName, "attenMaskCompressMode:%u", inputParams.get_attenMaskCompressMode());
     OP_LOGD(kOpName, "attenMaskS2Size:%u", inputParams.get_attenMaskS2Size());
-    OP_LOGD(kOpName, "isActualSeqLengthsNull:%u", inputParams.get_isActualSeqLengthsNull());
-    OP_LOGD(kOpName, "isActualSeqLengthsKVNull:%u", inputParams.get_isActualSeqLengthsKVNull());
+    OP_LOGD(kOpName, "isSeqUsedQlenNull:%u", inputParams.get_isSeqUsedQlenNull());
+    OP_LOGD(kOpName, "isSeqUsedKvlenNull:%u", inputParams.get_isSeqUsedKvlenNull());
     OP_LOGD(kOpName, "isKvContinuous:%u", inputParams.get_isKvContinuous());
     OP_LOGD(kOpName, "isGqa:%u", inputParams.get_isGqa());
     OP_LOGD(kOpName, "isSoftMaxLseEnable:%u", inputParams.get_isSoftMaxLseEnable());
@@ -230,9 +225,9 @@ ge::graphStatus QuantBlockSparseAttnTiling::DoOpTiling(QuantBlockSparseAttnTilin
     const uint64_t bnCount = tilingInfo_->bSize * tilingInfo_->n1Size;
     totalTaskNum_ = bnCount * tilingInfo_->gS1OuterSize;
     if (totalTaskNum_ == 0U || totalTaskNum_ > std::numeric_limits<uint32_t>::max()) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "bSize * n1Size * gS1OuterSize", std::to_string(totalTaskNum_),
-                                              "total task num must be in range [1, " +
-                                                  std::to_string(std::numeric_limits<uint32_t>::max()) + "]");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            kOpName, "bSize * n1Size * gS1OuterSize", std::to_string(totalTaskNum_),
+            "total task num must be in range [1, " + std::to_string(std::numeric_limits<uint32_t>::max()) + "]");
         return ge::GRAPH_FAILED;
     }
 

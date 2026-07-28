@@ -38,20 +38,13 @@ using namespace AscendC;
         BaseApi::QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType> op; \
         GET_TILING_DATA_WITH_STRUCT(QuantBlockSparseAttnTilingData, tilingDataIn, tiling); \
         const QuantBlockSparseAttnTilingData *__restrict tilingData = &tilingDataIn; \
-        op.InitBaseAPI(query, key, value, sparseIndices, sparseSeqLen, attenMask, metadata, \
-                       cuSeqlensQ, cuSeqlensKv, seqUsedQ, seqUsedKv, blockTable, \
-                       nullptr /* queryPaddingSize */, nullptr /* kvPaddingSize */, \
-                       qScale /* deqScaleQ */, kScale /* deqScaleK */, vScale /* deqScaleV */, \
-                       pScale /* pScale */, nullptr /* keySharedPrefix */, \
-                       nullptr /* valueSharedPrefix */, nullptr /* actualSharedPrefixLen */, \
-                       nullptr /* queryRope */, nullptr /* keyRope */, \
-                       nullptr /* learnableSink */, nullptr /* softmaxMax */, \
-                       nullptr /* softmaxSum */, nullptr /* softmaxOut */, \
-                       softmaxLse, attentionOut, user /* workspace */, \
-                       tilingData, &tPipe); \
+        op.InitBaseAPI(query, key, value, sparseIndices, sparseSeqLen, attenMask, metadata, cuSeqlensQ, cuSeqlensKv, \
+                       seqUsedQ, seqUsedKv, blockTable, nullptr /* queryPaddingSize */, nullptr /* kvPaddingSize */, \
+                       qScale /* deqScaleQ */, kScale /* deqScaleK */, vScale /* deqScaleV */, pScale /* pScale */, \
+                       nullptr /* softmaxMax */, nullptr /* softmaxSum */, softmaxLse, attentionOut, \
+                       user /* workspace */, tilingData, &tPipe); \
         op.Process(); \
     } while (0)
-
 
 template <uint32_t QKV_DTYPE, uint32_t LAYOUT_T, uint32_t KV_LAYOUT_T, uint32_t MASK_MODE, bool RETURN_SOFTMAX_LSE>
 __global__ __aicore__ void quant_block_sparse_attn(
