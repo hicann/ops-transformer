@@ -472,6 +472,24 @@ def load_excel_test_cases(excel_file_path: str, sheetname: str):
             )
 
         # 构建测试用例列表
+        int_columns = [
+            "B",
+            "S1",
+            "S2",
+            "N1",
+            "N2",
+            "D",
+            "K",
+            "block_size1",
+            "block_size2",
+            "cmp_ratio",
+            "ori_mask_mode",
+            "cmp_mask_mode",
+            "ori_win_left",
+            "ori_win_right",
+            "quant_mode",
+            "topk_value_mode",
+        ]
         test_cases = []
         i = 0
         for _, row in df.iterrows():
@@ -481,6 +499,9 @@ def load_excel_test_cases(excel_file_path: str, sheetname: str):
                     row_dict[col] = None
                 else:
                     row_dict[col] = parse_list_param(row_dict[col])
+            for col in int_columns:
+                if row_dict.get(col) is not None:
+                    row_dict[col] = int(row_dict[col])
             test_cases.append(row_dict)
             i = i + 1
 

@@ -49,7 +49,6 @@
 #include "../../sparse_flash_mla/arch35/common/buffers_policy_3buff_sfa.h"
 #endif
 
-
 using matmul::MatmulType;
 using namespace AscendC;
 using namespace optiling;
@@ -64,15 +63,17 @@ public:
     ARGS_TRAITS;
     __aicore__ inline QuantSparseFlashMlaCsa(){};
 
-    __aicore__ inline void
-    Init(__gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV, __gm__ uint8_t *qDescale,
-         __gm__ uint8_t *oriKVDescale, __gm__ uint8_t *cmpKVDescale, __gm__ uint8_t *oriSparseIndices,
-         __gm__ uint8_t *cmpSparseIndices, __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
-         __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
-         __gm__ uint8_t *sequsedQ, __gm__ uint8_t *seqUsedOriKV, __gm__ uint8_t *seqUsedCmpKV,
-         __gm__ uint8_t *cmpResidualKv, __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength,
-         __gm__ uint8_t *sinks, __gm__ uint8_t *metadata, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-         __gm__ uint8_t *workspace, const QuantSparseFlashMlaTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV,
+                                __gm__ uint8_t *qDescale, __gm__ uint8_t *oriKVDescale, __gm__ uint8_t *cmpKVDescale,
+                                __gm__ uint8_t *oriSparseIndices, __gm__ uint8_t *cmpSparseIndices,
+                                __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
+                                __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv,
+                                __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *seqUsedOriKV,
+                                __gm__ uint8_t *seqUsedCmpKV, __gm__ uint8_t *cmpResidualKv,
+                                __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength, __gm__ uint8_t *sinks,
+                                __gm__ uint8_t *metadata, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
+                                __gm__ uint8_t *workspace, const QuantSparseFlashMlaTilingData *__restrict tiling,
+                                TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -84,14 +85,16 @@ private:
                                            __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *sequsedOriKv,
                                            __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedCmpKv,
                                            __gm__ uint8_t *cmpResidualKv);
-    __aicore__ inline void
-    InitGlobalBuffer(__gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV, __gm__ uint8_t *qDescale,
-                     __gm__ uint8_t *oriKVDescale, __gm__ uint8_t *cmpKVDescale, __gm__ uint8_t *cmpSparseIndices,
-                     __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable, __gm__ uint8_t *cuSeqlensQ,
-                     __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedQ,
-                     __gm__ uint8_t *sequsedOriKv, __gm__ uint8_t *sequsedCmpKv, __gm__ uint8_t *cmpResidualKv,
-                     __gm__ uint8_t *sinks, __gm__ uint8_t *workspace,
-                     const QuantSparseFlashMlaTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV,
+                                            __gm__ uint8_t *qDescale, __gm__ uint8_t *oriKVDescale,
+                                            __gm__ uint8_t *cmpKVDescale, __gm__ uint8_t *cmpSparseIndices,
+                                            __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
+                                            __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv,
+                                            __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedQ,
+                                            __gm__ uint8_t *sequsedOriKv, __gm__ uint8_t *sequsedCmpKv,
+                                            __gm__ uint8_t *cmpResidualKv, __gm__ uint8_t *sinks,
+                                            __gm__ uint8_t *workspace,
+                                            const QuantSparseFlashMlaTilingData *__restrict tiling, TPipe *tPipe);
     __aicore__ inline void InitLocalBuffer();
     __aicore__ inline void InitMMResBuf(__gm__ uint8_t *workspace);
     __aicore__ inline void ComputeConstexpr();
@@ -224,10 +227,9 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Init
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline int64_t
-QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::GetSeqLen(int32_t bIdx, bool hasActualSeq, bool hasCuSeqlens,
-                                                               GlobalTensor<int32_t> &actualSeqGm,
-                                                               GlobalTensor<int32_t> &cuSeqlensGm, int64_t defaultSize)
+__aicore__ inline int64_t QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::GetSeqLen(
+    int32_t bIdx, bool hasActualSeq, bool hasCuSeqlens, GlobalTensor<int32_t> &actualSeqGm,
+    GlobalTensor<int32_t> &cuSeqlensGm, int64_t defaultSize)
 {
     if (hasActualSeq) {
         return actualSeqGm.GetValue(bIdx);
@@ -257,6 +259,7 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Pars
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE) {
         constInfo.cmpRatio = quantSparseFlashMlaBaseParams.cmpRatio;
     }
+    constInfo.oriMaskMode = quantSparseFlashMlaBaseParams.oriMaskMode;
     constInfo.oriWinLeft = quantSparseFlashMlaBaseParams.oriWinLeft;
     constInfo.oriWinRight = quantSparseFlashMlaBaseParams.oriWinRight;
     constInfo.softmaxScale = quantSparseFlashMlaBaseParams.softmaxScale;
@@ -599,9 +602,8 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Proc
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void
-QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index,
-                                                                              RunParamStr &runParam)
+__aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ComputeAxisIdxByBnAndGs1(
+    int64_t bnIndex, int64_t gS1Index, RunParamStr &runParam)
 {
     // GS1合轴, 不切G, 只切S1
     runParam.s1oIdx = gS1Index * runParam.qSNumInOneBlock;
@@ -616,10 +618,9 @@ QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ComputeAxisIdxByBnAndGs1(in
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void
-QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::SetRunInfo(RunInfo &runInfo, RunParamStr &runParam, int64_t taskId,
-                                                                int64_t s2LoopCount, int64_t s2LoopLimit,
-                                                                int64_t multiCoreInnerIdx)
+__aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::SetRunInfo(
+    RunInfo &runInfo, RunParamStr &runParam, int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit,
+    int64_t multiCoreInnerIdx)
 {
     if (s2LoopCount < runParam.oriKvLoopEndIdx) {
         runInfo.s2StartIdx = runParam.s2LineStartIdx;
@@ -653,8 +654,8 @@ QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::SetRunInfo(RunInfo &runInfo
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void
-QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::InitUniqueRunInfo(const RunParamStr &runParam, RunInfo &runInfo)
+__aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::InitUniqueRunInfo(
+    const RunParamStr &runParam, RunInfo &runInfo)
 {
     InitTaskParamByRun<TEMPLATE_INTF_ARGS>(runParam, runInfo);
 }

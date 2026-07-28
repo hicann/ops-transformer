@@ -31,13 +31,12 @@ using namespace AscendC;
 using namespace AscendC::Impl::Detail;
 
 TEMPLATE_INTF
-__aicore__ inline void
-GetSingleCoreParam(RunParamStr &runParam, const ConstInfo &constInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
-                   GlobalTensor<int32_t> &cuSeqlensOriKvGm, GlobalTensor<int32_t> &cuSeqlensCmpKvGm,
-                   GlobalTensor<int32_t> &actualSeqQlenGm, GlobalTensor<int32_t> &actualSeqOriKvlenGm,
-                   GlobalTensor<int32_t> &actualSeqCmpKvlenGm, GlobalTensor<int32_t> &cmpResidualKvGm,
-                   bool hasCuSeqlensOriKv, bool hasCuSeqlensCmpKv, bool hasActualSeqQlen, bool hasActualSeqOriKvlen,
-                   bool hasActualSeqCmpKvlen)
+__aicore__ inline void GetSingleCoreParam(
+    RunParamStr &runParam, const ConstInfo &constInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
+    GlobalTensor<int32_t> &cuSeqlensOriKvGm, GlobalTensor<int32_t> &cuSeqlensCmpKvGm,
+    GlobalTensor<int32_t> &actualSeqQlenGm, GlobalTensor<int32_t> &actualSeqOriKvlenGm,
+    GlobalTensor<int32_t> &actualSeqCmpKvlenGm, GlobalTensor<int32_t> &cmpResidualKvGm, bool hasCuSeqlensOriKv,
+    bool hasCuSeqlensCmpKv, bool hasActualSeqQlen, bool hasActualSeqOriKvlen, bool hasActualSeqCmpKvlen)
 {
     int32_t actualS1Size = 0;
     int32_t actualS2OriSize = 0;
@@ -83,23 +82,30 @@ GetSingleCoreParam(RunParamStr &runParam, const ConstInfo &constInfo, GlobalTens
         runParam.nextTokensPerBatchCmp =
             (int64_t)runParam.actualS2CmpSize * constInfo.cmpRatio + runParam.cmpResidual - runParam.actualS1Size;
     }
-    runParam.nextTokensPerBatchOri = runParam.actualS2OriSize - runParam.actualS1Size;
-    if (constInfo.oriWinLeft == -1) {
+
+    if (constInfo.oriMaskMode == 3) {
+        runParam.nextTokensPerBatchOri = runParam.actualS2OriSize - runParam.actualS1Size;
         runParam.preTokensPerBatch = runParam.actualS1Size;
-    } else {
-        runParam.preTokensPerBatch = -(runParam.actualS2OriSize - runParam.actualS1Size - constInfo.oriWinLeft);
+    } else if (constInfo.oriMaskMode == 4) {
+        const int64_t casualOffset = runParam.actualS2OriSize - runParam.actualS1Size;
+        runParam.preTokensPerBatch =
+            (constInfo.oriWinLeft == -1) ? runParam.actualS1Size : constInfo.oriWinLeft - casualOffset;
+        runParam.nextTokensPerBatchOri =
+            (constInfo.oriWinRight == -1) ? runParam.actualS2OriSize : casualOffset + constInfo.oriWinRight;
+        runParam.preTokensPerBatch = Min(runParam.preTokensPerBatch, static_cast<int64_t>(runParam.actualS1Size));
+    } else if (constInfo.oriMaskMode == 0) {
+        runParam.nextTokensPerBatchOri = runParam.actualS2OriSize;
+        runParam.preTokensPerBatch = runParam.actualS1Size;
     }
-    runParam.preTokensPerBatch = Min(runParam.preTokensPerBatch, runParam.actualS1Size);
 }
 
 TEMPLATE_INTF
-__aicore__ inline void
-ComputeParamBatch(RunParamStr &runParam, const ConstInfo &constInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
-                  GlobalTensor<int32_t> &cuSeqlensOriKvGm, GlobalTensor<int32_t> &cuSeqlensCmpKvGm,
-                  GlobalTensor<int32_t> &actualSeqQlenGm, GlobalTensor<int32_t> &actualSeqOriKvlenGm,
-                  GlobalTensor<int32_t> &actualSeqCmpKvlenGm, GlobalTensor<int32_t> &cmpResidualKvGm,
-                  bool hasCuSeqlensOriKv, bool hasCuSeqlensCmpKv, bool hasActualSeqQlen, bool hasActualSeqOriKvlen,
-                  bool hasActualSeqCmpKvlen)
+__aicore__ inline void ComputeParamBatch(
+    RunParamStr &runParam, const ConstInfo &constInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
+    GlobalTensor<int32_t> &cuSeqlensOriKvGm, GlobalTensor<int32_t> &cuSeqlensCmpKvGm,
+    GlobalTensor<int32_t> &actualSeqQlenGm, GlobalTensor<int32_t> &actualSeqOriKvlenGm,
+    GlobalTensor<int32_t> &actualSeqCmpKvlenGm, GlobalTensor<int32_t> &cmpResidualKvGm, bool hasCuSeqlensOriKv,
+    bool hasCuSeqlensCmpKv, bool hasActualSeqQlen, bool hasActualSeqOriKvlen, bool hasActualSeqCmpKvlen)
 {
     GetSingleCoreParam<TEMPLATE_INTF_ARGS>(runParam, constInfo, cuSeqlensQGm, cuSeqlensOriKvGm, cuSeqlensCmpKvGm,
                                            actualSeqQlenGm, actualSeqOriKvlenGm, actualSeqCmpKvlenGm, cmpResidualKvGm,
