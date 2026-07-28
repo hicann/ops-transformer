@@ -982,8 +982,9 @@ mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_we
         offsetTensor         = winInTensorSize
                             + (quant ? num_max_tokens_per_rank × num_topk × 4B : 0)
 
-        // sync flags（A3 仅 CrossRankSync）
-        offsetFlag           = ep_world_size × 512B
+        // sync flags
+        syncStateReservedSize = 512KB
+        offsetFlag            = max(ep_world_size × 512B, syncStateReservedSize)
         ```
 
         其中 `ep_world_size` 即通信域大小，$maxExpertPerRank$ 表示每张卡上可能专家数的最大值，$\mathrm{quant}$ 表示是否开启 dispatch 量化（`dispatch_quant_mode = 2`）。预留空间 10 MB 为内部元数据对齐与安全余量。
