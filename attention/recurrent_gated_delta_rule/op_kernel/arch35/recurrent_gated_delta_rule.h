@@ -371,8 +371,8 @@ private:
         stateOutQueue_.DeQue<stateType>();
         DataCopyExtParams stateOutParams;
         stateOutParams.blockCount = curSingleV;
-        stateOutParams.blockLen = DK_ * sizeof(outType);
-        stateOutParams.srcStride = (alignDK_ - DK_) / (BLOCK_SIZE_32B / sizeof(outType));
+        stateOutParams.blockLen = DK_ * sizeof(stateType);
+        stateOutParams.srcStride = (alignDK_ - DK_) / (BLOCK_SIZE_32B / sizeof(stateType));
         stateOutParams.dstStride = 0;
         uint64_t outStateGmOffset = (uint64_t)ssmStateIndicesGm_.GetValue(tIdx) * NV_ * DV_ * DK_ +
                                     (uint64_t)head_i * DV_ * DK_ + (uint64_t)dvIdx * DK_;

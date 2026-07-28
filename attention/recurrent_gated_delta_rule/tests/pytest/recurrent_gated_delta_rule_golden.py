@@ -354,10 +354,13 @@ def check_result(expect, result, data_type, pct_thd=0.005):
         err_limit = min(len(err_idx), max_error_idx)
         if err_limit > 0:
             err_indices = err_idx[:err_limit]
-            err_tensor = torch.as_tensor(
-                err_indices, dtype=torch.long, device=result_flat.device
+            err_tensor = torch.as_tensor(err_indices, dtype=torch.long)
+            err_r = (
+                result_flat[err_tensor.to(result_flat.device)]
+                .cpu()
+                .to(torch.float32)
+                .numpy()
             )
-            err_r = result_flat[err_tensor].cpu().to(torch.float32).numpy()
             err_c = expect_flat[err_tensor].cpu().to(torch.float32).numpy()
             display_error_output(
                 err_r, err_c, np.arange(err_limit), err_diff[:err_limit]
@@ -384,7 +387,7 @@ def cpu_recurrent_gated_delta_rule(
     q = q.to(torch.float32)
     k = k.to(torch.float32)
     v = v.to(torch.float32)
-    initial_state = state.to(torch.float32)
+    initial_state = state.to(torch.float32).clone()
     beta = beta.to(torch.float32)
     output = torch.empty_like(v).to(torch.float32)
     g = (
