@@ -38,6 +38,7 @@ def load_impl_module(stem):
 golden_module = load_impl_module("golden")
 inputs_module = load_impl_module("inputs")
 compare_module = load_impl_module("compare")
+graph_module = load_impl_module("graph")
 
 
 class LightningIndexerV2Spec:
@@ -57,6 +58,8 @@ class LightningIndexerV2Spec:
             score_layout=score_layout,
             cu_seqlens_q=cu_seqlens_q,
         )
+
+    torch_graph = graph_module.LightningIndexerV2AclGraph
 
 
 __spec__ = {

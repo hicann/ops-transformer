@@ -38,6 +38,7 @@ def load_impl_module(stem):
 golden_module = load_impl_module("golden")
 inputs_module = load_impl_module("inputs")
 compare_module = load_impl_module("compare")
+graph_module = load_impl_module("graph")
 
 
 class QuantLightningIndexerV2Spec:
@@ -58,6 +59,8 @@ class QuantLightningIndexerV2Spec:
             score_layout=score_layout,
             cu_seqlens_q=cu_seqlens_q,
         )
+
+    torch_graph = graph_module.QuantLightningIndexerV2AclGraph
 
 
 __spec__ = {
