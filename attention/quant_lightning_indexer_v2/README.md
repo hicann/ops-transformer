@@ -26,11 +26,11 @@
 
 | 参数名                     | 输入/输出/属性 | 描述  | 数据类型       | 数据格式   |
 |----------------------------|-----------|----------------------------------------------------------------------|----------------|------------|
-| query                     | 输入      | 公式中的$Q_{index}^{Quant}\in\R^{g\times d}$，表示输入Index Query，不支持非连续。| INT8、FLOAT8_e4m3fn、HIFLOAT8 | ND         |
-| key                   | 输入      | 公式中的$K_{index}^{Quant}\in\R^{S_{k}\times d}$，表示压缩后的输入Index Key，支持0轴非连续。| INT8、FLOAT8_e4m3fn、HIFLOAT8 | ND |
+| query                     | 输入      | 公式中的$Q_{index}^{Quant}\in\R^{g\times d}$，表示输入Index Query，不支持非连续。| INT8、FLOAT8_e4m3fn、HIFLOAT8、FLOAT4_e2m1 | ND         |
+| key                   | 输入      | 公式中的$K_{index}^{Quant}\in\R^{S_{k}\times d}$，表示压缩后的输入Index Key，支持0轴非连续。| INT8、FLOAT8_e4m3fn、HIFLOAT8、FLOAT4_e2m1 | ND |
 | weights                 | 输入      | 公式中的$W$，表示权重系数，不支持非连续。 | FLOAT16、FLOAT32 | ND |
-| query_dequant_scale             | 输入      | 公式中的$Scale_Q$，表示Index Query的反量化系数，不支持非连续。shape与weights一致 | FLOAT16、FLOAT32     | ND         |
-| key_dequant_scale            | 输入      | 公式中的$Scale_K$，表示Index Key的反量化系数，支持0轴非连续。| FLOAT16、FLOAT32       | ND         |
+| query_dequant_scale             | 输入      | 公式中的$Scale_Q$，表示Index Query的反量化系数，不支持非连续。非MX场景shape与weights一致；`quant_mode`为3/5时，shape为将`query`的D轴替换为(D/64, 2) | FLOAT16、FLOAT32、FLOAT8_e8m0     | ND         |
+| key_dequant_scale            | 输入      | 公式中的$Scale_K$，表示Index Key的反量化系数，支持0轴非连续。`quant_mode`为3/5时，shape为将`key`的D轴替换为(D/64, 2) | FLOAT16、FLOAT32、FLOAT8_e8m0       | ND         |
 | cu_seqlens_q                    | 可选输入      | layout_q为TND时必须传入，表示每个Batch中`query`的有效token数前缀和。；layout_q为BSND时不能传入 | INT32       | ND         |
 | cu_seqlens_k                    | 可选输入      | layout_k为TND时必须传入，表示每个Batch中`key`的有效token数前缀和；layout_k为PA_BSND或BSND时不能传入 | INT32       | ND         |
 | seqused_q                    | 可选输入      | layout_q为BSND时可选传入，表示每个Batch中`query`的有效token数，可传入None表示与query的S长度相同 | INT32       | ND         |
@@ -49,6 +49,13 @@
 | return_value      |  可选属性     | 表示是否输出`sparse_values`，默认值0。 | INT32          | -         |
 | sparse_indices     | 输出      | 公式中的输出Out，参与稀疏attention计算的token索引值。 | INT32          | ND         |
 | sparse_values           | 输出      | 公式中的Indices输出对应的value值。shape与sparse_indices一致。仅当return_value为True时输出有效值，否则输出bf16负无穷 | BFLOAT16         | ND          |
+
+## 约束说明
+
+- <term>Ascend 950PR/Ascend 950DT</term>：
+  - `query`、`key`在`quant_mode`为1/3时支持FLOAT8_e4m3fn，`quant_mode`为4时支持HIFLOAT8，`quant_mode`为5时支持FLOAT4_e2m1，不支持INT8。
+  - `quant_mode`为3/5时，`query_dequant_scale`和`key_dequant_scale`仅支持FLOAT8_e8m0。
+  - `quant_mode`为5时，`query`和`key`的逻辑数据类型为FLOAT4_e2m1，每个物理字节打包两个E2M1逻辑元素。
 
 ## 调用示例
 

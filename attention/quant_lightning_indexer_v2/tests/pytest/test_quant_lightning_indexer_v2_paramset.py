@@ -22,379 +22,457 @@ import random
 #                   PA_BBND 时 seqused_k 必传
 TEST_PARAMS = {
     # Ascend950 基础场景: BSND query + PA_BBND key
-    "quant_li_default_a5":{
+    "quant_li_default_a5": {
         "batch_size": [8],
         "q_seq": [15],
         "k_seq": [111],
-        "q_t_size":[8],
-        "k_t_size":[15],#压缩后的值
+        "q_t_size": [8],
+        "k_t_size": [15],  # 压缩后的值
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
-        "block_size": [512], # 取16的整数倍，最多支持到1024
-        "block_num":[8],
+        "block_size": [512],  # 取16的整数倍，最多支持到1024
+        "block_num": [8],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
-        "cu_seqlens_q": [None],     # BSND: cu_seqlens_q 不传
-        "cu_seqlens_k": [None],     # PA_BBND: cu_seqlens_k 不传
-        "seqused_q": [[3,3,3,3,3,3,3,3]],
-        "seqused_k": [[28,24,80,96,47,76,0,111]], # PA场景每个batch的实际token数
+        "cu_seqlens_q": [None],  # BSND: cu_seqlens_q 不传
+        "cu_seqlens_k": [None],  # PA_BBND: cu_seqlens_k 不传
+        "seqused_q": [[3, 3, 3, 3, 3, 3, 3, 3]],
+        "seqused_k": [[28, 24, 80, 96, 47, 76, 0, 111]],  # PA场景每个batch的实际token数
         "cmp_residual_k": [None],
         "max_seqlen_q": [-1],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [512],
         "sparse_mode": [3],
-        "query_datarange":[[-448,448]],
-        "key_datarange":[[-20,20]],
-        "weights_datarange":[[-123,123]],
-        "q_scale_datarange":[[0,255]],
-        "k_scale_datarange":[[0,65504]],
-        "cmp_ratio":[1], #1/2/4/8/16/32/64/128
-        "return_value":[0],
+        "query_datarange": [[-448, 448]],
+        "key_datarange": [[-20, 20]],
+        "weights_datarange": [[-123, 123]],
+        "q_scale_datarange": [[0, 255]],
+        "k_scale_datarange": [[0, 65504]],
+        "cmp_ratio": [1],  # 1/2/4/8/16/32/64/128
+        "return_value": [0],
         "output_idx_offset": [None],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
     # Ascend950 基础场景v2: BSND query + PA_BBND key
-    "quant_li_default_a5_v2":{
+    "quant_li_default_a5_v2": {
         "batch_size": [104],
         "q_seq": [4],
         "k_seq": [32768],
-        "q_t_size":[8],
-        "k_t_size":[15],#压缩后的值
+        "q_t_size": [8],
+        "k_t_size": [15],  # 压缩后的值
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
-        "block_size": [64], # 取16的整数倍，最多支持到1024
-        "block_num":[53256],
+        "block_size": [64],  # 取16的整数倍，最多支持到1024
+        "block_num": [53256],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
-        "cu_seqlens_q": [None],     # BSND: cu_seqlens_q 不传
-        "cu_seqlens_k": [None],     # PA_BBND: cu_seqlens_k 不传
+        "cu_seqlens_q": [None],  # BSND: cu_seqlens_q 不传
+        "cu_seqlens_k": [None],  # PA_BBND: cu_seqlens_k 不传
         "seqused_q": [None],
-        "seqused_k": [[14224] * 103 + [32768]], # PA场景每个batch的实际token数
+        "seqused_k": [[14224] * 103 + [32768]],  # PA场景每个batch的实际token数
         "cmp_residual_k": [None],
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [512],
         "sparse_mode": [0],
-        "query_datarange":[[2,10]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[4], #1/2/4/8/16/32/64/128
-        "return_value":[1],
-        "output_idx_offset": [[random.randint(2, 10) for _ in range(416)] for _ in range(1)]
+        "query_datarange": [[2, 10]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [4],  # 1/2/4/8/16/32/64/128
+        "return_value": [1],
+        "output_idx_offset": [
+            [random.randint(2, 10) for _ in range(416)] for _ in range(1)
+        ],
     },
-
     # Ascend950 基础场景v3: BSND query + PA_BBND key
-    "quant_li_default_a5_v3":{
+    "quant_li_default_a5_v3": {
         "batch_size": [26],
         "q_seq": [4],
         "k_seq": [262144],
-        "q_t_size":[8],
-        "k_t_size":[15],#压缩后的值
+        "q_t_size": [8],
+        "k_t_size": [15],  # 压缩后的值
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
-        "block_size": [64], # 取16的整数倍，最多支持到1024
-        "block_num":[106528],
+        "block_size": [64],  # 取16的整数倍，最多支持到1024
+        "block_num": [106528],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
-        "cu_seqlens_q": [None],     # BSND: cu_seqlens_q 不传
-        "cu_seqlens_k": [None],     # PA_BBND: cu_seqlens_k 不传
+        "cu_seqlens_q": [None],  # BSND: cu_seqlens_q 不传
+        "cu_seqlens_k": [None],  # PA_BBND: cu_seqlens_k 不传
         "seqused_q": [None],
-        "seqused_k": [[18244] * 25 + [262144]], # PA场景每个batch的实际token数
-        "cmp_residual_k": [[0,2,1,2,1,0,0,1,0,3,3,3,3,3,2,1,3,0,3,0,3,0,1,0,2,2]],
+        "seqused_k": [[18244] * 25 + [262144]],  # PA场景每个batch的实际token数
+        "cmp_residual_k": [
+            [
+                0,
+                2,
+                1,
+                2,
+                1,
+                0,
+                0,
+                1,
+                0,
+                3,
+                3,
+                3,
+                3,
+                3,
+                2,
+                1,
+                3,
+                0,
+                3,
+                0,
+                3,
+                0,
+                1,
+                0,
+                2,
+                2,
+            ]
+        ],
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [512],
         "sparse_mode": [3],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,0.5]],
-        "k_scale_datarange":[[0,0.5]],
-        "cmp_ratio":[4], #1/2/4/8/16/32/64/128
-        "return_value":[1],
-        "output_idx_offset": [[random.randint(0, 1000) for _ in range(104)] for _ in range(1)]
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 0.5]],
+        "k_scale_datarange": [[0, 0.5]],
+        "cmp_ratio": [4],  # 1/2/4/8/16/32/64/128
+        "return_value": [1],
+        "output_idx_offset": [
+            [random.randint(0, 1000) for _ in range(104)] for _ in range(1)
+        ],
     },
-
     # Ascend950 基础场景v4: BSND query + PA_BBND key
-    "quant_li_default_a5_v4":{
+    "quant_li_default_a5_v4": {
         "batch_size": [56],
         "q_seq": [4],
         "k_seq": [2048],
-        "q_t_size":[8],
-        "k_t_size":[15],#压缩后的值
+        "q_t_size": [8],
+        "k_t_size": [15],  # 压缩后的值
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
-        "block_size": [64], # 取16的整数倍，最多支持到1024
-        "block_num":[1792],
+        "block_size": [64],  # 取16的整数倍，最多支持到1024
+        "block_num": [1792],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
-        "cu_seqlens_q": [None],     # BSND: cu_seqlens_q 不传
-        "cu_seqlens_k": [None],     # PA_BBND: cu_seqlens_k 不传
+        "cu_seqlens_q": [None],  # BSND: cu_seqlens_q 不传
+        "cu_seqlens_k": [None],  # PA_BBND: cu_seqlens_k 不传
         "seqused_q": [None],
-        "seqused_k": [[1804] * 55 + [2048]], # PA场景每个batch的实际token数
+        "seqused_k": [[1804] * 55 + [2048]],  # PA场景每个batch的实际token数
         "cmp_residual_k": [None],
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [1024],
         "sparse_mode": [0],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[0,0.001]],
-        "weights_datarange":[[-20,20]],
-        "q_scale_datarange":[[0,5]],
-        "k_scale_datarange":[[0,5]],
-        "cmp_ratio":[4], #1/2/4/8/16/32/64/128
-        "return_value":[1],
-        "output_idx_offset": [[random.randint(0, 100) for _ in range(224)] for _ in range(1)]
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[0, 0.001]],
+        "weights_datarange": [[-20, 20]],
+        "q_scale_datarange": [[0, 5]],
+        "k_scale_datarange": [[0, 5]],
+        "cmp_ratio": [4],  # 1/2/4/8/16/32/64/128
+        "return_value": [1],
+        "output_idx_offset": [
+            [random.randint(0, 100) for _ in range(224)] for _ in range(1)
+        ],
     },
-
     # Ascend950 基础场景v5: BSND query + PA_BBND key
-    "quant_li_default_a5_v5":{
+    "quant_li_default_a5_v5": {
         "batch_size": [42],
         "q_seq": [4],
         "k_seq": [32768],
-        "q_t_size":[8],
-        "k_t_size":[15],#压缩后的值
+        "q_t_size": [8],
+        "k_t_size": [15],  # 压缩后的值
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
-        "block_size": [64], # 取16的整数倍，最多支持到1024
-        "block_num":[21523],
+        "block_size": [64],  # 取16的整数倍，最多支持到1024
+        "block_num": [21523],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
-        "cu_seqlens_q": [None],     # BSND: cu_seqlens_q 不传
-        "cu_seqlens_k": [None],     # PA_BBND: cu_seqlens_k 不传
+        "cu_seqlens_q": [None],  # BSND: cu_seqlens_q 不传
+        "cu_seqlens_k": [None],  # PA_BBND: cu_seqlens_k 不传
         "seqused_q": [None],
-        "seqused_k": [[20912] * 41 + [32768]], # PA场景每个batch的实际token数
-        "cmp_residual_k": [[2,1,3,0,3,0,0,0,3,1,1,2,2,2,3,2,1,2,1,2,1,2,2,0,2,1,2,3,1,0,0,0,3,2,0,3,0,2,2,1,2,0]],
+        "seqused_k": [[20912] * 41 + [32768]],  # PA场景每个batch的实际token数
+        "cmp_residual_k": [
+            [
+                2,
+                1,
+                3,
+                0,
+                3,
+                0,
+                0,
+                0,
+                3,
+                1,
+                1,
+                2,
+                2,
+                2,
+                3,
+                2,
+                1,
+                2,
+                1,
+                2,
+                1,
+                2,
+                2,
+                0,
+                2,
+                1,
+                2,
+                3,
+                1,
+                0,
+                0,
+                0,
+                3,
+                2,
+                0,
+                3,
+                0,
+                2,
+                2,
+                1,
+                2,
+                0,
+            ]
+        ],
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [1024],
         "sparse_mode": [3],
-        "query_datarange":[[0,0.001]],
-        "key_datarange":[[0.001,0.01]],
-        "weights_datarange":[[-0.5,0.5]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[4], #1/2/4/8/16/32/64/128
-        "return_value":[1],
-        "output_idx_offset": [[random.randint(2, 10) for _ in range(168)] for _ in range(1)]
+        "query_datarange": [[0, 0.001]],
+        "key_datarange": [[0.001, 0.01]],
+        "weights_datarange": [[-0.5, 0.5]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [4],  # 1/2/4/8/16/32/64/128
+        "return_value": [1],
+        "output_idx_offset": [
+            [random.randint(2, 10) for _ in range(168)] for _ in range(1)
+        ],
     },
-
     # Ascend950 基础场景v6: BSND query + PA_BBND key
-    "quant_li_default_a5_v6":{
+    "quant_li_default_a5_v6": {
         "batch_size": [13],
         "q_seq": [4],
         "k_seq": [262144],
-        "q_t_size":[8],
-        "k_t_size":[15],#压缩后的值
+        "q_t_size": [8],
+        "k_t_size": [15],  # 压缩后的值
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
-        "block_size": [64], # 取16的整数倍，最多支持到1024
-        "block_num":[53290],
+        "block_size": [64],  # 取16的整数倍，最多支持到1024
+        "block_num": [53290],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
-        "cu_seqlens_q": [None],     # BSND: cu_seqlens_q 不传
-        "cu_seqlens_k": [None],     # PA_BBND: cu_seqlens_k 不传
+        "cu_seqlens_q": [None],  # BSND: cu_seqlens_q 不传
+        "cu_seqlens_k": [None],  # PA_BBND: cu_seqlens_k 不传
         "seqused_q": [None],
-        "seqused_k": [[201988] * 12 + [262144]], # PA场景每个batch的实际token数
-        "cmp_residual_k": [[0,2,3,3,0,1,2,0,3,2,0,0,3]],
+        "seqused_k": [[201988] * 12 + [262144]],  # PA场景每个batch的实际token数
+        "cmp_residual_k": [[0, 2, 3, 3, 0, 1, 2, 0, 3, 2, 0, 0, 3]],
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [1024],
         "sparse_mode": [3],
-        "query_datarange":[[0.001,0.01]],
-        "key_datarange":[[-5,5]],
-        "weights_datarange":[[-2,-1]],
-        "q_scale_datarange":[[10,255]],
-        "k_scale_datarange":[[10,255]],
-        "cmp_ratio":[4], #1/2/4/8/16/32/64/128
-        "return_value":[1],
-        "output_idx_offset": [[random.randint(0, 1000000) for _ in range(52)] for _ in range(1)]
+        "query_datarange": [[0.001, 0.01]],
+        "key_datarange": [[-5, 5]],
+        "weights_datarange": [[-2, -1]],
+        "q_scale_datarange": [[10, 255]],
+        "k_scale_datarange": [[10, 255]],
+        "cmp_ratio": [4],  # 1/2/4/8/16/32/64/128
+        "return_value": [1],
+        "output_idx_offset": [
+            [random.randint(0, 1000000) for _ in range(52)] for _ in range(1)
+        ],
     },
-
     # Ascend950 基础场景v7: BSND query + PA_BBND key
-    "quant_li_default_a5_v7":{
+    "quant_li_default_a5_v7": {
         "batch_size": [4],
         "q_seq": [4096],
         "k_seq": [1024],
-        "q_t_size":[8],
-        "k_t_size":[15],#压缩后的值
+        "q_t_size": [8],
+        "k_t_size": [15],  # 压缩后的值
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
-        "block_size": [512], # 取16的整数倍，最多支持到1024
-        "block_num":[45],
+        "block_size": [512],  # 取16的整数倍，最多支持到1024
+        "block_num": [45],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
-        "cu_seqlens_q": [None],     # BSND: cu_seqlens_q 不传
-        "cu_seqlens_k": [None],     # PA_BBND: cu_seqlens_k 不传
+        "cu_seqlens_q": [None],  # BSND: cu_seqlens_q 不传
+        "cu_seqlens_k": [None],  # PA_BBND: cu_seqlens_k 不传
         "seqused_q": [None],
-        "seqused_k": [[1000] * 3 + [1024]], # PA场景每个batch的实际token数
+        "seqused_k": [[1000] * 3 + [1024]],  # PA场景每个batch的实际token数
         "cmp_residual_k": [None],
         "max_seqlen_q": [4096],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [512],
         "sparse_mode": [0],
-        "query_datarange":[[-5,5]],
-        "key_datarange":[[-100,100]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[4], #1/2/4/8/16/32/64/128
-        "return_value":[1],
-        "output_idx_offset": [[random.randint(0, 1000000) for _ in range(16384)] for _ in range(1)]
+        "query_datarange": [[-5, 5]],
+        "key_datarange": [[-100, 100]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [4],  # 1/2/4/8/16/32/64/128
+        "return_value": [1],
+        "output_idx_offset": [
+            [random.randint(0, 1000000) for _ in range(16384)] for _ in range(1)
+        ],
     },
-
     # Ascend950 基础场景v8: BSND query + PA_BBND key
-    "quant_li_default_a5_v8":{
+    "quant_li_default_a5_v8": {
         "batch_size": [4],
         "q_seq": [4096],
         "k_seq": [1024],
-        "q_t_size":[8],
-        "k_t_size":[15],#压缩后的值
+        "q_t_size": [8],
+        "k_t_size": [15],  # 压缩后的值
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
-        "block_size": [512], # 取16的整数倍，最多支持到1024
-        "block_num":[41],
+        "block_size": [512],  # 取16的整数倍，最多支持到1024
+        "block_num": [41],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
-        "cu_seqlens_q": [None],     # BSND: cu_seqlens_q 不传
-        "cu_seqlens_k": [None],     # PA_BBND: cu_seqlens_k 不传
+        "cu_seqlens_q": [None],  # BSND: cu_seqlens_q 不传
+        "cu_seqlens_k": [None],  # PA_BBND: cu_seqlens_k 不传
         "seqused_q": [[2736] * 3 + [4096]],
-        "seqused_k": [[92] * 3 + [1024]], # PA场景每个batch的实际token数
-        "cmp_residual_k": [[3,3,2,1]],
+        "seqused_k": [[92] * 3 + [1024]],  # PA场景每个batch的实际token数
+        "cmp_residual_k": [[3, 3, 2, 1]],
         "max_seqlen_q": [4096],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [1024],
         "sparse_mode": [3],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-0.5,0.5]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[4], #1/2/4/8/16/32/64/128
-        "return_value":[0],
-        "output_idx_offset": [[random.randint(0, 1) for _ in range(16384)] for _ in range(1)]
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-0.5, 0.5]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [4],  # 1/2/4/8/16/32/64/128
+        "return_value": [0],
+        "output_idx_offset": [
+            [random.randint(0, 1) for _ in range(16384)] for _ in range(1)
+        ],
     },
-
     # Ascend950 hifp8 场景: BSND query + PA_BBND key
-    "quant_li_default_hifp8_a5":{
+    "quant_li_default_hifp8_a5": {
         "batch_size": [3],
         "q_seq": [13],
         "k_seq": [111],
-        "q_t_size":[8],
-        "k_t_size":[15],#压缩后的值
+        "q_t_size": [8],
+        "k_t_size": [15],  # 压缩后的值
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
-        "block_size": [1024], # 取16的整数倍，最多支持到1024
-        "block_num":[100],
+        "block_size": [1024],  # 取16的整数倍，最多支持到1024
+        "block_num": [100],
         "qk_dtype": [torch.uint8],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
-        "cu_seqlens_q": [None],     # BSND: cu_seqlens_q 不传
-        "cu_seqlens_k": [None],     # PA_BBND: cu_seqlens_k 不传
-        "seqused_q": [[2,5,13]],
-        "seqused_k": [[2080,2114,1180]],
+        "cu_seqlens_q": [None],  # BSND: cu_seqlens_q 不传
+        "cu_seqlens_k": [None],  # PA_BBND: cu_seqlens_k 不传
+        "seqused_q": [[2, 5, 13]],
+        "seqused_k": [[2080, 2114, 1180]],
         "max_seqlen_q": [-1],
-        "cmp_residual_k":[[3,1,3]],
+        "cmp_residual_k": [[3, 1, 3]],
         "quant_mode": [4],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [512],
         "sparse_mode": [3],
-        "query_datarange":[[-448,448]],
-        "key_datarange":[[-20,20]],
-        "weights_datarange":[[-123,123]],
-        "q_scale_datarange":[[0,255]],
-        "k_scale_datarange":[[0,65504]],
-        "cmp_ratio":[4], #1/2/4/8/16/32/64/128
-        "return_value":[0],
-        "output_idx_offset": [None]
+        "query_datarange": [[-448, 448]],
+        "key_datarange": [[-20, 20]],
+        "weights_datarange": [[-123, 123]],
+        "q_scale_datarange": [[0, 255]],
+        "k_scale_datarange": [[0, 65504]],
+        "cmp_ratio": [4],  # 1/2/4/8/16/32/64/128
+        "return_value": [0],
+        "output_idx_offset": [None],
     },
-
     # Ascend910_93 场景: TND query + PA_BBND key
-    "quant_li_default_a3":{
+    "quant_li_default_a3": {
         "batch_size": [1],
         "q_seq": [1],
         "k_seq": [8192],
-        "q_t_size":[1],
-        "k_t_size":[8192],#压缩后的值
+        "q_t_size": [1],
+        "k_t_size": [8192],  # 压缩后的值
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
-        "block_size": [1024], # 取16的整数倍，最多支持到1024
-        "block_num":[17],
+        "block_size": [1024],  # 取16的整数倍，最多支持到1024
+        "block_num": [17],
         "qk_dtype": [torch.int8],
         "dequant_dtype": [torch.float16],
         "actual_seq_dtype": [torch.int32],
-        "cu_seqlens_q": [[0, 1]],   # TND: cu_seqlens_q 必传 [B+1]
-        "cu_seqlens_k": [None],     # PA_BBND: cu_seqlens_k 不传
-        "seqused_q": [None],        # TND: seqused_q 可选，None 时从 cu_seqlens 推导
-        "seqused_k": [[8196]],      # PA_BBND: seqused_k 必传
-        "cmp_residual_k": [[1]],    # cmp_ratio=4 时需要
-        "quant_mode": [2],          # 910_93 tiling 要求 quant_mode=2
+        "cu_seqlens_q": [[0, 1]],  # TND: cu_seqlens_q 必传 [B+1]
+        "cu_seqlens_k": [None],  # PA_BBND: cu_seqlens_k 不传
+        "seqused_q": [None],  # TND: seqused_q 可选，None 时从 cu_seqlens 推导
+        "seqused_k": [[8196]],  # PA_BBND: seqused_k 必传
+        "cmp_residual_k": [[1]],  # cmp_ratio=4 时需要
+        "quant_mode": [2],  # 910_93 tiling 要求 quant_mode=2
         "layout_query": ["TND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [512],
         "sparse_mode": [3],
-        "query_datarange":[[-100,100]],
-        "key_datarange":[[-100,100]],
-        "weights_datarange":[[-25,25]],
-        "q_scale_datarange":[[0,255]],
-        "k_scale_datarange":[[0,65504]],
-        "cmp_ratio":[4], #1/2/4/8/16/32/64/128
+        "query_datarange": [[-100, 100]],
+        "key_datarange": [[-100, 100]],
+        "weights_datarange": [[-25, 25]],
+        "q_scale_datarange": [[0, 255]],
+        "k_scale_datarange": [[0, 65504]],
+        "cmp_ratio": [4],  # 1/2/4/8/16/32/64/128
         "max_seqlen_q": [-1],
         "return_value": [0],
-        "output_idx_offset": [None]
+        "output_idx_offset": [None],
     },
-
     # ==================== 白盒测试用例（针对LD+returnValue修改）====================
     # WB1: LD + return_value=0 — 验证合并分支仅 isNeedLD=true 时不输出 value
-    "wb_ld_rv0_bsnd_pa":{
+    "wb_ld_rv0_bsnd_pa": {
         "batch_size": [8],
         "q_seq": [4],
         "k_seq": [32768],
-        "q_t_size":[8],
-        "k_t_size":[15],
+        "q_t_size": [8],
+        "k_t_size": [15],
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
         "block_size": [64],
-        "block_num":[4096],
+        "block_num": [4096],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
@@ -406,33 +484,32 @@ TEST_PARAMS = {
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [512],
         "sparse_mode": [3],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[1],
-        "return_value":[0],
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [1],
+        "return_value": [0],
         "output_idx_offset": [None],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
     # WB2: non-LD + return_value=1 — k_seq=128, block_size=128 → s2BlockNum=1, 不触发LD
     # 验证合并分支仅 returnValueFlag=true 时正确输出 value
-    "wb_nold_rv1_bsnd_pa":{
+    "wb_nold_rv1_bsnd_pa": {
         "batch_size": [2],
         "q_seq": [4],
         "k_seq": [128],
-        "q_t_size":[8],
-        "k_t_size":[15],
+        "q_t_size": [8],
+        "k_t_size": [15],
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
         "block_size": [128],
-        "block_num":[2],
+        "block_num": [2],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
@@ -444,33 +521,32 @@ TEST_PARAMS = {
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [128],
         "sparse_mode": [0],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[1],
-        "return_value":[1],
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [1],
+        "return_value": [1],
         "output_idx_offset": [[0] * 8],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
     # WB3: TND query + PA_BBND key + LD + return_value=1
     # 验证 infershape TND 分支 + ProcessLD value 输出
-    "wb_ld_rv1_tnd_pa":{
+    "wb_ld_rv1_tnd_pa": {
         "batch_size": [4],
         "q_seq": [4],
         "k_seq": [8192],
-        "q_t_size":[16],
-        "k_t_size":[15],
+        "q_t_size": [16],
+        "k_t_size": [15],
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
         "block_size": [64],
-        "block_num":[512],
+        "block_num": [512],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
@@ -482,33 +558,32 @@ TEST_PARAMS = {
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["TND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [512],
         "sparse_mode": [3],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[1],
-        "return_value":[1],
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [1],
+        "return_value": [1],
         "output_idx_offset": [[0] * 16],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
     # WB4: TND query + TND key + LD + return_value=1
     # 验证 TND+TND layout 路径 + ProcessLD
-    "wb_ld_rv1_tnd_tnd":{
+    "wb_ld_rv1_tnd_tnd": {
         "batch_size": [3],
         "q_seq": [4],
         "k_seq": [3072],
-        "q_t_size":[12],
-        "k_t_size":[3072],
+        "q_t_size": [12],
+        "k_t_size": [3072],
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
         "block_size": [64],
-        "block_num":[48],
+        "block_num": [48],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
@@ -520,33 +595,32 @@ TEST_PARAMS = {
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["TND"],
-        "layout_key":["TND"],
+        "layout_key": ["TND"],
         "sparse_count": [256],
         "sparse_mode": [0],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[1],
-        "return_value":[1],
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [1],
+        "return_value": [1],
         "output_idx_offset": [[0] * 12],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
     # WB5: BSND query + BSND key + LD + return_value=1
     # 验证非 PA key 路径 + ProcessLD
-    "wb_ld_rv1_bsnd_bsnd":{
+    "wb_ld_rv1_bsnd_bsnd": {
         "batch_size": [4],
         "q_seq": [4],
         "k_seq": [4096],
-        "q_t_size":[8],
-        "k_t_size":[15],
+        "q_t_size": [8],
+        "k_t_size": [15],
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
         "block_size": [64],
-        "block_num":[256],
+        "block_num": [256],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
@@ -558,33 +632,32 @@ TEST_PARAMS = {
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["BSND"],
+        "layout_key": ["BSND"],
         "sparse_count": [512],
         "sparse_mode": [0],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[1],
-        "return_value":[1],
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [1],
+        "return_value": [1],
         "output_idx_offset": [[0] * 16],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
     # WB6: quant_mode=4 (HIFLOAT8) + LD + return_value=1
     # 验证 HIFLOAT8 dtype + ProcessLD value 输出
-    "wb_ld_rv1_hifp8":{
+    "wb_ld_rv1_hifp8": {
         "batch_size": [4],
         "q_seq": [4],
         "k_seq": [8192],
-        "q_t_size":[8],
-        "k_t_size":[15],
+        "q_t_size": [8],
+        "k_t_size": [15],
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
         "block_size": [64],
-        "block_num":[512],
+        "block_num": [512],
         "qk_dtype": [torch.uint8],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
@@ -596,33 +669,32 @@ TEST_PARAMS = {
         "max_seqlen_q": [4],
         "quant_mode": [4],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [512],
         "sparse_mode": [3],
-        "query_datarange":[[-448,448]],
-        "key_datarange":[[-20,20]],
-        "weights_datarange":[[-123,123]],
-        "q_scale_datarange":[[0,255]],
-        "k_scale_datarange":[[0,65504]],
-        "cmp_ratio":[4],
-        "return_value":[1],
+        "query_datarange": [[-448, 448]],
+        "key_datarange": [[-20, 20]],
+        "weights_datarange": [[-123, 123]],
+        "q_scale_datarange": [[0, 255]],
+        "k_scale_datarange": [[0, 65504]],
+        "cmp_ratio": [4],
+        "return_value": [1],
         "output_idx_offset": [[0] * 16],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
     # WB7: group_size=32 (q_head_num=32) + LD + return_value=1
     # 验证 gSize=32 路径 + ProcessLD
-    "wb_ld_rv1_g32":{
+    "wb_ld_rv1_g32": {
         "batch_size": [4],
         "q_seq": [4],
         "k_seq": [8192],
-        "q_t_size":[8],
-        "k_t_size":[15],
+        "q_t_size": [8],
+        "k_t_size": [15],
         "q_head_num": [32],
         "k_head_num": [1],
         "head_dim": [128],
         "block_size": [64],
-        "block_num":[512],
+        "block_num": [512],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
@@ -634,33 +706,32 @@ TEST_PARAMS = {
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [512],
         "sparse_mode": [3],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[1],
-        "return_value":[1],
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [1],
+        "return_value": [1],
         "output_idx_offset": [[0] * 16],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
     # WB8: sparse_count=1 (最小边界) + LD + return_value=1
     # 验证 ProcessLD topk 边界
-    "wb_ld_rv1_sparse1":{
+    "wb_ld_rv1_sparse1": {
         "batch_size": [4],
         "q_seq": [4],
         "k_seq": [8192],
-        "q_t_size":[8],
-        "k_t_size":[15],
+        "q_t_size": [8],
+        "k_t_size": [15],
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
         "block_size": [64],
-        "block_num":[512],
+        "block_num": [512],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
@@ -672,33 +743,32 @@ TEST_PARAMS = {
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [1],
         "sparse_mode": [0],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[1],
-        "return_value":[1],
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [1],
+        "return_value": [1],
         "output_idx_offset": [[0] * 16],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
     # WB9: block_size=16 (最小边界) + LD + return_value=1
     # 验证 ProcessLD 对齐边界
-    "wb_ld_rv1_block16":{
+    "wb_ld_rv1_block16": {
         "batch_size": [4],
         "q_seq": [4],
         "k_seq": [4096],
-        "q_t_size":[8],
-        "k_t_size":[15],
+        "q_t_size": [8],
+        "k_t_size": [15],
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
         "block_size": [16],
-        "block_num":[1024],
+        "block_num": [1024],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
@@ -710,33 +780,32 @@ TEST_PARAMS = {
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [512],
         "sparse_mode": [0],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[1],
-        "return_value":[1],
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [1],
+        "return_value": [1],
         "output_idx_offset": [[0] * 16],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
     # WB10: block_size=1024 (最大边界) + LD + return_value=1
     # 验证大 block_size 下 ProcessLD
-    "wb_ld_rv1_block1024":{
+    "wb_ld_rv1_block1024": {
         "batch_size": [4],
         "q_seq": [4],
         "k_seq": [32768],
-        "q_t_size":[8],
-        "k_t_size":[15],
+        "q_t_size": [8],
+        "k_t_size": [15],
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
         "block_size": [1024],
-        "block_num":[128],
+        "block_num": [128],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
@@ -748,33 +817,32 @@ TEST_PARAMS = {
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [512],
         "sparse_mode": [3],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[1],
-        "return_value":[1],
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [1],
+        "return_value": [1],
         "output_idx_offset": [[0] * 16],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
     # WB11: sparse_count=2048 (最大边界) + LD + return_value=1
     # 验证 ProcessLD topk 最大值
-    "wb_ld_rv1_sparse2048":{
+    "wb_ld_rv1_sparse2048": {
         "batch_size": [4],
         "q_seq": [4],
         "k_seq": [32768],
-        "q_t_size":[8],
-        "k_t_size":[15],
+        "q_t_size": [8],
+        "k_t_size": [15],
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
         "block_size": [64],
-        "block_num":[4096],
+        "block_num": [4096],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
@@ -786,32 +854,31 @@ TEST_PARAMS = {
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [2048],
         "sparse_mode": [0],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[1],
-        "return_value":[1],
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [1],
+        "return_value": [1],
         "output_idx_offset": [[0] * 16],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
     # WB12: non-LD + return_value=0 — 基线对照（两条件均为false）
-    "wb_nold_rv0_bsnd_pa":{
+    "wb_nold_rv0_bsnd_pa": {
         "batch_size": [2],
         "q_seq": [4],
         "k_seq": [128],
-        "q_t_size":[8],
-        "k_t_size":[15],
+        "q_t_size": [8],
+        "k_t_size": [15],
         "q_head_num": [64],
         "k_head_num": [1],
         "head_dim": [128],
         "block_size": [128],
-        "block_num":[2],
+        "block_num": [2],
         "qk_dtype": [torch.float8_e4m3fn],
         "dequant_dtype": [torch.float32],
         "actual_seq_dtype": [torch.int32],
@@ -823,20 +890,19 @@ TEST_PARAMS = {
         "max_seqlen_q": [4],
         "quant_mode": [1],
         "layout_query": ["BSND"],
-        "layout_key":["PA_BBND"],
+        "layout_key": ["PA_BBND"],
         "sparse_count": [128],
         "sparse_mode": [0],
-        "query_datarange":[[-1,1]],
-        "key_datarange":[[-1,1]],
-        "weights_datarange":[[-1,1]],
-        "q_scale_datarange":[[0,1]],
-        "k_scale_datarange":[[0,1]],
-        "cmp_ratio":[1],
-        "return_value":[0],
+        "query_datarange": [[-1, 1]],
+        "key_datarange": [[-1, 1]],
+        "weights_datarange": [[-1, 1]],
+        "q_scale_datarange": [[0, 1]],
+        "k_scale_datarange": [[0, 1]],
+        "cmp_ratio": [1],
+        "return_value": [0],
         "output_idx_offset": [None],
-        "run_mode": ["eager"]
+        "run_mode": ["eager"],
     },
-
 }
 
 # 按需选择要启用的测试参数（例如默认启用所有）
@@ -856,6 +922,12 @@ elif "Ascend950" in properties.name:
             "quant_li_default_a5_v6",
             "quant_li_default_a5_v7",
             "quant_li_default_a5_v8",
+            "quant_li_default_a5_mxfp8",
+            "quant_li_default_a5_mxfp4",
+            "quant_li_default_a5_mxfp8_bsnd",
+            "quant_li_default_a5_mxfp4_bsnd",
+            "quant_li_default_a5_mxfp8_tnd",
+            "quant_li_default_a5_mxfp4_tnd",
             # 白盒测试用例
             "wb_ld_rv0_bsnd_pa",
             "wb_nold_rv1_bsnd_pa",

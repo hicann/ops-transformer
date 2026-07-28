@@ -19,25 +19,53 @@ import pandas as pd
 
 
 PARAM_NAMES = (
-    "batch_size", "q_seq", "k_seq", "q_t_size", "k_t_size", "q_head_num",
-    "k_head_num", "head_dim", "block_size", "block_num", "qk_dtype",
-    "dequant_dtype", "actual_seq_dtype", "cu_seq_q", "cu_seq_k", "act_seq_q",
-    "act_seq_k", "cmp_residual_k", "max_seqlen_q", "quant_mode", "layout_query",
-    "layout_key", "sparse_count", "sparse_mode", "query_datarange", "key_datarange",
-    "weights_datarange", "q_scale_datarange", "k_scale_datarange", "cmp_ratio",
-    "return_value", "output_idx_offset",
+    "batch_size",
+    "q_seq",
+    "k_seq",
+    "q_t_size",
+    "k_t_size",
+    "q_head_num",
+    "k_head_num",
+    "head_dim",
+    "block_size",
+    "block_num",
+    "qk_dtype",
+    "weight_dtype",
+    "dequant_dtype",
+    "actual_seq_dtype",
+    "cu_seq_q",
+    "cu_seq_k",
+    "act_seq_q",
+    "act_seq_k",
+    "cmp_residual_k",
+    "max_seqlen_q",
+    "quant_mode",
+    "layout_query",
+    "layout_key",
+    "sparse_count",
+    "sparse_mode",
+    "query_datarange",
+    "key_datarange",
+    "weights_datarange",
+    "q_scale_datarange",
+    "k_scale_datarange",
+    "cmp_ratio",
+    "return_value",
+    "output_idx_offset",
 )
 
 
-def ensure_comparison_passed(case_name, result, fulfill_percent,
-                             result_return_value="N/A",
-                             fulfill_percent_return_value=0):
+def ensure_comparison_passed(
+    case_name,
+    result,
+    fulfill_percent,
+    result_return_value="N/A",
+    fulfill_percent_return_value=0,
+):
     """Raise a serializable error when an accuracy comparison fails."""
     failures = []
     if result != "Pass":
-        failures.append(
-            f"index result={result}, fulfill_percent={fulfill_percent}"
-        )
+        failures.append(f"index result={result}, fulfill_percent={fulfill_percent}")
     if result_return_value not in ("N/A", "Pass"):
         failures.append(
             "value result="
@@ -84,7 +112,9 @@ class QliV2CaseSelector:
     @classmethod
     def resolve(cls, pt_dir, explicit_files="", case_names="", case_indexes=""):
         if explicit_files:
-            candidates = [Path(item.strip()) for item in explicit_files.split(",") if item.strip()]
+            candidates = [
+                Path(item.strip()) for item in explicit_files.split(",") if item.strip()
+            ]
         else:
             directory = Path(pt_dir)
             if not directory.is_dir():
@@ -137,15 +167,21 @@ class QliV2ResultWriter:
         readable = (
             f"QLI_B{values[0]}_S1{values[1]}_S2{values[2]}_"
             f"N1{values[5]}_N2{values[6]}_D{values[7]}_"
-            f"{values[20]}_{values[21]}_{values[10]}_"
-            f"QM{values[19]}_SM{values[23]}_CR{values[29]}_"
-            f"K{values[22]}_RV{values[30]}"
+            f"{values[21]}_{values[22]}_{values[10]}_"
+            f"QM{values[20]}_SM{values[24]}_CR{values[30]}_"
+            f"K{values[23]}_RV{values[31]}"
         )
         return re.sub(r"[^A-Za-z0-9_.-]+", "_", readable)
 
     @staticmethod
-    def row(case_name, params, result, fulfill_percent,
-            result_return_value="N/A", fulfill_percent_return_value=0):
+    def row(
+        case_name,
+        params,
+        result,
+        fulfill_percent,
+        result_return_value="N/A",
+        fulfill_percent_return_value=0,
+    ):
         values = list(params)
         if len(values) != len(PARAM_NAMES):
             raise ValueError(
@@ -153,12 +189,14 @@ class QliV2ResultWriter:
             )
         row = {"case_name": case_name}
         row.update(dict(zip(PARAM_NAMES, values)))
-        row.update({
-            "result": result,
-            "fulfill_percent": fulfill_percent,
-            "result_return_value": result_return_value,
-            "fulfill_percent_return_value": fulfill_percent_return_value,
-        })
+        row.update(
+            {
+                "result": result,
+                "fulfill_percent": fulfill_percent,
+                "result_return_value": result_return_value,
+                "fulfill_percent_return_value": fulfill_percent_return_value,
+            }
+        )
         return row
 
     @staticmethod
@@ -168,7 +206,9 @@ class QliV2ResultWriter:
         if output.exists():
             frame = pd.read_excel(output)
             expected_columns = list(row.keys())
-            legacy_columns = [name for name in expected_columns if name != "return_value"]
+            legacy_columns = [
+                name for name in expected_columns if name != "return_value"
+            ]
             if list(frame.columns) == legacy_columns:
                 frame["return_value"] = None
                 frame = frame[expected_columns]

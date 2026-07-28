@@ -19,9 +19,59 @@
 namespace op_api {
 using namespace at_npu::native;
 
-inline TensorWrapper MakeWrapper(const at::Tensor &tensor, aclDataType tensorAcltype)
+inline TensorWrapper MakeWrapper(const at::Tensor &tensor)
 {
-    return {tensor, tensorAcltype};
+    return {tensor, ConvertToAclDataType(tensor.scalar_type())};
+}
+
+inline bool IsMxQuantMode(int64_t quantMode) { return quantMode == 3 || quantMode == 5; }
+
+inline bool IsE8M0Tensor(const at::Tensor &tensor) { return tensor.scalar_type() == at::kFloat8_e8m0fnu; }
+
+inline bool IsFp4CompatibleTensor(const at::Tensor &tensor)
+{
+    return tensor.scalar_type() == at::kFloat4_e2m1fn_x2 || tensor.scalar_type() == at::kByte;
+}
+
+constexpr int64_t E8M0_SCALE_PACK_NUM = 2;
+
+inline void FixQLIV2AclDtypes(int64_t quantMode, TensorWrapper &queryWrapper, TensorWrapper &keyWrapper,
+                              TensorWrapper &queryScaleWrapper, TensorWrapper &keyScaleWrapper)
+{
+    if (quantMode == 4) {
+        TORCH_CHECK(queryWrapper.tensor_.scalar_type() == at::kByte, "When quant_mode is 4, query must be hifp8 type");
+        TORCH_CHECK(keyWrapper.tensor_.scalar_type() == at::kByte, "When quant_mode is 4, key must be hifp8 type");
+        queryWrapper.dtype = ACL_HIFLOAT8;
+        keyWrapper.dtype = ACL_HIFLOAT8;
+        return;
+    }
+
+    if (quantMode == 5) {
+        TORCH_CHECK(IsFp4CompatibleTensor(queryWrapper.tensor_),
+                    "When quant_mode is 5, query must be torch.float4_e2m1fn_x2 or packed torch.uint8");
+        TORCH_CHECK(IsFp4CompatibleTensor(keyWrapper.tensor_),
+                    "When quant_mode is 5, key must be torch.float4_e2m1fn_x2 or packed torch.uint8");
+        queryWrapper.dtype = ACL_FLOAT4_E2M1;
+        keyWrapper.dtype = ACL_FLOAT4_E2M1;
+    }
+
+    if (IsMxQuantMode(quantMode)) {
+        TORCH_CHECK(IsE8M0Tensor(queryScaleWrapper.tensor_),
+                    "When quant_mode is 3 or 5, query_dequant_scale must be torch.float8_e8m0fnu");
+        TORCH_CHECK(IsE8M0Tensor(keyScaleWrapper.tensor_),
+                    "When quant_mode is 3 or 5, key_dequant_scale must be torch.float8_e8m0fnu");
+        // Cube loads E8M0 scales in two-byte groups through a bfloat16_t view.
+        TORCH_CHECK(queryScaleWrapper.tensor_.storage_offset() % E8M0_SCALE_PACK_NUM == 0,
+                    "When quant_mode is 3 or 5, query_dequant_scale storage offset must satisfy 2-element E8M0 packing "
+                    "alignment, but got ",
+                    queryScaleWrapper.tensor_.storage_offset());
+        TORCH_CHECK(keyScaleWrapper.tensor_.storage_offset() % E8M0_SCALE_PACK_NUM == 0,
+                    "When quant_mode is 3 or 5, key_dequant_scale storage offset must satisfy 2-element E8M0 packing "
+                    "alignment, but got ",
+                    keyScaleWrapper.tensor_.storage_offset());
+        queryScaleWrapper.dtype = ACL_FLOAT8_E8M0;
+        keyScaleWrapper.dtype = ACL_FLOAT8_E8M0;
+    }
 }
 
 // npu tensor max size
@@ -74,9 +124,9 @@ at::Tensor QuantLightningIndexerMetadata(int64_t numHeadsQ, int64_t numHeadsK, i
 }
 
 // 工具函数，推导输出shape
-std::tuple<at::Tensor, at::Tensor>
-ConstructQuantLightningIndexerOutputTensor(const at::Tensor &query, const at::Tensor &key, int64_t sparseCount,
-                                           std::string queryLayoutStr, std::string keyLayoutStr, int64_t returnValue)
+std::tuple<at::Tensor, at::Tensor> ConstructQuantLightningIndexerOutputTensor(
+    const at::Tensor &query, const at::Tensor &key, int64_t sparseCount, std::string queryLayoutStr,
+    std::string keyLayoutStr, int64_t returnValue)
 {
     at::SmallVector<int64_t, SIZE> outputSize;
     for (size_t i = 0; i < query.sizes().size(); i++) {
@@ -111,15 +161,14 @@ ConstructQuantLightningIndexerOutputTensor(const at::Tensor &query, const at::Te
     return std::tuple<at::Tensor, at::Tensor>(sparseIndicesOut, sparseValuesOut);
 }
 
-std::tuple<at::Tensor, at::Tensor>
-QuantLightningIndexer(const at::Tensor &query, const at::Tensor &key, const at::Tensor &weights,
-                      const at::Tensor &queryDequantScale, const at::Tensor &keyDequantScale, int64_t topk,
-                      int64_t quantMode, const c10::optional<at::Tensor> &cuSeqlensQ,
-                      const c10::optional<at::Tensor> &cuSeqlensK, const c10::optional<at::Tensor> &sequsedQ,
-                      const c10::optional<at::Tensor> &sequsedK, const c10::optional<at::Tensor> &cmpResidualK,
-                      const c10::optional<at::Tensor> &blockTable, const c10::optional<at::Tensor> &outputIdxOffset,
-                      const c10::optional<at::Tensor> &metadata, int64_t maxSeqlenQ, c10::string_view layoutQ,
-                      c10::string_view layoutK, int64_t maskMode, int64_t cmpRatio, int64_t returnValue)
+std::tuple<at::Tensor, at::Tensor> QuantLightningIndexer(
+    const at::Tensor &query, const at::Tensor &key, const at::Tensor &weights, const at::Tensor &queryDequantScale,
+    const at::Tensor &keyDequantScale, int64_t topk, int64_t quantMode, const c10::optional<at::Tensor> &cuSeqlensQ,
+    const c10::optional<at::Tensor> &cuSeqlensK, const c10::optional<at::Tensor> &sequsedQ,
+    const c10::optional<at::Tensor> &sequsedK, const c10::optional<at::Tensor> &cmpResidualK,
+    const c10::optional<at::Tensor> &blockTable, const c10::optional<at::Tensor> &outputIdxOffset,
+    const c10::optional<at::Tensor> &metadata, int64_t maxSeqlenQ, c10::string_view layoutQ, c10::string_view layoutK,
+    int64_t maskMode, int64_t cmpRatio, int64_t returnValue)
 {
     TORCH_CHECK(query.numel() > 0, "Tensor query is empty.")
     TORCH_CHECK(key.numel() > 0, "Tensor key is empty.")
@@ -136,22 +185,16 @@ QuantLightningIndexer(const at::Tensor &query, const at::Tensor &key, const at::
     char *queryLayoutPtr = const_cast<char *>(queryLayoutStr.c_str());
     char *keyLayoutPtr = const_cast<char *>(keyLayoutStr.c_str());
 
-    if (quantMode == 4) {
-        //  hifp8接收数据类型为Uint8
-        TORCH_CHECK(query.scalar_type() == at::kByte, "When quant_mode is 4, query must be hifp8 type");
-        TORCH_CHECK(key.scalar_type() == at::kByte, "When quant_mode is 4, key must be hifp8 type");
-        TensorWrapper queryWrapper = MakeWrapper(query, ACL_HIFLOAT8);
-        TensorWrapper keyWrapper = MakeWrapper(key, ACL_HIFLOAT8);
-        ACLNN_CMD(aclnnQuantLightningIndexerV2, queryWrapper, keyWrapper, weights, queryDequantScale, keyDequantScale,
-                  cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blockTable, outputIdxOffset, metadata, topk,
-                  quantMode, maxSeqlenQ, queryLayoutPtr, keyLayoutPtr, maskMode, cmpRatio, returnValue,
-                  sparseIndicesOut, sparseValuesOut);
-    } else {
-        ACLNN_CMD(aclnnQuantLightningIndexerV2, query, key, weights, queryDequantScale, keyDequantScale, cuSeqlensQ,
-                  cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blockTable, outputIdxOffset, metadata, topk, quantMode,
-                  maxSeqlenQ, queryLayoutPtr, keyLayoutPtr, maskMode, cmpRatio, returnValue, sparseIndicesOut,
-                  sparseValuesOut);
-    }
+    auto queryWrapper = MakeWrapper(query);
+    auto keyWrapper = MakeWrapper(key);
+    auto queryScaleWrapper = MakeWrapper(queryDequantScale);
+    auto keyScaleWrapper = MakeWrapper(keyDequantScale);
+    FixQLIV2AclDtypes(quantMode, queryWrapper, keyWrapper, queryScaleWrapper, keyScaleWrapper);
+
+    ACLNN_CMD(aclnnQuantLightningIndexerV2, queryWrapper, keyWrapper, weights, queryScaleWrapper, keyScaleWrapper,
+              cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blockTable, outputIdxOffset, metadata, topk,
+              quantMode, maxSeqlenQ, queryLayoutPtr, keyLayoutPtr, maskMode, cmpRatio, returnValue, sparseIndicesOut,
+              sparseValuesOut);
 
     return std::tuple<at::Tensor, at::Tensor>(sparseIndicesOut, sparseValuesOut);
 }

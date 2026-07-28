@@ -100,7 +100,7 @@
     <tr>
       <td>quant_mode</td>
       <td>属性</td>
-      <td>表示量化模式，当前仅支持1/2/4。1表示qk: fp8(e4m3) per-token-head, scale: fp32；2表示qk: int8 per-token-head, scale: fp16, w: fp16；4表示qk: hif8 per-tensor, scale: fp32。</td>
+      <td>表示量化模式，当前支持1/2/3/4/5。1表示qk: fp8(e4m3) per-token-head, scale: fp32；2表示qk: int8 per-token-head, scale: fp16, w: fp16；3表示qk: mxfp8(e4m3), scale: fp8(e8m0)；4表示qk: hif8 per-tensor, scale: fp32；5表示qk: mxfp4(e2m1), scale: fp8(e8m0)。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
@@ -163,7 +163,7 @@
   </tbody>
   </table>
 
-  <ul><li><term>Ascend 950PR/Ascend 950DT</term> ：不支持quant_mode = 2。</li><li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：不支持num_heads_q = 32，不支持quant_mode = 1/4，不支持layout_k = BSND/TND，不支持cmp_ratio在[1，128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。</li><li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：不支持num_heads_q = 32，不支持quant_mode = 1/4，不支持layout_k = BSND/TND，不支持cmp_ratio在[1，128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。</li></ul>
+  <ul><li><term>Ascend 950PR/Ascend 950DT</term> ：不支持quant_mode = 2。</li><li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：不支持num_heads_q = 32，不支持quant_mode = 1/3/4/5，不支持layout_k = BSND/TND，不支持cmp_ratio在[1，128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。</li><li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：不支持num_heads_q = 32，不支持quant_mode = 1/3/4/5，不支持layout_k = BSND/TND，不支持cmp_ratio在[1，128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。</li></ul>
 
 ## 约束说明
 

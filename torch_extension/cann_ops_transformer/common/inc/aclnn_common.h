@@ -75,53 +75,54 @@ constexpr int64_t FP4_IN_INT8 = 2;
 constexpr int64_t PENULTIMATE_DIM = 2;
 const int g_toAclOffset = 256;
 
-#define AT_ALL_SCALAR_TYPE_AND_ACL_DATATYPE_PAIR(_)                                                                    \
-    _(at::ScalarType::Byte, ACL_UINT8)                                                                                 \
-    _(at::ScalarType::Char, ACL_INT8)                                                                                  \
-    _(at::ScalarType::Short, ACL_INT16)                                                                                \
-    _(at::ScalarType::Int, ACL_INT32)                                                                                  \
-    _(at::ScalarType::Long, ACL_INT64)                                                                                 \
-    _(at::ScalarType::Half, ACL_FLOAT16)                                                                               \
-    _(at::ScalarType::Float, ACL_FLOAT)                                                                                \
-    _(at::ScalarType::Double, ACL_DOUBLE)                                                                              \
-    _(at::ScalarType::ComplexHalf, ACL_COMPLEX32)                                                                      \
-    _(at::ScalarType::ComplexFloat, ACL_COMPLEX64)                                                                     \
-    _(at::ScalarType::ComplexDouble, ACL_COMPLEX128)                                                                   \
-    _(at::ScalarType::Bool, ACL_BOOL)                                                                                  \
-    _(at::ScalarType::QInt8, ACL_DT_UNDEFINED)                                                                         \
-    _(at::ScalarType::QUInt8, ACL_DT_UNDEFINED)                                                                        \
-    _(at::ScalarType::QInt32, ACL_DT_UNDEFINED)                                                                        \
-    _(at::ScalarType::BFloat16, ACL_BF16)                                                                              \
-    _(at::ScalarType::QUInt4x2, ACL_DT_UNDEFINED)                                                                      \
-    _(at::ScalarType::QUInt2x4, ACL_DT_UNDEFINED)                                                                      \
-    _(at::ScalarType::Bits1x8, ACL_DT_UNDEFINED)                                                                       \
-    _(at::ScalarType::Bits2x4, ACL_DT_UNDEFINED)                                                                       \
-    _(at::ScalarType::Bits4x2, ACL_DT_UNDEFINED)                                                                       \
-    _(at::ScalarType::Bits8, ACL_DT_UNDEFINED)                                                                         \
-    _(at::ScalarType::Bits16, ACL_DT_UNDEFINED)                                                                        \
-    _(at::ScalarType::Float8_e5m2, ACL_FLOAT8_E5M2)                                                                    \
-    _(at::ScalarType::Float8_e4m3fn, ACL_FLOAT8_E4M3FN)                                                                \
-    _(at::ScalarType::Float8_e5m2fnuz, ACL_DT_UNDEFINED)                                                               \
-    _(at::ScalarType::Float8_e4m3fnuz, ACL_DT_UNDEFINED)                                                               \
-    _(at::ScalarType::UInt16, ACL_UINT16)                                                                              \
-    _(at::ScalarType::UInt32, ACL_UINT32)                                                                              \
-    _(at::ScalarType::UInt64, ACL_UINT64)                                                                              \
-    _(at::ScalarType::UInt1, ACL_DT_UNDEFINED)                                                                         \
-    _(at::ScalarType::UInt2, ACL_DT_UNDEFINED)                                                                         \
-    _(at::ScalarType::UInt3, ACL_DT_UNDEFINED)                                                                         \
-    _(at::ScalarType::UInt4, ACL_DT_UNDEFINED)                                                                         \
-    _(at::ScalarType::UInt5, ACL_DT_UNDEFINED)                                                                         \
-    _(at::ScalarType::UInt6, ACL_DT_UNDEFINED)                                                                         \
-    _(at::ScalarType::UInt7, ACL_DT_UNDEFINED)                                                                         \
-    _(at::ScalarType::Int1, ACL_DT_UNDEFINED)                                                                          \
-    _(at::ScalarType::Int2, ACL_DT_UNDEFINED)                                                                          \
-    _(at::ScalarType::Int3, ACL_DT_UNDEFINED)                                                                          \
-    _(at::ScalarType::Int4, ACL_DT_UNDEFINED)                                                                          \
-    _(at::ScalarType::Int5, ACL_DT_UNDEFINED)                                                                          \
-    _(at::ScalarType::Int6, ACL_DT_UNDEFINED)                                                                          \
-    _(at::ScalarType::Int7, ACL_DT_UNDEFINED)                                                                          \
-    _(at::ScalarType::Float8_e8m0fnu, ACL_FLOAT8_E8M0)                                                                 \
-    _(at::ScalarType::Undefined, ACL_DT_UNDEFINED)                                                                     \
+#define AT_ALL_SCALAR_TYPE_AND_ACL_DATATYPE_PAIR(_) \
+    _(at::ScalarType::Byte, ACL_UINT8) \
+    _(at::ScalarType::Char, ACL_INT8) \
+    _(at::ScalarType::Short, ACL_INT16) \
+    _(at::ScalarType::Int, ACL_INT32) \
+    _(at::ScalarType::Long, ACL_INT64) \
+    _(at::ScalarType::Half, ACL_FLOAT16) \
+    _(at::ScalarType::Float, ACL_FLOAT) \
+    _(at::ScalarType::Double, ACL_DOUBLE) \
+    _(at::ScalarType::ComplexHalf, ACL_COMPLEX32) \
+    _(at::ScalarType::ComplexFloat, ACL_COMPLEX64) \
+    _(at::ScalarType::ComplexDouble, ACL_COMPLEX128) \
+    _(at::ScalarType::Bool, ACL_BOOL) \
+    _(at::ScalarType::QInt8, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::QUInt8, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::QInt32, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::BFloat16, ACL_BF16) \
+    _(at::ScalarType::QUInt4x2, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::QUInt2x4, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Bits1x8, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Bits2x4, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Bits4x2, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Bits8, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Bits16, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Float8_e5m2, ACL_FLOAT8_E5M2) \
+    _(at::ScalarType::Float8_e4m3fn, ACL_FLOAT8_E4M3FN) \
+    _(at::ScalarType::Float8_e5m2fnuz, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Float8_e4m3fnuz, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::UInt16, ACL_UINT16) \
+    _(at::ScalarType::UInt32, ACL_UINT32) \
+    _(at::ScalarType::UInt64, ACL_UINT64) \
+    _(at::ScalarType::UInt1, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::UInt2, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::UInt3, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::UInt4, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::UInt5, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::UInt6, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::UInt7, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Int1, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Int2, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Int3, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Int4, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Int5, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Int6, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Int7, ACL_DT_UNDEFINED) \
+    _(at::ScalarType::Float8_e8m0fnu, ACL_FLOAT8_E8M0) \
+    _(at::ScalarType::Float4_e2m1fn_x2, ACL_FLOAT4_E2M1) \
+    _(at::ScalarType::Undefined, ACL_DT_UNDEFINED) \
     _(at::ScalarType::NumOptions, ACL_DT_UNDEFINED)
 
 constexpr aclDataType kATenScalarTypeToAclDataTypeTable[] = {
@@ -134,19 +135,16 @@ constexpr aclDataType kATenScalarTypeToAclDataTypeTable[] = {
 
 enum class DType {
     UNDEFINED = -1,
-    ENUM_OFFSET(FLOAT, ACL_FLOAT)
-    ENUM_OFFSET(FLOAT16, ACL_FLOAT16) ENUM_OFFSET(INT8, ACL_INT8) ENUM_OFFSET(INT32, ACL_INT32)
-        ENUM_OFFSET(UINT8, ACL_UINT8) ENUM_OFFSET(INT16, ACL_INT16) ENUM_OFFSET(UINT16, ACL_UINT16)
-            ENUM_OFFSET(UINT32, ACL_UINT32) ENUM_OFFSET(INT64, ACL_INT64) ENUM_OFFSET(UINT64, ACL_UINT64)
-                ENUM_OFFSET(DOUBLE, ACL_DOUBLE) ENUM_OFFSET(BOOL, ACL_BOOL) ENUM_OFFSET(STRING, ACL_STRING)
-                    ENUM_OFFSET(COMPLEX64, ACL_COMPLEX64) ENUM_OFFSET(COMPLEX128, ACL_COMPLEX128)
-                        ENUM_OFFSET(BF16, ACL_BF16) ENUM_OFFSET(INT4, ACL_INT4) ENUM_OFFSET(UINT1, ACL_UINT1)
-                            ENUM_OFFSET(COMPLEX32, ACL_COMPLEX32) ENUM_OFFSET(HIFLOAT8, ACL_HIFLOAT8)
-                                ENUM_OFFSET(FLOAT8_E5M2, ACL_FLOAT8_E5M2) ENUM_OFFSET(FLOAT8_E4M3FN, ACL_FLOAT8_E4M3FN)
-                                    ENUM_OFFSET(FLOAT8_E8M0, ACL_FLOAT8_E8M0) ENUM_OFFSET(FLOAT6_E3M2, ACL_FLOAT6_E3M2)
-                                        ENUM_OFFSET(FLOAT6_E2M3, ACL_FLOAT6_E2M3)
-                                            ENUM_OFFSET(FLOAT4_E2M1, ACL_FLOAT4_E2M1)
-                                                ENUM_OFFSET(FLOAT4_E1M2, ACL_FLOAT4_E1M2)
+    ENUM_OFFSET(FLOAT, ACL_FLOAT) ENUM_OFFSET(FLOAT16, ACL_FLOAT16) ENUM_OFFSET(INT8, ACL_INT8) ENUM_OFFSET(
+        INT32, ACL_INT32) ENUM_OFFSET(UINT8, ACL_UINT8) ENUM_OFFSET(INT16, ACL_INT16) ENUM_OFFSET(UINT16, ACL_UINT16)
+        ENUM_OFFSET(UINT32, ACL_UINT32) ENUM_OFFSET(INT64, ACL_INT64) ENUM_OFFSET(UINT64, ACL_UINT64)
+            ENUM_OFFSET(DOUBLE, ACL_DOUBLE) ENUM_OFFSET(BOOL, ACL_BOOL) ENUM_OFFSET(STRING, ACL_STRING) ENUM_OFFSET(
+                COMPLEX64, ACL_COMPLEX64) ENUM_OFFSET(COMPLEX128, ACL_COMPLEX128) ENUM_OFFSET(BF16, ACL_BF16)
+                ENUM_OFFSET(INT4, ACL_INT4) ENUM_OFFSET(UINT1, ACL_UINT1) ENUM_OFFSET(COMPLEX32, ACL_COMPLEX32)
+                    ENUM_OFFSET(HIFLOAT8, ACL_HIFLOAT8) ENUM_OFFSET(FLOAT8_E5M2, ACL_FLOAT8_E5M2)
+                        ENUM_OFFSET(FLOAT8_E4M3FN, ACL_FLOAT8_E4M3FN) ENUM_OFFSET(FLOAT8_E8M0, ACL_FLOAT8_E8M0)
+                            ENUM_OFFSET(FLOAT6_E3M2, ACL_FLOAT6_E3M2) ENUM_OFFSET(FLOAT6_E2M3, ACL_FLOAT6_E2M3)
+                                ENUM_OFFSET(FLOAT4_E2M1, ACL_FLOAT4_E2M1) ENUM_OFFSET(FLOAT4_E1M2, ACL_FLOAT4_E1M2)
 };
 
 namespace op_infer {
@@ -176,6 +174,18 @@ typedef struct {
 inline bool Is4BitDtype(const aclDataType acl_data_type)
 {
     return acl_data_type == ACL_FLOAT4_E2M1 || acl_data_type == ACL_FLOAT4_E1M2 || acl_data_type == ACL_INT4;
+}
+
+inline int64_t ConvertToAclStorageOffset(const at::Tensor &at_tensor, const aclDataType acl_data_type)
+{
+    int64_t storageOffset = at_tensor.storage_offset();
+    if (Is4BitDtype(acl_data_type)) {
+        // ACL 4-bit descriptors express offsets in logical nibble elements.
+        TORCH_CHECK(storageOffset <= INT64_MAX / FP4_IN_INT8,
+                    "4-bit tensor storage offset is too large to convert to logical elements: ", storageOffset);
+        storageOffset *= FP4_IN_INT8;
+    }
+    return storageOffset;
 }
 
 static std::unordered_map<aclFormat, aclFormat> FORMAT_FAKE_TO_REAL{
@@ -233,13 +243,13 @@ enum QuantMode {
 
 #define GET_OP_API_FUNC(apiName) reinterpret_cast<_##apiName>(GetOpApiFuncAddr(#apiName))
 
-#define MEMCPY_TO_BUF(data_expression, size_expression)                                                                \
-    if (g_hashOffset + (size_expression) > kHashBufSize) {                                                             \
-        g_hashOffset = kHashBufMaxSize;                                                                                \
-        return;                                                                                                        \
-    }                                                                                                                  \
-    auto ret = memcpy_s(g_hashBuf + g_hashOffset, size_expression, data_expression, size_expression);                  \
-    TORCH_CHECK(ret == 0, "memcpy_s failed, error:", ret);                                                             \
+#define MEMCPY_TO_BUF(data_expression, size_expression) \
+    if (g_hashOffset + (size_expression) > kHashBufSize) { \
+        g_hashOffset = kHashBufMaxSize; \
+        return; \
+    } \
+    auto ret = memcpy_s(g_hashBuf + g_hashOffset, size_expression, data_expression, size_expression); \
+    TORCH_CHECK(ret == 0, "memcpy_s failed, error:", ret); \
     g_hashOffset += size_expression;
 
 aclDataType ConvertToAclDataType(const at::ScalarType &data_type)
@@ -261,20 +271,11 @@ inline aclDataType GetAclDataType(int64_t t)
     return ConvertToAclDataType(static_cast<at::ScalarType>(t));
 }
 
-inline const char *GetOpApiLibName(void)
-{
-    return "libopapi.so";
-}
+inline const char *GetOpApiLibName(void) { return "libopapi.so"; }
 
-inline const char *GetTransformerOpApiLibName(void)
-{
-    return "libopapi_transformer.so";
-}
+inline const char *GetTransformerOpApiLibName(void) { return "libopapi_transformer.so"; }
 
-inline const char *GetCustOpApiLibName(void)
-{
-    return "libcust_opapi.so";
-}
+inline const char *GetCustOpApiLibName(void) { return "libcust_opapi.so"; }
 
 inline void *GetOpApiFuncAddrInLib(void *handler, const char *libName, const char *apiName)
 {
@@ -477,9 +478,10 @@ inline aclTensor *ConvertType(const at::Tensor &at_tensor)
                                storageDims.size(), const_cast<void *>(aclInput.storage().data()));
     }
 
-    auto acl_tensor = aclCreateTensor(wrapperShape.data(), at_tensor.sizes().size(), acl_data_type,
-                                      wrapperStride.data(), at_tensor.storage_offset(), format, storageDims.data(),
-                                      storageDims.size(), const_cast<void *>(at_tensor.storage().data()));
+    auto acl_tensor =
+        aclCreateTensor(wrapperShape.data(), at_tensor.sizes().size(), acl_data_type, wrapperStride.data(),
+                        ConvertToAclStorageOffset(at_tensor, acl_data_type), format, storageDims.data(),
+                        storageDims.size(), const_cast<void *>(at_tensor.storage().data()));
     return acl_tensor;
 }
 
@@ -538,30 +540,26 @@ inline aclScalar *ConvertType(const at::Scalar &at_scalar)
                 std::string(c10::toString(scalar_data_type)) + " has not been supported")
     aclScalar *acl_scalar = nullptr;
     switch (scalar_data_type) {
-        case at::ScalarType::Double:
-            {
-                double value = at_scalar.toDouble();
-                acl_scalar = aclCreateScalar(&value, acl_data_type);
-                break;
-            }
-        case at::ScalarType::Long:
-            {
-                int64_t value = at_scalar.toLong();
-                acl_scalar = aclCreateScalar(&value, acl_data_type);
-                break;
-            }
-        case at::ScalarType::Bool:
-            {
-                bool value = at_scalar.toBool();
-                acl_scalar = aclCreateScalar(&value, acl_data_type);
-                break;
-            }
-        case at::ScalarType::ComplexDouble:
-            {
-                auto value = at_scalar.toComplexDouble();
-                acl_scalar = aclCreateScalar(&value, acl_data_type);
-                break;
-            }
+        case at::ScalarType::Double: {
+            double value = at_scalar.toDouble();
+            acl_scalar = aclCreateScalar(&value, acl_data_type);
+            break;
+        }
+        case at::ScalarType::Long: {
+            int64_t value = at_scalar.toLong();
+            acl_scalar = aclCreateScalar(&value, acl_data_type);
+            break;
+        }
+        case at::ScalarType::Bool: {
+            bool value = at_scalar.toBool();
+            acl_scalar = aclCreateScalar(&value, acl_data_type);
+            break;
+        }
+        case at::ScalarType::ComplexDouble: {
+            auto value = at_scalar.toComplexDouble();
+            acl_scalar = aclCreateScalar(&value, acl_data_type);
+            break;
+        }
         default:
             acl_scalar = nullptr;
             break;
@@ -644,15 +642,9 @@ inline aclScalar *ConvertType(const c10::optional<at::Scalar> &opt_scalar)
     return nullptr;
 }
 
-inline aclDataType ConvertType(const at::ScalarType scalarType)
-{
-    return ConvertToAclDataType(scalarType);
-}
+inline aclDataType ConvertType(const at::ScalarType scalarType) { return ConvertToAclDataType(scalarType); }
 
-inline const char *ConvertType(const string &str)
-{
-    return str.c_str();
-}
+inline const char *ConvertType(const string &str) { return str.c_str(); }
 
 aclTensor *ConvertType(const TensorWrapper &tensor_r)
 {
@@ -711,9 +703,10 @@ aclTensor *ConvertType(const TensorWrapper &tensor_r)
         }
     }
 
-    auto acl_tensor = aclCreateTensor(wrapperShape.data(), at_tensor.sizes().size(), acl_data_type,
-                                      wrapperStride.data(), at_tensor.storage_offset(), format, storageDims.data(),
-                                      storageDims.size(), const_cast<void *>(at_tensor.storage().data()));
+    auto acl_tensor =
+        aclCreateTensor(wrapperShape.data(), at_tensor.sizes().size(), acl_data_type, wrapperStride.data(),
+                        ConvertToAclStorageOffset(at_tensor, acl_data_type), format, storageDims.data(),
+                        storageDims.size(), const_cast<void *>(at_tensor.storage().data()));
     return acl_tensor;
 }
 
@@ -906,8 +899,7 @@ struct is_at_tensor_list<at::TensorList> : std::true_type {};
  */
 template <std::size_t I = 0, typename... Ts>
 typename std::enable_if<I == sizeof...(Ts), void>::type GetFirstTensor(const std::tuple<Ts...> &t, at::Tensor &res)
-{
-}
+{}
 
 template <std::size_t I = 0, typename... Ts>
     typename std::enable_if < I<sizeof...(Ts), void>::type GetFirstTensor(const std::tuple<Ts...> &t, at::Tensor &res)
@@ -934,60 +926,60 @@ auto DecodeDevice(Ts &...args) -> at::Device
     return ft.device();
 }
 
-#define ACLNN_CMD(aclnn_api, ...)                                                                                      \
-    do {                                                                                                               \
-        auto device = DecodeDevice(__VA_ARGS__);                                                                       \
-        const c10::OptionalDeviceGuard device_guard(device);                                                           \
-        static const auto getWorkspaceSizeFuncAddr = GetOpApiFuncAddr(#aclnn_api "GetWorkspaceSize");                  \
-        static const auto opApiFuncAddr = GetOpApiFuncAddr(#aclnn_api);                                                \
-        static const auto initMemAddr = GetOpApiFuncAddr("InitHugeMemThreadLocal");                                    \
-        static const auto unInitMemAddr = GetOpApiFuncAddr("UnInitHugeMemThreadLocal");                                \
-        static const auto releaseMemAddr = GetOpApiFuncAddr("ReleaseHugeMem");                                         \
-        TORCH_CHECK(getWorkspaceSizeFuncAddr != nullptr && opApiFuncAddr != nullptr, #aclnn_api, " or ",               \
+#define ACLNN_CMD(aclnn_api, ...) \
+    do { \
+        auto device = DecodeDevice(__VA_ARGS__); \
+        const c10::OptionalDeviceGuard device_guard(device); \
+        static const auto getWorkspaceSizeFuncAddr = GetOpApiFuncAddr(#aclnn_api "GetWorkspaceSize"); \
+        static const auto opApiFuncAddr = GetOpApiFuncAddr(#aclnn_api); \
+        static const auto initMemAddr = GetOpApiFuncAddr("InitHugeMemThreadLocal"); \
+        static const auto unInitMemAddr = GetOpApiFuncAddr("UnInitHugeMemThreadLocal"); \
+        static const auto releaseMemAddr = GetOpApiFuncAddr("ReleaseHugeMem"); \
+        TORCH_CHECK(getWorkspaceSizeFuncAddr != nullptr && opApiFuncAddr != nullptr, #aclnn_api, " or ", \
                     #aclnn_api "GetWorkspaceSize", " not in ", GetOpApiLibName(), ", or ", GetOpApiLibName(), ", or ", \
-                    GetTransformerOpApiLibName(), "not found.");                                                       \
-        auto acl_stream = c10_npu::getCurrentNPUStream().stream(false);                                                \
-        uint64_t workspace_size = 0;                                                                                   \
-        uint64_t *workspace_size_addr = &workspace_size;                                                               \
-        aclOpExecutor *executor = nullptr;                                                                             \
-        aclOpExecutor **executor_addr = &executor;                                                                     \
-        InitHugeMemThreadLocal initMemFunc = reinterpret_cast<InitHugeMemThreadLocal>(initMemAddr);                    \
-        UnInitHugeMemThreadLocal unInitMemFunc = reinterpret_cast<UnInitHugeMemThreadLocal>(unInitMemAddr);            \
-        if (initMemFunc) {                                                                                             \
-            initMemFunc(nullptr, false);                                                                               \
-        }                                                                                                              \
-        auto deterministic = at::globalContext().deterministicAlgorithms();                                            \
-        aclrtCtxSetSysParamOpt(aclSysParamOpt::ACL_OPT_DETERMINISTIC, deterministic ? 1 : 0);                          \
-        auto converted_params = ConvertTypes(__VA_ARGS__, workspace_size_addr, executor_addr);                         \
-        static auto getWorkspaceSizeFunc = ConvertToOpApiFunc(converted_params, getWorkspaceSizeFuncAddr);             \
-        auto workspace_status = call(getWorkspaceSizeFunc, converted_params);                                          \
-        TORCH_CHECK(workspace_status == 0, "call " #aclnn_api " failed, detail:", aclGetRecentErrMsg());               \
-        at::Tensor workspace_tensor;                                                                                   \
-        void *workspace_addr = nullptr;                                                                                \
-        if (workspace_size != 0) {                                                                                     \
-            at::TensorOptions options = at::TensorOptions(torch_npu::utils::get_npu_device_type());                    \
-            workspace_tensor = at::empty({workspace_size}, options.dtype(at::kByte));                                  \
-            workspace_addr = const_cast<void *>(workspace_tensor.storage().data());                                    \
-        }                                                                                                              \
-        auto acl_call = [converted_params, workspace_addr, workspace_size, acl_stream, executor]() -> int {            \
-            typedef int (*OpApiFunc)(void *, uint64_t, aclOpExecutor *, const aclrtStream);                            \
-            OpApiFunc opApiFunc = reinterpret_cast<OpApiFunc>(opApiFuncAddr);                                          \
-            auto api_ret = opApiFunc(workspace_addr, workspace_size, executor, acl_stream);                            \
-            TORCH_CHECK(api_ret == 0, "call " #aclnn_api " failed, detail:", aclGetRecentErrMsg());                    \
-            ReleaseConvertTypes(converted_params);                                                                     \
-            ReleaseHugeMem releaseMemFunc = reinterpret_cast<ReleaseHugeMem>(releaseMemAddr);                          \
-            if (releaseMemFunc) {                                                                                      \
-                releaseMemFunc(nullptr, false);                                                                        \
-            }                                                                                                          \
-            return api_ret;                                                                                            \
-        };                                                                                                             \
-        at_npu::native::OpCommand cmd;                                                                                 \
-        cmd.Name(#aclnn_api);                                                                                          \
-        cmd.SetCustomHandler(acl_call);                                                                                \
-        cmd.Run();                                                                                                     \
-        if (unInitMemFunc) {                                                                                           \
-            unInitMemFunc(nullptr, false);                                                                             \
-        }                                                                                                              \
+                    GetTransformerOpApiLibName(), "not found."); \
+        auto acl_stream = c10_npu::getCurrentNPUStream().stream(false); \
+        uint64_t workspace_size = 0; \
+        uint64_t *workspace_size_addr = &workspace_size; \
+        aclOpExecutor *executor = nullptr; \
+        aclOpExecutor **executor_addr = &executor; \
+        InitHugeMemThreadLocal initMemFunc = reinterpret_cast<InitHugeMemThreadLocal>(initMemAddr); \
+        UnInitHugeMemThreadLocal unInitMemFunc = reinterpret_cast<UnInitHugeMemThreadLocal>(unInitMemAddr); \
+        if (initMemFunc) { \
+            initMemFunc(nullptr, false); \
+        } \
+        auto deterministic = at::globalContext().deterministicAlgorithms(); \
+        aclrtCtxSetSysParamOpt(aclSysParamOpt::ACL_OPT_DETERMINISTIC, deterministic ? 1 : 0); \
+        auto converted_params = ConvertTypes(__VA_ARGS__, workspace_size_addr, executor_addr); \
+        static auto getWorkspaceSizeFunc = ConvertToOpApiFunc(converted_params, getWorkspaceSizeFuncAddr); \
+        auto workspace_status = call(getWorkspaceSizeFunc, converted_params); \
+        TORCH_CHECK(workspace_status == 0, "call " #aclnn_api " failed, detail:", aclGetRecentErrMsg()); \
+        at::Tensor workspace_tensor; \
+        void *workspace_addr = nullptr; \
+        if (workspace_size != 0) { \
+            at::TensorOptions options = at::TensorOptions(torch_npu::utils::get_npu_device_type()); \
+            workspace_tensor = at::empty({workspace_size}, options.dtype(at::kByte)); \
+            workspace_addr = const_cast<void *>(workspace_tensor.storage().data()); \
+        } \
+        auto acl_call = [converted_params, workspace_addr, workspace_size, acl_stream, executor]() -> int { \
+            typedef int (*OpApiFunc)(void *, uint64_t, aclOpExecutor *, const aclrtStream); \
+            OpApiFunc opApiFunc = reinterpret_cast<OpApiFunc>(opApiFuncAddr); \
+            auto api_ret = opApiFunc(workspace_addr, workspace_size, executor, acl_stream); \
+            TORCH_CHECK(api_ret == 0, "call " #aclnn_api " failed, detail:", aclGetRecentErrMsg()); \
+            ReleaseConvertTypes(converted_params); \
+            ReleaseHugeMem releaseMemFunc = reinterpret_cast<ReleaseHugeMem>(releaseMemAddr); \
+            if (releaseMemFunc) { \
+                releaseMemFunc(nullptr, false); \
+            } \
+            return api_ret; \
+        }; \
+        at_npu::native::OpCommand cmd; \
+        cmd.Name(#aclnn_api); \
+        cmd.SetCustomHandler(acl_call); \
+        cmd.Run(); \
+        if (unInitMemFunc) { \
+            unInitMemFunc(nullptr, false); \
+        } \
     } while (false)
 
 #endif // CANN_OPS_TRANSFORMER_ACLNN_COMMON_H

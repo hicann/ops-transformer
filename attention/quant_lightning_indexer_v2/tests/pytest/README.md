@@ -22,9 +22,16 @@
   - **key_layout**: PA_BBND、BSND、TND
 
 - **数据类型**:
-  - **qk_dtype**: FLOAT8_E4M3FN、INT8、HIFLOAT8
-  - **dequant_dtype**: FP32（Ascend950）、FP16（Ascend910_93）
+  - **qk_dtype**: FLOAT8_E4M3FN、INT8、HIFLOAT8、FLOAT4_E2M1
+  - **dequant_dtype**: FP32（Ascend950）、FP16（Ascend910_93）、FLOAT8_E8M0（MXFP8/MXFP4）
   - **actual_seq_dtype**: INT32
+
+### PyTorch MX类型约定
+
+- `quant_mode`为3/5时，`query_dequant_scale`和`key_dequant_scale`必须为`torch.float8_e8m0fnu`。
+- `quant_mode`为5时，`query`和`key`的算子逻辑数据类型为`FLOAT4_E2M1`（文档简写为`float4_e2m1`）：
+  - PyTorch提供`torch.float4_e2m1fn_x2`时，优先使用该原生打包类型；名称中的`x2`表示每个物理字节打包两个E2M1逻辑元素。
+  - PyTorch未提供该类型时，使用`torch.uint8`承载已打包数据，封装层会将其按`ACL_FLOAT4_E2M1`传入算子。
 
 - **运行模式**:
   - **eager**：直接调用 `torch.ops.cann_ops_transformer.quant_lightning_indexer`
@@ -211,8 +218,8 @@ bash batch_isolated_run.sh ./pt_path 1 graph   # graph模式 + 性能采集
 | head_dim | int | `128` |
 | block_size | int | `512` |
 | block_num | int | `8` |
-| qk_dtype | str | `FLOAT8_E4M3FN` / `INT8` / `HIFLOAT8` |
-| dequant_dtype | str | `FP32` / `FP16` |
+| qk_dtype | str | `FLOAT8_E4M3FN` / `INT8` / `HIFLOAT8` / `FLOAT4_E2M1` |
+| dequant_dtype | str | `FP32` / `FP16` / `FLOAT8_E8M0` |
 | actual_seq_dtype | str | `INT32` |
 | cu_seqlens_q | None/str | `None` 或 `"[0, 1]"` |
 | cu_seqlens_k | None/str | `None` 或 `"[0, 1]"` |
@@ -236,7 +243,7 @@ bash batch_isolated_run.sh ./pt_path 1 graph   # graph模式 + 性能采集
 
 **注意事项**：
 
-- `dequant_dtype`：Ascend950仅支持`FP32`，Ascend910_93支持`FP16`
+- `dequant_dtype`：Ascend950的`quant_mode=3/5`仅支持`FLOAT8_E8M0`，其他量化模式支持`FP32`；Ascend910_93支持`FP16`
 - `cmp_ratio > 1`且`sparse_mode != 0`时，`cmp_residual_k`必填（长度=batch_size的列表）
 - `return_value=1`时，`output_idx_offset`需提供有效值
 - Ascend910_93要求`quant_mode=2`

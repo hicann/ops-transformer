@@ -107,7 +107,7 @@ cann_ops_transformer.quant_lightning_indexer(
 | num_heads_k | int | 必选 | 表示Key的head个数，当前仅支持1。 | int32 | - |
 | head_dim | int | 必选 | 表示注意力头的维度，当前仅支持128。 | int32 | - |
 | topk | int | 必选 | 表示从Query中筛选出的关键稀疏token的个数，当前仅支持[1, 2048]。 | int32 | - |
-| quant_mode | int | 必选 | 表示量化模式。1表示Per-Token-Head float8_e4m3fn量化；2表示Per-Token-Head int8量化；4表示Per-Tensor HIfloat8量化。 | int32 | - |
+| quant_mode | int | 必选 | 表示量化模式，当前支持1/2/3/4/5。1表示qk: fp8(e4m3fn) per-token-head, scale: fp32；2表示qk: int8 per-token-head, scale: fp16, w: fp16；3表示qk: mxfp8(e4m3fn), scale: fp8(e8m0)；4表示qk: hifloat8 per-tensor, scale: fp32；5表示qk: mxfp4(e2m1), scale: fp8(e8m0)。 | int32 | - |
 | cu_seqlens_q | Tensor | 可选 | 表示不同Batch中Query的有效Sequence Length，仅layout_q为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。 | int32 | (B+1, ) |
 | cu_seqlens_k | Tensor | 可选 | 表示不同Batch中Key的有效Sequence Length，仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。 | int32 | (B+1, ) |
 | seqused_q | Tensor | 可选 | 表示不同Batch中Query实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。 | int32 | (B, ) |
@@ -125,23 +125,23 @@ cann_ops_transformer.quant_lightning_indexer(
 - <term>Ascend 950PR/Ascend 950DT</term>：不支持quant_mode = 2。
 <!-- end id5 -->
 <!-- npu="A3" id6 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持num_heads_q = 32，不支持quant_mode = 1/4，不支持layout_k = BSND/TND，不支持cmp_ratio在[1, 128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持num_heads_q = 32，不支持quant_mode = 1/3/4/5，不支持layout_k = BSND/TND，不支持cmp_ratio在[1, 128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。
 <!-- end id6 -->
 <!-- npu="910b" id7 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持num_heads_q = 32，不支持quant_mode = 1/4，不支持layout_k = BSND/TND，不支持cmp_ratio在[1, 128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持num_heads_q = 32，不支持quant_mode = 1/3/4/5，不支持layout_k = BSND/TND，不支持cmp_ratio在[1, 128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。
 <!-- end id7 -->
 
 ### quant_lightning_indexer
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
-| query | Tensor | 必选 | 公式中的量化输入$Q_{index}^{Quant}$。不支持空tensor。数据格式为ND。 | int8、float8_e4m3fn、HIfloat8 | layout_q为BSND时shape为(B,S1,N1,D)；layout_q为TND时shape为(T1,N1,D) |
-| key | Tensor | 必选 | 公式中的量化输入$K_{index}^{Quant}$。不支持空tensor。数据格式为ND，仅PA_BBND场景下0轴支持非连续。PA_BBND场景下block_size取值为16的倍数，最大支持1024。 | int8、float8_e4m3fn、HIfloat8 | layout_k为BSND时shape为(B,S2,N2,D)；layout_k为TND时shape为(T2,N2,D)；layout_k为PA_BBND时shape为(block_num,block_size,N2,D) |
+| query | Tensor | 必选 | 公式中的量化输入$Q_{index}^{Quant}$。不支持空tensor。数据格式为ND。 | int8、float8_e4m3fn、HIfloat8、float4_e2m1 | layout_q为BSND时shape为(B,S1,N1,D)；layout_q为TND时shape为(T1,N1,D) |
+| key | Tensor | 必选 | 公式中的量化输入$K_{index}^{Quant}$。不支持空tensor。数据格式为ND，仅PA_BBND场景下0轴支持非连续。PA_BBND场景下block_size取值为16的倍数，最大支持1024。 | int8、float8_e4m3fn、HIfloat8、float4_e2m1 | layout_k为BSND时shape为(B,S2,N2,D)；layout_k为TND时shape为(T2,N2,D)；layout_k为PA_BBND时shape为(block_num,block_size,N2,D) |
 | weights | Tensor | 必选 | 公式中的权重系数$W$。不支持空tensor。数据格式为ND。 | float16、float32 | layout_q为BSND时shape为(B,S1,N1)；layout_q为TND时shape为(T1,N1) |
-| query_dequant_scale | Tensor | 必选 | 公式中的$Scale_Q$，表示Index Query的反量化系数。不支持空tensor。数据格式为ND。 | float16、float32 | shape与weights保持一致 |
-| key_dequant_scale | Tensor | 必选 | 公式中的$Scale_K$，表示Index Key的反量化系数。不支持空tensor。数据格式为ND，仅PA_BBND场景下0轴支持非连续。 | float16、float32 | layout_k为PA_BBND时shape为(block_num,block_size,N2)；layout_k为BSND时shape为(B,S2,N2)；layout_k为TND时shape为(T2,N2)。quant_mode为4时shape必须为(1,)，表示Per-Tensor量化 |
+| query_dequant_scale | Tensor | 必选 | 公式中的$Scale_Q$，表示Index Query的反量化系数。不支持空tensor。数据格式为ND。 | float16、float32、float8_e8m0 | quant_mode为3/5时，layout_q为BSND时shape为(B,S1,N1,D/64,2)，layout_q为TND时shape为(T1,N1,D/64,2)；quant_mode为4时shape必须为(1,)；其他场景shape与weights保持一致 |
+| key_dequant_scale | Tensor | 必选 | 公式中的$Scale_K$，表示Index Key的反量化系数。不支持空tensor。数据格式为ND，仅PA_BBND场景下0轴支持非连续。 | float16、float32、float8_e8m0 | quant_mode为3/5时，layout_k为PA_BBND时shape为(block_num,block_size,N2,D/64,2)，layout_k为BSND时shape为(B,S2,N2,D/64,2)，layout_k为TND时shape为(T2,N2,D/64,2)；quant_mode为4时shape必须为(1,)；其他场景分别为(block_num,block_size,N2)、(B,S2,N2)或(T2,N2) |
 | topk | int | 必选 | topK阶段需要保留的block数量，当前支持[1, 2048]。 | int32 | - |
-| quant_mode | int | 必选 | 表示量化模式，当前仅支持1/2/4。1表示qk: fp8(e4m3fn) per-token-head, scale: fp32；2表示qk: int8 per-token-head, scale: fp16, w: fp16；4表示qk: hifloat8 per-tensor, scale: fp32。 | int32 | - |
+| quant_mode | int | 必选 | 表示量化模式，当前支持1/2/3/4/5。1表示qk: fp8(e4m3fn) per-token-head, scale: fp32；2表示qk: int8 per-token-head, scale: fp16, w: fp16；3表示qk: mxfp8(e4m3fn), scale: fp8(e8m0)；4表示qk: hifloat8 per-tensor, scale: fp32；5表示qk: mxfp4(e2m1), scale: fp8(e8m0)。 | int32 | - |
 | cu_seqlens_q | Tensor | 可选 | 当前Batch及前序Batch中query的有效token数的累加和，后一个元素的值必须大于等于前一个元素的值。仅layout_q为TND场景下必传，第一个值固定为0。数据格式为ND。 | int32 | (B+1,) |
 | cu_seqlens_k | Tensor | 可选 | 当前Batch及前序Batch中key的有效token数的累加和，后一个元素的值必须大于等于前一个元素的值。仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND。 | int32 | (B+1,) |
 | seqused_q | Tensor | 可选 | 不同Batch中query的真实使用长度，每个Batch的有效token数不超过query中的维度S大小且不小于0。数据格式为ND。 | int32 | (B,) |
@@ -159,8 +159,9 @@ cann_ops_transformer.quant_lightning_indexer(
 
 <!-- npu="950" id10 -->
 - <term>Ascend 950PR/Ascend 950DT</term>:
-  - query、key在quant_mode为1时支持float8_e4m3fn，quant_mode为4时支持HIfloat8，不支持int8。
-  - weights、query_dequant_scale和key_dequant_scale支持float32，不支持float16。
+  - query、key在quant_mode为1/3时支持float8_e4m3fn，quant_mode为4时支持HIfloat8，quant_mode为5时支持float4_e2m1，不支持int8。
+  - query_dequant_scale和key_dequant_scale在quant_mode为3/5时支持float8_e8m0，quant_mode为1/4时支持float32。
+  - weights支持float32，不支持float16。
   - query的N支持32或64。
 <!-- end id10 -->
 <!-- npu="A3,910b" id11 -->
