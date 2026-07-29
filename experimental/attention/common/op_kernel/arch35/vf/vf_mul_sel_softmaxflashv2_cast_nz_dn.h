@@ -1341,10 +1341,10 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf__ 
     Max(max1, max1, max3, preg_108);
     Max(max0, max0, max1, preg_108);
     Muls(max0, max0, dScale, preg_108);
-    Max(max0, max0, vreg_x_max_f32_b, preg_108);
     Muls(max0, max0, INV_LN2, preg_108);
     Truncate<T, RoundMode::CAST_CEIL>(max0, max0, preg_108);
     Muls(max0, max0, LN2, preg_108);
+    Max(max0, max0, vreg_x_max_f32_b, preg_108);
 
     if (subLoop == 0) {
         StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(
