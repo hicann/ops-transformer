@@ -578,6 +578,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/stem_oam_prep_varlen_q/README.md">stem_oam_prep_varlen_q</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>Stem OAM block-sparse attention中Q侧预处理算子，将变长Q tensor从paged存储格式转化为按stem block分组的flattened qFlat输出。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/scatter_pa_kv_cache_with_k_scale/README.md">scatter_pa_kv_cache_with_k_scale</a></td>
     <td>✓</td>
     <td>✓</td>
