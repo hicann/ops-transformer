@@ -184,6 +184,7 @@ __aicore__ inline void CompressorKernel<COMP>::InitTilingData()
     constInfo.nSize = tilingData_->baseParams.nSize;
     constInfo.vec1TailCacheSize = tilingData_->workspaceParams.vec1TailCacheSize;
     constInfo.dbWorkspaceRatio = tilingData_->workspaceParams.dbWorkspaceRatio;
+    constInfo.batchConsistency = tilingData_->baseParams.batchConsistency;
 }
 
 template <typename COMP>
@@ -195,9 +196,9 @@ __aicore__ inline void CompressorKernel<COMP>::SplitK()
         // 获取m大小
         mSize += bSeqUsed;
     }
-
     uint32_t mBaseNum = CeilDivT(mSize, constInfo.mBaseSize);
-    if (constInfo.dBasicBlockNum * mBaseNum < constInfo.usedCoreNum) {
+    if (constInfo.dBasicBlockNum * mBaseNum < constInfo.usedCoreNum &&
+        constInfo.batchConsistency != BATCH_CONSISTENCY) {
         constInfo.kBaseNum = constInfo.usedCoreNum / constInfo.dBasicBlockNum;
         uint32_t kAlignSize = CeilDivT(
             Align(constInfo.hSize, static_cast<uint32_t>(BUFFER_SIZE_BYTE_32B / sizeof(X_T))), constInfo.kBaseNum);

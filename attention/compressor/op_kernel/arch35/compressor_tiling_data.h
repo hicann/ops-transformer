@@ -19,6 +19,7 @@
 #include "kernel_tiling/kernel_tiling.h"
 
 const uint32_t CMP_MAX_AIC_CORE_NUM = 36;
+constexpr uint32_t BATCH_CONSISTENCY = 3;
 
 namespace optiling {
     struct CompressorSplitCoreParams {
@@ -46,6 +47,7 @@ namespace optiling {
         uint32_t kBaseSize = 0;
         uint32_t coreGroupNum = 0;
         uint32_t mLoopNum = 0;
+        uint32_t batchConsistency = 0;
         CompressorSplitCoreParams splitCoreParam[CMP_MAX_AIC_CORE_NUM];
     };
 
