@@ -123,6 +123,7 @@ void PrintWorkspaceInfo(const struct WorkspaceInfo *info, const char *nodeName)
     OP_LOGD(nodeName, "flagSwiGluToGmm2Ptr:        %ld\n", info->flagSwiGluToGmm2Ptr);
     OP_LOGD(nodeName, "flagDispatchToGmm1Ptr:      %ld\n", info->flagDispatchToGmm1Ptr);
     OP_LOGD(nodeName, "flagSendCntCalToUpdParamsPtr:      %ld\n", info->flagSendCntCalToUpdParamsPtr);
+    OP_LOGD(nodeName, "flagGmmToEpiloguePtr: %ld\n", info->flagGmmToEpiloguePtr);
 }
 
 void PrintPeermemInfo(const MegaMoeTilingData *tilingData, const char *nodeName)
@@ -758,9 +759,14 @@ static ge::graphStatus SetAdaptiveBufferConfigs(const gert::TilingContext *conte
         static_cast<int64_t>(MegaMoeImpl::L1_TILE_M_256);
     int64_t dispatchFlagSlotsPerExpert = (maxWavesPerExpert + INT_CACHELINE - 1) / INT_CACHELINE * INT_CACHELINE;
     uint64_t totalFlagElementCount =
-        static_cast<uint64_t>(tilingData->expertPerRank) *
+        static_cast<uint64_t>(tilingData->moeExpertPerRank) *
         (static_cast<uint64_t>(INT_CACHELINE) + static_cast<uint64_t>(dispatchFlagSlotsPerExpert) +
          static_cast<uint64_t>(INT_CACHELINE) * tilingData->aicNum);
+    if (tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W4 ||
+        tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4 ||
+        tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4_NZ) {
+        totalFlagElementCount += static_cast<uint64_t>(tilingData->aicNum) * INT_CACHELINE;
+    }
     if (tilingData->combineQuantMode != COMBINE_NO_QUANT) {
         uint64_t combineFlagElementCount = tilingData->combineSyncSlotCountPerExpert * tilingData->moeExpertPerRank *
                                            static_cast<uint64_t>(INT_CACHELINE);
