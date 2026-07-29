@@ -310,9 +310,8 @@ static ge::graphStatus InferShapeMoeDistributeDispatchV2(gert::InferShapeContext
         }
     } else {
         if (hasExpertScales && !IsTargetNpuArchInfershape(context->GetNodeName(), NPUARCH_A5)) {
-            epRecvCountShape->SetDim(
-                0U, *epWorldSize * localExpertNum + globalBsReal * SEND_COUNT_MEMORY_SIZE * k *
-                    (*epWorldSize) / RANK_NUM_PER_NODE);
+            epRecvCountShape->SetDim(0U, *epWorldSize * localExpertNum + globalBsReal * SEND_COUNT_MEMORY_SIZE * k *
+                                                                             (*epWorldSize) / RANK_NUM_PER_NODE);
         } else {
             epRecvCountShape->SetDim(0U, (*epWorldSize) * localExpertNum);
         }
@@ -390,7 +389,11 @@ static ge::graphStatus InferDataTypeMoeDistributeDispatchV2(gert::InferDataTypeC
     bool quantFlag = (scalesType != ge::DT_UNDEFINED) ? true : false;
     OP_LOGD(context->GetNodeName(), "quantFlag id %d.", quantFlag);
     ge::DataType expandXDtype = ge::DT_INT8;
-    if (!quantFlag && (static_cast<QuantMode>(*quantMode) == QuantMode::QUANT_MODE_NO_QUANT)) {
+    const bool isNoQuant = static_cast<QuantMode>(*quantMode) == QuantMode::QUANT_MODE_NO_QUANT;
+    // A2 packed INT4 is exposed as INT32. Its required per-token scale is
+    // transported together with x, rather than being used to quantize x.
+    // Therefore expand_x must preserve x's INT32 dtype even when scales exists.
+    if (isNoQuant && (!quantFlag || xDtype == ge::DT_INT32)) {
         expandXDtype = xDtype;
     }
     if ((yDtypePtr != nullptr) && (*yDtypePtr != ge::DT_UNDEFINED)) {

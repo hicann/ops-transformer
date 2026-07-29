@@ -23,7 +23,7 @@ namespace ge {
 
 * @par Inputs
 * Seven inputs, including:
-* @li x: A tensor. Support dtype: float16,bfloat16,float8_e5m2,float8_e4m3,hifloat8,float4_e2m1,
+* @li x: A tensor. Support dtype: float16,bfloat16,int32,float8_e5m2,float8_e4m3,hifloat8,float4_e2m1,
   float4_e1m2 dimension must be 2. Shape supports (BS, H), support format: ND.
 * @li expertIds: A tensor. Support dtype: int32, indicates top k experts of each token, dimension must be 2.
   Shape supports (BS, K), support format: ND.
@@ -56,8 +56,8 @@ namespace ge {
 
 * @par Outputs
 * Seven outputs, including:
-* @li expand_x: A tensor. Result of each expert after dispatching. Support dtype: float16,bfloat16,int8,float8_e4m3,
-  float8_e5m2,hifloat8,float4_e2m1,float4_e1m2. Shape supports (A, H), support format: ND.
+* @li expand_x: A tensor. Result of each expert after dispatching. Support dtype: float16,bfloat16,int32,
+  int8,float8_e4m3,float8_e5m2,hifloat8,float4_e2m1,float4_e1m2. Shape supports (A, H), support format: ND.
 * @li dynamic_scales: If quant is enabled, scale value of each token. A tensor. Support dtype: float32,float8_e8m0.
   Shape supports (A, ), support format: ND.
 * @li assist_info_for_combine: A tensor. Support dtype: int32. Shape supports (A * 128), support format: ND.
@@ -68,7 +68,7 @@ namespace ge {
 support format: ND.
 */
 REG_OP(MoeDistributeDispatchV2)
-    .INPUT(x, TensorType({DT_BF16, DT_FLOAT16, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_HIFLOAT8, DT_FLOAT4_E2M1,
+    .INPUT(x, TensorType({DT_BF16, DT_FLOAT16, DT_INT32, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_HIFLOAT8, DT_FLOAT4_E2M1,
                           DT_FLOAT4_E1M2}))
     .INPUT(expert_ids, TensorType({DT_INT32}))
     .OPTIONAL_INPUT(scales, TensorType({DT_FLOAT, DT_FLOAT8_E8M0}))
@@ -76,7 +76,7 @@ REG_OP(MoeDistributeDispatchV2)
     .OPTIONAL_INPUT(expert_scales, TensorType({DT_FLOAT}))
     .OPTIONAL_INPUT(elastic_info, TensorType({DT_INT32}))
     .OPTIONAL_INPUT(performance_info, TensorType({DT_INT64}))
-    .OUTPUT(expand_x, TensorType({DT_BF16, DT_INT8, DT_FLOAT16, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_HIFLOAT8,
+    .OUTPUT(expand_x, TensorType({DT_BF16, DT_INT8, DT_INT32, DT_FLOAT16, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_HIFLOAT8,
                                   DT_FLOAT4_E2M1, DT_FLOAT4_E1M2}))
     .OUTPUT(dynamic_scales, TensorType({DT_FLOAT, DT_FLOAT8_E8M0}))
     .OUTPUT(assist_info_for_combine, TensorType({DT_INT32}))

@@ -83,10 +83,10 @@ bool DispatchCheckNotNull(const aclTensor *x, const aclTensor *expertIds, const 
     return true;
 }
 
-aclnnStatus DispatchCheckParams(const aclTensor *x, const aclTensor *expertIds, const char *groupEp,
-                                const char *groupTp, int64_t quantMode, aclTensor *expandX, aclTensor *dynamicScales,
-                                aclTensor *assistInfoForCombine, aclTensor *expertTokensNums, aclTensor *epRecvCounts,
-                                aclTensor *tpRecvCounts)
+aclnnStatus DispatchCheckParams(const aclTensor *x, const aclTensor *expertIds, const aclTensor *scalesOptional,
+                                const char *groupEp, const char *groupTp, int64_t quantMode, aclTensor *expandX,
+                                aclTensor *dynamicScales, aclTensor *assistInfoForCombine, aclTensor *expertTokensNums,
+                                aclTensor *epRecvCounts, aclTensor *tpRecvCounts)
 {
     CHECK_RET(DispatchCheckNotNull(x, expertIds, groupEp, groupTp, expandX, dynamicScales, assistInfoForCombine,
                                    expertTokensNums, epRecvCounts),
@@ -98,6 +98,11 @@ aclnnStatus DispatchCheckParams(const aclTensor *x, const aclTensor *expertIds, 
 
     if (quantMode == DISPATCH_DYNAMIC_QUANT_MODE) {
         OP_LOGD("quantMode = 2, dynamicScales can't be null");
+        CHECK_RET(dynamicScales != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+    }
+    if (x->GetDataType() == ACL_INT32) {
+        OP_LOGD("x dtype is INT32, scales and dynamicScales can't be null");
+        CHECK_RET(scalesOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR);
         CHECK_RET(dynamicScales != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     }
     if (strnlen(groupEp, HCCL_GROUP_NAME_MAX) >= HCCL_GROUP_NAME_MAX) {
@@ -159,8 +164,9 @@ aclnnStatus aclnnMoeDistributeDispatchGetWorkspaceSizeBase(
     OP_LOGD("enter to the  aclnnMoeDistributeDispatchGetWorkspaceSizeBase\n");
     const static bool is910B = GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B;
     const static bool is950 = GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
-    auto retParam = DispatchCheckParams(x, expertIds, groupEp, groupTp, quantMode, expandXOut, dynamicScalesOut,
-                                        assistInfoForCombineOut, expertTokenNumsOut, epRecvCountsOut, tpRecvCountsOut);
+    auto retParam =
+        DispatchCheckParams(x, expertIds, scalesOptional, groupEp, groupTp, quantMode, expandXOut, dynamicScalesOut,
+                            assistInfoForCombineOut, expertTokenNumsOut, epRecvCountsOut, tpRecvCountsOut);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
 
     aclTensor *mc2Context = nullptr;
@@ -229,7 +235,6 @@ aclnnStatus aclnnMoeDistributeDispatchBase(void *workspace, uint64_t workspaceSi
 #endif
     return aclnnInnerMoeDistributeDispatchV2(workspace, workspaceSize, executor, stream);
 }
-
 
 #ifdef __cplusplus
 }

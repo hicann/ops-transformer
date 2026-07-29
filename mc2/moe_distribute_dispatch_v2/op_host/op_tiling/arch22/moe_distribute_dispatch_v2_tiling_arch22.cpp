@@ -69,12 +69,14 @@ constexpr uint32_t RANK_NUM_PER_NODE_A2 = 8;
 constexpr uint32_t BLOCK_SIZE_A2 = 32;
 constexpr uint32_t MAX_K_VALUE_A2 = 16;
 constexpr uint32_t MAX_HIDDEN_SIZE_A2 = 10240;
+constexpr uint32_t MAX_HIDDEN_SIZE_A2_INT32 = 5120;
 constexpr int32_t MAX_EP_WORLD_SIZE_A2 = 384;
 constexpr int32_t MAX_EP_WORLD_SIZE_A2_LAYERED = 64;
 constexpr int32_t MAX_MOE_EXPERT_NUMS_A2_FULLMESH = 1024;
 constexpr int32_t MAX_MOE_EXPERT_NUMS_A2_HIERARCHY = 512;
 constexpr uint32_t MAX_BATCH_SIZE_A2 = 256;
 constexpr uint32_t LAYERED_MAX_BATCH_SIZE_A2 = 512;
+constexpr uint64_t SCALE_PAYLOAD_SIZE_A2 = 32ULL;
 constexpr size_t USER_WORKSPACE_A2 = 1UL * 1024UL * 1024UL; // moeExpertNum_ * sizeof(uint32_t) + epWorldSize_ * 2 * 32
 constexpr uint64_t TILING_KEY_BASE_A2 = 2000000000;
 constexpr uint64_t TILING_KEY_LAYERED_COMM_A2 = 100000000;
@@ -170,7 +172,10 @@ static ge::graphStatus MoeDistributeDispatchA2CheckWinSize(const gert::TilingCon
     uint32_t localMoeExpertNum = info.moeExpertNum / epWorldSize;
     uint64_t maxBs = static_cast<uint64_t>(info.globalBs) / epWorldSize;
     uint64_t minHcclBuffSize = 0ULL;
-    constexpr uint64_t sizeofDtypeX = 2ULL; // token数据类型为float16/bfloat16，每个元素字节数为2
+    auto xDesc = context->GetInputDesc(X_INDEX);
+    OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xDesc"), return ge::GRAPH_FAILED);
+    uint64_t sizeofDtypeX = static_cast<uint64_t>(ge::GetSizeByDataType(xDesc->GetDataType()));
+    uint64_t scalePayloadSize = xDesc->GetDataType() == ge::DT_INT32 ? SCALE_PAYLOAD_SIZE_A2 : 0ULL;
     constexpr uint64_t BUFFER_NUM = 2UL;
     constexpr const char *HCCL_BUFFSIZE_HINT =
         "Please increase the HCCL_BUFFSIZE environment variable or provide an HcclCommConfig with a larger "
@@ -188,23 +193,25 @@ static ge::graphStatus MoeDistributeDispatchA2CheckWinSize(const gert::TilingCon
             OP_LOGW(nodeName,
                     "HCCL_BUFFSIZE is too small, min required HCCL_BUFFSIZE "
                     "((moeExpertNum + epWorldSize / 4) * Align512(maxBs "
-                    "* (h * 2 + 16 * Align8(k))) / 1MB + 8MB) = %luMB, actual HCCL_BUFFSIZE = %luMB, "
-                    "moeExpertNum = %u, maxBs = %lu, h = %u, k = %u. AlignY(x) = (x + Y - 1) / Y * Y. %s",
+                    "* (h * dtypeBytes + 16 * Align8(k))) / 1MB + 8MB) = %luMB, actual HCCL_BUFFSIZE = %luMB, "
+                    "moeExpertNum = %u, maxBs = %lu, h = %u, k = %u, dtypeBytes = %lu. "
+                    "AlignY(x) = (x + Y - 1) / Y * Y. %s",
                     ops::CeilDiv(minHcclBuffSize, MB_SIZE), ops::CeilDiv(hcclBuffSize, MB_SIZE), info.moeExpertNum,
-                    maxBs, info.h, info.k, HCCL_BUFFSIZE_HINT);
+                    maxBs, info.h, info.k, sizeofDtypeX, HCCL_BUFFSIZE_HINT);
         }
     } else {
         constexpr uint64_t extraBuffSize = 2 * MB_SIZE; // 固定2M额外空间作为存储非数据信息的区域
-        const uint64_t perTokenSize = info.h * sizeofDtypeX;
+        const uint64_t perTokenSize = info.h * sizeofDtypeX + scalePayloadSize;
         const uint64_t maxRecvTokenNum = maxBs * epWorldSize * std::min(localMoeExpertNum, info.k);
         minHcclBuffSize = BUFFER_NUM * (maxRecvTokenNum * perTokenSize + extraBuffSize);
         if (minHcclBuffSize > hcclBuffSize) {
             OP_LOGW(nodeName,
                     "HCCL_BUFFSIZE is too small, min required HCCL_BUFFSIZE (%lu * (maxBs * epWorldSize * "
-                    "min(localMoeExpertNum, k) * h * 2 / 1MB + 2MB)) = %luMB, actual HCCL_BUFFSIZE = %luMB, maxBs = "
-                    "%lu, epWorldSize = %u, localMoeExpertNum = %u, k = %u, h = %u. %s",
+                    "min(localMoeExpertNum, k) * (h * dtypeBytes + scalePayloadBytes) / 1MB + 2MB)) = %luMB, "
+                    "actual HCCL_BUFFSIZE = %luMB, maxBs = %lu, epWorldSize = %u, localMoeExpertNum = %u, "
+                    "k = %u, h = %u, dtypeBytes = %lu, scalePayloadBytes = %lu. %s",
                     BUFFER_NUM, ops::CeilDiv(minHcclBuffSize, MB_SIZE), ops::CeilDiv(hcclBuffSize, MB_SIZE), maxBs,
-                    epWorldSize, localMoeExpertNum, info.k, info.h, HCCL_BUFFSIZE_HINT);
+                    epWorldSize, localMoeExpertNum, info.k, info.h, sizeofDtypeX, scalePayloadSize, HCCL_BUFFSIZE_HINT);
         }
     }
     return ge::GRAPH_SUCCESS;
@@ -258,11 +265,11 @@ static ge::graphStatus MoeDistributeDispatchA2CheckAttrAndSetTiling(const gert::
     }
     if (*epWorldSizePtr <= 0 || *epWorldSizePtr > maxEpWorldSizeA2 ||
         ((*epWorldSizePtr > RANK_NUM_PER_NODE_A2) && (*epWorldSizePtr % RANK_NUM_PER_NODE_A2 != 0))) {
-        OP_LOGE_FOR_INVALID_VALUE(K_INNER_DEBUG, "epWorldSize", std::to_string(*epWorldSizePtr).c_str(),
-                                  (std::string("[1,") + std::to_string(maxEpWorldSizeA2) +
-                                   "], and must be a multiple of " + std::to_string(RANK_NUM_PER_NODE_A2) + " when > " +
-                                   std::to_string(RANK_NUM_PER_NODE_A2))
-                                      .c_str());
+        OP_LOGE_FOR_INVALID_VALUE(
+            K_INNER_DEBUG, "epWorldSize", std::to_string(*epWorldSizePtr).c_str(),
+            (std::string("[1,") + std::to_string(maxEpWorldSizeA2) + "], and must be a multiple of " +
+             std::to_string(RANK_NUM_PER_NODE_A2) + " when > " + std::to_string(RANK_NUM_PER_NODE_A2))
+                .c_str());
         return GRAPH_FAILED;
     }
     if (epRankIdPtr == nullptr) {
@@ -306,6 +313,14 @@ static ge::graphStatus MoeDistributeDispatchA2CheckAttrAndSetTiling(const gert::
                                   (std::to_string(static_cast<uint64_t>(QuantModeA5::NON_QUANT)) + " or " +
                                    std::to_string(static_cast<uint64_t>(QuantModeA5::PERTOKEN_DYNAMIC_QUANT)))
                                       .c_str());
+        return GRAPH_FAILED;
+    }
+    // int32场景下，不进行量化操作
+    auto xDesc = context->GetInputDesc(X_INDEX);
+    OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_INNER_DEBUG, "xDesc"), return GRAPH_FAILED);
+    if ((xDesc->GetDataType() == ge::DT_INT32) && (*quantModePtr != static_cast<int64_t>(QuantModeA5::NON_QUANT))) {
+        OP_LOGE_FOR_INVALID_VALUE(K_INNER_DEBUG, "quantMode", std::to_string(*quantModePtr).c_str(),
+                                  "0 when x dtype is INT32");
         return GRAPH_FAILED;
     }
     OP_TILING_CHECK(globalBsPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_INNER_DEBUG, "globalBs"), return GRAPH_FAILED);
@@ -425,16 +440,41 @@ static ge::graphStatus MoeDistributeDispatchA2CheckShapeAndSetTiling(const gert:
     OP_LOGD(nodeName, "expertId dim1 = %ld", expertIdStorageShape->GetStorageShape().GetDim(1));
 
     uint32_t h = xStorageShape->GetStorageShape().GetDim(1);
+    uint32_t xBs = xStorageShape->GetStorageShape().GetDim(0);
     uint32_t bs = expertIdStorageShape->GetStorageShape().GetDim(0);
     uint32_t k = expertIdStorageShape->GetStorageShape().GetDim(1);
     bool isScales = (scalesStorageShape != nullptr);
+
+    // int32场景下
+    auto xDesc = context->GetInputDesc(X_INDEX);
+    OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xDesc"), return ge::GRAPH_FAILED);
+    if (xDesc->GetDataType() == ge::DT_INT32) {
+        if (!isScales) { // 必须传入scales
+            OP_LOGE_FOR_INVALID_VALUE(nodeName, "scales", "nullptr", "a valid tensor when x dtype is INT32");
+            return ge::GRAPH_FAILED;
+        }
+        if (isLayered) { // 不支持分层方案
+            OP_LOGE_FOR_INVALID_VALUE(nodeName, "commAlg", "hierarchy", "fullmesh when x dtype is INT32");
+            return ge::GRAPH_FAILED;
+        }
+        const gert::Shape &scalesShape = scalesStorageShape->GetStorageShape();
+        // 数量上必须和token一致
+        if ((scalesShape.GetDimNum() != ONE_DIM) || (scalesShape.GetDim(0) != static_cast<int64_t>(xBs))) {
+            std::string shapeStr = Ops::Base::ToString(scalesShape);
+            std::string expectedShape = "[" + std::to_string(xBs) + "]";
+            std::string reason = "scales shape should be " + expectedShape + " when x dtype is INT32";
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "scales", shapeStr.c_str(), reason.c_str());
+            return ge::GRAPH_FAILED;
+        }
+    }
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_INNER_DEBUG, "attrs"), return ge::GRAPH_FAILED);
     auto quantModePtr = attrs->GetAttrPointer<int64_t>(ATTR_QUANT_MODE_INDEX);
-    if (h % BLOCK_SIZE_A2 != 0 || h == 0 || h > MAX_HIDDEN_SIZE_A2) {
+    uint32_t maxHiddenSizeA2 = xDesc->GetDataType() == ge::DT_INT32 ? MAX_HIDDEN_SIZE_A2_INT32 : MAX_HIDDEN_SIZE_A2;
+    if (h % BLOCK_SIZE_A2 != 0 || h == 0 || h > maxHiddenSizeA2) {
         OP_LOGE_FOR_INVALID_VALUE(K_INNER_DEBUG, "h (hidden size)", std::to_string(h).c_str(),
                                   (std::string("positive, divisible by ") + std::to_string(BLOCK_SIZE_A2) +
-                                   ", and at most " + std::to_string(MAX_HIDDEN_SIZE_A2))
+                                   ", and at most " + std::to_string(maxHiddenSizeA2))
                                       .c_str());
         return GRAPH_FAILED;
     }
@@ -461,7 +501,8 @@ static ge::graphStatus MoeDistributeDispatchA2CheckShapeAndSetTiling(const gert:
                 .c_str());
         return GRAPH_FAILED;
     }
-    if (*quantModePtr == static_cast<uint64_t>(QuantModeA5::NON_QUANT) && isScales) {
+    if (*quantModePtr == static_cast<uint64_t>(QuantModeA5::NON_QUANT) && isScales &&
+        xDesc->GetDataType() != ge::DT_INT32) { // int32场景下，scales是必要的
         OP_LOGE_FOR_INVALID_VALUE(K_INNER_DEBUG, "scales", "provided", "must be nullptr when quantMode is NON_QUANT");
         return GRAPH_FAILED;
     }

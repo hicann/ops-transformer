@@ -41,11 +41,11 @@ ACLNN_API bool DispatchCheckNotNull(const aclTensor *x, const aclTensor *expertI
                                     aclTensor *expertTokensNums, aclTensor *epRecvCounts);
 
 // 入参校验
-ACLNN_API aclnnStatus DispatchCheckParams(const aclTensor *x, const aclTensor *expertIds, const char *groupEp,
-                                          const char *groupTp, int64_t quantMode, aclTensor *expandX,
-                                          aclTensor *dynamicScales, aclTensor *assistInfoForCombine,
-                                          aclTensor *expertTokensNums, aclTensor *epRecvCounts,
-                                          aclTensor *tpRecvCounts);
+ACLNN_API aclnnStatus DispatchCheckParams(const aclTensor *x, const aclTensor *expertIds,
+                                          const aclTensor *scalesOptional, const char *groupEp, const char *groupTp,
+                                          int64_t quantMode, aclTensor *expandX, aclTensor *dynamicScales,
+                                          aclTensor *assistInfoForCombine, aclTensor *expertTokensNums,
+                                          aclTensor *epRecvCounts, aclTensor *tpRecvCounts);
 
 ACLNN_API aclnnStatus aclnnMoeDistributeDispatchBase(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                                      aclrtStream stream);
