@@ -235,14 +235,8 @@ struct WorkspaceInfo {
                 (int64_t)tilingData->expertPerRank * tilingData->epWorldSize * maskSlotSize, (int64_t)ALIGN_512);
 
             dispatchL1CommPtr = base + workspaceSize;
-            uint32_t mxScaleNum = Ops::Base::CeilDiv(tilingData->h, static_cast<uint32_t>(MXFP_SCALE_GROUP_NUM));
-            uint32_t dataBytes = Ops::Base::CeilAlign(tilingData->h, static_cast<uint32_t>(ALIGN_256)) * SIZE_INT_8;
-            uint32_t scaleBytes = mxScaleNum * SIZE_INT_8;
-            uint32_t tokenScaleBytes = Ops::Base::CeilAlign(dataBytes + scaleBytes, static_cast<uint32_t>(ALIGN_32));
-            uint32_t recordBytes = Ops::Base::CeilAlign(tokenScaleBytes + static_cast<uint32_t>(ALIGN_32),
-                                                        static_cast<uint32_t>(ALIGN_512));
             int64_t serverWorkspaceBytes =
-                static_cast<int64_t>(ALIGN_32) + static_cast<int64_t>(tilingData->bs) * recordBytes;
+                static_cast<int64_t>(ALIGN_32) + static_cast<int64_t>(tilingData->bs) * ALIGN_32;
             workspaceSize += Ops::Base::CeilAlign(static_cast<int64_t>(serverNum) * serverWorkspaceBytes,
                                                   static_cast<int64_t>(ALIGN_512));
 
@@ -255,9 +249,9 @@ struct WorkspaceInfo {
                                                   static_cast<int64_t>(ALIGN_512));
 
             dispatchL2CommPtr = base + workspaceSize;
-            workspaceSize +=
-                Ops::Base::CeilAlign(static_cast<int64_t>(tilingData->aicNum) * 6 * static_cast<int64_t>(recordBytes),
-                                     static_cast<int64_t>(ALIGN_512));
+            int64_t flagSnapshotBytes = static_cast<int64_t>(tilingData->bs) * static_cast<int64_t>(sizeof(uint64_t));
+            int64_t dispatchL2ScratchBytes = Ops::Base::CeilAlign(flagSnapshotBytes, static_cast<int64_t>(ALIGN_512));
+            workspaceSize += static_cast<int64_t>(tilingData->aicNum) * dispatchL2ScratchBytes;
         }
 
         // Shared expert workspace buffers
