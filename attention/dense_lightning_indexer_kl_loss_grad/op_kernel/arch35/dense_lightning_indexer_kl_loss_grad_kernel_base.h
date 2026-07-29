@@ -585,31 +585,6 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
     runInfo.taskIdMod3 = taskId % 3;
     runInfo.deterTaskId = deterTaskId;
     runInfo.deterTaskIdMod3 = deterTaskId % 3;
-    runInfo.kBaseSize = 2048;
-    runInfo.s2Offset = s2Offset;
-    runInfo.isLastBlock = s2Offset + VEC_SY_BASESIZE >= currentS2Size;
-    runInfo.kProcessSize = runInfo.s2RealSize - runInfo.s2Offset > 128 ? 128 : runInfo.s2RealSize - runInfo.s2Offset;
-    runInfo.isAlign64 = runInfo.kProcessSize % 64 == 0;
-    runInfo.kRealSizeAlign8 = (runInfo.kRealSize + 7) >> 3 << 3;
-    runInfo.s2LoopTimes = CeilDiv(runInfo.s2RealSize, constInfo.syKBaseSize);
-    runInfo.s2TailSize = (runInfo.s2RealSize % constInfo.syKBaseSize == 0) ?
-                             constInfo.syKBaseSize :
-                             (runInfo.s2RealSize % constInfo.syKBaseSize);
-
-    runInfo.s2BaseSize = VEC_SY_BASESIZE;
-
-    runInfo.queryIndexTensorOffset = runInfo.t1Index * constInfo.gSizeQueryIndex * constInfo.dSizeQueryIndex;
-    runInfo.keyIndexTensorOffset =
-        runInfo.t2Index * constInfo.n2Size * constInfo.dSizeQueryIndex + runInfo.s2Offset * constInfo.dSizeQueryIndex;
-    runInfo.firstNIndexSize = AlignTo(constInfo.gSizeQueryIndex, ALIGN_NUM_2) / 2;
-    if (constInfo.subBlockIdx == 0) {
-        runInfo.nIndexSize = runInfo.firstNIndexSize;
-    } else {
-        runInfo.nIndexSize = constInfo.gSizeQueryIndex - runInfo.firstNIndexSize;
-    }
-
-    runInfo.weightOffset =
-        runInfo.t1Index * constInfo.gSizeQueryIndex + runInfo.firstNIndexSize * constInfo.subBlockIdx;
 }
 
 template <typename CubeBlockType, typename VecBlockType>

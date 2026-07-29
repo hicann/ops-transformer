@@ -105,84 +105,84 @@
         <td>ND</td>
     </tr>
     <tr>
-        <td>attnSoftmaxL1Norm</td>
+        <td>attn_softmax_l1_norm</td>
         <td>输入</td>
         <td>主Attention分支预先计算出的目标分布，用于替代旧kernel内部的主Attention重算结果。</td>
         <td>FLOAT32</td>
         <td>ND</td>
     </tr>
     <tr>
-        <td>softmaxLse</td>
+        <td>softmax_lse</td>
         <td>输入</td>
         <td>softmax log-sum-exp值，由DenseLightningIndexerSoftmaxLse预先计算。</td>
         <td>FLOAT32</td>
         <td>ND</td>
     </tr>
     <tr>
-        <td>cuSeqLensQOptional</td>
+        <td>cu_seqLens_q</td>
         <td>可选输入</td>
         <td>TND layout下q的累积序列长度，shape为(B+1,)。</td>
         <td>INT32</td>
         <td>ND</td>
     </tr>
     <tr>
-        <td>cuSeqLensKOptional</td>
+        <td>cu_seqLens_k</td>
         <td>可选输入</td>
         <td>TND layout下k的累积序列长度，shape为(B+1,)。</td>
         <td>INT32</td>
         <td>ND</td>
     </tr>
     <tr>
-        <td>seqUsedQOptional</td>
+        <td>seqused_q</td>
         <td>可选输入</td>
         <td>表示每个batch实际使用的q长度。</td>
         <td>INT32</td>
         <td>ND</td>
     </tr>
     <tr>
-        <td>seqUsedKOptional</td>
+        <td>seqused_k</td>
         <td>可选输入</td>
         <td>表示每个batch实际使用的k长度。</td>
         <td>INT32</td>
         <td>ND</td>
     </tr>
     <tr>
-        <td>cmpResidualKOptional</td>
+        <td>cmp_residual_k</td>
         <td>可选输入</td>
         <td>maskMode=3且cmpRatio!=1时用于计算压缩前S2长度。</td>
         <td>INT32</td>
         <td>ND</td>
     </tr>
     <tr>
-        <td>metadataOptional</td>
+        <td>metadata</td>
         <td>可选输入</td>
         <td>由DenseLightningIndexerKLLossGradMetadata生成的分核信息。</td>
         <td>INT32</td>
         <td>ND</td>
     </tr>
     <tr>
-        <td>layoutQ</td>
+        <td>layout_q</td>
         <td>属性</td>
         <td>q侧layout格式。</td>
         <td>STRING</td>
         <td>-</td>
     </tr>
     <tr>
-        <td>layoutK</td>
+        <td>layout_k</td>
         <td>属性</td>
         <td>k侧layout格式。</td>
         <td>STRING</td>
         <td>-</td>
     </tr>
     <tr>
-        <td>maskMode</td>
+        <td>mask_mode</td>
         <td>属性</td>
         <td>mask模式，当前支持0和3。</td>
         <td>INT64</td>
         <td>-</td>
     </tr>
     <tr>
-        <td>cmpRatio</td>
+        <td>cmp_ratio</td>
         <td>属性</td>
         <td>压缩比，取值范围为[1,128]。</td>
         <td>INT64</td>
@@ -210,7 +210,7 @@
         <td>ND</td>
     </tr>
     <tr>
-        <td>softmaxOut</td>
+        <td>softmax_out</td>
         <td>输出</td>
         <td>Indexer分支softmax输出。</td>
         <td>FLOAT32</td>
@@ -221,9 +221,6 @@
 
 
 ## 约束说明
-
-- 确定性计算：
-  - DenseLightningIndexerKLLossGrad外部接口不提供deterministic入参，kernel侧优先使用运行时上下文中的确定性配置。
 
 - 公共约束
     - 参数q、k、dq、dk的数据类型应保持一致，支持FLOAT16和BFLOAT16。
@@ -374,4 +371,5 @@
 
 | 调用方式           | 调用样例                                                                                    | 说明                                                                                                  |
 |----------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| aclnn调用 | [aclnnDenseLightningIndexerKLLossGrad](./docs/aclnnDenseLightningIndexerKLLossGrad.md) | 通过[aclnnDenseLightningIndexerKLLossGrad](./docs/aclnnDenseLightningIndexerKLLossGrad.md)接口方式调用DenseLightningIndexerKLLossGrad算子。 |
+| aclnn调用 | [test_aclnn_dense_lightning_indexer_kl_loss_grad](./examples/test_aclnn_dense_lightning_indexer_kl_loss_grad.cpp) | 通过[aclnnDenseLightningIndexerKLLossGrad](./docs/aclnnDenseLightningIndexerKLLossGrad.md)接口方式调用DenseLightningIndexerKLLossGrad算子。 |
+| PyTorch API | [test_aclnn_dense_lightning_indexer_kl_loss_grad](./examples/test_aclnn_dense_lightning_indexer_kl_loss_grad.py) | 通过torch extension接口进行功能和精度验证。 |

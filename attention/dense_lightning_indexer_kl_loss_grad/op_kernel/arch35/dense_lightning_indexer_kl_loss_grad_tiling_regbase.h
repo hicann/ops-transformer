@@ -92,7 +92,7 @@ public:
     uint32_t get_maxSeqlenK() const { return maxSeqlenK; }
     void set_maxSeqlenK(uint32_t maxSeqlenKParam) { this->maxSeqlenK = maxSeqlenKParam; }
 
-    uint32_t get_mm3ResWorkSpaceOffset() const { return mm3ResWorkSpaceOffset; }
+    int64_t get_mm3ResWorkSpaceOffset() const { return mm3ResWorkSpaceOffset; }
     void set_mm3ResWorkSpaceOffset(uint32_t mm3ResWorkSpaceOffset)
     {
         this->mm3ResWorkSpaceOffset = mm3ResWorkSpaceOffset;

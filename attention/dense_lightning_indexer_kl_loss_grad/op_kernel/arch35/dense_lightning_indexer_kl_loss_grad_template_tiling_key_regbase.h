@@ -18,9 +18,17 @@
 
 #include "ascendc/host_api/tiling/template_argument.h"
 
-enum class LayoutTypeRegbase : uint8_t { LAYOUT_BSND = 0, LAYOUT_TND = 1, LAYOUT_NONE };
+enum class LayoutTypeRegbase : uint8_t {
+    LAYOUT_BSND = 0,
+    LAYOUT_TND = 1,
+    LAYOUT_NONE
+};
 
-enum class TopKRangeRegbase : uint8_t { RANGE_0_2K = 0, RANGE_2K_8K = 1, RANGE_NONE };
+enum class TopKRangeRegbase : uint8_t {
+    RANGE_0_2K = 0,
+    RANGE_2K_8K = 1,
+    RANGE_NONE
+};
 
 #define MQA_SPARSE 3 // 当前仅支持MQAsparseMode3
 #define ASCENDC_TPL_4_BW 4

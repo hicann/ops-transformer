@@ -23,7 +23,7 @@ class DenseLightningIndexerKLLossGradPost {
 public:
     __aicore__ inline DenseLightningIndexerKLLossGradPost(){};
     __aicore__ inline void Init(__gm__ uint8_t *dk, __gm__ uint8_t *workspace,
-                                const optiling::DenseLightningIndexerGradRegBaseTilingData *__restrict ordTilingData,
+                                const optiling::DenseLightningIndexerGradRegBaseTilingData *__restrict tiling,
                                 TPipe *pipe_in);
     __aicore__ inline void Process();
 
@@ -46,10 +46,10 @@ public:
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void DenseLightningIndexerKLLossGradPost<TEMPLATE_ARGS>::Init(
     __gm__ uint8_t *dk, __gm__ uint8_t *workspace,
-    const optiling::DenseLightningIndexerGradRegBaseTilingData *__restrict tilingData, TPipe *pipe_in)
+    const optiling::DenseLightningIndexerGradRegBaseTilingData *__restrict tiling, TPipe *pipe_in)
 {
     vBlockIdx = GetBlockIdx();
-    tilingData = tilingData;
+    tilingData = tiling;
     pipe = pipe_in;
 
     dkGm.SetGlobalBuffer((__gm__ OUT_T *)dk);

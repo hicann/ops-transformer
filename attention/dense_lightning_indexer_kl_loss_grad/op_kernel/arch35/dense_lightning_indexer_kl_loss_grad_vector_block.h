@@ -299,10 +299,7 @@ __aicore__ inline void DlikgBlockVec<TEMPLATE_ARGS>::CopyInWeight(DLIKGradRunInf
     DataCopyPad(weightInUb, weightGm[runInfo.weightOffset], dataCopyParams, padParams);
     dataCopyParams.blockLen = sizeof(float);
     DataCopyPad(lseInUb, softmaxLseGm[runInfo.t1Index], dataCopyParams, padParams);
-    this->weightInQue[runInfo.sTaskIdMod3].template EnQue(weightInUb);
-    this->weightInQue[runInfo.sTaskIdMod3].template DeQue<float>();
-    this->softmaxLseQue[runInfo.sTaskIdMod3].template EnQue(lseInUb);
-    this->softmaxLseQue[runInfo.sTaskIdMod3].template DeQue<float>();
+
     this->weightInQue[runInfo.sTaskIdMod3].template FreeTensor(weightInUb);
     this->softmaxLseQue[runInfo.sTaskIdMod3].template FreeTensor(lseInUb);
 }

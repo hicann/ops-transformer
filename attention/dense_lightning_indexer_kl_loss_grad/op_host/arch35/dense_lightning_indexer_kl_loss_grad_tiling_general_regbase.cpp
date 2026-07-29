@@ -120,6 +120,17 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::ValidateReq
     auto metadataDesc = context_->GetOptionalInputDesc(METADATA_INPUT_INDEX);
     OP_CHECK_IF(metadataTensor == nullptr, OP_LOGE(opName, "metadata must be provided."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(metadataDesc == nullptr, OP_LOGE(opName, "metadata desc must be provided."), return ge::GRAPH_FAILED);
+
+    if (layoutQuery == "TND") {
+        auto cuSeqQInput = context_->GetOptionalInputTensor(CU_SEQLENS_QUERY_INPUT_INDEX);
+        OP_CHECK_IF(cuSeqQInput == nullptr, OP_LOGE(opName, "cuSeqlensQ must be provided when layoutQ is TND."),
+                    return ge::GRAPH_FAILED);
+    }
+    if (layoutKey == "TND") {
+        auto cuSeqKInput = context_->GetOptionalInputTensor(CU_SEQLENS_KEY_INPUT_INDEX);
+        OP_CHECK_IF(cuSeqKInput == nullptr, OP_LOGE(opName, "cuSeqlensK must be provided when layoutK is TND."),
+                    return ge::GRAPH_FAILED);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -179,7 +190,7 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::CheckOutPut
                         "is not equal to layoutQuery [%s] len[%ld].",
                         queryIndexShape.GetDimNum(), keyIndexShape.GetDimNum(), attnSoftmaxL1Shape.GetDimNum(),
                         layoutQuery, layoutLen),
-                return false);
+                return ge::GRAPH_FAILED);
 
     auto qIdxDimNum = queryIndexShape.GetDimNum();
     if (qIdxDimNum != dQueryIndexShape.GetDimNum() ||
@@ -299,17 +310,17 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeAttrs()
         return false);
     OP_CHECK_IF(
         (sparseMode != SPARSE_MODE_SIZE_3 && sparseMode != SPARSE_MODE_SIZE_0),
-        OP_LOGE(opName, " The value of mask_mode is [%ld], but currently only supports mode [0,3].", sparseMode),
+        OP_LOGE(opName, " The value of mask_mode is [%d], but currently only supports mode [0,3].", sparseMode),
         return false);
     OP_CHECK_IF((cmpRatio < CMP_RATIO_1 || cmpRatio > CMP_RATIO_128),
-                OP_LOGE(opName, " The value of cmpRatio is [%ld], but currently only supports ranging from 1 to 128.",
+                OP_LOGE(opName, " The value of cmpRatio is [%d], but currently only supports ranging from 1 to 128.",
                         cmpRatio),
                 return false);
     OP_CHECK_IF((sparseMode == SPARSE_MODE_SIZE_3 && cmpRatio != 1 && cmpResidualK == nullptr),
                 OP_LOGE(opName, " cmp_residual_k is required when mask_mode is 3 with cmp_ratio not equal to 1!"),
                 return false);
 
-    OP_LOGD(context_, "attrs: layout_query[%s] layout_key[%s] mask_mode[%ld] cmp_ratio[%ld].", layoutQuery, layoutKey,
+    OP_LOGD(context_, "attrs: layout_query[%s] layout_key[%s] mask_mode[%d] cmp_ratio[%d].", layoutQuery, layoutKey,
             sparseMode, cmpRatio);
 
     if (CheckOutPut() == ge::GRAPH_FAILED) {
@@ -338,14 +349,14 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeDimLayout(const
             n1Size = queryIndexShape.GetDim(1);
             n2Size = keyIndexShape.GetDim(1);
             OP_CHECK_IF(n1Size < 1 || n1Size > 128,
-                        OP_LOGE(opName, "Inputshape N Size of Query should be range in 1~128, but got %ld.", n1Size),
+                        OP_LOGE(opName, "Inputshape N Size of Query should be range in 1~128, but got %d.", n1Size),
                         return false);
-            OP_CHECK_IF(n2Size != 1, OP_LOGE(opName, "Inputshape N Size of Key should be 1, but got %ld.", n2Size),
+            OP_CHECK_IF(n2Size != 1, OP_LOGE(opName, "Inputshape N Size of Key should be 1, but got %d.", n2Size),
                         return false);
             gSizeQueryIndex = queryIndexShape.GetDim(1) / n2Size;
             dSizeQueryIndex = queryIndexShape.GetDim(2);
             OP_CHECK_IF(dSizeQueryIndex != 128,
-                        OP_LOGE(opName, "Inputshape D Size should be 128, but got %ld.", dSizeQueryIndex),
+                        OP_LOGE(opName, "Inputshape D Size should be 128, but got %d.", dSizeQueryIndex),
                         return false);
             maxSeqlenK = attnSoftmaxL1Shape.GetDim(2);
             tilingData->baseParams.set_maxSeqlenK(static_cast<uint32_t>(maxSeqlenK));
@@ -361,21 +372,21 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeDimLayout(const
             n1Size = queryIndexShape.GetDim(2);
             n2Size = keyIndexShape.GetDim(2);
             OP_CHECK_IF(bSize < SIZE_1,
-                        OP_LOGE(opName, "Inputshape B Size should be greater than 0, but got %ld.", bSize),
+                        OP_LOGE(opName, "Inputshape B Size should be greater than 0, but got %d.", bSize),
                         return false);
-            OP_CHECK_IF(s1Size < SIZE_1, OP_LOGE(opName, "Query s1Size should be greater than 0, but got %ld.", s1Size),
+            OP_CHECK_IF(s1Size < SIZE_1, OP_LOGE(opName, "Query s1Size should be greater than 0, but got %d.", s1Size),
                         return false);
-            OP_CHECK_IF(s2Size < SIZE_1, OP_LOGE(opName, "Query s2Size should be greater than 0, but got %ld.", s2Size),
+            OP_CHECK_IF(s2Size < SIZE_1, OP_LOGE(opName, "Query s2Size should be greater than 0, but got %d.", s2Size),
                         return false);
             OP_CHECK_IF(n1Size < 1 || n1Size > 128,
-                        OP_LOGE(opName, "Inputshape N Size of Query should be range in 1~128, but got %ld.", n1Size),
+                        OP_LOGE(opName, "Inputshape N Size of Query should be range in 1~128, but got %d.", n1Size),
                         return false);
-            OP_CHECK_IF(n2Size != 1, OP_LOGE(opName, "Inputshape N Size of Key should be 1, but got %ld.", n2Size),
+            OP_CHECK_IF(n2Size != 1, OP_LOGE(opName, "Inputshape N Size of Key should be 1, but got %d.", n2Size),
                         return false);
             gSizeQueryIndex = queryIndexShape.GetDim(2) / n2Size;
             dSizeQueryIndex = queryIndexShape.GetDim(3);
             OP_CHECK_IF(dSizeQueryIndex != 128,
-                        OP_LOGE(opName, "Inputshape D Size should be 128, but got %ld.", dSizeQueryIndex),
+                        OP_LOGE(opName, "Inputshape D Size should be 128, but got %d.", dSizeQueryIndex),
                         return false);
             maxSeqlenK = attnSoftmaxL1Shape.GetDim(3);
             tilingData->baseParams.set_maxSeqlenK(static_cast<uint32_t>(maxSeqlenK));
@@ -706,9 +717,9 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::GetShapeAtt
     dlikGradBaseParams_->set_cmpRatio(cmpRatio);
 
     OP_LOGW(context_,
-            "INPUTPARAM bsize:[%ld], n2Size:[%ld], gSizeQueryIndex:[%ld],"
-            "s1Size:[%ld], s2Size:[%ld], dSizeQueryIndex:[%ld],"
-            "sparseMode:[%ld], cmpRatio:[%ld].",
+            "INPUTPARAM bsize:[%d], n2Size:[%d], gSizeQueryIndex:[%d],"
+            "s1Size:[%d], s2Size:[%d], dSizeQueryIndex:[%d],"
+            "sparseMode:[%d], cmpRatio:[%d].",
             bSize, n2Size, gSizeQueryIndex, s1Size, s2Size, dSizeQueryIndex, sparseMode, cmpRatio);
 
     return ge::GRAPH_SUCCESS;
@@ -895,26 +906,11 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::DoLibApiTil
 
 uint64_t DenseLightningIndexerKLLossGradTilingGeneralRegbase::GetTilingKey() const
 {
-    bool hasCuSeqlensQ = true;
-    bool hasCuSeqlensK = true;
-    bool hasSequsedQ = true;
-    bool hasSequsedK = true;
-    bool hasCmpResidualK = true;
-    if (context_->GetOptionalInputTensor(CU_SEQLENS_QUERY_INPUT_INDEX) == nullptr) {
-        hasCuSeqlensQ = false;
-    }
-    if (context_->GetOptionalInputTensor(CU_SEQLENS_KEY_INPUT_INDEX) == nullptr) {
-        hasCuSeqlensK = false;
-    }
-    if (context_->GetOptionalInputTensor(SEQUSED_QUERY_INPUT_INDEX) == nullptr) {
-        hasSequsedQ = false;
-    }
-    if (context_->GetOptionalInputTensor(SEQUSED_KEY_INPUT_INDEX) == nullptr) {
-        hasSequsedK = false;
-    }
-    if (context_->GetOptionalInputTensor(CMP_RESIDUAL_KEY_INPUT_INDEX) == nullptr) {
-        hasCmpResidualK = false;
-    }
+    bool hasCuSeqlensQ = context_->GetOptionalInputTensor(CU_SEQLENS_QUERY_INPUT_INDEX) != nullptr;
+    bool hasCuSeqlensK = context_->GetOptionalInputTensor(CU_SEQLENS_KEY_INPUT_INDEX) != nullptr;
+    bool hasSequsedQ = context_->GetOptionalInputTensor(SEQUSED_QUERY_INPUT_INDEX) != nullptr;
+    bool hasSequsedK = context_->GetOptionalInputTensor(SEQUSED_KEY_INPUT_INDEX) != nullptr;
+    bool hasCmpResidualK = context_->GetOptionalInputTensor(CMP_RESIDUAL_KEY_INPUT_INDEX) != nullptr;
     return GET_TPL_TILING_KEY(static_cast<uint8_t>(topKRange), static_cast<uint8_t>(tilingKeyLayout),
                               static_cast<uint8_t>(tilingKeyLayout), static_cast<uint8_t>(sparseMode),
                               static_cast<uint8_t>(hasCuSeqlensQ), static_cast<uint8_t>(hasCuSeqlensK),
