@@ -30,14 +30,13 @@ using namespace Ops::Transformer::OpTiling;
 
 class MhcPreSinkhornBackwardArch35DeterminiticTiling : public MhcPreSinkhornBackwardArch35Tiling {
 public:
-    explicit MhcPreSinkhornBackwardArch35DeterminiticTiling(gert::TilingContext* context)
+    explicit MhcPreSinkhornBackwardArch35DeterminiticTiling(gert::TilingContext *context)
         : MhcPreSinkhornBackwardArch35Tiling(context)
-    {
-    }
+    {}
 
 protected:
     bool IsCapable() override;
-    // ge::graphStatus GetShapeAttrsInfo() override;
+    ge::graphStatus GetShapeAttrsInfo() override;
     ge::graphStatus DoOpTiling() override;
     uint64_t GetTilingKey() const override;
     ge::graphStatus PostTiling() override;

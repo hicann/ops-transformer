@@ -66,19 +66,63 @@ using namespace ge;
 using namespace std;
 using namespace AscendC;
 
-bool MhcPreSinkhornBackwardArch35DeterminiticTiling::IsCapable()
-{
-    auto isDeterministic = (context_->GetDeterministic() == 1);
-    if (!isDeterministic) {
-        return false;
-    }
+bool MhcPreSinkhornBackwardArch35DeterminiticTiling::IsCapable() { return true; }
 
-    return true;
+ge::graphStatus MhcPreSinkhornBackwardArch35DeterminiticTiling::GetShapeAttrsInfo()
+{
+    OP_LOGD(opName, "MhcPreSinkhornBackwardArch35DeterminiticTiling GetShapeAttrsInfo");
+    const auto xShapePtr = context_->GetInputShape(INPUT_X_IDX);
+    if (xShapePtr == nullptr) {
+        OP_LOGE(context_, "input x shape is nullptr");
+        return ge::GRAPH_FAILED;
+    }
+    const auto skSumPtr = context_->GetInputShape(SUM_OUT_IDX);
+    if (skSumPtr == nullptr) {
+        OP_LOGE(context_, "input sum_out shape is nullptr");
+        return ge::GRAPH_FAILED;
+    }
+    auto xShape = xShapePtr->GetStorageShape();
+    OP_CHECK_IF(xShape.GetDimNum() != 4,
+                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
+                                            "xShape verify failed, x must be 4D, but got %lu dims", xShape.GetDimNum()),
+                return ge::GRAPH_FAILED);
+    auto skSumShape = skSumPtr->GetStorageShape();
+
+    auto attrsPtr = context_->GetAttrs();
+    if (attrsPtr == nullptr) {
+        OP_LOGE(context_, "attrs is nullptr");
+        return ge::GRAPH_FAILED;
+    }
+    auto epsPtr = attrsPtr->GetAttrPointer<float>(0);
+    hcEps_ = (epsPtr != nullptr) ? static_cast<float>(*epsPtr) : DEFAULT_EPS;
+
+    batchSize_ = xShape.GetDim(BATCH_SIZE_DIM_IDX);
+    seqLength_ = xShape.GetDim(SEQ_LENGTH_DIM_IDX);
+    n_ = xShape.GetDim(N_DIM_IDX);
+    c_ = xShape.GetDim(C_DIM_IDX);
+    skIterCount_ = skSumShape.GetDim(ITER_COUNT_IDX) / 2;
+
+    OP_CHECK_IF(n_ > 8,
+                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "n must be less than or equal 8, but got %ld", n_),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckShapeBase(batchSize_, seqLength_, n_, c_) != ge::GRAPH_SUCCESS,
+                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "CheckShape failed"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        skIterCount_ != 20,
+        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "sk_iter_count must be 20, but got %ld", skIterCount_),
+        return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(c_ <= 0 || c_ >= 100000 || c_ % 128 != 0,
+                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
+                                            "c must be > 0, < 100000 and divisible by 128, but got %ld", c_),
+                return ge::GRAPH_FAILED);
+
+    return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus MhcPreSinkhornBackwardArch35DeterminiticTiling::SetTilingData()
 {
-    MhcPreSinkhornBackwardArch35DeterminiticTilingData* tilingData =
+    MhcPreSinkhornBackwardArch35DeterminiticTilingData *tilingData =
         context_->GetTilingData<MhcPreSinkhornBackwardArch35DeterminiticTilingData>();
     auto platformInfo = context_->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(opName, "fail to get platform info"), return ge::GRAPH_FAILED);
@@ -179,8 +223,8 @@ void MhcPreSinkhornBackwardArch35DeterminiticTiling::DoUbTiling()
             Ops::Base::CeilAlign((2 * n_ + n_ * n_) * FP32_BYTE_SIZE, ubBlock_) +
             Ops::Base::CeilAlign((2 * n_ + n_ * n_) * FP32_BYTE_SIZE, ubBlock_) +
             5 * Ops::Base::CeilAlign(bsLoopDataLen_ * n_ * n_ * FP32_BYTE_SIZE, ubBlock_) +
-            2 * skIterCount_ * bsLoopDataLen_ * Ops::Base::CeilAlign(n_ * FP32_BYTE_SIZE, ubBlock_) +
-            skIterCount_ * bsLoopDataLen_ * Ops::Base::CeilAlign(n_ * n_ * FP32_BYTE_SIZE, ubBlock_) +
+            DOUBLE_BUFFER * 2 * skIterCount_ * bsLoopDataLen_ * Ops::Base::CeilAlign(n_ * FP32_BYTE_SIZE, ubBlock_) +
+            DOUBLE_BUFFER * skIterCount_ * bsLoopDataLen_ * Ops::Base::CeilAlign(n_ * n_ * FP32_BYTE_SIZE, ubBlock_) +
             4 * bsLoopDataLen_ * Ops::Base::CeilAlign(n_ * n_ * FP32_BYTE_SIZE, ubBlock_);
 
         restSize = ubSize_ - occupy;
@@ -199,7 +243,11 @@ void MhcPreSinkhornBackwardArch35DeterminiticTiling::DoUbTiling()
     cBlockTailCount_ = tailBsncTaskCount_;
     restSize = static_cast<int64_t>(-1);
     while (restSize <= 0) {
-        int64_t occupy = 4 * DOUBLE_BUFFER * Ops::Base::CeilAlign(cBlockCount_ * FP32_BYTE_SIZE, ubBlock_);
+        int64_t occupy = 4 * DOUBLE_BUFFER * Ops::Base::CeilAlign(cBlockCount_ * FP32_BYTE_SIZE, ubBlock_) +
+                         DOUBLE_BUFFER * Ops::Base::CeilAlign(usedAivNum_ * FP32_BYTE_SIZE, ubBlock_) + ubBlock_ +
+                         usedAivNum_ * Ops::Base::CeilAlign(n_ * n_ * FP32_BYTE_SIZE, ubBlock_) +
+                         2 * Ops::Base::CeilAlign((2 * n_ + n_ * n_) * FP32_BYTE_SIZE, ubBlock_) +
+                         2 * DOUBLE_BUFFER * Ops::Base::CeilAlign(cLoopDataLen_ * FP32_BYTE_SIZE, ubBlock_);
         restSize = ubSize_ - occupy;
         if (restSize <= 0 && cBlockCount_ > 1) {
             cBlockCount_--;
@@ -242,12 +290,10 @@ ge::graphStatus MhcPreSinkhornBackwardArch35DeterminiticTiling::GetWorkspaceSize
         (2 * usedAivNum_ * n_ + usedAivNum_ * n_ * n_) * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL + // gradBias
         batchSize_ * seqLength_ * n_ * c_ * FP32_BYTE_SIZE * 3 + 3 * WS_BUFFER_INTERVAL +      // gradXFrom
         batchSize_ * seqLength_ * (2 * n_ + n_ * n_) * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL +   // grad_hc_before_norm
-        batchSize_ * seqLength_ * (2 * n_ + n_ * n_) * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL +   // grad_norm_out
-        batchSize_ * seqLength_ * n_ * c_ * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL +              // gradXFromMatMul
-        batchSize_ * seqLength_ * n_ * c_ * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL;               // gradXFromRms
+        batchSize_ * seqLength_ * (2 * n_ + n_ * n_) * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL;    // grad_norm_out
 
     size_t systemWorkspaceSize = ascendPlatformInfo.GetLibApiWorkSpaceSize();
-    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(currentWorkspace == nullptr, OP_LOGE(opName, "fail to GetWorkspaceSizes"), return ge::GRAPH_FAILED);
     currentWorkspace[0] = systemWorkspaceSize + userWorkspaceSize;
 
@@ -284,10 +330,7 @@ void MhcPreSinkhornBackwardArch35DeterminiticTiling::DumpTilingInfo()
     OP_LOGI(opName, "Tiling info is: %s", info.str().c_str());
 }
 
-ge::graphStatus MhcPreSinkhornBackwardArch35DeterminiticTiling::DoLibApiTiling()
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus MhcPreSinkhornBackwardArch35DeterminiticTiling::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
 
 REGISTER_OPS_TILING_TEMPLATE(MhcPreSinkhornBackward, MhcPreSinkhornBackwardArch35DeterminiticTiling, 0);
 } // namespace optiling

@@ -51,7 +51,7 @@
 
     - **输出组合梯度计算**：
 
-        - **正向计算公式**：其中 $\mathbf{x}$ 为输入参数（前向输入x），$\mathbf{hPre}$ 为输入参数（前向保存的中间结果h_pre），$N$ 为输入Tensor中N维度的大小（当前仅支持4）。
+        - **正向计算公式**：其中 $\mathbf{x}$ 为输入参数（前向输入x），$\mathbf{hPre}$ 为输入参数（前向保存的中间结果h_pre），$N$ 为输入Tensor中N维度的大小（支持不超过8）。
 
         $$
         \mathbf{HIn} = \sum_{i=1}^{N} \mathbf{x}[B, S, i, :] \cdot \mathbf{hPre}[B, S, i]
@@ -531,7 +531,7 @@ aclnnStatus aclnnMhcPreSinkhornBackward(
          <tr>
         <td rowspan="4">ACLNN_ERR_INNER_TILING_ERROR</td>
         <td rowspan="4">561002</td>
-        <td>N不等于4。</td>
+        <td>N大于8。</td>
       </tr>
       <tr>
         <td>输入或输出tensor的维度(shape)与参数说明不符。</td>
@@ -590,16 +590,12 @@ aclnnStatus aclnnMhcPreSinkhornBackward(
 
 ## 约束说明
 
-- **确定性计算**：
-
-  - aclnnMhcPreSinkhornBackward默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
-
 - **规格约束**
 
   | 规格项 | 规格 | 规格说明 |
   | :--- | :--- | :--- |
   | sk_iter_count | 20 | Sinkhorn迭代次数当前仅支持20。 |
-  | N | 4 | 输入Tensor中N维度的大小仅支持4。 |
+  | N | ≤8 | N维度支持不超过8。 |
   | C | - | 大于0、小于100000且可以被128整除。 |
 
 ## 调用示例
