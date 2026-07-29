@@ -7,7 +7,7 @@ pre-commit是一个Git Hooks框架，用于在`git commit`时自动运行代码�
 | Hook | 功能 | 说明 |
 |------|------|------|
 | **pre-commit-hooks** | 基础规范检查 | 行尾空格、文件末尾换行、YAML/JSON 合法性、大文件、合并冲突标记、私钥检测 |
-| **clang-format** | C/C++ 代码格式化 | 自动格式化 C/C++/asc 代码，遵循 `.clang-format`（列宽 120） |
+| **clang-format** | C/C++ 代码格式化 | 自动格式化 C/C++/asc 代码，遵循 `.clang-format`（不限列宽，不自动拆行） |
 | **ruff-check / ruff-format** | Python 检查与格式化 | ruff 静态检查（自动修复）+ 代码格式化 |
 | **codespell** | 拼写检查 | 检测常见拼写错误（CANN/ascend 等术语已加入白名单） |
 | **OAT Check** | 开源合规检查 | 检测许可证头、禁止二进制/归档文件提交（基于 oat-py，Python 实现） |
@@ -135,10 +135,12 @@ git commit --no-verify -m "emergency fix"
 自动格式化 C/C++/asc 代码，遵循项目 `.clang-format` 配置（基于 Google 风格）：
 
 - **缩进**: 4 空格
-- **列宽**: 120 字符
+- **列宽**: 不限制（`ColumnLimit: 0`，既不自动拆行也不合并已有换行，换行由开发者自行控制）
+- **枚举**: 短枚举不合并成单行（`AllowShortEnumsOnASingleLine: false`），保持逐行
+- **构造函数初始化列表**: 逐行换行（`PackConstructorInitializers: Never`），防止不限宽时合并成单行巨码
 - **大括号**: 函数定义换行，控制语句同行
 - **指针对齐**: 右对齐(`int *ptr`)
-- **续行符**: `DontAlign`（`\` 紧贴每行内容，不右对齐，避免宏体被撑超过 120 列）
+- **续行符**: `DontAlign`（`\` 紧贴每行内容，不右对齐，与宏行长度解耦）
 
 ### 3. ruff (ruff-check / ruff-format)
 
@@ -157,7 +159,7 @@ OAT (Open Source Audit Tool) 检查开源合规性，基于 Python 版 `oat-py` 
 
 | 检查项 | 说明 |
 |--------|------|
-| 许可证头检查 | 确保源文件包含CANN License头 |
+| 许可证头检查 | 确保源文件包含CANN License头（YAML 配置文件和 CSV 测试用例文件已豁免，见 OAT.xml `defaultPolicyFilter`） |
 | 二进制文件检查 | 禁止提交二进制文件 |
 | 归档文件检查 | 禁止提交zip/tar等归档文件 |
 

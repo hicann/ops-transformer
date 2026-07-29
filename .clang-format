@@ -13,7 +13,7 @@
 #     clang-format -i -style=file <file>
 
 BasedOnStyle: Google
-ColumnLimit: 120
+ColumnLimit: 0
 AccessModifierOffset: -4
 SortIncludes: false
 SortUsingDeclarations: false
@@ -41,8 +41,6 @@ BraceWrapping:
 # Align
 AlignAfterOpenBracket: Align
 PenaltyBreakAssignment: 2
-# 注: pre-commit 锁定的 clang-format v18 下 Left/Right 会把续行符 \ 对齐到宏体最长内容行末尾,
-# 导致短行被撑超过 ColumnLimit(120)。DontAlign 让每行 \ 紧贴自身内容, 是唯一能稳定保证 <=120 的取值。
 AlignEscapedNewlines: DontAlign
 AlignOperands: true
 AlignTrailingComments: true
@@ -54,6 +52,7 @@ AlwaysBreakTemplateDeclarations: true
 BinPackArguments: true
 BreakBeforeTernaryOperators: false
 SpacesBeforeTrailingComments: 1
+PackConstructorInitializers: Never
 
 # pointer aligment
 DerivePointerAlignment: false
@@ -62,6 +61,7 @@ PointerAlignment: Right
 # single line layout
 AllowShortBlocksOnASingleLine: false
 AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: true
 AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
