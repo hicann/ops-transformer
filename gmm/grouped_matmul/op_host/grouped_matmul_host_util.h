@@ -17,6 +17,7 @@
 #define GROUPED_MATMUL_HOST_UTIL_H
 
 #include <map>
+#include <cstdint>
 
 namespace GroupedMatmul {
 constexpr uint32_t X_INDEX = 0;
@@ -53,15 +54,15 @@ constexpr uint32_t A16W8_MSD_KN_BASE_BLOCK = 128;
 constexpr uint32_t A16W8_MSD_AVERAGE_TOKEN_NUM = 64;
 constexpr uint32_t A16W8_MSD_MAX_K = 12U * 1024U;
 constexpr uint32_t A16W8_MSD_MIN_N = 1024;
-constexpr uint32_t UB_BLOCK_UNIT_SIZE = 32;  // 32: a block has 32 bytes data
+constexpr uint32_t UB_BLOCK_UNIT_SIZE = 32; // 32: a block has 32 bytes data
 constexpr uint32_t UB_ANTIQUANT_PER_BLOCK_ALIGN = 4U * 1024U;
-constexpr uint32_t UB_A16W8_BLOCK_NUM_FP16 = 6;  // 2 * sizeof(int8) + 2 * sizeof(half)
+constexpr uint32_t UB_A16W8_BLOCK_NUM_FP16 = 6; // 2 * sizeof(int8) + 2 * sizeof(half)
 constexpr uint32_t UB_A16W8_IO_USED_BLOCK_FP16 = 6;
-constexpr uint32_t UB_A16W8_BLOCK_NUM_BF16 = 8;  // tmpUb used 2 blks
+constexpr uint32_t UB_A16W8_BLOCK_NUM_BF16 = 8; // tmpUb used 2 blks
 constexpr uint32_t UB_A16W8_IO_USED_BLOCK_BF16 = 6;
-constexpr uint32_t UB_A16W4_BLOCK_NUM_FP16 = 5;  // 2 * sizeof(int4) + 2 * sizeof(half)
+constexpr uint32_t UB_A16W4_BLOCK_NUM_FP16 = 5; // 2 * sizeof(int4) + 2 * sizeof(half)
 constexpr uint32_t UB_A16W4_IO_USED_BLOCK_FP16 = 5;
-constexpr uint32_t UB_A16W4_BLOCK_NUM_BF16 = 7;  // tmpUb used 2 blks
+constexpr uint32_t UB_A16W4_BLOCK_NUM_BF16 = 7; // tmpUb used 2 blks
 constexpr uint32_t UB_A16W4_IO_USED_BLOCK_BF16 = 5;
 constexpr uint32_t UB_A4W4_BLOCK_NUM = 16;
 constexpr uint32_t UB_A4W4_IO_USED_BLOCK_HALF = 8; // 2 * sizeof(fp16) + 2 * sizeof(fp16/bf16)
@@ -87,8 +88,8 @@ constexpr uint64_t TILING_KEY_A16W8_MSD = 6;
 constexpr uint64_t TILING_KEY_A16W8_MSD_TRANS_W = 7;
 constexpr uint64_t TILING_KEY_A8W4_MSD = 8;
 constexpr uint64_t TILING_KEY_A8W4_MSD_NEW = 12;
-constexpr uint64_t TILING_KEY_A8W4 = 18; // per group
-constexpr uint64_t TILING_KEY_A8W4_FAKE_A8W8 = 17; //per channel
+constexpr uint64_t TILING_KEY_A8W4 = 18;           // per group
+constexpr uint64_t TILING_KEY_A8W4_FAKE_A8W8 = 17; // per channel
 constexpr uint64_t TILING_KEY_A8W4_AUTOTILING_A8W4 = 21;
 constexpr uint64_t TILING_KEY_A8W8_SPARSE_M = 9;
 constexpr uint64_t TILING_KEY_A8W8_SPARSE_M_TRANS_W = 10;
@@ -113,12 +114,12 @@ constexpr int32_t SPLIT_K = 2;
 constexpr int64_t ANTIQUANT_PERFORMANCE_THRESHOLD = 5L * 1024L * 1024L;
 constexpr int64_t ACT_TYPE_GELU = 2;
 constexpr uint16_t MAX_TENSOR_CONT = 128;
-constexpr int64_t FULL_K_SINGLE_N = 1280;        // used for fullload k case, by experiment
-constexpr int64_t FULL_K_N_THRESHOLD = 2560;     // used for fullload k case, by experiment
-constexpr int64_t FULL_K_M_THRESHOLD = 2048;     // used for fullload k case, by experiment
-constexpr int64_t FULL_K_M_E_THRESHOLD = 256;    // used for fullload k case, by experiment
-constexpr int64_t FULL_K_MAX_K_THRESHOLD = 384;  // used for fullload k case, by experiment
-constexpr int64_t FULL_K_MIN_K_THRESHOLD = 320;  // used for fullload k case, by experiment
+constexpr int64_t FULL_K_SINGLE_N = 1280;       // used for fullload k case, by experiment
+constexpr int64_t FULL_K_N_THRESHOLD = 2560;    // used for fullload k case, by experiment
+constexpr int64_t FULL_K_M_THRESHOLD = 2048;    // used for fullload k case, by experiment
+constexpr int64_t FULL_K_M_E_THRESHOLD = 256;   // used for fullload k case, by experiment
+constexpr int64_t FULL_K_MAX_K_THRESHOLD = 384; // used for fullload k case, by experiment
+constexpr int64_t FULL_K_MIN_K_THRESHOLD = 320; // used for fullload k case, by experiment
 constexpr uint32_t MIN_NZ_DIM = 4;
 constexpr uint32_t MIN_ND_DIM = 2;
 constexpr uint32_t A3_AIC_NUM = 24;
@@ -129,32 +130,27 @@ constexpr int32_t STATIC_TILING_DEPTH_A1_B1 = 8;
 constexpr int32_t STATIC_TILING_STEP_KA_KB = 4;
 constexpr int32_t STATIC_TILING_MAX_K = 8192;
 
-constexpr uint64_t RecursiveSum()
-{
-    return 0;
-}
+constexpr uint64_t RecursiveSum() { return 0; }
 
-template<typename T, typename... Args>
+template <typename T, typename... Args>
 constexpr uint64_t RecursiveSum(T templateId, Args... templateIds)
 {
     return static_cast<uint64_t>(templateId) + 2U * RecursiveSum(templateIds...);
 }
 
-const std::map<std::array<int64_t, 4>, std::array<int64_t, 2>> A8W8_PRETILING_WHITE_LIST = {   // used for A8W8 preTiling, by experiment
-    {{576, 7168, 4096, 0}, {128, 512}},
-    {{576, 2048, 7168, 1}, {96, 1792}}
-};
+const std::map<std::array<int64_t, 4>, std::array<int64_t, 2>> A8W8_PRETILING_WHITE_LIST =
+    { // used for A8W8 preTiling, by experiment
+        {{576, 7168, 4096, 0}, {128, 512}},
+        {{576, 2048, 7168, 1}, {96, 1792}}};
 
-const std::map<std::array<int64_t, 5>, int64_t> A8W4_PRETILING_WHITE_LIST = {   // used for A8W4 preTiling, by experiment
+const std::map<std::array<int64_t, 5>, int64_t> A8W4_PRETILING_WHITE_LIST = { // used for A8W4 preTiling, by experiment
     {{1, 16, 256, 512, 1}, 1},
-    {{256, 1024, 512, 32768, 1}, 1}
-};
+    {{256, 1024, 512, 32768, 1}, 1}};
 
-const std::map<std::array<int64_t, 2>, int64_t> A16W4_MSD_WHITE_LIST = {   // used for A16W4 MSD, by experiment
+const std::map<std::array<int64_t, 2>, int64_t> A16W4_MSD_WHITE_LIST = { // used for A16W4 MSD, by experiment
     // K, N
     {{2048, 7168}, 1},
-    {{7168, 4096}, 1}
-};
+    {{7168, 4096}, 1}};
 
 template <typename T1, typename T2>
 auto CeilDiv(T1 a, T2 b) -> T1
@@ -187,9 +183,10 @@ auto CeilAlign(T a, T b) -> T
  * if align is 0, return 0
  */
 template <typename T>
-auto FloorAlign(T x, T align) -> typename std::enable_if<std::is_integral<T>::value, T>::type {
-  return align == 0 ? 0 : x / align * align;
+auto FloorAlign(T x, T align) -> typename std::enable_if<std::is_integral<T>::value, T>::type
+{
+    return align == 0 ? 0 : x / align * align;
 }
-}  // namespace GroupedMatmul
+} // namespace GroupedMatmul
 
 #endif // GROUPED_MATMUL_HOST_UTIL_H
