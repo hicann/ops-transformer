@@ -33,7 +33,6 @@
 #include "common/op_api/mc2_context.h"
 #endif
 
-
 using namespace Ops::Transformer;
 using namespace op;
 #ifdef __cplusplus
@@ -66,7 +65,6 @@ enum class CommType : uint64_t {
     CCU = 1  // ccu通信设置为1
 };
 #endif
-
 
 bool CombineCheckNotNull(const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *assistInfoForCombine,
                          const aclTensor *epSendCounts, const aclTensor *expertScales, const char *groupEp,
@@ -128,7 +126,7 @@ static void SetCommArgs(aclOpExecutor **executor, const bool is910B, const bool 
             type = CommType::CCU;
         }
         void *args = reinterpret_cast<void *>(static_cast<uint64_t>(type));
-        NnopbaseSetUserHandle(executor, args);
+        NnopbaseSetUserHandle(*executor, args);
     }
 #endif
 
