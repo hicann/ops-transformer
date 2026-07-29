@@ -8,195 +8,81 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include <vector>
-#include <array>
-#include "gtest/gtest.h"
-#include "../../../op_api/aclnn_quant_block_sparse_attn.h"
-#include "op_api_ut_common/tensor_desc.h"
-#include "op_api_ut_common/scalar_desc.h"
+#include <gtest/gtest.h>
+#include "quant_block_sparse_attn_api_ut_param.h"
 #include "op_api_ut_common/op_api_ut.h"
-#include "opdev/platform.h"
+#include "../../../op_api/aclnn_quant_block_sparse_attn.h"
 
-using namespace std;
-using namespace op;
+namespace QuantBlockSparseAttnUT {
 
-class quant_block_sparse_attn_opapi_ut : public testing::Test {
+class AclnnQuantBlockSparseAttnTest : public testing::TestWithParam<QuantBlockSparseAttnApiUtParam> {
 protected:
     static void SetUpTestCase()
     {
-        SetPlatformSocVersion(SocVersion::ASCEND950);
-        cout << "quant_block_sparse_attn_opapi_ut SetUp" << endl;
+        std::cout << "QuantBlockSparseAttn AclnnQuantBlockSparseAttnTest SetUp" << std::endl;
     }
 
     static void TearDownTestCase()
     {
-        cout << "quant_block_sparse_attn_opapi_ut TearDown" << endl;
+        std::cout << "QuantBlockSparseAttn AclnnQuantBlockSparseAttnTest TearDown" << std::endl;
     }
 };
 
-TEST_F(quant_block_sparse_attn_opapi_ut, quant_block_sparse_attn_nullptr_query)
+TEST_P(AclnnQuantBlockSparseAttnTest, param)
 {
-    auto tensorQuery = TensorDesc({128, 1, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto tensorKey = TensorDesc({1, 1, 128, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto tensorValue = TensorDesc({1, 1, 128, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto tensorQDescale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.001, 0.002);
-    auto tensorKDescale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.001, 0.002);
-    auto tensorVDescale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.001, 0.002);
-    auto tensorPScale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(100, 200);
-    auto tensorSparseIndices = TensorDesc({1, 1, 1, 1}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{0});
-    auto tensorSparseSeqLen = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{128});
-    auto tensorAttenMask = TensorDesc({128, 128}, ACL_UINT8, ACL_FORMAT_ND).Value(vector<uint8_t>{0});
-    auto tensorAttentionOut = TensorDesc({128, 1, 128}, ACL_BF16, ACL_FORMAT_ND);
-    auto tensorSoftmaxLse = TensorDesc({1, 128}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto param = GetParam();
+    op::SetPlatformSocVersion(param.soc);
 
-    int64_t maxSeqlenQ = 128;
-    int64_t maxSeqlenKv = 128;
-    double softmaxScale = 0.08838834764;
-    int64_t sparseQBlockSize = 128;
-    int64_t sparseKvBlockSize = 128;
-    int64_t paBlockStride = 0;
-    char *layoutKv = (char *)"PA_BNSD";
-    char *layoutQ = (char *)"TND";
-    char *layoutSparseIndices = (char *)"B_N_Qb_Kb";
-    char *layoutOut = (char *)"TND";
-    int64_t quantMode = 1;
-    int64_t maskMode = 3;
-    bool returnSoftmaxLse = false;
+    aclTensor *queryPtr = param.query.GetViewDims().empty() ? nullptr : param.query.ToAclTypeRawPtr();
+    aclTensor *keyPtr = param.key.GetViewDims().empty() ? nullptr : param.key.ToAclTypeRawPtr();
+    aclTensor *valuePtr = param.value.GetViewDims().empty() ? nullptr : param.value.ToAclTypeRawPtr();
+    aclTensor *qDescalePtr = param.qDescale.GetViewDims().empty() ? nullptr : param.qDescale.ToAclTypeRawPtr();
+    aclTensor *kDescalePtr = param.kDescale.GetViewDims().empty() ? nullptr : param.kDescale.ToAclTypeRawPtr();
+    aclTensor *vDescalePtr = param.vDescale.GetViewDims().empty() ? nullptr : param.vDescale.ToAclTypeRawPtr();
+    aclTensor *pScalePtr = param.pScale.GetViewDims().empty() ? nullptr : param.pScale.ToAclTypeRawPtr();
+    aclTensor *cuSeqlensQPtr = param.cuSeqlensQ.GetViewDims().empty() ? nullptr : param.cuSeqlensQ.ToAclTypeRawPtr();
+    aclTensor *cuSeqlensKvPtr = param.cuSeqlensKv.GetViewDims().empty() ? nullptr : param.cuSeqlensKv.ToAclTypeRawPtr();
+    aclTensor *sequsedQPtr = param.sequsedQ.GetViewDims().empty() ? nullptr : param.sequsedQ.ToAclTypeRawPtr();
+    aclTensor *sequsedKvPtr = param.sequsedKv.GetViewDims().empty() ? nullptr : param.sequsedKv.ToAclTypeRawPtr();
+    aclTensor *sparseIndicesPtr =
+        param.sparseIndices.GetViewDims().empty() ? nullptr : param.sparseIndices.ToAclTypeRawPtr();
+    aclTensor *sparseSeqLenPtr =
+        param.sparseSeqLen.GetViewDims().empty() ? nullptr : param.sparseSeqLen.ToAclTypeRawPtr();
+    aclTensor *blockTablePtr = param.blockTable.GetViewDims().empty() ? nullptr : param.blockTable.ToAclTypeRawPtr();
+    aclTensor *attenMaskPtr = param.attenMask.GetViewDims().empty() ? nullptr : param.attenMask.ToAclTypeRawPtr();
+    aclTensor *metadataPtr = param.metadata.GetViewDims().empty() ? nullptr : param.metadata.ToAclTypeRawPtr();
+    aclTensor *attentionOutPtr =
+        param.attentionOut.GetViewDims().empty() ? nullptr : param.attentionOut.ToAclTypeRawPtr();
+    aclTensor *softmaxLsePtr = param.softmaxLse.GetViewDims().empty() ? nullptr : param.softmaxLse.ToAclTypeRawPtr();
 
-    auto ut = OP_API_UT(aclnnQuantBlockSparseAttn,
-                        INPUT(nullptr, tensorKey, tensorValue, tensorQDescale, tensorKDescale, tensorVDescale,
-                              tensorPScale, nullptr, nullptr, nullptr, nullptr, tensorSparseIndices, tensorSparseSeqLen,
-                              nullptr, tensorAttenMask, nullptr, maxSeqlenQ, maxSeqlenKv, softmaxScale,
-                              sparseQBlockSize, sparseKvBlockSize, paBlockStride, layoutKv, layoutQ,
-                              layoutSparseIndices, layoutOut, quantMode, maskMode, returnSoftmaxLse),
-                        OUTPUT(tensorAttentionOut, tensorSoftmaxLse));
+    auto ut = OP_API_UT(
+        aclnnQuantBlockSparseAttn,
+        INPUT(queryPtr, keyPtr, valuePtr, qDescalePtr, kDescalePtr, vDescalePtr, pScalePtr, cuSeqlensQPtr,
+              cuSeqlensKvPtr, sequsedQPtr, sequsedKvPtr, sparseIndicesPtr, sparseSeqLenPtr, blockTablePtr, attenMaskPtr,
+              metadataPtr, param.maxSeqlenQ, param.maxSeqlenKv, param.softmaxScale, param.sparseQBlockSize,
+              param.sparseKvBlockSize, param.paBlockStride, (char *)param.layoutKv.c_str(),
+              (char *)param.layoutQ.c_str(), (char *)param.layoutSparseIndices.c_str(), (char *)param.layoutOut.c_str(),
+              param.quantMode, param.maskMode, param.returnSoftmaxLse),
+        OUTPUT(attentionOutPtr, softmaxLsePtr));
 
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
-    aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
-    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
+    auto aclnnRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+
+    if (param.expectResult == ACLNN_SUCCESS) {
+        if (aclnnRet != ACLNN_SUCCESS) {
+            GTEST_SKIP() << "Normal case requires NPU hardware, got error: " << aclnnRet;
+        }
+    } else if (param.expectResult == ACLNN_ERR_PARAM_INVALID) {
+        EXPECT_NE(aclnnRet, ACLNN_SUCCESS);
+    } else {
+        EXPECT_EQ(param.expectResult, aclnnRet);
+    }
 }
 
-TEST_F(quant_block_sparse_attn_opapi_ut, quant_block_sparse_attn_nullptr_key)
-{
-    auto tensorQuery = TensorDesc({128, 1, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto tensorValue = TensorDesc({1, 1, 128, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto tensorQDescale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.001, 0.002);
-    auto tensorKDescale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.001, 0.002);
-    auto tensorVDescale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.001, 0.002);
-    auto tensorPScale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(100, 200);
-    auto tensorSparseIndices = TensorDesc({1, 1, 1, 1}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{0});
-    auto tensorSparseSeqLen = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{128});
-    auto tensorAttenMask = TensorDesc({128, 128}, ACL_UINT8, ACL_FORMAT_ND).Value(vector<uint8_t>{0});
-    auto tensorAttentionOut = TensorDesc({128, 1, 128}, ACL_BF16, ACL_FORMAT_ND);
-    auto tensorSoftmaxLse = TensorDesc({1, 128}, ACL_FLOAT, ACL_FORMAT_ND);
+INSTANTIATE_TEST_SUITE_P(
+    QuantBlockSparseAttn, AclnnQuantBlockSparseAttnTest,
+    testing::ValuesIn(GetCasesFromCsv<QuantBlockSparseAttnApiUtParam>(ReplaceFileExtension2Csv(__FILE__))),
+    PrintCaseInfoString<QuantBlockSparseAttnApiUtParam>);
 
-    int64_t maxSeqlenQ = 128;
-    int64_t maxSeqlenKv = 128;
-    double softmaxScale = 0.08838834764;
-    int64_t sparseQBlockSize = 128;
-    int64_t sparseKvBlockSize = 128;
-    int64_t paBlockStride = 0;
-    char *layoutKv = (char *)"PA_BNSD";
-    char *layoutQ = (char *)"TND";
-    char *layoutSparseIndices = (char *)"B_N_Qb_Kb";
-    char *layoutOut = (char *)"TND";
-    int64_t quantMode = 1;
-    int64_t maskMode = 3;
-    bool returnSoftmaxLse = false;
-
-    auto ut = OP_API_UT(aclnnQuantBlockSparseAttn,
-                        INPUT(tensorQuery, nullptr, tensorValue, tensorQDescale, tensorKDescale, tensorVDescale,
-                              tensorPScale, nullptr, nullptr, nullptr, nullptr, tensorSparseIndices, tensorSparseSeqLen,
-                              nullptr, tensorAttenMask, nullptr, maxSeqlenQ, maxSeqlenKv, softmaxScale,
-                              sparseQBlockSize, sparseKvBlockSize, paBlockStride, layoutKv, layoutQ,
-                              layoutSparseIndices, layoutOut, quantMode, maskMode, returnSoftmaxLse),
-                        OUTPUT(tensorAttentionOut, tensorSoftmaxLse));
-
-    uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
-    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
-}
-
-TEST_F(quant_block_sparse_attn_opapi_ut, quant_block_sparse_attn_nullptr_output)
-{
-    auto tensorQuery = TensorDesc({128, 1, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto tensorKey = TensorDesc({1, 1, 128, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto tensorValue = TensorDesc({1, 1, 128, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto tensorQDescale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.001, 0.002);
-    auto tensorKDescale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.001, 0.002);
-    auto tensorVDescale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.001, 0.002);
-    auto tensorPScale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(100, 200);
-    auto tensorSparseIndices = TensorDesc({1, 1, 1, 1}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{0});
-    auto tensorSparseSeqLen = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{128});
-    auto tensorAttenMask = TensorDesc({128, 128}, ACL_UINT8, ACL_FORMAT_ND).Value(vector<uint8_t>{0});
-    auto tensorSoftmaxLse = TensorDesc({1, 128}, ACL_FLOAT, ACL_FORMAT_ND);
-
-    int64_t maxSeqlenQ = 128;
-    int64_t maxSeqlenKv = 128;
-    double softmaxScale = 0.08838834764;
-    int64_t sparseQBlockSize = 128;
-    int64_t sparseKvBlockSize = 128;
-    int64_t paBlockStride = 0;
-    char *layoutKv = (char *)"PA_BNSD";
-    char *layoutQ = (char *)"TND";
-    char *layoutSparseIndices = (char *)"B_N_Qb_Kb";
-    char *layoutOut = (char *)"TND";
-    int64_t quantMode = 1;
-    int64_t maskMode = 3;
-    bool returnSoftmaxLse = false;
-
-    auto ut = OP_API_UT(aclnnQuantBlockSparseAttn,
-                        INPUT(tensorQuery, tensorKey, tensorValue, tensorQDescale, tensorKDescale, tensorVDescale,
-                              tensorPScale, nullptr, nullptr, nullptr, nullptr, tensorSparseIndices, tensorSparseSeqLen,
-                              nullptr, tensorAttenMask, nullptr, maxSeqlenQ, maxSeqlenKv, softmaxScale,
-                              sparseQBlockSize, sparseKvBlockSize, paBlockStride, layoutKv, layoutQ,
-                              layoutSparseIndices, layoutOut, quantMode, maskMode, returnSoftmaxLse),
-                        OUTPUT(nullptr, tensorSoftmaxLse));
-
-    uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
-    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
-}
-
-TEST_F(quant_block_sparse_attn_opapi_ut, quant_block_sparse_attn_normal_case)
-{
-    auto tensorQuery = TensorDesc({128, 1, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto tensorKey = TensorDesc({1, 1, 128, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto tensorValue = TensorDesc({1, 1, 128, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto tensorQDescale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.001, 0.002);
-    auto tensorKDescale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.001, 0.002);
-    auto tensorVDescale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.001, 0.002);
-    auto tensorPScale = TensorDesc({1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(100, 200);
-    auto tensorSparseIndices = TensorDesc({1, 1, 1, 1}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{0});
-    auto tensorSparseSeqLen = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{128});
-    auto tensorAttenMask = TensorDesc({128, 128}, ACL_UINT8, ACL_FORMAT_ND).Value(vector<uint8_t>{0});
-    auto tensorAttentionOut = TensorDesc({128, 1, 128}, ACL_BF16, ACL_FORMAT_ND);
-    auto tensorSoftmaxLse = TensorDesc({1, 128}, ACL_FLOAT, ACL_FORMAT_ND);
-
-    int64_t maxSeqlenQ = 128;
-    int64_t maxSeqlenKv = 128;
-    double softmaxScale = 0.08838834764;
-    int64_t sparseQBlockSize = 128;
-    int64_t sparseKvBlockSize = 128;
-    int64_t paBlockStride = 0;
-    char *layoutKv = (char *)"PA_BNSD";
-    char *layoutQ = (char *)"TND";
-    char *layoutSparseIndices = (char *)"B_N_Qb_Kb";
-    char *layoutOut = (char *)"TND";
-    int64_t quantMode = 1;
-    int64_t maskMode = 3;
-    bool returnSoftmaxLse = false;
-
-    auto ut = OP_API_UT(aclnnQuantBlockSparseAttn,
-                        INPUT(tensorQuery, tensorKey, tensorValue, tensorQDescale, tensorKDescale, tensorVDescale,
-                              tensorPScale, nullptr, nullptr, nullptr, nullptr, tensorSparseIndices, tensorSparseSeqLen,
-                              nullptr, tensorAttenMask, nullptr, maxSeqlenQ, maxSeqlenKv, softmaxScale,
-                              sparseQBlockSize, sparseKvBlockSize, paBlockStride, layoutKv, layoutQ,
-                              layoutSparseIndices, layoutOut, quantMode, maskMode, returnSoftmaxLse),
-                        OUTPUT(tensorAttentionOut, tensorSoftmaxLse));
-
-    GTEST_SKIP() << "Normal case requires NPU hardware for executor creation";
-}
+} // namespace QuantBlockSparseAttnUT

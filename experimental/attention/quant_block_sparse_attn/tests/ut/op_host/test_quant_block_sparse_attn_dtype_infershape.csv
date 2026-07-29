@@ -1,0 +1,3 @@
+caseName,expectStatus,queryDtype,keyDtype,valueDtype,qDescaleDtype,kDescaleDtype,vDescaleDtype,pScaleDtype,cuSeqlensQDtype,cuSeqlensKvDtype,sequsedQDtype,sequsedKvDtype,sparseIndicesDtype,sparseSeqLenDtype,blockTableDtype,attenMaskDtype,metadataDtype,expectAttentionOutDtype,expectSoftmaxLseDtype
+inferdatatype_non_bf16,SUCCESS,FLOAT8_E4M3FN,FLOAT8_E4M3FN,FLOAT8_E4M3FN,FLOAT,FLOAT,FLOAT,FLOAT,INT32,INT32,INT32,INT32,INT32,INT32,INT32,UINT8,INT32,BF16,FLOAT
+inferdatatype_already_bf16,SUCCESS,FLOAT8_E4M3FN,FLOAT8_E4M3FN,FLOAT8_E4M3FN,FLOAT,FLOAT,FLOAT,FLOAT,INT32,INT32,INT32,INT32,INT32,INT32,INT32,UINT8,INT32,BF16,FLOAT

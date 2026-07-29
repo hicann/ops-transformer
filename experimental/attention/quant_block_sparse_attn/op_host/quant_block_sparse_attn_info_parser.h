@@ -16,6 +16,8 @@
 #ifndef QUANT_BLOCK_SPARSE_ATTN_INFO_PARSER_H_
 #define QUANT_BLOCK_SPARSE_ATTN_INFO_PARSER_H_
 
+#include <string>
+
 #include <exe_graph/runtime/tiling_context.h>
 
 namespace optiling {
@@ -133,6 +135,10 @@ struct QuantBlockSparseAttnTilingInfo {
     uint32_t maskModeVal = 0;
     uint32_t quantModeVal = 1;
     uint32_t layoutQValue = 0;
+    std::string layoutQStr = "TND";
+    std::string layoutKVStr = "PA_BNSD";
+    std::string layoutSparseIndicesStr = "B_N_Qb_Kb";
+    std::string layoutOutStr = "TND";
     bool returnSoftmaxLseVal = false;
 
     bool isGqa = false;

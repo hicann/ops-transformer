@@ -19,6 +19,11 @@
 #include "opdev/tensor_view_utils.h"
 #include "../op_kernel_aicpu/quant_block_sparse_attn_metadata.h"
 
+static constexpr int64_t QBSA_QUANT_MODE_FP8 = 1;
+static constexpr int64_t QBSA_QUANT_MODE_MXFP8 = 2;
+static constexpr int64_t QBSA_SPARSE_BLOCK_SIZE_64 = 64;
+static constexpr int64_t QBSA_SPARSE_BLOCK_SIZE_128 = 128;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -56,17 +61,30 @@ static aclnnStatus CheckSingleParamQbsa(int64_t batchSize, int64_t numHeadsQ, in
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "maxSeqlenKv must be > -1, but got %ld", maxSeqlenKv);
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (sparseBlockSizeQ != 128) {
-        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "sparseBlockSizeQ only supports 128, but got %ld", sparseBlockSizeQ);
-        return ACLNN_ERR_PARAM_INVALID;
-    }
-    if (sparseBlockSizeK != 128) {
-        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "sparseBlockSizeK only supports 128, but got %ld", sparseBlockSizeK);
-        return ACLNN_ERR_PARAM_INVALID;
-    }
-    if (quantMode != 1 && quantMode != 2) {
+    if (quantMode != QBSA_QUANT_MODE_FP8 && quantMode != QBSA_QUANT_MODE_MXFP8) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "quantMode only supports 1 or 2, but got %ld", quantMode);
         return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (quantMode == QBSA_QUANT_MODE_FP8) {
+        if (sparseBlockSizeQ != QBSA_SPARSE_BLOCK_SIZE_128) {
+            OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "sparseBlockSizeQ only supports 128, but got %ld", sparseBlockSizeQ);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (sparseBlockSizeK != QBSA_SPARSE_BLOCK_SIZE_128) {
+            OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "sparseBlockSizeK only supports 128, but got %ld", sparseBlockSizeK);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    } else {
+        if (sparseBlockSizeQ != QBSA_SPARSE_BLOCK_SIZE_64 && sparseBlockSizeQ != QBSA_SPARSE_BLOCK_SIZE_128) {
+            OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+                    "sparseBlockSizeQ only supports 64 or 128 when quantMode is 2, but got %ld", sparseBlockSizeQ);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (sparseBlockSizeK != QBSA_SPARSE_BLOCK_SIZE_64 && sparseBlockSizeK != QBSA_SPARSE_BLOCK_SIZE_128) {
+            OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+                    "sparseBlockSizeK only supports 64 or 128 when quantMode is 2, but got %ld", sparseBlockSizeK);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     if ((layoutSparseIndices == nullptr) || (strcmp(layoutSparseIndices, "B_N_Qb_Kb") != 0)) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "layoutSparseIndices only supports B_N_Qb_Kb, but got %s",
@@ -105,9 +123,9 @@ static aclnnStatus CheckExistenceQbsa(const aclTensor *sparseSeqLen, const aclTe
         return ACLNN_ERR_PARAM_INVALID;
     }
     uint64_t minMetaSize = optiling::QBSA_HEAD_METADATA_SIZE +
-        static_cast<uint64_t>(batchSize) * static_cast<uint64_t>(numHeadsQ) *
-            optiling::AIC_CORE_NUM * optiling::QBSA_METADATA_SIZE +
-        static_cast<uint64_t>(optiling::AIV_CORE_NUM) * optiling::FD_METADATA_SIZE;
+                           static_cast<uint64_t>(batchSize) * static_cast<uint64_t>(numHeadsQ) *
+                               optiling::AIC_CORE_NUM * optiling::QBSA_METADATA_SIZE +
+                           static_cast<uint64_t>(optiling::AIV_CORE_NUM) * optiling::FD_METADATA_SIZE;
     if (metadata->GetViewShape().GetDim(0) < static_cast<int64_t>(minMetaSize)) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "metadata shape too small, need at least %llu int32, but got %ld",
                 static_cast<unsigned long long>(minMetaSize), metadata->GetViewShape().GetDim(0));

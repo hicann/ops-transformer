@@ -37,22 +37,22 @@ public:
             .IgnoreContiguous();
         this->Input("q_descale")
             .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_FLOAT})
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("k_descale")
             .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_FLOAT})
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND})
             .IgnoreContiguous();
         this->Input("v_descale")
             .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_FLOAT})
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("p_scale")
             .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_FLOAT})
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("cu_seqlens_q")
@@ -100,14 +100,8 @@ public:
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
-        this->Output("attention_out")
-            .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_BF16})
-            .FormatList({ge::FORMAT_ND});
-        this->Output("softmax_lse")
-            .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_FLOAT})
-            .FormatList({ge::FORMAT_ND});
+        this->Output("attention_out").ParamType(REQUIRED).DataTypeList({ge::DT_BF16}).FormatList({ge::FORMAT_ND});
+        this->Output("softmax_lse").ParamType(REQUIRED).DataTypeList({ge::DT_FLOAT}).FormatList({ge::FORMAT_ND});
 
         this->Attr("max_seqlen_q").AttrType(OPTIONAL).Int(0);
         this->Attr("max_seqlen_kv").AttrType(OPTIONAL).Int(0);

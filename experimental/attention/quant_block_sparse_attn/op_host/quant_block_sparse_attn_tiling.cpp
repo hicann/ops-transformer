@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 
 #include <tiling/platform/platform_ascendc.h>
@@ -39,6 +40,10 @@ constexpr uint8_t BSA_COMPAT_MASK_NONE = 0U;
 constexpr uint8_t BSA_COMPAT_MASK_RIGHT_DOWN_CAUSAL = 2U;
 constexpr uint32_t BSA_COMBINE_ALIGN_BYTES = 32U;
 constexpr uint32_t BSA_K_SCALE_BYTES = sizeof(float);
+constexpr uint32_t BSA_ATTEN_MASK_DEFAULT_BATCH = 1U;
+constexpr uint32_t BSA_ATTEN_MASK_DEFAULT_S2_SIZE = 2048U;
+constexpr uint32_t BSA_MXFP8_P_SCALE_SHAPE_SIZE = 1U;
+constexpr uint32_t BSA_MXFP8_VALUE_SCALE_LAST_DIM = 2U;
 
 uint32_t GetAicCoreNum(gert::TilingContext *context)
 {
@@ -50,6 +55,22 @@ uint32_t GetAicCoreNum(gert::TilingContext *context)
     const uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
     return aicNum == 0U ? BSA_MAX_CORE_NUM : std::min<uint32_t>(aicNum, BSA_MAX_CORE_NUM);
 }
+
+uint32_t CalcMxScaleDSize(uint32_t dSize)
+{
+    // 返回 MX scale 的 D/64 维度。
+    return BSACeilDiv(dSize, BSA_MXFP8_SCALE_GROUP_SIZE);
+}
+
+QuantBlockSparseAttnMxStrideParams MakePaBnbdStride(uint32_t n2Size, uint32_t blockSize, uint32_t lastDim)
+{
+    // PA BNBD：[physicalBlock,N,blockSize,lastDim]。
+    QuantBlockSparseAttnMxStrideParams stride;
+    stride.n2Stride = static_cast<uint64_t>(blockSize) * lastDim;
+    stride.bnStride = static_cast<uint64_t>(n2Size) * stride.n2Stride;
+    return stride;
+}
+
 } // namespace
 
 QuantBlockSparseAttnTiling::QuantBlockSparseAttnTiling(gert::TilingContext *context) : context_(context) {}
@@ -79,7 +100,8 @@ void QuantBlockSparseAttnTiling::FillSparseParams()
 void QuantBlockSparseAttnTiling::FillInputParams()
 {
     const auto &info = *tilingInfo_;
-    const uint8_t compatMaskMode = (info.maskModeVal == 3U) ? BSA_COMPAT_MASK_RIGHT_DOWN_CAUSAL : BSA_COMPAT_MASK_NONE;
+    const uint8_t compatMaskMode =
+        (info.maskModeVal == BSA_MASK_MODE_CAUSAL) ? BSA_COMPAT_MASK_RIGHT_DOWN_CAUSAL : BSA_COMPAT_MASK_NONE;
     auto &inputParams = tilingData_.inputParamsRegbase;
     inputParams.set_bSize(info.bSize);
     inputParams.set_t1Size(info.qTokenNum);
@@ -140,11 +162,122 @@ void QuantBlockSparseAttnTiling::FillInitOutputParams()
     initOutputParams.set_totalSoftMaxLseOutputSize(totalSoftmaxLseSize);
 }
 
+void QuantBlockSparseAttnTiling::FillMxTilingData()
+{
+    // 填充独立 MX tiling payload。
+    const auto &info = *tilingInfo_;
+    const uint8_t compatMaskMode =
+        (info.maskModeVal == BSA_MASK_MODE_CAUSAL) ? BSA_COMPAT_MASK_RIGHT_DOWN_CAUSAL : BSA_COMPAT_MASK_NONE;
+    const uint32_t dSize = info.dSize == 0U ? BSA_D_SIZE : info.dSize;
+    const uint32_t dSizeV = info.dSizeV == 0U ? BSA_D_SIZE : info.dSizeV;
+    const uint32_t queryScaleDSize = CalcMxScaleDSize(dSize);
+    const uint32_t keyScaleDSize = CalcMxScaleDSize(dSize);
+    // 每个 PA block 的 VScale 为 [N,ceil(blockSize/64),DV,2]。
+    const uint32_t valueScaleBlockSize = BSACeilDiv(info.kvBlockSizeVal, BSA_MXFP8_SCALE_GROUP_SIZE);
+    const uint32_t valueScaleDSize = dSizeV * BSA_MXFP8_VALUE_SCALE_LAST_DIM;
+    const bool actualSeqQNull = info.opParamInfo.seqUsedQ.tensor == nullptr;
+    const bool actualSeqKVNull = info.opParamInfo.seqUsedKV.tensor == nullptr;
+
+    auto &attrParams = mxTilingData_.attrParams;
+    attrParams.layoutQ = info.layoutQValue;
+    attrParams.layoutKv = BSA_LAYOUT_KV_PA_BNSD_VALUE;
+    attrParams.layoutSparseIndices = BSA_LAYOUT_SPARSE_B_N_QB_KB_VALUE;
+    attrParams.quantMode = info.quantModeVal;
+    attrParams.maskMode = info.maskModeVal;
+    attrParams.returnSoftmaxLse = info.returnSoftmaxLseVal ? 1U : 0U;
+
+    auto &baseParams = mxTilingData_.baseParams;
+    baseParams.bSize = info.bSize;
+    baseParams.t1Size = info.qTokenNum;
+    baseParams.t2Size = info.s2Size;
+    baseParams.n2Size = info.n2Size;
+    baseParams.gSize = info.gSize;
+    baseParams.s1Size = info.s1Size;
+    baseParams.s2Size = info.s2Size;
+    baseParams.dSize = dSize;
+    baseParams.dSizeV = dSizeV;
+    baseParams.dSizeRope = 0U;
+    baseParams.actualSeqLengthsQSize = actualSeqQNull ? 0U : info.bSize;
+    baseParams.actualSeqLengthsKVSize = actualSeqKVNull ? 0U : info.bSize;
+    baseParams.scaleValue = info.softmaxScaleVal;
+    baseParams.isKvContinuous = 0U;
+    baseParams.isActualSeqLengthsNull = actualSeqQNull ? 1U : 0U;
+    baseParams.isActualSeqLengthsKVNull = actualSeqKVNull ? 1U : 0U;
+    baseParams.coreNum = usedCoreNum_;
+    baseParams.outputLayout = info.layoutQValue;
+    // K/V 数据与 K/V scale 均按 PA BNBD 映射。
+    baseParams.keyStrides = MakePaBnbdStride(info.n2Size, info.kvBlockSizeVal, dSize);
+    baseParams.valueStrides = MakePaBnbdStride(info.n2Size, info.kvBlockSizeVal, dSizeV);
+    baseParams.kScaleStrides =
+        MakePaBnbdStride(info.n2Size, info.kvBlockSizeVal, keyScaleDSize * BSA_MXFP8_SCALE_LAST_DIM);
+    baseParams.vScaleStrides = MakePaBnbdStride(info.n2Size, valueScaleBlockSize, valueScaleDSize);
+
+    auto &attenMaskParams = mxTilingData_.attenMaskParams;
+    attenMaskParams.sparseMode = static_cast<uint8_t>(info.maskModeVal);
+    attenMaskParams.attenMaskDataType = 1U;
+    attenMaskParams.attenMaskCompressMode = compatMaskMode;
+    attenMaskParams.isRowInvalidOpen = 1U;
+    attenMaskParams.preTokens = std::numeric_limits<int32_t>::max();
+    attenMaskParams.nextTokens = 0;
+    attenMaskParams.attenMaskBatch = BSA_ATTEN_MASK_DEFAULT_BATCH;
+    attenMaskParams.attenMaskS1Size = info.s1Size;
+    attenMaskParams.attenMaskS2Size = BSA_ATTEN_MASK_DEFAULT_S2_SIZE;
+    attenMaskParams.isExistRowInvalid = 1U;
+
+    auto &pageAttentionParams = mxTilingData_.pageAttentionParams;
+    pageAttentionParams.paLayoutType = BSA_PA_LAYOUT_TYPE_BNBD;
+    pageAttentionParams.blockSize = info.kvBlockSizeVal;
+    pageAttentionParams.maxBlockNumPerBatch = info.maxBlockNumPerBatch;
+    pageAttentionParams.paBlockNumSum = info.paBlockNumSum;
+    pageAttentionParams.paBlockStride = info.paBlockStrideVal;
+    pageAttentionParams.qBlockSize = info.qBlockSizeVal;
+    pageAttentionParams.kvBlockSize = info.kvBlockSizeVal;
+
+    auto &sparseParams = mxTilingData_.sparseParams;
+    sparseParams.gS1OuterSize = info.gS1OuterSize;
+    sparseParams.sparseSeqLenStride = info.qbMax;
+    sparseParams.sparseIndicesStride = info.sparseCount;
+    sparseParams.maxQb = info.qbMax;
+    sparseParams.maxKb = info.kbMax;
+    sparseParams.sparseCount = info.sparseCount;
+
+    auto &workspaceParams = mxTilingData_.workspaceParams;
+    workspaceParams.accumOutSize = 0U;
+    workspaceParams.logSumExpSize = 0U;
+
+    auto &scaleParams = mxTilingData_.scaleParams;
+    // Q/K mode=6，V mode=8。
+    scaleParams.scaleGroupSize = BSA_MXFP8_SCALE_GROUP_SIZE;
+    scaleParams.scaleLastDim = BSA_MXFP8_SCALE_LAST_DIM;
+    scaleParams.queryScaleDSize = queryScaleDSize;
+    scaleParams.keyScaleDSize = keyScaleDSize;
+    scaleParams.valueScaleBlockSize = valueScaleBlockSize;
+    scaleParams.valueScaleDSize = valueScaleDSize;
+    scaleParams.pScaleShapeSize = BSA_MXFP8_P_SCALE_SHAPE_SIZE;
+    scaleParams.queryQuantMode = BSA_MXFP8_PER_TOKEN_GROUP_MODE;
+    scaleParams.keyAntiquantMode = BSA_MXFP8_PER_TOKEN_GROUP_MODE;
+    scaleParams.valueAntiquantMode = BSA_MXFP8_PER_CHANNEL_GROUP_MODE;
+
+    auto &emptyTensorParams = mxTilingData_.emptyTensorParams;
+    const uint64_t totalOutputSize = static_cast<uint64_t>(info.qTokenNum) * info.n1Size * dSizeV;
+    const uint64_t totalSoftmaxLseSize = static_cast<uint64_t>(info.qTokenNum) * info.n1Size;
+    emptyTensorParams.totalOutputSize = totalOutputSize;
+    emptyTensorParams.totalSoftMaxLseOutputSize = totalSoftmaxLseSize;
+}
+
 void QuantBlockSparseAttnTiling::CalcTilingKey()
 {
     const auto &info = *tilingInfo_;
-    tilingKey_ = GET_TPL_TILING_KEY(BSA_DTYPE_FP8_E4M3FN, info.layoutQValue, BSA_KV_LAYOUT_PA_BNSD, info.maskModeVal,
-                                    info.returnSoftmaxLseVal ? 1U : 0U);
+    if (info.quantModeVal == BSA_QUANT_MODE_MXFP8_FULL_QUANT) {
+        // MX 使用独立 tiling data 和 S2=512 config。
+        tilingKey_ = GET_TPL_TILING_KEY(BSA_DTYPE_FP8_E4M3FN, info.layoutQValue, BSA_KV_LAYOUT_PA_BNSD,
+                                        info.maskModeVal, info.returnSoftmaxLseVal ? 1U : 0U,
+                                        Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128, MXFullQuantMode);
+    } else {
+        tilingKey_ = GET_TPL_TILING_KEY(BSA_DTYPE_FP8_E4M3FN, info.layoutQValue, BSA_KV_LAYOUT_PA_BNSD,
+                                        info.maskModeVal, info.returnSoftmaxLseVal ? 1U : 0U,
+                                        Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128, FP8QuantMode);
+    }
 }
 
 void QuantBlockSparseAttnTiling::CalcWorkspaceSize() { workspaceSize_ = 0; }
@@ -211,7 +344,121 @@ void QuantBlockSparseAttnTiling::PrintAllTilingData()
     OP_LOGD(kOpName, "tilingKey:%lu", tilingKey_);
     OP_LOGD(kOpName, "workspaceSize:%lu", workspaceSize_);
     OP_LOGD(kOpName, "tilingDataSize:%lu", tilingData_.GetDataSize());
-    OP_LOGD(kOpName, "tilingDataCapacity:%lu", context_->GetRawTilingData()->GetCapacity());
+    auto rawTilingData = context_->GetRawTilingData();
+    OP_LOGD(kOpName, "tilingDataCapacity:%lu", rawTilingData == nullptr ? 0UL : rawTilingData->GetCapacity());
+}
+
+void QuantBlockSparseAttnTiling::PrintMxTilingData()
+{
+    const auto &attrParams = mxTilingData_.attrParams;
+    OP_LOGD(kOpName, "===== MX AttrParams =====");
+    OP_LOGD(kOpName, "layoutQ:%u", attrParams.layoutQ);
+    OP_LOGD(kOpName, "layoutKv:%u", attrParams.layoutKv);
+    OP_LOGD(kOpName, "layoutSparseIndices:%u", attrParams.layoutSparseIndices);
+    OP_LOGD(kOpName, "quantMode:%u", attrParams.quantMode);
+    OP_LOGD(kOpName, "maskMode:%u", attrParams.maskMode);
+    OP_LOGD(kOpName, "returnSoftmaxLse:%u", attrParams.returnSoftmaxLse);
+
+    const auto &baseParams = mxTilingData_.baseParams;
+    OP_LOGD(kOpName, "===== MX BaseParams =====");
+    OP_LOGD(kOpName, "bSize:%u", baseParams.bSize);
+    OP_LOGD(kOpName, "t1Size:%u", baseParams.t1Size);
+    OP_LOGD(kOpName, "t2Size:%u", baseParams.t2Size);
+    OP_LOGD(kOpName, "n2Size:%u", baseParams.n2Size);
+    OP_LOGD(kOpName, "gSize:%u", baseParams.gSize);
+    OP_LOGD(kOpName, "s1Size:%u", baseParams.s1Size);
+    OP_LOGD(kOpName, "s2Size:%u", baseParams.s2Size);
+    OP_LOGD(kOpName, "dSize:%u", baseParams.dSize);
+    OP_LOGD(kOpName, "dSizeV:%u", baseParams.dSizeV);
+    OP_LOGD(kOpName, "actualSeqLengthsQSize:%u", baseParams.actualSeqLengthsQSize);
+    OP_LOGD(kOpName, "actualSeqLengthsKVSize:%u", baseParams.actualSeqLengthsKVSize);
+    OP_LOGD(kOpName, "scaleValue:%f", baseParams.scaleValue);
+    OP_LOGD(kOpName, "isKvContinuous:%u", baseParams.isKvContinuous);
+    OP_LOGD(kOpName, "coreNum:%u", baseParams.coreNum);
+    OP_LOGD(kOpName, "keyStrides:%lu/%lu", baseParams.keyStrides.bnStride, baseParams.keyStrides.n2Stride);
+    OP_LOGD(kOpName, "valueStrides:%lu/%lu", baseParams.valueStrides.bnStride, baseParams.valueStrides.n2Stride);
+    OP_LOGD(kOpName, "kScaleStrides:%lu/%lu", baseParams.kScaleStrides.bnStride, baseParams.kScaleStrides.n2Stride);
+    OP_LOGD(kOpName, "vScaleStrides:%lu/%lu", baseParams.vScaleStrides.bnStride, baseParams.vScaleStrides.n2Stride);
+
+    const auto &attenMaskParams = mxTilingData_.attenMaskParams;
+    OP_LOGD(kOpName, "===== MX AttenMaskParams =====");
+    OP_LOGD(kOpName, "sparseMode:%u", attenMaskParams.sparseMode);
+    OP_LOGD(kOpName, "attenMaskCompressMode:%u", attenMaskParams.attenMaskCompressMode);
+    OP_LOGD(kOpName, "preTokens:%d", attenMaskParams.preTokens);
+    OP_LOGD(kOpName, "nextTokens:%d", attenMaskParams.nextTokens);
+    OP_LOGD(kOpName, "attenMaskS1Size:%u", attenMaskParams.attenMaskS1Size);
+    OP_LOGD(kOpName, "attenMaskS2Size:%u", attenMaskParams.attenMaskS2Size);
+
+    const auto &pageAttentionParams = mxTilingData_.pageAttentionParams;
+    OP_LOGD(kOpName, "===== MX PageAttentionParams =====");
+    OP_LOGD(kOpName, "paLayoutType:%u", pageAttentionParams.paLayoutType);
+    OP_LOGD(kOpName, "blockSize:%u", pageAttentionParams.blockSize);
+    OP_LOGD(kOpName, "maxBlockNumPerBatch:%u", pageAttentionParams.maxBlockNumPerBatch);
+    OP_LOGD(kOpName, "paBlockNumSum:%u", pageAttentionParams.paBlockNumSum);
+    OP_LOGD(kOpName, "paBlockStride:%u", pageAttentionParams.paBlockStride);
+    OP_LOGD(kOpName, "qBlockSize:%u", pageAttentionParams.qBlockSize);
+    OP_LOGD(kOpName, "kvBlockSize:%u", pageAttentionParams.kvBlockSize);
+
+    const auto &sparseParams = mxTilingData_.sparseParams;
+    OP_LOGD(kOpName, "===== MX SparseParams =====");
+    OP_LOGD(kOpName, "gS1OuterSize:%u", sparseParams.gS1OuterSize);
+    OP_LOGD(kOpName, "sparseSeqLenStride:%u", sparseParams.sparseSeqLenStride);
+    OP_LOGD(kOpName, "sparseIndicesStride:%u", sparseParams.sparseIndicesStride);
+    OP_LOGD(kOpName, "maxQb:%u", sparseParams.maxQb);
+    OP_LOGD(kOpName, "maxKb:%u", sparseParams.maxKb);
+    OP_LOGD(kOpName, "sparseCount:%u", sparseParams.sparseCount);
+
+    const auto &scaleParams = mxTilingData_.scaleParams;
+    OP_LOGD(kOpName, "===== MX ScaleParams =====");
+    OP_LOGD(kOpName, "scaleGroupSize:%u", scaleParams.scaleGroupSize);
+    OP_LOGD(kOpName, "scaleLastDim:%u", scaleParams.scaleLastDim);
+    OP_LOGD(kOpName, "queryScaleDSize:%u", scaleParams.queryScaleDSize);
+    OP_LOGD(kOpName, "keyScaleDSize:%u", scaleParams.keyScaleDSize);
+    OP_LOGD(kOpName, "valueScaleBlockSize:%u", scaleParams.valueScaleBlockSize);
+    OP_LOGD(kOpName, "valueScaleDSize:%u", scaleParams.valueScaleDSize);
+    OP_LOGD(kOpName, "pScaleShapeSize:%u", scaleParams.pScaleShapeSize);
+    OP_LOGD(kOpName, "queryQuantMode/keyAntiquantMode/valueAntiquantMode:%u/%u/%u", scaleParams.queryQuantMode,
+            scaleParams.keyAntiquantMode, scaleParams.valueAntiquantMode);
+
+    const auto &emptyTensorParams = mxTilingData_.emptyTensorParams;
+    OP_LOGD(kOpName, "===== MX EmptyTensorParams =====");
+    OP_LOGD(kOpName, "totalOutputSize:%lu", emptyTensorParams.totalOutputSize);
+    OP_LOGD(kOpName, "totalSoftMaxLseOutputSize:%lu", emptyTensorParams.totalSoftMaxLseOutputSize);
+
+    auto rawTilingData = context_->GetRawTilingData();
+    OP_LOGD(kOpName, "===== MX Summary =====");
+    OP_LOGD(kOpName, "usedCoreNum:%u", usedCoreNum_);
+    OP_LOGD(kOpName, "totalTaskNum:%lu", totalTaskNum_);
+    OP_LOGD(kOpName, "tilingKey:%lu", tilingKey_);
+    OP_LOGD(kOpName, "workspaceSize:%lu", workspaceSize_);
+    OP_LOGD(kOpName, "mxTilingDataSize:%lu", sizeof(QuantBlockSparseAttnMxTilingData));
+    OP_LOGD(kOpName, "tilingDataCapacity:%lu", rawTilingData == nullptr ? 0UL : rawTilingData->GetCapacity());
+}
+
+ge::graphStatus QuantBlockSparseAttnTiling::SaveTilingData()
+{
+    auto rawTilingData = context_->GetRawTilingData();
+    if (rawTilingData == nullptr) {
+        OP_LOGE(kOpName, "DoOpTiling: rawTilingData is nullptr");
+        return ge::GRAPH_FAILED;
+    }
+
+    if (tilingInfo_->quantModeVal == BSA_QUANT_MODE_MXFP8_FULL_QUANT) {
+        const auto dataSize = sizeof(QuantBlockSparseAttnMxTilingData);
+        if (rawTilingData->GetCapacity() < dataSize) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                kOpName, "tilingDataCapacity", std::to_string(rawTilingData->GetCapacity()),
+                "must be at least " + std::to_string(dataSize) + " for MXFP8 full-quant tiling data");
+            return ge::GRAPH_FAILED;
+        }
+        std::memcpy(rawTilingData->GetData(), &mxTilingData_, dataSize);
+        rawTilingData->SetDataSize(dataSize);
+        return ge::GRAPH_SUCCESS;
+    }
+
+    tilingData_.SaveToBuffer(rawTilingData->GetData(), rawTilingData->GetCapacity());
+    rawTilingData->SetDataSize(tilingData_.GetDataSize());
+    return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus QuantBlockSparseAttnTiling::DoOpTiling(QuantBlockSparseAttnTilingInfo *tilingInfo)
@@ -234,27 +481,27 @@ ge::graphStatus QuantBlockSparseAttnTiling::DoOpTiling(QuantBlockSparseAttnTilin
     const uint32_t maxAicCoreNum = GetAicCoreNum(context_);
     usedCoreNum_ = static_cast<uint32_t>(std::min<uint64_t>(static_cast<uint64_t>(maxAicCoreNum), totalTaskNum_));
 
-    FillPaParams();
-    FillSparseParams();
-    FillInputParams();
-    FillMultiCoreParams();
-    FillInitOutputParams();
+    if (tilingInfo_->quantModeVal == BSA_QUANT_MODE_MXFP8_FULL_QUANT) {
+        FillMxTilingData();
+    } else {
+        FillPaParams();
+        FillSparseParams();
+        FillInputParams();
+        FillMultiCoreParams();
+        FillInitOutputParams();
+    }
     CalcTilingKey();
     CalcWorkspaceSize();
-    PrintAllTilingData();
-
-    auto rawTilingData = context_->GetRawTilingData();
-    if (rawTilingData == nullptr) {
-        OP_LOGE(kOpName, "DoOpTiling: rawTilingData is nullptr");
-        return ge::GRAPH_FAILED;
+    if (tilingInfo_->quantModeVal == BSA_QUANT_MODE_MXFP8_FULL_QUANT) {
+        PrintMxTilingData();
+    } else {
+        PrintAllTilingData();
     }
 
     context_->SetBlockDim(usedCoreNum_);
     context_->SetTilingKey(tilingKey_);
     context_->SetScheduleMode(1);
-    tilingData_.SaveToBuffer(rawTilingData->GetData(), rawTilingData->GetCapacity());
-    rawTilingData->SetDataSize(tilingData_.GetDataSize());
-    return ge::GRAPH_SUCCESS;
+    return SaveTilingData();
 }
 
 ge::graphStatus TilingQuantBlockSparseAttn(gert::TilingContext *context)

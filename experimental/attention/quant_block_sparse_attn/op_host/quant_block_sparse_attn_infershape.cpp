@@ -73,9 +73,15 @@ ge::graphStatus InferShapeQuantBlockSparseAttn(gert::InferShapeContext *context)
         softmaxLseShape->SetDim(0, 0);
         return ge::GRAPH_SUCCESS;
     }
+    const int64_t *quantModePtr = attrs->GetAttrPointer<int64_t>(optiling::BSA_QUANT_MODE_ATTR_INDEX);
+    const uint32_t quantMode =
+        (quantModePtr != nullptr) ? static_cast<uint32_t>(*quantModePtr) : optiling::BSA_QUANT_MODE_FP8;
 
     softmaxLseShape->SetDimNum(2);
-    if (layoutQ == "NTD") {
+    if (quantMode == optiling::BSA_QUANT_MODE_MXFP8_FULL_QUANT) {
+        softmaxLseShape->SetDim(0, queryShape->GetDim(0)); // T
+        softmaxLseShape->SetDim(1, queryShape->GetDim(1)); // N1
+    } else if (layoutQ == "NTD") {
         softmaxLseShape->SetDim(0, queryShape->GetDim(0)); // N1
         softmaxLseShape->SetDim(1, queryShape->GetDim(1)); // T
     } else {
