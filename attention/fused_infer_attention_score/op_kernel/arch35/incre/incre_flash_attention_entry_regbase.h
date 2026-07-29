@@ -16,22 +16,23 @@
 #ifndef INCRE_FLASH_ATTENTION_ENTRY_310_H_
 #define INCRE_FLASH_ATTENTION_ENTRY_310_H_
 
-#include "kernel/incre_flash_attention_normal_Bbn2s2_Us2_regbase.h"
-#include "kernel/incre_flash_attention_antiquant_Bbn2s2_Us2_regbase.h"
 namespace optiling {};
-#if __has_include("../../../common/op_kernel/arch35/flash_attention_score_antiquant_kernel.h")
-#include "../../../common/op_kernel/arch35/flash_attention_score_antiquant_kernel.h"
-#include "incre_flash_attention_dummy.h"
-#include "../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_template_tiling_key_enum.h"
-#include "../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_entry_regbase.h"
-#else
-#include "../../common/arch35/flash_attention_score_antiquant_kernel.h"
-#include "incre_flash_attention_dummy.h"
-#include "../../prompt_flash_attention/arch35/prompt_flash_attention_template_tiling_key_enum.h"
-#include "../../prompt_flash_attention/arch35/prompt_flash_attention_entry_regbase.h"
-#endif
-
 using namespace AscendC;
+#include "lib/matmul_intf.h"
+#include "lib/matrix/matmul/tiling.h"
+#if __has_include("../../../../incre_flash_attention/op_kernel/arch35/incre_flash_attention_pub.h")
+#include "../../../../incre_flash_attention/op_kernel/arch35/incre_flash_attention_pub.h"
+#else
+#include "../../../incre_flash_attention/arch35/incre_flash_attention_pub.h"
+#endif
+#if __has_include("../../../../common/op_kernel/arch35/flash_attention_score_antiquant_kernel.h")
+#include "../../../../common/op_kernel/arch35/flash_attention_score_antiquant_kernel.h"
+#include "../../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_template_tiling_key_enum.h"
+#else
+#include "../../../common/arch35/flash_attention_score_antiquant_kernel.h"
+#include "../../../prompt_flash_attention/arch35/prompt_flash_attention_template_tiling_key_enum.h"
+#endif
+#include "../prompt/prompt_flash_attention_entry_regbase.h"
 
 #define REGBASE_COPY_TILING_DATA_ASCEND950_ANTIQUANT_BASEAPI(tiling)                                                         \
     GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling);                                 \
@@ -54,113 +55,6 @@ using namespace AscendC;
       keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, quantScale2, quantOffset2);                   \
     op.Process();                                                                                                                     \
   } while(0)
-
-#define INVOKE_IFA_DUMMY(templateClass, ...)                                                            \
-    TPipe tPipe1;                                                                                        \
-    REGBASE_COPY_TILING_DATA_ASCEND950_ANTIQUANT_BASEAPI(tiling);                                    \
-    IncreFlashAttentionDummy<half> op;                                                                  \
-    op.Init(attentionOut, tilingData);                                                                  \
-    op.Process();                                                                                       \
-    return
-
-#define NEED_CUBE_TILING (true)
-#define NOT_NEED_CUBE_TILING (false)
-
-#if defined (__DAV_C220_CUBE__) || defined (__DAV_C310_CUBE__) || (defined __DAV_310R6_CUBE__)
-#define COPY_TILING_DATA(tiling, need_cube)                                                             \
-    if constexpr (!need_cube) {                                                                         \
-      return;                                                                                           \
-    }                                                                                                   \
-    GET_TILING_DATA_MEMBER(IncreFlashAttentionTilingDataRegbase, bmm1TilingData, bmm1TilingDataVar, tiling);   \
-    GET_TILING_DATA_MEMBER(IncreFlashAttentionTilingDataRegbase, bmm2TilingData, bmm2TilingDataVar, tiling);   \
-    const IncreFlashAttentionTilingDataRegbase* __restrict tiling_data = nullptr;                              \
-    const TCubeTiling* __restrict bmm1tiling = &bmm1TilingDataVar;                                      \
-    const TCubeTiling* __restrict bmm2tiling = &bmm2TilingDataVar;
-
-#define COPY_TILING_DATA_NO_CUBE(tiling)                                                                \
-    COPY_TILING_DATA(tiling, NOT_NEED_CUBE_TILING);
-
-#define COPY_BMM1_TILING_DATA(tiling, need_cube)                                                        \
-    if constexpr (!need_cube) {                                                                         \
-      return;                                                                                           \
-    }                                                                                                   \
-    GET_TILING_DATA_MEMBER(IncreFlashAttentionTilingDataRegbase, bmm1TilingData, bmm1TilingDataVar, tiling);   \
-    const IncreFlashAttentionTilingDataRegbase* __restrict tiling_data = nullptr;                              \
-    const TCubeTiling* __restrict bmm1tiling = &bmm1TilingDataVar;
-
-#define COPY_BMM2_TILING_DATA(tiling, need_cube)                                                        \
-    if constexpr (!need_cube) {                                                                         \
-      return;                                                                                           \
-    }                                                                                                   \
-    GET_TILING_DATA_MEMBER(IncreFlashAttentionTilingDataRegbase, bmm2TilingData, bmm2TilingDataVar, tiling);   \
-    const IncreFlashAttentionTilingDataRegbase* __restrict tiling_data = nullptr;                              \
-    const TCubeTiling* __restrict bmm2tiling = &bmm2TilingDataVar;
-#else
-#define COPY_TILING_DATA(tiling, need_cube)                                                             \
-    GET_TILING_DATA_WITH_STRUCT(IncreFlashAttentionTilingDataRegbase, tiling_data_in, tiling);                 \
-    const IncreFlashAttentionTilingDataRegbase* __restrict tiling_data = &tiling_data_in;                      \
-    const TCubeTiling* __restrict bmm1tiling = &(tiling_data->bmm1TilingData);                          \
-    const TCubeTiling* __restrict bmm2tiling = &(tiling_data->bmm2TilingData);
-
-#define COPY_TILING_DATA_NO_CUBE(tiling)                                                                \
-    GET_TILING_DATA_WITH_STRUCT(IncreFlashAttentionTilingDataRegbase, tiling_data_in, tiling);                 \
-    const IncreFlashAttentionTilingDataRegbase* __restrict tiling_data = &tiling_data_in;
-
-#define COPY_BMM1_TILING_DATA(tiling, need_cube) COPY_TILING_DATA(tiling, need_cube)
-#define COPY_BMM2_TILING_DATA(tiling, need_cube) COPY_TILING_DATA(tiling, need_cube)
-#endif
-
-#ifdef __DAV_C310_CUBE__ // CUBE 实现
-
-#define REGBASE_COPY_TILING_DATA(tiling)                            \
-
-#define INVOKE_IFA_GENERAL_OP_IMPL_ASCEND950_FA(templateClass, vec1ResultSize, qkvSize, ...)                   \
-  do {                                                                                                    \
-    templateClass<__VA_ARGS__> op;                                                                        \
-    AscendC::Impl::Detail::GlobalTscmArray tscmArray;                                                     \
-    AscendC::Impl::Detail::tscmGlobal = &tscmArray;                                                       \
-    TSCM<QuePosition::VECIN, 1, 0x4> vec1ScmPing;                                                         \
-    TSCM<QuePosition::VECIN, 1, 0x4> vec1ScmPong;                                                         \
-    tPipe.InitBuffer(vec1ScmPing, 1, vec1ResultSize);                                                     \
-    tPipe.InitBuffer(vec1ScmPong, 1, vec1ResultSize);                                                     \
-    tPipe.InitBuffer(AscendC::Impl::Detail::tscmGlobal->localQue[0], 1, qkvSize);                         \
-    tPipe.InitBuffer(AscendC::Impl::Detail::tscmGlobal->localQue[1], 1, qkvSize);                         \
-    tPipe.InitBuffer(AscendC::Impl::Detail::tscmGlobal->localQue[2], 1, qkvSize);                         \
-    tPipe.InitBuffer(AscendC::Impl::Detail::tscmGlobal->localQue[3], 1, qkvSize);                         \
-    tPipe.InitBuffer(AscendC::Impl::Detail::tscmGlobal->localQue[4], 1, qkvSize);                         \
-    tPipe.InitBuffer(AscendC::Impl::Detail::tscmGlobal->localQue[5], 1, qkvSize);                         \
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.bmm1, (TCubeTiling *)nullptr, op.bmm2, (TCubeTiling *)nullptr);            \
-  } while (0)
-#else // VECTOR 实现
-
-#define REGBASE_COPY_TILING_DATA(tiling)                                                                                    \
-  GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling);                               \
-  const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData = &tilingDataIn;                                     \
-
-#define INVOKE_IFA_GENERAL_OP_IMPL_ASCEND950_FA(templateClass, vec1ResultSize, qkvSize, ...)                             \
-  do {                                                                                                                      \
-    if (query == nullptr) {return;}                                                                                         \
-    REGBASE_COPY_TILING_DATA(tiling);                                                                                       \
-    templateClass<__VA_ARGS__> op;                                                                                          \
-    TSCM<QuePosition::VECIN, 1, 0x4> vec1ScmPing;                                                                           \
-    TSCM<QuePosition::VECIN, 1, 0x4> vec1ScmPong;                                                                           \
-    tPipe.InitBuffer(vec1ScmPing, 1, vec1ResultSize);                                                                       \
-    tPipe.InitBuffer(vec1ScmPong, 1, vec1ResultSize);                                                                       \
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.bmm1, (TCubeTiling *)nullptr, op.bmm2, (TCubeTiling *)nullptr);      \
-    op.Init(query, key, value, pseShift, nullptr, nullptr, attenMask, nullptr, actualSeqLengthsQ,                           \
-      actualSeqLengthsKV, blockTable, queryPaddingSize, kvPaddingSize, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,      \
-      softmaxLse, attentionOut, user, vec1ScmPing, vec1ScmPong, tilingData, &tPipe);                                              \
-    op.Process();                                                                                                           \
-  } while (0)
-#endif
-
-#if (__CCE_AICORE__ == 310) || (defined __DAV_310R6__)
-#define MM1_OBJ op.mm1Processor.mm
-#define MM2_OBJ op.mm2Processor.bmm2
-#else
-#define MM1_OBJ op.mm
-#define MM2_OBJ op.bmm2
-#endif
 
 template<uint8_t inOutLayoutType, uint16_t config, uint8_t pseMode, uint8_t quantMode, bool hasAttenMask, bool hasRope, 
   uint8_t KvLayoutType, bool isFd, bool emptyTensor, bool enableKVPrefix, bool enableS1OutSplit>

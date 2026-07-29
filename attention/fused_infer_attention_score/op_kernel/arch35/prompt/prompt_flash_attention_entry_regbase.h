@@ -16,28 +16,33 @@
 #ifndef PROMPT_FLASH_ATTENTION_ENTRY_310_H_
 #define PROMPT_FLASH_ATTENTION_ENTRY_310_H_
 #include "prompt_flash_attention_zero_output.h"
-#include "prompt_flash_attention_tiling_regbase.h"
-#include "prompt_flash_attention_template_tiling_key_enum.h"
-#if __has_include("../../../common/op_kernel/arch35/flash_attention_score_kernel_infer.h")
-#include "../../../common/op_kernel/arch35/flash_attention_score_kernel_infer.h"
-#include "../../../common/op_kernel/arch35/flash_attention_noquant_kernel_infer.h"
-#include "../../../common/op_kernel/arch35/flash_attention_score_kernel_infer_mla_fullquant.h"
-#include "../../../common/op_kernel/arch35/flash_attention_score_kernel_infer_gqa_fullquant.h"
-#include "../../../common/op_kernel/arch35/flash_attention_score_kernel_infer_mx_fullquant.h"
-#include "../../../common/op_kernel/arch35/flash_attention_kernel_noquant_mla.h"
-#include "../../../common/op_kernel/arch35/fia_kernel_noquant_gqa.h"
-#include "../../../common/op_kernel/arch35/fia_kernel_fullquant_mx.h"
-#include "../../../common/op_kernel/arch35/fia_kernel_fullquant_gqa.h"
-#include "../../../common/op_kernel/arch35/fia_template_dispatcher.h"
+#if __has_include("../../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_tiling_regbase.h")
+#include "../../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_tiling_regbase.h"
+#include "../../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_template_tiling_key_enum.h"
 #else
-#include "../../common/arch35/flash_attention_score_kernel_infer.h"
-#include "../../common/arch35/flash_attention_score_kernel_infer_mla_fullquant.h"
-#include "../../common/arch35/flash_attention_score_kernel_infer_gqa_fullquant.h"
-#include "../../common/arch35/flash_attention_score_kernel_infer_mx_fullquant.h"
-#include "../../common/arch35/flash_attention_kernel_noquant_mla.h"
-#include "../../common/arch35/fia_kernel_noquant_gqa.h"
-#include "../../common/arch35/fia_kernel_fullquant_mx.h"
-#include "../../common/arch35/fia_kernel_fullquant_gqa.h"
+#include "../../../prompt_flash_attention/arch35/prompt_flash_attention_tiling_regbase.h"
+#include "../../../prompt_flash_attention/arch35/prompt_flash_attention_template_tiling_key_enum.h"
+#endif
+#if __has_include("../../../../common/op_kernel/arch35/flash_attention_score_kernel_infer.h")
+#include "../../../../common/op_kernel/arch35/flash_attention_score_kernel_infer.h"
+#include "../../../../common/op_kernel/arch35/flash_attention_noquant_kernel_infer.h"
+#include "../../../../common/op_kernel/arch35/flash_attention_score_kernel_infer_mla_fullquant.h"
+#include "../../../../common/op_kernel/arch35/flash_attention_score_kernel_infer_gqa_fullquant.h"
+#include "../../../../common/op_kernel/arch35/flash_attention_score_kernel_infer_mx_fullquant.h"
+#include "../../../../common/op_kernel/arch35/flash_attention_kernel_noquant_mla.h"
+#include "../../../../common/op_kernel/arch35/fia_kernel_noquant_gqa.h"
+#include "../../../../common/op_kernel/arch35/fia_kernel_fullquant_mx.h"
+#include "../../../../common/op_kernel/arch35/fia_kernel_fullquant_gqa.h"
+#include "../../../../common/op_kernel/arch35/fia_template_dispatcher.h"
+#else
+#include "../../../common/arch35/flash_attention_score_kernel_infer.h"
+#include "../../../common/arch35/flash_attention_score_kernel_infer_mla_fullquant.h"
+#include "../../../common/arch35/flash_attention_score_kernel_infer_gqa_fullquant.h"
+#include "../../../common/arch35/flash_attention_score_kernel_infer_mx_fullquant.h"
+#include "../../../common/arch35/flash_attention_kernel_noquant_mla.h"
+#include "../../../common/arch35/fia_kernel_noquant_gqa.h"
+#include "../../../common/arch35/fia_kernel_fullquant_mx.h"
+#include "../../../common/arch35/fia_kernel_fullquant_gqa.h"
 #endif
 
 
@@ -330,13 +335,6 @@ using namespace regbaseutil;
     PFA_REGBASE_COPY_TILING_DATA(tiling);                                                                              \
     PromptFlashAttentionZeroOutPut<T> op;                                                                              \
     op.Init(attentionOut, softmaxLse, tilingData);                                                                     \
-    op.Process();                                                                                                      \
-    return
-#define INVOKE_PFA_DUMMY(templateClass, ...)                                                                           \
-    TPipe tPipe;                                                                                                       \
-    PFA_REGBASE_COPY_TILING_DATA(tiling);                                                                              \
-    PromptFlashAttentionDummy<half> op;                                                                                \
-    op.Init(attentionOut, tilingData);                                                                                 \
     op.Process();                                                                                                      \
     return
 
