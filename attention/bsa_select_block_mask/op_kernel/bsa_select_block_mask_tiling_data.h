@@ -83,48 +83,179 @@ public:
     uint8_t kvLayout;
     uint8_t useActualBlockLenQ;
     uint8_t useActualBlockLenK;
+    uint8_t useActualSeqLenQ;
+    uint8_t useActualSeqLenK;
     uint16_t qChunkSize;
     uint16_t kChunkSize;
-    uint8_t rsvd3;
 
-    uint32_t get_batchSize() const { return batchSize; }
-    void set_batchSize(uint32_t v) { this->batchSize = v; }
-    uint32_t get_numHeads() const { return numHeads; }
-    void set_numHeads(uint32_t v) { this->numHeads = v; }
-    uint32_t get_maxQSeqlen() const { return maxQSeqlen; }
-    void set_maxQSeqlen(uint32_t v) { this->maxQSeqlen = v; }
-    uint32_t get_maxKvSeqlen() const { return maxKvSeqlen; }
-    void set_maxKvSeqlen(uint32_t v) { this->maxKvSeqlen = v; }
-    uint32_t get_dSize() const { return dSize; }
-    void set_dSize(uint32_t v) { this->dSize = v; }
-    uint64_t get_blockShapeX() const { return blockShapeX; }
-    void set_blockShapeX(uint64_t v) { this->blockShapeX = v; }
-    uint64_t get_blockShapeY() const { return blockShapeY; }
-    void set_blockShapeY(uint64_t v) { this->blockShapeY = v; }
-    uint32_t get_xBlocks() const { return xBlocks; }
-    void set_xBlocks(uint32_t v) { this->xBlocks = v; }
-    uint32_t get_yBlocks() const { return yBlocks; }
-    void set_yBlocks(uint32_t v) { this->yBlocks = v; }
-    float get_scaleValue() const { return scaleValue; }
-    void set_scaleValue(float v) { this->scaleValue = v; }
-    float get_sparsity() const { return sparsity; }
-    void set_sparsity(float v) { this->sparsity = v; }
-    uint64_t get_topKValue() const { return topKValue; }
-    void set_topKValue(uint64_t v) { this->topKValue = v; }
-    uint8_t get_sparsityMode() const { return sparsityMode; }
-    void set_sparsityMode(uint8_t v) { this->sparsityMode = v; }
-    uint8_t get_queryLayout() const { return queryLayout; }
-    void set_queryLayout(uint8_t v) { this->queryLayout = v; }
-    uint8_t get_kvLayout() const { return kvLayout; }
-    void set_kvLayout(uint8_t v) { this->kvLayout = v; }
-    uint8_t get_useActualBlockLenQ() const { return useActualBlockLenQ; }
-    void set_useActualBlockLenQ(uint8_t v) { this->useActualBlockLenQ = v; }
-    uint8_t get_useActualBlockLenK() const { return useActualBlockLenK; }
-    void set_useActualBlockLenK(uint8_t v) { this->useActualBlockLenK = v; }
-    uint16_t get_qChunkSize() const { return qChunkSize; }
-    void set_qChunkSize(uint16_t v) { this->qChunkSize = v; }
-    uint16_t get_kChunkSize() const { return kChunkSize; }
-    void set_kChunkSize(uint16_t v) { this->kChunkSize = v; }
+    uint32_t get_batchSize() const
+    {
+        return batchSize;
+    }
+    void set_batchSize(uint32_t v)
+    {
+        this->batchSize = v;
+    }
+    uint32_t get_numHeads() const
+    {
+        return numHeads;
+    }
+    void set_numHeads(uint32_t v)
+    {
+        this->numHeads = v;
+    }
+    uint32_t get_maxQSeqlen() const
+    {
+        return maxQSeqlen;
+    }
+    void set_maxQSeqlen(uint32_t v)
+    {
+        this->maxQSeqlen = v;
+    }
+    uint32_t get_maxKvSeqlen() const
+    {
+        return maxKvSeqlen;
+    }
+    void set_maxKvSeqlen(uint32_t v)
+    {
+        this->maxKvSeqlen = v;
+    }
+    uint32_t get_dSize() const
+    {
+        return dSize;
+    }
+    void set_dSize(uint32_t v)
+    {
+        this->dSize = v;
+    }
+    uint64_t get_blockShapeX() const
+    {
+        return blockShapeX;
+    }
+    void set_blockShapeX(uint64_t v)
+    {
+        this->blockShapeX = v;
+    }
+    uint64_t get_blockShapeY() const
+    {
+        return blockShapeY;
+    }
+    void set_blockShapeY(uint64_t v)
+    {
+        this->blockShapeY = v;
+    }
+    uint32_t get_xBlocks() const
+    {
+        return xBlocks;
+    }
+    void set_xBlocks(uint32_t v)
+    {
+        this->xBlocks = v;
+    }
+    uint32_t get_yBlocks() const
+    {
+        return yBlocks;
+    }
+    void set_yBlocks(uint32_t v)
+    {
+        this->yBlocks = v;
+    }
+    float get_scaleValue() const
+    {
+        return scaleValue;
+    }
+    void set_scaleValue(float v)
+    {
+        this->scaleValue = v;
+    }
+    float get_sparsity() const
+    {
+        return sparsity;
+    }
+    void set_sparsity(float v)
+    {
+        this->sparsity = v;
+    }
+    uint64_t get_topKValue() const
+    {
+        return topKValue;
+    }
+    void set_topKValue(uint64_t v)
+    {
+        this->topKValue = v;
+    }
+    uint8_t get_sparsityMode() const
+    {
+        return sparsityMode;
+    }
+    void set_sparsityMode(uint8_t v)
+    {
+        this->sparsityMode = v;
+    }
+    uint8_t get_queryLayout() const
+    {
+        return queryLayout;
+    }
+    void set_queryLayout(uint8_t v)
+    {
+        this->queryLayout = v;
+    }
+    uint8_t get_kvLayout() const
+    {
+        return kvLayout;
+    }
+    void set_kvLayout(uint8_t v)
+    {
+        this->kvLayout = v;
+    }
+    uint8_t get_useActualBlockLenQ() const
+    {
+        return useActualBlockLenQ;
+    }
+    void set_useActualBlockLenQ(uint8_t v)
+    {
+        this->useActualBlockLenQ = v;
+    }
+    uint8_t get_useActualBlockLenK() const
+    {
+        return useActualBlockLenK;
+    }
+    void set_useActualBlockLenK(uint8_t v)
+    {
+        this->useActualBlockLenK = v;
+    }
+    uint8_t get_useActualSeqLenQ() const
+    {
+        return useActualSeqLenQ;
+    }
+    void set_useActualSeqLenQ(uint8_t v)
+    {
+        this->useActualSeqLenQ = v;
+    }
+    uint8_t get_useActualSeqLenK() const
+    {
+        return useActualSeqLenK;
+    }
+    void set_useActualSeqLenK(uint8_t v)
+    {
+        this->useActualSeqLenK = v;
+    }
+    uint16_t get_qChunkSize() const
+    {
+        return qChunkSize;
+    }
+    void set_qChunkSize(uint16_t v)
+    {
+        this->qChunkSize = v;
+    }
+    uint16_t get_kChunkSize() const
+    {
+        return kChunkSize;
+    }
+    void set_kChunkSize(uint16_t v)
+    {
+        this->kChunkSize = v;
+    }
 };
 
 class BSAMultiCoreParams {
@@ -138,23 +269,71 @@ public:
     uint32_t extraYCores;
     uint32_t rsvd0;
     uint32_t activeYVecCoreNum;
-    
-    uint32_t get_coreNum() const { return coreNum; }
-    void set_coreNum(uint32_t v) { this->coreNum = v; }
-    uint32_t get_activeCoreNum() const { return activeCoreNum; }
-    void set_activeCoreNum(uint32_t v) { this->activeCoreNum = v; }
-    uint32_t get_rowsPerCore() const { return rowsPerCore; }
-    void set_rowsPerCore(uint32_t v) { this->rowsPerCore = v; }
-    uint32_t get_extraCores() const { return extraCores; }
-    void set_extraCores(uint32_t v) { this->extraCores = v; }
-    uint32_t get_totalRows() const { return totalRows; }
-    void set_totalRows(uint32_t v) { this->totalRows = v; }
-    uint32_t get_yBlocksPerCore() const { return yBlocksPerCore; }
-    void set_yBlocksPerCore(uint32_t v) { this->yBlocksPerCore = v; }
-    uint32_t get_extraYCores() const { return extraYCores; }
-    void set_extraYCores(uint32_t v) { this->extraYCores = v; }
-    uint32_t get_activeYCoreNum() const { return activeYVecCoreNum; }
-    void set_activeYCoreNum(uint32_t v) { this->activeYVecCoreNum = v; }
+
+    uint32_t get_coreNum() const
+    {
+        return coreNum;
+    }
+    void set_coreNum(uint32_t v)
+    {
+        this->coreNum = v;
+    }
+    uint32_t get_activeCoreNum() const
+    {
+        return activeCoreNum;
+    }
+    void set_activeCoreNum(uint32_t v)
+    {
+        this->activeCoreNum = v;
+    }
+    uint32_t get_rowsPerCore() const
+    {
+        return rowsPerCore;
+    }
+    void set_rowsPerCore(uint32_t v)
+    {
+        this->rowsPerCore = v;
+    }
+    uint32_t get_extraCores() const
+    {
+        return extraCores;
+    }
+    void set_extraCores(uint32_t v)
+    {
+        this->extraCores = v;
+    }
+    uint32_t get_totalRows() const
+    {
+        return totalRows;
+    }
+    void set_totalRows(uint32_t v)
+    {
+        this->totalRows = v;
+    }
+    uint32_t get_yBlocksPerCore() const
+    {
+        return yBlocksPerCore;
+    }
+    void set_yBlocksPerCore(uint32_t v)
+    {
+        this->yBlocksPerCore = v;
+    }
+    uint32_t get_extraYCores() const
+    {
+        return extraYCores;
+    }
+    void set_extraYCores(uint32_t v)
+    {
+        this->extraYCores = v;
+    }
+    uint32_t get_activeYCoreNum() const
+    {
+        return activeYVecCoreNum;
+    }
+    void set_activeYCoreNum(uint32_t v)
+    {
+        this->activeYVecCoreNum = v;
+    }
 };
 
 class BSAOutputParams {
@@ -166,18 +345,54 @@ public:
     uint64_t softmaxTmpSize;
     uint64_t totalWorkspaceSize;
 
-    uint64_t get_qCmpSize() const { return qCmpSize; }
-    void set_qCmpSize(uint64_t v) { this->qCmpSize = v; }
-    uint64_t get_kCmpSize() const { return kCmpSize; }
-    void set_kCmpSize(uint64_t v) { this->kCmpSize = v; }
-    uint64_t get_attnScoreSize() const { return attnScoreSize; }
-    void set_attnScoreSize(uint64_t v) { this->attnScoreSize = v; }
-    uint64_t get_topkWorkspaceSize() const { return topkWorkspaceSize; }
-    void set_topkWorkspaceSize(uint64_t v) { this->topkWorkspaceSize = v; }
-    uint64_t get_softmaxTmpSize() const { return softmaxTmpSize; }
-    void set_softmaxTmpSize(uint64_t v) { this->softmaxTmpSize = v; }
-    uint64_t get_totalWorkspaceSize() const { return totalWorkspaceSize; }
-    void set_totalWorkspaceSize(uint64_t v) { this->totalWorkspaceSize = v; }
+    uint64_t get_qCmpSize() const
+    {
+        return qCmpSize;
+    }
+    void set_qCmpSize(uint64_t v)
+    {
+        this->qCmpSize = v;
+    }
+    uint64_t get_kCmpSize() const
+    {
+        return kCmpSize;
+    }
+    void set_kCmpSize(uint64_t v)
+    {
+        this->kCmpSize = v;
+    }
+    uint64_t get_attnScoreSize() const
+    {
+        return attnScoreSize;
+    }
+    void set_attnScoreSize(uint64_t v)
+    {
+        this->attnScoreSize = v;
+    }
+    uint64_t get_topkWorkspaceSize() const
+    {
+        return topkWorkspaceSize;
+    }
+    void set_topkWorkspaceSize(uint64_t v)
+    {
+        this->topkWorkspaceSize = v;
+    }
+    uint64_t get_softmaxTmpSize() const
+    {
+        return softmaxTmpSize;
+    }
+    void set_softmaxTmpSize(uint64_t v)
+    {
+        this->softmaxTmpSize = v;
+    }
+    uint64_t get_totalWorkspaceSize() const
+    {
+        return totalWorkspaceSize;
+    }
+    void set_totalWorkspaceSize(uint64_t v)
+    {
+        this->totalWorkspaceSize = v;
+    }
 };
 
 class BSASelectBlockMaskTilingData {
@@ -190,7 +405,7 @@ public:
 template <typename T>
 inline T BSAAlign(T num, T rnd)
 {
-    return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd) * (rnd)));
+    return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
 }
 
 } // namespace optiling

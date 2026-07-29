@@ -219,7 +219,7 @@ aclnnStatus aclnnBSASelectBlockMask(
     <td>actualBlockLenQuery（aclIntArray*）</td>
     <td>输入</td>
     <td>每个query block内实际压缩的有效seq长度。<br>用于部分压缩场景（如末尾不完整块或仅压缩有效token）。</td>
-    <td><ul><li>可选输入：<ul><li>BNSD场景：shape为 [B, Xblocks]。</li><li>TND场景：shape为 [TotalBlockNum_Q]（各batch的Xblocks堆叠）。</li><li>每个元素取值范围 [0, blockShapeX]。</li><li>当actualBlockLen = 0时：对应block的q_cmp填0向量，不会被topK选中。</li><li>当actualBlockLen > 0时：仅对前actualBlockLen个token取均值。</li></ul></li>
+    <td><ul><li>可选输入：<ul><li>BNSD场景：shape为 [B, Xblocks]。</li><li>TND场景：shape为 [TotalBlockNum_Q]（各batch的实际有效Xblocks堆叠，vaildXblocks = ceil（actualSeqQ / blockShapeX））。</li><li>每个元素取值范围 [0, blockShapeX]。</li><li>当actualBlockLen = 0时：对应block的q_cmp填0向量，不会被topK选中。</li><li>当actualBlockLen > 0时：仅对前actualBlockLen个token取均值。</li></ul></li>
     <li>如不配置（传nullptr）：对query进行完整压缩（使用完整blockShapeX长度）。</li></ul></td>
     <td>INT64</td>
     <td>-</td>
@@ -230,7 +230,7 @@ aclnnStatus aclnnBSASelectBlockMask(
     <td>actualBlockLenKey（aclIntArray*）</td>
     <td>输入</td>
     <td>每个key block内实际压缩的有效seq长度。<br>用于部分压缩场景（如末尾不完整块或仅压缩有效token）。</td>
-    <td><ul><li>可选输入：<ul><li>BNSD场景：shape为 [B, Yblocks]。</li><li>TND场景：shape为 [TotalBlockNum_KV]（各batch的Yblocks堆叠）。</li><li>每个元素取值范围 [0, blockShapeY]。</li><li>当actualBlockLen = 0时：对应block的k_cmp填0向量， 不会被topK选中。</li><li>当actualBlockLen > 0时：仅对前actualBlockLen个token取均值。</li></ul></li>
+    <td><ul><li>可选输入：<ul><li>BNSD场景：shape为 [B, Yblocks]。</li><li>TND场景：shape为 [TotalBlockNum_K]（各batch的实际有效Yblocks堆叠，vaildYblocks = ceil（actualSeqK / blockShapeY））。</li><li>每个元素取值范围 [0, blockShapeY]。</li><li>当actualBlockLen = 0时：对应block的k_cmp填0向量， 不会被topK选中。</li><li>当actualBlockLen > 0时：仅对前actualBlockLen个token取均值。</li></ul></li>
     <li>如不配置（传nullptr）：对key进行完整压缩（使用完整blockShapeY长度）。</li></ul></td>
     <td>INT64</td>
     <td>-</td>

@@ -66,6 +66,10 @@ protected:
         sparsity = 0.5f;
         topKValue = 0ULL;
         sparsityMode = 0;
+        useActualBlockLenQ = 0;
+        useActualBlockLenK = 0;
+        useActualSeqLenQ = 0;
+        useActualSeqLenK = 0;
         queryLayout = nullptr;
         kvLayout = nullptr;
         opName = nullptr;
@@ -114,6 +118,8 @@ protected:
     uint8_t sparsityMode;
     uint8_t useActualBlockLenQ;
     uint8_t useActualBlockLenK;
+    uint8_t useActualSeqLenQ;
+    uint8_t useActualSeqLenK;
 
     const char *opName;
     const char *queryLayout;
@@ -136,5 +142,5 @@ protected:
     BSAOutputParams *outputParams_ = nullptr;
 };
 
-} // optiling
+} // namespace optiling
 #endif

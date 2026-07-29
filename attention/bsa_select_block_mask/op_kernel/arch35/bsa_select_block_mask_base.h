@@ -30,7 +30,8 @@ using AscendC::CacheMode;
 using AscendC::CrossCoreSetFlag;
 using AscendC::CrossCoreWaitFlag;
 
-template <typename BSAT> class BSASelectBlockMaskBase {
+template <typename BSAT>
+class BSASelectBlockMaskBase {
 public:
     using T = float;
     using IN_T = typename BSAT::inputT;
@@ -41,15 +42,12 @@ public:
     static constexpr BSALayout LAYOUT_Q = BSAT::layoutQ;
     static constexpr BSALayout LAYOUT_KV = BSAT::layoutKV;
 
-    __aicore__ inline BSASelectBlockMaskBase() {};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key,
-                                __gm__ uint8_t *blockShape, __gm__ uint8_t *postBlockShape,
-                                __gm__ uint8_t *actualSeqLensQ, __gm__ uint8_t *actualSeqLensKV,
-                                __gm__ uint8_t *actualBlockLenQ, __gm__ uint8_t *actualBlockLenKV,
-                                __gm__ uint8_t *maskOut,
-                                __gm__ uint8_t *workspace,
-                                const optiling::BSASelectBlockMaskTilingData *__restrict tiling,
-                                TPipe *tPipe);
+    __aicore__ inline BSASelectBlockMaskBase(){};
+    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *blockShape,
+                                __gm__ uint8_t *postBlockShape, __gm__ uint8_t *actualSeqLensQ,
+                                __gm__ uint8_t *actualSeqLensKV, __gm__ uint8_t *actualBlockLenQ,
+                                __gm__ uint8_t *actualBlockLenKV, __gm__ uint8_t *maskOut, __gm__ uint8_t *workspace,
+                                const optiling::BSASelectBlockMaskTilingData *__restrict tiling, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -58,21 +56,17 @@ private:
     __aicore__ inline void CalcMultiCoreOffset(uint32_t &startRow, uint32_t &endRow);
     __aicore__ inline void CalcKPoolingRange(uint32_t &startKBlock, uint32_t &endKBlock);
     // D2: dynamic partition by validYBlocks
-    __aicore__ inline void CalcKPoolingRangeValid(uint32_t &startKBlock, uint32_t &endKBlock,
-                                                 uint32_t validYBlocks);
+    __aicore__ inline void CalcKPoolingRangeValid(uint32_t &startKBlock, uint32_t &endKBlock, uint32_t validYBlocks);
     // D2: dynamic partition by validXBlocks
-    __aicore__ inline void CalcMultiCoreOffsetValid(uint32_t &startRow, uint32_t &endRow,
-                                                    uint32_t validXBlocks);
+    __aicore__ inline void CalcMultiCoreOffsetValid(uint32_t &startRow, uint32_t &endRow, uint32_t validXBlocks);
     __aicore__ inline void ProcessPoolingK(uint32_t batchIdx, uint32_t headIdx, uint64_t seqPrefixSumKV,
-                                             uint32_t validYBlocks);
-    __aicore__ inline void ProcessPoolingQ(uint32_t batchIdx, uint32_t headIdx,
-                                           uint32_t tokenStart, uint32_t tokenEnd, uint64_t seqPrefixSumQ);
-    __aicore__ inline void ProcessMatmulSoftmax(uint32_t batchIdx, uint32_t headIdx,
-                                                uint32_t qChunkStart, uint32_t curQChunkSize,
-                                                uint32_t validYBlocks);
-    __aicore__ inline void ProcessSoftmaxSecondPass(uint32_t qChunkStart, uint32_t curQChunkSize,
-                                                    uint32_t batchIdx, uint32_t headIdx,
-                                                    uint32_t validYBlocks);
+                                           uint64_t blockPrefixSumKV, uint32_t validYBlocks);
+    __aicore__ inline void ProcessPoolingQ(uint32_t batchIdx, uint32_t headIdx, uint32_t tokenStart, uint32_t tokenEnd,
+                                           uint64_t seqPrefixSumQ, uint64_t blockPrefixSumQ);
+    __aicore__ inline void ProcessMatmulSoftmax(uint32_t batchIdx, uint32_t headIdx, uint32_t qChunkStart,
+                                                uint32_t curQChunkSize, uint32_t validYBlocks);
+    __aicore__ inline void ProcessSoftmaxSecondPass(uint32_t qChunkStart, uint32_t curQChunkSize, uint32_t batchIdx,
+                                                    uint32_t headIdx, uint32_t validYBlocks);
 
     TPipe *pipe = nullptr;
     const optiling::BSASelectBlockMaskTilingData *__restrict tilingData = nullptr;
@@ -151,9 +145,9 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::InitWorkspace(__gm__ uint8_
     kCmpGm.SetGlobalBuffer((__gm__ POOL_OUT_T *)(workspace + constInfo.kCmpOffset),
                            outInfo.kCmpSize / sizeof(POOL_OUT_T));
     attnScoreFp16Gm.SetGlobalBuffer((__gm__ SFTMAX_OUT_T *)(workspace + constInfo.attnScoreOffset),
-                                 outInfo.attnScoreSize / sizeof(SFTMAX_OUT_T));
+                                    outInfo.attnScoreSize / sizeof(SFTMAX_OUT_T));
     scoreFp32Gm.SetGlobalBuffer((__gm__ T *)(workspace + constInfo.softmaxTmpOffset),
-                                 outInfo.softmaxTmpSize / sizeof(T));
+                                outInfo.softmaxTmpSize / sizeof(T));
     topkWorkspaceGm.SetGlobalBuffer((__gm__ int32_t *)(workspace + constInfo.topkWorkspaceOffset),
                                     outInfo.topkWorkspaceSize / sizeof(int32_t));
 
@@ -205,8 +199,8 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::CalcKPoolingRange(uint32_t 
 
 // D2: dynamic partition by validYBlocks (early-return style)
 template <typename BSAT>
-__aicore__ inline void BSASelectBlockMaskBase<BSAT>::CalcKPoolingRangeValid(
-    uint32_t &startKBlock, uint32_t &endKBlock, uint32_t validYBlocks)
+__aicore__ inline void BSASelectBlockMaskBase<BSAT>::CalcKPoolingRangeValid(uint32_t &startKBlock, uint32_t &endKBlock,
+                                                                            uint32_t validYBlocks)
 {
     if (validYBlocks == 0) {
         startKBlock = 0;
@@ -247,8 +241,8 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::CalcKPoolingRangeValid(
 
 // D2: dynamic partition by validXBlocks (early-return style)
 template <typename BSAT>
-__aicore__ inline void BSASelectBlockMaskBase<BSAT>::CalcMultiCoreOffsetValid(
-    uint32_t &startRow, uint32_t &endRow, uint32_t validXBlocks)
+__aicore__ inline void BSASelectBlockMaskBase<BSAT>::CalcMultiCoreOffsetValid(uint32_t &startRow, uint32_t &endRow,
+                                                                              uint32_t validXBlocks)
 {
     if (validXBlocks == 0) {
         startRow = 0;
@@ -288,15 +282,12 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::CalcMultiCoreOffsetValid(
 }
 
 template <typename BSAT>
-__aicore__ inline void BSASelectBlockMaskBase<BSAT>::Init(
-    __gm__ uint8_t *query, __gm__ uint8_t *key,
-    __gm__ uint8_t *blockShape, __gm__ uint8_t *postBlockShape,
-    __gm__ uint8_t *actualSeqLensQ, __gm__ uint8_t *actualSeqLensKV,
-    __gm__ uint8_t *actualBlockLenQ, __gm__ uint8_t *actualBlockLenKV,
-    __gm__ uint8_t *maskOut,
-    __gm__ uint8_t *workspace,
-    const optiling::BSASelectBlockMaskTilingData *__restrict tiling,
-    TPipe *tPipe)
+__aicore__ inline void
+BSASelectBlockMaskBase<BSAT>::Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *blockShape,
+                                   __gm__ uint8_t *postBlockShape, __gm__ uint8_t *actualSeqLensQ,
+                                   __gm__ uint8_t *actualSeqLensKV, __gm__ uint8_t *actualBlockLenQ,
+                                   __gm__ uint8_t *actualBlockLenKV, __gm__ uint8_t *maskOut, __gm__ uint8_t *workspace,
+                                   const optiling::BSASelectBlockMaskTilingData *__restrict tiling, TPipe *tPipe)
 {
     pipe = tPipe;
     tilingData = tiling;
@@ -336,9 +327,8 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::Init(
     if ASCEND_IS_AIV {
         vectorService.InitParams(constInfo, tilingData);
         vectorService.InitBuffers(pipe);
-        vectorService.InitGM(qCmpGm, kCmpGm, attnScoreFp16Gm, scoreFp32Gm,
-                             queryGm, keyGm, actualBlockLenQGm, actualBlockLenKVGm,
-                             actualSeqLensQGm, actualSeqLensKVGm);
+        vectorService.InitGM(qCmpGm, kCmpGm, attnScoreFp16Gm, scoreFp32Gm, queryGm, keyGm, actualBlockLenQGm,
+                             actualBlockLenKVGm, actualSeqLensQGm, actualSeqLensKVGm);
 
 
         radixTopKService.InitParams(constInfo, tilingData);
@@ -372,16 +362,18 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::Process()
     // BNSD 布局下 seqPrefixSum 不被使用（pool 的 BNSD 分支忽略），保持为 0 不影响行为。
     uint64_t seqPrefixSumQ = 0;
     uint64_t seqPrefixSumKV = 0;
+    uint64_t blockPrefixSumQ = 0;
+    uint64_t blockPrefixSumKV = 0;
 
     for (uint32_t batchIdx = 0; batchIdx < constInfo.batchSize; batchIdx++) {
         // D1: compute valid block counts for this batch
         uint32_t curBatchSq, curBatchSkv;
-        if constexpr (LAYOUT_Q == BSALayout::TND) {
+        if (tilingData->baseParams.useActualSeqLenQ) {
             curBatchSq = static_cast<uint32_t>(actualSeqLensQGm.GetValue(batchIdx));
         } else {
             curBatchSq = constInfo.maxQSeqlen;
         }
-        if constexpr (LAYOUT_KV == BSALayout::TND) {
+        if (tilingData->baseParams.useActualSeqLenK) {
             curBatchSkv = static_cast<uint32_t>(actualSeqLensKVGm.GetValue(batchIdx));
         } else {
             curBatchSkv = constInfo.maxKvSeqlen;
@@ -389,10 +381,8 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::Process()
         uint32_t validXBlocks = BSACeilDiv(curBatchSq, static_cast<uint32_t>(constInfo.blockShapeX));
         uint32_t validYBlocks = BSACeilDiv(curBatchSkv, static_cast<uint32_t>(constInfo.blockShapeY));
 
-        if constexpr (LAYOUT_Q == BSALayout::TND || LAYOUT_KV == BSALayout::TND) {
-            if ASCEND_IS_AIV {
-                radixTopKService.UpdateRuntimeParams(validXBlocks, validYBlocks);
-            }
+        if ASCEND_IS_AIV {
+            radixTopKService.UpdateRuntimeParams(validXBlocks, validYBlocks);
         }
 
         // D2: dynamic partition by validXBlocks
@@ -400,20 +390,18 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::Process()
         CalcMultiCoreOffsetValid(startRow, endRow, validXBlocks);
 
         for (uint32_t headIdx = 0; headIdx < constInfo.numHeads; headIdx++) {
-            ProcessPoolingK(batchIdx, headIdx, seqPrefixSumKV, validYBlocks);
+            ProcessPoolingK(batchIdx, headIdx, seqPrefixSumKV, blockPrefixSumKV, validYBlocks);
             AscendC::PipeBarrier<PIPE_ALL>();
             SyncAll<false>();
 
             // D2: Q chunk loop with dynamic partition (no truncation needed)
-            for (uint32_t qChunkStart = startRow; qChunkStart < endRow;
-                 qChunkStart += constInfo.qChunkSize) {
-
+            for (uint32_t qChunkStart = startRow; qChunkStart < endRow; qChunkStart += constInfo.qChunkSize) {
                 uint32_t qChunkEnd = BSAMin(qChunkStart + constInfo.qChunkSize, endRow);
                 uint32_t curQChunkSize = qChunkEnd - qChunkStart;
 
                 uint32_t tokenStart = qChunkStart * constInfo.blockShapeX;
                 uint32_t tokenEnd = BSAMin(qChunkEnd * constInfo.blockShapeX, curBatchSq);
-                ProcessPoolingQ(batchIdx, headIdx, tokenStart, tokenEnd, seqPrefixSumQ);
+                ProcessPoolingQ(batchIdx, headIdx, tokenStart, tokenEnd, seqPrefixSumQ, blockPrefixSumQ);
 
                 if ASCEND_IS_AIV {
                     CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SYNC_V1_TO_C1_FLAG[qChunkStart & 1]);
@@ -441,9 +429,11 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::Process()
         if (batchIdx + 1 < constInfo.batchSize) {
             if constexpr (LAYOUT_Q == BSALayout::TND) {
                 seqPrefixSumQ += static_cast<uint64_t>(actualSeqLensQGm.GetValue(batchIdx));
+                blockPrefixSumQ += validXBlocks;
             }
             if constexpr (LAYOUT_KV == BSALayout::TND) {
                 seqPrefixSumKV += static_cast<uint64_t>(actualSeqLensKVGm.GetValue(batchIdx));
+                blockPrefixSumKV += validYBlocks;
             }
         }
     }
@@ -458,7 +448,7 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::Process()
 
 template <typename BSAT>
 __aicore__ inline void BSASelectBlockMaskBase<BSAT>::ProcessPoolingK(uint32_t batchIdx, uint32_t headIdx,
-                                                                     uint64_t seqPrefixSumKV,
+                                                                     uint64_t seqPrefixSumKV, uint64_t blockPrefixSumKV,
                                                                      uint32_t validYBlocks)
 {
     if ASCEND_IS_AIV {
@@ -469,15 +459,16 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::ProcessPoolingK(uint32_t ba
         CalcKPoolingRangeValid(startKBlock, endKBlock, validYBlocks);
 
         for (uint32_t kBlockIdx = startKBlock; kBlockIdx < endKBlock; kBlockIdx++) {
-            vectorService.PoolingSingleKBlock(batchIdx, headIdx, kBlockIdx,
-                                              keyGm, actualBlockLenKVGm, kCmpGm, seqPrefixSumKV);
+            vectorService.PoolingSingleKBlock(batchIdx, headIdx, kBlockIdx, keyGm, actualBlockLenKVGm, kCmpGm,
+                                              seqPrefixSumKV, blockPrefixSumKV);
         }
     }
 }
 
 template <typename BSAT>
-__aicore__ inline void BSASelectBlockMaskBase<BSAT>::ProcessPoolingQ(
-    uint32_t batchIdx, uint32_t headIdx, uint32_t tokenStart, uint32_t tokenEnd, uint64_t seqPrefixSumQ)
+__aicore__ inline void BSASelectBlockMaskBase<BSAT>::ProcessPoolingQ(uint32_t batchIdx, uint32_t headIdx,
+                                                                     uint32_t tokenStart, uint32_t tokenEnd,
+                                                                     uint64_t seqPrefixSumQ, uint64_t blockPrefixSumQ)
 {
     if ASCEND_IS_AIV {
         uint32_t coreIdx = constInfo.aivIdx; // vec idx
@@ -505,58 +496,53 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::ProcessPoolingQ(
         }
 
         for (uint32_t qBlockIdx = startQBlockIdx; qBlockIdx < endQBlockIdx; qBlockIdx++) {
-            vectorService.PoolingSingleQBlock(batchIdx, headIdx, qBlockIdx,
-                                                queryGm, actualBlockLenQGm, qCmpGm, seqPrefixSumQ);
+            vectorService.PoolingSingleQBlock(batchIdx, headIdx, qBlockIdx, queryGm, actualBlockLenQGm, qCmpGm,
+                                              seqPrefixSumQ, blockPrefixSumQ);
         }
     }
 }
 
 template <typename BSAT>
-__aicore__ inline void BSASelectBlockMaskBase<BSAT>::ProcessMatmulSoftmax(
-    uint32_t batchIdx, uint32_t headIdx,
-    uint32_t qChunkStart, uint32_t curQChunkSize,
-    uint32_t validYBlocks)
+__aicore__ inline void BSASelectBlockMaskBase<BSAT>::ProcessMatmulSoftmax(uint32_t batchIdx, uint32_t headIdx,
+                                                                          uint32_t qChunkStart, uint32_t curQChunkSize,
+                                                                          uint32_t validYBlocks)
 {
     uint32_t loopChunkSize = CV_EXEC_RATIO * constInfo.kChunkSize;
     uint32_t flagId = 0;
     // D1: K loop truncated to validYBlocks
-    for (uint32_t kChunkStart = 0; kChunkStart < validYBlocks;
-         kChunkStart += loopChunkSize) {
-
+    for (uint32_t kChunkStart = 0; kChunkStart < validYBlocks; kChunkStart += loopChunkSize) {
         uint32_t kChunkEnd = BSAMin(kChunkStart + loopChunkSize, validYBlocks);
         uint32_t curKChunkSize = kChunkEnd - kChunkStart; // 实际执行k的blocks, 即k_comp的行数
 
         if ASCEND_IS_AIC {
-            matmulService.ComputeMatmulChunk(qChunkStart, curQChunkSize,
-                                             kChunkStart, curKChunkSize, batchIdx, headIdx);
+            matmulService.ComputeMatmulChunk(qChunkStart, curQChunkSize, kChunkStart, curKChunkSize, batchIdx, headIdx);
             CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SYNC_C1_TO_V1_FLAG[flagId % SYNC_C1_TO_V1_FLAG_NUMS]);
         }
 
         if ASCEND_IS_AIV {
             CrossCoreWaitFlag(SYNC_C1_TO_V1_FLAG[flagId % SYNC_C1_TO_V1_FLAG_NUMS]);
-            vectorService.OnlineSoftmaxFirstPassChunk(
-                qChunkStart, curQChunkSize, kChunkStart, curKChunkSize, validYBlocks);
+            vectorService.OnlineSoftmaxFirstPassChunk(qChunkStart, curQChunkSize, kChunkStart, curKChunkSize,
+                                                      validYBlocks);
         }
         flagId++;
     }
 }
 
 template <typename BSAT>
-__aicore__ inline void BSASelectBlockMaskBase<BSAT>::ProcessSoftmaxSecondPass(
-    uint32_t qChunkStart, uint32_t curQChunkSize, uint32_t batchIdx, uint32_t headIdx,
-    uint32_t validYBlocks)
+__aicore__ inline void BSASelectBlockMaskBase<BSAT>::ProcessSoftmaxSecondPass(uint32_t qChunkStart,
+                                                                              uint32_t curQChunkSize, uint32_t batchIdx,
+                                                                              uint32_t headIdx, uint32_t validYBlocks)
 {
     if ASCEND_IS_AIV {
         AscendC::PipeBarrier<PIPE_ALL>();
         uint32_t loopChunkSize = CV_EXEC_RATIO * constInfo.kChunkSize;
         // D1: K loop truncated to validYBlocks
         for (uint32_t kChunkStart = 0; kChunkStart < validYBlocks; kChunkStart += loopChunkSize) {
-
             uint32_t kChunkEnd = BSAMin(kChunkStart + loopChunkSize, validYBlocks);
             uint32_t curKChunkSize = kChunkEnd - kChunkStart;
 
-            vectorService.SoftmaxSecondPassAndCast(qChunkStart, curQChunkSize, kChunkStart,
-                                                   curKChunkSize, batchIdx, headIdx, validYBlocks);
+            vectorService.SoftmaxSecondPassAndCast(qChunkStart, curQChunkSize, kChunkStart, curKChunkSize, batchIdx,
+                                                   headIdx, validYBlocks);
         }
     }
 }
