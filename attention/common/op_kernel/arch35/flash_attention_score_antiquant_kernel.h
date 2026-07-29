@@ -820,9 +820,9 @@ FlashAttentionScoreAntiquantKernel<AntiquantCubeBlockType, AntiquantVecBlockType
         kvTensorDesc.SetShapeAddr(&dimInfo[0]);
         keyListTensorDesc.GetDesc(kvTensorDesc, bIdx);
         if constexpr (layout == LayOutTypeEnum::LAYOUT_BNSD) {
-            s2InCurrentBatch = kvTensorDesc.GetShape(2);
+            s2InCurrentBatch = kvTensorDesc.GetShape(2); // 2: s2位于索引位置2
         } else {
-            s2InCurrentBatch = kvTensorDesc.GetShape(1);
+            s2InCurrentBatch = kvTensorDesc.GetShape(1); // 1: s2位于索引位置1
         }
     }
     return s2InCurrentBatch;

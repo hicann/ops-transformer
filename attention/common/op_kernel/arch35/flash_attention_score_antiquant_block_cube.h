@@ -113,9 +113,7 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::CopyToL1Nd
     gm2L1Nd2NzParams.dValue = dValue;                       // 单个ND矩阵的实际列数，单位为元素个数
     gm2L1Nd2NzParams.srcNdMatrixStride = srcNdMatrixStride; // 相邻ND矩阵起始地址之间的偏移， 单位为元素个数
     gm2L1Nd2NzParams.srcDValue = srcDValue; // 同一个ND矩阵中相邻行起始地址之间的偏移， 单位为元素个数
-    gm2L1Nd2NzParams.dstNzC0Stride =
-        (dstNzC0Stride + 15) >>
-        4 << 4; // 转换为NZ矩阵后，相邻Block起始地址之间的偏移， 单位为Block个数 15 >> 4 << 4 is Align 16
+    gm2L1Nd2NzParams.dstNzC0Stride = (dstNzC0Stride + 15) >> 4 << 4; // 15 >> 4 << 4: 16位对齐
     gm2L1Nd2NzParams.dstNzNStride = 1; // 转换为NZ矩阵后，ND之间相邻两行在NZ矩阵中起始地址之间的偏移， 单位为Block个数
     gm2L1Nd2NzParams.dstNzMatrixStride = dstNzMatrixStride; // 两个NZ矩阵，起始地址之间的偏移，单位为元素数量
 
@@ -139,7 +137,7 @@ FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::PrepareMm1Input(Buffer<BufferType
                 constInfo.isPfaGS1Merge) {
                 CopyToL1Nd2Nz(mm1ATensor, this->queryGm[runParam.tensorQOffset], constInfo.s1Size, constInfo.gSize,
                               constInfo.dSize, constInfo.n2Size * constInfo.gSize * constInfo.dSize, constInfo.dSize,
-                              runInfo.s1RealSize, constInfo.gSize * 32 / sizeof(Q_T));
+                              runInfo.s1RealSize, constInfo.gSize * 32 / sizeof(Q_T)); // 32 / sizeof(Q_T): 每Block元素个数
             } else {
                 CopyToL1Nd2Nz(mm1ATensor, this->queryGm[runParam.tensorQOffset], 1, runInfo.s1RealSize, constInfo.dSize,
                               0, constInfo.mm1Ka, runInfo.s1RealSize, 0);
@@ -186,15 +184,10 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::IterateBmm
     CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(16 + VC_MM1RES_EVENT[runInfo.taskIdMod2]); // 16 is Vec num
 
     FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams; // L0C->UB
-    fixpipeParams.nSize =
-        (runInfo.s2RealSize + 7) >>
-        3 << 3; // L0C上的bmm1结果矩阵N方向的size大小；同mmadParams.n；8个元素（32B)对齐 7 >> 3 <<3 is Align
-    fixpipeParams.mSize = (runInfo.s1RealSize + 1) >>
-                          1 << 1; // 有效数据不足16行，只需输出部分行即可;L0C上的bmm1结果矩阵M方向的size大小必须是偶数
-    fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) * 16; // L0C上matmul结果相邻连续数据片断间隔（前面一个数据块的头与后面数据块的头的间隔），单位为16
-                                                                      // *sizeof(T) 15 is align
-    fixpipeParams.dstStride = s2BaseSize; // mmResUb上两行之间的间隔，单位：element。 //
-                                          // 128：根据比对dump文件得到，ND方案(S1 * S2)时脏数据用mask剔除
+    fixpipeParams.nSize = (runInfo.s2RealSize + 7) >> 3 << 3; // 7 >> 3 <<3: 8位对齐
+    fixpipeParams.mSize = (runInfo.s1RealSize + 1) >> 1 << 1; // 1 >> 1 << 1: 2位对齐，L0C上的bmm1结果矩阵M方向的size大小必须是偶数
+    fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) * 16; // 15 / 16 / 16: L0C上matmul结果相邻连续数据片断间隔，单位为16
+    fixpipeParams.dstStride = s2BaseSize;
     fixpipeParams.dualDstCtl = 1; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
     fixpipeParams.params.ndNum = 1;
     fixpipeParams.params.srcNdStride = 0;
@@ -254,16 +247,11 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::IterateBmm
     CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(16 + VC_MM2RES_EVENT[runInfo.taskIdMod2]); // 16 is Vec num
 
     FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;  // L0C->UB
-    fixpipeParams.nSize = (constInfo.dSizeV + 7) >> 3 << 3; // 7 >> 3 << 3 8位对齐
-    fixpipeParams.mSize =
-        s1BaseSize; // 有效数据不足16行，只需输出部分行即可;L0C上的bmm1结果矩阵M方向的size大小必须是偶数
-    fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) * 16; // L0C上matmul结果相邻连续数据片断间隔（前面一个数据块的头与后面数据块的头的间隔），单位为16
-                                                                      // *sizeof(T) 15 is align
-    fixpipeParams.dstStride =
-        ((uint32_t)dVTemplateType + 15) >>
-        4 << 4; // mmResUb上两行之间的间隔，单位：element。 // 128：根据比对dump文件得到，ND方案(S1 *
-                // S2)时脏数据用mask剔除 15 >> 4 << 4 is align
-    fixpipeParams.dualDstCtl = 1; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
+    fixpipeParams.nSize = (constInfo.dSizeV + 7) >> 3 << 3; // 7 >> 3 << 3: 8位对齐
+    fixpipeParams.mSize = s1BaseSize;
+    fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) * 16; // 15 / 16 / 16: 16位对齐
+    fixpipeParams.dstStride = ((uint32_t)dVTemplateType + 15) >> 4 << 4; // 15 >> 4 << 4: 16位对齐
+    fixpipeParams.dualDstCtl = 1;
     fixpipeParams.params.ndNum = 1;
     fixpipeParams.params.srcNdStride = 0;
     fixpipeParams.params.dstNdStride = 0;
