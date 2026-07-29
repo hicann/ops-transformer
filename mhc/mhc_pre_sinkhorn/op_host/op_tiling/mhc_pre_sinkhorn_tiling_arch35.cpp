@@ -53,7 +53,46 @@ constexpr int64_t HCMULT_VALUE = 4;
 constexpr int64_t NUM_ITERS_VALUE = 20;
 constexpr size_t X_DIM_NUM_3 = 3;
 constexpr size_t X_DIM_NUM_4 = 4;
-constexpr int32_t BATCH_CONSISTENCY_LEVEL = 3;  // batch一致性开关使能的确定性级别
+constexpr int32_t BATCH_CONSISTENCY_LEVEL = 3; // batch一致性开关使能的确定性级别
+constexpr uint32_t BATCH_MODE = 1;
+constexpr uint64_t TILING_KEY_NO_GRAD_K_SPLIT = 1000;
+constexpr uint64_t TILING_KEY_NO_GRAD_M_SPLIT = 1001;
+constexpr uint64_t TILING_KEY_GRAD_K_SPLIT = 2000;
+constexpr uint64_t TILING_KEY_GRAD_M_SPLIT = 2001;
+
+void PrintFinalTilingData(gert::TilingContext *context, MhcPreSinkhornRegbaseTilingData &tilingData, uint64_t tilingKey,
+                          uint64_t blockDim, size_t workspaceSize)
+{
+    OP_LOGD(context->GetNodeName(),
+            "MhcPreSinkhorn regbase final tiling summary: tilingKey=%lu, blockDim=%lu, workspaceSize=%zu, "
+            "tilingDataSize=%zu",
+            tilingKey, blockDim, workspaceSize, tilingData.GetDataSize());
+    OP_LOGD(context->GetNodeName(),
+            "MhcPreSinkhorn regbase final tiling shape: bs=%ld, hcMix=%ld, hcMult=%ld, d=%ld, hcMultAlign=%ld, "
+            "iterTimes=%ld, hcEps=%g, normEps=%g",
+            tilingData.get_bs(), tilingData.get_hcMix(), tilingData.get_hcMult(), tilingData.get_d(),
+            tilingData.get_hcMultAlign(), tilingData.get_iterTimes(), tilingData.get_hcEps(), tilingData.get_normEps());
+    OP_LOGD(context->GetNodeName(),
+            "MhcPreSinkhorn regbase final tiling core: rowOfFormerBlock=%ld, rowOfTailBlock=%ld, "
+            "rowLoopOfFormerBlock=%ld, rowLoopOfTailBlock=%ld, rowFactor=%ld, stage2RowFactor=%ld, "
+            "secondUsedCoreNum=%ld, rowInnerFactor=%ld",
+            tilingData.get_rowOfFormerBlock(), tilingData.get_rowOfTailBlock(), tilingData.get_rowLoopOfFormerBlock(),
+            tilingData.get_rowLoopOfTailBlock(), tilingData.get_rowFactor(), tilingData.get_stage2RowFactor(),
+            tilingData.get_secondUsedCoreNum(), tilingData.get_rowInnerFactor());
+    OP_LOGD(context->GetNodeName(),
+            "MhcPreSinkhorn regbase final tiling tail: tailRowFactorOfFormerBlock=%ld, "
+            "tailRowFactorOfTailBlock=%ld, dLoop=%ld, dFactor=%ld, tailDFactor=%ld",
+            tilingData.get_tailRowFactorOfFormerBlock(), tilingData.get_tailRowFactorOfTailBlock(),
+            tilingData.get_dLoop(), tilingData.get_dFactor(), tilingData.get_tailDFactor());
+    OP_LOGD(context->GetNodeName(),
+            "MhcPreSinkhorn regbase final tiling split: k=%ld, cubeBlockDimM=%ld, cubeBlockDimK=%ld, "
+            "kBlockFactor=%ld, multCoreSplitMSize=%ld, multCoreSplitKSize=%ld, mL1Size=%ld, kL1Size=%ld, "
+            "mUbSize=%ld, kUbSize=%ld, cvLoopKSize=%ld, bufferPool0Size=%ld, bufferPool1Size=%ld",
+            tilingData.get_k(), tilingData.get_cubeBlockDimM(), tilingData.get_cubeBlockDimK(),
+            tilingData.get_kBlockFactor(), tilingData.get_multCoreSplitMSize(), tilingData.get_multCoreSplitKSize(),
+            tilingData.get_mL1Size(), tilingData.get_kL1Size(), tilingData.get_mUbSize(), tilingData.get_kUbSize(),
+            tilingData.get_cvLoopKSize(), tilingData.get_bufferPool0Size(), tilingData.get_bufferPool1Size());
+}
 } // namespace
 
 MhcPreSinkhornTilingRegbase::MhcPreSinkhornTilingRegbase(gert::TilingContext *tilingContext) : context_(tilingContext)
@@ -78,6 +117,8 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::GetPlatformInfo()
         ubSize_ = ubSizePlatForm;
         socVersion_ = ascendcPlatform.GetSocVersion();
     }
+    OP_LOGD(context_->GetNodeName(), "MhcPreSinkhorn regbase platform: aivCoreNum=%lu, aicCoreNum=%lu, ubSize=%lu",
+            aivCoreNum_, aicCoreNum_, ubSize_);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -165,9 +206,12 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::GetShapeAttrsInfoInner()
                 OP_LOGE(context_->GetNodeName(), "numIters should be %ld, but is %ld", NUM_ITERS_VALUE, iterTimes_),
                 return ge::GRAPH_FAILED);
 
+    OP_LOGD(context_->GetNodeName(),
+            "MhcPreSinkhorn regbase shape attrs: bs=%ld, hcMix=%ld, hcMult=%ld, d=%ld, iterTimes=%ld, "
+            "needGrad=%d, hcEps=%g, normEps=%g",
+            bs_, hcMix_, hcMult_, d_, iterTimes_, needGrad_ ? 1 : 0, hcEps_, normEps_);
     return ge::GRAPH_SUCCESS;
 }
-
 
 ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRegbaseOpTiling()
 {
@@ -648,9 +692,14 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcOpTiling()
     uint64_t mDimNum = std::min(aicCoreNum_, static_cast<uint64_t>(CeilDiv(bs_, M_L1_MAX_SIZE)));
     uint64_t singleCoreM = RoundUp(CeilDiv(bs_, mDimNum), AscendC::BLOCK_CUBE);
     uint64_t kDimNum = aicCoreNum_ / mDimNum;
+    uint64_t originalKDimNum = kDimNum;
 
     // 如果开启了batch一致性开关，则强制走M分核模板
-    if (context_->GetDeterministicLevel() == BATCH_CONSISTENCY_LEVEL) {
+    int32_t deterministicLevel = context_->GetDeterministicLevel();
+    if (deterministicLevel == BATCH_CONSISTENCY_LEVEL) {
+        OP_LOGI(context_->GetNodeName(),
+                "MhcPreSinkhorn batch consistency enabled: deterministicLevel=%d, force kDimNum from %lu to 1.",
+                deterministicLevel, originalKDimNum);
         kDimNum = 1;
     }
 
@@ -666,24 +715,23 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcOpTiling()
                             128 * 128);
 
     tilingData_.set_cvLoopKSize(1024);
-    if (kDimNum != 1) {
-        if (needGrad_) {
-            tilingKey_ = 2000;
-            return CalcMKSplitCorePart2GradoutTiling();
-        } else {
-            tilingKey_ = 1000;
-            return CalcMKSplitCorePart2Tiling();
-        }
-    }
-    if (needGrad_) {
-        tilingKey_ = 2001;
-        return CalcRegbaseOpGradoutTiling();
+    bool isKSplit = kDimNum != 1;
+    if (isKSplit) {
+        tilingKey_ = needGrad_ ? TILING_KEY_GRAD_K_SPLIT : TILING_KEY_NO_GRAD_K_SPLIT;
     } else {
-        tilingKey_ = 1001;
-        return CalcRegbaseOpTiling();
+        tilingKey_ = needGrad_ ? TILING_KEY_GRAD_M_SPLIT : TILING_KEY_NO_GRAD_M_SPLIT;
     }
+    OP_LOGD(context_->GetNodeName(),
+            "MhcPreSinkhorn regbase tiling decision: tilingKey=%lu, needGrad=%d, deterministicLevel=%d, "
+            "mDimNum=%lu, singleCoreM=%lu, originalKDimNum=%lu, finalKDimNum=%lu, actualKBlockNum=%lu, "
+            "splitKSize=%lu, mL1Size=%ld, kL1Size=%ld",
+            tilingKey_, needGrad_ ? 1 : 0, deterministicLevel, mDimNum, singleCoreM, originalKDimNum, kDimNum,
+            actualKBlockNum, splitKSize, tilingData_.get_mL1Size(), tilingData_.get_kL1Size());
+    if (isKSplit) {
+        return needGrad_ ? CalcMKSplitCorePart2GradoutTiling() : CalcMKSplitCorePart2Tiling();
+    }
+    return needGrad_ ? CalcRegbaseOpGradoutTiling() : CalcRegbaseOpTiling();
 }
-
 
 ge::graphStatus MhcPreSinkhornTilingRegbase::DoOpTiling()
 {
@@ -712,7 +760,7 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::DoOpTiling()
 
 ge::graphStatus MhcPreSinkhornTilingRegbase::GetWorkspaceSize()
 {
-    if (tilingKey_ == 1000 || tilingKey_ == 2000) {
+    if (tilingKey_ == TILING_KEY_NO_GRAD_K_SPLIT || tilingKey_ == TILING_KEY_GRAD_K_SPLIT) {
         // K分核模板需要预留Workspace大小
         workspaceSize_ = tilingData_.get_kBlockFactor() * tilingData_.get_bs() * tilingData_.get_hcMix() * 4 +
                          tilingData_.get_kBlockFactor() * tilingData_.get_bs() * 4 + 16 * 1024 * 1024;
@@ -724,10 +772,12 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::PostTiling()
 {
     context_->SetTilingKey(tilingKey_);
     context_->SetBlockDim(aicCoreNum_);
+    context_->SetScheduleMode(BATCH_MODE);
     size_t *workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = workspaceSize_;
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
+    PrintFinalTilingData(context_, tilingData_, tilingKey_, aicCoreNum_, workspaceSize_);
     return ge::GRAPH_SUCCESS;
 }
 } // namespace optiling
