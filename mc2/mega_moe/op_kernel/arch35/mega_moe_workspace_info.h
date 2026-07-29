@@ -123,6 +123,7 @@ struct WorkspaceInfo {
     GM_ADDR sharedExpertSwigluDataPtr{nullptr};
     GM_ADDR sharedExpertSwigluScalePtr{nullptr};
     GM_ADDR gmm1TileStatusPtr{nullptr}; // GMM1 tile 就绪状态位区（仅 prefetch 软同步分配）
+    GM_ADDR sharedExpertGmm2TileCounterPtr{nullptr};
 
     GM_ADDR maskSlotPtr{nullptr};       // urma发送mask临时GM
     GM_ADDR dispatchL1CommPtr{nullptr}; // dispatch L1 communication workspace
@@ -285,6 +286,14 @@ struct WorkspaceInfo {
                 Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->bs * tilingData->sharedExpertNum * tilingData->hiddenDim /
                                          MegaMoeImpl::SWIGLU_N_HALF / MXFP_SCALE_GROUP_NUM,
                                      ALIGN_512);
+            // sharedExpertGmm2TileCounter: tile 级 flag counter, 每 shared expert 一组 slot
+            // slot 数 = CeilDiv(bs, GMM1_TILE_M), 每 slot 占 INT_CACHELINE 个 int32
+            sharedExpertGmm2TileCounterPtr = base + workspaceSize;
+            uint32_t tokenGroupCount = Ops::Base::CeilDiv(static_cast<uint32_t>(tilingData->bs),
+                                                          static_cast<uint32_t>(MegaMoeImpl::L1_TILE_M_256));
+            uint32_t totalSlots = tokenGroupCount * tilingData->sharedExpertNum;
+            workspaceSize += Ops::Base::CeilAlign(
+                static_cast<int64_t>(totalSlots) * static_cast<int64_t>(INT_CACHELINE) * SIZE_INT_32, ALIGN_512);
         }
     }
 };

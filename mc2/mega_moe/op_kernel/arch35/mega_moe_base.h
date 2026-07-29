@@ -40,6 +40,7 @@ struct GMMAddrInfo {
     __gm__ int32_t *swigluToGmm2Flag;
     __gm__ int32_t *dispatchToGmm1Flag;
     __gm__ int32_t *gmm2CombineSyncCounter;
+    __gm__ int32_t *sharedExpertGmm2TileCounter;
 };
 
 struct PeermemInfo {

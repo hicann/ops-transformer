@@ -90,6 +90,7 @@ private:
     __aicore__ inline SendMaskBufferConfig SendAndQuantBuffInit();
     __aicore__ inline void ResetFlagList();
     __aicore__ inline void ResetGmm2CombineSyncCounters();
+    __aicore__ inline void ResetSharedExpertGmm2TileCounters();
     __aicore__ inline void SendMaskCal(const SendMaskBufferConfig &bufferConfig);
     __aicore__ inline void SendCntCal(int32_t localExpertId, uint64_t &sendCnt);
     __aicore__ inline void MetaInfoCalAndDispatch(GMMAddrInfo &gmmAddrInfo, int32_t localExpertId,
@@ -194,7 +195,7 @@ private:
     // 6-buffer 软流水(占满 EVENT_ID0..EVENT_ID5)的 UB 基址；槽视图由 base + bufferIdx*mxQuantTokenScaleAlignBytes_
     uint32_t copyTmpBaseAddr_ = 0;
     // ProcessCombine wave 流水参数：只依赖 k_(常量), InitCombineBuffers 算一次, 免每 expert 重算
-    uint32_t combineNTilesPerGroup_ = 0;      // CeilDiv(k_, L1_TILE_N)
+    uint32_t gmm2NTilesPerGroup_ = 0;          // CeilDiv(k_, L1_TILE_N)
     uint32_t combineQuantTokenSizeBytes_ = 0; // CeilAlign(k_ + CeilDiv(k_,MXFP_SCALE_GROUP_NUM), ALIGN_32)
 
     // 大 BS route batch、ring buffer 和 reset batch 成员
@@ -556,9 +557,13 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ResetFlagList()
                                              0U, 0U};
         DataCopyPad(swigluToGmm2FlagGm_[coreOffset + resetElementOffset], resetTensor_, rankSyncCopyParams);
     }
-    // combine量化模式下TokenGroupCompleteFlag清零
+    // combine量化模式TokenGroupCompleteFlag清零
     if constexpr (CombineQuantMode != COMBINE_NO_QUANT) {
         ResetGmm2CombineSyncCounters();
+    }
+    // 共享专家 tile counter 清零
+    if (sharedExpertNum_ > 0) {
+        ResetSharedExpertGmm2TileCounters();
     }
 
     // prefetch 路径：清理 GMM1 tile 状态位区（含 allDone slot），避免上一轮残留导致软同步误判
@@ -1401,9 +1406,13 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::UpdateSharedGlobalBuffe
         gmmAddrInfo.bGlobal = params_.sharedB2GmAddr + Get<IDX_B2_OFFSET>(state.baseOffset) * sizeof(ActivationType);
         gmmAddrInfo.bScaleGlobal =
             params_.sharedB2ScaleGmAddr + Get<IDX_B2_SCALE_OFFSET>(state.baseOffset) * sizeof(QuantScaleOutType);
+        // tile counter: 每个 shared expert 独立一组 slot, 用 expertBeforeCnt/m_ 算出 sharedIdx
+        uint32_t tokenGroupCount = Ops::Base::CeilDiv(m_, static_cast<uint32_t>(GMM1_TILE_M));
+        uint32_t sharedIdx = static_cast<uint32_t>(state.expertBeforeCnt) / m_;
+        gmmAddrInfo.sharedExpertGmm2TileCounter =
+            (__gm__ int32_t *)params_.workspaceInfo.sharedExpertGmm2TileCounterPtr +
+            static_cast<uint64_t>(sharedIdx) * tokenGroupCount * static_cast<uint64_t>(INT_CACHELINE);
     }
-    gmmAddrInfo.swigluToGmm2Flag = nullptr;
-    gmmAddrInfo.dispatchToGmm1Flag = nullptr;
 }
 
 // =============================================
@@ -1436,6 +1445,30 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ResetGmm2CombineSyncCou
 }
 
 // =============================================
+// ResetSharedExpertGmm2TileCounters：重置共享专家 GMM2 tile counter
+// =============================================
+template <TemplateMegaMoeTypeClass>
+__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ResetSharedExpertGmm2TileCounters()
+{
+    uint32_t tokenGroupCount = Ops::Base::CeilDiv(m_, GMM1_TILE_M);
+    int32_t sharedTotalCounters = static_cast<int32_t>(tokenGroupCount * sharedExpertNum_ *
+                                                       static_cast<uint64_t>(INT_CACHELINE));
+    int32_t coreLen, coreOffset;
+    TilingByCore(sharedTotalCounters, coreLen, coreOffset);
+    GlobalTensor<int32_t> sharedTileCounterGm;
+    sharedTileCounterGm.SetGlobalBuffer((__gm__ int32_t *)params_.workspaceInfo.sharedExpertGmm2TileCounterPtr);
+    for (int32_t resetElementOffset = 0; resetElementOffset < coreLen;
+         resetElementOffset += resetBatchElementCount_) {
+        int32_t currentBatchElementCount = coreLen - resetElementOffset < resetBatchElementCount_ ?
+                                               coreLen - resetElementOffset :
+                                               resetBatchElementCount_;
+        DataCopyExtParams resetCopyParams{1U, static_cast<uint32_t>(currentBatchElementCount * sizeof(int32_t)),
+                                          0U, 0U, 0U};
+        DataCopyPad(sharedTileCounterGm[coreOffset + resetElementOffset], resetTensor_, resetCopyParams);
+    }
+}
+
+// =============================================
 // InitCombineBuffers：初始化 Combine 所需的 buffer 大小
 // =============================================
 template <TemplateMegaMoeTypeClass>
@@ -1446,7 +1479,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitCombineBuffers()
         uint32_t nScale = Ops::Base::CeilDiv(k_, uint32_t(MXFP_SCALE_GROUP_NUM));
         // 下面两个只依赖 k_ 的量提成员, 供 ProcessCombine 每 expert 复用(原先每次调用重算)
         combineQuantTokenSizeBytes_ = Ops::Base::CeilAlign(k_ + nScale, static_cast<uint32_t>(ALIGN_32));
-        combineNTilesPerGroup_ = Ops::Base::CeilDiv(k_, L1_TILE_N);
+        gmm2NTilesPerGroup_ = Ops::Base::CeilDiv(k_, L1_TILE_N);
         uint32_t singleTokenBytes = nAlign32 * sizeof(bfloat16_t) + combineQuantTokenSizeBytes_;
         combineUbTensorSize_ = (singleTokenBytes * 2) / sizeof(bfloat16_t);
     }
@@ -1489,7 +1522,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessCombine(const GM
         uint32_t syncSlotIndex = tokenGroupsThisExpert <= logicalCoreCount ? logicalCoreId : groupIndex;
         __gm__ int32_t *syncCounterAddress =
             MegaMoeImpl::GetCombineSyncCounterAddress(gmmAddrInfo.gmm2CombineSyncCounter, syncSlotIndex);
-        while (AscendC::ReadGmByPassDCache(syncCounterAddress) != combineNTilesPerGroup_) {
+        while (AscendC::ReadGmByPassDCache(syncCounterAddress) != gmm2NTilesPerGroup_) {
             int64_t waitStartCycle = AscendC::GetSystemCycle();
             while (AscendC::GetSystemCycle() - waitStartCycle < 100) {
             }
@@ -1696,6 +1729,7 @@ MegaMoe<TemplateMegaMoeTypeFunc>::UnpermuteBuffInit()
 
 // ===============================================================
 // UnpermuteSharedExpert：共享专家结果累加到当前 token 的 fp32 累加器
+// tile 级 flag 轮询: 等 C 核完成当前 token 对应的 GMM2 tile 后再读 sharedResult
 // ===============================================================
 template <TemplateMegaMoeTypeClass>
 __aicore__ inline void
@@ -1704,7 +1738,23 @@ MegaMoe<TemplateMegaMoeTypeFunc>::UnpermuteSharedExpert(int32_t tokenIdx, int32_
 {
     GlobalTensor<bfloat16_t> sharedResult;
     sharedResult.SetGlobalBuffer((__gm__ bfloat16_t *)params_.workspaceInfo.sharedExpertResultPtr);
+
+    // 当前 token 对应的 tile group index (GMM1_TILE_M=COMBINE_TOKEN_GROUP_SIZE=256)
+    uint32_t tokenGroupIndex = static_cast<uint32_t>(tokenIdx) / GMM1_TILE_M;
+    uint32_t tokenGroupCount = Ops::Base::CeilDiv(m_, GMM1_TILE_M);
+    uint64_t sharedExpertStride = static_cast<uint64_t>(tokenGroupCount) * static_cast<uint64_t>(INT_CACHELINE);
+
     for (uint32_t sharedIdx = 0; sharedIdx < sharedExpertNum_; sharedIdx++) {
+        // 轮询: 等待 C 核完成当前 shared expert 的当前 token group tile
+        __gm__ int32_t *counterAddr = MegaMoeImpl::GetCombineSyncCounterAddress(
+            (__gm__ int32_t *)params_.workspaceInfo.sharedExpertGmm2TileCounterPtr +
+                static_cast<uint64_t>(sharedIdx) * sharedExpertStride,
+            tokenGroupIndex);
+        while (AscendC::ReadGmByPassDCache(counterAddr) != static_cast<int32_t>(gmm2NTilesPerGroup_)) {
+            int64_t waitStartCycle = AscendC::GetSystemCycle();
+            while (AscendC::GetSystemCycle() - waitStartCycle < 100) {}
+        }
+
         int32_t accumulationItemIdxInBatch =
             localIdx * (topK_ + static_cast<int32_t>(sharedExpertNum_)) + topK_ + static_cast<int32_t>(sharedIdx);
         int32_t inputBufferIdx = accumulationItemIdxInBatch % bufferConfig.inputBufferCount;
@@ -1862,7 +1912,6 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::SharedExpertCopyInput()
     }
     WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
     WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
-    PipeBarrier<PIPE_ALL>();
 }
 
 // ===============================================================
@@ -2004,6 +2053,7 @@ template <TemplateMegaMoeTypeClass>
 __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessSharedExpertGmm2(const TupleShape &initShape,
                                                                                  const BlockOffset &initOffset)
 {
+    gmm2NTilesPerGroup_ = Ops::Base::CeilDiv(k_, L1_TILE_N);
     GMMAddrInfo sharedGmm2AddrInfo;
     ExpertLoopState sharedGmm2State{initShape, initOffset, 0};
     int32_t vecSetSyncCom = 0;
@@ -2014,7 +2064,6 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessSharedExpertGmm2
         UpdateSharedGlobalBuffer<AddrUpdateMode::GMM2>(sharedGmm2AddrInfo, sharedGmm2State);
         GroupMatmulWithCombine<true>(sharedGmm2AddrInfo, sharedGmm2State, sharedIdx, vecSetSyncCom);
     }
-    SyncAll<false>();
 }
 
 template <TemplateMegaMoeTypeClass>
@@ -2044,7 +2093,6 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Process()
     BlockOffset initOffset{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     if (sharedExpertNum_ > 0) {
         ProcessSharedExpertGmm1(initShape, initOffset);
-        SyncAll<false>();
     }
 
     CrossRankSyncInWorldSize();

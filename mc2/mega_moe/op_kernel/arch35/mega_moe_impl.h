@@ -150,6 +150,17 @@ __aicore__ inline void NotifyCombineConsumersOfTileCompletion(uint32_t rowTileOf
     }
 }
 
+// 共享专家专用: 每个 token group 独立 slot, 直接 AtomicAdd 通知对应 group 的 tile 完成
+__aicore__ inline void NotifySharedExpertTileCompletion(uint32_t rowTileOffset,
+                                                        __gm__ int32_t *sharedExpertCounterBase)
+{
+    AscendC::SetFlag<AscendC::HardEvent::FIX_S>(0);
+    AscendC::WaitFlag<AscendC::HardEvent::FIX_S>(0);
+
+    uint32_t tokenGroupIndex = rowTileOffset / COMBINE_TOKEN_GROUP_SIZE;
+    AscendC::AtomicAdd(GetCombineSyncCounterAddress(sharedExpertCounterBase, tokenGroupIndex), int32_t(1));
+}
+
 // =================================================================================================
 // WaitForUpstreamReady：等待上游 GMM 计算完成，GMM1/GMM2 分流（A8W8/A4W4 和 A8W4 共用）
 // =================================================================================================
@@ -501,6 +512,8 @@ __aicore__ inline void AicComputeGeneric(BlockMmad &blockMmad, WorkSet &workSet,
                 if constexpr ((CombineQuantMode != COMBINE_NO_QUANT || IsLayered) && !IsShared) {
                     NotifyCombineConsumersOfTileCompletion(mLoc, groupSyncSlotLayout,
                                                            workSet.gmmAddrInfo.gmm2CombineSyncCounter);
+                } else if constexpr (IsShared) {
+                    NotifySharedExpertTileCompletion(mLoc, workSet.gmmAddrInfo.sharedExpertGmm2TileCounter);
                 }
             }
         }
@@ -872,6 +885,8 @@ __aicore__ inline void AicComputeA8W4(BlockMmad &blockMmad, Scheduler &scheduler
             blockMmad(gmBlockA, gmBlockScaleA, gmBlockScaleB, tensorBlockGm);
             if constexpr ((CombineQuantMode != COMBINE_NO_QUANT || IsLayered) && !IsShared) {
                 NotifyCombineConsumersOfTileCompletion(mLoc, groupSyncSlotLayout, gmmAddrInfo.gmm2CombineSyncCounter);
+            } else if constexpr (IsShared) {
+                NotifySharedExpertTileCompletion(mLoc, gmmAddrInfo.sharedExpertGmm2TileCounter);
             }
         }
 
