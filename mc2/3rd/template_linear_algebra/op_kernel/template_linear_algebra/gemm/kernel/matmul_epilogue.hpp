@@ -146,7 +146,7 @@ public:
             auto layoutBlockC = layoutC.GetTileLayout(actualBlockShape.GetCoordMN());
             // Synchronize cross core
             Arch::CrossCoreWaitFlagWithReverse<0x2, PIPE_MTE3>(flagAicFinishStore);
-            // Actual calculatioin logic for performing block-scoped epilogue
+            // Actual calculation logic for performing block-scoped epilogue
             blockEpilogue(blockShape, blockCoord, actualBlockShape, gmBlockC, layoutBlockC);
         }
     }
