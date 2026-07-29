@@ -2,6 +2,11 @@
 
 ## 🔥Latest News
 
+- [2026/07] A5上新支持算子[quant_flash_attn](attention/quant_flash_attn)，Dense Attention全量化场景专用，以及experimental目录新增[同名算子](experimental/attention/quant_flash_attn)支持A5的MxFP4全量化；[chunk_gated_delta_rule](attention/chunk_gated_delta_rule)算子支持A5；A5新增DSV4 dense训练阶段TopK筛选反向算子[dense_lightning_indexer_grad_kl_loss](attention/dense_lightning_indexer_grad_kl_loss)、[dense_lightning_indexer_softmax_lse](attention/dense_lightning_indexer_softmax_lse)；mc2新支持算子[engram_fetch_grad](mc2/engram_fetch_grad)。
+- [2026/06] A5上新增支持[sparse_flash_mla](attention/sparse_flash_mla)、[mixed_quant_sparse_flash_mla](attention/mixed_quant_sparse_flash_mla)以及对应的metadata算子，用于DSV4场景稀疏Attention计算。新增[lightning_indexer_v2](attention/lightning_indexer_v2)、[quant_lightning_indexer_v2](attention/quant_lightning_indexer_v2)以及对应的metadata算子，用于DSV4场景TopK筛选。A5新增DSV4 sparse训练阶段Attention反向算子[sparse_flash_mla_grad](attention/sparse_flash_mla_grad)、[sparse_lightning_indexer_kl_loss_grad](attention/sparse_lightning_indexer_kl_loss_grad)；mc2新支持算子[engram_fetch](mc2/engram_fetch)、[engram_fetch_wait](mc2/engram_fetch_wait)。
+- [2026/05] [fused_infer_attention_score](attention/fused_infer_attention_score)算子A5上支持MxFP8全量化；A5上新支持算子[flash_attn](attention/flash_attn)，Dense Attention非量化场景专用。
+- [2026/04] mc2新支持算子[mega_moe](mc2/mega_moe)。
+- [2026/03] [recurrent_gated_delta_rule](attention/recurrent_gated_delta_rule)算子支持A5。
 - [2026/02] 新支持算子[mhc_post](experimental/mhc/mhc_post)、[mhc_pre](experimental/mhc/mhc_pre)、[mhc_res](experimental/mhc/mhc_res)。
 - [2026/01] 新支持算子[grouped_matmul<<<>>>调用示例](examples/fast_kernel_launch_example/csrc/grouped_matmul)，方便用户自定义使用。
 - [2026/01] 新支持算子[fused_floyd_attention](attention/fused_floyd_attention)、[fused_floyd_attention_grad](attention/fused_floyd_attention_grad)、[matmul_allto_all](mc2/matmul_allto_all)。
