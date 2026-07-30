@@ -16,6 +16,7 @@ import pandas as pd
 from pathlib import Path
 import pytest
 import sparse_flash_mla_golden
+import traceback
 
 excel_path = os.getenv("SMLA_EXCEL_PATH", "./excel/example.xlsx")
 excel_sheet = os.getenv("SMLA_EXCEL_SHEET", "CSA")
@@ -66,7 +67,9 @@ def generate_and_save(param_combinations):
         sparse_flash_mla_golden.save_test_case(input_data, save_path)
     except Exception as e:
         record_failed_case(param_combinations, e)
-        print(f"[FAILED CASE RECORDED] case_id={case_id}, error={e}")
+        pytest.fail(
+            f"[FAILED CASE RECORDED] case_id={case_id}\n{traceback.format_exc()}"
+        )
     finally:
         case_id += 1
 

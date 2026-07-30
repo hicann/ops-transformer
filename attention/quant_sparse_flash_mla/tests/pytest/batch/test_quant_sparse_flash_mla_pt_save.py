@@ -21,6 +21,7 @@ from pathlib import Path
 import utils
 import concurrent.futures
 import logging
+import traceback
 
 # 读取表格（支持通过环境变量传入）
 save_path = os.environ.get("QSMLA_PT_DIR", "qsmla_testcase")
@@ -45,8 +46,8 @@ for _, params in enumerate(ENABLED_PARAMS):
         normalized_params[key] = value
     normalized_params["topk_value_mode"] = params.get("topk_value_mode", 1)
     normalized_params["return_softmax_lse"] = params.get("return_softmax_lse", False)
-    normalized_params["ori_kv_topk_mode"] = params.get("ori_kv_topk_mode") or "fullK"
-    normalized_params["cmp_kv_topk_mode"] = params.get("cmp_kv_topk_mode") or "fullK"
+    normalized_params["ori_kv_topk_mode"] = params.get("ori_kv_topk_mode")
+    normalized_params["cmp_kv_topk_mode"] = params.get("cmp_kv_topk_mode")
     normalized_params["ori_sparse_indices_mode"] = (
         params.get("ori_sparse_indices_mode") or "full"
     )
@@ -271,7 +272,9 @@ def qsmla(param_combinations):
         )
     except Exception as e:
         record_failed_case(param_combinations, e)
-        logging.error(f"[FAILED CASE RECORDED] case_id={case_id}, error={e}")
+        pytest.fail(
+            f"[FAILED CASE RECORDED] case_id={case_id}\n{traceback.format_exc()}"
+        )
     finally:
         case_id += 1
 

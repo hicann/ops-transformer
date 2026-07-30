@@ -11,7 +11,6 @@
 # -----------------------------------------------------------------------------------------------------------
 
 import logging
-import math
 import torch
 
 logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
@@ -95,9 +94,3 @@ def check_valid_param(params):
                 for i in range(len(cu_seqlens_cmp_kv) - 1)
             ):
                 raise ValueError(f"cu_seqlens_cmp_kv必须单调递增: {cu_seqlens_cmp_kv}")
-            if cmp_ratio is not None and cmp_ratio != 1:
-                expected_T3 = math.floor(T2 / cmp_ratio)
-                if T3 != expected_T3:
-                    raise ValueError(
-                        f"cu_seqlens_cmp_kv最后一维({T3})与预期T3({expected_T3})不一致, T2={T2}, cmp_ratio={cmp_ratio}"
-                    )

@@ -1171,6 +1171,7 @@ def gen_cmp_kv(
 
     # generate cmp_sparse_indices
     cmp_sparse_indices = None
+    cmp_topk_length = None
     if template_run_mode in ("CSA", "ORI_CMP_SPARSE") and cmp_max_s2 != 0:
         if cmp_residual_kv is not None:
             cmp_restored_len = [

@@ -29,7 +29,7 @@ import utils
 pt_save_path = "mqsmla_testcase"
 device_id = 0
 save_pt = False
-result_path = Path('result.xlsx')
+result_path = Path("result.xlsx")
 
 param_combinations = []
 for params in ENABLED_PARAMS:
@@ -72,12 +72,12 @@ for params in ENABLED_PARAMS:
         "actlen_mode": params.get("actlen_mode"),
         "S1EQS2": params.get("S1EQS2", [False]),
         "return_softmax_lse": params.get("return_softmax_lse", [False]),
-        'ori_kv_topk_mode': params.get('ori_kv_topk_mode', ['fullK']),
-        'cmp_kv_topk_mode': params.get('cmp_kv_topk_mode',['fullK']),
-        'ori_sparse_indices_mode': params.get('ori_sparse_indices_mode', ['full']),
-        'cmp_sparse_indices_mode': params.get('cmp_sparse_indices_mode', ['full']),
-        'ori_topk_length': params.get('ori_topk_length', [None]),
-        'cmp_topk_length': params.get('cmp_topk_length', [None]),
+        "ori_kv_topk_mode": params.get("ori_kv_topk_mode", [None]),
+        "cmp_kv_topk_mode": params.get("cmp_kv_topk_mode", [None]),
+        "ori_sparse_indices_mode": params.get("ori_sparse_indices_mode", ["full"]),
+        "cmp_sparse_indices_mode": params.get("cmp_sparse_indices_mode", ["full"]),
+        "ori_topk_length": params.get("ori_topk_length", [None]),
+        "cmp_topk_length": params.get("cmp_topk_length", [None]),
     }
 
     param_names = list(param_values.keys())
@@ -87,6 +87,8 @@ for params in ENABLED_PARAMS:
         combination = dict(zip(param_names, combo))
         param_combinations.append(combination)
 case_id = 0
+
+
 def mqsmla(param_combinations):
     global case_id
 
@@ -94,33 +96,46 @@ def mqsmla(param_combinations):
     params = utils.fill_none_params(param_combinations)
 
     # 生成测试用例名称
-    Testcase_Name = params['Testcase_Name']
+    Testcase_Name = params["Testcase_Name"]
     if Testcase_Name is None:
-        ops_mode = 'prefill' if params['S1'] > 4 else "decode"
-        q_type_str = "BF16" if params['q_type'] == torch.bfloat16 else "FP16"
-        kv_type_str = "HIF8" if params['ori_kv_type'] == torch.uint8 else "FP8_E4M3FN"
-        prefix_part = f"{param_combinations['tc_prefix']}_" if param_combinations.get('tc_prefix', '') else ""
+        ops_mode = "prefill" if params["S1"] > 4 else "decode"
+        q_type_str = "BF16" if params["q_type"] == torch.bfloat16 else "FP16"
+        kv_type_str = "HIF8" if params["ori_kv_type"] == torch.uint8 else "FP8_E4M3FN"
+        prefix_part = (
+            f"{param_combinations['tc_prefix']}_"
+            if param_combinations.get("tc_prefix", "")
+            else ""
+        )
         Testcase_Name = f"mixedQuantSparseFlashMla_{params['template_run_mode']}_{ops_mode}_{params['layout_q']}_{q_type_str}_{params['layout_kv']}_{kv_type_str}_{params['B']}_{params['N1']}_{params['N2']}_{params['S1']}_{params['S2']}_{params['D']}_{params['K']}_{params['rope_head_dim']}_{case_id:06d}"
-        params['Testcase_Name'] = Testcase_Name
+        params["Testcase_Name"] = Testcase_Name
 
     # 输入参数的合法性校验
     try:
         check_valid_param.check_valid_param(params)
     except ValueError as e:
-       pytest.skip(f"输入参数校验失败:{e}")
+        pytest.skip(f"输入参数校验失败:{e}")
 
     # 生成测试数据及golden
-    test_data = mixed_quant_sparse_flash_mla_golden.generate_and_save_testdata(params, save_pt=save_pt, save_path=pt_save_path)
+    test_data = mixed_quant_sparse_flash_mla_golden.generate_and_save_testdata(
+        params, save_pt=save_pt, save_path=pt_save_path
+    )
 
     # 获得cpu结果(真值)和算子结果（测试值）
     npu_error_msg = None
     try:
-        npu_result, cpu_quant_result, cpu_lse, npu_lse = mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(
-            test_data, device_id=device_id)
-        result, fulfill_percent = result_compare_method.check_result(cpu_quant_result, npu_result)
-        if test_data['params'].get('return_softmax_lse'):
+        npu_result, cpu_quant_result, cpu_lse, npu_lse = (
+            mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(
+                test_data, device_id=device_id
+            )
+        )
+        result, fulfill_percent = result_compare_method.check_result(
+            cpu_quant_result, npu_result
+        )
+        if test_data["params"].get("return_softmax_lse"):
             print("return_softmax_lse is true!!!")
-            result, fulfill_percent = result_compare_method.check_result(cpu_lse, npu_lse)
+            result, fulfill_percent = result_compare_method.check_result(
+                cpu_lse, npu_lse
+            )
     except Exception as e:
         npu_error_msg = str(e)
         print("NPU ERROR：", npu_error_msg)
@@ -129,23 +144,30 @@ def mqsmla(param_combinations):
 
     case_id += 1
 
-    utils.save_result(test_data['params'], result, fulfill_percent, result_path)
+    utils.save_result(test_data["params"], result, fulfill_percent, result_path)
 
     if result == "Failed":
-        pytest.fail(f"用例精度失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%")
+        pytest.fail(
+            f"用例精度失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%"
+        )
     if result == "NPU ERROR":
-        pytest.fail(f"用例执行失败:{test_data['Testcase_Name']} NPU ERROR: {npu_error_msg}")
+        pytest.fail(
+            f"用例执行失败:{test_data['Testcase_Name']} NPU ERROR: {npu_error_msg}"
+        )
+
 
 def _gen_testcase_id(params, idx):
-    name = params.get('Testcase_Name')
+    name = params.get("Testcase_Name")
     if name is not None:
         return name
-    ops_mode = 'prefill' if params['S1'] > 4 else "decode"
-    q_type_str = "BF16" if params['q_type'] == torch.bfloat16 else "FP16"
-    kv_type_str = "HIF8" if params['ori_kv_type'] == torch.uint8 else "FP8_E4M3FN"
+    ops_mode = "prefill" if params["S1"] > 4 else "decode"
+    q_type_str = "BF16" if params["q_type"] == torch.bfloat16 else "FP16"
+    kv_type_str = "HIF8" if params["ori_kv_type"] == torch.uint8 else "FP8_E4M3FN"
     return f"{params['template_run_mode']}_{ops_mode}_{params['layout_q']}_{q_type_str}_{params['layout_kv']}_{kv_type_str}_B{params['B']}_S1{params['S1']}_S2{params['S2']}_D{params['D']}_K{params['K']}_{idx:06d}"
 
+
 testcase_ids = [_gen_testcase_id(p, i) for i, p in enumerate(param_combinations)]
+
 
 @pytest.mark.ci
 @pytest.mark.parametrize("param_combinations", param_combinations, ids=testcase_ids)
@@ -158,4 +180,4 @@ def test_mixed_quant_sparse_flash_mla(param_combinations):
             try:
                 result = future.result()
             except Exception as e:
-                pytest.fail(f"当前用例线程执行失败")
+                pytest.fail("当前用例线程执行失败")
