@@ -32,8 +32,7 @@ class CompressorKernel {
 public:
     __aicore__ inline CompressorKernel(TPipe *pipe, const optiling::CompressorTilingData *__restrict tilingData)
         : pipe_(pipe), tilingData_(tilingData)
-    {
-    }
+    {}
 
     __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate,
                                 __gm__ uint8_t *stateCache, __gm__ uint8_t *ape, __gm__ uint8_t *stateBlockTable,
@@ -107,11 +106,11 @@ private:
 };
 
 template <typename COMP>
-__aicore__ inline void
-CompressorKernel<COMP>::Init(__gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate, __gm__ uint8_t *stateCache,
-                             __gm__ uint8_t *ape, __gm__ uint8_t *stateBlockTable, __gm__ uint8_t *cuSeqlens,
-                             __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos, __gm__ uint8_t *cmpKvOut,
-                             __gm__ uint8_t *workspace)
+__aicore__ inline void CompressorKernel<COMP>::Init(__gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate,
+                                                    __gm__ uint8_t *stateCache, __gm__ uint8_t *ape,
+                                                    __gm__ uint8_t *stateBlockTable, __gm__ uint8_t *cuSeqlens,
+                                                    __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos,
+                                                    __gm__ uint8_t *cmpKvOut, __gm__ uint8_t *workspace)
 {
     if ASCEND_IS_AIV {
         constInfo.aiCoreIdx = GetBlockIdx() / 2;
@@ -149,14 +148,12 @@ CompressorKernel<COMP>::Init(__gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint
     // 4. 初始化block层
     if ASCEND_IS_AIC {
         blockCube_.InitParams(constInfo, tools_);
-        blockCube_.Init(x, wKv, wGate, stateCache, ape, stateBlockTable, cuSeqlens,
-                        seqUsed, startPos, cmpKvOut);
+        blockCube_.Init(x, wKv, wGate, stateCache, ape, stateBlockTable, cuSeqlens, seqUsed, startPos, cmpKvOut);
         blockCube_.InitBuffers(pipe_);
         blockCube_.InitGlobalBuffers(mm1KvResGm, mm1ScoreResGm);
     } else {
         blockVec_.InitParams(constInfo, tools_);
-        blockVec_.Init(x, wKv, wGate, stateCache, ape, stateBlockTable, cuSeqlens,
-                       seqUsed, startPos, cmpKvOut);
+        blockVec_.Init(x, wKv, wGate, stateCache, ape, stateBlockTable, cuSeqlens, seqUsed, startPos, cmpKvOut);
         blockVec_.InitBuffers(pipe_);
         blockVec_.InitVec1GlobalTensor(Vec1InputKvGm, Vec1InputScoreGm, vec1KvCacheGm, vec1ScoreCacheGm);
     }
@@ -242,7 +239,7 @@ __aicore__ inline void CompressorKernel<COMP>::SkipInvalidBatch(BatchInfo &batch
     if (batchInfo.bIdx < constInfo.batchSize) {
         batchInfo.bStartPos = tools_.GetStartPos(batchInfo.bIdx);
         batchInfo.sIdx = 0;
-        batchInfo.headHolderSeq = (uint32_t)(batchInfo.bStartPos & (constInfo.cmpRatio - 1));
+        batchInfo.headHolderSeq = (uint32_t)(batchInfo.bStartPos % constInfo.cmpRatio);
         batchInfo.tcNum =
             (uint32_t)((batchInfo.bStartPos + batchInfo.seqCnt + constInfo.cmpRatio - 1) / constInfo.cmpRatio -
                        batchInfo.bStartPos / constInfo.cmpRatio);
@@ -250,7 +247,6 @@ __aicore__ inline void CompressorKernel<COMP>::SkipInvalidBatch(BatchInfo &batch
                                                batchInfo.bStartPos / constInfo.cmpRatio);
     }
 }
-
 
 template <typename COMP>
 __aicore__ inline void CompressorKernel<COMP>::UpdateCurGroup(BasicBlockInfo &basicBlockInfo, BatchInfo batchInfo,
@@ -299,8 +295,7 @@ __aicore__ inline BasicBlockInfo CompressorKernel<COMP>::SkipOneLoop(BatchInfo &
                 alignSeq = constInfo.cmpRatio - batchInfo.headHolderSeq;
             }
             if (quota > alignSeq) {
-                uint64_t delta =
-                    (batchInfo.bStartPos + batchInfo.sIdx + quota) & (constInfo.cmpRatio - 1); // 超出对齐的部分
+                uint64_t delta = (batchInfo.bStartPos + batchInfo.sIdx + quota) % constInfo.cmpRatio; // 超出对齐的部分
                 curDealSeq = quota - delta;
                 quota -= curDealSeq;
                 curDealTcNum = (curDealSeq + constInfo.cmpRatio - 1) / constInfo.cmpRatio;
@@ -347,7 +342,6 @@ __aicore__ inline BasicBlockInfo CompressorKernel<COMP>::SkipOneLoop(BatchInfo &
     }
     return basicBlockInfo;
 }
-
 
 template <typename COMP>
 __aicore__ inline uint32_t CompressorKernel<COMP>::GetLoopTimes()

@@ -79,7 +79,7 @@
 | wgate | 输入 | 公式中的$W^{Gate}$，表示gate压缩权重。 | FLOAT16、BFLOAT16 | ND |
 | state_cache | 输入 | 公式中的$\left[kv\_state, score\_state\right]$, 表示kv\_state和score\_state的历史数据。 | FLOAT32     | ND         |
 | ape | 输入 | 公式中的$Ape$，表示positional biases。 | FLOAT32       | ND         |-         |
-| cmp\_ratio | 属性 | 用于稀疏计算，表示数据压缩率。 | INT32          | -         |
+| cmp\_ratio | 属性 | 用于稀疏计算，表示数据压缩率，取值范围为[2, 128]内的整数。 | INT32          | -         |
 | state\_block\_table | 可选输入 | 表示state\_cache存储使用的block映射表。<br>当其中元素的值为0时，表示当前位置无需进行更新state_cache操作。 | INT32 | ND         |
 | cu\_seqlens | 可选输入 | 表示不同Batch中的有效token数。  | INT32          | ND         |
 | seqused | 可选输入 | 表示不同Batch中实际参与压缩的token数。<br>如果指定为None时，表示和每个Batch上的Sequence Length长度相同。 | INT32          | ND         |
@@ -91,6 +91,7 @@
 
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
  cache_mode不支持输入2，且不支持0轴非连续。
+ cmp_ratio仅支持2/4/8/16/32/64/128
 
 ## 约束说明
 
@@ -154,7 +155,7 @@
   - 支持D为128/512。
   - 支持H为1K~10K，512对齐。
   - 支持block_size为1~1024。
-  - 支持cmp_ratio为2/4/8/16/32/64/128。支持如下三种典型组合场景：
+  - 支持如下三种典型组合场景：
       - C4A: D=512, coff=2, cmp_ratio=4；
       - C4Li: D=128, coff=2, cmp_ratio=4；
       - C128A: D=512, coff=1, cmp_ratio=128。
