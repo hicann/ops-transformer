@@ -1,0 +1,283 @@
+{
+  "op_type": "DenseLightningIndexerSoftmaxLseV2",
+  "op_list": [
+    {
+      "bin_filename": "DenseLightningIndexerSoftmaxLseV2_0e2106133132dc56a5e028c3ab148b85",
+      "inputs": [
+        {
+          "name": "query_index",
+          "index": 0,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "key_index",
+          "index": 1,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "weight",
+          "index": 2,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "cu_seq_lens_q",
+          "index": 3,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "cu_seq_lens_k",
+          "index": 4,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "seq_used_q",
+          "index": 5,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "seq_used_k",
+          "index": 6,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "cmp_residual_k",
+          "index": 7,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "metadata",
+          "index": 8,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "softmax_lse",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "layoutQ",
+          "dtype": "str",
+          "value": ""
+        },
+        {
+          "name": "layoutK",
+          "dtype": "str",
+          "value": ""
+        },
+        {
+          "name": "maskMode",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "cmpRatio",
+          "dtype": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "bin_filename": "DenseLightningIndexerSoftmaxLseV2_441d95d84e65204b07cca4bc7c37ef36",
+      "inputs": [
+        {
+          "name": "query_index",
+          "index": 0,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "key_index",
+          "index": 1,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "weight",
+          "index": 2,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "cu_seq_lens_q",
+          "index": 3,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "cu_seq_lens_k",
+          "index": 4,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "seq_used_q",
+          "index": 5,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "seq_used_k",
+          "index": 6,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "cmp_residual_k",
+          "index": 7,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "metadata",
+          "index": 8,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "softmax_lse",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "layoutQ",
+          "dtype": "str",
+          "value": ""
+        },
+        {
+          "name": "layoutK",
+          "dtype": "str",
+          "value": ""
+        },
+        {
+          "name": "maskMode",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "cmpRatio",
+          "dtype": "int",
+          "value": 1
+        }
+      ]
+    }
+  ]
+}
