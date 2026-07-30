@@ -503,7 +503,7 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::Communicati
         GM_ADDR srcWorkspaceAddr = sendCntWorkspaceAddr_ + epWorldSize_ * WIN_ADDR_ALIGN + srcOffset * sizeof(int32_t);
 
         if (dstRankId != epRankId_) { // 远端 使用URMA发送 count + state
-            uint64_t commHandle = GetCommHandle(mc2Context_, epRankId_, dstRankId);
+            uint64_t commHandle = GetCommHandle(mc2Context_, dstRankId);
             hcomm_.WriteNbi(commHandle, remoteCountAddr, srcWorkspaceAddr,
                             static_cast<uint64_t>(moeExpertNumPerRank_ * sizeof(int32_t)));
             hcomm_.Drain(commHandle);
@@ -673,7 +673,7 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::WriteToRemo
             continue; //  本端slot已经写入win
         }
 
-        uint64_t commHandle = GetCommHandle(mc2Context_, epRankId_, dstRankId);
+        uint64_t commHandle = GetCommHandle(mc2Context_, dstRankId);
         if (sendTokenNum > 0) {
             uint64_t sendDataSize = static_cast<uint64_t>(perSlotBytes_) * sendTokenNum;
             uint64_t srcSendWinOffset = static_cast<uint64_t>(dstRankId) * axisMaxBS_ * perSlotBytes_;

@@ -54,6 +54,8 @@ constexpr int COMM_PROTOCOL_UBC_CTP_VALUE = 4;
 constexpr int COMM_PROTOCOL_UBC_TP_VALUE = 5;
 constexpr int64_t BUFFER_ALIGNMENT = 2 * 1024 * 1024;
 constexpr int DIM_TWO = 2;
+constexpr uint32_t MOE_CHANNEL_HANDLE_NUM = 72U;
+constexpr uint32_t MOE_CHANNEL_NOTIFY_NUM = 3U;
 
 // RAII guard for multi-step host buffer allocation
 struct HostBufferGuard {
@@ -121,6 +123,7 @@ struct MoeCommContext {
     uint32_t rankSizePerServer = 0;
     uint64_t epHcclBuffer[HCCL_MAX_RANK_SIZE] = {};
     ChannelHandle hcommHandle[HCCL_MAX_RANK_SIZE] = {};
+    uint32_t channelsPerRank = 1;
 };
 
 struct EngramContextResources {
@@ -412,7 +415,7 @@ public:
         GetCommProtocol(hcclComm, protocol);
 
         MoeCommContext context;
-        BuildContext(hcclComm, groupName, "moe_dispatch_combine", protocol, context, cclBufferSize);
+        BuildContext(hcclComm, groupName, "moe_dispatch_combine_multi_channel", protocol, context, cclBufferSize);
         rankNumPerServer_ = rankNumPerUbDomain_;
         context.rankSizePerServer = rankNumPerServer_;
 
@@ -580,7 +583,8 @@ private:
                     static_cast<int>(protocol));
     }
 
-    void InitHcclChannel(const HcclComm &commHandle, uint32_t rankDim, uint32_t srcRankId, const CommProtocol &protocol,
+    void InitHcclChannel(const HcclComm &commHandle, uint32_t rankDim, uint32_t srcRankId,
+                         uint32_t channelsPerRank, const CommProtocol &protocol,
                          std::vector<HcclChannelDesc> &channelDesc)
     {
         uint32_t channelNum = static_cast<uint32_t>(channelDesc.size());
@@ -592,30 +596,53 @@ private:
         GetNetLayers(commHandle, netLayerList, netLayerNum);
         TORCH_CHECK(netLayerNum > 0, "Get HCCL net layers failed, netLayerNum is ", netLayerNum);
 
-        for (uint32_t i = 0; i < rankDim; ++i) {
-            if (i == srcRankId) {
+        for (uint32_t peer = 0; peer < rankDim; ++peer) {
+            if (peer == srcRankId) {
                 continue;
             }
-            uint32_t channelId = (i > srcRankId) ? (i - 1) : i;
-            uint32_t layerId = netLayerNum == 1 ? netLayerList[HCCL_COMM_LAYERS_UB_MEM] : layerMap_[i];
+            uint32_t peerIndex = (peer > srcRankId) ? (peer - 1) : peer;
+            uint32_t layerId = netLayerNum == 1 ? netLayerList[HCCL_COMM_LAYERS_UB_MEM] : layerMap_[peer];
             CommLink *links = nullptr;
-            GetHcclCommLink(commHandle, layerId, srcRankId, i, protocol, links);
-            channelDesc[channelId].channelProtocol = protocol;
-            channelDesc[channelId].remoteRank = i;
-            channelDesc[channelId].notifyNum = channelNum;
-            channelDesc[channelId].localEndpoint = links->srcEndpointDesc;
-            channelDesc[channelId].remoteEndpoint = links->dstEndpointDesc;
+            GetHcclCommLink(commHandle, layerId, srcRankId, peer, protocol, links);
+            for (uint32_t channel = 0; channel < channelsPerRank; ++channel) {
+                // Handles are compact by remote rank because the local rank does not need an HCOMM channel.
+                uint32_t channelId = peerIndex * channelsPerRank + channel;
+                channelDesc[channelId].channelProtocol = protocol;
+                channelDesc[channelId].remoteRank = peer;
+                channelDesc[channelId].notifyNum = MOE_CHANNEL_NOTIFY_NUM;
+                channelDesc[channelId].localEndpoint = links->srcEndpointDesc;
+                channelDesc[channelId].remoteEndpoint = links->dstEndpointDesc;
+            }
         }
     }
 
     void GetHcclCommChannel(const HcclComm &commHandle, const CommEngine &engine, uint32_t rankDim, uint32_t srcRankId,
                             const CommProtocol &protocol, MoeCommContext &context)
     {
-        uint32_t channelNum = rankDim - 1;
+        TORCH_CHECK(rankDim >= HCCL_MIN_RANK_SIZE && rankDim <= HCCL_MAX_RANK_SIZE,
+                    "Invalid HCCL rank size ", rankDim);
+        uint32_t remoteRankNum = rankDim - 1;
+        context.channelsPerRank = static_cast<uint32_t>(CeilDiv(MOE_CHANNEL_HANDLE_NUM, rankDim));
+        TORCH_CHECK(context.channelsPerRank > 0, "No HCCL channel capacity for rank size ", rankDim);
+        TORCH_CHECK(context.channelsPerRank <= HCCL_MAX_RANK_SIZE / rankDim,
+                    "HCCL channel handles exceed capacity, rank size ", rankDim, ", channels per rank ",
+                    context.channelsPerRank);
+        uint32_t channelNum = remoteRankNum * context.channelsPerRank;
         std::vector<HcclChannelDesc> channelDesc(channelNum);
+        ChannelHandle channelBuf[HCCL_MAX_RANK_SIZE] = {};
 
-        InitHcclChannel(commHandle, rankDim, srcRankId, protocol, channelDesc);
-        AcquireChannels(commHandle, engine, channelDesc, context.hcommHandle);
+        InitHcclChannel(commHandle, rankDim, srcRankId, context.channelsPerRank, protocol, channelDesc);
+        AcquireChannels(commHandle, engine, channelDesc, channelBuf);
+
+        uint32_t channelIndex = 0;
+        for (uint32_t peer = 0; peer < rankDim; ++peer) {
+            if (peer == srcRankId) {
+                continue;
+            }
+            for (uint32_t channel = 0; channel < context.channelsPerRank; ++channel) {
+                context.hcommHandle[peer * context.channelsPerRank + channel] = channelBuf[channelIndex++];
+            }
+        }
     }
 
     void GetHcclCommResource(const HcclComm &commHandle, const CommEngine &engine, const CommProtocol &protocol,
@@ -632,8 +659,9 @@ private:
             if (i == rankId) {
                 hcclRet = HcclGetHcclBufferFunc(commHandle, &tempBuffer, &hcclBufferSize);
             } else {
-                uint32_t idx = (i < rankId) ? i : (i - 1);
-                hcclRet = HcclChannelGetHcclBufferFunc(commHandle, context.hcommHandle[idx], &tempBuffer, &bufferSize);
+                uint32_t channelIndex = i * context.channelsPerRank;
+                hcclRet = HcclChannelGetHcclBufferFunc(commHandle, context.hcommHandle[channelIndex], &tempBuffer,
+                                                       &bufferSize);
             }
 
             TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Get HCCL buffer failed, src: ", rankId, ", dst: ", i,
