@@ -52,13 +52,13 @@ class StemOamPrepVarlenQOpBuilder(OpBuilder):
 
 
 stem_oam_prep_varlen_q_op_builder = StemOamPrepVarlenQOpBuilder()
-op_module = stem_oam_prep_varlen_q_op_builder.load()
 
 
 @impl(AS_LIBRARY, stem_oam_prep_varlen_q_op_builder.name, "PrivateUse1")
 def stem_oam_prep_varlen_q(
     q, q_seq_lens, cu_seq_lens_q, *, q_scale=None, stem_block_size=128, stem_stride=16
 ):
+    op_module = stem_oam_prep_varlen_q_op_builder.load()
     return op_module.stem_oam_prep_varlen_q(
         q, q_seq_lens, cu_seq_lens_q, q_scale, stem_block_size, stem_stride
     )

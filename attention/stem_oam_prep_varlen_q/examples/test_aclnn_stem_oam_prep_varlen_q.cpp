@@ -15,15 +15,8 @@
 
 #include <iostream>
 #include <vector>
-#include <sys/stat.h>
-#include <fstream>
-#include <fcntl.h>
-#include <unistd.h>
-#include <cstdio>
-#include <cassert>
-#include <iomanip>
+#include <cstring>
 #include "acl/acl.h"
-#include "aclnn/acl_meta.h"
 #include "aclnnop/aclnn_stem_oam_prep_varlen_q.h"
 
 #define CHECK_RET(cond, return_expr) \
@@ -38,48 +31,6 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-template <typename T>
-bool ReadFile(const std::string &filePath, std::vector<int64_t> shape, std::vector<T> &hostData)
-{
-    size_t fileSize = 1;
-    for (int64_t i : shape) {
-        fileSize *= i;
-    }
-    std::ifstream file(filePath, std::ios::binary);
-    if (!file.is_open()) {
-        std::cerr << "Cannot open file" << std::endl;
-        return false;
-    }
-    file.seekg(0, std::ios::end);
-    file.seekg(0, std::ios::beg);
-    hostData.reserve(fileSize);
-    if (!file.read(reinterpret_cast<char *>(hostData.data()), fileSize * sizeof(T))) {
-        std::cerr << "Read file failed" << std::endl;
-        return false;
-    }
-    file.close();
-    return true;
-}
-
-template <typename T>
-bool WriteFile(const std::string &filePath, int64_t size, std::vector<T> &hostData)
-{
-    int fd = open(filePath.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWRITE);
-    if (fd < 0) {
-        LOG_PRINT("Open file failed. path = %s", filePath.c_str());
-        return false;
-    }
-
-    size_t writeSize = write(fd, reinterpret_cast<char *>(hostData.data()), size * sizeof(T));
-    (void)close(fd);
-    if (writeSize != size * sizeof(T)) {
-        LOG_PRINT("Write file Failed.");
-        return false;
-    }
-
-    return true;
-}
-
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
 {
     int64_t shapeSize = 1;
@@ -87,18 +38,6 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
         shapeSize *= i;
     }
     return shapeSize;
-}
-
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr, int num)
-{
-    auto size = GetShapeSize(shape);
-    std::vector<float> resultData(size, 0);
-    auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), *deviceAddr,
-                           size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
-    for (int64_t i = 0; i < 10; i++) {
-        LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
-    }
 }
 
 int Init(int32_t deviceId, aclrtStream *stream)
@@ -132,23 +71,6 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-template <typename T>
-int CreateAclTensorND(const std::vector<T> &shape, void **deviceAddr, void **hostAddr, aclDataType dataType,
-                      aclTensor **tensor)
-{
-    auto size = GetShapeSize(shape) * sizeof(T);
-    auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc ND tensor device failed. ERROR: %d\n", ret); return ret);
-    ret = aclrtMalloc(hostAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc ND tensor host failed. ERROR: %d\n", ret); return ret);
-    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, nullptr, 0, aclFormat::ACL_FORMAT_ND, shape.data(),
-                              shape.size(), *deviceAddr);
-    ret = aclrtMemcpy(*deviceAddr, size, *hostAddr, GetShapeSize(shape) * aclDataTypeSize(dataType),
-                      ACL_MEMCPY_HOST_TO_DEVICE);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
-    return 0;
-}
-
 int main()
 {
     int32_t deviceId = 0; // 根据实际设备ID填写
@@ -167,25 +89,18 @@ int main()
     int64_t kflat_dim = stemStride * D;
 
     // qSeqLens 和 cuSeqLensQ
-    int32_t qSeqLens_data[] = {128, 128};
-    int32_t cuSeqLensQ_data[] = {0, 128, 256};
+    int64_t qSeqLens_data[] = {128, 128};
+    int64_t cuSeqLensQ_data[] = {0, 128, 256};
 
     // 创建输入输出形状
     std::vector<int64_t> qShape = {total_tokens, H_q, D};
     std::vector<int64_t> qScaleShape = {total_tokens, H_q};
     std::vector<int64_t> qFlatShape = {batch, H_q, max_Qb, kflat_dim};
-    std::vector<int64_t> qSeqLensShape = {batch};
-    std::vector<int64_t> cuSeqLensQShape = {batch + 1};
 
     // 设备地址
     void *qDeviceAddr = nullptr;
     void *qScaleDeviceAddr = nullptr;
     void *qFlatDeviceAddr = nullptr;
-
-    // Host 地址
-    void *qHostAddr = nullptr;
-    void *qScaleHostAddr = nullptr;
-    void *qFlatHostAddr = nullptr;
 
     // aclTensor
     aclTensor *q = nullptr;
@@ -195,15 +110,18 @@ int main()
     aclIntArray *cuSeqLensQ = nullptr;
 
     // 创建 q tensor (FP8_E4M3FN)
-    ret = CreateAclTensorND(qShape, &qDeviceAddr, &qHostAddr, aclDataType::ACL_FLOAT8_E4M3FN, &q);
+    std::vector<uint8_t> hostQ(GetShapeSize(qShape), 1);
+    ret = CreateAclTensor(hostQ, qShape, &qDeviceAddr, aclDataType::ACL_FLOAT8_E4M3FN, &q);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     // 创建 qScale tensor (FLOAT)
-    ret = CreateAclTensorND(qScaleShape, &qScaleDeviceAddr, &qScaleHostAddr, aclDataType::ACL_FLOAT, &qScale);
+    std::vector<float> hostQScale(GetShapeSize(qScaleShape), 1.0f);
+    ret = CreateAclTensor(hostQScale, qScaleShape, &qScaleDeviceAddr, aclDataType::ACL_FLOAT, &qScale);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     // 创建 qFlat output tensor (BFLOAT16)
-    ret = CreateAclTensorND(qFlatShape, &qFlatDeviceAddr, &qFlatHostAddr, aclDataType::ACL_BFLOAT16, &qFlat);
+    std::vector<uint16_t> hostQFlat(GetShapeSize(qFlatShape), 0);
+    ret = CreateAclTensor(hostQFlat, qFlatShape, &qFlatDeviceAddr, aclDataType::ACL_BF16, &qFlat);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     // 创建 qSeqLens 和 cuSeqLensQ
@@ -217,7 +135,7 @@ int main()
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
 
-    ret = aclnnStemOamPrepVarlenQGetWorkspaceSize(q, qScale, qSeqLens, cuSeqLensQ, stemBlockSize, stemStride, qFlat,
+    ret = aclnnStemOamPrepVarlenQGetWorkspaceSize(q, qSeqLens, cuSeqLensQ, qScale, stemBlockSize, stemStride, qFlat,
                                                   &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnStemOamPrepVarlenQGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
@@ -239,14 +157,18 @@ int main()
 
     // 5. 获取输出结果
     auto qFlatSize = GetShapeSize(qFlatShape);
-    std::vector<float> qFlatData(qFlatSize, 0);
+    std::vector<uint16_t> qFlatData(qFlatSize, 0);
     ret = aclrtMemcpy(qFlatData.data(), qFlatData.size() * sizeof(qFlatData[0]), qFlatDeviceAddr,
-                      qFlatSize * sizeof(float), ACL_MEMCPY_DEVICE_TO_HOST);
+                      qFlatSize * sizeof(uint16_t), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
 
-    // 打印前10个结果
+    // 打印前10个结果 (BF16 -> float 转换打印)
     for (int64_t i = 0; i < 10 && i < qFlatSize; i++) {
-        LOG_PRINT("qFlat[%ld] is: %f\n", i, qFlatData[i]);
+        uint16_t bf16Val = qFlatData[i];
+        uint32_t floatBits = static_cast<uint32_t>(bf16Val) << 16;
+        float floatVal;
+        std::memcpy(&floatVal, &floatBits, sizeof(float));
+        LOG_PRINT("qFlat[%ld] is: %f\n", i, floatVal);
     }
 
     // 6. 释放资源
@@ -263,10 +185,6 @@ int main()
     aclrtFree(qDeviceAddr);
     aclrtFree(qScaleDeviceAddr);
     aclrtFree(qFlatDeviceAddr);
-
-    aclrtFree(qHostAddr);
-    aclrtFree(qScaleHostAddr);
-    aclrtFree(qFlatHostAddr);
 
     aclrtDestroyStream(stream);
     aclrtResetDevice(deviceId);

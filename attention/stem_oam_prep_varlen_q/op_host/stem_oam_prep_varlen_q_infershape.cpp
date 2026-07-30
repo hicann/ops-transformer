@@ -16,6 +16,8 @@
 namespace ops {
 
 static constexpr int64_t DIM_QK = 128;
+static constexpr int64_t Q_DIM_NUM = 3;
+static constexpr int64_t Q_SEQ_LENS_DIM_NUM = 1;
 static constexpr int64_t INPUT_Q = 0;
 static constexpr int64_t INPUT_Q_SEQ_LENS = 1;
 static constexpr int64_t OUTPUT_Q_FLAT = 0;
@@ -60,6 +62,17 @@ static ge::graphStatus InferShapeForStemOamPrepVarlenQ(gert::InferShapeContext *
         qFlatShape->AppendDim(UNKNOWN_RANK_DIM_VALUE);
         OP_LOGD(context, "StemOamPrepVarlenQ infershape handles unknown rank.");
         return ge::GRAPH_SUCCESS;
+    }
+
+    if (qShape->GetDimNum() != Q_DIM_NUM) {
+        OP_LOGE(context, "q shape dim num must be %ld, but got %zu.", Q_DIM_NUM,
+                qShape->GetDimNum());
+        return ge::GRAPH_FAILED;
+    }
+    if (qSeqLensShape->GetDimNum() != Q_SEQ_LENS_DIM_NUM) {
+        OP_LOGE(context, "qSeqLens shape dim num must be %ld, but got %zu.",
+                Q_SEQ_LENS_DIM_NUM, qSeqLensShape->GetDimNum());
+        return ge::GRAPH_FAILED;
     }
 
     int64_t H_q = qShape->GetDim(1);
