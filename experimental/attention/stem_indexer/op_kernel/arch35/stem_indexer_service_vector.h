@@ -230,9 +230,11 @@ __aicore__ inline void SIVector<SIT>::InitSparseIndicesToNegOne(uint32_t gS1Idx,
     int64_t curGS1ProcNum = actMBaseSize;
     // 当前AIV核处理的GS1起始索引（双核分工）
     uint32_t aivParity = static_cast<uint32_t>(blockId_) & 1U;
-    int64_t curAivGS1Idx = curGS1Idx + aivParity * ((curGS1ProcNum + 1) >> 1U);
+    int64_t curAivGS1Idx = curGS1Idx + aivParity * ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U);
     // 当前AIV核需要处理的GS1行数量
-    int64_t curAivGS1ProcNum = (aivParity == 0U) ? ((curGS1ProcNum + 1) >> 1U) : (curGS1ProcNum >> 1U);
+    int64_t curAivGS1ProcNum = (aivParity == 0U) ?
+                                   ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U) :
+                                   (static_cast<uint64_t>(curGS1ProcNum) >> 1U);
     if (curAivGS1ProcNum == 0) {
         return;
     }
@@ -309,23 +311,20 @@ __aicore__ inline uint32_t SIVector<SIT>::CalcDynamicTopkCount(uint32_t s1Idx, i
         return static_cast<uint32_t>(kStart);
     }
 
-    // 计算 kEnd
-    int32_t kEnd = static_cast<int32_t>(kStart * alpha_);
+    // 公式定义 kEnd = alpha * kStart，插值完成后再向下取整。
+    float kStartFloat = static_cast<float>(kStart);
+    float kEnd = kStartFloat * alpha_;
 
     // 计算插值系数 t
     float t = static_cast<float>(s1Pos - kStart) / static_cast<float>(decayLen - 1);
+    float interpolatedTopkCount = kStartFloat + t * (kEnd - kStartFloat);
 
-    // 计算 dynamicTopkCount
-    uint32_t dynamicTopkCount =
-        static_cast<uint32_t>(static_cast<float>(kStart) + t * static_cast<float>(kEnd - kStart));
+    // 正数转有符号整数等价于 floor；外推到负数时先钳制，避免无符号转换。
+    int32_t dynamicTopkCount =
+        interpolatedTopkCount < 1.0f ? 1 : static_cast<int32_t>(interpolatedTopkCount);
+    dynamicTopkCount = Min(dynamicTopkCount, kStart);
 
-    // 限制范围：下限为 1，上限为 kStart
-    dynamicTopkCount =
-        dynamicTopkCount < 1 ?
-            1 :
-            (dynamicTopkCount > static_cast<uint32_t>(kStart) ? static_cast<uint32_t>(kStart) : dynamicTopkCount);
-
-    return dynamicTopkCount;
+    return static_cast<uint32_t>(dynamicTopkCount);
 }
 
 template <typename SIT>
@@ -477,9 +476,11 @@ __aicore__ inline void SIVector<SIT>::ProcessTopK(const SICommon::RunInfo &info,
     int64_t curGS1ProcNum = info.actMBaseSize;
     // 当前AIV核处理的GS1起始索引（双核分工）
     uint32_t aivParity = static_cast<uint32_t>(blockId_) & 1U;
-    int64_t curAivGS1Idx = curGS1Idx + aivParity * ((curGS1ProcNum + 1) >> 1U);
+    int64_t curAivGS1Idx = curGS1Idx + aivParity * ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U);
     // 当前AIV核需要处理的GS1行数量
-    int64_t curAivGS1ProcNum = (aivParity == 0U) ? ((curGS1ProcNum + 1) >> 1U) : (curGS1ProcNum >> 1U);
+    int64_t curAivGS1ProcNum = (aivParity == 0U) ?
+                                   ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U) :
+                                   (static_cast<uint64_t>(curGS1ProcNum) >> 1U);
 
     // S2 基本块信息
     uint32_t s2BlockStart = info.s2Idx * s2BaseSize_;
@@ -604,9 +605,11 @@ __aicore__ inline void SIVector<SIT>::ProcessDirectOutput(const SICommon::TempLo
         int64_t curGS1ProcNum = actMBaseSize;
         // 当前AIV核处理的gS1起始索引（双核分工）
         uint32_t aivParity = static_cast<uint32_t>(blockId_) & 1U;
-        int64_t curAivGS1Idx = curGS1Idx + aivParity * ((curGS1ProcNum + 1) >> 1U);
+        int64_t curAivGS1Idx = curGS1Idx + aivParity * ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U);
         // 当前AIV核需要处理的gS1行数量
-        int64_t curAivGS1ProcNum = (aivParity == 0U) ? ((curGS1ProcNum + 1) >> 1U) : (curGS1ProcNum >> 1U);
+        int64_t curAivGS1ProcNum = (aivParity == 0U) ?
+                                       ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U) :
+                                       (static_cast<uint64_t>(curGS1ProcNum) >> 1U);
 
         uint32_t curS1RealS2Len = actS2Size;
         uint32_t curAivGSize = CeilDiv(curAivGS1ProcNum, actS1Size);

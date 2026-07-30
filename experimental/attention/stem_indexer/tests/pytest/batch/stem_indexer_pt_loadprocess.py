@@ -37,11 +37,21 @@ def move_inputs_to_npu(test_data):
         "q_seq_lens": test_data["q_seq_lens"].npu(),
         "kv_seq_lens": test_data["kv_seq_lens"].npu(),
         "num_prompt_tokens": test_data["num_prompt_tokens"].npu(),
-        "metadata": test_data["metadata"].npu(),
     }
 
 
+def build_metadata(case, npu_inputs):
+    return torch.ops.custom.npu_stem_indexer_metadata(
+        npu_inputs["q_seq_lens"],
+        npu_inputs["kv_seq_lens"],
+        case["q_heads"],
+        case["kv_heads"],
+        **stem_indexer_golden.get_metadata_attrs(case),
+    )
+
+
 def call_stem_indexer(case, npu_inputs):
+    metadata = build_metadata(case, npu_inputs)
     return torch.ops.custom.npu_stem_indexer(
         npu_inputs["qflat"],
         npu_inputs["kflat"],
@@ -49,7 +59,7 @@ def call_stem_indexer(case, npu_inputs):
         npu_inputs["q_seq_lens"],
         npu_inputs["kv_seq_lens"],
         num_prompt_tokens=npu_inputs["num_prompt_tokens"],
-        metadata=npu_inputs["metadata"],
+        metadata=metadata,
         **stem_indexer_golden.get_call_attrs(case),
     )
 

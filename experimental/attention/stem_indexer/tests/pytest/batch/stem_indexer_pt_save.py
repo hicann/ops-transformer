@@ -19,7 +19,6 @@ import sys
 
 import pandas as pd
 import torch
-import torch_npu
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 PYTEST_DIR = os.path.dirname(CURRENT_DIR)
@@ -27,7 +26,6 @@ if PYTEST_DIR not in sys.path:
     sys.path.insert(0, PYTEST_DIR)
 
 import stem_indexer_golden  # noqa: E402
-import custom_ops  # noqa: E402, F401
 
 
 LIST_COLUMNS = {
@@ -162,28 +160,6 @@ def select_test_cases(test_cases):
     return filtered
 
 
-def to_cpu_tensor(tensor):
-    return tensor.detach().cpu() if hasattr(tensor, "detach") else tensor
-
-
-def build_metadata(case, inputs):
-    if case["expected_result"] == "FAIL":
-        return inputs["metadata"]
-
-    q_seq_lens = inputs["q_seq_lens"].npu()
-    kv_seq_lens = inputs["kv_seq_lens"].npu()
-    attrs = stem_indexer_golden.get_metadata_attrs(case)
-    metadata = torch.ops.custom.npu_stem_indexer_metadata(
-        q_seq_lens,
-        kv_seq_lens,
-        case["q_heads"],
-        case["kv_heads"],
-        **attrs,
-    )
-    torch_npu.npu.synchronize()
-    return to_cpu_tensor(metadata)
-
-
 def sanitize_case_name(case):
     name = f"{case['case_id']}_{case['testcase_name']}"
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
@@ -191,7 +167,6 @@ def sanitize_case_name(case):
 
 def build_pt_payload(case):
     inputs = stem_indexer_golden.build_case_inputs(case)
-    metadata = build_metadata(case, inputs)
     expected_indices = None
     expected_seq_len = None
     if case["expected_result"] == "PASS":
@@ -207,7 +182,6 @@ def build_pt_payload(case):
         "q_seq_lens": inputs["q_seq_lens"],
         "kv_seq_lens": inputs["kv_seq_lens"],
         "num_prompt_tokens": inputs["num_prompt_tokens"],
-        "metadata": metadata,
         "expected_sparse_indices": expected_indices,
         "expected_sparse_seq_len": expected_seq_len,
     }
@@ -250,7 +224,6 @@ def main():
     parser.add_argument("--device-id", type=int, default=0)
     args = parser.parse_args()
 
-    torch_npu.npu.set_device(args.device_id)
     test_cases = load_csv_test_cases(args.csv_path)
     test_cases = select_test_cases(test_cases)
     save_test_cases(test_cases, args.pt_output_dir)

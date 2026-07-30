@@ -1,0 +1,2 @@
+case_name,expectResult,qflat_dtype,kflat_dtype,vbias_dtype,q_seq_lens_dtype,kv_seq_lens_dtype,num_prompt_tokens_dtype,metadata_dtype,sparse_indices_dtype,sparse_seq_len_dtype,causal,stem_block_size,stem_stride,alpha,initial_blocks,window_size,k_block_num_rate_medium,k_block_num_bias_medium,k_block_num_rate_large,k_block_num_bias_large,topk_score_precision,case_annotation
+inferdtype_basic,SUCCESS,BF16,BF16,FLOAT,INT32,INT32,INT32,INT32,INT32,INT32,1,128,16,1.0,4,4,0.2,30,0.1,30,1,basic infer dtype test
