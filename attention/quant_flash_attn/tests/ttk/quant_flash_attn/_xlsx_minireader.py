@@ -68,13 +68,12 @@ def _cell_text(cell, shared_strings):
 
 
 def load_sheet1(xlsx_path: str):
-    """读 xlsx 的 sheet1（按行号排序），返回 list[dict[col_idx]→text]。
-
-    空单元格不出现在 dict 里，调用方用 dict.get(idx) 得 None。
-    """
-    with zipfile.ZipFile(xlsx_path) as z:
-        ss_xml = z.read("xl/sharedStrings.xml").decode("utf-8")
-        sheet_xml = z.read("xl/worksheets/sheet1.xml").decode("utf-8")
+    try:
+        with zipfile.ZipFile(xlsx_path) as z:
+            ss_xml = z.read("xl/sharedStrings.xml").decode("utf-8")
+            sheet_xml = z.read("xl/worksheets/sheet1.xml").decode("utf-8")
+    except KeyError:
+        return _load_sheet1_openpyxl(xlsx_path)
 
     ss_doc = minidom.parseString(ss_xml)
     shared_strings = []
@@ -94,5 +93,22 @@ def load_sheet1(xlsx_path: str):
             ref = c.getAttribute("r")
             col_idx, _row_idx = _parse_ref(ref)
             cells[col_idx] = _cell_text(c, shared_strings)
+        parsed_rows.append(cells)
+    return parsed_rows
+
+
+def _load_sheet1_openpyxl(xlsx_path: str):
+    import openpyxl
+
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+    ws = wb.active
+    parsed_rows = []
+    for row in ws.iter_rows():
+        cells = {}
+        for cell in row:
+            v = cell.value
+            if v is None:
+                continue
+            cells[cell.col_idx - 1] = str(v) if not isinstance(v, str) else v
         parsed_rows.append(cells)
     return parsed_rows

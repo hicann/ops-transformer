@@ -42,13 +42,12 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
     """aclgraph 编译目标: forward 只调 quant_flash_attn 主算子.
 
     __init__ (capture 之外) 完成:
-      1. 从函数参数取 bf16 q/k/v
-      2. bf16 -> fp8 + e8m0 量化
-      3. 注入 golden 全局变量 (B/N_q/.../ENABLE_PA/INPUT_LAYOUT/...)
-      4. prepare_npu_inputs: BNSD→TND/BSND layout 转换, e8m0 scale 打包, PA KV cache 预处理
-      5. cu_seqlens/seqused list → NPU tensor
-      6. quant_flash_attn_metadata 构建 (capture 之前, metadata 是 int32 tensor)
-      7. 所有运行时入参存为 self. 属性, forward 直接读
+      1. 从函数参数取 final-layout fp8 q/k/v + e8m0 descale + fp32 p_scale + int32 block_table
+      2. 注入 golden 全局变量 (B/N_q/.../ENABLE_PA/INPUT_LAYOUT/...)
+      3. prepare_npu_inputs
+      4. cu_seqlens/seqused list → NPU tensor
+      5. quant_flash_attn_metadata 构建 (capture 之前, metadata 是 int32 tensor)
+      6. 所有运行时入参存为 self. 属性, forward 直接读
 
     forward() (capture 之内) 只调:
       torch.ops.cann_ops_transformer.quant_flash_attn(self.q, ..., metadata=self.metadata, ...)
@@ -95,9 +94,10 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         super().__init__()
         torch_npu.npu.set_device(int(device_id))
 
-        # ---- 1. 从函数参数取 bf16  ----
-        # q, k, v 是 torch.bfloat16 (CSV tensor_dtypes=bfloat16)
-        # dequant_scale_q/k/v 是占位 fp8 tensor (CSV 占位 e4m3, 框架不支持 e8m0), 忽略
+        # ---- 1. 从函数参数取 final-layout fp8 + e8m0  ----
+        # q, k, v 是 torch.float8_e4m3fn, final layout (TND / PA paged)
+        # dequant_scale_q/k/v 是 torch.float8_e8m0fnu, final layout (TND / PA paged)
+        # p_scale 是 torch.float32, block_table 是 torch.int32
         p_scale_val = (
             float(p_scale.item())
             if isinstance(p_scale, torch.Tensor)
@@ -145,10 +145,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
             }
         )
 
-        # ---- 3. B1: bf16 -> fp8 + e8m0 量化  ----
-        fp8_dtype = torch.float8_e4m3fn
-        group_size = 32
-        fp8_max = 448.0
+        # ---- 3. 透传 ----
 
         def _to_cpu(t):
             return (
@@ -157,49 +154,34 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
                 else t
             )
 
-        q_cpu = _to_cpu(q)
-        k_cpu = _to_cpu(k)
-        v_cpu = _to_cpu(v)
+        q_fp8 = _to_cpu(q)
+        k_fp8 = _to_cpu(k)
+        v_fp8 = _to_cpu(v)
+        dequant_scale_q_cpu = _to_cpu(dequant_scale_q)
+        dequant_scale_k_cpu = _to_cpu(dequant_scale_k)
+        dequant_scale_v_cpu = _to_cpu(dequant_scale_v)
         p_scale_cpu = _to_cpu(p_scale)
         block_table_cpu = _to_cpu(block_table)
 
-        quant_scale_q = golden_mod.get_mxfp8_per_token_group_quant_scale(
-            q_cpu, fp8_dtype, group_size
-        )
-        quant_scale_k = golden_mod.get_mxfp8_per_token_group_quant_scale(
-            k_cpu, fp8_dtype, group_size
-        )
-        quant_scale_v = golden_mod.get_mxfp8_per_channel_group_quant_scale(
-            v_cpu, fp8_dtype, group_size
-        )
-
-        q_fp8 = (
-            golden_mod.mxfp8_per_token_group_quant(q_cpu, quant_scale_q, group_size)
-            .clamp(-fp8_max, fp8_max)
-            .to(fp8_dtype)
-        )
-        k_fp8 = (
-            golden_mod.mxfp8_per_token_group_quant(k_cpu, quant_scale_k, group_size)
-            .clamp(-fp8_max, fp8_max)
-            .to(fp8_dtype)
-        )
-        v_fp8 = (
-            golden_mod.mxfp8_per_channel_group_quant(v_cpu, quant_scale_v, group_size)
-            .clamp(-fp8_max, fp8_max)
-            .to(fp8_dtype)
+        logger.info(
+            "[GRAPH] 透传 fp8+e8m0 (q=%s, k=%s, v=%s, dq=%s, dk=%s, dv=%s, enable_pa=%s)",
+            tuple(q_fp8.shape),
+            tuple(k_fp8.shape),
+            tuple(v_fp8.shape),
+            tuple(dequant_scale_q_cpu.shape),
+            tuple(dequant_scale_k_cpu.shape),
+            tuple(dequant_scale_v_cpu.shape),
+            enable_pa,
         )
 
-        # ---- 4. prepare_npu_inputs: layout 转换 + e8m0 打包 + PA 预处理 ----
-        # 返回字典: q/k/v/mask/dequant_scale_q/k/v/p_scale/block_table (NPU tensor) +
-        #          cu_seqlens_q/kv, seqused_q/kv (python list, 未转 tensor) + 标量
-        # prepare_npu_inputs 期望 CPU tensor (内部 .npu()), 传 CPU fp8/scale/p_scale/block_table
+        # ---- 4. prepare_npu_inputs ----
         inputs = golden_mod.prepare_npu_inputs(
             q_fp8,
             k_fp8,
             v_fp8,
-            quant_scale_q,
-            quant_scale_k,
-            quant_scale_v,
+            dequant_scale_q_cpu,
+            dequant_scale_k_cpu,
+            dequant_scale_v_cpu,
             p_scale_cpu,
             cu_seqlens_q_list,
             cu_seqlens_kv_list,

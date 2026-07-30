@@ -61,7 +61,7 @@ CSV_PROFILES = [
 DTYPE_MAP = {
     "FLOAT8_E4M3FN": "float8_e4m3fn",
     "BF16": "bfloat16",
-    "FLOAT8_E8M0": "float8_e8m0fnu",
+    "FLOAT8_E8M0": "float8_e8m0",
     "INT32": "int32",
     "INT8": "int8",
     "FP32": "float32",
@@ -177,7 +177,7 @@ def _str_to_int(s):
     s = s.strip()
     if not s:
         return None
-    return int(float(s))  # Excel 可能给 "8.8387999999999994E-2" 这种浮点字符串
+    return int(float(s))
 
 
 def _str_to_float(s):
@@ -245,24 +245,6 @@ def _strip_or_none(s):
 #   6 p_scale        (AM-AO)   datarange 不映射（p_scale 是标量）
 #   7 block_table    (AI-AK)   空则 None 占位
 # attn_mask (BI-BK) 不映射：wrapper 无此参数
-def _bnsd_shape_from_attrs(B, N, D, cu_seqlens, seqused):
-    """从 case attributes 推导 BNSD 4维 (B, N, max_seq, D)。
-
-    customize_inputs in-place 写 BNSD 4维 (与量化函数
-    get_mxfp8_per_token_group_quant_scale 的 4维要求一致), CSV shape 必须和
-    in-place 写的 shape 严格对齐。max_seq 从 cu_seqlens 差分或 seqused 推导,
-    与 inputs.py 的逻辑一致。
-    """
-    if cu_seqlens and len(cu_seqlens) > 1:
-        actual_seq = [
-            cu_seqlens[i + 1] - cu_seqlens[i] for i in range(len(cu_seqlens) - 1)
-        ]
-    elif seqused and len(seqused) > 0:
-        actual_seq = list(seqused)
-    else:
-        actual_seq = [0]
-    max_seq = max(actual_seq) if actual_seq else D
-    return (B, N, max_seq, D)
 
 
 def _build_tensor_lists(row):
@@ -275,101 +257,48 @@ def _build_tensor_lists(row):
         dtypes.append(dtype)
         data_ranges.append(drange)
 
-    # CSV q/k/v 写 BNSD 4维 bfloat16 (与 inputs.py in-place 写的 shape 对齐),
-    # 框架生成 bf16 tensor, customize_inputs in-place 写真实数据, 量化 (bf16→fp8+e8m0)
-    # 在 wrapper/golden 内部各自做。descale 的 e8m0 因框架不认
-    # (numpy_to_torch_tensor 白名单缺 float8_e8m0), 仍走占位策略, 真实 e8m0 在
-    # wrapper/golden 内现算。
-    # shape 从 attributes (cu_seqlens/seqused) 推导, 与 inputs.py 逻辑一致,
-    # 不是 Excel 给的运行时 layout shape (TND 3维 / PA paged 5维)。
-    B_val = _str_to_int(row.get(COL["CA_batch_size"]))
-    cu_q = _str_to_int_list(row.get(COL["AP_cu_seqlens_q_value"]))
-    cu_kv = _str_to_int_list(row.get(COL["AT_cu_seqlens_kv_value"]))
-    seqused_q = _str_to_int_list(row.get(COL["AX_seqused_q_value"]))
-    seqused_kv = _str_to_int_list(row.get(COL["BB_seqused_kv_value"]))
-    if B_val is None:
-        B_val = max(1, len(cu_q) - 1) if cu_q and len(cu_q) >= 2 else 1
-    N_q_val = _str_to_int(row.get(COL["CB_num_heads_q"]))
-    N_kv_val = _str_to_int(row.get(COL["CC_num_heads_kv"]))
-    D_val = _str_to_int(row.get(COL["CD_head_dim"]))
+    # data_range 透传 Excel
+    _push(
+        _str_to_shape(row.get(COL["Q_q_shape"])),
+        _map_dtype(row.get(COL["R_q_dtype"])) or "float8_e4m3fn",
+        _str_to_datarange(row.get(COL["S_q_datarange"])),
+    )
+    _push(
+        _str_to_shape(row.get(COL["T_k_shape"])),
+        _map_dtype(row.get(COL["U_k_dtype"])) or "float8_e4m3fn",
+        _str_to_datarange(row.get(COL["V_k_datarange"])),
+    )
+    _push(
+        _str_to_shape(row.get(COL["W_v_shape"])),
+        _map_dtype(row.get(COL["X_v_dtype"])) or "float8_e4m3fn",
+        _str_to_datarange(row.get(COL["Y_v_datarange"])),
+    )
 
-    q_bnsd = _bnsd_shape_from_attrs(B_val, N_q_val, D_val, cu_q, seqused_q)
-    k_bnsd = _bnsd_shape_from_attrs(B_val, N_kv_val, D_val, cu_kv, seqused_kv)
-    v_bnsd = _bnsd_shape_from_attrs(B_val, N_kv_val, D_val, cu_kv, seqused_kv)
-
-    # 推导 actual_seq_kv (用于 block_table shape, 与 inputs.py 逻辑一致)
-    if cu_kv and len(cu_kv) > 1:
-        actual_seq_kv_list = [cu_kv[i + 1] - cu_kv[i] for i in range(len(cu_kv) - 1)]
-    elif seqused_kv and len(seqused_kv) > 0:
-        actual_seq_kv_list = list(seqused_kv)
-    else:
-        actual_seq_kv_list = [0]
-
-    # enable_pa / block_size (与 _build_attributes 逻辑一致)
-    layout_kv = _strip_or_none(row.get(COL["BX_layout_kv"]))
-    enable_pa = isinstance(layout_kv, str) and layout_kv.startswith("PA_")
-    if enable_pa:
-        k_shape = _str_to_shape(row.get(COL["T_k_shape"]))
-        if k_shape is not None:
-            bs_idx = 3 if layout_kv == "PA_NZ" else 2
-            block_size = k_shape[bs_idx] if len(k_shape) > bs_idx else 0
-        else:
-            block_size = 0
-    else:
-        block_size = 0
-
-    _push(q_bnsd, "bfloat16", _str_to_datarange(row.get(COL["S_q_datarange"])))
-    _push(k_bnsd, "bfloat16", _str_to_datarange(row.get(COL["V_k_datarange"])))
-    _push(v_bnsd, "bfloat16", _str_to_datarange(row.get(COL["Y_v_datarange"])))
-    # q/k/v descale：真实值由 customize_inputs 生成（amax 计算产物），datarange 不从 Excel 映射。
-    # 但 ttk 默认 input 生成路径对所有非 None shape 的 tensor 都要 RandomData(dtype, shape, data_range)，
-    # data_range=None 会让 get(None, 0) 崩溃，所以用 (0, 1) 占位（customize_inputs 会覆盖真实值）。
-    # dtype: Excel 里是 FLOAT8_E8M0，但 ttk numpy_to_torch_tensor 不支持 float8_e8m0fnu 转换
-    # （is_torch_native_dtype 用 hasattr 判断，NPU torch 有此属性但 numpy_to_torch_tensor 白名单没加）。
-    # descale 真实 dtype 由 customize_inputs 生成 e8m0 tensor 覆盖，这里用 float8_e4m3fn 占位让 ttk 默认路径不崩。
     _DRANGE_PLACEHOLDER = (0, 1)
-    _DESCALE_PLACEHOLDER_DTYPE = "float8_e4m3fn"
     _push(
         _str_to_shape(row.get(COL["Z_qdescale_shape"])),
-        _DESCALE_PLACEHOLDER_DTYPE,
+        _map_dtype(row.get(COL["AA_qdescale_dtype"])) or "float8_e8m0",
         _DRANGE_PLACEHOLDER,
     )
     _push(
         _str_to_shape(row.get(COL["AC_kdescale_shape"])),
-        _DESCALE_PLACEHOLDER_DTYPE,
+        _map_dtype(row.get(COL["AD_kdescale_dtype"])) or "float8_e8m0",
         _DRANGE_PLACEHOLDER,
     )
     _push(
         _str_to_shape(row.get(COL["AF_vdescale_shape"])),
-        _DESCALE_PLACEHOLDER_DTYPE,
+        _map_dtype(row.get(COL["AG_vdescale_dtype"])) or "float8_e8m0",
         _DRANGE_PLACEHOLDER,
     )
-    # p_scale：标量，真实值由 customize_inputs 生成，datarange 用占位
     _push(
         _str_to_shape(row.get(COL["AM_p_scale_shape"])),
         _map_dtype(row.get(COL["AN_p_scale_dtype"])),
         _DRANGE_PLACEHOLDER,
     )
-    # block_table：wrapper 签名中是必选位置参数（无默认值），
-    # 即使非 PA 模式 Excel 为空，也必须给占位 shape 让 ttk 计入 input_count，
-    # 否则 match_overload 会因 input_count < required 而返回 PARAM_PLAN_FAILURE。
-    # customize_inputs in-place 写真实 block_table (PA) 或零占位 (非 PA);
-    # wrapper 内 enable_pa=False 时忽略 block_table 参数。
-    # shape 必须和 inputs.py 推导一致:
-    #   PA 模式 (B, max_blocks), max_blocks = ceil(max(seqused_kv)/block_size);
-    #   非 PA 模式 (0,) 占位。
-    bt_dtype = _map_dtype(row.get(COL["AJ_block_table_dtype"])) or "int32"
-    if enable_pa:
-        import math
 
-        max_blocks = (
-            max(math.ceil(s / block_size) for s in actual_seq_kv_list)
-            if actual_seq_kv_list and block_size
-            else 0
-        )
-        bt_shape = (B_val, max_blocks)
-    else:
-        bt_shape = (0,)
+    bt_dtype = _map_dtype(row.get(COL["AJ_block_table_dtype"])) or "int32"
+    bt_shape_excel = _str_to_shape(row.get(COL["AI_block_table_shape"]))
+    bt_shape = bt_shape_excel if bt_shape_excel is not None else (0,)
     _push(bt_shape, bt_dtype, _DRANGE_PLACEHOLDER)
 
     return shapes, dtypes, data_ranges
@@ -466,11 +395,15 @@ def _build_attributes(row):
 
 
 def _precision_tolerances(row):
-    """默认 ((0.005, 0.000025),)；若 attn_out_dtype (L) 含 BF16 → ((0.0078125, 0.0001),)"""
+    """默认 ((0.005, 0.000025, 0.005, 0.005, 10),);
+    若 attn_out_dtype (L) 含 BF16 → ((0.0078125, 0.0001, 0.005, 0.005, 10),)
+
+    5-tuple = (rtol, atol, diff_thd, pct_thd, max_diff_hd)。后三位为 check_result的三个阈值, 默认 0.005/0.005/10
+    """
     out_dtype = _strip_or_none(row.get(COL["L_attn_out_dtype"]))
     if out_dtype and "BF16" in out_dtype.upper():
-        return ((0.0078125, 0.0001),)
-    return ((0.005, 0.000025),)
+        return ((0.0078125, 0.0001, 0.005, 0.005, 10),)
+    return ((0.005, 0.000025, 0.005, 0.005, 10),)
 
 
 def _row_to_csv(excel_row, api_name, testcase_suffix):

@@ -166,12 +166,28 @@ def display_error_output_torch(real_data, expect_data, err_idx, relative_diff):
     )
 
 
-def check_result(expect, npu_result, rtol=None, atol=None):
-    diff_thd = 0.005
-    pct_thd = 0.005
-    max_diff_hd = 10
+def check_result(
+    expect,
+    npu_result,
+    rtol=None,
+    atol=None,
+    diff_thd=None,
+    pct_thd=None,
+    max_diff_hd=None,
+):
+    # 5 个阈值均可经 CSV attributes['precision_tolerances'] 5-tuple 注入:
+    #   (rtol, atol, diff_thd, pct_thd, max_diff_hd)
+    # 未传入 (None) 时取默认值: diff_thd=0.005, pct_thd=0.005, max_diff_hd=10,
+    # rtol/atol 按 dtype 分支 (bf16 0.0078125/0.0001, 否则 0.005/0.000025)
+    _diff_thd_default = 0.005
+    _pct_thd_default = 0.005
+    _max_diff_hd_default = 10
     _rtol_default = 0.005
     _atol_default = 0.000025
+
+    diff_thd = _diff_thd_default if diff_thd is None else diff_thd
+    pct_thd = _pct_thd_default if pct_thd is None else pct_thd
+    max_diff_hd = _max_diff_hd_default if max_diff_hd is None else max_diff_hd
 
     real_data = npu_result.detach().cpu().flatten()
     expect_data = (

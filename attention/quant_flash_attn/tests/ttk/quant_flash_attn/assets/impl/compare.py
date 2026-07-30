@@ -32,29 +32,47 @@ def _resolve_csv_tolerance(idx):
 
     ttk 框架不把 testcase 对象直接传给 custom compare, golden 插件在调用前把
     csv 的 precision_tolerances / absolute_precision 暂存到 golden_mod 上。
-    返回 (rtol, atol); csv 省略时返回 (None, None) 由 check_result 用默认值
-    (与 spec.py tolerance dict 一致: fp16 0.005/0.000025, bf16 0.0078125/0.0001)。
+    返回 (rtol, atol, diff_thd, pct_thd, max_diff_hd); csv 省略时返回 (None,)*5
+    由 check_result 用默认值 (rtol/atol 按 dtype 分支, diff_thd=0.005, pct_thd=0.005,
+    max_diff_hd=10)。
 
-    precision_tolerances 格式: tuple of (rtol, atol) per output, 如 ((0.0078125, 0.0001),)
-    absolute_precision 格式: float 或 tuple of float per output
+    precision_tolerances 格式: tuple of per-output tuple, 每条目可为 2-tuple 或 5-tuple
+      2-tuple (向后兼容): (rtol, atol)                       如 ((0.0078125, 0.0001),)
+      5-tuple (新):        (rtol, atol, diff_thd, pct_thd, max_diff_hd)
+                          如 ((0.0078125, 0.0001, 0.005, 0.005, 10),)
+    5-tuple 的后三位 None → check_result 用默认值 (0.005/0.005/10)
     """
     pt = getattr(golden_mod, "_csv_precision_tolerances", None)
     ap = getattr(golden_mod, "_csv_absolute_precision", None)
     rtol = None
     atol = None
-    if pt and idx < len(pt):
-        pair = pt[idx]
+    diff_thd = None
+    pct_thd = None
+    max_diff_hd = None
+    if pt:
+        # 优先取 idx 对应条目; idx 超出范围时回退到最后一个可用条目 (通常 idx=0)
+        pair = pt[idx] if idx < len(pt) else pt[-1]
         if pair is not None and len(pair) >= 2:
             rtol = float(pair[0])
-            # atol 优先取 precision_tolerances 的第二个元素, 缺省回退 absolute_precision
             atol = float(pair[1])
+            # 5-tuple 的后三位 (向后兼容: 2-tuple 缺失 → None → check_result 用默认值)
+            if len(pair) >= 3 and pair[2] is not None:
+                diff_thd = float(pair[2])
+            if len(pair) >= 4 and pair[3] is not None:
+                pct_thd = float(pair[3])
+            if len(pair) >= 5 and pair[4] is not None:
+                max_diff_hd = float(pair[4])
     if atol is None and ap is not None:
         if isinstance(ap, (tuple, list)):
-            if idx < len(ap) and ap[idx] is not None:
-                atol = float(ap[idx])
+            val = ap[idx] if idx < len(ap) else ap[-1]
+            if val is not None:
+                atol = float(val)
         else:
             atol = float(ap)
-    return rtol, atol
+    # replay 模式: pt 为 None (golden 未注入) → 用 bf16 默认, 与 CSV atten 容差一致
+    if rtol is None and atol is None:
+        rtol, atol = 0.0078125, 0.0001
+    return rtol, atol, diff_thd, pct_thd, max_diff_hd
 
 
 def _to_torch(x):
@@ -134,10 +152,24 @@ def compare(*outputs, **kwargs):
         label = "atten" if idx == 0 else f"out{idx}"
         npu_torch = _to_torch(npu_out)
         golden_torch = _to_torch(golden_out)
-        rtol, atol = _resolve_csv_tolerance(idx)
-        logger.info("[COMPARE] %s: csv rtol=%s atol=%s", label, rtol, atol)
+        rtol, atol, diff_thd, pct_thd, max_diff_hd = _resolve_csv_tolerance(idx)
+        logger.info(
+            "[COMPARE] %s: csv rtol=%s atol=%s diff_thd=%s pct_thd=%s max_diff_hd=%s",
+            label,
+            rtol,
+            atol,
+            diff_thd,
+            pct_thd,
+            max_diff_hd,
+        )
         result, fulfill_percent, max_error = result_compare_method.check_result(
-            golden_torch, npu_torch, rtol=rtol, atol=atol
+            golden_torch,
+            npu_torch,
+            rtol=rtol,
+            atol=atol,
+            diff_thd=diff_thd,
+            pct_thd=pct_thd,
+            max_diff_hd=max_diff_hd,
         )
         is_pass = result == "Pass"
         if not is_pass:
