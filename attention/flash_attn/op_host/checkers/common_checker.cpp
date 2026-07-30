@@ -170,11 +170,13 @@ ge::graphStatus CommonChecker::CheckNonQuantHeadNum(const FaTilingInfo &faInfo)
             shapeStr.c_str(), "N of query and key must be greater than or equal to 0");
         return ge::GRAPH_FAILED;
     }
-    OP_CHECK_IF(faInfo.n1Size < faInfo.n2Size,
-                OP_LOGE(faInfo.opName, "numHeads(%ld) should be greater than or equal to numKeyValueHeads(%ld)!",
-                        faInfo.n1Size, faInfo.n2Size),
-                return ge::GRAPH_FAILED);
-
+    if (faInfo.n1Size < faInfo.n2Size) {
+        std::string shapeStr = ToString(faInfo.opParamInfo.query.shape->GetStorageShape()) + " and " +
+            ToString(faInfo.opParamInfo.key.shape->GetStorageShape());
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(faInfo.opName, "query and key",
+            shapeStr.c_str(), "N of query must be greater than or equal to the same axis of key");
+        return ge::GRAPH_FAILED;
+    }
     if (faInfo.n1Size % faInfo.n2Size != 0) {
         std::string shapeStr = ToString(faInfo.opParamInfo.query.shape->GetStorageShape()) + " and " +
             ToString(faInfo.opParamInfo.key.shape->GetStorageShape());
@@ -230,8 +232,10 @@ ge::graphStatus CommonChecker::CheckAxis(const FaTilingInfo &faInfo)
             "S of query must be greater than 0"),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(faInfo.s2Size <= 0,
-                OP_LOGE(faInfo.opName, "The axis KV_S must be greater than 0, the current is %ld.", faInfo.s2Size),
-                return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "key/value",
+            ToString(faInfo.opParamInfo.key.shape->GetStorageShape()).c_str(),
+            "S of key/value must be greater than 0"),
+        return ge::GRAPH_FAILED);
 
     const std::vector<int64_t> supportedHeadDims = {64, 128, 256};
     OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckValueSupport(faInfo.qkHeadDim, supportedHeadDims),

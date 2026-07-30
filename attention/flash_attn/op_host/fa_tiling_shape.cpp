@@ -133,7 +133,9 @@ int64_t FaTilingShape::GetAxisNum(const FaAxis &axis) const
 ge::graphStatus FaTilingShape::CheckHasAxis(const FaAxis &axis, const std::string &funcName) const
 {
     if (shape_.GetDimNum() == 0) {
-        OP_LOGE(opName_, "[%s] The dim number of %s is 0.", funcName.c_str(), name_.c_str());
+        std::string reason = "[" + funcName + "] The shape dim of " + name_ + " cannot be 0";
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, name_.c_str(),
+            std::to_string(0).c_str(), reason.c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -143,8 +145,11 @@ ge::graphStatus FaTilingShape::CheckHasAxis(const FaAxis &axis, const std::strin
     }
 
     if (shape_.GetDimNum() != layoutAxes.size()) {
-        OP_LOGE(opName_, "[%s] %s shape dimension is %zu, expected is %zu (layout %s).", funcName.c_str(),
-                name_.c_str(), shape_.GetDimNum(), layoutAxes.size(), LayoutToSerialString(layout_).c_str());
+        std::string dimStr = std::to_string(shape_.GetDimNum());
+        std::string reason = "[" + funcName + "] The shape dim of " + name_ +
+            " must be equal to the axes size of layout(" + LayoutToSerialString(layout_) + "): " +
+            std::to_string(layoutAxes.size());
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, name_.c_str(), dimStr.c_str(), reason.c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -152,15 +157,16 @@ ge::graphStatus FaTilingShape::CheckHasAxis(const FaAxis &axis, const std::strin
         if (HasShapeD()) {
             return ge::GRAPH_SUCCESS;
         }
-        OP_LOGE(opName_, "[%s] %s's layout is %s, axis D or (D1, D0) does not exist.", funcName.c_str(), name_.c_str(),
-                LayoutToSerialString(layout_).c_str());
+        std::string reason = "[" + funcName + "] Axis D or (D1, D0) cannot be empty when layout of " +
+            name_ + " is " + LayoutToSerialString(layout_);
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, name_.c_str(), reason.c_str());
         return ge::GRAPH_FAILED;
     } else if (HasAxis(axis)) {
         return ge::GRAPH_SUCCESS;
     }
-
-    OP_LOGE(opName_, "[%s] %s's layout is %s, %s is not exists.", funcName.c_str(), name_.c_str(),
-            LayoutToSerialString(layout_).c_str(), AxisToSerialString(axis).c_str());
+    std::string reasonStr = "[" + funcName + "] " + AxisToSerialString(axis) +
+        " cannot be empty when layout of " + name_ + " is " + LayoutToSerialString(layout_);
+    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, name_.c_str(), reasonStr.c_str());
     return ge::GRAPH_FAILED;
 }
 
@@ -259,8 +265,10 @@ ge::graphStatus FaTilingShapeCompare::CompareShape(FaTilingShapeCompareParam &pa
     }
 
     if (shape_.GetDimNum() != shapeExpected.GetDimNum() || shape_.GetDimNum() != layoutAxes.size()) {
-        OP_LOGE(opName_, "[%s] %s shape dimension is %zu, expected is %zu (layout %s).", funcName.c_str(),
-                name_.c_str(), shape_.GetDimNum(), shapeExpected.GetDimNum(), LayoutToSerialString(layout_).c_str());
+        std::string reason = "[" + funcName + "] The shape dim of " + name_ + " must be " +
+            std::to_string(shapeExpected.GetDimNum()) + " when layout is " + LayoutToSerialString(layout_);
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, name_.c_str(),
+            std::to_string(shape_.GetDimNum()).c_str(), reason.c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -274,17 +282,18 @@ ge::graphStatus FaTilingShapeCompare::CompareShape(FaTilingShapeCompareParam &pa
 
         if (!compareFunc(shape_.GetDim(i), shapeExpected.GetDim(i))) {
             if (param.compareTypeMap.empty()) {
-                OP_LOGE(opName_, "[%s] %s layout is %s, shape %s should be equal to %s.", funcName.c_str(),
-                        name_.c_str(), LayoutToSerialString(layout_).c_str(), GetShapeStr(shape_).c_str(),
-                        GetShapeStr(shapeExpected).c_str());
+                std::string reason = "[" + funcName + "] The shape of " + name_ + " must be equal to " +
+                    GetShapeStr(shapeExpected) + " when layout of " + name_ + " is " + LayoutToSerialString(layout_);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, name_.c_str(),
+                    GetShapeStr(shape_).c_str(), reason.c_str());
             } else {
-                OP_LOGE(opName_,
-                        "[%s] %s layout is %s, shape is %s, expected is %s, "
-                        "axis %s(%ld) should %s expected %ld.",
-                        funcName.c_str(), name_.c_str(), LayoutToSerialString(layout_).c_str(),
-                        GetShapeStr(shape_).c_str(), GetShapeStr(shapeExpected).c_str(),
-                        AxisToSerialString(axis).c_str(), shape_.GetDim(i),
-                        CompareTypeToSerialSymbolString(compareType).c_str(), shapeExpected.GetDim(i));
+                std::string paramStr = name_ + " and expected";
+                std::string shapeMsg = GetShapeStr(shape_) + " and " + GetShapeStr(shapeExpected);
+                std::string reason = "[" + funcName + "] The axis " + AxisToSerialString(axis) + " of " +
+                    name_ + " must " + CompareTypeToSerialSymbolString(compareType) + "expected: " +
+                    std::to_string(shapeExpected.GetDim(i)) + " when layout of " + name_ + " is " +
+                    LayoutToSerialString(layout_);
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, paramStr.c_str(), shapeMsg.c_str(), reason.c_str());
             }
             return ge::GRAPH_FAILED;
         }
