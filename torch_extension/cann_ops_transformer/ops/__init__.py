@@ -23,6 +23,10 @@ from .quant_sparse_flash_mla import (
 )
 from .scatter_pa_kv_cache_with_k_scale import scatter_pa_kv_cache_with_k_scale
 from .sparse_flash_mla import sparse_flash_mla, sparse_flash_mla_metadata
+from .sparse_flash_mla_softmax_l1_norm import (
+    sparse_flash_mla_softmax_l1_norm,
+    sparse_flash_mla_softmax_l1_norm_metadata,
+)
 from .sparse_lightning_indexer_kl_loss_grad import (
     sparse_lightning_indexer_kl_loss_grad,
     sparse_lightning_indexer_kl_loss_grad_metadata,
