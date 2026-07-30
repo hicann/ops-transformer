@@ -76,7 +76,7 @@ public:
     static constexpr bool PAGE_ATTENTION = QLIV2T::pageAttention;
     static constexpr LI_LAYOUT Q_LAYOUT_T = QLIV2T::layout;
     static constexpr LI_LAYOUT K_LAYOUT_T = QLIV2T::keyLayout;
-
+    using W_T = typename QLIV2T::weightType;
     using SCORE_T = typename QLIV2T::scoreType;
     using SCALE_T = typename QLIV2T::scaleType;
     using WEIGHT_T = typename QLIV2T::weightType;
@@ -125,6 +125,8 @@ protected:
     GlobalTensor<WEIGHT_T> weightsGm;
     GlobalTensor<bfloat16_t> mxQueryScaleGmBf16;
     GlobalTensor<bfloat16_t> mxKeyScaleGmBf16;
+    GlobalTensor<SCALE_T> qScaleGm;
+    GlobalTensor<SCALE_T> kScaleGm;
     GlobalTensor<uint32_t> metadataGm;
 
     GlobalTensor<int32_t> indiceOutGm;
@@ -514,10 +516,10 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::Init(
         if constexpr (IS_MX) {
             vectorService.InitVecInputTensor(weightsGm, indiceOutGm, blockTableGm, valueOutGm, outputIdxOffsetGm);
         } else {
-            GlobalTensor<float> qScaleGmForVec;
-            GlobalTensor<float> kScaleGmForVec;
-            qScaleGmForVec.SetGlobalBuffer((__gm__ float *)queryScale);
-            kScaleGmForVec.SetGlobalBuffer((__gm__ float *)keyScale);
+            GlobalTensor<SCALE_T> qScaleGmForVec;
+            GlobalTensor<SCALE_T> kScaleGmForVec;
+            qScaleGmForVec.SetGlobalBuffer((__gm__ SCALE_T *)queryScale);
+            kScaleGmForVec.SetGlobalBuffer((__gm__ SCALE_T *)keyScale);
             vectorService.InitVecInputTensor(weightsGm, indiceOutGm, blockTableGm, valueOutGm, outputIdxOffsetGm,
                                              qScaleGmForVec, kScaleGmForVec);
         }

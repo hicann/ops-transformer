@@ -85,6 +85,7 @@ constexpr uint32_t BLOCK_SIZE_FACTOR = 16;
 constexpr uint32_t SPARSE_MODE_LOWER = 3;
 constexpr uint32_t METADATA_LIMIT = 1024;
 constexpr int32_t QUANT_MODE_FP8 = 1;
+constexpr int32_t QUANT_MODE_INT8 = 2;
 constexpr int32_t QUANT_MODE_MXFP8 = 3;
 constexpr int32_t QUANT_MODE_HIFLOAT8 = 4;
 constexpr int32_t QUANT_MODE_MXFP4 = 5;

@@ -308,7 +308,8 @@ ge::graphStatus QLIV2InfoParser::CheckAttrParaInfo()
                     return ge::GRAPH_FAILED);
     }
 
-    OP_CHECK_IF(((std::string(opParamInfo_.layOutQuery) != "BSND") && (std::string(opParamInfo_.layOutQuery) != "TND")),
+    OP_CHECK_IF(((std::string(opParamInfo_.layOutQuery) != "BSND") &&
+                (std::string(opParamInfo_.layOutQuery) != "TND")),
                 OP_LOGE(opName_, "input attr layout_query only supported BSND or TND."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(((std::string(opParamInfo_.layOutKey) != "PA_BBND") &&
                  (std::string(opParamInfo_.layOutQuery)) != (std::string(opParamInfo_.layOutKey))),
@@ -325,10 +326,12 @@ ge::graphStatus QLIV2InfoParser::CheckAttrParaInfo()
         OP_CHECK_IF(*opParamInfo_.quantMode != 2, OP_LOGE(opName_, "input attr quant_mode only supported 2."),
                     return ge::GRAPH_FAILED);
     } else if (npuArch_ == NpuArch::DAV_3510) {
-        OP_CHECK_IF((*opParamInfo_.quantMode != QUANT_MODE_FP8) && (*opParamInfo_.quantMode != QUANT_MODE_MXFP8) &&
-                        (*opParamInfo_.quantMode != QUANT_MODE_HIFLOAT8) &&
-                        (*opParamInfo_.quantMode != QUANT_MODE_MXFP4),
-                    OP_LOGE(opName_, "input attr quant_mode only supported 1, 3, 4 and 5."), return ge::GRAPH_FAILED);
+        OP_CHECK_IF((*opParamInfo_.quantMode != QUANT_MODE_FP8) && (*opParamInfo_.quantMode != QUANT_MODE_INT8) &&
+                    (*opParamInfo_.quantMode != QUANT_MODE_MXFP8) &&
+                    (*opParamInfo_.quantMode != QUANT_MODE_HIFLOAT8) &&
+                    (*opParamInfo_.quantMode != QUANT_MODE_MXFP4),
+                    OP_LOGE(opName_, "input attr quant_mode only supported 1, 2, 3, 4 and 5."),
+                    return ge::GRAPH_FAILED);
     }
 
     if (npuArch_ == NpuArch::DAV_2201) {
@@ -413,6 +416,9 @@ ge::graphStatus QLIV2InfoParser::GetAndCheckInOutDataType()
         } else if (*opParamInfo_.quantMode == QUANT_MODE_MXFP4) {
             expectQType = ge::DT_FLOAT4_E2M1;
             expectScaleType = ge::DT_FLOAT8_E8M0;
+        } else if (*opParamInfo_.quantMode == QUANT_MODE_INT8) {
+            expectQType = ge::DT_INT8;
+            expectScaleType = ge::DT_FLOAT16;
         }
         OP_CHECK_IF(inputQType_ != expectQType,
                     OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
@@ -436,11 +442,20 @@ ge::graphStatus QLIV2InfoParser::GetAndCheckInOutDataType()
                                                   "The data types of the input weights must be float16"),
             return ge::GRAPH_FAILED);
     } else if (npuArch_ == NpuArch::DAV_3510) {
-        OP_CHECK_IF(
-            weightsType_ != ge::DT_FLOAT,
-            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "weights", QLIV2DataTypeToSerialString(weightsType_).c_str(),
-                                                  "The data types of the input weights must be float"),
-            return ge::GRAPH_FAILED);
+        if (inputQType_ == ge::DT_INT8) {
+            OP_CHECK_IF(weightsType_ != ge::DT_FLOAT16,
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "weights",
+                    QLIV2DataTypeToSerialString(weightsType_).c_str(),
+                    "When data types of input query is int8, the data types of the input weights must be float16"),
+                return ge::GRAPH_FAILED);
+        } else {
+            OP_CHECK_IF(weightsType_ != ge::DT_FLOAT,
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "weights",
+                    QLIV2DataTypeToSerialString(weightsType_).c_str(),
+                    "When data types of input query is not int8, "
+                    "the data types of the input weights must be float"),
+                return ge::GRAPH_FAILED);
+        }
     }
 
     OP_CHECK_IF(outputType_ != ge::DT_INT32,

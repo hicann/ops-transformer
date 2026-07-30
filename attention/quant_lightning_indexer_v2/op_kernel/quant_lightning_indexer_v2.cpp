@@ -48,6 +48,7 @@ __global__ __aicore__ void quant_lightning_indexer_v2(
 
 #if (__CCE_AICORE__ == 310)
     constexpr uint32_t QUANT_MODE_FP8 = 1;
+    constexpr uint32_t QUANT_MODE_INT8 = 2;
     constexpr uint32_t QUANT_MODE_MXFP8 = 3;
     constexpr uint32_t QUANT_MODE_HIFLOAT8 = 4;
     constexpr uint32_t QUANT_MODE_MXFP4 = 5;
@@ -64,7 +65,12 @@ __global__ __aicore__ void quant_lightning_indexer_v2(
         INVOKE_LI_NO_KFC_OP_IMPL(QLIV2Preload, fp4x2_e2m1_t, fp4x2_e2m1_t, bfloat16_t, uint16_t, int32_t,
                                  PAGE_ATTENTION, LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), fp8_e8m0_t, float,
                                  float);
+    } else if (tiling_data->quantMode == QUANT_MODE_INT8) {
+        INVOKE_LI_NO_KFC_OP_IMPL(QLIV2Preload, int8_t, int8_t, int32_t, uint16_t, int32_t,
+                                PAGE_ATTENTION, LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T),
+                                half, half, int32_t);
     }
+
 #else
     INVOKE_LI_NO_KFC_OP_IMPL(QLIV2Preload, int8_t, int8_t, float, uint16_t, int32_t, PAGE_ATTENTION,
                              LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
