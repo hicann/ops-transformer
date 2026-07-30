@@ -1010,7 +1010,7 @@ __aicore__ inline void QuantCompressorBlockVectorFullLoad<COMP>::CopyOutVec1ResT
         uint32_t bIdx = sliceInfo.bIdx;
         uint32_t sIdx = sliceInfo.sIdx;
         uint64_t ubOffset = 0;
-        while (compressTcSize > 0) {
+        while (compressTcSize > 0 && bIdx < constInfo_.batchSize) {
             uint32_t bStartPos = GetStartPos(bIdx);
             uint32_t preScSize = (sIdx + bStartPos) / cmpRatio_;
             uint32_t totalScSize = (GetSeqUsed(bIdx) + bStartPos) / cmpRatio_;

@@ -428,6 +428,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/quant_compressor/README.md">quant_compressor</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>推理场景下SMLA和QLI的前处理算子，是Compressor的量化版本，用于将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/quant_lightning_indexer/README.md">quant_lightning_indexer</a></td>
     <td>✓</td>
     <td>✓</td>

@@ -130,7 +130,8 @@ __aicore__ inline void QuantCompressorKernel<COMP>::Init(__gm__ uint8_t *x, __gm
 
     // 剔除尾部的无效batch
     for (; constInfo.batchSize > 0; --constInfo.batchSize) {
-        uint32_t bSeqUsed = tools_.GetSeqLength(constInfo.batchSize - 1);
+        uint32_t bSeqUsed = tools_.isExistSeqUsed_ ? tools_.GetSeqUsed(constInfo.batchSize - 1)
+                                                    : tools_.GetSeqLength(constInfo.batchSize - 1);
         if (bSeqUsed > 0) {
             break;
         }
@@ -188,6 +189,7 @@ __aicore__ inline void QuantCompressorKernel<COMP>::InitTilingData()
     constInfo.nSize = tilingData_->baseParams.nSize;
     constInfo.vec1TailCacheSize = tilingData_->workspaceParams.vec1TailCacheSize;
     constInfo.dbWorkspaceRatio = tilingData_->workspaceParams.dbWorkspaceRatio;
+    constInfo.batchConsistency = tilingData_->baseParams.batchConsistency;
 }
 
 template <typename COMP>
@@ -199,9 +201,9 @@ __aicore__ inline void QuantCompressorKernel<COMP>::SplitK()
         // 获取m大小
         mSize += bSeqUsed;
     }
-
     uint32_t mBaseNum = CeilDivT(mSize, constInfo.mBaseSize);
-    if (constInfo.dBasicBlockNum * mBaseNum < constInfo.usedCoreNum) {
+    if (constInfo.dBasicBlockNum * mBaseNum < constInfo.usedCoreNum &&
+        constInfo.batchConsistency != BATCH_CONSISTENCY) {
         constInfo.kBaseNum = constInfo.usedCoreNum / constInfo.dBasicBlockNum;
         uint32_t kAlignSize = CeilDivT(
             Align(constInfo.hSize, static_cast<uint32_t>(BUFFER_SIZE_BYTE_32B / sizeof(X_T))), constInfo.kBaseNum);
@@ -245,7 +247,7 @@ __aicore__ inline void QuantCompressorKernel<COMP>::SkipInvalidBatch(BatchInfo &
     if (batchInfo.bIdx < constInfo.batchSize) {
         batchInfo.bStartPos = tools_.GetStartPos(batchInfo.bIdx);
         batchInfo.sIdx = 0;
-        batchInfo.headHolderSeq = batchInfo.bStartPos & (constInfo.cmpRatio - 1);
+        batchInfo.headHolderSeq = (uint32_t)(batchInfo.bStartPos % constInfo.cmpRatio);
         batchInfo.tcNum = (batchInfo.bStartPos + batchInfo.seqCnt + constInfo.cmpRatio - 1) / constInfo.cmpRatio -
                           batchInfo.bStartPos / constInfo.cmpRatio;
         batchInfo.compressedTcNum = (batchInfo.bStartPos + batchInfo.seqUsedCnt) / constInfo.cmpRatio -
@@ -297,12 +299,12 @@ __aicore__ inline BasicBlockInfo QuantCompressorKernel<COMP>::SkipOneLoop(BatchI
         if (quota < batchInfo.remSeqCnt) {
             // 向下对齐r，
             uint32_t alignSeq = constInfo.cmpRatio;
-            if (batchInfo.bIdx == 0) {
+            if (batchInfo.sIdx == 0) {
                 alignSeq = constInfo.cmpRatio - batchInfo.headHolderSeq;
             }
             if (quota > alignSeq) {
                 uint32_t delta =
-                    (batchInfo.bStartPos + batchInfo.sIdx + quota) & (constInfo.cmpRatio - 1); // 超出对齐的部分
+                    (batchInfo.bStartPos + batchInfo.sIdx + quota) % constInfo.cmpRatio; // 超出对齐的部分
                 curDealSeq = quota - delta;
                 quota -= curDealSeq;
                 curDealTcNum = (curDealSeq + constInfo.cmpRatio - 1) / constInfo.cmpRatio;

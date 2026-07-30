@@ -2,21 +2,33 @@
 
 ## 产品支持情况
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
-- 接口功能：QuantCompressor是推理场景下SMLA和QLI的前处理算子，是[compressor](./compressor.md)的量化版本。用于将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。在长序列的情况下，QuantCompressor可以有效地减少计算开销。与compressor的区别在于：输入$x$、$W^{KV}$、$W^{Gate}$为HIFLOAT8量化数据，直接以HIFLOAT8参与Matmul运算（硬件原生支持），再对Matmul输出的FLOAT32结果乘以合并后的缩放因子进行反量化，从而降低显存占用与搬运开销。主要计算过程为：
+- **接口功能**：QuantCompressor是推理场景下SMLA和QLI的前处理算子，是[compressor](./compressor.md)的量化版本。用于将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。在长序列的情况下，QuantCompressor可以有效地减少计算开销。与compressor的区别在于：输入$x$、$W^{KV}$、$W^{Gate}$为HIFLOAT8量化数据，直接以HIFLOAT8参与Matmul运算（硬件原生支持），再对Matmul输出的FLOAT32结果乘以合并后的缩放因子进行反量化，从而降低显存占用与搬运开销。主要计算过程为：
     1. Matmul与反量化：将HIFLOAT8量化的输入$X$与$W^{KV}$做Matmul运算得到FLOAT32结果，再乘以合并缩放因子$x\_descale \cdot wkv\_descale$完成反量化得到$kv\_state$；将$X$与$W^{Gate}$做Matmul运算得到FLOAT32结果，再乘以合并缩放因子$x\_descale \cdot wgate\_descale$完成反量化得到$score\_state$。其中x_descale为per-tensor缩放（单个标量），wkv_descale与wgate_descale为per-channel缩放（通道数为coff\*D），合并后仍为per-channel缩放。$kv\_state$与$score\_state$根据输入的start_pos及cu_seqlens完成更新。
     2. 在coff为2的情况下对$kv\_state$和$score\_state$进行数据重排。
     3. 对$score\_state$按压缩比分组并与$Ape$相加，然后进行softmax运算，将softmax结果与$kv\_state$做Mul计算，后进行ReduceSum运算。
 
-- 计算公式：
+- **计算公式**：
 
     1. 计算矩阵乘法与反量化（quant_mode=1，A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL）：
 
@@ -100,15 +112,15 @@ cann_ops_transformer.quant_compressor(
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 | ---- | ---- | ---- | ---- | ---- | ---- |
 | x | Tensor | 必选 | 原始不经压缩的数据，对应公式中的 $X$，HIFLOAT8量化输入。不支持非连续，数据格式支持ND。 | uint8（HIFLOAT8） | [B,S,H]、[T,H] |
-| wkv | Tensor | 必选 | kv压缩权重，对应公式中的 $W^{KV}$，HIFLOAT8量化输入。不支持非连续，数据格式支持ND。 | uint8（HIFLOAT8） | [coff* D,H] |
-| wgate | Tensor | 必选 | gate压缩权重，对应公式中的 $W^{Gate}$，HIFLOAT8量化输入。不支持非连续，数据格式支持ND。 | uint8（HIFLOAT8） | [coff* D,H] |
-| state_cache | Tensor | 必选 | kv_state和score_state的历史数据，对应公式中的 $\left[kv\_state, score\_state\right]$。不支持非连续，数据格式支持ND。 | float32 | [block_num,block_size,2* coff* D]，要求block_num>0 |
-| ape | Tensor | 必选 | positional biases，对应公式中的 $Ape$。不支持非连续，数据格式支持ND。 | float32 | [cmp_ratio,coff* D] |
+| wkv | Tensor | 必选 | kv压缩权重，对应公式中的 $W^{KV}$，HIFLOAT8量化输入。不支持非连续，数据格式支持ND。 | uint8（HIFLOAT8） | [coff\*D,H] |
+| wgate | Tensor | 必选 | gate压缩权重，对应公式中的 $W^{Gate}$，HIFLOAT8量化输入。不支持非连续，数据格式支持ND。 | uint8（HIFLOAT8） | [coff\*D,H] |
+| state_cache | Tensor | 必选 | kv_state和score_state的历史数据，对应公式中的 $\left[kv\_state, score\_state\right]$。不支持非连续，数据格式支持ND。 | float32 | [block_num, block_size, 2\*coff\*D]，要求block_num>0 |
+| ape | Tensor | 必选 | positional biases，对应公式中的 $Ape$。不支持非连续，数据格式支持ND。 | float32 | [cmp_ratio,coff\*D] |
 | quant_mode | int | 必选 | 量化模式。取值范围为[1]，1表示A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL（HIFLOAT8输入，x按per-tensor缩放、wkv/wgate按per-channel缩放反量化）。 | - | - |
-| cmp_ratio | int | 必选 | 数据压缩率。默认值为4. | - | - |
+| cmp_ratio | int | 必选 | 数据压缩率。取值范围为[2, 128]内的整数。 | - | - |
 | x_descale | Tensor | 可选 | x的反量化缩放因子，per-tensor缩放。quant_mode=1时必选。不支持非连续，数据格式支持ND。 | float32 | [1,] |
-| wkv_descale | Tensor | 可选 | wkv的反量化缩放因子，per-channel缩放，通道数为coff\*D。quant_mode=1时必选。不支持非连续，数据格式支持ND。 | float32 | [coff* D,] |
-| wgate_descale | Tensor | 可选 | wgate的反量化缩放因子，per-channel缩放，通道数为coff\*D。quant_mode=1时必选。不支持非连续，数据格式支持ND。 | float32 | [coff* D,] |
+| wkv_descale | Tensor | 可选 | wkv的反量化缩放因子，per-channel缩放，通道数为coff\*D。quant_mode=1时必选。不支持非连续，数据格式支持ND。 | float32 | [coff\*D,] |
+| wgate_descale | Tensor | 可选 | wgate的反量化缩放因子，per-channel缩放，通道数为coff\*D。quant_mode=1时必选。不支持非连续，数据格式支持ND。 | float32 | [coff\*D,] |
 | state_block_table | Tensor | 可选 | state_cache存储使用的block映射表。不支持非连续，数据格式支持ND。 | int32 | cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B]。当其中元素的值为0时，表示当前位置无需进行更新state_cache操作 |
 | cu_seqlens | Tensor | 可选 | 不同Batch上的有效token数。不支持非连续，数据格式支持ND。<br>当x的shape为[B,S,H]时，参数必须为空。<br>当x的shape为[T,H]时，输入shape必须为[B+1,]，该参数为前缀和数组，后一个元素≥前一个元素，第一位必须为0。 | int32 | [B+1,] |
 | seqused | Tensor | 可选 | 不同Batch中实际参与压缩的token数。不支持非连续，数据格式支持ND。<br>指定为None时，数值等于每个Batch上的Sequence Length。<br>[B,S,H]场景：0 ≤ seqused[n] ≤ S<br>[T,H]场景：0 ≤ seqused[n] ≤ cu_seqlens[n+1] - cu_seqlens[n]。 | int32 | [B,] |
@@ -116,25 +128,23 @@ cann_ops_transformer.quant_compressor(
 | coff | int | 可选 | 默认值1，仅支持1/2。<br>coff=1：无需进行overlap数据重排<br>coff=2：需要进行overlap数据重排。 | int32 | - |
 | cache_mode | int | 可选 | state_cache的存储模式。<br>1：连续buffer<br>2：循环buffer<br>默认值1。 | int32 | - |
 
-- 该接口支持推理场景下使用。
-
 ## 返回值说明
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 | ---- | ---- | ---- | ---- | ---- | ---- |
-| cmp_kv | Tensor | 必选 | 压缩后的数据。不支持非连续，数据格式支持ND；<br>当x的shape为[B,S,H]时，输出拼接：(<batch0>compressed_tokens+pad0) +  (<batch1>compressed_tokens+pad1) + ... +  (<batchN>compressed_tokens+padN)；<br>当x的shape为[T,H]时，输出拼接：<batch0>compressed_tokens + <batch1>compressed_tokens + ... + <batchN>compressed_tokens + pad。 | bfloat16 | x=[B,S,H]：[B,ceil(S/cmp_ratio),D]<br>x=[T,H]：[min(T,T//cmp_ratio+B),D] |
+| cmp_kv | Tensor | 必选 | 压缩后的数据。不支持非连续，数据格式支持ND；<br>当x的shape为[B,S,H]时，输出拼接：(\<batch0\>compressed_tokens+pad0) +  (\<batch1\>compressed_tokens+pad1) + ... +  (\<batchN\>compressed_tokens+padN)；<br>当x的shape为[T,H]时，输出拼接：\<batch0\>compressed_tokens + \<batch1\>compressed_tokens + ... + \<batchN\>compressed_tokens + pad。 | bfloat16 | x=[B,S,H]：[B,ceil(S/cmp_ratio),D]<br>x=[T,H]：[min(T,T//cmp_ratio+B),D] |
 
 ## 约束说明
 
 - 该接口支持推理场景下使用。
 
-- 该接口支持单算子模式和TorchAir图模式调用。
+- 该接口支持单算子模式和TorchAir图模式(aclgraph)调用。
 
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 
 - 该接口支持B、S泛化，且存在如下场景限制：
-    - 只支持B、S为0。
-    - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
+  - 只支持B、S为0。
+  - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
     <div style="overflow-x: auto;">
     <table style="undefined;table-layout: fixed; width: 400px"><colgroup>
     <col style="width: 100px">
@@ -173,26 +183,24 @@ cann_ops_transformer.quant_compressor(
 - 支持H为1K~10K，512对齐。
 - 支持block_size为1~1024。
 - quant_mode取值为1（A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL），此时x_descale、wkv_descale、wgate_descale为必选输入。其中x_descale shape为[1,]（per-tensor缩放），wkv_descale、wgate_descale shape为[coff\*D,]（per-channel缩放）。
-- 支持cmp_ratio为2/4/8/16/32/64/128。支持如下三种典型组合场景：
-    - C4A: D=512, coff=2, cmp_ratio=4;
-    - C4Li: D=128, coff=2, cmp_ratio=4;
-    - C128A: D=512, coff=1, cmp_ratio=128。
-- 该接口支持aclgraph模式。
-- 该接口不支持GE图模式。
+- 支持如下三种典型组合场景：
+  - C4A: D=512, coff=2, cmp_ratio=4;
+  - C4Li: D=128, coff=2, cmp_ratio=4;
+  - C128A: D=512, coff=1, cmp_ratio=128。
 
 ## 确定性计算
 
 - 默认支持确定性计算。
 
-## 调用说明
+## 调用示例
 
-  - 单算子模式调用：
+- 单算子模式调用：
 
     ```python
     import torch
     import torch_npu
     import numpy as np
-    from cann_ops_transformer.ops import quant_compressor
+    from cann_ops_transformer import quant_compressor
     import torch.nn as nn
     import math
 
@@ -364,7 +372,7 @@ cann_ops_transformer.quant_compressor(
     )
     ```
 
-  - TorchAir图模式调用：
+- TorchAir图模式调用：
 
     ```python
     import torch
@@ -372,7 +380,7 @@ cann_ops_transformer.quant_compressor(
     import numpy as np
     import torch.nn as nn
     import torchair
-    from cann_ops_transformer.ops import quant_compressor
+    from cann_ops_transformer import quant_compressor
     import math
 
     def get_seq_used_by_batch(batch_idx, S, seqused, cu_seqlens):

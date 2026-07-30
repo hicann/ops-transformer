@@ -163,6 +163,7 @@ struct ConstInfo {
     uint32_t sIdxOfLastTc = 0;
     uint32_t mGroupNum = 0;
     uint32_t mCurGroupIdx = 0;
+    uint32_t batchConsistency = 0;
 
     // shape及参数
     uint32_t batchSize = 0;

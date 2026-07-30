@@ -354,7 +354,6 @@ __aicore__ inline void QuantCompressorBlockCubeFullLoad<COMP>::ComputeMm1(const 
     uint32_t hStart = constInfo_.kStart;
     uint32_t hSize = constInfo_.kEnd - constInfo_.kStart;
     uint32_t hIdxStart = (constInfo_.aiCoreIdx % constInfo_.dBasicBlockNum) * K_L1_BASE; // 每组核内的h循环起始不同
-    hIdxStart = 0;
     uint32_t kSize = K_L1_BASE;
     for (uint32_t h = 0; h < hSize; h += K_L1_BASE) {
         // h方向错位搬运

@@ -641,25 +641,40 @@ __aicore__ inline void QuantCompressorVec1SliceIterator<COMP>::IteratorSlice()
     sliceInfo_.compressoredScCnt += sliceInfo_.compressTcSize;
     sliceInfo_.sIdx += sliceInfo_.validSeqCnt;
     if (sliceInfo_.sIdx >= sliceInfo_.bSeqUsed) {
+        bool isFirstDoWhileIter = true;
         do {
             uint32_t seqLength = tools_.GetSeqLength(sliceInfo_.bIdx);
-            if (sliceInfo_.bSeqUsed < seqLength) {
+            if (sliceInfo_.sIdx < seqLength && sliceInfo_.bSeqUsed < seqLength) {
                 uint32_t nextAlignSIdx = Align(sliceInfo_.bStartPos + sliceInfo_.sIdx, cmpRatio) - sliceInfo_.bStartPos;
-                sliceInfo_.dealedSeqCnt += nextAlignSIdx - sliceInfo_.sIdx;
-                uint32_t tcGap =
-                    CeilDivT(static_cast<int32_t>(seqLength - nextAlignSIdx), static_cast<int32_t>(cmpRatio));
+                // 对齐点可能超出batch范围(当sIdx靠近batch末尾且bStartPos未对齐时)
+                // 此时本batch剩余序列为seqLength - sIdx, 不需要按对齐点推进
+                uint32_t advSeqCnt = min(nextAlignSIdx, seqLength);
+                sliceInfo_.dealedSeqCnt += advSeqCnt - sliceInfo_.sIdx;
+                uint32_t tcGap = 0;
+                if (nextAlignSIdx < seqLength) {
+                    tcGap = CeilDivT(static_cast<int32_t>(seqLength - nextAlignSIdx), static_cast<int32_t>(cmpRatio));
+                }
                 if (sliceInfo_.bSeqUsed == 0 && nextAlignSIdx > sliceInfo_.sIdx) {
                     // 此时bseqused所在压缩块未被纳入计算
-                    tcGap++;
+                    // 首轮do-while的batch已由GetSlice处理过首个Tc块，needDealTcSize_已减1，不能再加
+                    if (!isFirstDoWhileIter) {
+                        tcGap++;
+                    }
                 }
-                sliceInfo_.sIdx = nextAlignSIdx;
+                // sIdx不能超过seqLength, 否则下一轮do-while会下溢
+                sliceInfo_.sIdx = min(nextAlignSIdx, seqLength);
                 if (needDealTcSize_ < tcGap) {
-                    sliceInfo_.dealedSeqCnt += needDealTcSize_ * cmpRatio;
-                    sliceInfo_.sIdx += needDealTcSize_ * cmpRatio;
+                    // 需要消耗的seq不能超过batch范围
+                    uint32_t maxRemainSeq = (sliceInfo_.sIdx < seqLength) ? (seqLength - sliceInfo_.sIdx) : 0;
+                    uint32_t remainSeq = min(needDealTcSize_ * cmpRatio, maxRemainSeq);
+                    sliceInfo_.dealedSeqCnt += remainSeq;
+                    sliceInfo_.sIdx += remainSeq;
                     needDealTcSize_ = 0;
                     break;
                 }
-                sliceInfo_.dealedSeqCnt += seqLength - sliceInfo_.sIdx;
+                if (sliceInfo_.sIdx < seqLength) {
+                    sliceInfo_.dealedSeqCnt += seqLength - sliceInfo_.sIdx;
+                }
                 needDealTcSize_ -= tcGap;
             }
             sliceInfo_.bIdx++;
@@ -668,6 +683,7 @@ __aicore__ inline void QuantCompressorVec1SliceIterator<COMP>::IteratorSlice()
             }
             sliceInfo_.sIdx = 0;
             sliceInfo_.bSeqUsed = tools_.GetSeqUsed(sliceInfo_.bIdx);
+            isFirstDoWhileIter = false;
         } while (sliceInfo_.bSeqUsed == 0);
         sliceInfo_.bSeqLength = tools_.GetSeqLength(sliceInfo_.bIdx);
         sliceInfo_.bStartPos = tools_.GetStartPos(sliceInfo_.bIdx);

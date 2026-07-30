@@ -80,6 +80,8 @@ constexpr uint32_t MIN_HIDDEN_SIZE = 1024;
 constexpr uint32_t ALIGN_FACTOR_HIDDEN_SIZE = 512;
 constexpr uint32_t MIN_BLOCK_SIZE = 1;
 constexpr uint32_t MAX_BLOCK_SIZE = 1024;
+constexpr uint32_t MAX_CMPRATIO_SIZE = 128;
+constexpr uint32_t MIN_CMPRATIO_SIZE = 2;
 
 constexpr uint32_t BATCH_MODE_SCHEDULE = 1;
 
@@ -201,7 +203,6 @@ struct QuantCompressorBaseShapeInfo {
 };
 
 const std::vector<int> COFF{1, 2};
-const std::vector<int> CMP_RATIO{2, 4, 8, 16, 32, 64, 128};
 const std::vector<uint32_t> HEAD_DIM{128, 512};
 const std::vector<int> CACHE_MODE{1, 2};
 
@@ -213,6 +214,7 @@ struct QuantCompressorContext {
     const char *opName;
     const char *opType;
     fe::PlatFormInfos *platformInfo;
+    int batchConsistency;
 
     RequiredParaInfo x;
     RequiredParaInfo wkv;
@@ -320,7 +322,6 @@ private:
     ge::graphStatus CheckMultiParaConsistency() const;
     ge::graphStatus CheckDimNumConsistency() const;
     ge::graphStatus CheckEmptyTensor() const;
-    ge::graphStatus CheckScenarioConsistency() const;
     ge::graphStatus CheckBlockDimConstrain() const;
 
     size_t ubSize_ = 0;
