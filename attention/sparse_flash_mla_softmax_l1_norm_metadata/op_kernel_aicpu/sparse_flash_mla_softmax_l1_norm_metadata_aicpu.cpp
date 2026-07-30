@@ -15,7 +15,6 @@
 
 #include "log.h"
 #include "status.h"
-#include "cust_op/cust_cpu_utils.h"
 #include "../../sparse_flash_mla_softmax_l1_norm/op_kernel/sparse_flash_mla_softmax_l1_norm_metadata.h"
 #include "sparse_flash_mla_softmax_l1_norm_metadata_aicpu.h"
 #include "arch35/sparse_flash_mla_softmax_l1_norm_metadata_aicpu_arch35.h"

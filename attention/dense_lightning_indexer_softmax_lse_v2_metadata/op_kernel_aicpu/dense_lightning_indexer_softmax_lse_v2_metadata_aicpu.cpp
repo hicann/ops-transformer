@@ -15,7 +15,6 @@
 
 #include "log.h"
 #include "status.h"
-#include "cust_op/cust_cpu_utils.h"
 #include "../../dense_lightning_indexer_softmax_lse_v2/op_kernel/dense_lightning_indexer_softmax_lse_v2_metadata.h"
 #include "dense_lightning_indexer_softmax_lse_v2_metadata_aicpu.h"
 #include "arch35/dense_lightning_indexer_softmax_lse_v2_metadata_aicpu_arch35.h"
