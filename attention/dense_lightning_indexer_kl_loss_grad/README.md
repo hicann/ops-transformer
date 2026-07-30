@@ -372,4 +372,4 @@
 | 调用方式           | 调用样例                                                                                    | 说明                                                                                                  |
 |----------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | aclnn调用 | [test_aclnn_dense_lightning_indexer_kl_loss_grad](./examples/test_aclnn_dense_lightning_indexer_kl_loss_grad.cpp) | 通过[aclnnDenseLightningIndexerKLLossGrad](./docs/aclnnDenseLightningIndexerKLLossGrad.md)接口方式调用DenseLightningIndexerKLLossGrad算子。 |
-| PyTorch API | [test_aclnn_dense_lightning_indexer_kl_loss_grad](./examples/test_aclnn_dense_lightning_indexer_kl_loss_grad.py) | 通过torch extension接口进行功能和精度验证。 |
+| PyTorch API | [test_torch_dense_lightning_indexer_kl_loss_grad](./examples/test_torch_dense_lightning_indexer_kl_loss_grad.py) | 通过torch extension接口进行功能和精度验证。 |

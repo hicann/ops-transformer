@@ -132,7 +132,7 @@ aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape
     auto size = GetShapeSize(shape) * aclDataTypeSize(dataType);
     auto ret = aclrtMallocHost(&(tensor.hostAddr), size);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMallocHost failed. ERROR: %d", ret);
-    memset_s(tensor.hostAddr, 0, size);
+    memset(tensor.hostAddr, 0, size);
 
     ret = aclrtMalloc(&(tensor.deviceAddr), size, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMalloc failed. ERROR: %d", ret);

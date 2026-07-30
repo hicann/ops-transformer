@@ -433,7 +433,7 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeDtype()
     } else if (queryDtype == ge::DT_BF16 && keyDtype == ge::DT_BF16) {
         same16 = true;
     } else {
-        OP_LOGW(context_, "InputDtype is not same.: queryDtype[%s], keyDtype[%s]",
+        OP_LOGE(context_, "InputDtype is not same.: queryDtype[%s], keyDtype[%s]",
                 ge::TypeUtils::DataTypeToSerialString(queryDtype).c_str(),
                 ge::TypeUtils::DataTypeToSerialString(keyDtype).c_str());
         same16 = false;
@@ -441,8 +441,8 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeDtype()
     if (weightsDtype == ge::DT_FLOAT && softmaxLseDtype == ge::DT_FLOAT && attnSoftmaxL1Dtype == ge::DT_FLOAT) {
         same32 = true;
     } else {
-        OP_LOGW(context_,
-                "InputDtype is fault: weightsDtype must be float32, but[%s]; softmaxLseDtype must be int32, but[%s]; "
+        OP_LOGE(context_,
+                "InputDtype is fault: weightsDtype must be float32, but[%s]; softmaxLseDtype must be float32, but[%s]; "
                 "attnSoftmaxL1Dtype must be float32, but[%s].",
                 ge::TypeUtils::DataTypeToSerialString(weightsDtype).c_str(),
                 ge::TypeUtils::DataTypeToSerialString(softmaxLseDtype).c_str(),
@@ -450,13 +450,13 @@ bool DenseLightningIndexerKLLossGradTilingGeneralRegbase::AnalyzeDtype()
         same32 = false;
     }
     // 所有类型不满足返回false
-    if (same16 == false || same32 == false) {
+    if (!same16 || !same32) {
         return false;
     }
-    OP_LOGW(context_, "InputDtype: queryDtype[%s], keyDtype[%s],",
+    OP_LOGI(context_, "InputDtype: queryDtype[%s], keyDtype[%s],",
             ge::TypeUtils::DataTypeToSerialString(queryDtype).c_str(),
             ge::TypeUtils::DataTypeToSerialString(keyDtype).c_str());
-    OP_LOGW(context_, "weightsDtype[%s], softmaxLseDtype[%s], attnSoftmaxL1Dtype[%s].",
+    OP_LOGI(context_, "weightsDtype[%s], softmaxLseDtype[%s], attnSoftmaxL1Dtype[%s].",
             ge::TypeUtils::DataTypeToSerialString(weightsDtype).c_str(),
             ge::TypeUtils::DataTypeToSerialString(softmaxLseDtype).c_str(),
             ge::TypeUtils::DataTypeToSerialString(attnSoftmaxL1Dtype).c_str());
@@ -716,7 +716,7 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::GetShapeAtt
     dlikGradBaseParams_->set_sparseMode(sparseMode);
     dlikGradBaseParams_->set_cmpRatio(cmpRatio);
 
-    OP_LOGW(context_,
+    OP_LOGD(context_,
             "INPUTPARAM bsize:[%d], n2Size:[%d], gSizeQueryIndex:[%d],"
             "s1Size:[%d], s2Size:[%d], dSizeQueryIndex:[%d],"
             "sparseMode:[%d], cmpRatio:[%d].",
@@ -807,16 +807,12 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::DoCastTilin
     constexpr uint32_t postNzReservedN = 1;
 
     uint32_t postUbBaseSize = 0;
-    uint32_t qPostBaseNum = 0;
     int64_t nzReservedSize = 0;
     int64_t curPostCoexNode = postNzCoexNode;
     postUbBaseSize = (aicoreParams_.ubSize - 2 * nzReservedSize) / curPostCoexNode / // 开DB预留2份nzReservedSize
                      BASE_LEN_256 * BASE_LEN_256;
     OP_LOGI(context_, "DoCastTiling postUbBaseSize: %ld.", postUbBaseSize);
-    qPostBaseNum = 128 * 128;
-    OP_LOGI(context_, "DoCastTiling qPostBaseNum: %ld.", qPostBaseNum);
 
-    OP_CHECK_IF(qPostBaseNum == 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "qPostBaseNum is 0."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(usedCoreNum == 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "castUsedCoreNum is 0."),
                 return ge::GRAPH_FAILED);
 
@@ -878,9 +874,6 @@ ge::graphStatus DenseLightningIndexerKLLossGradTilingGeneralRegbase::DoCastTilin
     dlikGradMultiCoreParams_->set_kPostBlockFactor(kPostBlockFactor);
     dlikGradMultiCoreParams_->set_kPostBlockTotal(kPostBlockTotal);
     dlikGradMultiCoreParams_->set_kPostBlockTail(kPostBlockTail);
-    // dqWorkspaceLen = (allNumQuery * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
-    // dwWorkspaceLen = (allNumWeight * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
-    // softmaxOutWorkspaceLen = (allNumSoftmaxOut * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
     return ge::GRAPH_SUCCESS;
 }
 
