@@ -334,12 +334,15 @@ ge::graphStatus AllGatherQuantBmmTiling::SetQuantScene()
     auto scaleInv1Desc = context_->GetOptionalInputDesc(SCALE_INV1);
     auto scaleInv2Desc = context_->GetOptionalInputDesc(SCALE_INV2);
     OP_TILING_CHECK((scaleInv1Shape->GetStorageShape().GetDimNum() != scaleInv2Shape->GetStorageShape().GetDimNum()),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                         opName_, "x1Scale and x2Scale",
-                        (std::to_string(scaleInv1Shape->GetStorageShape().GetDimNum()) + "D and " +
+                        (std::string("x1Scale is ") +
+                         std::to_string(scaleInv1Shape->GetStorageShape().GetDimNum()) + "D, x2Scale is " +
                          std::to_string(scaleInv2Shape->GetStorageShape().GetDimNum()) + "D")
                             .c_str(),
-                        "The shape dims of x1Scale and x2Scale must be the same"),
+                        "The current shape combination does not match any scenario."
+                        "(PerTensor scenario: [x1Scale=1D, x2Scale=1D]; "
+                        "PerBlock scenario: [x1Scale=2D, x2Scale=2D]; MXFP scenario: [x1Scale=3D, x2Scale=3D])"),
                     return ge::GRAPH_FAILED);
     if ((scaleInv1Shape->GetStorageShape().GetDimNum() == DIM_NUM_IS_ONE) &&
         (scaleInv2Shape->GetStorageShape().GetDimNum() == DIM_NUM_IS_ONE)) {
