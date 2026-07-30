@@ -135,8 +135,6 @@ def _call_npu_quant_block_sparse_attn_metadata(test_data):
         layout_sparse_indices=metadata_input.get("layout_sparse_indices", inputs["layout_sparse_indices"]),
     )
     torch_npu.npu.synchronize()
-    metadata_cpu = metadata.detach().cpu()
-    nonzero_count = int(torch.count_nonzero(metadata_cpu).item())
     return metadata
 
 

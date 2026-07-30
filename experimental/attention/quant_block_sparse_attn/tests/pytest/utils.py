@@ -67,7 +67,6 @@ def _row_from_dict(params, result, fulfill_percent):
         "return_softmax_lse",
         "actlen_mode",
         "sparse_pattern",
-        "scale_pattern",
         "block_table_pattern",
         "pa_block_padding_bytes",
         "pa_block_stride",

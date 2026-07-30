@@ -736,8 +736,8 @@ __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe *pipe, 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::GetExtremeValue(T &negativeScalar, T &positiveScalar)
 {
-    uint16_t tmp1 = NEGATIVE_MIN_VALUE_FP16;
-    negativeScalar = *((half *)&tmp1);
+    uint32_t tmp1 = NEGATIVE_MIN_VALUE_FP32;
+    negativeScalar = *((float *)&tmp1);
 }
 
 // ================================= Child-specific functions =================================

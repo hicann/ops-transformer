@@ -16,7 +16,6 @@ import torch
 
 
 SUPPORTED_SPARSE_PATTERNS = {"sequential", "dense", "reverse", "tail", "random", "empty", "empty_tail", "causal"}
-SUPPORTED_SCALE_PATTERNS = {"ones", "gradient"}
 SUPPORTED_BLOCK_TABLE_PATTERNS = {"sequential", "reverse", "random"}
 
 
@@ -43,7 +42,6 @@ def check_valid_param(params):
     params.setdefault("mask_mode", 3)
     params.setdefault("output_dtype", torch.bfloat16)
     params.setdefault("sparse_pattern", "sequential")
-    params.setdefault("scale_pattern", "ones")
     params.setdefault("block_table_pattern", "sequential")
     params.setdefault("pa_block_padding_bytes", 0)
     params.setdefault("p_scale_value", 1.0)
@@ -88,9 +86,6 @@ def check_valid_param(params):
 
     if params["sparse_pattern"] not in SUPPORTED_SPARSE_PATTERNS:
         raise ValueError(f"unsupported sparse_pattern: {params['sparse_pattern']}")
-
-    if params["scale_pattern"] not in SUPPORTED_SCALE_PATTERNS:
-        raise ValueError(f"unsupported scale_pattern: {params['scale_pattern']}")
 
     if params["block_table_pattern"] not in SUPPORTED_BLOCK_TABLE_PATTERNS:
         raise ValueError(f"unsupported block_table_pattern: {params['block_table_pattern']}")

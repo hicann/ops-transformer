@@ -282,7 +282,6 @@ def cpu_quant_block_sparse_attn(
         "S1EQS2": False,
         "seed": int(kwargs.get("seed", 0)),
         "sparse_pattern": str(kwargs.get("sparse_pattern", "sequential")),
-        "scale_pattern": str(kwargs.get("scale_pattern", "ones")),
         "block_table_pattern": "sequential",
         "sparse_count": int(kwargs.get("sparse_count", 0)),
         "p_scale_value": float(p_scale_cpu[0].item()),

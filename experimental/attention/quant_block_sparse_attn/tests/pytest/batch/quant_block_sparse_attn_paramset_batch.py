@@ -20,7 +20,7 @@ EXCEL_COLUMNS = [
     "block_table_pattern",
     "layout_q", "layout_kv", "layout_sparse_indices", "layout_out",  "output_dtype",
     "actlen_mode", "quant_mode", "mask_mode",
-    "scale_pattern", "p_scale_value", "softmax_scale",
+    "p_scale_value", "softmax_scale",
     "return_softmax_lse", "seed",
 ]
 

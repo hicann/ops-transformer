@@ -24,12 +24,56 @@ import torch
 FP8_DTYPE = torch.float8_e4m3fn if hasattr(torch, "float8_e4m3fn") else None
 
 
+FP8_E4M3_MAX = 448.0
+SCALE_EPSILON = 1e-8
+
+
 def _fp8_rand(shape, low=-1.0, high=1.0, generator=None):
     return (
         torch.empty(shape, dtype=torch.float32)
         .uniform_(low, high, generator=generator)
         .to(FP8_DTYPE)
     )
+
+
+def _quant_fp32_to_fp8(tensor, quant_scale):
+    quantized = tensor.to(torch.float32) * quant_scale
+    quantized = torch.clamp(quantized, -FP8_E4M3_MAX, FP8_E4M3_MAX)
+    return quantized.to(FP8_DTYPE).contiguous()
+
+
+def _quantize_per_token_head(tensor):
+    row_max = torch.abs(tensor).amax(dim=-1, keepdim=True)
+    row_max = torch.maximum(
+        row_max, torch.tensor(SCALE_EPSILON, dtype=torch.float32, device=tensor.device)
+    )
+    quant_scale = FP8_E4M3_MAX / row_max
+    return _quant_fp32_to_fp8(tensor, quant_scale), (
+        1.0 / quant_scale
+    ).squeeze(-1).contiguous()
+
+
+def _quantize_value_per_head(tensor):
+    head_max = torch.abs(tensor).amax(dim=(0, 1, 3), keepdim=True)
+    head_max = torch.maximum(
+        head_max, torch.tensor(SCALE_EPSILON, dtype=torch.float32, device=tensor.device)
+    )
+    quant_scale = FP8_E4M3_MAX / head_max
+    value = _quant_fp32_to_fp8(tensor, quant_scale)
+    return value, (1.0 / quant_scale).reshape(tensor.shape[2]).contiguous()
+
+
+def _rand_fullquant_source(shape, amp_low, amp_high, generator, amp_shape=None):
+    base = torch.empty(shape, dtype=torch.float32).uniform_(-1.0, 1.0, generator=generator)
+    if amp_shape is None:
+        amp_shape = shape[:-1] + (1,)
+    log_low = math.log10(max(float(amp_low), SCALE_EPSILON))
+    log_high = math.log10(max(float(amp_high), SCALE_EPSILON))
+    exponent = torch.empty(amp_shape, dtype=torch.float32).uniform_(
+        log_low, log_high, generator=generator
+    )
+    amps = torch.pow(torch.tensor(10.0, dtype=torch.float32), exponent)
+    return base * amps
 
 
 def _make_block_table(batch, seq_len, block_size, pattern, rng):
@@ -133,16 +177,6 @@ def _make_sparse_indices(
     return sparse_indices, sparse_seq_len
 
 
-def _make_scale_tensor(shape, pattern):
-    if pattern == "ones":
-        return torch.ones(shape, dtype=torch.float32)
-    numel = 1
-    for s in shape:
-        numel *= s
-    values = torch.linspace(0.25, 2.0, steps=numel, dtype=torch.float32)
-    return values.reshape(shape)
-
-
 def _dense_to_pa(dense_key, dense_value, dense_k_scale, block_table, block_size):
     B, S2, N2, D = dense_key.shape
     block_num = int(block_table.max().item()) + 1
@@ -194,7 +228,6 @@ def customize_inputs(
     sparse_pattern="sequential",
     block_table_pattern="sequential",
     actlen_mode="full",
-    scale_pattern="ones",
     p_scale_value=1.0,
     seed=0,
     **kwargs,
@@ -202,7 +235,7 @@ def customize_inputs(
     """Fill input tensors in-place with consistent test data for quant_block_sparse_attn.
 
     E2E customize_inputs contract: modify tensors in-place, no return value.
-    Generation params (sparse_pattern, scale_pattern, etc.) arrive via
+    Generation params (sparse_pattern, etc.) arrive via
     extra_attrs from CSV attributes (non-operator params).
     """
     if FP8_DTYPE is None:
@@ -237,15 +270,32 @@ def customize_inputs(
     q_lengths = [S1] * B
     kv_lengths = [S2] * B
 
-    query_data = _fp8_rand(query.shape, generator=generator)
-    query.copy_(query_data)
+    amp_high = FP8_E4M3_MAX
+    if layout_q == "NTD":
+        query_source = _rand_fullquant_source(
+            (N1, B * S1, D), amp_high * 0.01, amp_high, generator
+        )
+    else:
+        query_source = _rand_fullquant_source(
+            (B * S1, N1, D), amp_high * 0.01, amp_high, generator
+        )
+    query_fp8, q_scale = _quantize_per_token_head(query_source)
+    query.copy_(query_fp8)
 
-    dense_key = _fp8_rand((B, S2, N2, D), generator=generator)
-    dense_value = _fp8_rand((B, S2, N2, D), generator=generator)
+    dense_key_source = _rand_fullquant_source(
+        (B, S2, N2, D), 1.0, amp_high, generator
+    )
+    dense_value_source = _rand_fullquant_source(
+        (B, S2, N2, D), 1.0, amp_high, generator, amp_shape=(B, 1, N2, 1)
+    )
+    dense_key, dense_k_scale_base = _quantize_per_token_head(dense_key_source)
+    dense_value, v_scale = _quantize_value_per_head(dense_value_source)
+
+    dense_k_scale = torch.zeros((B, S2, N2), dtype=torch.float32)
+    for b in range(B):
+        dense_k_scale[b] = dense_k_scale_base[b]
 
     block_table = _make_block_table(B, S2, sparse_kv_block_size, "sequential", rng)
-
-    dense_k_scale = _make_scale_tensor((B, S2, N2), scale_pattern)
     key_pa, value_pa, k_scale_pa = _dense_to_pa(
         dense_key, dense_value, dense_k_scale, block_table, sparse_kv_block_size
     )
@@ -253,22 +303,8 @@ def customize_inputs(
     key.copy_(key_pa)
     value.copy_(value_pa)
 
-    if layout_q == "BSND":
-        q_scale_shape = (B, S1, N1)
-    elif layout_q == "NTD":
-        q_scale_shape = (N1, B * S1)
-    else:
-        q_scale_shape = (B * S1, N1)
-
-    q_scale = _make_scale_tensor(q_scale_shape, scale_pattern)
     q_descale.copy_(q_scale)
-
     k_descale.copy_(k_scale_pa)
-
-    if scale_pattern == "ones":
-        v_scale = torch.ones((N2,), dtype=torch.float32)
-    else:
-        v_scale = torch.linspace(0.5, 1.75, steps=N2, dtype=torch.float32)
     v_descale.copy_(v_scale)
 
     p_scale_data = torch.tensor([float(p_scale_value)], dtype=torch.float32)
