@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * the CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file causal_conv1d_tiling.cpp
@@ -103,9 +103,7 @@ struct CausalConv1dInputInfo {
 
 class CausalConv1dTiling {
 public:
-    explicit CausalConv1dTiling(gert::TilingContext *context) : context_(context)
-    {
-    }
+    explicit CausalConv1dTiling(gert::TilingContext *context) : context_(context) {}
     ge::graphStatus DoTiling();
 
 private:
@@ -311,12 +309,12 @@ ge::graphStatus CausalConv1dTiling::ParseXShape(bool isFnMode)
         inputInfo_.seqLen = xShape.GetDim(1);
         inputInfo_.dim = xShape.GetDim(2);
         OP_CHECK_IF(inputInfo_.batch <= 0 || inputInfo_.dim <= 0 || inputInfo_.seqLen <= 0,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x",
-                                                          ("batch=" + std::to_string(inputInfo_.batch) +
-                                                           ", dim=" + std::to_string(inputInfo_.dim) +
-                                                           ", seqLen=" + std::to_string(inputInfo_.seqLen))
-                                                              .c_str(),
-                                                          "for 3D batch mode, shape must be (batch, seqlen, dim)"),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context_->GetNodeName(), "x",
+                        ("batch=" + std::to_string(inputInfo_.batch) + ", dim=" + std::to_string(inputInfo_.dim) +
+                         ", seqLen=" + std::to_string(inputInfo_.seqLen))
+                            .c_str(),
+                        "for 3D batch mode, shape must be (batch, seqlen, dim)"),
                     return ge::GRAPH_FAILED);
         int64_t cuSeqlen = 0;
         OP_CHECK_IF(__builtin_mul_overflow(inputInfo_.batch, inputInfo_.seqLen, &cuSeqlen),
@@ -344,11 +342,11 @@ ge::graphStatus CausalConv1dTiling::ParseXShape(bool isFnMode)
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     context_->GetNodeName(), "dim", std::to_string(inputInfo_.dim).c_str(), "must be 32-byte aligned"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(inputInfo_.cuSeqlen > static_cast<int64_t>(std::numeric_limits<int32_t>::max()),
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "cu_seqlen",
-                                                      std::to_string(inputInfo_.cuSeqlen).c_str(),
-                                                      "exceeds int32_t max"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        inputInfo_.cuSeqlen > static_cast<int64_t>(std::numeric_limits<int32_t>::max()),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "cu_seqlen",
+                                              std::to_string(inputInfo_.cuSeqlen).c_str(), "exceeds int32_t max"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -357,11 +355,11 @@ ge::graphStatus CausalConv1dTiling::ParseWeightShape()
     auto wShapePtr = context_->GetInputShape(WEIGHT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, wShapePtr);
     auto wShape = EnsureNotScalar(wShapePtr->GetStorageShape());
-    OP_CHECK_IF(wShape.GetDimNum() != 2,
-                OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "weight",
-                                             std::to_string(wShape.GetDimNum()).c_str(),
-                                             "2 dimensions (kernelWidth, dim)"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        wShape.GetDimNum() != 2,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "weight", std::to_string(wShape.GetDimNum()).c_str(),
+                                     "2 dimensions (kernelWidth, dim)"),
+        return ge::GRAPH_FAILED);
     inputInfo_.kernelWidth = wShape.GetDim(0);
     const int64_t wDim = wShape.GetDim(1);
     OP_CHECK_IF(wDim != inputInfo_.dim,
@@ -405,11 +403,11 @@ ge::graphStatus CausalConv1dTiling::ParseConvStatesShape()
                 OP_LOGE_FOR_INVALID_SHAPESIZE(context_->GetNodeName(), "conv_states",
                                               std::to_string(inputInfo_.numCacheLines).c_str(), "num_cache_lines > 0"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(convStatesDim != inputInfo_.dim,
-                OP_LOGE_FOR_INVALID_SHAPESIZE(context_->GetNodeName(), "conv_states",
-                                              std::to_string(convStatesDim).c_str(),
-                                              ("dim=" + std::to_string(inputInfo_.dim)).c_str()),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        convStatesDim != inputInfo_.dim,
+        OP_LOGE_FOR_INVALID_SHAPESIZE(context_->GetNodeName(), "conv_states", std::to_string(convStatesDim).c_str(),
+                                      ("dim=" + std::to_string(inputInfo_.dim)).c_str()),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(inputInfo_.stateLen < (inputInfo_.kernelWidth - 1),
                 OP_LOGE_FOR_INVALID_SHAPESIZE(
                     context_->GetNodeName(), "conv_states", std::to_string(inputInfo_.stateLen).c_str(),
@@ -638,11 +636,11 @@ ge::graphStatus CausalConv1dTiling::ParseBias()
                 OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "bias",
                                              std::to_string(biasShape.GetDimNum()).c_str(), "1D (dim,)"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(biasShape.GetDim(0) != inputInfo_.dim,
-                OP_LOGE_FOR_INVALID_SHAPESIZE(context_->GetNodeName(), "bias",
-                                              std::to_string(biasShape.GetDim(0)).c_str(),
-                                              ("dim=" + std::to_string(inputInfo_.dim)).c_str()),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        biasShape.GetDim(0) != inputInfo_.dim,
+        OP_LOGE_FOR_INVALID_SHAPESIZE(context_->GetNodeName(), "bias", std::to_string(biasShape.GetDim(0)).c_str(),
+                                      ("dim=" + std::to_string(inputInfo_.dim)).c_str()),
+        return ge::GRAPH_FAILED);
 
     auto biasDesc = context_->GetOptionalInputDesc(BIAS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, biasDesc);
@@ -773,11 +771,11 @@ bool CausalConv1dTiling::ChooseBaseDim(int64_t cuSeqlen, int64_t dim)
     int64_t baseDimCnt = Ops::Base::CeilDiv(dim, baseDim_);
     int64_t group = static_cast<int64_t>(coreNum_) / baseDimCnt;
     if (group <= 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "dim", std::to_string(inputInfo_.dim).c_str(),
-                                              ("too large for UB-limited baseDim: requires " +
-                                               std::to_string(baseDimCnt) + " cores, only " + std::to_string(coreNum_) +
-                                               " available")
-                                                  .c_str());
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context_->GetNodeName(), "dim", std::to_string(inputInfo_.dim).c_str(),
+            ("too large for UB-limited baseDim: requires " + std::to_string(baseDimCnt) + " cores, only " +
+             std::to_string(coreNum_) + " available")
+                .c_str());
         return false;
     }
     tokensPerBlock_ = Ops::Base::CeilDiv(cuSeqlen, group);
@@ -905,11 +903,11 @@ ge::graphStatus CausalConv1dTiling::DoTiling()
                 OP_LOGE(context_, "ParseCausalConv1dInputInfo error"), return ge::GRAPH_FAILED);
 
     ubLimitedBaseDim_ = ComputeUbLimitedBaseDim();
-    OP_CHECK_IF(ubLimitedBaseDim_ <= 0,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "ub_size",
-                                                      std::to_string(ubSize_).c_str(),
-                                                      "UB too small to allocate convolution buffers"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        ubLimitedBaseDim_ <= 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "ub_size", std::to_string(ubSize_).c_str(),
+                                              "UB too small to allocate convolution buffers"),
+        return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(!ChooseBaseDim(inputInfo_.cuSeqlen, inputInfo_.dim), OP_LOGE(context_, "ChooseBaseDim failed"),
                 return ge::GRAPH_FAILED);

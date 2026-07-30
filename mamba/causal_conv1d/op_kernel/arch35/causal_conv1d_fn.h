@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * the CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file causal_conv1d_fn.h
@@ -52,12 +52,12 @@ protected:
     template <int32_t kWindowMode>
     __aicore__ inline void ProcessImpl()
     {
-        int32_t dimStart;
+        int64_t dimStart;
         int32_t curBaseDim;
         int32_t batchIdx;
         int32_t batchCnt;
-        int32_t cursor;
-        int32_t cursorEnd;
+        int64_t cursor;
+        int64_t cursorEnd;
         if (!this->template InitBlock<kWindowMode>(dimStart, curBaseDim, batchIdx, batchCnt, cursor, cursorEnd)) {
             return;
         }
@@ -65,21 +65,21 @@ protected:
     }
 
     template <int32_t kWindowMode>
-    __aicore__ inline bool InitBlock(int32_t &dimStart, int32_t &curBaseDim, int32_t &batchIdx, int32_t &batchCnt,
-                                     int32_t &cursor, int32_t &cursorEnd)
+    __aicore__ inline bool InitBlock(int64_t &dimStart, int32_t &curBaseDim, int32_t &batchIdx, int32_t &batchCnt,
+                                     int64_t &cursor, int64_t &cursorEnd)
     {
-        const int32_t dim = this->tilingData_->dim;
-        const int32_t batch = this->tilingData_->batch;
-        const int32_t seqLen = this->tilingData_->seqLen;
-        const int32_t cuSeqlen = this->tilingData_->cuSeqlen;
+        const int64_t dim = this->tilingData_->dim;
+        const int64_t batch = this->tilingData_->batch;
+        const int64_t seqLen = this->tilingData_->seqLen;
+        const int64_t cuSeqlen = this->tilingData_->cuSeqlen;
         const int32_t baseDim = this->tilingData_->baseDim;
         const int32_t coBatch = static_cast<int32_t>(this->tilingData_->coBatch);
         const int32_t baseDimCnt = (dim + baseDim - 1) / baseDim;
-        const int32_t tokensPerBlock = static_cast<int32_t>(this->tilingData_->tokensPerBlock);
-        const int32_t tokenBlockCnt = static_cast<int32_t>(this->tilingData_->tokenBlockCnt);
+        const int64_t tokensPerBlock = this->tilingData_->tokensPerBlock;
+        const int64_t tokenBlockCnt = this->tilingData_->tokenBlockCnt;
 
         const int32_t blockIdx = static_cast<int32_t>(GetBlockIdx());
-        const int64_t coreCnt = static_cast<int64_t>(tokenBlockCnt) * baseDimCnt;
+        const int64_t coreCnt = tokenBlockCnt * baseDimCnt;
         if (static_cast<int64_t>(blockIdx) >= coreCnt) {
             return false;
         }
@@ -88,9 +88,9 @@ protected:
         const int32_t baseDimIdx = blockIdx % baseDimCnt;
         dimStart = baseDimIdx * baseDim;
         curBaseDim = (dimStart + baseDim <= dim) ? baseDim : (dim - dimStart);
-        const int32_t tokenStart = tokenTileId * tokensPerBlock;
-        const int32_t tokenEndRaw = tokenStart + tokensPerBlock;
-        const int32_t tokenEnd = (tokenEndRaw <= cuSeqlen) ? tokenEndRaw : cuSeqlen;
+        const int64_t tokenStart = static_cast<int64_t>(tokenTileId) * tokensPerBlock;
+        const int64_t tokenEndRaw = tokenStart + tokensPerBlock;
+        const int64_t tokenEnd = (tokenEndRaw <= cuSeqlen) ? tokenEndRaw : cuSeqlen;
         const bool valid = (tokenStart < cuSeqlen) && (curBaseDim > 0) && (tokenEnd > tokenStart);
 
         if (this->tilingData_->hasInitStateWorkspace) {
@@ -108,13 +108,13 @@ protected:
         this->LoadWeightAndBias(dimStart, curBaseDim);
 
         if constexpr (kWindowMode == SEQ_PARTITION_MODE_VARLEN) {
-            batchIdx = this->LocateBatchByToken(tokenStart);
-            batchCnt = batch;
+            batchIdx = this->LocateBatchByToken(static_cast<int32_t>(tokenStart));
+            batchCnt = static_cast<int32_t>(batch);
             cursor = tokenStart;
             cursorEnd = tokenEnd;
         } else {
-            batchIdx = tokenStart / (seqLen * coBatch);
-            batchCnt = batch / coBatch;
+            batchIdx = static_cast<int32_t>(tokenStart / (seqLen * coBatch));
+            batchCnt = static_cast<int32_t>(batch / coBatch);
             // cursor in time-step space: one step covers coBatch flat positions
             cursor = tokenStart / coBatch;
             cursorEnd = tokenEnd / coBatch;
@@ -123,20 +123,20 @@ protected:
     }
 
     template <int32_t kWindowMode>
-    __aicore__ inline void ProcessBlock(int32_t dimStart, int32_t curBaseDim, int32_t &batchIdx, int32_t batchCnt,
-                                        int32_t &cursor, int32_t cursorEnd)
+    __aicore__ inline void ProcessBlock(int64_t dimStart, int32_t curBaseDim, int32_t &batchIdx, int32_t batchCnt,
+                                        int64_t &cursor, int64_t cursorEnd)
     {
-        const int32_t dim = this->tilingData_->dim;
-        const int32_t seqLen = this->tilingData_->seqLen;
-        const int32_t stateLen = this->tilingData_->stateLen;
-        const int32_t kernelWidth = static_cast<int32_t>(this->tilingData_->kernelWidth);
+        const int64_t dim = this->tilingData_->dim;
+        const int64_t seqLen = this->tilingData_->seqLen;
+        const int64_t stateLen = this->tilingData_->stateLen;
+        const int64_t kernelWidth = this->tilingData_->kernelWidth;
         const int32_t coBatch = static_cast<int32_t>(this->tilingData_->coBatch);
         const bool hasCacheIndices = this->tilingData_->hasCacheIndices;
         const bool hasInitialStateMode = this->tilingData_->hasInitialStateMode;
 
         while (cursor < cursorEnd && batchIdx < batchCnt) {
-            int32_t curSeqStart;
-            int32_t curSeqEnd;
+            int64_t curSeqStart;
+            int64_t curSeqEnd;
             this->template GetSeqWindow<kWindowMode>(batchIdx, seqLen, coBatch, curSeqStart, curSeqEnd);
 
             if (cursor >= curSeqEnd) {
@@ -144,8 +144,8 @@ protected:
                 continue;
             }
 
-            int32_t chunkEnd = (cursorEnd < curSeqEnd) ? cursorEnd : curSeqEnd;
-            int32_t runLen = chunkEnd - cursor;
+            const int64_t chunkEnd = (cursorEnd < curSeqEnd) ? cursorEnd : curSeqEnd;
+            const int32_t runLen = static_cast<int32_t>(chunkEnd - cursor);
             if (runLen <= 0) {
                 ++batchIdx;
                 continue;
@@ -156,9 +156,9 @@ protected:
             //   cursor % seqLen = cursor - curSeqStart, so curSeqFlatPos = cursor.
             // For coBatch>1: cursor is time step, cursor % seqLen is batch-0 offset.
             // For varlen: cursor is flat position, curSeqFlatPos = cursor.
-            int32_t curSeqFlatPos;
+            int64_t curSeqFlatPos;
             if constexpr (kWindowMode == SEQ_PARTITION_MODE_BATCH) {
-                curSeqFlatPos = curSeqStart + (cursor % seqLen);
+                curSeqFlatPos = curSeqStart + cursor % seqLen;
             } else {
                 curSeqFlatPos = cursor;
             }
@@ -176,7 +176,7 @@ protected:
 
             this->InitRing(cacheIdx, hasInit, curSeqStart, curSeqFlatPos, dimStart, curBaseDim, dim);
             {
-                int32_t stStart;
+                int64_t stStart;
                 if constexpr (kWindowMode == SEQ_PARTITION_MODE_VARLEN) {
                     stStart = curSeqEnd - stateLen;
                 } else {
@@ -186,8 +186,10 @@ protected:
             }
 
             if (cursor + runLen >= curSeqEnd) {
-                const int32_t aliveCount = (kernelWidth - 1 < stateLen) ? (kernelWidth - 1) : stateLen;
-                this->WriteBackState(cacheIdx, runLen, dimStart, curBaseDim, dim, stateLen - aliveCount);
+                const int32_t aliveCount =
+                    static_cast<int32_t>((kernelWidth - 1 < stateLen) ? (kernelWidth - 1) : stateLen);
+                this->WriteBackState(cacheIdx, runLen, dimStart, curBaseDim, dim,
+                                     static_cast<int32_t>(stateLen - aliveCount));
             }
 
             SetEvent<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
@@ -200,28 +202,44 @@ protected:
         }
     }
 
-    __aicore__ inline void PrefetchInitStatesToWorkspace(int32_t dimStart, int32_t baseDimSize)
+    __aicore__ inline void PrefetchInitStatesToWorkspace(int64_t dimStart, int32_t baseDimSize)
     {
-        const int32_t dim = this->tilingData_->dim;
-        const int32_t stateLen = this->tilingData_->stateLen;
-        const int32_t numCacheLines = this->tilingData_->numCacheLines;
+        const int64_t dim = this->tilingData_->dim;
+        const int64_t stateLen = this->tilingData_->stateLen;
+        const int64_t batch = this->tilingData_->batch;
+        const bool hasCacheIndices = this->tilingData_->hasCacheIndices;
+        const bool hasInitialStateMode = this->tilingData_->hasInitialStateMode;
+        const int32_t nullBlockId = static_cast<int32_t>(this->tilingData_->nullBlockId);
         const int32_t batchRows = static_cast<int32_t>(this->tilingData_->kernelWidth) + 1;
         const uint32_t blockBytes = static_cast<uint32_t>(baseDimSize) * sizeof(T);
         const uint32_t gapBytes = static_cast<uint32_t>(dim - baseDimSize) * sizeof(T);
         LocalTensor<T> ubBuf = this->inTensor_;
 
-        const int64_t totalRows = static_cast<int64_t>(numCacheLines) * stateLen;
-        for (int64_t row = 0; row < totalRows; row += batchRows) {
-            const int64_t rowsThisBatch = (row + batchRows <= totalRows) ? batchRows : (totalRows - row);
-            const int64_t rowOffset = row * dim + dimStart;
+        for (int64_t b = 0; b < batch; ++b) {
+            if (hasInitialStateMode && this->initialStateModeGm_.GetValue(b) == 0) {
+                continue;
+            }
+            int64_t cacheIdx = b;
+            if (hasCacheIndices) {
+                cacheIdx = this->cacheIndicesGm_.GetValue(b);
+                if (cacheIdx == nullBlockId) {
+                    continue;
+                }
+            }
+            const int64_t slotBase = cacheIdx * stateLen;
+            const int64_t totalRows = slotBase + stateLen;
+            for (int64_t row = slotBase; row < totalRows; row += batchRows) {
+                const int64_t rowsThisBatch = (row + batchRows <= totalRows) ? batchRows : (totalRows - row);
+                const int64_t rowOffset = row * dim + dimStart;
 
-            DataCopyPad(ubBuf[0], this->convStatesGm_[rowOffset],
-                        {static_cast<uint16_t>(rowsThisBatch), blockBytes, gapBytes, 0, 0}, {false, 0, 0, 0});
-            SetEvent<HardEvent::MTE2_MTE3>(HardEvent::MTE2_MTE3);
+                DataCopyPad(ubBuf[0], this->convStatesGm_[rowOffset],
+                            {static_cast<uint16_t>(rowsThisBatch), blockBytes, gapBytes, 0, 0}, {false, 0, 0, 0});
+                SetEvent<HardEvent::MTE2_MTE3>(HardEvent::MTE2_MTE3);
 
-            DataCopyPad(this->initStateWorkspaceGm_[rowOffset], ubBuf[0],
-                        {static_cast<uint16_t>(rowsThisBatch), blockBytes, 0, gapBytes, 0});
-            SetEvent<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
+                DataCopyPad(this->initStateWorkspaceGm_[rowOffset], ubBuf[0],
+                            {static_cast<uint16_t>(rowsThisBatch), blockBytes, 0, gapBytes, 0});
+                SetEvent<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
+            }
         }
     }
 
@@ -241,43 +259,44 @@ protected:
         return left;
     }
 
-    __aicore__ inline void InitRing(int32_t cacheIdx, bool hasInit, int32_t seqStart, int32_t chunkStart,
-                                    int32_t dimStart, int32_t baseDim, int32_t dim)
+    __aicore__ inline void InitRing(int32_t cacheIdx, bool hasInit, int64_t seqStart, int64_t chunkStart,
+                                    int64_t dimStart, int32_t baseDim, int64_t dim)
     {
-        const int32_t width = static_cast<int32_t>(this->tilingData_->kernelWidth);
+        const int64_t width = this->tilingData_->kernelWidth;
         const int32_t coBatch = static_cast<int32_t>(this->tilingData_->coBatch);
         LocalTensor<T> ring = this->inTensor_;
         const uint32_t blockBytes = static_cast<uint32_t>(baseDim) * sizeof(T);
 
-        const int32_t histBegin = chunkStart - (width - 1);
+        const int64_t histBegin = chunkStart - (width - 1);
         int32_t padLen;
         if (seqStart <= histBegin) {
             padLen = 0;
         } else if (seqStart == chunkStart) {
-            padLen = width - 1;
+            padLen = static_cast<int32_t>(width - 1);
         } else {
-            padLen = seqStart - histBegin;
+            padLen = static_cast<int32_t>(seqStart - histBegin);
         }
-        const int32_t loadLen = width - 1 - padLen;
+        const int32_t loadLen = static_cast<int32_t>(width - 1 - padLen);
 
-        bool hasGmHistoryCopy =
-            this->LoadConvStates(ring, padLen, cacheIdx, histBegin, seqStart, width, dimStart, dim, baseDim, hasInit);
-        hasGmHistoryCopy |= this->LoadInput(ring, loadLen, padLen, chunkStart, width, dimStart, dim, baseDim);
+        bool hasGmHistoryCopy = this->LoadConvStates(ring, padLen, cacheIdx, histBegin, seqStart,
+                                                     static_cast<int32_t>(width), dimStart, dim, baseDim, hasInit);
+        hasGmHistoryCopy |=
+            this->LoadInput(ring, loadLen, padLen, chunkStart, static_cast<int32_t>(width), dimStart, dim, baseDim);
 
         if (hasGmHistoryCopy) {
             SetEvent<HardEvent::MTE2_V>(HardEvent::MTE2_V);
         }
 
-        const int32_t slot0 = CurrSlot(0, width);
-        const int32_t seqLen = static_cast<int32_t>(this->tilingData_->seqLen);
+        const int32_t slot0 = CurrSlot(0, static_cast<int32_t>(width));
+        const int64_t seqLen = this->tilingData_->seqLen;
         const uint32_t srcGapBatch = static_cast<uint32_t>(seqLen * dim - baseDim) * sizeof(T);
         DataCopyPad(ring[slot0 * this->dimBufferSize_], this->xGm_[chunkStart * dim + dimStart],
                     {static_cast<uint16_t>(coBatch), blockBytes, srcGapBatch, 0, 0}, {false, 0, 0, 0});
         SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
     }
 
-    __aicore__ inline bool LoadConvStates(LocalTensor<T> &ring, int32_t padLen, int32_t cacheIdx, int32_t histBegin,
-                                          int32_t seqStart, int32_t width, int32_t dimStart, int32_t dim,
+    __aicore__ inline bool LoadConvStates(LocalTensor<T> &ring, int32_t padLen, int32_t cacheIdx, int64_t histBegin,
+                                          int64_t seqStart, int32_t width, int64_t dimStart, int64_t dim,
                                           int32_t baseDim, bool hasInit)
     {
         if (padLen <= 0) {
@@ -287,10 +306,9 @@ protected:
             Duplicate(ring[0], static_cast<T>(0), padLen * this->dimBufferSize_);
             return false;
         }
-        const int32_t stateLen = this->tilingData_->stateLen;
-        const int32_t statePos = histBegin - seqStart + width - 1;
-        const int64_t srcBase =
-            static_cast<int64_t>(cacheIdx) * stateLen * dim + static_cast<int64_t>(statePos) * dim + dimStart;
+        const int64_t stateLen = this->tilingData_->stateLen;
+        const int64_t statePos = histBegin - seqStart + width - 1;
+        const int64_t srcBase = static_cast<int64_t>(cacheIdx) * stateLen * dim + statePos * dim + dimStart;
 
         LoopModeParams loopParams;
         loopParams.loop1Size = static_cast<uint32_t>(this->tilingData_->coBatch);
@@ -317,14 +335,14 @@ protected:
         return true;
     }
 
-    __aicore__ inline bool LoadInput(LocalTensor<T> &ring, int32_t loadLen, int32_t padLen, int32_t chunkStart,
-                                     int32_t width, int32_t dimStart, int32_t dim, int32_t baseDim)
+    __aicore__ inline bool LoadInput(LocalTensor<T> &ring, int32_t loadLen, int32_t padLen, int64_t chunkStart,
+                                     int32_t width, int64_t dimStart, int64_t dim, int32_t baseDim)
     {
         if (loadLen <= 0) {
             return false;
         }
-        const int32_t seqLen = static_cast<int32_t>(this->tilingData_->seqLen);
-        const int64_t xGmRow = static_cast<int64_t>(chunkStart - (width - 1)) + padLen;
+        const int64_t seqLen = this->tilingData_->seqLen;
+        const int64_t xGmRow = chunkStart - (width - 1) + padLen;
         const int64_t srcBase = xGmRow * dim + dimStart;
 
         LoopModeParams loopParams;
@@ -348,13 +366,13 @@ protected:
         return true;
     }
 
-    __aicore__ inline void RunSeq(int32_t start, int32_t len, int32_t dimStart, int32_t baseDim, int32_t cacheIdx,
-                                  int32_t stateStart, int32_t stateLen)
+    __aicore__ inline void RunSeq(int64_t start, int32_t len, int64_t dimStart, int32_t baseDim, int32_t cacheIdx,
+                                  int64_t stateStart, int64_t stateLen)
     {
-        const int32_t dim = static_cast<int32_t>(this->tilingData_->dim);
-        const int32_t kernelWidth = static_cast<int32_t>(this->tilingData_->kernelWidth);
+        const int64_t dim = this->tilingData_->dim;
+        const int64_t kernelWidth = this->tilingData_->kernelWidth;
         const int32_t coBatch = static_cast<int32_t>(this->tilingData_->coBatch);
-        const int32_t seqLen = static_cast<int32_t>(this->tilingData_->seqLen);
+        const int64_t seqLen = this->tilingData_->seqLen;
         const uint32_t blockBytes = static_cast<uint32_t>(baseDim) * sizeof(T);
         LocalTensor<T> ring = this->inTensor_;
         LocalTensor<T> outT = this->outTensor_;
@@ -367,7 +385,7 @@ protected:
                 if (idx > 0) {
                     WaitFlag<HardEvent::MTE3_MTE2>((idx & 1) ? EVENT_ID1 : EVENT_ID0);
                 }
-                const int64_t xGmBase = static_cast<int64_t>(start + idx + 1) * dim + dimStart;
+                const int64_t xGmBase = (start + idx + 1) * dim + dimStart;
                 const uint32_t srcGapBatchX = static_cast<uint32_t>(seqLen * dim - baseDim) * sizeof(T);
                 DataCopyPad(ring[slotNext * this->dimBufferSize_], this->xGm_[xGmBase],
                             {static_cast<uint16_t>(coBatch), blockBytes, srcGapBatchX, 0, 0}, {false, 0, 0, 0});
@@ -385,18 +403,18 @@ protected:
             SetFlag<HardEvent::V_MTE3>((idx & 1) ? EVENT_ID0 : EVENT_ID1);
             WaitFlag<HardEvent::V_MTE3>((idx & 1) ? EVENT_ID0 : EVENT_ID1);
 
-            const int64_t outGmBase = static_cast<int64_t>(start + idx) * dim + dimStart;
+            const int64_t outGmBase = (start + idx) * dim + dimStart;
             const uint32_t dstGapBatchY = static_cast<uint32_t>(seqLen * dim - baseDim) * sizeof(T);
             DataCopyPad(this->yGm_[outGmBase], outSlotT[0],
                         {static_cast<uint16_t>(coBatch), blockBytes, 0, dstGapBatchY, 0});
 
             // ---- dead slot state write: ring slot about to be overwritten → convStatesOutGm ----
-            const int32_t deadPaddedIdx = start + idx - kernelWidth + 1;
+            const int64_t deadPaddedIdx = start + idx - kernelWidth + 1;
             if (deadPaddedIdx >= stateStart) {
                 const int32_t deadSlot = static_cast<int32_t>(idx % (kernelWidth + 1));
-                const int32_t stateOffset = deadPaddedIdx - stateStart;
-                const int64_t stateGmBase = static_cast<int64_t>(cacheIdx) * stateLen * dim +
-                                            static_cast<int64_t>(stateOffset) * dim + dimStart;
+                const int64_t stateOffset = deadPaddedIdx - stateStart;
+                const int64_t stateGmBase =
+                    static_cast<int64_t>(cacheIdx) * stateLen * dim + stateOffset * dim + dimStart;
                 DataCopyExtParams stateCp;
                 stateCp.blockCount = static_cast<uint16_t>(coBatch);
                 stateCp.blockLen = blockBytes;

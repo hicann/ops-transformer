@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * the CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file causal_conv1d_update.h
@@ -60,7 +60,7 @@ protected:
     template <int32_t kWindowMode>
     __aicore__ inline void ProcessImpl()
     {
-        int32_t dimStart;
+        int64_t dimStart;
         int32_t curBaseDim;
         int64_t seqStart;
         int64_t seqEnd;
@@ -79,10 +79,10 @@ protected:
     // coBatch 语义: 每个 batch 组包含 coBatch 个连续 batch，
     // seqStart/seqEnd 以"组"为单位，batchIdx * coBatch 得到真实 batch 起始。
     template <int32_t kWindowMode>
-    __aicore__ inline bool InitBlock(int32_t &dimStart, int32_t &curBaseDim, int64_t &seqStart, int64_t &seqEnd)
+    __aicore__ inline bool InitBlock(int64_t &dimStart, int32_t &curBaseDim, int64_t &seqStart, int64_t &seqEnd)
     {
-        const int32_t dim = this->tilingData_->dim;
-        const int32_t batch = this->tilingData_->batch;
+        const int64_t dim = this->tilingData_->dim;
+        const int64_t batch = this->tilingData_->batch;
         const int32_t baseDim = this->tilingData_->baseDim;
         const int32_t coBatch = static_cast<int32_t>(this->tilingData_->coBatch);
         const int32_t baseDimCnt = (dim + baseDim - 1) / baseDim;
@@ -119,23 +119,23 @@ protected:
     //   5. WriteBackState — 存活 state 写回 GM
     //   6. SetEvent<MTE3_MTE2> — 确保 state 写完成后下一轮 state 读可以开始
     template <int32_t kWindowMode>
-    __aicore__ inline void ProcessBlock(int32_t dimStart, int32_t curBaseDim, int64_t seqStart, int64_t seqEnd)
+    __aicore__ inline void ProcessBlock(int64_t dimStart, int32_t curBaseDim, int64_t seqStart, int64_t seqEnd)
     {
-        const int32_t dim = this->tilingData_->dim;
-        const int32_t seqLen = this->tilingData_->seqLen;
+        const int64_t dim = this->tilingData_->dim;
+        const int64_t seqLen = this->tilingData_->seqLen;
         const int32_t coBatch = static_cast<int32_t>(this->tilingData_->coBatch);
-        const int32_t kernelWidth = static_cast<int32_t>(this->tilingData_->kernelWidth);
+        const int64_t kernelWidth = this->tilingData_->kernelWidth;
 
         for (int64_t batchIdx = seqStart; batchIdx < seqEnd; ++batchIdx) {
-            int32_t curSeqStart = 0;
-            int32_t curSeqEnd = 0;
+            int64_t curSeqStart = 0;
+            int64_t curSeqEnd = 0;
             this->template GetSeqWindow<kWindowMode>(static_cast<int32_t>(batchIdx), seqLen, coBatch, curSeqStart,
                                                      curSeqEnd);
             int32_t len;
             if constexpr (kWindowMode == SEQ_PARTITION_MODE_BATCH) {
-                len = seqLen;
+                len = static_cast<int32_t>(seqLen);
             } else {
-                len = curSeqEnd - curSeqStart;
+                len = static_cast<int32_t>(curSeqEnd - curSeqStart);
             }
 
             const int32_t batchBase = static_cast<int32_t>(batchIdx * coBatch);
@@ -157,8 +157,8 @@ protected:
             //   - len >  stateLen: 增量写满 [0..stateLen-1]，ring 中旧值已被覆盖，跳过回写
             bool doVarLenStateWrite = false;
             int32_t stateWriteStart = 0;
-            const int32_t stateLen = this->tilingData_->stateLen;
-            const int32_t lastWriteLen = kernelWidth - 1;
+            const int64_t stateLen = this->tilingData_->stateLen;
+            const int32_t lastWriteLen = static_cast<int32_t>(kernelWidth - 1);
             if (this->tilingData_->hasNumAcceptedTokens && len > 0) {
                 doVarLenStateWrite = true;
                 if (len - 1 < stateLen) {
@@ -199,13 +199,13 @@ protected:
     // coBatch > 1 时:
     //   - SetLoopMode 使 DMA 自动遍历 coBatch 个 batch 的 state/x 数据
     //   - ring 布局: [width+1][dimBufferSize_] = [width+1][coBatch * baseDim]
-    __aicore__ inline void InitRing(int32_t cacheIdx, int32_t stateTokenOffset, int32_t start, int32_t len,
-                                    int32_t dimStart, int32_t baseDim, int32_t dim)
+    __aicore__ inline void InitRing(int32_t cacheIdx, int32_t stateTokenOffset, int64_t start, int32_t len,
+                                    int64_t dimStart, int32_t baseDim, int64_t dim)
     {
-        const int32_t stateLen = this->tilingData_->stateLen;
-        const int32_t kernelWidth = static_cast<int32_t>(this->tilingData_->kernelWidth);
+        const int64_t stateLen = this->tilingData_->stateLen;
+        const int64_t kernelWidth = this->tilingData_->kernelWidth;
         const int32_t coBatch = static_cast<int32_t>(this->tilingData_->coBatch);
-        const int32_t seqLen = static_cast<int32_t>(this->tilingData_->seqLen);
+        const int64_t seqLen = this->tilingData_->seqLen;
         LocalTensor<T> ring = this->inTensor_;
 
         const uint32_t blockBytes = static_cast<uint32_t>(baseDim) * sizeof(T);
@@ -261,14 +261,14 @@ protected:
     //
     // Update 模式 (seqLen=1): 循环体仅执行 t=0 一次，
     // x 预取分支 (t+1<len) 和 state 写出分支 (t+2<len) 均不执行。
-    __aicore__ inline void RunSeq(int32_t start, int32_t len, int32_t dimStart, int32_t baseDim, int32_t cacheIdx,
+    __aicore__ inline void RunSeq(int64_t start, int32_t len, int64_t dimStart, int32_t baseDim, int32_t cacheIdx,
                                   bool doVarLenStateWrite, int32_t stateWriteStart)
     {
-        const int32_t dim = static_cast<int32_t>(this->tilingData_->dim);
-        const int32_t kernelWidth = static_cast<int32_t>(this->tilingData_->kernelWidth);
+        const int64_t dim = this->tilingData_->dim;
+        const int64_t kernelWidth = this->tilingData_->kernelWidth;
         const int32_t coBatch = static_cast<int32_t>(this->tilingData_->coBatch);
-        const int32_t seqLen = static_cast<int32_t>(this->tilingData_->seqLen);
-        const int32_t stateLen = this->tilingData_->stateLen;
+        const int64_t seqLen = this->tilingData_->seqLen;
+        const int64_t stateLen = this->tilingData_->stateLen;
         const uint32_t blockBytes = static_cast<uint32_t>(baseDim) * sizeof(T);
         LocalTensor<T> ring = this->inTensor_;
         LocalTensor<T> outT = this->outTensor_;
@@ -284,7 +284,7 @@ protected:
                     // 等上一轮 y/state 写出完成，ring slot 已释放
                     WaitFlag<HardEvent::MTE3_MTE2>((t & 1) ? EVENT_ID1 : EVENT_ID0);
                 }
-                const int64_t xGmBase = static_cast<int64_t>(start + t + 1) * dim + dimStart;
+                const int64_t xGmBase = (start + t + 1) * dim + dimStart;
                 const uint32_t srcGapX = static_cast<uint32_t>(seqLen * dim - baseDim) * sizeof(T);
                 DataCopyPad(ring[slotNext * this->dimBufferSize_], this->xGm_[xGmBase],
                             {static_cast<uint16_t>(coBatch), blockBytes, srcGapX, 0, 0}, {false, 0, 0, 0});
@@ -305,7 +305,7 @@ protected:
             SetFlag<HardEvent::V_MTE3>((t & 1) ? EVENT_ID0 : EVENT_ID1);
             WaitFlag<HardEvent::V_MTE3>((t & 1) ? EVENT_ID0 : EVENT_ID1);
 
-            const int64_t outGmBase = static_cast<int64_t>(start + t) * dim + dimStart;
+            const int64_t outGmBase = (start + t) * dim + dimStart;
             const uint32_t dstGapY = static_cast<uint32_t>(seqLen * dim - baseDim) * sizeof(T);
 
             DataCopyPad(this->yGm_[outGmBase], outT[outSlot * this->dimBufferSize_],

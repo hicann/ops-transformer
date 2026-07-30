@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file causal_conv1d.h
@@ -152,9 +152,9 @@ protected:
         }
     }
 
-    __aicore__ inline void LoadWeightAndBias(int32_t dimStart, int32_t baseDim)
+    __aicore__ inline void LoadWeightAndBias(int64_t dimStart, int32_t baseDim)
     {
-        const int32_t dim = this->tilingData_->dim;
+        const int64_t dim = this->tilingData_->dim;
         const int32_t width = static_cast<int32_t>(this->tilingData_->kernelWidth);
         LocalTensor<float> &weightCalc = this->pool_.weight;
         LocalTensor<float> &biasCalc = this->pool_.bias;
@@ -194,15 +194,15 @@ protected:
         }
     }
 
-#define CONV1D_ACC(ringN, wPtrN)                                                                                       \
-    if constexpr (IsSameType<T, float>::value) {                                                                       \
-        LoadAlign(ringF, ringN + col * V_LENGTH);                                                                      \
-    } else {                                                                                                           \
-        LoadAlign<T, LoadDist::DIST_UNPACK_B16>(ringTmp, ringN + col * V_LENGTH);                                      \
-        Cast<float, T, CastTraitB16ToB32>(ringF, ringTmp, pregLoop);                                                   \
-    }                                                                                                                  \
-    LoadAlign(weight, wPtrN + col * V_LENGTH);                                                                         \
-    Mul(tmp, ringF, weight, pregLoop);                                                                                 \
+#define CONV1D_ACC(ringN, wPtrN) \
+    if constexpr (IsSameType<T, float>::value) { \
+        LoadAlign(ringF, ringN + col * V_LENGTH); \
+    } else { \
+        LoadAlign<T, LoadDist::DIST_UNPACK_B16>(ringTmp, ringN + col * V_LENGTH); \
+        Cast<float, T, CastTraitB16ToB32>(ringF, ringTmp, pregLoop); \
+    } \
+    LoadAlign(weight, wPtrN + col * V_LENGTH); \
+    Mul(tmp, ringF, weight, pregLoop); \
     Add(bias, bias, tmp, pregLoop)
 
     __aicore__ inline void ComputeConv1dUnroll(LocalTensor<T> ring, LocalTensor<float> weight, LocalTensor<float> bias,
@@ -325,11 +325,11 @@ protected:
         }
     }
 
-    __aicore__ inline void WriteBackState(int32_t cacheIdx, int32_t len, int32_t dimStart, int32_t baseDim, int32_t dim,
+    __aicore__ inline void WriteBackState(int32_t cacheIdx, int32_t len, int64_t dimStart, int32_t baseDim, int64_t dim,
                                           int32_t destStart = 0)
     {
-        const int32_t stateLen = this->tilingData_->stateLen;
-        const int32_t width = static_cast<int32_t>(this->tilingData_->kernelWidth);
+        const int64_t stateLen = this->tilingData_->stateLen;
+        const int64_t width = this->tilingData_->kernelWidth;
         const int32_t coBatch = static_cast<int32_t>(this->tilingData_->coBatch);
         if (len <= 0) {
             return;
@@ -381,15 +381,15 @@ protected:
     }
 
     template <int32_t kWindowMode>
-    __aicore__ inline void GetSeqWindow(int32_t groupIdx, int32_t seqLen, int32_t coBatch, int32_t &curSeqStart,
-                                        int32_t &curSeqEnd) const
+    __aicore__ inline void GetSeqWindow(int32_t groupIdx, int64_t seqLen, int32_t coBatch, int64_t &curSeqStart,
+                                        int64_t &curSeqEnd) const
     {
         if constexpr (kWindowMode == SEQ_PARTITION_MODE_VARLEN) {
             curSeqStart = this->queryStartLocGm_.GetValue(groupIdx);
             curSeqEnd = this->queryStartLocGm_.GetValue(groupIdx + 1);
         } else {
-            curSeqStart = groupIdx * coBatch * seqLen;
-            curSeqEnd = (groupIdx + 1) * seqLen;
+            curSeqStart = static_cast<int64_t>(groupIdx) * coBatch * seqLen;
+            curSeqEnd = static_cast<int64_t>(groupIdx + 1) * seqLen;
         }
     }
 
@@ -416,10 +416,7 @@ protected:
         return hasInitialStateMode ? (this->initialStateModeGm_.GetValue(batchId) != 0) : false;
     }
 
-    __aicore__ inline const CausalConv1dTilingData *GetTilingData() const
-    {
-        return tilingData_;
-    }
+    __aicore__ inline const CausalConv1dTilingData *GetTilingData() const { return tilingData_; }
 
 protected:
     TPipe pipe_;
