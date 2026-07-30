@@ -18,10 +18,12 @@ kv_state_origin, score_state_origin.
 """
 
 import numpy as np
-import datetime
-import os
-import sys
 import torch
+import importlib.util
+import sys
+from pathlib import Path
+
+_PYTEST_GOLDEN_MODULE = None
 
 _BF16_RTOL = 0.0078125
 _BF16_ATOL = 0.0001
@@ -42,6 +44,29 @@ _OUTPUT_NAMES = [
 
 _BATCH_CONSISTENCY_CACHE = {}
 
+def _load_pytest_golden_module():
+    global _PYTEST_GOLDEN_MODULE
+    if _PYTEST_GOLDEN_MODULE is not None:
+        return _PYTEST_GOLDEN_MODULE
+    pytest_dir = Path(__file__).resolve().parents[2] / "pytest"
+    module_path = pytest_dir / "compressor_golden.py"
+    sys.path.insert(0, str(pytest_dir))
+    try:
+        spec = importlib.util.spec_from_file_location(
+            f"compressor_pytest_golden_compare_{abs(hash(module_path))}", module_path
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(pytest_dir))
+    _PYTEST_GOLDEN_MODULE = module
+    return _PYTEST_GOLDEN_MODULE
+
+_pytest_golden = _load_pytest_golden_module()
+display_output_np_isclose = _pytest_golden.display_output_np_isclose
+display_error_output = _pytest_golden.display_error_output
+cal_relative_diff_np_isclose = _pytest_golden.cal_relative_diff_np_isclose
+print_log = _pytest_golden.print_log
 
 def as_numpy(value):
     if hasattr(value, "detach"):
@@ -53,166 +78,6 @@ def _get_thresholds(dtype_str):
     if dtype_str == "bfloat16":
         return _BF16_RTOL, _BF16_ATOL, _PCT_THD
     return _FP16_RTOL, _FP16_ATOL, _PCT_THD
-
-
-def cal_relative_diff_np_isclose(real_data, expect_data, type_str="fp16"):
-    diff = abs(float(real_data) - float(expect_data))
-    result = diff / (np.abs(expect_data) + 10e-10)
-    return result
-
-
-def display_output_np_isclose(
-    real_data, expect_data, start, end, expect_fp32_data=None
-):
-    def display_inner(idx):
-        j = idx + start
-        diff_rate = cal_relative_diff_np_isclose(real_data[j], expect_data[j])
-
-        if "inf" in str(expect_data[j]) or "nan" in str(expect_data[j]):
-            diff_abs = "inf" if "inf" in str(expect_data[j]) else "nan"
-            if expect_fp32_data is not None:
-                print_log(
-                    "%08d \t %-7s \t %-7s \t %-7s \t %-7s \t %-7s"
-                    % (
-                        start + idx + 1,
-                        expect_fp32_data[j],
-                        expect_data[j],
-                        real_data[j],
-                        diff_abs,
-                        diff_rate,
-                    )
-                )
-            else:
-                print_log(
-                    "%08d \t %-7s \t %-7s \t %-7s \t %-7s"
-                    % (
-                        start + idx + 1,
-                        expect_data[j],
-                        real_data[j],
-                        diff_abs,
-                        diff_rate,
-                    )
-                )
-        else:
-            diff_abs = abs(np.float64(expect_data[j]) - np.float64(real_data[j]))
-            if expect_fp32_data is not None:
-                print_log(
-                    "%08d \t %0.7f \t %0.7f \t %0.7f \t %0.7f \t %0.7f"
-                    % (
-                        start + idx + 1,
-                        expect_fp32_data[j],
-                        expect_data[j],
-                        real_data[j],
-                        diff_abs,
-                        diff_rate,
-                    )
-                )
-            else:
-                print_log(
-                    "%08d \t %0.7f \t %0.7f \t %0.7f \t %0.7f"
-                    % (
-                        start + idx + 1,
-                        expect_data[j],
-                        real_data[j],
-                        diff_abs,
-                        diff_rate,
-                    )
-                )
-
-    print_log(
-        "---------------------------------------------------------------------------------------"
-    )
-    if expect_fp32_data is not None:
-        print_log(
-            "Loop \t ExpFP32Out \t ExpFP16Out \t NPUOut \tFpDiff(min) \t RateDiff"
-        )
-    else:
-        print_log("Loop \t ExpectOut \t RealOut \t FpDiff \t RateDiff")
-    print_log(
-        "---------------------------------------------------------------------------------------"
-    )
-    split_count = int(end - start)
-    if split_count <= 20:
-        for i in range(split_count + 1):
-            display_inner(i)
-    else:
-        for i in range(10):
-            display_inner(i)
-        print_log("...   \t   ...   \t   ...   \t   ...    \t   ...")
-        for i in range(split_count - 10 + 1, split_count + 1):
-            display_inner(i)
-
-
-def print_log(data=None, level="INFO"):
-    print(
-        "[%s] [%s]-%s:%s - %s"
-        % (
-            datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
-            level,
-            os.path.basename(sys._getframe().f_back.f_code.co_filename),
-            str(sys._getframe().f_back.f_lineno).zfill(4),
-            data,
-        )
-    )
-
-
-def display_error_output(real_data, expect_data, err_idx, relative_diff):
-    print_log(
-        "Error Line-----------------------------------------------------------------------------"
-    )
-    print_log("Loop \t ExpectOut \t RealOut \t FpDiff \t RateDiff")
-    print_log(
-        "---------------------------------------------------------------------------------------"
-    )
-    count = 0
-    len_err = len(err_idx)
-    for i in err_idx:
-        count += 1
-        if count < 10 or (90 < count < 100):
-            print_log(
-                "%08d \t %.7f \t %.7f \t %.7f \t %.7f"
-                % (
-                    i,
-                    expect_data[i],
-                    real_data[i],
-                    abs(np.float64(expect_data[i]) - np.float64(real_data[i])),
-                    relative_diff[count - 1],
-                )
-            )
-        elif count == 10 or (count == 100 and len_err > 100):
-            dot_3 = "..."
-            print_log(
-                "%08s \t %07s \t %07s \t %07s \t %07s"
-                % (dot_3, dot_3, dot_3, dot_3, dot_3)
-            )
-        elif count > 100:
-            break
-
-    print_log(
-        "Max-RE line:---------------------------------------------------------------------------"
-    )
-    max_error = max(relative_diff)
-    m_idx_list = err_idx[np.where(relative_diff == max_error)]
-    m_count = 0
-    for m_idx in m_idx_list:
-        m_count += 1
-        if m_count < 4:
-            print_log(
-                "%08d \t %.7f \t %.7f \t %.7f \t %.7f"
-                % (
-                    m_idx,
-                    expect_data[m_idx],
-                    real_data[m_idx],
-                    abs(np.float64(expect_data[m_idx]) - np.float64(real_data[m_idx])),
-                    max_error,
-                )
-            )
-        else:
-            break
-    print_log(
-        "---------------------------------------------------------------------------------------"
-    )
-
 
 def _tensor_compare(npu_out, golden_out, name):
     npu = as_numpy(npu_out)
@@ -367,7 +232,7 @@ def _batch_consistency_check(npu_cmp_kv, kwargs):
     npu_np = as_numpy(npu_cmp_kv)
     cache_key = batch_consistency_id
     result = []
-
+    slice_idx = 0
     for axis_pos, slices, cache_key_idx in zip(batch_axis, batch_slice_info, cache_key):
         if axis_pos is None or slices is None or cache_key_idx is None:
             continue
@@ -404,6 +269,11 @@ def _batch_consistency_check(npu_cmp_kv, kwargs):
                     slice_output = npu_np[start_idx : (start_idx + compare_len), :]
                 else:
                     if axis_idx == 1:
+                        if slices[0] is None:
+                            bidx = 0
+                        else:
+                            bidx = slices[0][slice_idx][0]
+                            slice_idx += 1
                         headSize = cmp_ratio - (start + start_pos_list[0]) % cmp_ratio
                         compare_len = (stop - start - headSize % cmp_ratio) // cmp_ratio
                         cache_len = cmp_ratio - start_pos_list[0] % cmp_ratio
@@ -413,7 +283,7 @@ def _batch_consistency_check(npu_cmp_kv, kwargs):
                             else (start + headSize + cmp_ratio - 1) // cmp_ratio
                         )
                         slice_output = npu_np[
-                            0, start_idx : (start_idx + compare_len), :
+                            bidx, start_idx : (start_idx + compare_len), :
                         ]
                     else:
                         slice_output = npu_np[start:stop, 1:, :]
