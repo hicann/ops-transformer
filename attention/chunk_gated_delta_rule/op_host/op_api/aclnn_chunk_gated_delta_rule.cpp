@@ -159,23 +159,17 @@ aclnnStatus aclnnChunkGatedDeltaRuleGetWorkspaceSize(const aclTensor *query, con
     auto beta_ = l0op::Contiguous(beta, uniqueExecutor.get());
     CHECK_RET(beta_ != nullptr, ACLNN_ERR_INNER_NULLPTR);
     // 仅在Ascend950支持initialState 0或1轴非连续时传入非连续tensor，使用CreateView设置stride信息
-    int64_t *stateShapeDims = nullptr;
-    uint64_t stateShapeDimsNum = 0;
-    int64_t *stateStrideDims = nullptr;
-    uint64_t stateStrideDimsNum = 0;
-    ret = aclGetViewShape(initialState, &stateShapeDims, &stateShapeDimsNum);
-    CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    ret = aclGetViewStrides(initialState, &stateStrideDims, &stateStrideDimsNum);
-    CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    CHECK_RET(stateShapeDimsNum == INITIAL_STATE_DIMS_NUM && stateStrideDimsNum == INITIAL_STATE_DIMS_NUM,
-              ACLNN_ERR_INNER_CREATE_EXECUTOR);
+    const auto &stateShape = initialState->GetViewShape();
+    const auto &stateStrides = initialState->GetViewStrides();
+    CHECK_RET(stateShape.GetDimNum() == INITIAL_STATE_DIMS_NUM &&
+              stateStrides.size() == INITIAL_STATE_DIMS_NUM, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     auto initialState_ = initialState;
 
     const char *socName = aclrtGetSocName();
     CHECK_RET(socName != nullptr, ACLNN_ERR_INNER_NULLPTR);
     bool isAscend950 = std::strstr(socName, "Ascend950") != nullptr;
-    if (isAscend950 && stateStrideDims[stateStrideDimsNum - 1] == 1 &&
-        stateStrideDims[stateStrideDimsNum - 2] == stateShapeDims[stateShapeDimsNum - 1]) {
+    if (isAscend950 && stateStrides[stateStrides.size() - 1] == 1 &&
+        stateStrides[stateStrides.size() - 2] == stateShape.GetDim(stateShape.GetDimNum() - 1)) {
         initialState_ = uniqueExecutor.get()->CreateView(initialState, initialState->GetViewShape(),
                                                          initialState->GetStorageShape(),
                                                          initialState->GetViewStrides(), initialState->GetViewOffset());

@@ -159,15 +159,11 @@ public:
             auto stateIn = inQueue_.DeQue<float>();
             DataCopy(stateFp32Ub_, stateIn, Dv_ * curDk_);
             inQueue_.FreeTensor(stateIn);
-            SetFlag<HardEvent::MTE2_V>(MTE2_V_EVENT);
-            WaitFlag<HardEvent::MTE2_V>(MTE2_V_EVENT);
             auto bf16State = outQueue_.AllocTensor<bfloat16_t>();
             Cast(bf16State, stateFp32Ub_, RoundMode::CAST_RINT, Dv_ * curDk_);
             outQueue_.EnQue(bf16State);
             CopyOut<bfloat16_t>(sTP_->curStateBf16[nvId * Dv_ * Dk_], Dv_, Dk_, false, curDk_);
             CalGCumExpFp32(sTP_->gCum[nvId * Sp_ + length]);
-            SetFlag<HardEvent::V_MTE2>(V_MTE2_EVENT);
-            WaitFlag<HardEvent::V_MTE2>(V_MTE2_EVENT);
             PipeBarrier<PIPE_MTE3>();
             auto fp32Local = outQueue_.AllocTensor<float>();
             DataCopy(fp32Local, stateFp32Ub_, Dv_ * curDk_);
@@ -221,9 +217,9 @@ public:
             CalStateNew(sTP_->vInnerBf16[mm_offset1], sTP_->kg[mm_offset0], stateOut);
         } else {
             CalStateNew(sTP_->vInner[mm_offset1], sTP_->kg[mm_offset0], stateOut);
+            SetFlag<HardEvent::FIX_MTE2>(FIX_MTE2_EVENT);
+            WaitFlag<HardEvent::FIX_MTE2>(FIX_MTE2_EVENT);
         }
-        SetFlag<HardEvent::FIX_MTE2>(FIX_MTE2_EVENT);
-        WaitFlag<HardEvent::FIX_MTE2>(FIX_MTE2_EVENT);
         CrossCoreSetFlag<0x2, PIPE_FIX>(0x4);
     }
 
