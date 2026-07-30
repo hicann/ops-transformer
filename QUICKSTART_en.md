@@ -13,7 +13,7 @@ This guide helps you quickly get started with CANN and the `ops-transformer` ope
 
 The basic flow of operator development and contribution is shown in the figure below. You are welcome and encouraged to contribute operators to the community to jointly enrich the project ecosystem.
 
-<!-- ![Operator Development Contribution Process](./docs/en/figures/算子开发贡献流程.png "Operator Development Contribution Process Diagram") -->
+![Operator Development Contribution Process](./docs/en/figures/Operator_development_contribution_process.png "Operator Development Contribution Process Diagram")
 
 To help you quickly understand the full process of operator development, we will use the **AddExample** operator as the practice object. Its source files are located in `ops-transformer/examples/add_example`. The specific operation steps are as follows:
 
@@ -31,11 +31,11 @@ For users without an environment, use the WebIDE development platform directly, 
 
 1. Enter the ops-transformer open-source project, click the "`Cloud Development`" button, and log in with a certified Huawei Cloud account. If not registered or certified, follow the page prompts to register and certify.
 
-   <!-- <img src="docs/en/figures/cloudIDE.png" alt="Cloud Platform" width="750px" height="90px"> -->
+   <img src="docs/en/figures/cloudIDE.PNG" alt="Cloud Platform" width="750px" height="90px"> 
 
 2. Follow the page prompts to create and start a cloud development environment. Click "`Connect > WebIDE`" to enter the one-stop operator development platform. The open-source project resources are in the `/mnt/workspace` directory by default.
 
-    <!-- <img src="docs/en/figures/webIDE.png" alt="Cloud Platform" width="1000px" height="150px"> -->
+  <!--  <img src="docs/en/figures/webIDE.png" alt="Cloud Platform" width="1000px" height="150px"> -->
 
 3. Check whether the environment is complete.
 

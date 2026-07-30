@@ -20,7 +20,7 @@
 
 ops-transformer is an advanced operator library provided by the [CANN](https://hiascend.com/software/cann) (Compute Architecture for Neural Networks) operator library for transformer-class large model computation, including attention-class, moe-class, and other operators. The operator library architecture diagram is as follows:
 
-<!-- <img src="docs/en/figures/architecture.png" alt="Architecture Diagram" width="700px" height="320px"> -->
+<img src="docs/en/figures/architecture.png" alt="Architecture Diagram" width="700px" height="320px">
 
 ## 📝Version Compatibility
 
