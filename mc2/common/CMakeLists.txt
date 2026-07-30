@@ -77,6 +77,13 @@ if (BUILD_OPEN_PROJECT)
             ${GENTASK_SRCS}
         )
     endif()
+    file(GLOB MC2_GRAPH_PLUGIN_SRCS
+        op_graph/mc2_moe_graph_context.cpp
+    )
+    if(MC2_GRAPH_PLUGIN_SRCS)
+        add_graph_plugin_modules()
+        target_sources(${GRAPH_PLUGIN_NAME}_obj PRIVATE ${MC2_GRAPH_PLUGIN_SRCS})
+    endif()
     if(NOT ENABLE_TEST)
         file(GLOB OPPROTO_SRCS)
         if(OPPROTO_SRCS)
