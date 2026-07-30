@@ -99,6 +99,17 @@ static const int64_t UB_BASIC_LIMIT_SIZE = static_cast<int64_t>(8) * 1024;
 static const int64_t SLOPE_BN_DIM_NUM = 2L;
 static const int64_t SLOPE_N_DIM_NUM = 1L;
 static const int64_t L1REUSE_D_LIMIT = 128L;
+static const int64_t L1REUSE_D_LIMIT_MIN = 192L;
+static const int64_t L1REUSE_D_REGULAR_MIN = 256L;
+static const int64_t L1REUSE_D_LIMIT_MAX = 512L;
+static const int64_t L1REUSE_D_ALIGN = 128L;
+static const int64_t L1REUSE_LARGE_D_HEAD_NUM = 16L;
+static const int64_t L1REUSE_B_SIZE = 1L;
+static const int64_t L1REUSE_G_SIZE = 1L;
+static const int64_t L1REUSE_S_SIZE_MIN = 4096L;
+static const int64_t L1REUSE_S_SIZE_MAX = 131072L;
+static const int64_t L1REUSE_BMM2_SINGLE_CORE_K = 512L;
+static const float KEEP_PROB_OPTIMIZE_EPS = 1e-6f;
 static const int64_t L1REUSE_BNG_LIMIT = 10L;
 static const int64_t L1REUSE_S2_LIMIT_1024 = 1024;
 static const int64_t L1REUSE_S2_LIMIT_2048 = 2048L;
@@ -147,12 +158,7 @@ enum AttenMaskShapeType : uint8_t {
     ATTEN_1_1_1_T_T = 99,
 };
 
-enum PseShapeType : uint8_t {
-    PSE_B_N2_G_S1_S2 = 0,
-    PSE_B_N2_G_1_S2 = 1,
-    PSE_B_N2_G_SLOPE,
-    PSE_1_N2_G_SLOPE
-};
+enum PseShapeType : uint8_t { PSE_B_N2_G_S1_S2 = 0, PSE_B_N2_G_1_S2 = 1, PSE_B_N2_G_SLOPE, PSE_1_N2_G_SLOPE };
 
 enum SparseMode : uint8_t {
     NO_MASK = 0,
@@ -176,20 +182,15 @@ enum AttenMaskCompressMode : uint8_t {
     BAND_LEFT_UP_CAUSAL_MODE
 };
 
-enum ImplMode : uint8_t {
-    AA_HIGH_PRECISION = 0,
-    AA_HIGH_PERFORMANCE = 1,
-    AA_INVALID_LINE_HIGH_PRECISION = 2
-};
+enum ImplMode : uint8_t { AA_HIGH_PRECISION = 0, AA_HIGH_PERFORMANCE = 1, AA_INVALID_LINE_HIGH_PRECISION = 2 };
 
 enum PseType : uint8_t {
-    PSE_OUTER_MUL_ADD_TYPE = 0, 
+    PSE_OUTER_MUL_ADD_TYPE = 0,
     PSE_OUTER_ADD_MUL_TYPE = 1, // default
     PSE_INNER_MUL_ADD_TYPE,
     PSE_INNER_MUL_ADD_SQRT_TYPE,
     PSE_INVALID_TYPE
 };
-
 
 enum PseEncodeType : uint8_t {
     PSE_ENCODE_NONE = 0,
@@ -224,12 +225,10 @@ struct MatmulConstParams {
     DTemplateType dType;
 };
 
-enum MatmulPolicyType : uint8_t{
-    MATMUL_POLICY_NORMAL = 0,
-    MATMUL_POLICY_UNSPLITK = 1
- };
+enum MatmulPolicyType : uint8_t { MATMUL_POLICY_NORMAL = 0, MATMUL_POLICY_UNSPLITK = 1 };
 
-template <typename T> static T AlignUp(T num1, T num2)
+template <typename T>
+static T AlignUp(T num1, T num2)
 {
     if (num2 == 0) {
         return 0;
@@ -240,7 +239,8 @@ template <typename T> static T AlignUp(T num1, T num2)
     return (num1 + num2 - 1) / num2 * num2;
 }
 
-template <typename T> static T AlignDown(T num1, T num2)
+template <typename T>
+static T AlignDown(T num1, T num2)
 {
     if (num2 == 0) {
         return 0;
@@ -248,7 +248,8 @@ template <typename T> static T AlignDown(T num1, T num2)
     return num1 / num2 * num2;
 }
 
-template <typename T> static T CeilDivision(T num1, T num2)
+template <typename T>
+static T CeilDivision(T num1, T num2)
 {
     if (num2 == 0) {
         return 0;
@@ -256,7 +257,8 @@ template <typename T> static T CeilDivision(T num1, T num2)
     return (num1 + num2 - 1) / num2;
 }
 
-template <typename T> static T CeilDiv(const T n1, const T n2)
+template <typename T>
+static T CeilDiv(const T n1, const T n2)
 {
     if (n1 == 0) {
         return 0;
@@ -264,7 +266,8 @@ template <typename T> static T CeilDiv(const T n1, const T n2)
     return (n2 != 0) ? (((n1 - 1) / n2) + 1) : n1;
 }
 
-template <typename T> static T CalcTailSize(T num1, T num2)
+template <typename T>
+static T CalcTailSize(T num1, T num2)
 {
     if (num2 == 0) {
         return 0;
@@ -275,9 +278,7 @@ template <typename T> static T CalcTailSize(T num1, T num2)
 
 class TilingKey {
 public:
-    TilingKey() : splitS1(0), splitS2(0), splitD(0), dtype(0), layoutType(0), sparseType(0), reserved(0)
-    {
-    }
+    TilingKey() : splitS1(0), splitS2(0), splitD(0), dtype(0), layoutType(0), sparseType(0), reserved(0) {}
 
     void Reset()
     {
@@ -290,10 +291,7 @@ public:
         reserved = 0U;
     }
 
-    uint32_t GetRawTilingKey() const
-    {
-        return *(reinterpret_cast<const uint32_t *>(this));
-    }
+    uint32_t GetRawTilingKey() const { return *(reinterpret_cast<const uint32_t *>(this)); }
 
     std::string ToString() const
     {
@@ -302,13 +300,13 @@ public:
         return ss.str();
     }
 
-    uint32_t splitS1    : 1;
-    uint32_t splitS2    : 1;
-    uint32_t splitD     : 1;
-    uint32_t dtype      : 2;
+    uint32_t splitS1 : 1;
+    uint32_t splitS2 : 1;
+    uint32_t splitD : 1;
+    uint32_t dtype : 2;
     uint32_t layoutType : 2;
     uint32_t sparseType : 2;
-    uint32_t reserved   : 23; // to fullfil 32 bit, if add new template bit then decrease this number
+    uint32_t reserved : 23; // to fullfil 32 bit, if add new template bit then decrease this number
 };
 
 inline bool operator==(const TilingKey &left, const TilingKey &right)
@@ -328,10 +326,7 @@ public:
 
 class FlashAttentionScoreTilingBase : public TilingBaseClass {
 public:
-    explicit FlashAttentionScoreTilingBase(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-        Reset();
-    }
+    explicit FlashAttentionScoreTilingBase(gert::TilingContext *context) : TilingBaseClass(context) { Reset(); }
     ~FlashAttentionScoreTilingBase() override = default;
 
     void Reset(gert::TilingContext *context) override
@@ -341,14 +336,8 @@ public:
     }
 
 protected:
-    [[nodiscard]] gert::TilingContext *GetContext()
-    {
-        return context_;
-    }
-    bool IsCapable() override
-    {
-        return true;
-    }
+    [[nodiscard]] gert::TilingContext *GetContext() { return context_; }
+    bool IsCapable() override { return true; }
     // 1、获取平台信息比如CoreNum、UB/L1/L0C资源大小
     ge::graphStatus GetPlatformInfo() override;
     // 2、获取INPUT/OUTPUT/ATTR信息
@@ -376,31 +365,51 @@ protected:
 
     void Reset();
 
-    void GetActualSeqLenData(int64_t inputIdx, std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> &res, int64_t &actualLen, int64_t &actualBatch, int64_t &endLen) const;
+    void GetActualSeqLenData(int64_t inputIdx, std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> &res, int64_t &actualLen,
+                             int64_t &actualBatch, int64_t &endLen) const;
 
     virtual int64_t GetNRatio();
 
-    virtual int64_t GetMinS1BasicBlock() const
+    bool IsKvL1ReuseTilingSupportedShape() const
     {
-        return std::min(64L, alignedS1);
+        bool isSupportedLayout = tilingData->inputParams.get_layoutType() == LAYOUT_BNSD;
+        bool isSupportedBatch = bSize == L1REUSE_B_SIZE;
+        bool isUngroupedHead = gSize == L1REUSE_G_SIZE;
+        bool isSupportedSeqLen = s1Size == s2Size && s1Size >= L1REUSE_S_SIZE_MIN && s1Size <= L1REUSE_S_SIZE_MAX;
+        bool isSupportedD =
+            dSize == L1REUSE_D_LIMIT_MIN ||
+            (dSize >= L1REUSE_D_REGULAR_MIN && dSize <= L1REUSE_D_LIMIT_MAX && dSize % L1REUSE_D_ALIGN == 0L);
+        bool isSupportedHead = n1Size > 0L && (dSize <= L1REUSE_D_REGULAR_MIN || n1Size == L1REUSE_LARGE_D_HEAD_NUM);
+        bool isSupportedDtype = inputDtype == ge::DT_FLOAT16 || inputDtype == ge::DT_BF16;
+        bool isNoMask = sparseMode == static_cast<int64_t>(NO_MASK) && attenMaskExistFlag == 0U;
+        bool isSupportedCausalMask =
+            attenMaskExistFlag == 1U && (sparseMode == static_cast<int64_t>(LEFT_UP_CAUSAL) ||
+                                         sparseMode == static_cast<int64_t>(RIGHT_DOWN_CAUSAL));
+        bool isSupportedMask = isNoMask || isSupportedCausalMask;
+        bool isKeepProbOne = keepProb > (1.0f - KEEP_PROB_OPTIMIZE_EPS) && keepProb < (1.0f + KEEP_PROB_OPTIMIZE_EPS);
+        bool hasNoExtraFeature = pseExistFlag == 0U && dropMaskExistFlag == 0U && !hasRope;
+
+        return isSupportedLayout && isSupportedBatch && isUngroupedHead && isSupportedSeqLen && isSupportedD &&
+               isSupportedHead && isSupportedDtype && isSupportedMask && isKeepProbOne && hasNoExtraFeature;
     }
 
-    virtual bool IsTemplateMatched() const
-    {
-        return expectTemplate == actualTemplate;
-    }
+    virtual int64_t GetMinS1BasicBlock() const { return std::min(64L, alignedS1); }
+
+    virtual bool IsTemplateMatched() const { return expectTemplate == actualTemplate; }
 
     ge::graphStatus CheckContext();
     virtual bool AnalyzeDtype();
     bool AnalyzeAttrs();
     bool AnalyzeLayout();
-    bool CouldConvertTND2BSH(std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> &resQ, std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> &resKV,
-                                            const uint32_t &firstValidIndex, const uint32_t &lastValidIndex, const int64_t &actualQBatch, const int64_t &actualKVBatch, 
-                                            int64_t &s1Max, int64_t &s2Max, int64_t &t1Size, int64_t &t2Size) const;
-    
+    bool CouldConvertTND2BSH(std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> &resQ,
+                             std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> &resKV, const uint32_t &firstValidIndex,
+                             const uint32_t &lastValidIndex, const int64_t &actualQBatch, const int64_t &actualKVBatch,
+                             int64_t &s1Max, int64_t &s2Max, int64_t &t1Size, int64_t &t2Size) const;
+
     bool Analyze3DimLayout(const gert::Shape &queryShape, const gert::Shape *queryRopeShape,
                            const gert::Shape &keyShape, const gert::Shape &valueShape, size_t layoutLen);
-    bool Analyze4DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &valueShape, size_t layoutLen);
+    bool Analyze4DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &valueShape,
+                           size_t layoutLen);
     bool AnalyzeOptionalInput();
     bool MatchTemplate();
     virtual void CalcS1S2BasicBlock(const BufferNum &bufferNum);
@@ -410,8 +419,8 @@ protected:
     int64_t CalcMaxS2BasicBlockSize(const BufferNum &bufferNum, int64_t tmpS1BasicBlock) const;
     virtual bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock) = 0;
     bool IsBasicBlockInSoftMax(const ge::Shape &shape) const;
-    virtual bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                                    int64_t batch, matmul_tiling::MatmulApiTiling &bmm1);
+    virtual bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t batch,
+                                    matmul_tiling::MatmulApiTiling &bmm1);
     virtual bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t tmpDBasicBlock,
                                     int64_t batch, matmul_tiling::MatmulApiTiling &bmm2) = 0;
     bool SetMatMulTiling(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t tmpDBasicBlock, int64_t batch,
@@ -555,10 +564,7 @@ protected:
     FlashAttentionScoreGeneralTilingData *tilingData = context_->GetTilingData<FlashAttentionScoreGeneralTilingData>();
 };
 
-int64_t FlashAttentionScoreTilingBase::GetNRatio()
-{
-    return BMM_SOFTMAX_RATIO;
-}
+int64_t FlashAttentionScoreTilingBase::GetNRatio() { return BMM_SOFTMAX_RATIO; }
 
 void FlashAttentionScoreTilingBase::GetMaxWorkspaceFlag()
 {
@@ -586,8 +592,7 @@ ge::graphStatus FlashAttentionScoreTilingBase::GetPlatformInfo()
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
         auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreCompileInfo *>(context_->GetCompileInfo());
-        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(opName, "compileInfoPtr is null."),
-                   return ge::GRAPH_FAILED);
+        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(opName, "compileInfoPtr is null."), return ge::GRAPH_FAILED);
         aivNum = compileInfoPtr->aivNum;
         aicNum = compileInfoPtr->aicNum;
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
@@ -604,7 +609,7 @@ ge::graphStatus FlashAttentionScoreTilingBase::GetPlatformInfo()
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, l2CacheSize);
     }
     OP_LOGI(context_, "get platform from compileInfo.aivNum(%u) aicNum(%u) ubSize(%lu) l1Size(%lu) l0cSize(%lu).",
-              aivNum, aicNum, aicoreParams_.ubSize, aicoreParams_.l1Size, aicoreParams_.l0cSize);
+            aivNum, aicNum, aicoreParams_.ubSize, aicoreParams_.l1Size, aicoreParams_.l0cSize);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -672,9 +677,9 @@ bool FlashAttentionScoreTilingBase::PretokenAndNexttokenAdjustment(SparseEnum &s
         sparseMode == static_cast<int64_t>(PREFIX_COMPRESS)) {
         if (preTokens < s1Size - 1 || nextTokens < s2Size - 1) {
             OP_LOGW(context_,
-                      "preTokens[%ld] and nextTokens[%ld] not match sparseMode[%ld], "
-                      "preTokens and nextTokens will be reset max int value.",
-                      preTokens, nextTokens, sparseMode);
+                    "preTokens[%ld] and nextTokens[%ld] not match sparseMode[%ld], "
+                    "preTokens and nextTokens will be reset max int value.",
+                    preTokens, nextTokens, sparseMode);
             preTokens = std::numeric_limits<int32_t>::max();
             nextTokens = std::numeric_limits<int32_t>::max();
         }
@@ -683,9 +688,9 @@ bool FlashAttentionScoreTilingBase::PretokenAndNexttokenAdjustment(SparseEnum &s
     } else if (sparseMode == static_cast<int64_t>(LEFT_UP_CAUSAL)) {
         if (preTokens != s1Size || nextTokens != 0) {
             OP_LOGW(context_,
-                      "preTokens[%ld] and nextTokens[%ld] not match sparseMode[%ld], "
-                      "preTokens will be reset max int value and nextTokens will be reset 0.",
-                      preTokens, nextTokens, sparseMode);
+                    "preTokens[%ld] and nextTokens[%ld] not match sparseMode[%ld], "
+                    "preTokens will be reset max int value and nextTokens will be reset 0.",
+                    preTokens, nextTokens, sparseMode);
             preTokens = s1Size; // if sparse type is causal, template always need preTokens equal to s1Size
             nextTokens = 0;
         }
@@ -694,9 +699,9 @@ bool FlashAttentionScoreTilingBase::PretokenAndNexttokenAdjustment(SparseEnum &s
         if (s1Size == s2Size) {
             if (preTokens != s1Size || nextTokens != 0) {
                 OP_LOGW(context_,
-                          "preTokens[%ld] and nextTokens[%ld] not match sparseMode[%ld], "
-                          "preTokens will be reset max int value and nextTokens will be reset 0.",
-                          preTokens, nextTokens, sparseMode);
+                        "preTokens[%ld] and nextTokens[%ld] not match sparseMode[%ld], "
+                        "preTokens will be reset max int value and nextTokens will be reset 0.",
+                        preTokens, nextTokens, sparseMode);
                 preTokens = s1Size; // if sparse type is causal, template always need preTokens equal to s1Size
                 nextTokens = 0;
             }
@@ -706,9 +711,9 @@ bool FlashAttentionScoreTilingBase::PretokenAndNexttokenAdjustment(SparseEnum &s
             preTokens = s1Size;
             nextTokens = s2Size - s1Size;
             OP_LOGD(context_,
-                      "Unequal s, sparseType rightDownCasual reset to band, and reset preTokens[%ld] "
-                      "and nextTokens[%ld].",
-                      preTokens, nextTokens);
+                    "Unequal s, sparseType rightDownCasual reset to band, and reset preTokens[%ld] "
+                    "and nextTokens[%ld].",
+                    preTokens, nextTokens);
             sparseType = SparseEnum::BAND;
             // check need to enable AA_INVALID_LINE_HIGH_PRECISION
             EnableBandInvalidLineImplMode();
@@ -737,9 +742,9 @@ bool FlashAttentionScoreTilingBase::SparseBandModeCheck(int64_t maxS1Value, int6
     if (preTokens >= 0 && nextTokens >= 0) {
         if (preTokens >= maxS1Value && nextTokens >= maxS2Value) {
             OP_LOGW(context_,
-                      "PreTokens[%ld] and nextTokens[%ld] config error, should not both greater than maxS1Val[%ld] "
-                      "maxS2Val[%ld].",
-                      oriPreTokens, oriNextTokens, maxS1Value, maxS2Value);
+                    "PreTokens[%ld] and nextTokens[%ld] config error, should not both greater than maxS1Val[%ld] "
+                    "maxS2Val[%ld].",
+                    oriPreTokens, oriNextTokens, maxS1Value, maxS2Value);
             return true;
         }
         s1SparseValidSize = std::min(AlignUp(preTokens, HIGH_PERF_BLOCK_SIZE), s1Size);
@@ -753,7 +758,7 @@ bool FlashAttentionScoreTilingBase::SparseBandModeCheck(int64_t maxS1Value, int6
 
     if (preTokens < 0 && nextTokens < 0) {
         OP_LOGE(context_, "PreTokens[%ld] and nextTokens[%ld] config error, there is no valid data block.",
-                  oriPreTokens, oriNextTokens);
+                oriPreTokens, oriNextTokens);
         return false;
     }
 
@@ -769,8 +774,8 @@ bool FlashAttentionScoreTilingBase::SparseBandModeCheck(int64_t maxS1Value, int6
             return true;
         } else {
             OP_LOGE(context_,
-                      "PreTokens[%ld] and nextTokens[%ld] config error with S1[%ld], there is no valid data block.",
-                      oriPreTokens, oriNextTokens, minS1Value);
+                    "PreTokens[%ld] and nextTokens[%ld] config error with S1[%ld], there is no valid data block.",
+                    oriPreTokens, oriNextTokens, minS1Value);
             return false;
         }
     }
@@ -787,8 +792,8 @@ bool FlashAttentionScoreTilingBase::SparseBandModeCheck(int64_t maxS1Value, int6
             return true;
         } else {
             OP_LOGE(context_,
-                      "PreTokens[%ld] and nextTokens[%ld] config error with S2[%ld], there is no valid data block.",
-                      oriPreTokens, oriNextTokens, minS2Value);
+                    "PreTokens[%ld] and nextTokens[%ld] config error with S2[%ld], there is no valid data block.",
+                    oriPreTokens, oriNextTokens, minS2Value);
             return false;
         }
     }
@@ -827,7 +832,7 @@ bool FlashAttentionScoreTilingBase::SparseModeProcess(SparseEnum &sparseType)
 bool FlashAttentionScoreTilingBase::GetSparseInfo(SparseEnum &sparseType)
 {
     OP_LOGD(context_, "check sparse info: preTokens[%ld], nextTokens[%ld], s1[%ld], s2[%ld], attenMaskExistFlag[%d].",
-              preTokens, nextTokens, s1Size, s2Size, attenMaskExistFlag);
+            preTokens, nextTokens, s1Size, s2Size, attenMaskExistFlag);
     if (attenMaskExistFlag != 1) {
         return true;
     }
@@ -864,16 +869,16 @@ bool FlashAttentionScoreTilingBase::SetPseAlibiParams()
     if (pseShape == nullptr || pseShape->GetStorageShape().GetDimNum() == 0) {
         return true;
     }
-    if (pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_TYPE) || pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_SQRT_TYPE)) {
+    if (pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_TYPE) ||
+        pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_SQRT_TYPE)) {
         if (s1Size != s2Size) {
             OP_LOGE(context_, "INNER Pse alibi is supported only when s1Size and s2Size are equal.");
             return false;
         }
         return true;
     }
-    if (pseShape->GetStorageShape().GetDimNum() < 1) {  // 1 is min dim num of legal pse
-        OP_LOGE(context_, "Invalid Pse DimNum(%zu), PseType(%ld).",
-                  pseShape->GetStorageShape().GetDimNum(), pseType);
+    if (pseShape->GetStorageShape().GetDimNum() < 1) { // 1 is min dim num of legal pse
+        OP_LOGE(context_, "Invalid Pse DimNum(%zu), PseType(%ld).", pseShape->GetStorageShape().GetDimNum(), pseType);
         return false;
     } else if (pseShape->GetStorageShape().GetDimNum() >= 2) {
         auto pseS1Size = pseShape->GetStorageShape().GetDim(pseShape->GetStorageShape().GetDimNum() - 2);
@@ -897,25 +902,16 @@ bool FlashAttentionScoreTilingBase::IsB41L2CacheOptimizable() const
     auto layoutType = tilingData->inputParams.get_layoutType();
 
     // BSND: S1,S2>1024, not 32-aligned (avoids tile-boundary bank conflict), N in (32,128] not 32-multiple
-    bool bsndOk = (layoutType == LAYOUT_BSND &&
-                   s1Size > 1024 && s2Size > 1024 &&
-                   s1Size % 32 != 0 && s2Size % 32 != 0 &&
-                   32 < n1Size && n1Size <= 128 && n1Size % 16 != 0 &&
-                   dSize == 128 && 1 <= bSize && bSize <= 16);
+    bool bsndOk =
+        (layoutType == LAYOUT_BSND && s1Size > 1024 && s2Size > 1024 && s1Size % 32 != 0 && s2Size % 32 != 0 &&
+         32 < n1Size && n1Size <= 128 && n1Size % 16 != 0 && dSize == 128 && 1 <= bSize && bSize <= 16);
 
     // SBH: S1>30K, S2 in [180,256] not 32-aligned, dSize=128, headNum=1, B in [5,7]
-    bool sbhOk = (layoutType == LAYOUT_SBH &&
-                  dSize == 128 &&
-                  n1Size == 1 &&
-                  s1Size > 30000 &&
-                  180 <= s2Size && s2Size <= 256 &&
-                  s2Size % 32 != 0 &&
-                  5 <= bSize && bSize <= 7);
+    bool sbhOk = (layoutType == LAYOUT_SBH && dSize == 128 && n1Size == 1 && s1Size > 30000 && 180 <= s2Size &&
+                  s2Size <= 256 && s2Size % 32 != 0 && 5 <= bSize && bSize <= 7);
 
-    return (l2CacheSize == B4_1_L2_CACHESIZE) &&
-           (inputDtype == ge::DT_BF16 || inputDtype == ge::DT_FLOAT16) &&
-           (static_cast<uint64_t>(origDataPerCore) >= perCoreL2 ||
-            static_cast<uint64_t>(totalAttnData) >= perCoreL2) &&
+    return (l2CacheSize == B4_1_L2_CACHESIZE) && (inputDtype == ge::DT_BF16 || inputDtype == ge::DT_FLOAT16) &&
+           (static_cast<uint64_t>(origDataPerCore) >= perCoreL2 || static_cast<uint64_t>(totalAttnData) >= perCoreL2) &&
            (bsndOk || sbhOk);
 }
 
@@ -924,11 +920,10 @@ ge::graphStatus FlashAttentionScoreTilingBase::GetShapeAttrsInfo()
     GetMaxWorkspaceFlag();
     opName = context_->GetNodeName();
     OP_LOGD(opName, "TilingContext: %s.", GetTilingContextDebugStr().c_str());
-    OP_CHECK_IF(CheckContext() != ge::GRAPH_SUCCESS, OP_LOGE(opName, "invalid context."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckContext() != ge::GRAPH_SUCCESS, OP_LOGE(opName, "invalid context."), return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(!AnalyzeAttrs() || !AnalyzeDtype() || !AnalyzeLayout() || !AnalyzeOptionalInput(),
-               OP_LOGE(opName, "fail to analyze context info."), return ge::GRAPH_FAILED);
+                OP_LOGE(opName, "fail to analyze context info."), return ge::GRAPH_FAILED);
 
     alignedS1 = AlignUp(s1Size, FRACTAL_NUM);
     alignedS2 = AlignUp(s2Size, FRACTAL_NUM);
@@ -936,12 +931,9 @@ ge::graphStatus FlashAttentionScoreTilingBase::GetShapeAttrsInfo()
     alignedD2 = AlignUp(d2Size, FRACTAL_NUM);
 
     if (!isMaxWorkspace) {
-        OP_CHECK_IF(alignedS1 <= 0, OP_LOGE(opName, "invalid alignedS1 %ld.", alignedS1),
-            return ge::GRAPH_FAILED);
-        OP_CHECK_IF(alignedS2 <= 0, OP_LOGE(opName, "invalid alignedS2 %ld.", alignedS2),
-            return ge::GRAPH_FAILED);
-        OP_CHECK_IF(alignedD <= 0, OP_LOGE(opName, "invalid alignedD %ld.", alignedD),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(alignedS1 <= 0, OP_LOGE(opName, "invalid alignedS1 %ld.", alignedS1), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(alignedS2 <= 0, OP_LOGE(opName, "invalid alignedS2 %ld.", alignedS2), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(alignedD <= 0, OP_LOGE(opName, "invalid alignedD %ld.", alignedD), return ge::GRAPH_FAILED);
     }
 
     auto &inputParams = tilingData->inputParams;
@@ -956,9 +948,10 @@ ge::graphStatus FlashAttentionScoreTilingBase::GetShapeAttrsInfo()
     inputParams.set_alignedS2(alignedS2);
     inputParams.set_pseType(static_cast<uint32_t>(pseType));
     inputParams.set_tndSoftmaxOut(tndSoftmaxOut);
-    OP_LOGD(context_, "input params: bn2gs1s2d[%ld, %ld, %ld, %ld, %ld, %ld], keepProb[%f], scaleValue[%f],"
-              "pseType:%ld, s1BasicBlockBest:%ld.", bSize, n2Size, gSize, s1Size, s2Size,
-              dSize, keepProb, scaleValue, pseType, s1BasicBlockBest);
+    OP_LOGD(context_,
+            "input params: bn2gs1s2d[%ld, %ld, %ld, %ld, %ld, %ld], keepProb[%f], scaleValue[%f],"
+            "pseType:%ld, s1BasicBlockBest:%ld.",
+            bSize, n2Size, gSize, s1Size, s2Size, dSize, keepProb, scaleValue, pseType, s1BasicBlockBest);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1069,7 +1062,7 @@ bool FlashAttentionScoreTilingBase::AnalyzeDtype()
             break;
         default:
             OP_LOGE(opName, "not support input dtype: %s for now",
-                                        ge::TypeUtils::DataTypeToSerialString(inputDtype).c_str());
+                    ge::TypeUtils::DataTypeToSerialString(inputDtype).c_str());
             return false;
     }
 
@@ -1095,8 +1088,8 @@ bool FlashAttentionScoreTilingBase::AnalyzeAttrs()
     scaleValue = *scaleValuePtr;
     n1Size = *n1SizePtr;
     OP_CHECK_IF(n1Size == 0, OP_LOGE(opName, "Head num is zero."), return false);
-    OP_CHECK_IF(keepProb <= 0.0 || keepProb > 1.0,
-               OP_LOGE(opName, "keepProb value must be in range of (0, 1]."), return false);
+    OP_CHECK_IF(keepProb <= 0.0 || keepProb > 1.0, OP_LOGE(opName, "keepProb value must be in range of (0, 1]."),
+                return false);
 
     implMode = ImplMode::AA_HIGH_PRECISION;
     if (attrs->GetAttrNum() > idx) {
@@ -1128,8 +1121,8 @@ bool FlashAttentionScoreTilingBase::AnalyzeAttrs()
     if (attrs->GetAttrNum() > idx) {
         auto pseTypePtr = attrs->GetAttrPointer<int64_t>(idx++);
         pseType = *pseTypePtr;
-        OP_CHECK_IF(pseType < 0 || pseType >= PSE_INVALID_TYPE,
-                   OP_LOGE(opName, "pseType value is out of range"), return false);
+        OP_CHECK_IF(pseType < 0 || pseType >= PSE_INVALID_TYPE, OP_LOGE(opName, "pseType value is out of range"),
+                    return false);
     }
     if (attrs->GetAttrNum() > static_cast<size_t>(SOFTMAX_OUT_LAYOUT_INDEX)) {
         // read 13th attr softmax_out_layout
@@ -1139,41 +1132,43 @@ bool FlashAttentionScoreTilingBase::AnalyzeAttrs()
             tndSoftmaxOut = static_cast<uint8_t>(1);
         }
     }
-    OP_LOGD(context_, "attrs: scale_value[%f] keep_prob[%f] pre_tockens[%ld] next_tockens[%ld] head_num[%ld]"
-              "input_layout[%s] inner_precise[%d] sparse_mode[%ld] pseType[%ld].",
-              scaleValue, keepProb, preTokens, nextTokens, n1Size, inputLayout, implMode, sparseMode, pseType);
+    OP_LOGD(context_,
+            "attrs: scale_value[%f] keep_prob[%f] pre_tockens[%ld] next_tockens[%ld] head_num[%ld]"
+            "input_layout[%s] inner_precise[%d] sparse_mode[%ld] pseType[%ld].",
+            scaleValue, keepProb, preTokens, nextTokens, n1Size, inputLayout, implMode, sparseMode, pseType);
     return true;
 }
 
 bool FlashAttentionScoreTilingBase::AnalyzeLayout()
 {
     auto &queryShape = context_->GetInputShape(0)->GetStorageShape();
-    auto *queryRopeShape = context_->GetOptionalInputShape(15) ? &context_->GetOptionalInputShape(15)->GetStorageShape() : nullptr;
+    auto *queryRopeShape =
+        context_->GetOptionalInputShape(15) ? &context_->GetOptionalInputShape(15)->GetStorageShape() : nullptr;
     auto &keyShape = context_->GetInputShape(1)->GetStorageShape();
     auto &valueShape = context_->GetInputShape(2)->GetStorageShape();
 
     size_t layoutLen = strlen(inputLayout);
     OP_LOGD(context_, "Get input_layout [%s].", inputLayout);
     OP_CHECK_IF(queryShape.GetDimNum() != layoutLen || keyShape.GetDimNum() != layoutLen,
-               OP_LOGE(opName, "Invalid layout[%s].", inputLayout), return false);
+                OP_LOGE(opName, "Invalid layout[%s].", inputLayout), return false);
     OP_CHECK_IF(!Analyze3DimLayout(queryShape, queryRopeShape, keyShape, valueShape, layoutLen) ||
-                !Analyze4DimLayout(queryShape, keyShape, valueShape, layoutLen),
-               OP_LOGE(opName, "Get unsupported layout: %s", inputLayout), return false);
+                    !Analyze4DimLayout(queryShape, keyShape, valueShape, layoutLen),
+                OP_LOGE(opName, "Get unsupported layout: %s", inputLayout), return false);
     OP_CHECK_IF(gSize == 0, OP_LOGE(opName, "gSize is zero."), return false);
     OP_CHECK_IF(n2Size == 0, OP_LOGE(opName, "n2Size is zero."), return false);
-    OP_CHECK_IF(dSize > HEAD_DIM_MAX_VALUE || dSize <= 0L,
-               OP_LOGE(opName, "dSize is not in range:(0, 512]."), return false);
+    OP_CHECK_IF(dSize > HEAD_DIM_MAX_VALUE || dSize <= 0L, OP_LOGE(opName, "dSize is not in range:(0, 512]."),
+                return false);
     OP_CHECK_IF(n1Size % n2Size != 0,
-               OP_LOGE(opName, "n1Size [%ld] should be a multiple of n2Size [%ld].", n1Size, n2Size),
-               return false);
+                OP_LOGE(opName, "n1Size [%ld] should be a multiple of n2Size [%ld].", n1Size, n2Size), return false);
     return true;
 }
 
 bool FlashAttentionScoreTilingBase::CouldConvertTND2BSH(std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> &resQ,
                                                         std::array<int64_t, MAX_VAR_LEN_SEQ_LEN> &resKV,
                                                         const uint32_t &firstValidIndex, const uint32_t &lastValidIndex,
-                                                        const int64_t &actualQBatch, const int64_t &actualKVBatch, int64_t &s1Max,
-                                                        int64_t &s2Max, int64_t &t1Size, int64_t &t2Size) const
+                                                        const int64_t &actualQBatch, const int64_t &actualKVBatch,
+                                                        int64_t &s1Max, int64_t &s2Max, int64_t &t1Size,
+                                                        int64_t &t2Size) const
 {
     auto pseShape = context_->GetOptionalInputShape(PSE_INPUT_INDEX);
     auto queryRopeShape = context_->GetOptionalInputShape(QUERY_ROPE_INPUT_INDEX);
@@ -1181,10 +1176,10 @@ bool FlashAttentionScoreTilingBase::CouldConvertTND2BSH(std::array<int64_t, MAX_
         return false;
     }
     if (tndSoftmaxOut == 1) {
-        return false; // could not switch to BSH layout with TND softmax 
+        return false; // could not switch to BSH layout with TND softmax
     }
     if (!(pseShape == nullptr || pseShape->GetStorageShape().GetDimNum() == 0)) {
-        return false; 
+        return false;
     }
     if (sparseMode == RIGHT_DOWN_CAUSAL_BAND || sparseMode == BAND_LEFT_UP_CAUSAL) {
         return false;
@@ -1217,7 +1212,7 @@ void FlashAttentionScoreTilingBase::GetActualSeqLenData(int64_t inputIdx, std::a
     auto &actualSeqLenShape = actualSeqLenTensor->GetShape().GetStorageShape();
     if (actualSeqLenShape.GetDimNum() != 1) {
         OP_LOGW(context_, "[%s]actualSeqLenShape is invalid %lu %ld", templateName, actualSeqLenShape.GetDimNum(),
-                  actualSeqLenShape.GetDim(0));
+                actualSeqLenShape.GetDim(0));
         return;
     }
     /* Get Data from tensor. */
@@ -1245,7 +1240,8 @@ void FlashAttentionScoreTilingBase::GetActualSeqLenData(int64_t inputIdx, std::a
 }
 
 bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &queryShape, const gert::Shape *queryRopeShape,
-                                                      const gert::Shape &keyShape, const gert::Shape &valueShape, size_t layoutLen)
+                                                      const gert::Shape &keyShape, const gert::Shape &valueShape,
+                                                      size_t layoutLen)
 {
     int64_t h1 = 0;
     int64_t h2 = 0;
@@ -1293,10 +1289,11 @@ bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &querySh
                 std::fill(actualSeqLenData.begin(), actualSeqLenData.end(), 0);
                 std::fill(actualSeqLenKvData.begin(), actualSeqLenKvData.end(), 0);
             }
-            GetActualSeqLenData(ACTUAL_SEQ_LENGTH_INPUT_INDEX, actualSeqLenData, actualSeqQLen,actualQBatch, endQLen);
-            GetActualSeqLenData(ACTUAL_SEQ_LENGTH_KV_INPUT_INDEX, actualSeqLenKvData, actualSeqKVLen,actualKVBatch, endKvLen);
+            GetActualSeqLenData(ACTUAL_SEQ_LENGTH_INPUT_INDEX, actualSeqLenData, actualSeqQLen, actualQBatch, endQLen);
+            GetActualSeqLenData(ACTUAL_SEQ_LENGTH_KV_INPUT_INDEX, actualSeqLenKvData, actualSeqKVLen, actualKVBatch,
+                                endKvLen);
             OP_CHECK_IF(actualSeqQLen != actualSeqKVLen && (!isMaxWorkspace),
-                       OP_LOGE(opName, "VarLen scene, q is not equal kv."), return false);
+                        OP_LOGE(opName, "VarLen scene, q is not equal kv."), return false);
             bSize = actualSeqQLen;
             accumS1 = std::accumulate(actualSeqLenData.begin(), actualSeqLenData.end(), 0LL);
             accumS2 = std::accumulate(actualSeqLenKvData.begin(), actualSeqLenKvData.end(), 0LL);
@@ -1310,8 +1307,10 @@ bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &querySh
             // 校验EOD场景尾部是否补0
             if (t1Size > accumS1 && t2Size > accumS2) {
                 if ((endQLen != 0 || endKvLen != 0) && (!isMaxWorkspace)) {
-                    OP_LOGE(opName, "The end of actualSeqQLen & actualSeqKvLen should be 0 in EOD scenario, but got (%d) and (%d).", 
-                                            endQLen, endKvLen);
+                    OP_LOGE(
+                        opName,
+                        "The end of actualSeqQLen & actualSeqKvLen should be 0 in EOD scenario, but got (%d) and (%d).",
+                        endQLen, endKvLen);
                     return false;
                 }
             }
@@ -1331,8 +1330,11 @@ bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &querySh
             }
             maxS1Val = *std::max_element(actualSeqLenData.begin(), actualSeqLenData.end());
             maxS2Val = *std::max_element(actualSeqLenKvData.begin(), actualSeqLenKvData.end());
-            bool couldConvert = CouldConvertTND2BSH(actualSeqLenData, actualSeqLenKvData,firstValidIndex,lastValidIndex,actualQBatch,actualKVBatch,maxS1Val,maxS2Val,t1Size,t2Size);
-            if (couldConvert && queryShape.GetDim(2) == 128 && keyShape.GetDim(2) == 128 && valueShape.GetDim(2) == 128) {
+            bool couldConvert =
+                CouldConvertTND2BSH(actualSeqLenData, actualSeqLenKvData, firstValidIndex, lastValidIndex, actualQBatch,
+                                    actualKVBatch, maxS1Val, maxS2Val, t1Size, t2Size);
+            if (couldConvert && queryShape.GetDim(2) == 128 && keyShape.GetDim(2) == 128 &&
+                valueShape.GetDim(2) == 128) {
                 bSize = actualQBatch;
                 s1Size = maxS1Val;
                 s2Size = maxS2Val;
@@ -1360,10 +1362,10 @@ bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &querySh
                 maxS2Val = *std::max_element(actualSeqLenKvData.begin(), actualSeqLenKvData.end());
                 s1Size = maxS1Val;
                 s2Size = maxS2Val;
-                OP_CHECK_IF(n1Size != queryShape.GetDim(1) && (!isMaxWorkspace),
-                        OP_LOGE(opName, "head_num is [%ld], but got query dim1 [%ld].", n1Size,
-                                                    queryShape.GetDim(1)),
-                        return false);
+                OP_CHECK_IF(
+                    n1Size != queryShape.GetDim(1) && (!isMaxWorkspace),
+                    OP_LOGE(opName, "head_num is [%ld], but got query dim1 [%ld].", n1Size, queryShape.GetDim(1)),
+                    return false);
                 n2Size = keyShape.GetDim(1);
                 OP_CHECK_IF(n2Size == 0 && (!isMaxWorkspace), OP_LOGE(opName, "N2 is zero."), return false);
                 gSize = queryShape.GetDim(1) / n2Size;
@@ -1380,7 +1382,7 @@ bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &querySh
                 tilingKeyLayout = LayoutType::LAYOUT_TND;
                 int32_t count512to1024 = 0;
                 int64_t seqQTotal = 0;
-                for (int64_t i  = 0; i < bSize; i++) {
+                for (int64_t i = 0; i < bSize; i++) {
                     if (actualSeqLenKvData[i] >= NUM_512 && actualSeqLenKvData[i] < NUM_1024) {
                         count512to1024++;
                     }
@@ -1401,9 +1403,8 @@ bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &querySh
             return false;
         }
         OP_CHECK_IF(h1 == 0 || h2 == 0, OP_LOGE(opName, "H is zero."), return false);
-        OP_CHECK_IF(h1 % n1Size != 0,
-                   OP_LOGE(opName, "h1 [%ld] should be a multiple of n1Size [%ld].", h1, n1Size),
-                   return false);
+        OP_CHECK_IF(h1 % n1Size != 0, OP_LOGE(opName, "h1 [%ld] should be a multiple of n1Size [%ld].", h1, n1Size),
+                    return false);
         dSize = h1 / n1Size;
         gSize = h1 / h2;
         n2Size = h2 / dSize;
@@ -1413,8 +1414,8 @@ bool FlashAttentionScoreTilingBase::Analyze3DimLayout(const gert::Shape &querySh
     return true;
 }
 
-bool FlashAttentionScoreTilingBase::Analyze4DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &valueShape,
-                                                      size_t layoutLen)
+bool FlashAttentionScoreTilingBase::Analyze4DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape,
+                                                      const gert::Shape &valueShape, size_t layoutLen)
 {
     if (layoutLen == 4UL) {
         // 2: N idx, 3: D idx
@@ -1425,9 +1426,8 @@ bool FlashAttentionScoreTilingBase::Analyze4DimLayout(const gert::Shape &querySh
             n2Size = keyShape.GetDim(2); // 2: N idx
             OP_CHECK_IF(n2Size == 0, OP_LOGE(opName, "N2 is zero."), return false);
             OP_CHECK_IF(n1Size != queryShape.GetDim(2),
-                       OP_LOGE(opName, "head_num is [%ld], but got query dim2 [%ld].", n1Size,
-                                                   queryShape.GetDim(2)),
-                       return false);
+                        OP_LOGE(opName, "head_num is [%ld], but got query dim2 [%ld].", n1Size, queryShape.GetDim(2)),
+                        return false);
             gSize = queryShape.GetDim(2) / n2Size; // 2: N idx
             dSize = queryShape.GetDim(3);          // 3: D1 idx
             d2Size = valueShape.GetDim(3);         // 3: D2 idx
@@ -1443,9 +1443,8 @@ bool FlashAttentionScoreTilingBase::Analyze4DimLayout(const gert::Shape &querySh
             n2Size = keyShape.GetDim(1); // 1: N idx
             OP_CHECK_IF(n2Size == 0, OP_LOGE(opName, "N2 is zero."), return false);
             OP_CHECK_IF(n1Size != queryShape.GetDim(1),
-                       OP_LOGE(opName, "head_num is [%ld], but got query dim1 [%ld].", n1Size,
-                                                   queryShape.GetDim(1)),
-                       return false);
+                        OP_LOGE(opName, "head_num is [%ld], but got query dim1 [%ld].", n1Size, queryShape.GetDim(1)),
+                        return false);
             gSize = queryShape.GetDim(1) / n2Size;
             s1Size = queryShape.GetDim(2); // 2: S idx
             s2Size = keyShape.GetDim(2);   // 2: S idx
@@ -1476,15 +1475,15 @@ SparseEnum FlashAttentionScoreTilingBase::GetPrefixNList(std::ostringstream &fai
     auto &prefixShape = prefixN->GetShape().GetStorageShape();
     if (prefixShape.GetDimNum() != 1) {
         OP_LOGW(context_, "[%s] prefixN shape is invalid, DimNum should be 1, but it is %lu.", templateName,
-                  prefixShape.GetDimNum());
+                prefixShape.GetDimNum());
         failReason << "prefixN shape is invalid, DimNum should be 1, but it is " << prefixShape.GetDimNum();
         return SparseEnum::ALL;
     }
     if (prefixShape.GetDim(0) != bSize) {
         OP_LOGW(context_, "[%s] prefixN is invalid, it should be the same size as bSize[%ld], but it is %ld.",
-                  templateName, bSize, prefixShape.GetDim(0));
-        failReason << "prefixN is invalid, it should be the same size as bSize[" << bSize
-                   << "], but it is " << prefixShape.GetDim(0);
+                templateName, bSize, prefixShape.GetDim(0));
+        failReason << "prefixN is invalid, it should be the same size as bSize[" << bSize << "], but it is "
+                   << prefixShape.GetDim(0);
         return SparseEnum::ALL;
     }
     /* Get Data from tensor. */
@@ -1498,8 +1497,8 @@ SparseEnum FlashAttentionScoreTilingBase::GetPrefixNList(std::ostringstream &fai
     int64_t nMin = ((s2Size - s1Size) > 0) ? (s2Size - s1Size) : 0;
     for (int64_t i = 0; i < bSize; ++i) {
         if (prefixNData[i] < nMin || prefixNData[i] > s2Size) {
-            OP_LOGW(context_, "[%s] batch[%ld] prefixN=%ld is invalid, should be in range of [%ld, %ld]",
-                      templateName, i, prefixNData[i], nMin, s2Size);
+            OP_LOGW(context_, "[%s] batch[%ld] prefixN=%ld is invalid, should be in range of [%ld, %ld]", templateName,
+                    i, prefixNData[i], nMin, s2Size);
             failReason << "batch[" << i << "] prefixN=" << prefixNData[i] << " is invalid, should be in range of ["
                        << nMin << ", " << s2Size << "]";
             return SparseEnum::ALL;
@@ -1514,7 +1513,8 @@ SparseEnum FlashAttentionScoreTilingBase::GetPrefixNList(std::ostringstream &fai
     return SparseEnum::PREFIX;
 }
 
-void FlashAttentionScoreTilingBase::SetQKVStartIdx() {
+void FlashAttentionScoreTilingBase::SetQKVStartIdx()
+{
     tilingData->inputParams.set_qStartIdx(0);
     tilingData->inputParams.set_kvStartIdx(0);
     auto qStartIdxTensor = context_->GetOptionalInputTensor(Q_START_IDX_INPUT_INDEX);
@@ -1566,14 +1566,15 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
     PseShapeType pseShapeType = PSE_B_N2_G_1_S2;
     auto pseShape = context_->GetOptionalInputShape(PSE_INPUT_INDEX);
     if (pseShape == nullptr || pseShape->GetStorageShape().GetDimNum() == 0) {
-        if(pseType != PSE_OUTER_ADD_MUL_TYPE){
+        if (pseType != PSE_OUTER_ADD_MUL_TYPE) {
             /*
-            * 1. pseType非默认值
-            * 2. 未传入PSE
-            * FA正向对这种情况进行了兼容，能够得到正确的计算结果。
-            * FA反向未兼容，因此统一拦截异常输入。
-            */
-            OP_LOGE(context_, "Get PseInput is nullptr, but pseType is not default=%u, now pseType=%ld.", PSE_OUTER_ADD_MUL_TYPE, pseType);
+             * 1. pseType非默认值
+             * 2. 未传入PSE
+             * FA正向对这种情况进行了兼容，能够得到正确的计算结果。
+             * FA反向未兼容，因此统一拦截异常输入。
+             */
+            OP_LOGE(context_, "Get PseInput is nullptr, but pseType is not default=%u, now pseType=%ld.",
+                    PSE_OUTER_ADD_MUL_TYPE, pseType);
             return false;
         }
     }
@@ -1582,7 +1583,8 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
         auto &pseShapeDims = pseShape->GetStorageShape();
         size_t pseDimNum = pseShapeDims.GetDimNum();
         int64_t pseBSize = pseShapeDims.GetDim(0);
-        if (pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_TYPE) || pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_SQRT_TYPE)) {
+        if (pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_TYPE) ||
+            pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_SQRT_TYPE)) {
             if (pseDimNum != SLOPE_BN_DIM_NUM && pseDimNum != SLOPE_N_DIM_NUM) {
                 OP_LOGE(context_, "pse inner mode, unsupported pse shape");
                 return false;
@@ -1626,16 +1628,17 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
                 pseShapeType = PSE_B_N2_G_S1_S2;
             } else if (pseDim1Size == n1Size && pseDim2Size == 1 && pseDim3Size == s2Size) {
                 pseShapeType = PSE_B_N2_G_1_S2;
-            } else if (pseDim1Size == n1Size && pseDim2Size == static_cast<int64_t>(PSE_ALIBI_S_SIZE) && pseDim3Size == s2Size) {
+            } else if (pseDim1Size == n1Size && pseDim2Size == static_cast<int64_t>(PSE_ALIBI_S_SIZE) &&
+                       pseDim3Size == s2Size) {
                 if (s1Size < pseDim2Size) {
-                    OP_LOGE(opName, "get unsupported pse shape, the shape is [%ld, %ld, %ld, %ld]", pseBSize, pseDim1Size,
-                              pseDim2Size, pseDim3Size);
+                    OP_LOGE(opName, "get unsupported pse shape, the shape is [%ld, %ld, %ld, %ld]", pseBSize,
+                            pseDim1Size, pseDim2Size, pseDim3Size);
                     return false;
                 }
                 pseShapeType = PSE_B_N2_G_S1_S2;
             } else {
                 OP_LOGE(opName, "get unsupported pse shape, the shape is [%ld, %ld, %ld, %ld]", pseBSize, pseDim1Size,
-                          pseDim2Size, pseDim3Size);
+                        pseDim2Size, pseDim3Size);
                 return false;
             }
         }
@@ -1646,14 +1649,14 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
 
     auto attenMaskInput = context_->GetOptionalInputDesc(ATTENTION_MASK_INPUT_INDEX);
     auto attenMaskShape = context_->GetOptionalInputShape(ATTENTION_MASK_INPUT_INDEX);
-    if (attenMaskInput != nullptr && attenMaskShape != nullptr &&
-        attenMaskShape->GetStorageShape().GetDimNum() != 0 && !isMaxWorkspace) {
+    if (attenMaskInput != nullptr && attenMaskShape != nullptr && attenMaskShape->GetStorageShape().GetDimNum() != 0 &&
+        !isMaxWorkspace) {
         attenMaskExistFlag = static_cast<uint8_t>(1);
         auto attenMaskType = attenMaskInput->GetDataType();
         OP_CHECK_IF(attenMaskType != ge::DT_BOOL && attenMaskType != ge::DT_UINT8,
-                   OP_LOGE(opName, "invalid attenMask dtype[%s], only support bool or uint8.",
-                                               ge::TypeUtils::DataTypeToSerialString(attenMaskType).c_str()),
-                   return false);
+                    OP_LOGE(opName, "invalid attenMask dtype[%s], only support bool or uint8.",
+                            ge::TypeUtils::DataTypeToSerialString(attenMaskType).c_str()),
+                    return false);
 
         tilingData->inputParams.set_attenMaskDataType(1);
         // 0: (B,N2,G,S1,S2), 1: (B,1,1,S1,S2), 2: (1,1,1,S1,S2)
@@ -1676,11 +1679,11 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
                 attenMaskShapeType = ATTEN_B_N2_G_S1_S2;
             } else {
                 OP_LOGE(context_,
-                          "get unsupported atten_mask shape, the shape is [%ld, %ld, %ld, %ld]. B=[%ld], N=[%ld], "
-                          "Sq=[%ld], Skv=[%ld], supported atten_mask shape can be [B, N, Sq, Skv], [B, 1, Sq, Skv], "
-                          "[1, 1, Sq, Skv] and [Sq, Skv].",
-                          attenMaskDim0Size, attenMaskDim1Size, attenMaskDim2Size, attenMaskDim3Size, bSize, n1Size,
-                          s1Size, s2Size);
+                        "get unsupported atten_mask shape, the shape is [%ld, %ld, %ld, %ld]. B=[%ld], N=[%ld], "
+                        "Sq=[%ld], Skv=[%ld], supported atten_mask shape can be [B, N, Sq, Skv], [B, 1, Sq, Skv], "
+                        "[1, 1, Sq, Skv] and [Sq, Skv].",
+                        attenMaskDim0Size, attenMaskDim1Size, attenMaskDim2Size, attenMaskDim3Size, bSize, n1Size,
+                        s1Size, s2Size);
                 return false;
             }
         } else if (attenMaskDimNum == ATTENTION_MASK_DIM_NUM_2) {
@@ -1694,16 +1697,15 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
             } else {
                 if (tilingData->inputParams.get_layoutType() == LAYOUT_TND) {
                     OP_LOGE(context_,
-                              "get unsupported atten_mask shape, the shape is [%ld, %ld]. MaxSq=[%ld],  MaxSkv=[%ld], "
-                              "when input_layout is TND, the supported atten_mask shape is [MaxSq, MaxSkv].",
-                              attenMaskDim0Size, attenMaskDim1Size, s1Size, s2Size);
+                            "get unsupported atten_mask shape, the shape is [%ld, %ld]. MaxSq=[%ld],  MaxSkv=[%ld], "
+                            "when input_layout is TND, the supported atten_mask shape is [MaxSq, MaxSkv].",
+                            attenMaskDim0Size, attenMaskDim1Size, s1Size, s2Size);
                 } else {
-                    OP_LOGE(
-                        context_,
-                        "get unsupported atten_mask shape, the shape is [%ld, %ld]. B=[%ld], N=[%ld], Sq=[%ld], "
-                        "Skv=[%ld], supported atten_mask shape can be [B, N, Sq, Skv], [B, 1, Sq, Skv], [1, 1, Sq, "
-                        "Skv] and [Sq, Skv].",
-                        attenMaskDim0Size, attenMaskDim1Size, bSize, n1Size, s1Size, s2Size);
+                    OP_LOGE(context_,
+                            "get unsupported atten_mask shape, the shape is [%ld, %ld]. B=[%ld], N=[%ld], Sq=[%ld], "
+                            "Skv=[%ld], supported atten_mask shape can be [B, N, Sq, Skv], [B, 1, Sq, Skv], [1, 1, Sq, "
+                            "Skv] and [Sq, Skv].",
+                            attenMaskDim0Size, attenMaskDim1Size, bSize, n1Size, s1Size, s2Size);
                 }
                 return false;
             }
@@ -1735,9 +1737,9 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
     if (dropMaskInput != nullptr && dropMaskShape != nullptr && dropMaskShape->GetStorageShape().GetDimNum() != 0) {
         auto dropMaskDtype = dropMaskInput->GetDataType();
         OP_CHECK_IF(dropMaskDtype != ge::DT_UINT8,
-                   OP_LOGE(opName, "invalid dropMask dtype[%s], only support uint8.",
-                                               ge::TypeUtils::DataTypeToSerialString(dropMaskDtype).c_str()),
-                   return false);
+                    OP_LOGE(opName, "invalid dropMask dtype[%s], only support uint8.",
+                            ge::TypeUtils::DataTypeToSerialString(dropMaskDtype).c_str()),
+                    return false);
         int64_t dimNum = dropMaskShape->GetStorageShape().GetDimNum();
         int64_t dropMaskShapeSize = 1;
         int64_t shapeSize = 0;
@@ -1757,7 +1759,7 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
         shapeSize = AlignUp(shapeSize, BYTE_BIT_NUM) / BYTE_BIT_NUM;
         if (dropMaskShapeSize < shapeSize) {
             OP_LOGE(context_, "Input dropMask shapeSize is invalid, it should not be less than %ld, but got %ld",
-                      shapeSize, dropMaskShapeSize);
+                    shapeSize, dropMaskShapeSize);
             return false;
         }
         dropMaskExistFlag = static_cast<uint8_t>(1);
@@ -1777,9 +1779,9 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
         int64_t dimNum = shape.GetDimNum();
         auto sinkDtype = sinkInputPtr->GetDataType();
         OP_CHECK_IF(sinkDtype != ge::DT_FLOAT,
-                OP_LOGE(opName, "invalid sink dtype[%s], only support float.",
-                        ge::TypeUtils::DataTypeToSerialString(sinkDtype).c_str()),
-                return false);
+                    OP_LOGE(opName, "invalid sink dtype[%s], only support float.",
+                            ge::TypeUtils::DataTypeToSerialString(sinkDtype).c_str()),
+                    return false);
 
         std::string sinkShape = "";
         for (int i = 0; i < dimNum; ++i) {
@@ -1788,14 +1790,16 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
                 sinkShape += ", ";
             }
         }
-        OP_CHECK_IF(dimNum != 1, OP_LOGE(opName, "invalid sink shape [%s], sink shape only support [n,].",sinkShape.c_str()),return false);
+        OP_CHECK_IF(dimNum != 1,
+                    OP_LOGE(opName, "invalid sink shape [%s], sink shape only support [n,].", sinkShape.c_str()),
+                    return false);
 
         int64_t expectShapeSize = n1Size;
         auto actualSinkShapeSize = shape.GetShapeSize();
 
         if (actualSinkShapeSize != expectShapeSize) {
-            OP_LOGE(context_, "Input sink shapeSize is invalid, it should be %ld, but got %ld",
-                    expectShapeSize, actualSinkShapeSize);
+            OP_LOGE(context_, "Input sink shapeSize is invalid, it should be %ld, but got %ld", expectShapeSize,
+                    actualSinkShapeSize);
             return false;
         }
         sinkExistFlag = static_cast<uint8_t>(1);
@@ -1803,8 +1807,8 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
 
     tilingData->inputParams.set_needSinkOp(sinkExistFlag);
 
-    OP_LOGD(context_, "pseExistFlag: %d, attenMaskExistFlag: %d, dropMaskExistFlag: %d, sinkExistFlag: %d.", pseExistFlag,
-            attenMaskExistFlag, dropMaskExistFlag, sinkExistFlag);
+    OP_LOGD(context_, "pseExistFlag: %d, attenMaskExistFlag: %d, dropMaskExistFlag: %d, sinkExistFlag: %d.",
+            pseExistFlag, attenMaskExistFlag, dropMaskExistFlag, sinkExistFlag);
     return true;
 }
 
@@ -1814,17 +1818,16 @@ ge::graphStatus FlashAttentionScoreTilingBase::DoOpTiling()
     OP_LOGD(context_, "[%s]try template[%s]", templateName, expectTemplate.ToString().c_str());
     if (!MatchTemplate()) {
         OP_LOGI(context_,
-                  "[%s]not match template[%s], input params: bn2gs1s2d[%ld, %ld, %ld, %ld, %ld, %ld], "
-                  "keepProb[%f]",
-                  templateName, expectTemplate.ToString().c_str(), inputParams.get_bSize(), inputParams.get_n2Size(),
-                  inputParams.get_gSize(), inputParams.get_s1Size(), inputParams.get_s2Size(), inputParams.get_dSize(),
-                  inputParams.get_keepProb());
+                "[%s]not match template[%s], input params: bn2gs1s2d[%ld, %ld, %ld, %ld, %ld, %ld], "
+                "keepProb[%f]",
+                templateName, expectTemplate.ToString().c_str(), inputParams.get_bSize(), inputParams.get_n2Size(),
+                inputParams.get_gSize(), inputParams.get_s1Size(), inputParams.get_s2Size(), inputParams.get_dSize(),
+                inputParams.get_keepProb());
         return ge::GRAPH_PARAM_INVALID;
     }
 
     SparseEnum sparseType = SparseEnum::ALL;
-    OP_CHECK_IF(!GetSparseInfo(sparseType), OP_LOGE(opName, "fail to get sparse info."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!GetSparseInfo(sparseType), OP_LOGE(opName, "fail to get sparse info."), return ge::GRAPH_FAILED);
     SetSparseTilingInfo(sparseType);
     inputParams.set_implMode(implMode);
     if (!isSparseValidSizeAligned) {
@@ -1836,8 +1839,7 @@ ge::graphStatus FlashAttentionScoreTilingBase::DoOpTiling()
     SetMultiCoreParams();
     SetTensorSizeParams();
     SetSparseParams();
-    OP_CHECK_IF(!SetPseAlibiParams(), OP_LOGE(opName, "fail to set pse alibi info."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!SetPseAlibiParams(), OP_LOGE(opName, "fail to set pse alibi info."), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1855,10 +1857,10 @@ bool FlashAttentionScoreTilingBase::MatchTemplate()
 
     if (s2BasicBlock == std::numeric_limits<int64_t>::max()) {
         OP_LOGD(context_,
-                  "[%s]can't find proper S1S2 basic block for shape: S1[%ld] S2[%ld], D[%ld], minS1BasicBlock[%ld], "
-                  "dtype[%s], high precision[%d]",
-                  templateName, s1Size, s2Size, dSize, GetMinS1BasicBlock(),
-                  ge::TypeUtils::DataTypeToSerialString(inputDtype).c_str(), isHighPercision);
+                "[%s]can't find proper S1S2 basic block for shape: S1[%ld] S2[%ld], D[%ld], minS1BasicBlock[%ld], "
+                "dtype[%s], high precision[%d]",
+                templateName, s1Size, s2Size, dSize, GetMinS1BasicBlock(),
+                ge::TypeUtils::DataTypeToSerialString(inputDtype).c_str(), isHighPercision);
         return false;
     }
 
@@ -1870,7 +1872,7 @@ bool FlashAttentionScoreTilingBase::MatchTemplate()
     if (IsTemplateMatched()) {
         (void)CalcUBSize(s1BasicBlock, s2BasicBlock);
         OP_LOGD(context_, "[%s]final basic block: [%ld, %ld, %ld], match template[%s].", templateName, s1BasicBlock,
-                  s2BasicBlock, dBasicBlock, actualTemplate.ToString().c_str());
+                s2BasicBlock, dBasicBlock, actualTemplate.ToString().c_str());
         return true;
     }
 
@@ -1912,8 +1914,7 @@ void FlashAttentionScoreTilingBase::CalcS1S2BasicBlock(const BufferNum &bufferNu
             break;
         }
 
-        OP_LOGD(context_, "[%s]get candidate basic block: [%ld, %ld]", templateName, tmpS1BasicBlock,
-                  tmpS2BasicBlock);
+        OP_LOGD(context_, "[%s]get candidate basic block: [%ld, %ld]", templateName, tmpS1BasicBlock, tmpS2BasicBlock);
         if (s2BasicBlock == std::numeric_limits<int64_t>::max()) {
             s1BasicBlock = tmpS1BasicBlock;
             s2BasicBlock = tmpS2BasicBlock;
@@ -1925,15 +1926,9 @@ void FlashAttentionScoreTilingBase::CalcS1S2BasicBlock(const BufferNum &bufferNu
     }
 }
 
-void FlashAttentionScoreTilingBase::CalcNRatio()
-{
-    return;
-}
+void FlashAttentionScoreTilingBase::CalcNRatio() { return; }
 
-void FlashAttentionScoreTilingBase::CalcDBasicBlock()
-{
-    return;
-}
+void FlashAttentionScoreTilingBase::CalcDBasicBlock() { return; }
 
 int64_t FlashAttentionScoreTilingBase::CalcMaxS1BasicBlockSize(int64_t actualD, const BufferNum &bufferNum) const
 {
@@ -2103,8 +2098,8 @@ ge::graphStatus FlashAttentionScoreTilingBase::PostTiling()
             workspaces[0] += pseAlibiBytes;
         }
     }
-    OP_LOGD(context_, "[%s] final workspace size:%zu, pseAlibiBaseS1:%ld, pseAlibiBaseS2:%ld.",
-              templateName, workspaces[0], pseAlibiBaseS1, pseAlibiBaseS2);
+    OP_LOGD(context_, "[%s] final workspace size:%zu, pseAlibiBaseS1:%ld, pseAlibiBaseS2:%ld.", templateName,
+            workspaces[0], pseAlibiBaseS1, pseAlibiBaseS2);
     OP_LOGD(opName, "[%s] tiling data:%s", templateName, GetTilingDataDebugStr().c_str());
 
     return ge::GRAPH_SUCCESS;
@@ -2211,9 +2206,10 @@ void FlashAttentionScoreTilingBase::SetDataCopyTransposeTiling()
     auto transposeSrcShape = ge::Shape({coreParams.get_bBaseSize(), 1, std::min(s1BasicBlock, alignedS1),
                                         coreParams.get_gBaseSize() * std::min(dBasicBlock, alignedD)});
     auto transposeDstShape = ge::Shape({bSize, n1Size, s1Size, n1Size * dSize});
-    tilingData->transposeTilingData.GetDataCopyTransposeTiling(coreParams.get_bBaseSize(), 1, std::min(s1BasicBlock, alignedS1),
-                                                               coreParams.get_gBaseSize() * std::min(dBasicBlock, alignedD),
-                                                               bSize, n1Size, s1Size, n1Size * dSize, inputDtypeBytes);
+    tilingData->transposeTilingData.GetDataCopyTransposeTiling(
+        coreParams.get_bBaseSize(), 1, std::min(s1BasicBlock, alignedS1),
+        coreParams.get_gBaseSize() * std::min(dBasicBlock, alignedD), bSize, n1Size, s1Size, n1Size * dSize,
+        inputDtypeBytes);
 }
 
 void FlashAttentionScoreTilingBase::SetTensorSizeParams()
@@ -2261,8 +2257,8 @@ void FlashAttentionScoreTilingBase::SetTensorSizeParams()
 
 bool FlashAttentionScoreTilingBase::InitSparseValidArray(std::vector<int64_t> &sparseValidArray, int64_t bIdx)
 {
-    OP_CHECK_IF(sparseValidArray.size() == 0,
-               OP_LOGE(opName, "Sparse valid array size should be larger than 0."), return false);
+    OP_CHECK_IF(sparseValidArray.size() == 0, OP_LOGE(opName, "Sparse valid array size should be larger than 0."),
+                return false);
     uint8_t sparseType = tilingData->inputParams.get_sparseType();
     if (sparseType == static_cast<uint8_t>(SparseEnum::PREFIX)) {
         for (int64_t i = 0; i < static_cast<int64_t>(sparseValidArray.size()); i++) {
@@ -2307,11 +2303,11 @@ bool FlashAttentionScoreTilingBase::PartitionSparseData(const std::vector<int64_
                                                         int64_t sparseRollingArraySum, int64_t sparseArraySize,
                                                         int64_t loadMaxEachCore, std::vector<int64_t> &partitionResult)
 {
-    OP_CHECK_IF(partitionResult.size() == 0,
-               OP_LOGE(opName, "partitionResult size should be larger than 0."), return false);
+    OP_CHECK_IF(partitionResult.size() == 0, OP_LOGE(opName, "partitionResult size should be larger than 0."),
+                return false);
 
-    OP_CHECK_IF(sparseRollingArraySum <= 0,
-               OP_LOGE(opName, "sparseRollingArraySum should be larger than 0."), return false);
+    OP_CHECK_IF(sparseRollingArraySum <= 0, OP_LOGE(opName, "sparseRollingArraySum should be larger than 0."),
+                return false);
     int64_t s1OuterCutEachCore = loadMaxEachCore / sparseRollingArraySum;
     int64_t s1OuterLoadEachCore = s1OuterCutEachCore * sparseRollingArraySum;
     int64_t s1OuterNumEachCore = s1OuterCutEachCore * sparseRollingArray.size();
@@ -2448,8 +2444,7 @@ bool FlashAttentionScoreTilingBase::SetSparseStartIdx(const std::vector<int64_t>
     std::vector<int64_t> lastValidPartitionResult(validCoreNum, totalSize);
     int64_t sparseArraySum = std::accumulate(sparseValidArray.begin(), sparseValidArray.end(), 0LL);
     int64_t loadTotal = sparseArraySum * (totalSize / sparseValidArray.size());
-    OP_CHECK_IF(validCoreNum <= 0, OP_LOGE(opName, "validCoreNum should be larger than 0."),
-               return false);
+    OP_CHECK_IF(validCoreNum <= 0, OP_LOGE(opName, "validCoreNum should be larger than 0."), return false);
     int64_t loadEachCoreLowerBound = loadTotal / validCoreNum - 1;
     int64_t loadEachCoreUpperBound =
         CeilDivision(loadTotal, validCoreNum) + (*std::max_element(sparseValidArray.begin(), sparseValidArray.end()));
@@ -2468,8 +2463,9 @@ bool FlashAttentionScoreTilingBase::SetSparseStartIdx(const std::vector<int64_t>
         sparseStartIdx[idx] = lastValidPartitionResult[idx];
     }
 
-    OP_LOGD(context_, "%ld", PrintSparseMaxMinLoadPerCore(sparseValidArray, sparseStartIdx, validCoreNum,
-                                                          CeilDivision(loadTotal, validCoreNum)));
+    OP_LOGD(context_, "%ld",
+            PrintSparseMaxMinLoadPerCore(sparseValidArray, sparseStartIdx, validCoreNum,
+                                         CeilDivision(loadTotal, validCoreNum)));
     return true;
 }
 
@@ -2521,7 +2517,7 @@ int64_t FlashAttentionScoreTilingBase::PrintSparseMaxMinLoadPerCore(const std::v
     }
 
     OP_LOGD(context_, "[%s]each core load: max[%ld], min[%ld], avg[%ld]", templateName, maxLoadSize, minLoadSize,
-              avgLoadSize);
+            avgLoadSize);
     return 0;
 }
 
@@ -2557,16 +2553,10 @@ void FlashAttentionScoreTilingBase::SetSparseParams()
 }
 
 /* 在子类中设置matmulConstArr列表 */
-void FlashAttentionScoreTilingBase::SetMatmulConstArr()
-{
-    return;
-}
+void FlashAttentionScoreTilingBase::SetMatmulConstArr() { return; }
 
 /* 检查是否满足进行matmul常量化的基本条件 */
-bool FlashAttentionScoreTilingBase::CheckScalarConstCondation()
-{
-    return false;
-}
+bool FlashAttentionScoreTilingBase::CheckScalarConstCondation() { return false; }
 
 /* 检查当前tiling中的baseMNK是否与子类枚举的常量化参数匹配 */
 bool FlashAttentionScoreTilingBase::MatchMatmulConst(MatmulConstParams &matmulConst)
@@ -2590,7 +2580,7 @@ void FlashAttentionScoreTilingBase::SetScalarConst()
         }
     }
     OP_LOGI(context_, "SetScalarConst_[s1TemplateType: %d, s2TemplateType: %d, dTemplateType: %d]",
-              static_cast<int>(s1TemplateType), static_cast<int>(s2TemplateType), static_cast<int>(dTemplateType));
+            static_cast<int>(s1TemplateType), static_cast<int>(s2TemplateType), static_cast<int>(dTemplateType));
 }
 
 ge::graphStatus FlashAttentionScoreTilingBase::GetWorkspaceSize()
@@ -2637,8 +2627,8 @@ protected:
 
     bool AnalyzeDtype() override
     {
-        OP_CHECK_IF(!FlashAttentionScoreTilingBase::AnalyzeDtype(),
-                   OP_LOGE(opName, "fail to analyze base dtype."), return false);
+        OP_CHECK_IF(!FlashAttentionScoreTilingBase::AnalyzeDtype(), OP_LOGE(opName, "fail to analyze base dtype."),
+                    return false);
         bmm2OutDtype = bmmDtype;
         return true;
     }
@@ -2762,10 +2752,7 @@ protected:
         }
     }
 
-    int64_t GetNRatio() override
-    {
-        return s1Ratio;
-    }
+    int64_t GetNRatio() override { return s1Ratio; }
 
     bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock) override
     {
@@ -2773,10 +2760,7 @@ protected:
         return true;
     }
 
-    void GetBufferNum(BufferNum &bufferNum) const override
-    {
-        bufferNum.bufferS1S2Num = s1dHighPerfBufferNum;
-    }
+    void GetBufferNum(BufferNum &bufferNum) const override { bufferNum.bufferS1S2Num = s1dHighPerfBufferNum; }
 
     void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum &bufferNum) override
     {
@@ -2789,10 +2773,7 @@ protected:
         s2BasicBlock = std::min(128L, alignedS2);
     }
 
-    void CalcDBasicBlock() override
-    {
-        dBasicBlock = std::min(128L, alignedD);
-    }
+    void CalcDBasicBlock() override { dBasicBlock = std::min(128L, alignedD); }
 
     bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, [[maybe_unused]] int64_t batch,
                             matmul_tiling::MatmulApiTiling &bmm1) override
@@ -2854,10 +2835,10 @@ protected:
         if (s2Size > s2SizeLimitMin) {
             return true;
         }
-        if (static_cast<uint64_t>(n2Size * gSize * ((alignedS1 + alignedS2) * alignedD + alignedS2)
-            * inputDtypeBytes) >= aicoreParams_.l1Size ||
-            static_cast<uint64_t>(n2Size * gSize * (alignedS1 + alignedD) * alignedS2
-            * inputDtypeBytes) >= aicoreParams_.l1Size) {
+        if (static_cast<uint64_t>(n2Size * gSize * ((alignedS1 + alignedS2) * alignedD + alignedS2) *
+                                  inputDtypeBytes) >= aicoreParams_.l1Size ||
+            static_cast<uint64_t>(n2Size * gSize * (alignedS1 + alignedD) * alignedS2 * inputDtypeBytes) >=
+                aicoreParams_.l1Size) {
             return true;
         }
         if (n2Size * gSize * alignedS1 * alignedS2 * inputDtypeBytes <= minSizeLimit * DATA_TYPE_FP16) {
@@ -2866,7 +2847,7 @@ protected:
         return true;
     }
 
-     void SetMatmulConstArr() override
+    void SetMatmulConstArr() override
     {
         matmulConstArr = {
             {128, 128, 80, STemplateType::ALIGNED_128, STemplateType::ALIGNED_128, DTemplateType::ALIGNED_80},
@@ -2897,14 +2878,15 @@ protected:
 
     uint64_t GetTilingKey() const override
     {
-        return GET_TPL_TILING_KEY(0, static_cast<uint8_t>(AxisEnum::S1), static_cast<uint8_t>(AxisEnum::D),
+        return GET_TPL_TILING_KEY(
+            0, static_cast<uint8_t>(AxisEnum::S1), static_cast<uint8_t>(AxisEnum::D),
             static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(implMode), static_cast<uint8_t>(tilingKeyDType),
             static_cast<uint8_t>(tilingKeyLayout), static_cast<uint8_t>(tilingKeyBmm1Format),
             static_cast<uint8_t>(tilingKeyBmm2Source), static_cast<uint8_t>(SparseEnum::ANY),
             static_cast<uint8_t>(PerformanceOrientedEnum::BIG_DOUBLE_BUFFER), static_cast<uint8_t>(hasDropOut),
             static_cast<uint8_t>(hasAttenMask), static_cast<uint8_t>(hasPse), static_cast<uint8_t>(enableL1Reuse),
-            static_cast<uint8_t>(hasRope), static_cast<uint8_t>(matmulPolicyType), 
-            static_cast<uint8_t>(s1TemplateType), static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType));
+            static_cast<uint8_t>(hasRope), static_cast<uint8_t>(matmulPolicyType), static_cast<uint8_t>(s1TemplateType),
+            static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType));
     }
 
     ge::graphStatus GetWorkspaceSize() override
@@ -2939,8 +2921,8 @@ protected:
                         WORK_SPACE_RESERVE_SIZE;
         if (pseType == PSE_INNER_MUL_ADD_TYPE || pseType == PSE_INNER_MUL_ADD_SQRT_TYPE) {
             pseAlibiBaseS2 = alignedS2;
-            pseAlibiBaseS1 = std::min(static_cast<int64_t>(coreParams.get_s1BaseSize()),
-                                      UB_BASIC_LIMIT_SIZE / pseAlibiBaseS2);
+            pseAlibiBaseS1 =
+                std::min(static_cast<int64_t>(coreParams.get_s1BaseSize()), UB_BASIC_LIMIT_SIZE / pseAlibiBaseS2);
             pseAlibiBaseS1 = std::max(pseAlibiBaseS1, UB_BASIC_LIMIT_SIZE / coreParams.get_s1BaseSize());
         }
         return ge::GRAPH_SUCCESS;
@@ -2963,10 +2945,7 @@ protected:
     int64_t dVec2BasicBlock_ = 1;
     int64_t s1Vec2BasicBlock_ = 1;
 
-    void GetBufferNum(BufferNum &bufferNum) const override
-    {
-        bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM;
-    }
+    void GetBufferNum(BufferNum &bufferNum) const override { bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM; }
 
     void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum &bufferNum) override
     {
@@ -2976,11 +2955,10 @@ protected:
         s1BasicBlock = std::min(maxS1BaseSize_, s1BasicBlock);
         dVec2BasicBlock_ = alignedD;
         if (dVec2BasicBlock_ <= S1_VEC2_BASE_SIZE_MAX) {
-            s1Vec2BasicBlock_ = blockBUBSizeLimit_ / dVec2BasicBlock_ / FRACTAL_NUM * FRACTAL_NUM *
-                                DATA_TYPE_FP16 / inputDtypeBytes;
+            s1Vec2BasicBlock_ =
+                blockBUBSizeLimit_ / dVec2BasicBlock_ / FRACTAL_NUM * FRACTAL_NUM * DATA_TYPE_FP16 / inputDtypeBytes;
         } else {
-            s1Vec2BasicBlock_ = blockBUBSizeLimit_ / dVec2BasicBlock_ *
-                                DATA_TYPE_FP16 / inputDtypeBytes;
+            s1Vec2BasicBlock_ = blockBUBSizeLimit_ / dVec2BasicBlock_ * DATA_TYPE_FP16 / inputDtypeBytes;
         }
         s1Vec2BasicBlock_ = std::min(s1Vec2BasicBlock_, alignedS1);
     }
@@ -3013,16 +2991,15 @@ protected:
         coreParams.set_s2SparseValidSize(s2SparseValidSize);
         batchBasic = coreParams.get_bBaseSize() * n2 * g;
         OP_LOGD(context_, "[b:%ld, n2:%ld, g:%ld, s1:%ld, s2:%ld, batchBasic:%ld].", b, n2, g, s1,
-                  inputParams.get_s2Size(), batchBasic);
+                inputParams.get_s2Size(), batchBasic);
         OP_LOGD(context_, "[bBaseSize: %d, bBaseTailSize:%d, bOuterSize:%ld].", coreParams.get_bBaseSize(),
-                  coreParams.get_bBaseTailSize(), coreParams.get_bOuterSize());
+                coreParams.get_bBaseTailSize(), coreParams.get_bOuterSize());
         OP_LOGD(context_, "[s1BaseSize: %d, s1BaseTailSize:%d, s1OuterSize:%ld].", coreParams.get_s1BaseSize(),
-                  coreParams.get_s1BaseTailSize(), coreParams.get_s1OuterSize());
+                coreParams.get_s1BaseTailSize(), coreParams.get_s1OuterSize());
         OP_LOGD(context_, "[s1Vec2BaseSize: %d, s1Vec2BaseTailSize:%d, s1Vec2OuterSize: %ld].",
-                  coreParams.get_s1Vec2BaseSize(), coreParams.get_s1Vec2BaseTailSize(),
-                  coreParams.get_s1Vec2OuterSize());
+                coreParams.get_s1Vec2BaseSize(), coreParams.get_s1Vec2BaseTailSize(), coreParams.get_s1Vec2OuterSize());
         OP_LOGD(context_, "[s2BaseSize: %d, s2BaseTailSize:%d, s2OuterSize:%ld].", coreParams.get_s2BaseSize(),
-                  coreParams.get_s2BaseTailSize(), coreParams.get_s2OuterSize());
+                coreParams.get_s2BaseTailSize(), coreParams.get_s2OuterSize());
     }
 
     void SetMultiCoreParams() override
@@ -3038,9 +3015,9 @@ protected:
         multiCoreParams.set_coreNum(
             static_cast<int32_t>(CeilDivision(totalSize, multiCoreParams.get_splitFactorSize())));
         OP_LOGD(context_,
-                  "[totalSize:%ld, tempUsedAivNum:%ld, splitFactorSize:%ld, splitFactorTailSize:%ld, coreNum: %d].",
-                  totalSize, tempUsedAivNum, multiCoreParams.get_splitFactorSize(),
-                  multiCoreParams.get_splitFactorTailSize(), multiCoreParams.get_coreNum());
+                "[totalSize:%ld, tempUsedAivNum:%ld, splitFactorSize:%ld, splitFactorTailSize:%ld, coreNum: %d].",
+                totalSize, tempUsedAivNum, multiCoreParams.get_splitFactorSize(),
+                multiCoreParams.get_splitFactorTailSize(), multiCoreParams.get_coreNum());
     }
 
     void SetTensorSizeParams() override
@@ -3076,10 +3053,7 @@ protected:
         tensorSizeParams.set_bmm2ResUbSize(coreParams.get_s1Vec2BaseSize() * dBasicBlock);
     }
 
-    void CalcDBasicBlock() override
-    {
-        dBasicBlock = alignedD;
-    }
+    void CalcDBasicBlock() override { dBasicBlock = alignedD; }
 
     bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t batch,
                             matmul_tiling::MatmulApiTiling &bmm1) override
@@ -3140,8 +3114,8 @@ protected:
     bool CheckScalarConstCondation() override
     {
         if (mm1BaseM == mm2BaseM && mm1BaseN == mm2BaseK && mm1BaseK == mm2BaseN &&
-            tilingKeyDType == DtypeEnum::BFLOAT16 && tilingKeyLayout == LayoutType::LAYOUT_BSH &&
-            hasDropOut == false && hasAttenMask == false && hasPse == false) {
+            tilingKeyDType == DtypeEnum::BFLOAT16 && tilingKeyLayout == LayoutType::LAYOUT_BSH && hasDropOut == false &&
+            hasAttenMask == false && hasPse == false) {
             return true;
         }
         return false;
@@ -3149,14 +3123,15 @@ protected:
 
     uint64_t GetTilingKey() const override
     {
-        return GET_TPL_TILING_KEY(0, static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(AxisEnum::NONE),
+        return GET_TPL_TILING_KEY(
+            0, static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(AxisEnum::NONE),
             static_cast<uint8_t>(AxisEnum::B), static_cast<uint8_t>(implMode), static_cast<uint8_t>(tilingKeyDType),
             static_cast<uint8_t>(tilingKeyLayout), static_cast<uint8_t>(tilingKeyBmm1Format),
             static_cast<uint8_t>(tilingKeyBmm2Source), static_cast<uint8_t>(SparseEnum::NONE),
             static_cast<uint8_t>(PerformanceOrientedEnum::BIG_DOUBLE_BUFFER), static_cast<uint8_t>(hasDropOut),
             static_cast<uint8_t>(hasAttenMask), static_cast<uint8_t>(hasPse), static_cast<uint8_t>(enableL1Reuse),
-            static_cast<uint8_t>(hasRope), static_cast<uint8_t>(matmulPolicyType), 
-            static_cast<uint8_t>(s1TemplateType), static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType));
+            static_cast<uint8_t>(hasRope), static_cast<uint8_t>(matmulPolicyType), static_cast<uint8_t>(s1TemplateType),
+            static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType));
     }
 
     bool IsCapable() override
@@ -3173,20 +3148,17 @@ protected:
         }
         if (notMatched) {
             OP_LOGE(context_,
-                      "[%s]not match template[%s], input params: bn2gs1s2d[%ld, %ld, %ld, %ld, %ld, %ld], "
-                      "keepProb[%f]",
-                      templateName, expectTemplate.ToString().c_str(), inputParams.get_bSize(),
-                      inputParams.get_n2Size(), inputParams.get_gSize(), inputParams.get_s1Size(),
-                      inputParams.get_s2Size(), inputParams.get_dSize(), inputParams.get_keepProb());
+                    "[%s]not match template[%s], input params: bn2gs1s2d[%ld, %ld, %ld, %ld, %ld, %ld], "
+                    "keepProb[%f]",
+                    templateName, expectTemplate.ToString().c_str(), inputParams.get_bSize(), inputParams.get_n2Size(),
+                    inputParams.get_gSize(), inputParams.get_s1Size(), inputParams.get_s2Size(),
+                    inputParams.get_dSize(), inputParams.get_keepProb());
             return false;
         }
         return true;
     }
 
-    bool IsTemplateMatched() const override
-    {
-        return true;
-    }
+    bool IsTemplateMatched() const override { return true; }
 
     bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock) override
     {
@@ -3223,7 +3195,8 @@ protected:
     {
         auto softmaxShape = ge::Shape({s1BasicBlock, s2BasicBlock});
         AscendC::SoftMaxFlashV2TilingFunc(softmaxShape, calcTypeSize, sizeof(float), apiMaxUBSize,
-                                          tilingData->softmaxFlashTilingData, true, IsBasicBlockInSoftMax(softmaxShape));
+                                          tilingData->softmaxFlashTilingData, true,
+                                          IsBasicBlockInSoftMax(softmaxShape));
     }
 };
 
@@ -3242,15 +3215,9 @@ protected:
     int64_t dAlignSize = 16;
     bool enableL1Reuse = false;
 
-    int64_t GetNRatio() override
-    {
-        return nRatio;
-    }
+    int64_t GetNRatio() override { return nRatio; }
 
-    void GetBufferNum(BufferNum &bufferNum) const override
-    {
-        bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM;
-    }
+    void GetBufferNum(BufferNum &bufferNum) const override { bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM; }
 
     void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum &bufferNum) override
     {
@@ -3277,15 +3244,16 @@ protected:
         if (s2Size / s2BasicBlock == 8L && s2Size % s2BasicBlock > 0 && s2Size % s2BasicBlock <= 16L) {
             nRatio = 5L;
         }
-        if (s2Size <= 2304 && s2Size >= 2049 && dSize == 64 && tilingData->inputParams.get_layoutType() == LAYOUT_BNSD) {
+        if (s2Size <= 2304 && s2Size >= 2049 && dSize == 64 &&
+            tilingData->inputParams.get_layoutType() == LAYOUT_BNSD) {
             nRatio = 6L;
+        }
+        if (IsKvL1ReuseTilingSupportedShape()) {
+            nRatio = 4L;
         }
     }
 
-    void CalcDBasicBlock() override
-    {
-        dBasicBlock = std::min(128L, alignedD);
-    }
+    void CalcDBasicBlock() override { dBasicBlock = std::min(128L, alignedD); }
 
     bool IsSpecialShape()
     {
@@ -3302,9 +3270,13 @@ protected:
             enableL1Reuse = false;
             return;
         }
+        if (IsKvL1ReuseTilingSupportedShape()) {
+            enableL1Reuse = true;
+            return;
+        }
         if (dSize > L1REUSE_D_LIMIT) {
             OP_LOGD(context_, "Current condition [dSize(%ld) > L1REUSE_D_LIMIT(%ld)] does not enable L1Reuse", dSize,
-                      L1REUSE_D_LIMIT);
+                    L1REUSE_D_LIMIT);
             return;
         }
         if (dSize == D_SPECIFIC_SIZE && tilingData->inputParams.get_layoutType() == LAYOUT_BNSD &&
@@ -3318,11 +3290,11 @@ protected:
             return;
         }
 
-        if ((tilingData->inputParams.get_layoutType() == LAYOUT_BSND || tilingData->inputParams.get_layoutType() ==
-            LAYOUT_BSH) && s2Size <= L1REUSE_S2_LIMIT_2048 && dSize <= D_SPECIFIC_SIZE &&
-            bSize * n1Size <= L1REUSE_BNG_LIMIT) {
+        if ((tilingData->inputParams.get_layoutType() == LAYOUT_BSND ||
+             tilingData->inputParams.get_layoutType() == LAYOUT_BSH) &&
+            s2Size <= L1REUSE_S2_LIMIT_2048 && dSize <= D_SPECIFIC_SIZE && bSize * n1Size <= L1REUSE_BNG_LIMIT) {
             OP_LOGD(context_, "Current condition [dSize(%ld) && layout(BSH/BSND) && BN(%ld)] does not enable L1Reuse",
-                      dSize, bSize * n1Size);
+                    dSize, bSize * n1Size);
             return;
         }
 
@@ -3330,7 +3302,7 @@ protected:
             tilingData->inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::PREFIX)) {
             if (bSize * n1Size * gSize <= L1REUSE_BNG_LIMIT && s2Size <= L1REUSE_S2_LIMIT_2048) {
                 OP_LOGD(context_, "Current condition [BNG(%ld) && s2Size(%ld)] does not enable L1Reuse.",
-                          bSize * n1Size * gSize, s2Size);
+                        bSize * n1Size * gSize, s2Size);
                 return;
             }
             enableL1Reuse = true;
@@ -3341,7 +3313,7 @@ protected:
             if ((bSize * n1Size * gSize <= L1REUSE_BNG_LIMIT && maxValidS2Len <= L1REUSE_S2_LIMIT_2048) ||
                 (maxValidS2Len <= L1REUSE_S2_LIMIT_1024)) {
                 OP_LOGD(context_, "Current condition [BNG(%ld) && maxValidS2Len(%ld)] does not enable L1Reuse.",
-                          bSize * n1Size * gSize, maxValidS2Len);
+                        bSize * n1Size * gSize, maxValidS2Len);
                 return;
             }
             enableL1Reuse = true;
@@ -3382,8 +3354,7 @@ protected:
         bmm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm2OutDtype);
-        bmm2.SetShape(singleM, dSize,
-                      std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size));
+        bmm2.SetShape(singleM, dSize, std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size));
         bmm2.SetOrgShape(s1Size, s2StrideSize, std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size),
                          s2StrideSize);
         bmm2.SetBias(false);
@@ -3403,19 +3374,20 @@ protected:
     uint64_t GetTilingKey() const override
     {
         // not care about layout in tiling key, pass BSND(enum value is 0)
-        return GET_TPL_TILING_KEY(0, static_cast<uint8_t>(AxisEnum::S1), static_cast<uint8_t>(AxisEnum::S2),
+        return GET_TPL_TILING_KEY(
+            0, static_cast<uint8_t>(AxisEnum::S1), static_cast<uint8_t>(AxisEnum::S2),
             static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(implMode), static_cast<uint8_t>(tilingKeyDType),
             static_cast<uint8_t>(tilingKeyLayout), static_cast<uint8_t>(tilingKeyBmm1Format),
             static_cast<uint8_t>(tilingKeyBmm2Source), static_cast<uint8_t>(SparseEnum::ANY),
             static_cast<uint8_t>(PerformanceOrientedEnum::BIG_DOUBLE_BUFFER), static_cast<uint8_t>(hasDropOut),
             static_cast<uint8_t>(hasAttenMask), static_cast<uint8_t>(hasPse), static_cast<uint8_t>(enableL1Reuse),
-            static_cast<uint8_t>(hasRope), static_cast<uint8_t>(matmulPolicyType), 
-            static_cast<uint8_t>(s1TemplateType), static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType));
+            static_cast<uint8_t>(hasRope), static_cast<uint8_t>(matmulPolicyType), static_cast<uint8_t>(s1TemplateType),
+            static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType));
     }
 
     bool IsCapable() override
     {
-        if (dSize != d2Size) {  // D不等长(d != dv): S1S2 支持并主动接住
+        if (dSize != d2Size) { // D不等长(d != dv): S1S2 支持并主动接住
             return true;
         }
         if (s2Size > s2sizeLimitMin) {
@@ -3424,10 +3396,7 @@ protected:
         return false;
     }
 
-    bool IsTemplateMatched() const override
-    {
-        return true;
-    }
+    bool IsTemplateMatched() const override { return true; }
 
     bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock) override
     {
@@ -3438,6 +3407,9 @@ protected:
     void RefreshSplitFactor()
     {
         SetEnableL1Reuse();
+        if (IsKvL1ReuseTilingSupportedShape()) {
+            tilingData->bmm2TilingData.singleCoreK = L1REUSE_BMM2_SINGLE_CORE_K;
+        }
         if (enableL1Reuse) {
             auto &multiCoreParams = tilingData->multiCoreParams;
             int64_t totalSize = multiCoreParams.get_totalSize();
@@ -3459,18 +3431,21 @@ protected:
 
         // 切D场景，stage1占用2倍的空间，stage2占用4倍空间
         workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_2 +
-                        SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
+                                             SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                            aivNum) +
                         WORK_SPACE_RESERVE_SIZE;
         // NZND场景，stage1占用3倍的空间，stage2占用4倍空间
         if (s2Size % S2_NZTOND_SIZE_64 != 0) {
             workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_3 +
-                            SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
+                                                 SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                aivNum) +
                             WORK_SPACE_RESERVE_SIZE;
         }
         // FP32场景，stage1占用4倍的空间，stage2占用4倍空间
         if (inputDtypeBytes == DATA_TYPE_FP32) {
             workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_4 +
-                            SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
+                                                 SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                aivNum) +
                             WORK_SPACE_RESERVE_SIZE;
         }
         if (pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_TYPE) ||
@@ -3497,7 +3472,8 @@ protected:
         auto softmaxShape = ge::Shape({s1BasicBlock / GetNRatio(), s2BasicBlock * GetNRatio()});
 
         AscendC::SoftMaxFlashV2TilingFunc(softmaxShape, calcTypeSize, sizeof(float), apiMaxUBSize,
-                                          tilingData->softmaxFlashTilingData, true, IsBasicBlockInSoftMax(softmaxShape));
+                                          tilingData->softmaxFlashTilingData, true,
+                                          IsBasicBlockInSoftMax(softmaxShape));
     }
 
     bool SetPseAlibiParams() override
@@ -3515,9 +3491,9 @@ protected:
             return true;
         }
         // 2: pre last axiss
-        if (pseShape->GetStorageShape().GetDimNum() < 1) {  // 1 is min dim num of legal pse
-            OP_LOGE(context_, "Invalid Pse DimNum(%zu), PseType(%ld).",
-                      pseShape->GetStorageShape().GetDimNum(), pseType);
+        if (pseShape->GetStorageShape().GetDimNum() < 1) { // 1 is min dim num of legal pse
+            OP_LOGE(context_, "Invalid Pse DimNum(%zu), PseType(%ld).", pseShape->GetStorageShape().GetDimNum(),
+                    pseType);
             return false;
         } else if (pseShape->GetStorageShape().GetDimNum() >= 2) {
             auto pseS1Size = pseShape->GetStorageShape().GetDim(pseShape->GetStorageShape().GetDimNum() - 2);
@@ -3527,7 +3503,7 @@ protected:
             if (pseS1Size == PSE_ALIBI_S_SIZE && s1Size > PSE_ALIBI_S_SIZE) {
                 if (s1Size == s2Size) {
                     OP_CHECK_IF(tilingData->inputParams.get_sparseType() != static_cast<uint8_t>(SparseEnum::CAUSAL),
-                            OP_LOGE(opName, "Pse alibi only support causal sparse type."), return false);
+                                OP_LOGE(opName, "Pse alibi only support causal sparse type."), return false);
                     pseEncodeType = PSE_ENCODE_ALIBI_S2_FULL;
                 } else {
                     OP_LOGE(opName, "Pse alibi only support same S1 S2 when S1 lager than 1024");
@@ -3545,7 +3521,8 @@ protected:
 
 class FlashAttentionScoreTilingS1s2Bn2gs1SameAB : public FlashAttentionScoreTilingBase {
 public:
-    explicit FlashAttentionScoreTilingS1s2Bn2gs1SameAB(gert::TilingContext *context) : FlashAttentionScoreTilingBase(context)
+    explicit FlashAttentionScoreTilingS1s2Bn2gs1SameAB(gert::TilingContext *context)
+        : FlashAttentionScoreTilingBase(context)
     {
         expectTemplate.splitS1 = 1U;
         expectTemplate.splitS2 = 1U;
@@ -3558,10 +3535,7 @@ protected:
     int64_t dAlignSize = 16;
     int64_t sAlignSize = 64;
 
-    int64_t GetNRatio() override
-    {
-        return nRatio;
-    }
+    int64_t GetNRatio() override { return nRatio; }
 
     void CalcNRatio() override
     {
@@ -3571,15 +3545,16 @@ protected:
             (s2Size / s2BasicBlock == 8L && s2Size % s2BasicBlock > 0 && s2Size % s2BasicBlock <= 16L)) {
             nRatio = 5L;
         }
-        if (s2Size <= 2304 && s2Size >= 2049 && dSize == 64 && tilingData->inputParams.get_layoutType() == LAYOUT_BNSD) {
+        if (s2Size <= 2304 && s2Size >= 2049 && dSize == 64 &&
+            tilingData->inputParams.get_layoutType() == LAYOUT_BNSD) {
             nRatio = 6L;
+        }
+        if (IsKvL1ReuseTilingSupportedShape()) {
+            nRatio = 4L;
         }
     }
 
-    void GetBufferNum(BufferNum &bufferNum) const override
-    {
-        bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM;
-    }
+    void GetBufferNum(BufferNum &bufferNum) const override { bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM; }
 
     void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum &bufferNum) override
     {
@@ -3595,10 +3570,7 @@ protected:
         }
     }
 
-    void CalcDBasicBlock() override
-    {
-        dBasicBlock = std::min(128L, alignedD);
-    }
+    void CalcDBasicBlock() override { dBasicBlock = std::min(128L, alignedD); }
 
     void SetMultiCoreParams() override
     {
@@ -3611,9 +3583,9 @@ protected:
         multiCoreParams.set_splitFactorSize(CeilDivision(totalSize, actualUsedAicNum));
         multiCoreParams.set_splitFactorTailSize(CalcTailSize(totalSize, multiCoreParams.get_splitFactorSize()));
         actualUsedAicNum = CeilDivision(totalSize, multiCoreParams.get_splitFactorSize());
-        if (totalSize > aicNum){
+        if (totalSize > aicNum) {
             multiCoreParams.set_coreNum(static_cast<int32_t>(aicNum * AIV_AIC_NUM_RATIO));
-        }else{
+        } else {
             multiCoreParams.set_coreNum(static_cast<int32_t>(actualUsedAicNum * AIV_AIC_NUM_RATIO));
         }
     }
@@ -3641,7 +3613,7 @@ protected:
             return false;
         }
         if ((dSize > BMM1_BASICBLOCK_K_64 && dSize <= BMM1_BASICBLOCK_K_128) ||
-             matmulPolicyType == MATMUL_POLICY_UNSPLITK) {
+            matmulPolicyType == MATMUL_POLICY_UNSPLITK) {
             int64_t baseM = std::min(BMM1_BASICBLOCK_M_128, AlignUp(s1Size, FRACTAL_NUM));
             int64_t baseN = std::min(BMM1_BASICBLOCK_N_128, AlignUp(s2Size, FRACTAL_NUM));
             bmm1.SetFixSplit(baseM, baseN, alignedD);
@@ -3662,8 +3634,7 @@ protected:
         bmm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm2OutDtype);
-        bmm2.SetShape(singleM, d2Size,
-                      std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size));
+        bmm2.SetShape(singleM, d2Size, std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size));
         bmm2.SetOrgShape(s1Size, vs2StrideSize, std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size),
                          vs2StrideSize);
         bmm2.SetBias(false);
@@ -3692,14 +3663,15 @@ protected:
 
     uint64_t GetTilingKey() const override
     {
-        return GET_TPL_TILING_KEY(0, static_cast<uint8_t>(AxisEnum::S1), static_cast<uint8_t>(AxisEnum::NONE),
+        return GET_TPL_TILING_KEY(
+            0, static_cast<uint8_t>(AxisEnum::S1), static_cast<uint8_t>(AxisEnum::NONE),
             static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(implMode), static_cast<uint8_t>(tilingKeyDType),
             static_cast<uint8_t>(tilingKeyLayout), static_cast<uint8_t>(tilingKeyBmm1Format),
             static_cast<uint8_t>(tilingKeyBmm2Source), static_cast<uint8_t>(SparseEnum::ANY),
             static_cast<uint8_t>(PerformanceOrientedEnum::BIG_DOUBLE_BUFFER), static_cast<uint8_t>(hasDropOut),
             static_cast<uint8_t>(hasAttenMask), static_cast<uint8_t>(hasPse), static_cast<uint8_t>(enableL1Reuse),
-            static_cast<uint8_t>(hasRope), static_cast<uint8_t>(matmulPolicyType), 
-            static_cast<uint8_t>(s1TemplateType), static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType));
+            static_cast<uint8_t>(hasRope), static_cast<uint8_t>(matmulPolicyType), static_cast<uint8_t>(s1TemplateType),
+            static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType));
     }
 
     bool IsCapable() override
@@ -3709,8 +3681,8 @@ protected:
         }
         if ((dSize % FRACTAL_NUM != 0 || dSize == D_SPECIFIC_SIZE_96) && (s2Size >= S2_REUSE_SIZE_512)) {
             isSameAB = true;
-            if (s1Size > SAMEAB_BASIC_BLOCK_OPTIMIZE && tilingKeyLayout != LayoutType::LAYOUT_BSH
-                && l2CacheSize > B4_L2_CACHESIZE) {
+            if (s1Size > SAMEAB_BASIC_BLOCK_OPTIMIZE && tilingKeyLayout != LayoutType::LAYOUT_BSH &&
+                l2CacheSize > B4_L2_CACHESIZE) {
                 enableBestBlock = true;
             }
             return true;
@@ -3718,25 +3690,23 @@ protected:
         if (s2Size > s2sizeLimitMin && dSize > SAMEAB_D_LIMIT_128 && dSize < SAMEAB_D_LIMIT_196) {
             isSameAB = true;
             if (dSize == SAMEAB_D_LIMIT_192 && s1Size % HIGH_PERF_SUPPORT_S1_BASIC == 0 &&
-                s2Size % HIGH_PERF_SUPPORT_S2_BASIC == 0 && inputLayout[0] == 'B' &&
-                inputLayout[1] == 'N' && inputLayout[2] == 'S' && inputLayout[3] == 'D') {
+                s2Size % HIGH_PERF_SUPPORT_S2_BASIC == 0 && inputLayout[0] == 'B' && inputLayout[1] == 'N' &&
+                inputLayout[2] == 'S' && inputLayout[3] == 'D') {
                 matmulPolicyType = MATMUL_POLICY_UNSPLITK;
             }
             return true;
         }
         // D=64切sameAB
         if (dSize == D_SPECIFIC_SIZE && s2Size % sAlignSize != 0 &&
-            (s2Size > s2sizeLimitMin * 2 && s2Size < S2_SPECIFIC_SIZE_18432)) { // s2Size 大于最小限制的两倍且小于特定大小18432
+            (s2Size > s2sizeLimitMin * 2 &&
+             s2Size < S2_SPECIFIC_SIZE_18432)) { // s2Size 大于最小限制的两倍且小于特定大小18432
             isSameAB = true;
             return true;
         }
         return false;
     }
 
-    bool IsTemplateMatched() const override
-    {
-        return true;
-    }
+    bool IsTemplateMatched() const override { return true; }
 
     bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock) override
     {
@@ -3754,8 +3724,9 @@ protected:
 
         // UB不常驻，stage1占用3倍的空间，stage2占用4倍空间
         workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_3 +
-                                            SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD2 * calcTypeSize) *
-                                            aicNum) + WORK_SPACE_RESERVE_SIZE;
+                                             SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD2 * calcTypeSize) *
+                                            aicNum) +
+                        WORK_SPACE_RESERVE_SIZE;
         if (pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_TYPE) ||
             pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_SQRT_TYPE)) {
             pseAlibiBaseS2 = s2sizeLimitMin;
@@ -3780,7 +3751,8 @@ protected:
         auto softmaxShape = ge::Shape({s1VecBasicBlock / GetNRatio(), s2BasicBlock * GetNRatio()});
 
         AscendC::SoftMaxFlashV2TilingFunc(softmaxShape, calcTypeSize, sizeof(float), apiMaxUBSize,
-                                          tilingData->softmaxFlashTilingData, true, IsBasicBlockInSoftMax(softmaxShape));
+                                          tilingData->softmaxFlashTilingData, true,
+                                          IsBasicBlockInSoftMax(softmaxShape));
     }
 
     bool SetPseAlibiParams() override
@@ -3798,9 +3770,9 @@ protected:
             return true;
         }
         // 1: pre last axiss
-        if (pseShape->GetStorageShape().GetDimNum() < 1) {  // 1 is min dim num of legal pse
-            OP_LOGE(context_, "Invalid Pse DimNum(%zu), PseType(%ld).",
-                      pseShape->GetStorageShape().GetDimNum(), pseType);
+        if (pseShape->GetStorageShape().GetDimNum() < 1) { // 1 is min dim num of legal pse
+            OP_LOGE(context_, "Invalid Pse DimNum(%zu), PseType(%ld).", pseShape->GetStorageShape().GetDimNum(),
+                    pseType);
             return false;
         } else if (pseShape->GetStorageShape().GetDimNum() >= 2) {
             auto pseS1Size = pseShape->GetStorageShape().GetDim(pseShape->GetStorageShape().GetDimNum() - 2);
@@ -3809,7 +3781,7 @@ protected:
             if (pseS1Size == PSE_ALIBI_S_SIZE && s1Size > PSE_ALIBI_S_SIZE) {
                 if (s1Size == s2Size) {
                     OP_CHECK_IF(tilingData->inputParams.get_sparseType() != static_cast<uint8_t>(SparseEnum::CAUSAL),
-                            OP_LOGE(opName, "Pse alibi only support causal sparse type."), return false);
+                                OP_LOGE(opName, "Pse alibi only support causal sparse type."), return false);
                     pseEncodeType = PSE_ENCODE_ALIBI_S2_FULL;
                 } else {
                     OP_LOGE(opName, "Pse alibi only support same S1 S2 when S1 lager than 1024");
@@ -3842,17 +3814,15 @@ protected:
 
     int64_t GetNRatio() override
     {
-        if (l2CacheSize <= B4_L2_CACHESIZE && isSameAB && alignedD == SAMEAB_D_LIMIT_128 && realT1Size >= B4_SEQ_LIMIT) {
+        if (l2CacheSize <= B4_L2_CACHESIZE && isSameAB && alignedD == SAMEAB_D_LIMIT_128 &&
+            realT1Size >= B4_SEQ_LIMIT) {
             return 4L;
         } else {
             return 8L;
         }
     }
 
-    void GetBufferNum(BufferNum &bufferNum) const override
-    {
-        bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM;
-    }
+    void GetBufferNum(BufferNum &bufferNum) const override { bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM; }
 
     void CalcS1S2BasicBlock([[maybe_unused]] const BufferNum &bufferNum) override
     {
@@ -3869,10 +3839,7 @@ protected:
         s2BasicBlock = std::min(TND_S1_BASICBLOCK_128, alignedS2);
     }
 
-    void CalcDBasicBlock() override
-    {
-        dBasicBlock = std::min(128L, alignedD);
-    }
+    void CalcDBasicBlock() override { dBasicBlock = std::min(128L, alignedD); }
 
     bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, [[maybe_unused]] int64_t batch,
                             matmul_tiling::MatmulApiTiling &bmm1) override
@@ -3908,8 +3875,7 @@ protected:
         bmm2.SetOrgShape(s1Size, s2StrideSize, std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size),
                          s2StrideSize);
         bmm2.SetBias(false);
-        if (!isSameAB && inputDtypeBytes != DATA_TYPE_FP32 && !hasRope && 
-            s1BasicBlock <= S1_BASIC_BLOCK_L1CARRY_MAX && 
+        if (!isSameAB && inputDtypeBytes != DATA_TYPE_FP32 && !hasRope && s1BasicBlock <= S1_BASIC_BLOCK_L1CARRY_MAX &&
             dSize <= D_SIZE_L1CARRY_MAX && d2Size <= D2_SIZE_L1CARRY_MAX) {
             // bmm2L1Carry走MDL，不切M/N
             bmm2.SetFixSplit(AlignUp(std::min(tmpS1BasicBlock, s1Size), FRACTAL_NUM), AlignUp(d2Size, FRACTAL_NUM), -1);
@@ -3928,23 +3894,26 @@ protected:
     {
         // not care about layout in tiling key, pass BSND(enum value is 0)
         if (isSameAB) {
-            return GET_TPL_TILING_KEY(0, static_cast<uint8_t>(AxisEnum::S1), static_cast<uint8_t>(AxisEnum::NONE),
-            static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(implMode), static_cast<uint8_t>(tilingKeyDType),
-            static_cast<uint8_t>(tilingKeyLayout), static_cast<uint8_t>(tilingKeyBmm1Format),
-            static_cast<uint8_t>(tilingKeyBmm2Source), static_cast<uint8_t>(SparseEnum::ANY),
-            static_cast<uint8_t>(PerformanceOrientedEnum::BIG_DOUBLE_BUFFER), static_cast<uint8_t>(hasDropOut),
-            static_cast<uint8_t>(hasAttenMask), static_cast<uint8_t>(hasPse), static_cast<uint8_t>(enableL1Reuse),
-            static_cast<uint8_t>(hasRope), static_cast<uint8_t>(matmulPolicyType), 
-            static_cast<uint8_t>(s1TemplateType), static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType));
+            return GET_TPL_TILING_KEY(
+                0, static_cast<uint8_t>(AxisEnum::S1), static_cast<uint8_t>(AxisEnum::NONE),
+                static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(implMode),
+                static_cast<uint8_t>(tilingKeyDType), static_cast<uint8_t>(tilingKeyLayout),
+                static_cast<uint8_t>(tilingKeyBmm1Format), static_cast<uint8_t>(tilingKeyBmm2Source),
+                static_cast<uint8_t>(SparseEnum::ANY), static_cast<uint8_t>(PerformanceOrientedEnum::BIG_DOUBLE_BUFFER),
+                static_cast<uint8_t>(hasDropOut), static_cast<uint8_t>(hasAttenMask), static_cast<uint8_t>(hasPse),
+                static_cast<uint8_t>(enableL1Reuse), static_cast<uint8_t>(hasRope),
+                static_cast<uint8_t>(matmulPolicyType), static_cast<uint8_t>(s1TemplateType),
+                static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType));
         }
-        return GET_TPL_TILING_KEY(0, static_cast<uint8_t>(AxisEnum::S1), static_cast<uint8_t>(AxisEnum::S2),
+        return GET_TPL_TILING_KEY(
+            0, static_cast<uint8_t>(AxisEnum::S1), static_cast<uint8_t>(AxisEnum::S2),
             static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(implMode), static_cast<uint8_t>(tilingKeyDType),
             static_cast<uint8_t>(tilingKeyLayout), static_cast<uint8_t>(tilingKeyBmm1Format),
             static_cast<uint8_t>(tilingKeyBmm2Source), static_cast<uint8_t>(SparseEnum::ANY),
             static_cast<uint8_t>(PerformanceOrientedEnum::BIG_DOUBLE_BUFFER), static_cast<uint8_t>(hasDropOut),
             static_cast<uint8_t>(hasAttenMask), static_cast<uint8_t>(hasPse), static_cast<uint8_t>(enableL1Reuse),
-            static_cast<uint8_t>(hasRope), static_cast<uint8_t>(matmulPolicyType), 
-            static_cast<uint8_t>(s1TemplateType), static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType));
+            static_cast<uint8_t>(hasRope), static_cast<uint8_t>(matmulPolicyType), static_cast<uint8_t>(s1TemplateType),
+            static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType));
     }
 
     bool SetPseAlibiParams() override
@@ -3957,21 +3926,27 @@ protected:
         }
         if (pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_TYPE) ||
             pseType == static_cast<int64_t>(PSE_INNER_MUL_ADD_SQRT_TYPE)) {
-            OP_CHECK_IF(tilingData->inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::RIGHT_DOWN_CAUSAL_BAND),
-                       OP_LOGE(opName, "INNER Pse does not support sparse mode 7."), return false);
+            OP_CHECK_IF(
+                tilingData->inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::RIGHT_DOWN_CAUSAL_BAND),
+                OP_LOGE(opName, "INNER Pse does not support sparse mode 7."), return false);
             if (tilingData->inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::BAND_LEFT_UP_CAUSAL)) {
                 for (int64_t i = 0L; i < bSize; ++i) {
                     if (i == 0) {
                         if (actualSeqLenData[0] - actualSeqLenKvData[0] + qStartIdx - kvStartIdx == 0) {
                             continue;
                         } else {
-                            OP_LOGE(context_, "INNER Pse sparse mode 8 is only supported when actualSeqLenData[0] %ld + qStartIdx %ld - actualSeqLenKvData[0] %ld - kvStartIdx %ld == 0.",
-                            actualSeqLenData[0], qStartIdx, actualSeqLenKvData[0], kvStartIdx);
+                            OP_LOGE(context_,
+                                    "INNER Pse sparse mode 8 is only supported when actualSeqLenData[0] %ld + "
+                                    "qStartIdx %ld - actualSeqLenKvData[0] %ld - kvStartIdx %ld == 0.",
+                                    actualSeqLenData[0], qStartIdx, actualSeqLenKvData[0], kvStartIdx);
                             return false;
                         }
                     }
                     if (actualSeqLenData[i] != actualSeqLenKvData[i]) {
-                        OP_LOGE(context_, "INNER Pse sparse mode 8 is only supported when actualSeqQLen[%ld] %ld and actualSeqKvLen[%ld] %ld are equal.", i, actualSeqLenData[i], i, actualSeqLenKvData[i]);
+                        OP_LOGE(context_,
+                                "INNER Pse sparse mode 8 is only supported when actualSeqQLen[%ld] %ld and "
+                                "actualSeqKvLen[%ld] %ld are equal.",
+                                i, actualSeqLenData[i], i, actualSeqLenKvData[i]);
                         return false;
                     }
                 }
@@ -3979,9 +3954,9 @@ protected:
             return true;
         }
         // 2: pre last axiss
-        if (pseShape->GetStorageShape().GetDimNum() < 1) {  // 1 is min dim num of legal pse
-            OP_LOGE(context_, "Invalid Pse DimNum(%zu), PseType(%ld).",
-                      pseShape->GetStorageShape().GetDimNum(), pseType);
+        if (pseShape->GetStorageShape().GetDimNum() < 1) { // 1 is min dim num of legal pse
+            OP_LOGE(context_, "Invalid Pse DimNum(%zu), PseType(%ld).", pseShape->GetStorageShape().GetDimNum(),
+                    pseType);
             return false;
         } else if (pseShape->GetStorageShape().GetDimNum() >= 2) {
             auto pseS1Size = pseShape->GetStorageShape().GetDim(pseShape->GetStorageShape().GetDimNum() - 2);
@@ -3996,10 +3971,10 @@ protected:
                         return false;
                     }
                 }
-                OP_CHECK_IF(tilingData->inputParams.get_sparseType() != static_cast<uint8_t>(SparseEnum::CAUSAL) &&
-                            tilingData->inputParams.get_sparseType() !=
-                                static_cast<uint8_t>(SparseEnum::RIGHT_DOWN_CAUSAL),
-                        OP_LOGE(opName, "Pse alibi only support causal sparse type."), return false);
+                OP_CHECK_IF(
+                    tilingData->inputParams.get_sparseType() != static_cast<uint8_t>(SparseEnum::CAUSAL) &&
+                        tilingData->inputParams.get_sparseType() != static_cast<uint8_t>(SparseEnum::RIGHT_DOWN_CAUSAL),
+                    OP_LOGE(opName, "Pse alibi only support causal sparse type."), return false);
                 pseEncodeType = PSE_ENCODE_ALIBI_S2_FULL;
                 OP_LOGD(context_, "[%s] PSE_ENCODE_ALIBI_S2_FULL.", templateName);
             }
@@ -4018,7 +3993,7 @@ protected:
         }
         // 此处走SameAB模板的准入条件均为经验值
         if ((bSize >= SPACE_NUM_4 && accumS1 >= SAMEAB_TND_BASIC_SIZE && accumS2 >= SAMEAB_TND_BASIC_SIZE &&
-            s1Size >= S2_REUSE_SIZE_512 && s2Size >= S2_REUSE_SIZE_512) ||
+             s1Size >= S2_REUSE_SIZE_512 && s2Size >= S2_REUSE_SIZE_512) ||
             (s2Size > S2_REUSE_SIZE_5120 && s1Size > S2_REUSE_SIZE_5120)) {
             isSameAB = true;
         }
@@ -4050,10 +4025,7 @@ protected:
         multiCoreParams.set_splitFactorSize(CeilDivision(totalSize, actualSplitAiCoreNum));
         multiCoreParams.set_splitFactorTailSize(CalcTailSize(totalSize, multiCoreParams.get_splitFactorSize()));
     }
-    bool IsTemplateMatched() const override
-    {
-        return true;
-    }
+    bool IsTemplateMatched() const override { return true; }
 
     bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock) override
     {
@@ -4066,9 +4038,10 @@ protected:
         auto &tensorSizeParams = tilingData->tensorSizeParams;
         auto &coreParams = tilingData->coreParams;
         // 走SameAB模板并满足条件S1BaseSize <= 256 && dSize == 192时使能L1自主管理，shareL1Size需设为0
-	    if (isSameAB && coreParams.get_s1BaseSize() <= 256 && (dSize == 192 || dSize == 128 || dSize == 88 || dSize == 80)) {
+        if (isSameAB && coreParams.get_s1BaseSize() <= 256 &&
+            (dSize == 192 || dSize == 128 || dSize == 88 || dSize == 80)) {
             tilingData->bmm1TilingData.shareL1Size = 0;
-            tilingData->bmm2TilingData.shareL1Size = 0; 
+            tilingData->bmm2TilingData.shareL1Size = 0;
         }
         size_t *workspaces = context_->GetWorkspaceSizes(1);
         int64_t bmm1Byetes;
@@ -4105,15 +4078,16 @@ protected:
 
         if (isMaxWorkspace) {
             auto actualSplitAiCoreNumMax = std::max(aicNum, aivNum);
-            workspaces[0] = static_cast<size_t>(
-                        (bmm1Byetes * SPACE_NUM_3 + stage1Bytes * SPACE_NUM_2 +
-                        SPACE_NUM_4 * 512 * alignedD * calcTypeSize + (512 * 1024 * 2)) * actualSplitAiCoreNumMax) +
-                        WORK_SPACE_RESERVE_SIZE;
+            workspaces[0] = static_cast<size_t>((bmm1Byetes * SPACE_NUM_3 + stage1Bytes * SPACE_NUM_2 +
+                                                 SPACE_NUM_4 * 512 * alignedD * calcTypeSize + (512 * 1024 * 2)) *
+                                                actualSplitAiCoreNumMax) +
+                            WORK_SPACE_RESERVE_SIZE;
         } else {
-            workspaces[0] = static_cast<size_t>(
-                        (bmm1Byetes * SPACE_NUM_3 + stage1Bytes * SPACE_NUM_2 +
-                        SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize + pseAlignSize) * actualSplitAiCoreNum) +
-                        WORK_SPACE_RESERVE_SIZE;
+            workspaces[0] = static_cast<size_t>((bmm1Byetes * SPACE_NUM_3 + stage1Bytes * SPACE_NUM_2 +
+                                                 SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize +
+                                                 pseAlignSize) *
+                                                actualSplitAiCoreNum) +
+                            WORK_SPACE_RESERVE_SIZE;
         }
         return ge::GRAPH_SUCCESS;
     }
@@ -4122,7 +4096,8 @@ protected:
     {
         auto softmaxShape = ge::Shape({s1BasicBlock / GetNRatio(), s2BasicBlock * GetNRatio()});
         AscendC::SoftMaxFlashV2TilingFunc(softmaxShape, calcTypeSize, sizeof(float), apiMaxUBSize,
-                                          tilingData->softmaxFlashTilingData, true, IsBasicBlockInSoftMax(softmaxShape));
+                                          tilingData->softmaxFlashTilingData, true,
+                                          IsBasicBlockInSoftMax(softmaxShape));
     }
 
     bool CheckPretokenAndNexttoken(SparseEnum &sparseType)
@@ -4130,9 +4105,9 @@ protected:
         if (sparseMode == static_cast<int64_t>(ALL_MASK)) {
             if (preTokens < s1Size - 1 || nextTokens < s2Size - 1) {
                 OP_LOGW(context_,
-                          "preTokens[%ld] and nextTokens[%ld] not match sparseMode[%ld], "
-                          "preTokens and nextTokens will be reset max int value.",
-                          preTokens, nextTokens, sparseMode);
+                        "preTokens[%ld] and nextTokens[%ld] not match sparseMode[%ld], "
+                        "preTokens and nextTokens will be reset max int value.",
+                        preTokens, nextTokens, sparseMode);
                 preTokens = std::numeric_limits<int32_t>::max();
                 nextTokens = std::numeric_limits<int32_t>::max();
             }
@@ -4145,7 +4120,7 @@ protected:
             for (int64_t i = 0L; i < bSize; ++i) {
                 if (actualSeqLenData[i] > actualSeqLenKvData[i]) {
                     OP_LOGE(context_, "Batch[%ld] s1[%ld] is larger than s2[%ld], exist invalid row.", i,
-                              actualSeqLenData[i], actualSeqLenKvData[i]);
+                            actualSeqLenData[i], actualSeqLenKvData[i]);
                     return false;
                 }
             }
@@ -4167,7 +4142,7 @@ protected:
                 }
                 if (actualSeqLenData[i] - nextTokens > actualSeqLenKvData[i]) {
                     OP_LOGE(context_, "Batch[%ld], s1[%ld], s2[%ld], next_tokens[%ld], has invalid row.", i,
-                              actualSeqLenData[i], actualSeqLenKvData[i], nextTokens);
+                            actualSeqLenData[i], actualSeqLenKvData[i], nextTokens);
                     return false;
                 }
             }
@@ -4182,9 +4157,9 @@ protected:
             int64_t lastS2 = actualSeqLenKvData[bandIndex];
             if (preTokens < lastS2 || nextTokens > 0) {
                 OP_LOGE(context_,
-                          "RightDownCausal_Band mode: pre_tokens[%ld] is smaller than last valid s2[%ld]"
-                          "or next_tokens[%ld] is larger than 0, wrong config.",
-                          preTokens, lastS2, nextTokens);
+                        "RightDownCausal_Band mode: pre_tokens[%ld] is smaller than last valid s2[%ld]"
+                        "or next_tokens[%ld] is larger than 0, wrong config.",
+                        preTokens, lastS2, nextTokens);
                 return false;
             }
             for (int64_t i = 0L; i < bSize; ++i) {
@@ -4193,12 +4168,12 @@ protected:
                 }
                 if (actualSeqLenData[i] > actualSeqLenKvData[i]) {
                     OP_LOGE(context_, "Batch[%ld] s1[%ld] is larger than s2[%ld].", i, actualSeqLenData[i],
-                              actualSeqLenKvData[i]);
+                            actualSeqLenKvData[i]);
                     return false;
                 }
                 if ((i == bandIndex) && (actualSeqLenData[i] - nextTokens > actualSeqLenKvData[i])) {
                     OP_LOGE(context_, "Batch[%ld], s1[%ld], s2[%ld], next_tokens[%ld], has invalid row.", i,
-                              actualSeqLenData[i], actualSeqLenKvData[i], nextTokens);
+                            actualSeqLenData[i], actualSeqLenKvData[i], nextTokens);
                     return false;
                 }
             }
@@ -4206,13 +4181,13 @@ protected:
         } else if (sparseMode == static_cast<int64_t>(BAND_LEFT_UP_CAUSAL)) {
             if (actualSeqLenData[bandIndex] - nextTokens > actualSeqLenKvData[bandIndex]) {
                 OP_LOGE(context_, "Batch[%ld], s1[%ld], s2[%ld], next_tokens[%ld], has invalid row.", bandIndex,
-                          actualSeqLenData[0], actualSeqLenKvData[0], nextTokens);
+                        actualSeqLenData[0], actualSeqLenKvData[0], nextTokens);
                 return false;
             }
             int64_t firstS2 = actualSeqLenKvData[bandIndex];
             if (preTokens < firstS2) {
                 OP_LOGE(context_, "Band_LeftUpCausal mode: pre_tokens[%ld] is smaller than first valid s2[%ld].",
-                          preTokens, firstS2);
+                        preTokens, firstS2);
                 return false;
             }
             sparseType = SparseEnum::BAND_LEFT_UP_CAUSAL;
@@ -4220,8 +4195,7 @@ protected:
         return true;
     }
 
-    bool SparseNoMaskModeCheck(int64_t maxS1Value, int64_t maxS2Value, int64_t minS2Value,
-                               SparseEnum &sparseType)
+    bool SparseNoMaskModeCheck(int64_t maxS1Value, int64_t maxS2Value, int64_t minS2Value, SparseEnum &sparseType)
     {
         if (nextTokens < 0) {
             OP_LOGE(context_, "nextTokens[%ld] config error, there is no valid data block.", nextTokens);
@@ -4236,7 +4210,7 @@ protected:
             }
             if (actualSeqLenKvData[i] + preTokens < actualSeqLenData[i]) {
                 OP_LOGE(context_, "Batch[%ld] s1[%ld] s2[%ld] has invalid row, check pre_tokens and next_tokens.", i,
-                          actualSeqLenData[i], actualSeqLenKvData[i]);
+                        actualSeqLenData[i], actualSeqLenKvData[i]);
                 return false;
             }
         }
@@ -4258,8 +4232,8 @@ protected:
                 return true;
             } else {
                 OP_LOGE(context_,
-                          "preTokens[%ld] and nextTokens[%ld] config error with S[%ld], has invalid data block.",
-                          preTokens, nextTokens, minS2Value);
+                        "preTokens[%ld] and nextTokens[%ld] config error with S[%ld], has invalid data block.",
+                        preTokens, nextTokens, minS2Value);
                 return false;
             }
         }
@@ -4277,14 +4251,14 @@ protected:
         auto &prefixShape = prefixN->GetShape().GetStorageShape();
         if (prefixShape.GetDimNum() != 1) {
             OP_LOGE(context_, "[%s] prefixN shape is invalid, DimNum should be 1, but it is %zu.", templateName,
-                      prefixShape.GetDimNum());
+                    prefixShape.GetDimNum());
             return false;
         }
         if (prefixShape.GetDim(0) != bSize) {
             OP_LOGE(context_,
-                      "[%s] prefixN is invalid, it should be the same size as bSize[%ld], but it "
-                      "is %ld.",
-                      templateName, bSize, prefixShape.GetDim(0));
+                    "[%s] prefixN is invalid, it should be the same size as bSize[%ld], but it "
+                    "is %ld.",
+                    templateName, bSize, prefixShape.GetDim(0));
             return false;
         }
 
@@ -4299,7 +4273,7 @@ protected:
             if (actualSeqLenData[i] > actualSeqLenKvData[i]) {
                 if (prefixNData[i] < 0 || prefixNData[i] > actualSeqLenKvData[i]) {
                     OP_LOGE(context_, "[%s] batch[%ld] prefixN=%ld is invalid, should be in range of [0, %ld]",
-                              templateName, i, prefixNData[i], actualSeqLenKvData[i]);
+                            templateName, i, prefixNData[i], actualSeqLenKvData[i]);
                     return false;
                 }
                 if (prefixNData[i] == 0) {
@@ -4310,8 +4284,8 @@ protected:
                 if (prefixNData[i] < actualSeqLenKvData[i] - actualSeqLenData[i] ||
                     prefixNData[i] > actualSeqLenKvData[i]) {
                     OP_LOGE(context_, "[%s] batch[%ld] prefixN=%ld is invalid, should be in range of [%ld, %ld]",
-                              templateName, i, prefixNData[i], actualSeqLenKvData[i] - actualSeqLenData[i],
-                              actualSeqLenKvData[i]);
+                            templateName, i, prefixNData[i], actualSeqLenKvData[i] - actualSeqLenData[i],
+                            actualSeqLenKvData[i]);
                     return false;
                 }
             }
@@ -4344,8 +4318,8 @@ protected:
     bool GetSparseInfo(SparseEnum &sparseType) override
     {
         OP_LOGD(context_,
-                  "check sparse feature: preTokens[%ld], nextTokens[%ld], s1[%ld], s2[%ld], attenMaskExist[%d].",
-                  preTokens, nextTokens, s1Size, s2Size, attenMaskExistFlag);
+                "check sparse feature: preTokens[%ld], nextTokens[%ld], s1[%ld], s2[%ld], attenMaskExist[%d].",
+                preTokens, nextTokens, s1Size, s2Size, attenMaskExistFlag);
         if (attenMaskExistFlag != 1 || tilingKeyLayout != LayoutType::LAYOUT_TND) {
             return true;
         }
@@ -4379,13 +4353,16 @@ protected:
         if (sparseType == static_cast<uint8_t>(SparseEnum::CAUSAL)) {
             s2RealSize = s1BasicBlock * (s1OutIdx + 1);
         } else if (sparseType == static_cast<uint8_t>(SparseEnum::PREFIX)) {
-            s2RealSize = std::max(s1BasicBlock * (s1OutIdx + 1) - actualSeqLenData[bOutIdx] +
-                actualSeqLenKvData[bOutIdx], prefixNData[bOutIdx]);
+            s2RealSize =
+                std::max(s1BasicBlock * (s1OutIdx + 1) - actualSeqLenData[bOutIdx] + actualSeqLenKvData[bOutIdx],
+                         prefixNData[bOutIdx]);
         } else if (sparseType == static_cast<uint8_t>(SparseEnum::BAND_COMPRESS)) {
             int64_t s2StartIdx = std::max(s1OutIdx * s1BasicBlock - actualSeqLenData[bOutIdx] +
-                std::max(actualSeqLenKvData[bOutIdx] - preTokens, 0L), 0L);
+                                              std::max(actualSeqLenKvData[bOutIdx] - preTokens, 0L),
+                                          0L);
             int64_t s2EndIdx = std::min((s1OutIdx + 1) * s1BasicBlock + actualSeqLenKvData[bOutIdx] -
-                std::max(actualSeqLenData[bOutIdx] - nextTokens, 0L), actualSeqLenKvData[bOutIdx]);
+                                            std::max(actualSeqLenData[bOutIdx] - nextTokens, 0L),
+                                        actualSeqLenKvData[bOutIdx]);
             if (s2EndIdx - s2StartIdx <= 0) {
                 s2StartIdx = 0;
                 s2EndIdx = actualSeqLenKvData[bOutIdx];
@@ -4426,8 +4403,9 @@ protected:
                      std::vector<int64_t> &localValue, std::vector<int64_t> &sparseStartIdx)
     {
         // to avoid buffer overflow, or maybe sometimes we want to only verify single core
-        int64_t validAiCoreNum = isSameAB ? std::min(static_cast<int64_t>(multiCoreParams.get_coreNum() / 2), MAX_AIC_NUM)
-                                          : std::min(static_cast<int64_t>(multiCoreParams.get_coreNum()), MAX_AIV_NUM);
+        int64_t validAiCoreNum = isSameAB ?
+                                     std::min(static_cast<int64_t>(multiCoreParams.get_coreNum() / 2), MAX_AIC_NUM) :
+                                     std::min(static_cast<int64_t>(multiCoreParams.get_coreNum()), MAX_AIV_NUM);
         int64_t totalSize = multiCoreParams.get_totalSize();
         int64_t maxVal = *std::max_element(localValue.begin(), localValue.end());
         int64_t tmpMaxVal = maxVal;
@@ -4490,13 +4468,14 @@ protected:
     bool SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray, MultiCoreParams &multiCoreParams) override
     {
         // to avoid buffer overflow, or maybe sometimes we want to only verify single core
-        int64_t validAiCoreNum = isSameAB ? std::min(static_cast<int64_t>(multiCoreParams.get_coreNum() / 2), MAX_AIC_NUM)
-                                          : std::min(static_cast<int64_t>(multiCoreParams.get_coreNum()), MAX_AIV_NUM);
+        int64_t validAiCoreNum = isSameAB ?
+                                     std::min(static_cast<int64_t>(multiCoreParams.get_coreNum() / 2), MAX_AIC_NUM) :
+                                     std::min(static_cast<int64_t>(multiCoreParams.get_coreNum()), MAX_AIV_NUM);
         int64_t totalSize = multiCoreParams.get_totalSize(); // BN2GS1.o
         int64_t *sparseStartIdx = multiCoreParams.get_sparseStartIdx();
         int64_t maxAiCoreNum = isSameAB ? MAX_AIC_NUM : MAX_AIV_NUM;
-        OP_CHECK_IF(totalSize <= 0 && !isMaxWorkspace,
-                    OP_LOGE(opName, "totalSize should be larger than 0."), return false);
+        OP_CHECK_IF(totalSize <= 0 && !isMaxWorkspace, OP_LOGE(opName, "totalSize should be larger than 0."),
+                    return false);
 
         // initLoad: 使用均分策略, 保证后续不会比均分差
         int64_t splitFactorSize = multiCoreParams.get_splitFactorSize();
@@ -4576,8 +4555,7 @@ protected:
         auto &inputParams = tilingData->inputParams;
         // TND EOD+Padding 场景下 kernel侧使用t1Size复用s1Size
         inputParams.set_s1Size(realT1Size);
-        if (!isSameAB && inputDtypeBytes != DATA_TYPE_FP32 && !hasRope && 
-            s1BasicBlock <= S1_BASIC_BLOCK_L1CARRY_MAX && 
+        if (!isSameAB && inputDtypeBytes != DATA_TYPE_FP32 && !hasRope && s1BasicBlock <= S1_BASIC_BLOCK_L1CARRY_MAX &&
             dSize <= D_SIZE_L1CARRY_MAX && d2Size <= D2_SIZE_L1CARRY_MAX) {
             this->needL1Carry = true;
             tilingData->bmm1TilingData.shareL1Size = 0;
@@ -4637,9 +4615,7 @@ protected:
         return true;
     }
 
-    void GetBufferNum([[maybe_unused]] BufferNum &bufferNum) const override
-    {
-    }
+    void GetBufferNum([[maybe_unused]] BufferNum &bufferNum) const override {}
 
     bool SetBmm2TilingInput([[maybe_unused]] int64_t tmpS1BasicBlock, [[maybe_unused]] int64_t tmpS2BasicBlock,
                             [[maybe_unused]] int64_t tmpDBasicBlock, [[maybe_unused]] int64_t batch,
@@ -4650,18 +4626,22 @@ protected:
 
     uint64_t GetTilingKey() const override
     {
-        return GET_TPL_TILING_KEY(0, 0, 0, 0, 0, 0, 0,
-                             0, 0, 0, 0, 0, 0, 0, 0, 0,
-                             0, 0, 0, 0);
+        return GET_TPL_TILING_KEY(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 };
 
 // NOTE manually initialize tiling data in hostapi scenario in highest priority template
-REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingDropMask, std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 90);
-REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionVarLenScoreTiling, std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 94);
-REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingS1s2Bn2gs1SameAB, std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 95);
-REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingS1s2Bn2gs1, std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 96);
-REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingS1Bn2gs1, std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 97);
-REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingB, std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 98);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingDropMask,
+                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 90);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionVarLenScoreTiling,
+                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 94);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingS1s2Bn2gs1SameAB,
+                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 95);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingS1s2Bn2gs1,
+                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 96);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingS1Bn2gs1,
+                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 97);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScore, FlashAttentionScoreTilingB,
+                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 98);
 } // namespace FA
 } // namespace optiling
