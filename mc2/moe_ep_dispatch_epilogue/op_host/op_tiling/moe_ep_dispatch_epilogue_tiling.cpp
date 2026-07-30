@@ -120,13 +120,13 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, const
         (*epRankIdPtr < 0) || (*epRankIdPtr >= epWorldSize),
         OP_LOGE(nodeName, "ep_rank_id is invalid, should be in [0, %ld), but got %ld.", epWorldSize, *epRankIdPtr),
         return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((*numExpertsPtr < MIN_NUM_EXPERTS) || (*numExpertsPtr > MAX_NUM_EXPERTS) ||
-                        (*numExpertsPtr % epWorldSize != 0),
-                    OP_LOGE(nodeName,
-                            "num_experts is invalid, should be in [%ld, %ld] and divisible by ep_world_size, but got "
-                            "num_experts=%ld, ep_world_size=%ld.",
-                            MIN_NUM_EXPERTS, MAX_NUM_EXPERTS, *numExpertsPtr, epWorldSize),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (*numExpertsPtr < MIN_NUM_EXPERTS) || (*numExpertsPtr > MAX_NUM_EXPERTS) || (*numExpertsPtr % epWorldSize != 0),
+        OP_LOGE(nodeName,
+                "num_experts is invalid, should be in [%ld, %ld] and divisible by ep_world_size, but got "
+                "num_experts=%ld, ep_world_size=%ld.",
+                MIN_NUM_EXPERTS, MAX_NUM_EXPERTS, *numExpertsPtr, epWorldSize),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(*nmtPtr <= 0, OP_LOGE(nodeName, "num_max_tokens_per_rank must be positive, but got %ld.", *nmtPtr),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(*cclBufferSizePtr <= 0,
@@ -418,25 +418,28 @@ static ge::graphStatus CheckWinSize(const gert::TilingContext *context, const ch
     uint64_t maxWindowSize = static_cast<uint64_t>(*cclBufferSizePtr);
     uint64_t epWorldSize = static_cast<uint64_t>(info.cfg.epWorldSize);
     uint64_t nmt = static_cast<uint64_t>(info.cfg.numMaxTokensPerRank);
-    uint64_t perSlotBytes = static_cast<uint64_t>(info.cfg.perSlotBytes);
     uint64_t moeExpertNumPerRank = static_cast<uint64_t>(info.cfg.numLocalExperts);
     uint64_t topK = static_cast<uint64_t>(info.cfg.topK);
 
-    uint64_t cntWinStateSize = epWorldSize * AlignUpWin(moeExpertNumPerRank * sizeof(int32_t)) +
-                               epWorldSize * WIN_ADDR_ALIGN;
+    uint64_t cntWinStateSize =
+        epWorldSize * AlignUpWin(moeExpertNumPerRank * sizeof(int32_t)) + epWorldSize * WIN_ADDR_ALIGN;
     uint64_t dispatchWinStateSize = cntWinStateSize + epWorldSize * WIN_ADDR_ALIGN;
     uint64_t combineWinStateSize = nmt * topK * WIN_ADDR_ALIGN + epWorldSize * WIN_ADDR_ALIGN;
-    uint64_t dispatchWinDataSize = epWorldSize * nmt * perSlotBytes;
-    uint32_t hiddenAlign = (info.cfg.hidden * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
+    uint64_t hiddenAlign = (info.cfg.hidden * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
+    uint64_t topKAlign = (topK * METADATA_DTYPE_SIZE + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
+    uint64_t dispatchReservedPerSlotBytes = AlignUpWin(hiddenAlign + topKAlign * 2 + UB_ALIGN);
+    uint64_t dispatchRecvWinDataReservedSize = epWorldSize * nmt * dispatchReservedPerSlotBytes;
     uint64_t combineWinDataSize = nmt * topK * AlignUpWin(static_cast<uint64_t>(hiddenAlign + UB_ALIGN));
     uint64_t totalStateWinSizeEp = dispatchWinStateSize + combineWinStateSize;
-    uint64_t winNeed = dispatchWinDataSize + combineWinDataSize + totalStateWinSizeEp;
+    uint64_t stateAndRecvDataWinSize = dispatchRecvWinDataReservedSize + combineWinDataSize + totalStateWinSizeEp;
+    uint64_t dispatchSendWinDataReservedSize = dispatchRecvWinDataReservedSize;
+    uint64_t winNeed = stateAndRecvDataWinSize + dispatchSendWinDataReservedSize;
     OP_TILING_CHECK(winNeed > maxWindowSize,
                     OP_LOGE(nodeName,
                             "ccl_buffer_size is not enough, need %lu (ep_world_size=%u, num_max_tokens_per_rank=%u, "
-                            "per_slot_bytes=%u), but got ccl_buffer_size=%lu.",
+                            "per_slot_bytes=%u, dispatch_reserved_per_slot_bytes=%lu), but got ccl_buffer_size=%lu.",
                             winNeed, info.cfg.epWorldSize, info.cfg.numMaxTokensPerRank, info.cfg.perSlotBytes,
-                            maxWindowSize),
+                            dispatchReservedPerSlotBytes, maxWindowSize),
                     return ge::GRAPH_FAILED);
 
     info.winDataOffset = totalStateWinSizeEp;

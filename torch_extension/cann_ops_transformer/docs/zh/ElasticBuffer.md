@@ -359,15 +359,26 @@ hidden_align = Align32(hidden * 2)
 dispatch_per_slot_bytes = Align512(hidden_align + metadata_bytes * 2 + 32)
 combine_per_slot_bytes = Align512(hidden_align + 32)
 
+dispatch_recv_buffer_size =
+    world_size * num_max_tokens_per_rank * dispatch_per_slot_bytes
+combine_recv_buffer_size =
+    num_max_tokens_per_rank * topk * combine_per_slot_bytes
+dispatch_send_buffer_size = dispatch_recv_buffer_size
+
 minimum_buffer_size =
     state_buffer_size
-    + world_size * num_max_tokens_per_rank * dispatch_per_slot_bytes
-    + num_max_tokens_per_rank * topk * combine_per_slot_bytes
+    + dispatch_recv_buffer_size
+    + combine_recv_buffer_size
+    + dispatch_send_buffer_size
 
 ccl_buffer_size = Align2(Align1MB(minimum_buffer_size) / 1MB) / 2
 ```
 
 其中 `AlignX(value) = ((value + X - 1) / X) * X`，公式中的 `/` 表示整除。
+
+通信窗口依次存放状态区、Dispatch接收区、Combine接收区和Dispatch发送区。Dispatch发送区与接收区均按
+`dispatch_per_slot_bytes` 的最大2字节hidden规格预留；kernel实际读写和通信仍使用当前数据类型对应的
+`per_slot_bytes`。Combine发送数据在Combine算子的workspace中暂存，不计入HCCL通信窗口大小。
 
 ### destroy
 

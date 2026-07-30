@@ -49,6 +49,7 @@ struct MoeEpDispatchInfo {
     uint64_t cntWinStateOffset;
     uint64_t slotWinStateOffset;
     uint64_t winDataOffset;
+    uint64_t dispatchSendWinOffset;
     uint64_t totalWinSizeEp;
     uint64_t totalUbSize;
 };

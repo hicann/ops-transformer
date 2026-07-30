@@ -36,10 +36,9 @@ struct MoeEpCombineInfo {
     uint32_t aivNum = 0;
     uint64_t totalWinSizeEp = 0;
     uint64_t totalUbSize = 0;
-    uint64_t localWsSizeDataPerRank = 0; // per-rank local workspace stride (compact, not CCL window size)
-    uint64_t localWsSizeStatusPerRank = 0;
-    uint64_t winStateOffset = 0; // Win State Offset
-    uint64_t winDataOffset = 0;  // Win Data Offset
+    uint64_t sendDataWorkspaceSizePerRank = 0; // N * K * actual perSlotBytes
+    uint64_t combineStateWinOffset = 0;
+    uint64_t combineDataWinOffset = 0;
 };
 
 struct MoeEpCombineTilingData {

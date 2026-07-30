@@ -96,6 +96,48 @@ def engram_fetch_wait(context, fetched):
     return op_module.ElasticBuffer.engram_fetch_wait(context, fetched)
 
 
+def _inline_align(value: int, base: int) -> int:
+    return (value + base - 1) // base * base
+
+
+def _get_moe_ep_minimum_window_bytes(
+    world_size: int,
+    num_max_tokens_per_rank: int,
+    hidden: int,
+    num_experts: int,
+    topk: int,
+) -> int:
+    win_addr_align = 512
+    ub_align = 32
+    max_out_dtype_size = 2
+    metadata_dtype_size = 4
+    state_dtype_size = 4
+    local_experts_num = num_experts // world_size
+
+    dispatch_count_size = world_size * _inline_align(
+        local_experts_num * state_dtype_size, win_addr_align
+    )
+    dispatch_notify_size = world_size * win_addr_align
+    combine_state_size = (
+        num_max_tokens_per_rank * topk * win_addr_align + world_size * win_addr_align
+    )
+    state_buffer_size = (
+        dispatch_count_size + dispatch_notify_size * 2 + combine_state_size
+    )
+
+    metadata_bytes = _inline_align(topk * metadata_dtype_size, ub_align)
+    hidden_align = _inline_align(hidden * max_out_dtype_size, ub_align)
+    dispatch_per_slot_bytes = _inline_align(
+        hidden_align + metadata_bytes * 2 + ub_align, win_addr_align
+    )
+    combine_per_slot_bytes = _inline_align(hidden_align + ub_align, win_addr_align)
+    dispatch_buffer_size = (
+        world_size * num_max_tokens_per_rank * dispatch_per_slot_bytes
+    )
+    combine_recv_buffer_size = num_max_tokens_per_rank * combine_per_slot_bytes * topk
+    return state_buffer_size + dispatch_buffer_size * 2 + combine_recv_buffer_size
+
+
 @dataclass
 class EPHandle:
     dst_buffer_slot_idx: torch.Tensor
@@ -246,60 +288,30 @@ class ElasticBuffer:
         num_experts: int,
         topk: int,
     ) -> int:
-        def inline_align(value, base):
-            return (value + base - 1) // base * base
-
         torch._check(
-            ((num_experts >= 2) and (num_experts <= 2048)),
-            lambda: (f"num_experts only support in [2, 2048], but got {num_experts=}."),
+            2 <= num_experts <= 2048,
+            lambda: f"num_experts only support in [2, 2048], but got {num_experts=}.",
         )
         torch._check(
-            ((topk >= 1) and (topk <= 32)),
-            lambda: (f"topk only support in [1, 32], but got {topk=}."),
+            1 <= topk <= 32,
+            lambda: f"topk only support in [1, 32], but got {topk=}.",
         )
 
-        win_addr_align = 512
-        ub_align = 32
-        max_out_dtype_size = 2
-        metadata_dtype_size = 4
-        state_dtype_size = 4
         mb_conversion = 1024 * 1024
-        local_experts_num = num_experts // world_size
-
-        dispatch_count_size = world_size * inline_align(
-            local_experts_num * state_dtype_size, win_addr_align
+        minimum_window_bytes = _get_moe_ep_minimum_window_bytes(
+            world_size,
+            num_max_tokens_per_rank,
+            hidden,
+            num_experts,
+            topk,
         )
-        dispatch_notify_size = world_size * win_addr_align
-        combine_state_size = (
-            num_max_tokens_per_rank * topk * win_addr_align
-            + world_size * win_addr_align
-        )
-        state_buffer_size = (
-            dispatch_count_size + dispatch_notify_size * 2 + combine_state_size
-        )
-
-        metadata_bytes = inline_align(topk * metadata_dtype_size, ub_align)
-        hidden_align = inline_align(hidden * max_out_dtype_size, ub_align)
-        dispatch_per_slot_bytes = inline_align(
-            hidden_align + metadata_bytes * 2 + ub_align, win_addr_align
-        )
-        combine_per_slot_bytes = inline_align(hidden_align + ub_align, win_addr_align)
-        dispatch_buffer_size = (
-            world_size * num_max_tokens_per_rank * dispatch_per_slot_bytes
-        )
-        combine_buffer_size = num_max_tokens_per_rank * combine_per_slot_bytes * topk
-
-        minimum_buffer_size = (
-            state_buffer_size + dispatch_buffer_size + combine_buffer_size
-        )
-        ccl_buffer_size = (
-            inline_align(
-                inline_align(minimum_buffer_size, mb_conversion) // mb_conversion, 2
+        return (
+            _inline_align(
+                _inline_align(minimum_window_bytes, mb_conversion) // mb_conversion,
+                2,
             )
             // 2
         )
-
-        return ccl_buffer_size
 
     def engram_write(self, storage: torch.Tensor) -> None:
         """
