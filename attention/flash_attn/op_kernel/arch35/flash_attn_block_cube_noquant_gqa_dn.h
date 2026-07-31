@@ -40,22 +40,22 @@ public:
     using MM_T = float;
 
     using ConstInfoX = ConstInfo_t<FiaKernelType::NO_QUANT>;
-    const ConstInfoX &constInfo;
+    const ConstInfoX &constInfo_;
 
     using SEQLEN_T = uint32_t;
-    SeqLensTool<LAYOUT_T, SEQLEN_T> &qSeqLensTool;
-    SeqLensTool<LAYOUT_KV, SEQLEN_T> &kvSeqLensTool;
+    SeqLensTool<LAYOUT_T, SEQLEN_T> &qSeqLensTool_;
+    SeqLensTool<LAYOUT_KV, SEQLEN_T> &kvSeqLensTool_;
 
     static constexpr GmFormat Q_FORMAT = GetQueryGmFormat<LAYOUT_T>();
     static constexpr GmFormat KV_FORMAT = GetKVGmFormat<LAYOUT_KV, PAGE_ATTENTION>();
     using FaGmTensorQ = FaGmTensor<Q_T, Q_FORMAT, SEQLEN_T, IS_TND<LAYOUT_T>()>;
     using FaGmTensorKV = FaGmTensor<KV_T, KV_FORMAT, SEQLEN_T, IS_TND<LAYOUT_KV>()>;
-    FaGmTensorQ queryGm;
-    FaGmTensorKV keyGm;
-    FaGmTensorKV valueGm;
-    CopyQueryGmToL1<Q_T, Q_FORMAT> copyQueryGmToL1;
-    CopyKvGmToL1<KV_T, KV_FORMAT> copyKvGmToL1;
-    GlobalTensor<int32_t> blockTableGm;
+    FaGmTensorQ queryGm_;
+    FaGmTensorKV keyGm_;
+    FaGmTensorKV valueGm_;
+    CopyQueryGmToL1<Q_T, Q_FORMAT> copyQueryGmToL1_;
+    CopyKvGmToL1<KV_T, KV_FORMAT> copyKvGmToL1_;
+    GlobalTensor<int32_t> blockTableGm_;
 
     // 核间同步ID
     static constexpr uint64_t CROSS_CORE_SYNC_MODE = 4;
@@ -88,8 +88,8 @@ public:
     static constexpr uint32_t UB_MM1_RES_BUF_BYTES = mBaseSize / CV_RATIO * s2BaseSize * sizeof(MM_T);
     static constexpr uint32_t UB_MM2_RES_BUFCNT = 2U;
     static constexpr uint32_t UB_MM2_RES_BUF_BYTES = mBaseSize / CV_RATIO * dVBaseSize * sizeof(MM_T);
-    LocalTensor<uint8_t> ubMm1ResBuffers;
-    LocalTensor<uint8_t> ubMm2ResBuffers;
+    LocalTensor<uint8_t> ubMm1ResBuffers_;
+    LocalTensor<uint8_t> ubMm2ResBuffers_;
     // L1
     static constexpr uint32_t L1_P_BUFCNT = 3U;
     static constexpr uint32_t L1_P_BUF_BYTES = mBaseSize * s2BaseSize * sizeof(INPUT_T);
@@ -98,69 +98,69 @@ public:
     static constexpr uint32_t L1_KV_BUFCNT = 4U;
     static constexpr uint32_t L1_KV_BUF_BYTES = 64 * 1024;
     LocalTensor<uint8_t>
-        l1PBuffers; // buffer位置+用途+Buffers, 例如l1PBuffers; 使用时命名: 用途+buffer位置+Tensor, 例如pL1Tensor
-    LocalTensor<uint8_t> l1QBuffers;
-    LocalTensor<uint8_t> l1KvBuffers;
-    uint32_t qBufId = 0;
-    uint32_t kvBufId = 0;
+        l1PBuffers_; // buffer位置+用途+Buffers, 例如l1PBuffers; 使用时命名: 用途+buffer位置+Tensor, 例如pL1Tensor
+    LocalTensor<uint8_t> l1QBuffers_;
+    LocalTensor<uint8_t> l1KvBuffers_;
+    uint32_t qBufId_ = 0;
+    uint32_t kvBufId_ = 0;
     // L0C
     static constexpr uint32_t L0C_BUFCNT = 4;
     static constexpr uint32_t L0C_BUF_BYTES = 64 * 1024;
-    LocalTensor<uint8_t> l0CBuffers;
-    uint32_t l0cBufId = 0;
+    LocalTensor<uint8_t> l0CBuffers_;
+    uint32_t l0cBufId_ = 0;
     // L0A/B
-    fa_base_matmul::BufferManager<fa_base_matmul::BufferType::L0A> l0aBufferManager;
-    fa_base_matmul::BufferManager<fa_base_matmul::BufferType::L0B> l0bBufferManager;
+    fa_base_matmul::BufferManager<fa_base_matmul::BufferType::L0A> l0aBufferManager_;
+    fa_base_matmul::BufferManager<fa_base_matmul::BufferType::L0B> l0bBufferManager_;
     using L0APolicyType =
         BuffersPolicyDB<BufferType::L0A, SyncType::INNER_CORE_SYNC, SyncMode::LOCK_UNLOCK, IdSource::EXTERNAL>;
     using L0BPolicyType =
         BuffersPolicyDB<BufferType::L0B, SyncType::INNER_CORE_SYNC, SyncMode::LOCK_UNLOCK, IdSource::EXTERNAL>;
-    L0APolicyType mmL0APolicy;
-    L0BPolicyType mmL0BPolicy;
+    L0APolicyType mmL0APolicy_;
+    L0BPolicyType mmL0BPolicy_;
 
     __aicore__ inline FANoQuantGqaBlockCubeDn(ConstInfoX &constInfo, SeqLensTool<LAYOUT_T, SEQLEN_T> &qSeqLensTool,
                                               SeqLensTool<LAYOUT_KV, SEQLEN_T> &kvSeqLensTool)
-        : constInfo(constInfo), qSeqLensTool(qSeqLensTool), kvSeqLensTool(kvSeqLensTool){};
+        : constInfo_(constInfo), qSeqLensTool_(qSeqLensTool), kvSeqLensTool_(kvSeqLensTool){};
 
     __aicore__ inline void InitBlock(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
                                      __gm__ uint8_t *blockTable)
     {
         if constexpr (PAGE_ATTENTION) {
-            blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
+            blockTableGm_.SetGlobalBuffer((__gm__ int32_t *)blockTable);
         }
 
-        InitQBuffer(constInfo.bSize, constInfo.n2Size, constInfo.gSize, constInfo.s1Size, constInfo.dSize, queryGm,
-                    query);
-        InitKVBuffer(constInfo.bSize, constInfo.s2Size, constInfo.n2Size, constInfo.blockSize, constInfo.dSize, keyGm,
-                     key, constInfo.keyBnStride, constInfo.keyN2Stride);
-        InitKVBuffer(constInfo.bSize, constInfo.s2Size, constInfo.n2Size, constInfo.blockSize, constInfo.dSizeV,
-                     valueGm, value, constInfo.valueBnStride, constInfo.valueN2Stride);
+        InitQBuffer(constInfo_.bSize, constInfo_.n2Size, constInfo_.gSize, constInfo_.s1Size, constInfo_.dSize,
+                    queryGm_, query);
+        InitKVBuffer(constInfo_.bSize, constInfo_.s2Size, constInfo_.n2Size, constInfo_.blockSize, constInfo_.dSize,
+                     keyGm_, key, constInfo_.keyBnStride, constInfo_.keyN2Stride);
+        InitKVBuffer(constInfo_.bSize, constInfo_.s2Size, constInfo_.n2Size, constInfo_.blockSize, constInfo_.dSizeV,
+                     valueGm_, value, constInfo_.valueBnStride, constInfo_.valueN2Stride);
     }
 
     __aicore__ inline void InitBuffers()
     {
         /*--------------------------------------------UB--------------------------------------------*/
         uint32_t addrUb = 0;
-        ubMm2ResBuffers = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, UB_MM2_RES_BUFCNT * UB_MM2_RES_BUF_BYTES);
+        ubMm2ResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, UB_MM2_RES_BUFCNT * UB_MM2_RES_BUF_BYTES);
         addrUb = UB_MM2_RES_BUFCNT * UB_MM2_RES_BUF_BYTES;
-        ubMm1ResBuffers = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, UB_MM1_RES_BUFCNT * UB_MM1_RES_BUF_BYTES);
+        ubMm1ResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, UB_MM1_RES_BUFCNT * UB_MM1_RES_BUF_BYTES);
 
         /*--------------------------------------------L1--------------------------------------------*/
         uint32_t addrL1 = 0;
-        l1PBuffers = LocalTensor<uint8_t>(TPosition::A1, addrL1, L1_P_BUFCNT * L1_P_BUF_BYTES);
+        l1PBuffers_ = LocalTensor<uint8_t>(TPosition::A1, addrL1, L1_P_BUFCNT * L1_P_BUF_BYTES);
         addrL1 = L1_P_BUFCNT * L1_P_BUF_BYTES;
-        l1QBuffers = LocalTensor<uint8_t>(TPosition::A1, addrL1, L1_Q_BUFCNT * L1_Q_BUF_BYTES);
+        l1QBuffers_ = LocalTensor<uint8_t>(TPosition::A1, addrL1, L1_Q_BUFCNT * L1_Q_BUF_BYTES);
         addrL1 += L1_Q_BUFCNT * L1_Q_BUF_BYTES;
-        l1KvBuffers = LocalTensor<uint8_t>(TPosition::A1, addrL1, L1_KV_BUFCNT * L1_KV_BUF_BYTES);
+        l1KvBuffers_ = LocalTensor<uint8_t>(TPosition::A1, addrL1, L1_KV_BUFCNT * L1_KV_BUF_BYTES);
 
         // /*--------------------------------------------L0A--------------------------------------------*/
-        l0aBufferManager.Init(BUFFER_SIZE_BYTE_64K);
+        l0aBufferManager_.Init(BUFFER_SIZE_BYTE_64K);
 
         // /*--------------------------------------------L0B--------------------------------------------*/
-        l0bBufferManager.Init(BUFFER_SIZE_BYTE_64K);
+        l0bBufferManager_.Init(BUFFER_SIZE_BYTE_64K);
 
         /*--------------------------------------------L0C--------------------------------------------*/
-        l0CBuffers = LocalTensor<uint8_t>(TPosition::CO1, 0U, L0C_BUFCNT * L0C_BUF_BYTES);
+        l0CBuffers_ = LocalTensor<uint8_t>(TPosition::CO1, 0U, L0C_BUFCNT * L0C_BUF_BYTES);
     }
 
     __aicore__ inline void InitQBuffer(uint32_t batchSize, uint32_t n2Size, uint32_t gSize, uint32_t qSeqSize,
@@ -168,9 +168,9 @@ public:
     {
         qGmTensor.gmTensor.SetGlobalBuffer((__gm__ Q_T *)gm);
         if constexpr (GmLayoutParams<Q_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_BNGSD) {
-            qGmTensor.offsetCalculator.Init(batchSize, n2Size, gSize, qSeqSize, headDim, qSeqLensTool.seqUsedParser);
+            qGmTensor.offsetCalculator.Init(batchSize, n2Size, gSize, qSeqSize, headDim, qSeqLensTool_.seqUsedParser);
         } else {
-            qGmTensor.offsetCalculator.Init(n2Size, gSize, headDim, qSeqLensTool.cuSeqLensParser);
+            qGmTensor.offsetCalculator.Init(n2Size, gSize, headDim, qSeqLensTool_.cuSeqLensParser);
         }
     }
 
@@ -181,18 +181,18 @@ public:
         kvGmTensor.gmTensor.SetGlobalBuffer((__gm__ KV_T *)gm);
 
         if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_BNBD) {
-            kvGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, headDim, blockTableGm,
-                                             constInfo.maxBlockNumPerBatch, bnStride, n2Stride);
+            kvGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, headDim, blockTableGm_,
+                                             constInfo_.maxBlockNumPerBatch, bnStride, n2Stride);
         } else if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_NZ) {
             uint32_t d0 = 32 / sizeof(KV_T);
             uint32_t d1 = headDim / d0;
-            kvGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, d1, d0, blockTableGm,
-                                             constInfo.maxBlockNumPerBatch, bnStride, n2Stride);
+            kvGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, d1, d0, blockTableGm_,
+                                             constInfo_.maxBlockNumPerBatch, bnStride, n2Stride);
         } else if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_BNSD) {
             kvGmTensor.offsetCalculator.Init(batchSize, n2Size, kvSeqSize, headDim);
-            kvGmTensor.offsetCalculator.Init(kvSeqLensTool.seqUsedParser);
+            kvGmTensor.offsetCalculator.Init(kvSeqLensTool_.seqUsedParser);
         } else if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_TND) {
-            kvGmTensor.offsetCalculator.Init(n2Size, headDim, kvSeqLensTool.cuSeqLensParser);
+            kvGmTensor.offsetCalculator.Init(n2Size, headDim, kvSeqLensTool_.cuSeqLensParser);
         }
     }
 
@@ -214,14 +214,14 @@ public:
 
     __aicore__ inline void AllocEventID()
     {
-        mmL0APolicy.Init(l0aBufferManager, BUFFER_SIZE_BYTE_32K, L0A_EVENT0, L0A_EVENT1);
-        mmL0BPolicy.Init(l0bBufferManager, BUFFER_SIZE_BYTE_32K, L0B_EVENT0, L0B_EVENT1);
+        mmL0APolicy_.Init(l0aBufferManager_, BUFFER_SIZE_BYTE_32K, L0A_EVENT0, L0A_EVENT1);
+        mmL0BPolicy_.Init(l0bBufferManager_, BUFFER_SIZE_BYTE_32K, L0B_EVENT0, L0B_EVENT1);
     }
 
     __aicore__ inline void FreeEventID()
     {
-        mmL0APolicy.Uninit(l0aBufferManager);
-        mmL0BPolicy.Uninit(l0bBufferManager);
+        mmL0APolicy_.Uninit(l0aBufferManager_);
+        mmL0BPolicy_.Uninit(l0bBufferManager_);
     }
 
     __aicore__ inline void CopyQuerySlice(const LocalTensor<Q_T> &dstTensor, uint32_t dOffset, uint32_t dRealSize,
@@ -236,12 +236,12 @@ public:
                         .dIdx = dOffset,
                         .gS1DealSize = runInfo.actMSize,
                         .dDealSize = dRealSize};
-        copyQueryGmToL1(l1Tensor, queryGm, gmCoord);
+        copyQueryGmToL1_(l1Tensor, queryGm_, gmCoord);
     }
 
     __aicore__ inline void CopyQueryTile(const LocalTensor<Q_T> &dstTensor, RunInfoX &runInfo)
     {
-        uint32_t dSize = constInfo.dSize;
+        uint32_t dSize = constInfo_.dSize;
         CopyQuerySlice(dstTensor, 0, dSize, runInfo);
     }
 
@@ -257,7 +257,7 @@ public:
                           .dIdx = dOffset,
                           .s2DealSize = runInfo.actSingleLoopS2Size,
                           .dDealSize = dRealSize};
-        copyKvGmToL1(l1Tensor, keyGm, gmCoord);
+        copyKvGmToL1_(l1Tensor, keyGm_, gmCoord);
     }
 
     __aicore__ inline void CopyValueSlice(const LocalTensor<KV_T> &dstTensor, uint32_t dOffset, uint32_t dRealSize,
@@ -272,25 +272,25 @@ public:
                           .dIdx = dOffset,
                           .s2DealSize = runInfo.actSingleLoopS2Size,
                           .dDealSize = dRealSize};
-        copyKvGmToL1(l1Tensor, valueGm, gmCoord);
+        copyKvGmToL1_(l1Tensor, valueGm_, gmCoord);
     }
 
     __aicore__ inline void CopyKeyTile(const LocalTensor<KV_T> &dstTensor, RunInfoX &runInfo)
     {
-        uint32_t dSize = constInfo.dSize;
+        uint32_t dSize = constInfo_.dSize;
         CopyKeySlice(dstTensor, 0, dSize, runInfo);
     }
 
     __aicore__ inline void CopyValueTile(const LocalTensor<KV_T> &dstTensor, RunInfoX &runInfo)
     {
-        CopyValueSlice(dstTensor, 0, constInfo.dSizeV, runInfo);
+        CopyValueSlice(dstTensor, 0, constInfo_.dSizeV, runInfo);
     }
 
     __aicore__ inline void IterateBmm1(RunInfoX &runInfo)
     {
         uint32_t mm1ResUbBufId = runInfo.loop % UB_MM1_RES_BUFCNT;
         LocalTensor<MM_T> mm1ResUbTensor =
-            ubMm1ResBuffers[mm1ResUbBufId * UB_MM1_RES_BUF_BYTES].template ReinterpretCast<MM_T>();
+            ubMm1ResBuffers_[mm1ResUbBufId * UB_MM1_RES_BUF_BYTES].template ReinterpretCast<MM_T>();
         uint32_t c1v1CrossCoreSyncIdx = CC_BMM1_0 + mm1ResUbBufId;
 
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(c1v1CrossCoreSyncIdx);
@@ -317,45 +317,45 @@ public:
 
     __aicore__ inline void IterateBmm1Dn(LocalTensor<MM_T> &mm1ResUbTensor, RunInfoX &runInfo)
     {
-        LocalTensor<Q_T> qL1Tensor = l1QBuffers[qBufId * L1_Q_BUF_BYTES].template ReinterpretCast<Q_T>();
+        LocalTensor<Q_T> qL1Tensor = l1QBuffers_[qBufId_ * L1_Q_BUF_BYTES].template ReinterpretCast<Q_T>();
         if (unlikely(runInfo.isFirstS2Loop)) {
-            Mutex::Lock<PIPE_MTE2>(Q_L1_EVENT0 + qBufId);
+            Mutex::Lock<PIPE_MTE2>(Q_L1_EVENT0 + qBufId_);
             CopyQueryTile(qL1Tensor, runInfo);
-            Mutex::Unlock<PIPE_MTE2>(Q_L1_EVENT0 + qBufId);
-            Mutex::Lock<PIPE_MTE1>(Q_L1_EVENT0 + qBufId);
+            Mutex::Unlock<PIPE_MTE2>(Q_L1_EVENT0 + qBufId_);
+            Mutex::Lock<PIPE_MTE1>(Q_L1_EVENT0 + qBufId_);
         }
 
-        LocalTensor<KV_T> kL1Tensor = l1KvBuffers[kvBufId * L1_KV_BUF_BYTES].template ReinterpretCast<KV_T>();
-        Mutex::Lock<PIPE_MTE2>(KV_L1_EVENT0 + kvBufId);
+        LocalTensor<KV_T> kL1Tensor = l1KvBuffers_[kvBufId_ * L1_KV_BUF_BYTES].template ReinterpretCast<KV_T>();
+        Mutex::Lock<PIPE_MTE2>(KV_L1_EVENT0 + kvBufId_);
         CopyKeyTile(kL1Tensor, runInfo);
-        Mutex::Unlock<PIPE_MTE2>(KV_L1_EVENT0 + kvBufId);
-        Mutex::Lock<PIPE_MTE1>(KV_L1_EVENT0 + kvBufId);
+        Mutex::Unlock<PIPE_MTE2>(KV_L1_EVENT0 + kvBufId_);
+        Mutex::Lock<PIPE_MTE1>(KV_L1_EVENT0 + kvBufId_);
         {
-            Mutex::Lock<PIPE_M>(L0C_EVENT0 + l0cBufId);
-            LocalTensor<MM_T> l0CSubTensor = l0CBuffers[l0cBufId * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
+            Mutex::Lock<PIPE_M>(L0C_EVENT0 + l0cBufId_);
+            LocalTensor<MM_T> l0CSubTensor = l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
             MMParam param = MakeMMParam((uint32_t)runInfo.actSingleLoopS2Size, (uint32_t)runInfo.actMSize,
-                                        (uint32_t)(constInfo.dSize), false, true);
+                                        (uint32_t)(constInfo_.dSize), false, true);
             if constexpr (dBaseSize > 128) {
-                MatmulK<KV_T, Q_T, MM_T, 128, 128, 128, ABLayout::MK, ABLayout::KN>(kL1Tensor, qL1Tensor, mmL0APolicy,
-                                                                                    mmL0BPolicy, l0CSubTensor, param);
+                MatmulK<KV_T, Q_T, MM_T, 128, 128, 128, ABLayout::MK, ABLayout::KN>(kL1Tensor, qL1Tensor, mmL0APolicy_,
+                                                                                    mmL0BPolicy_, l0CSubTensor, param);
             } else {
                 MatmulBase<KV_T, Q_T, MM_T, 128, 128, dBaseSize, ABLayout::MK, ABLayout::KN>(
-                    kL1Tensor, qL1Tensor, mmL0APolicy, mmL0BPolicy, l0CSubTensor, param);
+                    kL1Tensor, qL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
             }
-            Mutex::Unlock<PIPE_M>(L0C_EVENT0 + l0cBufId);
-            Mutex::Lock<PIPE_FIX>(L0C_EVENT0 + l0cBufId);
+            Mutex::Unlock<PIPE_M>(L0C_EVENT0 + l0cBufId_);
+            Mutex::Lock<PIPE_FIX>(L0C_EVENT0 + l0cBufId_);
 
             FixpipeMm1Dn(mm1ResUbTensor, l0CSubTensor, runInfo);
 
-            Mutex::Unlock<PIPE_FIX>(L0C_EVENT0 + l0cBufId);
-            l0cBufId = (l0cBufId + 1) % L0C_BUFCNT;
+            Mutex::Unlock<PIPE_FIX>(L0C_EVENT0 + l0cBufId_);
+            l0cBufId_ = (l0cBufId_ + 1) % L0C_BUFCNT;
         }
-        Mutex::Unlock<PIPE_MTE1>(KV_L1_EVENT0 + kvBufId);
-        kvBufId = (kvBufId + 1) % L1_KV_BUFCNT;
+        Mutex::Unlock<PIPE_MTE1>(KV_L1_EVENT0 + kvBufId_);
+        kvBufId_ = (kvBufId_ + 1) % L1_KV_BUFCNT;
 
         if (unlikely(runInfo.isLastS2Loop)) {
-            Mutex::Unlock<PIPE_MTE1>(Q_L1_EVENT0 + qBufId);
-            qBufId = (qBufId + 1) % L1_Q_BUFCNT;
+            Mutex::Unlock<PIPE_MTE1>(Q_L1_EVENT0 + qBufId_);
+            qBufId_ = (qBufId_ + 1) % L1_Q_BUFCNT;
         }
     }
 
@@ -365,9 +365,9 @@ public:
         uint32_t pL1BufId = runInfo.loop % L1_P_BUFCNT;
         uint32_t v1c2CrossCoreSyncIdx = CC_L1P_0 + pL1BufId;
         uint32_t c2v2CrossCoreSyncIdx = CC_BMM2_0 + mm2ResUbBufId;
-        LocalTensor<Q_T> pL1Tensor = l1PBuffers[pL1BufId * L1_P_BUF_BYTES].template ReinterpretCast<Q_T>();
+        LocalTensor<Q_T> pL1Tensor = l1PBuffers_[pL1BufId * L1_P_BUF_BYTES].template ReinterpretCast<Q_T>();
         LocalTensor<MM_T> mm2ResUbTensor =
-            ubMm2ResBuffers[mm2ResUbBufId * UB_MM2_RES_BUF_BYTES].template ReinterpretCast<MM_T>();
+            ubMm2ResBuffers_[mm2ResUbBufId * UB_MM2_RES_BUF_BYTES].template ReinterpretCast<MM_T>();
 
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(v1c2CrossCoreSyncIdx);
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(v1c2CrossCoreSyncIdx + AIV0_AIV1_OFFSET);
@@ -398,17 +398,17 @@ public:
     __aicore__ inline void IterateBmm2l0Split(LocalTensor<MM_T> &mm2ResUbTensor, LocalTensor<Q_T> &pL1Tensor,
                                               RunInfoX &runInfo)
     {
-        LocalTensor<KV_T> vL1Tensor = l1KvBuffers[kvBufId * L1_KV_BUF_BYTES].template ReinterpretCast<KV_T>();
-        Mutex::Lock<PIPE_MTE2>(KV_L1_EVENT0 + kvBufId);
+        LocalTensor<KV_T> vL1Tensor = l1KvBuffers_[kvBufId_ * L1_KV_BUF_BYTES].template ReinterpretCast<KV_T>();
+        Mutex::Lock<PIPE_MTE2>(KV_L1_EVENT0 + kvBufId_);
         CopyValueTile(vL1Tensor, runInfo);
-        Mutex::Unlock<PIPE_MTE2>(KV_L1_EVENT0 + kvBufId);
-        Mutex::Lock<PIPE_MTE1>(KV_L1_EVENT0 + kvBufId);
+        Mutex::Unlock<PIPE_MTE2>(KV_L1_EVENT0 + kvBufId_);
+        Mutex::Lock<PIPE_MTE1>(KV_L1_EVENT0 + kvBufId_);
         {
-            Mutex::Lock<PIPE_M>(L0C_EVENT0 + l0cBufId);
-            LocalTensor<MM_T> l0CSubTensor = l0CBuffers[l0cBufId * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
+            Mutex::Lock<PIPE_M>(L0C_EVENT0 + l0cBufId_);
+            LocalTensor<MM_T> l0CSubTensor = l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
             MMParam param = {
                 (uint32_t)mBaseSize,                   // singleM 128
-                (uint32_t)constInfo.dSizeV,            // singleN 128
+                (uint32_t)constInfo_.dSizeV,            // singleN 128
                 (uint32_t)runInfo.actSingleLoopS2Size, // singleK
                 true,                                  // isLeftTranspose
                 false                                  // isRightTranspose
@@ -416,26 +416,26 @@ public:
 
             if constexpr (dVBaseSize > 128) {
                 MatmulN<Q_T, KV_T, MM_T, mBaseSize, 128, s2BaseSize, ABLayout::MK, ABLayout::KN>(
-                    pL1Tensor, vL1Tensor, mmL0APolicy, mmL0BPolicy, l0CSubTensor, param);
+                    pL1Tensor, vL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
             } else {
                 if constexpr (s2BaseSize == 128) {
                     MatmulFull<Q_T, KV_T, MM_T, 128, dVBaseSize, 128, ABLayout::MK, ABLayout::KN>(
-                        pL1Tensor, vL1Tensor, mmL0APolicy, mmL0BPolicy, l0CSubTensor, param);
+                        pL1Tensor, vL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
                 } else {
                     MatmulBase<Q_T, KV_T, MM_T, 128, dVBaseSize, 128, ABLayout::MK, ABLayout::KN>(
-                        pL1Tensor, vL1Tensor, mmL0APolicy, mmL0BPolicy, l0CSubTensor, param);
+                        pL1Tensor, vL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
                 }
             }
-            Mutex::Unlock<PIPE_M>(L0C_EVENT0 + l0cBufId);
-            Mutex::Lock<PIPE_FIX>(L0C_EVENT0 + l0cBufId);
+            Mutex::Unlock<PIPE_M>(L0C_EVENT0 + l0cBufId_);
+            Mutex::Lock<PIPE_FIX>(L0C_EVENT0 + l0cBufId_);
 
-            FixpipeMm2PartialN(mm2ResUbTensor, l0CSubTensor, constInfo.dSizeV, runInfo);
+            FixpipeMm2PartialN(mm2ResUbTensor, l0CSubTensor, constInfo_.dSizeV, runInfo);
 
-            Mutex::Unlock<PIPE_FIX>(L0C_EVENT0 + l0cBufId);
-            l0cBufId = (l0cBufId + 1) % L0C_BUFCNT;
+            Mutex::Unlock<PIPE_FIX>(L0C_EVENT0 + l0cBufId_);
+            l0cBufId_ = (l0cBufId_ + 1) % L0C_BUFCNT;
         }
-        Mutex::Unlock<PIPE_MTE1>(KV_L1_EVENT0 + kvBufId);
-        kvBufId = (kvBufId + 1) % L1_KV_BUFCNT;
+        Mutex::Unlock<PIPE_MTE1>(KV_L1_EVENT0 + kvBufId_);
+        kvBufId_ = (kvBufId_ + 1) % L1_KV_BUFCNT;
     }
 }; // FANoQuantGqaBlockCubeDn
 
