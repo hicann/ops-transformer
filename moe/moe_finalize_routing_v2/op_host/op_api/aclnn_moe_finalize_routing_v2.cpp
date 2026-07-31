@@ -142,27 +142,30 @@ extern "C" {
 #endif
 
 ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2GetWorkspaceSize(
-    const aclTensor* expandedX, const aclTensor* expandedRowIdx, const aclTensor* x1Optional,
-    const aclTensor* x2Optional, const aclTensor* biasOptional, const aclTensor* scalesOptional,
-    const aclTensor* expertIdxOptional, int64_t dropPadMode, const aclTensor* out,
-    uint64_t* workspaceSize, aclOpExecutor** executor)
+    const aclTensor *expandedX, const aclTensor *expandedRowIdx, const aclTensor *x1Optional,
+    const aclTensor *x2Optional, const aclTensor *biasOptional, const aclTensor *scalesOptional,
+    const aclTensor *expertIdxOptional, int64_t dropPadMode, const aclTensor *out, uint64_t *workspaceSize,
+    aclOpExecutor **executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     L2_DFX_PHASE_1(aclnnMoeFinalizeRoutingV2,
-        DFX_IN(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional,
-               scalesOptional, expertIdxOptional, dropPadMode),
+                   DFX_IN(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
+                          expertIdxOptional, dropPadMode),
                    DFX_OUT(out));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     bool is310P = GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND310P;
+    bool isCommonValidationChip = Ops::Transformer::AclnnUtil::IsRegbase() ||
+                                  GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B ||
+                                  GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910_93;
 
     aclnnStatus ret = ACLNN_SUCCESS;
     if (is310P) {
         ret = MoeFinalizeRoutingV2Check::CheckParams310P(expandedX, expandedRowIdx, x1Optional, x2Optional,
                                                          biasOptional, scalesOptional, expertIdxOptional, out);
-    } else if (Ops::Transformer::AclnnUtil::IsRegbase()) {
+    } else if (isCommonValidationChip) {
         ret = MoeFinalizeRoutingV2Check::CheckParams(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional,
                                                      scalesOptional, expertIdxOptional, out);
     }
@@ -174,42 +177,41 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2GetWorkspaceSize(
     auto expandedRowIdxContiguous = l0op::Contiguous(expandedRowIdx, uniqueExecutor.get());
     CHECK_RET(expandedRowIdxContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor* x1Contiguous = nullptr;
+    const aclTensor *x1Contiguous = nullptr;
     if (x1Optional != nullptr) {
         x1Contiguous = l0op::Contiguous(x1Optional, uniqueExecutor.get());
         CHECK_RET(x1Contiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor* x2Contiguous = nullptr;
+    const aclTensor *x2Contiguous = nullptr;
     if (x2Optional != nullptr) {
         x2Contiguous = l0op::Contiguous(x2Optional, uniqueExecutor.get());
         CHECK_RET(x2Contiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor* biasContiguous = nullptr;
+    const aclTensor *biasContiguous = nullptr;
     if (biasOptional != nullptr) {
         biasContiguous = l0op::Contiguous(biasOptional, uniqueExecutor.get());
         CHECK_RET(biasContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor* scalesContiguous = nullptr;
+    const aclTensor *scalesContiguous = nullptr;
     if (scalesOptional != nullptr) {
         scalesContiguous = l0op::Contiguous(scalesOptional, uniqueExecutor.get());
         CHECK_RET(scalesContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor* expertIdxContiguous = nullptr;
+    const aclTensor *expertIdxContiguous = nullptr;
     if (expertIdxOptional != nullptr) {
         expertIdxContiguous = l0op::Contiguous(expertIdxOptional, uniqueExecutor.get());
         CHECK_RET(expertIdxContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
     // 调用l0接口进行计算，传入out参数
-    auto out_ = l0op::MoeFinalizeRoutingV2(expandedXContiguous, expandedRowIdxContiguous, x1Contiguous,
-                                           x2Contiguous, biasContiguous, scalesContiguous,
-                                           expertIdxContiguous, nullptr, nullptr, nullptr, nullptr,
-                                           dropPadMode, nullptr, nullptr, nullptr,
-                                           1, out, uniqueExecutor.get());
+    auto out_ =
+        l0op::MoeFinalizeRoutingV2(expandedXContiguous, expandedRowIdxContiguous, x1Contiguous, x2Contiguous,
+                                   biasContiguous, scalesContiguous, expertIdxContiguous, nullptr, nullptr, nullptr,
+                                   nullptr, dropPadMode, nullptr, nullptr, nullptr, 1, out, uniqueExecutor.get());
     CHECK_RET(out_ != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     // copyout结果，如果出参out是非连续Tensor，需要把计算完的连续Tensor转非连续
@@ -222,8 +224,8 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2GetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2(
-    void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
+ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                                aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnMoeFinalizeRoutingV2);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
