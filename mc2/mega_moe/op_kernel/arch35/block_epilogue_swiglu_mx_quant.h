@@ -41,6 +41,16 @@ enum class QuantDtype : uint8_t {
 };
 } // namespace SwigluQuantMsg
 
+enum class ActMode : uint8_t {
+    SWIGLU = 0,
+    SITU = 1,
+};
+
+enum class ActSubMode : uint8_t {
+    DEFAULT = 0,
+    LINEAR = 1,
+};
+
 namespace {
 constexpr int64_t OUT_ELE_NUM_ONE_BLK = 64;
 constexpr uint32_t Y_IDX = 0;
@@ -114,6 +124,11 @@ static constexpr AscendC::MicroAPI::CastTrait CAST_32_TO_83 = {
     DataTypeOut_, DataTypeIn_, DataTypeX2Scale_, DataTypeX1Scale_, IsTensorList_, TileM, TileN, TopkWeightsPrefetch, \
         IsInterleaved_
 
+// 前向声明：激活分块上下文结构体（仅含标量与 UB 指针，可跨函数传递）
+// 完整定义见 BlockEpilogueSwigluMxQuant 类定义之后
+template <typename DataTypeInT>
+struct ActivationContext;
+
 template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_,
           bool IsTensorList_, uint32_t TileM = 256, uint32_t TileN = 256, bool TopkWeightsPrefetch = false,
           bool IsInterleaved_ = false>
@@ -133,6 +148,10 @@ public:
         GM_ADDR biasGmAddr{nullptr};
         GM_ADDR metaInfoGmAddr{nullptr};
         float clampLimit{0.0f};
+        uint8_t actMode{0};
+        uint8_t actSubMode{0};
+        float activationAlpha{1.0f};
+        float activationBeta{1.0f};
         Arguments() = default;
     };
 
@@ -167,12 +186,22 @@ public:
 private:
     __aicore__ inline void VFDoSwigluForMX(uint16_t mSize, uint16_t pingpongIdx = 0, uint64_t mLoc = 0);
 
-    template <SwigluQuantMsg::QuantMode quantMode, bool IsInterleavedSrc = false>
+    template <SwigluQuantMsg::QuantMode quantMode, bool IsInterleavedSrc = false, ActMode Activation = ActMode::SWIGLU,
+              ActSubMode ActSub = ActSubMode::DEFAULT>
     __aicore__ inline void VFDoSwigluAndQuantForMX(__ubuf__ int8_t *outputDst, __ubuf__ uint16_t *scaleDst,
                                                    __ubuf__ DataTypeIn *firstSrc, __ubuf__ DataTypeIn *secondSrc,
                                                    __ubuf__ bfloat16_t *gluResAddr, __ubuf__ uint16_t *maxExpAddr,
                                                    __ubuf__ uint16_t *halfScaleLocalAddr, uint16_t mSize,
                                                    uint16_t nSize, uint64_t mLoc = 0);
+
+    // 激活流程独立函数：每种激活一个完整函数，自含全部寄存器声明与 __VEC_SCOPE__
+    // （RegTensor 不能跨函数传递，故各激活函数内独立声明寄存器）
+    // 由 VFDoSwigluAndQuantForMX 按模板参数 Activation 分派调用
+    template <bool IsInterleaved>
+    __aicore__ inline void ActivationFlowSwiGLU(const ActivationContext<DataTypeIn> &ctx);
+
+    template <ActSubMode ActSub, bool IsInterleaved>
+    __aicore__ inline void ActivationFlowSiTU(const ActivationContext<DataTypeIn> &ctx);
 
     __aicore__ inline void ComputeScale(__ubuf__ uint16_t *maxExpAddr, __ubuf__ uint16_t *mxScaleLocalAddr,
                                         __ubuf__ uint16_t *halfScaleLocalAddr, uint32_t totalScaleInUB,
@@ -228,6 +257,55 @@ private:
 
     BlockCoord blockCoord_{0, 0, 0, 0, 0, 0};
     float clampLimit_{0.0f};
+    uint8_t actMode_{0};
+    uint8_t actSubMode_{0};
+    float activationAlpha_{1.0f};
+    float activationBeta_{1.0f};
+};
+
+// ============================================================================
+// ActivationContext: 激活分块上下文
+// 仅含标量与 UB 指针（不含 RegTensor），可安全跨函数传递给各 ActivationFlow*
+// 由 VFDoSwigluAndQuantForMX 填充后分派给具体激活函数
+// ============================================================================
+template <typename DataTypeInT>
+struct ActivationContext {
+    // 源数据地址
+    __ubuf__ DataTypeInT *firstSrc = nullptr;
+    __ubuf__ DataTypeInT *secondSrc = nullptr;
+    __ubuf__ bfloat16_t *gluResAddr = nullptr;
+
+    // 对齐参数
+    uint32_t nSrcUbAligned = 0;
+    uint32_t nDstUbAligned = 0;
+
+    // 分块循环控制
+    uint16_t dim0VfTimes = 0;
+    uint16_t dim1VfTimes = 0;
+    uint32_t dim1Tail = 0;
+    uint16_t dim1TailTimes = 0;
+    uint16_t dim1Tail2 = 0;
+
+    // 尾循环 mask
+    uint32_t mask1Num = 0;
+    uint32_t mask2Num = 0;
+    uint32_t mask3Num = 0;
+
+    // 尾循环地址
+    __ubuf__ DataTypeInT *firstTailAddr = nullptr;
+    __ubuf__ DataTypeInT *secondTailAddr = nullptr;
+    __ubuf__ bfloat16_t *swigluTailAddr1 = nullptr;
+    __ubuf__ bfloat16_t *swigluTailAddr2 = nullptr;
+
+    // 权重预取地址（nullptr 表示不启用 TopkWeightsPrefetch）
+    __ubuf__ float *weightUbAddr = nullptr;
+
+    // 激活参数（beta/alpha 默认 1.0，倒数同步 1.0，兜底为恒等变换）
+    float clampLimit = 0.0f;
+    float beta = 1.0f;
+    float invBeta = 1.0f;
+    float alpha = 1.0f;
+    float invAlpha = 1.0f;
 };
 
 BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
@@ -242,6 +320,10 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     yScaleGmAddr_ = params.yScaleGmAddr;
     groupFlagListGmBaseAddr_ = params.groupFlagListGmAddr;
     clampLimit_ = params.clampLimit;
+    actMode_ = params.actMode;
+    actSubMode_ = params.actSubMode;
+    activationAlpha_ = params.activationAlpha;
+    activationBeta_ = params.activationBeta;
     metaInfoGmAddr_ = params.metaInfoGmAddr;
     metaInfoGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(metaInfoGmAddr_));
     if constexpr (AscendC::IsSameType<DataTypeOut, fp8_e4m3fn_t>::value) {
@@ -544,13 +626,346 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeDat
     return;
 }
 
+// ============================================================================
+// COMPUTE_TANH_TWOPATH: 两段式 tanh 宏（多项式路 + sigmoid 分解路）
+//   多项式路(|x|<0.6): x*(1 + c1*x^2 + c2*x^4 + c3*x^6 + c4*x^8), Horner + FusedMulDstAdd
+//   sigmoid路(|x|>=0.6): 2/(1+e^{-2x}) - 1, 天然保号无相消
+//   系数来源: tanh_dag.h / situ_mx_quant_common.h
+//   c1=-0.333327681, c2=0.133152977, c3=-0.0523039624, c4=0.0157396831
+// 用法: COMPUTE_TANH_TWOPATH(result, zReg, msk, oneReg, absReg, sqrReg,
+//                           polyReg, tmpReg, expReg, c1Reg, c2Reg, cmpMask);
+// 注意: 宏在函数内展开，所用寄存器须在调用点函数作用域内声明；
+//       宏会覆盖 sqrReg/polyReg/tmpReg/expReg/absReg/cmpMask，结果写入 result
+// ============================================================================
+#define COMPUTE_TANH_TWOPATH(result, zReg, msk, oneReg, absReg, sqrReg, \
+                             polyReg, tmpReg, expReg, c1Reg, c2Reg, cmpMask) \
+do { \
+    AscendC::MicroAPI::Mul(sqrReg, zReg, zReg, msk); \
+    AscendC::MicroAPI::Muls(polyReg, sqrReg, 0.0157396831f, msk); \
+    AscendC::MicroAPI::Adds(polyReg, polyReg, -0.0523039624f, msk); \
+    AscendC::MicroAPI::FusedMulDstAdd(polyReg, sqrReg, c2Reg, msk); \
+    AscendC::MicroAPI::FusedMulDstAdd(polyReg, sqrReg, c1Reg, msk); \
+    AscendC::MicroAPI::Mul(polyReg, polyReg, sqrReg, msk); \
+    AscendC::MicroAPI::FusedMulDstAdd(polyReg, zReg, zReg, msk); \
+    AscendC::MicroAPI::Muls(expReg, zReg, -2.0f, msk); \
+    AscendC::MicroAPI::Exp(expReg, expReg, msk); \
+    AscendC::MicroAPI::Adds(expReg, expReg, 1.0f, msk); \
+    AscendC::MicroAPI::Div(tmpReg, oneReg, expReg, msk); \
+    AscendC::MicroAPI::Muls(tmpReg, tmpReg, 2.0f, msk); \
+    AscendC::MicroAPI::Adds(tmpReg, tmpReg, -1.0f, msk); \
+    AscendC::MicroAPI::Abs(absReg, zReg, msk); \
+    AscendC::MicroAPI::CompareScalar<float, AscendC::CMPMODE::GE>(cmpMask, absReg, \
+                                                                  0.60000002384185791016f, msk); \
+    AscendC::MicroAPI::Select(result, tmpReg, polyReg, cmpMask); \
+} while (0)
+
+// ============================================================================
+// ActivationFlowSwiGLU: SwiGLU 激活完整计算流
+//   swish(x1) * x2, 其中 swish(x) = x / (exp(-x) + 1) = x * sigmoid(x)
+//   含主循环 + 尾循环 + pad 填零，所有寄存器在本函数内声明
+// ============================================================================
 BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-template <SwigluQuantMsg::QuantMode quantMode, bool IsInterleavedSrc>
+template <bool IsInterleaved>
+__aicore__ inline void
+BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ActivationFlowSwiGLU(
+    const ActivationContext<DataTypeIn> &ctx)
+{
+    const float scalarOne = 1.0f;
+    const float negScalarOne = -1.0f;
+    bfloat16_t numZero = 0;
+
+    __VEC_SCOPE__
+    {
+        AscendC::MicroAPI::RegTensor<DataTypeIn> vregX1;
+        AscendC::MicroAPI::RegTensor<DataTypeIn> vregX2;
+        AscendC::MicroAPI::RegTensor<float> vregX1F;
+        AscendC::MicroAPI::RegTensor<float> vregX2F;
+        AscendC::MicroAPI::RegTensor<float> negReg;
+        AscendC::MicroAPI::RegTensor<float> expReg;
+        AscendC::MicroAPI::RegTensor<float> addsReg;
+        AscendC::MicroAPI::RegTensor<float> sigmoidReg;
+        AscendC::MicroAPI::RegTensor<float> outFReg;
+        AscendC::MicroAPI::RegTensor<float> weightReg;
+        AscendC::MicroAPI::RegTensor<bfloat16_t> outTReg;
+        AscendC::MicroAPI::RegTensor<bfloat16_t> zeroReg;
+        AscendC::MicroAPI::MaskReg mask = AscendC::MicroAPI::CreateMask<float, AscendC::MicroAPI::MaskPattern::ALL>();
+        uint32_t mask1Num = ctx.mask1Num;
+        uint32_t mask2Num = ctx.mask2Num;
+        uint32_t mask3Num = ctx.mask3Num;
+        AscendC::MicroAPI::MaskReg mask1 = AscendC::MicroAPI::UpdateMask<float>(mask1Num);
+        AscendC::MicroAPI::MaskReg mask2 = AscendC::MicroAPI::UpdateMask<float>(mask2Num);
+        AscendC::MicroAPI::MaskReg mask3 = AscendC::MicroAPI::UpdateMask<bfloat16_t>(mask3Num);
+        for (uint16_t dim0vfLoopIdx = 0; dim0vfLoopIdx < ctx.dim0VfTimes; dim0vfLoopIdx++) {
+            if constexpr (TopkWeightsPrefetch) {
+                AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
+                    weightReg, ctx.weightUbAddr + dim0vfLoopIdx * INT32_PER_256B + WEIGHT_INDEX);
+            }
+            for (uint16_t dim1vfLoopIdx = 0; dim1vfLoopIdx < ctx.dim1VfTimes; dim1vfLoopIdx++) {
+                AscendC::MicroAPI::AddrReg srcIdxOffset = AscendC::MicroAPI::CreateAddrReg<DataTypeIn>(
+                    dim0vfLoopIdx, ctx.nSrcUbAligned, dim1vfLoopIdx, VF_LEN_FP32);
+                AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
+                    vregX1, ctx.firstSrc, srcIdxOffset);
+                AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
+                    vregX2, ctx.secondSrc, srcIdxOffset);
+                AscendC::MicroAPI::Cast<float, DataTypeIn, CAST_ZERO>(vregX1F, vregX1, mask);
+                AscendC::MicroAPI::Cast<float, DataTypeIn, CAST_ZERO>(vregX2F, vregX2, mask);
+
+                AscendC::MicroAPI::Mins(vregX1F, vregX1F, ctx.clampLimit, mask);
+                AscendC::MicroAPI::Mins(vregX2F, vregX2F, ctx.clampLimit, mask);
+                AscendC::MicroAPI::Maxs(vregX2F, vregX2F, -ctx.clampLimit, mask);
+
+                // === SwiGLU: swish(x1) * x2 ===
+                AscendC::MicroAPI::Muls(negReg, vregX1F, negScalarOne, mask); // -x
+                AscendC::MicroAPI::Exp(expReg, negReg, mask);                 // exp(-x)
+                AscendC::MicroAPI::Adds(addsReg, expReg, scalarOne, mask);    // exp(-x)+1
+                AscendC::MicroAPI::Div(sigmoidReg, vregX1F, addsReg, mask);   // swish(x)=x/(exp(-x)+1)
+                AscendC::MicroAPI::Mul(outFReg, sigmoidReg, vregX2F, mask);   // swish(x)*y
+                // === 激活结束 ===
+
+                if constexpr (TopkWeightsPrefetch) {
+                    AscendC::MicroAPI::Mul(outFReg, outFReg, weightReg, mask);
+                }
+
+                AscendC::MicroAPI::Cast<bfloat16_t, float, CAST_FP32_TO_FP16_BF16>(outTReg, outFReg, mask);
+                AscendC::MicroAPI::AddrReg outOffset = AscendC::MicroAPI::CreateAddrReg<bfloat16_t>(
+                    dim0vfLoopIdx, ctx.nDstUbAligned, dim1vfLoopIdx, VF_LEN_FP32);
+                AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
+                    ctx.gluResAddr, outTReg, outOffset, mask);
+            }
+            AscendC::MicroAPI::AddrReg srcIdxOffset1 =
+                AscendC::MicroAPI::CreateAddrReg<DataTypeIn>(dim0vfLoopIdx, ctx.nSrcUbAligned);
+            AscendC::MicroAPI::AddrReg outOffset1 =
+                AscendC::MicroAPI::CreateAddrReg<bfloat16_t>(dim0vfLoopIdx, ctx.nDstUbAligned);
+            for (uint16_t aa = 0; aa < ctx.dim1TailTimes; aa++) {
+                AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
+                    vregX1, ctx.firstTailAddr, srcIdxOffset1);
+                AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
+                    vregX2, ctx.secondTailAddr, srcIdxOffset1);
+                AscendC::MicroAPI::Cast<float, DataTypeIn, CAST_ZERO>(vregX1F, vregX1, mask1);
+                AscendC::MicroAPI::Cast<float, DataTypeIn, CAST_ZERO>(vregX2F, vregX2, mask1);
+
+                AscendC::MicroAPI::Mins(vregX1F, vregX1F, ctx.clampLimit, mask1);
+                AscendC::MicroAPI::Mins(vregX2F, vregX2F, ctx.clampLimit, mask1);
+                AscendC::MicroAPI::Maxs(vregX2F, vregX2F, -ctx.clampLimit, mask1);
+
+                // === SwiGLU: swish(x1) * x2 (tail, mask1) ===
+                AscendC::MicroAPI::Muls(negReg, vregX1F, negScalarOne, mask1);
+                AscendC::MicroAPI::Exp(expReg, negReg, mask1);
+                AscendC::MicroAPI::Adds(addsReg, expReg, scalarOne, mask1);
+                AscendC::MicroAPI::Div(sigmoidReg, vregX1F, addsReg, mask1);
+                AscendC::MicroAPI::Mul(outFReg, sigmoidReg, vregX2F, mask1);
+                // === 激活结束 ===
+
+                if constexpr (TopkWeightsPrefetch) {
+                    AscendC::MicroAPI::Mul(outFReg, outFReg, weightReg, mask1);
+                }
+
+                AscendC::MicroAPI::Cast<bfloat16_t, float, CAST_FP32_TO_FP16_BF16>(outTReg, outFReg, mask1);
+                AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
+                    ctx.swigluTailAddr1, outTReg, outOffset1, mask2);
+            }
+            for (uint16_t cc = 0; cc < ctx.dim1Tail2; cc++) {
+                AscendC::MicroAPI::Duplicate(zeroReg, numZero);
+                AscendC::MicroAPI::DataCopy<bfloat16_t>(ctx.swigluTailAddr2, zeroReg, outOffset1, mask3);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// ActivationFlowSiTU: SiTU 激活完整计算流
+//   situ_a = beta * tanh(gate/beta) * sigmoid(gate)
+//   ActSub==LINEAR: out = situ_a * (alpha * tanh(up/alpha))
+//   ActSub==DEFAULT: out = situ_a * up
+//   tanh 采用两段式（多项式路 + sigmoid 分解路），保号无相消
+//   参照 situ_mx_quant_common.h::ComputeVfSitu，含主循环 + 尾循环 + pad 填零
+// ============================================================================
+BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
+template <ActSubMode ActSub, bool IsInterleaved>
+__aicore__ inline void
+BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ActivationFlowSiTU(
+    const ActivationContext<DataTypeIn> &ctx)
+{
+    // 标量常量
+    const float tanhC1 = -0.333327681f;
+    const float tanhC2 = 0.133152977f;
+    const float scalarOne = 1.0f;
+    const float negScalarOne = -1.0f;
+    bfloat16_t numZero = 0;
+
+    __VEC_SCOPE__
+    {
+        // 通用寄存器（搬入/clamp/store）
+        AscendC::MicroAPI::RegTensor<DataTypeIn> vregX1;
+        AscendC::MicroAPI::RegTensor<DataTypeIn> vregX2;
+        AscendC::MicroAPI::RegTensor<float> vregX1F;
+        AscendC::MicroAPI::RegTensor<float> vregX2F;
+        AscendC::MicroAPI::RegTensor<float> outFReg;
+        AscendC::MicroAPI::RegTensor<float> weightReg;
+        AscendC::MicroAPI::RegTensor<bfloat16_t> outTReg;
+        AscendC::MicroAPI::RegTensor<bfloat16_t> zeroReg;
+
+        // SiTU 专用寄存器
+        AscendC::MicroAPI::RegTensor<float> negReg;
+        AscendC::MicroAPI::RegTensor<float> expReg;
+        AscendC::MicroAPI::RegTensor<float> addsReg;
+        AscendC::MicroAPI::RegTensor<float> sigmoidReg;
+        AscendC::MicroAPI::RegTensor<float> zReg;
+        AscendC::MicroAPI::RegTensor<float> betaReg;
+        AscendC::MicroAPI::RegTensor<float> oneReg;
+
+        // tanh 两段式专用寄存器
+        AscendC::MicroAPI::RegTensor<float> absReg;
+        AscendC::MicroAPI::RegTensor<float> sqrReg;
+        AscendC::MicroAPI::RegTensor<float> polyReg;
+        AscendC::MicroAPI::RegTensor<float> tanhTmpReg;
+        AscendC::MicroAPI::RegTensor<float> c1Reg;
+        AscendC::MicroAPI::RegTensor<float> c2Reg;
+        AscendC::MicroAPI::MaskReg cmpMaskReg;
+
+        AscendC::MicroAPI::MaskReg mask = AscendC::MicroAPI::CreateMask<float, AscendC::MicroAPI::MaskPattern::ALL>();
+        uint32_t mask1Num = ctx.mask1Num;
+        uint32_t mask2Num = ctx.mask2Num;
+        uint32_t mask3Num = ctx.mask3Num;
+        AscendC::MicroAPI::MaskReg mask1 = AscendC::MicroAPI::UpdateMask<float>(mask1Num);
+        AscendC::MicroAPI::MaskReg mask2 = AscendC::MicroAPI::UpdateMask<float>(mask2Num);
+        AscendC::MicroAPI::MaskReg mask3 = AscendC::MicroAPI::UpdateMask<bfloat16_t>(mask3Num);
+
+        // 循环前常量初始化（全量广播，不依赖 mask）
+        AscendC::MicroAPI::Duplicate(oneReg, scalarOne);
+        AscendC::MicroAPI::Duplicate(c1Reg, tanhC1);
+        AscendC::MicroAPI::Duplicate(c2Reg, tanhC2);
+
+        for (uint16_t dim0vfLoopIdx = 0; dim0vfLoopIdx < ctx.dim0VfTimes; dim0vfLoopIdx++) {
+            if constexpr (TopkWeightsPrefetch) {
+                AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
+                    weightReg, ctx.weightUbAddr + dim0vfLoopIdx * INT32_PER_256B + WEIGHT_INDEX);
+            }
+            for (uint16_t dim1vfLoopIdx = 0; dim1vfLoopIdx < ctx.dim1VfTimes; dim1vfLoopIdx++) {
+                AscendC::MicroAPI::AddrReg srcIdxOffset = AscendC::MicroAPI::CreateAddrReg<DataTypeIn>(
+                    dim0vfLoopIdx, ctx.nSrcUbAligned, dim1vfLoopIdx, VF_LEN_FP32);
+                AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
+                    vregX1, ctx.firstSrc, srcIdxOffset);
+                AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
+                    vregX2, ctx.secondSrc, srcIdxOffset);
+                AscendC::MicroAPI::Cast<float, DataTypeIn, CAST_ZERO>(vregX1F, vregX1, mask);
+                AscendC::MicroAPI::Cast<float, DataTypeIn, CAST_ZERO>(vregX2F, vregX2, mask);
+
+                AscendC::MicroAPI::Mins(vregX1F, vregX1F, ctx.clampLimit, mask);
+                AscendC::MicroAPI::Mins(vregX2F, vregX2F, ctx.clampLimit, mask);
+                AscendC::MicroAPI::Maxs(vregX2F, vregX2F, -ctx.clampLimit, mask);
+
+                // === SiTU 激活（主循环, mask）===
+                // gate路: z = gate / beta
+                AscendC::MicroAPI::Muls(zReg, vregX1F, ctx.invBeta, mask);
+                // tanh(gate/beta) — 两段式, 结果存 sigmoidReg
+                COMPUTE_TANH_TWOPATH(sigmoidReg, zReg, mask, oneReg, absReg, sqrReg, polyReg, tanhTmpReg, expReg,
+                                     c1Reg, c2Reg, cmpMaskReg);
+                // beta * sigmoid(gate) = beta / (exp(-gate)+1)
+                AscendC::MicroAPI::Muls(negReg, vregX1F, negScalarOne, mask); // -gate
+                AscendC::MicroAPI::Exp(expReg, negReg, mask);                 // exp(-gate)
+                AscendC::MicroAPI::Adds(addsReg, expReg, scalarOne, mask);    // exp(-gate)+1
+                AscendC::MicroAPI::Duplicate(betaReg, ctx.beta, mask);        // betaReg = beta
+                AscendC::MicroAPI::Div(expReg, betaReg, addsReg, mask);       // beta/(exp(-gate)+1)
+                // situ_a = tanh(gate/beta) * beta * sigmoid(gate)
+                AscendC::MicroAPI::Mul(outFReg, sigmoidReg, expReg, mask);    // outFReg = situ_a
+
+                if constexpr (ActSub == ActSubMode::LINEAR) {
+                    // up路: alpha * tanh(up/alpha), 用 vregX1F 暂存 gate_result
+                    AscendC::MicroAPI::Muls(vregX1F, outFReg, scalarOne, mask); // vregX1F = gate_result (保存)
+                    AscendC::MicroAPI::Muls(zReg, vregX2F, ctx.invAlpha, mask); // zReg = up/alpha
+                    COMPUTE_TANH_TWOPATH(sigmoidReg, zReg, mask, oneReg, absReg, sqrReg, polyReg, tanhTmpReg, expReg,
+                                         c1Reg, c2Reg, cmpMaskReg);
+                    // alpha * tanh(up/alpha)
+                    AscendC::MicroAPI::Muls(sigmoidReg, sigmoidReg, ctx.alpha, mask);
+                    // out = gate_result * up_transformed
+                    AscendC::MicroAPI::Mul(outFReg, vregX1F, sigmoidReg, mask);
+                } else {
+                    // SITU: out = situ_a * up
+                    AscendC::MicroAPI::Mul(outFReg, outFReg, vregX2F, mask);
+                }
+                // === 激活结束 ===
+
+                if constexpr (TopkWeightsPrefetch) {
+                    AscendC::MicroAPI::Mul(outFReg, outFReg, weightReg, mask);
+                }
+
+                AscendC::MicroAPI::Cast<bfloat16_t, float, CAST_FP32_TO_FP16_BF16>(outTReg, outFReg, mask);
+                AscendC::MicroAPI::AddrReg outOffset = AscendC::MicroAPI::CreateAddrReg<bfloat16_t>(
+                    dim0vfLoopIdx, ctx.nDstUbAligned, dim1vfLoopIdx, VF_LEN_FP32);
+                AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
+                    ctx.gluResAddr, outTReg, outOffset, mask);
+            }
+            AscendC::MicroAPI::AddrReg srcIdxOffset1 =
+                AscendC::MicroAPI::CreateAddrReg<DataTypeIn>(dim0vfLoopIdx, ctx.nSrcUbAligned);
+            AscendC::MicroAPI::AddrReg outOffset1 =
+                AscendC::MicroAPI::CreateAddrReg<bfloat16_t>(dim0vfLoopIdx, ctx.nDstUbAligned);
+            for (uint16_t aa = 0; aa < ctx.dim1TailTimes; aa++) {
+                AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
+                    vregX1, ctx.firstTailAddr, srcIdxOffset1);
+                AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
+                    vregX2, ctx.secondTailAddr, srcIdxOffset1);
+                AscendC::MicroAPI::Cast<float, DataTypeIn, CAST_ZERO>(vregX1F, vregX1, mask1);
+                AscendC::MicroAPI::Cast<float, DataTypeIn, CAST_ZERO>(vregX2F, vregX2, mask1);
+
+                AscendC::MicroAPI::Mins(vregX1F, vregX1F, ctx.clampLimit, mask1);
+                AscendC::MicroAPI::Mins(vregX2F, vregX2F, ctx.clampLimit, mask1);
+                AscendC::MicroAPI::Maxs(vregX2F, vregX2F, -ctx.clampLimit, mask1);
+
+                // === SiTU 激活（尾循环, mask1）===
+                AscendC::MicroAPI::Muls(zReg, vregX1F, ctx.invBeta, mask1);
+                COMPUTE_TANH_TWOPATH(sigmoidReg, zReg, mask1, oneReg, absReg, sqrReg, polyReg, tanhTmpReg, expReg,
+                                     c1Reg, c2Reg, cmpMaskReg);
+                AscendC::MicroAPI::Muls(negReg, vregX1F, negScalarOne, mask1);
+                AscendC::MicroAPI::Exp(expReg, negReg, mask1);
+                AscendC::MicroAPI::Adds(addsReg, expReg, scalarOne, mask1);
+                AscendC::MicroAPI::Duplicate(betaReg, ctx.beta, mask1);
+                AscendC::MicroAPI::Div(expReg, betaReg, addsReg, mask1);
+                AscendC::MicroAPI::Mul(outFReg, sigmoidReg, expReg, mask1);
+
+                if constexpr (ActSub == ActSubMode::LINEAR) {
+                    AscendC::MicroAPI::Muls(vregX1F, outFReg, scalarOne, mask1);
+                    AscendC::MicroAPI::Muls(zReg, vregX2F, ctx.invAlpha, mask1);
+                    COMPUTE_TANH_TWOPATH(sigmoidReg, zReg, mask1, oneReg, absReg, sqrReg, polyReg, tanhTmpReg, expReg,
+                                         c1Reg, c2Reg, cmpMaskReg);
+                    AscendC::MicroAPI::Muls(sigmoidReg, sigmoidReg, ctx.alpha, mask1);
+                    AscendC::MicroAPI::Mul(outFReg, vregX1F, sigmoidReg, mask1);
+                } else {
+                    AscendC::MicroAPI::Mul(outFReg, outFReg, vregX2F, mask1);
+                }
+                // === 激活结束 ===
+
+                if constexpr (TopkWeightsPrefetch) {
+                    AscendC::MicroAPI::Mul(outFReg, outFReg, weightReg, mask1);
+                }
+
+                AscendC::MicroAPI::Cast<bfloat16_t, float, CAST_FP32_TO_FP16_BF16>(outTReg, outFReg, mask1);
+                AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
+                    ctx.swigluTailAddr1, outTReg, outOffset1, mask2);
+            }
+            for (uint16_t cc = 0; cc < ctx.dim1Tail2; cc++) {
+                AscendC::MicroAPI::Duplicate(zeroReg, numZero);
+                AscendC::MicroAPI::DataCopy<bfloat16_t>(ctx.swigluTailAddr2, zeroReg, outOffset1, mask3);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// VFDoSwigluAndQuantForMX: 激活 + MX 量化主入口（重构后为分派器）
+//   1. 标量分块计算（对齐、tail、mask）
+//   2. 填充 ActivationContext
+//   3. 按模板参数 Activation 分派到 ActivationFlowSwiGLU / ActivationFlowSiTU
+//   4. MX 量化调度（ComputeMaxExp / ComputeScale / ComputeDataForQuantTargetFp8/Fp4）
+// ============================================================================
+BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
+template <SwigluQuantMsg::QuantMode quantMode, bool IsInterleavedSrc, ActMode Activation, ActSubMode ActSub>
 __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoSwigluAndQuantForMX(
     __ubuf__ int8_t *outputDst, __ubuf__ uint16_t *scaleDst, __ubuf__ DataTypeIn *firstSrc,
     __ubuf__ DataTypeIn *secondSrc, __ubuf__ bfloat16_t *gluResAddr, __ubuf__ uint16_t *maxExpAddr,
     __ubuf__ uint16_t *halfScaleLocalAddr, uint16_t mSize, uint16_t nSize, uint64_t mLoc)
 {
+    // ---- 标量分块计算（原样保留）----
     uint32_t nSrcUbAligned;
     if constexpr (IsInterleavedSrc) {
         // interleaved源布局为[x1, x2]连续存放在同一行，下一行stride是2*nSize
@@ -591,112 +1006,45 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
         swigluTailAddr1 = gluResAddr + offsetAlign;
         swigluTailAddr2 = gluResAddr + offsetAlign + dim1TailTimes * VF_LEN_FP32;
     }
-    const float scalarOne = 1.0f;
-    const float negScalarOne = -1.0f;
-    bfloat16_t numZero = 0;
 
-    // 权重已在 AivGmm1PostGeneric 中预加载到 weightUb_，直接取地址
-    __ubuf__ float *weightUbAddr = nullptr;
+    // ---- 填充分块上下文结构体 ----
+    ActivationContext<DataTypeIn> ctx;
+    ctx.firstSrc = firstSrc;
+    ctx.secondSrc = secondSrc;
+    ctx.gluResAddr = gluResAddr;
+    ctx.nSrcUbAligned = nSrcUbAligned;
+    ctx.nDstUbAligned = nDstUbAligned;
+    ctx.dim0VfTimes = dim0VfTimes;
+    ctx.dim1VfTimes = dim1VfTimes;
+    ctx.dim1Tail = dim1Tail;
+    ctx.dim1TailTimes = dim1TailTimes;
+    ctx.dim1Tail2 = dim1Tail2;
+    ctx.mask1Num = mask1Num;
+    ctx.mask2Num = mask2Num;
+    ctx.mask3Num = mask3Num;
+    ctx.firstTailAddr = firstTailAddr;
+    ctx.secondTailAddr = secondTailAddr;
+    ctx.swigluTailAddr1 = swigluTailAddr1;
+    ctx.swigluTailAddr2 = swigluTailAddr2;
+    ctx.clampLimit = clampLimit_;
+    ctx.beta = activationBeta_;
+    ctx.invBeta = (activationBeta_ != 0.0f) ? (1.0f / activationBeta_) : 1.0f;
+    ctx.alpha = activationAlpha_;
+    ctx.invAlpha = (activationAlpha_ != 0.0f) ? (1.0f / activationAlpha_) : 1.0f;
     if constexpr (TopkWeightsPrefetch) {
-        weightUbAddr = (__ubuf__ float *)weightUb_.GetPhyAddr();
+        ctx.weightUbAddr = (__ubuf__ float *)weightUb_.GetPhyAddr();
+    } else {
+        ctx.weightUbAddr = nullptr;
     }
 
-    // swiglu
-    __VEC_SCOPE__
-    {
-        AscendC::MicroAPI::RegTensor<DataTypeIn> vregX1;
-        AscendC::MicroAPI::RegTensor<DataTypeIn> vregX2;
-        AscendC::MicroAPI::RegTensor<float> vregX1F;
-        AscendC::MicroAPI::RegTensor<float> vregX2F;
-        AscendC::MicroAPI::RegTensor<float> negReg;
-        AscendC::MicroAPI::RegTensor<float> expReg;
-        AscendC::MicroAPI::RegTensor<float> addsReg;
-        AscendC::MicroAPI::RegTensor<float> sigmoidReg;
-        AscendC::MicroAPI::RegTensor<float> outFReg;
-        AscendC::MicroAPI::RegTensor<float> weightReg;
-        AscendC::MicroAPI::RegTensor<bfloat16_t> outTReg;
-        AscendC::MicroAPI::RegTensor<bfloat16_t> zeroReg;
-        AscendC::MicroAPI::MaskReg mask = AscendC::MicroAPI::CreateMask<float, AscendC::MicroAPI::MaskPattern::ALL>();
-        AscendC::MicroAPI::MaskReg mask1 = AscendC::MicroAPI::UpdateMask<float>(mask1Num);
-        AscendC::MicroAPI::MaskReg mask2 = AscendC::MicroAPI::UpdateMask<float>(mask2Num);
-        AscendC::MicroAPI::MaskReg mask3 = AscendC::MicroAPI::UpdateMask<bfloat16_t>(mask3Num);
-        for (uint16_t dim0vfLoopIdx = 0; dim0vfLoopIdx < dim0VfTimes; dim0vfLoopIdx++) {
-            if constexpr (TopkWeightsPrefetch) {
-                AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
-                    weightReg, weightUbAddr + dim0vfLoopIdx * INT32_PER_256B + WEIGHT_INDEX);
-            }
-            for (uint16_t dim1vfLoopIdx = 0; dim1vfLoopIdx < dim1VfTimes; dim1vfLoopIdx++) {
-                AscendC::MicroAPI::AddrReg srcIdxOffset = AscendC::MicroAPI::CreateAddrReg<DataTypeIn>(
-                    dim0vfLoopIdx, nSrcUbAligned, dim1vfLoopIdx, VF_LEN_FP32);
-                // 每次计算m=1, n=64的数据大小
-                AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                    vregX1, firstSrc, srcIdxOffset); // swishInput:x bf16
-                AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                    vregX2, secondSrc, srcIdxOffset); // gateInput:y bf16
-                // 数据类型转换
-                AscendC::MicroAPI::Cast<float, DataTypeIn, CAST_ZERO>(vregX1F, vregX1, mask);
-                AscendC::MicroAPI::Cast<float, DataTypeIn, CAST_ZERO>(vregX2F, vregX2, mask);
-
-                AscendC::MicroAPI::Mins(vregX1F, vregX1F, clampLimit_, mask);
-                AscendC::MicroAPI::Mins(vregX2F, vregX2F, clampLimit_, mask);
-                AscendC::MicroAPI::Maxs(vregX2F, vregX2F, -clampLimit_, mask);
-
-                // swish
-                AscendC::MicroAPI::Muls(negReg, vregX1F, negScalarOne, mask); // -x
-                AscendC::MicroAPI::Exp(expReg, negReg, mask);                 // exp(-x)
-                AscendC::MicroAPI::Adds(addsReg, expReg, scalarOne, mask);    // exp(-x)+1
-                AscendC::MicroAPI::Div(sigmoidReg, vregX1F, addsReg, mask);   // swish(x)=x/(exp(-x)+1)
-                AscendC::MicroAPI::Mul(outFReg, sigmoidReg, vregX2F, mask);   // swish(x)*y
-
-                if constexpr (TopkWeightsPrefetch) {
-                    AscendC::MicroAPI::Mul(outFReg, outFReg, weightReg, mask);
-                }
-
-                AscendC::MicroAPI::Cast<bfloat16_t, float, CAST_FP32_TO_FP16_BF16>(outTReg, outFReg, mask);
-                AscendC::MicroAPI::AddrReg outOffset = AscendC::MicroAPI::CreateAddrReg<bfloat16_t>(
-                    dim0vfLoopIdx, nDstUbAligned, dim1vfLoopIdx, VF_LEN_FP32);
-                AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
-                    gluResAddr, outTReg, outOffset, mask);
-            }
-            AscendC::MicroAPI::AddrReg srcIdxOffset1 =
-                AscendC::MicroAPI::CreateAddrReg<DataTypeIn>(dim0vfLoopIdx, nSrcUbAligned);
-            AscendC::MicroAPI::AddrReg outOffset1 =
-                AscendC::MicroAPI::CreateAddrReg<bfloat16_t>(dim0vfLoopIdx, nDstUbAligned);
-            for (uint16_t aa = 0; aa < dim1TailTimes; aa++) {
-                AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                    vregX1, firstTailAddr, srcIdxOffset1);
-                AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
-                    vregX2, secondTailAddr, srcIdxOffset1);
-                AscendC::MicroAPI::Cast<float, DataTypeIn, CAST_ZERO>(vregX1F, vregX1, mask1);
-                AscendC::MicroAPI::Cast<float, DataTypeIn, CAST_ZERO>(vregX2F, vregX2, mask1);
-
-                AscendC::MicroAPI::Mins(vregX1F, vregX1F, clampLimit_, mask1);
-                AscendC::MicroAPI::Mins(vregX2F, vregX2F, clampLimit_, mask1);
-                AscendC::MicroAPI::Maxs(vregX2F, vregX2F, -clampLimit_, mask1);
-
-                AscendC::MicroAPI::Muls(negReg, vregX1F, negScalarOne, mask1);
-                AscendC::MicroAPI::Exp(expReg, negReg, mask1);
-                AscendC::MicroAPI::Adds(addsReg, expReg, scalarOne, mask1);
-                AscendC::MicroAPI::Div(sigmoidReg, vregX1F, addsReg, mask1);
-                AscendC::MicroAPI::Mul(outFReg, sigmoidReg, vregX2F, mask1);
-
-                if constexpr (TopkWeightsPrefetch) {
-                    AscendC::MicroAPI::Mul(outFReg, outFReg, weightReg, mask1);
-                }
-
-                AscendC::MicroAPI::Cast<bfloat16_t, float, CAST_FP32_TO_FP16_BF16>(outTReg, outFReg, mask1);
-                AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
-                    swigluTailAddr1, outTReg, outOffset1, mask2);
-            }
-            for (uint16_t cc = 0; cc < dim1Tail2; cc++) {
-                AscendC::MicroAPI::Duplicate(zeroReg, numZero);
-                // 在计算swiglu时需把pad 0做了
-                AscendC::MicroAPI::DataCopy<bfloat16_t>(swigluTailAddr2, zeroReg, outOffset1, mask3);
-            }
-        }
+    // ---- 激活分派 ----
+    if constexpr (Activation == ActMode::SWIGLU) {
+        ActivationFlowSwiGLU<IsInterleavedSrc>(ctx);
+    } else if constexpr (Activation == ActMode::SITU) {
+        ActivationFlowSiTU<ActSub, IsInterleavedSrc>(ctx);
     }
 
-    // quant
+    // ---- 量化（原样保留，不涉及激活寄存器）----
     uint32_t totalDataInUb = mSize * nDstUbAligned;                  // 128*256
     uint32_t totalScaleInUb = totalDataInUb / AscendC::ONE_BLK_SIZE; // 128*256 / 32 = 128 * 8
     uint16_t loopDataNum = (totalDataInUb + vlForHalfNumber_ * 2 - 1) / (vlForHalfNumber_ * 2); // 128
@@ -735,18 +1083,29 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     __ubuf__ uint16_t *maxExpAddr = (__ubuf__ uint16_t *)maxExp_.GetPhyAddr() + pongMul * pongElemOf_uint16;
     __ubuf__ uint16_t *halfScaleAddr = (__ubuf__ uint16_t *)halfScale_.GetPhyAddr() + pongMul * pongElemOf_uint16;
 
+    __ubuf__ DataTypeIn *l0cOutUbSecondAddr;
     if constexpr (IsInterleaved_) {
-        // interleaved布局中两半输入在同一行连续存放，第二半从singleN_之后开始。
-        __ubuf__ DataTypeIn *l0cOutUbSecondAddr = l0cOutUbBase + singleN_;
-        VFDoSwigluAndQuantForMX<SwigluQuantMsg::QuantMode::MX_PERGROUP_MODE, true>(
-            quantOutputInUbAddr, quantScaleOutputInUbAddr, l0cOutUbBase, l0cOutUbSecondAddr, gluResAddr, maxExpAddr,
-            halfScaleAddr, mSize, singleN_, mLoc);
+        l0cOutUbSecondAddr = l0cOutUbBase + singleN_;
     } else {
-        // 非interleaved保留upstream/master的两块UB输入布局。
-        __ubuf__ DataTypeIn *l0cOutUbSecondAddr = (__ubuf__ DataTypeIn *)l0cOutUbSecond_.GetPhyAddr();
-        VFDoSwigluAndQuantForMX<SwigluQuantMsg::QuantMode::MX_PERGROUP_MODE, false>(
-            quantOutputInUbAddr, quantScaleOutputInUbAddr, l0cOutUbBase, l0cOutUbSecondAddr, gluResAddr, maxExpAddr,
-            halfScaleAddr, mSize, singleN_, mLoc);
+        l0cOutUbSecondAddr = (__ubuf__ DataTypeIn *)l0cOutUbSecond_.GetPhyAddr();
+    }
+    if (actMode_ == static_cast<uint8_t>(ActMode::SITU)) {
+        if (actSubMode_ == static_cast<uint8_t>(ActSubMode::LINEAR)) {
+            VFDoSwigluAndQuantForMX<SwigluQuantMsg::QuantMode::MX_PERGROUP_MODE, IsInterleaved_, ActMode::SITU,
+                                    ActSubMode::LINEAR>(quantOutputInUbAddr, quantScaleOutputInUbAddr, l0cOutUbBase,
+                                                        l0cOutUbSecondAddr, gluResAddr, maxExpAddr, halfScaleAddr,
+                                                        mSize, singleN_, mLoc);
+        } else {
+            VFDoSwigluAndQuantForMX<SwigluQuantMsg::QuantMode::MX_PERGROUP_MODE, IsInterleaved_, ActMode::SITU,
+                                    ActSubMode::DEFAULT>(quantOutputInUbAddr, quantScaleOutputInUbAddr, l0cOutUbBase,
+                                                         l0cOutUbSecondAddr, gluResAddr, maxExpAddr, halfScaleAddr,
+                                                         mSize, singleN_, mLoc);
+        }
+    } else {
+        VFDoSwigluAndQuantForMX<SwigluQuantMsg::QuantMode::MX_PERGROUP_MODE, IsInterleaved_, ActMode::SWIGLU,
+                                ActSubMode::DEFAULT>(quantOutputInUbAddr, quantScaleOutputInUbAddr, l0cOutUbBase,
+                                                     l0cOutUbSecondAddr, gluResAddr, maxExpAddr, halfScaleAddr, mSize,
+                                                     singleN_, mLoc);
     }
 }
 

@@ -203,6 +203,7 @@ class SymmBuffer:
             dispatch_quant_out_dtype,
             combine_quant_mode,
             comm_alg,
+            topk_weights_type,
         )
         self._ctx_manager = CommContextManager(
             self.group_name,

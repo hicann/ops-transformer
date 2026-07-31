@@ -468,6 +468,10 @@ static ge::graphStatus SetAttrParams(const gert::TilingContext *context, MegaMoe
     tilingData->blockNumPerEP = std::max(static_cast<uint32_t>(1), aicNum / tilingData->epWorldSize);
     tilingData->combineQuantMode = GetCombineQuantModeByAttr(context, config);
     tilingData->clampLimit = *activationClampPtr;
+    tilingData->actMode = 0U;            // ACT_MODE_SWIGLU, 功能关闭
+    tilingData->actSubMode = 0U;         // ACT_SUB_MODE_DEFAULT
+    tilingData->activationAlpha = 1.0f;
+    tilingData->activationBeta = 1.0f;
 
     auto moeExpertNumPtr = attrs->GetAttrPointer<int64_t>((config.attrMoeExpertNumIndex));
     int64_t moeExpertNum = static_cast<int64_t>(*moeExpertNumPtr);
@@ -507,6 +511,7 @@ static ge::graphStatus SetAttrParams(const gert::TilingContext *context, MegaMoe
     // GMM1 tile 状态位区每 expert 的 tile 上限（仅 prefetch 软同步路径使用）
     // outputN = hiddenDim / SWIGLU_N_HALF(2)，tileM=L1_TILE_M_256(256)，tileN=L1_TILE_N(256)
     // INT_CACHELINE=16：每 expert 的状态位按 16 对齐，与 kernel 侧 dispatchFlagSlotsPerExpert 一致
+    tilingData->maxTilesPerExpert = 0;
     if (tilingData->topkWeightsPrefetch == 1) {
         int64_t outputN = static_cast<int64_t>(tilingData->hiddenDim) / 2;
         int64_t maxTilesM = ops::CeilDiv(static_cast<int64_t>(tilingData->maxOutputSize), static_cast<int64_t>(256));

@@ -367,7 +367,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Init(
         reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.cumsumInfoPtr + cumsumStride * blockIdx_));
     epilogueOp_.Init({params_.workspaceInfo.swigluQuantDataPtr, params_.workspaceInfo.swigluQuantScalePtr,
                       params_.workspaceInfo.flagSwiGluToGmm2Ptr, nullptr, nullptr, nullptr,
-                      params_.workspaceInfo.metaInfoPtr, tilingData->clampLimit});
+                      params_.workspaceInfo.metaInfoPtr, tilingData->clampLimit, static_cast<uint8_t>(ActMode::SWIGLU),
+                      static_cast<uint8_t>(ActSubMode::DEFAULT), 1.0f, 1.0f});
     // 各 win 区相对 win 基址(rankSyncInWorldPtr)的偏移; 所有卡 win 布局一致, 跨卡读写用同一偏移。
     maskWinOffset_ = static_cast<uint64_t>(params_.peermemInfo.maskRecvPtr - params_.peermemInfo.rankSyncInWorldPtr);
     dispatchWinOffset_ =
@@ -2503,7 +2504,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessSh
 {
     sharedEpilogueOp_.Init({params_.workspaceInfo.sharedExpertSwigluDataPtr,
                            params_.workspaceInfo.sharedExpertSwigluScalePtr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, params_.tilingData->clampLimit});
+                           nullptr, params_.tilingData->clampLimit, static_cast<uint8_t>(ActMode::SWIGLU),
+                           static_cast<uint8_t>(ActSubMode::DEFAULT), 1.0f, 1.0f});
 
     GMMAddrInfo sharedGmm1AddrInfo;
     ExpertLoopState sharedGmm1State{initShape, initOffset, 0};
