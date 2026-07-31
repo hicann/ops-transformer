@@ -203,7 +203,7 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
     <tr>
       <td>partialSlice</td>
       <td>输入</td>
-      <td>D维度上的切片范围[start, end)，默认{0, 0}表示不做有效计算。start须在[0, D]内，end须在[start, D]内。</td>
+      <td>D维度上的切片范围。</td>
       <td>-</td>
       <td>IntArray</td>
       <td>-</td>
