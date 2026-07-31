@@ -13,7 +13,7 @@
 
 ## 功能说明
 
-- 算子功能：MegaMoE算子 将 MoE 层的专家 FFN 的完整计算流程及前后数据通信（即 Dispatch + Linear1 + SwiGLU + Linear2 + Combine）融合为单个算子，实现了通信和计算的掩盖。
+- 算子功能：MegaMoE算子将MoE层的专家FFN的完整计算流程及前后数据通信（即 Dispatch + Linear1 + SwiGLU + Linear2 + Combine）融合为单个算子，实现了通信和计算的掩盖。
 
 - 计算公式：
   - 输入：
@@ -52,7 +52,7 @@
     | A4W4-FP | FLOAT4_E2M1        | FLOAT4_E2M1            |
 
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持上表中A8W8-FP场景。
-    - <term>Ascend 950PR/Ascend 950DT</term>：不支持上表中A16W16 、A8W8-INT、A8W4-INT场景。
+    - <term>Ascend 950PR/Ascend 950DT</term>：不支持上表中A16W16、A8W8-INT、A8W4-INT场景。
 
     <details>
     <summary> A16W16 非量化场景</summary>
@@ -432,13 +432,15 @@
 
     说明：将量化后的 SwiGLU 输出与第二组权重 $W_2$ 做 MX 反量化后的矩阵乘法，将 $N/2$ 维中间表示映射回 $H$ 维隐藏空间，得到每个专家的输出 $O_e$。计算完成后通过 RDMA peermem 将结果按目标 Rank 的专家偏移地址写入远端，实现跨 Rank 聚合。
 
-    第四阶段对所有 Token 按路由权重加权求和，恢复为与输入相同形状的输出：
+    当启用共享专家（`sharedExpertNumPerRank` > 0）时，共享专家在每张卡上对本卡全部 token 本地执行与路由专家相同的 GMM1 + SwiGLU + GMM2 计算，使用 `sharedWeight1`、`sharedWeight2`、`sharedWeightScales1`、`sharedWeightScales2`，无需参与 Dispatch 通信。各共享专家的输出记为 $O^{\mathrm{shared}}_s$，$s \in \{0, \dots, \text{sharedExpertNumPerRank} - 1\}$。
+
+    第四阶段对所有 Token 按路由权重加权求和，并叠加共享专家输出，恢复为与输入相同形状的输出：
 
     $$
-    Y[i] = \sum_{k=0}^{K-1} W[i,\, k] \cdot O[\pi(i,\, k)]
+    Y[i] = \sum_{k=0}^{K-1} W[i,\, k] \cdot O[\pi(i,\, k)] + \sum_{s=0}^{\text{sharedExpertNumPerRank}-1} O^{\mathrm{shared}}_s[i]
     $$
 
-    说明：对每个 Token $i$，根据排序后的路由索引 $\pi(i,k)$ 从聚合后的专家结果中取出对应行，按 `topkWeights` 中的权重逐元素加权累加，得到最终输出 $Y$。
+    说明：对每个 Token $i$，根据排序后的路由索引 $\pi(i,k)$ 从聚合后的专家结果中取出对应行，按 `topkWeights` 中的权重逐元素加权累加，再直接加上各共享专家对当前 token 的输出，得到最终输出 $Y$。未启用共享专家时，共享专家求和项为零。
 
     其中，$X$ 表示参数 `x`，$W$ 表示参数 `topkWeights`，$W_1$ 表示参数 `weight1`，$W_2$ 表示参数 `weight2`，$Y$ 表示参数 `y`，$E_{\text{local}}$ 表示 `localMoeExpertNum = moeExpertNum / epWorldSize`（每个 Rank 的路由 MoE 专家数），$K$ 表示 `topkIds` 的第二维度。
 
@@ -507,15 +509,17 @@
           \cdot \mathrm{DQ}_{\mathrm{MX}}\!\left(W_{2,e},S_{2,e}\right).
     $$
 
+    当启用共享专家（`sharedExpertNumPerRank` > 0）时，共享专家在每张卡上对本卡全部 token 本地执行与路由专家相同的 GMM1 + SwiGLU + GMM2 计算，使用 `sharedWeight1`、`sharedWeight2`、`sharedWeightScales1`、`sharedWeightScales2`，无需参与 Dispatch 通信。各共享专家的输出记为 $O^{\mathrm{shared}}_s$，$s \in \{0, \dots, \text{sharedExpertNumPerRank} - 1\}$。
+
     第四阶段（Combine 与加权合并）：
 
-    将各专家输出送回原 rank，并根据 `topkWeights` 做加权合并：
+    将各专家输出送回原 rank，并根据 `topkWeights` 做加权合并，并叠加共享专家输出：
 
     $$
-    Y[i] = \sum_{k=0}^{K-1} W[i,k] \cdot O[\pi(i,k)],
+    Y[i] = \sum_{k=0}^{K-1} W[i,k] \cdot O[\pi(i,k)] + \sum_{s=0}^{\text{sharedExpertNumPerRank}-1} O^{\mathrm{shared}}_s[i],
     $$
 
-    最终输出 $Y$ 的数据类型为 BF16。A8W4-FP 的主要数据类型流为：`BF16 -> MXFP8 E4M3 -> A8W4 GMM1 -> MXFP8 E4M3 -> A8W4 GMM2 -> BF16`。
+    未启用共享专家时，共享专家求和项为零。最终输出 $Y$ 的数据类型为 BF16。A8W4-FP 的主要数据类型流为：`BF16 -> MXFP8 E4M3 -> A8W4 GMM1 -> MXFP8 E4M3 -> A8W4 GMM2 -> BF16`。
     </details>
 
     <details>
@@ -566,13 +570,15 @@
           \cdot \mathrm{DQ}_{\mathrm{MX}}\!\left(W_{2,e},S_{2,e}\right).
     $$
 
+    当启用共享专家（`sharedExpertNumPerRank` > 0）时，共享专家在每张卡上对本卡全部 token 本地执行与路由专家相同的 GMM1 + SwiGLU + GMM2 计算，使用 `sharedWeight1`、`sharedWeight2`、`sharedWeightScales1`、`sharedWeightScales2`，无需参与 Dispatch 通信。各共享专家的输出记为 $O^{\mathrm{shared}}_s$，$s \in \{0, \dots, \text{sharedExpertNumPerRank} - 1\}$。
+
     第四阶段（Combine 与加权合并）：
 
     $$
-    Y[i] = \sum_{k=0}^{K-1} W[i,k] \cdot O[\pi(i,k)],
+    Y[i] = \sum_{k=0}^{K-1} W[i,k] \cdot O[\pi(i,k)] + \sum_{s=0}^{\text{sharedExpertNumPerRank}-1} O^{\mathrm{shared}}_s[i],
     $$
 
-    最终输出 $Y$ 的数据类型为 BF16。A4W4-FP 的完整数据类型流为：`BF16 -> MXFP4 E2M1 -> A4W4 GMM1 -> MXFP8 E4M3 -> A8W4 GMM2 -> BF16`。其中所有 MX 缩放因子的类型均为 `FLOAT8_E8M0`，量化粒度均为 32 个连续元素。
+    未启用共享专家时，共享专家求和项为零。最终输出 $Y$ 的数据类型为 BF16。A4W4-FP 的完整数据类型流为：`BF16 -> MXFP4 E2M1 -> A4W4 GMM1 -> MXFP8 E4M3 -> A8W4 GMM2 -> BF16`。其中所有 MX 缩放因子的类型均为 `FLOAT8_E8M0`，量化粒度均为 32 个连续元素。
     </details>
 
 ## 参数说明
@@ -669,9 +675,16 @@
    <td>可选输入</td>
    <td>表示token是否参与通信。</td>
    <td>INT8</td>
+    <td>ND</td>
+  </tr>
+  <tr>
+   <td>scales</td>
+   <td>可选输入</td>
+   <td>量化平滑参数。</td>
+   <td>FLOAT8_E8M0、FLOAT32</td>
    <td>ND</td>
   </tr>
-    <tr>
+  <tr>
    <td>sharedWeight1</td>
    <td>可选输入</td>
    <td>共享专家网络第一线性层的权重矩阵（包括门控与上投影），用于将输入映射至中间维度，输出供给激活函数。</td>
@@ -819,6 +832,27 @@
    <td></td>
   </tr>
   <tr>
+   <td>topoType</td>
+   <td>可选属性</td>
+   <td>通信拓扑类型，由通信域上下文自动推导。0表示MTE拓扑，1表示URMA跨超拓扑。当前暂不支持URMA通信方式。默认值为0。</td>
+   <td>INT64</td>
+   <td></td>
+  </tr>
+  <tr>
+   <td>rankNumPerServer</td>
+   <td>可选属性</td>
+   <td>每台server上的rank数量，最少为2。默认值为2。</td>
+   <td>INT64</td>
+   <td></td>
+  </tr>
+  <tr>
+   <td>topkWeightsType</td>
+   <td>可选属性</td>
+   <td>topkWeights前移开关。0表示关闭，1表示开启（将topkWeights随token数据一起在dispatch阶段提前发送至目标rank，减少combine阶段通信量）。默认值为0。</td>
+   <td>INT64</td>
+   <td></td>
+  </tr>
+  <tr>
    <td>y</td>
    <td>输出</td>
    <td>计算输出结果，数据类型与输入x相同。</td>
@@ -860,31 +894,40 @@
       | A8W4-INT | BF16 | INT4(INT32) | INT4(INT32) | UINT64 | UINT64 | FP32 | FP32 | BF16 | 2 | 1（INT8） |
 
   - **<term>Ascend 950PR/Ascend 950DT</term>**：
-    - BS（x.dim0）支持[1, maxBS], maxBS = (8 *(totalUbSize - 48K)) / (topK* (64 + epWorldSize)), 其中totalUbSize为UB总大小，950系列产品该值支持到当前环境能申请的最大内存。
-    - H（x.dim1）支持1024、2048、3072、4096、5120、6144、7168、8192。
-    - topK（topkIds.dim1）支持[1, 32]。
-    - expertPerRank 范围 [1, 1024]。
-    - hiddenDim（weight1.dim1）仅支持1024、2048、3072、4096、7168。
-    - epWorldSize范围 [2, 1024]。
-    - moeExpertNum范围 [epWorldSize, 2048]，且moeExpertNum % epWorldSize == 0。
-    - maxRecvTokenNum范围 [0, BS × epWorldSize × min(topK, localMoeExpertNum)]。
-    - dispatchQuantOutDtype仅支持23（FLOAT8_E5M2）或24（FLOAT8_E4M3FN）或296（FLOAT4_E2M1）。
-    - 当前版本仅支持MXFP量化模式（dispatchQuantMode = 4），dispatch阶段使用MX逐组量化（group size = 32），量化缩放因子类型为FLOAT8_E8M0。
-    - combineQuantMode取值为0、3、4，0表示非量化，3表示MXFP float8_e5m2类型，4表示MXFP float8_e4m3类型
-    - commAlg必须为空字符串""。
-    - y的数据类型与x相同。
-    - weight1的dim1（hiddenDim）必须等于weight2的dim2的二倍，这是因为SwiGLU激活需要将中间维度从hiddenDim减半为hiddenDim/2。
-    - localMoeExpertNum = moeExpertNum / epWorldSize；sharedExpertNumPerRank = sharedWeight1.dim0（未启用共享专家时为0）；expertPerRank = sharedExpertNumPerRank + localMoeExpertNum。
+    - `BS`（`x`.dim0）支持[1, +∞)，实际上限受`cclBufferSize`约束。算子采用分批处理机制，BS不再受UB容量硬限制，dispatch阶段按固定粒度分批处理。
+    - `H`（`x`.dim1）支持1024、2048、3072、4096、5120、6144、7168、8192。
+    - `topK`（`topkIds`.dim1）支持[1, 32]。
+    - `expertPerRank` 范围 [1, 1024]。
+    - `hiddenDim`（`weight1`.dim1）仅支持1024、2048、3072、4096、7168。
+    - `epWorldSize`范围 [2, 1024]。
+    - `moeExpertNum`范围 [`epWorldSize`, 2048]，且`moeExpertNum` % `epWorldSize` == 0。
+    - `maxRecvTokenNum`范围 [0, `BS` × `epWorldSize` × min(`topK`, `localMoeExpertNum`)]。
+    - `dispatchQuantOutDtype`仅支持23（FLOAT8_E5M2）或24（FLOAT8_E4M3FN）或296（FLOAT4_E2M1）。
+    - 当前版本仅支持MXFP量化模式（`dispatchQuantMode` = 4），dispatch阶段使用MX逐组量化（group size = 32），量化缩放因子类型为FLOAT8_E8M0。
+    - `combineQuantMode`取值为0、3、4，0表示非量化，3表示MXFP float8_e5m2类型，4表示MXFP float8_e4m3类型
+    - `commAlg`必须为空字符串""。
+    - `y`的数据类型与`x`相同。
+    - `weight1`的dim1（`hiddenDim`）必须等于`weight2`的dim2的二倍，这是因为SwiGLU激活需要将中间维度从`hiddenDim`减半为`hiddenDim`/2。
+    - `localMoeExpertNum` = `moeExpertNum` / `epWorldSize`；`sharedExpertNumPerRank` = `sharedWeight1`.dim0（未启用共享专家时为0）；`expertPerRank` = `sharedExpertNumPerRank` + `localMoeExpertNum`。
+    - `sharedExpertNumPerRank`范围 [0, 4]。
+    - `topoType`由通信域上下文自动推导。0表示MTE拓扑，1表示URMA跨超拓扑。当前暂不支持URMA通信方式。
+    - `topkWeightsType`取值为0或1，0表示关闭topkWeights前移，1表示开启。当前暂不支持URMA通信方式。
+    - `numMaxTokensPerRank`为0时自动计算；非0时必须等于`BS`。
+    - `cclBufferSize`需 >= 全卡软同步预留空间（固定60KB） + mask接收空间 + 量化token缩放因子空间 + combine发送空间。
+    - `weightScales1`和`weightScales2`为必选输入，数据类型必须为FLOAT8_E8M0。
+    - `weight1`和`weight2`的数据类型必须一致，且仅支持FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。
+    - `topkWeights`数据类型仅支持BF16或FP32。
+    - `xActiveMask`和`scales`当前版本不支持非空输入，需传入空指针。
 
   - **MXFP量化场景约束**：
-      - weight1 shape为(localMoeExpertNum, hiddenDim, H)，weight2 shape为(localMoeExpertNum, H, hiddenDim/2)。
-      - weightScales1 shape为(localMoeExpertNum, hiddenDim, CeilDiv(H, 64), 2)。
-      - weightScales2 shape为(localMoeExpertNum, H, CeilDiv(hiddenDim/2, 64), 2)。
-      - sharedWeight1 shape为(sharedExpertNumPerRank, hiddenDim, H)，sharedWeight2 shape为(sharedExpertNumPerRank, H, hiddenDim/2)。
-      - sharedWeightScales1 shape为(sharedExpertNumPerRank, hiddenDim, CeilDiv(H, 64), 2)，sharedWeightScales2 shape为(sharedExpertNumPerRank, H, CeilDiv(hiddenDim/2, 64), 2)。
-      - weightScales1的dim3和weightScales2的dim3必须等于2。
-      - A8W4-FP场景下，FLOAT4_E2M1类型的weight1必须使用FORMAT_FRACTAL_NZ_C0_32格式。
-      - MXFP场景下，dispatchQuantOutDtype=23时weight1和weight2必须为FLOAT8_E5M2，dispatchQuantOutDtype=24时必须为FLOAT8_E4M3FN，dispatchQuantOutDtype=296时必须为FLOAT4_E2M1。
+      - `weight1` shape为(`localMoeExpertNum`, `hiddenDim`, `H`)，`weight2` shape为(`localMoeExpertNum`, `H`, `hiddenDim`/2)。
+      - `weightScales1` shape为(`localMoeExpertNum`, `hiddenDim`, CeilDiv(`H`, 64), 2)。
+      - `weightScales2` shape为(`localMoeExpertNum`, `H`, CeilDiv(`hiddenDim`/2, 64), 2)。
+      - `sharedWeight1` shape为(`sharedExpertNumPerRank`, `hiddenDim`, `H`)，`sharedWeight2` shape为(`sharedExpertNumPerRank`, `H`, `hiddenDim`/2)。
+      - `sharedWeightScales1` shape为(`sharedExpertNumPerRank`, `hiddenDim`, CeilDiv(`H`, 64), 2)，`sharedWeightScales2` shape为(`sharedExpertNumPerRank`, `H`, CeilDiv(`hiddenDim`/2, 64), 2)。
+      - `weightScales1`的dim3和`weightScales2`的dim3必须等于2。
+      - A8W4-FP场景下，FLOAT4_E2M1类型的`weight1`必须使用FORMAT_FRACTAL_NZ_C0_32格式。
+      - MXFP场景下，`dispatchQuantOutDtype`=23时`weight1`和`weight2`必须为FLOAT8_E5M2，`dispatchQuantOutDtype`=24时必须为FLOAT8_E4M3FN，`dispatchQuantOutDtype`=296时必须为FLOAT4_E2M1。
 
 ## 调用说明
 
