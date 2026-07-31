@@ -696,6 +696,7 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcOpTiling()
 
     // 如果开启了batch一致性开关，则强制走M分核模板
     int32_t deterministicLevel = context_->GetDeterministicLevel();
+    OP_LOGD(context_->GetNodeName(), "ops: MhcPreSinkhorn, deterministic_level=%d", deterministicLevel);
     if (deterministicLevel == BATCH_CONSISTENCY_LEVEL) {
         OP_LOGI(context_->GetNodeName(),
                 "MhcPreSinkhorn batch consistency enabled: deterministicLevel=%d, force kDimNum from %lu to 1.",
