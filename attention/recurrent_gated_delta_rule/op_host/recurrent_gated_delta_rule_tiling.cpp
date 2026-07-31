@@ -580,8 +580,19 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::GetStrides()
 {
     auto strideState = context_->GetInputStride(STATE_INDEX);
     if (strideState != nullptr && strideState->GetDimNum() == STATE_DIM_NUM) {
-        tilingData_.stateStride0 = strideState->GetStride(0);
-        tilingData_.stateStride1 = strideState->GetStride(1);
+        int64_t stride0 = strideState->GetStride(0);
+        int64_t stride1 = strideState->GetStride(1);
+        int64_t stride2 = strideState->GetStride(2);
+        int64_t stride3 = strideState->GetStride(3);
+        uint64_t expectStride2 = static_cast<uint64_t>(tilingData_.dk);
+        OP_CHECK_IF(stride2 != static_cast<int64_t>(expectStride2) || stride3 != 1,
+                    OP_LOGE(inputParams_.opName,
+                            "State only supports non-contiguous on dim 0 and dim 1, the innermost two dims must be "
+                            "contiguous, but got stride[%ld, %ld, %ld, %ld], expected stride2=%lu, stride3=1.",
+                            stride0, stride1, stride2, stride3, expectStride2),
+                    return ge::GRAPH_FAILED);
+        tilingData_.stateStride0 = static_cast<uint64_t>(stride0);
+        tilingData_.stateStride1 = static_cast<uint64_t>(stride1);
     } else {
         tilingData_.stateStride1 = static_cast<uint64_t>(tilingData_.dk) * static_cast<uint64_t>(tilingData_.dv);
         tilingData_.stateStride0 = static_cast<uint64_t>(tilingData_.nv) * tilingData_.stateStride1;
@@ -616,8 +627,8 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::CalUbSize()
     int64_t aNv = Ops::Base::CeilAlign(tilingData_.nv, static_cast<uint32_t>(16)); // 16 * 2 = 32B
     int64_t aDv = Ops::Base::CeilAlign(tilingData_.dv, static_cast<uint32_t>(16)); // 16 * 2 = 32B
     int64_t aDk = Ops::Base::CeilAlign(tilingData_.dk, static_cast<uint32_t>(16)); // 16 * 2 = 32B
-    int64_t usedUbBytes = MAX_MTP * (4 * aDk + 2 * aDv); // 4 for qInQueue_ & kInQueue_, 2 for vInQueue_
-    usedUbBytes += 128;                                  // reserve 128 Bytes
+    int64_t usedUbBytes = MAX_MTP * (4 * aDk + 2 * aDv);                           // 4 for qInQueue_ & kInQueue_, 2 for vInQueue_
+    usedUbBytes += 128;                                                            // reserve 128 Bytes
     if (tilingData_.hasGamaK) {
         usedUbBytes += MAX_MTP * 4 * aDk; // 4 for gk gamaInQueue_
     }
@@ -645,7 +656,6 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::CalUbSize()
 
     return ge::GRAPH_SUCCESS;
 }
-
 
 static ge::graphStatus RecurrentGatedDeltaRuleTilingFunc(gert::TilingContext *context)
 {

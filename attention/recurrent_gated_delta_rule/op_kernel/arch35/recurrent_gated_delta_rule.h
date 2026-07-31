@@ -153,6 +153,8 @@ public:
         vStep_ = vStep_ / BF16_NUM_PER_BLOCK * BF16_NUM_PER_BLOCK;
         load = 0;
         usedblk = 0;
+        stateStride0_ = tilingData->stateStride0;
+        stateStride1_ = tilingData->stateStride1;
     }
 
     __aicore__ inline void Init(const RGDRInitParams &initParams, TPipe *pipe)
@@ -325,7 +327,7 @@ private:
     __aicore__ inline void CopyInState(uint32_t stateBlockIdx, uint32_t head_i, uint32_t dvIdx, uint32_t curSingleV)
     {
         uint64_t stateGmOffset =
-            (uint64_t)stateBlockIdx * NV_ * DV_ * DK_ + (uint64_t)head_i * DV_ * DK_ + (uint64_t)dvIdx * DK_;
+            (uint64_t)stateBlockIdx * stateStride0_ + (uint64_t)head_i * stateStride1_ + (uint64_t)dvIdx * DK_;
         uint32_t dealRowCount = curSingleV;
         uint32_t actDataLen = DK_;
         uint64_t srcRowStride = DK_;
@@ -374,8 +376,8 @@ private:
         stateOutParams.blockLen = DK_ * sizeof(stateType);
         stateOutParams.srcStride = (alignDK_ - DK_) / (BLOCK_SIZE_32B / sizeof(stateType));
         stateOutParams.dstStride = 0;
-        uint64_t outStateGmOffset = (uint64_t)ssmStateIndicesGm_.GetValue(tIdx) * NV_ * DV_ * DK_ +
-                                    (uint64_t)head_i * DV_ * DK_ + (uint64_t)dvIdx * DK_;
+        uint64_t outStateGmOffset = (uint64_t)ssmStateIndicesGm_.GetValue(tIdx) * stateStride0_ +
+                                    (uint64_t)head_i * stateStride1_ + (uint64_t)dvIdx * DK_;
         DataCopyPad(finalStateGm_[outStateGmOffset], stateOutLocal, stateOutParams);
         stateOutQueue_.FreeTensor(stateOutLocal);
     }
@@ -518,6 +520,8 @@ private:
     bool hasGamaK_;
     float scale_;
     uint64_t blockIdx;
+    uint64_t stateStride0_;
+    uint64_t stateStride1_;
 
     float gama_;
     float beta_;

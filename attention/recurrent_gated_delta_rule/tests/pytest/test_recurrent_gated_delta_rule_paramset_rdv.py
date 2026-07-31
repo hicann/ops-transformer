@@ -31,6 +31,7 @@ BASE_CONFIG = {
     "gamma_k_datarange": [[-1, 0]],
     "beta_datarange": [[0, 1]],
     "state_datarange": [[-10, 10]],
+    "state_non_contiguous": [False],
 }
 
 
@@ -62,6 +63,7 @@ def generate_test_cases(batch_sizes, mtps, dk, dv, **kwargs):
             "gamma_k_datarange": config["gamma_k_datarange"],
             "beta_datarange": config["beta_datarange"],
             "state_datarange": config["state_datarange"],
+            "state_non_contiguous": config["state_non_contiguous"],
         }
         for bs, mtp in itertools.product(batch_sizes, mtps)
     ]
@@ -92,6 +94,7 @@ SPECIAL_CASES = [
         "gamma_k_datarange": [[-1, 0]],
         "beta_datarange": [[0, 1]],
         "state_datarange": [[-10, 10]],
+        "state_non_contiguous": [False],
     },
     {
         "batch_size": [1],
@@ -117,6 +120,7 @@ SPECIAL_CASES = [
         "gamma_k_datarange": [[-1, 0]],
         "beta_datarange": [[0, 1]],
         "state_datarange": [[-10, 10]],
+        "state_non_contiguous": [False],
     },
 ]
 
@@ -157,6 +161,7 @@ GROUP_5 = [
         "gamma_k_datarange": [[-1, 0]],
         "beta_datarange": [[0, 1]],
         "state_datarange": [[-10, 10]],
+        "state_non_contiguous": [False],
     }
 ]
 
@@ -185,6 +190,7 @@ GROUP_6 = [
         "gamma_k_datarange": [[-1, 0]],
         "beta_datarange": [[0, 1]],
         "state_datarange": [[-10, 10]],
+        "state_non_contiguous": [False],
     }
 ]
 
@@ -198,6 +204,20 @@ def _gen_fp32_state_cases(cases):
     return result
 
 
+def _gen_non_contiguous_state_cases(cases):
+    result = []
+    for c in cases:
+        c2 = dict(c)
+        c2["state_non_contiguous"] = [True]
+        result.append(c2)
+    return result
+
+
 _ALL_BF16_CASES = GROUP_1 + GROUP_2 + GROUP_3 + GROUP_4 + GROUP_5 + GROUP_6
 
-ENABLED_PARAMS_RDV = _ALL_BF16_CASES + _gen_fp32_state_cases(_ALL_BF16_CASES)
+ENABLED_PARAMS_RDV = (
+    _ALL_BF16_CASES
+    + _gen_fp32_state_cases(_ALL_BF16_CASES)
+    + _gen_non_contiguous_state_cases(_ALL_BF16_CASES)
+    + _gen_non_contiguous_state_cases(_gen_fp32_state_cases(_ALL_BF16_CASES))
+)

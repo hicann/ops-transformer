@@ -56,6 +56,7 @@ param_names = [
     "gamma_k_datarange",
     "beta_datarange",
     "state_datarange",
+    "state_non_contiguous",
 ]
 
 param_combinations = []
@@ -85,6 +86,7 @@ for _, params in enumerate(PARAM_SET):
         params["gamma_k_datarange"],
         params["beta_datarange"],
         params["state_datarange"],
+        params["state_non_contiguous"],
     ]
 
     for combo in itertools.product(*param_values):
@@ -120,6 +122,7 @@ def test_recurrent_gated_delta_rule(param_combinations):
     gamma_k_datarange = param_combinations["gamma_k_datarange"]
     beta_datarange = param_combinations["beta_datarange"]
     state_datarange = param_combinations["state_datarange"]
+    state_non_contiguous = param_combinations["state_non_contiguous"]
 
     test_data = (
         batch_size,
@@ -145,6 +148,7 @@ def test_recurrent_gated_delta_rule(param_combinations):
         gamma_k_datarange,
         beta_datarange,
         state_datarange,
+        state_non_contiguous,
     )
 
     torch_npu.npu.set_device(0)
