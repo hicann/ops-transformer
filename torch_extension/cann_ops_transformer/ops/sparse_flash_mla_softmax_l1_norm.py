@@ -107,7 +107,6 @@ class SparseFlashMlaSoftmaxL1NormOpBuilder(OpBuilder):
 
 
 sparse_flash_mla_softmax_l1_norm_op_builder = SparseFlashMlaSoftmaxL1NormOpBuilder()
-op_module = sparse_flash_mla_softmax_l1_norm_op_builder.load()
 
 
 @impl(AS_LIBRARY, SMLA_METADATA_OP_NAME, "PrivateUse1")
@@ -167,6 +166,7 @@ def sparse_flash_mla_softmax_l1_norm_metadata(
     mask_mode = 0 if mask_mode is None else mask_mode
     cmp_ratio = 1 if cmp_ratio is None else cmp_ratio
 
+    op_module = sparse_flash_mla_softmax_l1_norm_op_builder.load()
     return op_module.sparse_flash_mla_softmax_l1_norm_metadata(
         num_heads_q,
         num_heads_k,
@@ -281,6 +281,7 @@ def sparse_flash_mla_softmax_l1_norm(
     Returns:
         Tensor: softmax L1Norm 结果，shape (B,S1,N2,S2) 或 (T1,N2,T2)，dtype float32。
     """
+    op_module = sparse_flash_mla_softmax_l1_norm_op_builder.load()
     return op_module.sparse_flash_mla_softmax_l1_norm(
         q,
         k,

@@ -3,40 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
 <!-- end id1 -->
-
-<!-- end id1 -->
-<!-- npu="A3" id2 -->
 <!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
 <!-- end id2 -->
-
-<!-- end id2 -->
-<!-- npu="910b" id3 -->
 <!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
 <!-- end id3 -->
-
-<!-- end id3 -->
-<!-- npu="310b" id4 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
 <!-- end id4 -->
-
-<!-- end id4 -->
-<!-- npu="310p" id5 -->
 <!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
 <!-- end id5 -->
-
-<!-- end id5 -->
-<!-- npu="910" id6 -->
 <!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
-<!-- end id6 -->
-
 <!-- end id6 -->
 
 ## 功能说明
@@ -143,8 +125,8 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
     <tr>
       <td>seqUsedKOptional</td>
       <td>输入</td>
-      <td>预留接口参数，表示不同batch中key实际参与运算的sequence length。</td>
-      <td>支持空Tensor。当前kernel路径暂不使用。</td>
+      <td>表示不同batch中key实际参与运算的sequence length。</td>
+      <td>支持空Tensor。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
@@ -153,8 +135,8 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
     <tr>
       <td>cmpResidualKOptional</td>
       <td>输入</td>
-      <td>预留接口参数，表示不同batch中key的sequence length与cmpRatio相关的残差。</td>
-      <td>支持空Tensor。当前kernel路径暂不使用。</td>
+      <td>表示不同batch中key的sequence length与cmpRatio相关的残差。</td>
+      <td>支持空Tensor。maskMode=3且cmpRatio!=1时必须传</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
@@ -167,7 +149,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>支持空Tensor。maskMode=0且存在稀疏索引时需要传，且必须为准确值。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1维，shape为(B,S1)或(T1,)</td>
+      <td>2维、3维，shape为(B,S1,N2)或(T1,N2)</td>
       <td>x</td>
     </tr>
     <tr>

@@ -21,17 +21,13 @@
 #include "opdev/make_op_executor.h"
 #include "opdev/op_dfx.h"
 #include "opdev/op_executor.h"
+#include "opdev/op_log.h"
 #include "opdev/platform.h"
+#include "../sparse_flash_mla_softmax_l1_norm_metadata_check.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-static aclnnStatus ParamsCheck(const aclTensor *metadata)
-{
-    CHECK_RET(metadata != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    return ACLNN_SUCCESS;
-}
 
 aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadataGetWorkspaceSize(
     const aclTensor *cuSeqLensQOptional, const aclTensor *cuSeqLensKOptional, const aclTensor *seqUsedQOptional,
@@ -40,6 +36,14 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadataGetWorkspaceSize(
     int64_t topk, int64_t cmpRatio, int64_t maskMode, char *layoutQ, char *layoutK, const aclTensor *metadata,
     uint64_t *workspaceSize, aclOpExecutor **executor)
 {
+    if (workspaceSize == nullptr) {
+        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "workspaceSize is nullptr");
+        return ACLNN_ERR_INNER_NULLPTR;
+    }
+    if (executor == nullptr) {
+        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "executor is nullptr");
+        return ACLNN_ERR_INNER_NULLPTR;
+    }
     L2_DFX_PHASE_1(aclnnSparseFlashMlaSoftmaxL1NormMetadata,
                    DFX_IN(cuSeqLensQOptional, cuSeqLensKOptional, seqUsedQOptional, seqUsedKOptional,
                           cmpResidualKOptional, topkLengthOptional, batchSize, maxSeqLenQ, maxSeqLenK, numHeadsQ,
@@ -49,13 +53,16 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadataGetWorkspaceSize(
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    auto ret = ParamsCheck(metadata);
-    CHECK_RET(ret == ACLNN_SUCCESS, ret);
-
     const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
-    uint32_t aicCoreNum = npuInfo.GetCubeCoreNum();
+    int64_t aicCoreNum = static_cast<int64_t>(npuInfo.GetCubeCoreNum());
     std::string socVersionStr = npuInfo.GetSocLongVersion();
     const char *socVersion = socVersionStr.c_str();
+
+    auto ret = ParamsCheckSmlaL1Norm(cuSeqLensQOptional, cuSeqLensKOptional, seqUsedQOptional, seqUsedKOptional,
+                                     cmpResidualKOptional, topkLengthOptional, batchSize, maxSeqLenQ, maxSeqLenK,
+                                     numHeadsQ, numHeadsK, headDim, topk, maskMode, cmpRatio, layoutQ, layoutK,
+                                     metadata, aicCoreNum);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     const aclTensor *cuSeqLensQContiguous = nullptr;
     if (cuSeqLensQOptional != nullptr) {

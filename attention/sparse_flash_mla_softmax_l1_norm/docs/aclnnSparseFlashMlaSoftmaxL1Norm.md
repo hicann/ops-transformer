@@ -3,41 +3,24 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
 <!-- end id1 -->
-
-<!-- end id1 -->
-<!-- npu="A3" id2 -->
 <!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
 <!-- end id2 -->
-
-<!-- end id2 -->
-<!-- npu="910b" id3 -->
 <!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
 <!-- end id3 -->
-
-<!-- end id3 -->
-<!-- npu="310b" id4 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
 <!-- end id4 -->
-
-<!-- end id4 -->
-<!-- npu="310p" id5 -->
 <!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
 <!-- end id5 -->
-
-<!-- end id5 -->
-<!-- npu="910" id6 -->
 <!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
 <!-- end id6 -->
 
-<!-- end id6 -->
 
 ## 功能说明
 
@@ -75,10 +58,10 @@
 
     其中，$G$ 为group数（$G = N1 / N2$），$ReduceSum$ 在G维度（q head group维度）上对softmax概率$P$求和后取平均。
 
+
 ## 函数原型
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnSparseFlashMlaSoftmaxL1NormGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnSparseFlashMlaSoftmaxL1Norm”接口执行计算。
-
 ```c++
 aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormGetWorkspaceSize(
     const aclTensor   *q,
@@ -101,7 +84,6 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormGetWorkspaceSize(
     uint64_t          *workspaceSize,
     aclOpExecutor    **executor);
 ```
-
 ```c++
 aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
     void             *workspace,
@@ -256,7 +238,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             <td>输入</td>
             <td>表示每个batch S2 // cmpRatio后的余数。</td>
             <td>
-            当k不为空且maskMode=3时必须传入。
+            maskMode=3且cmpRatio!=1时必须传入。
             </td>
             <td>INT32</td>
             <td>ND</td>
@@ -298,7 +280,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             建议值：公式中d开根号的倒数。
             </td>
             <td>FLOAT32</td>
-            <td>N/A</td>
+            <td>-</td>
             <td>-</td>
             <td>-</td>
         </tr>
@@ -310,7 +292,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             取值范围：1~128。
             </td>
             <td>INT64</td>
-            <td>N/A</td>
+            <td>-</td>
             <td>-</td>
             <td>-</td>
         </tr>
@@ -324,7 +306,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
               </ul>
         </td>
         <td>INT64</td>
-        <td>N/A</td>
+        <td>-</td>
         <td>-</td>
         <td>-</td>
         </tr>
@@ -336,7 +318,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             支持"BSND"、"TND"。需与layoutKOptional一致。
             </td>
             <td>STRING</td>
-            <td>N/A</td>
+            <td>-</td>
             <td>-</td>
             <td>-</td>
         </tr>
@@ -348,7 +330,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             支持"BSND"、"TND"。需与layoutQOptional一致。
             </td>
             <td>STRING</td>
-            <td>N/A</td>
+            <td>-</td>
             <td>-</td>
             <td>-</td>
         </tr>
@@ -394,7 +376,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>
                 <td>161002</td>
-                <td>输入变量，如q、k……的数据类型和数据格式不在支持的范围内。</td>
+                <td>输入变量的数据类型和数据格式不在支持的范围内。</td>
             </tr>
             <tr>
                 <td>ACLNN_ERR_RUNTIME_ERROR</td>
@@ -403,6 +385,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             </tr>
         </tbody>
     </table>
+
 
 ## aclnnSparseFlashMlaSoftmaxL1Norm
 
@@ -446,6 +429,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
 - **返回值**
 
    aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+
 
 ## 约束说明
 
