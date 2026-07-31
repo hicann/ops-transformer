@@ -86,8 +86,11 @@ static constexpr MicroAPI::CastTrait CAST_FP4_TO_BF16_TRAIT = {MicroAPI::RegLayo
                                                                MicroAPI::MaskMergeMode::ZEROING,
                                                                AscendC::RoundMode::UNKNOWN};
 static constexpr uint32_t E2M1_SHIFT_RIGHT_SIZE = 0x2;
+// Embed packed E1M2 (s|e|mm) into the byte lanes consumed by the MX matmul path.
+static constexpr uint32_t E1M2_SHIFT_RIGHT_SIZE = 0x3;
 static constexpr uint32_t SHIFT_LEFT_SIZE = 0x4;
 static constexpr uint32_t E2M1_AND_MASK = 0x9C;
+static constexpr uint32_t E1M2_AND_MASK = 0x8E;
 
 template <typename xType>
 __aicore__ inline void MxScaleVf(RegTensor<uint8_t> &antiQuantScaleE8m0Vreg0,
@@ -166,12 +169,12 @@ __aicore__ inline void MxNkScaleVf(MxFp4NdScaleParams<xType> &mxFp4NdNkScalePara
         MxScaleVf(antiQuantScaleE8m0Vreg0, antiQuantScaleE8m0Vreg1, antiQuantScaleF16Vreg0, antiQuantScaleF16Vreg1,
                   maskAll);
 
-        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(mxFp4NdNkScaleParams.antiQuantScaleF16PhyAddr0 +
-                                                                          ubLoopNIdx * VECTOR_REG_WIDTH,
-                                                                      antiQuantScaleF16Vreg0, maskAll);
-        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(mxFp4NdNkScaleParams.antiQuantScaleF16PhyAddr1 +
-                                                                          ubLoopNIdx * VECTOR_REG_WIDTH,
-                                                                      antiQuantScaleF16Vreg1, maskAll);
+        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(
+            mxFp4NdNkScaleParams.antiQuantScaleF16PhyAddr0 + ubLoopNIdx * VECTOR_REG_WIDTH, antiQuantScaleF16Vreg0,
+            maskAll);
+        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(
+            mxFp4NdNkScaleParams.antiQuantScaleF16PhyAddr1 + ubLoopNIdx * VECTOR_REG_WIDTH, antiQuantScaleF16Vreg1,
+            maskAll);
     }
 }
 
@@ -195,12 +198,12 @@ __aicore__ inline void MxKnScaleVf(MxFp4NdScaleParams<xType> &mxFp4NdScaleParams
         MxScaleVf(antiQuantScaleE8m0Vreg0, antiQuantScaleE8m0Vreg1, antiQuantScaleF16Vreg0, antiQuantScaleF16Vreg1,
                   maskAll);
 
-        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(mxFp4NdScaleParams.antiQuantScaleF16PhyAddr0 +
-                                                                          ubLoopKIdx * VECTOR_REG_WIDTH,
-                                                                      antiQuantScaleF16Vreg0, maskAll);
-        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(mxFp4NdScaleParams.antiQuantScaleF16PhyAddr1 +
-                                                                          ubLoopKIdx * VECTOR_REG_WIDTH,
-                                                                      antiQuantScaleF16Vreg1, maskAll);
+        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(
+            mxFp4NdScaleParams.antiQuantScaleF16PhyAddr0 + ubLoopKIdx * VECTOR_REG_WIDTH, antiQuantScaleF16Vreg0,
+            maskAll);
+        MicroAPI::DataCopy<xType, MicroAPI::StoreDist::DIST_NORM_B16>(
+            mxFp4NdScaleParams.antiQuantScaleF16PhyAddr1 + ubLoopKIdx * VECTOR_REG_WIDTH, antiQuantScaleF16Vreg1,
+            maskAll);
     }
 }
 
@@ -222,12 +225,12 @@ __aicore__ inline void MxNkWeightVf(MxFp4NdWeightParams<xType, wType> &mxFp4NdNk
         // Vn  1 2 3 4 5 6 7 8
         // Vd
         // 11111111111111112222222222222233333333333333334444444444444444455555555555555666666666666666677777777777777
-        MicroAPI::DataCopy<xType, MicroAPI::LoadDist::DIST_E2B_B16>(antiQuantScaleF16Vreg0,
-                                                                    mxFp4NdNkWeightParams.antiQuantScaleF16PhyAddr0 +
-                                                                        ubLoopNIdx * (VECTOR_REG_WIDTH >> 2));
-        MicroAPI::DataCopy<xType, MicroAPI::LoadDist::DIST_E2B_B16>(antiQuantScaleF16Vreg1,
-                                                                    mxFp4NdNkWeightParams.antiQuantScaleF16PhyAddr1 +
-                                                                        ubLoopNIdx * (VECTOR_REG_WIDTH >> 2));
+        MicroAPI::DataCopy<xType, MicroAPI::LoadDist::DIST_E2B_B16>(
+            antiQuantScaleF16Vreg0,
+            mxFp4NdNkWeightParams.antiQuantScaleF16PhyAddr0 + ubLoopNIdx * (VECTOR_REG_WIDTH >> 2));
+        MicroAPI::DataCopy<xType, MicroAPI::LoadDist::DIST_E2B_B16>(
+            antiQuantScaleF16Vreg1,
+            mxFp4NdNkWeightParams.antiQuantScaleF16PhyAddr1 + ubLoopNIdx * (VECTOR_REG_WIDTH >> 2));
 
         // DIST_UNPK_B8 表示按照如下形式载入, 其中Vn中一个数字为4bit:
         // Vn  1 2 3 4 5 6 7 8 9 a b c d e f g .....
@@ -370,9 +373,12 @@ __simd_vf__ inline void AntiQuantMxA8W4NzNkVf(MxA8W4NzParams<xType, wType, biasT
     MicroAPI::MaskReg preg = MicroAPI::CreateMask<uint8_t, AscendC::MicroAPI::MaskPattern::ALL>();
     MicroAPI::MaskReg pregVsel = MicroAPI::CreateMask<uint16_t, AscendC::MicroAPI::MaskPattern::ALL>();
 
-    MicroAPI::Duplicate<int8_t, AscendC::MicroAPI::MaskMergeMode::ZEROING>(wShrReg, E2M1_SHIFT_RIGHT_SIZE, preg);
+    constexpr uint32_t shiftRightSize =
+        IsSameType<wType, fp4x2_e1m2_t>::value ? E1M2_SHIFT_RIGHT_SIZE : E2M1_SHIFT_RIGHT_SIZE;
+    constexpr uint32_t andMask = IsSameType<wType, fp4x2_e1m2_t>::value ? E1M2_AND_MASK : E2M1_AND_MASK;
+    MicroAPI::Duplicate<int8_t, AscendC::MicroAPI::MaskMergeMode::ZEROING>(wShrReg, shiftRightSize, preg);
     MicroAPI::Duplicate<int8_t, AscendC::MicroAPI::MaskMergeMode::ZEROING>(wShlReg, SHIFT_LEFT_SIZE, preg);
-    MicroAPI::Duplicate<int8_t, AscendC::MicroAPI::MaskMergeMode::ZEROING>(wAndReg, E2M1_AND_MASK, preg);
+    MicroAPI::Duplicate<int8_t, AscendC::MicroAPI::MaskMergeMode::ZEROING>(wAndReg, andMask, preg);
 
     for (uint16_t loopKIdx = 0; loopKIdx < mxA8W4NzParams.loopKNum; ++loopKIdx) {
         for (uint16_t innerLoopIdx = 0; innerLoopIdx < mxA8W4NzParams.innerLoopNum; ++innerLoopIdx) {

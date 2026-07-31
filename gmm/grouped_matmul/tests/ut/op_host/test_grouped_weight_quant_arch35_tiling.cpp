@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-
 /*!
  * \file test_grouped_weight_quant_arch35_tiling.cpp
  * \brief Unit tests for GroupedWeightQuantBatchMatmulTiling
@@ -27,15 +26,9 @@ using namespace ge;
 
 class GroupedWeightQuantBatchMatmulTilingTest : public testing::Test {
 protected:
-    static void SetUpTestCase()
-    {
-        std::cout << "GroupedWeightQuantBatchMatmulTiling SetUp" << std::endl;
-    }
+    static void SetUpTestCase() { std::cout << "GroupedWeightQuantBatchMatmulTiling SetUp" << std::endl; }
 
-    static void TearDownTestCase()
-    {
-        std::cout << "GroupedWeightQuantBatchMatmulTiling TearDown" << std::endl;
-    }
+    static void TearDownTestCase() { std::cout << "GroupedWeightQuantBatchMatmulTiling TearDown" << std::endl; }
 };
 
 namespace {
@@ -78,10 +71,7 @@ size_t GetConfiguredSize(int64_t configuredSize, size_t defaultSize)
     return configuredSize == DEFAULT_DYNAMIC_SIZE ? defaultSize : static_cast<size_t>(configuredSize);
 }
 
-size_t GetNumWeight(const MxA8W4SmsTilingParam &param)
-{
-    return GetConfiguredSize(param.numWeight, param.groupNum);
-}
+size_t GetNumWeight(const MxA8W4SmsTilingParam &param) { return GetConfiguredSize(param.numWeight, param.groupNum); }
 
 size_t GetNumAntiquantScale(const MxA8W4SmsTilingParam &param)
 {
@@ -164,8 +154,8 @@ std::vector<TensorDescription> MakeMxA8W4SmsInputs(const MxA8W4SmsTilingParam &p
     inputs.reserve(numX + numWeight + numBias + numAntiquantScale + 2);
 
     for (size_t i = 0; i < numX; ++i) {
-        inputs.emplace_back(MakeTensorDesc({static_cast<int64_t>(param.m), static_cast<int64_t>(param.k)},
-                                           param.xDtype, ge::FORMAT_ND));
+        inputs.emplace_back(MakeTensorDesc({static_cast<int64_t>(param.m), static_cast<int64_t>(param.k)}, param.xDtype,
+                                           ge::FORMAT_ND));
     }
 
     std::vector<int64_t> weightShape = MakeDefaultWeightShape(param);
@@ -173,48 +163,52 @@ std::vector<TensorDescription> MakeMxA8W4SmsInputs(const MxA8W4SmsTilingParam &p
         inputs.emplace_back(MakeTensorDesc(weightShape, weightShape, param.weightDtype, param.weightFormat));
     }
 
-    std::vector<int64_t> biasOriginShape = param.biasOriginShape.empty() ?
-        std::vector<int64_t>{static_cast<int64_t>(param.n)} : param.biasOriginShape;
+    std::vector<int64_t> biasOriginShape =
+        param.biasOriginShape.empty() ? std::vector<int64_t>{static_cast<int64_t>(param.n)} : param.biasOriginShape;
     std::vector<int64_t> biasStorageShape = param.biasStorageShape.empty() ? biasOriginShape : param.biasStorageShape;
     for (size_t i = 0; i < numBias; ++i) {
         inputs.emplace_back(MakeTensorDesc(biasOriginShape, biasStorageShape, ge::DT_BF16, ge::FORMAT_ND));
     }
 
     std::vector<int64_t> scaleOriginShape = param.antiquantScaleOriginShape.empty() ?
-        MakeDefaultAntiquantScaleShape(param) : param.antiquantScaleOriginShape;
-    std::vector<int64_t> scaleStorageShape = param.antiquantScaleStorageShape.empty() ? scaleOriginShape :
-        param.antiquantScaleStorageShape;
+                                                MakeDefaultAntiquantScaleShape(param) :
+                                                param.antiquantScaleOriginShape;
+    std::vector<int64_t> scaleStorageShape =
+        param.antiquantScaleStorageShape.empty() ? scaleOriginShape : param.antiquantScaleStorageShape;
     for (size_t i = 0; i < numAntiquantScale; ++i) {
-        inputs.emplace_back(MakeTensorDesc(scaleOriginShape, scaleStorageShape, param.antiquantScaleDtype, ge::FORMAT_ND));
+        inputs.emplace_back(
+            MakeTensorDesc(scaleOriginShape, scaleStorageShape, param.antiquantScaleDtype, ge::FORMAT_ND));
     }
 
     inputs.emplace_back(MakeTensorDesc({static_cast<int64_t>(GetGroupListSize(param))}, ge::DT_INT64, ge::FORMAT_ND));
-    std::vector<int64_t> perTokenScaleOriginShape = param.perTokenScaleOriginShape.empty() ?
-        MakeDefaultPerTokenScaleShape(param) : param.perTokenScaleOriginShape;
-    std::vector<int64_t> perTokenScaleStorageShape = param.perTokenScaleStorageShape.empty() ?
-        perTokenScaleOriginShape : param.perTokenScaleStorageShape;
-    inputs.emplace_back(MakeTensorDesc(perTokenScaleOriginShape, perTokenScaleStorageShape, ge::DT_FLOAT8_E8M0,
-                                       ge::FORMAT_ND));
+    std::vector<int64_t> perTokenScaleOriginShape =
+        param.perTokenScaleOriginShape.empty() ? MakeDefaultPerTokenScaleShape(param) : param.perTokenScaleOriginShape;
+    std::vector<int64_t> perTokenScaleStorageShape =
+        param.perTokenScaleStorageShape.empty() ? perTokenScaleOriginShape : param.perTokenScaleStorageShape;
+    inputs.emplace_back(
+        MakeTensorDesc(perTokenScaleOriginShape, perTokenScaleStorageShape, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND));
     return inputs;
 }
 
 std::vector<uint32_t> MakeMxA8W4SmsInputInstanceNums(const MxA8W4SmsTilingParam &param)
 {
-    return {static_cast<uint32_t>(GetConfiguredSize(param.numX, 1U)), static_cast<uint32_t>(GetNumWeight(param)),
-            static_cast<uint32_t>(GetNumBias(param)), 0U, 0U, static_cast<uint32_t>(GetNumAntiquantScale(param)),
-            0U, 1U, 1U};
+    return {static_cast<uint32_t>(GetConfiguredSize(param.numX, 1U)),
+            static_cast<uint32_t>(GetNumWeight(param)),
+            static_cast<uint32_t>(GetNumBias(param)),
+            0U,
+            0U,
+            static_cast<uint32_t>(GetNumAntiquantScale(param)),
+            0U,
+            1U,
+            1U};
 }
 
 gert::TilingContextPara MakeMxA8W4SmsContext(const MxA8W4SmsTilingParam &param, optiling::GMMCompileInfo *compileInfo)
 {
     return gert::TilingContextPara(
-        "GroupedMatmul",
-        MakeMxA8W4SmsInputs(param),
+        "GroupedMatmul", MakeMxA8W4SmsInputs(param),
         {MakeTensorDesc({static_cast<int64_t>(param.m), static_cast<int64_t>(param.n)}, ge::DT_BF16, ge::FORMAT_ND)},
-        MakeMxA8W4SmsAttrs(param),
-        MakeMxA8W4SmsInputInstanceNums(param),
-        {1U},
-        compileInfo);
+        MakeMxA8W4SmsAttrs(param), MakeMxA8W4SmsInputInstanceNums(param), {1U}, compileInfo);
 }
 
 uint64_t GetTilingKeyIndex(uint64_t value, std::initializer_list<uint64_t> supportedValues)
@@ -254,8 +248,9 @@ uint64_t MakeExpectedMxA8W4TilingKey(bool isSingleMultiSingle)
     append(GetTilingKeyIndex(static_cast<uint64_t>(optiling::OptimizationAlgorithmSubCategory::N_FIRST_TAIL_RESPLIT),
                              {0, 1, 2, 3}),
            4);
-    append(GetTilingKeyIndex(static_cast<uint64_t>(optiling::OptimizationAlgorithmCategory::VECTOR_ANTIQUANT), {0, 1, 2}),
-           4);
+    append(
+        GetTilingKeyIndex(static_cast<uint64_t>(optiling::OptimizationAlgorithmCategory::VECTOR_ANTIQUANT), {0, 1, 2}),
+        4);
     return tilingKey;
 }
 
@@ -317,11 +312,10 @@ gert::TilingContextPara MakeMxA8W4SssContext(optiling::GMMCompileInfo *compileIn
         "GroupedMatmul",
         {
             MakeTensorDesc({static_cast<int64_t>(m), static_cast<int64_t>(k)}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND),
-            MakeTensorDesc({static_cast<int64_t>(groupNum), static_cast<int64_t>(k / 32),
-                            static_cast<int64_t>(n / 16), 16, 32},
-                           {static_cast<int64_t>(groupNum), static_cast<int64_t>(k / 32),
-                            static_cast<int64_t>(n / 16), 16, 32},
-                           ge::DT_FLOAT4_E2M1, ge::FORMAT_FRACTAL_NZ),
+            MakeTensorDesc(
+                {static_cast<int64_t>(groupNum), static_cast<int64_t>(k / 32), static_cast<int64_t>(n / 16), 16, 32},
+                {static_cast<int64_t>(groupNum), static_cast<int64_t>(k / 32), static_cast<int64_t>(n / 16), 16, 32},
+                ge::DT_FLOAT4_E2M1, ge::FORMAT_FRACTAL_NZ),
             MakeTensorDesc({static_cast<int64_t>(groupNum), static_cast<int64_t>(n), static_cast<int64_t>(k / 64), 2},
                            ge::DT_FLOAT8_E8M0, ge::FORMAT_ND),
             MakeTensorDesc({static_cast<int64_t>(groupNum)}, ge::DT_INT64, ge::FORMAT_ND),
@@ -329,10 +323,7 @@ gert::TilingContextPara MakeMxA8W4SssContext(optiling::GMMCompileInfo *compileIn
                            ge::FORMAT_ND),
         },
         {MakeTensorDesc({static_cast<int64_t>(m), static_cast<int64_t>(n)}, ge::DT_BF16, ge::FORMAT_ND)},
-        MakeMxA8W4SmsAttrs(MxA8W4SmsTilingParam{}),
-        {1U, 1U, 0U, 0U, 0U, 1U, 0U, 1U, 1U},
-        {1U},
-        compileInfo);
+        MakeMxA8W4SmsAttrs(MxA8W4SmsTilingParam{}), {1U, 1U, 0U, 0U, 0U, 1U, 0U, 1U, 1U}, {1U}, compileInfo);
 }
 } // namespace
 
@@ -340,6 +331,14 @@ gert::TilingContextPara MakeMxA8W4SssContext(optiling::GMMCompileInfo *compileIn
 TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_mxa8w4_sms_scale3d_no_bias)
 {
     MxA8W4SmsTilingParam param;
+    ExpectMxA8W4SmsTilingSuccess(param);
+}
+
+// MxA8W4 NZ - FLOAT4_E1M2 weight reuses the E2M1 tiling strategy and selects a different kernel decode path.
+TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_mxa8w4_e1m2_sms_scale3d_no_bias)
+{
+    MxA8W4SmsTilingParam param;
+    param.weightDtype = ge::DT_FLOAT4_E1M2;
     ExpectMxA8W4SmsTilingSuccess(param);
 }
 
@@ -520,10 +519,6 @@ TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_mxa8w4_sms_antiquant
     param.antiquantScaleStorageShape = param.antiquantScaleOriginShape;
     ExpectMxA8W4SmsTilingFailure(param);
 }
-
-
-
-
 
 // A16W4 ND场景 - BF16输入, INT4权重, 单单单模式, Split M
 TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_a16w4_bf16_nd_single_single_single_splitm)
@@ -715,10 +710,10 @@ TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_a8w4_nz_int8_int4)
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // bias
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // scale
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // offset
-            {{{E, K / 128, N}, {E, K / 128, N}}, ge::DT_UINT64, ge::FORMAT_ND}, // antiquantScale (groupsize=128)
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                          // antiquantOffset
-            {{{E}, {E}}, ge::DT_INT64, ge::FORMAT_ND},                          // groupList
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                            // perTokenScale
+            {{{E, K / 128, N}, {E, K / 128, N}}, ge::DT_UINT64, ge::FORMAT_ND},               // antiquantScale (groupsize=128)
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                                        // antiquantOffset
+            {{{E}, {E}}, ge::DT_INT64, ge::FORMAT_ND},                                        // groupList
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // perTokenScale
         },
         {// output info
          {{{M, N}, {M, N}}, ge::DT_BF16, ge::FORMAT_ND}},
@@ -876,10 +871,10 @@ TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_a8w4_nz_groupsize_19
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // bias
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // scale
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // offset
-            {{{E, K / 192, N}, {E, K / 192, N}}, ge::DT_UINT64, ge::FORMAT_ND}, // antiquantScale (groupsize=192)
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                          // antiquantOffset
-            {{{E}, {E}}, ge::DT_INT64, ge::FORMAT_ND},                          // groupList
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                            // perTokenScale
+            {{{E, K / 192, N}, {E, K / 192, N}}, ge::DT_UINT64, ge::FORMAT_ND},               // antiquantScale (groupsize=192)
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                                        // antiquantOffset
+            {{{E}, {E}}, ge::DT_INT64, ge::FORMAT_ND},                                        // groupList
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // perTokenScale
         },
         {// output info
          {{{M, N}, {M, N}}, ge::DT_BF16, ge::FORMAT_ND}},
@@ -1066,7 +1061,7 @@ TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_a16w4_bf16_nd_large_
 TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_a16w4_bf16_nd_k0_mn_not_zero)
 {
     size_t M = 256;
-    size_t K = 0;    // K=0
+    size_t K = 0; // K=0
     size_t N = 512;
     size_t E = 2;
     optiling::GMMCompileInfo compileInfo = {
@@ -1117,8 +1112,8 @@ TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_a16w4_bf16_nd_k0_mn_
 // A16W4 ND场景 - K=0且M=0时应通过（空tensor场景）
 TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_a16w4_bf16_nd_k0_m0)
 {
-    size_t M = 0;    // M=0
-    size_t K = 0;    // K=0
+    size_t M = 0; // M=0
+    size_t K = 0; // K=0
     size_t N = 512;
     size_t E = 2;
     optiling::GMMCompileInfo compileInfo = {
@@ -1196,10 +1191,10 @@ TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_a8w4_nz_groupsize_25
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // bias
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // scale
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // offset
-            {{{E, K / 256, N}, {E, K / 256, N}}, ge::DT_UINT64, ge::FORMAT_ND}, // antiquantScale (groupsize=256)
-            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                          // antiquantOffset
-            {{{E}, {E}}, ge::DT_INT64, ge::FORMAT_ND},                          // groupList
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                            // perTokenScale
+            {{{E, K / 256, N}, {E, K / 256, N}}, ge::DT_UINT64, ge::FORMAT_ND},               // antiquantScale (groupsize=256)
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                                        // antiquantOffset
+            {{{E}, {E}}, ge::DT_INT64, ge::FORMAT_ND},                                        // groupList
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                          // perTokenScale
         },
         {// output info
          {{{M, N}, {M, N}}, ge::DT_BF16, ge::FORMAT_ND}},
