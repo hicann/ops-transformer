@@ -442,20 +442,11 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, MegaM
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertNum", std::to_string(sharedExpertNum).c_str(),
                                               "only support 0-4"),
                     return ge::GRAPH_FAILED);
-    auto topoTypePtr = attrs->GetAttrPointer<int64_t>((config.attrTopoTypeIndex));
-    OP_TILING_CHECK(sharedExpertNum > 0 && *topoTypePtr == TOPO_TYPE_URMA,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "topoType", std::to_string(*topoTypePtr).c_str(),
-                                              "shared expert only support MTE topo type"),
-                    return ge::GRAPH_FAILED);
 
     int64_t topkWeightsType = *attrs->GetAttrPointer<int64_t>((config.attrTopkWeightsTypeIndex));
     OP_TILING_CHECK(topkWeightsType != 0 && topkWeightsType != 1,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "topkWeightsType", std::to_string(topkWeightsType).c_str(),
                                               "only support 0(disabled) or 1(enabled)"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(topkWeightsType == 1 && *topoTypePtr == TILINGKEY_TPL_URMA,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "topkWeightsType", "1",
-                                              "topk_weights_type=1 is not supported with URMA topology"),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
