@@ -33,6 +33,8 @@ PARAM_MAP = {
     "data_range_q": "DATA_RANGE_Q",
     "data_range_k": "DATA_RANGE_K",
     "data_range_v": "DATA_RANGE_V",
+    "data_range_qr": "DATA_RANGE_QR",
+    "data_range_kr": "DATA_RANGE_KR",
     "enable_lse": "ENABLE_LSE",
     "enable_rope": "ENABLE_ROPE",
     "D_rope": "D_rope",
@@ -73,7 +75,11 @@ def execute_test(params, mode, cdir=None):
             qr_bf16, kr_bf16,
         )
         golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
-    else:
+
+    if "npu" in mode and "cpu" not in mode and "compare" not in mode:
+        return None, None
+
+    if "cpu" not in mode:
         cpu_out, cpu_lse = golden_cache.load_cpu_output(case_name, cache_dir=cdir)
 
     if "cpu" in mode and "npu" not in mode and "compare" not in mode:

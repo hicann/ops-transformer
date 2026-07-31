@@ -8,7 +8,7 @@ INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A
 See LICENSE in the root of the software repository for the full text of the License.
 -->
 
-# FIA FullQuant MXFP8 测试用例执行指南
+# QFA MXFP8 测试用例执行指南
 
 ## 1. 环境准备
 
@@ -27,7 +27,7 @@ bash install_torch_npu.sh   # 安装 PyTorch + TorchNPU
 source /home/user/Ascend/cann/set_env.sh
 conda activate your-env-name
 pip install pytest
-cd attention/fused_infer_attention_score/tests/pytest/fia_fullquant_mxfp8_test
+cd attention/quant_flash_attn/tests/pytest/qfa_mxfp8_test
 ```
 
 ---
@@ -35,23 +35,23 @@ cd attention/fused_infer_attention_score/tests/pytest/fia_fullquant_mxfp8_test
 ## 2. 文件结构
 
 ```
-fia_fullquant_mxfp8_test/
+qfa_mxfp8_test/
 ├── pytest.ini                                  # pytest 配置（自定义 marker）
 ├── conftest.py                                 # pytest 命令行选项（--golden-mode, --cache-dir, --msprof, --parse-prof, --perf-baseline）
 ├── common/
 │   ├── __init__.py
-│   ├── fia_fullquant_mxfp8_golden.py           # CPU golden 参考实现 + NPU 算子调用
+│   ├── quant_flash_attn_golden.py              # CPU golden 参考实现 + NPU 算子调用
 │   ├── golden_cache.py                         # .pt 缓存工具模块
 │   ├── result_compare_method.py                # 精度对比工具
 │   ├── perf_parser.py                          # msprof op_summary.csv 解析 + baseline 比较
 │   └── test_runner.py                          # 共享测试执行逻辑（apply_params / execute_test / check_results）
-├── fia_fullquant_mxfp8_paramset_common.py      # 参数展开公共逻辑 + 默认值
-├── fia_fullquant_mxfp8_paramset_debug.py       # debug 参数集（少量用例，快速验证）
-├── fia_fullquant_mxfp8_paramset_func_rdv.py    # 功能正确性参数集（~150 条）
-├── fia_fullquant_mxfp8_paramset_perf_rdv.py    # 性能/压力参数集（~100 条）
-├── test_fia_fullquant_mxfp8_debug.py           # debug 测试入口
-├── test_fia_fullquant_mxfp8_func_rdv.py        # 功能正确性测试入口
-└── test_fia_fullquant_mxfp8_perf_rdv.py        # 性能/压力测试入口
+├── quant_flash_attn_paramset_common.py         # 参数展开公共逻辑 + 默认值
+├── quant_flash_attn_paramset_debug.py          # debug 参数集（少量用例，快速验证）
+├── quant_flash_attn_paramset_func_rdv.py       # 功能正确性参数集（~150 条）
+├── quant_flash_attn_paramset_perf_rdv.py       # 性能/压力参数集（~100 条）
+├── test_quant_flash_attn_debug.py              # debug 测试入口
+├── test_quant_flash_attn_func_rdv.py           # 功能正确性测试入口
+└── test_quant_flash_attn_perf_rdv.py           # 性能/压力测试入口
 ```
 
 ---
@@ -62,21 +62,21 @@ fia_fullquant_mxfp8_test/
 
 | 测试文件 | Marker | 参数集 | 用途 |
 |----------|--------|--------|------|
-| `test_fia_fullquant_mxfp8_debug.py` | `@pytest.mark.debug` | debug（2 条） | 快速验证基本功能 |
-| `test_fia_fullquant_mxfp8_func_rdv.py` | `@pytest.mark.func_rdv` `@pytest.mark.ci` | func_rdv（~150 条） | 功能正确性全覆盖 |
-| `test_fia_fullquant_mxfp8_perf_rdv.py` | `@pytest.mark.perf_rdv` | perf_rdv（~100 条） | 性能/压力验证 |
+| `test_quant_flash_attn_debug.py` | `@pytest.mark.debug` | debug（2 条） | 快速验证基本功能 |
+| `test_quant_flash_attn_func_rdv.py` | `@pytest.mark.func_rdv` `@pytest.mark.ci` | func_rdv（~150 条） | 功能正确性全覆盖 |
+| `test_quant_flash_attn_perf_rdv.py` | `@pytest.mark.perf_rdv` | perf_rdv（~100 条） | 性能/压力验证 |
 
 ### 3.2 基本执行
 
 ```bash
 # 运行 debug 用例
-pytest test_fia_fullquant_mxfp8_debug.py -v
+pytest test_quant_flash_attn_debug.py -v
 
 # 运行功能正确性用例
-pytest test_fia_fullquant_mxfp8_func_rdv.py -v
+pytest test_quant_flash_attn_func_rdv.py -v
 
 # 运行性能/压力用例
-pytest test_fia_fullquant_mxfp8_perf_rdv.py -v
+pytest test_quant_flash_attn_perf_rdv.py -v
 
 # 按 marker 运行
 pytest -m debug -v
@@ -89,11 +89,11 @@ pytest -m ci -v
 
 ```bash
 # 精确指定单个用例
-pytest test_fia_fullquant_mxfp8_func_rdv.py -v -k "PA_NZ_B1_QS1_KVS512_Nq1_Nkv1_D128_SP3"
+pytest test_quant_flash_attn_func_rdv.py -v -k "PA_NZ_B1_QS1_KVS512_Nq1_Nkv1_D128_SP3"
 
 # 按 Prefill / Decode 模式
-pytest test_fia_fullquant_mxfp8_perf_rdv.py -v -k "Prefill"
-pytest test_fia_fullquant_mxfp8_perf_rdv.py -v -k "Decode"
+pytest test_quant_flash_attn_perf_rdv.py -v -k "Prefill"
+pytest test_quant_flash_attn_perf_rdv.py -v -k "Decode"
 
 # 按 layout 类型
 pytest -v -k "PA_NZ"
@@ -138,16 +138,16 @@ pytest -v -k "not Decode"
 
 ```bash
 # 仅生成并保存输入数据（不跑 CPU/NPU）
-pytest test_fia_fullquant_mxfp8_func_rdv.py -v --golden-mode=gen
+pytest test_quant_flash_attn_func_rdv.py -v --golden-mode=gen
 
 # 仅跑 NPU + 精度对比（CPU 输出从缓存加载）
-pytest test_fia_fullquant_mxfp8_func_rdv.py -v --golden-mode=npu,compare
+pytest test_quant_flash_attn_func_rdv.py -v --golden-mode=npu,compare
 
 # 跑 CPU + NPU（不对比）
-pytest test_fia_fullquant_mxfp8_func_rdv.py -v --golden-mode=cpu,npu
+pytest test_quant_flash_attn_func_rdv.py -v --golden-mode=cpu,npu
 
 # 全流程（等同于 --golden-mode=all）
-pytest test_fia_fullquant_mxfp8_func_rdv.py -v --golden-mode=gen,cpu,npu,compare
+pytest test_quant_flash_attn_func_rdv.py -v --golden-mode=gen,cpu,npu,compare
 ```
 
 ### 4.3 典型工作流
@@ -155,26 +155,26 @@ pytest test_fia_fullquant_mxfp8_func_rdv.py -v --golden-mode=gen,cpu,npu,compare
 **方式一：全流程一次跑完（默认）**
 
 ```bash
-pytest test_fia_fullquant_mxfp8_func_rdv.py -v
+pytest test_quant_flash_attn_func_rdv.py -v
 ```
 
 **方式二：分步执行（适合跨机器调试）**
 
 ```bash
 # 第一步：生成输入数据（不跑 CPU/NPU）
-pytest test_fia_fullquant_mxfp8_func_rdv.py -v --golden-mode=gen
+pytest test_quant_flash_attn_func_rdv.py -v --golden-mode=gen
 
 # 第二步：跑 CPU golden
-pytest test_fia_fullquant_mxfp8_func_rdv.py -v --golden-mode=cpu
+pytest test_quant_flash_attn_func_rdv.py -v --golden-mode=cpu
 
 # 第三步：在 NPU 机器上跑 NPU + 精度对比
-pytest test_fia_fullquant_mxfp8_func_rdv.py -v --golden-mode=npu,compare
+pytest test_quant_flash_attn_func_rdv.py -v --golden-mode=npu,compare
 ```
 
 ### 4.4 自定义缓存目录
 
 ```bash
-pytest test_fia_fullquant_mxfp8_func_rdv.py -v --cache-dir=/tmp/my_cache
+pytest test_quant_flash_attn_func_rdv.py -v --cache-dir=/tmp/my_cache
 ```
 
 默认缓存目录为 `common/golden_cache/`。
@@ -194,14 +194,14 @@ golden_cache/
 
 ## 5. 独立脚本运行
 
-`common/fia_fullquant_mxfp8_golden.py` 也支持独立运行，同样支持 `--mode` 组合：
+`common/quant_flash_attn_golden.py` 也支持独立运行，同样支持 `--mode` 组合：
 
 ```bash
 cd common/
-python fia_fullquant_mxfp8_golden.py --mode all --case-name my_case
-python fia_fullquant_mxfp8_golden.py --mode gen --case-name my_case
-python fia_fullquant_mxfp8_golden.py --mode npu,compare --case-name my_case
-python fia_fullquant_mxfp8_golden.py --mode cpu --case-name my_case --cache-dir=/tmp/cache
+python quant_flash_attn_golden.py --mode all --case-name my_case
+python quant_flash_attn_golden.py --mode gen --case-name my_case
+python quant_flash_attn_golden.py --mode npu,compare --case-name my_case
+python quant_flash_attn_golden.py --mode cpu --case-name my_case --cache-dir=/tmp/cache
 ```
 
 ---
@@ -288,7 +288,7 @@ python fia_fullquant_mxfp8_golden.py --mode cpu --case-name my_case --cache-dir=
 
 ## 8. 新增用例
 
-在对应的 paramset 文件中添加新条目。以 `fia_fullquant_mxfp8_paramset_func_rdv.py` 为例：
+在对应的 paramset 文件中添加新条目。以 `quant_flash_attn_paramset_func_rdv.py` 为例：
 
 ```python
 "PA_NZ_B1_QS256_KVS512_Nq4_Nkv1_D128_SP3": {

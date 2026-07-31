@@ -119,6 +119,8 @@ def case_to_csv_row(case):
         "data_range_q": case.get("data_range_q", 1.0),
         "data_range_k": case.get("data_range_k", 1.0),
         "data_range_v": case.get("data_range_v", 1.0),
+        "data_range_qr": case.get("data_range_qr", 1.0),
+        "data_range_kr": case.get("data_range_kr", 1.0),
     }
     # TTK process_dict 用 eval() 解析,需 Python dict 字面量(单引号)
     attributes = repr(attrs)
