@@ -30,6 +30,8 @@ COV="false"
 CLANG="false"
 VERBOSE="false"
 OOM="false"
+ENABLE_MSSANITIZER=FALSE
+ENABLE_DUMP_CCE=FALSE
 THREAD_NUM=$(grep -c ^processor /proc/cpuinfo)
 ENABLE_VALGRIND=FALSE
 ENABLE_CREATE_LIB=FALSE
@@ -112,7 +114,8 @@ function help_info() {
                 echo "    --kernel_template_input=args0,args1"
                 echo "                           Specify kernel template input arguments (comma-separated for multiple)"
                 echo "    --bisheng_flags        Specify bisheng compiler flags (comma-separated for multiple)"
-                echo "    --aicpu_kernel         Enable ENABLE_AICPU_KERNEL, compile kernel_aicpu"
+                echo "    --mssanitizer          Build with mssanitizer mode on the kernel side, with options: '-g --cce-enable-sanitizer'"
+                echo "    --dump_cce             Dump kernel precompiled files"
                 echo $dotted_line
                 echo "Examples:"
                 echo "    bash build.sh --pkg --soc=ascend910b --vendor_name=customize -j16 -O3"
@@ -120,7 +123,7 @@ function help_info() {
                 echo "    bash build.sh --pkg --experimental --soc=ascend910b"
                 echo "    bash build.sh --pkg --experimental --soc=ascend910b --ops=abs --oom"
                 echo "    bash build.sh --pkg --experimental --soc=ascend910b --ops=abs --bisheng_flags=dumc_cce"
-                echo "    bash build.sh --pkg --soc=ascend910b --ops=add_example --aicpu_kernel -j16"
+                echo "    bash build.sh --pkg --soc=ascend910b --ops=add_example --opkernel_aicpu -j16"
                 return
                 ;;
             test)
@@ -220,6 +223,21 @@ function help_info() {
                 echo "    bash build.sh --opkernel --soc=ascend310p --ops=add,sub"
                 echo "    bash build.sh --opkernel --soc=ascend310p --ops=add,sub --oom"
                 echo "    bash build.sh --pkg --experimental --soc=ascend910b --ops=abs --bisheng_flags=dumc_cce"
+                return
+                ;;
+            opkernel_aicpu)
+                echo "AICPU Opkernel Build Options:"
+                echo $dotted_line
+                echo "    --opkernel_aicpu       Build AICPU kernel"
+                echo "    --soc=soc_version      Compile for specified Ascend SoC"
+                echo "    --ops=op1,op2,...      Compile specified operators (comma-separated for multiple)"
+                echo "    --build-type=<Type>    Specify build-type (Type options: Release/Debug), Default:Release"
+                echo "    --mssanitizer          Build with mssanitizer mode on the kernel side"
+                echo "    --oom                  Build with oom mode on the kernel side"
+                echo $dotted_line
+                echo "Examples:"
+                echo "    bash build.sh --opkernel_aicpu --soc=ascend910b --ops=add_example"
+                echo "    bash build.sh --opkernel_aicpu --soc=ascend910b --ops=add_example --build-type=Debug"
                 return
                 ;;
             ophost_test)
@@ -338,7 +356,9 @@ function help_info() {
     echo "    --jit build run package without kernel bin"
     echo "    --pkg build run package with kernel bin"
     echo "    --experimental build experimental version"
-    echo "    --aicpu_kernel Enable ENABLE_AICPU_KERNEL, compile kernel_aicpu"
+    echo "    --opkernel_aicpu build aicpu kernel"
+    echo "    --mssanitizer Build with mssanitizer mode on the kernel side, with options: '-g --cce-enable-sanitizer'"
+    echo "    --dump_cce Dump kernel precompiled files"
     echo "    --opapi_test build and run opapi unit tests"
     echo "    --ophost_test build and run ophost unit tests"
     echo "    --opgraph_test build and run opgraph unit tests"
@@ -1099,6 +1119,7 @@ for arg in "$@"; do
             case "$prev_arg" in
             --pkg) SHOW_HELP="package" ;;
             --opkernel) SHOW_HELP="opkernel" ;;
+            --opkernel_aicpu) SHOW_HELP="opkernel_aicpu" ;;
             -u|--test) SHOW_HELP="test" ;;
             --make_clean) SHOW_HELP="clean" ;;
             --valgrind) SHOW_HELP="valgrind" ;;
@@ -1161,10 +1182,6 @@ while [[ $# -gt 0 ]]; do
         ;;
     --aicpu=*)
         OPTARG=$1
-        shift
-        ;;
-    --aicpu_kernel)
-        ENABLE_AICPU_KERNEL=TRUE
         shift
         ;;
     --bisheng_flags=*)
@@ -1459,6 +1476,18 @@ while [[ $# -gt 0 ]]; do
         CANN_3RD_LIB_PATH="$(realpath ${OPTARG#*=})"
         shift
         ;;
+    --mssanitizer)
+        ENABLE_MSSANITIZER=TRUE
+        shift
+        ;;
+    --dump_cce)
+        ENABLE_DUMP_CCE=TRUE
+        shift
+        ;;
+    --opkernel_aicpu)
+        ENABLE_AICPU_KERNEL=TRUE
+        shift
+        ;;
     --oom)
         OOM="true"
         shift
@@ -1470,6 +1499,30 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 set_ut_mode
+
+if [[ "$ENABLE_MSSANITIZER" == "TRUE" && "$OOM" == "true" ]]; then
+    echo "[ERROR] --mssanitizer cannot be used with --oom"
+    exit 1
+fi
+
+if [[ "$ENABLE_MSSANITIZER" == "TRUE" && "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
+    echo "[ERROR] --mssanitizer cannot be used with --dump_cce"
+    exit 1
+fi
+
+if [ -n "$BISHENG_FLAGS" ]; then
+    if [[ "$ENABLE_MSSANITIZER" == "TRUE" || "$OOM" == "true" || "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
+        echo "[ERROR] --bisheng_flags= cannot be used with --mssanitizer, --oom, --dump_cce"
+        exit 1
+    fi
+fi
+
+if [[ "$BUILD_TYPE" == "Debug" ]]; then
+    if [[ "$ENABLE_MSSANITIZER" == "TRUE" || "$OOM" == "true" || "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
+        echo "[ERROR] --build-type=Debug cannot be used with --mssanitizer, --oom, --dump_cce"
+        exit 1
+    fi
+fi
 
 if [ -n "$KERNEL_TEMPLATE_INPUT" ]; then
     if [[ -z "${ascend_op_name}" || "$ascend_op_name" == *","* ]]; then
@@ -1627,6 +1680,14 @@ fi
 
 if [ "${OOM}" == "true" ];then
     CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_OOM=ON"
+fi
+
+if [[ "$ENABLE_MSSANITIZER" == "TRUE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_MSSANITIZER=TRUE"
+fi
+
+if [[ "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_DUMP_CCE=TRUE"
 fi
 
 if [ -n "${EXAMPLE}" ];then
@@ -1999,6 +2060,10 @@ elif [[ "$ENABLE_STATIC" == "TRUE" ]]; then
 elif [[ "$ENABLE_OPKERNEL" == "TRUE" ]]; then
     set_compute_unit_option
     cmake_config -DENABLE_HOST_TILING=ON
+    build_kernel
+elif [[ "$ENABLE_AICPU_KERNEL" == "TRUE" && "$ENABLE_BUILD_PKG" != "TRUE" && "$ENABLE_BUILT_CUSTOM" != "TRUE" ]]; then
+    set_compute_unit_option
+    cmake_config -DENABLE_HOST_TILING=ON -DENABLE_AICPU_KERNEL=TRUE
     build_kernel
 elif [[ "$ENABLE_BUILT_CUSTOM" == "TRUE" ]]; then      # --ops, --vendor 新命令新使用
     set_compute_unit_option

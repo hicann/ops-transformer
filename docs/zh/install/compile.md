@@ -50,7 +50,7 @@
     进入项目根目录，执行如下编译命令：
 
     ```bash
-    bash build.sh --pkg --soc=${soc_version} [--vendor_name=${vendor_name}] [--ops=${op_list}] [--aicpu_kernel]
+    bash build.sh --pkg --soc=${soc_version} [--vendor_name=${vendor_name}] [--ops=${op_list}] [--opkernel_aicpu]
     # 以FlashAttentionScore算子编译为例
     # bash build.sh --pkg --soc=ascend910b --ops=flash_attention_score
     # 编译experimental贡献目录下的算子
@@ -61,9 +61,9 @@
     - --vendor_name（可选）：\$\{vendor\_name\}表示构建的自定义算子包名，默认名为custom。
     - --ops（可选）：\$\{op\_list\}表示待编译算子，不指定时默认编译所有算子。格式形如"apply_rotary_pos_emb,rope_quant_kvcache,..."，多算子之间用英文逗号","分隔。
     - --experimental（可选）：表示编译experimental贡献目录下的算子，${experimental_op}为新贡献算子目录名。
-    - --aicpu_kernel（可选）：开启ENABLE_AICPU_KERNEL，编译kernel_aicpu。
+    - --opkernel_aicpu（可选）：开启ENABLE_AICPU_KERNEL，编译kernel_aicpu。
 
-    > **说明**：编译纯AICPU算子（仅含op_kernel_aicpu目录的算子）时，必须添加--aicpu_kernel选项，否则会报"OpFileNotExistsError: File aic-*-ops-info.ini does not exist"错误，详见下方FAQ章节。
+    > **说明**：编译纯AICPU算子（仅含op_kernel_aicpu目录的算子）时，必须添加--opkernel_aicpu选项，否则会报"OpFileNotExistsError: File aic-*-ops-info.ini does not exist"错误，详见下方FAQ章节。
 
     若\$\{vendor\_name\}和\$\{op\_list\}都不传入编译的是ops-transformer包；若编译所有算子的自定义算子包，需传入\$\{vendor\_name\}。当提示如下信息，说明编译成功。
 
@@ -293,16 +293,16 @@ ERROR: No matching distribution found for setuptools>=40.8.0
 
 ### 单独编译aicpu算子报错
 
-单独编译纯AICPU算子（仅含op_kernel_aicpu目录的算子）时，若未添加--aicpu_kernel选项，会出现如下报错：
+单独编译纯AICPU算子（仅含op_kernel_aicpu目录的算子）时，若未添加--opkernel_aicpu选项，会出现如下报错：
 
 ```bash
 OpFileNotExistsError: File aic-*-ops-info.ini does not exist in directory [...]
 make: *** [Makefile:462: prepare_build] Error 2
 ```
 
-该报错原因为未开启ENABLE_AICPU_KERNEL，导致未生成aic-*-ops-info.ini文件。请在编译命令中添加--aicpu_kernel选项，例如：
+该报错原因为未开启ENABLE_AICPU_KERNEL，导致未生成aic-*-ops-info.ini文件。请在编译命令中添加--opkernel_aicpu选项，例如：
 
 ```bash
-bash build.sh --pkg --soc=${soc_version} --ops=${op_list} --aicpu_kernel
+bash build.sh --pkg --soc=${soc_version} --ops=${op_list} --opkernel_aicpu
 ```
 

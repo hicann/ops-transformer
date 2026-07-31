@@ -204,14 +204,14 @@ REGISTER_CPU_KERNEL(kAddExample, AddExampleCpuKernel);
    以`AddExample`算子为例，假设开发交付件在`examples`目录，完整代码参见[add_example](../../../examples/add_example/op_kernel_aicpu)目录。
 
    ```bash
-   # 编译指定算子，如bash build.sh --pkg --ops=add_example --aicpu_kernel -j16
-   bash build.sh --pkg --soc=${soc_version} --vendor_name=${vendor_name} --ops=${op_list} --aicpu_kernel [--experimental] [-j${n}]
+   # 编译指定算子，如bash build.sh --pkg --ops=add_example --opkernel_aicpu -j16
+   bash build.sh --pkg --soc=${soc_version} --vendor_name=${vendor_name} --ops=${op_list} --opkernel_aicpu [--experimental] [-j${n}]
    ```
 
    - --soc：\$\{soc\_version\}表示NPU型号。Atlas A2系列产品使用"ascend910b"（默认），Atlas A3系列产品使用"ascend910_93"，Ascend 950PR/Ascend 950DT产品使用"ascend950"。
    - --vendor_name（可选）：\$\{vendor\_name\}表示构建的自定义算子包名，默认名为custom。
    - --ops（可选）：\$\{op\_list\}表示待编译算子，不指定时默认编译所有算子。格式形如"--ops=add_example"。
-   - --aicpu_kernel：开启ENABLE_AICPU_KERNEL，编译kernel_aicpu
+   - --opkernel_aicpu：开启ENABLE_AICPU_KERNEL，编译kernel_aicpu
    - --experimental（可选）：若编译的算子为贡献算子，需配置--experimental。
    - -j（可选）：指定编译线程数，加快编译速度。
 

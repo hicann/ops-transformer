@@ -426,6 +426,15 @@ function(add_opc_config)
         list(APPEND _OPC_CONFIG "-fdata-sections")
     endif()
 
+    if(ENABLE_MSSANITIZER)
+        list(APPEND _OPC_CONFIG "-g")
+        list(APPEND _OPC_CONFIG "--cce-enable-sanitizer")
+    endif()
+
+    if(ENABLE_DUMP_CCE)
+        list(APPEND _OPC_CONFIG "--save-temp-files")
+    endif()
+
     if(_OPC_CONFIG)
         add_ops_compile_options(
                 OP_NAME ${OP_COMPILE_OP_NAME}
