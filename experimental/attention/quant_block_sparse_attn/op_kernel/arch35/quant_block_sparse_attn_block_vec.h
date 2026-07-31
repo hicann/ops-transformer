@@ -317,12 +317,12 @@ __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::ProcessVec1Dn(
 
     LocalTensor<float> qScaleUbTensor = qScaleInputQue.template AllocTensor<float>();
     LocalTensor<float> kScaleUbTensor = kScaleInputQue.template AllocTensor<float>();
-    if (runInfo.s2SparseBlk1RealSize < constInfo.kvSparseBlockSize) {
-        Duplicate<float>(kScaleUbTensor, 1, s2BaseSize);
-        TEventID vDoneEvent = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
-        SetFlag<HardEvent::V_MTE2>(vDoneEvent);  // Vector 完成
-        WaitFlag<HardEvent::V_MTE2>(vDoneEvent); // MTE2 等待
-    }
+
+    Duplicate<float>(kScaleUbTensor, 1, s2BaseSize);
+    TEventID vDoneEvent = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
+    SetFlag<HardEvent::V_MTE2>(vDoneEvent);  // Vector 完成
+    WaitFlag<HardEvent::V_MTE2>(vDoneEvent); // MTE2 等待
+
     copyQueryScaleGmToUb(qScaleUbTensor, deScaleQGm, runInfo, constInfo);
     copyKeyScaleGmToUb(kScaleUbTensor, deScaleKGm, blockTableGm, runInfo, constInfo);
     qScaleInputQue.template EnQue(qScaleUbTensor);
@@ -736,8 +736,8 @@ __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe *pipe, 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::GetExtremeValue(T &negativeScalar, T &positiveScalar)
 {
-    uint32_t tmp1 = NEGATIVE_MIN_VALUE_FP32;
-    negativeScalar = *((float *)&tmp1);
+    uint16_t tmp1 = NEGATIVE_MIN_VALUE_FP16;
+    negativeScalar = *((half *)&tmp1);
 }
 
 // ================================= Child-specific functions =================================

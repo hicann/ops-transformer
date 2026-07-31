@@ -569,7 +569,11 @@ def _reference_attention(
     fp8_dtype = _fp8_dtype()
     softmax_scale = float(case["softmax_scale"])
     p_scale_value = float(p_scale[0].item())
-    ln_p_scale = math.log(p_scale_value) if p_scale_value > 0 else 0.0
+    ln_p_scale = (
+        torch.log(torch.tensor(p_scale_value, dtype=torch.float32)).item()
+        if p_scale_value > 0
+        else 0.0
+    )
     sparse_q_block_size = case["sparse_q_block_size"]
     neg_inf = float("-inf")
 
@@ -648,12 +652,13 @@ def _reference_attention(
                     raise ValueError(f"unsupported mask_mode: {case['mask_mode']}")
 
                 # scores: (nq, npos)，标度在 matmul 之后施加（保持 FP8 桶一致）
+                # 与 kernel 对齐乘法顺序：先将 q_scale 乘以 softmax_scale(dScale)，
+                # 再乘到 QK 结果上，最后乘 k_scale，避免浮点非结合律导致的量化边界差异
                 scores = torch.matmul(q_block, k_mat.transpose(0, 1))
                 scores = (
                     scores
-                    * q_scale_block.view(nq, 1)
+                    * (q_scale_block.view(nq, 1) * softmax_scale)
                     * k_scale_vec.view(1, npos)
-                    * softmax_scale
                 )
                 scores = torch.where(
                     valid_mask, scores, torch.full_like(scores, MASK_VALUE)
@@ -662,11 +667,18 @@ def _reference_attention(
                 # 按 2-block chunk 的 online/flash FP8 数据流，向量化到 q 维
                 # p_scale 通过 ln(pScale) 编入 max（与 kernel FusedExpSub 路径对齐），
                 # 使 exp 的数值路径与 kernel 一致：exp(score - (actual_max - ln(pScale))) = p_c * pScale
+                # v_scale 乘入时机与 kernel 对齐：
+                #   chunk 0 (DataCopy): acc = pv_raw（不含 v_scale）
+                #   chunk 1 (isUpdatePre=true): acc = acc * rescale * v_scale + pv_raw * v_scale
+                #   chunk >1 (isUpdatePre=false): acc = acc * rescale + pv_raw * v_scale
+                #   单 chunk 最后除法 (LastDivNew): output = pv_raw * v_scale / sum
                 m_run = torch.full((nq,), neg_inf, dtype=torch.float32)
                 m_run_offset = torch.full((nq,), neg_inf, dtype=torch.float32)
                 l_run = torch.zeros((nq,), dtype=torch.float32)
                 acc = torch.zeros((nq, head_dim), dtype=torch.float32)
                 offset = 0
+                chunk_idx = 0
+                chunk_count = len(chunk_positions)
                 for chunk_pos_list in chunk_positions:
                     c0 = offset
                     c1 = offset + len(chunk_pos_list)
@@ -688,39 +700,63 @@ def _reference_attention(
                     m_new = torch.where(chunk_has, m_new, m_run)
                     # 编入 ln(pScale)，与 kernel 的 max0 = actual_max - ln(pScale) 对齐
                     m_new_offset = m_new - ln_p_scale
+                    # 与 kernel FusedExpSub 对齐：kernel 的 FusedExpSub(x, y) 计算 exp(x - y) 时，
+                    # 减法在硬件内部以更高精度完成（融合，无 float32 中间舍入）。
+                    # golden 用 float64 减法模拟该融合减法，避免 float32 减法舍入导致
+                    # exp 结果落在 FP8 量化边界的错误一侧。
                     rescale = torch.where(
-                        run_started, torch.exp(m_run_offset - m_new_offset), torch.zeros_like(m_run)
+                        run_started,
+                        torch.exp(m_run_offset.double() - m_new_offset.double()).float(),
+                        torch.zeros_like(m_run),
                     )
                     rescale = torch.where(
                         torch.isfinite(rescale), rescale, torch.zeros_like(rescale)
                     )
                     # FusedExpSub 等价：exp(score - (actual_max - ln(pScale))) = p_c * pScale
-                    p_scaled = torch.exp(s_c - m_new_offset.view(nq, 1))
+                    p_scaled = torch.exp(
+                        s_c.double() - m_new_offset.double().view(nq, 1)
+                    ).float()
                     p_scaled = torch.where(vm_c, p_scaled, torch.zeros_like(p_scaled))
                     # 仅对本轮有有效位置的行参与量化累加；其余行贡献 0
                     p_scaled = torch.where(chunk_has.view(nq, 1), p_scaled, torch.zeros_like(p_scaled))
                     # FP8 量化：p_scaled 已含 pScale 因子，直接 cast（与 kernel 一致）
                     p_quant = p_scaled.to(fp8_dtype).to(torch.float32)
                     # BMM2：不除 pScale（与 kernel 一致，pScale 在分子分母中同时出现，数学上约掉）
-                    pv = (
-                        torch.matmul(p_quant, v_mat[c0:c1])
-                        * v_scale_value
-                    )  # (nq, D)
-                    acc = acc * rescale.view(nq, 1) + pv
+                    pv_raw = torch.matmul(p_quant, v_mat[c0:c1])  # (nq, D)，不含 v_scale
+                    # 与 kernel FlashUpdate/FlashUpdateLast 的 isUpdatePre 逻辑对齐 v_scale 乘入时机
+                    if chunk_idx == 0:
+                        # 第一个 chunk：acc = pv_raw（与 kernel DataCopy 一致，不含 v_scale）
+                        acc = pv_raw
+                    elif chunk_idx == 1:
+                        # 第二个 chunk（isUpdatePre=true）：acc * rescale * v_scale + pv_raw * v_scale
+                        acc = acc * rescale.view(nq, 1) * v_scale_value + pv_raw * v_scale_value
+                    else:
+                        # 后续 chunk（isUpdatePre=false）：acc * rescale + pv_raw * v_scale
+                        acc = acc * rescale.view(nq, 1) + pv_raw * v_scale_value
                     # sum 累加含 pScale 因子的值（与 kernel 一致）
                     l_run = l_run * rescale + p_scaled.sum(dim=-1)
                     m_run = torch.where(chunk_has, m_new, m_run)
                     m_run_offset = torch.where(chunk_has, m_new_offset, m_run_offset)
+                    chunk_idx += 1
 
                 # any_valid 行：写回 attn=acc/l_run；空行保持 0 / EMPTY_LSE
                 any_valid = valid_mask.any(dim=-1)  # (nq,)
                 safe_l = torch.where(l_run > 0, l_run, torch.ones_like(l_run))
-                attn = acc / safe_l.view(nq, 1)  # (nq, D)
-                # lse = logsumexp(scores[valid]) per row
-                lse_scores = torch.where(
-                    valid_mask, scores, torch.full_like(scores, neg_inf)
-                )
-                lse = torch.logsumexp(lse_scores, dim=-1)  # (nq,)
+                if chunk_count <= 1:
+                    # 单 chunk：acc 不含 v_scale，与 kernel LastDivNew 对齐
+                    # output = pv_raw * v_scale / sum
+                    attn = acc * v_scale_value / safe_l.view(nq, 1)
+                else:
+                    # 多 chunk：acc 在第二个 chunk 已乘入 v_scale（isUpdatePre）
+                    attn = acc / safe_l.view(nq, 1)
+                # 与 kernel 对齐 lse 计算路径：lse = log(sum) + max
+                # kernel 中 sum 含 pScale 因子（exp(score - (actual_max - ln(pScale))) 之和），
+                # max 存储的是 actual_max - ln(pScale)。
+                # golden 中 l_run 含 pScale 因子，m_run_offset = actual_max - ln(pScale)，
+                # 故 lse = log(l_run) + m_run_offset 与 kernel 的 log(sum)+max 浮点路径一致，
+                # 避免与 torch.logsumexp 的不同浮点路径产生 1-2 ULP 差异导致量化边界问题。
+                safe_l_lse = torch.where(l_run > 0, l_run, torch.ones_like(l_run))
+                lse = torch.log(safe_l_lse) + m_run_offset  # (nq,)
 
                 for li, q_idx in enumerate(q_indices):
                     if not bool(any_valid[li].item()):
