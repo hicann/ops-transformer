@@ -288,6 +288,26 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/quant_sparse_flash_mla/README.md">quant_sparse_flash_mla</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>支持全量化场景下的Sliding Window Attention、Compressed Attention以及Sparse Compressed Attention计算。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/quant_sparse_flash_mla_metadata/README.md">quant_sparse_flash_mla_metadata</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI CPU</td>
+    <td>quant_sparse_flash_mla算子的前置算子，用于计算quant_sparse_flash_mla的负载均衡。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/mla_preprocess/README.md">mla_preprocess</a></td>
     <td>✓</td>
     <td>✓</td>

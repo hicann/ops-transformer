@@ -126,6 +126,8 @@
 - [aclnnMhcSinkhornBackward](../../mhc/mhc_sinkhorn_backward/docs/aclnnMhcSinkhornBackward.md)
 - [aclnnMixedQuantSparseFlashMla](../../attention/mixed_quant_sparse_flash_mla/docs/aclnnMixedQuantSparseFlashMla.md)
 - [aclnnMixedQuantSparseFlashMlaMetadata](../../attention/mixed_quant_sparse_flash_mla_metadata/docs/aclnnMixedQuantSparseFlashMlaMetadata.md)
+- [aclnnQuantSparseFlashMla](../../attention/quant_sparse_flash_mla/docs/aclnnQuantSparseFlashMla.md)
+- [aclnnQuantSparseFlashMlaMetadata](../../attention/quant_sparse_flash_mla_metadata/docs/aclnnQuantSparseFlashMlaMetadata.md)
 - [aclnnMlaPreprocess](../../attention/mla_preprocess/docs/aclnnMlaPreprocess.md)
 - [aclnnMlaPreprocessV2](../../attention/mla_preprocess_v2/docs/aclnnMlaPreprocessV2.md)
 - [aclnnMlaProlog](../../attention/mla_prolog/docs/aclnnMlaProlog.md)
