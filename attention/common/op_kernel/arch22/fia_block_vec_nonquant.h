@@ -1038,7 +1038,7 @@ FiaBlockVecNonQuant<FIAT>::DealInvalidRows(const RunInfo &info, LocalTensor<MM2_
         .nextTokensPerBatch = info.nextTokensPerBatch,
     };
 
-    fa_base_vector::InvalidRows<T, fa_base_vector::GeInputUbFormat<LAYOUT_T>()> invalidRows;
+    fa_base_vector::InvalidRows<T, GeInputUbFormat<LAYOUT_T>()> invalidRows;
     invalidRows(attenOutUb, params);
 }
 

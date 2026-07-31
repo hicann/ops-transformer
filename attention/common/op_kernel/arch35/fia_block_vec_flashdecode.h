@@ -378,7 +378,7 @@ protected:
             .nextTokensPerBatch = nextTokensPerBatch,
         };
 
-        fa_base_vector::InvalidRows<UBOUT_T, fa_base_vector::GeInputUbFormat<layout>()> invalidRows;
+        fa_base_vector::InvalidRows<UBOUT_T, AttentionCommon::GeInputUbFormat<layout>()> invalidRows;
         invalidRows(attenOutUb, params);
     }
 

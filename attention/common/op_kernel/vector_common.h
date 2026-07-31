@@ -29,6 +29,8 @@ using AscendC::LocalTensor;
 
 namespace fa_base_vector {
 
+constexpr float FLOAT_ZERO = 0;
+
 // BLOCK和REPEAT的字节数
 constexpr uint32_t REPEAT_BLOCK_BYTE = 256U;
 // BLOCK和REPEAT的FP32元素数
@@ -1115,32 +1117,6 @@ struct InvalidRowParams {
     int64_t preTokensPerBatch;
     int64_t nextTokensPerBatch;
 };
-
-template <FIA_LAYOUT LAYOUT_T>
-__aicore__ inline constexpr UbInputFormat GeInputUbFormat()
-{
-    static_assert((LAYOUT_T == FIA_LAYOUT::BSH) || (LAYOUT_T == FIA_LAYOUT::BNSD) || (LAYOUT_T == FIA_LAYOUT::TND) ||
-                      (LAYOUT_T == FIA_LAYOUT::NTD) || (LAYOUT_T == FIA_LAYOUT::BSND),
-                  "Get Query GmFormat fail, LAYOUT_T is incorrect");
-    if constexpr (LAYOUT_T == FIA_LAYOUT::BSH || LAYOUT_T == FIA_LAYOUT::TND || LAYOUT_T == FIA_LAYOUT::BSND) {
-        return UbInputFormat::S1G;
-    } else if constexpr (LAYOUT_T == FIA_LAYOUT::BNSD || LAYOUT_T == FIA_LAYOUT::NTD) {
-        return UbInputFormat::GS1;
-    }
-}
-
-template <LayOutTypeEnum LAYOUT>
-__aicore__ inline constexpr UbInputFormat GeInputUbFormat()
-{
-    static_assert((LAYOUT == LayOutTypeEnum::LAYOUT_BSH) || (LAYOUT == LayOutTypeEnum::LAYOUT_BNSD) ||
-                      (LAYOUT == LayOutTypeEnum::LAYOUT_TND) || (LAYOUT == LayOutTypeEnum::LAYOUT_NTD),
-                  "Get Query GmFormat fail, LAYOUT_T is incorrect");
-    if constexpr (LAYOUT == LayOutTypeEnum::LAYOUT_BSH || LAYOUT == LayOutTypeEnum::LAYOUT_TND) {
-        return UbInputFormat::S1G;
-    } else if constexpr (LAYOUT == LayOutTypeEnum::LAYOUT_BNSD || LAYOUT == LayOutTypeEnum::LAYOUT_NTD) {
-        return UbInputFormat::GS1;
-    }
-}
 
 template <typename T, UbInputFormat UB_INPUTFORMAT>
 class InvalidRows {

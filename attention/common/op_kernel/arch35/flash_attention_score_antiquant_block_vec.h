@@ -818,6 +818,8 @@ __aicore__ inline void
 FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::ComputeLogSumExpAndCopyToGm(const RunInfo<isInfer> &runInfo,
                                                                           ConstInfo<isInfer, hasRope> &constInfo)
 {
+    constexpr uint32_t FP32_ONE_BLOCK_SIZE = 8;
+
     if (unlikely(runInfo.halfS1RealSize == 0)) {
         return;
     }
@@ -1331,6 +1333,8 @@ ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void
 FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::InitFDBuffers(ConstInfo<isInfer, hasRope> &constInfo)
 {
+    constexpr uint32_t BUFFER_SIZE_BYTE_32K = 32768;
+
     this->tPipe->Reset();
     this->tPipe->InitBuffer(lseTmpBuff, bufferSizeByte32K);
     this->tPipe->InitBuffer(softmaxMaxInputQue, 1, bufferSizeByte32K);

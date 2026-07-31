@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file prompt_flash_attention_zero_output.h
+ * \file fia_arch35_zero_output.h
  * \brief
  */
-#ifndef PROMPT_FLASH_ATTENTION_ZERO_OUTPUT_H
-#define PROMPT_FLASH_ATTENTION_ZERO_OUTPUT_H
+#ifndef FIA_ARCH35_ZERO_OUTPUT_H
+#define FIA_ARCH35_ZERO_OUTPUT_H
 
 #include "kernel_tiling/kernel_tiling.h"
 #if ASC_DEVKIT_MAJOR >= 9
@@ -23,48 +23,50 @@
 #include "kernel_operator.h"
 #endif
 #include "lib/matmul_intf.h"
-#if __has_include("../../../../common/op_kernel/arch35/flash_attention_score_tiling_regbase.h")
-#include "../../../../common/op_kernel/arch35/flash_attention_score_tiling_regbase.h"
+#if __has_include("../../../common/op_kernel/arch35/flash_attention_score_tiling_regbase.h")
+#include "../../../common/op_kernel/arch35/flash_attention_score_tiling_regbase.h"
 #else
-#include "../../../common/arch35/flash_attention_score_tiling_regbase.h"
+#include "../../common/arch35/flash_attention_score_tiling_regbase.h"
 #endif
 
 using namespace AscendC;
 
-template<typename T>
-class PromptFlashAttentionZeroOutPut {
+template <typename T>
+class FiaZeroOutput {
 public:
-    __aicore__ inline PromptFlashAttentionZeroOutPut() {};
-    __aicore__ inline void Init(__gm__ uint8_t*  attentionOut,
-                                __gm__ uint8_t*  softmaxLse,
-                                const optiling::FlashAttentionScoreSimplifiedTilingData* __restrict tiling);
+    __aicore__ inline FiaZeroOutput(){};
+    __aicore__ inline void Init(__gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
+                                const optiling::FlashAttentionScoreSimplifiedTilingData *__restrict tiling);
     __aicore__ inline void Process();
     static constexpr bool POST_QUANT = !IsSameType<T, half>::value;
 
 protected:
-    const optiling::FlashAttentionScoreSimplifiedTilingData* __restrict tilingData;
+    const optiling::FlashAttentionScoreSimplifiedTilingData *__restrict tilingData;
     GlobalTensor<half> attentionOutGm;
     GlobalTensor<float> softmaxLseGm;
 };
 
-template<typename T>
-__aicore__ inline void PromptFlashAttentionZeroOutPut<T>::Init(__gm__ uint8_t*  attentionOut,
-                                                               __gm__ uint8_t*  softmaxLse,
-                                                               const optiling::FlashAttentionScoreSimplifiedTilingData* __restrict tiling) {
-    attentionOutGm.SetGlobalBuffer((__gm__ half*)attentionOut);
+template <typename T>
+__aicore__ inline void FiaZeroOutput<T>::Init(
+    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
+    const optiling::FlashAttentionScoreSimplifiedTilingData *__restrict tiling)
+{
+    attentionOutGm.SetGlobalBuffer((__gm__ half *)attentionOut);
     softmaxLseGm.SetGlobalBuffer((__gm__ float *)softmaxLse);
     tilingData = tiling;
 }
 
-template<typename T>
-__aicore__ inline void PromptFlashAttentionZeroOutPut<T>::Process() {
+template <typename T>
+__aicore__ inline void FiaZeroOutput<T>::Process()
+{
     uint32_t tmp_block_idx = GetBlockIdx();
     auto &initParams = tilingData->initOutputParams;
     uint32_t tailSize = initParams.totalOutputSize - tmp_block_idx * initParams.singleCoreSize;
     uint32_t singleInitOutputSize = tailSize < initParams.singleCoreSize ? tailSize : initParams.singleCoreSize;
     if (singleInitOutputSize > 0) {
-        if constexpr (POST_QUANT){
-            InitOutput<half>(attentionOutGm[tmp_block_idx * initParams.singleCoreSize / 2], singleInitOutputSize / 2, 0);
+        if constexpr (POST_QUANT) {
+            InitOutput<half>(attentionOutGm[tmp_block_idx * initParams.singleCoreSize / 2], singleInitOutputSize / 2,
+                             0);
         } else {
             InitOutput<half>(attentionOutGm[tmp_block_idx * initParams.singleCoreSize], singleInitOutputSize, 0);
         }
@@ -81,12 +83,12 @@ __aicore__ inline void PromptFlashAttentionZeroOutPut<T>::Process() {
             singleCoreLseSize += initParams.totalSoftMaxLseOutputSize % coreNum;
         }
         if (singleCoreLseSize > 0) {
-            InitOutput<float>(softmaxLseGm[tmp_block_idx * (initParams.totalSoftMaxLseOutputSize / coreNum)], 
-                singleCoreLseSize, 3e+99); // 3e+99:set the value of invalid batch to inf
+            InitOutput<float>(softmaxLseGm[tmp_block_idx * (initParams.totalSoftMaxLseOutputSize / coreNum)],
+                              singleCoreLseSize, 3e+99); // 3e+99:set the value of invalid batch to inf
         }
     }
 
     SetFlag<HardEvent::MTE3_V>(mte3ToV);
     WaitFlag<HardEvent::MTE3_V>(mte3ToV);
 }
-#endif  // PROMPT_FLASH_ATTENTION_ZERO_OUTPUT_H
+#endif // FIA_ARCH35_ZERO_OUTPUT_H

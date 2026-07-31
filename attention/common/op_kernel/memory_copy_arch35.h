@@ -12,7 +12,16 @@
 #define MEMORY_COPY_ARCH35_H
 
 #include "vector_common.h"
-#include "memory_copy.h"
+#include "memcopy/gm_layout.h"
+#include "memcopy/parser.h"
+#include "memcopy/offset_calculator_v2.h"
+#include "memcopy/fa_gm_tensor.h"
+#include "memcopy/fa_l1_tensor.h"
+#include "memcopy/fa_ub_tensor.h"
+#include "memcopy/gm_coord.h"
+#include "memcopy/copy_gm_to_l1.h"
+#include "memcopy/copy_gm_to_ub.h"
+#include "memcopy/copy_ub_to_gm.h"
 
 
 // 格式转换, 暂时放在这里
@@ -278,7 +287,7 @@ __aicore__ void CopyParamsGmToUb(LocalTensor<PARAM_T> &dstUb, FaGmTensor<PARAM_T
 }
 
 // ----------------------------------------------Copy LSE UB To Gm arch35--------------------------------
-template <typename T, typename CONST_INFO_T = AttentionCommon::ConstInfo>
+template <typename T, typename CONST_INFO_T>
 __aicore__ inline void DataCopySoftmaxLseBSNDArch35(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
                                                     uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
                                                     const CONST_INFO_T &constInfo, uint64_t s1LeftPaddingSize = 0)
@@ -309,7 +318,7 @@ __aicore__ inline void DataCopySoftmaxLseBSNDArch35(GlobalTensor<float> softmaxL
     }
 }
 
-template <typename T, typename CONST_INFO_T = AttentionCommon::ConstInfo>
+template <typename T, typename CONST_INFO_T>
 __aicore__ inline void DataCopySoftmaxLseBNSDArch35(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
                                                     uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
                                                     const CONST_INFO_T &constInfo, uint64_t qActSeqLens,
@@ -366,7 +375,7 @@ __aicore__ inline void DataCopySoftmaxLseBNSDArch35(GlobalTensor<float> softmaxL
     }
 }
 
-template <typename T, typename CONST_INFO_T = AttentionCommon::ConstInfo>
+template <typename T, typename CONST_INFO_T>
 __aicore__ inline void DataCopySoftmaxLseTNDArch35(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
                                                    uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
                                                    const CONST_INFO_T &constInfo)
@@ -397,7 +406,7 @@ __aicore__ inline void DataCopySoftmaxLseTNDArch35(GlobalTensor<float> softmaxLs
     }
 }
 
-template <typename T, typename CONST_INFO_T = AttentionCommon::ConstInfo>
+template <typename T, typename CONST_INFO_T>
 __aicore__ inline void DataCopySoftmaxLseTNDArch35NoGS1Merge(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
                                                              uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
                                                              const CONST_INFO_T &constInfo)
@@ -428,7 +437,7 @@ __aicore__ inline void DataCopySoftmaxLseTNDArch35NoGS1Merge(GlobalTensor<float>
     }
 }
 
-template <typename T, typename CONST_INFO_T = AttentionCommon::ConstInfo>
+template <typename T, typename CONST_INFO_T>
 __aicore__ inline void DataCopySoftmaxLseTNDtoNTArch35(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
                                                        uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
                                                        const CONST_INFO_T &constInfo)
@@ -458,7 +467,7 @@ __aicore__ inline void DataCopySoftmaxLseTNDtoNTArch35(GlobalTensor<float> softm
         ubOffset += curDealRowCount * AttentionCommon::FP32_BLOCK_ELEMENT_NUM;
     }
 }
-template <typename T, typename CONST_INFO_T = AttentionCommon::ConstInfo>
+template <typename T, typename CONST_INFO_T>
 __aicore__ inline void DataCopySoftmaxLseNTDArch35(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
                                                    uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
                                                    const CONST_INFO_T &constInfo, uint32_t s1Size)
@@ -486,6 +495,43 @@ __aicore__ inline void DataCopySoftmaxLseNTDArch35(GlobalTensor<float> softmaxLs
         DataCopyPad(softmaxLseGm[outOffset], lseSrc[ubOffset], dataCopyParams);
         startS1Idx = 0;
         ubOffset += curDealRowCount * AttentionCommon::FP32_BLOCK_ELEMENT_NUM;
+    }
+}
+
+template <GmFormat FORMAT, typename OUT_T, typename OffsetCalcType>
+__aicore__ inline void DealActSeqLenIsZero(uint32_t bIdx, uint32_t n2Idx, OffsetCalcType &offsetCalculator,
+                                           GlobalTensor<OUT_T> &attentionOutGm)
+{
+    if constexpr (FORMAT == GmFormat::TNGD) {
+        uint32_t s1Count = offsetCalculator.actualSeqLensQParser.GetTBase(bIdx + 1) -
+                           offsetCalculator.actualSeqLensQParser.GetTBase(bIdx);
+        for (int s1Idx = 0; s1Idx < s1Count; s1Idx++) {
+            uint64_t attenOutOffset = offsetCalculator.GetOffset(bIdx, n2Idx, 0, s1Idx, 0);
+            matmul::InitOutput<OUT_T>(attentionOutGm[attenOutOffset], offsetCalculator.GetStrideN2(), 0);
+        }
+    } else if constexpr (FORMAT == GmFormat::NGTD) {
+        uint32_t s1Count = offsetCalculator.actualSeqLensQParser.GetTBase(bIdx + 1) -
+                           offsetCalculator.actualSeqLensQParser.GetTBase(bIdx);
+        uint32_t gSize = offsetCalculator.GetDimG();
+        for (int gIdx = 0; gIdx < gSize; gIdx++) {
+            uint64_t attenOutOffset = offsetCalculator.GetOffset(bIdx, n2Idx, gIdx, 0, 0);
+            matmul::InitOutput<OUT_T>(attentionOutGm[attenOutOffset], s1Count * offsetCalculator.GetDimD(), 0);
+        }
+    } else if constexpr (FORMAT == GmFormat::BNGSD) {
+        uint64_t attenOutOffset = offsetCalculator.GetOffset(bIdx, n2Idx, 0, 0, 0);
+        matmul::InitOutput<OUT_T>(attentionOutGm[attenOutOffset], offsetCalculator.GetStrideN2(), 0);
+    } else if constexpr (FORMAT == GmFormat::BSNGD) {
+        uint32_t s1Size = offsetCalculator.GetDimS1();
+        for (int s1Idx = 0; s1Idx < s1Size; s1Idx++) {
+            uint64_t attenOutOffset = offsetCalculator.GetOffset(bIdx, n2Idx, 0, s1Idx, 0);
+            matmul::InitOutput<OUT_T>(attentionOutGm[attenOutOffset], offsetCalculator.GetStrideN2(), 0);
+        }
+    } else if constexpr (FORMAT == GmFormat::NGBSD) {
+        uint32_t gSize = offsetCalculator.GetDimG();
+        for (int gIdx = 0; gIdx < gSize; gIdx++) {
+            uint64_t attenOutOffset = offsetCalculator.GetOffset(bIdx, n2Idx, gIdx, 0, 0);
+            matmul::InitOutput<OUT_T>(attentionOutGm[attenOutOffset], offsetCalculator.GetStrideB(), 0);
+        }
     }
 }
 #endif

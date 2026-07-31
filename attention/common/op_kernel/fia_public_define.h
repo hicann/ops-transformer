@@ -23,6 +23,7 @@
 #endif
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
+#include "vector_common.h"
 
 using namespace AscendC;
 using AscendC::AIC;
@@ -267,6 +268,19 @@ __aicore__ inline int64_t ClipSInnerToken(int64_t sInnerToken, int64_t minValue,
     sInnerToken = sInnerToken > minValue ? sInnerToken : minValue;
     sInnerToken = sInnerToken < maxValue ? sInnerToken : maxValue;
     return sInnerToken;
+}
+
+template <FIA_LAYOUT LAYOUT_T>
+__aicore__ inline constexpr fa_base_vector::UbInputFormat GeInputUbFormat()
+{
+    static_assert((LAYOUT_T == FIA_LAYOUT::BSH) || (LAYOUT_T == FIA_LAYOUT::BNSD) || (LAYOUT_T == FIA_LAYOUT::TND) ||
+                      (LAYOUT_T == FIA_LAYOUT::NTD) || (LAYOUT_T == FIA_LAYOUT::BSND),
+                  "Get Query GmFormat fail, LAYOUT_T is incorrect");
+    if constexpr (LAYOUT_T == FIA_LAYOUT::BSH || LAYOUT_T == FIA_LAYOUT::TND || LAYOUT_T == FIA_LAYOUT::BSND) {
+        return fa_base_vector::UbInputFormat::S1G;
+    } else if constexpr (LAYOUT_T == FIA_LAYOUT::BNSD || LAYOUT_T == FIA_LAYOUT::NTD) {
+        return fa_base_vector::UbInputFormat::GS1;
+    }
 }
 } // namespace AttentionCommon
 

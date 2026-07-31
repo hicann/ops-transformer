@@ -16,7 +16,6 @@
 #include "kernel_operator.h"
 #include "kernel_operator_list_tensor_intf.h"
 #include "arch35/quant_flash_attn_common_def.h"
-#include "../../../common/op_kernel/fia_public_define.h"
 #include "util.h"
 #include "../../../common/op_kernel/vector_common.h"
 #include "arch35/quant_flash_attn_kernel_mxfp8.h"

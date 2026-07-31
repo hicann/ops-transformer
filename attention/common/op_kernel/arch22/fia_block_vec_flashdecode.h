@@ -783,7 +783,7 @@ __aicore__ inline void FiaBlockVecFlashDecode<FIAT>::DealInvalidRows(LocalTensor
         .nextTokensPerBatch = nextTokensPerBatch,
     };
 
-    fa_base_vector::InvalidRows<T, fa_base_vector::GeInputUbFormat<LAYOUT_T>()> invalidRows;
+    fa_base_vector::InvalidRows<T, GeInputUbFormat<LAYOUT_T>()> invalidRows;
     invalidRows(attenOutUb, params);
 }
 

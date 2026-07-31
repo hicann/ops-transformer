@@ -16,12 +16,7 @@
 #ifndef FLASH_ATTN_KERNEL_NOQUANT_GQA_ND_H_
 #define FLASH_ATTN_KERNEL_NOQUANT_GQA_ND_H_
 
-#include "adv_api/activation/softmax.h" // SoftmaxConfig / SoftmaxMode，fia_public_define.h 依赖
-#if __has_include("../../../common/op_kernel/fia_public_define.h")
-#include "../../../common/op_kernel/fia_public_define.h"
-#else
-#include "../../common/fia_public_define.h"
-#endif
+#include "adv_api/activation/softmax.h"
 #include "kernel_operator_list_tensor_intf.h" // TensorDesc
 #include "../utils/flash_attn_common_def.h"
 #include "../utils/flash_attn_utils.h"

@@ -155,6 +155,13 @@ public:
     }
 };
 
+__aicore__ inline int64_t ClipSInnerToken(int64_t sInnerToken, int64_t minValue, int64_t maxValue)
+{
+    sInnerToken = sInnerToken > minValue ? sInnerToken : minValue;
+    sInnerToken = sInnerToken < maxValue ? sInnerToken : maxValue;
+    return sInnerToken;
+}
+
 } // namespace BaseApi
 
 #endif // FLASH_ATTENTION_NOQUANT_GQA_BLOCK_CUBE_COMM_H_

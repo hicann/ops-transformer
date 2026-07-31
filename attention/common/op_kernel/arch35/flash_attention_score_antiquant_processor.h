@@ -423,6 +423,8 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
     } else if (taskParam.isPerHead) {
         Duplicate(dstLocal, srcGm.GetValue(taskParam.n2Idx), rowCnt * dBaseSize);
     } else {
+        constexpr uint64_t BYTE_BLOCK = 32UL;
+
         DataCopyExtParams copyInParams;
         DataCopyPadExtParams<ANTIQ_PARAMS_T> copyInPadParams;
         copyInParams.blockCount = rowCnt;
@@ -705,7 +707,7 @@ AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::CopyAnt
     const AntiquantTaskParamBaseAPI &taskParam, int32_t taskId, bool isBeforeHalf, int32_t s2RealSize)
 {
     uint16_t elementTypeSize = ONE_BLK_SIZE / sizeof(Q_T);
-    uint16_t dstStep = ALIGN((uint16_t)s2RealSize, (uint16_t)16);
+    uint16_t dstStep = (s2RealSize + 16 - 1) / 16 * 16;
     int32_t subBlockIdx;
     if (isBeforeHalf) {
         subBlockIdx = 0;

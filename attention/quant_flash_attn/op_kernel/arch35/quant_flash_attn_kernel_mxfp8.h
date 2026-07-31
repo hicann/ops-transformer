@@ -16,7 +16,6 @@
 #ifndef QUANT_FLASH_ATTN_KERNEL_MXFP8_H_
 #define QUANT_FLASH_ATTN_KERNEL_MXFP8_H_
 
-#include "../../../common/op_kernel/fia_public_define.h"
 #include "quant_flash_attn_common_def.h"
 #include "../../../common/op_kernel/vector_common.h"
 #include "quant_flash_attn_block_cube_mxfp8.h"
@@ -38,6 +37,13 @@ using namespace AscendC::Impl::Detail;
 using namespace regbaseutil;
 
 namespace BaseApi {
+__aicore__ inline int64_t ClipSInnerToken(int64_t sInnerToken, int64_t minValue, int64_t maxValue)
+{
+    sInnerToken = sInnerToken > minValue ? sInnerToken : minValue;
+    sInnerToken = sInnerToken < maxValue ? sInnerToken : maxValue;
+    return sInnerToken;
+}
+
 template <typename CubeBlockType, typename VecFaBlockType, typename VecFdBlockType>
 class FlashAttentionFullQuantMxKernel {
 public:
