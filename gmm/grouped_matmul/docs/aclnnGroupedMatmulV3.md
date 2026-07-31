@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-|产品      | 是否支持 |
-|:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      √     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -21,15 +31,21 @@
   - m轴分组：$k_i$各组相同，$weight_i/y_i$可以在$n_i$上拼接。
 
   相较于[GroupedMatmul](aclnnGroupedMatmul.md)接口，**此接口新增：**
+
+    <!-- npu="A3,910b" id7 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
       - 非量化场景，支持weight转置（转置指若shape为[M,K]时，则stride为[1,M],数据排布为[K,M]的场景）。
       - 支持m轴和k轴分组，由groupType表示。
       - x、weight、y都为单tensor，非量化场景下，支持x、weight输入都为float32类型。
       - 量化、伪量化场景，支持weight转置，支持weight为单tensor。
       - 对于[aclnnGroupedMatmulGetWorkspaceSize](aclnnGroupedMatmul.md)接口支持的特性，该接口不支持x为单tensor，weight/y为多tensor场景。
+    <!-- end id7 -->
+    <!-- npu="950" id8 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：
       - 伪量化场景，支持weight转置，支持x，weight，y均为单tensor。
       - 对于[aclnnGroupedMatmulGetWorkspaceSize](aclnnGroupedMatmul.md)接口支持的特性，该接口不支持x为单tensor，weight/y为多tensor场景。
+
+    <!-- end id8 -->
 
 **说明：**
 
@@ -251,12 +267,15 @@ aclnnStatus aclnnGroupedMatmulV3(
     </tr>
   </tbody></table>
 
+  <!-- npu="A3,910b" id9 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
     - x支持FLOAT16、BFLOAT16、INT8、FLOAT32
     - weight支持FLOAT16、BFLOAT16、INT8、FLOAT32
     - biasOptional支持FLOAT16、FLOAT32、INT32
     - y支持FLOAT16、BFLOAT16、INT8、FLOAT32
     - 输入参数x、weight，输出参数y支持最多128个tensor。
+  <!-- end id9 -->
+  <!-- npu="950" id10 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
     - x支持FLOAT16、BFLOAT16、FLOAT32、INT8
     - weight支持FLOAT16、BFLOAT16、FLOAT32、INT8
@@ -265,6 +284,8 @@ aclnnStatus aclnnGroupedMatmulV3(
     - 不支持offsetOptional
     - groupType支持m轴分组和不分组，仅非量化支持k轴分组。
     - 输入参数x、weight，输出参数y在非量化场景支持最多1024个tensor，在伪量化场景支持最多128个tensor，在量化场景支持最多1个tensor。
+
+  <!-- end id10 -->
 
 - **返回值：**
 
@@ -361,6 +382,8 @@ aclnnStatus aclnnGroupedMatmulV3(
   - aclnnGroupedMatmulV3默认确定性实现。
 - 如果传入groupListOptional，groupListOptional必须为非负递增数列。
 - x和weight中每一组tensor的每一维大小在32字节对齐后都应小于int32的最大值2147483647。
+
+<!-- npu="A3,910b" id11 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
   - 非量化场景支持的输入类型为：
     - x为FLOAT16、weight为FLOAT16、biasOptional为FLOAT16、scaleOptional为空、offsetOptional为空、antiquantScaleOptional为空、antiquantOffsetOptional为空、y为FLOAT16；
@@ -387,6 +410,8 @@ aclnnStatus aclnnGroupedMatmulV3(
 
   - x和weight中每一组tensor的最后一维大小都应小于65536。$x_i$的最后一维指当x不转置时$x_i$的K轴或当x转置时$x_i$的M轴。$weight_i$的最后一维指当weight不转置时$weight_i$的N轴或当weight转置时$weight_i$的K轴。
 
+<!-- end id11 -->
+<!-- npu="950" id12 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
 
   <details>
@@ -459,6 +484,8 @@ aclnnStatus aclnnGroupedMatmulV3(
         | 2 | 单多多 |1）仅支持splitItem为0/1<br>2）x，weight中tensor需为2维，shape分别为（K, M）和（K, N）；y中tensor需为2维， shape为（M, N）<br>3）groupListOptional可以传空，如果传groupListOptional，其最后一个值不大于x中tensor的第一维<br>4）groupListOptional第1维最大支持1024，即最多支持1024个group<br>5）x必须转置且weight不能转置<br>6）仅支持ND进ND出<br>7）不支持bias<br>8）仅支持非量化|
 
   </details>
+
+<!-- end id12 -->
 
 ## 调用示例
 

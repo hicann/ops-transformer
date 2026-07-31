@@ -127,6 +127,7 @@
     <td>-</td>
     <td>-</td>
     </tr>
+    <tr>
     <td>x1_offset</td>
     <td>可选输入</td>
     <td>预留参数，左矩阵的量化偏置。</td>
@@ -220,6 +221,7 @@
     </tbody></table>
 
 x1QuantMode、x2QuantMode、commQuantMode的枚举值与[量化模式](../../docs/zh/context/quant_mode_introduction.md)关系如下:
+
 * 0: 不量化
 * 1: pertensor
 * 2: perchannel

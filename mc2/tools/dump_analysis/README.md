@@ -6,7 +6,7 @@
 
 - profiling数据：在整网运行中，通常会调用多个算子进行联跑，通常会出现部分卡耗时过长的情况，该现象通常是由于卡中某个算子出现异常耗时导致的快慢卡现象，需要开发profiling数据分析工具排查可能出现异常耗时的算子以及对应的卡号，完成分析后需输出csv文件,并打屏输出对应的异常点。
 
-- graph图文件：当调用cache_compile接口时(调用方式可查看https://www.hiascend.com/document/detail/zh/Pytorch/730/modthirdparty/torchairuseguide/torchair_00099.html)，会在指定路径下生成graph图文件，该文件中包含每一张卡在每一轮执行的算子次数以及名称，可用于定位因执行序不一致导致的卡死现象。
+- graph图文件：当调用cache_compile接口时(调用方式可查看<https://www.hiascend.com/document/detail/zh/Pytorch/730/modthirdparty/torchairuseguide/torchair_00099.html)，会在指定路径下生成graph图文件，该文件中包含每一张卡在每一轮执行的算子次数以及名称，可用于定位因执行序不一致导致的卡死现象。>
 
 - plog日志：当设置环境变量ASCEND_SLOG_PRINT_TO_STDOUT=1时，会在/root/ascend/log下生成对应的plog日志，可以通过plog日志查看对应的报错信息以及错误码。
 
@@ -318,7 +318,7 @@ aiv_mte3_time：AI CORE->片上内存搬运类指令在AI Vector Core上的耗�
 
 [INFO] 开始进行错误日志分析<br>
 [INFO] 检测到(总线错误:0x800000错误，请进一步查看1520日志):51个<br>
-[INFO] 检测到GE错误:92个，请前往该网址,搜索GE Errors查询对应报错信息及解决方法: https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900beta2/index/index.html<br>
+[INFO] 检测到GE错误:92个，请前往该网址,搜索GE Errors查询对应报错信息及解决方法: <https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900beta2/index/index.html><br>
 [INFO] 检测到Aicore kernel execute failed类报错:23个，下列为前10条报错的具体信息<br>
 [INFO] 检测到Error happened, origin_op_name类报错:42个，下列为前10条报错的具体信息<br>
 [INFO] 开始检测是否所有卡都在dispatch or combine算子上执行失败<br>

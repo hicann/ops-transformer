@@ -4,20 +4,36 @@
 
 ## 产品支持情况
 
-| 产品                                                                                     | 是否支持 |
-| :--------------------------------------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                                                                      |    √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>                          |    ×    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √    |
-| <term>Atlas 200I/500 A2 推理产品</term>                                         |    ×    |
-| <term>Atlas 推理系列产品</term>                                                   |    ×    |
-| <term>Atlas 训练系列产品</term>                                                 |    ×    |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
 - **接口功能**：兼容`aclnnQuantMatmulAllReduce`、`aclnnQuantMatmulAllReduceV2`、`aclnnQuantMatmulAllReduceV3`支持的功能。
+
+  <!-- npu="910b" id7 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：无新增特性。
+  <!-- end id7 -->
+  <!-- npu="950" id8 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：新增perblock、pertile、mxfp量化方式。新增x1，x2输入支持dtype为`FLOAT8_E4M3FN`、`FLOAT8_E5M2`、HIFLOAT8、`FLOAT4_E2M1`。
+  <!-- end id8 -->
+
 - **计算公式**：
 
   - 公式1，开启低bit通信的公式2或公式3场景：
@@ -445,8 +461,14 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
 ## 约束说明
 
 - 确定性计算：
+
+  <!-- npu="910b" id9 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：`aclnnQuantMatmulAllReduceV4`默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算。
+  <!-- end id9 -->
+  <!-- npu="950" id10 -->
   - Ascend 950PR/Ascend 950DT：`aclnnQuantMatmulAllReduceV4`默认确定性实现。
+  <!-- end id10 -->
+
 - 增量场景不开启MC2，全量场景开启MC2。
 - 输入x1可为2维或者3维，其shape为(b, s, k)或者(m, k)。x2必须是2维。其shape为(k, n)，k轴满足mm算子入参要求，k轴相等。
 - m大小不超过2147483647，x1与x2的最后一维大小不超过65535，x1的最后一维指k，x2的最后一维指转置时的k或非转置时的n。
@@ -454,8 +476,14 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
 - x1和x2、dequantScale、output、bias（非空场景）、x3（非空场景）的数据类型和数据格式需要在支持的范围之内。
 - 传入的commQuantScale1与commQuantScale2需要同时为空指针或同时不为空指针，若传入的commQuantScale1与commQuantScale2同时不为空指针，两个量化参数shape需保持一致，类型需与算子输出类型保持一致，且每张卡输入保持一致。
 - 仅支持hccs链路all mesh组网。
+
+    <!-- npu="910b" id11 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持1、2、4、8卡。
+    <!-- end id11 -->
+    <!-- npu="950" id12 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：支持1、2、4、8、16、32、64卡。
+    <!-- end id12 -->
+
 - 一个模型中的通算融合MC2算子，仅支持相同通信域。
 - INT8和FP8低bit通信仅在通信bound的情况下存在性能收益，计算bound的情况不建议开启INT8或FP8低bit通信，即不建议输入commQuantScale1和commQuantScale2，且commQuantMode输入0。（注：INT8低bit通信指输入为int8且开启commQuantScale1Optional、commQuantScale2Optional；FP8低bit通信指输入为FLOAT8_E4M3FN/FLOAT8_E5M2且开启commQuantMode=1。）
 - 空tensor支持度：
@@ -469,6 +497,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
 
 输入和输出支持以下数据类型组合
 
+<!-- npu="910b" id13 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     <table>
     <thead>
@@ -525,6 +554,8 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
     </tbody>
     </table>
 
+<!-- end id13 -->
+<!-- npu="950" id14 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
 
     int8输入时，支持pertoken-perchannel量化 && pertensor-perchannel量化
@@ -727,12 +758,15 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
     </tbody>
     </table>
 
+<!-- end id14 -->
+
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
+<!-- npu="950,910b" id15 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：
 
   ```Cpp
@@ -1063,3 +1097,5 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
       return 0;
   }
   ```
+
+<!-- end id15 -->

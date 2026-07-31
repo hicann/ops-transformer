@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                             | 是否支持 |
-| :--------------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                  |    √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> |    √    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √    |
-| <term>Atlas 200I/500 A2 推理产品</term>                  |    ×    |
-| <term>Atlas 推理系列产品</term>                          |    ×    |
-| <term>Atlas 训练系列产品</term>                          |    ×    |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -19,8 +29,14 @@
   GroupedMatmul和MoeFinalizeRouting的融合算子，GroupedMatmul计算后的输出按照索引做combine动作。
 
   相较于aclnnGroupedMatmulFinalizeRoutingV2接口，**此接口新增:**
+
+    <!-- npu="A3,910b" id7 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：新增入参tuningConfigOptional，调优参数。数组中的第一个值表示各个专家处理的token数的预期值，算子tiling时会按照该预期值合理进行tiling切分，性能更优。
+    <!-- end id7 -->
+    <!-- npu="950" id8 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：新增了MX量化场景，相关信息参考[量化介绍](../../../docs/zh/context/quant_mode_introduction.md)。
+    <!-- end id8 -->
+
 - 计算公式：
 
   - 1.分组矩阵乘法GMM：
@@ -338,6 +354,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
   </tbody>
   </table>
 
+  <!-- npu="A3,910b" id9 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
 
     - x1仅支持INT8。维度为(m, k)，维度m的取值范围为[1,16\*1024\*8]，k支持2048;
@@ -352,6 +369,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     - rowIndexOptional支持m和x的m一致。
     - x1、x2、groupListOptional是必选参数，scaleOptional、pertokenScaleOptional、logitOptional、rowIndexOptional、biasOptional，sharedInputOptional是可选参数。
 
+  <!-- end id9 -->
+  <!-- npu="950" id10 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
     - x1不支持INT8。
     - x2不支持INT4。维度为(e,k,n)，转置情况下维度为(e,n,k)，e取值范围[1,1024]。
@@ -364,6 +383,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     - 当sharedInputOptional不为空时，其第一维长度为shareInputLen。sharedInputOffset、shareInputLen以及两者之和均需小于等于out的第一维batch。
     - x1支持M为0的空Tensor。
     - x2支持N为0的空Tensor。
+
+  <!-- end id10 -->
 
 - **返回值**
 
@@ -448,9 +469,16 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
 ## 约束说明
 
 - 确定性计算：
+
+  <!-- npu="A3,910b" id11 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：aclnnGroupedMatmulFinalizeRoutingV3默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
+  <!-- end id11 -->
+  <!-- npu="950" id12 -->
   - <term>Ascend 950PR/Ascend 950DT</term> ：aclnnGroupedMatmulFinalizeRoutingV3默认非确定性实现，不支持通过aclrtCtxSetSysParamOpt开启确定性。
 
+  <!-- end id12 -->
+
+<!-- npu="A3,910b" id13 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：仅支持伪量化场景。
 
   - 输入和输出支持以下数据类型组合：
@@ -465,6 +493,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
   - 该场景支持对称量化和非对称量化。在对称量化时，offsetOptional需要设置为空；在非对称量化时，offsetOptional代表离线计算的辅助结果，即为$antiquantOffsetOptional \times   scaleOptional$的结果。
   - 在该场景中，antiquantScaleOptional、antiquantOffsetOptional必须设置为空。
 
+<!-- end id13 -->
+<!-- npu="950" id14 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：仅支持MX全量化场景。
 
   - 输入和输出支持以下数据类型组合：
@@ -480,10 +510,13 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
   - e必须小于等于1024。
   - 在MXFP4场景中，k不能为2。
 
+<!-- end id14 -->
+
 ## 调用示例
 
 调用示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
+<!-- npu="A3,910b" id15 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
 
   ```Cpp
@@ -793,6 +826,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     }
   ```
 
+<!-- end id15 -->
+<!-- npu="950" id16 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
 
   ```cpp
@@ -1110,3 +1145,5 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
       return 0;
   }
   ```
+
+<!-- end id16 -->

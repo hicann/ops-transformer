@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    ×     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -310,6 +320,7 @@ aclnnStatus aclnnMoeDistributeDispatchTeardown(
     </tbody>
     </table>
 
+    <!-- npu="950" id7 -->
     - <term>Ascend 950DT</term>：
         - groupEp字符串长度范围为[1, 128)。
         - epWorldSize取值范围[2, 384]。当前仅支持2、8。
@@ -323,6 +334,8 @@ aclnnStatus aclnnMoeDistributeDispatchTeardown(
         - commType当前仅支持2。
         - commAlg预留字段，当前版本不支持，传NULL即可。
 
+    <!-- end id7 -->
+    <!-- npu="A3" id8 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
         - groupEp字符串长度范围为[1, 128)。
         - epWorldSize取值范围[2, 384]。
@@ -334,6 +347,8 @@ aclnnStatus aclnnMoeDistributeDispatchTeardown(
         - globalBs当每个rank的Bs数一致场景下，globalBs = Bs \* epWorldSize或globalBs = 0；当每个rank的Bs数不一致场景下，globalBs = maxBs \* epWorldSize，其中maxBs表示单卡Bs最大值。
         - commType当前仅支持0。
         - commAlg当前版本不支持，传空指针即可。
+
+    <!-- end id8 -->
 
 - **返回值：**
 
@@ -448,18 +463,31 @@ aclnnStatus aclnnMoeDistributeDispatchTeardown(
     * 当前版本暂不支持共享专家。sharedExpertNum和sharedExpertRankNum当前仅支持0。
 
 6. HCCL_BUFFSIZE：
+
+    <!-- npu="950" id9 -->
     - <term>Ascend 950DT</term>：
       调用本接口前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。要求 >= 2且满足>= 4 \* (`localExpertNum` \* `maxBs` \* `epWorldSize` \* Align512(Align32(2 \* H) + 44) + (`K` + `sharedExpertNum`) \* `maxBs` \* Align512(2 \* `H`))，`localExpertNum`代表使用MoE专家卡的本卡专家数，其中Align512(x) = ((x + 512 - 1) / 512) \* 512，Align32(x) = ((x + 32 - 1) / 32) \* 32。
 
+    <!-- end id9 -->
+    <!-- npu="A3" id10 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
       调用本接口前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。要求 >= 2且满足>= 2 \* (`localExpertNum` \* `maxBs` \* `epWorldSize` \* Align512(Align32(2 \* H) + 44) + (`K` + `sharedExpertNum`) \* `maxBs` \* Align512(2 \* `H`))，`localExpertNum`代表使用MoE专家卡的本卡专家数，其中Align512(x) = ((x + 512 - 1) / 512) \* 512，Align32(x) = ((x + 32 - 1) / 32) \* 32。
+
+    <!-- end id10 -->
 
 7. 通信域使用约束：
     - 一个模型中的aclnnMoeDistributeDispatchSetup接口，aclnnMoeDistributeDispatchTeardown接口，aclnnMoeDistributeCombineSetup接口，aclnnMoeDistributeCombineTeardown接口仅支持相同EP通信域，且该通信域中不允许有其他算子。
 
 8. 通信方式约束：
+
+    <!-- npu="950" id11 -->
     - <term>Ascend 950DT</term>：仅支持URMA通信。
+
+    <!-- end id11 -->
 
 ## 调用示例
 
+<!-- npu="950" id12 -->
 - <term>Ascend 950DT</term>：aclnnMoeDistributeDispatchTeardown必须在aclnnMoeDistributeDispatchSetup调用之后调用，请参考[aclnnMoeDistributeDispatchSetup](../../moe_distribute_dispatch_setup/docs/aclnnMoeDistributeDispatchSetup.md)中的调用示例。
+
+<!-- end id12 -->

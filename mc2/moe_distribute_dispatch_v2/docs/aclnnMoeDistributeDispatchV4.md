@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -35,10 +45,15 @@
 
     > 说明：TP域通信当前版本不再支持。
 
+<!-- npu="910b" id7 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：该接口必须与`aclnnMoeDistributeCombineV4`配套使用。
+<!-- end id7 -->
+<!-- npu="950,A3" id8 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：该接口必须与`aclnnMoeDistributeCombineV4`或`aclnnMoeDistributeCombineAddRmsNormV2`配套使用。
 
   说明：`aclnnMoeDistributeCombineV4`、`aclnnMoeDistributeCombineAddRmsNormV2`算子在后续文档中统称为**CombineV4系列算子**。
+
+<!-- end id8 -->
 
 ## 函数原型
 
@@ -449,6 +464,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     </tbody>
     </table>
 
+    <!-- npu="910b" id9 -->
     <details>
     <summary><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：</summary>
 
@@ -471,7 +487,9 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     - constExpertNum当前版本不支持，传0即可。
     - performanceInfoOptional可选择传入有效数据或填空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
     </details>
+    <!-- end id9 -->
 
+    <!-- npu="A3" id10 -->
     <details>
     <summary><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：</summary>
 
@@ -498,7 +516,9 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     - performanceInfoOptional可选择传入有效数据或填空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
     - scalesOptional 2D Tensor，非量化场景传空指针；动态量化可传有效数据或空指针。
     </details>
+    <!-- end id10 -->
 
+    <!-- npu="950" id11 -->
     <details>
     <summary><term>Ascend 950DT</term>：</summary>
 
@@ -525,6 +545,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     - performanceInfoOptional可选择传入有效数据或填空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
     - scalesOptional quantMode取值为0时，若`x`的数据类型为`FLOAT16`或`BFLOAT16`则传空指针，若`x`的数据类型为`HIFLOAT8`、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`则必传有效数据；quantMode取值为1时必传有效数据；quantMode取值为2或3时可传有效数据或空指针；quantMode取值为4时传空指针。
     </details>
+    <!-- end id11 -->
 
 - **返回值**
 
@@ -627,7 +648,10 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
 
 - **产品特定约束**：
 
+  <!-- npu="A3" id12 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明中的“本卡”均表示单DIE。
+
+  <!-- end id12 -->
 
 - **Shape变量约束**：
 
@@ -641,6 +665,8 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
   | localExpertNum |  本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，当前版本不支持TP域通信。 </li><li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：应满足0 < <code>localExpertNum \* epWorldSize</code> ≤ 2048。当commAlg="hierarchy"时，需满足localExpertNum ≤ 24且 <code>localExpertNum \* epWorldSize</code> ≤ 512</li><li><term>Ascend 950DT</term>：应满足0 < <code>localExpertNum \* epWorldSize</code> ≤ 2048。</li></ul>|
 
 - **quantMode相关约束**：
+
+  <!-- npu="910b" id13 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
       - `quantMode`取值为0时，表示非量化场景：
           - 当`x`的数据类型为`FLOAT16`或`BFLOAT16`时，输入`scalesOptional`传空指针，`expandX`的数据类型与`x`一致。
@@ -649,6 +675,8 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
           - 输入`scalesOptional`可传入空指针。
           - 若输入`scalesOptional`传入有效数据时，其shape为(`moeExpertNum`, `H`)。
           - 输出`dynamicScalesOut`shape为`(A, )`
+  <!-- end id13 -->
+  <!-- npu="A3" id14 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
       - `quantMode`取值为0时，表示非量化场景，输入`scalesOptional`传空指针，`expandX`的数据类型支持`FLOAT16`、`BFLOAT16`。
       - `quantMode`取值为2时，表示pertoken动态量化场景，`expandX`的数据类型支持`INT8`。
@@ -656,6 +684,8 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
           - 若输入`scalesOptional`传入有效数据且存在共享专家卡时，其shape为(`sharedExpertNum` + `moeExpertNum`, `H`)。
           - 若输入`scalesOptional`传入有效数据且不存在共享专家卡时，其shape为(`moeExpertNum`, `H`)。
           - 输出`dynamicScalesOut`shape为`(A, )`
+  <!-- end id14 -->
+  <!-- npu="950" id15 -->
   - <term>Ascend 950DT</term>：
       - `quantMode`取值为0时，表示非量化场景。
           - 当`x`的数据类型为`FLOAT16`或`BFLOAT16`时，`expandX`的数据类型可与`x`一致，也可为`HIFLOAT8`，输入`scalesOptional`必须传空指针。
@@ -682,39 +712,71 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
           - 输出`dynamicScalesOut`shape为`(A, Ceil(H, 128))`，其中`Ceil(H, 128) = (H + 128 - 1) / 128`
       - `quantMode`取值为4时，表示mx量化场景，`expandX`的数据类型支持`FLOAT8_E4M3FN`、`FLOAT8_E5M2`、`FLOAT4_E2M1`、`FLOAT4_E1M2`，输入`scalesOptional`必须传入空指针。输出`dynamicScalesOut`shape为`(A, Ceil(H, 64))`，其中`Ceil(H, 64) = (H + 64 - 1) / 64`。当`expandX`的数据类型为`FLOAT4_E2M1`或`FLOAT4_E1M2`时，H必须为偶数。
 
+  <!-- end id15 -->
+
 - **环境变量约束**：
   - **HCCL_BUFFSIZE**：
       调用本接口前需检查HCCL_BUFFSIZE环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。
+
+      <!-- npu="910b" id16 -->
       - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
           - commAlg配置为""或nullptr：依照HCCL_INTRA_PCIE_ENABLE和HCCL_INTRA_ROCE_ENABLE环境变量配置，选择"fullmesh"或"hierarchy"公式。
           - commAlg配置为"fullmesh": 当`x`的数据类型为`INT32`时，要求 >= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* (H \* sizeof(int32) + 32B) + 2MB)；其他数据类型要求 >= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB)。
           - commAlg配置为"hierarchy": 要求 >= (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512。
+      <!-- end id16 -->
+      <!-- npu="A3" id17 -->
       - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
         - 当commAlg为"fullmesh_v1"或空字符串或空指针时：要求取值满足 ≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 64) + (K + sharedExpertNum) \* maxBS \* Align512(2 \* H))。
         - 当commAlg为"fullmesh_v2"时：要求取值满足 ≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* 480Align512(Align32(2 \* H) + 64) + (K + sharedExpertNum) \* maxBS \* Align512(2 \* H))。
         - 其中`480Align512(x) = ((x + 480 - 1) / 480) * 512`，`Align512(x) = ((x + 512 - 1) / 512) * 512`，`Align32(x) = ((x + 32 - 1) / 32) * 32`。
         - 当commAlg为"hierarchy"时：要求取值满足(moeExpertNum \* maxBS \* (H \* 2 + (3 \* (K + 7) / 8 \* 8)) \* 4 + 64) + 404 \* 1024 \* 1024。
+      <!-- end id17 -->
+      <!-- npu="950" id18 -->
       - <term>Ascend 950DT</term>：
         - 当commAlg为"fullmesh_v1"或空字符串或空指针时：要求取值满足 ≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 64) + (K + sharedExpertNum) \* maxBS \* Align512(2 \* H))。
         - 当commAlg为"fullmesh_v2"时：要求取值满足 ≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* 480Align512(Align32(2 \* H) + 64) + (K + sharedExpertNum) \* maxBS \* Align512(2 \* H))。
         - 其中`480Align512(x) = ((x + 480 - 1) / 480) * 512`，`Align512(x) = ((x + 512 - 1) / 512) * 512`，`Align32(x) = ((x + 32 - 1) / 32) * 32`。
 
+      <!-- end id18 -->
+
   - **HCCL_INTRA_PCIE_ENABLE**和**HCCL_INTRA_ROCE_ENABLE**：
+
+      <!-- npu="910b" id19 -->
       - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：该环境变量不再推荐使用，建议commAlg配置"hierarchy"。
+      <!-- end id19 -->
+      <!-- npu="950,A3" id20 -->
       - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：不支持该环境变量。
+      <!-- end id20 -->
+
   - **HCCL_LOGIC_SUPERPOD_ID**
+
+      <!-- npu="A3" id21 -->
       - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：当commAlg配置"hierarchy"需根据不同的逻辑超节点配置该环境变量，例如两机分别设为`export HCCL_LOGIC_SUPERPOD_ID=0`和`export HCCL_LOGIC_SUPERPOD_ID=1`。
+
+      <!-- end id21 -->
 
 - **通信域使用约束**：
   - 一个模型中的CombineV4系列算子和`aclnnMoeDistributeDispatchV4`仅支持相同EP通信域，且该通信域中不允许有其他算子。
   - 一个模型中的CombineV4系列算子和`aclnnMoeDistributeDispatchV4`当前不支持TP域通信。
+
+  <!-- npu="A3" id22 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：仅在commAlg配置为"hierarchy"场景下通信域支持跨超节点，其余场景要求一个通信域内的节点需在一个超节点内，不支持跨超节点。
 
+  <!-- end id22 -->
+
 - **通信方式约束**：
+
+  <!-- npu="950" id23 -->
   - <term>Ascend 950DT</term>：仅支持UB Memory通信。
 
+  <!-- end id23 -->
+
 - **组网约束**：
+
+  <!-- npu="910b" id24 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：多机场景仅支持交换机组网，不支持双机直连组网。
+
+  <!-- end id24 -->
 
 - **其他约束**：
   - 公式中的“/”表示整除。
@@ -722,6 +784,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
 
 ## 调用示例
 
+<!-- npu="910b" id25 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：
 
     本示例支持A2算子运行在卡数为[2, 8]的单机环境中，用户可以根据需要在示例代码中设置EP_WORLD_SIZE_A2为卡数，并更改moeExpertNum，使得moeExpertNum可以被EP_WORLD_SIZE_A2整除。
@@ -1170,12 +1233,17 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
         }
         ```
 
+<!-- end id25 -->
+<!-- npu="950" id26 -->
 - <term>Ascend 950DT</term> ：请参考[aclnnMoeDistributeDispatchV2](../docs/aclnnMoeDistributeDispatchV2.md)中调用示例的准备部分和示例代码，按照上文的约束说明重新设置涉及的变量，V3接口相较于V2接口新增的场景参数按上述参数说明传值即可。
 
+<!-- end id26 -->
+<!-- npu="A3" id27 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
 
     具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
+<!-- end id27 -->
 - 示例代码如下，仅供参考
 
     ```Cpp

@@ -37,42 +37,42 @@
 <col style="width: 105px">
 </colgroup>
 <thead>
-	<tr>
-	<th>参数名</th>
-	<th>输入/输出</th>
-	<th>描述</th>
-	<th>数据类型</th>
-	<th>数据格式</th>
-	</tr></thead>
+ <tr>
+ <th>参数名</th>
+ <th>输入/输出</th>
+ <th>描述</th>
+ <th>数据类型</th>
+ <th>数据格式</th>
+ </tr></thead>
 <tbody>
-	<tr>
-	<td>init_matrix</td>
-	<td>输入</td>
-	<td>待变换的mHC层初始混合矩阵，为超连接原始矩阵。即公式中的M。</td>
-	<td>FLOAT32</td>
-	<td>ND</td>
-	</tr>
-	<tr>
-	<td>max_iter</td>
-	<td>输入</td>
-	<td>Sinkhorn-Knopp迭代最大次数，控制迭代收敛过程。即公式中的k。</td>
-	<td>INT32</td>
-	<td>标量</td>
-	</tr>
-	<tr>
-	<td>epsilon</td>
-	<td>输入</td>
-	<td>收敛阈值，矩阵行/列和与1的误差小于该值时停止迭代。</td>
-	<td>FLOAT32</td>
-	<td>标量</td>
-	</tr>
-	<tr>
-	<td>h_res</td>
-	<td>输出</td>
-	<td>经Sinkhorn变换后的双随机矩阵，作为MhcPost算子的h_res输入。即公式中的Hres。</td>
-	<td>FLOAT32</td>
-	<td>ND</td>
-	</tr>
+ <tr>
+ <td>init_matrix</td>
+ <td>输入</td>
+ <td>待变换的mHC层初始混合矩阵，为超连接原始矩阵。即公式中的M。</td>
+ <td>FLOAT32</td>
+ <td>ND</td>
+ </tr>
+ <tr>
+ <td>max_iter</td>
+ <td>输入</td>
+ <td>Sinkhorn-Knopp迭代最大次数，控制迭代收敛过程。即公式中的k。</td>
+ <td>INT32</td>
+ <td>标量</td>
+ </tr>
+ <tr>
+ <td>epsilon</td>
+ <td>输入</td>
+ <td>收敛阈值，矩阵行/列和与1的误差小于该值时停止迭代。</td>
+ <td>FLOAT32</td>
+ <td>标量</td>
+ </tr>
+ <tr>
+ <td>h_res</td>
+ <td>输出</td>
+ <td>经Sinkhorn变换后的双随机矩阵，作为MhcPost算子的h_res输入。即公式中的Hres。</td>
+ <td>FLOAT32</td>
+ <td>ND</td>
+ </tr>
 </tbody>
 </table>
 
@@ -87,4 +87,4 @@
 | 调用方式      | 调用样例                 | 说明                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
 | aclnn调用 | [test_aclnn_mhc_sinkhorn](examples/test_aclnn_mhc_sinkhorn.cpp) | 通过[aclnnMhcSinkhorn](docs/aclnnMhcSinkhorn.md)方式调用算子。|
-	 
+  

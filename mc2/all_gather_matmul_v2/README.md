@@ -66,6 +66,7 @@
         $$
 
 ## 参数说明
+
 <table style="undefined;table-layout: fixed; width: 1576px"><colgroup>
     <col style="width: 170px">
     <col style="width: 170px">
@@ -213,7 +214,7 @@
     - 当groupSize取值为549764202624，bias必须为空。
     - 支持2、4、8、16、32、64卡。
     - 支持CCU通信引擎和AICPU通信引擎，CCU仅支持单机UB域内互联，AICPU可支持跨机UB域内互联。
-    - allgather(x1)集合通信数据总量不能超过63*256MB，集合通信数据总量计算方式为：m * k * sizeof(x1_dtype) * 卡数。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
+    - allgather(x1)集合通信数据总量不能超过63*256MB，集合通信数据总量计算方式为：m* k *sizeof(x1_dtype)* 卡数。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     - 只支持x2矩阵转置/不转置，x1矩阵仅支持不转置场景。

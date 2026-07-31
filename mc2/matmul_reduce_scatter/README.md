@@ -311,7 +311,7 @@ aclnnStatus aclnnMatmulReduceScatter(
   - 支持2、4、8、16、32卡，并且仅支持hccs链路double ring组网。
   - aclnnMatmulReduceScatter默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
 - <term>Ascend 950PR/Ascend 950DT</term>：支持2、4、8、16、32、64卡，并且仅支持hccs链路all mesh组网。
-  - ReduceScatter集合通信数据总量不能超过16*256MB，集合通信数据总量计算方式为：m * n * sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
+  - ReduceScatter集合通信数据总量不能超过16*256MB，集合通信数据总量计算方式为：m* n * sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
   - aclnnMatmulReduceScatter默认为确定性实现。
 
 ## 调用说明

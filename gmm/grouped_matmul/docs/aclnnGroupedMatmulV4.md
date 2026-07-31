@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-|产品      | 是否支持 |
-|:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      √     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -22,14 +32,20 @@
 
   相较于[GroupedMatmulV3](aclnnGroupedMatmulV3.md)接口，**此接口新增：**
     - 支持groupListOptional中数值为分组轴上每组大小。
+
+    <!-- npu="A3,910b" id7 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
       - 支持静态量化（pertensor+perchannel）（量化方式请参见[量化介绍](../../../docs/zh/context/quant_mode_introduction.md)，下同）BFLOAT16和FLOAT16输出，带激活及不带激活场景
       - 支持动态量化（pertoken+perchannel）BFLOAT16和FLOAT16输出，带激活及不带激活场景。
       - 支持伪量化weight是INT4的输入，不带激活场景，支持perchannel和pergroup两种模式。
+    <!-- end id7 -->
+    <!-- npu="950" id8 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：
       - 支持静态量化，量化方式包括：1. pertensor-perchannel（T-C）；2. pertensor-pertensor（T-T）。支持BFLOAT16、FLOAT16和FLOAT32输出，且支持带bias场景。
       - 支持动态量化，量化方式包括：1. pertoken-perchannel（K-C）；2. pertoken-pertensor（K-T）；3. pertensor-pertensor（T-T）；4. pertensor-perchannel（T-C）；5. MX量化；6. pergroup-perblock（G-B）。支持BFLOAT16、FLOAT16和FLOAT32输出，且支持带bias场景。
       - 支持伪量化weight是INT4、FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8的输入，不带激活场景，支持perchannel和pergroup模式（INT4支持perchannel和pergroup，其余weight类型仅支持perchannel）。
+
+    <!-- end id8 -->
 
 **说明：**
 
@@ -360,6 +376,7 @@ aclnnStatus aclnnGroupedMatmulV4(
     </tr>
   </tbody></table>
 
+  <!-- npu="A3,910b" id9 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
     - x支持FLOAT16、BFLOAT16、FLOAT32、INT8、INT4
     - weight支持FLOAT16、BFLOAT16、FLOAT32、INT8、INT4，格式支持ND、FRACTAL_NZ
@@ -367,6 +384,8 @@ aclnnStatus aclnnGroupedMatmulV4(
     - scaleOptional支持UINT64、BFLOAT16、FLOAT32
     - perTokenScaleOptional支持FLOAT32
     - 输入参数x、weight，输出参数out支持最多128个tensor。
+  <!-- end id9 -->
+  <!-- npu="950" id10 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
     - x支持FLOAT8_E4M3FN、FLOAT8_E5M2、INT8、HIFLOAT8、FLOAT16、BFLOAT16、FLOAT32、FLOAT4_E2M1
     - weight支持FLOAT8_E4M3FN、FLOAT8_E5M2、INT8、INT4、HIFLOAT8、FLOAT16、BFLOAT16、FLOAT32、FLOAT4_E2M1，格式仅支持ND格式。
@@ -378,6 +397,8 @@ aclnnStatus aclnnGroupedMatmulV4(
     - 不支持offsetOptional
     - groupType支持m轴分组，仅非量化和量化支持k轴分组，仅非量化和伪量化支持不分组
     - 输入参数x、weight，输出参数out在非量化场景支持最多1024个tensor，在伪量化场景支持最多128个tensor，在全量化场景仅支持单tensor。
+
+  <!-- end id10 -->
 
 - **返回值：**
 
@@ -474,6 +495,7 @@ aclnnStatus aclnnGroupedMatmulV4(
 
 - GroupedMatmul算子根据计算过程中对输入数据（x, weight）和输出矩阵（out）的精度处理方式，其支持场景主要分为：非量化，伪量化，全量化。
 
+  <!-- npu="A3,910b" id11 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
 
     |场景名|    x    |    weight      |   out | 约束说明|计算公式|
@@ -487,10 +509,15 @@ aclnnStatus aclnnGroupedMatmulV4(
     |伪量化-A16W8|BFLOAT16/FLOAT16|INT8|BFLOAT16/FLOAT16|[A16W8场景约束](#a16w4场景约束)|[计算公式](#伪量化场景)|
     |伪量化-A16W4|BFLOAT16/FLOAT16|INT4|BFLOAT16/FLOAT16|[A16W4场景约束](#a16w4场景约束)|[计算公式](#伪量化场景)|
 
+  <!-- end id11 -->
+  <!-- npu="950" id12 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
 
     详见[Ascend 950PR/Ascend 950DT](#ascend_950pr_ascend950dt)
+  <!-- end id12 -->
+
 <a id="计算公式"></a>
+
 - 计算公式
   <a id="非量化场景"></a>
 
@@ -552,6 +579,7 @@ aclnnStatus aclnnGroupedMatmulV4(
 
   - aclnnGroupedMatmulV4默认确定性实现。
 
+<!-- npu="A3,910b" id13 -->
 <details>
 <summary><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term></summary>
 
@@ -785,9 +813,11 @@ aclnnStatus aclnnGroupedMatmulV4(
     </details>
 
 </details>
+<!-- end id13 -->
 
 <a id="ascend_950pr_ascend950dt"></a>
 
+<!-- npu="950" id14 -->
 <details>
 <summary><term>Ascend 950PR/Ascend 950DT</term></summary>
 
@@ -988,6 +1018,7 @@ aclnnStatus aclnnGroupedMatmulV4(
     </details>
 
 </details>
+<!-- end id14 -->
 
 ## 调用示例
 

@@ -93,13 +93,13 @@
 </table>
 
 ## 约束说明
+
 - 输入grad_y仅支持3维(T,n,n)或4维(B,S,n,n)。
 - 输入norm仅支持1维(2\*num_iters\*n\*align_n\*B\*S)或(2\*num_iters\*n\*align_n\*T)。
 - 输入sum仅支持1维(2\*num_iters\*align_n\*B\*S)或(2\*num_iters\*align_n\*T)。
 - num_iters：取值范围1~100，超出则报参数无效。
 - n：仅支持4、6或8。
 - align_n：固定取值为8。
-
 
 ## 调用说明
 

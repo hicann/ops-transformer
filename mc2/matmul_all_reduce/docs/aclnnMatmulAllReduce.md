@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    ×     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 **说明：** 使用该接口时，请确保驱动固件包和CANN包都为配套的8.0.RC2版本或者配套的更高版本，否则将会引发报错，比如BUS ERROR等。
 
@@ -261,17 +271,31 @@ aclnnStatus aclnnMatmulAllReduce(
 ## 约束说明
 
 - 确定性计算：
+
+  <!-- npu="910b" id7 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：`aclnnMatmulAllReduce`默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算。
+  <!-- end id7 -->
+  <!-- npu="950" id8 -->
   - Ascend 950PR/Ascend 950DT：`aclnnMatmulAllReduce`默认确定性实现。
+  <!-- end id8 -->
+
 - 增量场景不开启MC2，全量场景开启MC2。
 - 输入x1可为二维或者三维，其shape为(b, s, k)或者(m, k)。x2必须是二维，其shape为(k, n)，轴满足mm算子入参要求，k轴相等。bias若非空，其shape为(n)。
 - b*s、m、k、n的值均不得超过2147483647(INT32_MAX)。
 - 当输入x1的shape为(b, s, k)时，输出output的shape为(b, s, n)，当输入x1的shape为(m, k)时，输出output的shape为(m, n)。
 - x1、x2、bias计算输入的数据类型要和output计算输出的数据类型一致。
 - 仅支持HCCS链路all mesh组网。
+
+    <!-- npu="910b" id9 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持1、2、4、8卡。
+    <!-- end id9 -->
+    <!-- npu="950" id10 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：支持1、2、4、8、16、32、64卡。
+    <!-- end id10 -->
+
+<!-- npu="910b" id11 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。
+<!-- end id11 -->
 - 空tensor支持度：
   - 支持k为0的场景，输出为bias。
   - 支持bs/m/n为0，此时传入的输出也应该是空tensor，此场景不进入kernel计算，直接返回。
@@ -282,6 +306,7 @@ aclnnStatus aclnnMatmulAllReduce(
 
 说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
+<!-- npu="950,910b" id12 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：
 
     ```Cpp
@@ -483,3 +508,5 @@ aclnnStatus aclnnMatmulAllReduce(
         return 0;
     }
     ```
+
+<!-- end id12 -->

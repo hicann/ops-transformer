@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-|产品      | 是否支持 |
-|:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      √     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -267,14 +277,19 @@ aclnnStatus aclnnGroupedMatmul(
       </tr>
     </tbody></table>
 
+  <!-- npu="A3,910b" id7 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
     - x、weight支持FLOAT16、BFLOAT16、INT8
     - y支持FLOAT16、BFLOAT16、INT8、FLOAT32
+  <!-- end id7 -->
+  <!-- npu="950" id8 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
     - x支持FLOAT16、BFLOAT16、FLOAT32
     - weight支持FLOAT16、BFLOAT16、FLOAT32、INT8
     - y支持FLOAT16、BFLOAT16、FLOAT32
     - 不支持scaleOptional、offsetOptional
+
+  <!-- end id8 -->
 
 - **返回值：**
 
@@ -342,6 +357,8 @@ aclnnStatus aclnnGroupedMatmul(
 
 - 确定性计算：
   - aclnnGroupedMatmul默认确定性实现。
+
+<!-- npu="A3,910b" id9 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
   - 非量化场景支持的输入类型为：
     - x为FLOAT16、weight为FLOAT16、biasOptional为FLOAT16、scaleOptional为空、offsetOptional为空、antiquantScaleOptional为空、 antiquantOffsetOptional为空、y为FLOAT16；
@@ -366,6 +383,8 @@ aclnnStatus aclnnGroupedMatmul(
   - x和weight中每一组tensor的最后一维大小都应小于65536。$x_i$的最后一维指当属性transpose_x为false时$x_i$的K轴或当transpose_x为true时$x_i$的M轴。  $weight_i$的最后一维指当属性transpose_weight为false时$weight_i$的N轴或当transpose_weight为true时$weight_i$的K轴。
   - x和weight中每一组tensor的每一维大小在32字节对齐后都应小于int32的最大值2147483647。
 
+<!-- end id9 -->
+<!-- npu="950" id10 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
 
     <details>
@@ -422,6 +441,8 @@ aclnnStatus aclnnGroupedMatmul(
       | 多多单 |1）仅支持splitItem为2/3<br>2）x，y中tensor需为2维， shape分别为（M, K）和（M, N）；weight中tensor需为2维，shape为（N, K）或（K, N）；bias中tensor需为1维，shape为（N） <br>3）weight中每个tensor的N轴必须相等<br>4）若传入groupListOptional， groupListOptional的差值需与x中tensor的第一维一一对应，且长度最大为128<br>5）仅支持ND进ND出<br>6）仅支持非量化<br>7）不支持x转置，支持weight转置（weight若为多tensor，则每个tensor是否转置须保持一致）|
 
     </details>
+
+<!-- end id10 -->
 
 ## 调用示例
 

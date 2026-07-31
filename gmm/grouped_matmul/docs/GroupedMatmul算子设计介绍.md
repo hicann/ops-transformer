@@ -15,6 +15,7 @@ GroupedMatmul算子实现时还需要考虑如下两个方面：
 # 2 场景划分
 
 从功能角度可分为非量化场景、量化场景和伪量化场景，代码层面通过三种方式选择具体模板：
+
 1. 编译宏：通过x和weight的数据类型编译的宏ORIG_DTYPE_X，ORIG_DTYPE_WEIGHT；
 2. tilingkey：如x/weight是否转置；
 3. tilingData：如tiling中isPerTokenQuant表示是否为per token量化。

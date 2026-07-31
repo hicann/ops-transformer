@@ -320,7 +320,7 @@ aclnnStatus aclnnBandwidthTest(
 
 - **环境变量约束**：
     - 调用本接口前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB。
-    - 设置大小要求：<code>≥ 2 * (maxBs * worldSize * H * sizeof(dtype) + 2MB)</code>。
+    - 设置大小要求：<code>≥ 2 *(maxBs* worldSize *H* sizeof(dtype) + 2MB)</code>。
 
 - **通信域使用约束**：
     - 一个通信域内的节点需在一个超节点内，不支持跨超节点。

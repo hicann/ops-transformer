@@ -2,20 +2,31 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    ×     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
 - 接口功能：完成量化的Matmul计算、Permute（保证通信后地址连续）和AlltoAll通信的融合，**先计算后通信**，支持K-C量化、mx[量化模式](../../../docs/zh/context/quant_mode_introduction.md)。
 - 计算公式：假设x1的shape为(BS, H1)，x2的shape为(H1, H2)，rankSize为NPU卡数。
 
+  <!-- npu="910b" id7 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
     - K-C量化场景：
@@ -26,6 +37,8 @@
       output = AlltoAll(permutedOut).view(rankSize * BS, H2 / rankSize)
       $$
 
+  <!-- end id7 -->
+  <!-- npu="950" id8 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
 
     - K-C量化场景：
@@ -43,6 +56,8 @@
       permutedOut = computeOut.view(BS, rankSize, H2 / rankSize).permute(1, 0, 2) \\
       output = AlltoAll(permutedOut).view(rankSize * BS, H2 / rankSize)
       $$
+
+  <!-- end id8 -->
 
 ## 函数原型
 
@@ -415,16 +430,32 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
 
 * aclnnQuantMatmulAlltoAll默认支持确定性计算。
 * NPU卡数(rankSize)，根据设备型号有不同限制：
+
+  <!-- npu="910b" id9 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持2、4、8卡。
+  <!-- end id9 -->
+  <!-- npu="950" id10 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：支持2、4、8、16卡。
+  <!-- end id10 -->
+
 * 参数说明中shape使用的变量H2必须整除NPU卡数。
 * BS*rankSize和H2的值不得超过2147483647(INT32_MAX)，BS的值不得小于1，H2的值不得小于2。
 * 不支持空tensor。
 * 非连续tensor的支持度根据不同设备型号有不同的限制：
+
+  <!-- npu="910b" id11 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持任何非连续tensor。
+  <!-- end id11 -->
+  <!-- npu="950" id12 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：仅支持x2为非连续tensor，其它非连续tensor均不支持。
+  <!-- end id12 -->
+
 * 传入的x1、x2、x1Scale、x2Scale与output均不为空指针，且
+
+  <!-- npu="910b" id13 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：biasOptional不支持传入空指针。
+  <!-- end id13 -->
+
 * groupSize相关约束:
   - 仅当x1Scale和x2Scale输入都是2维及以上数据时，groupSize取值有效，其他场景需传入0。
   - 传入的groupSize内部会按如下公式分解得到groupSizeM、groupSizeN、groupSizeK，当其中有1个或多个为0，会根据x1/x2/x1Scale/x2Scale输入shape重新设置groupSizeM、groupSizeN、groupSizeK用于计算。原理：假设groupSizeM=0，表示m方向量化分组值由接口推断，推断公式为groupSizeM = m / scaleM（需保证m能被scaleM整除），其中m与x1 shape中的m一致，scaleM与x1Scale shape中的m一致，k和n方向同理。
@@ -445,6 +476,8 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
     | 4295032832 | [1,1,0] | [1,1,32] |
 
 * 该算子输入输出的数据类型、数据维度和量化模式根据不同设备型号有不同的限制：
+
+  <!-- npu="910b" id14 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     * 量化模式：
       * 目前支持：K-C量化，左矩阵perToken量化，x1QuantMode=3，右矩阵perChannel量化，x2QuantMode=2。
@@ -462,6 +495,8 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
 
     * 维度约束：
       * H1范围仅支持[1, 65535]。
+  <!-- end id14 -->
+  <!-- npu="950" id15 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
     * 量化模式：
       * 目前支持：K-C量化，左矩阵perToken量化，x1QuantMode=3，右矩阵perChannel量化，x2QuantMode=2；mx量化，左矩阵mx量化，x1QuantMode=6，右矩阵mx量化，x2QuantMode=6。
@@ -509,11 +544,19 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
       * H1范围仅支持[1, 65535]。
       * mx量化场景下，x2必须转置，shape为(H2, H1)，transposeX2为True。
       * mx量化场景下，且x1和x2输入为FLOAT4_E2M1时，H1必须是偶数，且ceil(H1/32)必须是偶数。
+  <!-- end id15 -->
+
 * 通算融合算子不支持并发调用，不同的通算融合算子也不支持并发调用。
 * 不支持跨超节点通信，只支持超节点内。
 * 通信约束：
+
+   <!-- npu="910b" id16 -->
    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持MTE通信，且通信缓冲区大于等于200MB。
+   <!-- end id16 -->
+   <!-- npu="950" id17 -->
    - <term>Ascend 950PR/Ascend 950DT</term>：支持AI_CPU通信。
+
+   <!-- end id17 -->
 
 ## 调用示例
 
@@ -521,6 +564,7 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
 
 说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
+<!-- npu="910b" id18 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
     ```Cpp
@@ -755,6 +799,8 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
     }
     ```
 
+<!-- end id18 -->
+<!-- npu="950" id19 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
 
     ```Cpp
@@ -987,3 +1033,5 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
         return 0;
     }
     ```
+
+<!-- end id19 -->

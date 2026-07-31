@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -382,23 +392,30 @@ aclnnStatus aclnnMoeDistributeDispatch(
     </tbody>
     </table>
 
+    <!-- npu="910b" id7 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
         - 不支持共享专家场景，不支持`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`属性。
         - 仅支持EP域，无TP域，不支持`groupTp`、`tpWorldSize`、`tpRankId`属性，`tpRecvCounts`为无效内容。
         - 仅设置环境变量`HCCL_INTRA_PCIE_ENABLE` = 1和`HCCL_INTRA_ROCE_ENABLE` = 0时，`expandScales`内容有效。
 
+    <!-- end id7 -->
+    <!-- npu="A3" id8 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
         - 不支持`expandScales`。
         - 不支持`xActiveMask`输入。
         - `sharedExpertNum`当前取值范围[0, 1]，0表示无共享专家，1表示一个共享专家，当前版本仅支持传1。
         - `sharedExpertRankNum`当前取值范围[0, epWorldSize)，不为0时需满足epWorldSize % sharedExpertRankNum = 0。
 
+    <!-- end id8 -->
+    <!-- npu="950" id9 -->
     - <term>Ascend 950DT</term>：
         - 不支持`expandScales`。
         - 不支持`xActiveMask`输入。
         - `sharedExpertNum`当前取值范围[0, 1]，0表示无共享专家，1表示一个共享专家，当前版本仅支持传1。
         - `sharedExpertRankNum`当前取值范围[0, epWorldSize)，不为0时需满足epWorldSize % sharedExpertRankNum = 0。
         - 当前不支持TP域通信，不支持`groupTp`、`tpWorldSize`、`tpRankId`属性，且`tpSendCounts`为无效内容。
+
+    <!-- end id9 -->
 
 - **返回值**
 
@@ -507,11 +524,20 @@ aclnnStatus aclnnMoeDistributeDispatch(
 - 通信域使用约束：
     - 一个模型中的`MoeDistributeCombine`和`MoeDistributeDispatch`仅支持相同EP通信域，且该通信域中不允许有其他算子。
     - 当前不支持TP域通信。
+
+    <!-- npu="A3" id10 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：一个通信域内的节点需在一个超节点内，不支持跨超节点。
 
+    <!-- end id10 -->
+
 - 通信方式约束：
+
+    <!-- npu="950" id11 -->
     - <term>Ascend 950DT</term>：仅支持UB Memory通信。
 
+    <!-- end id11 -->
+
+<!-- npu="910b" id12 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     - 参数说明里shape格式说明：
         - `H`：表示hidden size隐藏层大小，取值范围(0, 7168]，且保证是32的整数倍。
@@ -526,6 +552,8 @@ aclnnStatus aclnnMoeDistributeDispatch(
             - 若输入`scales`传入有效数据时，其shape为(`moeExpertNum`, `H`)。
     - 组网约束：多机场景仅支持交换机组网，不支持双机直连组网。
 
+<!-- end id12 -->
+<!-- npu="A3" id13 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
     - 该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
     - 参数说明里shape格式说明：
@@ -542,6 +570,8 @@ aclnnStatus aclnnMoeDistributeDispatch(
             - 若输入`scales`传入有效数据且存在共享专家卡时，其shape为(`sharedExpertNum` + `moeExpertNum`, `H`)。
             - 若输入`scales`传入有效数据且不存在共享专家卡时，其shape为(`moeExpertNum`, `H`)。
 
+<!-- end id13 -->
+<!-- npu="950" id14 -->
 - <term>Ascend 950DT</term>：
     - 参数说明里shape格式说明：
         - `H`：表示hidden size隐藏层大小，取值为7168。
@@ -557,8 +587,11 @@ aclnnStatus aclnnMoeDistributeDispatch(
             - 若输入`scales`传入有效数据且存在共享专家卡时，其shape为(`sharedExpertNum` + `moeExpertNum`, `H`)。
             - 若输入`scales`传入有效数据且不存在共享专家卡时，其shape为(`moeExpertNum`, `H`)。
 
+<!-- end id14 -->
+
 ## 调用示例
 
+<!-- npu="910b" id15 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
     - 文件准备：
@@ -611,6 +644,8 @@ aclnnStatus aclnnMoeDistributeDispatch(
         bash build.sh --run_example --ops=moe_distribute_dispatch eager cust
         ```
 
+<!-- end id15 -->
+<!-- npu="A3" id16 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
 
     - 环境变量配置：
@@ -621,8 +656,11 @@ aclnnStatus aclnnMoeDistributeDispatch(
         export ENV_DEV_NUM=16
         ```
 
+<!-- end id16 -->
+
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
+<!-- npu="950,A3,910b" id17 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Ascend 950DT</term>：
 
     ```Cpp
@@ -1136,3 +1174,5 @@ aclnnStatus aclnnMoeDistributeDispatch(
         return 0;
     }
     ```
+
+<!-- end id17 -->

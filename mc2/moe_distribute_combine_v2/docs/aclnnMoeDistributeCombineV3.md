@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -507,6 +517,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     </tbody>
     </table>
 
+    <!-- npu="910b" id7 -->
     <details>
     <summary><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：</summary>
 
@@ -536,7 +547,9 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     - copyExpertNum当commAlg="fullmesh"时，取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
     - constExpertNum当前版本不支持，传0即可。
     </details>
+    <!-- end id7 -->
 
+    <!-- npu="A3" id8 -->
     <details>
     <summary><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：</summary>
 
@@ -564,7 +577,9 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     - copyExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
     - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的常量专家的ID的值是[<code>moeExpertNum + zeroExpertNum + copyExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>)。
     </details>
+    <!-- end id8 -->
 
+    <!-- npu="950" id9 -->
     <details>
     <summary><term>Ascend 950DT</term>：</summary>
 
@@ -592,6 +607,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     - copyExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
     - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的常量专家的ID的值是[<code>moeExpertNum + zeroExpertNum + copyExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>)。
     </details>
+    <!-- end id9 -->
 
 - **返回值**
 
@@ -691,7 +707,11 @@ aclnnStatus aclnnMoeDistributeCombineV3(
   - 所有卡的`groupEp`、`epWorldSize`、`moeExpertNum`、`groupTp`、`tpWorldSize`、`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`、`globalBS`、`commAlg`参数及`HCCL_BUFFSIZE`取值需保持一致，且与`aclnnMoeDistributeDispatchV3`对应参数一致。
 
 - **产品特定约束**：
+
+  <!-- npu="A3" id10 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：单卡包含双DIE（晶粒/裸片），参数说明中的“本卡”均指单DIE。
+
+  <!-- end id10 -->
 
 - **Shape变量约束**：
 
@@ -706,28 +726,52 @@ aclnnStatus aclnnMoeDistributeCombineV3(
 
 - **环境变量约束**：
   - **HCCL_BUFFSIZE**：调用本接口前需检查HCCL_BUFFSIZE环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。
+
+      <!-- npu="910b" id11 -->
       - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
         - commAlg配置为""或nullptr：依照HCCL_INTRA_PCIE_ENABLE和HCCL_INTRA_ROCE_ENABLE环境变量配置，选择"fullmesh"或"hierarchy"公式。
         - commAlg配置为"fullmesh": 设置大小要求 <code>= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB)</code>。
         - commAlg配置为"hierarchy": 设置大小要求(≥ (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512)。
+      <!-- end id11 -->
+      <!-- npu="950,A3" id12 -->
       - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：
         - ep通信域内：设置大小要求 <code>>= 2且满足>= 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 44) + (K + sharedExpertNum) \* maxBS \* Align512(2 \* H))</code>，<code>localExpertNum</code>需使用MoE专家卡的本卡专家数，其中<code>Align512(x) = ((x + 512 - 1) / 512) \* 512，Align32(x) = ((x + 32 - 1) / 32) \* 32</code>。
         - tp通信域内：设置大小要求\>=A \* (H \* 2 + 128) \* 2。
 
+      <!-- end id12 -->
+
   - **HCCL_INTRA_PCIE_ENABLE/HCCL_INTRA_ROCE_ENABLE**：
+
+    <!-- npu="910b" id13 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：该环境变量不再推荐使用，建议commAlg配置"hierarchy"。
+    <!-- end id13 -->
+    <!-- npu="950,A3" id14 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：不支持该环境变量。
+
+    <!-- end id14 -->
 
 - **通信域使用约束**：
   - 一个模型中的`aclnnMoeDistributeCombineV3`系列算子和`aclnnMoeDistributeDispatchV3`仅支持相同EP通信域，且该通信域中不允许有其他算子。
   - 当前不支持TP域通信。
+
+  <!-- npu="A3" id15 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：一个通信域内的节点需在一个超节点内，不支持跨超节点。
 
+  <!-- end id15 -->
+
 - **通信方式约束**：
+
+  <!-- npu="950" id16 -->
   - <term>Ascend 950DT</term>：仅支持UB Memory通信。
 
+  <!-- end id16 -->
+
 - **组网约束**：
+
+  <!-- npu="910b" id17 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：多机场景仅支持交换机组网，不支持双机直连组网。
+
+  <!-- end id17 -->
 
 - **其他约束**：
   - 公式中的“/”表示整除。
@@ -735,6 +779,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(
 
 ## 调用示例
 
+<!-- npu="910b" id18 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：
 
     本示例支持A2算子运行在卡数为[2, 8]的单机环境中，用户可以根据需要在示例代码中设置EP_WORLD_SIZE_A2为卡数，并更改moeExpertNum，使得moeExpertNum可以被EP_WORLD_SIZE_A2整除。
@@ -1173,12 +1218,17 @@ aclnnStatus aclnnMoeDistributeCombineV3(
         }
         ```
 
+<!-- end id18 -->
+<!-- npu="950" id19 -->
 - <term>Ascend 950DT</term> ：请参考[aclnnMoeDistributeCombineV2](../docs/aclnnMoeDistributeCombineV2.md)中调用示例的准备部分和示例代码，按照上文的约束说明重新设置涉及的变量，V4接口相较于V3接口新增的场景参数按上述参数说明传值即可。
 
+<!-- end id19 -->
+<!-- npu="A3" id20 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
 
     具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
+<!-- end id20 -->
 - 示例代码如下，仅供参考
 
     ```Cpp

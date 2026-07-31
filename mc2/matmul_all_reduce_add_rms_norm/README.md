@@ -11,7 +11,7 @@
 
 - 算子功能：完成mm + all_reduce + add + rms_norm计算。
 - 计算公式：
- - 情景一：
+  - 情景一：
 
     $$
     mm\_out = allReduce(x1 @ x2 + bias)

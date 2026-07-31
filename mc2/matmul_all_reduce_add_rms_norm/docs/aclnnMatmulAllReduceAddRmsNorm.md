@@ -6,14 +6,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    ×     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    ×     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：不支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 **说明：** 使用该接口时，请确保驱动固件包和CANN包都为配套的8.0.RC2版本或者配套的更高版本，否则将会引发报错，比如BUS ERROR等。
 
@@ -37,9 +47,8 @@
 ## 函数原型
 
 - aclnnMatmulAllReduceAddRmsNorm和aclnnInplaceMatmulAllReduceAddRmsNorm实现相同的功能，使用区别如下，请根据自身实际场景选择合适的算子。
-
- - aclnnMatmulAllReduceAddRmsNorm：需新建两个输出张量normOut和张量y对象存储计算结果。
- - aclnnInplaceMatmulAllReduceAddRmsNorm：需新建一个输出张量normOut，原非Inplace场景中新建的输出张量y存储的结果直接存储到输入张量residual的内存中。
+- aclnnMatmulAllReduceAddRmsNorm：需新建两个输出张量normOut和张量y对象存储计算结果。
+- aclnnInplaceMatmulAllReduceAddRmsNorm：需新建一个输出张量normOut，原非Inplace场景中新建的输出张量y存储的结果直接存储到输入张量residual的内存中。
 每个算子分为两段式接口，必须先调用“aclnnMatmulAllReduceAddRmsNormGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnMatmulAllReduceAddRmsNorm”接口执行计算。
 
 ```cpp
@@ -327,13 +336,20 @@ aclnnStatus aclnnMatmulAllReduceAddRmsNorm(
 - 只支持x2矩阵转置/不转置，x1矩阵支持不转置场景。
 - 支持1、2、4、8卡，并且仅支持HCCS链路all mesh组网。
 - 支持(b*s)、n为0的空tensor，不支持k为0的空tensor。
+
+<!-- npu="910b" id7 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。
+
+<!-- end id7 -->
 
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
+<!-- npu="910b" id8 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+
+<!-- end id8 -->
 
 ```Cpp
 #include <iostream>

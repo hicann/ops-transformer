@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950DT</term>     |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -557,8 +567,8 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
 
 5. 参数说明里shape格式说明：
     - **A**：表示本卡需要分发的最大token数量，取值范围如下：
-      - 对于共享专家，需满足(A = Bs * epWorldSize * sharedExpertNum / sharedExpertRankNum)。
-      - 对于MoE专家，当`globalBS`为0时，需满足(A >= Bs * epWorldSize * min(localExpertNum, K))；当`globalBS`非0时，需满足(A >= globalBS * min(localExpertNum, K))。
+      - 对于共享专家，需满足(A = Bs *epWorldSize* sharedExpertNum / sharedExpertRankNum)。
+      - 对于MoE专家，当`globalBS`为0时，需满足(A >= Bs *epWorldSize* min(localExpertNum, K))；当`globalBS`非0时，需满足(A >= globalBS * min(localExpertNum, K))。
     - **H**：表示hidden size（隐藏层大小），取值范围为[1024, 8192]。
     - **Bs**：表示batch sequence size（本卡最终输出的token数量），取值范围为(0 < Bs ≤ 512)。
     - **K**：表示选取topK个专家，取值范围为(0 < K ≤ 16)且满足(0 < K ≤ moeExpertNum)。
@@ -568,21 +578,30 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
 
 6. **HCCL_BUFFSIZE**：
    调用本接口前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。
-    - ep通信域内：设置大小要求(≥ 2)且满足(1024^2 * (HCCL_BUFFSIZE - 2) / 2 ≥ Bs * 2 * (H + 128) * (epWorldSize * localExpertNum + K + 1))，其中`localExpertNum`需使用MoE专家卡的本卡专家数。
+    - ep通信域内：设置大小要求(≥ 2)且满足(1024^2 *(HCCL_BUFFSIZE - 2) / 2 ≥ Bs* 2 *(H + 128)* (epWorldSize * localExpertNum + K + 1))，其中`localExpertNum`需使用MoE专家卡的本卡专家数。
     - tp通信域内：预留参数，当前版本不支持。
 
 7. 通信域使用约束：
     - 一个模型中的`aclnnMoeDistributeCombineAddRmsNorm`和`aclnnMoeDistributeDispatchV2`仅支持相同EP通信域，且该通信域中不允许有其他算子。
     - 当前不支持TP域通信。
+
+   <!-- npu="A3" id7 -->
    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：一个通信域内的节点需在一个超节点内，不支持跨超节点。
 
+   <!-- end id7 -->
+
 8. 通信方式约束：
+
+    <!-- npu="950" id8 -->
     - <term>Ascend 950DT</term>：仅支持UB Memory通信。
+
+    <!-- end id8 -->
 
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
+<!-- npu="950,A3" id9 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Ascend 950DT</term>：
 
     ```Cpp
@@ -1052,3 +1071,5 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
         return 0;
     }
     ```
+
+<!-- end id9 -->

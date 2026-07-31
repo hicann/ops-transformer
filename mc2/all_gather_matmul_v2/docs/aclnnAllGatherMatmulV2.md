@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------:|
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                             |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -19,13 +29,18 @@
 
     `aclnnAllGatherMatmulV2`接口是对`aclnnAllGatherMatmul`接口的功能拓展，在支持x1和x2输入类型为FLOAT16/BFLOAT16的基础上，新增功能如下：
 
+    <!-- npu="950" id7 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：
 
         新增了对低精度数据类型FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8的支持。支持pertensor、perblock、mx[量化方式](../../../docs/zh/context/quant_mode_introduction.md)。
 
+    <!-- end id7 -->
+    <!-- npu="A3,910b" id8 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
         新增了对低精度数据类型INT8/INT4的支持。支持pertoken/perchannel[量化方式](../../../docs/zh/context/quant_mode_introduction.md)。
+
+    <!-- end id8 -->
 
 - **计算公式**：
 
@@ -310,6 +325,7 @@ aclnnStatus aclnnAllGatherMatmulV2(
     </tr>
     </tbody></table>
 
+    <!-- npu="A3,910b" id9 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
         - x1、x2：数据类型支持FLOAT16、BFLOAT16、INT8、INT4。
         - bias：在commMode为aiv时，当前版本仅支持输入nullptr。
@@ -319,6 +335,8 @@ aclnnStatus aclnnAllGatherMatmulV2(
         - commMode：当前仅支持aiv模式。aiv模式下使用AI VECTOR核完成通信任务。当前版本仅支持输入“aiv”。
         - output：数据类型支持FLOAT16、BFLOAT16。如果x1类型为FLOAT16、BFLOAT16，则output类型与x1保持一致。
         - gatherOut：数据类型支持FLOAT16、BFLOAT16、INT8、INT4。
+    <!-- end id9 -->
+    <!-- npu="950" id10 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：
         - x1、x2：的数据类型支持FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1。
         - bias：如果x1的数据类型是FLOAT16、BFLOAT16，则bias的数据类型必须为FLOAT16、BFLOAT16。如果x1的数据类型是FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1时，在pertensor和mx量化场景下，bias的数据类型必须为FLOAT。在perblock场景下，仅支持输入为nullptr。
@@ -334,6 +352,8 @@ aclnnStatus aclnnAllGatherMatmulV2(
             groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32
             $$
             - 如果满足重新设置条件，一般情况下，当x1Scale、x2Scale输入都是2维，且数据类型都为FLOAT时，[groupSizeM，groupSizeN，groupSizeK]取值组合会推导为[128, 128, 128]，对应groupSize的值为549764202624；当x1Scale、x2Scale输入都是3维，且数据类型都为FLOAT8_E8M0时，[groupSizeM, groupSizeN, groupSizeK]取值组合会推导为[1, 1, 32]，对应groupSize的值为4295032864。
+
+    <!-- end id10 -->
 
 - **返回值：**
 
@@ -411,6 +431,8 @@ aclnnStatus aclnnAllGatherMatmulV2(
 
 - 确定性计算：
   - `aclnnAllGatherMatmulV2`默认确定性实现。
+
+<!-- npu="950" id11 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
     - 输入x1为2维，其维度为\(m, k\)。x2必须是2维，其维度为\(k, n\)，轴满足mm算子入参要求，k轴相等，且k轴取值范围为\[256, 65535\)。m和n的值不得超过2147483647（INT32_MAX）。
     - x1/x2支持的空tensor场景，m和n可以为空，k不可为空，且需要满足以下条件：
@@ -431,6 +453,8 @@ aclnnStatus aclnnAllGatherMatmulV2(
     - 支持CCU通信引擎和AICPU通信引擎，CCU仅支持单机UB域内互联，AICPU可支持跨机UB域内互联。
     - 使用CCU通信引擎时，单个通信域内allgather(x1)集合通信数据总量不能超过63 \* 256MB，集合通信数据总量计算方式为：m \* k \* sizeof(x1_dtype) \* 卡数。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 
+<!-- end id11 -->
+<!-- npu="A3,910b" id12 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     - 只支持x2矩阵转置/不转置，x1矩阵仅支持不转置场景。
     - 输入x1必须是2维，其shape为\(m, k\)。
@@ -443,13 +467,17 @@ aclnnStatus aclnnAllGatherMatmulV2(
     - 支持2、4、8卡。
     - 通信缓冲区大于等于200MB。
 
+<!-- end id12 -->
+
 ## 调用示例
 
 说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
+<!-- npu="A3,910b" id13 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+
     ```c++
     #include <iostream>
     #include <vector>
@@ -700,6 +728,8 @@ aclnnStatus aclnnAllGatherMatmulV2(
     }
     ```
 
+<!-- end id13 -->
+<!-- npu="950" id14 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
 
     ```c++
@@ -982,3 +1012,5 @@ aclnnStatus aclnnAllGatherMatmulV2(
         return 0;
     }
     ```
+
+<!-- end id14 -->

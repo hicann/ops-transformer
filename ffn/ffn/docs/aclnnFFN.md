@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-|产品      | 是否支持 |
-|:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      ×     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      ×     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：不支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -20,21 +30,21 @@
 
   - **非量化场景：**
 
-	$$
+ $$
     y=activation(x * W1 + b1) * W2 + b2
-	$$
+ $$
 
   - **量化场景：**
 
-	$$
+ $$
     y=((activation((x * W1 + b1) * deqScale1) * scale + offset) * W2 + b2) * deqScale2
-	$$
+ $$
 
   - **伪量化场景：**
 
-	$$
+ $$
     y=activation(x * ((W1 + antiquantOffset1) * antiquantScale1) + b1) * ((W2 + antiquantOffset2) * antiquantScale2) + b2
-	$$
+ $$
 
 **说明：**
 FFN在无专家或单个专家场景是否有性能收益需要根据实际测试情况判断，当整网中FFN结构对应的小算子vector耗时超过30us，且在FFN结构中占比10%以上时，可以尝试使用该融合算子，若实际测试性能劣化则不使用。

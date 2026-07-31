@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                             |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -19,10 +29,15 @@
 
   相较于[aclnnGroupedMatmulSwigluQuant](../../grouped_matmul_swiglu_quant/docs/aclnnGroupedMatmulSwigluQuant.md)接口，**此接口新增：**
 
+    <!-- npu="950" id7 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：
       - 新增了MXFP8、MXFP4、Pertoken量化场景。
       - 参数weight, weightScale, weightAssistMatrix的字段类型变为tensorlist，请根据实际情况选择合适的接口。
+    <!-- end id7 -->
+
 - 计算公式：
+
+  <!-- npu="A3,910b" id8 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     <details>
     <summary>量化场景A8W8（A指激活矩阵，W指权重矩阵，8指INT8数据类型）：</summary>
@@ -200,6 +215,8 @@
           $Q_{i} = \left\lfloor \frac{S_{i}}{Q\_scale_{i}} \right\rceil$
     </details>
 
+  <!-- end id8 -->
+  <!-- npu="950" id9 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
     <details>
     <summary>MX量化场景：</summary>
@@ -284,6 +301,8 @@
 
              $Q_{i} = \lfloor \frac{S_{i}}{Q\_scale_{i}} \rceil$
     </details>
+
+  <!-- end id9 -->
 
 ## 函数原型
 
@@ -540,6 +559,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
     </tbody>
     </table>
 
+    <!-- npu="A3,910b" id10 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
       - weight在A4W4下支持NZ输入转置，其他场景仅支持非转置。INT32为A8W4和A4W4场景下的适配用途，实际1个INT32会被解释为8个INT4数据，A8W8场景不支持ND数据格式。
       - 支持dequantMode参数：A8W4和A4W4场景支持取值0和1，A8W8场景仅支持取值0。
@@ -547,6 +567,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
       - x和weight不支持空Tensor。
       - weight NZ转置输入时，仅支持单Tensor模式
       - weight、weightScale和weightAssistMatrix支持单Tensor场景（tensorlist长度为1）和多Tensor场景（tensorlist长度大于1）。
+    <!-- end id10 -->
+    <!-- npu="950" id11 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：
       - weight支持转置，仅支持ND格式。
       - 支持dequantMode参数：MX量化场景支持取值2，Pertoken场景支持取值为0。
@@ -556,6 +578,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
       - x和xScale支持M为0的空Tensor。
       - weight和weightScale支持N为0的空Tensor。
       - weight和weightScale目前仅支持tensorlist长度为1。
+
+    <!-- end id11 -->
 
   - **返回值**
 
@@ -635,6 +659,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
 
   - 确定性计算：
       - aclnnGroupedMatmulSwigluQuantV2默认为确定性实现。
+
+  <!-- npu="A3,910b" id12 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     - A8W8/A8W4/A4W4量化场景下需满足以下约束条件：
         - 数据类型需要满足下表：
@@ -784,6 +810,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
         - A4W4场景下，不支持N轴长度超过10240，不支持x的尾轴长度大于等于20000。
         - 多tensor场景下，即tensorlist长度大于1时，weight、weightScale和weightAssistMatrix的shape需要按照E的维度展平，例如{(E, K, N)}需要变成{E个(K, N)}。
 
+  <!-- end id12 -->
+  <!-- npu="950" id13 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
     - groupList第1维最大支持1024，即最多支持1024个group。
     - MX量化场景下需满足以下约束条件：
@@ -947,10 +975,13 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
           </tbody>
           </table>
 
+  <!-- end id13 -->
+
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
+  <!-- npu="A3,910b" id14 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
     ```cpp
@@ -1178,6 +1209,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
     }
     ```
 
+  <!-- end id14 -->
+  <!-- npu="950" id15 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
 
     ```cpp
@@ -1435,3 +1468,5 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
         return 0;
     }
     ```
+
+  <!-- end id15 -->

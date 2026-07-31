@@ -860,7 +860,7 @@
       | A8W4-INT | BF16 | INT4(INT32) | INT4(INT32) | UINT64 | UINT64 | FP32 | FP32 | BF16 | 2 | 1（INT8） |
 
   - **<term>Ascend 950PR/Ascend 950DT</term>**：
-    - BS（x.dim0）支持[1, maxBS], maxBS = (8 * (totalUbSize - 48K)) / (topK * (64 + epWorldSize)), 其中totalUbSize为UB总大小，950系列产品该值支持到当前环境能申请的最大内存。
+    - BS（x.dim0）支持[1, maxBS], maxBS = (8 *(totalUbSize - 48K)) / (topK* (64 + epWorldSize)), 其中totalUbSize为UB总大小，950系列产品该值支持到当前环境能申请的最大内存。
     - H（x.dim1）支持1024、2048、3072、4096、5120、6144、7168、8192。
     - topK（topkIds.dim1）支持[1, 32]。
     - expertPerRank 范围 [1, 1024]。

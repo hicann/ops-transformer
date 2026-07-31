@@ -64,6 +64,7 @@ world_size = server_num * rank_per_dev  # 总 world size
 ```
 
 **云环境配置**：当 `is_cloud = 1` 时，需要设置环境变量：
+
 - `VC_TASK_INDEX`: 当前任务索引
 - `VC_WORKER_HOSTS`: Worker 主机列表
 

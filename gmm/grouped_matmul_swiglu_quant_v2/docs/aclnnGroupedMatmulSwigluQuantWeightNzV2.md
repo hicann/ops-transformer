@@ -4,20 +4,32 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                             |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
 - 接口功能：融合GroupedMatmul、dequant、swiglu和quant，详细解释见计算公式。[aclnnGroupedMatmulSwigluQuantV2](./aclnnGroupedMatmulSwigluQuantV2.md)接口的weightNZ特化版本，此接口与aclnnGroupedMatmulSwigluQuantV2的区别在于：weight参数在该场景下强制视为FRACTAL_NZ格式。
 
 - 计算公式：
+
+  <!-- npu="A3,910b" id7 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     <details>
     <summary>量化场景A8W8（A指激活矩阵，W指权重矩阵，8指INT8数据类型）：</summary>
@@ -194,6 +206,8 @@
 
           $Q_{i} = \left\lfloor \frac{S_{i}}{Q\_scale_{i}} \right\rceil$
     </details>
+  <!-- end id7 -->
+  <!-- npu="950" id8 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
     <details>
     <summary>MX量化场景：</summary>
@@ -241,6 +255,8 @@
 
           - $blocksize$：指每次量化的元素个数，仅支持32。
     </details>
+
+  <!-- end id8 -->
 
 ## 函数原型
 
@@ -496,6 +512,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
     </tbody>
     </table>
 
+    <!-- npu="A3,910b" id9 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
       - <strong>weight强制视为FRACTAL_NZ格式。</strong>
       - 上表数据类型列中的角标“1”代表该系列不支持的数据类型
@@ -505,6 +522,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
       - x和weight不支持空Tensor。
       - weight NZ转置输入时，仅支持单Tensor模式
       - weight、weightScale和weightAssistMatrix支持单Tensor场景（tensorlist长度为1）和多Tensor场景（tensorlist长度大于1）。
+    <!-- end id9 -->
+    <!-- npu="950" id10 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：
       - <strong>weight强制视为FRACTAL_NZ格式。</strong>
       - 上表数据类型列中的角标“2”代表该系列不支持的数据类型
@@ -517,6 +536,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
       - MXFP4和MXFP8场景下，weight和weightScale既支持单Tensor场景（tensorlist长度必须为1）也支持多Tensor场景（tensorlist长度大于等于1）。多Tensor场景下，tensorlist长度需等于E，E可以为1，weight、weightScale的shape需要按照E的维度展平，例如{(E, K, N)}需要变成{E个(K, N)}。
       - MXA8W4场景下weight和weightScale支持多Tensor场景（tensorlist长度大于等于1）。
       - MXFP4场景支持weight NZ格式，x和weight为FLOAT4_E2M1或FLOAT4_E1M2（支持交叉），output支持FLOAT8_E4M3FN、FLOAT4_E1M2或FLOAT4_E2M1。
+
+    <!-- end id10 -->
 
   - **返回值**
 
@@ -596,6 +617,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
 
   - 确定性计算：
       - aclnnGroupedMatmulSwigluQuantWeightNzV2默认为确定性实现。
+
+  <!-- npu="A3,910b" id11 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     - A8W8/A8W4/A4W4量化场景下需满足以下约束条件：
         - 数据类型需要满足下表：
@@ -744,6 +767,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
         - A8W4场景下，不支持N轴长度超过10240，不支持x的尾轴长度大于等于20000。
         - A4W4场景下，不支持N轴长度超过10240，不支持x的尾轴长度大于等于20000。
         - 多tensor场景下，即tensorlist长度大于1时，weight、weightScale和weightAssistMatrix的shape需要按照E的维度展平，例如{(E, K, N)}需要变成{E个(K, N)}。
+  <!-- end id11 -->
+  <!-- npu="950" id12 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
     - groupList第1维最大支持1024，即最多支持1024个group。
     - MX量化场景下需满足以下约束条件：
@@ -892,10 +917,13 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
           - 多tensor场景下，所有weightScale tensor的shape需与对应weight tensor匹配。
           - 多tensor场景下，groupList的长度需等于weight/weightScale的tensor数量。
 
+  <!-- end id12 -->
+
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
+  <!-- npu="A3,910b" id13 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
     ```cpp
@@ -1125,6 +1153,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
     }
     ```
 
+  <!-- end id13 -->
+  <!-- npu="950" id14 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
 
     ```cpp
@@ -1435,3 +1465,5 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
         return 0;
     }
     ```
+
+  <!-- end id14 -->

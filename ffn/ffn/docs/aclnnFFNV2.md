@@ -4,14 +4,23 @@
 
 ## 产品支持情况
 
-|产品      | 是否支持 |
-|:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      ×     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      ×     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列加速卡产品</term>|      √     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：不支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+- <term>Atlas 推理系列加速卡产品</term>：支持
+
+<!-- npu="910" id5 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id5 -->
 
 ## 功能说明
 
@@ -514,6 +523,8 @@ N2表示第二个matmul的输出通道数，对应transform中的H。
 - 确定性计算：
   - aclnnFFNV2默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
 - 所有场景下需满足K1=N2, K1<65536, K2<65536, M轴在32Byte对齐后小于INT32的最大值。
+
+<!-- npu="910b" id6 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
   - 有专家时，专家数据的总数需要与x的M保持一致。
   - 激活层为geglu/swiglu/reglu时，仅支持无专家分组时的FLOAT16高性能场景（FLOAT16场景指类型为aclTensor的必选参数数据类型都为FLOAT16的场景），且N1=2\*K2。
@@ -535,6 +546,7 @@ N2表示第二个matmul的输出通道数，对应transform中的H。
   - innerPrecise参数在BFLOAT16非量化场景，只能配置为0；FLOAT16非量化场景，可以配置为0或者1；量化或者伪量化场景，0和1都可配置，但是配置后不生效。
   - tokensIndexFlag为true且有专家（expertTokens不为空）时，expertTokens中的数值必须满足：如果i和j都是expertTokens中有效的数组索引，且j大于i，那么expertTokens中第j个元素的数值大于或者等于expertTokens中第i个元素的数值。
 
+<!-- end id6 -->
 - <term>Atlas 推理系列加速卡产品</term>：
   - 只支持无专家场景。
   - 需满足N1=K2。

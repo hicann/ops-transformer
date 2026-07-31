@@ -4,23 +4,39 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------:|
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
 - 接口功能:
     aclnnMatmulReduceScatterV2接口是对aclnnMatmulReduceScatter接口的功能扩展，在支持x1和x2输入类型为FLOAT16/BFLOAT16的基础上，
+
+    <!-- npu="950" id7 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：
         - 新增了对低精度数据类型FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8/FLOAT4_E2M1的支持。支持pertensor、perblock、mx[量化方式](../../../docs/zh/context/quant_mode_introduction.md)。其中mx量化支持MXFP8和MXFP4量化场景。
+    <!-- end id7 -->
+    <!-- npu="A3,910b" id8 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
         - 新增了对低精度数据类型INT8的支持。支持pertoken/perchannel[量化方式](../../../docs/zh/context/quant_mode_introduction.md)。
+
+    <!-- end id8 -->
 
 - 计算公式：
     - 情形1：如果x1和x2数据类型为FLOAT16/BFLOAT16时，对入参x1、x2、bias进行matmul计算后，进行ReduceScatter通信。
@@ -277,6 +293,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     </tr>
     </tbody></table>
 
+    <!-- npu="A3,910b" id9 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
         - x1、x2：commMode为aiv时，数据类型支持FLOAT16、BFLOAT16、INT8，x1数据格式仅支持ND，x2数据格式支持ND、FRACTAL_NZ。
         - bias：在commMode为aiv时，当x1和x2数据类型为INT8时，bias数据类型可以是FLOAT16、BFLOAT16、FLOAT；当x1和x2数据类型为FLOAT16时，bias数据类型必须为FLOAT16、FLOAT；当x1和x2数据类型为BFLOAT16时，bias数据类型必须为BFLOAT16、FLOAT。
@@ -285,6 +302,8 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         - groupSize：当前版本仅支持输入为0。
         - commMode：当前仅支持aiv模式。aiv模式下使用AI VECTOR核完成通信任务。当前版本仅支持输入“aiv”。
         - output：数据类型支持FLOAT16、BFLOAT16。如果x1类型为FLOAT16、BFLOAT16，则output类型与x1保持一致。
+    <!-- end id9 -->
+    <!-- npu="950" id10 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：
         - x1、x2：数据类型支持FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1，数据格式仅支持ND。
         - bias：如果x1的数据类型是FLOAT16、BFLOAT16，则bias的数据类型必须为FLOAT16、BFLOAT16。如果x1的数据类型是FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1时，在pertensor和mx量化场景下，bias的数据类型必须为FLOAT。在perblock场景下，仅支持输入为nullptr。
@@ -303,6 +322,8 @@ aclnnStatus aclnnMatmulReduceScatterV2(
             $$
             groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32
             $$
+
+    <!-- end id10 -->
 
 - **返回值**
 
@@ -380,12 +401,22 @@ aclnnStatus aclnnMatmulReduceScatterV2(
 ## 约束说明
 
 - 通信约束：
+
+  <!-- npu="910b" id11 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：仅支持commMode为"aiv"，且通信缓冲区大于等于200MB。
+  <!-- end id11 -->
+  <!-- npu="A3" id12 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：仅支持commMode为"aiv"，且通信缓冲区大于等于200MB。
+  <!-- end id12 -->
+  <!-- npu="950" id13 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：当前版本仅支持输入commMode为“ai_cpu” 或 “ccu”。
+
+  <!-- end id13 -->
 
 - 确定性计算：
   - `aclnnMatmulReduceScatterV2`默认采用确定性计算实现。
+
+<!-- npu="950" id14 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
     - 只支持x2矩阵转置/不转置，x1矩阵仅支持不转置场景。
     - 输入x1为2维，其shape为\(m, k\)，m须为卡数rank\_size的整数倍。
@@ -401,8 +432,10 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     - 当x1、x2的数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2时，x1和x2的数据类型可以为其中任意一种。
     - mx量化场景下，且x1和x2输入为FLOAT4_E2M1（MXFP4量化）时，k必须是偶数。
     - 支持2、4、8、16、32、64卡；支持CCU通信和AICPU通信，CCU仅支持单机UB域内互联，AICPU可支持跨机UB域内互联。
-    - ReduceScatter集合通信数据总量不能超过16*256MB，集合通信数据总量计算方式为：m * n * sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
+    - ReduceScatter集合通信数据总量不能超过16*256MB，集合通信数据总量计算方式为：m* n * sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 
+<!-- end id14 -->
+<!-- npu="A3,910b" id15 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     - 只支持x2矩阵转置/不转置，x1矩阵仅支持不转置场景。
     - 输入x1为2维，其shape为\(m, k\)，m须为卡数rank\_size的整数倍。
@@ -414,12 +447,15 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     - bias数据类型与x1关联：当x1和x2数据类型为FLOAT16时，bias数据类型必须为FLOAT16；当x1和x2数据类型为BFLOAT16时，bias数据类型必须为BFLOAT16；当x1和x2数据类型为INT8时，bias数据类型必须为FLOAT。
     - 支持2、4、8卡。
 
+<!-- end id15 -->
+
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
+<!-- npu="A3,910b" id16 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
 
     ```c++
@@ -661,6 +697,8 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     }
     ```
 
+<!-- end id16 -->
+<!-- npu="950" id17 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
 
     ```c++
@@ -929,3 +967,5 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         return 0;
     }
     ```
+
+<!-- end id17 -->

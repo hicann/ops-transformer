@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    ×     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -502,7 +512,11 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
 - 确定性计算：
   - aclnnQuantGroupedMatMulAlltoAllv默认确定性实现。
 - 通信引擎约束：
+
+  <!-- npu="950" id7 -->
   - Ascend 950DT：支持AI_CPU通信。
+  <!-- end id7 -->
+
 - e * epWorldSize最大支持256，e表示单卡上的专家数量，最大支持到32，epWorldSize支持2/4/8/16/32/64/128/256;
 - gmmX的shape(A, H1)，A为sendCounts之和，H1取值范围(0, 65536);
 - gmmWeight的shape(e, H1, N1)，N1取值范围(0, 65536);
@@ -561,7 +575,10 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
 
 注意：由于量化接口仅支持Ascend 950DT，以下示例基于该系列实现。本示例代码以2卡为例，请根据实际环境卡数修改 EP_WORLD_SIZE。
 
+<!-- npu="950" id8 -->
 - <term>Ascend 950DT</term>：
+
+<!-- end id8 -->
 
 ```Cpp
 #include <thread>

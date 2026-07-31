@@ -2,14 +2,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -144,12 +154,17 @@ aclnnStatus aclnnDistributeBarrier(
     </tr>
     </tbody></table>
 
+    <!-- npu="A3" id7 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
         - 不支持FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E1M2、FLOAT4_E2M1、HIFLOAT8、INT4类型。
         - `epWorldSize`取值支持[2, 384]。
 
+    <!-- end id7 -->
+    <!-- npu="950" id8 -->
     - <term>Ascend 950DT</term>：
         - `epWorldSize`取值支持[2, 1024]。
+
+    <!-- end id8 -->
 
 ## aclnnDistributeBarrier
 
@@ -199,7 +214,11 @@ aclnnStatus aclnnDistributeBarrier(
   - aclnnDistributeBarrier默认确定性实现。
 
 - 通信方式约束：
+
+    <!-- npu="950" id9 -->
     - <term>Ascend 950DT</term>：仅支持UB Memory通信。
+
+    <!-- end id9 -->
 
 - 通信域使用约束：
     - 一个模型中的aclnnDistributeBarrier需要使用单独通信域，该通信域中不允许有其他算子。
@@ -212,6 +231,7 @@ aclnnStatus aclnnDistributeBarrier(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
+<!-- npu="950,A3" id10 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Ascend 950DT</term>：
 
     ```Cpp
@@ -666,3 +686,5 @@ aclnnStatus aclnnDistributeBarrier(
         return 0;
     }
     ```
+
+<!-- end id10 -->

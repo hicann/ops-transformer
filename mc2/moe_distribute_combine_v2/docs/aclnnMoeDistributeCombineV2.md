@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -411,6 +421,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     </tbody>
     </table>
 
+    <!-- npu="910b" id7 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
         - `commAlg`支持nullptr、""、"fullmesh"、"hierarchy"；推荐配置"hierarchy"并搭配≥25.0.RC1.1版本驱动；nullptr和""依HCCL环境变量选择算法（不推荐）；"fullmesh"通过RDMA直传token；"hierarchy"经机内、跨机两次发送减少跨机数据量。
         - 不支持共享专家场景。
@@ -429,6 +440,8 @@ aclnnStatus aclnnMoeDistributeCombineV2(
         - `sharedExpertRankNum`当前版本不支持，传0即可。
         - `commQuantMode`取值范围0或2（0表示不量化，2表示int8量化），取值为2仅当commAlg为"hierarchy"或HCCL_INTRA_PCIE_ENABLE=1且HCCL_INTRA_ROCE_ENABLE=0且驱动版本≥25.0.RC1.1时支持。
 
+    <!-- end id7 -->
+    <!-- npu="A3" id8 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
         - `commAlg`当前版本不支持，传空指针即可。
         - `epSendCounts`的shape为(epWorldSize \* max(tpWorldSize, 1) \* localExpertNum, )。
@@ -446,6 +459,8 @@ aclnnStatus aclnnMoeDistributeCombineV2(
         - `sharedExpertRankNum`取值范围[0, epWorldSize)；为0时需满足sharedExpertNum为0或1，不为0时需满足sharedExpertRankNum % sharedExpertNum = 0。
         - `commQuantMode`取值范围0或2（0表示不量化，2表示int8量化），取值为2仅当tpWorldSize < 2时可开启。
 
+    <!-- end id8 -->
+    <!-- npu="950" id9 -->
     - <term>Ascend 950DT</term>：
         - `commAlg`当前版本不支持，传空指针即可。
         - `epSendCounts`的shape为(epWorldSize \* max(tpWorldSize, 1) \* localExpertNum, )。
@@ -462,6 +477,8 @@ aclnnStatus aclnnMoeDistributeCombineV2(
         - `sharedExpertNum`当前取值范围[0, 4]。
         - `sharedExpertRankNum`取值范围[0, epWorldSize)；为0时需满足sharedExpertNum为0或1，不为0时需满足sharedExpertRankNum % sharedExpertNum = 0。
         - `commQuantMode`取值范围0、2、3或4（0表示不量化，2表示int8量化，3表示mxfp8量化e5m2，4表示mxfp8量化e4m3）。
+
+    <!-- end id9 -->
 
 - **返回值**
 
@@ -561,7 +578,11 @@ aclnnStatus aclnnMoeDistributeCombineV2(
   - 调用接口过程中使用的`groupEp`、`epWorldSize`、`moeExpertNum`、`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`、`globalBS`、`commAlg`参数及`HCCL_BUFFSIZE`取值所有卡需保持一致，网络中不同层中也需保持一致，且和`aclnnMoeDistributeDispatchV2`对应参数也保持一致。
 
 - **产品特定约束**：
+
+  <!-- npu="A3" id10 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
+
+  <!-- end id10 -->
 
 - **Shape变量约束**：
 
@@ -576,29 +597,55 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
 - **环境变量约束**：
   - **HCCL_BUFFSIZE**：调用本接口前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。
+
+    <!-- npu="910b" id11 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
       - commAlg为""或nullptr：依HCCL环境变量选择“fullmesh”或“hierarchy”公式。
       - commAlg为"fullmesh"：设置大小要求(≥ 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB))。
       - commAlg为"hierarchy"：设置大小要求(≥ (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512)。
+    <!-- end id11 -->
+    <!-- npu="A3" id12 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
       - ep通信域内：设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 44) + (K + sharedExpertNum) \* maxBS \* Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align512(x) = ((x + 512 - 1) / 512) * 512`；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。
       - tp通信域内：设置大小要求\>=A \* (H \* 2 + 128) \* 2。
+    <!-- end id12 -->
+    <!-- npu="950" id13 -->
     - <term>Ascend 950DT</term>：设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 44) + (K + sharedExpertNum) \* maxBS \* Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align512(x) = ((x + 512 - 1) / 512) * 512`；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。
 
+    <!-- end id13 -->
+
   - **HCCL_INTRA_PCIE_ENABLE和HCCL_INTRA_ROCE_ENABLE**：
+
+    <!-- npu="910b" id14 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：该环境变量不再推荐使用，建议通过`commAlg`配置为"hierarchy"。
+    <!-- end id14 -->
+    <!-- npu="950,A3" id15 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：不支持该环境变量。
+
+    <!-- end id15 -->
 
 - **通信域使用约束**：
   - 一个模型中的`aclnnMoeDistributeCombineV2`和`aclnnMoeDistributeDispatchV2`仅支持相同EP通信域，且该通信域中不允许有其他算子。
   - 当前不支持TP域通信。
+
+  <!-- npu="A3" id16 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：一个通信域内的节点需在一个超节点内，不支持跨超节点。
 
+  <!-- end id16 -->
+
 - **通信方式约束**：
+
+  <!-- npu="950" id17 -->
   - <term>Ascend 950DT</term>：仅支持UB Memory通信。
 
+  <!-- end id17 -->
+
 - **组网约束**：
+
+  <!-- npu="910b" id18 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：多机场景仅支持交换机组网，不支持双机直连组网。
+
+  <!-- end id18 -->
 
 - **其他约束**：
   - 公式中的“/”表示整除。
@@ -623,6 +670,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
     单机16卡场景则无需修改。
 
+<!-- npu="910b" id19 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
     无需配置ranktable文件以及环境变量RANK_TABLE_FILE、FIRST_RANK_ID。
@@ -642,12 +690,17 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     bash build.sh --run_example --ops=moe_distribute_combine_v2 eager cust
     ```
 
+<!-- end id19 -->
+<!-- npu="950,A3" id20 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Ascend 950DT</term>：
 
     无需配置ranktable文件以及环境变量RANK_TABLE_FILE、FIRST_RANK_ID。
 
+<!-- end id20 -->
+
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
+<!-- npu="950,A3,910b" id21 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Ascend 950DT</term>：
 
     ```Cpp
@@ -1382,3 +1435,5 @@ aclnnStatus aclnnMoeDistributeCombineV2(
         return 0;
     }
     ```
+
+<!-- end id21 -->

@@ -399,7 +399,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     - 当x1、x2的数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2时，x1和x2的数据类型可以为其中任意一种。
     - mx量化场景下，且x1和x2输入为FLOAT4_E2M1（MXFP4量化）时，k必须是偶数。
     - 支持2、4、8、16、32、64卡；支持CCU通信和AICPU通信，CCU仅支持单机UB域内互联，AICPU可支持跨机UB域内互联。
-    - ReduceScatter集合通信数据总量不能超过16*256MB，集合通信数据总量计算方式为：m * n * sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
+    - ReduceScatter集合通信数据总量不能超过16*256MB，集合通信数据总量计算方式为：m* n * sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     - 只支持x2矩阵转置/不转置，x1矩阵仅支持不转置场景。

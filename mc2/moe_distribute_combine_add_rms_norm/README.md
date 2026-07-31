@@ -414,8 +414,8 @@ $$
 
 - 参数说明里shape格式说明：
     - A：表示本卡需要分发的最大token数量，取值范围如下：
-        - 对于共享专家，要满足A = Bs * epWorldSize * sharedExpertNum / sharedExpertRankNum。
-        - 对于MoE专家，当globalBs为0时，要满足A >= Bs * epWorldSize * min(localExpertNum, K)；当globalBs非0时，要满足A >= globalBs * min(localExpertNum, K)。
+        - 对于共享专家，要满足A = Bs *epWorldSize* sharedExpertNum / sharedExpertRankNum。
+        - 对于MoE专家，当globalBs为0时，要满足A >= Bs *epWorldSize* min(localExpertNum, K)；当globalBs非0时，要满足A >= globalBs * min(localExpertNum, K)。
     - H：表示hidden size隐藏层大小，取值范围为[1024, 8192]。
     - Bs：表示batch sequence size，即本卡最终输出的token数量，取值范围为0 < Bs ≤ 512。
     - K：表示选取topK个专家，取值范围为0 < K ≤ 16同时满足0 < K ≤ moeExpertNum。
@@ -424,7 +424,7 @@ $$
         - 对于MoE专家卡，localExpertNum = moeExpertNum / (epWorldSize - sharedExpertRankNum)，当前版本不支持TP域通信。
 
 - HCCL_BUFFSIZE：
-    调用本接口前需检查HCCL_BUFFSIZE环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。要求 >= 2且满足1024 ^ 2 * (HCCL_BUFFSIZE - 2) / 2 >= (BS * 2 * (H + 128) * (epWorldSize * localExpertNum + K + 1))，localExpertNum需使用MoE专家卡的本卡专家数。
+    调用本接口前需检查HCCL_BUFFSIZE环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。要求 >= 2且满足1024 ^ 2 *(HCCL_BUFFSIZE - 2) / 2 >= (BS* 2 *(H + 128)* (epWorldSize * localExpertNum + K + 1))，localExpertNum需使用MoE专家卡的本卡专家数。
 
 - 通信域使用约束：
     - 一个模型中的aclnnMoeDistributeCombineAddRmsNorm和aclnnMoeDistributeDispatchV2仅支持相同EP通信域，且该通信域中不允许有其他算子。

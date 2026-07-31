@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    ×     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -36,7 +46,10 @@
 
 - 新增`commMode`参数，用户根据该参数指定芯片使用的通信引擎。
 
+  <!-- npu="950" id7 -->
   - <term>Ascend 950DT</term>：支持`ai_cpu`和`ccu`。
+
+  <!-- end id7 -->
 
 ## 函数原型
 
@@ -520,7 +533,11 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
 - 确定性计算：
   - aclnnQuantGroupedMatMulAlltoAllvV2默认确定性实现。
 - 通信引擎约束：
+
+  <!-- npu="950" id8 -->
   - Ascend 950DT：支持CCU通信和AI_CPU通信，CCU仅支持单机UB域内互联，AI_CPU可支持跨机UB域内互联。
+  <!-- end id8 -->
+
 - e * epWorldSize最大支持256，e表示单卡上的专家数量，最大支持到32，epWorldSize支持2/4/8/16/32/64/128/256;
 - gmmX的shape(A, H1)，A为sendCounts之和，H1取值范围(0, 65536);
 - gmmWeight的shape(e, H1, N1)，N1取值范围(0, 65536);
@@ -579,6 +596,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
 
 说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
+<!-- npu="950" id9 -->
 - <term>Ascend 950DT</term>：
 
     ```Cpp
@@ -932,3 +950,5 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
         return 0;
     }
     ```
+
+<!-- end id9 -->

@@ -18,6 +18,7 @@
     相较于DistributeBarrier算子，该算子变更如下：
     - 新增`context`入参，存入通信域相关信息；
     详细说明请参考以下参数说明。
+
 ## 参数说明
 
 <table style="undefined;table-layout: fixed; width: 1392px"> <colgroup>
@@ -81,6 +82,7 @@
  </tbody></table>
 
   - <term>Ascend 950PR/Ascend 950DT</term>：timeOutOptional参数里的超时时间单位为us，建议配置5000000us，根据实际环境不同超时时间下限可能不同。
+
 ## 约束说明
 
 - 通信域使用约束：
