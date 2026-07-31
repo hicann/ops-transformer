@@ -26,6 +26,7 @@
 ElasticBuffer类提供统一的分布式通信buffer管理能力：
 
 - Engram存储接口用于分布式Engram存储管理，支持将本rank的表写入host pinned共享段，以及通过RDMA从远端rank抓取Engram数据。需与 [get_engram_storage_size_hint](#get_engram_storage_size_hint静态方法) 配套使用。
+- Engram训练接口在推理接口的基础上，通过 `with_grad=True` 开启训练模式。前向 [engram_fetch](#engram_fetch) 在抓取数据的同时保存反向所需的通信元数据（封装为 [EngramFetchCtx](#engramfetchctx)），反向 [engram_fetch_grad](#engram_fetch_grad) 根据这些元数据将梯度沿前向路径反向交换并按local entry稀疏累加，产出稀疏梯度用于优化器更新。
 - Dispatch/Combine接口用于MoE的Expert Parallelism（EP）并行部署，支持通过[dispatch](#dispatch)将token数据分发到对应专家卡，再通过[combine](#combine)将专家输出按原路由聚合回原始序列。需与[get_moe_ep_ccl_buffer_size](#get_moe_ep_ccl_buffer_size静态方法)配套使用。
 
 ## 函数原型
@@ -40,11 +41,18 @@ class ElasticBuffer:
         num_max_tokens_per_rank: Optional[int] = None,
         hidden: Optional[int] = None,
         num_topk: Optional[int] = None,
+        with_grad: bool = False,
     )
 
     def engram_write(self, storage: torch.Tensor) -> None
 
-    def engram_fetch(self, indices: torch.Tensor) -> Callable[[], torch.Tensor]
+    def engram_fetch(self, indices: torch.Tensor) -> Callable
+
+    def engram_fetch_grad(
+        self,
+        grad_fetched: torch.Tensor,
+        fetch_ctx: EngramFetchCtx,
+    ) -> Tuple[torch.Tensor, torch.Tensor]
 
     def barrier(self, use_comm_stream: bool = True, with_cpu_sync: bool = False) -> None
 
@@ -90,6 +98,18 @@ class ElasticBuffer:
     def destroy(self) -> None
 ```
 
+## EngramFetchCtx
+
+前向 [engram_fetch](#engram_fetch) 在 `with_grad=True` 时返回的save-for-backward上下文，需原样传递给反向 [engram_fetch_grad](#engram_fetch_grad)。该对象由内部自动构造，无需手动创建。
+
+| 属性 | 类型 | shape | 说明 |
+|------|------|-------|------|
+| `perm` | `Tensor` | `(T,)` int32 | 桶排列序索引，反向按此重排梯度 |
+| `send_counts` | `Tensor` | `(W*8,)` int32 | 每rank发送的index数量（填充至32字节对齐，前W个元素有效），反向a2a的send量 |
+| `recv_counts` | `Tensor` | `(W,)` int32 | 每rank接收的index数量，反向a2a的recv量 |
+| `recv_local_entry` | `Tensor` | `(R_max,)` int32 | 接收到的local entry索引，反向按此scatter-add |
+| `num_recv` | `Tensor` | `(1,)` int32 | 实际接收行数R |
+
 ## 成员函数说明
 
 ### **init**
@@ -101,15 +121,16 @@ class ElasticBuffer:
 - **group** (`torch.distributed.ProcessGroup`)：必选参数，分布式进程组，用于跨rank通信和同步。
 - <strong>*</strong>：其之前的变量是位置相关的；之后的变量是可选参数，需要使用键值对赋值，不赋值会使用默认值。
 - **num_cpu_bytes** (`int`)：可选参数，CPU buffer大小（字节），用于host pinned存储区分配。默认值为0，且必须2MB对齐。
-- **num_max_tokens_per_rank** (`int`)：可选参数，表示每张卡上的最大token数量上限。使用 [dispatch](#dispatch) 和 [combine](#combine) 时必须与 `hidden`、`num_topk` 一起指定。
+- **num_max_tokens_per_rank** (`int`)：可选参数，表示每张卡上的最大token数量上限。使用 [dispatch](#dispatch) 和 [combine](#combine) 时必须与 `hidden`、`num_topk` 一起指定；使用 `with_grad=True` 训练模式时必须指定且大于0。
 - **hidden** (`int`)：可选参数，hidden size隐藏层大小。
 - **num_topk** (`int`)：可选参数，表示选取topK个专家。
+- **with_grad** (`bool`)：可选参数，是否开启训练。默认为 `False`（推理）。设为 `True` 时，前向 [engram_fetch](#engram_fetch) 会额外保存反向所需的通信元数据（封装为 [EngramFetchCtx](#engramfetchctx)），并可通过 [engram_fetch_grad](#engram_fetch_grad) 执行反向。
 
 **输出**：无返回值，构造ElasticBuffer实例。
 
 ### engram_write
 
-**功能**：将本rank的Engram表数据写入host pinned共享内存段，使其他rank可通过RDMA读取该数据。
+**功能**：将本rank的Engram表数据写入host pinned共享内存段，使其他rank可通过RDMA读取该数据。推理模式和训练模式均通过此接口写入storage。写入完成后，内部会自动获取通信上下文tensor、本地storage地址、通信buffer大小和rank数等信息，供后续 [engram_fetch](#engram_fetch) 使用。
 
 > **host pinned共享内存段**：指通过 `aclrtMallocHost` 分配的页锁定（pinned）主机内存，并经 `aclrtHostRegisterV2` 映射后获得设备可访问地址。该内存段既可被本卡NPU直接访问，也可被远端rank的NPU通过RDMA读取，从而实现跨rank的零拷贝数据共享。其大小由构造函数的 `num_cpu_bytes` 参数指定。
 
@@ -131,13 +152,16 @@ ElasticBuffer.engram_write(storage) -> None
 
 **输入参数**：
 
-- **storage** (`Tensor`)：必选参数，待写入的CPU tensor，shape为 `(num_entries, hidden)`，表示有 `num_entries` 个条目，每个条目维度为 `hidden`。
+- **storage** (`Tensor`)：必选参数，待写入的CPU tensor，shape为 `(num_entries, hidden)`，表示有 `num_entries` 个条目，每个条目维度为 `hidden`。要求2维、连续、`hidden`必须128对齐，数据类型支持 `bfloat16`、`float16`、`float32`。
 
 **输出说明**：无返回值，数据写入host pinned内存。
 
 ### engram_fetch
 
-**功能**：根据输入的全局索引，通过RDMA从对应rank的host pinned共享内存中抓取对应的Engram数据。接口采用异步设计：调用后立即返回一个callable，执行该callable时阻塞等待RDMA传输完成并返回结果tensor。
+**功能**：根据输入的全局索引，从对应rank抓取Engram数据。推理和训练的行为由构造时的 `with_grad` 决定：
+
+- **推理**（`with_grad=False`）：通过RDMA one-sided read从远端rank的host pinned共享内存抓取数据。接口采用异步设计：调用后立即返回一个callable，执行该callable时阻塞等待RDMA传输完成并返回结果tensor。
+- **训练**（`with_grad=True`）：通过all-to-all通信从远端rank抓取数据（桶排序 → a2a交换indices → 本地gather → a2a交换data → 还原），返回一个callable，执行该callable时等待传输完成并返回 `(fetched, fetch_ctx)` 二元组，其中 `fetch_ctx` 为save-for-backward上下文 [EngramFetchCtx](#engramfetchctx)。
 
 **计算公式**：
 
@@ -163,7 +187,7 @@ $EngramTable[rank\_id][local\_idx]$ 表示其中第 $local\_idx$ 个条目。
 **函数原型**：
 
 ```python
-ElasticBuffer.engram_fetch(indices) -> Callable[[], Tensor]
+ElasticBuffer.engram_fetch(indices) -> Callable
 ```
 
 **输入参数**：
@@ -172,11 +196,36 @@ ElasticBuffer.engram_fetch(indices) -> Callable[[], Tensor]
 
 **输出说明**：
 
-- **wait_callable** (`Callable[[], Tensor]`)：返回一个callable，调用时阻塞至RDMA完成并返回fetched tensor。
+- **wait_callable** (`Callable`)：返回一个callable，调用时根据模式返回不同结果。
 
-调用 `wait_callable()` 返回：
+**推理**调用 `wait_callable()` 返回：
 
 - **fetched** (`Tensor`)：NPU tensor，shape为 `(num_tokens, hidden)`，数据类型与 [engram_write](#engram_write) 的 `storage.dtype` 相同，数据格式为 $ND$。
+
+**训练**调用 `wait_callable()` 返回：
+
+- **fetched** (`Tensor`)：NPU tensor，shape为 `(num_tokens, hidden)`，数据类型与 `storage.dtype` 相同，数据格式为 $ND$。
+- **fetch_ctx** (`EngramFetchCtx`)：save-for-backward上下文，包含反向所需的5个通信元数据tensor（详见 [EngramFetchCtx](#engramfetchctx)）。需原样传递给 [engram_fetch_grad](#engram_fetch_grad)。
+
+### engram_fetch_grad
+
+**功能**：训练反向接口，需与训练模式的 [engram_fetch](#engram_fetch) 配套使用。根据前向保存的 [EngramFetchCtx](#engramfetchctx)，将 `grad_fetched` 沿前向路径反向交换并按local entry稀疏累加，产出稀疏梯度用于优化器更新。
+
+**函数原型**：
+
+```python
+ElasticBuffer.engram_fetch_grad(grad_fetched, fetch_ctx) -> (Tensor, Tensor)
+```
+
+**输入参数**：
+
+- **grad_fetched** (`Tensor`)：必选参数，前向 `fetched` 的梯度，NPU tensor，shape为 `(num_tokens, hidden)`，数据类型支持 `bfloat16`、`float16`、`float32`，数据格式为 $ND$。
+- **fetch_ctx** (`EngramFetchCtx`)：必选参数，前向 [engram_fetch](#engram_fetch) 训练模式返回的上下文对象，包含 `perm`、`send_counts`、`recv_counts`、`recv_local_entry`、`num_recv` 五个字段。
+
+**输出说明**：
+
+- **grad_unique** (`Tensor`)：NPU tensor，shape为 `(K, hidden)`，数据类型与 `grad_fetched` 相同（kernel内部按FP32累加后转回输出dtype），数据格式为 $ND$。其中 `K` 为去重后的local entry数量（运行时决定），前 `K` 行有效。
+- **unique_local_entry** (`Tensor`)：NPU tensor，shape为 `(K,)`，数据类型为 `int32`，数据格式为 $ND$。表示 `grad_unique` 每行对应的local entry索引，用于优化器按索引更新 `storage[unique_local_entry] -= lr × grad_unique`。
 
 ### barrier
 
@@ -382,7 +431,7 @@ ccl_buffer_size = Align2(Align1MB(minimum_buffer_size) / 1MB) / 2
 
 ### destroy
 
-**功能**：释放ElasticBuffer资源，包括host pinned内存、Engram运行时资源和Dispatch/Combine通信上下文。
+**功能**：释放ElasticBuffer资源，包括host pinned内存、Engram运行时资源和Dispatch/Combine通信上下文。训练模式下HCCL默认通信buffer由框架管理，无需手动释放。
 
 **输入参数**：无参数。
 
@@ -410,6 +459,13 @@ ccl_buffer_size = Align2(Align1MB(minimum_buffer_size) / 1MB) / 2
 - **Engram调用顺序约束**：
   - 必须先调用 [engram_write](#engram_write) 至少一次，才能调用 [engram_fetch](#engram_fetch)。
   - 同一ElasticBuffer实例上不允许并发 [engram_fetch](#engram_fetch)（需等待上次fetch的callable执行完成）。
+  - 训练模式下，必须先调用 [engram_fetch](#engram_fetch)（训练模式）获取 `fetch_ctx`，才能调用 [engram_fetch_grad](#engram_fetch_grad)。
+
+- **Engram训练模式约束**：
+  - `with_grad=True` 时，`num_max_tokens_per_rank` 必须为正整数。
+  - `with_grad=True` 时，[engram_fetch](#engram_fetch) 返回的 `fetch_ctx` 为局部变量，多次fetch不会覆盖（每次调用返回独立的ctx）。
+  - [engram_fetch_grad](#engram_fetch_grad) 的 `grad_fetched` shape 必须与前向 `fetched` 一致。
+  - 训练模式下，通信buffer使用HCCL默认buffer（大小受 `HCCL_BUFFSIZE` 环境变量控制，默认200MB），由框架管理，无需手动申请或释放。
 
 - **Engram数值约束**：
   - `num_cpu_bytes`、`num_entries`必须非负。
@@ -550,6 +606,101 @@ if __name__ == "__main__":
     else:
         print("[ERROR] Task failed. Please check the detailed error logs.")
         exit(1)
+```
+
+### Engram训练模式调用（多卡分布式）
+
+```python
+import os
+import torch
+import torch_npu
+import torch.distributed as dist
+from torch.multiprocessing import Process
+from cann_ops_transformer import ElasticBuffer
+
+num_entries = 4
+hidden = 128
+dtype = torch.bfloat16
+world_size = 2
+num_tokens = 6
+
+
+def set_device(rank):
+    torch_npu.npu.set_device(rank)
+
+
+def init_hccl_comm(rank, world_size):
+    dist.init_process_group(
+        backend="hccl",
+        rank=rank,
+        world_size=world_size,
+        init_method=f"tcp://127.0.0.1:50003",
+    )
+    return dist.new_group(backend="hccl", ranks=list(range(world_size)))
+
+
+def train_worker(rank):
+    set_device(rank)
+    group = init_hccl_comm(rank, world_size)
+    device = f"npu:{rank}"
+
+    # ==================== 生成 embedding 和 indices ====================
+    torch.manual_seed(42 + rank)
+    storage = torch.randn(num_entries, hidden, dtype=dtype)
+    total_entries = num_entries * world_size
+
+    torch.manual_seed(100 + rank)
+    indices = torch.randint(0, total_entries, (num_tokens,), dtype=torch.int32)
+
+    # ==================== 创建 ElasticBuffer（with_grad=True）====================
+    num_cpu_bytes = ElasticBuffer.get_engram_storage_size_hint(
+        num_entries, hidden, dtype
+    )
+    buffer = ElasticBuffer(
+        group=group,
+        num_cpu_bytes=num_cpu_bytes,
+        num_max_tokens_per_rank=num_tokens,
+        with_grad=True,
+    )
+
+    # ==================== 写入 storage ====================
+    buffer.engram_write(storage)
+    dist.barrier()
+    torch.npu.synchronize()
+
+    # ==================== 训练前向 ====================
+    indices_npu = indices.to(device)
+    fetched, fetch_ctx = buffer.engram_fetch(indices_npu)()
+    print(f"[rank {rank}] forward: fetched shape={fetched.shape}")
+
+    # ==================== 训练反向 ====================
+    # 假设 grad_fetched 来自 loss.backward()
+    grad_fetched = fetched.clone()
+    grad_unique, unique_local_entry = buffer.engram_fetch_grad(grad_fetched, fetch_ctx)
+    print(f"[rank {rank}] backward: grad_unique shape={grad_unique.shape}, dtype={grad_unique.dtype}")
+    print(f"[rank {rank}] backward: unique_local_entry={unique_local_entry.cpu().tolist()}")
+
+    # ==================== 优化器更新（稀疏） ====================
+    # storage[unique_local_entry] -= lr * grad_unique
+    # 注意: grad_unique 与 grad_fetched 同 dtype, 需类型转换后更新 storage
+
+    # ==================== 清理 ====================
+    dist.barrier()
+    torch.npu.synchronize()
+    buffer.destroy()
+    dist.destroy_process_group()
+
+
+if __name__ == "__main__":
+    torch.multiprocessing.set_start_method("forkserver", force=True)
+    proc_list = []
+    for rank in range(world_size):
+        proc = Process(target=train_worker, args=(rank,))
+        proc.start()
+        proc_list.append(proc)
+    for proc in proc_list:
+        proc.join()
+    print("All processes finished.")
 ```
 
 ### Dispatch/Combine单算子模式调用（多卡分布式）

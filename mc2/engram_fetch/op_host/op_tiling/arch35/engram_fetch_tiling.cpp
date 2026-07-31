@@ -407,6 +407,12 @@ static ge::graphStatus CheckTrainingParams(const gert::TilingContext *context, i
                         (std::to_string(recvCountsOutShape->GetStorageShape().GetDimNum()) + "D").c_str(),
                         "The shape dim of recvCountsOut must be 1D."),
                     return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        recvCountsOutShape->GetStorageShape().GetDim(0) <= 0,
+        OP_LOGE_FOR_INVALID_VALUE(
+            nodeName, "recvCountsOut",
+            (std::string("dim0=") + std::to_string(recvCountsOutShape->GetStorageShape().GetDim(0))).c_str(), "> 0"),
+        return ge::GRAPH_FAILED);
 
     const gert::StorageShape *recvLocalEntryOutShape = context->GetOutputShape(RECV_LOCAL_ENTRY_OUT_INDEX);
     OP_TILING_CHECK(recvLocalEntryOutShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "recvLocalEntryOut"),
