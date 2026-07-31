@@ -22,11 +22,11 @@ static const size_t INDEX_IN_SORTED_EXPERTS_X1 = 0;
 static constexpr size_t INDEX_out = 0;
 constexpr size_t numExpertsAttrIdx = 0U;
 
-static ge::graphStatus InfershapeForMoeComputeExpertTokens(gert::InferShapeContext* context)
+static ge::graphStatus InfershapeForMoeComputeExpertTokens(gert::InferShapeContext *context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do MoeComputeExpertTokensInfershape.");
     // 获取输入值shape
-    const gert::Shape* inputShape = context->GetInputShape(INDEX_IN_SORTED_EXPERTS_X1);
+    const gert::Shape *inputShape = context->GetInputShape(INDEX_IN_SORTED_EXPERTS_X1);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputShape);
 
     // 获取属性值
@@ -35,13 +35,13 @@ static ge::graphStatus InfershapeForMoeComputeExpertTokens(gert::InferShapeConte
     int64_t numExperts = *(attrs->GetInt(numExpertsAttrIdx));
     std::string numExpertsStr = std::to_string(numExperts);
     OP_CHECK_IF(
-        numExperts <= 0,
+        numExperts <= 0 || numExperts > 2048,
         OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "num_experts",
-            numExpertsStr.c_str(), "greater than 0"),
+                                  numExpertsStr.c_str(), "greater than 0 and not greater than 2048"),
         return GRAPH_FAILED);
 
     // 获取输出值shape
-    gert::Shape* output_y_shape = context->GetOutputShape(INDEX_out);
+    gert::Shape *output_y_shape = context->GetOutputShape(INDEX_out);
     OP_CHECK_NULL_WITH_CONTEXT(context, output_y_shape);
 
     const size_t input_dim_num = 1;

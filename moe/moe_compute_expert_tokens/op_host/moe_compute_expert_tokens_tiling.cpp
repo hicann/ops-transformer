@@ -105,25 +105,25 @@ static bool CheckParamsShape(const gert::TilingContext *context)
     std::string sortedExpertDimNum = std::to_string(sortedExpertShape.GetDimNum());
     OP_CHECK_IF(sortedExpertShape.GetDimNum() != SHAPE_SIZE,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "sorted_experts",
-                    sortedExpertDimNum.c_str(), "1D"),
+                                             sortedExpertDimNum.c_str(), "1D"),
                 return false);
 
     std::string outDimNum = std::to_string(outShape.GetDimNum());
     OP_CHECK_IF(outShape.GetDimNum() != SHAPE_SIZE,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "total_rows_before_expert",
-                    outDimNum.c_str(), "1D"),
+                                             outDimNum.c_str(), "1D"),
                 return false);
 
     std::string sortedExpertDtype = Ops::Base::ToString(sortedExpertType);
     OP_CHECK_IF(sortedExpertType != ge::DT_INT32 || dtypeSize != 4,
                 OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "sorted_experts",
-                    sortedExpertDtype.c_str(), "INT32"),
+                                          sortedExpertDtype.c_str(), "INT32"),
                 return false);
 
     std::string numOfExpertStr = std::to_string(numOfExpert);
-    OP_CHECK_IF(numOfExpert == 0,
+    OP_CHECK_IF(numOfExpert <= 0 || numOfExpert > 2048,
                 OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "num_experts",
-                    numOfExpertStr.c_str(), "greater than 0"),
+                                          numOfExpertStr.c_str(), "greater than 0 and not greater than 2048"),
                 return false);
 
     return true;
@@ -307,7 +307,8 @@ static inline ge::graphStatus InitPlatformTilingData(gert::TilingContext *contex
     std::string totalCoreNumStr = std::to_string(totalCoreNum);
     OP_CHECK_IF((totalCoreNum <= 0),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "total_core_num",
-                    totalCoreNumStr.c_str(), "The platform core num should be greater than 0."),
+                                                      totalCoreNumStr.c_str(),
+                                                      "The platform core num should be greater than 0."),
                 return ge::GRAPH_FAILED);
 
     uint64_t ubSizePlatForm;
@@ -316,7 +317,8 @@ static inline ge::graphStatus InitPlatformTilingData(gert::TilingContext *contex
     std::string ubSizePlatFormStr = std::to_string(ubSizePlatForm);
     OP_CHECK_IF((ubSizePlatForm <= 0),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "ub_size",
-                    ubSizePlatFormStr.c_str(), "The platform UB size should be greater than 0."),
+                                                      ubSizePlatFormStr.c_str(),
+                                                      "The platform UB size should be greater than 0."),
                 return ge::GRAPH_FAILED);
 
     tilingData.set_totalCoreNum(effectiveCoreNum);
@@ -333,14 +335,14 @@ static inline ge::graphStatus InitInputTilingData(gert::TilingContext *context,
     std::string sortedExpertInputDimNum = std::to_string(sortedExpertInputShape.GetDimNum());
     OP_CHECK_IF(sortedExpertInputShape.GetDimNum() != 1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "sorted_experts",
-                    sortedExpertInputDimNum.c_str(), "1D"),
+                                             sortedExpertInputDimNum.c_str(), "1D"),
                 return ge::GRAPH_FAILED);
 
     tilingData.set_sortedExpertNum(sortedExpertInputShape.GetDim(0));
     std::string sortedExpertNumStr = std::to_string(tilingData.get_sortedExpertNum());
     OP_CHECK_IF(tilingData.get_sortedExpertNum() > BSK_BOUND_NUM_UP_LIMIT,
                 OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "sorted_experts",
-                    sortedExpertNumStr.c_str(), "not greater than 2**24"),
+                                          sortedExpertNumStr.c_str(), "not greater than 2**24"),
                 return ge::GRAPH_FAILED);
 
     auto attrs = context->GetAttrs();
@@ -350,9 +352,9 @@ static inline ge::graphStatus InitInputTilingData(gert::TilingContext *context,
     const int64_t numOfExpert = *numOfExpertPtr;
     tilingData.set_numOfExpert(numOfExpert);
     std::string numOfExpertStr = std::to_string(tilingData.get_numOfExpert());
-    OP_CHECK_IF(tilingData.get_numOfExpert() > E_BOUND_NUM_UP_LIMIT,
+    OP_CHECK_IF(tilingData.get_numOfExpert() <= 0 || tilingData.get_numOfExpert() > E_BOUND_NUM_UP_LIMIT,
                 OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "num_experts",
-                    numOfExpertStr.c_str(), "not greater than 2048"),
+                                          numOfExpertStr.c_str(), "greater than 0 and not greater than 2048"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -362,17 +364,17 @@ static inline ge::graphStatus CalcMoeComputeExpertTokensTiling(gert::TilingConte
 {
     OP_CHECK_IF(CalcTemplate3ParamTiling(context, tilingData) != ge::GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "CalcTemplate3ParamTiling",
-                    "GRAPH_FAILED", "CalcTemplate3ParamTiling failed."),
+                                                      "GRAPH_FAILED", "CalcTemplate3ParamTiling failed."),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(CalcSortedExpertTiling(context, tilingData) != ge::GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "CalcSortedExpertTiling",
-                    "GRAPH_FAILED", "CalcSortedExpertTiling failed."),
+                                                      "GRAPH_FAILED", "CalcSortedExpertTiling failed."),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(CalcNumOfExpertTiling(context, tilingData) != ge::GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "CalcNumOfExpertTiling",
-                    "GRAPH_FAILED", "CalcNumOfExpertTiling failed."),
+                                                      "GRAPH_FAILED", "CalcNumOfExpertTiling failed."),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -421,7 +423,8 @@ static inline ge::graphStatus SaveTilingDataToContext(gert::TilingContext *conte
 {
     OP_CHECK_IF(MoeComputeExpertTokensSetTilingData(context, tilingData) != ge::GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "tiling_data",
-                    "save failed", "MoeComputeExpertTokensSetTilingData failed to set tiling data."),
+                                                      "save failed",
+                                                      "MoeComputeExpertTokensSetTilingData failed to set tiling data."),
                 return ge::GRAPH_FAILED);
 
     context->SetBlockDim(tilingData.get_totalCoreNum());
@@ -436,7 +439,8 @@ ge::graphStatus Tiling4MoeComputeExpertTokens(gert::TilingContext *context)
     OP_LOGD(context->GetNodeName(), "[MoeComputeExpertTokens] Tiling4MoeComputeExpertTokens running begin");
     OP_CHECK_IF(!CheckParamsShape(context),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "CheckParamsShape",
-                    "GRAPH_FAILED", "Tiling4MoeComputeExpertTokens check shape failed."),
+                                                      "GRAPH_FAILED",
+                                                      "Tiling4MoeComputeExpertTokens check shape failed."),
                 return ge::GRAPH_FAILED);
 
     MoeComputeExpertTokensTilingData tilingData;
