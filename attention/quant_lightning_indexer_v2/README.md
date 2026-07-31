@@ -62,3 +62,4 @@
 | 调用方式 | 调用样例 | 说明 |
 |----------|----------|------|
 | PyTorch API | - | 通过[torch.ops.cann_ops_transformer.quant_lightning_indexer](../../torch_extension/cann_ops_transformer/docs/zh/quant_lightning_indexer.md)接口调用QuantLightningIndexerV2算子。 |
+| aclnn API | `aclnnQuantLightningIndexerV2` | 通过[aclnnQuantLightningIndexerV2](docs/aclnnQuantLightningIndexerV2.md)两段式接口调用。示例代码见[examples/test_aclnn_quant_lightning_indexer_v2.cpp](examples/test_aclnn_quant_lightning_indexer_v2.cpp)。 |
