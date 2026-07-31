@@ -416,27 +416,68 @@ ge::graphStatus ChunkGatedDeltaRuleTiling::CheckExpectedShapes(
     const gert::Shape expectFinalStateShape =
         gert::Shape({tilingData_.b, tilingData_.nv, tilingData_.dv, tilingData_.dk});
 
-    OP_CHECK_IF(queryShape != expectQueryShape, OP_LOGE(context_->GetNodeName(), "query shape is invalid"),
+    OP_CHECK_IF(queryShape != expectQueryShape,
+                OP_LOGE(context_->GetNodeName(),
+                        "The shape of query parameter[%ld, %ld, %ld] is not expected, Expect [%ld, %ld, %ld].",
+                        queryShape.GetDim(DIM_0), queryShape.GetDim(DIM_1), queryShape.GetDim(DIM_2),
+                        expectQueryShape.GetDim(DIM_0), expectQueryShape.GetDim(DIM_1), expectQueryShape.GetDim(DIM_2)),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(keyShape != expectKeyShape, OP_LOGE(context_->GetNodeName(), "key shape is invalid"),
+    OP_CHECK_IF(keyShape != expectKeyShape,
+                OP_LOGE(context_->GetNodeName(),
+                        "The shape of key parameter[%ld, %ld, %ld] is not expected, Expect [%ld, %ld, %ld].",
+                        keyShape.GetDim(DIM_0), keyShape.GetDim(DIM_1), keyShape.GetDim(DIM_2),
+                        expectKeyShape.GetDim(DIM_0), expectKeyShape.GetDim(DIM_1), expectKeyShape.GetDim(DIM_2)),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(valueShape != expectValueShape, OP_LOGE(context_->GetNodeName(), "value shape is invalid"),
+    OP_CHECK_IF(valueShape != expectValueShape,
+                OP_LOGE(context_->GetNodeName(),
+                        "The shape of value parameter[%ld, %ld, %ld] is not expected, Expect [%ld, %ld, %ld].",
+                        valueShape.GetDim(DIM_0), valueShape.GetDim(DIM_1), valueShape.GetDim(DIM_2),
+                        expectValueShape.GetDim(DIM_0), expectValueShape.GetDim(DIM_1),
+                        expectValueShape.GetDim(DIM_2)),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(betaShape != expectBetaShape, OP_LOGE(context_->GetNodeName(), "beta shape is invalid"),
+    OP_CHECK_IF(betaShape != expectBetaShape,
+                OP_LOGE(context_->GetNodeName(),
+                        "The shape of beta parameter[%ld, %ld] is not expected, Expect [%ld, %ld].",
+                        betaShape.GetDim(DIM_0), betaShape.GetDim(DIM_1), expectBetaShape.GetDim(DIM_0),
+                        expectBetaShape.GetDim(DIM_1)),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(stateShape != expectStateShape, OP_LOGE(context_->GetNodeName(), "state shape is invalid"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        stateShape != expectStateShape,
+        OP_LOGE(context_->GetNodeName(),
+                "The shape of state parameter[%ld, %ld, %ld, %ld] is not expected, Expect [%ld, %ld, %ld, %ld].",
+                stateShape.GetDim(DIM_0), stateShape.GetDim(DIM_1), stateShape.GetDim(DIM_2), stateShape.GetDim(DIM_3),
+                expectStateShape.GetDim(DIM_0), expectStateShape.GetDim(DIM_1), expectStateShape.GetDim(DIM_2),
+                expectStateShape.GetDim(DIM_3)),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(actualSeqLengthsShape != expectActualSeqLengthsShape,
-                OP_LOGE(context_->GetNodeName(), "actual_seq_lengths shape is invalid"), return ge::GRAPH_FAILED);
+                OP_LOGE(context_->GetNodeName(),
+                        "The shape of actual_seq_lengths parameter[%ld] is not expected, Expect [%ld].",
+                        actualSeqLengthsShape.GetDim(DIM_0), expectActualSeqLengthsShape.GetDim(DIM_0)),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(outShape != expectOutShape, OP_LOGE(context_->GetNodeName(), "out shape is invalid"),
+    OP_CHECK_IF(outShape != expectOutShape,
+                OP_LOGE(context_->GetNodeName(),
+                        "The shape of out parameter[%ld, %ld, %ld] is not expected, Expect [%ld, %ld, %ld].",
+                        outShape.GetDim(DIM_0), outShape.GetDim(DIM_1), outShape.GetDim(DIM_2),
+                        expectOutShape.GetDim(DIM_0), expectOutShape.GetDim(DIM_1), expectOutShape.GetDim(DIM_2)),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(finalStateShape != expectFinalStateShape,
-                OP_LOGE(context_->GetNodeName(), "final_state shape is invalid"), return ge::GRAPH_FAILED);
+                OP_LOGE(context_->GetNodeName(),
+                        "The shape of final_state parameter[%ld, %ld, %ld, %ld] is not expected, Expect "
+                        "[%ld, %ld, %ld, %ld].",
+                        finalStateShape.GetDim(DIM_0), finalStateShape.GetDim(DIM_1), finalStateShape.GetDim(DIM_2),
+                        finalStateShape.GetDim(DIM_3), expectFinalStateShape.GetDim(DIM_0),
+                        expectFinalStateShape.GetDim(DIM_1), expectFinalStateShape.GetDim(DIM_2),
+                        expectFinalStateShape.GetDim(DIM_3)),
+                return ge::GRAPH_FAILED);
 
     if (gShape != nullptr) {
         const gert::Shape expectGShape = gert::Shape({tilingData_.t, tilingData_.nv});
-        OP_CHECK_IF(*gShape != expectGShape, OP_LOGE(context_->GetNodeName(), "g shape is invalid"),
+        OP_CHECK_IF(*gShape != expectGShape,
+                    OP_LOGE(context_->GetNodeName(),
+                            "The shape of g parameter[%ld, %ld] is not expected, Expect [%ld, %ld].",
+                            gShape->GetDim(DIM_0), gShape->GetDim(DIM_1), expectGShape.GetDim(DIM_0),
+                            expectGShape.GetDim(DIM_1)),
                     return ge::GRAPH_FAILED);
     }
 
