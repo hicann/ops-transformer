@@ -79,8 +79,9 @@ constexpr uint32_t DEQUANT_FP32_SCALE_EXPANSION = 4U;
  * 保守验证。分别取各 tensor 的独立上限时：
  *   recvFixedBytes             <= 32 + 8192 + 32768 + 4096 = 45088B；
  *   route batch tensor         = 12288 / 8 + 2 * 12288 * 4 = 99840B；
- *   6 个 dispatch slot         = 6 * (8448 + 32) = 50880B；
- *   合计 195808B，约 191.2KB；当前支持平台动态获取的 UB 预算可容纳该布局。
+ *   6 个 dispatch slot         <= 6 * (8192B token + 256B scale + 128B weight + 32B triple)
+ *                               = 51648B；
+ *   合计 196576B，约 192KB；当前支持平台动态获取的 UB 预算可容纳该布局。
  * 因此该基准在所有合法规格下至少支持双 buffer，且最坏规格也能支持当前上限 6 个 buffer。若修改
  * MAX_H、MAX_MOE_EXPERT_NUM、worldSize/expertPerRank 上限、DispatchBuffInit 固定 tensor 布局或
  * dispatch buffer 数量上限，必须重新验证该前提。
@@ -107,12 +108,12 @@ constexpr int32_t BASE_RECV_ROUTE_ITEMS_PER_BATCH = 12288;
  * 12288 的成立前提按最坏合法规格 k=8192、moeExpertNum=2048、N=6 保守验证：
  *   resetTensor                 <= 8KB；
  *   mxTempTensor                = 2KB；
- *   2 个 xOutTensor             = 2 * (8192B data + 256B scale) = 16.5KB；
+ *   2 个 xOutTensor             <= 2 * (8192B token + 256B scale + 128B weight) = 17152B；
  *   2 个 xInTensor              = 2 * 8192 * sizeof(bfloat16_t) = 32KB；
  *   sendCntAccTensor            <= Align32(2048 * sizeof(int32_t)) = 8KB；
  *   2 个 route int32 tensor     = 2 * 12288 * sizeof(int32_t) = 96KB；
  *   6 个 mask buffer            = 6 * (12288 / 8 + 32) = 9408B；
- *   合计 175808B，约 172KB；当前支持平台动态获取的 UB 预算可容纳该布局。
+ *   合计 176064B，约 172KB；当前支持平台动态获取的 UB 预算可容纳该布局。
  * 因此基准 batch 在所有合法规格下至少支持双 buffer，且最坏规格也能支持当前上限 6 个 buffer。
  * 若修改 MAX_H、MAX_MOE_EXPERT_NUM、DISPATCH_RESET_BATCH、Quant buffer 布局或 mask buffer 数量上限，
  * 必须重新验证该前提。

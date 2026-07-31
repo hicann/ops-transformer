@@ -140,8 +140,11 @@ struct WorkspaceInfo {
         workspaceSize += Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->maxOutputSize * tilingData->h, ALIGN_512);
         dispatchRevScalePtr = base + workspaceSize;
 
-        workspaceSize += Ops::Base::CeilAlign(
-            SIZE_INT_8 * tilingData->maxOutputSize * tilingData->h / MXFP_SCALE_GROUP_NUM, ALIGN_512);
+        int64_t dispatchScaleElementsPerToken =
+            Ops::Base::CeilDiv(static_cast<int64_t>(tilingData->h), static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
+            MXFP_MULTI_BASE_SIZE;
+        workspaceSize +=
+            Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->maxOutputSize * dispatchScaleElementsPerToken, ALIGN_512);
 
         swigluQuantDataPtr = base + workspaceSize;
         workspaceSize += Ops::Base::CeilAlign(

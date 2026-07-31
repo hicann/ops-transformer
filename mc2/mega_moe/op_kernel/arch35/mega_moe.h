@@ -198,8 +198,9 @@ private:
     // 6-buffer 软流水(占满 EVENT_ID0..EVENT_ID5)的 UB 基址；槽视图由 base + bufferIdx*mxQuantTokenScaleAlignBytes_
     uint32_t copyTmpBaseAddr_ = 0;
     // ProcessCombine wave 流水参数：只依赖 k_(常量), InitCombineBuffers 算一次, 免每 expert 重算
-    uint32_t gmm2NTilesPerGroup_ = 0;          // CeilDiv(k_, L1_TILE_N)
-    uint32_t combineQuantTokenSizeBytes_ = 0; // CeilAlign(k_ + CeilDiv(k_,MXFP_SCALE_GROUP_NUM), ALIGN_32)
+    uint32_t gmm2NTilesPerGroup_ = 0; // CeilDiv(k_, L1_TILE_N)
+    // Align32(Align256(k_) + Align2(CeilDiv(k_, MXFP_SCALE_GROUP_NUM)))
+    uint32_t combineQuantTokenSizeBytes_ = 0;
 
     // 大 BS route batch、ring buffer 和 reset batch 成员
     int32_t sendRouteItemsPerBatch_ = 0; // SendMaskCal 每个 batch 处理的 route item 数
@@ -340,9 +341,10 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Init(
     mxQuantTokenAlignBytes_ =
         Ops::Base::CeilAlign(static_cast<uint32_t>(k_ / A_ELEMS_PER_BYTE), static_cast<uint32_t>(ALIGN_256)) *
         sizeof(ActivationType);
-    mxQuantScaleAlignBytes_ = mxQuantScaleNumAlignPerToken_ * sizeof(uint8_t);
-    mxQuantTokenScaleAlignBytes_ =
-        Ops::Base::CeilAlign(mxQuantTokenAlignBytes_ + mxQuantScaleAlignBytes_, static_cast<uint32_t>(ALIGN_32));
+    mxQuantScaleAlignBytes_ =
+        Ops::Base::CeilAlign(mxQuantScaleNumAlignPerToken_ * static_cast<uint32_t>(sizeof(QuantScaleOutType)),
+                             static_cast<uint32_t>(ALIGN_32));
+    mxQuantTokenScaleAlignBytes_ = mxQuantTokenAlignBytes_ + mxQuantScaleAlignBytes_;
     if constexpr (TopkWeightsPrefetch) {
         weightAlignBytes_ =
             Ops::Base::CeilAlign(static_cast<uint32_t>(topK_ * sizeof(float)), static_cast<uint32_t>(ALIGN_32));
@@ -424,8 +426,8 @@ MegaMoe<TemplateMegaMoeTypeFunc>::DispatchBuffInit()
     // Tensor用处：MetaInfoCalAndDispatch 中的动态 dispatch ring，配合 EVENT_ID0..EVENT_ID(bufferCount-1) 做软流水；
     // 只记基址：槽视图在热路径由 DispatchCopyTmpTensor(base + bufferIdx*mxQuantTokenScaleAlignBytes_) 现场构造，
     // Tensor大小：bufferConfig.bufferCount 块(主线自适应 UB 预算给出的 2~6)，每块 mxQuantTokenScaleAlignBytes_；
-    // 该值即 Init() 算好的 CeilAlign(token+scale, 32)，与 host CalcDispatchBufferConfig 的 copyBufferBytes 恒相等，
-    // 且已向上对齐到 32B，故连续 ring 中每个 copyTmp 槽位的起始地址都保持 32B 对齐。
+    // 该值即 Init() 算好的 Align256(token) + Align32(scale) + optional Align32(weight)，与 host
+    // CalcDispatchBufferConfig 的 copyBufferBytes 恒相等，故连续 ring 中每个槽位均保持 32B 对齐。
     copyTmpBaseAddr_ = topkIndexTensorAddr + topkIndexTensorSize;
     uint32_t copyTmpTotalSize = static_cast<uint32_t>(bufferConfig.bufferCount) * mxQuantTokenScaleAlignBytes_;
     // Tensor用处：ExpertTokenNumCopyOut 函数中本卡各专家收到的 tokenCnt 数；
@@ -479,12 +481,8 @@ MegaMoe<TemplateMegaMoeTypeFunc>::SendAndQuantBuffInit()
         sizeof(int32_t);
 
     uint32_t mxTempTensorSize = 2 * 1024;
-    uint32_t xOutTokenBytes =
-        Ops::Base::CeilAlign(static_cast<uint32_t>(k_ / A_ELEMS_PER_BYTE), static_cast<uint32_t>(ALIGN_256));
-    uint32_t xOutTensorSize = xOutTokenBytes + Ops::Base::CeilDiv(k_, static_cast<uint32_t>(ALIGN_32));
-    if constexpr (TopkWeightsPrefetch) {
-        xOutTensorSize = Ops::Base::CeilAlign(xOutTensorSize + weightAlignBytes_, static_cast<uint32_t>(ALIGN_32));
-    }
+    // 单个 xOutTensor_ 槽位与 dispatch 的 token-scale-weight 槽位使用相同布局。
+    uint32_t xOutTensorSize = mxQuantTokenScaleAlignBytes_;
     uint32_t xInAlignSize = Ops::Base::CeilAlign(k_, static_cast<uint32_t>(ALIGN_128)) * sizeof(bfloat16_t);
     uint32_t expertPerCoreMax = Ops::Base::CeilDiv(worldSize_ * expertPerRank_, blockAivNum_);
     uint32_t sendCntAccSize =
@@ -802,12 +800,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::QuantProcessInRank()
     GlobalTensor<bfloat16_t> srcGlobalTensor;
     DataCopyParams xCopyInParams = {1U, static_cast<uint16_t>(H * sizeof(bfloat16_t)), 0U, 0U};
     DataCopyPadParams xCopyInPadParams{true, 0, 0, 0};
-    DataCopyExtParams xCopyOutParams = {1U, static_cast<uint32_t>(mxQuantTokenAlignBytes_ + mxQuantScaleAlignBytes_),
-                                        0U, 0U, 0U};
-    if constexpr (TopkWeightsPrefetch) {
-        xCopyOutParams.blockLen =
-            Ops::Base::CeilAlign(xCopyOutParams.blockLen + weightAlignBytes_, static_cast<uint32_t>(ALIGN_32));
-    }
+    DataCopyExtParams xCopyOutParams = {1U, mxQuantTokenScaleAlignBytes_, 0U, 0U, 0U};
     SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
     SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
     for (int32_t index = 0; index < currentNum; index++) {
@@ -1037,9 +1030,8 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::CopyGMToGMPerToken(int3
                                                                             const DispatchBufferConfig &bufferConfig)
 {
     // revTokenElemCnt_ / revScaleElemCnt_ 仅依赖 k_，已在 DispatchBuffInit 一次性算好(见成员)，此处不再逐调用重算。
-    // copyInNum(输入 token-scale 拼接,非紧密排列)与 Init 里算好的 mxQuantTokenScaleAlignBytes_ 同为
-    // CeilAlign(token+scale, 32)；ActivationType 恒为 1 字节(fp8 或 fp4 的 uint8 载体)，元素数即字节数，
-    // 故直接复用成员，免去逐调用重算同一个 CeilAlign（本函数被每个 dispatch batch 调用，属热路径）。
+    // copyInNum 直接复用 Init 算好的 Align256(token) + Align32(scale) + optional Align32(weight)；
+    // ActivationType 恒为 1 字节载体，元素数即字节数。
     // bufferCount 为 host 自适应 UB 预算给出的 ring 深度(2~6)，与 DispatchBuffInit 分配的 copyTmp/metaInfo 槽数一致。
     int32_t bufferCount = bufferConfig.bufferCount;
     uint32_t copyInNum = mxQuantTokenScaleAlignBytes_;
@@ -1113,16 +1105,6 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::MetaInfoCalAndDispatch(
     // cumsumInfo 按 [expert][source rank] 累加；前一个 expert 的末值就是当前 expert 的全局起始行。
     int32_t expertGlobalRowBegin =
         (localExpertId == 0) ? 0 : cumsumInfoTensor_.GetValue(localExpertId * worldSize_ - 1);
-
-    // A8W4 + prefetch 路径下 SwigluQuant 覆盖 V1 UB，topkIndexTensor_ 需重新初始化
-    if constexpr (ENABLE_A8W4 && TopkWeightsPrefetch) {
-        if (localExpertId != 0) {
-            uint32_t topkIndexTensorSize = Ops::Base::CeilAlign(static_cast<int64_t>(sendTotalNum_ * sizeof(int32_t)),
-                                                                static_cast<int64_t>(ALIGN_32));
-            CreateVecIndex(topkIndexTensor_, 0, topkIndexTensorSize / sizeof(int32_t));
-            AscendC::PipeBarrier<PIPE_V>();
-        }
-    }
 
     // 将 (source rank, rank 内 shard) 展平后分配给所有 block；同一 source rank 可由多个 core 并行 dispatch。
     for (uint32_t dispatchShardIdx = blockIdx_; dispatchShardIdx < worldSize_ * blockNumPerRank_;
@@ -1495,8 +1477,11 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitCombineBuffers()
     if constexpr (CombineQuantMode != COMBINE_NO_QUANT && g_coreType == AIV) {
         uint32_t nAlign32 = Ops::Base::CeilAlign(k_, static_cast<uint32_t>(ALIGN_32));
         uint32_t nScale = Ops::Base::CeilDiv(k_, uint32_t(MXFP_SCALE_GROUP_NUM));
+        uint32_t tokenStorageBytes = Ops::Base::CeilAlign(k_, static_cast<uint32_t>(ALIGN_256));
+        uint32_t storedScaleBytes = Ops::Base::CeilAlign(nScale, 2U);
         // 下面两个只依赖 k_ 的量提成员, 供 ProcessCombine 每 expert 复用(原先每次调用重算)
-        combineQuantTokenSizeBytes_ = Ops::Base::CeilAlign(k_ + nScale, static_cast<uint32_t>(ALIGN_32));
+        combineQuantTokenSizeBytes_ =
+            Ops::Base::CeilAlign(tokenStorageBytes + storedScaleBytes, static_cast<uint32_t>(ALIGN_32));
         gmm2NTilesPerGroup_ = Ops::Base::CeilDiv(k_, L1_TILE_N);
         uint32_t singleTokenBytes = nAlign32 * sizeof(bfloat16_t) + combineQuantTokenSizeBytes_;
         combineUbTensorSize_ = (singleTokenBytes * 2) / sizeof(bfloat16_t);
@@ -1634,11 +1619,12 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::UnpermuteProcessToken(
             Cast(dataInFp32, dataInBf16, AscendC::RoundMode::CAST_NONE, k_);
         } else {
             uint32_t nScale = Ops::Base::CeilDiv(k_, uint32_t(MXFP_SCALE_GROUP_NUM));
-            uint32_t quantTokenSize = k_ + nScale;
-            uint32_t quantEleNum = quantTokenSize / sizeof(bfloat16_t);
+            // Scale 从 256B 对齐后的 FP8 token 区域末尾开始；E8M0 scale 仍按实际 1B 存储，
+            // scale 数补成偶数且整条记录按 32B 对齐，因此可用 BF16 作为搬运载体。
+            uint32_t quantTokenElementCount = combineQuantTokenSizeBytes_ / sizeof(bfloat16_t);
+            uint64_t routeIndex = static_cast<uint64_t>(tokenIdx) * topK_ + expId;
             WaitFlag<AscendC::HardEvent::V_MTE2>(event);
-            DataCopy(dataInBf16, expandedX[(static_cast<uint64_t>(tokenIdx) * topK_ + expId) * quantEleNum],
-                     quantEleNum);
+            DataCopy(dataInBf16, expandedX[routeIndex * quantTokenElementCount], quantTokenElementCount);
             SetFlag<AscendC::HardEvent::MTE2_V>(event);
             WaitFlag<AscendC::HardEvent::MTE2_V>(event);
             using Fp8Type =
@@ -1894,9 +1880,8 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::SharedExpertCopyInput()
         Ops::Base::CeilDiv(static_cast<int64_t>(k_), static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
     // peermem 中每个 token 的 stride（prefetch 模式下含 weight，需用它计算偏移）
     uint32_t peermemTokenStride = mxQuantTokenScaleAlignBytes_;
-    // 实际搬运量只需 token+scale，不含 weight（shared expert 不走 weight 前移路径）
-    uint32_t copyInNum =
-        Ops::Base::CeilAlign(mxQuantTokenAlignBytes_ + mxQuantScaleAlignBytes_, static_cast<uint32_t>(ALIGN_32));
+    // 实际搬运量只需各自对齐后的 token 和 scale，不含 weight。
+    uint32_t copyInNum = mxQuantTokenAlignBytes_ + mxQuantScaleAlignBytes_;
 
     GlobalTensor<ActivationType> srcGlobalTensor;
     GlobalTensor<ActivationType> dataDstGlobalTensor;

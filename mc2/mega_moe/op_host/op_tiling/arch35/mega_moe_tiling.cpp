@@ -50,9 +50,12 @@ const static int64_t MIN_TOPK = 1LL;
 const static int64_t MAX_TOPK = 32LL;
 const static int64_t MIN_EXPERT_PER_RANK = 1LL;
 const static int64_t MAX_EXPERT_PER_RANK = 1024LL;
-const static int64_t H_BASE = 1024LL;
+const static int64_t MIN_H = 1024LL;
 const static int64_t MAX_H = 8LL * 1024LL; // 8K
+const static int64_t H_ALIGN = 32LL;
+const static int64_t W4_K_ALIGN = 64LL;
 const static int64_t HIDDEN_DIM_BASE = 1024LL;
+const static int64_t MAX_HIDDEN_DIM = 8LL * 1024LL; // 8K
 const static int64_t MIN_EP_WORLD_SIZE = 2LL;
 const static int64_t MAX_EP_WORLD_SIZE = 1024LL;
 const static int64_t MAX_MOE_EXPERT_NUM = 2048LL;
@@ -141,12 +144,28 @@ void PrintPeermemInfo(const MegaMoeTilingData *tilingData, const char *nodeName)
     OP_LOGD(nodeName, "maskRecvSize: {%ld}\n", maskRecvSize);
     uint32_t mxScaleNum = ops::CeilDiv(tilingData->h, static_cast<uint32_t>(ALIGN_32));
     uint32_t dataBytes = ops::CeilAlign(tilingData->h, static_cast<uint32_t>(ALIGN_256)) * sizeof(int8_t);
-    uint32_t scaleBytes = mxScaleNum * sizeof(int8_t);
-    uint32_t tokenBytes = ops::CeilAlign(dataBytes + scaleBytes, static_cast<uint32_t>(ALIGN_32));
+    uint32_t scaleAlignBytes =
+        ops::CeilAlign(mxScaleNum * static_cast<uint32_t>(sizeof(int8_t)), static_cast<uint32_t>(ALIGN_32));
+    uint32_t tokenBytes = dataBytes + scaleAlignBytes;
+    if (tilingData->topkWeightsPrefetch == 1) {
+        uint32_t weightBytes =
+            ops::CeilAlign(tilingData->topK * static_cast<uint32_t>(sizeof(float)), static_cast<uint32_t>(ALIGN_32));
+        tokenBytes += weightBytes;
+    }
     int64_t quantTokenScaleSize =
         ops::CeilAlign((int64_t)((int64_t)(tilingData->bs) * tokenBytes * sizeof(int8_t)), (int64_t)ALIGN_512);
     OP_LOGD(nodeName, "quantTokenScaleSize: {%ld}\n", quantTokenScaleSize);
-    int64_t combineSendSize = sendTotalNum * tilingData->h * 2; //  2 = sizeof(bfloat16_t)
+    // Non-quantized Combine stores one BF16 value (2 bytes) for each hidden-dimension element.
+    int64_t combineTokenBytes = static_cast<int64_t>(tilingData->h) * 2;
+    if (tilingData->combineQuantMode != COMBINE_NO_QUANT) {
+        int64_t tokenStorageBytes =
+            ops::CeilAlign(static_cast<int64_t>(tilingData->h), static_cast<int64_t>(ALIGN_256));
+        int64_t scaleCount =
+            ops::CeilDiv(static_cast<int64_t>(tilingData->h), static_cast<int64_t>(MXFP_SCALE_GROUP_NUM));
+        int64_t storedScaleBytes = ops::CeilAlign(scaleCount, static_cast<int64_t>(MXFP_MULTI_BASE_SIZE));
+        combineTokenBytes = ops::CeilAlign(tokenStorageBytes + storedScaleBytes, static_cast<int64_t>(ALIGN_32));
+    }
+    int64_t combineSendSize = ops::CeilAlign(sendTotalNum * combineTokenBytes, static_cast<int64_t>(ALIGN_512));
     OP_LOGD(nodeName, "combineSendSize: {%ld}\n", combineSendSize);
     OP_LOGD(nodeName, "total PeermemInfo Size: {%ld}\n",
             rankSyncInWorldSize + maskRecvSize + quantTokenScaleSize + combineSendSize);
@@ -314,16 +333,24 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, MegaM
     // quantTokenScale Size
     uint32_t mxScaleNum = ops::CeilDiv(h, static_cast<int64_t>(ALIGN_32));
     uint32_t dataBytes = ops::CeilAlign(h, static_cast<int64_t>(ALIGN_256)) * sizeof(int8_t);
-    uint32_t scaleBytes = mxScaleNum * sizeof(int8_t);
-    uint32_t tokenBytes = ops::CeilAlign(dataBytes + scaleBytes, static_cast<uint32_t>(ALIGN_32));
+    uint32_t scaleAlignBytes =
+        ops::CeilAlign(mxScaleNum * static_cast<uint32_t>(sizeof(int8_t)), static_cast<uint32_t>(ALIGN_32));
+    uint32_t tokenBytes = dataBytes + scaleAlignBytes;
     if (*attrs->GetAttrPointer<int64_t>((config.attrTopkWeightsTypeIndex)) == 1) {
         uint32_t weightBytes =
             ops::CeilAlign(static_cast<uint32_t>(topK * sizeof(float)), static_cast<uint32_t>(ALIGN_32));
         tokenBytes = ops::CeilAlign(tokenBytes + weightBytes, static_cast<uint32_t>(ALIGN_32));
     }
     int64_t quantTokenScaleSize = ops::CeilAlign((int64_t)(bs * tokenBytes * sizeof(int8_t)), (int64_t)ALIGN_512);
-    // combineSend Size
-    int64_t combineSendSize = ops::CeilAlign(bs * h * topK * yDtypeSize, ALIGN_512);
+    // 必须与 kernel InitCombineBuffers 的 combine record 布局一致。
+    int64_t combineTokenBytes = h * yDtypeSize;
+    if (GetCombineQuantModeByAttr(context, config) != COMBINE_NO_QUANT) {
+        int64_t tokenStorageBytes = ops::CeilAlign(h, static_cast<int64_t>(ALIGN_256));
+        int64_t scaleCount = ops::CeilDiv(h, static_cast<int64_t>(MXFP_SCALE_GROUP_NUM));
+        int64_t storedScaleBytes = ops::CeilAlign(scaleCount, static_cast<int64_t>(MXFP_MULTI_BASE_SIZE));
+        combineTokenBytes = ops::CeilAlign(tokenStorageBytes + storedScaleBytes, static_cast<int64_t>(ALIGN_32));
+    }
+    int64_t combineSendSize = ops::CeilAlign(bs * topK * combineTokenBytes, static_cast<int64_t>(ALIGN_512));
     int64_t leastCclBufferSize = PEERMEM_DATA_OFFSET + maskRecvSize + quantTokenScaleSize + combineSendSize;
     auto cclBufferSizePtr = attrs->GetAttrPointer<int64_t>((config.attrCclBufferSizeIndex));
     int64_t cclBufferSize = static_cast<int64_t>(*cclBufferSizePtr);
@@ -518,12 +545,14 @@ static MegaMoeDispatchBufferConfig CalcDispatchBufferConfig(const MegaMoeTilingD
     // copyBufferBytes 是每个 dispatch slot 中量化 token 和 scale 的拷贝区大小。
     uint32_t quantTokenBytes =
         ops::CeilAlign(tilingData->h / activationElementsPerByte, static_cast<uint32_t>(ALIGN_256));
-    uint32_t quantScaleBytes = (tilingData->h + ALIGN_32 - 1U) / ALIGN_32;
-    uint32_t copyBufferBytes = ops::CeilAlign(quantTokenBytes + quantScaleBytes, static_cast<uint32_t>(ALIGN_32));
+    uint32_t quantScaleAlignBytes = ops::CeilAlign(
+        ops::CeilDiv(tilingData->h, static_cast<uint32_t>(ALIGN_32)) * static_cast<uint32_t>(sizeof(int8_t)),
+        static_cast<uint32_t>(ALIGN_32));
+    uint32_t copyBufferBytes = quantTokenBytes + quantScaleAlignBytes;
     if (tilingData->topkWeightsPrefetch == 1) {
         uint32_t weightBytes =
             ops::CeilAlign(static_cast<uint32_t>(tilingData->topK * sizeof(float)), static_cast<uint32_t>(ALIGN_32));
-        copyBufferBytes = ops::CeilAlign(copyBufferBytes + weightBytes, static_cast<uint32_t>(ALIGN_32));
+        copyBufferBytes += weightBytes;
     }
     bufferConfig.copyBufferBytes = copyBufferBytes;
 
@@ -779,7 +808,15 @@ static ge::graphStatus SetAdaptiveBufferConfigs(const gert::TilingContext *conte
         ops::CeilAlign(resetBatchElementCount, static_cast<uint32_t>(INT32_PER_256B)) * sizeof(int32_t);
     uint32_t quantTokenBytes =
         ops::CeilAlign(tilingData->h / activationElementsPerByte, static_cast<uint32_t>(ALIGN_256));
-    uint32_t quantOutputBufferBytes = quantTokenBytes + ops::CeilDiv(tilingData->h, static_cast<uint32_t>(ALIGN_32));
+    uint32_t quantScaleAlignBytes = ops::CeilAlign(
+        ops::CeilDiv(tilingData->h, static_cast<uint32_t>(ALIGN_32)) * static_cast<uint32_t>(sizeof(int8_t)),
+        static_cast<uint32_t>(ALIGN_32));
+    // 与 kernel xOutTensorSize 一致：token 和 scale 分别对齐，prefetch 模式再追加对齐后的 weight。
+    uint32_t quantOutputBufferBytes = quantTokenBytes + quantScaleAlignBytes;
+    if (tilingData->topkWeightsPrefetch == 1) {
+        quantOutputBufferBytes +=
+            ops::CeilAlign(static_cast<uint32_t>(tilingData->topK * sizeof(float)), static_cast<uint32_t>(ALIGN_32));
+    }
     uint32_t quantInputBufferBytes = ops::CeilAlign(tilingData->h, static_cast<uint32_t>(ALIGN_128)) * sizeof(uint16_t);
     // sendCntAccTensor_ 按本卡 weight 容量分配，与 kernel 地址布局一致；实际 mask push 次数按 routed MoE
     // expert 数计算，不包含共享专家和未参与路由的预留 weight。
@@ -1517,16 +1554,25 @@ static ge::graphStatus CheckInputParam(const gert::TilingContext *context, MegaM
     int64_t xDim1 = xStorageShape->GetStorageShape().GetDim(1);
     // 检查 H 范围 [1K, 8K]
     OP_TILING_CHECK(
-        xDim1 < H_BASE || xDim1 > MAX_H,
+        xDim1 < MIN_H || xDim1 > MAX_H,
         OP_LOGE_FOR_INVALID_VALUE(
             nodeName, "H", std::to_string(xDim1).c_str(),
-            (std::string("should in [") + std::to_string(H_BASE) + ", " + std::to_string(MAX_H) + "]").c_str()),
+            (std::string("should in [") + std::to_string(MIN_H) + ", " + std::to_string(MAX_H) + "]").c_str()),
         return ge::GRAPH_FAILED);
-    // 检查 H 是否 1024 的倍数
-    OP_TILING_CHECK(xDim1 % H_BASE != 0,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "H", std::to_string(xDim1).c_str(),
-                                              (std::string("multiple of ") + std::to_string(H_BASE)).c_str()),
-                    return ge::GRAPH_FAILED);
+    auto attrs = context->GetAttrs();
+    auto topoTypePtr = attrs->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
+    auto weightOneDesc = context->GetDynamicInputDesc(config.weight1Index, 0);
+    OP_CHECK_NULL_WITH_CONTEXT(context, weightOneDesc);
+    bool isW4NzC0_32 = weightOneDesc->GetDataType() == ge::DT_FLOAT4_E2M1 &&
+                       weightOneDesc->GetStorageFormat() == ge::FORMAT_FRACTAL_NZ_C0_32;
+    // URMA/Layered 保持 1K 对齐；W4 的 NZ_C0_32 分形要求 GMM K 按 64 对齐；其余 MTE 路径按 32 对齐。
+    int64_t requiredHAlignment =
+        *topoTypePtr == TOPO_TYPE_URMA ? HIDDEN_DIM_BASE : (isW4NzC0_32 ? W4_K_ALIGN : H_ALIGN);
+    OP_TILING_CHECK(
+        xDim1 % requiredHAlignment != 0,
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "H", std::to_string(xDim1).c_str(),
+                                  (std::string("multiple of ") + std::to_string(requiredHAlignment)).c_str()),
+        return ge::GRAPH_FAILED);
 
     auto weightOneStorageShape = context->GetDynamicInputShape(config.weight1Index, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightOneStorageShape);
@@ -1539,11 +1585,16 @@ static ge::graphStatus CheckInputParam(const gert::TilingContext *context, MegaM
                     return ge::GRAPH_FAILED);
 
     int64_t weightOneDim1 = weightOneStorageShape->GetStorageShape().GetDim(1);
-    OP_TILING_CHECK(weightOneDim1 != 1LL * HIDDEN_DIM_BASE && weightOneDim1 != 2LL * HIDDEN_DIM_BASE &&
-                        weightOneDim1 != 3LL * HIDDEN_DIM_BASE && weightOneDim1 != 4LL * HIDDEN_DIM_BASE &&
-                        weightOneDim1 != 7LL * HIDDEN_DIM_BASE,
+    OP_TILING_CHECK(weightOneDim1 < HIDDEN_DIM_BASE || weightOneDim1 > MAX_HIDDEN_DIM,
+                    OP_LOGE_FOR_INVALID_VALUE(
+                        nodeName, "hiddenDim", std::to_string(weightOneDim1).c_str(),
+                        (std::string("should in [") + std::to_string(HIDDEN_DIM_BASE) + ", " +
+                         std::to_string(MAX_HIDDEN_DIM) + "]")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(weightOneDim1 % HIDDEN_DIM_BASE != 0,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "hiddenDim", std::to_string(weightOneDim1).c_str(),
-                                              "only support 1k/2k/3k/4k/7k"),
+                                              (std::string("multiple of ") + std::to_string(HIDDEN_DIM_BASE)).c_str()),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
