@@ -288,12 +288,6 @@ static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_
                         (std::string("dim0=") + std::to_string(recvCountsShape->GetStorageShape().GetDim(0))).c_str(),
                         "> 0"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(recvCountsShape->GetStorageShape().GetDim(0) != static_cast<int64_t>(rankSize),
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        nodeName, "recvCounts",
-                        (std::string("dim0=") + std::to_string(recvCountsShape->GetStorageShape().GetDim(0))).c_str(),
-                        (std::string("dim0 must equal sendCounts dim0(rankSize)=") + std::to_string(rankSize)).c_str()),
-                    return ge::GRAPH_FAILED);
 
     // recvLocalEntry: 1D (R,)
     const gert::StorageShape *recvLocalEntryShape = context->GetInputShape(IN_RECV_LOCAL_ENTRY);
@@ -577,6 +571,10 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context, const EngramFe
     OP_TILING_CHECK(totalRecv > 0 && hiddenBytes > INT64_MAX / totalRecv,
                     OP_LOGE(nodeName, "workspace overflow: totalRecv=%ld, hiddenBytes=%ld", totalRecv, hiddenBytes),
                     return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(totalRecv > 0 && tilingData.hiddenDim > INT64_MAX / totalRecv,
+                    OP_LOGE(nodeName, "workspace overflow: totalRecv=%ld, hiddenDim=%ld",
+                            totalRecv, tilingData.hiddenDim),
+                    return ge::GRAPH_FAILED);
 
     int64_t wsGradSorted = numTokens * hiddenBytes;
     int64_t wsRecvGrad = totalRecv * hiddenBytes;
@@ -584,8 +582,14 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context, const EngramFe
     int64_t wsRdispls = numRanks * UB_ALIGN;
     int64_t wsCounterScratch = static_cast<int64_t>(tilingData.aivNum) * UB_ALIGN;
     int64_t wsFlagScratch = 32;
+    uint32_t segLen = (static_cast<uint32_t>(tilingData.numEntriesPerRank) + tilingData.aivNum - 1U) /
+                      tilingData.aivNum;
+    uint32_t segLenAlign = (segLen * sizeof(int32_t) + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN / sizeof(int32_t);
+    int64_t wsSegUniqueEntry = static_cast<int64_t>(tilingData.aivNum) * segLenAlign * sizeof(int32_t);
+    int64_t wsSegCount = static_cast<int64_t>(tilingData.aivNum) * sizeof(int32_t);
 
-    int64_t wsTotal = wsGradSorted + wsRecvGrad + wsSdispls + wsRdispls + wsCounterScratch + wsFlagScratch;
+    int64_t wsTotal = wsGradSorted + wsRecvGrad + wsSdispls + wsRdispls + wsCounterScratch + wsFlagScratch +
+                      wsSegUniqueEntry + wsSegCount;
     wsTotal = AlignTo(wsTotal, BUFFER_ALIGNMENT);
     wsTotal += SYSTEM_NEED_WORKSPACE;
 
