@@ -22,12 +22,13 @@ namespace ge {
 * @brief Fusion op of allgather and matmul v2.
 * @par Inputs:
 * six inputs, including:
-* @li x1: A matrix tensor. The type support float16, bfloat16, float8_e4m3fn, float8_e5m2, hifloat8. The format support
-ND. The x1 only support 2 dimensions in current version, for example (M, K). The x1 doesn't support transposed.
-* @li x2: A matrix tensor. The type support float16, bfloat16, float8_e4m3fn, float8_e5m2, hifloat8. The format support
-ND. The x2 only support 2 dimensions in current version, for example (K, N). The x2 support transposed and
-non-transposed. The K value in x2 should be same as the K value in x1 when x2 is non-transposed, and the K value should
-be in range [256, 65535).
+* @li x1: A matrix tensor. The type support float16, bfloat16, float8_e4m3fn, float8_e5m2, hifloat8, float4_e2m1.
+The format support ND. The x1 only support 2 dimensions in current version, for example (M, K). The x1 doesn't
+support transposed.
+* @li x2: A matrix tensor. The type support float16, bfloat16, float8_e4m3fn, float8_e5m2, hifloat8, float4_e2m1.
+The format support ND. The x2 only support 2 dimensions in current version, for example (K, N). The x2 support
+transposed and non-transposed. The K value in x2 should be same as the K value in x1 when x2 is non-transposed,
+and the K value should be in range [256, 65535).
 * @li bias: A matrix tensor. If x1 type is float8_e4m3fn, float8_e5m2, hifloat8, then the bias type support float32.
   If x1 type is float16, bfloat16, then the bias type support float16, bfloat16. The format support ND. The current
 version not support the scenario where bias is not 0.
@@ -63,21 +64,22 @@ The block_size only supports 0 in the other scenario. \n
 * @li y: A matrix tensor. The type support float16, bfloat16, float32. The format support ND. The y is 2 dimension, for
 example (M*rank_size, N).
 * @li gather_out: A matrix tensor. All data returned from communication. The type of gather_out is consistent with that
-of x1. The type support float16, bfloat16, float8_e4m3fn, float8_e5m2, hifloat8. The format support ND.
+of x1. The type support float16, bfloat16, float8_e4m3fn, float8_e5m2, hifloat8, float4_e2m1. The format support ND.
 * @li amax_out: A matrix tensor. Maximum value of output matrix. The type support float32. The format support ND. The
 amax_out is 1 dimension and only one element, for example (1,). The amax_out only support nullptr in current version. \n
-* @li comm_mode: A string. Communication mode. Default: "ccu". The comm_mode only supports empty string, "ccu" ,
-"ai_cpu" or "aiv" in current version. \n
+* @li comm_mode: A string. Communication mode. Default: "ai_cpu". The comm_mode only supports "ccu" , "ai_cpu" or "aiv"
+in current version. \n
 */
 REG_OP(AllGatherMatmulV2)
-    .INPUT(x1, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2, DT_HIFLOAT8}))
-    .INPUT(x2, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2, DT_HIFLOAT8}))
+    .INPUT(x1, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2, DT_HIFLOAT8, DT_FLOAT4_E2M1}))
+    .INPUT(x2, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2, DT_HIFLOAT8, DT_FLOAT4_E2M1}))
     .OPTIONAL_INPUT(bias, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT}))
     .OPTIONAL_INPUT(x1_scale, TensorType({DT_FLOAT, DT_FLOAT_E8M0}))
     .OPTIONAL_INPUT(x2_scale, TensorType({DT_FLOAT, DT_FLOAT_E8M0}))
     .OPTIONAL_INPUT(quant_scale, TensorType({DT_FLOAT}))
     .OUTPUT(y, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT}))
-    .OUTPUT(gather_out, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2, DT_HIFLOAT8}))
+    .OUTPUT(gather_out,
+    TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2, DT_HIFLOAT8, DT_FLOAT4_E2M1}))
     .OUTPUT(amax_out, TensorType({DT_FLOAT}))
     .REQUIRED_ATTR(group, String)
     .ATTR(is_trans_a, Bool, false)
