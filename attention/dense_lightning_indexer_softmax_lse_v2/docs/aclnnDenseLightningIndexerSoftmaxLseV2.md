@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：DenseLightningIndexerSoftmaxLseV2 算子是 DenseLightningIndexerGradKlLoss 算子计算 Softmax 输入的分支算子。相比 aclnnDenseLightningIndexerSoftmaxLse，新增了压缩注意力（Compressed Attention）和稀疏注意力（Sparse Attention）支持，并支持通过 metadata 前置算子进行分核负载均衡。
+- 接口功能：DenseLightningIndexerSoftmaxLseV2 算子是 DenseLightningIndexerGradKlLoss 算子计算 Softmax 输入的分支算子。相比 aclnnDenseLightningIndexerSoftmaxLse，新增了压缩注意力（Compressed Attention）支持，并支持通过 metadata 前置算子进行分核负载均衡。
 
   主要计算过程为：
   1. 对 query_index 和 key_index 计算 attention score。
@@ -48,30 +48,30 @@
 
 ```c++
 aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2GetWorkspaceSize(
-    const aclTensor *queryIndex,
-    const aclTensor *keyIndex,
-    const aclTensor *weight,
-    const aclTensor *cuSeqLensQOptional,
-    const aclTensor *cuSeqLensKOptional,
-    const aclTensor *seqUsedQOptional,
-    const aclTensor *seqUsedKOptional,
-    const aclTensor *cmpResidualKOptional,
-    const aclTensor *metadataOptional,
-    const char *layoutQ,
-    const char *layoutK,
-    int64_t maskMode,
-    int64_t cmpRatio,
-    const aclTensor *softmaxLseOut,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensor  *queryIndex,
+    const aclTensor  *keyIndex,
+    const aclTensor  *weight,
+    const aclTensor  *cuSeqLensQOptional,
+    const aclTensor  *cuSeqLensKOptional,
+    const aclTensor  *seqUsedQOptional,
+    const aclTensor  *seqUsedKOptional,
+    const aclTensor  *cmpResidualKOptional,
+    const aclTensor  *metadataOptional,
+    const char       *layoutQ,
+    const char       *layoutK,
+    int64_t           maskMode,
+    int64_t           cmpRatio,
+    const aclTensor  *softmaxLseOut,
+    uint64_t         *workspaceSize,
+    aclOpExecutor   **executor);
 ```
 
 ```c++
 aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
-    void *workspace,
-    uint64_t workspaceSize,
+    void          *workspace,
+    uint64_t       workspaceSize,
     aclOpExecutor *executor,
-    aclrtStream stream);
+    aclrtStream    stream);
 ```
 
 ## aclnnDenseLightningIndexerSoftmaxLseV2GetWorkspaceSize
@@ -133,7 +133,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
      </tr>
      <tr>
       <td>cuSeqLensQOptional（aclTensor*）</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>当前 Batch 及前序 Batch 中 q 的有效 token 数的累加和。</td>
       <td><ul><li>TND 场景下必传，第一个值固定为 0。</li><li>支持空 Tensor。</li></ul></td>
       <td>INT32</td>
@@ -143,7 +143,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
      </tr>
      <tr>
       <td>cuSeqLensKOptional（aclTensor*）</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>当前 Batch 及前序 Batch 中 k 的有效 token 数的累加和。</td>
       <td><ul><li>TND 场景下必传，第一个值固定为 0。</li><li>支持空 Tensor。</li></ul></td>
       <td>INT32</td>
@@ -153,7 +153,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
      </tr>
      <tr>
       <td>seqUsedQOptional（aclTensor*）</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>不同 Batch 中 q 的实际使用长度。</td>
       <td><ul><li>支持空 Tensor。当该入参存在时，各 batch 按 seqused_q 的实际值参与运算。</li><li>seqused_q 的值不大于各 Batch 的实际 seqlen_q。</li></ul></td>
       <td>INT32</td>
@@ -163,7 +163,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
      </tr>
      <tr>
       <td>seqUsedKOptional（aclTensor*）</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>不同 Batch 中 k 的实际使用长度。</td>
       <td><ul><li>支持空 Tensor。当该入参存在时，各 batch 按 seqused_k 的实际值参与运算。</li><li>seqused_k 的值不大于各 Batch 的实际 seqlen_k。</li></ul></td>
       <td>INT32</td>
@@ -173,7 +173,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
      </tr>
      <tr>
       <td>cmpResidualKOptional（aclTensor*）</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>表示 k 的 sequence length 与 cmpRatio 相关的残差。</td>
       <td><ul><li>支持空 Tensor。</li><li>当 maskMode=3 且 cmpRatio>1 时必须传入。</li><li>cmp_residual_k 的每个值必须小于 cmpRatio。</li></ul></td>
       <td>INT32</td>
@@ -183,7 +183,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
      </tr>
      <tr>
       <td>metadataOptional（aclTensor*）</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>前置 AICPU 算子输出的分核负载均衡信息。</td>
       <td><ul><li>支持空 Tensor。</li><li>由 aclnnDenseLightningIndexerSoftmaxLseV2Metadata 算子输出，减少 tiling 阶段对 host array 的访问。</li></ul></td>
       <td>INT32</td>
@@ -195,7 +195,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>layoutQ（char*）</td>
       <td>输入</td>
       <td>表示 query 侧的排列格式。</td>
-      <td>支持 BSND、TND，默认值为 BSND。layoutQ 与 layoutK 必须一致。</td>
+      <td>支持 BSND、TND，传空指针时为 BSND。layoutQ 与 layoutK 必须一致。</td>
       <td>STRING</td>
       <td>-</td>
       <td>-</td>
@@ -205,7 +205,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>layoutK（char*）</td>
       <td>输入</td>
       <td>表示 key 侧的排列格式。</td>
-      <td>支持 BSND、TND，默认值为 BSND。layoutK 与 layoutQ 必须一致。</td>
+      <td>支持 BSND、TND，传空指针时为 BSND。layoutK 与 layoutQ 必须一致。</td>
       <td>STRING</td>
       <td>-</td>
       <td>-</td>
@@ -215,7 +215,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>maskMode（int64_t）</td>
       <td>输入</td>
       <td>表示 mask 的模式。</td>
-      <td><ul><li>0：No mask。</li><li>3：rightDownCausal 模式的 mask，对应以右顶点为划分的下三角场景。</li><li>默认值为 0。</li></ul></td>
+      <td><ul><li>0：No mask。</li><li>3：rightDownCausal 模式的 mask，对应以右顶点为划分的下三角场景。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -225,7 +225,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>cmpRatio（int64_t）</td>
       <td>输入</td>
       <td>表示 key 的压缩倍数。</td>
-      <td>取值范围 [1, 128]，默认值为 1，表示无压缩。</td>
+      <td>取值范围 [1, 128]，表示无压缩。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -266,7 +266,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
 
 - **返回值：**
 
-    返回 aclnnStatus 状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+    aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
     第一段接口完成入参校验，出现以下场景时报错：
 
@@ -276,9 +276,11 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
     <col style="width: 671px">
     </colgroup>
     <thead>
-     <th>返回值</th>
-     <th>错误码</th>
-     <th>描述</th>
+     <tr>
+      <th>返回值</th>
+      <th>错误码</th>
+      <th>描述</th>
+     </tr>
     </thead>
     <tbody>
      <tr>
@@ -335,18 +337,11 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
 
 - **返回值：**
 
-    返回 aclnnStatus 状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+    aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
 
-  - 参数 queryIndex、keyIndex 的数据类型应保持一致。
-
-  - 参数 weight 固定为 FLOAT32。
-
-  - 参数 layoutQ 与 layoutK 必须一致。
-
-  - 确定性计算：
-    aclnnDenseLightningIndexerSoftmaxLseV2 默认确定性实现。
+  - 确定性说明：aclnnDenseLightningIndexerSoftmaxLseV2默认确定性实现。
 
   - 公共约束
     - 入参为空的场景处理：

@@ -31,6 +31,8 @@
 |[causal_conv1d_fn](../../torch_extension/cann_ops_transformer/docs/zh/causal_conv1d_fn.md)| 因果一维卷积前向计算（prefill/chunk-prefill），封装aclnnCausalConv1dFn。| - | 默认支持确定性计算 |
 |[causal_conv1d_update](../../torch_extension/cann_ops_transformer/docs/zh/causal_conv1d_update.md)| 因果一维卷积状态更新（decode/update），封装aclnnCausalConv1dUpdate。 | - | 默认支持确定性计算 |
 |[compressor](../../torch_extension/cann_ops_transformer/docs/zh/compressor.md)| 将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。| 默认支持确定性计算 | 默认支持确定性计算  |
+|[dense_lightning_indexer_softmax_lse](../../torch_extension/cann_ops_transformer/docs/zh/dense_lightning_indexer_softmax_lse.md)| dense场景DenseLightningIndexerGradKlLoss算子计算Softmax输入的一个分支算子。支持压缩注意力（Compressed Attention），并支持通过metadata前置算子进行分核负载均衡。需与`dense_lightning_indexer_softmax_lse_metadata`配套使用。|-|默认确定性实现|
+|[dense_lightning_indexer_softmax_lse_metadata](../../torch_extension/cann_ops_transformer/docs/zh/dense_lightning_indexer_softmax_lse.md)| dense_lightning_indexer_softmax_lse接口的前置接口，用于计算dense_lightning_indexer_softmax_lse的负载均衡。|-|默认确定性实现|
 |[flash_attn](../../torch_extension/cann_ops_transformer/docs/zh/flash_attn.md)| 调用`FlashAttn`算子完成共享KV（Key和Value使用同一份输入）的非量化注意力计算，训练推理归一化。需与`flash_attn_metadata`配套使用。 | - | 默认支持确定性计算  |
 |[get_low_latency_ccl_buffer_size](../../torch_extension/cann_ops_transformer/docs/zh/get_low_latency_ccl_buffer_size.md)|计算low_latency_dispatch/low_latency_combine所需的HCCL通信buffer_size（单位MB），为MoeDistributeBuffer的静态方法，可在初始化前调用。|默认支持确定性计算|默认支持确定性计算|
 |[grouped_matmul_activation_quant](../../torch_extension/cann_ops_transformer/docs/zh/grouped_matmul_activation_quant.md)|融合GMM、激活函数和量化算子，完成分组矩阵乘、激活和量化计算，输出量化结果及量化因子。|-|默认确定性实现|
@@ -59,4 +61,5 @@
 |[sparse_lightning_indexer_kl_loss_grad](../../torch_extension/cann_ops_transformer/docs/zh/sparse_lightning_indexer_kl_loss_grad.md)| Lightning Indexer KL Loss训练场景下的反向输出。需与`sparse_lightning_indexer_kl_loss_grad_metadata`配套使用。|默认确定性实现|默认确定性实现|
 |[stem_oam_prep_varlen_q](../../torch_extension/cann_ops_transformer/docs/zh/stem_oam_prep_varlen_q.md)|完成Stem OAM block-sparse attention中Q侧预处理计算，将变长Q tensor转化为按stem block分组的flattened qFlat输出。|-|默认确定性实现|
 |[dense_lightning_indexer_kl_loss_grad](../../torch_extension/cann_ops_transformer/docs/zh/dense_lightning_indexer_kl_loss_grad.md)| Lightning Indexer KL Loss训练Dense场景下的反向输出。需与`dense_lightning_indexer_kl_loss_grad_metadata`配套使用。| - |默认确定性实现|
+|[sparse_flash_mla_softmax_l1_norm](../../torch_extension/cann_ops_transformer/docs/zh/sparse_flash_mla_softmax_l1_norm.md)|`dense_lightning_indexer_kl_loss_grad`的前置接口，生成attn_softmax_l1_norm。需与`sparse_flash_mla_softmax_l1_norm_metadata`配套使用。 |-|默认确定性实现|
 |[stem_oam_prep_paged_kv](../../torch_extension/cann_ops_transformer/docs/zh/stem_oam_prep_paged_kv.md)| 大模型推理动态稀疏注意力机制的前置评分模块，为block-sparse-attention的前置评分模块。| - |默认确定性实现|

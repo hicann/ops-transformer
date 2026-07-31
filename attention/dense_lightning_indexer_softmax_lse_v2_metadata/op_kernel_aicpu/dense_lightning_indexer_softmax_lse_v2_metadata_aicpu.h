@@ -92,9 +92,6 @@ public:
 private:
     bool Prepare(CpuKernelContext &ctx);
     bool ParamsCheck();
-    bool CheckAttrs();
-    bool CheckLayoutConsistency();
-    bool CheckTensorShapes();
     bool CheckTensorValues();
     ValidSocVersion ProcessSocVersion();
     bool BuildMetadata();

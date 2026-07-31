@@ -36,37 +36,35 @@
 
 ``` cpp
 aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2MetadataGetWorkspaceSize(
-    const aclTensor *cuSeqLensQOptional,
-    const aclTensor *cuSeqLensKOptional,
-    const aclTensor *seqUsedQOptional,
-    const aclTensor *seqUsedKOptional,
-    const aclTensor *cmpResidualKOptional,
-    int64_t batchSize,
-    int64_t maxSeqLenQ,
-    int64_t maxSeqLenK,
-    int64_t numHeadsQ,
-    int64_t numHeadsK,
-    int64_t headDim,
-    char *layoutQ,
-    char *layoutK,
-    int64_t maskMode,
-    int64_t cmpRatio,
-    const aclTensor *metadata,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensor   *cuSeqLensQOptional,
+    const aclTensor   *cuSeqLensKOptional,
+    const aclTensor   *seqUsedQOptional,
+    const aclTensor   *seqUsedKOptional,
+    const aclTensor   *cmpResidualKOptional,
+    int64_t            batchSize,
+    int64_t            maxSeqLenQ,
+    int64_t            maxSeqLenK,
+    int64_t            numHeadsQ,
+    int64_t            numHeadsK,
+    int64_t            headDim,
+    char              *layoutQ,
+    char              *layoutK,
+    int64_t            maskMode,
+    int64_t            cmpRatio,
+    const aclTensor   *metadata,
+    uint64_t          *workspaceSize,
+    aclOpExecutor    **executor);
 ```
 
 ``` cpp
 aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2Metadata(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    aclrtStream stream);
+    void           *workspace,
+    uint64_t        workspaceSize,
+    aclOpExecutor  *executor,
+    aclrtStream     stream);
 ```
 
 ## aclnnDenseLightningIndexerSoftmaxLseV2MetadataGetWorkspaceSize
-
-## 参数说明
 
 - **参数说明**
 
@@ -93,167 +91,167 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2Metadata(
     </tr></thead>
   <tbody>
     <tr>
-      <td>cuSeqLensQOptional</td>
+      <td>cuSeqLensQOptional（const aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中query的累积sequence length。<br>TND场景下必传，并可通过该入参shape推导batch。<br>第一个值固定为0。</td>
       <td>支持空Tensor。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B+1,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
-      <td>cuSeqLensKOptional</td>
+      <td>cuSeqLensKOptional（const aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中key的累积sequence length。<br>TND场景下必传。<br>第一个值固定为0。</td>
       <td>支持空Tensor。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B+1,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
-      <td>seqUsedQOptional</td>
+      <td>seqUsedQOptional（const aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中query实际参与运算的sequence length。</td>
       <td>支持空Tensor。当该入参存在时，seq总数按每个batch实际用到的seq累加计算。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
-      <td>seqUsedKOptional</td>
+      <td>seqUsedKOptional（const aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中key实际参与运算的sequence length。</td>
       <td>支持空Tensor。当该入参存在时，seqused_k的值不大于各batch的实际seqlen_k。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
-      <td>cmpResidualKOptional</td>
+      <td>cmpResidualKOptional（const aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中key的sequence length与cmpRatio相关的残差。</td>
       <td>支持空Tensor。当maskMode=3且cmpRatio>1时必须传入，且每个值必须小于cmpRatio。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
-      <td>batchSize</td>
+      <td>batchSize（int64_t）</td>
       <td>输入</td>
       <td>表示batch数量。</td>
       <td>支持非负数。TND场景可填0，并通过cuSeqLensQOptional推导。</td>
-      <td>INT64</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>maxSeqLenQ</td>
+      <td>maxSeqLenQ（int64_t）</td>
       <td>输入</td>
       <td>表示query的最大sequence length。</td>
       <td>支持非负数。BSND场景必须为正数。</td>
-      <td>INT64</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>maxSeqLenK</td>
+      <td>maxSeqLenK（int64_t）</td>
       <td>输入</td>
       <td>表示key的最大sequence length。</td>
       <td>支持非负数。BSND场景必须为正数。</td>
-      <td>INT64</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>numHeadsQ</td>
+      <td>numHeadsQ（int64_t）</td>
       <td>输入</td>
       <td>表示query的head个数。</td>
       <td>必须为正数，取值范围[1, 128]，并且能被numHeadsK整除。</td>
-      <td>INT64</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>numHeadsK</td>
+      <td>numHeadsK（int64_t）</td>
       <td>输入</td>
       <td>表示key的head个数。</td>
       <td>必须为正数。当前仅支持1。</td>
-      <td>INT64</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>headDim</td>
+      <td>headDim（int64_t）</td>
       <td>输入</td>
       <td>表示q/k的head dimension。</td>
       <td>必须为正数。当前仅支持128。</td>
-      <td>INT64</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>layoutQ</td>
+      <td>layoutQ（char*）</td>
       <td>输入</td>
       <td>表示query侧的排列格式。</td>
-      <td>支持BSND/TND，默认值为BSND。</td>
+      <td>支持BSND/TND，传空指针时为BSND。</td>
       <td>STRING</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>layoutK</td>
+      <td>layoutK（char*）</td>
       <td>输入</td>
       <td>表示key侧的排列格式。</td>
-      <td>支持BSND/TND，默认值为BSND。必须与layoutQ保持一致。</td>
+      <td>支持BSND/TND，传空指针时为BSND。必须与layoutQ保持一致。</td>
       <td>STRING</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>maskMode</td>
+      <td>maskMode（int64_t）</td>
       <td>输入</td>
       <td>表示sparse mask模式。</td>
       <td>0: No mask<br>3: Causal</td>
-      <td>INT64</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>cmpRatio</td>
+      <td>cmpRatio（int64_t）</td>
       <td>输入</td>
       <td>表示key的压缩率。</td>
       <td>取值范围[1, 128]。</td>
-      <td>INT64</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>metadata</td>
+      <td>metadata（const aclTensor*）</td>
       <td>输出</td>
       <td>表示负载均衡结果输出。</td>
       <td>输出结果作为aclnnDenseLightningIndexerSoftmaxLseV2的metadataOptional输入。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape固定为(64,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
-      <td>workspaceSize</td>
+      <td>workspaceSize（uint64_t*）</td>
       <td>输出</td>
       <td>返回需要在Device侧申请的workspace大小。</td>
       <td>当前实现返回0。</td>
@@ -263,7 +261,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2Metadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>executor</td>
+      <td>executor（aclOpExecutor**）</td>
       <td>输出</td>
       <td>返回op执行器，包含了算子计算流程。</td>
       <td>-</td>
@@ -277,7 +275,49 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2Metadata(
 
 - **返回值：**
 
-    返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+    aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+
+    第一段接口完成入参校验，出现以下场景时报错：
+
+    <table style="undefined;table-layout: fixed; width: 1000px"><colgroup>
+    <col style="width: 300px">
+    <col style="width: 150px">
+    <col style="width: 550px">
+    </colgroup>
+    <thead>
+      <tr>
+      <th>返回值</th>
+      <th>错误码</th>
+      <th>描述</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td>ACLNN_ERR_PARAM_NULLPTR</td>
+      <td>161001</td>
+      <td>metadata、workspaceSize、executor存在空指针。</td>
+    </tr>
+    <tr>
+      <td rowspan="6">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="6">161002</td>
+      <td>metadata的数据类型不在支持的范围之内。</td>
+    </tr>
+    <tr>
+      <td>numHeadsQ、numHeadsK、headDim不在支持的范围之内。</td>
+    </tr>
+    <tr>
+      <td>layoutQ与layoutK不一致，或不在支持的范围之内。</td>
+    </tr>
+    <tr>
+      <td>batchSize、maxSeqLenQ、maxSeqLenK不满足取值约束。</td>
+    </tr>
+    <tr>
+      <td>maskMode不在支持的范围之内。</td>
+    </tr>
+    <tr>
+      <td>cmpRatio不在支持的范围之内。</td>
+    </tr>
+    </tbody></table>
 
 ## aclnnDenseLightningIndexerSoftmaxLseV2Metadata
 
@@ -318,9 +358,9 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2Metadata(
     </tbody>
     </table>
 
-- **返回值：**
+- **返回值**
 
-    返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+  aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
 
@@ -705,9 +745,3 @@ int main() {
     return 0;
 }
 ```
-
-## 调用说明
-
-| 调用方式  | 样例代码 | 说明 |
-| ----------- | -------- | ---- |
-| aclnn接口 | [调用示例](#调用示例) | 通过`aclnnDenseLightningIndexerSoftmaxLseV2Metadata`接口方式调用，输出metadata供`aclnnDenseLightningIndexerSoftmaxLseV2`使用。 |

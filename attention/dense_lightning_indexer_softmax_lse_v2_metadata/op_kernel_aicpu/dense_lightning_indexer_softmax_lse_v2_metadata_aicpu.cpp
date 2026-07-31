@@ -96,130 +96,71 @@ bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::ParamsCheck()
     KERNEL_CHECK_NULLPTR(metadata_->GetData(), false, "metadata data is null");
     KERNEL_CHECK_NULLPTR(metadata_->GetTensorShape(), false, "metadata shape is null");
 
-    if (!CheckAttrs()) {
-        return false;
-    }
-    if (!CheckLayoutConsistency()) {
-        return false;
-    }
-    if (!CheckTensorShapes()) {
-        return false;
-    }
-    if (!CheckTensorValues()) {
-        return false;
-    }
-    return true;
-}
-
-bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CheckAttrs()
-{
-    if (aicCoreNum_ <= 0) {
-        KERNEL_LOG_ERROR("aic_core_num must be positive, but got %ld", aicCoreNum_);
-        return false;
-    }
-    if (numHeadsQ_ <= 0 || numHeadsK_ <= 0 || headDim_ <= 0) {
-        KERNEL_LOG_ERROR("num_heads_q/num_heads_k/head_dim must be positive, but got nq=%ld nk=%ld d=%ld", numHeadsQ_,
-                         numHeadsK_, headDim_);
-        return false;
-    }
-    if (headDim_ != 128) {
-        KERNEL_LOG_ERROR("head_dim only supports 128, but got %ld", headDim_);
-        return false;
-    }
-    if (numHeadsQ_ < 1 || numHeadsQ_ > 128) {
-        KERNEL_LOG_ERROR("num_heads_q must be in [1, 128], but got %ld", numHeadsQ_);
-        return false;
-    }
-    if (numHeadsK_ != 1) {
-        KERNEL_LOG_ERROR("num_heads_k only supports 1, but got %ld", numHeadsK_);
-        return false;
-    }
-    if (layout_ != layoutK_) {
-        KERNEL_LOG_ERROR("layout_q and layout_k must be the same, but got layout_q=%s layout_k=%s", layout_.c_str(),
-                         layoutK_.c_str());
-        return false;
-    }
-    if (numHeadsQ_ % numHeadsK_ != 0) {
-        KERNEL_LOG_ERROR("num_heads_q must be divisible by num_heads_k, but got nq=%ld nk=%ld", numHeadsQ_, numHeadsK_);
-        return false;
-    }
-    if (bSize_ <= 0) {
-        KERNEL_LOG_ERROR("batch_size must be positive, but got %ld", bSize_);
-        return false;
-    }
-    if (layoutType_ == DliLayout::BSND && s1Size_ <= 0) {
-        KERNEL_LOG_ERROR("max_seqlen_q must be positive for BSND, but got %ld", s1Size_);
-        return false;
-    }
-    if (s1Size_ < 0 || s2Size_ < 0) {
-        KERNEL_LOG_ERROR("max_seqlen_q/max_seqlen_k must be non-negative, but got q=%ld k=%ld", s1Size_, s2Size_);
-        return false;
-    }
-    if (maskMode_ != static_cast<int64_t>(DliSparseMode::NO_MASK) &&
-        maskMode_ != static_cast<int64_t>(DliSparseMode::RIGHT_DOWN_CAUSAL)) {
-        KERNEL_LOG_ERROR("mask_mode only supports 0 or 3, but got %ld", maskMode_);
-        return false;
-    }
-    if (cmpRatio_ < 1 || cmpRatio_ > 128) {
-        KERNEL_LOG_ERROR("cmp_ratio must be in [1, 128], but got %ld", cmpRatio_);
-        return false;
-    }
-    return true;
-}
-
-bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CheckLayoutConsistency()
-{
-    if (layoutType_ == DliLayout::TND && !IsTensorValid(cuSeqLensQuery_)) {
-        KERNEL_LOG_ERROR("cu_seqlens_q must be provided for TND layout.");
-        return false;
-    }
-    if (layoutType_ == DliLayout::TND && !IsTensorValid(cuSeqLensKey_)) {
-        KERNEL_LOG_ERROR("cu_seqlens_k must be provided for TND layout.");
-        return false;
-    }
-    return true;
-}
-
-bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CheckTensorShapes()
-{
-    if (IsTensorValid(cuSeqLensQuery_) && cuSeqLensQuery_->GetTensorShape()->GetDimSize(0) != bSize_ + 1) {
-        KERNEL_LOG_ERROR("cu_seqlens_q length must be batch_size + 1, but got %ld and batch_size=%ld.",
-                         cuSeqLensQuery_->GetTensorShape()->GetDimSize(0), bSize_);
-        return false;
-    }
-    if (IsTensorValid(cuSeqLensKey_) && cuSeqLensKey_->GetTensorShape()->GetDimSize(0) != bSize_ + 1) {
-        KERNEL_LOG_ERROR("cu_seqlens_k length must be batch_size + 1, but got %ld and batch_size=%ld.",
-                         cuSeqLensKey_->GetTensorShape()->GetDimSize(0), bSize_);
-        return false;
-    }
-    if (IsTensorValid(seqUsedQuery_) && seqUsedQuery_->GetTensorShape()->GetDimSize(0) != bSize_) {
-        KERNEL_LOG_ERROR("seqused_q length must be batch_size, but got %ld and batch_size=%ld.",
-                         seqUsedQuery_->GetTensorShape()->GetDimSize(0), bSize_);
-        return false;
-    }
-    if (IsTensorValid(seqUsedKey_) && seqUsedKey_->GetTensorShape()->GetDimSize(0) != bSize_) {
-        KERNEL_LOG_ERROR("seqused_k length must be batch_size, but got %ld and batch_size=%ld.",
-                         seqUsedKey_->GetTensorShape()->GetDimSize(0), bSize_);
-        return false;
-    }
-    if (IsTensorValid(cmpResidualKey_) && cmpResidualKey_->GetTensorShape()->GetDimSize(0) != bSize_) {
-        KERNEL_LOG_ERROR("cmp_residual_k length must be batch_size, but got %ld and batch_size=%ld.",
-                         cmpResidualKey_->GetTensorShape()->GetDimSize(0), bSize_);
-        return false;
-    }
-    return true;
+    return CheckTensorValues();
 }
 
 bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CheckTensorValues()
 {
-    if (cmpRatio_ > 1 && maskMode_ == static_cast<int64_t>(DliSparseMode::RIGHT_DOWN_CAUSAL) &&
-        !IsTensorValid(cmpResidualKey_)) {
-        KERNEL_LOG_ERROR("cmp_residual_k must be provided when mask_mode=3 and cmp_ratio>1.");
-        return false;
+    if (layoutType_ == DliLayout::TND && IsTensorValid(cuSeqLensQuery_)) {
+        auto *cuSeqQ = reinterpret_cast<const int32_t *>(cuSeqLensQuery_->GetData());
+        for (int64_t i = 0; i < bSize_ + 1; ++i) {
+            if (static_cast<int64_t>(cuSeqQ[i]) < 0) {
+                KERNEL_LOG_ERROR("The elements in cu_seqlens_q should be >= 0, but got cu_seqlens_q[%ld] = %d", i,
+                                 cuSeqQ[i]);
+                return false;
+            }
+            if (i > 0 && static_cast<int64_t>(cuSeqQ[i - 1]) > static_cast<int64_t>(cuSeqQ[i])) {
+                KERNEL_LOG_ERROR("The elements in cu_seqlens_q must be in ascending order, "
+                                 "but got cu_seqlens_q[%ld] = %d, cu_seqlens_q[%ld] = %d",
+                                 i - 1, cuSeqQ[i - 1], i, cuSeqQ[i]);
+                return false;
+            }
+        }
+    }
+    if (layoutType_ == DliLayout::TND && IsTensorValid(cuSeqLensKey_)) {
+        auto *cuSeqK = reinterpret_cast<const int32_t *>(cuSeqLensKey_->GetData());
+        for (int64_t i = 0; i < bSize_ + 1; ++i) {
+            if (static_cast<int64_t>(cuSeqK[i]) < 0) {
+                KERNEL_LOG_ERROR("The elements in cu_seqlens_k should be >= 0, but got cu_seqlens_k[%ld] = %d", i,
+                                 cuSeqK[i]);
+                return false;
+            }
+            if (i > 0 && static_cast<int64_t>(cuSeqK[i - 1]) > static_cast<int64_t>(cuSeqK[i])) {
+                KERNEL_LOG_ERROR("The elements in cu_seqlens_k must be in ascending order, "
+                                 "but got cu_seqlens_k[%ld] = %d, cu_seqlens_k[%ld] = %d",
+                                 i - 1, cuSeqK[i - 1], i, cuSeqK[i]);
+                return false;
+            }
+        }
+    }
+    if (IsTensorValid(seqUsedQuery_)) {
+        auto *seqUsedQ = reinterpret_cast<const int32_t *>(seqUsedQuery_->GetData());
+        for (int64_t i = 0; i < bSize_; ++i) {
+            if (static_cast<int64_t>(seqUsedQ[i]) < 0) {
+                KERNEL_LOG_ERROR("The elements in seqused_q should be >= 0, but got seqused_q[%ld] = %d",
+                                 i, seqUsedQ[i]);
+                return false;
+            }
+        }
+    }
+    if (IsTensorValid(seqUsedKey_)) {
+        auto *seqUsedK = reinterpret_cast<const int32_t *>(seqUsedKey_->GetData());
+        for (int64_t i = 0; i < bSize_; ++i) {
+            if (static_cast<int64_t>(seqUsedK[i]) < 0) {
+                KERNEL_LOG_ERROR("The elements in seqused_k should be >= 0, but got seqused_k[%ld] = %d",
+                                 i, seqUsedK[i]);
+                return false;
+            }
+        }
     }
     if (IsTensorValid(cmpResidualKey_)) {
         auto *data = reinterpret_cast<const int32_t *>(cmpResidualKey_->GetData());
         for (int64_t i = 0; i < bSize_; ++i) {
+            if (static_cast<int64_t>(data[i]) < 0) {
+                KERNEL_LOG_ERROR("The elements in cmp_residual_k should be >= 0, but got cmp_residual_k[%ld] = %d", i,
+                                 data[i]);
+                return false;
+            }
             if (static_cast<int64_t>(data[i]) >= cmpRatio_) {
                 KERNEL_LOG_ERROR("cmp_residual_k[%ld] must be less than cmp_ratio(%ld), but got %d.", i, cmpRatio_,
                                  data[i]);

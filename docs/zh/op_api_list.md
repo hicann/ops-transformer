@@ -64,6 +64,8 @@
 |[aclnnDistributeBarrierV2](../../mc2/distribute_barrier/docs/aclnnDistributeBarrierV2.md)|完成通信域内的全卡同步，xRef仅用于构建Tensor依赖，接口内不对xRef做任何操作。|默认确定性实现| 默认确定性实现 |
 |[aclnnDenseLightningIndexerGradKLLoss](../../attention/dense_lightning_indexer_grad_kl_loss/docs/aclnnDenseLightningIndexerGradKLLoss.md)|dense场景LightningIndexer的反向算子，再额外融合了Loss计算功能。|默认非确定性实现，支持配置开启| - |
 |[aclnnDenseLightningIndexerSoftmaxLse](../../attention/dense_lightning_indexer_softmax_lse/docs/aclnnDenseLightningIndexerSoftmaxLse.md)|dense场景DenseLightningIndexerGradKlLoss算子计算Softmax输入的一个分支算子。|默认确定性实现| 默认确定性实现 |
+|[aclnnDenseLightningIndexerSoftmaxLseV2](../../attention/dense_lightning_indexer_softmax_lse_v2/docs/aclnnDenseLightningIndexerSoftmaxLseV2.md)|dense场景DenseLightningIndexerGradKlLoss算子计算Softmax输入的一个分支算子。相比aclnnDenseLightningIndexerSoftmaxLse，新增了压缩注意力（Compressed Attention）支持，并支持通过metadata前置算子进行分核负载均衡。|- | 默认确定性实现 |
+|[aclnnDenseLightningIndexerSoftmaxLseV2Metadata](../../attention/dense_lightning_indexer_softmax_lse_v2_metadata/docs/aclnnDenseLightningIndexerSoftmaxLseV2Metadata.md)| aclnnDenseLightningIndexerSoftmaxLseV2接口的前置接口，用于计算aclnnDenseLightningIndexerSoftmaxLseV2的负载均衡。| - | 默认确定性实现 |
 |[aclnnFFN](../../ffn/ffn/docs/aclnnFFN.md)|该FFN算子提供MoeFFN和FFN的计算功能。|默认非确定性实现，支持配置开启| - |
 |[aclnnFFNV2](../../ffn/ffn/docs/aclnnFFNV2.md)|该FFN算子提供MoeFFN和FFN的计算功能。|默认非确定性实现，支持配置开启| - |
 |[aclnnFFNV3](../../ffn/ffn/docs/aclnnFFNV3.md)|该FFN算子提供MoeFFN和FFN的计算功能。|默认非确定性实现，支持配置开启| - |
@@ -250,6 +252,8 @@
 |[aclnnScatterPaKvCacheWithKScale](../../attention/scatter_pa_kv_cache_with_k_scale/docs/aclnnScatterPaKvCacheWithKScale.md)|训练场景下，更新KvCache中指定位置的key和value，同时更新key的scale值。|默认确定性实现| - |
 |[aclnnDenseLightningIndexerKLLossGrad](../../attention/dense_lightning_indexer_kl_loss_grad/docs/aclnnDenseLightningIndexerKLLossGrad.md)|LightningIndexer的反向算子，支持输出Loss计算所需Index部分的分数。| - | 默认非确定性实现，支持配置开启 |
 |[aclnnDenseLightningIndexerKLLossGradMetadata](../../attention/dense_lightning_indexer_kl_loss_grad_metadata/docs/aclnnDenseLightningIndexerKLLossGradMetadata.md)| aclnnDenseLightningIndexerKLLossGrad接口的前置接口，用于计算aclnnDenseLightningIndexerKLLossGrad的负载均衡。| - | 默认确定性实现 |
+|[aclnnSparseFlashMlaSoftmaxL1Norm](../../attention/sparse_flash_mla_softmax_l1_norm/docs/aclnnSparseFlashMlaSoftmaxL1Norm.md)|aclnnDenseLightningIndexerKLLossGradd的前置接口，用于计算attnSoftmaxL1Norm。| - | 默认确定性实现 |
+|[aclnnSparseFlashMlaSoftmaxL1NormMetadata](../../attention/sparse_flash_mla_softmax_l1_norm_metadata/docs/aclnnSparseFlashMlaSoftmaxL1NormMetadata.md)| aclnnSparseFlashMlaSoftmaxL1NormGrad接口的前置接口，用于计算aclnnSparseFlashMlaSoftmaxL1Norm的负载均衡。| - | 默认确定性实现 |
 
 ## 废弃接口
 

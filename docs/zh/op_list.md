@@ -88,6 +88,26 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/dense_lightning_indexer_softmax_lse_v2/README.md">dense_lightning_indexer_softmax_lse_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>DenseLightningIndexerGradKlLoss算子计算Softmax输入的一个分支算子。相比dense_lightning_indexer_softmax_lse，新增了压缩注意力（Compressed Attention）支持，并支持通过metadata前置算子进行分核负载均衡。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/dense_lightning_indexer_softmax_lse_v2_metadata/README.md">dense_lightning_indexer_softmax_lse_v2_metadata</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI CPU</td>
+    <td>dense_lightning_indexer_softmax_lse_v2算子的前置算子，用于计算dense_lightning_indexer_softmax_lse_v2的负载均衡。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/flash_attention_score/README.md">flash_attention_score</a></td>
     <td>✓</td>
     <td>✓</td>
@@ -645,6 +665,26 @@
     <td>✗</td>
     <td>AI CPU</td>
     <td>dense_lightning_indexer_kl_loss_grad算子的前置算子，用于计算dense_lightning_indexer_kl_loss_grad的负载均衡。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/sparse_flash_mla_softmax_l1_norm/README.md">sparse_flash_mla_softmax_l1_norm</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>训练场景下，作为dense_lightning_indexer_kl_loss_grad的前置接口，用于计算attnSoftmaxL1Norm。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/sparse_flash_mla_softmax_l1_norm_metadata/README.md">sparse_flash_mla_softmax_l1_norm_metadata</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI CPU</td>
+    <td>sparse_flash_mla_softmax_l1_norm算子的前置算子，用于计算sparse_flash_mla_softmax_l1_norm的负载均衡。</td>
   </tr>
   <tr>
     <td>attention</td>

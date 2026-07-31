@@ -910,10 +910,11 @@ def dense_lightning_indexer_softmax_lse_v2(
         [WS_MAX_ELEMS, 1],
         dtype=pl.DT_FP32,
     )
+    s2_size_aligned = (tiling.s2 + TKV - 1) // TKV * TKV
     tensor_workspace = pl.make_tensor(
         workspace + WS_MAX_BYTES * 2,
-        [WS_MAX_CORES, tiling.s2],
-        [tiling.s2, 1],
+        [WS_MAX_CORES, s2_size_aligned],
+        [s2_size_aligned, 1],
         dtype=pl.DT_FP32,
     )
 

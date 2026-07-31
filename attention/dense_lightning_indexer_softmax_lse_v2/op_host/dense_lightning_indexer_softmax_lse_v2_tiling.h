@@ -38,7 +38,11 @@ struct DenseLISoftmaxLseV2CompileInfo {
     static ge::graphStatus ParamCheck(gert::TilingContext *context, int64_t layout, int64_t maskMode, int64_t cmpRatio,
                                       const std::string &layoutQStr, const std::string &layoutKStr, int64_t bSize,
                                       int64_t s1Size, int64_t s2Size, int64_t n1Size, int64_t n2Size, int64_t dSize,
-                                      int64_t keyB, int64_t keyD, int64_t weightB, int64_t weightS1, int64_t weightN1);
+                                      int64_t keyB, int64_t keyD, int64_t weightB, int64_t weightS1, int64_t weightN1,
+                                      int64_t outDim0, int64_t outDim1, int64_t outDim2);
+    static ge::graphStatus CheckShapeDims(gert::TilingContext *context, int64_t layout,
+                                          const gert::StorageShape *queryShape, const gert::StorageShape *keyShape,
+                                          const gert::StorageShape *weightShape);
 };
 
 } // namespace optiling
