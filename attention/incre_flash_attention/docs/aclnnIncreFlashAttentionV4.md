@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-|产品      | 是否支持 |
-|:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      ×     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      √     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：不支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -437,18 +447,23 @@ aclnnStatus aclnnIncreFlashAttentionV4(
 
 - 确定性计算：
   - aclnnIncreFlashAttentionV4默认确定性实现。
+
+<!-- npu="950,910b" id7 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：
   - 支持B轴小于等于65536，N轴小于等于256，D轴小于等于512。
   - query数据类型支持FLOAT16、BFLOAT16，attentionOut、key和value数据类型支持FLOAT16、INT8、BFLOAT16。
   - dequantScale1、dequantScale2数据类型支持UINT64、FLOAT32。
   - quantScale1、quantScale2和quantOffset2数据类型支持FLOAT32
   - numKeyValueHeads数据类型支持INT64。
+<!-- end id7 -->
+<!-- npu="310p" id8 -->
 - <term>Atlas 推理系列产品</term>：
   - 支持B轴小于等于256，N轴小于等于256，D轴小于等于512。
   - 支持key、value的S轴小于等于65536。
   - query、key、value和attentionOut数据类型仅支持FLOAT16。
   - dequantScale1、quantScale1、dequantScale2、quantScale2和quantOffset2仅支持nullptr。
   - numKeyValueHeads仅支持取值0。
+<!-- end id8 -->
 - 非连续场景下，参数key、value的tensorlist中tensor的个数等于query的B(由于tensorlist限制，非连续场景下B需要小于等于256)。shape除S外需要完全一致，且batch只能为1。
 - query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
 - 参数query中的N和numHeads值相等，key、value的N和numKeyValueHeads值相等，并且numHeads是numKeyValueHeads的倍数关系。

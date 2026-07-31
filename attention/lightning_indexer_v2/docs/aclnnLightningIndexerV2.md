@@ -2,14 +2,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                     |     √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>    |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                              |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -402,10 +412,14 @@ aclnnStatus aclnnLightningIndexerV2(
 - 参数q、k的数据类型应保持一致。
 - sparseIndices无效部分填-1；sparseValues无效部分填-inf。
 - 传入的cmpResidualKOptional中每一个元素的值都应小于压缩率cmpRatio。
+
+<!-- npu="A3,910b" id7 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
   - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
   - 当前不支持sequsedQOptional、outputIdxOffsetOptional、maxSeqlenQ功能，不建议传入这些参数。
   - 当layoutK为PA_BBND时，必须传入sequsedKOptional；当layoutK不为PA_BBND时，不支持sequsedKOptional功能，不建议传入该参数。
+<!-- end id7 -->
+<!-- npu="950" id8 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
   - 当传入的参数layoutQ为BSND时，不支持传入cuSeqlensQOptional；当layoutK为BSND或PA_BBND时，不支持传入cuSeqlensKOptional。
   - 当传入参数outputIdxOffsetOptional时，只支持大于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparseIndice值不超过INT32的最大值。
@@ -413,6 +427,8 @@ aclnnStatus aclnnLightningIndexerV2(
   - 当传入的cmpRatio > 1且maskMode = 3时，必须传入cmpResidualKOptional，其余情况不传入。
   - 当传入的参数layoutK为PA_BBND时，必须传入sequsedKOptional。
   - 参数metadataOptional必须传入。
+
+<!-- end id8 -->
 
 ## 调用示例
 

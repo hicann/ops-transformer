@@ -2,14 +2,24 @@
 
 ## 产品支持情况
 
-|产品             |  是否支持  |
-|:-------------------------|:----------:|
-|  <term>Ascend 950PR/Ascend 950DT</term>   |     ×    |
-|  <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>   |     √    |
-|  <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>     |     √    |
-|  <term>Atlas 200I/500 A2 推理产品</term>    |     ×    |
-|  <term>Atlas 推理系列产品</term>    |     ×    |
-|  <term>Atlas 训练系列产品</term>    |     ×    |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：不支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -19,57 +29,57 @@
 
   1. Top-k value的计算公式：
 
-  $$
-  I_{t,:}=W_{t,:}@ReLU(\tilde{q}_{t,:}@\tilde{K}_{:t,:}^\top)
-  $$
+    $$
+    I_{t,:}=W_{t,:}@ReLU(\tilde{q}_{t,:}@\tilde{K}_{:t,:}^\top)
+    $$
 
-    - $W_{t,:}$是第$t$个token对应的$weights$；
-    - $\tilde{q}_{t,:}$是$\tilde{q}$矩阵第$t$个token对应的$G$个query头合轴后的结果；
-    - $\tilde{K}_{:t,:}$为$t$行$\tilde{K}$矩阵。
+      - $W_{t,:}$是第$t$个token对应的$weights$；
+      - $\tilde{q}_{t,:}$是$\tilde{q}$矩阵第$t$个token对应的$G$个query头合轴后的结果；
+      - $\tilde{K}_{:t,:}$为$t$行$\tilde{K}$矩阵。
 
   2. 正向的Softmax对应公式：
 
-  $$
-  p_{t,:} = \text{Softmax}(q_{t,:} @ K_{:t,:}^\top/\sqrt{d})
-  $$
+    $$
+    p_{t,:} = \text{Softmax}(q_{t,:} @ K_{:t,:}^\top/\sqrt{d})
+    $$
 
-    - $p_{t,:}$是第$t$个token对应的Softmax结果；
-    - $q_{t,:}$是$q$矩阵第$t$个token对应的$G$个query头合轴后的结果；
-    - ${K}_{:t,:}$为$t$行$K$矩阵。
+      - $p_{t,:}$是第$t$个token对应的Softmax结果；
+      - $q_{t,:}$是$q$矩阵第$t$个token对应的$G$个query头合轴后的结果；
+      - ${K}_{:t,:}$为$t$行$K$矩阵。
 
   3. npu_lightning_indexer会单独训练，对应的loss function为：
 
-  $$
-  Loss{=}\sum_tD_{KL}(p_{t,:}||Softmax(I_{t,:}))
-  $$
+      $$
+      Loss{=}\sum_tD_{KL}(p_{t,:}||Softmax(I_{t,:}))
+      $$
 
-  其中，$p_{t,:}$是target distribution，通过对main attention score进行所有的head的求和，然后把求和结果沿着上下文方向进行L1正则化得到。$D_{KL}$为KL散度，其表达式为：
+      其中，$p_{t,:}$是target distribution，通过对main attention score进行所有的head的求和，然后把求和结果沿着上下文方向进行L1正则化得到。$D_{KL}$为KL散度，其表达式为：
 
-  $$
-  D_{KL}(a||b){=}\sum_ia_i\mathrm{log}{\left(\frac{a_i}{b_i}\right)}
-  $$
+      $$
+      D_{KL}(a||b){=}\sum_ia_i\mathrm{log}{\left(\frac{a_i}{b_i}\right)}
+      $$
 
   4. 通过求导可得Loss的梯度表达式：
 
-  $$
-  dI\mathop{{}}\nolimits_{{t,:}}=Softmax \left( I\mathop{{}}\nolimits_{{t,:}} \left) -p\mathop{{}}\nolimits_{{t,:}}\right. \right.
-  $$
+      $$
+      dI\mathop{{}}\nolimits_{{t,:}}=Softmax \left( I\mathop{{}}\nolimits_{{t,:}} \left) -p\mathop{{}}\nolimits_{{t,:}}\right. \right.
+      $$
 
-  利用链式法则可以进行weights，query和key矩阵的梯度计算：
+      利用链式法则可以进行weights，query和key矩阵的梯度计算：
 
-  $$
-  dW\mathop{{}}\nolimits_{{t,:}}=dI\mathop{{}}\nolimits_{{t,:}}\text{@} \left( ReLU \left( S\mathop{{}}\nolimits_{{t,:}} \left) \left) \mathop{{}}\nolimits^{\top}\right. \right. \right. \right.
-  $$
+      $$
+      dW\mathop{{}}\nolimits_{{t,:}}=dI\mathop{{}}\nolimits_{{t,:}}\text{@} \left( ReLU \left( S\mathop{{}}\nolimits_{{t,:}} \left) \left) \mathop{{}}\nolimits^{\top}\right. \right. \right. \right.
+      $$
 
-  $$
-  d\mathop{{\tilde{q}}}\nolimits_{{t,:}}=dS\mathop{{}}\nolimits_{{t,:}}@\tilde{K}\mathop{{}}\nolimits_{{:t,:}}
-  $$
+      $$
+      d\mathop{{\tilde{q}}}\nolimits_{{t,:}}=dS\mathop{{}}\nolimits_{{t,:}}@\tilde{K}\mathop{{}}\nolimits_{{:t,:}}
+      $$
 
-  $$
-  d\tilde{K}\mathop{{}}\nolimits_{{:t,:}}=\left(dS\mathop{{}}\nolimits_{{t,:}} \left) \mathop{{}}\nolimits^{\top}@\tilde{q}\mathop{{}}\nolimits_{{:t, :}}\right. \right.
-  $$
+      $$
+      d\tilde{K}\mathop{{}}\nolimits_{{:t,:}}=\left(dS\mathop{{}}\nolimits_{{t,:}} \left) \mathop{{}}\nolimits^{\top}@\tilde{q}\mathop{{}}\nolimits_{{:t, :}}\right. \right.
+      $$
 
-  其中，$S$为$\tilde{q}$和$K$矩阵乘的结果。
+      其中，$S$为$\tilde{q}$和$K$矩阵乘的结果。
 
 <!-- - **说明**：
 

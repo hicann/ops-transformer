@@ -6,37 +6,49 @@
 
 <!-- npu="950" id1 -->
 
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
 
 <!-- end id1 -->
 
 <!-- npu="A3" id2 -->
 
+<!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
 
 <!-- end id2 -->
 
 <!-- npu="910b" id3 -->
 
+<!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
 
 <!-- end id3 -->
 
 <!-- npu="310b" id4 -->
 
+<!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
 
 <!-- end id4 -->
 
 <!-- npu="310p" id5 -->
 
+<!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
 
 <!-- end id5 -->
 
 <!-- npu="910" id6 -->
 
+<!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 <!-- end id6 -->
 
@@ -51,57 +63,57 @@
 
     1. 计算矩阵乘法与反量化（quant_mode=1，A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL）：
 
-    使用HIFLOAT8输入进行Matmul，输出FLOAT32结果后乘以合并缩放因子（x_descale与wkv/wgate_descale的乘积）完成反量化：
+      使用HIFLOAT8输入进行Matmul，输出FLOAT32结果后乘以合并缩放因子（x_descale与wkv/wgate_descale的乘积）完成反量化：
 
-    $$
-    C4A：\left[kv\_state^a, score\_state^a\right] = (X_{hif8} @ \left[W^{aKV}_{hif8}, W^{aGate}_{hif8}\right]) \cdot (x\_descale \cdot [wkv\_descale^a, wgate\_descale^a]), \left[kv\_state^b, score\_state^b\right] = (X_{hif8} @ \left[W^{bKV}_{hif8}, W^{bGate}_{hif8}\right]) \cdot (x\_descale \cdot [wkv\_descale^b, wgate\_descale^b]);
-    $$
+      $$
+      C4A：\left[kv\_state^a, score\_state^a\right] = (X_{hif8} @ \left[W^{aKV}_{hif8}, W^{aGate}_{hif8}\right]) \cdot (x\_descale \cdot [wkv\_descale^a, wgate\_descale^a]), \left[kv\_state^b, score\_state^b\right] = (X_{hif8} @ \left[W^{bKV}_{hif8}, W^{bGate}_{hif8}\right]) \cdot (x\_descale \cdot [wkv\_descale^b, wgate\_descale^b]);
+      $$
 
-    $$
-    C128A：\left[kv\_state, score\_state\right] = (X_{hif8} @ \left[W^{KV}_{hif8}, W^{Gate}_{hif8}\right]) \cdot (x\_descale \cdot [wkv\_descale, wgate\_descale])
-    $$
+      $$
+      C128A：\left[kv\_state, score\_state\right] = (X_{hif8} @ \left[W^{KV}_{hif8}, W^{Gate}_{hif8}\right]) \cdot (x\_descale \cdot [wkv\_descale, wgate\_descale])
+      $$
 
-    其中x_descale为per-tensor标量（shape为[1,]），wkv_descale、wgate_descale为per-channel向量（shape为[coff\*D,]，沿权重输出通道维度缩放），两者相乘后合并为per-channel缩放因子。
+      其中x_descale为per-tensor标量（shape为[1,]），wkv_descale、wgate_descale为per-channel向量（shape为[coff\*D,]，沿权重输出通道维度缩放），两者相乘后合并为per-channel缩放因子。
 
     2. 计算分组加法：
 
-    $$
-    C4A：score\_state_i^\prime = \left[score\_state_{\left[4(i-1)+1:4i,:\right]}^a; score\_state_{\left[4i+1:4(i+1),:\right]}^b\right] + Ape,~i=1,2,\cdots, \frac{s}{4};
-    $$
+      $$
+      C4A：score\_state_i^\prime = \left[score\_state_{\left[4(i-1)+1:4i,:\right]}^a; score\_state_{\left[4i+1:4(i+1),:\right]}^b\right] + Ape,~i=1,2,\cdots, \frac{s}{4};
+      $$
 
-    $$
-    C128A：score\_state_i^\prime = score\_state_{\left[128(i-1)+1:128i,:\right]} + Ape,~i=1,2,\cdots, \frac{s}{128};
-    $$
+      $$
+      C128A：score\_state_i^\prime = score\_state_{\left[128(i-1)+1:128i,:\right]} + Ape,~i=1,2,\cdots, \frac{s}{128};
+      $$
 
     3. 计算分组Softmax：
 
-    $$
-    C4A：S_i^\prime = softmax(score\_state_i^\prime),~i=1,2,\cdots, \frac{s}{4};
-    $$
+      $$
+      C4A：S_i^\prime = softmax(score\_state_i^\prime),~i=1,2,\cdots, \frac{s}{4};
+      $$
 
-    $$
-    C128A：S_i^\prime = softmax(score\_state_i^\prime),~i=1,2,\cdots, \frac{s}{128};
-    $$
+      $$
+      C128A：S_i^\prime = softmax(score\_state_i^\prime),~i=1,2,\cdots, \frac{s}{128};
+      $$
 
     4. 计算Hadamard乘积：
 
-    $$
-    C4A：(S_H)_i = S_i^\prime \odot \left[kv\_state^a_{\left[4(i-1)+1:4i,:\right]} ;kv\_state^b_{\left[4i+1:4(i+1),:\right]}\right],~i=1,2,\cdots, \frac{s}{4};
-    $$
+      $$
+      C4A：(S_H)_i = S_i^\prime \odot \left[kv\_state^a_{\left[4(i-1)+1:4i,:\right]} ;kv\_state^b_{\left[4i+1:4(i+1),:\right]}\right],~i=1,2,\cdots, \frac{s}{4};
+      $$
 
-    $$
-    C128A：S_H = S_i^\prime \odot kv\_state;
-    $$
+      $$
+      C128A：S_H = S_i^\prime \odot kv\_state;
+      $$
 
     5. 沿着压缩轴分组求和：
 
-    $$
-    C4A：C_{i}^{\text{Comp}} = \left[1\right]_{1\times8} @ (S_H)_i, ~i=1,2,\cdots, \frac{s}{4};
-    $$
+      $$
+      C4A：C_{i}^{\text{Comp}} = \left[1\right]_{1\times8} @ (S_H)_i, ~i=1,2,\cdots, \frac{s}{4};
+      $$
 
-    $$
-     C128A：C_{i}^{\text{Comp}} = \left[1\right]_{1\times128} @ (S_H)_i, ~i=1,2,\cdots, \frac{s}{128};
-    $$
+      $$
+      C128A：C_{i}^{\text{Comp}} = \left[1\right]_{1\times128} @ (S_H)_i, ~i=1,2,\cdots, \frac{s}{128};
+      $$
 
 ## 函数原型
 
@@ -459,7 +471,7 @@ aclnnStatus aclnnQuantCompressor(
 - 输入shape限制：
     - wkv支持输入shape[coff* D,H]
     - wgate支持输入shape[coff* D,H]
-    - stateCache支持输入shape[block_num,block_size,2* coff* D]，要求blockNum>0，cacheMode=2时，需要满足blockSize >= coff * cmp_ratio + S - 1。
+    - stateCache支持输入shape[block_num,block_size,2*coff* D]，要求blockNum>0，cacheMode=2时，需要满足blockSize >= coff * cmp_ratio + S - 1。
     - ape支持输入shape[cmp_ratio,coff* D]
     - xDescale支持输入shape[1,]，per-tensor缩放。
     - wkvDescale支持输入shape[coff* D,]，per-channel缩放。
@@ -469,12 +481,12 @@ aclnnStatus aclnnQuantCompressor(
         - cuSeqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须位0。
         - seqused，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即seqused[n] <= cu\_seqlens[n+1] - cu\_seqlens[n]，且不小于0。
         - cacheMode=1时，state\_block\_table支持输入shape[B,ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start\_pos)+max(cu\_seqlens[n+1] - cu\_seqlens[n])。cacheMode=2时，state\_block\_table支持输入shape[B]。
-        - cmpKv，输出shape为[min(T,T//cmp_ratio+B),D]：<batch0>compressed_tokens + <batch1>compressed_tokens + ... + <batchN>compressed_tokens + pad。
+        - cmpKv，输出shape为[min(T,T//cmp_ratio+B),D]：compressed_tokens + compressed_tokens + ... + compressed_tokens + pad。
     - 若x的维度不采用BS合轴，即x的输入shape为[B,S,H]
         - cuSeqlens，参数必须为空。
         - seqused，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即要求seqused[n] <= S，且不小于0。
         - cacheMode=1时，stateBlockTable支持输入shape[B,ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start\_pos)+S。cacheMode=2时，stateBlockTable支持输入shape[B]。
-        - cmpKv，输出shape为[B,ceil(S/cmp_ratio),D]：(<batch0>compressed_tokens+pad0) + (<batch1>compressed_tokens+pad1) + ...  + (<batchN>compressed_tokens+padN)。
+        - cmpKv，输出shape为[B,ceil(S/cmp_ratio),D]：(compressed_tokens+pad0) + (compressed_tokens+pad1) + ...  + (compressed_tokens+padN)。
 - 输入值域限制：
   - 该接口支持B、S泛化，且存在如下场景限制：
       - 只支持B、S为0

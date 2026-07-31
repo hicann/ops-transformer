@@ -149,7 +149,6 @@
   </tbody>
   </table>
 
-
 ## 约束说明
 
 - DenseLightningIndexerKLLossGradMetadata算子需要与DenseLightningIndexerKLLossGrad算子配套使用。

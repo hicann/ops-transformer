@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                              | 是否支持 |
-| :---------------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>|    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|    ×    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|    ×    |
-| <term>Atlas 200I/500 A2 推理产品</term>|    ×    |
-| <term>Atlas 推理系列产品</term>                         |    ×    |
-| <term>Atlas 训练系列产品</term>                          |    ×    |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -828,7 +838,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <td>
         <ul>
             <li>valueAntiquantMode模式编号0-6与keyAntiquantMode一致。</li>
-            <li>valueAntiquantMode为8时，代表per-channel-group模式。
+            <li>valueAntiquantMode为8时，代表per-channel-group模式。</li>
             <li>用户不特意指定时建议传入0。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
         </ul>
@@ -1487,9 +1497,12 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
         </tbody>
     </table>
 
+      <!-- npu="A3,910b" id7 -->
       - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
         - Prefill MLA场景下，不支持tensorlist、左padding
         - MLA场景下，不支持后量化
+
+      <!-- end id7 -->
 
 #### PSE参数组
 
@@ -1560,11 +1573,17 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
 - 一致性约束
   - 公共
     - 入参attenMask的输入维度仅支持2/3/4
+
+      <!-- npu="950" id8 -->
       - <term>Ascend 950PR/Ascend 950DT</term>：
         - 维度为2时，不支持sparseMode为0/1模式
+      <!-- end id8 -->
+      <!-- npu="A3,910b" id9 -->
       - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
         - sparseMode为0/1模式时，若传入query_rope和key_rope，或者query与key的D不等于value的D，则不支持attenMask输入维度为2
         - sparseMode为0/1模式时，若attenMask输入维度为2，则layout仅支持为BSH、BSND、BNSD、BNSD_BSND
+      <!-- end id9 -->
+
     - 入参sparseMode为0/1模式时，attenMask矩阵的shape应满足 [batchSize/1，>=Q_S，>=KV_S + actualSharedPrefixLen]
     - 入参sparseMode为2/3/4模式时，attenMask矩阵的shape最后两维应等于2048，即支持传入(2048,2048)或(1,2048,2048)或(1,1,2048,2048)
     - 非伪量化或Q_S大于1时，preTokens与nextTokens应满足nextTokens * (-1) <= preTokens，以确保具有有效数据

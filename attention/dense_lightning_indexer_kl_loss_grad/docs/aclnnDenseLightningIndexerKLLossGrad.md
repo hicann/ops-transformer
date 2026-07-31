@@ -3,22 +3,40 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
+<!-- npu="950" id1 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
 <!-- end id1 -->
+
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
 <!-- npu="A3" id2 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
 <!-- end id2 -->
+
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
 <!-- npu="910b" id3 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
 <!-- end id3 -->
+
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
 <!-- end id4 -->
+
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
 <!-- npu="310p" id5 -->
 - <term>Atlas 推理系列产品</term>：不支持
 <!-- end id5 -->
+
+<!-- end id5 -->
+<!-- npu="910" id6 -->
 <!-- npu="910" id6 -->
 - <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
+
 <!-- end id6 -->
 
 ## 功能说明
@@ -375,7 +393,6 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGrad(
         </tbody>
     </table>
 
-
 - **返回值：**
 
     返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
@@ -462,7 +479,11 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGrad(
 ## 约束说明
 
 - 确定性计算：
+
+    <!-- npu="950" id7 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：aclnnDenseLightningIndexerKLLossGrad默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
+
+    <!-- end id7 -->
 
 - 公共约束：
   - 参数q、k、dq、dk的数据类型应保持一致，支持FLOAT16和BFLOAT16。

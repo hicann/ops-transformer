@@ -394,6 +394,7 @@ pytest --msprof -v -m perf_rdv
 ```
 
 `--msprof` 的工作流程：
+
 1. 快照当前目录已有的 `PROF_*` 目录
 2. 用 `msprof python -m pytest ...` 包裹运行内层测试
 3. 测试完成后找到新生成的 `PROF_*` 目录
@@ -478,14 +479,19 @@ perf_output/
 ### 12.9 建立 Baseline
 
 1. 运行一次 profiling 生成报告：
+
    ```bash
    pytest --msprof -v -m debug
    ```
+
 2. 将生成的报告拷贝到 `perf_baseline/` 目录作为基线：
+
    ```bash
    cp perf_output/perf_report_*.log perf_baseline/
    ```
+
 3. 后续运行时指定该基线进行比较：
+
    ```bash
    pytest --msprof --perf-baseline=./perf_baseline/perf_report_20260615113640.log -v -m debug
    ```
