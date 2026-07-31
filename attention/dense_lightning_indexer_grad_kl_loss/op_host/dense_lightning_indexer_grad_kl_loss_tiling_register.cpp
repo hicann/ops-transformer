@@ -27,8 +27,7 @@ namespace optiling {
 static ge::graphStatus DenseLightningIndexerGradKLLossTilingFunc(gert::TilingContext* context)
 {
     DenseLightningIndexerGradKLLossTilingBase dligKLLossTiling(context);
-    dligKLLossTiling.DoTiling();
-    return ge::GRAPH_SUCCESS;
+    return dligKLLossTiling.DoTiling();
 }
 
 static ge::graphStatus TilingParseForDenseLightningIndexerGradKLLoss([[maybe_unused]] gert::TilingParseContext* context)

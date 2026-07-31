@@ -13,6 +13,7 @@
  * \brief
  */
 #include "dense_lightning_indexer_grad_kl_loss_tiling.h"
+#include <limits>
 #include <tiling/tiling_api.h>
 using namespace ge;
 using namespace AscendC;
@@ -128,8 +129,9 @@ bool DenseLightningIndexerGradKLLossTilingBase::AnalyzeLayout()
     }
     // TND和BSND的dim位置不同来赋值
     hasRope = hasQueryRope && hasKeyRope;
-    auto &queryRopeShape = queryRope->GetStorageShape();
-    auto &keyRopeShape = keyRope->GetStorageShape();
+    const gert::Shape emptyRopeShape;
+    const auto &queryRopeShape = hasQueryRope ? queryRope->GetStorageShape() : emptyRopeShape;
+    const auto &keyRopeShape = hasKeyRope ? keyRope->GetStorageShape() : emptyRopeShape;
 
     size_t layoutLen = strlen(inputLayout);
     OP_CHECK_IF(queryShape.GetDimNum() != layoutLen || keyShape.GetDimNum() != layoutLen ||
@@ -583,10 +585,9 @@ bool DenseLightningIndexerGradKLLossTilingBase::Balance4DLoad(std::vector<int64_
 }
 
 // 负载均衡
-bool DenseLightningIndexerGradKLLossTilingBase::SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray,
-                                                                  int64_t maxCoreNum)
+bool DenseLightningIndexerGradKLLossTilingBase::SetSparseStartIdx(
+    const std::vector<int64_t> &sparseValidArray)
 {
-    // to avoid buffer overflow, or maybe sometimes we want to only verify single core
     int64_t validAicNum = static_cast<int64_t>(dliGradkllossMultiCoreParams_->get_coreNum());
     int64_t totalSize = dliGradkllossMultiCoreParams_->get_totalSize();
     int64_t *sparseStartIdx = dliGradkllossMultiCoreParams_->get_bS1Ptr();
@@ -594,10 +595,13 @@ bool DenseLightningIndexerGradKLLossTilingBase::SetSparseStartIdx(const std::vec
 
     OP_CHECK_IF(totalSize <= 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "totalSize should be larger than 0."),
                 return false);
+    OP_CHECK_IF(validAicNum <= 0 || validAicNum > static_cast<int64_t>(MAX_CORE_NUM),
+                OPS_REPORT_VECTOR_INNER_ERR(opName, "validAicNum[%ld] is invalid.", validAicNum),
+                return false);
     if (tilingKeyLayout == LayoutType::LAYOUT_TND) {
         // initLoad: 使用均分策略, 保证后续不会比均分差
-        std::vector<int64_t> localSparseStartIdx(aicNum, totalSize);
-        for (int64_t idx = 0; idx < static_cast<int64_t>(aicNum); ++idx) {
+        std::vector<int64_t> localSparseStartIdx(validAicNum, totalSize);
+        for (int64_t idx = 0; idx < validAicNum; ++idx) {
             localSparseStartIdx[idx] = std::min((idx * splitFactorSize), totalSize);
         }
         std::vector<int64_t> localValue(validAicNum, 0);
@@ -606,12 +610,12 @@ bool DenseLightningIndexerGradKLLossTilingBase::SetSparseStartIdx(const std::vec
 
         // 负载均衡粗调
         std::vector<int64_t> tmpLocalValue(validAicNum, 0);
-        std::vector<int64_t> tmpsparseStartIdx(aicNum, totalSize);
+        std::vector<int64_t> tmpsparseStartIdx(validAicNum, totalSize);
         int64_t sparseArraySum = std::accumulate(sparseValidArray.begin(), sparseValidArray.end(), 0LL); // 得到所有T上的S2的总数量
         int64_t avgVal = CeilDivision(sparseArraySum, validAicNum); // 平均每个核需要处理的S2的总数量
 
         tmpsparseStartIdx[0] = 0;
-        for (int64_t idx = 1; idx < static_cast<int64_t>(aicNum); ++idx) {
+        for (int64_t idx = 1; idx < validAicNum; ++idx) {
             int64_t start = tmpsparseStartIdx[idx - 1];
             int64_t singleLoadValue = 0;
             tmpsparseStartIdx[idx] = start;
@@ -644,7 +648,7 @@ bool DenseLightningIndexerGradKLLossTilingBase::SetSparseStartIdx(const std::vec
             localSparseStartIdx.swap(tmpsparseStartIdx);
             localValue.swap(tmpLocalValue);
         }
-        for (int64_t idx = 0; idx < static_cast<int64_t>(aicNum); ++idx) {
+        for (int64_t idx = 0; idx < validAicNum; ++idx) {
             sparseStartIdx[idx] = localSparseStartIdx[idx];
         }
     } else if (tilingKeyLayout == LayoutType::LAYOUT_BSND) {
@@ -657,10 +661,8 @@ bool DenseLightningIndexerGradKLLossTilingBase::SetSparseStartIdx(const std::vec
         }
     }
 
-    for (int64_t idx = 1; idx < static_cast<int64_t>(MAX_CORE_NUM); ++idx) {
-        if (sparseStartIdx[idx] == 0) { 
-            sparseStartIdx[idx] = static_cast<int64_t>(sparseValidArray.size()); // 赋值为s1最大值
-        }
+    for (int64_t idx = validAicNum; idx < static_cast<int64_t>(MAX_CORE_NUM); ++idx) {
+        sparseStartIdx[idx] = totalSize;
     }    
     return true;
 }
@@ -677,18 +679,18 @@ int64_t DenseLightningIndexerGradKLLossTilingBase::CalcTotalSize() {
 
 void DenseLightningIndexerGradKLLossTilingBase::SetMultiCoreParamsRegbase(int64_t totalSize, int64_t coreNum)
 {
-    int64_t actualUsedCoreNum = std::min(totalSize, static_cast<int64_t>(coreNum));
+    int64_t actualUsedCoreNum = std::min({totalSize, coreNum, static_cast<int64_t>(MAX_CORE_NUM)});
     dliGradkllossMultiCoreParams_->set_coreNum(static_cast<int32_t>(actualUsedCoreNum));
     dliGradkllossMultiCoreParams_->set_totalSize(totalSize);
     dliGradkllossMultiCoreParams_->set_padTotalSize(padT1Size);
-    dliGradkllossMultiCoreParams_->set_splitFactorSize(CeilDivision(totalSize, actualUsedCoreNum));
+    dliGradkllossMultiCoreParams_->set_splitFactorSize(
+        actualUsedCoreNum > 0 ? CeilDivision(totalSize, actualUsedCoreNum) : 0);
 }
 
-void DenseLightningIndexerGradKLLossTilingBase::SetSparseParamsRegbase(int64_t maxCoreNum)
+bool DenseLightningIndexerGradKLLossTilingBase::SetSparseParamsRegbase()
 {
     std::vector<int64_t> sparseValidArray(dliGradkllossMultiCoreParams_->get_totalSize(), 0);
-    InitSparseValidArray(sparseValidArray);
-    SetSparseStartIdx(sparseValidArray, maxCoreNum);
+    return InitSparseValidArray(sparseValidArray) && SetSparseStartIdx(sparseValidArray);
 }
 
 void DenseLightningIndexerGradKLLossTilingBase::InitOutputSplit()
@@ -783,11 +785,12 @@ void DenseLightningIndexerGradKLLossTilingBase::CalcMultiCoreOffset(int64_t &bSt
     int64_t actualSum = 0;
 
     int64_t *sparseStartIdx = dliGradkllossMultiCoreParams_->get_bS1Ptr();
-    if (sparseStartIdx == nullptr || aicIdx >= optiling::MAX_CORE_NUM ) {
+    if (sparseStartIdx == nullptr ||
+        aicIdx >= static_cast<int64_t>(dliGradkllossMultiCoreParams_->get_coreNum())) {
         return;
     }
     int64_t bS1Index = sparseStartIdx[aicIdx];
-    int64_t bS1EndIndex = aicIdx + 1 < optiling::MAX_CORE_NUM ?
+    int64_t bS1EndIndex = aicIdx + 1 < dliGradkllossMultiCoreParams_->get_coreNum() ?
             sparseStartIdx[aicIdx + 1] : dliGradkllossMultiCoreParams_->get_totalSize();
     if (tilingKeyLayout == LayoutType::LAYOUT_TND) {
         bStartIdx = FindBIndex(0, bS1Index, actualSum);
@@ -898,6 +901,9 @@ ge::graphStatus DenseLightningIndexerGradKLLossTilingBase::GetPlatformInfo()
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, aicoreParams_.l0cSize);
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, l2CacheSize);
     }
+    OP_CHECK_IF(aicNum == 0 || aivNum == 0,
+                OP_LOGE(opName, "invalid core count, aicNum[%u], aivNum[%u].", aicNum, aivNum),
+                return ge::GRAPH_FAILED);
     OP_LOGD(opName, "get platform from compileInfo.aivNum(%u) aicNum(%u) ubSize(%lu) l1Size(%lu) l0cSize(%lu).",
             aivNum, aicNum, aicoreParams_.ubSize, aicoreParams_.l1Size, aicoreParams_.l0cSize);
 
@@ -910,13 +916,14 @@ ge::graphStatus DenseLightningIndexerGradKLLossTilingBase::DoOpTiling()
     // 无多余操作，分核，目前只实现TND场景分核
     int64_t totalSize = CalcTotalSize();
     SetMultiCoreParamsRegbase(totalSize, static_cast<int64_t>(aicNum));
+    OP_CHECK_IF(dliGradkllossMultiCoreParams_->get_coreNum() == 0,
+                OP_LOGE(opName, "no valid AIC task is available."), return ge::GRAPH_FAILED);
     context_->SetBlockDim(dliGradkllossMultiCoreParams_->get_coreNum()); // 使用的核数确定
     context_->SetScheduleMode(SCHEDULE_MODE_ALL_CORE);
 
-    std::vector<int64_t> shapeVec = {1,2048};
-    ge::Shape srcShape(shapeVec);
-
-    SetSparseParamsRegbase(static_cast<int64_t>(aicNum));
+    OP_CHECK_IF(!SetSparseParamsRegbase(),
+                OP_LOGE(opName, "failed to set sparse multi-core parameters."),
+                return ge::GRAPH_FAILED);
     InitOutputSplit(); // output分核
     // 确定性场景需要计算最大轮次
     CalcMaxLoop();
@@ -927,43 +934,54 @@ ge::graphStatus DenseLightningIndexerGradKLLossTilingBase::DoOpTiling()
 ge::graphStatus DenseLightningIndexerGradKLLossTilingBase::GetWorkspaceSize()
 {
     size_t *workspaces = context_->GetWorkspaceSizes(1);
-    int64_t bmm1Size = n2Size * S1_BASE_STEP * S2_BASE_STEP * sizeof(float);
-    int64_t bmm2Size = gSizeQueryIndex * S1_BASE_STEP * S2_BASE_STEP * sizeof(float);
-    int64_t reluGradSize = gSizeQueryIndex * S1_BASE_STEP * S2_BASE_STEP * sizeof(float);
-    int64_t psySyncSize = AIC_AIV_RATIO * S1_VEC_SIZE_8 * S2_BASE_STEP * 2 * sizeof(float);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
+    uint64_t bmm1Size = static_cast<uint64_t>(n2Size) * S1_BASE_STEP * S2_BASE_STEP * sizeof(float);
+    uint64_t bmm2Size = static_cast<uint64_t>(gSizeQueryIndex) * S1_BASE_STEP * S2_BASE_STEP * sizeof(float);
+    uint64_t reluGradSize =
+        static_cast<uint64_t>(gSizeQueryIndex) * S1_BASE_STEP * S2_BASE_STEP * sizeof(float);
+    uint64_t psySyncSize =
+        static_cast<uint64_t>(AIC_AIV_RATIO) * S1_VEC_SIZE_8 * S2_BASE_STEP * 2 * sizeof(float);
 
-    int64_t dWeightFloatSzie = S1_BASE_STEP * n2IndexSize * gSizeQueryIndex * sizeof(float);
+    uint64_t dWeightFloatSize =
+        static_cast<uint64_t>(S1_BASE_STEP) * n2IndexSize * gSizeQueryIndex * sizeof(float);
     auto weightsDtype = context_->GetInputDesc(WEIGHT_INPUT_INDEX)->GetDataType();
     if (weightsDtype == ge::DT_FLOAT) {
-        dWeightFloatSzie = 0;
+        dWeightFloatSize = 0;
     }
 
-    int64_t dQueryIndexFloatSzie = S1_BASE_STEP * gSizeQueryIndex * dSizeQueryIndex * sizeof(float);
-    int64_t dKeyIndexGmSize = 0;
+    uint64_t dQueryIndexFloatSize =
+        static_cast<uint64_t>(S1_BASE_STEP) * gSizeQueryIndex * dSizeQueryIndex * sizeof(float);
+    uint64_t dKeyIndexGmSize = 0;
     if (tilingKeyLayout == LayoutType::LAYOUT_TND) {
-        dKeyIndexGmSize = accumS2 * n2IndexSize * dSizeQueryIndex * sizeof(float); //batch
+        dKeyIndexGmSize =
+            static_cast<uint64_t>(accumS2) * n2IndexSize * dSizeQueryIndex * sizeof(float);
     } else {
-        dKeyIndexGmSize = bSize * s2Size * n2IndexSize * dSizeQueryIndex * sizeof(float); //batch
+        dKeyIndexGmSize =
+            static_cast<uint64_t>(bSize) * s2Size * n2IndexSize * dSizeQueryIndex * sizeof(float);
     }
 
-    int dKeyIndexDeterGmSize = 0;
-    int lossDeterGmSize = 0;
-    int coreRuninfoDeterGmSize = 0;
+    uint64_t dKeyIndexDeterGmSize = 0;
+    uint64_t lossDeterGmSize = 0;
+    uint64_t coreRuninfoDeterGmSize = 0;
     if (deterministic) {
-        int64_t coreNum = static_cast<int64_t>(dliGradkllossMultiCoreParams_->get_coreNum());
-        dKeyIndexDeterGmSize = coreNum * S2_BASE_STEP * n2IndexSize* dSizeQueryIndex * sizeof(float);
-        lossDeterGmSize = coreNum * AIC_AIV_RATIO * optiling::DETER_LOSS_TMP_GM_NUM * sizeof(float);
+        uint64_t coreNum = dliGradkllossMultiCoreParams_->get_coreNum();
+        dKeyIndexDeterGmSize =
+            coreNum * S2_BASE_STEP * n2IndexSize * dSizeQueryIndex * sizeof(float);
+        lossDeterGmSize =
+            coreNum * AIC_AIV_RATIO * optiling::DETER_LOSS_TMP_GM_NUM * sizeof(float);
         coreRuninfoDeterGmSize = coreNum * DETER_CORE_INFO_TMP_GM_NUM * sizeof(int64_t);
     }
 
-    int64_t singlecoreTotalSize =
-        PING_PONG_VALUE * (bmm1Size + bmm2Size + reluGradSize + psySyncSize) + dWeightFloatSzie + dQueryIndexFloatSzie;
-    int64_t multicoreTotalsize =
-        singlecoreTotalSize * static_cast<int64_t>(dliGradkllossMultiCoreParams_->get_coreNum()) + dKeyIndexGmSize +
+    uint64_t singlecoreTotalSize =
+        PING_PONG_VALUE * (bmm1Size + bmm2Size + reluGradSize + psySyncSize) +
+        dWeightFloatSize + dQueryIndexFloatSize;
+    uint64_t multicoreTotalSize =
+        singlecoreTotalSize * dliGradkllossMultiCoreParams_->get_coreNum() + dKeyIndexGmSize +
         dKeyIndexDeterGmSize + lossDeterGmSize + coreRuninfoDeterGmSize;
-
-    workspaces[0] = static_cast<size_t>(multicoreTotalsize) + WORK_SPACE_RESERVE_SIZE; // 预留16M空间必须加;
-    OP_LOGW(context_, "workspace size:[%ld], multicoreTotalsize:[%ld]", workspaces[0], multicoreTotalsize);
+    OP_CHECK_IF(multicoreTotalSize > std::numeric_limits<size_t>::max() - WORK_SPACE_RESERVE_SIZE,
+                OP_LOGE(opName, "workspace size overflow."), return ge::GRAPH_FAILED);
+    workspaces[0] = static_cast<size_t>(multicoreTotalSize + WORK_SPACE_RESERVE_SIZE);
+    OP_LOGW(context_, "workspace size:[%zu], multicoreTotalSize:[%lu]", workspaces[0], multicoreTotalSize);
     return ge::GRAPH_SUCCESS;
 }
 

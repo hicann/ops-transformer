@@ -15,8 +15,13 @@
 
 #include "kernel_operator.h"
 #include "dense_lightning_indexer_grad_kl_loss_tiling_key.h"
+#if (__CCE_AICORE__ == 310)
+#include "arch35/dense_lightning_indexer_grad_kl_loss_base.h"
+#include "arch35/dense_lightning_indexer_grad_kl_loss_common.h"
+#else
 #include "dense_lightning_indexer_grad_kl_loss_base.h"
 #include "dense_lightning_indexer_grad_kl_loss_common.h"
+#endif
 
 using namespace AscendC;
 
