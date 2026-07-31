@@ -29,6 +29,7 @@ constexpr uint64_t NUM_HALF = 2UL;
 constexpr uint64_t EVEN_FACTOR = 2UL;
 constexpr uint64_t POWER_OF_TWO = 2UL;
 constexpr uint32_t DB_SIZE = 2U;
+constexpr uint32_t TB_SIZE = 3U;
 constexpr uint32_t BASIC_BLOCK_SIZE_512 = 512U;
 constexpr uint32_t BASIC_BLOCK_SIZE_256 = 256U;
 constexpr uint32_t BASIC_BLOCK_SIZE_128 = 128U;

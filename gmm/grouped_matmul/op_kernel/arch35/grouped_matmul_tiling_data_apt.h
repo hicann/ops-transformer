@@ -74,7 +74,8 @@ struct QuantBasicApiMMTiling {
     uint32_t scaleKBL1 = 0;
     uint8_t isBias = 0;
     uint8_t dbL0C = 0;
-    uint16_t reserved1 = 0;
+    uint8_t l1BufferStage = 0;
+    uint8_t reserved1 = 0;
     uint32_t reserved2 = 0;
 };
 #pragma pack(pop)

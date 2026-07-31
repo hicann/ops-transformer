@@ -83,7 +83,36 @@ ge::graphStatus GroupedQmmBasicApiTiling::DoLibApiTiling()
             inputParams_.kSize);
         tilingData_.mmTilingData.scaleKBL1 = tilingData_.mmTilingData.scaleKAL1;
     }
+    tilingData_.mmTilingData.l1BufferStage = static_cast<uint8_t>(CanEnableThreeL1Buffer() ? TB_SIZE : DB_SIZE);
     return ge::GRAPH_SUCCESS;
+}
+
+bool GroupedQmmBasicApiTiling::CanEnableThreeL1Buffer() const
+{
+    if (!IsMicroScaling() || inputParams_.transA) {
+        return false;
+    }
+
+    const uint64_t kAL1 = tilingData_.mmTilingData.kAL1;
+    const uint64_t kBL1 = tilingData_.mmTilingData.kBL1;
+    const uint64_t scaleKL1 = tilingData_.mmTilingData.scaleKAL1;
+    if (kAL1 == 0UL || kBL1 == 0UL || scaleKL1 == 0UL) {
+        return false;
+    }
+
+    const uint64_t aL1Size =
+        GetSizeWithDataType(basicTiling_.baseM * CeilAlign(kAL1, MX_GROUP_SIZE), inputParams_.aDtype);
+    const uint64_t bL1Size =
+        GetSizeWithDataType(basicTiling_.baseN * CeilAlign(kBL1, MX_GROUP_SIZE), inputParams_.bDtype);
+    const uint64_t scaleKSize = CeilDiv(scaleKL1, MXFP_BASEK_FACTOR) * MXFP_MULTI_BASE_SIZE;
+    const uint64_t scaleAL1Size = GetSizeWithDataType(basicTiling_.baseM * scaleKSize, inputParams_.perTokenScaleDtype);
+    const uint64_t scaleBL1Size = GetSizeWithDataType(basicTiling_.baseN * scaleKSize, inputParams_.scaleDtype);
+    const uint64_t biasL1Size =
+        inputParams_.hasBias ? basicTiling_.baseN * ge::GetSizeByDataType(inputParams_.biasDtype) : 0UL;
+
+    const uint64_t commonL1Size = aL1Size + bL1Size + scaleAL1Size + scaleBL1Size + biasL1Size;
+    const uint64_t halfL1Size = aicoreParams_.l1Size / NUM_HALF;
+    return commonL1Size + aL1Size <= halfL1Size && commonL1Size + bL1Size <= halfL1Size;
 }
 
 ge::graphStatus GroupedQmmBasicApiTiling::PostTiling()

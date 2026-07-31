@@ -47,6 +47,7 @@ private:
     uint64_t GetDepthWithHighBW(uint64_t mnL1) const;
     void ModifyDepthForUnalign(uint64_t leftL1Size, uint64_t baseASize, uint64_t baseBSize, uint64_t baseScaleABSize);
     ge::graphStatus CalScaleFactors();
+    bool CanEnableThreeL1Buffer() const;
     GroupedMatmulTilingData::GMMQuantBasicApiTilingData tilingData_;
 };
 } // namespace optiling
