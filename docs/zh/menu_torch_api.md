@@ -19,6 +19,7 @@
 - [mhc_post](../../torch_extension/cann_ops_transformer/docs/zh/mhc_post.md)
 - [mhc_pre_sinkhorn](../../torch_extension/cann_ops_transformer/docs/zh/mhc_pre_sinkhorn.md)
 - [mixed_quant_sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/mixed_quant_sparse_flash_mla.md)
+- [moe_finalize_routing](../../torch_extension/cann_ops_transformer/docs/zh/moe_finalize_routing.md)
 - [moe_token_permute](../../torch_extension/cann_ops_transformer/docs/zh/moe_token_permute.md)
 - [qkv_rms_norm_rope_cache_with_k_scale](../../torch_extension/cann_ops_transformer/docs/zh/qkv_rms_norm_rope_cache_with_k_scale.md)
 - [quant_compressor](../../torch_extension/cann_ops_transformer/docs/zh/quant_compressor.md)

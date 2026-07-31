@@ -8,6 +8,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 from .sparse_flash_mla_grad import sparse_flash_mla_grad, sparse_flash_mla_grad_metadata
+from .moe_finalize_routing import moe_finalize_routing
 from .moe_token_permute import moe_token_permute
 from .mega_moe import get_symm_buffer_for_mega_moe, mega_moe
 from .deep_ep import MoeDistributeBuffer
