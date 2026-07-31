@@ -26,7 +26,7 @@
 #include "op_host/tiling_util.h"
 
 namespace optiling {
-    // ------------------公共定义--------------------------
+// ------------------公共定义--------------------------
 struct TilingRequiredParaInfo {
     const gert::CompileTimeTensorDesc *desc;
     const gert::StorageShape *shape;
@@ -37,11 +37,7 @@ struct TilingOptionalParaInfo {
     const gert::Tensor *tensor;
 };
 
-enum class DataLayout : uint32_t {
-    BSND = 0,
-    TND = 1,
-    PA_BBND = 2
-};
+enum class DataLayout : uint32_t { BSND = 0, TND = 1, PA_BBND = 2 };
 
 // ------------------算子原型索引常量定义----------------
 // Inputs Index
@@ -181,9 +177,7 @@ public:
 // -----------算子Tiling入参信息解析及Check类---------------
 class LIV2InfoParser {
 public:
-    explicit LIV2InfoParser(gert::TilingContext *context) : context_(context)
-    {
-    }
+    explicit LIV2InfoParser(gert::TilingContext *context) : context_(context) {}
     ~LIV2InfoParser() = default;
 
     ge::graphStatus CheckRequiredInOutExistence() const;
@@ -258,7 +252,7 @@ public:
 // ---------------算子Tiling类---------------
 class LightningIndexerV2Tiling {
 public:
-    explicit LightningIndexerV2Tiling(gert::TilingContext *context) : context_(context){};
+    explicit LightningIndexerV2Tiling(gert::TilingContext *context) : context_(context) {};
     ge::graphStatus DoTiling(LIV2TilingInfo *tilingInfo);
 
 private:

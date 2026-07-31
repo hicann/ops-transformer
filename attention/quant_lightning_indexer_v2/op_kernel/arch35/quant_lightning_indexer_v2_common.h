@@ -135,6 +135,7 @@ struct ConstInfo {
 
     // 基本块大小
     uint32_t mBaseSize = 1ULL;
+    uint32_t mBaseSizeMax = 1ULL;
     uint32_t s1BaseSize = 1ULL;
     uint32_t s2BaseSize = 1ULL;
 

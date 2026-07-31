@@ -90,12 +90,14 @@ public:
     static constexpr uint32_t SYNC_V1_C1_FLAG = 5;
 
     static constexpr uint32_t M_BASE_SIZE = 256;
+    static constexpr uint32_t M_BASE_SIZE_SMALL = 128;
     static constexpr uint32_t S1_BASE_SIZE = 4;
+    static constexpr uint32_t S1_BASE_SIZE_SMALL = 2;
     static constexpr uint32_t S2_BASE_SIZE = 128;
     static constexpr uint32_t HEAD_DIM = 128;
     static constexpr uint32_t K_HEAD_NUM = 1;
     static constexpr uint32_t GM_ALIGN_BYTES = 512;
-
+    static constexpr uint32_t TOPK_6K = 6144;
     static constexpr int64_t LD_PREFETCH_LEN = 2;
     // for workspace double
     static constexpr uint32_t WS_DOUBLE = 2;
@@ -212,10 +214,15 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::InitTilingData(const QLIV2TilingDat
 
     constInfo.kHeadNum = K_HEAD_NUM;
     constInfo.headDim = HEAD_DIM;
-
-    constInfo.mBaseSize = S1_BASE_SIZE * constInfo.gSize;
+    if (constInfo.sparseCount > TOPK_6K) {
+        constInfo.s1BaseSize = S1_BASE_SIZE_SMALL;
+        constInfo.mBaseSizeMax = M_BASE_SIZE_SMALL;
+    } else {
+        constInfo.s1BaseSize = S1_BASE_SIZE;
+        constInfo.mBaseSizeMax = M_BASE_SIZE;
+    }
+    constInfo.mBaseSize = constInfo.s1BaseSize * constInfo.gSize;
     constInfo.s2BaseSize = S2_BASE_SIZE;
-    constInfo.s1BaseSize = S1_BASE_SIZE;
     constInfo.returnValue = tilingData->returnValue;
 }
 
