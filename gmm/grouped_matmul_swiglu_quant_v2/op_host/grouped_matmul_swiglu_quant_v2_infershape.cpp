@@ -78,8 +78,12 @@ static ge::graphStatus InferShape4GroupedMatmulSwigluQuantV2(gert::InferShapeCon
     int64_t m = xShape->GetDim(M_DIM_INDEX);
     int64_t weightScaleDimNum = weightScaleShape->GetDimNum();
     int64_t nDimIndex = weightScaleDimNum - 1;
-    bool isMxShape = *quantModePtr == QUANT_MODE_MX_TYPE || weightScaleDimNum == MX_SINGLE_WEIGHT_SCALE_DIM ||
-                     weightScaleDimNum == MX_MULTI_WEIGHT_SCALE_DIM;
+    // A8W4/A4W4 per-group weightScale is also 3D, so per-token mode must not be identified as MX by rank.
+    // Preserve the original shape inference for invalid non-per-token modes; parameter validation rejects them later.
+    bool isMxShape = *quantModePtr != QUANT_MODE_PERTOKEN_TYPE &&
+                     (*quantModePtr == QUANT_MODE_MX_TYPE ||
+                      weightScaleDimNum == MX_SINGLE_WEIGHT_SCALE_DIM ||
+                      weightScaleDimNum == MX_MULTI_WEIGHT_SCALE_DIM);
     if (isMxShape) {
         if (weightScaleDimNum == MX_SINGLE_WEIGHT_SCALE_DIM) {
             nDimIndex = transposeWeight ? weightScaleDimNum - OUT_DIM_LEN : weightScaleDimNum - DIM_LEN;

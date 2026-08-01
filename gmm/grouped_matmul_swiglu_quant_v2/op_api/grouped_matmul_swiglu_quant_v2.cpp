@@ -22,6 +22,7 @@ namespace l0op {
 OP_TYPE_REGISTER(GroupedMatmulSwigluQuantV2);
 
 constexpr int64_t SWIGLU_SPLIT_SIZE = 64L;
+constexpr int64_t QUANT_MODE_PERTOKEN = 0L;
 constexpr size_t MX_MULTI_WEIGHT_DIM = 2UL;
 constexpr size_t MX_MULTI_WEIGHT_SCALE_N_DIM = 1UL;
 constexpr size_t MX_WEIGHT_SCALE_N_DIM = 2UL;
@@ -48,18 +49,27 @@ const std::tuple<aclTensor *, aclTensor *> GroupedMatmulSwigluQuantV2(const aclT
         return std::tuple(nullptr, nullptr);
     }
     int64_t m = xScale->GetViewShape().GetDim(0);
-    int64_t n = (*weightScale)[0]->GetViewShape().GetDim(1);
+    auto weightScaleShape = (*weightScale)[0]->GetViewShape();
+    int64_t weightScaleDimNum = static_cast<int64_t>(weightScaleShape.GetDimNum());
+    int64_t n = weightScaleShape.GetDim(weightScaleDimNum - 1);
     int64_t nAfterHalve = static_cast<int64_t>(n / 2);
     gert::Shape outShape({m, nAfterHalve});
     gert::Shape scaleOutShape({m});
     auto out = executor->AllocTensor(outShape, DataType::DT_INT8, ge::FORMAT_ND);
     auto scaleOut = executor->AllocTensor(scaleOutShape, DataType::DT_FLOAT, ge::FORMAT_ND);
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
-        n = IsMxWeightNzMultiTensor(weight) ?
-                (transposeWeight ? (*weightScale)[0]->GetViewShape().GetDim(0) :
-                                   (*weightScale)[0]->GetViewShape().GetDim(MX_MULTI_WEIGHT_SCALE_N_DIM)) :
-                (transposeWeight ? (*weightScale)[0]->GetViewShape().GetDim(MX_MULTI_WEIGHT_SCALE_N_DIM) :
-                                   (*weightScale)[0]->GetViewShape().GetDim(MX_WEIGHT_SCALE_N_DIM));
+        bool isMxWeightNzMultiTensor = IsMxWeightNzMultiTensor(weight);
+        if (quantMode == QUANT_MODE_PERTOKEN) {
+            // A8W4/A4W4 weightScale is [E, N] for per-channel and [E, KGroup, N] for per-group.
+            // WeightNZ may set transposeWeight, but weightScale remains ND and its last dimension is always N.
+            n = weightScaleShape.GetDim(weightScaleDimNum - 1);
+        } else {
+            n = isMxWeightNzMultiTensor ?
+                    (transposeWeight ? weightScaleShape.GetDim(0) :
+                                       weightScaleShape.GetDim(MX_MULTI_WEIGHT_SCALE_N_DIM)) :
+                    (transposeWeight ? weightScaleShape.GetDim(MX_MULTI_WEIGHT_SCALE_N_DIM) :
+                                       weightScaleShape.GetDim(MX_WEIGHT_SCALE_N_DIM));
+        }
         nAfterHalve = static_cast<int64_t>(n / 2); // outShape需要为[M, N / 2]
         gert::Shape outShapeV2({m, nAfterHalve});
         gert::Shape scaleOutShapeV2;
