@@ -853,18 +853,37 @@ __aicore__ inline void DenseLightningIndexerGradKLLossVector<DLIT>::VectorDwDqDk
             SetFlag<HardEvent::MTE2_V>(mte2ToV);
             WaitFlag<HardEvent::MTE2_V>(mte2ToV);
 
-            uint32_t weightOffset = rowIdx * constInfo.n1IndexSize + nIdx;
-            DenseDliGradKLLossArch35::ComputeGradElementwise(
-                mulLeftUb_, reluGradUb_,
-                reduceSumPUb_[rowIdx * runInfo.curS2StepSizeAlign8], reluResUb_,
-                weightUb_[runInfo.pingPongFlagV1V2], weightOffset,
-                runInfo.curS2StepSizeAlign8);
-            PipeBarrier<PIPE_V>();
+            if constexpr (deterministic) {
+                // Keep the two UB outputs in separate VF calls on the deterministic path.
+                DenseDliGradKLLossArch35::ComputeDwElementwise(
+                    mulLeftUb_, reduceSumPUb_[rowIdx * runInfo.curS2StepSizeAlign8],
+                    reluResUb_, runInfo.curS2StepSizeAlign8);
+                PipeBarrier<PIPE_V>();
 
-            AscendC::Sum(reduceSumResTensor_[nIdx * 8], mulLeftUb_, tmpUb_, sumParams);
-            PipeBarrier<PIPE_V>();
+                AscendC::Sum(reduceSumResTensor_[nIdx * 8], mulLeftUb_, tmpUb_, sumParams);
+                PipeBarrier<PIPE_V>();
 
-            WaitFlag<HardEvent::MTE3_V>(mte3ToV);
+                WaitFlag<HardEvent::MTE3_V>(mte3ToV);
+                uint32_t weightOffset = rowIdx * constInfo.n1IndexSize + nIdx;
+                DenseDliGradKLLossArch35::ComputeReluGradElementwise(
+                    reluGradUb_, reduceSumPUb_[rowIdx * runInfo.curS2StepSizeAlign8],
+                    reluResUb_, weightUb_[runInfo.pingPongFlagV1V2], weightOffset,
+                    runInfo.curS2StepSizeAlign8);
+                PipeBarrier<PIPE_V>();
+            } else {
+                uint32_t weightOffset = rowIdx * constInfo.n1IndexSize + nIdx;
+                DenseDliGradKLLossArch35::ComputeGradElementwise(
+                    mulLeftUb_, reluGradUb_,
+                    reduceSumPUb_[rowIdx * runInfo.curS2StepSizeAlign8], reluResUb_,
+                    weightUb_[runInfo.pingPongFlagV1V2], weightOffset,
+                    runInfo.curS2StepSizeAlign8);
+                PipeBarrier<PIPE_V>();
+
+                AscendC::Sum(reduceSumResTensor_[nIdx * 8], mulLeftUb_, tmpUb_, sumParams);
+                PipeBarrier<PIPE_V>();
+
+                WaitFlag<HardEvent::MTE3_V>(mte3ToV);
+            }
             SetFlag<HardEvent::V_MTE2>(vToMte2);
 
             SetFlag<HardEvent::V_MTE3>(vToMte3);
