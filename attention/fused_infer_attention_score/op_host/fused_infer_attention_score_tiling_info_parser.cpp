@@ -257,11 +257,11 @@ ge::graphStatus FiaInfoParser::GetStrides()
     keyStrides_ = context_->GetDynamicInputStride(KEY_INDEX, 0);
     valueStrides_ = context_->GetDynamicInputStride(VALUE_INDEX, 0);
     if (opParamInfo_.keyAntiquantScale.tensor != nullptr || opParamInfo_.valueAntiquantScale.tensor != nullptr) {
-        kScaleStrides_ = context_->GetInputStride(KEY_ANTIQUANT_SCALE_INDEX);
-        vScaleStrides_ = context_->GetInputStride(VALUE_ANTIQUANT_SCALE_INDEX);
+        kScaleStrides_ = context_->GetOptionalInputStride(KEY_ANTIQUANT_SCALE_INDEX);
+        vScaleStrides_ = context_->GetOptionalInputStride(VALUE_ANTIQUANT_SCALE_INDEX);
     }
     if (opParamInfo_.keyRope.desc != nullptr) {
-        kRopeStrides_ = context_->GetInputStride(KEY_ROPE_INDEX);
+        kRopeStrides_ = context_->GetOptionalInputStride(KEY_ROPE_INDEX);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -287,7 +287,7 @@ void FiaInfoParser::GetKvIsContiguous()
             valueNonContigDim_ = dim;
         }
     }
-    if (kRopeStrides_ != nullptr) {
+    if (kRopeStrides_ != nullptr && opParamInfo_.keyRope.tensor != nullptr) {
         int32_t dim = 0;
         if (CheckTensorContiguousLocal(opParamInfo_.keyRope.tensor->GetStorageShape().GetDimNum(),
                                        opParamInfo_.keyRope.tensor->GetStorageShape(),
