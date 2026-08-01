@@ -67,10 +67,11 @@ public:
 
     __aicore__ inline void operator()(LocalTensor<uint32_t>& mrgValueLocal, LocalTensor<uint32_t>& indicesOutLocal,
                                       LocalTensor<uint32_t>& hisValueLocal, uint32_t s2SeqLen, uint32_t loopIdx,
-                                      uint32_t s2LoopNum, bool returnValueFlag, uint32_t outputIdxOffset)
+                                      uint32_t s2LoopNum, bool isNeedLD, bool returnValueFlag,
+                                      uint32_t outputIdxOffset)
     {
         if (s2LoopNum == 1) {
-            if (returnValueFlag) {
+            if (isNeedLD || returnValueFlag) {
                 liV2Topkb32gather::LiTopKVF<true>(tmpIndexLocal, hisValueLocal, mrgValueLocal, histogramsLocal,
                                                   idx0Local, idx1Local, idx2Local, idx3Local,
                                                   nkValueLocal, topK, s2SeqLen);
@@ -89,7 +90,7 @@ public:
                 PipeBarrier<PIPE_V>();
                 AscendC::DataCopy(hisIndexLocal[(loopIdx + 1) % 2], tmpIndexLocal,
                                   LIV2Common::Align(topK, (uint32_t)256));
-            } else {
+            } else if (loopIdx != 0) {
                 liV2Topkb32gather::LiTopKVF<true>(tmpIndexLocal, hisValueLocal, mrgValueLocal, histogramsLocal,
                                                   idx0Local, idx1Local, idx2Local, idx3Local,
                                                   nkValueLocal, topK, s2SeqLen);
@@ -114,6 +115,19 @@ public:
             liV2Topkb32gather::IndicesAddOffset(indicesOutLocal, outputIdxOffset, topK);
         }
     }
+
+    __aicore__ inline void LdTopK(LocalTensor<uint32_t>& mrgValueLocal, LocalTensor<uint32_t> indexLocal,
+                                  LocalTensor<uint32_t>& indicesOutLocal,
+                                  LocalTensor<uint32_t>& hisValueLocal, uint32_t s2SeqLen, uint32_t loopIdx,
+                                  uint32_t s2LoopNum)
+    {
+        liV2Topkb32gather::LiTopKVF<true>(tmpIndexLocal, hisValueLocal, mrgValueLocal, histogramsLocal,
+                                      idx0Local, idx1Local, idx2Local, idx3Local,
+                                      nkValueLocal, topK, s2SeqLen);
+        PipeBarrier<PIPE_V>();
+        liV2Topkb32gather::LiTopKLDGatherVF(indicesOutLocal, tmpIndexLocal, indexLocal, topK);
+    }
+
 private:
     LocalTensor<uint32_t> hisIndexLocal[2]; // 每trunkLen长度的s2选出的topK个索引
     LocalTensor<uint32_t> histogramsLocal;  // 直方图的临时Buf 256 * 4B

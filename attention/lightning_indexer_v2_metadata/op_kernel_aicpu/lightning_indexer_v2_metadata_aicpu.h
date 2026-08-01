@@ -273,7 +273,7 @@ private:
     Tensor *metadata_ = nullptr;
     // attributes
     std::string socVersion_ = "";
-    bool supportFd_ = false;
+    bool supportFd_ = true;
     uint32_t aicCoreNum_ = optiling::AIC_CORE_MAX_NUM;
     uint32_t aivCoreNum_ = optiling::AIV_CORE_MAX_NUM;
     int32_t batchSize_ = 0;

@@ -639,6 +639,25 @@ __simd_vf__ void FindRealIndexVFImpl(__ubuf__ uint32_t* outputIdxBuf, __ubuf__ u
                                                                        outputGatherIdx, pregB32);
     }
 }
+/**
+    LD:输出最终的Idx
+*/
+__simd_vf__ void FindLDRealIndexVFImpl(__ubuf__ uint32_t* outputIdxBuf, __ubuf__ uint32_t* tmpIdxBuf,
+                                       __ubuf__ uint32_t* hisIdxBuf, uint16_t vfLoop)
+{
+    MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
+
+    MicroAPI::RegTensor<uint32_t> tmpIdx;
+    MicroAPI::RegTensor<uint32_t> outputIdx;
+
+    for (uint16_t i = 0; i < (uint16_t)(vfLoop); ++i) {
+        MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_NORM>(tmpIdx, tmpIdxBuf + i * 64);
+
+        MicroAPI::Gather(outputIdx, hisIdxBuf, tmpIdx, pregB32);
+
+        MicroAPI::StoreAlign<uint32_t, MicroAPI::StoreDist::DIST_NORM>(outputIdxBuf + i * 64, outputIdx, pregB32);
+    }
+}
 
 __simd_vf__ void IndicesAddOffsetVF(__ubuf__ uint32_t* indicesOutBuf, uint32_t outputIdxOffset, uint32_t vfLoop)
 {
@@ -754,6 +773,24 @@ __aicore__ inline void LiTopKGatherVF(const LocalTensor<uint32_t>& outputIdxLoca
     uint16_t topkLoopNum32 = (topK + repeatSize32 - 1) / repeatSize32;
 
     FindRealIndexVFImpl(outputIdxBuf, tmpIdxBuf, hisIdxBuf, topK, loopBasicIdx, topkLoopNum32);
+}
+
+/**
+    LD:gather最终的Idx
+*/
+__aicore__ inline void LiTopKLDGatherVF(const LocalTensor<uint32_t>& outputIdxLocal, // 输出Idx topK * 2B
+                                        const LocalTensor<uint32_t>& tmpIdxLocal, // 本轮tmpIdx输入 validLen * 2B
+                                        const LocalTensor<uint32_t>& hisIdxLocal, // 上一轮Idx输入 topK * 4B
+                                        uint32_t topK) // topK元素个数
+{
+    __ubuf__ uint32_t* outputIdxBuf = (__ubuf__ uint32_t*)outputIdxLocal.GetPhyAddr();
+    __ubuf__ uint32_t* tmpIdxBuf = (__ubuf__ uint32_t*)tmpIdxLocal.GetPhyAddr();
+    __ubuf__ uint32_t* hisIdxBuf = (__ubuf__ uint32_t*)hisIdxLocal.GetPhyAddr();
+
+    const uint16_t repeatSize32 = 64;
+    uint16_t topkLoopNum32 = (topK + repeatSize32 - 1) / repeatSize32;
+
+    FindLDRealIndexVFImpl(outputIdxBuf, tmpIdxBuf, hisIdxBuf, topkLoopNum32);
 }
 
 __aicore__ inline void IndicesAddOffset(const LocalTensor<uint32_t>& indicesOutLocal,
