@@ -847,14 +847,14 @@ __aicore__ inline void EngramFetchGradArch35::WriteGradResult(int32_t outOffset,
 {
     if (outputDtype_ == ENGRAM_DT_BFLOAT16) {
         LocalTensor<bfloat16_t> outTensor = pingBuf_.Get<bfloat16_t>();
-        Cast(outTensor, gradSumFp32, AscendC::RoundMode::CAST_ROUND, static_cast<uint32_t>(hiddenDim_));
+        Cast(outTensor, gradSumFp32, AscendC::RoundMode::CAST_RINT, static_cast<uint32_t>(hiddenDim_));
         EngramFetchGradSyncFunc<HardEvent::V_MTE3>();
         DataCopyPad(gradUniqueGM[static_cast<uint64_t>(outOffset) * hiddenDim_ * sizeof(bfloat16_t)],
                     outTensor.ReinterpretCast<uint8_t>(),
                     {1U, static_cast<uint16_t>(hiddenDim_ * sizeof(bfloat16_t)), 0U, 0U});
     } else if (outputDtype_ == ENGRAM_DT_FLOAT16) {
         LocalTensor<half> outTensor = pingBuf_.Get<half>();
-        Cast(outTensor, gradSumFp32, AscendC::RoundMode::CAST_ROUND, static_cast<uint32_t>(hiddenDim_));
+        Cast(outTensor, gradSumFp32, AscendC::RoundMode::CAST_RINT, static_cast<uint32_t>(hiddenDim_));
         EngramFetchGradSyncFunc<HardEvent::V_MTE3>();
         DataCopyPad(gradUniqueGM[static_cast<uint64_t>(outOffset) * hiddenDim_ * sizeof(half)],
                     outTensor.ReinterpretCast<uint8_t>(),
