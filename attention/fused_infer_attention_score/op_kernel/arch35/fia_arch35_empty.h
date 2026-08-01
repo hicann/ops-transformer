@@ -19,7 +19,6 @@
 #include "fia_arch35_common.h"
 #include "fia_arch35_zero_output.h"
 
-#if (__CCE_AICORE__ == 310) || (defined __DAV_310R6__)
 inline __aicore__ void fia_empty_regbase(__gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
                                          __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
 {
@@ -33,15 +32,5 @@ inline __aicore__ void fia_empty_regbase(__gm__ uint8_t *attentionOut, __gm__ ui
     op.Init(attentionOut, softmaxLse, tilingData);
     op.Process();
 }
-#else
-inline __aicore__ void fia_empty_regbase(__gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-                                         __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
-{
-    (void)attentionOut;
-    (void)softmaxLse;
-    (void)workspace;
-    (void)tiling;
-}
-#endif
 
 #endif // FIA_ARCH35_EMPTY_H_

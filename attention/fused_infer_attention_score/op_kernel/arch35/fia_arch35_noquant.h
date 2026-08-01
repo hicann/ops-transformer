@@ -17,23 +17,10 @@
 #define FIA_ARCH35_NOQUANT_H_
 
 #include "fia_arch35_common.h"
-#if __has_include( \
-    "../../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_template_tiling_key_enum.h")
 #include "../../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_template_tiling_key_enum.h"
-#else
-#include "../../../prompt_flash_attention/arch35/prompt_flash_attention_template_tiling_key_enum.h"
-#endif
-#if __has_include("../../../../common/op_kernel/arch35/flash_attention_noquant_kernel_infer.h")
 #include "../../../../common/op_kernel/arch35/flash_attention_noquant_kernel_infer.h"
 #include "../../../../common/op_kernel/arch35/flash_attention_kernel_noquant_mla.h"
-#else
-#include "../../../common/arch35/flash_attention_kernel_noquant_mla.h"
-#endif
-#if __has_include("../../../../common/op_kernel/arch35/fia_template_dispatcher.h")
 #include "../../../../common/op_kernel/arch35/fia_template_dispatcher.h"
-#else
-#include "../../../common/arch35/fia_kernel_noquant_gqa.h"
-#endif
 
 using namespace regbaseutil;
 
@@ -94,23 +81,7 @@ inline __aicore__ void fia_noquant_regbase(
 {
     __gm__ uint8_t *user = GetUserWorkspace(workspace);
 
-#if (__CCE_AICORE__ == 310) && (!defined(__DAV_310R6__))
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
-    REGISTER_TILING_DEFAULT(FlashAttentionScoreSimplifiedTilingData);
-    REGISTER_TILING_FOR_TILINGKEY("(((TILING_KEY_VAR >> 22) & 0x1f) != 30 && ((TILING_KEY_VAR >> 22) & 0x1f) != 19 && "
-                                  "((TILING_KEY_VAR >> 22) & 0x1f) != 20 && ((TILING_KEY_VAR >> 22) & 0x1f) != 21) && "
-                                  "((TILING_KEY_VAR >> 28) & 0x1) == 1 && ((TILING_KEY_VAR >> 8) & 0x12) == 9",
-                                  FlashAttentionScoreSimplifiedTilingData);
-    REGISTER_TILING_FOR_TILINGKEY(
-        "((TILING_KEY_VAR >> 22) & 0x1f) != 30 && ((TILING_KEY_VAR >> 22) & 0x1f) != 19 && ((TILING_KEY_VAR >> 22) & "
-        "0x1f) != 20 && ((TILING_KEY_VAR >> 22) & 0x1f) != 21 && ((TILING_KEY_VAR >> 8) & 0x12) != 9",
-        FusedInferAttentionScoreTilingData);
-    REGISTER_TILING_FOR_TILINGKEY("((TILING_KEY_VAR >> 22) & 0x1f) == 19 || ((TILING_KEY_VAR >> 22) & 0x1f) == 20 || "
-                                  "((TILING_KEY_VAR >> 22) & 0x1f) == 21",
-                                  FusedInferAttentionScoreFullQuantTilingData);
-    REGISTER_TILING_FOR_TILINGKEY("((TILING_KEY_VAR >> 22) & 0x1f) != 19 && ((TILING_KEY_VAR >> 22) & 0x1f) != 20 && "
-                                  "((TILING_KEY_VAR >> 22) & 0x1f) != 21",
-                                  FlashAttentionScoreSimplifiedTilingData);
     constexpr bool isPa = KvLayoutType != 0;
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16 && ORIG_DTYPE_KEY == DT_FLOAT16 && ORIG_DTYPE_ATTENTION_OUT == DT_FLOAT16)
     // 解析两个合并字段
@@ -437,7 +408,6 @@ inline __aicore__ void fia_noquant_regbase(
             dVTemplateType, static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope, true, isPa, isFd,
             enableKVPrefix, enableS1OutSplit);
     }
-#endif
 #endif
 }
 

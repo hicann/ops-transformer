@@ -17,17 +17,8 @@
 #define FIA_ARCH35_ANTIQUANT_H_
 
 #include "fia_arch35_common.h"
-#if __has_include( \
-    "../../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_template_tiling_key_enum.h")
 #include "../../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_template_tiling_key_enum.h"
-#else
-#include "../../../prompt_flash_attention/arch35/prompt_flash_attention_template_tiling_key_enum.h"
-#endif
-#if __has_include("../../../../common/op_kernel/arch35/flash_attention_score_antiquant_kernel.h")
 #include "../../../../common/op_kernel/arch35/flash_attention_score_antiquant_kernel.h"
-#else
-#include "../../../common/arch35/flash_attention_score_antiquant_kernel.h"
-#endif
 
 #define REGBASE_COPY_TILING_DATA_ASCEND950_ANTIQUANT_BASEAPI(tiling) \
     GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling); \
@@ -73,13 +64,6 @@ inline __aicore__ void fia_antiquant_regbase(
     获取Op可用WorkSpace空间
     **/
     __gm__ uint8_t *user = GetUserWorkspace(workspace);
-
-#if (__CCE_AICORE__ == 310) || (defined __DAV_310R6__)
-#ifdef __DAV_310R6_CUBE__
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
-#endif
-
-    REGISTER_TILING_FOR_TILINGKEY("((TILING_KEY_VAR >> 22) & 0x1f) < 15", FlashAttentionScoreSimplifiedTilingData);
 
     constexpr bool isPa = KvLayoutType != 0;
 
@@ -258,8 +242,6 @@ inline __aicore__ void fia_antiquant_regbase(
         ImplModeEnum::AA_HIGH_PRECISION, inputLayoutType, s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
         static_cast<PseTypeEnum>(pseMode), static_cast<AntiquantTypeEnum>(quantMode), hasAttenMask, false, false, true,
         isPa, isFd, enableKVPrefix);
-#endif
-
 #endif
 }
 
