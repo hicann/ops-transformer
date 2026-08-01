@@ -40,15 +40,15 @@ using namespace arch35QFA;
 
 ge::graphStatus QuantChecker::CheckSingleParaQuantMode(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: data_type 支持 INT32；支持输入范围为 1、2、3
+    // 文档约束: data_type 支持 INT32；当前仅支持 quant_mode = 1
     // quantMode 为属性，QfaTilingInfo 中存储为 QfaQuantMode 枚举
-    const std::vector<uint32_t> supportedQuantModes = {1, 2, 3};
+    const std::vector<uint32_t> supportedQuantModes = {1};
     uint32_t quantModeVal = static_cast<uint32_t>(qfaInfo.quantMode);
     OP_CHECK_IF(
         std::find(supportedQuantModes.begin(), supportedQuantModes.end(), quantModeVal) == supportedQuantModes.end(),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, QUANT_MODE_NAME.c_str(),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, "quant_mode",
                                               std::to_string(quantModeVal).c_str(),
-                                              "The value of quant_mode must be in {1, 2, 3}"),
+                                              "The value of quant_mode must be 1"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -183,7 +183,7 @@ ge::graphStatus QuantChecker::CheckParaExistence(const QfaTilingInfo &qfaInfo)
 {
     // quant_mode: 必选属性
     OP_CHECK_IF(qfaInfo.opParamInfo.quantMode == nullptr,
-                OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, QUANT_MODE_NAME.c_str()), return ge::GRAPH_FAILED);
+                OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, "quant_mode"), return ge::GRAPH_FAILED);
 
     // q_descale / k_descale / v_descale: 必须存在
     OP_CHECK_IF(qfaInfo.opParamInfo.qDescale.desc == nullptr || qfaInfo.opParamInfo.qDescale.shape == nullptr,
@@ -248,7 +248,7 @@ ge::graphStatus QuantChecker::CheckQDescaleShape(const QfaTilingInfo &qfaInfo) c
 
     // 约束: MxFP8场景下 q_descale 两种 shape 对应不同使用场景
     //   4D 为 prefill 场景，layout_q_descale 必须为 TND；5D 为 decode 场景，layout_q_descale 必须为 N2TGD
-    if (qfaInfo.quantMode == QfaQuantMode::MXFP8_FP32) {
+    if (qfaInfo.quantMode == QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
         std::string shapeStr = Ops::Base::ToString(shape->GetStorageShape());
         bool isDecode = (qfaInfo.layoutQDescale == QfaLayout::N2TGD);
         if (dimNum == DIM_NUM_4) {
@@ -382,7 +382,7 @@ ge::graphStatus QuantChecker::CheckMultiPara(const QfaTilingInfo &qfaInfo)
 ge::graphStatus QuantChecker::CheckDescaleDtype(const QfaTilingInfo &qfaInfo) const
 {
     // 文档约束(一致性校验): MxFP8 场景下, q/k/v descale 的 tensor_type 仅支持 FLOAT8_E8M0
-    if (qfaInfo.quantMode != QfaQuantMode::MXFP8_FP32) {
+    if (qfaInfo.quantMode != QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
         return ge::GRAPH_SUCCESS;
     }
 
@@ -510,7 +510,7 @@ struct QfaLayoutConstraintConfig {
 };
 
 const std::map<QfaQuantMode, QfaLayoutConstraintConfig> QFA_LAYOUT_CONSTRAINT_TABLE = {
-    {QfaQuantMode::MXFP8_FP32,
+    {QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32,
      {{QfaLayout::TND, QfaLayout::PA_BNBD, QfaLayout::PA_NZ}, {QfaLayout::TND}, {QfaLayout::TND, QfaLayout::N2TGD}}},
 };
 } // namespace

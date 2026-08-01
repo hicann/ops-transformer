@@ -1243,7 +1243,7 @@ def _call_npu_fa_op(
         cu_seqlens_kv=cu_seqlens_kv_t if is_tnd_kv else None,
         seqused_q=seqused_q_t,
         seqused_kv=seqused_kv_t,
-        dequant_scale_v=v_descale,
+        v_descale=v_descale,
         mask_mode=sparse_mode,
         layout_q=layout_q,
         layout_q_descale=layout_q_descale,

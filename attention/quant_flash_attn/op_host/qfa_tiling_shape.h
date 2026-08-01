@@ -69,7 +69,10 @@ class QfaTilingShape {
 
 public:
     QfaTilingShape(const gert::Shape &shape, QfaLayout layout, std::string name, std::string opName)
-        : shape_(shape), layout_(layout), name_(name), opName_(opName) {};
+        : shape_(shape),
+          layout_(layout),
+          name_(name),
+          opName_(opName) {};
 
 public:
     const gert::Shape &shape_;
@@ -141,7 +144,10 @@ class QfaTilingShapeCompare {
 
 public:
     QfaTilingShapeCompare(const gert::Shape &shape, QfaLayout layout, std::string name, std::string opName)
-        : shape_(shape), layout_(layout), name_(name), opName_(opName) {};
+        : shape_(shape),
+          layout_(layout),
+          name_(name),
+          opName_(opName) {};
 
 public:
     const gert::Shape &shape_;

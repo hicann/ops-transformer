@@ -22,7 +22,8 @@ namespace optiling {
 namespace quant_flash_attn {
 class QfaInfoParser {
 public:
-    explicit QfaInfoParser(const gert::TilingContext *context) : context_(context)
+    explicit QfaInfoParser(const gert::TilingContext *context)
+        : context_(context)
     {
     }
     ~QfaInfoParser() = default;
@@ -133,7 +134,7 @@ private:
     int64_t maskMode_ = 0;
 
     // Quant
-    QfaQuantMode quantMode_ = QfaQuantMode::MXFP8_FP32;
+    QfaQuantMode quantMode_ = QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32;
     int64_t blockSize_ = 0;
 
     // Sinks

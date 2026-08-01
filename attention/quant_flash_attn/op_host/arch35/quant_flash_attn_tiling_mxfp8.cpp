@@ -10,7 +10,7 @@
 
 /*!
  * \file quant_flash_attn_tiling_mxfp8.cpp
- * \brief QuantFlashAttn arch35 tiling implementation (MXFP8_FP32)
+ * \brief QuantFlashAttn arch35 tiling implementation (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32)
  */
 
 #include "quant_flash_attn_tiling_mxfp8.h"
@@ -40,7 +40,7 @@ bool QuantFlashAttnTilingImpl::IsCapable()
     if (qfaInfo_ == nullptr) {
         return false;
     }
-    if (qfaInfo_->quantMode != QfaQuantMode::MXFP8_FP32) {
+    if (qfaInfo_->quantMode != QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
         return false;
     }
     return true;
@@ -335,13 +335,10 @@ bool QuantFlashAttnTilingImpl::CheckNeedInitOutput() const
     if (qfaInfo_->maskMode == static_cast<int64_t>(MaskMode::NO_MASK)) {
         return false;
     }
-    if (qfaInfo_->maskMode == static_cast<int64_t>(MaskMode::ALL_MASK)) {
-        return true;
-    }
     if (qfaInfo_->maskMode == static_cast<int64_t>(MaskMode::CAUSAL)) {
         return qfaInfo_->s1Size > qfaInfo_->s2Size;
     }
-    if (qfaInfo_->maskMode == static_cast<int64_t>(MaskMode::BAND)) {
+    if (qfaInfo_->maskMode == static_cast<int64_t>(MaskMode::SLIDING_WINDOW)) {
         if (qfaInfo_->winRight == -1) {
             return false;
         }

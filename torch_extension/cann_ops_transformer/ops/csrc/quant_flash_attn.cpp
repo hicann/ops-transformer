@@ -19,7 +19,7 @@
 namespace op_api {
 const int64_t DIM_THREE = 3;
 const int64_t MAX_DIM_SIZE = 8;
-const int64_t QUANT_MODE_MXFP4 = 3;
+const int64_t QUANT_MODE_MXFP4 = 5;
 const int64_t FLOAT4_E2M1 = 296;
 const int64_t FLOAT8_E8M0 = 293;
 

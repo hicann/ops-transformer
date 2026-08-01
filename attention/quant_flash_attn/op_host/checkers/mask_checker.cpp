@@ -38,7 +38,7 @@ ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const QfaTilingInfo &qfaInf
     // qfaInfo.maskMode 为已解析的 int64_t（默认 0）
     const std::vector<int64_t> supportedMaskModes = {static_cast<int64_t>(MaskMode::NO_MASK),
                                                      static_cast<int64_t>(MaskMode::CAUSAL),
-                                                     static_cast<int64_t>(MaskMode::BAND)};
+                                                     static_cast<int64_t>(MaskMode::SLIDING_WINDOW)};
     OP_CHECK_IF(
         std::find(supportedMaskModes.begin(), supportedMaskModes.end(), qfaInfo.maskMode) == supportedMaskModes.end(),
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, MASK_MODE_NAME.c_str(),
@@ -129,7 +129,7 @@ ge::graphStatus MaskChecker::CheckMaskModeAttnMaskConsistency(const QfaTilingInf
     // 文档约束:
     //   - mask_mode=0 (NO_MASK): 不支持传入 attn_mask
     //   - mask_mode=3 (CAUSAL):  必须传入 attn_mask 矩阵
-    //   - mask_mode=4 (BAND):    必须传入 attn_mask 矩阵
+    //   - mask_mode=4 (SLIDING_WINDOW):    必须传入 attn_mask 矩阵
     bool attnMaskExists =
         (qfaInfo.opParamInfo.attnMask.tensor != nullptr && qfaInfo.opParamInfo.attnMask.desc != nullptr);
     if (qfaInfo.maskMode == static_cast<int64_t>(MaskMode::NO_MASK)) {
@@ -137,7 +137,7 @@ ge::graphStatus MaskChecker::CheckMaskModeAttnMaskConsistency(const QfaTilingInf
                     OP_LOGE(qfaInfo.opName, "When mask_mode is 0 (NO_MASK), attn_mask should not be provided."),
                     return ge::GRAPH_FAILED);
     } else {
-        // mask_mode 为 3 (CAUSAL) 或 4 (BAND) 时，必须传入 attn_mask
+        // mask_mode 为 3 (CAUSAL) 或 4 (SLIDING_WINDOW) 时，必须传入 attn_mask
         OP_CHECK_IF(!attnMaskExists, OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, ATTN_MASK_NAME.c_str()),
                     return ge::GRAPH_FAILED);
     }
@@ -158,12 +158,12 @@ ge::graphStatus MaskChecker::CheckMultiPara(const QfaTilingInfo &qfaInfo)
 
 ge::graphStatus MaskChecker::CheckMaskModeQuantMode(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: MxFP8 仅支持 mask_mode 取 0 和 3 (不支持 BAND=4)
-    if (qfaInfo.quantMode == QfaQuantMode::MXFP8_FP32) {
-        OP_CHECK_IF(qfaInfo.maskMode == static_cast<int64_t>(MaskMode::BAND),
+    // 文档约束: MxFP8 仅支持 mask_mode 取 0 和 3 (不支持 SLIDING_WINDOW=4)
+    if (qfaInfo.quantMode == QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
+        OP_CHECK_IF(qfaInfo.maskMode == static_cast<int64_t>(MaskMode::SLIDING_WINDOW),
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                         qfaInfo.opName, MASK_MODE_NAME.c_str(), std::to_string(qfaInfo.maskMode).c_str(),
-                        "MxFP8 only supports mask_mode 0 (NO_MASK) and 3 (CAUSAL), BAND(4) is not supported"),
+                        "MxFP8 only supports mask_mode 0 (NO_MASK) and 3 (CAUSAL), SLIDING_WINDOW(4) is not supported"),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;

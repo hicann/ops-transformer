@@ -7,7 +7,8 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
-from typing import Optional
+from typing import Optional, Union
+from enum import IntEnum
 import torch
 import torch_npu
 from torch.library import impl
@@ -17,13 +18,64 @@ from cann_ops_transformer.op_builder.builder import AS_LIBRARY
 QFA_METADATA_OP_NAME = "quant_flash_attn_metadata"
 
 
+class QuantMode(IntEnum):
+    """quant_mode 枚举：对外字符串/int 经由本枚举映射为传给算子侧的 int。"""
+
+    A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 1
+    A8C8_QKV_MXFP8_P_MXFP8_SOFTMAX_FP32 = 2
+    A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP16 = 3
+    A8C8_QKV_MXFP8_P_MXFP8_SOFTMAX_FP16 = 4
+    A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16 = 5
+    A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 6
+    A8C8_QKV_HIF8_PER_TENSOR_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 7
+    A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16 = 8
+    A4C4_QKV_HIF4_P_HIF4_LEVEL2_SOFTMAX_FP16 = 9
+    A4C4_QKV_HIF4_P_HIF4_LEVEL3_SOFTMAX_FP16 = 10
+
+
+class MaskMode(IntEnum):
+    """mask_mode 枚举：对外字符串/int 经由本枚举映射为传给算子侧的 int。"""
+
+    NO_MASK = 0
+    CAUSAL = 3
+    SLIDING_WINDOW = 4
+
+
+def _resolve_quant_mode(quant_mode: Union[str, int, "QuantMode"]) -> int:
+    """对外 str/int/IntEnum quant_mode 统一为传给算子侧的 int；校验取值合法性。"""
+    if isinstance(quant_mode, str):
+        try:
+            return int(QuantMode[quant_mode.strip().upper()])
+        except KeyError as exc:
+            valid = ", ".join(m.name.lower() for m in QuantMode)
+            raise ValueError(
+                f"quant_mode should be one of [{valid}], but got {quant_mode!r}"
+            ) from exc
+    return int(QuantMode(quant_mode))
+
+
+def _resolve_mask_mode(mask_mode: Union[str, int, "MaskMode", None]) -> int:
+    """对外 str/int/IntEnum/None mask_mode 统一为传给算子侧的 int；None 视为默认 0。"""
+    if mask_mode is None:
+        return int(MaskMode.NO_MASK)
+    if isinstance(mask_mode, str):
+        try:
+            return int(MaskMode[mask_mode.strip().upper()])
+        except KeyError as exc:
+            valid = ", ".join(m.name.lower() for m in MaskMode)
+            raise ValueError(
+                f"mask_mode should be one of [{valid}], but got {mask_mode!r}"
+            ) from exc
+    return int(MaskMode(mask_mode))
+
+
 def _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q):
-    if batch_size is not None:
-        return batch_size
+    if seqused_q is not None:
+        return seqused_q.size(0)
     elif cu_seqlens_q is not None and cu_seqlens_q.size(0) > 0:
         return cu_seqlens_q.size(0) - 1
-    elif seqused_q is not None:
-        return seqused_q.size(0)
+    elif batch_size is not None:
+        return batch_size
     return 0
 
 
@@ -37,7 +89,7 @@ class QuantFlashAttnOpBuilder(OpBuilder):
 
     def sources(self):
         """Path to C++ source code."""
-        return ['ops/csrc/quant_flash_attn.cpp']
+        return ["ops/csrc/quant_flash_attn.cpp"]
 
     def schema(self) -> str:
         """PyTorch operator signature."""
@@ -47,9 +99,8 @@ class QuantFlashAttnOpBuilder(OpBuilder):
             "Tensor? seqused_kv=None, Tensor? v_descale=None, "
             "int? batch_size=None, int? max_seqlen_q=-1, int? max_seqlen_kv=-1, "
             "int? mask_mode=0, int? win_left=-1, int? win_right=-1, "
-            "str? layout_q=\"BSND\", str? layout_q_descale=\"BSND\", "
-            "str? layout_kv=\"BSND\", str? layout_out=\"BSND\") -> Tensor",
-
+            'str? layout_q="BSND", str? layout_q_descale="BSND", '
+            'str? layout_kv="BSND", str? layout_out="BSND") -> Tensor',
             "quant_flash_attn(Tensor q, Tensor k, Tensor v, "
             "Tensor q_descale, Tensor k_descale, Tensor v_descale, int quant_mode, "
             "Tensor? block_table=None, Tensor? p_scale=None, "
@@ -58,8 +109,8 @@ class QuantFlashAttnOpBuilder(OpBuilder):
             "Tensor? sinks=None, Tensor? attn_mask=None, Tensor? metadata=None, "
             "float softmax_scale=1.0, int mask_mode=0, int win_left=-1, int win_right=-1, "
             "int max_seqlen_q=-1, int max_seqlen_kv=-1, "
-            "str layout_q=\"BSND\", str layout_q_descale=\"BSND\", str layout_kv=\"BSND\", str layout_out=\"BSND\", "
-            "bool return_softmax_lse=False) -> (Tensor, Tensor)"
+            'str layout_q="BSND", str layout_q_descale="BSND", str layout_kv="BSND", str layout_out="BSND", '
+            "bool return_softmax_lse=False) -> (Tensor, Tensor)",
         ]
 
     def register_meta(self):
@@ -67,12 +118,13 @@ class QuantFlashAttnOpBuilder(OpBuilder):
         Registers the Meta implementation (Shape/Dtype inference).
         Essential for Autograd and FakeTensor support.
         """
+
         @torch.library.register_fake("cann_ops_transformer::" + QFA_METADATA_OP_NAME)
         def quant_flash_attn_metadata_meta(
             num_heads_q: int,
             num_heads_kv: int,
             head_dim: int,
-            quant_mode: int,
+            quant_mode: Union[QuantMode, int],
             cu_seqlens_q: Optional[torch.Tensor] = None,
             cu_seqlens_kv: Optional[torch.Tensor] = None,
             seqused_q: Optional[torch.Tensor] = None,
@@ -81,7 +133,7 @@ class QuantFlashAttnOpBuilder(OpBuilder):
             batch_size: Optional[int] = None,
             max_seqlen_q: Optional[int] = -1,
             max_seqlen_kv: Optional[int] = -1,
-            mask_mode: Optional[int] = 0,
+            mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
             win_left: Optional[int] = -1,
             win_right: Optional[int] = -1,
             layout_q: Optional[str] = "BSND",
@@ -100,7 +152,7 @@ class QuantFlashAttnOpBuilder(OpBuilder):
             q_descale: torch.Tensor,
             k_descale: torch.Tensor,
             v_descale: torch.Tensor,
-            quant_mode: int,
+            quant_mode: Union[QuantMode, int],
             block_table: Optional[torch.Tensor] = None,
             p_scale: Optional[torch.Tensor] = None,
             cu_seqlens_q: Optional[torch.Tensor] = None,
@@ -111,7 +163,7 @@ class QuantFlashAttnOpBuilder(OpBuilder):
             attn_mask: Optional[torch.Tensor] = None,
             metadata: Optional[torch.Tensor] = None,
             softmax_scale: Optional[float] = 1.0,
-            mask_mode: Optional[int] = 0,
+            mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
             win_left: Optional[int] = -1,
             win_right: Optional[int] = -1,
             max_seqlen_q: Optional[int] = -1,
@@ -160,13 +212,13 @@ class QuantFlashAttnOpBuilder(OpBuilder):
                 torch._check(
                     layout_q != "TND",
                     lambda: f"When the layout of output is BSND, the layout of query "
-                            f"must be BNSD or BSND, but got {layout_q}",
+                    f"must be BNSD or BSND, but got {layout_q}",
                 )
                 attention_out_size = (b_size, s_size, n_size, d_size)
 
             return (
-                torch.empty(attention_out_size, dtype=torch.bfloat16, device='meta'),
-                torch.empty(softmax_out_size, dtype=torch.float32, device='meta')
+                torch.empty(attention_out_size, dtype=torch.bfloat16, device="meta"),
+                torch.empty(softmax_out_size, dtype=torch.float32, device="meta"),
             )
 
 
@@ -177,34 +229,35 @@ op_module = quant_flash_attn_op_builder.load()
 
 @impl(AS_LIBRARY, QFA_METADATA_OP_NAME, "PrivateUse1")
 def quant_flash_attn_metadata(
-        num_heads_q: int,
-        num_heads_kv: int,
-        head_dim: int,
-        quant_mode: int,
-        cu_seqlens_q: Optional[torch.Tensor] = None,
-        cu_seqlens_kv: Optional[torch.Tensor] = None,
-        seqused_q: Optional[torch.Tensor] = None,
-        seqused_kv: Optional[torch.Tensor] = None,
-        v_descale: Optional[torch.Tensor] = None,
-        batch_size: Optional[int] = None,
-        max_seqlen_q: Optional[int] = -1,
-        max_seqlen_kv: Optional[int] = -1,
-        mask_mode: Optional[int] = 0,
-        win_left: Optional[int] = -1,
-        win_right: Optional[int] = -1,
-        layout_q: Optional[str] = "BSND",
-        layout_q_descale: Optional[str] = "BSND",
-        layout_kv: Optional[str] = "BSND",
-        layout_out: Optional[str] = "BSND",
-    ):
+    num_heads_q: int,
+    num_heads_kv: int,
+    head_dim: int,
+    quant_mode: Union[QuantMode, int],
+    cu_seqlens_q: Optional[torch.Tensor] = None,
+    cu_seqlens_kv: Optional[torch.Tensor] = None,
+    seqused_q: Optional[torch.Tensor] = None,
+    seqused_kv: Optional[torch.Tensor] = None,
+    v_descale: Optional[torch.Tensor] = None,
+    batch_size: Optional[int] = None,
+    max_seqlen_q: Optional[int] = -1,
+    max_seqlen_kv: Optional[int] = -1,
+    mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
+    win_left: Optional[int] = -1,
+    win_right: Optional[int] = -1,
+    layout_q: Optional[str] = "BSND",
+    layout_q_descale: Optional[str] = "BSND",
+    layout_kv: Optional[str] = "BSND",
+    layout_out: Optional[str] = "BSND",
+):
     """
     Dispatcher implementation: NPU.
     'PrivateUse1' is dispatch key for custom NPU backends.
     """
-    batch_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q) if batch_size is None else batch_size
+    batch_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
     max_seqlen_q = -1 if max_seqlen_q is None else max_seqlen_q
     max_seqlen_kv = -1 if max_seqlen_kv is None else max_seqlen_kv
-    mask_mode = 0 if mask_mode is None else mask_mode
+    quant_mode = _resolve_quant_mode(quant_mode)
+    mask_mode = _resolve_mask_mode(mask_mode)
     win_left = -1 if win_left is None else win_left
     win_right = -1 if win_right is None else win_right
     layout_q = "BSND" if layout_q is None else layout_q
@@ -241,26 +294,26 @@ def quant_flash_attn_metadata(
 
 @torch.library.register_kernel("cann_ops_transformer::" + QFA_METADATA_OP_NAME, None)
 def quant_flash_attn_metadata_fallback(
-        num_heads_q: int,
-        num_heads_kv: int,
-        head_dim: int,
-        quant_mode: int,
-        cu_seqlens_q: Optional[torch.Tensor] = None,
-        cu_seqlens_kv: Optional[torch.Tensor] = None,
-        seqused_q: Optional[torch.Tensor] = None,
-        seqused_kv: Optional[torch.Tensor] = None,
-        v_descale: Optional[torch.Tensor] = None,
-        batch_size: Optional[int] = None,
-        max_seqlen_q: Optional[int] = -1,
-        max_seqlen_kv: Optional[int] = -1,
-        mask_mode: Optional[int] = 0,
-        win_left: Optional[int] = -1,
-        win_right: Optional[int] = -1,
-        layout_q: Optional[str] = "BSND",
-        layout_q_descale: Optional[str] = "BSND",
-        layout_kv: Optional[str] = "BSND",
-        layout_out: Optional[str] = "BSND"
-    ):
+    num_heads_q: int,
+    num_heads_kv: int,
+    head_dim: int,
+    quant_mode: Union[QuantMode, int],
+    cu_seqlens_q: Optional[torch.Tensor] = None,
+    cu_seqlens_kv: Optional[torch.Tensor] = None,
+    seqused_q: Optional[torch.Tensor] = None,
+    seqused_kv: Optional[torch.Tensor] = None,
+    v_descale: Optional[torch.Tensor] = None,
+    batch_size: Optional[int] = None,
+    max_seqlen_q: Optional[int] = -1,
+    max_seqlen_kv: Optional[int] = -1,
+    mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
+    win_left: Optional[int] = -1,
+    win_right: Optional[int] = -1,
+    layout_q: Optional[str] = "BSND",
+    layout_q_descale: Optional[str] = "BSND",
+    layout_kv: Optional[str] = "BSND",
+    layout_out: Optional[str] = "BSND",
+):
     # 处理所有 tensor 都为 None 的情况
     return quant_flash_attn_metadata(
         num_heads_q,
@@ -287,38 +340,40 @@ def quant_flash_attn_metadata_fallback(
 
 @impl(AS_LIBRARY, quant_flash_attn_op_builder.name, "PrivateUse1")
 def quant_flash_attn(
-        q: torch.Tensor,
-        k: torch.Tensor,
-        v: torch.Tensor,
-        q_descale: torch.Tensor,
-        k_descale: torch.Tensor,
-        v_descale: torch.Tensor,
-        quant_mode: int,
-        block_table: Optional[torch.Tensor] = None,
-        p_scale: Optional[torch.Tensor] = None,
-        cu_seqlens_q: Optional[torch.Tensor] = None,
-        cu_seqlens_kv: Optional[torch.Tensor] = None,
-        seqused_q: Optional[torch.Tensor] = None,
-        seqused_kv: Optional[torch.Tensor] = None,
-        sinks: Optional[torch.Tensor] = None,
-        attn_mask: Optional[torch.Tensor] = None,
-        metadata: Optional[torch.Tensor] = None,
-        softmax_scale: Optional[float] = 1.0,
-        mask_mode: Optional[int] = 0,
-        win_left: Optional[int] = -1,
-        win_right: Optional[int] = -1,
-        max_seqlen_q: Optional[int] = -1,
-        max_seqlen_kv: Optional[int] = -1,
-        layout_q: Optional[str] = "BSND",
-        layout_q_descale: Optional[str] = "BSND",
-        layout_kv: Optional[str] = "BSND",
-        layout_out: Optional[str] = "BSND",
-        return_softmax_lse: Optional[bool] = False,
-    ):
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    q_descale: torch.Tensor,
+    k_descale: torch.Tensor,
+    v_descale: torch.Tensor,
+    quant_mode: Union[QuantMode, int],
+    block_table: Optional[torch.Tensor] = None,
+    p_scale: Optional[torch.Tensor] = None,
+    cu_seqlens_q: Optional[torch.Tensor] = None,
+    cu_seqlens_kv: Optional[torch.Tensor] = None,
+    seqused_q: Optional[torch.Tensor] = None,
+    seqused_kv: Optional[torch.Tensor] = None,
+    sinks: Optional[torch.Tensor] = None,
+    attn_mask: Optional[torch.Tensor] = None,
+    metadata: Optional[torch.Tensor] = None,
+    softmax_scale: Optional[float] = 1.0,
+    mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
+    win_left: Optional[int] = -1,
+    win_right: Optional[int] = -1,
+    max_seqlen_q: Optional[int] = -1,
+    max_seqlen_kv: Optional[int] = -1,
+    layout_q: Optional[str] = "BSND",
+    layout_q_descale: Optional[str] = "BSND",
+    layout_kv: Optional[str] = "BSND",
+    layout_out: Optional[str] = "BSND",
+    return_softmax_lse: Optional[bool] = False,
+):
     """
     dispatcher implementation for NPU.
     'PrivateUse1' is the combine key for custom NPU backends.
     """
+    quant_mode = _resolve_quant_mode(quant_mode)
+    mask_mode = _resolve_mask_mode(mask_mode)
     return op_module.quant_flash_attn(
         q,
         k,
@@ -348,3 +403,9 @@ def quant_flash_attn(
         layout_out,
         return_softmax_lse,
     )
+
+
+quant_flash_attn.QuantMode = QuantMode
+quant_flash_attn.MaskMode = MaskMode
+quant_flash_attn_metadata.QuantMode = QuantMode
+quant_flash_attn_metadata.MaskMode = MaskMode

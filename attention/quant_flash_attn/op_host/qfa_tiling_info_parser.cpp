@@ -263,9 +263,10 @@ ge::graphStatus QfaInfoParser::GetQuantMode()
         return ge::GRAPH_FAILED;
     }
     int64_t quantModeVal = *opParamInfo_.quantMode;
-    if (quantModeVal != static_cast<int64_t>(QfaQuantMode::MXFP8_FP32)) {
+    if (quantModeVal != static_cast<int64_t>(QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
-                                              "quant_mode must be 1 (MXFP8_FP32)");
+                                              "quant_mode must be 1 "
+                                              "(A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32)");
         return ge::GRAPH_FAILED;
     }
     quantMode_ = static_cast<QfaQuantMode>(quantModeVal);

@@ -46,9 +46,9 @@ const aclTensor *QuantFlashAttnMetadata(const aclTensor *cuSeqlensQOptional, con
     auto ret = ADD_TO_LAUNCHER_LIST_AICPU(
         QuantFlashAttnMetadata,
         OP_ATTR_NAMES({"batch_size", "max_seqlen_q", "max_seqlen_kv", "num_heads_q", "num_heads_kv",
-                        "head_dim", "quant_mode", "mask_mode", "win_left", "win_right", "layout_q",
-                        "layout_q_descale", "layout_kv", "layout_out", "soc_version", "aic_core_num",
-                        "aiv_core_num"}),
+                       "head_dim", "quant_compute_mode", "mask_mode", "win_left", "win_right", "layout_q",
+                       "layout_q_descale", "layout_kv", "layout_out", "soc_version", "aic_core_num",
+                       "aiv_core_num"}),
         OP_INPUT(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, vDescaleOptional),
         OP_OUTPUT(metaData),
         OP_ATTR(batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, quantMode, maskMode, winLeft,

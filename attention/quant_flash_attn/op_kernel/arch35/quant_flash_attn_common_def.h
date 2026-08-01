@@ -37,7 +37,15 @@ static constexpr uint32_t FA_METADATA_HEADER_OFFSET = 16U * sizeof(uint32_t);
 #define ASCENDC_TPL_10_BW 10
 #define ASCENDC_TPL_3_BW 3
 
-enum class FA_LAYOUT : uint32_t { BSH = 0, BSND = 0, BNSD = 1, NZ = 2, TND = 3, NBSD = 4, NTD = 5 };
+enum class FA_LAYOUT : uint32_t {
+    BSH = 0,
+    BSND = 0,
+    BNSD = 1,
+    NZ = 2,
+    TND = 3,
+    NBSD = 4,
+    NTD = 5
+};
 
 enum class inferFaLayOutTypeEnum {
     None = 0,

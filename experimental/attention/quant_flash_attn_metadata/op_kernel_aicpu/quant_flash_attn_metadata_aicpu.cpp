@@ -205,8 +205,6 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     baseInfo.nextToken = winRight_ == -1 ? std::numeric_limits<uint32_t>::max() : winRight_;
     baseInfo.layoutQuery = ConvertToLayout(layoutQ_);
     baseInfo.layoutKv = ConvertToLayout(layoutKv_);
-    // 按 tmp 参考实现：quant_mode=1(mxfp8)/2(hif8) 时 query/kv 视为 INT8；
-    // quant_mode=3(mxfp4) 使用 base_info.h 默认值 FP16（load_balance 内部不依赖此值做 mxfp4 特化）。
     if (quantMode_ == 1 || quantMode_ == 2) {
         baseInfo.queryType = load_balance::DataType::INT8;
         baseInfo.kvType = load_balance::DataType::INT8;
@@ -303,11 +301,11 @@ bool QuantFlashAttnMetadataCpuKernel::GenMetaData(SectionStreamKResult &splitRes
             } else if (sectionId > 0) {
                 auto preQFaSplitRes = splitRes.sectionFaResult[sectionId - 1];
                 faMetadata.setQFaMetadata(sectionId, i, optiling::QFA_BN2_START_INDEX,
-                                          preQFaSplitRes.bN2End[preQFaSplitRes.usedCoreNum - 1]);
+                                         preQFaSplitRes.bN2End[preQFaSplitRes.usedCoreNum - 1]);
                 faMetadata.setQFaMetadata(sectionId, i, optiling::QFA_M_START_INDEX,
-                                          preQFaSplitRes.gS1End[preQFaSplitRes.usedCoreNum - 1]);
+                                         preQFaSplitRes.gS1End[preQFaSplitRes.usedCoreNum - 1]);
                 faMetadata.setQFaMetadata(sectionId, i, optiling::QFA_S2_START_INDEX,
-                                          preQFaSplitRes.s2End[preQFaSplitRes.usedCoreNum - 1]);
+                                         preQFaSplitRes.s2End[preQFaSplitRes.usedCoreNum - 1]);
             }
             // QFA end
             faMetadata.setQFaMetadata(sectionId, i, optiling::QFA_BN2_END_INDEX, faSplitRes.bN2End[i]);
@@ -315,7 +313,7 @@ bool QuantFlashAttnMetadataCpuKernel::GenMetaData(SectionStreamKResult &splitRes
             faMetadata.setQFaMetadata(sectionId, i, optiling::QFA_S2_END_INDEX, faSplitRes.s2End[i]);
             // QFA idx
             faMetadata.setQFaMetadata(sectionId, i, optiling::QFA_FIRST_QFD_DATA_WORKSPACE_IDX_INDEX,
-                                      faSplitRes.firstFdDataWorkspaceIdx[i]);
+                                     faSplitRes.firstFdDataWorkspaceIdx[i]);
         }
         // QFD Metadata Generate
         auto fdSplitRes = splitRes.sectionFdResult[sectionId];
@@ -325,9 +323,8 @@ bool QuantFlashAttnMetadataCpuKernel::GenMetaData(SectionStreamKResult &splitRes
             faMetadata.setQFdMetadata(sectionId, i, optiling::QFD_BN2_IDX_INDEX, fdSplitRes.bN2Idx[curTaskIdx]);
             faMetadata.setQFdMetadata(sectionId, i, optiling::QFD_M_IDX_INDEX, fdSplitRes.gS1Idx[curTaskIdx]);
             faMetadata.setQFdMetadata(sectionId, i, optiling::QFD_WORKSPACE_IDX_INDEX,
-                                      fdSplitRes.workspaceIdx[curTaskIdx]);
-            faMetadata.setQFdMetadata(sectionId, i, optiling::QFD_WORKSPACE_NUM_INDEX,
-                                      fdSplitRes.s2SplitNum[curTaskIdx]);
+                                     fdSplitRes.workspaceIdx[curTaskIdx]);
+            faMetadata.setQFdMetadata(sectionId, i, optiling::QFD_WORKSPACE_NUM_INDEX, fdSplitRes.s2SplitNum[curTaskIdx]);
             faMetadata.setQFdMetadata(sectionId, i, optiling::QFD_M_START_INDEX, fdSplitRes.mStart[i]);
             faMetadata.setQFdMetadata(sectionId, i, optiling::QFD_M_NUM_INDEX, fdSplitRes.mLen[i]);
         }

@@ -137,7 +137,9 @@ public:
 
     // ==============================fuction=======================================================
     __aicore__ inline FlashAttentionFullQuantMxKernel()
-        : cubeBlock(constInfo), vecFaBlock(constInfo), vecFdBlock(constInfo){};
+        : cubeBlock(constInfo),
+          vecFaBlock(constInfo),
+          vecFdBlock(constInfo){};
     __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
                                 __gm__ uint8_t *sinks, __gm__ uint8_t *attnMask, __gm__ uint8_t *cuSeqLensQ,
                                 __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *blockTable,
@@ -241,8 +243,8 @@ public:
 
         // GM Buffer
         if constexpr (!BMM2_TOUB) {
-            int64_t mm2ResultSize =
-                mBaseSize * constInfo.dBasicBlock; // 使用Cube计算的总大小，Gm上的数据按照实际的dSize存储
+            // 使用Cube计算的总大小，Gm上的数据按照实际的dSize存储
+            int64_t mm2ResultSize = mBaseSize * constInfo.dBasicBlock;
             int64_t prevCoretotalOffset = constInfo.aicIdx * 3 * mm2ResultSize; // 3为preload次数
             // SameB模式下V0和V1调用IterateAll的时候填写的地址相同
             gmBufferManager.Init(workspace + prevCoretotalOffset * sizeof(T));

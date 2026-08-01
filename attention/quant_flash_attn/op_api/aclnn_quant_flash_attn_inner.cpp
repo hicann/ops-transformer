@@ -45,7 +45,7 @@ void QuantFlashAttnProcessSinks(const aclTensor *&sinksOptional)
     }
 }
 
-}  // namespace
+} // namespace
 
 #ifdef __cplusplus
 }

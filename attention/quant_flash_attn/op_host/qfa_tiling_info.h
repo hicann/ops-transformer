@@ -54,7 +54,7 @@ const std::string LAYOUT_Q_NAME = "layout_q";
 const std::string LAYOUT_Q_DESCALE_NAME = "layout_q_descale";
 const std::string LAYOUT_KV_NAME = "layout_kv";
 const std::string LAYOUT_OUT_NAME = "layout_out";
-const std::string QUANT_MODE_NAME = "quant_mode";
+const std::string QUANT_MODE_NAME = "quant_compute_mode";
 const std::string RETURN_SOFTMAX_LSE_NAME = "return_softmax_lse";
 const std::string ATTN_OUT_NAME = "attn_out";
 const std::string SOFTMAX_LSE_NAME = "softmax_lse";
@@ -104,7 +104,11 @@ constexpr int64_t MASK_MODE_INT_MAX = 2147483647;
 // Enums
 // ============================================================
 
-enum class MaskMode : int32_t { NO_MASK = 0, ALL_MASK = 1, CAUSAL = 3, BAND = 4 };
+enum class MaskMode : int32_t {
+    NO_MASK = 0,
+    CAUSAL = 3,
+    SLIDING_WINDOW = 4
+};
 
 enum class QfaLayout : uint32_t {
     BSND = 0,
@@ -139,9 +143,14 @@ enum class QfaAxis : uint32_t {
     CONST = 12
 };
 
-enum class QfaQuantMode : uint32_t { MXFP8_FP32 = 1 };
+enum class QfaQuantMode : uint32_t {
+    A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 1
+};
 
-enum class KvStorageMode : uint32_t { BATCH_CONTINUOUS = 0, PAGE_ATTENTION = 1 };
+enum class KvStorageMode : uint32_t {
+    BATCH_CONTINUOUS = 0,
+    PAGE_ATTENTION = 1
+};
 
 // ============================================================
 // Function declarations
@@ -227,7 +236,7 @@ public:
     uint64_t totalLseSize = 0;
 
     // Quant Param
-    QfaQuantMode quantMode = QfaQuantMode::MXFP8_FP32;
+    QfaQuantMode quantMode = QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32;
 
     // PageAttention
     bool pageAttentionFlag = false;

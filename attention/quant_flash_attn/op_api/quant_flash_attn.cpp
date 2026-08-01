@@ -104,4 +104,4 @@ const std::array<const aclTensor *, 2> QuantFlashAttn(
     return {attentionOutAlloc, softmaxLseAlloc};
 }
 
-}  // namespace l0op
+} // namespace l0op

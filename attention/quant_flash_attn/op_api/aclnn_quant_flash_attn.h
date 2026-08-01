@@ -104,4 +104,4 @@ aclnnStatus aclnnQuantFlashAttn(void *workspace, uint64_t workspaceSize, aclOpEx
 }
 #endif
 
-#endif  // OP_API_INC_LEVEL2_ACLNN_QUANT_FLASH_ATTN_H_
+#endif // OP_API_INC_LEVEL2_ACLNN_QUANT_FLASH_ATTN_H_

@@ -50,7 +50,9 @@ struct QfaPlatFormInfo {
 
 class QuantFlashAttnTilingImpl : public FiaTilingBase {
 public:
-    explicit QuantFlashAttnTilingImpl(gert::TilingContext *context) : FiaTilingBase(context) {}
+    explicit QuantFlashAttnTilingImpl(gert::TilingContext *context)
+        : FiaTilingBase(context)
+    {}
     ~QuantFlashAttnTilingImpl() override = default;
 
     void InitTilingInfo(TilingInfo *tilingInfo) override;

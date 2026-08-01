@@ -41,17 +41,17 @@ constexpr uint32_t METADATA_INDEX = 14;
 
 // Attributes Index
 constexpr uint32_t ATTR_QUANT_MODE_INDEX = 0;
-constexpr uint32_t ATTR_SOFTMAX_SCALE_INDEX = 1;    // scaleValue
-constexpr uint32_t ATTR_MASK_MODE_INDEX = 2;        // mask_mode
-constexpr uint32_t ATTR_WIN_LEFT_INDEX = 3;         // win_left (preToken)
-constexpr uint32_t ATTR_WIN_RIGHT_INDEX = 4;        // win_right (nextToken)
-constexpr uint32_t ATTR_MAX_SEQLEN_Q_INDEX = 5;     // max_seqlen_q
-constexpr uint32_t ATTR_MAX_SEQLEN_KV_INDEX = 6;    // max_seqlen_kv
-constexpr uint32_t ATTR_LAYOUT_Q_INDEX = 7;         // layout_q
+constexpr uint32_t ATTR_SOFTMAX_SCALE_INDEX = 1;  // scaleValue
+constexpr uint32_t ATTR_MASK_MODE_INDEX = 2;      // mask_mode
+constexpr uint32_t ATTR_WIN_LEFT_INDEX = 3;       // win_left (preToken)
+constexpr uint32_t ATTR_WIN_RIGHT_INDEX = 4;      // win_right (nextToken)
+constexpr uint32_t ATTR_MAX_SEQLEN_Q_INDEX = 5;   // max_seqlen_q
+constexpr uint32_t ATTR_MAX_SEQLEN_KV_INDEX = 6;  // max_seqlen_kv
+constexpr uint32_t ATTR_LAYOUT_Q_INDEX = 7;       // layout_q
 constexpr uint32_t ATTR_LAYOUT_Q_DESCALE_INDEX = 8; // layout_q_descale
-constexpr uint32_t ATTR_LAYOUT_KV_INDEX = 9;        // layout_kv
-constexpr uint32_t ATTR_LAYOUT_OUT_INDEX = 10;      // layout_out
-constexpr uint32_t ATTR_RETURN_LSE_INDEX = 11;      // return_softmax_lse
+constexpr uint32_t ATTR_LAYOUT_KV_INDEX = 9;      // layout_kv
+constexpr uint32_t ATTR_LAYOUT_OUT_INDEX = 10;    // layout_out
+constexpr uint32_t ATTR_RETURN_LSE_INDEX = 11;    // return_softmax_lse
 
 // Output Index
 constexpr uint32_t ATTN_OUT_INDEX = 0;
@@ -87,6 +87,22 @@ const std::string LAYOUT_OUT_NAME = "layout_out";
 const std::string RETURN_SOFTMAX_LSE_NAME = "return_softmax_lse";
 const std::string ATTEN_OUT_NAME = "attn_out";
 const std::string SOFTMAX_LSE_NAME = "softmax_lse";
+
+// 对外 quant_mode 取值，与 cann_ops_transformer/ops/quant_flash_attn.py 的 QuantMode IntEnum 对齐。
+// 全部取值均通过单参数校验；其中仅 1(MXFP8)/5(MXFP4) 已实现，其余在一致性/特性交叉校验中报错。
+constexpr int64_t QUANT_MODE_A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 1;
+constexpr int64_t QUANT_MODE_A8C8_QKV_MXFP8_P_MXFP8_SOFTMAX_FP32 = 2;
+constexpr int64_t QUANT_MODE_A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP16 = 3;
+constexpr int64_t QUANT_MODE_A8C8_QKV_MXFP8_P_MXFP8_SOFTMAX_FP16 = 4;
+constexpr int64_t QUANT_MODE_A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16 = 5;
+constexpr int64_t QUANT_MODE_A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 6;
+constexpr int64_t QUANT_MODE_A8C8_QKV_HIF8_PER_TENSOR_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 7;
+constexpr int64_t QUANT_MODE_A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16 = 8;
+constexpr int64_t QUANT_MODE_A4C4_QKV_HIF4_P_HIF4_LEVEL2_SOFTMAX_FP16 = 9;
+constexpr int64_t QUANT_MODE_A4C4_QKV_HIF4_P_HIF4_LEVEL3_SOFTMAX_FP16 = 10;
+// 已实现 quant_mode 别名（语义化使用）
+constexpr int64_t QUANT_MODE_MXFP8 = QUANT_MODE_A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32;
+constexpr int64_t QUANT_MODE_MXFP4 = QUANT_MODE_A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16;
 
 constexpr int64_t MASK_MODE_INT_MAX = 2147483647;
 

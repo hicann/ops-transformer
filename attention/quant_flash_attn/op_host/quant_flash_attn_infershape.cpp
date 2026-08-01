@@ -32,8 +32,7 @@ static constexpr size_t ATTR_IDX_LAYOUT_Q = 7;
 static constexpr size_t ATTR_IDX_LAYOUT_Q_DESCALE = 8;
 static constexpr size_t ATTR_IDX_LAYOUT_KV = 9;
 static constexpr size_t ATTR_IDX_LAYOUT_OUT = 10;
-static constexpr size_t ATTR_IDX_PA_BLOCK_SIZE = 11;
-static constexpr size_t ATTR_IDX_RETURN_SOFTMAX_LSE = 12;
+static constexpr size_t ATTR_IDX_RETURN_SOFTMAX_LSE = 11;
 
 static constexpr size_t INPUT_IDX_Q = 0;
 static constexpr size_t INPUT_IDX_K = 1;

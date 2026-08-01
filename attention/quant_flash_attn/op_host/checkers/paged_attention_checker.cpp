@@ -126,7 +126,7 @@ ge::graphStatus PagedAttentionChecker::CheckFeature(const QfaTilingInfo &qfaInfo
             return ge::GRAPH_FAILED);
 
         // MxFP8 场景: blockSize 仅支持 512 或 1024
-        if (qfaInfo.quantMode == QfaQuantMode::MXFP8_FP32) {
+        if (qfaInfo.quantMode == QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
             OP_CHECK_IF(qfaInfo.blockSize != 512 && qfaInfo.blockSize != 1024,
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                             qfaInfo.opName, "block_size", std::to_string(qfaInfo.blockSize).c_str(),
