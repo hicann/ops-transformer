@@ -41,6 +41,7 @@ constexpr uint8_t BSA_COMPAT_MASK_RIGHT_DOWN_CAUSAL = 2U;
 constexpr uint32_t BSA_COMBINE_ALIGN_BYTES = 32U;
 constexpr uint32_t BSA_K_SCALE_BYTES = sizeof(float);
 constexpr uint32_t BSA_ATTEN_MASK_DEFAULT_BATCH = 1U;
+constexpr uint32_t BSA_ATTEN_MASK_DEFAULT_S1_SIZE = 2048U;
 constexpr uint32_t BSA_ATTEN_MASK_DEFAULT_S2_SIZE = 2048U;
 constexpr uint32_t BSA_MXFP8_P_SCALE_SHAPE_SIZE = 1U;
 constexpr uint32_t BSA_MXFP8_VALUE_SCALE_LAST_DIM = 2U;
@@ -85,7 +86,6 @@ void QuantBlockSparseAttnTiling::FillPaParams()
     paParams.set_kvBlockSize(info.kvBlockSizeVal);
     paParams.set_qBlockSize(info.qBlockSizeVal);
     paParams.set_paBlockStride(info.paBlockStrideVal);
-    paParams.set_attenMaskS1Size(static_cast<int32_t>(info.s1Size));
     paParams.set_isRowInvalid(1U);
 }
 
@@ -105,11 +105,8 @@ void QuantBlockSparseAttnTiling::FillInputParams()
     auto &inputParams = tilingData_.inputParamsRegbase;
     inputParams.set_bSize(info.bSize);
     inputParams.set_t1Size(info.qTokenNum);
-    inputParams.set_t2Size(info.s2Size);
     inputParams.set_n2Size(info.n2Size);
     inputParams.set_gSize(info.gSize);
-    inputParams.set_s1Size(info.s1Size);
-    inputParams.set_s2Size(info.s2Size);
     inputParams.set_dSize(info.dSize);
     inputParams.set_dSizeV(info.dSizeV);
     inputParams.set_scaleValue(info.softmaxScaleVal);
@@ -121,11 +118,8 @@ void QuantBlockSparseAttnTiling::FillInputParams()
         layoutTypeVal = BSA_LAYOUT_TYPE_NTD;
     }
     inputParams.set_layoutType(layoutTypeVal);
-    inputParams.set_attenMaskShapeType(2);
     inputParams.set_attenMaskCompressMode(compatMaskMode);
     inputParams.set_attenMaskS2Size(2048);
-    inputParams.set_isSeqUsedQlenNull(info.opParamInfo.cuSeqlensQ.tensor == nullptr ? 1 : 0);
-    inputParams.set_isSeqUsedKvlenNull(info.opParamInfo.cuSeqlensKV.tensor == nullptr ? 1 : 0);
     inputParams.set_seqUsedQlenSize(info.bSize);
     inputParams.set_seqUsedKvlenSize(info.bSize);
     inputParams.set_isKvContinuous(1); // 稀疏算子固定设为 1
@@ -175,7 +169,7 @@ void QuantBlockSparseAttnTiling::FillMxTilingData()
     // 每个 PA block 的 VScale 为 [N,ceil(blockSize/64),DV,2]。
     const uint32_t valueScaleBlockSize = BSACeilDiv(info.kvBlockSizeVal, BSA_MXFP8_SCALE_GROUP_SIZE);
     const uint32_t valueScaleDSize = dSizeV * BSA_MXFP8_VALUE_SCALE_LAST_DIM;
-    const bool actualSeqQNull = info.opParamInfo.seqUsedQ.tensor == nullptr;
+    const bool actualSeqQNull = info.opParamInfo.cuSeqlensQ.tensor == nullptr;
     const bool actualSeqKVNull = info.opParamInfo.seqUsedKV.tensor == nullptr;
 
     auto &attrParams = mxTilingData_.attrParams;
@@ -189,11 +183,8 @@ void QuantBlockSparseAttnTiling::FillMxTilingData()
     auto &baseParams = mxTilingData_.baseParams;
     baseParams.bSize = info.bSize;
     baseParams.t1Size = info.qTokenNum;
-    baseParams.t2Size = info.s2Size;
     baseParams.n2Size = info.n2Size;
     baseParams.gSize = info.gSize;
-    baseParams.s1Size = info.s1Size;
-    baseParams.s2Size = info.s2Size;
     baseParams.dSize = dSize;
     baseParams.dSizeV = dSizeV;
     baseParams.dSizeRope = 0U;
@@ -220,7 +211,7 @@ void QuantBlockSparseAttnTiling::FillMxTilingData()
     attenMaskParams.preTokens = std::numeric_limits<int32_t>::max();
     attenMaskParams.nextTokens = 0;
     attenMaskParams.attenMaskBatch = BSA_ATTEN_MASK_DEFAULT_BATCH;
-    attenMaskParams.attenMaskS1Size = info.s1Size;
+    attenMaskParams.attenMaskS1Size = BSA_ATTEN_MASK_DEFAULT_S1_SIZE;
     attenMaskParams.attenMaskS2Size = BSA_ATTEN_MASK_DEFAULT_S2_SIZE;
     attenMaskParams.isExistRowInvalid = 1U;
 
@@ -238,7 +229,7 @@ void QuantBlockSparseAttnTiling::FillMxTilingData()
     sparseParams.sparseSeqLenStride = info.qbMax;
     sparseParams.sparseIndicesStride = info.sparseCount;
     sparseParams.maxQb = info.qbMax;
-    sparseParams.maxKb = info.kbMax;
+    sparseParams.maxKb = info.sparseCount;
     sparseParams.sparseCount = info.sparseCount;
 
     auto &workspaceParams = mxTilingData_.workspaceParams;
@@ -292,7 +283,6 @@ void QuantBlockSparseAttnTiling::PrintAllTilingData()
     OP_LOGD(kOpName, "kvBlockSize:%u", paParams.get_kvBlockSize());
     OP_LOGD(kOpName, "qBlockSize:%u", paParams.get_qBlockSize());
     OP_LOGD(kOpName, "paBlockStride:%u", paParams.get_paBlockStride());
-    OP_LOGD(kOpName, "attenMaskS1Size:%d", paParams.get_attenMaskS1Size());
     OP_LOGD(kOpName, "isRowInvalid:%u", paParams.get_isRowInvalid());
 
     auto &sparseParams = tilingData_.sparseParams;
@@ -304,11 +294,8 @@ void QuantBlockSparseAttnTiling::PrintAllTilingData()
     OP_LOGD(kOpName, "===== InputParamsRegbase =====");
     OP_LOGD(kOpName, "bSize:%ld", inputParams.get_bSize());
     OP_LOGD(kOpName, "t1Size:%ld", inputParams.get_t1Size());
-    OP_LOGD(kOpName, "t2Size:%ld", inputParams.get_t2Size());
     OP_LOGD(kOpName, "n2Size:%ld", inputParams.get_n2Size());
     OP_LOGD(kOpName, "gSize:%ld", inputParams.get_gSize());
-    OP_LOGD(kOpName, "s1Size:%ld", inputParams.get_s1Size());
-    OP_LOGD(kOpName, "s2Size:%ld", inputParams.get_s2Size());
     OP_LOGD(kOpName, "dSize:%ld", inputParams.get_dSize());
     OP_LOGD(kOpName, "dSizeV:%ld", inputParams.get_dSizeV());
     OP_LOGD(kOpName, "scaleValue:%f", inputParams.get_scaleValue());
@@ -317,8 +304,6 @@ void QuantBlockSparseAttnTiling::PrintAllTilingData()
     OP_LOGD(kOpName, "layoutType:%u", inputParams.get_layoutType());
     OP_LOGD(kOpName, "attenMaskCompressMode:%u", inputParams.get_attenMaskCompressMode());
     OP_LOGD(kOpName, "attenMaskS2Size:%u", inputParams.get_attenMaskS2Size());
-    OP_LOGD(kOpName, "isSeqUsedQlenNull:%u", inputParams.get_isSeqUsedQlenNull());
-    OP_LOGD(kOpName, "isSeqUsedKvlenNull:%u", inputParams.get_isSeqUsedKvlenNull());
     OP_LOGD(kOpName, "isKvContinuous:%u", inputParams.get_isKvContinuous());
     OP_LOGD(kOpName, "isGqa:%u", inputParams.get_isGqa());
     OP_LOGD(kOpName, "isSoftMaxLseEnable:%u", inputParams.get_isSoftMaxLseEnable());
@@ -363,11 +348,8 @@ void QuantBlockSparseAttnTiling::PrintMxTilingData()
     OP_LOGD(kOpName, "===== MX BaseParams =====");
     OP_LOGD(kOpName, "bSize:%u", baseParams.bSize);
     OP_LOGD(kOpName, "t1Size:%u", baseParams.t1Size);
-    OP_LOGD(kOpName, "t2Size:%u", baseParams.t2Size);
     OP_LOGD(kOpName, "n2Size:%u", baseParams.n2Size);
     OP_LOGD(kOpName, "gSize:%u", baseParams.gSize);
-    OP_LOGD(kOpName, "s1Size:%u", baseParams.s1Size);
-    OP_LOGD(kOpName, "s2Size:%u", baseParams.s2Size);
     OP_LOGD(kOpName, "dSize:%u", baseParams.dSize);
     OP_LOGD(kOpName, "dSizeV:%u", baseParams.dSizeV);
     OP_LOGD(kOpName, "actualSeqLengthsQSize:%u", baseParams.actualSeqLengthsQSize);

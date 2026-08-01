@@ -144,8 +144,6 @@ private:
     __aicore__ inline void IterateBmm1Dn(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf,
                                          RunInfo &runInfo, ConstInfo &constInfo);
 
-    // --------------------Bmm2--------------------------
-    __aicore__ inline bool IsGS1Merge(ConstInfo &constInfo);
     TPipe *tPipe;
     /* =====================GM变量==================== */
     __gm__ uint8_t *currentKey;    // pageattention需要
@@ -234,8 +232,6 @@ __aicore__ inline void BSABlockCube<TEMPLATE_ARGS>::InitCubeInput(__gm__ uint8_t
         attenMaskInfo->preTokens = sharedParams->preTokens;
         attenMaskInfo->nextTokens = sharedParams->nextTokens;
         attenMaskInfo->compressMode = sharedParams->compressMode;
-        attenMaskInfo->attenMaskS1Size = sharedParams->attenMaskS1Size;
-        attenMaskInfo->attenMaskS2Size = sharedParams->attenMaskS2Size;
         if constexpr (isPa) {
             this->blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blocktablePtr);
             this->maxBlockNumPerBatch = sharedParams->blockTableDim2;
@@ -432,11 +428,6 @@ __aicore__ inline void BSABlockCube<TEMPLATE_ARGS>::IterateBmm2(
             1 << 1; // 有效数据不足16行，只需输出部分行即可;L0C上的bmm1结果矩阵M方向的size大小必须是偶数
         fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) *
                                   16; // L0C上bmm1结果相邻连续数据片段间隔（前面一个数据块的头与后面数据块的头的间隔）
-        bool isS1Odd =
-            (constInfo.s1Size % 2) != 0; // GS1合轴时，若s1为奇数且开启双目标模式，扩展M维度对齐g，避免计算中间块
-        if (IsGS1Merge(constInfo) && isS1Odd) {
-            fixpipeParams.mSize = runInfo.s1RealSize + constInfo.gSize;
-        }
     }
     if constexpr (bmm2Write2Ub) {
         fixpipeParams.dstStride = ((uint32_t)dVTemplateType + 15) >> 4 << 4;
@@ -615,16 +606,8 @@ __aicore__ inline void BSABlockCube<TEMPLATE_ARGS>::IterateBmm1Nd(
         mm1A.Wait<HardEvent::MTE1_MTE2>(); // 占用L1A
         LocalTensor<INPUT_T> mm1ATensor = mm1A.GetTensor<INPUT_T>();
 
-        if (IsGS1Merge(constInfo)) {
-            uint64_t gmOffset = this->queryGm.offsetCalculator.GetOffset(runInfo.boIdx, runInfo.n2oIdx, 0, 0,
-                                                                         0); // PFA GS1合轴下，g s1 d idx为0
-            CopyToL1Nd2NzGS1Merge<INPUT_T>(
-                mm1ATensor, this->queryGm.gmTensor[gmOffset], constInfo.s1Size, constInfo.gSize, constInfo.dSize,
-                constInfo.n2Size * constInfo.gSize * constInfo.dSize, constInfo.dSize, runInfo.s1RealSize);
-        } else {
-            CopyToL1Nd2Nz<INPUT_T>(mm1ATensor, this->queryGm.gmTensor[runInfo.queryOffset], runInfo.s1RealSize,
-                                   constInfo.dSize, constInfo.mm1Ka);
-        }
+        CopyToL1Nd2Nz<INPUT_T>(mm1ATensor, this->queryGm.gmTensor[runInfo.queryOffset], runInfo.s1RealSize,
+                               constInfo.dSize, constInfo.mm1Ka);
 
         mm1A.Set<HardEvent::MTE2_MTE1>(); // 通知
     } else {                              // 非S2的第一次循环直接复用Q
@@ -710,22 +693,10 @@ __aicore__ inline void BSABlockCube<TEMPLATE_ARGS>::IterateBmm1Nd(
     fixpipeParams.params.srcNdStride = 0;
     fixpipeParams.params.dstNdStride = 0;
 
-    bool isS1Odd = (constInfo.s1Size % 2) != 0; // GS1合轴时，若s1为奇数且开启双目标模式，扩展M维度对齐g，避免计算中间块
-    if (IsGS1Merge(constInfo) && isS1Odd) {
-        fixpipeParams.mSize = runInfo.s1RealSize + constInfo.gSize;
-    }
-
     Fixpipe<T, T, PFA_CFG_ROW_MAJOR_UB>(outputBuf.template GetTensor<T>(), mm1ResL0C.GetTensor<T>(),
                                         fixpipeParams); // 将matmul结果从L0C搬运到UB
     mm1ResL0C.Set<HardEvent::FIX_M>();                  // 释放L0C
     outputBuf.SetCrossCore();
-}
-
-// 判断是否GS1合轴
-TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline bool BSABlockCube<TEMPLATE_ARGS>::IsGS1Merge(ConstInfo &constInfo)
-{
-    return (Q_FORMAT == GmFormat::TNGD) && constInfo.isPfaGS1Merge;
 }
 
 TEMPLATES_DEF

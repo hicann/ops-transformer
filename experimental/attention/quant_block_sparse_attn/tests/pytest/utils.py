@@ -69,7 +69,6 @@ def _row_from_dict(params, result, fulfill_percent):
         "sparse_pattern",
         "block_table_pattern",
         "pa_block_padding_bytes",
-        "pa_block_stride",
         "p_scale_value",
         "seed",
         "FLOPS",

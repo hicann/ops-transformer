@@ -74,12 +74,9 @@ TEST_P(QuantBlockSparseAttnTilingArch35Test, param)
     });
 
     std::vector<OpAttr> attrs({
-        {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.max_seqlen_q)},
-        {"max_seqlen_kv", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.max_seqlen_kv)},
         {"softmax_scale", Ops::Transformer::AnyValue::CreateFrom<float>(param.softmax_scale)},
         {"sparse_q_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.sparse_q_block_size)},
         {"sparse_kv_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.sparse_kv_block_size)},
-        {"paBlockStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.paBlockStride)},
         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.layout_kv)},
         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.layout_q)},
         {"layout_sparse_indices", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.layout_sparse_indices)},

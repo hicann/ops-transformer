@@ -27,6 +27,18 @@ using namespace MicroAPI;
 // Empty-row lse sentinel, equivalent to common.h BSA_EMPTY_LSE_VALUE(-FLT_MAX).
 constexpr float VF_BSA_EMPTY_LSE_VALUE = -3.4028234663852886e38F;
 
+// Safe pre-pad value for AttenTail variants. Must be a large negative finite float
+// so that (pad_value * qScale * kScale) does NOT overflow to -inf/NaN before the
+// softmax max reduction. -FLT_MAX overflows when dequant scales are large.
+//
+// Optimal value = -(D * FP8_MAX^2) = -(128 * 448^2) = -25,690,112.
+// This is the minimum possible valid QK^T (all D dims at -448*+448), so it never
+// exceeds any valid score in magnitude. After scaling by qScale*kScale*softmax_scale,
+// the worst case equals -(sqrt(D) * R^2), which reaches -FP32_MAX at exactly the
+// same R that causes valid scores to overflow. Thus pre-pad is never the bottleneck.
+// Re-padding after the scale loop restores -FLT_MAX (vreg_min) so exp(-FLT_MAX - max) = 0.
+constexpr float VF_BSA_SAFE_PAD_VALUE = -25690112.0F;
+
 template <typename T, typename T2, bool hasAtten = false, bool needAtten = false, uint32_t ubN = 128>
 __simd_vf__ inline void ProcessVec1DnNoUpdateVF(
     __ubuf__ T2 *x_exp, __ubuf__ float *input_x_local_UB, __ubuf__ float *exp_max_fp32, __ubuf__ float *new_global_sum,
@@ -309,6 +321,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateAttenTailVF(
     RegTensor<float> max0, max1, max2, max3;
     MaskReg preg_compare0, preg_compare1, preg_compare2, preg_compare3;
     RegTensor<float> vreg_min;
+    RegTensor<float> vreg_safe_min;
     RegTensor<float> vreg_zero;
     RegTensor<float> vreg_empty_lse;
     MaskReg preg_invalid_cur;
@@ -339,13 +352,15 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateAttenTailVF(
     Duplicate(max2, minValue);
     Duplicate(max3, minValue);
     Duplicate(vreg_min, minValue);
+    Duplicate(vreg_safe_min, VF_BSA_SAFE_PAD_VALUE);
     Duplicate(vreg_zero, 0.0f);
     Duplicate(vreg_empty_lse, VF_BSA_EMPTY_LSE_VALUE);
     Duplicate(vreg_p_scale, pScale);
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_min, preg_135);
+        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(
+            (__ubuf__ T *&)input_x_local_UB + i * m, vreg_safe_min, preg_135);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
@@ -849,6 +864,7 @@ __simd_vf__ inline void ProcessVec1DnUpdateAttenTailVF(
     RegTensor<float> max0, max1, max2, max3;
     MaskReg preg_compare0, preg_compare1, preg_compare2, preg_compare3;
     RegTensor<float> vreg_min;
+    RegTensor<float> vreg_safe_min;
     RegTensor<float> vreg_zero;
     RegTensor<float> vreg_empty_lse;
     MaskReg preg_invalid_cur;
@@ -879,13 +895,15 @@ __simd_vf__ inline void ProcessVec1DnUpdateAttenTailVF(
     Duplicate(max2, minValue);
     Duplicate(max3, minValue);
     Duplicate(vreg_min, minValue);
+    Duplicate(vreg_safe_min, VF_BSA_SAFE_PAD_VALUE);
     Duplicate(vreg_zero, 0.0f);
     Duplicate(vreg_empty_lse, VF_BSA_EMPTY_LSE_VALUE);
     Duplicate(vreg_p_scale, pScale);
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_min, preg_135);
+        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(
+            (__ubuf__ T *&)input_x_local_UB + i * m, vreg_safe_min, preg_135);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
@@ -1421,6 +1439,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadAttenTailVF(
     RegTensor<float> max0, max1, max2, max3;
     MaskReg preg_compare0, preg_compare1, preg_compare2, preg_compare3;
     RegTensor<float> vreg_min;
+    RegTensor<float> vreg_safe_min;
     RegTensor<float> vreg_zero;
     RegTensor<float> vreg_empty_lse;
     MaskReg preg_invalid_cur;
@@ -1451,13 +1470,15 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadAttenTailVF(
     Duplicate(max2, minValue);
     Duplicate(max3, minValue);
     Duplicate(vreg_min, minValue);
+    Duplicate(vreg_safe_min, VF_BSA_SAFE_PAD_VALUE);
     Duplicate(vreg_zero, 0.0f);
     Duplicate(vreg_empty_lse, VF_BSA_EMPTY_LSE_VALUE);
     Duplicate(vreg_p_scale, pScale);
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_min, preg_135);
+        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(
+            (__ubuf__ T *&)input_x_local_UB + i * m, vreg_safe_min, preg_135);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 
@@ -1937,6 +1958,7 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadAttenTailVF(
     RegTensor<float> max0, max1, max2, max3;
     MaskReg preg_compare0, preg_compare1, preg_compare2, preg_compare3;
     RegTensor<float> vreg_min;
+    RegTensor<float> vreg_safe_min;
     RegTensor<float> vreg_zero;
     RegTensor<float> vreg_empty_lse;
     MaskReg preg_invalid_cur;
@@ -1967,13 +1989,15 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadAttenTailVF(
     Duplicate(max2, minValue);
     Duplicate(max3, minValue);
     Duplicate(vreg_min, minValue);
+    Duplicate(vreg_safe_min, VF_BSA_SAFE_PAD_VALUE);
     Duplicate(vreg_zero, 0.0f);
     Duplicate(vreg_empty_lse, VF_BSA_EMPTY_LSE_VALUE);
     Duplicate(vreg_p_scale, pScale);
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_min, preg_135);
+        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(
+            (__ubuf__ T *&)input_x_local_UB + i * m, vreg_safe_min, preg_135);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
 

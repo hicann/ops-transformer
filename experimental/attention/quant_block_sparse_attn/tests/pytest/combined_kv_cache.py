@@ -89,38 +89,10 @@ def make_combined_kv_views(storage, meta):
         fp8_storage, (block_num, n2, block_size, dv_size), value_stride, meta["value_offset_bytes"])
 
     fp32_storage = storage.view(torch.float32)
-    k_scale_stride = (pa_block_stride // FP32_BYTES, block_size, 1)
+    k_scale_stride = (pa_block_stride // FP32_BYTES, block_size, 1, 1)
     k_scale = torch.as_strided(
-        fp32_storage, (block_num, n2, block_size), k_scale_stride,
+        fp32_storage, (block_num, n2, block_size, 1), k_scale_stride,
         meta["k_scale_offset_bytes"] // FP32_BYTES)
-    return key, value, k_scale
-
-
-def make_combined_kv_kernel_inputs(storage, meta):
-    if storage.dtype != torch.uint8 or storage.dim() != 1 or not storage.is_contiguous():
-        raise ValueError("combined KV storage should be a contiguous rank-1 uint8 tensor")
-    if meta["layout_kv"] != "PA_BNSD":
-        raise ValueError(f"unsupported combined KV layout: {meta['layout_kv']}")
-    if meta.get("packing") != PACKING:
-        raise ValueError(f"unsupported combined KV packing: {meta.get('packing')}")
-
-    required_bytes = meta["block_num"] * meta["pa_block_stride"]
-    if storage.numel() < required_bytes:
-        raise ValueError(f"combined KV storage has {storage.numel()} bytes, expected at least {required_bytes}")
-
-    # The kernel indexes physical blocks with pa_block_stride from each segment base.
-    # Passing compact 4D as_strided views makes the ACL tensor MPU range equal to
-    # the logical numel, so block1 crosses that range. Tail views keep every
-    # kernel-side offset inside the argument's declared storage range.
-    fp8_storage = storage.view(_fp8_dtype())
-    key = fp8_storage[meta["key_offset_bytes"]:]
-    value = fp8_storage[meta["value_offset_bytes"]:]
-
-    if meta["k_scale_offset_bytes"] % FP32_BYTES != 0:
-        raise ValueError(
-            f"k_scale offset should be divisible by {FP32_BYTES}, got {meta['k_scale_offset_bytes']}")
-    fp32_storage = storage.view(torch.float32)
-    k_scale = fp32_storage[meta["k_scale_offset_bytes"] // FP32_BYTES:]
     return key, value, k_scale
 
 
@@ -151,7 +123,7 @@ def pack_combined_kv_cache(dense_key, dense_value, dense_k_scale, block_table, b
                 dense_key[batch_idx, start:end].permute(1, 0, 2))
             value[physical_block, :, :token_count].copy_(
                 dense_value[batch_idx, start:end].permute(1, 0, 2))
-            k_scale[physical_block, :, :token_count].copy_(
+            k_scale[physical_block, :, :token_count, 0].copy_(
                 dense_k_scale[batch_idx, start:end].permute(1, 0))
 
     return storage, meta
@@ -193,6 +165,7 @@ def assert_combined_kv_views(storage, meta):
     expected_k_scale_stride = (
         meta["pa_block_stride"] // FP32_BYTES,
         meta["block_size"],
+        1,
         1,
     )
     if key.stride() != expected_key_stride:

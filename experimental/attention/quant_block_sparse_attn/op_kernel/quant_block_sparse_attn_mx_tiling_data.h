@@ -36,11 +36,8 @@ struct QuantBlockSparseAttnMxAttrParams {
 struct QuantBlockSparseAttnMxBaseParams {
     uint32_t bSize = 0;
     uint32_t t1Size = 0;
-    uint32_t t2Size = 0;
     uint32_t n2Size = 0;
     uint32_t gSize = 0;
-    uint32_t s1Size = 0;
-    uint32_t s2Size = 0;
     uint32_t dSize = 0;
     uint32_t dSizeV = 0;
     uint32_t dSizeRope = 0;

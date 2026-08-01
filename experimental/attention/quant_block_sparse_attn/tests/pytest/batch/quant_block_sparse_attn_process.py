@@ -61,7 +61,7 @@ def _prepare_kv_inputs(inputs):
 
     kv_cache_storage = _to_npu(inputs["kv_cache_storage"])
     combined_kv_cache.assert_combined_kv_views(kv_cache_storage, inputs["kv_cache_meta"])
-    key, value, k_descale = combined_kv_cache.make_combined_kv_kernel_inputs(
+    key, value, k_descale = combined_kv_cache.make_combined_kv_views(
         kv_cache_storage, inputs["kv_cache_meta"])
     return kv_cache_storage, key, value, k_descale
 
@@ -128,8 +128,6 @@ def _call_npu_quant_block_sparse_attn_metadata(test_data):
         sparse_block_size_k=inputs["sparse_kv_block_size"],
         quant_mode=inputs["quant_mode"],
         mask_mode=inputs["mask_mode"],
-        max_seqlen_q=metadata_input.get("max_seqlen_q", inputs["max_seqlen_q"]),
-        max_seqlen_kv=metadata_input.get("max_seqlen_kv", inputs["max_seqlen_kv"]),
         layout_q=metadata_input.get("layout_q", inputs["layout_q"]),
         layout_kv=metadata_input.get("layout_kv", inputs["layout_kv"]),
         layout_sparse_indices=metadata_input.get("layout_sparse_indices", inputs["layout_sparse_indices"]),
@@ -171,9 +169,6 @@ def _call_npu_quant_block_sparse_attn(test_data, device_id):
         seqused_kv=_to_npu(inputs["seqused_kv"]),
         block_table=_to_npu(inputs["block_table"]),
         metadata=metadata,
-        max_seqlen_q=inputs["max_seqlen_q"],
-        max_seqlen_kv=inputs["max_seqlen_kv"],
-        pa_block_stride=inputs.get("pa_block_stride", inputs.get("kv_cache_meta", {}).get("pa_block_stride", 0)),
         layout_kv=inputs["layout_kv"],
         layout_q=inputs["layout_q"],
         layout_sparse_indices=inputs["layout_sparse_indices"],
@@ -201,8 +196,6 @@ class _QuantBlockSparseAttnGraph(torch.nn.Module):
             self.inputs["sparse_kv_block_size"],
             cu_seqlens_q=cu_seqlens_q, cu_seqlens_kv=cu_seqlens_kv, seqused_q=seqused_q,
             seqused_kv=seqused_kv, block_table=block_table, metadata=metadata,
-            max_seqlen_q=self.inputs["max_seqlen_q"], max_seqlen_kv=self.inputs["max_seqlen_kv"],
-            pa_block_stride=self.inputs.get("pa_block_stride", self.inputs.get("kv_cache_meta", {}).get("pa_block_stride", 0)),
             layout_kv=self.inputs["layout_kv"], layout_q=self.inputs["layout_q"],
             layout_sparse_indices=self.inputs["layout_sparse_indices"],
  	        layout_out=self.inputs["layout_out"], quant_mode=self.inputs["quant_mode"],

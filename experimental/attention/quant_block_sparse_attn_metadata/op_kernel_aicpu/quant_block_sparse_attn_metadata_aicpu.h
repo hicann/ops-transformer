@@ -91,7 +91,7 @@ private:
     uint32_t GetRowBlockNum(uint32_t bIdx, uint32_t n1Idx, uint32_t s1Idx) const;
     void InitBN1BlockInfo();
     uint64_t GetBN1BlockNum(uint32_t bIdx, uint32_t n1Idx) const;
-    uint32_t CalcValidS1Rows(uint32_t bIdx, uint32_t n1Idx) const;
+    uint32_t CalcValidS1Rows(uint32_t bIdx, uint32_t n1Idx, uint32_t &maxS2BlockNum) const;
     uint64_t CalcBN1Cost(uint32_t bIdx, uint32_t n1Idx) const;
     bool CalcSectionBoundaries(std::vector<SectionInfo> &sectionResults) const;
     bool AdvanceToValidRow(AssignContext &assignContext) const;
@@ -119,7 +119,6 @@ private:
     int32_t sparseBlockSizeK_ = 128;
     int32_t quantMode_ = 1;
     int32_t maskMode_ = 3;
-    int32_t maxSeqlenKv_ = 0;
     std::string layoutQ_ = "TND";
     std::string layoutKv_ = "PA_BNSD";
     std::string layoutSparseIndices_ = "B_N_Qb_Kb";

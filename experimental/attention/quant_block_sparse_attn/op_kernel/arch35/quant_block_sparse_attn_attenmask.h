@@ -48,8 +48,6 @@ struct AttenMaskInfo {
     int64_t preTokens;
     int64_t nextTokens;
     uint8_t compressMode;
-    int64_t attenMaskShapeType;
-    int64_t attenMaskS1Size;
     int64_t attenMaskS2Size;
     int64_t bandIndex;
     GM_ADDR prefixNAddr;
@@ -140,35 +138,6 @@ __aicore__ inline void GetAttenMaskComputeMode(int64_t deltaCausalOrNext, int64_
     }
 }
 
-template <bool hasAtten, DTemplateType dTemplateType = DTemplateType::Aligned128>
-__aicore__ inline int64_t ComputeOffsetForNoCompress(const RunInfo &runInfo, ConstInfo &constInfo,
-                                                     AttenMaskInfo &attenMaskInfo)
-{
-    if constexpr (hasAtten) {
-        int64_t bOffset = 0;
-        int64_t n2Offset = 0;
-        int64_t gOffset = 0;
-
-        if (attenMaskInfo.attenMaskShapeType == attenMaskBN2GS1S2) {
-            bOffset = runInfo.b1SSAttenMaskOffset * constInfo.n2G;
-            n2Offset = runInfo.n2oIdx * constInfo.gSize * runInfo.actualS1Size * runInfo.actualS2Size;
-            gOffset = runInfo.goIdx * runInfo.actualS1Size * runInfo.actualS2Size;
-        } else if (attenMaskInfo.attenMaskShapeType == attenMaskBS1S2) {
-            bOffset = runInfo.b1SSAttenMaskOffset;
-        }
-        int64_t s1Offset = runInfo.s1oIdx * constInfo.s1BaseSize + runInfo.vecCoreOffset;
-        if (constInfo.isGqa) {
-            s1Offset = s1Offset % constInfo.s1Size;
-        }
-        int64_t s2Offset = 0;
-
-        s2Offset = runInfo.s2StartIdx + runInfo.s2LoopCount * constInfo.s2BaseSize;
-        s1Offset += (runInfo.nextTokensPerBatch < 0) ? -runInfo.nextTokensPerBatch : 0;
-        s1Offset *= attenMaskInfo.attenMaskS2Size;
-        return bOffset + n2Offset + gOffset + s1Offset + s2Offset;
-    }
-}
-
 __aicore__ inline int64_t ComputeOffsetForCausal(const int64_t &delta, const uint32_t &s1BaseSize,
                                                  const uint32_t &s2BaseSize, const uint32_t &attenMaskS2Size,
                                                  const int64_t &vecCoreOffset, const bool useDn = false)
@@ -189,18 +158,6 @@ __aicore__ inline int64_t ComputeOffsetForCausal(const int64_t &delta, const uin
     return (Min(delta, s2BaseSize) + vecCoreOffset) * attenMaskS2Size;
 }
 
-__aicore__ inline int64_t ComputeOffsetForPrefixRectangle(const int64_t &delta, const uint32_t &s2BaseSize,
-                                                          const uint32_t &attenMaskS2Size)
-{
-    // attenMask S1 is same to S2
-    if (delta <= 0) {
-        return attenMaskS2Size * attenMaskS2Size + (attenMaskS2Size >> 1); // 2048 * 2048 + 1024
-    } else if (delta >= s2BaseSize) {
-        return attenMaskS2Size * attenMaskS2Size; // 2048 * 2048 + 0
-    } else {
-        return attenMaskS2Size * attenMaskS2Size + (attenMaskS2Size >> 1) - delta; // 2048 * 2048 + (1024 - delta)
-    }
-}
 
 #ifndef __CCE_KT_TEST__
 // 128bit 寄存器每次加载 4 个 uint32_t，偏移量 = 128bit/8 = 16 字节，即 64 个字节时为 4 个 128bit 元素
@@ -301,9 +258,6 @@ __aicore__ inline int64_t ComputeAttenMaskInnerOffset(const RunInfo &runInfo, Co
                                                       const bool useDn = false, const int32_t subLoop = 0)
 {
     if constexpr (hasAtten) {
-        if (attenMaskInfo.compressMode == static_cast<uint8_t>(AttenMaskCompressMode::NO_COMPRESS_MODE)) {
-            return ComputeOffsetForNoCompress<hasAtten, dTemplateType>(runInfo, constInfo, attenMaskInfo);
-        }
         // compress mode, 推理场景的TND和TND的offset计算相同，因为mask被padding到了最大的s2Size
         int64_t deltaCausalOrNext = 0;
         int64_t deltaPre = 0;

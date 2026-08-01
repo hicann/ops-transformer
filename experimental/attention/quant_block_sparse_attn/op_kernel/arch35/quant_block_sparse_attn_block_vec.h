@@ -75,7 +75,7 @@ public:
             tPipe = pipe;
             tilingData = tiling;
             InitCubeVecSharedParams(sharedParams, aicIdx, subBlockIdx);
-            this->GetExtremeValue(this->negativeFloatScalar, this->positiveFloatScalar);
+            this->negativeFloatScalar = this->GetNegativeValue();
             attenMaskInfoPtr = &attenMaskInfo;
         }
     }
@@ -158,7 +158,6 @@ public:
 
     AttenMaskInfo *attenMaskInfoPtr;
     T negativeFloatScalar;
-    T positiveFloatScalar;
     int64_t bmm2SubBlockOffset = 0;
     int64_t vec2SubBlockOffset = 0;
 
@@ -186,11 +185,7 @@ private:
                                                    SoftMaxShapeInfo &softmaxShapeInfo);
 
     __aicore__ inline int64_t ComputeOffsetForSoftmax(RunInfo &runInfo, const int64_t vec2S1Idx);
-    __aicore__ inline void GetExtremeValue(T &negativeScalar, T &positiveScalar);
-    __aicore__ inline void MlaTransposeDataCopyOut(RunInfo &runInfo, ConstInfo &constInfo,
-                                                   LocalTensor<OUTPUT_T> &attenOut);
-    __aicore__ inline void MlaTranspose2DataCopyOut(RunInfo &runInfo, ConstInfo &constInfo,
-                                                    LocalTensor<OUTPUT_T> &attenOut);
+    __aicore__ inline T GetNegativeValue();
     __aicore__ inline void InitOutputSingleCore(ConstInfo &constInfo);
     __aicore__ inline void InitLseOutputSingleCore(ConstInfo &constInfo);
     __aicore__ inline void SoftmaxLseCopyOut(LocalTensor<float> &softmaxSumTmp, LocalTensor<float> &softmaxMaxTmp,
@@ -409,8 +404,9 @@ __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::ProcessVec2OnUb(
 
     int64_t vec2CalcSize = runInfo.vec2S1RealSize * dTemplateAlign64;
     float deSCaleVValue = 1.0f;
-    // BSA: V 为 per-head 反量化，vScale shape [N2]，按 n2 head 取值。
-    // 原 deScaleKvOffset 未被赋值（未初始化），GetValue 会越界读 GM → AICore SVM page fault(507015)。
+    // QBSA: V 为 per-head 反量化，vScale shape [N2]，按 n2 head 取值。
+    // 原 deScaleKvOffset 未被赋值（未初始化），GetValue 会越界读 GM，
+    // 触发 AICore SVM page fault(507015)。
     deSCaleVValue = this->deScaleVGm.GetValue(runInfo.n2oIdx);
     LocalTensor<T> vec2ResUb = this->stage2OutBuf.template Get<T>();
     LocalTensor<T> mmRes = bmm2ResBuf.template GetTensor<T>();
@@ -419,7 +415,7 @@ __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::ProcessVec2OnUb(
         DataCopy(vec2ResUb, mmRes, vec2CalcSize);
     } else {
         LocalTensor<T> expUb = softmaxExpBuf[runInfo.taskIdMod3].template Get<T>();
-        // BSA: V per-head 反量化，前一块与当前块同为 vScale[n2oIdx]（非 FIA 的 per-block scale），
+        // QBSA: V per-head 反量化，前一块与当前块同为 vScale[n2oIdx]（非 FIA 的 per-block scale），
         // 不能用 deScaleKvOffset 的 per-block ping-pong（未初始化且 -1 会越界，触发 507015）。
         float deSCalePreVValue = this->deScaleVGm.GetValue(runInfo.n2oIdx);
         if (runInfo.s2LoopCount < runInfo.s2LoopLimit) {
@@ -468,108 +464,6 @@ __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::ProcessVec2(mm2ResPos &bmm2Re
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::MlaTransposeDataCopyOut(RunInfo &runInfo, ConstInfo &constInfo,
-                                                                           LocalTensor<OUTPUT_T> &attenOut)
-{
-    int64_t s1DealSize = runInfo.vec2S1RealSize;
-    int64_t headSize = 0;
-    int64_t attenOutOffset = constInfo.dSizeV;
-    int64_t headUbOffset = 0;
-    int64_t headGmOffset = 0;
-    int64_t curGIdx = runInfo.goIdx;
-    int64_t curS1Idx = runInfo.s1oIdx;
-
-    if (constInfo.gSize == 128) {
-        curGIdx = (curS1Idx % 2 == 0) ? curGIdx : 64;
-        curS1Idx /= 2;
-    } else if (constInfo.gSize <= 32) {
-        curS1Idx *= (64 / constInfo.gSize);
-    }
-
-    if (constInfo.subBlockIdx == 1) {
-        int64_t firstCurGIdx = curGIdx;
-        curGIdx = (firstCurGIdx + s1DealSize) % constInfo.gSize;
-        curS1Idx += (firstCurGIdx + s1DealSize) / constInfo.gSize;
-    }
-
-    DataCopyExtParams dataCopyParams;
-    if (curGIdx != 0 && constInfo.gSize != 1) {
-        headSize = curGIdx + s1DealSize < constInfo.gSize ? s1DealSize : constInfo.gSize - curGIdx;
-        headUbOffset = headSize * constInfo.dSizeV;
-        headGmOffset = constInfo.dSizeV - curGIdx * constInfo.t1Size * constInfo.dSizeV;
-        dataCopyParams.srcStride = 0;
-        dataCopyParams.dstStride = (constInfo.t1Size * constInfo.dSizeV - constInfo.dSizeV) * sizeof(OUTPUT_T);
-        dataCopyParams.blockLen = constInfo.dSizeV * sizeof(OUTPUT_T);
-        dataCopyParams.blockCount = headSize;
-
-        DataCopyPad(this->attentionOutGm[runInfo.attentionOutOffset], attenOut, dataCopyParams);
-    }
-
-    s1DealSize -= headSize;
-    int64_t blocks = CeilDiv(s1DealSize, constInfo.gSize);
-    bool hasTail = s1DealSize % constInfo.gSize != 0;
-    for (int64_t i = 0; i < blocks; i++) {
-        attenOutOffset = i * constInfo.dSizeV;
-        dataCopyParams.srcStride = 0;
-        dataCopyParams.dstStride = (constInfo.t1Size * constInfo.dSizeV - constInfo.dSizeV) * sizeof(OUTPUT_T);
-        dataCopyParams.blockLen = constInfo.dSizeV * sizeof(OUTPUT_T);
-        if (unlikely(i == blocks - 1 && hasTail)) {
-            dataCopyParams.blockCount = s1DealSize % constInfo.gSize;
-        } else {
-            dataCopyParams.blockCount = constInfo.gSize;
-        }
-
-        DataCopyPad(this->attentionOutGm[runInfo.attentionOutOffset + headGmOffset + attenOutOffset],
-                    attenOut[headUbOffset + i * constInfo.gSize * constInfo.dSizeV], dataCopyParams);
-    }
-}
-
-TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::MlaTranspose2DataCopyOut(RunInfo &runInfo, ConstInfo &constInfo,
-                                                                            LocalTensor<OUTPUT_T> &attenOut)
-{
-    int64_t s1DealSize = runInfo.vec2S1RealSize;
-    int64_t curGIdx = runInfo.sOuterOffset / constInfo.s1Size;
-    int64_t curS1Idx = runInfo.sOuterOffset % constInfo.s1Size;
-    bool hasHeadBlock = curS1Idx != 0;
-    int headBlock = hasHeadBlock ? constInfo.s1Size - curS1Idx : 0;
-    int gCount = hasHeadBlock ? (runInfo.vec2S1BaseSize - headBlock) / constInfo.s1Size :
-                                runInfo.vec2S1BaseSize / constInfo.s1Size;
-    bool hasTailBlock = (runInfo.vec2S1BaseSize - headBlock) % constInfo.s1Size;
-    int tailBlock = hasTailBlock ? runInfo.vec2S1BaseSize - gCount * constInfo.s1Size - headBlock : 0;
-    uint32_t attenOutUbOffset = 0;
-
-    if (curS1Idx != 0) {
-        DataCopyExtParams dataCopyParams;
-        dataCopyParams.srcStride = 0;
-        dataCopyParams.dstStride = 0;
-        dataCopyParams.blockLen = (constInfo.s1Size - curS1Idx) * constInfo.dSizeV * sizeof(OUTPUT_T);
-        dataCopyParams.blockCount = 1;
-        DataCopyPad(this->attentionOutGm[runInfo.attentionOutOffset], attenOut, dataCopyParams);
-        attenOutUbOffset += (constInfo.s1Size - curS1Idx) * constInfo.dSizeV;
-    }
-    DataCopyExtParams dataCopyParams;
-    dataCopyParams.blockCount = gCount;
-    dataCopyParams.blockLen = constInfo.s1Size * constInfo.dSizeV * sizeof(OUTPUT_T);
-    dataCopyParams.srcStride = 0;
-    dataCopyParams.dstStride = (constInfo.bSize - 1) * constInfo.s1Size * constInfo.dSizeV * sizeof(OUTPUT_T);
-    runInfo.attentionOutOffset +=
-        int(hasHeadBlock) * constInfo.bSize * constInfo.s1Size * constInfo.dSizeV - curS1Idx * constInfo.dSizeV;
-    DataCopyPad(this->attentionOutGm[runInfo.attentionOutOffset], attenOut[attenOutUbOffset], dataCopyParams);
-    attenOutUbOffset += dataCopyParams.blockCount * (constInfo.s1Size * constInfo.dSizeV);
-
-    if (hasTailBlock) {
-        DataCopyExtParams dataCopyParamsTail;
-        dataCopyParamsTail.blockCount = 1;
-        dataCopyParamsTail.blockLen = tailBlock * constInfo.dSizeV * sizeof(OUTPUT_T);
-        dataCopyParamsTail.srcStride = 0;
-        dataCopyParamsTail.dstStride = 0;
-        runInfo.attentionOutOffset += gCount * constInfo.bSize * constInfo.s1Size * constInfo.dSizeV;
-        DataCopyPad(this->attentionOutGm[runInfo.attentionOutOffset], attenOut[attenOutUbOffset], dataCopyParamsTail);
-    }
-}
-
-TEMPLATES_DEF_NO_DEFAULT
 template <typename VEC2_RES_T>
 __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::Bmm2DataCopyOut(RunInfo &runInfo, ConstInfo &constInfo,
                                                                    LocalTensor<VEC2_RES_T> &vec2ResUb,
@@ -600,28 +494,15 @@ __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::Bmm2DataCopyOut(RunInfo &runI
     int64_t attenOutOffset = constInfo.dSizeV;
     if constexpr (layout == BSALayout::TND) {
         attenOutOffset = constInfo.n2GDv;
-        // BSA: 每核独立计算一个 (n2,g) head，输出 TND [T, N1, Dv]，按 head 直写；
-        // 不走 FIA 的 GS1 合轴输出（否则会把单 head 结果按 G 合并散写到错误位置，导致输出全 0）。
+        // QBSA: 每核独立计算一个 (n2,g) head，输出 TND [T, N1, Dv]，按 head 直写；
+        // 不走 FIA 的 GS1 合轴输出，避免把单 head 结果按 G 合并散写到错误位置。
         if (constInfo.isGqa) {
             attenOutOffset = constInfo.dSizeV;
         }
     }
 
-    if (constInfo.isPfaGS1Merge && dSizeAligned64 - constInfo.dSizeV != 0 &&
-        constInfo.layoutType == static_cast<uint8_t>(BSALayout::TND)) {
-        for (int64_t i = 0; i < runInfo.vec2S1BaseSize / constInfo.gSize; i++) {
-            attenOutOffset = i * constInfo.dSizeV * constInfo.gSize * constInfo.n2Size;
-            dataCopyParams.blockLen = constInfo.dSizeV * sizeof(OUTPUT_T);
-            dataCopyParams.blockCount = constInfo.gSize;
-            dataCopyParams.dstStride = 0;
-            DataCopyPad(this->attentionOutGm[runInfo.attentionOutOffset + attenOutOffset],
-                        attenOut[i * constInfo.gSize * dSizeAligned64], dataCopyParams);
-        }
-    } else {
-        DataCopyPad(
-            this->attentionOutGm[runInfo.attentionOutOffset + vec2S1Idx * runInfo.vec2S1BaseSize * attenOutOffset],
-            attenOut, dataCopyParams);
-    }
+    DataCopyPad(this->attentionOutGm[runInfo.attentionOutOffset + vec2S1Idx * runInfo.vec2S1BaseSize * attenOutOffset],
+                attenOut, dataCopyParams);
 }
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::SoftmaxInitBuffer()
@@ -734,10 +615,10 @@ __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe *pipe, 
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::GetExtremeValue(T &negativeScalar, T &positiveScalar)
+__aicore__ inline T BSABlockVec<TEMPLATE_ARGS>::GetNegativeValue()
 {
-    uint16_t tmp1 = NEGATIVE_MIN_VALUE_FP16;
-    negativeScalar = *((half *)&tmp1);
+    uint32_t negativeValue = NEGATIVE_MIN_VALUE_FP32;
+    return *((float *)&negativeValue);
 }
 
 // ================================= Child-specific functions =================================
@@ -749,11 +630,8 @@ __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::InitCubeVecSharedParams(CVSha
     auto &inputParamsRegbase = this->tilingData->inputParamsRegbase;
     sharedParams.bSize = inputParamsRegbase.bSize;
     sharedParams.t1Size = inputParamsRegbase.t1Size;
-    sharedParams.t2Size = inputParamsRegbase.t2Size;
     sharedParams.n2Size = inputParamsRegbase.n2Size;
     sharedParams.gSize = inputParamsRegbase.gSize;
-    sharedParams.s1Size = inputParamsRegbase.s1Size;
-    sharedParams.s2Size = inputParamsRegbase.s2Size;
     sharedParams.dSize = inputParamsRegbase.dSize;
     sharedParams.dSizeV = inputParamsRegbase.dSizeV;
     sharedParams.preTokens = inputParamsRegbase.preTokens;
@@ -765,15 +643,11 @@ __aicore__ inline void BSABlockVec<TEMPLATE_ARGS>::InitCubeVecSharedParams(CVSha
 
     sharedParams.fromFused = inputParamsRegbase.fromFused;
     sharedParams.isGqa = inputParamsRegbase.isGqa;
-    sharedParams.isPfaGS1Merge = (inputParamsRegbase.isGqa && sharedParams.s1Size > 1);
     sharedParams.isKvContinuous = inputParamsRegbase.isKvContinuous;
     sharedParams.seqUsedQlenSize = inputParamsRegbase.seqUsedQlenSize;
     sharedParams.seqUsedKvlenSize = inputParamsRegbase.seqUsedKvlenSize;
-    sharedParams.isSeqUsedQlenNull = inputParamsRegbase.isSeqUsedQlenNull;
-    sharedParams.isSeqUsedKvlenNull = inputParamsRegbase.isSeqUsedKvlenNull;
     if constexpr (isPa) {
         auto &paParams = this->tilingData->paParams;
-        sharedParams.attenMaskS1Size = paParams.attenMaskS1Size;
         sharedParams.blockTableDim2 = paParams.blockTableDim2;
         sharedParams.kvSparseBlockSize = paParams.kvBlockSize;
         sharedParams.qSparseBlockSize = paParams.qBlockSize;

@@ -18,12 +18,9 @@ namespace QuantBlockSparseAttnUT {
 
 struct QuantBlockSparseAttnHostUtParamBase {
     std::string case_name;
-    int64_t max_seqlen_q = 0;
-    int64_t max_seqlen_kv = 0;
     float softmax_scale = 1.0f;
     int64_t sparse_q_block_size = 128;
     int64_t sparse_kv_block_size = 128;
-    int64_t paBlockStride = 0;
     std::string layout_kv = "PA_BNSD";
     std::string layout_q = "TND";
     std::string layout_sparse_indices = "B_N_Qb_Kb";
@@ -36,12 +33,9 @@ struct QuantBlockSparseAttnHostUtParamBase {
     explicit QuantBlockSparseAttnHostUtParamBase(const csv_map &csvMap)
     {
         this->case_name = ReadMap(csvMap, "caseName");
-        this->max_seqlen_q = std::stoll(ReadMap(csvMap, "max_seqlen_q", "0"));
-        this->max_seqlen_kv = std::stoll(ReadMap(csvMap, "max_seqlen_kv", "0"));
         this->softmax_scale = std::stof(ReadMap(csvMap, "softmax_scale", "1.0"));
         this->sparse_q_block_size = std::stoll(ReadMap(csvMap, "sparse_q_block_size", "128"));
         this->sparse_kv_block_size = std::stoll(ReadMap(csvMap, "sparse_kv_block_size", "128"));
-        this->paBlockStride = std::stoll(ReadMap(csvMap, "paBlockStride", "0"));
         this->layout_kv = ReadMap(csvMap, "layout_kv", "PA_BNSD");
         this->layout_q = ReadMap(csvMap, "layout_q", "TND");
         this->layout_sparse_indices = ReadMap(csvMap, "layout_sparse_indices", "B_N_Qb_Kb");

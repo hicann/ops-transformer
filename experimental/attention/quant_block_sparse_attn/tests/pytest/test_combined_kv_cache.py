@@ -32,7 +32,8 @@ def test_combined_kv_cache_views_and_segments():
     assert meta["pa_block_stride"] == 2 * 4 * 8 + 2 * 4 * 8 + 2 * 4 * 4
     assert key.stride() == (meta["pa_block_stride"], 4 * 8, 8, 1)
     assert value.stride() == (meta["pa_block_stride"], 4 * 8, 8, 1)
-    assert k_scale.stride() == (meta["pa_block_stride"] // 4, 4, 1)
+    assert k_scale.shape == (4, 2, 4, 1)
+    assert k_scale.stride() == (meta["pa_block_stride"] // 4, 4, 1, 1)
 
     for batch_idx in range(2):
         for logical_block in range(2):
@@ -47,7 +48,7 @@ def test_combined_kv_cache_views_and_segments():
                 value[physical_block, :, :count].to(torch.float32),
                 dense_value[batch_idx, start:end].permute(1, 0, 2).to(torch.float32))
             torch.testing.assert_close(
-                k_scale[physical_block, :, :count],
+                k_scale[physical_block, :, :count, 0],
                 dense_k_scale[batch_idx, start:end].permute(1, 0))
 
             block_base = physical_block * meta["pa_block_stride"]
@@ -84,6 +85,6 @@ def test_combined_kv_cache_storage_serialization(tmp_path):
 
     assert key.shape == (4, 2, 4, 8)
     assert value.shape == key.shape
-    assert k_scale.shape == (4, 2, 4)
+    assert k_scale.shape == (4, 2, 4, 1)
     assert loaded["meta"]["packing"] == combined_kv_cache.PACKING
     assert loaded["meta"]["pa_block_stride"] == meta["pa_block_stride"]

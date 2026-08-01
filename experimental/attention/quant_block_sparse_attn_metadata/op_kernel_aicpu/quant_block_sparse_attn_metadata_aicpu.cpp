@@ -63,7 +63,6 @@ bool QuantBlockSparseAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
     GetAttrValueOpt(ctx, "sparse_block_size_k", sparseBlockSizeK_);
     GetAttrValueOpt(ctx, "quant_mode", quantMode_);
     GetAttrValueOpt(ctx, "mask_mode", maskMode_);
-    GetAttrValueOpt(ctx, "max_seqlen_kv", maxSeqlenKv_);
     GetAttrValueOpt(ctx, "layout_q", layoutQ_);
     GetAttrValueOpt(ctx, "layout_kv", layoutKv_);
     GetAttrValueOpt(ctx, "layout_sparse_indices", layoutSparseIndices_);
@@ -201,12 +200,16 @@ uint64_t QuantBlockSparseAttnMetadataCpuKernel::GetBN1BlockNum(uint32_t bIdx, ui
     return bN1BlockNum_[bn1Idx];
 }
 
-uint32_t QuantBlockSparseAttnMetadataCpuKernel::CalcValidS1Rows(uint32_t bIdx, uint32_t n1Idx) const
+uint32_t QuantBlockSparseAttnMetadataCpuKernel::CalcValidS1Rows(uint32_t bIdx, uint32_t n1Idx,
+                                                                uint32_t &maxS2BlockNum) const
 {
     uint32_t validRows = 0U;
+    maxS2BlockNum = 0U;
     for (uint32_t s1Idx = 0U; s1Idx < Qbmax_; ++s1Idx) {
-        if (GetRowBlockNum(bIdx, n1Idx, s1Idx) > 0U) {
+        const uint32_t rowBlock = GetRowBlockNum(bIdx, n1Idx, s1Idx);
+        if (rowBlock > 0U) {
             validRows++;
+            maxS2BlockNum = std::max(maxS2BlockNum, rowBlock);
         }
     }
     return validRows;
@@ -218,16 +221,17 @@ uint64_t QuantBlockSparseAttnMetadataCpuKernel::CalcBN1Cost(uint32_t bIdx, uint3
     constexpr uint32_t BYTES_PER_ELEM_KV = 1U;
     constexpr uint32_t COST_FACTOR = 2U;
 
-    const uint32_t validS1Rows = CalcValidS1Rows(bIdx, n1Idx);
+    uint32_t maxS2BlockNum = 0U;
+    const uint32_t validS1Rows = CalcValidS1Rows(bIdx, n1Idx, maxS2BlockNum);
     if (validS1Rows == 0U) {
         return 0U;
     }
 
-    const uint32_t blockSizeQ = static_cast<uint32_t>(std::max(sparseBlockSizeQ_, 1));
-    const uint32_t maxSeqlenKv = static_cast<uint32_t>(std::max(maxSeqlenKv_, 0));
     const uint32_t headDim = static_cast<uint32_t>(std::max(headDim_, 0));
-    const uint64_t s1Cost = static_cast<uint64_t>(validS1Rows) * blockSizeQ * headDim * BYTES_PER_ELEM_Q * COST_FACTOR;
-    const uint64_t s2Cost = static_cast<uint64_t>(maxSeqlenKv) * headDim * BYTES_PER_ELEM_KV * COST_FACTOR;
+    const uint64_t s1Cost = static_cast<uint64_t>(validS1Rows) * static_cast<uint32_t>(sparseBlockSizeQ_) *
+        headDim * BYTES_PER_ELEM_Q * COST_FACTOR;
+    const uint64_t s2Size = static_cast<uint64_t>(maxS2BlockNum) * static_cast<uint32_t>(sparseBlockSizeK_);
+    const uint64_t s2Cost = s2Size * headDim * BYTES_PER_ELEM_KV * COST_FACTOR;
     return s1Cost + s2Cost;
 }
 

@@ -28,8 +28,6 @@ const aclTensor* QuantBlockSparseAttnMetadata(
     int64_t sparseBlockSizeK,
     int64_t quantMode,
     int64_t maskMode,
-    int64_t maxSeqlenQ,
-    int64_t maxSeqlenKv,
     const char* layoutQOptional,
     const char* layoutKvOptional,
     const char* layoutSparseIndicesOptional,

@@ -123,8 +123,6 @@ public:
     GlobalTensor<int32_t> metadataGm;
     GlobalTensor<int32_t> blockTableGm;
     __gm__ int32_t *cuSeqQlenAddr;
-    __gm__ int32_t *cuSeqKvlenAddr;
-    __gm__ int32_t *seqUsedQlenAddr;
     __gm__ int32_t *seqUsedKvlenAddr;
     int32_t aicIdx;
 
@@ -185,8 +183,8 @@ __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::InitGlobalBuffer(
     __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *sparseIndices, __gm__ uint8_t *sparseSeqLen,
-    __gm__ uint8_t *attenMask, __gm__ uint8_t *metadata, __gm__ uint8_t *cuSeqQlen, __gm__ uint8_t *cuSeqKvlen,
-    __gm__ uint8_t *seqUsedQlen, __gm__ uint8_t *seqUsedKvlen, __gm__ uint8_t *deqScaleQ, __gm__ uint8_t *deqScaleK,
+    __gm__ uint8_t *attenMask, __gm__ uint8_t *metadata, __gm__ uint8_t *cuSeqQlen, __gm__ uint8_t *,
+    __gm__ uint8_t *, __gm__ uint8_t *seqUsedKvlen, __gm__ uint8_t *deqScaleQ, __gm__ uint8_t *deqScaleK,
     __gm__ uint8_t *deqScaleV, __gm__ uint8_t *pScale, __gm__ uint8_t *blockTable, __gm__ uint8_t *queryPaddingSize,
     __gm__ uint8_t *kvPaddingSize, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *workspace,
     const QuantBlockSparseAttnTilingData *__restrict tiling, TPipe *tPipe)
@@ -200,8 +198,6 @@ __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::
     }
     if constexpr (layout == BSALayout::TND || layout == BSALayout::NTD) {
         cuSeqQlenAddr = (__gm__ int32_t *)cuSeqQlen;
-        cuSeqKvlenAddr = (__gm__ int32_t *)cuSeqKvlen;
-        seqUsedQlenAddr = (__gm__ int32_t *)seqUsedQlen;
         seqUsedKvlenAddr = (__gm__ int32_t *)seqUsedKvlen;
     }
 
@@ -293,10 +289,7 @@ __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::
 
     constInfo.bSize = sharedParams.bSize;
     constInfo.t1Size = sharedParams.t1Size;
-    constInfo.t2Size = sharedParams.t2Size;
     constInfo.n2Size = sharedParams.n2Size;
-    constInfo.s1Size = sharedParams.s1Size;
-    constInfo.s2Size = sharedParams.s2Size;
     constInfo.dSize = sharedParams.dSize;
     constInfo.dSizeV = sharedParams.dSizeV;
     constInfo.combineDim = (constInfo.dSize + constInfo.dSizeV + sizeof(float) + 31U) / 32U * 32U;
@@ -305,25 +298,16 @@ __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::
     constInfo.gSize = sharedParams.gSize;
     constInfo.n1Size = constInfo.n2Size * constInfo.gSize;
     constInfo.s1OuterSize = sharedParams.s1OuterSize;
-    constInfo.s1S2 = constInfo.s1Size * constInfo.s2Size;
-    constInfo.gS1 = constInfo.gSize * constInfo.s1Size;
     constInfo.n2G = constInfo.n2Size * constInfo.gSize;
 
-    constInfo.s1Dv = constInfo.s1Size * constInfo.dSizeV;
-    constInfo.s2Dv = constInfo.s2Size * constInfo.dSizeV;
     constInfo.n2Dv = constInfo.n2Size * constInfo.dSizeV;
     constInfo.gDv = constInfo.gSize * constInfo.dSizeV;
-    constInfo.gS1Dv = constInfo.gSize * constInfo.s1Dv;
-    constInfo.n2S2Dv = constInfo.n2Size * constInfo.s2Dv;
     constInfo.n2GDv = constInfo.n2Size * constInfo.gDv;
     constInfo.s2BaseN2Dv = s2BaseSize * constInfo.n2Dv;
-    constInfo.n2GS1Dv = constInfo.n2Size * constInfo.gS1Dv;
     constInfo.layoutType = sharedParams.layoutType;
 
-    constInfo.s1D = constInfo.s1Size * constInfo.dSize;
     constInfo.gD = constInfo.gSize * constInfo.dSize;
     constInfo.n2GD = constInfo.n2Size * constInfo.gD;
-    constInfo.gS1D = constInfo.gS1 * constInfo.dSize;
     constInfo.maxBlockNumPerBatch = sharedParams.blockTableDim2;
 
     if constexpr (layout == BSALayout::TND) {
@@ -350,12 +334,9 @@ __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::
 
     if ASCEND_IS_AIV {
         auto &inputParamsRegbase = this->tilingData->inputParamsRegbase;
-        auto &paParams = this->tilingData->paParams;
         if constexpr (hasAtten) {
             attenMaskInfo.preTokens = sharedParams.preTokens;
             attenMaskInfo.nextTokens = sharedParams.nextTokens;
-            attenMaskInfo.attenMaskShapeType = inputParamsRegbase.attenMaskShapeType;
-            attenMaskInfo.attenMaskS1Size = paParams.attenMaskS1Size;
             attenMaskInfo.attenMaskS2Size = inputParamsRegbase.attenMaskS2Size;
             attenMaskInfo.bandIndex = inputParamsRegbase.bandIndex;
         }
@@ -491,12 +472,9 @@ __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::
     }
     this->constInfo.isRowInvalid = this->sharedParams.isRowInvalid;
     this->constInfo.isGqa = this->sharedParams.isGqa;
-    this->constInfo.isPfaGS1Merge = this->sharedParams.isPfaGS1Merge;
     this->constInfo.isKvContinuous = this->sharedParams.isKvContinuous;
     this->constInfo.seqUsedQlenSize = this->sharedParams.seqUsedQlenSize;
     this->constInfo.seqUsedKvlenSize = this->sharedParams.seqUsedKvlenSize;
-    this->constInfo.isSeqUsedQlenNull = static_cast<bool>(this->sharedParams.isSeqUsedQlenNull);
-    this->constInfo.isSeqUsedKvlenNull = static_cast<bool>(this->sharedParams.isSeqUsedKvlenNull);
     if constexpr (isPa) {
         this->constInfo.blockTableDim2 = this->sharedParams.blockTableDim2;
         this->constInfo.kvSparseBlockSize = this->sharedParams.kvSparseBlockSize;
@@ -563,7 +541,7 @@ __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::
             runParam.n2oIdx = runParam.n1oIdx / constInfo.gSize;
             runParam.goIdx = runParam.n1oIdx % constInfo.gSize;
             ComputeParamBatch<CHILD_SPEC_TEMPLATE_ARGS>(runParam, this->constInfo, this->attenMaskInfo, this->keyGm,
-                                                        this->cuSeqQlenAddr, this->cuSeqKvlenAddr);
+                                                        this->cuSeqQlenAddr, this->seqUsedKvlenAddr);
             ComputeS1LoopInfo<CHILD_SPEC_TEMPLATE_ARGS>(runParam, constInfo, s1StartIdx, s1EndIdx,
                                                         bn1Idx == bn1StartIdx, sectionLastBN);
             int64_t temps1End = coreLastBN ? (runParam.s1LoopEnd + 3) : runParam.s1LoopEnd;

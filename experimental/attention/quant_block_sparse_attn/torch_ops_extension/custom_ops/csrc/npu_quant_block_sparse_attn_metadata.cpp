@@ -42,8 +42,7 @@ at::Tensor npu_quant_block_sparse_attn_metadata_npu(
     const c10::optional<at::Tensor> &cuSeqlensQ, const c10::optional<at::Tensor> &cuSeqlensKv,
     const c10::optional<at::Tensor> &sequsedQ, const c10::optional<at::Tensor> &sequsedKv,
     int64_t batchSize, int64_t sparseBlockSizeQ, int64_t sparseBlockSizeK, int64_t quantMode, int64_t maskMode,
-    int64_t maxSeqlenQ, int64_t maxSeqlenKv, c10::string_view layoutQ, c10::string_view layoutKv,
-    c10::string_view layoutSparseIndices)
+    c10::string_view layoutQ, c10::string_view layoutKv, c10::string_view layoutSparseIndices)
 {
     at::Device outputDevice = sparseSeqLen.device();
     uint64_t metadata_size = GetQbsaMetadataOutputSize(batchSize, numHeadsQ);
@@ -64,7 +63,7 @@ at::Tensor npu_quant_block_sparse_attn_metadata_npu(
     EXEC_NPU_CMD_V1(aclnnQuantBlockSparseAttnMetadata,
         sparseSeqLen, cuSeqlensQValue, cuSeqlensKvValue, sequsedQValue, sequsedKvValue,
         batchSize, numHeadsQ, numHeadsKv, headDim, sparseBlockSizeQ, sparseBlockSizeK, quantMode, maskMode,
-        maxSeqlenQ, maxSeqlenKv, layoutQPtr, layoutKvPtr, layoutSparseIndicesPtr, output);
+        layoutQPtr, layoutKvPtr, layoutSparseIndicesPtr, output);
     return output;
 }
 
@@ -73,8 +72,7 @@ at::Tensor npu_quant_block_sparse_attn_metadata_meta(
     const c10::optional<at::Tensor> &cuSeqlensQ, const c10::optional<at::Tensor> &cuSeqlensKv,
     const c10::optional<at::Tensor> &sequsedQ, const c10::optional<at::Tensor> &sequsedKv,
     int64_t batchSize, int64_t sparseBlockSizeQ, int64_t sparseBlockSizeK, int64_t quantMode, int64_t maskMode,
-    int64_t maxSeqlenQ, int64_t maxSeqlenKv, c10::string_view layoutQ, c10::string_view layoutKv,
-    c10::string_view layoutSparseIndices)
+    c10::string_view layoutQ, c10::string_view layoutKv, c10::string_view layoutSparseIndices)
 {
     uint64_t metadata_size = GetQbsaMetadataOutputSize(batchSize, numHeadsQ);
     return torch::empty({metadata_size}, sparseSeqLen.options().dtype(torch::kInt32));

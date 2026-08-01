@@ -1350,7 +1350,7 @@ def _call_npu_fa_op(
 
     if CASE.get("empty_actual_seq", False):
         seqused_q = torch.empty((0,), dtype=torch.int32)
-        seqused_kv = torch.empty((0,), dtype=torch.int32)
+        seqused_kv = torch.tensor(kv_lengths, dtype=torch.int32)
     else:
         seqused_q = torch.tensor(q_lengths, dtype=torch.int32)
         seqused_kv = torch.tensor(kv_lengths, dtype=torch.int32)
@@ -1361,9 +1361,6 @@ def _call_npu_fa_op(
     sparse_indices = _to_npu(sparse_indices)
     sparse_seq_len = _to_npu(sparse_seq_len)
     block_table = _to_npu(block_table)
-
-    max_sq = max(q_lengths)
-    max_skv = max(kv_lengths)
 
     torch_npu.npu.synchronize()
     metadata = torch.ops.custom.npu_quant_block_sparse_attn_metadata(
@@ -1380,8 +1377,6 @@ def _call_npu_fa_op(
         sparse_block_size_k=SPARSE_BLOCK_SIZE,
         quant_mode=QUANT_MODE_MXFP8,
         mask_mode=MASK_MODE,
-        max_seqlen_q=max_sq,
-        max_seqlen_kv=max_skv,
         layout_q=layout_q,
         layout_kv=layout_kv,
         layout_sparse_indices=SPARSE_INDICES_LAYOUT,
@@ -1408,9 +1403,6 @@ def _call_npu_fa_op(
         seqused_kv=seqused_kv,
         block_table=block_table,
         metadata=metadata,
-        max_seqlen_q=max_sq,
-        max_seqlen_kv=max_skv,
-        pa_block_stride=0,
         layout_kv=layout_kv,
         layout_q=layout_q,
         layout_sparse_indices=SPARSE_INDICES_LAYOUT,

@@ -30,28 +30,26 @@ const aclTensor *QuantBlockSparseAttnMetadata(
     const aclTensor *sparseSeqLen, const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional,
     const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional, int64_t batchSize, int64_t numHeadsQ,
     int64_t numHeadsKv, int64_t headDim, int64_t sparseBlockSizeQ, int64_t sparseBlockSizeK, int64_t quantMode,
-    int64_t maskMode, int64_t maxSeqlenQ, int64_t maxSeqlenKv, const char *layoutQOptional,
-    const char *layoutKvOptional, const char *layoutSparseIndicesOptional, const char *socVersion,
-    int64_t aicCoreNum, int64_t aivCoreNum, const aclTensor *metadata, aclOpExecutor *executor)
+    int64_t maskMode, const char *layoutQOptional, const char *layoutKvOptional,
+    const char *layoutSparseIndicesOptional, const char *socVersion, int64_t aicCoreNum, int64_t aivCoreNum,
+    const aclTensor *metadata, aclOpExecutor *executor)
 {
     L0_DFX(QuantBlockSparseAttnMetadata, sparseSeqLen, cuSeqlensQOptional, cuSeqlensKvOptional,
            sequsedQOptional, sequsedKvOptional, batchSize, numHeadsQ, numHeadsKv, headDim, sparseBlockSizeQ,
-           sparseBlockSizeK, quantMode, maskMode, maxSeqlenQ, maxSeqlenKv, layoutQOptional, layoutKvOptional,
-           layoutSparseIndicesOptional, socVersion, aicCoreNum, aivCoreNum, metadata);
+           sparseBlockSizeK, quantMode, maskMode, layoutQOptional, layoutKvOptional, layoutSparseIndicesOptional,
+           socVersion, aicCoreNum, aivCoreNum, metadata);
 
     static internal::AicpuTaskSpace space("QuantBlockSparseAttnMetadata");
 
     auto ret = ADD_TO_LAUNCHER_LIST_AICPU(
         QuantBlockSparseAttnMetadata,
         OP_ATTR_NAMES({"batch_size", "num_heads_q", "num_heads_kv", "head_dim", "sparse_block_size_q",
-                       "sparse_block_size_k", "quant_mode", "mask_mode", "max_seqlen_q", "max_seqlen_kv",
-                       "layout_q", "layout_kv", "layout_sparse_indices", "soc_version", "aic_core_num",
-                       "aiv_core_num"}),
+                       "sparse_block_size_k", "quant_mode", "mask_mode", "layout_q", "layout_kv",
+                       "layout_sparse_indices", "soc_version", "aic_core_num", "aiv_core_num"}),
         OP_INPUT(sparseSeqLen, cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional),
         OP_OUTPUT(metadata),
         OP_ATTR(batchSize, numHeadsQ, numHeadsKv, headDim, sparseBlockSizeQ, sparseBlockSizeK, quantMode, maskMode,
-                maxSeqlenQ, maxSeqlenKv, layoutQOptional, layoutKvOptional, layoutSparseIndicesOptional, socVersion,
-                aicCoreNum, aivCoreNum));
+                layoutQOptional, layoutKvOptional, layoutSparseIndicesOptional, socVersion, aicCoreNum, aivCoreNum));
     OP_CHECK(ret == ACL_SUCCESS,
              OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "QuantBlockSparseAttnMetadata ADD_TO_LAUNCHER_LIST_AICPU failed."),
              return nullptr);

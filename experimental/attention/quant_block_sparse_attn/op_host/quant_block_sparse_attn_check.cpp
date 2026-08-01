@@ -74,7 +74,7 @@ ge::graphStatus CheckInputShape(const BSARequiredParaInfo &input, const char *in
                                 const std::array<int64_t, N> &expectedShape)
 {
     if (input.shape == nullptr) {
-        OP_LOGE(kOpName, "%s shape is nullptr", inputName);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, inputName, "nullptr", "shape is nullptr");
         return ge::GRAPH_FAILED;
     }
     const gert::Shape &actualShape = input.shape->GetStorageShape();
@@ -91,7 +91,7 @@ ge::graphStatus CheckInputDtype(const BSARequiredParaInfo &input, const char *in
                                 const char *expectedTypeName)
 {
     if (input.desc == nullptr) {
-        OP_LOGE(kOpName, "%s desc is nullptr", inputName);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, inputName, "nullptr", "desc is nullptr");
         return ge::GRAPH_FAILED;
     }
     const ge::DataType actualType = input.desc->GetDataType();
@@ -131,6 +131,31 @@ ge::graphStatus CheckKVDtypeConsistency(const QuantBlockSparseAttnParaInfo &opPa
     }
     return ge::GRAPH_SUCCESS;
 }
+
+ge::graphStatus CheckStrideDim(const gert::Stride *stride, const char *inputName, size_t dim, uint64_t expected)
+{
+    if (stride == nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            kOpName, inputName, "nullptr",
+            "stride is nullptr. PA_BNSD segmented KV-cache requires 4D non-contiguous key/value/k_descale views");
+        return ge::GRAPH_FAILED;
+    }
+    if (stride->GetDimNum() <= dim) {
+        const std::string argName = std::string(inputName) + " stride";
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            kOpName, argName.c_str(), std::to_string(stride->GetDimNum()) + "D",
+            "at least " + std::to_string(dim + 1U) + "D stride for PA_BNSD segmented KV-cache");
+        return ge::GRAPH_FAILED;
+    }
+    const uint64_t actual = stride->GetStride(dim);
+    if (actual != expected) {
+        const std::string argName = std::string(inputName) + " stride[" + std::to_string(dim) + "]";
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, argName.c_str(), std::to_string(actual),
+                                              "must be " + std::to_string(expected));
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
 } // namespace
 
 QuantBlockSparseAttnCheck::QuantBlockSparseAttnCheck(const QuantBlockSparseAttnTilingInfo &tilingInfo)
@@ -147,6 +172,12 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckAttrs() const
             tilingInfo_.layoutKVStr + "/" + tilingInfo_.layoutSparseIndicesStr + "/" +
                 std::to_string(tilingInfo_.quantModeVal),
             "layout_kv must be PA_BNSD, layout_sparse_indices must be B_N_Qb_Kb, quant_mode must be 1 or 2");
+        return ge::GRAPH_FAILED;
+    }
+
+    if (tilingInfo_.quantModeVal == BSA_QUANT_MODE_FP8 && tilingInfo_.layoutOutStr != "TND") {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "layout_out", tilingInfo_.layoutOutStr,
+                                              "must be TND in quant_mode=1 FP8 scenario");
         return ge::GRAPH_FAILED;
     }
 
@@ -347,12 +378,14 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckExistence() const
     }
     if (opParamInfo.cuSeqlensQ.tensor == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "cu_seqlens_q", "nullptr",
-                                              "cu_seqlens_q is required for TND/NTD layout");
+                                              "cu_seqlens_q is required for TND/NTD query layout "
+                                              "with PA BNBD KV-cache");
         return ge::GRAPH_FAILED;
     }
-    if (opParamInfo.cuSeqlensKV.tensor == nullptr) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "cu_seqlens_kv", "nullptr",
-                                              "cu_seqlens_kv is required for TND/NTD layout");
+    if (opParamInfo.seqUsedKV.tensor == nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "seqused_kv", "nullptr",
+                                              "seqused_kv is required for TND/NTD query layout "
+                                              "with PA BNBD KV-cache");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -360,6 +393,18 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckExistence() const
 
 ge::graphStatus QuantBlockSparseAttnCheck::CheckShapeConsistency() const
 {
+    const auto &opParamInfo = tilingInfo_.opParamInfo;
+    const gert::Shape &sparseIndicesShape = opParamInfo.sparseIndices.shape->GetStorageShape();
+    const gert::Shape &sparseSeqLenShape = opParamInfo.sparseSeqLen.shape->GetStorageShape();
+    if (sparseIndicesShape.GetDimNum() != DIM_NUM_4 || sparseSeqLenShape.GetDimNum() != DIM_NUM_3) {
+        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+            kOpName, "sparse_indices, sparse_seq_len",
+            std::to_string(sparseIndicesShape.GetDimNum()) + "D, " + std::to_string(sparseSeqLenShape.GetDimNum()) +
+                "D",
+            "sparse_indices must be 4D and sparse_seq_len must be 3D");
+        return ge::GRAPH_FAILED;
+    }
+
     if (tilingInfo_.bSize == 0U || tilingInfo_.n1Size == 0U || tilingInfo_.n2Size == 0U || tilingInfo_.gSize == 0U) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             kOpName, "bSize/n1Size/n2Size/gSize",
@@ -374,16 +419,19 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckShapeConsistency() const
             "must be divisible by n2Size (kv head num) " + std::to_string(tilingInfo_.n2Size));
         return ge::GRAPH_FAILED;
     }
-    if (tilingInfo_.s1Size == 0U || tilingInfo_.s2Size == 0U) {
+    if (tilingInfo_.qBlockSizeVal == 0U || tilingInfo_.kvBlockSizeVal == 0U) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            kOpName, "s1Size/s2Size", std::to_string(tilingInfo_.s1Size) + "/" + std::to_string(tilingInfo_.s2Size),
-            "sequence lengths must be greater than 0");
+            kOpName, "q_block_size/kv_block_size",
+            std::to_string(tilingInfo_.qBlockSizeVal) + "/" + std::to_string(tilingInfo_.kvBlockSizeVal),
+            "block sizes must be greater than 0");
         return ge::GRAPH_FAILED;
     }
-    if (tilingInfo_.qbMax == 0U || tilingInfo_.kbMax == 0U) {
+    if (tilingInfo_.qbMax == 0U || tilingInfo_.sparseCount == 0U || tilingInfo_.maxBlockNumPerBatch == 0U) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            kOpName, "qbMax/kbMax", std::to_string(tilingInfo_.qbMax) + "/" + std::to_string(tilingInfo_.kbMax),
-            "block counts must be greater than 0");
+            kOpName, "qbMax/sparseCount/maxBlockNumPerBatch",
+            std::to_string(tilingInfo_.qbMax) + "/" + std::to_string(tilingInfo_.sparseCount) + "/" +
+                std::to_string(tilingInfo_.maxBlockNumPerBatch),
+            "block counts and sparse count must be greater than 0");
         return ge::GRAPH_FAILED;
     }
     if (tilingInfo_.dSize != BSA_D_SIZE || tilingInfo_.dSizeV != BSA_D_SIZE) {
@@ -399,38 +447,11 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckKeyValueShape() const
 {
     const auto &opParamInfo = tilingInfo_.opParamInfo;
     if (opParamInfo.key.shape == nullptr || opParamInfo.value.shape == nullptr) {
-        OP_LOGE(kOpName, "CheckKeyValueShape: key/value shape is nullptr");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "key/value", "nullptr", "shape is nullptr");
         return ge::GRAPH_FAILED;
     }
     const gert::Shape &keyShape = opParamInfo.key.shape->GetStorageShape();
     const gert::Shape &valueShape = opParamInfo.value.shape->GetStorageShape();
-
-    if (keyShape.GetDimNum() == DIM_NUM_1) {
-        if (tilingInfo_.quantModeVal == BSA_QUANT_MODE_MXFP8_FULL_QUANT) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(kOpName, "key", "1D",
-                                                     "4D PA BNBD is required for quant_mode=2 MXFP8");
-            return ge::GRAPH_FAILED;
-        }
-        if (tilingInfo_.paBlockStrideVal == 0U) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "pa_block_stride", "0",
-                                                  "must be greater than 0 for 1D combined KV storage");
-            return ge::GRAPH_FAILED;
-        }
-        const int64_t keyStorageSize = keyShape.GetShapeSize();
-        if (keyStorageSize <= 0 || static_cast<uint64_t>(keyStorageSize) % tilingInfo_.paBlockStrideVal != 0U) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                kOpName, "key", Ops::Base::ToString(keyShape),
-                "1D combined KV storage size must be a positive multiple of pa_block_stride=" +
-                    std::to_string(tilingInfo_.paBlockStrideVal));
-            return ge::GRAPH_FAILED;
-        }
-        if (valueShape.GetDimNum() != DIM_NUM_1) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(kOpName, "value", std::to_string(valueShape.GetDimNum()) + "D",
-                                                     "1D (must match key when using 1D combined KV storage)");
-            return ge::GRAPH_FAILED;
-        }
-        return ge::GRAPH_SUCCESS;
-    }
 
     if (keyShape.GetDimNum() != DIM_NUM_4 || valueShape.GetDimNum() != DIM_NUM_4) {
         OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
@@ -458,6 +479,32 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckKeyValueShape() const
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(kOpName, "key/value",
                                               Ops::Base::ToString(keyShape) + "/" + Ops::Base::ToString(valueShape),
                                               "key dim[3] must match dSize and value dim[3] must match dSizeV");
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckStrideDim(opParamInfo.key.stride, "key", DIM_0, tilingInfo_.paBlockStrideVal) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckStrideDim(opParamInfo.key.stride, "key", DIM_1, tilingInfo_.kvBlockSizeVal * tilingInfo_.dSize) !=
+        ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckStrideDim(opParamInfo.key.stride, "key", DIM_2, tilingInfo_.dSize) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckStrideDim(opParamInfo.key.stride, "key", DIM_3, 1U) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckStrideDim(opParamInfo.value.stride, "value", DIM_0, tilingInfo_.paBlockStrideVal) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckStrideDim(opParamInfo.value.stride, "value", DIM_1, tilingInfo_.kvBlockSizeVal * tilingInfo_.dSizeV) !=
+        ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckStrideDim(opParamInfo.value.stride, "value", DIM_2, tilingInfo_.dSizeV) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckStrideDim(opParamInfo.value.stride, "value", DIM_3, 1U) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -488,27 +535,41 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckQuantShape() const
 
     if (opParamInfo.kDescale.shape != nullptr) {
         const gert::Shape &kDescaleShape = opParamInfo.kDescale.shape->GetStorageShape();
-        const gert::Shape &keyShape = opParamInfo.key.shape->GetStorageShape();
-        if (kDescaleShape.GetDimNum() == DIM_NUM_1) {
-            if (keyShape.GetDimNum() != DIM_NUM_1) {
-                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(kOpName, "k_descale",
-                                                         std::to_string(kDescaleShape.GetDimNum()) + "D",
-                                                         "3D (when key is 4D) or 1D (when key is 1D combined KV)");
-                return ge::GRAPH_FAILED;
-            }
-        } else if (kDescaleShape.GetDimNum() == DIM_NUM_3) {
+        if (kDescaleShape.GetDimNum() == DIM_NUM_4) {
             if (kDescaleShape.GetDim(DIM_0) != static_cast<int64_t>(tilingInfo_.paBlockNumSum) ||
                 kDescaleShape.GetDim(DIM_1) != static_cast<int64_t>(tilingInfo_.n2Size) ||
-                kDescaleShape.GetDim(DIM_2) != static_cast<int64_t>(tilingInfo_.kvBlockSizeVal)) {
+                kDescaleShape.GetDim(DIM_2) != static_cast<int64_t>(tilingInfo_.kvBlockSizeVal) ||
+                kDescaleShape.GetDim(DIM_3) != 1) {
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(kOpName, "k_descale", Ops::Base::ToString(kDescaleShape),
                                                       "must be (" + std::to_string(tilingInfo_.paBlockNumSum) + ", " +
                                                           std::to_string(tilingInfo_.n2Size) + ", " +
-                                                          std::to_string(tilingInfo_.kvBlockSizeVal) + ")");
+                                                          std::to_string(tilingInfo_.kvBlockSizeVal) + ", 1)");
+                return ge::GRAPH_FAILED;
+            }
+            if (tilingInfo_.paBlockStrideVal % sizeof(float) != 0U) {
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    kOpName, "key stride[0]", std::to_string(tilingInfo_.paBlockStrideVal),
+                    "must be divisible by sizeof(float) to align k_descale block stride");
+                return ge::GRAPH_FAILED;
+            }
+            if (CheckStrideDim(opParamInfo.kDescale.stride, "k_descale", DIM_0,
+                               tilingInfo_.paBlockStrideVal / sizeof(float)) != ge::GRAPH_SUCCESS) {
+                return ge::GRAPH_FAILED;
+            }
+            if (CheckStrideDim(opParamInfo.kDescale.stride, "k_descale", DIM_1, tilingInfo_.kvBlockSizeVal) !=
+                ge::GRAPH_SUCCESS) {
+                return ge::GRAPH_FAILED;
+            }
+            if (CheckStrideDim(opParamInfo.kDescale.stride, "k_descale", DIM_2, 1U) != ge::GRAPH_SUCCESS) {
+                return ge::GRAPH_FAILED;
+            }
+            if (CheckStrideDim(opParamInfo.kDescale.stride, "k_descale", DIM_3, 1U) != ge::GRAPH_SUCCESS) {
                 return ge::GRAPH_FAILED;
             }
         } else {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                kOpName, "k_descale", std::to_string(kDescaleShape.GetDimNum()) + "D", "3D or 1D combined KV");
+                kOpName, "k_descale", std::to_string(kDescaleShape.GetDimNum()) + "D",
+                "4D [blockNum, kvHeadNum, blockSize, 1]");
             return ge::GRAPH_FAILED;
         }
     }

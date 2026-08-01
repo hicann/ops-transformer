@@ -113,17 +113,10 @@ struct MxScaleConstInfo {
     uint32_t valueScaleDSize = 0U;
 };
 
-// MX kernel 使用的特性开关。
-struct MxFeatureConstInfo {
-    bool isActualLenDimsNull = false;
-    bool isActualLenDimsKVNull = false;
-};
-
 struct MxConstInfo : MxBaseConstInfo,
                      MxPageAttentionConstInfo,
                      MxSparseConstInfo,
-                     MxScaleConstInfo,
-                     MxFeatureConstInfo {};
+                     MxScaleConstInfo {};
 } // namespace regbasemx
 
 #endif // QUANT_BLOCK_SPARSE_ATTN_COMMON_UTIL_REGBASE_MX_H_

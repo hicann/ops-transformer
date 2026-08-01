@@ -83,9 +83,8 @@ enum class S2TemplateType {
     uint32_t firstHalfS1RealSize; \
     int64_t tensorQOffset;      /* query的offset souter层确定 */ \
     int64_t attentionOutOffset; /* attentionOut的offset souter层确定 */ \
-    int64_t actualS1Size;       /* Q的seqUsedQlen */ \
-    int64_t actualS2Size;       /* KV的seqUsedKvlen */ \
-    uint64_t b1SSAttenMaskOffset; \
+    int64_t actualS1Size;       /* Q的实际长度，由cuSeqQlen相邻前缀差计算 */ \
+    int64_t actualS2Size;       /* KV的实际长度，由seqUsedKvlen读取 */ \
     uint64_t b1SSOffsetAlign16; \
     int64_t qRopeNBGOffset; /* QueryRope 的 offset */ \
     int64_t kRopeNBGOffset; /* G方向上,不同g的KeyRope的offset */
@@ -148,12 +147,10 @@ struct RunParamStr { // 分核与切块需要使用到参数
     int64_t multiCoreInnerIdx = 0; \
 \
     int64_t attentionOutOffset; \
-    int64_t actualS1Size;       /* 非TND=总s1Size, TND=当前batch的s1 */ \
-    int64_t actualS2Size;       /* 非TND=总s2Size, TND=当前batch的s2 */ \
+    int64_t actualS1Size;       /* 当前batch的s1 */ \
+    int64_t actualS2Size;       /* 当前batch的s2 */ \
     int64_t preTokensPerBatch;  /* vec2左上顶点pretoken */ \
     int64_t nextTokensPerBatch; /* vec2左上顶点nexttoken */ \
-    /* 训练=b1SSOffset; 推理非TND mask可大于s1*s2, TND mask已pad */ \
-    int64_t b1SSAttenMaskOffset; \
     int64_t b1SSOffsetAlign; /* TND s2对齐16后前面batch的s1*s2之和 */ \
     int64_t deScaleKvOffset; /* KV反量化scale在Gm偏移, shape[B,N2,1,Ceil(S2,128),1] */ \
     uint8_t taskIdMod2; \
@@ -181,7 +178,6 @@ struct RunInfo {
     uint32_t s2BaseSize; \
     int64_t bSize; \
     int64_t t1Size; \
-    int64_t t2Size; \
     int64_t dSize; \
     int64_t dSizeV; \
     int64_t dBasicBlock; \
@@ -189,21 +185,7 @@ struct RunInfo {
     int64_t n1Size; \
     int64_t gSize; /* g轴的大小 */ \
     int64_t n2Size; \
-    int64_t s1Size; /* s1总大小 */ \
-    int64_t s2Size; /* s2总大小 */ \
     /* 轴的乘积 */ \
-    int64_t s1D; \
-    int64_t gS1D; \
-    int64_t n2GS1D; \
-    int64_t s2D; \
-    int64_t n2S2D; \
-    int64_t s1Dv; \
-    int64_t gS1Dv; \
-    int64_t n2GS1Dv; \
-    int64_t s2Dv; \
-    int64_t n2S2Dv; \
-    int64_t s1S2; \
-    int64_t gS1; \
     int64_t gD; \
     int64_t n2D; \
     int64_t bN2D; \
@@ -258,12 +240,9 @@ struct RunInfo {
     uint32_t maxKb; \
     /* 推理新增 */ \
     bool isRowInvalid;       /* 是否使能行无效 */ \
-    bool isSeqUsedQlenNull;  /* 判断是否有 seqUsedQlen */ \
-    bool isSeqUsedKvlenNull; /* 判断是否有 seqUsedKvlen */ \
     bool isGqa; \
-    bool isPfaGS1Merge; /* 判断是否为PFA GS1合轴 */ \
 \
-    uint32_t seqUsedQlenSize;  /* seqUsedQlen 的长度 */ \
+    uint32_t seqUsedQlenSize;  /* 去掉前导0后的cuSeqQlen长度 */ \
     uint32_t seqUsedKvlenSize; /* seqUsedKvlen 的长度 */ \
     uint32_t isKvContinuous;   /* 是否为tensorlist */ \
     /* service mm1 mm2 pageAttention */ \
@@ -291,17 +270,13 @@ struct RunInfo {
     /* base params */ \
     uint32_t bSize; \
     int64_t t1Size; \
-    int64_t t2Size; \
     uint32_t n2Size; \
     uint32_t gSize; \
-    uint32_t s1Size; \
-    uint32_t s2Size; \
     uint32_t dSize : 16; \
     uint32_t dSizeV : 16; \
     /* special params */ \
     int64_t preTokens; \
     int64_t nextTokens; \
-    uint32_t attenMaskS1Size; \
     uint32_t attenMaskS2Size; \
     /* core params */ \
     uint32_t s1OuterSize; \
@@ -330,11 +305,8 @@ struct CVSharedParams<false> {
     CV_SHARED_PARAMS;
     uint32_t fromFused : 1;
     uint32_t isGqa : 1;
-    uint32_t isPfaGS1Merge : 1;
     uint32_t isKvContinuous : 1;
     uint32_t isRowInvalid : 1;
-    uint32_t isSeqUsedQlenNull : 1;
-    uint32_t isSeqUsedKvlenNull : 1;
     uint32_t needInit : 1;
     uint32_t isPostQuantPerChnl : 1;
     uint32_t isPostQuantBF16 : 1;
@@ -350,11 +322,8 @@ struct CVSharedParams<true> {
     CV_SHARED_PARAMS;
     uint32_t fromFused : 1;
     uint32_t isGqa : 1;
-    uint32_t isPfaGS1Merge : 1;
     uint32_t isKvContinuous : 1;
     uint32_t isRowInvalid : 1;
-    uint32_t isSeqUsedQlenNull : 1;
-    uint32_t isSeqUsedKvlenNull : 1;
     uint32_t needInit : 1;
     uint32_t isPostQuantPerChnl : 1;
     uint32_t isPostQuantBF16 : 1;

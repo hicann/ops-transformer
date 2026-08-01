@@ -173,7 +173,6 @@ def cpu_quant_block_sparse_attn(
     metadata=None,
     max_seqlen_q=0,
     max_seqlen_kv=0,
-    pa_block_stride=0,
     layout_kv="PA_BNSD",
     layout_q="BSND",
     layout_sparse_indices="B_N_Qb_Kb",

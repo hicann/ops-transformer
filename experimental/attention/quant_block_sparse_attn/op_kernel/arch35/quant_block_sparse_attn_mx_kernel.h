@@ -62,8 +62,8 @@ public:
 
     __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
                                 __gm__ uint8_t *sparseIndices, __gm__ uint8_t *sparseSeqLen, __gm__ uint8_t *attenMask,
-                                __gm__ uint8_t *metadata, __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensKv,
-                                __gm__ uint8_t *seqUsedQ, __gm__ uint8_t *seqUsedKv, __gm__ uint8_t *blockTable,
+                                __gm__ uint8_t *metadata, __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *,
+                                __gm__ uint8_t *, __gm__ uint8_t *seqUsedKv, __gm__ uint8_t *blockTable,
                                 __gm__ uint8_t *qScale, __gm__ uint8_t *kScale, __gm__ uint8_t *vScale,
                                 __gm__ uint8_t *pScale, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *attentionOut,
                                 __gm__ uint8_t *, const QuantBlockSparseAttnMxTilingData *__restrict tiling,
@@ -79,12 +79,10 @@ public:
         sparseSeqLenGm.SetGlobalBuffer((__gm__ int32_t *)sparseSeqLen);
         metadataGm.SetGlobalBuffer((__gm__ int32_t *)metadata);
         cuSeqlensQGm.SetGlobalBuffer((__gm__ int32_t *)cuSeqlensQ);
-        cuSeqlensKvGm.SetGlobalBuffer((__gm__ int32_t *)cuSeqlensKv);
-        seqUsedQGm.SetGlobalBuffer((__gm__ int32_t *)seqUsedQ);
         seqUsedKvGm.SetGlobalBuffer((__gm__ int32_t *)seqUsedKv);
         // 预取序列长度元数据，重叠 InitBuffers 期间的 HBM 延迟。
         dc_preload(reinterpret_cast<__gm__ uint64_t *>(cuSeqlensQ), 0);
-        dc_preload(reinterpret_cast<__gm__ uint64_t *>(cuSeqlensKv), 0);
+        dc_preload(reinterpret_cast<__gm__ uint64_t *>(seqUsedKv), 0);
         InitConstInfo();
         InitMMResBuf();
         cubeBlock.Init(pipe, &l1BufferManager, queryPtr, keyPtr, valuePtr, blockTable, qScale, kScale, vScale);
@@ -130,8 +128,6 @@ private:
         constInfo.dSize = baseParams.dSize;
         constInfo.dSizeV = baseParams.dSizeV;
         constInfo.scaleValue = baseParams.scaleValue;
-        constInfo.isActualLenDimsNull = baseParams.isActualSeqLengthsNull != 0U;
-        constInfo.isActualLenDimsKVNull = baseParams.isActualSeqLengthsKVNull != 0U;
         constInfo.coreNum = baseParams.coreNum;
         constInfo.n2GD = constInfo.realN2Size * constInfo.dSize;
         constInfo.attentionOutStride = (constInfo.realN2Size - 1U) * constInfo.dSizeV * sizeof(bfloat16_t);
@@ -189,18 +185,12 @@ private:
 
     __aicore__ inline uint32_t GetActualQSeqLen(uint32_t bIdx)
     {
-        if (!constInfo.isActualLenDimsNull) {
-            return static_cast<uint32_t>(seqUsedQGm.GetValue(bIdx));
-        }
         return static_cast<uint32_t>(cuSeqlensQGm.GetValue(bIdx + 1U) - cuSeqlensQGm.GetValue(bIdx));
     }
 
     __aicore__ inline uint32_t GetActualKvSeqLen(uint32_t bIdx)
     {
-        if (!constInfo.isActualLenDimsKVNull) {
-            return static_cast<uint32_t>(seqUsedKvGm.GetValue(bIdx));
-        }
-        return static_cast<uint32_t>(cuSeqlensKvGm.GetValue(bIdx + 1U) - cuSeqlensKvGm.GetValue(bIdx));
+        return static_cast<uint32_t>(seqUsedKvGm.GetValue(bIdx));
     }
 
     __aicore__ inline uint32_t GetQTokenBase(uint32_t bIdx)
@@ -448,8 +438,6 @@ private:
     GlobalTensor<int32_t> sparseSeqLenGm;
     GlobalTensor<int32_t> metadataGm;
     GlobalTensor<int32_t> cuSeqlensQGm;
-    GlobalTensor<int32_t> cuSeqlensKvGm;
-    GlobalTensor<int32_t> seqUsedQGm;
     GlobalTensor<int32_t> seqUsedKvGm;
     BufferManager<BufferType::UB> ubBufferManager;
     BufferManager<BufferType::L1> l1BufferManager;

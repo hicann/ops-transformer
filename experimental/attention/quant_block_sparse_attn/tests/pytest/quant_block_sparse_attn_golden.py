@@ -25,8 +25,8 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
-DATA_RANGE_LEFT = -448.0
-DATA_RANGE_RIGHT = 448.0
+DATA_RANGE_LEFT = -1000
+DATA_RANGE_RIGHT = 1000
 FP8_E4M3_MAX = 448.0
 SCALE_EPSILON = 1e-8
 EMPTY_LSE = -3.4028234663852886e38
@@ -834,7 +834,6 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
         case["layout_kv"],
     )
     combined_kv_cache.assert_combined_kv_views(kv_cache_storage, kv_cache_meta)
-    case["pa_block_stride"] = kv_cache_meta["pa_block_stride"]
     atten_mask = torch.tril(torch.ones((2048, 2048), dtype=torch.uint8)).T.contiguous()
     sparse_indices, sparse_seq_len = _make_sparse_indices(
         case, q_lengths, kv_lengths, rng
@@ -872,11 +871,6 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
         kv_lengths,
     )
 
-    max_seqlen_q = max(q_lengths)
-    max_seqlen_kv = max(kv_lengths)
-    case["max_seqlen_q"] = max_seqlen_q
-    case["max_seqlen_kv"] = max_seqlen_kv
-
     golden = {
         "attention_out": attention_out,
         "softmax_lse": softmax_lse,
@@ -889,11 +883,8 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
             "num_heads_kv": n2,
             "head_dim": head_dim,
             "batch_size": batch,
-            "max_seqlen_q": max_seqlen_q,
-            "max_seqlen_kv": max_seqlen_kv,
             "layout_q": case["layout_q"],
             "layout_kv": case["layout_kv"],
-            "pa_block_stride": kv_cache_meta["pa_block_stride"],
         },
         "input": {
             "query": query,
@@ -911,12 +902,9 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
             "block_table": block_table,
             "atten_mask": atten_mask,
             "metadata": None,
-            "max_seqlen_q": max_seqlen_q,
-            "max_seqlen_kv": max_seqlen_kv,
             "softmax_scale": case["softmax_scale"],
             "sparse_q_block_size": sparse_q_block_size,
             "sparse_kv_block_size": sparse_kv_block_size,
-            "pa_block_stride": kv_cache_meta["pa_block_stride"],
             "layout_kv": case["layout_kv"],
             "layout_q": case["layout_q"],
             "layout_sparse_indices": case["layout_sparse_indices"],
