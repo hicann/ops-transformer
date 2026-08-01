@@ -298,8 +298,6 @@ attention:
       - attention/prompt_flash_attention/tests
       - attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_context.h
       - attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_register.cpp
-      - attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_v2.h       # A5 FIA tiling 重构后不再依赖PFA算子，目前PFA tiling_v2目前已无法走入，无需看护
-      - attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_v2.cpp
       - attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_arch38.h   # arch38 tiling 目前UT框架不支持（会被高级api拦截走不进去tiling，后续打通后开放）
       - attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_arch38.cpp
     test:

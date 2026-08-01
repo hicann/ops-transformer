@@ -20,7 +20,7 @@ endif()
 
 set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
 if("${CONDITION_UNIT}" STREQUAL "ascend950")
-    set(quant_flash_attn_depends attention/incre_flash_attention attention/prompt_flash_attention attention/fused_infer_attention_score attention/common CACHE INTERNAL "Dependencies for quant_flash_attn")
+    set(quant_flash_attn_depends attention/fused_infer_attention_score attention/common CACHE INTERNAL "Dependencies for quant_flash_attn")
     add_ops_compile_options(
         OP_NAME QuantFlashAttn
         COMPUTE_UNIT Ascend950PR_9599

@@ -24,7 +24,7 @@
 #include "../split_core_v2.h"
 #include "../../../fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_utils.h"
 #include "../../../fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_constants.h"
-#include "../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_template_tiling_key_enum.h"
+#include "../../../fused_infer_attention_score/op_kernel/arch35/fia_arch35_template_tiling_key_enum.h"
 
 using namespace ge;
 using namespace AscendC;

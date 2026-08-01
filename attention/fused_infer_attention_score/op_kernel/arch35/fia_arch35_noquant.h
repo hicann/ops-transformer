@@ -10,14 +10,14 @@
 
 /*!
  * \file fia_arch35_noquant.h
- * \brief arch35 FIA 非量化路由(quantMode == 31: NoQuantMode)
+ * \brief arch35 FIA 非量化路由
  */
 
 #ifndef FIA_ARCH35_NOQUANT_H_
 #define FIA_ARCH35_NOQUANT_H_
 
 #include "fia_arch35_common.h"
-#include "../../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_template_tiling_key_enum.h"
+#include "fia_arch35_template_tiling_key_enum.h"
 #include "../../../../common/op_kernel/arch35/flash_attention_noquant_kernel_infer.h"
 #include "../../../../common/op_kernel/arch35/flash_attention_kernel_noquant_mla.h"
 #include "../../../../common/op_kernel/arch35/fia_template_dispatcher.h"

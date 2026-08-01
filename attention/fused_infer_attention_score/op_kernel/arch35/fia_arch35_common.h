@@ -10,7 +10,7 @@
 
 /*!
  * \file fia_arch35_common.h
- * \brief arch35 FIA 公共前置:共享头、共享宏、emptyTensor 支持
+ * \brief arch35 FIA 公共前置
  */
 
 #ifndef FIA_ARCH35_COMMON_H_

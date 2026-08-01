@@ -10,14 +10,14 @@
 
 /*!
  * \file fia_arch35_fullquant.h
- * \brief arch35 FIA 全量化路由(quantMode >= 15 且 != 31: 17-21/30)
+ * \brief arch35 FIA 全量化路由
  */
 
 #ifndef FIA_ARCH35_FULLQUANT_H_
 #define FIA_ARCH35_FULLQUANT_H_
 
 #include "fia_arch35_common.h"
-#include "../../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_template_tiling_key_enum.h"
+#include "fia_arch35_template_tiling_key_enum.h"
 #include "../../../../common/op_kernel/arch35/flash_attention_score_kernel_infer_mla_fullquant.h"
 #include "../../../../common/op_kernel/arch35/flash_attention_score_kernel_infer_gqa_fullquant.h"
 #include "../../../../common/op_kernel/arch35/flash_attention_score_kernel_infer_mx_fullquant.h"

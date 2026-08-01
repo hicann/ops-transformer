@@ -656,13 +656,6 @@ void FusedInferAttentionScoreTilingImpl::ComputeSplitNBSeq(const FiaTilingInfo &
         gS1StartIdx[curCore + 1] = tmpCoreSposEnd;
     }
 
-    PromptAttentionSeqParams *seqParams = &pfaTilingData_.promptAttentionSeqParams;
-    seqParams->set_CoreHeadNumTail(coreNidStart.data());
-    seqParams->set_actualS1(coreNidEnd.data());
-    seqParams->set_actualCoreNums(coreSidStart.data());
-    seqParams->set_singleCoreHeadNumSize(coreSidEnd.data());
-    seqParams->set_coreSeqPosStart(coreSposStart.data());
-    seqParams->set_coreSeqPosEnd(coreSposEnd.data());
     faRunTilingAdapter_.multiCoreParamsRegbase.set_bnStartIdx(bnStartIdx.data());
     faRunTilingAdapter_.multiCoreParamsRegbase.set_sparseStartIdx(gS1StartIdx.data());
 }
@@ -790,7 +783,6 @@ void FusedInferAttentionScoreTilingImpl::SplitNBSeq(const FiaTilingInfo &fiaInfo
         totalBlockNumsOneHead += GetCalcBlockNumsOneHead(fiaInfo, actualSeqLengthsQ_[bIdx], actualSeqLengthsKV_[bIdx],
                                                          sOuterSize, sInnerSize);
     }
-    pfaTilingData_.promptAttentionSingleCoreParams.set_multiSmaxsInnerLoopTimes(multiSmaxsInnerLoopTimes);
 
     double coreWeightTarget = (double(totalBlockNumsOneHead * nLoopTimes_) / double(curCoreNum));
 
@@ -807,7 +799,6 @@ void FusedInferAttentionScoreTilingImpl::SplitNBSeq(const FiaTilingInfo &fiaInfo
     ComputeSplitNBSeq(fiaInfo, tilingElementArrayLen, sOuterSize, sInnerSize, coreWeightTarget, curIndx);
 
     uint32_t actualCoreNums = (curIndx + 1) * CV_RATIO;
-    pfaTilingData_.promptAttentionSingleCoreParams.set_actualCoreNums(actualCoreNums);
     int64_t sinnerBlocknum = (fiaInfo.s2Size + sInnerSize - 1) / sInnerSize;
     int64_t totalSize = (sinnerBlocknum == 0) ? 0 : (totalBlockNumsOneHead / sinnerBlocknum) * nLoopTimes_;
     int64_t aicUsedCoreNum = curIndx + 1;
@@ -1633,85 +1624,9 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::GetWorkspace(gert::TilingCon
     return ge::GRAPH_SUCCESS;
 }
 
-bool FusedInferAttentionScoreTilingImpl::EnableMTE2BmmPipe(const FiaTilingInfo &fiaInfo,
-                                                           matmul_tiling::MatmulApiTiling &bmm,
-                                                           TCubeTiling &bmmTilingData)
-{
-    if (fiaInfo.s1Size > NUM_16) {
-        return true;
-    }
-    uint32_t baseK = 32U;
-    uint32_t headSize = fiaInfo.qkHeadDim;
-    if (fiaInfo.mlaMode == MlaMode::ROPE_SPLIT_D512) {
-        headSize = fiaInfo.qkHeadDim + fiaInfo.ropeHeadDim;
-    }
-    if (headSize % baseK != 0) {
-        return true;
-    }
-
-    uint32_t baseM = std::min(uint32_t(128), sOuterFactor_);
-    uint32_t baseN = std::min(uint32_t(512), sInnerFactor_);
-    if (fiaInfo.kvStorageMode == KvStorageMode::PAGE_ATTENTION) {
-        baseN = 128; // 128
-    }
-    bool res = (bmm.SetFixSplit(baseM, baseN, baseK) == ge::GRAPH_SUCCESS);
-    OP_CHECK_IF(!res, OP_LOGE(fiaInfo.opName, "set fix split fail"), return ge::GRAPH_FAILED);
-    // check
-    res = bmm.GetTiling(bmmTilingData) != -1;
-    return res;
-}
-
 ge::graphStatus FusedInferAttentionScoreTilingImpl::SetDequantMMTilingData(const gert::TilingContext *context,
                                                                            const FiaTilingInfo &fiaInfo)
 {
-    auto platformInfoPtr = context->GetPlatformInfo();
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
-    matmul_tiling::MatmulApiTiling bmm1(ascendcPlatform);
-    matmul_tiling::MatmulApiTiling bmm2(ascendcPlatform);
-
-    matmul_tiling::DataType qType;
-    matmul_tiling::DataType kvType;
-
-    uint32_t baseN = 512; // antiquant to split K;
-    uint32_t singleM;
-    if (isPFAFlag_) {
-        singleM = sOuterFactor_;
-    } else {
-        singleM = fiaInfo.gSize;
-    }
-    bmm1.SetShape(singleM, sInnerFactor_, fiaInfo.qkHeadDim);
-    bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, kvType, false);
-    bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, kvType, true);
-    bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, qType, false);
-    bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, qType, true);
-    bmm1.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND_ALIGN, matmul_tiling::DataType::DT_FLOAT);
-    bmm1.SetOrgShape(singleM, sInnerFactor_, fiaInfo.qkHeadDim, headDimAlign_);
-    bmm1.SetBias(false);
-
-    uint32_t bmm1BaseN = std::min(AlignUp(sInnerFactor_, NUM_16), baseN);
-    // 向下对齐保证M*N不超过L0C，且由于bmm1BaseN有最大限制，L0C_SIZE / sizeof(float) / bmm1BaseN不会小于16
-    uint32_t bmm1MaxBaseM =
-        AlignUp(static_cast<uint32_t>(platformInfo_.l0cSize / sizeof(float) / bmm1BaseN) - NUM_16, NUM_16);
-
-    OP_CHECK_IF((bmm1.SetFixSplit(std::min(AlignUp(singleM, NUM_16), bmm1MaxBaseM), AlignUp(bmm1BaseN, NUM_16)) == -1),
-                OP_LOGE(fiaInfo.opName, "Bmm1 SetFixSplit fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF((bmm1.SetTraverse(matmul_tiling::MatrixTraverse::FIRSTN) == -1),
-                OP_LOGE(fiaInfo.opName, "Bmm1 SetTraverse fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF((bmm1.GetTiling(ifaTilingData_.bmm1TilingData) == -1), OP_LOGE(fiaInfo.opName, "Bmm1 get tiling fail."),
-                return ge::GRAPH_FAILED);
-
-    bmm2.SetShape(singleM, fiaInfo.qkHeadDim, sInnerFactor_);
-    bmm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, qType, false);
-    bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, qType, false);
-    bmm2.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND_ALIGN, matmul_tiling::DataType::DT_FLOAT);
-    bmm2.SetOrgShape(singleM, headDimAlign_, sInnerSizeAlign_, sInnerFactor_);
-    // 存在输入query是BNSD格式，但使能PA，需要按BSH SetOrgShape
-    bmm2.SetBias(false);
-    OP_CHECK_IF((bmm2.SetFixSplit(std::min(AlignUp(singleM, NUM_16), NUM_128)) == -1),
-                OP_LOGE(fiaInfo.opName, "Bmm2 SetFixSplit fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF((bmm2.GetTiling(ifaTilingData_.bmm2TilingData) == -1), OP_LOGE(fiaInfo.opName, "Bmm2 get tiling fail."),
-                return ge::GRAPH_FAILED);
-
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1745,7 +1660,6 @@ static void SetSparseCompressMode(const FiaTilingInfo &fiaInfo, InputParamsRegba
 ge::graphStatus FusedInferAttentionScoreTilingImpl::ComputeTilingData(const FiaTilingInfo &fiaInfo)
 {
     auto &inputParams = faRunTilingAdapter_.inputParamsRegbase;
-    auto &baseParams = pfaTilingData_.promptAttentionBaseParams;
 
     if (SetMaskTilingData(fiaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -1765,15 +1679,11 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::ComputeTilingData(const FiaT
 ge::graphStatus FusedInferAttentionScoreTilingImpl::SetMaskTilingData(const FiaTilingInfo &fiaInfo)
 {
     auto &inputParams = faRunTilingAdapter_.inputParamsRegbase;
-    auto &baseParams = pfaTilingData_.promptAttentionBaseParams;
-    auto &singleCoreParams = pfaTilingData_.promptAttentionSingleCoreParams;
 
     if (!fiaInfo.attenMaskFlag) {
         inputParams.set_attenMaskS1Size(0);
         inputParams.set_attenMaskS2Size(0);
         inputParams.set_attenMaskShapeType(0);
-        baseParams.set_maskQsSize(0);
-        baseParams.set_maskKVsSize(0);
         return ge::GRAPH_SUCCESS;
     }
 
@@ -1788,11 +1698,8 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::SetMaskTilingData(const FiaT
     uint64_t maskS1Size = shape.GetDim(maskDimNum - 2);
     uint64_t maskS2Size = shape.GetDim(maskDimNum - 1);
     inputParams.set_attenMaskShapeType(maskBatch > 1 ? 1 : 2);
-    singleCoreParams.set_attenMaskBatch(maskBatch);
     inputParams.set_attenMaskS1Size(maskS1Size);
     inputParams.set_attenMaskS2Size(maskS2Size);
-    baseParams.set_maskQsSize(maskS1Size);
-    baseParams.set_maskKVsSize(maskS2Size);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1839,10 +1746,8 @@ void FusedInferAttentionScoreTilingImpl::SetLayoutType(const FiaTilingInfo &fiaI
         {FiaLayout::BSH, 1}, {FiaLayout::TND, 4}, {FiaLayout::BSND, 1}, {FiaLayout::BNSD, 3}, {FiaLayout::NTD, 5},
     };
     auto &inputParams = faRunTilingAdapter_.inputParamsRegbase;
-    auto &baseParams = pfaTilingData_.promptAttentionBaseParams;
     uint8_t layoutType = GetMapValueOrDefault(layoutTypeMap, fiaInfo.qLayout);
     inputParams.set_layoutType(layoutType);
-    baseParams.set_layoutType(layoutType);
 }
 
 void FusedInferAttentionScoreTilingImpl::SetPaLayoutTilingData(const FiaTilingInfo &fiaInfo)
@@ -1852,25 +1757,20 @@ void FusedInferAttentionScoreTilingImpl::SetPaLayoutTilingData(const FiaTilingIn
     }
 
     auto &inputParams = faRunTilingAdapter_.inputParamsRegbase;
-    auto &baseParams = pfaTilingData_.promptAttentionBaseParams;
 
     if (fiaInfo.antiQuantFlag) {
         uint32_t dimNum = fiaInfo.opParamInfo.key.shape->GetStorageShape().GetDimNum();
         uint8_t paType = (dimNum == 3) ? 0 : (dimNum == 4) ? 1 : (dimNum == 5) ? 2 : 0;
         inputParams.set_paLayoutType(paType);
-        baseParams.set_PAlayoutType(paType);
         return;
     }
 
     if (fiaInfo.kvLayout == FiaLayout::BnBsH) {
         inputParams.set_paLayoutType(1);
-        baseParams.set_PAlayoutType(1);
     } else if (fiaInfo.kvLayout == FiaLayout::BnNBsD) {
         inputParams.set_paLayoutType(0);
-        baseParams.set_PAlayoutType(0);
     } else if (fiaInfo.kvLayout == FiaLayout::NZ) {
         inputParams.set_paLayoutType(2);
-        baseParams.set_PAlayoutType(2);
     }
 }
 
@@ -1881,10 +1781,8 @@ void FusedInferAttentionScoreTilingImpl::SetTransposeLayout(const FiaTilingInfo 
         {"BSND_NBSD", 5}, {"BSH_NBSD", 6},  {"NTD_TND", 7},  {"TND_NTD", 8},
     };
     auto &inputParams = faRunTilingAdapter_.inputParamsRegbase;
-    auto &baseParams = pfaTilingData_.promptAttentionBaseParams;
     uint32_t transposeType = GetMapValueOrDefault(transposeLayoutMap, std::string(fiaInfo.opParamInfo.layOut));
     inputParams.set_transposeLayout(transposeType);
-    baseParams.set_transposeLayout(transposeType);
 }
 
 void FusedInferAttentionScoreTilingImpl::SetAntiQuantInfo(const FiaTilingInfo &fiaInfo)

@@ -18,15 +18,7 @@
 
 #include "ascendc/host_api/tiling/template_argument.h"
 
-#if __has_include("../../incre_flash_attention/op_kernel/arch35/incre_flash_attention_tiling_regbase.h")
-#include "../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_template_tiling_key_enum.h"
-#include "../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_tiling_regbase.h"
-#include "../../incre_flash_attention/op_kernel/arch35/incre_flash_attention_tiling_regbase.h"
-#else
-#include "../prompt_flash_attention/arch35/prompt_flash_attention_template_tiling_key_enum.h"
-#include "../prompt_flash_attention/arch35/prompt_flash_attention_tiling_regbase.h"
-#include "../incre_flash_attention/arch35/incre_flash_attention_tiling_regbase.h"
-#endif
+#include "arch35/fia_arch35_template_tiling_key_enum.h"
 
 #ifndef ORIG_DTYPE_QUERY
 #define ORIG_DTYPE_QUERY (DT_BF16)

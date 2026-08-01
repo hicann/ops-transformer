@@ -21,7 +21,6 @@
 #include "tiling/tiling_api.h"  //这个头文件顺序必须在手写的tiling data前
 #include "../../../common/op_kernel/arch35/flash_attention_score_tiling_regbase.h"
 #include "../../op_kernel/fused_infer_attention_score_template_tiling_key.h"
-#include "../../../prompt_flash_attention/op_kernel/arch35/prompt_flash_attention_tiling_regbase.h"
 
 namespace optiling {
 
@@ -95,8 +94,6 @@ protected:
     ge::graphStatus SetWorkspaceAntiQuant(const FiaTilingInfo &fiaInfo, int64_t &workspaceSize_);
     ge::graphStatus SetWorkspacePTQuant(const FiaTilingInfo &fiaInfo, int64_t &curWorkspaceSize);
 
-    bool EnableMTE2BmmPipe(const FiaTilingInfo &fiaInfo, matmul_tiling::MatmulApiTiling &bmm,
-                           TCubeTiling &bmmTilingData);
     ge::graphStatus SetFATilingData(const FiaTilingInfo &fiaInfo);
     void SetFATilingDataInputParams(const FiaTilingInfo &fiaInfo);
     void SetFATilingDataInitOutput(const FiaTilingInfo &fiaInfo);
@@ -155,8 +152,6 @@ protected:
     void PrintAllTilingData(const FiaTilingInfo &fiaInfo);
     void PrintInputParams(const FiaTilingInfo &fiaInfo);
 
-    PromptFlashAttentionTilingDataV2 pfaTilingData_;
-    IncreFlashAttentionTilingDataRegbase ifaTilingData_;
     FlashAttentionScoreSimplifiedTilingData faRunTilingAdapter_;
     FiaTilingKeyInfo tilingKeyInfo_;
     FiaPlatFormInfo platformInfo_;
