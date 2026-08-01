@@ -364,7 +364,6 @@ def process_long_s2_reduce_sum(
         ws_chunk_sum = ws_chunk_sum + pl.getval(lse_vec_tile, 0)
     write_scalar_vf(lse_vec_tile, ws_chunk_sum)
 
-
 # ================================================================
 #  Inner kernel — receives typed tensor views + workspace
 # ================================================================
@@ -449,6 +448,7 @@ def dense_lightning_indexer_softmax_lse_v2_inner(
     b_s1_per_tail_core = pl.getval(metadata, 3)
     total_cores = fore_core_num + tail_core_num
     work_count = 0
+    message = pl.struct("Message", max_v0=0.0, sum_v0=0.0, max_v1=0.0, sum_v1=0.0)
 
     if core_id < fore_core_num:
         work_count = b_s1_per_core
@@ -641,6 +641,31 @@ def dense_lightning_indexer_softmax_lse_v2_inner(
                             pipe=pl.PipeType.FIX, event_id=QK_READY_IDS[task_id % 2]
                         )
                         task_id = task_id + 1
+
+                # C侧汇聚V0/V1的max值
+                pl.system.wait_cross_core(pipe=pl.PipeType.S, event_id=4, sync_mode=pl.CrossCoreSyncMode.INTRA_BLOCK)
+                pl.ssbuf_load(message, 0)
+                max0 = message.max_v0
+                pl.ssbuf_load(message, 32)
+                max1 = message.max_v1
+                message.max_v0 = max0
+                message.max_v1 = max1
+                tmp_max = pl.max(max0, max1)
+                message.max_v1 = tmp_max
+                pl.ssbuf_store(message, 64)
+                pl.system.set_cross_core(pipe=pl.PipeType.S, event_id=5, sync_mode=pl.CrossCoreSyncMode.INTRA_BLOCK)
+
+                # C侧汇聚V0/V1的sum值
+                pl.system.wait_cross_core(pipe=pl.PipeType.S, event_id=6, sync_mode=pl.CrossCoreSyncMode.INTRA_BLOCK)
+                pl.ssbuf_load(message, 0)
+                sum0 = message.sum_v0
+                pl.ssbuf_load(message, 32)
+                sum1 = message.sum_v1
+                tmp_sum = sum0 + sum1
+                message.sum_v1 = tmp_sum
+                pl.ssbuf_store(message, 64)
+                pl.system.set_cross_core(pipe=pl.PipeType.S, event_id=7, sync_mode=pl.CrossCoreSyncMode.INTRA_BLOCK)
+   
         pl.system.wait_cross_core(pipe=pl.PipeType.FIX, event_id=QK_FREE_IDS[0])
         pl.system.wait_cross_core(pipe=pl.PipeType.FIX, event_id=QK_FREE_IDS[1])
     with pl.section_vector():
@@ -766,24 +791,17 @@ def dense_lightning_indexer_softmax_lse_v2_inner(
                         task_id,
                     )
 
-                pl.set_validshape(max_tile, [1, 1])
-                pl.store(workspace_max, max_tile, [0, core_id * 2 + sub_id])
-                pl.system.set_cross_core(
-                    pipe=pl.PipeType.MTE3,
-                    event_id=4,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_SUBBLOCK,
-                )
-                pl.system.wait_cross_core(
-                    pipe=pl.PipeType.MTE2,
-                    event_id=4,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_SUBBLOCK,
-                )
-                tmp_s2_max = pl.getval(max_tile, 0)
-                pl.set_validshape(max_tile, [1, 2])
-                pl.load(max_tile, workspace_max, [0, core_id * 2])
-                v0_tmp_max = pl.getval(max_tile, 0)
-                v1_tmp_max = pl.getval(max_tile, 1)
-                tmp_s2_max = pl.max(v0_tmp_max, v1_tmp_max)
+                if sub_id == 0:
+                    message.max_v0 = pl.getval(max_tile, 0)
+                    pl.ssbuf_store(message, 0)
+                else:
+                    message.max_v1 = pl.getval(max_tile, 0)
+                    pl.ssbuf_store(message, 32)
+
+                pl.system.set_cross_core(pipe=pl.PipeType.S, event_id=4, sync_mode=pl.CrossCoreSyncMode.INTRA_BLOCK)
+                pl.system.wait_cross_core(pipe=pl.PipeType.S, event_id=5, sync_mode=pl.CrossCoreSyncMode.INTRA_BLOCK)
+                pl.ssbuf_load(message, 64)
+                tmp_s2_max = message.max_v1
 
                 if is_long_s2 == 0:
                     process_reduce_sum_vf(
@@ -805,23 +823,17 @@ def dense_lightning_indexer_softmax_lse_v2_inner(
                         prev_s2_vec_tail_size,
                     )
 
-                pl.set_validshape(lse_vec_tile, [1, 1])
-                pl.store(workspace_sum, lse_vec_tile, [0, core_id * 2 + sub_id])
-                pl.system.set_cross_core(
-                    pipe=pl.PipeType.MTE3,
-                    event_id=5,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_SUBBLOCK,
-                )
-                pl.system.wait_cross_core(
-                    pipe=pl.PipeType.MTE2,
-                    event_id=5,
-                    sync_mode=pl.CrossCoreSyncMode.INTER_SUBBLOCK,
-                )
-                pl.set_validshape(lse_vec_tile, [1, 2])
-                pl.load(lse_vec_tile, workspace_sum, [0, core_id * 2])
-                v0_tmp_sum = pl.getval(lse_vec_tile, 0)
-                v1_tmp_sum = pl.getval(lse_vec_tile, 1)
-                reduce_res = v0_tmp_sum + v1_tmp_sum
+                if sub_id == 0:
+                    message.sum_v0 = pl.getval(lse_vec_tile, 0)
+                    pl.ssbuf_store(message, 0)
+                else:
+                    message.sum_v1 = pl.getval(lse_vec_tile, 0)
+                    pl.ssbuf_store(message, 32)
+                pl.system.set_cross_core(pipe=pl.PipeType.S, event_id=6, sync_mode=pl.CrossCoreSyncMode.INTRA_BLOCK)
+                pl.system.wait_cross_core(pipe=pl.PipeType.S, event_id=7, sync_mode=pl.CrossCoreSyncMode.INTRA_BLOCK)
+                pl.ssbuf_load(message, 64)
+                reduce_res = message.sum_v1
+
                 process_lse_vf(lse_vec_tile, reduce_res, tmp_s2_max)
                 pl.set_validshape(lse_vec_tile, [1, 1])
                 pl.store(lse_out, lse_vec_tile, [prev_q_offset, 0])
