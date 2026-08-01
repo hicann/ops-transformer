@@ -119,10 +119,11 @@ static constexpr AscendC::MicroAPI::CastTrait CAST_32_TO_83 = {
     AscendC::RoundMode::CAST_RINT};
 #define BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS \
     template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_, \
-              bool IsTensorList_, uint32_t TileM, uint32_t TileN, bool TopkWeightsPrefetch, bool IsInterleaved_>
+              bool IsTensorList_, uint32_t TileM, uint32_t TileN, bool TopkWeightsPrefetch, bool IsInterleaved_, \
+              bool IsWaveFlagGrained_>
 #define BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS \
     DataTypeOut_, DataTypeIn_, DataTypeX2Scale_, DataTypeX1Scale_, IsTensorList_, TileM, TileN, TopkWeightsPrefetch, \
-        IsInterleaved_
+        IsInterleaved_, IsWaveFlagGrained_
 
 // 前向声明：激活分块上下文结构体（仅含标量与 UB 指针，可跨函数传递）
 // 完整定义见 BlockEpilogueSwigluMxQuant 类定义之后
@@ -131,7 +132,7 @@ struct ActivationContext;
 
 template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_,
           bool IsTensorList_, uint32_t TileM = 256, uint32_t TileN = 256, bool TopkWeightsPrefetch = false,
-          bool IsInterleaved_ = false>
+          bool IsInterleaved_ = false, bool IsWaveFlagGrained_ = false>
 class BlockEpilogueSwigluMxQuant {
 public:
     __aicore__ inline BlockEpilogueSwigluMxQuant() {}
@@ -176,7 +177,7 @@ public:
     __aicore__ inline auto GetSecondL0c2UbTensor();
     __aicore__ inline void operator()(const BlockShape &blockShape, const BlockCoord &blockCoord,
                                       uint16_t pingpongIdx = 0);
-    __aicore__ inline void UpdateGlobalAddr(const BlockCoord &baseOffset);
+    __aicore__ inline void UpdateGlobalAddr(const BlockCoord &baseOffset, uint32_t flagElementOffset = 0);
     __aicore__ inline void UpdateNextProblem(const ProblemShape &problemShape);
 
     // 权重预加载相关：由 AivGmm1PostGeneric 提前 DataCopy，VFDoSwigluAndQuantForMX 直接消费
@@ -362,15 +363,16 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
 }
 
 BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(
-    const BlockCoord &baseOffset)
+__aicore__ inline void
+BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(
+    const BlockCoord &baseOffset, uint32_t flagElementOffset)
 {
     if constexpr (g_coreType == AscendC::AIV) {
         quantOutputGlobal_.SetGlobalBuffer((__gm__ int8_t *)yGmAddr_ + Get<Y_IDX>(baseOffset));
         quantScaleGlobal_.SetGlobalBuffer((__gm__ int8_t *)yScaleGmAddr_ + Get<Y_SCALE_IDX>(baseOffset));
         if (groupFlagListGmBaseAddr_ != nullptr) {
-            groupFlagListGmAddr_ =
-                (__gm__ int32_t *)groupFlagListGmBaseAddr_ + Get<GROUP_FLAG_IDX>(baseOffset) * INT_CACHELINE;
+            groupFlagListGmAddr_ = (__gm__ int32_t *)groupFlagListGmBaseAddr_ +
+                                   Get<GROUP_FLAG_IDX>(baseOffset) * INT_CACHELINE + flagElementOffset;
         } else {
             groupFlagListGmAddr_ = nullptr;
         }
@@ -639,25 +641,25 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeDat
 // ============================================================================
 #define COMPUTE_TANH_TWOPATH(result, zReg, msk, oneReg, absReg, sqrReg, \
                              polyReg, tmpReg, expReg, c1Reg, c2Reg, cmpMask) \
-do { \
-    AscendC::MicroAPI::Mul(sqrReg, zReg, zReg, msk); \
-    AscendC::MicroAPI::Muls(polyReg, sqrReg, 0.0157396831f, msk); \
-    AscendC::MicroAPI::Adds(polyReg, polyReg, -0.0523039624f, msk); \
-    AscendC::MicroAPI::FusedMulDstAdd(polyReg, sqrReg, c2Reg, msk); \
-    AscendC::MicroAPI::FusedMulDstAdd(polyReg, sqrReg, c1Reg, msk); \
-    AscendC::MicroAPI::Mul(polyReg, polyReg, sqrReg, msk); \
-    AscendC::MicroAPI::FusedMulDstAdd(polyReg, zReg, zReg, msk); \
-    AscendC::MicroAPI::Muls(expReg, zReg, -2.0f, msk); \
-    AscendC::MicroAPI::Exp(expReg, expReg, msk); \
-    AscendC::MicroAPI::Adds(expReg, expReg, 1.0f, msk); \
-    AscendC::MicroAPI::Div(tmpReg, oneReg, expReg, msk); \
-    AscendC::MicroAPI::Muls(tmpReg, tmpReg, 2.0f, msk); \
-    AscendC::MicroAPI::Adds(tmpReg, tmpReg, -1.0f, msk); \
-    AscendC::MicroAPI::Abs(absReg, zReg, msk); \
-    AscendC::MicroAPI::CompareScalar<float, AscendC::CMPMODE::GE>(cmpMask, absReg, \
-                                                                  0.60000002384185791016f, msk); \
-    AscendC::MicroAPI::Select(result, tmpReg, polyReg, cmpMask); \
-} while (0)
+    do { \
+        AscendC::MicroAPI::Mul(sqrReg, zReg, zReg, msk); \
+        AscendC::MicroAPI::Muls(polyReg, sqrReg, 0.0157396831f, msk); \
+        AscendC::MicroAPI::Adds(polyReg, polyReg, -0.0523039624f, msk); \
+        AscendC::MicroAPI::FusedMulDstAdd(polyReg, sqrReg, c2Reg, msk); \
+        AscendC::MicroAPI::FusedMulDstAdd(polyReg, sqrReg, c1Reg, msk); \
+        AscendC::MicroAPI::Mul(polyReg, polyReg, sqrReg, msk); \
+        AscendC::MicroAPI::FusedMulDstAdd(polyReg, zReg, zReg, msk); \
+        AscendC::MicroAPI::Muls(expReg, zReg, -2.0f, msk); \
+        AscendC::MicroAPI::Exp(expReg, expReg, msk); \
+        AscendC::MicroAPI::Adds(expReg, expReg, 1.0f, msk); \
+        AscendC::MicroAPI::Div(tmpReg, oneReg, expReg, msk); \
+        AscendC::MicroAPI::Muls(tmpReg, tmpReg, 2.0f, msk); \
+        AscendC::MicroAPI::Adds(tmpReg, tmpReg, -1.0f, msk); \
+        AscendC::MicroAPI::Abs(absReg, zReg, msk); \
+        AscendC::MicroAPI::CompareScalar<float, AscendC::CMPMODE::GE>(cmpMask, absReg, \
+                                                                      0.60000002384185791016f, msk); \
+        AscendC::MicroAPI::Select(result, tmpReg, polyReg, cmpMask); \
+    } while (0)
 
 // ============================================================================
 // ActivationFlowSwiGLU: SwiGLU 激活完整计算流
@@ -868,7 +870,7 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
                 AscendC::MicroAPI::Duplicate(betaReg, ctx.beta, mask);        // betaReg = beta
                 AscendC::MicroAPI::Div(expReg, betaReg, addsReg, mask);       // beta/(exp(-gate)+1)
                 // situ_a = tanh(gate/beta) * beta * sigmoid(gate)
-                AscendC::MicroAPI::Mul(outFReg, sigmoidReg, expReg, mask);    // outFReg = situ_a
+                AscendC::MicroAPI::Mul(outFReg, sigmoidReg, expReg, mask); // outFReg = situ_a
 
                 if constexpr (ActSub == ActSubMode::LINEAR) {
                     // up路: alpha * tanh(up/alpha), 用 vregX1F 暂存 gate_result
@@ -1045,12 +1047,12 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     }
 
     // ---- 量化（原样保留，不涉及激活寄存器）----
-    uint32_t totalDataInUb = mSize * nDstUbAligned;                  // 128*256
-    uint32_t totalScaleInUb = totalDataInUb / AscendC::ONE_BLK_SIZE; // 128*256 / 32 = 128 * 8
+    uint32_t totalDataInUb = mSize * nDstUbAligned;
+    uint32_t totalScaleInUb = totalDataInUb / AscendC::ONE_BLK_SIZE;
     uint16_t loopDataNum = (totalDataInUb + vlForHalfNumber_ * 2 - 1) / (vlForHalfNumber_ * 2); // 128
     uint16_t loopScaleNum = (totalScaleInUb + vlForHalfNumber_ - 1) / vlForHalfNumber_;         // 8
     ComputeMaxExp(gluResAddr, maxExpAddr, totalDataInUb, loopDataNum);                          // 获取最大值
-    ComputeScale(maxExpAddr, scaleDst, halfScaleLocalAddr, totalScaleInUb, loopScaleNum); // 计算scale和halfScale
+    ComputeScale(maxExpAddr, scaleDst, halfScaleLocalAddr, totalScaleInUb, loopScaleNum);       // 计算scale和halfScale
     if constexpr (AscendC::IsSameType<DataTypeOut, fp8_e4m3fn_t>::value ||
                   AscendC::IsSameType<DataTypeOut, fp8_e5m2_t>::value) {
         ComputeDataForQuantTargetFp8(gluResAddr, halfScaleLocalAddr, outputDst, totalDataInUb,
@@ -1164,7 +1166,14 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(0);
     AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(0);
     if (groupFlagListGmAddr_ != nullptr) {
-        AscendC::AtomicAdd(groupFlagListGmAddr_, 1);
+        if constexpr (IsWaveFlagGrained_) {
+            // The scheduler carries mLoc's wave index in the spare GROUP_FLAG
+            // coordinate.  Each wave owns an independent cache-line slot.
+            AscendC::AtomicAdd(
+                groupFlagListGmAddr_ + Get<GROUP_FLAG_IDX>(blockCoord) * INT_CACHELINE, 1);
+        } else {
+            AscendC::AtomicAdd(groupFlagListGmAddr_, 1);
+        }
     }
     return;
 }

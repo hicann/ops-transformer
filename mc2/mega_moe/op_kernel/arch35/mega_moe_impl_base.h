@@ -30,5 +30,6 @@ constexpr uint32_t MAX_SINGLE_MN_ALIGN32_NUM_256 = (MAX_SINGLE_MN_256_256 + 31U)
 constexpr uint32_t MAX_SINGLE_MN_128_256 = 128 * 256;
 constexpr uint32_t MAX_SINGLE_MN_ALIGN32_NUM_128 = (MAX_SINGLE_MN_128_256 + 31U) / ALIGN32 * ALIGN32;
 constexpr uint32_t META_INFO_TENSOR_ADDR = 200U * 1024U; // metaInfo tensor 在 UB 中的起始地址
+
 } // namespace MegaMoeImpl
 #endif // MEGA_MOE_IMP_BASE_H

@@ -26,7 +26,6 @@
 #include "../../../moe_distribute_dispatch_v2/op_kernel/quantize_functions.h"
 #endif
 
-#include "mega_moe_impl_base.h"
 using namespace AscendC;
 
 namespace MegaMoeCombineImpl {
@@ -36,6 +35,9 @@ __aicore__ inline void CombineTokens(uint32_t nLoc, uint32_t n, LocalTensor<int3
                                      LocalTensor<ElementMMadOut2> &l0cOutUbGMM2, BlockShape &actualBlockShape,
                                      uint32_t ubTileN, const Params &params)
 {
+    // The caller owns the GM-to-UB lifetime of metaInfoTensor and must make it
+    // scalar-visible once after the bulk preload.  Keeping that dependency at
+    // the preload boundary avoids one MTE2_S round trip for every token row.
     int32_t lenTile = Get<M_VALUE>(actualBlockShape);
     AscendC::GlobalTensor<ElementMMadOut2> gmRemoteD;
     uint64_t gmRemoteBaseOffset = params.peermemInfo.combineSendPtr - params.peermemInfo.rankSyncInWorldPtr;
@@ -43,8 +45,6 @@ __aicore__ inline void CombineTokens(uint32_t nLoc, uint32_t n, LocalTensor<int3
     ub2GmParams.blockCount = 1;
     // 尾块只发送 actualN 个有效元素，但 UB 中相邻两行仍按物理 tile 宽度 ubTileN 排布。
     ub2GmParams.blockLen = Get<N_VALUE>(actualBlockShape) * sizeof(ElementMMadOut2);
-    AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(0);
-    AscendC::WaitFlag<AscendC::HardEvent::MTE2_S>(0);
     for (int32_t tileIdx = 0; tileIdx < lenTile; ++tileIdx) {
         uint32_t toRankId = metaInfoTensor.GetValue(tileIdx * 8);
         uint32_t tokenIdx = metaInfoTensor.GetValue(tileIdx * 8 + 1);
@@ -53,6 +53,37 @@ __aicore__ inline void CombineTokens(uint32_t nLoc, uint32_t n, LocalTensor<int3
             reinterpret_cast<__gm__ ElementMMadOut2 *>(GetRankWinAddrWithOffset(toRankId, gmRemoteBaseOffset)));
         uint64_t gmDstOffset = (static_cast<uint64_t>(tokenIdx) * params.tilingData->topK + topkIdx) * n + nLoc;
         AscendC::DataCopyPad(gmRemoteD[gmDstOffset], l0cOutUbGMM2[tileIdx * ubTileN], ub2GmParams);
+    }
+}
+
+// Wave combine has one complete row resident in UB. Resolve the route and
+// destination row once, then issue fixed-size remote copies for both BF16 and
+// FP8 rows.
+template <typename Element>
+__aicore__ inline void SendCombineTokenRow(uint32_t rowElements, uint64_t gmRemoteBaseOffset,
+                                           LocalTensor<int32_t> &metaInfoTensor, LocalTensor<Element> &rowTensor,
+                                           const Params &params)
+{
+    uint32_t toRankId = metaInfoTensor.GetValue(RANK_ID);
+    uint32_t tokenIdx = metaInfoTensor.GetValue(TOKEN_ID);
+    uint32_t topkIdx = metaInfoTensor.GetValue(TOPK_INDEX);
+
+    AscendC::GlobalTensor<Element> gmRemoteD;
+    gmRemoteD.SetGlobalBuffer(
+        reinterpret_cast<__gm__ Element *>(GetRankWinAddrWithOffset(toRankId, gmRemoteBaseOffset)));
+    uint64_t gmDstRowOffset =
+        (static_cast<uint64_t>(tokenIdx) * params.tilingData->topK + topkIdx) * rowElements;
+
+    constexpr uint32_t TRANSFER_BYTES = 512U;
+    constexpr uint32_t TILE_ELEMENTS = TRANSFER_BYTES / sizeof(Element);
+    AscendC::DataCopyExtParams ub2GmParams{1U, 0U, 0U, 0U, 0U};
+    for (uint32_t elementOffset = 0U; elementOffset < rowElements; elementOffset += TILE_ELEMENTS) {
+        // 每轮最多下发 512B；最后一轮不足 512B 时只发送有效尾块。
+        uint32_t remainingElements = rowElements - elementOffset;
+        uint32_t currentElements = remainingElements < TILE_ELEMENTS ? remainingElements : TILE_ELEMENTS;
+        ub2GmParams.blockLen = currentElements * sizeof(Element);
+        AscendC::DataCopyPad(
+            gmRemoteD[gmDstRowOffset + elementOffset], rowTensor[elementOffset], ub2GmParams);
     }
 }
 

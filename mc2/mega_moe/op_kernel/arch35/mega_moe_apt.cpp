@@ -20,6 +20,7 @@
 
 #ifdef ENABLE_TENSOR_API
 #include "mega_moe.h"
+#include "mega_moe_wave.h"
 #include "mega_moe_layered.h"
 #endif
 
@@ -30,6 +31,17 @@ using namespace AscendC;
 #ifdef ENABLE_TENSOR_API
 using namespace MegaMoeImpl;
 #endif
+
+#ifndef MEGA_MOE_WEIGHT1_INTERLEAVED
+#define MEGA_MOE_WEIGHT1_INTERLEAVED 0
+#endif
+#if MEGA_MOE_WEIGHT1_INTERLEAVED != 0 && MEGA_MOE_WEIGHT1_INTERLEAVED != 1
+#error "MEGA_MOE_WEIGHT1_INTERLEAVED must be 0 or 1"
+#endif
+
+// Use the conventional contiguous gate/up weight1 and MX-scale layout by
+// default. Builds that provide an interleaved weight can override this to 1.
+static constexpr bool WEIGHT1_INTERLEAVED = MEGA_MOE_WEIGHT1_INTERLEAVED != 0;
 
 template <uint8_t DispatchQuantMode, uint8_t DispatchQuantOutType, uint8_t CombineQuantOutType, uint8_t CommModeType,
           bool TopkWeightsPrefetch>
@@ -44,20 +56,37 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     REGISTER_TILING_DEFAULT(MegaMoeTilingData);
     GET_TILING_DATA_WITH_STRUCT(MegaMoeTilingData, tilingData, tilingGM);
-#if defined(ENABLE_TENSOR_API) && defined(ORIG_DTYPE_X) && (ORIG_DTYPE_X == DT_BF16) && defined(ORIG_DTYPE_Y) &&       \
-    (ORIG_DTYPE_Y == DT_BF16) && defined(ORIG_DTYPE_WEIGHT1) &&                                                        \
-    ((ORIG_DTYPE_WEIGHT1 == DT_FLOAT8_E5M2) || (ORIG_DTYPE_WEIGHT1 == DT_FLOAT8_E4M3FN) ||                             \
-     (ORIG_DTYPE_WEIGHT1 == DT_FLOAT4_E2M1)) &&                                                                        \
+#if defined(ENABLE_TENSOR_API) && defined(ORIG_DTYPE_X) && (ORIG_DTYPE_X == DT_BF16) && defined(ORIG_DTYPE_Y) && \
+    (ORIG_DTYPE_Y == DT_BF16) && defined(ORIG_DTYPE_WEIGHT1) && \
+    ((ORIG_DTYPE_WEIGHT1 == DT_FLOAT8_E5M2) || (ORIG_DTYPE_WEIGHT1 == DT_FLOAT8_E4M3FN) || \
+     (ORIG_DTYPE_WEIGHT1 == DT_FLOAT4_E2M1)) && \
     defined(ORIG_DTYPE_WEIGHT2) && (ORIG_DTYPE_WEIGHT2 == ORIG_DTYPE_WEIGHT1)
     if constexpr (CommModeType == TILINGKEY_TPL_MTE) {
         if constexpr (DispatchQuantMode == DISPATCH_QUANT_MODE_MXFP) {
-            MegaMoe<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType, CombineQuantOutType,
-                    TopkWeightsPrefetch>
-                op;
-            op.Init(context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2,
-                    scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
-                    expertTokenNumsOut, workspaceGM, &tilingData);
-            op.Process();
+            // Dispatch dtype and weight dtype uniquely identify A8W8, so no
+            // additional tiling-key dimension is needed for wave routing.
+            constexpr bool isA8W8DtypePair =
+                (DispatchQuantOutType == DISPATCH_QUANT_OUT_DTYPE_E5M2 &&
+                 Std::IsSame<DTYPE_WEIGHT1, fp8_e5m2_t>::value) ||
+                (DispatchQuantOutType == DISPATCH_QUANT_OUT_DTYPE_E4M3FN &&
+                 Std::IsSame<DTYPE_WEIGHT1, fp8_e4m3fn_t>::value);
+            if constexpr (isA8W8DtypePair) {
+                MegaMoeWave<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType,
+                            CombineQuantOutType, TopkWeightsPrefetch, WEIGHT1_INTERLEAVED>
+                    op;
+                op.Init(context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2,
+                        scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
+                        expertTokenNumsOut, workspaceGM, &tilingData);
+                op.Process();
+            } else {
+                MegaMoe<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType, CombineQuantOutType,
+                        TopkWeightsPrefetch>
+                    op;
+                op.Init(context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2,
+                        scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
+                        expertTokenNumsOut, workspaceGM, &tilingData);
+                op.Process();
+            }
         }
     } else if constexpr (CommModeType == TILINGKEY_TPL_URMA) {
         if constexpr (DispatchQuantMode == DISPATCH_QUANT_MODE_MXFP) {
