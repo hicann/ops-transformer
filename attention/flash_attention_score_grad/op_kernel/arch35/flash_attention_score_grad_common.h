@@ -513,6 +513,7 @@ struct FagRunInfo {
     int32_t halfS2RealSize; // vector侧实际的s2基本块大小，如果Cube基本块=128，那么halfS2RealSize=64
     int32_t
         firstHalfS2RealSize; // 当s2RealSize不是2的整数倍时，v0比v1少计算一行，计算subblock偏移的时候需要使用v0的s2 size
+    int32_t s1AlignedSize;
     uint8_t isS2IdxNoChange;     // s2Idx是否变化
     uint8_t isNextS2IdxNoChange; // 下一个基本块的s2Idx是否变化（是否切换了列）
     // BN2模板使用

@@ -1047,6 +1047,7 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
         runInfo.commonRunInfo.actualS2Size = constInfo.commonConstInfo.s2Size;
     }
 
+    runInfo.s1AlignedSize = AlignTo16(runInfo.commonRunInfo.s1RealSize);
     // BN2扩展模板专用
     if constexpr (IS_BN2_MULTIBLK) {
         runInfo.isLastS1Outer = isLastS1Outer[taskId & 1];

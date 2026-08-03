@@ -274,6 +274,7 @@ FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBlockType>::SetRunInfoDeter
     runInfo.commonRunInfo.s2StartIdx = runInfo.s2CvBegin;
     runInfo.commonRunInfo.vecCoreOffset = this->vSubBlockIdx * runInfo.commonRunInfo.firstHalfS1RealSize;
     runInfo.commonRunInfo.s2AlignedSize = AlignTo16(runInfo.commonRunInfo.s2RealSize);
+    runInfo.s1AlignedSize = AlignTo16(runInfo.commonRunInfo.s1RealSize);
     
     runInfo.isS2IdxNoChange = (this->lastS2oCvDimIdx == runInfo.s2oIdx && this->lastBdimIdx == runInfo.commonRunInfo.boIdx &&
                                this->lastN2dimIdx == runInfo.commonRunInfo.n2oIdx);

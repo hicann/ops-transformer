@@ -602,8 +602,11 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
     int64_t curLoopIdx = 0; // just for continuous split core
     nextValidBlockInnerIdx = this->GetNextValidIdx(
         runInfos[0], taskId, this->tilingData->s1s2BNGS1S2BlockNumList.blockStarts[this->cBlockIdx], curLoopIdx);
+    if (nextValidBlockInnerIdx == -1) {
+        return;
+    }
+    
     blockInnerIdx = nextValidBlockInnerIdx;
-
     FagRunInfo prevRunInfo;
     bool needSyncDkDvFixUb = false;
     bool isLastTwoLoop = false;
