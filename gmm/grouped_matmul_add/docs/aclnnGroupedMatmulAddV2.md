@@ -281,6 +281,10 @@ aclnnStatus aclnnGroupedMatmulAddV2(
 - 支持的输入类型组合为：
   - x为FLOAT16、weight为FLOAT16、yRef为FLOAT32。
   - x为BFLOAT16、weight为BFLOAT16、yRef为FLOAT32。
+- groupListType：支持0、1。
+  - groupListType=0：groupList须为非负单调非递减数列（累积和），最后一个值不大于x中tensor的第一维。以K=256、E=4（各组大小依次为64、0、128、64）为例：`[64, 64, 192, 256]`
+  - groupListType=1：groupList须为非负数列（各组大小），数值总和不大于x中tensor的第一维。例如：`[64, 0, 128, 64]`
+- groupList第1维最大支持1024，即最多支持1024个group。
 
 ## 调用示例
 
