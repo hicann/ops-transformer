@@ -80,13 +80,16 @@ constexpr uint64_t RESERVED_SPACE_SIZE = 10 * 1024 * 1024;
 constexpr int64_t PEERMEM_DATA_OFFSET = 1024 * 60LL; // （预留）60KB 固定偏移
 constexpr int64_t ALIGN_128 = 128LL;
 constexpr int64_t ALIGN_512 = 512LL;
+// 与 kernel 侧 SYNC_STATE_RESERVED_SIZE 保持一致：
+// 前 256KB 内放 per-rank 状态，后 256KB 放 per-block self state。
+constexpr int64_t SYNC_STATE_RESERVED_SIZE = 512 * 1024LL;
 
 // 维度范围限制
 constexpr int64_t MIN_BS = 1;
 constexpr int64_t MAX_BS = 4096;
 constexpr int64_t MIN_HIDDEN_SIZE = 1024;
 constexpr int64_t MAX_HIDDEN_SIZE = 8192;
-constexpr int64_t MIN_INTERMEDIATE_HIDDEN = 1024;
+constexpr int64_t MIN_INTERMEDIATE_HIDDEN = 512;
 constexpr int64_t MAX_INTERMEDIATE_HIDDEN = 3072;
 constexpr int64_t MIN_TOPK = 1;
 constexpr int64_t MAX_TOPK = 16;
@@ -148,6 +151,9 @@ static int64_t CalcLeastCclBufferSize(int64_t maxRecvTokenNum, int64_t h, int64_
         int64_t dispatchFlag = epWorldSize * MAX_EXPERT_PER_RANK * 64;
         int64_t allgatherFlag = epWorldSize * 64;
         offsetFlag += dispatchFlag + allgatherFlag;
+    } else {
+        // A3 need self state
+        offsetFlag = std::max(epWorldSize * ALIGN_512, SYNC_STATE_RESERVED_SIZE);
     }
     return offsetTokenPerExpert + offsetTensor + offsetFlag + RESERVED_SPACE_SIZE;
 }

@@ -140,6 +140,7 @@ constexpr int64_t ALIGN_512 = 512LL;
 constexpr int64_t MB_SIZE = 1024LL * 1024LL;
 constexpr int64_t RESERVED_SPACE_SIZE = 10LL * 1024 * 1024;
 constexpr int64_t MAX_EXPERTS_PER_RANK_A2A3 = 128LL;
+constexpr int64_t SYNC_STATE_RESERVED_SIZE = 512LL * 1024;
 
 int64_t CeilAlign(int64_t val, int64_t align)
 {
@@ -198,8 +199,8 @@ int64_t CalcLeastCclBufferSizeA3(int64_t h, int64_t epWorldSize, bool isQuantRou
         offsetTensor += bs * topK * static_cast<int64_t>(sizeof(float));
     }
 
-    // Data block 3: sync flags (CrossRankSync only)
-    int64_t offsetFlag = epWorldSize * ALIGN_512;
+    // Data block 3: sync flags
+    int64_t offsetFlag = std::max(epWorldSize * ALIGN_512, SYNC_STATE_RESERVED_SIZE);
 
     return (offsetTokenPerExpert + offsetTensor + offsetFlag + RESERVED_SPACE_SIZE + MB_SIZE) / MB_SIZE;
 }
