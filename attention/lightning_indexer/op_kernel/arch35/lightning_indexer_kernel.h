@@ -150,6 +150,7 @@ template <typename LIT>
 __aicore__ inline void LightningIndexerKernel<LIT>::InitTilingData(const LITilingData *__restrict tilingData)
 {
     usedCoreNum = tilingData->usedCoreNum;
+    constInfo.keyStride0 = tilingData->keyStride0;
     constInfo.batchSize = tilingData->bSize;
     constInfo.qHeadNum = constInfo.gSize = tilingData->gSize;
     constInfo.qSeqSize = tilingData->s1Size;

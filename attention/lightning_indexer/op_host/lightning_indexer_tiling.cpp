@@ -244,6 +244,13 @@ ge::graphStatus LIInfoParser::GetAndCheckAttrParaInfo()
     opParamInfo_.preTokens = attrs->GetAttrPointer<int64_t>(ATTR_PRE_TOKENS_INDEX);
     opParamInfo_.nextTokens = attrs->GetAttrPointer<int64_t>(ATTR_NEXT_TOKENS_INDEX);
     opParamInfo_.returnValue = attrs->GetAttrPointer<bool>(ATTR_RETURN_VALUE_INDEX);
+    
+    auto keyStrides = context_->GetDynamicInputStride(KEY_INDEX, 0);
+    if (keyStrides != nullptr && keyStrides->GetDimNum() > 1) {
+        keyStride0_ = keyStrides->GetStride(0);
+        keyStride1_ = keyStrides->GetStride(1);
+    }
+    
     if (opParamInfo_.layOut != nullptr) {
         OP_LOGI(context_->GetNodeName(), "layout_query is:%s", opParamInfo_.layOut);
     }
@@ -500,6 +507,44 @@ ge::graphStatus LIInfoParser::CheckShapeDim()
     if (opParamInfo_.valuesOut.shape->GetStorageShape().GetShapeSize() != 0 && !(*opParamInfo_.returnValue)) {
         OP_LOGW(opName_, "when returnValue is false, valuesOut must be null.");
     }
+    return ge::GRAPH_SUCCESS;
+}
+
+// key非连续校验：通过shape计算expected stride进行校验
+// PA_BBND时，只允许0轴非连续，其余轴必须连续
+// 非PA_BBND时，所有轴都必须连续
+ge::graphStatus LIInfoParser::CheckKeyContiguous() const
+{
+    if (npuArch_ != NpuArch::DAV_3510) {
+        return ge::GRAPH_SUCCESS; // AutoContiguous
+    }
+
+    bool keyNonContiguous = false;
+    // PA_BBND: 0轴允许非连续，从1轴开始检查；非PA_BBND: 检查shape总size
+    // PA_BBND: axis 0 allows non-contiguous, check starts from axis 1
+    // Non-PA_BBND: check total shape size
+    if (keyStride0_ != 0 && opParamInfo_.key.shape != nullptr) {
+        auto &shape = opParamInfo_.key.shape->GetStorageShape();
+        uint64_t totalElements = 0;
+        uint64_t shapeSize = 0;
+
+        if (kLayout_ == DataLayout::BnBsND) {
+            totalElements = keyStride1_ * static_cast<uint64_t>(shape.GetDim(1));
+            shapeSize = static_cast<uint64_t>(shape.GetDim(1)) * static_cast<uint64_t>(shape.GetDim(2)) *
+                        static_cast<uint64_t>(shape.GetDim(3));
+        } else {
+            totalElements = keyStride0_ * static_cast<uint64_t>(shape.GetDim(0));
+            shapeSize = context_->GetOptionalInputTensor(KEY_INDEX)->GetShapeSize();
+        }
+
+        keyNonContiguous = (shapeSize != totalElements);
+    }
+
+    OP_CHECK_IF(keyNonContiguous,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "key",
+                    "key only support non-contiguous tensor on the 0-axis with PA_BSND layout"),
+                return ge::GRAPH_FAILED);
+
     return ge::GRAPH_SUCCESS;
 }
 
@@ -955,6 +1000,18 @@ void LIInfoParser::GenerateInfo(LITilingInfo &liInfo)
 
     liInfo.inputQLayout = qLayout_;
     liInfo.inputKLayout = kLayout_;
+
+    if (npuArch_ != NpuArch::DAV_3510) {
+        liInfo.keyStride0 = 0;  // 910无需使用stride
+    } else {
+        if (keyStride0_ != 0) {
+            liInfo.keyStride0 = keyStride0_;
+        } else if (layOutKeyStr == "PA_BSND") {
+            liInfo.keyStride0 = blockSize_ * n2Size_ * headDim_;
+        } else {
+            liInfo.keyStride0 = 0;  // 非PA无需使用stride
+        }
+    }
 }
 ge::graphStatus LIInfoParser::CheckFeatureMlaNoQuantShape() const
 {
@@ -1015,7 +1072,7 @@ ge::graphStatus LIInfoParser::ParseAndCheck(LITilingInfo &liInfo)
         return ge::GRAPH_FAILED;
     }
 
-    if (ge::GRAPH_SUCCESS != ValidateInputShapesMatch()) {
+    if (ge::GRAPH_SUCCESS != ValidateInputShapesMatch() || ge::GRAPH_SUCCESS != CheckKeyContiguous()) {
         return ge::GRAPH_FAILED;
     }
 
@@ -1089,6 +1146,7 @@ ge::graphStatus LightningIndexerTiling::DoTiling(LITilingInfo *tilingInfo)
     tilingData_.set_nextTokens(tilingInfo->nextTokens);
     tilingData_.set_returnValue(tilingInfo->returnValue);
     tilingData_.set_usedCoreNum(blockDim);
+    tilingData_.set_keyStride0(tilingInfo->keyStride0);
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
 

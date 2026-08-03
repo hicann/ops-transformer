@@ -121,6 +121,7 @@ struct ConstInfo {
     bool isLDOpen = false;
     bool returnValueFlag = false;
     bool splitMFlag = false;
+    uint32_t keyStride0 = 0U;
 };
 
 struct SplitCoreInfo {

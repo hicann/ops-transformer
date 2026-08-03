@@ -63,7 +63,8 @@
       <td>
           <ul>
                 <li>公式中的输入K。</li>
-                <li>不支持空tensor和非连续。</li>
+                <li>不支持空tensor。</li>
+                <li>在layout_key为PA_BSND时，支持0轴非连续。</li>
                 <li>layout_key为PA_BSND时，shape为[block_num, block_size, K_N, D]，其中block_num为PageAttention时block总数、block_size为一个block的token数；layout_key为BSND时，shape为[B, K_S, K_N, D]；layout_key为TND时，shape为[K_T, K_N, D]。</li>
           </ul>
       </td>
@@ -244,8 +245,10 @@
 - Ascend 950PR/Ascend 950DT：
   - query Q_N仅支持8、16、24、32、64。
   - 参数weights不支持`float32`类型。
+  - 仅在layout_key为PA_BSND时，key支持0轴非连续。
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
   - query Q_N支持小于等于64。
+  - key不支持非连续。
 
 ## 调用示例
 

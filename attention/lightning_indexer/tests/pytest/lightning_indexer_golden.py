@@ -179,7 +179,6 @@ class GeneralizedLI:
             # 根据布尔矩阵置-inf
             reduce_sum[cur_m_broadcasted.to(dtype = torch.bool)] = -torch.inf
         to_be_sort_ele = reduce_sum.clone()
-        to_be_sort_ele = to_be_sort_ele.to(torch.bfloat16)
         # 稳定排序
         b_sorted_indices = torch.full(to_be_sort_ele.shape, -1, dtype=torch.int32)
         if sparse_mode == 3:
@@ -448,6 +447,18 @@ def li_output_single(params):
                 else:
                     for i_n in range(k_head_num):
                         key[cur_block_id, :, i_n, :] = key_expand[i_batch, i_n, block_start_pos:block_start_pos+block_size,:]
+        
+        # kv_cache 0轴非连续：将key融合到blockFusion (ref v1 commit keyStride0)
+        properties = torch.npu.get_device_properties()
+        if "Ascend950" in properties.name:
+            key_stride = 10  # 0轴非连续增加stride
+            bytes_per_token = head_dim + key_stride # 整个非连续的长度
+            blockFusion = torch.zeros((block_num, block_size * k_head_num * bytes_per_token), dtype=qk_dtype)
+            key_flat = key.view(block_num, block_size * k_head_num * head_dim)
+            blockFusion[:, :block_size * k_head_num * head_dim] = key_flat
+            blockFusion = blockFusion.npu()
+            key = blockFusion[:, :block_size * k_head_num * head_dim].view(block_num, block_size, k_head_num, head_dim)
+        
         key = key.npu()
         block_table = torch.from_numpy(block_table).to(dtype=torch.int32).npu()
 
