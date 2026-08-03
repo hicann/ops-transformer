@@ -39,7 +39,12 @@ constexpr uint16_t SEND_SYNC_EVENT_ID = 9;
 constexpr uint16_t RECV_SYNC_EVENT_ID = 10;
 
 constexpr uint32_t SELF_STATE_OFFSET = 256 * 1024;
+// CrossRankSyncV2 的 self state 从 SELF_STATE_OFFSET 开始，并按每个 block
+// UB_ALIGN 个 int32_t（128B）保存一个状态。为该区域固定预留 256KB，
+// 避免小 EP 场景下仅按 EP * STATE_OFFSET 预留导致访问越过 winSize。
+constexpr uint32_t SELF_STATE_REGION_SIZE = 256 * 1024;
 constexpr uint32_t STATE_OFFSET = 512;
+constexpr uint32_t SYNC_STATE_RESERVED_SIZE = SELF_STATE_OFFSET + SELF_STATE_REGION_SIZE;
 
 template <typename T>
 FORCE_INLINE_AICORE void gm_store(__gm__ T *addr, T val)
@@ -210,7 +215,21 @@ public:
             m_rankSize = WinContext_->rankSize;
         }
         m_segmentSize = WinContext_->winSize;
-        m_tailReservedSize = m_rankSize * STATE_OFFSET;
+        if constexpr (IS_A2) {
+            // A2 只使用按 rank 分配的 CrossRankSync 状态区。
+            m_tailReservedSize = static_cast<size_t>(m_rankSize) * STATE_OFFSET;
+        } else {
+            // A3 尾部同时容纳：
+            // 1. [0, rankSize * STATE_OFFSET) 的 per-rank 同步状态；
+            // 2. [SELF_STATE_OFFSET, SELF_STATE_OFFSET + SELF_STATE_REGION_SIZE)
+            //    的 per-block 本轮状态。
+            // 当前支持的最大 rankSize 为 128，per-rank 区最多 64KB，不会与
+            // 256KB 起始的 self-state 区重叠。
+            m_tailReservedSize =
+                static_cast<size_t>(SYNC_STATE_RESERVED_SIZE) > static_cast<size_t>(m_rankSize) * STATE_OFFSET ?
+                    static_cast<size_t>(SYNC_STATE_RESERVED_SIZE) :
+                    static_cast<size_t>(m_rankSize) * STATE_OFFSET;
+        }
     }
 
     FORCE_INLINE_AICORE

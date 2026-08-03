@@ -145,6 +145,7 @@ constexpr int64_t ALIGN_512 = 512LL;
 constexpr int64_t MB_SIZE = 1024LL * 1024LL;
 constexpr int64_t RESERVED_SPACE_SIZE = 10LL * 1024 * 1024;
 constexpr int64_t MAX_EXPERTS_PER_RANK_A2A3 = 128LL;
+constexpr int64_t SYNC_STATE_RESERVED_SIZE = 512LL * 1024;
 
 int64_t CeilAlign(int64_t val, int64_t align)
 {
@@ -203,8 +204,8 @@ int64_t CalcLeastCclBufferSizeA3(int64_t h, int64_t epWorldSize, bool isQuantRou
         offsetTensor += bs * topK * static_cast<int64_t>(sizeof(float));
     }
 
-    // Data block 3: sync flags (CrossRankSync only)
-    int64_t offsetFlag = epWorldSize * ALIGN_512;
+    // Data block 3: sync flags
+    int64_t offsetFlag = std::max(epWorldSize * ALIGN_512, SYNC_STATE_RESERVED_SIZE);
 
     return (offsetTokenPerExpert + offsetTensor + offsetFlag + RESERVED_SPACE_SIZE + MB_SIZE) / MB_SIZE;
 }
@@ -248,8 +249,9 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
     bool isA2 = (socName != nullptr && std::strstr(socName, "Ascend910B") != nullptr);
     bool isA3 = (socName != nullptr && std::strstr(socName, "Ascend910_93") != nullptr);
     if (isA2 || isA3) {
-        TORCH_CHECK(epWorldSize == 2 || epWorldSize == 4 || epWorldSize == 8 || epWorldSize == 16 || epWorldSize == 32,
-                    "ep_world_size only support {2, 4, 8, 16, 32} on A2/A3, but got ", epWorldSize);
+        TORCH_CHECK(epWorldSize == 2 || epWorldSize == 4 || epWorldSize == 8 || epWorldSize == 16 ||
+                    epWorldSize == 32 || epWorldSize == 64,
+                    "ep_world_size only support {2, 4, 8, 16, 32, 64} on A2/A3, but got ", epWorldSize);
         TORCH_CHECK(hidden >= 1024 && hidden <= 8192 && hidden % 512 == 0,
                     "hidden only support [1024, 8192] and hidden % 512 == 0 on A2/A3, but got ", hidden);
         TORCH_CHECK(numMaxTokensPerRank >= 1 && numMaxTokensPerRank <= 4096,
