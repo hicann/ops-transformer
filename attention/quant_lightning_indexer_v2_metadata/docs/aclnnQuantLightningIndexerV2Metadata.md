@@ -25,7 +25,7 @@
 
 ## 功能说明
 
-- 接口功能：该接口为AI CPU算子接口，是aclnnQuantLightningIndexerV2算子的前置算子接口。根据aclnnQuantLightningIndexerV2算子接口的输入信息，计算并输出负载均衡结果。输出结果可以作为aclnnQuantLightningIndexerV2算子接口的输入，减少aclnnQuantLightningIndexerV2算子接口的执行耗时。
+- 算子功能：`aclnnQuantLightningIndexerV2Metadata`是`aclnnQuantLightningIndexerV2`算子的前置算子，用于生成负载均衡的任务划分方案。本算子不执行实际的LightningIndexer计算，而是根据输入参数在AI CPU计算出每个AI Core应处理的计算起止范围，从而最大化计算资源的利用率，避免各Core间负载不均衡的问题。
 
   **该算子不建议单独使用，建议与aclnnQuantLightningIndexerV2算子配合使用，形成完整的工作流。**
     1. 接受aclnnQuantLightningIndexerV2算子接口输入数据shape信息，包含batchSize、qSeqlen、kSeqlen、mask。通过对输入分块并模拟计算耗时，均匀分配分块到可用核上，以降低aclnnQuantLightningIndexerV2算子的整体计算耗时，并提高硬件利用率。

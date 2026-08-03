@@ -11,9 +11,7 @@
 |<term>Atlas 训练系列产品</term>                                | ×  |
 
 ## 功能说明
-- API功能：`SparseAttnSharedkvMetadata`算子旨在生成一个任务列表，包含每个AIcore的Attention计算任务的起止点的Batch、Head、以及Q和K的分块的索引，供后续`SparseAttnSharedkv`算子使用。
-
-
+- 算子功能：`SparseAttnSharedkvMetadata`是`SparseAttnSharedkv`算子的前置算子，用于后续Attention计算生成负载均衡的任务划分方案。本算子不执行实际的Attention计算，而是根据输入参数在AI CPU计算出每个AI Core应处理的Attention计算起止范围，从而最大化计算资源的利用率，避免各Core间负载不均衡的问题。
 
 ## 参数说明
 
