@@ -8,19 +8,37 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+/*!
+ * \file moe_ep_dispatch_base.h
+ * \brief
+ */
+
 #ifndef MOE_EP_DISPATCH_BASE_H
 #define MOE_EP_DISPATCH_BASE_H
 
-#if __has_include("../common/mc2_moe_context.h")
-#include "../common/mc2_moe_context.h"
+#if ASC_DEVKIT_MAJOR >= 9
+#include "basic_api/kernel_basic_intf.h"
 #else
-#include "../../common/op_kernel/mc2_moe_context.h"
+#include "kernel_operator.h"
 #endif
 
-namespace Mc2Kernel {
+#include "adv_api/hcomm/hcomm.h"
+
+#if __has_include("../common/mc2_moe_context.h")
+#include "../common/mc2_moe_context.h"
+#include "../common/mc2_kernel_utils.h"
+#else
+#include "../../common/op_kernel/mc2_moe_context.h"
+#include "../../common/op_kernel/mc2_kernel_utils.h"
+#endif
+
+namespace MoeEpDispatchBase {
 
 using namespace AscendC;
 
+constexpr uint64_t DISPATCH_CQE_MAX_WRITE_SIZE = 256UL * 1024UL * 1024UL;
+
+// PerExpertCnt Calculation
 template <Reg::HistogramsType htype, typename T, typename U>
 __simd_vf__ __aicore__ inline void HistogramsVf(__ubuf__ U *dst, __ubuf__ T *src, uint16_t repeatElm,
                                            uint16_t halfRepeat, uint32_t totalElm, uint16_t repeatTimes)
@@ -54,15 +72,66 @@ __aicore__ inline void GetExpertFreq(LocalTensor<uint16_t> &dstLocal, LocalTenso
     PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline GM_ADDR GetWinAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext *ctx, uint32_t rankId, uint64_t offset)
+__aicore__ inline GM_ADDR GetWindowAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext *context, uint32_t rankId,
+                                                uint64_t offset)
 {
-    return (GM_ADDR)ctx->epHcclBuffer[rankId] + offset;
+    return (GM_ADDR)context->epHcclBuffer[rankId] + offset;
 }
 
-__aicore__ inline uint64_t GetCommHandle(__gm__ Mc2Aclnn::MoeCommContext *ctx, uint32_t rankId)
+__aicore__ inline uint64_t GetCommHandle(__gm__ Mc2Aclnn::MoeCommContext *context, uint32_t rankId,
+                                         uint32_t channelIndex = 0U)
 {
-    uint32_t channelsPerRank = ctx->channelsPerRank == 0 ? 1 : ctx->channelsPerRank;
-    return ctx->hcommHandle[rankId * channelsPerRank];
+    uint32_t channelsPerRank = context->channelsPerRank == 0U ? 1U : context->channelsPerRank;
+    return context->hcommHandle[rankId * channelsPerRank + channelIndex];
+}
+
+// For Hybrid
+__aicore__ inline uint32_t GetCurrentServerIndex(uint32_t epRankId, uint32_t rankSizePerServer)
+{
+    return rankSizePerServer == 0U ? 0U : epRankId / rankSizePerServer;
+}
+
+__aicore__ inline uint32_t GetServerStartRank(uint32_t epRankId, uint32_t rankSizePerServer)
+{
+    return GetCurrentServerIndex(epRankId, rankSizePerServer) * rankSizePerServer;
+}
+
+__aicore__ inline uint32_t GetServerEndRank(uint32_t epRankId, uint32_t rankSizePerServer, uint32_t epWorldSize)
+{
+    uint32_t serverEndRank = GetServerStartRank(epRankId, rankSizePerServer) + rankSizePerServer;
+    return serverEndRank > epWorldSize ? epWorldSize : serverEndRank;
+}
+
+template <typename HcommType>
+__aicore__ inline void WriteRemoteWindowByChunks(HcommType &hcomm, uint64_t commHandle, GM_ADDR remoteWindowAddr,
+                                                 GM_ADDR localWorkspaceAddr, uint64_t sendBytes)
+{
+    // HCCL单次写有CQE大小限制，保持原分片写逻辑
+    uint64_t splitCount = (sendBytes + DISPATCH_CQE_MAX_WRITE_SIZE - 1UL) / DISPATCH_CQE_MAX_WRITE_SIZE;
+    uint64_t dataBytes = DISPATCH_CQE_MAX_WRITE_SIZE;
+    for (uint64_t splitIndex = 0UL; splitIndex < splitCount; splitIndex++) {
+        if (splitIndex == splitCount - 1UL) {
+            dataBytes = sendBytes - splitIndex * DISPATCH_CQE_MAX_WRITE_SIZE;
+        }
+        hcomm.WriteNbi(commHandle, remoteWindowAddr, localWorkspaceAddr, dataBytes);
+        localWorkspaceAddr += dataBytes;
+        remoteWindowAddr += dataBytes;
+    }
+    hcomm.Drain(commHandle);
+}
+
+
+} // namespace MoeEpDispatchBase
+
+namespace Mc2Kernel {
+
+using MoeEpDispatchBase::GetCommHandle;
+using MoeEpDispatchBase::GetExpertFreq;
+
+__aicore__ inline GM_ADDR GetWinAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext *context, uint32_t rankId,
+                                             uint64_t offset)
+{
+    return MoeEpDispatchBase::GetWindowAddrByRankId(context, rankId, offset);
 }
 
 } // namespace Mc2Kernel

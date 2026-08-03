@@ -46,7 +46,22 @@ public:
             .DataTypeList({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
-        this->Input("cached_handle_dst_buffer_slot_idx")
+        this->Input("cached_dst_slot_idx")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("cached_route_count")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("cached_route_dst_scaleout")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("cached_route_scaleout_slot")
             .ParamType(OPTIONAL)
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
@@ -64,6 +79,18 @@ public:
             .ParamType(REQUIRED)
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND});
+        this->Output("route_count")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND});
+        this->Output("route_dst_scaleout")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND});
+        this->Output("route_scaleout_slot")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND});
 
         this->Attr("ep_world_size").AttrType(REQUIRED).Int();
         this->Attr("ep_rank_id").AttrType(REQUIRED).Int();
@@ -73,6 +100,8 @@ public:
         this->Attr("expert_alignment").AttrType(OPTIONAL).Int(1);
         this->Attr("do_cpu_sync").AttrType(OPTIONAL).Bool(true);
         this->Attr("host_pinned_counter_addr").AttrType(OPTIONAL).Int(0);
+        this->Attr("topo_type").AttrType(OPTIONAL).Int(0);
+        this->Attr("rank_num_per_server").AttrType(OPTIONAL).Int(1);
 
         OpAICoreConfig aicore_config;
         aicore_config.DynamicCompileStaticFlag(true)

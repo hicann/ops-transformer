@@ -169,13 +169,21 @@ def _inline_align(value: int, base: int) -> int:
     return (value + base - 1) // base * base
 
 
-def _get_moe_ep_minimum_window_bytes(
+@dataclass(frozen=True)
+class _MoeEpWindowLayout:
+    state_buffer_bytes: int
+    dispatch_slot_bytes: int
+    combine_slot_bytes: int
+    scaleup_receive_buffer_bytes: int
+
+
+def _get_moe_ep_window_layout(
     world_size: int,
     num_max_tokens_per_rank: int,
     hidden: int,
     num_experts: int,
     topk: int,
-) -> int:
+) -> _MoeEpWindowLayout:
     win_addr_align = 512
     ub_align = 32
     max_out_dtype_size = 2
@@ -200,11 +208,30 @@ def _get_moe_ep_minimum_window_bytes(
         hidden_align + metadata_bytes * 2 + ub_align, win_addr_align
     )
     combine_per_slot_bytes = _inline_align(hidden_align + ub_align, win_addr_align)
-    dispatch_buffer_size = (
+    scaleup_receive_buffer_bytes = (
         world_size * num_max_tokens_per_rank * dispatch_per_slot_bytes
     )
-    combine_recv_buffer_size = num_max_tokens_per_rank * combine_per_slot_bytes * topk
-    return state_buffer_size + dispatch_buffer_size * 2 + combine_recv_buffer_size
+    return _MoeEpWindowLayout(
+        state_buffer_bytes=state_buffer_size,
+        dispatch_slot_bytes=dispatch_per_slot_bytes,
+        combine_slot_bytes=combine_per_slot_bytes,
+        scaleup_receive_buffer_bytes=scaleup_receive_buffer_bytes,
+    )
+
+
+def _get_moe_ep_direct_window_bytes(
+    layout: _MoeEpWindowLayout,
+    num_max_tokens_per_rank: int,
+    topk: int,
+) -> int:
+    combine_receive_buffer_bytes = (
+        num_max_tokens_per_rank * layout.combine_slot_bytes * topk
+    )
+    return (
+        layout.state_buffer_bytes
+        + layout.scaleup_receive_buffer_bytes * 2
+        + combine_receive_buffer_bytes
+    )
 
 
 @dataclass
@@ -217,6 +244,9 @@ class EPHandle:
     expert_alignment: int
     num_max_tokens_per_rank: int
     topk_idx: torch.Tensor
+    route_count: Optional[torch.Tensor] = None
+    route_dst_scaleout: Optional[torch.Tensor] = None
+    route_scaleout_slot: Optional[torch.Tensor] = None
 
     @property
     def num_recv_tokens(self) -> int:
@@ -228,7 +258,10 @@ class _DispatchArgs:
     x: torch.Tensor
     scales: Optional[torch.Tensor]
     topk_idx: torch.Tensor
-    cached_dst_slot: Optional[torch.Tensor]
+    cached_dst_slot_idx: Optional[torch.Tensor]
+    cached_route_count: Optional[torch.Tensor]
+    cached_route_dst_scaleout: Optional[torch.Tensor]
+    cached_route_scaleout_slot: Optional[torch.Tensor]
     cached_recv_src_metadata: Optional[torch.Tensor]
     num_experts: int
     num_max_tokens_per_rank: int
@@ -355,12 +388,64 @@ class ElasticBuffer:
         )
 
         mb_conversion = 1024 * 1024
-        minimum_window_bytes = _get_moe_ep_minimum_window_bytes(
+        window_layout = _get_moe_ep_window_layout(
             world_size,
             num_max_tokens_per_rank,
             hidden,
             num_experts,
             topk,
+        )
+        direct_minimum_window_bytes = _get_moe_ep_direct_window_bytes(
+            window_layout,
+            num_max_tokens_per_rank,
+            topk,
+        )
+        win_addr_align = 512
+        state_dtype_size = 4
+
+        def get_dispatch_buffer_size(rank_num_per_server):
+            scaleout_rank_count = world_size // rank_num_per_server
+            scaleout_per_slot_bytes = _inline_align(
+                window_layout.dispatch_slot_bytes + topk * state_dtype_size,
+                win_addr_align,
+            )
+            scaleout_recv_data_size = (
+                scaleout_rank_count
+                * num_max_tokens_per_rank
+                * scaleout_per_slot_bytes
+            )
+            scaleout_recv_status_size = (
+                scaleout_rank_count * num_max_tokens_per_rank * win_addr_align
+            )
+            payload_stash_size = num_max_tokens_per_rank * scaleout_per_slot_bytes
+            return (
+                scaleout_recv_data_size
+                + window_layout.scaleup_receive_buffer_bytes
+                + scaleout_recv_status_size
+                + payload_stash_size
+            )
+
+        # Context topology is unavailable here, so reserve for the largest valid hybrid layout.
+        rank_num_per_server_candidates = [
+            rank_num_per_server
+            for rank_num_per_server in range(1, world_size + 1)
+            if world_size % rank_num_per_server == 0
+        ]
+        dispatch_buffer_size = max(
+            get_dispatch_buffer_size(rank_num_per_server)
+            for rank_num_per_server in rank_num_per_server_candidates
+        )
+        combine_buffer_size = (
+            num_max_tokens_per_rank * window_layout.combine_slot_bytes * topk
+        )
+
+        hybrid_minimum_window_bytes = (
+            window_layout.state_buffer_bytes
+            + dispatch_buffer_size
+            + combine_buffer_size
+        )
+        minimum_window_bytes = max(
+            direct_minimum_window_bytes, hybrid_minimum_window_bytes
         )
         return (
             _inline_align(
@@ -619,15 +704,36 @@ class ElasticBuffer:
             expert_alignment,
             do_cpu_sync,
         )
+        torch._check(
+            args.x.shape[1] == self._hidden,
+            lambda: f"x hidden must equal configured hidden, got {args.x.shape[1]} and {self._hidden}",
+        )
+        torch._check(
+            args.topk_idx.shape[1] == self._num_topk,
+            lambda: (
+                "topk_idx topk must equal configured num_topk, "
+                f"got {args.topk_idx.shape[1]} and {self._num_topk}"
+            ),
+        )
         hp_addr = self._prepare_host_counter(args.do_cpu_sync)
 
-        num_recv_per_rank, num_recv_per_expert, dst_slot = (
+        (
+            num_recv_per_rank,
+            num_recv_per_expert,
+            dst_slot,
+            route_count,
+            route_dst_scaleout,
+            route_scaleout_slot,
+        ) = (
             self._runtime.moe_ep_dispatch(
                 args.x,
                 args.topk_idx,
                 topk_weights,
                 args.scales,
-                args.cached_dst_slot,
+                args.cached_dst_slot_idx,
+                args.cached_route_count,
+                args.cached_route_dst_scaleout,
+                args.cached_route_scaleout_slot,
                 self._ep_world_size,
                 self._rank_id,
                 args.num_experts,
@@ -653,7 +759,6 @@ class ElasticBuffer:
                 self._rank_id,
                 args.num_experts,
                 args.num_max_tokens_per_rank,
-                args.expert_alignment,
                 recv_x,
                 recv_src_meta,
                 recv_topk_weights,
@@ -663,7 +768,14 @@ class ElasticBuffer:
 
         recv_x = (recv_x, recv_scales) if recv_scales is not None else recv_x
         new_handle = self._make_dispatch_handle(
-            args, dst_slot, recv_src_meta, num_recv_per_rank, num_recv_per_expert
+            args,
+            dst_slot,
+            recv_src_meta,
+            num_recv_per_rank,
+            num_recv_per_expert,
+            route_count,
+            route_dst_scaleout,
+            route_scaleout_slot,
         )
         return recv_x, None, recv_topk_weights, new_handle
 
@@ -698,18 +810,18 @@ class ElasticBuffer:
             lambda: ("bias is not supported, please set bias to None."),
         )
 
-        combined_x, combined_topk_weights = self._runtime.moe_ep_combine(
-            x,
-            handle.topk_idx,
-            handle.recv_src_metadata,
-            handle.num_recv_tokens_per_expert,
-            topk_weights,
-            bias_0,
-            bias_1,
-            self._ep_world_size,
-            self._rank_id,
-            handle.num_experts,
-            handle.num_max_tokens_per_rank,
+        combined_x, combined_topk_weights = (
+            self._runtime.moe_ep_combine(
+                x,
+                handle.topk_idx,
+                handle.recv_src_metadata,
+                handle.num_recv_tokens_per_expert,
+                topk_weights,
+                self._ep_world_size,
+                self._rank_id,
+                handle.num_experts,
+                handle.num_max_tokens_per_rank,
+            )
         )
         return combined_x, combined_topk_weights
 
@@ -800,6 +912,9 @@ class ElasticBuffer:
                 scales,
                 handle.topk_idx,
                 handle.dst_buffer_slot_idx,
+                handle.route_count,
+                handle.route_dst_scaleout,
+                handle.route_scaleout_slot,
                 handle.recv_src_metadata,
                 handle.num_experts,
                 handle.num_max_tokens_per_rank,
@@ -819,6 +934,9 @@ class ElasticBuffer:
             x,
             scales,
             topk_idx,
+            None,
+            None,
+            None,
             None,
             None,
             num_experts,
@@ -882,6 +1000,9 @@ class ElasticBuffer:
         recv_src_meta: torch.Tensor,
         num_recv_per_rank: torch.Tensor,
         num_recv_per_expert: torch.Tensor,
+        route_count: torch.Tensor,
+        route_dst_scaleout: torch.Tensor,
+        route_scaleout_slot: torch.Tensor,
     ) -> EPHandle:
         topk_idx = (
             args.topk_idx
@@ -897,6 +1018,9 @@ class ElasticBuffer:
             expert_alignment=args.expert_alignment,
             num_max_tokens_per_rank=args.num_max_tokens_per_rank,
             topk_idx=topk_idx,
+            route_count=route_count,
+            route_dst_scaleout=route_dst_scaleout,
+            route_scaleout_slot=route_scaleout_slot,
         )
 
     def _unpack_bias(self, bias):
