@@ -18,6 +18,8 @@
 
 #include <cstdint>
 #include <vector>
+#include "log.h"
+#include "cpu_tensor.h"
 #include "cpu_context.h"
 
 namespace aicpu {
@@ -94,12 +96,22 @@ inline void GetAttrValueOpt(CpuKernelContext &ctx, const std::string &name, bool
     }
 }
 
-inline std::vector<int64_t> GetTensorDataAsInt64(Tensor *tensor, size_t size)
+inline bool IsTensorExists(const Tensor *tensor)
 {
-    std::vector<int64_t> result(size, 0);
-    if (tensor == nullptr || tensor->GetData() == nullptr || size == 0) {
+    return (tensor != nullptr && tensor->GetData() != nullptr);
+}
+
+inline std::vector<int64_t> GetTensorDataAsInt64(const Tensor *tensor)
+{
+    std::vector<int64_t> result {};
+
+    if (!IsTensorExists(tensor)) {
         return result;
     }
+
+    int64_t size = tensor->NumElements();
+    result.resize(size);
+
     void *data = tensor->GetData();
     switch (tensor->GetDataType()) {
         case DT_INT32:

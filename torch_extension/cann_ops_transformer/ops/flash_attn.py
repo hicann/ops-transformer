@@ -18,13 +18,16 @@ FA_METADATA_OP_NAME = "flash_attn_metadata"
 
 
 def _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q):
-    if batch_size is not None:
-        return batch_size
+    if seqused_q is not None:
+        return seqused_q.size(0)
     elif cu_seqlens_q is not None and cu_seqlens_q.size(0) > 0:
         return cu_seqlens_q.size(0) - 1
-    elif seqused_q is not None:
-        return seqused_q.size(0)
-    return 0
+
+    if batch_size is None:
+        raise ValueError(f"When seqused_q and cu_seqlens_q are not provdied, batch_size must be provided")
+    elif batch_size < 0:
+        raise ValueError(f"batch_size must be greater than 0, but got {batch_size}")
+    return batch_size
 
 
 def _calculate_metadata_size(batch_size, num_heads_kv):
@@ -65,7 +68,7 @@ class FlashAttenOpBuilder(OpBuilder):
         Essential for Autograd and FakeTensor support.
         """
 
-        @torch.library.register_fake("cann_ops_transformer::" + FA_METADATA_OP_NAME)
+        @torch.library.register_fake("cann_ops_transformer::flash_attn_metadata")
         def flash_attn_metadata_meta(
             num_heads_q: int,
             num_heads_kv: int,
@@ -84,13 +87,11 @@ class FlashAttenOpBuilder(OpBuilder):
             layout_kv: Optional[str] = None,
             layout_out: Optional[str] = None,
         ):
-            batch_size = (_calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
-                if batch_size is None
-                else batch_size)
-            metadata_size = _calculate_metadata_size(batch_size, num_heads_kv)
-            return torch.empty((metadata_size,), dtype=torch.int32, device="npu")
+            b_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
+            metadata_size = _calculate_metadata_size(b_size, num_heads_kv)
+            return torch.empty((metadata_size,), dtype=torch.int32, device="meta")
 
-        @impl(AS_LIBRARY, self.name, "Meta")
+        @torch.library.register_fake("cann_ops_transformer::flash_attn")
         def flash_attn_meta(
             q: torch.Tensor,
             k: torch.Tensor,
@@ -171,25 +172,19 @@ def flash_attn_metadata(
     seqused_q: Optional[torch.Tensor] = None,
     seqused_kv: Optional[torch.Tensor] = None,
     batch_size: Optional[int] = None,
-    max_seqlen_q: Optional[int] = None,
-    max_seqlen_kv: Optional[int] = None,
-    mask_mode: Optional[int] = None,
-    win_left: Optional[int] = None,
-    win_right: Optional[int] = None,
-    layout_q: Optional[str] = None,
-    layout_kv: Optional[str] = None,
-    layout_out: Optional[str] = None,
+    max_seqlen_q: Optional[int] = -1,
+    max_seqlen_kv: Optional[int] = -1,
+    mask_mode: Optional[int] = 0,
+    win_left: Optional[int] = -1,
+    win_right: Optional[int] = -1,
+    layout_q: Optional[str] = "BSND",
+    layout_kv: Optional[str] = "BSND",
+    layout_out: Optional[str] = "BSND",
 ):
     """
     Dispatcher implementation: NPU.
     'PrivateUse1' is dispatch key for custom NPU backends.
     """
-    op_module = flash_attn_op_builder.load()
-    batch_size = (
-        _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
-        if batch_size is None
-        else batch_size
-    )
     max_seqlen_q = -1 if max_seqlen_q is None else max_seqlen_q
     max_seqlen_kv = -1 if max_seqlen_kv is None else max_seqlen_kv
     mask_mode = 1 if mask_mode is None else mask_mode
@@ -199,7 +194,9 @@ def flash_attn_metadata(
     layout_kv = "BSND" if layout_kv is None else layout_kv
     layout_out = "BSND" if layout_out is None else layout_out
 
-    metadata_size = _calculate_metadata_size(batch_size, num_heads_kv)
+    op_module = flash_attn_op_builder.load()
+    b_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
+    metadata_size = _calculate_metadata_size(b_size, num_heads_kv)
     output = torch.empty((metadata_size,), dtype=torch.int32, device="npu")
 
     return op_module.flash_attn_metadata(
