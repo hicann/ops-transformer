@@ -32,6 +32,14 @@ static const int64_t BOUND_K_V2 = 256;
 static const int64_t ALIGNED_H_V2 = 512;
 static const int64_t NETWORKSIZE2_V2 = 5120;
 static const int64_t RESERVED_BUFFER = 1024;
+static const int64_t FAST_PATH_RESERVED_BUFFER = 5120;
+static const int64_t FAST_PATH_ALIGN = 512;
+static const int64_t FAST_PATH_MIN_BUFFER_NUM = 2;
+static const int64_t FAST_PATH_MAX_BUFFER_NUM = 4;
+static const int64_t FAST_PATH_QUEUE_NUM = 2;
+static const int64_t FAST_PATH_CAST_BUFFER_NUM = 2;
+static const int64_t FAST_PATH_FLOAT_BYTES = 4;
+static const int64_t FAST_PATH_TAIL_RESERVED_BUFFER = 256;
 
 static const size_t INDEX_IN_EXPAND_PERMUTED_ROWS_V2 = 0;
 static const size_t INDEX_IN_EXPANDED_SRC_TO_DST_ROW_V2 = 1;
@@ -91,22 +99,31 @@ private:
     void GetTilingData() const;
     ge::graphStatus LoadHKAndCalcTiling();
     ge::graphStatus LoadBiasAndCalcTiling();
+    ge::graphStatus CalcUnpermuteFastTiling();
     ge::graphStatus OptimizedCutH();
     ge::graphStatus Check310pParams();
     void SetTilingData();
     void CutH();
     ge::graphStatus CalcTilingData();
+    bool IsUnpermuteFastPath() const;
+    int64_t GetFastPathMaxHiddenSize(int64_t bufferNum) const;
     int64_t GetAllBiasTilingKey() const;
     int64_t GetTilingKeyForBigK() const;
     int64_t GetTilingKeyForLoadH() const;
     int64_t GetTilingKeyForK2() const;
     int64_t GetTilingKeyForK4() const;
     int64_t GetTilingKeyForDefault() const;
+    bool isUnpermuteFastPath_{false};
 };
 
 inline static int64_t AlignParamV2(const int64_t param, const int32_t typeSize)
 {
     return ((param * typeSize + ONE_BLK_SIZE_V2 - 1) / ONE_BLK_SIZE_V2 * ONE_BLK_SIZE_V2) / typeSize;
+}
+
+inline static int64_t AlignFastPathParam(const int64_t value)
+{
+    return (value + FAST_PATH_ALIGN - 1) / FAST_PATH_ALIGN * FAST_PATH_ALIGN;
 }
 
 ge::graphStatus MoeFinalizeRoutingV2Membase::DoGetPlatformInfo()
@@ -188,6 +205,7 @@ ge::graphStatus MoeFinalizeRoutingV2Membase::DoGetShapeAttrsInfo()
     params.x2Shape = x2Shape;
     params.biasShape = biasShape;
     params.scalesShape = scalesShape;
+    params.expertForSourceRowShape = expandedExpertIdxShape;
     params.expandedRowIdxShape = expandedRowIdxShapePtr;
 
     OP_CHECK_IF(
@@ -634,8 +652,127 @@ ge::graphStatus MoeFinalizeRoutingV2Membase::OptimizedCutH()
     return ge::GRAPH_SUCCESS;
 }
 
+bool MoeFinalizeRoutingV2Membase::IsUnpermuteFastPath() const
+{
+    auto isEmptyOptional = [](const gert::StorageShape* shape) {
+        return shape == nullptr || shape->GetStorageShape().GetShapeSize() == 0;
+    };
+    bool isA2OrA3 = socVersion_ == platform_ascendc::SocVersion::ASCEND910B ||
+                    socVersion_ == platform_ascendc::SocVersion::ASCEND910_93;
+    bool isRowMajor = dropPadMode_ == DROP_MODE_VALUE_2 || dropPadMode_ == DROP_MODE_VALUE_3;
+    return isA2OrA3 && dataType_ == ge::DT_BF16 && k_ == 1 && isRowMajor &&
+           isEmptyOptional(params.x1Shape) && isEmptyOptional(params.x2Shape) && isEmptyOptional(params.biasShape) &&
+           isEmptyOptional(params.scalesShape) && isEmptyOptional(params.expertForSourceRowShape);
+}
+
+int64_t MoeFinalizeRoutingV2Membase::GetFastPathMaxHiddenSize(int64_t bufferNum) const
+{
+    // Match MoeTokenUnpermute's BF16 UB model: input queue + output queue + two FP32 cast buffers.
+    int64_t unitHiddenSpace = inputDataTypeSize_ * (FAST_PATH_QUEUE_NUM + bufferNum - 1) +
+                              FAST_PATH_FLOAT_BYTES * FAST_PATH_CAST_BUFFER_NUM;
+    int64_t rawUbSize = ubSize_ + RESERVED_BUFFER;
+    int64_t maxHiddenSize = (rawUbSize - FAST_PATH_RESERVED_BUFFER) / unitHiddenSpace;
+    if (maxHiddenSize <= FAST_PATH_ALIGN) {
+        return 0;
+    }
+    return AlignFastPathParam(maxHiddenSize - FAST_PATH_ALIGN);
+}
+
+ge::graphStatus MoeFinalizeRoutingV2Membase::CalcUnpermuteFastTiling()
+{
+    if (h_ <= 0) {
+        return ge::GRAPH_FAILED;
+    }
+    const auto& expandedXShape = params.expandedXShape->GetStorageShape();
+    int64_t expandedXRowNum = expandedXShape.GetShapeSize() / h_;
+    if (expandedXRowNum <= 0) {
+        return ge::GRAPH_FAILED;
+    }
+
+    int64_t maxHiddenSize = GetFastPathMaxHiddenSize(FAST_PATH_MIN_BUFFER_NUM);
+    if (maxHiddenSize <= 0) {
+        return ge::GRAPH_FAILED;
+    }
+
+    int64_t fastHiddenSliceLength;
+    int64_t fastHiddenSliceCount;
+    int64_t fastHiddenSliceRemain;
+    if (AlignFastPathParam(h_) <= maxHiddenSize) {
+        fastHiddenSliceLength = h_;
+        fastHiddenSliceCount = 1;
+        fastHiddenSliceRemain = 0;
+    } else {
+        fastHiddenSliceLength = maxHiddenSize;
+        fastHiddenSliceCount = h_ / maxHiddenSize;
+        fastHiddenSliceRemain = h_ % maxHiddenSize;
+    }
+
+    int64_t fastBufferNum = FAST_PATH_MAX_BUFFER_NUM;
+    while (fastBufferNum > FAST_PATH_MIN_BUFFER_NUM &&
+           fastHiddenSliceLength > GetFastPathMaxHiddenSize(fastBufferNum)) {
+        --fastBufferNum;
+    }
+
+    int64_t fastUsedCoreNum = min(totalRowNum_, totalCoreNum_);
+    if (fastUsedCoreNum <= 0) {
+        return ge::GRAPH_FAILED;
+    }
+    int64_t fastRowsPerCore = totalRowNum_ / fastUsedCoreNum;
+    int64_t fastRemainderCoreCount = totalRowNum_ % fastUsedCoreNum;
+
+    int64_t unitHiddenSpace = inputDataTypeSize_ * (FAST_PATH_QUEUE_NUM + fastBufferNum - 1) +
+                              FAST_PATH_FLOAT_BYTES * FAST_PATH_CAST_BUFFER_NUM;
+    int64_t remainUbSize = ubSize_ + RESERVED_BUFFER - AlignFastPathParam(fastHiddenSliceLength) * unitHiddenSpace -
+                           FAST_PATH_TAIL_RESERVED_BUFFER;
+    if (remainUbSize <= 0) {
+        return ge::GRAPH_FAILED;
+    }
+
+    int64_t fastRowsPerTile;
+    int64_t fastTileCount;
+    int64_t fastTileRemain;
+    int64_t indexBytesPerCore = fastRowsPerCore * INT_NUM_OF_BYTES_V2;
+    if (remainUbSize >= indexBytesPerCore) {
+        fastRowsPerTile = fastRowsPerCore;
+        fastTileCount = 1;
+        fastTileRemain = 0;
+    } else {
+        fastRowsPerTile = remainUbSize / INT_NUM_OF_BYTES_V2;
+        if (fastRowsPerTile <= 0) {
+            return ge::GRAPH_FAILED;
+        }
+        fastTileCount = fastRowsPerCore / fastRowsPerTile;
+        fastTileRemain = fastRowsPerCore % fastRowsPerTile;
+    }
+
+    // Under key 20050 these fields carry the same quantities as MoeTokenUnpermute tiling.
+    // The fast path has no bias, so biasRowNum carries the number of addressable rows in expanded_x.
+    usedCoreNum_ = fastUsedCoreNum;
+    biasRowNum_ = expandedXRowNum;
+    normalH_ = fastHiddenSliceLength;
+    hSliceNum_ = fastHiddenSliceCount;
+    unnormalH_ = fastHiddenSliceRemain;
+    normalK_ = fastBufferNum; // input queue buffer count
+    normalCoreHandleNum_ = fastRowsPerCore;
+    tailCoreHandleNum_ = fastRemainderCoreCount;
+    normalCoreHandleNumPerLoop_ = fastRowsPerTile;
+    normalCoreLoopNum_ = fastTileCount;
+    normalCoreHandleNumTailLoop_ = fastTileRemain;
+    tailCoreLoopNum_ = 0;
+    tailCoreHandleNumPerLoop_ = 0;
+    tailCoreHandleNumTailLoop_ = 0;
+    unnormalK_ = 0;
+    kSliceNum_ = 0;
+    isUnpermuteFastPath_ = true;
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus MoeFinalizeRoutingV2Membase::CalcTilingData()
 {
+    isUnpermuteFastPath_ = false;
+    if (IsUnpermuteFastPath() && CalcUnpermuteFastTiling() == ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_SUCCESS;
+    }
     // 非尾核，每个核处理的skip1行数
     normalCoreHandleNum_ = (totalRowNum_ + totalCoreNum_ - 1) / totalCoreNum_;
     // 使用的核数
@@ -822,7 +959,9 @@ int64_t MoeFinalizeRoutingV2Membase::GetTilingKeyForDefault() const
 
 void MoeFinalizeRoutingV2Membase::CalcTilingKeyWithScales()
 {
-    if (isOptimizedCutH_) {
+    if (isUnpermuteFastPath_) {
+        tilingKey_ = DTYPE_BF16_UNPERMUTE_FAST_V2;
+    } else if (isOptimizedCutH_) {
         tilingKey_ = (biasIsNull_ == 1) ? DTYPE_FLOAT_CUTH_NETWORK_V2_WITHOUT_BIAS : DTYPE_FLOAT_CUTH_NETWORK_V2;
     } else if (isCanLoadAllBias_) {
         tilingKey_ = GetAllBiasTilingKey();
@@ -854,6 +993,7 @@ void MoeFinalizeRoutingV2Membase::DoPostTiling()
 
 void MoeFinalizeRoutingV2Membase::PrintTilingData()
 {
+    OP_LOGI(context_->GetNodeName(), "MoeFinalizeRoutingV2 get tiling key: %lx", tilingKey_);
     OP_LOGI("MoeFinalizeRoutingV2", "totalCoreNum: %ld", tilingData.get_totalCoreNum());
     OP_LOGI("MoeFinalizeRoutingV2", "usedCoreNum: %ld", tilingData.get_usedCoreNum());
     OP_LOGI("MoeFinalizeRoutingV2", "skip2IsNull: %ld", tilingData.get_skip2IsNull());

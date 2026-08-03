@@ -1122,6 +1122,126 @@ TEST_F(MoeFinalizeRoutingTilingV2, MoeFinalizeRouting_tiling_all_bias_bf16_mix_f
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 20043, "", {16777216});
 }
 
+TEST_F(MoeFinalizeRoutingTilingV2, MoeFinalizeRouting_tiling_bf16_unpermute_fast_a2) {
+    optiling::MoeFinalizeRoutingCompileInfoV2 compileInfo = {48, 196608};
+    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2",
+        {
+            {{{10128, 4096}, {10128, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{10128}, {10128}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {{{{10128, 4096}, {10128, 4096}}, ge::DT_BF16, ge::FORMAT_ND},},
+        DefaultAttrs(2, 1),
+        &compileInfo,
+        "Ascend910B", 48, 196608);
+    string expectTilingData =
+        "48 48 1 10128 10128 4096 4096 0 1 4 0 0 1 211 1 211 0 0 0 0 0 0 1 2 1 ";
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 20050, expectTilingData, {16777216});
+}
+
+TEST_F(MoeFinalizeRoutingTilingV2, MoeFinalizeRouting_tiling_bf16_unpermute_fast_a2_40_core_tail) {
+    optiling::MoeFinalizeRoutingCompileInfoV2 compileInfo = {40, 196608};
+    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2",
+        {
+            {{{10128, 4096}, {10128, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{10128}, {10128}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {{{{10128, 4096}, {10128, 4096}}, ge::DT_BF16, ge::FORMAT_ND},},
+        DefaultAttrs(2, 1),
+        &compileInfo,
+        "Ascend910B", 40, 196608);
+    string expectTilingData =
+        "40 40 1 10128 10128 4096 4096 0 1 4 0 0 1 253 1 253 0 8 0 0 0 0 1 2 1 ";
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 20050, expectTilingData, {16777216});
+}
+
+TEST_F(MoeFinalizeRoutingTilingV2, MoeFinalizeRouting_tiling_bf16_unpermute_fast_a3) {
+    optiling::MoeFinalizeRoutingCompileInfoV2 compileInfo = {48, 196608};
+    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2",
+        {
+            {{{10128, 4096}, {10128, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{10128}, {10128}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {{{{10128, 4096}, {10128, 4096}}, ge::DT_BF16, ge::FORMAT_ND},},
+        DefaultAttrs(2, 1),
+        &compileInfo,
+        "Ascend910_93", 48, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 20050, "", {16777216});
+}
+
+TEST_F(MoeFinalizeRoutingTilingV2, MoeFinalizeRouting_tiling_bf16_unpermute_fast_mode3) {
+    optiling::MoeFinalizeRoutingCompileInfoV2 compileInfo = {48, 196608};
+    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2",
+        {
+            {{{8, 1266, 4096}, {8, 1266, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{10000}, {10000}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {{{{10000, 4096}, {10000, 4096}}, ge::DT_BF16, ge::FORMAT_ND},},
+        DefaultAttrs(3, 1),
+        &compileInfo,
+        "Ascend910B", 48, 196608);
+    string expectTilingData =
+        "48 48 1 10128 10000 4096 4096 0 1 4 0 0 1 208 1 208 0 16 0 0 0 0 1 3 1 ";
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 20050, expectTilingData, {16777216});
+}
+
+TEST_F(MoeFinalizeRoutingTilingV2, MoeFinalizeRouting_tiling_bf16_unpermute_fast_fallback_with_scales) {
+    optiling::MoeFinalizeRoutingCompileInfoV2 compileInfo = {48, 196608};
+    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2",
+        {
+            {{{10128, 4096}, {10128, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{10128}, {10128}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{10128, 1}, {10128, 1}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {{{{10128, 4096}, {10128, 4096}}, ge::DT_BF16, ge::FORMAT_ND},},
+        DefaultAttrs(2, 1),
+        &compileInfo,
+        "Ascend910B", 48, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 20036, "", {16777216});
+}
+
+TEST_F(MoeFinalizeRoutingTilingV2, MoeFinalizeRouting_tiling_bf16_unpermute_fast_fallback_mode0) {
+    optiling::MoeFinalizeRoutingCompileInfoV2 compileInfo = {48, 196608};
+    gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2",
+        {
+            {{{10128, 4096}, {10128, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{10128}, {10128}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_BF16, ge::FORMAT_ND},
+            {{}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {{{{10128, 4096}, {10128, 4096}}, ge::DT_BF16, ge::FORMAT_ND},},
+        DefaultAttrs(0, 1),
+        &compileInfo,
+        "Ascend910B", 48, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 20036, "", {16777216});
+}
+
 TEST_F(MoeFinalizeRoutingTilingV2, MoeFinalizeRouting_tiling_310p_float_success) {
     optiling::MoeFinalizeRoutingCompileInfoV2 compileInfo = {40, 65536};
     gert::TilingContextPara tilingContextPara("MoeFinalizeRoutingV2",

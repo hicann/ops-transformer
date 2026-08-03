@@ -25,6 +25,7 @@
 #include "moe_finalize_routing_v2_fp_db_all_bias.h"
 #include "moe_finalize_routing_v2_bf16_all_bias.h"
 #include "moe_finalize_routing_v2_fp_cuth_k2_optimized.h"
+#include "moe_finalize_routing_v2_unpermute_fast.h"
 
 #define TILING_KEY_DTYPE_FLOAT_BIG_K_V2 20000
 #define TILING_KEY_DTYPE_FLOAT16_BIG_K_V2 20001
@@ -75,6 +76,7 @@
 #define TILING_KEY_DTYPE_BF16_CUTH_K4_V2_WITHOUT_BIAS_MIX_PRECISION 20047
 #define TILING_KEY_DTYPE_BF16_CUTH_V2_WITHOUT_BIAS_MIX_PRECISION 20048
 #define TILING_KEY_DTYPE_BF16_ALL_BIAS_V2_WITHOUT_BIAS_MIX_PRECISION 20049
+#define TILING_KEY_DTYPE_BF16_UNPERMUTE_FAST_V2 20050
 
 using namespace MoeFinalizeRoutingV2;
 
@@ -198,7 +200,11 @@ extern "C" __global__ __aicore__ void moe_finalize_routing_v2(
 #endif
 
 #if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113)) && (ORIG_DTYPE_EXPANDED_X == DT_BF16)
-    if (TILING_KEY_IS(TILING_KEY_DTYPE_BF16_BIG_K_V2)) {
+    if (TILING_KEY_IS(TILING_KEY_DTYPE_BF16_UNPERMUTE_FAST_V2)) {
+        MoeFinalizeRoutingV2::MoeFinalizeRoutingV2UnpermuteFast<bfloat16_t, int32_t, bfloat16_t, false> op;
+        op.Init(expandedPermutedRows, expandedSrcToDstRow, nullptr, out, &tilingData, &pipe);
+        op.Process();
+    } else if (TILING_KEY_IS(TILING_KEY_DTYPE_BF16_BIG_K_V2)) {
         MoeFinalizeRoutingV2::MoeFinalizeRoutingV2Bf16CutK<bfloat16_t, bfloat16_t, true> op(tilingData, pipe);
         op.Init(expandedPermutedRows, expandedSrcToDstRow, skip1, skip2, bias, scales, expertForSourceRow, out, userWS);
         op.Process();
