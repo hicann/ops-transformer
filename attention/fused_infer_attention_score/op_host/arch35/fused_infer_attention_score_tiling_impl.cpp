@@ -545,22 +545,6 @@ int64_t FusedInferAttentionScoreTilingImpl::GetCalcBlockNumsOneHead(const FiaTil
     }
 }
 
-int64_t FusedInferAttentionScoreTilingImpl::GetSInnerBlockNums(int64_t sInnerIndexStart, int64_t sInnerIndexEnd,
-                                                               int64_t innerBlockNums) const
-{
-    int64_t sInnerBlockNums = 0;
-    if (sInnerIndexEnd < 0) {
-        sInnerBlockNums = 0;
-    } else if (sInnerIndexEnd < innerBlockNums) {
-        sInnerBlockNums = (sInnerIndexStart < 0) ? (sInnerIndexEnd + 1) : (sInnerIndexEnd - sInnerIndexStart + 1);
-    } else {
-        sInnerBlockNums = (sInnerIndexStart < 0) ?
-                              innerBlockNums :
-                              (sInnerIndexStart < innerBlockNums ? innerBlockNums - sInnerIndexStart : 0);
-    }
-    return sInnerBlockNums;
-}
-
 void FusedInferAttentionScoreTilingImpl::ComputeSplitNBSeq(const FiaTilingInfo &fiaInfo, const size_t maxCoreNums,
                                                            uint32_t sOuterSize, uint32_t sInnerSize,
                                                            double coreWeightTarget, uint32_t &curCore)
@@ -1586,21 +1570,6 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::SetWorkspaceAntiQuant(const 
         workspaceSize_ += platformInfo_.coreNum * 64 * 2; // bmm1 bmm2 2份
     }
 
-    return ge::GRAPH_SUCCESS;
-}
-
-ge::graphStatus FusedInferAttentionScoreTilingImpl::SetWorkspacePTQuant(const FiaTilingInfo &fiaInfo,
-                                                                        int64_t &curWorkspaceSize)
-{
-    uint64_t maxSpmSize = 0; // 待处理 tilingData.promptAttentionTensorSizeRect.get_spmTmpSize();
-    int64_t mm1ResSize = sOuterFactor_ * CV_RATIO * sInnerFactor_;
-    int64_t mm2ResSize = sOuterFactor_ * CV_RATIO * fiaInfo.vHeadDim;
-    curWorkspaceSize = platformInfo_.defaultSysWorkspaceSize +
-                       platformInfo_.coreNum * 2 * (maxSpmSize + mm1ResSize * 2 + mm2ResSize * 2);
-    if (fiaInfo.kvStorageMode == KvStorageMode::PAGE_ATTENTION) {
-        // 2 bmm, db, ensure alignment of each structure 64B, dcci cacheline needs
-        curWorkspaceSize += static_cast<uint64_t>(platformInfo_.coreNum) * 2 * 2 * 64;
-    }
     return ge::GRAPH_SUCCESS;
 }
 

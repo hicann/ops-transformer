@@ -82,38 +82,6 @@ ge::graphStatus FiaTilingFullQuantMxArch35::DoOpTiling()
     OP_CHECK_IF(SetPlatMemoryInfo() != ge::GRAPH_SUCCESS, OP_LOGE(fiaInfo_->opName, "Set plat memory info fail."),
                 return ge::GRAPH_FAILED);
 
-    if (fiaInfo_->emptyTensorFlag) {
-        int64_t outSize = fiaInfo_->opParamInfo.attenOut.shape->GetStorageShape().GetShapeSize();
-        int64_t lseSize =
-            fiaInfo_->softmaxLseFlag ? fiaInfo_->opParamInfo.lseOut.shape->GetStorageShape().GetShapeSize() : 0;
-        uint32_t singleCoreSize = (outSize + platformInfo_.aivNum - 1) / (platformInfo_.aivNum);
-        if (fiaInfo_->isOutQuantEnable) {
-            singleCoreSize = AlignUp(singleCoreSize, uint32_t(2));
-        }
-        tilingData_.baseTiling.fiaEmptyTensorParams.singleCoreSize = singleCoreSize;
-        tilingData_.baseTiling.fiaEmptyTensorParams.totalOutputSize =
-            static_cast<uint64_t>(std::max(outSize, static_cast<int64_t>(0)));
-        tilingData_.baseTiling.fiaEmptyTensorParams.totalSoftMaxLseOutputSize =
-            static_cast<uint64_t>(std::max(lseSize, static_cast<int64_t>(0)));
-        tilingData_.baseTiling.fiaEmptyTensorParams.needInit = 1;
-
-        tilingKeyInfo_.emptyTensor = true;
-        tilingKey_ = GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.config, tilingKeyInfo_.pseMode,
-                                        tilingKeyInfo_.quantMode, tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.hasRope,
-                                        tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd, tilingKeyInfo_.emptyTensor,
-                                        tilingKeyInfo_.enableKvPrefix, tilingKeyInfo_.enableS1OutSplit);
-
-        workspaceSize_ = platformInfo_.defaultSysWorkspaceSize;
-        CalcNumBlocks(platformInfo_.aicNum);
-
-        if ((SetNumBlocks(numBlocks_) != ge::GRAPH_SUCCESS) || (SetTilingKey(tilingKey_) != ge::GRAPH_SUCCESS) ||
-            (SetWorkspaceSize(workspaceSize_) != ge::GRAPH_SUCCESS) ||
-            (SetTilingData(tilingData_) != ge::GRAPH_SUCCESS)) {
-            return ge::GRAPH_FAILED;
-        }
-        return ge::GRAPH_SUCCESS;
-    }
-
     if (fiaInfo_->isMaxWorkspace) {
         // tiling下沉场景，无法获取到actual_seq，分核结果未知，workspace设置成最大
         CalcMaxWorkspaceSize();
@@ -256,128 +224,6 @@ void FiaTilingFullQuantMxArch35::AdjustSinnerAndSouter()
     OP_LOGI(fiaInfo_->opName, "Souter:%u SInner:%u", sOuterFactor_, sInnerFactor_);
 }
 
-void FiaTilingFullQuantMxArch35::GetPreNextTokensLeftUp(int64_t actualSeqLength, int64_t actualSeqLengthKV,
-                                                        int64_t &preTokensLeftUp, int64_t &nextTokensLeftUp)
-{
-    if (fiaInfo_->sparseMode == SPARSE_MODE_RIGHT_DOWN) {
-        preTokensLeftUp = SPARSE_MODE_INT_MAX;
-        if (fiaInfo_->ropeMode == RopeMode::ROPE_SPLIT && fiaInfo_->vHeadDim == 512) {
-            if (fiaInfo_->qLayout == FiaLayout::BSND || fiaInfo_->qLayout == FiaLayout::BSH ||
-                fiaInfo_->qLayout == FiaLayout::TND) {
-                nextTokensLeftUp = actualSeqLengthKV * fiaInfo_->gSize - actualSeqLength;
-            } else { // BNSD场景下分核不做优化
-                nextTokensLeftUp = SPARSE_MODE_INT_MAX;
-            }
-        } else {
-            nextTokensLeftUp = actualSeqLengthKV - actualSeqLength;
-        }
-    } else if (fiaInfo_->sparseMode == SPARSE_MODE_BAND) {
-        preTokensLeftUp = fiaInfo_->preToken - actualSeqLengthKV + actualSeqLength;
-        nextTokensLeftUp = fiaInfo_->nextToken + actualSeqLengthKV - actualSeqLength;
-    } else {
-        preTokensLeftUp = fiaInfo_->preToken;
-        nextTokensLeftUp = fiaInfo_->nextToken;
-    }
-}
-
-void FiaTilingFullQuantMxArch35::FixParamWithRowInvalid(int64_t &actualSeqLength, int64_t actualSeqLengthKV,
-                                                        int64_t &preTokensLeftUp, int64_t &nextTokensLeftUp)
-{
-    // 若出现行无效，需要重新计算nexttokens，pretokens，actualseqlen，以便正确计算分核核数
-    int64_t nextTokensError = (nextTokensLeftUp < 0) ? -nextTokensLeftUp : 0;
-    nextTokensError = nextTokensError > actualSeqLength ? actualSeqLength : nextTokensError;
-    int64_t preTokensError = 0;
-    if (fiaInfo_->mlaMode == MlaMode::ROPE_SPLIT_D512) {
-        preTokensError = (actualSeqLength > actualSeqLengthKV * fiaInfo_->gSize + preTokensLeftUp) ?
-                             (actualSeqLength - actualSeqLengthKV * fiaInfo_->gSize - preTokensLeftUp) :
-                             0;
-    } else {
-        preTokensError = (actualSeqLength > actualSeqLengthKV + preTokensLeftUp) ?
-                             (actualSeqLength - actualSeqLengthKV - preTokensLeftUp) :
-                             0;
-    }
-    preTokensError = preTokensError > actualSeqLength ? actualSeqLength : preTokensError;
-
-    // 若出现上方行无效，需要重新计算nexttokens，pretokens，actualseqlen
-    nextTokensLeftUp += nextTokensError;
-    preTokensLeftUp -= nextTokensError;
-    actualSeqLength -= nextTokensError;
-
-    // 若出现下方行无效，需要重新计算actualseqlen
-    actualSeqLength -= preTokensError;
-}
-
-bool FiaTilingFullQuantMxArch35::CheckS1OutSplit()
-{
-    return false;
-    if (fiaInfo_->isOutQuantEnable) {
-        return false;
-    }
-
-    if (fiaInfo_->sysPrefixFlag || fiaInfo_->kvPaddingSizeFlag || fiaInfo_->qPaddingSizeFlag ||
-        fiaInfo_->learnableSinkFlag || fiaInfo_->enableAlibiPse) {
-        return false;
-    }
-
-    if (fiaInfo_->sparseMode == SPARSE_MODE_BAND ||
-        (fiaInfo_->sparseMode == SPARSE_MODE_NO_MASK && fiaInfo_->attenMaskFlag)) {
-        return false;
-    }
-
-    // 仅支持非量化，占用2B
-    const int64_t dataTypeSize = 2U;
-    int64_t bnSize = std::min(fiaInfo_->bSize * fiaInfo_->n2Size, platformInfo_.aicNum);
-
-    // 当所需的L2cache资源的超过系统配置一半时，开启S1外切分核优化L2cache复用率，乘2是经验值，后续进行优化
-    return bnSize * fiaInfo_->s2Size * (fiaInfo_->qkHeadDim + fiaInfo_->vHeadDim) * dataTypeSize * 2 >=
-           platformInfo_.l2Size;
-}
-
-void FiaTilingFullQuantMxArch35::SplitOutSeq()
-{
-    uint32_t curCoreNum = platformInfo_.aicNum;
-    uint32_t sOuterSize = sOuterFactor_ * CV_RATIO;
-    int64_t totalSize = 0;
-    for (uint32_t bIdx = 0; bIdx < fiaInfo_->bSize; bIdx++) {
-        int64_t actualSeqLengthsTmp = actualSeqLengthsQ_[bIdx]; // 用于存放减去行无效后，真实的actseqlen
-        int64_t preTokensLeftUp = 0;
-        int64_t nextTokensLeftUp = 0;
-        GetPreNextTokensLeftUp(actualSeqLengthsQ_[bIdx], actualSeqLengthsKV_[bIdx] + fiaInfo_->systemPrefixLen,
-                               preTokensLeftUp, nextTokensLeftUp);
-        FixParamWithRowInvalid(actualSeqLengthsTmp, actualSeqLengthsKV_[bIdx] + fiaInfo_->systemPrefixLen,
-                               preTokensLeftUp, nextTokensLeftUp);
-
-        int64_t outerBlockNums = (actualSeqLengthsTmp * fiaInfo_->gSize + static_cast<int64_t>(sOuterSize) - 1) /
-                                 static_cast<int64_t>(sOuterSize) * fiaInfo_->n2Size;
-        if (actualSeqLengthsTmp == 0 || actualSeqLengthsKV_[bIdx] == 0) {
-            outerBlockNums = fiaInfo_->n2Size;
-        }
-        totalSize += outerBlockNums;
-        OP_LOGD(fiaInfo_->opName,
-                "bIdx:%u, sOuterSize:%u, sactualSeqLengthsQ_[bIdx]:%lld, actualSeqLengthsKV_[bIdx]:%lld, "
-                "outerBlockNums:%lld, totalSize:%lld\n",
-                bIdx, sOuterSize, actualSeqLengthsQ_[bIdx], actualSeqLengthsKV_[bIdx], outerBlockNums, totalSize);
-    }
-
-    int64_t actualUsedCoreNum = std::min(totalSize, static_cast<int64_t>(curCoreNum));
-    CalcNumBlocks(actualUsedCoreNum);
-    tilingData_.baseTiling.fiaS1OuterSplitCoreParams.totalSize = totalSize;
-    tilingData_.baseTiling.fiaS1OuterSplitCoreParams.enableS1OutSplit = true;
-    OP_LOGD(fiaInfo_->opName, "actualUsedCoreNum:%lld\n", actualUsedCoreNum);
-    OP_LOGD(fiaInfo_->opName, "totalSize:%lld\n", totalSize);
-    OP_LOGD(fiaInfo_->opName, "gqa enableS1OutSplit\n");
-}
-
-bool FiaTilingFullQuantMxArch35::CheckQKVActualSeqLengthsRight()
-{
-    for (uint32_t bIdx = 0; bIdx < fiaInfo_->bSize; bIdx++) {
-        if ((actualSeqLengthsQ_[bIdx] % SOUTER_32 > 0) || (actualSeqLengthsKV_[bIdx] <= SINNER_128)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void FiaTilingFullQuantMxArch35::CreateSplitInput(split_core_v2::BaseInfo &baseInfo,
                                                   split_core_v2::SplitParam &splitParam)
 {
@@ -480,16 +326,11 @@ void FiaTilingFullQuantMxArch35::SplitPolicy()
     split_core_v2::SplitParam splitParam{};
     CreateSplitInput(baseInfo, splitParam);
 
-    enableS1OutSplit = CheckS1OutSplit();
-    if (enableS1OutSplit) {
-        SplitOutSeq();
-    } else {
-        split_core_v2::FAMetaData result{platformInfo_.aicNum, platformInfo_.cvRatio};
-        split_core_v2::SplitCore(platformInfo_.aicNum, baseInfo, splitParam, result);
-        SetSplitOutput(result);
-        CalcNumBlocks(result.usedCoreNum);
-        flashDecodeFlag_ = (result.fdRes.fdNum > 0);
-    }
+    split_core_v2::FAMetaData result{platformInfo_.aicNum, platformInfo_.cvRatio};
+    split_core_v2::SplitCore(platformInfo_.aicNum, baseInfo, splitParam, result);
+    SetSplitOutput(result);
+    CalcNumBlocks(result.usedCoreNum);
+    flashDecodeFlag_ = (result.fdRes.fdNum > 0);
     fiaInfo_->isExistRowInvalid =
         (fiaInfo_->needInit || IsExistRowInvalid(baseInfo) || IsActualSeqLengthsKVHasZero(baseInfo));
 }
@@ -731,16 +572,6 @@ void FiaTilingFullQuantMxArch35::CalcWorkspaceSize()
 
     int64_t bmm2Bytes = 0;
     int64_t vec2Bytes = 0;
-    int64_t bmm2ResBlockSize = dVBasicBlock;
-    if (dVBasicBlock > DSIZE_256) {
-        bmm2ResBlockSize = DSIZE_512;
-    }
-    if (dSize > DSIZE_128) {
-        bmm2Bytes = mSize * bmm2ResBlockSize * sizeof(float);
-        if (dVBasicBlock > DSIZE_256) {
-            vec2Bytes = mSize * dVBasicBlock * sizeof(float);
-        }
-    }
     workspaceSize_ += (bmm2Bytes + vec2Bytes) * 3 * numBlocks_; // 3: perload 2次 需要2+1
 
     if (flashDecodeFlag_) {

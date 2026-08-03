@@ -39,13 +39,11 @@ private:
     // enableFullQuant 相关校验函数
     ge::graphStatus CheckDataTypeSupportFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantScaleDtypeMLAFullquant(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckDequantScaleDtypeGQAPerblock(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantScaleDtypeGQAPertensor(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantScaleDtypeMXFP8Fullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantScaleDtypeFP8GQAFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantScaleDtypeFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantModeMLAFullquant(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckDequantModeGQAPerblock(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantModeGQAPertensor(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantModeMXFP8Fullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantModeFP8GQAFullquant(const FiaTilingInfo &fiaInfo);
@@ -57,12 +55,10 @@ private:
         const std::string &quantModeName, const std::string &inputName) const;
     ge::graphStatus CheckExistencePertensorFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckExistenceMLAFullquant(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckExistencePerblockFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckExistenceMXFP8Fullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckExistenceFP8GQAFullquant(const FiaTilingInfo &fiaInfo);
 
     ge::graphStatus CheckFeaturePertensorFullquant(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckFeaturePerblockFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckFeatureMLAFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckFeatureSupportFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckFeatureMXFP8Fullquant(const FiaTilingInfo &fiaInfo) const;
@@ -74,21 +70,12 @@ private:
     ge::graphStatus CheckDequantScaleShapeMXFP8(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantScaleBnNBsDShapeMXFP8(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantScaleNZShapeMXFP8(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckQuantScale1ShapePerblock(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckQuantScale1ShapeMXFP8(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckQuantScale1ShapeFP8GQA(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckDequantScaleShapePerblockNTD(const FiaTilingInfo &fiaInfo,
-        const gert::Shape &dequantScaleQueryShape, const gert::Shape &keyAntiquantScaleShape,
-        const gert::Shape &valueAntiquantScaleShape, uint32_t fp8QBlockSize, uint32_t fp8KVBlockSize) const;
-    ge::graphStatus CheckDequantScaleShapePerblockNonNTD(const FiaTilingInfo &fiaInfo,
-        const gert::Shape &dequantScaleQueryShape, const gert::Shape &keyAntiquantScaleShape,
-        const gert::Shape &valueAntiquantScaleShape, uint32_t fp8QBlockSize, uint32_t fp8KVBlockSize) const;
-    ge::graphStatus CheckDequantScaleShapePerblock(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantScaleShapeFP8GQA(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantScaleShapeFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantScaleShapeCrossFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckInputDTypeFullquant(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckInputLayoutPerblock(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckInputLayoutPertensor(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckInputLayoutMLAFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckInputLayoutMXFP8Fullquant(const FiaTilingInfo &fiaInfo) const;
@@ -154,7 +141,6 @@ private:
     int64_t GetValueScaleActualKVlens4TNDNoPa(const FiaTilingInfo &fiaInfo) const;
 
 private:
-    bool enableQKVPerblockQuant_ = false;
     bool enableQKVPertensorQuant_ = false;
     bool enableQPerTokenHeadKVPerTensor_ = false;
     bool enableQKVMxfp8FullQuant_ = false;
