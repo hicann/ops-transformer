@@ -170,7 +170,7 @@ void QuantFlashAttnTilingImpl::UpdateTilingKeyLayout()
     } else if (qfaInfo_->qLayout == QfaLayout::TND) {
         tilingKeyInfo_.inputLayout = InOutLayoutType_TND_TND;
     } else {
-        tilingKeyInfo_.inputLayout = InOutLayoutType_BSH_BSH;
+        tilingKeyInfo_.inputLayout = InOutLayoutType_BSND_BSND;
     }
 }
 
@@ -179,7 +179,7 @@ void QuantFlashAttnTilingImpl::UpdateTilingKeyKvLayout()
     if (!qfaInfo_->pageAttentionFlag) {
         tilingKeyInfo_.kvLayoutType = KvLayoutType_NO_PA;
     } else if (qfaInfo_->kvLayout == QfaLayout::PA_BBND) {
-        tilingKeyInfo_.kvLayoutType = KvLayoutType_PA_BBH;
+        tilingKeyInfo_.kvLayoutType = KvLayoutType_PA_BBND;
     } else if (qfaInfo_->kvLayout == QfaLayout::PA_BNBD) {
         tilingKeyInfo_.kvLayoutType = KvLayoutType_PA_BNBD;
     } else if (qfaInfo_->kvLayout == QfaLayout::PA_NZ) {

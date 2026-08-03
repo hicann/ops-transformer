@@ -111,12 +111,12 @@ static constexpr inferFaLayOutTypeEnum InOutLayoutTypeValue[3][2] = {
 #define InOutLayoutType_BNSD 1
 #define InOutLayoutType_TND 2
 // backward compat
-#define InOutLayoutType_BSH_BSH InOutLayoutType_BSND
+#define InOutLayoutType_BSND_BSND InOutLayoutType_BSND
 #define InOutLayoutType_BNSD_BNSD InOutLayoutType_BNSD
 #define InOutLayoutType_TND_TND InOutLayoutType_TND
 
 #define KvLayoutType_NO_PA 0
-#define KvLayoutType_PA_BBH 1
+#define KvLayoutType_PA_BBND 1
 #define KvLayoutType_PA_BNBD 2
 #define KvLayoutType_PA_NZ 3
 

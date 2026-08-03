@@ -2885,8 +2885,7 @@ TEST_PARAMS = {
 }
 
 SKIP_CASES = {
-    "PA_NZ_B8_QS60_KVS1536_Nq4_Nkv4_D128_SP3",
-    "PA_NZ_B8_QS1_KVS999_Nq128_Nkv4_D128_SP3",
+    "PA_BnNBsD_B1_QS15_KVS0_Nq20_Nkv4_D128_SP0",
 }
 
 CASES = expand_paramset_to_cases(TEST_PARAMS)

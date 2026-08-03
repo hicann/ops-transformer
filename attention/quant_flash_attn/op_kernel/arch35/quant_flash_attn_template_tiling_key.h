@@ -24,7 +24,7 @@ using namespace optiling;
 
 ASCENDC_TPL_ARGS_DECL(QuantFlashAttn,
                       //    InOutLayoutType (8-bit)
-                      //    0: InOutLayoutType_BSH_BSH
+                      //    0: InOutLayoutType_BSND_BSND
                       //    1: InOutLayoutType_BNSD_BNSD
                       //    2: InOutLayoutType_TND_TND
                       ASCENDC_TPL_UINT_DECL(InOutLayoutType, ASCENDC_TPL_8_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 255),
@@ -41,7 +41,7 @@ ASCENDC_TPL_ARGS_DECL(QuantFlashAttn,
                       ASCENDC_TPL_BOOL_DECL(HasAttenMask, false, true),
                       //    KvLayoutType (2-bit)
                       //    0: KvLayoutType_NO_PA
-                      //    1: KvLayoutType_PA_BBH
+                      //    1: KvLayoutType_PA_BBND
                       //    2: KvLayoutType_PA_BNBD
                       //    3: KvLayoutType_PA_NZ
                       ASCENDC_TPL_UINT_DECL(KvLayoutType, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 3),
@@ -57,6 +57,7 @@ ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(
     ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
     ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA, KvLayoutType_PA_BNBD,
                          KvLayoutType_PA_NZ),
-    ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)));
+    ASCENDC_TPL_BOOL_SEL(IsFd, false),
+    ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)));
 
 #endif // TEMPLATE_TILING_KEY_QUANT_FLASH_ATTN_H_
