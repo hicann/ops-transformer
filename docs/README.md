@@ -62,7 +62,7 @@ Docs目录结构说明如下：
 
 ### 样例实践
 
-如需学习算子领域高性能实战案例，可参考[cann-samples Performance目录](https://gitcode.com/cann/cann-samples/blob/master/Samples/2_Performance/README.md)）。
+如需学习算子领域高性能实战案例，可参考[cann-samples Performance目录](https://gitcode.com/cann/cann-samples/blob/master/Samples/2_Performance/README.md)。
 
 |  算子分类       |  样例算子       | 说明                  |
 | ----------------------- | ---------------------- | ---------------------- |
