@@ -216,6 +216,7 @@ def dense_lightning_indexer_kl_loss_grad(
     mask_mode=0,
     cmp_ratio=1,
 ):
+    op_module = dense_lightning_indexer_kl_loss_grad_op_builder.load()
     return op_module.dense_lightning_indexer_kl_loss_grad(
         q,
         k,
