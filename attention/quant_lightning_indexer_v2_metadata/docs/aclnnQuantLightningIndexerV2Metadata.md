@@ -98,7 +98,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
       <td>cuSeqlensQOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中Query的有效Sequence Length。</td>
-      <td><ul><li>支持空Tensor</li><li>layoutQOptional为TND场景下必传。</li><li>第一个值为额外值并固定为0。</li><li>shape固定为(B+1, )。</li></ul></td>
+      <td><ul><li>支持空Tensor</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
@@ -108,7 +108,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
       <td>cuSeqlensKOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中Key的有效Sequence Length。</td>
-      <td><ul><li>支持空Tensor。</li><li>layoutKOptional为TND场景下必传。</li><li>第一个值为额外值并固定为0。</li><li>shape固定为(B+1, )。</li></ul></td>
+      <td><ul><li>支持空Tensor。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
@@ -137,7 +137,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>cmpResidualKOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中cmp_kv压缩后Sequence Length的余数，配合cmpRatio实现cmp_kv部分的mask和负载计算。</td>
+      <td>表示不同Batch中cmp_k压缩后Sequence Length的余数，配合cmpRatio实现cmp_k部分的mask和负载计算。</td>
       <td><ul><li>支持空Tensor。</li><li>cmpRatio不为1，且mask为3场景下必传。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -148,7 +148,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
       <td>numHeadsQ（int64_t）</td>
       <td>输入</td>
       <td>表示Query的head个数。</td>
-      <td>当前仅支持32/64。</td>
+      <td>当前支持[1, 64]。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -178,7 +178,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
       <td>topk（int64_t）</td>
       <td>输入</td>
       <td>表示从Query中筛选出的关键稀疏token的个数。</td>
-      <td>当前仅支持[1, 2048]</td>
+      <td>当前仅支持[1, 8192]。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -188,7 +188,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
       <td>quantMode（int64_t）</td>
       <td>输入</td>
       <td>表示量化模式。</td>
-      <td><ul><li>当前仅支持1/2/4。</li><li>1: qk: fp8(e4m3) per-token-head; scale: fp32。</li><li>2: qk: int8 per-token-head; scale: fp16 w: fp16。</li><li>4: qk: hif8 per-tensor; scale: fp32。</li></ul></td>
+      <td><ul><li>当前支持1/2/3/4/5。</li><li>1: qk: fp8(e4m3) per-token-head; scale: fp32。</li><li>2: qk: int8 per-token-head; scale: fp16 w: fp16。</li><li>3: qk: mxfp8(e4m3), scale: fp8(e8m0)。</li><li>4: qk: hif8 per-tensor; scale: fp32。</li><li>5: mxfp4(e2m1), scale: fp8(e8m0)。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -258,7 +258,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
       <td>cmpRatio（int64_t）</td>
       <td>输入</td>
       <td>表示Key的压缩率。</td>
-      <td><ul><li>取值范围[1，128]</li><li>建议值1，表示无压缩。</li></ul></td>
+      <td><ul><li>取值范围[1，128]。</li><li>建议值1，表示无压缩。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -268,10 +268,10 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
       <td>metadata（aclTensor*）</td>
       <td>输出</td>
       <td>表示负载均衡结果输出。</td>
-      <td>-</td>
+      <td>shape固定为(1024, )。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1维，shape固定为(1024)</td>
+      <td>1维</td>
       <td>×</td>
     </tr>
     <tr>
@@ -297,7 +297,14 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
   </tbody>
   </table>
 
-  <ul><li><term>Ascend 950PR/Ascend 950DT</term> ：不支持quantMode = 2。</li><li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：不支持numHeadsQ = 32，不支持quantMode = 1/4，不支持layoutKOptional = BSND/TND，不支持cmpRatio在[1，128]任意取值，仅支持cmpRatio = 1/2/4/8/16/32/64/128。</li><li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：不支持numHeadsQ = 32，不支持quantMode = 1/4，不支持layoutKOptional = BSND/TND，不支持cmpRatio在[1，128]任意取值，仅支持cmpRatio = 1/2/4/8/16/32/64/128。</li></ul>
+  <ul>
+    <!-- npu="A3" id7 -->
+    <li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：numHeadsQ仅支持64，不支持quantMode = 1/3/4/5，topk仅支持[1, 2048]，不支持layoutKOptional = BSND/TND，不支持cmpRatio在[1，128]任意取值，仅支持cmpRatio = 1/2/4/8/16/32/64/128。</li>
+    <!-- end id7 -->
+    <!-- npu="910b" id8 -->
+    <li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：numHeadsQ仅支持64，不支持quantMode = 1/3/4/5，topk仅支持[1, 2048]，不支持layoutKOptional = BSND/TND，不支持cmpRatio在[1，128]任意取值，仅支持cmpRatio = 1/2/4/8/16/32/64/128。</li>
+    <!-- end id8 -->
+  </ul>
 
 - **返回值：**
 
@@ -383,25 +390,29 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
 
   - aclnnQuantLightningIndexerV2Metadata默认确定性实现。
   - B（Batch）表示输入样本批量大小。
+  - 参数cuSeqlensQOptional、cuSeqlensKOptional要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
+  - 参数sequsedQOptional、sequsedKOptional要求其值表示每个Batch中的有效token数。
+  - 非PA场景layoutQOptional、layoutKOptional须相同。
+  - 参数cmpResidualKOptional需满足cmpResidualKOptional[i] < cmpRatio。
+  - layoutQOptional=BSND场景
+    - sequsedQOptional和maxSeqlenQ至少需要传入1个，sequsedQOptional未传入时，maxSeqlenQ不能为-1。
+  - layoutKOptional=BSND场景
+    - sequsedKOptional和maxSeqlenK至少需要传入1个，sequsedKOptional未传入时，maxSeqlenK不能为-1。
+  - layoutQOptional=TND场景
+    - cuSeqlensQOptional必需传入。
+  - layoutKOptional=TND场景
+    - cuSeqlensKOptional必需传入。
+  - layoutKOptional=PA_BBND场景
+    - sequsedKOptional必需传入。
   - Batch取值规则
-    - 优先获取sequsedQOptional中的Batch信息。
-    - 如果未传入sequsedQOptional，优先获取cuSeqlensQOptional中的Batch信息。
-    - 如果未传入sequsedQOptional，且layoutQOptional为TND，则必获取cuSeqlensQOptional中的Batch信息。
-    - 除上所述，使用batchSize。
-  - Sequence Length取值规则
-    - 优先获取sequsedQOptional中的Sequence Length信息。
-    - 如果未传入sequsedQOptional，且layoutQOptional为TND，则必获取cuSeqlensQOptional中的Sequence Length信息。
-    - 除上所述，使用maxSeqlenQ。
-    - Key与Query的获取规则一致。
-  - layout约束
-    - 当layoutKOptional为PA_BBND时，layoutQOptional可以任意取值。
-    - 除上所述，layoutQOptional必须与layoutKOptional保持一致。
-  - BSND场景
-    - 当传入的layoutQOptional为"BSND"时，视为使用BSND场景。
-    - 在未传入cuSeqlensQOptional和sequsedQOptional的情况下，必传batchSize、maxSeqlenQ、maxSeqlenK参数。
-  - TND场景
-    - 当传入的layoutQOptional为"TND"时，视为使用TND场景。
-    - 必传cuSeqlensQOptional、cuSeqlensKOptional参数。
+    - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batchSize获取batch数。
+    - layoutQOptional为TND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过cuSeqlensQOptional的shape推导batch。
+  - Query Seqlen取值规则
+    - layoutQOptional为BSND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过maxSeqlenQ获取seqlen。
+    - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中的元素获取seqlen。
+  - Key Seqlen取值规则
+    - layoutKOptional为BSND时，优先通过sequsedKOptional中的元素获取seqlen，sequsedKOptional未传入则通过maxSeqlenK获取seqlen。
+    - layoutKOptional为TND时，优先通过sequsedKOptional中的元素获取seqlen，sequsedKOptional未传入则通过cuSeqlensKOptional中的元素获取seqlen。
 
 ## 调用示例
 

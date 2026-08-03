@@ -37,21 +37,21 @@
     <tr>
       <td>cu_seqlens_q</td>
       <td>可选输入</td>
-      <td>表示不同Batch中Query的有效Sequence Length，shape为(B+1, )，仅layout_q为TND场景需传入。</td>
+      <td>表示不同Batch中Query的有效Sequence Length，shape为(B+1, )。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cu_seqlens_ori_kv</td>
       <td>可选输入</td>
-      <td>表示不同Batch中ori_kv的有效Sequence Length，shape为(B+1, )，仅layout_kv为TND场景需传入。</td>
+      <td>表示不同Batch中ori_kv的有效Sequence Length，shape为(B+1, )。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cu_seqlens_cmp_kv</td>
       <td>可选输入</td>
-      <td>表示不同Batch中cmp_kv的有效Sequence Length，shape为(B+1, )，仅layout_kv为TND场景需传入。</td>
+      <td>表示不同Batch中cmp_kv的有效Sequence Length，shape为(B+1, )。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -226,7 +226,7 @@
     <tr>
       <td>metadata</td>
       <td>输出</td>
-      <td>表示负载均衡结果输出，shape固定为[1024]。</td>
+      <td>表示负载均衡结果输出，shape固定为(1024, )</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -237,10 +237,34 @@
 
 - SparseFlashMlaGradMetadata算子需要与SparseFlashMlaGrad算子配套使用。
 - B（Batch）表示输入样本批量大小。
-- 参数cu_seqlens_q、cu_seqlens_ori_kv及cu_seqlens_cmp_kv要求其值为当前Batch与前序Batch有效token数的累加值，后一个元素的值必须大于等于前一个元素的值。
+- layout_q、layout_k须相同。
+- 参数cu_seqlens_q、cu_seqlens_ori_kv及cu_seqlens_cmp_kv要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
 - 参数seqused_q、seqused_ori_kv、seqused_cmp_kv要求其值表示每个Batch中的有效token数。
 - 参数cmp_residual_kv需满足cmp_residual_kv[i] < cmp_ratio。
 - ori_mask_mode及cmp_mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../docs/zh/context/sparse_mode_introduction.md)。
+- layout_q=BSND场景
+  - seqused_q和max_seqlen_q至少需要传入1个。
+  - ori_topk不为0且传入ori_topk_length时，，或cmp_topk不为0且传入cmp_topk_length时，max_seqlen_q必须传入query shape中的S值。
+- layout_kv=BSND场景
+  - has_ori_kv为true，且ori_topk为0时，seqused_ori_kv和max_seqlen_ori_kv至少需要传入1个。
+  - has_cmp_kv为true，且cmp_topk为0时，seqused_cmp_kv和max_seqlen_cmp_kv至少需要传入1个。
+- layout_q=TND场景
+  - cu_seqlens_q必需传入。
+- layout_kv=TND场景
+  - has_ori_kv为true时，cu_seqlens_ori_kv必需传入。
+  - has_cmp_kv为true，cu_seqlens_cmp_kv必需传入。
+- Batch取值规则
+  - layout_q为BSND时，优先通过seqused_q的shape推导batch，seqused_q未传入则通过batch_size获取batch数。
+  - layout_q为TND时，优先通过seqused_q的shape推导batch，seqused_q未传入则通过cu_seqlens_q的shape推导batch。
+- Query Seqlen取值规则
+  - layout_q为BSND时，优先通过seqused_q中的元素获取seqlen，seqused_q未传入则通过max_seqlen_q获取seqlen。
+  - layout_q为TND时，优先通过seqused_q中的元素获取seqlen，seqused_q未传入则通过cu_seqlens_q中的元素获取seqlen。
+- Ori_kv Seqlen取值规则
+  - layout_kv为BSND时，优先通过seqused_ori_kv中的元素获取seqlen，seqused_ori_kv未传入则通过max_seqlen_ori_kv获取seqlen，若max_seqlen_ori_kv未传入且ori_topk不为0，则通过ori_topk_length或ori_topk获取seqlen（ori_topk_length优先级高于ori_topk）。
+  - layout_kv为TND时，优先通过seqused_ori_kv中的元素获取seqlen，seqused_ori_kv未传入则通过cu_seqlens_ori_kv中的元素获取seqlen。
+- Cmp_kv Seqlen取值规则
+  - layout_kv为BSND时，优先通过seqused_cmp_kv中的元素获取seqlen，seqused_cmp_kv未传入则通过max_seqlen_cmp_kv获取seqlen，若max_seqlen_cmp_kv未传入且cmp_topk不为0，则通过cmp_topk_length或cmp_topk获取seqlen（cmp_topk_length优先级高于cmp_topk）。
+  - layout_kv为TND时，优先通过seqused_cmp_kv中的元素获取seqlen，seqused_cmp_kv未传入则通过cu_seqlens_cmp_kv中的元素获取seqlen。
 
 ## 调用说明
 

@@ -33,7 +33,7 @@
 
   输出metadata tensor的shape为(1024,)，数据类型为INT32，内部结构如下：
 
-  - FA Metadata区域（AIC_CORE_NUM × 8个INT32），每个AICore的FA阶段任务信息：
+  - FA Metadata区域（AIC_CORE_NUM × 9个INT32），每个AICore的FA阶段任务信息：
 
     | 索引 | 含义 |
     | :--- | :--- |
@@ -45,6 +45,7 @@
     | 5 | m_end，M结束索引 |
     | 6 | s2_end，S2结束索引 |
     | 7 | first_fd_data_workspace_idx，第一份FD归约数据的workspace偏移 |
+    | 8 | max_s2_block_num，单核上分配到的最多的s2 block数 |
 
   - FD Metadata区域（AIV_CORE_NUM × 8个INT32），每个AIVCore的FD归约任务信息：
 
@@ -147,37 +148,37 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>cuSeqlensQOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中q的有效token数（前缀和形式）。</td>
-      <td>layoutQOptional为TND时必须传入。每个元素表示当前batch与之前所有batch的token数总和。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B+1,)</td>
+      <td>1维</td>
       <td>√</td>
     </tr>
     <tr>
       <td>cuSeqlensOriKvOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中oriKv的有效token数（前缀和形式）。</td>
-      <td>layoutKvOptional为TND时必须传入。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B+1,)</td>
+      <td>1维</td>
       <td>√</td>
     </tr>
     <tr>
       <td>cuSeqlensCmpKvOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中cmpKv的有效token数（前缀和形式）。</td>
-      <td>layoutKvOptional为TND且存在cmpKv时必须传入。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B+1,)</td>
+      <td>1维</td>
       <td>√</td>
     </tr>
     <tr>
       <td>sequsedQOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中q实际参与运算的token数。</td>
-      <td>当前暂不支持指定该参数。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
@@ -187,20 +188,20 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>sequsedOriKvOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中oriKv实际参与运算的token数。</td>
-      <td>layoutKvOptional为PA_BBND时必须传入；layoutKvOptional为BSND时可选传入，用于指定每个batch的oriKv有效长度；layoutKvOptional为TND时使用cuSeqlensOriKvOptional表达序列边界。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B,)</td>
+      <td>1维</td>
       <td>√</td>
     </tr>
     <tr>
       <td>sequsedCmpKvOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中cmpKv实际参与运算的token数。</td>
-      <td>可选输入。传入时shape必须为(B,)，作为每个batch的cmp逻辑有效长度，优先于maxSeqlenCmpKv、cuSeqlensCmpKvOptional或PA block table推导；layoutKvOptional为BSND、TND、PA_BBND时均可使用。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B,)</td>
+      <td>1维</td>
       <td>√</td>
     </tr>
     <tr>
@@ -210,34 +211,34 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>在CSA、HCA、cmpRatio不等于1且cmpMaskMode为3场景必传，layoutKvOptional为BSND、TND、PA_BBND时均可使用。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B,)</td>
+      <td>1维</td>
       <td>√</td>
     </tr>
     <tr>
       <td>oriTopkLengthOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>预留输入，当前版本不支持传入非空Tensor。</td>
-      <td>必须传入nullptr或空Tensor；传入非空Tensor会返回参数错误。</td>
+      <td>表示不同q token对应的ori_kv部分关键稀疏token的个数。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape为(B, S1, N2)或(T1, N2)。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
-      <td>-</td>
+      <td>2维、3维</td>
       <td>√</td>
     </tr>
     <tr>
       <td>cmpTopkLengthOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>预留输入，当前版本不支持传入非空Tensor。</td>
-      <td>必须传入nullptr或空Tensor；传入非空Tensor会返回参数错误。</td>
+      <td>表示不同q token对应的cmp_kv部分关键稀疏token的个数。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape为(B, S1, N2)或(T1, N2)。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
-      <td>-</td>
+      <td>2维、3维</td>
       <td>√</td>
     </tr>
     <tr>
       <td>numHeadsQ（int64_t）</td>
       <td>输入</td>
       <td>Query的多头数。</td>
-      <td>仅支持1、2、4、8、16、32、64、128，numHeadsQ / numHeadsKv仅支持[1,128]范围内的2的幂。</td>
+      <td>支持[1, 128]。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -267,7 +268,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>batchSize（int64_t）</td>
       <td>输入</td>
       <td>输入样本批量大小。</td>
-      <td>传入0时表示从cuSeqLensQ推断；layoutQ为TND时无需手动指定。</td>
+      <td>layoutQ为TND时无需手动指定，建议值为0。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -277,7 +278,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>maxSeqlenQ（int64_t）</td>
       <td>输入</td>
       <td>所有Batch中q的最大有效token数。</td>
-      <td>传入0时表示由接口推导。</td>
+      <td>传入0时表示由接口推导，建议值为0。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -287,7 +288,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>maxSeqlenOriKv（int64_t）</td>
       <td>输入</td>
       <td>所有Batch中oriKv的最大有效token数。</td>
-      <td>传入0时表示由接口推导。</td>
+      <td>传入0时表示由接口推导，建议值为0。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -297,7 +298,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>maxSeqlenCmpKv（int64_t）</td>
       <td>输入</td>
       <td>所有Batch中cmpKv的最大有效token数。</td>
-      <td>传入0时表示由接口推导。</td>
+      <td>传入0时表示由接口推导，建议值为0。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -307,7 +308,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>oriTopk（int64_t）</td>
       <td>输入</td>
       <td>从oriKv中筛选的稀疏token个数。</td>
-      <td>当前暂不支持传入非0值，仅支持0。</td>
+      <td>建议值为0。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -317,7 +318,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>cmpTopk（int64_t）</td>
       <td>输入</td>
       <td>从cmpKv中筛选的稀疏token个数。</td>
-      <td>CSA场景下仅支持512或1024，SWA、HCA场景下为0。</td>
+      <td>CSA场景下仅支持512或1024，SWA、HCA场景下为0，建议值为0。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -327,7 +328,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>cmpRatio（int64_t）</td>
       <td>输入</td>
       <td>cmpKv相对于压缩前KV长度的压缩倍率，用于恢复cmp侧mask使用的压缩前KV长度。</td>
-      <td>支持1、4、128；仅传入oriKv时不参与压缩KV计算，CSA场景传4，HCA场景传128。</td>
+      <td>支持[1, 128]，仅传入oriKv时不参与压缩KV计算，CSA场景传4，HCA场景传128，建议值为0。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -337,7 +338,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>oriMaskMode（int64_t）</td>
       <td>输入</td>
       <td>q和oriKv计算的mask模式。</td>
-      <td>0: No Mask。<br/>3: RightDownCausal模式。<br/>4: Band模式。</td>
+      <td>0: No Mask。<br/>3: RightDownCausal模式。<br/>4: Band模式。<br/>建议值为0。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -347,7 +348,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>cmpMaskMode（int64_t）</td>
       <td>输入</td>
       <td>q和cmpKv计算的mask模式。</td>
-      <td>0: No Mask。<br/>3: RightDownCausal模式。</td>
+      <td>0: No Mask。<br/>3: RightDownCausal模式。<br/>建议值为0。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -357,7 +358,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>oriWinLeft（int64_t）</td>
       <td>输入</td>
       <td>滑动窗口向左扩展的token数。</td>
-      <td>支持-1或非负数，其中-1表示窗口不受限。</td>
+      <td>支持-1或非负数，其中-1表示窗口不受限，建议值为-1。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -367,7 +368,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>oriWinRight（int64_t）</td>
       <td>输入</td>
       <td>滑动窗口向右扩展的token数。</td>
-      <td>支持-1或非负数，其中-1表示窗口不受限。</td>
+      <td>支持-1或非负数，其中-1表示窗口不受限，建议值为-1。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -377,7 +378,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>layoutQOptional（char*）</td>
       <td>输入</td>
       <td>标识输入q的数据排布格式。</td>
-      <td>支持"BSND"和"TND"。</td>
+      <td>支持"BSND"和"TND"，建议值为"BSND"。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -387,7 +388,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>layoutKvOptional（char*）</td>
       <td>输入</td>
       <td>标识输入KV的数据排布格式。</td>
-      <td>支持"PA_BBND"、"BSND"和"TND"。</td>
+      <td>支持"PA_BBND"、"BSND"和"TND"，建议值为"BSND"。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -397,7 +398,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>hasOriKv（bool）</td>
       <td>输入</td>
       <td>是否传入oriKv。</td>
-      <td>根据是否传入oriKv设置。</td>
+      <td>根据是否传入oriKv设置，建议值为true。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -407,7 +408,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>hasCmpKv（bool）</td>
       <td>输入</td>
       <td>是否传入cmpKv。</td>
-      <td>SWA场景为false，CSA、HCA场景为true。根据是否传入cmpKv设置。</td>
+      <td>SWA场景为false，CSA、HCA场景为true。根据是否传入cmpKv设置，建议值为true。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -417,10 +418,10 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>metaData（aclTensor*）</td>
       <td>输出</td>
       <td>分核元数据输出，供SparseFlashMla算子使用。</td>
-      <td>-</td>
+      <td>shape固定为(1024, )。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(1024,)</td>
+      <td>1维</td>
       <td>×</td>
     </tr>
     <tr>
@@ -446,13 +447,14 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
   </tbody>
   </table>
 
-  <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：numHeadsQ/numHeadsKv支持1、2、4、8、16、32、64、128，oriMaskMode仅支持4，cmpMaskMode仅支持3，oriWinLeft仅支持127，oriWinRight仅支持0。
-  <!-- end id7 -->
-  <!-- npu="950" id8 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：numHeadsQ/numHeadsKv不支持1，oriMaskMode仅支持4，cmpMaskMode仅支持3，oriWinLeft仅支持127，oriWinRight仅支持0。
-
-  <!-- end id8 -->
+  <ul>
+    <!-- npu="A3" id7 -->
+    <li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：不支持sequsedQOptional、oriTopkLengthOptional、cmpTopkLengthOptional，numHeadsQ/numHeadsKv仅支持1、2、4、8、16、32、64、128，oriTopk仅支持0，cmpTopk仅支持0、512、1024，oriMaskMode仅支持4，cmpMaskMode仅支持3，oriWinLeft仅支持127，oriWinRight仅支持0，cmpRatio仅支持1、4、128。</li>
+    <!-- end id7 -->
+    <!-- npu="910b" id8 -->
+    <li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：不支持sequsedQOptional、oriTopkLengthOptional、cmpTopkLengthOptional，numHeadsQ/numHeadsKv仅支持1、2、4、8、16、32、64、128，oriTopk仅支持0，cmpTopk仅支持0、512、1024，oriMaskMode仅支持4，cmpMaskMode仅支持3，oriWinLeft仅支持127，oriWinRight仅支持0，cmpRatio仅支持1、4、128。</li>
+    <!-- end id8 -->
+  </ul>
 
 - **返回值**
 
@@ -460,8 +462,63 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
 
   第一段接口完成入参校验，出现以下场景时报错：
 
-  <!-- npu="A3,910b" id9 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+    <!-- npu="950" id9 -->
+  - <term>Ascend 950PR/Ascend 950DT</term>：
+
+    <table style="undefined;table-layout: fixed;width: 1200px"><colgroup>
+    <col style="width: 262px">
+    <col style="width: 121px">
+    <col style="width: 817px">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>返回值</th>
+        <th>错误码</th>
+        <th>描述</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>ACLNN_ERR_INNER_CREATE_EXECUTOR</td>
+        <td>561101</td>
+        <td>创建aclOpExecutor失败。</td>
+      </tr>
+      <tr>
+        <td>ACLNN_ERR_INNER_NULLPTR</td>
+        <td>561103</td>
+        <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AICPU任务失败。</td>
+      </tr>
+      <tr>
+        <td rowspan="8">ACLNN_ERR_PARAM_INVALID</td>
+        <td rowspan="8">161002</td>
+        <td>batchSize或maxSeqlenQ为负数。</td>
+      </tr>
+      <tr>
+        <td>numHeadsQ不在[1,128]范围内，numHeadsKv不为1，numHeadsQ不能被numHeadsKv整除，或numHeadsQ/numHeadsKv不在[1,128]范围内。</td>
+      </tr>
+      <tr>
+        <td>headDim不为512。</td>
+      </tr>
+      <tr>
+        <td>oriMaskMode不为0、3、4，或cmpMaskMode不为0、3。</td>
+      </tr>
+      <tr>
+        <td>oriWinLeft或oriWinRight小于-1。</td>
+      </tr>
+      <tr>
+        <td>hasCmpKv为true时，cmpRatio不在[1,128]范围内。</td>
+      </tr>
+      <tr>
+        <td>hasCmpKv为true时，cmpTopk为负数。</td>
+      </tr>
+      <tr>
+        <td>layoutQOptional、layoutKvOptional、cuSeqlens、seqused或metaData的shape、数据类型、必选关系不在支持范围内。</td>
+      </tr>
+    </tbody>
+    </table>
+  <!-- end id9 -->
+  <!-- npu="A3" id10 -->
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
 
     <table style="undefined;table-layout: fixed;width: 1200px"><colgroup>
     <col style="width: 262px">
@@ -517,10 +574,9 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       </tr>
     </tbody>
     </table>
-
-  <!-- end id9 -->
-  <!-- npu="950" id10 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  <!-- end id10 -->
+  <!-- npu="910b" id11 -->
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
     <table style="undefined;table-layout: fixed;width: 1200px"><colgroup>
     <col style="width: 262px">
@@ -546,35 +602,37 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
         <td>workspaceSize或executor为空指针；可选输入做连续化处理后为空指针；或添加SparseFlashMlaMetadata AICPU任务失败。</td>
       </tr>
       <tr>
-        <td rowspan="8">ACLNN_ERR_PARAM_INVALID</td>
-        <td rowspan="8">161002</td>
+        <td rowspan="9">ACLNN_ERR_PARAM_INVALID</td>
+        <td rowspan="9">161002</td>
         <td>batchSize或maxSeqlenQ为负数。</td>
       </tr>
       <tr>
-        <td>numHeadsQ不在[1,128]范围内，numHeadsKv不为1，numHeadsQ不能被numHeadsKv整除，或numHeadsQ/numHeadsKv不在[1,128]范围内。</td>
+        <td>numHeadsQ不在[1,128]范围内，numHeadsKv不为1，numHeadsQ不能被numHeadsKv整除，或numHeadsQ/numHeadsKv不是[1,128]范围内的2的幂。</td>
       </tr>
       <tr>
         <td>headDim不为512。</td>
       </tr>
       <tr>
-        <td>oriMaskMode不为0、3、4，或cmpMaskMode不为0、3。</td>
+        <td>oriMaskMode不为4，或cmpMaskMode不为3。</td>
       </tr>
       <tr>
-        <td>oriWinLeft或oriWinRight小于-1。</td>
+        <td>oriWinLeft不为127，或oriWinRight不为0。</td>
       </tr>
       <tr>
-        <td>hasCmpKv为true时，cmpRatio不在[1,128]范围内。</td>
+        <td>SWA场景cmpRatio不为1，或cmpRatio与CSA、HCA场景不匹配。</td>
       </tr>
       <tr>
-        <td>hasCmpKv为true时，cmpTopk为负数。</td>
+        <td>cmpTopk不为0、512或1024。</td>
+      </tr>
+      <tr>
+        <td>oriTopkLengthOptional或cmpTopkLengthOptional传入非空Tensor。</td>
       </tr>
       <tr>
         <td>layoutQOptional、layoutKvOptional、cuSeqlens、seqused或metaData的shape、数据类型、必选关系不在支持范围内。</td>
       </tr>
     </tbody>
     </table>
-
-  <!-- end id10 -->
+  <!-- end id11 -->
 
 ## aclnnSparseFlashMlaMetadata
 
@@ -625,14 +683,59 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
 
   - aclnnSparseFlashMlaMetadata默认采用确定性实现，相同输入多次调用结果一致。
 
-- 使用约束
+- 通用规格约束
+  - B（Batch）表示输入样本批量大小。
+  - 参数cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
+  - 参数sequsedQOptional、sequsedOriKvOptional、sequsedCmpKvOptional要求其值表示每个Batch中的有效token数。
   - layoutQOptional和layoutKvOptional组合仅支持"BSND"/"BSND"、"TND"/"TND"、"BSND"/"PA_BBND"、"TND"/"PA_BBND"；非PA_BBND场景下layoutQOptional和layoutKvOptional必须一致。
+  - 参数cmpResidualKvOptional需满足cmpResidualKvOptional[i] < cmpRatio。
+<!-- npu="950" id12 -->
+- Ascend 950PR/Ascend 950DT约束：
+  - hasOriKv为true，且oriTopk不为0且oriMaskMode为0时，oriTopkLengthOptional必须传入。
+  - hasCmpKv为true，且cmpTopk不为0且cmpMaskMode为0时，cmpTopkLengthOptional必须传入。
+  - layoutQOptional=BSND场景
+    - sequsedQOptional和maxSeqlenQ至少需要传入1个。
+    - oriTopk不为0且传入oriTopkLengthOptional时，或cmpTopk不为0且传入cmpTopkLengthOptional时，maxSeqlenQ必须传入query shape中的S值。
+  - layoutKvOptional=BSND场景
+    - hasOriKv为true，且oriTopk为0时，sequsedOriKvOptional和maxSeqlenOriKv至少需要传入1个。
+    - hasCmpKv为true，且cmpTopk为0时，sequsedCmpKvOptional和maxSeqlenCmpKv至少需要传入1个。
+  - layoutQOptional=TND场景
+    - cuSeqlensQOptional必须传入。
+  - layoutKvOptional=TND场景
+    - hasOriKv为true时，cuSeqlensOriKvOptional必须传入。
+    - hasCmpKv为true，cuSeqlensCmpKvOptional必须传入。
+  - layoutKvOptional=PA_BBND场景
+    - hasOriKv为true，且oriMaskMode不为0或oriTopk为0时，sequsedOriKvOptional必须传入。
+    - hasCmpKv为true，且cmpMaskMode不为0或cmpTopk为0时，sequsedCmpKvOptional必须传入。
+  - Batch取值规则
+    - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batch_size获取batch数。
+    - layoutQOptional为TND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过cuSeqlensQOptional的shape推导batch。
+  - Query Seqlen取值规则
+    - layoutQOptional为BSND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过maxSeqlenQ获取seqlen。
+    - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中的元素获取seqlen。
+  - Ori_kv Seqlen取值规则
+    - layoutKvOptional为BSND时，优先通过sequsedOriKvOptional中的元素获取seqlen，sequsedOriKvOptional未传入则通过maxSeqlenOriKv获取seqlen，若maxSeqlenOriKv未传入且oriTopk不为0，则通过oriTopkLengthOptional或oriTopk获取seqlen（oriTopkLengthOptional优先级高于oriTopk）。
+    - layoutKvOptional为TND时，优先通过sequsedOriKvOptional中的元素获取seqlen，sequsedOriKvOptional未传入则通过cuSeqlensOriKvOptional中的元素获取seqlen。
+  - Cmp_kv Seqlen取值规则
+    - layoutKvOptional为BSND时，优先通过sequsedCmpKvOptional中的元素获取seqlen，sequsedCmpKvOptional未传入则通过maxSeqlenCmpKv获取seqlen，若maxSeqlenCmpKv未传入且cmpTopk不为0，则通过cmpTopkLengthOptional或cmpTopk获取seqlen（cmpTopkLengthOptional优先级高于cmpTopk）。
+    - layoutKvOptional为TND时，优先通过sequsedCmpKvOptional中的元素获取seqlen，sequsedCmpKvOptional未传入则通过cuSeqlensCmpKvOptional中的元素获取seqlen。
+<!-- end id12 -->
+<!-- npu="A3" id13 -->
+- Atlas A3 训练系列产品/Atlas A3 推理系列产品约束：
   - layoutQOptional为TND时，`cuSeqlensQOptional`必须传入。
   - layoutKvOptional为PA_BBND时，`sequsedOriKvOptional`必须传入。BSND场景可选传入`sequsedOriKvOptional`覆盖每个batch的oriKv有效长度；TND场景使用`cuSeqlensOriKvOptional`表达oriKv序列边界。
   - layoutKvOptional为TND时，`cuSeqlensOriKvOptional`必须传入；若hasCmpKv为true，`cuSeqlensCmpKvOptional`也必须传入。
   - `sequsedCmpKvOptional`为所有layoutKvOptional下的可选输入，显式传入时用于覆盖cmp侧逻辑有效长度。
   - `cmpResidualKvOptional`为`aclnnSparseFlashMlaMetadata`和`aclnnSparseFlashMla`的可选输入，在CSA、HCA、cmpRatio不等于1且cmpMaskMode为3场景必传，用于恢复cmp侧mask使用的压缩前长度。
-  - 该算子为AICPU算子，在Host侧CPU上执行，不占用NPU计算资源。
+<!-- end id13 -->
+<!-- npu="910b" id14 -->
+- Atlas A2 训练系列产品/Atlas A2 推理系列产品约束：
+  - layoutQOptional为TND时，`cuSeqlensQOptional`必须传入。
+  - layoutKvOptional为PA_BBND时，`sequsedOriKvOptional`必须传入。BSND场景可选传入`sequsedOriKvOptional`覆盖每个batch的oriKv有效长度；TND场景使用`cuSeqlensOriKvOptional`表达oriKv序列边界。
+  - layoutKvOptional为TND时，`cuSeqlensOriKvOptional`必须传入；若hasCmpKv为true，`cuSeqlensCmpKvOptional`也必须传入。
+  - `sequsedCmpKvOptional`为所有layoutKvOptional下的可选输入，显式传入时用于覆盖cmp侧逻辑有效长度。
+  - `cmpResidualKvOptional`为`aclnnSparseFlashMlaMetadata`和`aclnnSparseFlashMla`的可选输入，在CSA、HCA、cmpRatio不等于1且cmpMaskMode为3场景必传，用于恢复cmp侧mask使用的压缩前长度。
+<!-- end id14 -->
 
 ## 调用示例
 

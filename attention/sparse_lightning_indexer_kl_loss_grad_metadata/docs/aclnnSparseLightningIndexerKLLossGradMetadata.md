@@ -97,7 +97,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       <td>cuSeqLensQOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中query的累积sequence length。</td>
-      <td><ul><li>支持空Tensor</li><li>TND场景下必传，并可通过该入参shape推导batch。</li><li>第一个值固定为0。</li><li>shape固定为(B+1, )。</li></ul></td>
+      <td><ul><li>支持空Tensor</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
@@ -107,7 +107,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       <td>cuSeqLensKOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中key的累积sequence length。</td>
-      <td><ul><li>支持空Tensor</li><li>TND场景下必传。</li><li>第一个值固定为0。</li><li>shape固定为(B+1, )。</li></ul></td>
+      <td><ul><li>支持空Tensor</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
@@ -247,7 +247,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       <td>cmpRatio（int64_t）</td>
       <td>输入</td>
       <td>表示key的压缩率。</td>
-      <td><ul><li>取值范围[1，128]</li><li>建议值1，表示无压缩。</li></ul></td>
+      <td><ul><li>取值范围[1，128]。</li><li>建议值1，表示无压缩。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -257,10 +257,10 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       <td>metadata（aclTensor*）</td>
       <td>输出</td>
       <td>表示负载均衡结果输出。</td>
-      <td>输出结果作为aclnnSparseLightningIndexerKLLossGrad的metadataOptional输入。</td>
+      <td>输出结果作为aclnnSparseLightningIndexerKLLossGrad的metadataOptional输入，shape固定为(64, )。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1维，shape固定为(64,)</td>
+      <td>1维</td>
       <td>x</td>
     </tr>
     <tr>
@@ -286,7 +286,17 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
   </tbody>
   </table>
 
-  <ul><li><term>Ascend 950PR/Ascend 950DT</term> ：topk仅支持[1, 2048]。</li><li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：不支持seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li><li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：不支持seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li></ul>
+  <ul>
+    <!-- npu="950" id7 -->
+    <li><term>Ascend 950PR/Ascend 950DT</term> ：topk仅支持[1, 2048]。</li>
+    <!-- end id7 -->
+    <!-- npu="A3" id8 -->
+    <li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：不支持seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
+    <!-- end id8 -->
+    <!-- npu="910b" id9 -->
+    <li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：不支持seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
+    <!-- end id9 -->
+  </ul>
 
 - **返回值：**
 
@@ -371,11 +381,34 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
 
   - aclnnSparseLightningIndexerKLLossGradMetadata为确定性实现，确定性计算配置不会改变其输出规则。
   - B（Batch）表示输入样本批量大小。
-  - BSND场景
-    - 必传batchSize、maxSeqLenQ、maxSeqLenK和topk参数，以获取shape信息。
-  - TND场景
-    - 必传cuSeqLensQOptional、cuSeqLensKOptional和topk参数，以获取正确shape信息。
-    - 当batchSize为0时，通过cuSeqLensQOptional的shape推导batch。
+  - 参数cuSeqlensQOptional、cuSeqlensKOptional要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
+  - 参数sequsedQOptional、sequsedKOptional要求其值表示每个Batch中的有效token数。
+  - 参数cmpResidualKOptional需满足cmpResidualKOptional[i] < cmpRatio。
+  - layoutQOptional、layoutKOptional须相同。
+  - numHeadsQ必须能被numHeadsK整除。
+  <!-- npu="950" id10 -->
+  - Ascend 950PR/Ascend 950DT约束：
+    - layoutQOptional=BSND场景
+      - sequsedQOptional和maxSeqlenQ至少需要传入1个。
+    - layoutQOptional=TND场景
+      - cuSeqlensQOptional必需传入。
+  <!-- end id10 -->
+  <!-- npu="A3" id11 -->
+  - Atlas A3 训练系列产品/Atlas A3 推理系列产品约束：
+    - BSND场景
+      - 必传batchSize、maxSeqLenQ、maxSeqLenK和topk参数，以获取shape信息。
+    - TND场景
+      - 必传cuSeqLensQOptional、cuSeqLensKOptional和topk参数，以获取正确shape信息。
+      - 当batchSize为0时，通过cuSeqLensQOptional的shape推导batch。
+  <!-- end id11 -->
+  <!-- npu="910b" id12 -->
+  - Atlas A2 训练系列产品/Atlas A2 推理系列产品约束：
+    - BSND场景
+      - 必传batchSize、maxSeqLenQ、maxSeqLenK和topk参数，以获取shape信息。
+    - TND场景
+      - 必传cuSeqLensQOptional、cuSeqLensKOptional和topk参数，以获取正确shape信息。
+      - 当batchSize为0时，通过cuSeqLensQOptional的shape推导batch。
+  <!-- end id12 -->
 
 <details>
 <summary><a id="Mask"></a>Mask</summary>
@@ -409,23 +442,55 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
 <details>
 <summary><a id="特殊约束"></a>特殊约束</summary>
 
-  - Batch取值规则
-    - 如果batchSize大于0，优先使用batchSize。
-    - 如果batchSize小于等于0，且layoutQOptional为TND，则通过cuSeqLensQOptional的shape推导batch。
-    - 如果batchSize小于等于0，且layoutQOptional为BSND，则报错。
-  - Seqlen取值规则
-    - TND场景下，通过cuSeqLensQOptional和cuSeqLensKOptional计算每个batch的实际q/k长度。
-    - BSND场景下，通过maxSeqLenQ和maxSeqLenK获取q/k长度。
-  - layout约束
-    - layoutQOptional必须为BSND或TND。
-    - layoutKOptional支持BSND和TND，建议与layoutQOptional保持一致。
-  - head约束
-    - numHeadsQ、numHeadsK和headDim必须为正数。
-    - numHeadsQ必须能被numHeadsK整除。
-  - sparse约束
-    - topk必须为正数。
-    - cmpRatio取值范围为[0, 128]。
-    - maskMode当前仅支持0和3。
+  <!-- npu="950" id13 -->
+  - Ascend 950PR/Ascend 950DT约束：
+      - Batch取值规则
+        - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batch_size获取batch数。
+        - layoutQOptional为TND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过cuSeqlensQOptional的shape推导batch。
+      - Query Seqlen取值规则
+        - layoutQOptional为BSND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过maxSeqlenQ获取seqlen。
+        - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中的元素获取seqlen。
+  <!-- end id13 -->
+  <!-- npu="A3" id14 -->
+  - Atlas A3 训练系列产品/Atlas A3 推理系列产品约束：
+    - Batch取值规则
+      - 如果batchSize大于0，优先使用batchSize。
+      - 如果batchSize小于等于0，且layoutQOptional为TND，则通过cuSeqLensQOptional的shape推导batch。
+      - 如果batchSize小于等于0，且layoutQOptional为BSND，则报错。
+    - Seqlen取值规则
+      - TND场景下，通过cuSeqLensQOptional和cuSeqLensKOptional计算每个batch的实际q/k长度。
+      - BSND场景下，通过maxSeqLenQ和maxSeqLenK获取q/k长度。
+    - layout约束
+      - layoutQOptional必须为BSND或TND。
+      - layoutKOptional支持BSND和TND，建议与layoutQOptional保持一致。
+    - head约束
+      - numHeadsQ、numHeadsK和headDim必须为正数。
+      - numHeadsQ必须能被numHeadsK整除。
+    - sparse约束
+      - topk必须为正数。
+      - cmpRatio取值范围为[0, 128]。
+      - maskMode当前仅支持0和3。
+  <!-- end id14 -->
+  <!-- npu="910b" id15 -->
+  - Atlas A2 训练系列产品/Atlas A2 推理系列产品约束：
+    - Batch取值规则
+      - 如果batchSize大于0，优先使用batchSize。
+      - 如果batchSize小于等于0，且layoutQOptional为TND，则通过cuSeqLensQOptional的shape推导batch。
+      - 如果batchSize小于等于0，且layoutQOptional为BSND，则报错。
+    - Seqlen取值规则
+      - TND场景下，通过cuSeqLensQOptional和cuSeqLensKOptional计算每个batch的实际q/k长度。
+      - BSND场景下，通过maxSeqLenQ和maxSeqLenK获取q/k长度。
+    - layout约束
+      - layoutQOptional必须为BSND或TND。
+      - layoutKOptional支持BSND和TND，建议与layoutQOptional保持一致。
+    - head约束
+      - numHeadsQ、numHeadsK和headDim必须为正数。
+      - numHeadsQ必须能被numHeadsK整除。
+    - sparse约束
+      - topk必须为正数。
+      - cmpRatio取值范围为[0, 128]。
+      - maskMode当前仅支持0和3。
+  <!-- end id15 -->
 
 </details>
 
@@ -433,7 +498,53 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
 <summary><a id="Metadata"></a>Metadata输出布局</summary>
 
   metadata输出为INT32 Tensor，当前shape固定为(64,)，字段布局如下。
-
+  <ul>
+  <!-- npu="950" id16 -->
+  <li><term>Ascend 950PR/Ascend 950DT</term> ：
+  <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
+    <col style="width: 180px">
+    <col style="width: 150px">
+    <col style="width: 820px">
+    </colgroup>
+    <thead>
+        <tr>
+        <th>字段</th>
+        <th>index</th>
+        <th>说明</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+        <td>totalNum</td>
+        <td>0</td>
+        <td>B/S1合轴后的任务总行数，即所有batch中query的sequence length之和。</td>
+        </tr>
+        <tr>
+        <td>formerCoreProcessNum</td>
+        <td>1</td>
+        <td>满载核（前部核）每个核处理的任务行数，等于ceil(totalNum / aicCoreNum)。</td>
+        </tr>
+        <tr>
+        <td>remainCoreProcessNum</td>
+        <td>2</td>
+        <td>尾部核每个核处理的任务行数，等于formerCoreProcessNum - 1。</td>
+        </tr>
+        <tr>
+        <td>remainCoreNum</td>
+        <td>3</td>
+        <td>尾部核数量，即处理较少任务的核数，等于formerCoreProcessNum × aicCoreNum - totalNum。</td>
+        </tr>
+        <tr>
+        <td>usedCoreNum</td>
+        <td>4</td>
+        <td>实际使用的AIC核数，当totalNum < aicCoreNum时取totalNum，否则取aicCoreNum。</td>
+        </tr>
+    </tbody>
+  </table>
+  </li>
+  <!-- end id16 -->
+  <!-- npu="A3" id17 -->
+  <li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：
   <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
     <col style="width: 180px">
     <col style="width: 150px">
@@ -474,6 +585,53 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
         </tr>
     </tbody>
   </table>
+  </li>
+  <!-- end id17 -->
+  <!-- npu="910b" id18 -->
+  <li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：
+  <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
+    <col style="width: 180px">
+    <col style="width: 150px">
+    <col style="width: 820px">
+    </colgroup>
+    <thead>
+        <tr>
+        <th>字段</th>
+        <th>index</th>
+        <th>说明</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+        <td>coreNum</td>
+        <td>0</td>
+        <td>主kernel实际使用的cube core数量。</td>
+        </tr>
+        <tr>
+        <td>totalSize</td>
+        <td>1</td>
+        <td>B/S1合轴后的任务总行数。</td>
+        </tr>
+        <tr>
+        <td>splitFactorSize</td>
+        <td>2</td>
+        <td>均分场景下的初始分核粒度。</td>
+        </tr>
+        <tr>
+        <td>reserved</td>
+        <td>3-7</td>
+        <td>预留字段，当前置0。</td>
+        </tr>
+        <tr>
+        <td>bS1Index</td>
+        <td>8-32</td>
+        <td>每个cube core的起始B/S1合轴索引，非活跃core填充totalSize。</td>
+        </tr>
+    </tbody>
+  </table>
+  </li>
+  <!-- end id18 -->
+  </ul>
 
 </details>
 
@@ -488,6 +646,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
 #include <cstring>
 #include <functional>
 #include <iostream>
+#include <string>
 #include <utility>
 #include <vector>
 #include "acl/acl.h"
@@ -504,6 +663,13 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
 constexpr uint32_t SLI_METADATA_MAX_CORE_NUM = 25;
 constexpr uint32_t SLI_METADATA_HEADER_SIZE = 8;
 constexpr uint32_t SLI_METADATA_SIZE = 64;
+
+constexpr uint32_t GRAD_METADATA_SIZE = 5;
+constexpr uint32_t TOTAL_NUM = 0;
+constexpr uint32_t FORMER_CORE_PROCESS_NUM = 1;
+constexpr uint32_t REMAIN_CORE_PROCESS_NUM = 2;
+constexpr uint32_t REMAIN_CORE_NUM = 3;
+constexpr uint32_t USED_CORE_NUM = 4;
 
 struct SliGradKLLossMetaData {
     int32_t coreNum;
@@ -562,7 +728,7 @@ struct ArgContext {
     int64_t topk { 512 };
     char *layoutQOptional { nullptr };
     char *layoutKOptional { nullptr };
-    int64_t maskMode { 3 };
+    int64_t maskMode { 0 };
     int64_t cmpRatio { 4 };
 };
 
@@ -686,6 +852,18 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
 
 void PrintMetadata(const SliGradKLLossMetaData &metadata)
 {
+    const char *socName = aclrtGetSocName();
+    std::string socVersion = (socName != nullptr) ? std::string(socName) : std::string();
+    bool isA5 = socVersion.find("Ascend910") == std::string::npos;
+    if (isA5) {
+        const int32_t *data = reinterpret_cast<const int32_t *>(&metadata);
+        printf("TOTAL_NUM               : %d\n", data[TOTAL_NUM]);
+        printf("FORMER_CORE_PROCESS_NUM : %d\n", data[FORMER_CORE_PROCESS_NUM]);
+        printf("REMAIN_CORE_PROCESS_NUM : %d\n", data[REMAIN_CORE_PROCESS_NUM]);
+        printf("REMAIN_CORE_NUM         : %d\n", data[REMAIN_CORE_NUM]);
+        printf("USED_CORE_NUM           : %d\n", data[USED_CORE_NUM]);
+        return;
+    }
     printf("coreNum          : %d\n", metadata.coreNum);
     printf("totalSize        : %d\n", metadata.totalSize);
     printf("splitFactorSize  : %d\n", metadata.splitFactorSize);
@@ -745,9 +923,3 @@ int main() {
     return 0;
 }
 ```
-
-## 调用说明
-
-| 调用方式  | 样例代码 | 说明 |
-| ----------- | -------- | ---- |
-| aclnn接口 | [调用示例](#调用示例) | 通过`aclnnSparseLightningIndexerKLLossGradMetadata`接口方式调用，输出metadata供`aclnnSparseLightningIndexerKLLossGrad`使用。 |

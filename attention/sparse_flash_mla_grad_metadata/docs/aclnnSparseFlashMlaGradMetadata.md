@@ -108,7 +108,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
       <td>cuSeqlensQOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中Query的有效Sequence Length。</td>
-      <td><ul><li>支持空Tensor</li><li>layoutQOptional为TND场景下必传。</li><li>第一个值为额外值并固定为0。</li><li>shape固定为(B+1, )。</li></ul></td>
+      <td><ul><li>支持空Tensor。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
@@ -118,7 +118,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
       <td>cuSeqlensOriKvOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中ori_kv的有效Sequence Length。</td>
-      <td><ul><li>支持空Tensor。</li><li>layoutKvOptional为TND场景下必传。</li><li>第一个值为额外值并固定为0。</li><li>shape固定为(B+1, )。</li></ul></td>
+      <td><ul><li>支持空Tensor。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
@@ -128,7 +128,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
       <td>cuSeqlensCmpKvOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中cmp_kv的有效Sequence Length。</td>
-      <td><ul><li>支持空Tensor。</li><li>layoutKvOptional为TND场景下必传。</li><li>第一个值为额外值并固定为0。</li><li>shape固定为(B+1, )。</li></ul></td>
+      <td><ul><li>支持空Tensor。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
@@ -378,10 +378,10 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
       <td>metadata（aclTensor*）</td>
       <td>输出</td>
       <td>表示负载均衡结果输出。</td>
-      <td>-</td>
+      <td>shape固定为(1024, )</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1维，shape固定为(1024)</td>
+      <td>1维</td>
       <td>×</td>
     </tr>
     <tr>
@@ -491,21 +491,34 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
 
   - aclnnSparseFlashMlaGradMetadata默认确定性实现。
   - B（Batch）表示输入样本批量大小。
+  - 参数cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
+  - 参数sequsedQOptional、sequsedOriKvOptional、sequsedCmpKvOptional要求其值表示每个Batch中的有效token数。
+  - layoutQOptional、layoutKvOptional须相同。
+  - 参数cmpResidualKvOptional需满足cmpResidualKvOptional[i] < cmpRatio。
+  - numHeadsQ必须能被numHeadsKv整除。
+  - layoutQOptional=BSND场景
+    - sequsedQOptional和maxSeqlenQ至少需要传入1个。
+    - oriTopk不为0且传入oriTopkLengthOptional时，或cmpTopk不为0且传入cmpTopkLengthOptional时，maxSeqlenQ必须传入query shape中的S值。
+  - layoutKvOptional=BSND场景
+    - hasOriKv为true，且oriTopk为0时，sequsedOriKvOptional和maxSeqlenOriKv至少需要传入1个。
+    - hasCmpKv为true，且cmpTopk为0时，sequsedCmpKvOptional和maxSeqlenCmpKv至少需要传入1个。
+  - layoutQOptional=TND场景
+    - cuSeqlensQOptional必需传入。
+  - layoutKvOptional=TND场景
+    - hasOriKv为true时，cuSeqlensOriKvOptional必需传入。
+    - hasCmpKv为true，cuSeqlensCmpKvOptional必需传入。
   - Batch取值规则
-    - 优先获取sequsedQOptional中的Batch信息。
-    - 如果未传入sequsedQOptional，且layoutQOptional为TND和传入了cuSeqlensQOptional，则获取cuSeqlensQOptional中的Batch信息。
-    - 除上所述，使用batchSize。
-  - Query Sequence Length取值规则
-    - 优先获取sequsedQOptional中的Sequence Length信息。
-    - 如果未传入sequsedQOptional，且layoutQOptional为TND和传入了cuSeqlensQOptional，则获取cuSeqlensQOptional中的Sequence Length信息。
-    - 除上所述，使用maxSeqlenQ。
-    - ori_kv、cmp_kv Sequence Length与Query的获取规则一致。
-  - BSND场景
-    - 当传入的layoutQOptional为"BSND"时，在未传入sequsedQOptional的情况下，必传maxSeqlenQ参数。
-    - 当传入的layoutKvOptional为"BSND"时，若hasOriKv为true，在未传入sequsedOriKvOptional的情况下，必传maxSeqlenOriKv参数；若hasCmpKv为true，在未传入sequsedCmpKvOptional的情况下，必传maxSeqlenCmpKv参数。
-  - TND场景
-    - 当传入的layoutQOptional为"TND"时，必传cuSeqlensQOptional参数。
-    - 当传入的layoutKvOptional为"TND"时，若hasOriKv为true，必传cuSeqlensOriKvOptional；若hasCmpKv为true，必传cuSeqlensCmpKvOptional参数。
+    - 如果layoutQOptional为BSND，则优先通过seqUsedQOptional的shape推导batch，seqUsedQOptional未传入则通过batchSize获取batch数。
+    - 如果layoutQOptional为TND，则优先通过seqUsedQOptional的shape推导batch，seqUsedQOptional未传入则通过cuSeqLensQOptional的shape推导batch。
+  - Query Seqlen取值规则
+    - 如果layoutQOptional为BSND，则优先通过seqUsedQOptional中的元素获取seqlen，seqUsedQOptional未传入则通过maxSeqLenQ获取seqlen。
+    - 如果layoutQOptional为TND，则优先通过seqUsedQOptional中的元素获取seqlen，seqUsedQOptional未传入则通过cuSeqLensQOptional中的元素获取seqlen。
+  - Ori_kv Seqlen取值规则
+    - 如果layoutKvOptional为BSND，则优先通过sequsedOriKvOptional中的元素获取seqlen，sequsedOriKvOptional未传入则通过maxSeqlenOriKv获取seqlen。
+    - 如果layoutKvOptional为TND，则优先通过sequsedOriKvOptional中的元素获取seqlen，sequsedOriKvOptional未传入则通过cuSeqlensOriKvOptional中的元素获取seqlen。
+  - Cmp_kv Seqlen取值规则
+    - 如果layoutKvOptional为BSND，则优先通过sequsedCmpKvOptional中的元素获取seqlen，sequsedCmpKvOptional未传入则通过maxSeqlenCmpKv获取seqlen。
+    - 如果layoutKvOptional为TND，则优先通过sequsedCmpKvOptional中的元素获取seqlen，sequsedCmpKvOptional未传入则通过cuSeqlensCmpKvOptional中的元素获取seqlen。
 
 ## 调用示例
 
