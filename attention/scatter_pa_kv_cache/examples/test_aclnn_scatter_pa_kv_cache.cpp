@@ -106,9 +106,9 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     char * cacheMode = "PA_NZ";
     char * scatterMode = "None";
 
-    std::vector<int16_t> hostKey(128, 1);
-    std::vector<int16_t> hostValue(128, 1);
-    std::vector<int32_t> hostSlotMapping(2, 1);
+    std::vector<int16_t> hostKey(128, 0);
+    std::vector<int16_t> hostValue(128, 0);
+    std::vector<int32_t> hostSlotMapping = {0, 1};
     std::vector<int16_t> hostKeyCacheRef(2048, 1);
     std::vector<int16_t> hostValueCacheRef(2048, 1);
     std::vector<int64_t> hostStrides(2, 1);
@@ -155,13 +155,22 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
     // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
-    auto size = GetShapeSize(keyCacheShape);
-    std::vector<float> resultData(size, 0);
-    ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), keyCacheDeviceAddr,
-                      size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
-    for (int64_t i = 0; i < size; i++) {
-      LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+    auto keyCacheSize = GetShapeSize(keyCacheShape);
+    std::vector<int16_t> keyCacheResult(keyCacheSize, 0);
+    ret = aclrtMemcpy(keyCacheResult.data(), keyCacheResult.size() * sizeof(int16_t), keyCacheDeviceAddr,
+                      keyCacheSize * sizeof(int16_t), ACL_MEMCPY_DEVICE_TO_HOST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy keyCache from device to host failed. ERROR: %d\n", ret); return ret);
+    for (int64_t i = 0; i < keyCacheSize; i++) {
+      LOG_PRINT("keyCache[%ld] is: %d\n", i, keyCacheResult[i]);
+    }
+
+    auto valueCacheSize = GetShapeSize(valueCacheShape);
+    std::vector<int16_t> valueCacheResult(valueCacheSize, 0);
+    ret = aclrtMemcpy(valueCacheResult.data(), valueCacheResult.size() * sizeof(int16_t), valueCacheDeviceAddr,
+                      valueCacheSize * sizeof(int16_t), ACL_MEMCPY_DEVICE_TO_HOST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy valueCache from device to host failed. ERROR: %d\n", ret); return ret);
+    for (int64_t i = 0; i < valueCacheSize; i++) {
+      LOG_PRINT("valueCache[%ld] is: %d\n", i, valueCacheResult[i]);
     }
 
     // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
