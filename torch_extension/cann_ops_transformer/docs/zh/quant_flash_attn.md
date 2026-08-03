@@ -115,10 +115,10 @@ cann_ops_transformer.quant_flash_attn(
     seqused_kv=None,
     p_scale=None,
     sinks=None,
+    attn_mask=None,
     metadata=None,
     softmax_scale=1.0,
     mask_mode=0,
-    attn_mask=None,
     win_left=-1,
     win_right=-1,
     max_seqlen_q=-1,
@@ -215,10 +215,10 @@ cann_ops_transformer.quant_flash_attn(
 | seqused_kv | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,) | × |
 | p_scale | Tensor | 可选 | P的量化参数 | float32 | ND | (1,) | × |
 | sinks | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | float32 | ND | (Q_N,) | × |
+| attn_mask | Tensor | 可选 | 掩码矩阵 | int8/uint8/bool | ND | (2048, 2048) | × |
 | metadata | Tensor | 可选 | `quant_flash_attn_metadata`生成的任务切分结果，传入后可优化调度 | int32 | ND | (max_schedule_size,) | x |
 | softmax_scale | float | 可选 | 可显式设置缩放因子，覆盖默认计算 | float32 | - | - | - |
 | mask_mode | int/MaskMode | 可选 | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」 | int32 | - | - | - |
-| attn_mask | Tensor | 可选 | 掩码矩阵 | int8/uint8/bool | ND | (2048, 2048) | × |
 | win_left | int | 可选 | window左界限 | int32 | - | - | - |
 | win_right | int | 可选 | window右界限 | int32 | - | - | - |
 | max_seqlen_q | int | 可选 | 指定查询q序列的长度上限，MX FP8场景下为必选且必须大于等于0，其他场景仅支持-1 | int32 | - | - | - |
@@ -242,7 +242,7 @@ cann_ops_transformer.quant_flash_attn(
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 | 非连续Tensor |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | attn_out | Tensor | 必选 | quant_flash_attn的计算输出。 | bfloat16 | ND | (Q_T, Q_N, D) | × |
-| softmax_lse | Tensor | 可选 | softmax的LSE结果。`return_softmax_lse`为True时，输出shape为(Q_N, Q_T)的Tensor；`return_softmax_lse`为False时，则输出shape为[1]的值为0的Tensor。 | float32 | ND | (Q_N, Q_T) | × |
+| softmax_lse | Tensor | 可选 | softmax的LSE结果。`return_softmax_lse`为True时，输出shape为(Q_N, Q_T)的Tensor；`return_softmax_lse`为False时，则输出空Tensor。 | float32 | ND | (Q_N, Q_T) | × |
 
 ## 约束说明
 
@@ -979,7 +979,7 @@ mask_mode参数解释
             <td>可选属性，默认值为False</td>
             <td rowspan="2">
                 <ul>
-                    <li>当return_softmax_lse为False时，输出shape为[1]的值为0的Tensor</li>
+                    <li>当return_softmax_lse为False时，输出空Tensor</li>
                     <li>当return_softmax_lse为True时，softmax_lse必须非空，输出shape见<a href="#layout匹配关系表">layout匹配关系表</a></li>
                 </ul>
             </td>
@@ -1151,10 +1151,10 @@ mask_mode参数解释
         block_table=block_table,
         cu_seqlens_q=cu_seqlens_q,
         seqused_kv=seqused_kv,
+        attn_mask=attn_mask,
         metadata=metadata,
         softmax_scale=1.0 / (D ** 0.5),
         mask_mode=3,
-        attn_mask=attn_mask,
         win_left=-1,
         win_right=-1,
         layout_q="TND",
