@@ -24,6 +24,7 @@ namespace MoeInitRoutingV3 {
 using namespace AscendC;
 
 constexpr int64_t FULLLOAD_DYNAMIC_QUANT_BUFFER_NUM = 1;
+constexpr int64_t FULLLOAD_DYNAMIC_QUANT_INPUT_X_QUEUE_NUM = 3;
 
 template <typename T, typename QuantT = int8_t>
 class MoeV3FullLoadDynamicQuant : public MoeV3FullLoadBase<T> {
@@ -49,10 +50,10 @@ private:
                                              MicroAPI::MaskReg &maskRegHalf);
 
 private:
-    TQue<QuePosition::VECIN, 3> inputXInQueue_;
-    TQue<QuePosition::VECIN, 1> smoothInQueue_;
-    TQue<QuePosition::VECOUT, 1> inputXOutQueue_;
-    TQue<QuePosition::VECOUT, 1> scaleOutQueue_;
+    TQue<QuePosition::VECIN, FULLLOAD_DYNAMIC_QUANT_INPUT_X_QUEUE_NUM> inputXInQueue_;
+    TQue<QuePosition::VECIN, FULLLOAD_DYNAMIC_QUANT_BUFFER_NUM> smoothInQueue_;
+    TQue<QuePosition::VECOUT, FULLLOAD_DYNAMIC_QUANT_BUFFER_NUM> inputXOutQueue_;
+    TQue<QuePosition::VECOUT, FULLLOAD_DYNAMIC_QUANT_BUFFER_NUM> scaleOutQueue_;
 
     GlobalTensor<T> xGm_;
     GlobalTensor<int8_t> expandedXGm_;

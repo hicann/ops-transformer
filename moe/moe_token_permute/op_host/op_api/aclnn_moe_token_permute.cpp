@@ -66,6 +66,7 @@ static inline bool CheckDtypeValidRegbase(const aclTensor *tokens, const aclTens
     return true;
 }
 
+
 static inline bool CheckDtypeValidInt8Regbase(const aclTensor *tokens, const aclTensor *indices,
                                               const aclTensor *permuteTokensOut,
                                               const aclTensor *sortedIndicesOut)
@@ -198,6 +199,9 @@ aclnnStatus aclnnMoeTokenPermuteGetWorkspaceSize(
         DFX_IN(tokens, indices, numOutTokens, paddedMode),
                    DFX_OUT(permuteTokensOut, sortedIndicesOut));
 
+    CHECK_RET(MoeTokenPermuteCheck::CheckNotNull(tokens, indices, permuteTokensOut, sortedIndicesOut),
+              ACLNN_ERR_PARAM_NULLPTR);
+
     bool useMoeInitRoutingV2 = Ops::Transformer::AclnnUtil::IsRegbase();
     if (!useMoeInitRoutingV2) {
         return aclnnInnerMoeTokenPermuteGetWorkspaceSize(
@@ -205,8 +209,6 @@ aclnnStatus aclnnMoeTokenPermuteGetWorkspaceSize(
     }
     CHECK_RET(paddedMode == false, ACLNN_ERR_PARAM_INVALID);
 
-    CHECK_RET(MoeTokenPermuteCheck::CheckNotNull(tokens, indices, permuteTokensOut, sortedIndicesOut),
-              ACLNN_ERR_PARAM_NULLPTR);
     bool isRegbaseCalled = GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND950 &&
                                tokens->GetDataType() == DataType::DT_INT8;
     if (isRegbaseCalled) {

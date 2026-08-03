@@ -62,14 +62,14 @@
     <tr>
       <td>indices</td>
       <td>输入</td>
-      <td>输入indices，对应公式中的`Indices`。tokens数据类型为INT8时，元素个数不大于`10240`。</td>
+      <td>输入indices，对应公式中的`Indices`。tokens数据类型为INT8时，取值范围为`[0, 10240)`。</td>
       <td>INT32、INT64</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>numOutTokens</td>
       <td>属性</td>
-      <td>有效输出token数，设置为0时，表示不会删除任何token。不为0时，会按照numOutTokens进行切片丢弃按照indices排序好的token中超过numOutTokens的部分，为负数时按照切片索引为负数时处理。tokens数据类型为INT8时，numOutTokens不大于`10240`。</td>
+      <td>有效输出token数，设置为0时，表示不会删除任何token。不为0时，会按照numOutTokens进行切片丢弃按照indices排序好的token中超过numOutTokens的部分，为负数时按照切片索引为负数时处理。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -99,8 +99,9 @@
 
 ## 约束说明
 
-- indices要求元素个数小于`16777215`，值大于等于`0`小于`16777215`(单点支持int32或int64的最大或最小值，其余值不在范围内排序结果不正确)。
-- tokens数据类型为INT8时，indices元素个数不大于`10240`，numOutTokens不大于`10240`。
+- indices要求元素个数小于`16777215`，值大于等于`0`小于`16777215`(单点支持int32或int64的最大或最小值，其余值不在范围内排序结果不正确)。在Ascend 950上调用`aclnnMoeTokenPermute`且tokens数据类型为INT8时，indices表示expert ID，取值范围为`[0, 10240)`。
+- 调用`aclnnMoeTokenPermute`时，tokens必须为2D，indices必须为1D或2D。
+- 调用`aclnnMoeTokenPermuteV2`时，tokens必须为2D，indices必须为1D或2D。
 - 不支持paddedMode为`true`。
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：topK小于等于512。
 - <term>Ascend 950PR/Ascend 950DT</term>：
@@ -117,4 +118,3 @@
 | 调用方式   | 样例代码           | 说明                                         |
 | ---------------- | --------------------------- | --------------------------------------------------- |
 | aclnn接口  | [test_aclnn_moe_token_permute](examples/test_aclnn_moe_token_permute.cpp) | 通过[aclnnMoeTokenPermute](docs/aclnnMoeTokenPermute.md)接口方式调用MoeTokenPermute算子。 |
-

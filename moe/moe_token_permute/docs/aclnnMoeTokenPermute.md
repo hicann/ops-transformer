@@ -106,7 +106,7 @@ aclnnStatus aclnnMoeTokenPermute(
       <td>indices</td>
       <td>输入</td>
       <td>输入indices索引。</td>
-      <td><ul><li>支持空tensor。</li><li>要求shape为2D或1D。</li><li>paddedMode为false时表示每一个输入token对应的topK个处理专家索引，shape为(num_tokens, topK)或(num_tokens)。</li><li>paddedMode为true时表示每个专家选中的token索引（暂不支持）。</li><li>元素个数小于16777215，值大于等于0且小于16777215。</li><li>tokens数据类型为INT8时，元素个数不大于10240。</li></ul></td>
+      <td><ul><li>支持空tensor。</li><li>要求shape为2D或1D。</li><li>paddedMode为false时表示每一个输入token对应的topK个处理专家索引，shape为(num_tokens, topK)或(num_tokens)。</li><li>paddedMode为true时表示每个专家选中的token索引（暂不支持）。</li><li>元素个数小于16777215，值大于等于0且小于16777215。</li><li>在Ascend 950上调用本接口且tokens数据类型为INT8时，元素表示expert ID，取值范围为[0, 10240)，最大值为10239，不支持10240。</li><li>tokens数据类型为INT8时，取值范围为[0, 10240)。</li></ul></td>
       <td>INT32、INT64</td>
       <td>ND</td>
       <td>1或2</td>
@@ -116,7 +116,7 @@ aclnnStatus aclnnMoeTokenPermute(
       <td>numOutTokens</td>
       <td>输入</td>
       <td>有效输出token数。</td>
-      <td>值范围为任意整数；0表示不会删除任何token，大于0时会按照numOutTokens对按照专家排序好的token进行切片，保留前numOutTokens个token，小于0时按负的切片索引进行处理。tokens数据类型为INT8时，numOutTokens不大于10240。</td>
+      <td>值范围为任意整数；0表示不会删除任何token，大于0时会按照numOutTokens对按照专家排序好的token进行切片，保留前numOutTokens个token，小于0时按负的切片索引进行处理。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -265,7 +265,8 @@ aclnnStatus aclnnMoeTokenPermute(
 ## 约束说明
 
 - INT8类型的tokens和permuteTokensOut仅支持Ascend 950，且二者数据类型必须一致。
-- tokens数据类型为INT8时，indices元素个数不大于`10240`，numOutTokens不大于`10240`。
+- 在Ascend 950上调用本接口且`tokens`数据类型为INT8时，`indices`表示expert ID，取值范围为`[0, 10240)`，最大值为`10239`，不支持`10240`。
+- 调用本接口时，`indices`必须为1D或2D；不满足时接口直接返回参数错误。
 - 确定性计算：
   - aclnnMoeTokenPermute默认确定性实现。
 
