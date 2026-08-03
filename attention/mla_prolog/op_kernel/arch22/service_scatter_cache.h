@@ -36,7 +36,7 @@ struct ScatterCacheParams {
  * @param inputLocal 输入tensor，[row, col]，一行对应一个token，只支持单行数据处理，row为1
  * @param scatterCacheParams 所需相关参数，包括
           blockSize KV blocks的大小
-          paTokenIndex 待处理token在cache中的全局index，取值[0, blockNum*blockSize)
+          paTokenIndex 待处理token在cache中的全局index，取值[0, blockNum*blockSize)或负值，负值代表不处理
           row 待处理的行数
           col 待处理的列数，需满足32 bytes对齐
  */
@@ -45,12 +45,14 @@ template <typename T, bool IS_NZ>
 __aicore__ inline void ScatterCacheUnAligned(const GlobalTensor<T> &cacheGm, const LocalTensor<T> &inputLocal,
                                              const ScatterCacheParams &scatterCacheParams)
 {
-    if (scatterCacheParams.paTokenIndex < 0 && IS_NZ) {
+    if (scatterCacheParams.paTokenIndex < 0) {
         return;
     }
-    // blockCount, blockLen, srcStride, dstStride
-    DataCopyParams dataCopyParams{1, static_cast<uint16_t>(scatterCacheParams.col * sizeof(T)), 0, 0};
-    DataCopyPad(cacheGm[scatterCacheParams.paTokenIndex * scatterCacheParams.stride], inputLocal, dataCopyParams);
+    if constexpr (!IS_NZ) {
+        // blockCount, blockLen, srcStride, dstStride
+        DataCopyParams dataCopyParams{1, static_cast<uint16_t>(scatterCacheParams.col * sizeof(T)), 0, 0};
+        DataCopyPad(cacheGm[scatterCacheParams.paTokenIndex * scatterCacheParams.stride], inputLocal, dataCopyParams);
+    }
 }
 
 template <typename T, bool IS_NZ>
