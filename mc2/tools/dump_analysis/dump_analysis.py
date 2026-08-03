@@ -683,7 +683,7 @@ def com_status_analysis(
     logging.info("3.2 combine 中各核分配到状态位数量%s", com_status_core)
     if com_unwait_index_func == []:
         return com_statu_error_dict
-    logging.warning(
+    logging.error(
         "3.2 combine有如下下标的核未等到状态%s,(共%d个核)",
         com_unwait_index_func,
         len(com_unwait_index_func),
@@ -742,6 +742,8 @@ dump_epsendcnt = []
 start_idx = 0
 dis_com_version = "None"
 dis_com = "None"
+dis_epworldsize = 0
+com_epworldsize = 0
 
 if (soc_version == SOC_VERSION_950) or (soc_version == SOC_VERSION_910B):
     perfix = "mc2_"
@@ -869,11 +871,18 @@ for filename in os.listdir(os.path.join(floder_path)):
                 )
         else:
             logging.info("1.1 未调用到combine算子不进行combine的rankid,moe专家输入分析")
+
         if soc_version == SOC_VERSION_910B:
             if dis_core_num != 0:
                 all_card_num = dis_epworldsize
             elif com_core_num != 0:
                 all_card_num = com_epworldsize
+
+        # 总卡数以win区获取的ep_worldsize为准，如没有则以文件数判断
+        if dis_epworldsize != 0 and com_epworldsize != 0:
+            if dis_epworldsize == com_epworldsize:
+                all_card_num = dis_epworldsize
+
         if dis_moe_num != 0 and com_moe_num != 0:
             if dis_moe_num != com_moe_num:
                 logging.error(
@@ -990,14 +999,15 @@ for filename in os.listdir(os.path.join(floder_path)):
                     (dis_status_num * 8),
                     len(int32_dis_0_status),
                 )
+            logging.info("3.2 状态区实际挂的区域与win区获取的区域相反")
             if dis_0_1 == 0:
-                logging.info("3.2 dispatch 0区状态区数据:%s", int32_dis_0_status.dtype)
+                logging.info("3.2 dispatch 1区状态区数据:%s", int32_dis_1_status.dtype)
                 logging.info(
-                    "3.2 dispatch 0区状态区数据 shape:%d", len(int32_dis_0_status)
+                    "3.2 dispatch 1区状态区数据 shape:%d", len(int32_dis_1_status)
                 )
-                logging.info("3.2 dispatch 0区状态区数据:%s", int32_dis_0_status)
+                logging.info("3.2 dispatch 1区状态区数据:%s", int32_dis_1_status)
                 dis_status_class = WinData(
-                    win_data_list_01=int32_dis_0_status,
+                    win_data_list_01=int32_dis_1_status,
                     win_data_list_02=dis_status_list,
                     win_data_01=dis_status_num,
                     win_data_02=dis_0_1,
@@ -1012,13 +1022,13 @@ for filename in os.listdir(os.path.join(floder_path)):
                 )
                 logging.info("3.3 dispatch状态区分析完成\n")
             elif dis_0_1 == 1:
-                logging.info("3.2 dispatch 1区状态区数据:%s", int32_dis_1_status.dtype)
+                logging.info("3.2 dispatch 0区状态区数据:%s", int32_dis_0_status.dtype)
                 logging.info(
-                    "3.2 dispatch 1区状态区数据 shape:%d", len(int32_dis_1_status)
+                    "3.2 dispatch 0区状态区数据 shape:%d", len(int32_dis_0_status)
                 )
-                logging.info("3.2 dispatch 1区状态区数据:%s", int32_dis_1_status)
+                logging.info("3.2 dispatch 0区状态区数据:%s", int32_dis_0_status)
                 dis_status_class = WinData(
-                    win_data_list_01=int32_dis_1_status,
+                    win_data_list_01=int32_dis_0_status,
                     win_data_list_02=dis_status_list,
                     win_data_01=dis_status_num,
                     win_data_02=dis_0_1,
@@ -1057,14 +1067,15 @@ for filename in os.listdir(os.path.join(floder_path)):
             com_status_num = get_com_status_num(
                 bs, k, share_expert_num, len(int32_dis_0_status)
             )
+            logging.info("4.2 状态区实际挂的区域与win区获取的区域相反")
             if com_0_1 == 0:
-                logging.info("4.2 combine 0区状态区数据:%s", int32_com_0_status.dtype)
+                logging.info("4.2 combine 1区状态区数据:%s", int32_com_1_status.dtype)
                 logging.info(
-                    "4.2 combine 0区状态区数据 shape:%d", len(int32_com_0_status)
+                    "4.2 combine 1区状态区数据 shape:%d", len(int32_com_1_status)
                 )
-                logging.info("4.2 combine 0区状态区数据:%s", int32_com_0_status)
+                logging.info("4.2 combine 1区状态区数据:%s", int32_com_1_status)
                 com_status_class = WinData(
-                    win_data_list_01=int32_com_0_status,
+                    win_data_list_01=int32_com_1_status,
                     win_data_list_02=com_status_list,
                     win_data_01=com_status_num,
                     win_data_02=com_0_1,
@@ -1082,13 +1093,13 @@ for filename in os.listdir(os.path.join(floder_path)):
                 )
                 logging.info("4.3 combine状态区分析完成\n")
             elif com_0_1 == 1:
-                logging.info("4.2 combine 1区状态区数据:%s", int32_com_1_status.dtype)
+                logging.info("4.2 combine 0区状态区数据:%s", int32_com_0_status.dtype)
                 logging.info(
-                    "4.2 combine 1区状态区数据 shape:%d", len(int32_com_1_status)
+                    "4.2 combine 0区状态区数据 shape:%d", len(int32_com_0_status)
                 )
-                logging.info("4.2 combine 1区状态区数据:%s", int32_com_1_status)
+                logging.info("4.2 combine 0区状态区数据:%s", int32_com_0_status)
                 com_status_class = WinData(
-                    win_data_list_01=int32_com_1_status,
+                    win_data_list_01=int32_com_0_status,
                     win_data_list_02=com_status_list,
                     win_data_01=com_status_num,
                     win_data_02=com_0_1,
@@ -1209,10 +1220,10 @@ for filename in os.listdir(os.path.join(floder_path)):
             )
 
             if dis_0_1 == 0:
-                int32_dis_0_status_info = pd.DataFrame(
-                    [int32_dis_0_status], index=[f"d{card_num}_dispatch 0区状态区数据"]
+                int32_dis_1_status_info = pd.DataFrame(
+                    [int32_dis_1_status], index=[f"d{card_num}_dispatch 1区状态区数据"]
                 )
-                int32_dis_0_status_info.to_csv(
+                int32_dis_1_status_info.to_csv(
                     "win_status_list.csv",
                     index=True,
                     mode="a",
@@ -1220,10 +1231,10 @@ for filename in os.listdir(os.path.join(floder_path)):
                     encoding="gbk",
                 )
             else:
-                int32_dis_1_status_info = pd.DataFrame(
-                    [int32_dis_1_status], index=[f"d{card_num}_dispatch 1区状态区数据"]
+                int32_dis_0_status_info = pd.DataFrame(
+                    [int32_dis_0_status], index=[f"d{card_num}_dispatch 0区状态区数据"]
                 )
-                int32_dis_1_status_info.to_csv(
+                int32_dis_0_status_info.to_csv(
                     "win_status_list.csv",
                     index=True,
                     mode="a",
@@ -1294,10 +1305,10 @@ for filename in os.listdir(os.path.join(floder_path)):
             )
 
             if com_0_1 == 0:
-                int32_com_0_status_info = pd.DataFrame(
-                    [int32_com_0_status], index=[f"d{card_num}_combine 0区状态区数据"]
+                int32_com_1_status_info = pd.DataFrame(
+                    [int32_com_1_status], index=[f"d{card_num}_combine 1区状态区数据"]
                 )
-                int32_com_0_status_info.to_csv(
+                int32_com_1_status_info.to_csv(
                     "win_status_list.csv",
                     index=True,
                     mode="a",
@@ -1305,10 +1316,10 @@ for filename in os.listdir(os.path.join(floder_path)):
                     encoding="gbk",
                 )
             else:
-                int32_com_1_status_info = pd.DataFrame(
-                    [int32_com_1_status], index=[f"d{card_num}_combine 1区状态区数据"]
+                int32_com_0_status_info = pd.DataFrame(
+                    [int32_com_0_status], index=[f"d{card_num}_combine 0区状态区数据"]
                 )
-                int32_com_1_status_info.to_csv(
+                int32_com_0_status_info.to_csv(
                     "win_status_list.csv",
                     index=True,
                     mode="a",

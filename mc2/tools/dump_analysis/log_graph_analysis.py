@@ -104,7 +104,8 @@ def compare_graph_info(graph_info_func):
 
 
 def get_plog_error(log_path_list_func):
-    result = {"error1": [], "error2": [], "error3": [], "error4": []}
+    # 新增ras_code存储键
+    result = {"error1": [], "error2": [], "error3": [], "error4": [], "ras_code_0x81b18603": []}
 
     # 遍历所有日志文件
     for log_path in log_path_list_func:
@@ -127,6 +128,11 @@ def classify_error_lines(lines, result):
         line = line.strip()
         if not line:
             continue
+
+        # 全日志全量检索ras_code，不受ERROR行限制
+        if "ras_code=0x81b18603" in line:
+            result["ras_code_0x81b18603"].append(line)
+
         # 提前过滤非ERROR行，减少嵌套
         if "[ERROR]" not in line:
             continue
@@ -173,6 +179,8 @@ def print_error_result(result):
     # error3 / error4 交给子函数处理
     error3_dict_func = handle_error3(result, patterns_error3)
     handle_error4(result, patterns_error4)
+    # 调用ras_code独立打印函数，同级摆放
+    handle_ras_code(result)
 
     return error3_dict_func
 
@@ -235,6 +243,20 @@ def handle_error4(result, patterns_error4):
             )
 
 
+# 独立ras_code打印函数
+def handle_ras_code(result):
+    ras_list = result.get("ras_code_0x81b18603", [])
+    total_cnt = len(ras_list)
+    if total_cnt > 0:
+        logging.info(
+            "检测到 ras_code=0x81b18603 全日志匹配记录:%d个,该类报错通常为UB链路问题,下列为前10条内容",
+            total_cnt
+        )
+        # 控制台仅展示前10条
+        for idx, content in enumerate(ras_list[:10], 1):
+            logging.info("[%d] %s", idx, content)
+
+
 def check_error3_kernel(error3_dict_func):
     # 允许的算子白名单
     allowed_kernels = {"dispatch", "combine"}
@@ -262,6 +284,7 @@ def dict_to_csv(error_dict_func):
         "error2": "GE Errors",
         "error3": "Aicore kernel execute failed类报错",
         "error4": "Error happened, origin_op_name类报错",
+        "ras_code_0x81b18603": "全日志匹配ras_code=0x81b18603记录,通常为UB链路问题",
     }
 
     # 过滤空列表 + 映射名称
