@@ -21,8 +21,11 @@
 #include <vector>
 #include <string>
 #include <sstream>
-#include <cstdlib>
+#include <cerrno>
 #include <climits>
+#include <cstdlib>
+#include <cstring>
+#include <set>
 #include <functional>
 #include <type_traits>
 #include <unordered_map>
@@ -295,32 +298,45 @@ inline void *GetOpApiLibHandler(const char *libName)
     return handler;
 }
 
+static inline void TryLoadCustOpApiFromEnv(const char *envName, const std::string &subDir,
+    std::vector<void *> &handlers, std::set<std::string> &loadedPaths)
+{
+    const char *env = std::getenv(envName);
+    if (env == nullptr) {
+        return;
+    }
+    std::istringstream stream(env);
+    std::string dir;
+    while (std::getline(stream, dir, ':')) {
+        if (dir.empty()) {
+            continue;
+        }
+        std::string soPathStr = dir + subDir + GetCustOpApiLibName();
+        char soPath[PATH_MAX] = {0};
+        if (realpath(soPathStr.c_str(), soPath) == nullptr) {
+            int errnoCopy = errno;
+            ASCEND_LOGW("realpath failed for %s, errno=%d(%s).", soPathStr.c_str(), errnoCopy, strerror(errnoCopy));
+            continue;
+        }
+        if (!loadedPaths.insert(soPath).second) {
+            continue;
+        }
+        auto handler = dlopen(soPath, RTLD_LAZY);
+        if (handler != nullptr) {
+            handlers.push_back(handler);
+        } else {
+            ASCEND_LOGW("dlopen %s failed, error:%s.", soPath, dlerror());
+        }
+    }
+}
+
 inline std::vector<void *> GetCustOpApiHandlers()
 {
     std::vector<void *> handlers;
-    const char *env = std::getenv("ASCEND_CUSTOM_OPP_PATH");
-    if (env != nullptr) {
-        std::string envStr(env);
-        std::istringstream iss(envStr);
-        std::string path;
-        while (std::getline(iss, path, ':')) {
-            if (path.empty()) {
-                continue;
-            }
-            std::string soPathStr = path + "/op_api/lib/" + GetCustOpApiLibName();
-            char soPath[PATH_MAX] = {0};
-            if (realpath(soPathStr.c_str(), soPath) == nullptr) {
-                ASCEND_LOGW("realpath failed for %s.", soPathStr.c_str());
-                continue;
-            }
-            auto handler = dlopen(soPath, RTLD_LAZY);
-            if (handler != nullptr) {
-                handlers.push_back(handler);
-            } else {
-                ASCEND_LOGW("dlopen %s failed, error:%s.", soPath, dlerror());
-            }
-        }
-    }
+    std::set<std::string> loadedPaths;
+    TryLoadCustOpApiFromEnv("ASCEND_CUSTOM_OPP_PATH", "/op_api/lib/", handlers, loadedPaths);
+    TryLoadCustOpApiFromEnv("LD_LIBRARY_PATH", "/", handlers, loadedPaths);
+
     if (handlers.empty()) {
         auto handler = GetOpApiLibHandler(GetCustOpApiLibName());
         if (handler != nullptr) {
