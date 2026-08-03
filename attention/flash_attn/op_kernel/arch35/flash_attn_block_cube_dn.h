@@ -9,13 +9,13 @@
  */
 
 /*!
- * \file flash_attn_block_cube_noquant_gqa_dn.h
+ * \file flash_attn_block_cube_dn.h
  * \brief FANoQuantGqaBlockCubeDn
  */
-#ifndef FLASH_ATTENTION_NOQUANT_GQA_BLOCK_CUBE_DN_H_
-#define FLASH_ATTENTION_NOQUANT_GQA_BLOCK_CUBE_DN_H_
+#ifndef FLASH_ATTENTION_BLOCK_CUBE_DN_H_
+#define FLASH_ATTENTION_BLOCK_CUBE_DN_H_
 
-#include "../utils/flash_attn_block_cube_noquant_gqa_comm.h"
+#include "../utils/flash_attn_block_cube_comm.h"
 
 namespace BaseApi {
 
@@ -120,7 +120,9 @@ public:
 
     __aicore__ inline FANoQuantGqaBlockCubeDn(ConstInfoX &constInfo, SeqLensTool<LAYOUT_T, SEQLEN_T> &qSeqLensTool,
                                               SeqLensTool<LAYOUT_KV, SEQLEN_T> &kvSeqLensTool)
-        : constInfo_(constInfo), qSeqLensTool_(qSeqLensTool), kvSeqLensTool_(kvSeqLensTool){};
+        : constInfo_(constInfo),
+          qSeqLensTool_(qSeqLensTool),
+          kvSeqLensTool_(kvSeqLensTool){};
 
     __aicore__ inline void InitBlock(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
                                      __gm__ uint8_t *blockTable)
@@ -239,12 +241,6 @@ public:
         copyQueryGmToL1_(l1Tensor, queryGm_, gmCoord);
     }
 
-    __aicore__ inline void CopyQueryTile(const LocalTensor<Q_T> &dstTensor, RunInfoX &runInfo)
-    {
-        uint32_t dSize = constInfo_.dSize;
-        CopyQuerySlice(dstTensor, 0, dSize, runInfo);
-    }
-
     __aicore__ inline void CopyKeySlice(const LocalTensor<KV_T> &dstTensor, uint32_t dOffset, uint32_t dRealSize,
                                         RunInfoX &runInfo)
     {
@@ -275,17 +271,6 @@ public:
         copyKvGmToL1_(l1Tensor, valueGm_, gmCoord);
     }
 
-    __aicore__ inline void CopyKeyTile(const LocalTensor<KV_T> &dstTensor, RunInfoX &runInfo)
-    {
-        uint32_t dSize = constInfo_.dSize;
-        CopyKeySlice(dstTensor, 0, dSize, runInfo);
-    }
-
-    __aicore__ inline void CopyValueTile(const LocalTensor<KV_T> &dstTensor, RunInfoX &runInfo)
-    {
-        CopyValueSlice(dstTensor, 0, constInfo_.dSizeV, runInfo);
-    }
-
     __aicore__ inline void IterateBmm1(RunInfoX &runInfo)
     {
         uint32_t mm1ResUbBufId = runInfo.loop % UB_MM1_RES_BUFCNT;
@@ -306,7 +291,7 @@ public:
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
         fixpipeParams.nSize = (runInfo.actMSize + 31) >> 5 << 5;
         fixpipeParams.mSize = runInfo.actSingleLoopS2Size;
-        fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) * 16;
+        fixpipeParams.srcStride = (fixpipeParams.mSize + 15) >> 4 << 4;
         fixpipeParams.dstStride = fixpipeParams.nSize / 2;
         fixpipeParams.dualDstCtl = 2;
         fixpipeParams.params.ndNum = 1;
@@ -320,14 +305,14 @@ public:
         LocalTensor<Q_T> qL1Tensor = l1QBuffers_[qBufId_ * L1_Q_BUF_BYTES].template ReinterpretCast<Q_T>();
         if (unlikely(runInfo.isFirstS2Loop)) {
             Mutex::Lock<PIPE_MTE2>(Q_L1_EVENT0 + qBufId_);
-            CopyQueryTile(qL1Tensor, runInfo);
+            CopyQuerySlice(qL1Tensor, 0, constInfo_.dSize, runInfo);
             Mutex::Unlock<PIPE_MTE2>(Q_L1_EVENT0 + qBufId_);
             Mutex::Lock<PIPE_MTE1>(Q_L1_EVENT0 + qBufId_);
         }
 
         LocalTensor<KV_T> kL1Tensor = l1KvBuffers_[kvBufId_ * L1_KV_BUF_BYTES].template ReinterpretCast<KV_T>();
         Mutex::Lock<PIPE_MTE2>(KV_L1_EVENT0 + kvBufId_);
-        CopyKeyTile(kL1Tensor, runInfo);
+        CopyKeySlice(kL1Tensor, 0, constInfo_.dSize, runInfo);
         Mutex::Unlock<PIPE_MTE2>(KV_L1_EVENT0 + kvBufId_);
         Mutex::Lock<PIPE_MTE1>(KV_L1_EVENT0 + kvBufId_);
         {
@@ -400,7 +385,7 @@ public:
     {
         LocalTensor<KV_T> vL1Tensor = l1KvBuffers_[kvBufId_ * L1_KV_BUF_BYTES].template ReinterpretCast<KV_T>();
         Mutex::Lock<PIPE_MTE2>(KV_L1_EVENT0 + kvBufId_);
-        CopyValueTile(vL1Tensor, runInfo);
+        CopyValueSlice(vL1Tensor, 0, constInfo_.dSizeV, runInfo);
         Mutex::Unlock<PIPE_MTE2>(KV_L1_EVENT0 + kvBufId_);
         Mutex::Lock<PIPE_MTE1>(KV_L1_EVENT0 + kvBufId_);
         {
@@ -408,7 +393,7 @@ public:
             LocalTensor<MM_T> l0CSubTensor = l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
             MMParam param = {
                 (uint32_t)mBaseSize,                   // singleM 128
-                (uint32_t)constInfo_.dSizeV,            // singleN 128
+                (uint32_t)constInfo_.dSizeV,           // singleN 128
                 (uint32_t)runInfo.actSingleLoopS2Size, // singleK
                 true,                                  // isLeftTranspose
                 false                                  // isRightTranspose
@@ -454,4 +439,4 @@ public:
 
 } // namespace BaseApi
 
-#endif // FLASH_ATTENTION_NOQUANT_GQA_BLOCK_CUBE_DN_H_
+#endif // FLASH_ATTENTION_BLOCK_CUBE_DN_H_

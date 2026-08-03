@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file flash_attn_block_vec_noquant_gqa_nd.h
+ * \file flash_attn_block_vec_nd.h
  * \brief FANoQuantGqaBlockVecNd —— Nd 路径专用 Vec Block 模板（独立类，无 base 基类）。
  */
-#ifndef FLASH_ATTENTION_NOQUANT_GQA_BLOCK_VEC_ND_H_
-#define FLASH_ATTENTION_NOQUANT_GQA_BLOCK_VEC_ND_H_
+#ifndef FLASH_ATTENTION_BLOCK_VEC_ND_H_
+#define FLASH_ATTENTION_BLOCK_VEC_ND_H_
 
 #include "kernel_operator.h"
 
@@ -794,4 +794,4 @@ public:
 };
 
 } // namespace BaseApi
-#endif // FLASH_ATTENTION_NOQUANT_GQA_BLOCK_VEC_ND_H_
+#endif // FLASH_ATTENTION_BLOCK_VEC_ND_H_

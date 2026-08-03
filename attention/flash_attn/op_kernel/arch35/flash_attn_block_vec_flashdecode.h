@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file flash_attn_block_vec_noquant_flashdecode.h
+ * \file flash_attn_block_vec_flashdecode.h
  * \brief
  */
 #ifndef FLASH_ATTN_BLOCK_VEC_FLASHDECODE_H

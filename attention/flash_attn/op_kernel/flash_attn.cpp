@@ -30,8 +30,8 @@
 #else
 #include "../common/arch35/flash_attention_score_common_regbase.h"
 #endif
-#include "arch35/flash_attn_kernel_noquant_gqa_dn.h"
-#include "arch35/flash_attn_kernel_noquant_gqa_nd.h"
+#include "arch35/flash_attn_kernel_dn.h"
+#include "arch35/flash_attn_kernel_nd.h"
 
 using namespace AscendC;
 

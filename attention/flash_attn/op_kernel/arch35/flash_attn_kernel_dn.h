@@ -9,26 +9,26 @@
  */
 
 /*!
- * \file flash_attn_kernel_noquant_gqa_nd.h
- * \brief FlashAttentionNoQuantGqaKernelNd —— Nd 路径专用 kernel 模板（独立类）。
+ * \file flash_attn_kernel_dn.h
+ * \brief FlashAttentionNoQuantGqaKernelDn —— Dn 路径专用 kernel 模板（独立类）。
  */
 
-#ifndef FLASH_ATTN_KERNEL_NOQUANT_GQA_ND_H_
-#define FLASH_ATTN_KERNEL_NOQUANT_GQA_ND_H_
+#ifndef FLASH_ATTN_KERNEL_DN_H_
+#define FLASH_ATTN_KERNEL_DN_H_
 
 #include "adv_api/activation/softmax.h"
 #include "kernel_operator_list_tensor_intf.h" // TensorDesc
 #include "../utils/flash_attn_common_def.h"
 #include "../utils/flash_attn_utils.h"
 
-#include "flash_attn_block_cube_noquant_gqa_nd.h"
-#include "flash_attn_block_vec_noquant_gqa_nd.h"
+#include "flash_attn_block_cube_dn.h"
+#include "flash_attn_block_vec_dn.h"
 #if __has_include("../../../common/op_kernel/memory_copy_arch35.h")
 #include "../../../common/op_kernel/memory_copy_arch35.h"
 #else
 #include "../../common/memory_copy_arch35.h"
 #endif
-#include "flash_attn_block_vec_noquant_flashdecode.h"
+#include "flash_attn_block_vec_flashdecode.h"
 
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
@@ -45,7 +45,7 @@ using namespace regbaseutil;
 
 namespace BaseApi {
 template <typename FA_T, typename CubeBlockType, typename VecFaBlockType, typename VecFdBlockType>
-class FlashAttentionNoQuantGqaKernelNd {
+class FlashAttentionNoQuantGqaKernelDn {
 public:
     using T = float;
     using SEQLEN_T = uint32_t;
@@ -108,8 +108,9 @@ public:
     bool tailS2Split_ = false;
 
     // ==============================fuction=======================================================
-    __aicore__ inline FlashAttentionNoQuantGqaKernelNd()
-        : cubeBlock_(constInfo_, qSeqLensTool_, kvSeqLensTool_), vecFaBlock_(constInfo_, qSeqLensTool_, kvSeqLensTool_),
+    __aicore__ inline FlashAttentionNoQuantGqaKernelDn()
+        : cubeBlock_(constInfo_, qSeqLensTool_, kvSeqLensTool_),
+          vecFaBlock_(constInfo_, qSeqLensTool_, kvSeqLensTool_),
           vecFdBlock_(constInfo_, qSeqLensTool_, kvSeqLensTool_){};
 
     __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
@@ -128,11 +129,11 @@ public:
         constInfo_.learnableSinkFlag = (learnableSink != nullptr);
 
         faMetaDataGm_.SetGlobalBuffer((__gm__ uint32_t *)(fiaMetaData + FA_METADATA_HEADER_OFFSET),
-                                     FA_AIC_CORE_NUM * 16U * sectionNum_);
+                                      FA_AIC_CORE_NUM * 16U * sectionNum_);
 
         qSeqLensTool_.Init(cuSeqLensQ, constInfo_.cuSeqLensQSize, seqUsedQ, constInfo_.seqUsedQSize, constInfo_.s1Size);
         kvSeqLensTool_.Init(cuSeqLensKv, constInfo_.cuSeqLensKVSize, seqUsedKv, constInfo_.seqUsedKvSize,
-                           constInfo_.s2Size);
+                            constInfo_.s2Size);
 
         if ASCEND_IS_AIC {
             cubeBlock_.InitBlock(query, key, value, blockTable);
@@ -147,7 +148,7 @@ public:
                     FA_AIV_CORE_NUM * 16U * sectionNum_);
                 vecFdBlock_.InitBlock(learnableSink, softmaxLse, attentionOut);
                 vecFdBlock_.InitGlobalTensor(vecFaBlock_.softmaxFDMaxGm_, vecFaBlock_.softmaxFDSumGm_,
-                                            vecFaBlock_.accumOutGm_);
+                                             vecFaBlock_.accumOutGm_);
             }
         }
     }
@@ -530,7 +531,8 @@ public:
         info.isS2SplitCore = false;
         info.faTmpOutWsPos = coreFirstTmpOutWsPos_;
         info.isLastS2Loop = (s2Cur + 1 == curS2End_);
-        info.actVecMSize = (info.actMSize + 1) >> 1;
+        info.actMSizeAlign32 = (info.actMSize + 31) >> 5 << 5;
+        info.actVecMSize = info.actMSize <= 16 ? info.actMSize : (info.actMSizeAlign32 >> 1);
         info.vecMbaseIdx = 0;
         if (constInfo_.subBlockIdx == 1) {
             info.vecMbaseIdx = info.actVecMSize;
@@ -635,8 +637,8 @@ public:
             vecFaBlock_.InitCrossCoreSync();
             vecFaBlock_.AllocEventID();
         } else {
-            cubeBlock_.InitCrossCoreSync();
             cubeBlock_.InitBuffers();
+            cubeBlock_.InitCrossCoreSync();
             cubeBlock_.AllocEventID();
         }
         for (uint32_t sectionIdx = 0; sectionIdx < sectionNum_; sectionIdx++) {
@@ -655,8 +657,8 @@ public:
             cubeBlock_.UnInitCrossCoreSync();
         }
     }
-}; // FlashAttentionNoQuantGqaKernelNd
+}; // FlashAttentionNoQuantGqaKernelDn
 
 } // namespace BaseApi
 
-#endif // FLASH_ATTN_KERNEL_NOQUANT_GQA_ND_H_
+#endif // FLASH_ATTN_KERNEL_DN_H_
