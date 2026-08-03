@@ -378,7 +378,7 @@ TEST_P(ChunkGatedDeltaRuleTest, RunTest)
     std::cout << "]" << std::endl;
 
     uint32_t blockDim = 8;
-    ICPU_SET_TILING_KEY(0);
+    ICPU_SET_TILING_KEY(hasGamma ? 10 : 0);
     ICPU_RUN_KF(chunk_gated_delta_rule, blockDim, queryGm, keyGm, valueGm, betaGm, stateGm, seqlensGm,
                 (hasGamma ? gammaGm : nullptr), outGm, finalStateGm, workspace, tiling);
 }

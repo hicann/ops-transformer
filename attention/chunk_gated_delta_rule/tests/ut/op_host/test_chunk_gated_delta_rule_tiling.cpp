@@ -106,7 +106,7 @@ TEST_F(ChunkGatedDeltaRuleTilingTest, BasicWithGamma)
                                               },
                                               &compileinfo);
 
-    int64_t expectTilingKey = 0UL;
+    int64_t expectTilingKey = 10UL;
     TilingInfo tilingInfo;
     EXPECT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, expectTilingKey);
@@ -150,6 +150,96 @@ TEST_F(ChunkGatedDeltaRuleTilingTest, BasicWithoutGamma)
                                               &compileinfo);
 
     int64_t expectTilingKey = 0UL;
+    TilingInfo tilingInfo;
+    EXPECT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
+    EXPECT_EQ(tilingInfo.tilingKey, expectTilingKey);
+}
+
+TEST_F(ChunkGatedDeltaRuleTilingTest, BasicFp32StateWithoutGamma)
+{
+    optiling::ChunkGatedDeltaRuleCompileInfo compileinfo = {48, 196608};
+
+    uint32_t bs = 2;
+    uint32_t seqLen = 100;
+    uint32_t t = bs * seqLen;
+    uint32_t nk = 4;
+    uint32_t nv = 8;
+    uint32_t dk = 128;
+    uint32_t dv = 128;
+
+    gert::StorageShape queryShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape keyShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape valueShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape betaShape = {{t, nv}, {t, nv}};
+    gert::StorageShape stateShape = {{bs, nv, dv, dk}, {bs, nv, dv, dk}};
+    gert::StorageShape seqLengthsShape = {{bs}, {bs}};
+
+    gert::TilingContextPara tilingContextPara("ChunkGatedDeltaRule",
+                                              {
+                                                  {queryShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {keyShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {valueShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {betaShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {stateShape, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {seqLengthsShape, ge::DT_INT32, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {{{t, nv, dv}, {t, nv, dv}}, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {{{bs, nv, dv, dk}, {bs, nv, dv, dk}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+                                              },
+                                              &compileinfo,
+                                              "Ascend950");
+
+    int64_t expectTilingKey = 1UL;
+    TilingInfo tilingInfo;
+    EXPECT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
+    EXPECT_EQ(tilingInfo.tilingKey, expectTilingKey);
+}
+
+TEST_F(ChunkGatedDeltaRuleTilingTest, BasicFp32StateWithGamma)
+{
+    optiling::ChunkGatedDeltaRuleCompileInfo compileinfo = {48, 196608};
+
+    uint32_t bs = 2;
+    uint32_t seqLen = 100;
+    uint32_t t = bs * seqLen;
+    uint32_t nk = 4;
+    uint32_t nv = 8;
+    uint32_t dk = 128;
+    uint32_t dv = 128;
+
+    gert::StorageShape queryShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape keyShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape valueShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape betaShape = {{t, nv}, {t, nv}};
+    gert::StorageShape stateShape = {{bs, nv, dv, dk}, {bs, nv, dv, dk}};
+    gert::StorageShape seqLengthsShape = {{bs}, {bs}};
+    gert::StorageShape gShape = {{t, nv}, {t, nv}};
+
+    gert::TilingContextPara tilingContextPara("ChunkGatedDeltaRule",
+                                              {
+                                                  {queryShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {keyShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {valueShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {betaShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {stateShape, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {seqLengthsShape, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {gShape, ge::DT_FLOAT, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {{{t, nv, dv}, {t, nv, dv}}, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {{{bs, nv, dv, dk}, {bs, nv, dv, dk}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+                                              },
+                                              &compileinfo,
+                                              "Ascend950");
+
+    int64_t expectTilingKey = 11UL;
     TilingInfo tilingInfo;
     EXPECT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, expectTilingKey);

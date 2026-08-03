@@ -33,12 +33,20 @@ extern "C" __global__ __aicore__ void chunk_gated_delta_rule(GM_ADDR query, GM_A
 
     __gm__ uint8_t *user = GetUserWorkspace(workspaceGM);
     CGDRInitParams initParams{query, key, value, beta, initialState, seqlens, gOptional, out, finalState};
-    if (TILING_KEY_IS(TILING_KEY_CGDR_FP32_STATE)) {
-        CGDR<bfloat16_t, float, float> op(&pipe, &tilingData);
+    if (TILING_KEY_IS(TILING_KEY_CGDR_FP32_STATE_WITH_GAMMA)) {
+        CGDR<bfloat16_t, float, float, true> op(&pipe, &tilingData);
         op.Init(initParams, user);
         op.Process();
-    } else if (TILING_KEY_IS(TILING_KEY_CGDR_BF16_STATE)) {
-        CGDR<bfloat16_t, float, bfloat16_t> op(&pipe, &tilingData);
+    } else if (TILING_KEY_IS(TILING_KEY_CGDR_FP32_STATE_NO_GAMMA)) {
+        CGDR<bfloat16_t, float, float, false> op(&pipe, &tilingData);
+        op.Init(initParams, user);
+        op.Process();
+    } else if (TILING_KEY_IS(TILING_KEY_CGDR_BF16_STATE_WITH_GAMMA)) {
+        CGDR<bfloat16_t, float, bfloat16_t, true> op(&pipe, &tilingData);
+        op.Init(initParams, user);
+        op.Process();
+    } else if (TILING_KEY_IS(TILING_KEY_CGDR_BF16_STATE_NO_GAMMA)) {
+        CGDR<bfloat16_t, float, bfloat16_t, false> op(&pipe, &tilingData);
         op.Init(initParams, user);
         op.Process();
     }

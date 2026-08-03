@@ -11,12 +11,16 @@
 /*!
  * \file chunk_gated_delta_rule_tiling_key.h
  * \brief chunk_gated_delta_rule tiling key definitions
+ * ones digit: stateIsFp32 (0=bf16, 1=fp32)
+ * tens digit: hasGamma (0=no, 1=yes)
  */
 
 #ifndef CHUNK_GATED_DELTA_RULE_TILING_KEY_H
 #define CHUNK_GATED_DELTA_RULE_TILING_KEY_H
 
-#define TILING_KEY_CGDR_BF16_STATE 0UL
-#define TILING_KEY_CGDR_FP32_STATE 1UL
+#define TILING_KEY_CGDR_BF16_STATE_NO_GAMMA    0UL
+#define TILING_KEY_CGDR_FP32_STATE_NO_GAMMA    1UL
+#define TILING_KEY_CGDR_BF16_STATE_WITH_GAMMA  10UL
+#define TILING_KEY_CGDR_FP32_STATE_WITH_GAMMA  11UL
 
 #endif // CHUNK_GATED_DELTA_RULE_TILING_KEY_H

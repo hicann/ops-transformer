@@ -41,7 +41,7 @@ struct CGDRInitParams {
 };
 
 
-template <typename lowType, typename highType, typename stateType = lowType>
+template <typename lowType, typename highType, typename stateType = lowType, bool gOptional = false>
 class CGDR {
 public:
     static constexpr bool kStateIsFp32 = std::is_same_v<stateType, float>;
@@ -117,9 +117,8 @@ public:
 
         dataSize = tiling_->t * tiling_->nv;
         beta_.SetGlobalBuffer(reinterpret_cast<__gm__ lowType *>(initParams.beta), dataSize);
-        if (initParams.gOptional != nullptr) {
+        if constexpr (gOptional) {
             g_.SetGlobalBuffer(reinterpret_cast<__gm__ highType *>(initParams.gOptional), dataSize);
-            gFlag_ = true;
         }
 
         dataSize = tiling_->b * tiling_->nv * tiling_->dv * tiling_->dk;
@@ -213,7 +212,7 @@ private:
     {
         GDRStageOneInitParams<vInnerType> initStageOneParams{query_, key_,         value_,        beta_,   g_,
                                                              gCum_,  kCumDecay_,   vInner_,       qPrime_, kg_,
-                                                             qkt_,   stageWsAddr_, stageOneMask_, cg,      gFlag_};
+                                                             qkt_,   stageWsAddr_, stageOneMask_, cg};
         stageOneOp_.Init(initStageOneParams, pipe_, tiling_);
         stageOneOp_.Process();
         pipe_->Reset();
@@ -223,7 +222,7 @@ private:
     __aicore__ inline void RunStage2(ChunkGroup &cg, GlobalTensor<sType> stateIn, GlobalTensor<sType> stateOut,
                                      bool isFirstGroup)
     {
-        Stage2<sType> stageTwoOp;
+        Stage2<sType, gOptional> stageTwoOp;
         StageTwoParams<sType> initStageTwoParams;
         initStageTwoParams.qPrime = qPrime_;
         initStageTwoParams.vInner = vInner_;
@@ -245,7 +244,6 @@ private:
         initStageTwoParams.Dk = tiling_->dk;
         initStageTwoParams.stateStride1 = tiling_->stateStride1;
         initStageTwoParams.useInitialState = isFirstGroup;
-        initStageTwoParams.gOptional = gFlag_;
         initStageTwoParams.isFirstGroup = isFirstGroup;
         initStageTwoParams.stateIn = stateIn;
         initStageTwoParams.stateOut = stateOut;
@@ -270,7 +268,7 @@ private:
         } else {
             vInnerBf16 = vInner_;
         }
-        Stage3 stageThreeOp;
+        Stage3<gOptional> stageThreeOp;
         StageThreeParams initStageThreeParams{
             qkt_,         gCum_,
             vInnerBf16,   stageThreeMask_[int(GetBlockIdx() / 2) * tiling_->chunkSize * tiling_->chunkSize],
@@ -278,8 +276,7 @@ private:
             &stage3Mm_,   pipe_,
             &cg,          tiling_->scale,
             tiling_->nv,  tiling_->nk,
-            tiling_->dv,  tiling_->dk,
-            gFlag_};
+            tiling_->dv,  tiling_->dk};
         stageThreeOp.Init(&initStageThreeParams, tiling_->aiCoreNum);
         stageThreeOp.Process();
         pipe_->Reset();
@@ -324,8 +321,7 @@ private:
     StageThreeMT stage3Mm_;
 
     // Stage operators
-    Stage1<kStateIsFp32> stageOneOp_;
-    bool gFlag_ = false;
+    Stage1<kStateIsFp32, gOptional> stageOneOp_;
 };
 
 } // namespace ChunkGatedDeltaRule
