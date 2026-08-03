@@ -58,7 +58,7 @@ struct PeermemInfo {
         rankSyncInWorldPtr = base;
         int64_t offset = PEERMEM_DATA_OFFSET;
         maskRecvPtr = base + offset;
-        // 每张卡为自己的 expertPerRank 个专家、各 worldSize 个源卡保留一份 [mask | count] 槽位。
+        // 每张卡为自己的 moeExpertPerRank 个 routed 专家、各 worldSize 个源卡保留一份 [mask | count] 槽位。
         // 槽位 = bit-packed mask (CeilAlign(compareCount/8,32)) + 32B count(源卡 SendMaskCal 同步算好),
         // 与 mega_moe.h FirstBuffInit 的 maskSlotSize_ 一致; 接收端直接读 count, 不再 GatherMask 计数。
         int64_t sendTotalNum = static_cast<int64_t>(tilingData->bs) * tilingData->topK;
@@ -67,7 +67,7 @@ struct PeermemInfo {
         int64_t maskAlignSize = Ops::Base::CeilAlign(compareCount / 8, (int64_t)ALIGN_32);
         int64_t maskSlotSize = maskAlignSize + (int64_t)ALIGN_32; // mask + 32B count
         // 整个 mask 区按 512 对齐, 保证后续 quantTokenScalePtr 仍 512 对齐(CopyGMToGMPerToken 用普通 DataCopy 读)。
-        offset += Ops::Base::CeilAlign((int64_t)tilingData->expertPerRank * tilingData->epWorldSize * maskSlotSize,
+        offset += Ops::Base::CeilAlign((int64_t)tilingData->moeExpertPerRank * tilingData->epWorldSize * maskSlotSize,
                                        (int64_t)ALIGN_512);
 
         if (tilingData->topoType == TOPO_TYPE_MTE) {

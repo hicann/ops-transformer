@@ -161,7 +161,6 @@ private:
     uint32_t topK_ = 0;
     uint32_t rankId_ = 0;
     uint32_t worldSize_ = 0;
-    uint32_t expertPerRank_ = 0;
     int64_t hiddenDim_ = 0;
     uint64_t maxOutputSize_ = 0;
     uint32_t startBlockIdx_ = 0;
@@ -280,7 +279,6 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Init(
     topK_ = tilingData->topK;
     sendTotalNum_ = static_cast<uint64_t>(m_) * topK_;
     worldSize_ = tilingData->epWorldSize;
-    expertPerRank_ = tilingData->expertPerRank;
     moeExpertPerRank_ = tilingData->moeExpertPerRank;
     sharedExpertNum_ = tilingData->sharedExpertNum;
     blockNumPerRank_ = tilingData->blockNumPerEP;
@@ -318,7 +316,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Init(
     // 每个 block 负责一个专家，cumsumInfo 中每个专家占 worldSize 个
     // int32_t 存 rank 维度的 cumsum 结果，blockIdx 决定了负责哪个专家。
     uint64_t cumsumStride =
-        Ops::Base::CeilAlign(static_cast<int64_t>(worldSize_ * expertPerRank_ * sizeof(int32_t)), ALIGN_32);
+        Ops::Base::CeilAlign(static_cast<int64_t>(worldSize_ * moeExpertPerRank_ * sizeof(int32_t)), ALIGN_32);
     cumsumInfoGlobalTensor_.SetGlobalBuffer(
         reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.cumsumInfoPtr + cumsumStride * blockIdx_));
     epilogueOp_.Init({params_.workspaceInfo.swigluQuantDataPtr, params_.workspaceInfo.swigluQuantScalePtr,
@@ -375,11 +373,12 @@ MegaMoe<TemplateMegaMoeTypeFunc>::DispatchBuffInit()
     // 与 route batch 无关的固定占用
     uint32_t expertTokenCntTensorSize = ALIGN_32;
     uint32_t cumsumInfoTensorSize = Ops::Base::CeilAlign(
-        static_cast<int64_t>(worldSize_ * expertPerRank_ * sizeof(int32_t)), static_cast<int64_t>(ALIGN_32));
+        static_cast<int64_t>(worldSize_ * moeExpertPerRank_ * sizeof(int32_t)), static_cast<int64_t>(ALIGN_32));
     // sendCntTensor_: 每 src rank 一个 burst(32B), 共 worldsize*32B（stride 只读 count 跳过 mask 区）
     uint32_t sendCntTensorSize = worldSize_ * static_cast<uint32_t>(ALIGN_32);
     uint32_t expertTokenNumsOutTensorSize =
-        Ops::Base::CeilAlign(static_cast<int64_t>(expertPerRank_ * sizeof(int32_t)), static_cast<int64_t>(ALIGN_32));
+        Ops::Base::CeilAlign(static_cast<int64_t>(moeExpertPerRank_ * sizeof(int32_t)),
+                             static_cast<int64_t>(ALIGN_32));
 
     // Dispatch 的 UB 布局与 AIV 分核无关；对应 host CalcDispatchBufferConfig 的唯一配置。
     bufferConfig = params_.tilingData->dispatchBufferConfig;
@@ -393,7 +392,7 @@ MegaMoe<TemplateMegaMoeTypeFunc>::DispatchBuffInit()
     expertTokenCntTensor_ =
         LocalTensor<int32_t>(TPosition::VECCALC, expertTokenCntTensorAddr, expertTokenCntTensorSize / sizeof(int32_t));
     // Tensor用处：SendCntCal 函数中记录本卡专家收到 token count 的 cumsum 累加值；
-    // Tensor大小：worldSize_ * expertPerRank_ * sizeof(int32_t) align 至 32 字节对齐；
+    // Tensor大小：worldSize_ * moeExpertPerRank_ * sizeof(int32_t) align 至 32 字节对齐；
     uint32_t cumsumInfoTensorAddr = expertTokenCntTensorAddr + expertTokenCntTensorSize;
     cumsumInfoTensor_ =
         LocalTensor<int32_t>(TPosition::VECCALC, cumsumInfoTensorAddr, cumsumInfoTensorSize / sizeof(int32_t));
@@ -430,7 +429,7 @@ MegaMoe<TemplateMegaMoeTypeFunc>::DispatchBuffInit()
     copyTmpBaseAddr_ = topkIndexTensorAddr + topkIndexTensorSize;
     uint32_t copyTmpTotalSize = static_cast<uint32_t>(bufferConfig.bufferCount) * mxQuantTokenScaleAlignBytes_;
     // Tensor用处：ExpertTokenNumCopyOut 函数中本卡各专家收到的 tokenCnt 数；
-    // Tensor大小：expertPerRank_ * sizeof(int32_t) 对齐至 32 字节；
+    // Tensor大小：moeExpertPerRank_ * sizeof(int32_t) 对齐至 32 字节；
     uint32_t expertTokenNumsOutTensorAddr = copyTmpBaseAddr_ + copyTmpTotalSize;
     expertTokenNumsOutTensor_ = LocalTensor<int32_t>(TPosition::VECCALC, expertTokenNumsOutTensorAddr,
                                                      expertTokenNumsOutTensorSize / sizeof(int32_t));
@@ -473,7 +472,7 @@ MegaMoe<TemplateMegaMoeTypeFunc>::SendAndQuantBuffInit()
     // 单个 xOutTensor_ 槽位与 dispatch 的 token-scale-weight 槽位使用相同布局。
     uint32_t xOutTensorSize = mxQuantTokenScaleAlignBytes_;
     uint32_t xInAlignSize = Ops::Base::CeilAlign(k_, static_cast<uint32_t>(ALIGN_128)) * sizeof(bfloat16_t);
-    uint32_t expertPerCoreMax = Ops::Base::CeilDiv(worldSize_ * expertPerRank_, blockAivNum_);
+    uint32_t expertPerCoreMax = Ops::Base::CeilDiv(worldSize_ * moeExpertPerRank_, blockAivNum_);
     uint32_t sendCntAccSize =
         Ops::Base::CeilAlign(static_cast<int64_t>(expertPerCoreMax * sizeof(int32_t)), static_cast<int64_t>(ALIGN_32));
 
@@ -556,7 +555,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ResetFlagList()
         GlobalTensor<int32_t> statusGm;
         statusGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.gmm1TileStatusPtr));
         int32_t statusElementCount =
-            (static_cast<int32_t>(expertPerRank_) *
+            (static_cast<int32_t>(moeExpertPerRank_) *
                  static_cast<int32_t>(params_.tilingData->maxTilesPerExpert) +
              1) *
             INT_CACHELINE;
@@ -2084,16 +2083,16 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Process()
         if constexpr (g_coreType == AIV) {
             constexpr uint32_t epilogueSubIdx = ENABLE_A8W4 ? 1 : 0;
             if (subBlockIdx_ == epilogueSubIdx) {
-                int32_t allDoneTag = static_cast<int32_t>(expertPerRank_ + 1);
+                int32_t allDoneTag = static_cast<int32_t>(moeExpertPerRank_ + 1);
                 __gm__ int32_t *allDoneAddr =
                     reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.gmm1TileStatusPtr) +
-                    static_cast<int64_t>(expertPerRank_) * params_.tilingData->maxTilesPerExpert * INT_CACHELINE;
+                    static_cast<int64_t>(moeExpertPerRank_) * params_.tilingData->maxTilesPerExpert * INT_CACHELINE;
                 AscendC::WriteGmByPassDCache(allDoneAddr, allDoneTag);
             }
         } else { // AIC
-            int32_t allDoneTag = static_cast<int32_t>(expertPerRank_ + 1);
+            int32_t allDoneTag = static_cast<int32_t>(moeExpertPerRank_ + 1);
             __gm__ int32_t *allDoneAddr = reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.gmm1TileStatusPtr) +
-                                          static_cast<int64_t>(expertPerRank_) *
+                                          static_cast<int64_t>(moeExpertPerRank_) *
                                               params_.tilingData->maxTilesPerExpert * INT_CACHELINE;
             while (AscendC::ReadGmByPassDCache(allDoneAddr) != allDoneTag) {
                 int64_t st = AscendC::GetSystemCycle();

@@ -71,11 +71,11 @@ constexpr uint32_t DEQUANT_FP32_SCALE_EXPANSION = 4U;
  * Brecv 表示基准 batch 的 route item 数，D 表示 dispatch buffer 数：
  *   recvVariableBytes(Brecv, D) = Brecv / 8 + 2 * Brecv * sizeof(int32_t)
  *                                  + D * (tokenScaleBytes + 32)；
- *   recvFixedBytes = 32 + Align32(worldSize * expertPerRank * 4) + worldSize * 32
- *                    + Align32(expertPerRank * 4)；
+ *   recvFixedBytes = 32 + Align32(worldSize * moeExpertPerRank * 4) + worldSize * 32
+ *                    + Align32(moeExpertPerRank * 4)；
  *   recvFixedBytes + recvVariableBytes(Brecv, D) <= availableUbBytes。
  *
- * 12288 的成立前提按 k=8192、moeExpertNum<=2048、worldSize<=1024、expertPerRank<=1024 和 D=6
+ * 12288 的成立前提按 k=8192、moeExpertNum<=2048、worldSize<=1024、moeExpertPerRank<=1024 和 D=6
  * 保守验证。分别取各 tensor 的独立上限时：
  *   recvFixedBytes             <= 32 + 8192 + 32768 + 4096 = 45088B；
  *   route batch tensor         = 12288 / 8 + 2 * 12288 * 4 = 99840B；
@@ -83,7 +83,7 @@ constexpr uint32_t DEQUANT_FP32_SCALE_EXPANSION = 4U;
  *                               = 51648B；
  *   合计 196576B，约 192KB；当前支持平台动态获取的 UB 预算可容纳该布局。
  * 因此该基准在所有合法规格下至少支持双 buffer，且最坏规格也能支持当前上限 6 个 buffer。若修改
- * MAX_H、MAX_MOE_EXPERT_NUM、worldSize/expertPerRank 上限、DispatchBuffInit 固定 tensor 布局或
+ * MAX_H、MAX_MOE_EXPERT_NUM、worldSize/moeExpertPerRank 上限、DispatchBuffInit 固定 tensor 布局或
  * dispatch buffer 数量上限，必须重新验证该前提。
  *
  * CalcDispatchBufferConfig 固定选中的 buffer 数后，用剩余 UB 扩大 batch，并向下对齐到 ALIGN_256。
@@ -161,8 +161,7 @@ struct MegaMoeSendMaskBufferConfig {
     uint32_t bufferBytes;
 };
 struct MegaMoeTilingData {
-    uint32_t expertPerRank;    // 本卡 routed weight 容量，可大于实际参与路由的专家数
-    uint32_t moeExpertPerRank; // 本卡实际参与 topK 路由的 MoE 专家数
+    uint32_t moeExpertPerRank; // 本卡参与 topK 路由的 MoE 专家数，等于 weight1.dim0
     uint32_t bs;
     uint32_t h;
     uint32_t hiddenDim;
