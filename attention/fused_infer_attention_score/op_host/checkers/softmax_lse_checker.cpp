@@ -80,9 +80,10 @@ ge::graphStatus SoftmaxLSEChecker::CheckFeatureDimAndShape(const FiaTilingInfo &
                 lseShape->GetStorageShape().GetDim(DIM_NUM_1) != fiaInfo.n1Size ||
                 lseShape->GetStorageShape().GetDim(DIM_NUM_2) != SHAPE_PARAMS_CONST) {
                 std::string shapeStr = ToStringRaw(lseShape->GetStorageShape());
+                std::string reasonMsg = "The shape of softmax_lse must be [T(" +
+                    std::to_string(fiaInfo.qTSize) + "), N(" + std::to_string(fiaInfo.n1Size) + "), 1]";
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                    fiaInfo.opName, "softmax_lse", shapeStr.c_str(),
-                    "The shape of softmax_lse must be [T, N, 1]");
+                    fiaInfo.opName, "softmax_lse", shapeStr.c_str(), reasonMsg.c_str());
                 return ge::GRAPH_FAILED;
             }
         } else {
@@ -96,8 +97,11 @@ ge::graphStatus SoftmaxLSEChecker::CheckFeatureDimAndShape(const FiaTilingInfo &
                 lseShape->GetStorageShape().GetDim(DIM_NUM_2) != fiaInfo.s1Size ||
                 lseShape->GetStorageShape().GetDim(DIM_NUM_3) != SHAPE_PARAMS_CONST) {
                 std::string shapeStr = ToStringRaw(lseShape->GetStorageShape());
+                std::string reasonMsg = "The shape of softmax_lse must be [B(" +
+                    std::to_string(fiaInfo.bSize) + "), N(" + std::to_string(fiaInfo.n1Size) + "), Q_S(" +
+                    std::to_string(fiaInfo.s1Size) + "), 1]";
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(fiaInfo.opName, "softmax_lse", shapeStr.c_str(),
-                                                      "The shape of softmax_lse must be [B, N, Q_S, 1]");
+                                                      reasonMsg.c_str());
                 return ge::GRAPH_FAILED;
             }
         }
