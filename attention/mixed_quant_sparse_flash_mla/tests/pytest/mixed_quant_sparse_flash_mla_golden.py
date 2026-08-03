@@ -30,6 +30,16 @@ DATA_RANGE_RIGHT = 10
 FP8_DATA_RANGE_LEFT = -5
 FP8_DATA_RANGE_RIGHT = 5
 
+
+def resolve_input_data_ranges(q_datarange, ori_kv_datarange, cmp_kv_datarange):
+    """Apply the canonical MQSMLA data range defaults."""
+    default_range = [DATA_RANGE_LEFT, DATA_RANGE_RIGHT]
+    return tuple(
+        value if value is not None else list(default_range)
+        for value in (q_datarange, ori_kv_datarange, cmp_kv_datarange)
+    )
+
+
 FP32_FRACTION_BITS = 23  # fp32尾数位数
 
 HIF8_EXP_ZERO_THRESHOLD = -23  # 边界值
@@ -2159,15 +2169,11 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
     ori_topk_length_override = params.get("ori_topk_length", None)
     cmp_topk_length_override = params.get("cmp_topk_length", None)
 
-    q_datarange = params.get("q_datarange")
-    ori_kv_datarange = params.get("ori_kv_datarange")
-    cmp_kv_datarange = params.get("cmp_kv_datarange")
-    if q_datarange is None:
-        q_datarange = [DATA_RANGE_LEFT, DATA_RANGE_RIGHT]
-    if ori_kv_datarange is None:
-        ori_kv_datarange = [DATA_RANGE_LEFT, DATA_RANGE_RIGHT]
-    if cmp_kv_datarange is None:
-        cmp_kv_datarange = [DATA_RANGE_LEFT, DATA_RANGE_RIGHT]
+    q_datarange, ori_kv_datarange, cmp_kv_datarange = resolve_input_data_ranges(
+        params.get("q_datarange"),
+        params.get("ori_kv_datarange"),
+        params.get("cmp_kv_datarange"),
+    )
 
     if seqused_q is None:
         raise ValueError("seqused_q must not be None")

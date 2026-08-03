@@ -24,14 +24,20 @@ def load_impl_module(stem):
     if name in sys.modules:
         return sys.modules[name]
     path = ASSET_IMPL_DIR / f"{stem}.py"
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
     try:
+        spec = importlib.util.spec_from_file_location(name, path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot create import spec for {path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
         spec.loader.exec_module(module)
-    except Exception:
+    except Exception as exc:
         sys.modules.pop(name, None)
-        raise
+        raise RuntimeError(
+            "Failed to load QuantLightningIndexerV2 assets module; "
+            f"stage=impl/{stem}; module={path.resolve()}; "
+            f"original error: {type(exc).__name__}: {exc}"
+        ) from exc
     return module
 
 
@@ -50,15 +56,16 @@ class QuantLightningIndexerV2Spec:
         "float8_e4m3fn": {"standard": "stat_rel_err"},
     }
 
-    def compare(*outputs, **kwargs):
-        score_layout, cu_seqlens_q = golden_module.get_score_context()
-        return compare_module.compare(
-            *outputs,
-            scores=golden_module.get_topk_scores(),
-            index_offsets=golden_module.get_index_offsets(),
-            score_layout=score_layout,
-            cu_seqlens_q=cu_seqlens_q,
-        )
+    def compare(*outputs, compare_context=None, **kwargs):
+        del kwargs
+        testcase_name = None if compare_context is None else compare_context.testcase_name
+        data = golden_module.get_compare_data(testcase_name)
+        if data is None:
+            if compare_context is None:
+                raise RuntimeError("QuantLightningIndexerV2 pytest compare requires compare_context")
+            data = inputs_module.rebuild_qli_v2_compare_data(compare_context)
+            golden_module.set_compare_data(compare_context.testcase_name, data)
+        return compare_module.compare(*outputs, compare_data=data)
 
     torch_graph = graph_module.QuantLightningIndexerV2AclGraph
 

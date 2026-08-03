@@ -1366,7 +1366,37 @@ def gen_cmp_kv(
     )
 
 
-def gen_data(params):
+def resolve_compressed_actual_lengths(
+    seqused_ori_kv, seqused_cmp_kv, cmp_residual_kv, cmp_ratio
+):
+    """Resolve compressed actual lengths exactly as SMLA input generation does."""
+    if seqused_ori_kv is None or cmp_ratio is None:
+        return seqused_cmp_kv, cmp_residual_kv
+    if cmp_ratio < 1:
+        raise ValueError(
+            f"cmp_ratio should be in range [1, 128], but got {cmp_ratio}"
+        )
+    if seqused_cmp_kv is None:
+        if torch.is_tensor(seqused_ori_kv):
+            seqused_cmp_kv = seqused_ori_kv // cmp_ratio
+        else:
+            seqused_cmp_kv = [value // cmp_ratio for value in seqused_ori_kv]
+    if cmp_residual_kv is None:
+        if torch.is_tensor(seqused_ori_kv):
+            cmp_residual_kv = seqused_ori_kv % cmp_ratio
+        else:
+            cmp_residual_kv = [value % cmp_ratio for value in seqused_ori_kv]
+    return seqused_cmp_kv, cmp_residual_kv
+
+
+def resolve_query_actual_lengths(layout_q, batch_size, sequence_length, seqused_q):
+    """Resolve the query actual lengths exactly as SMLA input generation does."""
+    if layout_q == "BSND" and seqused_q is None:
+        return [int(sequence_length)] * int(batch_size)
+    return seqused_q
+
+
+def gen_data(params, prepare_device_storage=True):
     # 从字典中提取参数
     layout_q = params.get("layout_q")
     layout_kv = params.get("layout_kv")
@@ -1456,6 +1486,7 @@ def gen_data(params):
     N1 = int(N1)
     N2 = int(N2)
     D = int(D)
+    seqused_q = resolve_query_actual_lengths(layout_q, B, S1, seqused_q)
 
     if layout_q == "TND" and T1 == None:
         raise ValueError("T1 must be provided when layout_kv is TND")
@@ -1536,15 +1567,9 @@ def gen_data(params):
     else:
         raise ValueError(f"layout_kv is not support {layout_kv}")
 
-    if seqused_ori_kv is not None and cmp_ratio is not None:
-        if cmp_ratio < 1:
-            raise ValueError(
-                f"cmp_ratio should be in range [1, 128], but got {cmp_ratio}"
-            )
-        if seqused_cmp_kv is None:
-            seqused_cmp_kv = seqused_ori_kv // cmp_ratio
-        if cmp_residual_kv is None:
-            cmp_residual_kv = seqused_ori_kv % cmp_ratio
+    seqused_cmp_kv, cmp_residual_kv = resolve_compressed_actual_lengths(
+        seqused_ori_kv, seqused_cmp_kv, cmp_residual_kv, cmp_ratio
+    )
     # 路由到三个算子的逻辑：
     template_idx = 0
 
@@ -1674,9 +1699,14 @@ def gen_data(params):
         torch.rand((N1,)) * (q_datarange[1] - q_datarange[0]) / 10 + q_datarange[0] / 10
     ).to(torch.float)
 
-    # kv_cache 0轴非连续
-    properties = torch.npu.get_device_properties()
-    if "Ascend950" in properties.name and layout_kv == "PA_BBND":
+    # Pytest materializes the A5 PA stride on device. TTK supplies the same
+    # storage/stride through its CSV allocation and only needs logical CPU data.
+    properties = torch.npu.get_device_properties() if prepare_device_storage else None
+    if (
+        properties is not None
+        and "Ascend950" in properties.name
+        and layout_kv == "PA_BBND"
+    ):
         key_stride = 10  # 0轴非连续增加stride
         blocksize_with_stride = block_size1 + key_stride  # 整个非连续的长度
         blockFusion1 = torch.zeros(

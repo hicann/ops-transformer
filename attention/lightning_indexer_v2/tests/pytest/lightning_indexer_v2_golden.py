@@ -23,6 +23,7 @@ import math
 import ctypes
 import copy
 import ast
+from liv2_parameter_normalization import normalize_liv2_params
 try:
     import cann_ops_transformer
 except ImportError:
@@ -638,42 +639,14 @@ def trans_prefix_actseq(self,list):
         return list_new
 
 def liv2_output_single(params, is_batch = False, split_s1 = DEFAULT_SPLIT_S1, s1size = DEFAULT_S1SIZE):
+    if is_batch:
+        params = normalize_liv2_params(params)
     batch_size, q_seq, k_seq, q_t_size, k_t_size, q_head_num, k_head_num, head_dim, block_size, block_num, \
     qk_dtype, cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k, cmp_residual_k, output_idx_offset, \
     layout_query, layout_key, topk, mask_mode, query_datarange, key_datarange, weights_datarange, \
     cmp_ratio, return_value, max_seqlen_q = params
 
     if is_batch:
-        if q_t_size is None:
-            q_t_size = 0
-        if k_t_size is None:
-            k_t_size = 0
-        if block_size is None:
-            block_size = 0
-        if block_num is None:
-            block_num = 0
-        batch_size = int(batch_size)
-        q_seq = int(q_seq)
-        k_seq = int(k_seq)
-        q_t_size = int(q_t_size)
-        k_t_size = int(k_t_size)
-        q_head_num = int(q_head_num)
-        k_head_num = int(k_head_num)
-        head_dim = int(head_dim)
-        block_size = int(block_size)
-        block_num = int(block_num)
-        cmp_ratio = int(cmp_ratio)
-        if max_seqlen_q is None:
-            max_seqlen_q = -1
-        max_seqlen_q = int(max_seqlen_q)
-        topk = int(topk)
-        mask_mode = int(mask_mode)
-        return_value = int(return_value)
-
-        params = batch_size, q_seq, k_seq, q_t_size, k_t_size, q_head_num, k_head_num, head_dim, block_size, block_num, \
-                 qk_dtype, cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k, cmp_residual_k, output_idx_offset, \
-                 layout_query, layout_key, topk, mask_mode, query_datarange, key_datarange, weights_datarange, \
-                 cmp_ratio, return_value, max_seqlen_q
         if qk_dtype == 'FP16':
             qk_dtype = torch.float16
         else:

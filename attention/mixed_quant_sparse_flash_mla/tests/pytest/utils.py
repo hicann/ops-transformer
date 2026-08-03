@@ -158,6 +158,32 @@ def gen_cu_seqlens_from_seqused(seqused):
     return cu_seqlens
 
 
+def gen_cu_seqlens_cmp_kv(
+    cu_seqlens_ori_kv, seqused_cmp_kv, cmp_ratio, layout_kv="TND"
+):
+    """Generate compressed prefixes for TND storage or PA actual lengths."""
+    if layout_kv == "PA_BBND":
+        return gen_cu_seqlens_from_seqused(seqused_cmp_kv)
+
+    inferred = [math.floor(value / cmp_ratio) for value in cu_seqlens_ori_kv]
+    capacities = [
+        inferred[index + 1] - inferred[index]
+        for index in range(len(inferred) - 1)
+    ]
+    if all(capacity >= actual for capacity, actual in zip(capacities, seqused_cmp_kv)):
+        return inferred
+
+    required = sum(seqused_cmp_kv)
+    total = inferred[-1]
+    if required > total:
+        raise ValueError(
+            f"compressed actual lengths require {required} elements, "
+            f"but inferred T3 capacity is {total}"
+        )
+    adjusted = list(seqused_cmp_kv)
+    adjusted[-1] += total - required
+    return gen_cu_seqlens_from_seqused(adjusted)
+
 def calc_block_num(seqused_ori_kv, seqused_cmp_kv, block_size1, block_size2, cmp_ratio):
     """
     计算block_num1和block_num2
@@ -348,7 +374,9 @@ def fill_none_params(params_dict):
         if seqused_cmp_kv is None:
             seqused_cmp_kv = gen_seqused_cmp_kv(seqused_ori_kv, cmp_ratio)
         if cu_seqlens_cmp_kv is None:
-            cu_seqlens_cmp_kv = [math.floor(c / cmp_ratio) for c in cu_seqlens_ori_kv]
+            cu_seqlens_cmp_kv = gen_cu_seqlens_cmp_kv(
+                cu_seqlens_ori_kv, seqused_cmp_kv, cmp_ratio, params_dict["layout_kv"]
+            )
         if cmp_residual_kv is None:
             cmp_residual_kv = (
                 [s % cmp_ratio for s in seqused_ori_kv] if cmp_mask_mode != 0 else None

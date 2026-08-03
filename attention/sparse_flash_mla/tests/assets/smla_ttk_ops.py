@@ -63,7 +63,7 @@ def build_sparse_flash_mla_metadata(
     cmp_residual_kv: Optional[torch.Tensor] = None,
     ori_topk_length: Optional[torch.Tensor] = None,
     cmp_topk_length: Optional[torch.Tensor] = None,
-    cmp_ratio: int = 1,
+    cmp_ratio: Optional[int] = None,
     ori_mask_mode: int = 4,
     cmp_mask_mode: int = 3,
     ori_win_left: int = 127,
@@ -72,9 +72,11 @@ def build_sparse_flash_mla_metadata(
     layout_kv: str = "BSND",
     has_ori_kv: Optional[bool] = None,
     has_cmp_kv: Optional[bool] = None,
-    **_unused,
+    **extra_kwargs,
 ):
     """Build metadata before the main op or graph capture."""
+    del extra_kwargs
+    effective_cmp_ratio = 1 if cmp_ratio is None else int(cmp_ratio)
     num_heads_q = int(q.shape[1] if layout_q == "TND" else q.shape[2])
     kv_ref = ori_kv if ori_kv is not None else cmp_kv
     num_heads_kv = int(kv_ref.shape[1] if layout_kv == "TND" else kv_ref.shape[2])
@@ -124,7 +126,7 @@ def build_sparse_flash_mla_metadata(
         max_seqlen_cmp_kv=int(max_seqlen_cmp_kv),
         ori_topk=int(ori_topk),
         cmp_topk=int(cmp_topk),
-        cmp_ratio=int(cmp_ratio),
+        cmp_ratio=effective_cmp_ratio,
         ori_mask_mode=int(ori_mask_mode),
         cmp_mask_mode=int(cmp_mask_mode),
         ori_win_left=int(ori_win_left),
@@ -159,7 +161,7 @@ def sparse_flash_mla_ttk(
     cmp_topk_length: Optional[torch.Tensor] = None,
     sinks: Optional[torch.Tensor] = None,
     softmax_scale: float = 1.0,
-    cmp_ratio: int = 1,
+    cmp_ratio: Optional[int] = None,
     ori_mask_mode: int = 4,
     cmp_mask_mode: int = 3,
     ori_win_left: int = 127,
@@ -170,8 +172,11 @@ def sparse_flash_mla_ttk(
     return_softmax_lse: bool = False,
     has_ori_kv: Optional[bool] = None,
     has_cmp_kv: Optional[bool] = None,
+    **extra_kwargs,
 ):
     """Generate metadata in TTK, then call the extension op."""
+    del extra_kwargs
+    effective_cmp_ratio = 1 if cmp_ratio is None else int(cmp_ratio)
     metadata = build_sparse_flash_mla_metadata(
         q,
         ori_kv=ori_kv,
@@ -187,7 +192,7 @@ def sparse_flash_mla_ttk(
         cmp_residual_kv=cmp_residual_kv,
         ori_topk_length=ori_topk_length,
         cmp_topk_length=cmp_topk_length,
-        cmp_ratio=cmp_ratio,
+        cmp_ratio=effective_cmp_ratio,
         ori_mask_mode=ori_mask_mode,
         cmp_mask_mode=cmp_mask_mode,
         ori_win_left=ori_win_left,
@@ -218,7 +223,7 @@ def sparse_flash_mla_ttk(
         sinks=sinks,
         metadata=metadata,
         softmax_scale=float(softmax_scale),
-        cmp_ratio=int(cmp_ratio),
+        cmp_ratio=effective_cmp_ratio,
         ori_mask_mode=int(ori_mask_mode),
         cmp_mask_mode=int(cmp_mask_mode),
         ori_win_left=int(ori_win_left),

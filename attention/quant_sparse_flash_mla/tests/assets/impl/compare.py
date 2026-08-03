@@ -10,7 +10,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""TTK result adapter for the LightningIndexer V2 pytest TopK comparison."""
+"""TTK result adapter for the QuantSparseFlashMla pytest compare."""
 
 import importlib.util
 import logging
@@ -22,8 +22,8 @@ import numpy as np
 import torch
 
 
-class PytestV2TopKComparator:
-    """Run the pytest V2 TopK compare with replay-safe data from the TestSpec."""
+class PytestResultComparator:
+    """Load and invoke the canonical pytest comparison without changing TTK logging."""
 
     def __init__(self):
         self.module = None
@@ -37,7 +37,7 @@ class PytestV2TopKComparator:
                 return self.module
             pytest_dir = Path(__file__).resolve().parents[2] / "pytest"
             module_path = pytest_dir / "result_compare_method.py"
-            module_name = "li_v2_ttk_pytest_compare"
+            module_name = "qsmla_ttk_pytest_compare"
             inserted = str(pytest_dir) not in sys.path
             original_basic_config = logging.basicConfig
             if inserted:
@@ -54,7 +54,7 @@ class PytestV2TopKComparator:
             except Exception as exc:
                 sys.modules.pop(module_name, None)
                 raise RuntimeError(
-                    "Failed to load LightningIndexerV2 pytest compare; "
+                    "Failed to load QuantSparseFlashMla pytest compare; "
                     f"module={module_path.resolve()}; "
                     f"original error: {type(exc).__name__}: {exc}"
                 ) from exc
@@ -66,8 +66,6 @@ class PytestV2TopKComparator:
 
     @staticmethod
     def to_torch(value):
-        if value is None:
-            return None
         if torch.is_tensor(value):
             return value.detach().cpu().clone()
         array = np.array(value, copy=True, order="C")
@@ -81,97 +79,57 @@ class PytestV2TopKComparator:
             storage_dtype, torch_dtype = custom_dtypes[dtype_name]
             storage = np.ascontiguousarray(array).view(storage_dtype)
             return torch.from_numpy(storage).view(torch_dtype).reshape(array.shape)
-        return torch.from_numpy(array)
+        try:
+            return torch.from_numpy(array)
+        except TypeError:
+            return torch.from_numpy(array.astype(np.float32))
 
     @staticmethod
-    def result_dict(result, stage):
+    def normalize_result(result, output_index):
         if not isinstance(result, (list, tuple)) or len(result) < 2:
-            raise ValueError(f"pytest {stage} returned invalid result: {result!r}")
+            raise ValueError(
+                f"pytest check_result output[{output_index}] returned invalid result: {result!r}"
+            )
         status, precision = result[:2]
         passed = str(status).strip().lower() == "pass"
         return {
             "pass": passed,
             "precision": float(precision),
             "error_info": None if passed else (
-                f"pytest LightningIndexerV2 {stage} returned {status!r}"
+                f"pytest check_result output[{output_index}] returned {status!r}"
             ),
         }
 
-    def compare(self, *outputs, compare_data=None):
-        if compare_data is None:
-            raise ValueError("LightningIndexerV2 pytest compare data is unavailable")
+    def compare(self, *outputs):
         if len(outputs) < 2 or len(outputs) % 2 != 0:
             return {
                 "pass": False,
                 "precision": "invalid",
                 "error_info": "compare expects NPU outputs followed by golden outputs",
             }
-        params = compare_data.get("params")
-        topk_value = compare_data.get("topk_value")
-        if params is None or topk_value is None:
-            raise ValueError("LightningIndexerV2 pytest compare data lacks params or topk_value")
-        half = len(outputs) // 2
-        npu_outputs = outputs[:half]
-        golden_outputs = outputs[half:]
-        if tuple(getattr(npu_outputs[0], "shape", ())) != tuple(getattr(golden_outputs[0], "shape", ())):
-            return {
-                "pass": False,
-                "precision": "shape_mismatch",
-                "error_info": (
-                    "index output shape mismatch: "
-                    f"npu={getattr(npu_outputs[0], 'shape', None)}, "
-                    f"golden={getattr(golden_outputs[0], 'shape', None)}"
-                ),
-            }
-        return_value = bool(params[-2])
-        if return_value and half < 2:
-            return {
-                "pass": False,
-                "precision": "missing_output",
-                "error_info": "return_value is enabled but the NPU sparse-value output is missing",
-            }
-        npu_values = npu_outputs[1] if half > 1 else torch.empty(0)
-        golden_values = golden_outputs[1] if half > 1 else torch.empty(0)
-        if return_value and tuple(getattr(npu_values, "shape", ())) != tuple(getattr(golden_values, "shape", ())):
-            return {
-                "pass": False,
-                "precision": "shape_mismatch",
-                "error_info": (
-                    "sparse-value output shape mismatch: "
-                    f"npu={getattr(npu_values, 'shape', None)}, "
-                    f"golden={getattr(golden_values, 'shape', None)}"
-                ),
-            }
-        npu_indices = self.to_torch(npu_outputs[0])
-        npu_values = self.to_torch(npu_values)
-        golden_values = self.to_torch(golden_values)
-        if return_value:
-            npu_values, _ = npu_values.sort(dim=-1, descending=True)
-        output_idx_offset = self.to_torch(compare_data.get("output_idx_offset"))
-        golden_values_for_index = golden_values.detach().cpu().float().numpy()
-        npu_values_for_index = npu_values.detach().cpu().float().numpy()
         module = self.load_module()
-        index_result = module.check_result(
-            self.to_torch(golden_outputs[0]),
-            npu_indices,
-            self.to_torch(topk_value),
-            output_idx_offset,
-            params,
-            golden_values_for_index,
-            npu_values_for_index,
-        )
-        results = [self.result_dict(index_result, "index compare")]
-        if return_value:
-            value_result = module.check_result_return_value(
-                golden_values, npu_values, params
-            )
-            results.append(self.result_dict(value_result, "sparse-value compare"))
+        half = len(outputs) // 2
+        results = []
+        for output_index, (npu_output, golden) in enumerate(
+                zip(outputs[:half], outputs[half:])):
+            if golden is None:
+                results.append({"pass": True, "precision": "SUPPRESSED"})
+                continue
+            if npu_output is None:
+                results.append({
+                    "pass": False,
+                    "precision": "NO_OUTPUT",
+                    "error_info": f"NPU output[{output_index}] is None",
+                })
+                continue
+            result = module.check_result(self.to_torch(golden), self.to_torch(npu_output))
+            results.append(self.normalize_result(result, output_index))
         return results
 
 
-COMPARATOR = PytestV2TopKComparator()
+COMPARATOR = PytestResultComparator()
 
 
-def compare(*outputs, compare_data=None):
-    """Compare V2 TopK outputs with the canonical pytest policy."""
-    return COMPARATOR.compare(*outputs, compare_data=compare_data)
+def compare(*outputs):
+    """Compare outputs with the operator's canonical pytest policy."""
+    return COMPARATOR.compare(*outputs)

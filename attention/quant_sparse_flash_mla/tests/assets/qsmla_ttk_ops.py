@@ -10,7 +10,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""TTK metadata-first adapter for the installed MixedQuantSparseFlashMla API."""
+"""TTK metadata-first adapter for the installed QuantSparseFlashMla API."""
 
 from typing import Optional
 
@@ -19,7 +19,7 @@ import torch
 import cann_ops_transformer
 
 
-class MixedQuantSparseFlashMlaMetadataBuilder:
+class QuantSparseFlashMlaMetadataBuilder:
     """Derive scalar metadata parameters from operator inputs."""
 
     @staticmethod
@@ -46,7 +46,7 @@ class MixedQuantSparseFlashMlaMetadataBuilder:
         return int(fallback or 0)
 
 
-def build_mixed_quant_sparse_flash_mla_metadata(
+def build_quant_sparse_flash_mla_metadata(
     q: torch.Tensor,
     *,
     ori_kv: Optional[torch.Tensor] = None,
@@ -63,7 +63,6 @@ def build_mixed_quant_sparse_flash_mla_metadata(
     ori_topk_length: Optional[torch.Tensor] = None,
     cmp_topk_length: Optional[torch.Tensor] = None,
     quant_mode: int = 1,
-    rope_head_dim: int = 64,
     cmp_ratio: int = 1,
     ori_mask_mode: int = 4,
     cmp_mask_mode: int = 3,
@@ -85,7 +84,7 @@ def build_mixed_quant_sparse_flash_mla_metadata(
     batch_size = (
         int(q.shape[0])
         if layout_q == "BSND"
-        else MixedQuantSparseFlashMlaMetadataBuilder.infer_batch(
+        else QuantSparseFlashMlaMetadataBuilder.infer_batch(
             cu_seqlens_q, seqused_q
         )
     )
@@ -93,16 +92,16 @@ def build_mixed_quant_sparse_flash_mla_metadata(
     max_seqlen_q = (
         int(q_fallback)
         if layout_q == "BSND"
-        else MixedQuantSparseFlashMlaMetadataBuilder.prefix_max(
+        else QuantSparseFlashMlaMetadataBuilder.prefix_max(
             cu_seqlens_q, q_fallback
         )
     )
     ori_fallback = 0 if ori_kv is None else (ori_kv.shape[0] if layout_kv == "TND" else ori_kv.shape[1])
     cmp_fallback = 0 if cmp_kv is None else (cmp_kv.shape[0] if layout_kv == "TND" else cmp_kv.shape[1])
-    max_seqlen_ori_kv = MixedQuantSparseFlashMlaMetadataBuilder.max_seq(
+    max_seqlen_ori_kv = QuantSparseFlashMlaMetadataBuilder.max_seq(
         cu_seqlens_ori_kv, seqused_ori_kv, ori_fallback
     )
-    max_seqlen_cmp_kv = MixedQuantSparseFlashMlaMetadataBuilder.max_seq(
+    max_seqlen_cmp_kv = QuantSparseFlashMlaMetadataBuilder.max_seq(
         cu_seqlens_cmp_kv, seqused_cmp_kv, cmp_fallback
     )
     ori_topk = int(ori_sparse_indices.shape[-1]) if ori_sparse_indices is not None else 0
@@ -116,7 +115,7 @@ def build_mixed_quant_sparse_flash_mla_metadata(
     if has_cmp_kv is None:
         has_cmp_kv = cmp_kv is not None
 
-    metadata = torch.ops.cann_ops_transformer.mixed_quant_sparse_flash_mla_metadata(
+    metadata = torch.ops.cann_ops_transformer.quant_sparse_flash_mla_metadata(
         int(num_heads_q),
         int(num_heads_kv),
         int(head_dim),
@@ -136,7 +135,6 @@ def build_mixed_quant_sparse_flash_mla_metadata(
         max_seqlen_cmp_kv=int(max_seqlen_cmp_kv),
         ori_topk=int(ori_topk),
         cmp_topk=int(cmp_topk),
-        rope_head_dim=int(rope_head_dim),
         cmp_ratio=int(cmp_ratio),
         ori_mask_mode=int(ori_mask_mode),
         cmp_mask_mode=int(cmp_mask_mode),
@@ -152,11 +150,14 @@ def build_mixed_quant_sparse_flash_mla_metadata(
     return metadata
 
 
-def mixed_quant_sparse_flash_mla_ttk(
+def quant_sparse_flash_mla_ttk(
     q: torch.Tensor,
     *,
     ori_kv: Optional[torch.Tensor] = None,
     cmp_kv: Optional[torch.Tensor] = None,
+    q_descale: Optional[torch.Tensor] = None,
+    ori_kv_descale: Optional[torch.Tensor] = None,
+    cmp_kv_descale: Optional[torch.Tensor] = None,
     ori_sparse_indices: Optional[torch.Tensor] = None,
     cmp_sparse_indices: Optional[torch.Tensor] = None,
     ori_block_table: Optional[torch.Tensor] = None,
@@ -172,7 +173,6 @@ def mixed_quant_sparse_flash_mla_ttk(
     cmp_topk_length: Optional[torch.Tensor] = None,
     sinks: Optional[torch.Tensor] = None,
     quant_mode: int = 1,
-    rope_head_dim: int = 64,
     softmax_scale: float = 1.0,
     cmp_ratio: int = 1,
     ori_mask_mode: int = 4,
@@ -186,13 +186,11 @@ def mixed_quant_sparse_flash_mla_ttk(
     has_ori_kv: Optional[bool] = None,
     has_cmp_kv: Optional[bool] = None,
     metadata_cmp_topk: Optional[int] = None,
-    key_dtype: Optional[int] = None,
-    value_dtype: Optional[int] = None,
-    **extra_kwargs,
+    pytest_cmp_mask_mode: Optional[int] = None,
 ):
-    """Generate metadata in TTK, then call the mixed-quant extension op."""
-    del extra_kwargs
-    metadata = build_mixed_quant_sparse_flash_mla_metadata(
+    """Generate metadata in TTK, then call the quantized extension op."""
+    del pytest_cmp_mask_mode
+    metadata = build_quant_sparse_flash_mla_metadata(
         q,
         ori_kv=ori_kv,
         cmp_kv=cmp_kv,
@@ -208,7 +206,6 @@ def mixed_quant_sparse_flash_mla_ttk(
         ori_topk_length=ori_topk_length,
         cmp_topk_length=cmp_topk_length,
         quant_mode=quant_mode,
-        rope_head_dim=rope_head_dim,
         cmp_ratio=cmp_ratio,
         ori_mask_mode=ori_mask_mode,
         cmp_mask_mode=cmp_mask_mode,
@@ -221,10 +218,13 @@ def mixed_quant_sparse_flash_mla_ttk(
         metadata_cmp_topk=metadata_cmp_topk,
     )
 
-    return torch.ops.cann_ops_transformer.mixed_quant_sparse_flash_mla(
+    return torch.ops.cann_ops_transformer.quant_sparse_flash_mla(
         q,
         ori_kv=ori_kv,
         cmp_kv=cmp_kv,
+        q_descale=q_descale,
+        ori_kv_descale=ori_kv_descale,
+        cmp_kv_descale=cmp_kv_descale,
         ori_sparse_indices=ori_sparse_indices,
         cmp_sparse_indices=cmp_sparse_indices,
         ori_block_table=ori_block_table,
@@ -241,7 +241,6 @@ def mixed_quant_sparse_flash_mla_ttk(
         sinks=sinks,
         metadata=metadata,
         quant_mode=int(quant_mode),
-        rope_head_dim=int(rope_head_dim),
         softmax_scale=float(softmax_scale),
         cmp_ratio=int(cmp_ratio),
         ori_mask_mode=int(ori_mask_mode),
@@ -252,6 +251,4 @@ def mixed_quant_sparse_flash_mla_ttk(
         layout_kv=layout_kv,
         topk_value_mode=int(topk_value_mode),
         return_softmax_lse=bool(return_softmax_lse),
-        key_dtype=key_dtype,
-        value_dtype=value_dtype,
     )

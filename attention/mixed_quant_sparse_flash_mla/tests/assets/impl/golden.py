@@ -41,6 +41,5 @@ def cpu_mixed_quant_sparse_flash_mla(q, *, return_softmax_lse=False,
             "MixedQuantSparseFlashMla TTK golden requires customize_inputs "
             "to generate pytest data first"
         )
-    if bool(return_softmax_lse):
-        raise RuntimeError("MQSMLA pytest golden does not provide softmax_lse")
-    return data["cpu_output"], None
+    softmax_lse = data.get("cpu_lse") if bool(return_softmax_lse) else None
+    return data["cpu_output"], softmax_lse

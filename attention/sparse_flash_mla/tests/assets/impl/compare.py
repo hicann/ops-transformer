@@ -10,118 +10,126 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""Precision comparison aligned with the SparseFlashMla pytest policy."""
+"""TTK result adapter for the SparseFlashMla pytest compare."""
+
+import importlib.util
+import logging
+import sys
+import threading
+from pathlib import Path
 
 import numpy as np
+import torch
 
 
-class SparseFlashMlaComparator:
-    """Apply the pytest relative-error and global failure-ratio policy."""
+class PytestResultComparator:
+    """Load and invoke the canonical pytest comparison without changing TTK logging."""
 
-    DEFAULT_RTOL = 0.005
-    BFLOAT16_RTOL = 0.0078125
-    DEFAULT_ATOL = 0.000025
-    BFLOAT16_ATOL = 0.0001
-    FAIL_RATIO = 0.005
-    MAX_RELATIVE_ERROR = 10.0
-    RELATIVE_FLOOR = (1.0 / (1 << 14)) / 0.005
-    RELATIVE_EPSILON = 2e-9
+    def __init__(self):
+        self.module = None
+        self.lock = threading.Lock()
+
+    def load_module(self):
+        if self.module is not None:
+            return self.module
+        with self.lock:
+            if self.module is not None:
+                return self.module
+            pytest_dir = Path(__file__).resolve().parents[2] / "pytest"
+            module_path = pytest_dir / "result_compare_method.py"
+            module_name = "smla_ttk_pytest_compare"
+            inserted = str(pytest_dir) not in sys.path
+            original_basic_config = logging.basicConfig
+            if inserted:
+                sys.path.insert(0, str(pytest_dir))
+            try:
+                logging.basicConfig = lambda *args, **kwargs: None
+                spec = importlib.util.spec_from_file_location(module_name, module_path)
+                if spec is None or spec.loader is None:
+                    raise ImportError(f"cannot create import spec for {module_path}")
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[module_name] = module
+                spec.loader.exec_module(module)
+                self.module = module
+            except Exception as exc:
+                sys.modules.pop(module_name, None)
+                raise RuntimeError(
+                    "Failed to load SparseFlashMla pytest compare; "
+                    f"module={module_path.resolve()}; "
+                    f"original error: {type(exc).__name__}: {exc}"
+                ) from exc
+            finally:
+                logging.basicConfig = original_basic_config
+                if inserted and str(pytest_dir) in sys.path:
+                    sys.path.remove(str(pytest_dir))
+        return self.module
 
     @staticmethod
-    def is_bfloat16(value):
-        return "bfloat16" in str(getattr(value, "dtype", ""))
+    def to_torch(value):
+        if torch.is_tensor(value):
+            return value.detach().cpu().clone()
+        array = np.array(value, copy=True, order="C")
+        dtype_name = str(array.dtype)
+        custom_dtypes = {
+            "bfloat16": (np.uint16, torch.bfloat16),
+            "float8_e4m3fn": (np.uint8, torch.float8_e4m3fn),
+            "float8_e5m2": (np.uint8, torch.float8_e5m2),
+        }
+        if dtype_name in custom_dtypes:
+            storage_dtype, torch_dtype = custom_dtypes[dtype_name]
+            storage = np.ascontiguousarray(array).view(storage_dtype)
+            return torch.from_numpy(storage).view(torch_dtype).reshape(array.shape)
+        try:
+            return torch.from_numpy(array)
+        except TypeError:
+            return torch.from_numpy(array.astype(np.float32))
 
-    @classmethod
-    def as_float32(cls, value):
-        if hasattr(value, "detach"):
-            value = value.detach().cpu()
-            if cls.is_bfloat16(value):
-                value = value.float()
-            value = value.numpy()
-        return np.asarray(value).astype(np.float32)
-
-    @classmethod
-    def compare_output(cls, npu_out, golden_out):
-        if golden_out is None:
-            return {"pass": True, "precision": "SUPPRESSED"}
-        if npu_out is None:
-            return {
-                "pass": False,
-                "precision": "NO_OUTPUT",
-                "error_info": "NPU output is None",
-            }
-
-        is_bfloat16 = cls.is_bfloat16(npu_out)
-        rtol = cls.BFLOAT16_RTOL if is_bfloat16 else cls.DEFAULT_RTOL
-        atol = cls.BFLOAT16_ATOL if is_bfloat16 else cls.DEFAULT_ATOL
-        npu = cls.as_float32(npu_out)
-        golden = cls.as_float32(golden_out)
-        if npu.shape != golden.shape:
-            return {
-                "pass": False,
-                "precision": "shape_mismatch",
-                "error_info": f"output shape mismatch: npu={npu.shape}, golden={golden.shape}",
-            }
-        if golden.size == 0:
-            return {"pass": True, "precision": 100.0}
-
-        npu_flat = npu.reshape(-1)
-        golden_flat = golden.reshape(-1)
-        mismatch = ~np.isclose(
-            npu_flat, golden_flat, rtol=rtol, atol=atol, equal_nan=True
-        )
-        diff_idx = np.where(mismatch)[0]
-        fail_ratio = diff_idx.size / golden_flat.size
-        max_relative_error = 0.0
-        if diff_idx.size:
-            diff_abs = np.abs(golden_flat - npu_flat)
-            denominator = np.maximum(
-                np.maximum(np.abs(npu_flat), np.abs(golden_flat)), cls.RELATIVE_FLOOR
+    @staticmethod
+    def normalize_result(result, output_index):
+        if not isinstance(result, (list, tuple)) or len(result) < 2:
+            raise ValueError(
+                f"pytest check_result output[{output_index}] returned invalid result: {result!r}"
             )
-            relative_error = diff_abs / (denominator + cls.RELATIVE_EPSILON)
-            max_relative_error = float(np.max(relative_error[diff_idx]))
-
-        passed = (
-            fail_ratio <= cls.FAIL_RATIO
-            and max_relative_error < cls.MAX_RELATIVE_ERROR
-        )
-        precision = (golden_flat.size - diff_idx.size) / golden_flat.size * 100
-        error_info = None
-        if not passed:
-            error_info = (
-                f"SMLA precision failed: mismatches={diff_idx.size}, "
-                f"fail_ratio={fail_ratio:.6g}, "
-                f"max_relative_error={max_relative_error:.6g}"
-            )
+        status, precision = result[:2]
+        passed = str(status).strip().lower() == "pass"
         return {
             "pass": passed,
-            "precision": precision,
-            "diff_indices": diff_idx[:1000].tolist(),
-            "error_info": error_info,
-            "metrics": {
-                "rtol": rtol,
-                "atol": atol,
-                "fail_ratio": fail_ratio,
-                "fail_ratio_limit": cls.FAIL_RATIO,
-                "max_relative_error": max_relative_error,
-                "max_relative_error_limit": cls.MAX_RELATIVE_ERROR,
-            },
+            "precision": float(precision),
+            "error_info": None if passed else (
+                f"pytest check_result output[{output_index}] returned {status!r}"
+            ),
         }
 
+    def compare(self, *outputs):
+        if len(outputs) < 2 or len(outputs) % 2 != 0:
+            return {
+                "pass": False,
+                "precision": "invalid",
+                "error_info": "compare expects NPU outputs followed by golden outputs",
+            }
+        module = self.load_module()
+        half = len(outputs) // 2
+        results = []
+        for output_index, (npu_output, golden) in enumerate(
+                zip(outputs[:half], outputs[half:])):
+            if golden is None:
+                results.append({"pass": True, "precision": "SUPPRESSED"})
+                continue
+            if npu_output is None:
+                results.append({
+                    "pass": False,
+                    "precision": "NO_OUTPUT",
+                    "error_info": f"NPU output[{output_index}] is None",
+                })
+                continue
+            result = module.check_result(self.to_torch(golden), self.to_torch(npu_output))
+            results.append(self.normalize_result(result, output_index))
+        return results
 
-COMPARATOR = SparseFlashMlaComparator()
+
+COMPARATOR = PytestResultComparator()
 
 
 def compare(*outputs):
-    """Compare NPU outputs followed by golden outputs."""
-    if len(outputs) < 2 or len(outputs) % 2 != 0:
-        return {
-            "pass": False,
-            "precision": "invalid",
-            "error_info": "compare expects NPU outputs followed by golden outputs",
-        }
-    half = len(outputs) // 2
-    return [
-        COMPARATOR.compare_output(npu_out, golden_out)
-        for npu_out, golden_out in zip(outputs[:half], outputs[half:])
-    ]
+    """Compare outputs with the operator's canonical pytest policy."""
+    return COMPARATOR.compare(*outputs)

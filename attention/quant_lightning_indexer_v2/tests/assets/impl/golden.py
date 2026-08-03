@@ -20,17 +20,11 @@ class CaseDataStore:
 
     def __init__(self):
         self.case_data = {}
-        self.topk_scores = None
-        self.index_offsets = None
-        self.score_layout = None
-        self.cu_seqlens_q = None
+        self.active_testcase_name = None
 
     def clear(self):
         self.case_data.clear()
-        self.topk_scores = None
-        self.index_offsets = None
-        self.score_layout = None
-        self.cu_seqlens_q = None
+        self.active_testcase_name = None
 
     def put(self, testcase_name, data):
         if testcase_name is not None:
@@ -44,26 +38,23 @@ class CaseDataStore:
                 "QuantLightningIndexer V2 TTK golden requires customize_inputs "
                 "to generate pytest data first"
             )
-        self.topk_scores = data["topk_value"]
-        self.index_offsets = data.get("output_idx_offset")
-        self.score_layout = data.get("score_layout")
-        self.cu_seqlens_q = data.get("cu_seqlens_q")
+        self.active_testcase_name = str(testcase_name)
         return data
 
 
 CASE_DATA = CaseDataStore()
 
 
-def get_topk_scores():
-    return CASE_DATA.topk_scores
+def get_compare_data(testcase_name):
+    """Return pytest comparison context for the active or replayed case."""
+    if testcase_name is None:
+        return None
+    return CASE_DATA.case_data.get(str(testcase_name))
 
 
-def get_index_offsets():
-    return CASE_DATA.index_offsets
-
-
-def get_score_context():
-    return CASE_DATA.score_layout, CASE_DATA.cu_seqlens_q
+def set_compare_data(testcase_name, data):
+    CASE_DATA.active_testcase_name = str(testcase_name)
+    CASE_DATA.case_data = {str(testcase_name): data}
 
 
 def cpu_quant_lightning_indexer_v2(query, key, weights, query_dequant_scale,

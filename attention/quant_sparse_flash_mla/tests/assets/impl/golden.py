@@ -10,7 +10,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""CPU golden adapter for SparseFlashMla TTK cases."""
+"""CPU golden adapter for QuantSparseFlashMla TTK cases."""
 
 
 class CaseDataStore:
@@ -32,15 +32,14 @@ class CaseDataStore:
 CASE_DATA = CaseDataStore()
 
 
-def cpu_sparse_flash_mla(q, *, return_softmax_lse=False, testcase_name=None,
-                         layout_q="BSND", **kwargs):
-    del q, layout_q, kwargs
+def cpu_quant_sparse_flash_mla(q, *, return_softmax_lse=False,
+                                     testcase_name=None, **kwargs):
+    del q, kwargs
     data = CASE_DATA.get(testcase_name)
     if data is None:
         raise RuntimeError(
-            "SparseFlashMla TTK golden requires customize_inputs to generate pytest data first"
+            "QuantSparseFlashMla TTK golden requires customize_inputs "
+            "to generate pytest data first"
         )
-    lse = data.get("softmax_lse")
-    if lse is None or not bool(return_softmax_lse):
-        lse = None
-    return data["cpu_output"], lse
+    softmax_lse = data.get("cpu_lse") if bool(return_softmax_lse) else None
+    return data["cpu_output"], softmax_lse
