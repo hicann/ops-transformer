@@ -358,6 +358,7 @@ void QSFAMlaTiling::FillTilingBaseParamsMla()
     tilingData_.baseParams.set_dSizeVInput(qsfaInfo_->dSizeVInput);
     tilingData_.baseParams.set_isActualLenDimsNull(qsfaInfo_->actualQSeqLenFlag ? 0U : 1U);
     tilingData_.baseParams.set_isActualLenDimsKVNull(qsfaInfo_->actualSeqLenFlag ? 0U : 1U);
+    tilingData_.baseParams.set_keyStride0(qsfaInfo_->keyStride0);
 }
 
 // for flash decode
@@ -1598,6 +1599,12 @@ ge::graphStatus QSFAInfoParser::GetAttrParaInfo()
     opParamInfo_.tileSize = attrs->GetAttrPointer<int64_t>(TILE_SIZE_ATTR_INDEX);
     opParamInfo_.ropeHeadDim = attrs->GetAttrPointer<int64_t>(ROPE_HEAD_DIM_ATTR_INDEX);
 
+    auto keyStrides = context_->GetDynamicInputStride(KEY_INPUT_INDEX, 0);
+    if (keyStrides != nullptr && keyStrides->GetDimNum() > 1) {
+        keyStride0_ = keyStrides->GetStride(0);
+        keyStride1_ = keyStrides->GetStride(1);
+    }
+
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1870,6 +1877,41 @@ ge::graphStatus QSFAInfoParser::GetActualseqInfo()
     return ge::GRAPH_SUCCESS;
 }
 
+// 非连续校验：通过shape计算expected stride进行校验
+// PA_BSND时，只允许0轴非连续，其余轴必须连续
+// 非PA_BSND时，所有轴都必须连续
+ge::graphStatus QSFAInfoParser::CheckContiguous() const
+{
+    if (!isA5_) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    bool keyNonContiguous = false;
+    if (keyStride0_ != 0 && keyShape_.GetDimNum() > 0) {
+        uint64_t totalElements = 0;
+        uint64_t shapeSize = 0;
+
+        if (kvLayout_ == QSFALayout::PA_BSND) {
+            totalElements = keyStride1_ * static_cast<uint64_t>(keyShape_.GetDim(1));
+            shapeSize = static_cast<uint64_t>(keyShape_.GetDim(1)) *
+                        static_cast<uint64_t>(keyShape_.GetDim(2)) *
+                        static_cast<uint64_t>(keyShape_.GetDim(3));
+        } else {
+            totalElements = keyStride0_ * static_cast<uint64_t>(keyShape_.GetDim(0));
+            shapeSize = context_->GetOptionalInputTensor(KEY_INPUT_INDEX)->GetShapeSize();
+        }
+        keyNonContiguous = (shapeSize != totalElements);
+    }
+
+    OP_CHECK_IF(keyNonContiguous,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_,
+            "key", Ops::Base::ToString(opParamInfo_.key.shape->GetStorageShape()).c_str(),
+            "Key only supports non-contiguous tensor on the 0-axis in PA scenarios"),
+        return ge::GRAPH_FAILED);
+
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus QSFAInfoParser::GetShapeAndSizeInfo()
 {
     SetQSFAShape();
@@ -1918,6 +1960,18 @@ void QSFAInfoParser::GenerateInfo(QSFATilingInfo &qsfaInfo)
     qsfaInfo.blockSize = blockSize_;
     qsfaInfo.blockTypeSize = sizeof(float);
     qsfaInfo.maxBlockNumPerBatch = maxBlockNumPerBatch_;
+
+    if (npuArch_ != NpuArch::DAV_3510) {
+        qsfaInfo.keyStride0 = 0;  // 910无需使用stride
+    } else {
+        if (keyStride0_ != 0) {
+            qsfaInfo.keyStride0 = keyStride0_;
+        } else if (kvLayout_ == QSFALayout::PA_BSND) {
+            qsfaInfo.keyStride0 = blockSize_ * dSizeKV_;
+        } else {
+            qsfaInfo.keyStride0 = 0;  // 非PA无需使用stride
+        }
+    }
 
     FillTilingInfoAttrsAndLayouts(qsfaInfo);
 }
@@ -1973,6 +2027,10 @@ ge::graphStatus QSFAInfoParser::Parse(QSFATilingInfo &qsfaInfo)
     }
 
     if (ge::GRAPH_SUCCESS != GetActualseqInfo()) {
+        return ge::GRAPH_FAILED;
+    }
+
+    if (ge::GRAPH_SUCCESS != CheckContiguous()) {
         return ge::GRAPH_FAILED;
     }
 

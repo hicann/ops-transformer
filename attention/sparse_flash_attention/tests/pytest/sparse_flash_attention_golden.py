@@ -854,6 +854,29 @@ def kv_pa_preprocessing(input_tensor_dict, fa_param, params):
     input_tensor_dict["value_cache"] = k_cache_base.to("npu")
     input_tensor_dict["key_rope_cache"] = k_cache_rope.to("npu")
 
+    # kv_cache 0轴非连续
+    properties = torch.npu.get_device_properties()
+    if "Ascend950" in properties.name:
+        key_stride = 10  # 0轴非连续增加stride
+        block_num = params["block_num"]
+        base_kv = k_cache_base
+        blocksize_with_stride = blockSize + key_stride
+        blockFusion = torch.zeros((block_num, blocksize_with_stride * N * D), dtype=k_dtype)
+        base_flat = base_kv.reshape(block_num, blockSize * N * D)
+        blockFusion[:, : blockSize * N * D] = base_flat
+        blockFusion = blockFusion.npu()
+        base_kv_nc = blockFusion[:, : blockSize * N * D].view(block_num, blockSize, N, D)
+        input_tensor_dict["key_cache"] = base_kv_nc
+        input_tensor_dict["value_cache"] = base_kv_nc
+
+        base_rope = k_cache_rope
+        blockFusion_rope = torch.zeros((block_num, blocksize_with_stride * N * rope_head_dim), dtype=k_dtype)
+        rope_flat = base_rope.reshape(block_num, blockSize * N * rope_head_dim)
+        blockFusion_rope[:, : blockSize * N * rope_head_dim] = rope_flat
+        blockFusion_rope = blockFusion_rope.npu()
+        base_kvrope_nc = blockFusion_rope[:, : blockSize * N * rope_head_dim].view(block_num, blockSize, N, rope_head_dim)
+        input_tensor_dict["key_rope_cache"] = base_kvrope_nc
+
 
 def kv_nopa_preprocessing(input_tensor_dict, fa_param):
     input_tensor_dict["key_cache"] = fa_param["_raw_key"].contiguous().to("npu")

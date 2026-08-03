@@ -452,6 +452,10 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<CubeBlockType, VecBlockTyp
         constInfo.maxBlockNumPerBatch = sharedParams.maxBlockNumPerBatch;
     }
 
+    if ASCEND_IS_AIV {
+        constInfo.keyStride0 = this->tilingData->baseParams.keyStride0;
+    }
+
     InitUniqueConstInfo();
 }
 

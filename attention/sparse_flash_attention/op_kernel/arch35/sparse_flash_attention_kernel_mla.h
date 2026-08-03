@@ -457,6 +457,10 @@ __aicore__ inline void SparseFlashAttentionKernelMla<CubeBlockType, VecBlockType
         constInfo.maxBlockNumPerBatch = sharedParams.maxBlockNumPerBatch;
     }
 
+    if ASCEND_IS_AIV {
+        constInfo.keyStride0 = this->tilingData->baseParams.keyStride0;
+    }
+
     InitUniqueConstInfo();
 }
 
