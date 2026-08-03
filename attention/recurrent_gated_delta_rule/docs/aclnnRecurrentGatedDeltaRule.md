@@ -145,10 +145,10 @@ aclnnStatus aclnnRecurrentGatedDeltaRule(
       <td>输入&输出</td>
       <td>状态矩阵，公式中的S。</td>
       <td>不支持空Tensor。</td>
-      <td>BFLOAT16</td>
+      <td>BFLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>(BlockNum, Nv, Dv, Dk)</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>actualSeqLengths</td>
@@ -320,6 +320,7 @@ aclnnStatus aclnnRecurrentGatedDeltaRule(
 - 确定性计算：
   - aclnnRecurrentGatedDeltaRule默认确定性实现。
 - 输入shape大小需满足约束：$0 < L_i \le 8$，$0 < N_k \le 256$，$N_k \le N_v \le 256$，$N_v$ % $N_k == 0$，$0 < D_k \le 512$，$0 < D_v \le 512$，$0 < T$，$0 < B$，$T \le BlockNum$。
+- stateRef仅支持0轴、1轴非连续Tensor。
 - 以下约束由于算子无法获取tensor中具体数值，故需用户保证，算子不校验：
   - $ssmStateIndices[i] < BlockNum$
   - $0 < actualSeqLengths[i] \le 8$，且$actualSeqLengths[i]$累加和等于$T$

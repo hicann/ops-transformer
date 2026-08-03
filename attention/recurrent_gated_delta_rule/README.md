@@ -78,10 +78,10 @@
     <td>ND</td>
   </tr>
   <tr>
-    <td>state</td>
+    <td>stateRef</td>
     <td>输入&输出</td>
     <td>状态矩阵，公式中的输入S。</td>
-    <td>BFLOAT16</td>
+    <td>BFLOAT16、FLOAT32</td>
     <td>ND</td>
   </tr>
   <tr>
