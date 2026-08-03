@@ -1984,6 +1984,21 @@ MoeDistributeDispatchV2TilingFuncBase::MoeDistributeDispatchA3TilingFuncImplPubl
     OP_TILING_CHECK(CheckAndSetPlatformInfo(context, tilingData, isLayered, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Tiling set platformInfo Failed"), return ge::GRAPH_FAILED);
 
+    // A5 CumSum 最小 tmp 大小
+    if (tilingData->moeDistributeDispatchV2Info.expertTokenNumsType != 0) {
+        tilingData->moeDistributeDispatchV2Info.cumsumTmpMinSize = 0;
+    } else {
+        uint32_t localExpertNumAlign = (localMoeExpertNum + 7U) / 8U * 8U;
+        std::vector<int64_t> cumsumShapeDims = {1, static_cast<int64_t>(localExpertNumAlign)};
+        auto cumsumSrcShape = ge::Shape(cumsumShapeDims);
+        uint32_t cumsumMaxTmp = 0;
+        uint32_t cumsumMinTmp = 0;
+        GetCumSumMaxMinTmpSize(cumsumSrcShape, sizeof(float), true, false, cumsumMaxTmp, cumsumMinTmp);
+        tilingData->moeDistributeDispatchV2Info.cumsumTmpMinSize = cumsumMinTmp;
+        OP_LOGI(nodeName, "MTE cumsumTmpMinSize=%u. Kernel falls back to scalar prefix sum if UB is insufficient.",
+                cumsumMinTmp);
+    }
+
     PrintTilingDataInfo(nodeName, *tilingData);
     return ge::GRAPH_SUCCESS;
 }

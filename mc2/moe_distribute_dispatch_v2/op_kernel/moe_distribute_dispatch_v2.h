@@ -86,7 +86,7 @@ private:
     __aicore__ inline void LocalWindowCopy();
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
     __aicore__ inline void SetExpertTokenNumsA5();
-    __aicore__ inline void SetExpertPrefixSumA5(uint32_t localExpertNum);
+    __aicore__ inline void SetExpertPrefixSumA5(uint32_t localExpertNum, bool useCumSum);
 #else
     __aicore__ inline void SetExpertTokenNums();
 #endif
@@ -270,6 +270,7 @@ private:
     bool isExpertMaskFlag_ = false;
     bool hasElasticInfoFlag_ = false;
     bool isPerformanceFlag_ = false;
+    uint32_t cumsumTmpMinSize_ = 0;
     bool isScalingDownFlag_ = false;
     bool isShareExpertRankFlag_ = false;
     bool hasExpertScalesFlag_ = false;
@@ -332,6 +333,7 @@ __aicore__ inline void MoeDistributeDispatchV2<TemplateDispatchV2TypeFunc>::Init
     epWorldSizeOriginal_ = tilingData->moeDistributeDispatchV2Info.epWorldSize;
     hasElasticInfoFlag_ = tilingData->moeDistributeDispatchV2Info.hasElasticInfo;
     isPerformanceFlag_ = tilingData->moeDistributeDispatchV2Info.isPerformance;
+    cumsumTmpMinSize_ = tilingData->moeDistributeDispatchV2Info.cumsumTmpMinSize;
     hasExpertScalesFlag_ = tilingData->moeDistributeDispatchV2Info.hasExpertScales;
     epWorldSize_ = tilingData->moeDistributeDispatchV2Info.epWorldSize;
     sharedExpertRankNum_ = tilingData->moeDistributeDispatchV2Info.sharedExpertRankNum;
@@ -1145,7 +1147,16 @@ __aicore__ inline void MoeDistributeDispatchV2<TemplateDispatchV2TypeFunc>::Buff
     }
     tpipe_->InitBuffer(tokenNumBuf_, Ceil(moeExpertNumPerRank_ * sizeof(int64_t), UB_ALIGN) * UB_ALIGN);
     totalUsedUB_ += Ceil(moeExpertNumPerRank_ * sizeof(int64_t), UB_ALIGN) * UB_ALIGN;
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+    // A5 statusBuf 兼作 CumSum tmpBuffer，超 UB 则不扩展
+    uint32_t statusBufOrigin = moeExpertNumPerRank_ * epWorldSize_ * UB_ALIGN;
+    uint32_t statusBufSize = (statusBufOrigin > cumsumTmpMinSize_) ? statusBufOrigin : cumsumTmpMinSize_;
+    if (totalUsedUB_ + statusBufSize > totalUbSize_) {
+        statusBufSize = statusBufOrigin;
+    }
+#else
     uint32_t statusBufSize = moeExpertNumPerRank_ * epWorldSize_ * UB_ALIGN;
+#endif
     tpipe_->InitBuffer(statusBuf_, statusBufSize);
     totalUsedUB_ += statusBufSize;
     // A3基础ReduceSum需要workLocalBuf_；A5复用已有UB buffer，不单独申请
@@ -1490,9 +1501,8 @@ __aicore__ inline void MoeDistributeDispatchV2<TemplateDispatchV2TypeFunc>::Loca
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
 template <TemplateDispatchV2TypeClass>
 __aicore__ inline void
-MoeDistributeDispatchV2<TemplateDispatchV2TypeFunc>::SetExpertPrefixSumA5(uint32_t localExpertNum)
+MoeDistributeDispatchV2<TemplateDispatchV2TypeFunc>::SetExpertPrefixSumA5(uint32_t localExpertNum, bool useCumSum)
 {
-    bool useCumSum = (epWorldSize_ >= UB_ALIGN / sizeof(float));
     DataCopyExtParams expertTokenNumsCopyParams{1U, static_cast<uint32_t>(localExpertNum * sizeof(int64_t)), 0U, 0U,
                                                 0U};
     LocalTensor<int32_t> expertTokenNumInt32Tensor = expertTokenNumTensor_.ReinterpretCast<int32_t>();
@@ -1545,7 +1555,9 @@ __aicore__ inline void MoeDistributeDispatchV2<TemplateDispatchV2TypeFunc>::SetE
     SyncFunc<AscendC::HardEvent::MTE2_V>();
 
     expertTokenNumTensor_ = statusBuf_.Get<float>();
-    if ((expertTokenNumsType_ == 0) && (epWorldSize_ >= UB_ALIGN / sizeof(float))) {
+    uint32_t statusBufSize = statusBuf_.Get<uint8_t>().GetSize();
+    bool useCumSum = (expertTokenNumsType_ == 0) && (cumsumTmpMinSize_ > 0U) && (statusBufSize >= cumsumTmpMinSize_);
+    if (useCumSum) {
         expertTokenNumTensor_ = tokenNumBuf_.Get<float>();
     }
     uint32_t expertCountShape[] = {localExpertNum, epWorldSize_};
@@ -1564,7 +1576,7 @@ __aicore__ inline void MoeDistributeDispatchV2<TemplateDispatchV2TypeFunc>::SetE
         return;
     }
 
-    SetExpertPrefixSumA5(localExpertNum);
+    SetExpertPrefixSumA5(localExpertNum, useCumSum);
 }
 #else
 // 更新tokenNumsOut tensor

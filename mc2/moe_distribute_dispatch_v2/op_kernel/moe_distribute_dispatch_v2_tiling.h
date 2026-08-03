@@ -49,6 +49,7 @@ struct MoeDistributeDispatchV2Info {
     uint64_t scalesCol;
     uint32_t scalesTypeSize;
     uint64_t scalesCount;
+    uint32_t cumsumTmpMinSize;    // cumsum min tmp size, 0 means no cumsum
 };
 
 struct MoeDistributeDispatchV2TilingData {
