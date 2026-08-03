@@ -144,10 +144,8 @@ TILING_DATA_FIELD_DEF(int64_t, hcMult);
 TILING_DATA_FIELD_DEF(int64_t, d);
 TILING_DATA_FIELD_DEF(int64_t, hcMultAlign);
 TILING_DATA_FIELD_DEF(int64_t, rowOfFormerBlock);
-TILING_DATA_FIELD_DEF(int64_t, rowOfTailBlock);
 TILING_DATA_FIELD_DEF(int64_t, rowLoopOfFormerBlock);
 TILING_DATA_FIELD_DEF(int64_t, rowLoopOfTailBlock);
-TILING_DATA_FIELD_DEF(int64_t, rowFactor);
 TILING_DATA_FIELD_DEF(int64_t, tailRowFactorOfFormerBlock);
 TILING_DATA_FIELD_DEF(int64_t, tailRowFactorOfTailBlock);
 TILING_DATA_FIELD_DEF(int64_t, dLoop);
@@ -164,9 +162,7 @@ TILING_DATA_FIELD_DEF(int64_t, mL1Size);
 TILING_DATA_FIELD_DEF(int64_t, cubeBlockDimM);
 TILING_DATA_FIELD_DEF(int64_t, cubeBlockDimK);
 TILING_DATA_FIELD_DEF(int64_t, kUbSize);
-TILING_DATA_FIELD_DEF(int64_t, cvLoopKSize);
 TILING_DATA_FIELD_DEF(int64_t, multCoreSplitKSize);
-TILING_DATA_FIELD_DEF(int64_t, multCoreSplitMSize);
 TILING_DATA_FIELD_DEF(int64_t, secondUsedCoreNum);
 TILING_DATA_FIELD_DEF(int64_t, rowInnerFactor);
 TILING_DATA_FIELD_DEF(int64_t, bufferPool0Size);
@@ -182,13 +178,14 @@ REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_2001, MhcPreSinkhornRegbaseTilingData)
 struct MhcPreSinkhornCompileInfo {
     uint64_t coreNum = 0;
     uint64_t ubSize = 0;
+    uint64_t sysWorkspaceSize = 0;
 };
 
 class MhcPreSinkhornTiling {
 public:
     explicit MhcPreSinkhornTiling(gert::TilingContext* tilingContext) : context_(tilingContext) {}
     ~MhcPreSinkhornTiling() = default;
-    
+
     ge::graphStatus GetPlatformInfo();
     ge::graphStatus DoOpTiling();
     ge::graphStatus GetWorkspaceSize();
@@ -267,30 +264,30 @@ public:
     ge::graphStatus CalcMKSplitCorePart2GradoutTiling();
 
 private:
+    enum class GradOutMode {
+        DISABLED,
+        ENABLED,
+    };
+
+    enum class SplitMode {
+        M_SPLIT,
+        K_SPLIT,
+    };
+
+    ge::graphStatus CalcRegbaseCommonTiling(GradOutMode gradOutMode, SplitMode splitMode);
+
     gert::TilingContext *context_ = nullptr;
     uint64_t tilingKey_ = 0;
     MhcPreSinkhornRegbaseTilingData tilingData_;
     uint64_t aivCoreNum_ = 0;
     uint64_t aicCoreNum_ = 0;
     uint64_t workspaceSize_ = 0;
-    uint64_t usedCoreNums_ = 0;
-    uint64_t usedAivCoreNums_ = 0;
+    uint64_t sysWorkspaceSize_ = 0;
     uint64_t ubSize_ = 0;
     int64_t bs_ = 0;
     int64_t hcMix_ = 0;
     int64_t hcMult_ = 0;
     int64_t d_ = 0;
-    int64_t hcMultAlign_ = 0;
-    int64_t rowOfFormerBlock_ = 0;
-    int64_t rowOfTailBlock_ = 0;
-    int64_t rowLoopOfFormerBlock_ = 0;
-    int64_t rowLoopOfTailBlock_ = 0;
-    int64_t rowFactor_ = 0;
-    int64_t tailRowFactorOfFormerBlock_ = 0;
-    int64_t tailRowFactorOfTailBlock_ = 0;
-    int64_t dLoop_ = 0;
-    int64_t dFactor_ = 0;
-    int64_t tailDFactor_ = 0;
     int64_t iterTimes_ = 0;
     double hcEps_ = 0.0;
     double normEps_ = 0.0;

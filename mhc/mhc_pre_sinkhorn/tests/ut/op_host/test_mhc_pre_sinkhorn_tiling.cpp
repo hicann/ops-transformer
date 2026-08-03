@@ -8,13 +8,215 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <array>
+#include <cstring>
 #include <iostream>
+#include <memory>
 #include <gtest/gtest.h>
 #include "../../../op_host/op_tiling/mhc_pre_sinkhorn_tiling.h"
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 
 using namespace std;
+
+namespace {
+constexpr char ASCEND950_SOC_VERSION[] = "Ascend950";
+constexpr int64_t HC_MULT = 4;
+constexpr int64_t HC_MIX = 24;
+constexpr int64_t NUM_ITERS = 20;
+constexpr uint64_t SYS_WORKSPACE_SIZE = 16 * 1024 * 1024;
+
+struct CoreTilingExpected {
+    int64_t rowOfFormerBlock;
+    int64_t rowLoopOfFormerBlock;
+    int64_t rowLoopOfTailBlock;
+    int64_t tailRowFactorOfFormerBlock;
+    int64_t tailRowFactorOfTailBlock;
+};
+
+struct DTilingExpected {
+    int64_t dLoop;
+    int64_t dFactor;
+    int64_t tailDFactor;
+};
+
+struct SplitTilingExpected {
+    int64_t kBlockFactor;
+    int64_t stage2RowFactor;
+    int64_t kL1Size;
+    int64_t mL1Size;
+    int64_t cubeBlockDimM;
+    int64_t cubeBlockDimK;
+    int64_t kUbSize;
+    int64_t multCoreSplitKSize;
+    int64_t secondUsedCoreNum;
+    int64_t rowInnerFactor;
+    int64_t bufferPool0Size;
+    int64_t bufferPool1Size;
+    int64_t mUbSize;
+};
+
+struct RegbaseTilingExpected {
+    CoreTilingExpected core;
+    DTilingExpected d;
+    SplitTilingExpected split;
+};
+
+struct RegbaseTilingBaseline {
+    const char *name;
+    int64_t sequenceLength;
+    int64_t d;
+    bool needBackward;
+    uint64_t ubSize;
+    uint64_t tilingKey;
+    size_t workspaceSize;
+    RegbaseTilingExpected expected;
+    uint64_t coreNum = 64;
+    int64_t hcMix = HC_MIX;
+};
+
+std::unique_ptr<gert::TilingContextPara> BuildRegbaseTilingContext(const RegbaseTilingBaseline &baseline,
+                                                                   void *compileInfo)
+{
+    const int64_t b = 1;
+    const int64_t s = baseline.sequenceLength;
+    const int64_t phiDim1 = HC_MULT * baseline.d;
+    std::unique_ptr<gert::TilingContextPara> context(new gert::TilingContextPara(
+        "MhcPreSinkhorn",
+        {
+            {{{b, s, HC_MULT, baseline.d}, {b, s, HC_MULT, baseline.d}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{baseline.hcMix, phiDim1}, {baseline.hcMix, phiDim1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{3}, {3}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{baseline.hcMix}, {baseline.hcMix}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{b, s, baseline.d}, {b, s, baseline.d}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{b, s, HC_MULT}, {b, s, HC_MULT}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{b, s, HC_MULT, HC_MULT}, {b, s, HC_MULT, HC_MULT}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{b, s, HC_MULT}, {b, s, HC_MULT}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{b, s, baseline.hcMix}, {b, s, baseline.hcMix}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{b, s, 1}, {b, s, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{NUM_ITERS * 2, b, s, HC_MULT}, {NUM_ITERS * 2, b, s, HC_MULT}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{NUM_ITERS * 2, b, s, HC_MULT, HC_MULT}, {NUM_ITERS * 2, b, s, HC_MULT, HC_MULT}},
+             ge::DT_FLOAT,
+             ge::FORMAT_ND},
+        },
+        {
+            {"hc_mult", Ops::Transformer::AnyValue::CreateFrom<int64_t>(HC_MULT)},
+            {"num_iters", Ops::Transformer::AnyValue::CreateFrom<int64_t>(NUM_ITERS)},
+            {"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+            {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+            {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(baseline.needBackward)},
+        },
+        compileInfo, ASCEND950_SOC_VERSION, baseline.coreNum, baseline.ubSize));
+    return context;
+}
+
+template <typename T>
+T ReadTilingField(const uint8_t *buffer, size_t &offset)
+{
+    T value = 0;
+    std::memcpy(&value, buffer + offset, sizeof(value));
+    offset += sizeof(value);
+    return value;
+}
+
+void DeserializeRegbaseTilingData(const TilingInfo &tilingInfo,
+                                  optiling::MhcPreSinkhornRegbaseTilingData &tilingData)
+{
+    size_t offset = 0;
+#define READ_TILING_FIELD(type, field) \
+    tilingData.set_##field(ReadTilingField<type>(tilingInfo.tilingData.get(), offset))
+    READ_TILING_FIELD(int64_t, bs);
+    READ_TILING_FIELD(int64_t, hcMix);
+    READ_TILING_FIELD(int64_t, hcMult);
+    READ_TILING_FIELD(int64_t, d);
+    READ_TILING_FIELD(int64_t, hcMultAlign);
+    READ_TILING_FIELD(int64_t, rowOfFormerBlock);
+    READ_TILING_FIELD(int64_t, rowLoopOfFormerBlock);
+    READ_TILING_FIELD(int64_t, rowLoopOfTailBlock);
+    READ_TILING_FIELD(int64_t, tailRowFactorOfFormerBlock);
+    READ_TILING_FIELD(int64_t, tailRowFactorOfTailBlock);
+    READ_TILING_FIELD(int64_t, dLoop);
+    READ_TILING_FIELD(int64_t, dFactor);
+    READ_TILING_FIELD(int64_t, tailDFactor);
+    READ_TILING_FIELD(int64_t, iterTimes);
+    READ_TILING_FIELD(float, hcEps);
+    READ_TILING_FIELD(float, normEps);
+    READ_TILING_FIELD(int64_t, kBlockFactor);
+    READ_TILING_FIELD(int64_t, stage2RowFactor);
+    READ_TILING_FIELD(int64_t, k);
+    READ_TILING_FIELD(int64_t, kL1Size);
+    READ_TILING_FIELD(int64_t, mL1Size);
+    READ_TILING_FIELD(int64_t, cubeBlockDimM);
+    READ_TILING_FIELD(int64_t, cubeBlockDimK);
+    READ_TILING_FIELD(int64_t, kUbSize);
+    READ_TILING_FIELD(int64_t, multCoreSplitKSize);
+    READ_TILING_FIELD(int64_t, secondUsedCoreNum);
+    READ_TILING_FIELD(int64_t, rowInnerFactor);
+    READ_TILING_FIELD(int64_t, bufferPool0Size);
+    READ_TILING_FIELD(int64_t, bufferPool1Size);
+    READ_TILING_FIELD(int64_t, mUbSize);
+#undef READ_TILING_FIELD
+    EXPECT_EQ(offset, tilingInfo.tilingDataSize) << "Regbase tiling data schema changed; update the deserializer";
+}
+
+void ExpectRegbaseTilingData(const RegbaseTilingBaseline &baseline)
+{
+    TilingInfo tilingInfo;
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {baseline.coreNum, baseline.ubSize, SYS_WORKSPACE_SIZE};
+    auto tilingContext = BuildRegbaseTilingContext(baseline, &compileInfo);
+    ASSERT_TRUE(ExecuteTiling(*tilingContext, tilingInfo));
+    ASSERT_EQ(tilingInfo.tilingKey, baseline.tilingKey);
+    ASSERT_EQ(tilingInfo.workspaceSizes.size(), 1U);
+    EXPECT_EQ(tilingInfo.workspaceSizes[0], static_cast<int64_t>(baseline.workspaceSize));
+    optiling::MhcPreSinkhornRegbaseTilingData actual;
+    ASSERT_EQ(tilingInfo.tilingDataSize, actual.GetDataSize());
+    DeserializeRegbaseTilingData(tilingInfo, actual);
+
+#define EXPECT_TILING_FIELD(field, expected) \
+    EXPECT_EQ(actual.get_##field(), (expected)) << baseline.name << ": " #field
+    EXPECT_TILING_FIELD(bs, baseline.sequenceLength);
+    EXPECT_TILING_FIELD(hcMix, baseline.hcMix);
+    EXPECT_TILING_FIELD(hcMult, HC_MULT);
+    EXPECT_TILING_FIELD(d, baseline.d);
+    EXPECT_TILING_FIELD(hcMultAlign, 8);
+    EXPECT_TILING_FIELD(rowOfFormerBlock, baseline.expected.core.rowOfFormerBlock);
+    EXPECT_TILING_FIELD(rowLoopOfFormerBlock, baseline.expected.core.rowLoopOfFormerBlock);
+    EXPECT_TILING_FIELD(rowLoopOfTailBlock, baseline.expected.core.rowLoopOfTailBlock);
+    EXPECT_TILING_FIELD(tailRowFactorOfFormerBlock, baseline.expected.core.tailRowFactorOfFormerBlock);
+    EXPECT_TILING_FIELD(tailRowFactorOfTailBlock, baseline.expected.core.tailRowFactorOfTailBlock);
+    EXPECT_TILING_FIELD(dLoop, baseline.expected.d.dLoop);
+    EXPECT_TILING_FIELD(dFactor, baseline.expected.d.dFactor);
+    EXPECT_TILING_FIELD(tailDFactor, baseline.expected.d.tailDFactor);
+    EXPECT_TILING_FIELD(iterTimes, NUM_ITERS);
+    EXPECT_FLOAT_EQ(actual.get_hcEps(), 1e-6f) << baseline.name << ": hcEps";
+    EXPECT_FLOAT_EQ(actual.get_normEps(), 1e-6f) << baseline.name << ": normEps";
+    EXPECT_TILING_FIELD(kBlockFactor, baseline.expected.split.kBlockFactor);
+    EXPECT_TILING_FIELD(stage2RowFactor, baseline.expected.split.stage2RowFactor);
+    EXPECT_TILING_FIELD(k, HC_MULT * baseline.d);
+    EXPECT_TILING_FIELD(kL1Size, baseline.expected.split.kL1Size);
+    EXPECT_TILING_FIELD(mL1Size, baseline.expected.split.mL1Size);
+    EXPECT_TILING_FIELD(cubeBlockDimM, baseline.expected.split.cubeBlockDimM);
+    EXPECT_TILING_FIELD(cubeBlockDimK, baseline.expected.split.cubeBlockDimK);
+    EXPECT_TILING_FIELD(kUbSize, baseline.expected.split.kUbSize);
+    EXPECT_TILING_FIELD(multCoreSplitKSize, baseline.expected.split.multCoreSplitKSize);
+    EXPECT_TILING_FIELD(secondUsedCoreNum, baseline.expected.split.secondUsedCoreNum);
+    EXPECT_TILING_FIELD(rowInnerFactor, baseline.expected.split.rowInnerFactor);
+    EXPECT_TILING_FIELD(bufferPool0Size, baseline.expected.split.bufferPool0Size);
+    EXPECT_TILING_FIELD(bufferPool1Size, baseline.expected.split.bufferPool1Size);
+    EXPECT_TILING_FIELD(mUbSize, baseline.expected.split.mUbSize);
+#undef EXPECT_TILING_FIELD
+}
+
+void ExpectRegbaseTilingFailure(const RegbaseTilingBaseline &baseline)
+{
+    TilingInfo tilingInfo;
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {baseline.coreNum, baseline.ubSize, SYS_WORKSPACE_SIZE};
+    auto tilingContext = BuildRegbaseTilingContext(baseline, &compileInfo);
+    EXPECT_FALSE(ExecuteTiling(*tilingContext, tilingInfo));
+}
+} // namespace
 
 class MhcPreSinkhornTiling : public testing::Test {
 protected:
@@ -28,6 +230,48 @@ protected:
         std::cout << "MhcPreSinkhornTiling TearDown" << std::endl;
     }
 };
+
+TEST_F(MhcPreSinkhornTiling, ascend950_regbase_tilingdata_matches_pre_refactor)
+{
+    // The first four cases cover the original functions: K/M split x no-grad/grad-out; the last covers D splitting.
+    const std::array<RegbaseTilingBaseline, 5> baselines = {{
+        {"k_split_no_grad", 256, 4096, false, 262144, 1000, 18415616, {{4, 2, 2, 2, 2}, {1, 4096, 4096}, {64, 2, 128, 256, 1, 64, 64, 256, 64, 0, 0, 0, 128}}},
+        {"m_split_no_grad", 16384, 4096, false, 262144, 1001, SYS_WORKSPACE_SIZE, {{256, 86, 86, 1, 1}, {1, 4096, 4096}, {1, 0, 128, 256, 64, 1, 64, 16384, 0, 3, 262144, 249152, 128}}},
+        {"k_split_grad_out", 256, 7168, true, 262144, 2000, 18210816, {{4, 4, 4, 1, 1}, {1, 7168, 7168}, {56, 1, 128, 256, 1, 56, 64, 512, 64, 0, 0, 0, 128}}},
+        {"m_split_grad_out", 16384, 7168, true, 262144, 2001, SYS_WORKSPACE_SIZE, {{256, 256, 256, 1, 1}, {1, 7168, 7168}, {1, 0, 128, 256, 64, 1, 64, 28672, 0, 1, 262144, 249152, 128}}},
+        {"k_split_no_grad_d_split", 256, 4096, false, 49152, 1000, 18415616, {{4, 4, 4, 1, 1}, {4, 1344, 64}, {64, 1, 128, 256, 1, 64, 64, 256, 64, 0, 0, 0, 128}}},
+    }};
+
+    for (const auto &baseline : baselines) {
+        SCOPED_TRACE(baseline.name);
+        ExpectRegbaseTilingData(baseline);
+    }
+}
+
+TEST_F(MhcPreSinkhornTiling, ascend950_regbase_core_tiling_boundary_branches)
+{
+    // These cases cover Ascend950-only common tiling boundaries: partial core rows, the dFactor path without
+    // DownAlign, and M-split grad-out UB accounting. The preceding regression case covers dFactor DownAlign.
+    const std::array<RegbaseTilingBaseline, 3> baselines = {{
+        {"k_split_partial_core_rows", 65, 4096, false, 262144, 1000, 17193216, {{2, 1, 1, 2, 1}, {1, 4096, 4096}, {64, 2, 384, 80, 1, 64, 192, 256, 33, 0, 0, 0, 40}}},
+        {"k_split_d_factor_at_ub_limit", 256, 4096, false, 17312, 1000, 18415616, {{4, 4, 4, 1, 1}, {256, 16, 16}, {64, 1, 128, 256, 1, 64, 64, 256, 64, 0, 0, 0, 128}}},
+        {"m_split_grad_out_d_factor_at_ub_limit", 16384, 4096, true, 51232, 2001, SYS_WORKSPACE_SIZE, {{256, 256, 256, 1, 1}, {256, 16, 16}, {1, 0, 128, 256, 64, 1, 64, 16384, 0, 1, 51232, 38240, 128}}},
+    }};
+
+    for (const auto &baseline : baselines) {
+        SCOPED_TRACE(baseline.name);
+        ExpectRegbaseTilingData(baseline);
+    }
+
+    const RegbaseTilingBaseline insufficientUb = {
+        "k_split_insufficient_minimum_tile", 256, 4096, false, 17311, 0, 0, {}};
+    ExpectRegbaseTilingFailure(insufficientUb);
+
+    RegbaseTilingBaseline insufficientMBufferPool = {
+        "m_split_negative_buffer_pool", 16384, 4096, false, 262144, 0, 0, {}};
+    insufficientMBufferPool.hcMix = 1024;
+    ExpectRegbaseTilingFailure(insufficientMBufferPool);
+}
 
 TEST_F(MhcPreSinkhornTiling, test_tiling_B1_S1024_N4_C512)
 {
