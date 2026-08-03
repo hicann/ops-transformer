@@ -177,7 +177,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     <tr>
     <td>expertScales</td>
     <td>输入</td>
-    <td>每个token的topK个专家的权重。支持空Tensor；传入空Tensor时不进行加权，直接对专家输出求和。</td>
+    <td>每个token的topK个专家的权重。</td>
     <td>非空时要求2D Tensor；空Tensor至少有一个维度为0，不要求固定维数。</td>
     <td>FLOAT32</td>
     <td>ND</td>
@@ -553,6 +553,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     <details>
     <summary><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：</summary>
 
+    - expertScales仅支持传入形状为(BS, K)的有效Tensor并进行加权聚合，不支持空Tensor。
     - commAlg当前版本不支持，传空指针即可。
     - epSendCounts的shape为(epWorldSize \* localExpertNum, )。
     - tpSendCountsOptional为预留参数，TP域通信不再支持，传空指针即可。
@@ -583,6 +584,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     <details>
     <summary><term>Ascend 950DT</term>：</summary>
 
+    - expertScales可选择是否使能专家权重功能；expertScales传形状为(BS, K)的有效Tensor时使能并进行加权，传空Tensor时不使能并直接对专家输出求和。
     - commAlg当前版本不支持，传空指针即可。
     - epSendCounts的shape为(epWorldSize \* localExpertNum, )。
     - 当前不支持TP域通信。

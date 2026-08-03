@@ -13,7 +13,7 @@
 
 ## 功能说明
 
-- 接口功能：进行AllToAllV通信，最后将接收的数据整合；expertScales非空时乘权重再相加，为空时直接相加。不支持TP域通信。
+- 接口功能：进行AllToAllV通信，最后将接收的数据整合。
 
     相较于MoeDistributeCombine算子，该算子变更如下：
     - 输入了更详细的token信息辅助`MoeDistributeCombineV2`高效地进行全卡同步，因此原算子中shape为(`BS` *`K`,)的`expandIdx`入参替换为shape为(`A`* 128,)的`assistInfoForCombine`参数；
@@ -81,7 +81,7 @@
   <tr>
    <td>expertScales</td>
    <td>输入</td>
-   <td>每个token的topK个专家的权重。非空Tensor的形状为(BS, K)；支持至少一个维度为0的空Tensor，传入空Tensor时不进行加权，直接对专家输出求和。</td>
+   <td>每个token的topK个专家的权重。</td>
    <td>FLOAT32</td>
    <td>ND</td>
   </tr>
@@ -321,11 +321,13 @@
 
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
     * 当`commAlg` = "hierarchy"，必须传入`expandScalesOptional`。
+    * `expertScales`仅支持传入形状为(BS, K)的有效Tensor并进行加权聚合，不支持空Tensor。
     * commAlg支持""，"fullmesh_v1"，"fullmesh_v2", "hierarchy"三种输入方式。""：默认值，不开启fullmesh_v2模板；"fullmesh_v1"：不开启fullmesh_v2模板；"fullmesh_v2"：开启fullmesh_v2模板；"hierarchy": 开启跨超模板，仅支持共享专家为0的场景，且不支持可变BS、二维mask、特殊专家、performanceInfo场景。
     * epWorldSize取值范围[2, 768]；当commAlg="hierarchy"场景时，取值范围为[16, 256]，且为16的整数倍。
     * moeExpertNum取值范围(0, 1024]；当commAlg="hierarchy"场景时，取值范围为(0, 512]。
 
 - <term>Ascend 950DT</term>：
+    * 可选择是否使能expertScales专家权重功能；`expertScales`传形状为(BS, K)的有效Tensor时使能并进行加权，传空Tensor时不使能并直接对专家输出求和。
     * 不支持`expandScalesOptional`。
     * 不支持`commAlg`。
     * 仅支持EP域，无TP域，不支持`groupTp`、`tpWorldSize`、`tpRankId`属性，且`tpRecvCounts`输出为无效内容。

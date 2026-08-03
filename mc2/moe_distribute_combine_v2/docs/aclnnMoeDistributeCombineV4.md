@@ -554,6 +554,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     <details>
     <summary><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：</summary>
 
+    - expertScales仅支持传入形状为(BS, K)的有效Tensor并进行加权聚合，不支持空Tensor。
     - commAlg支持""，"hierarchy"两种输入方式。""：默认值，不开启hierarchy跨超模板；"hierarchy": 开启跨超模板，该模板仅支持tpWorldSize为1、共享专家为0的场景，且不支持可变BS、二维mask、特殊专家、performanceInfo场景。
     - epSendCounts的shape为(epWorldSize \* localExpertNum, )。
     - tpSendCountsOptional为预留参数，TP域通信不再支持，传空指针即可。
@@ -585,6 +586,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     <details>
     <summary><term>Ascend 950DT</term>：</summary>
 
+    - expertScales可选择是否使能专家权重功能；expertScales传形状为(BS, K)的有效Tensor时使能并进行加权，传空Tensor时不使能并直接对专家输出求和。
     - commAlg当前版本不支持，传空指针即可。
     - epSendCounts的shape为(epWorldSize \* localExpertNum, )。
     - 当前不支持TP域通信。

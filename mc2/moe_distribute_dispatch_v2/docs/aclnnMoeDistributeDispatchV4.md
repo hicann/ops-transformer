@@ -496,7 +496,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     - dynamicScalesOut仅quantMode取值为2时有输出。
     - commAlg支持""，"fullmesh_v1"，"fullmesh_v2", "hierarchy"三种输入方式。""：默认值，不开启fullmesh_v2模板；"fullmesh_v1"：不开启fullmesh_v2模板；"fullmesh_v2"：开启fullmesh_v2模板；"hierarchy": 开启跨超模板，该模板仅支持tpWorldSize为1、共享专家为0的场景，且不支持可变BS、二维mask、特殊专家、performanceInfo场景。
     - xActiveMaskOptional要求为1D或2D Tensor（1D时shape为(BS, )，2D时shape为(BS, K)）；1D时true需排在false前，2D时token对应K个值全为false则不参与通信。
-    - expertScalesOptional当commAlg="hierarchy"场景时，要求为2D Tensor，shape为(BS, K)；当commAlg=""、"fullmesh_v1"、"fullmesh_v2"场景时，可传有效Tensor或空指针，有效Tensor为2D Tensor，shape为(BS, K)，传空指针时expertScalesOptional无效，不支持空Tensor。
+    - expertScalesOptional当commAlg="hierarchy"场景时，要求为2D Tensor，shape为(BS, K)；当commAlg=""、"fullmesh_v1"、"fullmesh_v2"场景时，`传空指针即可。
     - epWorldSize取值范围[2, 768]；当commAlg="hierarchy"场景时，取值范围为[16, 256]，且为16的整数倍。
     - moeExpertNum取值范围(0, 1024]；当commAlg="hierarchy"场景时，取值范围为(0, 512]。
     - groupTp预留参数，当前版本不支持，传空字符串即可。
@@ -507,7 +507,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     - sharedExpertRankNum取值范围[0, epWorldSize)；为0时需满足sharedExpertNum为0或1，不为0时需满足sharedExpertRankNum % sharedExpertNum = 0。
     - epRecvCountsOut的shape为(epWorldSize \* localExpertNum,)。
     - tpRecvCountsOut（预留输出，当前版本不支持，传空指针即可）。
-    - expandScalesOut当commAlg="hierarchy"场景时，要求为1D Tensor，shape为(A,)；当commAlg=""、"fullmesh_v1"、"fullmesh_v2"场景时支持该输出，expertScalesOptional传空指针时该输出无效。
+    - expandScalesOut当commAlg="hierarchy"场景时，要求为1D Tensor，shape为(A,)；当commAlg=""、"fullmesh_v1"、"fullmesh_v2"场景时暂不支持该输出。
     - quantMode支持0（非量化）、2（动态量化）。
     - elasticInfoOptional当前版本不支持，传空指针即可。
     - zeroExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是<code>[moeExpertNum, moeExpertNum + zeroExpertNum)</code>。
@@ -525,7 +525,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     - dynamicScalesOut quantMode取值为2、3、4时有输出；quantMode取值为0且`x`的数据类型为`HIFLOAT8`、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`时也有输出。
     - commAlg支持""，"fullmesh_v1"，"fullmesh_v2"三种输入方式。""：默认值，不开启fullmesh_v2模板；"fullmesh_v1"：不开启fullmesh_v2模板；"fullmesh_v2"：开启fullmesh_v2模板。
     - xActiveMaskOptional要求为1D或2D Tensor（1D时shape为(BS, )，2D时shape为(BS, K)）；1D时true需排在false前，2D时token对应K个值全为false则不参与通信。
-    - expertScalesOptional可传有效Tensor或空指针，有效Tensor为2D Tensor，shape为(BS, K)，传空指针时expertScalesOptional无效，不支持空Tensor。
+    - expertScalesOptional可传有效Tensor或空指针。传有效Tensor时使能expertScales专家权重功能，有效Tensor为2D Tensor，shape为(BS, K)；传空指针时不使能expertScales专家权重功能。不支持空Tensor。
     - epWorldSize取值范围[2, 1024]。
     - moeExpertNum取值范围(0, 1024]。
     - groupTp当前版本不支持，传空字符串即可。
@@ -536,7 +536,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     - sharedExpertRankNum取值范围[0, epWorldSize)；为0时需满足sharedExpertNum为0或1，不为0时需满足sharedExpertRankNum % sharedExpertNum = 0。
     - epRecvCountsOut的shape为(epWorldSize \* localExpertNum,)。
     - tpRecvCountsOut（预留输出，当前版本不支持，传空指针即可）。
-    - 支持expandScalesOut输出，expertScalesOptional传空指针时该输出无效。
+    - expandScalesOut当使能expertScales专家权重功能时，输出有效；不使能时，该输出无效。
     - quantMode支持0（非量化）、1（静态量化）、2（pertoken动态量化）、3（pergroup动态量化）、4（mx动态量化）。
     - elasticInfoOptional当前版本不支持，传空指针即可。
     - zeroExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是<code>[moeExpertNum, moeExpertNum + zeroExpertNum)</code>。

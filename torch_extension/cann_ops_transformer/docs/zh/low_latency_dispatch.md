@@ -246,7 +246,7 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
         <td>topk_weights</td>
         <td>Tensor</td>
         <td>可选</td>
-        <td>表示每个token的topK个专家权重，可传有效Tensor或None，有效Tensor为2D Tensor，shape为(BS, K)，传None时`topk_weights`无效，不支持空Tensor。</td>
+        <td>表示每个token的topK个专家权重。</td>
         <td>float32</td>
         <td>(BS, K)</td>
     </tr>
@@ -513,7 +513,7 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
 - 调用接口过程中使用的`num_experts`、`expert_shard_type`、`shared_expert_num`、`shared_expert_rank_num`、`num_max_dispatch_tokens_per_rank`参数取值所有卡需保持一致，`expert_shard_type`、`num_max_dispatch_tokens_per_rank`网络中不同层中也需保持一致，且和[low_latency_combine](low_latency_combine.md)对应参数也保持一致。
 - 该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
 - num_experts + zero_expert_num + copy_expert_num + const_expert_num < MAX_int32。
-- quant_mode相关约束：
+- 相关约束：
   <!-- npu="910b" id7 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
     - `quant_mode=0`表示非量化场景，`x_smooth_scale`不传，`expand_x`的数据类型支持float16、bfloat16。
@@ -521,13 +521,13 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
   <!-- end id7 -->
   <!-- npu="A3" id8 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
-    - `topk_weights`可传有效Tensor或None，有效Tensor为2D Tensor，shape为(BS, K)，传None时`topk_weights`和`expand_scales`输出无效，不支持空Tensor；传有效Tensor时支持`expand_scales`输出。
+    - 不支持topK专家权重功能，`topk_weights`必须传None，`expand_scales`输出无效。
     - `quant_mode=0`表示非量化场景，`x_smooth_scale`不传，`expand_x`的数据类型支持float16、bfloat16。
     - `quant_mode=2`表示pertoken动态量化场景，`expand_x`的数据类型支持int8，`x_smooth_scale`可传可不传；若存在共享专家且传入有效Tensor，shape为(shared_expert_num + num_experts, H)，若不存在共享专家，shape为(num_experts, H)，输出`dynamic_scales` shape为(A,)。
   <!-- end id8 -->
   <!-- npu="950" id9 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
-    - `topk_weights`可传有效Tensor或None，有效Tensor为2D Tensor，shape为(BS, K)，传None时`topk_weights`和`expand_scales`输出无效，不支持空Tensor；传有效Tensor时支持`expand_scales`输出。
+    - `topk_weights`可传有效Tensor或None。传有效Tensor时使能topK专家权重功能，有效Tensor为2D Tensor，shape为(BS, K)，且`expand_scales`输出有效；传None时不使能topK专家权重功能，`expand_scales`输出无效。不支持空Tensor。
     - `quant_mode=0`表示非量化场景。当`x`为float16或bfloat16时，`expand_x`可与`x`一致，也可通过`y_dtype`指定为hifloat8，`x_smooth_scale`必须为None；当`x`为hifloat8、float8_e5m2、float8_e4m3fn、float4_e2m1、float4_e1m2时，`x_smooth_scale`必须传有效Tensor，`expand_x`与`x`逻辑类型一致。`x`为hifloat8时，`x_smooth_scale`逻辑类型为float；`x`为float8_e5m2或float8_e4m3fn时，`x_smooth_scale`逻辑类型为float或float8_e8m0；`x`为float4_e2m1或float4_e1m2时，`x_smooth_scale`逻辑类型为float8_e8m0，且H必须为偶数。此时`x_smooth_scale` shape为(BS, dim1)，其中dim1 <= H。
     - `quant_mode=1`表示静态量化场景，`expand_x`支持int8、hifloat8，`x_smooth_scale`必须传有效Tensor。`expand_x`为int8时，`x_smooth_scale`可表示量化系数，shape为(1,)；也可表示每个专家共享的平滑权重，shape为(H,)；也可表示融合了每个专家平滑权重的量化系数，有共享专家时shape为(shared_expert_num + num_experts, H)，无共享专家时shape为(num_experts, H)。`expand_x`为hifloat8时，`x_smooth_scale` shape必须为(1,)。
     - `quant_mode=2`表示pertoken动态量化场景，`expand_x`支持int8、float8_e4m3fn、float8_e5m2，`x_smooth_scale`可传可不传；若传入有效Tensor，其专家维shape规则同`quant_mode=1`，输出`dynamic_scales` shape为(A,)。

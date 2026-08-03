@@ -426,7 +426,15 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
 - 调用接口过程中使用的`group_ep`、`ep_world_size`、`num_experts`、`expert_shard_type`、`shared_expert_num`、`shared_expert_rank_num`、`num_max_dispatch_tokens_per_rank`参数取值所有卡需保持一致，`group_ep`、`ep_world_size`、`expert_shard_type`、`num_max_dispatch_tokens_per_rank`网络中不同层中也需保持一致，且和[low_latency_dispatch](low_latency_dispatch.md)对应参数也保持一致。
 - 该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
 - num_experts + zero_expert_num + copy_expert_num + const_expert_num < MAX_int32。
-
+- 相关约束：
+  <!-- npu="A3" id7 -->
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+    - `topk_weights`仅支持传入有效Tensor并进行加权聚合。
+  <!-- end id7 -->
+  <!-- npu="950" id8 -->
+  - <term>Ascend 950PR/Ascend 950DT</term>：
+    - `topk_weights`可传有效Tensor或None或空Tesenor，传有效Tensor时使能topK专家权重功能，传None或空Tesenor时不使能并直接对专家输出求和
+  <!-- end id8 -->
 - HCCL通信域缓存区大小：
 
     调用本接口前需检查通信域缓存区大小取值是否合理，单位MB，不配置时默认为200MB。
