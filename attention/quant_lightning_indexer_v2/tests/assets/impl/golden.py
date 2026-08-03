@@ -48,6 +48,8 @@ CASE_DATA = CaseDataStore()
 def get_compare_data(testcase_name):
     """Return pytest comparison context for the active or replayed case."""
     if testcase_name is None:
+        testcase_name = CASE_DATA.active_testcase_name
+    if testcase_name is None:
         return None
     return CASE_DATA.case_data.get(str(testcase_name))
 

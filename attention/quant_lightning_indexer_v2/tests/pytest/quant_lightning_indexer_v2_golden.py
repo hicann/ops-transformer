@@ -25,6 +25,7 @@ import ctypes
 import copy
 import ast
 from qliv2_parameter_normalization import normalize_qliv2_params
+
 try:
     import cann_ops_transformer
 except ImportError:
@@ -1432,31 +1433,86 @@ class GeneralizedQLIV2:
         return y, y_value, sparse_value
 
 
-def qliv2_output_single(params, is_batch = False, split_s1 = DEFAULT_SPLIT_S1, s1size = DEFAULT_S1SIZE):
+def trans_prefix_actseq(self, list):
+    list_len = len(list)
+    if list_len == 0:
+        raise ValueError("PA场景下 act_seq需要必传")
+    list_new = []
+    list_new.append(list[0])
+    for i in range(list_len - 1):
+        new_item = list[i + 1] - list[i]
+        if new_item >= 0:
+            list_new.append(new_item)
+        else:
+            raise ValueError(f"PA场景下act seq 为非递减数列 act_seq ={list}")
+    return list_new
+
+
+def qliv2_output_single(
+    params, is_batch=False, split_s1=DEFAULT_SPLIT_S1, s1size=DEFAULT_S1SIZE
+):
     if is_batch:
         params = normalize_qliv2_params(params)
-    batch_size, q_seq, k_seq, q_t_size, k_t_size, q_head_num, k_head_num, head_dim, block_size,\
-    block_num, qk_dtype, dequant_dtype, actual_seq_dtype, cu_seqlens_q, cu_seqlens_k, seqused_q,\
-    seqused_k, cmp_residual_k, max_seqlen_q, quant_mode, layout_query, layout_key, sparse_count,\
-    sparse_mode, query_datarange, key_datarange, weights_datarange, q_scale_datarange,\
-    k_scale_datarange, cmp_ratio, return_value, output_idx_offset = params
+    (
+        batch_size,
+        q_seq,
+        k_seq,
+        q_t_size,
+        k_t_size,
+        q_head_num,
+        k_head_num,
+        head_dim,
+        block_size,
+        block_num,
+        qk_dtype,
+        weight_dtype,
+        dequant_dtype,
+        actual_seq_dtype,
+        cu_seqlens_q,
+        cu_seqlens_k,
+        seqused_q,
+        seqused_k,
+        cmp_residual_k,
+        max_seqlen_q,
+        quant_mode,
+        layout_query,
+        layout_key,
+        sparse_count,
+        sparse_mode,
+        query_datarange,
+        key_datarange,
+        weights_datarange,
+        q_scale_datarange,
+        k_scale_datarange,
+        cmp_ratio,
+        return_value,
+        output_idx_offset,
+    ) = params
 
     if is_batch:
-        if qk_dtype == 'INT8':
-            qk_dtype = torch.int8
-        elif qk_dtype == 'FLOAT8_E4M3FN':
-            qk_dtype = torch.float8_e4m3fn
-        elif qk_dtype == 'HIFLOAT8':
-            qk_dtype = torch.uint8
+        dtype_map = {
+            "INT8": torch.int8,
+            "UINT8": torch.uint8,
+            "HIFLOAT8": torch.uint8,
+            "INT32": torch.int32,
+            "INT64": torch.int64,
+            "FP16": torch.float16,
+            "FLOAT16": torch.float16,
+            "FP32": torch.float32,
+            "FLOAT": torch.float32,
+            "FLOAT32": torch.float32,
+            "BF16": torch.bfloat16,
+            "FLOAT8_E4M3FN": torch.float8_e4m3fn,
+            "FLOAT8_E8M0": torch.float8_e8m0fnu,
+            "FLOAT8_E8M0FNU": torch.float8_e8m0fnu,
+            "FLOAT4_E2M1": MXFP4_TORCH_DTYPE,
+            "FLOAT4_E2M1FN_X2": MXFP4_TORCH_DTYPE,
+        }
+        qk_dtype = dtype_map.get(qk_dtype, qk_dtype)
+        weight_dtype = dtype_map.get(weight_dtype, weight_dtype)
+        dequant_dtype = dtype_map.get(dequant_dtype, dequant_dtype)
+        actual_seq_dtype = dtype_map.get(actual_seq_dtype, actual_seq_dtype)
 
-        if dequant_dtype == 'FP16':
-            dequant_dtype = torch.float16
-        elif dequant_dtype == 'FP32':
-            dequant_dtype = torch.float32
-
-        if actual_seq_dtype == 'INT32':
-            actual_seq_dtype = torch.int32
-        
         if cu_seqlens_q is not None and isinstance(cu_seqlens_q, str):
             cu_seqlens_q = ast.literal_eval(cu_seqlens_q)
         if cu_seqlens_k is not None and isinstance(cu_seqlens_k, str):

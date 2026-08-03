@@ -471,7 +471,7 @@ class QuantLightningIndexerV2InputAdapter:
             "params": params,
             "scores": scores,
             "topk_value": scores,
-            "index_offsets": None if offset is None else offset.detach().cpu(),
+            "output_idx_offset": None if offset is None else offset.detach().cpu(),
             "score_layout": layout_q,
             "cu_seqlens_q": cu_q_cpu,
         }
