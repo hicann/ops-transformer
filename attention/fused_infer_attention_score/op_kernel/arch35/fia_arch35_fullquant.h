@@ -18,10 +18,10 @@
 
 #include "fia_arch35_common.h"
 #include "fia_arch35_template_tiling_key_enum.h"
-#include "../../../../common/op_kernel/arch35/flash_attention_score_kernel_infer_mla_fullquant.h"
-#include "../../../../common/op_kernel/arch35/flash_attention_score_kernel_infer_gqa_fullquant.h"
-#include "../../../../common/op_kernel/arch35/flash_attention_score_kernel_infer_mx_fullquant.h"
-#include "../../../../common/op_kernel/arch35/fia_template_dispatcher.h"
+#include "flash_attention_score_kernel_infer_mla_fullquant.h"
+#include "flash_attention_score_kernel_infer_gqa_fullquant.h"
+#include "flash_attention_score_kernel_infer_mx_fullquant.h"
+#include "fia_template_dispatcher.h"
 
 using namespace regbaseutil;
 

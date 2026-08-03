@@ -18,9 +18,9 @@
 
 #include "fia_arch35_common.h"
 #include "fia_arch35_template_tiling_key_enum.h"
-#include "../../../../common/op_kernel/arch35/flash_attention_noquant_kernel_infer.h"
-#include "../../../../common/op_kernel/arch35/flash_attention_kernel_noquant_mla.h"
-#include "../../../../common/op_kernel/arch35/fia_template_dispatcher.h"
+#include "flash_attention_noquant_kernel_infer.h"
+#include "flash_attention_kernel_noquant_mla.h"
+#include "fia_template_dispatcher.h"
 
 using namespace regbaseutil;
 

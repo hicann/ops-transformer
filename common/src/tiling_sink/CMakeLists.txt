@@ -20,13 +20,13 @@ set(ATTENTION_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../../attention)
 file(GLOB_RECURSE ARCH35_CHECKER_SRC_FILES
     ${ATTENTION_SRC}/fused_infer_attention_score/op_host/checkers/*checker*.cpp)
 set(src_files
-  ${ATTENTION_SRC}/common/op_host/fia_tiling_info.cpp
-  ${ATTENTION_SRC}/common/op_host/arch22/fia_tiling_nonquant_mla.cpp
-  ${ATTENTION_SRC}/common/op_host/arch22/fia_tiling_nonquant.cpp
-  ${ATTENTION_SRC}/common/op_host/arch22/fia_tiling_empty_tensor.cpp
-  ${ATTENTION_SRC}/common/op_host/arch35/fia_tiling_nonquant_gqa.cpp
-  ${ATTENTION_SRC}/common/op_host/arch35/fia_tiling_fullquant_mx.cpp
-  ${ATTENTION_SRC}/common/op_host/arch35/fia_tiling_fullquant_gqa.cpp
+  ${ATTENTION_SRC}/fused_infer_attention_score/op_host/fia_tiling_info.cpp
+  ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch22/fia_tiling_nonquant_mla.cpp
+  ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch22/fia_tiling_nonquant.cpp
+  ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch22/fia_tiling_empty_tensor.cpp
+  ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch35/fia_tiling_nonquant_gqa.cpp
+  ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch35/fia_tiling_fullquant_mx.cpp
+  ${ATTENTION_SRC}/fused_infer_attention_score/op_host/arch35/fia_tiling_fullquant_gqa.cpp
   ${ATTENTION_SRC}/common/op_host/fia_tiling_shape.cpp
   ${ATTENTION_SRC}/common/op_host/split_core.cpp
   ${ATTENTION_SRC}/common/op_host/split_core_v2.cpp

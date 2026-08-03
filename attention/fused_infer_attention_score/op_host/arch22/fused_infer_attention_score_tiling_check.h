@@ -15,7 +15,7 @@
 #ifndef FUSED_INFER_ATTENTION_SCORE_TILING_CHECK_H
 #define FUSED_INFER_ATTENTION_SCORE_TILING_CHECK_H
 
-#include "../../../common/op_host/fia_tiling_info.h"
+#include "../fia_tiling_info.h"
 #include "../../../common/op_host/fia_tiling_shape.h"
 
 namespace optiling {

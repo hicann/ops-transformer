@@ -17,9 +17,9 @@
 #include "fused_infer_attention_score_tiling_check.h"
 #include "../checkers/fia_checker.h"
 #include "../fused_infer_attention_score_tiling_info_parser.h"
-#include "../../../common/op_host/arch22/fia_tiling_nonquant_mla.h"
-#include "../../../common/op_host/arch22/fia_tiling_nonquant.h"
-#include "../../../common/op_host/arch22/fia_tiling_empty_tensor.h"
+#include "fia_tiling_nonquant_mla.h"
+#include "fia_tiling_nonquant.h"
+#include "fia_tiling_empty_tensor.h"
 #include "../../../common/op_host/fia_tiling_templates_registry.h"
 
 using namespace AscendC;

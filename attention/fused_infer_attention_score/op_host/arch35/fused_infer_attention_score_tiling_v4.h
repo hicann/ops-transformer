@@ -17,7 +17,7 @@
 #define AIR_CXX_RUNTIME_V4_OP_IMPL_FUSEDINFERATTENTIONSCORE_V4_H_
 #include "register/tilingdata_base.h"
 #include "../../../common/op_host/fia_tiling_base.h"
-#include "../../../common/op_host/fia_tiling_info.h"
+#include "../fia_tiling_info.h"
 
 namespace optiling {
 ge::graphStatus TilingFusedInferAttentionScoreV4(gert::TilingContext *context);

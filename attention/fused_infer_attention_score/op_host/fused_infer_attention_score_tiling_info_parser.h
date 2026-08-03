@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include "../../common/op_host/fia_tiling_info.h"
+#include "fia_tiling_info.h"
 #include "../../common/op_host/fia_tiling_shape.h"
 
 namespace optiling {

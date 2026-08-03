@@ -18,7 +18,7 @@
 
 #include "fia_arch35_common.h"
 #include "fia_arch35_template_tiling_key_enum.h"
-#include "../../../../common/op_kernel/arch35/flash_attention_score_antiquant_kernel.h"
+#include "flash_attention_score_antiquant_kernel.h"
 
 #define REGBASE_COPY_TILING_DATA_ASCEND950_ANTIQUANT_BASEAPI(tiling) \
     GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling); \

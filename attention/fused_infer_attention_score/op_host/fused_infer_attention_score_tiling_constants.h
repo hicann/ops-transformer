@@ -16,7 +16,7 @@
 #ifndef FUSED_INFER_ATTENTION_SCORE_TILING_CONSTANTS_H
 #define FUSED_INFER_ATTENTION_SCORE_TILING_CONSTANTS_H
 
-#include "../../common/op_host/fia_tiling_info.h"
+#include "fia_tiling_info.h"
 
 namespace optiling {
 namespace arch35FIA {

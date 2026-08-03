@@ -58,15 +58,15 @@ if(NOT BUILD_OPS_RTY_KERNEL)
     add_tiling_modules()
     target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
     ../../common/op_host/fia_tiling_shape.cpp
-    ../../common/op_host/fia_tiling_info.cpp
+    fia_tiling_info.cpp
     ../../common/op_host/split_core.cpp
     ../../common/op_host/split_core_v2.cpp
-    ../../common/op_host/arch22/fia_tiling_nonquant_mla.cpp
-    ../../common/op_host/arch22/fia_tiling_nonquant.cpp
-    ../../common/op_host/arch22/fia_tiling_empty_tensor.cpp
-    ../../common/op_host/arch35/fia_tiling_nonquant_gqa.cpp
-    ../../common/op_host/arch35/fia_tiling_fullquant_mx.cpp
-    ../../common/op_host/arch35/fia_tiling_fullquant_gqa.cpp
+    arch22/fia_tiling_nonquant_mla.cpp
+    arch22/fia_tiling_nonquant.cpp
+    arch22/fia_tiling_empty_tensor.cpp
+    arch35/fia_tiling_nonquant_gqa.cpp
+    arch35/fia_tiling_fullquant_mx.cpp
+    arch35/fia_tiling_fullquant_gqa.cpp
     ../op_host/arch35/fused_infer_attention_score_tiling_v4.cpp
     ../op_host/arch35/fused_infer_attention_score_tiling_impl.cpp
     ../op_host/arch38/fused_infer_attention_score_tiling_arch38.cpp
