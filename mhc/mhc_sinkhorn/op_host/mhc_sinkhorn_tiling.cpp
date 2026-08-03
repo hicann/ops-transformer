@@ -25,6 +25,8 @@ using namespace AscendC;
 namespace optiling {
 constexpr int64_t X_IDX = 0;
 constexpr int64_t Y_IDX = 0;
+constexpr int64_t NORM_OUT_IDX = 1;
+constexpr int64_t SUM_OUT_IDX = 2;
 constexpr int64_t ATTR_EPS_IDX = 0;
 constexpr int64_t ATTR_NUM_ITERS_IDX = 1;
 constexpr int64_t ATTR_OUT_FLAG_IDX = 2;
@@ -43,6 +45,8 @@ constexpr int64_t NUM_ONE_HUNDRED = 100;
 constexpr int64_t N_NUM_4 = 4;
 constexpr int64_t N_NUM_6 = 6;
 constexpr int64_t N_NUM_8 = 8;
+constexpr int64_t N_ALIGN = 8;
+constexpr int64_t DOUBLE_SIZE = 2;
 
 constexpr int64_t ASCENDC_TOOLS_WORKSPACE = 0;
 
@@ -121,6 +125,27 @@ ge::graphStatus MhcSinkhornTiling::CheckInputDtype()
         return ge::GRAPH_FAILED;
     }
 
+    if (outFlag_ == NUM_ONE) {
+        auto normOutPtr = context_->GetOutputDesc(NORM_OUT_IDX);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, normOutPtr);
+        auto normOutDtype = normOutPtr->GetDataType();
+        if (normOutDtype != xDtype_) {
+            OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(opName_, "normOut",
+                                                   ge::TypeUtils::DataTypeToSerialString(normOutDtype).c_str(),
+                                                   "the dtype of normOut must be equal to the dtype of x");
+            return ge::GRAPH_FAILED;
+        }
+        auto sumOutPtr = context_->GetOutputDesc(SUM_OUT_IDX);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, sumOutPtr);
+        auto sumOutDtype = sumOutPtr->GetDataType();
+        if (sumOutDtype != xDtype_) {
+            OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(opName_, "sumOut",
+                                                   ge::TypeUtils::DataTypeToSerialString(sumOutDtype).c_str(),
+                                                   "the dtype of sumOut must be equal to the dtype of x");
+            return ge::GRAPH_FAILED;
+        }
+    }
+
     return ge::GRAPH_SUCCESS;
 }
 
@@ -178,6 +203,29 @@ ge::graphStatus MhcSinkhornTiling::CheckInputShape()
         std::string dimMsg = "y=" + std::to_string(yDimNum_) + ", x=" + std::to_string(xDimNum_);
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "x, y", dimMsg.c_str(), "y dim must equal x dim");
         return ge::GRAPH_FAILED;
+    }
+
+    if (outFlag_ == NUM_ONE) {
+        int64_t expectNormSize = DOUBLE_SIZE * num_iters_ * T_ * n_ * N_ALIGN;
+        int64_t expectSumSize = DOUBLE_SIZE * num_iters_ * T_ * N_ALIGN;
+        auto normOutShapePtr = context_->GetOutputShape(NORM_OUT_IDX);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, normOutShapePtr);
+        auto normOutShapeSize = normOutShapePtr->GetStorageShape().GetShapeSize();
+        if (normOutShapeSize != expectNormSize) {
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "normOut",
+                                                   Ops::Base::ToString(normOutShapePtr->GetStorageShape()).c_str(),
+                                                   "normOut shape size must be 2*numIters*T*n*8");
+            return ge::GRAPH_FAILED;
+        }
+        auto sumOutShapePtr = context_->GetOutputShape(SUM_OUT_IDX);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, sumOutShapePtr);
+        auto sumOutShapeSize = sumOutShapePtr->GetStorageShape().GetShapeSize();
+        if (sumOutShapeSize != expectSumSize) {
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "sumOut",
+                                                   Ops::Base::ToString(sumOutShapePtr->GetStorageShape()).c_str(),
+                                                   "sumOut shape size must be 2*numIters*T*8");
+            return ge::GRAPH_FAILED;
+        }
     }
 
     return ge::GRAPH_SUCCESS;

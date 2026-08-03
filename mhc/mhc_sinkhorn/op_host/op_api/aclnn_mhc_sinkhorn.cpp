@@ -7,8 +7,8 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
- 
- /*!
+
+/*!
  * \file aclnn_mhc_sinkhorn.cpp
  * \brief aclnn_mhc_sinkhorn
  */
@@ -38,6 +38,7 @@ extern "C" {
 
 static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
 
+static constexpr size_t DIM_ZERO = 0;
 static constexpr size_t DIM_ONE = 1;
 static constexpr size_t DIM_TWO = 2;
 static constexpr size_t DIM_THREE = 3;
@@ -48,7 +49,8 @@ static constexpr size_t SUPPORT_DIM_NUM_4 = 4;
 static const int64_t N_VALID_4 = 4;
 static const int64_t N_VALID_6 = 6;
 static const int64_t N_VALID_8 = 8;
-
+static constexpr int64_t N_ALIGN = 8;
+static constexpr int64_t DOUBLE_SIZE = 2;
 
 static bool CheckNotNull(const aclTensor *x, int64_t outFlag, const aclTensor *output, const aclTensor *normOut,
                          const aclTensor *sumOut)
@@ -86,6 +88,19 @@ static bool CheckFormat(const aclTensor *x, int64_t outFlag, const aclTensor *ou
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Format of input and output should be same. x [%s], output [%s].",
                 ToString(x->GetStorageFormat()).GetString(), ToString(output->GetStorageFormat()).GetString());
         return false;
+    }
+    // outFlag为1时，normOut和sumOut的格式也需要与x一致
+    if (outFlag) {
+        if (x->GetStorageFormat() != normOut->GetStorageFormat()) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Format of input and normOut should be same. x [%s], normOut [%s].",
+                    ToString(x->GetStorageFormat()).GetString(), ToString(normOut->GetStorageFormat()).GetString());
+            return false;
+        }
+        if (x->GetStorageFormat() != sumOut->GetStorageFormat()) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Format of input and sumOut should be same. x [%s], sumOut [%s].",
+                    ToString(x->GetStorageFormat()).GetString(), ToString(sumOut->GetStorageFormat()).GetString());
+            return false;
+        }
     }
     return true;
 }
@@ -133,6 +148,27 @@ static bool CheckShape(const aclTensor *x, int64_t outFlag, const aclTensor *out
                 "n0 must equal n1, and n must be %ld or %ld or %ld, but got n0 = %ld, n1 = %ld", N_VALID_4, N_VALID_6,
                 N_VALID_8, n0, n1);
         return false;
+    }
+
+    // outFlag为1时，校验normOut和sumOut的元素总数是否符合预期
+    if (outFlag) {
+        int64_t T = xShape.GetDim(DIM_ZERO);
+        if (xDim == SUPPORT_DIM_NUM_4) {
+            T = xShape.GetDim(DIM_ZERO) * xShape.GetDim(DIM_ONE);
+        }
+        int64_t n = n0;
+        int64_t expectNormSize = DOUBLE_SIZE * numIters * T * n * N_ALIGN;
+        int64_t expectSumSize = DOUBLE_SIZE * numIters * T * N_ALIGN;
+        if (normOut->GetViewShape().GetShapeSize() != expectNormSize) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "normOut shape size must be %ld, but got %ld.", expectNormSize,
+                    normOut->GetViewShape().GetShapeSize());
+            return false;
+        }
+        if (sumOut->GetViewShape().GetShapeSize() != expectSumSize) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "sumOut shape size must be %ld, but got %ld.", expectSumSize,
+                    sumOut->GetViewShape().GetShapeSize());
+            return false;
+        }
     }
     return true;
 }
@@ -185,7 +221,7 @@ aclnnStatus aclnnMhcSinkhornGetWorkspaceSize(const aclTensor *x, float eps, int6
     // 将输入x转换成连续的tensor
     const aclTensor *xContiguous = l0op::Contiguous(x, uniqueExecutor.get());
     CHECK_RET(xContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    aclTensor *outputContiguous = const_cast<aclTensor*>(l0op::Contiguous(output, uniqueExecutor.get()));
+    aclTensor *outputContiguous = const_cast<aclTensor *>(l0op::Contiguous(output, uniqueExecutor.get()));
     CHECK_RET(outputContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     const aclTensor *kernelOut =
