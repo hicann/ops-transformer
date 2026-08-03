@@ -109,7 +109,6 @@ private:
     __aicore__ inline SendMaskBufferConfig SendAndQuantBuffInit();
     __aicore__ inline void ExpertTokenNumsBuffInit();
     __aicore__ inline void ResetFlagList();
-    __aicore__ inline void ResetSharedExpertGmm2TileCounters();
     __aicore__ inline void SendMaskCal(const SendMaskBufferConfig &bufferConfig);
     __aicore__ inline void SendCntCal(int32_t localExpertId, uint64_t &sendCnt);
     __aicore__ inline void DispatchExpert(ExpertLoopState &state, GMMAddrInfo &gmmAddrInfo, uint32_t expertIdx,
@@ -653,9 +652,6 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ResetFlagList()
                                              0U, 0U};
         DataCopyPad(swigluToGmm2FlagGm_[coreOffset + resetElementOffset], resetTensor_, rankSyncCopyParams);
     }
-    if (sharedExpertNum_ > 0) {
-        ResetSharedExpertGmm2TileCounters();
-    }
     // 预取路径：清理 GMM1 tile 状态位区（含 allDone slot），避免上一轮残留导致软同步误判。
     if constexpr (TopkWeightsPrefetch) {
         GlobalTensor<int32_t> statusGm;
@@ -676,31 +672,6 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ResetFlagList()
                                                0U, 0U, 0U};
             DataCopyPad(statusGm[statusCoreOffset + resetElementOffset], resetTensor_, statusCopyParams);
         }
-    }
-}
-
-// ===============================================================
-// ResetSharedExpertGmm2TileCounters：清理共享专家 GMM2 tile counter
-// ===============================================================
-template <TemplateMegaMoeWaveTypeClass>
-__aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ResetSharedExpertGmm2TileCounters()
-{
-    uint32_t tokenGroupCount = Ops::Base::CeilDiv(m_, GMM1_TILE_M);
-    int32_t totalCounters = static_cast<int32_t>(
-        tokenGroupCount * sharedExpertNum_ * static_cast<uint64_t>(INT_CACHELINE));
-    int32_t coreLen, coreOffset;
-    TilingByCore(totalCounters, coreLen, coreOffset);
-    GlobalTensor<int32_t> sharedTileCounterGm;
-    sharedTileCounterGm.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.sharedExpertGmm2TileCounterPtr));
-    for (int32_t resetElementOffset = 0; resetElementOffset < coreLen;
-         resetElementOffset += resetBatchElementCount_) {
-        int32_t currentBatchElementCount = coreLen - resetElementOffset < resetBatchElementCount_ ?
-                                               coreLen - resetElementOffset :
-                                               resetBatchElementCount_;
-        DataCopyExtParams resetCopyParams{
-            1U, static_cast<uint32_t>(currentBatchElementCount * sizeof(int32_t)), 0U, 0U, 0U};
-        DataCopyPad(sharedTileCounterGm[coreOffset + resetElementOffset], resetTensor_, resetCopyParams);
     }
 }
 

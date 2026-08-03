@@ -134,6 +134,12 @@ HOST_DEVICE int64_t CalcMegaMoeFlagWorkspaceSize(const MegaMoeTilingData *tiling
         flagElementCount += static_cast<int64_t>(tilingData->combineSyncSlotCountPerExpert) *
                             routedExpertCount * INT_CACHELINE;
     }
+    if (tilingData->sharedExpertNum > 0) {
+        int64_t tokenGroupCount = Ops::Base::CeilDiv(static_cast<int64_t>(tilingData->bs),
+                                                     static_cast<int64_t>(MegaMoeImpl::L1_TILE_M_256));
+        flagElementCount += tokenGroupCount * static_cast<int64_t>(tilingData->sharedExpertNum) *
+                            static_cast<int64_t>(INT_CACHELINE);
+    }
     return flagElementCount * SIZE_INT_32;
 }
 
@@ -262,6 +268,16 @@ struct WorkspaceInfo {
                              routedExpertCount * INT_CACHELINE * SIZE_INT_32;
         }
 
+        // Shared expert GMM2 tile counter: tile 级 flag counter, 每 shared expert 一组 slot。
+        // 纳入连续 flag 区以便 ResetFlagList 一次性清零。
+        if (tilingData->sharedExpertNum > 0) {
+            sharedExpertGmm2TileCounterPtr = base + workspaceSize;
+            int64_t tokenGroupCount = Ops::Base::CeilDiv(static_cast<int64_t>(tilingData->bs),
+                                                         static_cast<int64_t>(MegaMoeImpl::L1_TILE_M_256));
+            workspaceSize += SIZE_INT_32 * tokenGroupCount *
+                             static_cast<int64_t>(tilingData->sharedExpertNum) * INT_CACHELINE;
+        }
+
         // Conditional allocation for A8W4 / combine-quant paths.
         // 以下条件分配与 mega_moe.h 编译期守卫 (ENABLE_A8W4 / ENABLE_A4W4 / CombineQuantMode) 一致，
         // 由 TilingKey 保证同步。
@@ -375,14 +391,6 @@ struct WorkspaceInfo {
                 Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->bs * tilingData->sharedExpertNum * tilingData->hiddenDim /
                                          MegaMoeImpl::SWIGLU_N_HALF / MXFP_SCALE_GROUP_NUM,
                                      ALIGN_512);
-            // sharedExpertGmm2TileCounter: tile 级 flag counter, 每 shared expert 一组 slot
-            // slot 数 = CeilDiv(bs, GMM1_TILE_M), 每 slot 占 INT_CACHELINE 个 int32
-            sharedExpertGmm2TileCounterPtr = base + workspaceSize;
-            uint32_t tokenGroupCount = Ops::Base::CeilDiv(static_cast<uint32_t>(tilingData->bs),
-                                                          static_cast<uint32_t>(MegaMoeImpl::L1_TILE_M_256));
-            uint32_t totalSlots = tokenGroupCount * tilingData->sharedExpertNum;
-            workspaceSize += Ops::Base::CeilAlign(
-                static_cast<int64_t>(totalSlots) * static_cast<int64_t>(INT_CACHELINE) * SIZE_INT_32, ALIGN_512);
         }
     }
 };
