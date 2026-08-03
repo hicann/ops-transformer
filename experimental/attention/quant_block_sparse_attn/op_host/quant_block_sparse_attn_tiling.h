@@ -37,6 +37,7 @@ constexpr uint32_t BSA_MASK_MODE_NONE = 0U;
 constexpr uint32_t BSA_MASK_MODE_CAUSAL = 3U;
 constexpr uint32_t BSA_MASK_MODE_MAX = 4U;
 constexpr uint32_t BSA_MXFP8_S2_BASE_SIZE = 512U;
+constexpr uint32_t BSA_MXFP8_MAX_PA_BLOCK_SIZE = 1024U;
 constexpr uint32_t BSA_MXFP8_SPARSE_BLOCK_SIZE_128 = 128U;
 constexpr uint32_t BSA_MXFP8_SPARSE_BLOCK_SIZE_64 = 64U;
 constexpr uint32_t BSA_MXFP8_SCALE_GROUP_SIZE = 64U;

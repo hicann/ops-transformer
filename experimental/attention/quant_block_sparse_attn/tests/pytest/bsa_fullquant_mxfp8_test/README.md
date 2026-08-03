@@ -279,6 +279,6 @@ python experimental/attention/quant_block_sparse_attn/tests/pytest/bsa_fullquant
 - `softmax_scale` 留空时，脚本按 `1 / sqrt(D)` 自动补齐。
 - `N1` 必须能被 `N2` 整除；`n1_n2_ratio` 仅记录用例设计，不参与运行校验。
 - `s2_base_size` 是 golden 划分 C1 子块的必需运行字段，当前 MXFP8 模板固定为 `512`。
-- `block_size`、`sparse_q_block_size`、`sparse_kv_block_size` 必须相等。
+- `sparse_q_block_size` 必须等于 `sparse_kv_block_size`；`block_size`（PA 物理块大小）必须是 `sparse_kv_block_size` 的正整数倍（支持 `block_size = m * sparse_kv_block_size`）。
 - `s1_s2_relation`、`alignment` 和 `s1_base_size` 仅作为覆盖场景说明保留，不参与 pytest 计算或校验。
 - CSV 可直接扩展到多行；case 名称在一个或多个输入文件之间都不能重复。

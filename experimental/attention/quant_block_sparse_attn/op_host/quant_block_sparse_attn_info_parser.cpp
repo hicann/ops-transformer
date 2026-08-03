@@ -147,6 +147,11 @@ ge::graphStatus QuantBlockSparseAttnInfoParser::ParseKeyValue(QuantBlockSparseAt
         return ge::GRAPH_FAILED;
     }
     tilingInfo.paBlockStrideVal = static_cast<uint32_t>(paBlockStride);
+    if (!BSAGetDimAsU32(keyShape, DIM_PA_BLOCK_SIZE, tilingInfo.paBlockSizeVal)) {
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(kOpName, "key", std::to_string(keyShape.GetDimNum()) + "D",
+                                                 "failed to get paBlockSize from key shape dim[2]");
+        return ge::GRAPH_FAILED;
+    }
 
     if (tilingInfo.n2Size == 0U || tilingInfo.n1Size % tilingInfo.n2Size != 0U) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(

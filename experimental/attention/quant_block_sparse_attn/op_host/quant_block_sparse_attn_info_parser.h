@@ -115,6 +115,7 @@ struct QuantBlockSparseAttnTilingInfo {
     uint32_t sparseCount = 0;
     uint32_t qBlockSizeVal = 0;
     uint32_t kvBlockSizeVal = 0;
+    uint32_t paBlockSizeVal = 0;
     uint32_t paBlockStrideVal = 0;
     uint32_t maxBlockNumPerBatch = 0;
     uint32_t paBlockNumSum = 0;

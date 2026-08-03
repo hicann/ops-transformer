@@ -167,7 +167,7 @@ void QuantBlockSparseAttnTiling::FillMxTilingData()
     const uint32_t queryScaleDSize = CalcMxScaleDSize(dSize);
     const uint32_t keyScaleDSize = CalcMxScaleDSize(dSize);
     // 每个 PA block 的 VScale 为 [N,ceil(blockSize/64),DV,2]。
-    const uint32_t valueScaleBlockSize = BSACeilDiv(info.kvBlockSizeVal, BSA_MXFP8_SCALE_GROUP_SIZE);
+    const uint32_t valueScaleBlockSize = BSACeilDiv(info.paBlockSizeVal, BSA_MXFP8_SCALE_GROUP_SIZE);
     const uint32_t valueScaleDSize = dSizeV * BSA_MXFP8_VALUE_SCALE_LAST_DIM;
     const bool actualSeqQNull = info.opParamInfo.cuSeqlensQ.tensor == nullptr;
     const bool actualSeqKVNull = info.opParamInfo.seqUsedKV.tensor == nullptr;
@@ -197,10 +197,10 @@ void QuantBlockSparseAttnTiling::FillMxTilingData()
     baseParams.coreNum = usedCoreNum_;
     baseParams.outputLayout = info.layoutQValue;
     // K/V 数据与 K/V scale 均按 PA BNBD 映射。
-    baseParams.keyStrides = MakePaBnbdStride(info.n2Size, info.kvBlockSizeVal, dSize);
-    baseParams.valueStrides = MakePaBnbdStride(info.n2Size, info.kvBlockSizeVal, dSizeV);
+    baseParams.keyStrides = MakePaBnbdStride(info.n2Size, info.paBlockSizeVal, dSize);
+    baseParams.valueStrides = MakePaBnbdStride(info.n2Size, info.paBlockSizeVal, dSizeV);
     baseParams.kScaleStrides =
-        MakePaBnbdStride(info.n2Size, info.kvBlockSizeVal, keyScaleDSize * BSA_MXFP8_SCALE_LAST_DIM);
+        MakePaBnbdStride(info.n2Size, info.paBlockSizeVal, keyScaleDSize * BSA_MXFP8_SCALE_LAST_DIM);
     baseParams.vScaleStrides = MakePaBnbdStride(info.n2Size, valueScaleBlockSize, valueScaleDSize);
 
     auto &attenMaskParams = mxTilingData_.attenMaskParams;
@@ -217,7 +217,7 @@ void QuantBlockSparseAttnTiling::FillMxTilingData()
 
     auto &pageAttentionParams = mxTilingData_.pageAttentionParams;
     pageAttentionParams.paLayoutType = BSA_PA_LAYOUT_TYPE_BNBD;
-    pageAttentionParams.blockSize = info.kvBlockSizeVal;
+    pageAttentionParams.blockSize = info.paBlockSizeVal;
     pageAttentionParams.maxBlockNumPerBatch = info.maxBlockNumPerBatch;
     pageAttentionParams.paBlockNumSum = info.paBlockNumSum;
     pageAttentionParams.paBlockStride = info.paBlockStrideVal;

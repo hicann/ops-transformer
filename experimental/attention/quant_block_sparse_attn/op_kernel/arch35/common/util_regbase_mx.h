@@ -97,6 +97,7 @@ struct MxPageAttentionConstInfo {
     uint32_t paBlockStride = 0U;
     uint32_t qSparseBlockSize = 0U;
     uint32_t kvSparseBlockSize = 0U;
+    uint32_t paBlockSize = 0U;
 };
 
 // B_N_Qb_Kb sparse 参数。

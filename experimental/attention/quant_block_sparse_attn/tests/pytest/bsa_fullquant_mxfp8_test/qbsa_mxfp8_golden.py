@@ -277,14 +277,19 @@ def _validate_case_design_fields(case):
             f"s2_base_size must be 512 for MXFP8, got {case['s2_base_size']}"
         )
 
-    block_sizes = [
-        case.get(name)
-        for name in ("block_size", "sparse_q_block_size", "sparse_kv_block_size")
-    ]
-    if all(value is not None for value in block_sizes) and len(set(block_sizes)) != 1:
+    sparse_q = case.get("sparse_q_block_size")
+    sparse_kv = case.get("sparse_kv_block_size")
+    pa_block = case.get("block_size")
+    if sparse_q is not None and sparse_kv is not None and sparse_q != sparse_kv:
         raise ValueError(
-            "block_size, sparse_q_block_size and sparse_kv_block_size must be equal, "
-            f"got {block_sizes}"
+            f"sparse_q_block_size must equal sparse_kv_block_size, got {sparse_q} vs {sparse_kv}"
+        )
+    if all(v is not None for v in (pa_block, sparse_kv)) and (
+        pa_block < sparse_kv or pa_block % sparse_kv != 0
+    ):
+        raise ValueError(
+            f"block_size must be a positive multiple of sparse_kv_block_size, "
+            f"got block_size={pa_block}, sparse_kv_block_size={sparse_kv}"
         )
 
     _get_runtime_seq_lengths(case, "actual_seq_q", "S1")
@@ -1007,25 +1012,33 @@ def _positions_from_sparse(
             f"C1 S2 size must be divisible by sparse block size, got {c1_s2_size} and {SPARSE_BLOCK_SIZE}"
         )
     blocks_per_c1 = c1_s2_size // SPARSE_BLOCK_SIZE
+    blocks_per_task = int(CASE["s2_base_size"]) // SPARSE_BLOCK_SIZE
     chunk_positions = []
-    cursor = 0
-    while cursor < block_count:
-        c1_positions = []
-        for offset in range(blocks_per_c1):
-            if cursor + offset >= block_count:
-                continue
+    task_start = 0
+    while task_start < block_count:
+        task_end = min(task_start + blocks_per_task, block_count)
+        task_raw = []
+        for offset in range(task_end - task_start):
             block_idx = int(
-                sparse_indices[batch_idx, head_idx, qb_idx, cursor + offset].item()
+                sparse_indices[batch_idx, head_idx, qb_idx, task_start + offset].item()
             )
-            if block_idx < 0:
-                continue
-            start = block_idx * SPARSE_BLOCK_SIZE
-            end = min(start + SPARSE_BLOCK_SIZE, kv_len)
-            if start < kv_len:
-                c1_positions.extend(range(start, end))
-        if c1_positions:
-            chunk_positions.append(c1_positions)
-        cursor += blocks_per_c1
+            task_raw.append(block_idx)
+        task_valid = sorted(b for b in task_raw if b >= 0)
+        cursor = 0
+        while cursor < len(task_valid):
+            c1_positions = []
+            for offset in range(blocks_per_c1):
+                if cursor + offset >= len(task_valid):
+                    continue
+                block_idx = task_valid[cursor + offset]
+                start = block_idx * SPARSE_BLOCK_SIZE
+                end = min(start + SPARSE_BLOCK_SIZE, kv_len)
+                if start < kv_len:
+                    c1_positions.extend(range(start, end))
+            if c1_positions:
+                chunk_positions.append(c1_positions)
+            cursor += blocks_per_c1
+        task_start += blocks_per_task
     return chunk_positions
 
 
