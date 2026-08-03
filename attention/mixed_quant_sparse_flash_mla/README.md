@@ -15,21 +15,27 @@
 
 - 算子功能：
 
-  `MixedQuantSparseFlashMla`算子旨在完成以下公式描述的Attention计算，支持SWA（Sliding Window Attention）、CSA（Compressed Sparse Attention）、HCA（Heavily Compressed Attention）三类Attention计算场景。与`SparseFlashMla`的区别在于，本算子支持KV的per-token-group量化输入。调用时需要使用`MixedQuantSparseFlashMlaMetadata`生成的任务列表`metadata`。
+  `MixedQuantSparseFlashMla`算子旨在完成量化和稀疏场景下的MLA（Multi-head Latent Attention）注意力计算，支持SWA（Sliding Window Attention）、CSA（Compressed Sparse Attention）、HCA（Heavily Compressed Attention）三类Attention计算场景。与`SparseFlashMla`的区别在于，本算子支持KV的per-token-group量化输入。该算子的三种典型场景：
 
-  典型调用流程如下：
+  - **SWA（Sliding Window Attention）**：仅传入`ori_kv`，对原始KV做滑动窗口注意力。
+  - **CSA（Compressed Sparse Attention）**：同时传入`ori_kv`、`cmp_kv`和`cmp_sparse_indices`，对原始KV窗口和topK选择出的压缩KV共同做注意力。
+  - **HCA（Heavily Compressed Attention）**：同时传入`ori_kv`和`cmp_kv`，对原始KV窗口和连续压缩KV段共同做注意力。
 
-  1. 准备`q`、`ori_kv`、`cmp_kv`、序列长度、`block table`、`sinks`等输入。
-  2. 调用`MixedQuantSparseFlashMlaMetadata`生成`metadata`。
-  3. 调用`MixedQuantSparseFlashMla`，将上一步得到的`metadata`传入主算子。
+  调用时需要使用`MixedQuantSparseFlashMlaMetadata`生成的任务列表`metadata`，在主算子执行前生成，当前版本主算子必须传入该`metadata`。典型调用流程如下：
+
+  1. 根据调用场景准备`q`、`ori_kv`、`cmp_kv`等对应输入。
+  2. 调用`MixedQuantSparseFlashMlaMetadata`生成`metadata`，作为`MixedQuantSparseFlashMla`的入参。
+  3. 调用`MixedQuantSparseFlashMla`，将上一步得到的`metadata`传入主算子，生成计算结果。
 
 - 计算公式：
+
+  `MixedQuantSparseFlashMla`采用MLA对KV共享输入的稀疏注意力进行计算，其原理是对输入的KV进行选择性压缩与量化处理，再将Query与拼接后的KV计算结果通过Softmax得到注意力权重。
+
+  MLA的计算公式一般定义如下，其中$\tilde{K}=\tilde{V}$为基于入参控制的实际参与计算的KV，由`ori_kv`的滑动窗口部分和`cmp_kv`的压缩部分共同组成，实际参与计算的KV范围由`cmp_ratio`、`ori_mask_mode`、`cmp_mask_mode`、`ori_win_left`、`ori_win_right`以及`cmp_sparse_indices`决定。
 
     $$
     O = \text{softmax}(Q@\tilde{K}^T \cdot \text{softmax\_scale})@\tilde{V}
     $$
-
-    其中$\tilde{K}=\tilde{V}$为基于`ori_kv`、`cmp_kv`以及`cmp_ratio`等入参控制的实际参与计算的$KV$。
 
 ## 参数说明
 
@@ -54,49 +60,49 @@
     <tr>
       <td>q</td>
       <td>输入</td>
-      <td>对应公式中的Q。</td>
+      <td>表示对应公式中的Q。</td>
       <td>BFLOAT16</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>ori_kv</td>
       <td>可选输入</td>
-      <td>对应公式中K和V的一部分，表示原始不经压缩的量化KV。由nope、rope、scale、padding拼接而成，详见quant_mode。</td>
+      <td>表示对应公式中K和V的一部分，为原始不经压缩的量化KV，Key和Value共享同一份数据。由nope、rope、scale、padding拼接而成，详见quant_mode。</td>
       <td>详见quant_mode</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cmp_kv</td>
       <td>可选输入</td>
-      <td>对应公式中K和V的一部分，表示经过压缩的量化KV。由nope、rope、scale、padding拼接而成，详见quant_mode。</td>
+      <td>表示对应公式中K和V的一部分，为经过压缩的量化KV，Key和Value共享同一份数据。由nope、rope、scale、padding拼接而成，详见quant_mode。</td>
       <td>详见quant_mode</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>ori_sparse_indices</td>
       <td>可选输入</td>
-      <td>表示从ori_kv中离散取数的索引，当前版本不支持传入。</td>
+      <td>表示原始KV topK索引，无效位置填-1。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cmp_sparse_indices</td>
       <td>可选输入</td>
-      <td>表示从cmp_kv中离散取数的索引。</td>
+      <td>表示压缩KV topK索引，无效位置填-1。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>ori_block_table</td>
       <td>可选输入</td>
-      <td>表示PageAttention中ori_kv使用的block映射表。</td>
+      <td>表示PageAttention场景下ori_kv使用的block映射表。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cmp_block_table</td>
       <td>可选输入</td>
-      <td>表示PageAttention中cmp_kv使用的block映射表。</td>
+      <td>表示PageAttention场景下cmp_kv使用的block映射表。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -152,28 +158,28 @@
     <tr>
       <td>ori_topk_length</td>
       <td>可选输入</td>
-      <td>预留输入，当前版本不支持传入非空Tensor。</td>
+      <td>表示ori_sparse_indices实际参与计算的长度。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cmp_topk_length</td>
       <td>可选输入</td>
-      <td>预留输入，当前版本不支持传入非空Tensor。</td>
+      <td>表示cmp_sparse_indices实际参与计算的长度。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>sinks</td>
       <td>可选输入</td>
-      <td>表示attention sinks输入。</td>
+      <td>表示各注意力头设置独立可学习虚拟偏移项，用于维持长文本推理时的稳定性。</td>
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>metadata</td>
       <td>可选输入</td>
-      <td>MixedQuantSparseFlashMlaMetadata生成的任务切分结果。</td>
+      <td>表示MixedQuantSparseFlashMlaMetadata生成的分核信息。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -194,7 +200,7 @@
     <tr>
       <td>softmax_scale</td>
       <td>可选属性</td>
-      <td>对应公式中的softmax_scale。</td>
+      <td>表示对应公式中的softmax_scale，默认值为1.0。</td>
       <td>FLOAT</td>
       <td>-</td>
     </tr>
@@ -208,28 +214,28 @@
     <tr>
       <td>ori_mask_mode</td>
       <td>可选属性</td>
-      <td>表示q和ori_kv计算的mask模式。<br/>0: No Mask。<br/>3: RightDownCausal模式。<br/>4: Band模式。</td>
+      <td>表示q和ori_kv计算的mask模式。<br/>0: No mask。<br/>3: rightDownCausal模式。<br/>4: sliding window模式。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>cmp_mask_mode</td>
       <td>可选属性</td>
-      <td>表示q和cmp_kv计算的mask模式。<br/>0: No Mask。<br/>3: RightDownCausal模式。</td>
+      <td>表示q和cmp_kv计算的mask模式。<br/>0: No mask。<br/>3: rightDownCausal模式。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>ori_win_left</td>
       <td>可选属性</td>
-      <td>表示q和ori_kv计算中q对过去token计算的数量，支持-1或非负数，其中-1表示窗口不受限。</td>
+      <td>表示q和ori_kv计算中q对历史token计算的数量，-1表示无穷大，即全部参与运算。默认值为-1。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>ori_win_right</td>
       <td>可选属性</td>
-      <td>表示q和ori_kv计算中q对未来token计算的数量，支持-1或非负数，其中-1表示窗口不受限。</td>
+      <td>表示q和ori_kv计算中q对未来token计算的数量，-1表示无穷大，即全部参与运算。默认值为-1。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
@@ -250,28 +256,28 @@
     <tr>
       <td>topk_value_mode</td>
       <td>可选属性</td>
-      <td>表示TopK索引取值模式。</td>
+      <td>表示topK索引取值模式，默认值为1。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>return_softmax_lse</td>
       <td>可选属性</td>
-      <td>表示是否返回softmax_lse。</td>
+      <td>表示是否返回softmax的lse结果，默认值为False。</td>
       <td>BOOL</td>
       <td>-</td>
     </tr>
     <tr>
       <td>attn_out</td>
       <td>输出</td>
-      <td>对应公式中的输出O。</td>
+      <td>表示对应公式中的输出O。</td>
       <td>BFLOAT16</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>softmax_lse</td>
       <td>可选输出</td>
-      <td>返回softmax的log-sum-exp结果。</td>
+      <td>表示对query乘key的结果先取max得到softmax_max，query乘key的结果减去softmax_max后取exp再取sum得到softmax_sum，最后对softmax_sum取log再加上softmax_max得到的结果。</td>
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
@@ -283,36 +289,58 @@
 - 该接口支持推理场景下使用。
 - 该接口支持aclgraph模式。
 - 该接口当前支持三种计算场景：SWA（Sliding Window Attention）场景仅传入`ori_kv`；CSA（Compressed Sparse Attention）场景传入`ori_kv`、`cmp_kv`及`cmp_sparse_indices`；HCA（Heavily Compressed Attention）场景传入`ori_kv`及`cmp_kv`。
+
+### 常见字段释义
+
+|    命名    |                            含义                            |
+| :---------: | :---------------------------------------------------------: |
+|      b      |      输入样本batch大小                |
+|     q_s     |      输入q的序列长度      |
+|    ori_kv_s    |  输入ori_kv的序列长度  |
+|    cmp_kv_s    |  输入cmp_kv的序列长度  |
+|     q_n     |        输入q的头数        |
+|    kv_n    |    输入ori_kv/cmp_kv的头数    |
+|      q_d      |          输入q的注意力头的维度         |
+|      kv_d      |          输入ori_kv/cmp_kv的注意力头的维度         |
+|     q_t     |          输入q所有batch序列长度的累加和          |
+|     ori_kv_t    |          输入ori_kv所有batch序列长度的累加和          |
+|     cmp_kv_t    |          输入cmp_kv所有batch序列长度的累加和          |
+|      ori_kv_k      |           输入ori_sparse_indices中topK选出的token个数         |
+|      cmp_kv_k      |           输入cmp_sparse_indices中topK选出的token个数         |
+|      ori_kv_s_max      |           输入ori_kv的最大序列长度         |
+|      cmp_kv_s_max      |           输入cmp_kv的最大序列长度         |
+|      ori_kv_block_size      |           输入ori_kv在PagedAttention场景下的block大小         |
+|      cmp_kv_block_size      |           输入cmp_kv在PagedAttention场景下的block大小         |
+|      ori_kv_block_nums      |           输入ori_kv在PagedAttention场景下的block数量         |
+|      cmp_kv_block_nums      |           输入cmp_kv在PagedAttention场景下的block数量         |
+
 - 通用规格约束如下：
-  - KV\_N仅支持1，D仅支持512。其中，`ori_kv`和`cmp_kv`的D_kv由nope、rope、scale、padding拼接而成，详见`quant_mode`。
+  - kv_n仅支持1，q_d仅支持512。其中，`ori_kv`和`cmp_kv`的kv_d由nope、rope、scale、padding拼接而成，详见`quant_mode`。
   - `cmp_ratio`表示`cmp_kv`相对于压缩前KV长度的压缩倍率；仅传入`ori_kv`时，`cmp_ratio`不参与压缩KV计算，需保持默认值1；支持1到128。
   - `ori_mask_mode`支持0、3和4，`cmp_mask_mode`支持0和3，`ori_win_left`和`ori_win_right`支持-1或非负数，-1表示对应方向不受限。
   - `rope_head_dim`仅支持64。
   - `layout_q`和`layout_kv`组合仅支持"BSND"/"BSND"、"TND"/"TND"、"BSND"/"PA_BBND"、"TND"/"PA_BBND"；非PA_BBND场景下`layout_q`和`layout_kv`必须一致；PA_BBND场景下`block_size`支持1到1024。
-  - `ori_topk_length`和`cmp_topk_length`为预留输入，全平台均不支持传入非空Tensor。
 - 当`layout_q`为TND时，功能使用限制如下：
-  - `q`的shape需要为[Q\_T, Q\_N, D]。
-  - `ori_sparse_indices`当前暂不支持。
-  - `cmp_sparse_indices`的shape需要为[Q\_T, KV\_N, K2]，其中K2为对`cmp_kv`一次离散选取的token数。
-  - `cu_seqlens_q`必须传入，输入维度为B+1，大小为参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须>=前一个元素的值且首元素必须为0。
+  - `q`的shape需要为[q_t, q_n, q_d]。
+  - `ori_sparse_indices`的shape需要为[q_t, kv_n, ori_kv_k]。
+  - `cmp_sparse_indices`的shape需要为[q_t, kv_n, cmp_kv_k]。
+  - `cu_seqlens_q`必须传入，输入维度为b+1，每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须>=前一个元素的值且首元素必须为0。
 - 当`layout_q`为BSND时，功能使用限制如下：
-  - `q`的shape需要为[B, Q\_S, Q\_N, D]。
-  - `ori_sparse_indices`当前暂不支持。
-  - `cmp_sparse_indices`的shape需要为[B, Q\_S, KV\_N, K2]，其中K2为对`cmp_kv`一次离散选取的token数。
+  - `q`的shape需要为[b, q_s, q_n, q_d]。
+  - `cmp_sparse_indices`的shape需要为[b, q_s, kv_n, ori_kv_k]。
+  - `cmp_sparse_indices`的shape需要为[b, q_s, kv_n, cmp_kv_k]。
 - PageAttention场景下，功能使用限制如下：
-  - `ori_kv`和`cmp_kv`的shape分别为[ori\_block\_num, ori\_block\_size, KV\_N, D]和[cmp\_block\_num, cmp\_block\_size, KV\_N, D]，其中ori\_block\_num和cmp\_block\_num为PageAttention时block总数，ori\_block\_size和cmp\_block\_size为一个block的token数，ori\_block\_size和cmp\_block\_size取值为1到1024，KV_N仅支持1。
-  - `ori_block_table`和`cmp_block_table`的shape为2维，其中第一维长度为B，第二维长度不小于所有batch中最大的S2和S3对应的block数量，即S2\_max / block\_size和S3\_max / block\_size向上取整。
+  - `ori_kv`和`cmp_kv`的shape分别为[ori_kv_block_nums, ori_kv_block_size, kv_n, kv_d]和[cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d]，其中ori_kv_block_nums和cmp_kv_block_nums为PagedAttention场景下的block数量，ori_kv_block_size和cmp_kv_block_size为一个block的token数，取值为1到1024。
+  - `ori_block_table`和`cmp_block_table`的shape为2维，其中第一维长度为b，第二维长度不小于所有batch中最大的ori_kv_s和cmp_kv_s对应的block数量，即ori_kv_s_max / ori_kv_block_size和cmp_kv_s_max / cmp_kv_block_size向上取整。
 - `metadata`为算子实际需要使用的分核结果，目前该参数必传，shape大小固定为[1024]。
 - `layout_kv`支持输入"BSND"、"TND"和"PA_BBND"，需满足上述`layout_q`和`layout_kv`组合约束。
   - 当输入为PA_BBND时，`seqused_ori_kv`和`ori_block_table`必须传入；当输入为BSND时，`seqused_ori_kv`可用于表达每个batch的`ori_kv`有效长度；当输入为TND时，`ori_kv`有效长度由`cu_seqlens_ori_kv`表达。
-  - 当输入为BSND时，`ori_kv`和`cmp_kv`的layout都必须为BSND，ori_kv的shape为[B, S2, KV\_N, D]，cmp_kv的shape为[B, S3, KV\_N, D]。
+  - 当输入为BSND时，`ori_kv`和`cmp_kv`的layout都必须为BSND，ori_kv的shape为[b, ori_kv_s, kv_n, kv_d]，cmp_kv的shape为[b, cmp_kv_s, kv_n, kv_d]。
   - 当输入为TND时，`cu_seqlens_ori_kv`必须传入；若存在`cmp_kv`，`cu_seqlens_cmp_kv`也必须传入。
 - `return_softmax_lse`为False时返回占位Tensor；为True时返回softmax的log-sum-exp结果。
 - 除`ori_topk_length`和`cmp_topk_length`等预留输入可不传或传入空Tensor外，其余已传入Tensor不支持为空。
 - `seqused_cmp_kv`为所有`layout_kv`下的可选输入，显式传入时用于覆盖cmp侧逻辑有效长度；未传时由`cmp_kv` shape、`cu_seqlens_cmp_kv`或PA block table相关语义推导。
 - `cmp_residual_kv`为算子的可选入参；传入后用于按`cmp_len * cmp_ratio + residual`恢复cmp侧mask使用的压缩前KV长度，其中`cmp_len`优先来自显式传入的`seqused_cmp_kv`。
-- `q`、`ori_kv`、`cmp_kv`数据排布格式支持从多种维度解读，B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Hidden-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
-- Q\_S表示q shape中的S，S2表示ori_kv shape中的S，S3表示cmp_kv shape中的S；Q\_N表示num\_q\_heads，KV\_N表示num\_ori_kv\_heads和num\_cmp_kv\_heads；Q\_T表示q shape中的输入样本序列长度的累加和。
 
 ## 调用说明
 

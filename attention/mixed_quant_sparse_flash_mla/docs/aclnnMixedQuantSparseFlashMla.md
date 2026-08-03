@@ -25,15 +25,18 @@
 
 - 接口功能：
 
-  `aclnnMixedQuantSparseFlashMla`算子实现基于共享KV（Key=Value）的稀疏注意力计算，支持SWA（Sliding Window Attention）、CSA（Compressed Sparse Attention）、HCA（Heavily Compressed Attention）三类Attention计算场景。与`SparseFlashMla`的区别在于，本算子支持KV的per-token-group量化输入。该算子适用于大语言模型推理场景，通过滑动窗口和KV压缩机制大幅降低长序列注意力计算的开销。调用时需要使用`aclnnMixedQuantSparseFlashMlaMetadata`生成的任务列表`metadata`。
+  `aclnnMixedQuantSparseFlashMla`算子旨在完成量化和稀疏场景下的MLA（Multi-head Latent Attention）注意力计算。该接口支持以下三类计算模式：
+  - **SWA（Sliding Window Attention）**：仅传入`oriKvOptional`，对原始KV做滑动窗口注意力。
+  - **CSA（Compressed Sparse Attention）**：同时传入`oriKvOptional`、`cmpKvOptional`和`cmpSparseIndicesOptional`，对原始KV窗口和topK选择出的压缩KV共同做注意力。
+  - **HCA（Heavily Compressed Attention）**：同时传入`oriKvOptional`和`cmpKvOptional`，对原始KV窗口和连续压缩KV段共同做注意力。
+
+  `aclnnMixedQuantSparseFlashMlaMetadata`是`aclnnMixedQuantSparseFlashMla`的分核信息，在主算子执行前生成。当前版本主算子必须传入该metadata。典型调用流程如下：
 
   **该算子不建议单独使用，建议与aclnnMixedQuantSparseFlashMlaMetadata算子配合使用，形成完整的工作流。**
 
-  典型调用流程如下：
-
-  1. 准备`q`、`ori_kv`、`cmp_kv`、序列长度、`block table`、`sinks`等输入。
-  2. 调用`aclnnMixedQuantSparseFlashMlaMetadata`生成`metadata`。
-  3. 调用`aclnnMixedQuantSparseFlashMla`，将上一步得到的`metadata`传入主算子。
+  1. 根据调用场景准备对应输入。
+  2. 调用`aclnnMixedQuantSparseFlashMlaMetadata`生成`metadata`，作为`aclnnMixedQuantSparseFlashMla`的入参。
+  3. 调用`aclnnMixedQuantSparseFlashMla`，生成计算结果。
 
 - 计算公式：
 
@@ -43,55 +46,55 @@
 
   其中$\tilde{K} = \tilde{V}$（共享KV），$\tilde{K}$由滑动窗口内的原始KV和因果边界内的压缩KV拼接而成，具体参与计算的KV范围由模板模式和mask参数决定：
 
-  - 滑动窗口部分（oriKv）：对第$i_{S1}$个Query token，其因果对角线位置为$\text{ori\_threshold} = S2_{act} - S1_{act} + i_{S1} + 1$，窗口范围为$[\max(\text{ori\_threshold} - \text{ori\_win\_left} - 1, 0), \text{ori\_threshold} + \text{ori\_win\_right})$。
+  - 滑动窗口部分（oriKv）：对第$i_{S1}$个Query token，其因果对角线位置为$\text{oriThreshold} = S2_{act} - S1_{act} + i_{S1} + 1$，窗口范围为$[\max(\text{oriThreshold} - \text{oriWinLeft} - 1, 0), \text{oriThreshold} + \text{oriWinRight})$。
 
-  - 压缩KV部分（cmpKv）：因果边界阈值为$\text{cmp\_threshold} = \lfloor \frac{\text{ori\_threshold}}{\text{cmp\_ratio}} \rfloor$。HCA场景取$[0, \text{cmp\_threshold})$内的连续压缩KV；CSA场景通过TopK索引从压缩KV中按需收集，仅保留$\text{begin\_idx} < \text{cmp\_threshold}$的块。
+  - 压缩KV部分（cmpKv）：因果边界阈值为$\text{cmpThreshold} = \lfloor \frac{\text{oriThreshold}}{\text{cmpRatio}} \rfloor$。HCA场景取$[0, \text{cmpThreshold})$内的连续压缩KV；CSA场景通过TopK索引从压缩KV中按需收集，仅保留$\text{beginIdx} < \text{cmpThreshold}$的块。
 
   注意力计算采用Online Softmax（Flash Attention V2），S2方向按512分块循环，sinks作为每行softmax的初始最大值：
 
   $$
-  \text{row\_max}^{(0)} = \text{sinks}[g], \quad \text{row\_sum}^{(0)} = 1.0, \quad O^{(0)} = 0
+  \text{rowMax}^{(0)} = \text{sinks}[g], \quad \text{rowSum}^{(0)} = 1.0, \quad O^{(0)} = 0
   $$
 
   $$
-  S^{(t)} = Q \cdot K_{tile}^{(t)T} \cdot \text{softmax\_scale}
+  S^{(t)} = Q \cdot K_{tile}^{(t)T} \cdot \text{softmaxScale}
   $$
 
   $$
-  \text{row\_max}^{(t+1)} = \max(\text{row\_max}^{(t)}, \max(S^{(t)}, \text{dim}=-1))
+  \text{rowMax}^{(t+1)} = \max(\text{rowMax}^{(t)}, \max(S^{(t)}, \text{dim}=-1))
   $$
 
   $$
-  \text{row\_sum}^{(t+1)} = \exp(\text{row\_max}^{(t)} - \text{row\_max}^{(t+1)}) \cdot \text{row\_sum}^{(t)} + \sum \exp(S^{(t)} - \text{row\_max}^{(t+1)})
+  \text{rowSum}^{(t+1)} = \exp(\text{rowMax}^{(t)} - \text{rowMax}^{(t+1)}) \cdot \text{rowSum}^{(t)} + \sum \exp(S^{(t)} - \text{rowMax}^{(t+1)})
   $$
 
   $$
-  O^{(t+1)} = \exp(\text{row\_max}^{(t)} - \text{row\_max}^{(t+1)}) \cdot O^{(t)} + \exp(S^{(t)} - \text{row\_max}^{(t+1)}) \cdot V_{tile}^{(t)}
+  O^{(t+1)} = \exp(\text{rowMax}^{(t)} - \text{rowMax}^{(t+1)}) \cdot O^{(t)} + \exp(S^{(t)} - \text{rowMax}^{(t+1)}) \cdot V_{tile}^{(t)}
   $$
 
   $$
-  O_{final} = O^{(T_{s2})} / \text{row\_sum}^{(T_{s2})}
+  O_{final} = O^{(T_{s2})} / \text{rowSum}^{(T_{s2})}
   $$
 
 - 符号说明
 
   | 符号                | 含义                                                      |
   | ------------------- | --------------------------------------------------------- |
-  | Q                   | Query输入，形状为[G, D]（单行）                           |
-  | K_tile_t            | 第t个S2分块的KV数据，K=V（共享KV）                         |
-  | S_t                 | 第t个分块的QK缩放注意力分数                                |
-  | P_t                 | 第t个分块的softmax概率                                     |
-  | O_t                 | 第t个分块后的累加输出                                      |
-  | softmax_scale       | 缩放系数，通常取每个注意力头维度的倒数平方根                |
-  | B                   | Batch Size                                                |
-  | S1/S1_act           | Query序列长度/实际有效长度                                 |
-  | S2/S2_act           | 原始KV序列长度/实际有效长度                                |
-  | N1                  | Query头数                                                 |
-  | N2                  | KV头数                                                    |
-  | G                   | GQA分组比，G=N1/N2                                        |
-  | D                   | 每个注意力头的维度                                        |
-  | sinks               | 注意力汇点，形状为[N1]                                    |
-  | cmp_ratio           | cmpKv的压缩倍率，用于换算cmp侧mask的压缩前KV长度            |
+  | $Q$                 | Query输入，形状为[G, D]（单行）                           |
+  | $K_{tile}^{t}$      | 第t个S2分块的KV数据，K=V（共享KV）                         |
+  | $S_t$               | 第t个分块的QK缩放注意力分数                                |
+  | $P_t$               | 第t个分块的softmax概率                                     |
+  | $O_t$               | 第t个分块后的累加输出                                      |
+  | $softmaxScale$      | 缩放系数，通常取每个注意力头维度的倒数平方根                |
+  | $B$                 | Batch Size                                                |
+  | $S1$/$S1_{act}$     | Query序列长度/实际有效长度                                 |
+  | $S2$/$S2_{act}$     | 原始KV序列长度/实际有效长度                                |
+  | $N1$                | Query头数                                                 |
+  | $N2$                | KV头数                                                    |
+  | $G$                 | GQA分组比，$G=N1/N2$                                      |
+  | $D$                 | 每个注意力头的维度                                        |
+  | $sinks$             | 注意力汇点，形状为[N1]                                    |
+  | $cmpRatio$          | cmpKv的压缩倍率，用于换算cmp侧mask的压缩前KV长度            |
 
 ## 函数原型
 
@@ -178,8 +181,8 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>ND</td>
       <td>
         <ul>
-          <li>layoutQ为BSND时：(B, S1, N1, D)</li>
-          <li>layoutQ为TND时：(T1, N1, D)</li>
+          <li>layoutQ为BSND时：(b, qS, qN, qD)</li>
+          <li>layoutQ为TND时：(qT, qN, qD)</li>
         </ul>
       </td>
       <td>√</td>
@@ -193,11 +196,11 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>ND</td>
       <td>
         <ul>
-          <li>layoutKv为PA_BBND时：(ori_block_num, ori_block_size, N2, D_KV)，ori_block_size支持1到1024</li>
-          <li>layoutKv为BSND时：(B, S2, N2, D_KV)</li>
-          <li>layoutKv为TND时：(T2, N2, D_KV)</li>
+          <li>layoutKv为PA_BBND时：(oriKvBlockNums, oriKvBlockSize, kvN, kvD)，oriKvBlockSize支持1到1024</li>
+          <li>layoutKv为BSND时：(b, oriKvS, kvN, kvD)</li>
+          <li>layoutKv为TND时：(oriKvT, kvN, kvD)</li>
         </ul>
-        N2仅支持1，D_KV由quantMode决定。
+        kvN仅支持1，kvD由quantMode决定。
       </td>
       <td>√</td>
     </tr>
@@ -210,11 +213,11 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>ND</td>
       <td>
         <ul>
-          <li>layoutKv为PA_BBND时：(cmp_block_num, cmp_block_size, N2, D_KV)，cmp_block_size支持1到1024</li>
-          <li>layoutKv为BSND时：(B, S3, N2, D_KV)</li>
-          <li>layoutKv为TND时：(T3, N2, D_KV)</li>
+          <li>layoutKv为PA_BBND时：(cmpKvBlockNums, cmpKvBlockSize, kvN, kvD)，cmpKvBlockSize支持1到1024</li>
+          <li>layoutKv为BSND时：(b, cmpKvS, kvN, kvD)</li>
+          <li>layoutKv为TND时：(cmpKvT, kvN, kvD)</li>
         </ul>
-        N2仅支持1，D_KV由quantMode决定。
+        kvN仅支持1，kvD由quantMode决定。
       </td>
       <td>√</td>
     </tr>
@@ -222,25 +225,31 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>oriSparseIndicesOptional（aclTensor*）</td>
       <td>输入</td>
       <td>代表离散取oriKvCache的索引。</td>
-      <td>当前暂不支持，必须传入nullptr。</td>
+      <td>可选输入，无效位置填-1，其余为非负整数。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>-</td>
+      <td>
+        <ul>
+          <li>layoutQ为BSND时：(b, qS, kvN, oriKvK)</li>
+          <li>layoutQ为TND时：(qT, kvN, oriKvK)</li>
+        </ul>
+        其中oriKvK为对oriKvOptional的TopK稀疏选择数，范围支持大于0。
+      </td>
       <td>√</td>
     </tr>
     <tr>
       <td>cmpSparseIndicesOptional（aclTensor*）</td>
       <td>输入</td>
       <td>代表离散取cmpKvCache的TopK索引。</td>
-      <td>CSA场景必须传入，SWA/HCA场景不传入。</td>
+      <td>CSA场景必须传入，SWA/HCA场景不传入。无效位置填-1，其余为非负整数。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>
         <ul>
-          <li>layoutQ为BSND时：(B, S1, N2, K2)</li>
-          <li>layoutQ为TND时：(T1, N2, K2)</li>
+          <li>layoutQ为BSND时：(b, qS, kvN, cmpKvK)</li>
+          <li>layoutQ为TND时：(qT, kvN, cmpKvK)</li>
         </ul>
-        其中K2为cmpKv的TopK稀疏选择数。
+        其中cmpKvK为对cmpKvOptional的TopK稀疏选择数，范围支持大于0。
       </td>
       <td>√</td>
     </tr>
@@ -251,7 +260,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>layoutKv为PA_BBND时必须传入。第二维长度不小于所有batch中最大的S2对应的block数量。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B, ori_max_block_num_per_batch)</td>
+      <td>(b, Ceil(oriKvSMax/oriKvBlockSize))</td>
       <td>√</td>
     </tr>
     <tr>
@@ -261,7 +270,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>CSA/HCA场景且layoutKv为PA_BBND时必须传入。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B, cmp_max_block_num_per_batch)</td>
+      <td>(b, Ceil(cmpKvSMax/cmpKvBlockSize))</td>
       <td>√</td>
     </tr>
     <tr>
@@ -271,7 +280,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>layoutQOptional为TND时必须传入。每个元素表示当前batch与之前所有batch的token数总和。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B+1,)</td>
+      <td>(b+1,)</td>
       <td>√</td>
     </tr>
     <tr>
@@ -281,7 +290,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>layoutKvOptional为TND时必须传入。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B+1,)</td>
+      <td>(b+1,)</td>
       <td>√</td>
     </tr>
     <tr>
@@ -291,7 +300,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>layoutKvOptional为TND且存在cmpKvOptional时必须传入。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B+1,)</td>
+      <td>(b+1,)</td>
       <td>√</td>
     </tr>
     <tr>
@@ -301,7 +310,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>当前暂不支持指定该参数。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B,)</td>
+      <td>(b,)</td>
       <td>√</td>
     </tr>
     <tr>
@@ -311,7 +320,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>layoutKvOptional为PA_BBND时必须传入；layoutKvOptional为BSND时可选传入，用于指定每个batch的oriKv有效长度；layoutKvOptional为TND时使用cuSeqlensOriKvOptional表达序列边界。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B,)</td>
+      <td>(b,)</td>
       <td>√</td>
     </tr>
     <tr>
@@ -321,7 +330,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>可选输入。传入时shape必须为(B,)，作为每个batch的cmp逻辑有效长度，优先于cmpKvOptional shape、cuSeqlensCmpKvOptional或PA block table推导；layoutKvOptional为BSND、TND、PA_BBND时均可使用。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B,)</td>
+      <td>(b,)</td>
       <td>√</td>
     </tr>
     <tr>
@@ -331,43 +340,53 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>可选输入。传入时shape必须为(B,)，第b个batch按cmp_len * cmpRatio + cmpResidualKvOptional[b]恢复压缩前KV长度；在CSA/HCA、cmpRatio不等于1且cmpMaskMode为3场景必传。该参数是主算子和aclnnMixedQuantSparseFlashMlaMetadata的可选入参，layoutKvOptional为BSND、TND、PA_BBND时均可使用。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B,)</td>
+      <td>(b,)</td>
       <td>√</td>
     </tr>
     <tr>
       <td>oriTopkLengthOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>预留输入，当前版本不支持传入非空Tensor。</td>
-      <td>必须传入nullptr或空Tensor；传入非空Tensor会返回参数错误。</td>
+      <td>用于标识oriSparseIndicesOptional实际参与计算的长度。</td>
+      <td>oriMaskMode=0且传入oriSparseIndicesOptional时必传；其他场景不支持传入。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>-</td>
+      <td>
+        <ul>
+          <li>layoutQ为BSND时：(b, qS, kvN)</li>
+          <li>layoutQ为TND时：(qT, kvN)</li>
+        </ul>
+      </td>
       <td>√</td>
     </tr>
     <tr>
       <td>cmpTopkLengthOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>预留输入，当前版本不支持传入非空Tensor。</td>
-      <td>必须传入nullptr或空Tensor；传入非空Tensor会返回参数错误。</td>
+      <td>用于标识cmpSparseIndicesOptional实际参与计算的长度。</td>
+      <td>cmpMaskMode=0且传入cmpSparseIndicesOptional时必传；其他场景不支持传入。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>-</td>
+      <td>
+        <ul>
+          <li>layoutQ为BSND时：(b, qS, kvN)</li>
+          <li>layoutQ为TND时：(qT, kvN)</li>
+        </ul>
+      </td>
       <td>√</td>
     </tr>
     <tr>
       <td>sinksOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>注意力汇点tensor，作为每行softmax的初始最大值。</td>
+      <td>表示各注意力头设置独立可学习虚拟偏移项，用于维持长文本推理时的稳定性。</td>
       <td>必须传入。</td>
       <td>FLOAT32</td>
       <td>ND</td>
-      <td>(N1,)</td>
+      <td>(qN,)</td>
       <td>√</td>
     </tr>
     <tr>
       <td>metadataOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>AICPU算子aclnnMixedQuantSparseFlashMlaMetadata的分核结果。</td>
+      <td>AICPU算子aclnnMixedQuantSparseFlashMlaMetadata的分核信息。</td>
       <td>必须传入。由aclnnMixedQuantSparseFlashMlaMetadata算子生成。</td>
       <td>INT32</td>
       <td>ND</td>
@@ -378,7 +397,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>quantMode（int64_t）</td>
       <td>输入</td>
       <td>表示量化模式。</td>
-      <td>量化模式1表示K、V nope为per-token-group量化，scale类型为bfloat16，量化模式2表示K、V nope为per-token-group量化，scale类型为FLOAT8_E8M0。当前仅支持1和2。</td>
+      <td>表示量化模式。量化模式1表示K、V nope为per-token-group量化，scale类型为bfloat16，量化模式2表示K、V nope为per-token-group量化，scale类型为FLOAT8_E8M0。当前仅支持1和2，量化模式2仅支持layout_kv为PA_BBND。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -408,7 +427,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>cmpRatio（int64_t）</td>
       <td>输入</td>
       <td>cmpKv相对于压缩前KV长度的压缩倍率，用于恢复cmp侧mask使用的压缩前KV长度。</td>
-      <td>支持1到128。</td>
+      <td>cmpRatio支持1到128。在SWA典型场景，仅支持默认值1。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -418,7 +437,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>oriMaskMode（int64_t）</td>
       <td>输入</td>
       <td>q和oriKv计算的mask模式。</td>
-      <td>仅支持4: Band模式。</td>
+      <td>支持：<br/>0: No mask。<br/>3: rightDownCausal模式。<br/>4: sliding window模式。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -428,7 +447,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>cmpMaskMode（int64_t）</td>
       <td>输入</td>
       <td>q和cmpKv计算的mask模式。</td>
-      <td>仅支持3: RightDownCausal模式。SWA场景下该参数不生效。</td>
+      <td>支持：<br/>0: No mask。<br/>3: rightDownCausal模式。SWA场景下该参数不生效。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -437,8 +456,8 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
     <tr>
       <td>oriWinLeft（int64_t）</td>
       <td>输入</td>
-      <td>q和oriKv计算中，在因果边界基础上向左多看的token数。</td>
-      <td>支持-1或非负数，-1表示左侧窗口不受限。</td>
+      <td>表示q和oriKvOptional计算中q对历史token计算的数量。</td>
+      <td>支持-1或非负数，-1表示无穷大，即全部参与运算。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -447,8 +466,8 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
     <tr>
       <td>oriWinRight（int64_t）</td>
       <td>输入</td>
-      <td>q和oriKv计算中，在因果边界基础上向右多看的token数。</td>
-      <td>支持-1或非负数，-1表示右侧窗口不受限。</td>
+      <td>表示q和oriKvOptional计算中q对未来token计算的数量。</td>
+      <td>支持-1或非负数，-1表示无穷大，即全部参与运算。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -513,8 +532,8 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>ND</td>
       <td>
         <ul>
-          <li>layoutQ为BSND时：(B, N2, S1, N1/N2)</li>
-          <li>layoutQ为TND时：(N2, T1, N1/N2)</li>
+          <li>layoutQ为BSND时：(b, kvN, qS, qN/kvN)</li>
+          <li>layoutQ为TND时：(kvN, qT, qN/kvN)</li>
           <li>returnSoftmaxLse为false时：占位Tensor</li>
         </ul>
       </td>
@@ -543,10 +562,31 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
   </tbody>
   </table>
 
-  <!-- npu="950" id7 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：N1/N2支持2、4、8、16、32、64、128，不支持1。
+  - <term>Ascend 950PR/Ascend 950DT</term>：qN/kvN支持2、4、8、16、32、64、128，不支持1。
 
-  <!-- end id7 -->
+- **常见字段释义**
+
+|    命名    |                            含义                            |
+| :---------: | :---------------------------------------------------------: |
+|      b      |      输入样本batch大小                |
+|     qS     |      输入q的序列长度      |
+|    oriKvS    |  输入oriKvOptional的序列长度  |
+|    cmpKvS    |  输入cmpKvOptional的序列长度  |
+|     qN     |        输入q的头数        |
+|    kvN    |    输入oriKvOptional/cmpKvOptional的头数    |
+|      qD      |          输入q的注意力头的维度         |
+|      kvD      |          输入oriKvOptional/cmpKvOptional的注意力头的维度         |
+|     qT     |          输入q所有batch序列长度的累加和          |
+|     oriKvT    |          输入oriKvOptional所有batch序列长度的累加和          |
+|     cmpKvT    |          输入cmpKvOptional所有batch序列长度的累加和          |
+|      oriKvK      |           输入oriSparseIndicesOptional中topK选出的token个数         |
+|      cmpKvK      |           输入cmpSparseIndicesOptional中topK选出的token个数         |
+|      oriKvSMax      |           输入oriKvOptional的最大序列长度         |
+|      cmpKvSMax      |           输入cmpKvOptional的最大序列长度         |
+|      oriKvBlockSize      |           输入oriKvOptional在PagedAttention场景下的block大小         |
+|      cmpKvBlockSize      |           输入cmpKvOptional在PagedAttention场景下的block大小         |
+|      oriKvBlockNums      |           输入oriKvOptional在PagedAttention场景下的block数量         |
+|      cmpKvBlockNums      |           输入cmpKvOptional在PagedAttention场景下的block数量         |
 
 - **返回值**
 
@@ -573,30 +613,9 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>传入参数是必选输入、输出或者必选属性，且是空指针。</td>
     </tr>
     <tr>
-      <td rowspan="8">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="8">161002</td>
-      <td>输入变量的数据类型和数据格式不在支持的范围内。</td>
-    </tr>
-    <tr>
-      <td>N1不在[2,4,8,16,32,64,128]范围内，或N2不为1。</td>
-    </tr>
-    <tr>
-      <td>D不为512。</td>
-    </tr>
-    <tr>
-      <td>quantMode不为1或2。</td>
-    </tr>
-    <tr>
-      <td>oriMaskMode不为4且不为3，或cmpMaskMode不为3。</td>
-    </tr>
-    <tr>
-      <td>oriWinLeft或oriWinRight小于-1。</td>
-    </tr>
-    <tr>
-      <td>SWA场景cmpRatio不为1，或cmpRatio与CSA/HCA场景不匹配。</td>
-    </tr>
-    <tr>
-      <td>layoutQOptional、layoutKvOptional、topkValueMode、cmpSparseIndicesOptional、metadataOptional、sinksOptional、cuSeqlens或seqused相关参数规格不在支持范围内。</td>
+      <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="1">161002</td>
+      <td>输入变量的数据类型、数据格式、属性值不在支持的范围内。</td>
     </tr>
   </tbody>
   </table>
@@ -652,31 +671,763 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
 
 - 使用约束
 
-  - 本算子仅支持推理场景。
-  - 除`oriTopkLengthOptional`和`cmpTopkLengthOptional`等预留输入可传入nullptr或空Tensor外，其余已传入Tensor不支持为空。
-  - `metadataOptional`参数必须传入，由`aclnnMixedQuantSparseFlashMlaMetadata`算子生成，shape固定为(1024,)。
-  - `cmpResidualKvOptional`为主算子和`aclnnMixedQuantSparseFlashMlaMetadata`的可选入参；传入后用于按`cmp_len * cmpRatio + residual`恢复cmp侧mask使用的压缩前长度。
-  - `ropeHeadDim`仅支持64。
-  - `oriMaskMode`支持4和3，`cmpMaskMode`仅支持3，`oriWinLeft`和`oriWinRight`支持-1或非负数，-1表示对应方向不受限。
+  - 参数cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional、sequsedQOptional、sequsedOriKvOptional、sequsedCmpKvOptional、cmpResidualKvOptional、oriBlockTableOptional、cmpBlockTableOptional等输入属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+  - aclnnMixedQuantSparseFlashMlaMetadata和aclnnMixedQuantSparseFlashMla的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由用户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+  - oriTopkLengthOptional、cmpTopkLengthOptional表示ori/cmp sparseIndices实际参与计算的长度。其值不能大于sparseIndicesOptional的最后一维大小，且当sequsedQOptional传入时，topkLength对应有效部分的值需要大于等于0。
+  - 当oriMaskMode/cmpMaskMode为0时，oriKvK/cmpKvK需要大于等于oriTopkLengthOptional/cmpTopkLengthOptional的最大值。
+  - cmpResidualKvOptional配合cmpRatio使用，可恢复压缩前KV长度。且每个batch的值需要小于cmpRatio。
+  - attnOutOut：tensor类型，公式中的输出，数据类型支持BFLOAT16。数据格式支持ND。限制：该输出参数的shape与入参q的shape保持一致，dtype与q一致。
+  - returnSoftmaxLse=False时返回shape为[1]的值为0的tensor；returnSoftmaxLse=True时返回FLOAT32的log-sum-exp结果。
+  - cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。
+  - 当layoutKv为PA_BBND时，oriKvOptional和cmpKvOptional支持0轴非连续。
+  - 各参数shape中以相同符号表示的维度，其对应轴的实际数值需保持一致。
 
-- 三种Attention场景输入要求
+### 特性参数组
 
-  | 场景 | oriKvOptional | cmpKvOptional | cmpSparseIndicesOptional | 说明 |
-  | :--- | :----- | :----- | :----------------- | :--- |
-  | SWA   | 必须传入 | 不传入 | 不传入 | 仅滑动窗口注意力 |
-  | CSA   | 必须传入 | 必须传入 | 必须传入 | 滑动窗口 + TopK稀疏压缩KV |
-  | HCA | 必须传入 | 必须传入 | 不传入 | 滑动窗口 + 稠密压缩KV |
+|      特性参数组      |     参数字段名称     |
+| :-------------------: | :-------------------: |
+|      公共参数组      | q、quantMode、oriKvOptional、cmpKvOptional、metadataOptional、ropeHeadDim、softmaxScale、layoutQ、layoutKv、attnOutOut |
+|      Mask参数组      | oriMaskMode、cmpMaskMode、oriWinLeft、oriWinRight |
+|   SeqLens参数组   | cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional、sequsedQOptional、sequsedOriKvOptional、sequsedCmpKvOptional |
+|   稀疏压缩参数组    | cmpRatio、cmpResidualKvOptional、oriSparseIndicesOptional、cmpSparseIndicesOptional、oriTopkLengthOptional、cmpTopkLengthOptional、topkValueMode |
+| Paged Attention参数组 | oriBlockTableOptional、cmpBlockTableOptional |
+|   Sinks参数组   | sinksOptional |
+|   SoftmaxLse参数组   | returnSoftmaxLse、softmaxLseOutOptional |
 
-- `cmpRatio`约束：SWA场景仅支持1。
+### 计算模式说明
 
-- Layout约束
+|    命名    |    典型场景需传入参数    |    全稀疏场景需传入参数    |
+| :---------: | :--------------------------------: | :---------------------------: |
+|      SWA      | oriKvOptional | oriKvOptional、oriSparseIndicesOptional |
+|      HCA      | oriKvOptional、cmpKvOptional|-|
+|      CSA      | oriKvOptional、cmpKvOptional、cmpSparseIndicesOptional| oriKvOptional、oriSparseIndicesOptional、cmpKvOptional、cmpSparseIndicesOptional|
 
-  - `layoutQOptional`和`layoutKvOptional`组合仅支持"BSND"/"BSND"、"TND"/"TND"、"BSND"/"PA_BBND"、"TND"/"PA_BBND"；非PA_BBND场景下`layoutQOptional`和`layoutKvOptional`必须一致。
-  - 当`layoutQOptional`为TND时，`cuSeqlensQOptional`必须传入。
-  - 当`layoutKvOptional`为PA_BBND时，`sequsedOriKvOptional`必须传入，`oriBlockTableOptional`必须传入。BSND场景可选传入`sequsedOriKvOptional`覆盖每个batch的oriKv有效长度；TND场景使用`cuSeqlensOriKvOptional`表达oriKv序列边界。
-  - 当`layoutKvOptional`为TND时，`cuSeqlensOriKvOptional`必须传入。
-  - 当`layoutKvOptional`为TND且存在`cmpKvOptional`时，`cuSeqlensCmpKvOptional`必须传入。
-  - `sequsedCmpKvOptional`为所有layoutKvOptional下的可选输入，显式传入时用于覆盖cmp侧逻辑有效长度。
+### 参数组约束
+
+#### 公共参数组
+
+- 入参为空的场景处理：
+    - 空tensor指必选输入、某调用场景下必传输入和输出的shape size为0，即有任意轴为0。
+    - 触发空tensor的用例将全部拦截报错。
+
+- q、oriKvOptional、cmpKvOptional、attnOutOut校验
+
+<table style="undefined;table-layout: fixed; width:1625px"><colgroup>
+<col style="width: 147px">
+<col style="width: 232px">
+<col style="width: 232px">
+<col style="width: 293px">
+<col style="width: 185px">
+</colgroup>
+<thead>
+<tr>
+    <th>参数</th>
+    <th>单参数校验</th>
+    <th>存在性校验</th>
+    <th>一致性校验</th>
+    <th>特性交叉校验</th>
+</tr>
+</thead>
+<tbody>
+    <tr>
+        <td>q</td>
+        <td>
+            <ul>
+                <li>dtype支持BFLOAT16</li>
+                <li>layoutQ为BSND时，q的shape为(b, qS, qN, qD)</li>
+                <li>layoutQ为TND时，q的shape为(qT, qN, qD)</li>
+            </ul>
+        </td>
+        <td>
+            必须传入
+        </td>
+        <td rowspan="4">
+            <ul>
+                <li>q、attnOutOut的dtype、shape需相同</li>
+                <li>若cmpKvOptional传入，oriKvOptional与cmpKvOptional的dtype需一致</li>
+                <li>layoutKv不为PA_BBND时，layoutQ和layoutKv需保持一致</li>
+                <li>layoutKv为PA_BBND时，layoutQ可为BSND或TND</li>
+            </ul>
+        </td>
+        <td rowspan="4">
+            轴校验：
+            <ul>
+                <li>b > 0</li>
+                <li>qS > 0</li>
+                <li>0 < qN <= 128</li>
+                <li>qD = 512</li>
+                <li>qT > 0</li>
+                <li>oriKvS > 0</li>
+                <li>cmpKvS > 0</li>
+                <li>kvN = 1</li>
+                <li>quantMode=1时kvD=608，quantMode=2时kvD=584</li>
+                <li>oriKvT > 0</li>
+                <li>cmpKvT > 0</li>
+                <li>oriKvBlockNums > 0</li>
+                <li>cmpKvBlockNums > 0</li>
+                <li>1 <= oriKvBlockSize <= 1024</li>
+                <li>1 <= cmpKvBlockSize <= 1024</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td>oriKvOptional</td>
+        <td>
+            <ul>
+                <li>dtype支持FLOAT8_E4M3FN</li>
+                <li>layoutKv为BSND时，oriKvOptional的shape为(b, oriKvS, kvN, kvD)</li>
+                <li>layoutKv为TND时，oriKvOptional的shape为(oriKvT, kvN, kvD)</li>
+                <li>layoutKv为PA_BBND时，oriKvOptional的shape为(oriKvBlockNums, oriKvBlockSize, kvN, kvD)</li>
+            </ul>
+        </td>
+        <td>
+            当前版本必传
+        </td>
+    </tr>
+    <tr>
+        <td>attnOutOut</td>
+        <td>
+            <ul>
+                <li>dtype支持BFLOAT16</li>
+                <li>layoutQ为BSND时，attnOutOut的shape为(b, qS, qN, qD)</li>
+                <li>layoutQ为TND时，attnOutOut的shape为(qT, qN, qD)</li>
+            </ul>
+        </td>
+        <td>
+            必须传入
+        </td>
+    </tr>
+    <tr>
+        <td>cmpKvOptional</td>
+        <td>
+            <ul>
+                <li>dtype支持FLOAT8_E4M3FN</li>
+                <li>layoutKv为BSND时，cmpKvOptional的shape为(b, cmpKvS, kvN, kvD)</li>
+                <li>layoutKv为TND时，cmpKvOptional的shape为(cmpKvT, kvN, kvD)</li>
+                <li>layoutKv为PA_BBND时，cmpKvOptional的shape为(cmpKvBlockNums, cmpKvBlockSize, kvN, kvD)</li>
+            </ul>
+        </td>
+        <td>
+            可选输入
+        </td>
+    </tr>
+</tbody>
+</table>
+layout匹配关系表：
+<table style="undefined;table-layout: fixed; width:1625px"><colgroup>
+<col style="width: 400px">
+<col style="width: 400px">
+<col style="width: 400px">
+<col style="width: 400px">
+</colgroup>
+<thead>
+<tr>
+    <th>layoutQ</th>
+    <th>layoutKv</th>
+</tr>
+</thead>
+<tbody>
+    <tr>
+        <td>BSND</td>
+        <td>
+          <li>BSND</li>
+          <li>PA_BBND</li>
+        </td>
+    </tr>
+    <tr>
+        <td>TND</td>
+        <td>
+          <li>TND</li>
+          <li>PA_BBND</li>
+        </td>
+    </tr>
+</tbody>
+</table>
+
+metadataOptional校验
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 147px">
+        <col style="width: 232px">
+        <col style="width: 232px">
+        <col style="width: 293px">
+        <col style="width: 185px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>参数</th>
+            <th>单参数校验</th>
+            <th>存在性校验</th>
+            <th>一致性校验</th>
+            <th>特性交叉校验</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>metadataOptional</td>
+            <td>
+                <ul>
+                    <li>dtype仅支持INT32</li>
+                    <li>shape由aclnnMixedQuantSparseFlashMlaMetadata动态计算</li>
+                </ul>
+            </td>
+            <td>当前版本必传</td>
+            <td>无</td>
+            <td>传入时需与aclnnMixedQuantSparseFlashMlaMetadata生成的结果一致</td>
+        </tr>
+    </tbody>
+</table>
+
+#### Mask参数组
+
+<ul>
+    <li>oriMaskMode/cmpMaskMode=0，全计算模式（默认值）</li>
+    <li>oriMaskMode/cmpMaskMode=3，Causal模式</li>
+    <li>oriMaskMode=4，SlidingWindow模式</li>
+</ul>
+
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 147px">
+        <col style="width: 232px">
+        <col style="width: 200px">
+        <col style="width: 100px">
+        <col style="width: 200px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>参数</th>
+            <th>单参数校验</th>
+            <th>存在性校验</th>
+            <th>一致性校验</th>
+            <th>特性交叉校验</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>oriMaskMode</td>
+            <td>
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>支持输入范围仅为0、3、4，默认值为0</li>
+                </ul>
+            </td>
+            <td>
+                可选，如果不传该参数，默认值为0
+            </td>
+            <td>
+                <ul>
+                    <li>无</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                     <li>只有oriKvOptional稀疏场景下，cmpMaskMode为0和oriMaskMode必须为0</li>
+                     <li>SWA场景下，oriMaskMode为0、3、4</li>
+                 </ul>
+             </td>
+         </tr>
+         <tr>
+             <td>cmpMaskMode</td>
+             <td>
+                 <ul>
+                     <li>dtype支持INT32</li>
+                     <li>支持输入范围仅为0、3，默认值为0</li>
+                 </ul>
+             </td>
+             <td>
+                 可选，如果不传该参数，默认值为0
+             </td>
+             <td>
+                 <ul>
+                     <li>无</li>
+                 </ul>
+             </td>
+             <td>
+                     <li>当oriKvOptional/cmpKvOptional/cmpSparseIndicesOptional/oriSparseIndicesOptional传入时，cmpMaskMode为0和oriMaskMode必须为0</li>
+                    <li>当cmpKvOptional不传时，oriMaskMode为3、4</li>
+                    <li>当oriMaskMode为3时，cmpMaskMode必须为3</li>
+                    <li>当oriMaskMode为4时，cmpMaskMode必须为3</li>
+            </td>
+        </tr>
+        <tr>
+            <td>oriWinLeft/oriWinRight</td>
+            <td>
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>支持输入范围仅为-1，>=0</li>
+                </ul>
+            </td>
+            <td>
+                可选，如果不传该参数，默认值为-1
+            </td>
+            <td>
+                <ul>
+                    无
+                </ul>
+            </td>
+            <td>
+                    <li>只有oriMaskMode为4时，oriWinLeft/oriWinRight可以>=0</li>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+#### SeqLens参数组
+
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 147px">
+        <col style="width: 232px">
+        <col style="width: 232px">
+        <col style="width: 293px">
+        <col style="width: 185px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>参数</th>
+            <th>单参数校验</th>
+            <th>存在性校验</th>
+            <th>一致性校验</th>
+            <th>特性交叉校验</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>sequsedQOptional</td>
+            <td >
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>shape为(b,)</li>
+                    <li>取值仅支持非负整数</li>
+                    <li>sequsedQOptional中的值需小于等于qS</li>
+                </ul>
+            </td>
+            <td>无</td>
+            <td>无</td>
+            <td>无</td>
+        </tr>
+        <tr>
+            <td>sequsedOriKvOptional</td>
+            <td >
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>shape为(b,)</li>
+                    <li>取值仅支持非负整数</li>
+                    <li>sequsedOriKvOptional中的值需小于等于kvS</li>
+                </ul>
+            </td>
+            <td >
+                <ul>
+                    <li>当layoutKv为BSND时，可选传入</li>
+                    <li>当layoutKv为PA_BBND时，必须传入</li>
+                    <li>当oriTopkLengthOptional传入时，可以不传</li>
+                </ul>
+            </td>
+            <td>无</td>
+            <td>无</td>
+        </tr>
+        <tr>
+            <td>sequsedCmpKvOptional</td>
+            <td >
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>shape为(b,)</li>
+                    <li>取值仅支持非负整数</li>
+                    <li>sequsedCmpKvOptional中的值需小于等于kvS</li>
+                </ul>
+            </td>
+            <td >
+                <ul>
+                    <li>当layoutKv为BSND时，可选传入</li>
+                    <li>当layoutKv为PA_BBND且cmpKvOptional传入时，必须传入</li>
+                    <li>当cmpTopkLengthOptional传入时，可以不传</li>
+                </ul>
+            </td>
+            <td>无</td>
+            <td>无</td>
+        </tr>
+        <tr>
+            <td>cuSeqlensQOptional</td>
+            <td>
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>shape为(b+1,)</li>
+                    <li>取值仅支持非负整数</li>
+                    <li>其值应非递减（大于等于前一个值）排列，第一个元素为0且最后一个元素等于qT</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>当layoutQ为TND时，必须传入</li>
+                    <li>当layoutQ不为TND时，不支持传入</li>
+                </ul>
+            </td>
+            <td>无</td>
+            <td>无</td>
+        </tr>
+        <tr>
+            <td>cuSeqlensOriKvOptional</td>
+            <td>
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>shape为(b+1,)</li>
+                    <li>取值仅支持非负整数</li>
+                    <li>其值应非递减（大于等于前一个值）排列，第一个元素为0且最后一个元素等于oriKvT</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>当layoutKv为TND时，必须传入</li>
+                    <li>当layoutKv不为TND时，不支持传入</li>
+                </ul>
+            </td>
+            <td>无</td>
+            <td>无</td>
+        </tr>
+        <tr>
+            <td>cuSeqlensCmpKvOptional</td>
+            <td>
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>shape为(b+1,)</li>
+                    <li>取值仅支持非负整数</li>
+                    <li>其值应非递减（大于等于前一个值）排列，第一个元素为0且最后一个元素等于cmpKvT</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>当layoutKv为TND时，必须传入</li>
+                    <li>当layoutKv不为TND时，不支持传入</li>
+                </ul>
+            </td>
+            <td>无</td>
+            <td>无</td>
+        </tr>
+    </tbody>
+</table>
+
+#### 稀疏压缩参数组
+
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 147px">
+        <col style="width: 232px">
+        <col style="width: 232px">
+        <col style="width: 293px">
+        <col style="width: 185px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>参数</th>
+            <th>单参数校验</th>
+            <th>存在性校验</th>
+            <th>一致性校验</th>
+            <th>特性交叉校验</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>cmpRatio</td>
+            <td>
+                <ul>
+                    <li>data_type支持INT32</li>
+                    <li>表示cmpKvOptional相对于压缩前KV长度的压缩倍率，需大于0</li>
+                    <li>默认值为1</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>可选，默认值为1</li>
+                </ul>
+            </td>
+            <td>无</td>
+            <td>
+                <ul>
+                    <li>在SWA典型场景，仅支持默认值1。</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>cmpResidualKvOptional</td>
+            <td>
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>shape为(b,)</li>
+                    <li>取值仅支持非负整数</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>只有cmpKvOptional传入才校验</li>
+                    <li>可选</li>
+                    <li>当cmpMaskMode=3且cmpRatio!=1时，必传</li>
+                </ul>
+            </td>
+            <td>
+                <ul>无</ul>
+            </td>
+            <td>无</td>
+        </tr>
+        <tr>
+            <td>oriSparseIndicesOptional</td>
+            <td>
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>shape为(qT, kvN, oriKvK)或(b, qS, kvN, oriKvK)</li>
+                    <li>无效位置填-1，其余为非负整数</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>可选</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>当layoutQ为TND时，该shape为(qT, kvN, oriKvK)</li>
+                    <li>当layoutQ为BSND时，该shape为(b, qS, kvN, oriKvK)</li>
+                </ul>
+            </td>
+            <td>无</td>
+        </tr>
+        <tr>
+            <td>cmpSparseIndicesOptional</td>
+            <td>
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>shape为(qT, kvN, cmpKvK)或(b, qS, kvN, cmpKvK)</li>
+                    <li>无效位置填-1，其余为非负整数</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>只有cmpKvOptional传入才校验</li>
+                    <li>可选</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>当layoutQ为TND时，该shape为(qT, kvN, cmpKvK)</li>
+                    <li>当layoutQ为BSND时，该shape为(b, qS, kvN, cmpKvK)</li>
+                </ul>
+            </td>
+            <td>无</td>
+        </tr>
+        <tr>
+            <td>oriTopkLengthOptional</td>
+            <td>
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>shape为(b, qS, kvN)或(qT, kvN)</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>oriMaskMode=0且oriSparseIndicesOptional不为空时，必须传入</li>
+                    <li>其他场景不支持传入</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>当layoutQ为TND时，该shape为(qT, kvN)</li>
+                    <li>当layoutQ为BSND时，该shape为(b, qS, kvN)</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>当oriMaskMode不为0时，不支持传入</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>cmpTopkLengthOptional</td>
+            <td>
+                <ul>
+                    <li>dtype支持INT32</li>
+                    <li>shape为(b, qS, kvN)或(qT, kvN)</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>只有cmpKvOptional传入才校验</li>
+                    <li>cmpMaskMode=0且cmpSparseIndicesOptional不为空时，必须传入</li>
+                    <li>其他场景不支持传入</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>当layoutQ为TND时，该shape为(qT, kvN)</li>
+                    <li>当layoutQ为BSND时，该shape为(b, qS, kvN)</li>
+                </ul>
+            </td>
+            <td>无</td>
+        </tr>
+        <tr>
+            <td>topkValueMode</td>
+            <td>
+                <ul>
+                    <li>data_type支持INT32</li>
+                    <li>topK索引取值模式，默认值为1</li>
+                </ul>
+            </td>
+            <td>可选属性，默认值为1</td>
+            <td>无</td>
+            <td>无</td>
+        </tr>
+    </tbody>
+</table>
+
+#### Paged Attention参数组
+
+当layoutKv为PA_BBND时，开启Paged Attention
+
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 147px">
+        <col style="width: 232px">
+        <col style="width: 232px">
+        <col style="width: 293px">
+        <col style="width: 185px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>参数</th>
+            <th>单参数校验</th>
+            <th>存在性校验</th>
+            <th>一致性校验</th>
+            <th>特性交叉校验</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>oriBlockTableOptional</td>
+            <td>
+                <ul>
+                    <li>dtype仅支持INT32</li>
+                    <li>shape为(b, Ceil(oriKvSMax/oriKvBlockSize))</li>
+                    <li>值只能为正整数</li>
+                </ul>
+            </td>
+            <td>可选</td>
+            <td>无</td>
+            <td>
+                <ul>
+                    <li>oriBlockTableOptional存在时，必须传入sequsedOriKvOptional</li>
+                    <li>PagedAttention开启情况下，blockTable必须不为空</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>cmpBlockTableOptional</td>
+            <td>
+                <ul>
+                    <li>dtype仅支持INT32</li>
+                    <li>shape为(b, Ceil(cmpKvSMax/cmpKvBlockSize))</li>
+                    <li>值只能为正整数</li>
+                </ul>
+            </td>
+            <td>
+                <ul>
+                    <li>只有cmpKvOptional传入才校验</li>
+                    <li>可选</li>
+                </ul>
+            </td>
+            <td>无</td>
+            <td>
+                <ul>
+                    <li>cmpBlockTableOptional存在时，必须传入sequsedCmpKvOptional</li>
+                    <li>PagedAttention开启情况下，blockTable必须不为空</li>
+                </ul>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+#### Sinks参数组
+
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 147px">
+        <col style="width: 232px">
+        <col style="width: 232px">
+        <col style="width: 293px">
+        <col style="width: 185px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>参数</th>
+            <th>单参数校验</th>
+            <th>存在性校验</th>
+            <th>一致性校验</th>
+            <th>特性交叉校验</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>sinksOptional</td>
+            <td>
+                <ul>
+                    <li>dtype支持FLOAT32</li>
+                    <li>shape为(qN, )</li>
+                </ul>
+            </td>
+            <td> 当前版本必传 </td>
+            <td> 无 </td>
+            <td> 无 </td>
+        </tr>
+    </tbody>
+</table>
+
+#### SoftmaxLse参数组
+
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 147px">
+        <col style="width: 232px">
+        <col style="width: 232px">
+        <col style="width: 293px">
+        <col style="width: 185px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>参数</th>
+            <th>单参数校验</th>
+            <th>存在性校验</th>
+            <th>一致性校验</th>
+            <th>特性交叉校验</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>returnSoftmaxLse</td>
+            <td>
+                <ul>
+                    <li>data_type仅支持bool</li>
+                    <li>true代表开启softmaxLse，false代表关闭softmaxLse</li>
+                </ul>
+            </td>
+            <td>可选，默认值为false</td>
+            <td rowspan="2">
+                <ul>
+                     <li>当returnSoftmaxLse为false时，输出shape为[1]的值为0的tensor</li>
+                    <li>当returnSoftmaxLse为true时，softmaxLseOutOptional的shape与layoutQ的关系如下：<ul><li>layoutQ为BSND时，softmaxLseOutOptional的shape为(b, kvN, qS, qN/kvN)</li><li>layoutQ为TND时，softmaxLseOutOptional的shape为(kvN, qT, qN/kvN)</li></ul></li>
+                </ul>
+            </td>
+            <td>无</td>
+        </tr>
+        <tr>
+            <td>softmaxLseOutOptional</td>
+            <td>
+                <ul>
+                    <li>data_type仅支持FLOAT32</li>
+                </ul>
+            </td>
+            <td>无</td>
+            <td>无</td>
+        </tr>
+    </tbody>
+</table>
 
 ## 调用示例
 

@@ -639,31 +639,11 @@ aclnnStatus aclnnQuantSparseFlashMla(
       <td>传入参数是必选输入、输出或者必选属性，且是空指针。</td>
     </tr>
     <tr>
-      <td rowspan="8">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="8">161002</td>
-      <td>输入变量的数据类型和数据格式不在支持的范围内。</td>
+      <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="1">161002</td>
+      <td>输入变量的数据类型、数据格式和属性值不在支持的范围内。</td>
     </tr>
-    <tr>
-      <td>qN不在1到128范围内，或kvN不为1。</td>
-    </tr>
-    <tr>
-      <td>kvD和qD不为512。</td>
-    </tr>
-    <tr>
-      <td>quantMode不为1。</td>
-    </tr>
-    <tr>
-      <td>oriMaskMode不为0/3/4，或cmpMaskMode不为0/3。</td>
-    </tr>
-    <tr>
-      <td>oriWinLeft和oriWinRight不在-1或非负数范围内。</td>
-    </tr>
-    <tr>
-      <td>SWA场景cmpRatio不为1，或cmpRatio在CSA/HCA场景下范围不在1到128内。</td>
-    </tr>
-    <tr>
-      <td>layoutQOptional、layoutKvOptional、topkValueMode、cmpSparseIndicesOptional、metadataOptional、sinksOptional、cuSeqlens或seqused相关参数规格不在支持范围内。</td>
-    </tr>
+  
   </tbody>
   </table>
 
@@ -747,14 +727,14 @@ aclnnStatus aclnnQuantSparseFlashMla(
 | :---------: | :--------------------------------: | :---------------------------: |
 |      SWA      | oriKvOptional | oriKvOptional、oriKvSparseIndicesOptional |
 |      HCA      | oriKvOptional、cmpKvOptional|-|
-|      CSA      | oriKvOptional、cmpKvOptional| oriKvOptional、oriKvSparseIndicesOptional、cmpKvOptional、cmpKvSparseIndicesOptional|
+|      CSA      | oriKvOptional、cmpKvOptional、cmpKvSparseIndicesOptional| oriKvOptional、oriKvSparseIndicesOptional、cmpKvOptional、cmpKvSparseIndicesOptional|
 
 ### 参数组约束
 
 #### 公共参数组
 
 - 入参为空的场景处理：
-    - 空tensor指必选输入、某调用场景下下必传输入和输出的shape size为0，即有任意轴为0。
+    - 空tensor指必选输入、某调用场景下必传输入和输出的shape size为0，即有任意轴为0。
     - 触发空tensor的用例将全部拦截报错。
 
 - q、oriKvOptional、cmpKvOptional、attnOutOut校验
@@ -859,6 +839,36 @@ aclnnStatus aclnnQuantSparseFlashMla(
             可选输入
         </td>
     </tr>
+    <tr>
+        <td>qDescaleOptional</td>
+        <td>
+            <ul>
+                <li>dtype支持FLOAT32</li>
+            </ul>
+        </td>
+        <td rowspan="3">
+            当前版本必传
+        </td>
+        <td rowspan="3">
+            当quantMode=1时，shape为[1]
+        </td>
+    </tr>
+    <tr>
+        <td>oriKvDescaleOptional</td>
+        <td>
+            <ul>
+                <li>dtype支持FLOAT32</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td>cmpKvDescaleOptional</td>
+        <td>
+            <ul>
+                <li>dtype支持FLOAT32</li>
+            </ul>
+        </td>
+    </tr>
 </tbody>
 </table>
 layout匹配关系表：
@@ -916,12 +926,12 @@ metadataOptional校验
             <td>
                 <ul>
                     <li>dtype仅支持INT32</li>
-                    <li>shape由aclnnQuantSparseFlashMetadata动态计算</li>
+                    <li>shape由aclnnQuantSparseFlashMlaMetadata动态计算</li>
                 </ul>
             </td>
             <td>当前版本必传</td>
             <td>无</td>
-            <td>传入时需与aclnnQuantSparseFlashMetadata生成的结果一致</td>
+            <td>传入时需与aclnnQuantSparseFlashMlaMetadata生成的结果一致</td>
         </tr>
     </tbody>
 </table>
@@ -992,10 +1002,12 @@ metadataOptional校验
                  </ul>
              </td>
              <td>
-                     <li>当oriKvOptional/cmpKvOptional/cmpSparseIndicesOptional/oriSparseIndicesOptional传入时，cmpMaskMode为0和oriMaskMode必须为0</li>
+                <ul>
+                    <li>当oriKvOptional/cmpKvOptional/cmpSparseIndicesOptional/oriSparseIndicesOptional传入时，cmpMaskMode为0和oriMaskMode必须为0</li>
                     <li>当cmpKvOptional不传时，oriMaskMode为3、4</li>
                     <li>当oriMaskMode为3时，cmpMaskMode必须为3</li>
                     <li>当oriMaskMode为4时，cmpMaskMode必须为3</li>
+                </ul>
             </td>
         </tr>
         <tr>
@@ -1015,7 +1027,9 @@ metadataOptional校验
                 </ul>
             </td>
             <td>
+                <ul>
                     <li>只有oriMaskMode为4时，oriWinLeft/oriWinRight可以>=0</li>
+                </ul>
             </td>
         </tr>
     </tbody>
@@ -1121,7 +1135,7 @@ metadataOptional校验
                     <li>dtype支持INT32</li>
                     <li>shape为(b+1,)</li>
                     <li>取值仅支持非负整数</li>
-                    <li>其值应非递减（大于等于前一个值）排列，第一个元素为0且最后一个元素等于kvT</li>
+                    <li>其值应非递减（大于等于前一个值）排列，第一个元素为0且最后一个元素等于oriKvT</li>
                 </ul>
             </td>
             <td>
@@ -1140,7 +1154,7 @@ metadataOptional校验
                     <li>dtype支持INT32</li>
                     <li>shape为(b+1,)</li>
                     <li>取值仅支持非负整数</li>
-                    <li>其值应非递减（大于等于前一个值）排列，第一个元素为0且最后一个元素等于kvT</li>
+                    <li>其值应非递减（大于等于前一个值）排列，第一个元素为0且最后一个元素等于cmpKvT</li>
                 </ul>
             </td>
             <td>
@@ -1354,7 +1368,7 @@ metadataOptional校验
             <td>
                 <ul>
                     <li>dtype仅支持INT32</li>
-                    <li>shape为(b, oriKvSMax/oriKvBlockSize)</li>
+                    <li>shape为(b, Ceil(oriKvSMax/oriKvBlockSize))</li>
                     <li>值只能为正整数</li>
                 </ul>
             </td>
