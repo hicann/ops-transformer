@@ -230,7 +230,11 @@ ge::graphStatus ChunkGatedDeltaRuleTiling::DoMatmulTiling()
 
 ge::graphStatus ChunkGatedDeltaRuleTiling::DoLibApiTiling()
 {
-    tilingKey_ = (tilingData_.stateIsFp32 ? 1UL : 0UL) + (tilingData_.hasGamma != 0 ? 10UL : 0UL);
+    if (socVersion_ == platform_ascendc::SocVersion::ASCEND950) {
+        tilingKey_ = (tilingData_.stateIsFp32 ? 1UL : 0UL) + (tilingData_.hasGamma != 0 ? 10UL : 0UL);
+    } else {
+        tilingKey_ = 0UL;
+    }
 
     // 执行 matmul tiling
     if (DoMatmulTiling() != ge::GRAPH_SUCCESS) {

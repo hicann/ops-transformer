@@ -106,7 +106,7 @@ TEST_F(ChunkGatedDeltaRuleTilingTest, BasicWithGamma)
                                               },
                                               &compileinfo);
 
-    int64_t expectTilingKey = 10UL;
+    int64_t expectTilingKey = 0UL;
     TilingInfo tilingInfo;
     EXPECT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, expectTilingKey);
