@@ -89,19 +89,6 @@ static bool CheckFormat(const aclTensor *x, int64_t outFlag, const aclTensor *ou
                 ToString(x->GetStorageFormat()).GetString(), ToString(output->GetStorageFormat()).GetString());
         return false;
     }
-    // outFlag为1时，normOut和sumOut的格式也需要与x一致
-    if (outFlag) {
-        if (x->GetStorageFormat() != normOut->GetStorageFormat()) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Format of input and normOut should be same. x [%s], normOut [%s].",
-                    ToString(x->GetStorageFormat()).GetString(), ToString(normOut->GetStorageFormat()).GetString());
-            return false;
-        }
-        if (x->GetStorageFormat() != sumOut->GetStorageFormat()) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Format of input and sumOut should be same. x [%s], sumOut [%s].",
-                    ToString(x->GetStorageFormat()).GetString(), ToString(sumOut->GetStorageFormat()).GetString());
-            return false;
-        }
-    }
     return true;
 }
 

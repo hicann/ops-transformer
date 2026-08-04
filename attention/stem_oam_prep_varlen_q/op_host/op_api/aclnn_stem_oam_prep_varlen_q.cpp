@@ -161,6 +161,10 @@ aclnnStatus aclnnStemOamPrepVarlenQGetWorkspaceSize(const aclTensor *q, const ac
     L2_DFX_PHASE_1(aclnnStemOamPrepVarlenQ, DFX_IN(q, qSeqLens, cuSeqLensQ, qScale, stemBlockSize, stemStride),
                    DFX_OUT(qFlat));
 
+    auto uniqueExecutor = CREATE_EXECUTOR();
+    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
+    auto *executorImpl = uniqueExecutor.get();
+
     aclnnStatus ret = CheckNullptr(q, qSeqLens, cuSeqLensQ, qFlat, workspaceSize, executor);
     if (ret != ACLNN_SUCCESS) {
         return ret;
@@ -173,6 +177,7 @@ aclnnStatus aclnnStemOamPrepVarlenQGetWorkspaceSize(const aclTensor *q, const ac
 
     if (q->IsEmpty() || qSeqLens->Size() == 0) {
         *workspaceSize = 0;
+        uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;
     }
 
@@ -185,10 +190,6 @@ aclnnStatus aclnnStemOamPrepVarlenQGetWorkspaceSize(const aclTensor *q, const ac
     if (ret != ACLNN_SUCCESS) {
         return ret;
     }
-
-    auto uniqueExecutor = CREATE_EXECUTOR();
-    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-    auto *executorImpl = uniqueExecutor.get();
 
     q = l0op::Contiguous(q, executorImpl);
     CHECK_RET(q != nullptr, ACLNN_ERR_INNER_NULLPTR);
