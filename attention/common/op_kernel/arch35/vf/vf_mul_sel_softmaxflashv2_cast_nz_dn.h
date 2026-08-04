@@ -1049,19 +1049,14 @@ ProcessVec1DnNoUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf__ float *input_x_local_U
         // pscale update
         RegTensor<bfloat16_t> vreg_p_scale_bf16_0;
         RegTensor<bfloat16_t> vreg_p_scale_bf16_1;
-        RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0_0;
-        RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0_1;
-        RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0_dst0;
-        RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0_dst1;
+        RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0;
         Cast<bfloat16_t, T, castTraitRintZero>(vreg_p_scale_bf16_0, vreg_x_max_f32_b, preg_135);
-        Cast<fp8_e8m0_t, bfloat16_t, castTraitNoneZero>(vreg_p_scale_f8e8m0_0, vreg_p_scale_bf16_0, preg_108);
         Cast<bfloat16_t, T, castTraitRintOne>(vreg_p_scale_bf16_1, vreg_x_max_f32_b, preg_135);
-        Cast<fp8_e8m0_t, bfloat16_t, castTraitNoneZero>(vreg_p_scale_f8e8m0_1, vreg_p_scale_bf16_1, preg_108);
-        Or((RegTensor<uint8_t> &)vreg_p_scale_f8e8m0_0, (RegTensor<uint8_t> &)vreg_p_scale_f8e8m0_0,
-           (RegTensor<uint8_t> &)vreg_p_scale_f8e8m0_1, preg_134);
-        DeInterleave(vreg_p_scale_f8e8m0_dst0, vreg_p_scale_f8e8m0_dst1, vreg_p_scale_f8e8m0_0, vreg_p_scale_f8e8m0_0);
-        StoreAlign<fp8_e8m0_t, MicroAPI::StoreDist::DIST_NORM_B8>(((__ubuf__ fp8_e8m0_t *&)pScaleSubLoop0),
-                                                                  vreg_p_scale_f8e8m0_dst0, preg_134);
+        Or((RegTensor<uint16_t> &)vreg_p_scale_bf16_0, (RegTensor<uint16_t> &)vreg_p_scale_bf16_0,
+            (RegTensor<uint16_t> &)vreg_p_scale_bf16_1, preg_108);
+        Cast<fp8_e8m0_t, bfloat16_t, castTraitNoneZero>(vreg_p_scale_f8e8m0, vreg_p_scale_bf16_0, preg_108);
+        StoreAlign<fp8_e8m0_t, MicroAPI::StoreDist::DIST_PACK_B16>(((__ubuf__ fp8_e8m0_t *&)pScaleSubLoop0),
+                                                                  vreg_p_scale_f8e8m0, preg_108);
     }
 }
 
@@ -1372,19 +1367,14 @@ ProcessVec1DnUpdateMxfp8VF(__ubuf__ T2 *x_exp, __ubuf__ float *input_x_local_UB,
         // pscale update
         RegTensor<bfloat16_t> vreg_p_scale_bf16_0;
         RegTensor<bfloat16_t> vreg_p_scale_bf16_1;
-        RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0_0;
-        RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0_1;
-        RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0_dst0;
-        RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0_dst1;
+        RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0;
         Cast<bfloat16_t, T, castTraitRintZero>(vreg_p_scale_bf16_0, vreg_subloop_update, preg_135);
-        Cast<fp8_e8m0_t, bfloat16_t, castTraitNoneZero>(vreg_p_scale_f8e8m0_0, vreg_p_scale_bf16_0, preg_108);
         Cast<bfloat16_t, T, castTraitRintOne>(vreg_p_scale_bf16_1, vreg_subloop_update, preg_135);
-        Cast<fp8_e8m0_t, bfloat16_t, castTraitNoneZero>(vreg_p_scale_f8e8m0_1, vreg_p_scale_bf16_1, preg_108);
-        Or((RegTensor<uint8_t> &)vreg_p_scale_f8e8m0_0, (RegTensor<uint8_t> &)vreg_p_scale_f8e8m0_0,
-           (RegTensor<uint8_t> &)vreg_p_scale_f8e8m0_1, preg_134);
-        DeInterleave(vreg_p_scale_f8e8m0_dst0, vreg_p_scale_f8e8m0_dst1, vreg_p_scale_f8e8m0_0, vreg_p_scale_f8e8m0_0);
-        StoreAlign<fp8_e8m0_t, MicroAPI::StoreDist::DIST_NORM_B8>(((__ubuf__ fp8_e8m0_t *&)pScaleSubLoop0),
-                                                                  vreg_p_scale_f8e8m0_dst0, preg_134);
+        Or((RegTensor<uint16_t> &)vreg_p_scale_bf16_0, (RegTensor<uint16_t> &)vreg_p_scale_bf16_0,
+            (RegTensor<uint16_t> &)vreg_p_scale_bf16_1, preg_108);
+        Cast<fp8_e8m0_t, bfloat16_t, castTraitNoneZero>(vreg_p_scale_f8e8m0, vreg_p_scale_bf16_0, preg_108);
+        StoreAlign<fp8_e8m0_t, MicroAPI::StoreDist::DIST_PACK_B16>(((__ubuf__ fp8_e8m0_t *&)pScaleSubLoop0),
+                                                                  vreg_p_scale_f8e8m0, preg_108);
     }
 }
 
