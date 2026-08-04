@@ -544,14 +544,19 @@ __aicore__ inline void ComputePerTileDynamic(__ubuf__ T *srcAddr, __ubuf__ float
     uint16_t loopNum = Ceil(totalCountInUB, vlB16);
     uint32_t totalCntForB32 = totalCountInUB;
     float maxVal = 0.0f;
+    float invMaxVal = 0.0f;
     if constexpr (Std::IsSame<U, fp8_e5m2_t>::value) {
         maxVal = FP8_E5M2_MAX_VALUE;
+        invMaxVal = 1.0f / FP8_E5M2_MAX_VALUE;
     } else if constexpr (Std::IsSame<U, fp8_e4m3fn_t>::value) {
         maxVal = FP8_E4M3_MAX_VALUE;
+        invMaxVal = 1.0f / FP8_E4M3_MAX_VALUE;
     } else if constexpr (Std::IsSame<U, hifloat8_t>::value) {
         maxVal = HIFP8_MAX_VALUE;
+        invMaxVal = 1.0f / HIFP8_MAX_VALUE;
     } else if constexpr (Std::IsSame<U, int8_t>::value) {
         maxVal = INT8_MAX_VALUE;
+        invMaxVal = 1.0f / INT8_MAX_VALUE;
     }
 
     __VEC_SCOPE__
@@ -570,14 +575,17 @@ __aicore__ inline void ComputePerTileDynamic(__ubuf__ T *srcAddr, __ubuf__ float
         MicroAPI::RegTensor<float> vSmooth1;
         MicroAPI::RegTensor<float> vTileMax;
         MicroAPI::RegTensor<float> vDynScale;
+        MicroAPI::RegTensor<float> vOutputScale;
         MicroAPI::RegTensor<float> vMaxVal;
-        MicroAPI::RegTensor<float> vOneVal;
+        MicroAPI::RegTensor<float> vInvMaxVal;
 
         MicroAPI::RegTensor<U> vOut0;
         MicroAPI::RegTensor<U> vOut1;
 
         MicroAPI::Duplicate(vMaxVal, maxVal);
-        MicroAPI::Duplicate(vOneVal, 1.0f);
+        MicroAPI::Duplicate(vInvMaxVal, invMaxVal);
+
+        static constexpr MicroAPI::DivSpecificMode divMode = {MicroAPI::MaskMergeMode::ZEROING, true};
 
         static constexpr MicroAPI::CastTrait castTraitZero = {MicroAPI::RegLayout::ZERO, MicroAPI::SatMode::UNKNOWN,
                                                               MicroAPI::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
@@ -613,7 +621,7 @@ __aicore__ inline void ComputePerTileDynamic(__ubuf__ T *srcAddr, __ubuf__ float
             MicroAPI::Max(vTileMax, vInFP32Zero, vInFP32One, maskAll);
             MicroAPI::ReduceMax(vTileMax, vTileMax, dataMask2);
             MicroAPI::Duplicate(vTileMax, vTileMax, maskAll);
-            MicroAPI::Div(vDynScale, vMaxVal, vTileMax, maskAll);
+            MicroAPI::Div<float, &divMode>(vDynScale, vMaxVal, vTileMax, maskAll);
             MicroAPI::Mul(vSmooth0, vSmooth0, vDynScale, maskAll);
             MicroAPI::Mul(vSmooth1, vSmooth1, vDynScale, maskAll);
 
@@ -634,8 +642,8 @@ __aicore__ inline void ComputePerTileDynamic(__ubuf__ T *srcAddr, __ubuf__ float
             MicroAPI::DataCopy<int8_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::StoreDist::DIST_PACK4_B32>(
                 outLocalAddr, (MicroAPI::RegTensor<int8_t> &)vOut1, OUT_ELE_NUM_ONE_BLK, dataMask3);
 
-            MicroAPI::Div(vDynScale, vOneVal, vDynScale, maskAll);
-            MicroAPI::DataCopy<float, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(scaleOutLocalAddr + i, vDynScale,
+            MicroAPI::Mul(vOutputScale, vTileMax, vInvMaxVal, maskOne);
+            MicroAPI::DataCopy<float, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(scaleOutLocalAddr + i, vOutputScale,
                                                                                    maskOne);
         }
     }
