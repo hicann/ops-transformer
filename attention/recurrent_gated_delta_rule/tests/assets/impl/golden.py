@@ -10,17 +10,17 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""TTK e2e golden adapter for RecurrentGatedDeltaRule.
+"""TTK golden adapter for RecurrentGatedDeltaRule (e2e + aclnn).
 
 The CPU reference is loaded from tests/pytest/recurrent_gated_delta_rule_golden.py.
-This adapter maps torch_npu API-style parameters to the CPU golden signature and
-aligns return values with NPU outputs (returned output + in-place modified state).
+This adapter maps torch_npu / aclnn API-style parameters to the CPU golden
+signature and aligns return values with NPU outputs (returned output + in-place
+modified state).
 """
 
 import importlib.util
 import sys
 from pathlib import Path
-
 
 
 PYTEST_GOLDEN_MODULE = None
@@ -52,7 +52,8 @@ def load_pytest_golden_module():
 __golden__ = {
     "e2e": {
         "torch_npu.npu_recurrent_gated_delta_rule": "cpu_recurrent_gated_delta_rule"
-    }
+    },
+    "aclnn": {"aclnnRecurrentGatedDeltaRule": "aclnn_cpu_recurrent_gated_delta_rule"},
 }
 
 
@@ -105,3 +106,48 @@ def cpu_recurrent_gated_delta_rule(query, key, value, state, *args, **kwargs):
     output = output.to(query.dtype)
     state_out = state_out.to(state.dtype)
     return output, state_out
+
+
+def aclnn_cpu_recurrent_gated_delta_rule(
+    query,
+    key,
+    value,
+    beta,
+    stateRef,
+    actualSeqLengths,
+    ssmStateIndices,
+    g=None,
+    gk=None,
+    numAcceptedTokens=None,
+    scaleValue=0.125,
+    out=None,
+    **kwargs,
+):
+    """Golden reference for aclnnRecurrentGatedDeltaRule.
+
+    Parameters follow aclnnRecurrentGatedDeltaRuleGetWorkspaceSize (without
+    workspaceSize and executor).  Maps aclnn parameter order to the CPU golden
+    signature and returns a list [output, state_out] aligned with
+    output_tensor_indexes (out first, stateRef second).
+    """
+    mod = load_pytest_golden_module()
+    query = query.clone()
+    key = key.clone()
+    value = value.clone()
+    stateRef = stateRef.clone()
+    output, state_out = mod.cpu_recurrent_gated_delta_rule(
+        query,
+        key,
+        value,
+        stateRef,
+        beta,
+        scaleValue,
+        actualSeqLengths,
+        ssmStateIndices,
+        num_accepted_tokens=numAcceptedTokens,
+        g=g,
+        gk=gk,
+    )
+    output = output.to(query.dtype)
+    state_out = state_out.to(stateRef.dtype)
+    return [output, state_out]

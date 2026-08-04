@@ -10,14 +10,15 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""TTK e2e input adapter for RecurrentGatedDeltaRule.
+"""TTK input adapter for RecurrentGatedDeltaRule (e2e + aclnn).
 
 Fills index/length tensors (actual_seq_lengths, ssm_state_indices, num_accepted_tokens)
 with shape-consistent values that cannot be randomly generated.
 """
 
 __input__ = {
-    "e2e": {"torch_npu.npu_recurrent_gated_delta_rule": "generate_rgdr_inputs"}
+    "e2e": {"torch_npu.npu_recurrent_gated_delta_rule": "generate_rgdr_inputs"},
+    "aclnn": {"aclnnRecurrentGatedDeltaRule": "aclnn_generate_rgdr_inputs"},
 }
 
 import torch
@@ -78,3 +79,39 @@ def generate_rgdr_inputs(query, key, value, state, *args, **kwargs):
     if num_accepted_tokens is not None:
         nat_vals = [min(i + 1, act_vals[i]) for i in range(B)]
         fill_tensor(num_accepted_tokens, nat_vals)
+
+
+def aclnn_generate_rgdr_inputs(
+    query,
+    key,
+    value,
+    beta,
+    stateRef,
+    actualSeqLengths,
+    ssmStateIndices,
+    g=None,
+    gk=None,
+    numAcceptedTokens=None,
+    scaleValue=0.125,
+    out=None,
+    **kwargs,
+):
+    """Fill index/length tensors for aclnn mode.
+
+    Parameters follow aclnnRecurrentGatedDeltaRuleGetWorkspaceSize (without
+    workspaceSize and executor). Modifies int32 tensors in-place; return value
+    is ignored by the ACLNN input pipeline.
+    """
+    T = query.shape[0]
+    B = actualSeqLengths.shape[0]
+
+    base = T // B
+    remainder = T % B
+    act_vals = [base + (1 if i < remainder else 0) for i in range(B)]
+    fill_tensor(actualSeqLengths, act_vals)
+
+    fill_tensor(ssmStateIndices, list(range(T)))
+
+    if numAcceptedTokens is not None:
+        nat_vals = [min(i + 1, act_vals[i]) for i in range(B)]
+        fill_tensor(numAcceptedTokens, nat_vals)
