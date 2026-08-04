@@ -150,17 +150,17 @@
         以FlashAttentionScore算子的运行结果为例，运行后的结果示例如下：
 
         ```text
-        mean result[0] is: 256.000000
-        mean result[1] is: 256.000000
-        mean result[2] is: 256.000000
-        mean result[3] is: 256.000000
-        mean result[4] is: 256.000000
+        result[0] is: 256.000000
+        result[1] is: 256.000000
+        result[2] is: 256.000000
+        result[3] is: 256.000000
+        result[4] is: 256.000000
 
         ...
-        mean result[65532] is: 256.000000
-        mean result[65533] is: 256.000000
-        mean result[65534] is: 256.000000
-        mean result[65535] is: 256.000000
+        result[65532] is: 256.000000
+        result[65533] is: 256.000000
+        result[65534] is: 256.000000
+        result[65535] is: 256.000000
         ```
 
         若执行结果报错，未出现预期结果，可以使用aclGetRecentErrMsg接口获取报错具体信息。
