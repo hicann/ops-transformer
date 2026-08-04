@@ -374,6 +374,9 @@ struct MlaPrologContext {
     const float *qcQrScale;
     const float *kcScale;
 
+    uint64_t kvCacheStride0 = 0U;
+    uint64_t krCacheStride0 = 0U;
+
     size_t *workSpaces;
     uint64_t tilingKey;
     uint32_t blockDim;

@@ -229,6 +229,8 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_noQuant)
     baseParams_->dimHeadRope = 64;
     baseParams_->blockNum = 1;
     baseParams_->blockSize = 16;
+    baseParams_->kvCacheStride0 = 16 * 512;
+    baseParams_->krCacheStride0 = 16 * 64;
     baseParams_->mm1BlockNum = 24;
     baseParams_->mm2BlockNum = 9;
     baseParams_->mm3BlockNum = 24;
@@ -354,6 +356,8 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_semiQuantKVNoQuant)
     baseParams_->dimHeadRope = 64;
     baseParams_->blockNum = 1;
     baseParams_->blockSize = 16;
+    baseParams_->kvCacheStride0 = 16 * 512;
+    baseParams_->krCacheStride0 = 16 * 64;
     baseParams_->mm1BlockNum = 24;
     baseParams_->mm2BlockNum = 9;
     baseParams_->mm3BlockNum = 24;
@@ -489,6 +493,8 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_semiQuantKVQuant)
     baseParams_->dimHeadRope = 64;
     baseParams_->blockNum = 1;
     baseParams_->blockSize = 16;
+    baseParams_->kvCacheStride0 = 16 * 512;
+    baseParams_->krCacheStride0 = 16 * 64;
     baseParams_->mm1BlockNum = 24;
     baseParams_->mm2BlockNum = 9;
     baseParams_->mm3BlockNum = 24;
@@ -614,6 +620,8 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_semiQuantKVQuantPerfill)
     baseParams_->dimHeadRope = 64;
     baseParams_->blockNum = 1;
     baseParams_->blockSize = 16;
+    baseParams_->kvCacheStride0 = 16 * 512;
+    baseParams_->krCacheStride0 = 16 * 64;
     baseParams_->mm1BlockNum = 24;
     baseParams_->mm2BlockNum = 9;
     baseParams_->mm3BlockNum = 24;
@@ -740,6 +748,8 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_QuantKVNoQuant)
     baseParams_->dimHeadRope = 64;
     baseParams_->blockNum = 1;
     baseParams_->blockSize = 16;
+    baseParams_->kvCacheStride0 = 16 * 512;
+    baseParams_->krCacheStride0 = 16 * 64;
     baseParams_->mm1BlockNum = 24;
     baseParams_->mm2BlockNum = 9;
     baseParams_->mm3BlockNum = 24;
@@ -865,6 +875,8 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_QuantKVQuant)
     baseParams_->dimHeadRope = 64;
     baseParams_->blockNum = 1;
     baseParams_->blockSize = 16;
+    baseParams_->kvCacheStride0 = 16 * 512;
+    baseParams_->krCacheStride0 = 16 * 64;
     baseParams_->mm1BlockNum = 24;
     baseParams_->mm2BlockNum = 9;
     baseParams_->mm3BlockNum = 24;
@@ -990,6 +1002,8 @@ TEST_F(MlaPrologV3Kernel, test_case_v3_QuantKVQuantPerfill)
     baseParams_->dimHeadRope = 64;
     baseParams_->blockNum = 1;
     baseParams_->blockSize = 16;
+    baseParams_->kvCacheStride0 = 16 * 512;
+    baseParams_->krCacheStride0 = 16 * 64;
     baseParams_->mm1BlockNum = 24;
     baseParams_->mm2BlockNum = 9;
     baseParams_->mm3BlockNum = 24;
