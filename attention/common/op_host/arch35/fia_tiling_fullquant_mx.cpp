@@ -421,9 +421,9 @@ void FiaTilingFullQuantMxArch35::CreateSplitInput(split_core_v2::BaseInfo &baseI
     splitParam.mBaseSize = sOuterFactor_ * CV_RATIO;
     splitParam.s2BaseSize = sInnerFactor_;
     splitParam.gS1BaseSizeOfFd = 8;
-    splitParam.streamK = true;
-    splitParam.fdTolerance = 10; // 实验经验值
-    splitParam.fdLeastBlock = 2; // 实验经验值
+    splitParam.streamK = decodeS1GMerge_; // decode场景开启FD
+    splitParam.fdTolerance = 10;          // 实验经验值
+    splitParam.fdLeastBlock = 2;          // 实验经验值
 }
 
 void FiaTilingFullQuantMxArch35::SetSplitOutput(const split_core_v2::FAMetaData &splitRes)
