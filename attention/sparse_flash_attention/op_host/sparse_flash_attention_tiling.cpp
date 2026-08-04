@@ -1077,10 +1077,6 @@ ge::graphStatus SFATilingCheck::CheckSinks() const
     if (opParamInfo_.sinks.tensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
-    OP_CHECK_IF(kvLayout_ == SFALayout::PA_BSND,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "layout_kv", SFALayoutToSerialString(kvLayout_).c_str(),
-                                                      "When sinks is not null, layout_kv does not support PA_BSND"),
-                return ge::GRAPH_FAILED);
     if (ge::GRAPH_SUCCESS != CheckDtypeSupport(opParamInfo_.sinks.desc, SINKS_NAME)) {
         return ge::GRAPH_FAILED;
     }

@@ -311,8 +311,6 @@ def convert_param_combination_to_cs_format(param_combination):
     use_sinks = bool(param_combination.get("use_sinks", False))
     block_size = param_combination.get("block_size") or 256
     block_num = param_combination.get("block_num")
-    if use_sinks and layout_kv == "PA_BSND":
-        raise ValueError("sinks 场景不支持 PA_BSND")
 
     # 参数校验：TND layout 下 T 不能超过 B*S
     if layout_query == "TND" and T1 is not None:

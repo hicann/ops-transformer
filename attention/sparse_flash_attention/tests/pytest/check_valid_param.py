@@ -101,9 +101,6 @@ def check_valid_param(params):
         raise ValueError(
             f"非 PA_BSND 场景下 layout_kv({layout_kv}) 必须等于 layout_query({layout_query})"
         )
-    if use_sinks and layout_kv == "PA_BSND":
-        raise ValueError("sinks 场景不支持 PA_BSND")
-
     for name, value in (
         ("B", B),
         ("S1", S1),

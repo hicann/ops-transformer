@@ -17,19 +17,6 @@ from torchair.configs.compiler_config import CompilerConfig
 import numpy as np
 
 
-def _has_sinks(torch_tensor_dict):
-    return torch_tensor_dict.get("sinks") is not None
-
-
-def _is_pa_layout(layout_kv):
-    return layout_kv == "PA_BSND"
-
-
-def _validate_sinks_layout(torch_tensor_dict, layout_kv):
-    if _has_sinks(torch_tensor_dict) and _is_pa_layout(layout_kv):
-        raise ValueError("sinks 场景不支持 PA_BSND")
-
-
 def _load_inputs_to_npu(input_dict):
     def to_npu(value):
         if isinstance(value, torch.Tensor):
@@ -40,7 +27,6 @@ def _load_inputs_to_npu(input_dict):
 
 
 def call_npu_eager(torch_tensor_dict, params):
-    _validate_sinks_layout(torch_tensor_dict, params.get("layout_kv"))
     kwargs = {
         "query": torch_tensor_dict.get("query"),
         "key": torch_tensor_dict.get("key_cache"),
@@ -141,13 +127,10 @@ class Network(torch.nn.Module):
             "return_softmax_lse": return_softmax_lse,
             "sinks": sinks,
         }
-        if sinks is not None and layout_kv == "PA_BSND":
-            raise ValueError("sinks 场景不支持 PA_BSND")
         return torch_npu.npu_sparse_flash_attention(**kwargs)
 
 
 def call_npu_graph(torch_tensor_dict, params):
-    _validate_sinks_layout(torch_tensor_dict, params.get("layout_kv"))
     torch._dynamo.reset()
     npu_model = Network().npu()
     config = CompilerConfig()
