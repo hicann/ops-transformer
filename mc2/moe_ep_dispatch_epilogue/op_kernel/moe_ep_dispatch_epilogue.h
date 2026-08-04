@@ -405,8 +405,6 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
             for (uint32_t localExpertId = 0; localExpertId < numLocalExperts_; ++localExpertId) {
                 int32_t targetExpertId = static_cast<int32_t>(epRankId_ * numLocalExperts_ + localExpertId);
                 uint64_t rsvdCnt = 0;
-                SyncFunc<AscendC::HardEvent::S_V>();
-                Duplicate<uint32_t>(sharedTmpInt32, 0, calCntAlign);
                 CompareScalar(sharedTmpInt8, ubTopkIds_, static_cast<int32_t>(targetExpertId), AscendC::CMPMODE::EQ,
                               calCntAlign);
                 GatherMask(ubTargetExpertId_, ubTopkIds_, sharedTmpInt32, true, calCnt, {1, 1, 0, 0}, rsvdCnt);
