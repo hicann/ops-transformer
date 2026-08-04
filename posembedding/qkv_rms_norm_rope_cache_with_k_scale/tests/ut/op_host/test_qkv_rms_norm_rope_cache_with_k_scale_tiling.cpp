@@ -14,39 +14,48 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
-#include <fstream>
-#include <map>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
 
-#include "gmm_csv_ge_parse_utils.h"
-#include "gmm_csv_parse_utils.h"
 #include "op_common/op_host/util/math_util.h"
+#include "op_host_csv_case_loader.h"
 #include "tiling_case_executor.h"
 
 #include "../../../op_host/op_tiling/arch35/qkv_rms_norm_rope_cache_with_k_scale_base_tiling.h"
 #include "../../../op_host/op_tiling/arch35/qkv_rms_norm_rope_cache_with_k_scale_tiling.h"
-#include "../../../op_kernel/arch35/qkv_rms_norm_rope_cache_with_k_scale_tiling_key.h"
 
 namespace {
 using QkvTiling = optiling::QkvRmsNormRopeCacheWithKScale::QkvRmsNormRopeCacheWithKScaleBaseTiling;
-using ContractInput = optiling::QkvRmsNormRopeCacheWithKScale::ContractInput;
-using TensorContractInfo = optiling::QkvRmsNormRopeCacheWithKScale::TensorContractInfo;
+using CompileInfo = optiling::QkvRmsNormRopeCacheWithKScaleCompileInfo;
+using TensorDesc = gert::TilingContextPara::TensorDescription;
 using TilingData = optiling::QkvRmsNormRopeCacheWithKScaleTilingData;
 
-constexpr uint64_t TEST_BLOCK_SIZE = 128U;
 constexpr uint64_t TEST_OP_WORKSPACE_SIZE = 4096U;
 constexpr uint64_t RESERVED_WORKSPACE_SIZE = 16UL * 1024UL * 1024UL;
 constexpr uint64_t TEST_LAYOUT_NTD = 0U;
 constexpr uint64_t TEST_LAYOUT_TND = 1U;
-constexpr uint64_t QKV_LAYOUT_TILING_KEY_SHIFT = 8U;
-constexpr uint64_t Q_OUT_LAYOUT_TILING_KEY_SHIFT = 12U;
+constexpr int64_t EXPECT_UNSET = -1;
+constexpr float DEFAULT_EPSILON = 1e-6F;
 
-uint64_t EncodeQkvKScaleTilingKey(uint64_t layoutQkv, uint64_t layoutQOut)
+int64_t ReadExpected(const csv_map &csvMap, const std::string &key)
 {
-    return (layoutQkv << QKV_LAYOUT_TILING_KEY_SHIFT) | (layoutQOut << Q_OUT_LAYOUT_TILING_KEY_SHIFT);
+    const std::string value = ReadMap(csvMap, key);
+    return value.empty() ? EXPECT_UNSET : std::stoll(value);
+}
+
+bool IsNullValue(const std::string &value) { return value.empty() || value == "<null>"; }
+
+std::string DecodeString(const std::string &value) { return value == "<empty>" ? std::string() : value; }
+
+std::vector<int64_t> ParseIntList(const std::string &value)
+{
+    if (IsNullValue(value) || value == "<empty>") {
+        return {};
+    }
+    std::string normalized = value;
+    std::replace(normalized.begin(), normalized.end(), '|', ' ');
+    return GetShapeArr(normalized);
 }
 
 uint64_t CalcQkPreprocessNzBytes(uint64_t rowCount)
@@ -56,134 +65,161 @@ uint64_t CalcQkPreprocessNzBytes(uint64_t rowCount)
     return blockCount * QkvTiling::QK_PREPROCESS_BLOCK_BYTES;
 }
 
-struct TilingRunOptions {
-    uint64_t aicNum = 32U;
-    bool aivNumPresent = false;
-    uint64_t aivNum = 0U;
-    bool headNumsPresent = false;
-    std::vector<int64_t> headNums;
-    bool layoutQkvPresent = true;
-    bool layoutQOutPresent = true;
-    bool layoutQkvOverridePresent = false;
-    bool layoutQOutOverridePresent = false;
-    std::string layoutQkvOverride;
-    std::string layoutQOutOverride;
+struct ExpectedTiling {
+    int64_t tilingKey = EXPECT_UNSET;
+    int64_t blockNum = EXPECT_UNSET;
+    int64_t workspaceSize = EXPECT_UNSET;
+    int64_t tilingDataZero = EXPECT_UNSET;
+    int64_t tokenTile = EXPECT_UNSET;
+    int64_t tokenTilePerAiv = EXPECT_UNSET;
+    int64_t rowTile = EXPECT_UNSET;
+    int64_t rowTileAligned = EXPECT_UNSET;
+    int64_t coreTokenTile = EXPECT_UNSET;
+    int64_t coreGroupNum = EXPECT_UNSET;
+    int64_t kvStrideBlock = EXPECT_UNSET;
+    int64_t kvStrideHead = EXPECT_UNSET;
+    int64_t kvStrideToken = EXPECT_UNSET;
+    int64_t kScaleStrideBlock = EXPECT_UNSET;
+    int64_t kScaleStrideHead = EXPECT_UNSET;
+    int64_t kScaleStrideToken = EXPECT_UNSET;
+};
+
+struct QkvTilingCase : public HostUtParamBase {
+    TensorDesc qkv = TD_DEFAULT;
+    TensorDesc qGamma = TD_DEFAULT;
+    TensorDesc kGamma = TD_DEFAULT;
+    TensorDesc cosSin = TD_DEFAULT;
+    TensorDesc slotMapping = TD_DEFAULT;
+    TensorDesc kCache = TD_DEFAULT;
+    TensorDesc vCache = TD_DEFAULT;
+    TensorDesc kScaleCache = TD_DEFAULT;
+    TensorDesc queryStartLoc = TD_DEFAULT;
+    TensorDesc seqLens = TD_DEFAULT;
+    TensorDesc rotation = TD_DEFAULT;
+    TensorDesc vScale = TD_DEFAULT;
+    TensorDesc mropePosition = TD_DEFAULT;
+
+    TensorDesc qOut = TD_DEFAULT;
+    TensorDesc qScale = TD_DEFAULT;
+
+    std::string headNums;
+    std::string layoutQkv;
+    std::string layoutQOut;
+    std::string epsilon;
+    std::string mropeSection;
+    std::string qQuantMode;
+    std::string qOutDtypeAttr;
+    uint32_t aicNum = 32U;
+    uint32_t aivNum = aicNum * QkvTiling::AIV_PER_AIC;
     std::string socVersion = "Ascend950";
+    ExpectedTiling expected;
+
+    QkvTilingCase(const csv_map &csvMap)
+        : HostUtParamBase(csvMap)
+    {
+        inputInstance.emplace_back(GetTensorGE(csvMap, "qkv_shape", "qkv_dtype", "qkv_format", qkv));
+        inputInstance.emplace_back(GetTensorGE(csvMap, "qGamma_shape", "qGamma_dtype", "qGamma_format", qGamma));
+        inputInstance.emplace_back(GetTensorGE(csvMap, "kGamma_shape", "kGamma_dtype", "kGamma_format", kGamma));
+        inputInstance.emplace_back(GetTensorGE(csvMap, "cosSin_shape", "cosSin_dtype", "cosSin_format", cosSin));
+        inputInstance.emplace_back(
+            GetTensorGE(csvMap, "slotMapping_shape", "slotMapping_dtype", "slotMapping_format", slotMapping));
+        inputInstance.emplace_back(GetTensorGE(csvMap, "kCache_shape", "kCache_dtype", "kCache_format", kCache));
+        inputInstance.emplace_back(GetTensorGE(csvMap, "vCache_shape", "vCache_dtype", "vCache_format", vCache));
+        inputInstance.emplace_back(
+            GetTensorGE(csvMap, "kScaleCache_shape", "kScaleCache_dtype", "kScaleCache_format", kScaleCache));
+        inputInstance.emplace_back(
+            GetTensorGE(csvMap, "queryStartLoc_shape", "queryStartLoc_dtype", "queryStartLoc_format", queryStartLoc));
+        inputInstance.emplace_back(GetTensorGE(csvMap, "seqLens_shape", "seqLens_dtype", "seqLens_format", seqLens));
+        inputInstance.emplace_back(
+            GetTensorGE(csvMap, "rotation_shape", "rotation_dtype", "rotation_format", rotation));
+        inputInstance.emplace_back(GetTensorGE(csvMap, "vScale_shape", "vScale_dtype", "vScale_format", vScale));
+        inputInstance.emplace_back(
+            GetTensorGE(csvMap, "mropePosition_shape", "mropePosition_dtype", "mropePosition_format", mropePosition));
+
+        outputInstance.emplace_back(GetTensorGE(csvMap, "qOut_shape", "qOut_dtype", "qOut_format", qOut));
+        outputInstance.emplace_back(GetTensorGE(csvMap, "qScale_shape", "qScale_dtype", "qScale_format", qScale));
+        outputInstance.emplace_back(inputInstance[5]);
+        outputInstance.emplace_back(inputInstance[6]);
+        outputInstance.emplace_back(inputInstance[7]);
+
+        headNums = ReadMap(csvMap, "head_nums");
+        layoutQkv = ReadMap(csvMap, "layout_qkv");
+        layoutQOut = ReadMap(csvMap, "layout_q_out");
+        epsilon = ReadMap(csvMap, "epsilon");
+        mropeSection = ReadMap(csvMap, "mrope_section");
+        qQuantMode = ReadMap(csvMap, "q_quant_mode");
+        qOutDtypeAttr = ReadMap(csvMap, "q_out_dtype_attr");
+        aicNum = static_cast<uint32_t>(std::stoull(ReadMap(csvMap, "aic_num", "32")));
+        const std::string aivNumValue = ReadMap(csvMap, "aiv_num");
+        aivNum = IsNullValue(aivNumValue) ? aicNum * QkvTiling::AIV_PER_AIC :
+                                            static_cast<uint32_t>(std::stoull(aivNumValue));
+        socVersion = ReadMap(csvMap, "soc_version", "Ascend950");
+
+        expected.tilingKey = ReadExpected(csvMap, "expectTilingKey");
+        expected.blockNum = ReadExpected(csvMap, "expectBlockNum");
+        expected.workspaceSize = ReadExpected(csvMap, "expectWorkspaceSize");
+        expected.tilingDataZero = ReadExpected(csvMap, "expectTilingDataZero");
+        expected.tokenTile = ReadExpected(csvMap, "expectTokenTile");
+        expected.tokenTilePerAiv = ReadExpected(csvMap, "expectTokenTilePerAiv");
+        expected.rowTile = ReadExpected(csvMap, "expectRowTile");
+        expected.rowTileAligned = ReadExpected(csvMap, "expectRowTileAligned");
+        expected.coreTokenTile = ReadExpected(csvMap, "expectCoreTokenTile");
+        expected.coreGroupNum = ReadExpected(csvMap, "expectCoreGroupNum");
+        expected.kvStrideBlock = ReadExpected(csvMap, "expectKvStrideBlock");
+        expected.kvStrideHead = ReadExpected(csvMap, "expectKvStrideHead");
+        expected.kvStrideToken = ReadExpected(csvMap, "expectKvStrideToken");
+        expected.kScaleStrideBlock = ReadExpected(csvMap, "expectKScaleStrideBlock");
+        expected.kScaleStrideHead = ReadExpected(csvMap, "expectKScaleStrideHead");
+        expected.kScaleStrideToken = ReadExpected(csvMap, "expectKScaleStrideToken");
+    }
 };
 
-bool ExecuteTilingForInput(const ContractInput &input, TilingInfo &tilingInfo, uint64_t aicNum = 32);
-bool ExecuteTilingForInput(const ContractInput &input, TilingInfo &tilingInfo, const TilingRunOptions &options);
-
-gert::StorageShape MakeStorageShape(const gert::Shape &shape)
+std::vector<gert::TilingContextPara::OpAttr> BuildAttrs(const QkvTilingCase &testCase)
 {
-    gert::StorageShape storageShape;
-    for (uint64_t i = 0; i < shape.GetDimNum(); ++i) {
-        storageShape.MutableOriginShape().AppendDim(shape.GetDim(i));
-        storageShape.MutableStorageShape().AppendDim(shape.GetDim(i));
+    std::vector<gert::TilingContextPara::OpAttr> attrs;
+    if (IsNullValue(testCase.headNums)) {
+        return attrs;
     }
-    return storageShape;
-}
 
-template <typename... Args>
-void SetShape(TensorContractInfo &tensor, Args... dims)
-{
-    tensor.shape = gert::Shape();
-    (tensor.shape.AppendDim(static_cast<int64_t>(dims)), ...);
-    tensor.shapePresent = true;
-}
-
-void SetShape(TensorContractInfo &tensor, const std::vector<int64_t> &dims)
-{
-    tensor.shape = gert::Shape();
-    for (const auto dim : dims) {
-        tensor.shape.AppendDim(dim);
+    attrs.emplace_back("head_nums",
+                       Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(ParseIntList(testCase.headNums)));
+    if (IsNullValue(testCase.layoutQkv)) {
+        return attrs;
     }
-    tensor.shapePresent = true;
-}
-
-void RefreshShapes(ContractInput &input)
-{
-    const uint64_t qkvN = input.numQHeads + input.numKHeads + input.numVHeads;
-    if (input.layoutQkv == TEST_LAYOUT_TND) {
-        SetShape(input.qkv, input.totalTokens, qkvN, input.headDim);
-    } else {
-        SetShape(input.qkv, qkvN, input.totalTokens, input.headDim);
+    attrs.emplace_back("layout_qkv",
+                       Ops::Transformer::AnyValue::CreateFrom<std::string>(DecodeString(testCase.layoutQkv)));
+    if (IsNullValue(testCase.layoutQOut)) {
+        return attrs;
     }
-    SetShape(input.qGamma, input.headDim);
-    SetShape(input.kGamma, input.headDim);
-    SetShape(input.cosSin, input.maxSeqLen, input.headDim);
-    SetShape(input.slotMapping, input.totalTokens);
-    SetShape(input.kCache, input.blockNum, input.numKHeads, input.blockSize, input.headDim);
-    SetShape(input.vCache, input.blockNum, input.numVHeads, input.blockSize, input.headDim);
-    SetShape(input.kScaleCache, input.blockNum, input.numKHeads, input.blockSize, 1);
-    SetShape(input.queryStartLoc, static_cast<uint64_t>(input.batch) + 1);
-    SetShape(input.seqLens, static_cast<uint64_t>(input.batch));
-    SetShape(input.rotation, input.headDim, input.headDim);
-    SetShape(input.vScale, input.numVHeads);
+    attrs.emplace_back("layout_q_out",
+                       Ops::Transformer::AnyValue::CreateFrom<std::string>(DecodeString(testCase.layoutQOut)));
+    if (IsNullValue(testCase.epsilon)) {
+        return attrs;
+    }
+    attrs.emplace_back("epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(std::stof(testCase.epsilon)));
+    if (IsNullValue(testCase.mropeSection)) {
+        return attrs;
+    }
+    attrs.emplace_back("mrope_section", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(
+                                            ParseIntList(testCase.mropeSection)));
+    if (IsNullValue(testCase.qQuantMode)) {
+        return attrs;
+    }
+    attrs.emplace_back("q_quant_mode",
+                       Ops::Transformer::AnyValue::CreateFrom<std::string>(DecodeString(testCase.qQuantMode)));
+    if (IsNullValue(testCase.qOutDtypeAttr)) {
+        return attrs;
+    }
+    attrs.emplace_back("q_out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(
+                                          static_cast<int64_t>(Str2DTypeGE(testCase.qOutDtypeAttr))));
+    return attrs;
 }
 
-ContractInput BuildInput(uint64_t totalTokens = 128, uint64_t numQHeads = 16, uint64_t numKHeads = 2,
-                         uint64_t numVHeads = 2, uint64_t headDim = 128)
+CompileInfo BuildCompileInfo(const QkvTilingCase &testCase)
 {
-    ContractInput input;
-    input.totalTokens = totalTokens;
-    input.batch = 1;
-    input.numQHeads = numQHeads;
-    input.numKHeads = numKHeads;
-    input.numVHeads = numVHeads;
-    input.headDim = headDim;
-    input.maxSeqLen = 256;
-    input.blockNum = 8;
-    input.blockSize = 128;
-
-    input.qkv.dtype = ge::DT_BF16;
-    input.qGamma.dtype = ge::DT_FLOAT;
-    input.kGamma.dtype = ge::DT_FLOAT;
-    input.cosSin.dtype = ge::DT_FLOAT;
-    input.slotMapping.dtype = ge::DT_INT32;
-    input.kCache.dtype = ge::DT_FLOAT8_E4M3FN;
-    input.vCache.dtype = ge::DT_FLOAT8_E4M3FN;
-    input.kScaleCache.dtype = ge::DT_FLOAT;
-    input.queryStartLoc.dtype = ge::DT_INT32;
-    input.seqLens.dtype = ge::DT_INT32;
-    input.rotation.dtype = ge::DT_BF16;
-    input.vScale.dtype = ge::DT_FLOAT;
-    RefreshShapes(input);
-    return input;
-}
-
-struct ConcurrentTilingCase {
-    uint64_t totalTokens;
-    uint64_t numQHeads;
-    uint64_t numKHeads;
-    uint64_t numVHeads;
-    uint64_t headDim;
-    uint64_t aicNum;
-    ge::graphStatus status;
-    uint64_t tokenTile;
-    uint64_t coreTokenTile;
-    uint64_t coreGroupNum;
-    uint64_t layoutQkv = TEST_LAYOUT_NTD;
-    uint64_t layoutQOut = TEST_LAYOUT_NTD;
-};
-
-struct ConcurrentTilingResult {
-    bool ok = true;
-    uint64_t failedCase = 0;
-    uint32_t failedIteration = 0;
-    bool success = false;
-    uint64_t tokenTile = 0;
-    uint64_t coreTokenTile = 0;
-    uint64_t coreGroupNum = 0;
-    uint64_t blockNum = 0;
-};
-
-optiling::QkvRmsNormRopeCacheWithKScaleCompileInfo BuildCompileInfo(const TilingRunOptions &options)
-{
-    optiling::QkvRmsNormRopeCacheWithKScaleCompileInfo compileInfo;
-    compileInfo.aicNum = static_cast<uint32_t>(options.aicNum);
-    compileInfo.aivNum =
-        static_cast<uint32_t>(options.aivNumPresent ? options.aivNum : options.aicNum * QkvTiling::AIV_PER_AIC);
+    CompileInfo compileInfo;
+    compileInfo.aicNum = testCase.aicNum;
+    compileInfo.aivNum = testCase.aivNum;
     compileInfo.ubSize = 262144U;
     compileInfo.l1Size = 524288U;
     compileInfo.l0cSize = 131072U;
@@ -191,606 +227,227 @@ optiling::QkvRmsNormRopeCacheWithKScaleCompileInfo BuildCompileInfo(const Tiling
     return compileInfo;
 }
 
-gert::TilingContextPara::TensorDescription MakeTensorDesc(const TensorContractInfo &tensor)
+gert::TilingContextPara BuildTilingContext(const QkvTilingCase &testCase, CompileInfo &compileInfo)
 {
-    return {MakeStorageShape(tensor.shape), tensor.dtype, ge::FORMAT_ND};
+    return gert::TilingContextPara(
+        "QkvRmsNormRopeCacheWithKScale",
+        {testCase.qkv, testCase.qGamma, testCase.kGamma, testCase.cosSin, testCase.slotMapping, testCase.kCache,
+         testCase.vCache, testCase.kScaleCache, testCase.queryStartLoc, testCase.seqLens, testCase.rotation,
+         testCase.vScale, testCase.mropePosition},
+        {testCase.qOut, testCase.qScale, testCase.kCache, testCase.vCache, testCase.kScaleCache}, BuildAttrs(testCase),
+        testCase.inputInstance, testCase.outputInstance, &compileInfo, testCase.socVersion, testCase.aicNum,
+        compileInfo.ubSize);
 }
 
-gert::TilingContextPara::TensorDescription MakeEmptyTensorDesc(ge::DataType dtype)
+bool RunTiling(const QkvTilingCase &testCase, TilingInfo &tilingInfo)
 {
-    return {gert::StorageShape(), dtype, ge::FORMAT_ND};
+    auto compileInfo = BuildCompileInfo(testCase);
+    auto tilingContext = BuildTilingContext(testCase, compileInfo);
+    return ExecuteTiling(tilingContext, tilingInfo);
 }
 
-std::vector<gert::TilingContextPara::TensorDescription> BuildTilingInputDescs(const ContractInput &input)
+uint64_t ParseLayout(const std::string &value, uint64_t defaultLayout)
 {
-    std::vector<gert::TilingContextPara::TensorDescription> inputs;
-    inputs.reserve(12U);
-    inputs.push_back(MakeTensorDesc(input.qkv));
-    inputs.push_back(MakeTensorDesc(input.qGamma));
-    inputs.push_back(MakeTensorDesc(input.kGamma));
-    inputs.push_back(MakeTensorDesc(input.cosSin));
-    inputs.push_back(MakeTensorDesc(input.slotMapping));
-    inputs.push_back(MakeTensorDesc(input.kCache));
-    inputs.push_back(MakeTensorDesc(input.vCache));
-    inputs.push_back(MakeTensorDesc(input.kScaleCache));
-    inputs.push_back(MakeTensorDesc(input.queryStartLoc));
-    inputs.push_back(MakeTensorDesc(input.seqLens));
-    inputs.push_back(input.rotation.shapePresent ? MakeTensorDesc(input.rotation) :
-                                                   MakeEmptyTensorDesc(ge::DT_UNDEFINED));
-    inputs.push_back(input.vScale.shapePresent ? MakeTensorDesc(input.vScale) : MakeEmptyTensorDesc(ge::DT_UNDEFINED));
-    return inputs;
-}
-
-std::vector<gert::TilingContextPara::TensorDescription> BuildTilingOutputDescs(const ContractInput &input)
-{
-    const bool isTnd = input.layoutQOut == TEST_LAYOUT_TND;
-    std::vector<gert::TilingContextPara::TensorDescription> outputs;
-    outputs.reserve(5U);
-    gert::Shape qOutShape;
-    qOutShape.AppendDim(static_cast<int64_t>(isTnd ? input.totalTokens : input.numQHeads));
-    qOutShape.AppendDim(static_cast<int64_t>(isTnd ? input.numQHeads : input.totalTokens));
-    qOutShape.AppendDim(static_cast<int64_t>(input.headDim));
-    outputs.push_back({MakeStorageShape(qOutShape), ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND});
-    gert::Shape scaleShape;
-    scaleShape.AppendDim(static_cast<int64_t>(isTnd ? input.totalTokens : input.numQHeads));
-    scaleShape.AppendDim(static_cast<int64_t>(isTnd ? input.numQHeads : input.totalTokens));
-    outputs.push_back({MakeStorageShape(scaleShape), ge::DT_FLOAT, ge::FORMAT_ND});
-    outputs.push_back(MakeTensorDesc(input.kCache));
-    outputs.push_back(MakeTensorDesc(input.vCache));
-    outputs.push_back(MakeTensorDesc(input.kScaleCache));
-    return outputs;
-}
-
-std::vector<gert::TilingContextPara::OpAttr> BuildTilingAttrs(const ContractInput &input,
-                                                              const TilingRunOptions &options)
-{
-    std::vector<int64_t> headNums;
-    if (options.headNumsPresent) {
-        headNums = options.headNums;
-    } else {
-        headNums.reserve(3U);
-        headNums.push_back(static_cast<int64_t>(input.numQHeads));
-        headNums.push_back(static_cast<int64_t>(input.numKHeads));
-        headNums.push_back(static_cast<int64_t>(input.numVHeads));
+    const std::string layout = DecodeString(value);
+    if (layout == "NTD") {
+        return TEST_LAYOUT_NTD;
     }
-
-    std::vector<gert::TilingContextPara::OpAttr> attrs;
-    attrs.reserve(4U);
-    attrs.push_back(gert::TilingContextPara::OpAttr(
-        "head_nums", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(headNums)));
-    if (options.layoutQkvPresent) {
-        const std::string layoutQkv = options.layoutQkvOverridePresent ?
-                                          options.layoutQkvOverride :
-                                          (input.layoutQkv == TEST_LAYOUT_TND ? "TND" : "NTD");
-        attrs.push_back(gert::TilingContextPara::OpAttr(
-            "layout_qkv", Ops::Transformer::AnyValue::CreateFrom<std::string>(layoutQkv)));
+    if (layout == "TND") {
+        return TEST_LAYOUT_TND;
     }
-    if (options.layoutQkvPresent && options.layoutQOutPresent) {
-        const std::string layoutQOut = options.layoutQOutOverridePresent ?
-                                           options.layoutQOutOverride :
-                                           (input.layoutQOut == TEST_LAYOUT_TND ? "TND" : "NTD");
-        attrs.push_back(gert::TilingContextPara::OpAttr(
-            "layout_q_out", Ops::Transformer::AnyValue::CreateFrom<std::string>(layoutQOut)));
-        attrs.push_back(
-            gert::TilingContextPara::OpAttr("epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)));
-    }
-    return attrs;
+    return defaultLayout;
 }
 
-bool ExecuteTilingForInput(const ContractInput &input, TilingInfo &tilingInfo, uint64_t aicNum)
-{
-    TilingRunOptions options;
-    options.aicNum = aicNum;
-    return ExecuteTilingForInput(input, tilingInfo, options);
-}
-
-bool ExecuteTilingForInput(const ContractInput &input, TilingInfo &tilingInfo, const TilingRunOptions &options)
-{
-    auto compileInfo = BuildCompileInfo(options);
-    gert::TilingContextPara tilingContextPara("QkvRmsNormRopeCacheWithKScale", BuildTilingInputDescs(input),
-                                              BuildTilingOutputDescs(input), BuildTilingAttrs(input, options),
-                                              &compileInfo, options.socVersion, options.aicNum, compileInfo.ubSize);
-    return ExecuteTiling(tilingContextPara, tilingInfo);
-}
-
-bool MatchesConcurrentTilingCase(const ConcurrentTilingCase &item, bool success, const TilingInfo &tilingInfo)
-{
-    if (success != (item.status == ge::GRAPH_SUCCESS)) {
-        return false;
-    }
-    if (!success) {
-        return true;
-    }
-    if (tilingInfo.tilingDataSize < sizeof(optiling::QkvRmsNormRopeCacheWithKScaleTilingData) ||
-        tilingInfo.tilingData == nullptr || tilingInfo.workspaceSizes.empty()) {
-        return false;
-    }
-
-    const auto *tilingData =
-        reinterpret_cast<const optiling::QkvRmsNormRopeCacheWithKScaleTilingData *>(tilingInfo.tilingData.get());
-    const int64_t expectedWorkspace = static_cast<int64_t>(RESERVED_WORKSPACE_SIZE + TEST_OP_WORKSPACE_SIZE);
-    return tilingInfo.blockNum == item.coreGroupNum && tilingInfo.workspaceSizes[0] == expectedWorkspace &&
-           tilingData->totalTokens == item.totalTokens && tilingData->qHeadNum == item.numQHeads &&
-           tilingData->kvHeadNum == item.numKHeads && tilingData->headDim == item.headDim &&
-           tilingData->blockSize == TEST_BLOCK_SIZE && tilingData->tokenTile == item.tokenTile &&
-           tilingData->coreTokenTile == item.coreTokenTile && tilingData->coreGroupNum == item.coreGroupNum;
-}
-
-uint64_t ParseU64(const std::string &value, uint64_t defaultValue = 0)
-{
-    const std::string trimmed = ops::ut::Trim(value);
-    return trimmed.empty() ? defaultValue : static_cast<uint64_t>(std::stoull(trimmed));
-}
-
-struct CsvTilingCase {
-    std::string caseName;
-    std::string updates;
-    uint64_t totalTokens = 128;
-    uint64_t numQHeads = 16;
-    uint64_t numKHeads = 2;
-    uint64_t numVHeads = 2;
-    uint64_t headDim = 128;
-    uint64_t aicNum = 32;
-    uint64_t layoutQkv = TEST_LAYOUT_NTD;
-    uint64_t layoutQOut = TEST_LAYOUT_NTD;
-    ge::graphStatus expectedStatus = ge::GRAPH_SUCCESS;
-    uint64_t tokenTile = 0;
-    uint64_t tokenTilePerAiv = 0;
-    uint64_t rowTile = 0;
-    uint64_t rowTileAligned = 0;
-    uint64_t coreTokenTile = 0;
-    uint64_t coreGroupNum = 0;
-    uint64_t kvStrideBlock = 0;
-    uint64_t kvStrideHead = 0;
-    uint64_t kvStrideToken = 0;
-    uint64_t kScaleStrideBlock = 0;
-    uint64_t kScaleStrideHead = 0;
-    uint64_t kScaleStrideToken = 0;
-    std::string checkSpec;
-    std::map<std::string, std::string> spec;
-
-    bool HasSpec(const std::string &key) const
-    {
-        return spec.find(key) != spec.end();
-    }
-
-    uint64_t SpecU64(const std::string &key, uint64_t defaultValue = 0) const
-    {
-        const auto it = spec.find(key);
-        return it == spec.end() ? defaultValue : ParseU64(it->second);
-    }
+struct DerivedInput {
+    uint64_t totalTokens = 0U;
+    uint64_t batch = 0U;
+    uint64_t numQHeads = 0U;
+    uint64_t numKHeads = 0U;
+    uint64_t numVHeads = 0U;
+    uint64_t headDim = 0U;
+    uint64_t blockSize = 0U;
+    float epsilon = DEFAULT_EPSILON;
 };
 
-std::string CsvColumn(const std::vector<std::string> &cols, uint64_t index)
+DerivedInput DeriveInput(const QkvTilingCase &testCase)
 {
-    return index < cols.size() ? ops::ut::Trim(cols[index]) : std::string();
+    DerivedInput input;
+    const auto headNums = ParseIntList(testCase.headNums);
+    input.numQHeads = static_cast<uint64_t>(headNums[0]);
+    input.numKHeads = static_cast<uint64_t>(headNums[1]);
+    input.numVHeads = static_cast<uint64_t>(headNums[2]);
+
+    const uint64_t layoutQkv = ParseLayout(testCase.layoutQkv, TEST_LAYOUT_TND);
+    const auto &qkvShape = testCase.qkv.shape_.GetStorageShape();
+    input.totalTokens = static_cast<uint64_t>(qkvShape.GetDim(layoutQkv == TEST_LAYOUT_TND ? 0 : 1));
+    input.headDim = static_cast<uint64_t>(qkvShape.GetDim(2));
+    // M-RoPE deliberately leaves the RoPE sequence tensors absent.
+    const bool isMrope = ParseIntList(testCase.mropeSection).size() == 3U;
+    input.batch = isMrope ? 0U : static_cast<uint64_t>(testCase.queryStartLoc.shape_.GetStorageShape().GetDim(0) - 1);
+    input.blockSize = static_cast<uint64_t>(testCase.kCache.shape_.GetStorageShape().GetDim(2));
+    input.epsilon = IsNullValue(testCase.epsilon) ? DEFAULT_EPSILON : std::stof(testCase.epsilon);
+    return input;
 }
 
-uint64_t ParseLayout(const std::string &value)
+void ExpectU64(const std::string &caseName, const char *field, int64_t expected, uint64_t actual)
 {
-    const std::string layout = ops::ut::ToLower(ops::ut::Trim(value));
-    return layout == "tnd" ? TEST_LAYOUT_TND : TEST_LAYOUT_NTD;
-}
-
-ge::graphStatus ParseGraphStatus(const std::string &value)
-{
-    return ops::ut::ToLower(ops::ut::Trim(value)) == "success" ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED;
-}
-
-TensorContractInfo *FindTensor(ContractInput &input, const std::string &name)
-{
-    if (name == "qkv") {
-        return &input.qkv;
-    }
-    if (name == "qGamma") {
-        return &input.qGamma;
-    }
-    if (name == "kGamma") {
-        return &input.kGamma;
-    }
-    if (name == "cosSin") {
-        return &input.cosSin;
-    }
-    if (name == "slotMapping") {
-        return &input.slotMapping;
-    }
-    if (name == "kCache") {
-        return &input.kCache;
-    }
-    if (name == "vCache") {
-        return &input.vCache;
-    }
-    if (name == "kScaleCache") {
-        return &input.kScaleCache;
-    }
-    if (name == "queryStartLoc") {
-        return &input.queryStartLoc;
-    }
-    if (name == "seqLens") {
-        return &input.seqLens;
-    }
-    if (name == "rotation") {
-        return &input.rotation;
-    }
-    if (name == "vScale") {
-        return &input.vScale;
-    }
-    return nullptr;
-}
-
-std::map<std::string, std::string> ParseSpec(const std::string &spec)
-{
-    std::map<std::string, std::string> result;
-    const std::string trimmedSpec = ops::ut::Trim(spec);
-    if (trimmedSpec.empty() || ops::ut::ToLower(trimmedSpec) == "none") {
-        return result;
-    }
-
-    std::vector<std::string> items;
-    ops::ut::SplitStr2Vec(trimmedSpec, ";", items);
-    for (const auto &item : items) {
-        std::vector<std::string> keyValue;
-        ops::ut::SplitStr2Vec(item, "=", keyValue);
-        if (keyValue.size() >= 2U) {
-            result[ops::ut::Trim(keyValue[0])] = ops::ut::Trim(keyValue[1]);
-        }
-    }
-    return result;
-}
-
-void ApplyTensorUpdate(ContractInput &input, const std::string &update)
-{
-    const std::string trimmed = ops::ut::Trim(update);
-    if (trimmed.empty() || ops::ut::ToLower(trimmed) == "none") {
-        return;
-    }
-    const auto equalPos = trimmed.find('=');
-    const auto dotPos = trimmed.find('.');
-    if (equalPos == std::string::npos || dotPos == std::string::npos || dotPos > equalPos) {
-        throw std::invalid_argument("bad tensor update: " + trimmed);
-    }
-    const std::string tensorName = ops::ut::Trim(trimmed.substr(0, dotPos));
-    const std::string field = ops::ut::Trim(trimmed.substr(dotPos + 1, equalPos - dotPos - 1));
-    const std::string value = ops::ut::Trim(trimmed.substr(equalPos + 1));
-    TensorContractInfo *tensor = FindTensor(input, tensorName);
-    if (tensor == nullptr) {
-        throw std::invalid_argument("unknown tensor in update: " + trimmed);
-    }
-    if (field == "shape") {
-        SetShape(*tensor, ops::ut::ParseI64List(value));
-    } else if (field == "dtype") {
-        tensor->dtype = ops::ut::ParseGeDtype(value);
-    } else if (field == "present") {
-        tensor->shapePresent = ops::ut::ParseBool(value);
-    } else {
-        throw std::invalid_argument("unknown tensor update field: " + trimmed);
+    if (expected >= 0) {
+        EXPECT_EQ(actual, static_cast<uint64_t>(expected)) << "caseName=" << caseName << ", field=" << field;
     }
 }
 
-void ApplyRunOptionUpdate(TilingRunOptions &options, const std::string &field, const std::string &value)
+void ExpectTilingResult(const QkvTilingCase &testCase, const TilingInfo &tilingInfo)
 {
-    if (field == "aicNum") {
-        options.aicNum = ParseU64(value);
-    } else if (field == "aivNum") {
-        options.aivNum = ParseU64(value);
-        options.aivNumPresent = true;
-    } else if (field == "headNums") {
-        options.headNums = ops::ut::ParseI64List(value);
-        options.headNumsPresent = true;
-    } else if (field == "layoutQkvAttrPresent") {
-        options.layoutQkvPresent = ops::ut::ParseBool(value);
-    } else if (field == "layoutQOutAttrPresent") {
-        options.layoutQOutPresent = ops::ut::ParseBool(value);
-    } else if (field == "layoutQkvAttr") {
-        options.layoutQkvOverride = value == "<empty>" ? "" : value;
-        options.layoutQkvOverridePresent = true;
-    } else if (field == "layoutQOutAttr") {
-        options.layoutQOutOverride = value == "<empty>" ? "" : value;
-        options.layoutQOutOverridePresent = true;
-    } else if (field == "socVersion") {
-        options.socVersion = value;
-    } else {
-        throw std::invalid_argument("unknown run option field: " + field);
+    const auto &expected = testCase.expected;
+    if (expected.tilingKey >= 0) {
+        EXPECT_EQ(tilingInfo.tilingKey, expected.tilingKey) << "caseName=" << testCase.case_name;
     }
-}
-
-void ApplyInputUpdate(ContractInput &input, const std::string &field, const std::string &value)
-{
-    if (field == "layoutQOut") {
-        input.layoutQOut = ParseLayout(value);
-        return;
-    }
-    throw std::invalid_argument("unknown input update field: " + field);
-}
-
-void ApplyCsvUpdate(ContractInput &input, TilingRunOptions &options, const std::string &update)
-{
-    const std::string trimmed = ops::ut::Trim(update);
-    if (trimmed.empty() || ops::ut::ToLower(trimmed) == "none") {
-        return;
-    }
-    const auto equalPos = trimmed.find('=');
-    const auto dotPos = trimmed.find('.');
-    if (equalPos == std::string::npos) {
-        throw std::invalid_argument("bad csv update: " + trimmed);
-    }
-    if (dotPos == std::string::npos || dotPos > equalPos) {
-        const std::string field = ops::ut::Trim(trimmed.substr(0, equalPos));
-        const std::string value = ops::ut::Trim(trimmed.substr(equalPos + 1));
-        if (field == "layoutQOut") {
-            ApplyInputUpdate(input, field, value);
-        } else {
-            ApplyRunOptionUpdate(options, field, value);
-        }
-        return;
-    }
-    ApplyTensorUpdate(input, trimmed);
-}
-
-void ApplyCsvUpdates(ContractInput &input, TilingRunOptions &options, const std::string &updatesText)
-{
-    std::vector<std::string> updates;
-    ops::ut::SplitStr2Vec(updatesText, ";", updates);
-    for (const auto &update : updates) {
-        ApplyCsvUpdate(input, options, update);
-    }
-}
-
-CsvTilingCase ParseCsvCase(const std::vector<std::string> &cols)
-{
-    CsvTilingCase item;
-    item.caseName = CsvColumn(cols, 0);
-    item.updates = CsvColumn(cols, 1);
-    item.totalTokens = ParseU64(CsvColumn(cols, 2), 128U);
-    item.numQHeads = ParseU64(CsvColumn(cols, 3), 16U);
-    item.numKHeads = ParseU64(CsvColumn(cols, 4), 2U);
-    item.numVHeads = ParseU64(CsvColumn(cols, 5), 2U);
-    item.headDim = ParseU64(CsvColumn(cols, 6), 128U);
-    item.aicNum = ParseU64(CsvColumn(cols, 7), 32U);
-    item.layoutQkv = ParseLayout(CsvColumn(cols, 8));
-    item.layoutQOut = item.layoutQkv;
-    item.expectedStatus = ParseGraphStatus(CsvColumn(cols, 9));
-    item.tokenTile = ParseU64(CsvColumn(cols, 10));
-    item.tokenTilePerAiv = ParseU64(CsvColumn(cols, 11));
-    item.rowTile = ParseU64(CsvColumn(cols, 12));
-    item.rowTileAligned = ParseU64(CsvColumn(cols, 13));
-    item.coreTokenTile = ParseU64(CsvColumn(cols, 14));
-    item.coreGroupNum = ParseU64(CsvColumn(cols, 15));
-    item.kvStrideBlock = ParseU64(CsvColumn(cols, 16));
-    item.kvStrideHead = ParseU64(CsvColumn(cols, 17));
-    item.kvStrideToken = ParseU64(CsvColumn(cols, 18));
-    item.kScaleStrideBlock = ParseU64(CsvColumn(cols, 19));
-    item.kScaleStrideHead = ParseU64(CsvColumn(cols, 20));
-    item.kScaleStrideToken = ParseU64(CsvColumn(cols, 21));
-    item.checkSpec = CsvColumn(cols, 22);
-    item.spec = ParseSpec(item.checkSpec);
-    return item;
-}
-
-std::vector<CsvTilingCase> LoadCsvTilingCases(const std::string &csvFilePath)
-{
-    std::ifstream in(csvFilePath);
-    EXPECT_TRUE(in.is_open()) << "Failed to open CSV file: " << csvFilePath;
-
-    std::vector<CsvTilingCase> cases;
-    std::string line;
-    uint64_t lineNo = 0U;
-    while (std::getline(in, line)) {
-        ++lineNo;
-        const std::string trimmed = ops::ut::Trim(line);
-        if (trimmed.empty() || trimmed[0] == '#') {
-            continue;
-        }
-        std::vector<std::string> cols;
-        ops::ut::SplitStr2Vec(trimmed, ",", cols);
-        if (!cols.empty() && ops::ut::Trim(cols[0]) == "caseName") {
-            continue;
-        }
-        if (cols.size() != 23U) {
-            ADD_FAILURE() << "Bad csv row column count in " << csvFilePath << ": line=" << lineNo;
-            continue;
-        }
-        try {
-            cases.push_back(ParseCsvCase(cols));
-        } catch (const std::exception &error) {
-            ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvFilePath, lineNo, CsvColumn(cols, 0), error);
-        }
-    }
-    EXPECT_FALSE(cases.empty()) << "No valid cases parsed from CSV: " << csvFilePath;
-    return cases;
-}
-
-const std::vector<CsvTilingCase> &GetCsvTilingCases()
-{
-    static const auto cases = LoadCsvTilingCases(
-        ops::ut::ResolveCsvPath("test_qkv_rms_norm_rope_cache_with_k_scale_tiling.csv",
-                                "posembedding/qkv_rms_norm_rope_cache_with_k_scale/tests/ut/op_host", __FILE__));
-    return cases;
-}
-
-std::string MakeCsvTilingCaseName(const testing::TestParamInfo<CsvTilingCase> &info)
-{
-    return ops::ut::MakeSafeParamName(info.param.caseName);
-}
-
-uint64_t ExpectTileFromSpec(const CsvTilingCase &item, const ContractInput &input, const TilingData &tiling,
-                            const std::string &prefix)
-{
-    const uint64_t tokenOffset = item.SpecU64(prefix + "TokenOffset");
-    const uint64_t inputSize = item.SpecU64(prefix + "InputSize");
-    uint64_t tokenSize = 0U;
-    if (tokenOffset < input.totalTokens && inputSize != 0U) {
-        tokenSize = std::min(inputSize, std::min(tiling.tokenTile, input.totalTokens - tokenOffset));
+    ExpectU64(testCase.case_name, "blockNum", expected.blockNum, tilingInfo.blockNum);
+    if (expected.workspaceSize >= 0) {
+        ASSERT_FALSE(tilingInfo.workspaceSizes.empty()) << "caseName=" << testCase.case_name;
+        EXPECT_EQ(tilingInfo.workspaceSizes[0], expected.workspaceSize) << "caseName=" << testCase.case_name;
     }
 
-    EXPECT_EQ(tokenOffset, item.SpecU64(prefix + "ExpectOffset")) << "caseName=" << item.caseName;
-    EXPECT_EQ(tokenSize, item.SpecU64(prefix + "ExpectSize")) << "caseName=" << item.caseName;
-    EXPECT_EQ(tokenSize * (tiling.qHeadNum + tiling.kvHeadNum), item.SpecU64(prefix + "ExpectRowSize"))
-        << "caseName=" << item.caseName;
-
-    return tokenSize;
-}
-
-void ExpectTilingKey(const CsvTilingCase &item, const ContractInput &input, const TilingInfo &tilingInfo)
-{
-    const uint64_t expectedLayout =
-        input.layoutQkv == TEST_LAYOUT_TND ? QKV_K_SCALE_LAYOUT_TND : QKV_K_SCALE_LAYOUT_NTD;
-    const uint64_t expectedLayoutQOut =
-        input.layoutQOut == TEST_LAYOUT_TND ? QKV_K_SCALE_LAYOUT_TND : QKV_K_SCALE_LAYOUT_NTD;
-    EXPECT_EQ(static_cast<uint64_t>(tilingInfo.tilingKey), EncodeQkvKScaleTilingKey(expectedLayout, expectedLayoutQOut))
-        << "caseName=" << item.caseName;
-}
-
-void ExpectCoreRangeFromSpec(const CsvTilingCase &item, const ContractInput &input, const TilingData &tiling)
-{
-    const uint64_t coreIndex = item.SpecU64("coreIndex");
-    const uint64_t rangeBegin = coreIndex * tiling.coreTokenTile;
-    const uint64_t rangeEnd = std::min(input.totalTokens, rangeBegin + tiling.coreTokenTile);
-    EXPECT_LT(coreIndex, tiling.coreGroupNum) << "caseName=" << item.caseName;
-    EXPECT_EQ(rangeBegin, item.SpecU64("rangeBegin")) << "caseName=" << item.caseName;
-    EXPECT_EQ(rangeEnd, item.SpecU64("rangeEnd")) << "caseName=" << item.caseName;
-}
-
-void ExpectCoreCoverFromSpec(const CsvTilingCase &item, const ContractInput &input, const TilingData &tiling)
-{
-    const uint64_t lastCoreIndex = item.SpecU64("lastCoreIndex");
-    const uint64_t lastBegin = lastCoreIndex * tiling.coreTokenTile;
-    const uint64_t lastEnd = std::min(input.totalTokens, lastBegin + tiling.coreTokenTile);
-    EXPECT_LT(lastCoreIndex, tiling.coreGroupNum) << "caseName=" << item.caseName;
-    EXPECT_EQ(lastBegin, item.SpecU64("lastBegin")) << "caseName=" << item.caseName;
-    EXPECT_EQ(lastEnd, item.SpecU64("lastEnd")) << "caseName=" << item.caseName;
-    EXPECT_EQ(lastEnd, item.SpecU64("coveredEnd", input.totalTokens)) << "caseName=" << item.caseName;
-}
-
-void ExpectCoreLocalTilesFromSpec(const CsvTilingCase &item, const ContractInput &input, const TilingData &tiling)
-{
-    ExpectCoreRangeFromSpec(item, input, tiling);
-    const uint64_t tile0TokenSize = ExpectTileFromSpec(item, input, tiling, "tile0");
-    if (!item.HasSpec("tile1TokenOffset")) {
+    ASSERT_GE(tilingInfo.tilingDataSize, sizeof(TilingData)) << "caseName=" << testCase.case_name;
+    ASSERT_NE(tilingInfo.tilingData, nullptr) << "caseName=" << testCase.case_name;
+    if (expected.tilingDataZero == 1) {
+        const auto *begin = tilingInfo.tilingData.get();
+        EXPECT_TRUE(std::all_of(begin, begin + sizeof(TilingData), [](uint8_t value) { return value == 0U; }))
+            << "caseName=" << testCase.case_name;
         return;
     }
 
-    const uint64_t tile1TokenSize = ExpectTileFromSpec(item, input, tiling, "tile1");
-    if (!item.HasSpec("tile2TokenOffset")) {
-        EXPECT_EQ(tile0TokenSize + tile1TokenSize, item.SpecU64("rangeEnd") - item.SpecU64("rangeBegin"))
-            << "caseName=" << item.caseName;
-        return;
+    const auto &tiling = *reinterpret_cast<const TilingData *>(tilingInfo.tilingData.get());
+    const auto input = DeriveInput(testCase);
+    EXPECT_EQ(tiling.totalTokens, input.totalTokens) << "caseName=" << testCase.case_name;
+    EXPECT_EQ(tiling.batch, input.batch) << "caseName=" << testCase.case_name;
+    EXPECT_EQ(tiling.qHeadNum, input.numQHeads) << "caseName=" << testCase.case_name;
+    EXPECT_EQ(tiling.kvHeadNum, input.numKHeads) << "caseName=" << testCase.case_name;
+    EXPECT_EQ(input.numVHeads, input.numKHeads) << "caseName=" << testCase.case_name;
+    EXPECT_EQ(tiling.headDim, input.headDim) << "caseName=" << testCase.case_name;
+    EXPECT_EQ(tiling.blockSize, input.blockSize) << "caseName=" << testCase.case_name;
+
+    const auto mropeSection = ParseIntList(testCase.mropeSection);
+    if (mropeSection.size() == 3U) {
+        EXPECT_EQ(tiling.mropeSectionH, static_cast<uint64_t>(mropeSection[1])) << "caseName=" << testCase.case_name;
+        EXPECT_EQ(tiling.mropeSectionW, static_cast<uint64_t>(mropeSection[2])) << "caseName=" << testCase.case_name;
     }
 
-    const uint64_t tile2TokenSize = ExpectTileFromSpec(item, input, tiling, "tile2");
-    EXPECT_EQ(tile0TokenSize + tile1TokenSize + tile2TokenSize, item.SpecU64("rangeEnd") - item.SpecU64("rangeBegin"))
-        << "caseName=" << item.caseName;
-}
-
-bool IsKnownSpecKey(const std::string &key)
-{
-    return key == "tileTokenOffset" || key == "tileInputSize" || key == "tileExpectOffset" || key == "tileExpectSize" ||
-           key == "tileExpectRowSize" || key == "coreIndex" || key == "rangeBegin" || key == "rangeEnd" ||
-           key == "lastCoreIndex" || key == "lastBegin" || key == "lastEnd" || key == "coveredEnd" ||
-           key == "tile0TokenOffset" || key == "tile0InputSize" || key == "tile0ExpectOffset" ||
-           key == "tile0ExpectSize" || key == "tile0ExpectRowSize" || key == "tile1TokenOffset" ||
-           key == "tile1InputSize" || key == "tile1ExpectOffset" || key == "tile1ExpectSize" ||
-           key == "tile1ExpectRowSize" || key == "tile2TokenOffset" || key == "tile2InputSize" ||
-           key == "tile2ExpectOffset" || key == "tile2ExpectSize" || key == "tile2ExpectRowSize";
-}
-
-void ExpectCsvSpecChecks(const CsvTilingCase &item, const ContractInput &input, const TilingData &tiling)
-{
-    for (const auto &spec : item.spec) {
-        EXPECT_TRUE(IsKnownSpecKey(spec.first)) << "caseName=" << item.caseName << ", specKey=" << spec.first;
-    }
-    if (item.HasSpec("tileTokenOffset")) {
-        ExpectTileFromSpec(item, input, tiling, "tile");
-    }
-    if (item.HasSpec("lastCoreIndex")) {
-        ExpectCoreCoverFromSpec(item, input, tiling);
-    }
-    if (item.HasSpec("tile0TokenOffset")) {
-        ExpectCoreLocalTilesFromSpec(item, input, tiling);
-    } else if (item.HasSpec("coreIndex")) {
-        ExpectCoreRangeFromSpec(item, input, tiling);
-    }
-}
-
-class QkvRmsNormRopeCacheWithKScaleCsvTiling : public testing::TestWithParam<CsvTilingCase> {};
-
-} // namespace
-
-TEST_P(QkvRmsNormRopeCacheWithKScaleCsvTiling, RunsCase)
-{
-    const auto &item = GetParam();
-    auto input = BuildInput(item.totalTokens, item.numQHeads, item.numKHeads, item.numVHeads, item.headDim);
-    input.layoutQkv = item.layoutQkv;
-    input.layoutQOut = item.layoutQOut;
-    RefreshShapes(input);
-    TilingRunOptions options;
-    options.aicNum = item.aicNum;
-    ApplyCsvUpdates(input, options, item.updates);
-
-    TilingInfo tilingInfo;
-    const bool success = ExecuteTilingForInput(input, tilingInfo, options);
-    const auto status = success ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED;
-    EXPECT_EQ(status, item.expectedStatus) << "caseName=" << item.caseName;
-    if (status != ge::GRAPH_SUCCESS) {
-        return;
-    }
-    ASSERT_GE(tilingInfo.tilingDataSize, sizeof(optiling::QkvRmsNormRopeCacheWithKScaleTilingData));
-    ASSERT_NE(tilingInfo.tilingData, nullptr);
-    const auto &tiling =
-        *reinterpret_cast<const optiling::QkvRmsNormRopeCacheWithKScaleTilingData *>(tilingInfo.tilingData.get());
-
-    EXPECT_EQ(tiling.totalTokens, input.totalTokens);
-    EXPECT_EQ(tiling.batch, input.batch);
-    EXPECT_EQ(tiling.qHeadNum, input.numQHeads);
-    EXPECT_EQ(tiling.kvHeadNum, input.numKHeads);
-    EXPECT_EQ(tiling.headDim, input.headDim);
-    EXPECT_EQ(tiling.blockSize, input.blockSize);
-    EXPECT_EQ(tiling.tokenTile, item.tokenTile);
     const uint64_t tokenTilePerAiv = Ops::Base::CeilDiv(tiling.tokenTile, QkvTiling::AIV_PER_AIC);
     const uint64_t qkHeadNum = tiling.qHeadNum + tiling.kvHeadNum;
     const uint64_t rowTile = tiling.tokenTile * qkHeadNum;
-    EXPECT_EQ(tokenTilePerAiv, item.tokenTilePerAiv);
-    EXPECT_EQ(rowTile, item.rowTile);
-    EXPECT_EQ(Ops::Base::CeilAlign(rowTile, 16UL), item.rowTileAligned);
-    EXPECT_EQ(tiling.coreTokenTile, item.coreTokenTile);
-    EXPECT_EQ(tiling.coreGroupNum, item.coreGroupNum);
-    EXPECT_EQ(qkHeadNum, input.numQHeads + input.numKHeads);
+    ExpectU64(testCase.case_name, "tokenTile", expected.tokenTile, tiling.tokenTile);
+    ExpectU64(testCase.case_name, "tokenTilePerAiv", expected.tokenTilePerAiv, tokenTilePerAiv);
+    ExpectU64(testCase.case_name, "rowTile", expected.rowTile, rowTile);
+    ExpectU64(testCase.case_name, "rowTileAligned", expected.rowTileAligned, Ops::Base::CeilAlign(rowTile, 16UL));
+    ExpectU64(testCase.case_name, "coreTokenTile", expected.coreTokenTile, tiling.coreTokenTile);
+    ExpectU64(testCase.case_name, "coreGroupNum", expected.coreGroupNum, tiling.coreGroupNum);
+
     const uint64_t qPreprocessRows = tokenTilePerAiv * tiling.qHeadNum;
     const uint64_t kPreprocessRows = tokenTilePerAiv * tiling.kvHeadNum;
     EXPECT_LE(CalcQkPreprocessNzBytes(qPreprocessRows) + CalcQkPreprocessNzBytes(kPreprocessRows),
               QkvTiling::QK_PREPROCESS_UB_BYTES);
     EXPECT_LE(tokenTilePerAiv * qkHeadNum, QkvTiling::QK_OUTPUT_ROWS_PER_AIV);
-    EXPECT_LE(tokenTilePerAiv * (qkHeadNum + tiling.kvHeadNum), QkvTiling::QKV_INPUT_ROWS_PER_AIV);
+    const uint64_t qkvInputRowsPerAiv =
+        mropeSection.size() == 3U ? QkvTiling::MROPE_COMPACT_INPUT_ROWS_PER_AIV : QkvTiling::QKV_INPUT_ROWS_PER_AIV;
+    EXPECT_LE(tokenTilePerAiv * (qkHeadNum + tiling.kvHeadNum), qkvInputRowsPerAiv);
     EXPECT_LE(tokenTilePerAiv * tiling.kvHeadNum, QkvTiling::V_OUTPUT_ROWS_PER_AIV);
-    EXPECT_EQ(tiling.kvCacheStrideBlock, item.kvStrideBlock);
-    EXPECT_EQ(tiling.kvCacheStrideHead, item.kvStrideHead);
-    EXPECT_EQ(tiling.kvCacheStrideToken, item.kvStrideToken);
-    EXPECT_EQ(tiling.kScaleCacheStrideBlock, item.kScaleStrideBlock);
-    EXPECT_EQ(tiling.kScaleCacheStrideHead, item.kScaleStrideHead);
-    EXPECT_EQ(tiling.kScaleCacheStrideToken, item.kScaleStrideToken);
-    EXPECT_FLOAT_EQ(tiling.epsilon, 1e-6F);
-    ExpectTilingKey(item, input, tilingInfo);
-    ExpectCsvSpecChecks(item, input, tiling);
+
+    ExpectU64(testCase.case_name, "kvCacheStrideBlock", expected.kvStrideBlock, tiling.kvCacheStrideBlock);
+    ExpectU64(testCase.case_name, "kvCacheStrideHead", expected.kvStrideHead, tiling.kvCacheStrideHead);
+    ExpectU64(testCase.case_name, "kvCacheStrideToken", expected.kvStrideToken, tiling.kvCacheStrideToken);
+    ExpectU64(testCase.case_name, "kScaleCacheStrideBlock", expected.kScaleStrideBlock, tiling.kScaleCacheStrideBlock);
+    ExpectU64(testCase.case_name, "kScaleCacheStrideHead", expected.kScaleStrideHead, tiling.kScaleCacheStrideHead);
+    ExpectU64(testCase.case_name, "kScaleCacheStrideToken", expected.kScaleStrideToken, tiling.kScaleCacheStrideToken);
+    EXPECT_FLOAT_EQ(tiling.epsilon, input.epsilon) << "caseName=" << testCase.case_name;
 }
 
-INSTANTIATE_TEST_SUITE_P(CsvCases, QkvRmsNormRopeCacheWithKScaleCsvTiling, testing::ValuesIn(GetCsvTilingCases()),
-                         MakeCsvTilingCaseName);
+const std::vector<QkvTilingCase> &GetTilingCases()
+{
+    static const auto cases = GetCasesFromCsv<QkvTilingCase>(ReplaceFileExtension2Csv(__FILE__));
+    return cases;
+}
+
+const QkvTilingCase *FindTilingCase(const std::string &caseName)
+{
+    const auto &cases = GetTilingCases();
+    const auto it = std::find_if(cases.begin(), cases.end(),
+                                 [&](const QkvTilingCase &testCase) { return testCase.case_name == caseName; });
+    return it == cases.end() ? nullptr : &*it;
+}
+
+bool MatchesExpectedResult(const QkvTilingCase &testCase, bool success, const TilingInfo &tilingInfo)
+{
+    if (success != (testCase.expectResult == ge::GRAPH_SUCCESS)) {
+        return false;
+    }
+    if (!success) {
+        return true;
+    }
+    if (tilingInfo.tilingDataSize < sizeof(TilingData) || tilingInfo.tilingData == nullptr) {
+        return false;
+    }
+    const auto *tiling = reinterpret_cast<const TilingData *>(tilingInfo.tilingData.get());
+    const auto matches = [](int64_t expected, uint64_t actual) {
+        return expected < 0 || static_cast<uint64_t>(expected) == actual;
+    };
+    return matches(testCase.expected.tilingKey, static_cast<uint64_t>(tilingInfo.tilingKey)) &&
+           matches(testCase.expected.blockNum, tilingInfo.blockNum) &&
+           matches(testCase.expected.tokenTile, tiling->tokenTile) &&
+           matches(testCase.expected.coreTokenTile, tiling->coreTokenTile) &&
+           matches(testCase.expected.coreGroupNum, tiling->coreGroupNum);
+}
+
+struct ConcurrentTilingResult {
+    bool ok = true;
+    uint64_t failedCase = 0U;
+    uint32_t failedIteration = 0U;
+    bool success = false;
+    uint64_t tokenTile = 0U;
+    uint64_t coreTokenTile = 0U;
+    uint64_t coreGroupNum = 0U;
+    uint64_t blockNum = 0U;
+};
+
+class QkvRmsNormRopeCacheWithKScaleCsvTiling : public testing::TestWithParam<QkvTilingCase> {};
+
+} // namespace
+
+TEST_P(QkvRmsNormRopeCacheWithKScaleCsvTiling, RunsCase)
+{
+    const auto &testCase = GetParam();
+    TilingInfo tilingInfo;
+    const bool success = RunTiling(testCase, tilingInfo);
+    const auto status = success ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED;
+    EXPECT_EQ(status, testCase.expectResult) << "caseName=" << testCase.case_name;
+    if (status == ge::GRAPH_SUCCESS && testCase.expectResult == ge::GRAPH_SUCCESS) {
+        ExpectTilingResult(testCase, tilingInfo);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(CsvCases, QkvRmsNormRopeCacheWithKScaleCsvTiling, testing::ValuesIn(GetTilingCases()),
+                         PrintCaseInfoString<QkvTilingCase>);
 
 TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, RealTilingIsStableAcrossThreads)
 {
     constexpr uint32_t THREAD_COUNT = 8U;
     constexpr uint32_t ITERATIONS = 64U;
-    std::vector<ConcurrentTilingCase> cases;
-    cases.reserve(5U);
-    cases.push_back({128, 16, 2, 2, 128, 32, ge::GRAPH_SUCCESS, 8, 4, 32, TEST_LAYOUT_NTD, TEST_LAYOUT_NTD});
-    cases.push_back({512, 64, 8, 8, 128, 32, ge::GRAPH_SUCCESS, 2, 16, 32, TEST_LAYOUT_NTD, TEST_LAYOUT_NTD});
-    cases.push_back({1024, 16, 2, 2, 128, 32, ge::GRAPH_SUCCESS, 8, 32, 32, TEST_LAYOUT_NTD, TEST_LAYOUT_NTD});
-    cases.push_back({128, 128, 8, 8, 128, 32, ge::GRAPH_FAILED, 0, 0, 0, TEST_LAYOUT_NTD, TEST_LAYOUT_NTD});
-    cases.push_back({128, 16, 2, 2, 64, 32, ge::GRAPH_FAILED, 0, 0, 0, TEST_LAYOUT_NTD, TEST_LAYOUT_NTD});
+    const std::array<std::string, 5> caseNames = {
+        "q16_k2_v2_basic",
+        "t512_q64_k8",
+        "t1024_q16_k2",
+        "too_many_q_heads",
+        "unsupported_head_dim",
+    };
+    std::array<const QkvTilingCase *, caseNames.size()> cases = {};
+    for (size_t i = 0; i < caseNames.size(); ++i) {
+        cases[i] = FindTilingCase(caseNames[i]);
+        ASSERT_NE(cases[i], nullptr) << "caseName=" << caseNames[i];
+    }
+
     std::atomic<bool> start(false);
     std::array<ConcurrentTilingResult, THREAD_COUNT> results;
     std::array<std::thread, THREAD_COUNT> threads;
-
     for (uint32_t threadIdx = 0U; threadIdx < THREAD_COUNT; ++threadIdx) {
         threads[threadIdx] = std::thread([threadIdx, &cases, &results, &start]() {
             while (!start.load(std::memory_order_acquire)) {
@@ -798,28 +455,21 @@ TEST(QkvRmsNormRopeCacheWithKScaleBaseTiling, RealTilingIsStableAcrossThreads)
             }
             for (uint32_t iter = 0U; iter < ITERATIONS; ++iter) {
                 const uint64_t caseIdx = (static_cast<uint64_t>(threadIdx) + iter) % cases.size();
-                const auto &item = cases[caseIdx];
-                auto input = BuildInput(item.totalTokens, item.numQHeads, item.numKHeads, item.numVHeads, item.headDim);
-                input.layoutQkv = item.layoutQkv;
-                input.layoutQOut = item.layoutQOut;
-                RefreshShapes(input);
+                const auto &testCase = *cases[caseIdx];
                 TilingInfo tilingInfo;
-                const bool success = ExecuteTilingForInput(input, tilingInfo, item.aicNum);
-                if (!MatchesConcurrentTilingCase(item, success, tilingInfo)) {
+                const bool success = RunTiling(testCase, tilingInfo);
+                if (!MatchesExpectedResult(testCase, success, tilingInfo)) {
                     results[threadIdx].ok = false;
                     results[threadIdx].failedCase = caseIdx;
                     results[threadIdx].failedIteration = iter;
                     results[threadIdx].success = success;
                     results[threadIdx].blockNum = tilingInfo.blockNum;
-                    if (success &&
-                        tilingInfo.tilingDataSize >= sizeof(optiling::QkvRmsNormRopeCacheWithKScaleTilingData) &&
+                    if (success && tilingInfo.tilingDataSize >= sizeof(TilingData) &&
                         tilingInfo.tilingData != nullptr) {
-                        const auto *tilingData =
-                            reinterpret_cast<const optiling::QkvRmsNormRopeCacheWithKScaleTilingData *>(
-                                tilingInfo.tilingData.get());
-                        results[threadIdx].tokenTile = tilingData->tokenTile;
-                        results[threadIdx].coreTokenTile = tilingData->coreTokenTile;
-                        results[threadIdx].coreGroupNum = tilingData->coreGroupNum;
+                        const auto *tiling = reinterpret_cast<const TilingData *>(tilingInfo.tilingData.get());
+                        results[threadIdx].tokenTile = tiling->tokenTile;
+                        results[threadIdx].coreTokenTile = tiling->coreTokenTile;
+                        results[threadIdx].coreGroupNum = tiling->coreGroupNum;
                     }
                     return;
                 }

@@ -37,6 +37,11 @@ struct QkvRmsNormRopeCacheWithKScaleTilingData {
     uint64_t kScaleCacheStrideToken = 0;
     uint64_t tokenTile = 0;
     float epsilon = 0.0F;
+    // M-RoPE uses only the H/W lane capacities at device side.  The T
+    // capacity is validated by host tiling but intentionally is not consumed
+    // by the kernel.
+    uint64_t mropeSectionH = 0;
+    uint64_t mropeSectionW = 0;
 };
 #pragma pack(pop)
 

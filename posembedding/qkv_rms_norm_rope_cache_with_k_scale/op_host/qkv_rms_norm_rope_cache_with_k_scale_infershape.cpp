@@ -23,6 +23,7 @@ static constexpr uint64_t K_SCALE_CACHE_INDEX = 7;
 static constexpr uint64_t HEAD_NUMS_ATTR_INDEX = 0;
 static constexpr uint64_t QKV_LAYOUT_ATTR_INDEX = 1;
 static constexpr uint64_t Q_OUT_LAYOUT_ATTR_INDEX = 2;
+static constexpr uint64_t Q_OUT_DTYPE_ATTR_INDEX = 6;
 
 static constexpr uint64_t Q_OUT_INDEX = 0;
 static constexpr uint64_t Q_SCALE_INDEX = 1;
@@ -66,10 +67,7 @@ static const char *GetLogOpName(gert::InferShapeContext *context)
     return context == nullptr || context->GetNodeName() == nullptr ? DEFAULT_OP_NAME : context->GetNodeName();
 }
 
-static std::string RankString(uint64_t dimNum)
-{
-    return std::to_string(dimNum) + "D";
-}
+static std::string RankString(uint64_t dimNum) { return std::to_string(dimNum) + "D"; }
 
 static std::string ShapeString(const gert::Shape *shape)
 {
@@ -318,8 +316,22 @@ ge::graphStatus InferDtype4QkvRmsNormRopeCacheWithKScale(gert::InferDataTypeCont
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(DEFAULT_OP_NAME, "context", "nullptr", "context can not be nullptr");
         return ge::GRAPH_FAILED;
     }
-    // q_out is always the quantized FP8 query output of this op, independent of the qkv input dtype.
-    context->SetOutputDataType(Q_OUT_INDEX, ge::DT_FLOAT8_E4M3FN);
+    ge::DataType qOutDtype = ge::DT_FLOAT8_E4M3FN;
+    const auto *attrs = context->GetAttrs();
+    if (attrs != nullptr && static_cast<uint64_t>(attrs->GetAttrNum()) > Q_OUT_DTYPE_ATTR_INDEX) {
+        const int64_t *qOutDtypeAttr = attrs->GetInt(Q_OUT_DTYPE_ATTR_INDEX);
+        if (qOutDtypeAttr != nullptr) {
+            const auto requestedDtype = static_cast<ge::DataType>(*qOutDtypeAttr);
+            if (requestedDtype != ge::DT_FLOAT8_E4M3FN && requestedDtype != ge::DT_BF16) {
+                const std::string incorrectValue = std::to_string(*qOutDtypeAttr);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(DEFAULT_OP_NAME, "q_out_dtype", incorrectValue.c_str(),
+                                                      "q_out_dtype must be ge::DT_FLOAT8_E4M3FN or ge::DT_BF16");
+                return ge::GRAPH_FAILED;
+            }
+            qOutDtype = requestedDtype;
+        }
+    }
+    context->SetOutputDataType(Q_OUT_INDEX, qOutDtype);
     context->SetOutputDataType(Q_SCALE_INDEX, ge::DT_FLOAT);
     context->SetOutputDataType(K_CACHE_OUT_INDEX, context->GetInputDataType(K_CACHE_INDEX));
     context->SetOutputDataType(V_CACHE_OUT_INDEX, context->GetInputDataType(V_CACHE_INDEX));

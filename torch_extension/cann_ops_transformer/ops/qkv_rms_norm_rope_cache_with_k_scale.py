@@ -20,6 +20,8 @@ OP_NAME = "qkv_rms_norm_rope_cache_with_k_scale"
 INPLACE_OP_NAME = "qkv_rms_norm_rope_cache_with_k_scale_"
 QKV_LAYOUT_TND = "TND"
 QKV_LAYOUT_NTD = "NTD"
+DEFAULT_Q_OUT_DTYPE = torch.float8_e4m3fn
+Q_QUANT_PER_TOKEN_PER_HEAD = "PerTokenPerHead"
 
 
 class QkvRmsNormRopeCacheWithKScaleOpBuilder(OpBuilder):
@@ -40,7 +42,8 @@ class QkvRmsNormRopeCacheWithKScaleOpBuilder(OpBuilder):
             "*, "
             "Tensor? rotation=None, Tensor? v_scale=None, "
             'str? layout_qkv="TND", str? layout_q_out="NTD", '
-            "float epsilon=0.000001) -> (Tensor, Tensor)",
+            "float epsilon=0.000001, Tensor? mrope_position=None, int[]? mrope_section=None, "
+            'str q_quant_mode="PerTokenPerHead", ScalarType? q_out_dtype=None) -> (Tensor, Tensor)',
             "qkv_rms_norm_rope_cache_with_k_scale("
             "Tensor qkv, Tensor q_gamma, Tensor k_gamma, Tensor cos_sin, Tensor slot_mapping, "
             "Tensor k_cache, Tensor v_cache, Tensor k_scale_cache, "
@@ -48,7 +51,9 @@ class QkvRmsNormRopeCacheWithKScaleOpBuilder(OpBuilder):
             "*, "
             "Tensor? rotation=None, Tensor? v_scale=None, "
             'str? layout_qkv="TND", str? layout_q_out="NTD", '
-            "float epsilon=0.000001) -> (Tensor, Tensor, Tensor, Tensor, Tensor)",
+            "float epsilon=0.000001, Tensor? mrope_position=None, int[]? mrope_section=None, "
+            'str q_quant_mode="PerTokenPerHead", ScalarType? q_out_dtype=None) -> '
+            "(Tensor, Tensor, Tensor, Tensor, Tensor)",
         ]
 
     def register_meta(self):
@@ -76,9 +81,19 @@ class QkvRmsNormRopeCacheWithKScaleOpBuilder(OpBuilder):
             layout_qkv=QKV_LAYOUT_TND,
             layout_q_out=QKV_LAYOUT_NTD,
             epsilon=1e-6,
+            mrope_position=None,
+            mrope_section=None,
+            q_quant_mode=Q_QUANT_PER_TOKEN_PER_HEAD,
+            q_out_dtype=DEFAULT_Q_OUT_DTYPE,
         ):
             return _qkv_rms_norm_rope_cache_with_k_scale_meta_outputs(
-                qkv, head_nums, layout_qkv, layout_q_out
+                qkv,
+                head_nums,
+                layout_qkv,
+                layout_q_out,
+                mrope_position,
+                mrope_section,
+                q_out_dtype,
             )
 
         @impl(AS_LIBRARY, OP_NAME, "Meta")
@@ -100,9 +115,19 @@ class QkvRmsNormRopeCacheWithKScaleOpBuilder(OpBuilder):
             layout_qkv=QKV_LAYOUT_TND,
             layout_q_out=QKV_LAYOUT_NTD,
             epsilon=1e-6,
+            mrope_position=None,
+            mrope_section=None,
+            q_quant_mode=Q_QUANT_PER_TOKEN_PER_HEAD,
+            q_out_dtype=DEFAULT_Q_OUT_DTYPE,
         ):
             q_out, q_scale = _qkv_rms_norm_rope_cache_with_k_scale_meta_outputs(
-                qkv, head_nums, layout_qkv, layout_q_out
+                qkv,
+                head_nums,
+                layout_qkv,
+                layout_q_out,
+                mrope_position,
+                mrope_section,
+                q_out_dtype,
             )
             return (
                 q_out,
@@ -124,10 +149,6 @@ def _get_q_head_num_for_meta(head_nums):
         )
 
     n_q = head_nums[0]
-    if n_q <= 0:
-        raise RuntimeError(
-            "qkv_rms_norm_rope_cache_with_k_scale: head_nums[0] must be greater than 0"
-        )
     return n_q
 
 
@@ -147,29 +168,32 @@ def _normalize_meta_layouts(layout_qkv, layout_q_out):
     )
 
 
-def _get_qkv_shape_for_meta(qkv, layout_qkv, n_q):
+def _normalize_q_out_dtype(q_out_dtype):
+    if q_out_dtype is None:
+        return DEFAULT_Q_OUT_DTYPE
+    if not isinstance(q_out_dtype, torch.dtype):
+        raise RuntimeError(
+            "qkv_rms_norm_rope_cache_with_k_scale: q_out_dtype must be a torch.dtype"
+        )
+    return q_out_dtype
+
+
+def _get_qkv_shape_for_meta(qkv, layout_qkv):
     if qkv.dim() < 3:
         raise RuntimeError(
             "qkv_rms_norm_rope_cache_with_k_scale: qkv must be at least 3D"
         )
 
     is_ntd = layout_qkv == QKV_LAYOUT_NTD
-    head_axis = 0 if is_ntd else 1
     token_axis = 1 if is_ntd else 0
     token_num = qkv.size(token_axis)
     head_size = qkv.size(2)
-    if token_num <= 0 or head_size <= 0:
-        raise RuntimeError(
-            "qkv_rms_norm_rope_cache_with_k_scale: qkv token and head dimensions must be positive"
-        )
-    if qkv.size(head_axis) < n_q:
-        raise RuntimeError(
-            "qkv_rms_norm_rope_cache_with_k_scale: qkv head dimension must be greater than or equal to head_nums[0]"
-        )
     return token_num, head_size
 
 
-def _make_meta_output_tensors(n_q, token_num, head_size, layout_q_out):
+def _make_meta_output_tensors(
+    n_q, token_num, head_size, layout_q_out, is_mrope, q_out_dtype
+):
     if layout_q_out == QKV_LAYOUT_NTD:
         q_out_shape = (n_q, token_num, head_size)
         q_scale_shape = (n_q, token_num)
@@ -177,19 +201,32 @@ def _make_meta_output_tensors(n_q, token_num, head_size, layout_q_out):
         q_out_shape = (token_num, n_q, head_size)
         q_scale_shape = (token_num, n_q)
 
-    # q_out dtype is fixed by the ACLNN contract: Q is dynamically quantized to FP8 E4M3FN.
-    q_out = torch.empty(q_out_shape, dtype=torch.float8_e4m3fn, device="meta")
-    q_scale = torch.empty(q_scale_shape, dtype=torch.float32, device="meta")
+    q_scale = (
+        None
+        if is_mrope
+        else torch.empty(q_scale_shape, dtype=torch.float32, device="meta")
+    )
+    q_out = torch.empty(q_out_shape, dtype=q_out_dtype, device="meta")
     return q_out, q_scale
 
 
 def _qkv_rms_norm_rope_cache_with_k_scale_meta_outputs(
-    qkv, head_nums, layout_qkv, layout_q_out
+    qkv,
+    head_nums,
+    layout_qkv,
+    layout_q_out,
+    mrope_position,
+    mrope_section,
+    q_out_dtype,
 ):
     n_q = _get_q_head_num_for_meta(head_nums)
+    q_out_dtype = _normalize_q_out_dtype(q_out_dtype)
     layout_qkv, layout_q_out = _normalize_meta_layouts(layout_qkv, layout_q_out)
-    token_num, head_size = _get_qkv_shape_for_meta(qkv, layout_qkv, n_q)
-    return _make_meta_output_tensors(n_q, token_num, head_size, layout_q_out)
+    token_num, head_size = _get_qkv_shape_for_meta(qkv, layout_qkv)
+    is_mrope = mrope_position is not None or bool(mrope_section)
+    return _make_meta_output_tensors(
+        n_q, token_num, head_size, layout_q_out, is_mrope, q_out_dtype
+    )
 
 
 qkv_rms_norm_rope_cache_with_k_scale_op_builder = (
@@ -216,10 +253,19 @@ def qkv_rms_norm_rope_cache_with_k_scale_(
     layout_qkv: Optional[str] = QKV_LAYOUT_TND,
     layout_q_out: Optional[str] = QKV_LAYOUT_NTD,
     epsilon: float = 1e-6,
+    mrope_position: Optional[torch.Tensor] = None,
+    mrope_section: Optional[List[int]] = None,
+    q_quant_mode: str = Q_QUANT_PER_TOKEN_PER_HEAD,
+    q_out_dtype: Optional[torch.dtype] = DEFAULT_Q_OUT_DTYPE,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
-    Run Q/K/V RMSNorm, RoPE, rotation matmul, FP8 quantization, and in-place KV cache update.
+    Run Q/K/V RMSNorm, RoPE, scene-specific quantization, and in-place KV cache update.
+
+    In the M-RoPE scene, ``mrope_position`` is an INT32 tensor with logical
+    shape ``[T, 3]``: each row is one token and columns are ordered T/H/W.
+    The wrapper forwards this optional tensor without transposing or reshaping it.
     """
+    q_out_dtype = _normalize_q_out_dtype(q_out_dtype)
     op_module = qkv_rms_norm_rope_cache_with_k_scale_op_builder.load()
     return op_module.qkv_rms_norm_rope_cache_with_k_scale_(
         qkv,
@@ -238,6 +284,10 @@ def qkv_rms_norm_rope_cache_with_k_scale_(
         rotation,
         v_scale,
         epsilon,
+        mrope_position,
+        mrope_section,
+        q_quant_mode,
+        q_out_dtype,
     )
 
 
@@ -260,10 +310,18 @@ def qkv_rms_norm_rope_cache_with_k_scale(
     layout_qkv: Optional[str] = QKV_LAYOUT_TND,
     layout_q_out: Optional[str] = QKV_LAYOUT_NTD,
     epsilon: float = 1e-6,
+    mrope_position: Optional[torch.Tensor] = None,
+    mrope_section: Optional[List[int]] = None,
+    q_quant_mode: str = Q_QUANT_PER_TOKEN_PER_HEAD,
+    q_out_dtype: Optional[torch.dtype] = DEFAULT_Q_OUT_DTYPE,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Functional variant returning cloned cache outputs instead of mutating caller-visible caches.
+
+    In the M-RoPE scene, ``mrope_position`` uses logical shape ``[T, 3]`` with
+    T/H/W positions in columns 0/1/2 respectively.
     """
+    q_out_dtype = _normalize_q_out_dtype(q_out_dtype)
     op_module = qkv_rms_norm_rope_cache_with_k_scale_op_builder.load()
     return op_module.qkv_rms_norm_rope_cache_with_k_scale(
         qkv,
@@ -282,4 +340,8 @@ def qkv_rms_norm_rope_cache_with_k_scale(
         rotation,
         v_scale,
         epsilon,
+        mrope_position,
+        mrope_section,
+        q_quant_mode,
+        q_out_dtype,
     )

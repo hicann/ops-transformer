@@ -15,16 +15,16 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_qkv_rms_norm_rope_cache_with_k_scale.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 struct TensorResource {
@@ -213,8 +213,8 @@ int main()
     TensorResource vScale;
     TensorResource qOut;
     TensorResource qScale;
-    resource.tensors = {&qkv,         &qGamma,    &kGamma,        &cosSin,   &slotMapping, &kCache, &vCache,
-                        &kScaleCache, &queryStartLoc, &seqLens, &rotation, &vScale,      &qOut,   &qScale};
+    resource.tensors = {&qkv, &qGamma, &kGamma, &cosSin, &slotMapping, &kCache, &vCache,
+                        &kScaleCache, &queryStartLoc, &seqLens, &rotation, &vScale, &qOut, &qScale};
 
     ret = CreateAclTensor(qkvHostData, qkvShape, ACL_BF16, qkv);
     CHECK_RET(ret == ACL_SUCCESS, return ReturnAfterCleanup(ret, resource));
@@ -256,8 +256,9 @@ int main()
     uint64_t workspaceSize = 0;
     aclnnStatus status = aclnnQkvRmsNormRopeCacheWithKScaleGetWorkspaceSize(
         qkv.tensor, qGamma.tensor, kGamma.tensor, cosSin.tensor, slotMapping.tensor, kCache.tensor, vCache.tensor,
-        kScaleCache.tensor, queryStartLoc.tensor, seqLens.tensor, rotation.tensor, vScale.tensor, resource.headNums,
-        layoutQkv, layoutQOut, epsilon, qOut.tensor, qScale.tensor, &workspaceSize, &resource.executor);
+        kScaleCache.tensor, queryStartLoc.tensor, seqLens.tensor, rotation.tensor, vScale.tensor, nullptr,
+        resource.headNums, layoutQkv, layoutQOut, epsilon, nullptr, "PerTokenPerHead", qOut.tensor, qScale.tensor,
+        &workspaceSize, &resource.executor);
     CHECK_RET(status == ACL_SUCCESS,
               LOG_PRINT("aclnnQkvRmsNormRopeCacheWithKScaleGetWorkspaceSize failed. ERROR: %d\n", status);
               return ReturnAfterCleanup(static_cast<int>(status), resource));
