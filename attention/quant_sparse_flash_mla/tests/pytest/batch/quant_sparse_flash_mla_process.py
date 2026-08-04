@@ -192,7 +192,7 @@ def test_qsmla_quant_process_graph(test_data, device_id=0):
         op_win_kwargs["ori_win_left"] = op_input["ori_win_left"]
     if op_input.get("ori_win_right") is not None:
         op_win_kwargs["ori_win_right"] = op_input["ori_win_right"]
-    npu_result = npu_model(
+    npu_result, npu_lse = npu_model(
         q=op_input["q"].npu() if op_input["q"] is not None else None,
         ori_kv=op_input["ori_kv"].npu() if op_input["ori_kv"] is not None else None,
         cmp_kv=op_input["cmp_kv"].npu() if op_input["cmp_kv"] is not None else None,
@@ -257,7 +257,7 @@ def test_qsmla_quant_process_graph(test_data, device_id=0):
         topk_value_mode=op_input.get("topk_value_mode", 1),
         return_softmax_lse=op_input.get("return_softmax_lse", False),
     )
-    return npu_result, cpu_output
+    return npu_result, cpu_output, cpu_lse, npu_lse
 
 
 def test_qsmla_quant_process_ci(test_data, device_id=0):

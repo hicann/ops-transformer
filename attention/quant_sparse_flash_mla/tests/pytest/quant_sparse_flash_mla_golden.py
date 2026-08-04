@@ -665,7 +665,7 @@ class GeneralizedSFAQuant:
 
         cmp_topk_length_bnsd = None
         if (
-            self.template_run_mode in ("ORI_SPARSE", "ORI_CMP_SPARSE")
+            self.template_run_mode in ("ORI_SPARSE", "ORI_CMP_SPARSE", "CSA")
             and cmp_topk_length is not None
         ):
             cmp_topk_length_bnsd, _ = self.trans_topk_length_shape_to_bnsd(

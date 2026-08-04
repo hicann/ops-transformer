@@ -70,10 +70,28 @@ def mqsmla(testcase_files):
     try:
         npu_result, cpu_quant_result, cpu_lse, npu_lse = mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(
             test_data, device_id=device_id)
-        result, fulfill_percent = result_compare_method.check_result(cpu_quant_result, npu_result)
+        attn_result, attn_percent = result_compare_method.check_result(cpu_quant_result, npu_result)
+        lse_res, lse_pct = None, None
+        fail_info = []
+        min_fulfill = attn_percent  # 修复：main_pct → attn_percent
+
         if test_data['params'].get('return_softmax_lse'):
             print("return_softmax_lse is true!!!")
-            result, fulfill_percent = result_compare_method.check_result(cpu_lse, npu_lse)
+            lse_res, lse_pct = result_compare_method.check_result(cpu_lse, npu_lse)
+            min_fulfill = min(min_fulfill, lse_pct)
+        
+        if attn_result != "Pass":
+            fail_info.append(f"MAIN_FAILED:{attn_result}")
+        # LSE失败记录
+        if lse_res is not None and lse_res != "Pass":
+            fail_info.append(f"LSE_FAILED:{lse_res}")
+
+        if fail_info:
+            result = "; ".join(fail_info)
+            fulfill_percent = min_fulfill
+        else:
+            result = "Pass"
+            fulfill_percent = min_fulfill
     except Exception as e:
         npu_error_msg = str(e)
         print("NPU ERROR：", npu_error_msg)

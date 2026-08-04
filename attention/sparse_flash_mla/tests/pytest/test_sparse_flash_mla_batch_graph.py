@@ -73,10 +73,26 @@ def smla_graph(testcase_files):
     npu_error_msg = None
     try:
         npu_result, softmax_lse = sparse_flash_mla_process.call_npu_graph(test_data, device_id=device_id)
-        result, fulfill_percent = result_compare_method.check_result(test_data['cpu_output'], npu_result)
+        attn_result, attn_percent = result_compare_method.check_result(test_data['cpu_output'], npu_result)
+        lse_result, lse_percent = None, None
+        fail_info = []
+        min_fulfill = attn_percent
         if test_data['params'].get('return_softmax_lse'):
             print("return_softmax_lse is true!!!")
-            result, fulfill_percent = result_compare_method.check_result(test_data['softmax_lse'], softmax_lse)
+            lse_result, lse_percent = result_compare_method.check_result(test_data['softmax_lse'], softmax_lse)
+            min_fulfill = min(min_fulfill, lse_percent)
+
+        if attn_result != "Pass":
+            fail_info.append(f"MAIN_FAILED:{attn_result}")
+        if lse_result is not None and lse_result != "Pass":
+            fail_info.append(f"LSE_FAILED:{lse_result}")
+
+        if fail_info:
+            result = "; ".join(fail_info)
+            fulfill_percent = min_fulfill
+        else:
+            result = "Pass"
+            fulfill_percent = min_fulfill
     except Exception as e:
         npu_error_msg = str(e)
         print("NPU ERROR：", npu_error_msg)

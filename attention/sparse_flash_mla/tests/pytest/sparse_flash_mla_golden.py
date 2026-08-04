@@ -758,7 +758,7 @@ class GeneralizedSFA:
             )
         else:
             ori_topk_length_bnsd = None
-        if template_idx == 4:
+        if template_idx == 2 or template_idx == 4:
             cmp_topk_length_bnsd, _ = (
                 self.trans_topk_length_shape_to_bnsd(
                     cmp_topk_length, cmp_topk_length.shape, self.layout_q, cu_seqlens_q

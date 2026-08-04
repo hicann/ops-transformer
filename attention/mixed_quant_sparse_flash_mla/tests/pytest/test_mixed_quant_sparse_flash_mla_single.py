@@ -128,14 +128,31 @@ def mqsmla(param_combinations):
                 test_data, device_id=device_id
             )
         )
-        result, fulfill_percent = result_compare_method.check_result(
+        attn_result, attn_percent = result_compare_method.check_result(
             cpu_quant_result, npu_result
         )
+        lse_result, lse_percent = None, None
+        fail_info = []
+        min_fulfill = attn_percent
+
         if test_data["params"].get("return_softmax_lse"):
             print("return_softmax_lse is true!!!")
-            result, fulfill_percent = result_compare_method.check_result(
+            lse_result, lse_percent = result_compare_method.check_result(
                 cpu_lse, npu_lse
             )
+            min_fulfill = min(min_fulfill, lse_percent)
+
+        if attn_result != "Pass":
+            fail_info.append(f"MAIN_FAILED:{attn_result}")
+        if lse_result is not None and lse_result != "Pass":
+            fail_info.append(f"LSE_FAILED:{lse_result}")
+
+        if fail_info:
+            result = "; ".join(fail_info)
+            fulfill_percent = min_fulfill
+        else:
+            result = "Pass"
+            fulfill_percent = min_fulfill
     except Exception as e:
         npu_error_msg = str(e)
         print("NPU ERROR：", npu_error_msg)
