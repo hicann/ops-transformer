@@ -63,13 +63,13 @@
 
   - 最终输出
 
-  $$
-  \mathbf{normOut}[2 \times \mathbf{numIters} - 1]
-  $$
+    $$
+    \mathbf{normOut}[2 \times \mathbf{numIters} - 1]
+    $$
 
-  $$
-  \mathbf{sumOut}[2 \times \mathbf{numIters} - 1]
-  $$
+    $$
+    \mathbf{sumOut}[2 \times \mathbf{numIters} - 1]
+    $$
 
   - 符号说明
 
@@ -266,9 +266,9 @@ aclnnStatus aclnnMhcPreSinkhorn(
       </tr>
       <tr>
         <td>hPre（aclTensor*）</td>
-        <td>可选输出</td>
+        <td>输出</td>
         <td>需要反向时输出，做完sigmoid计算之后的hPre矩阵。</td>
-        <td>根据needBackward决定是否输出。</td>
+        <td>当needBackward为false时，此输出无效。</td>
         <td>FLOAT32</td>
         <td>ND</td>
         <td>(bs, seq_len, n)</td>
@@ -276,9 +276,9 @@ aclnnStatus aclnnMhcPreSinkhorn(
       </tr>
       <tr>
         <td>hcBeforeNorm（aclTensor*）</td>
-        <td>可选输出</td>
+        <td>输出</td>
         <td>需要反向时输出，x与phi矩阵乘的结果。</td>
-        <td>根据needBackward决定是否输出。</td>
+        <td>当needBackward为false时，此输出无效。</td>
         <td>FLOAT32</td>
         <td>ND</td>
         <td>(bs, seq_len, n*n + 2*n)</td>
@@ -286,9 +286,9 @@ aclnnStatus aclnnMhcPreSinkhorn(
       </tr>
       <tr>
         <td>invRms（aclTensor*）</td>
-        <td>可选输出</td>
+        <td>输出</td>
         <td>需要反向时输出，RmsNorm计算得到的1/r。</td>
-        <td>根据needBackward决定是否输出。</td>
+        <td>当needBackward为false时，此输出无效。</td>
         <td>FLOAT32</td>
         <td>ND</td>
         <td>(bs, seq_len, 1)</td>
@@ -296,9 +296,9 @@ aclnnStatus aclnnMhcPreSinkhorn(
       </tr>
       <tr>
         <td>sumOut（aclTensor*）</td>
-        <td>可选输出</td>
+        <td>输出</td>
         <td>需要反向时输出，每一次迭代的colSum/rowSum结果。</td>
-        <td>根据needBackward决定是否输出。</td>
+        <td>当needBackward为false时，此输出无效。</td>
         <td>FLOAT32</td>
         <td>ND</td>
         <td>(sk_iter_count * 2, bs, seq_len, n)</td>
@@ -306,9 +306,9 @@ aclnnStatus aclnnMhcPreSinkhorn(
       </tr>
       <tr>
         <td>normOut（aclTensor*）</td>
-        <td>可选输出</td>
+        <td>输出</td>
         <td>需要反向时输出，每一次colSum/rowSum迭代后的comb结果。</td>
-        <td>根据needBackward决定是否输出。</td>
+        <td>当needBackward为false时，此输出无效。</td>
         <td>FLOAT32</td>
         <td>ND</td>
         <td>(sk_iter_count * 2, bs, seq_len, n, n)</td>

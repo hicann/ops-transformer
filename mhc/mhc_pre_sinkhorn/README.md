@@ -17,7 +17,7 @@
 
 - **计算公式**：
 
-  $$ 
+  $$
   \begin{aligned}
   \vec{x^{'}_{l}} &= \frac{1}{\sqrt{\frac{1}{d} \sum_{\dim=-2,\text{keepdim}=\text{True}} x_i^2 + \epsilon}}\\
   H^{pre}_l &= \alpha^{pre}_{l} ·(\vec{x^{'}_{l}}\varphi^{pre}_{l}) + b^{pre}_{l}\\
@@ -105,35 +105,35 @@
       </tr>
       <tr>
         <td>hcMult</td>
-        <td>可选输入</td>
+        <td>可选属性</td>
         <td>残差流数量，HC维度大小，当前仅支持4。</td>
         <td>INT32</td>
         <td>-</td>
       </tr>
       <tr>
         <td>numIters</td>
-        <td>可选输入</td>
+        <td>可选属性</td>
         <td>表示sinkhorn算法迭代次数，当前仅支持20。</td>
         <td>INT32</td>
         <td>-</td>
       </tr>
       <tr>
         <td>hcEps</td>
-        <td>可选输入</td>
+        <td>可选属性</td>
         <td>h_pre的sigmoid后的eps参数。</td>
         <td>DOUBLE</td>
         <td>-</td>
       </tr>
       <tr>
         <td>normEps</td>
-        <td>可选输入</td>
+        <td>可选属性</td>
         <td>RmsNorm的防除零参数。</td>
         <td>DOUBLE</td>
         <td>-</td>
       </tr>
       <tr>
         <td>needBackward</td>
-        <td>可选输入</td>
+        <td>可选属性</td>
         <td>是否需要输出额外属性。</td>
         <td>BOOL</td>
         <td>-</td>
@@ -161,36 +161,36 @@
       </tr>
       <tr>
         <td>hPre</td>
-        <td>可选输出</td>
-        <td>需要反向时输出，做完sigmoid计算之后的hPre矩阵。</td>
+        <td>输出</td>
+        <td>需要反向时输出，做完sigmoid计算之后的hPre矩阵。needBackward为false时，输出无效。</td>
         <td>FLOAT32</td>
         <td>ND</td>
       </tr>
       <tr>
         <td>hcBeforeNorm</td>
-        <td>可选输出</td>
-        <td>需要反向时输出，x与phi矩阵乘的结果。</td>
+        <td>输出</td>
+        <td>需要反向时输出，x与phi矩阵乘的结果。needBackward为false时，输出无效。</td>
         <td>FLOAT32</td>
         <td>ND</td>
       </tr>
       <tr>
         <td>invRms</td>
-        <td>可选输出</td>
-        <td>需要反向时输出，RmsNorm计算得到的1/r。</td>
+        <td>输出</td>
+        <td>需要反向时输出，RmsNorm计算得到的1/r。needBackward为false时，输出无效。</td>
         <td>FLOAT32</td>
         <td>ND</td>
       </tr>
       <tr>
         <td>sumOut</td>
-        <td>可选输出</td>
-        <td>需要反向时输出，每一次迭代的colSum/rowSum结果。</td>
+        <td>输出</td>
+        <td>需要反向时输出，每一次迭代的colSum/rowSum结果。needBackward为false时，输出无效。</td>
         <td>FLOAT32</td>
         <td>ND</td>
       </tr>
       <tr>
         <td>normOut</td>
-        <td>可选输出</td>
-        <td>需要反向时输出，每一次colSum/rowSum迭代后的comb结果。</td>
+        <td>输出</td>
+        <td>需要反向时输出，每一次colSum/rowSum迭代后的comb结果。needBackward为false时，输出无效。</td>
         <td>FLOAT32</td>
         <td>ND</td>
       </tr>
