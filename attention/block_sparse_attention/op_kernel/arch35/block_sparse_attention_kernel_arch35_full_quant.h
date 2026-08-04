@@ -27,13 +27,13 @@ template <
 class BsaFullQuantKernelArch35 {
 public:
     using ArchTag = typename BlockMmadPV::ArchTag;
-    
-    using ElementQ = typename BlockMmadQK::ElementA; // fp8_e4m3fn_t
-    using ElementK = typename BlockMmadQK::ElementB; // fp8_e4m3fn_t
+
+    using ElementQ = typename BlockMmadQK::ElementA;               // fp8_e4m3fn_t
+    using ElementK = typename BlockMmadQK::ElementB;               // fp8_e4m3fn_t
     using ElementS = typename EpilogueOnlineSoftmax::ElementInput; // half/bloat16_t
-    using ElementP = typename BlockMmadPV::ElementA; // fp8_e4m3fn_t
-    using ElementV = typename BlockMmadPV::ElementB; // fp8_e4m3fn_t
-    using ElementOTmp = typename BlockMmadPV::ElementC; // float
+    using ElementP = typename BlockMmadPV::ElementA;               // fp8_e4m3fn_t
+    using ElementV = typename BlockMmadPV::ElementB;               // fp8_e4m3fn_t
+    using ElementOTmp = typename BlockMmadPV::ElementC;            // float
     using ElementO = typename EpilogueOnlineSoftmax::ElementInput; // half/bloat16_t
     using ElementLse = typename EpilogueRescaleO::ElementLse;
     using ElementSparseMask = typename EpilogueMask2Idx::ElementSparseMask;
@@ -108,9 +108,8 @@ public:
 #ifdef __DAV_VEC__
         EpilogueMask2Idx epilogueMask2Idx(resource);
         uint32_t totalRowNumBlockMask = batch_ * qHeads_ * xBlockNumAligned_;
-        epilogueMask2Idx(
-            gBlockSparseMask, gSparseIdx, gSparseCount,
-            totalRowNumBlockMask, yBlockNumAligned_, avgRowPerSubCore_, preActiveSubCoreNum_);
+        epilogueMask2Idx(gBlockSparseMask, gSparseIdx, gSparseCount, totalRowNumBlockMask, yBlockNumAligned_,
+                         avgRowPerSubCore_, preActiveSubCoreNum_);
 #endif
         AscendC::SyncAll<false>();
 #ifdef __DAV_CUBE__
@@ -131,12 +130,12 @@ public:
         int64_t strideQO = 0;
         int64_t strideKV = 0;
         int64_t strideLse = 0;
-        int64_t strideQOB = 0;  // BNSD/BSND batch_ stride for Q
-        int64_t strideQON = 0;  // BNSD/BSND head stride for Q
-        int64_t strideQOS = 0;  // BNSD/BSND seq stride for Q
-        int64_t strideKVB = 0;  // BNSD/BSND batch_ stride for KV
-        int64_t strideKVN = 0;  // BNSD/BSND head stride for KV
-        int64_t strideKVS = 0;  // BNSD/BSND seq stride for KV
+        int64_t strideQOB = 0; // BNSD/BSND batch_ stride for Q
+        int64_t strideQON = 0; // BNSD/BSND head stride for Q
+        int64_t strideQOS = 0; // BNSD/BSND seq stride for Q
+        int64_t strideKVB = 0; // BNSD/BSND batch_ stride for KV
+        int64_t strideKVN = 0; // BNSD/BSND head stride for KV
+        int64_t strideKVS = 0; // BNSD/BSND seq stride for KV
         int64_t strideLseB = 0;
         int64_t strideLseN = 0;
         int64_t strideLseS = 0;
@@ -145,9 +144,9 @@ public:
             strideQO = qHeads_ * embed_;
             strideLse = qHeads_;
         } else if constexpr (qFormat == Format::BNSD) {
-            strideQOB = qHeads_ * qSeqlenAligned_ * embed_;  // batch_ stride
-            strideQON = qSeqlenAligned_ * embed_;  // head stride
-            strideQOS = embed_;  // seq stride
+            strideQOB = qHeads_ * qSeqlenAligned_ * embed_; // batch_ stride
+            strideQON = qSeqlenAligned_ * embed_;           // head stride
+            strideQOS = embed_;                             // seq stride
             strideLseB = qHeads_ * qSeqlenAligned_;
             strideLseN = qSeqlenAligned_;
             strideLseS = 1;
@@ -264,11 +263,12 @@ public:
 
             // the actual x block num of cur batch_, calc by actual qseqlen
             uint32_t xBlockNumAval = static_cast<uint32_t>(CeilDiv(qSeqlen, static_cast<int64_t>(blockShapeX_)));
-            uint32_t xBlockSize = (xBlockIdx == xBlockNumAval - 1) ?
-                (qSeqlen - xBlockIdx * blockShapeX_) : blockShapeX_;
+            uint32_t xBlockSize =
+                (xBlockIdx == xBlockNumAval - 1) ? (qSeqlen - xBlockIdx * blockShapeX_) : blockShapeX_;
             uint32_t qSTileNumCurXBlock = CeilDiv(xBlockSize, qBaseTile_);
             uint32_t qSTileSizeAct = (qSTileIdxCurXBlock == qSTileNumCurXBlock - 1) ?
-                (xBlockSize - qSTileIdxCurXBlock * qBaseTile_) : qBaseTile_;
+                                         (xBlockSize - qSTileIdxCurXBlock * qBaseTile_) :
+                                         qBaseTile_;
             // calc the gathered kvS from sparse mask
             uint32_t gmOffsetSparseCount =
                 curBatch * qHeads_ * xBlockNumAligned_ + qHeadIdx * xBlockNumAligned_ + xBlockIdx;
@@ -279,8 +279,8 @@ public:
             uint32_t lastSparseIdx = gSparseIdx.GetValue(lastIdxOffset);
 
             uint32_t yBlockNumAval = static_cast<uint32_t>(CeilDiv(kvSeqlen, static_cast<int64_t>(blockShapeY_)));
-            uint32_t lastYBlockSize = (lastSparseIdx == yBlockNumAval - 1) ?
-                kvSeqlen - lastSparseIdx * blockShapeY_ : blockShapeY_;
+            uint32_t lastYBlockSize =
+                (lastSparseIdx == yBlockNumAval - 1) ? kvSeqlen - lastSparseIdx * blockShapeY_ : blockShapeY_;
             int64_t gatheredKvSeqlen = (yBlockNumRsvd - 1) * blockShapeY_ + lastYBlockSize;
             // the rowNum of cur task
             // no qS*qN combination even in GQA/MQA senario, since each qN has a different sparse pattern
@@ -352,8 +352,7 @@ public:
                     GemmCoord actualBlockShapeQK{rowNum, kvSTileSizeAct, embed_};
                     uint32_t ubSBufId = gatheredKvSTileIdx % UB_S_OTMP_BUF_STAGES;
                     auto ubSLayoutTla = tla::MakeLayout<ElementS, LayoutS>(rowNumRound, RoundUp(kvSTileSizeAct, 16));
-                    auto ubSTensorTla = tla::MakeTensor(ubSTensor[ubSBufId],
-                    ubSLayoutTla, Arch::PositionUB{});
+                    auto ubSTensorTla = tla::MakeTensor(ubSTensor[ubSBufId], ubSLayoutTla, Arch::PositionUB{});
                     uint32_t Mm1ToSmFlagId = ubSBufId;
                     Arch::CrossCoreFlag mm1ToSmFlag(Mm1ToSmFlagId);
 #ifdef __DAV_CUBE__
@@ -380,8 +379,7 @@ public:
                     uint32_t smToMm2FlagId = l1PBufId + UB_S_OTMP_BUF_STAGES;
                     Arch::CrossCoreFlag smToMm2Flag(smToMm2FlagId);
                     auto l1PLayoutTla = tla::MakeLayout<ElementP, NpuArch::layout::zN>(rowNum, kvSTileSizeAct);
-                    auto l1PTensorTla = tla::MakeTensor(l1PTensor[l1PBufId],
-                    l1PLayoutTla, Arch::PositionL1{});
+                    auto l1PTensorTla = tla::MakeTensor(l1PTensor[l1PBufId], l1PLayoutTla, Arch::PositionL1{});
 #ifdef __DAV_VEC__
                     // Stage 2: Online softmax (computed on VECTOR core)
                     // online softmax
@@ -410,10 +408,10 @@ public:
 #ifdef __DAV_CUBE__
                     uint32_t l1PBufId = gatheredKvSTileIdxDe % pL1BufNum_;
                     auto ubOTmpLayoutTla = tla::MakeLayout<ElementOTmp, LayoutOTmp>(rowNumRound, embedRound);
-                    auto ubOTmpTensorTla = tla::MakeTensor(ubOTmpTensor[ubOTmpBufId],
-                        ubOTmpLayoutTla, Arch::PositionUB{});
+                    auto ubOTmpTensorTla =
+                        tla::MakeTensor(ubOTmpTensor[ubOTmpBufId], ubOTmpLayoutTla, Arch::PositionUB{});
                     uint32_t smToMm2FlagId = l1PBufId + UB_S_OTMP_BUF_STAGES;
-                    
+
                     Arch::CrossCoreFlag smToMm2Flag(smToMm2FlagId);
                     Arch::CrossCoreFlag mm2ToReFlag(Mm2ToReFlagId);
                     uint64_t prefixSumL0AStages = CalcCrossMm1Mm2PrefixSumL0ABStages(
@@ -423,7 +421,7 @@ public:
                     uint32_t yBlockIndexOffsetDe = (gatheredKvSTileIdxDe * kvBaseTile_) / blockShapeY_;
                     uint32_t yBlockIndexDe = gSparseIdx[gmOffsetSparseIdx].GetValue(yBlockIndexOffsetDe);
                     uint32_t kvDequantScaleOffsetDe =
-                    curBatch * kvHeads_ * yBlockNumAligned_ + kvHeadIdx * yBlockNumAligned_ + yBlockIndexDe;
+                        curBatch * kvHeads_ * yBlockNumAligned_ + kvHeadIdx * yBlockNumAligned_ + yBlockIndexDe;
                     float vDequantScaleValue = gVDequantScale.GetValue(kvDequantScaleOffsetDe);
                     uint64_t deqScalar = static_cast<uint64_t>(*reinterpret_cast<int32_t *>(&vDequantScaleValue));
                     blockMmadPV(gmVTensorTla, ubOTmpTensorTla, gSparseIdx[gmOffsetSparseIdx], actualBlockShapePV,
@@ -434,12 +432,9 @@ public:
                     // rescale O
                     Arch::CrossCoreFlag mm2ToReFlag(Mm2ToReFlagId);
                     uint32_t curTileMod = gatheredKvSTileIdxDe % (PRE_LAUNCH + 1);
-                    epilogueRescaleO(
-                        gmOTensorTla, gmLseTensorTla, actualBlockShapePV,
-                        curTileMod, gatheredKvSTileIdxDe,
-                        (gatheredKvSTileIdxDe == 0),
-                        (gatheredKvSTileIdxDe == kvSLoopNum - 1),
-                        mm2ToReFlag);
+                    epilogueRescaleO(gmOTensorTla, gmLseTensorTla, actualBlockShapePV, curTileMod, gatheredKvSTileIdxDe,
+                                     (gatheredKvSTileIdxDe == 0), (gatheredKvSTileIdxDe == kvSLoopNum - 1),
+                                     mm2ToReFlag);
 #endif
                 }
             }
@@ -492,17 +487,17 @@ public:
         vL1BufNum_ = bsaTilingData->BsaMmPhaseL1TileInfo.vL1BufNum;
         pL1BufNum_ = bsaTilingData->BsaMmPhaseL1TileInfo.pL1BufNum;
         Gemm::Block::Mm1L1TileHelper mm1L1TileHelper(mm1L1TileM_, mm1L1TileN_, mm1L1TileKLeft_, mm1L1TileKRight_,
-            qL1BufNum_, kL1BufNum_);
+                                                     qL1BufNum_, kL1BufNum_);
         mm1L1TileHelper_ = mm1L1TileHelper;
         Gemm::Block::Mm2L1TileHelper mm2L1TileHelper(mm2L1TileM_, mm2L1TileN_, mm2L1TileKLeft_, mm2L1TileKRight_,
-            pL1BufNum_, vL1BufNum_);
+                                                     pL1BufNum_, vL1BufNum_);
         mm2L1TileHelper_ = mm2L1TileHelper;
         mm2L1AddrStart_ = mm1L1TileM_ * mm1L1TileKLeft_ * qL1BufNum_ * sizeof(ElementQ) +
                           mm1L1TileKRight_ * mm1L1TileN_ * kL1BufNum_ * sizeof(ElementK);
-        mm1L0ATotalStages_ = (qBaseTile_ / BlockMmadQK::L0_TILE_M) * (embed_ / BlockMmadQK::L0_TILE_K);
-        mm1L0BTotalStages_ = (kvBaseTile_ / BlockMmadQK::L0_TILE_N) * (embed_ / BlockMmadQK::L0_TILE_K);
-        mm2L0ATotalStages_ = (qBaseTile_ / BlockMmadPV::L0_TILE_M) * (kvBaseTile_ / BlockMmadPV::L0_TILE_K);
-        mm2L0BTotalStages_ = (kvBaseTile_ / BlockMmadPV::L0_TILE_K) * (embed_ / BlockMmadPV::L0_TILE_N);
+        mm1L0ATotalStages_ = CeilDiv(qBaseTile_, BlockMmadQK::L0_TILE_M) * (embed_ / BlockMmadQK::L0_TILE_K);
+        mm1L0BTotalStages_ = CeilDiv(kvBaseTile_, BlockMmadQK::L0_TILE_N) * (embed_ / BlockMmadQK::L0_TILE_K);
+        mm2L0ATotalStages_ = CeilDiv(qBaseTile_, BlockMmadPV::L0_TILE_M) * CeilDiv(kvBaseTile_, BlockMmadPV::L0_TILE_K);
+        mm2L0BTotalStages_ = CeilDiv(kvBaseTile_, BlockMmadPV::L0_TILE_K) * (embed_ / BlockMmadPV::L0_TILE_N);
     }
 
     __aicore__ inline
@@ -538,8 +533,8 @@ public:
         uint32_t colNumPerSubCore = EpilogueOnlineSoftmax::SM_COL_MAX_ELEM_NUM;
         uint32_t rescaleCol = EpilogueRescaleO::RESCALE_COL_MAX_ELEM_NUM;
         for (uint32_t i = 0; i < UB_S_OTMP_BUF_STAGES; i++) {
-            ubSTensor[i] = resource.ubBuf.template GetBufferByByte<ElementS>(
-                rowNumPerSubCore * colNumPerSubCore * sizeof(ElementS) * i);
+            ubSTensor[i] = resource.ubBuf.template GetBufferByByte<ElementS>(rowNumPerSubCore * colNumPerSubCore *
+                                                                             sizeof(ElementS) * i);
             ubOTmpTensor[i] = resource.ubBuf.template GetBufferByByte<ElementOTmp>(
                 rowNumPerSubCore * colNumPerSubCore * sizeof(ElementS) * UB_S_OTMP_BUF_STAGES +
                 rowNumPerSubCore * colNumPerSubCore * sizeof(ElementS) * UB_S_OTMP_BUF_STAGES +
@@ -712,4 +707,4 @@ private:
     Gemm::Block::Mm2L1TileHelper mm2L1TileHelper_;
 };
 
-}
+} // namespace BsaKernelArch35

@@ -9,6 +9,7 @@
  */
 
 #include "block_sparse_attention_tiling.h"
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include "log/log.h"
@@ -90,6 +91,7 @@ constexpr uint32_t NUM3 = 3;
 constexpr uint32_t SOC_VER_950_CODE = 4;
 constexpr uint32_t INF_WINDOW_SIZE_PRE_NEXT = 2147483647;
 
+constexpr uint32_t TILE_SIZE_16 = 16;
 constexpr uint32_t TILE_SIZE_128 = 128;
 constexpr uint32_t TILE_SIZE_256 = 256;
 constexpr uint32_t D_SIZE_128 = 128;
@@ -618,12 +620,12 @@ ge::graphStatus BSATiling::CheckSparsePattern(gert::TilingContext *bsaContext, c
                 blockShapeX_, blockShapeY_);
         return ge::GRAPH_FAILED;
     }
-    // temporary regulation of blockShapeY
+    // Only blockShapeY requires alignment (A950: 16; A910/A910B: 128). blockShapeX has no align constraint.
     if (blockShapeY_ % defaultShape != 0) {
         OP_LOGE(bsaContext->GetNodeName(),
-                "BlockShape elem1 must be a multiple of 128 so far, "
+                "BlockShape elem1 must be a multiple of %ld, "
                 "but got elem1: %ld.",
-                blockShapeY_);
+                defaultShape, blockShapeY_);
         return ge::GRAPH_FAILED;
     }
     if (blockSparseMaskShape->GetStorageShape().GetDimNum() != 4) {
@@ -655,6 +657,7 @@ ge::graphStatus BSATiling::CheckSparsePattern(gert::TilingContext *bsaContext, c
 
 ge::graphStatus BSATiling::ParseSparsePattern(gert::TilingContext *bsaContext)
 {
+    constexpr int64_t MIN_BLOCK_ALIGN = 16;
     constexpr int64_t DEFAULT_BLOCK_SHAPE = 128;
     blockShapeX_ = DEFAULT_BLOCK_SHAPE;
     blockShapeY_ = DEFAULT_BLOCK_SHAPE;
@@ -677,7 +680,8 @@ ge::graphStatus BSATiling::ParseSparsePattern(gert::TilingContext *bsaContext)
             blockShapeY_ = blockShapeList[1];
         }
     }
-    if (CheckSparsePattern(bsaContext, DEFAULT_BLOCK_SHAPE) != ge::GRAPH_SUCCESS) {
+    const int64_t defaultShape = (socVer_ == SOC_VER_950_CODE) ? MIN_BLOCK_ALIGN : DEFAULT_BLOCK_SHAPE;
+    if (CheckSparsePattern(bsaContext, defaultShape) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -790,29 +794,6 @@ ge::graphStatus BSATiling::ValidateVDequantScale(gert::TilingContext *bsaContext
     return ValidateGenericDequantScale(bsaContext, V_DEQUANT_SCALE_INDEX);
 }
 
-ge::graphStatus BSATiling::CheckBlockShapeQuantConstraint(gert::TilingContext *bsaContext)
-{
-    if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
-        constexpr int64_t SUPPORTED_BLOCK_SHAPE_X = 128;
-        constexpr int64_t SUPPORTED_MULTIPLE_OF_BLOCK_SHAPE_Y = 256;
-        if (blockShapeX_ != SUPPORTED_BLOCK_SHAPE_X) {
-            OP_LOGE(bsaContext->GetNodeName(),
-                    "In the float8_e4m3fn full-quant scenario, blockShape element 0 must be consistent with %ld, but "
-                    "now it is %ld.",
-                    SUPPORTED_BLOCK_SHAPE_X, blockShapeX_);
-            return ge::GRAPH_FAILED;
-        }
-        if (blockShapeY_ % SUPPORTED_MULTIPLE_OF_BLOCK_SHAPE_Y != 0) {
-            OP_LOGE(bsaContext->GetNodeName(),
-                    "In the float8_e4m3fn full-quant scenario, blockShape element 1 must be a multiple of %ld, but now "
-                    "it is %ld.",
-                    SUPPORTED_MULTIPLE_OF_BLOCK_SHAPE_Y, blockShapeY_);
-            return ge::GRAPH_FAILED;
-        }
-    }
-    return ge::GRAPH_SUCCESS;
-}
-
 ge::graphStatus BSATiling::ParseOptionalTensors(gert::TilingContext *bsaContext)
 {
     if (ParseSeqlens(bsaContext) != ge::GRAPH_SUCCESS || ParseSparsePattern(bsaContext) != ge::GRAPH_SUCCESS ||
@@ -823,8 +804,7 @@ ge::graphStatus BSATiling::ParseOptionalTensors(gert::TilingContext *bsaContext)
     if (socVer_ == SOC_VER_950_CODE) {
         if (ValidateQDequantScale(bsaContext) != ge::GRAPH_SUCCESS ||
             ValidateKDequantScale(bsaContext) != ge::GRAPH_SUCCESS ||
-            ValidateVDequantScale(bsaContext) != ge::GRAPH_SUCCESS ||
-            CheckBlockShapeQuantConstraint(bsaContext) != ge::GRAPH_SUCCESS) {
+            ValidateVDequantScale(bsaContext) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
     }
@@ -941,13 +921,54 @@ uint32_t BSATiling::GetCurQSTileNum950(int64_t curQSeqlen)
     return curQSTileNum;
 }
 
+static inline uint32_t GetMaxDiv(uint32_t value, uint32_t maxBound)
+{
+    if (value == 0 || maxBound == 0) {
+        return 1;
+    }
+    if (maxBound >= value) {
+        return value;
+    }
+    uint32_t result = 1;
+    for (uint32_t d = 1; d * d <= value; ++d) {
+        if (value % d == 0) {
+            if (d <= maxBound) {
+                result = std::max(result, d);
+            }
+            const uint32_t paired = value / d;
+            if (paired <= maxBound) {
+                result = std::max(result, paired);
+            }
+        }
+    }
+    return result;
+}
+
+// FP8: pick largest preferred tile that divides blockShapeY (tile <= Y, Y % tile == 0).
+static inline uint32_t CalcFp8KvBaseTile(uint32_t blockShapeY, uint32_t preferredTile)
+{
+    if (blockShapeY % preferredTile == 0) {
+        return preferredTile;
+    }
+    // Mixed path prefers 256; fall back to 128 when Y is a multiple of 128 but not 256.
+    if (preferredTile > TILE_SIZE_128 && blockShapeY % TILE_SIZE_128 == 0) {
+        return TILE_SIZE_128;
+    }
+    if (blockShapeY > preferredTile) {
+        return GetMaxDiv(blockShapeY, preferredTile);
+    }
+    return blockShapeY;
+}
+
 void BSATiling::CalcBaseTileTilingParams950()
 {
-    qBaseTile_ = (blockShapeX_ > TILE_SIZE_128) ? TILE_SIZE_128 : blockShapeX_;
-    if (innerPrecise_ == BsaInnerCalcPrec::LOW_HIGH_MIXED && embeddingSize_ <= D_SIZE_128) {
-        kvBaseTile_ = TILE_SIZE_256;
+    qBaseTile_ = (blockShapeX_ > TILE_SIZE_128) ? TILE_SIZE_128 : static_cast<uint32_t>(blockShapeX_);
+    const bool isMixedPrecision = (innerPrecise_ == BsaInnerCalcPrec::LOW_HIGH_MIXED && embeddingSize_ <= D_SIZE_128);
+    if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
+        const uint32_t preferredTile = isMixedPrecision ? TILE_SIZE_256 : TILE_SIZE_128;
+        kvBaseTile_ = CalcFp8KvBaseTile(static_cast<uint32_t>(blockShapeY_), preferredTile);
     } else {
-        kvBaseTile_ = TILE_SIZE_128;
+        kvBaseTile_ = isMixedPrecision ? TILE_SIZE_256 : TILE_SIZE_128;
     }
 }
 

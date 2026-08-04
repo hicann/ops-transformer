@@ -70,10 +70,10 @@ aclnnStatus aclnnBlockSparseAttention(
   - TND: [total_kv_tokens, num_kv_heads, head_dim]
   - BNSD: [batch, num_kv_heads, kv_seqlen, head_dim]
 
-- **blockSparseMaskOptional**: 
+- **blockSparseMaskOptional**:
   - 稀疏Mask: [batch, headNum, ceilDiv(maxQSeqLength, blockShapeX), ceilDiv(maxKvSeqLength, blockShapeY)]
 
-- **blockShapeOptional**: 
+- **blockShapeOptional**:
   - blockShapeX: Q方向块大小
   - blockShapeY: KV方向块大小
 
@@ -113,9 +113,9 @@ aclnnStatus ret = aclnnBlockSparseAttentionGetWorkspaceSize(
 if (ret == ACLNN_SUCCESS) {
     void *workspace = nullptr;
     aclrtMalloc(&workspace, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
-    
+
     ret = aclnnBlockSparseAttention(workspace, workspaceSize, executor, stream);
-    
+
     aclrtFree(workspace);
 }
 ```
@@ -156,7 +156,7 @@ KV方向: ceil(1024/128)=8块 [0, 1, 2, 3, 4, 5, 6, 7]
 
 1. qInputLayout当前仅支持"TND"和"BNSD"。
 2. kvInputLayout当前仅支持"TND"和"BNSD"。
-3. blockShapeOptional如果传入，则必须包含至少两个元素[blockShapeX, blockShapeY]，且值必须大于0，blockShapeY必须为128的倍数。
+3. blockShapeOptional如果传入，则必须包含至少两个元素[blockShapeX, blockShapeY]，且值必须大于0，blockShapeY在<term>Ascend 950PR/Ascend 950DT</term>上须为16的倍数，在<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>上须为128的倍数。
 4. qSeqlen和kvSeqlen不需要被blockShape整除，支持非对齐场景，实际分块数通过向上取整计算。
 5. blockSparseMaskOptional当前必须传入，且shape必须为[batch, headNum, ceilDiv(maxQS, blockShapeX), ceilDiv(maxKVS, blockShapeY)]。
 6. attentionMaskOptional当前只支持传入nullptr。
