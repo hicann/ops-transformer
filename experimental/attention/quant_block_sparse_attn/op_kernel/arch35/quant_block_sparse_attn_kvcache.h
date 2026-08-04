@@ -30,7 +30,7 @@ __aicore__ inline int64_t CalculateActualS1Size(RunParamStr &, const ConstInfo &
                                                 __gm__ int32_t *cuSeqQlenAddr)
 {
     int64_t actualS1Size = 0;
-    if constexpr (layout == BSALayout::TND || layout == BSALayout::NTD) {
+    if constexpr (layout == QBSALayout::TND || layout == QBSALayout::NTD) {
         actualS1Size = cuSeqQlenAddr[bIdx + 1] - cuSeqQlenAddr[bIdx];
     }
 
@@ -42,7 +42,7 @@ __aicore__ inline int64_t CalculateActualS2Size(RunParamStr &, const ConstInfo &
                                                 __gm__ int32_t *seqUsedKvlenAddr)
 {
     int64_t actualS2Size = 0;
-    if constexpr (layout == BSALayout::TND || layout == BSALayout::NTD) {
+    if constexpr (layout == QBSALayout::TND || layout == QBSALayout::NTD) {
         actualS2Size = seqUsedKvlenAddr[bIdx];
     }
     return actualS2Size;
@@ -64,16 +64,16 @@ __aicore__ inline void ComputeParamBatch(RunParamStr &runParam, const ConstInfo 
         runParam.nextTokensPerBatch = attenMaskInfo.nextTokens;
         if (attenMaskInfo.compressMode == static_cast<uint8_t>(AttenMaskCompressMode::RIGHT_DOWN_CAUSAL_MODE)) {
             runParam.preTokensPerBatch = SPARSE_MODE_INT_DEFAULT;
-            if constexpr (layout == BSALayout::TND || layout == BSALayout::NTD) {
+            if constexpr (layout == QBSALayout::TND || layout == QBSALayout::NTD) {
                 runParam.nextTokensPerBatch = runParam.actualS2Size - runParam.actualS1Size;
             }
         }
     }
     // 计算query偏移量
-    if constexpr (layout == BSALayout::TND) {
+    if constexpr (layout == QBSALayout::TND) {
         runParam.qBScalarOffset = cuSeqQlenAddr[runParam.boIdx] * constInfo.n2G;
         runParam.qBOffset = runParam.qBScalarOffset * constInfo.dSize;
-    } else if constexpr (layout == BSALayout::NTD) {
+    } else if constexpr (layout == QBSALayout::NTD) {
         runParam.qBScalarOffset =
             constInfo.t1Size * (runParam.n2oIdx * constInfo.gSize + runParam.goIdx) + cuSeqQlenAddr[runParam.boIdx];
         runParam.qBOffset = runParam.qBScalarOffset * constInfo.dSize;
@@ -128,21 +128,21 @@ __aicore__ inline void LoopSOuterOffsetInit(RunParamStr &runParam, const ConstIn
     int64_t seqOffset = cuSeqQlenAddr[bIdx];
 
     if ASCEND_IS_AIC {
-        if constexpr (layout == BSALayout::TND) {
+        if constexpr (layout == QBSALayout::TND) {
             runParam.tensorQOffset = runParam.qBOffset + runParam.cubeSOuterOffset * constInfo.n2GD +
                                      runParam.n2oIdx * constInfo.gD + runParam.goIdx * constInfo.dSize;
-        } else if constexpr (layout == BSALayout::NTD) {
+        } else if constexpr (layout == QBSALayout::NTD) {
             runParam.tensorQOffset = runParam.n2oIdx * constInfo.gSize * constInfo.t1Size * constInfo.dSize +
                                      runParam.goIdx * constInfo.t1Size * constInfo.dSize +
                                      (seqOffset + runParam.cubeSOuterOffset) * constInfo.dSize;
         }
     } else {
-        if constexpr (layout == BSALayout::TND || layout == BSALayout::NTD) {
+        if constexpr (layout == QBSALayout::TND || layout == QBSALayout::NTD) {
             // 起始地址  需要stride偏移
             runParam.attentionOutOffset = seqOffset * constInfo.n2GDv + runParam.sOuterOffset * constInfo.n2GDv +
                                           runParam.n2oIdx * constInfo.gDv + runParam.goIdx * constInfo.dSizeV;
         }
-        if constexpr (layout == BSALayout::TND || layout == BSALayout::NTD) {
+        if constexpr (layout == QBSALayout::TND || layout == QBSALayout::NTD) {
             runParam.softmaxLseOffset = runParam.n1oIdx * constInfo.t1Size + seqOffset + runParam.sOuterOffset;
         }
     }

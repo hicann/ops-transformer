@@ -22,8 +22,8 @@
  *    and SyncAll<false>() for AIC<->AIV communication, which are not available
  *    in CPU simulation.
  *
- * 3. g_coreType dispatch: The kernel selects between BSABlockCube (real on AIC,
- *    dummy on AIV) and BSABlockVec (dummy on AIC, real on AIV) based on g_coreType.
+ * 3. g_coreType dispatch: The kernel selects between QBSABlockCube (real on AIC,
+ *    dummy on AIV) and QBSABlockVec (dummy on AIC, real on AIV) based on g_coreType.
  *    CPU simulation cannot emulate both core types simultaneously.
  *
  * 4. RegBase kernel: Uses regbaseutil namespace, ARGS_TRAITS, CHILD_SPEC_TEMPLATE_ARGS

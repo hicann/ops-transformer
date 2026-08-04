@@ -19,10 +19,10 @@
 #include "../../quant_block_sparse_attn_common.h"
 
 namespace regbasemx {
-constexpr uint32_t BSA_MX_SCALE_LAST_DIM = 2U;
-constexpr uint32_t BSA_MX_S2_BASE_SIZE = 512U;
-constexpr uint32_t BSA_MX_MIN_KV_BLOCK_SIZE = 64U;
-constexpr uint32_t BSA_MX_MAX_SPARSE_BLOCK_PER_TASK = BSA_MX_S2_BASE_SIZE / BSA_MX_MIN_KV_BLOCK_SIZE;
+constexpr uint32_t QBSA_MX_SCALE_LAST_DIM = 2U;
+constexpr uint32_t QBSA_MX_S2_BASE_SIZE = 512U;
+constexpr uint32_t QBSA_MX_MIN_KV_BLOCK_SIZE = 64U;
+constexpr uint32_t QBSA_MX_MAX_SPARSE_BLOCK_PER_TASK = QBSA_MX_S2_BASE_SIZE / QBSA_MX_MIN_KV_BLOCK_SIZE;
 
 // 单个 (B, N1, S1 block, 512-token logical S2 tile) 的运行期状态。
 struct MxRunInfo {
@@ -55,14 +55,14 @@ struct MxRunInfo {
     // Sparse block 索引与拼接信息，单 task 最多 8 个 block。
     uint32_t sparseBlockCount = 0U;
     // 有效 block id 升序，负 index 在末尾。
-    int64_t sparseBlockIdx[BSA_MX_MAX_SPARSE_BLOCK_PER_TASK] = {};
+    int64_t sparseBlockIdx[QBSA_MX_MAX_SPARSE_BLOCK_PER_TASK] = {};
     // 原始 KV token 起点，用于 PA/mask 寻址。
-    uint64_t sparseBlockTokenOffset[BSA_MX_MAX_SPARSE_BLOCK_PER_TASK] = {};
+    uint64_t sparseBlockTokenOffset[QBSA_MX_MAX_SPARSE_BLOCK_PER_TASK] = {};
     // 拼接后 tile 起点，K/V/scale/mask 共用。
-    uint32_t sparseBlockTileOffset[BSA_MX_MAX_SPARSE_BLOCK_PER_TASK] = {};
-    uint32_t sparseBlockRealSize[BSA_MX_MAX_SPARSE_BLOCK_PER_TASK] = {};
+    uint32_t sparseBlockTileOffset[QBSA_MX_MAX_SPARSE_BLOCK_PER_TASK] = {};
+    uint32_t sparseBlockRealSize[QBSA_MX_MAX_SPARSE_BLOCK_PER_TASK] = {};
     // true 表示跨 causal 边界或整块不可见，需要搬压缩 mask。
-    bool sparseBlockPartialMask[BSA_MX_MAX_SPARSE_BLOCK_PER_TASK] = {};
+    bool sparseBlockPartialMask[QBSA_MX_MAX_SPARSE_BLOCK_PER_TASK] = {};
 
     // Q/QScale 的 TND GM offset。
     uint64_t queryTokenBase = 0U;
@@ -108,7 +108,7 @@ struct MxSparseConstInfo {
 
 // QScale 为 [T,N,D/64,2]；K/V scale 为 PA BNBD 布局。
 struct MxScaleConstInfo {
-    uint32_t scaleLastDim = BSA_MX_SCALE_LAST_DIM;
+    uint32_t scaleLastDim = QBSA_MX_SCALE_LAST_DIM;
     uint32_t queryScaleDSize = 0U;
     uint32_t keyScaleDSize = 0U;
     uint32_t valueScaleDSize = 0U;

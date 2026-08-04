@@ -32,7 +32,7 @@ using namespace regbasemx;
 
 namespace BaseApi {
 // V1 执行 softmax/P 量化，V2 更新并写回 attention output/LSE。
-template <typename inputType, typename mmType, typename outputType, BSALayout layout, BSALayout kvLayout,
+template <typename inputType, typename mmType, typename outputType, QBSALayout layout, QBSALayout kvLayout,
           S1TemplateType s1TemplateType, S2TemplateType s2TemplateType, DTemplateType dTemplateType,
           DTemplateType dVTemplateType, bool hasAtten, bool hasLse, bool isPa, bool useDn = true>
 class QuantBlockSparseAttnMxBlockVec {
@@ -47,15 +47,15 @@ public:
     static constexpr bool HAS_ATTEN = hasAtten;
     static constexpr bool HAS_LSE = hasLse;
     static constexpr bool IS_PA = isPa;
-    static constexpr BSALayout LAYOUT = layout;
-    static constexpr BSALayout KV_LAYOUT = kvLayout;
+    static constexpr QBSALayout LAYOUT = layout;
+    static constexpr QBSALayout KV_LAYOUT = kvLayout;
     static constexpr uint32_t M_BASE = static_cast<uint32_t>(s1TemplateType);
     static constexpr uint32_t S2_BASE = static_cast<uint32_t>(s2TemplateType);
     static constexpr uint32_t S2_SPLIT = 256U;
     static constexpr uint32_t VEC_M_BASE = M_BASE >> 1U;
     static constexpr uint32_t D_BASE = static_cast<uint32_t>(dTemplateType);
     static constexpr uint32_t DV_BASE = static_cast<uint32_t>(dVTemplateType);
-    static_assert(LAYOUT == BSALayout::TND && KV_LAYOUT == BSALayout::PA_BNSD && IS_PA,
+    static_assert(LAYOUT == QBSALayout::TND && KV_LAYOUT == QBSALayout::PA_BNSD && IS_PA,
                   "MX vector currently only supports TND query and PA_BNSD KV");
     static_assert(M_BASE == 128U && S2_BASE == 512U && D_BASE == 128U && DV_BASE == 128U,
                   "MX vector currently only supports S1=128, S2=512, D=128 and DV=128");
@@ -157,7 +157,7 @@ public:
                                  0.0F);
             if constexpr (HAS_LSE) {
                 InitOutputSingleCore(softmaxLseGm_, emptyTensorParams.totalSoftMaxLseOutputSize, aivCoreNum,
-                                     constInfo.aivIdx, BSA_EMPTY_LSE_VALUE);
+                                     constInfo.aivIdx, QBSA_EMPTY_LSE_VALUE);
             }
             WaitFlag<HardEvent::MTE3_V>(mte3ToVId_[0]);
             SyncAll();

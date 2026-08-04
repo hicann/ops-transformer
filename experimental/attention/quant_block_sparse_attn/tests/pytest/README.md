@@ -10,7 +10,7 @@ The pytest framework follows the current `QuantBlockSparseAttn` op definition:
 
 ## Golden Semantics
 
-The CPU golden follows BSA scheme 2.4:
+The CPU golden follows QBSA scheme 2.4:
 
 - `sparse_indices` stores logical KV block ids in actual KV token space.
 - `q_descale` and `k_descale` are applied in Vec1 as row x column scale on raw `QK^T`.

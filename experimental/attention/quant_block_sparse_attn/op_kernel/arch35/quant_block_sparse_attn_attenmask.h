@@ -8,8 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-// BSA-COPY-OF: FIA fullquant GQA local migration.
-
 /*!
  * \file quant_block_sparse_attn_attenmask.h
  * \brief

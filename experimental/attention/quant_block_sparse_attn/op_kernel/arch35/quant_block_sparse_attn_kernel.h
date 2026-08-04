@@ -8,8 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-// BSA-COPY-OF: FIA fullquant GQA local migration.
-
 /*!
  * \file quant_block_sparse_attn_kernel.h
  * \brief
@@ -41,14 +39,14 @@ using namespace AscendC::Impl::Detail;
 using namespace regbaseutil;
 
 namespace BaseApi {
-namespace BSAKernelBase {
+namespace QBSAKernelBase {
 template <bool useDn, bool isFp8>
 struct Bmm2ResBuffSel {
     using Type =
         std::conditional_t<(useDn && isFp8), BuffersPolicySingleBuffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>,
                            BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>>;
 };
-} // namespace BSAKernelBase
+} // namespace QBSAKernelBase
 
 template <typename CubeBlockType, typename VecBlockType>
 class QuantBlockSparseAttnKernel {
@@ -110,7 +108,7 @@ public:
 
     BufferManager<BufferType::UB> ubBufferManager;
     BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> bmm1Buffers;
-    using bmm2ResBufferType = typename BSAKernelBase::Bmm2ResBuffSel<useDn, isFp8>::Type;
+    using bmm2ResBufferType = typename QBSAKernelBase::Bmm2ResBuffSel<useDn, isFp8>::Type;
     bmm2ResBufferType bmm2Buffers;
 
     BufferManager<BufferType::L1> l1BufferManager;
@@ -196,7 +194,7 @@ __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::
     if constexpr (isPa) {
         blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
     }
-    if constexpr (layout == BSALayout::TND || layout == BSALayout::NTD) {
+    if constexpr (layout == QBSALayout::TND || layout == QBSALayout::NTD) {
         cuSeqQlenAddr = (__gm__ int32_t *)cuSeqQlen;
         seqUsedKvlenAddr = (__gm__ int32_t *)seqUsedKvlen;
     }
@@ -310,18 +308,18 @@ __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::
     constInfo.n2GD = constInfo.n2Size * constInfo.gD;
     constInfo.maxBlockNumPerBatch = sharedParams.blockTableDim2;
 
-    if constexpr (layout == BSALayout::TND) {
+    if constexpr (layout == QBSALayout::TND) {
         constInfo.s1BaseN2GDv = s1BaseSize * constInfo.n2GDv;
 
         constInfo.mm1Ka = constInfo.n2Size * constInfo.gSize * constInfo.dSize;
         constInfo.mm1Kb = constInfo.n2Size * constInfo.dSize;
         constInfo.mm2Kb = constInfo.n2Dv;
         if ASCEND_IS_AIV {
-            // BSA: 输出 TND [T, N1, Dv]，同一 head 相邻 token 间隔 (n2G-1)*Dv 个元素（跳过其余 head）。
+            // QBSA: 输出 TND [T, N1, Dv]，同一 head 相邻 token 间隔 (n2G-1)*Dv 个元素（跳过其余 head）。
             // 每核独立计算一个 head，不做 FIA GS1 合轴/连续 GQA 输出，固定使用 per-head stride。
             constInfo.attentionOutStride = (constInfo.n2G - 1) * constInfo.dSizeV * sizeof(OUTPUT_T);
         }
-    } else if constexpr (layout == BSALayout::NTD) {
+    } else if constexpr (layout == QBSALayout::NTD) {
         constInfo.s1BaseDv = s1BaseSize * constInfo.dSizeV;
         constInfo.s2BaseDv = s2BaseSize * constInfo.dSizeV;
         constInfo.mm1Ka = constInfo.dSize;
@@ -497,7 +495,7 @@ template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>::ProcessMainLoop()
 {
     int32_t actualCoreNums = this->sharedParams.coreNum;
-    if (this->aicIdx >= actualCoreNums || static_cast<uint32_t>(this->aicIdx) >= BSA_FA_AIC_CORE_NUM) {
+    if (this->aicIdx >= actualCoreNums || static_cast<uint32_t>(this->aicIdx) >= QBSA_FA_AIC_CORE_NUM) {
         return;
     }
 

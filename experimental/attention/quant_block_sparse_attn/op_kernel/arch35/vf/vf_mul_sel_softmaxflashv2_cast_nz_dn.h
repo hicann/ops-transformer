@@ -24,8 +24,8 @@ using namespace MicroAPI;
 #define VMULSCVT false
 #define DROPOUT false
 
-// Empty-row lse sentinel, equivalent to common.h BSA_EMPTY_LSE_VALUE(-FLT_MAX).
-constexpr float VF_BSA_EMPTY_LSE_VALUE = -3.4028234663852886e38F;
+// Empty-row lse sentinel, equivalent to common.h QBSA_EMPTY_LSE_VALUE(-FLT_MAX).
+constexpr float VF_QBSA_EMPTY_LSE_VALUE = -3.4028234663852886e38F;
 
 // Safe pre-pad value for AttenTail variants. Must be a large negative finite float
 // so that (pad_value * qScale * kScale) does NOT overflow to -inf/NaN before the
@@ -37,7 +37,7 @@ constexpr float VF_BSA_EMPTY_LSE_VALUE = -3.4028234663852886e38F;
 // the worst case equals -(sqrt(D) * R^2), which reaches -FP32_MAX at exactly the
 // same R that causes valid scores to overflow. Thus pre-pad is never the bottleneck.
 // Re-padding after the scale loop restores -FLT_MAX (vreg_min) so exp(-FLT_MAX - max) = 0.
-constexpr float VF_BSA_SAFE_PAD_VALUE = -25690112.0F;
+constexpr float VF_QBSA_SAFE_PAD_VALUE = -25690112.0F;
 
 template <typename T, typename T2, bool hasAtten = false, bool needAtten = false, uint32_t ubN = 128>
 __simd_vf__ inline void ProcessVec1DnNoUpdateVF(
@@ -120,7 +120,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateVF(
     Duplicate(max3, minValue);
     Duplicate(vreg_min, minValue);
     Duplicate(vreg_zero, 0.0f);
-    Duplicate(vreg_empty_lse, VF_BSA_EMPTY_LSE_VALUE);
+    Duplicate(vreg_empty_lse, VF_QBSA_EMPTY_LSE_VALUE);
     Duplicate(vreg_p_scale, pScale);
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
@@ -352,9 +352,9 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateAttenTailVF(
     Duplicate(max2, minValue);
     Duplicate(max3, minValue);
     Duplicate(vreg_min, minValue);
-    Duplicate(vreg_safe_min, VF_BSA_SAFE_PAD_VALUE);
+    Duplicate(vreg_safe_min, VF_QBSA_SAFE_PAD_VALUE);
     Duplicate(vreg_zero, 0.0f);
-    Duplicate(vreg_empty_lse, VF_BSA_EMPTY_LSE_VALUE);
+    Duplicate(vreg_empty_lse, VF_QBSA_EMPTY_LSE_VALUE);
     Duplicate(vreg_p_scale, pScale);
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
@@ -655,7 +655,7 @@ __simd_vf__ inline void ProcessVec1DnUpdateVF(
     Duplicate(max3, minValue);
     Duplicate(vreg_min, minValue);
     Duplicate(vreg_zero, 0.0f);
-    Duplicate(vreg_empty_lse, VF_BSA_EMPTY_LSE_VALUE);
+    Duplicate(vreg_empty_lse, VF_QBSA_EMPTY_LSE_VALUE);
     Duplicate(vreg_p_scale, pScale);
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
@@ -895,9 +895,9 @@ __simd_vf__ inline void ProcessVec1DnUpdateAttenTailVF(
     Duplicate(max2, minValue);
     Duplicate(max3, minValue);
     Duplicate(vreg_min, minValue);
-    Duplicate(vreg_safe_min, VF_BSA_SAFE_PAD_VALUE);
+    Duplicate(vreg_safe_min, VF_QBSA_SAFE_PAD_VALUE);
     Duplicate(vreg_zero, 0.0f);
-    Duplicate(vreg_empty_lse, VF_BSA_EMPTY_LSE_VALUE);
+    Duplicate(vreg_empty_lse, VF_QBSA_EMPTY_LSE_VALUE);
     Duplicate(vreg_p_scale, pScale);
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
@@ -1249,7 +1249,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadVF(
     Duplicate(max3, minValue);
     Duplicate(vreg_min, minValue);
     Duplicate(vreg_zero, 0.0f);
-    Duplicate(vreg_empty_lse, VF_BSA_EMPTY_LSE_VALUE);
+    Duplicate(vreg_empty_lse, VF_QBSA_EMPTY_LSE_VALUE);
     Duplicate(vreg_p_scale, pScale);
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
@@ -1470,9 +1470,9 @@ __simd_vf__ inline void ProcessVec1DnNoUpdatePerTokenHeadAttenTailVF(
     Duplicate(max2, minValue);
     Duplicate(max3, minValue);
     Duplicate(vreg_min, minValue);
-    Duplicate(vreg_safe_min, VF_BSA_SAFE_PAD_VALUE);
+    Duplicate(vreg_safe_min, VF_QBSA_SAFE_PAD_VALUE);
     Duplicate(vreg_zero, 0.0f);
-    Duplicate(vreg_empty_lse, VF_BSA_EMPTY_LSE_VALUE);
+    Duplicate(vreg_empty_lse, VF_QBSA_EMPTY_LSE_VALUE);
     Duplicate(vreg_p_scale, pScale);
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
@@ -1760,7 +1760,7 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadVF(
     Duplicate(max3, minValue);
     Duplicate(vreg_min, minValue);
     Duplicate(vreg_zero, 0.0f);
-    Duplicate(vreg_empty_lse, VF_BSA_EMPTY_LSE_VALUE);
+    Duplicate(vreg_empty_lse, VF_QBSA_EMPTY_LSE_VALUE);
     Duplicate(vreg_p_scale, pScale);
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 
@@ -1989,9 +1989,9 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadAttenTailVF(
     Duplicate(max2, minValue);
     Duplicate(max3, minValue);
     Duplicate(vreg_min, minValue);
-    Duplicate(vreg_safe_min, VF_BSA_SAFE_PAD_VALUE);
+    Duplicate(vreg_safe_min, VF_QBSA_SAFE_PAD_VALUE);
     Duplicate(vreg_zero, 0.0f);
-    Duplicate(vreg_empty_lse, VF_BSA_EMPTY_LSE_VALUE);
+    Duplicate(vreg_empty_lse, VF_QBSA_EMPTY_LSE_VALUE);
     Duplicate(vreg_p_scale, pScale);
     Ln(vreg_ln_p_scale, vreg_p_scale, preg_135);
 

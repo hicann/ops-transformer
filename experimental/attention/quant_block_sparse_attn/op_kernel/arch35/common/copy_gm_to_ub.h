@@ -20,7 +20,7 @@
 // GM->UB
 // antiquant
 // ----------------------------------------------CopyAntiquantGmToUb--------------------------------
-template <typename T, BSALayout GM_FORMAT>
+template <typename T, QBSALayout GM_FORMAT>
 class CopyAntiquantGmToUb {
 public:
     __aicore__ inline void operator()(LocalTensor<T> &dstTensor, const GlobalTensor<T> &srcTensor,
@@ -38,7 +38,7 @@ private:
     {
         int64_t byteOffset1 = 0;
         int64_t byteOffset2 = 0;
-        if constexpr (GM_FORMAT == BSALayout::PA_BNSD) {
+        if constexpr (GM_FORMAT == QBSALayout::PA_BNSD) {
             DataCopyExtParams dataCopyParams;
             dataCopyParams.blockCount = 1;
 
@@ -56,7 +56,7 @@ private:
                 DataCopyPad(dstTensor[constInfo.kvSparseBlockSize], srcTensor[byteOffset2], dataCopyParams,
                             dataCopyPadParams);
             }
-        } else if constexpr (GM_FORMAT == BSALayout::PA_BSND) {
+        } else if constexpr (GM_FORMAT == QBSALayout::PA_BSND) {
             GetPaKScaleOffset(byteOffset1, runInfo.sparseBlkIdx1, blockTableTensor, runInfo, constInfo);
             GetPaKScaleOffset(byteOffset2, runInfo.sparseBlkIdx2, blockTableTensor, runInfo, constInfo);
             DataCopyExtParams dataCopyParams;
@@ -81,7 +81,7 @@ private:
 };
 
 // ----------------------------------------------CopyQueryScaleGmToUb--------------------------------
-template <typename T, BSALayout GM_FORMAT>
+template <typename T, QBSALayout GM_FORMAT>
 class CopyQueryScaleGmToUb {
 public:
     __aicore__ inline void operator()(LocalTensor<T> &dstTensor, const GlobalTensor<T> &srcTensor,
@@ -94,7 +94,7 @@ private:
     __aicore__ inline void ProcessGS1(LocalTensor<T> &dstTensor, const GlobalTensor<T> &srcTensor,
                                       const RunInfo &runInfo, const ConstInfo &constInfo)
     {
-        if constexpr (GM_FORMAT == BSALayout::TND) {
+        if constexpr (GM_FORMAT == QBSALayout::TND) {
             DataCopyExtParams dataCopyParams;
             dataCopyParams.blockCount = 64;
             dataCopyParams.blockLen = sizeof(float);
@@ -104,7 +104,7 @@ private:
             int64_t n1Idx = runInfo.n2oIdx * constInfo.gSize + runInfo.goIdx;
             int64_t qScaleOffset = runInfo.qBScalarOffset + runInfo.sOuterOffset * constInfo.n1Size + n1Idx;
             DataCopyPad(dstTensor, srcTensor[qScaleOffset], dataCopyParams, dataCopyPadParams);
-        } else if constexpr (GM_FORMAT == BSALayout::NTD) {
+        } else if constexpr (GM_FORMAT == QBSALayout::NTD) {
             DataCopyExtParams dataCopyParams;
             dataCopyParams.blockCount = 1;
             dataCopyParams.blockLen = runInfo.halfS1RealSize * sizeof(float);

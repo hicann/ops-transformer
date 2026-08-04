@@ -24,21 +24,21 @@
 #endif
 
 // metadata获取: head[8] + qbsa[sectionNum][AIC_CORE_NUM][8] + fd[AIV_CORE_NUM][8]
-constexpr uint32_t BSA_FA_HEAD_METADATA_SIZE = 8U;
-constexpr uint32_t BSA_FA_HEAD_SECTION_NUM_INDEX = 0U;
-constexpr uint32_t BSA_FA_AIC_CORE_NUM = 36U;
-constexpr uint32_t BSA_FA_AIV_CORE_NUM = 72U;
-constexpr uint32_t BSA_FA_METADATA_SIZE = 8U;
-constexpr uint32_t BSA_FA_FD_METADATA_SIZE = 8U;
+constexpr uint32_t QBSA_FA_HEAD_METADATA_SIZE = 8U;
+constexpr uint32_t QBSA_FA_HEAD_SECTION_NUM_INDEX = 0U;
+constexpr uint32_t QBSA_FA_AIC_CORE_NUM = 36U;
+constexpr uint32_t QBSA_FA_AIV_CORE_NUM = 72U;
+constexpr uint32_t QBSA_FA_METADATA_SIZE = 8U;
+constexpr uint32_t QBSA_FA_FD_METADATA_SIZE = 8U;
 
-constexpr uint32_t BSA_FA_CORE_ENABLE_INDEX = 0U;
-constexpr uint32_t BSA_FA_BN1_START_INDEX = 1U;
-constexpr uint32_t BSA_FA_S1_START_INDEX = 2U;
-constexpr uint32_t BSA_FA_S2_START_INDEX = 3U;
-constexpr uint32_t BSA_FA_BN1_END_INDEX = 4U;
-constexpr uint32_t BSA_FA_S1_END_INDEX = 5U;
-constexpr uint32_t BSA_FA_S2_END_INDEX = 6U;
-constexpr uint32_t BSA_FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX = 7U;
+constexpr uint32_t QBSA_FA_CORE_ENABLE_INDEX = 0U;
+constexpr uint32_t QBSA_FA_BN1_START_INDEX = 1U;
+constexpr uint32_t QBSA_FA_S1_START_INDEX = 2U;
+constexpr uint32_t QBSA_FA_S2_START_INDEX = 3U;
+constexpr uint32_t QBSA_FA_BN1_END_INDEX = 4U;
+constexpr uint32_t QBSA_FA_S1_END_INDEX = 5U;
+constexpr uint32_t QBSA_FA_S2_END_INDEX = 6U;
+constexpr uint32_t QBSA_FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX = 7U;
 
 struct BsaFaCoreMetadata {
     uint32_t coreEnable{0U};
@@ -53,14 +53,14 @@ struct BsaFaCoreMetadata {
 
 __aicore__ inline uint32_t GetBsaSectionNum(AscendC::GlobalTensor<int32_t> &metadataGm)
 {
-    return metadataGm.GetValue(BSA_FA_HEAD_SECTION_NUM_INDEX);
+    return metadataGm.GetValue(QBSA_FA_HEAD_SECTION_NUM_INDEX);
 }
 
 __aicore__ inline uint64_t GetBsaCoreMetadataOffset(uint32_t sectionIdx, uint32_t coreIdx)
 {
-    return BSA_FA_HEAD_METADATA_SIZE +
-           static_cast<uint64_t>(sectionIdx) * BSA_FA_AIC_CORE_NUM * BSA_FA_METADATA_SIZE +
-           static_cast<uint64_t>(coreIdx) * BSA_FA_METADATA_SIZE;
+    return QBSA_FA_HEAD_METADATA_SIZE +
+           static_cast<uint64_t>(sectionIdx) * QBSA_FA_AIC_CORE_NUM * QBSA_FA_METADATA_SIZE +
+           static_cast<uint64_t>(coreIdx) * QBSA_FA_METADATA_SIZE;
 }
 
 __aicore__ inline uint32_t GetBsaAttrMetadata(AscendC::GlobalTensor<int32_t> &metadataGm, uint32_t sectionIdx,
@@ -72,7 +72,7 @@ __aicore__ inline uint32_t GetBsaAttrMetadata(AscendC::GlobalTensor<int32_t> &me
 __aicore__ inline bool IsBsaCoreEnabled(AscendC::GlobalTensor<int32_t> &metadataGm, uint32_t sectionIdx,
                                         uint32_t coreIdx)
 {
-    return GetBsaAttrMetadata(metadataGm, sectionIdx, coreIdx, BSA_FA_CORE_ENABLE_INDEX) != 0U;
+    return GetBsaAttrMetadata(metadataGm, sectionIdx, coreIdx, QBSA_FA_CORE_ENABLE_INDEX) != 0U;
 }
 
 __aicore__ inline uint32_t GetBsaLastValidSectionIdx(AscendC::GlobalTensor<int32_t> &metadataGm, uint32_t sectionNum,
@@ -92,14 +92,14 @@ __aicore__ inline BsaFaCoreMetadata GetBsaCoreMetadata(AscendC::GlobalTensor<int
 {
     uint64_t baseOffset = GetBsaCoreMetadataOffset(sectionIdx, coreIdx);
     BsaFaCoreMetadata coreMetadata;
-    coreMetadata.coreEnable = metadataGm.GetValue(baseOffset + BSA_FA_CORE_ENABLE_INDEX);
-    coreMetadata.bn1StartIdx = metadataGm.GetValue(baseOffset + BSA_FA_BN1_START_INDEX);
-    coreMetadata.s1StartIdx = metadataGm.GetValue(baseOffset + BSA_FA_S1_START_INDEX);
-    coreMetadata.s2StartIdx = metadataGm.GetValue(baseOffset + BSA_FA_S2_START_INDEX);
-    coreMetadata.bn1EndIdx = metadataGm.GetValue(baseOffset + BSA_FA_BN1_END_INDEX);
-    coreMetadata.s1EndIdx = metadataGm.GetValue(baseOffset + BSA_FA_S1_END_INDEX);
-    coreMetadata.s2EndIdx = metadataGm.GetValue(baseOffset + BSA_FA_S2_END_INDEX);
-    coreMetadata.firstFdDataWorkspaceIdx = metadataGm.GetValue(baseOffset + BSA_FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX);
+    coreMetadata.coreEnable = metadataGm.GetValue(baseOffset + QBSA_FA_CORE_ENABLE_INDEX);
+    coreMetadata.bn1StartIdx = metadataGm.GetValue(baseOffset + QBSA_FA_BN1_START_INDEX);
+    coreMetadata.s1StartIdx = metadataGm.GetValue(baseOffset + QBSA_FA_S1_START_INDEX);
+    coreMetadata.s2StartIdx = metadataGm.GetValue(baseOffset + QBSA_FA_S2_START_INDEX);
+    coreMetadata.bn1EndIdx = metadataGm.GetValue(baseOffset + QBSA_FA_BN1_END_INDEX);
+    coreMetadata.s1EndIdx = metadataGm.GetValue(baseOffset + QBSA_FA_S1_END_INDEX);
+    coreMetadata.s2EndIdx = metadataGm.GetValue(baseOffset + QBSA_FA_S2_END_INDEX);
+    coreMetadata.firstFdDataWorkspaceIdx = metadataGm.GetValue(baseOffset + QBSA_FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX);
     return coreMetadata;
 }
 

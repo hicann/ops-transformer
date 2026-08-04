@@ -30,14 +30,14 @@ using namespace optiling;
 //   - GET_TILING_DATA -> InitBaseAPI -> Process()
 // __VA_ARGS__ 为 block 模板参数（严格对齐 CUBE_BLOCK_TRAITS 字段顺序，共 17 个）。
 
-#define BSA_OP_IMPL_WITH_TILING(tilingDataPtr, ...) \
+#define QBSA_OP_IMPL_WITH_TILING(tilingDataPtr, ...) \
     do { \
         using CubeBlockType = \
-            typename std::conditional<g_coreType == AscendC::AIC, BaseApi::BSABlockCube<__VA_ARGS__>, \
-                                      BaseApi::BSABlockCubeDummy<__VA_ARGS__>>::type; \
+            typename std::conditional<g_coreType == AscendC::AIC, BaseApi::QBSABlockCube<__VA_ARGS__>, \
+                                      BaseApi::QBSABlockCubeDummy<__VA_ARGS__>>::type; \
         using VecBlockType = \
-            typename std::conditional<g_coreType == AscendC::AIC, BaseApi::BSABlockVecDummy<__VA_ARGS__>, \
-                                      BaseApi::BSABlockVec<__VA_ARGS__>>::type; \
+            typename std::conditional<g_coreType == AscendC::AIC, BaseApi::QBSABlockVecDummy<__VA_ARGS__>, \
+                                      BaseApi::QBSABlockVec<__VA_ARGS__>>::type; \
         BaseApi::QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType> op; \
         op.InitBaseAPI(query, key, value, sparseIndices, sparseSeqLen, attenMask, metadata, cuSeqlensQ, cuSeqlensKv, \
                        seqUsedQ, seqUsedKv, blockTable, nullptr /* queryPaddingSize */, nullptr /* kvPaddingSize */, \
@@ -47,14 +47,14 @@ using namespace optiling;
         op.Process(); \
     } while (0)
 
-#define BSA_OP_IMPL(...) \
+#define QBSA_OP_IMPL(...) \
     do { \
         GET_TILING_DATA_WITH_STRUCT(QuantBlockSparseAttnTilingData, tilingDataIn, tiling); \
         const QuantBlockSparseAttnTilingData *__restrict tilingData = &tilingDataIn; \
-        BSA_OP_IMPL_WITH_TILING(tilingData, __VA_ARGS__); \
+        QBSA_OP_IMPL_WITH_TILING(tilingData, __VA_ARGS__); \
     } while (0)
 
-#define BSA_MX_OP_IMPL_WITH_TILING(tilingDataPtr, ...) \
+#define QBSA_MX_OP_IMPL_WITH_TILING(tilingDataPtr, ...) \
     do { \
         /* MXFullQuantMode 读取 QuantBlockSparseAttnMxTilingData，不读取 FP8 tiling struct。 */ \
         BaseApi::QuantBlockSparseAttnMxKernel<__VA_ARGS__> op; \
@@ -64,11 +64,11 @@ using namespace optiling;
         op.Process(); \
     } while (0)
 
-#define BSA_MX_OP_IMPL(...) \
+#define QBSA_MX_OP_IMPL(...) \
     do { \
         GET_TILING_DATA_WITH_STRUCT(QuantBlockSparseAttnMxTilingData, tilingDataIn, tiling); \
         const QuantBlockSparseAttnMxTilingData *__restrict tilingData = &tilingDataIn; \
-        BSA_MX_OP_IMPL_WITH_TILING(tilingData, __VA_ARGS__); \
+        QBSA_MX_OP_IMPL_WITH_TILING(tilingData, __VA_ARGS__); \
     } while (0)
 
 template <uint32_t QKV_DTYPE, uint32_t LAYOUT_T, uint32_t KV_LAYOUT_T, uint32_t MASK_MODE, bool RETURN_SOFTMAX_LSE,
@@ -86,8 +86,8 @@ __global__ __aicore__ void quant_block_sparse_attn(
     TPipe tPipe;
     __gm__ uint8_t *user = GetUserWorkspace(workspace);
 
-    constexpr BSALayout layout = static_cast<BSALayout>(LAYOUT_T);
-    constexpr BSALayout kvLayout = static_cast<BSALayout>(KV_LAYOUT_T);
+    constexpr QBSALayout layout = static_cast<QBSALayout>(LAYOUT_T);
+    constexpr QBSALayout kvLayout = static_cast<QBSALayout>(KV_LAYOUT_T);
     // isPa: KV 连续 -> false; PA_ND -> true
     constexpr bool bsaIsPa = true;
     constexpr bool bsaUseDn = BaseApi::IsDn();
@@ -96,13 +96,13 @@ __global__ __aicore__ void quant_block_sparse_attn(
         // MX 当前支持 TND + PA BNBD，S2 logical tile 为 512。
         static_assert(Config == Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128,
                       "MXFullQuantMode must use S1=128, S2=512, D=128, DV=128 config");
-        BSA_MX_OP_IMPL(fp8_e4m3fn_t, float, bfloat16_t, layout, kvLayout, S1TemplateType::Aligned128,
+        QBSA_MX_OP_IMPL(fp8_e4m3fn_t, float, bfloat16_t, layout, kvLayout, S1TemplateType::Aligned128,
                        S2TemplateType::Aligned512, DTemplateType::Aligned128, DTemplateType::Aligned128, HAS_ATTENTION,
                        RETURN_SOFTMAX_LSE, bsaIsPa, bsaUseDn);
     } else {
         static_assert(Config == Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128,
                       "FP8QuantMode must use S1=128, S2=256, D=128, DV=128 config");
-        BSA_OP_IMPL(fp8_e4m3fn_t, float, bfloat16_t, layout, kvLayout, S1TemplateType::Aligned128,
+        QBSA_OP_IMPL(fp8_e4m3fn_t, float, bfloat16_t, layout, kvLayout, S1TemplateType::Aligned128,
                     S2TemplateType::Aligned256, DTemplateType::Aligned128, DTemplateType::Aligned128, HAS_ATTENTION,
                     bsaIsPa, bsaUseDn);
     }

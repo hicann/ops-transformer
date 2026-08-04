@@ -23,34 +23,35 @@
 #include <exe_graph/runtime/tiling_context.h>
 #include <register/op_impl_registry.h>
 #include "register/tilingdata_base.h"
+#include "../op_kernel/quant_block_sparse_attn_const.h"
 #include "../op_kernel/quant_block_sparse_attn_mx_tiling_data.h"
 #include "quant_block_sparse_attn_info_parser.h"
 
 namespace optiling {
-constexpr uint32_t BSA_MAX_CORE_NUM = 36U;
-constexpr uint32_t BSA_CORE_SPLIT_NUM = BSA_MAX_CORE_NUM + 1U;
-constexpr uint32_t BSA_BLOCK_SIZE = 128U;
-constexpr uint32_t BSA_D_SIZE = 128U;
-constexpr uint32_t BSA_QUANT_MODE_FP8 = 1U;
-constexpr uint32_t BSA_QUANT_MODE_MXFP8_FULL_QUANT = 2U;
-constexpr uint32_t BSA_MASK_MODE_NONE = 0U;
-constexpr uint32_t BSA_MASK_MODE_CAUSAL = 3U;
-constexpr uint32_t BSA_MASK_MODE_MAX = 4U;
-constexpr uint32_t BSA_MXFP8_S2_BASE_SIZE = 512U;
-constexpr uint32_t BSA_MXFP8_MAX_PA_BLOCK_SIZE = 1024U;
-constexpr uint32_t BSA_MXFP8_SPARSE_BLOCK_SIZE_128 = 128U;
-constexpr uint32_t BSA_MXFP8_SPARSE_BLOCK_SIZE_64 = 64U;
-constexpr uint32_t BSA_MXFP8_SCALE_GROUP_SIZE = 64U;
-constexpr uint32_t BSA_MXFP8_SCALE_LAST_DIM = 2U;
-constexpr uint32_t BSA_MXFP8_PER_TOKEN_GROUP_MODE = 6U;
-constexpr uint32_t BSA_MXFP8_PER_CHANNEL_GROUP_MODE = 8U;
+constexpr uint32_t QBSA_MAX_CORE_NUM = 36U;
+constexpr uint32_t QBSA_CORE_SPLIT_NUM = QBSA_MAX_CORE_NUM + 1U;
+constexpr uint32_t QBSA_BLOCK_SIZE = 128U;
+constexpr uint32_t QBSA_D_SIZE = 128U;
+constexpr uint32_t QBSA_QUANT_MODE_FP8 = 1U;
+constexpr uint32_t QBSA_QUANT_MODE_MXFP8_FULL_QUANT = 2U;
+constexpr uint32_t QBSA_MASK_MODE_NONE = 0U;
+constexpr uint32_t QBSA_MASK_MODE_CAUSAL = 3U;
+constexpr uint32_t QBSA_MASK_MODE_MAX = 4U;
+constexpr uint32_t QBSA_MXFP8_S2_BASE_SIZE = 512U;
+constexpr uint32_t QBSA_MXFP8_MAX_PA_BLOCK_SIZE = 1024U;
+constexpr uint32_t QBSA_MXFP8_SPARSE_BLOCK_SIZE_128 = 128U;
+constexpr uint32_t QBSA_MXFP8_SPARSE_BLOCK_SIZE_64 = 64U;
+constexpr uint32_t QBSA_MXFP8_SCALE_GROUP_SIZE = 64U;
+constexpr uint32_t QBSA_MXFP8_SCALE_LAST_DIM = 2U;
+constexpr uint32_t QBSA_MXFP8_PER_TOKEN_GROUP_MODE = 6U;
+constexpr uint32_t QBSA_MXFP8_PER_CHANNEL_GROUP_MODE = 8U;
 
-inline uint32_t BSACeilDiv(uint32_t value, uint32_t divisor)
+inline uint32_t QBSACeilDiv(uint32_t value, uint32_t divisor)
 {
     return divisor == 0U ? 0U : (value + divisor - 1U) / divisor;
 }
 
-inline bool BSAGetDimAsU32(const gert::Shape &shape, size_t dimIndex, uint32_t &value)
+inline bool QBSAGetDimAsU32(const gert::Shape &shape, size_t dimIndex, uint32_t &value)
 {
     if (dimIndex >= shape.GetDimNum()) {
         return false;
@@ -63,7 +64,7 @@ inline bool BSAGetDimAsU32(const gert::Shape &shape, size_t dimIndex, uint32_t &
     return true;
 }
 
-inline uint32_t BSAGetPositiveAttr(const gert::RuntimeAttrs *attrs, uint32_t index, uint32_t defaultValue)
+inline uint32_t QBSAGetPositiveAttr(const gert::RuntimeAttrs *attrs, uint32_t index, uint32_t defaultValue)
 {
     const int64_t *attrPtr = attrs->GetAttrPointer<int64_t>(index);
     if (attrPtr == nullptr || *attrPtr <= 0) {
@@ -75,7 +76,7 @@ inline uint32_t BSAGetPositiveAttr(const gert::RuntimeAttrs *attrs, uint32_t ind
     return static_cast<uint32_t>(*attrPtr);
 }
 
-inline uint32_t BSAGetUintAttr(const gert::RuntimeAttrs *attrs, uint32_t index, uint32_t defaultValue)
+inline uint32_t QBSAGetUintAttr(const gert::RuntimeAttrs *attrs, uint32_t index, uint32_t defaultValue)
 {
     const int64_t *attrPtr = attrs->GetAttrPointer<int64_t>(index);
     if (attrPtr == nullptr || *attrPtr < 0) {
@@ -87,19 +88,19 @@ inline uint32_t BSAGetUintAttr(const gert::RuntimeAttrs *attrs, uint32_t index, 
     return static_cast<uint32_t>(*attrPtr);
 }
 
-inline float BSAGetFloatAttr(const gert::RuntimeAttrs *attrs, uint32_t index, float defaultValue)
+inline float QBSAGetFloatAttr(const gert::RuntimeAttrs *attrs, uint32_t index, float defaultValue)
 {
     const float *attrPtr = attrs->GetAttrPointer<float>(index);
     return attrPtr == nullptr ? defaultValue : *attrPtr;
 }
 
-inline bool BSAGetBoolAttr(const gert::RuntimeAttrs *attrs, uint32_t index, bool defaultValue)
+inline bool QBSAGetBoolAttr(const gert::RuntimeAttrs *attrs, uint32_t index, bool defaultValue)
 {
     const bool *attrPtr = attrs->GetAttrPointer<bool>(index);
     return attrPtr == nullptr ? defaultValue : *attrPtr;
 }
 
-inline std::string BSAGetStringAttr(const gert::RuntimeAttrs *attrs, uint32_t index, const char *defaultValue)
+inline std::string QBSAGetStringAttr(const gert::RuntimeAttrs *attrs, uint32_t index, const char *defaultValue)
 {
     const char *attrPtr = attrs->GetAttrPointer<char>(index);
     return attrPtr == nullptr ? std::string(defaultValue) : std::string(attrPtr);
@@ -158,7 +159,7 @@ REGISTER_TILING_DATA_CLASS(QuantBlockSparseAttnInputParamsRegbaseOp, QuantBlockS
 BEGIN_TILING_DATA_DEF(QuantBlockSparseAttnMultiCoreParams)
 TILING_DATA_FIELD_DEF(int32_t, coreNum)
 TILING_DATA_FIELD_DEF(int64_t, s1OuterSize)
-TILING_DATA_FIELD_DEF_ARR(uint32_t, BSA_CORE_SPLIT_NUM, bnStartIdx)
+TILING_DATA_FIELD_DEF_ARR(uint32_t, QBSA_CORE_SPLIT_NUM, bnStartIdx)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(QuantBlockSparseAttnMultiCoreParamsOp, QuantBlockSparseAttnMultiCoreParams)
 

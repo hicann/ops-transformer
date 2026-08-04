@@ -19,27 +19,21 @@
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
+#include "quant_block_sparse_attn_const.h"
 
 using namespace AscendC;
 
-enum class BSALayout : uint32_t {
-    TND = 2,
-    PA_BNSD = 3,
-    PA_BSND = 4,
-    NTD = 5,
-};
-
-enum class BSADType : uint32_t {
+enum class QBSADType : uint32_t {
     FP8_E4M3FN = 0,
 };
 
-enum class BSAMaskMode : uint32_t {
+enum class QBSAMaskMode : uint32_t {
     NONE = 0,
     CAUSAL = 3,
 };
 
-constexpr uint32_t BSA_BLOCK_SIZE = 128U;
-constexpr uint32_t BSA_HEAD_DIM = 128U;
-constexpr float BSA_EMPTY_LSE_VALUE = -3.4028234663852886e38F;
+constexpr uint32_t QBSA_BLOCK_SIZE = 128U;
+constexpr uint32_t QBSA_HEAD_DIM = 128U;
+constexpr float QBSA_EMPTY_LSE_VALUE = -3.4028234663852886e38F;
 
 #endif // QUANT_BLOCK_SPARSE_ATTN_COMMON_H

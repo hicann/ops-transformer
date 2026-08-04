@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 """Custom op loader for quant_block_sparse_attn pytest.
 
-The BSA pytest tree should not hard-code one development worktree.  This module
+The QBSA pytest tree should not hard-code one development worktree.  This module
 checks the current torch registry and only loads an external extension when
-`BSA_CUSTOM_OPS_PATH` explicitly points to one.
+`QBSA_CUSTOM_OPS_PATH` explicitly points to one.
 """
 
 import glob
@@ -37,7 +37,7 @@ def _append_env_path(env_name, paths):
 
 def _candidate_roots():
     roots = []
-    value = os.environ.get("BSA_CUSTOM_OPS_PATH")
+    value = os.environ.get("QBSA_CUSTOM_OPS_PATH")
     if value:
         roots.extend(Path(part) for part in value.split(":") if part)
     roots.append(Path(__file__).resolve().parents[2] / "torch_ops_extension")

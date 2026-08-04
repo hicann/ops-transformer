@@ -23,71 +23,71 @@
 namespace optiling {
 
 // Inputs Index
-constexpr uint32_t BSA_QUERY_INDEX = 0U;
-constexpr uint32_t BSA_KEY_INDEX = 1U;
-constexpr uint32_t BSA_VALUE_INDEX = 2U;
-constexpr uint32_t BSA_Q_DESCALE_INDEX = 3U;
-constexpr uint32_t BSA_K_DESCALE_INDEX = 4U;
-constexpr uint32_t BSA_V_DESCALE_INDEX = 5U;
-constexpr uint32_t BSA_P_SCALE_INDEX = 6U;
-constexpr uint32_t BSA_CU_SEQLENS_Q_INDEX = 7U;
-constexpr uint32_t BSA_CU_SEQLENS_KV_INDEX = 8U;
-constexpr uint32_t BSA_SEQUSED_Q_INDEX = 9U;
-constexpr uint32_t BSA_SEQUSED_KV_INDEX = 10U;
-constexpr uint32_t BSA_SPARSE_INDICES_INDEX = 11U;
-constexpr uint32_t BSA_SPARSE_SEQ_LEN_INDEX = 12U;
-constexpr uint32_t BSA_BLOCK_TABLE_INDEX = 13U;
-constexpr uint32_t BSA_ATTEN_MASK_INDEX = 14U;
-constexpr uint32_t BSA_METADATA_INDEX = 15U;
+constexpr uint32_t QBSA_QUERY_INDEX = 0U;
+constexpr uint32_t QBSA_KEY_INDEX = 1U;
+constexpr uint32_t QBSA_VALUE_INDEX = 2U;
+constexpr uint32_t QBSA_Q_DESCALE_INDEX = 3U;
+constexpr uint32_t QBSA_K_DESCALE_INDEX = 4U;
+constexpr uint32_t QBSA_V_DESCALE_INDEX = 5U;
+constexpr uint32_t QBSA_P_SCALE_INDEX = 6U;
+constexpr uint32_t QBSA_CU_SEQLENS_Q_INDEX = 7U;
+constexpr uint32_t QBSA_CU_SEQLENS_KV_INDEX = 8U;
+constexpr uint32_t QBSA_SEQUSED_Q_INDEX = 9U;
+constexpr uint32_t QBSA_SEQUSED_KV_INDEX = 10U;
+constexpr uint32_t QBSA_SPARSE_INDICES_INDEX = 11U;
+constexpr uint32_t QBSA_SPARSE_SEQ_LEN_INDEX = 12U;
+constexpr uint32_t QBSA_BLOCK_TABLE_INDEX = 13U;
+constexpr uint32_t QBSA_ATTEN_MASK_INDEX = 14U;
+constexpr uint32_t QBSA_METADATA_INDEX = 15U;
 
 // Outputs Index
-constexpr uint32_t BSA_ATTENTION_OUT_INDEX = 0U;
-constexpr uint32_t BSA_SOFTMAX_LSE_INDEX = 1U;
+constexpr uint32_t QBSA_ATTENTION_OUT_INDEX = 0U;
+constexpr uint32_t QBSA_SOFTMAX_LSE_INDEX = 1U;
 
 // Attributes Index
-constexpr uint32_t BSA_SOFTMAX_SCALE_ATTR_INDEX = 0U;
-constexpr uint32_t BSA_SPARSE_Q_BLOCK_SIZE_ATTR_INDEX = 1U;
-constexpr uint32_t BSA_SPARSE_KV_BLOCK_SIZE_ATTR_INDEX = 2U;
-constexpr uint32_t BSA_LAYOUT_KV_ATTR_INDEX = 3U;
-constexpr uint32_t BSA_LAYOUT_Q_ATTR_INDEX = 4U;
-constexpr uint32_t BSA_LAYOUT_SPARSE_INDICES_ATTR_INDEX = 5U;
-constexpr uint32_t BSA_LAYOUT_OUT_ATTR_INDEX = 6U;
-constexpr uint32_t BSA_QUANT_MODE_ATTR_INDEX = 7U;
-constexpr uint32_t BSA_MASK_MODE_ATTR_INDEX = 8U;
-constexpr uint32_t BSA_RETURN_SOFTMAX_LSE_ATTR_INDEX = 9U;
+constexpr uint32_t QBSA_SOFTMAX_SCALE_ATTR_INDEX = 0U;
+constexpr uint32_t QBSA_SPARSE_Q_BLOCK_SIZE_ATTR_INDEX = 1U;
+constexpr uint32_t QBSA_SPARSE_KV_BLOCK_SIZE_ATTR_INDEX = 2U;
+constexpr uint32_t QBSA_LAYOUT_KV_ATTR_INDEX = 3U;
+constexpr uint32_t QBSA_LAYOUT_Q_ATTR_INDEX = 4U;
+constexpr uint32_t QBSA_LAYOUT_SPARSE_INDICES_ATTR_INDEX = 5U;
+constexpr uint32_t QBSA_LAYOUT_OUT_ATTR_INDEX = 6U;
+constexpr uint32_t QBSA_QUANT_MODE_ATTR_INDEX = 7U;
+constexpr uint32_t QBSA_MASK_MODE_ATTR_INDEX = 8U;
+constexpr uint32_t QBSA_RETURN_SOFTMAX_LSE_ATTR_INDEX = 9U;
 
-struct BSARequiredParaInfo {
+struct QBSARequiredParaInfo {
     const gert::CompileTimeTensorDesc *desc = nullptr;
     const gert::StorageShape *shape = nullptr;
     const gert::Stride *stride = nullptr;
 };
 
-struct BSAOptionalParaInfo {
+struct QBSAOptionalParaInfo {
     const gert::CompileTimeTensorDesc *desc = nullptr;
     const gert::Tensor *tensor = nullptr;
 };
 
 struct QuantBlockSparseAttnParaInfo {
-    BSARequiredParaInfo query;
-    BSARequiredParaInfo key;
-    BSARequiredParaInfo value;
-    BSARequiredParaInfo qDescale;
-    BSARequiredParaInfo kDescale;
-    BSARequiredParaInfo vDescale;
-    BSARequiredParaInfo pScale;
-    BSARequiredParaInfo sparseIndices;
-    BSARequiredParaInfo sparseSeqLen;
-    BSARequiredParaInfo attenMask;
+    QBSARequiredParaInfo query;
+    QBSARequiredParaInfo key;
+    QBSARequiredParaInfo value;
+    QBSARequiredParaInfo qDescale;
+    QBSARequiredParaInfo kDescale;
+    QBSARequiredParaInfo vDescale;
+    QBSARequiredParaInfo pScale;
+    QBSARequiredParaInfo sparseIndices;
+    QBSARequiredParaInfo sparseSeqLen;
+    QBSARequiredParaInfo attenMask;
 
-    BSAOptionalParaInfo cuSeqlensQ;
-    BSAOptionalParaInfo cuSeqlensKV;
-    BSAOptionalParaInfo seqUsedQ;
-    BSAOptionalParaInfo seqUsedKV;
-    BSAOptionalParaInfo blockTable;
-    BSAOptionalParaInfo metadata;
+    QBSAOptionalParaInfo cuSeqlensQ;
+    QBSAOptionalParaInfo cuSeqlensKV;
+    QBSAOptionalParaInfo seqUsedQ;
+    QBSAOptionalParaInfo seqUsedKV;
+    QBSAOptionalParaInfo blockTable;
+    QBSAOptionalParaInfo metadata;
 
-    BSARequiredParaInfo attnOut;
-    BSARequiredParaInfo lseOut;
+    QBSARequiredParaInfo attnOut;
+    QBSARequiredParaInfo lseOut;
 
     const float *softmaxScale = nullptr;
     const int64_t *qBlockSize = nullptr;

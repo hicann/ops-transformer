@@ -21,9 +21,9 @@ const int64_t DIM_THREE = 3;
 const int64_t DIM_FOUR = 4;
 const int64_t DIM_FIVE = 5;
 const int64_t FP32_BYTES = 4;
-const int64_t BSA_MXFP8_FULL_QUANT_MODE = 2;
-const int64_t BSA_MXFP8_SCALE_GROUP_SIZE = 64;
-const int64_t BSA_MXFP8_SCALE_LAST_DIM = 2;
+const int64_t QBSA_MXFP8_FULL_QUANT_MODE = 2;
+const int64_t QBSA_MXFP8_SCALE_GROUP_SIZE = 64;
+const int64_t QBSA_MXFP8_SCALE_LAST_DIM = 2;
 
 // 工具函数，推导输出 attention_out / softmax_lse 的 shape 与 dtype
 //   - attention_out: BF16，TND 保持原布局，NTD 转为 TND
@@ -36,7 +36,7 @@ std::tuple<at::Tensor, at::Tensor> construct_bsa_output_tensors(const at::Tensor
     TORCH_CHECK(query.dim() == DIM_THREE, "query should be 3D for layout_q TND/NTD, but got ", query.dim(), "D.");
     TORCH_CHECK(layout_q_str == "TND" || layout_q_str == "NTD", "layout_q should be TND or NTD, but got ",
                 layout_q_str);
-    TORCH_CHECK(quant_mode != BSA_MXFP8_FULL_QUANT_MODE || layout_q_str == "TND",
+    TORCH_CHECK(quant_mode != QBSA_MXFP8_FULL_QUANT_MODE || layout_q_str == "TND",
                 "quant_mode=2 MXFP8 full-quant only supports layout_q TND, but got ", layout_q_str, ".");
     for (auto i = 0; i < query.sizes().size(); i++) {
         TORCH_CHECK(query.size(i) > 0,
@@ -51,7 +51,7 @@ std::tuple<at::Tensor, at::Tensor> construct_bsa_output_tensors(const at::Tensor
     int64_t d_size = query.size(2);
     at::SmallVector<int64_t, SIZE> atten_out_size = {t_size, n1_size, d_size};
     at::SmallVector<int64_t, SIZE> softmax_lse_size;
-    if (quant_mode == BSA_MXFP8_FULL_QUANT_MODE) {
+    if (quant_mode == QBSA_MXFP8_FULL_QUANT_MODE) {
         softmax_lse_size = {t_size, n1_size};
     } else {
         softmax_lse_size = {n1_size, t_size};
@@ -96,17 +96,17 @@ std::tuple<at::Tensor, at::Tensor> npu_quant_block_sparse_attn_npu(
             value.stride(3) == 1,
         "value should use segmented PA_BNSD stride [paBlockStride, blockSize * headDim, headDim, 1], but got ",
         value.strides());
-    if (quant_mode == BSA_MXFP8_FULL_QUANT_MODE) {
-        const int64_t keyScaleDSize = (key.size(3) + BSA_MXFP8_SCALE_GROUP_SIZE - 1) / BSA_MXFP8_SCALE_GROUP_SIZE;
+    if (quant_mode == QBSA_MXFP8_FULL_QUANT_MODE) {
+        const int64_t keyScaleDSize = (key.size(3) + QBSA_MXFP8_SCALE_GROUP_SIZE - 1) / QBSA_MXFP8_SCALE_GROUP_SIZE;
         const int64_t valueScaleBlockSize =
-            (value.size(2) + BSA_MXFP8_SCALE_GROUP_SIZE - 1) / BSA_MXFP8_SCALE_GROUP_SIZE;
+            (value.size(2) + QBSA_MXFP8_SCALE_GROUP_SIZE - 1) / QBSA_MXFP8_SCALE_GROUP_SIZE;
         TORCH_CHECK(k_descale.dim() == DIM_FIVE,
                     "k_descale should be 5D [blockNum, Nkv, blockSize, D / 64, 2] in quant_mode=2 MXFP8 "
                     "full-quant scenario, but got dim=",
                     k_descale.dim());
         TORCH_CHECK(k_descale.size(0) == key.size(0) && k_descale.size(1) == key.size(1) &&
                         k_descale.size(2) == key.size(2) && k_descale.size(3) == keyScaleDSize &&
-                        k_descale.size(4) == BSA_MXFP8_SCALE_LAST_DIM,
+                        k_descale.size(4) == QBSA_MXFP8_SCALE_LAST_DIM,
                     "k_descale should be [blockNum, Nkv, blockSize, D / 64, 2] and match key PA_BNSD "
                     "shape, but got k_descale sizes ",
                     k_descale.sizes(), " and key sizes ", key.sizes());
@@ -123,7 +123,7 @@ std::tuple<at::Tensor, at::Tensor> npu_quant_block_sparse_attn_npu(
                     v_descale.dim());
         TORCH_CHECK(v_descale.size(0) == value.size(0) && v_descale.size(1) == value.size(1) &&
                         v_descale.size(2) == valueScaleBlockSize && v_descale.size(3) == value.size(3) &&
-                        v_descale.size(4) == BSA_MXFP8_SCALE_LAST_DIM,
+                        v_descale.size(4) == QBSA_MXFP8_SCALE_LAST_DIM,
                     "v_descale should be [blockNum, Nkv, blockSize / 64, DV, 2] and match value PA_BNSD "
                     "shape, but got v_descale sizes ",
                     v_descale.sizes(), " and value sizes ", value.sizes());
