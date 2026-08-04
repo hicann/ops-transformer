@@ -408,7 +408,7 @@ TEST_F(GroupedMatmulFinalizeRoutingWeightQuantTiling, TestMXA8W4WeightNzEZeroWit
 TEST_F(GroupedMatmulFinalizeRoutingWeightQuantTiling, TestCsvFileLoaded)
 {
     auto& cases = GetCsvTestCases();
-    EXPECT_EQ(cases.size(), 28) << "Expected 28 test cases in CSV file";
+    EXPECT_EQ(cases.size(), 30) << "Expected 30 test cases in CSV file";
 
     cout << "Successfully loaded " << cases.size() << " test cases from CSV" << endl;
     for (const auto& pair : cases) {

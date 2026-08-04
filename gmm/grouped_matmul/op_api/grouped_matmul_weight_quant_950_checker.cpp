@@ -296,24 +296,28 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckDimNumAndFormat(si
                                                                               size_t wIdx) const
 {
     if (unlikely(op::IsPrivateFormat((*gmmParams_.x)[xIdx]->GetStorageFormat()))) {
-        OP_LOGE_FOR_INVALID_FORMAT(GetAclnnName(), "x", "not ND", "ND");
+        OP_LOGE_FOR_INVALID_FORMAT(GetAclnnName(), "x",
+                                   op::ToString((*gmmParams_.x)[xIdx]->GetStorageFormat()).GetString(), "ND");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (unlikely(op::IsPrivateFormat((*gmmParams_.y)[yIdx]->GetStorageFormat()))) {
-        OP_LOGE_FOR_INVALID_FORMAT(GetAclnnName(), "y", "not ND", "ND");
+        OP_LOGE_FOR_INVALID_FORMAT(GetAclnnName(), "y",
+                                   op::ToString((*gmmParams_.y)[yIdx]->GetStorageFormat()).GetString(), "ND");
         return ACLNN_ERR_PARAM_INVALID;
     }
 
     if (IsA16W8ND() || IsA16F8ND() || IsA16W4()) {
         if (unlikely(op::IsPrivateFormat((*gmmParams_.weight)[wIdx]->GetStorageFormat()))) {
-            OP_LOGE_FOR_INVALID_FORMATS_WITH_REASON(GetAclnnName(), "weight", "NZ",
-                                                    "The format of weight must be ND " + GetDataFlowString());
+            OP_LOGE_FOR_INVALID_FORMATS_WITH_REASON(
+                GetAclnnName(), "weight", op::ToString((*gmmParams_.weight)[wIdx]->GetStorageFormat()).GetString(),
+                "The format of weight must be ND " + GetDataFlowString());
             return ACLNN_ERR_PARAM_INVALID;
         }
     } else {
         if (unlikely(!op::IsPrivateFormat((*gmmParams_.weight)[wIdx]->GetStorageFormat()))) {
-            OP_LOGE_FOR_INVALID_FORMATS_WITH_REASON(GetAclnnName(), "weight", "ND",
-                                                    "The format of weight must be NZ " + GetDataFlowString());
+            OP_LOGE_FOR_INVALID_FORMATS_WITH_REASON(
+                GetAclnnName(), "weight", op::ToString((*gmmParams_.weight)[wIdx]->GetStorageFormat()).GetString(),
+                "The format of weight must be NZ " + GetDataFlowString());
             return ACLNN_ERR_PARAM_INVALID;
         }
     }

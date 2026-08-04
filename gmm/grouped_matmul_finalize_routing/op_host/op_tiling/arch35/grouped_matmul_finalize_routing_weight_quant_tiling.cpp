@@ -558,13 +558,13 @@ static bool CheckKNAlignmentAndMinSize(int64_t kSize, int64_t nSize)
         return false;
     }
     if (unlikely(kSize < MIN_KN_SIZE)) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(OP_NAME, "x", "K=" + std::to_string(kSize),
-                                                 "K of x must be >= " + std::to_string(MIN_KN_SIZE));
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(OP_NAME, "x", "K=" + std::to_string(kSize),
+                                              "K of x must be >= " + std::to_string(MIN_KN_SIZE));
         return false;
     }
     if (unlikely(nSize < MIN_KN_SIZE)) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(OP_NAME, "weight", "N=" + std::to_string(nSize),
-                                                 "N of weight must be >= " + std::to_string(MIN_KN_SIZE));
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(OP_NAME, "weight", "N=" + std::to_string(nSize),
+                                              "N of weight must be >= " + std::to_string(MIN_KN_SIZE));
         return false;
     }
     return true;
