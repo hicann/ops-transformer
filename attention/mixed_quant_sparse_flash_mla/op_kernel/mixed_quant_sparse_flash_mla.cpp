@@ -37,7 +37,8 @@ using namespace AscendC;
         op.Process();                                                                             \
     } while (0)
 
-template<int FLASH_DECODE, int LAYOUT_T, int KV_LAYOUT_T, int TEMPLATE_MODE, int SPLIT_G, int QUANT_MODE, int KV_DTYPE>
+template<int FLASH_DECODE, int LAYOUT_T, int KV_LAYOUT_T, int TEMPLATE_MODE, int SPLIT_G, int QUANT_MODE, int KV_DTYPE,
+    int BATCH_CONSISTENCY>
  __global__ __aicore__ void mixed_quant_sparse_flash_mla(__gm__ uint8_t *query, __gm__ uint8_t *oriKV,
     __gm__ uint8_t *cmpKV, __gm__ uint8_t *oriSparseIndices, __gm__ uint8_t *cmpSparseIndices,
     __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable, __gm__ uint8_t *cuSeqlensQ,
@@ -48,7 +49,6 @@ template<int FLASH_DECODE, int LAYOUT_T, int KV_LAYOUT_T, int TEMPLATE_MODE, int
     __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
-
     TPipe tPipe;
     __gm__ uint8_t *user = GetUserWorkspace(workspace);
 
@@ -57,12 +57,12 @@ template<int FLASH_DECODE, int LAYOUT_T, int KV_LAYOUT_T, int TEMPLATE_MODE, int
             fp8_e4m3fn_t, float, bfloat16_t, FLASH_DECODE, KV_LAYOUT_T == QSMLA_LAYOUT_PA_BBND,
             static_cast<QSMLA_LAYOUT>(LAYOUT_T), static_cast<QSMLA_LAYOUT>(KV_LAYOUT_T),
             static_cast<QSMLATemplateMode>(TEMPLATE_MODE), SPLIT_G,
-            static_cast<SCALE_CONTIGUOUS_MODE>(QUANT_MODE));
+            static_cast<SCALE_CONTIGUOUS_MODE>(QUANT_MODE), BATCH_CONSISTENCY);
     } else {
         QSMLA_OP_IMPL(BaseApi::MixedQuantSparseFlashMlaCsa, MixedQuantSparseFlashMlaTilingData, bfloat16_t,
             hifloat8_t, float, bfloat16_t, FLASH_DECODE, KV_LAYOUT_T == QSMLA_LAYOUT_PA_BBND,
             static_cast<QSMLA_LAYOUT>(LAYOUT_T), static_cast<QSMLA_LAYOUT>(KV_LAYOUT_T),
             static_cast<QSMLATemplateMode>(TEMPLATE_MODE), SPLIT_G,
-            static_cast<SCALE_CONTIGUOUS_MODE>(QUANT_MODE));
+            static_cast<SCALE_CONTIGUOUS_MODE>(QUANT_MODE), BATCH_CONSISTENCY);
     }
 }

@@ -24,6 +24,8 @@ using std::pair;
 using std::string;
 namespace optiling {
 
+constexpr int64_t BATCH_CONSISTENCY_LEVEL = 3;
+
 struct QSMLACompileInfo {
     int64_t core_num;
 };
@@ -79,6 +81,7 @@ ge::graphStatus MQSMLAInfoParser::GetNpuInfo()
         OP_LOGE(opName_, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
         return GRAPH_FAILED;
     }
+    batchConsistency_ = (context_->GetDeterministicLevel() == BATCH_CONSISTENCY_LEVEL);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -543,6 +546,7 @@ void MQSMLAInfoParser::GenerateInfo(MQSMLATilingInfo &qsmlaInfo)
     qsmlaInfo.cmpMaxBlockNumPerBatch = cmpMaxBlockNumPerBatch_;
 
     qsmlaInfo.isSameSeqAllKVTensor = isSameSeqAllKVTensor_;
+    qsmlaInfo.batchConsistency = batchConsistency_;
 
     qsmlaInfo.quantMode = *opParamInfo_.quantMode;
     qsmlaInfo.tileSize = 64;
@@ -644,17 +648,29 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo *til
     constexpr uint32_t MAX_S2_SPLIT_NUM = 2;  // 每核最多S2切分次数
     constexpr uint32_t FLOAT_ELEM_SIZE = 4;   // sizeof(float)
     constexpr uint32_t FD_BLOCK_ELEM = 8;     // FD广播份数
-    uint32_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
+    constexpr uint32_t FD_MAX_SUM_REGION_NUM = 2; // max和sum两个区域
+    constexpr uint32_t BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM = 33;
+    size_t workspaceSize = static_cast<size_t>(ascendcPlatform.GetLibApiWorkSpaceSize());
     bool isSplitG = tilingInfo->gSize > 64; // gSize超过64时采用Split-G
     if (isSplitG) {
-        workspaceSize += (S2_BASE_SIZE * D_SIZE * VEC_RES_ELEM_SIZE * TRIPLE_BUFFER_NUM * (aicNum >> 1));
+        workspaceSize += static_cast<size_t>(S2_BASE_SIZE) * D_SIZE * VEC_RES_ELEM_SIZE *
+            TRIPLE_BUFFER_NUM * (aicNum >> 1);
     }
     uint32_t fdStagingMSize = tilingInfo->gSize;
     uint32_t fdStagingSlotNum = isSplitG ? (aicNum >> 1) : aicNum;
-    // 末尾的2对应每个split分别暂存max和sum。
-    uint32_t s2SplitStagingPerSlot = fdStagingMSize * D_SIZE * FLOAT_ELEM_SIZE * MAX_S2_SPLIT_NUM +
-                                     fdStagingMSize * FD_BLOCK_ELEM * FLOAT_ELEM_SIZE * MAX_S2_SPLIT_NUM * 2;
-    workspaceSize += s2SplitStagingPerSlot * fdStagingSlotNum;
+    if (tilingInfo->batchConsistency) {
+        size_t combineElemSize = static_cast<size_t>(fdStagingMSize) * D_SIZE +
+            static_cast<size_t>(FD_MAX_SUM_REGION_NUM) * fdStagingMSize * FD_BLOCK_ELEM;
+        workspaceSize += 2ULL * fdStagingSlotNum * combineElemSize * FLOAT_ELEM_SIZE;
+        workspaceSize += static_cast<size_t>(aicNum) * BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM *
+            combineElemSize * FLOAT_ELEM_SIZE;
+    } else {
+        // 末尾的2对应每个split分别暂存max和sum。
+        size_t s2SplitStagingPerSlot = static_cast<size_t>(fdStagingMSize) * D_SIZE * FLOAT_ELEM_SIZE *
+            MAX_S2_SPLIT_NUM + static_cast<size_t>(fdStagingMSize) * FD_BLOCK_ELEM * FLOAT_ELEM_SIZE *
+            MAX_S2_SPLIT_NUM * FD_MAX_SUM_REGION_NUM;
+        workspaceSize += s2SplitStagingPerSlot * fdStagingSlotNum;
+    }
     size_t *workSpaces = context_->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
 
@@ -699,7 +715,9 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo *til
     uint32_t tilingKey =
         GET_TPL_TILING_KEY(0U, qLayout, inputKvLayout, static_cast<uint32_t>(perfMode_),
                            static_cast<uint32_t>(isSplitG), static_cast<uint32_t>(tilingInfo->quantMode),
-                           ((oriKvType == ge::DT_FLOAT8_E4M3FN) ? DTYPE_FP8_E4M3FN : DTYPE_HIF8));
+                           ((oriKvType == ge::DT_FLOAT8_E4M3FN) ? DTYPE_FP8_E4M3FN : DTYPE_HIF8),
+                           static_cast<uint32_t>(tilingInfo->batchConsistency));
+    OP_LOGI("tilingkey", "Tiling key: %u.", tilingKey);
     context_->SetTilingKey(tilingKey);
     context_->SetScheduleMode(1);
 

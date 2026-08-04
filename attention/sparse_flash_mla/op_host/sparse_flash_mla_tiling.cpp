@@ -46,7 +46,9 @@ static const std::string CMP_TOPK_LENGTH_NAME = "cmp_topk_length";
 static const std::string A2_A3_PLATFORM_LOG = "A2/A3";
 static const std::string A5_PLATFORM_LOG = "A5";
 constexpr uint32_t FD_MAX_S2_SPLIT_NUM = 2U;
+constexpr uint32_t BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM = 33U;
 constexpr uint32_t FD_BROADCAST_ELEMS = 8U;
+constexpr int64_t BATCH_CONSISTENCY_LEVEL = 3;
 static bool IsNonEmptyOptionalTensor(const gert::Tensor *tensor)
 {
     return tensor != nullptr && tensor->GetShapeSize() > 0;
@@ -352,6 +354,7 @@ ge::graphStatus SMLAInfoParser::GetNpuInfo()
         OP_LOGE(opName_, "Npu Arch Version[%d] is not support.", (int32_t)npuArch_);
         return ge::GRAPH_FAILED;
     }
+    batchConsistency_ = (context_->GetDeterministicLevel() == BATCH_CONSISTENCY_LEVEL);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1054,6 +1057,7 @@ void SMLAInfoParser::GenerateInfo(SMLATilingInfo &smlaInfo)
     smlaInfo.kvLayout = kvLayout_;
     smlaInfo.outLayout = outLayout_;
     smlaInfo.returnSoftmaxLse = *opParamInfo_.returnSoftmaxLse;
+    smlaInfo.batchConsistency = batchConsistency_;
 
     smlaInfo.actualLenDimsOriKV = actualLenDimsOriKV_;
     smlaInfo.actualLenDimsCmpKV = actualLenDimsCmpKV_;
@@ -2020,10 +2024,18 @@ uint64_t SparseFlashMlaTiling::CalcFdStagingWorkspaceSize(const SMLATilingInfo *
         return 0ULL;
     }
 
-    const uint64_t slotCount = CalcFdLogicalSlotCount(tilingInfo, aicNum) * FD_MAX_S2_SPLIT_NUM;
+    const uint64_t logicalCoreSlots = CalcFdLogicalSlotCount(tilingInfo, aicNum);
     // 2表示max和sum两个缓冲区
     const uint64_t bytesPerSlot = tilingInfo->gSize * sizeof(float) * (headDimAlign_ + 2ULL * FD_BROADCAST_ELEMS);
-    return slotCount * bytesPerSlot;
+    if (tilingInfo->batchConsistency) {
+        // Intra-core reduction ping-pongs by multiCoreIdxMod2. Cross-core staging
+        // keeps one reduce-block range for every physical AIC.
+        const uint64_t intraCoreSlots = 2ULL * logicalCoreSlots;
+        const uint64_t crossCoreSlots =
+            static_cast<uint64_t>(aicNum) * BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM;
+        return (intraCoreSlots + crossCoreSlots) * bytesPerSlot;
+    }
+    return logicalCoreSlots * FD_MAX_S2_SPLIT_NUM * bytesPerSlot;
 }
 
 // --------------------------SparseFlashMlaTiling类成员函数定义----------------------
@@ -2044,7 +2056,7 @@ ge::graphStatus SparseFlashMlaTiling::DoOpTiling(SMLATilingInfo *tilingInfo)
     constexpr uint32_t VEC2_RES_ELEM_SIZE = 4;
     constexpr uint32_t PRELOAD_NUM = 2;
 
-    uint32_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
+    size_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     if (tilingInfo->npuArch == NpuArch::DAV_3510) {
         bool isSplitG = tilingInfo->gSize > 64;
         if (isSplitG || tilingInfo->perfMode == SMLATemplateMode::CSA_TEMPLATE_MODE ||
@@ -2074,7 +2086,7 @@ ge::graphStatus SparseFlashMlaTiling::DoOpTiling(SMLATilingInfo *tilingInfo)
             workspaceSize += MERGE_CACHE_GM_BUF_NUM * 512 * 512 * 2 * aicNum;
         }
     }
-    workspaceSize += static_cast<uint32_t>(CalcFdStagingWorkspaceSize(tilingInfo, aicNum));
+    workspaceSize += CalcFdStagingWorkspaceSize(tilingInfo, aicNum);
     size_t *workSpaces = context_->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
 
@@ -2134,7 +2146,7 @@ ge::graphStatus SparseFlashMlaTiling::DoOpTiling(SMLATilingInfo *tilingInfo)
         splitG = static_cast<uint32_t>(tilingInfo->gSize > 64);
     }
     tilingKey = GET_TPL_TILING_KEY(0U, qLayout, inputKvLayout, static_cast<uint32_t>(tilingInfo->perfMode), splitG,
-                                   headRatioOne);
+                                   headRatioOne, static_cast<uint32_t>(tilingInfo->batchConsistency));
     context_->SetScheduleMode(1);
     context_->SetTilingKey(tilingKey);
 

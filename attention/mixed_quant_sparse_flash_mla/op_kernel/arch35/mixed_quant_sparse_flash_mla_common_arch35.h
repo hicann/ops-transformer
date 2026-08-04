@@ -30,6 +30,7 @@ constexpr uint32_t BUFFER_SIZE_128K = 131072; // 131072表示128 * 1024
 
 constexpr uint32_t CV_RATIO = 2;
 constexpr uint64_t SYNC_MODE = 4;
+constexpr uint32_t BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM = 33U; // 同token最大规约块数
 
 namespace BaseApi {
 __aicore__ constexpr uint64_t Align2Func(uint64_t data)
@@ -55,10 +56,12 @@ __aicore__ constexpr uint64_t Align64Func(uint64_t data)
 
 #define TEMPLATE_INTF \
     template <typename Q_T, typename KV_T, typename T, typename OUTPUT_T, bool isFd, bool isPa, QSMLA_LAYOUT LAYOUT_T, \
-    QSMLA_LAYOUT KV_LAYOUT_T, QSMLATemplateMode TEMPLATE_MODE, bool IS_SPLIT_G, SCALE_CONTIGUOUS_MODE QUANT_MODE>
+    QSMLA_LAYOUT KV_LAYOUT_T, QSMLATemplateMode TEMPLATE_MODE, bool IS_SPLIT_G, SCALE_CONTIGUOUS_MODE QUANT_MODE, \
+    bool IS_BATCH_CONSISTENCY>
 
 #define TEMPLATE_INTF_ARGS \
-    Q_T, KV_T, T, OUTPUT_T, isFd, isPa, LAYOUT_T, KV_LAYOUT_T, TEMPLATE_MODE, IS_SPLIT_G, QUANT_MODE
+    Q_T, KV_T, T, OUTPUT_T, isFd, isPa, LAYOUT_T, KV_LAYOUT_T, TEMPLATE_MODE, IS_SPLIT_G, QUANT_MODE, \
+    IS_BATCH_CONSISTENCY
 
 #define CUBE_BLOCK_TRAITS_TYPE_FIELDS(X) \
     X(Q_T) \
@@ -74,6 +77,7 @@ __aicore__ constexpr uint64_t Align64Func(uint64_t data)
     X(TEMPLATE_MODE, QSMLATemplateMode, QSMLATemplateMode::CSA_TEMPLATE_MODE) \
     X(IS_SPLIT_G, bool, false) \
     X(QUANT_MODE, SCALE_CONTIGUOUS_MODE, SCALE_CONTIGUOUS_MODE::CONTIGUOUS) \
+    X(IS_BATCH_CONSISTENCY, bool, false) \
 
 /* 1. 生成带默认值的模版Template */
 #define GEN_TYPE_PARAM(name) typename name,

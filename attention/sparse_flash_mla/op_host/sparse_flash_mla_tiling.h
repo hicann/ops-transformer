@@ -282,6 +282,7 @@ public:
     // Others Flag
     uint32_t sparseCount = 0;
     bool returnSoftmaxLse = false;
+    bool batchConsistency = false;
 
     // PageAttention
     uint32_t blockTypeSize = 0;
@@ -539,6 +540,7 @@ public:
     bool isSameSeqAllKVTensor_ = true;
     uint32_t actualLenDimsKV_ = 0;
     uint32_t actualLenDimsQ_ = 0;
+    bool batchConsistency_ = false;
 
     uint32_t actualLenDimsOriKV_ = 0;
     uint32_t actualLenDimsCmpKV_ = 0;

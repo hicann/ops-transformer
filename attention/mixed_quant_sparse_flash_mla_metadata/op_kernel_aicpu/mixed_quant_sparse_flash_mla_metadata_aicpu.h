@@ -29,7 +29,7 @@ namespace aicpu {
 constexpr int64_t FA_TOLERANCE_RATIO = 2;
 constexpr uint32_t COST_WEIGHT_M = 6U;
 constexpr uint32_t COST_WEIGHT_S2 = 10U;
-constexpr uint32_t reductionTileNum = 32U;
+constexpr uint32_t BATCH_CONSISTENCY_MAX_REDUCTION_PARTS = 32U;
 constexpr bool ORI_KV = false;
 constexpr bool CMP_KV = true;
 constexpr uint32_t NO_MASK = 0;
@@ -108,7 +108,7 @@ struct SplitResult {
     int64_t maxCost{0};                              // 慢核开销
     uint32_t numOfFdHead{0U};                        // 归约任务数量
     uint32_t maxS2SplitNum{0U};                      // 单个归约任务最大分核数量
-    uint32_t maxS2GBaseNum{0U};                      // 单个核最大s2基本块数量
+    uint32_t maxS2LoopNum{0U};                       // 单个核最大s2计算轮次数量
     FlashDecodeResult fdRes{0U, 0U};                 // FD信息
 
     SplitResult(uint32_t aicNum, uint32_t aivNum)
@@ -139,13 +139,17 @@ struct SplitInfo {
 struct CostInfo {
     std::vector<int64_t> bN2CostOfEachBatch{};          // 整个batch的开销
     std::vector<uint32_t> bN2BlockOfEachBatch{};        // 整个batch的开销
+    std::vector<uint32_t> bN2S2LoopOfEachBatch{};       // 整个batch的s2计算轮次数量
     std::vector<int64_t> bN2LastBlockCostOfEachBatch{}; // batch最后一块的开销
     uint32_t totalBlockNum{0U};
     int64_t totalCost{0};
     int64_t maxS1GCost{0}; // 记录所有S1G行中的最大开销
 
     explicit CostInfo(uint32_t batchSize)
-        : bN2CostOfEachBatch(batchSize), bN2BlockOfEachBatch(batchSize), bN2LastBlockCostOfEachBatch(batchSize)
+        : bN2CostOfEachBatch(batchSize),
+          bN2BlockOfEachBatch(batchSize),
+          bN2S2LoopOfEachBatch(batchSize),
+          bN2LastBlockCostOfEachBatch(batchSize)
     {}
 };
 
@@ -183,6 +187,7 @@ struct S1GCache {
     int64_t s1GCost{0};
     int64_t s1GLastBlockCost{0};
     uint32_t s1GBlock{0U};
+    uint32_t s2Loop{0U};
     uint32_t oriS1GBlock{0U};
     int64_t oriS1GCost{0};
     int64_t oriS1GLastBlockCost{0};
@@ -195,7 +200,7 @@ struct S1GCache {
     int64_t cmpS2TailSize{0};
     uint32_t actOriS2Size{0};
     uint32_t actCmpS2Size{0};
-    uint32_t reductionTileSize{0};
+    uint32_t reductionBlockSize{0};
 };
 
 // 分核功能模块内部使用：记录分配过程中，当前核的负载信息
@@ -203,6 +208,7 @@ struct CoreCache {
     int64_t costLimit{0}; // 负载上限
     int64_t cost{0};      // 已分配负载
     uint32_t block{0U};   // 已分配块数
+    uint32_t s2Loop{0U};  // 已分配s2计算轮次数量
 };
 
 // 分核功能模块内部使用：记录分配过程中的上下文信息
@@ -218,6 +224,7 @@ struct AssignContext {
 
     int64_t bN2Cost{0};
     uint32_t bN2Block{0U};
+    uint32_t bN2S2Loop{0U};
     bool isFinished{false};
     BatchCache batchCache{};
     S1GCache s1GCache{};
@@ -257,7 +264,7 @@ private:
     Range<int64_t> CalcS2TokenRange(uint32_t s1GIdx, const BatchCache &batchCache, bool isCmpKv);
     int64_t OriCalcCost(uint32_t basicM, uint32_t basicS2);
     int64_t CmpCalcCost(uint32_t basicM, uint32_t basicS2);
-    void CalcCostTable(uint32_t s1GTailSize, uint32_t reductionTileSize, uint32_t oriS2TailSize,
+    void CalcCostTable(uint32_t s1GTailSize, uint32_t reductionBlockSize, uint32_t oriS2TailSize,
                        uint32_t cmpS2TailSize);
 
     // cache calculation
@@ -280,13 +287,14 @@ private:
     void AssignByBatch(const SplitContext &splitContext, AssignContext &assignContext);
     void AssignByRow(const SplitContext &splitContext, AssignContext &assignContext);
     int64_t CalcCurBlockCost(const AssignContext &assignContext);
+    uint32_t CalcCurBlockS2Loop(const AssignContext &assignContext);
     void AssignByBlock(const SplitContext &splitContext, AssignContext &assignContext);
     void ForceAssign(const SplitContext &splitContext, AssignContext &assignContext);
     void AssignBlocksToCore(const SplitContext &splitContext, AssignContext &assignContext, SplitResult &result);
 
     // FD
     bool IsNeedRecordFDInfo(const AssignContext &assignContext, const SplitResult &splitRes);
-    bool isFirstReductionTile(const AssignContext &assignContext, const SplitResult &splitRes);
+    bool isFirstReductionBlock(const AssignContext &assignContext, const SplitResult &splitRes);
     void RecordFDInfo(const SplitContext &splitContext, const AssignContext &assignContext, SplitResult &result);
 
     // main
