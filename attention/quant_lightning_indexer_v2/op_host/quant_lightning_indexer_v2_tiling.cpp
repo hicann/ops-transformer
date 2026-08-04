@@ -1323,10 +1323,9 @@ ge::graphStatus QLIV2InfoParser::CheckKeyContiguous() const
     }
     OP_CHECK_IF(
         keyNonContiguous || scaleNonContiguous,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "keyNonContiguous and scaleNonContiguous",
-                                              std::string(keyNonContiguous ? "true" : "false") + " and " +
-                                                  std::string(scaleNonContiguous ? "true" : "false"),
-                                              "key and keyscale only support non-continuous keying on the 0-axis"),
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName_, "key or key_dequant_scale",
+            "key and key_dequant_scale only support non-continuous keying on the 0-axis"),
         return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
