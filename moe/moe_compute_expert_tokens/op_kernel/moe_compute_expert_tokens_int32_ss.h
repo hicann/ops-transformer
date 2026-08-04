@@ -286,6 +286,9 @@ __aicore__ inline void MoeComputeExpertTokensInt32SS<T>::CopyOut()
     DataCopyParams dataCopyParams{blockCount, blockLen, srcStride, dstStride};
     SetAtomicAdd<int32_t>();
     SetAtomicMax<int32_t>();
+    event_t eventIdSToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE3));
+    SetFlag<HardEvent::S_MTE3>(eventIdSToMte3);
+    WaitFlag<HardEvent::S_MTE3>(eventIdSToMte3);
     DataCopyPad(gmOutput_, output, dataCopyParams);
     SetAtomicNone();
     tmpOutQueue_.FreeTensor(output);
