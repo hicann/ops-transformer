@@ -321,8 +321,11 @@ ge::graphStatus StemIndexerInfoParser::ValidateInputShapesMatch()
     OP_CHECK_IF(qSeqShape.GetDim(DIM_IDX_ZERO) != bSize_ || kvSeqShape.GetDim(DIM_IDX_ZERO) != bSize_ ||
                     numPromptShape.GetDim(DIM_IDX_ZERO) != bSize_,
                 OP_LOGE(opName_, "seq length input shape should be [batch]."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(metadataShape.GetDim(DIM_IDX_ZERO) != METADATA_LIMIT,
-                OP_LOGE(opName_, "metadata shape dim0 should be %u.", METADATA_LIMIT), return ge::GRAPH_FAILED);
+    uint64_t metadataCapacity = CalcStemIndexerMetadataCapacity(bSize_, kvHeadNum_);
+    OP_CHECK_IF(metadataShape.GetDim(DIM_IDX_ZERO) < static_cast<int64_t>(metadataCapacity),
+                OP_LOGE(opName_, "metadata shape dim0 should be at least %llu for batch %u and kv_heads %u.",
+                        static_cast<unsigned long long>(metadataCapacity), bSize_, kvHeadNum_),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         sparseIndicesShape.GetDim(DIM_IDX_ZERO) != bSize_ || sparseIndicesShape.GetDim(DIM_IDX_ONE) != qHeadNum_ ||
             sparseIndicesShape.GetDim(DIM_IDX_TWO) != maxQb_ || sparseIndicesShape.GetDim(DIM_IDX_THREE) != maxKb_,

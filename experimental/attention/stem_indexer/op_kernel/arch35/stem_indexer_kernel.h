@@ -30,7 +30,6 @@ namespace SIKernel {
 using namespace SICommon;
 using namespace matmul;
 using namespace optiling;
-using namespace optiling::detail;
 using AscendC::CacheMode;
 using AscendC::CrossCoreSetFlag;
 using AscendC::CrossCoreWaitFlag;
@@ -69,7 +68,7 @@ protected:
     bool needCleanOutput = false;
     // ================================Global Buffer区=================================
 
-    GlobalTensor<uint32_t> metadataGm;
+    GlobalTensor<uint32_t> faMetaDataGm;
     GlobalTensor<Q_T> queryGm;
     GlobalTensor<K_T> keyGm;
     GlobalTensor<float> vbiasGm;
@@ -84,6 +83,7 @@ protected:
     uint32_t tmpBlockIdx = 0U;
     uint32_t aiCoreIdx = 0U;
     uint32_t usedCoreNum = 0U;
+    uint32_t sectionNum_ = 0U;
 
     SICommon::ConstInfo constInfo{};
     SICommon::TempLoopInfo tempLoopInfo{};
@@ -95,8 +95,7 @@ protected:
     __aicore__ inline void InitActualSeqLen(__gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengthsK);
     __aicore__ inline bool NeedCleanOutput();
     // ================================Split Core================================
-    __aicore__ inline void SplitCoreByAICPU(uint32_t cubeCoreIdx, uint32_t vecCoreIdx,
-                                            GlobalTensor<uint32_t> &metadataGm);
+    __aicore__ inline void GetFASectionInfo(uint32_t sectionIdx);
     __aicore__ inline uint32_t GetS2BaseBlockNumOnMask(uint32_t gS1Idx, uint32_t actS1Size, uint32_t actS2Size);
     __aicore__ inline uint32_t CalcS2ValidSize(uint32_t gS1Idx, uint32_t actS1Size, uint32_t actS2Size);
     // ================================Process functions================================
@@ -262,66 +261,49 @@ __aicore__ inline uint32_t SIPreload<SIT>::CalcS2ValidSize(uint32_t gS1Idx, uint
 }
 
 template <typename SIT>
-__aicore__ inline void SIPreload<SIT>::SplitCoreByAICPU(uint32_t cubeCoreIdx, uint32_t vecCoreIdx,
-                                                        GlobalTensor<uint32_t> &metadataGm)
+__aicore__ inline void SIPreload<SIT>::GetFASectionInfo(uint32_t sectionIdx)
 {
-    uint32_t liCoreEnableIndex = GetAttrAbsIndex(cubeCoreIdx, SLI_CORE_ENABLE_INDEX);
-    uint32_t bN2StartIndex = GetAttrAbsIndex(cubeCoreIdx, SLI_BN2_START_INDEX);
-    uint32_t mStartIndex = GetAttrAbsIndex(cubeCoreIdx, SLI_M_START_INDEX);
-    uint32_t s2StartIndex = GetAttrAbsIndex(cubeCoreIdx, SLI_S2_START_INDEX);
-    uint32_t bN2EndIndex = GetAttrAbsIndex(cubeCoreIdx, SLI_BN2_END_INDEX);
-    uint32_t mEndIndex = GetAttrAbsIndex(cubeCoreIdx, SLI_M_END_INDEX);
-    uint32_t s2EndIndex = GetAttrAbsIndex(cubeCoreIdx, SLI_S2_END_INDEX);
+    uint32_t bN2StartIndex = GetFASectionMetaIndex(aiCoreIdx, SLI_SEC_BN2_START_INDEX, sectionIdx);
+    uint32_t mStartIndex = GetFASectionMetaIndex(aiCoreIdx, SLI_SEC_M_START_INDEX, sectionIdx);
+    uint32_t s2StartIndex = GetFASectionMetaIndex(aiCoreIdx, SLI_SEC_S2_START_INDEX, sectionIdx);
+    uint32_t bN2EndIndex = GetFASectionMetaIndex(aiCoreIdx, SLI_SEC_BN2_END_INDEX, sectionIdx);
+    uint32_t mEndIndex = GetFASectionMetaIndex(aiCoreIdx, SLI_SEC_M_END_INDEX, sectionIdx);
+    uint32_t s2EndIndex = GetFASectionMetaIndex(aiCoreIdx, SLI_SEC_S2_END_INDEX, sectionIdx);
 
-    uint32_t liZeroCoreEnableIndex = GetAttrAbsIndex(0, SLI_CORE_ENABLE_INDEX);
-    if (metadataGm.GetValue(liZeroCoreEnableIndex) == 0) {
-        isUsedCoreEqZero = true;
-    }
-    if (metadataGm.GetValue(liCoreEnableIndex) == 0) {
+    uint32_t bN2EndRhs = faMetaDataGm.GetValue(bN2EndIndex);
+    uint32_t mEndRhs = faMetaDataGm.GetValue(mEndIndex);
+    uint32_t s2EndRhs = faMetaDataGm.GetValue(s2EndIndex);
+    if (bN2EndRhs == 0U && mEndRhs == 0U && s2EndRhs == 0U) {
         splitCoreInfo.isCoreEnable = false;
         return;
-    } else {
-        splitCoreInfo.isCoreEnable = true;
     }
+    splitCoreInfo.isCoreEnable = true;
 
-    splitCoreInfo.bN2Start = metadataGm.GetValue(bN2StartIndex);
-    splitCoreInfo.gS1Start = metadataGm.GetValue(mStartIndex);
-    splitCoreInfo.s2Start = metadataGm.GetValue(s2StartIndex);
-    splitCoreInfo.bN2End = metadataGm.GetValue(bN2EndIndex);
-    splitCoreInfo.gS1End = metadataGm.GetValue(mEndIndex);
-    splitCoreInfo.s2End = metadataGm.GetValue(s2EndIndex);
+    splitCoreInfo.bN2Start = faMetaDataGm.GetValue(bN2StartIndex);
+    splitCoreInfo.gS1Start = faMetaDataGm.GetValue(mStartIndex);
+    splitCoreInfo.s2Start = faMetaDataGm.GetValue(s2StartIndex);
+    splitCoreInfo.bN2End = bN2EndRhs;
+    splitCoreInfo.gS1End = mEndRhs;
+    splitCoreInfo.s2End = s2EndRhs;
 
     if (splitCoreInfo.s2End != 0) {
-        // 此时只需要s2End往前退一格，bN2End和gS1End都不变
         splitCoreInfo.s2End = splitCoreInfo.s2End - 1;
     } else {
         if (splitCoreInfo.gS1End != 0) {
-            // splitCoreInfo.gS1End != 0 splitCoreInfo.s2End == 0 时，gS1End需要往前退一格, bN2End不变
-            // 此时需要使用bIdx获取实际Actal S2来计算出 s2End
             splitCoreInfo.gS1End = splitCoreInfo.gS1End - 1;
-            // 需要获取当前的Actaul S2
             uint32_t bIdx = splitCoreInfo.bN2End / constInfo.kvHeadNum;
             uint32_t actS1Size, actS2Size;
             GetS1S2ActualSeqLen(bIdx, actS1Size, actS2Size);
-            // s2的切块数量
             uint32_t s2BaseNum = GetS2BaseBlockNumOnMask(splitCoreInfo.gS1End, actS1Size, actS2Size);
             splitCoreInfo.s2End = (s2BaseNum == 0U) ? 0U : s2BaseNum - 1U;
         } else {
-            // splitCoreInfo.gS1End == 0 splitCoreInfo.s2End == 0 时，bN2End需要往前退一格
-            // 此时需要使用bIdx获取实际Actal S1和S2来计算出 gS1End 和 s2End
             splitCoreInfo.bN2End = splitCoreInfo.bN2End - 1;
-
-            // 需要获取当前的Actaul S1 S2
             uint32_t bIdx = splitCoreInfo.bN2End / constInfo.kvHeadNum;
             uint32_t actS1Size, actS2Size;
             GetS1S2ActualSeqLen(bIdx, actS1Size, actS2Size);
-
-            // m轴(gS1)方向的切块数量
             uint32_t gS1BaseNum = static_cast<uint32_t>(CeilDiv(static_cast<uint64_t>(actS1Size) * constInfo.gSize,
                                                                 static_cast<uint64_t>(constInfo.mBaseSize)));
             splitCoreInfo.gS1End = (gS1BaseNum == 0U) ? 0U : gS1BaseNum - 1U;
-
-            // s2的切块数量
             uint32_t s2BaseNum = GetS2BaseBlockNumOnMask(splitCoreInfo.gS1End, actS1Size, actS2Size);
             splitCoreInfo.s2End = (s2BaseNum == 0U) ? 0U : s2BaseNum - 1U;
         }
@@ -346,9 +328,14 @@ SIPreload<SIT>::Init(__gm__ uint8_t *qflat, __gm__ uint8_t *kflat, __gm__ uint8_
     InitTilingData(tiling);
     InitActualSeqLen(qSeqLens, kvSeqLens);
     numPromptTokensGm.SetGlobalBuffer((__gm__ int32_t *)numPromptTokens, constInfo.batchSize);
-    // 获取 AICPU metadata 算好的分核信息。
-    metadataGm.SetGlobalBuffer((__gm__ uint32_t *)metadata);
-    SplitCoreByAICPU(aiCoreIdx, tmpBlockIdx, metadataGm);
+
+    sectionNum_ = ((__gm__ uint32_t *)metadata)[0];
+    if (sectionNum_ == 0U) {
+        isUsedCoreEqZero = true;
+    }
+    faMetaDataGm.SetGlobalBuffer((__gm__ uint32_t *)(metadata + SLI_METADATA_HEADER_OFFSET),
+                                 AIC_CORE_NUM * SLI_PER_CORE_STRIDE * sectionNum_);
+
     needCleanOutput = NeedCleanOutput();
 
     pipe = tPipe;
@@ -362,6 +349,8 @@ SIPreload<SIT>::Init(__gm__ uint8_t *qflat, __gm__ uint8_t *kflat, __gm__ uint8_
     } else {
         queryGm.SetGlobalBuffer((__gm__ Q_T *)qflat);
         keyGm.SetGlobalBuffer((__gm__ K_T *)kflat);
+        queryGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
+        keyGm.SetL2CacheHint(CacheMode::CACHE_MODE_NORMAL);
         matmulService.InitParams(constInfo);
         matmulService.InitMm1GlobalTensor(queryGm, keyGm);
     }
@@ -479,22 +468,32 @@ __aicore__ inline void SIPreload<SIT>::Process()
         return;
     }
 
-    ProcessMain();
-}
-
-template <typename SIT>
-__aicore__ inline void SIPreload<SIT>::ProcessMain()
-{
-    if (!splitCoreInfo.isCoreEnable) {
-        return;
-    }
-
     if ASCEND_IS_AIV {
         vectorService.AllocEventID();
     } else {
         matmulService.AllocEventID();
     }
 
+    for (uint32_t sectionIdx = 0; sectionIdx < sectionNum_; sectionIdx++) {
+        GetFASectionInfo(sectionIdx);
+        if (!splitCoreInfo.isCoreEnable) {
+            continue;
+        }
+        ProcessMain();
+    }
+
+    if ASCEND_IS_AIV {
+        vectorService.FreeEventID();
+    } else {
+        matmulService.FreeEventID();
+        CrossCoreWaitFlag<SICommon::SI_SYNC_MODE4, PIPE_FIX>(SICommon::CROSS_VC_EVENT + 0);
+        CrossCoreWaitFlag<SICommon::SI_SYNC_MODE4, PIPE_FIX>(SICommon::CROSS_VC_EVENT + 1);
+    }
+}
+
+template <typename SIT>
+__aicore__ inline void SIPreload<SIT>::ProcessMain()
+{
     SICommon::RunInfo runInfo;
     uint32_t gloop = 0;
     for (uint32_t bN2LoopIdx = splitCoreInfo.bN2Start; bN2LoopIdx <= splitCoreInfo.bN2End; bN2LoopIdx++) {
@@ -505,7 +504,6 @@ __aicore__ inline void SIPreload<SIT>::ProcessMain()
 
         for (uint32_t gS1LoopIdx = splitCoreInfo.gS1Start; gS1LoopIdx <= tempLoopInfo.gS1LoopEnd; gS1LoopIdx++) {
             CalcS2LoopParams(bN2LoopIdx, gS1LoopIdx);
-            // s2ValidSize excludes windowSize, so initial blocks covering it can use direct output.
             if (tempLoopInfo.s2ValidSize <= constInfo.initialBlocks) {
                 vectorService.ProcessDirectOutput(tempLoopInfo, gS1LoopIdx);
                 splitCoreInfo.s2Start = 0;
@@ -519,14 +517,6 @@ __aicore__ inline void SIPreload<SIT>::ProcessMain()
             splitCoreInfo.s2Start = 0;
         }
         splitCoreInfo.gS1Start = 0;
-    }
-
-    if ASCEND_IS_AIV {
-        vectorService.FreeEventID();
-    } else {
-        matmulService.FreeEventID();
-        CrossCoreWaitFlag<SICommon::SI_SYNC_MODE4, PIPE_FIX>(SICommon::CROSS_VC_EVENT + 0);
-        CrossCoreWaitFlag<SICommon::SI_SYNC_MODE4, PIPE_FIX>(SICommon::CROSS_VC_EVENT + 1);
     }
 }
 

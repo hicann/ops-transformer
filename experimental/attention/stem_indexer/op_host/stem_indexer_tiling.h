@@ -65,7 +65,11 @@ constexpr uint32_t STEM_STRIDE_LIMIT = 16;
 constexpr uint32_t HEAD_DIM_LIMIT = 2048;
 constexpr uint32_t INITIAL_BLOCKS_LIMIT = 4;
 constexpr uint32_t WINDOW_SIZE_LIMIT = 4;
-constexpr uint32_t METADATA_LIMIT = 2048;
+constexpr uint64_t STEM_INDEXER_METADATA_HEADER_ELEMS = 16U;
+constexpr uint64_t STEM_INDEXER_METADATA_CORE_STRIDE = 16U;
+constexpr uint64_t STEM_INDEXER_METADATA_AIC_CORE_NUM = 36U;
+constexpr uint64_t STEM_INDEXER_METADATA_AIV_CORE_NUM = 72U;
+constexpr uint64_t STEM_INDEXER_METADATA_ALIGN_ELEMS = 4096U;
 constexpr uint32_t Q_HEAD_NUM_32 = 32;
 constexpr uint32_t Q_HEAD_NUM_64 = 64;
 constexpr uint32_t KV_HEAD_NUM_2 = 2;
@@ -82,6 +86,17 @@ constexpr uint32_t K_BLOCK_NUM_BIAS_MEDIUM_LIMIT = 30U;
 constexpr uint32_t K_BLOCK_NUM_BIAS_LARGE_LIMIT = 30U;
 constexpr int64_t TOPK_SCORE_PRECISION_UINT32 = 1;
 constexpr int64_t TOPK_SCORE_PRECISION_UINT16 = 2;
+
+constexpr uint64_t CalcStemIndexerMetadataCapacity(uint64_t batchSize, uint64_t kvHeadNum)
+{
+    uint64_t maxSectionNum = batchSize * kvHeadNum;
+    uint64_t requiredElems =
+        STEM_INDEXER_METADATA_HEADER_ELEMS +
+        maxSectionNum * (STEM_INDEXER_METADATA_AIC_CORE_NUM + STEM_INDEXER_METADATA_AIV_CORE_NUM) *
+            STEM_INDEXER_METADATA_CORE_STRIDE;
+    return (requiredElems + STEM_INDEXER_METADATA_ALIGN_ELEMS - 1U) / STEM_INDEXER_METADATA_ALIGN_ELEMS *
+           STEM_INDEXER_METADATA_ALIGN_ELEMS;
+}
 
 BEGIN_TILING_DATA_DEF(StemIndexerTilingData)
 TILING_DATA_FIELD_DEF(uint32_t, bSize)

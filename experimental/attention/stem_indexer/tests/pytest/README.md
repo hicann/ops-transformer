@@ -48,7 +48,8 @@ single和batch模式当前均维护154条正例case，分别从`ENABLED_PARAMS`�
 ## Metadata说明
 
 `metadata`是StemIndexer主算子的前置输入，pytest正例和普通单case脚本都会先调用
-`stem_indexer_metadata`生成`int32[2048]`的metadata，再传给`stem_indexer`。
+`stem_indexer_metadata`按`16 + B * kv_heads * (36 + 72) * 16`生成动态容量的metadata，
+并向上对齐到4096个INT32元素，再传给`stem_indexer`。
 当前case表只保留可运行并可与golden比对的正例。
 
 当前StemIndexer主算子使用BNSD布局，`q_seq_lens`和`kv_seq_lens`按batch实际长度传入，

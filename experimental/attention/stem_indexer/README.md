@@ -31,7 +31,7 @@
 | q_seq_lens             | 输入      | 每个batch中query的有效token数。 | INT32     | ND         |
 | kv_seq_lens            | 输入      | 每个batch中key的有效token数。 | INT32       | ND         |
 | num_prompt_tokens                    | 输入      | prompt token数，用于TPD动态TopK预算分档。 | INT32       | ND         |
-| metadata                    | 输入      | StemIndexerMetadata算子传入的分核调度信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容，shape大小为`[2048]`，当前不支持传空。 | INT32       | ND         |
+| metadata                    | 输入      | StemIndexerMetadata算子传入的分核调度信息，包含section数及每个核处理数据的起止点等内容。长度按最大section数动态计算并对齐到4096个INT32元素，当前不支持传空。 | INT32       | ND         |
 | causal                 | 属性      | 是否因果（right-down causal mask），默认值true。 | BOOL          | -         |
 | stem_block_size                 | 属性| block大小，当前仅支持128。 | INT32 | -         |
 | stem_stride                 | 可选属性| 代表聚合stride，当前仅支持16。 | INT32 | -         |
@@ -53,7 +53,7 @@
 -   `qflat`/`kflat`仅支持BF16，`vbias`仅支持FP32，`q_seq_lens`/`kv_seq_lens`/`num_prompt_tokens`/`metadata`及输出仅支持INT32。
 -   `q_heads`仅支持32/64，`kv_heads`仅支持2/4/8，且需满足`q_heads % kv_heads == 0`（GQA）。
 -   `headDim`固定为128；`stem_block_size`固定为128，`stem_stride`固定为16，因此`qflat`/`kflat`最后一维固定为`stem_stride * D = 16 * 128 = 2048`。
--   `metadata`首维必须为2048。
+-   `metadata`最大section数按`B * kv_heads`计算，所需元素数为`16 + B * kv_heads * (36 + 72) * 16`，首维向上对齐到4096个INT32元素。
 -   `initial_blocks`固定为4，`window_size`固定为4。
 -   TopK预算分档：prompt block数较小时直接取prompt block数；中等长度使用`k_block_num_rate_medium * prompt_block + k_block_num_bias_medium`；长序列使用`k_block_num_rate_large * prompt_block + k_block_num_bias_large`；再按query位置与`alpha`线性衰减得到当前query block的动态TopK预算。
 -   输出`sparse_indices`采用有效前缀契约：仅前`sparse_seq_len`项有效，尾部无效区在S2内层首轮以-1前置初始化，下游BlockSparseAttention只读取有效前缀。
@@ -88,10 +88,10 @@
     kv_seq_lens = torch.full((b,), kv_seq_len, dtype=torch.int32).npu()
     num_prompt_tokens_tensor = torch.full((b,), num_prompt_tokens, dtype=torch.int32).npu()
 
-    # 1. 前置分核：生成分核调度 metadata，shape 固定为 [2048]
+    # 1. 前置分核：生成动态容量的分核调度 metadata
     metadata = torch.ops.custom.npu_stem_indexer_metadata(
         q_seq_lens, kv_seq_lens, q_heads, kv_heads,
-        causal=True, stem_block_size=stem_block_size, dim_qkflat=d, window_size=4)
+        causal=True, stem_block_size=stem_block_size, dim_qkflat=stem_stride * d, window_size=4)
 
     # 2. 主算子：块级打分与动态选块
     sparse_indices, sparse_seq_len = torch.ops.custom.npu_stem_indexer(

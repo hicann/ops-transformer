@@ -18,7 +18,6 @@ E2E customize_inputs contract: modify tensors in-place via x.copy_(value).
 import torch
 
 HEAD_DIM = 128
-METADATA_SIZE = 2048
 
 
 def _make_float_tensor(shape, dtype, pattern, seed=17):

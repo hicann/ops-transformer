@@ -19,6 +19,22 @@
 #include "opdev/tensor_view_utils.h"
 
 static constexpr int64_t STEM_BLOCK_SIZE_128 = 128;
+static constexpr int64_t STEM_INDEXER_METADATA_HEADER_SIZE = 16;
+static constexpr int64_t STEM_INDEXER_METADATA_CORE_STRIDE = 16;
+static constexpr int64_t STEM_INDEXER_METADATA_AIC_CORE_NUM = 36;
+static constexpr int64_t STEM_INDEXER_METADATA_AIV_CORE_NUM = 72;
+static constexpr int64_t STEM_INDEXER_METADATA_ALIGN_SIZE = 4096;
+
+static int64_t CalcMetadataCapacity(int64_t batchSize, int64_t kvHeads)
+{
+    int64_t maxSectionNum = batchSize * kvHeads;
+    int64_t requiredSize =
+        STEM_INDEXER_METADATA_HEADER_SIZE +
+        maxSectionNum * (STEM_INDEXER_METADATA_AIC_CORE_NUM + STEM_INDEXER_METADATA_AIV_CORE_NUM) *
+            STEM_INDEXER_METADATA_CORE_STRIDE;
+    return (requiredSize + STEM_INDEXER_METADATA_ALIGN_SIZE - 1) / STEM_INDEXER_METADATA_ALIGN_SIZE *
+           STEM_INDEXER_METADATA_ALIGN_SIZE;
+}
 
 static bool IsTensorExist(const aclTensor *tensor)
 {
@@ -30,7 +46,7 @@ static bool IsTensorExist(const aclTensor *tensor)
 
 static aclnnStatus ParamsCheck(const aclTensor *qSeqLens, const aclTensor *kvSeqLens,
                                int64_t qHeads, int64_t kvHeads, int64_t stemBlockSize, int64_t dimQkflat,
-                               int64_t windowSize)
+                               int64_t windowSize, const aclTensor *metadata)
 {
     if (!IsTensorExist(qSeqLens)) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "qSeqLens does not exists");
@@ -70,6 +86,23 @@ static aclnnStatus ParamsCheck(const aclTensor *qSeqLens, const aclTensor *kvSeq
 
     if (windowSize < 0) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "windowSize must be non-negative, but got %ld", windowSize);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+
+    if (!IsTensorExist(metadata) || metadata->GetViewShape().GetDimNum() != 1) {
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "metadata must be a non-empty 1D tensor");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (metadata->GetDataType() != ACL_INT32) {
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "metadata only supports int32");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+
+    int64_t metadataCapacity = CalcMetadataCapacity(qSeqLens->GetViewShape().GetDim(0), kvHeads);
+    if (metadata->GetViewShape().GetDim(0) < metadataCapacity) {
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+                "metadata dim0 must be at least %ld for batch %ld and kvHeads %ld, but got %ld",
+                metadataCapacity, qSeqLens->GetViewShape().GetDim(0), kvHeads, metadata->GetViewShape().GetDim(0));
         return ACLNN_ERR_PARAM_INVALID;
     }
 

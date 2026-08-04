@@ -7,14 +7,16 @@ import pandas as pd
 
 AIC_CORE_NUM = 36
 AIV_CORE_NUM = 72
-FA_METADATA_SIZE = 8
-FD_METADATA_SIZE = 8
+METADATA_HEADER_SIZE = 16
+FA_METADATA_SIZE = 16
+AIV_RESERVED_METADATA_SIZE = 16
+METADATA_ALIGN_SIZE = 4096
 
 qSeqLens = torch.tensor([384], dtype=torch.int32).npu()
 kvSeqLens = torch.tensor([32768], dtype=torch.int32).npu()
 qHeads = 1
 kvHeads = 1
-dimQkflat = 128
+dimQkflat = 2048
 stemBlockSize = 128
 causal=True
 windowSize=4
@@ -35,26 +37,21 @@ if isinstance(metadata, torch.Tensor):
 else:
     metadata_np = np.array(metadata).flatten()
 
-fa_data = [[0 for _ in range(FA_METADATA_SIZE)] for _ in range(AIC_CORE_NUM)]
-fd_data = [[0 for _ in range(FD_METADATA_SIZE)] for _ in range(AIV_CORE_NUM)]
+section_num = int(metadata_np[0])
+max_section_num = len(qSeqLens) * kvHeads
+required_size = METADATA_HEADER_SIZE + max_section_num * (
+    AIC_CORE_NUM * FA_METADATA_SIZE + AIV_CORE_NUM * AIV_RESERVED_METADATA_SIZE
+)
+expected_size = ((required_size + METADATA_ALIGN_SIZE - 1) // METADATA_ALIGN_SIZE) * METADATA_ALIGN_SIZE
+if len(metadata_np) != expected_size:
+    raise ValueError(f"算子输出数据长度({len(metadata_np)})与期望长度({expected_size})不一致")
 
-# 按8元素一组解析aic部分
-fa_length = AIC_CORE_NUM * FA_METADATA_SIZE
-fd_length = AIV_CORE_NUM * FD_METADATA_SIZE
-if len(metadata_np) < fa_length + fd_length:
-    raise ValueError(f"算子输出数据长度({len(metadata_np)})不足，期望至少{fa_length} + {fd_length}")
+fa_base = METADATA_HEADER_SIZE
 
-for i in range(AIC_CORE_NUM):
-    for j in range(FA_METADATA_SIZE):
-        fa_data[i][j] = metadata_np[i * FA_METADATA_SIZE + j]
-
-for i in range(AIV_CORE_NUM):
-    for j in range(FD_METADATA_SIZE):
-        fd_data[i][j] = metadata_np[fa_length + i * FD_METADATA_SIZE + j]
-
-print("=============================== FA =========================")
-for aic in range (AIC_CORE_NUM):
-    print(fa_data[aic])
-print("=============================== FD =========================")
-for aiv in range (AIV_CORE_NUM):
-    print(fd_data[aiv])
+print(f"section_num={section_num}, metadata_size={len(metadata_np)}")
+for section_idx in range(section_num):
+    print(f"=============================== Section {section_idx} FA =========================")
+    section_fa_base = fa_base + section_idx * AIC_CORE_NUM * FA_METADATA_SIZE
+    for aic in range(AIC_CORE_NUM):
+        offset = section_fa_base + aic * FA_METADATA_SIZE
+        print(metadata_np[offset : offset + FA_METADATA_SIZE].tolist())

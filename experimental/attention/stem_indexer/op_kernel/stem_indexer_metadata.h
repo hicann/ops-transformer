@@ -17,92 +17,33 @@
 #define STEM_INDEXER_METADATA_H
 
 #include <cstdint>
-#include <cassert>
 
 namespace optiling {
 
 // Constants
 constexpr uint32_t AIC_CORE_NUM = 36U;
-constexpr uint32_t AIV_CORE_NUM = 72U;
-constexpr uint32_t SLI_META_SIZE = 2048U;
 using SLI_METADATA_T = uint32_t;
 
-constexpr uint32_t FA_METADATA_SIZE = 8U;
-constexpr uint32_t FD_METADATA_SIZE = 8U;
+// Section-based metadata layout
+constexpr uint32_t SLI_PER_CORE_STRIDE = 16U;
+constexpr uint32_t SLI_METADATA_HEADER_OFFSET = SLI_PER_CORE_STRIDE * sizeof(uint32_t);
 
-// FA Metadata Index Definitions
-constexpr uint32_t SLI_CORE_ENABLE_INDEX = 0U;
-constexpr uint32_t SLI_BN2_START_INDEX = 1U;
-constexpr uint32_t SLI_M_START_INDEX = 2U;
-constexpr uint32_t SLI_S2_START_INDEX = 3U;
-constexpr uint32_t SLI_BN2_END_INDEX = 4U;
-constexpr uint32_t SLI_M_END_INDEX = 5U;
-constexpr uint32_t SLI_S2_END_INDEX = 6U;
-constexpr uint32_t SLI_FIRST_FD_DATA_WORKSPACE_IDX_INDEX = 7U;
-
-// FD Metadata Index Definitions
-constexpr uint32_t SLD_CORE_ENABLE_INDEX = 0U;
-constexpr uint32_t SLD_BN2_IDX_INDEX = 1U;
-constexpr uint32_t SLD_M_IDX_INDEX = 2U;
-constexpr uint32_t SLD_WORKSPACE_IDX_INDEX = 3U;
-constexpr uint32_t SLD_WORKSPACE_NUM_INDEX = 4U;
-constexpr uint32_t SLD_M_START_INDEX = 5U;
-constexpr uint32_t SLD_M_NUM_INDEX = 6U;
+// Section-based FA Metadata Index (0-based, matching AICPU flash_attn_metadata format)
+constexpr uint32_t SLI_SEC_BN2_START_INDEX = 0U;
+constexpr uint32_t SLI_SEC_M_START_INDEX = 1U;
+constexpr uint32_t SLI_SEC_S2_START_INDEX = 2U;
+constexpr uint32_t SLI_SEC_BN2_END_INDEX = 3U;
+constexpr uint32_t SLI_SEC_M_END_INDEX = 4U;
+constexpr uint32_t SLI_SEC_S2_END_INDEX = 5U;
 
 #ifdef __CCE_AICORE__
 
-/**
- * @brief 获取属性的绝对索引
- * @param coreIdx 核索引
- * @param metaIdx 元数据索引
- * @param isAIV 是否为AIV数据，默认为false
- * @return 返回属性的绝对索引
- */
-__aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx, bool isAIV = false)
+__aicore__ inline uint32_t GetFASectionMetaIndex(uint32_t coreIdx, uint32_t metaIdx, uint32_t sectionIdx)
 {
-    if (isAIV) {
-        return AIC_CORE_NUM * FA_METADATA_SIZE + FD_METADATA_SIZE * coreIdx + metaIdx;
-    } else {
-        return FA_METADATA_SIZE * coreIdx + metaIdx;
-    }
+    return SLI_PER_CORE_STRIDE * AIC_CORE_NUM * sectionIdx + SLI_PER_CORE_STRIDE * coreIdx + metaIdx;
 }
-#endif
 
-namespace detail {
-struct SliMetadata {
-    SLI_METADATA_T *faMetadata; // [AIC_CORE_NUM][FA_METADATA_SIZE];
-    SLI_METADATA_T *fdMetadata; // [AIV_CORE_NUM][FD_METADATA_SIZE];
-    SliMetadata(void *metadataPtr)
-        : faMetadata(static_cast<SLI_METADATA_T *>(metadataPtr)),
-          fdMetadata(faMetadata + AIC_CORE_NUM * FA_METADATA_SIZE)
-    {
-    }
-    void SetFaMetadata(uint32_t aicIdx, uint32_t metaIdx, uint32_t val)
-    {
-        assert(aicIdx < AIC_CORE_NUM);
-        assert(metaIdx < FA_METADATA_SIZE);
-        faMetadata[FA_METADATA_SIZE * aicIdx + metaIdx] = val;
-    }
-    uint32_t GetFaMetadata(uint32_t aicIdx, uint32_t metaIdx)
-    {
-        assert(aicIdx < AIC_CORE_NUM);
-        assert(metaIdx < FA_METADATA_SIZE);
-        return faMetadata[FA_METADATA_SIZE * aicIdx + metaIdx];
-    }
-    void SetFdMetadata(uint32_t aivIdx, uint32_t metaIdx, uint32_t val)
-    {
-        assert(aivIdx < AIV_CORE_NUM);
-        assert(metaIdx < FD_METADATA_SIZE);
-        fdMetadata[FD_METADATA_SIZE * aivIdx + metaIdx] = val;
-    }
-    uint32_t GetFdMetadata(uint32_t aivIdx, uint32_t metaIdx)
-    {
-        assert(aivIdx < AIV_CORE_NUM);
-        assert(metaIdx < FD_METADATA_SIZE);
-        return fdMetadata[FD_METADATA_SIZE * aivIdx + metaIdx];
-    }
-};
-} // namespace detail
+#endif
 
 } // namespace optiling
 

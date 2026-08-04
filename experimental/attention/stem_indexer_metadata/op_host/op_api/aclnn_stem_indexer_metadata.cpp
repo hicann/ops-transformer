@@ -47,7 +47,7 @@ aclnnStatus aclnnStemIndexerMetadataGetWorkspaceSize(
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    auto ret = ParamsCheck(qSeqLens, kvSeqLens, qHeads, kvHeads, stemBlockSize, dimQkflat, windowSize);
+    auto ret = ParamsCheck(qSeqLens, kvSeqLens, qHeads, kvHeads, stemBlockSize, dimQkflat, windowSize, metadata);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();

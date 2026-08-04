@@ -23,7 +23,11 @@ K_BLOCK_NUM_RATE_MEDIUM = 0.2
 K_BLOCK_NUM_BIAS_MEDIUM = 30
 K_BLOCK_NUM_RATE_LARGE = 0.1
 K_BLOCK_NUM_BIAS_LARGE = 30
-METADATA_SIZE = 2048
+METADATA_HEADER_SIZE = 16
+METADATA_CORE_STRIDE = 16
+METADATA_AIC_CORE_NUM = 36
+METADATA_AIV_CORE_NUM = 72
+METADATA_ALIGN_SIZE = 4096
 DEFAULT_TOPK_SCORE_PRECISION = 1
 TOPK_SCORE_TYPE_BY_PRECISION = {1: "uint32", 2: "uint16"}
 
@@ -37,6 +41,14 @@ DTYPE_MAP = {
 
 def ceil_div(value, factor):
     return (int(value) + int(factor) - 1) // int(factor)
+
+
+def get_metadata_size(batch_size, kv_heads):
+    max_section_num = int(batch_size) * int(kv_heads)
+    metadata_size = METADATA_HEADER_SIZE + max_section_num * (
+        METADATA_AIC_CORE_NUM + METADATA_AIV_CORE_NUM
+    ) * METADATA_CORE_STRIDE
+    return ceil_div(metadata_size, METADATA_ALIGN_SIZE) * METADATA_ALIGN_SIZE
 
 
 def to_float32(value):
@@ -139,7 +151,7 @@ def get_tensor_shapes(case):
     metadata_shape = (
         parse_shape(special["metadata_shape"])
         if "metadata_shape" in special
-        else [METADATA_SIZE]
+        else [get_metadata_size(batch_size, kv_heads)]
     )
     return qflat_shape, kflat_shape, vbias_shape, metadata_shape
 
@@ -197,7 +209,7 @@ def get_metadata_attrs(case):
     return {
         "causal": bool(case["causal"]),
         "stem_block_size": int(case["stem_block_size"]),
-        "dim_qkflat": HEAD_DIM,
+        "dim_qkflat": int(case["stem_stride"]) * HEAD_DIM,
         "window_size": int(case["window_size"]),
     }
 
