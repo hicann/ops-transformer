@@ -81,7 +81,7 @@ aclnnStatus aclnnSparseFlashAttention(
   > [!NOTE]
   >
   >- query、key、value参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
-  >- Q\_S和S1表示query shape中的S，KV\_S和S2表示key shape中的S，Q\_N和N1表示num\_query\_heads，KV\_N和N2表示num\_key\_value\_heads，T1表示query shape中的T，T2表示key shape中的输入样本序列长度的累加和。
+  >- S1表示query shape中的S，S2表示key shape中的S，N1表示query对应的多头数，N2表示key对应的多头数，T1表示query shape中的T，T2表示key shape中的输入样本序列长度的累加和。
 
   <table style="undefined;table-layout: fixed; width: 1494px"><colgroup>
   <col style="width: 146px">
@@ -114,8 +114,8 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>ND</td>
      <td>
           <ul>
-                <li>layout_query为BSND时，shape为(B,S1,N1,D)。</li>
-                <li>layout_query为TND时，shape为(T1,N1,D)。</li>
+                <li>layoutQuery为BSND时，shape为(B,S1,N1,D)。</li>
+                <li>layoutQuery为TND时，shape为(T1,N1,D)。</li>
           </ul>
       </td>
       <td>x</td>
@@ -127,19 +127,19 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>
           <ul>
                 <li>不支持空tensor。</li>
-                <li>block_num为PageAttention时block总数。</li>
+                <li>blockNum为PageAttention时block总数。</li>
           </ul>
       </td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>
           <ul>
-                <li>layout_kv为PA_BSND时，shape为(block_num, block_size, KV_N, D)。</li>
-                <li>layout_kv为BSND时，shape为(B, S2, KV_N, D)。</li>
-                <li>layout_kv为TND时，shape为(T2, KV_N, D)。</li>
+                <li>layoutKv为PA_BSND时，shape为(blockNum, blockSize, N2, D)。</li>
+                <li>layoutKv为BSND时，shape为(B, S2, N2, D)。</li>
+                <li>layoutKv为TND时，shape为(T2, N2, D)。</li>
           </ul>
       </td>
-      <td>x</td>
+      <td>✓</td>
     </tr>
     <tr>
       <td>value（aclTensor）</td>
@@ -149,7 +149,7 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>shape与key的shape一致。</td>
-      <td>x</td>
+      <td>✓</td>
     </tr>
     <tr>
       <td>sparseIndices（aclTensor）</td>
@@ -158,15 +158,15 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>
           <ul>
                 <li>不支持空tensor。</li>
-                <li>sparse_size为一次离散选取的block数，需要保证每行有效值均在前半部分，无效值均在后半部分，且需要满足sparse_size大于0。</li>
+                <li>sparseSize为一次离散选取的block数，需要保证每行有效值均在前半部分，无效值均在后半部分，且需要满足sparseSize大于0。</li>
           </ul>
       </td>
       <td>INT32</td>
       <td>ND</td>
       <td>
           <ul>
-                <li>layout_query为BSND时，shape为(B, Q_S, KV_N, sparse_size)。</li>
-                <li>layout_query为TND时，shape为(Q_T, KV_N, sparse_size)。</li>
+                <li>layoutQuery为BSND时，shape为(B, S1, N2, sparseSize)。</li>
+                <li>layoutQuery为TND时，shape为(T1, N2, sparseSize)。</li>
           </ul>
       </td>
       <td>x</td>
@@ -178,12 +178,12 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>
           <ul>
                 <li>不支持空tensor。</li>
-                <li>第二维长度不小于所有batch中最大的S2对应的block数量，即S2_max / block_size向上取整。</li>
+                <li>第二维长度不小于所有batch中最大的S2对应的block数量，即S2_max / blockSize向上取整。</li>
           </ul>
       </td>
       <td>INT32</td>
       <td>ND</td>
-      <td>shape支持(B,S2/block_size)。</td>
+      <td>shape支持(B,S2/blockSize)。</td>
       <td>x</td>
     </tr>
     <tr>
@@ -195,7 +195,7 @@ aclnnStatus aclnnSparseFlashAttention(
                 <li>不支持空tensor。</li>
                 <li>如果不指定seqlen可传入None，表示和query的shape的S长度相同。</li>
                 <li>该入参中每个Batch的有效token数不超过query中的维度S大小且不小于0。支持长度为B的一维tensor。</li>
-                <li>layout_query为TND时，该入参必须传入，且以该入参元素的数量作为B值，该参数中每个元素的值表示当前batch与之前所有batch的token数总和。</li>
+                <li>layoutQuery为TND时，该入参必须传入，且以该入参元素的数量作为B值，该参数中每个元素的值表示当前batch与之前所有batch的token数总和。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -212,8 +212,8 @@ aclnnStatus aclnnSparseFlashAttention(
                 <li>不支持空tensor。</li>
                 <li>如果不指定seqlen可传入None，表示和key的shape的S长度相同。</li>
                 <li>该参数中每个Batch的有效token数不超过key/value中的维度S大小且不小于0。支持长度为B的一维tensor。</li>
-                <li>当layout_kv为TND或PA_BSND时，该入参必须传入。</li>
-                <li>layout_kv为TND，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
+                <li>当layoutKv为TND或PA_BSND时，该入参必须传入。</li>
+                <li>layoutKv为TND，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -230,8 +230,8 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>ND</td>
       <td>
           <ul>
-                <li>layout_query为TND时，shape为(B,S1,N1,Dr)。</li>
-                <li>layout_query为BSND时，shape为(T1,N1,Dr)。</li>
+                <li>layoutQuery为TND时，shape为(B,S1,N1,Dr)。</li>
+                <li>layoutQuery为BSND时，shape为(T1,N1,Dr)。</li>
           </ul>
       </td>
       <td>x</td>
@@ -245,12 +245,12 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>ND</td>
       <td>
           <ul>
-                <li>layout_kv为TND时，shape为(B,S1,N1,Dr)。</li>
-                <li>layout_kv为BSND时，shape为(T1,N1,Dr)。</li>
-                <li>layout_kv为PA_BSND时，shape为(block_num,block_size,N2,Dr)。</li>
+                <li>layoutKv为TND时，shape为(B,S1,N1,Dr)。</li>
+                <li>layoutKv为BSND时，shape为(T1,N1,Dr)。</li>
+                <li>layoutKv为PA_BSND时，shape为(blockNum,blockSize,N2,Dr)。</li>
           </ul>
       </td>
-      <td>x</td>
+      <td>✓</td>
     </tr>
     <tr>
       <td>scaleValue（double）</td>
@@ -268,8 +268,8 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>代表sparse阶段的block大小。</td>
       <td>
           <ul>
-                <li>sparse_block_size为1时，为Token-wise稀疏化场景，将每个token视为独立单元，在计算重要性分数时，评估每个查询token与每个键值token之间的独立关联程度。</li>
-                <li>sparse_block_size为大于1小于等于128时，为Block-wise稀疏化场景，将token序列划分为固定大小的连续块，以块为单位进行重要性评估，块内token共享相同的稀疏化决策。</li>
+                <li>sparseBlockSize为1时，为Token-wise稀疏化场景，将每个token视为独立单元，在计算重要性分数时，评估每个查询token与每个键值token之间的独立关联程度。</li>
+                <li>sparseBlockSize为大于1小于等于128时，为Block-wise稀疏化场景，将token序列划分为固定大小的连续块，以块为单位进行重要性评估，块内token共享相同的稀疏化决策。</li>
           </ul>
       </td>
       <td>INT64</td>
@@ -313,8 +313,8 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>表示sparse的模式。</td>
       <td>
           <ul>
-                <li>sparse_mode为0时，代表全部计算。</li>
-                <li>sparse_mode为3时，代表rightDownCausal模式的mask，对应以右下顶点往左上为划分线的下三角场景。</li>
+                <li>sparseMode为0时，代表全部计算。</li>
+                <li>sparseMode为3时，代表rightDownCausal模式的mask，对应以右下顶点往左上为划分线的下三角场景。</li>
           </ul>
       </td>
       <td>INT64</td>
@@ -355,11 +355,11 @@ aclnnStatus aclnnSparseFlashAttention(
     <tr>
       <td>returnSoftmaxLse（bool）</td>
       <td>输入</td>
-      <td>用于表示是否返回softmax_max和softmax_sum。</td>
+      <td>用于表示是否返回softmaxMax和softmaxSum。</td>
       <td>
           <ul>
                 <li>True表示返回，False表示不返回；默认值为False。</li>
-                <li>该参数仅在训练且layout_kv不为PA_BSND场景支持。</li>
+                <li>该参数仅在训练且layoutKv不为PA_BSND场景支持。</li>
           </ul>
       </td>
       <td>BOOL</td>
@@ -376,8 +376,8 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>ND</td>
       <td>
           <ul>
-                <li>layout_query为BSND时，shape为(B,S1,N1,D)。</li>
-                <li>layout_query为TND时shape为(T1,N1,D)。</li>
+                <li>layoutQuery为BSND时，shape为(B,S1,N1,D)。</li>
+                <li>layoutQuery为TND时shape为(T1,N1,D)。</li>
           </ul>
       </td>
       <td>x</td>
@@ -385,14 +385,14 @@ aclnnStatus aclnnSparseFlashAttention(
     <tr>
       <td>softmaxMaxOut（aclTensor）</td>
       <td>输出</td>
-      <td>Attention算法对query乘key的结果，取max得到softmax_max。</td>
+      <td>Attention算法对query乘key的结果，取max得到softmaxMax。</td>
       <td>不支持空tensor。</td>
       <td>FLOAT</td>
       <td>ND</td>
       <td>
           <ul>
-                <li>layout_query为BSND时，shape为(B,N2,S1,N1/N2)。</li>
-                <li>layout_query为TND时shape为(N2,T1,N1/N2)。</li>
+                <li>layoutQuery为BSND时，shape为(B,N2,S1,N1/N2)。</li>
+                <li>layoutQuery为TND时shape为(N2,T1,N1/N2)。</li>
           </ul>
       </td>
       <td>x</td>
@@ -400,14 +400,14 @@ aclnnStatus aclnnSparseFlashAttention(
    <tr>
       <td>softmaxSumOut（aclTensor）</td>
       <td>输出</td>
-      <td>Attention算法query乘key的结果减去softmax_max,再取exp，接着求sum，得到softmax_sum。</td>
+      <td>Attention算法query乘key的结果减去softmaxMax,再取exp，接着求sum，得到softmaxSum。</td>
       <td>不支持空tensor。</td>
       <td>FLOAT</td>
       <td>ND</td>
       <td>
           <ul>
-                <li>layout_query为BSND时，shape为(B,N2,S1,N1/N2)。</li>
-                <li>layout_query为TND时shape为(N2,T1,N1/N2)。</li>
+                <li>layoutQuery为BSND时，shape为(B,N2,S1,N1/N2)。</li>
+                <li>layoutQuery为TND时shape为(N2,T1,N1/N2)。</li>
           </ul>
       </td>
       <td>x</td>
@@ -512,32 +512,17 @@ aclnnStatus aclnnSparseFlashAttention(
 
 - 确定性计算：aclnnSparseFlashAttention默认确定性实现。
 - 该接口支持推理场景下使用。
-- N1支持情况：
-
-  <!-- npu="950" id7 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
-    - N1支持1~128。
-  <!-- end id7 -->
-  <!-- npu="A3,910b" id8 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
-    - N1支持1/2/4/8/16/32/64/128。
-  <!-- end id8 -->
-
 - N2仅支持1。
-- block_size为一个block的token数，block_size取值为16的倍数，且最大支持1024。
-- 参数query中的D和key、value的D值相等为512，参数query_rope中的Dr和key_rope的Dr值相等为64。
+- blockSize为一个block的token数，blockSize取值为16的倍数，且最大支持1024。
+- 参数query中的D和key、value的D值相等为512，参数queryRope中的Dr和keyRope的Dr值相等为64。
 - 参数query、key、value的数据类型必须保持一致。
-- 支持sparse_block_size整除block_size。
-
-  <!-- npu="950" id9 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
-    - 只支持sparse_block_size为1。
-  <!-- end id9 -->
-  <!-- npu="A3,910b" id10 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
-    - 支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparse_block_size整除block_size
-
-  <!-- end id10 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：
+  - N1支持1~128。
+  - 仅支持sparseBlockSize为1。
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - N1支持1/2/4/8/16/32/64/128。
+  - sparseBlockSize支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparseBlockSize整除blockSize。
+  - key、value和key_rope不支持非连续。
 
 ## 调用示例
 
