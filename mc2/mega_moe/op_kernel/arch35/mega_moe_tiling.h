@@ -161,7 +161,7 @@ struct MegaMoeSendMaskBufferConfig {
     uint32_t bufferBytes;
 };
 struct MegaMoeTilingData {
-    uint32_t moeExpertPerRank; // 本卡参与 topK 路由的 MoE 专家数，等于 weight1.dim0
+    uint32_t moeExpertPerRank; // 本卡参与 topK 路由的 MoE 专家数，与 weight1 表达的专家数一致
     uint32_t bs;
     uint32_t h;
     uint32_t hiddenDim;
@@ -200,5 +200,7 @@ struct MegaMoeTilingData {
     float activationAlpha;      // linear_beta, 默认 1.0
     float activationBeta;       // beta, 默认 1.0
     uint32_t expertsPerBatch;
+    // MoE 和共享专家使用相同布局：true 表示每个专家一个二维 tensor，false 表示单个三维堆叠 tensor。
+    bool isPerExpertWeightTensor;
 };
 #endif

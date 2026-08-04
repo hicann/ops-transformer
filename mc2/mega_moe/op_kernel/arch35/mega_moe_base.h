@@ -115,6 +115,14 @@ struct CombineCommParams {
     __gm__ Mc2MoeContext *mc2Context;
 };
 
+// 保存 TensorList 入口地址，便于逐 expert 布局按当前 expert 下标解析权重。
+struct ExpertWeightTensorListAddrs {
+    GM_ADDR weight1 = nullptr;
+    GM_ADDR weightScales1 = nullptr;
+    GM_ADDR weight2 = nullptr;
+    GM_ADDR weightScales2 = nullptr;
+};
+
 struct Params {
     GM_ADDR aGmAddr;
     GM_ADDR expertIdxGmAddr;
@@ -242,6 +250,18 @@ __aicore__ inline GM_ADDR GetTensorAddr(uint16_t index, GM_ADDR tensorPtr)
     uint64_t tensorPtrOffset = *dataAddr;
     __gm__ uint64_t *retPtr = dataAddr + (tensorPtrOffset >> 3);
     return reinterpret_cast<GM_ADDR>(*(retPtr + index));
+}
+
+template <typename ElementType>
+__aicore__ inline GM_ADDR GetExpertWeightAddr(GM_ADDR tensorListAddr, bool isPerExpertWeightTensor,
+                                              uint32_t expertIdx, uint64_t elementOffset)
+{
+    uint16_t tensorIdx = isPerExpertWeightTensor ? static_cast<uint16_t>(expertIdx) : 0U;
+    GM_ADDR tensorAddr = GetTensorAddr(tensorIdx, tensorListAddr);
+    if (isPerExpertWeightTensor) {
+        return tensorAddr;
+    }
+    return tensorAddr + elementOffset * sizeof(ElementType);
 }
 
 // Base template: handles single-index case

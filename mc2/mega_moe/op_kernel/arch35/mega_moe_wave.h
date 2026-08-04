@@ -122,9 +122,11 @@ private:
     __aicore__ inline bool UpdateGroupParams(ExpertLoopState &state, uint32_t expertIdx, uint64_t sendCnt = 0);
     __aicore__ inline bool UpdateSharedGroupParams(ExpertLoopState &state, uint32_t expertIdx);
     template <AddrUpdateMode Mode>
-    __aicore__ inline void UpdateGlobalBuffer(GMMAddrInfo &gmmAddrInfo, const ExpertLoopState &state);
+    __aicore__ inline void UpdateGlobalBuffer(GMMAddrInfo &gmmAddrInfo, const ExpertLoopState &state,
+                                              uint32_t expertIdx);
     template <AddrUpdateMode Mode>
-    __aicore__ inline void UpdateSharedGlobalBuffer(GMMAddrInfo &gmmAddrInfo, const ExpertLoopState &state);
+    __aicore__ inline void UpdateSharedGlobalBuffer(GMMAddrInfo &gmmAddrInfo, const ExpertLoopState &state,
+                                                    uint32_t sharedExpertIdx);
     __aicore__ inline void Unpermute();
     __aicore__ inline UnpermuteBufferConfig UnpermuteBuffInit();
     __aicore__ inline void UnpermuteLoadWeights(int32_t coreOffset, int32_t batchTokenOffset, int32_t batchTokenCount,
@@ -203,6 +205,8 @@ private:
 
     __gm__ Mc2MoeContext *mc2Context_{nullptr};
     Params params_{};
+    ExpertWeightTensorListAddrs moeWeightTensorListAddrs_{};
+    ExpertWeightTensorListAddrs sharedWeightTensorListAddrs_{};
 
     GlobalTensor<int32_t> swigluToGmm2FlagGm_;
     GlobalTensor<int32_t> expertTokenNumsOut_;
@@ -245,6 +249,7 @@ private:
     // 共享专家相关成员
     uint32_t sharedExpertNum_ = 0;
     uint32_t moeExpertPerRank_ = 0;
+    bool isPerExpertWeightTensor_ = false;
     uint32_t gmm2NTilesPerGroup_ = 0;
     int64_t revTokenElemCnt_ = 0;
     int64_t revScaleElemCnt_ = 0;
@@ -351,6 +356,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::Init(
     worldSize_ = tilingData->epWorldSize;
     moeExpertPerRank_ = tilingData->moeExpertPerRank;
     sharedExpertNum_ = tilingData->sharedExpertNum;
+    isPerExpertWeightTensor_ = tilingData->isPerExpertWeightTensor;
     expertsPerBatch_ = tilingData->expertsPerBatch == 0U ? 1U : tilingData->expertsPerBatch;
     if (expertsPerBatch_ > moeExpertPerRank_) {
         expertsPerBatch_ = moeExpertPerRank_;
@@ -370,15 +376,9 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::Init(
     }
     params_.aGmAddr = x;
     params_.expertIdxGmAddr = topkIds;
-    params_.bGmAddr = GetTensorAddr(0, weight1);
-    params_.b2GmAddr = GetTensorAddr(0, weight2);
-    params_.bScaleGmAddr = GetTensorAddr(0, weightScales1);
-    params_.b2ScaleGmAddr = GetTensorAddr(0, weightScales2);
-    params_.sharedBGmAddr = GetTensorAddr(0, sharedWeight1);
-    params_.sharedB2GmAddr = GetTensorAddr(0, sharedWeight2);
-    params_.sharedBScaleGmAddr = GetTensorAddr(0, sharedWeightScales1);
-    params_.sharedB2ScaleGmAddr = GetTensorAddr(0, sharedWeightScales2);
-
+    moeWeightTensorListAddrs_ = {weight1, weightScales1, weight2, weightScales2};
+    sharedWeightTensorListAddrs_ =
+        {sharedWeight1, sharedWeightScales1, sharedWeight2, sharedWeightScales2};
     params_.y2GmAddr = yOut;
     params_.expertTokenNumsOutGmAddr = expertTokenNumsOut;
     params_.probsGmAddr = topkWeights;
@@ -1004,7 +1004,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::DispatchExpert(
         uint64_t sendCnt = 0;
         SendCntCal(static_cast<int32_t>(expertIdx), sendCnt);
         if (UpdateGroupParams<AddrUpdateMode::GMM1>(state, expertIdx, sendCnt)) {
-            UpdateGlobalBuffer<AddrUpdateMode::GMM1>(gmmAddrInfo, state);
+            UpdateGlobalBuffer<AddrUpdateMode::GMM1>(gmmAddrInfo, state, expertIdx);
             MetaInfoCalAndDispatch(gmmAddrInfo, static_cast<int32_t>(expertIdx), bufferConfig);
         }
     }
@@ -1437,7 +1437,8 @@ __aicore__ inline bool MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::UpdateSharedGro
 template <TemplateMegaMoeWaveTypeClass>
 template <AddrUpdateMode Mode>
 __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::UpdateGlobalBuffer(GMMAddrInfo &gmmAddrInfo,
-                                                                                    const ExpertLoopState &state)
+                                                                                    const ExpertLoopState &state,
+                                                                                    uint32_t expertIdx)
 {
     if constexpr (Mode == AddrUpdateMode::GMM1) {
         if constexpr (TopkWeightsPrefetch) {
@@ -1449,9 +1450,13 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::UpdateGlobalBuf
         gmmAddrInfo.aScaleGlobal = params_.workspaceInfo.dispatchRevScalePtr +
                                    Get<IDX_A_SCALE_OFFSET>(state.baseOffset) * sizeof(QuantScaleOutType);
 
-        gmmAddrInfo.bGlobal = params_.bGmAddr + Get<IDX_B_OFFSET>(state.baseOffset) * sizeof(ActivationType);
+        gmmAddrInfo.bGlobal = GetExpertWeightAddr<ActivationType>(moeWeightTensorListAddrs_.weight1,
+                                                                  isPerExpertWeightTensor_, expertIdx,
+                                                                  Get<IDX_B_OFFSET>(state.baseOffset));
         gmmAddrInfo.bScaleGlobal =
-            params_.bScaleGmAddr + Get<IDX_B_SCALE_OFFSET>(state.baseOffset) * sizeof(QuantScaleOutType);
+            GetExpertWeightAddr<QuantScaleOutType>(moeWeightTensorListAddrs_.weightScales1,
+                                                   isPerExpertWeightTensor_, expertIdx,
+                                                   Get<IDX_B_SCALE_OFFSET>(state.baseOffset));
 
         if constexpr (g_coreType == AIV) {
             AscendC::Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> vecBaseOffset{
@@ -1470,9 +1475,13 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::UpdateGlobalBuf
             params_.workspaceInfo.swigluQuantDataPtr + Get<IDX_C_OFFSET>(state.baseOffset) * sizeof(ActivationType);
         gmmAddrInfo.aScaleGlobal = params_.workspaceInfo.swigluQuantScalePtr +
                                    Get<IDX_C_SCALE_OFFSET>(state.baseOffset) * sizeof(QuantScaleOutType);
-        gmmAddrInfo.bGlobal = params_.b2GmAddr + Get<IDX_B2_OFFSET>(state.baseOffset) * sizeof(ActivationType);
+        gmmAddrInfo.bGlobal = GetExpertWeightAddr<ActivationType>(moeWeightTensorListAddrs_.weight2,
+                                                                  isPerExpertWeightTensor_, expertIdx,
+                                                                  Get<IDX_B2_OFFSET>(state.baseOffset));
         gmmAddrInfo.bScaleGlobal =
-            params_.b2ScaleGmAddr + Get<IDX_B2_SCALE_OFFSET>(state.baseOffset) * sizeof(QuantScaleOutType);
+            GetExpertWeightAddr<QuantScaleOutType>(moeWeightTensorListAddrs_.weightScales2,
+                                                   isPerExpertWeightTensor_, expertIdx,
+                                                   Get<IDX_B2_SCALE_OFFSET>(state.baseOffset));
     }
     gmmAddrInfo.swigluToGmm2Flag = (__gm__ int32_t *)params_.workspaceInfo.flagSwiGluToGmm2Ptr +
                                    Get<IDX_FLAG_OFFSET>(state.baseOffset) * swigluFlagSlotsPerExpert_;
@@ -1487,14 +1496,19 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::UpdateGlobalBuf
 template <TemplateMegaMoeWaveTypeClass>
 template <AddrUpdateMode Mode>
 __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::UpdateSharedGlobalBuffer(GMMAddrInfo &gmmAddrInfo,
-                                                                                          const ExpertLoopState &state)
+                                                                                          const ExpertLoopState &state,
+                                                                                          uint32_t sharedExpertIdx)
 {
     if constexpr (Mode == AddrUpdateMode::GMM1) {
         gmmAddrInfo.aGlobal = params_.workspaceInfo.sharedExpertInputDataPtr;
         gmmAddrInfo.aScaleGlobal = params_.workspaceInfo.sharedExpertInputScalePtr;
-        gmmAddrInfo.bGlobal = params_.sharedBGmAddr + Get<IDX_B_OFFSET>(state.baseOffset) * sizeof(ActivationType);
+        gmmAddrInfo.bGlobal =
+            GetExpertWeightAddr<ActivationType>(sharedWeightTensorListAddrs_.weight1, isPerExpertWeightTensor_,
+                                                sharedExpertIdx, Get<IDX_B_OFFSET>(state.baseOffset));
         gmmAddrInfo.bScaleGlobal =
-            params_.sharedBScaleGmAddr + Get<IDX_B_SCALE_OFFSET>(state.baseOffset) * sizeof(QuantScaleOutType);
+            GetExpertWeightAddr<QuantScaleOutType>(sharedWeightTensorListAddrs_.weightScales1,
+                                                   isPerExpertWeightTensor_, sharedExpertIdx,
+                                                   Get<IDX_B_SCALE_OFFSET>(state.baseOffset));
     } else if constexpr (Mode == AddrUpdateMode::GMM2) {
         gmmAddrInfo.gmm2OutGlobal =
             params_.workspaceInfo.sharedExpertResultPtr + Get<IDX_GMM2_OFFSET>(state.baseOffset) * sizeof(bfloat16_t);
@@ -1502,9 +1516,13 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::UpdateSharedGlo
                               Get<IDX_C_OFFSET>(state.baseOffset) * sizeof(ActivationType);
         gmmAddrInfo.aScaleGlobal = params_.workspaceInfo.sharedExpertSwigluScalePtr +
                                    Get<IDX_C_SCALE_OFFSET>(state.baseOffset) * sizeof(QuantScaleOutType);
-        gmmAddrInfo.bGlobal = params_.sharedB2GmAddr + Get<IDX_B2_OFFSET>(state.baseOffset) * sizeof(ActivationType);
+        gmmAddrInfo.bGlobal =
+            GetExpertWeightAddr<ActivationType>(sharedWeightTensorListAddrs_.weight2, isPerExpertWeightTensor_,
+                                                sharedExpertIdx, Get<IDX_B2_OFFSET>(state.baseOffset));
         gmmAddrInfo.bScaleGlobal =
-            params_.sharedB2ScaleGmAddr + Get<IDX_B2_SCALE_OFFSET>(state.baseOffset) * sizeof(QuantScaleOutType);
+            GetExpertWeightAddr<QuantScaleOutType>(sharedWeightTensorListAddrs_.weightScales2,
+                                                   isPerExpertWeightTensor_, sharedExpertIdx,
+                                                   Get<IDX_B2_SCALE_OFFSET>(state.baseOffset));
         uint32_t tokenGroupCount = Ops::Base::CeilDiv(m_, GMM1_TILE_M);
         uint32_t sharedIdx = static_cast<uint32_t>(state.expertBeforeCnt) / m_;
         gmmAddrInfo.sharedExpertGmm2TileCounter =
@@ -2188,7 +2206,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessGmm1Wave
         if (!UpdateGroupParams<AddrUpdateMode::GMM1>(gmm1State, expertIdx)) {
             continue;
         }
-        UpdateGlobalBuffer<AddrUpdateMode::GMM1>(gmm1AddrInfo, gmm1State);
+        UpdateGlobalBuffer<AddrUpdateMode::GMM1>(gmm1AddrInfo, gmm1State, expertIdx);
         GroupMatmulWithSwigluQuant(
             epilogueOp_, gmm1AddrInfo, gmm1State, expertIdx, vecSetSyncCom);
     }
@@ -2212,7 +2230,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessGmm2Wave
         if (!UpdateGroupParams<AddrUpdateMode::GMM2>(gmm2State, expertIdx)) {
             continue;
         }
-        UpdateGlobalBuffer<AddrUpdateMode::GMM2>(gmm2AddrInfo, gmm2State);
+        UpdateGlobalBuffer<AddrUpdateMode::GMM2>(gmm2AddrInfo, gmm2State, expertIdx);
         GroupMatmulGmm2(gmm2AddrInfo, gmm2State, vecSetSyncCom);
         PublishGmm2Ready(expertIdx);
     }
@@ -2239,7 +2257,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessCombineE
         if (!UpdateGroupParams<AddrUpdateMode::GMM2>(combineState, expertIdx)) {
             continue;
         }
-        UpdateGlobalBuffer<AddrUpdateMode::GMM2>(combineAddrInfo, combineState);
+        UpdateGlobalBuffer<AddrUpdateMode::GMM2>(combineAddrInfo, combineState, expertIdx);
         uint32_t currentExpertTokenNum =
             static_cast<uint32_t>(Get<M_VALUE>(combineState.problemShape));
         MegaMoeImpl::TokenRange currentCoreTokenRange =
@@ -2368,7 +2386,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessSharedEx
         if (!UpdateSharedGroupParams(sharedGmm1State, sharedIdx)) {
             continue;
         }
-        UpdateSharedGlobalBuffer<AddrUpdateMode::GMM1>(sharedGmm1AddrInfo, sharedGmm1State);
+        UpdateSharedGlobalBuffer<AddrUpdateMode::GMM1>(sharedGmm1AddrInfo, sharedGmm1State, sharedIdx);
         GroupMatmulWithSwigluQuant<GmmExpertMode::SHARED>(
             sharedEpilogueOp_, sharedGmm1AddrInfo, sharedGmm1State, sharedIdx, vecSetSyncCom);
     }
@@ -2393,7 +2411,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessSharedEx
         if (!UpdateSharedGroupParams(sharedGmm2State, sharedIdx)) {
             continue;
         }
-        UpdateSharedGlobalBuffer<AddrUpdateMode::GMM2>(sharedGmm2AddrInfo, sharedGmm2State);
+        UpdateSharedGlobalBuffer<AddrUpdateMode::GMM2>(sharedGmm2AddrInfo, sharedGmm2State, sharedIdx);
         GroupMatmulGmm2<GmmExpertMode::SHARED>(sharedGmm2AddrInfo, sharedGmm2State, vecSetSyncCom);
     }
 }
