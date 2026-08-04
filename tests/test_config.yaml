@@ -129,7 +129,10 @@ attention:
     test:
       ut: True
     ut_cov_exclude:
-      - attention/flash_attention_score_grad
+      - attention/flash_attention_score_grad/op_api
+      - attention/flash_attention_score_grad/op_graph
+      - attention/flash_attention_score_grad/op_kernel
+      - attention/flash_attention_score_grad/tests
     options:
       - flash_attention_score_grad
 
