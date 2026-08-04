@@ -18,7 +18,7 @@
 
 #include "ascendc/host_api/tiling/template_argument.h"
 
-#include "arch35/fia_arch35_template_tiling_key_enum.h"
+#include "fia_arch35_template_tiling_key_enum.h"
 
 #ifndef ORIG_DTYPE_QUERY
 #define ORIG_DTYPE_QUERY (DT_BF16)

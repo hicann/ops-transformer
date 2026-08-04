@@ -19,13 +19,12 @@
 #include "kernel_operator.h"
 #endif
 #include "kernel_operator_list_tensor_intf.h"
-#include "fused_infer_attention_score_template_tiling_key.h"
+#include "arch35/fused_infer_attention_score_template_tiling_key.h"
 #include "arch35/fia_arch35_common.h"
 #include "arch35/fia_arch35_empty.h"
 #include "arch35/fia_arch35_antiquant.h"
 #include "arch35/fia_arch35_noquant.h"
 #include "arch35/fia_arch35_fullquant.h"
-#include "fused_infer_attention_score_tilingkey.h"
 
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t pseMode, uint8_t quantMode, bool hasAttenMask, bool hasRope,
           uint8_t KvLayoutType, bool isFd, bool emptyTensor, bool enableKVPrefix, bool enableS1OutSplit,

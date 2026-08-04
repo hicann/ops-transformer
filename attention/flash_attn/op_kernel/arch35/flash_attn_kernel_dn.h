@@ -24,9 +24,9 @@
 #include "flash_attn_block_cube_dn.h"
 #include "flash_attn_block_vec_dn.h"
 #if __has_include("../../../common/op_kernel/memory_copy_arch35.h")
-#include "../../../common/op_kernel/memory_copy_arch35.h"
+#include "memory_copy_arch35.h"
 #else
-#include "../../common/memory_copy_arch35.h"
+#include "memory_copy_arch35.h"
 #endif
 #include "flash_attn_block_vec_flashdecode.h"
 

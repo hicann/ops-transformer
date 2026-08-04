@@ -26,7 +26,7 @@
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode.h"
 #include "fia_public_define_arch35.h"
 #include "../../../common/op_kernel/vector_common.h"
-#include "../../../common/op_kernel/memory_copy_arch35.h"
+#include "memory_copy_arch35.h"
 
 using namespace AscendC;
 using namespace FaVectorApi;

@@ -21,7 +21,6 @@
 #include "err/ops_err.h"
 #include "tiling/tiling_api.h"
 #include "platform/platform_info.h"
-#include "../../op_kernel/fused_infer_attention_score_tilingkey.h"
 
 using namespace ge;
 using namespace AscendC;

@@ -17,9 +17,9 @@
 
 #include "../../common/op_kernel/array.h"
 #include "../../common/op_kernel/axis.h"
-#include "../fia_public_define.h"
+#include "fia_public_define.h"
 #include "../../common/op_kernel/vector_common.h"
-#include "../memory_copy.h"
+#include "memory_copy.h"
 #include "kernel_common.h"
 
 /**

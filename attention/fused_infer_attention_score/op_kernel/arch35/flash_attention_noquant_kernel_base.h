@@ -16,7 +16,6 @@
 #ifndef FLASH_ATTENTION_NOQUANT_KERNEL_BASE_H_
 #define FLASH_ATTENTION_NOQUANT_KERNEL_BASE_H_
 #include "flash_attention_noquant_block_cube.h"
-#include "flash_attention_noquant_block_vec_train.h"
 #include "flash_attention_noquant_block_vec_infer.h"
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase.h"
 #if ASC_DEVKIT_MAJOR >= 9

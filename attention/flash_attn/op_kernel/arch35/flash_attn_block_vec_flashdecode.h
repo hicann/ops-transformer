@@ -24,11 +24,11 @@
 #if __has_include("../../../common/op_kernel/arch35/infer_flash_attention_comm.h")
 #include "../../../common/op_kernel/arch35/infer_flash_attention_comm.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode.h"
-#include "../../../common/op_kernel/memory_copy_arch35.h"
+#include "memory_copy_arch35.h"
 #else
 #include "../../common/arch35/infer_flash_attention_comm.h"
 #include "../../common/arch35/vf/vf_flash_decode.h"
-#include "../../common/memory_copy_arch35.h"
+#include "memory_copy_arch35.h"
 #endif
 
 namespace BaseApi {

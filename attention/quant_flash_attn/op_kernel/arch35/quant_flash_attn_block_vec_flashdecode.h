@@ -23,7 +23,7 @@
 #include "../../../common/op_kernel/arch35/infer_flash_attention_comm.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode.h"
 #include "quant_flash_attn_common_def.h"
-#include "../../../common/op_kernel/memory_copy_arch35.h"
+#include "memory_copy_arch35.h"
 
 namespace BaseApi {
 

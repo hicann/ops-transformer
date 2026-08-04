@@ -23,7 +23,7 @@
 #endif
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
-#include "../../common/op_kernel/vector_common.h"
+#include "../../../common/op_kernel/vector_common.h"
 
 using namespace AscendC;
 using AscendC::AIC;

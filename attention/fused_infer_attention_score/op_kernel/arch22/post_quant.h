@@ -15,7 +15,7 @@
 #ifndef POST_QUANT_H
 #define POST_QUANT_H
 #include "memory_copy.h"
-#include "../../common/op_kernel/vector_common.h"
+#include "../../../common/op_kernel/vector_common.h"
 
 struct PostQuantInfo_V2 {
     uint32_t gSize;

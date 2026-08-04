@@ -25,7 +25,7 @@
 #include "../../../common/op_kernel/arch35/vf/vf_div_cast.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode.h"
 #include "../../../common/op_kernel/vector_common.h"
-#include "../../../common/op_kernel/memory_copy_arch35.h"
+#include "memory_copy_arch35.h"
 #include "quant_flash_attn_common_def.h"
 
 using namespace AscendC;

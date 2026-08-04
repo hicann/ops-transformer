@@ -22,7 +22,7 @@
 #include "tiling/tiling_api.h" // 这个头文件顺序必须在手写的tiling data前
 #include "../../op_kernel/arch35/fia_tiling_data_fullquant.h"
 #include "../../../common/op_host/split_core_v2.h"
-#include "../../op_kernel/fused_infer_attention_score_template_tiling_key.h"
+#include "../../op_kernel/arch35/fused_infer_attention_score_template_tiling_key.h"
 
 namespace optiling {
 constexpr int64_t SPARSE_MODE_INT_MAX = 2147483647;

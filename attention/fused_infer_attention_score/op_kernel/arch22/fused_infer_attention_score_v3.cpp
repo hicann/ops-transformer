@@ -22,7 +22,7 @@
 #include "fused_infer_attention_score_tilingkey.h"
 
 #ifdef NOT_DYNAMIC_COMPILE
-#include "arch22/fia_kernel_empty_tensor.h"
+#include "fia_kernel_empty_tensor.h"
 #endif
 
 #ifdef FIA_ENABLE_MLA
@@ -32,8 +32,8 @@
     ((ORIG_DTYPE_QUERY == DT_BF16) && (ORIG_DTYPE_ATTENTION_OUT == DT_BF16) && (ORIG_DTYPE_KEY == DT_BF16)) || \
     ((ORIG_DTYPE_QUERY == DT_FLOAT16) && (ORIG_DTYPE_ATTENTION_OUT == DT_INT8) && (ORIG_DTYPE_KEY == DT_FLOAT16)) || \
     ((ORIG_DTYPE_QUERY == DT_BF16) && (ORIG_DTYPE_ATTENTION_OUT == DT_INT8) && (ORIG_DTYPE_KEY == DT_BF16))
-#include "arch22/fia_kernel_nonquant_mla.h"
-#include "arch22/fia_kernel_nonquant.h"
+#include "fia_kernel_nonquant_mla.h"
+#include "fia_kernel_nonquant.h"
 #endif
 #endif // FIA_ENABLE_MLA
 

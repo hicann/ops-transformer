@@ -19,7 +19,7 @@
 #include "fia_public_define_arch35.h"
 #include "fia_block_cube_noquant_gqa.h"
 #include "fia_block_vec_noquant_gqa.h"
-#include "../../../common/op_kernel/memory_copy_arch35.h"
+#include "memory_copy_arch35.h"
 #include "fia_block_vec_flashdecode.h"
 
 #if ASC_DEVKIT_MAJOR >= 9

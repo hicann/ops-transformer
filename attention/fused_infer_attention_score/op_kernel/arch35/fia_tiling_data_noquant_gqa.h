@@ -16,7 +16,7 @@
 #ifndef FIA_TILING_DATA_NOQUANT_GQA_H_
 #define FIA_TILING_DATA_NOQUANT_GQA_H_
 
-#include "../fia_tiling_data_public.h"
+#include "fia_tiling_data_public.h"
 
 namespace optiling {
 

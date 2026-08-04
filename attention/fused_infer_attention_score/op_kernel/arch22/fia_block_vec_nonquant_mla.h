@@ -25,9 +25,9 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
-#include "../fia_public_define.h"
+#include "fia_public_define.h"
 #include "../../common/op_kernel/vector_common.h"
-#include "../memory_copy.h"
+#include "memory_copy.h"
 #include "../../common/op_kernel/const_def.h"
 
 using namespace AttentionCommon;

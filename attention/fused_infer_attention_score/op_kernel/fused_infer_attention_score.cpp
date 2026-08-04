@@ -23,7 +23,7 @@
 // ifa must include before pfa
 #define FIA_ENABLE_MLA
 
-#include "fused_infer_attention_score_tilingkey.h"
+#include "arch22/fused_infer_attention_score_tilingkey.h"
 
 #if (__NPU_ARCH__ == 5102)
 #ifdef NOT_DYNAMIC_COMPILE
@@ -47,7 +47,7 @@
 #include "../incre_flash_attention/incre_flash_attention.cpp"
 #include "../prompt_flash_attention/prompt_flash_attention.cpp"
 #endif
-#include "fused_infer_attention_score_v3.cpp"
+#include "arch22/fused_infer_attention_score_v3.cpp"
 #include "flash_attention_interface.cpp"
 #endif
 
