@@ -211,14 +211,14 @@
   <tr>
     <td>kvCache</td>
     <td>输入</td>
-    <td>Device侧的aclTensor，与输出的kvCacheOut为同一tensor，输入格式随cacheMode变化。<br><br>cacheMode为0：shape为[blockNum,blockSize,1,576]<br>cacheMode为1：shape为[blockNum,blockSize,1,512]<br>cacheMode为2：shape为[blockNum,headNum*512/32,block_size,32]<br>cacheMode为3：shape为[blockNum,headNum*512/16,block_size,16]</td>
+    <td>Device侧的aclTensor，与输出的kvCacheOut为同一tensor，输入格式随cacheMode变化。<br><br>cacheMode为0：shape为[blockNum,blockSize,1,576]<br>cacheMode为1：shape为[blockNum,blockSize,1,512]<br>cacheMode为2：shape为[blockNum,16,block_size,32]<br>cacheMode为3：shape为[blockNum,32,block_size,16]</td>
     <td>cacheMode为0：与input一致<br>cacheMode为1：与input一致<br>cacheMode为2：INT8<br>cacheMode为3：与input一致</td>
     <td>ND<br>ND<br>NZ<br>NZ</td>
   </tr>
   <tr>
     <td>kvCacheRope</td>
     <td>输入</td>
-    <td>Device侧的aclTensor，可选参数，支出传入空指针。与输出的krCacheOut为同一tensor，输入格式随cacheMode变化。<br><br>cacheMode为0：不传入。<br>cacheMode为1：shape为[blockNum,blockSize,1,64]<br>cacheMode为2或3：shape为[blockNum, headNum*64 / 16 ,block_size, 16]</td>
+    <td>Device侧的aclTensor，可选参数，支出传入空指针。与输出的krCacheOut为同一tensor，输入格式随cacheMode变化。<br><br>cacheMode为0：不传入。<br>cacheMode为1：shape为[blockNum,blockSize,1,64]<br>cacheMode为2或3：shape为[blockNum, 4 ,block_size, 16]</td>
     <td>与input一致</td>
     <td><br>ND<br>NZ</td>
   </tr>
@@ -344,7 +344,7 @@
   <tr>
     <td>kvCacheOut</td>
     <td>输出</td>
-    <td>表示Key经过ReshapeAndCache后的输出，shape和dtype随cacheMode变化<br><br>cacheMode为0：shape为[blockNum, blockSize, 1, 576]<br>cacheMode为1：shape为[blockNum, blockSize, 1, 512]<br>cacheMode为2：shape为[blockNum, headNum*512/32, block_size, 32]<br>cacheMode为3：shape为[blockNum, headNum*512/16, block_size, 16]</td>
+    <td>表示Key经过ReshapeAndCache后的输出，shape和dtype随cacheMode变化<br><br>cacheMode为0：shape为[blockNum, blockSize, 1, 576]<br>cacheMode为1：shape为[blockNum, blockSize, 1, 512]<br>cacheMode为2：shape为[blockNum, 16, block_size, 32]<br>cacheMode为3：shape为[blockNum, 32, block_size, 16]</td>
     <td>cacheMode为0：与input一致<br>cacheMode为1：与input一致<br>cacheMode为2：INT8<br>cacheMode为3：与input一致</td>
     <td>ND<br>ND<br>NZ<br>NZ</td>
   </tr>
@@ -358,7 +358,7 @@
   <tr>
     <td>krCacheOut</td>
     <td>输出</td>
-    <td>表示Key经过ROPE和ReshapeAndCache后的输出，shape和dtype随cacheMode变化，<br><br>cacheMode为0：不输出<br>cacheMode为1：shape为[blockNum, blockSize, 1, 64]<br>cacheMode为2或3：shape为[blockNum, headNum*64 / 16 ,block_size, 16]</td>
+    <td>表示Key经过ROPE和ReshapeAndCache后的输出，shape和dtype随cacheMode变化，<br><br>cacheMode为0：不输出<br>cacheMode为1：shape为[blockNum, blockSize, 1, 64]<br>cacheMode为2或3：shape为[blockNum, 4 ,block_size, 16]</td>
     <td><br>cacheMode为1：与input一致<br>cacheMode为2或3：与input一致</td>
     <td><br>ND<br>NZ</td>
   </tr>
