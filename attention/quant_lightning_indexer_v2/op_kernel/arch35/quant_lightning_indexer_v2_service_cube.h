@@ -82,6 +82,8 @@ public:
     static constexpr uint64_t QUERY_BUFFER_OFFSET = M_BASIC_BLOCK * D_BASIC_BLOCK;
     static constexpr uint64_t L0AB_BUFFER_OFFSET = M_BASIC_BLOCK_L0 * D_BASIC_BLOCK_L0;
     static constexpr uint64_t L0C_BUFFER_OFFSET = M_BASIC_BLOCK_L0 * S2_BASIC_BLOCK_L0;
+    // Key L0 ping-pong is sized by S2, not by the (potentially larger) M block.
+    static constexpr uint64_t KEY_L0_BUFFER_OFFSET = S2_BASIC_BLOCK_L0 * D_BASIC_BLOCK_L0;
     // MX qScale L1乒乓缓冲区步长：M基本块 * 固定D基本块 / 32
     static constexpr uint64_t QUERY_SCALE_BUFFER_OFFSET = M_BASIC_BLOCK * D_BASIC_BLOCK / MX_SCALE_GROUP_SIZE;
     // MXFP4打包路径每次32字节搬入/scale对应64个逻辑D元素
@@ -614,7 +616,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadKeyToL0b(uint64_t s2L1Offset, ui
 
         uint64_t keyDataOffsetInBuf = (keyL1BufIdx_ % KEY_BUF_NUM) * keyBufferOffset_;
         uint64_t keyScaleOffsetInBuf = (keyL1BufIdx_ % KEY_BUF_NUM) * keyScaleBufferOffset_;
-        LocalTensor<L0_K_T> keyL0Tensor = keyL0_[(l0BufIdx_ % L0_BUF_NUM) * L0AB_BUFFER_OFFSET];
+        LocalTensor<L0_K_T> keyL0Tensor = keyL0_[(l0BufIdx_ % L0_BUF_NUM) * KEY_L0_BUFFER_OFFSET];
         LocalTensor<fp8_e8m0_t> keyScaleL1Tensor =
             keyScaleL1_[keyScaleOffsetInBuf].template ReinterpretCast<fp8_e8m0_t>();
         if constexpr (IS_MXFP4) {
@@ -626,7 +628,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadKeyToL0b(uint64_t s2L1Offset, ui
             LoadData(keyL0Tensor, keyL1MxTensor, keyScaleL1Tensor, loadData2DParamsV2, loadDataMxParams);
         }
     } else {
-        LoadData(keyL0_[(l0BufIdx_ % L0_BUF_NUM) * L0AB_BUFFER_OFFSET],
+        LoadData(keyL0_[(l0BufIdx_ % L0_BUF_NUM) * KEY_L0_BUFFER_OFFSET],
                  keyL1_[(keyL1BufIdx_ % KEY_BUF_NUM) * keyBufferOffset_], loadData2DParamsV2);
     }
 }
@@ -642,7 +644,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::ComputeL0c(uint64_t s1gL0RealSize, u
     mmadParams.cmatrixInitVal = true;
     mmadParams.cmatrixSource = false;
     LocalTensor<L0_Q_T> queryL0Tensor = queryL0_[(l0BufIdx_ % L0_BUF_NUM) * l0abBufferOffset_];
-    LocalTensor<L0_K_T> keyL0Tensor = keyL0_[(l0BufIdx_ % L0_BUF_NUM) * L0AB_BUFFER_OFFSET];
+    LocalTensor<L0_K_T> keyL0Tensor = keyL0_[(l0BufIdx_ % L0_BUF_NUM) * KEY_L0_BUFFER_OFFSET];
     Mmad(cL0_[(l0BufIdx_ % L0_BUF_NUM) * l0cBufferOffset_], queryL0Tensor, keyL0Tensor, mmadParams);
     if ((mmadParams.m / 16) * (mmadParams.n / 16) < 10) {
         PipeBarrier<PIPE_M>();
@@ -690,7 +692,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::Fixp(uint64_t s1gGmOffset, uint64_t 
     } else {
         uint32_t nSize = CeilAlign(s2L0RealSize, static_cast<uint64_t>(UB_BLOCK / sizeof(QK_T)));
         // 有效数据不足16行，只需输出部分行即可; L0C上bmm1结果矩阵M方向size必须是偶数
-        uint32_t mSize = (s1gL0RealSize + 1) >> 1 << 1;
+        uint32_t mSize = s1gSizeAlign2G;
         // L0C上matmul结果相邻连续数据片断间隔, 单位为16 * sizeof(T)
         uint32_t srcStride = ((mSize + 15) / 16) * 16;
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams; // L0C->UB
@@ -707,7 +709,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::Fixp(uint64_t s1gGmOffset, uint64_t 
         fixpipeParams.reluEn = true;
         fixpipeParams.subBlockId = 0;
         Fixpipe<QK_T, CL0_T, QLIV2_CFG_ROW_MAJOR_UB>(mm1ResUB_[(runInfo.loop % 2) * (UB_BANK_STRIDE / sizeof(QK_T))],
-                                                     cL0_[(l0BufIdx_ % L0_BUF_NUM) * L0C_BUFFER_OFFSET], fixpipeParams);
+                                                     cL0_[(l0BufIdx_ % L0_BUF_NUM) * l0cBufferOffset_], fixpipeParams);
 
         fixpipeParams.subBlockId = 1;
         Fixpipe<QK_T, CL0_T, QLIV2_CFG_ROW_MAJOR_UB>(

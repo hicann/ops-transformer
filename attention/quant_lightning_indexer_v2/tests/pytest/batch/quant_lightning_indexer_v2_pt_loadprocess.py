@@ -157,8 +157,15 @@ def test_qliv2_process(filepath, device_id=0):
     )
 
     torch.npu.synchronize()
-    npu_topk_value, npu_sort_order = npu_value.sort(dim=-1, descending=True)
-    npu_result = torch.gather(npu_result, dim=-1, index=npu_sort_order)
+    npu_topk_value = npu_value
+    if return_value:
+        if npu_topk_value.shape != npu_result.shape:
+            raise RuntimeError(
+                "sparse_values and sparse_indices must have the same shape when return_value=1, "
+                f"but got {tuple(npu_topk_value.shape)} and {tuple(npu_result.shape)}"
+            )
+        npu_topk_value, npu_sort_order = npu_topk_value.sort(dim=-1, descending=True)
+        npu_result = torch.gather(npu_result, dim=-1, index=npu_sort_order)
     return (
         cpu_result,
         npu_result,

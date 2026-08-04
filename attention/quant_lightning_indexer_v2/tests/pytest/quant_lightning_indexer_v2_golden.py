@@ -176,6 +176,22 @@ def reduce_mxfp4_weighted_qk(weight_matrix, qk_matrix):
     return acc_bf16
 
 
+def reduce_mxfp8_weighted_qk(weight_matrix, qk_matrix):
+    output_shape = (weight_matrix.shape[0], weight_matrix.shape[1], qk_matrix.shape[2])
+    acc_fp32 = torch.zeros(
+        output_shape, dtype=torch.float32, device=weight_matrix.device
+    )
+
+    for g_idx in range(weight_matrix.shape[2]):
+        weight_fp64 = weight_matrix[:, :, g_idx : g_idx + 1].to(torch.float64)
+        qk_fp64 = qk_matrix[:, g_idx : g_idx + 1, :].to(torch.float64)
+        # Model an FP32-destination MulAddDst: compute the fused multiply-add in
+        # FP64, then round once to the FP32 destination after every G.
+        fma_fp64 = acc_fp32.to(torch.float64) + weight_fp64 * qk_fp64
+        acc_fp32 = fma_fp64.to(torch.float32)
+    return acc_fp32
+
+
 def get_qk_physical_head_dim(head_dim, quant_mode):
     return head_dim // FP4_PACK_NUM if is_mxfp4_quant_mode(quant_mode) else head_dim
 
@@ -844,10 +860,9 @@ class GeneralizedQLIV2:
                 cur_q.squeeze(0), cur_k.permute(0, 1, 3, 2).squeeze(0)
             ).unsqueeze(0)
             qk_relu_out = qk_bmm_res.to(dtype=torch.float32).clamp_min(0.0)
-            brc_vmul = torch.bmm(
-                cur_wt.permute(0, 2, 3, 1).to(dtype=torch.float32).squeeze(0),
-                qk_relu_out.permute(0, 2, 1, 3).to(dtype=torch.float32).squeeze(0),
-            ).unsqueeze(0)
+            weight_matrix = cur_wt.permute(0, 2, 3, 1).squeeze(0)
+            qk_matrix = qk_relu_out.permute(0, 2, 1, 3).squeeze(0)
+            brc_vmul = reduce_mxfp8_weighted_qk(weight_matrix, qk_matrix).unsqueeze(0)
         temp_b, temp_s1, temp_n1, temp_s2 = brc_vmul.shape
         temp_n2 = self.k_head_num
         actual_selected_count = min(temp_s2, sparse_count)

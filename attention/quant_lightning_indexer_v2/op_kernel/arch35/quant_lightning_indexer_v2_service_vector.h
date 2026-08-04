@@ -388,7 +388,6 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::CleanInvalidOutput(int64_t invalidS1
     AscendC::InitGlobalMemory(indexOutput, dealSize, constInfo_.INVALID_IDX);
 
     if (returnValueFlag) {
-        SetFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
         WaitFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
         Duplicate(valueOutLocal_.template ReinterpretCast<uint16_t>(), constInfo_.NEG_INF_BFLOAT,
                   constInfo_.sparseCount);
@@ -402,6 +401,7 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::CleanInvalidOutput(int64_t invalidS1
         copyOutValueParams.srcStride = 0;
         copyOutValueParams.dstStride = 0;
         AscendC::DataCopyPad(valueOutGm[invalidS1Offset], valueOutLocal_, copyOutValueParams);
+        SetFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
     }
 }
 
@@ -673,7 +673,7 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessTopK(const QLIV2Common::RunIn
 
     int32_t validAllS2Len = cuRealAcSeq;
     for (uint32_t i = 0; i < curAivS1ProcNum; i++) {
-        if (i > 0) {
+        if (i > 0 && !info.isNeedLD && returnValueFlag) {
             SetFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);
             WaitFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);
         }
