@@ -948,16 +948,16 @@ ge::graphStatus CheckFAISeqlenDataInTND(
         int64_t keyT = keyShape->GetStorageShape().GetDim(DIM_0);
         int64_t valueT = valueShape->GetStorageShape().GetDim(DIM_0);
 
-        OP_CHECK_IF(queryT != lastSeqLen,
+        OP_CHECK_IF(queryT < lastSeqLen,
                 OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                "When layout is TND, queryT(%ld) must be equal to the last element of actualSequenceLengthQ(%ld)",
+                "When layout is TND, queryT(%ld) shouldn't be less than the last element of actualSeqLengths(%ld)",
                 queryT, lastSeqLen),
                 return ge::GRAPH_FAILED);
         if (!isPageAttention) {
-            OP_CHECK_IF((keyT != lastSeqLenKV) || (valueT != lastSeqLenKV),
+            OP_CHECK_IF((keyT < lastSeqLenKV) || (valueT < lastSeqLenKV),
                     OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
                     "When layout is TND and PA not enabled, "
-                    "keyT(%ld) and valueT(%ld) must be equal to the last element of actualSeqenceLengthKV(%ld)",
+                    "keyT(%ld) and valueT(%ld) shouldn't be less than the last element of actualSeqLengthsKv(%ld)",
                     keyT, valueT, lastSeqLenKV),
                     return ge::GRAPH_FAILED);
         }
