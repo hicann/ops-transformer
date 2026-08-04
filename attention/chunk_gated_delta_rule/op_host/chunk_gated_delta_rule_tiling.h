@@ -77,6 +77,7 @@ protected:
     ge::graphStatus CheckContext();
     ge::graphStatus AnalyzeDtype();
     ge::graphStatus AnalyzeShapes();
+    ge::graphStatus AnalyzeEmptyTensor();
     ge::graphStatus CheckDerivedDimConstraints();
     ge::graphStatus GetScale();
     ge::graphStatus GetStrides();
