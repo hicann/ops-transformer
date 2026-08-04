@@ -57,6 +57,7 @@ constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16U * 1024U * 1024U;
 constexpr uint64_t MB_SIZE = 1024UL * 1024UL;
 constexpr uint64_t UB_ALIGN = 32UL;
 constexpr uint64_t COMM_ALIGN = 512UL;
+constexpr uint64_t NOTIFY_CNT_ALIGN = 15000UL;
 constexpr uint64_t MAX_OUT_DTYPE_SIZE = 2UL;
 constexpr uint64_t METADATA_DTYPE_SIZE = 4UL;
 constexpr int64_t H_MIN = 1;
@@ -320,8 +321,9 @@ static ge::graphStatus CheckWinSize(const gert::TilingContext *context, MoeEpCom
     uint64_t moeExpertNumPerRank = static_cast<uint64_t>(info.cfg.numLocalExperts);
     uint64_t combineDataSizePerRank = nmt * topK * static_cast<uint64_t>(info.cfg.perSlotBytes);
 
+    uint64_t dispatchNotifySize = (nmt + NOTIFY_CNT_ALIGN - 1) / NOTIFY_CNT_ALIGN * epWorldSize * COMM_ALIGN;
     uint64_t dispatchWinStateSize =
-        epWorldSize * AlignUpWin(moeExpertNumPerRank * sizeof(int32_t)) + 2 * epWorldSize * COMM_ALIGN;
+        epWorldSize * AlignUpWin(moeExpertNumPerRank * sizeof(int32_t)) + epWorldSize * COMM_ALIGN + dispatchNotifySize;
     uint64_t combineWinStateSize = nmt * topK * COMM_ALIGN + epWorldSize * COMM_ALIGN;
     uint64_t hiddenAlign = (info.cfg.hidden * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
     uint64_t topKAlign = (topK * METADATA_DTYPE_SIZE + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;

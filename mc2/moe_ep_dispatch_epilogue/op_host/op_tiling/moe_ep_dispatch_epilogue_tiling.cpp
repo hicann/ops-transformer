@@ -62,6 +62,7 @@ constexpr uint32_t TWO_DIMS = 2U;
 constexpr int64_t META_INNER_DIM = 4; // recvSrcMetadata dim(1) = 4
 constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16U * 1024U * 1024U;
 constexpr uint64_t WIN_ADDR_ALIGN = 512UL;
+constexpr uint64_t NOTIFY_CNT_ALIGN = 15000UL;
 constexpr int64_t MAX_EP_WORLD_SIZE = 1024;
 constexpr int64_t MIN_EP_WORLD_SIZE = 2;
 constexpr int64_t MAX_NUM_EXPERTS = 2048;
@@ -442,12 +443,13 @@ static ge::graphStatus CheckWinSize(const gert::TilingContext *context, const ch
     uint64_t superNodeCount = static_cast<uint64_t>(info.numScaleoutRanks);
     uint64_t cntWinStateSize =
         epWorldSize * AlignUpWin(moeExpertNumPerRank * sizeof(int32_t)) + epWorldSize * WIN_ADDR_ALIGN;
-    uint64_t dispatchWinStateSize = cntWinStateSize + epWorldSize * WIN_ADDR_ALIGN;
+    uint64_t dispatchNotifyCount = (nmt + NOTIFY_CNT_ALIGN - 1) / NOTIFY_CNT_ALIGN;
+    uint64_t dispatchWinStateSize = cntWinStateSize + dispatchNotifyCount * epWorldSize * WIN_ADDR_ALIGN;
     uint64_t combineWinStateSize = nmt * topK * WIN_ADDR_ALIGN + epWorldSize * WIN_ADDR_ALIGN;
     uint64_t hiddenAlign = (info.cfg.hidden * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
-    uint64_t dispatchReservedPerSlotBytes = perSlotBytes;
-    uint64_t scaleoutReservedPerSlotBytes =
-        AlignUpWin(dispatchReservedPerSlotBytes + topK * sizeof(int32_t));
+    uint32_t topKAlign = ((info.cfg.topK * METADATA_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN;
+    uint64_t dispatchReservedPerSlotBytes = AlignUpWin(static_cast<uint64_t>(hiddenAlign + topKAlign * 2 + UB_ALIGN));
+    uint64_t scaleoutReservedPerSlotBytes = AlignUpWin(dispatchReservedPerSlotBytes + topK * sizeof(int32_t));
     uint64_t combineWinDataSize = nmt * topK * AlignUpWin(static_cast<uint64_t>(hiddenAlign + UB_ALIGN));
     uint64_t totalStateWinSizeEp = dispatchWinStateSize + combineWinStateSize;
     uint64_t winDataOffset;
@@ -483,6 +485,7 @@ static ge::graphStatus CheckWinSize(const gert::TilingContext *context, const ch
 
     info.winDataOffset = winDataOffset;
     info.slotWinStateOffset = cntWinStateSize;
+    info.dispatchNotifyCount = static_cast<uint32_t>(dispatchNotifyCount);
     return ge::GRAPH_SUCCESS;
 }
 
