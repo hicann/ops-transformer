@@ -23,7 +23,6 @@
 #include "platform/platform_info_def.h"
 #include "op_common/op_host/util/platform_util.h"
 
-
 namespace optiling {
 constexpr uint64_t DIM_0 = 0;
 constexpr uint64_t DIM_1 = 1;
@@ -46,7 +45,7 @@ constexpr uint64_t INPUT_STRIDES_INDEX = 2;
 constexpr uint64_t INPUT_OFFSET_INDEX = 3;
 constexpr uint64_t ALIGN = 32;
 constexpr uint64_t RESERVED_BUFFER = 1024;
-constexpr uint64_t NUM_HEAD_MAX = 4095;  // datacopypad基础接口中跳搬的块数，最大维4095
+constexpr uint64_t NUM_HEAD_MAX = 4095; // datacopypad基础接口中跳搬的块数，最大维4095
 
 constexpr uint64_t TILING_ID_TEMPLATE = 1000;
 constexpr uint64_t TILING_ID_FULL = 1;
@@ -61,7 +60,7 @@ constexpr int64_t TEMPLATE_NORM_NCT = 7;
 constexpr int64_t TEMPLATE_SISO_NCT = 8;
 constexpr int64_t TEMPLATE_NHSD = 9;
 
-constexpr uint64_t TASK_MULTIPLE = 2; // Compress_rope模式下KV分核，分核任务量翻倍
+constexpr uint64_t TASK_MULTIPLE = 2;  // Compress_rope模式下KV分核，分核任务量翻倍
 constexpr uint64_t SMALL_TOKEN = 1000; // token数
 
 bool ScatterPaKvCacheMembaseTiling::IsCapable()
@@ -166,7 +165,8 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::GetInputDtypeKv()
         return ge::GRAPH_FAILED;
     }
     if (!(params_.templateType == TEMPLATE_ROPE || params_.templateType == TEMPLATE_OMNI)) {
-        if (!(inputValueDtype_ == ge::DT_FLOAT16 || inputValueDtype_ == ge::DT_BF16 || inputValueDtype_ == ge::DT_INT8)) {
+        if (!(inputValueDtype_ == ge::DT_FLOAT16 || inputValueDtype_ == ge::DT_BF16 ||
+              inputValueDtype_ == ge::DT_INT8)) {
             OP_LOGE(context_, "input value dtype must be float16 or bfloat16 or int8.");
             return ge::GRAPH_FAILED;
         }
@@ -250,8 +250,7 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::CheckInputDimNumNz()
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF((kCacheDimNum != static_cast<size_t>(DIM_4) && kCacheDimNum != static_cast<size_t>(DIM_5)),
-                OP_LOGE(context_, "key_cache should be is 4 dim or 5 dim."),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(context_, "key_cache should be is 4 dim or 5 dim."), return ge::GRAPH_FAILED);
 
     OP_CHECK_IF((slotDimNum != static_cast<size_t>(DIM_1)), OP_LOGE(context_, "slot_mapping should be is 1 dim."),
                 return ge::GRAPH_FAILED);
@@ -260,8 +259,7 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::CheckInputDimNumNz()
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF((vCacheDimNum != static_cast<size_t>(DIM_4) && vCacheDimNum != static_cast<size_t>(DIM_5)),
-                OP_LOGE(context_, "value_cache should be is 4 dim or 5 dim."),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(context_, "value_cache should be is 4 dim or 5 dim."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -324,7 +322,7 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::CheckInputDimNum()
         } else if (params_.templateType == TEMPLATE_NZ) {
             return CheckInputDimNumNz();
         } else if (params_.templateType == TEMPLATE_ALIBI || params_.templateType == TEMPLATE_ROPE ||
-            params_.templateType == TEMPLATE_OMNI) {
+                   params_.templateType == TEMPLATE_OMNI) {
             compressLensShape_ = context_->GetInputShape(INPUT_COMPRESS_LENS)->GetOriginShape();
             seqLensShape_ = context_->GetInputShape(INPUT_SEQ_LENS)->GetOriginShape();
             return CheckInputDimNumCompress();
@@ -347,7 +345,7 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::CheckInputShapeSiso()
     OP_CHECK_IF((static_cast<uint64_t>(numBlocks) * params_.blockSize < params_.numTokens),
                 OP_LOGE(context_, "numBlocks * blockSize should larger than numTokens."), return ge::GRAPH_FAILED);
     if (!(params_.templateType == TEMPLATE_ALIBI || params_.templateType == TEMPLATE_ROPE ||
-        params_.templateType == TEMPLATE_OMNI)) {
+          params_.templateType == TEMPLATE_OMNI)) {
         OP_CHECK_IF((params_.numHead != inputKeyCacheInShape_.GetDim(DIM_2)),
                     OP_LOGE(context_, "dim2 of keyCache should be same as numHead."), return ge::GRAPH_FAILED);
     }
@@ -386,14 +384,14 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::CheckInputShapeNHSD()
     params_.vHeadSize = inputValueShape_.GetDim(DIM_2);
     int64_t numBlocks = inputKeyCacheInShape_.GetDim(DIM_0);
     params_.blockSize = inputKeyCacheInShape_.GetDim(DIM_2);
-    bool isAlign = ((params_.kHeadSize * params_.typeByteK) % ALIGN == 0 &&
-                        (params_.vHeadSize * params_.typeByteV) % ALIGN == 0);
+    bool isAlign =
+        ((params_.kHeadSize * params_.typeByteK) % ALIGN == 0 && (params_.vHeadSize * params_.typeByteV) % ALIGN == 0);
     OP_CHECK_IF((!isAlign), OP_LOGE(context_, "kHeadSize and vHeadSize should be align to 32."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF((params_.numHead != inputKeyCacheInShape_.GetDim(DIM_1)),
                 OP_LOGE(context_, "dim1 of keyCache should be same as numHead."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF((params_.numHead > NUM_HEAD_MAX),
-                OP_LOGE(context_, "num head must less than or equal 4095."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF((params_.numHead > NUM_HEAD_MAX), OP_LOGE(context_, "num head must less than or equal 4095."),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF((static_cast<uint64_t>(numBlocks) * params_.blockSize < params_.numTokens),
                 OP_LOGE(context_, "numBlocks * blockSize should larger than numTokens."), return ge::GRAPH_FAILED);
     OP_CHECK_IF((inputKeyCacheInShape_.GetDim(DIM_2) != inputValueCacheInShape_.GetDim(DIM_2)),
@@ -424,8 +422,8 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::CheckInputShapeNz()
     int64_t lastDimK = ALIGN / params_.typeByteK;
     int64_t lastDimV = ALIGN / params_.typeByteV;
 
-    OP_CHECK_IF((params_.blockSize > UINT16_MAX),
-                OP_LOGE(context_, "blockSize should less than UINT16_MAX."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF((params_.blockSize > UINT16_MAX), OP_LOGE(context_, "blockSize should less than UINT16_MAX."),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF((static_cast<uint64_t>(numBlocks) * params_.blockSize < params_.numTokens),
                 OP_LOGE(context_, "numBlocks * blockSize should larger than numTokens."), return ge::GRAPH_FAILED);
 
@@ -469,8 +467,8 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::CheckInputShapeCompress()
     if (CheckInputShapeNorm() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    OP_CHECK_IF((inputKeyCacheInShape_.GetDim(DIM_2) != 1),
-                OP_LOGE(context_, "dim2 of keyCache should be 1."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF((inputKeyCacheInShape_.GetDim(DIM_2) != 1), OP_LOGE(context_, "dim2 of keyCache should be 1."),
+                return ge::GRAPH_FAILED);
 
     auto seqLens = context_->GetOptionalInputTensor(INPUT_SEQ_LENS);
     OP_CHECK_NULL_WITH_CONTEXT(context_, seqLens);
@@ -490,7 +488,7 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::CheckInputShape()
     } else if (params_.templateType == TEMPLATE_NZ) {
         return CheckInputShapeNz();
     } else if (params_.templateType == TEMPLATE_ALIBI || params_.templateType == TEMPLATE_ROPE ||
-        params_.templateType == TEMPLATE_OMNI) {
+               params_.templateType == TEMPLATE_OMNI) {
         return CheckInputShapeCompress();
     } else if (params_.templateType == TEMPLATE_NHSD) {
         return CheckInputShapeNHSD();
@@ -534,7 +532,7 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::GetTemplateType()
     if (context_->GetInputTensor(INPUT_VALUE_CACHE_INDEX)->GetOriginShape().GetDimNum() == 0) {
         if (params_.templateType == TEMPLATE_NORM_NCT) {
             params_.templateType = TEMPLATE_SISO_NCT;
-        } else  if (params_.templateType == TEMPLATE_NORMAL) {
+        } else if (params_.templateType == TEMPLATE_NORMAL) {
             params_.templateType = TEMPLATE_SISO;
         } else {
             OP_LOGE(context_, "Siso only support templateType is TEMPLATE_NORM_NCT or TEMPLATE_NORMAL.");
@@ -560,9 +558,6 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::GetShapeAttrsInfo()
     if (CheckInputShape() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    auto attrs = context_->GetAttrs();
-    auto strides = attrs->GetListInt(INPUT_STRIDES_INDEX);
-    auto offsets = attrs->GetListInt(INPUT_OFFSET_INDEX);
 
     bool isViewKCache = context_->InputIsView(DIM_1);
     bool isViewVCache = context_->InputIsView(DIM_4);
@@ -579,6 +574,20 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::GetShapeAttrsInfo()
         }
     }
     if (params_.templateType == TEMPLATE_NORM_NCT || params_.templateType == TEMPLATE_SISO_NCT) {
+        auto attrs = context_->GetAttrs();
+        OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
+        auto strides = attrs->GetListInt(INPUT_STRIDES_INDEX);
+        auto offsets = attrs->GetListInt(INPUT_OFFSET_INDEX);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, strides);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, offsets);
+        if (strides->GetSize() < DIM_2) {
+            OP_LOGE(context_, "strides size should be at least 2, but got %zu.", strides->GetSize());
+            return ge::GRAPH_FAILED;
+        }
+        if (offsets->GetSize() < DIM_2) {
+            OP_LOGE(context_, "offsets size should be at least 2, but got %zu.", offsets->GetSize());
+            return ge::GRAPH_FAILED;
+        }
         params_.kStride = strides->GetData()[0];
         params_.vStride = strides->GetData()[1];
         params_.kOffset = offsets->GetData()[0];
@@ -589,16 +598,14 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::GetShapeAttrsInfo()
 
 ge::graphStatus ScatterPaKvCacheMembaseTiling::DoNHSDOpTiling()
 {
-    OP_CHECK_IF(((params_.numHead * params_.kHeadSize + params_.numHead * params_.vHeadSize) * params_.typeByteK 
-                    > params_.ubSize),
-                    OP_LOGE(context_, "one token key size plus one token value must less than 196608."),
-                    return ge::GRAPH_FAILED);
+    OP_CHECK_IF(((params_.numHead * params_.kHeadSize + params_.numHead * params_.vHeadSize) * params_.typeByteK >
+                 params_.ubSize),
+                OP_LOGE(context_, "one token key size plus one token value must less than 196608."),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF((params_.blockSize * params_.kHeadSize > UINT32_MAX),
-                    OP_LOGE(context_, "blockSize * kHeadSize must less than UINT32_MAX."),
-                    return ge::GRAPH_FAILED);
+                OP_LOGE(context_, "blockSize * kHeadSize must less than UINT32_MAX."), return ge::GRAPH_FAILED);
     OP_CHECK_IF((params_.blockSize * params_.vHeadSize > UINT32_MAX),
-                    OP_LOGE(context_, "blockSize * vHeadSize must less than UINT32_MAX."),
-                    return ge::GRAPH_FAILED);
+                OP_LOGE(context_, "blockSize * vHeadSize must less than UINT32_MAX."), return ge::GRAPH_FAILED);
     params_.blockFactor = Ops::Base::CeilDiv<int64_t>(params_.numTokens, params_.usedCoreNum);
     params_.usedCoreNum =
         std::min(Ops::Base::CeilDiv<int64_t>(params_.numTokens, params_.blockFactor), params_.usedCoreNum);
@@ -620,7 +627,7 @@ ge::graphStatus ScatterPaKvCacheMembaseTiling::DoNoCompressOpTiling()
         canLoad = (static_cast<uint64_t>(params_.numHead) * params_.kHeadSize * params_.typeByteK <= params_.ubSize);
     } else {
         canLoad = ((static_cast<uint64_t>(params_.numHead) * params_.kHeadSize * params_.typeByteK +
-                   static_cast<uint64_t>(params_.numHead) * params_.vHeadSize * params_.typeByteV) <= params_.ubSize);
+                    static_cast<uint64_t>(params_.numHead) * params_.vHeadSize * params_.typeByteV) <= params_.ubSize);
     }
 
     params_.blockFactor = Ops::Base::CeilDiv<int64_t>(params_.numTokens, params_.usedCoreNum);
@@ -721,7 +728,7 @@ void ScatterPaKvCacheMembaseTiling::DumpTilingInfo()
     info << "blockFactor: " << params_.blockFactor << std::endl;
     info << "tailBlockFactor: " << params_.tailBlockFactor << std::endl;
     info << "numTokens: " << params_.numTokens << std::endl;
-    info << "numHead: " << params_.numHead  << std::endl;
+    info << "numHead: " << params_.numHead << std::endl;
     info << "kHeadSize: " << params_.kHeadSize << std::endl;
     info << "vHeadSize: " << params_.vHeadSize << std::endl;
     info << "blockSize: " << params_.blockSize << std::endl;

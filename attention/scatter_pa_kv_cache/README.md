@@ -31,8 +31,8 @@
     last_dim_v = 32 / sizeof(dtypeValue)
     (k_head_size * sizeof(dtypeKey)) % 32 == 0
     (v_head_size * sizeof(dtypeValue)) % 32 == 0
-    ```  
-    
+    ```
+
   - 场景二：
 
     ```python
@@ -215,14 +215,15 @@
     <tr>
       <td>offsets</td>
       <td>输入</td>
-      <td>key和value在非连续状态下的偏移，数组长度为2。其值应该大于0。</td>
+      <td>key和value在非连续状态下的偏移，数组长度为2。其值应该大于等于0。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
   </tbody></table>
 
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：<br>
-  - key/value数据类型仅支持：FLOAT16、BFLOAT16、INT8；<br>
+- 各产品对key/value/keyCacheRef/valueCacheRef数据类型的支持范围：
+  - <term>Ascend 950PR/Ascend 950DT</term>：支持参数表中列出的全部数据类型；其中FLOAT4_E1M2、FLOAT4_E2M1仅场景一、场景二且scatterMode为"None"时支持。
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：仅支持FLOAT16、BFLOAT16、INT8。
 
 ## 约束说明
 
