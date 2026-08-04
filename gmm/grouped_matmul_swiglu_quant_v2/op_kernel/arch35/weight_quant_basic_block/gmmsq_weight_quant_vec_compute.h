@@ -70,8 +70,8 @@ __aicore__ constexpr GmmsqUbBufferInfo GetGMMSQMxA8W4BufferInfo()
     };
 }
 
-#define GMMSQ_WQ_VEC_COMPUTE_TEMPLATE_PARAM                                                                            \
-    template <typename xType, typename wType, typename yType, typename yScaleType, const WqmmConfig &wqmmConfig,       \
+#define GMMSQ_WQ_VEC_COMPUTE_TEMPLATE_PARAM \
+    template <typename xType, typename wType, typename yType, typename yScaleType, const WqmmConfig &wqmmConfig, \
               const VecAntiQuantConfig &vecConfig>
 
 #define GMMSQ_WQ_VEC_COMPUTE_CLASS GMMSQWeightQuantVecCompute<xType, wType, yType, yScaleType, wqmmConfig, vecConfig>
@@ -113,7 +113,9 @@ private:
 
     static constexpr uint32_t EVENT_ID_V_TO_MTE2 = 0;
     static constexpr uint32_t EVENT_ID_MTE2_TO_V = 0;
-    static constexpr uint32_t EVENT_ID_MTE3_TO_V = 0;
+    static constexpr uint32_t EVENT_ID_WEIGHT_MTE3_TO_V = 0;
+    static constexpr uint32_t EVENT_ID_QUANT_MTE3_TO_V =
+        EVENT_ID_WEIGHT_MTE3_TO_V + UB_BUFFER_INFO.weightHighBitBufferNum;
     static constexpr uint32_t EVENT_ID_V_TO_MTE3 = 0;
 
     GlobalTensor<wType> wGlobal_;
@@ -164,7 +166,7 @@ __aicore__ inline void GMMSQ_WQ_VEC_COMPUTE_CLASS::Init(__gm__ yType *yFp32Addr,
     yFp8Buffer_ = LocalTensor<fp8_e4m3fn_t>(TPosition::LCM, ubOffset, UB_BUFFER_INFO.yFp8TotalSize);
 
     for (uint16_t idx = 0; idx < UB_BUFFER_INFO.weightHighBitBufferNum; idx++) {
-        SetFlag<HardEvent::MTE3_V>(EVENT_ID_MTE3_TO_V + idx);
+        SetFlag<HardEvent::MTE3_V>(EVENT_ID_WEIGHT_MTE3_TO_V + idx);
     }
 
     for (uint16_t idx = 0; idx < vecConfig.ubMte2BufferNum; idx++) {
@@ -232,7 +234,8 @@ __aicore__ inline void GMMSQ_WQ_VEC_COMPUTE_CLASS::WeightAntiQuantComputeNzNk(ui
                                                                               const LocalTensor<xType> &weightHighBitL1,
                                                                               const BasicBlockOffsetParam &offsetParam)
 {
-    WaitFlag<HardEvent::MTE3_V>(EVENT_ID_MTE3_TO_V + (ubComputeLoopIdx_ & (UB_BUFFER_INFO.weightHighBitBufferNum - 1)));
+    WaitFlag<HardEvent::MTE3_V>(EVENT_ID_WEIGHT_MTE3_TO_V +
+                                (ubComputeLoopIdx_ & (UB_BUFFER_INFO.weightHighBitBufferNum - 1)));
 
     AntiQuantProcessNzMxA8W4(kRealSize, kGmOffset, offsetParam);
 
@@ -243,7 +246,8 @@ __aicore__ inline void GMMSQ_WQ_VEC_COMPUTE_CLASS::WeightAntiQuantComputeNzNk(ui
         CopyWeightHighBitForAligned(offsetParam.nL1Size, kRealSize, weightHighBitL1);
     }
 
-    SetFlag<HardEvent::MTE3_V>(EVENT_ID_MTE3_TO_V + (ubComputeLoopIdx_ & (UB_BUFFER_INFO.weightHighBitBufferNum - 1)));
+    SetFlag<HardEvent::MTE3_V>(EVENT_ID_WEIGHT_MTE3_TO_V +
+                               (ubComputeLoopIdx_ & (UB_BUFFER_INFO.weightHighBitBufferNum - 1)));
     ubComputeLoopIdx_++;
 }
 
@@ -439,8 +443,8 @@ __aicore__ inline void GMMSQ_WQ_VEC_COMPUTE_CLASS::CopyScaleFromUb2Gm(const Basi
     DataCopyPad2D(yScaleGlobal_[scaleGmOffset], scaleE8M0Buffer_, mRealSize, nGroupCount, nGroupCount,
                   nTotalGroupCount);
 
-    SetFlag<HardEvent::MTE3_V>(EVENT_ID_MTE3_TO_V);
-    WaitFlag<HardEvent::MTE3_V>(EVENT_ID_MTE3_TO_V);
+    SetFlag<HardEvent::MTE3_V>(EVENT_ID_QUANT_MTE3_TO_V);
+    WaitFlag<HardEvent::MTE3_V>(EVENT_ID_QUANT_MTE3_TO_V);
 }
 
 GMMSQ_WQ_VEC_COMPUTE_TEMPLATE_PARAM
@@ -465,7 +469,7 @@ GMMSQ_WQ_VEC_COMPUTE_TEMPLATE_PARAM
 __aicore__ inline void GMMSQ_WQ_VEC_COMPUTE_CLASS::End()
 {
     for (uint16_t idx = 0; idx < UB_BUFFER_INFO.weightHighBitBufferNum; idx++) {
-        WaitFlag<HardEvent::MTE3_V>(EVENT_ID_MTE3_TO_V + idx);
+        WaitFlag<HardEvent::MTE3_V>(EVENT_ID_WEIGHT_MTE3_TO_V + idx);
     }
 
     for (uint16_t idx = 0; idx < vecConfig.ubMte2BufferNum; idx++) {

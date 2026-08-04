@@ -66,8 +66,8 @@ __simd_vf__ inline void GmmSwigluVf(__ubuf__ DataTypeIn *firstSrc, __ubuf__ Data
     const float mulFactor = 64.0; // 64：GMM缩小64倍在此处补齐
     for (uint16_t mIdx = 0; mIdx < mSize; mIdx++) {
         uint32_t elementNum = nSize;
-        AscendC::MicroAPI::MaskReg mask = AscendC::MicroAPI::UpdateMask<DataTypeIn>(elementNum);
         for (uint16_t vfBlockIdx = 0; vfBlockIdx < oneRowRepeatTimes; vfBlockIdx++) {
+            AscendC::MicroAPI::MaskReg mask = AscendC::MicroAPI::UpdateMask<DataTypeIn>(elementNum);
             AscendC::MicroAPI::RegTensor<bfloat16_t> verg4;
             AscendC::MicroAPI::RegTensor<float> swishInput, gateInput;
             AscendC::MicroAPI::RegTensor<float> verg0, verg1, verg2, verg3, swishOutput;
@@ -160,6 +160,7 @@ __simd_vf__ inline void ComputeScaleVf(__ubuf__ uint16_t *maxExpAddr, __ubuf__ u
                                        uint16_t loopNumScale, uint32_t vlForHalfNumber, uint16_t fpEmax)
 {
     AscendC::MicroAPI::RegTensor<uint16_t> expMask, sharedExp, scaleValue, scaleOffset, halfScale, fp8NanRegTensor;
+    AscendC::MicroAPI::Duplicate(expMask, static_cast<uint16_t>(0x7f80));
     AscendC::MicroAPI::MaskReg cmpResult, zeroMask, invalidDataMask, specialDataMask, preMaskScale;
     AscendC::MicroAPI::RegTensor<uint16_t> vdMaxExp;
     AscendC::MicroAPI::RegTensor<uint16_t> maxExpValue, zeroRegTensor, nanRegTensor, specialExpRegTensor;
