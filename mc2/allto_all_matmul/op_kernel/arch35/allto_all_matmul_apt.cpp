@@ -16,7 +16,7 @@
 #include <kernel_operator.h>
 #include <lib/matmul_intf.h>
 #include "common.h"
-#include "../allto_all_matmul_arch35.h"
+#include "../allto_all_matmul_kernel_base.h"
 #include "../allto_all_matmul_pipeline.h"
 #include "allto_all_matmul_tiling_key.h"
 #include "allto_all_matmul_tiling_data.h"
@@ -45,7 +45,7 @@ using MC2KernelTemplate::MC2AlltoAllPrimitives;
         using SchedulerType = Mc2Kernel::AlltoAllMatmulPipeLine<CommunicationType, TransposeType, ComputationType,     \
                                                                 SchedulerContextType>;                                 \
         SchedulerType SchedulerImpl(&commImplName, &transposeImplName, &matmulImplName);                               \
-        Mc2Kernel::AlltoAllMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingData> op(             \
+        Mc2Kernel::AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingData> op(         \
             &SchedulerImpl);                                                                                           \
         op.Init(x1, x2, bias, y, all2all_out, workspaceGM, &tilingData, &pipe);                                        \
         op.Process();                                                                                                  \

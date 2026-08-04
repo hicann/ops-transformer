@@ -20,7 +20,7 @@
 #include "lib/matmul_intf.h"
 #include "allto_all_matmul_tiling_key.h"
 #include "allto_all_matmul.h"
-#include "../allto_all_matmul_arch35.h" // A3非量化与A5共用流水
+#include "../allto_all_matmul_kernel_base.h" // A3非量化与A5共用流水
 #include "../allto_all_matmul_pipeline.h"
 
 using namespace AscendC;
@@ -51,7 +51,7 @@ using namespace Mc2Kernel;
         using SchedulerType =                                                                                          \
             AlltoAllMatmulPipeLine<CommunicationType, TransposeType, ComputationType, SchedulerContextType>;           \
         SchedulerType SchedulerImpl(&commImplName, &transposeImplName, &matmulImplName);                               \
-        AlltoAllMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataA3> op(&SchedulerImpl);      \
+        AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataA3> op(&SchedulerImpl);  \
         op.Init(x1, x2, bias, y, all2all_out, workspaceGM, &tilingData, &pipe);                                        \
         op.Process();                                                                                                  \
     } while (0)

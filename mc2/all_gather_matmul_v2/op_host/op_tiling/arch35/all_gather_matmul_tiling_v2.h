@@ -26,7 +26,7 @@
 #include "mat_mul_v3/op_host/op_tiling/arch35/matmul_tiling_registry.h"
 #include "mc2_matmul_tiling_cfg.h"
 #include "mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_strategy.h"
-#include "../../../op_kernel/all_gather_matmul_tiling_arch35.h"
+#include "../../../op_kernel/all_gather_matmul_tiling_data.h"
 
 namespace optiling {
 

@@ -9,18 +9,18 @@
  */
 
 /*!
- * \file allto_all_matmul_arch35.h
+ * \file allto_all_matmul_kernel_base.h
  * \brief
  */
 
-#ifndef ALLTO_ALL_MATMUL_ARCH35_H
-#define ALLTO_ALL_MATMUL_ARCH35_H
+#ifndef ALLTO_ALL_MATMUL_KERNEL_BASE_H
+#define ALLTO_ALL_MATMUL_KERNEL_BASE_H
 
 namespace Mc2Kernel {
 template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
-class AlltoAllMatmulArch35 {
+class AlltoAllMatmulKernelBase {
 public:
-    __aicore__ inline AlltoAllMatmulArch35(SchedulerType *pipeLine) : pipeLine_(pipeLine){};
+    __aicore__ inline AlltoAllMatmulKernelBase(SchedulerType *pipeLine) : pipeLine_(pipeLine){};
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR all2all_out,
                                 GM_ADDR workspaceGM, AlltoAllMatmulTilingDataType *tilingData, AscendC::TPipe *tPipe);
     __aicore__ inline void Process();
@@ -45,7 +45,8 @@ private:
 
 
 template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
-__aicore__ inline void AlltoAllMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>::Init(
+__aicore__ inline void
+    AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>::Init(
     GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR all2all_out, GM_ADDR workspaceGM,
     AlltoAllMatmulTilingDataType *tilingData, AscendC::TPipe *tPipe)
 {
@@ -71,7 +72,7 @@ __aicore__ inline void AlltoAllMatmulArch35<SchedulerType, SchedulerContextType,
 
 template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
 __aicore__ inline void
-AlltoAllMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>::Process()
+AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>::Process()
 {
     auto &&mc2Tiling_ = tilingData_->alltoAllMatmulTilingInfo;
     // 启动主块流水
@@ -90,7 +91,8 @@ AlltoAllMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDa
 
 template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
 __aicore__ inline void
-AlltoAllMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>::ProcessTile(uint32_t taskCnt)
+AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>
+::ProcessTile(uint32_t taskCnt)
 {
     auto &&mc2Tiling_ = tilingData_->alltoAllMatmulTilingInfo;
     // 复用的变量
@@ -137,7 +139,8 @@ AlltoAllMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDa
 
 template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
 __aicore__ inline void
-AlltoAllMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>::ProcessTail(uint32_t taskCnt)
+AlltoAllMatmulKernelBase<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>
+::ProcessTail(uint32_t taskCnt)
 {
     auto &&mc2Tiling_ = tilingData_->alltoAllMatmulTilingInfo;
     // 复用的变量

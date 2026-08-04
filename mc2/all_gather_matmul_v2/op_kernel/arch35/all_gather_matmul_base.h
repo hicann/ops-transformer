@@ -24,7 +24,7 @@
 #include "lib/matmul_intf.h"
 #include "common.h"
 #include "lib/hccl/hccl.h"
-#include "../all_gather_matmul_tiling_arch35.h"
+#include "../all_gather_matmul_tiling_data.h"
 
 namespace AllGatherMatmulImpl {
 using namespace AscendC;
