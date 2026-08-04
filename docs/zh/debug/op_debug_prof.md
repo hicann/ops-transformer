@@ -64,7 +64,91 @@
     AscendC::DataCopy(outputGMZ[progress * tileLength_], zLocal, tileLength_);
     ```
 
-对于复杂场景的问题定位，比如算子卡死、GM/UB访问越界等场景，可以采取**单步调试**的方式，具体操作请参见[msDebug](https://www.hiascend.com/document/redirect/CannCommunityToolMsdebug)算子调试工具。
+* **msDebug单步调试**
+
+  对于复杂场景的问题定位，比如算子卡死、GM/UB访问越界等场景，可以采取[msDebug](https://gitcode.com/Ascend/msdebug/blob/master/docs/zh/user_guide/msdebug_user_guide.md)单步调试的方式，具体操作步骤如下：
+
+  1. **编译O0 -g的Kernel**
+
+     使用msDebug调试前，需要编译不带优化且带调试信息的Kernel，通过`--op_debug_config "ccec_O0,ccec_g"`选项实现：
+
+     ```bash
+     bash build.sh --pkg --ops=add_example --soc=ascend910b --op_debug_config "ccec_O0,ccec_g"
+     ```
+
+     若上述编译失败，或运行算子本身就存在精度问题，可能是由于该算子tilingKey较多（大算子），需要对目标tilingKey对应的分支代码单独调试。此时需要增加`--tiling_key`选项指定目标tilingKey。
+
+     首先可用msdebug直接运行一次算子，观察Kernel启动信息来确定目标tilingKey：
+
+     ```
+     [Launch of Kernel RunAicpuKfcResInit on Device 0]
+     [Launch of Kernel RunAicpuKfcResInit on Device 1]
+     [Launch of Kernel AddExample_c9e4347749ac13425bf7e31c6a5e306a_7 on Device 1]
+     [Launch of Kernel AddExample_c9e4347749ac13425bf7e31c6a5e306a_7 on Device 0]
+     ```
+
+     其中`_c9e4347749ac13425bf7e31c6a5e306a`即为tilingKey。确定目标tilingKey后，编译命令如下：
+
+     ```bash
+     bash build.sh --pkg --ops=add_example --soc=ascend910b --op_debug_config "ccec_O0,ccec_g" --tiling_key=c9e4347749ac13425bf7e31c6a5e306a
+     ```
+
+  2. **启动msDebug调试**
+
+     安装算子包后，进入算子可执行文件所在目录，使用msdebug启动调试：
+
+     ```bash
+     msdebug ./test_aclnn_add_example
+     ```
+
+     更多msDebug使用方法请参见[msDebug](https://gitcode.com/Ascend/msdebug/blob/master/docs/zh/user_guide/msdebug_user_guide.md)算子调试工具文档。
+
+### 3. Kernel检测
+
+[msSanitizer](https://www.hiascend.com/document/redirect/CannCommunityToolMssanitizer)是Ascend C算子内存检测和竞争检测工具，可用于检测Kernel运行过程中的GM/UB越界访问、内存泄漏、并发竞争等问题。下面以`add_example`算子为例，介绍使用步骤：
+
+1. **编译使能检测的Kernel**
+
+   通过`--op_debug_config "sanitizer"`选项编译带检测的Kernel，将下述命令中的`add_example`替换为实际待检测的算子名：
+
+   ```bash
+   bash build.sh --pkg --ops=add_example --soc=ascend910b --op_debug_config "sanitizer"
+   ```
+
+   对于Ascend 950，当前需临时修改CANN包中的opc编译脚本，在`_gen_compile_cmd_c310`函数中添加`--cce-enable-sanitizer`、`-g`、`-fno-jump-tables`选项：
+
+   ```bash
+   vim ${ASCEND_HOME_PATH}/cann/python/site-packages/asc_op_compile_base/asc_op_compiler/ascendc_compile_v220.py
+   ```
+
+2. **安装编译包**
+
+   编译完成后，进入`build_out`目录安装生成的算子包（文件名随SoC版本不同而变化，以950为例）：
+
+   ```bash
+   cd build_out
+   bash cann-ops-transformer-custom_linux-aarch64.run
+   cd ..
+   ```
+
+3. **编译并运行测试用例**
+
+   ```bash
+   bash build.sh --run_example add_example eager cust --soc=ascend910b
+   ```
+
+4. **执行msSanitizer检测**
+
+   使用mssanitizer同时执行内存检测和竞争检测：
+
+   ```bash
+   mssanitizer --tool=memcheck --tool=racecheck \
+       --log-level=error \
+       --kernel-name=AddExample \
+       -- build/test_aclnn_add_example > mssanitizer_result.txt 2>&1
+   ```
+
+   检测结果输出到`mssanitizer_result.txt`中，更多msSanitizer使用方法请参见[msSanitizer](https://www.hiascend.com/document/redirect/CannCommunityToolMssanitizer)算子检测工具文档。
 
 ## 性能调优
 
