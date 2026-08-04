@@ -203,7 +203,7 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
     <tr>
       <td>partialSlice</td>
       <td>输入</td>
-      <td>D维度上的切片范围。</td>
+      <td>dyRef最后一维(D维)上的切片范围，为[start, end)，表示对dyRef[..., start:end]执行旋转位置编码梯度计算。</td>
       <td>-</td>
       <td>IntArray</td>
       <td>-</td>
@@ -321,7 +321,7 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
 - 该算子仅支持Ascend 950 AI Processor。
 - 该算子仅支持连续Tensor，不支持非连续Tensor。
 - **该算子当前版本仅支持 interleave 模式（`rotary_mode=1`）**。half（0）、quarter（2）、interleave-half（3）模式暂未实现。
-- 该算子不支持输入空Tensor（任意维度大小不能为0），不支持 slice 长度为零（即 `partial_slice[0] == partial_slice[1]`）的场景。
+- 该算子不支持输入空Tensor（任意维度大小不能为0），不支持 slice 长度为零（即 `partial_slice[0] == partial_slice[1]`，也就是 `start == end`）的场景。
 
 - 确定性计算：
   - aclnnInplacePartialRotaryMulGrad默认确定性实现。

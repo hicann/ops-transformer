@@ -156,7 +156,7 @@
   <tr>
     <td>partial_slice</td>
     <td>属性</td>
-    <td>D维度上的切片范围[start, end)，默认{0, 0}表示不做有效计算。start须在[0, D]内，end须在[start, D]内。</td>
+    <td>dy最后一维(D维)上的切片范围，为[start, end)，表示对dy[..., start:end]执行旋转位置编码梯度计算。</td>
     <td>IntArray</td>
     <td>-</td>
   </tr>
@@ -168,14 +168,14 @@
 - 该算子仅支持Ascend 950 AI Processor。
 - 该算子仅支持连续Tensor，不支持非连续Tensor。
 - 该算子当前版本仅支持 interleave 模式（`rotary_mode=1`）。其他模式暂不支持。
-- 该算子不支持输入空Tensor（任意维度大小不能为0），不支持 slice 长度为零（即 `partial_slice[0] == partial_slice[1]`）的场景。
+- 该算子不支持输入空Tensor（任意维度大小不能为0），不支持 slice 长度为零（即 `partial_slice[0] == partial_slice[1]`，也就是 `start == end`）的场景。
 - Inplace执行：输入dy和输出共享同一个Tensor，计算结果直接写回输入dy。
 - 输入dy当前只支持BSND排布，输入cos/sin的shape必须与dy满足B/S/N维度的广播关系（如BSND、111D、1SND、B1ND、BS1D、11ND、B11D、1S1D等）。各参数的shape约束可以描述如下：
   - 输入张量dy的最后一维大小D必须小于等于1024。
-  - 输入张量cos、sin的最后一维大小必须等于partial_slice的切片长度（即partial_slice[1] - partial_slice[0]）。
+  - 输入张量cos、sin的最后一维大小必须等于切片长度(end - start)。
   - 输入张量cos和sin的shape必须完全相同，cos和sin的B、S、N维度需要与dy满足[broadcast关系](../../docs/zh/context/broadcast_relationship.md)，且广播后的B、S、N必须等于dy的B、S、N。
-  - half、interleave和interleave-half模式下，partial_slice切片长度（即partial_slice[1] - partial_slice[0]）必须能被2整除。
-  - quarter模式下，partial_slice切片长度（即partial_slice[1] - partial_slice[0]）必须能被4整除。
+  - half、interleave和interleave-half模式下，切片长度(end - start)必须能被2整除。
+  - quarter模式下，切片长度(end - start)必须能被4整除。
   - 输入张量cos和sin的数据类型必须相同。
 
 
