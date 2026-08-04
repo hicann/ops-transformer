@@ -40,8 +40,10 @@ public:
     __aicore__ inline void InitCubeBlock(__gm__ uint8_t *query,
                                          const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, TPipe *tPipe,
                                          BufferManager<BufferType::L1> *l1BuffMgr);
-    __aicore__ inline void SendCrossCoreFlag();
+    __aicore__ inline void SetCrossCoreFlag();
+    __aicore__ inline void WaitCrossCoreFlag();
     __aicore__ inline void InitLocalBuffer();
+    __aicore__ inline void UninitLocalBuffer();
     __aicore__ inline void CopyToL1Nd2Nz(const LocalTensor<Q_T> &l1Tensor, const GlobalTensor<Q_T> &gmTensor,
                                          uint32_t ndNum, uint32_t nValue, uint32_t dValue, uint32_t srcNdMatrixStride,
                                          uint32_t srcDValue, uint32_t dstNzC0Stride, uint32_t dstNzMatrixStride);
@@ -81,12 +83,29 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::InitCubeBl
 }
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::SendCrossCoreFlag()
+__aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::SetCrossCoreFlag()
 {
-    CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(CV_L1_EVENT[0]);
-    CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(16 + CV_L1_EVENT[0]); // 一个aic对应两个aiv,  一共32个核，所以是16
-    CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(CV_L1_EVENT[1]);
-    CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(16 + CV_L1_EVENT[1]); // 一个aic对应两个aiv,  一共32个核，所以是16
+    if ASCEND_IS_AIC {
+        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(CV_L1_EVENT[0]);
+        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(16 + CV_L1_EVENT[0]); // 一个aic对应两个aiv,  一共32个核，所以是16
+        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(CV_L1_EVENT[1]);
+        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(16 + CV_L1_EVENT[1]); // 一个aic对应两个aiv,  一共32个核，所以是16
+    }
+}
+
+ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::WaitCrossCoreFlag()
+{
+    if ASCEND_IS_AIC {
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM1RES_EVENT[0]);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM1RES_EVENT[0] + 16);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM1RES_EVENT[1]);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM1RES_EVENT[1] + 16);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM2RES_EVENT[0]);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM2RES_EVENT[0] + 16);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM2RES_EVENT[1]);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM2RES_EVENT[1] + 16);
+    }
 }
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
@@ -99,6 +118,15 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::InitLocalB
     mmL0ABuffers.Init(l0aBufferManager, (L0A_SIZE / DOUBLE_BUFFER_NUM) * KB_TO_BYTES); // 双缓冲 l0a内存大小为32K
     mmL0BBuffers.Init(l0bBufferManager, (L0B_SIZE / DOUBLE_BUFFER_NUM) * KB_TO_BYTES); // 双缓冲 l0b内存大小32K
     mmL0CBuffers.Init(l0cBufferManager, (L0C_SIZE / DOUBLE_BUFFER_NUM) * KB_TO_BYTES); // 双缓冲 l0c内存大小128K
+}
+
+ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::UninitLocalBuffer()
+{
+    mm1AL1Buffers.Uninit(*l1BufferManagerPtr);
+    mmL0ABuffers.Uninit(l0aBufferManager);
+    mmL0BBuffers.Uninit(l0bBufferManager);
+    mmL0CBuffers.Uninit(l0cBufferManager);
 }
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
@@ -273,10 +301,16 @@ public:
                                          BufferManager<BufferType::L1> *l1BuffMgr)
     {
     }
-    __aicore__ inline void SendCrossCoreFlag()
+    __aicore__ inline void SetCrossCoreFlag()
+    {
+    }
+    __aicore__ inline void WaitCrossCoreFlag()
     {
     }
     __aicore__ inline void InitLocalBuffer()
+    {
+    }
+    __aicore__ inline void UninitLocalBuffer()
     {
     }
 };
