@@ -1,0 +1,590 @@
+{
+  "op_type": "MoeGatingTopKBackward",
+  "op_list": [
+    {
+      "bin_filename": "MoeGatingTopKBackward_ec5e49a0ae6cde7bb103f8204c5aedef",
+      "inputs": [
+        {
+          "name": "x_norm",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "grad_y",
+          "index": 1,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "expert_idx",
+          "index": 2,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "grad_x",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "renorm",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "norm_type",
+          "dtype": "int",
+          "value": 1
+        },
+        {
+          "name": "routed_scaling_factor",
+          "dtype": "float",
+          "value": 1.0
+        },
+        {
+          "name": "eps",
+          "dtype": "float",
+          "value": 1e-20
+        }
+      ]
+    },
+    {
+      "bin_filename": "MoeGatingTopKBackward_1a9f93304ba2ce8153c3f3ee3d4a6aed",
+      "inputs": [
+        {
+          "name": "x_norm",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "grad_y",
+          "index": 1,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "expert_idx",
+          "index": 2,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "grad_x",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "renorm",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "norm_type",
+          "dtype": "int",
+          "value": 1
+        },
+        {
+          "name": "routed_scaling_factor",
+          "dtype": "float",
+          "value": 0.1
+        },
+        {
+          "name": "eps",
+          "dtype": "float",
+          "value": 1e-20
+        }
+      ]
+    },
+    {
+      "bin_filename": "MoeGatingTopKBackward_e13228989aa5293e8eca41976270299d",
+      "inputs": [
+        {
+          "name": "x_norm",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "grad_y",
+          "index": 1,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "expert_idx",
+          "index": 2,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "grad_x",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "renorm",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "norm_type",
+          "dtype": "int",
+          "value": 1
+        },
+        {
+          "name": "routed_scaling_factor",
+          "dtype": "float",
+          "value": 2.5
+        },
+        {
+          "name": "eps",
+          "dtype": "float",
+          "value": 1e-20
+        }
+      ]
+    },
+    {
+      "bin_filename": "MoeGatingTopKBackward_9e334206921f8701016ec277b4b448db",
+      "inputs": [
+        {
+          "name": "x_norm",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "grad_y",
+          "index": 1,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "expert_idx",
+          "index": 2,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "grad_x",
+          "index": 0,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "renorm",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "norm_type",
+          "dtype": "int",
+          "value": 1
+        },
+        {
+          "name": "routed_scaling_factor",
+          "dtype": "float",
+          "value": 1.0
+        },
+        {
+          "name": "eps",
+          "dtype": "float",
+          "value": 1e-20
+        }
+      ]
+    },
+    {
+      "bin_filename": "MoeGatingTopKBackward_f7d98f445563181d6ee8dcf152432761",
+      "inputs": [
+        {
+          "name": "x_norm",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "grad_y",
+          "index": 1,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "expert_idx",
+          "index": 2,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "grad_x",
+          "index": 0,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "renorm",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "norm_type",
+          "dtype": "int",
+          "value": 1
+        },
+        {
+          "name": "routed_scaling_factor",
+          "dtype": "float",
+          "value": 0.1
+        },
+        {
+          "name": "eps",
+          "dtype": "float",
+          "value": 1e-20
+        }
+      ]
+    },
+    {
+      "bin_filename": "MoeGatingTopKBackward_beec09b4446d9de638bfd4c32a5b18ef",
+      "inputs": [
+        {
+          "name": "x_norm",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "grad_y",
+          "index": 1,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "expert_idx",
+          "index": 2,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "grad_x",
+          "index": 0,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "renorm",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "norm_type",
+          "dtype": "int",
+          "value": 1
+        },
+        {
+          "name": "routed_scaling_factor",
+          "dtype": "float",
+          "value": 2.5
+        },
+        {
+          "name": "eps",
+          "dtype": "float",
+          "value": 1e-20
+        }
+      ]
+    },
+    {
+      "bin_filename": "MoeGatingTopKBackward_90c019d28d6e3d04a226dd11a12abbfd",
+      "inputs": [
+        {
+          "name": "x_norm",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "grad_y",
+          "index": 1,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "expert_idx",
+          "index": 2,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "grad_x",
+          "index": 0,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "renorm",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "norm_type",
+          "dtype": "int",
+          "value": 1
+        },
+        {
+          "name": "routed_scaling_factor",
+          "dtype": "float",
+          "value": 1.0
+        },
+        {
+          "name": "eps",
+          "dtype": "float",
+          "value": 1e-20
+        }
+      ]
+    },
+    {
+      "bin_filename": "MoeGatingTopKBackward_c75fc48e592e7fca58aaec0b2e7f42cc",
+      "inputs": [
+        {
+          "name": "x_norm",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "grad_y",
+          "index": 1,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "expert_idx",
+          "index": 2,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "grad_x",
+          "index": 0,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "renorm",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "norm_type",
+          "dtype": "int",
+          "value": 1
+        },
+        {
+          "name": "routed_scaling_factor",
+          "dtype": "float",
+          "value": 2.5
+        },
+        {
+          "name": "eps",
+          "dtype": "float",
+          "value": 1e-20
+        }
+      ]
+    },
+    {
+      "bin_filename": "MoeGatingTopKBackward_b09616c6d53f4171b00a14e93c15fccc",
+      "inputs": [
+        {
+          "name": "x_norm",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "grad_y",
+          "index": 1,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        },
+        {
+          "name": "expert_idx",
+          "index": 2,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "grad_x",
+          "index": 0,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2],
+          "format_match_mode": "FormatAgnostic"
+        }
+      ],
+      "attrs": [
+        {
+          "name": "renorm",
+          "dtype": "int",
+          "value": 0
+        },
+        {
+          "name": "norm_type",
+          "dtype": "int",
+          "value": 1
+        },
+        {
+          "name": "routed_scaling_factor",
+          "dtype": "float",
+          "value": 2.5
+        },
+        {
+          "name": "eps",
+          "dtype": "float",
+          "value": 1e-10
+        }
+      ]
+    }
+  ]
+}

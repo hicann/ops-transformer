@@ -32,24 +32,45 @@
 
 namespace optiling {
 BEGIN_TILING_DATA_DEF(MoeGatingTopKBackwardTilingData)
-TILING_DATA_FIELD_DEF(int64_t, needCoreNum);   // 所需要的总核数
-TILING_DATA_FIELD_DEF(int64_t, perCoreRows);   // 头核需要处理的 token 数
-TILING_DATA_FIELD_DEF(int64_t, lastCoreRows);  // 尾核需要处理的 token 数
-TILING_DATA_FIELD_DEF(int64_t, baseRows);      // 头核、尾核的头 loop 一次搬运的 token 数，同时也是一个 UB 可以处理的最多 token 数
-TILING_DATA_FIELD_DEF(int64_t, perLoopTimes);  // 头核需要 loop 的次数
-TILING_DATA_FIELD_DEF(int64_t, perTailRows);   // 头核尾 loop 一次搬运的 token 数
-TILING_DATA_FIELD_DEF(int64_t, lastLoopTimes); // 尾核需要 loop 的次数
-TILING_DATA_FIELD_DEF(int64_t, lastTailRows);  // 尾核尾 loop 一次搬运的 token 数
-TILING_DATA_FIELD_DEF(int64_t, tokenCount);    // x_norm shape [M,N] 中的 M, 所有的 token 数量
-TILING_DATA_FIELD_DEF(int64_t, expertCount);   // x_norm shape [M,N] 中的 N, 所有的 expert 数量
-TILING_DATA_FIELD_DEF(int64_t, k);             // grad_y shape [M,K] 中的 K，选择的前 K 个 expert 数量
-TILING_DATA_FIELD_DEF(int64_t, gradYDtypeSize);    // grad_y的数据类型
+TILING_DATA_FIELD_DEF(int64_t, needCoreNum);  // 所需要的总核数
+TILING_DATA_FIELD_DEF(int64_t, perCoreRows);  // 头核需要处理的 token 数
+TILING_DATA_FIELD_DEF(int64_t, lastCoreRows); // 尾核需要处理的 token 数
+TILING_DATA_FIELD_DEF(int64_t,
+                      baseRows); // 头核、尾核的头 loop 一次搬运的 token 数，同时也是一个 UB 可以处理的最多 token 数
+TILING_DATA_FIELD_DEF(int64_t, perLoopTimes);   // 头核需要 loop 的次数
+TILING_DATA_FIELD_DEF(int64_t, perTailRows);    // 头核尾 loop 一次搬运的 token 数
+TILING_DATA_FIELD_DEF(int64_t, lastLoopTimes);  // 尾核需要 loop 的次数
+TILING_DATA_FIELD_DEF(int64_t, lastTailRows);   // 尾核尾 loop 一次搬运的 token 数
+TILING_DATA_FIELD_DEF(int64_t, tokenCount);     // x_norm shape [M,N] 中的 M, 所有的 token 数量
+TILING_DATA_FIELD_DEF(int64_t, expertCount);    // x_norm shape [M,N] 中的 N, 所有的 expert 数量
+TILING_DATA_FIELD_DEF(int64_t, k);              // grad_y shape [M,K] 中的 K，选择的前 K 个 expert 数量
+TILING_DATA_FIELD_DEF(int64_t, gradYDtypeSize); // grad_y的数据类型
 TILING_DATA_FIELD_DEF(int64_t, renorm);
 TILING_DATA_FIELD_DEF(int64_t, normType);
 TILING_DATA_FIELD_DEF(float, routedScalingFactor);
 TILING_DATA_FIELD_DEF(float, eps);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(MoeGatingTopKBackward, MoeGatingTopKBackwardTilingData)
+
+BEGIN_TILING_DATA_DEF(MoeGatingTopKBackwardRegbaseTilingData)
+TILING_DATA_FIELD_DEF(int64_t, needCoreNum);    // 所需要的总核数
+TILING_DATA_FIELD_DEF(int64_t, perCoreRows);    // 头核需要处理的 token 数
+TILING_DATA_FIELD_DEF(int64_t, lastCoreRows);   // 尾核需要处理的 token 数
+TILING_DATA_FIELD_DEF(int64_t, baseRows);       // 头核、尾核的头 loop 一次搬运的 token 数
+TILING_DATA_FIELD_DEF(int64_t, perLoopTimes);   // 头核需要 loop 的次数
+TILING_DATA_FIELD_DEF(int64_t, perTailRows);    // 头核尾 loop 一次搬运的 token 数
+TILING_DATA_FIELD_DEF(int64_t, lastLoopTimes);  // 尾核需要 loop 的次数
+TILING_DATA_FIELD_DEF(int64_t, lastTailRows);   // 尾核尾 loop 一次搬运的 token 数
+TILING_DATA_FIELD_DEF(int64_t, tokenCount);     // x_norm shape [M,N] 中的 M, 所有的 token 数量
+TILING_DATA_FIELD_DEF(int64_t, expertCount);    // x_norm shape [M,N] 中的 N, 所有的 expert 数量
+TILING_DATA_FIELD_DEF(int64_t, k);              // grad_y shape [M,K] 中的 K，选择的前 K 个 expert 数量
+TILING_DATA_FIELD_DEF(int64_t, gradYDtypeSize); // grad_y的数据类型
+TILING_DATA_FIELD_DEF(int64_t, renorm);
+TILING_DATA_FIELD_DEF(int64_t, normType);
+TILING_DATA_FIELD_DEF(float, routedScalingFactor);
+TILING_DATA_FIELD_DEF(float, eps);
+END_TILING_DATA_DEF;
+REGISTER_TILING_DATA_CLASS(MoeGatingTopKBackward_10000, MoeGatingTopKBackwardRegbaseTilingData)
 
 struct MoeGatingTopKBackwardCompileInfo {
     uint64_t ubSize = 0;
