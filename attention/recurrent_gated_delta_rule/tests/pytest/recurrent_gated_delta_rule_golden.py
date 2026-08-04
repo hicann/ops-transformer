@@ -613,7 +613,11 @@ def run_recurrent_gated_delta_rule_eager(
 
     # ======================== execute npu finish ================================
     # start run custom ops
-    init_state = state.clone()
+    if state_non_contiguous:
+        init_padded = padded_state.clone()
+        init_state = init_padded[::2, ::2, :, :]
+    else:
+        init_state = state.clone()
     npu_out = torch_npu.npu_recurrent_gated_delta_rule(
         query,
         key,
@@ -645,17 +649,17 @@ def run_recurrent_gated_delta_rule_eager(
     del query, key, value, state, beta, act_seq_len, ssm_state_indices
     del num_accepted_tokens, g, gk, init_state
     if state_non_contiguous:
-        del padded_state
+        del padded_state, init_padded
     torch.npu.empty_cache()
 
     print(
         "--------------------------------------------------------------check result-------------------------------------------------------------"
     )
-    check_result(cpu_out, npu_out, out_data_type)
+    out_pct, out_result = check_result(cpu_out, npu_out, out_data_type)
     print(
         "--------------------------------------------------------------check state ouput-------------------------------------------------------------"
     )
-    check_result(
+    state_pct, state_result = check_result(
         cpu_state_ouput,
         npu_state_out,
         state_data_type_str,
@@ -664,6 +668,13 @@ def run_recurrent_gated_delta_rule_eager(
     del cpu_out, cpu_state_ouput, npu_out, npu_state_out
     gc.collect()
     torch.npu.empty_cache()
+
+    assert out_result == "Pass", (
+        f"output precision check failed: pass_rate={out_pct:.4f}%"
+    )
+    assert state_result == "Pass", (
+        f"state precision check failed: pass_rate={state_pct:.4f}%"
+    )
 
 
 if __name__ == "__main__":
