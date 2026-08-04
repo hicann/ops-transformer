@@ -82,6 +82,13 @@ TILING_DATA_FIELD_DEF(uint64_t, dPOutSize);
 TILING_DATA_FIELD_DEF(uint64_t, dQOutSize);
 TILING_DATA_FIELD_DEF(uint64_t, dKOutSize);
 TILING_DATA_FIELD_DEF(uint64_t, dVOutSize);
+TILING_DATA_FIELD_DEF(uint64_t, detDkWorkspaceSize);
+TILING_DATA_FIELD_DEF(uint64_t, detDvWorkspaceSize);
+TILING_DATA_FIELD_DEF(uint32_t, aicNumForDet);
+TILING_DATA_FIELD_DEF(uint32_t, groupSizeForDet);
+TILING_DATA_FIELD_DEF(uint8_t, deterministic);
+TILING_DATA_FIELD_DEF(uint32_t, batchSizeForDet);
+TILING_DATA_FIELD_DEF(uint32_t, KForDet);
 
 TILING_DATA_FIELD_DEF(uint32_t, basicQBlockSize);
 TILING_DATA_FIELD_DEF(uint32_t, basicKVBlockSize);
@@ -210,6 +217,7 @@ private:
     int64_t totalTokensT_ = 0; // TND格式Q的第一维（T维度，总token数）
 
     ge::DataType dataType_ = ge::DT_FLOAT16;
+    bool deterministic_ = false;
 
     BlockSparseAttentionGradTilingData *tilingData_ = nullptr;
 };
