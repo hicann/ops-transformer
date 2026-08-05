@@ -48,7 +48,7 @@
 #include "../prompt_flash_attention/prompt_flash_attention.cpp"
 #endif
 #include "arch22/fused_infer_attention_score_v3.cpp"
-#include "flash_attention_interface.cpp"
+#include "arch22/flash_attention_interface.cpp"
 #endif
 
 #define FullQuantTiling 15
