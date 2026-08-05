@@ -263,7 +263,7 @@ int main()
     aclrtStream stream = nullptr;
     Tensors tensors;
 
-    int64_t bs = 2, seq_len = 128, n = 4, c = 256;
+    int64_t bs = 2, seq_len = 128, n = 4, c = 4096;
     int64_t hc_mult = n;
     int64_t hc_mix = n * n + 2 * n;
     int64_t num_iters = 20;

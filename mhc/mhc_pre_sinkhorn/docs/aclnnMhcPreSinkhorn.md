@@ -437,6 +437,8 @@ aclnnStatus aclnnMhcPreSinkhorn(
   | c（A5）       | 4096、7168          | <term>Ascend 950PR/Ascend 950DT</term>尾轴c仅支持4096、7168。 |
   | c（A2/A3）    | 128对齐，[1, 100000] | <term>Atlas A2/A3</term>尾轴c需为128的倍数且取值范围为[1, 100000]。       |
 
+- 在<term>Ascend 950PR/Ascend 950DT</term>使用场景下，输入phi的数据范围建议在$\pm \frac{1}{\sqrt{nc}}$范围内，此范围内具有较好的数值稳定性。
+
 ## 调用示例
 
 调用示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
@@ -697,7 +699,7 @@ int main()
   aclrtStream stream = nullptr;
   Tensors tensors;
 
-  int64_t bs = 2, seq_len = 128, n = 4, c = 256;
+  int64_t bs = 2, seq_len = 128, n = 4, c = 4096;
   int64_t hc_mult = n;
   int64_t hc_mix = n * n + 2 * n;
   int64_t num_iters = 20;

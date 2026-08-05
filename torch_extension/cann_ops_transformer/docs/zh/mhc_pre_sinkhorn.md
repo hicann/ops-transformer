@@ -219,7 +219,7 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
 ## 约束说明
 
 - 该接口支持训练、推理场景下使用。
-- 该接口支持单算子模式调用。
+- 该接口支持单算子模式和图模式调用。
 - 参数约束：x、phi、alpha、bias不支持空Tensor。
 - 规格约束：
   - numIters：表示迭代次数，要求不超过20，若超出该范围会返回参数无效错误。
@@ -263,4 +263,42 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
   hin, hPost, hRes = mhc_pre_sinkhorn(
     x, phi, alpha, bias, hcMult, numIters, hcEps, normEps
   )
+  ```
+
+- 图模式调用：
+
+  ```python
+  import torch
+  import torch_npu
+  import torchair
+  from cann_ops_transformer.ops import mhc_pre_sinkhorn
+
+  torch_npu.npu.set_device(0)
+
+  B = 1
+  S = 128
+  N = 4
+  C = 4096
+
+  class MhcPreSinkhornModel(torch.nn.Module):
+      def forward(self, x, phi, alpha, bias):
+          hin, hPost, hRes = mhc_pre_sinkhorn(
+              x, phi, alpha, bias,
+              hc_mult=4,
+              num_iters=20,
+              hc_eps=1e-6,
+              norm_eps=1e-6
+          )
+          return hin, hPost, hRes
+
+  model = MhcPreSinkhornModel().npu()
+  npu_backend = torchair.get_npu_backend()
+  model = torch.compile(model, backend=npu_backend, dynamic=False)
+
+  x = torch.randn(B, S, N, C, dtype=torch.bfloat16, device="npu")
+  phi = torch.randn(N * N + 2 * N, N * C, dtype=torch.float32, device="npu")
+  alpha = torch.randn(3, dtype=torch.float32, device="npu")
+  bias = torch.randn(N * N + 2 * N, dtype=torch.float32, device="npu")
+
+  hin, hPost, hRes = model(x, phi, alpha, bias)
   ```

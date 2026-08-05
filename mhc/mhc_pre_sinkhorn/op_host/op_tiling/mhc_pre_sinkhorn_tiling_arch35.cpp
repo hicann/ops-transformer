@@ -500,8 +500,9 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcOpTiling()
     tilingData_.set_cubeBlockDimK(actualKBlockNum);
     tilingData_.set_mL1Size(std::min(M_L1_MAX_SIZE, singleCoreM));
     tilingData_.set_multCoreSplitKSize(splitKSize);
-    tilingData_.set_kL1Size(std::min(A_L1_SIZE / tilingData_.get_mL1Size(), static_cast<uint64_t>(K_L1_MAX_SIZE)) /
-                            128 * 128);
+    // 开启batch一致性开关时mL1Size固定取M_L1_MAX_SIZE，使kL1Size不随实际bs_切分结果变化，保证在不同batch下切分一致
+    uint64_t mSizeForKL1 = (deterministicLevel == BATCH_CONSISTENCY_LEVEL) ? M_L1_MAX_SIZE : tilingData_.get_mL1Size();
+    tilingData_.set_kL1Size(std::min(A_L1_SIZE / mSizeForKL1, static_cast<uint64_t>(K_L1_MAX_SIZE)) / 128 * 128);
 
     bool isKSplit = kDimNum != 1;
     if (isKSplit) {
