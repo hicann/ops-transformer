@@ -175,12 +175,15 @@ public:
     __aicore__ inline void Init(Params const &params);
     __aicore__ inline auto GetFirstL0c2UbTensor();
     __aicore__ inline auto GetSecondL0c2UbTensor();
+    // Computes and writes one activation/quant tile without notifying GMM2.
     __aicore__ inline void operator()(const BlockShape &blockShape, const BlockCoord &blockCoord,
                                       uint16_t pingpongIdx = 0);
     __aicore__ inline void UpdateGlobalAddr(const BlockCoord &baseOffset, uint32_t flagElementOffset = 0);
+    // Pipeline controllers call this immediately after each completed tile.
+    __aicore__ inline void NotifyCompletedTile(uint32_t flagSlotIdx = 0);
     __aicore__ inline void UpdateNextProblem(const ProblemShape &problemShape);
 
-    // 权重预加载相关：由 AivGmm1PostGeneric 提前 DataCopy，VFDoSwigluAndQuantForMX 直接消费
+    // 权重预加载相关：由 ComputeSwigluTileGeneric 提前 DataCopy，VFDoSwigluAndQuantForMX 直接消费
     AscendC::LocalTensor<float> weightUb_;
     AscendC::GlobalTensor<float> metaInfoGm_;
 
@@ -1165,18 +1168,20 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(0);
     AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(0);
     AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(0);
+}
+
+BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::NotifyCompletedTile(
+    uint32_t flagSlotIdx)
+{
     if (groupFlagListGmAddr_ != nullptr) {
         if constexpr (IsWaveFlagGrained_) {
-            // The scheduler carries mLoc's wave index in the spare GROUP_FLAG
-            // coordinate.  Each wave owns an independent cache-line slot.
-            AscendC::AtomicAdd(
-                groupFlagListGmAddr_ + Get<GROUP_FLAG_IDX>(blockCoord) * INT_CACHELINE, 1);
+            AscendC::AtomicAdd(groupFlagListGmAddr_ + static_cast<uint64_t>(flagSlotIdx) * INT_CACHELINE, 1);
         } else {
             AscendC::AtomicAdd(groupFlagListGmAddr_, 1);
         }
     }
-    return;
 }
 
-#endif // BLOCK_EPILOGUE_SWIGLU_QUANT_H
-#endif
+#endif // defined(__DAV_C310__)
+#endif // BLOCK_EPILOGUE_SWIGLU_MX_QUANT_H

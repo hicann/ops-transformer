@@ -148,6 +148,27 @@ enum class AddrUpdateMode : int32_t {
     GMM2
 };
 
+// Logical block-job scheduling information supplied by the caller. jobIndex
+// is zero-based and contiguous in [0, totalJobs). All three physical cores
+// in one MIX_AIC_1_2 block must receive the same context.
+struct BlockJobContext {
+    uint32_t jobIndex;
+    uint32_t totalJobs;
+};
+
+// GM workspace indexing is independent of the number of blocks participating
+// in a reusable stage. This keeps shared data readable by later stages that may
+// use a different block count.
+struct BlockWorkspaceContext {
+    uint32_t blockIdx;
+    uint32_t blockNum;
+};
+
+template <typename T>
+struct PackedElementTraits {
+    static constexpr uint32_t ELEMENTS_PER_BYTE = Std::IsSame<T, fp4x2_e2m1_t>::value ? 2U : 1U;
+};
+
 __aicore__ inline void NotifyCube(uint16_t value = 0)
 {
     CrossCoreSetFlag<SYNC_AIC_AIV_MODE, PIPE_V>(AIV_SYNC_AIC_FLAG + value);

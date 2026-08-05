@@ -30,6 +30,15 @@
 #include "block_epilogue_swiglu_mx_quant.h"
 #include "mega_moe_impl.h"
 #include "mega_moe_utils.h"
+#include "mega_moe_job_context.h"
+#include "aiv_compute/mega_moe_quant_process.h"
+#include "aiv_compute/mega_moe_shared_expert_prepare.h"
+#include "aiv_compute/mega_moe_expert_token_count.h"
+#include "aiv_comm/mega_moe_send_mask.h"
+#include "aiv_comm/mega_moe_token_dispatch.h"
+#include "mega_moe_workspace_reset.h"
+#include "mega_moe_gmm1_swiglu.h"
+#include "mega_moe_shared_expert_gmm1_swiglu.h"
 #if __has_include("../../moe_distribute_dispatch_v2/quantize_functions.h")
 #include "../../moe_distribute_dispatch_v2/quantize_functions.h"
 #else
@@ -154,8 +163,8 @@ private:
                                             uint32_t metaInfoUbTokenOffset,
                                             const CombineBufferConfig &bufferConfig, uint32_t &rowSequence);
     __aicore__ inline void ProcessGmm1Wave(uint32_t batchBegin, uint32_t batchEnd,
-                                           ExpertLoopState &gmm1State, GMMAddrInfo &gmm1AddrInfo,
-                                           int32_t &vecSetSyncCom);
+                                           Gmm1ExpertLoopState &gmm1State, GMMAddrInfo &gmm1AddrInfo,
+                                           Gmm1SwigluState &runtimeState);
     __aicore__ inline void ProcessGmm2Wave(uint32_t batchBegin, uint32_t batchEnd,
                                            ExpertLoopState &gmm2State, GMMAddrInfo &gmm2AddrInfo,
                                            int32_t &vecSetSyncCom);
@@ -207,10 +216,19 @@ private:
     Params params_{};
     ExpertWeightTensorListAddrs moeWeightTensorListAddrs_{};
     ExpertWeightTensorListAddrs sharedWeightTensorListAddrs_{};
+    DispatchPrepareContext dispatchPrepareContext_;
+    SendMaskArgs sendMaskArgs_;
+    ResetWorkspaceArgs resetWorkspaceArgs_;
+    QuantProcessArgs quantProcessArgs_;
+    SharedExpertPrepareArgs sharedExpertPrepareArgs_;
+    TokenDispatchContext tokenDispatchContext_;
+    TokenDispatchArgs tokenDispatchArgs_;
+    Gmm1SwigluContext gmm1Context_;
+    Gmm1SwigluArgs gmm1Args_;
+    SharedExpertGmm1SwigluContext sharedGmm1Context_;
+    SharedExpertGmm1SwigluArgs sharedGmm1Args_;
 
-    GlobalTensor<int32_t> swigluToGmm2FlagGm_;
     GlobalTensor<int32_t> expertTokenNumsOut_;
-    GlobalTensor<int32_t> expertRevNumsGlobalTensor_;
 
     uint32_t m_ = 0;
     uint32_t k_ = 0;
@@ -237,25 +255,18 @@ private:
     uint32_t mxQuantScaleAlignBytes_ = 0;
     uint32_t mxQuantTokenScaleAlignBytes_ = 0;
     uint32_t weightAlignBytes_ = 0;
-    uint32_t ubBufferUsedAddr_ = 0;
     uint16_t gmm2PingPongIdx_ = 0;
     uint64_t sendTotalNum_ = 0;
     uint32_t maskAlignSize_ = 0;
     uint32_t maskSlotSize_ = 0;   // 单个 win 槽位 = maskAlignSize_(mask) + 32B(count)
     uint64_t maskWinOffset_ = 0;  // maskRecvPtr 相对 win 基址(rankSyncInWorldPtr)的偏移
     uint64_t quantWinOffset_ = 0; // quantTokenScalePtr 相对 win 基址的偏移
-    uint64_t cumsumRevCntInRank_ = 0;
     int32_t compareCount_ = 0;
     // 共享专家相关成员
     uint32_t sharedExpertNum_ = 0;
     uint32_t moeExpertPerRank_ = 0;
     bool isPerExpertWeightTensor_ = false;
     uint32_t gmm2NTilesPerGroup_ = 0;
-    int64_t revTokenElemCnt_ = 0;
-    int64_t revScaleElemCnt_ = 0;
-    // 6-buffer 软流水(占满 EVENT_ID0..EVENT_ID5)的 UB 基址；槽视图由 base + bufferIdx*mxQuantTokenScaleAlignBytes_
-    uint32_t copyTmpBaseAddr_ = 0;
-
     // 大 BS 路由分批、环形缓冲区和清零分批相关成员
     int32_t sendRouteItemsPerBatch_ = 0; // SendMaskCal 每个 batch 处理的 route item 数
     int32_t sendRouteBatchCount_ = 0;    // SendMaskCal 的 batch 总数
@@ -293,26 +304,9 @@ private:
         ((GMM2_READY_MAX_SCAN_BYTES + ALIGN_512 - 1U) / ALIGN_512) * ALIGN_512;
     static constexpr uint32_t GMM2_READY_SUM_UB_ADDR = GMM2_READY_REDUCE_TMP_UB_ADDR + ALIGN_512;
     static constexpr uint32_t COMBINE_META_INFO_TOKEN_CAPACITY = 1536U;
-    LocalTensor<int32_t> topkIndexTensor_;
-    LocalTensor<int32_t> sendCntTensor_;       // SendCntCal stride 只读 worldsize 个 count
-    LocalTensor<uint8_t> maskBatchTensor_;     // MetaInfoCalAndDispatch 当前 batch 的 mask 切片
-    LocalTensor<uint32_t> maskBatchU32Tensor_; // maskBatchTensor_ 的 u32 视图，供 GatherMask
-    LocalTensor<int32_t> expertTokenCntTensor_;
-    LocalTensor<int32_t> validTopkIndexTensor_;
-    LocalTensor<int32_t> cumsumInfoTensor_;
-    LocalTensor<int32_t> metaInfoTensor_;
     LocalTensor<int32_t> expertTokenNumsStridedTensor_;
     LocalTensor<int32_t> expertTokenNumsCompactTensor_;
-    LocalTensor<bfloat16_t> xInTensor1_;
-    LocalTensor<bfloat16_t> xInTensor2_;
-    LocalTensor<ActivationType> xOutTensor1_;
-    LocalTensor<ActivationType> xOutTensor2_;
-    LocalTensor<uint16_t> mxTempTensor_;
     LocalTensor<int32_t> resetTensor_;
-    LocalTensor<int32_t> topkIdsTensor_;
-    LocalTensor<uint8_t> sendMaskTensor_;      // SendMaskCal 源卡生成并推送 [mask|count] 的动态 ring buffer
-    LocalTensor<int32_t> sendGatherOutTensor_; // SendMaskCal GatherMask 计 count 的废弃输出 scratch
-    LocalTensor<int32_t> sendCntAccTensor_;    // SendMaskCal per-expert 跨 batch count 累加器
     LocalTensor<int32_t> combineMetaInfoTensor_;
     LocalTensor<bfloat16_t> combineRowBufferTensor_;
     LocalTensor<float> combineQuantTempTensor_;
@@ -322,6 +316,11 @@ private:
     LocalTensor<float> fp32ScaleTensor_;
     LocalTensor<bfloat16_t> bf16ScaleTensor_;
     LocalTensor<bfloat16_t> topKWeightsBf16Tensor_; // Unpermute bf16 weight 搬运中转
+    QuantProcessScratch<ActivationType> quantProcessScratch_;
+    SharedExpertPrepareScratch<ActivationType> sharedExpertPrepareScratch_;
+    SendMaskScratch sendMaskScratch_;
+    TokenDispatchScratch<ActivationType> tokenDispatchScratch_;
+    Gmm1SwigluScratch gmm1Scratch_;
 
     static constexpr uint32_t GMM1_TILE_M = MegaMoeImpl::L1_TILE_M_256;
     static constexpr uint32_t EPILOGUE_TILE_M =
@@ -386,7 +385,8 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::Init(
     params_.peermemInfo = PeermemInfo(winRankAddr_[rankId_], tilingData, 1U);
     params_.tilingData = tilingData;
     expertTokenNumsOut_.SetGlobalBuffer((__gm__ int32_t *)params_.expertTokenNumsOutGmAddr);
-    expertRevNumsGlobalTensor_.SetGlobalBuffer((__gm__ int32_t *)params_.workspaceInfo.expertRevTokenNumsPtr);
+    tokenDispatchScratch_.expertRevNumsGlobalTensor.SetGlobalBuffer(
+        reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.expertRevTokenNumsPtr));
     epilogueOp_.Init({params_.workspaceInfo.swigluQuantDataPtr, params_.workspaceInfo.swigluQuantScalePtr,
                       params_.workspaceInfo.flagSwiGluToGmm2Ptr, nullptr, nullptr, nullptr,
                       params_.workspaceInfo.metaInfoPtr, tilingData->clampLimit, tilingData->actMode,
@@ -414,6 +414,116 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::Init(
             Ops::Base::CeilAlign(static_cast<uint32_t>(topK_ * sizeof(float)), static_cast<uint32_t>(ALIGN_32));
         mxQuantTokenScaleAlignBytes_ += weightAlignBytes_;
     }
+
+    dispatchPrepareContext_ = {
+        {aivCoreIdx_, blockAivNum_}, {rankId_, worldSize_, moeExpertPerRank_}, {static_cast<int32_t>(m_), topK_, k_}};
+    const SendMaskBufferConfig &sendMaskBufferConfig =
+        aivCoreIdx_ < tilingData->sendMaskCoreCountWithExtraExpert ?
+            tilingData->sendMaskConfigForCoreWithExtraExpert :
+            tilingData->sendMaskConfigForCoreWithoutExtraExpert;
+    sendMaskArgs_ = {params_.expertIdxGmAddr, ::winRankAddr_, maskAlignSize_, maskSlotSize_, maskWinOffset_,
+                     sendMaskBufferConfig};
+    int32_t resetFlagNum =
+        static_cast<int32_t>(CalcMegaMoeFlagWorkspaceSize(params_.tilingData) / sizeof(int32_t));
+    int32_t sharedExpertGmm2TileCounterNum =
+        static_cast<int32_t>(Ops::Base::CeilDiv(m_, GMM1_TILE_M) * sharedExpertNum_ *
+                             static_cast<uint64_t>(INT_CACHELINE));
+    resetWorkspaceArgs_ = {params_.workspaceInfo.flagSwiGluToGmm2Ptr,
+                           params_.workspaceInfo.gmm2CombineSyncCounterPtr,
+                           params_.workspaceInfo.sharedExpertGmm2TileCounterPtr,
+                           params_.workspaceInfo.gmm1TileStatusPtr,
+                           resetFlagNum,
+                           0,
+                           sharedExpertGmm2TileCounterNum,
+                           static_cast<int32_t>(moeExpertPerRank_),
+                           static_cast<int32_t>(tilingData->maxTilesPerExpert),
+                           0};
+    quantProcessArgs_ = {params_.aGmAddr,
+                         params_.probsGmAddr,
+                         params_.peermemInfo.quantTokenScalePtr,
+                         mxQuantTokenAlignBytes_,
+                         mxQuantScaleAlignBytes_,
+                         mxQuantTokenScaleAlignBytes_,
+                         mxQuantScaleNumAlignPerToken_,
+                         topK_};
+    sharedExpertPrepareArgs_ = {params_.peermemInfo.quantTokenScalePtr,
+                                params_.workspaceInfo.sharedExpertInputDataPtr,
+                                params_.workspaceInfo.sharedExpertInputScalePtr,
+                                mxQuantTokenAlignBytes_,
+                                mxQuantScaleAlignBytes_,
+                                mxQuantTokenScaleAlignBytes_,
+                                1U};
+    tokenDispatchContext_ = {{blockIdx_, blockNum_},
+                             {blockIdx_, aicNum_},
+                             worldSize_,
+                             moeExpertPerRank_,
+                             k_,
+                             topK_,
+                             blockNumPerRank_,
+                             maxOutputSize_,
+                             sendTotalNum_,
+                             tilingData->dispatchBufferConfig,
+                             maskAlignSize_,
+                             maskSlotSize_,
+                             quantWinOffset_,
+                             mxQuantTokenAlignBytes_,
+                             mxQuantScaleAlignBytes_,
+                             mxQuantTokenScaleAlignBytes_,
+                             dispatchFlagSlotsPerExpert_,
+                             1U};
+    tokenDispatchArgs_ = {::winRankAddr_,
+                          params_.peermemInfo.maskRecvPtr,
+                          params_.workspaceInfo.expertRevTokenNumsPtr,
+                          params_.workspaceInfo.metaInfoPtr,
+                          params_.workspaceInfo.cumsumInfoPtr,
+                          params_.workspaceInfo.dispatchRevDataPtr,
+                          params_.workspaceInfo.dispatchRevScalePtr,
+                          params_.workspaceInfo.flagDispatchToGmm1Ptr,
+                          params_.workspaceInfo.flagSendCntCalToUpdParamsPtr};
+    gmm1Context_ = {{blockIdx_, blockNum_},
+                    {blockIdx_, aicNum_},
+                    moeExpertPerRank_,
+                    moeExpertPerRank_,
+                    k_,
+                    static_cast<uint32_t>(hiddenDim_),
+                    dispatchFlagSlotsPerExpert_,
+                    swigluFlagSlotsPerExpert_,
+                    tilingData->maxTilesPerExpert,
+                    tilingData->groupedMatmulMode,
+                    1U,
+                    isPerExpertWeightTensor_};
+    gmm1Args_ = {params_.workspaceInfo.expertRevTokenNumsPtr,
+                 params_.workspaceInfo.dispatchRevDataPtr,
+                 params_.workspaceInfo.dispatchRevScalePtr,
+                 params_.workspaceInfo.gmm1MmadResPtr,
+                 moeWeightTensorListAddrs_.weight1,
+                 moeWeightTensorListAddrs_.weightScales1,
+                 params_.workspaceInfo.flagDispatchToGmm1Ptr,
+                 params_.workspaceInfo.flagSendCntCalToUpdParamsPtr,
+                 params_.workspaceInfo.gmm1TileStatusPtr,
+                 nullptr};
+    sharedGmm1Context_ = {{blockIdx_, blockNum_},
+                          sharedExpertNum_,
+                          m_,
+                          k_,
+                          static_cast<uint32_t>(hiddenDim_),
+                          tilingData->groupedMatmulMode,
+                          isPerExpertWeightTensor_};
+    sharedGmm1Args_ = {params_.workspaceInfo.sharedExpertInputDataPtr,
+                       params_.workspaceInfo.sharedExpertInputScalePtr,
+                       params_.workspaceInfo.sharedExpertGmm1OutPtr,
+                       sharedWeightTensorListAddrs_.weight1,
+                       sharedWeightTensorListAddrs_.weightScales1,
+                       params_.workspaceInfo.sharedExpertSwigluDataPtr,
+                       params_.workspaceInfo.sharedExpertSwigluScalePtr,
+                       nullptr,
+                       tilingData->clampLimit,
+                       tilingData->actMode,
+                       tilingData->actSubMode,
+                       tilingData->activationAlpha,
+                       tilingData->activationBeta};
+    gmm1Scratch_.expertRevNumsGlobalTensor.SetGlobalBuffer(
+        reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.expertRevTokenNumsPtr));
 }
 
 // =================================================================================================
@@ -429,9 +539,10 @@ MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::DispatchBuffInit()
         return bufferConfig;
     }
 
-    revTokenElemCnt_ = k_; // A8W8 输出 token 的元素数
-    revScaleElemCnt_ = Ops::Base::CeilDiv(static_cast<int64_t>(k_), static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
-                       MXFP_MULTI_BASE_SIZE; // 输出 token-scale 元素数，紧密排列
+    tokenDispatchScratch_.revTokenElemCnt = k_; // A8W8 输出 token 的元素数
+    tokenDispatchScratch_.revScaleElemCnt =
+        Ops::Base::CeilDiv(static_cast<int64_t>(k_), static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
+        MXFP_MULTI_BASE_SIZE; // 输出 token-scale 元素数，紧密排列
 
     // 与 route batch 无关的固定占用
     uint32_t expertTokenCntTensorSize = ALIGN_32;
@@ -448,37 +559,40 @@ MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::DispatchBuffInit()
     // Tensor 用途：在 SendCntCal 中记录本卡各专家收到的 token 总数；
     // Tensor 大小：仅记录 count 值且各专家之间复用，申请 32 字节；
     uint32_t expertTokenCntTensorAddr = 0;
-    expertTokenCntTensor_ =
+    tokenDispatchScratch_.expertTokenCntTensor =
         LocalTensor<int32_t>(TPosition::VECCALC, expertTokenCntTensorAddr, expertTokenCntTensorSize / sizeof(int32_t));
     // Tensor 用途：在 SendCntCal 中记录本卡专家收到 token count 的前缀和；
     // Tensor 大小：worldSize_ * moeExpertPerRank_ * sizeof(int32_t)，向上对齐至 32 字节；
     uint32_t cumsumInfoTensorAddr = expertTokenCntTensorAddr + expertTokenCntTensorSize;
-    cumsumInfoTensor_ =
+    tokenDispatchScratch_.cumsumInfoTensor =
         LocalTensor<int32_t>(TPosition::VECCALC, cumsumInfoTensorAddr, cumsumInfoTensorSize / sizeof(int32_t));
     // Tensor 用途：SendCntCal 按 stride 跳过 mask 区读取 count 时，暂存各源 rank 的 count；
     // Tensor 大小：每个源 rank 占一个 32B burst，共 worldSize_ * 32B；
     uint32_t sendCntTensorAddr = cumsumInfoTensorAddr + cumsumInfoTensorSize;
-    sendCntTensor_ = LocalTensor<int32_t>(TPosition::VECCALC, sendCntTensorAddr, sendCntTensorSize / sizeof(int32_t));
+    tokenDispatchScratch_.sendCntTensor =
+        LocalTensor<int32_t>(TPosition::VECCALC, sendCntTensorAddr, sendCntTensorSize / sizeof(int32_t));
     // Tensor 用途：在 MetaInfoCalAndDispatch 中接收当前 batch 的 mask 切片；
     // Tensor 大小：recvRouteItemsPerBatch_ / 8 字节，每个 bit 对应一个路由项；
     uint32_t maskBatchAddr = sendCntTensorAddr + sendCntTensorSize;
     uint32_t maskBatchSize =
         static_cast<uint32_t>(recvRouteItemsPerBatch_ / 8) * static_cast<uint32_t>(sizeof(uint8_t));
-    maskBatchTensor_ = LocalTensor<uint8_t>(TPosition::VECCALC, maskBatchAddr, maskBatchSize / sizeof(uint8_t));
-    maskBatchU32Tensor_ = LocalTensor<uint32_t>(TPosition::VECCALC, maskBatchAddr, maskBatchSize / sizeof(uint32_t));
+    tokenDispatchScratch_.maskBatchTensor =
+        LocalTensor<uint8_t>(TPosition::VECCALC, maskBatchAddr, maskBatchSize / sizeof(uint8_t));
+    tokenDispatchScratch_.maskBatchU32Tensor =
+        LocalTensor<uint32_t>(TPosition::VECCALC, maskBatchAddr, maskBatchSize / sizeof(uint32_t));
     // Tensor 用途：MetaInfoCalAndDispatch 中 GatherMask 的目标 Tensor；
     // Tensor 大小：recvRouteItemsPerBatch_ * sizeof(int32_t)，向上对齐至 32 字节；
     uint32_t validTopkIndexTensorAddr = maskBatchAddr + maskBatchSize;
     uint32_t validTopkIndexTensorSize = Ops::Base::CeilAlign(
         static_cast<int64_t>(recvRouteItemsPerBatch_ * sizeof(int32_t)), static_cast<int64_t>(ALIGN_32));
-    validTopkIndexTensor_ =
+    tokenDispatchScratch_.validTopkIndexTensor =
         LocalTensor<int32_t>(TPosition::VECCALC, validTopkIndexTensorAddr, validTopkIndexTensorSize / sizeof(int32_t));
     // Tensor 用途：MetaInfoCalAndDispatch 中 GatherMask 的源 Tensor，保存本 batch 的全局索引；
     // Tensor 大小：与 validTopkIndexTensor_ 一致，为 recvRouteItemsPerBatch_ * sizeof(int32_t)，
     // 向上对齐至 32 字节；
     uint32_t topkIndexTensorAddr = validTopkIndexTensorAddr + validTopkIndexTensorSize;
     uint32_t topkIndexTensorSize = validTopkIndexTensorSize;
-    topkIndexTensor_ =
+    tokenDispatchScratch_.topkIndexTensor =
         LocalTensor<int32_t>(TPosition::VECCALC, topkIndexTensorAddr, topkIndexTensorSize / sizeof(int32_t));
     // 路由批次 Tensor 后依次放置 copyTmp 环形缓冲区和 32B metaInfo 环形缓冲区。
     // Tensor 用途：MetaInfoCalAndDispatch 中的动态 dispatch 环形缓冲区，配合
@@ -488,16 +602,16 @@ MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::DispatchBuffInit()
     // 每块 mxQuantTokenScaleAlignBytes_；
     // 该值即 Init() 算好的 Align256(token) + Align32(scale) + optional Align32(weight)，与 host
     // CalcDispatchBufferConfig 的 copyBufferBytes 恒相等，故连续 ring 中每个槽位均保持 32B 对齐。
-    copyTmpBaseAddr_ = topkIndexTensorAddr + topkIndexTensorSize;
+    tokenDispatchScratch_.copyTmpBaseAddr = topkIndexTensorAddr + topkIndexTensorSize;
     uint32_t copyTmpTotalSize = static_cast<uint32_t>(bufferConfig.bufferCount) * mxQuantTokenScaleAlignBytes_;
     // Tensor 用途：CopyGMToGMPerToken 中的 metaInfo 环形缓冲区，逐 token 即时写入 GM；
     // Tensor 大小：bufferCount * 32B，与 copyTmp 槽位和事件编号一一对应。
-    uint32_t metaInfoTensorAddr = copyTmpBaseAddr_ + copyTmpTotalSize;
+    uint32_t metaInfoTensorAddr = tokenDispatchScratch_.copyTmpBaseAddr + copyTmpTotalSize;
     uint32_t metaInfoReserveSize =
         static_cast<uint32_t>(bufferConfig.bufferCount) * static_cast<uint32_t>(INT32_PER_256B) * sizeof(int32_t);
-    metaInfoTensor_ =
+    tokenDispatchScratch_.metaInfoTensor =
         LocalTensor<int32_t>(TPosition::VECCALC, metaInfoTensorAddr, metaInfoReserveSize / sizeof(int32_t));
-    ubBufferUsedAddr_ = metaInfoTensorAddr + metaInfoReserveSize;
+    tokenDispatchScratch_.cumsumRevCntInRank = 0U;
     return bufferConfig;
 }
 
@@ -590,38 +704,46 @@ MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::SendAndQuantBuffInit()
     uint32_t topkIdsTensorAddr = 0;
     uint32_t topkIdsTensorSize =
         static_cast<uint32_t>(sendRouteItemsPerBatch_) * static_cast<uint32_t>(sizeof(int32_t));
-    topkIdsTensor_ = LocalTensor<int32_t>(TPosition::VECCALC, topkIdsTensorAddr, topkIdsTensorSize / sizeof(int32_t));
+    sendMaskScratch_.topkIdsTensor =
+        LocalTensor<int32_t>(TPosition::VECCALC, topkIdsTensorAddr, topkIdsTensorSize / sizeof(int32_t));
 
     uint32_t resetAddrActual = topkIdsTensorAddr + topkIdsTensorSize;
     resetTensor_ = LocalTensor<int32_t>(TPosition::VECCALC, resetAddrActual, resetTensorSize / sizeof(int32_t));
     Duplicate<int32_t>(resetTensor_, 0, (resetTensorSize / sizeof(int32_t)));
 
     uint32_t mxTempTensorAddr = resetAddrActual + resetTensorSize;
-    mxTempTensor_ = LocalTensor<uint16_t>(TPosition::VECCALC, mxTempTensorAddr, mxTempTensorSize / sizeof(uint16_t));
+    quantProcessScratch_.mxTempTensor =
+        LocalTensor<uint16_t>(TPosition::VECCALC, mxTempTensorAddr, mxTempTensorSize / sizeof(uint16_t));
 
     uint32_t xOutTensorAddr1 = mxTempTensorAddr + mxTempTensorSize;
-    xOutTensor1_ =
+    quantProcessScratch_.xOutTensor0 =
         LocalTensor<ActivationType>(TPosition::VECCALC, xOutTensorAddr1, xOutTensorSize / sizeof(ActivationType));
     uint32_t xOutTensorAddr2 = xOutTensorAddr1 + xOutTensorSize;
-    xOutTensor2_ =
+    quantProcessScratch_.xOutTensor1 =
         LocalTensor<ActivationType>(TPosition::VECCALC, xOutTensorAddr2, xOutTensorSize / sizeof(ActivationType));
 
     uint32_t xInAlignAddr1 = xOutTensorAddr2 + xOutTensorSize;
-    xInTensor1_ = LocalTensor<bfloat16_t>(TPosition::VECCALC, xInAlignAddr1, xInAlignSize / sizeof(bfloat16_t));
+    quantProcessScratch_.xInTensor0 =
+        LocalTensor<bfloat16_t>(TPosition::VECCALC, xInAlignAddr1, xInAlignSize / sizeof(bfloat16_t));
     uint32_t xInAlignAddr2 = xInAlignAddr1 + xInAlignSize;
-    xInTensor2_ = LocalTensor<bfloat16_t>(TPosition::VECCALC, xInAlignAddr2, xInAlignSize / sizeof(bfloat16_t));
+    quantProcessScratch_.xInTensor1 =
+        LocalTensor<bfloat16_t>(TPosition::VECCALC, xInAlignAddr2, xInAlignSize / sizeof(bfloat16_t));
 
     uint32_t sendMaskAddr = xInAlignAddr2 + xInAlignSize;
     uint32_t sendGatherOutSize =
         static_cast<uint32_t>(sendRouteItemsPerBatch_) * static_cast<uint32_t>(sizeof(int32_t));
 
     uint32_t sendMaskTotalBytes = static_cast<uint32_t>(bufferConfig.bufferCount) * bufferConfig.bufferBytes;
-    sendMaskTensor_ = LocalTensor<uint8_t>(TPosition::VECCALC, sendMaskAddr, sendMaskTotalBytes);
+    sendMaskScratch_.sendMaskTensor = LocalTensor<uint8_t>(TPosition::VECCALC, sendMaskAddr, sendMaskTotalBytes);
     uint32_t sendGatherOutAddr = sendMaskAddr + sendMaskTotalBytes;
-    sendGatherOutTensor_ =
+    sendMaskScratch_.sendGatherOutTensor =
         LocalTensor<int32_t>(TPosition::VECCALC, sendGatherOutAddr, sendGatherOutSize / sizeof(int32_t));
     uint32_t sendCntAccAddr = sendGatherOutAddr + sendGatherOutSize;
-    sendCntAccTensor_ = LocalTensor<int32_t>(TPosition::VECCALC, sendCntAccAddr, sendCntAccSize / sizeof(int32_t));
+    sendMaskScratch_.sendCntAccTensor =
+        LocalTensor<int32_t>(TPosition::VECCALC, sendCntAccAddr, sendCntAccSize / sizeof(int32_t));
+    sharedExpertPrepareScratch_.copyBuffer0 = quantProcessScratch_.xOutTensor0;
+    sharedExpertPrepareScratch_.copyBuffer1 = quantProcessScratch_.xOutTensor1;
+    resetWorkspaceArgs_.resetBatchElementCount = resetBatchElementCount_;
     return bufferConfig;
 }
 
@@ -635,7 +757,8 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ResetFlagList()
     if constexpr (g_coreType == AIC) {
         return;
     }
-    swigluToGmm2FlagGm_.SetGlobalBuffer((__gm__ int32_t *)params_.workspaceInfo.flagSwiGluToGmm2Ptr);
+    GlobalTensor<int32_t> swigluToGmm2FlagGm;
+    swigluToGmm2FlagGm.SetGlobalBuffer((__gm__ int32_t *)params_.workspaceInfo.flagSwiGluToGmm2Ptr);
     int32_t flagNum =
         static_cast<int32_t>(CalcMegaMoeFlagWorkspaceSize(params_.tilingData) / sizeof(int32_t));
     int32_t coreLen, coreOffset;
@@ -648,7 +771,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ResetFlagList()
                                                resetBatchElementCount_;
         DataCopyExtParams rankSyncCopyParams{1U, static_cast<uint32_t>(currentBatchElementCount * sizeof(int32_t)), 0U,
                                              0U, 0U};
-        DataCopyPad(swigluToGmm2FlagGm_[coreOffset + resetElementOffset], resetTensor_, rankSyncCopyParams);
+        DataCopyPad(swigluToGmm2FlagGm[coreOffset + resetElementOffset], resetTensor_, rankSyncCopyParams);
     }
     // 预取路径：清理 GMM1 tile 状态位区（含 allDone slot），避免上一轮残留导致软同步误判。
     if constexpr (TopkWeightsPrefetch) {
@@ -711,7 +834,8 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ExpertTokenNumC
         static_cast<uint16_t>(moeExpertPerRank_), static_cast<uint32_t>(sizeof(int32_t)),
         expertCountStrideBytes - static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U};
     DataCopyPadExtParams<int32_t> loadPadParams{true, 0U, 0U, 0U};
-    DataCopyPad(expertTokenNumsStridedTensor_, expertRevNumsGlobalTensor_, loadParams, loadPadParams);
+    DataCopyPad(expertTokenNumsStridedTensor_, tokenDispatchScratch_.expertRevNumsGlobalTensor, loadParams,
+                loadPadParams);
     SyncFuncStatic<AscendC::HardEvent::MTE2_S, SYNC_EVENT_ID2>();
 
     for (uint32_t expertIdx = 0U; expertIdx < moeExpertPerRank_; ++expertIdx) {
@@ -769,7 +893,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::SendMaskCal(con
     DataCopyPadExtParams<int32_t> loadPad{false, 0U, 0U, 0};
 
     // 清零逐专家的跨 batch 累加器。
-    Duplicate<int32_t>(sendCntAccTensor_, 0, ownedExpertNum);
+    Duplicate<int32_t>(sendMaskScratch_.sendCntAccTensor, 0, ownedExpertNum);
     SyncFuncStatic<AscendC::HardEvent::V_S, SYNC_EVENT_ID2>();
 
     // mask 推送环形缓冲区初始化：先将实际分配的全部槽位交给 Vector。
@@ -797,7 +921,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::SendMaskCal(con
         // 加载本 batch 的 topk
         SyncFuncStatic<AscendC::HardEvent::V_MTE2, SYNC_EVENT_ID1>();
         DataCopyExtParams loadParams{1U, static_cast<uint32_t>(validLen * sizeof(int32_t)), 0U, 0U, 0U};
-        DataCopyPad(topkIdsTensor_, srcGlobalTensor[batchStart], loadParams, loadPad);
+        DataCopyPad(sendMaskScratch_.topkIdsTensor, srcGlobalTensor[batchStart], loadParams, loadPad);
         SyncFuncStatic<AscendC::HardEvent::MTE2_V, SYNC_EVENT_ID1>();
 
         // 内层：逐专家循环。
@@ -808,21 +932,23 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::SendMaskCal(con
 
             int32_t bufferIdx = iter % bufferConfig.bufferCount;
             TEventID bufEvent = static_cast<TEventID>(bufferIdx);
-            LocalTensor<uint8_t> maskBuf = sendMaskTensor_[bufferIdx * bufferConfig.bufferBytes];
+            LocalTensor<uint8_t> maskBuf =
+                sendMaskScratch_.sendMaskTensor[bufferIdx * bufferConfig.bufferBytes];
             LocalTensor<uint32_t> maskBufU32 = maskBuf.template ReinterpretCast<uint32_t>();
 
             WaitFlag<AscendC::HardEvent::MTE3_V>(bufEvent);
             // DAV_3510 要求 CompareScalar 的 count * sizeof(int32_t) 按 256B 对齐，因此这里传入对齐后的
             // 批次长度，而不是 validLen。后续两处 GatherMask 均受 validLen 限制，会忽略补齐区域产生的 mask 位。
-            CompareScalar(maskBuf, topkIdsTensor_, globalExpertId, AscendC::CMPMODE::EQ, sendRouteItemsPerBatch_);
+            CompareScalar(maskBuf, sendMaskScratch_.topkIdsTensor, globalExpertId, AscendC::CMPMODE::EQ,
+                          sendRouteItemsPerBatch_);
             uint64_t batchMatchedRouteCount = 0;
-            GatherMask(sendGatherOutTensor_, topkIdsTensor_, maskBufU32, true, static_cast<uint32_t>(validLen),
-                       {1, 1, 0, 0}, batchMatchedRouteCount);
+            GatherMask(sendMaskScratch_.sendGatherOutTensor, sendMaskScratch_.topkIdsTensor, maskBufU32, true,
+                       static_cast<uint32_t>(validLen), {1, 1, 0, 0}, batchMatchedRouteCount);
 
             SyncFuncStatic<AscendC::HardEvent::V_S, SYNC_EVENT_ID2>();
             int32_t expertMatchedRouteCount =
-                sendCntAccTensor_.GetValue(ownedIdx) + static_cast<int32_t>(batchMatchedRouteCount);
-            sendCntAccTensor_.SetValue(ownedIdx, expertMatchedRouteCount);
+                sendMaskScratch_.sendCntAccTensor.GetValue(ownedIdx) + static_cast<int32_t>(batchMatchedRouteCount);
+            sendMaskScratch_.sendCntAccTensor.SetValue(ownedIdx, expertMatchedRouteCount);
             if (isLastBatch) {
                 maskBuf.template ReinterpretCast<int32_t>().SetValue(sliceBytes / sizeof(int32_t),
                                                                      expertMatchedRouteCount);
@@ -859,7 +985,8 @@ MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::LoadTopkWeightsToUb(const LocalTensor<
         weightGm.SetGlobalBuffer(
             (__gm__ TopkWeightsType *)(params_.probsGmAddr + (curentOffset + index) * topK_ * sizeof(TopkWeightsType)));
         if constexpr (Std::IsSame<TopkWeightsType, bfloat16_t>::value) {
-            LocalTensor<TopkWeightsType> weightBf16Tmp = mxTempTensor_.ReinterpretCast<TopkWeightsType>();
+            LocalTensor<TopkWeightsType> weightBf16Tmp =
+                quantProcessScratch_.mxTempTensor.template ReinterpretCast<TopkWeightsType>();
             DataCopyPad(weightBf16Tmp, weightGm,
                         {1U, static_cast<uint32_t>(topK_ * sizeof(TopkWeightsType)), 0U, 0U, 0U}, {false, 0U, 0U, 0U});
             SetFlag<AscendC::HardEvent::MTE2_V>(event);
@@ -907,8 +1034,10 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::QuantProcessInR
             (__gm__ bfloat16_t *)(params_.aGmAddr + static_cast<uint64_t>(currentOffset + index) *
                                                         static_cast<uint64_t>(H) * sizeof(bfloat16_t)));
         auto event = (index % DOUBLE_BUFFER == 0) ? EVENT_ID0 : EVENT_ID1;
-        auto xInTensor = (index % DOUBLE_BUFFER == 0) ? xInTensor1_ : xInTensor2_;
-        auto xOutTensor = (index % DOUBLE_BUFFER == 0) ? xOutTensor1_ : xOutTensor2_;
+        auto xInTensor = (index % DOUBLE_BUFFER == 0) ? quantProcessScratch_.xInTensor0 :
+                                                        quantProcessScratch_.xInTensor1;
+        auto xOutTensor = (index % DOUBLE_BUFFER == 0) ? quantProcessScratch_.xOutTensor0 :
+                                                         quantProcessScratch_.xOutTensor1;
         GlobalTensor<uint8_t> dstGlobalTensor;
         dstGlobalTensor.SetGlobalBuffer((__gm__ uint8_t *)(params_.peermemInfo.quantTokenScalePtr +
                                                            static_cast<uint64_t>(currentOffset + index) *
@@ -917,10 +1046,11 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::QuantProcessInR
         DataCopyPad(xInTensor, srcGlobalTensor, xCopyInParams, xCopyInPadParams);
         LoadTopkWeightsToUb(xOutTensor, currentOffset, index, event);
         __ubuf__ bfloat16_t *srcAddr = (__ubuf__ bfloat16_t *)xInTensor.GetPhyAddr();
-        __ubuf__ uint16_t *maxExpAddr = (__ubuf__ uint16_t *)mxTempTensor_.GetPhyAddr();
+        __ubuf__ uint16_t *maxExpAddr = (__ubuf__ uint16_t *)quantProcessScratch_.mxTempTensor.GetPhyAddr();
         __ubuf__ uint16_t *halfScaleAddr =
             (__ubuf__ uint16_t *)
-                mxTempTensor_[Ops::Base::CeilAlign(mxQuantScaleNumAlignPerToken_, static_cast<uint32_t>(ALIGN_32))]
+                quantProcessScratch_
+                    .mxTempTensor[Ops::Base::CeilAlign(mxQuantScaleNumAlignPerToken_, static_cast<uint32_t>(ALIGN_32))]
                     .GetPhyAddr();
         __ubuf__ int8_t *outDataAddr = (__ubuf__ int8_t *)xOutTensor.GetPhyAddr();
         __ubuf__ uint16_t *mxScaleAddr = (__ubuf__ uint16_t *)xOutTensor[mxQuantTokenAlignBytes_].GetPhyAddr();
@@ -960,7 +1090,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::SendCntCal(int3
     DataCopyExtParams cntCopyParams{static_cast<uint16_t>(worldSize_), static_cast<uint32_t>(sizeof(int32_t)),
                                     static_cast<uint32_t>(maskSlotSize_ - sizeof(int32_t)), 0U, 0U};
     DataCopyPadExtParams<int32_t> cntPad{true, 0U, 0U, 0U};
-    DataCopyPad(sendCntTensor_, cntSrcGlobal, cntCopyParams, cntPad);
+    DataCopyPad(tokenDispatchScratch_.sendCntTensor, cntSrcGlobal, cntCopyParams, cntPad);
 
     SyncFuncStatic<AscendC::HardEvent::MTE2_S, SYNC_EVENT_ID2>(); // count 读取(标量)就绪
     if constexpr (TopkWeightsPrefetch) {
@@ -972,17 +1102,20 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::SendCntCal(int3
     // 阶段 2：逐 rank 读取 count 并计算前缀和（4B count 按 32B burst 落位，下标为 rank * 8）。
     constexpr int32_t CNT_STRIDE_I32 = ALIGN_32 / sizeof(int32_t);
     for (int32_t calRankId = 0; calRankId < static_cast<int32_t>(worldSize_); ++calRankId) {
-        int32_t perRankCnt = sendCntTensor_.GetValue(calRankId * CNT_STRIDE_I32);
+        int32_t perRankCnt = tokenDispatchScratch_.sendCntTensor.GetValue(calRankId * CNT_STRIDE_I32);
         sendCnt += static_cast<uint64_t>(perRankCnt);
-        cumsumRevCntInRank_ += static_cast<uint64_t>(perRankCnt);
-        cumsumInfoTensor_.SetValue(localExpertId * worldSize_ + calRankId, static_cast<int32_t>(cumsumRevCntInRank_));
+        tokenDispatchScratch_.cumsumRevCntInRank += static_cast<uint64_t>(perRankCnt);
+        tokenDispatchScratch_.cumsumInfoTensor.SetValue(
+            localExpertId * worldSize_ + calRankId, static_cast<int32_t>(tokenDispatchScratch_.cumsumRevCntInRank));
     }
 
     // 阶段 3：写入 GM 并通知 AIC。
-    expertTokenCntTensor_.SetValue(0, sendCnt);
+    tokenDispatchScratch_.expertTokenCntTensor.SetValue(0, sendCnt);
     SyncFuncStatic<AscendC::HardEvent::S_MTE3, SYNC_EVENT_ID2>();
-    DataCopy<int32_t>(expertRevNumsGlobalTensor_[localExpertId * INT32_PER_256B * aicNum_ + INT32_PER_256B * blockIdx_],
-                      expertTokenCntTensor_, INT32_PER_256B);
+    DataCopy<int32_t>(
+        tokenDispatchScratch_
+            .expertRevNumsGlobalTensor[localExpertId * INT32_PER_256B * aicNum_ + INT32_PER_256B * blockIdx_],
+        tokenDispatchScratch_.expertTokenCntTensor, INT32_PER_256B);
     PipeBarrier<PIPE_ALL>();
 
     __gm__ int32_t *sendCntFlag = (__gm__ int32_t *)params_.workspaceInfo.flagSendCntCalToUpdParamsPtr +
@@ -994,18 +1127,19 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::SendCntCal(int3
 // AIV1 专职执行 dispatch。将状态推进集中在此函数中，保证滚动调度器对每个专家只推进一次 dispatch 游标。
 template <TemplateMegaMoeWaveTypeClass>
 __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::DispatchExpert(
-    ExpertLoopState &state, GMMAddrInfo &gmmAddrInfo, uint32_t expertIdx,
-    const DispatchBufferConfig &bufferConfig)
+    ExpertLoopState &state, GMMAddrInfo &gmmAddrInfo, uint32_t expertIdx, const DispatchBufferConfig &)
 {
     if constexpr (g_coreType == AIV) {
         if (subBlockIdx_ != 1) {
             return;
         }
         uint64_t sendCnt = 0;
-        SendCntCal(static_cast<int32_t>(expertIdx), sendCnt);
+        ComputeExpertTokenCountAndNotify<ActivationType, false, TopkWeightsPrefetch>(
+            tokenDispatchContext_, tokenDispatchArgs_, tokenDispatchScratch_, expertIdx, sendCnt);
         if (UpdateGroupParams<AddrUpdateMode::GMM1>(state, expertIdx, sendCnt)) {
             UpdateGlobalBuffer<AddrUpdateMode::GMM1>(gmmAddrInfo, state, expertIdx);
-            MetaInfoCalAndDispatch(gmmAddrInfo, static_cast<int32_t>(expertIdx), bufferConfig);
+            DispatchExpertTokens<ActivationType, QuantScaleOutType, false, GMM1_TILE_M, TopkWeightsPrefetch>(
+                tokenDispatchContext_, tokenDispatchArgs_, tokenDispatchScratch_, expertIdx);
         }
     }
 }
@@ -1036,7 +1170,9 @@ __aicore__ inline auto
 MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::DispatchCopyTmpTensor(int32_t bufferIdx) -> LocalTensor<ActivationType>
 {
     return LocalTensor<ActivationType>(
-        TPosition::VECCALC, copyTmpBaseAddr_ + static_cast<uint32_t>(bufferIdx) * mxQuantTokenScaleAlignBytes_,
+        TPosition::VECCALC,
+        tokenDispatchScratch_.copyTmpBaseAddr +
+            static_cast<uint32_t>(bufferIdx) * mxQuantTokenScaleAlignBytes_,
         mxQuantTokenScaleAlignBytes_ / sizeof(ActivationType));
 }
 
@@ -1068,9 +1204,9 @@ MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::FetchTokenNLoadMetaInfo(
     if constexpr (IsBufferReuse) {
         WaitFlag<AscendC::HardEvent::MTE3_S>(eventId); // 等该 metaInfo 槽被 MTE3 读走，方可覆盖
     }
-    metaInfoTensor_[bufferIdx * INT32_PER_256B].SetValue(RANK_ID, remoteRankIdx);
-    metaInfoTensor_[bufferIdx * INT32_PER_256B].SetValue(TOKEN_ID, tokenIndex);
-    metaInfoTensor_[bufferIdx * INT32_PER_256B].SetValue(TOPK_INDEX, topkIndex % topK_);
+    tokenDispatchScratch_.metaInfoTensor[bufferIdx * INT32_PER_256B].SetValue(RANK_ID, remoteRankIdx);
+    tokenDispatchScratch_.metaInfoTensor[bufferIdx * INT32_PER_256B].SetValue(TOKEN_ID, tokenIndex);
+    tokenDispatchScratch_.metaInfoTensor[bufferIdx * INT32_PER_256B].SetValue(TOPK_INDEX, topkIndex % topK_);
     if constexpr (TopkWeightsPrefetch) {
         SetFlag<AscendC::HardEvent::MTE2_S>(eventId);
     } else {
@@ -1100,19 +1236,21 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::DispatchCopyMte
         WaitFlag<AscendC::HardEvent::MTE2_S>(eventId);
         uint32_t weightOffsetInUb = mxQuantTokenAlignBytes_ + mxQuantScaleAlignBytes_;
         LocalTensor<int32_t> bufWeightsInt32 = tokenScalebuf[weightOffsetInUb].template ReinterpretCast<int32_t>();
-        int32_t topkIndex = validTopkIndexTensor_.GetValue(copyStartIdx + copyIdx);
+        int32_t topkIndex = tokenDispatchScratch_.validTopkIndexTensor.GetValue(copyStartIdx + copyIdx);
         int32_t weightBits = bufWeightsInt32.GetValue(static_cast<uint32_t>(topkIndex % topK_));
-        metaInfoTensor_[bufferIdx * INT32_PER_256B].SetValue(WEIGHT_INDEX, weightBits);
+        tokenDispatchScratch_.metaInfoTensor[bufferIdx * INT32_PER_256B].SetValue(WEIGHT_INDEX, weightBits);
         SetFlag<AscendC::HardEvent::S_MTE3>(eventId);
     }
 
-    DataCopyPad(tokenRevGlobalTensor[dstIdx * revTokenElemCnt_], tokenScalebuf,
-                {1, static_cast<uint16_t>(revTokenElemCnt_ * sizeof(ActivationType)), 0U, 0U, 0U});
-    DataCopyPad(scaleRevGlobalTensor[dstIdx * revScaleElemCnt_], bufScale,
-                {1, static_cast<uint16_t>(revScaleElemCnt_ * sizeof(QuantScaleOutType)), 0U, 0U, 0U});
+    DataCopyPad(tokenRevGlobalTensor[dstIdx * tokenDispatchScratch_.revTokenElemCnt], tokenScalebuf,
+                {1, static_cast<uint16_t>(tokenDispatchScratch_.revTokenElemCnt * sizeof(ActivationType)), 0U, 0U,
+                 0U});
+    DataCopyPad(scaleRevGlobalTensor[dstIdx * tokenDispatchScratch_.revScaleElemCnt], bufScale,
+                {1, static_cast<uint16_t>(tokenDispatchScratch_.revScaleElemCnt * sizeof(QuantScaleOutType)), 0U,
+                 0U, 0U});
     WaitFlag<AscendC::HardEvent::S_MTE3>(eventId); // S 侧 metaInfo 组装完成后方可搬
-    DataCopy(metaInfoGlobalTensor[dstIdx * INT32_PER_256B], metaInfoTensor_[bufferIdx * INT32_PER_256B],
-             INT32_PER_256B);
+    DataCopy(metaInfoGlobalTensor[dstIdx * INT32_PER_256B],
+             tokenDispatchScratch_.metaInfoTensor[bufferIdx * INT32_PER_256B], INT32_PER_256B);
     SetFlag<AscendC::HardEvent::MTE3_MTE2>(eventId); // 释放 buffer
     SetFlag<AscendC::HardEvent::MTE3_S>(eventId);    // 释放 metaInfo 槽
 }
@@ -1156,9 +1294,11 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::CopyGMToGMPerTo
     GlobalTensor<QuantScaleOutType> scaleRevGlobalTensor;
     GlobalTensor<int32_t> metaInfoGlobalTensor;
     tokenRevGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ ActivationType *>(
-        params_.workspaceInfo.dispatchRevDataPtr + rowDstOffsetInCore * revTokenElemCnt_));
+        params_.workspaceInfo.dispatchRevDataPtr +
+        rowDstOffsetInCore * tokenDispatchScratch_.revTokenElemCnt));
     scaleRevGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ QuantScaleOutType *>(
-        params_.workspaceInfo.dispatchRevScalePtr + rowDstOffsetInCore * revScaleElemCnt_));
+        params_.workspaceInfo.dispatchRevScalePtr +
+        rowDstOffsetInCore * tokenDispatchScratch_.revScaleElemCnt));
     remoteRankGlobalTensor.SetGlobalBuffer(
         reinterpret_cast<__gm__ ActivationType *>(GetRankWinAddrWithOffset(remoteRankIdx, quantWinOffset_)));
     metaInfoGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(
@@ -1169,14 +1309,14 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::CopyGMToGMPerTo
     // 末尾阶段 3b 排空；首次调用的跨阶段 UB 复用由 dispatch 阶段入口同步保证。
 
     // 阶段 1（启动）：先发 token 0 的 MTE2，下一步即可在发 token 1 后搬出 token 0。
-    int32_t firstTopkIndex = validTopkIndexTensor_.GetValue(copyStartIdx);
+    int32_t firstTopkIndex = tokenDispatchScratch_.validTopkIndexTensor.GetValue(copyStartIdx);
     FetchTokenNLoadMetaInfo<false>(0, firstTopkIndex, remoteRankIdx, remoteRankGlobalTensor, copyInNum);
 
     // 阶段 2a（首次填槽）：这些 buffer 没有上一轮 MTE3，用 <false> 在编译期删掉两个复用等待。
     int32_t firstUseEnd = copyNum < bufferCount ? copyNum : bufferCount;
     for (int32_t issueIdx = 1; issueIdx < firstUseEnd; ++issueIdx) {
         int32_t copyIdx = issueIdx - 1;
-        int32_t topkIndex = validTopkIndexTensor_.GetValue(copyStartIdx + issueIdx);
+        int32_t topkIndex = tokenDispatchScratch_.validTopkIndexTensor.GetValue(copyStartIdx + issueIdx);
         FetchTokenNLoadMetaInfo<false>(issueIdx, topkIndex, remoteRankIdx, remoteRankGlobalTensor, copyInNum);
         DispatchCopyMte3(copyIdx, copyIdx, tokenRevGlobalTensor, scaleRevGlobalTensor, metaInfoGlobalTensor,
                          copyStartIdx, copyIdx);
@@ -1187,7 +1327,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::CopyGMToGMPerTo
         int32_t copyIdx = issueIdx - 1;
         int32_t issueBufferIdx = issueIdx % bufferCount;
         int32_t copyBufferIdx = copyIdx % bufferCount;
-        int32_t topkIndex = validTopkIndexTensor_.GetValue(copyStartIdx + issueIdx);
+        int32_t topkIndex = tokenDispatchScratch_.validTopkIndexTensor.GetValue(copyStartIdx + issueIdx);
         FetchTokenNLoadMetaInfo<true>(issueBufferIdx, topkIndex, remoteRankIdx, remoteRankGlobalTensor, copyInNum);
         DispatchCopyMte3(copyBufferIdx, copyIdx, tokenRevGlobalTensor, scaleRevGlobalTensor, metaInfoGlobalTensor,
                          copyStartIdx, copyIdx);
@@ -1221,8 +1361,9 @@ MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::MetaInfoCalAndDispatch(GMMAddrInfo &gm
 {
     constexpr int32_t GMM1_WAVE_ROW_COUNT = static_cast<int32_t>(GMM1_TILE_M);
     // cumsumInfo 按 [expert][source rank] 累加；前一个 expert 的末值就是当前 expert 的全局起始行。
-    int32_t expertGlobalRowBegin =
-        (localExpertId == 0) ? 0 : cumsumInfoTensor_.GetValue(localExpertId * worldSize_ - 1);
+    int32_t expertGlobalRowBegin = localExpertId == 0 ?
+                                       0 :
+                                       tokenDispatchScratch_.cumsumInfoTensor.GetValue(localExpertId * worldSize_ - 1);
 
     // 将 (source rank, rank 内 shard) 展平后分配给所有 block；同一 source rank 可由多个 core 并行 dispatch。
     for (uint32_t dispatchShardIdx = blockIdx_; dispatchShardIdx < worldSize_ * blockNumPerRank_;
@@ -1233,7 +1374,7 @@ MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::MetaInfoCalAndDispatch(GMMAddrInfo &gm
         uint32_t rankSegmentDstRowBegin =
             ((remoteRankIdx == 0 && localExpertId == 0) ?
                  0 :
-                 cumsumInfoTensor_.GetValue(localExpertId * worldSize_ + remoteRankIdx - 1));
+                 tokenDispatchScratch_.cumsumInfoTensor.GetValue(localExpertId * worldSize_ + remoteRankIdx - 1));
         // 当前 core 负责该 rank segment 中的命中序号区间 [coreMatchOrdinalBegin, coreMatchOrdinalEnd)。
         int32_t coreMatchOrdinalBegin = 0;
         int32_t coreMatchOrdinalEnd = 0;
@@ -1241,8 +1382,9 @@ MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::MetaInfoCalAndDispatch(GMMAddrInfo &gm
         if (rankSegmentDstRowBegin < maxOutputSize_) {
             // rankTokenCount 是当前 source rank 发给当前 expert 的原始行数；rankDispatchRowCount 额外受
             // maxOutputSize_ 截断，是实际允许写入 workspace 的行数。
-            int32_t rankTokenCount = cumsumInfoTensor_.GetValue(localExpertId * worldSize_ + remoteRankIdx) -
-                                     static_cast<int32_t>(rankSegmentDstRowBegin);
+            int32_t rankTokenCount =
+                tokenDispatchScratch_.cumsumInfoTensor.GetValue(localExpertId * worldSize_ + remoteRankIdx) -
+                static_cast<int32_t>(rankSegmentDstRowBegin);
             int32_t rankDispatchRowCount = (rankSegmentDstRowBegin + rankTokenCount > maxOutputSize_) ?
                                                static_cast<int32_t>(maxOutputSize_ - rankSegmentDstRowBegin) :
                                                rankTokenCount;
@@ -1280,12 +1422,14 @@ MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::MetaInfoCalAndDispatch(GMMAddrInfo &gm
                 (__gm__ uint8_t *)(params_.peermemInfo.maskRecvPtr +
                                    (static_cast<uint64_t>(localExpertId) * worldSize_ + remoteRankIdx) * maskSlotSize_ +
                                    static_cast<uint64_t>(batchRouteBegin / 8)));
-            DataCopy(maskBatchTensor_, remoteRankMaskGlobal, static_cast<uint32_t>(maskSliceBytes));
+            DataCopy(tokenDispatchScratch_.maskBatchTensor, remoteRankMaskGlobal,
+                     static_cast<uint32_t>(maskSliceBytes));
             SyncFuncStatic<AscendC::HardEvent::MTE2_V, SYNC_EVENT_ID1>();
             // GatherMask 根据 mask 压缩本 batch 的全局 route index，并返回当前 batch 的命中数量。
-            CreateVecIndex(topkIndexTensor_, batchRouteBegin, recvRouteItemsPerBatch_);
+            CreateVecIndex(tokenDispatchScratch_.topkIndexTensor, batchRouteBegin, recvRouteItemsPerBatch_);
             uint64_t batchMatchedRouteCount = 0; // 当前 batch 中 mask=1 的 route item 数
-            GatherMask(validTopkIndexTensor_, topkIndexTensor_, maskBatchU32Tensor_, true,
+            GatherMask(tokenDispatchScratch_.validTopkIndexTensor, tokenDispatchScratch_.topkIndexTensor,
+                       tokenDispatchScratch_.maskBatchU32Tensor, true,
                        static_cast<uint32_t>(validRouteCount), {1, 1, 0, 0}, batchMatchedRouteCount);
             SyncFuncStatic<AscendC::HardEvent::V_S, SYNC_EVENT_ID4>();
             // 当前 batch 和本 core 各自在 match-ordinal 坐标系中的区间，二者交集即本次 dispatch 范围。
@@ -1379,16 +1523,16 @@ __aicore__ inline bool MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::UpdateGroupPara
 
             uint64_t offsetInCnt = expertIdx * 8 * aicNum_ + 8 * blockIdx_;
             DataCacheCleanAndInvalid<int32_t, CacheLine::ENTIRE_DATA_CACHE, DcciDst::CACHELINE_OUT>(
-                expertRevNumsGlobalTensor_[offsetInCnt]);
-            Get<M_VALUE>(state.problemShape) = expertRevNumsGlobalTensor_.GetValue(offsetInCnt);
+                tokenDispatchScratch_.expertRevNumsGlobalTensor[offsetInCnt]);
+            Get<M_VALUE>(state.problemShape) = tokenDispatchScratch_.expertRevNumsGlobalTensor.GetValue(offsetInCnt);
         } else {
             Get<M_VALUE>(state.problemShape) = sendCnt;
         }
     } else if constexpr (Mode == AddrUpdateMode::GMM2) {
         uint64_t offsetInCnt = expertIdx * 8 * aicNum_ + 8 * blockIdx_;
         DataCacheCleanAndInvalid<int32_t, CacheLine::ENTIRE_DATA_CACHE, DcciDst::CACHELINE_OUT>(
-            expertRevNumsGlobalTensor_[offsetInCnt]);
-        Get<M_VALUE>(state.problemShape) = expertRevNumsGlobalTensor_.GetValue(offsetInCnt);
+            tokenDispatchScratch_.expertRevNumsGlobalTensor[offsetInCnt]);
+        Get<M_VALUE>(state.problemShape) = tokenDispatchScratch_.expertRevNumsGlobalTensor.GetValue(offsetInCnt);
     }
 
     if (Get<M_VALUE>(state.problemShape) == 0) {
@@ -2092,7 +2236,8 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::SharedExpertCop
         int32_t tokenIdx = curentOffset + index;
         uint64_t remoteCopyOffset = static_cast<uint64_t>(tokenIdx) * static_cast<uint64_t>(peermemTokenStride);
         auto event = (index % DOUBLE_BUFFER == 0) ? EVENT_ID0 : EVENT_ID1;
-        auto copyTmpTensor = (index % DOUBLE_BUFFER == 0) ? xOutTensor1_ : xOutTensor2_;
+        auto copyTmpTensor = (index % DOUBLE_BUFFER == 0) ? sharedExpertPrepareScratch_.copyBuffer0 :
+                                                            sharedExpertPrepareScratch_.copyBuffer1;
 
         WaitFlag<AscendC::HardEvent::MTE3_MTE2>(event);
         DataCopy(copyTmpTensor, srcGlobalTensor[remoteCopyOffset], copyInNum);
@@ -2194,8 +2339,8 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::GroupMatmulGmm2
 // ==================================================================================
 template <TemplateMegaMoeWaveTypeClass>
 __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessGmm1Wave(
-    uint32_t batchBegin, uint32_t batchEnd, ExpertLoopState &gmm1State,
-    GMMAddrInfo &gmm1AddrInfo, int32_t &vecSetSyncCom)
+    uint32_t batchBegin, uint32_t batchEnd, Gmm1ExpertLoopState &gmm1State,
+    GMMAddrInfo &gmm1AddrInfo, Gmm1SwigluState &runtimeState)
 {
     if constexpr (g_coreType == AIV) {
         if (subBlockIdx_ == 1) {
@@ -2203,12 +2348,17 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessGmm1Wave
         }
     }
     for (uint32_t expertIdx = batchBegin; expertIdx < batchEnd; ++expertIdx) {
-        if (!UpdateGroupParams<AddrUpdateMode::GMM1>(gmm1State, expertIdx)) {
+        if (!WaitAndUpdateGmm1GroupParams<false>(
+                gmm1Context_, gmm1Args_, gmm1Scratch_, gmm1State, expertIdx, 0U)) {
             continue;
         }
-        UpdateGlobalBuffer<AddrUpdateMode::GMM1>(gmm1AddrInfo, gmm1State, expertIdx);
-        GroupMatmulWithSwigluQuant(
-            epilogueOp_, gmm1AddrInfo, gmm1State, expertIdx, vecSetSyncCom);
+        UpdateGmm1GlobalBuffer<ActivationType, Weight1Type, ActivationType, QuantScaleOutType, false,
+                               TopkWeightsPrefetch>(
+            gmm1Context_, gmm1Args_, epilogueOp_, gmm1AddrInfo, gmm1State, expertIdx);
+        ControlGmm1SwigluPipelineByMode<QuantOutType, Weight1Type, ActivationType, QuantScaleOutType, false,
+                                        GMM1_TILE_M, EPILOGUE_TILE_M, TopkWeightsPrefetch,
+                                        GMM1_INTERLEAVED, true>(
+            gmm1Context_, params_, epilogueOp_, gmm1AddrInfo, gmm1State, runtimeState, expertIdx);
     }
 }
 
@@ -2309,9 +2459,12 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessRoutedEx
     Get<K_VALUE>(initShape) = k_;
     BlockOffset initOffset{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     ExpertLoopState dispatchState{initShape, initOffset, 0};
-    ExpertLoopState gmm1State{initShape, initOffset, 0};
+    Gmm1ExpertLoopState gmm1State = CreateGmm1ExpertLoopState(gmm1Context_);
     ExpertLoopState gmm2State{initShape, initOffset, 0};
     ExpertLoopState combineState{initShape, initOffset, 0};
+    int32_t gmm1TileSequence = 0;
+    Gmm1SwigluState gmm1RuntimeState{
+        startBlockIdx_, vecSetSyncCom, gmm1TileSequence, gmm1PingPongIdx_};
 
     const uint32_t expertsPerWave = expertsPerBatch_;
 
@@ -2333,7 +2486,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessRoutedEx
             dispatchState, dispatchAddrInfo, nextDispatchExpert, nextBatchEnd, dispatchBufferConfig);
 
         ProcessGmm1Wave(
-            batchBegin, batchEnd, gmm1State, gmm1AddrInfo, vecSetSyncCom);
+            batchBegin, batchEnd, gmm1State, gmm1AddrInfo, gmm1RuntimeState);
         const uint32_t gmm1EndCursor = startBlockIdx_;
 
         ProcessGmm2Wave(batchBegin, batchEnd, gmm2State, gmm2AddrInfo, vecSetSyncCom);
@@ -2370,27 +2523,16 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessRoutedEx
 // 可选共享专家流程：依次执行共享专家 GMM1 与 SwiGLU，并在结束后重置 GMM 调度状态。
 // ===============================================================
 template <TemplateMegaMoeWaveTypeClass>
-__aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessSharedExpertGmm1(const TupleShape &initShape,
-                                                                                         const BlockOffset &initOffset)
+__aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessSharedExpertGmm1(const TupleShape &,
+                                                                                         const BlockOffset &)
 {
-    sharedEpilogueOp_.Init({params_.workspaceInfo.sharedExpertSwigluDataPtr,
-                            params_.workspaceInfo.sharedExpertSwigluScalePtr, nullptr, nullptr, nullptr, nullptr,
-                            nullptr, params_.tilingData->clampLimit, params_.tilingData->actMode,
-                            params_.tilingData->actSubMode, params_.tilingData->activationAlpha,
-                            params_.tilingData->activationBeta});
-
-    GMMAddrInfo sharedGmm1AddrInfo;
-    ExpertLoopState sharedGmm1State{initShape, initOffset, 0};
     int32_t vecSetSyncCom = 0;
-    for (uint32_t sharedIdx = 0; sharedIdx < sharedExpertNum_; sharedIdx++) {
-        if (!UpdateSharedGroupParams(sharedGmm1State, sharedIdx)) {
-            continue;
-        }
-        UpdateSharedGlobalBuffer<AddrUpdateMode::GMM1>(sharedGmm1AddrInfo, sharedGmm1State, sharedIdx);
-        GroupMatmulWithSwigluQuant<GmmExpertMode::SHARED>(
-            sharedEpilogueOp_, sharedGmm1AddrInfo, sharedGmm1State, sharedIdx, vecSetSyncCom);
-    }
-    EndSync<GMM1_UB_PINGPONG>(vecSetSyncCom, gmm1PingPongIdx_);
+    int32_t gmTileSequence = 0;
+    SharedExpertGmm1SwigluState runtimeState{
+        startBlockIdx_, vecSetSyncCom, gmTileSequence, gmm1PingPongIdx_};
+    ControlSharedExpertGmm1SwigluPipeline<QuantOutType, ActivationType, Weight1Type, ActivationType,
+                                          QuantScaleOutType, false, GMM1_TILE_M, GMM1_INTERLEAVED, true>(
+        sharedGmm1Context_, sharedGmm1Args_, params_, sharedEpilogueOp_, runtimeState);
     vecSetSyncCom = 0;
     gmm1PingPongIdx_ = 0;
     startBlockIdx_ = 0; // 共享专家 GMM1 修改了 startBlockIdx_，重置后供路由专家 GMM1 使用
@@ -2422,18 +2564,22 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::Process()
     // 保存入口时的溢出模式，并初始化输入准备阶段使用的 UB。
     int64_t oriOverflowMode = GetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>();
     SetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>(0);
-    SendMaskBufferConfig sendMaskBufferConfig = SendAndQuantBuffInit();
+    SendAndQuantBuffInit();
 
     // 阶段 1：AIV 完成本卡输入量化、路由 mask 推送和 flag 清零。
-    QuantProcessInRank();              // 量化本卡 token
-    SendMaskCal(sendMaskBufferConfig); // 源卡按所有全局专家算 mask 并推送到目标专家卡
-    ResetFlagList();                   // 清理 workspace 中的 flag
+    QuantizeLocalTokens<QuantMode, QuantOutType, ActivationType, TopkWeightsType, TopkWeightsPrefetch>(
+        dispatchPrepareContext_, quantProcessArgs_, quantProcessScratch_);
+    GatherAndSendExpertMasks(dispatchPrepareContext_, sendMaskArgs_, sendMaskScratch_);
+    ResetDispatchWorkspace<false, TopkWeightsPrefetch>(
+        dispatchPrepareContext_, resetWorkspaceArgs_, resetTensor_);
     if (sharedExpertNum_ > 0) {
         // 可选：为共享专家拆分连续布局的输入数据与 scale。
-        SharedExpertCopyInput();
-    }
-    if constexpr (g_coreType == AIV) {
-        PipeBarrier<PIPE_ALL>();
+        PrepareSharedExpertInput<ActivationType, QuantScaleOutType>(
+            dispatchPrepareContext_, sharedExpertPrepareArgs_, sharedExpertPrepareScratch_);
+    } else {
+        if constexpr (g_coreType == AIV) {
+            PipeBarrier<PIPE_ALL>();
+        }
     }
     SyncAll<false>(); // AIC 等待 AIV 完成输入准备与 flag 清零后再进入计算
 
