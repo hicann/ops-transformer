@@ -328,7 +328,7 @@ public:
 
         LocalTensor<T> mmRes = bmm1ResBuf.template GetTensor<T>();
         auto stage1CastTensor = this->stage1OutQue[stage1Offset].template AllocTensor<INPUT_T>();
-        constexpr uint32_t pScaleByteOffset = 16640; // 16640: softmax res UB size
+        constexpr int32_t pScaleByteOffset = 16640; // 16640: softmax res UB size
         LocalTensor<fp8_e8m0_t> pScaleSubLoop0Tensor =
             stage1CastTensor.template ReinterpretCast<fp8_e8m0_t>()[pScaleByteOffset];
 
@@ -551,7 +551,7 @@ public:
 
         LocalTensor<T> mmRes = bmm1ResBuf.template GetTensor<T>();
         auto stage1CastTensor = this->stage1OutQue[stage1Offset].template AllocTensor<INPUT_T>();
-        constexpr uint32_t pScaleByteOffset = 16640;
+        constexpr int32_t pScaleByteOffset = 16640; // 16640: softmax res UB size
         LocalTensor<fp8_e8m0_t> pScaleSubLoop0Tensor =
             stage1CastTensor.template ReinterpretCast<fp8_e8m0_t>()[pScaleByteOffset];
 

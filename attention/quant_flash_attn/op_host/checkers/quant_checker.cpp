@@ -22,7 +22,7 @@
 #include "log/error_code.h"
 #include "register/op_def_registry.h"
 #include "../qfa_tiling_info.h"
-#include "../../../fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_utils.h"
+#include "../quant_flash_attn_tiling_utils.h"
 #include "quant_checker.h"
 
 namespace optiling {
