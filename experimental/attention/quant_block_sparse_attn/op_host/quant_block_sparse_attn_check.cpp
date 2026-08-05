@@ -128,8 +128,12 @@ ge::graphStatus CheckKVDtypeConsistency(const QuantBlockSparseAttnParaInfo &opPa
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckStrideDim(const gert::Stride *stride, const char *inputName, size_t dim, uint64_t expected)
+ge::graphStatus CheckStrideDim(const gert::Stride *stride, const char *inputName, size_t dim, uint64_t expected,
+                               bool hasViewStride)
 {
+    if (!hasViewStride) {
+        return ge::GRAPH_SUCCESS;
+    }
     if (stride == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             kOpName, inputName, "nullptr",
@@ -516,36 +520,38 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckKeyValueShape() const
     }
     if (CheckStrideDim(opParamInfo.key.stride, "key",
                        QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_NUM),
-                       tilingInfo_.paBlockStrideVal) != ge::GRAPH_SUCCESS) {
+                       tilingInfo_.paBlockStrideVal, tilingInfo_.hasViewStride) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (CheckStrideDim(opParamInfo.key.stride, "key", QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::N),
-                       tilingInfo_.paBlockSizeVal * tilingInfo_.dSize) != ge::GRAPH_SUCCESS) {
+                       tilingInfo_.paBlockSizeVal * tilingInfo_.dSize,
+                       tilingInfo_.hasViewStride) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (CheckStrideDim(opParamInfo.key.stride, "key", QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_SIZE),
-                       tilingInfo_.dSize) != ge::GRAPH_SUCCESS) {
+                       tilingInfo_.dSize, tilingInfo_.hasViewStride) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (CheckStrideDim(opParamInfo.key.stride, "key", QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::HEAD_DIM),
-                       1U) != ge::GRAPH_SUCCESS) {
+                       1U, tilingInfo_.hasViewStride) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (CheckStrideDim(opParamInfo.value.stride, "value",
                        QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_NUM),
-                       tilingInfo_.paBlockStrideVal) != ge::GRAPH_SUCCESS) {
+                       tilingInfo_.paBlockStrideVal, tilingInfo_.hasViewStride) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (CheckStrideDim(opParamInfo.value.stride, "value", QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::N),
-                       tilingInfo_.paBlockSizeVal * tilingInfo_.dSizeV) != ge::GRAPH_SUCCESS) {
+                       tilingInfo_.paBlockSizeVal * tilingInfo_.dSizeV,
+                       tilingInfo_.hasViewStride) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (CheckStrideDim(opParamInfo.value.stride, "value", QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_SIZE),
-                       tilingInfo_.dSizeV) != ge::GRAPH_SUCCESS) {
+                       tilingInfo_.dSizeV, tilingInfo_.hasViewStride) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (CheckStrideDim(opParamInfo.value.stride, "value", QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::HEAD_DIM),
-                       1U) != ge::GRAPH_SUCCESS) {
+                       1U, tilingInfo_.hasViewStride) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -599,20 +605,24 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckQuantShape() const
             }
             if (CheckStrideDim(opParamInfo.kDescale.stride, "k_descale",
                                QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_NUM),
-                               tilingInfo_.paBlockStrideVal / sizeof(float)) != ge::GRAPH_SUCCESS) {
+                               tilingInfo_.paBlockStrideVal / sizeof(float),
+                               tilingInfo_.hasViewStride) != ge::GRAPH_SUCCESS) {
                 return ge::GRAPH_FAILED;
             }
             if (CheckStrideDim(opParamInfo.kDescale.stride, "k_descale",
                                QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::N),
-                               tilingInfo_.kvBlockSizeVal) != ge::GRAPH_SUCCESS) {
+                               tilingInfo_.kvBlockSizeVal,
+                               tilingInfo_.hasViewStride) != ge::GRAPH_SUCCESS) {
                 return ge::GRAPH_FAILED;
             }
             if (CheckStrideDim(opParamInfo.kDescale.stride, "k_descale",
-                               QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_SIZE), 1U) != ge::GRAPH_SUCCESS) {
+                               QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_SIZE), 1U,
+                               tilingInfo_.hasViewStride) != ge::GRAPH_SUCCESS) {
                 return ge::GRAPH_FAILED;
             }
             if (CheckStrideDim(opParamInfo.kDescale.stride, "k_descale",
-                               QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::HEAD_DIM), 1U) != ge::GRAPH_SUCCESS) {
+                               QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::HEAD_DIM), 1U,
+                               tilingInfo_.hasViewStride) != ge::GRAPH_SUCCESS) {
                 return ge::GRAPH_FAILED;
             }
         } else {

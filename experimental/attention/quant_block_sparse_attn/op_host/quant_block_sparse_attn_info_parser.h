@@ -135,6 +135,7 @@ struct QuantBlockSparseAttnTilingInfo {
     bool returnSoftmaxLseVal = false;
 
     bool isGqa = false;
+    bool hasViewStride = true;
 };
 
 class QuantBlockSparseAttnInfoParser {

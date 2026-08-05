@@ -45,6 +45,8 @@ def _to_cpu(tensor):
 def _check_runtime_available():
     if torch_npu is None:
         pytest.skip(f"torch_npu is not available: {TORCH_NPU_IMPORT_ERROR}")
+    if not torch_npu.npu.is_available():
+        pytest.skip("NPU device is not available (aclInit failed or no /dev/davinci*).")
     if not custom_ops.has_quant_block_sparse_attn_op():
         detail = "; ".join(custom_ops.load_errors()[:3])
         suffix = f" Load errors: {detail}" if detail else ""
@@ -183,13 +185,36 @@ def _call_npu_quant_block_sparse_attn(test_data, device_id):
 
 
 class _QuantBlockSparseAttnGraph(torch.nn.Module):
-    def __init__(self, inputs):
+    def __init__(self, inputs, kv_cache_meta=None):
         super().__init__()
         self.inputs = inputs
+        self.kv_cache_meta = kv_cache_meta
 
-    def forward(self, query, key, value, q_descale, k_descale, v_descale, p_scale, sparse_indices,
+    def _rebuild_combined_kv_views(self, kv_cache_storage):
+        meta = self.kv_cache_meta
+        fp8_storage = kv_cache_storage.view(torch.float8_e4m3fn)
+        key = torch.as_strided(
+            fp8_storage,
+            (meta["block_num"], meta["n2"], meta["block_size"], meta["d_size"]),
+            (meta["pa_block_stride"], meta["block_size"] * meta["d_size"], meta["d_size"], 1),
+            meta["key_offset_bytes"])
+        value = torch.as_strided(
+            fp8_storage,
+            (meta["block_num"], meta["n2"], meta["block_size"], meta["dv_size"]),
+            (meta["pa_block_stride"], meta["block_size"] * meta["dv_size"], meta["dv_size"], 1),
+            meta["value_offset_bytes"])
+        fp32_storage = kv_cache_storage.view(torch.float32)
+        k_descale = torch.as_strided(
+            fp32_storage,
+            (meta["block_num"], meta["n2"], meta["block_size"], 1),
+            (meta["pa_block_stride"] // 4, meta["block_size"], 1, 1),
+            meta["k_scale_offset_bytes"] // 4)
+        return key, value, k_descale
+
+    def forward(self, query, kv_cache_storage, q_descale, v_descale, p_scale, sparse_indices,
                 sparse_seq_len, atten_mask, cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv,
                 block_table, metadata):
+        key, value, k_descale = self._rebuild_combined_kv_views(kv_cache_storage)
         return torch.ops.custom.npu_quant_block_sparse_attn(
             query, key, value, q_descale, k_descale, v_descale, p_scale, sparse_indices, sparse_seq_len,
             atten_mask, self.inputs["softmax_scale"], self.inputs["sparse_q_block_size"],
@@ -198,8 +223,14 @@ class _QuantBlockSparseAttnGraph(torch.nn.Module):
             seqused_kv=seqused_kv, block_table=block_table, metadata=metadata,
             layout_kv=self.inputs["layout_kv"], layout_q=self.inputs["layout_q"],
             layout_sparse_indices=self.inputs["layout_sparse_indices"],
- 	        layout_out=self.inputs["layout_out"], quant_mode=self.inputs["quant_mode"],
+   	        layout_out=self.inputs["layout_out"], quant_mode=self.inputs["quant_mode"],
             mask_mode=self.inputs["mask_mode"], return_softmax_lse=self.inputs["return_softmax_lse"])
+
+
+def _mark_static_tensors(*tensors):
+    for tensor in tensors:
+        if tensor is not None:
+            torch._dynamo.mark_static(tensor)
 
 
 def test_quant_block_sparse_attn_process_graph(test_data, device_id=0):
@@ -207,18 +238,41 @@ def test_quant_block_sparse_attn_process_graph(test_data, device_id=0):
     torch_npu.npu.set_device(device_id)
     inputs = test_data["input"]
     kv_cache_storage, key, value, k_descale = _prepare_kv_inputs(inputs)
+    if kv_cache_storage is None:
+        pytest.skip("graph mode currently requires combined KV cache storage")
+    combined_kv_cache.assert_combined_kv_views(kv_cache_storage, inputs["kv_cache_meta"])
     metadata = _prepare_metadata(test_data)
+    query = _to_npu(inputs["query"])
+    kv_cache_storage = _to_npu(inputs["kv_cache_storage"])
+    q_descale = _to_npu(inputs["q_descale"])
+    v_descale = _to_npu(inputs["v_descale"])
+    p_scale = _to_npu(inputs["p_scale"])
+    sparse_indices = _to_npu(inputs["sparse_indices"])
+    sparse_seq_len = _to_npu(inputs["sparse_seq_len"])
+    atten_mask = _to_npu(inputs.get("atten_mask"))
+    cu_seqlens_q = _to_npu(inputs["cu_seqlens_q"])
+    cu_seqlens_kv = _to_npu(inputs["cu_seqlens_kv"])
+    seqused_q = _to_npu(inputs["seqused_q"])
+    seqused_kv = _to_npu(inputs["seqused_kv"])
+    block_table = _to_npu(inputs["block_table"])
+
     config = CompilerConfig()
     config.mode = "reduce-overhead"
+    config.debug.aclgraph.disable_reinplace_inplaceable_ops_pass = True
     npu_backend = torchair.get_npu_backend(compiler_config=config)
+    _mark_static_tensors(
+        query, kv_cache_storage, q_descale, v_descale, p_scale, sparse_indices,
+        sparse_seq_len, atten_mask, cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv,
+        block_table, metadata,
+    )
+    torch._dynamo.reset()
     model = torch.compile(
-        _QuantBlockSparseAttnGraph(inputs).npu(), fullgraph=True, backend=npu_backend, dynamic=False)
+        _QuantBlockSparseAttnGraph(inputs, inputs["kv_cache_meta"]).npu(),
+        fullgraph=True, backend=npu_backend, dynamic=False)
     output = model(
-        _to_npu(inputs["query"]), key, value, _to_npu(inputs["q_descale"]), k_descale,
-        _to_npu(inputs["v_descale"]), _to_npu(inputs["p_scale"]), _to_npu(inputs["sparse_indices"]),
-        _to_npu(inputs["sparse_seq_len"]), _to_npu(inputs.get("atten_mask")), _to_npu(inputs["cu_seqlens_q"]),
-        _to_npu(inputs["cu_seqlens_kv"]), _to_npu(inputs["seqused_q"]), _to_npu(inputs["seqused_kv"]),
-        _to_npu(inputs["block_table"]), metadata)
+        query, kv_cache_storage, q_descale, v_descale, p_scale, sparse_indices,
+        sparse_seq_len, atten_mask, cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv,
+        block_table, metadata)
     torch_npu.npu.synchronize()
     del kv_cache_storage
     return _normalize_npu_output(output, inputs["return_softmax_lse"]), _golden_output(test_data)

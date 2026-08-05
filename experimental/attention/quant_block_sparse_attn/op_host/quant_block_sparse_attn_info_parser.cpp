@@ -94,37 +94,40 @@ ge::graphStatus QuantBlockSparseAttnInfoParser::ParseKeyValue(QuantBlockSparseAt
     }
 
     uint64_t paBlockStride = 0U;
-    if (keyStride == nullptr) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            kOpName, "key stride", "nullptr",
-            "PA_BNSD segmented KV-cache requires 4D non-contiguous key/value/k_descale views");
-        return ge::GRAPH_FAILED;
-    }
-
-    paBlockStride = keyStride->GetStride(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_NUM));
-    if (tilingInfo.quantModeVal == QBSA_QUANT_MODE_FP8 && valueShape.GetDimNum() == DIM_NUM_4 &&
-        kDescaleShape.GetDimNum() == DIM_NUM_4) {
-        const uint64_t keyBlockBytes =
+    if (context_->InputIsView(QBSA_KEY_INDEX) && keyStride != nullptr) {
+        tilingInfo.hasViewStride = true;
+        paBlockStride = keyStride->GetStride(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_NUM));
+        if (tilingInfo.quantModeVal == QBSA_QUANT_MODE_FP8 && valueShape.GetDimNum() == DIM_NUM_4 &&
+            kDescaleShape.GetDimNum() == DIM_NUM_4) {
+            const uint64_t keyBlockBytes =
+                static_cast<uint64_t>(keyShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::N))) *
+                static_cast<uint64_t>(keyShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_SIZE))) *
+                static_cast<uint64_t>(keyShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::HEAD_DIM)));
+            const uint64_t valueBlockBytes =
+                static_cast<uint64_t>(valueShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::N))) *
+                static_cast<uint64_t>(valueShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_SIZE))) *
+                static_cast<uint64_t>(valueShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::HEAD_DIM)));
+            const uint64_t kDescaleBlockBytes =
+                static_cast<uint64_t>(kDescaleShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::N))) *
+                static_cast<uint64_t>(kDescaleShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_SIZE))) *
+                static_cast<uint64_t>(kDescaleShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::HEAD_DIM))) *
+                sizeof(float);
+            const uint64_t expectedPaBlockStride = keyBlockBytes + valueBlockBytes + kDescaleBlockBytes;
+            if (paBlockStride != expectedPaBlockStride) {
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    kOpName, "key stride[0]", std::to_string(paBlockStride),
+                    "must be equal to K/V/k_descale concatenated physical block size " +
+                        std::to_string(expectedPaBlockStride));
+                return ge::GRAPH_FAILED;
+            }
+        }
+    } else {
+        tilingInfo.hasViewStride = false;
+        paBlockStride =
             static_cast<uint64_t>(keyShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::N))) *
             static_cast<uint64_t>(keyShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_SIZE))) *
             static_cast<uint64_t>(keyShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::HEAD_DIM)));
-        const uint64_t valueBlockBytes =
-            static_cast<uint64_t>(valueShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::N))) *
-            static_cast<uint64_t>(valueShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_SIZE))) *
-            static_cast<uint64_t>(valueShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::HEAD_DIM)));
-        const uint64_t kDescaleBlockBytes =
-            static_cast<uint64_t>(kDescaleShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::N))) *
-            static_cast<uint64_t>(kDescaleShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::BLOCK_SIZE))) *
-            static_cast<uint64_t>(kDescaleShape.GetDim(QBSAGetAxisIdx(QBSALayout::PA_BNSD, QBSAAxis::HEAD_DIM))) *
-            sizeof(float);
-        const uint64_t expectedPaBlockStride = keyBlockBytes + valueBlockBytes + kDescaleBlockBytes;
-        if (paBlockStride != expectedPaBlockStride) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                kOpName, "key stride[0]", std::to_string(paBlockStride),
-                "must be equal to K/V/k_descale concatenated physical block size " +
-                    std::to_string(expectedPaBlockStride));
-            return ge::GRAPH_FAILED;
-        }
+        OP_LOGD(kOpName, "key is not a view, treat as contiguous, paBlockStride=%llu", paBlockStride);
     }
     if (paBlockStride == 0U || paBlockStride > static_cast<uint64_t>(std::numeric_limits<uint32_t>::max())) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "key stride[0]", std::to_string(paBlockStride),
