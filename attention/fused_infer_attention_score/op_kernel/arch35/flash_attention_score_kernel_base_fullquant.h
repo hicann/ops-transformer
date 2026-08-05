@@ -15,7 +15,6 @@
 
 #ifndef FLASH_ATTENTION_SCORE_KERNEL_BASE_FULLQUANT_H_
 #define FLASH_ATTENTION_SCORE_KERNEL_BASE_FULLQUANT_H_
-#include "flash_attention_score_block_vec_train.h"
 #include "flash_attention_score_block_cube_mla_fullquant.h"
 #include "flash_attention_score_block_vec_infer_mla_fullquant.h"
 #include "flash_attention_score_block_cube_gqa_fullquant.h"
