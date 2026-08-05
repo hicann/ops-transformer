@@ -1,0 +1,416 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------------------------------------
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# -----------------------------------------------------------------------------------------------------------
+
+"""Convert pytests TestCases dict → TTK E2E CSV.
+
+Usage:
+    python3 gen_cases.py [--output flash_attn_stc.csv]
+
+Reads functional_stc.py TestCases, normalizes params (same logic as
+case_loader.normalize_params), computes tensor shapes, and writes a
+TTK E2E CSV file compatible with:
+    python3 -m ttk e2e -i flash_attn_stc.csv --plugin .
+
+Tensor order in CSV (matches flash_attn_ttk signature keyword-only order):
+    [0] q              [3] block_table       [6] seqused_q
+    [1] k              [4] cu_seqlens_q      [7] seqused_kv
+    [2] v              [5] cu_seqlens_kv
+
+Unused positions use None. Small integer tensors (cu_seqlens, seqused)
+get their values from attributes dict → override_tensors_from_attributes.
+block_table is filled by customize_inputs.
+"""
+
+import argparse
+import csv
+import itertools
+import math
+import os
+import sys
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_PYTESTS = os.path.join(_HERE, "..", "pytests")
+if _PYTESTS not in sys.path:
+    sys.path.insert(0, _PYTESTS)
+
+API_NAME = "flash_attn_ttk_ops.flash_attn_ttk"
+
+HEADER = [
+    "testcase_name",
+    "api_name",
+    "tensor_view_shapes",
+    "tensor_dtypes",
+    "tensor_formats",
+    "attributes",
+    "output_tensor_indexes",
+    "golden_api",
+    "input_data_ranges",
+    "precision_tolerances",
+    "absolute_precision",
+]
+
+DTYPE_MAP = {"fp16": "float16", "bf16": "bfloat16"}
+INT_DTYPE = "int32"
+ABSOLUTE_PRECISION_DEFAULT = 1e-8
+
+
+# ── param normalization (mirrors case_loader.normalize_params) ──
+
+
+def normalize_params(raw):
+    c = dict(raw)
+    layout_q = c.get("layout_q", "BNSD")
+    c.setdefault("layout_kv", layout_q)
+    c.setdefault("layout_out", layout_q)
+    c.setdefault("N2", c["N1"])
+    c.setdefault("S2", c.get("S1"))
+    c.setdefault("DV", c.get("D"))
+    c.setdefault("mask_mode", 0)
+    c.setdefault("win_left", -1)
+    c.setdefault("win_right", -1)
+    c.setdefault("return_softmax_lse", False)
+
+    for key in ("cu_seqlens_q", "cu_seqlens_kv", "seqused_q", "seqused_kv"):
+        if c.get(key) == [None] or c.get(key) is None:
+            c.pop(key, None)
+
+    if layout_q == "TND":
+        cu_q = c.get("cu_seqlens_q")
+        if cu_q:
+            c.setdefault(
+                "seqused_q", [cu_q[i + 1] - cu_q[i] for i in range(len(cu_q) - 1)]
+            )
+            layout_kv_val = c.get("layout_kv", layout_q)
+            if layout_kv_val not in ("PA_BBND", "PA_BNBD", "PA_NZ"):
+                c.setdefault("cu_seqlens_kv", list(cu_q))
+                cu_kv = c.get("cu_seqlens_kv")
+                c.setdefault(
+                    "seqused_kv",
+                    [cu_kv[i + 1] - cu_kv[i] for i in range(len(cu_kv) - 1)],
+                )
+        c["B"] = 1
+
+    layout_kv_val = c.get("layout_kv", layout_q)
+    if layout_kv_val in ("PA_BBND", "PA_BNBD", "PA_NZ"):
+        c.setdefault("block_size", 128)
+        if "seqused_kv" not in c:
+            c["seqused_kv"] = [c.get("S2", c.get("S1"))] * c.get("B", 1)
+
+        if layout_kv_val == "PA_NZ":
+            dtype_str = c.get("Dtype", "fp16")
+            c["nz_blk_elem"] = 16 if dtype_str in ("fp16", "bf16") else 32
+            c["D_nz_sub"] = c["D"] // c["nz_blk_elem"]
+            c["DV_nz_sub"] = c.get("DV", c["D"]) // c["nz_blk_elem"]
+
+        if c.get("block_table") is not None and isinstance(c.get("block_table"), list):
+            bt_raw = c["block_table"]
+            c["num_blocks"] = int(max(max(row) for row in bt_raw)) + 1
+            return c
+
+        seqused_kv = c["seqused_kv"]
+        block_size = c["block_size"]
+        bt_shape = c.get("block_table_shape", [])
+        if bt_shape:
+            b_val = bt_shape[0]
+            max_blk = bt_shape[1]
+        else:
+            b_val = c.get("B", 1)
+            if layout_q == "TND":
+                cu_q = c.get("cu_seqlens_q")
+                b_val = len(cu_q) - 1 if cu_q else 1
+            max_blk = (
+                (max(seqused_kv) + block_size - 1) // block_size if seqused_kv else 1
+            )
+        c["num_blocks"] = max_blk * b_val
+        c["_bt_b"] = b_val
+        c["_bt_max_blk"] = max_blk
+    return c
+
+
+# ── shape computation ──
+
+
+def _qkv_shapes(p):
+    layout_q = p.get("layout_q", "BNSD")
+    layout_kv = p.get("layout_kv", layout_q)
+    B = p.get("B", 1)
+    N1 = p["N1"]
+    N2 = p.get("N2", N1)
+    S1 = p.get("S1", 1)
+    S2 = p.get("S2", S1)
+    D = p["D"]
+    DV = p.get("DV", D)
+
+    if layout_q == "BNSD":
+        q_shape = (B, N1, S1, D)
+    elif layout_q == "BSND":
+        q_shape = (B, S1, N1, D)
+    elif layout_q == "TND":
+        cu_q = p.get("cu_seqlens_q")
+        total_s1 = cu_q[-1] if cu_q else S1
+        q_shape = (total_s1, N1, D)
+    else:
+        q_shape = (B, N1, S1, D)
+
+    if layout_kv == "BNSD":
+        k_shape = (B, N2, S2, D)
+        v_shape = (B, N2, S2, DV)
+    elif layout_kv == "BSND":
+        k_shape = (B, S2, N2, D)
+        v_shape = (B, S2, N2, DV)
+    elif layout_kv == "TND":
+        cu_kv = p.get("cu_seqlens_kv")
+        total_s2 = cu_kv[-1] if cu_kv else S2
+        k_shape = (total_s2, N2, D)
+        v_shape = (total_s2, N2, DV)
+    elif layout_kv == "PA_BBND":
+        num_blocks = p.get("num_blocks", 1)
+        bs = p.get("block_size", 128)
+        k_shape = (num_blocks, bs, N2, D)
+        v_shape = (num_blocks, bs, N2, DV)
+    elif layout_kv == "PA_BNBD":
+        num_blocks = p.get("num_blocks", 1)
+        bs = p.get("block_size", 128)
+        k_shape = (num_blocks, N2, bs, D)
+        v_shape = (num_blocks, N2, bs, DV)
+    elif layout_kv == "PA_NZ":
+        num_blocks = p.get("num_blocks", 1)
+        bs = p.get("block_size", 128)
+        nz_sub = p.get("D_nz_sub", D // 16)
+        dv_nz_sub = p.get("DV_nz_sub", DV // 16)
+        nz_blk = p.get("nz_blk_elem", 16)
+        k_shape = (num_blocks, N2, nz_sub, bs, nz_blk)
+        v_shape = (num_blocks, N2, dv_nz_sub, bs, nz_blk)
+    else:
+        k_shape = (B, N2, S2, D)
+        v_shape = (B, N2, S2, DV)
+
+    return q_shape, k_shape, v_shape
+
+
+def _aux_shapes(p):
+    """Compute shapes for block_table, cu_seqlens_q/kv, seqused_q/kv."""
+    layout_q = p.get("layout_q", "BNSD")
+    layout_kv = p.get("layout_kv", layout_q)
+    B = p.get("B", 1)
+
+    bt_shape = None
+    if layout_kv in ("PA_BBND", "PA_BNBD", "PA_NZ"):
+        bt_b = p.get("_bt_b", B)
+        bt_max_blk = p.get("_bt_max_blk", 1)
+        bt_shape = (bt_b, bt_max_blk)
+
+    cu_q = p.get("cu_seqlens_q")
+    cu_kv = p.get("cu_seqlens_kv")
+    sq = p.get("seqused_q")
+    skv = p.get("seqused_kv")
+
+    cu_q_shape = (len(cu_q),) if cu_q else None
+    cu_kv_shape = (len(cu_kv),) if cu_kv else None
+    sq_shape = (len(sq),) if sq else None
+    skv_shape = (len(skv),) if skv else None
+
+    return bt_shape, cu_q_shape, cu_kv_shape, sq_shape, skv_shape
+
+
+# ── attributes builder ──
+
+
+def _build_attrs(p):
+    attrs = {}
+
+    def _set(key, val):
+        if val is not None:
+            attrs[key] = val
+
+    dtype_str = p.get("Dtype", "fp16")
+    D = p["D"]
+    scale = p.get("scale")
+    if scale is None:
+        scale = 1.0 / (D**0.5)
+    _set("softmax_scale", float(scale))
+
+    _set("mask_mode", int(p.get("mask_mode", 0)))
+
+    wl = p.get("win_left", -1)
+    wr = p.get("win_right", -1)
+    wl = int(float(wl)) if wl is not None else -1
+    wr = int(float(wr)) if wr is not None else -1
+    _set("win_left", wl)
+    _set("win_right", wr)
+
+    _set("layout_q", p.get("layout_q", "BNSD"))
+    _set("layout_kv", p.get("layout_kv", p.get("layout_q", "BNSD")))
+    _set("layout_out", p.get("layout_out", p.get("layout_q", "BNSD")))
+
+    rsl = p.get("return_softmax_lse", False)
+    _set(
+        "return_softmax_lse",
+        bool(int(rsl)) if isinstance(rsl, (int, str)) else bool(rsl),
+    )
+
+    layout_q = p.get("layout_q", "BNSD")
+    if layout_q == "TND":
+        cu_q = p.get("cu_seqlens_q")
+        if cu_q:
+            _set("batch_size", len(cu_q) - 1)
+    else:
+        _set("batch_size", int(p.get("B", 1)))
+
+    cu_q = p.get("cu_seqlens_q")
+    cu_kv = p.get("cu_seqlens_kv")
+    sq = p.get("seqused_q")
+    skv = p.get("seqused_kv")
+    _set("cu_seqlens_q", list(cu_q) if cu_q else None)
+    _set("cu_seqlens_kv", list(cu_kv) if cu_kv else None)
+    _set("seqused_q", list(sq) if sq else None)
+    _set("seqused_kv", list(skv) if skv else None)
+
+    _set("max_seqlen_q", _resolve_max_seqlen(p, "q", cu_q, sq))
+    _set("max_seqlen_kv", _resolve_max_seqlen(p, "kv", cu_kv, skv))
+
+    layout_kv = p.get("layout_kv", layout_q)
+    if layout_kv in ("PA_BBND", "PA_BNBD", "PA_NZ"):
+        _set("block_size", int(p.get("block_size", 128)))
+
+    return attrs
+
+
+def _resolve_max_seqlen(p, suffix, cu_seqlens, seqused):
+    """Same logic as pytests data.py _resolve_max_seqlen."""
+    explicit = p.get(f"max_seqlen_{suffix}")
+    if explicit is not None:
+        return int(explicit)
+    if seqused:
+        return max(int(x) for x in seqused)
+    if cu_seqlens and len(cu_seqlens) > 1:
+        return max(
+            cu_seqlens[i + 1] - cu_seqlens[i] for i in range(len(cu_seqlens) - 1)
+        )
+    fallback = p.get("S2", p.get("S1", 1)) if suffix == "kv" else p.get("S1", 1)
+    return int(fallback)
+
+
+# ── precision ──
+
+
+def _precision(p):
+    dtype_str = p.get("Dtype", "fp16")
+    if dtype_str == "bf16":
+        return ((0.0078125, 0.0001),)
+    return ((0.005, 0.000025),)
+
+
+# ── data ranges ──
+
+
+def _data_ranges(p, num_tensors):
+    q_range = p.get("q_range", (-5.0, 5.0))
+    k_range = p.get("k_range", (-5.0, 5.0))
+    v_range = p.get("v_range", (-5.0, 5.0))
+    main = [tuple(q_range), tuple(k_range), tuple(v_range)]
+    aux = [(None, None)] * (num_tensors - 3)
+    return tuple(main + aux)
+
+
+# ── CSV row builder ──
+
+
+def _build_row(case_name, p):
+    q_shape, k_shape, v_shape = _qkv_shapes(p)
+    bt_shape, cu_q_shape, cu_kv_shape, sq_shape, skv_shape = _aux_shapes(p)
+
+    mask_mode = int(p.get("mask_mode", 0))
+    attn_mask_shape = (2048, 2048) if mask_mode in (3, 4) else None
+
+    shapes = [
+        q_shape,
+        k_shape,
+        v_shape,
+        bt_shape,
+        cu_q_shape,
+        cu_kv_shape,
+        sq_shape,
+        skv_shape,
+        attn_mask_shape,
+        None,
+    ]
+    dtype_str = DTYPE_MAP.get(p.get("Dtype", "fp16"), "float16")
+
+    dtypes = [dtype_str, dtype_str, dtype_str]
+    for i in range(3, len(shapes)):
+        if shapes[i] is None:
+            dtypes.append(None)
+        elif i == 8:
+            dtypes.append("int8")
+        else:
+            dtypes.append(INT_DTYPE)
+
+    data_ranges = _data_ranges(p, len(shapes))
+
+    attrs = _build_attrs(p)
+    prec = _precision(p)
+
+    return [
+        case_name,
+        API_NAME,
+        repr(tuple(shapes)),
+        repr(tuple(dtypes)),
+        "",
+        repr(attrs),
+        "",
+        "",
+        repr(data_ranges),
+        repr(prec),
+        repr(ABSOLUTE_PRECISION_DEFAULT),
+    ]
+
+
+# ── main ──
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Convert pytests TestCases → TTK E2E CSV"
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        default="flash_attn_stc.csv",
+        help="Output CSV filename (default: flash_attn_stc.csv)",
+    )
+    parser.add_argument(
+        "--case-file",
+        default="functional_stc",
+        help="Test case module (default: functional_stc)",
+    )
+    args = parser.parse_args()
+
+    from core.case_loader import load_case_modules
+
+    cases = load_case_modules([f"test_cases.{args.case_file}"])
+
+    out_path = os.path.join(_HERE, args.output)
+    with open(out_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(HEADER)
+        for case_id, raw_params in sorted(cases.items()):
+            short_name = case_id.rsplit("/", 1)[-1]
+            p = normalize_params(raw_params)
+            row = _build_row(short_name, p)
+            writer.writerow(row)
+
+    print(f"wrote {out_path} ({len(cases)} cases)")
+
+
+if __name__ == "__main__":
+    main()
