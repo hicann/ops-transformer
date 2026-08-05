@@ -1,7 +1,7 @@
 name: PR-pipeline_ops-transformer
 
 concurrency:
-  max: 5
+  max: 15
   exceed-action: QUEUE
   enable: true
   preemption:
@@ -26,6 +26,7 @@ env:
   SOURCE_BRANCH: ${{ atomgit.head_ref }}
   obs_path: "${{ vars.OBS_PATH }}/${{ env.MERGE_ID }}"
   obs_smoke_path: "${{ env.obs_path }}/presmoke/2" 
+  online: ${{ vars.APPLY_LABEL }}
 
 stages:
   stage1:
@@ -48,67 +49,9 @@ stages:
         runs-on: [dedicate-hosted, x64, small]
         container:
           image: swr.cn-north-4.myhuaweicloud.com/ci_cann/ubuntu20.04.05_x86:k8s_v1.1006
-      JOB_pr:
-        name: Test_get-pr
-        needs: []
-        steps:
-          -
-            name: Checkout
-            identifier: process_checkout
-            uses: checkout
-            with:
-              ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
-              token: ${{ secrets.GIT_TOKEN }}
-          -
-            name: get_pr
-            identifier: get_pr
-            uses: cann/.gitcode/actions/get-pr@master
-            with:
-              workspace: ${{ steps.process_checkout.outputs.path }}
-              target_branch: ${{ env.TARGET_BRANCH }}
-              git_token: ${{ secrets.GIT_TOKEN }}
-          -
-            name: upload
-            uses: obs-upload
-            with:
-              endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
-              bucket: "ascend-ci"
-              access-key: ${{ secrets.AK }}
-              secret-key: ${{ secrets.SK }}
-              artifact-path: |
-                ${{ steps.process_checkout.outputs.path }}/pr_filelist.txt
-                ${{ steps.process_checkout.outputs.path }}/pr_filelist_mod.txt
-                ${{ steps.process_checkout.outputs.path }}/pr_filelist_precommit.txt
-                ${{ steps.process_checkout.outputs.path }}/update_file_detail.txt
-              object-prefix: ${{ env.obs_path }}/
-        if: "${{ default() }}"
-        runs-on:
-        - default
-      JOB_shell:
-        name: Test_get-shell
-        needs: []
-        steps:
-          -
-            name: Checkout
-            identifier: process_checkout
-            uses: checkout
-            with:
-              ref: master
-              token: ${{ secrets.GIT_TOKEN }}
-          -
-            name: upload
-            uses: obs-upload
-            with:
-              endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
-              bucket: "ascend-ci"
-              access-key: ${{ secrets.AK }}
-              secret-key: ${{ secrets.SK }}
-              artifact-path: |
-                ${{ steps.process_checkout.outputs.path }}/.gitcode/scripts/*
-              object-prefix: ${{ env.obs_path }}/
-        if: "${{ default() }}"
-        runs-on:
-        - default
+      JOB_pre:
+        name: Test_PreBuild
+        uses: cann/.gitcode/.gitcode/workflows/pre_action.yml@master
     pre:
     - type: auto
     fail-fast: true
@@ -295,35 +238,11 @@ stages:
         with:
           precommit_image_version: ${{ jobs.JOB_image.outputs.precommit }}
           codecheck_image_version: ${{ jobs.JOB_image.outputs.codecheck }}
-      JOB_staticcheck_markdown:
-        name: CodeCheck_staticcheck_markdown
+      JOB_staticcheck_md_check:
+        name: CodeCheck_staticcheck_md_check
         uses: .gitcode/workflows/staticcheck_action.yml
         with:
-          check_type: 'markdown'
-          image_version: ${{ jobs.JOB_image.outputs.staticcheck }}
-      JOB_staticcheck_codespell_check:
-        name: CodeCheck_staticcheck_codespell
-        uses: .gitcode/workflows/staticcheck_action.yml
-        with:
-          check_type: 'codespell_check'
-          image_version: ${{ jobs.JOB_image.outputs.staticcheck }}
-      JOB_staticcheck_tag_closed_check:
-        name: CodeCheck_staticcheck_tag_closed
-        uses: .gitcode/workflows/staticcheck_action.yml
-        with:
-          check_type: 'tag_closed_check'
-          image_version: ${{ jobs.JOB_image.outputs.staticcheck }}
-      JOB_staticcheck_resource_existence_check:
-        name: CodeCheck_staticcheck_resource_existence
-        uses: .gitcode/workflows/staticcheck_action.yml
-        with:
-          check_type: 'resource_existence_check'
-          image_version: ${{ jobs.JOB_image.outputs.staticcheck }}
-      JOB_staticcheck_link_validity_check:
-        name: CodeCheck_staticcheck_link_validity
-        uses: .gitcode/workflows/staticcheck_action.yml
-        with:
-          check_type: 'link_validity_check'
+          check_type: 'md_check'
           image_version: ${{ jobs.JOB_image.outputs.staticcheck }}
     pre:
     - type: auto
@@ -405,6 +324,7 @@ stages:
           -
             name: smoke executor
             uses: manifest-management-plugin
+            timeout-minutes: 30
             with:
               action: DEPLOY
               repo: ${{ steps.process_checkout.outputs.path }}
@@ -425,6 +345,7 @@ stages:
           -
             name: smoke resource clean
             uses: manifest-management-plugin
+            if: ${{ always() }}
             with:
               action: CRUSH
               repo: ${{ steps.process_checkout.outputs.path }}
@@ -492,18 +413,5 @@ stages:
 post:
   jobs: 
     job_post: 
-      name: Test_finish
-      steps:
-        - 
-          name: query_pipeline
-          uses: cann/.gitcode/actions/query-pipeline@master
-          with:
-            owner: ${{ env.org_name }}
-            repo: ${{ env.repo_name }}
-            run_id: ${{ atomgit.workflow_run_id }}
-            token: ${{ secrets.GIT_TOKEN }}
-            pr_number: ${{ env.MERGE_ID }}
-            apply_label: ${{ vars.APPLY_LABEL }}
-      runs-on: [dedicate-hosted, x64, small]
-      container:
-        image: swr.cn-north-4.myhuaweicloud.com/ci_cann/${{ jobs.JOB_image.outputs.codecheck }}
+      name: Test_post
+      uses: cann/.gitcode/.gitcode/workflows/post_action.yml@master
