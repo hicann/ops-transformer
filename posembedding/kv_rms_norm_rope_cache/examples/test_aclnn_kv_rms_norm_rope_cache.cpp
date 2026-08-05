@@ -35,7 +35,7 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape) {
 
 void PrintOutResult(std::vector<int64_t> &shape, void** deviceAddr) {
   auto size = GetShapeSize(shape);
-  std::vector<int8_t> resultData(size, 0);
+  std::vector<aclFloat16> resultData(size, aclFloatToFloat16(0.0f));
   auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]),
                          *deviceAddr, size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
@@ -45,7 +45,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void** deviceAddr) {
   uint64_t bIdx = 0;
   uint64_t sIdx = 0;
   for (uint64_t i = 0; i < size; i++) {
-    LOG_PRINT("result[%lu] is: %d\n", i, resultData[i]);
+    LOG_PRINT("result[%lu] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
     // Fast diagonal traverse
     bIdx = (bIdx >= batchKv) ? batchKv : (bIdx + 1);
     sIdx = (sIdx >= batchSeq) ? batchSeq : (sIdx + 1);
