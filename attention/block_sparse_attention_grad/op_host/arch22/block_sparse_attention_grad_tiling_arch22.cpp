@@ -11,7 +11,6 @@
 #include "../block_sparse_attention_grad_tiling.h"
 #include <cmath>
 #include <cstring>
-#include <cstdlib>
 #include <string>
 #include "log/log.h"
 
@@ -262,8 +261,7 @@ ge::graphStatus BSAGradTiling::ProcessInput(gert::TilingContext *context)
         }
     }
 
-    const char* detEnv = std::getenv("BSAG_DETERMINISTIC");
-    deterministic_ = (detEnv != nullptr && std::string(detEnv) == "1");
+    deterministic_ = (context->GetDeterministic() == 1);
     return ProcessAttrs(context);
 }
 
