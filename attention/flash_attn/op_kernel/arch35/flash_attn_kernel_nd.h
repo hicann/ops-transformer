@@ -16,18 +16,12 @@
 #ifndef FLASH_ATTN_KERNEL_ND_H_
 #define FLASH_ATTN_KERNEL_ND_H_
 
-#include "adv_api/activation/softmax.h"
-#include "kernel_operator_list_tensor_intf.h" // TensorDesc
 #include "../utils/flash_attn_common_def.h"
 #include "../utils/flash_attn_utils.h"
 
 #include "flash_attn_block_cube_nd.h"
 #include "flash_attn_block_vec_nd.h"
-#if __has_include("../../../common/op_kernel/memory_copy_arch35.h")
 #include "memory_copy_arch35.h"
-#else
-#include "memory_copy_arch35.h"
-#endif
 #include "flash_attn_block_vec_flashdecode.h"
 
 #if ASC_DEVKIT_MAJOR >= 9

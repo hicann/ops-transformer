@@ -15,11 +15,8 @@
 #ifndef FLASH_ATTENTION_BLOCK_VEC_ND_H_
 #define FLASH_ATTENTION_BLOCK_VEC_ND_H_
 
-#include "kernel_operator.h"
-
 #include "../utils/attenmask_gs1.h"
 
-#include "adv_api/activation/softmax.h"
 #if __has_include("../../../common/op_kernel/arch35/flash_attention_score_common_regbase.h")
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase.h"
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz.h"
@@ -28,7 +25,6 @@
 #include "../../../common/op_kernel/arch35/vf/vf_div_cast.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode.h"
 #include "../../../common/op_kernel/vector_common.h"
-#include "memory_copy_arch35.h"
 #include "../../../common/op_kernel/init_output.h"
 #else
 #include "../../common/arch35/flash_attention_score_common_regbase.h"
@@ -38,9 +34,10 @@
 #include "../../common/arch35/vf/vf_div_cast.h"
 #include "../../common/arch35/vf/vf_flash_decode.h"
 #include "../../common/vector_common.h"
-#include "memory_copy_arch35.h"
 #include "../../common/init_output.h"
 #endif
+
+#include "memory_copy_arch35.h"
 
 using namespace AscendC;
 using namespace FaVectorApi;

@@ -15,21 +15,15 @@
 #ifndef FLASH_ATTN_BLOCK_VEC_FLASHDECODE_H
 #define FLASH_ATTN_BLOCK_VEC_FLASHDECODE_H
 
-#include "kernel_operator.h"
-#include "kernel_operator_list_tensor_intf.h"
-#include "kernel_tiling/kernel_tiling.h"
-#include "lib/matmul_intf.h"
-#include "lib/matrix/matmul/tiling.h"
+#include "../utils/attenmask_gs1.h"
 
-#if __has_include("../../../common/op_kernel/arch35/infer_flash_attention_comm.h")
-#include "../../../common/op_kernel/arch35/infer_flash_attention_comm.h"
+#if __has_include("../../../common/op_kernel/arch35/vf/vf_flash_decode.h")
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode.h"
-#include "memory_copy_arch35.h"
 #else
-#include "../../common/arch35/infer_flash_attention_comm.h"
 #include "../../common/arch35/vf/vf_flash_decode.h"
-#include "memory_copy_arch35.h"
 #endif
+
+#include "memory_copy_arch35.h"
 
 namespace BaseApi {
 struct TaskInfo {

@@ -9,24 +9,23 @@
  */
 
 /*!
- * \file flash_attn_block_cube_comm.h
- * \brief
+ * \file flash_attn_type.h
+ * \brief flash_attn 核心类型定义: FAType / 布局格式映射 / SeqLensTool / ClipSInnerToken
  */
-#ifndef FLASH_ATTENTION_BLOCK_CUBE_COMM_H_
-#define FLASH_ATTENTION_BLOCK_CUBE_COMM_H_
+#ifndef FLASH_ATTN_TYPE_H_
+#define FLASH_ATTN_TYPE_H_
 
-#include "../../../common/op_kernel/offset_calculator.h"
-#include "../../../common/op_kernel/matmul.h"
-#include "../../../common/op_kernel/FixpipeOut.h"
+#include "flash_attn_common_def.h"
 #include "../arch35/memory_copy_arch35.h"
-#include "../../../common/op_kernel/arch35/infer_flash_attention_comm.h"
+#if __has_include("../../../common/op_kernel/arch35/flash_attention_score_common_regbase.h")
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase.h"
-#include "kernel_operator_list_tensor_intf.h"
+#else
+#include "../../common/arch35/flash_attention_score_common_regbase.h"
+#endif
 
 using namespace AscendC;
 using namespace AscendC::Impl::Detail;
 using namespace regbaseutil;
-using namespace fa_base_matmul;
 
 namespace BaseApi {
 
@@ -164,4 +163,4 @@ __aicore__ inline int64_t ClipSInnerToken(int64_t sInnerToken, int64_t minValue,
 
 } // namespace BaseApi
 
-#endif // FLASH_ATTENTION_BLOCK_CUBE_COMM_H_
+#endif // FLASH_ATTN_TYPE_H_

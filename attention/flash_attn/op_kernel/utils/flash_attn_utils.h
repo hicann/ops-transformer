@@ -16,7 +16,6 @@
 #ifndef FLASH_ATTN_UTILS_H_
 #define FLASH_ATTN_UTILS_H_
 
-#include "util.h"
 #include "kernel_operator_list_tensor_intf.h"
 
 using AscendC::LocalTensor;
