@@ -81,6 +81,8 @@ if(UT_TEST_ALL OR OP_API_UT)
           platform
           c_sec
           -Wl,--no-whole-archive
+          ascendalog
+          unified_dlog
           )
 
   ## exec opapi ut exe

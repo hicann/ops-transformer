@@ -570,8 +570,15 @@ endmacro()
 #   to install the generated artifacts into the kernel staging dir.
 # ------------------------------------------------------------------------------------------------------------
 function(enable_pypto_kernel op_file)
-    set(_gen ${ASCEND_BINARY_OUT_DIR}/${ASCEND_COMPUTE_UNIT}/${op_file}_pypto_gen)
-    set(_py  ${CMAKE_CURRENT_SOURCE_DIR}/../op_kernel/${op_file}.py)
+    set(_compute_units ${ASCEND_COMPUTE_UNIT})
+    list(FILTER _compute_units INCLUDE REGEX ".+")
+    if (NOT _compute_units)
+        message(FATAL_ERROR "enable_pypto_kernel: ASCEND_COMPUTE_UNIT is empty")
+    endif ()
+    list(GET _compute_units 0 _soc_unit)
+
+    set(_gen "${ASCEND_BINARY_OUT_DIR}/${_soc_unit}/${op_file}_pypto_gen")
+    set(_py  "${CMAKE_CURRENT_SOURCE_DIR}/../op_kernel/${op_file}.py")
 
     if (NOT EXISTS ${_py})
         message(FATAL_ERROR "enable_pypto_kernel: kernel python file not found: ${_py}")
@@ -580,8 +587,8 @@ function(enable_pypto_kernel op_file)
     message(STATUS "pypto codegen: ${op_file} -> ${_gen}")
     execute_process(
         COMMAND ${HI_PYTHON} ${OPS_ADV_DIR}/cmake/scripts/pypto_codegen.py
-                --py-file ${_py} --out-dir ${_gen}
-                --op-file ${op_file} --soc ${ASCEND_COMPUTE_UNIT}
+                --py-file "${_py}" --out-dir "${_gen}"
+                --op-file "${op_file}" --soc "${_soc_unit}"
         RESULT_VARIABLE _rc
     )
     if (NOT _rc EQUAL 0)
