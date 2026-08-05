@@ -14,6 +14,7 @@
 #include <nlohmann/json.hpp>
 #include "platform/platform_infos_def.h"
 #include "base/registry/op_impl_space_registry_v2.h"
+#include "exe_graph/runtime/tensor.h"
 #include <string>
 #include <sstream>
 #include <iomanip>
@@ -30,9 +31,23 @@
     std::vector<gert::Tensor *> outputTensors = {};                                                                                                                                                                                          \
     std::vector<std::unique_ptr<gert::Tensor>> inputTensorsKeepAlive = {};                                                                                                                                                                   \
     std::vector<std::unique_ptr<gert::Tensor>> outputTensorsKeepAlive = {};                                                                                                                                                                  \
+    std::vector<std::unique_ptr<gert::TensorV2>> inputTensorsV2KeepAlive = {};                                                                                                                                                               \
     for (size_t index = 0; index < inputNum; index++) {                                                                                                                                                                                      \
         if (tilingContextPara.inputTensorDesc_[index].shape_.GetStorageShape().GetDimNum() == 0) {                                                                                                                                           \
             inputIrInstance.push_back(0);                                                                                                                                                                                                    \
+        } else if (tilingContextPara.inputTensorDesc_[index].hasStride_) {                                                                                                                                                                   \
+            inputIrInstance.push_back(1);                                                                                                                                                                                                    \
+            auto curTensorV2 = std::make_unique<gert::TensorV2>(                                                                                                                                                                              \
+                tilingContextPara.inputTensorDesc_[index].shape_,                                                                                                                                                                            \
+                gert::StorageFormat(tilingContextPara.inputTensorDesc_[index].format_,                                                                                                                                                       \
+                                    tilingContextPara.inputTensorDesc_[index].format_, gert::ExpandDimsType()),                                                                                                                              \
+                gert::TensorPlacement::kOnHost, tilingContextPara.inputTensorDesc_[index].dtype_,                                                                                                                                            \
+                tilingContextPara.inputTensorDesc_[index].isConst_ ?                                                                                                                                                                         \
+                    tilingContextPara.inputTensorDesc_[index].constValue_ :                                                                                                                                                                  \
+                    nullptr);                                                                                                                                                                                                                \
+            curTensorV2->MutableStride() = tilingContextPara.inputTensorDesc_[index].stride_;                                                                                                                                                \
+            inputTensors.push_back(reinterpret_cast<gert::Tensor*>(curTensorV2.get()));                                                                                                                                                      \
+            inputTensorsV2KeepAlive.push_back(std::move(curTensorV2));                                                                                                                                                                       \
         } else {                                                                                                                                                                                                                             \
             inputIrInstance.push_back(1);                                                                                                                                                                                                    \
             std::unique_ptr<gert::Tensor> curTensor = std::make_unique<gert::Tensor>(                                                                                                                                                        \

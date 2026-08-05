@@ -13,6 +13,7 @@
 
 #include "op_tiling_context_builder.h"
 #include "any_value.h"
+#include "exe_graph/runtime/stride.h"
 
 namespace gert {
 
@@ -32,6 +33,8 @@ public:
         ge::Format format_ = ge::FORMAT_ND;
         bool isConst_ = false;
         void *constValue_ = nullptr;
+        gert::Stride stride_;
+        bool hasStride_ = false;
     };
 
     class OpAttr {
