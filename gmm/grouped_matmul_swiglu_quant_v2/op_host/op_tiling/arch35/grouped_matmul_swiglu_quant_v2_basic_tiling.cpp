@@ -883,7 +883,8 @@ ge::graphStatus GroupedMatmulSwigluQuantV2Tiling950::PostTiling()
 
 uint64_t GroupedMatmulSwigluQuantV2Tiling950::GetTilingKey() const
 {
-    return GET_TPL_TILING_KEY(static_cast<uint64_t>(inputParams_.transB), static_cast<uint64_t>(inputParams_.transA));
+    return GET_TPL_TILING_KEY(static_cast<uint64_t>(inputParams_.transB), static_cast<uint64_t>(inputParams_.transA),
+                              static_cast<uint64_t>(GMM_SWIGLU_QUANT_ORIGINAL_KERNEL_TYPE));
 }
 
 bool GroupedMatmulSwigluQuantV2Tiling950::IsB8(ge::DataType dtype)
