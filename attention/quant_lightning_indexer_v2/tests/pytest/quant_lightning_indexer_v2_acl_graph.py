@@ -95,7 +95,12 @@ def _qliv2_prepare_tensors_and_metadata(params, tensor_dict):
         query = tensor_dict["query"].to(dtype=torch.float8_e4m3fn).npu()
         key = tensor_dict["key"].to(dtype=torch.float8_e4m3fn).npu()
         if "blockFusion" in tensor_dict and tensor_dict["blockFusion"] is not None:
-            blockFusion = tensor_dict["blockFusion"].to(dtype=torch.float8_e4m3fn).npu()
+            blockFusion = tensor_dict["blockFusion"]
+            if blockFusion.dtype == torch.uint8:
+                blockFusion = blockFusion.view(torch.float8_e4m3fn)
+            else:
+                blockFusion = blockFusion.to(dtype=torch.float8_e4m3fn)
+            blockFusion = blockFusion.npu()
     else:
         query = tensor_dict["query"].npu()
         key = tensor_dict["key"].npu()

@@ -44,6 +44,7 @@ def normalize_qliv2_params(params):
             q_scale_datarange, k_scale_datarange, cmp_ratio, return_value,
             output_idx_offset,
         ) = values
+        weight_dtype = dequant_dtype
 
     q_t_size = 0 if q_t_size is None else int(q_t_size)
     k_t_size = 0 if k_t_size is None else int(k_t_size)
@@ -63,6 +64,4 @@ def normalize_qliv2_params(params):
         query_datarange, key_datarange, weights_datarange, q_scale_datarange,
         k_scale_datarange, int(cmp_ratio), int(return_value), output_idx_offset,
     )
-    if has_weight_dtype:
-        normalized = normalized[:11] + (weight_dtype,) + normalized[11:]
-    return normalized
+    return normalized[:11] + (weight_dtype,) + normalized[11:]

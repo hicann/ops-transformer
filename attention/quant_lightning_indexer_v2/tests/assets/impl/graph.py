@@ -41,7 +41,14 @@ class QuantLightningIndexerV2AclGraph(torch.nn.Module):
         return_value=0,
     ):
         super().__init__()
-        from qli_v2_ttk_ops import QuantLightningIndexerMetadataBuilder
+        from qli_v2_ttk_ops import (
+            QuantLightningIndexerMetadataBuilder,
+            restore_mx_input_dtypes,
+        )
+
+        query, key, query_dequant_scale, key_dequant_scale = restore_mx_input_dtypes(
+            query, key, query_dequant_scale, key_dequant_scale, quant_mode
+        )
 
         self.query = query
         self.key = key

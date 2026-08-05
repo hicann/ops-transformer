@@ -19,6 +19,12 @@ from pathlib import Path
 
 import torch
 
+from qli_v2_ttk_ops import (
+    QUANT_MODE_MXFP4,
+    QUANT_MODE_MXFP8,
+    restore_mx_input_dtypes,
+)
+
 
 class QuantLightningIndexerV2InputAdapter:
     """Translate a TTK case and reuse the pytest input/golden generator."""
@@ -125,7 +131,11 @@ class QuantLightningIndexerV2InputAdapter:
         return None
 
     @staticmethod
-    def qk_dtype_name(tensor):
+    def qk_dtype_name(tensor, quant_mode):
+        if quant_mode == QUANT_MODE_MXFP8:
+            return "FLOAT8_E4M3FN"
+        if quant_mode == QUANT_MODE_MXFP4:
+            return "FLOAT4_E2M1FN_X2"
         dtype_name = str(tensor.dtype)
         if dtype_name == "torch.int8":
             return "INT8"
@@ -136,7 +146,9 @@ class QuantLightningIndexerV2InputAdapter:
         raise ValueError(f"unsupported QLI_V2 q/k dtype: {tensor.dtype}")
 
     @staticmethod
-    def dequant_dtype_name(tensor):
+    def dequant_dtype_name(tensor, quant_mode):
+        if quant_mode in (QUANT_MODE_MXFP8, QUANT_MODE_MXFP4):
+            return "FLOAT8_E8M0FNU"
         if tensor.dtype == torch.float16:
             return "FP16"
         if tensor.dtype == torch.float32:
@@ -166,7 +178,7 @@ class QuantLightningIndexerV2InputAdapter:
         return "weight_dtype" in parameters
 
     def geometry(self, query, key, layout_query, layout_key,
-                 cu_q, cu_k, seq_q, seq_k):
+                 cu_q, cu_k, seq_q, seq_k, quant_mode):
         q_lengths = self.prefix_lengths(cu_q) or (seq_q or [])
         k_lengths = self.prefix_lengths(cu_k) or (seq_k or [])
         if layout_query == "BSND":
@@ -178,6 +190,9 @@ class QuantLightningIndexerV2InputAdapter:
             q_seq = max(q_lengths, default=q_t_size)
         else:
             raise ValueError(f"unsupported QLI_V2 query layout: {layout_query}")
+
+        if quant_mode == QUANT_MODE_MXFP4:
+            head_dim *= 2
 
         if layout_key == "BSND":
             _, k_seq, k_head_num, _ = [int(item) for item in key.shape]
@@ -210,21 +225,22 @@ class QuantLightningIndexerV2InputAdapter:
         seq_q = self.list_value(kwargs, "seqused_q")
         seq_k = self.list_value(kwargs, "seqused_k")
         residual = self.list_value(kwargs, "cmp_residual_k")
+        quant_mode = kwargs.get("quant_mode")
+        quant_mode = None if quant_mode is None else int(quant_mode)
         geometry = self.geometry(
-            query, key, layout_query, layout_key, cu_q, cu_k, seq_q, seq_k
+            query, key, layout_query, layout_key, cu_q, cu_k, seq_q, seq_k,
+            quant_mode,
         )
-        input_ranges = kwargs.get("input_ranges") or ()
+        input_ranges = kwargs.get("qli_input_ranges") or kwargs.get("input_ranges") or ()
         output_range = kwargs.get("output_idx_offset_range")
         output_range = None if output_range is None else repr(list(output_range))
         max_seqlen_q = kwargs.get("max_seqlen_q")
         max_seqlen_q = None if max_seqlen_q is None else int(max_seqlen_q)
-        quant_mode = kwargs.get("quant_mode")
-        quant_mode = None if quant_mode is None else int(quant_mode)
-        dtype_params = (self.qk_dtype_name(query),)
+        dtype_params = (self.qk_dtype_name(query, quant_mode),)
         if include_weight_dtype:
             dtype_params += (self.weight_dtype_name(weights),)
         dtype_params += (
-            self.dequant_dtype_name(query_dequant_scale),
+            self.dequant_dtype_name(query_dequant_scale, quant_mode),
             "INT32",
         )
         params = geometry + dtype_params + (
@@ -251,7 +267,7 @@ class QuantLightningIndexerV2InputAdapter:
         return self.load_pytest_normalizer().normalize_qliv2_params(params)
 
     @staticmethod
-    def copy_tensor(dst, src, name):
+    def copy_tensor(dst, src, name, packed_dtype=None):
         if dst is None:
             if src is not None:
                 raise ValueError(
@@ -261,6 +277,11 @@ class QuantLightningIndexerV2InputAdapter:
         if src is None:
             raise ValueError(f"{name} is present in CSV but pytest generator returned None")
         src_cpu = src.detach().cpu() if torch.is_tensor(src) else torch.as_tensor(src)
+        src_cpu = src_cpu.contiguous()
+        if packed_dtype is not None:
+            src_cpu = src_cpu.to(packed_dtype)
+        if dst.dtype == torch.uint8 and src_cpu.element_size() == 1:
+            src_cpu = src_cpu.view(torch.uint8)
         if tuple(dst.shape) != tuple(src_cpu.shape):
             raise ValueError(
                 f"{name} shape mismatch: TTK={tuple(dst.shape)} "
@@ -294,12 +315,12 @@ class QuantLightningIndexerV2InputAdapter:
         """Restore a paged key or scale tensor to its logical BNS(D) layout."""
         physical = tensor.detach().cpu()
         table = block_table.detach().cpu().to(torch.int64)
-        if physical.ndim not in (3, 4):
+        if physical.ndim < 3:
             raise ValueError(
-                f"paged tensor must be 3-D or 4-D, got shape {tuple(physical.shape)}"
+                f"paged tensor must have at least 3 dimensions, got shape {tuple(physical.shape)}"
             )
         block_size, head_num = int(physical.shape[1]), int(physical.shape[2])
-        trailing = (int(physical.shape[3]),) if physical.ndim == 4 else ()
+        trailing = tuple(int(dim) for dim in physical.shape[3:])
         logical = torch.zeros(
             (batch_size, head_num, sequence_length, *trailing), dtype=physical.dtype
         )
@@ -314,7 +335,7 @@ class QuantLightningIndexerV2InputAdapter:
                     break
                 count = min(block_size, sequence_length - start)
                 block = physical[block_id_value, :count]
-                permutation = (1, 0, 2) if physical.ndim == 4 else (1, 0)
+                permutation = (1, 0, *range(2, block.ndim))
                 logical[batch_idx, :, start:start + count] = block.permute(*permutation)
         return logical
 
@@ -416,6 +437,16 @@ class QuantLightningIndexerV2InputAdapter:
         cu_k_cpu = as_int_tensor(cu_k_values)
         seq_q_cpu = as_int_tensor(seq_q_values)
         seq_k_cpu = as_int_tensor(seq_k_values)
+        query, key, query_scale, key_scale = restore_mx_input_dtypes(
+            query, key, query_scale, key_scale, quant_mode
+        )
+        query = query.detach().cpu()
+        key = key.detach().cpu()
+        weights = weights.detach().cpu()
+        query_scale = query_scale.detach().cpu()
+        key_scale = key_scale.detach().cpu()
+        block_table = None if block_table is None else block_table.detach().cpu()
+        offset = None if offset is None else offset.detach().cpu()
         model_args = [
             batch_size, q_seq, k_seq, q_t_size, k_t_size,
             q_head_num, k_head_num, head_dim, block_size, block_num,
@@ -481,6 +512,7 @@ class QuantLightningIndexerV2InputAdapter:
                   seqused_q, seqused_k, cmp_residual_k, block_table,
                   output_idx_offset, layout_query, layout_key, kwargs):
         pytest_golden = self.load_pytest_golden()
+        quant_mode = int(kwargs.get("quant_mode") or 1)
         params = self.build_case_params(
             query,
             key,
@@ -508,7 +540,12 @@ class QuantLightningIndexerV2InputAdapter:
             ("block_table", block_table, "block_table"),
             ("output_idx_offset", output_idx_offset, "output_idx_offset"),
         ):
-            self.copy_tensor(dst, data.get(src_name), name)
+            packed_dtype = (
+                torch.float8_e4m3fn
+                if quant_mode == QUANT_MODE_MXFP8 and name in ("query", "key")
+                else None
+            )
+            self.copy_tensor(dst, data.get(src_name), name, packed_dtype)
         testcase_name = kwargs.get("testcase_name")
         golden_store.put(
             testcase_name,

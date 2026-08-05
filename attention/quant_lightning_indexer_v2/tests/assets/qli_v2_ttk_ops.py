@@ -19,6 +19,37 @@ import torch
 import cann_ops_transformer
 
 
+QUANT_MODE_MXFP4 = 5
+QUANT_MODE_MXFP8 = 3
+
+
+def restore_mx_input_dtypes(query, key, query_dequant_scale,
+                            key_dequant_scale, quant_mode):
+    quant_mode = int(quant_mode)
+    qk_dtype = None
+    if quant_mode == QUANT_MODE_MXFP8:
+        qk_dtype = getattr(torch, "float8_e4m3fn", None)
+    elif quant_mode == QUANT_MODE_MXFP4:
+        qk_dtype = getattr(torch, "float4_e2m1fn_x2", None)
+    else:
+        return query, key, query_dequant_scale, key_dequant_scale
+    if qk_dtype is None:
+        raise RuntimeError("current PyTorch does not provide the requested MX dtype")
+
+    scale_dtype = getattr(torch, "float8_e8m0fnu", None)
+    if scale_dtype is None:
+        raise RuntimeError("current PyTorch does not provide float8_e8m0fnu")
+    if query.dtype == torch.uint8:
+        query = query.view(qk_dtype)
+    if key.dtype == torch.uint8:
+        key = key.view(qk_dtype)
+    if query_dequant_scale.dtype == torch.uint8:
+        query_dequant_scale = query_dequant_scale.view(scale_dtype)
+    if key_dequant_scale.dtype == torch.uint8:
+        key_dequant_scale = key_dequant_scale.view(scale_dtype)
+    return query, key, query_dequant_scale, key_dequant_scale
+
+
 class QuantLightningIndexerMetadataBuilder:
     """Derive and create the metadata consumed by the main operator."""
 
@@ -53,7 +84,9 @@ class QuantLightningIndexerMetadataBuilder:
         metadata = torch.ops.cann_ops_transformer.quant_lightning_indexer_metadata(
             num_heads_q=q_head_num,
             num_heads_k=k_head_num,
-            head_dim=int(query.shape[-1]),
+            head_dim=int(query.shape[-1]) * (
+                2 if int(quant_mode) == QUANT_MODE_MXFP4 else 1
+            ),
             topk=int(sparse_count),
             quant_mode=int(quant_mode),
             cu_seqlens_q=cu_seqlens_q,
@@ -97,6 +130,9 @@ def quant_lightning_indexer_v2(
     cmp_ratio: int = 1,
     return_value: int = 0,
 ):
+    query, key, query_dequant_scale, key_dequant_scale = restore_mx_input_dtypes(
+        query, key, query_dequant_scale, key_dequant_scale, quant_mode
+    )
     metadata = QuantLightningIndexerMetadataBuilder.build(
         query,
         key,

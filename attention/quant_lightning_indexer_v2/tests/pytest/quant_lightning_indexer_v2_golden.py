@@ -2140,7 +2140,7 @@ def qliv2_output_single(
             query = query.to(dtype=torch.float16)
             key = key.to(dtype=torch.float16)
             if blockFusion is not None:
-                blockFusion = blockFusion.to(dtype=torch.float16)
+                blockFusion = blockFusion.view(torch.uint8)
 
         output_tensors = {
             "params": params,

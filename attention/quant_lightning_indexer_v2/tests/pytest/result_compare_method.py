@@ -395,6 +395,30 @@ def trans_tnd_actseq(list):
     return list_new
 
 
+def _reshape_topk_value(topk_value, total_rows, sparse_count, params):
+    if isinstance(topk_value, torch.Tensor):
+        topk_value = topk_value.detach().cpu().float().numpy()
+    else:
+        topk_value = np.asarray(topk_value)
+    if topk_value.size == total_rows * sparse_count:
+        return topk_value.reshape(total_rows, sparse_count)
+
+    batch_size, cu_seqlens_q, layout_query = params[0], params[14], params[21]
+    if layout_query != "TND" or topk_value.ndim != 4:
+        raise ValueError(
+            f"topk value shape {topk_value.shape} cannot reshape to "
+            f"({total_rows}, {sparse_count})"
+        )
+    cu_seqlens_q = _get_tnd_query_prefix(cu_seqlens_q, batch_size)
+    topk_value = np.concatenate([
+        topk_value[batch_idx, :, :cu_seqlens_q[batch_idx + 1] - cu_seqlens_q[batch_idx], :]
+        .transpose(1, 0, 2)
+        .reshape(-1, sparse_count)
+        for batch_idx in range(batch_size)
+    ])
+    return topk_value.reshape(total_rows, sparse_count)
+
+
 def check_result(
     expect,
     result,
@@ -556,8 +580,12 @@ def check_result(
     npu_reshape = npu_output.reshape([total_rows, sparse_count])
     cpu_reshape = cpu_output.reshape([total_rows, sparse_count])
     if return_value:
-        cpu_topk_value = cpu_topk_value.reshape([total_rows, sparse_count])
-        npu_topk_value = npu_topk_value.reshape([total_rows, sparse_count])
+        cpu_topk_value = _reshape_topk_value(
+            cpu_topk_value, total_rows, sparse_count, params
+        )
+        npu_topk_value = _reshape_topk_value(
+            npu_topk_value, total_rows, sparse_count, params
+        )
     start_time = time()
     invalid_data = cpu_reshape != -1
     valid_lens = invalid_data.sum(axis=-1)  # (total_rows,)

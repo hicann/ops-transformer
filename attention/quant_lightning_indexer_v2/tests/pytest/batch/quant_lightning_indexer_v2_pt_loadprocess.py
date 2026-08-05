@@ -20,24 +20,38 @@ import random
 import math
 import ast
 import cann_ops_transformer
+from qliv2_parameter_normalization import normalize_qliv2_params
+
+QUANT_MODE_MXFP4 = 5
 
 
 def test_qliv2_process(filepath, device_id=0):
     # 加载测试数据
     test_data = torch.load(filepath, map_location="cpu")
 
-    params = test_data["params"]
+    params = normalize_qliv2_params(test_data["params"])
     cpu_result = test_data["cpu_result"]
     topk_value = test_data["topk_value"]
     cpu_topk_value = test_data["cpu_topk_value"]
     print("执行用例：", filepath)
     torch_npu.npu.set_device(device_id)
 
-    if params[10] == "FLOAT8_E4M3FN":
+    quant_mode = test_data["quant_mode"]
+    if quant_mode == QUANT_MODE_MXFP4:
+        query = test_data["query"].view(torch.uint8).npu()
+        key = test_data["key"].view(torch.uint8).npu()
+        if "blockFusion" in test_data and test_data["blockFusion"] is not None:
+            blockFusion = test_data["blockFusion"].view(torch.uint8).npu()
+    elif params[10] == "FLOAT8_E4M3FN" or params[10] == torch.float8_e4m3fn:
         query = test_data["query"].to(dtype=torch.float8_e4m3fn).npu()
         key = test_data["key"].to(dtype=torch.float8_e4m3fn).npu()
         if "blockFusion" in test_data and test_data["blockFusion"] is not None:
-            blockFusion = test_data["blockFusion"].to(dtype=torch.float8_e4m3fn).npu()
+            blockFusion = test_data["blockFusion"]
+            if blockFusion.dtype == torch.uint8:
+                blockFusion = blockFusion.view(torch.float8_e4m3fn)
+            else:
+                blockFusion = blockFusion.to(dtype=torch.float8_e4m3fn)
+            blockFusion = blockFusion.npu()
     else:
         query = test_data["query"].npu()
         key = test_data["key"].npu()
@@ -97,7 +111,6 @@ def test_qliv2_process(filepath, device_id=0):
         block_table = test_data["block_table"].npu()
     else:
         block_table = None
-    quant_mode = test_data["quant_mode"]
     layout_query = test_data["layout_query"]
     layout_key = test_data["layout_key"]
     sparse_count = test_data["sparse_count"]
@@ -186,7 +199,7 @@ def test_qliv2_process_graph(filepath, device_id=0):
     import quant_lightning_indexer_v2_acl_graph
 
     test_data = torch.load(filepath, map_location="cpu")
-    params = test_data["params"]
+    params = normalize_qliv2_params(test_data["params"])
     output_idx_offset = test_data.get("output_idx_offset", None)
 
     torch_npu.npu.set_device(device_id)

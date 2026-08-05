@@ -136,4 +136,7 @@ if [ "$USE_MSPROF" = "1" ]; then
     echo "性能表格:  ${RESULT_XLSX%.xlsx}_perf.xlsx"
 fi
 
+if [ "$FAIL" -gt 0 ]; then
+    exit 1
+fi
 exit 0

@@ -21,6 +21,7 @@ from batch import quant_lightning_indexer_v2_pt_loadprocess
 from qliv2_test_utils import (
     QliV2CaseSelector,
     QliV2ResultWriter,
+    ensure_comparison_passed,
 )
 
 TEST_INPUT_PATH_ENV = os.environ.get("QLIV2_TESTCASE_DIR", "").strip()
@@ -145,6 +146,19 @@ def qliv2(testcase_file):
         fulfill_precent_return_value,
     )
     QliV2ResultWriter.append(RESULT_PATH, row_data)
+
+    case_name = Path(testcase_file).stem
+    if result != "NPU ERROR":
+        try:
+            ensure_comparison_passed(
+                case_name,
+                result,
+                fulfill_percent,
+                result_return_value,
+                fulfill_precent_return_value,
+            )
+        except AssertionError as error:
+            return str(error)
 
     if result == "NPU ERROR":
         return f"用例执行失败:{Path(testcase_file).stem}"
