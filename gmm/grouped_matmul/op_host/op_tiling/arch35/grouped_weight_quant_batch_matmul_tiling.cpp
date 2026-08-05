@@ -34,6 +34,18 @@ namespace optiling {
 static const std::map<ge::DataType, std::unordered_set<ge::DataType>> BIAS_TYPE_SUPPORT_MAP = {
     {ge::DT_FLOAT16, {ge::DT_FLOAT16}}, {ge::DT_BF16, {ge::DT_BF16, ge::DT_FLOAT}}};
 
+bool GroupedWeightQuantBatchMatmulTiling::GetDimFromEnd(
+    const gert::Shape &shape, size_t posFromEnd, uint64_t &out) const
+{
+    OP_CHECK_IF(posFromEnd == 0 || posFromEnd > shape.GetDimNum(),
+                OP_LOGE(OP_NAME, "posFromEnd[%zu] invalid, dimNum[%zu].", posFromEnd, shape.GetDimNum()),
+                return false);
+    int64_t v = shape.GetDim(static_cast<int64_t>(shape.GetDimNum() - posFromEnd));
+    OP_CHECK_IF(v < 0, OP_LOGE(OP_NAME, "dim value[%ld] is negative."), return false);
+    out = static_cast<uint64_t>(v);
+    return true;
+}
+
 bool GroupedWeightQuantBatchMatmulTiling::CheckCoreNum(const gert::TilingContext *context) const
 {
     OP_CHECK_IF(
@@ -429,7 +441,14 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckTensorShapeSingleXMultiWeightSing
         auto xShapePtr = context->GetDynamicInputShape(X_IDX, 0);
         auto xShape = xShapePtr->GetStorageShape();
         uint32_t xDimNum = static_cast<uint32_t>(xShape.GetDimNum());
-        uint64_t kSize = transA_ ? xShape.GetDim(0) : xShape.GetDim(xDimNum - 1);
+        uint64_t kSize = 0;
+        if (transA_) {
+            OP_CHECK_IF(!GetDimFromEnd(xShape, xDimNum, kSize),
+                        OP_LOGE(context->GetNodeName(), "Get kSize from x dim0 failed."), return false);
+        } else {
+            OP_CHECK_IF(!GetDimFromEnd(xShape, 1, kSize),
+                        OP_LOGE(context->GetNodeName(), "Get kSize from x last dim failed."), return false);
+        }
         int64_t scaleGroupNum = tensorShape.GetDim(tensorDimNum - PENULTIMATE_DIM) * MX_GROUP_FACTOR;
         OP_CHECK_IF(scaleGroupNum <= 0 || kSize % static_cast<uint64_t>(scaleGroupNum) != 0,
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
@@ -1328,7 +1347,8 @@ bool GroupedWeightQuantBatchMatmulTiling::SetShapeListSplitMSingleXSingleWeightS
         const gert::StorageShape *yShapePtr = context->GetOutputShape(0);
         OP_CHECK_IF(yShapePtr == nullptr, OP_LOGE(context->GetNodeName(), "yShapePtr is nullptr."), return false);
         const gert::Shape &yShape = yShapePtr->GetOriginShape();
-        nSizeOri_ = yShape.GetDim(static_cast<uint32_t>(yShape.GetDimNum()) - 1);
+        OP_CHECK_IF(!GetDimFromEnd(yShape, 1, nSizeOri_),
+                    OP_LOGE(context->GetNodeName(), "Get nSizeOri_ from y last dim failed."), return false);
     }
 
     if (weightDtype_ == ge::DT_FLOAT || weightDtype_ == ge::DT_INT32) {
@@ -1355,13 +1375,20 @@ bool GroupedWeightQuantBatchMatmulTiling::SetShapeListSplitMSingleXMultiWeightSi
     gert::Shape xShape = xTensor->GetStorageShape();
     uint32_t xDimNum = static_cast<uint32_t>(xShape.GetDimNum());
     mSize_ = transA_ ? xShape.GetDim(1) : xShape.GetDim(0);
-    kSize_ = transA_ ? xShape.GetDim(0) : xShape.GetDim(xDimNum - 1);
+    if (transA_) {
+        OP_CHECK_IF(!GetDimFromEnd(xShape, xDimNum, kSize_),
+                    OP_LOGE(context->GetNodeName(), "Get kSize_ from x dim0 failed."), return false);
+    } else {
+        OP_CHECK_IF(!GetDimFromEnd(xShape, 1, kSize_),
+                    OP_LOGE(context->GetNodeName(), "Get kSize_ from x last dim failed."), return false);
+    }
 
     if (weightNzFlag_) {
         const gert::StorageShape *yShapePtr = context->GetOutputShape(0);
         OP_CHECK_IF(yShapePtr == nullptr, OP_LOGE(context->GetNodeName(), "yShapePtr is nullptr."), return false);
         const gert::Shape &yShape = yShapePtr->GetOriginShape();
-        nSizeOri_ = yShape.GetDim(static_cast<uint32_t>(yShape.GetDimNum()) - 1);
+        OP_CHECK_IF(!GetDimFromEnd(yShape, 1, nSizeOri_),
+                    OP_LOGE(context->GetNodeName(), "Get nSizeOri_ from y last dim failed."), return false);
     }
 
     bool isFp4PackType = weightDtype_ == ge::DT_FLOAT || weightDtype_ == ge::DT_INT32;
@@ -1373,7 +1400,14 @@ bool GroupedWeightQuantBatchMatmulTiling::SetShapeListSplitMSingleXMultiWeightSi
         gert::Shape wShape = wTensor->GetStorageShape();
         uint32_t wDimNum = static_cast<uint32_t>(wShape.GetDimNum());
         // -1含义为(K, N)场景N索引，-2含义为(N, K)场景N索引
-        uint64_t nSize = transB_ ? wShape.GetDim(wDimNum - 2) : wShape.GetDim(wDimNum - 1);
+        uint64_t nSize = 0;
+        if (transB_) {
+            OP_CHECK_IF(!GetDimFromEnd(wShape, 2, nSize),
+                        OP_LOGE(context->GetNodeName(), "Get nSize from w dim[-2] failed."), return false);
+        } else {
+            OP_CHECK_IF(!GetDimFromEnd(wShape, 1, nSize),
+                        OP_LOGE(context->GetNodeName(), "Get nSize from w last dim failed."), return false);
+        }
         if (weightNzFlag_) {
             // 非转置NZ排布(N1, K1, K0, N0), 转置NZ排布(K1, N1, N0, K0)
             // -3含义：转置N1索引；-2含义：转置N0索引

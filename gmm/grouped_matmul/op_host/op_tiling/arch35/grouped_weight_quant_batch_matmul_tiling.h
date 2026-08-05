@@ -291,6 +291,7 @@ protected:
     bool SetShapeListSplitMSingleXSingleWeightSingleY(const gert::TilingContext *context);
     bool SetShapeListSplitMSingleXMultiWeightSingleY(const gert::TilingContext *context);
     bool SetShapeListMultiXMultiWeightMultiY(const gert::TilingContext *context);
+    bool GetDimFromEnd(const gert::Shape &shape, size_t posFromEnd, uint64_t &out) const;
     uint16_t GetTensorListSize(const gert::TilingContext *context, uint32_t attrIdx) const;
     void GetNumOfInputs(const gert::TilingContext *context);
     bool SetAntiquantGroupSize(const gert::TilingContext *context);
