@@ -1,6 +1,6 @@
 # 环境部署
 
-在学习各类[学习教程](../../../README.md#学习教程)操作之前，请您先参考下面步骤完成基础环境搭建和源码下载，确保已安装NPU驱动、固件和CANN软件（`Ascend-cann-toolkit`和`Ascend-cann-ops`）等。
+在学习各类[学习教程](../../../README.md#学习教程)操作之前，请您先参考下面步骤完成基础环境搭建和源码下载，确保已安装NPU驱动和CANN软件（`Ascend-cann-toolkit`和`Ascend-cann-ops`）等。
 
 ## 环境安装
 
@@ -9,19 +9,19 @@
 > **说明**：本文提到的编译态和运行态含义如下，请根据实际情况选择。
 >
 > - 编译态：针对仅编译本项目不运行的场景，只需安装CANN toolkit包。
-> - 运行态：针对运行本项目的场景（编译运行或纯运行），需安装驱动与固件、CANN toolkit包、CANN ops包。
+> - 运行态：针对运行本项目的场景（编译运行或纯运行），需安装驱动、CANN toolkit包、CANN ops包。
 
 |  安装方式  |  使用说明  |  使用场景  |
 | ----- | ------ | ------ |
-|  CANNLab  | 一站式开发平台，提供在线直接运行的昇腾环境，无需手动安装。<br>当前可提供单机算力，**默认安装最新最新版本CANN包**。 | 适用于没有昇腾设备的开发者。|
-|  Docker  | Docker镜像是一种高效部署方式，已预集成CANN包和必备依赖。<br>当前仅适用于Atlas A2系列产品，OS仅支持Ubuntu操作系统。**默认安装最新最新版本CANN包**。 |适用有昇腾设备，需要快速搭建环境的开发者。|
+|  CANNLab  | 一站式开发平台，提供在线直接运行的昇腾环境，无需手动安装。<br>当前可提供单机算力，**默认安装最新版本CANN包**。 | 适用于没有昇腾设备的开发者。|
+|  Docker  | Docker镜像是一种高效部署方式，已预集成CANN包和必备依赖。<br>当前适用于Atlas A2、A3系列产品，OS支持ubuntu22.04、openEuler24.03等。**默认安装最新版本CANN包**。 |适用有昇腾设备，需要快速搭建环境的开发者。|
 |  手动安装  | 手动安装CANN包和基础依赖，灵活性高。 |适用有昇腾设备，想体验手动安装CANN包或体验最新master分支能力的开发者。|
 
 ### 方式1：CANNLab
 
-对于无昇腾设备的开发者，可直接使用CANNLab云开发环境，即“**一站式开发平台**”，该平台为您提供在线可直接运行的昇腾环境，环境中已安装必备的驱动固件、软件包和依赖，无需手动安装。
+对于无昇腾设备的开发者，可直接使用CANNLab云开发环境，即“**一站式开发平台**”，该平台为您提供在线可直接运行的昇腾环境，环境中已安装必备的驱动、软件包和依赖，无需手动安装。
 
-> **说明**：环境默认安装最新最新版本CANN包，源码下载时注意与软件配套。更多关于开发平台的介绍请参考[CANNLab指导](https://gitcode.com/org/cann/discussions/54)。
+> **说明**：环境默认安装最新版本CANN包，源码下载时注意与软件配套。更多关于开发平台的介绍请参考[CANNLab指导](https://gitcode.com/org/cann/discussions/54)。
 
 1. 进入开源项目，单击“`CANNLab`”按钮，使用已认证过的华为云账号登录。若未注册或认证，请根据页面提示进行注册和认证。
 
@@ -38,23 +38,29 @@
 > **说明**：
 >
 > - 镜像文件比较大，下载需要一定时间，请您耐心等待。关于docker命令的选项介绍可通过`docker --help`查询。
-> - 环境默认安装最新最新版本CANN包，源码下载时注意与软件配套。
+> - 环境默认安装最新版本CANN包，源码下载时注意与软件配套。
 
-1.**安装驱动与固件（运行态依赖）**
+1.**安装驱动（运行态依赖）**
 
-驱动与固件是运行态依赖，若仅编译算子，可以不安装。使用`npu-smi info`检查是否有NPU相关信息，若没有，请参考《[CANN快速安装](https://www.hiascend.com/cann/download)》完成驱动与固件安装。
+驱动是运行态依赖，若仅编译算子，可以不安装。使用`npu-smi info`检查是否有NPU相关信息，若没有，请参考《[CANN快速安装](https://www.hiascend.com/cann/download)》完成驱动安装：
+
+   - 步骤1：在页面中选择自己的产品系列、CPU架构、操作系统，安装方式选择"在线安装（Yum）"。
+   - 步骤2：按照页面指引依次完成"配置用户属组"、"安装依赖&配源"、"安装NPU驱动"三个环节。
+   - 步骤3：执行`npu-smi info`，若能正常显示NPU设备信息，则说明驱动安装成功。
 
 2.**下载镜像**
 
 - 步骤1：以root用户登录宿主机。确保宿主机已安装Docker引擎（版本1.11.2及以上），使用`docker --version`检查Docker版本，若没有，请参考[Docker官方安装指南](https://docs.docker.com/engine/install/)。
 - 步骤2：从[昇腾镜像仓库](https://www.hiascend.com/developer/ascendhub/detail/17da20d1c2b6493cb38765adeba85884)拉取已预集成CANN软件包及`ops-transformer`所需依赖的镜像。
 
-  示例如下，请自行替换CANN版本号、芯片系列、操作系统、python版本信息。
+  示例如下，请自行替换CANN版本号、芯片系列、操作系统、python版本等信息，各字段支持的取值可在上述昇腾镜像仓库页面查询。
 
     ```bash
     # 以cann:9.1.0-beta.1版本为例
     docker pull swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-beta.1-910b-openeuler24.03-py3.12-devel
     ```
+
+    > **说明**：镜像标签格式为`<CANN版本>-<芯片系列>-<操作系统>-<Python版本>-devel`。带`-devel`后缀的镜像为算子开发镜像，内含算子开发编译依赖。
 
 3.**运行Docker**
 
@@ -63,6 +69,8 @@
 ```bash
 docker run --name cann_container --device /dev/davinci0 --device /dev/davinci_manager --device /dev/devmm_svm --device /dev/hisi_hdc -v /usr/local/dcmi:/usr/local/dcmi -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi -v /usr/local/Ascend/driver/lib64/:/usr/local/Ascend/driver/lib64/ -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info -v /etc/ascend_install.info:/etc/ascend_install.info -it swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-beta.1-910b-openeuler24.03-py3.12-devel bash
 ```
+
+> **说明**：`--name`用于指定容器名称，请替换为便于识别的自定义名称；若该名称已被占用，容器会启动失败。
 
 | 参数 | 说明 | 注意事项 |
 | :--- | :--- | :--- |
@@ -88,9 +96,13 @@ docker run --name cann_container --device /dev/davinci0 --device /dev/davinci_ma
 
 - **场景1：体验master版本能力或基于master版本进行开发**
 
-    1. **安装驱动与固件（运行态依赖）**
+    1. **安装驱动（运行态依赖）**
 
-        驱动与固件是运行态依赖，若仅编译算子，可以不安装。使用`npu-smi info`检查是否有NPU相关信息，若没有，请参考《[CANN快速安装](https://www.hiascend.com/cann/download)》完成驱动与固件安装。
+        驱动是运行态依赖，若仅编译算子，可以不安装。使用`npu-smi info`检查是否有NPU相关信息，若没有，请参考《[CANN快速安装](https://www.hiascend.com/cann/download)》完成驱动安装：
+
+        - 步骤1：在页面中选择自己的产品系列、CPU架构、操作系统，安装方式选择"在线安装（Yum）"。
+        - 步骤2：按照页面指引依次完成"配置用户属组"、"安装依赖&配源"、"安装NPU驱动"三个环节。
+        - 步骤3：执行`npu-smi info`，若能正常显示NPU设备信息，则说明驱动安装成功。
 
     2. **安装CANN包**
 
@@ -119,7 +131,7 @@ docker run --name cann_container --device /dev/davinci0 --device /dev/davinci_ma
 
 - **场景2：体验已发布版本能力或基于已发布版本进行开发**
 
-    请访问[CANN官网下载中心](https://www.hiascend.com/cann/download)，选择发布版本（仅支持CANN 8.5.0及后续版本），并根据产品型号和环境架构下载对应包，最后参考网页提供的命令完成安装。
+    请参考《[CANN快速安装](https://www.hiascend.com/cann/download)》，选择版本（仅支持CANN 8.5.0及后续版本），并根据产品系列、CPU架构、操作系统等下载对应包，最后参考页面提供的命令完成安装。
 
 #### 安装基础依赖
 

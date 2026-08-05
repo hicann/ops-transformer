@@ -185,7 +185,7 @@ KV方向: ceil(512/64)=8块 [0, 1, 2, 3, 4, 5, 6, 7]
 算子编译集成在ops-transformer-dev的统一编译流程中:
 
 ```bash
-bash build.sh --soc=Ascend910B3
+bash build.sh --soc=ascend910b
 ```
 
 ## 版本历史

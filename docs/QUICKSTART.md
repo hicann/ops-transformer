@@ -6,7 +6,7 @@
 
 1. **[前提条件](../README.md)**：参考项目README完成环境准备和源码下载，此处不再赘述。快速入门场景**推荐CANNLab或Docker部署**，操作简单。
 
-   > **说明**：CANNLab或Docker环境默认提供最新最新版本CANN包；如需体验master分支最新能力，可手动搭建环境。
+   > **说明**：CANNLab或Docker环境默认提供最新版本CANN包；如需体验master分支最新能力，可手动搭建环境。
 
 2. **[编译运行](#一编译运行)**：编译自定义算子包并安装，实现快速调用算子。
 
@@ -42,6 +42,12 @@
 ### 2. 编译AddExample算子
 
 编译指定的算子，通用编译命令格式：`bash build.sh --pkg --soc=<芯片版本> --ops=<算子名>`。
+
+> **说明**：编译前请确保已配置CANN环境变量，否则可能因找不到`ASCEND_HOME_PATH`等导致编译失败。默认路径安装时执行：
+>
+> ```bash
+> source /usr/local/Ascend/cann/set_env.sh
+> ```
 
 以AddExample算子为例，编译命令如下：
 
@@ -178,12 +184,11 @@ __aicore__ inline void AddExample<T>::Compute(int32_t progress)
   该接口支持打印Scalar类型数据，如整数、字符型、布尔型等，详细介绍请参见[《Ascend C API》](https://hiascend.com/document/redirect/CannCommunityAscendCApi)中“Ascend C算子开发接口 > SIMD API > 基础API > 调试接口 > 上板打印 > printf”。
 
   ```c++
-  blockLength_ = (tilingData->totalLength + AscendC::GetBlockNum() - 1) / AscendC::GetBlockNum();
+  blockLength_ = tilingData->totalLength / AscendC::GetBlockNum();
   tileNum_ = tilingData->tileNum;
-  tileLength_ = ((blockLength_ + tileNum_ - 1) / tileNum_ / BUFFER_NUM) ?
-        ((blockLength_ + tileNum_ - 1) / tileNum_ / BUFFER_NUM) : 1;
+  tileLength_ = blockLength_ / tileNum_ / BUFFER_NUM;
   // 打印当前核计算Block长度
-  AscendC::PRINTF("Tiling blockLength is %llu\n", blockLength_);
+  AscendC::PRINTF("Tiling blockLength is %ld\n", blockLength_);
   ```
 
 - **DumpTensor**
@@ -191,14 +196,13 @@ __aicore__ inline void AddExample<T>::Compute(int32_t progress)
   该接口支持Dump指定Tensor的内容，同时支持打印自定义附加信息，比如当前行号等，详细介绍请参见[《Ascend C API》](https://hiascend.com/document/redirect/CannCommunityAscendCApi)中“Ascend C算子开发接口 > SIMD API > 基础API > 调试接口 > 上板打印 > DumpTensor”。
 
   ```c++
-  AscendC::LocalTensor<T> zLocal = outputQueueZ.DeQue<T>();
-  // 打印zLocal Tensor信息
+  // 在Compute函数中，Add之后、EnQue之前调用
   DumpTensor(zLocal, 0, 128);
   ```
 
 ### 2. 性能采集
 
-当算子功能验证正确后，可通过`msprof`工具采集算子性能数据。
+当算子功能验证正确后，可通过`msprof op`命令采集算子级性能数据。
 
 - **生成可执行文件**
 
@@ -213,10 +217,12 @@ __aicore__ inline void AddExample<T>::Compute(int32_t progress)
     进入AddExample算子可执行文件目录`ops-transformer/build/`，执行如下命令：
 
     ```bash
-    msprof --application="./test_aclnn_add_example"
+    msprof op ./test_aclnn_add_example
     ```
 
-采集结果在项目`ops-transformer/build/`目录，msprof命令执行完后会自动解析并导出性能数据结果文件，详细内容请参见[msprof](https://www.hiascend.com/document/detail/zh/mindstudio/82RC1/T&ITools/Profiling/atlasprofiling_16_0110.html#ZH-CN_TOPIC_0000002504160251)。
+    执行后会直接打印算子基础信息（如Op Name、Op Type、Task Duration、Block Dim等）和性能瓶颈提示。
+
+采集结果保存在项目`ops-transformer/build/`目录下的`OPPROF_*`文件夹中，命令执行完后会自动解析并导出性能数据文件。如需进一步解读各项性能指标（如流水占比、带宽利用率等），请参见[《msProf工具使用指南》](https://www.hiascend.com/document/redirect/CannCommunityToolMsprof)。
 
 ## 四、算子验证
 
@@ -241,11 +247,13 @@ int main() {
     for (int i = 0; i < 4096; ++i) {
         selfXHostData[i] = static_cast<float>(i % 10); // 填充0-9的循环值
     }
-    // === ② 参考selfX，同理修改selfY、selfZ的输入 ===
+    // === ② 参考selfX，同理修改selfY（第二个输入）与out（输出）的shape及数据 ===
 
     // ... 后续执行代码 ...
 }
 ```
+
+> **注意**：修改shape时需同步修改对应host侧数据vector的长度（本例`selfX`、`selfY`、`out`三者的vector长度都要从默认的2048改为4096 = 8×8×8×8），并保证三者shape一致，否则会出现数据越界或结果不匹配。
 
 ### 2. 重新编译并验证
 

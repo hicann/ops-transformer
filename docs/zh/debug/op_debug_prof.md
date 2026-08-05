@@ -9,7 +9,7 @@
 
 * **plog获取**
 
-    程序执行结束后，默认可在"$HOME/ascendc/log"下查看，host日志文件存储路径如下：
+    程序执行结束后，默认可在"$HOME/ascend/log"下查看，host日志文件存储路径如下：
 
     ```bash
     $HOME/ascend/log/debug/plog/plog-pid_*.log

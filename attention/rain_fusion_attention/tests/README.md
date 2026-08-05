@@ -34,7 +34,7 @@
 ```bash
 # 编译测试
 cd /path/to/ops-transformer-dev
-bash build.sh --soc=Ascend910B3
+bash build.sh --soc=ascend910b
 
 # 运行测试
 ./test_rain_fusion_attention
