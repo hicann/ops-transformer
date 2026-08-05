@@ -43,6 +43,7 @@ ENABLE_AICPU=TRUE
 ENABLE_BUILT_CUSTOM=FALSE
 ENABLE_STATIC=FALSE
 ENABLE_EXPERIMENTAL=FALSE
+ENABLE_TORCH_EXTENSION_ONLY=FALSE
 KERNEL_TEMPLATE_INPUT=""
 ASCEND_SOC_UNITS="ascend910b"
 SUPPORT_COMPUTE_UNIT_SHORT=("ascend910b" "ascend910_93" "ascend950" "ascend310p" "kirinx90" "kirin9030" "mc62")
@@ -355,6 +356,7 @@ function help_info() {
     echo "    --opkernel build binary kernel"
     echo "    --jit build run package without kernel bin"
     echo "    --pkg build run package with kernel bin"
+    echo "    --torch_extension_only       Build torch_extension whl package only"
     echo "    --experimental build experimental version"
     echo "    --opkernel_aicpu build aicpu kernel"
     echo "    --mssanitizer Build with mssanitizer mode on the kernel side, with options: '-g --cce-enable-sanitizer'"
@@ -1102,6 +1104,322 @@ set_example_opt() {
   fi
 }
 
+# 所有支持的长选项（不含值），用于参数合法性校验
+SUPPORTED_LONG_OPTS=(
+  "help" "pkg" "static" "jit" "noaicpu" "opkernel_aicpu" "opkernel"
+  "experimental" "noexec" "torch_extension_only" "oom" "make_clean"
+  "mssanitizer" "dump_cce"
+  "ophost" "opapi" "opgraph" "onnxplugin"
+  "ophost_test" "opapi_test" "opgraph_test" "opkernel_test"
+  "asan" "valgrind" "ubsan" "cov" "clang" "run_example"
+  "parent_job" "enable_host_tiling" "disable-check-compatible" "disable-check-compatiable"
+  "ops=" "module=" "aicpu=" "bisheng_flags=" "soc=" "build-type=" "version="
+  "rule_launch=" "simulator=" "example_name=" "tiling_key=" "tiling-key="
+  "kernel_template_input=" "vendor_name=" "genop=" "genop_aicpu="
+  "cann_3rd_lib_path=" "op_build_tool" "ascend_cmake_dir"
+  "ccache" "PR_UT" "PR_PKG" "op_debug_config" "ops-compile-options"
+  "op-name" "compute-unit" "package-path" "build" "changed_list"
+  "test" "example" "verbose"
+)
+
+check_option_validity() {
+  for arg in "$@"; do
+    if [[ "$arg" =~ ^- ]]; then
+      if [[ "$arg" =~ ^-- ]]; then
+        local long_opt="${arg:2}"
+        local opt_name="${long_opt%%=*}"
+        local found=false
+        for supported_opt in "${SUPPORTED_LONG_OPTS[@]}"; do
+          if [[ "$supported_opt" =~ =$ ]]; then
+            local base_opt="${supported_opt%=}"
+            if [[ "$opt_name" == "$base_opt" ]]; then
+              found=true
+              break
+            fi
+          else
+            if [[ "$opt_name" == "$supported_opt" ]]; then
+              found=true
+              break
+            fi
+          fi
+        done
+        if [[ "$found" == "false" ]]; then
+          echo "[ERROR] Invalid option: --$opt_name"
+          echo "Use 'bash build.sh --help' for more information."
+          exit 1
+        fi
+      fi
+    fi
+  done
+}
+
+check_param() {
+  if [[ "$ENABLE_MSSANITIZER" == "TRUE" && "$OOM" == "true" ]]; then
+    echo "[ERROR] --mssanitizer cannot be used with --oom"
+    exit 1
+  fi
+
+  if [[ "$ENABLE_MSSANITIZER" == "TRUE" && "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
+    echo "[ERROR] --mssanitizer cannot be used with --dump_cce"
+    exit 1
+  fi
+
+  if [ -n "$BISHENG_FLAGS" ]; then
+    if [[ "$ENABLE_MSSANITIZER" == "TRUE" || "$OOM" == "true" || "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
+      echo "[ERROR] --bisheng_flags= cannot be used with --mssanitizer, --oom, --dump_cce"
+      exit 1
+    fi
+  fi
+
+  if [[ "$BUILD_TYPE" == "Debug" ]]; then
+    if [[ "$ENABLE_MSSANITIZER" == "TRUE" || "$OOM" == "true" || "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
+      echo "[ERROR] --build-type=Debug cannot be used with --mssanitizer, --oom, --dump_cce"
+      exit 1
+    fi
+  fi
+
+  if [ -n "$KERNEL_TEMPLATE_INPUT" ]; then
+    if [[ -z "${ascend_op_name}" || "$ascend_op_name" == *","* ]]; then
+      echo "[ERROR] --kernel_template_input must be used with --ops= and can only specify a single operator"
+      exit 1
+    fi
+  fi
+}
+
+assemble_cmake_args() {
+  if [ -n "${vendor_name}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DVENDOR_NAME=${vendor_name}"
+  fi
+
+  if [ -n "${VERSION}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DVERSION=${VERSION}"
+  fi
+
+  if [[ "$ENABLE_EXPERIMENTAL" == "TRUE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_EXPERIMENTAL=TRUE"
+  fi
+
+  if [ -n "${ascend_compute_unit}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DASCEND_COMPUTE_UNIT=${ascend_compute_unit}"
+  fi
+
+  if [ -n "${ascend_op_name}" ];then
+    if [[ "${ascend_op_name}" == *"moe_distribute_combine_v2"* ]] && [[ "${ascend_op_name}" != *"moe_distribute_combine_v3"* ]]; then
+      ascend_op_name="${ascend_op_name};moe_distribute_combine_v3"
+    fi
+    if [[ "${ascend_op_name}" == *"moe_distribute_dispatch_v2"* ]] && [[ "${ascend_op_name}" != *"moe_distribute_dispatch_v3"* ]]; then
+      ascend_op_name="${ascend_op_name};moe_distribute_dispatch_v3"
+    fi
+    if [[ "${ascend_op_name}" == *"distribute_barrier"* ]] && [[ "${ascend_op_name}" != *"distribute_barrier_extend"* ]]; then
+      ascend_op_name="${ascend_op_name};distribute_barrier_extend"
+    fi
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DASCEND_OP_NAME=${ascend_op_name}"
+    if [[ "${ascend_op_name}" != *"fused_infer_attention_score"* ]] && [[ "${ascend_op_name}" != *"incre_flash_attention"* ]]; then
+      CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_TILING_SINK=OFF"
+    fi
+  fi
+
+  if [ -n "${ascend_module_name}" ];then
+    if [[ "$ascend_module_name" == *mc2* ]]; then
+      if [[ "$ascend_module_name" != *gmm* ]]; then
+        ascend_module_name="${ascend_module_name},gmm"
+      fi
+    fi
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DASCEND_MODULE_NAME=${ascend_module_name}"
+    if [[ "${ascend_module_name}" != *"attention"* ]]; then
+      CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_TILING_SINK=OFF"
+    fi
+  fi
+
+  if [ -n "${op_build_tool}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_BUILD_TOOL=${op_build_tool}"
+  fi
+  if [ -n "${ascend_cmake_dir}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DASCEND_CMAKE_DIR=${ascend_cmake_dir}"
+  fi
+  if [[ "$ENABLE_TEST" == "TRUE" ]]; then
+    if [ -z "$ascend_op_name" ]; then
+      TEST="all"
+    else
+      TEST="$ascend_op_name"
+    fi
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_TEST=TRUE"
+  fi
+  if [[ $UT_TEST_CNT -eq 0 ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DUT_INFERSHAPE_FLAG=TRUE"
+  fi
+  if [[ "$OP_HOST_UT" == "TRUE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_HOST_UT=TRUE"
+  fi
+  if [[ "$OP_API_UT" == "TRUE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_API_UT=TRUE"
+  fi
+  if [[ "$OP_GRAPH_UT" == "TRUE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_GRAPH_UT=TRUE"
+  fi
+  if [[ "$OP_KERNEL_UT" == "TRUE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_KERNEL_UT=TRUE"
+  fi
+  if [[ "$UT_TEST_ALL" == "TRUE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DUT_TEST_ALL=TRUE"
+  fi
+  if [[ "$ENABLE_UT_EXEC" == "TRUE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_UT_EXEC=TRUE"
+  fi
+  if [[ "x$ENABLE_RULE_LAUNCH" != "x" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DRULE_LAUNCH=${ENABLE_RULE_LAUNCH}"
+  fi
+
+  if [ -n "${TEST}" ];then
+    if [ -n "${PR_CHANGED_FILES}" ];then
+      TEST=$(python3 "$CURRENT_DIR"/cmake/scripts/parse_changed_files.py -c "$CURRENT_DIR"/tests/test_config.yaml -f "$PR_CHANGED_FILES" get_related_ut)
+      echo "Operators that need to run UT: $TEST"
+      if [ -z "${TEST}" ];then
+        log "Info: This PR didn't trigger any UTest."
+        exit 0
+      fi
+      if [ "$TEST" != "all" ];then
+        TEST="${TEST%;}"
+        TEST="${TEST//;/,}"
+        CUSTOM_OPTION="${CUSTOM_OPTION} -DASCEND_OP_NAME=${TEST}"
+      fi
+      CUSTOM_OPTION="${CUSTOM_OPTION} -DTESTS_UT_OPS_TEST_CI_PR=ON"
+    fi
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DTESTS_UT_OPS_TEST=${TEST}"
+    if [ "${CLANG}" == "true" ];then
+      CLANG_C_COMPILER="$(which clang)"
+      if [ ! -f "${CLANG_C_COMPILER}" ];then
+        log "Error: Can't find clang path ${CLANG_C_COMPILER}"
+        exit 1
+      fi
+
+      CLANG_PATH=$(dirname "${CLANG_C_COMPILER}")
+      CLANG_CXX_COMPILER="${CLANG_PATH}/clang++"
+      CLANG_LINKER="${CLANG_PATH}/lld"
+      CLANG_AR="${CLANG_PATH}/llvm-ar"
+      CLANG_STRIP="${CLANG_PATH}/llvm-strip"
+      CLANG_OBJCOPY="${CLANG_PATH}/llvm-objcopy"
+
+      CUSTOM_OPTION="${CUSTOM_OPTION} -DCMAKE_C_COMPILER=${CLANG_C_COMPILER} -DCMAKE_CXX_COMPILER=${CLANG_CXX_COMPILER}"
+      CUSTOM_OPTION="${CUSTOM_OPTION} -DCMAKE_LINKER=${CLANG_LINKER} -DCMAKE_AR=${CLANG_AR} -DCMAKE_STRIP=${CLANG_STRIP}"
+      CUSTOM_OPTION="${CUSTOM_OPTION} -DCMAKE_OBJCOPY=${CLANG_OBJCOPY}"
+    fi
+
+    if [ "${ASAN}" == "true" ];then
+      CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_ASAN=TRUE"
+    fi
+
+    if [ "${ENABLE_VALGRIND}" == "TRUE" ];then
+      CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_VALGRIND=TRUE"
+    fi
+
+    if [ "${UBSAN}" == "true" ];then
+      CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_UBSAN=true"
+    fi
+
+    BUILD=ops_test_utest
+  fi
+
+  if [ "${ASAN}" == "true" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_ASAN=TRUE"
+  fi
+
+  if [ "${COV}" == "true" ];then
+    if [ "${CLANG}" == "true" ];then
+      log "Warning: GCOV only supported in gnu compiler."
+    else
+      CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_GCOV=true"
+    fi
+  fi
+
+  if [ "${OOM}" == "true" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_OOM=ON"
+  fi
+
+  if [[ "$ENABLE_MSSANITIZER" == "TRUE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_MSSANITIZER=TRUE"
+  fi
+
+  if [[ "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_DUMP_CCE=TRUE"
+  fi
+
+  if [ -n "${EXAMPLE}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DTESTS_EXAMPLE_OPS_TEST=${EXAMPLE}"
+    BUILD=ops_test_example
+  fi
+
+  if [ -n "${TILING_KEY}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DTILING_KEY=${TILING_KEY}"
+  fi
+
+  if [ -n "${KERNEL_TEMPLATE_INPUT}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DKERNEL_TEMPLATE_INPUT=${KERNEL_TEMPLATE_INPUT}"
+  fi
+
+  if [ -n "${OP_DEBUG_CONFIG}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_DEBUG_CONFIG=${OP_DEBUG_CONFIG}"
+  fi
+
+  if [ -n "${OPS_COMPILE_OPTIONS}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DOPS_COMPILE_OPTIONS=${OPS_COMPILE_OPTIONS}"
+  fi
+
+  if [ "${HOST_TILING}" == "true" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_HOST_TILING=ON"
+  fi
+
+  if [ "${ENABLE_DEBUG}" == "TRUE" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_DEBUG=ON"
+  fi
+
+  if [ -n "${BUILD_TYPE}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
+  fi
+
+  if [ -n "${VERSION}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DVERSION=${VERSION}"
+  fi
+
+  if [ -n "${CMAKE_BUILD_MODE}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DCMAKE_BUILD_MODE=${CMAKE_BUILD_MODE}"
+  fi
+  CUSTOM_OPTION="${CUSTOM_OPTION} -DCANN_3RD_LIB_PATH=${CANN_3RD_LIB_PATH}"
+
+  if [ -n "${BISHENG_FLAGS}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DBISHENG_FLAGS=${BISHENG_FLAGS}"
+  fi
+
+  if [ -n "${ENABLE_AICPU_KERNEL}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_AICPU_KERNEL=${ENABLE_AICPU_KERNEL}"
+  fi
+
+  if [[ "$ENABLE_STATIC" == "TRUE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_STATIC=${ENABLE_STATIC}"
+  fi
+
+  if [[ "$ENABLE_AICPU" == "FALSE" ]]; then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_AICPU=OFF -DENABLE_TILING_SINK=OFF "
+  fi
+
+  if [ -n "${ascend_package_path}" ];then
+    ASCEND_CANN_PACKAGE_PATH=${ascend_package_path}
+  elif [ -n "${ASCEND_HOME_PATH}" ];then
+    ASCEND_CANN_PACKAGE_PATH=${ASCEND_HOME_PATH}
+  elif [ -n "${ASCEND_OPP_PATH}" ];then
+    ASCEND_CANN_PACKAGE_PATH=$(dirname ${ASCEND_OPP_PATH})
+  elif [ -d "${DEFAULT_TOOLKIT_INSTALL_DIR}" ];then
+    ASCEND_CANN_PACKAGE_PATH=${DEFAULT_TOOLKIT_INSTALL_DIR}
+  elif [ -d "${DEFAULT_INSTALL_DIR}" ];then
+    ASCEND_CANN_PACKAGE_PATH=${DEFAULT_INSTALL_DIR}
+  else
+    log "Error: Please set the toolkit package installation directory through parameter -p|--package-path."
+    exit 1
+  fi
+
+  CUSTOM_OPTION="${CUSTOM_OPTION} -DCUSTOM_ASCEND_CANN_PACKAGE_PATH=${ASCEND_CANN_PACKAGE_PATH} -DCHECK_COMPATIBLE=${CHECK_COMPATIBLE}"
+}
+
 ########################################################################################################################
 # 参数解析处理
 ########################################################################################################################
@@ -1139,6 +1457,8 @@ for arg in "$@"; do
       exit 0
     fi
   done
+
+check_option_validity "$@"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -1425,6 +1745,10 @@ while [[ $# -gt 0 ]]; do
         ENABLE_UT_EXEC=FALSE
         shift
         ;;
+    --torch_extension_only)
+        ENABLE_TORCH_EXTENSION_ONLY=TRUE
+        shift
+        ;;
     -j*)
         OPTARG=$1
         if [[ "$OPTARG" =~ ^-j[0-9]+$ ]]; then
@@ -1500,269 +1824,9 @@ while [[ $# -gt 0 ]]; do
 done
 set_ut_mode
 
-if [[ "$ENABLE_MSSANITIZER" == "TRUE" && "$OOM" == "true" ]]; then
-    echo "[ERROR] --mssanitizer cannot be used with --oom"
-    exit 1
-fi
+check_param
 
-if [[ "$ENABLE_MSSANITIZER" == "TRUE" && "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
-    echo "[ERROR] --mssanitizer cannot be used with --dump_cce"
-    exit 1
-fi
-
-if [ -n "$BISHENG_FLAGS" ]; then
-    if [[ "$ENABLE_MSSANITIZER" == "TRUE" || "$OOM" == "true" || "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
-        echo "[ERROR] --bisheng_flags= cannot be used with --mssanitizer, --oom, --dump_cce"
-        exit 1
-    fi
-fi
-
-if [[ "$BUILD_TYPE" == "Debug" ]]; then
-    if [[ "$ENABLE_MSSANITIZER" == "TRUE" || "$OOM" == "true" || "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
-        echo "[ERROR] --build-type=Debug cannot be used with --mssanitizer, --oom, --dump_cce"
-        exit 1
-    fi
-fi
-
-if [ -n "$KERNEL_TEMPLATE_INPUT" ]; then
-    if [[ -z "${ascend_op_name}" || "$ascend_op_name" == *","* ]]; then
-        echo "[ERROR] --kernel_template_input must be used with --ops= and can only specify a single operator"
-        exit 1
-    fi
-fi
-
-if [ -n "${vendor_name}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DVENDOR_NAME=${vendor_name}"
-fi
-
-if [ -n "${VERSION}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DVERSION=${VERSION}"
-fi
-
-if [[ "$ENABLE_EXPERIMENTAL" == "TRUE" ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_EXPERIMENTAL=TRUE"
-fi
-
-if [ -n "${ascend_compute_unit}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DASCEND_COMPUTE_UNIT=${ascend_compute_unit}"
-fi
-
-if [ -n "${ascend_op_name}" ];then
-    if [[ "${ascend_op_name}" == *"moe_distribute_combine_v2"* ]] && [[ "${ascend_op_name}" != *"moe_distribute_combine_v3"* ]]; then
-        ascend_op_name="${ascend_op_name};moe_distribute_combine_v3"
-    fi
-    if [[ "${ascend_op_name}" == *"moe_distribute_dispatch_v2"* ]] && [[ "${ascend_op_name}" != *"moe_distribute_dispatch_v3"* ]]; then
-        ascend_op_name="${ascend_op_name};moe_distribute_dispatch_v3"
-    fi
-    if [[ "${ascend_op_name}" == *"distribute_barrier"* ]] && [[ "${ascend_op_name}" != *"distribute_barrier_extend"* ]]; then
- 	    ascend_op_name="${ascend_op_name};distribute_barrier_extend"
-    fi
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DASCEND_OP_NAME=${ascend_op_name}"
-    if [[ "${ascend_op_name}" != *"fused_infer_attention_score"* ]] && [[ "${ascend_op_name}" != *"incre_flash_attention"* ]]; then
-        CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_TILING_SINK=OFF"
-    fi
-fi
-
-if [ -n "${ascend_module_name}" ];then
-    if [[ "$ascend_module_name" == *mc2* ]]; then
-        # 避免重复添加
-        if [[ "$ascend_module_name" != *gmm* ]]; then
-            ascend_module_name="${ascend_module_name},gmm"
-        fi
-    fi
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DASCEND_MODULE_NAME=${ascend_module_name}"
-    if [[ "${ascend_module_name}" != *"attention"* ]]; then
- 	    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_TILING_SINK=OFF"
-    fi
-
-fi
-
-if [ -n "${op_build_tool}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_BUILD_TOOL=${op_build_tool}"
-fi
-if [ -n "${ascend_cmake_dir}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DASCEND_CMAKE_DIR=${ascend_cmake_dir}"
-fi
-if [[ "$ENABLE_TEST" == "TRUE" ]]; then
-    if [ -z "$ascend_op_name" ]; then
-        TEST="all"
-    else
-        TEST="$ascend_op_name"
-    fi
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_TEST=TRUE"
-fi
-if [[ $UT_TEST_CNT -eq 0 ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DUT_INFERSHAPE_FLAG=TRUE"
-fi
-if [[ "$OP_HOST_UT" == "TRUE" ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_HOST_UT=TRUE"
-fi
-if [[ "$OP_API_UT" == "TRUE" ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_API_UT=TRUE"
-fi
-if [[ "$OP_GRAPH_UT" == "TRUE" ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_GRAPH_UT=TRUE"
-fi
-if [[ "$OP_KERNEL_UT" == "TRUE" ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_KERNEL_UT=TRUE"
-fi
-if [[ "$UT_TEST_ALL" == "TRUE" ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DUT_TEST_ALL=TRUE"
-fi
-if [[ "$ENABLE_UT_EXEC" == "TRUE" ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_UT_EXEC=TRUE"
-fi
-if [[ "x$ENABLE_RULE_LAUNCH" != "x" ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DRULE_LAUNCH=${ENABLE_RULE_LAUNCH}"
-fi
-
-if [ -n "${TEST}" ];then
-    if [ -n "${PR_CHANGED_FILES}" ];then
-        TEST=$(python3 "$CURRENT_DIR"/cmake/scripts/parse_changed_files.py -c "$CURRENT_DIR"/tests/test_config.yaml -f "$PR_CHANGED_FILES" get_related_ut)
-        echo "Operators that need to run UT: $TEST"
-        if [ -z "${TEST}" ];then
-            log "Info: This PR didn't trigger any UTest."
-            exit 0
-        fi
-        if [ "$TEST" != "all" ];then
-            TEST="${TEST%;}"
-            TEST="${TEST//;/,}"
-            CUSTOM_OPTION="${CUSTOM_OPTION} -DASCEND_OP_NAME=${TEST}"
-        fi
-        CUSTOM_OPTION="${CUSTOM_OPTION} -DTESTS_UT_OPS_TEST_CI_PR=ON"
-    fi
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DTESTS_UT_OPS_TEST=${TEST}"
-    if [ "${CLANG}" == "true" ];then
-        CLANG_C_COMPILER="$(which clang)"
-        if [ ! -f "${CLANG_C_COMPILER}" ];then
-            log "Error: Can't find clang path ${CLANG_C_COMPILER}"
-            exit 1
-        fi
-
-        CLANG_PATH=$(dirname "${CLANG_C_COMPILER}")
-        CLANG_CXX_COMPILER="${CLANG_PATH}/clang++"
-        CLANG_LINKER="${CLANG_PATH}/lld"
-        CLANG_AR="${CLANG_PATH}/llvm-ar"
-        CLANG_STRIP="${CLANG_PATH}/llvm-strip"
-        CLANG_OBJCOPY="${CLANG_PATH}/llvm-objcopy"
-
-        CUSTOM_OPTION="${CUSTOM_OPTION} -DCMAKE_C_COMPILER=${CLANG_C_COMPILER} -DCMAKE_CXX_COMPILER=${CLANG_CXX_COMPILER}"
-        CUSTOM_OPTION="${CUSTOM_OPTION} -DCMAKE_LINKER=${CLANG_LINKER} -DCMAKE_AR=${CLANG_AR} -DCMAKE_STRIP=${CLANG_STRIP}"
-        CUSTOM_OPTION="${CUSTOM_OPTION} -DCMAKE_OBJCOPY=${CLANG_OBJCOPY}"
-    fi
-
-    if [ "${ASAN}" == "true" ];then
-        CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_ASAN=TRUE"
-    fi
-
-    if [ "${ENABLE_VALGRIND}" == "TRUE" ];then
-        CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_VALGRIND=TRUE"
-    fi
-
-    if [ "${UBSAN}" == "true" ];then
-        CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_UBSAN=true"
-    fi
-
-    BUILD=ops_test_utest
-fi
-
-if [ "${ASAN}" == "true" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_ASAN=TRUE"
-fi
-
-if [ "${COV}" == "true" ];then
-    if [ "${CLANG}" == "true" ];then
-        log "Warning: GCOV only supported in gnu compiler."
-    else
-        CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_GCOV=true"
-    fi
-fi
-
-if [ "${OOM}" == "true" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_OOM=ON"
-fi
-
-if [[ "$ENABLE_MSSANITIZER" == "TRUE" ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_MSSANITIZER=TRUE"
-fi
-
-if [[ "$ENABLE_DUMP_CCE" == "TRUE" ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_DUMP_CCE=TRUE"
-fi
-
-if [ -n "${EXAMPLE}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DTESTS_EXAMPLE_OPS_TEST=${EXAMPLE}"
-
-    BUILD=ops_test_example
-fi
-
-if [ -n "${TILING_KEY}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DTILING_KEY=${TILING_KEY}"
-fi
-
-if [ -n "${KERNEL_TEMPLATE_INPUT}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DKERNEL_TEMPLATE_INPUT=${KERNEL_TEMPLATE_INPUT}"
-fi
-
-if [ -n "${OP_DEBUG_CONFIG}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_DEBUG_CONFIG=${OP_DEBUG_CONFIG}"
-fi
-
-if [ -n "${OPS_COMPILE_OPTIONS}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DOPS_COMPILE_OPTIONS=${OPS_COMPILE_OPTIONS}"
-fi
-
-if [ "${HOST_TILING}" == "true" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_HOST_TILING=ON"
-fi
-
-if [ "${ENABLE_DEBUG}" == "TRUE" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_DEBUG=ON"
-fi
-
-if [ -n "${BUILD_TYPE}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
-fi
-
-if [ -n "${VERSION}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DVERSION=${VERSION}"
-fi
-
-if [ -n "${CMAKE_BUILD_MODE}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DCMAKE_BUILD_MODE=${CMAKE_BUILD_MODE}"
-fi
-CUSTOM_OPTION="${CUSTOM_OPTION} -DCANN_3RD_LIB_PATH=${CANN_3RD_LIB_PATH}"
-
-if [ -n "${BISHENG_FLAGS}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DBISHENG_FLAGS=${BISHENG_FLAGS}"
-fi
-
-if [ -n "${ENABLE_AICPU_KERNEL}" ];then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_AICPU_KERNEL=${ENABLE_AICPU_KERNEL}"
-fi
-
-if [[ "$ENABLE_STATIC" == "TRUE" ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_STATIC=${ENABLE_STATIC}"
-fi
-
-if [[ "$ENABLE_AICPU" == "FALSE" ]]; then
-    CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_AICPU=OFF -DENABLE_TILING_SINK=OFF "
-fi
-
-if [ -n "${ascend_package_path}" ];then
-    ASCEND_CANN_PACKAGE_PATH=${ascend_package_path}
-elif [ -n "${ASCEND_HOME_PATH}" ];then
-    ASCEND_CANN_PACKAGE_PATH=${ASCEND_HOME_PATH}
-elif [ -n "${ASCEND_OPP_PATH}" ];then
-    ASCEND_CANN_PACKAGE_PATH=$(dirname ${ASCEND_OPP_PATH})
-elif [ -d "${DEFAULT_TOOLKIT_INSTALL_DIR}" ];then
-    ASCEND_CANN_PACKAGE_PATH=${DEFAULT_TOOLKIT_INSTALL_DIR}
-elif [ -d "${DEFAULT_INSTALL_DIR}" ];then
-    ASCEND_CANN_PACKAGE_PATH=${DEFAULT_INSTALL_DIR}
-else
-    log "Error: Please set the toolkit package installation directory through parameter -p|--package-path."
-    exit 1
-fi
+assemble_cmake_args
 
 function get_cpu_num() {
     CPU_NUM=$(($(cat /proc/cpuinfo | grep "^processor" | wc -l)*2))
@@ -1816,8 +1880,6 @@ function set_compute_unit_option_ut() {
     done
     CUSTOM_OPTION="$CUSTOM_OPTION -DASCEND_COMPUTE_UNIT=$COMPUTE_UNIT_SHORT"
  }
-
-CUSTOM_OPTION="${CUSTOM_OPTION} -DCUSTOM_ASCEND_CANN_PACKAGE_PATH=${ASCEND_CANN_PACKAGE_PATH} -DCHECK_COMPATIBLE=${CHECK_COMPATIBLE}"
 
 ########################################################################################################################
 # 处理流程
@@ -2023,11 +2085,21 @@ function build_pr_ut_exclude_mc2()
     build_ut ${BUILD}
 }
 
+main() {
+
 if [[ "$ENABLE_GENOP" == "TRUE" ]]; then
     gen_op
 fi
 if [[ "$ENABLE_GENOP_AICPU" == "TRUE" ]]; then
     gen_aicpu_op
+fi
+
+if [[ "$ENABLE_TORCH_EXTENSION_ONLY" == "TRUE" ]]; then
+    build_torch_extension_whl || exit 1
+    mkdir -p "${BUILD_OUT_DIR}"
+    cp "${CURRENT_DIR}/torch_extension/dist/"*.whl "${BUILD_OUT_DIR}/"
+    log "[INFO] torch_extension whl package copied to ${BUILD_OUT_DIR}"
+    exit 0
 fi
 
 if [[ "$ENABLE_TEST" == "TRUE" ]]; then
@@ -2115,4 +2187,7 @@ else
         build ${BUILD}
     fi
 fi
+}
+
+main
 } | while IFS= read -r line; do echo "[$(date '+%Y-%m-%d %H:%M:%S')] $line"; done
