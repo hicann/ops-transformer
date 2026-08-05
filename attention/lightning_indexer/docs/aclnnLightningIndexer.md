@@ -108,8 +108,8 @@ aclnnStatus aclnnLightningIndexer(
       <td>ND</td>
       <td>
           <ul>
-                <li>layout_query为BSND时，shape为(B,S1,N1,D)。</li>
-                <li>layout_query为TND时，shape为(T1,N1,D)。</li>
+                <li>layoutQueryOptional为BSND时，shape为(B,S1,N1,D)。</li>
+                <li>layoutQueryOptional为TND时，shape为(T1,N1,D)。</li>
           </ul>
       </td>
       <td>x</td>
@@ -121,19 +121,19 @@ aclnnStatus aclnnLightningIndexer(
       <td>
           <ul>
                 <li>不支持空tensor。</li>
-                <li>block_num为PageAttention时block总数，block_size为一个block的token数。</li>
+                <li>blockNum为PageAttention时block总数，blockSize为一个block的token数。</li>
           </ul>
       </td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>
           <ul>
-                <li>layout_key为PA_BSND时，shape为(block_num, block_size, N2, D)。</li>
-                <li>layout_kv为BSND时，shape为(B, S2, N2, D)。</li>
-                <li>layout_kv为TND时，shape为(T2, N2, D)。</li>
+                <li>layoutKeyOptional为PA_BSND时，shape为(blockNum, blockSize, N2, D)。</li>
+                <li>layoutKeyOptional为BSND时，shape为(B, S2, N2, D)。</li>
+                <li>layoutKeyOptional为TND时，shape为(T2, N2, D)。</li>
           </ul>
       </td>
-      <td>x</td>
+      <td>✓</td>
     </tr>
     <tr>
       <td>weights</td>
@@ -144,8 +144,8 @@ aclnnStatus aclnnLightningIndexer(
       <td>ND</td>
       <td>
           <ul>
-                <li>layout_query为BSND时，shape为(B,S1,N1)。</li>
-                <li>layout_query为TND时，shape为(T1,N1)。</li>
+                <li>layoutQueryOptional为BSND时，shape为(B,S1,N1)。</li>
+                <li>layoutQueryOptional为TND时，shape为(T1,N1)。</li>
           </ul>
       </td>
       <td>x</td>
@@ -159,7 +159,7 @@ aclnnStatus aclnnLightningIndexer(
                 <li>不支持空tensor。</li>
                 <li>如果不指定seqlen可传入None，表示和`query`的shape的S长度相同。</li>
                 <li>该入参中每个Batch的有效token数不超过`query`中的维度S大小且不小于0，支持长度为B的一维tensor。</li>
-                <li>当`layout_query`为TND时，该入参必须传入，且以该入参元素的数量作为B值，该入参中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
+                <li>当`layoutQueryOptional`为TND时，该入参必须传入，且以该入参元素的数量作为B值，该入参中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -176,7 +176,7 @@ aclnnStatus aclnnLightningIndexer(
                 <li>不支持空tensor。</li>
                 <li>如果不指定seqlen可传入None，表示和key的shape的S长度相同。</li>
                 <li> 该参数中每个Batch的有效token数不超过`key/value`中的维度S大小且不小于0，支持长度为B的一维tensor。</li>
-                <li>当`layout_key`为TND或PA_BSND时，该入参必须传入，`layout_key`为TND，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
+                <li>当`layoutKeyOptional`为TND或PA_BSND时，该入参必须传入，`layoutKeyOptional`为TND，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -191,12 +191,12 @@ aclnnStatus aclnnLightningIndexer(
       <td>
           <ul>
                 <li>不支持空tensor。</li>
-                <li>PageAttention场景下，block\_table必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大actual\_seq\_lengths\_key对应的block数量）</li>
+                <li>PageAttention场景下，blockTableOptional必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大actualSeqLengthsKeyOptional对应的block数量）</li>
           </ul>
       </td>
       <td>INT32</td>
       <td>ND</td>
-      <td>shape支持(B,S2/block_size)</td>
+      <td>shape支持(B,S2/blockSize)</td>
       <td>x</td>
     </tr>
     <tr>
@@ -245,8 +245,8 @@ aclnnStatus aclnnLightningIndexer(
       <td>表示sparse的模式。</td>
       <td>
           <ul>
-                <li>sparse_mode为0时，代表defaultMask模式。</li>
-                <li>sparse_mode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。</li>
+                <li>sparseMode为0时，代表defaultMask模式。</li>
+                <li>sparseMode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -281,7 +281,7 @@ aclnnStatus aclnnLightningIndexer(
       <td>
           <ul>
                 <li>True表示输出，但图模式下不支持，False表示不输出；默认值为False</li>
-                <li>仅在训练且layout_key不为PA_BSND场景支持</li>
+                <li>仅在训练且layoutKeyOptional不为PA_BSND场景支持</li>
           </ul>
       </td>
       <td>BOOL</td>
@@ -298,8 +298,8 @@ aclnnStatus aclnnLightningIndexer(
       <td>-</td>
       <td>
           <ul>
-                <li>layout_query为"BSND"时输出shape为[B, S1, N2, sparseCount]。</li>
-                <li>layout_query为"TND"时输出shape为[T1, N2, sparseCount]。</li>
+                <li>layoutQueryOptional为"BSND"时输出shape为[B, S1, N2, sparseCount]。</li>
+                <li>layoutQueryOptional为"TND"时输出shape为[T1, N2, sparseCount]。</li>
           </ul>
       </td>
       <td>x</td>
@@ -412,11 +412,18 @@ aclnnStatus aclnnLightningIndexer(
 
 ## 约束说明
 
-- 参数query中的N支持小于等于64，key的N支持1。
+- 参数key的N支持1。
 - headdim支持128。
-- block_size取值为16的倍数，最大支持1024。
+- blockSize取值为16的倍数，最大支持1024。
 - 参数query、key的数据类型应保持一致。
 - 参数weights不为`float32`时，参数query、key、weights的数据类型应保持一致。
+- Ascend 950PR/Ascend 950DT：
+  - query的N仅支持8、16、24、32、64。
+  - 参数weights不支持`float32`类型。
+  - 仅在layoutKeyOptional为PA_BSND时，key支持0轴非连续。
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - query的N支持小于等于64。
+  - key不支持非连续。
 
 ## 调用示例
 
