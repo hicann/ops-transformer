@@ -592,10 +592,10 @@ def run_recurrent_gated_delta_rule_eager(
     state = state.to("npu:%s" % DEVICE_ID)
     if state_non_contiguous:
         padded_state = torch.zeros(
-            block_num * 2, nv * 2, dv, dk, dtype=state.dtype, device=state.device
+            block_num, nv, dv + 1, dk, dtype=state.dtype, device=state.device
         )
-        padded_state[::2, ::2, :, :] = state
-        state = padded_state[::2, ::2, :, :]
+        padded_state[:, :, :dv, :] = state
+        state = padded_state[:, :, :dv, :]
         print(
             f"state non-contiguous: shape={state.shape}, strides={state.stride()}, "
             f"is_contiguous={state.is_contiguous()}"
@@ -615,7 +615,7 @@ def run_recurrent_gated_delta_rule_eager(
     # start run custom ops
     if state_non_contiguous:
         init_padded = padded_state.clone()
-        init_state = init_padded[::2, ::2, :, :]
+        init_state = init_padded[:, :, :dv, :]
     else:
         init_state = state.clone()
     npu_out = torch_npu.npu_recurrent_gated_delta_rule(
