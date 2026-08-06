@@ -1,7 +1,7 @@
 # ============================================================
 # tests/st/CMakeLists.txt — apace ST 顶层构建入口
 # ============================================================
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.18.4)
 
 # ---- 查找 CANN 工具链 ----
 if(UNIX)

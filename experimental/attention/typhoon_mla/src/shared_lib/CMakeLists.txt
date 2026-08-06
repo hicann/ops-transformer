@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.18.4)
 project(catlass_kernel)
 
 set(KERNEL_OBJ_FILES "")

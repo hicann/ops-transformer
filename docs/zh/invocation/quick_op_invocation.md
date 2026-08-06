@@ -258,7 +258,7 @@ int main()
 - **调用自定义算子**：依赖自定义算子包
 
     ```cmake
-    cmake_minimum_required(VERSION 3.14)
+    cmake_minimum_required(VERSION 3.18.4)
     # 设置工程名
     project(ACLNN_EXAMPLE)
 
@@ -323,7 +323,7 @@ int main()
 - **调用标准算子（内置算子）**：依赖ops-transformer整包
 
     ```cmake
-    cmake_minimum_required(VERSION 3.14)
+    cmake_minimum_required(VERSION 3.18.4)
     # 设置工程名
     project(ACLNN_EXAMPLE)
 
@@ -472,7 +472,7 @@ int main()
    在`${test_geir_op_name}.cpp`同级目录下创建CMakeLists.txt文件，GE图引擎会根据配置好的环境变量自动加载已安装好的算子包（无论是自定义算子包或是标准内置算子包）库文件，无需特意区分。示例如下，仅供参考，请根据实际情况自行修改。
 
     ```bash
-   cmake_minimum_required(VERSION 3.14)
+   cmake_minimum_required(VERSION 3.18.4)
 
    # 设置工程名
    project(GE_IR_EXAMPLE)

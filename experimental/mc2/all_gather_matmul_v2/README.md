@@ -21,7 +21,7 @@ echo $ASCEND_HOME_PATH
 
 # 检查CMake版本
 cmake --version | head -1
-# CMake版本 >= 3.16
+# CMake版本 >= 3.18.4
 
 # 检查编译器
 which bisheng
@@ -71,7 +71,7 @@ python test.py
 > 💡 **提示**：如果遇到环境配置问题，请确保：
 > 1. `ASCEND_HOME_PATH`环境变量已正确设置
 > 2. Bisheng编译器已安装并可用
-> 3. CMake版本为3.16或更高
+> 3. CMake版本为3.18.4或更高
 > 4. torch及TorchNPU已安装并可用
 
 ## 💻 实战示例：AllGatherMatmul优化

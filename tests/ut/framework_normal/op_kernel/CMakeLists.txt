@@ -8,7 +8,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.18.4)
 
 if(UT_TEST_ALL OR OP_KERNEL_UT)
     ## set variables

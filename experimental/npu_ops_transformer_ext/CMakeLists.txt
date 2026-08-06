@@ -8,7 +8,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.18.4)
 project(NpuOpsTransformerExt)
 option(BUILD_TORCH_OPS "Build torch ops project (PyTorch extension style)" OFF)
 message(STATUS "Build torch ops: ${BUILD_TORCH_OPS}")

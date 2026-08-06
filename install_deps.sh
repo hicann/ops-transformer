@@ -412,9 +412,9 @@ install_patch() {
 }
 
 install_cmake() {
-    # CMake version >= 3.16.0
+    # CMake version >= 3.18.4
     echo -e "\n==== Checking CMake ===="
-    local req_ver="3.16.0"
+    local req_ver="3.18.4"
     local curr_ver=""
 
     if command -v cmake &> /dev/null; then

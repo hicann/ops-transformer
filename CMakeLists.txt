@@ -8,7 +8,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.18.4)
 include(cmake/fetch_cann_cmake.cmake)
 if(DEFINED RULE_LAUNCH AND RULE_LAUNCH)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${RULE_LAUNCH})
