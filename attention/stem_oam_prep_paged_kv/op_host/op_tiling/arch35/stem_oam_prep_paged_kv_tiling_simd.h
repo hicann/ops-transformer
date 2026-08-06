@@ -35,8 +35,8 @@ constexpr int64_t STEM_BLOCK_SIZE_ALIGN = 32;
 constexpr int64_t STEM_BLOCK_SIZE_MAX = 256;
 constexpr int64_t STEM_STRIDE_ALIGN = 16;
 constexpr int64_t STEM_STRIDE_MAX = 64;
-constexpr int64_t CACHE_LAYOUT_A = 0;
-constexpr int64_t CACHE_LAYOUT_B = 1;
+constexpr int64_t KV_LAYOUT_BBND = 0;
+constexpr int64_t KV_LAYOUT_BNBD = 1;
 constexpr int64_t KV_CACHE_DIM_NUM = 4;
 constexpr int64_t V_SCALE_DIM_NUM = 1;
 constexpr int64_t STRIDE_DIM_NUM = 4;
@@ -50,10 +50,9 @@ constexpr size_t INPUT_V_SCALE_INDEX = 5;
 constexpr size_t INPUT_COUNT = 6;
 
 constexpr size_t ATTR_LAMBDA_MAG_INDEX = 0;
-constexpr size_t ATTR_CACHE_LAYOUT_INDEX = 1;
-constexpr size_t ATTR_KV_BLOCK_SIZE_INDEX = 2;
-constexpr size_t ATTR_STEM_BLOCK_SIZE_INDEX = 3;
-constexpr size_t ATTR_STEM_STRIDE_INDEX = 4;
+constexpr size_t ATTR_KV_LAYOUT_INDEX = 1;
+constexpr size_t ATTR_STEM_BLOCK_SIZE_INDEX = 2;
+constexpr size_t ATTR_STEM_STRIDE_INDEX = 3;
 
 constexpr size_t OUTPUT_KFLAT_INDEX = 0;
 
@@ -91,7 +90,7 @@ private:
 
     int64_t batchSize_ = 0;
     int64_t numKvHeads_ = 0;
-    int64_t kvLayout_ = CACHE_LAYOUT_A;
+    int64_t kvLayout_ = KV_LAYOUT_BNBD;
     int64_t kvBlockSize_ = KV_BLOCK_SIZE_64;
     int64_t stemBlocks_ = STEM_BLOCK_SIZE_MAX;
     uint32_t stemStride_ = STEM_STRIDE_ALIGN;

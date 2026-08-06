@@ -26,15 +26,16 @@ OP_TYPE_REGISTER(StemOamPrepPagedKv);
 
 std::tuple<const aclTensor *, const aclTensor *> StemOamPrepPagedKv(
     const aclTensor *kCache, const aclTensor *vCache, const aclTensor *kvIndices, const aclTensor *kvSeqLens,
-    const aclTensor *kScaleCache, const aclTensor *vScale, float lambdaMag, int64_t cacheLayout, int64_t kvBlockSize,
-    int64_t stemBlockSize, int64_t stemStride, const aclTensor *kFlat, const aclTensor *vBias, aclOpExecutor *executor)
+    const aclTensor *kScaleCache, const aclTensor *vScale, float lambdaMag, const std::string &kvLayout,
+    int64_t stemBlockSize, int64_t stemStride, const aclTensor *kFlat, const aclTensor *vBias,
+    aclOpExecutor *executor)
 {
-    L0_DFX(StemOamPrepPagedKv, kCache, vCache, kvIndices, kvSeqLens, kScaleCache, vScale, lambdaMag, cacheLayout,
-           kvBlockSize, stemBlockSize, stemStride);
+    L0_DFX(StemOamPrepPagedKv, kCache, vCache, kvIndices, kvSeqLens, kScaleCache, vScale, lambdaMag, kvLayout,
+           stemBlockSize, stemStride);
 
     auto ret = ADD_TO_LAUNCHER_LIST_AICORE(
         StemOamPrepPagedKv, OP_INPUT(kCache, vCache, kvIndices, kvSeqLens, kScaleCache, vScale),
-        OP_ATTR(lambdaMag, cacheLayout, kvBlockSize, stemBlockSize, stemStride), OP_OUTPUT(kFlat, vBias));
+        OP_ATTR(lambdaMag, kvLayout, stemBlockSize, stemStride), OP_OUTPUT(kFlat, vBias));
 
     auto kNullResult = std::tuple<const aclTensor *, const aclTensor *>{nullptr, nullptr};
     OP_CHECK(ret == ACLNN_SUCCESS,

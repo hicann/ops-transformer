@@ -43,21 +43,74 @@
 
 - 接口功能：Stem OAM (Output-Aware Metric) 大模型推理动态稀疏注意力机制的前置评分模块。从 Paged KV Cache 中提取 K/V 数据，经 K Processing (per-token K-scale × group sum + anti-diagonal flip) 和 V Processing (per-head vScale × L2 Norm → Log → Global Normalize → ReLU → Block Average) 计算，输出 kFlat 和 vBias 供 Stem OAM score computation 使用。
 
-- 输入输出支持以下数据场景：
+- 计算公式：
+阶段1：De-page + Cast FP32 + kScaleCache Gather
 
-    ```python
-    kCache:[total_blocks, kvBlockSize, H_kv, D] 或 [total_blocks, H_kv, kvBlockSize, D]
-    vCache:[total_blocks, kvBlockSize, H_kv, D] 或 [total_blocks, H_kv, kvBlockSize, D]
-    kvIndices:[batch, max_kv_blocks]
-    kvSeqLens:[batch]
-    kScaleCache:[total_blocks, kvBlockSize, H_kv, 1] 或 [total_blocks, H_kv, kvBlockSize, 1]
-    vScale:[H_kv]
-    kFlat:[batch, H_kv, max_Kb, stemStride * D]
-    vBias:[batch, H_kv, max_Kb]
-    ```
+$$
+K\_dense[b], V\_dense[b], kscale\_per\_row[b] = Cast\big(gather(kcache[kv\_indices[b]]),\ FP32\big),\ Cast\big(gather(vcache[kv\_indices[b]]),\ FP32\big),\ gather(kScaleCache[kv\_indices[b]])
+$$
 
-- kCache/vCache 支持两种 layout，由 cacheLayout 属性指定：0=Layout A (interleaved), 1=Layout B (contiguous)。且当前仅支持D=128。
-- kScaleCache 布局随 cacheLayout 变化，与 kCache/vCache 布局一致（仅最后一维 D=1 代替 D=128）。
+$$
+k\_padded[b] = \lceil kv\_len[b] / B \rceil \times B, \quad num\_Kb[b] = k\_padded[b] / B, \quad R = B / S
+$$
+
+$$
+K\_scaled[b, h] = K\_dense[b, h, :] \times kscale\_per\_row[b, h, :] \quad (\text{per-token per-head, broadcast on dim})
+$$
+
+阶段2：K Processing(Weighted Group Sum + Anti-diagonal Flip)
+
+$$
+K\_group\_sum[b,h,kb,g,:] = \sum_{r=0}^{R-1} K\_blocks[b,h,kb,r,g,:]
+$$
+
+$$
+K\_group\_rev[b,h,kb,g',:] = K\_group\_sum[b,h,kb,\ S-1-g',:] \quad (\text{anti-diagonal flip})
+$$
+
+$$
+kFlat[b,h,kb,:] = reshape(K\_group\_rev[b,h,kb,:,:],\ [kflat\_dim = S \times D]) \xrightarrow{Cast} BF16
+$$
+
+阶段3：V Processing
+
+**Step 3a: L2 Norm + Max Pool + Log**
+
+$$
+norms[b,h,idx,s,:] = \| V\_rows[b,h,idx,s,:] \times vScale[h] \|_2 =  \sqrt{\sum_d (V\_rows[idx,s,d] \times vScale[h])^2}
+$$
+
+$$
+v\_norm\_down[b,h,idx] = \max_{s} norms[b,h,idx,s,:] \quad (\text{zero beyond } kv\_len)
+$$
+
+$$
+log\_vals[b,h,idx] = \log(v\_norm\_down[b,h,idx] + \epsilon), \quad \epsilon = 10^{-6}
+$$
+
+**Step 3b: Global Normalize (μ/σ over ALL k_down_len values)**
+
+$$
+\mu[b,h] = \frac{1}{k\_down\_len} \sum_{idx=0}^{k\_down\_len-1} log\_vals[b,h,idx]
+$$
+
+$$
+\sigma[b,h] = \sqrt{\frac{\sum(log\_vals - \mu)^2}{k\_down\_len - 1}} \quad (k\_down\_len > 1);\quad \sigma = 0 \quad (k\_down\_len = 1)
+$$
+
+**Step 3c: Normalize + ReLU + Block Average**
+
+$$
+normalized[b,h,idx] = \frac{log\_vals[b,h,idx] - \mu[b,h]}{\sigma[b,h] + \epsilon}
+$$
+
+$$
+v\_final[b,h,idx] = \lambda \times ReLU(normalized[b,h,idx])
+$$
+
+$$
+vBias[b,h,kb] = \frac{1}{R} \sum_{r=0}^{R-1} v\_final[b,h,\ kb \times R + r]
+$$
 
 ## 函数原型
 
@@ -72,8 +125,7 @@ aclnnStatus aclnnStemOamPrepPagedKvGetWorkspaceSize(
   const aclTensor  *kScaleCache,
   const aclTensor  *vScale,
   double            lambdaMag,
-  int64_t           cacheLayout,
-  int64_t           kvBlockSize,
+  const char        *kvLayout,
   int64_t           stemBlockSize,
   int64_t           stemStride,
   const aclTensor  *kFlat,
@@ -120,7 +172,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
       <td class="tg-0pky">kCache（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">Paged K cache。</td>
-      <td class="tg-0pky">不支持空Tensor。<br>cacheLayout=0时shape为[total_blocks, kvBlockSize, H_kv, D]，cacheLayout=1时shape为[total_blocks, H_kv, kvBlockSize, D]。<br>支持前三维非连续，最后一维必须连续。</td>
+      <td class="tg-0pky">不支持空Tensor。<br>两种布局, 由kvLayout指定, 当前仅支持"BNBD":<br>"BBND"为[total_blocks, kvBlockSize, H_kv, D=128], <br>"BNBD"为[total_blocks, H_kv, kvBlockSize, D=128]。<br>支持前三维非连续，最后一维必须连续。</td>
       <td class="tg-0pky">FLOAT8_E4M3FN</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">4</td>
@@ -130,7 +182,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
       <td class="tg-0pky">vCache（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">Paged V cache。</td>
-      <td class="tg-0pky">不支持空Tensor。<br>shape与kCache一致。</td>
+      <td class="tg-0pky">不支持空Tensor。<br>布局与kCache保持一致。</td>
       <td class="tg-0pky">与kCache保持一致</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">4</td>
@@ -139,8 +191,8 @@ aclnnStatus aclnnStemOamPrepPagedKv(
     <tr>
       <td class="tg-0pky">kvIndices（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
-      <td class="tg-0pky">Block index 数组，每个batch的physical block索引。</td>
-      <td class="tg-0pky">不支持空Tensor。<br>shape[1]=max_kv_blocks，max_kv_blocks由kvSeqLens决定：<br>max_kv_blocks = max(ceil(kvSeqLens[b] / kvBlockSize))。</td>
+      <td class="tg-0pky">每batch KV Block index数组</td>
+      <td class="tg-0pky">不支持空Tensor。<br>shape:[batch, max_kv_blocks], max_kv_blocks最大值2048</td>
       <td class="tg-0pky">INT32</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">2</td>
@@ -150,78 +202,68 @@ aclnnStatus aclnnStemOamPrepPagedKv(
       <td class="tg-0pky">kvSeqLens（aclIntArray*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">每batch KV序列长度。</td>
-      <td class="tg-0pky">不支持空列表。<br>该值用于派生kvIndices第二维max_kv_blocks及输出shape中max_Kb。</td>
+      <td class="tg-0pky">不支持空列表。<br>shape:[batch], kv序列长度最大值262144</td>
       <td class="tg-0pky">INT32</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">1</td>
       <td class="tg-0pky">x</td>
     </tr>
     <tr>
-      <td class="tg-0pky">kScaleCache（aclTensor*）</td>
+      <td class="tg-0pky">kScaleCacheOptional（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">Per-token per-head K scale。</td>
-      <td class="tg-0pky">FP8输入时必填。<br>随cacheLayout变化：<br>cacheLayout=0: [total_blocks, kvBlockSize, H_kv, 1]<br>cacheLayout=1: [total_blocks, H_kv, kvBlockSize, 1]。<br>支持前三维非连续，最后一维必须连续。</td>
+      <td class="tg-0pky">kCache数据类型为FP8时必填，其他类型可省略（传nullptr）。<br>两种布局, 由kvLayout指定, 当前仅支持"BNBD":<br>"BBND"为[total_blocks, kvBlockSize, H_kv, 1],<br>"BNBD"为[total_blocks, H_kv, kvBlockSize, 1]。<br>支持前三维非连续，最后一维必须连续。</td>
       <td class="tg-0pky">FLOAT</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">4</td>
       <td class="tg-0pky">√</td>
     </tr>
     <tr>
-      <td class="tg-0pky">vScale（aclTensor*）</td>
+      <td class="tg-0pky">vScaleOptional（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">Per-head V scale。</td>
-      <td class="tg-0pky">FP8输入时必填。</td>
+      <td class="tg-0pky">kCache数据类型为FP8时必填，其他类型可省略（传nullptr）。<br>shape:[H_kv]</td>
       <td class="tg-0pky">FLOAT</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">1</td>
       <td class="tg-0pky">x</td>
     </tr>
     <tr>
-      <td class="tg-0pky">lambdaMag（double）</td>
+      <td class="tg-0pky">lambdaMag</td>
       <td class="tg-0pky">ATTR</td>
-      <td class="tg-0pky">V bias 乘数，默认 0.3。</td>
-      <td class="tg-0pky">必填。</td>
-      <td class="tg-0pky">-</td>
+      <td class="tg-0pky">V bias 乘数</td>
+      <td class="tg-0pky">取值范围: (0,1]。</td>
+      <td class="tg-0pky">double</td>
       <td class="tg-0pky">-</td>
       <td class="tg-0pky">-</td>
       <td class="tg-0pky">-</td>
     </tr>
     <tr>
-      <td class="tg-0pky">cacheLayout（int64_t）</td>
+      <td class="tg-0pky">kvLayout</td>
       <td class="tg-0pky">ATTR</td>
-      <td class="tg-0pky">KV Cache布局，0=Layout A (interleaved), 1=Layout B (contiguous)。当前仅支持Layout B</td>
-      <td class="tg-0pky">必填。</td>
-      <td class="tg-0pky">-</td>
+      <td class="tg-0pky">KV Cache布局</td>
+      <td class="tg-0pky">取值范围: "BBND"、"BNBD"。当前仅支持"BNBD"</td>
+      <td class="tg-0pky">char*</td>
       <td class="tg-0pky">-</td>
       <td class="tg-0pky">-</td>
       <td class="tg-0pky">-</td>
     </tr>
     <tr>
-      <td class="tg-0pky">kvBlockSize（int64_t）</td>
-      <td class="tg-0pky">ATTR</td>
-      <td class="tg-0pky">Paged KV block size，64或128。</td>
-      <td class="tg-0pky">必填。</td>
-      <td class="tg-0pky">-</td>
-      <td class="tg-0pky">-</td>
-      <td class="tg-0pky">-</td>
-      <td class="tg-0pky">-</td>
-    </tr>
-    <tr>
-      <td class="tg-0lax">stemBlockSize（int64_t）</td>
+      <td class="tg-0lax">stemBlockSize</td>
       <td class="tg-0lax">ATTR</td>
-      <td class="tg-0lax">Stem block大小，%32==0，≤256，且stemBlockSize必须是stemStride的整数倍，推荐128。</td>
-      <td class="tg-0lax">必填。</td>
-      <td class="tg-0lax">-</td>
+      <td class="tg-0lax">Stem block大小</td>
+      <td class="tg-0lax">取值范围: %32==0, ≤256, 且stemBlockSize必须是stemStride的整数倍，推荐128。</td>
+      <td class="tg-0lax">int64_t</td>
       <td class="tg-0lax">-</td>
       <td class="tg-0lax">-</td>
       <td class="tg-0lax">-</td>
     </tr>
     <tr>
-      <td class="tg-0lax">stemStride（int64_t）</td>
+      <td class="tg-0lax">stemStride</td>
       <td class="tg-0lax">ATTR</td>
-      <td class="tg-0lax">Stride大小，%16==0，≤64，≤stemBlockSize，推荐16。</td>
-      <td class="tg-0lax">必填。</td>
-      <td class="tg-0lax">-</td>
+      <td class="tg-0lax">Stride大小</td>
+      <td class="tg-0lax">取值范围: %16==0，≤64，≤stemBlockSize，推荐16。</td>
+      <td class="tg-0lax">int64_t</td>
       <td class="tg-0lax">-</td>
       <td class="tg-0lax">-</td>
       <td class="tg-0lax">-</td>
@@ -230,7 +272,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
       <td class="tg-0lax">kFlat（aclTensor*）</td>
       <td class="tg-0lax">输出</td>
       <td class="tg-0lax">K group sum + anti-diag flip 结果。</td>
-      <td class="tg-0lax">不支持空Tensor。<br>shape为[batch, H_kv, max_Kb, kflat_dim]，其中kflat_dim=stemStride*128。</td>
+      <td class="tg-0lax">不支持空Tensor。<br>shape为[batch, H_kv, max_Kb, kflat_dim]，其中kflat_dim=stemStride*D, <br>max_Kb依赖kvSeqLens输入计算获得。</td>
       <td class="tg-0lax">BFLOAT16</td>
       <td class="tg-0lax">ND</td>
       <td class="tg-0lax">4</td>
@@ -240,7 +282,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
       <td class="tg-0lax">vBias（aclTensor*）</td>
       <td class="tg-0lax">输出</td>
       <td class="tg-0lax">V block bias结果。</td>
-      <td class="tg-0lax">不支持空Tensor。<br>shape为[batch, H_kv, max_Kb]。</td>
+      <td class="tg-0lax">不支持空Tensor。<br>shape为[batch, H_kv, max_Kb], max_Kb依赖kvSeqLens输入计算获得。</td>
       <td class="tg-0lax">FLOAT</td>
       <td class="tg-0lax">ND</td>
       <td class="tg-0lax">3</td>
@@ -289,7 +331,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>传入的kCache、vCache、kFlat、vBias是空指针。<br>FP8输入时kScaleCache、vScale不允许空指针。</td>
+      <td>传入的kCache、vCache、kFlat、vBias是空指针。<br>kCache数据类型为FP8时kScaleCache、vScale空指针。</td>
     </tr>
     <tr>
       <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
@@ -303,7 +345,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
       <td>vScale shape不是1D [H_kv]。</td>
     </tr>
     <tr>
-      <td>cacheLayout/kvBlockSize/stemBlockSize/stemStride不满足约束。</td>
+      <td>kvLayout/stemBlockSize/stemStride不满足约束。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_INNER</td>
@@ -358,14 +400,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
 
 ## 约束说明
 
-- kCache/vCache dtype必须为FLOAT8_E4M3FN（仅FP8路径）。
-- kScaleCache/vScale必填，不允许nullptr。
-- kScaleCache shape随cacheLayout变化：Layout A `[total_blocks, kvBlockSize, H_kv, 1]`，Layout B `[total_blocks, H_kv, kvBlockSize, 1]`。当前仅支持Layout B。
-- vScale shape：`[H_kv]`。
 - kvBlockSize ∈ {64, 128}。
-- stemBlockSize % 32 == 0，≤256；stemStride % 16 == 0，≤64，且stemStride ≤ stemBlockSize，stemBlockSize必须是stemStride的整数倍。
-- 边界：kvSeqLens[b]=0时该batch对应的kFlat/vBias输出全零；kScaleCache padding rows（beyond kv_len）→ zero。
-
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
@@ -433,7 +468,6 @@ aclnnStatus aclnnStemOamPrepPagedKv(
 
     int64_t batch = 1;
     int64_t totalBlocks = 8;
-    int64_t kvBlockSize = 64;
     int64_t numKvHeads = 4;
     int64_t dimQk = 128;
     int64_t maxKvBlocks = 2;
@@ -441,11 +475,11 @@ aclnnStatus aclnnStemOamPrepPagedKv(
     int64_t stemStride = 16;
     int64_t maxKb = 2;
     int64_t kflatDim = stemStride * dimQk;
-    int64_t cacheLayout = 1;
+    const char *kvLayout = "BNBD";
 
-    std::vector<int64_t> kCacheShape = {totalBlocks, numKvHeads, kvBlockSize, dimQk};
+    std::vector<int64_t> kCacheShape = {totalBlocks, numKvHeads, 64, dimQk};
     std::vector<int64_t> kvIndicesShape = {batch, maxKvBlocks};
-    std::vector<int64_t> kScaleCacheShape = {totalBlocks, numKvHeads, kvBlockSize, 1};
+    std::vector<int64_t> kScaleCacheShape = {totalBlocks, numKvHeads, 64, 1};
     std::vector<int64_t> vScaleShape = {numKvHeads};
     std::vector<int64_t> kFlatShape = {batch, numKvHeads, maxKb, kflatDim};
     std::vector<int64_t> vBiasShape = {batch, numKvHeads, maxKb};
@@ -496,7 +530,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
     aclOpExecutor* executor;
     ret = aclnnStemOamPrepPagedKvGetWorkspaceSize(
         kCache, vCache, kvIndices, kvSeqLens, kScaleCache, vScale,
-        0.3, cacheLayout, kvBlockSize, stemBlockSize, stemStride,
+        0.3, kvLayout, stemBlockSize, stemStride,
         kFlat, vBias, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 

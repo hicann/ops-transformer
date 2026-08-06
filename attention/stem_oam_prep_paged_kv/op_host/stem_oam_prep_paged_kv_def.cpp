@@ -17,10 +17,9 @@
 namespace ops {
 
 constexpr double DEFAULT_LAMBDA_MAG = 0.3;
-constexpr int64_t DEFAULT_CACHE_LAYOUT = 0;
-constexpr int64_t DEFAULT_KV_BLOCK_SIZE = 64;
 constexpr int64_t DEFAULT_STEM_BLOCK_SIZE = 128;
 constexpr int64_t DEFAULT_STEM_STRIDE = 16;
+const char *DEFAULT_KV_LAYOUT = "BNBD";
 
 class StemOamPrepPagedKv : public OpDef {
 public:
@@ -41,11 +40,11 @@ public:
             .Format({ge::FORMAT_ND})
             .ValueDepend(OPTIONAL);
         this->Input("kScaleCache")
-            .ParamType(REQUIRED)
+            .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT})
             .Format({ge::FORMAT_ND});
         this->Input("vScale")
-            .ParamType(REQUIRED)
+            .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT})
             .Format({ge::FORMAT_ND});
         this->Output("kFlat")
@@ -57,8 +56,7 @@ public:
             .DataType({ge::DT_FLOAT})
             .Format({ge::FORMAT_ND});
         this->Attr("lambdaMag").AttrType(OPTIONAL).Float(DEFAULT_LAMBDA_MAG);
-        this->Attr("cacheLayout").AttrType(OPTIONAL).Int(DEFAULT_CACHE_LAYOUT);
-        this->Attr("kvBlockSize").AttrType(OPTIONAL).Int(DEFAULT_KV_BLOCK_SIZE);
+        this->Attr("kvLayout").AttrType(OPTIONAL).String(DEFAULT_KV_LAYOUT);
         this->Attr("stemBlockSize").AttrType(OPTIONAL).Int(DEFAULT_STEM_BLOCK_SIZE);
         this->Attr("stemStride").AttrType(OPTIONAL).Int(DEFAULT_STEM_STRIDE);
         OpAICoreConfig aicore_config;

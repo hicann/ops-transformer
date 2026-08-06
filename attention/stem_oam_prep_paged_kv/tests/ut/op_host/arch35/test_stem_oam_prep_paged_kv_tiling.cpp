@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 #include <iostream>
+#include <string>
 #include <vector>
 
 #include "tiling_case_executor.h"
@@ -34,12 +35,13 @@ struct InputBundle {
 };
 
 InputBundle MakeInputs(int64_t totalBlocks = 8, int64_t kvBlockSize = 64, int64_t numKvHeads = 4, int64_t batch = 1,
-                       int64_t maxKvBlocks = 2, int64_t cacheLayout = 0, std::vector<int32_t> seqLens = {128})
+                       int64_t maxKvBlocks = 2, const std::string &kvLayout = "BBND",
+                       std::vector<int32_t> seqLens = {128})
 {
     InputBundle bundle;
     bundle.kvSeqLensData = std::move(seqLens);
 
-    if (cacheLayout == 0) {
+    if (kvLayout == "BBND") {
         bundle.descs = {
             {{{totalBlocks, kvBlockSize, numKvHeads, 128}, {totalBlocks, kvBlockSize, numKvHeads, 128}},
              ge::DT_FLOAT8_E4M3FN,
@@ -86,13 +88,12 @@ std::vector<TensorDesc> MakeOutputs(int64_t batch, int64_t numKvHeads, int64_t m
     };
 }
 
-std::vector<OpAttr> MakeAttrs(float lambdaMag = 0.3f, int64_t cacheLayout = 0, int64_t kvBlockSize = 64,
+std::vector<OpAttr> MakeAttrs(float lambdaMag = 0.3f, const std::string &kvLayout = "BBND",
                               int64_t stemBlockSize = 128, int64_t stemStride = 16)
 {
     return {
         {"lambdaMag", Ops::Transformer::AnyValue::CreateFrom<float>(lambdaMag)},
-        {"cacheLayout", Ops::Transformer::AnyValue::CreateFrom<int64_t>(cacheLayout)},
-        {"kvBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(kvBlockSize)},
+        {"kvLayout", Ops::Transformer::AnyValue::CreateFrom<const char*>(kvLayout.c_str())},
         {"stemBlockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(stemBlockSize)},
         {"stemStride", Ops::Transformer::AnyValue::CreateFrom<int64_t>(stemStride)},
     };
@@ -120,48 +121,48 @@ void ExpectTilingResult(const gert::TilingContextPara &para, bool expectSuccess)
 
 TEST_F(StemOamPrepPagedKvTilingArch35, basic_layout0)
 {
-    auto inputBundle = MakeInputs(8, 64, 4, 1, 2, 0, {128});
+    auto inputBundle = MakeInputs(8, 64, 4, 1, 2, "BBND", {128});
     auto outputs = MakeOutputs(1, 4, 1, 16);
-    auto attrs = MakeAttrs(0.3f, 0, 64, 128, 16);
+    auto attrs = MakeAttrs(0.3f, "BBND", 128, 16);
     ExpectTilingResult(BuildTilingPara(inputBundle.descs, outputs, attrs), true);
 }
 
 TEST_F(StemOamPrepPagedKvTilingArch35, basic_layout1)
 {
-    auto inputBundle = MakeInputs(8, 64, 4, 1, 2, 1, {128});
+    auto inputBundle = MakeInputs(8, 64, 4, 1, 2, "BNBD", {128});
     auto outputs = MakeOutputs(1, 4, 1, 16);
-    auto attrs = MakeAttrs(0.3f, 1, 64, 128, 16);
+    auto attrs = MakeAttrs(0.3f, "BNBD", 128, 16);
     ExpectTilingResult(BuildTilingPara(inputBundle.descs, outputs, attrs), true);
 }
 
 TEST_F(StemOamPrepPagedKvTilingArch35, multibatch_kvblock128)
 {
-    auto inputBundle = MakeInputs(16, 128, 8, 2, 4, 0, {128, 256});
+    auto inputBundle = MakeInputs(16, 128, 8, 2, 4, "BBND", {128, 256});
     auto outputs = MakeOutputs(2, 8, 2, 32);
-    auto attrs = MakeAttrs(0.5f, 0, 128, 128, 32);
+    auto attrs = MakeAttrs(0.5f, "BBND", 128, 32);
     ExpectTilingResult(BuildTilingPara(inputBundle.descs, outputs, attrs), true);
 }
 
 TEST_F(StemOamPrepPagedKvTilingArch35, non_aligned_kvseqlens)
 {
-    auto inputBundle = MakeInputs(8, 64, 4, 1, 2, 0, {100});
+    auto inputBundle = MakeInputs(8, 64, 4, 1, 2, "BBND", {100});
     auto outputs = MakeOutputs(1, 4, 1, 16);
-    auto attrs = MakeAttrs(0.3f, 0, 64, 128, 16);
+    auto attrs = MakeAttrs(0.3f, "BBND", 128, 16);
     ExpectTilingResult(BuildTilingPara(inputBundle.descs, outputs, attrs), true);
 }
 
 TEST_F(StemOamPrepPagedKvTilingArch35, stemblock256_stemstride64)
 {
-    auto inputBundle = MakeInputs(4, 64, 2, 1, 1, 0, {200});
+    auto inputBundle = MakeInputs(4, 64, 2, 1, 1, "BBND", {200});
     auto outputs = MakeOutputs(1, 2, 1, 64);
-    auto attrs = MakeAttrs(0.3f, 0, 64, 256, 64);
+    auto attrs = MakeAttrs(0.3f, "BBND", 256, 64);
     ExpectTilingResult(BuildTilingPara(inputBundle.descs, outputs, attrs), true);
 }
 
 TEST_F(StemOamPrepPagedKvTilingArch35, layout1_stemstride16_maxKb2)
 {
-    auto inputBundle = MakeInputs(8, 64, 4, 1, 2, 1, {256});
+    auto inputBundle = MakeInputs(8, 64, 4, 1, 2, "BNBD", {256});
     auto outputs = MakeOutputs(1, 4, 2, 16);
-    auto attrs = MakeAttrs(0.3f, 1, 64, 128, 16);
+    auto attrs = MakeAttrs(0.3f, "BNBD", 128, 16);
     ExpectTilingResult(BuildTilingPara(inputBundle.descs, outputs, attrs), true);
 }

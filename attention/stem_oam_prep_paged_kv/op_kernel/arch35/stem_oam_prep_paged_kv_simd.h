@@ -481,8 +481,8 @@ __aicore__ inline void StemOamPrepPagedKvSimd::ComputeVFlat(int64_t headIdx, int
                 auto normsWhereAddrStart = normsAddr + i * stemStride_ + j * vfLen;
                 AscendC::MicroAPI::LoadAlign(normsReg, normsWhereAddrStart);
                 AscendC::MicroAPI::Reduce<MicroAPI::ReduceType::MAX, float, float>(normsReg, normsReg, valueMaskReg);
-                AscendC::MicroAPI::Compare<float, AscendC::CMPMODE::GT>(maxMaskReg, normsReg, normsMaxReg, oneMaskReg);
-                AscendC::MicroAPI::Select(normsMaxReg, normsReg, normsMaxReg, maxMaskReg);
+                AscendC::MicroAPI::Compare<float, AscendC::CMPMODE::GT>(maxMaskReg, normsMaxReg, normsReg, oneMaskReg);
+                AscendC::MicroAPI::Select(normsMaxReg, normsMaxReg, normsReg, maxMaskReg);
             }
             AscendC::MicroAPI::Store(vNormDownAddr + i, normsMaxReg, 1);
         }
