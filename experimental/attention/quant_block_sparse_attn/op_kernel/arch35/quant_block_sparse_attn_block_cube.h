@@ -320,9 +320,8 @@ __aicore__ inline void QBSABlockCube<TEMPLATE_ARGS>::IterateBmm2(
     // mm2A.WaitCrossCore();
     mm2B.Wait<HardEvent::MTE1_MTE2>(); // 占用L1B
     LocalTensor<INPUT_T> mm2BTensor = mm2B.GetTensor<INPUT_T>();
-    int32_t remainBlocks = runInfo.actSparseLen - runInfo.s2LoopCount * 2;
     uint32_t actualS2RealSize = (uint32_t)runInfo.s2SparseBlk1RealSize;
-    if (remainBlocks >= 2) {
+    if (likely(runInfo.sparseBlkIdx2 != -1)) {
         actualS2RealSize += (uint32_t)runInfo.s2SparseBlk2RealSize;
     }
     if constexpr (isPa) {
@@ -348,7 +347,7 @@ __aicore__ inline void QBSABlockCube<TEMPLATE_ARGS>::IterateBmm2(
         GlobalTensor<INPUT_T> mm2BGmTensor = GetValueGm(runInfo, constInfo);
         GmCopyInToL1PA<INPUT_T>(mm2BTensor, mm2BGmTensor, blockTableGm, pa_kvLayout, shape, startPos);
 
-        if (remainBlocks >= 2) {
+        if (likely(runInfo.sparseBlkIdx2 != -1)) {
             startPos.s2Offset = coordInfo[runInfo.taskIdMod3].sparseBlockIdx[1] * constInfo.kvSparseBlockSize;
             shape.copyRowNum = runInfo.s2SparseBlk2RealSize;
             uint32_t blockElementCnt = 32U / sizeof(INPUT_T);
@@ -464,9 +463,8 @@ __aicore__ inline void QBSABlockCube<TEMPLATE_ARGS>::IterateBmm1Dn(
     mm1A = l1KBuffers.Get();
     mm1A.Wait<HardEvent::MTE1_MTE2>();
     LocalTensor<INPUT_T> mm1ATensor = mm1A.GetTensor<INPUT_T>();
-    int32_t remainBlocks = runInfo.actSparseLen - runInfo.s2LoopCount * 2;
     uint32_t actualS2RealSize = (uint32_t)runInfo.s2SparseBlk1RealSize;
-    if (remainBlocks >= 2) {
+    if (likely(runInfo.sparseBlkIdx2 != -1)) {
         actualS2RealSize += (uint32_t)runInfo.s2SparseBlk2RealSize;
     }
     if constexpr (isPa) {
@@ -492,7 +490,7 @@ __aicore__ inline void QBSABlockCube<TEMPLATE_ARGS>::IterateBmm1Dn(
         GlobalTensor<INPUT_T> mm1AGmTensor = GetKeyGm(runInfo, constInfo);
         GmCopyInToL1PA<INPUT_T>(mm1ATensor, mm1AGmTensor, blockTableGm, pa_kvLayout, shape, startPos);
 
-        if (remainBlocks >= 2) {
+        if (likely(runInfo.sparseBlkIdx2 != -1)) {
             startPos.s2Offset = coordInfo[runInfo.taskIdMod3].sparseBlockIdx[1] * constInfo.kvSparseBlockSize;
             shape.copyRowNum = runInfo.s2SparseBlk2RealSize;
             uint32_t blockElementCnt = 32U / sizeof(INPUT_T);

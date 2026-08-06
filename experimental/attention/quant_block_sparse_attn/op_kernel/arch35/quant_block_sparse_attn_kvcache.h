@@ -239,7 +239,6 @@ __aicore__ inline void SwapValues(T &numValue1, T &numValue2)
 __aicore__ inline void SwapSparseBlockSlots(RunInfo &runInfo)
 {
     SwapValues(runInfo.sparseBlkIdx1, runInfo.sparseBlkIdx2);
-    SwapValues(runInfo.phyBlkNumIdx1, runInfo.phyBlkNumIdx2);
     SwapValues(runInfo.s2SparseBlk1RealSize, runInfo.s2SparseBlk2RealSize);
     SwapValues(runInfo.s2SparseBlk1RealAlignedSize, runInfo.s2SparseBlk2RealAlignedSize);
     SwapValues(runInfo.sparseBlk1PartialMask, runInfo.sparseBlk2PartialMask);
@@ -247,14 +246,14 @@ __aicore__ inline void SwapSparseBlockSlots(RunInfo &runInfo)
 
 __aicore__ inline void IdxSortBySparseIdx(RunInfo &runInfo)
 {
-    if (runInfo.sparseBlkIdx1 == -1 && runInfo.sparseBlkIdx2 == -1) {
+    if (unlikely(runInfo.sparseBlkIdx1 == -1 && runInfo.sparseBlkIdx2 == -1)) {
         return;
     }
-    if (runInfo.sparseBlkIdx1 == -1) {
+    if (unlikely(runInfo.sparseBlkIdx1 == -1)) {
         SwapSparseBlockSlots(runInfo);
         return;
     }
-    if (runInfo.sparseBlkIdx2 == -1) {
+    if (unlikely(runInfo.sparseBlkIdx2 == -1)) {
         return;
     }
     if (runInfo.sparseBlkIdx1 > runInfo.sparseBlkIdx2) {

@@ -311,10 +311,13 @@ __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::ProcessVec1Dn(
     LocalTensor<float> qScaleUbTensor = qScaleInputQue.template AllocTensor<float>();
     LocalTensor<float> kScaleUbTensor = kScaleInputQue.template AllocTensor<float>();
 
-    Duplicate<float>(kScaleUbTensor, 1, s2BaseSize);
-    TEventID vDoneEvent = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
-    SetFlag<HardEvent::V_MTE2>(vDoneEvent);  // Vector 完成
-    WaitFlag<HardEvent::V_MTE2>(vDoneEvent); // MTE2 等待
+    if (unlikely(runInfo.s2SparseBlk2RealSize < constInfo.kvSparseBlockSize)) {
+        Duplicate<float>(kScaleUbTensor, 1, s2BaseSize);
+        TEventID vDoneEvent = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
+        SetFlag<HardEvent::V_MTE2>(vDoneEvent);  // Vector 完成
+        WaitFlag<HardEvent::V_MTE2>(vDoneEvent); // MTE2 等待
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(vDoneEvent);
+    }
 
     copyQueryScaleGmToUb(qScaleUbTensor, deScaleQGm, runInfo, constInfo);
     copyKeyScaleGmToUb(kScaleUbTensor, deScaleKGm, blockTableGm, runInfo, constInfo);
@@ -378,8 +381,10 @@ __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::ProcessVec1Dn(
     outputBuf.SetCrossCore();
     //-----------------------------------------------------------------
     this->stage1OutQue[stage1Offset].template FreeTensor(stage1CastTensor);
-    if (constInfo.isSoftmaxLseEnable && unlikely(runInfo.s2LoopCount == runInfo.s2LoopLimit)) {
-        SoftmaxDataCopyOut(runInfo, constInfo, sumUb, maxUb);
+    if constexpr (hasLse) {
+        if (unlikely(runInfo.s2LoopCount == runInfo.s2LoopLimit)) {
+            SoftmaxDataCopyOut(runInfo, constInfo, sumUb, maxUb);
+        }
     }
     return;
 }
@@ -683,11 +688,12 @@ __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::CleanOutput(__gm__ uint8_t *
 {
     if ASCEND_IS_AIV {
         this->attentionOutGm.SetGlobalBuffer((__gm__ OUTPUT_T *)attentionOut);
-        softmaxLseGm.SetGlobalBuffer((__gm__ float *)softmaxLse);
-        constInfo.isSoftmaxLseEnable = this->tilingData->inputParamsRegbase.isSoftMaxLseEnable;
+        if constexpr (hasLse) {
+            softmaxLseGm.SetGlobalBuffer((__gm__ float *)softmaxLse);
+        }
         if (this->tilingData->initOutputParams.needInit == 1) {
             InitOutputSingleCore(constInfo);
-            if (constInfo.isSoftmaxLseEnable) {
+            if constexpr (hasLse) {
                 SyncAll();
                 InitLseOutputSingleCore(constInfo);
             }
@@ -709,7 +715,7 @@ __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::InitGlobalBuffer(
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::InitUniqueLocalBuffer(ConstInfo &constInfo)
 {
-    if (constInfo.isSoftmaxLseEnable) {
+    if constexpr (hasLse) {
         this->tPipe->InitBuffer(softmaxLseQueue, 1, (s1BaseSize >> 1U) * sizeof(float) * 8);
     }
 }
@@ -740,9 +746,6 @@ __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::SoftmaxLseCopyOut(LocalTenso
         return;
     }
 
-    if (!constInfo.isSoftmaxLseEnable) {
-        return;
-    }
     LocalTensor<float> lseUb = this->softmaxLseQueue.template AllocTensor<float>();
     ComputeLseOutputVF(lseUb, softmaxSumTmp, softmaxMaxTmp, runInfo.halfS1RealSize);
     softmaxLseQueue.template EnQue(lseUb);

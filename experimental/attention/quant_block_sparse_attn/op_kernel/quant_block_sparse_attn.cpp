@@ -28,7 +28,7 @@ using namespace optiling;
 //   - 按 g_coreType 选择实/Dummy 的 Cube/Vec block（AIC 跑真 Cube + Dummy Vec，AIV 跑 Dummy Cube + 真 Vec）
 //   - 实例化 QuantBlockSparseAttnKernel<CubeBlockType, VecBlockType>
 //   - GET_TILING_DATA -> InitBaseAPI -> Process()
-// __VA_ARGS__ 为 block 模板参数（严格对齐 CUBE_BLOCK_TRAITS 字段顺序，共 17 个）。
+// __VA_ARGS__ 为 block 模板参数（严格对齐 CUBE_BLOCK_TRAITS 字段顺序）。
 
 #define QBSA_OP_IMPL_WITH_TILING(tilingDataPtr, ...) \
     do { \
@@ -104,6 +104,6 @@ __global__ __aicore__ void quant_block_sparse_attn(
                       "FP8QuantMode must use S1=128, S2=256, D=128, DV=128 config");
         QBSA_OP_IMPL(fp8_e4m3fn_t, float, bfloat16_t, layout, kvLayout, S1TemplateType::Aligned128,
                     S2TemplateType::Aligned256, DTemplateType::Aligned128, DTemplateType::Aligned128, HAS_ATTENTION,
-                    bsaIsPa, bsaUseDn);
+                    RETURN_SOFTMAX_LSE, bsaIsPa, bsaUseDn);
     }
 }

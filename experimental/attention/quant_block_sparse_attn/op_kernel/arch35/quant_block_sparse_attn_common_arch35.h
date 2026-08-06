@@ -76,16 +76,16 @@ __aicore__ constexpr TPosition GetC2Position()
 
 #define CHILD_SPEC_TEMPLATE_ARGS                                                                                       \
     INPUT_T, T, layout, kvLayout, s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType, hasAtten, OUTPUT_T,   \
-        isPa, useDn
+        hasLse, isPa, useDn
 
 #define TEMPLATE_INTF                                                                                                  \
     template <typename INPUT_T, typename T, QBSALayout layout, QBSALayout kvLayout, S1TemplateType s1TemplateType,     \
               S2TemplateType s2TemplateType, DTemplateType dTemplateType, DTemplateType dVTemplateType, bool hasAtten, \
-              typename OUTPUT_T, bool isPa, bool useDn = true>
+              typename OUTPUT_T, bool hasLse, bool isPa, bool useDn = true>
 
 #define TEMPLATE_INTF_ARGS                                                                                             \
     INPUT_T, T, layout, kvLayout, s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType, hasAtten, OUTPUT_T,   \
-        isPa, useDn
+        hasLse, isPa, useDn
 
 #define CUBE_BLOCK_TRAITS_TYPE_FIELDS(X)                                                                               \
     X(INPUT_T)                                                                                                         \
@@ -100,6 +100,7 @@ __aicore__ constexpr TPosition GetC2Position()
     X(dTemplateType, DTemplateType, DTemplateType::Aligned128)                                                         \
     X(dVTemplateType, DTemplateType, DTemplateType::Aligned128)                                                        \
     X(hasAtten, bool, false)                                                                                           \
+    X(hasLse, bool, false)                                                                                             \
     X(isPa, bool, false)                                                                                               \
     X(useDn, bool, false)
 
