@@ -75,8 +75,6 @@ if _TORCHAIR_AVAILABLE:
             cache_layout: str，cache布局格式
             meta_outputs: TensorSpec，输出的shape/dtype信息
 
-        Returns:
-            tuple: (key_cache_out, value_cache_out, key_scale_cache_out)
         """
         return ge.ScatterPaKvCacheWithKScale(
             key,

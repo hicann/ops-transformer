@@ -74,7 +74,7 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
     key_scale_cache,
     *,
     cache_layout='BNBD'
-) -> Tuple[Tensor, Tensor, Tensor]
+) -> None
 ```
 
 ## 参数说明
@@ -92,11 +92,7 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
 
 ## 返回值说明
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| key_cache_out | Tensor | 必选 | 更新后的key cache，shape和dtype与输入key_cache相同。 | 与key保持一致 | (num_blocks, num_head, block_size, k_head_size) |
-| value_cache_out | Tensor | 必选 | 更新后的value cache，shape和dtype与输入value_cache相同。 | 与value保持一致 | (num_blocks, num_head, block_size, v_head_size) |
-| key_scale_cache_out | Tensor | 必选 | 更新后的key scale cache，shape和dtype与输入key_scale_cache相同。 | float | (num_blocks, num_head, block_size, 1) |
+无返回值。该接口为原地更新接口，调用后 `key_cache`、`value_cache`、`key_scale_cache` 会被原地更新，无需接收返回值。
 
 ## 约束说明
 
@@ -154,8 +150,8 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
     key_scale = torch.randn(num_tokens, num_head, dtype=torch.float32, device="npu")
     key_scale_cache = torch.zeros(num_blocks, num_head, block_size, 1, dtype=torch.float32, device="npu")
 
-    # 调用算子，将key/value/key_scale按slot_mapping写入cache
-    key_cache_out, value_cache_out, key_scale_cache_out = cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
+    # 调用算子，将key/value/key_scale按slot_mapping写入cache（原地更新，无返回值）
+    cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
         key,
         value,
         key_cache,
@@ -167,9 +163,9 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
     )
 
     torch_npu.npu.synchronize()
-    print(key_cache_out.shape, key_cache_out.dtype)
-    print(value_cache_out.shape, value_cache_out.dtype)
-    print(key_scale_cache_out.shape, key_scale_cache_out.dtype)
+    print(key_cache.shape, key_cache.dtype)
+    print(value_cache.shape, value_cache.dtype)
+    print(key_scale_cache.shape, key_scale_cache.dtype)
     ```
 
 - 图模式（torchair）调用：
@@ -216,7 +212,7 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
         @torch._dynamo.disable
         def forward(self, key, value, key_cache, value_cache, slot_mapping, key_scale, key_scale_cache,
                     cache_layout='BNBD'):
-            return torch.ops.cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
+            torch.ops.cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
                 key,
                 value,
                 key_cache,
@@ -226,16 +222,17 @@ cann_ops_transformer.scatter_pa_kv_cache_with_k_scale(
                 key_scale_cache,
                 cache_layout=cache_layout,
             )
+            return key_cache, value_cache, key_scale_cache
 
     config = CompilerConfig()
     config.mode = "reduce-overhead"
     npu_backend = torchair.get_npu_backend(compiler_config=config)
     torch._dynamo.reset()
     npu_mode = torch.compile(ScatterPaKvCacheWithKScaleNetwork(), backend=npu_backend, dynamic=False)
-    key_cache_out, value_cache_out, key_scale_cache_out = npu_mode(
+    key_cache, value_cache, key_scale_cache = npu_mode(
         key, value, key_cache, value_cache, slot_mapping, key_scale, key_scale_cache, cache_layout='BNBD')
 
-    print(key_cache_out.shape, key_cache_out.dtype)
-    print(value_cache_out.shape, value_cache_out.dtype)
-    print(key_scale_cache_out.shape, key_scale_cache_out.dtype)
+    print(key_cache.shape, key_cache.dtype)
+    print(value_cache.shape, value_cache.dtype)
+    print(key_scale_cache.shape, key_scale_cache.dtype)
     ```
