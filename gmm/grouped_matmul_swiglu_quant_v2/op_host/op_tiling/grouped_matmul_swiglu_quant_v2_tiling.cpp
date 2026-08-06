@@ -81,7 +81,7 @@ static ge::graphStatus GroupedMatmulSwigluQuantV2TilingFunc(gert::TilingContext 
             // 伪量化场景 MxA8W4: x=FP8_E4M3FN, w=FP4_E2M1
             OP_LOGD("GroupedMatmulSwigluQuantV2TilingFunc", "Using the weight quant tiling for MxA8W4");
             registerList[0] = GMMSQ_WEIGHT_QUANT_TILING_TEMPLATE;
-        } else if (xScaleDtype == ge::DT_FLOAT8_E8M0 && weightFormat == ge::FORMAT_ND) {
+        } else if (xScaleDtype == ge::DT_FLOAT8_E8M0 && weightFormat == (ge::FORMAT_ND || ge::FORMAT_NCL)) {
             // Tensor API is preferred for MX quant with ND weight. Unsupported cases fall back to template 2.
             registerList = {GMMSQ_TENSOR_API_TILING_TEMPLATE, GMMSQ_950_TILING_TEMPLATE};
             OP_LOGD("GroupedMatmulSwigluQuantV2TilingFunc",

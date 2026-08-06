@@ -284,18 +284,18 @@ bool GroupedMatmulSwigluQuantV2BasicApiTiling950::IsCapable()
         xScaleDtype_ == ge::DT_FLOAT8_E8M0 &&
         inputParams_.scaleDtype == ge::DT_FLOAT8_E8M0 && IsFp8(inputParams_.outDataDtype) &&
         inputParams_.outScaleDtype == ge::DT_FLOAT8_E8M0;
-    const bool formatSupported = inputParams_.aFormat == ge::FORMAT_ND &&
-                                 inputParams_.bFormat == ge::FORMAT_ND &&
-                                 xScaleFormat_ == ge::FORMAT_ND &&
-                                 weightScaleFormat_ == ge::FORMAT_ND &&
-                                 inputParams_.cFormat == ge::FORMAT_ND &&
-                                 yScaleFormat_ == ge::FORMAT_ND;
+    const bool formatSupported = (inputParams_.aFormat == ge::FORMAT_ND || ge::FORMAT_NCL) &&
+                                 (inputParams_.bFormat == ge::FORMAT_ND || ge::FORMAT_NCL) &&
+                                 (xScaleFormat_ == ge::FORMAT_ND || ge::FORMAT_NCL) &&
+                                 (weightScaleFormat_ == ge::FORMAT_ND || ge::FORMAT_NCL) &&
+                                 (inputParams_.cFormat == ge::FORMAT_ND || ge::FORMAT_NCL) &&
+                                 (yScaleFormat_ == ge::FORMAT_ND || ge::FORMAT_NCL);
     const bool coreSupported =
         aicoreParams_.aicNum > 0 && aivNum_ == AIC_AIV_CORE_RATIO * aicoreParams_.aicNum;
     const bool checkTensorApiShapes = CheckTensorApiShapes();
     const bool checkTensorApiScaleShapes = CheckTensorApiScaleShapes();
     const uint32_t averageMPerGroup = static_cast<uint32_t>(inputParams_.mSize / inputParams_.groupNum);
-    const bool checkMSizeGroupNumRatio = averageMPerGroup >= TENSOR_API_M_MIN;
+    const bool checkMSizeGroupNumRatio = averageMPerGroup > TENSOR_API_M_MIN;
     const bool checkNSizeAlign = inputParams_.nSize % TENSOR_API_FP8_N_ALIGN == 0;
     const bool checkBNoTransMLimlit =
         inputParams_.transB ? true : inputParams_.mSize > TENSOR_API_B_NOTRANS_M_LOWER_LIMIT;
