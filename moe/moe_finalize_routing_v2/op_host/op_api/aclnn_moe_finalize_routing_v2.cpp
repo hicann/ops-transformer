@@ -19,123 +19,24 @@
 #include "opdev/tensor_view_utils.h"
 #include "opdev/op_log.h"
 #include "moe_finalize_routing_v2.h"
+#include "moe_finalize_routing_common.h"
 
 using namespace op;
 
-namespace MoeFinalizeRoutingV2Check {
-
-static const std::initializer_list<op::DataType> MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X = {
-    DataType::DT_FLOAT16, DataType::DT_BF16, DataType::DT_FLOAT};
-static const std::initializer_list<op::DataType> MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X_310P = {
-    DataType::DT_FLOAT16, DataType::DT_FLOAT};
-static const std::initializer_list<op::DataType> MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_ROW_IDX = {
-    DataType::DT_INT32};
-
-static inline bool CheckNotNull(const aclTensor *expandedX, const aclTensor *expandedRowIdx, const aclTensor *out)
+static aclnnStatus CheckV2(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
+                           const aclTensor *x1Optional, const aclTensor *x2Optional,
+                           const aclTensor *biasOptional, const aclTensor *scalesOptional,
+                           const aclTensor *expertIdxOptional, const aclTensor *out)
 {
-    OP_CHECK_NULL(expandedX, return false);
-    OP_CHECK_NULL(expandedRowIdx, return false);
-    OP_CHECK_NULL(out, return false);
-    return true;
-}
-
-static inline bool CheckDtypeValid(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
-                                   const aclTensor *x1Optional, const aclTensor *x2Optional,
-                                   const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                                   const aclTensor *expertIdxOptional, const aclTensor *out)
-{
-    if (expandedX != nullptr && expandedX->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(expandedX, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X, return false);
+    if (MoeFinalizeRoutingCheck::Is310P()) {
+        return MoeFinalizeRoutingCheck::CheckParams310P(expandedX, expandedRowIdx, x1Optional, x2Optional,
+                                                        biasOptional, scalesOptional, expertIdxOptional, out);
+    } else if (MoeFinalizeRoutingCheck::IsCommonValidationChip()) {
+        return MoeFinalizeRoutingCheck::CheckParams(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional,
+                                                    scalesOptional, expertIdxOptional, out);
     }
-    if (expandedRowIdx != nullptr && expandedRowIdx->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(expandedRowIdx, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_ROW_IDX, return false);
-    }
-    if (x1Optional != nullptr && x1Optional->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(x1Optional, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X, return false);
-        OP_CHECK_DTYPE_NOT_SAME(expandedX, x1Optional, return false);
-    }
-    if (x2Optional != nullptr && x2Optional->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(x2Optional, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X, return false);
-        OP_CHECK_DTYPE_NOT_SAME(expandedX, x2Optional, return false);
-    }
-    if (biasOptional != nullptr && biasOptional->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(biasOptional, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X, return false);
-        OP_CHECK_DTYPE_NOT_SAME(expandedX, biasOptional, return false);
-    }
-    if (scalesOptional != nullptr && scalesOptional->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(scalesOptional, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X, return false);
-    }
-    if (expertIdxOptional != nullptr && expertIdxOptional->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(expertIdxOptional, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_ROW_IDX, return false);
-    }
-    if (out != nullptr && out->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(out, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X, return false);
-        OP_CHECK_DTYPE_NOT_SAME(expandedX, out, return false);
-    }
-    return true;
-}
-
-static inline bool CheckDtypeValid310P(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
-                                       const aclTensor *x1Optional, const aclTensor *x2Optional,
-                                       const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                                       const aclTensor *expertIdxOptional, const aclTensor *out)
-{
-    if (expandedX != nullptr && expandedX->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(expandedX, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X_310P, return false);
-    }
-    if (expandedRowIdx != nullptr && expandedRowIdx->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(expandedRowIdx, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_ROW_IDX, return false);
-    }
-    if (x1Optional != nullptr && x1Optional->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(x1Optional, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X_310P, return false);
-        OP_CHECK_DTYPE_NOT_SAME(expandedX, x1Optional, return false);
-    }
-    if (x2Optional != nullptr && x2Optional->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(x2Optional, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X_310P, return false);
-        OP_CHECK_DTYPE_NOT_SAME(expandedX, x2Optional, return false);
-    }
-    if (biasOptional != nullptr && biasOptional->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(biasOptional, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X_310P, return false);
-        OP_CHECK_DTYPE_NOT_SAME(expandedX, biasOptional, return false);
-    }
-    if (scalesOptional != nullptr && scalesOptional->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(scalesOptional, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X_310P, return false);
-    }
-    if (expertIdxOptional != nullptr && expertIdxOptional->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(expertIdxOptional, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_ROW_IDX, return false);
-    }
-    if (out != nullptr && out->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(out, MOE_FINALIZE_ROUTING_V2_DTYPE_SUPPORT_LIST_X_310P, return false);
-        OP_CHECK_DTYPE_NOT_SAME(expandedX, out, return false);
-    }
-    return true;
-}
-
-static aclnnStatus CheckParams(const aclTensor *expandedX, const aclTensor *expandedRowIdx, const aclTensor *x1Optional,
-                               const aclTensor *x2Optional, const aclTensor *biasOptional,
-                               const aclTensor *scalesOptional, const aclTensor *expertIdxOptional,
-                               const aclTensor *out)
-{
-    CHECK_RET(CheckNotNull(expandedX, expandedRowIdx, out), ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(CheckDtypeValid(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
-                              expertIdxOptional, out),
-              ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;
 }
-
-static aclnnStatus CheckParams310P(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
-                                   const aclTensor *x1Optional, const aclTensor *x2Optional,
-                                   const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                                   const aclTensor *expertIdxOptional, const aclTensor *out)
-{
-    CHECK_RET(CheckNotNull(expandedX, expandedRowIdx, out), ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(CheckDtypeValid310P(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
-                                  expertIdxOptional, out),
-              ACLNN_ERR_PARAM_INVALID);
-    return ACLNN_SUCCESS;
-}
-
-} // namespace MoeFinalizeRoutingV2Check
 
 #ifdef __cplusplus
 extern "C" {
@@ -156,19 +57,8 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2GetWorkspaceSize(
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    bool is310P = GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND310P;
-    bool isCommonValidationChip = Ops::Transformer::AclnnUtil::IsRegbase() ||
-                                  GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B ||
-                                  GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910_93;
-
-    aclnnStatus ret = ACLNN_SUCCESS;
-    if (is310P) {
-        ret = MoeFinalizeRoutingV2Check::CheckParams310P(expandedX, expandedRowIdx, x1Optional, x2Optional,
-                                                         biasOptional, scalesOptional, expertIdxOptional, out);
-    } else if (isCommonValidationChip) {
-        ret = MoeFinalizeRoutingV2Check::CheckParams(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional,
-                                                     scalesOptional, expertIdxOptional, out);
-    }
+    auto ret = CheckV2(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
+                       expertIdxOptional, out);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     // 固定写法，将输入转换成连续的tensor
