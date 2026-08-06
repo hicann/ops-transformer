@@ -226,6 +226,7 @@ AswBL1FullLoadKernelMainLoop(MatmulImpl<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, MM_CF
         }
     }
     InQueueBL1.FreeTensor(bl1Local);
+    SetMMLayoutTransform(false);
     mm.SetHF32(false, 0);
 }
 

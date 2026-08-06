@@ -1034,6 +1034,7 @@ __aicore__ inline void Mc2BatchMatMulMultiBatchFullLoadKernel<A_TYPE, B_TYPE, C_
             InQueueAL1_.FreeTensor(aLocal_);
         }
     }
+    SetMMLayoutTransform(false);
     mm_.SetHF32(false, 0);
 }
 

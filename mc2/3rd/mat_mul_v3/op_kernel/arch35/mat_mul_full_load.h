@@ -257,6 +257,7 @@ Mc2MatmulAswKernelABL1FullLoad<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM
     if (block_.matmulTilingData_->tCubeTiling.isBias) {
         InQueueBiasL1_.FreeTensor(biasL1Local_);
     }
+    SetMMLayoutTransform(false);
     mm_.SetHF32(false, 0);
 }
 
