@@ -10,7 +10,7 @@
 
 图1计算流程图：
 
-![MlaProlog计算流程图](../../../docs/zh/figures/MlaProlog计算流程.png)
+![MlaProlog计算流程图](../../../docs/zh/figures/mla_prolog_compute_flow.png)
 
 按照Multi-Head Latent Attention定义的计算流程实现，整体计算流程如下：
 
@@ -49,7 +49,7 @@ MlaProlog融合算子包含了Vector计算和Cube计算，Vector侧和Cube侧的
 
 图2流水控制图：
 
-![MlaProlog流水控制图](../../../docs/zh/figures/MlaProlog流水控制.png)
+![MlaProlog流水控制图](../../../docs/zh/figures/mla_prolog_pipeline_control.png)
 
 1、MatmulCq计算的时候，对Hcq进行了分核，单核没有计算一个完整的token，所以在RmsNormCq计算前，
 需要做AIC与AIV之间的同步控制（SYNC_MMCQ_NOMRCQ）
@@ -233,7 +233,7 @@ RMSNorm的计算参考公式（3）-（4）。
     $$
     smooth是指将数据变得“平滑”一些，容易对数据进行量化，如下图所示：
 
-    ![smooth概念](../../../docs/zh/figures/smooth概念.png)
+    ![smooth概念](../../../docs/zh/figures/smooth_concept.png)
 
   - 静态量化：当前仅支持Perchannel量化，该量化是指按列量化，对输入tensor的每一列用一个scale进行量化。
 

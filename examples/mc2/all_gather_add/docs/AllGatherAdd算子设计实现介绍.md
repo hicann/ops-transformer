@@ -128,23 +128,23 @@ AllGather操作会将通信域内所有卡的输入按照卡id重新排序，然
 
 本样例通信域内卡数rank_size固定为2，若通信不切分轮次，通信计算串行进行，算子语义示意图如下：
 
-![AllGatherAdd算子计算语义示意图.png](figures/AllGatherAdd算子计算语义示意图.png)
+![all_gather_add_compute_semantics_diagram.png](figures/all_gather_add_compute_semantics_diagram.png)
 
 AllGatherAdd算子的数据在卡间进行AllGather通信，在卡内进行Add计算，通信计算部分可以并行进行互不影响。
 因此，可以将通信数据切分多块，每次通信只通信一块数据，每次计算只对前一轮的通信结果进行操作，流水互相掩盖，可得到通信计算掩盖示意图如下：
 
-![AllGatherAdd通算掩盖示意图.png](figures/AllGatherAdd通算掩盖示意图.png)
+![all_gather_add_comm_compute_overlap_diagram.png](figures/all_gather_add_comm_compute_overlap_diagram.png)
 
 **AllGatherAdd算子计算过程示意**：（通信切分轮次为2时）
 
 1. AI Core将要执行的通信信息写入Global Memory中的消息区，实现任务下发。消息区是特定地址的Global Memory，AI Core和AI CPU通过向其写入和轮询读取来实现消息在两者间的传递，这些操作统一封装于[Hccl](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/ascendcopapi/atlasascendc_api_07_0869.html)高阶API中。
 2. AI CPU从消息区读取到所有通信任务信息，开始基于HCCS（华为缓存一致性系统，用于CPU/NPU之间的高速互联）链路执行第一轮AllGather集合通信任务。下图为第一轮AllGather通信示意图。
 
-![AllGatherAdd第一轮通信示意图.png](figures/AllGatherAdd第一轮通信示意图.png)
+![all_gather_add_first_round_comm_diagram.png](figures/all_gather_add_first_round_comm_diagram.png)
 
 3. AI CPU完成第一轮通信任务后，向消息区写入第一轮通信任务已完成的状态，并开始执行第二轮通信任务。同时，AI Vector开始对第一轮AllGather通信结果进行Add计算。下图为第二轮通信和rank0上第一轮Add计算的示意图。
 
-![Rank0上第一轮Add示意图.png](figures/Rank0上第一轮Add示意图.png)
+![all_gather_add_rank0_first_round_add_diagram.png](figures/all_gather_add_rank0_first_round_add_diagram.png)
 
 4. 按照通信切分轮次逐步完成所有数据块的通信和计算。
 
@@ -391,7 +391,7 @@ extern "C" __global__ __aicore__ void all_gather_add(GM_ADDR aGM, GM_ADDR bGM, G
 
     第一轮通信任务完成后，算子开始第一轮Add计算。在开始计算之前，需要确认参与计算的数据地址，CalcAddGmAddr函数根据通信轮次和卡数计算本核需要处理数据的起始地址。为了实现通信计算掩盖和多核并行，提升计算效率，将Add计算的操作数进行切分，切分后的数据分配到不同的核上进行处理。本样例仅切分操作数的Y轴，示意图如下。在这种场景下，每个核需要计算两个加数相对于原始数据的偏移量，并将偏移后的数据块传入AIV核的Unified Buffer作为入参进行Add计算。
 
-    ![Add计算分核示意图.png](figures/Add计算分核示意图.png)
+    ![all_gather_add_core_partition_diagram.png](figures/all_gather_add_core_partition_diagram.png)
 
     如上图所示，假设当前在AIV-26核进行第一次Add计算，根据Process()函数逻辑，当i = 0时，CalcAddGmAddr函数第一次触发执行，根据[hccl.wait()](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/ascendcopapi/atlasascendc_api_07_0878.html)接口说明，此时第一轮通信已经完成，第二轮通信开始，因此CalcAddGmAddr函数中计算本核需要处理数据的起始地址偏移时，首先偏移i * 单次通信数据长度的距离，如图commOffset；每次Add操作对上一轮通信的结果进行计算，由于通信分多轮进行，每张卡的相邻数据块在gatherOutGM中起始地址存在偏移（即strideCount），因此需要根据卡数和当前核的index计算当前核被分到处理哪个rank的通信数据，如图，总共40个AIV核被均分给两个rank，则AIV-26被分到处理来自rank1的数据，blockOffset如图；计算出当前核处理的rank后，最终偏移需要再加上在此rank数据上的偏移，即6 * 每个核处理的数据个数。
     CalcAddGmAddr函数实现如下：
@@ -410,7 +410,7 @@ extern "C" __global__ __aicore__ void all_gather_add(GM_ADDR aGM, GM_ADDR bGM, G
 
     每个核完成数据地址的计算之后，就可以遵循[典型算子的编程范式](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/opdevg/Ascendcopdevg/atlas_ascendc_10_00033.html)，CopyIn（从GM将数据搬到片上Local Memo）->Compute（调用Add算术API完成计算）->CopyOut（从Local Memo将计算结果搬出到GM），完成AllGatherAdd算子的全部计算。每个核内的Add计算内存示意图：
 
-    ![Add计算内存搬运示意图.png](figures/Add计算内存搬运示意图.png)
+    ![all_gather_add_memory_transfer_diagram.png](figures/all_gather_add_memory_transfer_diagram.png)
 
     - 轮询等待每个分块的通信完成和计算完成，最后释放资源。
 

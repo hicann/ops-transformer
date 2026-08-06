@@ -153,7 +153,7 @@ mean result[65535] is: 256.000000
 
 为方便调用算子，Host侧提供算子对应的C语言API（即以aclnn为前缀的API）实现算子调用，无需提供算子IR（Intermediate Representation）定义。aclnn API调用流程如下：
 
-![原理图](../figures/aclnn调用.png)
+![原理图](../figures/aclnn_call_flow.png)
 
 #### 编译运行
 
@@ -410,7 +410,7 @@ int main()
 
 该方式基于算子GE IR（Intermediate Representation）定义，以构图方式调用算子，调用流程如下：
 
-![原理图](../figures/IR调用.png)
+![原理图](../figures/geir_call_flow.png)
 
 #### 编译运行
 

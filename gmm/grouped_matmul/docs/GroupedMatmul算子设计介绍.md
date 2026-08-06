@@ -30,7 +30,7 @@ GroupedMatmul算子实现时还需要考虑如下两个方面：
 本章以per token量化场景为例介绍一下GroupedMatmul的算法流程，计算过程如下：
 matmul(int32) -> 反量化(fp32) -> mul(fp32) -> 激活函数(fp32)(可选) -> cast(fp16/bf16)，其中mul(fp32)的输入perTokenScale还需要从shape(m) broadcast成(m，n)。
 
-![GroupedMatmul量化场景流程图](../../../docs/zh/figures/GMM量化场景流程图.png)
+![GroupedMatmul量化场景流程图](../../../docs/zh/figures/gmm_quant_scenario_flow.png)
 
 ## 2.2 分组方式
 
@@ -99,7 +99,7 @@ kernel中为了避免在栈空间中申请GMMArray中3个数组以及避免拷�
 
 UB buffer分配如下：
 
-![GroupedMatmul量化场景UB_buffer分配](../../../docs/zh/figures/GMM量化场景UB_Buffer分配.png)
+![GroupedMatmul量化场景UB_buffer分配](../../../docs/zh/figures/gmm_quant_scenario_ub_buffer_allocation.png)
 
 1. vector计算的输入即matmul的输出的类型为int32，在开启doubleBuffer之后输入需要sizeof(int32) * 2，即8份buffer；
 2. vector计算的输出为fp16/bf16，其需要sizeof(fp16/bf16) * 2，即4份buffer；
@@ -111,17 +111,17 @@ UB buffer分配如下：
 
 GroupedMatmul实现时需要考虑输入为多个tensor的情况，即每组matmul的shape可能各不相同，而kernel侧不能为每组matmul单独配置对应的matmul高阶api接口实例（tiling结构体和core栈空间大小均不允许）。为了适配不同shape的matmul计算，GroupedMatmul采用基本块方式（横向分核），以baseM、baseN为基本块进行分核计算，此处baseM/baseN为matmul的参数。
 
-![基本块分核](../../../docs/zh/figures/GMM横向分核方案.png)
+![基本块分核](../../../docs/zh/figures/gmm_horizontal_core_partition_scheme.png)
 
 ## 3.4 对角线分核方案
 
 按基本块方案进行分核，容易存在同地址访问的问题，例如当基本块方案中nDim=coreNum时，则同一时间所有的核都在访问左矩阵的相同地址，对性能影响较大。因此当基本块数量超过coreNum时（没超过coreNum时，对角线方案无法解决同地址访问问题），可以采用如下对角线方案，同一时间不同核尽量错开对数据的访问，每个方块代表一个输出的基本块，数字代表基本块遍历顺序（横向分核为原始基本块分核方案）。
 
-![对角线分核](../../../docs/zh/figures/GMM对角线分核方案.png)
+![对角线分核](../../../docs/zh/figures/gmm_diagonal_core_partition_scheme.png)
 
 对于适合对角线优化的场景，在基本块方案上输入数据会存在多次访问，当nDim/mDim很大时，“对角线”不能直接任意往下延伸，否则在k值比较大的场景下，对角线上对应的输入数据均为不同的数据，已经加载过一次的数据被新数据从L2 cache中替换掉，后续需要加载时还是从DDR内存中加载，导致性能劣化。因此需要限制对角线范围，以充分利用L2 cache中缓存的数据。
 
-![对角线分组](../../../docs/zh/figures/GMM对角线分组方案.png)
+![对角线分组](../../../docs/zh/figures/gmm_diagonal_grouping_scheme.png)
 
 将对角线遍历按阈值进行分组，为尽量避免同地址访问，两个方向的阈值最好都不小于实际的物理核数，因此有：
 

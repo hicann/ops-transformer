@@ -66,7 +66,7 @@ V侧流水设计需要考虑Vector的搬运及计算过程，实施的优化手�
 以下面的流水任务示意图为例，Vec使用ping-pong表示两个数据处理任务，每个任务需要依次搬运DataCopy与计算Clc操作。任务间存在数据的依赖关系，比如处理完DataCopy之后，才能对Clc进行处理。
 将图的流水任务做ping-pong流水间的double buffer处理后，从运行图中可以看出，对于同一片数据，搬运DataCopy与计算Clc之间，串行处理；不同的数据切片，同一时间点，可以有多个任务在并行处理，由此达到任务并行、提升性能的目的。
 
-![设计图2](./fig/设计图2.png)
+![设计图2](./fig/fa_design_diagram_2.png)
 
 其中ping、pong两块计算数据所占用的内存资源均相互独立。
 ​FA类融合算子V侧计算过程较多，情况也比较复杂，通常简单的double buffer是无法覆盖所有情况的，因此会出现不同的计算流水排布。不同的计算流水适用于不同类的shape特征，以达到在该类特征下最好的流水设计。
@@ -78,7 +78,7 @@ V侧流水设计需要考虑Vector的搬运及计算过程，实施的优化手�
 
     该场景流水特征下，Vector计算节点少，计算速度快，在<term>Atlas A2训练系列产品</term> C:V=1:2的情况下，Cube的搬运时长足以覆盖Vector的计算时长，因此只要关注Cube的MTE2耗时即可，最终达成MTE2 bound。在Cube双发机制下，提前发射两块Cube计算，Cube1、Cube2计算可以衔接，使得Cube利用率最高，达成Cube bound。
 
-  ![FA流水.jpg](../../../docs/zh/figures/FA流水.png)
+  ![FA流水.jpg](../../../docs/zh/figures/fa_pipeline.png)
 
 2. Ascend 950PR/Ascend 950DT
   Ascend 950PR/Ascend 950DT的CV流水设计思路和A2基本一致。差异点在于其cube的preload次数为3次：完成3次mm1的计算后才会开启mm2的计算；目的是优化启动阶段的CV流水，使其更紧密，以达到整体性能的最优。

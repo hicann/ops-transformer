@@ -20,32 +20,32 @@ CANN算子量化是指对神经网络中Matmul等矩阵（cube）类算子的输
 
   假设左矩阵shape为(m, k)，右矩阵shape为(k, n)，k为reduce轴，生成量化参数的shape为(1, )。
 
-  ![原理图](../figures/pertensor量化.png)
+  ![原理图](../figures/pertensor_quantization.png)
 
 - perchannel量化（简称C量化）：量化对象是右矩阵，每个channel分别使用独立的量化参数。
 
   假设右矩阵shape为(k, n)，k为reduce轴，生成量化参数的shape为(n, )。
 
-  ![原理图](../figures/perchannel量化.png)
+  ![原理图](../figures/perchannel_quantization.png)
 
 - pertoken量化（简称K量化）：量化对象是左矩阵，每个token分别使用独立的量化参数。
 
   假设左矩阵shape为(m, k)，k为reduce轴，生成量化参数的shape为(m, )。
 
-  ![原理图](../figures/pertoken量化.png)
+  ![原理图](../figures/pertoken_quantization.png)
 
 - pergroup量化（简称G量化）：量化对象既可以是左矩阵，也可以是右矩阵，在reduce轴上对数据分组，每组使用独立的量化参数。
   - 假设左矩阵shape为(m, k)，k为reduce轴，在k轴上分组，group size为gs，生成量化参数的shape为(m, k/gs)。
   - 假设右矩阵shape为(k, n)，k为reduce轴，在k轴上分组，group size为gs，生成量化参数的shape为(k/gs, n)。
 
-  ![原理图](../figures/pergroup量化.png)
+  ![原理图](../figures/pergroup_quantization.png)
 
 - perblock量化（简称B量化）：量化对象既可以是左矩阵，也可以是右矩阵，在所有轴上对数据分块，每块使用独立的量化参数。
 
   - 假设左矩阵shape为(m, k)，k为reduce轴，在m、k轴上分别按(bs, bs)块对数据分组，bs为block size，生成量化参数的shape为(m/bs, k/bs)。
   - 假设右矩阵shape为(k, n)，k为reduce轴，在k、n轴上分别按(bs, bs)块对数据分组，bs为block size，生成量化参数的shape为(k/bs, n/bs)。
 
-  ![原理图](../figures/perblock量化.png)
+  ![原理图](../figures/perblock_quantization.png)
 
 ## 常见组合量化
 
@@ -56,4 +56,4 @@ CANN算子量化是指对神经网络中Matmul等矩阵（cube）类算子的输
   - pertensor-perchannel-pergroup量化模式（简称T-CG量化模式）
   - perblock-perblock量化模式（简称B-B量化模式）
 - 伪量化：一般是指对权重矩阵（weight）进行量化的模式，包括perchannel量化模式（简称C量化模式）。
-- MX量化(Microscaling Formats)：指由开放计算项目（OCP）制定的低精度数据表示方式，属于pergroup量化模式，表示量化参数类型为FLOAT8_E8M0且group size为32的特例情况。
+- MX量化（Microscaling Formats）：指由开放计算项目（OCP）制定的低精度数据表示方式。属于pergroup量化模式，表示量化参数类型为FLOAT8\_E8M0且gourp size为32的特例情况。

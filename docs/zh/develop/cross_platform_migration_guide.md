@@ -7,13 +7,13 @@
 ### Atlas A2 系列硬件架构
 
 <div align="center">
-  <img src="../figures/Atlas A2硬件架构.png" width="900" alt="Atlas A2硬件架构" />
+  <img src="../figures/atlas_a2_hardware_arch.png" width="900" alt="Atlas A2硬件架构" />
 </div>
 
 ### Ascend 950 系列硬件架构
 
 <div align="center">
-  <img src="../figures/Ascend 950硬件架构.png" width="900" alt="Ascend 950硬件架构" />
+  <img src="../figures/ascend950_hardware_arch.png" width="900" alt="Ascend 950硬件架构" />
 </div>
 
 ### 代际规格参数对比
@@ -134,7 +134,7 @@
 Ascend 950硬件新增同地址请求并行处理特性，不需要在各种分核场景额外规避同地址访问冲突。迁移时可将Atlas A2上为“错位规避冲突”设计的分核策略简化为更规则的滑动窗口模板（如行组窗口+列向往返扫描），减少无效偏移与冗余地址变换。实践中建议先以功能等价为目标保留原tile尺寸，再逐步放开分核约束，结合profiling数据观察MAC利用率、MTE2利用率、L2命中率等关键指标，确认模板调整是否带来稳定收益。
 
 <div align="center">
-  <img src="../figures/SWAT滑动窗口模板.png" width="900" alt="SWAT滑动窗口模板" />
+  <img src="../figures/swat_sliding_window_template.png" width="900" alt="SWAT滑动窗口模板" />
 </div>
 
 #### Tile尺寸大小调整
@@ -331,7 +331,7 @@ __VEC_SCOPE__
 
 Ascend 950新架构引入UB2L1 & L0C2UB间的直连通路，实现矩阵计算数据的快速搬移，旨在简化CV融合算子开发并提升性能。
 <div align="center">
-  <img src="../figures/Ascend950新增CV直连通路.png" width="700" alt="Ascend950新增CV直连通路" />
+  <img src="../figures/ascend950_cv_direct_channel.png" width="700" alt="Ascend950新增CV直连通路" />
 </div>
 
 **矩阵搬入**

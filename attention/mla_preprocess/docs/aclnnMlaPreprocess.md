@@ -34,7 +34,7 @@
 
 - **计算流程图**
 
-![MlaPreprocess图](../../../docs/zh/figures/MlaPreprocess计算过程.png)
+![MlaPreprocess图](../../../docs/zh/figures/mla_preprocess_compute_process.png)
 
 - **计算公式**：
 

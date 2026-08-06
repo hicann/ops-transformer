@@ -175,7 +175,7 @@ cannsim report [options]
 
 4. 仿真结果查看
     在Chrome浏览器中输入“chrome://tracing”地址，并将生成的指令流水图文件（trace.json）拖到空白处打开，键盘上输入快捷键（W：放大，S：缩小，A：左移，D：右移）可进行查看。
-    ![指令流水图](../figures/指令流水图.png)
+    ![指令流水图](../figures/cannsim_pipeline_chart.png)
 
     表2 关键字段说明
 

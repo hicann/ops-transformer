@@ -2,7 +2,7 @@
 
 # 1 FFN融合算子设计介绍
 
-<img src="../../../docs/zh/figures/FFN计算流程.png" alt="FFN计算流程" style="zoom:75%;" />
+<img src="../../../docs/zh/figures/ffn_compute_flow.png" alt="FFN计算流程" style="zoom:75%;" />
 
 FFN算子核心计算过程如上图所示，计算主要由matmul1 -> 激活函数 -> matmul2组成，主体逻辑（流程控制）运行在VectorCore上。
 
@@ -40,7 +40,7 @@ FFN算子核心计算过程如上图所示，计算主要由matmul1 -> 激活函
 
 * dequant scale float32转uint64
 
-  通过gather的方式将float32数据排放在uint64的低32中，过程如下：<img src="../../../docs/zh/figures/FFN dequant转uint64计算过程.png" alt="FFN dequant转uint64计算过程" style="zoom:67%;" />
+  通过gather的方式将float32数据排放在uint64的低32中，过程如下：<img src="../../../docs/zh/figures/ffn_dequant_to_uint64_compute_process.png" alt="FFN dequant转uint64计算过程" style="zoom:67%;" />
 
   1. 生成gather所需要的index，即srcOffset；
      * 先用CreateVecIndex生成数据数列0,1,2,...,2*n-1，其中n为dequant scale的数据个数，数据类型为int32，再Cast为uint32；
@@ -54,7 +54,7 @@ FFN算子核心计算过程如上图所示，计算主要由matmul1 -> 激活函
 
 * 总结量化场景的vector计算过程如下图：
 
-  ![FFN量化场景vector计算过程](../../../docs/zh/figures/FFN量化场景vector计算过程.png)
+  ![FFN量化场景vector计算过程](../../../docs/zh/figures/ffn_quant_scenario_vector_compute_process.png)
 
 ## 2.3 伪量化
 
@@ -106,7 +106,7 @@ matmul tiling分为两个部分，分核和单核内的切分，这两部分相�
 
   按上述shape，专家并行分核的策略如下：
 
-  <img src="../../../docs/zh/figures/FFN专家并行示意图.png" alt="FFN专家并行示意图" style="zoom:67%;" />
+  <img src="../../../docs/zh/figures/ffn_expert_parallel_diagram.png" alt="FFN专家并行示意图" style="zoom:67%;" />
 
   1. 当某一个专家对应的matmul不够分满AiCore核时，空闲的那部分核用来计算第二组专家，此时workspace中同时存在两个专家的中间结果。
   2. matmul2的n足够分慢AICore核，因此采用串行的方式计算（不采用并行是考虑到m和n分核更容易造成算力分配不均从而影响性能，如下文混合并行中所述）；
@@ -145,7 +145,7 @@ for (int offsetM = 0; offsetM < cubeTiling.baseM; offsetM += baseM) {
 
 上述计算过程需要确定vector计算的baseM、baseN，同时确定UB buffer的分配复用情况。非量化、伪量化的计算过程简单，没有UB buffer的复用，而量化场景多、计算复杂，UB buffer需要复用，以提高单次计算的数据量，其复用情况如下（量化模板vector计算过程见上文）：
 
-![FFN量化场景UB buffer分配](../../../docs/zh/figures/FFN量化场景UB_buffer分配.png)
+![FFN量化场景UB buffer分配](../../../docs/zh/figures/ffn_quant_scenario_ub_buffer_allocation.png)
 
 定义每份buffer分配的字节大小比上处理的数据个数（baseM*baseN，记为ubCalcSize）为该buffer的份数，总结不同场景的UB buffer分配情况如下：
 
@@ -179,7 +179,7 @@ FFN实际应用场景中计算流程上主要是Cube上的MTE2（DDR到CubeCore�
 
 伪量化主要是VectorCore上的CastWeight与CubeCore上的matmul的并行计算。
 
-<img src="../../../docs/zh/figures/FFN伪量化场景流水并发.png" alt="FFN伪量化场景流水并发" style="zoom:67%;" />
+<img src="../../../docs/zh/figures/ffn_pseudo_quant_scenario_pipeline_concurrency.png" alt="FFN伪量化场景流水并发" style="zoom:67%;" />
 
 1. 上述示例流程中CastWeight1与matmul2并行（除首次），CastWeight2与matmul1并行（除最后一次）；
 2. 3个SyncAll，其中matmul1前面的SyncAll是等待所有VectorCore完成CastWeight1（weight的反量化过程）；matmul2前面的SyncAll为等待所有VectorCore完成激活函数和CastWeight2过程；
