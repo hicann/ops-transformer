@@ -430,7 +430,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
             <li>不支持空Tensor。</li>
             <li>使用时，shape必须与keyAntiquantScaleOptional保持一致。</li>
             <li>不使用该功能时可传入nullptr。</li>
-            <li>支持per-tensor，per-channel，per-token，per-channel-group，per-tensor叠加per-head，per-token叠加per-head，per-token叠加使用page attention模式管理scale/offset、per-token叠加per head并使用page attention模式管理scale/offset。</li>
+            <li>支持per-tensor，per-channel，per-token，per-channel-group，per-tensor叠加per-head，per-token叠加per-head，per-token叠加使用page attention模式管理scale/offset、per-token叠加per-head并使用page attention模式管理scale/offset。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
         </ul>
         </td>
@@ -448,7 +448,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
             <li>不支持空Tensor。</li>
             <li>不使用该功能时可传入nullptr。</li>
             <li>不支持非连续tensor。</li>
-            <li>支持per-tensor，per-channel，per-token，per-tensor叠加per-head，per-token叠加per-head，per-token叠加使用page attention模式管理scale/offset、per-token叠加per head并使用page attention模式管理scale/offset和per-token-group。</li>
+            <li>支持per-tensor，per-channel，per-token，per-tensor叠加per-head，per-token叠加per-head，per-token叠加使用page attention模式管理scale/offset、per-token叠加per-head并使用page attention模式管理scale/offset和per-token-group。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
         </ul>
         </td>
@@ -737,11 +737,11 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <td>
         <ul>
             <li>inputLayout为TND、TND_NTD、NTD_TND时，综合约束请见<a href="#约束说明">约束说明</a>。</li>
-            <li>sparseMode为0时，代表defaultMask模式，如果attenmask未传入则不做mask操作，忽略preTokens和nextTokens（内部赋值为INT_MAX）；如果传入，则需要传入完整的attenmask矩阵（S1 * S2），表示preTokens和nextTokens之间的部分需要计算；要求preTokens + nextTokens >= 0。 </li>
-            <li>sparseMode为1时，代表allMask，必须传入完整的attenmask矩阵（S1 * S2）。</li>
-            <li>sparseMode为2时，代表leftUpCausal模式的mask，需要传入优化后的attenmask矩阵（2048*2048）。</li>
-            <li>sparseMode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景，需要传入优化后的attenmask矩阵（2048*2048）。</li>
-            <li>sparseMode为4时，代表band模式的mask，需要传入优化后的attenmask矩阵（2048*2048）；要求preTokens + nextTokens >= 0。</li>
+            <li>sparseMode为0时，代表defaultMask模式，如果attenMask未传入则不做mask操作，忽略preTokens和nextTokens（内部赋值为INT_MAX）；如果传入，则需要传入完整的attenMask矩阵（S1 * S2），表示preTokens和nextTokens之间的部分需要计算；要求preTokens + nextTokens >= 0。 </li>
+            <li>sparseMode为1时，代表allMask，必须传入完整的attenMask矩阵（S1 * S2）。</li>
+            <li>sparseMode为2时，代表leftUpCausal模式的mask，需要传入优化后的attenMask矩阵（2048*2048）。</li>
+            <li>sparseMode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景，需要传入优化后的attenMask矩阵（2048*2048）。</li>
+            <li>sparseMode为4时，代表band模式的mask，需要传入优化后的attenMask矩阵（2048*2048）；要求preTokens + nextTokens >= 0。</li>
             <li>sparseMode为5、6、7、8时，分别代表prefix、global、dilated、block_local，均暂不支持。</li>
             <li>用户不特意指定时建议传入0。</li>
         </ul>
@@ -820,7 +820,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
             <li>keyAntiquantMode为2时，代表per-tensor叠加per-head模式。</li>
             <li>keyAntiquantMode为3时，代表per-token叠加per-head模式。</li>
             <li>keyAntiquantMode为4时，代表per-token叠加使用page attention模式管理scale/offset模式。</li>
-            <li>keyAntiquantMode为5时，代表per-token叠加per head并使用page attention模式管理scale/offset模式。</li>
+            <li>keyAntiquantMode为5时，代表per-token叠加per-head并使用page attention模式管理scale/offset模式。</li>
             <li>keyAntiquantMode为6时，代表per-token-group模式。</li>
             <li>传入0-6之外的其他值会执行异常。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
@@ -1385,7 +1385,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
             </tr>
             <tr>
                 <td>query,attentionOut的tensor的shapeSize为0</td>
-                <td>attentionOut为返回空tesor</td>
+                <td>attentionOut为返回空tensor</td>
             </tr>
             <tr>
                 <td>query,attentionOut的tensor的shapeSize不为0,且key,value的tensor的shapeSize为0</td>
@@ -1521,7 +1521,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
           - P_S1(tensor shape的第3维) > 1时：
             - tensor shape的第1维应等于1或者B
             - tensor shape的第2维应等于Q_N
-            - tensor shape的第3为应大于等于Q_S
+            - tensor shape的第3维应大于等于Q_S
             - 非prefix场景时，tensor shape的第4维应大于等于KV_S
             - prefix场景时，tensor shape的第4维应大于等于KV_S + actualSharedPrefixLen
           - P_S1(tensor shape的第3维) = 1时：
@@ -1611,7 +1611,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
         - 当query的layout为非TND/NTD时，长度应等于1或者大于等于query的batch值
       - 入参中的数值应满足以下条件：
         - 当query的layout为TND/NTD时，其值应递增(大于等于前一个值)排列
-        - 当query的layout为TND/NTD是，最后一个元素应等于T
+        - 当query的layout为TND/NTD时，最后一个元素应等于T
         - 当query的layout为非TND/NTD时，其值应不大于Q_S
         - 其值应为非负数
     - 入参actualSeqLengthsKv(key/value的actualSeqLengths)应满足以下条件：
@@ -1644,7 +1644,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
       - 入参中的数值应满足以下条件：
         - 其值应为0(per-channel/per-tensor)、1(per-token)、2(per-tensor叠加per-head)、3(per-token叠加per-head)、
           4(per-token模式使用page attention管理scale/offset)、
-          5(per-token叠加per-head模式并使用page attenion管理scale/offser)、6(per-token-group)
+          5(per-token叠加per-head模式并使用page attention管理scale/offset)、6(per-token-group)
         - 除key支持per-channel叠加value支持per-token，keyAntiquantMode和valueAntiquantMode应相等
     - 入参keyAntiquantScale和valueAntiquantScale应满足以下条件：
       - 入参的数据类型应满足以下条件：
@@ -1662,7 +1662,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
         - per-tensor叠加per-head，shape应为(N)
         - per-token叠加per-head，shape应为(B, N, >=KV_S)
         - per-token模式使用page attention管理scale/offset，shape应为(blockNum, blockSize)
-        - ter-token叠加per-head模式并使用page attention管理scale/offset, shape应为(blockNum, N, blockSize)
+        - per-token叠加per-head模式并使用page attention管理scale/offset, shape应为(blockNum, N, blockSize)
         - key支持per-channel叠加value支持per-token，keyAntiquantScale的shape应为(1, N, 1, D)、(1, N, D)、(1, H)、(N, 1, D)、(N, D)、(H)
         - key支持per-channel叠加value支持per-token，valueAntiquantScale的shape应为(1, B, >=KV_S)、(B, >=KV_S)
         - per-token-group，shape应为(1, B, N, >=KV_S, D/32)
@@ -1673,7 +1673,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
         - per-token模式，其支持的数据类型为INT8、INT4(INT32)、FLOAT8_E4M3FN
         - per-tensor叠加per-head模式，其支持的数据类型为INT8
         - per-token叠加per-head模式，其支持的数据类型为INT8、INT4(INT32)
-        - per-token模式使用page attenion管理scale/offset，其支持的数据类型为INT8、FLOAT8_E4M3FN
+        - per-token模式使用page attention管理scale/offset，其支持的数据类型为INT8、FLOAT8_E4M3FN
         - key支持per-channel叠加value支持per-token，其支持的数据类型为INT8、INT4(INT32)
         - per-token-group，其支持的数据类型为FLOAT4_E2M1
   - 全量化场景
