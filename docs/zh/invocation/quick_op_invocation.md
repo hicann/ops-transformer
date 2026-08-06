@@ -36,7 +36,7 @@
 - 基于**自定义算子包**执行算子样例，命令如下：
 
     ```bash
-    bash build.sh --run_example ${op} ${mode} ${pkg_mode} [--vendor_name=${vendor_name}] [--soc=${soc_version}]
+    bash build.sh --run_example ${op} ${mode} ${pkg_mode} [--example_name=${example_name}] [--vendor_name=${vendor_name}] [--soc=${soc_version}] [--simulator=${simulator}] [--experimental=${experimental}]
     # 以FlashAttentionScore算子example执行为例
     # bash build.sh --run_example flash_attention_score eager cust --vendor_name=custom
     ```
@@ -125,7 +125,7 @@ mean result[1] is: 256.000000
 mean result[2] is: 256.000000
 mean result[3] is: 256.000000
 mean result[4] is: 256.000000
-mean result[4] is: 256.000000
+mean result[5] is: 256.000000
 ...
 mean result[65532] is: 256.000000
 mean result[65533] is: 256.000000
@@ -151,7 +151,7 @@ mean result[65535] is: 256.000000
 
 #### 调用流程
 
-为方便调用算子，Host侧提供算子对应的C语言API（即以aclnn为前缀的API）实现算子调用，无需提供算子IR（Intermediate Representation）定义。aclnn API调用流程如下
+为方便调用算子，Host侧提供算子对应的C语言API（即以aclnn为前缀的API）实现算子调用，无需提供算子IR（Intermediate Representation）定义。aclnn API调用流程如下：
 
 ![原理图](../figures/aclnn调用.png)
 
@@ -257,7 +257,7 @@ int main()
 
 - **调用自定义算子**：依赖自定义算子包
 
-    ```bash
+    ```cmake
     cmake_minimum_required(VERSION 3.14)
     # 设置工程名
     project(ACLNN_EXAMPLE)
@@ -322,7 +322,7 @@ int main()
 
 - **调用标准算子（内置算子）**：依赖ops-transformer整包
 
-    ```bash
+    ```cmake
     cmake_minimum_required(VERSION 3.14)
     # 设置工程名
     project(ACLNN_EXAMPLE)

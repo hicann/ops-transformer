@@ -99,8 +99,8 @@
     <td>所有使用int4_t的算子需要切换到支持的数据类型（如int8），并更新量化解算逻辑</td>
   </tr>
   <tr>
-    <td>不支持4：2稀疏矩阵计算</td>
-    <td>原依赖4：2稀疏特性提速的kernel需要改为稠密或其他支持的稀疏策略，并更新性能预期说明</td>
+    <td>不支持4:2稀疏矩阵计算</td>
+    <td>原依赖4:2稀疏特性提速的kernel需要改为稠密或其他支持的稀疏策略，并更新性能预期说明</td>
   </tr>
   <tr>
     <td rowspan="1">存储单元</td>
@@ -168,7 +168,7 @@ TBuf<QuePosition::VECCALC> indexBuf_;
 for (int64_t j = 0; j < rows; j++) {
     INDICES_T index = GetIndex(yIdx, indiceEndIdx);  // 标量读取索引
     int64_t xIndex = index * tilingData_->innerSize;
-    DataCopyPad(xLocal[j * colsAlign], xGm[offset], dataCoptExtParams, dataCopyPadExtParams); // 批量连续数搬入
+    DataCopyPad(xLocal[j * colsAlign], xGm[offset], dataCopyExtParams, dataCopyPadExtParams); // 批量连续数搬入
 }
 inQueue_.EnQue<int8_t>(xLocal);  // 入队等待输出
 ```
@@ -231,6 +231,8 @@ __simd_vf__ __aicore__ void GenIndexBuf(ubuf int32_t* helpAddr, int32_t colFacto
     AscendC::MicroAPI::RegTensor<int32_t> v0;
     AscendC::MicroAPI::RegTensor<int32_t> v1;
     AscendC::MicroAPI::RegTensor<int32_t> vd1;
+    AscendC::MicroAPI::RegTensor<int32_t> vd2;
+    AscendC::MicroAPI::RegTensor<int32_t> vd3;
 
     // 创建全量掩码
     AscendC::MicroAPI::MaskReg preg =
@@ -251,10 +253,12 @@ __simd_vf__ __aicore__ void GenIndexBuf(ubuf int32_t* helpAddr, int32_t colFacto
 
 ```cpp
 // 动态掩码：处理尾部不完整数据
-__simd_vf__ __aicore__ void GatherProcess(ubuf int8_t* curYAddr, uint16_t repeatimes, uint16_t computeSize)
+__simd_vf__ __aicore__ void GatherProcess(ubuf int8_t* curXAddr, ubuf int8_t* curYAddr, uint16_t repeatTimes, uint16_t computeSize)
 {
     MicroAPI::RegTensor<int8_t> vregTemp;
     MicroAPI::MaskReg preg;
+    // sreg为剩余待处理元素（普通unit32_t标量计数）
+    unit32_t sreg = static_cast<unit32_t>(repeatimes)*computeSize;
 
     for (uint16_t r = 0; r < repeatTimes; r++) {
         // 根据剩余元素数更新掩码
@@ -343,7 +347,7 @@ Ascend 950新架构引入UB2L1 & L0C2UB间的直连通路，实现矩阵计算�
 ```cpp
 // 1. 新增: 搬入接口增加UB2L1的Nd2Nz搬入，支持Src&Dst都是LocalTensor的形式
 template <typename T>
-__aicore__ inline void DataCopy(const LocalTensor<T>& dst, const LocalTensor<T>& src, const Nd2NzParams& intriParams)；
+__aicore__ inline void DataCopy(const LocalTensor<T>& dst, const LocalTensor<T>& src, const Nd2NzParams& intriParams);
 
 // 2. 新增: 搬出接口增加L0C2UB的搬出，支持直接从L0C搬出到UB,支持Src&Dst都是LocalTensor的形式
 template <typename T, typename U, const FixpipeConfig& config = CFG_ROW_MAJOR>
@@ -356,9 +360,9 @@ struct FixpipeParamsC310 {
 
 // 3. 能力增强: 核间同步接口新增模式3
 template <uint8_t modeId, pipe_t pipe>
-__aicore__ inline void CrossCoreSetFlag(uint16_t flagId)
+__aicore__ inline void CrossCoreSetFlag(uint16_t flagId);
 template <uint8_t modeId = 0, pipe_t pipe = PIPE_S>
-__aicore__ inline void CrossCoreWaitFlag(uint16_t flagId)
+__aicore__ inline void CrossCoreWaitFlag(uint16_t flagId);
 
 ```
 

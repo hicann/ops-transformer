@@ -14,7 +14,7 @@ aclTensor支持的数据类型参见[数据类型](data_type.md)，其中部分�
 >
 >- 为方便描述，表格中使用的数据类型是**简写形式**，代表的含义：ACL\_FLOAT\(f32\)、ACL\_FLOAT16\(f16\)、ACL\_DOUBLE\(f64\)、ACL\_BF16\(bf16\)、ACL\_INT8\(s8\)、ACL\_UINT8\(u8\)、ACL\_INT16\(s16\)、ACL\_UINT16\(u16\)、ACL\_INT32\(s32\)、ACL\_UINT32\(u32\)、ACL\_INT64\(s64\)、ACL\_UINT64\(u64\)、ACL\_BOOL\(bool\)、ACL\_COMPLEX32\(c32\)、ACL\_COMPLEX64\(c64\)、ACL\_COMPLEX128\(c128\)。
 >- 表格里表头和最左侧一列分别表示待推导的两个输入数据类型，表格中对应位置表示推导出的数据类型。
->- 表中叉号(×)表示这两种类型不能进行推导计算。
+>- 表中叉号（×）表示这两种类型不能进行推导计算。
 
 **表1**  数据类型推导关系
 

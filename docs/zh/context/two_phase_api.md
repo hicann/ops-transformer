@@ -2,7 +2,7 @@
 
 基于单算子API执行方式调用算子API时，通常分为“两段式”，样式形如：
 
-```Cpp
+```cpp
 aclnnStatus aclxxXxxGetWorkspaceSize(const aclTensor *src, ..., aclTensor *out, ..., uint64_t *workspaceSize, aclOpExecutor **executor);
 aclnnStatus aclxxXxx(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
 ```
@@ -16,7 +16,7 @@ aclnnStatus aclxxXxx(void *workspace, uint64_t workspaceSize, aclOpExecutor *exe
 > - workspace是指除输入/输出外，算子在NPU上完成计算所需要的临时内存，workspaceSize表示临时内存的大小。
 > - 第二段接口aclxxXxx(...)不能重复调用，如下调用方式会出现异常：
 >
->   ```Cpp
+>   ```cpp
 >   aclxxXxxGetWorkspaceSize(...)
 >   aclxxXxx(...)
 >   aclxxXxx(...)

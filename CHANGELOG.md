@@ -48,4 +48,4 @@ ops-transformer算子首个Beta版本8.5.0-beta.1 现已发布。本版本引入
 
 - mc2通信域支持统一的torch.dist.group问题。([Issue47](https://gitcode.com/cann/ops-transformer/issues/47))
 - add_example样例算子执行调用问题修复。([Issue174](https://gitcode.com/cann/ops-transformer/issues/174))
-- 修复install_deps.sh脚本不支持openEuler系统问题。([Issue255](https://gitcode.com/cann/ops-transformer/issues/255))
+- 修复install_deps.sh脚本不支持openEuler系统的问题。([Issue255](https://gitcode.com/cann/ops-transformer/issues/255))

@@ -8,7 +8,7 @@
 
 ## 编译前准备
 
-本章以开发和运行环境合设场景为例，即带AI处理器的机器既作为开发环境又作为运行环境。该场景下，代码开发和代码运行在同一台机器上。这里以**FlashAttentionScore算子**为例，其他算子的调用逻辑、流程、编译脚本与FlashAttentionScore算子大致一样，请根据实际情况自行修改API调用脚本（\*.cpp）和编译脚本(CMakeLists)。
+本章以开发和运行环境合设场景为例，即带AI处理器的机器既作为开发环境又作为运行环境。该场景下，代码开发和代码运行在同一台机器上。这里以**FlashAttentionScore算子**为例，其他算子的调用逻辑、流程、编译脚本与FlashAttentionScore算子大致一样，请根据实际情况自行修改API调用脚本(\*.cpp)和编译脚本(CMakeLists)。
 
 - **示例代码**
 
@@ -124,21 +124,21 @@
 
      其中${INSTALL_DIR}为CANN软件安装后文件存储路径，请根据实际情况替换。
   3. 编译并运行。
-        - 进入CMakeLists.txt所在目录，执行如下命令，新建build目录存放生成的编译文件。
+      - 进入CMakeLists.txt所在目录，执行如下命令，新建build目录存放生成的编译文件。
 
-          ```bash
-          mkdir -p build
-          ```
+        ```bash
+        mkdir -p build
+        ```
 
-        - 进入build目录，执行cmake命令编译，再执行make命令生成可执行文件。
+      - 进入build目录，执行cmake命令编译，再执行make命令生成可执行文件。
 
-          ```bash
-          cd build
-          cmake ../ -DCMAKE_CXX_COMPILER=g++ -DCMAKE_SKIP_RPATH=TRUE
-          make
-          ```
+        ```bash
+        cd build
+        cmake ../ -DCMAKE_CXX_COMPILER=g++ -DCMAKE_SKIP_RPATH=TRUE
+        make
+        ```
 
-          编译成功后，会在build目录的bin文件夹下生成opapi\_test可执行文件。
+        编译成功后，会在build目录的bin文件夹下生成opapi\_test可执行文件。
 
       - 进入bin目录，运行可执行文件opapi\_test。
 
@@ -179,5 +179,5 @@
 
         ```text
         aclnnFlashAttentionScoreGetWorkspaceSize failed. ERROR: 161001
-        [ERROR msg][PID:xxxx] xxx(timesamp) AclNN_Parameter_Error(EZ1001): The query cannot be nullptr.
+        [ERROR msg][PID:xxxx] xxx(timestamp) AclNN_Parameter_Error(EZ1001): The query cannot be nullptr.
         ```

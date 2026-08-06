@@ -15,7 +15,7 @@
   ```python
   import torch
   import torch_npu
-  import cann-ops-transformer
+  import cann_ops_transformer
   ```
 
 - **V版本演进说明**

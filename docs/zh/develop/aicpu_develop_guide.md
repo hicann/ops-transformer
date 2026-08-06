@@ -177,9 +177,9 @@ uint32_t AddExampleCpuKernel::Compute(CpuKernelContext& ctx) {
     case DT_FLOAT:
       return AddCompute<float>(...);
     case DT_INT32:
-      return AddCompute<int32>(...);
+      return AddCompute<int32_t>(...);
       ....
-    default : return PARAM_INVALID;
+    default : return kParamInvalid;
   }
 }
 
@@ -190,11 +190,11 @@ REGISTER_CPU_KERNEL(kAddExample, AddExampleCpuKernel);
 
 ## aclnn适配
 
-通常算子开发和编译完成后，会自动生成aclnn接口（一套基于C的API），无需做其他配置，可直接在应用程序中调用aclnn接口实现调用算子。
+通常算子开发和编译完成后，会自动生成aclnn接口（一套基于C的API），无需做其他配置，可直接在应用程序中调用aclnn接口实现算子调用。
 
 ## 编译部署
 
-算子开发完成后，需对算子工程进行编译，生成自定义算子安装包\*\.run，具体操作如下：
+算子开发完成后，需对算子工程进行编译，生成自定义算子安装包 `*.run`，具体操作如下：
 
 1. **准备工作。**
 
@@ -234,7 +234,7 @@ REGISTER_CPU_KERNEL(kAddExample, AddExampleCpuKernel);
    自定义算子包安装后在```${ASCEND_HOME_PATH}/opp/vendors/custom_transformer/scripts```目录会生成`uninstall.sh`，通过该脚本可卸载自定义算子包，命令如下：
 
    ```bash
-   bash ${ASCEND_HOME_PATH}/opp/vendors/custom_transformer/scripts/uninstall.sh
+   bash ${ASCEND_HOME_PATH}/opp/vendors/${vendor_name}_transformer/scripts/uninstall.sh
    ```
 
 ## 算子验证

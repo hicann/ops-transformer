@@ -1,7 +1,7 @@
 # aclnn返回码
 
 调用aclnn API时，常见的接口返回码如[表1](#table1)所示。
-对于异常状态码值，可以通过aclGetRecentErrMsg接口（[《Runtime运行时 API》](https://hiascend.com/document/redirect/CannCommunityRuntimeApi)）获取异常信息，您可以根据报错提示排查问题或者联系技术支持。
+对于异常状态码值，可以通过aclGetRecentErrMsg接口（[《Runtime运行时 API》](https://hiascend.com/document/redirect/CannCommunityRuntimeApi)）获取异常信息，可根据报错提示排查问题或联系技术支持。
 
 **表1**  返回状态码 <a id="table1"></a>
 

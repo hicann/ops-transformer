@@ -15,7 +15,7 @@
     $HOME/ascend/log/debug/plog/plog-pid_*.log
     ```
 
-    开启环境变量ASCEND_SLOG_PRINT_TO_STDOUT可以将log日志直接打屏显示(1:开启打屏，0：关闭打屏)，配置示例如下：
+   开启环境变量ASCEND_SLOG_PRINT_TO_STDOUT可以将log日志直接打屏显示(1：开启打屏，0：关闭打屏)，配置示例如下：
 
     ```bash
     export ASCEND_SLOG_PRINT_TO_STDOUT=1
@@ -27,15 +27,15 @@
 
     通过aclGetRecentErrMsg接口（参见[《Runtime运行时API》](https://hiascend.com/document/redirect/CannCommunityRuntimeApi)）获取aclnn接口调用过程中的异常信息，使用方法如下：
 
-    ```cpp
-    printf(aclGetRecentErrMsg());
-    ```
+   ```cpp
+   printf("%s",aclGetRecentErrMsg());
+   ```
 
     打印错误信息样例如下：
 
-    ```text
-    [PID:646612] 2026-01-24-11:53:44.671.727 AclNN_Parameter_Error(EZ1001): Expected a proper Tensor but got null for argument addmmTennsor.self.
-    ```
+   ```text
+   [PID:646612] 2026-01-24-11:53:44.671.727 AclNN_Parameter_Error(EZ1001): Expected a proper Tensor but got null for argument addmmTensor.self.
+   ```
 
 ### 2. Kernel调试
 
@@ -231,5 +231,5 @@
     msprof op simulator --output=$PWD/pipeline_auto --kernel-name "AddExample" ./test_aclnn_add_example
     ```
 
-    采集结果在本项目`$PWD/pipeline_auto/OPPROF_**`目录中。
-    其中流水相关文件路径为`OPPROF**/simulator/visualize_data.bin`，可以借助[MindStudio Insight](https://www.hiascend.com/document/redirect/MindStudioInsight)工具中“基础操作 > 导入数据”章节查看如何导入流水数据。
+      采集结果在本项目`$PWD/pipeline_auto/OPPROF_**`目录中。
+      其中流水相关文件路径为`OPPROF_*/simulator/visualize_data.bin`，可以借助[MindStudio Insight](https://www.hiascend.com/document/redirect/MindStudioInsight)工具中“基础操作 > 导入数据”章节查看如何导入流水数据。
