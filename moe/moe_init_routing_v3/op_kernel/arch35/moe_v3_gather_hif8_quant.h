@@ -81,8 +81,8 @@ private:
 
 template <typename T>
 __aicore__ inline void MoeGatherOutHif8Quant<T>::Init(GM_ADDR x, GM_ADDR workspace, GM_ADDR expandedRowIdx,
-                                             GM_ADDR expandedX,
-                                             const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+                                                      GM_ADDR expandedX,
+                                                      const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
 {
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
@@ -98,9 +98,9 @@ __aicore__ inline void MoeGatherOutHif8Quant<T>::Init(GM_ADDR x, GM_ADDR workspa
     lastLoopCols_ = tilingData->gatherOutComputeParamsOp.lastLoopCols;
 
     actualExpertNum_ = tilingData->actualExpertNum;
-    expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 +
-                                            Align(actualExpertNum_, sizeof(int32_t)),
-                                        1);
+    expertTotalCountGm_.SetGlobalBuffer(
+        (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum_, sizeof(int32_t)),
+        1);
     AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
         expertTotalCountGm_);
     expertTotalCount_ = expertTotalCountGm_.GetValue(0);
@@ -122,9 +122,9 @@ __aicore__ inline void MoeGatherOutHif8Quant<T>::Init(GM_ADDR x, GM_ADDR workspa
     curCoreLastLoopIndicesElements_ = curCoreIndicesElements_ - (indicesLoops_ - 1) * curCorePerLoopIndicesElements_;
 
     xGm_.SetGlobalBuffer((__gm__ T *)x, n_ * cols_);
-    
+
     expandedXGm_.SetGlobalBuffer((__gm__ hifloat8_t *)expandedX + blockIdx_ * perCoreIndicesElements_ * cols_,
-                                    curCoreIndicesElements_ * cols_);
+                                 curCoreIndicesElements_ * cols_);
 
     pipe_->InitBuffer(expandedRowIdxCopyInQueue_, GATHER_HIF8_QUANT_BUFFER_NUM,
                       AlignBytes(curCorePerLoopIndicesElements_, sizeof(int32_t)));
@@ -138,9 +138,9 @@ __aicore__ inline void MoeGatherOutHif8Quant<T>::Init(GM_ADDR x, GM_ADDR workspa
         expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
                                           Align(curCoreIndicesElements_, sizeof(int32_t)));
     } else {
-        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) +
-                                              blockIdx_ * perCoreIndicesElements_,
-                                          Align(curCoreIndicesElements_, sizeof(int32_t)));
+        expandedRowIdxGm_.SetGlobalBuffer(
+            (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
+            Align(curCoreIndicesElements_, sizeof(int32_t)));
     }
 }
 

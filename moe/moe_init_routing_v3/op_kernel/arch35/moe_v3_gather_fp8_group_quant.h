@@ -366,12 +366,12 @@ __aicore__ inline void MoeV3GatherFP8GroupQuant<T, U, CLAMP_AMAX>::InitKernelTil
     scaleCols_ = Ceil(cols_, FP8_GROUP_QUANT_SIZE);
 
     int64_t actualExpertNum = tilingData->actualExpertNum;
-    expertTotalCountGm_.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum, sizeof(int32_t)),
-        actualExpertNum);
 
     int64_t scanRowCount = n_ * k_;
     if (!useGatherCopy_) {
+        expertTotalCountGm_.SetGlobalBuffer(
+            (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum, sizeof(int32_t)),
+            1);
         DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(expertTotalCountGm_);
         scanRowCount = expertTotalCountGm_.GetValue(0);
     }

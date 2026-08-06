@@ -24,7 +24,7 @@ using namespace AscendC;
 
 template <typename T, typename U>
 __simd_vf__ inline void vfMxfp4ComputeMaxExp(__ubuf__ T *xAddr, __ubuf__ uint16_t *maxExpOutAddr, uint32_t xElemNum,
-                                        uint16_t vfLoopNum, uint32_t vlForT, uint32_t numVRegBlocks)
+                                             uint16_t vfLoopNum, uint32_t vlForT, uint32_t numVRegBlocks)
 {
     using namespace AscendC::MicroAPI;
 
@@ -55,7 +55,7 @@ __simd_vf__ inline void vfMxfp4ComputeMaxExp(__ubuf__ T *xAddr, __ubuf__ uint16_
 
         // 双搬入，奇数位放x0、偶数位放x1
         DataCopy<T, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_DINTLV_B16>(x0, x1, xAddr, vlForT * 2);
-        
+
         if constexpr (IsSameType<T, half>::value) {
             // 单独提取fp16中inf/nan的元素
             And(exp0FP16, (RegTensor<uint16_t> &)x0, emaskFP16, mask0);
@@ -92,9 +92,9 @@ __simd_vf__ inline void vfMxfp4ComputeMaxExp(__ubuf__ T *xAddr, __ubuf__ uint16_
 
 template <typename T, typename U>
 __simd_vf__ inline void vfMxfp4ComputeScale(__ubuf__ uint16_t *maxExpInAddr, __ubuf__ uint16_t *mxScaleOutAddr,
-                                       __ubuf__ uint16_t *invScaleOutAddr, uint32_t scaleElemNum,
-                                       uint32_t validScaleElemNum, uint16_t vfLoopNum,
-                                       uint32_t vlForT, uint16_t expLowerBoundValue)
+                                            __ubuf__ uint16_t *invScaleOutAddr, uint32_t scaleElemNum,
+                                            uint32_t validScaleElemNum, uint16_t vfLoopNum, uint32_t vlForT,
+                                            uint16_t expLowerBoundValue)
 {
     using namespace AscendC::MicroAPI;
 
@@ -175,13 +175,13 @@ __simd_vf__ inline void vfMxfp4ComputeScale(__ubuf__ uint16_t *maxExpInAddr, __u
 
 template <typename T, typename U>
 __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t *invScaleInAddr,
-                                      __ubuf__ int8_t *xQuantOutAddr, uint32_t xElemNum, uint16_t vfLoopNum,
-                                      uint32_t vlForT, uint32_t numVRegBlocks)
+                                           __ubuf__ int8_t *xQuantOutAddr, uint32_t xElemNum, uint16_t vfLoopNum,
+                                           uint32_t vlForT, uint32_t numVRegBlocks)
 {
     using namespace AscendC::MicroAPI;
     // fp16转fp32
     static constexpr CastTrait castTraitF16toFp32Zero = {RegLayout::ZERO, SatMode::UNKNOWN, MaskMergeMode::ZEROING,
-                                                        RoundMode::UNKNOWN};
+                                                         RoundMode::UNKNOWN};
     static constexpr CastTrait castTraitF16toFp32One = {RegLayout::ONE, SatMode::UNKNOWN, MaskMergeMode::ZEROING,
                                                         RoundMode::UNKNOWN};
     // fp32转bf16，涉及宽度变化，精度截断
@@ -191,7 +191,7 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
                                                   RoundMode::CAST_TRUNC};
     // bf16转b4
     static constexpr CastTrait traitB16ToB4 = {RegLayout::ZERO, SatMode::UNKNOWN, MaskMergeMode::ZEROING,
-                                                      RoundMode::CAST_RINT};
+                                               RoundMode::CAST_RINT};
 
     RegTensor<uint16_t> invScale;
     RegTensor<float> invScaleFP32, halfScaleForMulFP32;
@@ -217,19 +217,17 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
 
         // 拷入待量化的x：x0存放偶数位的值，x1存放奇数位的值，双搬共拷入vlForT*2个元素
         DataCopy<T, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_DINTLV_B16>(x0, x1, xAddr, vlForT * 2);
-        
+
         // 拷入invScale，类型为uint16（计算时翻译成bfloat16），其中每个元素广播至32B，这里就是每个元素重复16次，共256B/32B=8个元素，也就是numVRegBlocks的值
         // 应该是加载(256/32=8)B的元素
-        DataCopy<uint16_t, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_E2B_B16>(invScale,
-                                                                                  invScaleInAddr,
+        DataCopy<uint16_t, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_E2B_B16>(invScale, invScaleInAddr,
                                                                                   numVRegBlocks);
 
         if constexpr (IsSameType<T, half>::value) {
             // 对于T为fp16，先把x和invScale转成fp32，再计算x*invScale后做类型转换：fp32->bf16->float4
 
-             // 1.将invScale从BF16转为FP32
-            Cast<float, bfloat16_t, castTraitF16toFp32Zero>(halfScaleForMulFP32,
-                                                            (RegTensor<bfloat16_t>&)invScale,
+            // 1.将invScale从BF16转为FP32
+            Cast<float, bfloat16_t, castTraitF16toFp32Zero>(halfScaleForMulFP32, (RegTensor<bfloat16_t> &)invScale,
                                                             maskAllB16);
 
             // 2.处理x0：FP16 -> FP32 (分离奇偶位)
@@ -252,9 +250,9 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
             RegTensor<int32_t> exp1FP321;
 
             Duplicate(negZero1, NEG_ZERO);
-            Compare<int32_t, CMPMODE::EQ>(negInfMask1, (RegTensor<int32_t>&)vdExp0ZeroFP32, negZero1, pregAll321);
+            Compare<int32_t, CMPMODE::EQ>(negInfMask1, (RegTensor<int32_t> &)vdExp0ZeroFP32, negZero1, pregAll321);
             Duplicate(maxExpFP321, FP32_EMASK_AND_INF_VAL);
-            And(exp0FP321, (RegTensor<int32_t>&)vdExp0ZeroFP32, maxExpFP321, pregAll321);
+            And(exp0FP321, (RegTensor<int32_t> &)vdExp0ZeroFP32, maxExpFP321, pregAll321);
             ShiftRights(exp0FP321, exp0FP321, FP32_EXP_SHR_BITS, pregAll321);
             Adds(exp0FP321, exp0FP321, FP32_BIAS_NEG, pregAll321);
             Maxs(exp0FP321, exp0FP321, 0, pregAll321);
@@ -262,17 +260,17 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
             Muls(exp1FP321, exp0FP321, NEG_ONE, pregAll321);
             Adds(exp1FP321, exp1FP321, FP32_BIAS, pregAll321);
             ShiftLefts(exp1FP321, exp1FP321, FP32_EXP_SHR_BITS, pregAll321);
-            Mul(vdExp0ZeroFP32, vdExp0ZeroFP32, (RegTensor<float>&)exp1FP321, pregAll321);
+            Mul(vdExp0ZeroFP32, vdExp0ZeroFP32, (RegTensor<float> &)exp1FP321, pregAll321);
             Adds(exp0FP321, exp0FP321, FP32_BIAS, pregAll321);
             ShiftLefts(exp0FP321, exp0FP321, FP32_EXP_SHR_BITS, pregAll321);
             CompareScalar<float, CMPMODE::LT>(specialMask1, vdExp0ZeroFP32, 0, pregAll321);
             Truncate<float, RoundMode::CAST_RINT>(vdExp0ZeroFP32, vdExp0ZeroFP32, pregAll321);
-            Mul(vdExp0ZeroFP32, vdExp0ZeroFP32, (RegTensor<float>&)exp0FP321, pregAll321);
+            Mul(vdExp0ZeroFP32, vdExp0ZeroFP32, (RegTensor<float> &)exp0FP321, pregAll321);
             CompareScalar<float, CMPMODE::EQ>(zeroMask1, vdExp0ZeroFP32, 0, pregAll321);
             MaskAnd(zeroMask1, specialMask1, zeroMask1, pregAll321);
             MaskOr(zeroMask1, negInfMask1, zeroMask1, pregAll321);
-            Select<int32_t>((RegTensor<int32_t>&)vdExp0ZeroFP32, negZero1,
-                            (RegTensor<int32_t>&)vdExp0ZeroFP32, zeroMask1);
+            Select<int32_t>((RegTensor<int32_t> &)vdExp0ZeroFP32, negZero1, (RegTensor<int32_t> &)vdExp0ZeroFP32,
+                            zeroMask1);
 
             // ComputeFP4FromHalf2
             MaskReg pregAll322 = CreateMask<uint32_t, MaskPattern::ALL>();
@@ -286,9 +284,9 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
             RegTensor<int32_t> exp1FP322;
 
             Duplicate(negZero2, NEG_ZERO);
-            Compare<int32_t, CMPMODE::EQ>(negInfMask2, (RegTensor<int32_t>&)vdExp0OneFP32, negZero2, pregAll322);
+            Compare<int32_t, CMPMODE::EQ>(negInfMask2, (RegTensor<int32_t> &)vdExp0OneFP32, negZero2, pregAll322);
             Duplicate(maxExpFP322, FP32_EMASK_AND_INF_VAL);
-            And(exp0FP322, (RegTensor<int32_t>&)vdExp0OneFP32, maxExpFP322, pregAll322);
+            And(exp0FP322, (RegTensor<int32_t> &)vdExp0OneFP32, maxExpFP322, pregAll322);
             ShiftRights(exp0FP322, exp0FP322, FP32_EXP_SHR_BITS, pregAll322);
             Adds(exp0FP322, exp0FP322, FP32_BIAS_NEG, pregAll322);
             Maxs(exp0FP322, exp0FP322, 0, pregAll322);
@@ -296,27 +294,27 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
             Muls(exp1FP322, exp0FP322, NEG_ONE, pregAll322);
             Adds(exp1FP322, exp1FP322, FP32_BIAS, pregAll322);
             ShiftLefts(exp1FP322, exp1FP322, FP32_EXP_SHR_BITS, pregAll322);
-            Mul(vdExp0OneFP32, vdExp0OneFP32, (RegTensor<float>&)exp1FP322, pregAll322);
+            Mul(vdExp0OneFP32, vdExp0OneFP32, (RegTensor<float> &)exp1FP322, pregAll322);
             Adds(exp0FP322, exp0FP322, FP32_BIAS, pregAll322);
             ShiftLefts(exp0FP322, exp0FP322, FP32_EXP_SHR_BITS, pregAll322);
             CompareScalar<float, CMPMODE::LT>(specialMask2, vdExp0OneFP32, 0, pregAll322);
             Truncate<float, RoundMode::CAST_RINT>(vdExp0OneFP32, vdExp0OneFP32, pregAll322);
-            Mul(vdExp0OneFP32, vdExp0OneFP32, (RegTensor<float>&)exp0FP322, pregAll322);
+            Mul(vdExp0OneFP32, vdExp0OneFP32, (RegTensor<float> &)exp0FP322, pregAll322);
             CompareScalar<float, CMPMODE::EQ>(zeroMask2, vdExp0OneFP32, 0, pregAll322);
             MaskAnd(zeroMask2, specialMask2, zeroMask2, pregAll322);
             MaskOr(zeroMask2, negInfMask2, zeroMask2, pregAll322);
-            Select<int32_t>((RegTensor<int32_t>&)vdExp0OneFP32, negZero2,
-                            (RegTensor<int32_t>&)vdExp0OneFP32, zeroMask2);
+            Select<int32_t>((RegTensor<int32_t> &)vdExp0OneFP32, negZero2, (RegTensor<int32_t> &)vdExp0OneFP32,
+                            zeroMask2);
 
             // 4.FP32 -> BF16 (首次精度截断，使用RINT舍入)
             Cast<bfloat16_t, float, castTraitFp32toBF16>(vdExp0ZeroBF16, vdExp0ZeroFP32, maskAllB32);
             Cast<bfloat16_t, float, castTraitFp32toBF16>(vdExp0OneBF16, vdExp0OneFP32, maskAllB32);
 
             // 5.Pack：将BF16低16位打包到32位空间，紧凑存储
-            Pack<uint16_t, uint32_t, HighLowPart::LOWEST>((RegTensor<uint16_t>&)vdExp0ZeroBF16,
-                                                          (RegTensor<uint32_t>&)vdExp0ZeroBF16);
-            Pack<uint16_t, uint32_t, HighLowPart::LOWEST>((RegTensor<uint16_t>&)vdExp0OneBF16,
-                                                          (RegTensor<uint32_t>&)vdExp0OneBF16);
+            Pack<uint16_t, uint32_t, HighLowPart::LOWEST>((RegTensor<uint16_t> &)vdExp0ZeroBF16,
+                                                          (RegTensor<uint32_t> &)vdExp0ZeroBF16);
+            Pack<uint16_t, uint32_t, HighLowPart::LOWEST>((RegTensor<uint16_t> &)vdExp0OneBF16,
+                                                          (RegTensor<uint32_t> &)vdExp0OneBF16);
 
             // 6.Interleave：恢复x0的原始顺序
             Interleave(vdExp0ZeroBF16, vdExp0OneBF16, vdExp0ZeroBF16, vdExp0OneBF16);
@@ -340,9 +338,9 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
             RegTensor<int32_t> exp1FP323;
 
             Duplicate(negZero3, NEG_ZERO);
-            Compare<int32_t, CMPMODE::EQ>(negInfMask3, (RegTensor<int32_t>&)vdExp1ZeroFP32, negZero3, pregAll323);
+            Compare<int32_t, CMPMODE::EQ>(negInfMask3, (RegTensor<int32_t> &)vdExp1ZeroFP32, negZero3, pregAll323);
             Duplicate(maxExpFP323, FP32_EMASK_AND_INF_VAL);
-            And(exp0FP323, (RegTensor<int32_t>&)vdExp1ZeroFP32, maxExpFP323, pregAll323);
+            And(exp0FP323, (RegTensor<int32_t> &)vdExp1ZeroFP32, maxExpFP323, pregAll323);
             ShiftRights(exp0FP323, exp0FP323, FP32_EXP_SHR_BITS, pregAll323);
             Adds(exp0FP323, exp0FP323, FP32_BIAS_NEG, pregAll323);
             Maxs(exp0FP323, exp0FP323, 0, pregAll323);
@@ -350,17 +348,17 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
             Muls(exp1FP323, exp0FP323, NEG_ONE, pregAll323);
             Adds(exp1FP323, exp1FP323, FP32_BIAS, pregAll323);
             ShiftLefts(exp1FP323, exp1FP323, FP32_EXP_SHR_BITS, pregAll323);
-            Mul(vdExp1ZeroFP32, vdExp1ZeroFP32, (RegTensor<float>&)exp1FP323, pregAll323);
+            Mul(vdExp1ZeroFP32, vdExp1ZeroFP32, (RegTensor<float> &)exp1FP323, pregAll323);
             Adds(exp0FP323, exp0FP323, FP32_BIAS, pregAll323);
             ShiftLefts(exp0FP323, exp0FP323, FP32_EXP_SHR_BITS, pregAll323);
             CompareScalar<float, CMPMODE::LT>(specialMask3, vdExp1ZeroFP32, 0, pregAll323);
             Truncate<float, RoundMode::CAST_RINT>(vdExp1ZeroFP32, vdExp1ZeroFP32, pregAll323);
-            Mul(vdExp1ZeroFP32, vdExp1ZeroFP32, (RegTensor<float>&)exp0FP323, pregAll323);
+            Mul(vdExp1ZeroFP32, vdExp1ZeroFP32, (RegTensor<float> &)exp0FP323, pregAll323);
             CompareScalar<float, CMPMODE::EQ>(zeroMask3, vdExp1ZeroFP32, 0, pregAll323);
             MaskAnd(zeroMask3, specialMask3, zeroMask3, pregAll323);
             MaskOr(zeroMask3, negInfMask3, zeroMask3, pregAll323);
-            Select<int32_t>((RegTensor<int32_t>&)vdExp1ZeroFP32, negZero3,
-                            (RegTensor<int32_t>&)vdExp1ZeroFP32, zeroMask3);
+            Select<int32_t>((RegTensor<int32_t> &)vdExp1ZeroFP32, negZero3, (RegTensor<int32_t> &)vdExp1ZeroFP32,
+                            zeroMask3);
 
             // ComputeFP4FromHalf4
             MaskReg pregAll324 = CreateMask<uint32_t, MaskPattern::ALL>();
@@ -374,9 +372,9 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
             RegTensor<int32_t> exp1FP324;
 
             Duplicate(negZero4, NEG_ZERO);
-            Compare<int32_t, CMPMODE::EQ>(negInfMask4, (RegTensor<int32_t>&)vdExp1OneFP32, negZero4, pregAll324);
+            Compare<int32_t, CMPMODE::EQ>(negInfMask4, (RegTensor<int32_t> &)vdExp1OneFP32, negZero4, pregAll324);
             Duplicate(maxExpFP324, FP32_EMASK_AND_INF_VAL);
-            And(exp0FP324, (RegTensor<int32_t>&)vdExp1OneFP32, maxExpFP324, pregAll324);
+            And(exp0FP324, (RegTensor<int32_t> &)vdExp1OneFP32, maxExpFP324, pregAll324);
             ShiftRights(exp0FP324, exp0FP324, FP32_EXP_SHR_BITS, pregAll324);
             Adds(exp0FP324, exp0FP324, FP32_BIAS_NEG, pregAll324);
             Maxs(exp0FP324, exp0FP324, 0, pregAll324);
@@ -384,25 +382,25 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
             Muls(exp1FP324, exp0FP324, NEG_ONE, pregAll324);
             Adds(exp1FP324, exp1FP324, FP32_BIAS, pregAll324);
             ShiftLefts(exp1FP324, exp1FP324, FP32_EXP_SHR_BITS, pregAll324);
-            Mul(vdExp1OneFP32, vdExp1OneFP32, (RegTensor<float>&)exp1FP324, pregAll324);
+            Mul(vdExp1OneFP32, vdExp1OneFP32, (RegTensor<float> &)exp1FP324, pregAll324);
             Adds(exp0FP324, exp0FP324, FP32_BIAS, pregAll324);
             ShiftLefts(exp0FP324, exp0FP324, FP32_EXP_SHR_BITS, pregAll324);
             CompareScalar<float, CMPMODE::LT>(specialMask4, vdExp1OneFP32, 0, pregAll324);
             Truncate<float, RoundMode::CAST_RINT>(vdExp1OneFP32, vdExp1OneFP32, pregAll324);
-            Mul(vdExp1OneFP32, vdExp1OneFP32, (RegTensor<float>&)exp0FP324, pregAll324);
+            Mul(vdExp1OneFP32, vdExp1OneFP32, (RegTensor<float> &)exp0FP324, pregAll324);
             CompareScalar<float, CMPMODE::EQ>(zeroMask4, vdExp1OneFP32, 0, pregAll324);
             MaskAnd(zeroMask4, specialMask4, zeroMask4, pregAll324);
             MaskOr(zeroMask4, negInfMask4, zeroMask4, pregAll324);
-            Select<int32_t>((RegTensor<int32_t>&)vdExp1OneFP32, negZero4,
-                            (RegTensor<int32_t>&)vdExp1OneFP32, zeroMask4);
+            Select<int32_t>((RegTensor<int32_t> &)vdExp1OneFP32, negZero4, (RegTensor<int32_t> &)vdExp1OneFP32,
+                            zeroMask4);
 
             Cast<bfloat16_t, float, castTraitFp32toBF16>(vdExp1ZeroBF16, vdExp1ZeroFP32, maskAllB32);
             Cast<bfloat16_t, float, castTraitFp32toBF16>(vdExp1OneBF16, vdExp1OneFP32, maskAllB32);
 
-            Pack<uint16_t, uint32_t, HighLowPart::LOWEST>((RegTensor<uint16_t>&)vdExp1ZeroBF16,
-                                                          (RegTensor<uint32_t>&)vdExp1ZeroBF16);
-            Pack<uint16_t, uint32_t, HighLowPart::LOWEST>((RegTensor<uint16_t>&)vdExp1OneBF16,
-                                                          (RegTensor<uint32_t>&)vdExp1OneBF16);
+            Pack<uint16_t, uint32_t, HighLowPart::LOWEST>((RegTensor<uint16_t> &)vdExp1ZeroBF16,
+                                                          (RegTensor<uint32_t> &)vdExp1ZeroBF16);
+            Pack<uint16_t, uint32_t, HighLowPart::LOWEST>((RegTensor<uint16_t> &)vdExp1OneBF16,
+                                                          (RegTensor<uint32_t> &)vdExp1OneBF16);
 
             Interleave(vdExp1ZeroBF16, vdExp1OneBF16, vdExp1ZeroBF16, vdExp1OneBF16);
 
@@ -509,10 +507,10 @@ private:
 
 template <typename T, typename U>
 __aicore__ inline void MoeV3GatherMxfp4Quant<T, U>::Init(GM_ADDR xAddr, GM_ADDR unused_ScaleAddr,
-                                                          GM_ADDR sortedExpertIdxAddr, GM_ADDR expandedRowIdxAddr,
-                                                          GM_ADDR expandedXAddr, GM_ADDR expandedScaleAddr,
-                                                          const MoeInitRoutingV3Arch35TilingData *tilingData,
-                                                          TPipe *tPipe)
+                                                         GM_ADDR sortedExpertIdxAddr, GM_ADDR expandedRowIdxAddr,
+                                                         GM_ADDR expandedXAddr, GM_ADDR expandedScaleAddr,
+                                                         const MoeInitRoutingV3Arch35TilingData *tilingData,
+                                                         TPipe *tPipe)
 {
 #if (__NPU_ARCH__ == 3510)
     SetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>(0);
@@ -528,9 +526,9 @@ __aicore__ inline void MoeV3GatherMxfp4Quant<T, U>::Init(GM_ADDR xAddr, GM_ADDR 
         sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
                                         Align(perCoreRow_, sizeof(int32_t)));
     } else {
-        sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdxAddr + Align(n_ * k_, sizeof(int32_t)) +
-                                            blockIdx_ * perCoreRow_,
-                                        Align(perCoreRow_, sizeof(int32_t)));
+        sortedRowIdxGm_.SetGlobalBuffer(
+            (__gm__ int32_t *)sortedExpertIdxAddr + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+            Align(perCoreRow_, sizeof(int32_t)));
     }
     expandedScaleOutGm_.SetGlobalBuffer((__gm__ uint8_t *)expandedScaleAddr);
 
@@ -553,7 +551,7 @@ __aicore__ inline void MoeV3GatherMxfp4Quant<T, U>::Init(GM_ADDR xAddr, GM_ADDR 
 
 template <typename T, typename U>
 __aicore__ inline void MoeV3GatherMxfp4Quant<T, U>::InitKernelTiling(GM_ADDR sortedExpertIdxAddr,
-                                                                const MoeInitRoutingV3Arch35TilingData *tilingData)
+                                                                     const MoeInitRoutingV3Arch35TilingData *tilingData)
 {
     gatherOutTilingData_ = &(tilingData->gatherOutComputeParamsOp);
     cols_ = tilingData->cols;
@@ -566,7 +564,8 @@ __aicore__ inline void MoeV3GatherMxfp4Quant<T, U>::InitKernelTiling(GM_ADDR sor
     // core split
     int64_t actualExpertNum_ = tilingData->actualExpertNum;
     expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdxAddr + Align(n_ * k_, sizeof(int32_t)) * 2 +
-                                        Align(actualExpertNum_, sizeof(int32_t)), actualExpertNum_);
+                                            Align(actualExpertNum_, sizeof(int32_t)),
+                                        1);
     int64_t expertTotalCount_ = expertTotalCountGm_.GetValue(0);
     perCoreRow_ = Ceil(expertTotalCount_, tilingData->coreNum);
     needCoreNum_ = Ceil(expertTotalCount_, perCoreRow_);
@@ -663,7 +662,7 @@ __aicore__ inline void MoeV3GatherMxfp4Quant<T, U>::CopyIn(int64_t srcIdx, int64
 
 template <typename T, typename U>
 __aicore__ inline void MoeV3GatherMxfp4Quant<T, U>::Compute(uint32_t xElemNum, uint32_t scaleElemNum,
-                                                             uint32_t validScaleElemNum)
+                                                            uint32_t validScaleElemNum)
 {
     // deque input
     LocalTensor<T> xLocal = xInQueue_.DeQue<T>();
@@ -684,7 +683,7 @@ __aicore__ inline void MoeV3GatherMxfp4Quant<T, U>::Compute(uint32_t xElemNum, u
     uint16_t vfLoopNumForScale = (scaleElemNum + vlForB16_ - 1) / vlForB16_;
 
     VF_CALL<vfMxfp4ComputeMaxExp<T, U>>(xLocalAddr, maxExpLocalAddr, xElemNum, vfLoopNumForX, vlForB16_,
-                                   numUbBlocksPerVReg_);
+                                        numUbBlocksPerVReg_);
     VF_CALL<vfMxfp4ComputeScale<T, U>>(maxExpLocalAddr, mxScaleLocalAddr, invScaleLocalAddr, scaleElemNum,
                                        validScaleElemNum, vfLoopNumForScale, vlForB16_, lowerBoundOfB16MaxExp_);
     VF_CALL<vfMxfp4ComputeData<T, U>>(xLocalAddr, invScaleLocalAddr, xQuantLocalAddr, xElemNum, vfLoopNumForX,
@@ -699,7 +698,7 @@ __aicore__ inline void MoeV3GatherMxfp4Quant<T, U>::Compute(uint32_t xElemNum, u
 
 template <typename T, typename U>
 __aicore__ inline void MoeV3GatherMxfp4Quant<T, U>::CopyOut(int64_t dstIdx, int64_t colIdx, int64_t loopCols,
-                                                             int64_t loopScaleCols)
+                                                            int64_t loopScaleCols)
 {
     LocalTensor<uint8_t> mxScaleLocal = mxScaleOutQueue_.DeQue<uint8_t>();
     LocalTensor<uint8_t> outLocal = xQuantOutQueue_.DeQue<uint8_t>();

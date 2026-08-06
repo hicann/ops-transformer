@@ -65,8 +65,9 @@ __aicore__ inline void RowIdxGather::Init(GM_ADDR expandedRowIdx, GM_ADDR worksp
     useGatherCopy_ = tilingData->useGatherCopy;
 
     expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)workspace +
-                                        Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2 +
-                                        Align(tilingData->actualExpertNum, sizeof(int32_t)));
+                                            Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2 +
+                                            Align(tilingData->actualExpertNum, sizeof(int32_t)),
+                                        1);
     int64_t expertTotalCount = expertTotalCountGm_.GetValue(0);
 
     perCoreElements_ = Ceil(expertTotalCount, needCoreNum_);

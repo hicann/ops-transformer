@@ -277,10 +277,11 @@ private:
 };
 
 template <typename T, typename U>
-__aicore__ inline void
-MoeGatherOutFP8PerBlockQuant<T, U>::Init(GM_ADDR xAddr, GM_ADDR unused_ScaleAddr, GM_ADDR sortedExpertIdxAddr,
-                                         GM_ADDR expandedRowIdxAddr, GM_ADDR expandedXAddr, GM_ADDR expandedScaleAddr,
-                                         const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+__aicore__ inline void MoeGatherOutFP8PerBlockQuant<T, U>::Init(GM_ADDR xAddr, GM_ADDR unused_ScaleAddr,
+                                                                GM_ADDR sortedExpertIdxAddr, GM_ADDR expandedRowIdxAddr,
+                                                                GM_ADDR expandedXAddr, GM_ADDR expandedScaleAddr,
+                                                                const MoeInitRoutingV3Arch35TilingData *tilingData,
+                                                                TPipe *tPipe)
 {
 #if (__NPU_ARCH__ == 3510)
     SetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>(0);
@@ -299,9 +300,9 @@ MoeGatherOutFP8PerBlockQuant<T, U>::Init(GM_ADDR xAddr, GM_ADDR unused_ScaleAddr
         sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdxAddr + blockIdx_ * perCoreRow_,
                                         Align(perCoreRow_, sizeof(int32_t)));
     } else {
-        sortedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdxAddr + Align(n_ * k_, sizeof(int32_t)) +
-                                            blockIdx_ * perCoreRow_,
-                                        Align(perCoreRow_, sizeof(int32_t)));
+        sortedRowIdxGm_.SetGlobalBuffer(
+            (__gm__ int32_t *)sortedExpertIdxAddr + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreRow_,
+            Align(perCoreRow_, sizeof(int32_t)));
     }
 
     InitBuffer();
@@ -314,9 +315,8 @@ MoeGatherOutFP8PerBlockQuant<T, U>::Init(GM_ADDR xAddr, GM_ADDR unused_ScaleAddr
 }
 
 template <typename T, typename U>
-__aicore__ inline void
-MoeGatherOutFP8PerBlockQuant<T, U>::InitKernelTiling(GM_ADDR sortedExpertIdxAddr,
-                                                     const MoeInitRoutingV3Arch35TilingData *tilingData)
+__aicore__ inline void MoeGatherOutFP8PerBlockQuant<T, U>::InitKernelTiling(
+    GM_ADDR sortedExpertIdxAddr, const MoeInitRoutingV3Arch35TilingData *tilingData)
 {
     gatherOutTilingData_ = &(tilingData->gatherOutComputeParamsOp);
     cols_ = tilingData->cols;
@@ -330,7 +330,7 @@ MoeGatherOutFP8PerBlockQuant<T, U>::InitKernelTiling(GM_ADDR sortedExpertIdxAddr
     int64_t actualExpertNum_ = tilingData->actualExpertNum;
     expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)sortedExpertIdxAddr + Align(n_ * k_, sizeof(int32_t)) * 2 +
                                             Align(actualExpertNum_, sizeof(int32_t)),
-                                        actualExpertNum_);
+                                        1);
 
     AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
         expertTotalCountGm_);

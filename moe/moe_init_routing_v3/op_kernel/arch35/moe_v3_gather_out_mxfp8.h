@@ -90,11 +90,11 @@ __aicore__ inline void MoeV3GatherOutMxfp8<T>::InitKernelTiling(GM_ADDR workspac
 
     // core split
     int64_t actualExpertNum_ = tilingData->actualExpertNum;
-    expertTotalCountGm_.SetGlobalBuffer(
-        (__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum_, sizeof(int32_t)),
-        1);
     int64_t scanRowCount = n_ * k_;
     if (!useGatherCopy_) {
+        expertTotalCountGm_.SetGlobalBuffer((__gm__ int32_t *)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 +
+                                                Align(actualExpertNum_, sizeof(int32_t)),
+                                            1);
         DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(expertTotalCountGm_);
         scanRowCount = expertTotalCountGm_.GetValue(0);
     }
