@@ -19,8 +19,6 @@
 #include "fia_arch35_common.h"
 #include "fia_arch35_template_tiling_key_enum.h"
 #include "flash_attention_score_kernel_infer_mla_fullquant.h"
-#include "flash_attention_score_kernel_infer_gqa_fullquant.h"
-#include "flash_attention_score_kernel_infer_mx_fullquant.h"
 #include "fia_template_dispatcher.h"
 
 using namespace regbaseutil;
@@ -47,49 +45,6 @@ using namespace regbaseutil;
         op.Process(); \
     } while (0)
 
-#define INVOKE_GQA_FULLQUANT_GENERAL_OP_IMPL_ASCEND950_FA_BASEAPI(templateClass, vec1ResultSize, qkvSize, ...) \
-    do { \
-        if (query == nullptr) { \
-            return; \
-        } \
-        FIA_REGBASE_COPY_TILING_DATA(tiling); \
-        TPipe tPipe; \
-        using CubeBlockType = \
-            typename std::conditional<g_coreType == AscendC::AIC, BaseApi::FABlockCubeGqaFullquant<__VA_ARGS__>, \
-                                      BaseApi::FABlockCubeGqaFullquantDummy<__VA_ARGS__>>::type; \
-        using VecBlockType = \
-            typename std::conditional<g_coreType == AscendC::AIC, BaseApi::FABlockVecFullquantDummy<__VA_ARGS__>, \
-                                      BaseApi::FABlockVecInferGqaFullquant<__VA_ARGS__>>::type; \
-        templateClass<CubeBlockType, VecBlockType> op; \
-        op.InitBaseAPI(query, key, value, pseShift, nullptr, nullptr, attenMask, nullptr, actualSeqLengths, \
-                       actualSeqLengthsKV, blocktable, queryPaddingSize, kvPaddingSize, dequantScaleQuery, \
-                       key_antiquant_scale, value_antiquant_scale, quant_scale1, postQuantScale, postQuantOffset, \
-                       keySharedPrefix, valueSharedPrefix, actualSharedPrefixLen, queryRope, keyRope, learnableSink, \
-                       nullptr, nullptr, nullptr, softmaxLse, attentionOut, user, tilingData, &tPipe); \
-        op.Process(); \
-    } while (0)
-
-#define INVOKE_MX_FULLQUANT_GENERAL_OP_IMPL_ASCEND950_FA_BASEAPI(templateClass, vec1ResultSize, qkvSize, ...) \
-    do { \
-        if (query == nullptr) { \
-            return; \
-        } \
-        FIA_REGBASE_COPY_TILING_DATA(tiling); \
-        TPipe tPipe; \
-        using CubeBlockType = \
-            typename std::conditional<g_coreType == AscendC::AIC, BaseApi::FABlockCubeMxFullquant<__VA_ARGS__>, \
-                                      BaseApi::FABlockCubeMxFullquantDummy<__VA_ARGS__>>::type; \
-        using VecBlockType = \
-            typename std::conditional<g_coreType == AscendC::AIC, BaseApi::FABlockVecFullquantDummy<__VA_ARGS__>, \
-                                      BaseApi::FABlockVecInferMxFullquant<__VA_ARGS__>>::type; \
-        templateClass<CubeBlockType, VecBlockType> op; \
-        op.InitBaseAPI(query, key, value, pseShift, nullptr, nullptr, attenMask, nullptr, actualSeqLengths, \
-                       actualSeqLengthsKV, blocktable, queryPaddingSize, kvPaddingSize, dequantScaleQuery, \
-                       key_antiquant_scale, value_antiquant_scale, quant_scale1, postQuantScale, postQuantOffset, \
-                       keySharedPrefix, valueSharedPrefix, actualSharedPrefixLen, queryRope, keyRope, learnableSink, \
-                       nullptr, nullptr, nullptr, softmaxLse, attentionOut, user, tilingData, &tPipe); \
-        op.Process(); \
-    } while (0)
 
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t pseMode, uint8_t quantMode, bool hasAttenMask, bool hasRope,
           uint8_t KvLayoutType, bool isFd, bool emptyTensor, bool enableKVPrefix, bool enableS1OutSplit,
@@ -126,54 +81,11 @@ inline __aicore__ void fia_fullquant_regbase(
                 key_antiquant_scale, value_antiquant_scale, quant_scale1, queryRope, keyRope, attentionOut, softmaxLse,
                 user, tiling);
         }
-    } else {
-        PARSE_PARAMS_NoQuant(inOutLayoutType, config, pseMode, quantMode, hasAttenMask, hasRope, isPa, isFd,
-                             emptyTensor, pFAMatMulType, enableKVPrefix, enableS1OutSplit);
-        constexpr uint64_t vec1ResultSize =
-            static_cast<uint64_t>(s1TemplateType) * static_cast<uint64_t>(s2TemplateType) * 2;
-        if constexpr (quantMode == FULLQUANT_MODE_QKV_MXFP8_PREFILL) {
-            constexpr uint64_t qkvSizeRsv2 =
-                MAX(MAX(static_cast<uint64_t>(s1TemplateType), static_cast<uint64_t>(s2TemplateType)) *
-                        (static_cast<uint64_t>(dTemplateType) >> 1),
-                    static_cast<uint64_t>(s2TemplateType) * (static_cast<uint64_t>(dTemplateType) >> 1)) *
-                2;
-            INVOKE_MX_FULLQUANT_GENERAL_OP_IMPL_ASCEND950_FA_BASEAPI(
-                BaseApi::FlashAttentionScoreKernelInferMxFullquant, vec1ResultSize, qkvSizeRsv2, fp8_e4m3fn_t, float,
-                half, ImplModeEnum::AA_HIGH_PRECISION, inputLayoutType, s1TemplateType, s2TemplateType, dTemplateType,
-                dVTemplateType, static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope, true, isPa, isFd,
-                enableKVPrefix);
-        } else {
-            constexpr uint64_t qkvSizeRsv2 =
-                MAX(MAX(static_cast<uint64_t>(s1TemplateType), static_cast<uint64_t>(s2TemplateType)) *
-                        static_cast<uint64_t>(dTemplateType),
-                    static_cast<uint64_t>(s2TemplateType) * static_cast<uint64_t>(dTemplateType)) *
-                2;
-            INVOKE_GQA_FULLQUANT_GENERAL_OP_IMPL_ASCEND950_FA_BASEAPI(
-                BaseApi::FlashAttentionScoreKernelInferGqaFullquant, vec1ResultSize, qkvSizeRsv2, fp8_e4m3fn_t, float,
-                half, ImplModeEnum::AA_HIGH_PRECISION, inputLayoutType, s1TemplateType, s2TemplateType, dTemplateType,
-                dVTemplateType, static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope, true, isPa, isFd,
-                enableKVPrefix, enableS1OutSplit);
-        }
     }
 #endif
 
-#if (ORIG_DTYPE_QUERY == DT_HIFLOAT8 && ORIG_DTYPE_KEY == DT_HIFLOAT8 && ORIG_DTYPE_ATTENTION_OUT == DT_FLOAT16)
-    PARSE_PARAMS_NoQuant(inOutLayoutType, config, pseMode, quantMode, hasAttenMask, hasRope, isPa, isFd, emptyTensor);
-    constexpr uint64_t vec1ResultSize =
-        static_cast<uint64_t>(s1TemplateType) * static_cast<uint64_t>(s2TemplateType) * 2;
-    constexpr uint64_t qkvSizeRsv2 =
-        MAX(MAX(static_cast<uint64_t>(s1TemplateType), static_cast<uint64_t>(s2TemplateType)) *
-                static_cast<uint64_t>(dTemplateType),
-            static_cast<uint64_t>(s2TemplateType) * static_cast<uint64_t>(dTemplateType)) *
-        2;
-    INVOKE_GQA_FULLQUANT_GENERAL_OP_IMPL_ASCEND950_FA_BASEAPI(
-        BaseApi::FlashAttentionScoreKernelInferGqaFullquant, vec1ResultSize, qkvSizeRsv2, hifloat8_t, float, half,
-        ImplModeEnum::AA_HIGH_PRECISION, inputLayoutType, s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
-        static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope, true, isPa, isFd);
-#endif
-
 #if (ORIG_DTYPE_QUERY == DT_HIFLOAT8 && ORIG_DTYPE_KEY == DT_HIFLOAT8 && ORIG_DTYPE_ATTENTION_OUT == DT_BF16)
-    PARSE_PARAMS_NoQuant(inOutLayoutType, config, pseMode, quantMode, hasAttenMask, hasRope, isPa, isFd, emptyTensor,
+    PARSE_PARAMS_FullQuant(inOutLayoutType, config, pseMode, quantMode, hasAttenMask, hasRope, isPa, isFd, emptyTensor,
                          enableKVPrefix);
     constexpr uint64_t vec1ResultSize =
         static_cast<uint64_t>(s1TemplateType) * static_cast<uint64_t>(s2TemplateType) * 2;
@@ -181,23 +93,12 @@ inline __aicore__ void fia_fullquant_regbase(
         constexpr uint64_t qkvSizeRsv2 =
             MAX(MAX(static_cast<uint64_t>(s1TemplateType), static_cast<uint64_t>(s2TemplateType)) *
                     (static_cast<uint64_t>(dVTemplateType) >> 1),
-                static_cast<uint64_t>(s2TemplateType) * (static_cast<uint64_t>(dVTemplateType) >> 1)) *
-            2;
+                static_cast<uint64_t>(s2TemplateType) * (static_cast<uint64_t>(dVTemplateType) >> 1)) * 2;
         INVOKE_MLA_FULLQUANT_GENERAL_OP_IMPL_ASCEND950_FA_BASEAPI(
             BaseApi::FlashAttentionScoreKernelInferMlaFullquant, vec1ResultSize, qkvSizeRsv2, hifloat8_t, float,
             bfloat16_t, ImplModeEnum::AA_HIGH_PRECISION, inputLayoutType, s1TemplateType, s2TemplateType, dTemplateType,
             dVTemplateType, static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope, true, isPa, isFd,
             enableKVPrefix);
-    } else {
-        constexpr uint64_t qkvSizeRsv2 =
-            MAX(MAX(static_cast<uint64_t>(s1TemplateType), static_cast<uint64_t>(s2TemplateType)) *
-                    static_cast<uint64_t>(dTemplateType),
-                static_cast<uint64_t>(s2TemplateType) * static_cast<uint64_t>(dTemplateType)) *
-            2;
-        INVOKE_GQA_FULLQUANT_GENERAL_OP_IMPL_ASCEND950_FA_BASEAPI(
-            BaseApi::FlashAttentionScoreKernelInferGqaFullquant, vec1ResultSize, qkvSizeRsv2, hifloat8_t, float,
-            bfloat16_t, ImplModeEnum::AA_HIGH_PRECISION, inputLayoutType, s1TemplateType, s2TemplateType, dTemplateType,
-            dVTemplateType, static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope, true, isPa, isFd);
     }
 #endif
 
@@ -219,7 +120,7 @@ inline __aicore__ void fia_fullquant_regbase(
                                                            queryRope, keyRope, attentionOut, softmaxLse, user, tiling);
         }
     } else {
-        PARSE_PARAMS_NoQuant(inOutLayoutType, config, pseMode, quantMode, hasAttenMask, hasRope, isPa, isFd,
+        PARSE_PARAMS_FullQuant(inOutLayoutType, config, pseMode, quantMode, hasAttenMask, hasRope, isPa, isFd,
                              emptyTensor, enableKVPrefix);
         constexpr uint64_t vec1ResultSize =
             static_cast<uint64_t>(s1TemplateType) * static_cast<uint64_t>(s2TemplateType) * 2;
@@ -227,32 +128,9 @@ inline __aicore__ void fia_fullquant_regbase(
             constexpr uint64_t qkvSizeRsv2 =
                 MAX(MAX(static_cast<uint64_t>(s1TemplateType), static_cast<uint64_t>(s2TemplateType)) *
                         (static_cast<uint64_t>(dVTemplateType) >> 1),
-                    static_cast<uint64_t>(s2TemplateType) * (static_cast<uint64_t>(dVTemplateType) >> 1)) *
-                2;
+                    static_cast<uint64_t>(s2TemplateType) * (static_cast<uint64_t>(dVTemplateType) >> 1)) * 2;
             INVOKE_MLA_FULLQUANT_GENERAL_OP_IMPL_ASCEND950_FA_BASEAPI(
                 BaseApi::FlashAttentionScoreKernelInferMlaFullquant, vec1ResultSize, qkvSizeRsv2, fp8_e4m3fn_t, float,
-                bfloat16_t, ImplModeEnum::AA_HIGH_PRECISION, inputLayoutType, s1TemplateType, s2TemplateType,
-                dTemplateType, dVTemplateType, static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope, true,
-                isPa, isFd, enableKVPrefix);
-        } else if constexpr (quantMode == FULLQUANT_MODE_QKV_MXFP8_PREFILL) {
-            constexpr uint64_t qkvSizeRsv2 =
-                MAX(MAX(static_cast<uint64_t>(s1TemplateType), static_cast<uint64_t>(s2TemplateType)) *
-                        static_cast<uint64_t>(dTemplateType),
-                    static_cast<uint64_t>(s2TemplateType) * static_cast<uint64_t>(dTemplateType)) *
-                2;
-            INVOKE_MX_FULLQUANT_GENERAL_OP_IMPL_ASCEND950_FA_BASEAPI(
-                BaseApi::FlashAttentionScoreKernelInferMxFullquant, vec1ResultSize, qkvSizeRsv2, fp8_e4m3fn_t, float,
-                bfloat16_t, ImplModeEnum::AA_HIGH_PRECISION, inputLayoutType, s1TemplateType, s2TemplateType,
-                dTemplateType, dVTemplateType, static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope, true,
-                isPa, isFd, enableKVPrefix);
-        } else {
-            constexpr uint64_t qkvSizeRsv2 =
-                MAX(MAX(static_cast<uint64_t>(s1TemplateType), static_cast<uint64_t>(s2TemplateType)) *
-                        static_cast<uint64_t>(dTemplateType),
-                    static_cast<uint64_t>(s2TemplateType) * static_cast<uint64_t>(dTemplateType)) *
-                2;
-            INVOKE_GQA_FULLQUANT_GENERAL_OP_IMPL_ASCEND950_FA_BASEAPI(
-                BaseApi::FlashAttentionScoreKernelInferGqaFullquant, vec1ResultSize, qkvSizeRsv2, fp8_e4m3fn_t, float,
                 bfloat16_t, ImplModeEnum::AA_HIGH_PRECISION, inputLayoutType, s1TemplateType, s2TemplateType,
                 dTemplateType, dVTemplateType, static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope, true,
                 isPa, isFd, enableKVPrefix);
@@ -261,7 +139,7 @@ inline __aicore__ void fia_fullquant_regbase(
 #endif
 
 #if (ORIG_DTYPE_QUERY == DT_INT8 && ORIG_DTYPE_KEY == DT_INT8 && ORIG_DTYPE_ATTENTION_OUT == DT_BF16)
-    PARSE_PARAMS_NoQuant(inOutLayoutType, config, pseMode, quantMode, hasAttenMask, hasRope, isPa, isFd, emptyTensor,
+    PARSE_PARAMS_FullQuant(inOutLayoutType, config, pseMode, quantMode, hasAttenMask, hasRope, isPa, isFd, emptyTensor,
                          enableKVPrefix);
     constexpr uint64_t vec1ResultSize =
         static_cast<uint64_t>(s1TemplateType) * static_cast<uint64_t>(s2TemplateType) * 2;
@@ -269,8 +147,7 @@ inline __aicore__ void fia_fullquant_regbase(
         constexpr uint64_t qkvSizeRsv2 =
             MAX(MAX(static_cast<uint64_t>(s1TemplateType), static_cast<uint64_t>(s2TemplateType)) *
                     (static_cast<uint64_t>(dVTemplateType) >> 1),
-                static_cast<uint64_t>(s2TemplateType) * (static_cast<uint64_t>(dVTemplateType) >> 1)) *
-            2;
+                static_cast<uint64_t>(s2TemplateType) * (static_cast<uint64_t>(dVTemplateType) >> 1)) * 2;
         INVOKE_MLA_FULLQUANT_GENERAL_OP_IMPL_ASCEND950_FA_BASEAPI(
             BaseApi::FlashAttentionScoreKernelInferMlaFullquant, vec1ResultSize, qkvSizeRsv2, int8_t, float, bfloat16_t,
             ImplModeEnum::AA_HIGH_PRECISION, inputLayoutType, s1TemplateType, s2TemplateType, dTemplateType,

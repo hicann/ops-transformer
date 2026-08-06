@@ -17,10 +17,6 @@
 #define FLASH_ATTENTION_SCORE_KERNEL_BASE_FULLQUANT_H_
 #include "flash_attention_score_block_cube_mla_fullquant.h"
 #include "flash_attention_score_block_vec_infer_mla_fullquant.h"
-#include "flash_attention_score_block_cube_gqa_fullquant.h"
-#include "flash_attention_score_block_vec_infer_gqa_fullquant.h"
-#include "flash_attention_score_block_cube_mx_fullquant.h"
-#include "flash_attention_score_block_vec_infer_mx_fullquant.h"
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase.h"
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
