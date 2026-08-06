@@ -15,6 +15,7 @@
 #include <utility>
 #include <vector>
 #include "../../../../op_host/op_api/aclnn_mhc_pre.h"
+#include "../../../../op_host/op_api/aclnn_mhc_pre_v2.h"
 #include "op_api_ut_common/op_api_ut.h"
 #include "op_api_ut_common/tensor_desc.h"
 #include "opdev/platform.h"
@@ -44,6 +45,9 @@ constexpr int64_t PHI_ROWS = N * N + 2 * N;
 constexpr int64_t ND = N * D;
 constexpr double NORM_EPS = 1e-6;
 constexpr double HC_EPS = 1e-6;
+constexpr int64_t MHC_PRE_DEFAULT = 0;
+constexpr int64_t MHC_PRE_USE_HF32 = 1;
+constexpr int64_t MHC_PRE_INVALID_MODE = 2;
 
 using TensorDescPtr = std::unique_ptr<TensorDesc>;
 
@@ -104,6 +108,17 @@ aclnnStatus RunMhcPre(TensorDesc &x, TensorDesc &phi, TensorDesc &alpha, TensorD
     return ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
 }
 
+
+aclnnStatus RunMhcPreV2(TensorDesc &x, TensorDesc &phi, TensorDesc &alpha, TensorDesc &bias, TensorDesc &gamma,
+                        TensorDesc &hIn, TensorDesc &hPost, TensorDesc &hRes, TensorDesc &invRms, TensorDesc &hMix,
+                        TensorDesc &hPre, int64_t implMode)
+{
+    auto ut = OP_API_UT(aclnnMhcPreV2, INPUT(x, phi, alpha, bias, gamma, NORM_EPS, HC_EPS, implMode),
+                        OUTPUT(hIn, hPost, hRes, invRms, hMix, hPre));
+    uint64_t workspaceSize = 0;
+    aclOpExecutor *executor = nullptr;
+    return ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+}
 aclnnStatus RunMhcPreNoOptional(TensorDesc &x, TensorDesc &phi, TensorDesc &alpha, TensorDesc &bias, TensorDesc &gamma,
                                 TensorDesc &hIn, TensorDesc &hPost, TensorDesc &hRes)
 {
@@ -190,6 +205,25 @@ TEST_F(MhcPreOpapiUt, aclnn_mhc_pre_valid_4d_fp16_with_optional_outputs)
 
     EXPECT_NE(RunMhcPre(*tensors.x, *tensors.phi, *tensors.alpha, *tensors.bias, *tensors.gamma, *tensors.hIn,
                         *tensors.hPost, *tensors.hRes, *tensors.invRms, *tensors.hMix, *tensors.hPre),
+              ACLNN_ERR_PARAM_INVALID);
+}
+
+TEST_F(MhcPreOpapiUt, aclnn_mhc_pre_v2_valid_impl_mode_cases)
+{
+    for (const auto implMode : {MHC_PRE_DEFAULT, MHC_PRE_USE_HF32}) {
+        auto tensors = MakeValidTensors();
+        EXPECT_NE(RunMhcPreV2(*tensors.x, *tensors.phi, *tensors.alpha, *tensors.bias, *tensors.gamma, *tensors.hIn,
+                              *tensors.hPost, *tensors.hRes, *tensors.invRms, *tensors.hMix, *tensors.hPre, implMode),
+                  ACLNN_ERR_PARAM_INVALID);
+    }
+}
+
+TEST_F(MhcPreOpapiUt, aclnn_mhc_pre_v2_invalid_impl_mode)
+{
+    auto tensors = MakeValidTensors();
+    EXPECT_EQ(RunMhcPreV2(*tensors.x, *tensors.phi, *tensors.alpha, *tensors.bias, *tensors.gamma, *tensors.hIn,
+                          *tensors.hPost, *tensors.hRes, *tensors.invRms, *tensors.hMix, *tensors.hPre,
+                          MHC_PRE_INVALID_MODE),
               ACLNN_ERR_PARAM_INVALID);
 }
 
@@ -353,7 +387,7 @@ TEST_F(MhcPreOpapiUt, aclnn_mhc_pre_invalid_partial_optional_outputs)
 {
     auto tensors = MakeValidTensors();
 
-    EXPECT_EQ(RunMhcPrePartialOptional(*tensors.x, *tensors.phi, *tensors.alpha, *tensors.bias, *tensors.gamma, *tensors.hIn,
-                                       *tensors.hPost, *tensors.hRes, *tensors.invRms),
+    EXPECT_EQ(RunMhcPrePartialOptional(*tensors.x, *tensors.phi, *tensors.alpha, *tensors.bias, *tensors.gamma,
+                                       *tensors.hIn, *tensors.hPost, *tensors.hRes, *tensors.invRms),
               ACLNN_ERR_PARAM_INVALID);
 }

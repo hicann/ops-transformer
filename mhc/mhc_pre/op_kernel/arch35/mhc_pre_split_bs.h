@@ -10,436 +10,243 @@
 
 /*!
  * \file mhc_pre_split_bs.h
- * \brief MHC Pre kernel for batch split mode
+ * \brief BS-split Basic API implementation for MHC Pre
  */
 
-#ifndef MHC_PRE_SPLIT_BS_H_
-#define MHC_PRE_SPLIT_BS_H_
+#ifndef MHC_PRE_SPLIT_BS_H
+#define MHC_PRE_SPLIT_BS_H
 
-#include "kernel_operator.h"
-#include "lib/matmul_intf.h"
-#include "kernel_tiling/kernel_tiling.h"
-#include "mhc_pre_utils.h"
-#include "mhc_pre_kernel_base.h"
-#include "mhc_pre_tiling_key.h"
+#include "mhc_pre_vector_compute.h"
+#include "mhc_pre_cube_compute.h"
 
 namespace MhcPre {
 
-using namespace matmul;
-using namespace AscendC;
+constexpr uint32_t MHC_PRE_BS_SEQUENTIAL_PARTIAL_K = 1024U;
 
-static constexpr uint64_t SYNC_V2C = 0x1;
-static constexpr uint64_t SYNC_C2V = 0x2;
-static constexpr uint64_t SYNC_C2V1 = 0x3;
-
-static constexpr uint32_t DEFAULT_CHUNK_SIZE = 64;
-static constexpr uint32_t DEFAULT_V1_CHUNK_D_SIZE = 5120;
-
-template <class T, class P, int8_t HAS_RESI>
-class MhcPreKernelSplitBS : public MhcPreKernelBase<T, P> {
+template <class T, class P, int8_t RESI_MODE>
+class MhcPreSplitBS {
 public:
-    using Base = MhcPreKernelBase<T, P>;
-    using Base::mm;
-    using Base::mnConfig_;
-    using Base::coreNum_;
-    using Base::totalLength_;
-    using Base::N_;
-    using Base::D_;
-    using Base::outFlag_;
-    using Base::hasGamma_;
-    using Base::xGm_;
-    using Base::phiGm_;
-    using Base::alphaGm_;
-    using Base::biasGm_;
-    using Base::gammaGm_;
-    using Base::hinGm_;
-    using Base::hPostGm_;
-    using Base::hResGm_;
-    using Base::invRmsGm_;
-    using Base::hMixGm_;
-    using Base::hPreGm_;
-    using Base::xFloatGm_;
-    using Base::xInQueue_;
-    using Base::gammaInQueue_;
-    using Base::invRmsOutQueue_;
-    using Base::outQueue_;
-    using Base::biasInQue_;
-    using Base::tmpBuff_;
-    using Base::alphaBuf_;
-    using Base::inputBuff_;
-    using Base::hPreBuff_;
-    using Base::hPostBuff_;
-    using Base::hResBuff_;
-    using Base::alphaInUb_;
-    using Base::biasInUb_;
-    using Base::matmulRes_;
-    using Base::xLocal_;
-    using Base::invRmsUb_;
-    using Base::gammaUb_;
-    using Base::preOffsetBuf_;
-    using Base::postOffsetBuf_;
-    using Base::resOffsetBuf_;
-    using Base::pipe_;
-    using Base::matrixInfo_;
-    using Base::vectorOffset_;
-    using Base::tiling_;
-    using Base::chunkTSize_;
-    using Base::v1ChunkDSize_;
-    using Base::curSingleT_;
-    using Base::coreIdx_;
-    using Base::subBlockIdx_;
-    using Base::scaleMean_;
-    using Base::globalOffsetM_;
-    using Base::vectorCount_;
-    using Base::cubeCount_;
-    using Base::mmCount_;
-    using Base::vec1Count_;
-    using Base::eleNumPerVf_;
-    using Base::kDoubleBufferCount;
-    using Base::kSingleBufferCount;
-    using Base::kHalfSplitDivisor;
-    using Base::ND_LENGTH;
-    using Base::PARALLEL_NUM;
-    using Base::hasResi_;
-    using Base::V0_BASE_T;
-    using Base::V1_BASE_T;
+    __aicore__ inline MhcPreSplitBS() = default;
 
-    static constexpr int8_t kHasResi = HAS_RESI;
+    __aicore__ inline void Init(InitParams initParams)
+    {
+        vector_.BindGlobalTensors(initParams);
+        vector_.InitFromTilingData(initParams.tilingData);
+        vector_.InitMNConfig();
+        vector_.InitHMixBuffer(initParams);
+        vector_.InitPipeAndCoreIdx(initParams.tPipeIn);
 
-    __aicore__ inline MhcPreKernelSplitBS(MT &matmul) : Base(matmul) {}
-    __aicore__ inline void Init(InitParams initParams);
-    __aicore__ inline void InitHMixBuffer(InitParams initParams);
-    __aicore__ inline void InitUbBuffers();
-    __aicore__ inline void Process();
-    __aicore__ inline void InitBlockParams(uint64_t curblock, uint32_t tBlockNum);
-    __aicore__ inline void AICProcess(uint32_t offsetNd, uint32_t outOffset);
-    __aicore__ inline void V0PostProcess(uint32_t curblock, uint32_t tBlockNum);
-    __aicore__ inline void V0Prologue(uint32_t curNdLen, uint32_t offsetNd);
-    __aicore__ inline void AIV1Process(uint64_t curBlock, uint64_t tBlockNum);
-    __aicore__ inline void AIV1Prologue(uint64_t offsetT, uint64_t lenT, uint64_t singleCoreOffset);
-};
-
-template <class T, class P, int8_t HAS_RESI>
-__aicore__ inline void MhcPreKernelSplitBS<T, P, HAS_RESI>::Init(InitParams initParams)
-{
-    this->BindGlobalTensors(initParams);
-    this->InitFromTilingData(initParams.tilingData);
-    this->InitMNConfig();
-    InitHMixBuffer(initParams);
-    this->InitPipeAndCoreIdx(initParams.tPipeIn);
-    InitUbBuffers();
-    SyncAll<false>();
-
-    if ASCEND_IS_AIV {
-        coreIdx_ = GetBlockIdx() / kDoubleBufferCount;
-        this->AIVPreLoad();
-    }
-}
-
-template <class T, class P, int8_t HAS_RESI>
-__aicore__ inline void MhcPreKernelSplitBS<T, P, HAS_RESI>::InitHMixBuffer(InitParams initParams)
-{
-    if (outFlag_) {
-        hMixGm_.SetGlobalBuffer(reinterpret_cast<__gm__ P *>(initParams.h_mix));
-    } else {
-        hMixGm_.SetGlobalBuffer(
-            reinterpret_cast<__gm__ P *>(initParams.workspace + mnConfig_.singleCoreM * mnConfig_.singleCoreK *
-                                                                    PARALLEL_NUM * sizeof(P) * coreNum_));
-    }
-}
-
-template <class T, class P, int8_t HAS_RESI>
-__aicore__ inline void MhcPreKernelSplitBS<T, P, HAS_RESI>::InitUbBuffers()
-{
-    if ASCEND_IS_NOT_AIV {
-        return;
-    }
-
-    static constexpr uint32_t kXInQueueBufferBytes = 80 * 1024;
-    static constexpr uint32_t kOutQueueBufferBytes = 20 * 1024;
-    static constexpr uint32_t kTmpBufferBytes = 40 * 1024;
-
-    pipe_->InitBuffer(xInQueue_, kDoubleBufferCount, kXInQueueBufferBytes);
-    pipe_->InitBuffer(outQueue_, kDoubleBufferCount, kOutQueueBufferBytes);
-    pipe_->InitBuffer(invRmsOutQueue_, kSingleBufferCount, (curSingleT_ / kHalfSplitDivisor) * sizeof(P));
-
-    if (hasGamma_) {
-        pipe_->InitBuffer(gammaInQueue_, kSingleBufferCount, ND_LENGTH * sizeof(P));
-    }
-
-    pipe_->InitBuffer(tmpBuff_, kTmpBufferBytes);
-
-    pipe_->InitBuffer(biasInQue_, kSingleBufferCount, mnConfig_.n * sizeof(P));
-    pipe_->InitBuffer(alphaBuf_, mnConfig_.n * sizeof(P));
-    alphaInUb_ = alphaBuf_.template Get<P>();
-
-    preOffsetBuf_ = tmpBuff_.template GetWithOffset<uint32_t>(uint32_t(mnConfig_.n * V1_BASE_T), 0);
-    postOffsetBuf_ = preOffsetBuf_[N_ * V1_BASE_T];
-    if constexpr (HAS_RESI == MHC_PRE_HAS_RESI) {
-        resOffsetBuf_ = postOffsetBuf_[N_ * V1_BASE_T];
-    }
-    uint64_t buffOffset = 0;
-
-    buffOffset = mnConfig_.n * V1_BASE_T * sizeof(uint32_t) + (curSingleT_ / 2) * sizeof(uint32_t);
-    hPreBuff_ = tmpBuff_.template GetWithOffset<P>(uint32_t(V1_BASE_T * N_), buffOffset);
-    buffOffset += V1_BASE_T * N_ * sizeof(P);
-
-    hPostBuff_ = tmpBuff_.template GetWithOffset<P>(uint32_t(V1_BASE_T * N_), buffOffset);
-    buffOffset += V1_BASE_T * N_ * sizeof(P);
-}
-
-template <class T, class P, int8_t HAS_RESI>
-__aicore__ inline void MhcPreKernelSplitBS<T, P, HAS_RESI>::Process()
-{
-    uint32_t tBlockNum = Ceil(totalLength_, chunkTSize_);
-
-    for (uint64_t curblock = coreIdx_; curblock < tBlockNum; curblock += coreNum_) {
-        InitBlockParams(curblock, tBlockNum);
-
-        uint64_t outOffset = 0;
-        if ASCEND_IS_AIC {
-            if (outFlag_) {
-                outOffset = globalOffsetM_ * mnConfig_.n;
-            } else {
-                outOffset = mnConfig_.singleCoreM * mnConfig_.singleCoreN * ((mmCount_ % 2) * coreNum_ + coreIdx_);
-            }
-            mnConfig_.curSingleCoreK = mnConfig_.singleCoreK;
-        }
-
-        for (uint32_t offsetNd = 0; offsetNd < matrixInfo_.nD; offsetNd += ND_LENGTH) {
-            if ASCEND_IS_AIV {
-                uint32_t curNdLen = MhcPreUtils::Min(ND_LENGTH, matrixInfo_.nD - offsetNd);
-                if (vectorCount_ >= 2) {
-                    AscendC::CrossCoreWaitFlag(SYNC_C2V);
-                }
-                V0Prologue(curNdLen, offsetNd);
-                CrossCoreSetFlag<0x2, PIPE_MTE3>(SYNC_V2C);
-                vectorCount_++;
-            }
-
-            if ASCEND_IS_AIC {
-                AscendC::CrossCoreWaitFlag(SYNC_V2C);
-                AICProcess(offsetNd, outOffset);
-                CrossCoreSetFlag<0x2, PIPE_FIX>(SYNC_C2V);
-            }
-        }
-        mmCount_++;
-        CrossCoreSetFlag<0x2, PIPE_FIX>(SYNC_C2V1);
+        InitUbBuffersBasicApi();
+        SyncAll<false>();
 
         if ASCEND_IS_AIV {
-            V0PostProcess(curblock, tBlockNum);
-            AIV1Process(curblock, tBlockNum);
-            vec1Count_++;
+            vector_.coreIdx_ = GetBlockIdx() / vector_.kDoubleBufferCount;
+            vector_.AIVPreLoad();
+        }
+        if ASCEND_IS_AIC {
+            vector_.pipe_->InitBuffer(l1Buffer_, MHC_PRE_BASIC_API_L1_ALLOC_SIZE);
+            aL1_ = l1Buffer_.Get<float>();
+            bL1_ = aL1_[MHC_PRE_BASIC_API_L1_BUF_NUM * MHC_PRE_BASIC_API_L1_BUF_OFFSET];
+            mmService_.Init(vector_.implMode_);
         }
     }
-    if ASCEND_IS_AIV {
-        invRmsOutQueue_.FreeTensor(invRmsUb_);
-        biasInQue_.FreeTensor(biasInUb_);
-    }
-}
 
-template <class T, class P, int8_t HAS_RESI>
-__aicore__ inline void MhcPreKernelSplitBS<T, P, HAS_RESI>::InitBlockParams(uint64_t curblock, uint32_t tBlockNum)
-{
-    globalOffsetM_ = curblock * chunkTSize_;
-    curSingleT_ = chunkTSize_;
-    if (curblock == tBlockNum - 1) {
-        mnConfig_.curSingleCoreM = totalLength_ - globalOffsetM_;
-        curSingleT_ = matrixInfo_.totalLength - curblock * chunkTSize_;
-    }
-    if ASCEND_IS_AIV {
-        this->VectorComputeOffset();
-    }
-}
-
-template <class T, class P, int8_t HAS_RESI>
-__aicore__ inline void MhcPreKernelSplitBS<T, P, HAS_RESI>::AICProcess(uint32_t offsetNd, uint32_t outOffset)
-{
-    if (offsetNd + mnConfig_.singleCoreK > mnConfig_.k) {
-        mnConfig_.curSingleCoreK = mnConfig_.k - offsetNd;
-    }
-
-    uint64_t xOffset = chunkTSize_ * ND_LENGTH * (coreIdx_ + (cubeCount_ % PARALLEL_NUM) * coreNum_);
-
-    mm.SetOrgShape(mnConfig_.curSingleCoreM, mnConfig_.curSingleCoreN, mnConfig_.curSingleCoreK, mnConfig_.k);
-    mm.SetSingleShape(mnConfig_.curSingleCoreM, mnConfig_.curSingleCoreN, mnConfig_.curSingleCoreK);
-    mm.SetTensorA(xFloatGm_[xOffset]);
-    mm.SetTensorB(phiGm_[offsetNd], true);
-    mm.IterateAll(hMixGm_[outOffset], offsetNd == 0 ? 0 : 1);
-    mm.End();
-    cubeCount_++;
-}
-
-template <class T, class P, int8_t HAS_RESI>
-__aicore__ inline void MhcPreKernelSplitBS<T, P, HAS_RESI>::V0Prologue(uint32_t curNdLen, uint32_t offsetNd)
-{
-    for (uint32_t offsetM = vectorOffset_.offsetMStart; offsetM < vectorOffset_.offsetMEnd; offsetM += V0_BASE_T) {
-        uint32_t curMLen = V0_BASE_T;
-        if (offsetM + V0_BASE_T >= vectorOffset_.offsetMEnd) {
-            curMLen = vectorOffset_.offsetMEnd - offsetM;
-        }
-        uint64_t invRmsOffset = offsetM - vectorOffset_.offsetMStart;
-        LocalTensor<P> invRmsUb = invRmsUb_[invRmsOffset];
-        xLocal_ = xInQueue_.template AllocTensor<T>();
-        this->DataCopyX(curMLen, curNdLen, offsetM, offsetNd);
-        xLocal_ = xInQueue_.template DeQue<T>();
-
-        LocalTensor<P> aL1Ub = outQueue_.template AllocTensor<P>();
-        if (hasGamma_) {
-            gammaUb_ = gammaInQueue_.template AllocTensor<P>();
-            this->DataCopyGamma(curNdLen, offsetNd);
-            gammaUb_ = gammaInQueue_.template DeQue<P>();
-
-            if (offsetNd == 0) {
-                this->template VFDoV0ProcessXIn<true, true>((__ubuf__ P *)aL1Ub.GetPhyAddr(), (__ubuf__ P *)invRmsUb.GetPhyAddr(),
-                                             (__ubuf__ T *)xLocal_.GetPhyAddr(), (__ubuf__ P *)gammaUb_.GetPhyAddr(),
-                                             curMLen, curNdLen);
-            } else {
-                this->template VFDoV0ProcessXIn<true, false>((__ubuf__ P *)aL1Ub.GetPhyAddr(), (__ubuf__ P *)invRmsUb.GetPhyAddr(),
-                                              (__ubuf__ T *)xLocal_.GetPhyAddr(), (__ubuf__ P *)gammaUb_.GetPhyAddr(),
-                                              curMLen, curNdLen);
-            }
-            gammaInQueue_.FreeTensor(gammaUb_);
-        } else {
-            if (offsetNd == 0) {
-                this->template VFDoV0ProcessXIn<false, true>((__ubuf__ P *)aL1Ub.GetPhyAddr(), (__ubuf__ P *)invRmsUb.GetPhyAddr(),
-                                              (__ubuf__ T *)xLocal_.GetPhyAddr(), nullptr, curMLen, curNdLen);
-            } else {
-                this->template VFDoV0ProcessXIn<false, false>((__ubuf__ P *)aL1Ub.GetPhyAddr(), (__ubuf__ P *)invRmsUb.GetPhyAddr(),
-                                               (__ubuf__ T *)xLocal_.GetPhyAddr(), nullptr, curMLen, curNdLen);
-            }
-        }
-        outQueue_.template EnQue<P>(aL1Ub);
-        aL1Ub = outQueue_.template DeQue<P>();
-        this->DataCopyOutToWorkSpace(aL1Ub, curMLen, curNdLen, offsetM, offsetNd);
-
-        xInQueue_.FreeTensor(xLocal_);
-        outQueue_.FreeTensor(aL1Ub);
-    }
-}
-
-template <class T, class P, int8_t HAS_RESI>
-__aicore__ inline void MhcPreKernelSplitBS<T, P, HAS_RESI>::V0PostProcess(uint32_t curblock, uint32_t tBlockNum)
-{
-    if (vectorOffset_.singleCoreM == 0) {
-        return;
-    }
-
-    this->VFDoV0ProcessInvRms((__ubuf__ P *)invRmsUb_.GetPhyAddr(), vectorOffset_.singleCoreM, scaleMean_,
-                        matrixInfo_.normEps);
-    this->DataCopyOutInvRmsUb(vectorOffset_.singleCoreM, vectorOffset_.offsetMStart);
-}
-
-template <class T, class P, int8_t HAS_RESI>
-__aicore__ inline void MhcPreKernelSplitBS<T, P, HAS_RESI>::AIV1Process(uint64_t curBlock, uint64_t tBlockNum)
-{
-    AscendC::CrossCoreWaitFlag(SYNC_C2V1);
-    if (vectorOffset_.singleCoreM <= 0) {
-        return;
-    }
-    uint64_t lenT = 0;
-    uint64_t lenD = 0;
-    uint64_t singleCoreOffset = 0;
-    for (int offsetT = vectorOffset_.offsetMStart; offsetT < vectorOffset_.offsetMEnd; offsetT += V1_BASE_T) {
-        lenT = V1_BASE_T < vectorOffset_.offsetMEnd - offsetT ? V1_BASE_T : vectorOffset_.offsetMEnd - offsetT;
-        lenD = v1ChunkDSize_;
-        AIV1Prologue(offsetT, lenT, singleCoreOffset);
-
-        this->AIV1ProcessHPost(offsetT, lenT);
-
-        this->AIV1ProcessHPre(offsetT, lenT);
-        this->AIV1ProcessHIn(offsetT, lenT, lenD);
-
-        singleCoreOffset += V1_BASE_T;
-    }
-}
-
-template <class T, class P, int8_t HAS_RESI>
-__aicore__ inline void MhcPreKernelSplitBS<T, P, HAS_RESI>::AIV1Prologue(
-    uint64_t offsetT, uint64_t lenT, uint64_t singleCoreOffset)
-{
-    uint64_t offset = globalOffsetM_ + offsetT;
-    uint64_t HMixOffset = 0;
-    LocalTensor<P> hResOutLocal;
-    if constexpr (HAS_RESI == MHC_PRE_HAS_RESI) {
-        hResOutLocal = outQueue_.template AllocTensor<P>();
-    }
-    if (outFlag_) {
-        HMixOffset = (globalOffsetM_ + offsetT) * mnConfig_.n;
-    } else {
-        HMixOffset = mnConfig_.singleCoreM * mnConfig_.singleCoreN * ((vec1Count_ % 2) * coreNum_ + coreIdx_) +
-                     offsetT * mnConfig_.n;
-    }
-    this->HMixCopyIn(HMixOffset, lenT);
-    matmulRes_ = xInQueue_.template DeQue<P>();
-
-    __ubuf__ P *matmulPtr = (__ubuf__ P *)matmulRes_.GetPhyAddr();
-    __ubuf__ P *invRmsPtr = (__ubuf__ P *)invRmsUb_.GetPhyAddr();
-    __ubuf__ P *biasInPtr = (__ubuf__ P *)biasInUb_.GetPhyAddr();
-    __ubuf__ P *alphaInPtr = (__ubuf__ P *)alphaInUb_.GetPhyAddr();
-    __ubuf__ P *hPreBuffPtr = (__ubuf__ P *)hPreBuff_.GetPhyAddr();
-    __ubuf__ P *hPostBuffPtr = (__ubuf__ P *)hPostBuff_.GetPhyAddr();
-
-    __VEC_SCOPE__
+    __aicore__ inline void Process()
     {
-        MicroAPI::RegTensor<P> matmulResReg;
-        MicroAPI::RegTensor<P> invRmsReg;
-        MicroAPI::RegTensor<P> invRmsBroadReg;
-        MicroAPI::RegTensor<P> biasInReg;
-        MicroAPI::RegTensor<P> alphaInReg;
+        uint32_t tBlockNum = Ceil(vector_.totalLength_, vector_.chunkTSize_);
 
-        for (uint16_t tIdx = 0; tIdx < static_cast<uint16_t>(lenT); tIdx++) {
-            MicroAPI::Load<P>(invRmsReg, invRmsPtr + singleCoreOffset + tIdx);
+        for (uint64_t curblock = vector_.coreIdx_; curblock < tBlockNum; curblock += vector_.coreNum_) {
+            vector_.InitBlockParams(curblock, tBlockNum);
+            ConfigureDirectUbRowPartition();
 
-            uint32_t loopCntPerN = (mnConfig_.n + eleNumPerVf_ - 1) / eleNumPerVf_;
-            uint32_t curLen = mnConfig_.n;
-            for (uint16_t vfBlockIdx = 0; vfBlockIdx < (uint16_t)loopCntPerN; vfBlockIdx++) {
-                uint32_t maskOffset = tIdx * mnConfig_.n + vfBlockIdx * eleNumPerVf_;
-                uint32_t alphaOffset = vfBlockIdx * eleNumPerVf_;
-                uint32_t biasOffset = vfBlockIdx * eleNumPerVf_;
-                uint32_t curOffset =
-                    MhcPreUtils::Min(mnConfig_.n - vfBlockIdx * eleNumPerVf_, static_cast<uint64_t>(eleNumPerVf_));
-                MicroAPI::MaskReg curMask = MicroAPI::UpdateMask<P>(curLen);
-
-                MicroAPI::Load<P>(matmulResReg, matmulPtr + maskOffset);
-                MicroAPI::Load<P>(biasInReg, biasInPtr + biasOffset);
-                MicroAPI::Load<P>(alphaInReg, alphaInPtr + alphaOffset);
-
-                MicroAPI::Duplicate(invRmsBroadReg, invRmsReg, curMask);
-                MicroAPI::Mul(matmulResReg, matmulResReg, invRmsBroadReg, curMask);
-
-                MicroAPI::Mul(matmulResReg, matmulResReg, alphaInReg, curMask);
-
-                MicroAPI::Add(matmulResReg, matmulResReg, biasInReg, curMask);
-
-                MicroAPI::Store<P>(matmulPtr + maskOffset, matmulResReg, curOffset);
+            if ASCEND_IS_AIC {
+                vector_.mnConfig_.curSingleCoreK = vector_.mnConfig_.singleCoreK;
             }
+
+            uint32_t partialIndex = 0U;
+            for (uint32_t offsetNd = 0; offsetNd < vector_.matrixInfo_.nD; offsetNd += vector_.ND_LENGTH) {
+                uint32_t curNdLen = MhcPreMin(vector_.ND_LENGTH, vector_.matrixInfo_.nD - offsetNd);
+                bool isPartialEnd = IsSequentialPartialEnd(offsetNd, curNdLen);
+                // Two X staging slots are free initially. From the third slice on,
+                // AIV waits until AIC returns the slot through X_CONSUMED_FLAG.
+                if ASCEND_IS_AIV {
+                    if (vector_.vectorCount_ >= 2) {
+                        AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE3>(
+                            MHC_PRE_X_CONSUMED_FLAG);
+                    }
+                    vector_.V0Prologue(curNdLen, offsetNd);
+                    CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE3>(MHC_PRE_X_READY_FLAG);
+                    vector_.vectorCount_++;
+                }
+
+                if ASCEND_IS_AIC {
+                    AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(MHC_PRE_X_READY_FLAG);
+                    AscendC::CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(
+                        MHC_PRE_X_READY_FLAG + MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+                    AICProcessBasicApi(offsetNd, partialIndex);
+                    CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(MHC_PRE_X_CONSUMED_FLAG);
+                    CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(
+                        MHC_PRE_X_CONSUMED_FLAG + MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+                }
+                if (isPartialEnd) {
+                    partialIndex++;
+                }
+            }
+            vector_.mmCount_++;
+            if ASCEND_IS_AIC {
+                CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_FIX>(MHC_PRE_MM_READY_FLAG);
+                CrossCoreSetFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_FIX>(
+                    MHC_PRE_MM_READY_FLAG + MHC_PRE_SUBBLOCK_FLAG_OFFSET);
+            }
+
+            if ASCEND_IS_AIV {
+                vector_.V0PostProcess(curblock, tBlockNum);
+                CrossCoreWaitFlag<MHC_PRE_CROSS_CORE_SYNC_MODE, PIPE_MTE2>(MHC_PRE_MM_READY_FLAG);
+                AIV1ProcessDirect();
+                vector_.vec1Count_++;
+            }
+        }
+
+        if ASCEND_IS_AIV {
+            vector_.invRmsOutQueue_.FreeTensor(vector_.invRmsUb_);
+            vector_.biasInQue_.FreeTensor(vector_.biasInUb_);
+        } else {
+            mmService_.End(vector_.implMode_);
         }
     }
 
-    Gather(hPreBuff_, matmulRes_, preOffsetBuf_, uint32_t(0), lenT * N_);
-    Gather(hPostBuff_, matmulRes_, postOffsetBuf_, uint32_t(0), lenT * N_);
+private:
+    __aicore__ inline void InitUbBuffersBasicApi()
+    {
+        if ASCEND_IS_NOT_AIV {
+            return;
+        }
 
-    if constexpr (HAS_RESI == MHC_PRE_HAS_RESI) {
-        Gather(hResOutLocal, matmulRes_, resOffsetBuf_, uint32_t(0), lenT * N_ * N_);
-        PipeBarrier<PIPE_V>();
+        vector_.pipe_->InitBuffer(
+            vector_.xInQueue_, vector_.kDoubleBufferCount, vector_.kXInQueueBufferBytes);
+        vector_.pipe_->InitBuffer(
+            vector_.outQueue_, vector_.kDoubleBufferCount, vector_.kOutQueueBufferBytes);
 
-        outQueue_.EnQue(hResOutLocal);
-        hResOutLocal = outQueue_.template DeQue<P>();
-        DataCopyExtParams copyParams;
-        copyParams.blockCount = static_cast<uint16_t>(1);
-        copyParams.blockLen = uint32_t(lenT * N_ * N_ * sizeof(P));
-        copyParams.srcStride = uint32_t(0);
-        copyParams.dstStride = uint32_t(0);
-        DataCopyPad(hResGm_[offset * N_ * N_], hResOutLocal, copyParams);
-        outQueue_.FreeTensor(hResOutLocal);
-    } else {
-        PipeBarrier<PIPE_V>();
+        uint32_t invRmsRows =
+            (vector_.curSingleT_ + vector_.kHalfSplitDivisor - 1U) / vector_.kHalfSplitDivisor;
+        uint32_t invRmsBytes = MhcPreAlign(
+            invRmsRows, vector_.kAlignmentBytes / sizeof(P)) * sizeof(P);
+        vector_.pipe_->InitBuffer(vector_.invRmsOutQueue_, vector_.kSingleBufferCount, invRmsBytes);
+
+        if (vector_.hasGamma_) {
+            vector_.pipe_->InitBuffer(vector_.gammaInQueue_, vector_.kSingleBufferCount,
+                                      vector_.ND_LENGTH * sizeof(P));
+        }
+
+        uint32_t parameterBufferBytes = MhcPreAlign(
+            vector_.mnConfig_.n * sizeof(P), vector_.kAlignmentBytes);
+        vector_.pipe_->InitBuffer(vector_.biasInQue_, vector_.kSingleBufferCount, parameterBufferBytes);
+        vector_.pipe_->InitBuffer(vector_.alphaBuf_, parameterBufferBytes);
+        vector_.alphaInUb_ = vector_.alphaBuf_.template Get<P>();
+
+        uint32_t hSegmentBytes = MhcPreAlign(
+            vector_.V1_BASE_T * vector_.N_ * sizeof(P), vector_.kAlignmentBytes);
+        vector_.pipe_->InitBuffer(vector_.tmpBuff_, 2U * hSegmentBytes);
+        vector_.hPreBuff_ = vector_.tmpBuff_.template GetWithOffset<P>(
+            static_cast<uint32_t>(vector_.V1_BASE_T * vector_.N_), 0);
+        vector_.hPostBuff_ = vector_.tmpBuff_.template GetWithOffset<P>(
+            static_cast<uint32_t>(vector_.V1_BASE_T * vector_.N_), hSegmentBytes);
     }
 
-    xInQueue_.FreeTensor(matmulRes_);
-}
+    __aicore__ inline void ConfigureDirectUbRowPartition()
+    {
+        if ASCEND_IS_NOT_AIV {
+            return;
+        }
+        uint64_t firstRows = (vector_.curSingleT_ + 1U) / 2U;
+        if (vector_.subBlockIdx_ == 0) {
+            vector_.vectorOffset_.singleCoreM = firstRows;
+            vector_.vectorOffset_.offsetMStart = 0;
+            vector_.vectorOffset_.offsetMEnd = firstRows;
+        } else {
+            vector_.vectorOffset_.singleCoreM = vector_.curSingleT_ - firstRows;
+            vector_.vectorOffset_.offsetMStart = firstRows;
+            vector_.vectorOffset_.offsetMEnd = vector_.curSingleT_;
+        }
+    }
+
+    __aicore__ inline bool IsSequentialPartialEnd(uint32_t offsetNd, uint32_t currentK) const
+    {
+        uint32_t endK = offsetNd + currentK;
+        return endK >= vector_.matrixInfo_.nD || endK % MHC_PRE_BS_SEQUENTIAL_PARTIAL_K == 0U;
+    }
+
+    __aicore__ inline void AICProcessBasicApi(uint32_t offsetNd, uint32_t partialIndex)
+    {
+        if (offsetNd + vector_.mnConfig_.singleCoreK > vector_.mnConfig_.k) {
+            vector_.mnConfig_.curSingleCoreK = vector_.mnConfig_.k - offsetNd;
+        }
+
+        uint32_t currentK = vector_.mnConfig_.curSingleCoreK;
+        uint64_t xOffset = vector_.chunkTSize_ * vector_.ND_LENGTH *
+                           (vector_.coreIdx_ + (vector_.cubeCount_ % vector_.PARALLEL_NUM) * vector_.coreNum_);
+        uint8_t aL1BufferId = vector_.cubeCount_ & 1;
+        uint8_t bL1BufferId = mmService_.GetBL1BufferId();
+
+        LocalTensor<float> currentAL1 = aL1_[aL1BufferId * MHC_PRE_BASIC_API_L1_BUF_OFFSET];
+        LocalTensor<float> currentBL1 = bL1_[bL1BufferId * MHC_PRE_BASIC_API_L1_BUF_OFFSET];
+        mmService_.CopyInA1Nd2Nz(vector_.mnConfig_.curSingleCoreM, currentK,
+                                 vector_.xFloatGm_[xOffset], currentAL1);
+        mmService_.CopyInB1Nd2Nz(vector_.mnConfig_.k, currentK, vector_.mnConfig_.n,
+                                 vector_.phiGm_[offsetNd], currentBL1);
+
+        bool isFirstKL1 = offsetNd % MHC_PRE_BS_SEQUENTIAL_PARTIAL_K == 0U;
+        bool isLastKL1 = IsSequentialPartialEnd(offsetNd, currentK);
+        uint64_t mAlign = BasicApiAlign(vector_.mnConfig_.curSingleCoreM, AscendC::BLOCK_CUBE);
+        uint64_t nAlign = BasicApiAlign(vector_.mnConfig_.n, AscendC::BLOCK_CUBE);
+        // Fill available L0 from the live M/N footprint instead of hard-coding baseK for one shape.
+        uint64_t baseK = (256 / AscendC::Std::max(mAlign, nAlign)) * 32;
+        mmService_.Process(vector_.mnConfig_.curSingleCoreM, vector_.mnConfig_.n,
+                           vector_.mnConfig_.curSingleCoreM, baseK, isFirstKL1, isLastKL1, currentAL1, currentBL1);
+
+        if (isLastKL1) {
+            // Emit ordered K=1024 partials. Later partials atomically accumulate into the same compact
+            // hMix rows, avoiding a separate vector reduction kernel while retaining the required order.
+            if (partialIndex != 0U) {
+                AscendC::SetAtomicAdd<float>();
+            }
+            uint64_t outputOffset = vector_.globalOffsetM_ * vector_.mnConfig_.n;
+            mmService_.CopyOut(vector_.hMixGm_[outputOffset], vector_.mnConfig_.n);
+            if (offsetNd + currentK >= vector_.matrixInfo_.nD) {
+                AscendC::DisableDmaAtomic();
+            }
+        }
+        vector_.cubeCount_++;
+    }
+
+    __aicore__ inline void AIV1ProcessDirect()
+    {
+        if (vector_.vectorOffset_.singleCoreM == 0) {
+            return;
+        }
+
+        uint64_t localOffset = 0;
+        for (uint64_t offsetT = vector_.vectorOffset_.offsetMStart;
+             offsetT < vector_.vectorOffset_.offsetMEnd; offsetT += vector_.V1_BASE_T) {
+            uint64_t lenT = AscendC::Std::min(static_cast<uint64_t>(vector_.V1_BASE_T),
+                                              vector_.vectorOffset_.offsetMEnd - offsetT);
+            uint64_t hMixOffset = (vector_.globalOffsetM_ + offsetT) * vector_.mnConfig_.n;
+            vector_.HMixCopyIn(hMixOffset, lenT);
+            LocalTensor<P> hMixLocal = vector_.xInQueue_.template DeQue<P>();
+            vector_.AIV1PostProcessTile(
+                hMixLocal, offsetT, lenT, static_cast<uint32_t>(localOffset), vector_.mnConfig_.n);
+            vector_.xInQueue_.FreeTensor(hMixLocal);
+            localOffset += lenT;
+        }
+    }
+
+    MhcPreVectorCompute<T, P, RESI_MODE> vector_;
+    MhcPreCubeCompute mmService_;
+    TBuf<TPosition::A1> l1Buffer_;
+    LocalTensor<float> aL1_;
+    LocalTensor<float> bL1_;
+};
 
 } // namespace MhcPre
 
-#endif // MHC_PRE_SPLIT_BS_KERNEL_H_
+#endif // MHC_PRE_SPLIT_BS_H

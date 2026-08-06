@@ -90,6 +90,7 @@ public:
         this->Attr("out_flag").AttrType(OPTIONAL).Int(0);
         this->Attr("norm_eps").AttrType(OPTIONAL).Float(1e-6f);
         this->Attr("hc_eps").AttrType(OPTIONAL).Float(1e-6f);
+        this->Attr("op_impl_mode").AttrType(OPTIONAL).Int(0);
     }
 };
 

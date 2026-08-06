@@ -29,17 +29,20 @@ using namespace ge;
 
 namespace ops {
 
+// Input tensor indices.
 const constexpr int64_t X_INDEX = 0;
 const constexpr int64_t PHI_INDEX = 1;
 const constexpr int64_t ALPHA_INDEX = 2;
 
+// Output tensor indices.
 const constexpr int64_t OUT_H_IN_INDEX = 0;
 const constexpr int64_t OUT_H_POST_INDEX = 1;
 const constexpr int64_t OUT_H_RES_INDEX = 2;
 const constexpr int64_t OUT_INV_RMS_INDEX = 3;
-const constexpr int64_t OUT_MM_RES_INDEX = 4;
+const constexpr int64_t OUT_H_MIX_INDEX = 4;
 const constexpr int64_t OUT_H_PRE_INDEX = 5;
 
+// Supported input ranks and dynamic-shape marker.
 const constexpr int64_t BSND_DIM_NUM = 4;
 const constexpr int64_t TND_DIM_NUM = 3;
 const constexpr int64_t UNKNOWN_DIM_VALUE = -1LL;
@@ -117,9 +120,9 @@ static ge::graphStatus InferShape4MhcPre(InferShapeContext *context)
     // has residual
     bool hasResi = (alphaDimSize == 3);
 
-    gert::Shape *outShapes[6] = {context->GetOutputShape(OUT_H_IN_INDEX),   context->GetOutputShape(OUT_H_POST_INDEX),
-                                 context->GetOutputShape(OUT_H_RES_INDEX),  context->GetOutputShape(OUT_INV_RMS_INDEX),
-                                 context->GetOutputShape(OUT_MM_RES_INDEX), context->GetOutputShape(OUT_H_PRE_INDEX)};
+    gert::Shape *outShapes[6] = {context->GetOutputShape(OUT_H_IN_INDEX), context->GetOutputShape(OUT_H_POST_INDEX),
+                                 context->GetOutputShape(OUT_H_RES_INDEX), context->GetOutputShape(OUT_INV_RMS_INDEX),
+                                 context->GetOutputShape(OUT_H_MIX_INDEX), context->GetOutputShape(OUT_H_PRE_INDEX)};
     if (xDim == BSND_DIM_NUM) {
         // b,s,n,d
         uint64_t b = xShape->GetDim(0), s = xShape->GetDim(1), n = xShape->GetDim(2), d = xShape->GetDim(3);
@@ -133,7 +136,7 @@ static ge::graphStatus InferShape4MhcPre(InferShapeContext *context)
             SetShape1D(outShapes[OUT_H_RES_INDEX], 0);
         }
         SetShape2D(outShapes[OUT_INV_RMS_INDEX], b, s);
-        SetShape3D(outShapes[OUT_MM_RES_INDEX], b, s, matN);
+        SetShape3D(outShapes[OUT_H_MIX_INDEX], b, s, matN);
         SetShape3D(outShapes[OUT_H_PRE_INDEX], b, s, n);
     } else {
         // t,n,d
@@ -148,7 +151,7 @@ static ge::graphStatus InferShape4MhcPre(InferShapeContext *context)
             SetShape1D(outShapes[OUT_H_RES_INDEX], 0);
         }
         SetShape1D(outShapes[OUT_INV_RMS_INDEX], t);
-        SetShape2D(outShapes[OUT_MM_RES_INDEX], t, matN);
+        SetShape2D(outShapes[OUT_H_MIX_INDEX], t, matN);
         SetShape2D(outShapes[OUT_H_PRE_INDEX], t, n);
     }
 
@@ -163,7 +166,7 @@ static graphStatus InferDataType4MhcPre(gert::InferDataTypeContext *context)
     context->SetOutputDataType(OUT_H_POST_INDEX, DataType::DT_FLOAT);
     context->SetOutputDataType(OUT_H_RES_INDEX, DataType::DT_FLOAT);
     context->SetOutputDataType(OUT_INV_RMS_INDEX, DataType::DT_FLOAT);
-    context->SetOutputDataType(OUT_MM_RES_INDEX, DataType::DT_FLOAT);
+    context->SetOutputDataType(OUT_H_MIX_INDEX, DataType::DT_FLOAT);
     context->SetOutputDataType(OUT_H_PRE_INDEX, DataType::DT_FLOAT);
     return GRAPH_SUCCESS;
 }

@@ -24,11 +24,11 @@ namespace optiling {
 
 enum class TilingMode : uint8_t {
     SPLIT_BS = 0,
-    SPLIT_ND = 1
+    SPLIT_ND = 1,
+    SPLIT_M_K = 2
 };
 
 BEGIN_TILING_DATA_DEF(MhcPreTilingData)
-TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, matmulTiling);
 TILING_DATA_FIELD_DEF(uint32_t, coreNum);
 TILING_DATA_FIELD_DEF(uint32_t, outFlag);
 TILING_DATA_FIELD_DEF(uint32_t, hasGamma);
@@ -43,6 +43,20 @@ TILING_DATA_FIELD_DEF(uint64_t, D);
 TILING_DATA_FIELD_DEF(float, normEps);
 TILING_DATA_FIELD_DEF(float, hcEps);
 TILING_DATA_FIELD_DEF(float, scaleMean);
+TILING_DATA_FIELD_DEF(uint32_t, mL1Size);
+TILING_DATA_FIELD_DEF(uint32_t, kUbSize);
+TILING_DATA_FIELD_DEF(uint32_t, kL1Size);
+TILING_DATA_FIELD_DEF(uint32_t, fusionAlign);
+TILING_DATA_FIELD_DEF(uint32_t, cubeBlockDimM);
+TILING_DATA_FIELD_DEF(uint32_t, cubeBlockDimK);
+TILING_DATA_FIELD_DEF(uint32_t, multCoreSplitKSize);
+TILING_DATA_FIELD_DEF(uint32_t, mkWorkspaceMmOffset);
+TILING_DATA_FIELD_DEF(uint32_t, mkWorkspaceRmsOffset);
+TILING_DATA_FIELD_DEF(uint32_t, mkWorkspaceFinalOffset);
+TILING_DATA_FIELD_DEF(uint32_t, mkUseGmStage);
+TILING_DATA_FIELD_DEF(uint32_t, stage2UsedAivNum);
+TILING_DATA_FIELD_DEF(uint32_t, stage2RowsPerCore);
+TILING_DATA_FIELD_DEF(uint32_t, implMode);
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MhcPre, MhcPreTilingData);
@@ -60,7 +74,8 @@ struct MhcPreCompileInfo {
 
 class MhcPreBaseTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MhcPreBaseTiling(gert::TilingContext *context) : Ops::Transformer::OpTiling::TilingBaseClass(context) {};
+    explicit MhcPreBaseTiling(gert::TilingContext *context)
+        : Ops::Transformer::OpTiling::TilingBaseClass(context) {};
 
     ~MhcPreBaseTiling() override = default;
 
@@ -115,11 +130,17 @@ protected:
     void FillTilingData();
     ge::graphStatus TilingProcess();
     ge::graphStatus CheckUbBufferSize();
+    ge::graphStatus CalculateBsTiling();
+    ge::graphStatus CalculateNdTiling();
+    ge::graphStatus CalculateMkTiling();
+    bool CanUseMk() const;
+    uint32_t SelectMkStage() const;
     size_t GetLastRequiredInputIndex() const;
 
 private:
     MhcPreTilingData tilingData_;
     uint32_t blockDim_ = 32; // AIC
+    uint32_t aivBlockDim_ = 64;
     uint64_t totalLength_ = 0;
     uint64_t m_ = 0;
     uint64_t ubSize_ = 0;
@@ -136,11 +157,11 @@ private:
     uint32_t hasGamma_ = 0;
     uint32_t chunkTSize_ = 0;
     uint32_t v1ChunkDSize_ = 0;
+    uint32_t usedCoreNum_ = 0;
+    float scaleMean_ = 0.0f;
+    uint32_t implMode_ = 0;
     TilingMode tilingMode_ = TilingMode::SPLIT_BS;
     uint32_t hasResi_ = 1;
-
-protected:
-    matmul_tiling::MultiCoreMatmulTiling mm_;
 };
 
 } // namespace optiling

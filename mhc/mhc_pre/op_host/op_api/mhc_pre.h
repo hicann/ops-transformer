@@ -17,7 +17,8 @@
 namespace l0op {
 const std::tuple<aclTensor *, aclTensor *, aclTensor *, aclTensor *, aclTensor *, aclTensor *>
 MhcPre(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias,
-       const aclTensor *gammaOptional, int64_t outFlag, double normEps, double hcEps, aclOpExecutor *executor);
+       const aclTensor *gammaOptional, int64_t outFlag, double normEps, double hcEps, int64_t opImplMode,
+       aclOpExecutor *executor);
 }
 
 #endif // OP_API_MHC_PRE_H_

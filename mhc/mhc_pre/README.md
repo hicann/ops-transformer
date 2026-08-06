@@ -112,6 +112,13 @@ $$
         <td>-</td>
       </tr>
       <tr>
+        <td>op_impl_mode</td>
+        <td>可选输入</td>
+        <td>指定MhcPre算子的计算模式，0表示Cube使用FP32模式计算，1表示Cube使用HF32模式计算，默认值为0。</td>
+        <td>INT64</td>
+        <td>-</td>
+      </tr>
+      <tr>
         <td>h_in</td>
         <td>输出</td>
         <td>输出的h_in作为Attention/MLP层的输入，对应公式中的hIn。</td>
@@ -166,3 +173,4 @@ $$
 | 调用方式      | 调用样例                 | 说明                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
 | aclnn调用 | [test_aclnn_mhc_pre](examples/test_aclnn_mhc_pre.cpp) | 通过[aclnnMhcPre](docs/aclnnMhcPre.md)接口方式调用MhcPre算子。 |
+| aclnn调用 | [test_aclnn_mhc_pre_v2](examples/test_aclnn_mhc_pre_v2.cpp) | 通过[aclnnMhcPreV2](docs/aclnnMhcPreV2.md)接口方式调用MhcPre算子，并通过opImplMode选择Cube的FP32或HF32计算模式。 |
