@@ -406,6 +406,8 @@ def get_param_fus(input_tensor_dict, params):
         params["dtype_input"]["dequant_scale"]
     )
     fa_param["v_dequant_scale_tensor"] = input_tensor_dict["dequant_scale"]
+    
+    fa_param["sinks_tensor"] = input_tensor_dict.get("sinks")
 
     # >> out info
     fa_param["out_shape"] = fa_param["q_shape"]
@@ -522,6 +524,10 @@ def generate_input_tensors(params):
     raw = {}
     for key in tensor_keys:
         raw[key] = generate_tensor_data.gen_tensor_data(params, key).to("npu")
+    
+    sinks = None
+    if params.get("enable_sinks", False):
+        sinks = generate_tensor_data.gen_tensor_data(params, "sinks").to("npu")
 
     return {
         "query": raw["query"],
@@ -538,6 +544,7 @@ def generate_input_tensors(params):
         "v_dequant_scale": raw["dequant_scale"],
         "key_dequant_scale": raw["dequant_scale"],
         "value_dequant_scale": raw["dequant_scale"],
+        "sinks": sinks,
         "scale_value": params["scalevalue"],
         "key_quant_mode": params["key_quant_mode"],
         "value_quant_mode": params["value_quant_mode"],
@@ -926,6 +933,17 @@ def softmax(x):
     return ans
 
 
+def softmax_sinks(x, sinks):
+    x = x.float()
+    sinks = sinks.unsqueeze(1)
+    x_concat = torch.cat([x, sinks], dim=-1)
+    x_max = x_concat.max(dim=-1, keepdim=True).values
+    y = torch.exp(x - x_max)
+    x_sum = y.sum(dim=-1, keepdim=True) + torch.exp(sinks - x_max)
+    ans = y / x_sum
+    return ans
+
+
 def _t_increattention_bnsd(fa_param):
     batch_size = fa_param["b"]
     numheads = fa_param["numHeads"]
@@ -940,6 +958,9 @@ def _t_increattention_bnsd(fa_param):
     out_shape_bnsd[-1] = fa_param["v_bnsd_shape"][-1]
     sparse_mode = fa_param["sparse_mode"]
     g = numheads // numKeyValueHeads
+    sinks_tensor = fa_param.get("sinks_tensor")
+    if sinks_tensor is not None:
+        sinks_tensor = sinks_tensor.cpu().float()
 
     q_bnsd_tensor = fa_param["q_bnsd_tensor"]
     k_bnsd_tensor = fa_param["k_bnsd_tensor"].float()
@@ -998,7 +1019,12 @@ def _t_increattention_bnsd(fa_param):
                     continue
                 bmm1Res = torch.matmul(q_curr.float(), k_sparse.float().T)
                 scaleRes = bmm1Res * scaleValue
-                softmax_res = softmax(scaleRes)
+                cur_sinks = None
+                if sinks_tensor is None:
+                    softmax_res = softmax(scaleRes)
+                else:
+                    cur_sinks = sinks_tensor[n2Idx * g: (n2Idx + 1) * g]
+                    softmax_res = softmax_sinks(scaleRes, cur_sinks)
                 if fa_param["q_dtype"] == "float16":
                     bmm2Res = torch.matmul(
                         softmax_res.to(torch.float16).float(), v_sparse.float()
