@@ -8,7 +8,7 @@
 |<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
 |<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      ×     |
 |<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列加速卡产品</term>|      ×     |
+|<term>Atlas 推理系列产品</term>|      ×     |
 |<term>Atlas 训练系列产品</term>|      ×     |
 
 ## 功能说明
@@ -16,16 +16,16 @@
 - API功能：Compressor是推理场景下SMLA和QLI的前处理算子，用于将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。在长序列的情况下，Compressor可以有效地减少计算开销。
 
 - 计算公式：
-  
+
     压缩阶段：
     1. 计算矩阵乘法：
-        - C4A: $\left[kv\_state^a, score\_state^a\right] = X @ \left[W^{aKV}, W^{aGate}\right], \left[kv\_state^b, score\_state^b\right] = X @ \left[W^{bKV}, W^{bGate}\right];$ 
+        - C4A: $\left[kv\_state^a, score\_state^a\right] = X @ \left[W^{aKV}, W^{aGate}\right], \left[kv\_state^b, score\_state^b\right] = X @ \left[W^{bKV}, W^{bGate}\right];$
         - C128A: $\left[kv\_state, score\_state\right] = X @ \left[W^{KV}, W^{Gate}\right]$
     2. 计算分组加法：
-        - C4A: $score\_state_i^\prime = \left[score\_state_{\left[4(i-1)+1:4i,:\right]}^a; score\_state_{\left[4i+1:4(i+1),:\right]}^b\right] + Ape,~i=1,2,\cdots, \frac{s}{4};$ 
+        - C4A: $score\_state_i^\prime = \left[score\_state_{\left[4(i-1)+1:4i,:\right]}^a; score\_state_{\left[4i+1:4(i+1),:\right]}^b\right] + Ape,~i=1,2,\cdots, \frac{s}{4};$
         - C128A: $score\_state_i^\prime = score\_state_{\left[128(i-1)+1:128i,:\right]} + Ape,~i=1,2,\cdots, \frac{s}{128};$
     3. 计算分组Softmax：
-        - C4A: $S_i^\prime = softmax(score\_state_i^\prime),~i=1,2,\cdots, \frac{s}{4};$ 
+        - C4A: $S_i^\prime = softmax(score\_state_i^\prime),~i=1,2,\cdots, \frac{s}{4};$
         - C128A: $S_i^\prime = softmax(score\_state_i^\prime),~i=1,2,\cdots, \frac{s}{128};$
     4. 计算Hadamard乘积：
         - C4A: $(S_H)_i = S_i^\prime \odot \left[kv\_state^a_{\left[4(i-1)+1:4i,:\right]} ; kv\_state^b_{\left[4i+1:4(i+1),:\right]}\right],~i=1,2,\cdots, \frac{s}{4};$
@@ -40,7 +40,7 @@
         - $\text{RMS}(C^{\text{Comp}}) = \sqrt{\frac{1}{N} \sum_{i=j* N}^{(j+1)* N} {(C_{i}^{\text{Comp}})}^{\text{2}} + norm\_eps} ,N=head\_dim, ~j=1,2,\cdots, \frac{s}{cmp\_ratio}$
         - $\text{RmsNorm}(C^{\text{Comp}}) = norm\_weight \cdot \frac{C_{i}^{\text{Comp}}}{\text{RMS}(C^{\text{Comp}})}$
     7. 计算Rope；
-   
+
 - 主要计算过程为：
     1. 将输入$X$与$W^{KV}$做Matmul运算得到$kv\_state$，将输入$X$与$W^{Gate}$做Matmul运算后再与$Ape$做Add运算得到$score\_state$，$kv\_state$与$score\_state$根据输入的start_pos及cu_seqlens完成更新。
     2. 在coff为2的情况下对$kv\_state$和$score\_state$进行数据重排。
@@ -173,7 +173,7 @@
     cache_mode = 1
     head_dim = 512
     cu_seqlens = [0, 1]
-    # ------------- 
+    # -------------
     B = 1
     S = 1
     S_max = 0
@@ -204,7 +204,7 @@
             cu_seqlens = torch.tensor(cu_seqlens).to(torch.int32)
         for i in range(B):
             if start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i] > S_max:
-                S_max = start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i] 
+                S_max = start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i]
     else:
         cu_seqlens = None
         S_max = max(start_pos) + S
@@ -312,7 +312,7 @@
             wgate,
             state_cache,
             ape,
-            norm_weight, 
+            norm_weight,
             rope_sin,
             rope_cos,
             rope_head_dim = rope_head_dim,
@@ -358,7 +358,7 @@
     cache_mode = 1
     head_dim = 512
     cu_seqlens = [0, 1]
-    # ------------- 
+    # -------------
     B = 1
     S = 1
     S_max = 0
@@ -389,7 +389,7 @@
             cu_seqlens = torch.tensor(cu_seqlens).to(torch.int32)
         for i in range(B):
             if start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i] > S_max:
-                S_max = start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i] 
+                S_max = start_pos[i] + cu_seqlens[i + 1] - cu_seqlens[i]
     else:
         cu_seqlens = None
         S_max = max(start_pos) + S
@@ -494,8 +494,8 @@
         def __init__(self):
             super(CompressorNetwork, self).__init__()
 
-        def forward(self, x, wkv, wgate, state_cache, ape, norm_weight, rope_sin,         
-                    rope_cos, rope_head_dim, cmp_ratio, state_block_table = None, cu_seqlens = None, 
+        def forward(self, x, wkv, wgate, state_cache, ape, norm_weight, rope_sin,
+                    rope_cos, rope_head_dim, cmp_ratio, state_block_table = None, cu_seqlens = None,
                     seqused = None, start_pos = None, coff = 1, norm_eps = 1e-6, rotary_mode = 1, cache_mode = 1):
             cmp_kv = (
                 torch.ops.custom.compressor(
@@ -504,7 +504,7 @@
                     wgate,
                     state_cache,
                     ape,
-                    norm_weight, 
+                    norm_weight,
                     rope_sin,
                     rope_cos,
                     rope_head_dim = rope_head_dim,
@@ -533,7 +533,7 @@
                     wgate,
                     state_cache,
                     ape,
-                    norm_weight, 
+                    norm_weight,
                     rope_sin,
                     rope_cos,
                     rope_head_dim = rope_head_dim,

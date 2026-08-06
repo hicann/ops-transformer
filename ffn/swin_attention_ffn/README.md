@@ -29,7 +29,7 @@
     <td style="text-align: center;">×</td>
   </tr>
   <tr>
-    <td>Atlas 推理系列加速卡产品</td>
+    <td>Atlas 推理系列产品</td>
     <td style="text-align: center;">×</td>
   </tr>
   <tr>

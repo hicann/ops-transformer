@@ -276,7 +276,7 @@ If this block-sparse kernel is of interest, please consider merging it with the 
 </table>
 
 - Atlas A2 训练系列产品/Atlas A2 推理系列产品：数据类型支持FLOAT16、BFLOAT16、INT8。
-- Atlas 推理系列加速卡产品：仅支持FLOAT16。
+- Atlas 推理系列产品：仅支持FLOAT16。
 
 ## 约束说明
 

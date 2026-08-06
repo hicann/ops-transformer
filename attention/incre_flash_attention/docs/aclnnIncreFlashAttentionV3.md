@@ -16,11 +16,12 @@
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
 <!-- end id4 -->
-- <term>Atlas 推理系列加速卡产品</term>：支持
-
-<!-- npu="910" id5 -->
-- <term>Atlas 训练系列产品</term>：不支持
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：支持
 <!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -442,7 +443,7 @@ aclnnStatus aclnnIncreFlashAttentionV3(
   - quantScale1、quantScale2和quantOffset2数据类型支持FLOAT32
   - numKeyValueHeads数据类型支持INT64。
 <!-- end id6 -->
-- <term>Atlas 推理系列加速卡产品</term>：
+- <term>Atlas 推理系列产品</term>：
   - 支持B轴小于等于256，N轴小于等于256，D轴小于等于512。
   - 支持key、value的S轴小于等于65536。
   - query、key、value和attentionOut数据类型仅支持FLOAT16。

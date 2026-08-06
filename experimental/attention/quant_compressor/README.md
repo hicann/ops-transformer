@@ -8,7 +8,7 @@
 |<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
 |<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      ×     |
 |<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列加速卡产品</term>|      ×     |
+|<term>Atlas 推理系列产品</term>|      ×     |
 |<term>Atlas 训练系列产品</term>|      ×     |
 
 ## 功能说明
@@ -16,25 +16,25 @@
 - API功能：QuantCompressor是推理场景下SAS和QLI的前处理算子，是Compressor算子的量化版本。该算子将每$cmp\_ratio$个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。在长序列的情况下，QuantCompressor可以有效地减少计算开销。与Compressor算子相比，QuantCompressor使用HIFLOAT8量化格式接收输入数据x、wkv、wgate，并通过反量化缩放系数（descale）在计算过程中将量化结果恢复为FP32精度。
 
 - 计算公式：
-  
+
     压缩阶段：
     1. 计算HIFLOAT8矩阵乘法（反量化）：
-        - C4A: $\left[kv\_state^a, score\_state^a\right] = \text{Dequant}(X_{hifp8} @ W^{aKV}_{hifp8}) \cdot \text{Descale}, \left[kv\_state^b, score\_state^b\right] = \text{Dequant}(X_{hifp8} @ W^{bKV}_{hifp8}) \cdot \text{Descale};$ 
+        - C4A: $\left[kv\_state^a, score\_state^a\right] = \text{Dequant}(X_{hifp8} @ W^{aKV}_{hifp8}) \cdot \text{Descale}, \left[kv\_state^b, score\_state^b\right] = \text{Dequant}(X_{hifp8} @ W^{bKV}_{hifp8}) \cdot \text{Descale};$
         - C4Li: $\left[kv\_state^a, score\_state^a\right] = \text{Dequant}(X_{hifp8} @ W^{aKV}_{hifp8}) \cdot \text{Descale}, \left[kv\_state^b, score\_state^b\right] = \text{Dequant}(X_{hifp8} @ W^{bGate}_{hifp8}) \cdot \text{Descale};$
         - C128A: $\left[kv\_state, score\_state\right] = \text{Dequant}(X_{hifp8} @ W^{KV}_{hifp8}) \cdot \text{Descale}$
         其中 $\text{Dequant}(\text{Matmul}_{\text{HIFP8}}) = \text{Matmul}_{\text{HIFP8}} \cdot (x\_descale \otimes w\_descale)$
     2. 计算分组加法：
-        - C4A: $score\_state_i^\prime = \left[score\_state_{\left[4(i-1)+1:4i,:\right]}^a; score\_state_{\left[4i+1:4(i+1),:\right]}^b\right] + Ape,~i=1,2,\cdots, \frac{s}{4};$ 
+        - C4A: $score\_state_i^\prime = \left[score\_state_{\left[4(i-1)+1:4i,:\right]}^a; score\_state_{\left[4i+1:4(i+1),:\right]}^b\right] + Ape,~i=1,2,\cdots, \frac{s}{4};$
         - C128A: $score\_state_i^\prime = score\_state_{\left[128(i-1)+1:128i,:\right]} + Ape,~i=1,2,\cdots, \frac{s}{128};$
     3. 计算分组Softmax：
-        - C4A: $S_i^\prime = softmax(score\_state_i^\prime),~i=1,2,\cdots, \frac{s}{4};$ 
+        - C4A: $S_i^\prime = softmax(score\_state_i^\prime),~i=1,2,\cdots, \frac{s}{4};$
         - C128A: $S_i^\prime = softmax(score\_state_i^\prime),~i=1,2,\cdots, \frac{s}{128};$
     4. 计算Hadamard乘积：
         - C4A: $(S_H)_i = S_i^\prime \odot \left[kv\_state^a_{\left[4(i-1)+1:4i,:\right]} ; kv\_state^b_{\left[4i+1:4(i+1),:\right]}\right],~i=1,2,\cdots, \frac{s}{4};$
         - C128A: $S_H = S_i^\prime \odot kv\_state;$
     5. 沿着压缩轴分组求和：
         - C4A: $C_{i}^{\text{Comp}} = \left[1\right]_{1\times8} @ (S_H)_i, ~i=1,2,\cdots, \frac{s}{4};$
-        - C128A: $C_{i}^{\text{Comp}} = \left[1\right]_{1\times128} @ (S_H)_i, ~i=1,2,\cdots, \frac{s}{128};$ 
+        - C128A: $C_{i}^{\text{Comp}} = \left[1\right]_{1\times128} @ (S_H)_i, ~i=1,2,\cdots, \frac{s}{128};$
 
 - 主要计算过程为：
     1. 将HIFLOAT8输入$X_{hifp8}$与$W^{KV}_{hifp8}$做Matmul运算（通过反量化缩放系数$x\_descale \otimes wkv\_descale$将结果反量化为FP32）得到$kv\_state$，将HIFLOAT8输入$X_{hifp8}$与$W^{Gate}_{hifp8}$做Matmul运算（通过反量化缩放系数$x\_descale \otimes wgate\_descale$将结果反量化为FP32）得到$score\_state$，并根据输入的start\_pos及cu\_seqlens完成state\_cache更新。

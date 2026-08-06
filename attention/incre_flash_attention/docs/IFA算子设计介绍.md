@@ -39,7 +39,7 @@
 1. C+V模板：对应文件名incre_flash_attention_split_Bbn2s2_Us2.h, IFA基础模板，支持绝大多数输入场景,计算时同时开启VectorCore和CubeCore, matmul计算放在CubeCore执行; matmul计算为调用AscendC提供的高阶API;
 2. All-Vector模板：对应文件名incre_flash_attention_allvec_new.h,对C+V模板的补充，主流程与C+V模板基本一致, matmul计算由vector实现,降低Cube启动和CV通信开销,对于部分输入类型有更好的性能表现；支持场景：
 
-- <term>Atlas 推理系列加速卡产品</term>：全部使用该模板。
+- <term>Atlas 推理系列产品</term>：全部使用该模板。
 
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：非PA,非GQA,且Q、KV 、Output类型全部为FP16 。
 
@@ -67,7 +67,7 @@ a. 将核心的数量用满，防止部分核闲置;
 
 b. 每一个核心被分配的计算量相对均匀，避免出现某些核计算的数据量过大,其余核空闲的情况;
 
-c. AIC和AIV之间处理的数据量要符合其对应的算力，避免AIC或AIV出现长时间的空闲。 
+c. AIC和AIV之间处理的数据量要符合其对应的算力，避免AIC或AIV出现长时间的空闲。
 
 IFA算子包含B、N2(key和value的N)、G(query_N/kv_N)、S1(query的S)、S2(key和value的S)共5个轴，  S1轴固定为1,不参与切分。G轴只在Vector计算时切块,  BN2S2切分逻辑如下：
 
@@ -81,18 +81,18 @@ IFA算子包含B、N2(key和value的N)、G(query_N/kv_N)、S1(query的S)、S2(ke
 // 单核计算伪代码
 void compute() {
   loops = blocks_to_compute_of_this_core(); // 当前核需要计算几个数据块
-      
+
   for (i = 0; i < loops; i++) {
     block = get_curr_block(i);
     bidx, nidx, sidx = dims_of_this_block(block);
-      
-    innerloops = get_inner_loops_of_this_block_by_actual_seq_len(bidx, nidx, sidx); // 数据块实际内切份数 
+
+    innerloops = get_inner_loops_of_this_block_by_actual_seq_len(bidx, nidx, sidx); // 数据块实际内切份数
     q_offset = get_offset_of_query(bidx, nidx);
 
     softmax_sum = {0};
     softmax_exp = {0};
     softmax_max = {min_float};
-      
+
     for (j = 0; j < innerloops; j++) { // flash attention循环
       kv_offset = get_offset_of_kv_block(j);
 
@@ -156,7 +156,7 @@ IFA场景下， A矩阵较小,可以通过变换A矩阵来适配B矩阵,基本�
 
 #### PageAttention
 
-KV block内存不连续， MatMul针对这种场景提供了回调函数进行B矩阵的拷贝(GM->L1),  IFA中实现相应的拷贝函数，回调函数在Cube中执行,参数通过GM传递, Vector设置相应的参数后到GM后（确保DCCI）再通知MatMul工作。 
+KV block内存不连续， MatMul针对这种场景提供了回调函数进行B矩阵的拷贝(GM->L1),  IFA中实现相应的拷贝函数，回调函数在Cube中执行,参数通过GM传递, Vector设置相应的参数后到GM后（确保DCCI）再通知MatMul工作。
 
 #### GQA
 

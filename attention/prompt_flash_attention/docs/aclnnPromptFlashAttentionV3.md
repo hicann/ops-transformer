@@ -520,13 +520,13 @@ aclnnStatus aclnnPromptFlashAttentionV3(
       - 当sparse=3时，要求每个batch单独的actualSeqLengths < actualSeqLengthsKv。
 
   <!-- end id8 -->
-  - <term>Atlas 推理系列加速卡产品</term>：
+  - <term>Atlas 推理系列产品</term>：
       - 在inputLayout为BSH时，支持B轴小于等于300，其余情况B轴小于等于128；支持N轴小于等于256；支持S轴小于等于65535（64k）, Q_S或KV_S非128对齐，Q_S和KV_S不等长的场景不支持配置atten_mask；支持D轴小于等于512。
 
   <!-- npu="950,910b" id9 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持FLOAT16、BFLOAT16、INT8。
   <!-- end id9 -->
-  - <term>Atlas 推理系列加速卡产品</term>：数据类型仅支持FLOAT16。
+  - <term>Atlas 推理系列产品</term>：数据类型仅支持FLOAT16。
 
 - pseShift功能使用限制如下：
 
@@ -537,7 +537,7 @@ aclnnStatus aclnnPromptFlashAttentionV3(
   <!-- npu="950,910b" id10 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持FLOAT16、BFLOAT16，且在pseShift为FLOAT16类型时，要求此时的query为FLOAT16或INT8类型，而在pseShift为BFLOAT16类型时，要求此时的query为BFLOAT16类型。在query、key、value为FLOAT16且pseShift存在的情况下，默认走高精度模式，对应的限制继承自高精度模式的限制。
   <!-- end id10 -->
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持nullptr。
+  - <term>Atlas 推理系列产品</term>：仅支持nullptr。
 
 - attenMask功能使用限制如下：
 
@@ -547,7 +547,7 @@ aclnnStatus aclnnPromptFlashAttentionV3(
   <!-- npu="950,910b" id11 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持BOOL、INT8和UINT8。
   <!-- end id11 -->
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持BOOL。
+  - <term>Atlas 推理系列产品</term>：仅支持BOOL。
 
 - actualSeqLengths，actualSeqLengthsKv输入，功能使用限制如下：
 
@@ -559,7 +559,7 @@ aclnnStatus aclnnPromptFlashAttentionV3(
   <!-- npu="910b" id12 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64，支持TND格式。
   <!-- end id12 -->
-  - <term>Atlas 推理系列加速卡产品</term>：数据类型支持INT64。
+  - <term>Atlas 推理系列产品</term>：数据类型支持INT64。
 
   <!-- npu="950" id13 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：数据类型支持INT64。
@@ -571,35 +571,35 @@ aclnnStatus aclnnPromptFlashAttentionV3(
   <!-- npu="950,910b" id14 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持UINT64、FLOAT32。
   <!-- end id14 -->
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持nullptr。
+  - <term>Atlas 推理系列产品</term>：仅支持nullptr。
 
 - quantScale1输入，功能使用限制如下：
 
   <!-- npu="950,910b" id15 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持FLOAT32。
   <!-- end id15 -->
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持nullptr。
+  - <term>Atlas 推理系列产品</term>：仅支持nullptr。
 
 - quantScale2，quantOffset2输入，功能使用限制如下：
 
   <!-- npu="950,910b" id16 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持FLOAT32和BFLOAT16。
   <!-- end id16 -->
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持nullptr。
+  - <term>Atlas 推理系列产品</term>：仅支持nullptr。
 
 - preTokens输入，功能使用限制如下：
 
   <!-- npu="950,910b" id17 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持INT64。
   <!-- end id17 -->
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持取值2147483647。
+  - <term>Atlas 推理系列产品</term>：仅支持取值2147483647。
 
 - nextTokens输入，功能使用限制如下：
 
   <!-- npu="950,910b" id18 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持INT64。
   <!-- end id18 -->
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持取值0和2147483647。
+  - <term>Atlas 推理系列产品</term>：仅支持取值0和2147483647。
 
 - inputLayout输入，功能使用限制如下：
 
@@ -617,7 +617,7 @@ aclnnStatus aclnnPromptFlashAttentionV3(
   <!-- npu="950,910b" id20 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持INT64。
   <!-- end id20 -->
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持取值0。
+  - <term>Atlas 推理系列产品</term>：仅支持取值0。
 
 - sparseMode输入，功能使用限制如下：
 
@@ -633,7 +633,7 @@ aclnnStatus aclnnPromptFlashAttentionV3(
   <!-- npu="910b" id22 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：当inputLayout为TND时，sparseMode仅支持取值0、3。
   <!-- end id22 -->
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持取值0。
+  - <term>Atlas 推理系列产品</term>：仅支持取值0。
 
 - innerPrecise输入，功能使用限制如下：
 
@@ -683,7 +683,7 @@ aclnnStatus aclnnPromptFlashAttentionV3(
   <!-- npu="950,910b" id23 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持FLOAT16、BFLOAT16、INT8。
   <!-- end id23 -->
-  - <term>Atlas 推理系列加速卡产品</term>：仅支持FLOAT16。
+  - <term>Atlas 推理系列产品</term>：仅支持FLOAT16。
 
 - int8量化相关入参数量与输入、输出数据格式的综合限制：
 
