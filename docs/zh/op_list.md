@@ -344,7 +344,7 @@
     <td>✓</td>
     <td>✗</td>
     <td>AI Core</td>
-    <td>SparselightningIndexerGradKlLoss算子是LightningIndexer的反向算子，再额外融合了Loss计算功能输出。</td>
+    <td>SparselightningIndexerGradKlLoss算子是LightningIndexer的反向算子，并额外融合了Loss计算功能输出。</td>
   </tr>
   <tr>
     <td>attention</td>
@@ -464,7 +464,7 @@
     <td>✗</td>
     <td>✓</td>
     <td>AI Core</td>
-    <td>全量推理场景的FlashAttention算子。</td>
+    <td>面向Swin Transformer的注意力输出后处理融合算子，完成输出线性投影（MatMul+Bias）、窗口还原、反向循环移位以及残差加法。</td>
   </tr>
   <tr>
     <td>ffn</td>
@@ -665,7 +665,7 @@
     <td>✓</td>
     <td>AI Core</td>
     <td>完成通信域内的全卡同步，xRef仅用于构建Tensor依赖，接口内不对xRef做任何操作。</td>
- 	</tr>
+  </tr>
   <tr>
     <td>mc2</td>
     <td><a href="../../mc2/grouped_mat_mul_all_reduce/README.md">grouped_mat_mul_all_reduce</a></td>
@@ -1014,7 +1014,7 @@
     <td>✓</td>
     <td>✗</td>
     <td>AI Core</td>
-    <td>aclnnMoeTokenPermuteWithRoutingMap的反向传播。</td>
+    <td>MoE的permute计算，将token和expert的标签作为routingMap传入，根据routingMap将tokens和可选probsOptional广播后排序。</td>
   </tr>
   <tr>
     <td>moe</td>
@@ -1094,7 +1094,7 @@
     <td>✓</td>
     <td>✓</td>
     <td>AI Core</td>
-    <td>基于用Sinkhorn-Knopp迭代算法将超连接的混合矩阵投影到双随机矩阵流形，以此稳定深度网络信号传播、解决梯度消失 / 爆炸问题</td>
+    <td>基于Sinkhorn-Knopp迭代算法将超连接的混合矩阵投影到双随机矩阵流形，以此稳定深度网络信号传播、解决梯度消失 / 爆炸问题</td>
   </tr>
   <tr>
     <td>mhc</td>
@@ -1114,7 +1114,7 @@
     <td>✓</td>
     <td>✓</td>
     <td>AI Core</td>
-    <td>基于一系列计算对mHC架构中上一层输出进行Post Mapping，对上一层的输入进行Res Mapping，然后对二者进行残差连接，得到下一层的输入</td>
+    <td>基于一系列计算对mHC架构中上一层输出进行Post Mapping，对上一层的输入进行Res Mapping，然后对二者进行残差连接，得到下一层的输入。</td>
   </tr>
    <tr>
     <td>mhc</td>
@@ -1124,7 +1124,7 @@
     <td>✓</td>
     <td>✓</td>
     <td>AI Core</td>
-    <td>mhc_post基于一系列计算对mHC架构中上一层输出进行Post Mapping，对上一层的输入进行Res Mapping，然后对二者进行残差连接，得到下一层的输入。该算子实现前述过程的反向</td>
+    <td>mhc_post基于一系列计算对mHC架构中上一层输出进行Post Mapping，对上一层的输入进行Res Mapping，然后对二者进行残差连接，得到下一层的输入。该算子实现前述过程的反向计算。</td>
   </tr>
   <tr>
     <td>mhc</td>
@@ -1214,7 +1214,7 @@
     <td>✗</td>
     <td>✓</td>
     <td>AI Core</td>
-    <td>对输入张量的尾轴进行切分。</td>
+    <td>对输入张量按照‘sizeSplits’对尾轴进行切分，划分为q、k、vOut，对q、k进行旋转位置编码，生成qOut与kOut，之后对kOut与vOut进行量化并按照‘indices’更新到kCacheRef和vCacheRef上。</td>
   </tr>
   <tr>
     <td>posembedding</td>

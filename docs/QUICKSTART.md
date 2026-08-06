@@ -2,7 +2,7 @@
 
 ## 使用须知
 
-本指南旨在帮助您快速上手CANN和`ops-transformer`算子仓的使用。为方便快速了解算子开发全流程，以**AddExample**算子为实践对象，算子源码位于`ops-transformer/examples/add_example`，操作流程如下：
+本指南旨在帮助开发者快速上手CANN和`ops-transformer`算子仓的使用。为方便快速了解算子开发全流程，以**AddExample**算子为实践对象，算子源码位于`ops-transformer/examples/add_example`，操作流程如下：
 
 1. **[前提条件](../README.md)**：参考项目README完成环境准备和源码下载，此处不再赘述。快速入门场景**推荐CANNLab或Docker部署**，操作简单。
 
@@ -26,9 +26,10 @@
    
    默认提供最新版本CANN包配套的项目源码，进入源码目录，\$\{gitCode\_id\}替换为开发者个人gitCode账号。
    
-   ```
+   ```bash
    cd /mnt/workspace/gitCode/${gitCode_id}/ops-transformer
    ```
+
 - 非CANNLab云开发环境：
   
   根据[release仓库](https://gitcode.com/cann/release-management)源码与CANN版本配套关系，执行如下命令下载源码，\$\{tag\_version\}替换为目标分支标签，例如9.0.0。
@@ -50,6 +51,7 @@
 ```bash
 bash build.sh --pkg --soc=${soc_version} --ops=add_example -j16
 ```
+
 产品名对应的${soc_version}取值如下，请按实际场景传参。
 
 - Atlas A2 训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
@@ -92,7 +94,7 @@ bash build.sh --run_example add_example eager cust --vendor_name=custom
 
 预期输出：打印算子`AddExample`的加法计算结果，表明算子已成功部署并正确执行。
 
-```
+```bash
 add_example first input[0] is: 1.000000, second input[0] is: 1.000000, result[0] is: 2.000000
 add_example first input[1] is: 1.000000, second input[1] is: 1.000000, result[1] is: 2.000000
 add_example first input[2] is: 1.000000, second input[2] is: 1.000000, result[2] is: 2.000000
@@ -152,7 +154,7 @@ __aicore__ inline void AddExample<T>::Compute(int32_t progress)
 
 4. **成功标志**：输出结果变成乘法结果。
 
-    ```
+    ```bash
     add_example first input[0] is: 1.000000, second input[0] is: 1.000000, result[0] is: 1.000000
     add_example first input[1] is: 1.000000, second input[1] is: 1.000000, result[1] is: 1.000000
     add_example first input[2] is: 1.000000, second input[2] is: 1.000000, result[2] is: 1.000000
@@ -262,4 +264,4 @@ int main() {
 
 ## 结语
 
-体验完上述流程，您已基本完成算子开发过程，如果您想进一步贡献新算子或学习更多高阶开发、调试等技能，请访问本项目README学习[进阶教程](../README.md#学习教程)和[贡献指南](../README.md#相关信息)等。
+体验完上述流程，已基本完成算子开发过程，若想进一步贡献新算子或学习更多高阶开发、调试等技能，请访问本项目README学习[进阶教程](../README.md#学习教程)和[贡献指南](../README.md#相关信息)等。

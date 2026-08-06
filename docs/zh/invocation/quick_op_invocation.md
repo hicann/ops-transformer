@@ -36,7 +36,7 @@
 - 基于**自定义算子包**执行算子样例，命令如下：
 
     ```bash
-    bash build.sh --run_example ${op} ${mode} ${pkg_mode} [--vendor_name=${vendor_name}] [--soc=${soc_version}]
+    bash build.sh --run_example ${op} ${mode} ${pkg_mode}[--example_name=${example_name}] [--vendor_name=${vendor_name}] [--soc=${soc_version}] [--simulator=${simulator}] [--experimental=${experimental}]
     # 以FlashAttentionScore算子example执行为例
     # bash build.sh --run_example flash_attention_score eager cust --vendor_name=custom
     ```
@@ -125,7 +125,7 @@ mean result[1] is: 256.000000
 mean result[2] is: 256.000000
 mean result[3] is: 256.000000
 mean result[4] is: 256.000000
-mean result[4] is: 256.000000
+mean result[5] is: 256.000000
 ...
 mean result[65532] is: 256.000000
 mean result[65533] is: 256.000000
@@ -151,7 +151,7 @@ mean result[65535] is: 256.000000
 
 #### 调用流程
 
-为方便调用算子，Host侧提供算子对应的C语言API（即以aclnn为前缀的API）实现算子调用，无需提供算子IR（Intermediate Representation）定义。aclnn API调用流程如下
+为方便调用算子，Host侧提供算子对应的C语言API（即以aclnn为前缀的API）实现算子调用，无需提供算子IR（Intermediate Representation）定义。aclnn API调用流程如下：
 
 ![原理图](../figures/aclnn调用.png)
 
@@ -166,7 +166,6 @@ mean result[65535] is: 256.000000
 在环境任意目录下，新建调用cpp脚本，命名自定义（例如`${test_aclnn_op_name}.cpp`）。
 
 为方便理解，以`AddExample`算子为例，调用脚本如下，仅供参考，全量代码参见[test_aclnn_add_example.cpp](../../../examples/add_example/examples/test_aclnn_add_example.cpp)。
-
 
 ```Cpp
 int aclnnAddExampleTest(int32_t deviceId, aclrtStream& stream)
@@ -258,7 +257,7 @@ int main()
 
 - **调用自定义算子**：依赖自定义算子包
 
-    ```bash
+    ```cmake
     cmake_minimum_required(VERSION 3.14)
     # 设置工程名
     project(ACLNN_EXAMPLE)
@@ -323,47 +322,47 @@ int main()
 
 - **调用标准算子（内置算子）**：依赖ops-transformer整包
 
-    ```bash
+    ```cmake
     cmake_minimum_required(VERSION 3.14)
     # 设置工程名
     project(ACLNN_EXAMPLE)
         
     # 设置C++编译标准
     add_compile_options(-std=c++11)
-        
-	# 设置编译输出目录为当前目录下的bin文件夹
+
+    # 设置编译输出目录为当前目录下的bin文件夹
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY  "./bin")
         
-	# 设置调试和发布模式的编译选项
+    # 设置调试和发布模式的编译选项
     set(CMAKE_CXX_FLAGS_DEBUG "-fPIC -O0 -g -Wall")
     set(CMAKE_CXX_FLAGS_RELEASE "-fPIC -O2 -Wall")
         
-	# 添加可执行文件（自定义：替换为实际调用算子的*.cpp文件）
+    # 添加可执行文件（自定义：替换为实际调用算子的*.cpp文件）
     add_executable(${test_aclnn_op_name}
     ${test_aclnn_op_name}.cpp)
         
-	# ASCEND_PATH（如遇CANN包路径有误，请根据实际路径修改）
+    # ASCEND_PATH（如遇CANN包路径有误，请根据实际路径修改）
     if(NOT "$ENV{ASCEND_HOME_PATH}" STREQUAL "")
         set(ASCEND_PATH $ENV{ASCEND_HOME_PATH})
     else()
         set(ASCEND_PATH "/usr/local/Ascend/cann")
     endif()
         
-	# 设置头文件路径
+    # 设置头文件路径
     set(INCLUDE_BASE_DIR "${ASCEND_PATH}/include")
     include_directories(
         ${INCLUDE_BASE_DIR}
         ${ASCEND_PATH}/include/aclnnop
     )
         
-	# 链接所需的动态库（自定义：替换为实际算子可执行文件）
+    # 链接所需的动态库（自定义：替换为实际算子可执行文件）
     target_link_libraries(${test_aclnn_op_name} PRIVATE
         ${ASCEND_PATH}/lib64/libascendcl.so
         ${ASCEND_PATH}/lib64/libnnopbase.so
         ${ASCEND_PATH}/lib64/libopapi_transformer.so            # 链接内置算子库文件
     )
         
-	# 安装目标文件到bin目录（自定义：替换为实际算子可执行文件）  
+    # 安装目标文件到bin目录（自定义：替换为实际算子可执行文件）  
     install(TARGETS ${test_aclnn_op_name} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
     ```
     
@@ -400,7 +399,7 @@ int main()
 
     默认在当前执行路径`/build/bin`下生成可执行文件${test_aclnn_op_name}。运行结果以test_aclnn_add_example为例：
 
-   ```
+   ```bash
    mean result[2046] is 2.000000
    mean result[2047] is 2.000000
    ```
@@ -550,6 +549,7 @@ int main()
    
     默认在当前执行路径`/build/bin`下生成可执行文件${test_geir_op_name}，运行结果如下：
    
-    ```
+    ```bash
     INFO - [XIR]: Finalize ir graph session success
     ```
+    

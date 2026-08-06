@@ -1,6 +1,6 @@
 # 贡献指南
 
-本项目欢迎广大开发者体验并参与贡献，在参与社区贡献之前。请参见[cann-community](https://gitcode.com/cann/community)了解行为准则，进行CLA协议签署，了解源码仓的贡献流程。
+本项目欢迎广大开发者体验并参与贡献，在参与社区贡献之前，请参见[cann-community](https://gitcode.com/cann/community)了解行为准则，进行CLA协议签署，了解源码仓的贡献流程。
 
 开发者准备本地代码与提交PR时需要重点关注如下几点：
 
@@ -37,7 +37,7 @@ Sig组将指派Committer对您提交的Issue进行评审并反馈修改意见。
 
 生态最简算子交付件如下：
 
-```
+```text
 ${op_class}                                          # 算子分类
 ├── ${op_name}                                       # 算子名
 │   ├── ${op_name}.cpp                               # 算子Kernel实现文件
@@ -109,7 +109,7 @@ Committer检视通过后，标注`/lgtm`标签。Maintainer将在1天内进行�
 
 项目标准算子交付件如下：
 
-```
+```text
 ${op_class}                                          # 算子分类
 ├── ${op_name}                                       # 算子名
 │   ├── op_host                                      # 算子定义、Tiling相关实现

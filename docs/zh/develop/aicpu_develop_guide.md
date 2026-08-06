@@ -44,7 +44,7 @@ Create the AI CPU initial directory for ${op_name} under ${op_class} success
 
 创建完成后，目录结构如下所示：
 
-```
+```text
 ${op_name}                              # 替换为实际算子名的小写下划线形式
 ├── examples                            # 算子调用示例
 │   └── test_aclnn_${op_name}.cpp       # 算子aclnn调用示例
@@ -61,7 +61,7 @@ ${op_name}                              # 替换为实际算子名的小写下�
 
 若```${op_class}```为全新算子分类需额外在`CMakeLists`中添加```add_subdirectory(${op_class})```，否则无法正常编译。
 
- ```
+ ```text
  if(ENABLE_EXPERIMENTAL)
    # genop新增experimental算子分类
    # add_subdirectory(${op_class})
@@ -72,6 +72,7 @@ ${op_name}                              # 替换为实际算子名的小写下�
    add_subdirectory(transformer)
  endif()
  ```
+
 ## 算子定义
 
 算子定义需要完成两个交付件：`README.md` ```${op_name}.json```
@@ -99,6 +100,7 @@ graph LR
   H([算子类声明]) -->A([Compute函数实现])
   A -->B([注册算子])
 ```
+
 ### 代码实现
 
 Kernel一共需要两个交付件：```${op_name}_aicpu.cpp``` ```${op_name}_aicpu.h```
@@ -125,6 +127,7 @@ class AddExampleCpuKernel : public CpuKernel {
 };
 }  // namespace aicpu
 ```
+
 **交付件2：${op_name}_aicpu.cpp**
 
 Compute函数实现与AI CPU算子注册
@@ -174,9 +177,9 @@ uint32_t AddExampleCpuKernel::Compute(CpuKernelContext& ctx) {
     case DT_FLOAT:
       return AddCompute<float>(...);
     case DT_INT32:
-      return AddCompute<int32>(...);
+      return AddCompute<int32_t>(...);
       ....
-    default : return PARAM_INVALID;
+    default : return kParamInvalid;
   }
 }
 
@@ -184,13 +187,14 @@ uint32_t AddExampleCpuKernel::Compute(CpuKernelContext& ctx) {
 REGISTER_CPU_KERNEL(kAddExample, AddExampleCpuKernel);
 }  // namespace aicpu
 ```
+
 ## aclnn适配
 
-通常算子开发和编译完成后，会自动生成aclnn接口（一套基于C的API），无需做其他配置，可直接在应用程序中调用aclnn接口实现调用算子。
+通常算子开发和编译完成后，会自动生成aclnn接口（一套基于C的API），无需做其他配置，可直接在应用程序中调用aclnn接口实现算子调用。
 
 ## 编译部署
 
-算子开发完成后，需对算子工程进行编译，生成自定义算子安装包\*\.run，具体操作如下：
+算子开发完成后，需对算子工程进行编译，生成自定义算子安装包*.run，具体操作如下：
 
 1. **准备工作。**
 
@@ -203,6 +207,7 @@ REGISTER_CPU_KERNEL(kAddExample, AddExampleCpuKernel);
    # 编译指定算子，如bash build.sh --pkg --ops=add_example --aicpu_kernel -j16
    bash build.sh --pkg --soc=${soc_version} --vendor_name=${vendor_name} --ops=${op_list} --aicpu_kernel [--experimental] [-j${n}]
    ```
+   
    - --soc：\$\{soc\_version\}表示NPU型号。Atlas A2系列产品使用"ascend910b"（默认），Atlas A3系列产品使用"ascend910_93"，Ascend 950PR/Ascend 950DT产品使用"ascend950"。
    - --vendor_name（可选）：\$\{vendor\_name\}表示构建的自定义算子包名，默认名为custom。
    - --ops（可选）：\$\{op\_list\}表示待编译算子，不指定时默认编译所有算子。格式形如"--ops=add_example"。
@@ -215,19 +220,21 @@ REGISTER_CPU_KERNEL(kAddExample, AddExampleCpuKernel);
    ```bash
    Self-extractable archive "cann-ops-transformer-${vendor_name}_linux-${arch}.run" successfully created.
    ```
+
 3. **安装自定义算子包。**
 
    ```bash
    # 安装run包
    ./build_out/cann-ops-transformer-${vendor_name}_linux-${arch}.run
    ```
+
    自定义算子包安装在```${ASCEND_HOME_PATH}/opp/vendors```路径中，```${ASCEND_HOME_PATH}```表示CANN软件安装目录，可提前在环境变量中配置。
 4. **（可选）卸载自定义算子包。**
 
    自定义算子包安装后在```${ASCEND_HOME_PATH}/opp/vendors/custom_transformer/scripts```目录会生成`uninstall.sh`，通过该脚本可卸载自定义算子包，命令如下：
 
    ```bash
-   bash ${ASCEND_HOME_PATH}/opp/vendors/custom_transformer/scripts/uninstall.sh
+   bash ${ASCEND_HOME_PATH}/opp/vendors/${vendor_name}_transformer/scripts/uninstall.sh
    ```
 
 ## 算子验证
@@ -238,6 +245,7 @@ REGISTER_CPU_KERNEL(kAddExample, AddExampleCpuKernel);
 export LD_LIBRARY_PATH=${ASCEND_HOME_PATH}/opp/vendors/${vendor_name}_transformer/op_api/lib:${LD_LIBRARY_PATH}
 export ASCEND_CUSTOM_OPP_PATH=${ASCEND_HOME_PATH}/opp/vendors/${vendor_name}_transformer
 ```
+
 - **UT验证**
 
   算子开发过程中，可通过UT验证（如Kernel）方式进行快速验证，如需查看详细实现，请参考[Kernel UT](../../../examples/add_example/tests/ut/op_kernel_aicpu/test_add_example.cpp)。

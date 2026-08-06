@@ -43,7 +43,7 @@
 
 若在有互联网的环境下编译，编译过程中会自动安装第三方依赖，无需手动安装。不同场景下源码编译和部署命令如下：
 
-#### 自定义算子包
+### 自定义算子包
 
 1. **编译自定义算子包**
 
@@ -77,13 +77,13 @@
     ```
 
     自定义算子包安装路径为```${ASCEND_HOME_PATH}/opp/vendors```，\$\{ASCEND\_HOME\_PATH\}已通过环境变量配置，表示CANN toolkit包安装路径，一般为\$\{install\_path\}/cann。
-    > 说明：如果部署算子包时通过配置--install-path参数指定了算子包的安装目录，则在使用自定义算子前，需要执行source \$\{install-path\}/vendors/${vendor_name}/bin/set_env.bash命令，set_env.bash脚本中将自定义算子包的安装路径追加到环境变量ASCEND_CUSTOM_OPP_PATH中，使自定义算子在当前环境中生效。
+    > 说明：如果部署算子包时通过配置--install-path参数指定了算子包的安装目录，则在使用自定义算子前，需要执行source \$\{install_path\}/vendors/${vendor_name}/bin/set_env.bash命令，set_env.bash脚本中将自定义算子包的安装路径追加到环境变量ASCEND_CUSTOM_OPP_PATH中，使自定义算子在当前环境中生效。
 
 3. **（可选）删除自定义算子包**
 
     注意自定义算子包不支持卸载，如需卸载，请删除vendors\/\$\{vendor\_name}目录，并删除vendors/config.ini中load_priority对应\$\{vendor\_name\}的配置项。
 
-#### ops-transformer包
+### ops-transformer包
 
 1. **编译ops-transformer包**
 
@@ -123,7 +123,7 @@
     ./${install_path}/cann/share/info/ops_transformer/script/uninstall.sh
     ```
 
-#### ops-transformer静态库
+### ops-transformer静态库
 
 > 说明：静态库仅支持Atlas A2、Atlas A3、Atlas A5系列产品。experimental算子暂不支持使用静态库。
 
@@ -155,7 +155,7 @@
 
     \$\{static\_lib\_path\}表示静态库解压路径。解压后目录结构如下：
 
-    ```
+    ```text
     ├── cann-${soc_name}-ops-transformer-static_${cann_version}_linux-${arch}
     │   ├── lib64
     │   │   ├── libcann_transformer_static.a        # 静态库文件
@@ -163,7 +163,7 @@
     |       ├── ...                                 # aclnn接口头文件
     ```
 
-### 未联网编译
+## 未联网编译
 
 若在没有连接互联网的环境下编译，需要提前准备好依赖的第三方软件，再进行源码编译。具体过程如下：
 
@@ -277,13 +277,12 @@ Global Environment TearDown
 
 ### 本地编译报错"ERROR: No matching distribution found for setuptools>=40.8.0"
 
-```
+```text
 Could not fetch URL XXX (Caused by SSLError(SSLCertVerificationError))
 ERROR: Could not find a version that satisfies the requirement setuptools>=40.8.0 (from versions: none)
 ERROR: No matching distribution found for setuptools>=40.8.0
 ```
+
 1、检查[环境部署](./quick_install.md)中根目录requirements.txt中python三方库依赖是否齐全
 
 2、检查环境~/.pip/pip.conf或~/.config/pip/pip.conf指定的pip源是否可用
-
-

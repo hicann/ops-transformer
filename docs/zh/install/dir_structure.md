@@ -46,7 +46,7 @@
 │   │   │   ├── ${op_name}_infershape.cpp               # 可选，InferShape实现，根据算子形状推导输出shape，若未配置则输出shape与输入shape一样
 │   │   │   ├── ${op_name}_tiling_${sub_case}.cpp       # 可选，针对某些子场景下的Tiling优化，${sub_case}表示子场景，若无该文件表明该算子没有对应子场景的特定Tiling策略
 │   │   │   ├── ${op_name}_tiling_${sub_case}.h         # 可选，${sub_case}子场景下Tiling实现用的头文件
-│   │   │   ├── ${op_name}_tiling.cpp                   # 可选，若无该文件表明对应场景下无Tiling实现(将张量划分为多个小块，区分数据类型进行并行计算)
+│   │   │   ├── ${op_name}_tiling.cpp                   # 可选，若无该文件表明对应场景下无Tiling实现（将张量划分为多个小块，区分数据类型进行并行计算）
 │   │   │   ├── ${op_name}_tiling.h                     # 可选，Tiling实现用的头文件
 │   │   │   └── CMakeLists.txt                          # Host侧cmakelist文件
 │   │   ├── op_api                                      # 可选，算子aclnn实现文件目录，若未配置工程自动生成

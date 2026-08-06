@@ -1,6 +1,6 @@
 # 环境部署
 
-在学习各类[学习教程](../../../README.md#学习教程)操作之前，请您先参考下面步骤完成基础环境搭建和源码下载，确保已安装NPU驱动、固件和CANN软件（`Ascend-cann-toolkit`和`Ascend-cann-ops`）等。
+在学习各类[学习教程](../../../README.md#学习教程)操作之前，请先参考下面步骤完成基础环境搭建和源码下载，确保已安装NPU驱动、固件和CANN软件（`Ascend-cann-toolkit`和`Ascend-cann-ops`）等。
 
 ## 环境安装
 
@@ -19,7 +19,7 @@
 
 ### 方式1：CANNLab
 
-对于无昇腾设备的开发者，可直接使用CANNLab云开发环境，即“**一站式开发平台**”，该平台为您提供在线可直接运行的昇腾环境，环境中已安装必备的驱动固件、软件包和依赖，无需手动安装。
+对于无昇腾设备的开发者，可直接使用CANNLab云开发环境，即“**一站式开发平台**”，该平台提供在线可直接运行的昇腾环境，环境中已安装必备的驱动固件、软件包和依赖，无需手动安装。
 
 > **说明**：环境默认安装最新版本CANN包，源码下载时注意与软件配套。更多关于开发平台的介绍请参考[CANNLab指导](https://gitcode.com/org/cann/discussions/54)。
 
@@ -35,18 +35,18 @@
 
 ### 方式2：Docker部署
 
-对于有昇腾设备的开发者，若您想快速搭建昇腾环境，可使用Docker镜像部署。
+对于有昇腾设备的开发者，若想快速搭建昇腾环境，可使用Docker镜像部署。
 
 > **说明**：
 >
-> - 镜像文件比较大，下载需要一定时间，请您耐心等待。关于docker命令的选项介绍可通过`docker --help`查询。
+> - 镜像文件比较大，下载需要一定时间，请耐心等待。关于docker命令的选项介绍可通过`docker --help`查询。
 > - 环境默认安装最新版本CANN包，源码下载时注意与软件配套。
 
-1.**安装驱动与固件（运行态依赖）**
+1. **安装驱动与固件（运行态依赖）**
 
 驱动与固件是运行态依赖，若仅编译算子，可以不安装。使用`npu-smi info`检查是否有NPU相关信息，若没有，请参考《[CANN快速安装](https://www.hiascend.com/cann/download)》完成驱动与固件安装。
 
-2.**下载镜像**
+2. **下载镜像**
 
 - 步骤1：以root用户登录宿主机。确保宿主机已安装Docker引擎（版本1.11.2及以上），使用`docker --version`检查Docker版本，若没有，请参考[Docker官方安装指南](https://docs.docker.com/engine/install/)。
 - 步骤2：从[昇腾镜像仓库](https://www.hiascend.com/developer/ascendhub/detail/17da20d1c2b6493cb38765adeba85884)拉取已预集成CANN软件包及`ops-transformer`所需依赖的镜像。
@@ -58,7 +58,7 @@
     docker pull swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.1.0-beta.1-910b-openeuler24.03-py3.12-devel
     ```
 
-3.**运行Docker**
+3. **运行Docker**
 
 拉取镜像后，需要以特定参数启动容器，以便容器内能访问宿主的昇腾设备。
 
@@ -84,7 +84,7 @@ docker run --name cann_container --device /dev/davinci0 --device /dev/davinci_ma
 
 ### 方式3：手动安装
 
-对于有昇腾设备的开发者，若您想手动搭建昇腾环境，请参考下述步骤。
+对于有昇腾设备的开发者，若想手动搭建昇腾环境，请参考下述步骤。
 
 #### 安装软件
 
@@ -111,6 +111,7 @@ docker run --name cann_container --device /dev/davinci0 --device /dev/davinci_ma
             ```bash
             bash ./Ascend-cann-${soc_name}-ops_${cann_version}_linux-${arch}.run --install --install-path=${install_path}
             ```
+
         变量含义说明：
 
         - \$\{cann\_version\}：表示CANN包版本号。
