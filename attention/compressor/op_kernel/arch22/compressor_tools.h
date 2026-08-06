@@ -655,22 +655,27 @@ __aicore__ inline void CompressorVec1SliceIterator<COMP>::IteratorSlice()
             if (sliceInfo_.bSeqUsed < seqLength) {
                 uint64_t nextAlignSIdx = Align(sliceInfo_.bStartPos + sliceInfo_.sIdx, (uint64_t)cmpRatio) -
                     sliceInfo_.bStartPos;
-                sliceInfo_.dealedSeqCnt += nextAlignSIdx - sliceInfo_.sIdx;
-                uint32_t tcGap = CeilDivT(static_cast<int32_t>(seqLength - nextAlignSIdx),
-                                    static_cast<int32_t>(cmpRatio));
-                if (sliceInfo_.bSeqUsed == 0 && nextAlignSIdx > sliceInfo_.sIdx) {
-                    // 此时bseqused所在压缩块未被纳入计算
-                    tcGap++;
+                if (nextAlignSIdx >= seqLength) {
+                    sliceInfo_.dealedSeqCnt += seqLength - sliceInfo_.sIdx;
+                    sliceInfo_.sIdx = seqLength;
+                } else {
+                    sliceInfo_.dealedSeqCnt += nextAlignSIdx - sliceInfo_.sIdx;
+                    uint32_t tcGap = CeilDivT(static_cast<int32_t>(seqLength - nextAlignSIdx),
+                                        static_cast<int32_t>(cmpRatio));
+                    if (sliceInfo_.bSeqUsed == 0 && nextAlignSIdx > sliceInfo_.sIdx) {
+                        // 此时bseqused所在压缩块未被纳入计算
+                        tcGap++;
+                    }
+                    sliceInfo_.sIdx = nextAlignSIdx;
+                    if (needDealTcSize_ < tcGap) {
+                        sliceInfo_.dealedSeqCnt += needDealTcSize_ * cmpRatio;
+                        sliceInfo_.sIdx += needDealTcSize_ * cmpRatio;
+                        needDealTcSize_ = 0;
+                        break;
+                    }
+                    sliceInfo_.dealedSeqCnt += seqLength - sliceInfo_.sIdx;
+                    needDealTcSize_ -= tcGap;
                 }
-                sliceInfo_.sIdx = nextAlignSIdx;
-                if (needDealTcSize_ < tcGap) {
-                    sliceInfo_.dealedSeqCnt += needDealTcSize_ * cmpRatio;
-                    sliceInfo_.sIdx += needDealTcSize_ * cmpRatio;
-                    needDealTcSize_ = 0;
-                    break;
-                }
-                sliceInfo_.dealedSeqCnt += seqLength - sliceInfo_.sIdx;
-                needDealTcSize_ -= tcGap;
             }
             sliceInfo_.bIdx++;
             if (sliceInfo_.bIdx == batch_size_) {
