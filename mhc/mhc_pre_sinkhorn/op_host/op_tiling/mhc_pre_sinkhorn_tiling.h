@@ -177,6 +177,7 @@ REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_2001, MhcPreSinkhornRegbaseTilingData)
 
 struct MhcPreSinkhornCompileInfo {
     uint64_t coreNum = 0;
+    uint64_t aicCoreNum = 0;
     uint64_t ubSize = 0;
     uint64_t sysWorkspaceSize = 0;
 };
