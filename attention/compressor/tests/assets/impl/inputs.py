@@ -209,7 +209,6 @@ def apply_batch_slice_seeded(
     # 输入 tensor 列表（与 tensor_view_shapes 顺序一致）
     is_th = x.dim() == 2
     input_tensors = [x, wkv, wgate, state_cache, ape]
-    torch_npu.npu.set_deterministic_level(3)
     for idx, tensor in enumerate(input_tensors):
         if tensor is None or not torch.is_tensor(tensor):
             continue
@@ -282,7 +281,8 @@ def apply_batch_slice_seeded(
                                 cache_data = cache_rng.uniform(
                                     cache_lo, cache_hi, size=tuple(cache_shape)
                                 ).astype(np.float32)
-                                state_cache[start:end, :, :] = torch.from_numpy(
+                                block_id = state_block_table[start]
+                                state_cache[block_id:(block_id + length), :, :] = torch.from_numpy(
                                     cache_data
                                 ).to(state_cache.dtype)
                             else:
@@ -313,14 +313,17 @@ def apply_batch_slice_seeded(
                         ).to(tensor.dtype)
                     else:
                         if axis_pos == 1:
-                            if start < cmp_ratio:
-                                continue
+                            if slices[0] is None:
+                                bidx = 0
+                            else:
+                                bidx = slices[0][slice_idx][0]
+                                slice_idx += 1
                             sliced_shape[0] = 1
                             sliced_shape[axis_pos] = length + cmp_ratio
                             data = rng.uniform(lo, hi, size=tuple(sliced_shape)).astype(
                                 np.float32
                             )
-                            tensor[0, (start - cmp_ratio) : end, :] = torch.from_numpy(
+                            tensor[bidx, (start - cmp_ratio) : end, :] = torch.from_numpy(
                                 data
                             ).to(tensor.dtype)
                         else:
@@ -340,7 +343,8 @@ def apply_batch_slice_seeded(
                                 cache_data = cache_rng.uniform(
                                     cache_lo, cache_hi, size=tuple(cache_shape)
                                 ).astype(np.float32)
-                                state_cache[start:end, :, :] = torch.from_numpy(
+                                block_id = state_block_table[start]
+                                state_cache[block_id:(block_id + length), :, :] = torch.from_numpy(
                                     cache_data
                                 ).to(state_cache.dtype)
                             else:
