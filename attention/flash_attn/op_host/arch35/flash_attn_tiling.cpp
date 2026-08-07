@@ -196,7 +196,6 @@ void FlashAttnTilingImpl::GenTilingKey()
             tilingKeyInfo_.config);
 }
 
-
 void FlashAttnTilingImpl::CalcNumBlocks(uint32_t aicNum)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(faInfo_->platformInfo);
@@ -345,9 +344,9 @@ bool FlashAttnTilingImpl::CheckNeedInitOutput() const
     if (seqUsedQFlag_ || seqUsedKvFlag_) {
         return true;
     }
-    // TND变长: 各batch的s1/s2比不同, NO_MASK时每行至少算到actSeqLensKv, 有mask时可能存在空行
-    if (faInfo_->qLayout == FaLayout::TND && faInfo_->kvLayout == FaLayout::TND) {
-        return faInfo_->maskMode != static_cast<int64_t>(MaskMode::NO_MASK);
+    // 传入cuSeqLenKv时默认清零，可能会有空batch
+    if (cuSeqLenKVFlag_) {
+        return true;
     }
     // 非TND固定shape: 按mask模式判断是否存在整行被mask掉的query块
     if (faInfo_->maskMode == static_cast<int64_t>(MaskMode::NO_MASK)) {
