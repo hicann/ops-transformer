@@ -120,7 +120,6 @@ _CASE_REQUIRED_RUNTIME_FIELDS = {
     "quant_mode",
     "sparse_pattern",
     "block_table_pattern",
-    "p_scale_value",
 }
 
 # 其余列作为用例设计参考信息原样保留，不参与 pytest 计算。CSV 按列名解析，允许继续携带扩展字段。
@@ -217,6 +216,8 @@ def _parse_case_field(field_name, value):
     if field_name in _CASE_INT_FIELDS:
         return int(value)
     if field_name in _CASE_FLOAT_FIELDS:
+        if isinstance(value, str) and value.strip().lower() == "none":
+            return None
         return float(value)
     if field_name in _CASE_INT_LIST_FIELDS:
         parsed = value if isinstance(value, list) else json.loads(str(value))
@@ -964,7 +965,8 @@ def _generate_reference_style_mxfp8_inputs():
     sparse_indices, sparse_seq_len = _make_reference_sparse_indices(
         case, q_lengths, kv_lengths, rng
     )
-    p_scale = torch.tensor([float(case["p_scale_value"])], dtype=torch.float32)
+    p_scale_value = case.get("p_scale_value")
+    p_scale = None if p_scale_value is None else torch.tensor([float(p_scale_value)], dtype=torch.float32)
 
     return {
         "case": case,
@@ -1146,8 +1148,8 @@ def cpu_mxfp8_golden(
     group = n1 // n2
     head_dim = D
     softmax_scale = float(CASE["softmax_scale"])
-    p_scale_value = float(torch.as_tensor(p_scale).reshape(-1)[0].item())
-    ln_p_scale = math.log(p_scale_value)
+    p_scale_value = 1.0 if p_scale is None else float(torch.as_tensor(p_scale).reshape(-1)[0].item())
+    ln_p_scale = 0.0 if p_scale_value == 1.0 else math.log(p_scale_value)
 
     attention_out = torch.zeros((total_q, n1, head_dim), dtype=torch.float32)
     softmax_lse = torch.full((total_q, n1), EMPTY_LSE, dtype=torch.float32)
@@ -1691,11 +1693,15 @@ def npu_mxfp8_fa(
     deq_q_npu = q_scale_e8m0.npu()
     logger.info("[NPU] Q descale layout=TND, shape=%s", q_scale_e8m0.shape)
 
-    p_scale_e8m0 = fp32_to_e8m0fnu_safe(p_scale, "P scale")
-    p_scale_npu = p_scale_e8m0.npu()
-    logger.info(
-        "[NPU] P scale dtype=%s, shape=%s", p_scale_e8m0.dtype, p_scale_e8m0.shape
-    )
+    if p_scale is not None:
+        p_scale_e8m0 = fp32_to_e8m0fnu_safe(p_scale, "P scale")
+        p_scale_npu = p_scale_e8m0.npu()
+        logger.info(
+            "[NPU] P scale dtype=%s, shape=%s", p_scale_e8m0.dtype, p_scale_e8m0.shape
+        )
+    else:
+        p_scale_npu = torch.tensor([], dtype=torch.float8_e8m0fnu).npu()
+        logger.info("[NPU] P scale=empty tensor (shape size 0, default 1.0)")
     mask_arg = _build_causal_mask()
 
     if block_table_torch is None:

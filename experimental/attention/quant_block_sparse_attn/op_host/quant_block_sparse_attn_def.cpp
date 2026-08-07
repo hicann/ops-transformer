@@ -51,7 +51,7 @@ public:
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("p_scale")
-            .ParamType(REQUIRED)
+            .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();

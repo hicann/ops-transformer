@@ -84,15 +84,16 @@ public:
             if constexpr (HAS_LSE) {
                 softmaxLseGm_.SetGlobalBuffer((__gm__ float *)softmaxLse);
             }
-            GlobalTensor<uint8_t> pScaleGm;
-            pScaleGm.SetGlobalBuffer((__gm__ uint8_t *)pScale);
+            if (pScale != nullptr) {
+                GlobalTensor<uint8_t> pScaleGm;
+                pScaleGm.SetGlobalBuffer((__gm__ uint8_t *)pScale);
+                pScaleValue_ = DecodeE8M0Scale(pScaleGm.GetValue(0));
+            }
             if constexpr (HAS_ATTEN) {
                 attenMaskGm_.SetGlobalBuffer((__gm__ uint8_t *)attenMask);
                 attenMaskS2Size_ = attenMaskS2Size;
             }
             negativeFloatScalar_ = *((const MM_T *)&NEGATIVE_MIN_VALUE_FP32);
-            // 输入 quantScale1 为 [1] e8m0；VF 另行生成 C2 使用的 PScale。
-            pScaleValue_ = DecodeE8M0Scale(pScaleGm.GetValue(0));
         }
     }
 

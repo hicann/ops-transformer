@@ -86,7 +86,9 @@ public:
         InitConstInfo();
         InitMMResBuf();
         cubeBlock.Init(pipe, &l1BufferManager, queryPtr, keyPtr, valuePtr, blockTable, qScale, kScale, vScale);
-        vecBlock.Init(pipe, pScale, softmaxLse, attentionOut, attenMask, tilingData->attenMaskParams.attenMaskS2Size);
+        __gm__ uint8_t *pScalePtr = (tilingData->scaleParams.pScaleShapeSize == 0U) ? nullptr : pScale;
+        vecBlock.Init(pipe, pScalePtr, softmaxLse, attentionOut, attenMask,
+                        tilingData->attenMaskParams.attenMaskS2Size);
     }
 
     __aicore__ inline void Process()

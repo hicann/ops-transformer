@@ -180,33 +180,33 @@ ge::graphStatus QuantBlockSparseAttnInfoParser::ParseOptionalInputs(QuantBlockSp
 {
     auto &opParamInfo = tilingInfo.opParamInfo;
 
-    opParamInfo.cuSeqlensQ.desc = context_->GetInputDesc(QBSA_CU_SEQLENS_Q_INDEX);
+    opParamInfo.cuSeqlensQ.desc = context_->GetOptionalInputDesc(QBSA_CU_SEQLENS_Q_INDEX);
     const gert::StorageShape *cuSeqlensQShape = context_->GetOptionalInputShape(QBSA_CU_SEQLENS_Q_INDEX);
     opParamInfo.cuSeqlensQ.tensor =
         (cuSeqlensQShape != nullptr && cuSeqlensQShape->GetStorageShape().GetShapeSize() > 0) ?
             reinterpret_cast<const gert::Tensor *>(cuSeqlensQShape) :
             nullptr;
 
-    opParamInfo.cuSeqlensKV.desc = context_->GetInputDesc(QBSA_CU_SEQLENS_KV_INDEX);
+    opParamInfo.cuSeqlensKV.desc = context_->GetOptionalInputDesc(QBSA_CU_SEQLENS_KV_INDEX);
     const gert::StorageShape *cuSeqlensKVShape = context_->GetOptionalInputShape(QBSA_CU_SEQLENS_KV_INDEX);
     opParamInfo.cuSeqlensKV.tensor =
         (cuSeqlensKVShape != nullptr && cuSeqlensKVShape->GetStorageShape().GetShapeSize() > 0) ?
             reinterpret_cast<const gert::Tensor *>(cuSeqlensKVShape) :
             nullptr;
 
-    opParamInfo.seqUsedQ.desc = context_->GetInputDesc(QBSA_SEQUSED_Q_INDEX);
+    opParamInfo.seqUsedQ.desc = context_->GetOptionalInputDesc(QBSA_SEQUSED_Q_INDEX);
     const gert::StorageShape *seqUsedQShape = context_->GetOptionalInputShape(QBSA_SEQUSED_Q_INDEX);
     opParamInfo.seqUsedQ.tensor = (seqUsedQShape != nullptr && seqUsedQShape->GetStorageShape().GetShapeSize() > 0) ?
                                       reinterpret_cast<const gert::Tensor *>(seqUsedQShape) :
                                       nullptr;
 
-    opParamInfo.seqUsedKV.desc = context_->GetInputDesc(QBSA_SEQUSED_KV_INDEX);
+    opParamInfo.seqUsedKV.desc = context_->GetOptionalInputDesc(QBSA_SEQUSED_KV_INDEX);
     const gert::StorageShape *seqUsedKVShape = context_->GetOptionalInputShape(QBSA_SEQUSED_KV_INDEX);
     opParamInfo.seqUsedKV.tensor = (seqUsedKVShape != nullptr && seqUsedKVShape->GetStorageShape().GetShapeSize() > 0) ?
                                        reinterpret_cast<const gert::Tensor *>(seqUsedKVShape) :
                                        nullptr;
 
-    opParamInfo.blockTable.desc = context_->GetInputDesc(QBSA_BLOCK_TABLE_INDEX);
+    opParamInfo.blockTable.desc = context_->GetOptionalInputDesc(QBSA_BLOCK_TABLE_INDEX);
     const gert::StorageShape *blockTableStorageShape = context_->GetOptionalInputShape(QBSA_BLOCK_TABLE_INDEX);
     opParamInfo.blockTable.tensor =
         (blockTableStorageShape != nullptr && blockTableStorageShape->GetStorageShape().GetShapeSize() > 0) ?
@@ -218,7 +218,7 @@ ge::graphStatus QuantBlockSparseAttnInfoParser::ParseOptionalInputs(QuantBlockSp
         return ge::GRAPH_FAILED;
     }
 
-    opParamInfo.metadata.desc = context_->GetInputDesc(QBSA_METADATA_INDEX);
+    opParamInfo.metadata.desc = context_->GetOptionalInputDesc(QBSA_METADATA_INDEX);
     const gert::StorageShape *metadataShape = context_->GetOptionalInputShape(QBSA_METADATA_INDEX);
     opParamInfo.metadata.tensor = (metadataShape != nullptr && metadataShape->GetStorageShape().GetShapeSize() > 0) ?
                                       reinterpret_cast<const gert::Tensor *>(metadataShape) :
@@ -309,13 +309,13 @@ ge::graphStatus QuantBlockSparseAttnInfoParser::Parse(QuantBlockSparseAttnTiling
     opParamInfo.kDescale.stride = context_->GetInputStride(QBSA_K_DESCALE_INDEX);
     opParamInfo.vDescale.desc = context_->GetInputDesc(QBSA_V_DESCALE_INDEX);
     opParamInfo.vDescale.shape = context_->GetInputShape(QBSA_V_DESCALE_INDEX);
-    opParamInfo.pScale.desc = context_->GetInputDesc(QBSA_P_SCALE_INDEX);
-    opParamInfo.pScale.shape = context_->GetInputShape(QBSA_P_SCALE_INDEX);
+    opParamInfo.pScale.desc = context_->GetOptionalInputDesc(QBSA_P_SCALE_INDEX);
+    opParamInfo.pScale.shape = context_->GetOptionalInputShape(QBSA_P_SCALE_INDEX);
     opParamInfo.sparseIndices.desc = context_->GetInputDesc(QBSA_SPARSE_INDICES_INDEX);
     opParamInfo.sparseIndices.shape = context_->GetInputShape(QBSA_SPARSE_INDICES_INDEX);
     opParamInfo.sparseSeqLen.desc = context_->GetInputDesc(QBSA_SPARSE_SEQ_LEN_INDEX);
     opParamInfo.sparseSeqLen.shape = context_->GetInputShape(QBSA_SPARSE_SEQ_LEN_INDEX);
-    opParamInfo.attenMask.desc = context_->GetInputDesc(QBSA_ATTEN_MASK_INDEX);
+    opParamInfo.attenMask.desc = context_->GetOptionalInputDesc(QBSA_ATTEN_MASK_INDEX);
     opParamInfo.attenMask.shape = context_->GetOptionalInputShape(QBSA_ATTEN_MASK_INDEX);
     opParamInfo.attnOut.desc = context_->GetOutputDesc(QBSA_ATTENTION_OUT_INDEX);
     opParamInfo.attnOut.shape = context_->GetOutputShape(QBSA_ATTENTION_OUT_INDEX);
@@ -328,7 +328,7 @@ ge::graphStatus QuantBlockSparseAttnInfoParser::Parse(QuantBlockSparseAttnTiling
 
     if (opParamInfo.query.shape == nullptr || opParamInfo.key.shape == nullptr || opParamInfo.value.shape == nullptr ||
         opParamInfo.qDescale.shape == nullptr || opParamInfo.kDescale.shape == nullptr ||
-        opParamInfo.vDescale.shape == nullptr || opParamInfo.pScale.shape == nullptr ||
+        opParamInfo.vDescale.shape == nullptr ||
         opParamInfo.sparseIndices.shape == nullptr || opParamInfo.sparseSeqLen.shape == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "required input shape", "nullptr",
                                               "query/key/value/scale/sparse input shape must not be nullptr");

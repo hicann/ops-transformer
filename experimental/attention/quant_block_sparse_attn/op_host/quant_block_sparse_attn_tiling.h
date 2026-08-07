@@ -153,6 +153,7 @@ TILING_DATA_FIELD_DEF(uint8_t, isKvContinuous)
 TILING_DATA_FIELD_DEF(uint8_t, fromFused)
 TILING_DATA_FIELD_DEF(uint8_t, isGqa)
 TILING_DATA_FIELD_DEF(uint8_t, isSoftMaxLseEnable)
+TILING_DATA_FIELD_DEF(uint32_t, pScaleShapeSize)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(QuantBlockSparseAttnInputParamsRegbaseOp, QuantBlockSparseAttnInputParamsRegbase)
 

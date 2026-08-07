@@ -43,7 +43,7 @@ torch.ops.custom.npu_quant_block_sparse_attn(
     q_descale: Tensor,
     k_descale: Tensor,
     v_descale: Tensor,
-    p_scale: Tensor,
+    p_scale: Optional[Tensor] = 1.0f,
     sparse_indices: Tensor,
     sparse_seq_len: Tensor,
     atten_mask: Optional[Tensor],
@@ -467,7 +467,7 @@ QuantBlockSparseAttn 算子约束分为 4 个档位，按约束复杂程度递�
   </tr>
   <tr>
     <td>p_scale</td>
-    <td>INPUT</td>
+    <td>INPUT(OPTIONAL)</td>
     <td>Tensor</td>
   </tr>
   <tr>

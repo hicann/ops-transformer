@@ -18,7 +18,7 @@
 TORCH_LIBRARY(custom, m)
 {
     m.def("npu_quant_block_sparse_attn(Tensor query, Tensor key, Tensor value, "
-          "Tensor q_descale, Tensor k_descale, Tensor v_descale, Tensor p_scale, "
+          "Tensor q_descale, Tensor k_descale, Tensor v_descale, Tensor? p_scale, "
           "Tensor sparse_indices, Tensor sparse_seq_len, Tensor? atten_mask, "
           "float softmax_scale, int sparse_q_block_size, int sparse_kv_block_size, *, "
           "Tensor? cu_seqlens_q=None, Tensor? cu_seqlens_kv=None, "
