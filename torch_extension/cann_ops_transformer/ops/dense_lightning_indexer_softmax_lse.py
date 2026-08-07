@@ -102,7 +102,6 @@ class DenseLightningIndexerSoftmaxLseOpBuilder(OpBuilder):
 dense_lightning_indexer_softmax_lse_op_builder = (
     DenseLightningIndexerSoftmaxLseOpBuilder()
 )
-op_module = dense_lightning_indexer_softmax_lse_op_builder.load()
 
 
 @impl(AS_LIBRARY, DLI_METADATA_OP_NAME, "PrivateUse1")
@@ -157,6 +156,7 @@ def dense_lightning_indexer_softmax_lse_metadata(
     mask_mode = 0 if mask_mode is None else mask_mode
     cmp_ratio = 1 if cmp_ratio is None else cmp_ratio
 
+    op_module = dense_lightning_indexer_softmax_lse_op_builder.load()
     return op_module.dense_lightning_indexer_softmax_lse_v2_metadata(
         num_heads_q,
         num_heads_k,
@@ -259,6 +259,7 @@ def dense_lightning_indexer_softmax_lse(
     Returns:
         Tensor: softmax_lse 输出，BSND shape (B,S1)，TND shape (T1,)，dtype 为 float32。
     """
+    op_module = dense_lightning_indexer_softmax_lse_op_builder.load()
     return op_module.dense_lightning_indexer_softmax_lse_v2(
         query_index,
         key_index,

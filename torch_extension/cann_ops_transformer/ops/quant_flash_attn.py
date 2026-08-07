@@ -224,7 +224,6 @@ class QuantFlashAttnOpBuilder(OpBuilder):
 
 # Instantiate the builder
 quant_flash_attn_op_builder = QuantFlashAttnOpBuilder()
-op_module = quant_flash_attn_op_builder.load()
 
 
 @impl(AS_LIBRARY, QFA_METADATA_OP_NAME, "PrivateUse1")
@@ -268,6 +267,7 @@ def quant_flash_attn_metadata(
     metadata_size = _calculate_metadata_size()
     output = torch.empty((metadata_size,), dtype=torch.int32, device="npu")
 
+    op_module = quant_flash_attn_op_builder.load()
     return op_module.quant_flash_attn_metadata(
         cu_seqlens_q,
         cu_seqlens_kv,
@@ -374,6 +374,7 @@ def quant_flash_attn(
     """
     quant_mode = _resolve_quant_mode(quant_mode)
     mask_mode = _resolve_mask_mode(mask_mode)
+    op_module = quant_flash_attn_op_builder.load()
     return op_module.quant_flash_attn(
         q,
         k,

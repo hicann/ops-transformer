@@ -95,10 +95,6 @@ class InplacePartialRotaryMulOpBuilder(OpBuilder):
 
 # Instantiate the builder
 inplace_partial_rotary_mul_op_builder = InplacePartialRotaryMulOpBuilder()
-# Pre-load the op module so that torch.compile / dynamo tracing does not
-# encounter torch.utils.cpp_extension.load() at trace time (it is marked
-# as "skipped" by the dynamo trace rules).
-inplace_partial_rotary_mul_op_builder.load()
 
 
 @impl(AS_LIBRARY, inplace_partial_rotary_mul_op_builder.name, "PrivateUse1")

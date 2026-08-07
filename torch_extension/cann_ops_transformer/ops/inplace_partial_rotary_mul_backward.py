@@ -80,9 +80,6 @@ class InplacePartialRotaryMulBackwardOpBuilder(OpBuilder):
 inplace_partial_rotary_mul_backward_op_builder = (
     InplacePartialRotaryMulBackwardOpBuilder()
 )
-# Pre-load the op module so that torch.compile / dynamo tracing does not
-# encounter torch.utils.cpp_extension.load() at trace time.
-inplace_partial_rotary_mul_backward_op_builder.load()
 
 
 @impl(AS_LIBRARY, inplace_partial_rotary_mul_backward_op_builder.name, "PrivateUse1")

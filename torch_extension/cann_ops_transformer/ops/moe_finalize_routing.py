@@ -86,7 +86,6 @@ class _MoeFinalizeRoutingOpBuilder(OpBuilder):
 
 
 _moe_finalize_routing_builder = _MoeFinalizeRoutingOpBuilder()
-_op_module = _moe_finalize_routing_builder.load()
 
 
 @impl(AS_LIBRARY, _moe_finalize_routing_builder.name, "PrivateUse1")
@@ -108,6 +107,7 @@ def _moe_finalize_routing(
     constant_expert_range=None,
     k=1,
 ):
+    _op_module = _moe_finalize_routing_builder.load()
     return _op_module.moe_finalize_routing(
         expanded_x,
         expanded_row_idx,
