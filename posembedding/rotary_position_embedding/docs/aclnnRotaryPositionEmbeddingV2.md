@@ -4,21 +4,31 @@
 
 ## 产品支持情况
 
-| 产品                                                                   | 是否支持 |
-|:-------------------------------------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                                                |    √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>                        |    √    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √    |
-| <term>Atlas 200I/500 A2 推理产品</term>                                         |    ×    |
-| <term>Atlas 推理系列产品</term>                                                |    ×    |
-| <term>Atlas 训练系列产品</term>                                                 |    ×    |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
 - 接口功能：执行单路旋转位置编码计算。本接口相较于[aclnnRotaryPositionEmbedding](aclnnRotaryPositionEmbedding.md)，新增入参rotate，在推荐场景中通过输入旋转编码矩阵获得性能收益，请根据实际情况选择合适的接口。
 
 - rotate推荐使用场景
-  - interleave模式，且B * N * S > 28800。
+  - interleave模式，且B *N* S > 28800。
   - half模式仅在以下场景时推荐使用：输入矩阵x需要在最后一个维度切分多份时，每一份都需要调用aclnnRotaryPositionEmbedding接口进行旋转位置编码计算，可以通过构造旋转编码矩阵实现一次调用获得性能收益，以x的layout为BSND需要切分为3份为例：
      x切分为3份，$x = [x1|x2|x3]_{(dim=4)} ∈ R^{B×S×N×D}, x1 ∈ R^{B×S×N×D1},x2 ∈ R^{B×S×N×D2},x3 ∈ R^{B×S×N×D3},其中D = D1 + D2 + D3$，那么可以构造一个rotate矩阵，实现调用一次aclnnRotaryPositionEmbeddingV2接口完成x的旋转位置编码计算功能，rotate矩阵构造如下：
 
@@ -28,6 +38,7 @@
 
 - 计算公式：
 
+  <!-- npu="A3,910b" id7 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
     - 不传入rotate参数（推荐half模式1D使用）：
@@ -77,6 +88,8 @@
       $$
       y = x * cos + x\_rotate * sin
       $$
+
+  <!-- end id7 -->
 
 ## 函数原型
 
@@ -213,8 +226,14 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
   </table>
 
   - 参数mode约束：
+
+    <!-- npu="A3,910b" id8 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：0=half，1=interleave。V2接口不同mode参数约束和V1接口相同，开发者可以根据mode在调用示例的辅助矩阵rotate生成中选择合适的rotate生成方式。
+    <!-- end id8 -->
+    <!-- npu="950" id9 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：2=quarter，3=interleave-half。
+
+    <!-- end id9 -->
 
   - 参数rotate当前支持BFLOAT16、FLOAT16、FLOAT32类型。
 
@@ -303,6 +322,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
 
 ## 约束说明
 
+<!-- npu="A3,910b" id10 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
   输入张量x支持BNSD、BSND、SBND、TND排布。
@@ -324,6 +344,8 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
     - 当x为BSND时，cos、sin支持1S1D
     - 当x为SBND时，cos、sin支持S11D
     - 当x为TND时，cos、sin支持T1D
+<!-- end id10 -->
+<!-- npu="950" id11 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
 
   输入张量x支持BNSD、BSND、SBND、TND排布，不支持辅助矩阵输入。各参数的shape约束可以描述如下：
@@ -331,6 +353,8 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
   - 输入张量x和输出张量y的shape必须完全相同。
   - 输入张量cos和sin的shape必须完全相同，cos和sin的shape需要与x满[broadcast关系](../../../docs/zh/context/broadcast_relationship.md)，且广播的shape必须等于x的shape。
   - 当x为TND时，cos、sin支持T1D、TND。
+
+<!-- end id11 -->
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 

@@ -34,7 +34,9 @@
 
       - 输入的weight会被接口按AI处理器亲和数据排布格式（FRACTAL_NZ）解析。
       - 新增参数quantGroupSize，整数型参数，代表分组量化（per-group）的分组大小，不涉及分组量化时，填0。
+      <!-- npu="950" id7 -->
       - <term>Ascend 950PR/Ascend 950DT</term>：暂不支持quantGroupSize参数。
+      <!-- end id7 -->
 
   - **计算公式**：
 
@@ -369,7 +371,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
     <td>quantGroupSize</td>
     <td>输入</td>
     <td>代表分组量化（per-group）的分组大小。</td>
-    <td>不涉及分组量化时，填0。<term>Ascend 950PR/Ascend 950DT</term>暂不支持。</td>
+    <td>不涉及分组量化时，填0。</td>
     <td>INT64</td>
     <td>-</td>
     <td>-</td>
@@ -428,6 +430,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
     </tbody>
     </table>
 
+    <!-- npu="950" id8 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：
       - 上表数据类型列中的角标"1"代表该系列不支持的数据类型。
       - `weight`支持FRACTAL_NZ格式。当最后两根轴其中一根轴为1（即n=1或k=1）时，不支持私有格式，不能调用该接口。可使用aclnnNpuFormatCast接口完成输入Format从ND到AI处理器亲和数据排布格式（NZ）的转换。如原始weight为转置状态且想使用性能更高的非转置通路计算，可使用aclnnPermute接口转为非转置后再调用aclnnNpuFormatCast接口。非全量化场景，当数据类型为FLOAT4_E2M1时，还需要在aclnnNpuFormatCast调用后，调用aclnnCast接口将FLOAT32表示的FLOAT4_E2M1转换为正确的类型。但当为INT4类型时，需要使用aclnnConvertWeightToInt4Pack接口完成数据格式从ND到NZ和数据类型从INT32到INT4的转换。当传入FLOAT32或者INT32时，接口内部每个FLOAT32/INT32识别成8个FLOAT4_E2M1/INT4。
@@ -436,11 +439,14 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       - `quantGroupSize`暂不支持。
       - `actType`支持0、1、2、4、5。综合约束请参见<a href="#约束说明">约束说明</a>。
       - 输入参数`x`、`weight`，输出参数`out`在非量化场景支持最多1024个tensor，在伪量化场景支持最多128个tensor。在全量化场景下，输入参数`x`、输出参数`out`最多支持1个tensor；动态量化（mx量化）场景下，输入参数`weight`支持多tensor，最多支持1024个tensor。
+    <!-- end id8 -->
 
+    <!-- npu="A3,910b" id9 -->
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
       - 上表数据类型列中的角标"2"代表该系列不支持的数据类型。
       - `weight`会被接口按FRACTAL_NZ格式解析。当传入INT32时，接口内部将每个INT32识别成8个INT4。
       - 输入参数`x`、`weight`，输出参数`out`支持最多128个tensor。
+    <!-- end id9 -->
 
   - **返回值：**
 
@@ -517,6 +523,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 - 确定性计算：
   - aclnnGroupedMatmulWeightNz默认确定性实现。
 
+<!-- npu="A3,910b" id10 -->
 <details>
 <summary><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term></summary>
 
@@ -590,7 +597,9 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       | 0 | 多多单 |1）仅支持splitItem为2/3<br>2）x,weight,y中tensor需为2维<br>3）weight中每个tensor的N轴必须相等<br>4）若传入groupListOptional，当groupListType为0时，groupListOptional的差值需与x中tensor的第一维一一对应，当groupListType为1时，groupListOptional的数值需与x中tensor的第一维一一对应，且长度最大为128，当groupListType为2时，groupListOptional第二列的数值需与x中tensor的第一维一一对应，且长度最大为128<br>5）支持weight转置，但weight的tensorList中每个tensor是否转置需保持统一<br>6）x不支持转置 |
 
 </details>
+<!-- end id10 -->
 
+<!-- npu="950" id11 -->
 <details>
 <summary><term>Ascend 950PR/Ascend 950DT</term></summary>
 
@@ -718,6 +727,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       | 0 | 多多单 |1）仅支持splitItem为2/3<br>2）x，out中tensor需为2维， shape分别为（M, K）和（M, N）；weight中tensor需为2维，shape为（N, K）或（K, N）；bias中tensor需为1维，shape为（N）<br>3）weight中每个tensor的N轴必须相等<br>4）若传入groupListOptional，当groupListType为0时，groupListOptional的差值需与x中tensor的第一维一一对应，当groupListType为1时，groupListOptional的数值需与x中tensor的第一维一一对应，且长度最大为1024<br>5）支持weight转置，但weight的tensorList中每个tensor是否转置需保持统一<br>6）x不支持转置<br>7）仅支持非量化|
 
 </details>
+<!-- end id11 -->
 
 ## 调用示例
 

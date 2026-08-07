@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         |  是否支持   |
-| :----------------------------------------------------------- |:-------:|
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √    |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×    |
-| <term>Atlas 推理系列产品</term>                             |    √    |
-| <term>Atlas 训练系列产品</term>                              |    x    |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：x
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -344,7 +354,10 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
   </tbody>
   </table>
 
+  <!-- npu="310p" id7 -->
   - <term>Atlas 推理系列产品</term>：不支持BFLOAT16
+
+  <!-- end id7 -->
 
 - **返回值**
 
@@ -420,6 +433,7 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
 - 确定性计算：
   - aclnnApplyRotaryPosEmbV2默认确定性实现。
 
+<!-- npu="A3,910b,310p" id8 -->
 - <term>Atlas 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
   - layout为1时，queryRef、keyRef、cos、sin输入shape的前2维（B、S）必须相等；layout为4时，第1维（T）必须相等。
   - queryRef、keyRef输入shape的最后一维（D）必须相等，cos、sin输入shape的最后一维（D）必须相等。
@@ -433,10 +447,14 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
     `ub_required = (q_n + k_n) * lastDim * castSize * 2 + lastDim * DtypeSize * 4 + (q_n + k_n) * lastDim * castSize + (q_n + k_n) * lastDim * castSize * 2 + cast * (lastDim * 4 * 2)`，
     当计算出`ub_required`的大小超过当前AI处理器的UB空间总大小时，不支持使用该融合算子。
 
+<!-- end id8 -->
+<!-- npu="950" id9 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
   - 对于任意layout，queryRef与keyRef除N维度外其他维度必须相同；queryRef、keyRef输入shape的最后一维（D）必须相等，cos、sin输入shape的最后一维（D）必须相等，且小于等于queryRef、keyRef输入shape的最后一维（D）。
   - 输入张量queryRef、keyRef、cos、sin的dtype必须相同。
   - rotaryMode为"half"和"interleave"时，输入shape最后一维必须被2整除；rotaryMode为"quarter"时，输入shape最后一维必须被4整除。
+
+<!-- end id9 -->
 
 ## 调用示例
 

@@ -21,8 +21,8 @@
 
   | 场景类型 | kv分量来源 | 说明 |
     | :------: | :------: | :------ |
-    |V1|rms_size=Dv=512<br>rope_size=Dk=64<br>vOptional=None|kv合轴模式：对输入张量kv的尾轴，拆分出左半边用于rms_norm计算，右半边用于rope计算，再将计算结果分别scatter到两块cache中。<li>与DeepSeekV3网络结构强相关，仅支持N=1的场景。<li>rms_norm计算所需数据Dv和rope计算所需数据Dk由输入kv的D切分而来，Dk、Dv大小需满足Dk+Dv=Dkv。|
-    |V2|Dv=128<br>rms_size=Dk=Dkv=192<br>rope_size=64<br>vOptional的shape为[Bkv, Nkv, Skv, Dv]|kv分离模式：对输入张量kv进行rms_norm计算，之后对尾轴前64维进行rope计算并覆盖写回对应元素，最终结果scatter写入到k_cache中；对输入张量vOptional进行中间处理，最终结果scatter写入到ckv_cache中。<li>支持N=1/2/4/8<li>此场景下k与v尾轴分离，kv仅存储k分量尾轴，vOptional则存储v分量尾轴。|
+    |V1|rms_size=Dv=512<br>rope_size=Dk=64<br>vOptional=None|kv合轴模式：对输入张量kv的尾轴，拆分出左半边用于rms_norm计算，右半边用于rope计算，再将计算结果分别scatter到两块cache中。<li>与DeepSeekV3网络结构强相关，仅支持N=1的场景。</li><li>rms_norm计算所需数据Dv和rope计算所需数据Dk由输入kv的D切分而来，Dk、Dv大小需满足Dk+Dv=Dkv。|
+    |V2|Dv=128<br>rms_size=Dk=Dkv=192<br>rope_size=64<br>vOptional的shape为[Bkv, Nkv, Skv, Dv]|kv分离模式：对输入张量kv进行rms_norm计算，之后对尾轴前64维进行rope计算并覆盖写回对应元素，最终结果scatter写入到k_cache中；对输入张量vOptional进行中间处理，最终结果scatter写入到ckv_cache中。</li><li>支持N=1/2/4/8</li><li>此场景下k与v尾轴分离，kv仅存储k分量尾轴，vOptional则存储v分量尾轴。</li>|
 
     * <term>Ascend 950PR/Ascend 950DT</term>：仅支持V1场景。
     * <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持V1和V2场景。
@@ -301,8 +301,8 @@
 
           | 场景类型 | 量化参数Shape |
           | :------: | :------ |
-          |V1|<li>k_rope_scale和k_rope_offset的shape支持：[1, Dk]、[Dk,]、[1,]。<li>c_kv_scale和c_kv_offset的shape支持：[1, Dv]、[Dv,]、[1,]。|
-          |V2|<li>k_rope_scale和k_rope_offset的shape支持：[N, Dk]。<li>c_kv_scale和c_kv_offset的shape支持：[N, Dv]。|
+          |V1|<li>k_rope_scale和k_rope_offset的shape支持：[1, Dk]、[Dk,]、[1,]。</li><li>c_kv_scale和c_kv_offset的shape支持：[1, Dv]、[Dv,]、[1,]。</li>|
+          |V2|<li>k_rope_scale和k_rope_offset的shape支持：[N, Dk]。</li><li>c_kv_scale和c_kv_offset的shape支持：[N, Dv]。</li>|
 
           * <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：V1场景不支持量化参数项的shape为[1,]。
 
@@ -319,7 +319,7 @@
       | scale==None | 与kv保持一致 | 非法输入，拦截 |
       | scale!=None | INT8、HIFLOAT8、FLOAT8E5M2、FLOAT8E4M3FN | INT8、HIFLOAT8、FLOAT8E5M2、FLOAT8E4M3FN |
 
-      * 量化模式时，k_cache和ckv_cache的dtype应为相应产品上支持的 数据类型。
+      * 量化模式时，k_cache和ckv_cache的dtype应为相应产品上支持的数据类型。
       * 非量化模式时，量化参数(k_rope_scale, k_rope_offset, c_kv_scale, c_kv_offset)必须设为None，且k_cache和ckv_cache的dtype必须与kv保持一致。
 
     * 输入分量关于量化因子scale与量化偏移scale的对应关系如下：
@@ -349,7 +349,7 @@
         </tr></thead>
       <tbody>
       <tr>
-          <td rowspan="5">无量化模式<li>scale输入：k_rope_scale==None && c_kv_scale==None<li>offset输入：k_rope_offset==None && c_kv_offset==None</td>
+          <td rowspan="5">无量化模式<li>scale输入：k_rope_scale==None && c_kv_scale==None</li><li>offset输入：k_rope_offset==None && c_kv_offset==None</li></td>
           <td rowspan="1">Norm</td>
           <td rowspan="5">V1和V2都支持。</td>
       </tr>
@@ -366,9 +366,9 @@
           <td>PA_BLK_NZ</td>
       </tr>
       <tr>
-          <td rowspan="5">静态量化模式<li>scale输入：k_rope_scale和c_kv_scale至少一个非空。<li>offset输入：仅限对应scale为非空时，offset输入合法。相应offset如果为空，则为<b>静态对称量化</b>；相应offset如果非空，则为<b>静态非对称量化</b>。</td>
+          <td rowspan="5">静态量化模式<li>scale输入：k_rope_scale和c_kv_scale至少一个非空。</li><li>offset输入：仅限对应scale为非空时，offset输入合法。相应offset如果为空，则为<b>静态对称量化</b>；相应offset如果非空，则为<b>静态非对称量化</b>。</li></td>
           <td rowspan="1">Norm</td>
-          <td rowspan="5"><li><b>静态对称量化</b>和<b>静态非对称量化</b>，支持存在差异。<li>支持K和V独立选择不同量化模式。</td>
+          <td rowspan="5"><li><b>静态对称量化</b>和<b>静态非对称量化</b>，支持存在差异。</li><li>支持K和V独立选择不同量化模式。</li></td>
       </tr>
       <tr>
           <td>PA/PA_BNSD</td>
@@ -409,9 +409,9 @@
     * 当cache_mode为PA_BNSD、PA_NZ时，shape为1维[Bkv * Skv]，要求index的value值范围为[-1,block_num * block_size)。value数值不能重复。
     * 当cache_mode为PA_BLK_BNSD、PA_BLK_NZ时，shape为1维[Bkv * ceil_div(Skv,block_size)]，要求index的value的数值范围为[-1,block_num * block_size)。value/block_size的值不能重复。
   * is_output_kv约束：
-    * 作用是输出中间处理结果：使能 k_rope 和 c_kv。
+    * 作用是输出中间处理结果：开启 k_rope 和 c_kv。
     * 在cache_mode为PA, PA_BNSD, PA_NZ, PA_BLK_BNSD, PA_BLK_NZ模式时有效。
-    * 在cache_mode为Norm时，仅在V2场景中使能量化模式时有效。
+    * 在cache_mode为Norm时，仅在V2场景中开启量化模式时有效。
 
   * 输入组合约束：
 
@@ -436,18 +436,18 @@
         <tbody>
         <tr>
             <td>Norm</td>
-            <td rowspan="6"><li>V1场景：[Bkv, 1, Skv, Dv+Dk]（kv）<li>V2场景：<ul><li>[Bkv, N, Skv, Dk]（kv）<li>[Bkv, N, Skv, Dv]（vOptional）</ul></td>
-            <td rowspan="2"><li>支持S轴无广播：Srope=Skv。<li>支持S轴广播：Srope=1。</td>
-            <td><li>在<b>无量化模式</b>下：is_output_kv无效，k_rope 和 c_kv 无效。<li>V1场景：<ul><li>仅支持<b>无量化模式</b>，所有量化参数项皆为非法。</ul><li>V2场景：<ul><li>支持<b>无量化模式</b>和<b>静态量化模式</b>。<li>k和v对应的量化参数项必须为2维[N, D]。</ul></td>
+            <td rowspan="6"><li>V1场景：[Bkv, 1, Skv, Dv+Dk]（kv）</li><li>V2场景：<ul><li>[Bkv, N, Skv, Dk]（kv）</li><li>[Bkv, N, Skv, Dv]（vOptional）</li></ul></li></td>
+            <td rowspan="2"><li>支持S轴无广播：Srope=Skv。</li><li>支持S轴广播：Srope=1。</li></td>
+            <td><li>在<b>无量化模式</b>下：is_output_kv无效，k_rope 和 c_kv 无效。</li><li>V1场景：<ul><li>仅支持<b>无量化模式</b>，所有量化参数项皆为非法。</li></ul></li><li>V2场景：<ul><li>支持<b>无量化模式</b>和<b>静态量化模式</b>。</li><li>k和v对应的量化参数项必须为2维[N, D]。</li></ul></li></td>
         </tr>
         <tr>
             <td>PA</td>
-            <td><li><b>无量化模式</b>下，支持S轴广播和S轴无广播。<li><b>静态量化模式</b>下，仅支持S轴无广播，否则为非法输入。<li>量化参数项：<ul><li>V1场景：支持shape为2维[1,D]或1维[D]。仅支持<b>静态对称量化</b>。<li>V2场景：支持shape为2维[N,D]。支持<b>静态对称量化</b>和<b>静态非对称量化</b>。</ul></td>
+            <td><li><b>无量化模式</b>下，支持S轴广播和S轴无广播。</li><li><b>静态量化模式</b>下，仅支持S轴无广播，否则为非法输入。</li><li>量化参数项：<ul><li>V1场景：支持shape为2维[1,D]或1维[D]。仅支持<b>静态对称量化</b>。</li><li>V2场景：支持shape为2维[N,D]。支持<b>静态对称量化</b>和<b>静态非对称量化</b>。</li></ul></li></td>
         </tr>
         <tr>
             <td>PA_BNSD</td>
-            <td rowspan="4"><li>不支持S轴广播：必须满足Srope=Skv。</td>
-            <td rowspan="4"><li>支持无量化模式。<li>量化参数项：<ul><li>V1场景：支持shape为2维[1,D]或1维[D]。仅支持<b>静态对称量化</b>。<li>V2场景：支持shape为2维[N,D]。支持<b>静态对称量化</b>和<b>静态非对称量化</b>。</td>
+            <td rowspan="4"><li>不支持S轴广播：必须满足Srope=Skv。</li></td>
+            <td rowspan="4"><li>支持无量化模式。</li><li>量化参数项：</li><ul><li>V1场景：支持shape为2维[1,D]或1维[D]。仅支持<b>静态对称量化</b>。</li><li>V2场景：支持shape为2维[N,D]。支持<b>静态对称量化</b>和<b>静态非对称量化</b>。</li></ul></td>
         </tr>
         <tr>
             <td>PA_NZ</td>

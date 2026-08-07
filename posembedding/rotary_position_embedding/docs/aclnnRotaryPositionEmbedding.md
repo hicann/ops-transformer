@@ -4,21 +4,34 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| :----------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                             |    √     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
 - 接口功能：执行单路旋转位置编码计算。
 - 计算公式：
 
+    <!-- npu="A3,910b" id7 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+
+    <!-- end id7 -->
 
     （1）half模式（mode等于0）：
 
@@ -227,12 +240,22 @@ aclnnStatus aclnnRotaryPositionEmbedding(
   </tbody>
   </table>
 
+  <!-- npu="310p" id8 -->
   - <term>Atlas 推理系列产品</term>：不支持BFLOAT16数据类型
 
+  <!-- end id8 -->
   - 参数mode约束：
+
+    <!-- npu="A3,910b" id9 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：0=half，1=interleave。
+    <!-- end id9 -->
+    <!-- npu="950" id10 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：2=quarter，3=interleave-half。
+    <!-- end id10 -->
+    <!-- npu="310p" id11 -->
     - <term>Atlas 推理系列产品</term>：0=half。
+
+    <!-- end id11 -->
 
 - **返回值：**
 
@@ -286,6 +309,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
 - 确定性计算：
   - aclnnRotaryPositionEmbedding默认确定性实现。
 
+<!-- npu="950" id12 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
 
   输入张量x支持BNSD、BSND、SBND、TND排布。各参数的shape约束可以描述如下：
@@ -293,6 +317,8 @@ aclnnStatus aclnnRotaryPositionEmbedding(
   - 输入张量x和输出张量y的shape必须完全相同。
   - 输入张量cos和sin的shape必须完全相同，cos和sin的shape需要与x满足[broadcast关系](../../../docs/zh/context/broadcast_relationship.md)，且广播后的shape必须等于x的shape。
   - 当x为TND时，cos、sin支持T1D、TND。
+<!-- end id12 -->
+<!-- npu="A3,910b" id13 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
   输入张量x支持BNSD、BSND、SBND、TND排布。
@@ -302,8 +328,8 @@ aclnnStatus aclnnRotaryPositionEmbedding(
   - half模式：
     - B，N < 1000;
     - 当x为BNSD时，cos、sin支持11SD、B1SD、BNSD
-      - 当（D/2）% (32/inputDtypeSize) == 0时，需满足B * N <= S * 8
-      - 当（D/2）% (32/inputDtypeSize) != 0时，需满足B * N * 2 <= (S + coreNum -1) / coreNum或者D >= 80
+      - 当（D/2）% (32/inputDtypeSize) == 0时，需满足B *N <= S* 8
+      - 当（D/2）% (32/inputDtypeSize) != 0时，需满足B *N* 2 <= (S + coreNum -1) / coreNum或者D >= 80
     - 当x为BSND时，cos、sin支持1S1D、BS1D、BSND
     - 当x为SBND时，cos、sin支持S11D、SB1D、SBND
     - 当x为TND时，cos、sin支持T1D、TND
@@ -314,6 +340,8 @@ aclnnStatus aclnnRotaryPositionEmbedding(
     - 当x为SBND时，cos、sin支持S11D
     - 当x为TND时，cos、sin支持T1D
 
+<!-- end id13 -->
+<!-- npu="310p" id14 -->
 - <term>Atlas 推理系列产品</term>：
 
   输入张量x支持BNSD、BSND、SBND、TND排布。
@@ -323,12 +351,14 @@ aclnnStatus aclnnRotaryPositionEmbedding(
   - 仅支持half模式：
     - B，N < 1000
     - 当x为BNSD时，cos、sin支持11SD、B1SD、BNSD
-      - B * N <= S * 8
+      - B *N <= S* 8
     - 当x为BSND时，cos、sin支持1S1D、BS1D、BSND
-      - (N - 1) * D * BytePerData / 32 < UINT16\_MAX，其中BytePerData当输入数据类型为FLOAT16时，值为2；数据类型为FLOAT32时，值为4
+      - (N - 1) *D* BytePerData / 32 < UINT16\_MAX，其中BytePerData当输入数据类型为FLOAT16时，值为2；数据类型为FLOAT32时，值为4
     - 当x为SBND时，cos、sin支持S11D、SB1D、SBND
-      - (B * N - 1) * D * BytePerData / 32 < UINT16\_MAX，其中BytePerData当输入数据类型为FLOAT16时，值为2；数据类型为FLOAT32时，值为4
+      - (B *N - 1)* D * BytePerData / 32 < UINT16\_MAX，其中BytePerData当输入数据类型为FLOAT16时，值为2；数据类型为FLOAT32时，值为4
     - 当x为TND时，cos、sin支持T1D、TND
+
+<!-- end id14 -->
 
 ## 调用示例
 

@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         |  是否支持   |
-| :----------------------------------------------------------- |:-------:|
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √    |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×    |
-| <term>Atlas 推理系列产品</term>                             |    ×    |
-| <term>Atlas 训练系列产品</term>                              |    ×    |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -20,7 +30,10 @@
 
     取旋转位置编码的正向计算中，broadcast的轴列表为`dims`，则计算公式可表达如下：
 
+    <!-- npu="A3,910b" id7 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+
+    <!-- end id7 -->
 
     （1）half模式（mode等于0）：
 
@@ -299,8 +312,14 @@ aclnnStatus aclnnRotaryPositionEmbeddingGrad(
   </table>
 
   - 参数mode约束：
+
+    <!-- npu="A3,910b" id8 -->
     - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：0=half，1=interleave。
+    <!-- end id8 -->
+    <!-- npu="950" id9 -->
     - <term>Ascend 950PR/Ascend 950DT</term>：2=quarter，3=interleave-half。
+
+    <!-- end id9 -->
 
 - **返回值**
 
@@ -395,6 +414,8 @@ aclnnStatus aclnnRotaryPositionEmbeddingGrad(
     - 输入张量dy和输出张量dx的shape必须完全相同。
     - 输入张量cos和sin的shape必须完全相同，cos和sin的shape需要与dy满足[broadcast关系](../../../docs/zh/context/broadcast_relationship.md)，且广播后的shape必须等于dy的shape。
     - 当dy为TND时，cos、sin支持T1D、TND。
+
+  <!-- npu="A3,910b" id10 -->
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
     - 输入张量dy支持BNSD、BSND、SBND、TND排布。
@@ -413,6 +434,8 @@ aclnnStatus aclnnRotaryPositionEmbeddingGrad(
       - 当dy为BSND时，cos、sin支持1S1D
       - 当dy为SBND时，cos、sin支持S11D
       - 当dy为TND时，cos、sin支持T1D
+
+  <!-- end id10 -->
 
 ## 调用示例
 

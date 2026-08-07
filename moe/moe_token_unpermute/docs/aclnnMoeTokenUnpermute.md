@@ -4,14 +4,24 @@
 
 ## 产品支持情况
 
-| 产品                                                         |  是否支持   |
-| :----------------------------------------------------------- |:-------:|
-| <term>Ascend 950PR/Ascend 950DT</term>                      |     √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>      |    √    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>      |    √    |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×    |
-| <term>Atlas 推理系列产品</term>                             |    ×    |
-| <term>Atlas 训练系列产品</term>                              |    ×    |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -265,7 +275,10 @@ aclnnStatus aclnnMoeTokenUnpermute(
 - 确定性计算：
   - aclnnMoeTokenUnpermute默认确定性实现。
 
+<!-- npu="A3,910b" id7 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：topK_num <= 512。
+<!-- end id7 -->
+<!-- npu="950" id8 -->
 - <term>Ascend 950PR/Ascend 950DT</term>：
   在调用本接口时，框架内部会转调用[aclnnMoeFinalizeRoutingV2](../../moe_finalize_routing_v2/docs/aclnnMoeFinalizeRoutingV2.md)接口，如果出现参数错误提示，请参考以下参数映射关系：
   - permutedTokens输入等同于aclnnMoeFinalizeRoutingV2接口的expandedX输入。
@@ -273,10 +286,14 @@ aclnnStatus aclnnMoeTokenUnpermute(
   - probsOptional输入等同于aclnnMoeFinalizeRoutingV2接口的scalesOptional输入。
   - paddedMode输入等同于aclnnMoeFinalizeRoutingV2接口的dropPadMode输入。
   - out输出等同于aclnnMoeFinalizeRoutingV2接口的out输出。
+<!-- end id8 -->
+<!-- npu="310p" id9 -->
 - |<term>Atlas 推理系列产品</term>：
   - permutedTokens与probsOptional支持的数据类型为FLOAT16、FLOAT32。
   - topK_num <= 512。
   - hidden_size是128的倍数且小于10240。
+
+<!-- end id9 -->
 
 ## 调用示例
 
