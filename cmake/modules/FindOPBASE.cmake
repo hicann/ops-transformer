@@ -41,6 +41,11 @@ if(OPBASE_FOUND)
     message(STATUS "Found OPABSE lib:${OPBASE_LIB_DIR}")
   endif()
   set(OPBASE_INC_DIRS
+    ${OPBASE_SOURCE_PATH}/pkg_inc/op_common
+    ${OPBASE_SOURCE_PATH}/include/op_common
+    ${OPBASE_SOURCE_PATH}/pkg_inc/op_common/op_host
+    ${OPBASE_SOURCE_PATH}/include/op_common/op_host
+    ${OPBASE_SOURCE_PATH}/include/op_common/atvoss
     ${OPBASE_INC_DIR}
     ${OPBASE_INC_DIR}/op_common
     ${OPBASE_INC_DIR}/op_common/op_host
