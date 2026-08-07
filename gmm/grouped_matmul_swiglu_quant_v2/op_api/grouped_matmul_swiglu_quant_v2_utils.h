@@ -854,6 +854,11 @@ protected:
         GMM_SWIGLU_CHECK_DTYPE(groupList, "groupList", GROUP_LIST_DTYPE_SUPPORT_LIST, return false);
         GMM_SWIGLU_CHECK_DTYPE(outputScale, "outputScale", QUANTSCALEOUT_DTYPE_SUPPORT_LIST, return false);
         DataType outputDtype = gmmDsqParams_.output->GetDataType();
+        if (IsMxfp8WeightNzFormat((*gmmDsqParams_.weight)[0]) && outputDtype != DataType::DT_FLOAT8_E4M3FN) {
+            OP_LOGE_FOR_INVALID_DTYPE(apiName_.c_str(), "output", op::ToString(outputDtype).GetString(),
+                                      "{FLOAT8_E4M3FN}");
+            return false;
+        }
         if (outputDtype != DataType::DT_FLOAT8_E4M3FN && outputDtype != DataType::DT_FLOAT8_E5M2) {
             OP_LOGE_FOR_INVALID_DTYPE(apiName_.c_str(), "output", op::ToString(outputDtype).GetString(),
                                       "{FLOAT8_E4M3FN, FLOAT8_E5M2}");
