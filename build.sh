@@ -67,6 +67,7 @@ ENABLE_GENOP=FALSE
 ENABLE_GENOP_AICPU=FALSE
 GENOP_TYPE=""
 GENOP_NAME=""
+INCREMENTAL_BUILD=FALSE
 PR_CHANGED_FILES=""  # PR场景, 修改文件清单, 可用于标识是否PR场景
 UT_SOC_ARRAY=()
 UT_TEST_CNT=0
@@ -105,6 +106,7 @@ function help_info() {
                 echo "    --vendor_name=name     Specify custom operator package vendor name"
                 echo "    --ops=op1,op2,...      Compile specified operators (comma-separated for multiple)"
                 echo "    --module=module1,...   Compile specified modules (comma-separated, supported: mc2,attention,moe,ffn,mhc,posembedding,gmm)"
+                echo "    --incremental          Reuse existing build/output directories without default clean"
                 echo "    -j[n]                  Compile thread nums, default is 8, eg: -j8"
                 echo "    -O[n]                  Compile optimization options, support [O0 O1 O2 O3], eg:-O3"
                 echo "    --experimental         Build experimental version"
@@ -135,6 +137,7 @@ function help_info() {
                 echo "    --cov                  Enable code coverage for unit tests"
                 echo "    --ops=op1,op2,...      Compile specified operators (comma-separated for multiple)"
                 echo "    --soc=soc_version      Run unit tests for specified Ascend SoC"
+                echo "    --incremental          Reuse existing build/output directories without default clean"
                 echo "    --valgrind             Run unit tests with valgrind (disables ASAN and noexec)"
                 echo "    --ophost_test          Build and run ophost unit tests"
                 echo "    --opapi_test           Build and run opapi unit tests"
@@ -341,6 +344,7 @@ function help_info() {
     echo "    --version Specify version"
     echo "    --cov When building uTest locally, count the coverage."
     echo "    --noexec Only compile ut, do not execute the compiled executable file"
+    echo "    --incremental Reuse existing build/output directories and skip the default clean step"
     echo "    --make_clean Clean build artifacts"
     echo "    --asan Enable asan on the host side"
     echo "    --valgrind run ut with valgrind. This option will disable asan, noexec and run utest by valgrind"
@@ -411,6 +415,11 @@ function clean()
         fi
     fi
 
+    mkdir -p ${BUILD_DIR} ${OUTPUT_DIR}
+}
+
+function ensure_build_dirs()
+{
     mkdir -p ${BUILD_DIR} ${OUTPUT_DIR}
 }
 
@@ -1119,7 +1128,7 @@ SUPPORTED_LONG_OPTS=(
   "cann_3rd_lib_path=" "op_build_tool" "ascend_cmake_dir"
   "ccache" "PR_UT" "PR_PKG" "op_debug_config" "ops-compile-options"
   "op-name" "compute-unit" "package-path" "build" "changed_list"
-  "test" "example" "verbose"
+  "test" "example" "verbose" "incremental"
 )
 
 check_option_validity() {
@@ -1795,6 +1804,10 @@ while [[ $# -gt 0 ]]; do
         clean_third_party
         shift
         ;;
+    --incremental)
+        INCREMENTAL_BUILD=TRUE
+        shift
+        ;;
     --cann_3rd_lib_path=*)
         OPTARG=$1
         CANN_3RD_LIB_PATH="$(realpath ${OPTARG#*=})"
@@ -1887,7 +1900,12 @@ function set_compute_unit_option_ut() {
 
 set_env
 
-clean
+if [[ "${INCREMENTAL_BUILD}" == "TRUE" ]]; then
+    log "Info: incremental build enabled, keep existing build/output directories."
+    ensure_build_dirs
+else
+    clean
+fi
 
 if [ -n "${CCACHE_PROGRAM}" ]; then
     if [ "${CCACHE_PROGRAM}" == "false" ] || [ "${CCACHE_PROGRAM}" == "off" ]; then
