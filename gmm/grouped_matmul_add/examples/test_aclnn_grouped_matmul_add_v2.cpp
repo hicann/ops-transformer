@@ -127,7 +127,14 @@ int aclnnGroupedMatmulAddV2Test(aclrtStream &stream, int groupListType) {
   std::vector<int64_t> weightShape= {512, 256};
   std::vector<int64_t> yShape = {2, 256, 256};
   std::vector<int64_t> groupListShape = {2};
-  std::vector<int64_t> groupListData = {256, 512};
+  std::vector<int64_t> groupListData;
+  if (groupListType == 0) {
+    // 0: comsum
+    groupListData = {256, 512};
+  } else if (groupListType == 1) {
+    // 1: count
+    groupListData = {256, 256};
+  }
   void* xDeviceAddr;
   void* weightDeviceAddr;
   void* yDeviceAddr;
