@@ -166,8 +166,11 @@ class QuantSparseFlashMlaBatchComparator:
         try:
             if not (len(batch_axis) == len(batch_slice_info) == len(batch_seed)):
                 raise ValueError("batch metadata top-level counts differ")
-            if not batch_axis or tuple(batch_axis[0]) != (0,):
-                raise ValueError(f"{self.OPERATOR_NAME} batch compare requires q axis 0")
+            if not batch_axis or tuple(batch_axis[0]) not in ((0,), (0, 1)):
+                raise ValueError(
+                    f"{self.OPERATOR_NAME} batch compare requires logical q axes "
+                    "(0,) or (0, 1)"
+                )
             if batch_slice_info[0] is None or batch_seed[0] is None:
                 raise ValueError(
                     f"{self.OPERATOR_NAME} batch compare requires q slices and seeds"
@@ -180,41 +183,57 @@ class QuantSparseFlashMlaBatchComparator:
                 raise ValueError(
                     f"{self.OPERATOR_NAME} batch compare supports q seeds only"
                 )
-            if len(batch_slice_info[0]) != 1 or len(batch_seed[0]) != 1:
+            axes = tuple(batch_axis[0])
+            if (len(batch_slice_info[0]) != len(axes)
+                    or len(batch_seed[0]) != len(axes)):
                 raise ValueError(
-                    f"{self.OPERATOR_NAME} q metadata must contain exactly one axis group"
+                    f"{self.OPERATOR_NAME} q slice/seed groups must match logical axes"
                 )
 
-            slices = batch_slice_info[0][0]
-            seeds = batch_seed[0][0]
-            if not slices or len(slices) != len(seeds):
+            axis_slices = batch_slice_info[0]
+            axis_seeds = batch_seed[0]
+            sample_count = len(axis_slices[0])
+            if not sample_count or any(
+                    len(values) != sample_count for values in (*axis_slices, *axis_seeds)):
                 raise ValueError(
-                    f"{self.OPERATOR_NAME} q slice and seed counts differ or are empty"
+                    f"{self.OPERATOR_NAME} q axis sample counts differ or are empty"
                 )
 
             relations = []
-            expected_ids = []
-            for slice_value, seed in zip(slices, seeds):
-                if not isinstance(slice_value, (tuple, list)) or len(slice_value) != 3:
-                    raise ValueError(f"invalid q slice {slice_value!r}")
-                if not all(isinstance(value, Integral) for value in slice_value):
-                    raise ValueError(f"q slice must contain integers: {slice_value!r}")
-                if not isinstance(seed, Integral):
-                    raise ValueError(f"q seed must be an integer: {seed!r}")
-                start, stop, step = (int(value) for value in slice_value)
-                seed = int(seed)
-                if step != 1 or start < 0 or start >= stop:
-                    raise ValueError(
-                        "q slice must be non-empty, non-negative and contiguous: "
-                        f"{slice_value!r}"
+            expected_axes = [[] for _axis in axes]
+            for sample_index in range(sample_count):
+                parsed_slices = []
+                seed = None
+                for axis_group, axis in enumerate(axes):
+                    slice_value = axis_slices[axis_group][sample_index]
+                    seed_value = axis_seeds[axis_group][sample_index]
+                    if not isinstance(slice_value, (tuple, list)) or len(slice_value) != 3:
+                        raise ValueError(f"invalid q axis {axis} slice {slice_value!r}")
+                    if not all(isinstance(value, Integral) for value in slice_value):
+                        raise ValueError(f"q slice must contain integers: {slice_value!r}")
+                    if not isinstance(seed_value, Integral):
+                        raise ValueError(f"q seed must be an integer: {seed_value!r}")
+                    start, stop, step = (int(value) for value in slice_value)
+                    seed_value = int(seed_value)
+                    if step != 1 or start < 0 or start >= stop:
+                        raise ValueError(
+                            "q slice must be non-empty, non-negative and contiguous: "
+                            f"{slice_value!r}"
+                        )
+                    if seed is not None and seed_value != seed:
+                        raise ValueError("logical B and S slices must use the same seed")
+                    seed = seed_value
+                    parsed_slices.append((start, stop, step))
+                    expected_axes[axis_group].append(
+                        f"{seed}_{axis}_{start}_{stop}_{step}"
                     )
-                relation = (0, 0, seed, stop - start)
-                relations.append(((start, stop, step), relation))
-                expected_ids.append(f"{seed}_0_{start}_{stop}_{step}")
+                if axes == (0, 1) and parsed_slices[0][1] - parsed_slices[0][0] != 1:
+                    raise ValueError("logical (B,S) relation requires one B per sample")
+                relations.append((tuple(parsed_slices), seed, axes))
         except (IndexError, TypeError, ValueError) as error:
             return None, self.config_failure(str(error))
 
-        expected_batch_id = ((tuple(expected_ids),),)
+        expected_batch_id = (tuple(tuple(values) for values in expected_axes),)
         if batch_consistency_id != expected_batch_id:
             return None, self.config_failure(
                 f"{self.OPERATOR_NAME} batch_consistency_id does not match batch "
@@ -223,8 +242,45 @@ class QuantSparseFlashMlaBatchComparator:
             )
         return relations, None
 
+    def output_selector(self, npu, relation, compare_context):
+        slices, _seed, axes = relation
+        batch_slice = slices[0]
+        sequence_slice = slices[1] if axes == (0, 1) else None
+        attributes = dict(compare_context.attributes) if compare_context is not None else {}
+        layout_q = attributes.get("layout_q", "BSND")
+        batch_start, batch_stop, _ = batch_slice
+        if layout_q == "BSND":
+            if batch_stop > npu.shape[0]:
+                raise ValueError(
+                    f"logical B slice {batch_slice!r} exceeds output B={npu.shape[0]}"
+                )
+            selector = [slice(*batch_slice)]
+            if sequence_slice is not None:
+                if npu.ndim < 2 or sequence_slice[1] > npu.shape[1]:
+                    raise ValueError(f"logical S slice {sequence_slice!r} exceeds BSND output")
+                selector.append(slice(*sequence_slice))
+        elif layout_q == "TND":
+            prefix = attributes.get("cu_seqlens_q_values")
+            if prefix is None or len(prefix) < 2 or prefix[0] != 0:
+                raise ValueError("TND batch compare requires cu_seqlens_q_values")
+            if batch_stop >= len(prefix) or prefix[-1] != npu.shape[0]:
+                raise ValueError("cu_seqlens_q_values does not match TND output")
+            if sequence_slice is None:
+                token_start, token_stop = prefix[batch_start], prefix[batch_stop]
+            else:
+                token_start = prefix[batch_start] + sequence_slice[0]
+                token_stop = prefix[batch_start] + sequence_slice[1]
+                if token_stop > prefix[batch_start + 1]:
+                    raise ValueError("logical S slice exceeds its TND batch interval")
+            selector = [slice(token_start, token_stop, 1)]
+        else:
+            raise ValueError(f"unsupported layout_q={layout_q!r}")
+        selector.extend([slice(None)] * (npu.ndim - len(selector)))
+        return tuple(selector)
+
     def compare_same_case(self, npu_output, batch_consistency_id,
-                          batch_axis, batch_slice_info, batch_seed):
+                          batch_axis, batch_slice_info, batch_seed,
+                          compare_context=None):
         relations, error = self.parse_relations(
             batch_consistency_id, batch_axis, batch_slice_info, batch_seed
         )
@@ -241,16 +297,16 @@ class QuantSparseFlashMlaBatchComparator:
                 f"{self.OPERATOR_NAME} batch output must have a batch axis"
             )
         current_groups = {}
-        for slice_value, relation in relations:
-            if slice_value[1] > npu.shape[0]:
-                return self.config_failure(
-                    f"{self.OPERATOR_NAME} q slice {slice_value!r} exceeds output "
-                    f"batch size {npu.shape[0]}"
+        for relation in relations:
+            try:
+                value = self.storage_bytes(
+                    npu[self.output_selector(npu, relation, compare_context)]
                 )
-            selector = (slice(*slice_value),) + (slice(None),) * (npu.ndim - 1)
-            current_groups.setdefault(relation, []).append(
-                self.storage_bytes(npu[selector])
-            )
+            except (IndexError, TypeError, ValueError) as error:
+                return self.config_failure(str(error))
+            _slices, seed, axes = relation
+            relation_key = (0, axes, seed, value[0])
+            current_groups.setdefault(relation_key, []).append(value)
 
         compared_groups = 0
         for relation, values in current_groups.items():
@@ -275,14 +331,15 @@ BATCH_COMPARATOR = QuantSparseFlashMlaBatchComparator()
 
 
 def compare(*outputs, batch_consistency_id=None, batch_axis=None,
-            batch_slice_info=None, batch_seed=None):
+            batch_slice_info=None, batch_seed=None, compare_context=None):
     """Run pytest precision comparison before exact same-case batch checks."""
     results = COMPARATOR.compare(*outputs)
     if not isinstance(results, list) or not all(result["pass"] for result in results):
         return results
 
     batch_result = BATCH_COMPARATOR.compare_same_case(
-        outputs[0], batch_consistency_id, batch_axis, batch_slice_info, batch_seed
+        outputs[0], batch_consistency_id, batch_axis, batch_slice_info, batch_seed,
+        compare_context,
     )
     if batch_result is not None:
         results.append(batch_result)

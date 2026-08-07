@@ -17,9 +17,10 @@ import ast
 import csv
 import hashlib
 import json
+import os
+import tempfile
 from collections import Counter, defaultdict
 from pathlib import Path
-
 
 class BatchOutputComparator:
     """Validate same-case and cross-case relations from raw output bins."""
@@ -30,6 +31,10 @@ class BatchOutputComparator:
         "cu_seqlens_ori_kv_values",
         "cu_seqlens_cmp_kv_values",
     )
+    STATIC_SEQUENCE_ATTRIBUTE_NAMES = frozenset((
+        "q_datarange", "ori_kv_datarange", "cmp_kv_datarange",
+    ))
+    BLOCK_COUNT_ATTRIBUTE_NAMES = frozenset(("block_num1", "block_num2"))
 
     BYTE_WIDTHS = {
         "bool": 1,
@@ -52,7 +57,8 @@ class BatchOutputComparator:
     }
 
     def __init__(self, case_csv, result_csv, dump_dir, report_path,
-                 output_index, require_intra_case, require_cross_case):
+                 output_index, require_intra_case, require_cross_case,
+                 excel_path=None):
         self.case_csv = Path(case_csv)
         self.result_csv = Path(result_csv)
         self.dump_dir = Path(dump_dir)
@@ -60,6 +66,7 @@ class BatchOutputComparator:
         self.output_index = output_index
         self.require_intra_case = require_intra_case
         self.require_cross_case = require_cross_case
+        self.excel_path = Path(excel_path) if excel_path else None
 
     @staticmethod
     def read_rows(path):
@@ -125,6 +132,11 @@ class BatchOutputComparator:
         for key, value in attributes.items():
             if key in self.PREFIX_ATTRIBUTE_NAMES and isinstance(value, (list, tuple)):
                 normalized[key] = self.normalize_prefix(value, start, stop)
+            elif key in self.STATIC_SEQUENCE_ATTRIBUTE_NAMES:
+                normalized[key] = self.normalize_value(value)
+            elif (key in self.BLOCK_COUNT_ATTRIBUTE_NAMES
+                  and attributes.get("layout_kv") != "PA_BBND"):
+                continue
             elif isinstance(value, (list, tuple)) and len(value) == batch_size:
                 normalized[key] = self.normalize_value(value[start:stop])
             elif key == "B":
@@ -225,6 +237,19 @@ class BatchOutputComparator:
             element_count *= dimension
         return element_count * byte_width
 
+    @staticmethod
+    def parse_slice(testcase_name, axis, value):
+        if not isinstance(value, (tuple, list)) or len(value) != 3:
+            raise ValueError(f"{testcase_name}: invalid logical axis {axis} slice {value!r}")
+        if not all(isinstance(item, int) for item in value):
+            raise ValueError(f"{testcase_name}: logical slice must contain integers")
+        start, stop, step = (int(item) for item in value)
+        if step != 1 or start < 0 or start >= stop:
+            raise ValueError(
+                f"{testcase_name}: logical slice must be non-empty and contiguous"
+            )
+        return start, stop, step
+
     def parse_relations(self, row):
         batch_axis = self.parse_cell(row, "batch_axis")
         batch_slices = self.parse_cell(row, "batch_slice_info")
@@ -236,54 +261,97 @@ class BatchOutputComparator:
             )
         if not (len(batch_axis) == len(batch_slices) == len(batch_seed)):
             raise ValueError(f"{row['testcase_name']}: batch metadata top-level counts differ")
-        if not batch_axis or tuple(batch_axis[0]) != (0,):
-            raise ValueError(f"{row['testcase_name']}: only q axis 0 is supported")
+        if not batch_axis or tuple(batch_axis[0]) not in ((0,), (0, 1)):
+            raise ValueError(
+                f"{row['testcase_name']}: q must use logical axes (0,) or (0, 1)"
+            )
         if batch_slices[0] is None or batch_seed[0] is None:
             raise ValueError(f"{row['testcase_name']}: q slices and q seeds are required")
         if any(value is not None for value in batch_slices[1:]):
             raise ValueError(f"{row['testcase_name']}: only q relations are supported")
         if any(value is not None for value in batch_seed[1:]):
             raise ValueError(f"{row['testcase_name']}: only q relation seeds are supported")
-        if len(batch_slices[0]) != 1 or len(batch_seed[0]) != 1:
-            raise ValueError(f"{row['testcase_name']}: q must declare exactly one axis group")
-
-        slices = batch_slices[0][0]
-        seeds = batch_seed[0][0]
-        if not slices or len(slices) != len(seeds):
-            raise ValueError(f"{row['testcase_name']}: q slice and seed counts differ or are empty")
+        axes = tuple(batch_axis[0])
+        axis_slices = batch_slices[0]
+        axis_seeds = batch_seed[0]
+        if len(axis_slices) != len(axes) or len(axis_seeds) != len(axes):
+            raise ValueError(f"{row['testcase_name']}: q groups must match logical axes")
+        sample_count = len(axis_slices[0])
+        if not sample_count or any(
+                len(values) != sample_count for values in (*axis_slices, *axis_seeds)):
+            raise ValueError(f"{row['testcase_name']}: q axis sample counts differ or are empty")
 
         relations = []
-        for slice_value, seed in zip(slices, seeds):
-            if not isinstance(slice_value, (tuple, list)) or len(slice_value) != 3:
-                raise ValueError(f"{row['testcase_name']}: invalid q slice {slice_value!r}")
-            if not all(isinstance(value, int) for value in slice_value):
-                raise ValueError(f"{row['testcase_name']}: q slice must contain integers")
-            if not isinstance(seed, int):
-                raise ValueError(f"{row['testcase_name']}: q seed must be an integer")
-            start, stop, step = slice_value
-            if step != 1 or start < 0 or start >= stop:
+        for sample_index in range(sample_count):
+            slices = []
+            seed = None
+            for axis_group, axis in enumerate(axes):
+                slices.append(self.parse_slice(
+                    row["testcase_name"], axis, axis_slices[axis_group][sample_index]
+                ))
+                seed_value = axis_seeds[axis_group][sample_index]
+                if not isinstance(seed_value, int):
+                    raise ValueError(f"{row['testcase_name']}: q seed must be an integer")
+                if seed is not None and seed != seed_value:
+                    raise ValueError(
+                        f"{row['testcase_name']}: logical B and S must use the same seed"
+                    )
+                seed = int(seed_value)
+            if axes == (0, 1) and slices[0][1] - slices[0][0] != 1:
                 raise ValueError(
-                    f"{row['testcase_name']}: q slice must be non-empty and contiguous"
+                    f"{row['testcase_name']}: logical (B,S) requires one B per sample"
                 )
-            relations.append((start, stop, seed, stop - start))
+            relations.append({"axes": axes, "slices": tuple(slices), "seed": seed})
+
+        if axes == (0, 1) and len({item["slices"][1] for item in relations}) > 1:
+            attributes = self.parse_cell(row, "attributes", {})
+            masks = [attributes.get("ori_mask_mode")]
+            if attributes.get("has_cmp_kv", True):
+                masks.append(attributes.get("cmp_mask_mode"))
+            if any(value not in (None, 0) for value in masks):
+                raise ValueError(
+                    f"{row['testcase_name']}: shifted logical S relations require no-mask mode"
+                )
         return relations
 
-    def build_context(self, row, start, stop, output_extent, output_shape, output_dtype):
+    def build_context(self, row, relation, output_shape, output_dtype):
         shapes = self.parse_cell(row, "tensor_view_shapes")
         dtypes = self.parse_cell(row, "tensor_dtypes")
         ranges = self.parse_cell(row, "input_data_ranges", ())
+        output_extent = output_shape[0]
         attributes, batch_size, q_prefix, prefixes = self.layout_context(
             row, output_extent
         )
-        batch_start, batch_stop = self.logical_batch_slice(
-            row["testcase_name"], start, stop, q_prefix
+        batch_slice = relation["slices"][0]
+        batch_start, batch_stop, _ = batch_slice
+        sequence_slice = (
+            relation["slices"][1] if relation["axes"] == (0, 1) else None
         )
         token_lengths = self.relation_token_lengths(prefixes, batch_start, batch_stop)
+        if sequence_slice is not None:
+            token_lengths["q"] = sequence_slice[1] - sequence_slice[0]
+        feature_shape = (
+            output_shape[2:]
+            if attributes.get("layout_q", "BSND") == "BSND" and sequence_slice is not None
+            else output_shape[1:]
+        )
+        sequence_context = None
+        if sequence_slice is not None:
+            masks = [attributes.get("ori_mask_mode")]
+            if attributes.get("has_cmp_kv", True):
+                masks.append(attributes.get("cmp_mask_mode"))
+            sequence_context = (
+                [0, sequence_slice[1] - sequence_slice[0]]
+                if all(value in (None, 0) for value in masks)
+                else list(sequence_slice[:2])
+            )
         return {
             "api_name": row.get("api_name"),
             "layout_q": attributes.get("layout_q", "BSND"),
             "layout_kv": attributes.get("layout_kv", "BSND"),
             "relation_batch_count": batch_stop - batch_start,
+            "relation_axes": list(relation["axes"]),
+            "relation_sequence_slice": sequence_context,
             "relation_token_lengths": token_lengths,
             "input_shapes_without_relation": self.normalize_shapes(
                 shapes, self.dynamic_extents(batch_size, prefixes)
@@ -293,9 +361,63 @@ class BatchOutputComparator:
             "attributes": self.normalize_attributes(
                 attributes, batch_start, batch_stop, batch_size, token_lengths
             ),
-            "output_shape": list(output_shape),
+            "output_feature_shape": list(feature_shape),
             "output_dtype": str(output_dtype),
         }
+
+    def extract_output(self, row, relation, output_shape, output_dtype, output_bytes):
+        attributes, batch_size, q_prefix, _prefixes = self.layout_context(
+            row, output_shape[0]
+        )
+        batch_slice = relation["slices"][0]
+        batch_start, batch_stop, _ = batch_slice
+        if batch_stop > batch_size:
+            raise ValueError(f"{row['testcase_name']}: logical B slice exceeds B={batch_size}")
+        sequence_slice = (
+            relation["slices"][1] if relation["axes"] == (0, 1) else None
+        )
+        byte_width = self.expected_byte_count((1,), output_dtype)
+        if attributes.get("layout_q", "BSND") == "BSND":
+            if len(output_shape) < 2:
+                raise ValueError(f"{row['testcase_name']}: BSND output has no S axis")
+            sequence_extent = output_shape[1]
+            trailing_count = 1
+            for dimension in output_shape[2:]:
+                trailing_count *= dimension
+            if sequence_slice is None:
+                element_start = batch_start * sequence_extent * trailing_count
+                element_stop = batch_stop * sequence_extent * trailing_count
+                sample_shape = [batch_stop - batch_start, *output_shape[1:]]
+            else:
+                if sequence_slice[1] > sequence_extent:
+                    raise ValueError(f"{row['testcase_name']}: logical S slice exceeds output S")
+                element_start = (
+                    batch_start * sequence_extent + sequence_slice[0]
+                ) * trailing_count
+                element_stop = (
+                    batch_start * sequence_extent + sequence_slice[1]
+                ) * trailing_count
+                sample_shape = [1, sequence_slice[1] - sequence_slice[0], *output_shape[2:]]
+        else:
+            trailing_count = 1
+            for dimension in output_shape[1:]:
+                trailing_count *= dimension
+            if sequence_slice is None:
+                token_start, token_stop = q_prefix[batch_start], q_prefix[batch_stop]
+            else:
+                token_start = q_prefix[batch_start] + sequence_slice[0]
+                token_stop = q_prefix[batch_start] + sequence_slice[1]
+                if token_stop > q_prefix[batch_start + 1]:
+                    raise ValueError(
+                        f"{row['testcase_name']}: logical S slice exceeds TND interval"
+                    )
+            element_start = token_start * trailing_count
+            element_stop = token_stop * trailing_count
+            sample_shape = [token_stop - token_start, *output_shape[1:]]
+        return (
+            output_bytes[element_start * byte_width:element_stop * byte_width],
+            sample_shape,
+        )
 
     def build_samples(self, case_rows, result_rows):
         result_by_case = {}
@@ -349,24 +471,34 @@ class BatchOutputComparator:
                     f"{testcase_name}: output byte count {len(output_bytes)} does not match "
                     f"shape/dtype expectation {expected_bytes}"
                 )
-            bytes_per_item = len(output_bytes) // output_extent
-
-            for start, stop, seed, length in self.parse_relations(row):
-                if stop > output_extent:
-                    raise ValueError(
-                        f"{testcase_name}: q slice {(start, stop, 1)!r} exceeds "
-                        f"output axis-0 extent {output_extent}"
-                    )
-                relation = (self.output_index, 0, seed, length)
-                value = output_bytes[start * bytes_per_item:stop * bytes_per_item]
+            for logical_relation in self.parse_relations(row):
+                value, sample_shape = self.extract_output(
+                    row, logical_relation, output_shape, output_dtype, output_bytes
+                )
+                logical_sizes = tuple(
+                    stop - start
+                    for start, stop, _step in logical_relation["slices"]
+                )
+                relation = (
+                    self.output_index,
+                    logical_relation["axes"],
+                    logical_relation["seed"],
+                    logical_sizes,
+                )
                 samples.append({
                     "testcase_name": testcase_name,
                     "relation": relation,
-                    "slice": [start, stop, 1],
-                    "shape": [length, *output_shape[1:]],
+                    "slice": {
+                        "B": list(logical_relation["slices"][0]),
+                        "S": (
+                            list(logical_relation["slices"][1])
+                            if logical_relation["axes"] == (0, 1) else None
+                        ),
+                    },
+                    "shape": sample_shape,
                     "dtype": str(output_dtype),
                     "context": self.build_context(
-                        row, start, stop, output_extent, output_shape[1:], output_dtype
+                        row, logical_relation, output_shape, output_dtype
                     ),
                     "digest": hashlib.sha256(value).hexdigest(),
                     "value": value,
@@ -423,6 +555,85 @@ class BatchOutputComparator:
             "errors": errors,
         }
 
+    def write_excel(self, report):
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Font, PatternFill
+
+        workbook = Workbook()
+        summary = workbook.active
+        summary.title = "Summary"
+        summary.append(("Field", "Value"))
+        for key in (
+            "status", "case_csv", "result_csv", "dump_dir", "output_index",
+            "require_intra_case", "require_cross_case", "group_count", "sample_count",
+        ):
+            summary.append((key, str(report[key])))
+
+        details = workbook.create_sheet("Relations")
+        headers = (
+            "Group", "Output", "Logical axes", "Seed", "Logical size", "Status",
+            "Case count", "Sample count", "Testcase", "Slice", "Shape",
+            "Dtype", "SHA-256", "Errors",
+        )
+        details.append(headers)
+        for group_id, group in enumerate(report["groups"], start=1):
+            first_row = details.max_row + 1
+            output_index, batch_axis, seed, slice_length = group["relation"]
+            errors = "\n".join(group["errors"])
+            for sample in group["samples"]:
+                details.append((
+                    group_id, output_index, repr(batch_axis), seed, repr(slice_length),
+                    group["status"], group["case_count"], group["sample_count"],
+                    sample["testcase_name"], repr(sample["slice"]),
+                    repr(sample["shape"]), sample["dtype"], sample["sha256"], errors,
+                ))
+            last_row = details.max_row
+            if last_row > first_row:
+                for column in (*range(1, 9), 14):
+                    details.merge_cells(
+                        start_row=first_row,
+                        start_column=column,
+                        end_row=last_row,
+                        end_column=column,
+                    )
+            for column in (*range(1, 9), 14):
+                details.cell(first_row, column).alignment = Alignment(
+                    horizontal="center", vertical="center", wrap_text=True
+                )
+            fill = "C6EFCE" if group["status"] == "PASS" else "FFC7CE"
+            details.cell(first_row, 6).fill = PatternFill("solid", fgColor=fill)
+
+        header_fill = PatternFill("solid", fgColor="D9EAF7")
+        for worksheet in (summary, details):
+            worksheet.freeze_panes = "A2"
+            worksheet.sheet_view.showGridLines = False
+            for cell in worksheet[1]:
+                cell.font = Font(bold=True)
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+        details.freeze_panes = "I2"
+        details.auto_filter.ref = details.dimensions
+        for column, width in {
+            "A": 9, "B": 9, "C": 8, "D": 12, "E": 14, "F": 10,
+            "G": 12, "H": 14, "I": 54, "J": 20, "K": 24, "L": 16,
+            "M": 68, "N": 58,
+        }.items():
+            details.column_dimensions[column].width = width
+        summary.column_dimensions["A"].width = 28
+        summary.column_dimensions["B"].width = 100
+
+        self.excel_path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            prefix=f".{self.excel_path.stem}.", suffix=".xlsx",
+            dir=self.excel_path.parent, delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+        try:
+            workbook.save(temporary)
+            os.replace(temporary, self.excel_path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
     def run(self):
         case_rows = self.read_rows(self.case_csv)
         result_rows = self.read_rows(self.result_csv)
@@ -451,6 +662,8 @@ class BatchOutputComparator:
         self.report_path.write_text(
             json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
+        if self.excel_path is not None:
+            self.write_excel(report)
         return passed, report
 
 
@@ -462,6 +675,7 @@ def build_parser():
     parser.add_argument("--result", required=True, help="TTK result CSV")
     parser.add_argument("--dump-dir", required=True, help="Directory set through NPU_DUMP_PATH")
     parser.add_argument("--report", required=True, help="JSON report path")
+    parser.add_argument("--excel", help="Optional grouped Excel report path")
     parser.add_argument("--output-index", type=int, default=0, help="Output index dumped by E2E")
     parser.add_argument(
         "--require-intra-case",
@@ -486,6 +700,7 @@ def main():
         args.output_index,
         args.require_intra_case,
         args.require_cross_case,
+        args.excel,
     )
     try:
         passed, report = comparator.run()

@@ -14,6 +14,7 @@
 
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import torch
@@ -31,14 +32,22 @@ COMPARE_MODULE = load_asset_module("compare")
 INPUTS_MODULE = load_asset_module("inputs")
 
 
-def batch_kwargs(slices, seed):
+def batch_kwargs(slices, seed, sequence_slices=None):
+    axes = (0,) if sequence_slices is None else (0, 1)
+    slice_groups = (tuple(slices),)
+    seed_groups = (tuple(seed for _ in slices),)
+    ids = [tuple(f"{seed}_0_{start}_{stop}_{step}"
+                 for start, stop, step in slices)]
+    if sequence_slices is not None:
+        slice_groups += (tuple(sequence_slices),)
+        seed_groups += (tuple(seed for _ in sequence_slices),)
+        ids.append(tuple(f"{seed}_1_{start}_{stop}_{step}"
+                         for start, stop, step in sequence_slices))
     return {
-        "batch_consistency_id": ((tuple(
-            f"{seed}_0_{start}_{stop}_{step}" for start, stop, step in slices
-        ),),),
-        "batch_axis": ((0,),),
-        "batch_slice_info": ((tuple(slices),),),
-        "batch_seed": ((tuple(seed for _ in slices),),),
+        "batch_consistency_id": (tuple(ids),),
+        "batch_axis": (axes,),
+        "batch_slice_info": (slice_groups,),
+        "batch_seed": (seed_groups,),
     }
 
 
@@ -74,6 +83,28 @@ def test_same_case_batch_compare_rejects_different_storage_bits():
     assert result[-1]["precision"] == "batch_intra=FAIL"
 
 
+def test_same_case_batch_compare_maps_tnd_logical_sequence_slices():
+    output = np.array(
+        [[8.0], [9.0], [1.0], [2.0], [5.0], [6.0], [7.0], [1.0], [2.0]],
+        dtype=np.float32,
+    )
+    fields = batch_kwargs(
+        ((0, 1, 1), (1, 2, 1)),
+        7001,
+        ((2, 4, 1), (3, 5, 1)),
+    )
+    context = SimpleNamespace(attributes={
+        "layout_q": "TND",
+        "cu_seqlens_q_values": [0, 4, 9],
+    })
+
+    result = COMPARE_MODULE.compare(
+        output, output.copy(), compare_context=context, **fields
+    )
+
+    assert result[-1] == {"pass": True, "precision": "batch_intra=PASS"}
+
+
 def test_batch_random_context_repeats_declared_batch_slices():
     q = torch.empty((3, 1, 1, 1), dtype=torch.float32)
     fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001)
@@ -85,6 +116,35 @@ def test_batch_random_context_repeats_declared_batch_slices():
 
     assert torch.rand is original_rand
     assert torch.equal(value[0], value[2])
+
+
+def test_sparse_modes_map_randperm_by_relation_with_nonuniform_batches():
+    q = torch.empty((3, 2, 1, 1), dtype=torch.float32)
+    fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001)
+    fields.update({
+        "layout_q": "BSND",
+        "layout_kv": "BSND",
+        "seqused_q_values": [2, 1, 2],
+    })
+
+    for mode in ("CSA", "ORI_SPARSE", "ORI_CMP_SPARSE"):
+        context = INPUTS_MODULE.TorchBatchRandomContext.from_case(
+            q, None, None, fields
+        )
+        context.validate_params({
+            "template_mode": mode,
+            "ori_sparse_indices_mode": "full",
+            "cmp_sparse_indices_mode": "full",
+            "ori_kv_topk_mode": "fullK",
+            "cmp_kv_topk_mode": "fullK",
+            "seqused_q": [2, 1, 2],
+            "S1": 2,
+            "N2": 1,
+        })
+        with context:
+            permutations = [torch.randperm(8) for _ in range(5)]
+        assert torch.equal(permutations[0], permutations[3])
+        assert torch.equal(permutations[1], permutations[4])
 
 
 def test_bsnd_batch_context_ignores_auxiliary_q_prefix():
@@ -106,7 +166,7 @@ def test_tnd_batch_random_context_maps_q_and_kv_token_ranges():
     q = torch.empty((8, 1, 1), dtype=torch.float32)
     ori_kv = torch.empty((12, 1, 1), dtype=torch.float32)
     cmp_kv = torch.empty((4, 1, 1), dtype=torch.float32)
-    fields = batch_kwargs(((0, 2, 1), (4, 6, 1)), 7001)
+    fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001)
     fields.update({
         "layout_q": "TND",
         "layout_kv": "TND",
@@ -121,9 +181,9 @@ def test_tnd_batch_random_context_maps_q_and_kv_token_ranges():
 
     with INPUTS_MODULE.TorchBatchRandomContext.from_case(
             q, ori_kv, cmp_kv, fields):
-        q_value = torch.rand(8, 2)
-        ori_value = torch.rand(12, 2)
-        cmp_value = torch.rand(4, 2)
+        q_value = torch.rand(q.shape)
+        ori_value = torch.rand(ori_kv.shape)
+        cmp_value = torch.rand(cmp_kv.shape)
         batch_value = torch.rand(4, 2, 2)
 
     assert torch.equal(q_value[0:2], q_value[4:6])
@@ -132,9 +192,34 @@ def test_tnd_batch_random_context_maps_q_and_kv_token_ranges():
     assert torch.equal(batch_value[0], batch_value[2])
 
 
-def test_tnd_batch_random_context_rejects_partial_logical_batch():
+def test_tnd_batch_random_context_distinguishes_equal_q_and_kv_extents():
+    q = torch.empty((8, 2, 1), dtype=torch.float32)
+    ori_kv = torch.empty((8, 1, 1), dtype=torch.float32)
+    fields = batch_kwargs(
+        ((0, 1, 1), (2, 3, 1)),
+        7001,
+        ((0, 1, 1), (1, 2, 1)),
+    )
+    fields.update({
+        "layout_q": "TND",
+        "layout_kv": "TND",
+        "cu_seqlens_q_values": [0, 2, 4, 6, 8],
+        "cu_seqlens_ori_kv_values": [0, 2, 4, 6, 8],
+        "seqused_q_values": [2, 2, 2, 2],
+        "seqused_ori_kv_values": [2, 2, 2, 2],
+    })
+
+    with INPUTS_MODULE.TorchBatchRandomContext.from_case(q, ori_kv, None, fields):
+        q_value = torch.rand(8, 2, 1)
+        ori_value = torch.rand(8, 1, 1)
+
+    assert torch.equal(q_value[0:1], q_value[5:6])
+    assert torch.equal(ori_value[0:2], ori_value[4:6])
+
+
+def test_tnd_batch_random_context_rejects_out_of_range_logical_batch():
     q = torch.empty((8, 1, 1), dtype=torch.float32)
-    fields = batch_kwargs(((1, 3, 1), (4, 6, 1)), 7001)
+    fields = batch_kwargs(((1, 3, 1), (3, 5, 1)), 7001)
     fields.update({
         "layout_q": "TND",
         "layout_kv": "PA_BBND",
@@ -144,9 +229,57 @@ def test_tnd_batch_random_context_rejects_partial_logical_batch():
     try:
         INPUTS_MODULE.TorchBatchRandomContext.from_case(q, None, None, fields)
     except ValueError as error:
-        assert "complete cu_seqlens_q intervals" in str(error)
+        assert "logical B slice must be in-range" in str(error)
     else:
-        raise AssertionError("partial TND logical batch must be rejected")
+        raise AssertionError("out-of-range logical batch must be rejected")
+
+
+def test_tnd_sequence_relation_maps_logical_bs_to_physical_tokens():
+    q = torch.empty((12, 1, 1), dtype=torch.float32)
+    ori_kv = torch.empty((15, 1, 1), dtype=torch.float32)
+    fields = batch_kwargs(
+        ((0, 1, 1), (2, 3, 1)),
+        7001,
+        ((1, 3, 1), (0, 2, 1)),
+    )
+    fields.update({
+        "layout_q": "TND",
+        "layout_kv": "TND",
+        "cu_seqlens_q_values": [0, 4, 8, 12],
+        "cu_seqlens_ori_kv_values": [0, 5, 10, 15],
+        "seqused_q_values": [4, 4, 4],
+        "seqused_ori_kv_values": [5, 5, 5],
+    })
+
+    with INPUTS_MODULE.TorchBatchRandomContext.from_case(q, ori_kv, None, fields):
+        q_value = torch.rand(q.shape)
+        ori_value = torch.rand(ori_kv.shape)
+
+    assert torch.equal(q_value[1:3], q_value[8:10])
+    assert torch.equal(ori_value[0:5], ori_value[10:15])
+
+
+def test_sequence_relation_different_positions_requires_no_mask():
+    q = torch.empty((8, 1, 1), dtype=torch.float32)
+    fields = batch_kwargs(
+        ((0, 1, 1), (1, 2, 1)),
+        7001,
+        ((0, 2, 1), (2, 4, 1)),
+    )
+    fields.update({
+        "layout_q": "TND",
+        "layout_kv": "TND",
+        "cu_seqlens_q_values": [0, 4, 8],
+        "seqused_q_values": [4, 4],
+    })
+    context = INPUTS_MODULE.TorchBatchRandomContext.from_case(q, None, None, fields)
+
+    try:
+        context.validate_params({"template_mode": "HCA", "ori_mask_mode": 4})
+    except ValueError as error:
+        assert "require no-mask mode" in str(error)
+    else:
+        raise AssertionError("position-dependent mask must reject shifted logical S slices")
 
 
 def test_pa_batch_random_context_uses_logical_batch_relations():
@@ -218,6 +351,8 @@ def test_tnd_pa_input_adapter_preserves_relation_through_block_tables():
     )
 
     assert torch.equal(q[0], q[2])
+    assert torch.equal(ori_block_table[0], ori_block_table[2])
+    assert torch.equal(cmp_block_table[0], cmp_block_table[2])
     assert torch.equal(
         ori_kv[int(ori_block_table[0, 0])],
         ori_kv[int(ori_block_table[2, 0])],
