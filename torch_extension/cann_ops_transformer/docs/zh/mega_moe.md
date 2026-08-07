@@ -1228,12 +1228,13 @@ mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_we
     offsetTensor         = winInTensorSize
                         + (quant ? num_max_tokens_per_rank × num_topk × 4B : 0)
 
-        // sync flags
-        syncStateReservedSize = 512KB
-        offsetFlag            = max(ep_world_size × 512B, syncStateReservedSize)
-        ```
+    // sync flags
+    syncStateReservedSize = 512KB
+    offsetFlag            = max(ep_world_size × 512B, syncStateReservedSize)
+    ```
     <!-- end id12 -->
 
+    <!-- npu="950" id13 -->
      **Ascend 950PR/Ascend 950DT：**
 
     ```text
@@ -1261,17 +1262,20 @@ mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_we
     ```
     其中 `ep_world_size` 即通信域大小，$maxExpertPerRank$ 表示每张卡上可能专家数的最大值，$\mathrm{quant}$ 表示是否开启dispatch量化（`dispatch_quant_mode = 2`）。预留空间10 MB为内部元数据对齐与安全余量。
   - 通信域各节点的驱动版本应当相同。
-  <!-- npu="910b" id13 -->
+    <!-- end id13 -->
+  <!-- npu="910b" id14 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：多机通信域要求交换机组网，不支持双机直连组网。
-  <!-- end id13 -->
-  <!-- npu="A3" id14 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：多机通信域要求在一个超节点内，不支持双机直连组网和跨超节点组网。
-  - Ascend 950PR/Ascend 950DT：仅支持UB Memory通信协议。
   <!-- end id14 -->
+  <!-- npu="A3" id15 -->
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：多机通信域要求在一个超节点内，不支持双机直连组网和跨超节点组网。
+  <!-- end id15 -->
+  <!-- npu="950" id16 -->
+  - <term>Ascend 950PR/Ascend 950DT</term>：仅支持UB Memory通信协议。
+  <!-- end id16 -->
 
 - **参数约束**：
 
-  <!-- npu="A3,910b" id15 -->
+  <!-- npu="A3,910b" id17 -->
   - **Atlas A2 训练系列产品/Atlas A2 推理系列产品、Atlas A3 训练系列产品/Atlas A3 推理系列产品：**
 
     - 各卡 `num_tokens` 需保持一致。
@@ -1353,6 +1357,8 @@ mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_we
         </tfoot>
         </table>
 
+  <!-- end id17 -->
+  <!-- npu="950" id18 -->
   - **Ascend 950PR/Ascend 950DT：**
     - num_tokens（x.dim0）范围 [1, +∞)，实际上限受`ccl_buffer_size`约束。算子采用分批处理机制，BS不再受UB容量硬限制，dispatch阶段按固定粒度分批处理。
     - hidden（x.dim1）仅支持1024、2048、3072、4096、5120、6144、7168、8192。
@@ -1470,7 +1476,7 @@ mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_we
         </tfoot>
         </table>
 
-  <!-- end id16 -->
+  <!-- end id18 -->
 
 ## 确定性计算
 
@@ -1482,7 +1488,7 @@ mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_we
 
   下面示例将两个接口按调用顺序串联：先初始化通信域，再用get_symm_buffer_for_mega_moe构造sym_buffer，最后调用mega_moe运行算子。
 
-  <!-- npu="950" id17 -->
+  <!-- npu="950" id19 -->
   - **Ascend 950PR/Ascend 950DT**：
 
     ```python
@@ -1689,9 +1695,9 @@ mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_we
             expert_scales_list=golden_expert_scales_list,
         )
     ```
-  <!-- end id17 -->
+  <!-- end id19 -->
 
-  <!-- npu="A3,910b" id18 -->
+  <!-- npu="A3,910b" id20 -->
   - **Atlas A2 训练系列产品/Atlas A2 推理系列产品、Atlas A3 训练系列产品/Atlas A3 推理系列产品**：
 
     ```python
@@ -1915,3 +1921,4 @@ mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_we
         else:
             raise ValueError(f"Unsupported scene: {scene}, please choose from ['A16W16', 'A8W8-INT', 'A8W4-INT']")
     ```
+  <!-- end id20 -->
