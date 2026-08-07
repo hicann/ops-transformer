@@ -797,7 +797,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
   #define LOG_PRINT(message, ...)         \
       do {                                \
           printf(message, ##__VA_ARGS__); \
-      } while(0)
+      } while (0)
 
   constexpr int DEV_NUM = 2;
 

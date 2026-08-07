@@ -308,7 +308,7 @@ aclnnStatus aclnnQuantReduceScatter(
                 return ret);
         std::vector<int64_t> strides(shape.size(), 1);
         for (int64_t i = shape.size() - 2; i >= 0; i--) {
-            strides[i] = shape[i +1] * strides[i + 1];
+            strides[i] = shape[i + 1] * strides[i + 1];
         }
         *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
             shape.data(), shape.size(), *deviceAddr);
