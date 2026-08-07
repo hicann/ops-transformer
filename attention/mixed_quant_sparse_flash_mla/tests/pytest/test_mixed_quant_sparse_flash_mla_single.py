@@ -28,8 +28,8 @@ import utils
 
 pt_save_path = "mqsmla_testcase"
 device_id = 0
-save_pt = False
-result_path = Path("result.xlsx")
+save_pt = os.environ.get("SAVE_PT", "0") == "1"
+result_path = Path(os.environ.get("MQSMLA_RESULT_SAVE_PATH", "result.xlsx"))
 
 param_combinations = []
 for params in ENABLED_PARAMS:

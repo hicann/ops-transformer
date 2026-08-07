@@ -47,7 +47,7 @@ else:
 
 
 def qsmla(testcase_files):
-    test_data = torch.load(testcase_files, map_location="cpu")
+    test_data = torch.load(testcase_files, map_location="cpu", weights_only=False)
     try:
         if is_run_graph:
             npu_result, cpu_quant_result, cpu_lse, npu_lse = (

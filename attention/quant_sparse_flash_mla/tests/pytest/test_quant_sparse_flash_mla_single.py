@@ -25,8 +25,8 @@ import os
 
 pt_save_path = "qsmla_testcase"
 device_id = 0
-save_pt = False
-result_path = Path("result.xlsx")
+save_pt = os.environ.get("SAVE_PT", "0") == "1"
+result_path = Path(os.environ.get("QSMLA_RESULT_SAVE_PATH", "result.xlsx"))
 is_run_graph = os.environ.get("RUN_GRAPH", "0") == "1"
 
 # 日志配置
@@ -152,10 +152,10 @@ def qsmla(param_combinations):
             lse_res, lse_pct = result_compare_method.check_result(cpu_lse, npu_lse)
 
         # 主输出失败记录
-        if main_res != "PASS":
+        if main_res != "Pass":
             fail_info.append(f"MAIN_FAILED:{main_res}")
         # LSE失败记录
-        if lse_res is not None and lse_res != "PASS":
+        if lse_res is not None and lse_res != "Pass":
             fail_info.append(f"LSE_FAILED:{lse_res}")
             min_fulfill = min(min_fulfill, lse_pct)
 

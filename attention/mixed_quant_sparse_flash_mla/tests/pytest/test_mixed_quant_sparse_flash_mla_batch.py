@@ -65,7 +65,7 @@ else:
     print(f"错误: 输出目录不存在: {testcase_path}")
 
 def mqsmla(testcase_files):
-    test_data = torch.load(testcase_files, map_location="cpu")
+    test_data = torch.load(testcase_files, map_location="cpu", weights_only=False)
     npu_error_msg = None
     try:
         npu_result, cpu_quant_result, cpu_lse, npu_lse = mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(

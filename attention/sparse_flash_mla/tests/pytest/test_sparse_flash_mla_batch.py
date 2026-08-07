@@ -73,7 +73,7 @@ print("files:", locals()["testcase_files"])
 def test_sparse_flash_mla(testcase_files):
     print("执行文件: ", testcase_files)
     torch_npu.npu.set_device(0)
-    test_data = torch.load(testcase_files, map_location="cpu")
+    test_data = torch.load(testcase_files, map_location="cpu", weights_only=False)
     npu_result = None
     try:
         npu_result, softmax_lse = sparse_flash_mla_process.call_npu(test_data)
