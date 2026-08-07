@@ -18,6 +18,7 @@ signature and aligns return values with NPU outputs (returned output + in-place
 modified state).
 """
 
+import gc
 import importlib.util
 import sys
 from pathlib import Path
@@ -86,10 +87,6 @@ def cpu_recurrent_gated_delta_rule(query, key, value, state, *args, **kwargs):
             p[name] = args[i]
         else:
             p[name] = None
-    query = query.clone()
-    key = key.clone()
-    value = value.clone()
-    state = state.clone()
     output, state_out = mod.cpu_recurrent_gated_delta_rule(
         query,
         key,
@@ -105,6 +102,7 @@ def cpu_recurrent_gated_delta_rule(query, key, value, state, *args, **kwargs):
     )
     output = output.to(query.dtype)
     state_out = state_out.to(state.dtype)
+    gc.collect()
     return output, state_out
 
 
@@ -131,10 +129,6 @@ def aclnn_cpu_recurrent_gated_delta_rule(
     output_tensor_indexes (out first, stateRef second).
     """
     mod = load_pytest_golden_module()
-    query = query.clone()
-    key = key.clone()
-    value = value.clone()
-    stateRef = stateRef.clone()
     output, state_out = mod.cpu_recurrent_gated_delta_rule(
         query,
         key,
@@ -150,4 +144,5 @@ def aclnn_cpu_recurrent_gated_delta_rule(
     )
     output = output.to(query.dtype)
     state_out = state_out.to(stateRef.dtype)
+    gc.collect()
     return [output, state_out]

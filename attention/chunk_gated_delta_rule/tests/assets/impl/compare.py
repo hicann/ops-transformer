@@ -96,25 +96,42 @@ def cross_check_output(npu_out, golden_out, bench_out, name):
     Computes mare/mere/rmse/smra ratios (NPU error / benchmark error) and
     checks against thresholds (CV_MAX_RE / CV_AVER_RE / CV_RMSE / CV_SMALL_VAL).
     """
-    t = as_numpy(npu_out).reshape(-1).astype(np.float32)
     g = as_numpy(golden_out).reshape(-1).astype(np.float32)
-    b = as_numpy(bench_out).reshape(-1).astype(np.float32)
+    t = as_numpy(npu_out).reshape(-1).astype(np.float32)
 
-    if t.shape != g.shape or t.shape != b.shape:
-        return {
+    if t.shape != g.shape:
+        result = {
             "pass": False,
             "precision": "shape_mismatch",
-            "error_info": f"{name} shape mismatch: npu={t.shape}, golden={g.shape}, bench={b.shape}",
+            "error_info": f"{name} shape mismatch: npu={t.shape}, golden={g.shape}",
         }
+        del t, g
+        return result
 
     max_re_npu = _get_max_re(t, g)
-    max_re_bench = _get_max_re(b, g)
     avg_re_npu = _get_avg_re(t, g)
-    avg_re_bench = _get_avg_re(b, g)
     rmse_npu = _get_rmse(t, g)
-    rmse_bench = _get_rmse(b, g)
     smra_npu, err_npu, num_small = _get_smra(t, g)
+
+    del t
+
+    b = as_numpy(bench_out).reshape(-1).astype(np.float32)
+
+    if b.shape != g.shape:
+        result = {
+            "pass": False,
+            "precision": "shape_mismatch",
+            "error_info": f"{name} shape mismatch: bench={b.shape}, golden={g.shape}",
+        }
+        del b, g
+        return result
+
+    max_re_bench = _get_max_re(b, g)
+    avg_re_bench = _get_avg_re(b, g)
+    rmse_bench = _get_rmse(b, g)
     smra_bench, err_bench, _ = _get_smra(b, g)
+
+    del b, g
 
     max_re_rate = _safe_div(max_re_npu, max_re_bench)
     avg_re_rate = _safe_div(avg_re_npu, avg_re_bench)

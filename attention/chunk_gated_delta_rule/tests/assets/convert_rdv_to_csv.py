@@ -102,6 +102,19 @@ def _ranges_tuple_str(ranges):
     return _tuple_str(parts)
 
 
+def _contig_stride(shape):
+    """Row-major contiguous strides for a shape (same convention as numpy/torch)."""
+    if shape is None:
+        return None
+    dims = list(shape)
+    if not dims:
+        return ()
+    strides = [1] * len(dims)
+    for i in range(len(dims) - 2, -1, -1):
+        strides[i] = strides[i + 1] * dims[i + 1]
+    return tuple(strides)
+
+
 def _build_e2e_row(name, B, seqlen, Nk, Nv, Dk, Dv, has_g, scale, dt, sdt, is_contig):
     T = B * seqlen if isinstance(seqlen, int) else sum(seqlen)
 
@@ -139,9 +152,9 @@ def _build_e2e_row(name, B, seqlen, Nk, Nv, Dk, Dv, has_g, scale, dt, sdt, is_co
     else:
         state_storage = (B, Nv, Dv + 1, Dk)
         state_stride = (Nv * (Dv + 1) * Dk, (Dv + 1) * Dk, Dk, 1)
-        storage_shapes = [None for _ in shapes]
+        storage_shapes = [s for s in shapes]
         storage_shapes[4] = state_storage
-        strides = [None for _ in shapes]
+        strides = [_contig_stride(s) for s in shapes]
         strides[4] = state_stride
         offsets = ["0"] * len(shapes)
         ts = _tuple_str(storage_shapes)
@@ -209,9 +222,9 @@ def _build_aclnn_row(name, B, seqlen, Nk, Nv, Dk, Dv, has_g, scale, dt, sdt, is_
     else:
         state_storage = (B, Nv, Dv + 1, Dk)
         state_stride = (Nv * (Dv + 1) * Dk, (Dv + 1) * Dk, Dk, 1)
-        storage_shapes = [None for _ in shapes]
+        storage_shapes = [s for s in shapes]
         storage_shapes[4] = state_storage
-        strides = [None for _ in shapes]
+        strides = [_contig_stride(s) for s in shapes]
         strides[4] = state_stride
         offsets = ["0"] * len(shapes)
         ts = _tuple_str(storage_shapes)

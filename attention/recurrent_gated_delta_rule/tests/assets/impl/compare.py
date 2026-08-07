@@ -157,8 +157,8 @@ def numerical_compare(npu_out, golden_out):
 
     Print format and pass/fail criteria mirror pytest check_result().
     """
-    npu = as_numpy(npu_out).reshape(-1).astype(np.float32)
-    golden = as_numpy(golden_out).reshape(-1).astype(np.float32)
+    npu = as_numpy(npu_out).reshape(-1).astype(np.float32, copy=False)
+    golden = as_numpy(golden_out).reshape(-1).astype(np.float32, copy=False)
     if npu.shape != golden.shape:
         return {
             "pass": False,

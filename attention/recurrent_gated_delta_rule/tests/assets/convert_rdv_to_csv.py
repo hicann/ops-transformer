@@ -15,27 +15,33 @@
 生成 E2E + ACLNN 两份 CSV，覆盖 RDV 全部用例（含 fp32 state、非连续 state）。
 
 用法:
-    cd attention/recurrent_gated_delta_rule/tests/pytest
-    python3 gen_ttk_csv.py
+    cd attention/recurrent_gated_delta_rule/tests/assets
+    python3 convert_rdv_to_csv.py [--rdv-file PATH] [--output-dir DIR]
 """
 
+import argparse
 import csv
+import importlib.util
 import itertools
 import sys
 from pathlib import Path
 
 import torch
 
-sys.path.insert(0, str(Path(__file__).parent))
-from test_recurrent_gated_delta_rule_paramset_rdv import ENABLED_PARAMS_RDV  # noqa: E402
+
+def _load_rdv_module(rdv_path):
+    spec = importlib.util.spec_from_file_location("rdv_cases", rdv_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["rdv_cases"] = module
+    spec.loader.exec_module(module)
+    return module
+
 
 DTYPE_MAP = {
     torch.bfloat16: "bfloat16",
     torch.float32: "float32",
     torch.float16: "float16",
 }
-
-OUTPUT_DIR = Path(__file__).resolve().parent.parent / "assets" / "rgdr_assets"
 
 
 def dtype_str(dt):
@@ -123,10 +129,10 @@ def non_contig_fields(tensor_count, state_idx, state_shape, block_num, nv, dv, d
     return tuple(storage_shapes), tuple(view_strides), tuple(view_offsets)
 
 
-def build_e2e_rows():
+def build_e2e_rows(cases):
     rows = []
     idx = 0
-    for param_dict in ENABLED_PARAMS_RDV:
+    for param_dict in cases:
         for case in expand(param_dict):
             b, mtp, nk, nv, dk, dv, block_num, scale, t = compute_derived(case)
             has_g = case["has_gamma"] in (True, "True")
@@ -191,10 +197,10 @@ def build_e2e_rows():
     return rows
 
 
-def build_aclnn_rows():
+def build_aclnn_rows(cases):
     rows = []
     idx = 0
-    for param_dict in ENABLED_PARAMS_RDV:
+    for param_dict in cases:
         for case in expand(param_dict):
             b, mtp, nk, nv, dk, dv, block_num, scale, t = compute_derived(case)
             has_g = case["has_gamma"] in (True, "True")
@@ -318,14 +324,42 @@ def write_csv(path, rows, is_aclnn):
 
 
 def main():
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser(
+        description="Convert rdv paramset cases to ttk CSV"
+    )
+    parser.add_argument(
+        "--rdv-file",
+        default=str(
+            Path(__file__).resolve().parents[1]
+            / "pytest"
+            / "test_recurrent_gated_delta_rule_paramset_rdv.py"
+        ),
+        help="Path to test_recurrent_gated_delta_rule_paramset_rdv.py",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=str(Path(__file__).resolve().parent),
+        help="Output directory for CSV files",
+    )
+    args = parser.parse_args()
 
-    e2e_rows = build_e2e_rows()
-    e2e_path = OUTPUT_DIR / "recurrent_gated_delta_rule_rdv.csv"
+    rdv_path = Path(args.rdv_file).resolve()
+    if not rdv_path.exists():
+        print(f"ERROR: rdv file not found: {rdv_path}")
+        sys.exit(1)
+
+    mod = _load_rdv_module(rdv_path)
+    cases = mod.ENABLED_PARAMS_RDV
+
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    e2e_rows = build_e2e_rows(cases)
+    e2e_path = output_dir / "recurrent_gated_delta_rule_rdv.csv"
     write_csv(e2e_path, e2e_rows, is_aclnn=False)
 
-    aclnn_rows = build_aclnn_rows()
-    aclnn_path = OUTPUT_DIR / "aclnn_recurrent_gated_delta_rule_rdv.csv"
+    aclnn_rows = build_aclnn_rows(cases)
+    aclnn_path = output_dir / "aclnn_recurrent_gated_delta_rule_rdv.csv"
     write_csv(aclnn_path, aclnn_rows, is_aclnn=True)
 
     total = len(e2e_rows)

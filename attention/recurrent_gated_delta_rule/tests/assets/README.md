@@ -35,15 +35,14 @@
 
 ```
 attention/recurrent_gated_delta_rule/tests/
-├── pytest/
-│   └── gen_ttk_csv.py                                # RDV全量用例转TTK CSV脚本（E2E + ACLNN）
 └── assets/
-    ├── spec.py                                       # TestSpec：注册API + golden/inputs/tolerance/compare/torch_graph（e2e + aclnn）
+    ├── convert_rdv_to_csv.py                            # RDV全量用例转TTK CSV脚本（E2E + ACLNN）
+    ├── spec.py                                          # TestSpec：注册API + golden/inputs/tolerance/compare/torch_graph（e2e + aclnn）
     └── impl/
-        ├── golden.py                                 # golden适配器（e2e + aclnn），复用pytest的CPU golden
-        ├── inputs.py                                 # inputs适配器（e2e + aclnn），填充index/length类张量
-        ├── compare.py                                # 数值精度对比（output + state双输出）
-        └── graph.py                                  # 自定义torch.nn.Module，torch.compile图模式专用
+        ├── golden.py                                    # golden适配器（e2e + aclnn），复用pytest的CPU golden
+        ├── inputs.py                                    # inputs适配器（e2e + aclnn），填充index/length类张量
+        ├── compare.py                                   # 数值精度对比（output + state双输出）
+        └── graph.py                                     # 自定义torch.nn.Module，torch.compile图模式专用
 ```
 
 ### 文件职责
@@ -79,15 +78,15 @@ attention/recurrent_gated_delta_rule/tests/
 
 - `RgdrGraphModule`：torch.compile图模式自定义Module，显式返回`(output, state_out)`以便追踪in-place state修改。
 
-### pytest/gen_ttk_csv.py
+### convert_rdv_to_csv.py
 
 - 将`tests/pytest/test_recurrent_gated_delta_rule_paramset_rdv.py`中的全量RDV用例（148条）转换为TTK CSV。
 - 覆盖连续/非连续state、bf16/fp32 state dtype组合，非连续state通过`tensor_storage_shapes`/`tensor_view_strides`/`tensor_view_offsets`描述。
 - 生成两份CSV：E2E模式（`recurrent_gated_delta_rule_rdv.csv`）与ACLNN模式（`aclnn_recurrent_gated_delta_rule_rdv.csv`）。
 
 ```bash
-cd attention/recurrent_gated_delta_rule/tests/pytest
-python3 gen_ttk_csv.py
+cd attention/recurrent_gated_delta_rule/tests/assets
+python3 convert_rdv_to_csv.py
 ```
 
 ## 使用方法
