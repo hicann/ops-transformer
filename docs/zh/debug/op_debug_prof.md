@@ -199,21 +199,21 @@
 
     完成算子开发和编译后，假设采用aclnn接口方式调用，生成的算子可执行文件（test_aclnn_add_example）所在目录为本项目`examples/add_example/examples/build/bin/`。
 
-* **针对Ascend 950PR，可使用[CANN Simulator](./cann_sim.md)仿真工具，执行仿真命令，生成仿真数据**
+* **针对Ascend 950PR，可使用[NPU Simulator](./npu_sim.md)仿真工具，执行仿真命令，生成仿真数据**
 
     执行仿真命令，生成仿真数据
 
     ```bash
-    cannsim record ./test_aclnn_add_example -s Ascend950 --gen-report
+    npusim record ./test_aclnn_add_example -s Ascend950 --gen-report
     ```
 
-    仿真结果在本项目`examples/add_example/examples/build/bin/cannsim_*/report/results/kernel_*/core_*`目录，流水相关文件为：
+    仿真结果在本项目`examples/add_example/examples/build/bin/npusim_*/report/results/kernel_*/core_*`目录，流水相关文件为：
 
     ```bash
     trace_core0.json
     ```
 
-    在Chrome浏览器中输入“chrome://tracing”地址，并将生成的指令流水图文件（trace_core0.json）拖到空白处打开，具体参数介绍参考CANN Simulator中[“仿真结果解析”](./cann_sim.md#仿真结果解析说明)章节。
+    在Chrome浏览器中输入“chrome://tracing”地址，并将生成的指令流水图文件（trace_core0.json）拖到空白处打开，具体参数介绍参考NPU Simulator中[“仿真结果解析”](./npu_sim.md#仿真结果解析说明)章节。
 
 * **针对Atlas A2/A3系列产品，可使用[msProf](https://www.hiascend.com/document/redirect/CannCommunityToolMsprof)工具，执行仿真命令，生成仿真数据**
 
