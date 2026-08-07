@@ -91,9 +91,10 @@ int64_t GetKeyBatchSizeLiV2(int64_t batchSize, const aclTensor *cuSeqlensKOption
     return batchSize;
 }
 
-aclnnStatus CheckSingleParamLiV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t topk, int64_t batchSize,
-    int64_t maxSeqlenQ, int64_t maxSeqlenK, const char *layoutQOptional, const char *layoutKOptional, int64_t maskMode,
-    int64_t cmpRatio, uint32_t aicCoreNum, uint32_t aivCoreNum, const std::string &socVersion)
+aclnnStatus CheckSingleParamLiV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk,
+    int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK, const char *layoutQOptional,
+    const char *layoutKOptional, int64_t maskMode, int64_t cmpRatio, uint32_t aicCoreNum, uint32_t aivCoreNum,
+    const std::string &socVersion)
 {
     // num_heads_q 校验
     CHECK_COND(numHeadsQ >= LI_V2_NUM_HEADS_Q_LOWER_BOUND && numHeadsQ <= LI_V2_NUM_HEADS_Q_UPPER_BOUND,
@@ -102,6 +103,9 @@ aclnnStatus CheckSingleParamLiV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t t
     // num_heads_k 校验
     CHECK_COND(numHeadsK == 1, ACLNN_ERR_PARAM_INVALID,
         "num_heads_kv should only be 1, but got %lld", numHeadsK);
+    // head_dim 校验
+    CHECK_COND(headDim == 128, ACLNN_ERR_PARAM_INVALID,
+        "head_dim should be 128, but got %lld", headDim);
     // topk 校验
     CHECK_COND(topk >= LI_V2_TOPK_LOWER_BOUND && topk <= LI_V2_TOPK_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
         "topk should be [%lld, %lld], but got %lld", LI_V2_TOPK_LOWER_BOUND, LI_V2_TOPK_UPPER_BOUND, topk);
@@ -135,6 +139,18 @@ aclnnStatus CheckSingleParamLiV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t t
     if ((strcmp(layoutKOptional, "PA_BBND") != 0)) {
         CHECK_COND((strcmp(layoutQOptional, layoutKOptional) == 0), ACLNN_ERR_PARAM_INVALID,
             "For layout_k != PA_BBND, layout_q and layout_k must be the same!");
+    }
+    // 校验 layout_q 为 BSND 时，max_seqlen_q 必须大于 0
+    if (strcmp(layoutQOptional, "BSND") == 0) {
+        CHECK_COND(maxSeqlenQ > 0, ACLNN_ERR_PARAM_INVALID,
+            "When layout_q is BSND, the value of max_seqlen_q "
+            "must be equal to the size of the second axis of q, but got %lld", maxSeqlenQ);
+    }
+    // 校验 layout_k 为 BSND 时，max_seqlen_k 必须大于 0
+    if (strcmp(layoutKOptional, "BSND") == 0) {
+        CHECK_COND(maxSeqlenK > 0, ACLNN_ERR_PARAM_INVALID,
+            "When layout_k is BSND, the value of max_seqlen_k "
+            "must be equal to the size of the second axis of k, but got %lld", maxSeqlenK);
     }
     // 核心数校验
     CHECK_COND(aicCoreNum > 0, ACLNN_ERR_PARAM_INVALID, "AIC num should be larger than 0, but got %u", aicCoreNum);
@@ -287,8 +303,8 @@ aclnnStatus ParamsCheckLiV2(
     char *layoutKOptional, int64_t maskMode, int64_t cmpRatio, const aclTensor *metadata, uint32_t aicCoreNum,
     uint32_t aivCoreNum, const std::string &socVersion)
 {
-    auto ret = CheckSingleParamLiV2(numHeadsQ, numHeadsK, topk, batchSize, maxSeqlenQ, maxSeqlenK, layoutQOptional,
-        layoutKOptional, maskMode, cmpRatio, aicCoreNum, aivCoreNum, socVersion);
+    auto ret = CheckSingleParamLiV2(numHeadsQ, numHeadsK, headDim, topk, batchSize, maxSeqlenQ, maxSeqlenK,
+        layoutQOptional, layoutKOptional, maskMode, cmpRatio, aicCoreNum, aivCoreNum, socVersion);
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     ret = CheckExistenceLiV2(maskMode, cmpRatio, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional,

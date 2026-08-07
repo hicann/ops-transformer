@@ -204,6 +204,13 @@ aclnnStatus CheckSingleParamSli(int64_t batchSize, int64_t maxSeqlenQ, int64_t m
                                                "The value of layout_q must be equal to that of layout_k");
         return ACLNN_ERR_PARAM_INVALID;
     }
+    // 校验 layout_q 为 BSND 时，max_seqlen_q 必须大于 0
+    if (strcmp(layoutQOptional, "BSND") == 0 && maxSeqlenQ <= 0) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SLI_ACLNN_OP_NAME, "max_seqlen_q", std::to_string(maxSeqlenQ),
+                                              "When layout_q is BSND, the value of max_seqlen_q "
+                                              "must be equal to the size of the second axis of q");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     // 核心数校验
     if (aicCoreNum == 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SLI_ACLNN_OP_NAME, "aic_core_num", std::to_string(aicCoreNum),

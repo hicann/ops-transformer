@@ -167,13 +167,12 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck
     if (layoutQ_ == "TND") {
         if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
             const int32_t *cuSeqlensQPtr = static_cast<const int32_t*>(cuSeqlensQ_->GetData());
+            // 校验 cu_seqlens_q 首元素为 0
+            if (cuSeqlensQPtr[0] != 0) {
+                KERNEL_LOG_ERROR("The first element of cu_seqlens_q should be 0, but got %d", cuSeqlensQPtr[0]);
+                return false;
+            }
             for (int i = 0; i < batchSize + 1; i++) {
-                // 校验 cu_seqlens_q 元素非负
-                if (cuSeqlensQPtr[i] < 0) {
-                    KERNEL_LOG_ERROR("The elements in cu_seqlens_q should be >= 0, but got cu_seqlens_q[%d] = %d",
-                        i, cuSeqlensQPtr[i]);
-                    return false;
-                }
                 // 校验 cu_seqlens_q 元素递增
                 if (i > 0 && cuSeqlensQPtr[i - 1] > cuSeqlensQPtr[i]) {
                     KERNEL_LOG_ERROR("The elements in cu_seqlens_q must be in ascending order, "
@@ -188,13 +187,12 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck
     if (layoutK_ == "TND") {
         if (cuSeqlensK_ != nullptr && cuSeqlensK_->GetData() != nullptr) {
             const int32_t *cuSeqlensKPtr = static_cast<const int32_t*>(cuSeqlensK_->GetData());
+            // 校验 cu_seqlens_k 首元素为 0
+            if (cuSeqlensKPtr[0] != 0) {
+                KERNEL_LOG_ERROR("The first element of cu_seqlens_k should be 0, but got %d", cuSeqlensKPtr[0]);
+                return false;
+            }
             for (int i = 0; i < batchSize + 1; i++) {
-                // 校验 cu_seqlens_k 元素非负
-                if (cuSeqlensKPtr[i] < 0) {
-                    KERNEL_LOG_ERROR("The elements in cu_seqlens_k should be >= 0, but got cu_seqlens_k[%d] = %d",
-                        i, cuSeqlensKPtr[i]);
-                    return false;
-                }
                 // 校验 cu_seqlens_k 元素递增
                 if (i > 0 && cuSeqlensKPtr[i - 1] > cuSeqlensKPtr[i]) {
                     KERNEL_LOG_ERROR("The elements in cu_seqlens_k must be in ascending order, "
@@ -208,11 +206,28 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsCheck
     // 校验 seqused_q 元素非负
     if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
         const int32_t *sequsedQPtr = static_cast<const int32_t*>(sequsedQ_->GetData());
+        const int32_t *cuSeqlensQPtr = (layoutQ_ == "TND" && cuSeqlensQ_ != nullptr &&
+                                        cuSeqlensQ_->GetData() != nullptr) ?
+                                           static_cast<const int32_t*>(cuSeqlensQ_->GetData()) : nullptr;
         for (int i = 0; i < batchSize; i++) {
             if (sequsedQPtr[i] < 0) {
                 KERNEL_LOG_ERROR("The elements in seqused_q should be >= 0, but got seqused_q[%d] = %d",
                     i, sequsedQPtr[i]);
                 return false;
+            }
+            // 校验 seqused_q 元素不大于 max_seqlen_q (BSND) 或 cu_seqlens_q 序列长度 (TND)
+            if (layoutQ_ == "BSND" && sequsedQPtr[i] > maxSeqlenQ_) {
+                KERNEL_LOG_ERROR("The elements in seqused_q should not be greater than max_seqlen_q %d, "
+                                 "but got seqused_q[%d] = %d", maxSeqlenQ_, i, sequsedQPtr[i]);
+                return false;
+            }
+            if (cuSeqlensQPtr != nullptr) {
+                int32_t seqLen = cuSeqlensQPtr[i + 1] - cuSeqlensQPtr[i];
+                if (sequsedQPtr[i] > seqLen) {
+                    KERNEL_LOG_ERROR("The elements in seqused_q should not be greater than the sequence length "
+                                     "from cu_seqlens_q %d, but got seqused_q[%d] = %d", seqLen, i, sequsedQPtr[i]);
+                    return false;
+                }
             }
         }
     }
