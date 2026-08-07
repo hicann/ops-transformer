@@ -171,7 +171,7 @@ public:
     float pScaleValue_{1.0f};
     bool isSkipMask_{false};
     bool isFullMask_{false};
-    uint32_t minValue_{NEGATIVE_MIN_VALUE_FP32};
+    uint32_t minValue_{NEGATIVE_MIN_VALUE_FP32_LN2};
 
     // ==================== Functions ======================
     __aicore__ inline QuantFlashAttnBlockVecMxfp8(ConstInfoX &constInfo)
@@ -183,9 +183,12 @@ public:
                                         __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace)
     {
         tPipe_ = pipe;
-        uint32_t tmp1 = NEGATIVE_MIN_VALUE_FP32;
+        uint32_t tmp1 = NEGATIVE_MIN_VALUE_FP32_LN2;
         this->negativeFloatScalar_ = *((T *)&tmp1);
-        UpdateMinCheckValue();
+        if constexpr (USE_DN) {
+            minValue_ = NEGATIVE_MIN_VALUE_FP32;
+            UpdateMinCheckValue();
+        }
 
         InitVecInput(actualSeqQlenAddr, actualSeqKvlenAddr, pScale, attenMask, softmaxLse, attentionOut, workspace);
     }
