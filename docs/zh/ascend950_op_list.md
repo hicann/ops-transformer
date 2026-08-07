@@ -158,26 +158,6 @@ Ascend 950支持的算子分类和算子列表如下：
   </tr>
   <tr>
     <td>attention</td>
-    <td><a href="../../attention/mla_prolog/README.md">mla_prolog</a></td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✗</td>
-    <td>✗</td>
-    <td>AI Core</td>
-    <td>推理MlaProlog算子。</td>
-  </tr>
-  <tr>
-    <td>attention</td>
-    <td><a href="../../attention/mla_prolog_v2/README.md">mla_prolog_v2</a></td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✗</td>
-    <td>AI Core</td>
-    <td>推理MlaPrologV2WeightNz算子。</td>
-  </tr>
-  <tr>
-    <td>attention</td>
     <td><a href="../../attention/mla_prolog_v3/README.md">mla_prolog_v3</a></td>
     <td>✓</td>
     <td>✓</td>
