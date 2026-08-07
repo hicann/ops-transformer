@@ -245,40 +245,43 @@
 - 该接口支持训练、推理场景下使用。
 - 该接口支持aclgraph模式。
 - 通用规格约束如下：
-  - B（Batch）表示输入样本批量大小。
+  - B（Batch）表示输入样本批量大小，q、ori_kv、cmp_kv为配套的SparseFlashMla算子的入参，S1表示layout_q=BSND时，q shape中的S轴的大小，T1表示layout_q=TND时，q shape中的T轴的大小，S2表示layout_kv=BSND时，ori_kv shape中的S轴的大小，S3表示layout_kv=BSND时，cmp_kv shape中的S轴的大小，N2表示ori_kv、cmp_kv shape中的N轴的大小。
   - 参数`cu_seqlens_q`、`cu_seqlens_ori_kv`及`cu_seqlens_cmp_kv`要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
   - 参数`seqused_q`、`seqused_ori_kv`、`seqused_cmp_kv`要求其值表示每个Batch中的有效token数。
   - `layout_q`和`layout_kv`组合仅支持"BSND"/"BSND"、"TND"/"TND"、"BSND"/"PA_BBND"、"TND"/"PA_BBND"；非PA_BBND场景下`layout_q`和`layout_kv`必须一致。
   - 参数`cmp_residual_kv`需满足`cmp_residual_kv`[i] < `cmp_ratio`。
 - Ascend 950PR/Ascend 950DT约束：
-  - has_ori_kv为true，且ori_topk不为0且ori_mask_mode为0时，ori_topk_length必须传入。
-  - has_cmp_kv为true，且cmp_top不为0且cmp_mask_mode为0时，cmp_topk_length必须传入。
+  - has_ori_kv为true时，ori_topk大于0认为ori_kv部分是稀疏的，ori_topk为0则认为ori_kv部分是非稀疏的。
+  - has_cmp_kv为true时，cmp_topk大于0认为cmp_kv部分是稀疏的，cmp_topk为0则认为cmp_kv部分是非稀疏的。
+  - has_ori_kv为true，ori_topk不为0且ori_mask_mode为0时，ori_topk_length必须传入，此时取ori_mask_mode规则与ori_topk_length元素的最小值作为当前q token对应的ori_kv的有效seqlen，其他ori_kv稀疏场景取ori_mask_mode规则与ori_topk的最小值作为当前q token对应的ori_kv的有效seqlen。
+  - has_cmp_kv为true，cmp_topk不为0且cmp_mask_mode为0时，cmp_topk_length必须传入，此时取cmp_mask_mode规则与cmp_topk_length元素的最小值作为当前q token对应的cmp_kv的有效seqlen，其他cmp_kv稀疏场景取cmp_mask_mode规则与cmp_topk的最小值作为当前q token对应的cmp_kv的有效seqlen。
   - layout_q=BSND场景
-    - seqused_q和max_seqlen_q至少需要传入1个。
-    - ori_topk不为0且传入ori_topk_length时，或cmp_topk不为0且传入cmp_topk_length时，max_seqlen_q必须传入query shape中的S值。
+    - max_seqlen_q必须传入S1的值。
   - layout_kv=BSND场景
-    - has_ori_kv为true，且ori_topk为0时，seqused_ori_kv和max_seqlen_ori_kv至少需要传入1个。
-    - has_cmp_kv为true，且cmp_topk为0时，seqused_cmp_kv和max_seqlen_cmp_kv至少需要传入1个。
+    - has_ori_kv为true时，max_seqlen_ori_kv必须传入S2的值。
+    - has_cmp_kv为true时，max_seqlen_cmp_kv必须传入S3的值。
   - layout_q=TND场景
     - cu_seqlens_q必须传入。
   - layout_kv=TND场景
     - has_ori_kv为true时，cu_seqlens_ori_kv必须传入。
-    - has_cmp_kv为true，cu_seqlens_cmp_kv必须传入。
+    - has_cmp_kv为true时，cu_seqlens_cmp_kv必须传入。
   - layout_kv=PA_BBND场景
-    - has_ori_kv为true，且ori_mask_mode不为0或ori_topk为0时，必传seqused_ori_kv参数。
-    - has_cmp_kv为true，且cmp_mask_mode不为0或cmp_topk为0时，必传seqused_cmp_kv参数。
+    - has_ori_kv为true，ori_topk不为0且ori_mask_mode为0时（ori_topk_length必传场景），seqused_ori_kv可选传入，其他场景seqused_ori_kv必须传入。
+    - has_cmp_kv为true，cmp_topk不为0且cmp_mask_mode为0时（cmp_topk_length必传场景），seqused_cmp_kv可选传入，其他场景seqused_cmp_kv必须传入。
   - Batch取值规则
     - layout_q为BSND时，优先通过seqused_q的shape推导batch，seqused_q未传入则通过batch_size获取batch数。
     - layout_q为TND时，优先通过seqused_q的shape推导batch，seqused_q未传入则通过cu_seqlens_q的shape推导batch。
-  - Query Seqlen取值规则
+  - q Seqlen取值规则
     - layout_q为BSND时，优先通过seqused_q中的元素获取seqlen，seqused_q未传入则通过max_seqlen_q获取seqlen。
     - layout_q为TND时，优先通过seqused_q中的元素获取seqlen，seqused_q未传入则通过cu_seqlens_q中的元素获取seqlen。
-  - Ori_kv Seqlen取值规则
-    - layout_kv为BSND时，优先通过seqused_ori_kv中的元素获取seqlen，seqused_ori_kv未传入则通过max_seqlen_ori_kv获取seqlen，若max_seqlen_ori_kv未传入且ori_topk不为0，则通过ori_topk_length或ori_topk获取seqlen（ori_topk_length优先级高于ori_topk）。
+  - ori_kv Seqlen取值规则
+    - layout_kv为BSND时，优先通过seqused_ori_kv中的元素获取seqlen，seqused_ori_kv未传入则通过max_seqlen_ori_kv获取seqlen。
     - layout_kv为TND时，优先通过seqused_ori_kv中的元素获取seqlen，seqused_ori_kv未传入则通过cu_seqlens_ori_kv中的元素获取seqlen。
-  - Cmp_kv Seqlen取值规则
-    - layout_kv为BSND时，优先通过seqused_cmp_kv中的元素获取seqlen，seqused_cmp_kv未传入则通过max_seqlen_cmp_kv获取seqlen，若max_seqlen_cmp_kv未传入且cmp_topk不为0，则通过cmp_topk_length或cmp_topk获取seqlen（cmp_topk_length优先级高于cmp_topk）。
+    - layout_kv为PA_BBND时，优先通过seqused_ori_kv中的元素获取seqlen，seqused_ori_kv未传入则通过ori_topk_length获取seqlen。
+  - cmp_kv Seqlen取值规则
+    - layout_kv为BSND时，优先通过seqused_cmp_kv中的元素获取seqlen，seqused_cmp_kv未传入则通过max_seqlen_cmp_kv获取seqlen。
     - layout_kv为TND时，优先通过seqused_cmp_kv中的元素获取seqlen，seqused_cmp_kv未传入则通过cu_seqlens_cmp_kv中的元素获取seqlen。
+    - layout_kv为PA_BBND时，优先通过seqused_cmp_kv中的元素获取seqlen，seqused_cmp_kv未传入则通过cmp_topk_length获取seqlen。
 - Atlas A3 训练系列产品/Atlas A3 推理系列产品约束：
   - `cmp_ratio`表示`cmp_kv`相对于压缩前KV长度的压缩倍率；仅传入`ori_kv`时不参与压缩KV计算。CSA场景传4，HCA场景传128。
   - `cmp_topk`在CSA场景支持512或1024，SWA、HCA场景传0。

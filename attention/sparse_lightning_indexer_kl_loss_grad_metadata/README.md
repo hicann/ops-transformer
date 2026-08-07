@@ -37,28 +37,28 @@
     <tr>
       <td>cu_seqlens_q</td>
       <td>可选输入</td>
-      <td>表示不同Batch中Query的有效Sequence Length，shape为(B+1, )。</td>
+      <td>表示不同Batch中q的有效Sequence Length，shape为(B+1, )。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cu_seqlens_k</td>
       <td>可选输入</td>
-      <td>表示不同Batch中Key的有效Sequence Length，shape为(B+1, )。</td>
+      <td>表示不同Batch中k的有效Sequence Length，shape为(B+1, )。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>seqused_q</td>
       <td>可选输入</td>
-      <td>表示不同Batch中Query实际参与运算的Sequence Length，shape为(B, )。</td>
+      <td>表示不同Batch中q实际参与运算的Sequence Length，shape为(B, )。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>seqused_k</td>
       <td>可选输入</td>
-      <td>表示不同Batch中Key实际参与运算的Sequence Length，shape为(B, )。</td>
+      <td>表示不同Batch中k实际参与运算的Sequence Length，shape为(B, )。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -72,14 +72,14 @@
     <tr>
       <td>num_heads_q</td>
       <td>属性</td>
-      <td>表示Query的head个数，当前支持[1, 128]。</td>
+      <td>表示q的head个数，当前支持[1, 128]。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>num_heads_k</td>
       <td>属性</td>
-      <td>表示Key的head个数，当前仅支持1</td>
+      <td>表示k的head个数，当前仅支持1</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
@@ -93,7 +93,7 @@
     <tr>
       <td>topk</td>
       <td>可选属性</td>
-      <td>表示从Query中筛选出的关键稀疏token的个数，当前支持[1, 2048]和4096、8192。</td>
+      <td>表示从q中筛选出的关键稀疏token的个数，当前支持[1, 2048]和4096、8192。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
@@ -107,28 +107,28 @@
     <tr>
       <td>max_seqlen_q</td>
       <td>可选属性</td>
-      <td>表示Query的最长Sequence Length，默认值为0。</td>
+      <td>表示q的最长Sequence Length，默认值为0。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>max_seqlen_k</td>
       <td>可选属性</td>
-      <td>表示Key的最长Sequence Length，默认值为0。</td>
+      <td>表示k的最长Sequence Length，默认值为0。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>layout_q</td>
       <td>可选属性</td>
-      <td>表示Query的排列格式，支持BSND、TND，默认值为BSND。</td>
+      <td>表示q的排列格式，支持BSND、TND，默认值为BSND。</td>
       <td>STRING</td>
       <td>-</td>
     </tr>
     <tr>
       <td>layout_k</td>
       <td>可选属性</td>
-      <td>表示Key的排列格式，支持BSND、TND，默认值为BSND。</td>
+      <td>表示k的排列格式，支持BSND、TND，默认值为BSND。</td>
       <td>STRING</td>
       <td>-</td>
     </tr>
@@ -142,7 +142,7 @@
     <tr>
       <td>cmp_ratio</td>
       <td>可选属性</td>
-      <td>表示Key的压缩率，取值范围[1, 128]，默认值为1，表示无压缩。</td>
+      <td>表示k的压缩率，取值范围[1, 128]，默认值为1，表示无压缩。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
@@ -165,7 +165,7 @@
 ## 约束说明
 
 - SparseLightningIndexerKLLossGradMetadata算子需要与SparseLightningIndexerKLLossGrad算子配套使用。
-- B（Batch）表示输入样本批量大小。
+- B（Batch）表示输入样本批量大小，q为配套的SparseLightningIndexerKLLossGrad算子的入参，S1表示layout_q=BSND时，q shape中的S轴的大小。
 - layout_q、layout_k须相同。
 - 参数cu_seqlens_q、cu_seqlens_k要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
 - 参数seqused_q、seqused_k要求其值表示每个Batch中的有效token数。
@@ -173,9 +173,15 @@
 - mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../docs/zh/context/sparse_mode_introduction.md)。
 - Ascend 950PR/Ascend 950DT约束：
   - layout_q=BSND场景
-    - seqused_q和max_seqlen_q至少需要传入1个。
+    - max_seqlen_q必须传入S1的值。
   - layout_q=TND场景
     - cu_seqlens_q必需传入。
+  - Batch取值规则
+    - layout_q为BSND时，优先通过seqused_q的shape推导batch，seqused_q未传入则通过batch_size获取batch数。
+    - layout_q为TND时，优先通过seqused_q的shape推导batch，seqused_q未传入则通过cu_seqlens_q的shape推导batch。
+  - q Seqlen取值规则
+    - layout_q为BSND时，优先通过seqused_q中的元素获取seqlen，seqused_q未传入则通过max_seqlen_q获取seqlen。
+    - layout_q为TND时，优先通过seqused_q中的元素获取seqlen，seqused_q未传入则通过cu_seqlens_q中的元素获取seqlen。
 
 ## 调用说明
 

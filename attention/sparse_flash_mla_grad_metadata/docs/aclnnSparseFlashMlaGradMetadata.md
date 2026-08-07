@@ -107,7 +107,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>cuSeqlensQOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中Query的有效Sequence Length。</td>
+      <td>表示不同Batch中q的有效Sequence Length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -117,7 +117,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>cuSeqlensOriKvOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中ori_kv的有效Sequence Length。</td>
+      <td>表示不同Batch中oriKvOptional的有效Sequence Length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -127,7 +127,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>cuSeqlensCmpKvOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中cmp_kv的有效Sequence Length。</td>
+      <td>表示不同Batch中cmpKvOptional的有效Sequence Length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -137,7 +137,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>sequsedQOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中Query实际参与运算的Sequence Length。</td>
+      <td>表示不同Batch中q实际参与运算的Sequence Length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -147,7 +147,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>sequsedOriKvOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中ori_kv实际参与运算的Sequence Length。</td>
+      <td>表示不同Batch中oriKvOptional实际参与运算的Sequence Length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -157,7 +157,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>sequsedCmpKvOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中cmp_kv实际参与运算的Sequence Length。</td>
+      <td>表示不同Batch中cmpKvOptional实际参与运算的Sequence Length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -167,7 +167,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>cmpResidualKvOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中cmp_kv压缩后Sequence Length的余数，配合cmpRatio实现cmp_kv部分的mask和负载计算。</td>
+      <td>表示不同Batch中cmpKvOptional压缩后Sequence Length的余数，配合cmpRatio实现cmpKvOptional部分的mask和负载计算。</td>
       <td><ul><li>支持空Tensor。</li><li>cmpRatio不为1，且mask为3场景下必传。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -177,7 +177,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>oriTopkLengthOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同q token对应的ori_kv部分关键稀疏token的个数。</td>
+      <td>表示不同q token对应的oriKvOptional部分关键稀疏token的个数。</td>
       <td><ul><li>支持空Tensor。</li><li>shape为(B, S1, N2)或(T1, N2)。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -187,7 +187,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>cmpTopkLengthOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同q token对应的cmp_kv部分关键稀疏token的个数。</td>
+      <td>表示不同q token对应的cmpKvOptional部分关键稀疏token的个数。</td>
       <td><ul><li>支持空Tensor。</li><li>shape为(B, S1, N2)或(T1, N2)。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -197,7 +197,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>numHeadsQ（int64_t）</td>
       <td>输入</td>
-      <td>表示Query的head个数。</td>
+      <td>表示q的head个数。</td>
       <td>当前支持[1, 128]。</td>
       <td>-</td>
       <td>-</td>
@@ -207,7 +207,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>numHeadsKv（int64_t）</td>
       <td>输入</td>
-      <td>Key和Value对应的多头数。</td>
+      <td>oriKvOptional、cmpKvOptional对应的多头数。</td>
       <td>当前仅支持1。</td>
       <td>-</td>
       <td>-</td>
@@ -237,7 +237,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>maxSeqlenQ（int64_t）</td>
       <td>输入</td>
-      <td>表示Query的最长Sequence Length。</td>
+      <td>表示q的最长Sequence Length。</td>
       <td><ul><li>支持非负数。</li><li>建议值为0。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -247,7 +247,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>maxSeqlenOriKv（int64_t）</td>
       <td>输入</td>
-      <td>表示ori_kv的最长Sequence Length。</td>
+      <td>表示oriKvOptional的最长Sequence Length。</td>
       <td><ul><li>支持非负数。</li><li>建议值为0。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -257,7 +257,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>maxSeqlenCmpKv（int64_t）</td>
       <td>输入</td>
-      <td>表示cmp_kv的最长Sequence Length。</td>
+      <td>表示cmpKvOptional的最长Sequence Length。</td>
       <td><ul><li>支持非负数。</li><li>建议值为0。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -267,7 +267,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>oriTopk（int64_t）</td>
       <td>输入</td>
-      <td>表示ori_kv中筛选出的关键稀疏token的个数。0表示非稀疏场景。</td>
+      <td>表示oriKvOptional中筛选出的关键稀疏token的个数。0表示非稀疏场景。</td>
       <td><ul><li>支持非负数。</li><li>建议值为0。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -277,7 +277,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>cmpTopk（int64_t）</td>
       <td>输入</td>
-      <td>表示cmp_kv中筛选出的关键稀疏token的个数。0表示非稀疏场景。</td>
+      <td>表示cmpKvOptional中筛选出的关键稀疏token的个数。0表示非稀疏场景。</td>
       <td><ul><li>支持非负数。</li><li>建议值为0。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -287,7 +287,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>cmpRatio（int64_t）</td>
       <td>输入</td>
-      <td>表示对cmp_kv的压缩率。</td>
+      <td>表示对cmpKvOptional的压缩率。</td>
       <td><ul><li>当前支持[1, 128]。</li><li>建议值1，表示无压缩。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -297,7 +297,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>oriMaskMode（int64_t）</td>
       <td>输入</td>
-      <td>表示q和ori_kv计算的mask模式。</td>
+      <td>表示q和oriKvOptional计算的mask模式。</td>
       <td><ul><li>0表示No mask。</li><li>3表示rightDownCausal模式。</li><li>4表示sliding window模式，对应由oriWinLeft和oriWinRight划分的窗口场景。</li><li>建议值为0。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -307,7 +307,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>cmpMaskMode（int64_t）</td>
       <td>输入</td>
-      <td>表示q和cmp_kv计算的mask模式。</td>
+      <td>表示q和cmpKvOptional计算的mask模式。</td>
       <td><ul><li>0表示No mask。</li><li>3表示rightDownCausal模式，对应以右顶点为划分的下三角场景。</li><li>建议值为0。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -317,7 +317,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>oriWinLeft（int64_t）</td>
       <td>输入</td>
-      <td>表示q和ori_kv计算中q对过去token计算的数量。</td>
+      <td>表示q和oriKvOptional计算中q对过去token计算的数量。</td>
       <td><ul><li>取值范围≥-1，-1表示无穷大。</li><li>建议值为-1。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -327,7 +327,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>oriWinRight（int64_t）</td>
       <td>输入</td>
-      <td>表示q和ori_kv计算中q对未来token计算的数量。</td>
+      <td>表示q和oriKvOptional计算中q对未来token计算的数量。</td>
       <td><ul><li>取值范围≥-1，-1表示无穷大。</li><li>建议值为-1。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -337,7 +337,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>layoutQOptional（char*）</td>
       <td>输入</td>
-      <td>表示Query的排列格式。</td>
+      <td>表示q的排列格式。</td>
       <td><ul><li>支持 BSND、TND。</li><li>建议值为BSND。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -347,7 +347,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>layoutKvOptional（char*）</td>
       <td>输入</td>
-      <td>表示Key的排列格式。</td>
+      <td>表示oriKvOptional、cmpKvOptional的排列格式。</td>
       <td><ul><li>支持 BSND、TND。</li><li>建议值为BSND。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -357,8 +357,8 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>hasOriKv（bool）</td>
       <td>输入</td>
-      <td>用于标识是否含有ori_kv。</td>
-      <td><ul><li>true: 含有ori_kv。</li><li>false: 不含有ori_kv。</li><li>建议值为true。</li></ul></td>
+      <td>用于标识是否含有oriKvOptional。</td>
+      <td><ul><li>true: 含有oriKvOptional。</li><li>false: 不含有oriKvOptional。</li><li>建议值为true。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -367,8 +367,8 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
     <tr>
       <td>hasCmpKv（bool）</td>
       <td>输入</td>
-      <td>用于标识是否含有cmp_kv。</td>
-      <td><ul><li>true: 含有cmp_kv。</li><li>false: 不含有cmp_kv。</li><li>建议值为true。</li></ul></td>
+      <td>用于标识是否含有cmpKvOptional。</td>
+      <td><ul><li>true: 含有cmpKvOptional。</li><li>false: 不含有cmpKvOptional。</li><li>建议值为true。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -490,35 +490,38 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
 ## 约束说明
 
   - aclnnSparseFlashMlaGradMetadata默认确定性实现。
-  - B（Batch）表示输入样本批量大小。
+  - B（Batch）表示输入样本批量大小，q、oriKvOptional、cmpKvOptional为配套的aclnnSparseFlashMlaGrad算子的入参，S1表示layoutQOptional=BSND时，q shape中的S轴的大小，T1表示layoutQOptional=TND时，q shape中的T轴的大小，S2表示layoutKvOptional=BSND时，oriKvOptional shape中的S轴的大小，S3表示layoutKvOptional=BSND时，cmpKvOptional shape中的S轴的大小，N2表示oriKvOptional、cmpKvOptional shape中的N轴的大小。
   - 参数cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
   - 参数sequsedQOptional、sequsedOriKvOptional、sequsedCmpKvOptional要求其值表示每个Batch中的有效token数。
   - layoutQOptional、layoutKvOptional须相同。
   - 参数cmpResidualKvOptional需满足cmpResidualKvOptional[i] < cmpRatio。
   - numHeadsQ必须能被numHeadsKv整除。
+  - hasOriKv为true时，oriTopk大于0认为oriKvOptional部分是稀疏的，oriTopk为0则认为oriKvOptional部分是非稀疏的。
+  - hasCmpKv为true时，cmpTopk大于0认为cmpKvOptional部分是稀疏的，cmpTopk为0则认为cmpKvOptional部分是非稀疏的。
+  - hasOriKv为true，oriTopk不为0且oriMaskMode为0时，oriTopkLengthOptional必须传入，此时取oriMaskMode规则与oriTopkLengthOptional元素的最小值作为当前q token对应的oriKvOptional的有效seqlen，其他oriKvOptional稀疏场景取oriMaskMode规则与oriTopk的最小值作为当前q token对应的oriKvOptional的有效seqlen。
+  - hasCmpKv为true，cmpTopk不为0且cmpMaskMode为0时，cmpTopkLengthOptional必须传入，此时取cmpMaskMode规则与cmpTopkLengthOptional元素的最小值作为当前q token对应的cmpKvOptional的有效seqlen，其他cmpKvOptional稀疏场景取cmpMaskMode规则与cmpTopk的最小值作为当前q token对应的cmpKvOptional的有效seqlen。
   - layoutQOptional=BSND场景
-    - sequsedQOptional和maxSeqlenQ至少需要传入1个。
-    - oriTopk不为0且传入oriTopkLengthOptional时，或cmpTopk不为0且传入cmpTopkLengthOptional时，maxSeqlenQ必须传入query shape中的S值。
+    - maxSeqlenQ必须传入S1的值。
   - layoutKvOptional=BSND场景
-    - hasOriKv为true，且oriTopk为0时，sequsedOriKvOptional和maxSeqlenOriKv至少需要传入1个。
-    - hasCmpKv为true，且cmpTopk为0时，sequsedCmpKvOptional和maxSeqlenCmpKv至少需要传入1个。
+    - hasOriKv为true时，maxSeqlenOriKv必须传入S2的值。
+    - hasCmpKv为true时，maxSeqlenCmpKv必须传入S3的值。
   - layoutQOptional=TND场景
-    - cuSeqlensQOptional必需传入。
+    - cuSeqlensQOptional必须传入。
   - layoutKvOptional=TND场景
-    - hasOriKv为true时，cuSeqlensOriKvOptional必需传入。
-    - hasCmpKv为true，cuSeqlensCmpKvOptional必需传入。
+    - hasOriKv为true时，cuSeqlensOriKvOptional必须传入。
+    - hasCmpKv为true时，cuSeqlensCmpKvOptional必须传入。
   - Batch取值规则
-    - 如果layoutQOptional为BSND，则优先通过seqUsedQOptional的shape推导batch，seqUsedQOptional未传入则通过batchSize获取batch数。
-    - 如果layoutQOptional为TND，则优先通过seqUsedQOptional的shape推导batch，seqUsedQOptional未传入则通过cuSeqLensQOptional的shape推导batch。
-  - Query Seqlen取值规则
-    - 如果layoutQOptional为BSND，则优先通过seqUsedQOptional中的元素获取seqlen，seqUsedQOptional未传入则通过maxSeqLenQ获取seqlen。
-    - 如果layoutQOptional为TND，则优先通过seqUsedQOptional中的元素获取seqlen，seqUsedQOptional未传入则通过cuSeqLensQOptional中的元素获取seqlen。
-  - Ori_kv Seqlen取值规则
-    - 如果layoutKvOptional为BSND，则优先通过sequsedOriKvOptional中的元素获取seqlen，sequsedOriKvOptional未传入则通过maxSeqlenOriKv获取seqlen。
-    - 如果layoutKvOptional为TND，则优先通过sequsedOriKvOptional中的元素获取seqlen，sequsedOriKvOptional未传入则通过cuSeqlensOriKvOptional中的元素获取seqlen。
-  - Cmp_kv Seqlen取值规则
-    - 如果layoutKvOptional为BSND，则优先通过sequsedCmpKvOptional中的元素获取seqlen，sequsedCmpKvOptional未传入则通过maxSeqlenCmpKv获取seqlen。
-    - 如果layoutKvOptional为TND，则优先通过sequsedCmpKvOptional中的元素获取seqlen，sequsedCmpKvOptional未传入则通过cuSeqlensCmpKvOptional中的元素获取seqlen。
+    - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batchSize获取batch数。
+    - layoutQOptional为TND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过cuSeqlensQOptional的shape推导batch。
+  - q Seqlen取值规则
+    - layoutQOptional为BSND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过maxSeqlenQ获取seqlen。
+    - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中的元素获取seqlen。
+  - oriKvOptional Seqlen取值规则
+    - layoutKvOptional为BSND时，优先通过sequsedOriKvOptional中的元素获取seqlen，sequsedOriKvOptional未传入则通过maxSeqlenOriKv获取seqlen。
+    - layoutKvOptional为TND时，优先通过sequsedOriKvOptional中的元素获取seqlen，sequsedOriKvOptional未传入则通过cuSeqlensOriKvOptional中的元素获取seqlen。
+  - cmpKvOptional Seqlen取值规则
+    - layoutKvOptional为BSND时，优先通过sequsedCmpKvOptional中的元素获取seqlen，sequsedCmpKvOptional未传入则通过maxSeqlenCmpKv获取seqlen。
+    - layoutKvOptional为TND时，优先通过sequsedCmpKvOptional中的元素获取seqlen，sequsedCmpKvOptional未传入则通过cuSeqlensCmpKvOptional中的元素获取seqlen。
 
 ## 调用示例
 

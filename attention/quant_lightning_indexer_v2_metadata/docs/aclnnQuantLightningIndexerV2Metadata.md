@@ -97,7 +97,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>cuSeqlensQOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中Query的有效Sequence Length。</td>
+      <td>表示不同Batch中q的有效Sequence Length。</td>
       <td><ul><li>支持空Tensor</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -107,7 +107,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>cuSeqlensKOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中Key的有效Sequence Length。</td>
+      <td>表示不同Batch中k的有效Sequence Length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -117,7 +117,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>sequsedQOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中Query实际参与运算的Sequence Length。</td>
+      <td>表示不同Batch中q实际参与运算的Sequence Length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -127,7 +127,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>sequsedKOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中Key实际参与运算的Sequence Length。</td>
+      <td>表示不同Batch中k实际参与运算的Sequence Length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -137,7 +137,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>cmpResidualKOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中cmp_k压缩后Sequence Length的余数，配合cmpRatio实现cmp_k部分的mask和负载计算。</td>
+      <td>表示不同Batch中k压缩后Sequence Length的余数，配合cmpRatio实现mask和负载计算。</td>
       <td><ul><li>支持空Tensor。</li><li>cmpRatio不为1，且mask为3场景下必传。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -147,7 +147,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>numHeadsQ（int64_t）</td>
       <td>输入</td>
-      <td>表示Query的head个数。</td>
+      <td>表示q的head个数。</td>
       <td>当前支持[1, 64]。</td>
       <td>-</td>
       <td>-</td>
@@ -157,7 +157,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>numHeadsK（int64_t）</td>
       <td>输入</td>
-      <td>表示Key的head个数。</td>
+      <td>表示k的head个数。</td>
       <td>当前仅支持1。</td>
       <td>-</td>
       <td>-</td>
@@ -177,7 +177,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>topk（int64_t）</td>
       <td>输入</td>
-      <td>表示从Query中筛选出的关键稀疏token的个数。</td>
+      <td>表示从q中筛选出的关键稀疏token的个数。</td>
       <td>当前仅支持[1, 8192]。</td>
       <td>-</td>
       <td>-</td>
@@ -207,7 +207,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>maxSeqlenQ（int64_t）</td>
       <td>输入</td>
-      <td>表示Query的最长Sequence Length。</td>
+      <td>表示q的最长Sequence Length。</td>
       <td><ul><li>取值范围≥-1，-1表示任意可能长度。</li><li>建议值为-1。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -217,7 +217,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>maxSeqlenK（int64_t）</td>
       <td>输入</td>
-      <td>表示Key的最长Sequence Length。</td>
+      <td>表示k的最长Sequence Length。</td>
       <td><ul><li>取值范围≥-1，-1表示任意可能长度。</li><li>建议值为-1。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -227,7 +227,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>layoutQOptional（char*）</td>
       <td>输入</td>
-      <td>表示Query的排列格式。</td>
+      <td>表示q的排列格式。</td>
       <td><ul><li>支持 BSND、TND。</li><li>建议值为BSND。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -237,7 +237,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>layoutKOptional（char*）</td>
       <td>输入</td>
-      <td>表示Key的排列格式。</td>
+      <td>表示k的排列格式。</td>
       <td><ul><li>支持 BSND、TND、PA_BBND。</li><li>建议值为BSND。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -257,7 +257,7 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
     <tr>
       <td>cmpRatio（int64_t）</td>
       <td>输入</td>
-      <td>表示Key的压缩率。</td>
+      <td>表示k的压缩率。</td>
       <td><ul><li>取值范围[1，128]。</li><li>建议值1，表示无压缩。</li></ul></td>
       <td>-</td>
       <td>-</td>
@@ -389,28 +389,28 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
 ## 约束说明
 
   - aclnnQuantLightningIndexerV2Metadata默认确定性实现。
-  - B（Batch）表示输入样本批量大小。
+  - B（Batch）表示输入样本批量大小，q、k为配套的aclnnQuantLightningIndexerV2算子的入参，S1表示layoutQOptional=BSND时，q shape中的S轴的大小，S2表示layoutKOptional=BSND时，k shape中的S轴的大小。
   - 参数cuSeqlensQOptional、cuSeqlensKOptional要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
   - 参数sequsedQOptional、sequsedKOptional要求其值表示每个Batch中的有效token数。
   - 非PA场景layoutQOptional、layoutKOptional须相同。
   - 参数cmpResidualKOptional需满足cmpResidualKOptional[i] < cmpRatio。
   - layoutQOptional=BSND场景
-    - sequsedQOptional和maxSeqlenQ至少需要传入1个，sequsedQOptional未传入时，maxSeqlenQ不能为-1。
+    - maxSeqlenQ必须传入S1的值。
   - layoutKOptional=BSND场景
-    - sequsedKOptional和maxSeqlenK至少需要传入1个，sequsedKOptional未传入时，maxSeqlenK不能为-1。
+    - maxSeqlenK必须传入S2的值。
   - layoutQOptional=TND场景
-    - cuSeqlensQOptional必需传入。
+    - cuSeqlensQOptional必须传入。
   - layoutKOptional=TND场景
-    - cuSeqlensKOptional必需传入。
+    - cuSeqlensKOptional必须传入。
   - layoutKOptional=PA_BBND场景
-    - sequsedKOptional必需传入。
+    - sequsedKOptional必须传入。
   - Batch取值规则
     - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batchSize获取batch数。
     - layoutQOptional为TND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过cuSeqlensQOptional的shape推导batch。
-  - Query Seqlen取值规则
+  - q Seqlen取值规则
     - layoutQOptional为BSND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过maxSeqlenQ获取seqlen。
     - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中的元素获取seqlen。
-  - Key Seqlen取值规则
+  - k Seqlen取值规则
     - layoutKOptional为BSND时，优先通过sequsedKOptional中的元素获取seqlen，sequsedKOptional未传入则通过maxSeqlenK获取seqlen。
     - layoutKOptional为TND时，优先通过sequsedKOptional中的元素获取seqlen，sequsedKOptional未传入则通过cuSeqlensKOptional中的元素获取seqlen。
 
