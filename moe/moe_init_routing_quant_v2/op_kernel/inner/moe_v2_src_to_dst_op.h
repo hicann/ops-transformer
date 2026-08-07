@@ -65,12 +65,15 @@ __aicore__ inline void MoeV2SrcToDstOp::AssistInit()
     LocalTensor<int32_t> assistTensor = assistBuffer.Get<int32_t>(ASSIST_NUM);
     DataCopy(assistTensor, assistGm, ASSIST_NUM);
     SetWaitFlag<HardEvent::MTE2_V>(HardEvent::MTE2_V);
+    PipeBarrier<PIPE_V>();
     Adds(assistTensor, assistTensor, (int32_t)(this->blockIdx * this->srcToDstTilingData->perCoreRows), ASSIST_NUM);
 }
 
 __aicore__ inline void MoeV2SrcToDstOp::CopyIn(int64_t progress)
 {
     LocalTensor<int32_t> inLocal = copyInQueue.AllocTensor<int32_t>();
+    SetFlag<HardEvent::S_MTE2>(EVENT_ID0);
+    WaitFlag<HardEvent::S_MTE2>(EVENT_ID0);
     DataCopy(inLocal, expandDstToSrcRowGm[progress * perLoopRows], Align(currentLoopRows, sizeof(int32_t)));
     copyInQueue.EnQue<int32_t>(inLocal);
 }
@@ -83,6 +86,7 @@ __aicore__ inline void MoeV2SrcToDstOp::Compute(int64_t progress)
     PipeBarrier<PIPE_V>();
     int64_t loops = Ceil(currentLoopRows, ASSIST_INDEX_NUM);
     for (int64_t i = 0; i < loops; i++) {
+        PipeBarrier<PIPE_V>();
         Adds(
             outLocal[i * ASSIST_NUM], assistTensor,
             static_cast<int32_t>(this->perLoopRows * progress + i * ASSIST_INDEX_NUM), ASSIST_NUM);
@@ -100,6 +104,8 @@ __aicore__ inline void MoeV2SrcToDstOp::CopyOut()
     intriParams.blockCount = 1;
     intriParams.blockLen = sizeof(int32_t);
     uint32_t outOffset;
+    SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
     for (int64_t idx = 0; idx < currentLoopRows; idx++) {
         outOffset = inLocal.GetValue(idx);
         DataCopyPad(expandSrcToDstRowGm[outOffset], outLocal[idx * INT32_ONE_BLOCK_NUM], intriParams);

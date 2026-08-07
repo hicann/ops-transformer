@@ -85,6 +85,8 @@ __aicore__ inline void MoeV2GatherQuant<T>::CopyInIndices(int64_t progress)
     LocalTensor<int32_t> indicesLocal = expandRowIdxCopyInQueue.AllocTensor<int32_t>();
     DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(this->currentLoopRows * sizeof(int32_t)), 0, 0, 0};
     DataCopyPadExtParams<int32_t> dataCopyPadParams{false, 0, 0, 0};
+    SetFlag<HardEvent::S_MTE2>(EVENT_ID0);
+    WaitFlag<HardEvent::S_MTE2>(EVENT_ID0);
     DataCopyPad(indicesLocal, expandedRowIdxGm[indicesOffset], dataCopyParams, dataCopyPadParams);
     expandRowIdxCopyInQueue.EnQue<int32_t>(indicesLocal);
 }
@@ -98,6 +100,7 @@ __aicore__ inline void MoeV2GatherQuant<T>::Compute()
     LocalTensor<half> halfLocal = halfQueue.AllocTensor<half>();
     uint32_t elements = Align(this->colsTileLength, sizeof(T));
     if constexpr (IsSameType<T, bfloat16_t>::value) {
+        PipeBarrier<PIPE_V>();
         Cast(floatLocal, inLocal, RoundMode::CAST_NONE, elements);
         PipeBarrier<PIPE_V>();
         Cast(halfLocal, floatLocal, RoundMode::CAST_NONE, elements);
@@ -107,6 +110,7 @@ __aicore__ inline void MoeV2GatherQuant<T>::Compute()
         Adds(halfLocal, halfLocal, static_cast<half>(this->offset), elements);
         PipeBarrier<PIPE_V>();
         LocalTensor<int32_t> intLocal = floatLocal.ReinterpretCast<int32_t>();
+        PipeBarrier<PIPE_V>();
         Cast(intLocal, halfLocal, RoundMode::CAST_RINT, elements);
         PipeBarrier<PIPE_V>();
         SetDeqScale((half)1.000000e+00f);
@@ -115,6 +119,7 @@ __aicore__ inline void MoeV2GatherQuant<T>::Compute()
         PipeBarrier<PIPE_V>();
         Cast(outLocal, halfLocal, RoundMode::CAST_RINT, elements);
     } else if constexpr (IsSameType<T, float>::value) {
+        PipeBarrier<PIPE_V>();
         Cast(halfLocal, inLocal, RoundMode::CAST_NONE, elements);
         PipeBarrier<PIPE_V>();
         Muls(halfLocal, halfLocal, static_cast<half>(this->scale), elements);
@@ -123,6 +128,7 @@ __aicore__ inline void MoeV2GatherQuant<T>::Compute()
         PipeBarrier<PIPE_V>();
         Cast(outLocal, halfLocal, RoundMode::CAST_RINT, elements);
     } else {
+        PipeBarrier<PIPE_V>();
         Muls(inLocal, inLocal, static_cast<T>(this->scale), elements);
         PipeBarrier<PIPE_V>();
         Adds(inLocal, inLocal, static_cast<T>(this->offset), elements);
@@ -140,6 +146,8 @@ __aicore__ inline void MoeV2GatherQuant<T>::CopyOut(int64_t progress)
     LocalTensor<int32_t> indicesLocal = expandRowIdxCopyInQueue.DeQue<int32_t>();
     SetWaitFlag<HardEvent::MTE2_S>(HardEvent::MTE2_S);
     colsTileLength = this->perLoopCols;
+    SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
     for (int64_t colsLoop = 0; colsLoop < this->colLoops; colsLoop++) {
         int64_t initialRow = this->gatherOutTilingData->perCoreRows * this->blockIdx + this->perLoopRows * progress;
         int64_t curLoopRow = 0;

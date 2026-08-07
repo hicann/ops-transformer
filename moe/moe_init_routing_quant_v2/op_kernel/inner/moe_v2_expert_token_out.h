@@ -82,6 +82,7 @@ private:
 __aicore__ inline void MoeV2ExpertTokenOut::InitLocal()
 {
     LocalTensor<int32_t> tokenIdxLocal = expertTokenIdxCopyOutQueue.AllocTensor<int32_t>();
+    PipeBarrier<PIPE_V>();
     Duplicate<int32_t>(tokenIdxLocal, 0, this->expertNumUbAlign);
     expertTokenIdxCopyOutQueue.EnQue<int32_t>(tokenIdxLocal);
 
@@ -92,6 +93,7 @@ __aicore__ inline void MoeV2ExpertTokenOut::InitLocal()
     }
     LocalTensor<int32_t> outLocal = copyInQueue.AllocTensor<int32_t>();
     int64_t loops = (coreRows + perLoopRows - 1) / perLoopRows;
+    PipeBarrier<PIPE_V>();
     Duplicate<int32_t>(outLocal, -1, perLoopRows);
     SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
     for (int64_t loop = 0; loop < loops; loop++) {
@@ -112,6 +114,8 @@ __aicore__ inline void MoeV2ExpertTokenOut::InitLocal()
 __aicore__ inline void MoeV2ExpertTokenOut::CopyIn(int64_t progress)
 {
     LocalTensor<int32_t> inLocal = copyInQueue.AllocTensor<int32_t>();
+    SetFlag<HardEvent::S_MTE2>(EVENT_ID0);
+    WaitFlag<HardEvent::S_MTE2>(EVENT_ID0);
     DataCopy(inLocal, expandedExpertIdxGm[progress * perLoopRows], Align(currentLoopRows, sizeof(int32_t)));
     copyInQueue.EnQue<int32_t>(inLocal);
 }
@@ -120,14 +124,25 @@ __aicore__ inline void MoeV2ExpertTokenOut::GetExpertTokenCount(int32_t curExper
 {
     this->tokenCount++;
     if (this->lastExpertId < curExpertId) {
+        SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
+        SetFlag<HardEvent::V_S>(EVENT_ID0);
+        WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
+        WaitFlag<HardEvent::V_S>(EVENT_ID0);
         this->expertTokenIdxOutLocal.SetValue(this->expertIdx, this->tokenCount - 1);
         this->tokenCount = 1;
         this->expertIdx += (curExpertId - this->lastExpertId);
+        SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
+        SetFlag<HardEvent::S_V>(EVENT_ID0);
+        WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
+        WaitFlag<HardEvent::S_V>(EVENT_ID0);
         while (curExpertId - this->firstExpertId + 1 > this->expertNumUbAlign) {
             SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
             CopyOutExpertTokensCumsum(false);
             CopyOutExpertTokensCount(false);
             SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);
+            PipeBarrier<PIPE_V>();
+            SetFlag<HardEvent::S_V>(EVENT_ID0);
+            WaitFlag<HardEvent::S_V>(EVENT_ID0);
             Duplicate<int32_t>(this->expertTokenIdxOutLocal, 0, this->expertNumUbAlign);
             SetWaitFlag<HardEvent::V_S>(HardEvent::V_S);
             this->firstExpertId += this->expertNumUbAlign;
@@ -142,36 +157,67 @@ __aicore__ inline void MoeV2ExpertTokenOut::Compute(int64_t progress)
     LocalTensor<int32_t> inLocal = copyInQueue.DeQue<int32_t>();
     SetWaitFlag<HardEvent::MTE2_S>(HardEvent::MTE2_S);
     if (this->lastExpertId == -1) {
+        SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
+        SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
+        SetFlag<HardEvent::V_S>(EVENT_ID0);
+        WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
+        WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
+        WaitFlag<HardEvent::V_S>(EVENT_ID0);
         this->lastExpertId = inLocal.GetValue(0);
         this->firstExpertId = this->lastExpertId;
     }
+    SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
+    SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
+    SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
+    SetFlag<HardEvent::S_V>(EVENT_ID0);
+    SetFlag<HardEvent::V_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
+    WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
+    WaitFlag<HardEvent::S_V>(EVENT_ID0);
+    WaitFlag<HardEvent::V_S>(EVENT_ID0);
     for (int64_t i = 0; i < currentLoopRows; i++) {
         int32_t expertId = inLocal.GetValue(i);
         GetExpertTokenCount(expertId);
     }
+    SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
+    SetFlag<HardEvent::V_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
+    WaitFlag<HardEvent::V_S>(EVENT_ID0);
     this->expertTokenIdxOutLocal.SetValue(this->expertIdx, this->tokenCount);
     copyInQueue.FreeTensor(inLocal);
 }
 
 __aicore__ inline void MoeV2ExpertTokenOut::CopyOutExpertTokensCumsum(bool isTail)
 {
+    SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
+    WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
     if (this->dropPadMode != DROPLESS_MODE || expertTokensCountOrCumsumFlag != EXERPT_TOKENS_CUMSUM) {
         return;
     }
     int64_t copyLength = isTail ? this->lastExpertId - this->firstExpertId + 1 : this->expertNumUbAlign;
     int64_t end = this->expertNum - this->firstExpertId;
+    SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
+    SetFlag<HardEvent::V_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
+    WaitFlag<HardEvent::V_S>(EVENT_ID0);
     for (int64_t i = 0; i < copyLength; i++) {
         this->expertTokenValue += this->expertTokenIdxOutLocal.GetValue(i);
         this->expertTokenIdxOutLocal.SetValue(i, this->expertTokenValue);
     }
     // if the remianing UB is sufficient, use the UB space to copy
     // otherwise, copy the calculated data first, and then copy the last tokenValue to remaining expert position
+    SetFlag<HardEvent::S_V>(EVENT_ID0);
+    WaitFlag<HardEvent::S_V>(EVENT_ID0);
     if (isTail && end <= this->expertNumUbAlign) {
         int64_t startAlign = Min(Align(copyLength, sizeof(int32_t)), end);
         for (int64_t i = copyLength; i < startAlign; i++) {
             this->expertTokenIdxOutLocal.SetValue(i, this->expertTokenValue);
         }
         if (startAlign < end) {
+            PipeBarrier<PIPE_V>();
+            SetFlag<HardEvent::S_V>(EVENT_ID0);
+            WaitFlag<HardEvent::S_V>(EVENT_ID0);
             Duplicate<int32_t>(this->expertTokenIdxOutLocal[startAlign], this->expertTokenValue, end - startAlign);
         }
         copyLength = end;
@@ -180,11 +226,16 @@ __aicore__ inline void MoeV2ExpertTokenOut::CopyOutExpertTokensCumsum(bool isTai
     DataCopyExtParams copyParams{
         static_cast<uint16_t>(1), static_cast<uint32_t>(copyLength * sizeof(int32_t)), 0, 0, 0};
     SetAtomicAdd<int32_t>();
+    SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
+    WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
     DataCopyPad(expertTokensCountOrCumsumGm[this->firstExpertId], this->expertTokenIdxOutLocal, copyParams);
     SetAtomicNone();
     if (isTail && end > this->expertNumUbAlign) {
         int64_t remainderLength = end - copyLength;
         SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);
+        PipeBarrier<PIPE_V>();
+        SetFlag<HardEvent::S_V>(EVENT_ID0);
+        WaitFlag<HardEvent::S_V>(EVENT_ID0);
         Duplicate<int32_t>(this->expertTokenIdxOutLocal, this->expertTokenValue, this->expertNumUbAlign);
         SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
         int64_t loopTimes = remainderLength / this->expertNumUbAlign + 1;
@@ -208,9 +259,13 @@ __aicore__ inline void MoeV2ExpertTokenOut::CopyOutExpertTokensCount(bool isTail
         static_cast<uint16_t>(1), static_cast<uint32_t>(copyLength * sizeof(int32_t)), 0, 0, 0};
     SetAtomicAdd<int32_t>();
     if (this->dropPadMode == DROP_PAD_MODE && expertTokensBeforeCapacityFlag > EXERPT_TOKENS_NONE) {
+        SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
+        WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
         DataCopyPad(expertTokensBeforeCapacityGm[this->firstExpertId], this->expertTokenIdxOutLocal, copyParams);
     }
     if (this->dropPadMode == DROPLESS_MODE && expertTokensCountOrCumsumFlag == EXERPT_TOKENS_COUNT) {
+        SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
+        WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
         DataCopyPad(expertTokensCountOrCumsumGm[this->firstExpertId], this->expertTokenIdxOutLocal, copyParams);
     }
     SetAtomicNone();
@@ -229,6 +284,8 @@ __aicore__ inline void MoeV2ExpertTokenOut::CopyOutTokenGm()
     DataCopyExtParams copyParams{
         static_cast<uint16_t>(1), static_cast<uint32_t>(EXPERT_ID_VALUE_NUM * sizeof(int32_t)), 0, 0, 0};
     SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
+    SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
+    WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
     DataCopyPad(
         expertIdxValueGm[this->blockIdx * EXPERT_ID_VALUE_NUM], this->expertTokenIdxOutLocal[this->expertNumUbAlign],
         copyParams);
@@ -299,6 +356,10 @@ __aicore__ inline void MoeV2ExpertTokenOut::Process()
         currentLoopRows = perLoopRows;
         InitLocal();
         this->expertTokenIdxOutLocal = expertTokenIdxCopyOutQueue.DeQue<int32_t>();
+        SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
+        SetFlag<HardEvent::V_S>(EVENT_ID0);
+        WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
+        WaitFlag<HardEvent::V_S>(EVENT_ID0);
         for (int64_t loop = 0; loop < loops - 1; loop++) {
             CopyIn(loop);
             Compute(loop);

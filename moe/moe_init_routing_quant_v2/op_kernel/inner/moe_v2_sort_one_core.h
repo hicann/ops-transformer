@@ -50,6 +50,8 @@ __aicore__ inline void MoeV2SortOneCore::CopyIn()
     DataCopyPad(inLocal[0], expertIdxGm, dataCopyParams, dataCopyPadParams);
 
     LocalTensor<int32_t> rowIdxLocal = inLocal[this->sortNum];
+    SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
     ArithProgression<int32_t>(rowIdxLocal, 0, 1, this->sortNum);
     sortDataCopyInQueue.EnQue(inLocal);
 }
@@ -59,6 +61,9 @@ __aicore__ inline void MoeV2SortOneCore::SortCompute()
     LocalTensor<int32_t> inLocal = sortDataCopyInQueue.DeQue<int32_t>();
     LocalTensor<int32_t> expertForSourceRowLocal = inLocal[0];
     LocalTensor<float> expertForSourceRowLocalFp32 = expertForSourceRowLocal.ReinterpretCast<float>();
+    PipeBarrier<PIPE_V>();
+    SetFlag<HardEvent::S_V>(EVENT_ID0);
+    WaitFlag<HardEvent::S_V>(EVENT_ID0);
     Cast(expertForSourceRowLocalFp32, expertForSourceRowLocal, RoundMode::CAST_ROUND, this->tileLength);
     PipeBarrier<PIPE_V>();
     Muls(expertForSourceRowLocalFp32, expertForSourceRowLocalFp32, (float)-1, this->tileLength);
@@ -71,18 +76,23 @@ __aicore__ inline void MoeV2SortOneCore::SortCompute()
         mask0 = mask0 << duplicateNum;
         mask0 = mask0 & (UINT64_MAX >> ONE_REPEAT_SORT_NUM);
         uint64_t mask[2] = {mask0, 0};
+        PipeBarrier<PIPE_V>();
         Duplicate(expertForSourceRowLocalFp32[duplicateIndex], MIN_FP32, mask, 1, DST_BLK_STRIDE, DST_REP_STRIDE);
         PipeBarrier<PIPE_V>();
     }
 
     LocalTensor<float> concatLocal;
+    PipeBarrier<PIPE_V>();
     LocalTensor<float> tempTensor = tempBuffer.Get<float>(GetSortLen<float>(this->sortNum));
+    PipeBarrier<PIPE_V>();
     Concat(concatLocal, expertForSourceRowLocalFp32, tempTensor, this->sortNum / ONE_REPEAT_SORT_NUM);
     PipeBarrier<PIPE_V>();
 
+    PipeBarrier<PIPE_V>();
     LocalTensor<float> sortedLocal = sortedBuffer.Get<float>(GetSortLen<float>(this->sortNum));
     LocalTensor<uint32_t> sourceRowLocal;
     sourceRowLocal = inLocal[this->sortNum].ReinterpretCast<uint32_t>();
+    PipeBarrier<PIPE_V>();
     Sort<float, true>(sortedLocal, concatLocal, sourceRowLocal, tempTensor, this->sortNum / ONE_REPEAT_SORT_NUM);
     PipeBarrier<PIPE_V>();
 
@@ -90,6 +100,7 @@ __aicore__ inline void MoeV2SortOneCore::SortCompute()
     LocalTensor<float> sortedExpertForSourceRowLocal = outLocal[0];
     LocalTensor<uint32_t> expandDstToSrcRowLocal;
     expandDstToSrcRowLocal = outLocal[this->sortNum].ReinterpretCast<uint32_t>();
+    PipeBarrier<PIPE_V>();
     Extract(sortedExpertForSourceRowLocal, expandDstToSrcRowLocal, sortedLocal, this->sortNum / ONE_REPEAT_SORT_NUM);
     PipeBarrier<PIPE_V>();
     Muls(sortedExpertForSourceRowLocal, sortedExpertForSourceRowLocal, (float)-1, this->tileLength);
@@ -97,6 +108,7 @@ __aicore__ inline void MoeV2SortOneCore::SortCompute()
 
     LocalTensor<int32_t> expertForSourceRowLocalInt32;
     expertForSourceRowLocalInt32 = sortedExpertForSourceRowLocal.ReinterpretCast<int32_t>();
+    PipeBarrier<PIPE_V>();
     Cast(expertForSourceRowLocalInt32, sortedExpertForSourceRowLocal, RoundMode::CAST_ROUND, this->tileLength);
     sortDataCopyOutQueue.EnQue<float>(outLocal);
     sortDataCopyInQueue.FreeTensor(inLocal);
@@ -139,11 +151,13 @@ __aicore__ inline void MoeV2SortOneCore::Init(
         if (this->expertTokensCountOrCumsumFlag > 0) {
             expertTokensCountOrCumsumGm.SetGlobalBuffer(
                 (__gm__ int32_t*)expertTokensCountOrCumsum, Align(this->expertNum, sizeof(int32_t)));
+            PipeBarrier<PIPE_V>();
             InitGlobalMemory(expertTokensCountOrCumsumGm, this->expertNum, 0);
         }
         if (this->expertTokensBeforeCapacityFlag == 1) {
             expertTokensBeforeCapacityGm.SetGlobalBuffer(
                 (__gm__ int32_t*)expertTokensBeforeCapacity, Align(this->expertNum, sizeof(int32_t)));
+            PipeBarrier<PIPE_V>();
             InitGlobalMemory(expertTokensBeforeCapacityGm, this->expertNum, 0);
         }
     }

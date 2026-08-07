@@ -112,6 +112,7 @@ __aicore__ inline void MoeV2Mrgsort::CopyIn()
     for (int64_t i = 0, j = 0; i < listNum; i++) {
         lengths[i] = Min(param->oneLoopMaxElements, listRemainElements[i]);
         if (lengths[i] > 0) {
+            PipeBarrier<PIPE_V>();
             DataCopy(
                 this->ubInputs[i], this->gmInputs[i][offsets[i]], Align(GetSortLen<float>(lengths[i]), sizeof(float)));
             tmpUbInputs[j] = this->ubInputs[i];
@@ -127,16 +128,20 @@ __aicore__ inline void MoeV2Mrgsort::MrgsortCompute()
     SetWaitFlag<HardEvent::MTE2_V>(HardEvent::MTE2_V);
     if (this->remainListNum == MERGE_LIST_TWO) {
         MrgSortSrcList sortListTail = MrgSortSrcList(tmpUbInputs[0], tmpUbInputs[1], tmpUbInputs[0], tmpUbInputs[0]);
+        PipeBarrier<PIPE_V>();
         MrgSort<float, true>(this->ubOutput, sortListTail, elementCountListTail, listSortedNums, validBitTail, 1);
     } else if (this->remainListNum == MERGE_LIST_THREE) {
         MrgSortSrcList sortListTail =
             MrgSortSrcList(tmpUbInputs[0], tmpUbInputs[1], tmpUbInputs[MERGE_LIST_IDX_TWO], tmpUbInputs[0]);
+        PipeBarrier<PIPE_V>();
         MrgSort<float, true>(this->ubOutput, sortListTail, elementCountListTail, listSortedNums, validBitTail, 1);
     } else if (this->remainListNum == MERGE_LIST_FOUR) {
         MrgSortSrcList sortListTail = MrgSortSrcList(
             tmpUbInputs[0], tmpUbInputs[1], tmpUbInputs[MERGE_LIST_IDX_TWO], tmpUbInputs[MERGE_LIST_IDX_THREE]);
+        PipeBarrier<PIPE_V>();
         MrgSort<float, true>(this->ubOutput, sortListTail, elementCountListTail, listSortedNums, validBitTail, 1);
     } else {
+        PipeBarrier<PIPE_V>();
         DataCopy(
             this->ubOutput, this->tmpUbInputs[0], Align(GetSortLen<float>(elementCountListTail[0]), sizeof(float)));
         listSortedNums[0] = elementCountListTail[0];
@@ -152,6 +157,7 @@ __aicore__ inline void MoeV2Mrgsort::UpdateSortInfo()
             listRemainElements[i] -= listSortedNums[j];
             allRemainElements -= listSortedNums[j];
             // update offset
+            PipeBarrier<PIPE_V>();
             offsets[i] += GetSortOffset<float>(listSortedNums[j]);
             // update current loop sorted nums
             curLoopSortedNum += listSortedNums[j];
@@ -164,9 +170,11 @@ __aicore__ inline void MoeV2Mrgsort::CopyOut()
 {
     DataCopyParams intriParams;
     intriParams.blockCount = 1;
+    PipeBarrier<PIPE_V>();
     intriParams.blockLen = GetSortLen<float>(curLoopSortedNum) * sizeof(float);
     SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
     DataCopyPad(this->gmOutput[outOffset], this->ubOutput, intriParams);
+    PipeBarrier<PIPE_V>();
     outOffset += GetSortLen<float>(curLoopSortedNum);
 }
 
@@ -176,6 +184,7 @@ __aicore__ inline void MoeV2Mrgsort::Init(MoeV2MrgsortParam* param)
     this->remainListNum = listNum;
 
     for (int64_t i = 0; i < listNum; i++) {
+        PipeBarrier<PIPE_V>();
         offsets[i] = GetSortOffset<float>(param->perListElements * i);
         if (i == listNum - 1) {
             listRemainElements[i] = param->lastListElements;

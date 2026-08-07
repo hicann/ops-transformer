@@ -78,6 +78,7 @@ __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::AssistInit()
 {
     if constexpr (IsSameType<T, int8_t>::value) {
         LocalTensor<int16_t> outLocal = copyOutZeroQueue.AllocTensor<int16_t>();
+        PipeBarrier<PIPE_V>();
         Duplicate<int16_t>(outLocal, static_cast<int16_t>(0), this->perLoopCols);
         copyOutZeroQueue.EnQue<int16_t>(outLocal);
     } else {
@@ -105,6 +106,8 @@ __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::CopyIn(int64_t 
 {
     LocalTensor<int32_t> inLocal = copyInQueue.AllocTensor<int32_t>();
     int64_t length = Align(currentLoopRows, sizeof(int32_t));
+    SetFlag<HardEvent::S_MTE2>(EVENT_ID0);
+    WaitFlag<HardEvent::S_MTE2>(EVENT_ID0);
     DataCopy(inLocal, expandDstToSrcRowGm[progress * perLoopRows], length);
     DataCopy(inLocal[length], expandedExpertIdxGm[progress * perLoopRows], length);
     copyInQueue.EnQue<int32_t>(inLocal);
@@ -123,6 +126,8 @@ __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::CopyOut(int64_t
         this->lastExpertId = this->lastCoreExpertId;
         this->tokenCount = this->lastCoreExpertIdNum;
     }
+    SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
     for (int64_t idx = 0; idx < currentLoopRows; idx++) {
         int32_t expertIdx = inLocal[length].GetValue(idx);
         SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
@@ -150,8 +155,12 @@ __aicore__ inline void MoeV2SrcToDstWithCapacity<T, TilingData>::CopyOut(int64_t
         if (this->tokenCount < this->expertCapacity) {
             int32_t outOffset = inLocal.GetValue(idx);
             index = expertIdx * this->expertCapacity + this->tokenCount;
+            SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
+            WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
             outLocal.SetValue(0, index);
             SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
+            SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
+            WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
             DataCopyPad(expandedRowIdxGm[outOffset], outLocal, copyParams);
             SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
             this->tokenCount++;

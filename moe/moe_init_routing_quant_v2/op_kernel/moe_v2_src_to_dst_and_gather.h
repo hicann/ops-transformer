@@ -105,9 +105,11 @@ template <typename T, typename TilingData>
 __aicore__ inline void MoeV2SrcToDstAndGather<T, TilingData>::AssistInit()
 {
     LocalTensor<int16_t> outLocal = copyOutZeroQueue.AllocTensor<int16_t>();
+    PipeBarrier<PIPE_V>();
     Duplicate<int16_t>(outLocal, static_cast<int16_t>(0), this->perLoopCols);
     copyOutZeroQueue.EnQue<int16_t>(outLocal);
     LocalTensor<float> scaleOutLocal = scaleOutZeroQueue.AllocTensor<float>();
+    PipeBarrier<PIPE_V>();
     Duplicate<float>(scaleOutLocal, 0.0f, 8);
     scaleOutZeroQueue.EnQue<float>(scaleOutLocal);
 
@@ -130,6 +132,8 @@ __aicore__ inline void MoeV2SrcToDstAndGather<T, TilingData>::CopyIn(int64_t pro
 {
     LocalTensor<int32_t> inLocal = copyInQueue.AllocTensor<int32_t>();
     int64_t length = Align(currentLoopRows, sizeof(int32_t));
+    SetFlag<HardEvent::S_MTE2>(EVENT_ID0);
+    WaitFlag<HardEvent::S_MTE2>(EVENT_ID0);
     DataCopy(inLocal, expandDstToSrcRowGm[progress * perLoopRows], length);
     DataCopy(inLocal[length], expandedExpertIdxGm[progress * perLoopRows], length);
 
@@ -169,33 +173,48 @@ __aicore__ inline void MoeV2SrcToDstAndGather<T, TilingData>::Compute(int32_t sr
     LocalTensor<float> dynamicQuantLocal = scaleOutQueue.AllocTensor<float>();
 
     if constexpr (!IsSameType<T, float>::value) {
+        PipeBarrier<PIPE_V>();
         Cast(inLocal, inLocal.template ReinterpretCast<T>()[perLoopColsAlign], RoundMode::CAST_NONE, this->cols);
         PipeBarrier<PIPE_V>();
     }
 
     if (smoothType != 0) {
+        PipeBarrier<PIPE_V>();
         Mul(inLocal, inLocal, smoothLocal, this->cols);
         PipeBarrier<PIPE_V>();
     }
 
+    PipeBarrier<PIPE_V>();
     Abs(tempLocal, inLocal, this->cols);
     PipeBarrier<PIPE_V>();
 
+    PipeBarrier<PIPE_V>();
     ReduceMax(dynamicQuantLocal, tempLocal, tempLocal, this->cols);
     PipeBarrier<PIPE_V>();
 
+    SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
+    SetFlag<HardEvent::V_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
+    WaitFlag<HardEvent::V_S>(EVENT_ID0);
     float maxValue = dynamicQuantLocal.GetValue(0) / 127.0f;
 
+    PipeBarrier<PIPE_V>();
+    SetFlag<HardEvent::S_V>(EVENT_ID0);
+    WaitFlag<HardEvent::S_V>(EVENT_ID0);
     Duplicate<float>(dynamicQuantLocal, maxValue, 8);
+    PipeBarrier<PIPE_V>();
     Duplicate<float>(tempLocal, maxValue, this->cols);
     PipeBarrier<PIPE_V>();
 
+    PipeBarrier<PIPE_V>();
     Div(tempLocal, inLocal, tempLocal, this->cols);
     PipeBarrier<PIPE_V>();
 
+    PipeBarrier<PIPE_V>();
     Cast(tempLocal.ReinterpretCast<half>(), tempLocal, RoundMode::CAST_TRUNC, this->cols);
     PipeBarrier<PIPE_V>();
 
+    PipeBarrier<PIPE_V>();
     Cast(outLocal, tempLocal.ReinterpretCast<half>(), RoundMode::CAST_ROUND, this->cols);
 
     calcQueue.FreeTensor(tempLocal);
@@ -203,6 +222,8 @@ __aicore__ inline void MoeV2SrcToDstAndGather<T, TilingData>::Compute(int32_t sr
     scaleOutQueue.EnQue(dynamicQuantLocal);
 
     LocalTensor<float> quantScaleLocal = scaleOutQueue.DeQue<float>();
+    SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
+    WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
     DataCopyPad(dynamicQuantScaleGm[dstIdx], quantScaleLocal, quantScaleParams);
 
     outLocal = inputXOutQueue.DeQue<int8_t>();
@@ -229,6 +250,8 @@ __aicore__ inline void MoeV2SrcToDstAndGather<T, TilingData>::CopyOut(int64_t pr
         this->lastExpertId = this->lastCoreExpertId;
         this->tokenCount = this->lastCoreExpertIdNum;
     }
+    SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
     for (int64_t idx = 0; idx < currentLoopRows; idx++) {
         int32_t expertIdx = inLocal[length].GetValue(idx);
         SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
@@ -247,8 +270,12 @@ __aicore__ inline void MoeV2SrcToDstAndGather<T, TilingData>::CopyOut(int64_t pr
         if (this->tokenCount < this->expertCapacity) {
             int32_t outOffset = inLocal.GetValue(idx);
             index = expertIdx * this->expertCapacity + this->tokenCount;
+            SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
+            WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
             outLocal.SetValue(0, index);
             SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
+            SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
+            WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
             DataCopyPad(expandedRowIdxGm[outOffset], outLocal, copyParams);
             Compute(outOffset, index, expertIdx);
             SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
@@ -281,6 +308,7 @@ __aicore__ inline float MoeV2SrcToDstAndGather<T, TilingData>::ComputeMax(
     inLocal = inputXInQueue.DeQue<float>();
 
     if constexpr (!IsSameType<T, float>::value) {
+        PipeBarrier<PIPE_V>();
         Cast(inLocal, inLocal.ReinterpretCast<T>()[perLoopColsAlign], RoundMode::CAST_NONE, colsTileLength);
         PipeBarrier<PIPE_V>();
     }
@@ -292,19 +320,26 @@ __aicore__ inline float MoeV2SrcToDstAndGather<T, TilingData>::ComputeMax(
         smoothInQueue.EnQue(smoothLocal);
         smoothLocal = smoothInQueue.DeQue<float>();
 
+        PipeBarrier<PIPE_V>();
         Mul(inLocal, inLocal, smoothLocal, colsTileLength);
         PipeBarrier<PIPE_V>();
     }
 
+    PipeBarrier<PIPE_V>();
     Abs(tempLocal, inLocal, colsTileLength);
     PipeBarrier<PIPE_V>();
 
+    PipeBarrier<PIPE_V>();
+    SetFlag<HardEvent::S_V>(EVENT_ID0);
+    WaitFlag<HardEvent::S_V>(EVENT_ID0);
     ReduceMax(dynamicQuantLocal[8], tempLocal, tempLocal, colsTileLength);
 
     DataCopyPad(quantSrcGm[j * this->perLoopCols], inLocal, intriParamsFp32);
     smoothInQueue.FreeTensor(smoothLocal);
     SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
 
+    SetFlag<HardEvent::V_S>(EVENT_ID0);
+    WaitFlag<HardEvent::V_S>(EVENT_ID0);
     return dynamicQuantLocal.GetValue(8);
 }
 
@@ -321,15 +356,19 @@ __aicore__ inline void MoeV2SrcToDstAndGather<T, TilingData>::ComputeScale(
     inputXInQueue.EnQue<float>(inLocal);
     inLocal = inputXInQueue.DeQue<float>();
 
+    PipeBarrier<PIPE_V>();
     Duplicate<float>(tempLocal, scaleTemp, colsTileLength);
     PipeBarrier<PIPE_V>();
 
+    PipeBarrier<PIPE_V>();
     Div(tempLocal, inLocal, tempLocal, colsTileLength);
     PipeBarrier<PIPE_V>();
 
+    PipeBarrier<PIPE_V>();
     Cast(tempLocal.ReinterpretCast<half>(), tempLocal, RoundMode::CAST_TRUNC, colsTileLength);
     PipeBarrier<PIPE_V>();
 
+    PipeBarrier<PIPE_V>();
     Cast(outLocal, tempLocal.ReinterpretCast<half>(), RoundMode::CAST_ROUND, colsTileLength);
 
     inputXOutQueue.EnQue(outLocal);
@@ -351,6 +390,13 @@ __aicore__ inline void MoeV2SrcToDstAndGather<T, TilingData>::ComputeLoops(
 
     uint32_t tmp = 0xFF7FFFFF;
     float reduceMax = *((float*)&tmp);
+    SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
+    SetFlag<HardEvent::S_V>(EVENT_ID0);
+    SetFlag<HardEvent::V_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
+    WaitFlag<HardEvent::S_V>(EVENT_ID0);
+    WaitFlag<HardEvent::V_S>(EVENT_ID0);
+    PipeBarrier<PIPE_V>();
     for (int64_t j = 0; j < this->colLoops; j++) {
         colsTileLength = this->perLoopCols;
         if (j == this->colLoops - 1) {
@@ -361,10 +407,15 @@ __aicore__ inline void MoeV2SrcToDstAndGather<T, TilingData>::ComputeLoops(
     }
 
     float scaleTemp = reduceMax / 127.0f;
+    PipeBarrier<PIPE_V>();
+    SetFlag<HardEvent::S_V>(EVENT_ID0);
+    WaitFlag<HardEvent::S_V>(EVENT_ID0);
     Duplicate<float>(quantScaleLocal, scaleTemp, 8);
     scaleOutQueue.EnQue(quantScaleLocal);
     quantScaleLocal = scaleOutQueue.DeQue<float>();
 
+    SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
+    WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
     DataCopyPad(dynamicQuantScaleGm[dstIdx], quantScaleLocal, quantScaleParams);
 
     for (int64_t j = 0; j < this->colLoops; j++) {
@@ -394,6 +445,8 @@ __aicore__ inline void MoeV2SrcToDstAndGather<T, TilingData>::CopyOutLoops(int64
         this->lastExpertId = this->lastCoreExpertId;
         this->tokenCount = this->lastCoreExpertIdNum;
     }
+    SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
     for (int64_t idx = 0; idx < currentLoopRows; idx++) {
         int32_t expertIdx = inLocal[length].GetValue(idx);
         SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
@@ -422,8 +475,12 @@ __aicore__ inline void MoeV2SrcToDstAndGather<T, TilingData>::CopyOutLoops(int64
         if (this->tokenCount < this->expertCapacity) {
             int32_t outOffset = inLocal.GetValue(idx);
             index = expertIdx * this->expertCapacity + this->tokenCount;
+            SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
+            WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
             outLocal.SetValue(0, index);
             SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
+            SetFlag<HardEvent::S_MTE3>(EVENT_ID0);
+            WaitFlag<HardEvent::S_MTE3>(EVENT_ID0);
             DataCopyPad(expandedRowIdxGm[outOffset], outLocal, copyParams);
             if (smoothType == 2) {
                 ComputeLoops(outOffset, index, expertIdx);

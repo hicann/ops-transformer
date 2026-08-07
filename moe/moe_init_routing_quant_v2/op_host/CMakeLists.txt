@@ -25,7 +25,7 @@ if (BUILD_OPEN_PROJECT)
     else()
         add_ops_compile_options(
                 OP_NAME MoeInitRoutingQuantV2
-                OPTIONS --cce-auto-sync=on
+                OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
                 -Werror
         )

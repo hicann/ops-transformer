@@ -58,6 +58,7 @@ __aicore__ inline void MoeV2FullLoadQuant<T>::Compute(int64_t xLocalLength)
 
     uint32_t elements = Align(this->cols, sizeof(int8_t)) * xLocalLength;
     if constexpr (IsSameType<T, bfloat16_t>::value) {
+        PipeBarrier<PIPE_V>();
         Cast(floatLocal, inLocal, RoundMode::CAST_NONE, elements);
         PipeBarrier<PIPE_V>();
         Cast(halfLocal, floatLocal, RoundMode::CAST_NONE, elements);
@@ -67,6 +68,7 @@ __aicore__ inline void MoeV2FullLoadQuant<T>::Compute(int64_t xLocalLength)
         Adds(halfLocal, halfLocal, static_cast<half>(this->offset), elements);
         PipeBarrier<PIPE_V>();
         LocalTensor<int32_t> intLocal = floatLocal.ReinterpretCast<int32_t>();
+        PipeBarrier<PIPE_V>();
         Cast(intLocal, halfLocal, RoundMode::CAST_RINT, elements);
         PipeBarrier<PIPE_V>();
         SetDeqScale((half)1.000000e+00f);
@@ -75,6 +77,7 @@ __aicore__ inline void MoeV2FullLoadQuant<T>::Compute(int64_t xLocalLength)
         PipeBarrier<PIPE_V>();
         Cast(outLocal, halfLocal, RoundMode::CAST_RINT, elements);
     } else if constexpr (IsSameType<T, float>::value) {
+        PipeBarrier<PIPE_V>();
         Cast(halfLocal, inLocal, RoundMode::CAST_NONE, elements);
         PipeBarrier<PIPE_V>();
         Muls(halfLocal, halfLocal, static_cast<half>(this->scale), elements);
@@ -83,6 +86,7 @@ __aicore__ inline void MoeV2FullLoadQuant<T>::Compute(int64_t xLocalLength)
         PipeBarrier<PIPE_V>();
         Cast(outLocal, halfLocal, RoundMode::CAST_RINT, elements);
     } else {
+        PipeBarrier<PIPE_V>();
         Muls(inLocal, inLocal, static_cast<T>(this->scale), elements);
         PipeBarrier<PIPE_V>();
         Adds(inLocal, inLocal, static_cast<T>(this->offset), elements);
@@ -115,6 +119,10 @@ __aicore__ inline void MoeV2FullLoadQuant<T>::CopyOutX()
     LocalTensor<int8_t> outLocal = inputXCopyOutQueue.DeQue<int8_t>();
     int64_t k = 0;
     DataCopyExtParams intriParams{1, static_cast<uint32_t>(this->cols * sizeof(int8_t)), 0, 0, 0};
+    SetFlag<HardEvent::MTE3_S>(EVENT_ID0);
+    SetFlag<HardEvent::V_S>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE3_S>(EVENT_ID0);
+    WaitFlag<HardEvent::V_S>(EVENT_ID0);
     for (int64_t i = startXRow; i <= endXRow; i++) {
         for (; k < this->perCoreRows && curRowsStart / this->k == i; curRowsStart++, k++) {
             int32_t outIndex = expandedRowIdx.GetValue(curRowsStart);
