@@ -461,7 +461,7 @@ aclnnStatus aclnnGroupedMatmulV3(
 
   - 不为空的参数支持的数据类型和维度组合要满足下表（其中g为matmul组数即分组数）：
 
-      |groupType| x dtype     | x shape | weight dtype |weight shape| biasOptional dtype |biasOptional shape| scaleOptional dtpye |scaleOptional shape| out dtpye    |out shape|
+      |groupType| x dtype     | x shape | weight dtype |weight shape| biasOptional dtype |biasOptional shape| scaleOptional dtype |scaleOptional shape| out dtype    |out shape|
       |:-------:|:-------:|:-------:|:-------:|:-------:| :------      | :------      |:-------       | :------ |:-------       | :------ |
       |0|INT8     |(M,K)|INT8     |(g,K,N)/(g,N,K)|INT32/null    | (g,N)|UINT64/INT64  |(g,N)/null|INT8|(M,N)|
 
