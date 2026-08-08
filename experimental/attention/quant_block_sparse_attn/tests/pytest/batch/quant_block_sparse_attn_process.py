@@ -219,7 +219,7 @@ class _QuantBlockSparseAttnGraph(torch.nn.Module):
             query, key, value, q_descale, k_descale, v_descale, p_scale, sparse_indices, sparse_seq_len,
             atten_mask, self.inputs["softmax_scale"], self.inputs["sparse_q_block_size"],
             self.inputs["sparse_kv_block_size"],
-            cu_seqlens_q=cu_seqlens_q, cu_seqlens_kv=cu_seqlens_kv, seqused_q=seqused_q,
+            cu_seqlens_q=cu_seqlens_q, cu_seqlens_kv=None, seqused_q=None,
             seqused_kv=seqused_kv, block_table=block_table, metadata=metadata,
             layout_kv=self.inputs["layout_kv"], layout_q=self.inputs["layout_q"],
             layout_sparse_indices=self.inputs["layout_sparse_indices"],

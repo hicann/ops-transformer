@@ -30,6 +30,7 @@ public:
 
 private:
     ge::graphStatus CheckAttrs() const;
+    ge::graphStatus CheckSoftmaxScale() const;
     ge::graphStatus CheckDtype() const;
     ge::graphStatus CheckFormat() const;
     ge::graphStatus CheckScaleDtype() const;

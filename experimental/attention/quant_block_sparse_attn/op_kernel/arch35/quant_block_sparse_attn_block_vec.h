@@ -693,9 +693,6 @@ __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::SoftmaxLseCopyOut(LocalTenso
         return;
     }
 
-    if (!constInfo.isSoftmaxLseEnable) {
-        return;
-    }
     // 复用 qScaleInputQue 的 2048B buffer：ProcessVec1Dn 中 qScale 已先 FreeTensor 释放，
     // 不再单独分配 softmaxLseQueue，节省一块 2048B UB。
     LocalTensor<float> lseUb = this->qScaleInputQue.template AllocTensor<float>();

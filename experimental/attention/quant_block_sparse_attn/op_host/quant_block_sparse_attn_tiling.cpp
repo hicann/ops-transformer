@@ -434,7 +434,7 @@ ge::graphStatus QuantBlockSparseAttnTiling::SaveTilingData()
         if (rawTilingData->GetCapacity() < dataSize) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                 kOpName, "tilingDataCapacity", std::to_string(rawTilingData->GetCapacity()),
-                "must be at least " + std::to_string(dataSize) + " for MXFP8 full-quant tiling data");
+                "Must be at least " + std::to_string(dataSize) + " for MXFP8 full-quant tiling data");
             return ge::GRAPH_FAILED;
         }
         std::memcpy(rawTilingData->GetData(), &mxTilingData_, dataSize);
@@ -460,7 +460,7 @@ ge::graphStatus QuantBlockSparseAttnTiling::DoOpTiling(QuantBlockSparseAttnTilin
     if (totalTaskNum_ == 0U || totalTaskNum_ > std::numeric_limits<uint32_t>::max()) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             kOpName, "bSize * n1Size * gS1OuterSize", std::to_string(totalTaskNum_),
-            "total task num must be in range [1, " + std::to_string(std::numeric_limits<uint32_t>::max()) + "]");
+            "Total task num must be in range [1, " + std::to_string(std::numeric_limits<uint32_t>::max()) + "]");
         return ge::GRAPH_FAILED;
     }
 
