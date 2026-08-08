@@ -2945,6 +2945,7 @@ TestCases = [
         "n1_n2_ratio": 1,
         "s1_s2_relation": "lt",
         "alignment": "s1_aligned_s2_aligned",
+        "blocknum": 86,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_8_4_2_8192_8192_128_128_00001",
@@ -2989,6 +2990,7 @@ TestCases = [
         "n1_n2_ratio": 2,
         "s1_s2_relation": "eq",
         "alignment": "s1_aligned_s2_aligned",
+        "blocknum": 361,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_16_9_3_2048_8192_128_128_00002",
@@ -3033,6 +3035,7 @@ TestCases = [
         "n1_n2_ratio": 3,
         "s1_s2_relation": "lt",
         "alignment": "s1_aligned_s2_aligned",
+        "blocknum": 688,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_32_16_4_3072_4096_128_128_00003",
@@ -3077,6 +3080,7 @@ TestCases = [
         "n1_n2_ratio": 4,
         "s1_s2_relation": "lt",
         "alignment": "s1_aligned_s2_aligned",
+        "blocknum": 299,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_64_25_5_2048_2048_128_128_00004",
@@ -3121,6 +3125,7 @@ TestCases = [
         "n1_n2_ratio": 5,
         "s1_s2_relation": "eq",
         "alignment": "s1_aligned_s2_aligned",
+        "blocknum": 449,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_128_36_6_4_1024_128_128_00005",
@@ -3165,6 +3170,7 @@ TestCases = [
         "n1_n2_ratio": 6,
         "s1_s2_relation": "lt",
         "alignment": "s1_unaligned_s2_aligned",
+        "blocknum": 220,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_10_49_7_777_896_128_128_00006",
@@ -3209,6 +3215,7 @@ TestCases = [
         "n1_n2_ratio": 7,
         "s1_s2_relation": "lt",
         "alignment": "s1_unaligned_s2_unaligned",
+        "blocknum": 17,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_20_64_8_2304_2560_128_128_00007",
@@ -3253,6 +3260,7 @@ TestCases = [
         "n1_n2_ratio": 8,
         "s1_s2_relation": "lt",
         "alignment": "s1_aligned_s2_aligned",
+        "blocknum": 100,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_40_9_1_1536_1777_128_128_00008",
@@ -3297,6 +3305,7 @@ TestCases = [
         "n1_n2_ratio": 9,
         "s1_s2_relation": "lt",
         "alignment": "s1_aligned_s2_unaligned",
+        "blocknum": 155,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_120_20_2_16_1024_128_128_00009",
@@ -3341,6 +3350,7 @@ TestCases = [
         "n1_n2_ratio": 10,
         "s1_s2_relation": "lt",
         "alignment": "s1_unaligned_s2_aligned",
+        "blocknum": 162,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_96_33_3_1024_1024_128_128_00010",
@@ -3385,6 +3395,7 @@ TestCases = [
         "n1_n2_ratio": 11,
         "s1_s2_relation": "eq",
         "alignment": "s1_aligned_s2_aligned",
+        "blocknum": 189,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_2_48_4_2142_2300_128_128_00011",
@@ -3429,6 +3440,7 @@ TestCases = [
         "n1_n2_ratio": 12,
         "s1_s2_relation": "lt",
         "alignment": "s1_unaligned_s2_unaligned",
+        "blocknum": 10,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_6_65_5_2350_2350_128_128_00012",
@@ -3473,6 +3485,7 @@ TestCases = [
         "n1_n2_ratio": 13,
         "s1_s2_relation": "eq",
         "alignment": "s1_unaligned_s2_unaligned",
+        "blocknum": 18,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_12_84_6_4096_2048_128_128_00013",
@@ -3517,6 +3530,7 @@ TestCases = [
         "n1_n2_ratio": 14,
         "s1_s2_relation": "gt",
         "alignment": "s1_aligned_s2_aligned",
+        "blocknum": 34,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_24_105_7_4096_4096_128_128_00014",
@@ -3561,6 +3575,7 @@ TestCases = [
         "n1_n2_ratio": 15,
         "s1_s2_relation": "eq",
         "alignment": "s1_aligned_s2_aligned",
+        "blocknum": 120,
     },
     {
         "name": "BSA_FP8_e4m3_FP8_e4m3_BF16_mxfp8_12_128_8_25_25_128_128_00015",
@@ -3605,6 +3620,7 @@ TestCases = [
         "n1_n2_ratio": 16,
         "s1_s2_relation": "eq",
         "alignment": "s1_unaligned_s2_unaligned",
+        "blocknum": 15,
     },
     {
         "name": "NO_PSCALE_B2_BS64_MASK0_CAUSAL",
