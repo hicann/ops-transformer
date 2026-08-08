@@ -18,6 +18,8 @@ EXCEL_COLUMNS = [
     "sparse_q_block_size", "sparse_kv_block_size",
     "sparse_count", "sparse_pattern",
     "block_table_pattern",
+    "block_num",
+    "q_datarange", "k_datarange", "v_datarange",
     "layout_q", "layout_kv", "layout_sparse_indices", "layout_out",  "output_dtype",
     "actlen_mode", "quant_mode", "mask_mode",
     "p_scale_value", "softmax_scale",
@@ -30,7 +32,8 @@ EXCEL_FILENAME = "cases.csv,cases_stc.csv,cases_generalized.csv"
 
 _INT_COLS = {"B", "N1", "N2", "S1", "S2", "D",
              "sparse_q_block_size", "sparse_kv_block_size",
-             "sparse_count", "quant_mode", "mask_mode", "seed"}
+             "sparse_count", "quant_mode", "mask_mode", "seed",
+             "block_num"}
 _FLOAT_COLS = {"p_scale_value", "softmax_scale"}
 _BOOL_COLS = {"return_softmax_lse"}
 

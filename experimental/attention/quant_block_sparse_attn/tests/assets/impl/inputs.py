@@ -76,20 +76,69 @@ def _rand_fullquant_source(shape, amp_low, amp_high, generator, amp_shape=None):
     return base * amps
 
 
-def _make_block_table(batch, seq_len, block_size, pattern, rng):
-    block_num_per_batch = math.ceil(seq_len / block_size)
-    block_table = torch.empty((batch, block_num_per_batch), dtype=torch.int32)
-    for batch_idx in range(batch):
-        ids = list(
-            range(
-                batch_idx * block_num_per_batch, (batch_idx + 1) * block_num_per_batch
+def _make_block_table(batch, seq_len, block_size, pattern, rng, blocknum=None, q_block_num=1):
+    kv_block_num = math.ceil(seq_len / block_size)
+    width = kv_block_num
+    needed_block_num = batch * width
+
+    if blocknum is None or blocknum >= needed_block_num:
+        block_table = torch.empty((batch, kv_block_num), dtype=torch.int32)
+        for batch_idx in range(batch):
+            ids = list(
+                range(
+                    batch_idx * kv_block_num, (batch_idx + 1) * kv_block_num
+                )
             )
-        )
-        if pattern == "reverse":
-            ids.reverse()
-        elif pattern == "random":
-            rng.shuffle(ids)
-        block_table[batch_idx] = torch.tensor(ids, dtype=torch.int32)
+            if pattern == "reverse":
+                ids.reverse()
+            elif pattern == "random":
+                rng.shuffle(ids)
+            block_table[batch_idx] = torch.tensor(ids, dtype=torch.int32)
+        return block_table
+
+    if blocknum < width:
+        # 物理块池小于每 batch 的逻辑块数：前几列共享（全部指向物理块 0），
+        # 其余列互不相同，所有 batch 行一致，总物理块数精确等于 blocknum。
+        shared_cols = width - blocknum + 1
+        if shared_cols <= 0 or shared_cols > width:
+            raise ValueError(f"blocknum={blocknum} out of range [1, {width}]")
+        block_table = torch.zeros((batch, width), dtype=torch.int32)
+        for batch_idx in range(batch):
+            for block_idx in range(shared_cols, width):
+                block_table[batch_idx, block_idx] = block_idx - shared_cols + 1
+        return block_table
+
+    # batch >= 2 且 blocknum >= width：共享前缀（前几列各 batch 相同）+ 每 batch 独有尾部
+    block_table = torch.empty((batch, width), dtype=torch.int32)
+    shared_count = needed_block_num - blocknum
+    full_shared_cols = shared_count // (batch - 1)
+    partial_share = shared_count % (batch - 1)
+    next_id = 0
+    col = 0
+
+    for _ in range(full_shared_cols):
+        for batch_idx in range(batch):
+            block_table[batch_idx, col] = next_id
+        next_id += 1
+        col += 1
+
+    if partial_share > 0:
+        shared_id = next_id
+        next_id += 1
+        for batch_idx in range(partial_share + 1):
+            block_table[batch_idx, col] = shared_id
+        for batch_idx in range(partial_share + 1, batch):
+            block_table[batch_idx, col] = next_id
+            next_id += 1
+        col += 1
+
+    for batch_idx in range(batch):
+        for block_idx in range(col, width):
+            block_table[batch_idx, block_idx] = next_id
+            next_id += 1
+
+    if next_id != blocknum:
+        raise AssertionError(f"block_table generated {next_id} physical blocks, expected {blocknum}")
     return block_table
 
 
@@ -177,9 +226,15 @@ def _make_sparse_indices(
     return sparse_indices, sparse_seq_len
 
 
-def _dense_to_pa(dense_key, dense_value, dense_k_scale, block_table, block_size):
+def _dense_to_pa(dense_key, dense_value, dense_k_scale, block_table, block_size, num_blocks=None):
     B, S2, N2, D = dense_key.shape
-    block_num = int(block_table.max().item()) + 1
+    required = int(block_table.max().item()) + 1
+    if num_blocks is not None and num_blocks < required:
+        raise ValueError(
+            f"pre-allocated num_blocks={num_blocks} < required physical blocks {required}"
+        )
+    # 预分配物理池可能大于 block_table 实际用到的块数，按预分配大小定 PA 张量，尾部补零
+    block_num = num_blocks if num_blocks is not None else required
     key_pa = torch.zeros((block_num, N2, block_size, D), dtype=dense_key.dtype)
     value_pa = torch.zeros((block_num, N2, block_size, D), dtype=dense_value.dtype)
     k_scale_pa = torch.zeros((block_num, N2, block_size), dtype=torch.float32)
@@ -265,7 +320,10 @@ def customize_inputs(
         if key.dim() == 4
         else math.ceil(max_seqlen_kv / sparse_kv_block_size)
     )
-    S2 = max_seqlen_kv if max_seqlen_kv > 0 else num_blocks * block_size
+    # S2 由 sparse_indices 的逻辑 KV 块数（末维）反推，保证 sparse_indices 生成结果与预分配形状一致；
+    # 不能用 key.shape[0]（物理块数）推，物理池在共享场景下可小于逻辑块数。
+    kv_max = int(sparse_indices.shape[-1])
+    S2 = kv_max * sparse_kv_block_size
 
     q_lengths = [S1] * B
     kv_lengths = [S2] * B
@@ -295,19 +353,37 @@ def customize_inputs(
     for b in range(B):
         dense_k_scale[b] = dense_k_scale_base[b]
 
-    block_table = _make_block_table(B, S2, sparse_kv_block_size, "sequential", rng)
+    block_table = _make_block_table(
+        B,
+        S2,
+        sparse_kv_block_size,
+        block_table_pattern,
+        rng,
+        blocknum=int(key.shape[0]) if key.dim() == 4 else None,
+    )
     key_pa, value_pa, k_scale_pa = _dense_to_pa(
-        dense_key, dense_value, dense_k_scale, block_table, sparse_kv_block_size
+        dense_key,
+        dense_value,
+        dense_k_scale,
+        block_table,
+        sparse_kv_block_size,
+        num_blocks=int(key.shape[0]) if key.dim() == 4 else None,
     )
 
     key.copy_(key_pa)
     value.copy_(value_pa)
 
     q_descale.copy_(q_scale)
-    k_descale.copy_(k_scale_pa)
+    # k_scale_pa 为 3D (blockNum, N2, blockSize)，k_descale 要求 4D (blockNum, N2, blockSize, 1)，
+    # 补末尾单例维再拷贝，避免 3D 被错误广播成 [blockNum, N2, blockSize, ...]。
+    k_descale.copy_(k_scale_pa.unsqueeze(-1))
     v_descale.copy_(v_scale)
 
-    p_scale_data = torch.tensor([float(p_scale_value)], dtype=torch.float32)
+    # p_scale 必填（shape [1]）：p_scale_value 未指定时生成 [-1, 1] 随机 float，否则用给定值
+    if p_scale_value is None:
+        p_scale_data = torch.tensor([rng.uniform(-1.0, 1.0)], dtype=torch.float32)
+    else:
+        p_scale_data = torch.tensor([float(p_scale_value)], dtype=torch.float32)
     p_scale.copy_(p_scale_data)
 
     sparse_indices_data, sparse_seq_len_data = _make_sparse_indices(
@@ -328,5 +404,10 @@ def customize_inputs(
     sparse_indices.copy_(sparse_indices_data)
     sparse_seq_len.copy_(sparse_seq_len_data)
 
-    atten_mask_data = torch.tril(torch.ones(atten_mask.shape, dtype=torch.uint8)).T
-    atten_mask.copy_(atten_mask_data)
+    if int(mask_mode) == 3:
+        # 因果掩码：仅在需要掩码时生成；mask_mode=0（无掩码）时预分配的 atten_mask 为空，
+        # 用形状 [0] 生成 tril 会失败，故跳过。
+        atten_mask_data = torch.tril(torch.ones(atten_mask.shape, dtype=torch.uint8)).T
+        atten_mask.copy_(atten_mask_data)
+    elif atten_mask.numel() > 0:
+        atten_mask.zero_()

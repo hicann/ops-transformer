@@ -40,8 +40,6 @@ def _runtime_library_dirs():
     if conda_prefix:
         candidates.append(Path(conda_prefix) / "lib")
     candidates.extend([
-        Path("/home/wz/miniforge3/envs/torch29/lib"),
-        Path("/home/dyx/miniforge3/envs/torch29/lib"),
         Path(sys.executable).resolve().parents[1] / "lib",
     ])
     deduped = []
@@ -78,7 +76,6 @@ def _custom_opp_roots():
     if build_roots:
         return build_roots
     candidates = [
-        Path("/home/dyx/vendors/custom_transformer"),
         Path("/workspace/vendors/custom_transformer"),
     ]
     return [path for path in candidates if path.exists()]

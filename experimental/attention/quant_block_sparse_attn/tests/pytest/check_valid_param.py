@@ -58,10 +58,52 @@ def check_valid_param(params):
     if not isinstance(pa_block_padding_bytes, int) or pa_block_padding_bytes != 0:
         raise ValueError(f"pa_block_padding_bytes should be 0 for segmented KV cache, got {pa_block_padding_bytes}")
 
+    block_num = params.get("block_num")
+    if block_num is not None:
+        if isinstance(block_num, float) and block_num.is_integer():
+            block_num = int(block_num)
+            params["block_num"] = block_num
+        if not isinstance(block_num, int) or block_num <= 0:
+            raise ValueError(f"block_num should be a positive int or None, got {block_num}")
+
+    for key in ("q_datarange", "k_datarange", "v_datarange"):
+        value = params.get(key)
+        if value is None:
+            continue
+        try:
+            if isinstance(value, str):
+                s = value.strip()
+                if s.startswith("[") and s.endswith("]"):
+                    s = s[1:-1]
+                try:
+                    r = float(s)
+                    low, high = -r, r
+                except ValueError:
+                    parts = s.split(",")
+                    if len(parts) != 2:
+                        raise ValueError(f"expected like [-100,100], got {value!r}")
+                    low = float(parts[0].strip())
+                    high = float(parts[1].strip())
+            elif isinstance(value, (int, float)):
+                r = float(value)
+                low, high = -r, r
+            elif isinstance(value, (list, tuple)) and len(value) == 2:
+                low = float(value[0])
+                high = float(value[1])
+            else:
+                raise ValueError(f"unsupported format {value!r}")
+        except (ValueError, TypeError) as error:
+            raise ValueError(
+                f"{key} should be like [-100,100], a scalar, or a (low, high) pair, got {value}"
+            ) from error
+        if low > high:
+            raise ValueError(f"{key} should satisfy low <= high, got ({low}, {high})")
+        params[key] = (low, high)
+
     if params["layout_q"] not in ("TND", "NTD"):
         raise ValueError(f"unsupported layout_q: {params['layout_q']}")
 
-    if params.get("layout_kv") != "PA_BNSD":
+    if params.get("layout_kv") != "PA_BNSD" and params.get("layout_out") != "PA_BNBD":
         raise ValueError(f"unsupported layout_kv: {params.get('layout_kv')}")
 
     if params.get("layout_sparse_indices") != "B_N_Qb_Kb":

@@ -102,14 +102,10 @@ public:
                                             __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
                                             __gm__ uint8_t *&workspace, uint64_t singleCoreOffset, uint32_t aicIdx,
                                             ConstInfo &constInfo);
-    __aicore__ inline void InitUniqueLocalBuffer(ConstInfo &constInfo);
     __aicore__ inline void GenerateDropoutMask(RunInfo &runInfo, ConstInfo &constInfo, LocalTensor<uint8_t> &dropMaskUb)
     {}
     __aicore__ inline void SoftmaxDataCopyOut(RunInfo &runInfo, ConstInfo &constInfo, LocalTensor<float> &sumUb,
                                               LocalTensor<float> &maxUb);
-    __aicore__ inline void SoftmaxDataCopyOutFp8(RunInfo &runInfo, ConstInfo &constInfo, LocalTensor<half> &sumUb,
-                                                 LocalTensor<half> &maxUb)
-    {}
     template <typename VEC2_RES_T>
     __aicore__ inline void CopyOutAttentionOut(RunInfo &runInfo, ConstInfo &constInfo,
                                                LocalTensor<VEC2_RES_T> &vec2ResUb, int64_t vec2S1Idx,
@@ -141,16 +137,9 @@ public:
     TBuf<> softmaxSumBuf[3];
     TBuf<> softmaxExpBuf[3];
     TBuf<> pScaleBuf[3];
-    TBuf<> preLoopMaxBuf;
-    TBuf<> preLoopSumBuf;
-    TBuf<> firstLoopSumBuf;
     TQue<QuePosition::VECIN, 1> qScaleInputQue;
     TQue<QuePosition::VECIN, 1> kScaleInputQue;
     TBuf<> vselrIndexesBuf[5];
-    TBuf<> mm2InBuf;
-    TBuf<> mm2OutBuf;
-    TQue<QuePosition::VECOUT, 1> maxBrdcst;
-    TQue<QuePosition::VECOUT, 1> sumBrdcst;
     CopyQueryScaleGmToUb<float, layout> copyQueryScaleGmToUb;
     CopyAntiquantGmToUb<float, kvLayout> copyKeyScaleGmToUb;
 
@@ -161,12 +150,8 @@ public:
 
     GlobalTensor<float> softmaxLseGm;
     TBuf<> lseTmpBuff;
-    TQue<QuePosition::VECOUT, 1> softmaxLseQueue;
 
 protected:
-    __aicore__ inline void BroadCastAndCopyOut(RunInfo &runInfo, GlobalTensor<T> &sumGm, GlobalTensor<T> &maxGm,
-                                               int64_t gmOffset, int64_t calculateSize);
-
     template <typename VEC2_RES_T>
     __aicore__ inline void Bmm2DataCopyOut(RunInfo &runInfo, ConstInfo &constInfo, LocalTensor<VEC2_RES_T> &vec2ResUb,
                                            int64_t vec2S1Idx, int64_t vec2CalcSize = 0);
@@ -269,28 +254,6 @@ __aicore__ inline bool QBSABlockVec<TEMPLATE_ARGS>::SoftmaxInvalidLineCheck(Loca
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::BroadCastAndCopyOut(RunInfo &runInfo, GlobalTensor<T> &sumGm,
-                                                                        GlobalTensor<T> &maxGm, int64_t gmOffset,
-                                                                        int64_t calculateSize)
-{
-    LocalTensor<float> sumTensor = softmaxSumBuf[runInfo.multiCoreIdxMod3].template Get<float>();
-    LocalTensor<float> sumOutTensor = sumBrdcst.template AllocTensor<float>();
-    FaVectorApi::BroadcastMaxSum(sumOutTensor, sumTensor, runInfo.halfS1RealSize);
-    sumBrdcst.template EnQue(sumOutTensor);
-    sumBrdcst.template DeQue<float>();
-    DataCopy(sumGm[gmOffset], sumOutTensor, calculateSize);
-    sumBrdcst.template FreeTensor(sumOutTensor);
-
-    LocalTensor<float> maxOutTensor = maxBrdcst.template AllocTensor<float>();
-    LocalTensor<float> maxTensor = softmaxMaxBuf[runInfo.multiCoreIdxMod3].template Get<float>();
-    FaVectorApi::BroadcastMaxSum(maxOutTensor, maxTensor, runInfo.halfS1RealSize);
-    maxBrdcst.template EnQue(maxOutTensor);
-    maxBrdcst.template DeQue<float>();
-    DataCopy(maxGm[gmOffset], maxOutTensor, calculateSize);
-    maxBrdcst.template FreeTensor(maxOutTensor);
-}
-
-TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::ProcessVec1Dn(
     Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &outputBuf,
     Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm1ResBuf, RunInfo &runInfo, ConstInfo &constInfo)
@@ -310,7 +273,6 @@ __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::ProcessVec1Dn(
 
     LocalTensor<float> qScaleUbTensor = qScaleInputQue.template AllocTensor<float>();
     LocalTensor<float> kScaleUbTensor = kScaleInputQue.template AllocTensor<float>();
-
     if (unlikely(runInfo.s2SparseBlk2RealSize < constInfo.kvSparseBlockSize)) {
         Duplicate<float>(kScaleUbTensor, 1, s2BaseSize);
         TEventID vDoneEvent = GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>();
@@ -514,17 +476,12 @@ __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::SoftmaxInitBuffer()
     tPipe->InitBuffer(softmaxSumBuf[0], 256);
     tPipe->InitBuffer(softmaxSumBuf[1], 256);
     tPipe->InitBuffer(softmaxSumBuf[2], 256);
-    tPipe->InitBuffer(maxBrdcst, 1, 2048);
-    tPipe->InitBuffer(sumBrdcst, 1, 2048);
     tPipe->InitBuffer(softmaxMaxBuf[0], 256);
     tPipe->InitBuffer(softmaxMaxBuf[1], 256);
     tPipe->InitBuffer(softmaxMaxBuf[2], 256);
     tPipe->InitBuffer(softmaxExpBuf[0], 256);
     tPipe->InitBuffer(softmaxExpBuf[1], 256);
     tPipe->InitBuffer(softmaxExpBuf[2], 256);
-    tPipe->InitBuffer(preLoopMaxBuf, 256);
-    tPipe->InitBuffer(preLoopSumBuf, 256);
-    tPipe->InitBuffer(firstLoopSumBuf, 256);
     tPipe->InitBuffer(qScaleInputQue, 1, 256 * 8);
     tPipe->InitBuffer(kScaleInputQue, 1, 1024);
 }
@@ -610,8 +567,6 @@ __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe *pipe,
             qGatherTensor.SetValue(i, i * 8);
         }
     }
-
-    InitUniqueLocalBuffer(constInfo);
 
     mte3ToVId[0] = GetTPipePtr()->AllocEventID<HardEvent::MTE3_V>();
     vToMte3Id[0] = GetTPipePtr()->AllocEventID<HardEvent::V_MTE3>();
@@ -713,14 +668,6 @@ __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::InitGlobalBuffer(
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::InitUniqueLocalBuffer(ConstInfo &constInfo)
-{
-    if constexpr (hasLse) {
-        this->tPipe->InitBuffer(softmaxLseQueue, 1, (s1BaseSize >> 1U) * sizeof(float) * 8);
-    }
-}
-
-TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::SoftmaxDataCopyOut(RunInfo &runInfo, ConstInfo &constInfo,
                                                                        LocalTensor<float> &sumUb,
                                                                        LocalTensor<float> &maxUb)
@@ -746,17 +693,36 @@ __aicore__ inline void QBSABlockVec<TEMPLATE_ARGS>::SoftmaxLseCopyOut(LocalTenso
         return;
     }
 
-    LocalTensor<float> lseUb = this->softmaxLseQueue.template AllocTensor<float>();
+    if (!constInfo.isSoftmaxLseEnable) {
+        return;
+    }
+    // 复用 qScaleInputQue 的 2048B buffer：ProcessVec1Dn 中 qScale 已先 FreeTensor 释放，
+    // 不再单独分配 softmaxLseQueue，节省一块 2048B UB。
+    LocalTensor<float> lseUb = this->qScaleInputQue.template AllocTensor<float>();
+    // lse 事件按次分配/释放（与 vDoneEvent 模式一致），避免长期占用事件池。
+    TEventID lseVToMte3Id = GetTPipePtr()->AllocEventID<HardEvent::V_MTE3>();
+    TEventID lseMte3ToMte2Id = GetTPipePtr()->AllocEventID<HardEvent::MTE3_MTE2>();
+
     ComputeLseOutputVF(lseUb, softmaxSumTmp, softmaxMaxTmp, runInfo.halfS1RealSize);
-    softmaxLseQueue.template EnQue(lseUb);
-    softmaxLseQueue.DeQue<float>();
+
+    // Vector 写完 lseUb 后，MTE3 才能读取。
+    SetFlag<HardEvent::V_MTE3>(lseVToMte3Id);
+    WaitFlag<HardEvent::V_MTE3>(lseVToMte3Id);
+
     DataCopyExtParams intriParams1;
     intriParams1.blockLen = sizeof(float);
     intriParams1.blockCount = runInfo.halfS1RealSize;
     intriParams1.srcStride = 0;
     intriParams1.dstStride = 0;
     DataCopyPad(this->softmaxLseGm[runInfo.softmaxLseOffset], lseUb, intriParams1);
-    softmaxLseQueue.FreeTensor(lseUb);
+
+    // MTE3 读完 lseUb 后，下一轮 MTE2 才能覆写该 UB。
+    SetFlag<HardEvent::MTE3_MTE2>(lseMte3ToMte2Id);
+    WaitFlag<HardEvent::MTE3_MTE2>(lseMte3ToMte2Id);
+
+    GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(lseVToMte3Id);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(lseMte3ToMte2Id);
+    this->qScaleInputQue.FreeTensor(lseUb);
 }
 
 TEMPLATES_DEF_NO_DEFAULT

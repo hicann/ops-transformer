@@ -131,24 +131,28 @@ def _auto_block_table(B, S2, block_size, pattern="sequential", seed=0):
     return block_table
 
 
-def _pa_to_dense(pa_tensor, block_table, B, S2, dim_perm, block_size):
-    n2 = int(pa_tensor.shape[1])
-    if pa_tensor.dim() == 4:
-        d = int(pa_tensor.shape[3])
-        dense = torch.zeros((B, S2, n2, d), dtype=pa_tensor.dtype)
-    else:
-        dense = torch.zeros((B, S2, n2), dtype=pa_tensor.dtype)
-    for b in range(B):
-        for logical_block in range(block_table.shape[1]):
-            physical = int(block_table[b, logical_block].item())
-            start = logical_block * block_size
-            end = min(start + block_size, S2)
-            token_count = end - start
-            if token_count <= 0:
-                continue
-            src = pa_tensor[physical, :, :token_count]
-            dense[b, start:end] = src.permute(*dim_perm)
-    return dense
+def _pack_pa_to_combined(key_pa, value_pa, k_scale_pa, block_size, layout_kv):
+    """Directly pack separate PA key/value/k_descale into a combined KV storage+meta.
+
+    Same layout as bsa_ttk_ops._pack_combined_kv, so the reference reads exactly
+    what the kernel reads (no PA->dense->PA round-trip).
+    """
+    golden_module = load_pytest_golden_module()
+    block_num = int(key_pa.shape[0])
+    n2 = int(key_pa.shape[1])
+    d_size = int(key_pa.shape[3])
+    dv_size = int(value_pa.shape[3])
+    meta = golden_module.combined_kv_cache.make_combined_kv_meta(
+        block_num, block_size, n2, d_size, dv_size, 0, layout_kv
+    )
+    storage = torch.zeros((block_num * meta["pa_block_stride"],), dtype=torch.uint8)
+    key_view, value_view, k_scale_view = golden_module.combined_kv_cache.make_combined_kv_views(
+        storage, meta
+    )
+    key_view.copy_(key_pa)
+    value_view.copy_(value_pa)
+    k_scale_view.copy_(k_scale_pa if k_scale_pa.dim() == 4 else k_scale_pa.unsqueeze(-1))
+    return storage, meta
 
 
 def cpu_quant_block_sparse_attn(
@@ -225,42 +229,20 @@ def cpu_quant_block_sparse_attn(
     )
     S2 = max(kv_lengths) if kv_lengths else max_seqlen_kv
 
-    if key_cpu.dim() == 4:
-        if block_table_cpu is None:
-            block_table_cpu = _auto_block_table(
-                B, S2, sparse_kv_block_size, "sequential", 0
-            )
-        dense_key = _pa_to_dense(
-            key_cpu, block_table_cpu, B, S2, (1, 0, 2), sparse_kv_block_size
+    if key_cpu.dim() != 4:
+        raise ValueError(
+            f"kv_cache-based reference requires 4D PA key, got {tuple(key_cpu.shape)}"
         )
-        dense_value = _pa_to_dense(
-            value_cpu, block_table_cpu, B, S2, (1, 0, 2), sparse_kv_block_size
+    if block_table_cpu is None:
+        block_table_cpu = _auto_block_table(
+            B, S2, sparse_kv_block_size, "sequential", 0
         )
-    else:
-        dense_key = key_cpu
-        dense_value = value_cpu
 
     if cu_seqlens_q_cpu is None and layout_q != "BSND":
         cu_seqlens_q_cpu = _lengths_to_prefix(q_lengths)
     if cu_seqlens_kv_cpu is None and layout_q != "BSND":
         cu_seqlens_kv_cpu = _lengths_to_prefix(kv_lengths)
     cu_seqlens_q_inp = cu_seqlens_q_cpu
-    cu_seqlens_kv_inp = cu_seqlens_kv_cpu
-
-    if k_descale_cpu.dim() == 3 and key_cpu.dim() == 4:
-        k_scale_dense = _pa_to_dense(
-            k_descale_cpu, block_table_cpu, B, S2, (1, 0), sparse_kv_block_size
-        )
-        if layout_q == "BSND":
-            k_scale = k_scale_dense
-        else:
-            k_scale = k_scale_dense.reshape(B * S2, N2)
-    elif k_descale_cpu.dim() == 1:
-        k_scale = k_descale_cpu.unsqueeze(0).expand(B, -1, N2).contiguous()
-        if layout_q != "BSND":
-            k_scale = k_scale.reshape(B * S2, N2)
-    else:
-        k_scale = k_descale_cpu
 
     v_scale = v_descale_cpu if v_descale_cpu.dim() == 1 else v_descale_cpu.view(-1)
 
@@ -291,19 +273,23 @@ def cpu_quant_block_sparse_attn(
         "quant_mode": int(quant_mode),
     }
 
+    # 直接从 PA 张量打包组合 kv_cache（布局与 bsa_ttk_ops._pack_combined_kv 一致），
+    # 保证参考读到的是 kernel 实际读取的同一份缓存，不再做 PA->dense->PA 往返。
+    kv_cache_storage, kv_cache_meta = _pack_pa_to_combined(
+        key_cpu, value_cpu, k_descale_cpu, int(key_cpu.shape[2]), layout_kv
+    )
     attention_out, softmax_lse = golden_module._reference_attention(
         case,
         q_cpu,
-        dense_key,
-        dense_value,
+        kv_cache_storage,
+        kv_cache_meta,
+        block_table_cpu,
         q_descale_cpu,
-        k_scale,
         v_scale,
         p_scale_cpu,
         sparse_indices_cpu,
         sparse_seq_len_cpu,
         cu_seqlens_q_inp,
-        cu_seqlens_kv_inp,
         q_lengths,
         kv_lengths,
     )

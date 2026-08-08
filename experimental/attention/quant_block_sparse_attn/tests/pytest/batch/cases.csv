@@ -1,71 +1,71 @@
-case_name,enable,B,N1,N2,S1,S2,D,sparse_q_block_size,sparse_kv_block_size,sparse_count,sparse_pattern,block_table_pattern,layout_q,layout_out,layout_kv,layout_sparse_indices,output_dtype,actlen_mode,quant_mode,mask_mode,p_scale_value,softmax_scale,return_softmax_lse,seed
-basic_s256_seq_full_m0_lse,TRUE,4,32,4,256,256,128,128,128,2,sequential,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,1,0.0883883476483184,TRUE,3
-basic_s256_rev_full_m3_lse,TRUE,8,32,4,256,256,128,128,128,2,reverse,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s256_512_causal_full_m3,TRUE,8,32,4,256,512,128,128,128,2,causal,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s256_512_seq_full_m0,TRUE,1,32,4,256,512,128,128,128,4,sequential,reverse,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,FALSE,3
-basic_s512_seq_full_m3_n16,TRUE,4,16,2,512,512,128,128,128,2,sequential,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s512_rev_full_m0_n8,TRUE,1,8,1,512,512,128,128,128,4,reverse,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.8,0.0883883476483184,TRUE,3
-basic_s512_1024_causal_full_m3,TRUE,1,32,4,512,1024,128,128,128,4,causal,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s512_1024_seq_full_m0_grad,TRUE,8,32,4,512,1024,128,128,128,8,sequential,random,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.4,0.0883883476483184,FALSE,3
-basic_s1024_seq_full_m3_lse,TRUE,1,32,4,1024,1024,128,128,128,8,sequential,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s1024_rev_full_m0,TRUE,8,32,4,1024,1024,128,128,128,4,reverse,reverse,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.6,0.0883883476483184,TRUE,3
-basic_s1024_causal_full_m3_n16,TRUE,8,16,2,1024,1024,128,128,128,8,causal,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s1024_seq_full_m0_n24,TRUE,4,24,3,1024,1024,128,128,128,6,sequential,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,FALSE,3
-basic_s1024_2048_seq_full_m3,TRUE,8,32,4,1024,2048,128,128,128,8,sequential,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s1024_2048_rev_full_m0,TRUE,8,32,4,1024,2048,128,128,128,16,reverse,random,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.3,0.0883883476483184,TRUE,3
-basic_s2048_seq_full_m3,TRUE,8,32,4,2048,2048,128,128,128,8,sequential,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s2048_causal_full_m0,TRUE,8,32,4,2048,2048,128,128,128,16,causal,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,1,0.0883883476483184,TRUE,3
-basic_s2048_rev_full_m3_n8,TRUE,1,8,1,2048,2048,128,128,128,8,reverse,reverse,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.7,0.0883883476483184,FALSE,3
-basic_s2048_4096_seq_full_m3,TRUE,8,32,4,2048,4096,128,128,128,16,sequential,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s2048_4096_causal_full_m0,TRUE,4,32,4,2048,4096,128,128,128,32,causal,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,TRUE,3
-basic_s4096_seq_full_m3,TRUE,8,32,4,4096,4096,128,128,128,16,sequential,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s4096_rev_full_m0,TRUE,8,32,4,4096,4096,128,128,128,32,reverse,reverse,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.8,0.0883883476483184,TRUE,3
-basic_s4096_causal_full_m3_n16,TRUE,8,16,2,4096,4096,128,128,128,16,causal,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s4096_8192_seq_full_m3,TRUE,1,32,4,4096,8192,128,128,128,32,sequential,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s4096_8192_rev_full_m0,TRUE,8,32,4,4096,8192,128,128,128,64,reverse,random,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.2,0.0883883476483184,FALSE,3
-basic_s8192_seq_full_m3,TRUE,8,32,4,8192,8192,128,128,128,32,sequential,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s8192_causal_full_m0,TRUE,8,32,4,8192,8192,128,128,128,64,causal,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,1,0.0883883476483184,TRUE,3
-basic_s8192_rev_full_m3_n24,TRUE,8,24,3,8192,8192,128,128,128,32,reverse,reverse,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.6,0.0883883476483184,TRUE,3
-basic_s8192_16384_seq_full_m3,TRUE,4,32,4,8192,16384,128,128,128,64,sequential,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s8192_16384_causal_full_m0,TRUE,4,32,4,8192,16384,128,128,128,128,causal,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,TRUE,3
-basic_s16384_seq_full_m3,TRUE,8,32,4,16384,16384,128,128,128,64,sequential,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s16384_rev_full_m0,TRUE,1,32,4,16384,16384,128,128,128,128,reverse,reverse,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.4,0.0883883476483184,FALSE,3
-basic_s16384_causal_full_m3_n8,TRUE,4,8,1,16384,16384,128,128,128,64,causal,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s16384_32768_seq_full_m3,TRUE,8,32,4,16384,32768,128,128,128,128,sequential,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s16384_32768_rev_full_m0,TRUE,8,32,4,16384,32768,128,128,128,256,reverse,random,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.3,0.0883883476483184,TRUE,3
-basic_s32768_seq_full_m3,TRUE,8,32,4,32768,32768,128,128,128,128,sequential,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s32768_causal_full_m0,TRUE,1,32,4,32768,32768,128,128,128,256,causal,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,1,0.0883883476483184,TRUE,3
-basic_s32768_rev_full_m3_n16,TRUE,4,16,2,32768,32768,128,128,128,128,reverse,reverse,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.5,0.0883883476483184,FALSE,3
-basic_s1024_grad_btrev_m3,TRUE,8,32,4,1024,1024,128,128,128,8,sequential,reverse,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.5,0.0883883476483184,TRUE,3
-basic_s2048_grad_btrand_m0,TRUE,8,32,4,2048,2048,128,128,128,16,reverse,random,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.3,0.0883883476483184,TRUE,3
-basic_s4096_ones_btrand_m3,TRUE,1,32,4,4096,4096,128,128,128,32,causal,random,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.8,0.0883883476483184,TRUE,3
-basic_s8192_grad_btrev_m0,TRUE,8,32,4,8192,8192,128,128,128,64,sequential,reverse,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.2,0.0883883476483184,TRUE,3
-basic_s2048_nolse_m3,TRUE,8,32,4,2048,2048,128,128,128,16,sequential,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,FALSE,3
-basic_s4096_nolse_m0,TRUE,4,32,4,4096,4096,128,128,128,32,reverse,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.6,0.0883883476483184,FALSE,3
-basic_s8192_nolse_m3,TRUE,1,32,4,8192,8192,128,128,128,64,causal,reverse,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.4,0.0883883476483184,FALSE,3
-basic_s16384_nolse_m0,TRUE,4,32,4,16384,16384,128,128,128,128,sequential,random,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,FALSE,3
-basic_s1024_512_seq_full_m3,TRUE,8,32,4,1024,512,128,128,128,4,sequential,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-basic_s2048_1024_causal_full_m0,TRUE,1,32,4,2048,1024,128,128,128,8,causal,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.7,0.0883883476483184,TRUE,3
-basic_s4096_2048_rev_full_m3,TRUE,8,32,4,4096,2048,128,128,128,16,reverse,reverse,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.5,0.0883883476483184,TRUE,3
-basic_s8192_4096_seq_full_m0,TRUE,1,32,4,8192,4096,128,128,128,32,sequential,random,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.3,0.0883883476483184,FALSE,3
-basic_s1024_seq_random_m3,TRUE,4,32,4,1024,1024,128,128,128,8,sequential,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,3,1,0.0883883476483184,TRUE,3
-gen_dense_s512_full_m3,TRUE,4,32,4,512,512,128,128,128,4,dense,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-gen_dense_s2048_full_m0,TRUE,1,32,4,2048,2048,128,128,128,16,dense,reverse,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,TRUE,3
-gen_tail_s1024_full_m3,TRUE,1,32,4,1024,1024,128,128,128,8,tail,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-gen_tail_s4096_full_m0,TRUE,4,32,4,4096,4096,128,128,128,32,tail,random,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.4,0.0883883476483184,FALSE,3
-gen_random_s2048_full_m3,TRUE,4,32,4,2048,2048,128,128,128,16,random,random,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.8,0.0883883476483184,TRUE,3
-gen_random_s8192_full_m0,TRUE,8,32,4,8192,8192,128,128,128,64,random,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.3,0.0883883476483184,TRUE,3
-gen_dense_s8192_random_m3,TRUE,8,32,4,8192,8192,128,128,128,32,dense,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,3,1,0.0883883476483184,TRUE,3
-gen_tail_s16384_random_m0,TRUE,8,32,4,16384,16384,128,128,128,64,tail,reverse,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,0,0.6,0.0883883476483184,TRUE,3
-gen_random_s32768_random_m3,TRUE,4,32,4,32768,32768,128,128,128,128,random,random,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,3,0.2,0.0883883476483184,FALSE,3
-gen_dense_s1024_2048_full_m3,TRUE,4,32,4,1024,2048,128,128,128,8,dense,sequential,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-gen_tail_s2048_4096_full_m0,TRUE,4,32,4,2048,4096,128,128,128,16,tail,reverse,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,TRUE,3
-gen_random_s4096_8192_full_m3,TRUE,8,32,4,4096,8192,128,128,128,32,random,random,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.7,0.0883883476483184,TRUE,3
-gen_dense_s8192_16384_random_m0,TRUE,1,32,4,8192,16384,128,128,128,64,dense,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,0,0.4,0.0883883476483184,TRUE,3
-gen_tail_s16384_32768_full_m3,TRUE,8,32,4,16384,32768,128,128,128,128,tail,reverse,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
-gen_causal_s1024_random_m3,TRUE,4,32,4,1024,1024,128,128,128,4,causal,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,3,0.8,0.0883883476483184,TRUE,3
-gen_seq_s4096_random_m0,TRUE,8,32,4,4096,4096,128,128,128,16,sequential,random,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,0,0.5,0.0883883476483184,FALSE,3
-gen_rev_s16384_random_m3,TRUE,4,32,4,16384,16384,128,128,128,32,reverse,reverse,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,3,0.3,0.0883883476483184,TRUE,3
-gen_dense_s256_full_m0_n8,TRUE,8,8,1,256,256,128,128,128,2,dense,sequential,TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,1,0.0883883476483184,TRUE,3
-gen_tail_s32768_full_m0_n24,TRUE,1,24,3,32768,32768,128,128,128,128,tail,random,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.6,0.0883883476483184,TRUE,3
-gen_random_s512_1024_random_m3,TRUE,8,32,4,512,1024,128,128,128,4,random,reverse,NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,3,0.9,0.0883883476483184,TRUE,3
+case_name,enable,B,N1,N2,S1,S2,D,sparse_q_block_size,sparse_kv_block_size,sparse_count,sparse_pattern,block_table_pattern,block_num,q_datarange,k_datarange,v_datarange,layout_q,layout_out,layout_kv,layout_sparse_indices,output_dtype,actlen_mode,quant_mode,mask_mode,p_scale_value,softmax_scale,return_softmax_lse,seed
+basic_s256_seq_full_m0_lse,TRUE,4,32,4,256,256,128,128,128,2,sequential,sequential,2,"[-21, 54]","[-42, 65]","[-65, 19]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,1,0.0883883476483184,TRUE,3
+basic_s256_rev_full_m3_lse,TRUE,8,32,4,256,256,128,128,128,2,reverse,sequential,16,"[-70, 17]","[-91, 33]","[-84, 86]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s256_512_causal_full_m3,TRUE,8,32,4,256,512,128,128,128,2,causal,sequential,33,"[-15, 38]","[-15, 71]","[-45, 71]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s256_512_seq_full_m0,TRUE,1,32,4,256,512,128,128,128,4,sequential,reverse,1,"[-68, 89]","[-54, 55]","[-64, 94]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,FALSE,3
+basic_s512_seq_full_m3_n16,TRUE,4,16,2,512,512,128,128,128,2,sequential,sequential,16,"[-3, 75]","[-69, 16]","[-77, 38]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s512_rev_full_m0_n8,TRUE,1,8,1,512,512,128,128,128,4,reverse,sequential,5,"[-66, 96]","[-55, 41]","[-79, 55]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.8,0.0883883476483184,TRUE,3
+basic_s512_1024_causal_full_m3,TRUE,1,32,4,512,1024,128,128,128,4,causal,sequential,7,"[-14, 96]","[-75, 30]","[-43, 14]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s512_1024_seq_full_m0_grad,TRUE,8,32,4,512,1024,128,128,128,8,sequential,random,64,"[-88, 54]","[-67, 14]","[-37, 65]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.4,0.0883883476483184,FALSE,3
+basic_s1024_seq_full_m3_lse,TRUE,1,32,4,1024,1024,128,128,128,8,sequential,sequential,10,"[-25, 87]","[-10, 7]","[-97, 28]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s1024_rev_full_m0,TRUE,8,32,4,1024,1024,128,128,128,4,reverse,reverse,27,"[-80, 56]","[-15, 94]","[-91, 80]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.6,0.0883883476483184,TRUE,3
+basic_s1024_causal_full_m3_n16,TRUE,8,16,2,1024,1024,128,128,128,8,causal,sequential,64,"[-20, 73]","[-10, 93]","[-55, 49]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s1024_seq_full_m0_n24,TRUE,4,24,3,1024,1024,128,128,128,6,sequential,sequential,33,"[-19, 28]","[-63, 64]","[-83, 97]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,FALSE,3
+basic_s1024_2048_seq_full_m3,TRUE,8,32,4,1024,2048,128,128,128,8,sequential,sequential,30,"[-20, 44]","[-60, 18]","[-48, 60]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s1024_2048_rev_full_m0,TRUE,8,32,4,1024,2048,128,128,128,16,reverse,random,128,"[-77, 30]","[-52, 5]","[-62, 37]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.3,0.0883883476483184,TRUE,3
+basic_s2048_seq_full_m3,TRUE,8,32,4,2048,2048,128,128,128,8,sequential,sequential,144,"[-89, 69]","[-69, 11]","[-69, 21]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s2048_causal_full_m0,TRUE,8,32,4,2048,2048,128,128,128,16,causal,sequential,101,"[-68, 41]","[-38, 42]","[-32, 16]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,1,0.0883883476483184,TRUE,3
+basic_s2048_rev_full_m3_n8,TRUE,1,8,1,2048,2048,128,128,128,8,reverse,reverse,16,"[-37, 32]","[-53, 50]","[-73, 90]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.7,0.0883883476483184,FALSE,3
+basic_s2048_4096_seq_full_m3,TRUE,8,32,4,2048,4096,128,128,128,16,sequential,sequential,259,"[-97, 63]","[-24, 15]","[-33, 42]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s2048_4096_causal_full_m0,TRUE,4,32,4,2048,4096,128,128,128,32,causal,sequential,63,"[-45, 51]","[-76, 87]","[-46, 9]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,TRUE,3
+basic_s4096_seq_full_m3,TRUE,8,32,4,4096,4096,128,128,128,16,sequential,sequential,256,"[-47, 89]","[-88, 97]","[-74, 33]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s4096_rev_full_m0,TRUE,8,32,4,4096,4096,128,128,128,32,reverse,reverse,288,"[-83, 92]","[-61, 82]","[-1, 50]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.8,0.0883883476483184,TRUE,3
+basic_s4096_causal_full_m3_n16,TRUE,8,16,2,4096,4096,128,128,128,16,causal,sequential,95,"[-5, 92]","[-18, 100]","[-23, 50]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s4096_8192_seq_full_m3,TRUE,1,32,4,4096,8192,128,128,128,32,sequential,sequential,64,"[-71, 91]","[-51, 93]","[-83, 43]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s4096_8192_rev_full_m0,TRUE,8,32,4,4096,8192,128,128,128,64,reverse,random,570,"[-30, 24]","[-19, 16]","[-24, 87]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.2,0.0883883476483184,FALSE,3
+basic_s8192_seq_full_m3,TRUE,8,32,4,8192,8192,128,128,128,32,sequential,sequential,307,"[-39, 76]","[-81, 52]","[-78, 96]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s8192_causal_full_m0,TRUE,8,32,4,8192,8192,128,128,128,64,causal,sequential,512,"[-9, 90]","[-88, 23]","[-5, 15]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,1,0.0883883476483184,TRUE,3
+basic_s8192_rev_full_m3_n24,TRUE,8,24,3,8192,8192,128,128,128,32,reverse,reverse,524,"[-96, 54]","[-37, 69]","[-75, 10]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.6,0.0883883476483184,TRUE,3
+basic_s8192_16384_seq_full_m3,TRUE,4,32,4,8192,16384,128,128,128,64,sequential,sequential,27,"[-22, 64]","[-62, 21]","[-22, 85]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s8192_16384_causal_full_m0,TRUE,4,32,4,8192,16384,128,128,128,128,causal,sequential,512,"[-59, 27]","[-6, 10]","[-76, 5]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,TRUE,3
+basic_s16384_seq_full_m3,TRUE,8,32,4,16384,16384,128,128,128,64,sequential,sequential,1041,"[-11, 76]","[-80, 73]","[-69, 78]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s16384_rev_full_m0,TRUE,1,32,4,16384,16384,128,128,128,128,reverse,reverse,105,"[-43, 41]","[-23, 27]","[-4, 3]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.4,0.0883883476483184,FALSE,3
+basic_s16384_causal_full_m3_n8,TRUE,4,8,1,16384,16384,128,128,128,64,causal,sequential,512,"[-76, 87]","[-84, 60]","[-87, 91]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s16384_32768_seq_full_m3,TRUE,8,32,4,16384,32768,128,128,128,128,sequential,sequential,2222,"[-19, 82]","[-3, 37]","[-2, 73]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s16384_32768_rev_full_m0,TRUE,8,32,4,16384,32768,128,128,128,256,reverse,random,778,"[-47, 65]","[-6, 4]","[-2, 92]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.3,0.0883883476483184,TRUE,3
+basic_s32768_seq_full_m3,TRUE,8,32,4,32768,32768,128,128,128,128,sequential,sequential,2048,"[-99, 29]","[-72, 34]","[-10, 38]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s32768_causal_full_m0,TRUE,1,32,4,32768,32768,128,128,128,256,causal,sequential,380,"[-73, 48]","[-63, 87]","[-88, 25]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,1,0.0883883476483184,TRUE,3
+basic_s32768_rev_full_m3_n16,TRUE,4,16,2,32768,32768,128,128,128,128,reverse,reverse,778,"[-41, 55]","[-91, 35]","[-5, 35]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.5,0.0883883476483184,FALSE,3
+basic_s1024_grad_btrev_m3,TRUE,8,32,4,1024,1024,128,128,128,8,sequential,reverse,64,"[-64, 31]","[-93, 78]","[-17, 74]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.5,0.0883883476483184,TRUE,3
+basic_s2048_grad_btrand_m0,TRUE,8,32,4,2048,2048,128,128,128,16,reverse,random,138,"[-61, 29]","[-8, 47]","[-27, 29]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.3,0.0883883476483184,TRUE,3
+basic_s4096_ones_btrand_m3,TRUE,1,32,4,4096,4096,128,128,128,32,causal,random,2,"[-100, 97]","[-42, 84]","[-32, 77]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.8,0.0883883476483184,TRUE,3
+basic_s8192_grad_btrev_m0,TRUE,8,32,4,8192,8192,128,128,128,64,sequential,reverse,512,"[-59, 41]","[-66, 44]","[-89, 25]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.2,0.0883883476483184,TRUE,3
+basic_s2048_nolse_m3,TRUE,8,32,4,2048,2048,128,128,128,16,sequential,sequential,140,"[-4, 79]","[-2, 55]","[-40, 9]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,FALSE,3
+basic_s4096_nolse_m0,TRUE,4,32,4,4096,4096,128,128,128,32,reverse,sequential,82,"[-46, 72]","[-80, 51]","[-50, 18]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.6,0.0883883476483184,FALSE,3
+basic_s8192_nolse_m3,TRUE,1,32,4,8192,8192,128,128,128,64,causal,reverse,64,"[-22, 10]","[-2, 55]","[-9, 13]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.4,0.0883883476483184,FALSE,3
+basic_s16384_nolse_m0,TRUE,4,32,4,16384,16384,128,128,128,128,sequential,random,619,"[-82, 76]","[-37, 97]","[-74, 66]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,FALSE,3
+basic_s1024_512_seq_full_m3,TRUE,8,32,4,1024,512,128,128,128,4,sequential,sequential,6,"[-8, 96]","[-4, 64]","[-35, 60]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+basic_s2048_1024_causal_full_m0,TRUE,1,32,4,2048,1024,128,128,128,8,causal,sequential,8,"[-1, 62]","[-40, 30]","[-63, 86]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.7,0.0883883476483184,TRUE,3
+basic_s4096_2048_rev_full_m3,TRUE,8,32,4,4096,2048,128,128,128,16,reverse,reverse,139,"[-36, 51]","[-71, 76]","[-93, 34]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.5,0.0883883476483184,TRUE,3
+basic_s8192_4096_seq_full_m0,TRUE,1,32,4,8192,4096,128,128,128,32,sequential,random,17,"[-2, 33]","[-59, 80]","[-48, 100]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.3,0.0883883476483184,FALSE,3
+basic_s1024_seq_random_m3,TRUE,4,32,4,1024,1024,128,128,128,8,sequential,sequential,32,"[-60, 56]","[-79, 16]","[-99, 29]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,3,1,0.0883883476483184,TRUE,3
+gen_dense_s512_full_m3,TRUE,4,32,4,512,512,128,128,128,4,dense,sequential,20,"[-10, 72]","[-42, 75]","[-44, 85]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+gen_dense_s2048_full_m0,TRUE,1,32,4,2048,2048,128,128,128,16,dense,reverse,14,"[-82, 17]","[-51, 70]","[-84, 6]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,TRUE,3
+gen_tail_s1024_full_m3,TRUE,1,32,4,1024,1024,128,128,128,8,tail,sequential,8,"[-53, 20]","[-32, 46]","[-13, 90]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+gen_tail_s4096_full_m0,TRUE,4,32,4,4096,4096,128,128,128,32,tail,random,158,"[-87, 21]","[-40, 55]","[-83, 12]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.4,0.0883883476483184,FALSE,3
+gen_random_s2048_full_m3,TRUE,4,32,4,2048,2048,128,128,128,16,random,random,42,"[-82, 44]","[-60, 45]","[-73, 10]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.8,0.0883883476483184,TRUE,3
+gen_random_s8192_full_m0,TRUE,8,32,4,8192,8192,128,128,128,64,random,sequential,512,"[-9, 75]","[-8, 92]","[-45, 19]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.3,0.0883883476483184,TRUE,3
+gen_dense_s8192_random_m3,TRUE,8,32,4,8192,8192,128,128,128,32,dense,sequential,527,"[-58, 34]","[-19, 84]","[-28, 63]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,3,1,0.0883883476483184,TRUE,3
+gen_tail_s16384_random_m0,TRUE,8,32,4,16384,16384,128,128,128,64,tail,reverse,476,"[-49, 22]","[-13, 76]","[-72, 13]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,0,0.6,0.0883883476483184,TRUE,3
+gen_random_s32768_random_m3,TRUE,4,32,4,32768,32768,128,128,128,128,random,random,1024,"[-65, 82]","[-30, 12]","[-96, 57]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,3,0.2,0.0883883476483184,FALSE,3
+gen_dense_s1024_2048_full_m3,TRUE,4,32,4,1024,2048,128,128,128,8,dense,sequential,72,"[-82, 73]","[-25, 77]","[-96, 42]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+gen_tail_s2048_4096_full_m0,TRUE,4,32,4,2048,4096,128,128,128,16,tail,reverse,10,"[-86, 73]","[-74, 77]","[-10, 69]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.5,0.0883883476483184,TRUE,3
+gen_random_s4096_8192_full_m3,TRUE,8,32,4,4096,8192,128,128,128,32,random,random,512,"[-34, 51]","[-20, 39]","[-24, 83]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,0.7,0.0883883476483184,TRUE,3
+gen_dense_s8192_16384_random_m0,TRUE,1,32,4,8192,16384,128,128,128,64,dense,sequential,199,"[-35, 15]","[-4, 56]","[-36, 17]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,0,0.4,0.0883883476483184,TRUE,3
+gen_tail_s16384_32768_full_m3,TRUE,8,32,4,16384,32768,128,128,128,128,tail,reverse,309,"[-26, 10]","[-96, 82]","[-14, 99]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,3,1,0.0883883476483184,TRUE,3
+gen_causal_s1024_random_m3,TRUE,4,32,4,1024,1024,128,128,128,4,causal,sequential,32,"[-27, 5]","[-31, 59]","[-95, 79]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,3,0.8,0.0883883476483184,TRUE,3
+gen_seq_s4096_random_m0,TRUE,8,32,4,4096,4096,128,128,128,16,sequential,random,266,"[-45, 32]","[-22, 96]","[-90, 86]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,0,0.5,0.0883883476483184,FALSE,3
+gen_rev_s16384_random_m3,TRUE,4,32,4,16384,16384,128,128,128,32,reverse,reverse,304,"[-55, 85]","[-100, 32]","[-66, 23]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,3,0.3,0.0883883476483184,TRUE,3
+gen_dense_s256_full_m0_n8,TRUE,8,8,1,256,256,128,128,128,2,dense,sequential,16,"[-99, 81]","[-97, 77]","[-81, 12]",TND,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,1,0.0883883476483184,TRUE,3
+gen_tail_s32768_full_m0_n24,TRUE,1,24,3,32768,32768,128,128,128,128,tail,random,482,"[-74, 33]","[-96, 69]","[-56, 91]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,full,1,0,0.6,0.0883883476483184,TRUE,3
+gen_random_s512_1024_random_m3,TRUE,8,32,4,512,1024,128,128,128,4,random,reverse,58,"[-5, 63]","[-20, 22]","[-67, 99]",NTD,TND,PA_BNSD,B_N_Qb_Kb,bfloat16,random,1,3,0.9,0.0883883476483184,TRUE,3
