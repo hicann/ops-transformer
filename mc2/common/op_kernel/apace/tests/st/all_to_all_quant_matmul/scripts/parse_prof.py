@@ -31,7 +31,7 @@ from statistics import median
 _DEFAULT_PROF = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "prof"
 )
-KERNEL_SUBSTR = "AllGatherQuantMatmulKernel"
+KERNEL_SUBSTR = "AllToAllQuantMatmulKernelE4M3E4M3_Udma"
 GROUP_THRESHOLD_S = 5
 OUTLIER_FACTOR = 1.2
 WARMUP_SKIP = 3  # 删除前 N 轮数据（冷启动 + 预热）
@@ -139,7 +139,7 @@ def report_case(prof_base, case_dirs, case_idx, mkn_str=None):
                 all_cubes.setdefault(dev, []).extend(cv)
 
     if not all_devices:
-        print(f"  [Case {case_idx}] No AllGatherQuantMatmulKernel rows found.\n")
+        print(f"  [Case {case_idx}] No AllToAllQuantMatmulKernel rows found.\n")
         return None
 
     info = read_case_info_from_input(prof_base, case_dirs, mkn_str)
@@ -251,7 +251,7 @@ def main():
     print(f"Found {len(cases)} case(s) in {prof_base}\n")
 
     print("=" * 64)
-    print("AllGatherQuantMatmul — Per-Card Latency (avg, outliers > 2x min excluded)")
+    print("AllToAllQuantMatmul — Per-Card Latency (avg, outliers > 2x min excluded)")
     print("=" * 64)
 
     results = []

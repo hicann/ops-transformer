@@ -54,6 +54,7 @@ public:
     }
 
     void SetOptimizeEnable(bool enable) { isOpenOptimize_ = enable; }
+    void SetMTailAlignEnable(bool enable) { enableMTailAlign_ = enable; }
 
 protected:
     QuantMatmulArgs args_{};
@@ -61,6 +62,7 @@ protected:
     QuantMatmulRunInfo runInfo_{};
 
     bool isOpenOptimize_{true};
+    bool enableMTailAlign_{false};
 
     virtual const char* TilingName() const = 0;
 

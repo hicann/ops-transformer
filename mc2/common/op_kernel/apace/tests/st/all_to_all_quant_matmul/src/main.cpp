@@ -278,6 +278,10 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
         INFO_LOG("[Rank %d] headMSize=%u tileCnt=%u | per-iter ms: avg=%.3f min=%.3f max=%.3f (excl warmup)",
                  rankId, headMSize, tileCnt, avg, minv, maxv);
 
+        ACL_CHECK(aclrtSynchronizeStream(stream));
+        ACL_CHECK(aclrtMemcpy(hostOutput.data(), sizeOutput, deviceOutput, sizeOutput, ACL_MEMCPY_DEVICE_TO_HOST));
+        WriteFile(outputDir + "/npu_out.bin", hostOutput.data(), sizeOutput);
+
         aclrtFree(boostIn);
         aclrtFree(boostOut);
         aclrtFree(cacheFlush);

@@ -52,6 +52,7 @@ private:
     using Base::platformInfo_;
     using Base::runInfo_;
     using Base::isOpenOptimize_;
+    using Base::enableMTailAlign_;
 
 private:
     uint32_t CalcScaleKL1() const
@@ -109,13 +110,47 @@ private:
         uint64_t nTileMax = std::min(tileMax, CeilDiv(runInfo_.baseN, CUBE_BLOCK));
         uint64_t preSplitMax = runInfo_.mTailSize >= runInfo_.nTailSize ? mTileMax : nTileMax;
         uint64_t secSplitMax = runInfo_.mTailSize >= runInfo_.nTailSize ? nTileMax : mTileMax;
-        while ((CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum && preSplit < preSplitMax) ||
-               (CalUsedCoreNum(runInfo_, preSplit, secSplit + 1UL) <= platformInfo_.aicNum && secSplit < secSplitMax)) {
-            if (CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum && preSplit < preSplitMax) {
-                preSplitValid = ++preSplit;
+
+        if (enableMTailAlign_) {
+            bool preIsM = (runInfo_.mTailSize >= runInfo_.nTailSize);
+            while (true) {
+                uint64_t newPreTile = preSplit;
+                uint64_t newSecTile = secSplit;
+
+                if (preSplit < preSplitMax &&
+                    CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum) {
+                    uint64_t nextTileCount = CalcAlignedSplit(preSplit, secSplit, preSplitMax,
+                                                              preIsM ? runInfo_.mTailSize : 0);
+                    if (nextTileCount > 0) { newPreTile = nextTileCount; }
+                }
+
+                if (secSplit < secSplitMax &&
+                    CalUsedCoreNum(runInfo_, newPreTile, secSplit + 1UL) <= platformInfo_.aicNum) {
+                    uint64_t nextTileCount = CalcAlignedSplit(secSplit, newPreTile, secSplitMax,
+                                                              !preIsM ? runInfo_.mTailSize : 0);
+                    if (nextTileCount > 0) { newSecTile = nextTileCount; }
+                }
+
+                if (newPreTile == preSplit && newSecTile == secSplit) { break; }
+
+                preSplit = newPreTile;
+                secSplit = newSecTile;
+                preSplitValid = newPreTile;
+                secSplitValid = newSecTile;
             }
-            if (CalUsedCoreNum(runInfo_, preSplit, secSplit + 1UL) <= platformInfo_.aicNum && secSplit < secSplitMax) {
-                secSplitValid = ++secSplit;
+        } else {
+            while ((preSplit < preSplitMax &&
+                    CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum) ||
+                   (secSplit < secSplitMax &&
+                    CalUsedCoreNum(runInfo_, preSplit, secSplit + 1UL) <= platformInfo_.aicNum)) {
+                if (preSplit < preSplitMax &&
+                    CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum) {
+                    preSplitValid = ++preSplit;
+                }
+                if (secSplit < secSplitMax &&
+                    CalUsedCoreNum(runInfo_, preSplit, secSplit + 1UL) <= platformInfo_.aicNum) {
+                    secSplitValid = ++secSplit;
+                }
             }
         }
 
@@ -311,6 +346,21 @@ private:
     uint64_t CalUsedCoreNum(const QuantMatmulRunInfo& runInfo, uint64_t mTile, uint64_t nTile)
     {
         return mTile * nTile * runInfo.tailBlockCnt;
+    }
+
+    uint64_t CalcAlignedSplit(uint64_t growTileCount, uint64_t fixedTileCount,
+                              uint64_t tileCountMax, uint64_t alignTailSize)
+    {
+        for (uint64_t increment = 1; increment <= 2; ++increment) {
+            uint64_t nextTileCount = growTileCount + increment;
+            if (nextTileCount > tileCountMax) { break; }
+            uint64_t usedCores = CalUsedCoreNum(runInfo_, nextTileCount, fixedTileCount);
+            if (usedCores > platformInfo_.aicNum) { break; }
+            if (alignTailSize == 0 || CeilDiv(alignTailSize, nextTileCount) % CUBE_BLOCK == 0) {
+                return nextTileCount;
+            }
+        }
+        return 0;
     }
 
     uint64_t GetDepthA1B1(const QuantMatmulRunInfo& runInfo, uint64_t leftSize, uint64_t perDepthSize,

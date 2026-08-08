@@ -69,8 +69,8 @@ private:
     using AllGatherCommScale = Apace::AivComm::CollectiveComm<
       Apace::AivComm::CommCollectiveOp::AllGather,
       Apace::AivComm::CommMode::PUT, AscendC::fp8_e8m0_t, TeamBarrier>;
-    AllGatherCommData all_gather_data_;
-    AllGatherCommScale all_gather_scale_;
+    AllGatherCommData allGatherData_;
+    AllGatherCommScale allGatherScale_;
     CommTilingData commTilingData_{};
     CommTilingData commTilingScale_{};
     TeamBarrier teamBarrier_;
@@ -145,6 +145,8 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Init(
     uint32_t ubOffset = 0;
     auto commBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);
     ubOffset += COMM_WORKSPACE_SIZE;
+    auto commScaleBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);
+    ubOffset += COMM_WORKSPACE_SIZE;
     auto barrierBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);
     teamBarrier_.Init(barrierBuf.Get(), ubmemCtx_, rankSize_,
                       static_cast<uint32_t>(GetBlockIdx()));
@@ -161,11 +163,11 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Init(
     commTilingScale_.splitAxisTailCnt = tailCnt_;
     scaleKLen_ = scaleKGroups_ * static_cast<uint64_t>(Blaze::Gemm::MXFP_MULTI_BASE_SIZE);
     commTilingScale_.nonSplitAxisSize = scaleKLen_;
-    all_gather_data_.template Init<BARRIER_NONE>(udmaCtx_, teamBarrier_, commTilingData_,
+    allGatherData_.template Init<BARRIER_NONE>(udmaCtx_, teamBarrier_, commTilingData_,
                           aGM_, commBuf.Get(), rankSize_,
                           static_cast<uint32_t>(GetBlockIdx()));
-    all_gather_scale_.Init(udmaCtx_, teamBarrier_, commTilingScale_,
-                          aScaleGM_, commBuf.Get(), rankSize_,
+    allGatherScale_.template Init<BARRIER_DEVICE>(udmaCtx_, teamBarrier_, commTilingScale_,
+                          aScaleGM_, commScaleBuf.Get(), rankSize_,
                           static_cast<uint32_t>(GetBlockIdx()), dataRegionBytes_);
     AscendC::SyncAll<true>();
 }
@@ -243,21 +245,21 @@ __aicore__ inline GM_ADDR AllGatherMxMatmulUdmaImpl<AType, BType, CType>::GetWin
 template <typename AType, typename BType, typename CType>
 __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::AllGatherProcess()
 {
-    // 预触发 dependId=0：自身数据始终就绪，AIC 可直接消费。
+    // 预触发 dependTileIdx=0：自身数据始终就绪，AIC 可直接消费。
     CrossCoreSetFlag<0x2, PIPE_MTE3>(0);
 
     for (uint32_t round = 0; round < commTurn_; ++round) {
         if (static_cast<uint32_t>(GetBlockIdx()) < rankSize_) {
-            all_gather_scale_.Commit();
-            all_gather_data_.Commit();
-            all_gather_data_.template Wait<BARRIER_DEVICE>();
+            allGatherScale_.Commit();
+            allGatherData_.Commit();
+            allGatherData_.template Wait<BARRIER_DEVICE>();
         }
         AscendC::SyncAll<true>();
-        // round 0 对应 dependId=1，AIC 侧按 dependId 等待对应的远端 round 数据。
+        // round 0 对应 dependTileIdx=1，AIC 侧按 dependTileIdx 等待对应的远端 round 数据。
         CrossCoreSetFlag<0x2, PIPE_MTE3>(round + 1);
     }
-    all_gather_scale_.Finalize();
-    all_gather_data_.Finalize();
+    allGatherScale_.Finalize();
+    allGatherData_.Finalize();
 }
 
 } // namespace AllGatherQuantMatmulImpl

@@ -90,18 +90,21 @@ class FragmentTensor {
 public:
     __aicore__ inline FragmentTensor() = default;
 
+    /*!
+     * \brief 构造函数
+     * \note addrList 必须在 FragmentTensor 整个生命周期内保持有效，
+     *       本类只保存指针，不拷贝数组内容。调用方须保证 addrList 非空。
+     */
     __aicore__ inline FragmentTensor(
         const FragmentParam<Dims>& fragParam,
-        GM_ADDR* addrList)
+        GM_ADDR const* addrList)
         : fragParam_(fragParam)
     {
-        for (uint32_t i = 0; i < fragParam.fragmentCnt; ++i) {
-            addrList_[i] = addrList[i];
+        if (addrList != nullptr) {
+            addrList_ = addrList;
         }
-        for (uint32_t d = 0; d < Dims; ++d) {
-            sliceCoord_[d] = 0;
-            sliceShape_[d] = fragParam.assembledShape[d];
-        }
+        ArrayFill(sliceCoord_, 0, AscendC::Std::make_index_sequence<Dims>{});
+        ArrayCopy(sliceShape_, fragParam_.assembledShape, AscendC::Std::make_index_sequence<Dims>{});
     }
 
     __aicore__ inline auto GetFragment(uint32_t idx) const
@@ -109,9 +112,7 @@ public:
         auto fragmentAddr = reinterpret_cast<__gm__ ElementType*>(addrList_[idx]);
 
         uint64_t fragmentShape[Dims];
-        for (uint32_t i = 0; i < Dims; ++i) {
-            fragmentShape[i] = fragParam_.assembledShape[i];
-        }
+        ArrayCopy(fragmentShape, fragParam_.assembledShape, AscendC::Std::make_index_sequence<Dims>{});
         fragmentShape[fragParam_.assembleAxis] = fragParam_.fragmentSize;
 
         auto memPtr = AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>(fragmentAddr);
@@ -143,10 +144,10 @@ public:
         return addrList_[idx];
     }
 
-    __aicore__ inline void UpdateAddrList(GM_ADDR* addrList)
+        __aicore__ inline void UpdateAddrList(GM_ADDR const* addrList)
     {
-        for (uint32_t i = 0; i < fragParam_.fragmentCnt; ++i) {
-            addrList_[i] = addrList[i];
+        if (addrList != nullptr) {
+            addrList_ = addrList;
         }
     }
 
@@ -246,11 +247,9 @@ public:
         info.addr = addrList_[info.fragmentIdx];
 
         // 非 assembleAxis 槽位：直接整体复制 slice 视图，assembleAxis 槽位下面覆盖
-        for (uint32_t d = 0; d < Dims; ++d) {
-            info.fragCoord[d] = sliceCoord_[d];
-            info.localCoord[d] = 0;
-            info.copyShape[d] = sliceShape_[d];
-        }
+        ArrayCopy(info.fragCoord, sliceCoord_, AscendC::Std::make_index_sequence<Dims>{});
+        ArrayFill(info.localCoord, 0, AscendC::Std::make_index_sequence<Dims>{});
+        ArrayCopy(info.copyShape, sliceShape_, AscendC::Std::make_index_sequence<Dims>{});
 
         // assembleAxis 槽位：head/body/tail 三选一
         if (localIdx == 0) {
@@ -271,6 +270,22 @@ public:
     }
 
 private:
+    template<size_t... Is>
+    static __aicore__ inline void ArrayCopy(
+        uint64_t (&dst)[Dims], const uint64_t (&src)[Dims],
+        AscendC::Std::index_sequence<Is...>)
+    {
+        ((dst[Is] = src[Is]), ...);
+    }
+
+    template<size_t... Is>
+    static __aicore__ inline void ArrayFill(
+        uint64_t (&dst)[Dims], uint64_t val,
+        AscendC::Std::index_sequence<Is...>)
+    {
+        ((dst[Is] = val), ...);
+    }
+
     template<typename CoordType, typename ShapeType, size_t... Is>
     __aicore__ inline void SliceImpl(
         uint64_t (&coord)[Dims], uint64_t (&shape)[Dims],
@@ -294,61 +309,44 @@ private:
     }
 
     FragmentParam<Dims> fragParam_;
-    GM_ADDR addrList_[MaxFragments];
+    GM_ADDR const *addrList_{nullptr};
     uint64_t sliceCoord_[Dims]{};
     uint64_t sliceShape_[Dims]{};
 };
 
-template<typename CopyHandle, typename DestTensor,
+template<bool isScatter, typename CopyHandle, typename TensorType,
          uint32_t Dims, uint32_t MaxF, typename GmLayoutF, typename ElemT>
 __aicore__ inline void FragmentSliceCopy(
     CopyHandle copyHandle,
-    DestTensor& dest,
-    const FragmentTensor<Dims, MaxF, GmLayoutF, ElemT>& src)
+    TensorType& tensor,
+    const FragmentTensor<Dims, MaxF, GmLayoutF, ElemT>& fragmentTensor)
 {
-    const auto assembleAxis = src.GetSplitAxis();
-    auto composition = src.ComputeFragmentComposition(
-        src.GetSliceCoord(assembleAxis), src.GetSliceShape(assembleAxis));
+    const auto assembleAxis = fragmentTensor.GetSplitAxis();
+    auto composition = fragmentTensor.ComputeFragmentComposition(
+        fragmentTensor.GetSliceCoord(assembleAxis), fragmentTensor.GetSliceShape(assembleAxis));
 
     for (uint32_t idx = 0; idx < composition.totalFragmentCnt; ++idx) {
-        auto info = src.GetFragmentInfo(idx, composition);
-        auto fragment = src.GetFragment(info.fragmentIdx);
-        auto gmTensor = fragment.Slice(
-            MakeCoordFromArray<Dims>(info.fragCoord), MakeShapeFromArray<Dims>(info.copyShape));
-        auto l1Tensor = dest.Slice(
-            MakeCoordFromArray<Dims>(info.localCoord), MakeShapeFromArray<Dims>(info.copyShape));
-        AscendC::Te::Copy(copyHandle, l1Tensor, gmTensor);
-    }
-}
+        auto info = fragmentTensor.GetFragmentInfo(idx, composition);
 
-template<typename CopyHandle, uint32_t Dims, uint32_t MaxF, typename LayoutF, typename ElemT, typename DestTensor>
-__aicore__ inline void FragmentSliceScatter(
-    CopyHandle copyHandle,
-    const FragmentTensor<Dims, MaxF, LayoutF, ElemT>& src,
-    DestTensor& dest)
-{
-    const auto assembleAxis = src.GetSplitAxis();
-    const uint64_t realFragmentSize = src.GetRealFragmentSize();
-
-    auto composition = src.ComputeFragmentComposition(
-        src.GetSliceCoord(assembleAxis), src.GetSliceShape(assembleAxis));
-
-    for (uint32_t idx = 0; idx < composition.totalFragmentCnt; ++idx) {
-        auto info = src.GetFragmentInfo(idx, composition);
-
-        // assembleAxis 方向按 realFragmentSize 裁剪（尾块 pad 行不拷贝）
-        if (info.fragCoord[assembleAxis] >= realFragmentSize) { continue; }
-        uint64_t remain = realFragmentSize - info.fragCoord[assembleAxis];
-        if (info.copyShape[assembleAxis] > remain) {
-            info.copyShape[assembleAxis] = remain;
+        if constexpr (isScatter) {
+            const uint64_t realFragmentSize = fragmentTensor.GetRealFragmentSize();
+            if (info.fragCoord[assembleAxis] >= realFragmentSize) { continue; }
+            uint64_t remain = realFragmentSize - info.fragCoord[assembleAxis];
+            if (info.copyShape[assembleAxis] > remain) {
+                info.copyShape[assembleAxis] = remain;
+            }
         }
 
-        auto fragment = src.GetFragment(info.fragmentIdx);
-        auto cBlock = fragment.Slice(
+        auto fragment = fragmentTensor.GetFragment(info.fragmentIdx);
+        auto fragSlice = fragment.Slice(
             MakeCoordFromArray<Dims>(info.fragCoord), MakeShapeFromArray<Dims>(info.copyShape));
-        auto l0cSlice = dest.Slice(
+        auto tensorSlice = tensor.Slice(
             MakeCoordFromArray<Dims>(info.localCoord), MakeShapeFromArray<Dims>(info.copyShape));
-        AscendC::Te::Copy(copyHandle, cBlock, l0cSlice);
+        if constexpr (isScatter) {
+            AscendC::Te::Copy(copyHandle, fragSlice, tensorSlice);
+        } else {
+            AscendC::Te::Copy(copyHandle, tensorSlice, fragSlice);
+        }
     }
 }
 

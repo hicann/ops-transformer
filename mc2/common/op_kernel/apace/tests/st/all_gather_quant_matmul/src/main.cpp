@@ -43,7 +43,7 @@ using namespace AllGatherQuantMatmulImpl;
 using namespace Apace::AivComm;
 
 using CommContext = Apace::AivComm::CommContext;
-static constexpr int32_t BENCHMARK_ITERATIONS = 10;
+static constexpr int32_t BENCHMARK_ITERATIONS = 20;
 static constexpr uint32_t TILE_M = 512;
 
 #define HCCL_CHECK(status) do { \
@@ -53,14 +53,15 @@ static constexpr uint32_t TILE_M = 512;
   } \
 } while (0)
 
-void ParseArgs(int argc, char *argv[], int *m, int *k, int *n, int *rankNum)
+void ParseArgs(int argc, char *argv[], int *m, int *k, int *n, int *rankNum, std::string &mode)
 {
   if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
-    std::cerr << "Usage: " << argv[0] << " m k n rankNum" << std::endl;
+    std::cerr << "Usage: " << argv[0] << " m k n rankNum [mode]" << std::endl;
     std::cerr << "  m: row of matrix A per rank" << std::endl;
     std::cerr << "  k: col of matrix A (= row of matrix B, full K)" << std::endl;
     std::cerr << "  n: col of matrix B (total N)" << std::endl;
     std::cerr << "  rankNum: number of ranks" << std::endl;
+    std::cerr << "  mode: optional, 'precision' (default) | 'perf'" << std::endl;
     exit(1);
   }
   if (argc < 5) {
@@ -83,6 +84,10 @@ void ParseArgs(int argc, char *argv[], int *m, int *k, int *n, int *rankNum)
   if (CeilDiv(*k, static_cast<int>(::MXFP_DIVISOR_SIZE)) % 2 != 0) {
     throw std::invalid_argument("ERROR: CeilDiv(K, 64) must be an even number");
   }
+  mode = (argc >= 6) ? std::string(argv[5]) : std::string("precision");
+  if (mode != "precision" && mode != "perf") {
+    throw std::invalid_argument("ERROR: mode must be 'precision' or 'perf'");
+  }
 }
 
 int LaunchKernel(uint32_t usedCoreNum, aclrtStream stream,
@@ -96,7 +101,7 @@ int LaunchKernel(uint32_t usedCoreNum, aclrtStream stream,
   return 0;
 }
 
-int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n)
+int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n, const std::string &mode)
 {
   const char *ipport = "tcp://127.0.0.1:8998";
   INFO_LOG("rankNum=%d, rankId=%d", rankNum, rankId);
@@ -117,6 +122,7 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n)
 
   QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN> tilingEngine;
   tilingEngine.SetOptimizeEnable(false);
+  tilingEngine.SetMTailAlignEnable(true);
   tilingEngine.GetTilingData(totalLogicalM, static_cast<uint32_t>(n),
                   static_cast<uint32_t>(k), tilingData.mmTile);
   tilingData.commTile.splitAxisTileSize = tileM;
@@ -218,32 +224,40 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n)
   printf("[Rank %d] Launching AllGatherQuantMatmulKernel...\n", rankId);
   fflush(stdout);
 
-  aclrtEvent kernelStartEvent = nullptr, kernelEndEvent = nullptr;
-  ACL_CHECK(aclrtCreateEvent(&kernelStartEvent));
-  ACL_CHECK(aclrtCreateEvent(&kernelEndEvent));
-  ACL_CHECK(aclrtRecordEvent(kernelStartEvent, stream));
-
-  for (int i = 0; i < BENCHMARK_ITERATIONS; ++i) {
-    LaunchKernel(tilingData.mmTile.usedCoreNum, stream, devContext,
-               deviceA, deviceScaleA, deviceB, deviceScaleB, deviceOutput, tilingData);
-  }
-  ACL_CHECK(aclrtRecordEvent(kernelEndEvent, stream));
+  LaunchKernel(tilingData.mmTile.usedCoreNum, stream, devContext,
+             deviceA, deviceScaleA, deviceB, deviceScaleB, deviceOutput, tilingData);
   ACL_CHECK(aclrtSynchronizeStream(stream));
-
-  float kernelElapsedMs = 0.0F;
-  ACL_CHECK(aclrtEventElapsedTime(&kernelElapsedMs, kernelStartEvent, kernelEndEvent));
-  double kernelElapsedUs = static_cast<double>(kernelElapsedMs) * 1000.0;
-  printf("[Rank %d] Kernel completed! Elapsed time: %.3f us (avg over %d iterations)\n",
-       rankId, kernelElapsedUs / BENCHMARK_ITERATIONS, BENCHMARK_ITERATIONS);
-  fflush(stdout);
-
   size_t outputSize = static_cast<size_t>(rankNum) * m * n * sizeof(uint16_t);
   ACL_CHECK(aclrtMemcpy(hostOutput.data(), outputSize, deviceOutput, outputSize, ACL_MEMCPY_DEVICE_TO_HOST));
+
+  int32_t iterations = (mode == "perf") ? BENCHMARK_ITERATIONS : 1;
+  if (iterations > 1) {
+      aclrtEvent kernelStartEvent = nullptr, kernelEndEvent = nullptr;
+      ACL_CHECK(aclrtCreateEvent(&kernelStartEvent));
+      ACL_CHECK(aclrtCreateEvent(&kernelEndEvent));
+      ACL_CHECK(aclrtRecordEvent(kernelStartEvent, stream));
+      for (int i = 1; i < iterations; ++i) {
+          LaunchKernel(tilingData.mmTile.usedCoreNum, stream, devContext,
+                     deviceA, deviceScaleA, deviceB, deviceScaleB, deviceOutput, tilingData);
+      }
+      ACL_CHECK(aclrtRecordEvent(kernelEndEvent, stream));
+      ACL_CHECK(aclrtSynchronizeStream(stream));
+
+      float kernelElapsedMs = 0.0F;
+      ACL_CHECK(aclrtEventElapsedTime(&kernelElapsedMs, kernelStartEvent, kernelEndEvent));
+      double kernelElapsedUs = static_cast<double>(kernelElapsedMs) * 1000.0;
+      printf("[Rank %d] Kernel completed! Elapsed time: %.3f us (avg over %d iterations)\n",
+           rankId, kernelElapsedUs / (iterations - 1), iterations - 1);
+      fflush(stdout);
+      if (kernelEndEvent) aclrtDestroyEvent(kernelEndEvent);
+      if (kernelStartEvent) aclrtDestroyEvent(kernelStartEvent);
+  } else {
+      printf("[Rank %d] Kernel completed! (precision mode)\n", rankId);
+      fflush(stdout);
+  }
+
   { std::string cmd = "mkdir -p " + outputDir; system(cmd.c_str()); }
   WriteFile(outputDir + "/npu_out.bin", hostOutput.data(), outputSize);
-
-  if (kernelEndEvent) aclrtDestroyEvent(kernelEndEvent);
-  if (kernelStartEvent) aclrtDestroyEvent(kernelStartEvent);
   aclrtFree(devContext);
   aclrtFree(deviceA); aclrtFree(deviceScaleA); aclrtFree(deviceB);
   aclrtFree(deviceScaleB); aclrtFree(deviceOutput);
@@ -257,17 +271,18 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n)
 int main(int argc, char *argv[])
 {
   int m = 0, k = 0, n = 0, rankNum = 0;
-  try { ParseArgs(argc, argv, &m, &k, &n, &rankNum); }
+  std::string mode;
+  try { ParseArgs(argc, argv, &m, &k, &n, &rankNum, mode); }
   catch (const std::invalid_argument& e) {
     std::cerr << e.what() << std::endl; return -1;
   }
-  INFO_LOG("Master (PID=%d) will fork %d processes", getpid(), rankNum);
+  INFO_LOG("Master (PID=%d) will fork %d processes (mode=%s)", getpid(), rankNum, mode.c_str());
 
   std::vector<pid_t> pids(rankNum);
   for (int rankId = 0; rankId < rankNum; ++rankId) {
     pid_t pid = fork();
     if (pid < 0) { ERROR_LOG("Fork failed for rank %d", rankId); exit(-1); }
-    else if (pid == 0) { exit(RunAllGatherQuantMatmul(rankNum, rankId, m, k, n)); }
+    else if (pid == 0) { exit(RunAllGatherQuantMatmul(rankNum, rankId, m, k, n, mode)); }
     else { pids[rankId] = pid; INFO_LOG("Forked Rank %d -> PID %d", rankId, pid); }
   }
 
