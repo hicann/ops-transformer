@@ -10,222 +10,106 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""TopK compare helpers for QuantLightningIndexer TestSpec adapters."""
+"""TTK result adapter for the QuantLightningIndexer pytest TopK comparison."""
+
+import importlib.util
+import logging
+import sys
+import threading
+from pathlib import Path
 
 import numpy as np
-
-# Match the pytest boundary-score policy for non-identical TopK index sets.
-_TOPK_REL_TOL = 0.0001
-_VALUE_RTOL = 0.005
-_VALUE_ATOL = 0.000025
-_VALUE_FAIL_RATIO = 0.05
+import torch
 
 
-def as_numpy(value):
-    if hasattr(value, "detach"):
-        value = value.detach().cpu().numpy()
-    return np.asarray(value)
+class PytestTopKComparator:
+    """Run the pytest TopK compare with replay-safe data supplied by the TestSpec."""
 
+    def __init__(self):
+        self.module = None
+        self.lock = threading.Lock()
 
-def row_set_diff_positions(output_row, golden_row):
-    golden_set = {int(x) for x in golden_row if x >= 0}
-    bad_positions = [idx for idx, value in enumerate(output_row) if value >= 0 and int(value) not in golden_set]
-    output_set = {int(x) for x in output_row if x >= 0}
-    missing_count = max(len(output_set - golden_set), len(golden_set - output_set))
-    if missing_count <= 0:
-        return []
-    if len(bad_positions) >= missing_count:
-        return bad_positions[:missing_count]
-    positional = [idx for idx, (out, gold) in enumerate(zip(output_row, golden_row)) if out != gold]
-    return (bad_positions + positional)[:missing_count]
+    def load_module(self):
+        if self.module is not None:
+            return self.module
+        with self.lock:
+            if self.module is not None:
+                return self.module
+            pytest_dir = Path(__file__).resolve().parents[2] / "pytest"
+            module_path = pytest_dir / "result_compare_method.py"
+            module_name = "qli_ttk_pytest_compare"
+            inserted = str(pytest_dir) not in sys.path
+            original_basic_config = logging.basicConfig
+            if inserted:
+                sys.path.insert(0, str(pytest_dir))
+            try:
+                logging.basicConfig = lambda *args, **kwargs: None
+                spec = importlib.util.spec_from_file_location(module_name, module_path)
+                if spec is None or spec.loader is None:
+                    raise ImportError(f"cannot create import spec for {module_path}")
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[module_name] = module
+                spec.loader.exec_module(module)
+                self.module = module
+            except Exception as exc:
+                sys.modules.pop(module_name, None)
+                raise RuntimeError(
+                    "Failed to load QuantLightningIndexer pytest compare; "
+                    f"module={module_path.resolve()}; "
+                    f"original error: {type(exc).__name__}: {exc}"
+                ) from exc
+            finally:
+                logging.basicConfig = original_basic_config
+                if inserted and str(pytest_dir) in sys.path:
+                    sys.path.remove(str(pytest_dir))
+        return self.module
 
+    @staticmethod
+    def to_torch(value):
+        if torch.is_tensor(value):
+            return value.detach().cpu().clone()
+        return torch.from_numpy(np.array(value, copy=True, order="C"))
 
-def score_relative_diff(score, boundary):
-    score_diff = abs(float(score) - float(boundary))
-    denom = max(abs(float(boundary)), 1e-10)
-    return abs(score_diff / denom)
-
-
-def is_score_close_to_boundary(score, boundary):
-    return score_relative_diff(score, boundary) <= _TOPK_REL_TOL
-
-
-def row_score_diff_to_boundary(output_indices, golden_indices, score_row):
-    if len(golden_indices) == 0:
-        return 0.0, 0.0
-    boundary_idx = int(golden_indices[-1])
-    if boundary_idx < 0 or boundary_idx >= score_row.shape[-1]:
-        return 0.0, 0.0
-    boundary = float(score_row[boundary_idx])
-    candidates = {int(x) for x in output_indices} ^ {int(x) for x in golden_indices}
-    max_abs = 0.0
-    max_rel = 0.0
-    for idx in candidates:
-        if 0 <= idx < score_row.shape[-1]:
-            abs_diff = abs(float(score_row[idx]) - boundary)
-            max_abs = max(max_abs, abs_diff)
-            max_rel = max(max_rel, score_relative_diff(score_row[idx], boundary))
-    return max_abs, max_rel
-
-
-def is_row_equivalent_by_score(output_indices, golden_indices, score_row):
-    if len(output_indices) != len(golden_indices) or len(golden_indices) == 0:
-        return False
-    output_set = {int(x) for x in output_indices}
-    golden_set = {int(x) for x in golden_indices}
-    if output_set == golden_set:
-        return True
-    only_output = list(output_set - golden_set)
-    only_golden = list(golden_set - output_set)
-    if len(only_output) != len(only_golden):
-        return False
-
-    boundary_idx = int(golden_indices[-1])
-    if boundary_idx < 0 or boundary_idx >= score_row.shape[-1]:
-        return False
-    boundary = float(score_row[boundary_idx])
-    for idx in only_output + only_golden:
-        if idx < 0 or idx >= score_row.shape[-1]:
-            return False
-        if not is_score_close_to_boundary(score_row[idx], boundary):
-            return False
-    return True
-
-
-def topk_index_compare(npu_out, golden_out, scores):
-    npu = as_numpy(npu_out)
-    golden = as_numpy(golden_out)
-    if npu.shape != golden.shape:
+    @staticmethod
+    def result_dict(result):
+        if not isinstance(result, (list, tuple)) or len(result) < 2:
+            raise ValueError(f"pytest check_result returned invalid result: {result!r}")
+        status, precision = result[:2]
+        passed = str(status).strip().lower() == "pass"
         return {
-            "pass": False,
-            "precision": "shape_mismatch",
-            "error_info": f"index shape mismatch: npu={npu.shape}, golden={golden.shape}",
-        }
-    if npu.size == 0:
-        return {"pass": True, "precision": 100.0, "metrics": {"rows": 0}}
-
-    scores_np = None if scores is None else as_numpy(scores)
-    if scores_np is None or tuple(scores_np.shape[:-1]) != tuple(golden.shape[:-1]):
-        sorted_npu = np.sort(npu, axis=-1).reshape(-1)
-        sorted_golden = np.sort(golden, axis=-1).reshape(-1)
-        diff_idx = np.where(sorted_npu != sorted_golden)[0].tolist()
-        precision = (sorted_golden.size - len(diff_idx)) / sorted_golden.size * 100
-        reason = "score context missing" if scores_np is None else f"score shape {scores_np.shape} vs index shape {golden.shape}"
-        return {
-            "pass": len(diff_idx) == 0,
-            "precision": precision,
-            "diff_indices": diff_idx[:1000],
-            "error_info": None if not diff_idx else f"TopK fallback sorted-index compare failed: {reason}",
-            "metrics": {"fallback": reason, "diff_positions": len(diff_idx)},
+            "pass": passed,
+            "precision": float(precision),
+            "error_info": None if passed else (
+                f"pytest QuantLightningIndexer check_result returned {status!r}"
+            ),
         }
 
-    row_count = int(np.prod(golden.shape[:-1])) if golden.shape[:-1] else 1
-    k_count = golden.shape[-1]
-    output_rows = npu.reshape(row_count, k_count)
-    golden_rows = golden.reshape(row_count, k_count)
-    score_rows = scores_np.reshape(row_count, scores_np.shape[-1])
-
-    diff_indices = []
-    set_equal_rows = 0
-    score_equiv_rows = 0
-    failed_rows = 0
-    max_failed_abs_diff = 0.0
-    max_failed_rel_diff = 0.0
-    for row_idx, (output_row, golden_row, score_row) in enumerate(zip(output_rows, golden_rows, score_rows)):
-        output_valid = output_row[output_row >= 0].astype(np.int64)
-        golden_valid = golden_row[golden_row >= 0].astype(np.int64)
-        if np.array_equal(np.sort(output_valid), np.sort(golden_valid)):
-            set_equal_rows += 1
-            continue
-        if is_row_equivalent_by_score(output_valid, golden_valid, score_row):
-            score_equiv_rows += 1
-            continue
-        failed_rows += 1
-        abs_diff, rel_diff = row_score_diff_to_boundary(output_valid, golden_valid, score_row)
-        max_failed_abs_diff = max(max_failed_abs_diff, abs_diff)
-        max_failed_rel_diff = max(max_failed_rel_diff, rel_diff)
-        base = row_idx * k_count
-        diff_indices.extend(base + i for i in row_set_diff_positions(output_row, golden_row))
-
-    precision = (golden.size - len(diff_indices)) / golden.size * 100
-    fail_ratio = len(diff_indices) / golden.size
-    passed = failed_rows == 0
-    error_info = None
-    if failed_rows:
-        verdict = "tolerated" if passed else "failed"
-        error_info = (
-            f"TopK index compare {verdict} rows={failed_rows}, diff_positions={len(diff_indices)}, "
-            f"fail_ratio={fail_ratio:.6g}, max_failed_abs_score_diff={max_failed_abs_diff:.6g}, "
-            f"max_failed_rel_score_diff={max_failed_rel_diff:.6g}"
+    def compare(self, *outputs, compare_data=None):
+        if compare_data is None:
+            raise ValueError("QuantLightningIndexer pytest compare data is unavailable")
+        if len(outputs) != 2:
+            return {
+                "pass": False,
+                "precision": "invalid",
+                "error_info": "compare expects one NPU output followed by one golden output",
+            }
+        params = compare_data.get("params")
+        topk_value = compare_data.get("topk_value")
+        if params is None or topk_value is None:
+            raise ValueError("QuantLightningIndexer pytest compare data lacks params or topk_value")
+        npu_output, golden = outputs
+        result = self.load_module().check_result(
+            self.to_torch(golden),
+            self.to_torch(npu_output),
+            self.to_torch(topk_value),
+            params,
         )
-    return {
-        "pass": passed,
-        "precision": precision,
-        "diff_indices": diff_indices[:1000],
-        "error_info": error_info,
-        "metrics": {
-            "rows": row_count,
-            "set_equal_rows": set_equal_rows,
-            "score_equivalent_rows": score_equiv_rows,
-            "failed_rows": failed_rows,
-            "diff_positions": len(diff_indices),
-            "fail_ratio": fail_ratio,
-            "topk_rel_tol": _TOPK_REL_TOL,
-            "max_failed_abs_score_diff": max_failed_abs_diff,
-            "max_failed_rel_score_diff": max_failed_rel_diff,
-        },
-    }
+        return self.result_dict(result)
 
 
-def expected_values_from_scores(scores, value_shape):
-    if scores is None:
-        return None
-    scores_np = as_numpy(scores).astype(np.float32)
-    if tuple(scores_np.shape[:-1]) != tuple(value_shape[:-1]):
-        return None
-    k_count = value_shape[-1]
-    sorted_scores = np.sort(scores_np, axis=-1)[..., ::-1]
-    if sorted_scores.shape[-1] < k_count:
-        pad_shape = sorted_scores.shape[:-1] + (k_count - sorted_scores.shape[-1],)
-        sorted_scores = np.concatenate(
-            [sorted_scores, np.full(pad_shape, -np.inf, dtype=np.float32)], axis=-1)
-    return sorted_scores[..., :k_count]
+COMPARATOR = PytestTopKComparator()
 
 
-def value_compare(npu_out, golden_out, scores=None):
-    npu = as_numpy(npu_out).astype(np.float32)
-    expected = expected_values_from_scores(scores, npu.shape)
-    if expected is None:
-        expected = np.sort(as_numpy(golden_out).astype(np.float32), axis=-1)
-        npu = np.sort(npu, axis=-1)
-    if npu.size != expected.size:
-        return {
-            "pass": False,
-            "precision": "size_mismatch",
-            "error_info": f"value size mismatch: npu={npu.size}, golden={expected.size}",
-        }
-    if expected.size == 0:
-        return {"pass": True, "precision": 100.0}
-    diff = ~np.isclose(npu.reshape(-1), expected.reshape(-1), rtol=_VALUE_RTOL, atol=_VALUE_ATOL, equal_nan=True)
-    diff_idx = np.where(diff)[0].tolist()
-    precision = (expected.size - len(diff_idx)) / expected.size * 100
-    return {
-        "pass": (len(diff_idx) / expected.size) <= _VALUE_FAIL_RATIO,
-        "precision": precision,
-        "diff_indices": diff_idx[:1000],
-        "error_info": None if not diff_idx else f"value compare mismatches={len(diff_idx)}",
-        "metrics": {"rtol": _VALUE_RTOL, "atol": _VALUE_ATOL, "fail_ratio": _VALUE_FAIL_RATIO},
-    }
-
-
-def compare(*outputs, scores=None):
-    """Compare NPU outputs against golden references using TopK index and value tolerance policies."""
-    if len(outputs) < 2 or len(outputs) % 2 != 0:
-        return {"pass": False, "precision": "invalid", "error_info": "compare expects NPU outputs followed by golden outputs"}
-    half = len(outputs) // 2
-    npu_outputs = outputs[:half]
-    golden_outputs = outputs[half:]
-    results = [topk_index_compare(npu_outputs[0], golden_outputs[0], scores)]
-    for idx in range(1, half):
-        results.append(value_compare(npu_outputs[idx], golden_outputs[idx], scores=scores))
-    return results[0] if len(results) == 1 else results
+def compare(*outputs, compare_data=None):
+    """Compare TopK outputs with the canonical pytest policy."""
+    return COMPARATOR.compare(*outputs, compare_data=compare_data)

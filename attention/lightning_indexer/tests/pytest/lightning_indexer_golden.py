@@ -375,7 +375,8 @@ class GeneralizedLI:
         y = self.trans_bnsd_to_layout(y, out_shape_bnsd, layout_query, actualSeqLengths_q)
         return y, y_value
 
-def li_output_single(params):
+def generate_li_test_data(params):
+    """Generate LightningIndexer inputs and CPU golden without running the main op."""
     batch_size, q_seq, k_seq, q_t_size, k_t_size, q_head_num, k_head_num, head_dim, block_size, block_num, \
     qk_dtype, weight_dtype, actual_seq_dtype, act_seq_q, act_seq_k, layout_query, layout_key, sparse_count, \
     sparse_mode, query_datarange, key_datarange, weights_datarange, return_value = params
@@ -463,17 +464,40 @@ def li_output_single(params):
         block_table = torch.from_numpy(block_table).to(dtype=torch.int32).npu()
 
     # cpu golden生成
-    cpu_result, topk_value = test_li.forward(query, key_cpu, weights, actual_seq_lengths_query, actual_seq_lengths_key, block_table)
-    cpu_result, _ = torch.sort(cpu_result)
+    cpu_result_raw, topk_value = test_li.forward(
+        query, key_cpu, weights, actual_seq_lengths_query,
+        actual_seq_lengths_key, block_table)
+    score_values = test_li.trans_bnsd_to_layout(
+        topk_value, list(topk_value.shape), layout_query,
+        test_li.actual_seq_lengths_query)
+    cpu_result, _ = torch.sort(cpu_result_raw)
+    return {
+        "params": params,
+        "cpu_result": cpu_result,
+        "cpu_result_raw": cpu_result_raw,
+        "topk_value": topk_value,
+        "score_values": score_values,
+        "query": query,
+        "key": key,
+        "weights": weights,
+        "actual_seq_lengths_query": actual_seq_lengths_query,
+        "actual_seq_lengths_key": actual_seq_lengths_key,
+        "block_table": block_table,
+    }
 
-    npu_result, sparse_value = torch_npu.npu_lightning_indexer(query, key, weights,
-                                                    actual_seq_lengths_query = actual_seq_lengths_query,
-                                                    actual_seq_lengths_key = actual_seq_lengths_key,
-                                                    block_table = block_table,
+
+def li_output_single(params):
+    data = generate_li_test_data(params)
+    layout_query, layout_key, sparse_count, sparse_mode = params[15:19]
+    npu_result, sparse_value = torch_npu.npu_lightning_indexer(
+                                                    data["query"], data["key"], data["weights"],
+                                                    actual_seq_lengths_query = data["actual_seq_lengths_query"],
+                                                    actual_seq_lengths_key = data["actual_seq_lengths_key"],
+                                                    block_table = data["block_table"],
                                                     layout_query = layout_query,
                                                     layout_key = layout_key,
                                                     sparse_count = sparse_count,
                                                     sparse_mode = sparse_mode)
     torch.npu.synchronize()
     npu_result, _ = torch.sort(npu_result)
-    return cpu_result, npu_result, topk_value, sparse_value
+    return data["cpu_result"], npu_result, data["topk_value"], sparse_value

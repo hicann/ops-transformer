@@ -13,6 +13,7 @@
 """TestSpec adapter for QuantLightningIndexer assets."""
 
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -20,10 +21,24 @@ ASSET_IMPL_DIR = Path(__file__).with_name("impl")
 
 
 def load_impl_module(stem):
+    name = f"qli_ttk_{stem}"
+    if name in sys.modules:
+        return sys.modules[name]
     path = ASSET_IMPL_DIR / f"{stem}.py"
-    spec = importlib.util.spec_from_file_location(f"qli_assets_impl_{stem}_{abs(hash(path))}", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    try:
+        spec = importlib.util.spec_from_file_location(name, path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot create import spec for {path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        sys.modules.pop(name, None)
+        raise RuntimeError(
+            "Failed to load QuantLightningIndexer assets module; "
+            f"stage=impl/{stem}; module={path.resolve()}; "
+            f"original error: {type(exc).__name__}: {exc}"
+        ) from exc
     return module
 
 
@@ -40,8 +55,16 @@ class QuantLightningIndexerSpec:
         "bfloat16": {"standard": "stat_rel_err"},
     }
 
-    def compare(*outputs, **kwargs):
-        return compare_module.compare(*outputs, scores=golden_module.get_topk_scores())
+    def compare(*outputs, compare_context=None, **kwargs):
+        del kwargs
+        testcase_name = None if compare_context is None else compare_context.testcase_name
+        data = golden_module.get_compare_data(testcase_name)
+        if data is None:
+            if compare_context is None:
+                raise RuntimeError("QuantLightningIndexer pytest compare requires compare_context")
+            data = inputs_module.rebuild_qli_compare_data(compare_context)
+            golden_module.set_compare_data(compare_context.testcase_name, data)
+        return compare_module.compare(*outputs, compare_data=data)
 
 
 __spec__ = {

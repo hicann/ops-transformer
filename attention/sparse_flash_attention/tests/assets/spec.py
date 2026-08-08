@@ -13,6 +13,7 @@
 """TestSpec adapter for SparseFlashAttention assets."""
 
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -20,26 +21,41 @@ ASSET_IMPL_DIR = Path(__file__).with_name("impl")
 
 
 def load_impl_module(stem):
+    name = f"sfa_ttk_{stem}"
+    if name in sys.modules:
+        return sys.modules[name]
     path = ASSET_IMPL_DIR / f"{stem}.py"
-    spec = importlib.util.spec_from_file_location(
-        f"sfa_assets_impl_{stem}_{abs(hash(path))}", path
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    try:
+        spec = importlib.util.spec_from_file_location(name, path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot create import spec for {path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        sys.modules.pop(name, None)
+        raise RuntimeError(
+            "Failed to load SparseFlashAttention assets module; "
+            f"stage=impl/{stem}; module={path.resolve()}; "
+            f"original error: {type(exc).__name__}: {exc}"
+        ) from exc
     return module
 
 
 golden_module = load_impl_module("golden")
 inputs_module = load_impl_module("inputs")
+compare_module = load_impl_module("compare")
 
 
 class SparseFlashAttentionSpec:
     golden = golden_module.cpu_sparse_flash_attention
-    customize_inputs = inputs_module.generate_valid_sparse_indices
+    customize_inputs = inputs_module.generate_sfa_inputs
     tolerance = {
         "float16": {"standard": "stat_rel_err"},
         "bfloat16": {"standard": "stat_rel_err"},
     }
+
+    compare = staticmethod(compare_module.compare)
 
 
 __spec__ = {

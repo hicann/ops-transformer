@@ -10,255 +10,200 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""
-Input plugin for sparse_flash_attention - generates valid sparse_indices.
-"""
+"""Input adapter that delegates SparseFlashAttention data construction to pytest."""
 
-import math
-import numpy as np
+import importlib.util
+import sys
+from pathlib import Path
+
 import torch
 
-__input__ = {
-    "e2e": {"torch_npu.npu_sparse_flash_attention": "generate_valid_sparse_indices"}
-}
 
+class SparseFlashAttentionInputAdapter:
+    """Delegate input construction to pytest while keeping adapter state local."""
 
-def to_list(value):
-    if value is None:
-        return []
-    if torch.is_tensor(value):
-        value = value.detach().cpu().tolist()
-    elif hasattr(value, "tolist"):
-        value = value.tolist()
-    if isinstance(value, (list, tuple)):
-        return [int(v) for v in value]
-    return [int(value)]
-
-
-def fill_tensor_from_value(tensor, value):
-    if tensor is None or value is None or not torch.is_tensor(tensor):
-        return
-    data = torch.tensor(value, dtype=tensor.dtype, device=tensor.device)
-    tensor.copy_(data.reshape(tensor.shape))
-
-
-def fill_random_block_table(block_table, actual_seq_kv, block_size, block_num, seed=0):
-    if block_table is None:
-        return
-    shape = tuple(block_table.shape)
-    if len(shape) < 2:
-        return
-    block_size = max(int(block_size or 1), 1)
-    actual = to_list(actual_seq_kv)
-    if not actual:
-        actual = [shape[1] * block_size] * shape[0]
-    used_blocks = [
-        math.ceil(
-            max(int(actual[idx] if idx < len(actual) else actual[-1]), 0) / block_size
-        )
-        for idx in range(shape[0])
-    ]
-    required_blocks = sum(used_blocks)
-    block_num = int(block_num or required_blocks)
-    if required_blocks > block_num:
-        raise ValueError(
-            f"block_table requires {required_blocks} blocks, but block_num is {block_num}"
+    @staticmethod
+    def module_load_error(path, exc):
+        return RuntimeError(
+            "Failed to load SparseFlashAttention module; "
+            f"stage=assets Golden store; module={path.resolve()}; "
+            f"original error: {type(exc).__name__}: {exc}"
         )
 
-    generator = torch.Generator(device="cpu")
-    generator.manual_seed(int(seed or 0))
-    block_ids = torch.randperm(block_num, dtype=torch.int32, generator=generator)
-    if torch.is_tensor(block_table):
-        table = torch.full(shape, -1, dtype=torch.int32, device=block_table.device)
-    else:
-        table = np.full(shape, -1, dtype=np.int32)
-    cursor = 0
-    for batch_idx, blocks in enumerate(used_blocks):
-        take = min(blocks, shape[1])
-        values = block_ids[cursor : cursor + take]
-        if torch.is_tensor(block_table):
-            table[batch_idx, :take] = values.to(device=block_table.device)
-        else:
-            table[batch_idx, :take] = values.cpu().numpy()
-        cursor += blocks
-    if torch.is_tensor(block_table):
-        block_table.copy_(table.to(dtype=block_table.dtype))
-    else:
-        block_table[...] = table.astype(block_table.dtype, copy=False)
+    def golden_module(self):
+        name = "sfa_ttk_golden"
+        if name in sys.modules:
+            return sys.modules[name]
+        path = Path(__file__).with_name("golden.py")
+        try:
+            spec = importlib.util.spec_from_file_location(name, path)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"cannot create import spec for {path}")
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[name] = module
+            spec.loader.exec_module(module)
+        except Exception as exc:
+            sys.modules.pop(name, None)
+            raise self.module_load_error(path, exc) from exc
+        return module
 
-
-def align_value_with_key_for_mla(key, value):
-    if (
-        key is None
-        or value is None
-        or not torch.is_tensor(key)
-        or not torch.is_tensor(value)
-    ):
-        return
-    if tuple(key.shape) != tuple(value.shape):
-        return
-    # Pytest MLA-absorb path feeds value_cache from key_cache; keep TTK NPU input
-    # aligned with the golden formula instead of using an independent random V.
-    value.copy_(key.to(dtype=value.dtype, device=value.device))
-
-
-def generate_valid_sparse_indices(
-    query, key, value, sparse_indices, scale_value, sparse_block_size, **kwargs
-):
-    """Generate valid sparse_indices based on threshold (matches pytest logic)."""
-    align_value_with_key_for_mla(key, value)
-
-    if sparse_indices is None:
-        return
-
-    layout_query = kwargs.get("layout_query", "BSND")
-    layout_kv = kwargs.get("layout_kv", "BSND")
-    sparse_mode = kwargs.get("sparse_mode", 0)
-    actual_seq_q = kwargs.get("actual_seq_lengths_query")
-    actual_seq_kv = kwargs.get("actual_seq_lengths_kv")
-    block_table = kwargs.get("block_table")
-
-    fill_tensor_from_value(actual_seq_q, kwargs.get("actual_seq_lengths_query"))
-    fill_tensor_from_value(actual_seq_kv, kwargs.get("actual_seq_lengths_kv"))
-    if layout_kv == "PA_BSND":
-        pa_block_size = kwargs.get("block_size") or key.shape[1]
-        pa_block_num = kwargs.get("block_num") or key.shape[0]
-        fill_random_block_table(
-            block_table,
-            actual_seq_kv,
-            pa_block_size,
-            pa_block_num,
-            kwargs.get("block_table_seed", 0),
-        )
-
-    actual_seq_q_list = to_list(actual_seq_q)
-    actual_seq_kv_list = to_list(actual_seq_kv)
-
-    sparse_block_size_val = sparse_block_size or 1
-
-    if layout_query == "BSND":
-        B = query.shape[0]
-        S1 = query.shape[1]
-    else:
-        B = len(actual_seq_q_list) if actual_seq_q_list else 1
-        S1 = max(actual_seq_q_list) if actual_seq_q_list else query.shape[0]
-
-    N2 = key.shape[-2] if layout_kv in ["BSND", "PA_BSND"] else key.shape[1]
-    K = sparse_indices.shape[-1]
-
-    if not actual_seq_kv_list:
-        if layout_kv == "BSND":
-            default_kv = key.shape[1]
-        elif layout_kv == "PA_BSND":
-            pa_block_size = kwargs.get("block_size") or key.shape[1]
-            bt_width = (
-                block_table.shape[1]
-                if torch.is_tensor(block_table) and block_table.dim() > 1
-                else 1
-            )
-            default_kv = pa_block_size * bt_width
-        else:
-            default_kv = key.shape[0]
-        actual_seq_kv_list = [default_kv] * B
-    if not actual_seq_q_list:
-        actual_seq_q_list = [S1] * B
-
-    sparse_indices_new = torch.full(sparse_indices.shape, -1, dtype=torch.int32)
-
-    if layout_query == "TND" and len(sparse_indices.shape) == 3:
-        batch_q_lengths = []
-        prev = 0
-        for cum_sum in actual_seq_q_list:
-            batch_q_lengths.append(cum_sum - prev)
-            prev = cum_sum
-
-        batch_kv_lengths = (
-            actual_seq_kv_list
-            if layout_kv == "PA_BSND"
-            else [
-                cum_sum - prev_kv
-                for prev_kv, cum_sum in zip(
-                    [0] + actual_seq_kv_list[:-1], actual_seq_kv_list
+    @staticmethod
+    def copy_tensor(destination, source, name):
+        if destination is None:
+            if source is not None:
+                raise ValueError(
+                    f"{name} is absent from CSV but pytest generator produced a tensor"
                 )
-            ]
-            if layout_kv == "TND"
-            else actual_seq_kv_list
+            return
+        if source is None:
+            raise ValueError(f"{name} is declared by CSV but pytest did not produce it")
+        source_cpu = source.detach().cpu() if torch.is_tensor(source) else torch.as_tensor(source)
+        if tuple(destination.shape) != tuple(source_cpu.shape):
+            raise ValueError(
+                f"{name} shape mismatch: TTK={tuple(destination.shape)}, pytest={tuple(source_cpu.shape)}"
+            )
+        if destination.dtype != source_cpu.dtype:
+            raise ValueError(
+                f"{name} dtype mismatch: TTK={destination.dtype}, pytest={source_cpu.dtype}"
+            )
+        destination.copy_(source_cpu.to(device=destination.device))
+
+    @staticmethod
+    def copy_sequence(destination, values, name):
+        if destination is None:
+            if values is not None:
+                raise ValueError(
+                    f"{name} is absent from CSV but pytest parameter conversion "
+                    "produced values"
+                )
+            return
+        if values is None:
+            raise ValueError(
+                f"{name} is declared by CSV but pytest parameter conversion returned None"
+            )
+        source = torch.tensor(values, dtype=destination.dtype, device=destination.device)
+        if source.numel() != destination.numel():
+            raise ValueError(
+                f"{name} size mismatch: TTK={destination.numel()}, pytest={source.numel()}"
+            )
+        destination.copy_(source.reshape(destination.shape))
+
+    @staticmethod
+    def validate_api_attributes(params, scale_value, sparse_block_size,
+                                layout_query, layout_kv, sparse_mode,
+                                attention_mode, return_softmax_lse,
+                                rope_head_dim):
+        expected = {
+            "scalevalue": scale_value,
+            "sparse_blocksize": sparse_block_size,
+            "layout_query": layout_query,
+            "layout_kv": layout_kv,
+            "sparsemode": sparse_mode,
+            "attention_mode": attention_mode,
+            "return_softmax_lse": return_softmax_lse,
+            "rope_head_dim": rope_head_dim,
+        }
+        mismatches = {
+            name: (params.get(name), value)
+            for name, value in expected.items()
+            if params.get(name) != value
+        }
+        if mismatches:
+            raise ValueError(
+                "SparseFlashAttention API attributes differ from explicit pytest "
+                f"fields: {mismatches}"
+            )
+
+    def generate(self, query, key, value, sparse_indices, scale_value, *, block_table=None,
+                 actual_seq_lengths_query=None, actual_seq_lengths_kv=None,
+                 query_rope=None, key_rope=None, sparse_block_size=1,
+                 layout_query="BSND", layout_kv="BSND", sparse_mode=3,
+                 attention_mode=0, return_softmax_lse=False, testcase_name=None,
+                 input_ranges=None, **kwargs):
+        """Generate final API tensors and the CPU golden through pytest."""
+        del input_ranges
+        golden_module = self.golden_module()
+        params, pytest_golden = (
+            golden_module.SparseFlashAttentionPytestAdapter.convert_params(
+                kwargs, testcase_name
+            )
+        )
+        self.validate_api_attributes(
+            params,
+            scale_value,
+            sparse_block_size,
+            layout_query,
+            layout_kv,
+            sparse_mode,
+            attention_mode,
+            return_softmax_lse,
+            int(kwargs["rope_head_dim"]),
+        )
+        generated = pytest_golden.generate_input_tensors(params)
+        outputs, generated, _ = pytest_golden.compute_cpu(generated, params)
+        if outputs is None:
+            raise RuntimeError("SparseFlashAttention pytest compute_cpu failed")
+        if hasattr(torch, "npu"):
+            torch.npu.synchronize()
+
+        self.copy_tensor(query, generated.get("query"), "query")
+        self.copy_tensor(key, generated.get("key_cache", generated.get("key")), "key")
+        self.copy_tensor(value, generated.get("value_cache", generated.get("value")), "value")
+        self.copy_tensor(sparse_indices, generated.get("sparse_indices"), "sparse_indices")
+        # Pytest creates an internal block table for its CPU model even for non-PA layouts.
+        if block_table is not None:
+            self.copy_tensor(block_table, generated.get("block_table"), "block_table")
+        elif layout_kv == "PA_BSND":
+            raise ValueError("PA_BSND requires block_table to be declared by the CSV")
+        self.copy_sequence(actual_seq_lengths_query, params["actualseqlengths"], "actual_seq_lengths_query")
+        self.copy_sequence(actual_seq_lengths_kv, params["actualseqlengthskv"], "actual_seq_lengths_kv")
+        self.copy_tensor(query_rope, generated.get("query_rope"), "query_rope")
+        self.copy_tensor(key_rope, generated.get("key_rope_cache", generated.get("key_rope")), "key_rope")
+
+        golden_module.CASE_DATA.put(
+            testcase_name,
+            {
+                "golden": golden_module.normalize_pytest_outputs(
+                    outputs, query, params["return_softmax_lse"]
+                )
+            },
         )
 
-        t_offset = 0
-        for b in range(B):
-            batch_seq_q = (
-                batch_q_lengths[b] if b < len(batch_q_lengths) else batch_q_lengths[0]
-            )
-            batch_seq_kv = (
-                batch_kv_lengths[b]
-                if b < len(batch_kv_lengths)
-                else batch_kv_lengths[0]
-            )
 
-            for t_local in range(batch_seq_q):
-                t_global = t_offset + t_local
-                for n in range(N2):
-                    threshold = (
-                        batch_seq_kv
-                        if sparse_mode == 0
-                        else batch_seq_kv - batch_seq_q + t_local + 1
-                    )
-                    if threshold <= 0:
-                        continue
-
-                    valid_blocks = math.ceil(max(0, threshold) / sparse_block_size_val)
-                    if valid_blocks <= 0:
-                        continue
-
-                    if valid_blocks > 1:
-                        block_indices = torch.randperm(valid_blocks, dtype=torch.int32)
-                    else:
-                        block_indices = torch.zeros(1, dtype=torch.int32)
-
-                    topk = min(valid_blocks, K)
-                    if topk > 0:
-                        sparse_indices_new[t_global, n, : topk - 1] = (
-                            block_indices[: topk - 1] if topk > 1 else torch.tensor([])
-                        )
-                        sparse_indices_new[t_global, n, topk - 1] = valid_blocks - 1
-
-            t_offset += batch_seq_q
-    else:
-        for b in range(B):
-            seq_kv = (
-                actual_seq_kv_list[b]
-                if b < len(actual_seq_kv_list)
-                else actual_seq_kv_list[0]
-            )
-            seq_q = (
-                actual_seq_q_list[b]
-                if b < len(actual_seq_q_list)
-                else actual_seq_q_list[0]
-            )
-
-            for n in range(N2):
-                for s in range(S1):
-                    threshold = seq_kv if sparse_mode == 0 else seq_kv - seq_q + s + 1
-                    if threshold <= 0:
-                        continue
-
-                    valid_blocks = math.ceil(max(0, threshold) / sparse_block_size_val)
-                    if valid_blocks <= 0:
-                        continue
-
-                    if valid_blocks > 1:
-                        block_indices = torch.randperm(valid_blocks, dtype=torch.int32)
-                    else:
-                        block_indices = torch.zeros(1, dtype=torch.int32)
-
-                    topk = min(valid_blocks, K)
-                    if topk > 0:
-                        sparse_indices_new[b, s, n, : topk - 1] = (
-                            block_indices[: topk - 1] if topk > 1 else torch.tensor([])
-                        )
-                        sparse_indices_new[b, s, n, topk - 1] = valid_blocks - 1
-
-    sparse_indices[:] = sparse_indices_new.to(sparse_indices.dtype).to(
-        sparse_indices.device
+def generate_sfa_inputs(query, key, value, sparse_indices, scale_value, *, block_table=None,
+                        actual_seq_lengths_query=None, actual_seq_lengths_kv=None,
+                        query_rope=None, key_rope=None, sparse_block_size=1,
+                        layout_query="BSND", layout_kv="BSND", sparse_mode=3,
+                        attention_mode=0, return_softmax_lse=False, testcase_name=None,
+                        input_ranges=None, **kwargs):
+    return INPUT_ADAPTER.generate(
+        query,
+        key,
+        value,
+        sparse_indices,
+        scale_value,
+        block_table=block_table,
+        actual_seq_lengths_query=actual_seq_lengths_query,
+        actual_seq_lengths_kv=actual_seq_lengths_kv,
+        query_rope=query_rope,
+        key_rope=key_rope,
+        sparse_block_size=sparse_block_size,
+        layout_query=layout_query,
+        layout_kv=layout_kv,
+        sparse_mode=sparse_mode,
+        attention_mode=attention_mode,
+        return_softmax_lse=return_softmax_lse,
+        testcase_name=testcase_name,
+        input_ranges=input_ranges,
+        **kwargs,
     )
+
+
+INPUT_ADAPTER = SparseFlashAttentionInputAdapter()
+
+
+__input__ = {
+    "e2e": {
+        "torch_npu.npu_sparse_flash_attention": "generate_sfa_inputs",
+    }
+}

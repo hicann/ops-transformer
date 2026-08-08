@@ -10,58 +10,46 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-import importlib.util
-import math
-import sys
-from pathlib import Path
+class CaseDataStore:
+    """Share one pytest-generated case between input, golden, and compare callbacks."""
 
-import torch
+    def __init__(self):
+        self.case_data = {}
+        self.active_testcase_name = None
 
+    def clear(self):
+        self.case_data.clear()
+        self.active_testcase_name = None
 
-PYTEST_GOLDEN_MODULE = None
+    def put(self, testcase_name, data):
+        if testcase_name is not None:
+            self.clear()
+            self.case_data = {str(testcase_name): data}
 
-
-def load_pytest_golden_module():
-    """Load tests/pytest/quant_lightning_indexer_golden.py as the canonical CPU golden."""
-    global PYTEST_GOLDEN_MODULE
-    if PYTEST_GOLDEN_MODULE is not None:
-        return PYTEST_GOLDEN_MODULE
-    pytest_dir = Path(__file__).resolve().parents[2] / "pytest"
-    module_path = pytest_dir / "quant_lightning_indexer_golden.py"
-    sys.path.insert(0, str(pytest_dir))
-    try:
-        spec = importlib.util.spec_from_file_location(
-            f"qli_pytest_golden_{abs(hash(module_path))}", module_path
-        )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-    finally:
-        try:
-            sys.path.remove(str(pytest_dir))
-        except ValueError:
-            pass
-    PYTEST_GOLDEN_MODULE = module
-    return PYTEST_GOLDEN_MODULE
+    def activate(self, testcase_name):
+        data = self.case_data.get(str(testcase_name)) if testcase_name is not None else None
+        if data is None:
+            raise RuntimeError(
+                "QuantLightningIndexer TTK golden requires customize_inputs "
+                "to generate pytest data first"
+            )
+        self.active_testcase_name = str(testcase_name)
+        return data
 
 
-# ========================= TTK e2e adapter =========================
-# The CPU reference is loaded from tests/pytest; assets keeps only the TTK adapter layer.
-# The adapter below maps TTK API-style tensors to the GeneralizedQLI object.
-_TTK_V3_TOPK_SCORES = None
+CASE_DATA = CaseDataStore()
 
 
-def clear_topk_scores():
-    global _TTK_V3_TOPK_SCORES
-    _TTK_V3_TOPK_SCORES = None
+def get_compare_data(testcase_name):
+    """Return pytest comparison context for the active or replayed case."""
+    if testcase_name is None:
+        return None
+    return CASE_DATA.case_data.get(str(testcase_name))
 
 
-def set_topk_scores(scores):
-    global _TTK_V3_TOPK_SCORES
-    _TTK_V3_TOPK_SCORES = scores
-
-
-def get_topk_scores():
-    return _TTK_V3_TOPK_SCORES
+def set_compare_data(testcase_name, data):
+    CASE_DATA.active_testcase_name = str(testcase_name)
+    CASE_DATA.case_data = {str(testcase_name): data}
 
 
 __golden__ = {
@@ -71,59 +59,6 @@ __golden__ = {
 }
 
 
-def ttk_tensor_to_list(value):
-    if value is None:
-        return []
-    if torch.is_tensor(value):
-        return [int(x) for x in value.detach().cpu().reshape(-1).tolist()]
-    if isinstance(value, (list, tuple)):
-        return [int(x) for x in value]
-    return [int(value)]
-
-
-def ttk_per_batch_from_prefix(prefix):
-    prefix = ttk_tensor_to_list(prefix)
-    if not prefix:
-        return []
-    out = [prefix[0]]
-    for i in range(len(prefix) - 1):
-        out.append(prefix[i + 1] - prefix[i])
-    return out
-
-
-def ttk_scores_to_layout(golden_obj, scores_bnsd, layout_query, act_q_per_batch):
-    shape = list(scores_bnsd.shape)
-    return golden_obj.trans_bnsd_to_layout(scores_bnsd, shape, layout_query, act_q_per_batch)
-
-
-def ttk_restore_pa_bsnd(paged_tensor, block_table, act_k, block_size):
-    if paged_tensor is None or block_table is None:
-        return paged_tensor
-    act_k = [int(x) for x in act_k]
-    page_table = block_table.detach().cpu() if torch.is_tensor(block_table) else torch.tensor(block_table)
-    src = paged_tensor.detach().cpu()
-    batch = len(act_k)
-    num_heads = src.shape[2]
-    tail_shape = src.shape[3:]
-    max_k = max(act_k) if act_k else 0
-    restored = torch.zeros((batch, num_heads, max_k) + tail_shape, dtype=src.dtype)
-    for b_idx, cur_k in enumerate(act_k):
-        if cur_k <= 0:
-            continue
-        pages = int(math.ceil(cur_k / block_size))
-        copied = 0
-        for page_idx in range(min(pages, page_table.shape[1])):
-            block_id = int(page_table[b_idx, page_idx].item())
-            if block_id < 0:
-                continue
-            take = min(block_size, cur_k - copied)
-            restored[b_idx, :, copied:copied + take, ...] = src[block_id, :take, :, ...].permute(1, 0, *range(2, src.dim() - 1))
-            copied += take
-            if copied >= cur_k:
-                break
-    return restored
-
-
 def cpu_quant_lightning_indexer(query, key, weights, query_dequant_scale,
                                 key_dequant_scale, query_quant_mode=0, key_quant_mode=0,
                                 *, actual_seq_lengths_query=None,
@@ -131,61 +66,11 @@ def cpu_quant_lightning_indexer(query, key, weights, query_dequant_scale,
                                 layout_query="BSND", layout_key="BSND", sparse_count=2048,
                                 sparse_mode=3, pre_tokens=(1 << 63) - 1,
                                 next_tokens=(1 << 63) - 1, query_dtype=None,
-                                key_dtype=None, **kwargs):
-    """Golden reference implementation for quantized LightningIndexer attention with TopK scoring."""
-    clear_topk_scores()
-    q_shape = list(query.shape)
-    k_shape = list(key.shape)
-    act_q = ttk_tensor_to_list(actual_seq_lengths_query)
-    act_k = ttk_tensor_to_list(actual_seq_lengths_key)
-
-    if layout_query == "TND":
-        batch_size = len(act_q) if act_q else 1
-        q_t_size, q_head_num, head_dim = q_shape
-        q_seq = max(ttk_per_batch_from_prefix(act_q) or [q_t_size])
-        act_q_forward = act_q
-    else:
-        batch_size, q_seq, q_head_num, head_dim = q_shape
-        act_q_forward = act_q or [q_seq] * batch_size
-        q_t_size = sum(act_q_forward)
-
-    if layout_key == "TND":
-        k_t_size, k_head_num, _ = k_shape
-        k_seq = max(ttk_per_batch_from_prefix(act_k) or [k_t_size])
-        act_k_forward = act_k
-    elif layout_key == "PA_BSND":
-        block_num, block_size, k_head_num, _ = k_shape
-        k_t_size = sum(act_k) if act_k else block_num * block_size
-        k_seq = max(act_k or [block_size])
-        act_k_forward = act_k or [k_seq] * batch_size
-    else:
-        _, k_seq, k_head_num, _ = k_shape
-        k_t_size = sum(act_k) if act_k else k_seq * batch_size
-        act_k_forward = act_k or [k_seq] * batch_size
-        block_size = int(kwargs.get("block_size", 16))
-        block_num = int(kwargs.get("block_num", 0))
-
-    block_size = int(kwargs.get("block_size", locals().get("block_size", 16)))
-    block_num = int(kwargs.get("block_num", locals().get("block_num", 0)))
-
-    golden_key = key
-    golden_key_scale = key_dequant_scale
-    if layout_key == "PA_BSND":
-        golden_key = ttk_restore_pa_bsnd(key, block_table, act_k_forward, block_size)
-        golden_key_scale = ttk_restore_pa_bsnd(key_dequant_scale, block_table, act_k_forward, block_size).squeeze(-1)
-
-    golden_cls = load_pytest_golden_module().GeneralizedQLI
-    golden = golden_cls(batch_size, q_seq, k_seq, q_t_size, k_t_size,
-                            q_head_num, k_head_num, head_dim, block_size, block_num,
-                            query.dtype, weights.dtype, query_dequant_scale.dtype,
-                            torch.int32, act_q_forward, act_k_forward,
-                            int(query_quant_mode), int(key_quant_mode),
-                            layout_query, layout_key, int(sparse_count), int(sparse_mode))
-    fwd_act_q = act_q_forward if layout_query == "TND" else torch.tensor(act_q_forward, dtype=torch.int32)
-    fwd_act_k = act_k_forward if layout_key == "TND" else torch.tensor(act_k_forward, dtype=torch.int32)
-    indices, full_scores_bnsd = golden.forward(query, golden_key, weights,
-                                               query_dequant_scale, golden_key_scale,
-                                               fwd_act_q, fwd_act_k, block_table)
-    act_q_per_batch = ttk_per_batch_from_prefix(act_q_forward) if layout_query == "TND" else act_q_forward
-    set_topk_scores(ttk_scores_to_layout(golden, full_scores_bnsd, layout_query, act_q_per_batch))
-    return indices
+                                key_dtype=None, testcase_name=None, **kwargs):
+    """Return the CPU output produced while generating this exact pytest case."""
+    del query, key, weights, query_dequant_scale, key_dequant_scale
+    del query_quant_mode, key_quant_mode, actual_seq_lengths_query
+    del actual_seq_lengths_key, block_table, layout_query, layout_key
+    del sparse_count, sparse_mode, pre_tokens, next_tokens
+    del query_dtype, key_dtype, kwargs
+    return CASE_DATA.activate(testcase_name)["cpu_result"]

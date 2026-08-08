@@ -10,7 +10,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""TTK result adapter for the LightningIndexer pytest TopK comparison."""
+"""TTK result adapter for the KvQuantSparseFlashAttention pytest compare."""
 
 import importlib.util
 import logging
@@ -22,8 +22,8 @@ import numpy as np
 import torch
 
 
-class PytestTopKComparator:
-    """Run the pytest TopK compare with replay-safe data supplied by the TestSpec."""
+class PytestResultComparator:
+    """Load and invoke the canonical pytest comparison without changing TTK logging."""
 
     def __init__(self):
         self.module = None
@@ -37,7 +37,7 @@ class PytestTopKComparator:
                 return self.module
             pytest_dir = Path(__file__).resolve().parents[2] / "pytest"
             module_path = pytest_dir / "result_compare_method.py"
-            module_name = "li_ttk_pytest_compare"
+            module_name = "qsfa_ttk_pytest_compare"
             inserted = str(pytest_dir) not in sys.path
             original_basic_config = logging.basicConfig
             if inserted:
@@ -54,7 +54,7 @@ class PytestTopKComparator:
             except Exception as exc:
                 sys.modules.pop(module_name, None)
                 raise RuntimeError(
-                    "Failed to load LightningIndexer pytest compare; "
+                    "Failed to load KvQuantSparseFlashAttention pytest compare; "
                     f"module={module_path.resolve()}; "
                     f"original error: {type(exc).__name__}: {exc}"
                 ) from exc
@@ -69,12 +69,12 @@ class PytestTopKComparator:
         if torch.is_tensor(value):
             return value.detach().cpu().clone()
         array = np.array(value, copy=True, order="C")
+        dtype_name = str(array.dtype)
         custom_dtypes = {
             "bfloat16": (np.uint16, torch.bfloat16),
             "float8_e4m3fn": (np.uint8, torch.float8_e4m3fn),
             "float8_e5m2": (np.uint8, torch.float8_e5m2),
         }
-        dtype_name = str(array.dtype)
         if dtype_name in custom_dtypes:
             storage_dtype, torch_dtype = custom_dtypes[dtype_name]
             storage = np.ascontiguousarray(array).view(storage_dtype)
@@ -85,57 +85,51 @@ class PytestTopKComparator:
             return torch.from_numpy(array.astype(np.float32))
 
     @staticmethod
-    def result_dict(result):
+    def normalize_result(result, output_index):
         if not isinstance(result, (list, tuple)) or len(result) < 2:
-            raise ValueError(f"pytest check_result returned invalid result: {result!r}")
+            raise ValueError(
+                f"pytest check_result output[{output_index}] returned invalid result: {result!r}"
+            )
         status, precision = result[:2]
         passed = str(status).strip().lower() == "pass"
         return {
             "pass": passed,
             "precision": float(precision),
             "error_info": None if passed else (
-                f"pytest LightningIndexer check_result returned {status!r}"
+                f"pytest check_result output[{output_index}] returned {status!r}"
             ),
         }
 
-    def compare(self, *outputs, compare_data=None):
-        if compare_data is None:
-            raise ValueError("LightningIndexer pytest compare data is unavailable")
+    def compare(self, *outputs):
         if len(outputs) < 2 or len(outputs) % 2 != 0:
             return {
                 "pass": False,
                 "precision": "invalid",
                 "error_info": "compare expects NPU outputs followed by golden outputs",
             }
-        params = compare_data.get("params")
-        topk_value = compare_data.get("topk_value")
-        if params is None or topk_value is None:
-            raise ValueError("LightningIndexer pytest compare data lacks params or topk_value")
+        module = self.load_module()
         half = len(outputs) // 2
-        npu_outputs = outputs[:half]
-        golden_outputs = outputs[half:]
-        return_value = bool(params[-1])
-        if return_value and len(npu_outputs) < 2:
-            return {
-                "pass": False,
-                "precision": "missing_output",
-                "error_info": "return_value is enabled but the NPU sparse-value output is missing",
-            }
-        sparse_value = npu_outputs[1] if len(npu_outputs) > 1 else torch.empty(0)
-        npu_indices, _ = torch.sort(self.to_torch(npu_outputs[0]))
-        result = self.load_module().check_result(
-            self.to_torch(golden_outputs[0]),
-            npu_indices,
-            self.to_torch(topk_value),
-            self.to_torch(sparse_value),
-            params,
-        )
-        return self.result_dict(result)
+        results = []
+        for output_index, (npu_output, golden) in enumerate(
+                zip(outputs[:half], outputs[half:])):
+            if golden is None:
+                results.append({"pass": True, "precision": "SUPPRESSED"})
+                continue
+            if npu_output is None:
+                results.append({
+                    "pass": False,
+                    "precision": "NO_OUTPUT",
+                    "error_info": f"NPU output[{output_index}] is None",
+                })
+                continue
+            result = module.check_result(self.to_torch(golden), self.to_torch(npu_output))
+            results.append(self.normalize_result(result, output_index))
+        return results
 
 
-COMPARATOR = PytestTopKComparator()
+COMPARATOR = PytestResultComparator()
 
 
-def compare(*outputs, compare_data=None):
-    """Compare TopK outputs with the canonical pytest policy."""
-    return COMPARATOR.compare(*outputs, compare_data=compare_data)
+def compare(*outputs):
+    """Compare outputs with the operator's canonical pytest policy."""
+    return COMPARATOR.compare(*outputs)
