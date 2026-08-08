@@ -69,6 +69,9 @@ public:
                                 __gm__ uint8_t *, const QuantBlockSparseAttnMxTilingData *__restrict tiling,
                                 TPipe *tPipe)
     {
+        // 跨核 Buffer ID 由核内状态生成，ACL 图重放会复用该状态；每次启动时需重置计数器，
+        // 保证 AIC 与 AIV 使用相同的事件 ID 序列。
+        fa_base_matmul::idCounterNum = 0;
         // Q/K/V 在 cube 中结合 block_table 完成 PA 搬运。
         pipe = tPipe;
         tilingData = tiling;
@@ -88,7 +91,7 @@ public:
         cubeBlock.Init(pipe, &l1BufferManager, queryPtr, keyPtr, valuePtr, blockTable, qScale, kScale, vScale);
         __gm__ uint8_t *pScalePtr = (tilingData->scaleParams.pScaleShapeSize == 0U) ? nullptr : pScale;
         vecBlock.Init(pipe, pScalePtr, softmaxLse, attentionOut, attenMask,
-                        tilingData->attenMaskParams.attenMaskS2Size);
+                      tilingData->attenMaskParams.attenMaskS2Size);
     }
 
     __aicore__ inline void Process()
