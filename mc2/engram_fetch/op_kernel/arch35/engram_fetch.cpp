@@ -13,6 +13,16 @@
  * \brief engram_fetch 算子 kernel 入口
  */
 
+#if __has_include("version/asc_devkit_version.h") && __has_include("version/hcomm_version.h")
+#include "version/asc_devkit_version.h"
+#include "version/hcomm_version.h"
+
+#if (ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 0)) && \
+    (HCOMM_MAJOR > 9 || (HCOMM_MAJOR == 9 && HCOMM_MINOR > 0))
+#define ENABLE_ENGRAM_FETCH_KERNEL
+#endif
+
+#endif
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"
 #else
@@ -35,6 +45,7 @@ __global__ __aicore__ void engram_fetch(GM_ADDR commContext, GM_ADDR indices, GM
     REGISTER_TILING_DEFAULT(EngramFetchTilingData);
     GET_TILING_DATA_WITH_STRUCT(EngramFetchTilingData, tilingData, tilingGM);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
+#if defined(ENABLE_ENGRAM_FETCH_KERNEL)
     if constexpr (EngramFetchMode == ENGRAM_FETCH_DEFAULT_MODE) {
         AscendC::TPipe pipe;
         EngramFetchArch35 op;
@@ -47,4 +58,5 @@ __global__ __aicore__ void engram_fetch(GM_ADDR commContext, GM_ADDR indices, GM
                 workspaceGM, localStorageAddr, &pipe, &tilingData);
         op.Process();
     }
+#endif
 }

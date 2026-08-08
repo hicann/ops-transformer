@@ -15,16 +15,30 @@
 #ifndef MOE_EP_COMBINE_H
 #define MOE_EP_COMBINE_H
 
+#if __has_include("version/asc_devkit_version.h") && __has_include("version/hcomm_version.h")
+#include "version/asc_devkit_version.h"
+#include "version/hcomm_version.h"
+
+#if (ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 0)) && \
+    (HCOMM_MAJOR > 9 || (HCOMM_MAJOR == 9 && HCOMM_MINOR > 0))
+#define ENABLE_MOE_EP_COMBINE_KERNEL
+#endif
+
+#endif
+
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"
 #else
 #include "kernel_operator.h"
 #endif
+
 #include "kernel_tiling/kernel_tiling.h"
 #include "adv_api/hccl/hccl.h"
 #include "adv_api/reduce/reduce.h"
 #include "adv_api/reduce/sum.h"
+#if __has_include("adv_api/hcomm/hcomm.h")
 #include "adv_api/hcomm/hcomm.h"
+#endif
 
 #include "moe_ep_combine_tiling_key.h"
 #if __has_include("../common/moe_distribute_base.h")
@@ -43,6 +57,8 @@
 #endif
 
 namespace MoeEpCombineImpl {
+
+#if defined(ENABLE_MOE_EP_COMBINE_KERNEL)
 
 using namespace AscendC;
 
@@ -64,8 +80,7 @@ static constexpr struct UrmaWqeEntry DEFAULT_WQE_CONFIG = {
     .fence = 1,
     .se = 0,
     .cqe = 1,
-    .inlineEn = 0
-};
+    .inlineEn = 0};
 
 template <TemplateMoeEpCombineTypeClass>
 class MoeEpCombine {
@@ -90,7 +105,7 @@ private:
     __aicore__ inline void ProcessTopKToken(uint32_t tokenIndex);
     __aicore__ inline void SendPhaseExpertToToken();
     __aicore__ inline void GetCoreAssignment(uint32_t totalBlocks, uint32_t &targetRank,
-                                              uint32_t &coreIndexInGroup, uint32_t &groupSize);
+                                             uint32_t &coreIndexInGroup, uint32_t &groupSize);
     __aicore__ inline void BuffInit();
     __aicore__ inline void MaskAlign(LocalTensor<half> maskCalcSelectedTensor);
     __aicore__ inline void MaskCheck();
@@ -341,8 +356,8 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::SendQueuedTok
             GM_ADDR localSendDataWorkspaceAddr = GetLocalSendDataWorkspaceAddr(srcRank) + slotOffset;
             CopyTokenFromQueue(localSendDataWorkspaceAddr);
             uint64_t commHandle = GetCommHandle(srcRank, channelIndex);
-            hcomm_.WriteWithNotifyNbi<true, PIPE_S, PIPE_MTE3, DEFAULT_WQE_CONFIG>(commHandle, remoteRankWinAddr,
-                                     localSendDataWorkspaceAddr, XTypeAlign32Size_, remoteRankStateAddr, 1);
+            hcomm_.WriteWithNotifyNbi<true, PIPE_S, PIPE_MTE3, DEFAULT_WQE_CONFIG>(
+                commHandle, remoteRankWinAddr, localSendDataWorkspaceAddr, XTypeAlign32Size_, remoteRankStateAddr, 1);
             hcomm_.Drain(commHandle);
         } else {
             CopyTokenFromQueue(remoteRankWinAddr);
@@ -362,8 +377,8 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::SendQueuedTok
 
         GM_ADDR tokenAddr = (GM_ADDR)xGm_.GetPhyAddr(tokenIndex * axisH_);
         uint64_t commHandle = GetCommHandle(srcRank, channelIndex);
-        hcomm_.WriteWithNotifyNbi<true, PIPE_S, PIPE_MTE3, DEFAULT_WQE_CONFIG>(commHandle, remoteRankWinAddr,
-                                 tokenAddr, axisH_ * sizeof(XType), remoteRankStateAddr, 1);
+        hcomm_.WriteWithNotifyNbi<true, PIPE_S, PIPE_MTE3, DEFAULT_WQE_CONFIG>(
+            commHandle, remoteRankWinAddr, tokenAddr, axisH_ * sizeof(XType), remoteRankStateAddr, 1);
         hcomm_.Drain(commHandle);
     }
 }
@@ -624,6 +639,8 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Process()
     BuffInit();
     RecvPhaseReduce();
 }
+
+#endif
 
 } // namespace MoeEpCombineImpl
 

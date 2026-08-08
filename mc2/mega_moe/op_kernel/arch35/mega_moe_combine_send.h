@@ -16,7 +16,23 @@
 #ifndef MEGA_MOE_COMBINE_SEND_H
 #define MEGA_MOE_COMBINE_SEND_H
 
+#if __has_include("version/asc_devkit_version.h") && __has_include("version/hcomm_version.h")
+#include "version/asc_devkit_version.h"
+#include "version/hcomm_version.h"
+
+#if (ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 0)) && \
+    (HCOMM_MAJOR > 9 || (HCOMM_MAJOR == 9 && HCOMM_MINOR > 0))
+#define ENABLE_MEGA_MOE_LAYERED_KERNEL
+#endif
+
+#endif
+
+#if ASC_DEVKIT_MAJOR >= 9
+#include "basic_api/kernel_basic_intf.h"
+#else
 #include "kernel_operator.h"
+#endif
+
 #include "mega_moe_base.h"
 #if __has_include("../../common/mc2_kernel_utils.h")
 #include "../../common/mc2_kernel_utils.h"
@@ -93,6 +109,8 @@ __aicore__ inline void CombineSendTokenToRemote(uint32_t batchStart, uint32_t cu
                                                 LocalTensor<int32_t> &metaInfoTensor, LocalTensor<DataType> &ubQuant,
                                                 const Params &params, GM_ADDR localSrcPtr)
 {
+#if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
+
     SyncFuncStatic<AscendC::HardEvent::MTE2_S, SYNC_EVENT_ID3>();
     int64_t quantTokenSize = IsQuantized ? (n + nScale) : n;
     uint32_t toRankId = metaInfoTensor.GetValue(batchStart * META_INFO_SIZE + RANK_ID);
@@ -134,6 +152,8 @@ __aicore__ inline void CombineSendTokenToRemote(uint32_t batchStart, uint32_t cu
         GM_ADDR remoteAddr = GetRankWinAddrWithOffset(toRankId, gmRemoteOffset) + dstBaseOffset * sizeof(DataType);
         params.combineCommParams.hcomm->WriteNbi(channelHandle, remoteAddr, srcAddr, quantTokenSize * sizeof(DataType));
     }
+
+#endif
 }
 
 // =============================================

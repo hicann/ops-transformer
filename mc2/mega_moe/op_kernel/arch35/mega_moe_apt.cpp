@@ -12,15 +12,33 @@
  * \file mega_moe_apt.cpp
  */
 
+#if __has_include("version/asc_devkit_version.h") && __has_include("version/hcomm_version.h")
+#include "version/asc_devkit_version.h"
+#include "version/hcomm_version.h"
+
 #if ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 0)
 #define ENABLE_TENSOR_API
 #endif
 
+#if (ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 0)) && \
+    (HCOMM_MAJOR > 9 || (HCOMM_MAJOR == 9 && HCOMM_MINOR > 0))
+#define ENABLE_MEGA_MOE_LAYERED_KERNEL
+#endif
+
+#endif
+
+#if ASC_DEVKIT_MAJOR >= 9
+#include "basic_api/kernel_basic_intf.h"
+#else
 #include "kernel_operator.h"
+#endif
 
 #ifdef ENABLE_TENSOR_API
 #include "mega_moe.h"
 #include "mega_moe_wave.h"
+#endif
+
+#if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
 #include "mega_moe_layered.h"
 #endif
 
@@ -89,6 +107,7 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
             }
         }
     } else if constexpr (CommModeType == TILINGKEY_TPL_URMA) {
+#if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
         if constexpr (DispatchQuantMode == DISPATCH_QUANT_MODE_MXFP) {
             MegaMoeLayered<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType,
                            CombineQuantOutType, TopkWeightsPrefetch>
@@ -98,6 +117,7 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
                     expertTokenNumsOut, workspaceGM, &tilingData);
             op.Process();
         }
+#endif
     }
 #endif
 }

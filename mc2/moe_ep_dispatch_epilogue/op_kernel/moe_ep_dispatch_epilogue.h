@@ -16,6 +16,17 @@
 #ifndef MOE_EP_DISPATCH_EPILOGUE_H
 #define MOE_EP_DISPATCH_EPILOGUE_H
 
+#if __has_include("version/asc_devkit_version.h") && __has_include("version/hcomm_version.h")
+#include "version/asc_devkit_version.h"
+#include "version/hcomm_version.h"
+
+#if (ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 0)) && \
+    (HCOMM_MAJOR > 9 || (HCOMM_MAJOR == 9 && HCOMM_MINOR > 0))
+#define ENABLE_MOE_EP_DISPATCH_EPILOGUE_KERNEL
+#endif
+
+#endif
+
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"
 #else
@@ -36,6 +47,8 @@
 #endif
 
 namespace MoeEpDispatchEpilogueImpl {
+
+#if defined(ENABLE_MOE_EP_DISPATCH_EPILOGUE_KERNEL)
 
 using namespace AscendC;
 
@@ -352,7 +365,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     DataCopyParams clearStatusCopyParams = {static_cast<uint16_t>(totalNotifyCnt_), 1U, 0U,
                                             static_cast<uint16_t>((WIN_ADDR_ALIGN - UB_ALIGN) / UB_ALIGN)};
 
-    SyncFunc<AscendC::HardEvent::S_V>();    // 确保expertSum_计算完成
+    SyncFunc<AscendC::HardEvent::S_V>(); // 确保expertSum_计算完成
     while (sumOfFlag != commpareFlag) {
         DataCopy(ubWaitStatus_, statusGMTensor, statusCopyParams);
         SyncFunc<AscendC::HardEvent::MTE2_V>();
@@ -696,6 +709,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
         processed += tileCnt;
     }
 }
+#endif
+
 } // namespace MoeEpDispatchEpilogueImpl
 
 #endif // MOE_EP_DISPATCH_EPILOGUE_H

@@ -16,7 +16,17 @@
 #ifndef MEGA_MOE_LAYERED_H
 #define MEGA_MOE_LAYERED_H
 
-#include "kernel_operator.h"
+#if __has_include("version/asc_devkit_version.h") && __has_include("version/hcomm_version.h")
+#include "version/asc_devkit_version.h"
+#include "version/hcomm_version.h"
+
+#if (ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 0)) && \
+    (HCOMM_MAJOR > 9 || (HCOMM_MAJOR == 9 && HCOMM_MINOR > 0))
+#define ENABLE_MEGA_MOE_LAYERED_KERNEL
+#endif
+
+#endif
+
 #include "kernel_tiling/kernel_tiling.h"
 #if __has_include("../../common/mc2_kernel_utils.h")
 #include "../../common/mc2_kernel_utils.h"
@@ -37,6 +47,8 @@
 using namespace AscendC;
 
 namespace MegaMoeImpl {
+
+#if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
 using TupleShape = Shape<int64_t, int64_t, int64_t, int64_t>;
 using BlockOffset = Shape<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t,
                           int64_t, int64_t, int64_t, int64_t>;
@@ -2685,6 +2697,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Process()
     }
     SetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>(oriOverflowMode);
 }
+
+#endif
 
 } // namespace MegaMoeImpl
 #undef TemplateMegaMoeLayeredTypeClass

@@ -11,15 +11,34 @@
 #ifndef ENGRAM_FETCH_GRAD_ARCH35_H
 #define ENGRAM_FETCH_GRAD_ARCH35_H
 
+#if __has_include("version/asc_devkit_version.h") && __has_include("version/hcomm_version.h")
+#include "version/asc_devkit_version.h"
+#include "version/hcomm_version.h"
+
+#if (ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 0)) && \
+    (HCOMM_MAJOR > 9 || (HCOMM_MAJOR == 9 && HCOMM_MINOR > 0))
+#define ENABLE_ENGRAM_FETCH_GRAD_KERNEL
+#endif
+
+#endif
+
+#if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"
+#else
 #include "kernel_operator.h"
+#endif
+
 #include "kernel_tiling/kernel_tiling.h"
 #include "../engram_fetch_grad_tiling_data.h"
 #include "../engram_fetch_grad_utils.h"
 #include "adv_api/hccl/hccl.h"
+#if __has_include("adv_api/hcomm/hcomm.h")
 #include "adv_api/hcomm/hcomm.h"
+#endif
 
 namespace Mc2Kernel {
+
+#if defined(ENABLE_ENGRAM_FETCH_GRAD_KERNEL)
 
 using namespace AscendC;
 
@@ -985,6 +1004,8 @@ __aicore__ inline void EngramFetchGradArch35::Process()
         UniqueScatterAdd();
     }
 }
+
+#endif
 
 } // namespace Mc2Kernel
 

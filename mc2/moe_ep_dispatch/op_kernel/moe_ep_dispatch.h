@@ -16,6 +16,17 @@
 #ifndef MOE_EP_DISPATCH_H
 #define MOE_EP_DISPATCH_H
 
+#if __has_include("version/asc_devkit_version.h") && __has_include("version/hcomm_version.h")
+#include "version/asc_devkit_version.h"
+#include "version/hcomm_version.h"
+
+#if (ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 0)) && \
+    (HCOMM_MAJOR > 9 || (HCOMM_MAJOR == 9 && HCOMM_MINOR > 0))
+#define ENABLE_MOE_EP_KERNEL
+#endif
+
+#endif
+
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"
 #else
@@ -26,7 +37,9 @@
 #include "adv_api/hccl/hccl.h"
 #include "adv_api/reduce/reduce.h"
 #include "adv_api/reduce/sum.h"
+#if __has_include("adv_api/hcomm/hcomm.h")
 #include "adv_api/hcomm/hcomm.h"
+#endif
 #include "moe_ep_dispatch_tiling.h"
 #include "moe_ep_dispatch_base.h"
 
@@ -45,6 +58,8 @@ namespace MoeEpDispatchImpl {
 #define TemplateMoeEpDispatchTypeClass \
     typename XType, typename ScalesType, bool DoCpuSync, bool IsCached, bool IsTopkWeights, uint8_t NetworkMode
 #define TemplateMoeEpDispatchTypeFunc XType, ScalesType, DoCpuSync, IsCached, IsTopkWeights, NetworkMode
+
+#if defined(ENABLE_MOE_EP_KERNEL)
 
 using namespace AscendC;
 using namespace Mc2Kernel;
@@ -804,6 +819,9 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::Process()
         WriteToRemoteWindow();
     }
 }
+
+#endif
+
 } // namespace MoeEpDispatchImpl
 
 #endif // MOE_EP_DISPATCH_H
