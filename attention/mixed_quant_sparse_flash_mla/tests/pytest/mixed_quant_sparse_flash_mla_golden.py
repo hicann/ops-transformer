@@ -678,7 +678,6 @@ class GeneralizedSFAQuant:
                         b_index, n_index, :cur_act_seq, :
                     ]
                 t_start += cur_act_seq
-            output = output.transpose(0, 1).contiguous()
             return output
         else:
             return tensor
