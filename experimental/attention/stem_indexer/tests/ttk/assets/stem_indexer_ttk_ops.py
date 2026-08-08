@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------------------------------------
-# Copyright (c) 2024 Huawei Technologies Co., Ltd.
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
 # This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ _CUSTOM_OPS_LOADED = False
 def _ensure_custom_ops():
     global _CUSTOM_OPS_LOADED
     if not _CUSTOM_OPS_LOADED:
-        pytest_dir = str(Path(__file__).resolve().parents[1] / "pytest")
+        pytest_dir = str(Path(__file__).resolve().parents[2] / "pytest")
         if pytest_dir not in sys.path:
             sys.path.insert(0, pytest_dir)
         import custom_ops  # noqa: F401
@@ -50,13 +50,19 @@ def stem_indexer(
     k_block_num_bias_medium: int = 30,
     k_block_num_rate_large: float = 0.1,
     k_block_num_bias_large: int = 30,
+    topk_score_precision: int = 1,
+    metadata_mode: str = "auto",
+    num_prompt_tokens_mode: str = "provided",
 ):
     """Generate metadata if needed, then call npu_stem_indexer."""
     _ensure_custom_ops()
     q_heads = int(qflat.shape[1])
     kv_heads = int(kflat.shape[1])
 
-    if metadata is None or int(torch.count_nonzero(metadata).item()) == 0:
+    if num_prompt_tokens_mode == "none":
+        num_prompt_tokens = None
+
+    if metadata_mode == "auto":
         metadata = torch.ops.custom.npu_stem_indexer_metadata(
             q_seq_lens,
             kv_seq_lens,
@@ -67,6 +73,9 @@ def stem_indexer(
             dim_qkflat=128,
             window_size=window_size,
         )
+    elif metadata_mode == "none":
+        metadata = None
+    # "provided": 保留传入的 metadata 原样，不再重建
 
     return torch.ops.custom.npu_stem_indexer(
         qflat,
@@ -86,4 +95,5 @@ def stem_indexer(
         k_block_num_bias_medium=k_block_num_bias_medium,
         k_block_num_rate_large=k_block_num_rate_large,
         k_block_num_bias_large=k_block_num_bias_large,
+        topk_score_precision=topk_score_precision,
     )

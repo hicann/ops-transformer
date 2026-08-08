@@ -20,6 +20,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 import custom_ops  # noqa: E402, F401
+from stem_indexer_aclgraph import build_metadata, call_stem_indexer_graph  # noqa: E402
 
 
 def torch_load_cpu(filepath):
@@ -40,17 +41,8 @@ def move_inputs_to_npu(test_data):
     }
 
 
-def build_metadata(case, npu_inputs):
-    return torch.ops.custom.npu_stem_indexer_metadata(
-        npu_inputs["q_seq_lens"],
-        npu_inputs["kv_seq_lens"],
-        case["q_heads"],
-        case["kv_heads"],
-        **stem_indexer_golden.get_metadata_attrs(case),
-    )
-
-
 def call_stem_indexer(case, npu_inputs):
+    """eager 模式：直接调用 torch.ops.custom.npu_stem_indexer。"""
     metadata = build_metadata(case, npu_inputs)
     return torch.ops.custom.npu_stem_indexer(
         npu_inputs["qflat"],
@@ -64,13 +56,18 @@ def call_stem_indexer(case, npu_inputs):
     )
 
 
-def stem_indexer_process(filepath, device_id=0, return_test_data=False):
+def stem_indexer_process(filepath, device_id=0, return_test_data=False, mode="eager"):
     test_data = torch_load_cpu(filepath)
     case = test_data["case"]
-    print("Running StemIndexer testcase:", filepath)
+    print(f"Running StemIndexer testcase (mode={mode}):", filepath)
     torch_npu.npu.set_device(device_id)
     npu_inputs = move_inputs_to_npu(test_data)
-    npu_result = call_stem_indexer(case, npu_inputs)
+
+    if mode == "graph":
+        npu_result = call_stem_indexer_graph(case, npu_inputs, device_id=device_id)
+    else:
+        npu_result = call_stem_indexer(case, npu_inputs)
+
     torch_npu.npu.synchronize()
     result = (
         test_data["expected_sparse_indices"],

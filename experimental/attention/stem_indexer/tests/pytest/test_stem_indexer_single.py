@@ -20,7 +20,18 @@ torch_npu = pytest.importorskip("torch_npu")
 import result_compare_method  # noqa: E402
 import stem_indexer_golden  # noqa: E402
 import custom_ops  # noqa: E402, F401
+from stem_indexer_aclgraph import call_stem_indexer_graph  # noqa: E402
 from test_stem_indexer_paramset import ENABLED_PARAMS  # noqa: E402
+
+# 通过环境变量 STEM_INDEXER_MODE 切换执行模式：eager（默认）或 graph
+# 例: STEM_INDEXER_MODE=graph python -m pytest test_stem_indexer_single.py -m graph
+EXEC_MODE = os.environ.get("STEM_INDEXER_MODE", "eager").strip().lower()
+if EXEC_MODE not in ("eager", "graph"):
+    raise ValueError(
+        f"Unsupported STEM_INDEXER_MODE: {EXEC_MODE!r}. "
+        "Expected 'eager' or 'graph'."
+    )
+_IS_GRAPH_MODE = EXEC_MODE == "graph"
 
 
 # 支持通过环境变量 STEM_INDEXER_CASE_ID 指定只跑特定 case_id（逗号分隔多个）
@@ -81,6 +92,8 @@ def run_stem_indexer_case(case):
     inputs = stem_indexer_golden.build_case_inputs(case)
 
     if case["expected_result"] == "FAIL":
+        if _IS_GRAPH_MODE:
+            pytest.skip("Graph mode does not support FAIL test cases.")
         if case["testcase_name"] == "invalid_sparse_indices_shape":
             pytest.skip(
                 "Torch custom op API does not expose output tensor shape injection."
@@ -92,7 +105,12 @@ def run_stem_indexer_case(case):
     expected_indices, expected_seq_len = stem_indexer_golden.stem_indexer_golden(
         case, inputs
     )
-    npu_result = call_stem_indexer(case, inputs)
+
+    if _IS_GRAPH_MODE:
+        npu_result = call_stem_indexer_graph(case, move_inputs_to_npu(inputs))
+    else:
+        npu_result = call_stem_indexer(case, inputs)
+
     torch_npu.npu.synchronize()
     result_compare_method.assert_stem_indexer_result(
         expected_indices, expected_seq_len, npu_result, case, inputs
@@ -100,6 +118,7 @@ def run_stem_indexer_case(case):
 
 
 @pytest.mark.ci
+@pytest.mark.graph
 @pytest.mark.parametrize("case", TEST_CASES, ids=case_id)
 def test_stem_indexer(case):
     run_stem_indexer_case(case)

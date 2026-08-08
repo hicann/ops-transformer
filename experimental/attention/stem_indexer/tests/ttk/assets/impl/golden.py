@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------------------------------------
-# Copyright (c) 2024 Huawei Technologies Co., Ltd.
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
 # This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ def load_pytest_golden_module():
     global PYTEST_GOLDEN_MODULE
     if PYTEST_GOLDEN_MODULE is not None:
         return PYTEST_GOLDEN_MODULE
-    pytest_dir = Path(__file__).resolve().parents[2] / "pytest"
+    pytest_dir = Path(__file__).resolve().parents[3] / "pytest"
     module_path = pytest_dir / "stem_indexer_golden.py"
     sys.path.insert(0, str(pytest_dir))
     try:
