@@ -12,6 +12,7 @@
 
 """Input customization for QuantSparseFlashMla TTK cases."""
 
+import hashlib
 import importlib.util
 import random
 import sys
@@ -76,7 +77,10 @@ class QuantSparseFlashMlaBatchRandomContext:
                     ),
                     "cmp_kv",
                 )
-        self.base_seed = self.relations[0][2]
+        self.relation_seed = self.relations[0][2]
+        self.base_seed = self.case_seed(
+            kwargs.get("testcase_name"), self.relation_seed
+        )
         self.call_index = 0
         self.randperm_call_index = 0
         self.randperm_batch_offsets = None
@@ -84,6 +88,14 @@ class QuantSparseFlashMlaBatchRandomContext:
         self.original_torch_rand = None
         self.original_torch_randperm = None
         self.original_python_uniform = None
+
+    @classmethod
+    def case_seed(cls, testcase_name, fallback):
+        """Give each case an independent background while keeping relation seed explicit."""
+        if not testcase_name:
+            return int(fallback)
+        digest = hashlib.sha256(str(testcase_name).encode("utf-8")).digest()
+        return int.from_bytes(digest[:8], "big") % cls.SEED_MODULUS
 
     @classmethod
     def from_case(cls, q, ori_kv, cmp_kv, kwargs):
@@ -401,8 +413,13 @@ class QuantSparseFlashMlaBatchRandomContext:
         self.call_index += 1
         call_kwargs = dict(kwargs)
         device = call_kwargs.get("device") or "cpu"
+        requested_rank = (
+            len(size[0]) if len(size) == 1 and isinstance(size[0], (tuple, list))
+            else len(size)
+        )
+        seed = self.base_seed if requested_rank >= 2 else self.relation_seed
         call_kwargs["generator"] = self.create_generator(
-            self.derive_seed(self.base_seed, call_index), device
+            self.derive_seed(seed, call_index), device
         )
         value = self.original_torch_rand(*size, **call_kwargs)
         if value.ndim < 2:
@@ -473,7 +490,7 @@ class QuantSparseFlashMlaBatchRandomContext:
     def python_uniform(self, low, high):
         call_index = self.call_index
         self.call_index += 1
-        rng = random.Random(self.derive_seed(self.base_seed, call_index))
+        rng = random.Random(self.derive_seed(self.relation_seed, call_index))
         return rng.uniform(low, high)
 
     def __enter__(self):

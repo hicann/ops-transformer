@@ -89,6 +89,23 @@ class BatchOutputComparator:
             ) from error
 
     @staticmethod
+    def case_is_enabled(row):
+        """Mirror TTK's CSV boolean semantics; an absent value defaults to enabled."""
+        value = row.get("is_enabled")
+        if value is None or not value.strip():
+            return True
+        normalized = value.strip()
+        if normalized.upper() in ("TRUE", "FALSE"):
+            normalized = normalized.title()
+        try:
+            return bool(ast.literal_eval(normalized))
+        except (SyntaxError, ValueError) as error:
+            testcase_name = row.get("testcase_name", "<unknown>")
+            raise ValueError(
+                f"{testcase_name}: invalid is_enabled: {error}"
+            ) from error
+
+    @staticmethod
     def normalize_value(value):
         if isinstance(value, dict):
             return {
@@ -643,9 +660,18 @@ class BatchOutputComparator:
             temporary.unlink(missing_ok=True)
 
     def run(self):
+        if self.output_index != self.PRIMARY_OUTPUT_INDEX:
+            raise ValueError("QSMLA batch consistency supports output index 0 only")
         case_rows = self.read_rows(self.case_csv)
         result_rows = self.read_rows(self.result_csv)
-        samples = self.build_samples(case_rows, result_rows)
+        disabled_cases = [
+            row.get("testcase_name", "<unknown>")
+            for row in case_rows if not self.case_is_enabled(row)
+        ]
+        enabled_case_rows = [
+            row for row in case_rows if self.case_is_enabled(row)
+        ]
+        samples = self.build_samples(enabled_case_rows, result_rows)
         grouped_samples = defaultdict(list)
         for sample in samples:
             grouped_samples[sample["relation"]].append(sample)
@@ -664,6 +690,8 @@ class BatchOutputComparator:
             "require_cross_case": self.require_cross_case,
             "group_count": len(groups),
             "sample_count": len(samples),
+            "disabled_case_count": len(disabled_cases),
+            "disabled_cases": disabled_cases,
             "groups": groups,
         }
         self.report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -717,7 +745,8 @@ def main():
         return 1
     print(
         f"batch consistency {report['status']}: groups={report['group_count']}, "
-        f"samples={report['sample_count']}, report={args.report}"
+        f"samples={report['sample_count']}, "
+        f"skipped_disabled={report['disabled_case_count']}, report={args.report}"
     )
     return 0 if passed else 1
 

@@ -115,6 +115,26 @@ def test_qsmla_batch_random_context_repeats_declared_batch_slices():
     assert torch.equal(first_permutation, third_permutation)
 
 
+def test_cross_case_changes_background_but_keeps_relation_slice():
+    q = torch.empty((3, 2, 1, 1), dtype=torch.float32)
+    fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001)
+    fields.update({"layout_q": "BSND", "layout_kv": "BSND"})
+
+    fields["testcase_name"] = "QSMLA_CASE_A"
+    with INPUTS_MODULE.QuantSparseFlashMlaBatchRandomContext.from_case(
+            q, None, None, fields):
+        first = torch.rand(q.shape)
+
+    fields["testcase_name"] = "QSMLA_CASE_B"
+    with INPUTS_MODULE.QuantSparseFlashMlaBatchRandomContext.from_case(
+            q, None, None, fields):
+        second = torch.rand(q.shape)
+
+    assert torch.equal(first[0], first[2])
+    assert torch.equal(second[0], second[2])
+    assert not torch.equal(first[1], second[1])
+
+
 def test_qsmla_sparse_randperm_maps_nonuniform_batch_call_offsets():
     q = torch.empty((3, 2, 1, 1), dtype=torch.float32)
     fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001)

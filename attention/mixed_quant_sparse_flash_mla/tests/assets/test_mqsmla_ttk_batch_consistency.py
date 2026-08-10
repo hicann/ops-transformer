@@ -118,6 +118,24 @@ def test_batch_random_context_repeats_declared_batch_slices():
     assert np.array_equal(value[0], value[2])
 
 
+def test_cross_case_changes_background_but_keeps_relation_slice():
+    q = torch.empty((3, 2, 1, 1), dtype=torch.float32)
+    fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001)
+    fields.update({"layout_q": "BSND", "layout_kv": "BSND"})
+
+    fields["testcase_name"] = "MQSMLA_CASE_A"
+    with INPUTS_MODULE.NumpyBatchRandomContext.from_case(q, None, None, fields):
+        first = np.random.uniform(-1.0, 1.0, q.shape)
+
+    fields["testcase_name"] = "MQSMLA_CASE_B"
+    with INPUTS_MODULE.NumpyBatchRandomContext.from_case(q, None, None, fields):
+        second = np.random.uniform(-1.0, 1.0, q.shape)
+
+    assert np.array_equal(first[0], first[2])
+    assert np.array_equal(second[0], second[2])
+    assert not np.array_equal(first[1], second[1])
+
+
 def test_sparse_modes_map_randperm_and_accept_quant_mode_two():
     q = torch.empty((3, 2, 1, 1), dtype=torch.float32)
     fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001)

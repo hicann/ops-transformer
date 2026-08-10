@@ -12,6 +12,7 @@
 
 """Input customization for MixedQuantSparseFlashMla TTK cases."""
 
+import hashlib
 import importlib.util
 import random
 import sys
@@ -69,7 +70,10 @@ class NumpyBatchRandomContext:
                     ),
                     "cmp_kv",
                 )
-        self.base_seed = self.relations[0][2]
+        self.relation_seed = self.relations[0][2]
+        self.base_seed = self.case_seed(
+            kwargs.get("testcase_name"), self.relation_seed
+        )
         self.call_index = 0
         self.randperm_call_index = 0
         self.randperm_batch_offsets = None
@@ -77,6 +81,14 @@ class NumpyBatchRandomContext:
         self.original_numpy_uniform = None
         self.original_python_uniform = None
         self.original_torch_randperm = None
+
+    @classmethod
+    def case_seed(cls, testcase_name, fallback):
+        """Give each case an independent background while keeping relation seed explicit."""
+        if not testcase_name:
+            return int(fallback)
+        digest = hashlib.sha256(str(testcase_name).encode("utf-8")).digest()
+        return int.from_bytes(digest[:8], "big") % cls.SEED_MODULUS
 
     @classmethod
     def from_case(cls, q, ori_kv, cmp_kv, kwargs):
@@ -386,7 +398,13 @@ class NumpyBatchRandomContext:
     def numpy_uniform(self, low=0.0, high=1.0, size=None):
         call_index = self.call_index
         self.call_index += 1
-        rng = np.random.default_rng(self.derive_seed(self.base_seed, call_index))
+        requested_rank = (
+            0 if size is None
+            else 1 if isinstance(size, int)
+            else len(size)
+        )
+        seed = self.base_seed if requested_rank >= 2 else self.relation_seed
+        rng = np.random.default_rng(self.derive_seed(seed, call_index))
         value = rng.uniform(low, high, size)
         if size is None:
             return value
@@ -412,7 +430,7 @@ class NumpyBatchRandomContext:
     def python_uniform(self, low, high):
         call_index = self.call_index
         self.call_index += 1
-        rng = random.Random(self.derive_seed(self.base_seed, call_index))
+        rng = random.Random(self.derive_seed(self.relation_seed, call_index))
         return rng.uniform(low, high)
 
     def torch_randperm(self, n, **kwargs):

@@ -55,6 +55,7 @@ class FixtureWriter:
     def case_row(self, testcase_name, batch_size, slices, seed):
         row = {
             "testcase_name": testcase_name,
+            "is_enabled": "True",
             "api_name": API_NAME,
             "tensor_view_shapes": repr(((batch_size, 1, 1, 2),)),
             "tensor_dtypes": repr(("float16",)),
@@ -239,6 +240,57 @@ def test_batch_output_comparator_rejects_failed_ttk_case(tmp_path):
 
     assert completed.returncode == 1
     assert "precision_status is 'FAIL', expected PASS" in completed.stdout
+
+
+def test_batch_output_comparator_skips_disabled_case_without_result_or_dump(tmp_path):
+    fixture = FixtureWriter(tmp_path)
+    fixture.write_fixture()
+    rows = fixture.read_rows(fixture.case_csv)
+    disabled = fixture.case_row(
+        "CASE_DISABLED", 3, ((0, 1, 1), (2, 3, 1)), 7001
+    )
+    disabled["is_enabled"] = "False"
+    fixture.write_csv(fixture.case_csv, [*rows, disabled])
+
+    completed = subprocess.run(fixture.command(), check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0, completed.stderr + completed.stdout
+    report = json.loads(fixture.report.read_text(encoding="utf-8"))
+    assert report["disabled_case_count"] == 1
+    assert report["disabled_cases"] == ["CASE_DISABLED"]
+
+
+def test_batch_output_comparator_keeps_relation_gate_after_disabling_member(tmp_path):
+    fixture = FixtureWriter(tmp_path)
+    fixture.write_fixture()
+    case_rows = fixture.read_rows(fixture.case_csv)
+    case_rows[1]["is_enabled"] = "False"
+    fixture.write_csv(fixture.case_csv, case_rows)
+    fixture.write_csv(fixture.result_csv, fixture.read_rows(fixture.result_csv)[:1])
+    (fixture.dump_dir / "CASE_B3_output_0.bin").unlink()
+
+    completed = subprocess.run(fixture.command(), check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 1
+    assert "result CSV has no matching testcase" not in completed.stdout
+    report = json.loads(fixture.report.read_text(encoding="utf-8"))
+    assert report["disabled_cases"] == ["CASE_B3"]
+    assert "relation appears in fewer than two testcases" in report["groups"][0]["errors"]
+
+
+def test_batch_output_comparator_rejects_non_primary_output(tmp_path):
+    fixture = FixtureWriter(tmp_path)
+    fixture.write_fixture()
+
+    completed = subprocess.run(
+        [*fixture.command(), "--output-index", "1"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 1
+    assert "supports output index 0 only" in completed.stdout
 
 
 def test_batch_output_comparator_requires_ttk_intra_case_result(tmp_path):
