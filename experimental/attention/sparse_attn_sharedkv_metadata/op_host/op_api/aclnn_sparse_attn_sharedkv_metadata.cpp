@@ -100,7 +100,7 @@ aclnnStatus aclnnSparseAttnSharedkvMetadataGetWorkspaceSize(
         uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    *workspaceSize = 0;
+    *workspaceSize = uniqueExecutor->GetWorkspaceSize();
     uniqueExecutor.ReleaseTo(executor);
     return ACLNN_SUCCESS;
 }
