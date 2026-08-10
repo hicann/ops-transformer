@@ -13,7 +13,29 @@
 """Convert pytests TestCases dict → TTK E2E CSV.
 
 Usage:
-    python3 gen_cases.py [--output flash_attn_stc.csv]
+    # 默认: 读取 functional_stc 用例, 输出到 testcase/flash_attn_stc.csv
+    python3 gen_cases.py
+
+    # 指定输出路径 (相对 assets/ 目录解析, 也支持绝对路径)
+    python3 gen_cases.py -o /tmp/result.csv
+    python3 gen_cases.py -o ../output/flash_attn_stc.csv
+
+    # 指定用例模块 (对应 pytests/test_cases/<module>.py, 默认 functional_stc)
+    python3 gen_cases.py --case-file functional_stc -o /tmp/result.csv
+
+    # 生成的 CSV 用 ttk e2e 跑:
+    python3 -m ttk e2e -i testcase/flash_attn_stc.csv --plugin .
+
+参数说明:
+    --output, -o         输出 CSV 路径, 相对 assets/ 目录或绝对路径
+                         (默认: testcase/flash_attn_stc.csv)
+    --case-file          用例模块名, 对应 pytests/test_cases/<name>.py
+                         (默认: functional_stc)
+
+注意:
+    - -o 路径是相对 assets/ 目录拼接的, 不要再加 assets/ 前缀
+    - 父目录不存在会自动创建
+    - 非法用例 (nc_kv_dims 非法组合) 会直接报错, 中断生成
 
 Reads functional_stc.py TestCases, normalizes params (same logic as
 case_loader.normalize_params), computes tensor shapes, and writes a
@@ -76,13 +98,16 @@ def normalize_params(raw):
     layout_q = c.get("layout_q", "BNSD")
     layout_kv = c.get("layout_kv", layout_q)
     nc_kv_dims = c.get("nc_kv_dims")
-    # 拦截用例(REJ): 非 PA 必须连续; PA_BBND 仅 dim0 合法。
-    # pytest 预期 NPU compute 报错, TTK 无"预期失败"机制, 不生成
+    # 非法用例校验: 非 PA 必须连续; PA_BBND 仅 dim0 合法。
     if nc_kv_dims is not None:
         if layout_kv not in ("PA_BBND", "PA_BNBD", "PA_NZ"):
-            return None
+            raise ValueError(
+                f"nc_kv_dims={nc_kv_dims} 仅支持 PA 布局, 当前 layout_kv={layout_kv}"
+            )
         if layout_kv == "PA_BBND" and nc_kv_dims == (0, 1):
-            return None
+            raise ValueError(
+                f"PA_BBND 布局 nc_kv_dims 仅支持 (0,), 当前 nc_kv_dims={nc_kv_dims}"
+            )
     c.setdefault("layout_kv", layout_q)
     c.setdefault("layout_out", layout_q)
     c.setdefault("N2", c["N1"])
@@ -508,8 +533,6 @@ def main():
         for case_id, raw_params in sorted(cases.items()):
             short_name = case_id.rsplit("/", 1)[-1]
             p = normalize_params(raw_params)
-            if p is None:  # REJ 拦截用例: 预期算子报错, TTK 不生成
-                continue
             row = _build_row(short_name, p)
             writer.writerow(row if has_nc else row[: len(HEADER)])
             written += 1
