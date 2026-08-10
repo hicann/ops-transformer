@@ -185,7 +185,10 @@ cann_ops_transformer.quant_lightning_indexer(
   - 当layout_k为TND时，不支持传入seqused_k。
   - 不支持output_idx_offset。
   - 仅支持num_heads_q = 64、q_n = 64。
-  - 仅支持quant_mode = 2，q、k仅支持int8，不支持float8_e4m3fn和HIfloat8，w、q_descale和k_descale支持float16，不支持float32。
+  - 仅支持quant_mode = 2。
+  - q、k仅支持int8，不支持float8_e4m3fn、HIfloat8和float4_e2m1。
+  - q_descale和k_descale支持float16，不支持float32和float8_e8m0。
+  - w支持float16，不支持float32。
   - layout_k仅支持PA_BBND，必须传入seqused_k。
   - cmp_ratio仅支持2的幂次方值：1/2/4/8/16/32/64/128。
   - 不支持return_value功能，不建议传入该参数。

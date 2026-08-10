@@ -60,6 +60,14 @@
   - `query`的N支持[1, 64]，`key`的N仅支持1。
   - `topk`支持[1, 8192]。
 
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - `quant_mode`仅支持2。
+  - `query`、`key`支持INT8，不支持FLOAT8_e4m3fn、HIFLOAT8和FLOAT4_e2m1。
+  - `query_dequant_scale`和`key_dequant_scale`支持FLOAT16，不支持FLOAT32和FLOAT8_e8m0。
+  - `weights`支持FLOAT16，不支持FLOAT32。
+  - `query`的N仅支持64，`key`的N仅支持1。
+  - `topk`支持[1, 2048]。
+
 ## 调用示例
 
 | 调用方式 | 调用样例 | 说明 |

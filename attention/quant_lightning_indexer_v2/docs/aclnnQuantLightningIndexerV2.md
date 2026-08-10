@@ -472,8 +472,9 @@ aclnnStatus aclnnQuantLightningIndexerV2(
   - `quant_mode` 仅支持 2（Per-Token-Head量化）。
   - `cmp_ratio` 仅支持 2 的幂次方且范围为 [1, 128]，即 1/2/4/8/16/32/64/128。
   - 不支持 `return_value`。
-  - query 和 key：支持 INT8，不支持 FLOAT8_e4m3fn 和 HIFLOAT8。
-  - weights、query_dequant_scale 和 key_dequant_scale：支持 FLOAT16，不支持 FLOAT32。
+  - query 和 key：支持 INT8，不支持 FLOAT8_e4m3fn、HIFLOAT8 和 FLOAT4_e2m1。
+  - query_dequant_scale 和 key_dequant_scale：支持 FLOAT16，不支持 FLOAT32 和 FLOAT8_e8m0。
+  - weights：支持 FLOAT16，不支持 FLOAT32。
   - query Q_N 仅支持 64。
   - topk 仅支持 [1, 2048]。
 <!-- end id11 -->

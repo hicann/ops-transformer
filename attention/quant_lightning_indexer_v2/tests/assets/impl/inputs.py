@@ -311,6 +311,16 @@ class QuantLightningIndexerV2InputAdapter:
         return [int(value) for value in tensor.detach().cpu().reshape(-1).tolist()]
 
     @staticmethod
+    def unpack_mxfp4(tensor, fp4_values):
+        """Unpack two FP4 E2M1 values stored in each uint8 byte."""
+        packed = tensor.view(torch.uint8).contiguous()
+        codes = torch.stack(
+            (packed & 0x0F, packed >> 4),
+            dim=-1,
+        ).flatten(-2)
+        return fp4_values[codes.to(torch.long)]
+
+    @staticmethod
     def restore_paged_tensor(tensor, block_table, batch_size, sequence_length):
         """Restore a paged key or scale tensor to its logical BNS(D) layout."""
         physical = tensor.detach().cpu()
@@ -447,10 +457,18 @@ class QuantLightningIndexerV2InputAdapter:
         key_scale = key_scale.detach().cpu()
         block_table = None if block_table is None else block_table.detach().cpu()
         offset = None if offset is None else offset.detach().cpu()
+        qk_dtype = query.dtype
+        if quant_mode == QUANT_MODE_MXFP4:
+            query = self.unpack_mxfp4(
+                query, pytest_golden.FP4_E2M1_VALUES
+            )
+            key = self.unpack_mxfp4(
+                key, pytest_golden.FP4_E2M1_VALUES
+            )
         model_args = [
             batch_size, q_seq, k_seq, q_t_size, k_t_size,
             q_head_num, k_head_num, head_dim, block_size, block_num,
-            query.dtype,
+            qk_dtype,
         ]
         if uses_weight_dtype:
             model_args.append(weights.dtype)
