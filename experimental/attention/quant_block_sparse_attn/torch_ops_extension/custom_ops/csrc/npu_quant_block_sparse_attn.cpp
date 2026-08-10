@@ -183,9 +183,9 @@ std::tuple<at::Tensor, at::Tensor> npu_quant_block_sparse_attn_npu(
     if (p_scale.has_value() && p_scale.value().defined()) {
         p_scale_arg = &p_scale.value();
     } else {
-        const at::ScalarType emptyDtype = (quant_mode == QBSA_MXFP8_FULL_QUANT_MODE)
+        const at::ScalarType empty_dtype = (quant_mode == QBSA_MXFP8_FULL_QUANT_MODE)
                                           ? at::kFloat8_e8m0fnu : at::kFloat;
-        p_scale_placeholder = at::empty({0}, query.options().dtype(emptyDtype));
+        p_scale_placeholder = at::empty({0}, query.options().dtype(empty_dtype));
         p_scale_arg = &p_scale_placeholder;
     }
 
