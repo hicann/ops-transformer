@@ -1218,6 +1218,16 @@
   </tr>
   <tr>
     <td>moe</td>
+    <td><a href="../../moe/moe_init_routing_v4/README.md">moe_init_routing_v4</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>MoE的routing计算，根据<a href="../../moe/moe_gating_top_k_softmax_v2/docs/aclnnMoeGatingTopKSoftmaxV2.md">aclnnMoeGatingTopKSoftmaxV2</a>的计算结果做routing处理，支持非量化、静态量化和动态量化模式。</td>
+  </tr>
+  <tr>
+    <td>moe</td>
     <td><a href="../../moe/moe_re_routing/README.md">moe_re_routing</a></td>
     <td>✓</td>
     <td>✓</td>
@@ -1225,6 +1235,16 @@
     <td>✓</td>
     <td>AI Core</td>
     <td>MoE网络中，进行AlltoAll操作从其他卡上拿到需要算的token后，将token按照专家顺序重新排列。</td>
+  </tr>
+  <tr>
+    <td>moe</td>
+    <td><a href="../../moe/moe_re_routing_v2/README.md">moe_re_routing_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>MoE网络中，进行AlltoAll操作从其他卡上拿到需要算的token后，将token按照专家顺序重新排列，支持对topkWeight重排。</td>
   </tr>
   <tr>
     <td>moe</td>

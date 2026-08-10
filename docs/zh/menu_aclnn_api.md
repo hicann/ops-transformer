@@ -166,6 +166,7 @@
 - [aclnnMoeInitRoutingV2](../../moe/moe_init_routing_v2/docs/aclnnMoeInitRoutingV2.md)
 - [aclnnMoeInitRoutingV2Grad](../../moe/moe_init_routing_v2_grad/docs/aclnnMoeInitRoutingV2Grad.md)
 - [aclnnMoeInitRoutingV3](../../moe/moe_init_routing_v3/docs/aclnnMoeInitRoutingV3.md)
+- [aclnnMoeInitRoutingV4](../../moe/moe_init_routing_v4/docs/aclnnMoeInitRoutingV4.md)
 - [aclnnMoeTokenPermute](../../moe/moe_token_permute/docs/aclnnMoeTokenPermute.md)
 - [aclnnMoeTokenPermuteGrad](../../moe/moe_token_permute_grad/docs/aclnnMoeTokenPermuteGrad.md)
 - [aclnnMoeTokenPermuteV2](../../moe/moe_token_permute/docs/aclnnMoeTokenPermuteV2.md)

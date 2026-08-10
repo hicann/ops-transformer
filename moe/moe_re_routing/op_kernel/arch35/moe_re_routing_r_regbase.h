@@ -19,6 +19,7 @@
 #include "kernel_operator.h"
 #include "platform.h"
 #include "op_kernel/math_util.h"
+#include "moe_re_routing_common.h"
 
 namespace MoeReRouting {
 using namespace AscendC;
@@ -31,8 +32,8 @@ public:
     {
     }
     __aicore__ inline void Init(GM_ADDR tokens, GM_ADDR expertTokenNumPerRank, GM_ADDR perTokenScales,
-                                GM_ADDR permuteTokens, GM_ADDR permutePerTokenScales, GM_ADDR permuteTokenIdx,
-                                GM_ADDR expertTokenNum);
+                                GM_ADDR expertTopkWeight, GM_ADDR permuteTokens, GM_ADDR permutePerTokenScales,
+                                GM_ADDR permuteTokenIdx, GM_ADDR expertTokenNum, GM_ADDR permuteTopkWeight);
     __aicore__ inline void Process();
 
 protected:
@@ -48,6 +49,7 @@ protected:
     __aicore__ inline void CopyInScale(const int64_t blockLen, const int64_t offset);
     __aicore__ inline void CopyOutScale(const int64_t blockLen, const int64_t offset);
     __aicore__ inline void CopyOutIndex(const int64_t rows, const int64_t srcOffset, const int64_t dstOffset);
+    __aicore__ inline void CopyTopkWeight(const int64_t rows, const int64_t srcOffset, const int64_t dstOffset);
 
     TPipe *pipe_ = nullptr;
     const MoeReRoutingRTilingData *tilingData_;
@@ -59,8 +61,11 @@ protected:
     GlobalTensor<TIndex> srcRankTokenGm_;
     GlobalTensor<TIndex> dstExpertTokenGm_;
     GlobalTensor<int32_t> tokenIdxGm_;
+    GlobalTensor<float> srcTopkWeightGm_;
+    GlobalTensor<float> dstTopkWeightGm_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> queBind_;
     TQue<QuePosition::VECOUT, 1> idxOutQue_;
+    TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> topkWeightQue_;
     static constexpr int64_t DOUBLE_BUFFER = 2;
     static constexpr int64_t INDEX_UB_SIZE = 256;
     int64_t blockIdx_ = 0;
@@ -73,8 +78,9 @@ protected:
 
 template <typename T, typename TIndex, typename TScale, bool hasScales>
 __aicore__ inline void MoeReRoutingRRegbase<T, TIndex, TScale, hasScales>::Init(
-    GM_ADDR tokens, GM_ADDR expertTokenNumPerRank, GM_ADDR perTokenScales, GM_ADDR permuteTokens,
-    GM_ADDR permutePerTokenScales, GM_ADDR permuteTokenIdx, GM_ADDR expertTokenNum)
+    GM_ADDR tokens, GM_ADDR expertTokenNumPerRank, GM_ADDR perTokenScales, GM_ADDR expertTopkWeight,
+    GM_ADDR permuteTokens, GM_ADDR permutePerTokenScales, GM_ADDR permuteTokenIdx, GM_ADDR expertTokenNum,
+    GM_ADDR permuteTopkWeight)
 {
     blockIdx_ = GetBlockIdx();
     tokenSize_ = tilingData_->tokenSize;
@@ -89,10 +95,18 @@ __aicore__ inline void MoeReRoutingRRegbase<T, TIndex, TScale, hasScales>::Init(
         srcScaleGm_.SetGlobalBuffer((__gm__ TScale *)perTokenScales);
         dstScaleGm_.SetGlobalBuffer((__gm__ TScale *)permutePerTokenScales);
     }
+    if (tilingData_->hasTopkWeight == HAS_TOPK_WEIGHT) {
+        srcTopkWeightGm_.SetGlobalBuffer((__gm__ float *)expertTopkWeight);
+        dstTopkWeightGm_.SetGlobalBuffer((__gm__ float *)permuteTopkWeight);
+    }
     this->pipe_->InitBuffer(queBind_, DOUBLE_BUFFER,
                             Ops::Base::CeilAlign(tilingData_->ubFactor, static_cast<int64_t>(BLOCK_SIZE / sizeof(T))));
     this->pipe_->InitBuffer(idxOutQue_, DOUBLE_BUFFER,
                             Ops::Base::CeilAlign(INDEX_UB_SIZE * sizeof(TIndex), BLOCK_SIZE / sizeof(TIndex)));
+    if (tilingData_->hasTopkWeight == HAS_TOPK_WEIGHT) {
+        this->pipe_->InitBuffer(topkWeightQue_, DOUBLE_BUFFER,
+                                Ops::Base::CeilAlign(INDEX_UB_SIZE * sizeof(float), BLOCK_SIZE / sizeof(float)));
+    }
 }
 
 template <typename T, typename TIndex, typename TScale, bool hasScales>
@@ -132,6 +146,9 @@ __aicore__ inline void MoeReRoutingRRegbase<T, TIndex, TScale, hasScales>::Proce
                 tokensDst_ += srcRankTokenGm_(rankIdx * tilingData_->expertNum + expertIdx);
             }
             ProcessTokenScale(currTokenNum);
+            if (tilingData_->hasTopkWeight == HAS_TOPK_WEIGHT) {
+                CopyTopkWeight(currTokenNum, tokensSrc_, tokensDst_);
+            }
             tokensSrc_ += currTokenNum;
             // 计算当前rank之后的dst偏移
             for (int64_t rankIdx = currRankId; rankIdx < tilingData_->rankNum; rankIdx++) {
@@ -334,6 +351,27 @@ __aicore__ inline void MoeReRoutingRRegbase<T, TIndex, TScale, hasScales>::CopyO
         DataCopyExtParams copyParams(1, subRows * sizeof(int32_t), 0, 0, 0);
         DataCopyPad(tokenIdxGm_[offset + loopIdx * INDEX_UB_SIZE], indexLocal, copyParams);
         idxOutQue_.FreeTensor(indexLocal);
+    }
+}
+
+template <typename T, typename TIndex, typename TScale, bool hasScales>
+__aicore__ inline void MoeReRoutingRRegbase<T, TIndex, TScale, hasScales>::CopyTopkWeight(
+    const int64_t rows, const int64_t srcOffset, const int64_t dstOffset)
+{
+    int64_t loopCnt = Ops::Base::CeilDiv(rows, INDEX_UB_SIZE);
+    int64_t subRows = INDEX_UB_SIZE;
+    for (int64_t loopIdx = 0; loopIdx < loopCnt; loopIdx++) {
+        if (loopIdx == loopCnt - 1 && rows % INDEX_UB_SIZE != 0) {
+            subRows = rows % INDEX_UB_SIZE;
+        }
+        LocalTensor<float> topkLocal = topkWeightQue_.AllocTensor<float>();
+        DataCopyExtParams copyParams(1, subRows * sizeof(float), 0, 0, 0);
+        DataCopyPadExtParams<float> padParams(false, 0, 0, 0);
+        DataCopyPad(topkLocal, srcTopkWeightGm_[srcOffset + loopIdx * INDEX_UB_SIZE], copyParams, padParams);
+        topkWeightQue_.EnQue(topkLocal);
+        topkLocal = topkWeightQue_.DeQue<float>();
+        DataCopyPad(dstTopkWeightGm_[dstOffset + loopIdx * INDEX_UB_SIZE], topkLocal, copyParams);
+        topkWeightQue_.FreeTensor(topkLocal);
     }
 }
 

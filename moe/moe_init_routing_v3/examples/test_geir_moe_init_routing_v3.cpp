@@ -26,7 +26,7 @@
 #include "array_ops.h"
 #include "ge_ir_build.h"
 
-#include "fusion_ops.h"
+#include "../op_graph/moe_init_routing_v3_proto.h"
 #include "nn_other.h"
 
 #define FAILED -1

@@ -31,7 +31,8 @@ class MoeV3FullLoadDynamicQuant : public MoeV3FullLoadBase<T> {
 public:
     __aicore__ inline MoeV3FullLoadDynamicQuant(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
-                                GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale, GM_ADDR workspace,
+                                GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale,
+                                GM_ADDR topkWeight, GM_ADDR expandedTopkWeight, GM_ADDR workspace,
                                 const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
@@ -75,11 +76,13 @@ template <typename T, typename QuantT>
 __aicore__ inline void
 MoeV3FullLoadDynamicQuant<T, QuantT>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX,
                                            GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
-                                           GM_ADDR expandedScale, GM_ADDR workspace,
+                                           GM_ADDR expandedScale,
+                                           GM_ADDR topkWeight, GM_ADDR expandedTopkWeight, GM_ADDR workspace,
                                            const MoeInitRoutingV3Arch35TilingData *tilingData,
                                            TPipe *tPipe)
 {
-    MoeV3FullLoadBase<T>::Init(expertIdx, expandedRowIdx, expertTokensCountOrCumsum, workspace, tilingData, tPipe);
+    MoeV3FullLoadBase<T>::Init(expertIdx, expandedRowIdx, expertTokensCountOrCumsum,
+                                topkWeight, expandedTopkWeight, workspace, tilingData, tPipe);
 
     colsAlign_ = Align(this->cols_, sizeof(T));
     if constexpr (IsSameType<QuantT, int4b_t>::value) {
@@ -432,8 +435,14 @@ __aicore__ inline void MoeV3FullLoadDynamicQuant<T, QuantT>::Process()
         }
 
         if (this->epFullload_ || this->isInputScale_) {
+            if (this->isInputTopkWeight_) {
+                this->TopkWeightScatterOut();
+            }
             ScatterOutXDynamicQuant();
         } else {
+            if (this->isInputTopkWeight_) {
+                this->TopkWeightGatherOut();
+            }
             GatherOutXDynamicQuant();
         }
 

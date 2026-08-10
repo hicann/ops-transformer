@@ -25,7 +25,8 @@ class MoeV3FullLoadUnquantized : public MoeV3FullLoadBase<T> {
 public:
     __aicore__ inline MoeV3FullLoadUnquantized(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
-                                GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale, GM_ADDR workspace,
+                                GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale,
+                                GM_ADDR topkWeight, GM_ADDR expandedTopkWeight, GM_ADDR workspace,
                                 const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
@@ -56,9 +57,11 @@ template <typename T>
 __aicore__ inline void
 MoeV3FullLoadUnquantized<T>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX,
                                   GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale,
-                                  GM_ADDR workspace, const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
+                                  GM_ADDR topkWeight, GM_ADDR expandedTopkWeight, GM_ADDR workspace,
+                                  const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe)
 {
-    MoeV3FullLoadBase<T>::Init(expertIdx, expandedRowIdx, expertTokensCountOrCumsum, workspace, tilingData, tPipe);
+    MoeV3FullLoadBase<T>::Init(expertIdx, expandedRowIdx, expertTokensCountOrCumsum,
+                                topkWeight, expandedTopkWeight, workspace, tilingData, tPipe);
 
     if constexpr (IsSameType<T, hifloat8_t>::value) {
         xUint8tGm_.SetGlobalBuffer((__gm__ uint8_t *)x);
@@ -113,11 +116,17 @@ __aicore__ inline void MoeV3FullLoadUnquantized<T>::Process()
         }
 
         if (this->epFullload_) {
+            if (this->isInputTopkWeight_) {
+                this->TopkWeightScatterOut();
+            }
             this->ScatterOutX();
             if (this->isInputScale_) {
                 this->ScatterOutScale();
             }
         } else {
+            if (this->isInputTopkWeight_) {
+                this->TopkWeightGatherOut();
+            }
             this->GatherOutX();
             if (this->isInputScale_) {
                 this->GatherOutScale();
@@ -148,11 +157,17 @@ __aicore__ inline void MoeV3FullLoadUnquantized<T>::ProcessDropPadMode()
         if (this->isInputScale_) {
             this->ZeroOutScale();
         }
+        if (this->isInputTopkWeight_) {
+            this->TopkWeightZeroOut();
+        }
     }
 #ifndef __CCE_KT_TEST__
     AscendC::SyncAll();
 #endif
     if (this->blockIdx_ < this->needCoreNum_) {
+        if (this->isInputTopkWeight_) {
+            this->TopkWeightGatherOut();
+        }
         this->GatherOutX();
         if (this->isInputScale_) {
             this->GatherOutScale();

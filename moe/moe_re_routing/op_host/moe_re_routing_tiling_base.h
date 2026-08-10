@@ -65,9 +65,11 @@ protected:
     int64_t expertNum_ = {0};
     int64_t idxType_ = {0};
     bool hasScale_{false};
+    bool hasTopkWeight_{false};
     ge::DataType tokenDtype_ = ge::DT_UNDEFINED;
     ge::DataType expertDtype_ = ge::DT_UNDEFINED;
     ge::DataType scaleDtype_ = ge::DT_UNDEFINED;
+    ge::DataType topkWeightDtype_ = ge::DT_UNDEFINED;
 };
 
 }  // namespace optiling

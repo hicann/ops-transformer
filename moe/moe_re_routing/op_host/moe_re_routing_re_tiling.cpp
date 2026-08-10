@@ -24,6 +24,7 @@ namespace optiling {
 
 constexpr int64_t NUM_TWO = 2;
 constexpr int64_t BYTE_LENGTH_FOUR = 4;
+constexpr int64_t RESERVE_UB_GAP = 32;
 constexpr uint64_t MOE_RE_ROUTING_RE_WITHOUT_SCALE = 200000;
 constexpr uint64_t MOE_RE_ROUTING_RE_WITH_SCALE_FLOAT = 200100;
 /* Note: MOE_RE_ROUTING_RE_WITH_SCALE_FLOAT8_E8M0 key is shared by multiple quantization types:
@@ -58,7 +59,13 @@ ge::graphStatus MoeReRoutingReTiling::SplitUb()
 {
     // 切分ub
     int64_t reserveUbSize = INDEX_UB_SIZE * DOUBLE_BUFFER * ge::GetSizeByDataType(expertDtype_);
+    if (hasTopkWeight_) {
+        reserveUbSize += INDEX_UB_SIZE * DOUBLE_BUFFER * sizeof(float);
+    }
     int64_t canUseUbSize = (ubSize_ - reserveUbSize) / DOUBLE_BUFFER;
+    if (hasTopkWeight_) {
+        canUseUbSize -= RESERVE_UB_GAP;
+    }
     ubFactor_ = Ops::Base::CeilAlign(canUseUbSize, static_cast<int64_t>(Ops::Base::GetUbBlockSize(context_)));
     return ge::GRAPH_SUCCESS;
 }
@@ -101,11 +108,13 @@ void MoeReRoutingReTiling::PrintTilingData()
     OP_LOGI(context_->GetNodeName(),
             "MoeReRoutingReTiling tilingData: tokenSize is %ld, scaleSize is %ld, rankNum is %ld,"
             "expertNum is %ld, blockNumR = %ld, blockFactorR = %ld, blockNumE = %ld, blockFactorE = %ld,"
-            "coreNum is %ld, ubFactor is %ld, idxType_ = %ld, tokenSizeOrigin is %ld, tilingKey is %ld",
+            "coreNum is %ld, ubFactor is %ld, idxType_ = %ld, tokenSizeOrigin is %ld, hasTopkWeight is %ld,"
+            "tilingKey is %ld",
             tilingData_.get_tokenSize(), tilingData_.get_scaleSize(), tilingData_.get_rankNum(),
             tilingData_.get_expertNum(), tilingData_.get_blockNumR(), tilingData_.get_blockFactorR(),
             tilingData_.get_blockNumE(), tilingData_.get_blockFactorE(), tilingData_.get_coreNum(),
-            tilingData_.get_ubFactor(), tilingData_.get_idxType(), tilingData_.get_tokenSizeOrigin(), tilingKey_);
+            tilingData_.get_ubFactor(), tilingData_.get_idxType(), tilingData_.get_tokenSizeOrigin(),
+            tilingData_.get_hasTopkWeight(), tilingKey_);
     return;
 }
 
@@ -134,6 +143,7 @@ ge::graphStatus MoeReRoutingReTiling::PostTiling()
     tilingData_.set_idxType(idxType_);
     tilingData_.set_tokenSizeOrigin(
         (tokenDtype_ == ge::DT_FLOAT4_E2M1 || tokenDtype_ == ge::DT_FLOAT4_E1M2) ? tokenSize_ : 0);
+    tilingData_.set_hasTopkWeight(hasTopkWeight_ ? 1 : 0);
 
     context_->SetBlockDim(blockNum_);
     context_->SetTilingKey(GetTilingKey());

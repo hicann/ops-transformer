@@ -52,6 +52,7 @@ TILING_DATA_FIELD_DEF(int64_t, blockFactorE);    // 每个核处理的expert数
 TILING_DATA_FIELD_DEF(int64_t, ubFactor);        // 可用Ub大小
 TILING_DATA_FIELD_DEF(int64_t, idxType);         // 属性idxType
 TILING_DATA_FIELD_DEF(int64_t, tokenSizeOrigin); // FP4原始token大小
+TILING_DATA_FIELD_DEF(int64_t, hasTopkWeight);  // 0=无topkWeight,1=有topkWeight
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MoeReRouting_200000, MoeReRoutingReTilingData);
@@ -68,6 +69,7 @@ TILING_DATA_FIELD_DEF(int64_t, blockFactor);     // 每个核处理的rank数
 TILING_DATA_FIELD_DEF(int64_t, ubFactor);        // 可用Ub大小
 TILING_DATA_FIELD_DEF(int64_t, idxType);         // 属性idxType
 TILING_DATA_FIELD_DEF(int64_t, tokenSizeOrigin); // FP4原始token大小
+TILING_DATA_FIELD_DEF(int64_t, hasTopkWeight);  // 0=无topkWeight,1=有topkWeight
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MoeReRouting_210000, MoeReRoutingRTilingData);

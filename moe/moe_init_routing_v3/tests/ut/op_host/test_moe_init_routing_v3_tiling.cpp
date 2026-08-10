@@ -18,24 +18,25 @@
 #include "platform/platform_infos_def.h"
 #include "op_tiling_parse_context_builder.h"
 #include "base/registry/op_impl_space_registry_v2.h"
-#include <nlohmann/json.hpp>
 
 using namespace std;
 
 namespace {
+constexpr uint32_t ASCEND910B_CORE_NUM = 64;
+constexpr uint32_t ASCEND910B_L2_SIZE = 33554432;
+constexpr uint32_t ASCEND910B_UB_SIZE = 262144;
+constexpr uint32_t ASCEND910B_L1_SIZE = 524288;
+
 void InitParsePlatformInfo(fe::PlatFormInfos &platformInfo)
 {
     platformInfo.Init();
-    const char *compileJson =
-        R"({"hardware_info": {"UB_SIZE": 262144, "CORE_NUM": 64, "L2_SIZE": 33554432, "L1_SIZE": 524288, "L0A_SIZE": 65536, "L0B_SIZE": 65536, "L0C_SIZE": 131072, "BT_SIZE": 0, "load3d_constraints": "1", "socVersion":"Ascend910B"}})";
-    nlohmann::json compileInfoJson = nlohmann::json::parse(compileJson);
     map<string, string> socInfos;
     map<string, string> aicoreSpec;
-    socInfos["ai_core_cnt"] = to_string(compileInfoJson["hardware_info"]["CORE_NUM"].get<uint32_t>());
-    socInfos["l2_size"] = to_string(compileInfoJson["hardware_info"]["L2_SIZE"].get<uint32_t>());
+    socInfos["ai_core_cnt"] = to_string(ASCEND910B_CORE_NUM);
+    socInfos["l2_size"] = to_string(ASCEND910B_L2_SIZE);
     socInfos["core_type_list"] = "AICore";
-    aicoreSpec["ub_size"] = to_string(compileInfoJson["hardware_info"]["UB_SIZE"].get<uint32_t>());
-    aicoreSpec["l1_size"] = to_string(compileInfoJson["hardware_info"]["L1_SIZE"].get<uint32_t>());
+    aicoreSpec["ub_size"] = to_string(ASCEND910B_UB_SIZE);
+    aicoreSpec["l1_size"] = to_string(ASCEND910B_L1_SIZE);
     map<string, string> versions = {{"NpuArch", "2201"}, {"Short_SoC_version", "Ascend910B"}};
     platformInfo.SetPlatformRes("SoCInfo", socInfos);
     platformInfo.SetPlatformRes("AICoreSpec", aicoreSpec);

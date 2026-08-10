@@ -30,7 +30,8 @@ class MoeV3FullLoadStaticQuant : public MoeV3FullLoadBase<T> {
 public:
     __aicore__ inline MoeV3FullLoadStaticQuant(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX, GM_ADDR expandedRowIdx,
-                                GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale, GM_ADDR workspace,
+                                GM_ADDR expertTokensCountOrCumsum, GM_ADDR expandedScale,
+                                GM_ADDR topkWeight, GM_ADDR expandedTopkWeight, GM_ADDR workspace,
                                 GM_ADDR offset, const MoeInitRoutingV3Arch35TilingData *tilingData, TPipe *tPipe);
     __aicore__ inline void Process();
 
@@ -63,11 +64,14 @@ private:
 template <typename T>
 __aicore__ inline void MoeV3FullLoadStaticQuant<T>::Init(GM_ADDR x, GM_ADDR expertIdx, GM_ADDR scale, GM_ADDR expandedX,
                                                          GM_ADDR expandedRowIdx, GM_ADDR expertTokensCountOrCumsum,
-                                                         GM_ADDR expandedScale, GM_ADDR workspace, GM_ADDR offset,
+                                                         GM_ADDR expandedScale,
+                                                         GM_ADDR topkWeight, GM_ADDR expandedTopkWeight,
+                                                         GM_ADDR workspace, GM_ADDR offset,
                                                          const MoeInitRoutingV3Arch35TilingData *tilingData,
                                                          TPipe *tPipe)
 {
-    MoeV3FullLoadBase<T>::Init(expertIdx, expandedRowIdx, expertTokensCountOrCumsum, workspace, tilingData, tPipe);
+    MoeV3FullLoadBase<T>::Init(expertIdx, expandedRowIdx, expertTokensCountOrCumsum,
+                                topkWeight, expandedTopkWeight, workspace, tilingData, tPipe);
 
     colsAlign_ = Align(this->cols_, sizeof(T));
     inFactor_ = Align(this->cols_, sizeof(int8_t));
@@ -235,8 +239,14 @@ __aicore__ inline void MoeV3FullLoadStaticQuant<T>::Process()
         }
 
         if (this->epFullload_) {
+            if (this->isInputTopkWeight_) {
+                this->TopkWeightScatterOut();
+            }
             ScatterOutXStaticQuant();
         } else {
+            if (this->isInputTopkWeight_) {
+                this->TopkWeightGatherOut();
+            }
             GatherOutXStaticQuant();
         }
 

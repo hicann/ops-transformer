@@ -54,7 +54,6 @@ from .stem_oam_prep_varlen_q import stem_oam_prep_varlen_q
 from .causal_conv1d_fn import causal_conv1d_fn
 from .causal_conv1d_update import causal_conv1d_update
 from .stem_oam_prep_paged_kv import stem_oam_prep_paged_kv
-from . import graph_convert as _graph_convert
 from .qkv_rms_norm_rope_cache_with_k_scale import (
     qkv_rms_norm_rope_cache_with_k_scale,
     qkv_rms_norm_rope_cache_with_k_scale_,
@@ -65,3 +64,6 @@ from .dense_lightning_indexer_softmax_lse import (
     dense_lightning_indexer_softmax_lse,
     dense_lightning_indexer_softmax_lse_metadata,
 )
+from .moe_init_routing import moe_init_routing
+from .moe_re_routing import moe_re_routing
+from . import graph_convert as _graph_convert
