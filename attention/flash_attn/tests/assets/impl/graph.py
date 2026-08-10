@@ -10,27 +10,77 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""Mainline TTK graph adapter with metadata generated before capture."""
+"""TTK graph adapter for the installed FlashAttn API."""
 
 import torch
+
+
+def _resolve_max_seqlen(explicit):
+    if explicit is not None and int(explicit) > 0:
+        return int(explicit)
+    return -1
+
+
+def _build_metadata(
+    q,
+    k,
+    *,
+    cu_seqlens_q=None,
+    cu_seqlens_kv=None,
+    seqused_q=None,
+    seqused_kv=None,
+    batch_size=None,
+    mask_mode=0,
+    win_left=-1,
+    win_right=-1,
+    max_seqlen_q=None,
+    max_seqlen_kv=None,
+    layout_q="BSND",
+    layout_kv="BSND",
+    layout_out="BSND",
+):
+    """Build metadata from graph inputs without importing sibling assets."""
+    head_dim = int(q.shape[-1])
+    if layout_q in ("TND", "BNSD"):
+        num_heads_q = int(q.shape[1])
+    else:
+        num_heads_q = int(q.shape[2])
+
+    if layout_kv in ("TND", "BNSD", "PA_BNBD", "PA_NZ"):
+        num_heads_kv = int(k.shape[1])
+    elif layout_kv == "PA_BBND":
+        num_heads_kv = int(k.shape[2])
+    else:
+        num_heads_kv = int(k.shape[2])
+
+    metadata = torch.ops.cann_ops_transformer.flash_attn_metadata(
+        num_heads_q,
+        num_heads_kv,
+        head_dim,
+        cu_seqlens_q=cu_seqlens_q,
+        cu_seqlens_kv=cu_seqlens_kv,
+        seqused_q=seqused_q,
+        seqused_kv=seqused_kv,
+        batch_size=batch_size,
+        max_seqlen_q=_resolve_max_seqlen(max_seqlen_q),
+        max_seqlen_kv=_resolve_max_seqlen(max_seqlen_kv),
+        mask_mode=int(mask_mode),
+        win_left=int(win_left),
+        win_right=int(win_right),
+        layout_q=layout_q,
+        layout_kv=layout_kv,
+        layout_out=layout_out,
+    )
+    if hasattr(metadata, "to") and metadata.device != q.device:
+        metadata = metadata.to(q.device)
+    return metadata
 
 
 class FlashAttnAclGraph(torch.nn.Module):
     def __init__(
         self,
-        q,
-        k,
-        v,
         *,
-        block_table=None,
-        cu_seqlens_q=None,
-        cu_seqlens_kv=None,
-        seqused_q=None,
-        seqused_kv=None,
         batch_size=None,
-        sinks=None,
-        attn_mask=None,
-        metadata=None,
         softmax_scale=1.0,
         mask_mode=0,
         win_left=-1,
@@ -43,63 +93,64 @@ class FlashAttnAclGraph(torch.nn.Module):
         return_softmax_lse=False,
     ):
         super().__init__()
-        from flash_attn_ttk_ops import build_flash_attn_metadata
-
-        self.q = q
-        self.k = k
-        self.v = v
-        self.block_table = block_table
-        self.cu_seqlens_q = cu_seqlens_q
-        self.cu_seqlens_kv = cu_seqlens_kv
-        self.seqused_q = seqused_q
-        self.seqused_kv = seqused_kv
-        self.sinks = sinks
-        self.attn_mask = attn_mask
+        self.batch_size = batch_size
         self.softmax_scale = float(softmax_scale)
         self.mask_mode = int(mask_mode)
         self.win_left = int(win_left)
         self.win_right = int(win_right)
-        self.max_seqlen_q = int(max_seqlen_q) if max_seqlen_q is not None else -1
-        self.max_seqlen_kv = int(max_seqlen_kv) if max_seqlen_kv is not None else -1
+        self.max_seqlen_q = _resolve_max_seqlen(max_seqlen_q)
+        self.max_seqlen_kv = _resolve_max_seqlen(max_seqlen_kv)
         self.layout_q = layout_q
         self.layout_kv = layout_kv
         self.layout_out = layout_out
         self.return_softmax_lse = bool(return_softmax_lse)
+
+    def forward(
+        self,
+        q,
+        k,
+        v,
+        *,
+        block_table=None,
+        cu_seqlens_q=None,
+        cu_seqlens_kv=None,
+        seqused_q=None,
+        seqused_kv=None,
+        sinks=None,
+        attn_mask=None,
+        metadata=None,
+    ):
         if metadata is None:
-            self.metadata = build_flash_attn_metadata(
+            metadata = _build_metadata(
                 q,
                 k,
                 cu_seqlens_q=cu_seqlens_q,
                 cu_seqlens_kv=cu_seqlens_kv,
                 seqused_q=seqused_q,
                 seqused_kv=seqused_kv,
-                batch_size=batch_size,
-                softmax_scale=softmax_scale,
-                mask_mode=mask_mode,
-                win_left=win_left,
-                win_right=win_right,
-                max_seqlen_q=max_seqlen_q,
-                max_seqlen_kv=max_seqlen_kv,
-                layout_q=layout_q,
-                layout_kv=layout_kv,
-                layout_out=layout_out,
+                batch_size=self.batch_size,
+                mask_mode=self.mask_mode,
+                win_left=self.win_left,
+                win_right=self.win_right,
+                max_seqlen_q=self.max_seqlen_q,
+                max_seqlen_kv=self.max_seqlen_kv,
+                layout_q=self.layout_q,
+                layout_kv=self.layout_kv,
+                layout_out=self.layout_out,
             )
-        else:
-            self.metadata = metadata
 
-    def forward(self):
         return torch.ops.cann_ops_transformer.flash_attn(
-            self.q,
-            self.k,
-            self.v,
-            block_table=self.block_table,
-            cu_seqlens_q=self.cu_seqlens_q,
-            cu_seqlens_kv=self.cu_seqlens_kv,
-            seqused_q=self.seqused_q,
-            seqused_kv=self.seqused_kv,
-            sinks=self.sinks,
-            attn_mask=self.attn_mask,
-            metadata=self.metadata,
+            q,
+            k,
+            v,
+            block_table=block_table,
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_kv=cu_seqlens_kv,
+            seqused_q=seqused_q,
+            seqused_kv=seqused_kv,
+            sinks=sinks,
+            attn_mask=attn_mask,
+            metadata=metadata,
             softmax_scale=self.softmax_scale,
             mask_mode=self.mask_mode,
             win_left=self.win_left,

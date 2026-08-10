@@ -1045,8 +1045,8 @@ TestCases = {
         'mask_mode': [3],
         'seqused_q': [[1024, 1024]],
         'seqused_kv': [[1024, 1024]],
-        'cu_seqlens_q': [[1, 1025, 2049]],
-        'cu_seqlens_kv': [[1, 1025, 2049]],
+        'cu_seqlens_q': [[0, 1024, 2048]],
+        'cu_seqlens_kv': [[0, 1024, 2048]],
         'return_softmax_lse': [0],
     },
     'aclnnFlashAttn_varlen_test_case403': {

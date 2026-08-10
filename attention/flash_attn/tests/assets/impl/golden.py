@@ -255,11 +255,17 @@ class FlashAttnGolden:
             out_tnd = torch.zeros(
                 total_q, N_q, dv, dtype=torch.float32, device=q.device
             )
-            lse_tnd = torch.zeros(total_q, N_q, dtype=torch.float32, device=q.device)
+            # 算子 lse 输出为 (N, T), 与算子对齐
+            lse_tnd = torch.zeros(N_q, total_q, dtype=torch.float32, device=q.device)
             out = None
             lse = None
         else:
-            max_sq = max(q_lens) if q_lens else 0
+            # out/lse 的 S 维度用张量全量(算子按 q 张量形状输出),
+            # 不能取 max(seqused_q) — 否则 seqused < S1 时 shape mismatch
+            if layout_q == "BSND":
+                max_sq = q.shape[1]
+            else:
+                max_sq = q.shape[2]
             out = torch.zeros(B, N_q, max_sq, dv, dtype=torch.float32, device=q.device)
             lse = torch.zeros(B, N_q, max_sq, dtype=torch.float32, device=q.device)
             out_tnd = None
@@ -272,7 +278,7 @@ class FlashAttnGolden:
                 q_start = cu_q[b]
             if sq <= 0 or skv <= 0:
                 if is_tnd_out:
-                    lse_tnd[q_start : q_start + sq, :] = 0.0
+                    lse_tnd[:, q_start : q_start + sq] = 0.0
                 else:
                     lse[b, :, :sq] = 0.0
                 continue
@@ -336,7 +342,7 @@ class FlashAttnGolden:
                         o, l = compute_fn(q_bh, k_bh, v_bh, mask_b, scale, sink)
                     if is_tnd_out:
                         out_tnd[q_start : q_start + sq, qh, :] = o
-                        lse_tnd[q_start : q_start + sq, qh] = l
+                        lse_tnd[qh, q_start : q_start + sq] = l
                     else:
                         out[b, qh, :sq, :] = o
                         lse[b, qh, :sq] = l
@@ -660,8 +666,10 @@ def _derive_head_dims(q, k, layout_q, layout_kv):
         num_heads_kv = int(k.shape[1])
     elif layout_kv == "BNSD":
         num_heads_kv = int(k.shape[1])
-    elif layout_kv in ("PA_BBND", "PA_BNBD"):
-        num_heads_kv = int(k.shape[2]) if layout_kv == "PA_BBND" else int(k.shape[1])
+    elif layout_kv in ("PA_BNBD", "PA_NZ"):
+        num_heads_kv = int(k.shape[1])
+    elif layout_kv == "PA_BBND":
+        num_heads_kv = int(k.shape[2])
     else:
         num_heads_kv = int(k.shape[2])
     return num_heads_q, num_heads_kv, head_dim
@@ -694,6 +702,11 @@ def cpu_flash_attn(
     **_unused,
 ):
     """Compute CPU golden reference using FlashAttnGolden."""
+    if sinks is not None:
+        message = "FlashAttn golden does not support sinks yet"
+        print(message)
+        raise NotImplementedError(message)
+
     q_cpu = _to_cpu(q)
     k_cpu = _to_cpu(k)
     v_cpu = _to_cpu(v)

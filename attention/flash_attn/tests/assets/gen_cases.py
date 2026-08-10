@@ -23,7 +23,9 @@ TTK E2E CSV file compatible with:
 Tensor order in CSV (matches flash_attn_ttk signature keyword-only order):
     [0] q              [3] block_table       [6] seqused_q
     [1] k              [4] cu_seqlens_q      [7] seqused_kv
-    [2] v              [5] cu_seqlens_kv
+    [2] v              [5] cu_seqlens_kv      [8] sinks
+                                                   [9] attn_mask
+                                                  [10] metadata
 
 Unused positions use None. Small integer tensors (cu_seqlens, seqused)
 get their values from attributes dict → override_tensors_from_attributes.
@@ -58,6 +60,9 @@ HEADER = [
     "absolute_precision",
 ]
 
+# kv 0 轴非连续声明列(仅套件含 nc_kv_dims 用例时输出)
+NC_HEADER = ["tensor_storage_shapes", "tensor_view_offsets", "tensor_view_strides"]
+
 DTYPE_MAP = {"fp16": "float16", "bf16": "bfloat16"}
 INT_DTYPE = "int32"
 ABSOLUTE_PRECISION_DEFAULT = 1e-8
@@ -69,6 +74,15 @@ ABSOLUTE_PRECISION_DEFAULT = 1e-8
 def normalize_params(raw):
     c = dict(raw)
     layout_q = c.get("layout_q", "BNSD")
+    layout_kv = c.get("layout_kv", layout_q)
+    nc_kv_dims = c.get("nc_kv_dims")
+    # 拦截用例(REJ): 非 PA 必须连续; PA_BBND 仅 dim0 合法。
+    # pytest 预期 NPU compute 报错, TTK 无"预期失败"机制, 不生成
+    if nc_kv_dims is not None:
+        if layout_kv not in ("PA_BBND", "PA_BNBD", "PA_NZ"):
+            return None
+        if layout_kv == "PA_BBND" and nc_kv_dims == (0, 1):
+            return None
     c.setdefault("layout_kv", layout_q)
     c.setdefault("layout_out", layout_q)
     c.setdefault("N2", c["N1"])
@@ -77,11 +91,25 @@ def normalize_params(raw):
     c.setdefault("mask_mode", 0)
     c.setdefault("win_left", -1)
     c.setdefault("win_right", -1)
+    # mask_mode=0(无掩码)/3(因果掩码)时算子不接受 win_left/win_right 有值:
+    # mask_checker 要求其必须为 -1 (op_host/checkers/mask_checker.cpp CheckParaExistence),
+    # 历史用例透传的 65536("无限窗口"哨兵值)语义与 -1 等价, 此处统一归 -1
+    if int(c.get("mask_mode", 0)) in (0, 3):
+        c["win_left"] = -1
+        c["win_right"] = -1
     c.setdefault("return_softmax_lse", False)
 
     for key in ("cu_seqlens_q", "cu_seqlens_kv", "seqused_q", "seqused_kv"):
         if c.get(key) == [None] or c.get(key) is None:
             c.pop(key, None)
+
+    # cu_seqlens 首值必须为 0; 若非 0 则整体平移(段长不变)
+    for key in ("cu_seqlens_q", "cu_seqlens_kv"):
+        v = c.get(key)
+        if isinstance(v, (list, tuple)) and len(v) > 0:
+            first = v[0]
+            if isinstance(first, (int, float)) and int(first) != 0:
+                c[key] = [int(x) - int(first) for x in v]
 
     if layout_q == "TND":
         cu_q = c.get("cu_seqlens_q")
@@ -114,6 +142,8 @@ def normalize_params(raw):
         if c.get("block_table") is not None and isinstance(c.get("block_table"), list):
             bt_raw = c["block_table"]
             c["num_blocks"] = int(max(max(row) for row in bt_raw)) + 1
+            c["_bt_b"] = len(bt_raw)
+            c["_bt_max_blk"] = max(len(row) for row in bt_raw)
             return c
 
         seqused_kv = c["seqused_kv"]
@@ -130,7 +160,13 @@ def normalize_params(raw):
             max_blk = (
                 (max(seqused_kv) + block_size - 1) // block_size if seqused_kv else 1
             )
-        c["num_blocks"] = max_blk * b_val
+        # num_blocks 取按 seqused_kv 顺序填充实际占用的 page 数(与 inputs.py 填充一致),
+        # 避免按 max_blk*B 整体分配导致 K/V 缓冲过度分配(如 (30,4096) 多出约 300 倍)
+        used = 0
+        for i in range(b_val):
+            s = seqused_kv[i] if i < len(seqused_kv) else seqused_kv[-1]
+            used += min((int(s) + block_size - 1) // block_size, max_blk)
+        c["num_blocks"] = max(used, 1)
         c["_bt_b"] = b_val
         c["_bt_max_blk"] = max_blk
     return c
@@ -270,10 +306,14 @@ def _build_attrs(p):
     cu_kv = p.get("cu_seqlens_kv")
     sq = p.get("seqused_q")
     skv = p.get("seqused_kv")
-    _set("cu_seqlens_q", list(cu_q) if cu_q else None)
-    _set("cu_seqlens_kv", list(cu_kv) if cu_kv else None)
-    _set("seqused_q", list(sq) if sq else None)
-    _set("seqused_kv", list(skv) if skv else None)
+    # 小整数张量的值不直接放同名 attr: TTK match_overload 会把
+    # "张量参数名出现在 attrs" 重复计入输入数, 超出 flash_attn_ttk 的
+    # 11 参数上限导致 PARAM_PLAN_FAILURE。改用 *_values 键,
+    # 由 impl/inputs.py customize_inputs 填入对应张量。
+    _set("cu_seqlens_q_values", list(cu_q) if cu_q else None)
+    _set("cu_seqlens_kv_values", list(cu_kv) if cu_kv else None)
+    _set("seqused_q_values", list(sq) if sq else None)
+    _set("seqused_kv_values", list(skv) if skv else None)
 
     _set("max_seqlen_q", _resolve_max_seqlen(p, "q", cu_q, sq))
     _set("max_seqlen_kv", _resolve_max_seqlen(p, "kv", cu_kv, skv))
@@ -325,6 +365,38 @@ def _data_ranges(p, num_tensors):
 # ── CSV row builder ──
 
 
+def _nc_fields(shape, nc_kv_dims):
+    """构造 kv 非连续视图的 storage/stride/offset 三元组。
+
+    与 pytests utils/data.py make_noncontiguous 逐位一致:
+      nc_kv_dims == 0      -> pad dim1 (+1 元素), 0 轴 stride 膨胀
+      nc_kv_dims == (0, 1) -> pad dim2 (+1 元素), 0/1 轴 stride 联动膨胀
+    返回 (storage_shape, view_stride, view_offset); 无 NC 时返回 (None, None, None)。
+    """
+    if nc_kv_dims == 0:
+        pad_dim = 1
+    elif nc_kv_dims == (0, 1):
+        pad_dim = 2
+    else:
+        return None, None, None
+    storage = list(shape)
+    storage[pad_dim] += 1
+    strides = [1] * len(shape)
+    for d in range(len(shape) - 2, -1, -1):
+        strides[d] = strides[d + 1] * storage[d + 1]
+    return tuple(storage), tuple(strides), 0
+
+
+def _contiguous_stride(shape):
+    """计算 shape 的连续 strides (numpy/torch 行主序约定)。"""
+    if not shape:
+        return ()
+    strides = [1] * len(shape)
+    for d in range(len(shape) - 2, -1, -1):
+        strides[d] = strides[d + 1] * shape[d + 1]
+    return tuple(strides)
+
+
 def _build_row(case_name, p):
     q_shape, k_shape, v_shape = _qkv_shapes(p)
     bt_shape, cu_q_shape, cu_kv_shape, sq_shape, skv_shape = _aux_shapes(p)
@@ -341,6 +413,7 @@ def _build_row(case_name, p):
         cu_kv_shape,
         sq_shape,
         skv_shape,
+        None,
         attn_mask_shape,
         None,
     ]
@@ -350,7 +423,7 @@ def _build_row(case_name, p):
     for i in range(3, len(shapes)):
         if shapes[i] is None:
             dtypes.append(None)
-        elif i == 8:
+        elif i == 9:
             dtypes.append("int8")
         else:
             dtypes.append(INT_DTYPE)
@@ -359,6 +432,27 @@ def _build_row(case_name, p):
 
     attrs = _build_attrs(p)
     prec = _precision(p)
+
+    # kv 0 轴非连续声明列(仅套件含 nc_kv_dims 用例时输出)。
+    # 注意: TTK 对这三列没有"留空=None=默认连续"的回退 —— flat_storage_shape/
+    # flat_view_offset 会把显式 None 原样返回 (RandomData 与 torch.as_strided 均会
+    # 抛错导致 INPUT_GEN_FAILURE), 因此所有有张量的槽位都必须填显式连续值。
+    nc_kv_dims = p.get("nc_kv_dims")
+    storage_shapes = [None] * len(shapes)
+    view_strides = [None] * len(shapes)
+    view_offsets = [None] * len(shapes)
+    if nc_kv_dims is not None:
+        for i, shape in enumerate(shapes):
+            if shape is None:
+                continue  # 槽位无张量, TTK 跳过
+            if i in (1, 2):
+                storage_shapes[i], view_strides[i], view_offsets[i] = _nc_fields(
+                    shape, nc_kv_dims
+                )
+            else:
+                storage_shapes[i] = shape
+                view_strides[i] = _contiguous_stride(shape)
+                view_offsets[i] = 0
 
     return [
         case_name,
@@ -372,6 +466,9 @@ def _build_row(case_name, p):
         repr(data_ranges),
         repr(prec),
         repr(ABSOLUTE_PRECISION_DEFAULT),
+        repr(tuple(storage_shapes)),
+        repr(tuple(view_offsets)),
+        repr(tuple(view_strides)),
     ]
 
 
@@ -385,8 +482,8 @@ def main():
     parser.add_argument(
         "--output",
         "-o",
-        default="flash_attn_stc.csv",
-        help="Output CSV filename (default: flash_attn_stc.csv)",
+        default="testcase/flash_attn_stc.csv",
+        help="Output CSV path relative to assets (default: testcase/flash_attn_stc.csv)",
     )
     parser.add_argument(
         "--case-file",
@@ -399,17 +496,25 @@ def main():
 
     cases = load_case_modules([f"test_cases.{args.case_file}"])
 
+    has_nc = any("nc_kv_dims" in raw for raw in cases.values())
+    header = HEADER + NC_HEADER if has_nc else HEADER
+
     out_path = os.path.join(_HERE, args.output)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    written = 0
     with open(out_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(HEADER)
+        writer.writerow(header)
         for case_id, raw_params in sorted(cases.items()):
             short_name = case_id.rsplit("/", 1)[-1]
             p = normalize_params(raw_params)
+            if p is None:  # REJ 拦截用例: 预期算子报错, TTK 不生成
+                continue
             row = _build_row(short_name, p)
-            writer.writerow(row)
+            writer.writerow(row if has_nc else row[: len(HEADER)])
+            written += 1
 
-    print(f"wrote {out_path} ({len(cases)} cases)")
+    print(f"wrote {out_path} ({written} cases)")
 
 
 if __name__ == "__main__":
