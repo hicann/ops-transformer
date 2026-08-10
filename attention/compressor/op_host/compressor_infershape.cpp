@@ -10,7 +10,6 @@
 
 #include <graph/utils/type_utils.h>
 #include <register/op_impl_registry.h>
-#include "err/ops_err.h"
 #include "log/log.h"
 
 using namespace ge;
@@ -144,7 +143,8 @@ ge::graphStatus SetCompressorShapeDim(const CompressorProtoShapeParam &shapePara
 
 ge::graphStatus InferDataTypeCompressor(gert::InferDataTypeContext* context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE(context->GetNodeName(), "Context is nullptr."),
+    OP_CHECK_IF(context == nullptr,
+               OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("Compressor", "context", "is nullptr"),
                return ge::GRAPH_FAILED);
     OP_LOGI(context->GetNodeName(), "Enter Compressor inferDataType impl.");
 
@@ -155,18 +155,21 @@ ge::graphStatus InferDataTypeCompressor(gert::InferDataTypeContext* context)
 
 ge::graphStatus InferShapeCompressor(gert::InferShapeContext* context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE(context->GetNodeName(), "Context is nullptr."),
+    OP_CHECK_IF(context == nullptr,
+               OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("Compressor", "context", "is nullptr"),
                return ge::GRAPH_FAILED);
     OP_LOGI(context->GetNodeName(), "Enter Compressor infershape impl.");
 
     CompressorProtoShapeParam shapeParam {};
     auto apiRet = GetCompressorShapeDim(context, shapeParam);
-    OP_CHECK_IF((apiRet != GRAPH_SUCCESS),  OP_LOGE(context->GetNodeName(), "Context get input shape failed"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((apiRet != GRAPH_SUCCESS),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "context", "get input shape failed"),
+                return ge::GRAPH_FAILED);
 
     apiRet = SetCompressorShapeDim(shapeParam, context);
-    OP_CHECK_IF((apiRet != GRAPH_SUCCESS), OP_LOGE(context->GetNodeName(), "Context set output shape failed"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((apiRet != GRAPH_SUCCESS),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "context", "set output shape failed"),
+                return ge::GRAPH_FAILED);
 
     return GRAPH_SUCCESS;
 }

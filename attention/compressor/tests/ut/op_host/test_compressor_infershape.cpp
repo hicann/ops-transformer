@@ -12,6 +12,8 @@
 #include <iostream>
 #include "infer_shape_context_faker.h"
 #include "infer_shape_case_executor.h"
+#include "infer_datatype_context_faker.h"
+#include "base/registry/op_impl_space_registry_v2.h"
 
 class CompressorInfershape : public testing::Test {
 protected:
@@ -265,4 +267,42 @@ TEST_F(CompressorInfershape, bsh_empty_batch)
     // B=0, Sr=ceil(4/4)=1, output: [0, 1, 512]
     std::vector<std::vector<int64_t>> expectOutputShape = {{0, 1, 512}};
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
+// ====================================================================
+// InferDataType — output dtype follows x
+// ====================================================================
+
+TEST_F(CompressorInfershape, inferdatatype_bf16)
+{
+    auto spaceRegistry = gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry();
+    ASSERT_NE(spaceRegistry, nullptr);
+    auto data_type_func = spaceRegistry->GetOpImpl("Compressor")->infer_datatype;
+    ASSERT_NE(data_type_func, nullptr);
+    ge::DataType dtBf16 = ge::DT_BF16;
+    ge::DataType dtFp32 = ge::DT_FLOAT;
+    ge::DataType dtInt32 = ge::DT_INT32;
+    auto context_holder = gert::InferDataTypeContextFaker()
+                              .IrInputNum(9)
+                              .NodeIoNum(9, 2)
+                              .NodeInputTd(0, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(1, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(2, ge::DT_BF16, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(3, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(4, ge::DT_FLOAT, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(5, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(6, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(7, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(8, ge::DT_INT32, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .InputDataTypes({&dtBf16, &dtBf16, &dtBf16, &dtFp32, &dtFp32,
+                                               &dtInt32, &dtInt32, &dtInt32, &dtInt32})
+                              .OutputDataTypes({&dtBf16, &dtFp32})
+                              .Build();
+    auto context = context_holder.GetContext<gert::InferDataTypeContext>();
+    EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
+    ASSERT_NE(context, nullptr);
+    // cmp_kv output dtype should follow x (DT_BF16)
+    EXPECT_EQ(context->GetOutputDataType(0), ge::DT_BF16);
 }

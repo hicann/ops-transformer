@@ -37,6 +37,7 @@
 #endif
 
 namespace optiling {
+namespace {
 
 // INPUT
 constexpr uint32_t TOKEN_X_INPUT_INDEX = 0;
@@ -180,7 +181,6 @@ enum class LayoutType { LAYOUT_BSH, LAYOUT_TH };
 
 enum class TemplateId : uint8_t { NORMAL = 0, EMPTY_X = 1, FULL_LOAD = 2 };
 
-CMP_EXTERN_C ge::graphStatus TilingCompressor(gert::TilingContext *context);
 struct CompressorBaseShapeInfo {
     uint32_t bSize = 0;    // B
     uint32_t sSize = 0;    // S
@@ -319,6 +319,9 @@ private:
     CompressorWorkspaceParams *workspaceParams_ = nullptr;
 };
 
+} // namespace anonymous
+
+CMP_EXTERN_C ge::graphStatus TilingCompressorArch35(gert::TilingContext *context);
 } // namespace optiling
 
 #endif

@@ -761,3 +761,77 @@ TEST_F(QuantCompressorTiling, quant_compressor_tiling_bsh_full_load_core2)
     );
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, std::numeric_limits<uint64_t>::max());
 }
+
+// ====================================================================
+// Additional Error Cases — err msg branch coverage gaps
+// ====================================================================
+
+// TH layout without cu_seqlens (should be present) -> EZ0037 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON
+TEST_F(QuantCompressorTiling, quant_compressor_tiling_th_without_cu_seqlens)
+{
+    QuantCompressorUtCompileInfo compileInfo{};
+    gert::TilingContextPara tilingContextPara(
+        "QuantCompressor",
+        {
+            {{{128, 4096}, {128, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},        // TH layout
+            {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 256}, {4, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},                              // cu_seqlens absent in TH
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+        },
+        {
+            {{{32, 128}, {32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo, "Ascend950");
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// quantMode=1 but xDescale absent -> EZ0037 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON
+TEST_F(QuantCompressorTiling, quant_compressor_tiling_quant_mode1_without_xdescale)
+{
+    QuantCompressorUtCompileInfo compileInfo{};
+    gert::TilingContextPara tilingContextPara(
+        "QuantCompressor",
+        {
+            {{{1, 128, 4096}, {1, 128, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 256}, {4, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},                              // x_descale absent
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+        },
+        {
+            {{{1, 32, 128}, {1, 32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo, "Ascend950");
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}

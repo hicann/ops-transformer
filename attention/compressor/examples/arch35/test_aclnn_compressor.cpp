@@ -4,26 +4,26 @@
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
 /*!
- * \file test_aclnn_quant_compressor.cpp
- * \brief QuantCompressor 算子 aclnn 调用示例
- *        场景：C4A（D=512, coff=2, cmp_ratio=4, cache_mode=1, BSH layout）
+ * \file test_aclnn_compressor.cpp
+ * \brief Compressor 算子 aclnn 调用示例（A5 / ascend950）
+ *        场景：C4A（D=512, coff=2, cmp_ratio=4, cache_mode=1, BSH layout, BF16）
+ *        A5 版本，B=1,S=4 时 tokenSize=4 <= 256，会触发 FULL_LOAD 高性能模板。
  */
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <cstring>
 #include <iostream>
 #include <numeric>
 #include <vector>
 #include "acl/acl.h"
-#include "aclnnop/aclnn_quant_compressor.h"
-#include "securec.h"
+#include "aclnnop/aclnn_compressor.h"
+#include "opdev/bfloat16.h"
 
 #define CHECK_RET(cond, return_expr) \
     do { \
@@ -39,20 +39,7 @@
 
 namespace {
 
-template <typename To, typename From>
-inline To BitCopy(const From &src)
-{
-    static_assert(sizeof(To) == sizeof(From), "size mismatch");
-    To dst;
-    memcpy_s(&dst, sizeof(To), &src, sizeof(From));
-    return dst;
-}
-
-inline float Bf16ToFloat(uint16_t h)
-{
-    uint32_t x = static_cast<uint32_t>(h) << 16;
-    return BitCopy<float>(x);
-}
+using op::bfloat16;
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
 {
@@ -105,12 +92,12 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 void PrintBf16Result(const std::vector<int64_t> &shape, void **deviceAddr)
 {
     auto size = GetShapeSize(shape);
-    std::vector<uint16_t> resultData(size, 0);
+    std::vector<bfloat16> resultData(size, bfloat16(0.0f));
     auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), *deviceAddr,
                            size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
     for (int64_t i = 0; i < size && i < 10; i++) { // 10: max print
-        LOG_PRINT("cmp_kv[%ld] is: %f\n", i, Bf16ToFloat(resultData[i]));
+        LOG_PRINT("cmp_kv[%ld] is: %f\n", i, static_cast<float>(resultData[i]));
     }
 }
 
@@ -125,7 +112,7 @@ int main()
     auto ret = Init(deviceId, &context, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
-    // 场景参数: C4A (D=512, coff=2, cmp_ratio=4, cache_mode=1, BSH layout)
+    // 场景参数: C4A (D=512, coff=2, cmp_ratio=4, cache_mode=1, BSH layout, BF16)
     int64_t B = 1;
     int64_t S = 4;
     int64_t hiddenSize = 4096;
@@ -133,14 +120,13 @@ int main()
     int64_t coff = 2;
     int64_t cmpRatio = 4;
     int64_t cacheMode = 1; // 1: 连续buffer (LINEAR_BUFFER)
-    int64_t quantMode = 1; // 1: A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL
-    int64_t stateCacheStrideDim0 = 0;
     int64_t blockSize = 128;
 
     int64_t Smax = S;
     int64_t maxBlockNumPerBatch = (Smax + blockSize - 1) / blockSize;
     int64_t blockNum = B * maxBlockNumPerBatch;
     int64_t coffD = coff * headDim;
+    int64_t stateCacheStrideDim0 = blockSize * 2 * coffD; // state_cache 0轴 stride = dim1 * dim2
 
     // 2. 构造输入与输出 shape
     std::vector<int64_t> xShape = {B, S, hiddenSize};
@@ -148,9 +134,6 @@ int main()
     std::vector<int64_t> wgateShape = {coffD, hiddenSize};
     std::vector<int64_t> stateCacheShape = {blockNum, blockSize, 2 * coffD};
     std::vector<int64_t> apeShape = {cmpRatio, coffD};
-    std::vector<int64_t> xDescaleShape = {1};
-    std::vector<int64_t> wkvDescaleShape = {coffD};
-    std::vector<int64_t> wgateDescaleShape = {coffD};
     std::vector<int64_t> stateBlockTableShape = {B, maxBlockNumPerBatch};
     std::vector<int64_t> startPosShape = {B};
     int64_t Sr = (S + cmpRatio - 1) / cmpRatio;
@@ -164,20 +147,17 @@ int main()
     int64_t apeSize = GetShapeSize(apeShape);
     int64_t cmpKvSize = GetShapeSize(cmpKvShape);
 
-    std::vector<uint8_t> xHostData(xSize, blockSize);
-    std::vector<uint8_t> wkvHostData(wkvSize, blockSize);
-    std::vector<uint8_t> wgateHostData(wgateSize, blockSize);
+    std::vector<bfloat16> xHostData(xSize, bfloat16(0.1f));
+    std::vector<bfloat16> wkvHostData(wkvSize, bfloat16(0.1f));
+    std::vector<bfloat16> wgateHostData(wgateSize, bfloat16(0.1f));
     std::vector<float_t> stateCacheHostData(stateCacheSize, 0.1f);
     std::vector<float_t> apeHostData(apeSize, 0.1f);
-    std::vector<float_t> xDescaleHostData = {0.5f};
-    std::vector<float_t> wkvDescaleHostData(coffD, 0.1f);
-    std::vector<float_t> wgateDescaleHostData(coffD, 0.1f);
     std::vector<int32_t> stateBlockTableHostData;
     for (int64_t i = 0; i < B * maxBlockNumPerBatch; i++) {
         stateBlockTableHostData.push_back(static_cast<int32_t>(i + 1));
     }
     std::vector<int32_t> startPosHostData(B, 0);
-    std::vector<uint16_t> cmpKvHostData(cmpKvSize, 0);
+    std::vector<bfloat16> cmpKvHostData(cmpKvSize, bfloat16(0.0f));
 
     // 4. 创建 aclTensor
     void *xDeviceAddr = nullptr;
@@ -185,9 +165,6 @@ int main()
     void *wgateDeviceAddr = nullptr;
     void *stateCacheDeviceAddr = nullptr;
     void *apeDeviceAddr = nullptr;
-    void *xDescaleDeviceAddr = nullptr;
-    void *wkvDescaleDeviceAddr = nullptr;
-    void *wgateDescaleDeviceAddr = nullptr;
     void *stateBlockTableDeviceAddr = nullptr;
     void *startPosDeviceAddr = nullptr;
     void *cmpKvDeviceAddr = nullptr;
@@ -197,31 +174,20 @@ int main()
     aclTensor *wgate = nullptr;
     aclTensor *stateCacheRef = nullptr;
     aclTensor *ape = nullptr;
-    aclTensor *xDescale = nullptr;
-    aclTensor *wkvDescale = nullptr;
-    aclTensor *wgateDescale = nullptr;
     aclTensor *stateBlockTable = nullptr;
     aclTensor *startPos = nullptr;
     aclTensor *cmpKvOut = nullptr;
 
-    ret = CreateAclTensor(xHostData, xShape, &xDeviceAddr, aclDataType::ACL_HIFLOAT8, &x);
+    ret = CreateAclTensor(xHostData, xShape, &xDeviceAddr, aclDataType::ACL_BF16, &x);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(wkvHostData, wkvShape, &wkvDeviceAddr, aclDataType::ACL_HIFLOAT8, &wkv);
+    ret = CreateAclTensor(wkvHostData, wkvShape, &wkvDeviceAddr, aclDataType::ACL_BF16, &wkv);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(wgateHostData, wgateShape, &wgateDeviceAddr, aclDataType::ACL_HIFLOAT8, &wgate);
+    ret = CreateAclTensor(wgateHostData, wgateShape, &wgateDeviceAddr, aclDataType::ACL_BF16, &wgate);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(stateCacheHostData, stateCacheShape, &stateCacheDeviceAddr, aclDataType::ACL_FLOAT,
                           &stateCacheRef);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(apeHostData, apeShape, &apeDeviceAddr, aclDataType::ACL_FLOAT, &ape);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(xDescaleHostData, xDescaleShape, &xDescaleDeviceAddr, aclDataType::ACL_FLOAT, &xDescale);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(wkvDescaleHostData, wkvDescaleShape, &wkvDescaleDeviceAddr, aclDataType::ACL_FLOAT,
-                          &wkvDescale);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(wgateDescaleHostData, wgateDescaleShape, &wgateDescaleDeviceAddr, aclDataType::ACL_FLOAT,
-                          &wgateDescale);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(stateBlockTableHostData, stateBlockTableShape, &stateBlockTableDeviceAddr,
                           aclDataType::ACL_INT32, &stateBlockTable);
@@ -231,14 +197,14 @@ int main()
     ret = CreateAclTensor(cmpKvHostData, cmpKvShape, &cmpKvDeviceAddr, aclDataType::ACL_BF16, &cmpKvOut);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    // 5. 调用 aclnnQuantCompressorGetWorkspaceSize
+    // 5. 调用 aclnnCompressorGetWorkspaceSize
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
 
-    ret = aclnnQuantCompressorGetWorkspaceSize(x, wkv, wgate, stateCacheRef, ape, xDescale, wkvDescale, wgateDescale,
-                                               stateBlockTable, nullptr, nullptr, startPos, quantMode, cmpRatio, coff,
-                                               cacheMode, stateCacheStrideDim0, cmpKvOut, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnQuantCompressorGetWorkspaceSize failed. ERROR: %d\n", ret);
+    ret = aclnnCompressorGetWorkspaceSize(x, wkv, wgate, stateCacheRef, ape, stateBlockTable, nullptr, nullptr,
+                                          startPos, cmpRatio, coff, cacheMode, stateCacheStrideDim0, cmpKvOut,
+                                          &workspaceSize, &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCompressorGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
     // 6. 申请 workspace
@@ -248,16 +214,16 @@ int main()
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
     }
 
-    // 7. 调用 aclnnQuantCompressor
-    ret = aclnnQuantCompressor(workspaceAddr, workspaceSize, executor, stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnQuantCompressor failed. ERROR: %d\n", ret); return ret);
+    // 7. 调用 aclnnCompressor
+    ret = aclnnCompressor(workspaceAddr, workspaceSize, executor, stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCompressor failed. ERROR: %d\n", ret); return ret);
 
     // 8. 同步等待
     ret = aclrtSynchronizeStream(stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
     // 9. 获取输出
-    LOG_PRINT("QuantCompressor execution succeeded.\n");
+    LOG_PRINT("Compressor execution succeeded.\n");
     PrintBf16Result(cmpKvShape, &cmpKvDeviceAddr);
 
     // 10. 释放资源
@@ -266,9 +232,6 @@ int main()
     aclDestroyTensor(wgate);
     aclDestroyTensor(stateCacheRef);
     aclDestroyTensor(ape);
-    aclDestroyTensor(xDescale);
-    aclDestroyTensor(wkvDescale);
-    aclDestroyTensor(wgateDescale);
     aclDestroyTensor(stateBlockTable);
     aclDestroyTensor(startPos);
     aclDestroyTensor(cmpKvOut);
@@ -278,9 +241,6 @@ int main()
     aclrtFree(wgateDeviceAddr);
     aclrtFree(stateCacheDeviceAddr);
     aclrtFree(apeDeviceAddr);
-    aclrtFree(xDescaleDeviceAddr);
-    aclrtFree(wkvDescaleDeviceAddr);
-    aclrtFree(wgateDescaleDeviceAddr);
     aclrtFree(stateBlockTableDeviceAddr);
     aclrtFree(startPosDeviceAddr);
     aclrtFree(cmpKvDeviceAddr);

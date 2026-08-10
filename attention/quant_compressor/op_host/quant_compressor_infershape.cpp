@@ -10,7 +10,6 @@
 
 #include <graph/utils/type_utils.h>
 #include <register/op_impl_registry.h>
-#include "err/ops_err.h"
 #include "log/log.h"
 
 using namespace ge;
@@ -150,7 +149,9 @@ ge::graphStatus SetQuantCompressorShapeDim(const QuantCompressorProtoShapeParam 
 
 ge::graphStatus InferDataTypeQuantCompressor(gert::InferDataTypeContext *context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE(context->GetNodeName(), "Context is nullptr."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context == nullptr,
+               OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("QuantCompressor", "context", "is nullptr"),
+               return ge::GRAPH_FAILED);
     OP_LOGI(context->GetNodeName(), "Enter QuantCompressor inferDataType impl.");
 
     context->SetOutputDataType(CMP_KV_OUTPUT_INDEX, ge::DT_BF16);
@@ -160,16 +161,20 @@ ge::graphStatus InferDataTypeQuantCompressor(gert::InferDataTypeContext *context
 
 ge::graphStatus InferShapeQuantCompressor(gert::InferShapeContext *context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE(context->GetNodeName(), "Context is nullptr."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context == nullptr,
+               OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("QuantCompressor", "context", "is nullptr"),
+               return ge::GRAPH_FAILED);
     OP_LOGI(context->GetNodeName(), "Enter QuantCompressor infershape impl.");
 
     QuantCompressorProtoShapeParam shapeParam{};
     auto apiRet = GetQuantCompressorShapeDim(context, shapeParam);
-    OP_CHECK_IF((apiRet != GRAPH_SUCCESS), OP_LOGE(context->GetNodeName(), "Context get input shape failed"),
+    OP_CHECK_IF((apiRet != GRAPH_SUCCESS),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "context", "get input shape failed"),
                 return ge::GRAPH_FAILED);
 
     apiRet = SetQuantCompressorShapeDim(shapeParam, context);
-    OP_CHECK_IF((apiRet != GRAPH_SUCCESS), OP_LOGE(context->GetNodeName(), "Context set output shape failed"),
+    OP_CHECK_IF((apiRet != GRAPH_SUCCESS),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "context", "set output shape failed"),
                 return ge::GRAPH_FAILED);
 
     return GRAPH_SUCCESS;
