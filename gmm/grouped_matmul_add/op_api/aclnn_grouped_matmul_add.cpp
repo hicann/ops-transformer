@@ -51,9 +51,6 @@ static aclnnStatus CheckNotNull(gmm_add_advanced::GroupedMatmulAddParams params,
                "groupList");
     CHECK_COND(params.yRef != nullptr, ACLNN_ERR_PARAM_NULLPTR, "In op [%s], [%s] must not be nullptr.", opName,
                "yRef");
-    CHECK_COND(params.groupListType == 0 || params.groupListType == 1, ACLNN_ERR_PARAM_INVALID,
-               "In op [%s], when non-quant, [%s] is not supported, got [%ld].", opName, "groupListType",
-               params.groupListType);
     return ACLNN_SUCCESS;
 }
 
@@ -98,10 +95,10 @@ static aclnnStatus CheckShape(gmm_add_advanced::GroupedMatmulAddParams params, c
                "In op [%s], when non-quant, the shape of [%s] is not supported, got [dim num %zu]. "
                "Constraint:[dim num must be 1].",
                opName, "groupList", groupListDimNum);
-    auto aKDim = xViewShape.GetDim(0); // 0: x shape k direction
-    auto aMDim = xViewShape.GetDim(1); // 1: x shape m direction
-    auto bKDim = wViewShape.GetDim(0); // 0: w shape k direction
-    auto bNDim = wViewShape.GetDim(1); // 1: w shape m direction
+    auto aKDim = xViewShape.GetDim(0);                // 0: x shape k direction
+    auto aMDim = xViewShape.GetDim(1);                // 1: x shape m direction
+    auto bKDim = wViewShape.GetDim(0);                // 0: w shape k direction
+    auto bNDim = wViewShape.GetDim(1);                // 1: w shape m direction
     auto groupListDim = groupListViewShape.GetDim(0); // 0: groupList shape
 
     CHECK_COND(aMDim >= 0, ACLNN_ERR_PARAM_INVALID,
@@ -120,12 +117,12 @@ static aclnnStatus CheckShape(gmm_add_advanced::GroupedMatmulAddParams params, c
         OP_LOGW("Expected shape of y is 3 Dim.");
     }
     // only check total size for avoiding error interception. the y shape Dim is not interceped before.
-    auto expectedYSize =  aMDim * bNDim * groupListDim;
+    auto expectedYSize = aMDim * bNDim * groupListDim;
     auto actualYSize = yRefViewShape.GetShapeSize();
     CHECK_COND(expectedYSize == actualYSize, ACLNN_ERR_PARAM_INVALID,
-        "In op [%s], when non-quant, the shape of [%s] is not supported, got [shape size %ld]. "
-        "Constraint:[shape size should be %ld].",
-        opName, "yRef", actualYSize, expectedYSize);
+               "In op [%s], when non-quant, the shape of [%s] is not supported, got [shape size %ld]. "
+               "Constraint:[shape size should be %ld].",
+               opName, "yRef", actualYSize, expectedYSize);
 
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         auto groupNum = params.groupList->GetViewShape().GetDim(0);
@@ -156,7 +153,7 @@ static aclnnStatus CheckShape(gmm_add_advanced::GroupedMatmulAddParams params, c
 static aclnnStatus CheckZeroShape(gmm_add_advanced::GroupedMatmulAddParams params)
 {
     bool isEmptyX = params.x->IsEmpty() ? true : false;
-    bool isEmptyWeight = params.weight->IsEmpty()? true : false;
+    bool isEmptyWeight = params.weight->IsEmpty() ? true : false;
     // support return empty tensor
     aclnnStatus ret = isEmptyX || isEmptyWeight ? ACLNN_ERR_PARAM_INVALID : ACLNN_SUCCESS;
     return ret;
@@ -204,12 +201,27 @@ static aclnnStatus CheckDtype(gmm_add_advanced::GroupedMatmulAddParams params, c
     return ACLNN_SUCCESS;
 }
 
+static aclnnStatus CheckAttrs(gmm_add_advanced::GroupedMatmulAddParams params, const char *opName)
+{
+    CHECK_COND(params.groupListType == 0 || params.groupListType == 1, ACLNN_ERR_PARAM_INVALID,
+               "In op [%s], when non-quant, [%s] only supported 0/1, but got [%ld].", opName, "groupListType",
+               params.groupListType);
+    CHECK_COND(params.groupType == 2, ACLNN_ERR_PARAM_INVALID,
+               "In op [%s], when non-quant, [%s] must be 2, but got [%ld].", opName, "groupType", params.groupType);
+    CHECK_COND(params.transposeX, ACLNN_ERR_PARAM_INVALID, "In op [%s], when non-quant, [%s] must be True.", opName,
+               "transposeX");
+    CHECK_COND(!params.transposeWeight, ACLNN_ERR_PARAM_INVALID, "In op [%s], when non-quant,  [%s] must be False.",
+               opName, "transposeWeight");
+    return ACLNN_SUCCESS;
+}
+
 static aclnnStatus CheckParams(gmm_add_advanced::GroupedMatmulAddParams params, const char *opName)
 {
     CHECK_RET(CheckNotNull(params, opName) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckFormat(params, opName) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckShape(params, opName) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckDtype(params, opName) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckAttrs(params, opName) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;
 }
 
@@ -268,7 +280,7 @@ aclnnStatus aclnnGroupedMatmulAddV2GetWorkspaceSize(const aclTensor *x, const ac
                                                     uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     const char *opName = "grouped_matmul_add";
-    gmm_add_advanced::GroupedMatmulAddParams params{x,          weight,          groupList, yRef,
+    gmm_add_advanced::GroupedMatmulAddParams params{x, weight, groupList, yRef,
                                                     transposeX, transposeWeight, groupType, groupListType};
     // Standard syntax, Check parameters.
     L2_DFX_PHASE_1(aclnnGroupedMatmulAddV2,
