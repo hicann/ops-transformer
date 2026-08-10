@@ -11,44 +11,26 @@
 #ifndef MEGA_MOE_TOKEN_DISPATCH_H
 #define MEGA_MOE_TOKEN_DISPATCH_H
 
-#include "../mega_moe_job_context.h"
-#include "../mega_moe_impl.h"
+#include "../common/mega_moe_utils.h"
 
 namespace MegaMoeImpl {
 
+using namespace AscendC;
+
 // Token Dispatch uses a logical block job for work partitioning and a physical
 // workspace slot for count/flag publication. Neither index is derived here.
-struct TokenDispatchContext {
+struct TokenDispatchConfig {
+    MoeStageCommonConfig common;
     BlockJobContext blockJob;
     BlockWorkspaceContext countWorkspace;
-    uint32_t worldSize;
-    uint32_t expertCapacityPerRank; // Weight/workspace capacity, including reserved expert slots.
-    uint32_t tokenHiddenDim;
-    uint32_t topK;
-    uint32_t blockNumPerRank;
     uint64_t maxOutputSize;
-    uint64_t sendTotalNum;
     MegaMoeDispatchBufferConfig bufferConfig;
     uint32_t maskAlignSize;
-    uint32_t maskSlotSize;
     uint64_t quantWinOffset;
     uint32_t quantTokenAlignBytes;
     uint32_t quantScaleAlignBytes;
     uint32_t quantTokenScaleAlignBytes;
     int32_t dispatchFlagSlotsPerExpert;
-    uint32_t activationElementsPerByte;
-};
-
-struct TokenDispatchArgs {
-    GM_ADDR *winRankAddr;
-    GM_ADDR maskRecvPtr;
-    GM_ADDR expertRevTokenNumsPtr;
-    GM_ADDR metaInfoPtr;
-    GM_ADDR cumsumInfoPtr;
-    GM_ADDR dispatchRevDataPtr;
-    GM_ADDR dispatchRevScalePtr;
-    GM_ADDR dispatchToGmm1FlagPtr;
-    GM_ADDR sendCntFlagPtr;
 };
 
 template <typename ActivationType>
@@ -71,84 +53,9 @@ struct TokenDispatchScratch {
     uint64_t cumsumRevCntInRank;
 };
 
-// Prototype: MegaMoe::DispatchBuffInit. Builds the bounded-UB scratch layout used by Token Dispatch.
-template <typename ActivationType, bool EnableA8W4>
-__aicore__ inline void InitTokenDispatchBuffers(const TokenDispatchContext &context, const TokenDispatchArgs &args,
-                                                TokenDispatchScratch<ActivationType> &scratch)
-{
-    scratch.expertRevNumsGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(args.expertRevTokenNumsPtr));
-    if constexpr (g_coreType == AIC) {
-        return;
-    }
-    // Only AIV1 performs SendCnt/Dispatch and later exports the cumsum result.
-    if (GetSubBlockIdx() != 1) {
-        return;
-    }
-    const MegaMoeDispatchBufferConfig &bufferConfig = context.bufferConfig;
-    scratch.revTokenElemCnt = context.tokenHiddenDim / context.activationElementsPerByte;
-    scratch.revScaleElemCnt =
-        Ops::Base::CeilDiv(static_cast<int64_t>(context.tokenHiddenDim), static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
-        MXFP_MULTI_BASE_SIZE;
-    uint32_t cumsumInfoTensorSize =
-        Ops::Base::CeilAlign(static_cast<int64_t>(context.worldSize * context.expertCapacityPerRank * sizeof(int32_t)),
-                             static_cast<int64_t>(ALIGN_32));
-    if constexpr (EnableA8W4) {
-        scratch.cumsumInfoGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(
-            args.cumsumInfoPtr + static_cast<uint64_t>(cumsumInfoTensorSize) * context.countWorkspace.blockIdx));
-    }
-    scratch.cumsumRevCntInRank = 0;
-
-    uint32_t expertTokenCntTensorAddr = 0;
-    uint32_t expertTokenCntTensorSize = ALIGN_32;
-    scratch.expertTokenCntTensor =
-        LocalTensor<int32_t>(TPosition::VECCALC, expertTokenCntTensorAddr, expertTokenCntTensorSize / sizeof(int32_t));
-
-    uint32_t cumsumInfoTensorAddr = expertTokenCntTensorAddr + expertTokenCntTensorSize;
-    scratch.cumsumInfoTensor =
-        LocalTensor<int32_t>(TPosition::VECCALC, cumsumInfoTensorAddr, cumsumInfoTensorSize / sizeof(int32_t));
-
-    uint32_t sendCntTensorAddr = cumsumInfoTensorAddr + cumsumInfoTensorSize;
-    uint32_t sendCntTensorSize = context.worldSize * static_cast<uint32_t>(ALIGN_32);
-    scratch.sendCntTensor =
-        LocalTensor<int32_t>(TPosition::VECCALC, sendCntTensorAddr, sendCntTensorSize / sizeof(int32_t));
-
-    uint32_t maskBatchTensorAddr = sendCntTensorAddr + sendCntTensorSize;
-    uint32_t maskBatchTensorSize = static_cast<uint32_t>(bufferConfig.routeItemsPerBatch / 8);
-    scratch.maskBatchTensor = LocalTensor<uint8_t>(TPosition::VECCALC, maskBatchTensorAddr, maskBatchTensorSize);
-    scratch.maskBatchU32Tensor =
-        LocalTensor<uint32_t>(TPosition::VECCALC, maskBatchTensorAddr, maskBatchTensorSize / sizeof(uint32_t));
-
-    uint32_t validTopkIndexTensorAddr = maskBatchTensorAddr + maskBatchTensorSize;
-    uint32_t validTopkIndexTensorSize = Ops::Base::CeilAlign(
-        static_cast<int64_t>(bufferConfig.routeItemsPerBatch * sizeof(int32_t)), static_cast<int64_t>(ALIGN_32));
-    scratch.validTopkIndexTensor =
-        LocalTensor<int32_t>(TPosition::VECCALC, validTopkIndexTensorAddr, validTopkIndexTensorSize / sizeof(int32_t));
-
-    uint32_t topkIndexTensorAddr = validTopkIndexTensorAddr + validTopkIndexTensorSize;
-    uint32_t topkIndexTensorSize = validTopkIndexTensorSize;
-    scratch.topkIndexTensor =
-        LocalTensor<int32_t>(TPosition::VECCALC, topkIndexTensorAddr, topkIndexTensorSize / sizeof(int32_t));
-
-    scratch.copyTmpBaseAddr = topkIndexTensorAddr + topkIndexTensorSize;
-    uint32_t copyTmpTotalSize = static_cast<uint32_t>(bufferConfig.bufferCount) * context.quantTokenScaleAlignBytes;
-
-    uint32_t expertTokenNumsOutTensorAddr = scratch.copyTmpBaseAddr + copyTmpTotalSize;
-    uint32_t expertTokenNumsOutTensorSize = Ops::Base::CeilAlign(
-        static_cast<int64_t>(context.expertCapacityPerRank * sizeof(int32_t)), static_cast<int64_t>(ALIGN_32));
-    scratch.expertTokenNumsOutTensor = LocalTensor<int32_t>(TPosition::VECCALC, expertTokenNumsOutTensorAddr,
-                                                            expertTokenNumsOutTensorSize / sizeof(int32_t));
-    uint32_t metaInfoTensorAddr = expertTokenNumsOutTensorAddr + expertTokenNumsOutTensorSize;
-    uint32_t metaInfoTensorSize = static_cast<uint32_t>(bufferConfig.bufferCount) * INT32_PER_256B * sizeof(int32_t);
-    scratch.metaInfoTensor =
-        LocalTensor<int32_t>(TPosition::VECCALC, metaInfoTensorAddr, metaInfoTensorSize / sizeof(int32_t));
-
-    // ComputeExpertTokenCountAndNotify overwrites every cumsum element before it is read. Clearing it here
-    // would also introduce an unsynchronized V-to-S WAW with the first scalar updates.
-}
-
 template <typename ActivationType>
 __aicore__ inline LocalTensor<ActivationType> GetDispatchCopyBuffer(
-    const TokenDispatchContext &context, const TokenDispatchScratch<ActivationType> &scratch, int32_t bufferIdx)
+    const TokenDispatchConfig &context, const TokenDispatchScratch<ActivationType> &scratch, int32_t bufferIdx)
 {
     return LocalTensor<ActivationType>(
         TPosition::VECCALC,
@@ -157,14 +64,14 @@ __aicore__ inline LocalTensor<ActivationType> GetDispatchCopyBuffer(
 }
 
 template <bool IsBufferReuse, bool TopkWeightsPrefetch, typename ActivationType>
-__aicore__ inline void FetchDispatchTokenAndMetaInfo(const TokenDispatchContext &context,
+__aicore__ inline void FetchDispatchTokenAndMetaInfo(const TokenDispatchConfig &context,
                                                      TokenDispatchScratch<ActivationType> &scratch,
                                                      int32_t bufferIdx, int32_t topkIndex, int32_t remoteRankIdx,
                                                      GlobalTensor<ActivationType> &remoteRankGlobalTensor)
 {
     TEventID eventId = static_cast<TEventID>(bufferIdx);
     LocalTensor<ActivationType> copyTmpTensor = GetDispatchCopyBuffer(context, scratch, bufferIdx);
-    int32_t tokenIndex = topkIndex / static_cast<int32_t>(context.topK);
+    int32_t tokenIndex = topkIndex / static_cast<int32_t>(context.common.topK);
     uint64_t remoteCopyOffset =
         static_cast<uint64_t>(tokenIndex) * static_cast<uint64_t>(context.quantTokenScaleAlignBytes);
     if constexpr (IsBufferReuse) {
@@ -179,7 +86,7 @@ __aicore__ inline void FetchDispatchTokenAndMetaInfo(const TokenDispatchContext 
     scratch.metaInfoTensor[bufferIdx * INT32_PER_256B].SetValue(RANK_ID, remoteRankIdx);
     scratch.metaInfoTensor[bufferIdx * INT32_PER_256B].SetValue(TOKEN_ID, tokenIndex);
     scratch.metaInfoTensor[bufferIdx * INT32_PER_256B].SetValue(TOPK_INDEX,
-                                                                topkIndex % static_cast<int32_t>(context.topK));
+                                                                topkIndex % static_cast<int32_t>(context.common.topK));
     if constexpr (TopkWeightsPrefetch) {
         SetFlag<AscendC::HardEvent::MTE2_S>(eventId);
     } else {
@@ -189,7 +96,7 @@ __aicore__ inline void FetchDispatchTokenAndMetaInfo(const TokenDispatchContext 
 
 template <typename ActivationType, typename QuantScaleType, bool TopkWeightsPrefetch>
 __aicore__ inline void StoreDispatchTokenAndMetaInfo(
-    const TokenDispatchContext &context, TokenDispatchScratch<ActivationType> &scratch, int32_t bufferIdx,
+    const TokenDispatchConfig &context, TokenDispatchScratch<ActivationType> &scratch, int32_t bufferIdx,
     int32_t dstIdx, GlobalTensor<ActivationType> &tokenRevGlobalTensor,
     GlobalTensor<QuantScaleType> &scaleRevGlobalTensor, GlobalTensor<int32_t> &metaInfoGlobalTensor,
     int32_t copyStartIdx, int32_t copyIdx)
@@ -205,7 +112,7 @@ __aicore__ inline void StoreDispatchTokenAndMetaInfo(
         LocalTensor<int32_t> weightBitsTensor = tokenScaleBuffer[weightOffsetInUb].template ReinterpretCast<int32_t>();
         int32_t topkIndex = scratch.validTopkIndexTensor.GetValue(copyStartIdx + copyIdx);
         int32_t weightBits =
-            weightBitsTensor.GetValue(static_cast<uint32_t>(topkIndex % static_cast<int32_t>(context.topK)));
+            weightBitsTensor.GetValue(static_cast<uint32_t>(topkIndex % static_cast<int32_t>(context.common.topK)));
         scratch.metaInfoTensor[bufferIdx * INT32_PER_256B].SetValue(WEIGHT_INDEX, weightBits);
         SetFlag<AscendC::HardEvent::S_MTE3>(eventId);
     }
@@ -223,7 +130,7 @@ __aicore__ inline void StoreDispatchTokenAndMetaInfo(
 // Prototype: MegaMoe::CopyGMToGMPerToken. Copies one dispatch shard and emits its metadata.
 template <typename ActivationType, typename QuantScaleType, bool TopkWeightsPrefetch>
 __aicore__ inline void CopyTokensAndMetaForDispatch(
-    const TokenDispatchContext &context, const TokenDispatchArgs &args,
+    const TokenDispatchConfig &context, const Params &params, GM_ADDR *winRankAddr,
     TokenDispatchScratch<ActivationType> &scratch, int32_t rowDstOffset, int32_t remoteRankIdx,
     int32_t copyStartIdx, int32_t copyNum)
 {
@@ -235,13 +142,16 @@ __aicore__ inline void CopyTokensAndMetaForDispatch(
     GlobalTensor<QuantScaleType> scaleRevGlobalTensor;
     GlobalTensor<int32_t> metaInfoGlobalTensor;
     tokenRevGlobalTensor.SetGlobalBuffer(
-        reinterpret_cast<__gm__ ActivationType *>(args.dispatchRevDataPtr + rowDstOffset * scratch.revTokenElemCnt));
+        reinterpret_cast<__gm__ ActivationType *>(params.workspaceInfo.dispatchRevDataPtr +
+                                                  rowDstOffset * scratch.revTokenElemCnt));
     scaleRevGlobalTensor.SetGlobalBuffer(
-        reinterpret_cast<__gm__ QuantScaleType *>(args.dispatchRevScalePtr + rowDstOffset * scratch.revScaleElemCnt));
+        reinterpret_cast<__gm__ QuantScaleType *>(params.workspaceInfo.dispatchRevScalePtr +
+                                                  rowDstOffset * scratch.revScaleElemCnt));
     remoteRankGlobalTensor.SetGlobalBuffer(
-        reinterpret_cast<__gm__ ActivationType *>(args.winRankAddr[remoteRankIdx] + context.quantWinOffset));
+        reinterpret_cast<__gm__ ActivationType *>(winRankAddr[remoteRankIdx] + context.quantWinOffset));
     metaInfoGlobalTensor.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t *>(args.metaInfoPtr + rowDstOffset * INT32_PER_256B * sizeof(int32_t)));
+        reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.metaInfoPtr +
+                                           rowDstOffset * INT32_PER_256B * sizeof(int32_t)));
 
     // The only caller enters this function for a non-empty match interval, so copyNum is at least one.
     // GatherMask's V-to-S synchronization covers the first scalar read, and the drain below covers
@@ -294,30 +204,30 @@ struct DispatchShardRange {
 
 template <typename ActivationType>
 __aicore__ inline DispatchShardRange CalculateDispatchShardRange(
-    const TokenDispatchContext &context, const TokenDispatchScratch<ActivationType> &scratch,
-    uint32_t localExpertId, uint32_t dispatchShardIdx)
+    const TokenDispatchConfig &context, const TokenDispatchScratch<ActivationType> &scratch,
+    uint32_t localExpertId, uint32_t dispatchShardIdx, uint32_t rankShardCount)
 {
-    uint32_t remoteRankIdx = dispatchShardIdx / context.blockNumPerRank;
-    uint32_t rankShardIdx = dispatchShardIdx % context.blockNumPerRank;
+    uint32_t remoteRankIdx = dispatchShardIdx / rankShardCount;
+    uint32_t rankShardIdx = dispatchShardIdx % rankShardCount;
     uint32_t rankSegmentDstRowBegin =
         (remoteRankIdx == 0U && localExpertId == 0U) ?
             0U :
             static_cast<uint32_t>(
-                scratch.cumsumInfoTensor.GetValue(localExpertId * context.worldSize + remoteRankIdx - 1U));
+                scratch.cumsumInfoTensor.GetValue(localExpertId * context.common.worldSize + remoteRankIdx - 1U));
     DispatchShardRange range{remoteRankIdx, rankSegmentDstRowBegin, 0, 0, 0};
     if (rankSegmentDstRowBegin >= context.maxOutputSize) {
         return range;
     }
 
     int32_t rankTokenCount =
-        scratch.cumsumInfoTensor.GetValue(localExpertId * context.worldSize + remoteRankIdx) -
+        scratch.cumsumInfoTensor.GetValue(localExpertId * context.common.worldSize + remoteRankIdx) -
         static_cast<int32_t>(rankSegmentDstRowBegin);
     int32_t rankDispatchRowCount =
         rankSegmentDstRowBegin + rankTokenCount > context.maxOutputSize ?
             static_cast<int32_t>(context.maxOutputSize - rankSegmentDstRowBegin) :
             rankTokenCount;
     int32_t rowsPerRankShard =
-        Ops::Base::CeilDiv(rankDispatchRowCount, static_cast<int32_t>(context.blockNumPerRank));
+        Ops::Base::CeilDiv(rankDispatchRowCount, static_cast<int32_t>(rankShardCount));
     int32_t rankShardRowBegin = static_cast<int32_t>(rankShardIdx) * rowsPerRankShard;
     range.dstRowBegin = static_cast<int32_t>(rankSegmentDstRowBegin) + rankShardRowBegin;
     int32_t dispatchRowCount =
@@ -334,22 +244,26 @@ __aicore__ inline DispatchShardRange CalculateDispatchShardRange(
 // Prototype: MegaMoe::MetaInfoCalAndDispatch. Scans route batches and dispatches one block's token shards.
 template <typename ActivationType, typename QuantScaleType, bool EnableA8W4, uint32_t PipelineTileM,
           bool TopkWeightsPrefetch>
-__aicore__ inline void DispatchExpertTokens(const TokenDispatchContext &context, const TokenDispatchArgs &args,
-                                            TokenDispatchScratch<ActivationType> &scratch, uint32_t localExpertId)
+__aicore__ inline void DispatchExpertTokens(const TokenDispatchConfig &context, const Params &params,
+                                            GM_ADDR *winRankAddr, TokenDispatchScratch<ActivationType> &scratch,
+                                            uint32_t localExpertId)
 {
     constexpr int32_t dispatchWaveRowCount = static_cast<int32_t>(PipelineTileM);
     const MegaMoeDispatchBufferConfig &bufferConfig = context.bufferConfig;
+    uint32_t maskSlotSize = context.maskAlignSize + static_cast<uint32_t>(ALIGN_32);
     int32_t expertGlobalRowBegin =
-        localExpertId == 0 ? 0 : scratch.cumsumInfoTensor.GetValue(localExpertId * context.worldSize - 1);
-    __gm__ int32_t *dispatchWaveReadyCount = reinterpret_cast<__gm__ int32_t *>(args.dispatchToGmm1FlagPtr) +
-                                             static_cast<uint64_t>(localExpertId) *
-                                                 context.dispatchFlagSlotsPerExpert;
+        localExpertId == 0 ? 0 : scratch.cumsumInfoTensor.GetValue(localExpertId * context.common.worldSize - 1);
+    __gm__ int32_t *dispatchWaveReadyCount =
+        reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.flagDispatchToGmm1Ptr) +
+        static_cast<uint64_t>(localExpertId) * context.dispatchFlagSlotsPerExpert;
+    uint32_t rankShardCount = context.countWorkspace.blockNum / context.common.worldSize;
+    rankShardCount = rankShardCount == 0U ? 1U : rankShardCount;
 
     for (uint32_t dispatchShardIdx = context.blockJob.jobIndex;
-         dispatchShardIdx < context.worldSize * context.blockNumPerRank;
+         dispatchShardIdx < context.common.worldSize * rankShardCount;
          dispatchShardIdx += context.blockJob.totalJobs) {
         DispatchShardRange shardRange =
-            CalculateDispatchShardRange(context, scratch, localExpertId, dispatchShardIdx);
+            CalculateDispatchShardRange(context, scratch, localExpertId, dispatchShardIdx, rankShardCount);
 
         GlobalTensor<uint8_t> remoteRankMaskGlobal;
         int32_t matchedRouteCount = 0;
@@ -362,15 +276,16 @@ __aicore__ inline void DispatchExpertTokens(const TokenDispatchContext &context,
             int32_t validRouteCount = bufferConfig.routeItemsPerBatch;
             int32_t maskSliceBytes = bufferConfig.routeItemsPerBatch / 8;
             if (isLastBatch) {
-                validRouteCount = static_cast<int32_t>(context.sendTotalNum - static_cast<uint64_t>(batchRouteBegin));
+                uint64_t sendTotalNum = static_cast<uint64_t>(context.common.tokenNum) * context.common.topK;
+                validRouteCount = static_cast<int32_t>(sendTotalNum - static_cast<uint64_t>(batchRouteBegin));
                 if (batchRouteBegin / 8 + maskSliceBytes > static_cast<int32_t>(context.maskAlignSize)) {
                     maskSliceBytes = static_cast<int32_t>(context.maskAlignSize) - batchRouteBegin / 8;
                 }
             }
             remoteRankMaskGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t *>(
-                args.maskRecvPtr +
-                (static_cast<uint64_t>(localExpertId) * context.worldSize + shardRange.remoteRankIdx) *
-                    context.maskSlotSize +
+                params.peermemInfo.maskRecvPtr +
+                (static_cast<uint64_t>(localExpertId) * context.common.worldSize + shardRange.remoteRankIdx) *
+                    maskSlotSize +
                 static_cast<uint64_t>(batchRouteBegin / 8)));
             DataCopy(scratch.maskBatchTensor, remoteRankMaskGlobal, static_cast<uint32_t>(maskSliceBytes));
             SyncFuncStatic<AscendC::HardEvent::MTE2_V, SYNC_EVENT_ID1>();
@@ -393,7 +308,8 @@ __aicore__ inline void DispatchExpertTokens(const TokenDispatchContext &context,
                 int32_t dispatchDstRowBegin =
                     static_cast<int32_t>(shardRange.rankSegmentDstRowBegin) + dispatchMatchOrdinalBegin;
                 CopyTokensAndMetaForDispatch<ActivationType, QuantScaleType, TopkWeightsPrefetch>(
-                    context, args, scratch, dispatchDstRowBegin, shardRange.remoteRankIdx, batchLocalMatchBegin,
+                    context, params, winRankAddr, scratch, dispatchDstRowBegin, shardRange.remoteRankIdx,
+                    batchLocalMatchBegin,
                     batchDispatchRowCount);
                 dispatchedRowCount += batchDispatchRowCount;
             }
@@ -415,6 +331,164 @@ __aicore__ inline void DispatchExpertTokens(const TokenDispatchContext &context,
                 AtomicAdd(dispatchWaveReadyCount + static_cast<int64_t>(waveIdx) * INT_CACHELINE,
                           overlapRowEnd - overlapRowBegin);
             }
+        }
+    }
+}
+
+// 计算一个专家的接收 token 数，并发布就绪 flag。
+template <typename ActivationType, bool EnableA8W4, bool TopkWeightsPrefetch>
+__aicore__ inline void ComputeExpertTokenCountAndNotify(
+    const TokenDispatchConfig &context, const Params &params,
+    TokenDispatchScratch<ActivationType> &scratch, uint32_t localExpertId, uint64_t &sendCnt)
+{
+    sendCnt = 0;
+    uint32_t maskSlotSize = context.maskAlignSize + static_cast<uint32_t>(ALIGN_32);
+    GlobalTensor<int32_t> countSrcGlobal;
+    countSrcGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(
+        params.peermemInfo.maskRecvPtr +
+        static_cast<uint64_t>(localExpertId) * context.common.worldSize * maskSlotSize +
+        context.maskAlignSize));
+    DataCopyExtParams countCopyParams{static_cast<uint16_t>(context.common.worldSize),
+                                      static_cast<uint32_t>(sizeof(int32_t)),
+                                      static_cast<uint32_t>(maskSlotSize - sizeof(int32_t)), 0U, 0U};
+    DataCopyPadExtParams<int32_t> countPad{true, 0U, 0U, 0U};
+    DataCopyPad(scratch.sendCntTensor, countSrcGlobal, countCopyParams, countPad);
+
+    if constexpr (EnableA8W4) {
+        if (localExpertId != 0) {
+            DataCopyPad(
+                scratch.cumsumInfoTensor, scratch.cumsumInfoGlobalTensor,
+                {1U, static_cast<uint32_t>(context.common.worldSize * localExpertId * sizeof(int32_t)), 0U, 0U, 0U},
+                {true, 0U, 0U, 0U});
+        }
+    }
+    SyncFuncStatic<AscendC::HardEvent::MTE2_S, SYNC_EVENT_ID2>();
+    if constexpr (TopkWeightsPrefetch) {
+        SyncFuncStatic<AscendC::HardEvent::MTE2_V, SYNC_EVENT_ID1>();
+    }
+    constexpr int32_t countStrideI32 = ALIGN_32 / sizeof(int32_t);
+    for (uint32_t rankIdx = 0; rankIdx < context.common.worldSize; ++rankIdx) {
+        int32_t rankCount = scratch.sendCntTensor.GetValue(rankIdx * countStrideI32);
+        sendCnt += static_cast<uint64_t>(rankCount);
+        scratch.cumsumRevCntInRank += static_cast<uint64_t>(rankCount);
+        scratch.cumsumInfoTensor.SetValue(localExpertId * context.common.worldSize + rankIdx,
+                                          static_cast<int32_t>(scratch.cumsumRevCntInRank));
+    }
+
+    scratch.expertTokenCntTensor.SetValue(0, sendCnt);
+    SyncFuncStatic<AscendC::HardEvent::S_MTE3, SYNC_EVENT_ID2>();
+    uint64_t countOffset = localExpertId * INT32_PER_256B * context.countWorkspace.blockNum +
+                           INT32_PER_256B * context.countWorkspace.blockIdx;
+    DataCopy<int32_t>(scratch.expertRevNumsGlobalTensor[countOffset], scratch.expertTokenCntTensor, INT32_PER_256B);
+    if constexpr (EnableA8W4) {
+        DataCopyPad(
+            scratch.cumsumInfoGlobalTensor, scratch.cumsumInfoTensor,
+            {1U, static_cast<uint32_t>(context.common.worldSize * (localExpertId + 1) * sizeof(int32_t)), 0U, 0U, 0U});
+    }
+    PipeBarrier<PIPE_ALL>();
+
+    __gm__ int32_t *sendCntFlag =
+        reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.flagSendCntCalToUpdParamsPtr) +
+        static_cast<uint64_t>(localExpertId) * context.countWorkspace.blockNum * INT_CACHELINE +
+        static_cast<uint64_t>(context.countWorkspace.blockIdx) * INT_CACHELINE;
+    AscendC::AtomicAdd(sendCntFlag, static_cast<int32_t>(1));
+}
+
+// 导出 Token Dispatch 生成的逐专家接收 token 数。
+template <typename ActivationType, bool ReloadCumsumFromGm>
+__aicore__ inline void ExportExpertTokenCounts(const TokenDispatchConfig &context,
+                                               TokenDispatchScratch<ActivationType> &scratch,
+                                               const Params &params)
+{
+    if constexpr (g_coreType == AIC) {
+        return;
+    }
+    if constexpr (ReloadCumsumFromGm) {
+        DataCopyPad(scratch.cumsumInfoTensor, scratch.cumsumInfoGlobalTensor,
+                    {1U,
+                     static_cast<uint32_t>(
+                         context.common.worldSize * context.common.moeExpertPerRank * sizeof(int32_t)),
+                     0U, 0U, 0U},
+                    {true, 0U, 0U, 0U});
+        SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
+        WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
+    }
+    int32_t lastRankIdx = static_cast<int32_t>(context.common.worldSize - 1U);
+    scratch.expertTokenNumsOutTensor.SetValue(0, scratch.cumsumInfoTensor.GetValue(lastRankIdx));
+    for (int32_t expertIdx = 1; expertIdx < static_cast<int32_t>(context.common.moeExpertPerRank); ++expertIdx) {
+        int32_t currentCount = scratch.cumsumInfoTensor.GetValue(
+            expertIdx * static_cast<int32_t>(context.common.worldSize) + lastRankIdx);
+        int32_t previousCount = scratch.cumsumInfoTensor.GetValue(
+            (expertIdx - 1) * static_cast<int32_t>(context.common.worldSize) + lastRankIdx);
+        scratch.expertTokenNumsOutTensor.SetValue(expertIdx, currentCount - previousCount);
+    }
+    SyncFuncStatic<HardEvent::S_MTE3, SYNC_EVENT_ID2>();
+    GlobalTensor<int32_t> expertTokenNumsOut;
+    expertTokenNumsOut.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(params.expertTokenNumsOutGmAddr));
+    DataCopyPad(expertTokenNumsOut, scratch.expertTokenNumsOutTensor,
+                {1U, static_cast<uint32_t>(context.common.moeExpertPerRank * sizeof(int32_t)), 0U, 0U, 0U});
+    SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
+}
+
+struct ExpertTokenCountExportScratch {
+    LocalTensor<int32_t> stridedTensor;
+    LocalTensor<int32_t> compactTensor;
+};
+
+// 从稳定的物理 workspace 槽导出专家 token 数。
+__aicore__ inline void ExportExpertTokenCountsFromWorkspace(
+    const TokenDispatchConfig &context, const Params &params, ExpertTokenCountExportScratch &scratch)
+{
+    if constexpr (g_coreType == AIC) {
+        return;
+    }
+    if (GetSubBlockIdx() != 1U || context.blockJob.jobIndex != 0U) {
+        return;
+    }
+    uint32_t expertPerRank = context.common.moeExpertPerRank;
+    GlobalTensor<int32_t> expertRevTokenNums;
+    expertRevTokenNums.SetGlobalBuffer(
+        reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.expertRevTokenNumsPtr));
+    uint32_t expertCountStrideBytes =
+        context.countWorkspace.blockNum * static_cast<uint32_t>(INT32_PER_256B) * sizeof(int32_t);
+    DataCopyPad(scratch.stridedTensor,
+                expertRevTokenNums[context.countWorkspace.blockIdx * static_cast<uint32_t>(INT32_PER_256B)],
+                {static_cast<uint16_t>(expertPerRank), static_cast<uint32_t>(sizeof(int32_t)),
+                 expertCountStrideBytes - static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U},
+                {true, 0U, 0U, 0U});
+    SyncFuncStatic<HardEvent::MTE2_S, SYNC_EVENT_ID2>();
+    for (uint32_t expertIdx = 0U; expertIdx < expertPerRank; ++expertIdx) {
+        int32_t tokenCount =
+            scratch.stridedTensor.GetValue(expertIdx * static_cast<uint32_t>(INT32_PER_256B));
+        scratch.compactTensor.SetValue(expertIdx, tokenCount);
+    }
+    SyncFuncStatic<HardEvent::S_MTE3, SYNC_EVENT_ID2>();
+    GlobalTensor<int32_t> expertTokenNumsOut;
+    expertTokenNumsOut.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(params.expertTokenNumsOutGmAddr));
+    DataCopyPad(expertTokenNumsOut, scratch.compactTensor,
+                {1U, static_cast<uint32_t>(expertPerRank * sizeof(int32_t)), 0U, 0U, 0U});
+    SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
+}
+
+// 执行一个 MoE 专家的 SendCount 和 Token Dispatch。
+template <typename ActivationType, typename QuantScaleType, bool EnableA8W4, uint32_t Gmm1TileM,
+          bool TopkWeightsPrefetch>
+__aicore__ inline void RunMoeExpertDispatchStage(
+    const TokenDispatchConfig &context, const Params &params, GM_ADDR *winRankAddr,
+    TokenDispatchScratch<ActivationType> &scratch, uint32_t expertIdx, uint64_t &sendCnt)
+{
+    sendCnt = 0U;
+    if constexpr (g_coreType == AIV) {
+        if (GetSubBlockIdx() != 1U) {
+            return;
+        }
+        ComputeExpertTokenCountAndNotify<ActivationType, EnableA8W4, TopkWeightsPrefetch>(
+            context, params, scratch, expertIdx, sendCnt);
+        if (sendCnt != 0U) {
+            DispatchExpertTokens<ActivationType, QuantScaleType, EnableA8W4, Gmm1TileM, TopkWeightsPrefetch>(
+                context, params, winRankAddr, scratch, expertIdx);
         }
     }
 }

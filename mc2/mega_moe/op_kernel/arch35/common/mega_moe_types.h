@@ -1,0 +1,131 @@
+/**
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+#ifndef MEGA_MOE_TYPES_H
+#define MEGA_MOE_TYPES_H
+
+#include "lib/std/tuple.h"
+#include "../mega_moe_tiling.h"
+#include "mega_moe_constants.h"
+#include "mega_moe_workspace.h"
+#include "adv_api/hcomm/hcomm.h"
+
+namespace MegaMoeImpl {
+
+using namespace AscendC;
+
+struct Mc2MoeContext {
+    uint32_t epRankId = 0;
+    uint32_t rankSizePerServer = 0;
+    uint64_t kfcContextAddr = 0; // 通信 API 所需的地址
+    uint64_t epHcclBuffer[HCCL_MAX_RANK_SIZE] = {};
+    uint64_t hcommHandle[HCCL_MAX_RANK_SIZE] = {}; // 支持 ROCE 或 URMA
+};
+
+struct GMMAddrInfo {
+    GM_ADDR aGlobal;
+    GM_ADDR bGlobal;
+    GM_ADDR aScaleGlobal;
+    GM_ADDR bScaleGlobal;
+    GM_ADDR gmm1OutGlobal;
+    GM_ADDR gmm2OutGlobal;
+    GM_ADDR metaInfoGlobal;
+    __gm__ int32_t *swigluToGmm2Flag;
+    __gm__ int32_t *dispatchToGmm1Flag;
+    __gm__ int32_t *gmm2CombineSyncCounter;
+    __gm__ int32_t *gmmToEpilogueFlag;
+    __gm__ int32_t *gmm1TileStatus;
+    __gm__ int32_t *sharedExpertGmm2TileCounter;
+};
+
+struct CombineCommParams {
+    uint32_t rankId;
+    Hcomm<COMM_PROTOCOL_UBC_CTP> *hcomm;
+    __gm__ Mc2MoeContext *mc2Context;
+};
+
+// 保存 TensorList 入口地址，供按 expert 布局解析当前专家权重。
+struct ExpertWeightTensorListAddrs {
+    GM_ADDR weight1 = nullptr;
+    GM_ADDR weightScales1 = nullptr;
+    GM_ADDR weight2 = nullptr;
+    GM_ADDR weightScales2 = nullptr;
+};
+
+struct Params {
+    GM_ADDR aGmAddr;
+    GM_ADDR expertIdxGmAddr;
+    GM_ADDR bGmAddr;
+    GM_ADDR bScaleGmAddr;
+    GM_ADDR b2GmAddr;
+    GM_ADDR b2ScaleGmAddr;
+    GM_ADDR sharedBGmAddr;
+    GM_ADDR sharedBScaleGmAddr;
+    GM_ADDR sharedB2GmAddr;
+    GM_ADDR sharedB2ScaleGmAddr;
+    GM_ADDR probsGmAddr;
+    GM_ADDR y2GmAddr;
+    GM_ADDR expertTokenNumsOutGmAddr;
+    WorkspaceInfo workspaceInfo;
+    PeermemInfo peermemInfo;
+    MegaMoeTilingData *tilingData;
+    CombineCommParams combineCommParams;
+};
+
+enum class AddrUpdateMode : int32_t {
+    GMM1,
+    GMM2
+};
+
+struct BlockJobContext {
+    uint32_t jobIndex;
+    uint32_t totalJobs;
+};
+
+// Count/flag workspace 的物理分区；当前与 BlockJobContext 同值，但其编号由 workspace 生产者和消费者共同约定。
+struct BlockWorkspaceContext {
+    uint32_t blockIdx;
+    uint32_t blockNum;
+};
+
+template <typename T>
+struct PackedElementTraits {
+    static constexpr uint32_t ELEMENTS_PER_BYTE = Std::IsSame<T, fp4x2_e2m1_t>::value ? 2U : 1U;
+};
+
+struct AivJobContext {
+    uint32_t jobIndex;
+    uint32_t totalJobs;
+};
+
+struct MoeStageCommonConfig {
+    uint32_t rankId;
+    uint32_t worldSize;
+    uint32_t moeExpertPerRank;
+    uint32_t sharedExpertNum;
+    uint32_t tokenNum;
+    uint32_t topK;
+    uint32_t tokenHiddenDim;
+    uint32_t gmm1OutputDim;
+};
+
+struct DispatchPrepareConfig {
+    AivJobContext job;
+    MoeStageCommonConfig common;
+};
+
+struct GroupSyncSlotLayout {
+    uint32_t baseSlotCountPerGroup;
+    uint32_t extraSlotGroupCount;
+};
+
+} // namespace MegaMoeImpl
+
+#endif // MEGA_MOE_TYPES_H

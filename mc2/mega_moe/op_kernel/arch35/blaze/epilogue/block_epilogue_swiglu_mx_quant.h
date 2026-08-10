@@ -22,7 +22,11 @@
 #else
 #include "kernel_operator.h"
 #endif
-#include "mega_moe_base.h"
+#include "../../common/mega_moe_utils.h"
+
+namespace MegaMoeImpl {
+
+using namespace AscendC;
 
 namespace SwigluQuantMsg {
 enum class QuantMode : uint32_t {
@@ -55,7 +59,6 @@ namespace {
 constexpr int64_t OUT_ELE_NUM_ONE_BLK = 64;
 constexpr uint32_t Y_IDX = 0;
 constexpr uint32_t Y_SCALE_IDX = 1;
-constexpr uint32_t GROUP_FLAG_IDX = 2;
 constexpr uint32_t M_LOC_IDX = 4;
 constexpr uint32_t BLOCK_SIZE = 32;
 constexpr uint16_t MAX_EXP_FOR_BF16 = 0x7f80;
@@ -119,11 +122,10 @@ static constexpr AscendC::MicroAPI::CastTrait CAST_32_TO_83 = {
     AscendC::RoundMode::CAST_RINT};
 #define BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS \
     template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_, \
-              bool IsTensorList_, uint32_t TileM, uint32_t TileN, bool TopkWeightsPrefetch, bool IsInterleaved_, \
-              bool IsWaveFlagGrained_>
+              bool IsTensorList_, uint32_t TileM, uint32_t TileN, bool TopkWeightsPrefetch, bool IsInterleaved_>
 #define BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS \
     DataTypeOut_, DataTypeIn_, DataTypeX2Scale_, DataTypeX1Scale_, IsTensorList_, TileM, TileN, TopkWeightsPrefetch, \
-        IsInterleaved_, IsWaveFlagGrained_
+        IsInterleaved_
 
 // 前向声明：激活分块上下文结构体（仅含标量与 UB 指针，可跨函数传递）
 // 完整定义见 BlockEpilogueSwigluMxQuant 类定义之后
@@ -132,7 +134,7 @@ struct ActivationContext;
 
 template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_,
           bool IsTensorList_, uint32_t TileM = 256, uint32_t TileN = 256, bool TopkWeightsPrefetch = false,
-          bool IsInterleaved_ = false, bool IsWaveFlagGrained_ = false>
+          bool IsInterleaved_ = false>
 class BlockEpilogueSwigluMxQuant {
 public:
     __aicore__ inline BlockEpilogueSwigluMxQuant() {}
@@ -143,11 +145,9 @@ public:
     struct Arguments {
         GM_ADDR yGmAddr{nullptr};
         GM_ADDR yScaleGmAddr{nullptr};
-        GM_ADDR groupFlagListGmAddr{nullptr};
         GM_ADDR x2ScaleGmAddr{nullptr};
         GM_ADDR x1ScaleGmAddr{nullptr};
         GM_ADDR biasGmAddr{nullptr};
-        GM_ADDR metaInfoGmAddr{nullptr};
         float clampLimit{0.0f};
         uint8_t actMode{0};
         uint8_t actSubMode{0};
@@ -175,17 +175,12 @@ public:
     __aicore__ inline void Init(Params const &params);
     __aicore__ inline auto GetFirstL0c2UbTensor();
     __aicore__ inline auto GetSecondL0c2UbTensor();
-    // Computes and writes one activation/quant tile without notifying GMM2.
+    __aicore__ inline auto GetTopkWeightTensor();
+    // 计算并写回一个激活/量化 tile，不包含流水通知。
     __aicore__ inline void operator()(const BlockShape &blockShape, const BlockCoord &blockCoord,
                                       uint16_t pingpongIdx = 0);
-    __aicore__ inline void UpdateGlobalAddr(const BlockCoord &baseOffset, uint32_t flagElementOffset = 0);
-    // Pipeline controllers call this immediately after each completed tile.
-    __aicore__ inline void NotifyCompletedTile(uint32_t flagSlotIdx = 0);
+    __aicore__ inline void UpdateGlobalAddr(const BlockCoord &baseOffset);
     __aicore__ inline void UpdateNextProblem(const ProblemShape &problemShape);
-
-    // 权重预加载相关：由 ComputeSwigluTileGeneric 提前 DataCopy，VFDoSwigluAndQuantForMX 直接消费
-    AscendC::LocalTensor<float> weightUb_;
-    AscendC::GlobalTensor<float> metaInfoGm_;
 
 private:
     __aicore__ inline void VFDoSwigluForMX(uint16_t mSize, uint16_t pingpongIdx = 0, uint64_t mLoc = 0);
@@ -231,11 +226,8 @@ private:
     // GM ADDR
     AscendC::GlobalTensor<int8_t> quantOutputGlobal_;
     AscendC::GlobalTensor<int8_t> quantScaleGlobal_;
-    __gm__ int32_t *groupFlagListGmAddr_;
     GM_ADDR yGmAddr_{nullptr};
     GM_ADDR yScaleGmAddr_{nullptr};
-    GM_ADDR groupFlagListGmBaseAddr_{nullptr};
-    GM_ADDR metaInfoGmAddr_{nullptr};
 
     // UB ADDR
     AscendC::LocalTensor<DataTypeIn> l0cOutUbFirst_{AscendC::TPosition::VECIN, 0, MAX_SINGLE_MN};
@@ -247,6 +239,7 @@ private:
     AscendC::LocalTensor<bfloat16_t> gluRes_;
     AscendC::LocalTensor<uint16_t> maxExp_;
     AscendC::LocalTensor<uint16_t> halfScale_;
+    AscendC::LocalTensor<float> weightUb_;
 
     int64_t n_;
     int64_t scaleN_;
@@ -318,18 +311,14 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     if constexpr (g_coreType == AscendC::AIC) {
         return;
     }
-    // Init is called with a temporary Arguments object. Keep the GM bases owned by this
-    // epilogue so UpdateGlobalAddr never dereferences a dangling parameter reference.
+    // Init 接收临时 Arguments，Epilogue 自身保存输出 GM 基址，避免后续引用失效。
     yGmAddr_ = params.yGmAddr;
     yScaleGmAddr_ = params.yScaleGmAddr;
-    groupFlagListGmBaseAddr_ = params.groupFlagListGmAddr;
     clampLimit_ = params.clampLimit;
     actMode_ = params.actMode;
     actSubMode_ = params.actSubMode;
     activationAlpha_ = params.activationAlpha;
     activationBeta_ = params.activationBeta;
-    metaInfoGmAddr_ = params.metaInfoGmAddr;
-    metaInfoGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(metaInfoGmAddr_));
     if constexpr (AscendC::IsSameType<DataTypeOut, fp8_e4m3fn_t>::value) {
         fpEmax_ = FP8_E4M3_MAX_EXP;
     } else if constexpr (AscendC::IsSameType<DataTypeOut, fp8_e5m2_t>::value) {
@@ -343,7 +332,7 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     // 重构UB内存
     // 当前master默认非interleaved，保留完整256x256空间；interleaved预留按half tile + pingpong偏移使用。
     constexpr uint32_t MAX_SINGLE_MN_ALIAS =
-        IsInterleaved_ ? MAX_SINGLE_MN / MegaMoeImpl::SWIGLU_N_HALF : MAX_SINGLE_MN;
+        IsInterleaved_ ? MAX_SINGLE_MN / SWIGLU_N_HALF : MAX_SINGLE_MN;
     constexpr uint32_t gluResOffset = 0;
     gluRes_ = AscendC::LocalTensor<bfloat16_t>(AscendC::TPosition::VECCALC, gluResOffset, MAX_SINGLE_MN_ALIAS);
     constexpr uint32_t quantOutputOffset = gluResOffset + MAX_SINGLE_MN_ALIAS * sizeof(bfloat16_t);
@@ -361,24 +350,19 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     // weight UB: 放在 VECIN 区之后的安全区域，仅 mode=1 分配
     if constexpr (TopkWeightsPrefetch) {
         constexpr uint32_t vecinEnd = MAX_SINGLE_MN * sizeof(DataTypeIn) * 2U;
-        weightUb_ = AscendC::LocalTensor<float>(AscendC::TPosition::VECCALC, vecinEnd, MAX_TILE_M * INT32_PER_256B);
+        weightUb_ = AscendC::LocalTensor<float>(AscendC::TPosition::VECCALC, vecinEnd,
+                                                MAX_TILE_M * INT32_PER_256B);
     }
 }
 
 BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void
 BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(
-    const BlockCoord &baseOffset, uint32_t flagElementOffset)
+    const BlockCoord &baseOffset)
 {
     if constexpr (g_coreType == AscendC::AIV) {
         quantOutputGlobal_.SetGlobalBuffer((__gm__ int8_t *)yGmAddr_ + Get<Y_IDX>(baseOffset));
         quantScaleGlobal_.SetGlobalBuffer((__gm__ int8_t *)yScaleGmAddr_ + Get<Y_SCALE_IDX>(baseOffset));
-        if (groupFlagListGmBaseAddr_ != nullptr) {
-            groupFlagListGmAddr_ = (__gm__ int32_t *)groupFlagListGmBaseAddr_ +
-                                   Get<GROUP_FLAG_IDX>(baseOffset) * INT_CACHELINE + flagElementOffset;
-        } else {
-            groupFlagListGmAddr_ = nullptr;
-        }
     }
 }
 
@@ -387,8 +371,9 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     const ProblemShape &problemShape)
 {
     n_ = Get<N_VALUE>(problemShape); // n/2
-    scaleN_ =
-        Ops::Base::CeilDiv(static_cast<uint64_t>(n_), static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
+    scaleN_ = Ops::Base::CeilDiv(static_cast<uint64_t>(n_),
+                                 static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) *
+              MXFP_MULTI_BASE_SIZE;
 }
 
 BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
@@ -417,8 +402,10 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     uint64_t blockCount, uint64_t offset, AscendC::LocalTensor<int8_t> &src)
 {
     AscendC::DataCopyExtParams ub2GmParams{0, 0, 0, 0, 0};
-    auto blockScaleN = Ops::Base::CeilDiv(static_cast<uint64_t>(singleN_), static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) *
-                       MXFP_MULTI_BASE_SIZE; // 256 / 32 = 8
+    auto blockScaleN =
+        Ops::Base::CeilDiv(static_cast<uint64_t>(singleN_),
+                           static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) *
+        MXFP_MULTI_BASE_SIZE; // 256 / 32 = 8
     // scale layout in UB is already compact: (mSize, blockScaleN). Compact copy avoids (mSize*8)->(mSize,32).
     ub2GmParams.blockCount = blockCount; // 128
     ub2GmParams.blockLen = blockScaleN;  // 8
@@ -1127,6 +1114,12 @@ __aicore__ inline auto BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
 }
 
 BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline auto BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::GetTopkWeightTensor()
+{
+    return weightUb_;
+}
+
+BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::operator()(
     const BlockShape &blockShape, const BlockCoord &blockCoord, uint16_t pingpongIdx)
 {
@@ -1170,18 +1163,7 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(0);
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::NotifyCompletedTile(
-    uint32_t flagSlotIdx)
-{
-    if (groupFlagListGmAddr_ != nullptr) {
-        if constexpr (IsWaveFlagGrained_) {
-            AscendC::AtomicAdd(groupFlagListGmAddr_ + static_cast<uint64_t>(flagSlotIdx) * INT_CACHELINE, 1);
-        } else {
-            AscendC::AtomicAdd(groupFlagListGmAddr_, 1);
-        }
-    }
-}
+} // namespace MegaMoeImpl
 
 #endif // defined(__DAV_C310__)
 #endif // BLOCK_EPILOGUE_SWIGLU_MX_QUANT_H

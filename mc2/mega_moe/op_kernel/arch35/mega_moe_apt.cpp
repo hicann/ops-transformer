@@ -46,9 +46,6 @@
 #include "mega_moe_tiling_key.h"
 
 using namespace AscendC;
-#ifdef ENABLE_TENSOR_API
-using namespace MegaMoeImpl;
-#endif
 
 #ifndef MEGA_MOE_WEIGHT1_INTERLEAVED
 #define MEGA_MOE_WEIGHT1_INTERLEAVED 0
@@ -89,16 +86,16 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
                 (DispatchQuantOutType == DISPATCH_QUANT_OUT_DTYPE_E4M3FN &&
                  Std::IsSame<DTYPE_WEIGHT1, fp8_e4m3fn_t>::value);
             if constexpr (isA8W8DtypePair) {
-                MegaMoeWave<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType,
-                            CombineQuantOutType, TopkWeightsPrefetch, WEIGHT1_INTERLEAVED>
+                MegaMoeImpl::MegaMoeWave<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType,
+                                         CombineQuantOutType, TopkWeightsPrefetch, WEIGHT1_INTERLEAVED>
                     op;
                 op.Init(context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2,
                         scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
                         expertTokenNumsOut, workspaceGM, &tilingData);
                 op.Process();
             } else {
-                MegaMoe<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType, CombineQuantOutType,
-                        TopkWeightsPrefetch>
+                MegaMoeImpl::MegaMoe<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType,
+                                     CombineQuantOutType, TopkWeightsPrefetch>
                     op;
                 op.Init(context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2,
                         scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
@@ -109,8 +106,8 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
     } else if constexpr (CommModeType == TILINGKEY_TPL_URMA) {
 #if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
         if constexpr (DispatchQuantMode == DISPATCH_QUANT_MODE_MXFP) {
-            MegaMoeLayered<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType,
-                           CombineQuantOutType, TopkWeightsPrefetch>
+            MegaMoeImpl::MegaMoeLayered<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType,
+                                        CombineQuantOutType, TopkWeightsPrefetch>
                 op;
             op.Init(context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2,
                     scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,

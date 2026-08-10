@@ -31,11 +31,12 @@
 #include "../mega_moe.h"
 #include "../../../op_kernel/arch35/mega_moe_tiling.h"
 #include "../../../op_kernel/arch35/mega_moe_tiling_key.h"
-#include "../../../op_kernel/arch35/mega_moe_workspace_info.h"
+#include "../../../op_kernel/arch35/common/mega_moe_workspace.h"
 
 using namespace Mc2Tiling;
 using namespace AscendC;
 using namespace ge;
+using namespace MegaMoeImpl;
 
 namespace optiling {
 namespace {
@@ -870,6 +871,40 @@ static uint64_t CalcCombineSyncSlotCountPerExpert(const MegaMoeTilingData *tilin
     return std::max(maxTokenGroupCountForOneExpert, logicalCoreCount);
 }
 
+static uint64_t CalcHostFlagElementCount(const MegaMoeTilingData *tilingData)
+{
+    bool isA8W8 = tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_GENERAL ||
+                  tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W8_NZ;
+    bool useMteA8W8Wave = tilingData->topoType == TOPO_TYPE_MTE && isA8W8;
+    bool useGroupSyncCounters =
+        tilingData->topoType == TOPO_TYPE_URMA ||
+        (tilingData->combineQuantMode != COMBINE_NO_QUANT && !useMteA8W8Wave);
+    uint64_t maxWavesPerExpert = ops::CeilDiv<uint64_t>(tilingData->maxOutputSize, L1_TILE_M_256);
+    uint64_t waveFlagSlotsPerExpert = maxWavesPerExpert * INT_CACHELINE;
+    uint64_t swigluFlagSlotsPerExpert = useMteA8W8Wave ? waveFlagSlotsPerExpert : INT_CACHELINE;
+    uint64_t moeExpertCount = tilingData->moeExpertPerRank;
+
+    uint64_t flagElementCount =
+        moeExpertCount * (swigluFlagSlotsPerExpert + waveFlagSlotsPerExpert +
+                          static_cast<uint64_t>(INT_CACHELINE) * tilingData->aicNum);
+    if (tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W4 ||
+        tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4 ||
+        tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4_NZ) {
+        flagElementCount += static_cast<uint64_t>(tilingData->aicNum) * INT_CACHELINE;
+    }
+    if (useMteA8W8Wave) {
+        flagElementCount += moeExpertCount * tilingData->aicNum * INT_CACHELINE;
+    }
+    if (useGroupSyncCounters) {
+        flagElementCount += tilingData->combineSyncSlotCountPerExpert * moeExpertCount * INT_CACHELINE;
+    }
+    if (tilingData->sharedExpertNum > 0) {
+        uint64_t tokenGroupCount = ops::CeilDiv<uint64_t>(tilingData->bs, L1_TILE_M_256);
+        flagElementCount += tokenGroupCount * tilingData->sharedExpertNum * INT_CACHELINE;
+    }
+    return flagElementCount;
+}
+
 static ge::graphStatus SetAdaptiveBufferConfigs(const gert::TilingContext *context, MegaMoeConfig &config,
                                                 MegaMoeTilingData *tilingData, uint32_t availableUbBytes)
 {
@@ -887,8 +922,7 @@ static ge::graphStatus SetAdaptiveBufferConfigs(const gert::TilingContext *conte
 
     tilingData->combineSyncSlotCountPerExpert = CalcCombineSyncSlotCountPerExpert(tilingData);
 
-    uint64_t totalFlagElementCount =
-        static_cast<uint64_t>(CalcMegaMoeFlagWorkspaceSize(tilingData) / sizeof(int32_t));
+    uint64_t totalFlagElementCount = CalcHostFlagElementCount(tilingData);
     uint32_t resetElementCountPerCore =
         static_cast<uint32_t>(ops::CeilDiv(totalFlagElementCount, static_cast<uint64_t>(tilingData->blockAivNum)));
     uint32_t resetBatchElementCount = std::min(resetElementCountPerCore, static_cast<uint32_t>(DISPATCH_RESET_BATCH));
@@ -906,7 +940,7 @@ static ge::graphStatus SetAdaptiveBufferConfigs(const gert::TilingContext *conte
             ops::CeilAlign(static_cast<uint32_t>(tilingData->topK * sizeof(float)), static_cast<uint32_t>(ALIGN_32));
     }
     uint32_t quantInputBufferBytes = ops::CeilAlign(tilingData->h, static_cast<uint32_t>(ALIGN_128)) * sizeof(uint16_t);
-    // sendCntAccTensor_ 按本卡 routed MoE expert 数分配，与 kernel 地址布局一致。
+    // sendCntAccTensor_ 按本卡 MoE 专家数分配，与 kernel 地址布局一致。
     uint32_t maxExpertCountPerCore =
         ops::CeilDiv(tilingData->epWorldSize * tilingData->moeExpertPerRank, tilingData->blockAivNum);
     uint32_t sendCountAccumulatorBytes = static_cast<uint32_t>(ops::CeilAlign(
@@ -924,7 +958,7 @@ static ge::graphStatus SetAdaptiveBufferConfigs(const gert::TilingContext *conte
      * 若修改 SendMaskCal 的 expert 分核方式、ownedExpertCount 或 maskPushCount 计算，必须同步更新
      * 这里的两类 core 划分和 kernel 配置选择条件。
      */
-    // SendMaskCal 只遍历 routed MoE 专家，不包含独立处理的共享专家。
+    // SendMaskCal 只遍历 MoE 专家，不包含独立处理的共享专家。
     uint32_t totalExpertCount = tilingData->epWorldSize * tilingData->moeExpertPerRank;
     uint32_t expertCountPerCoreWithoutExtraExpert = totalExpertCount / tilingData->blockAivNum;
     tilingData->sendMaskCoreCountWithExtraExpert = totalExpertCount % tilingData->blockAivNum;
@@ -1388,7 +1422,7 @@ static ge::graphStatus CheckOutputTensorDim(const gert::TilingContext *context, 
     const int64_t expertTokenNumsDim0 = expertTokenNumsStorageShape->GetStorageShape().GetDim(0);
     OP_LOGD(nodeName, "expertTokenNums dim0 = %ld", expertTokenNumsDim0);
 
-    // expertTokenNums 仅报告路由专家的 token 数，不包含共享专家.
+    // expertTokenNums 仅报告 MoE 专家的 token 数，不包含共享专家。
     auto attrs = context->GetAttrs();
     auto moeExpertNumPtr = attrs->GetAttrPointer<int64_t>((config.attrMoeExpertNumIndex));
     auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>((config.attrEpWorldSizeIndex));
