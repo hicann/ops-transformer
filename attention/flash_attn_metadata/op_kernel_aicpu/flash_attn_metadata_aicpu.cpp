@@ -35,7 +35,7 @@ uint32_t FlashAttnMetadataCpuKernel::Compute(CpuKernelContext &ctx)
     bool success = Prepare(ctx);
     KERNEL_CHECK_FALSE(success, FA_KERNEL_STATUS_PARAM_INVALID, "Prepare data failed!");
 
-    load_balance::SectionStreamKResult splitRes {};
+    load_balance::SectionStreamKResult splitRes{};
     success = BalanceSchedule(splitRes);
     KERNEL_CHECK_FALSE(success, FA_KERNEL_STATUS_PARAM_INVALID, "Schedule load balance failed!");
 
@@ -99,8 +99,8 @@ bool FlashAttnMetadataCpuKernel::CheckActualQuerySeq()
 {
     isActualSeqlenQAccum_ = false;
     actualSeqlenQ_.clear();
-    std::vector<int64_t> cuSeqlensQ {};
-    std::vector<int64_t> sequsedQ {};
+    std::vector<int64_t> cuSeqlensQ{};
+    std::vector<int64_t> sequsedQ{};
 
     cuSeqlensQ = GetTensorDataAsInt64(cuSeqlensQ_);
     sequsedQ = GetTensorDataAsInt64(sequsedQ_);
@@ -123,7 +123,7 @@ bool FlashAttnMetadataCpuKernel::CheckActualQuerySeq()
         if (cuSeqlensQ[i] < cuSeqlensQ[i - 1]) {
             KERNEL_LOG_ERROR(
                 "The %zuth element of cuSeqlensQ must not be less than the %zuth element, but got %ld and %ld",
-                i, i -1, cuSeqlensQ[i], cuSeqlensQ[i - 1]);
+                i, i - 1, cuSeqlensQ[i], cuSeqlensQ[i - 1]);
             return false;
         }
     }
@@ -143,8 +143,8 @@ bool FlashAttnMetadataCpuKernel::CheckActualKvSeq()
 {
     isActualSeqlenKvAccum_ = false;
     actualSeqlenKv_.clear();
-    std::vector<int64_t> cuSeqlensKv {};
-    std::vector<int64_t> sequsedKv {};
+    std::vector<int64_t> cuSeqlensKv{};
+    std::vector<int64_t> sequsedKv{};
 
     cuSeqlensKv = GetTensorDataAsInt64(cuSeqlensKv_);
     sequsedKv = GetTensorDataAsInt64(sequsedKv_);
@@ -152,7 +152,7 @@ bool FlashAttnMetadataCpuKernel::CheckActualKvSeq()
     for (size_t i = 0; i < sequsedKv.size(); ++i) {
         if (sequsedKv[i] < 0) {
             KERNEL_LOG_ERROR("The elements of sequsedKv must be non-negative, but %zuth element is %ld",
-                i, sequsedKv[i]);
+                             i, sequsedKv[i]);
             return false;
         }
     }
@@ -201,20 +201,21 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
         qlayout = optiling::flash_attn::fa_tiling_util::LAYOUT_TND;
     }
     optiling::flash_attn::fa_tiling_util::AdjustSinnerAndSouter(baseInfo.headDim, maxSeqlenQ_,
-        maxSeqlenKv_, baseInfo.sparseMode, baseInfo.preToken, baseInfo.nextToken, qlayout,
-        mBaseSize_, s2BaseSize_);
+                                                                maxSeqlenKv_, baseInfo.sparseMode, baseInfo.preToken,
+                                                                baseInfo.nextToken, qlayout,
+                                                                mBaseSize_, s2BaseSize_);
     mBaseSize_ *= (aivCoreNum_ / aicCoreNum_);
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
-    param.l2Byte = 96U * 1024U * 1024U;      // 96: 96MB, 1024: Mb2Kb, 1024:Kb2Mb
-    param.fdTolerance = 10;                  // 10: tolerance block
-    param.fdLeastBlock = 3;                  // 3: least block
+    param.l2Byte = 96U * 1024U * 1024U; // 96: 96MB, 1024: Mb2Kb, 1024:Kb2Mb
+    param.fdTolerance = 10;             // 10: tolerance block
+    param.fdLeastBlock = 3;             // 3: least block
     param.fdOn = true;
 }
 
 void FlashAttnMetadataCpuKernel::InitBaseInfo()
 {
-    baseInfo.batchSize = batchSize_;
+    baseInfo.batchSize = (actualSeqlenQ_.empty()) ? batchSize_ : actualSeqlenQ_.size();
     baseInfo.querySeqSize = maxSeqlenQ_;
     baseInfo.queryHeadNum = numHeadsQ_;
     baseInfo.kvSeqSize = maxSeqlenKv_;
@@ -246,17 +247,17 @@ bool FlashAttnMetadataCpuKernel::BalanceSchedule(load_balance::SectionStreamKRes
 bool FlashAttnMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult &splitRes)
 {
     detail::FaMetadata faMetadata(metadata_->GetData(), splitRes.sectionNum);
-    faMetadata.Clear();         // set to all 0
+    faMetadata.Clear(); // set to all 0
 
     faMetadata.SetHeadMetadata(HEAD_SECTION_NUM_INDEX, splitRes.sectionNum);
     faMetadata.SetHeadMetadata(HEAD_M_BASE_SIZE_INDEX, mBaseSize_);
     faMetadata.SetHeadMetadata(HEAD_S2_BASE_SIZE_INDEX, s2BaseSize_);
     if (std::any_of(splitRes.sectionFdResult.begin(), splitRes.sectionFdResult.end(),
-        [](load_balance::SectionStreamKFdResult result) { return result.usedVecNum > 0U; })) {
+                    [](load_balance::SectionStreamKFdResult result) { return result.usedVecNum > 0U; })) {
         faMetadata.SetHeadMetadata(HEAD_IS_FD_INDEX, 1U);
     }
 
-    load_balance::SectionStreamKFaResult dummyHead { static_cast<uint32_t>(aicCoreNum_) }; // all zeror dummy head
+    load_balance::SectionStreamKFaResult dummyHead{static_cast<uint32_t>(aicCoreNum_)}; // all zeror dummy head
     for (uint32_t secIdx = 0; secIdx < splitRes.sectionNum; ++secIdx) {
         auto &faRes = splitRes.sectionFaResult[secIdx];
         for (uint32_t aicIdx = 0; aicIdx < faRes.usedCoreNum; ++aicIdx) {
@@ -267,24 +268,24 @@ bool FlashAttnMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult 
             FA_METADATA_T s2Start = (aicIdx == 0) ? prevFaRes.s2End[prevLastCore] : faRes.s2End[aicIdx - 1U];
 
             faMetadata.SetFaMetadata(secIdx, aicIdx, FA_BN2_START_INDEX, bn2Start);
-            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_M_START_INDEX,   mStart);
-            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_S2_START_INDEX,  s2Start);
-            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_BN2_END_INDEX,   faRes.bN2End[aicIdx]);
-            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_M_END_INDEX,     faRes.gS1End[aicIdx]);
-            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_S2_END_INDEX,    faRes.s2End[aicIdx]);
+            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_M_START_INDEX, mStart);
+            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_S2_START_INDEX, s2Start);
+            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_BN2_END_INDEX, faRes.bN2End[aicIdx]);
+            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_M_END_INDEX, faRes.gS1End[aicIdx]);
+            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_S2_END_INDEX, faRes.s2End[aicIdx]);
             faMetadata.SetFaMetadata(secIdx, aicIdx, FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX,
-                faRes.firstFdDataWorkspaceIdx[aicIdx]);
+                                     faRes.firstFdDataWorkspaceIdx[aicIdx]);
         }
 
         auto &fdRes = splitRes.sectionFdResult[secIdx];
         for (uint32_t aivIdx = 0; aivIdx < fdRes.usedVecNum; ++aivIdx) {
             uint32_t t = fdRes.taskIdx[aivIdx];
-            faMetadata.SetFdMetadata(secIdx, aivIdx, FD_BN2_IDX_INDEX,       fdRes.bN2Idx[t]);
-            faMetadata.SetFdMetadata(secIdx, aivIdx, FD_M_IDX_INDEX,         fdRes.gS1Idx[t]);
+            faMetadata.SetFdMetadata(secIdx, aivIdx, FD_BN2_IDX_INDEX, fdRes.bN2Idx[t]);
+            faMetadata.SetFdMetadata(secIdx, aivIdx, FD_M_IDX_INDEX, fdRes.gS1Idx[t]);
             faMetadata.SetFdMetadata(secIdx, aivIdx, FD_WORKSPACE_IDX_INDEX, fdRes.workspaceIdx[t]);
             faMetadata.SetFdMetadata(secIdx, aivIdx, FD_WORKSPACE_NUM_INDEX, fdRes.s2SplitNum[t]);
-            faMetadata.SetFdMetadata(secIdx, aivIdx, FD_M_START_INDEX,       fdRes.mStart[aivIdx]);
-            faMetadata.SetFdMetadata(secIdx, aivIdx, FD_M_NUM_INDEX,         fdRes.mLen[aivIdx]);
+            faMetadata.SetFdMetadata(secIdx, aivIdx, FD_M_START_INDEX, fdRes.mStart[aivIdx]);
+            faMetadata.SetFdMetadata(secIdx, aivIdx, FD_M_NUM_INDEX, fdRes.mLen[aivIdx]);
         }
     }
     return true;

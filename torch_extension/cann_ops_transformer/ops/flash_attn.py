@@ -24,9 +24,14 @@ def _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q):
         return cu_seqlens_q.size(0) - 1
 
     if batch_size is None:
-        raise ValueError(f"When seqused_q and cu_seqlens_q are not provdied, batch_size must be provided")
+        raise ValueError(
+            "When seqused_q and cu_seqlens_q are not provided, batch_size must be provided"
+        )
     elif batch_size < 0:
-        raise ValueError(f"batch_size must be greater than 0, but got {batch_size}")
+        raise ValueError(
+            f"When seqused_q and cu_seqlens_q are not provided, "
+            f"batch_size must be greater than 0, but got {batch_size}"
+        )
     return batch_size
 
 
@@ -171,7 +176,7 @@ def flash_attn_metadata(
     cu_seqlens_kv: Optional[torch.Tensor] = None,
     seqused_q: Optional[torch.Tensor] = None,
     seqused_kv: Optional[torch.Tensor] = None,
-    batch_size: Optional[int] = None,
+    batch_size: Optional[int] = -1,
     max_seqlen_q: Optional[int] = -1,
     max_seqlen_kv: Optional[int] = -1,
     mask_mode: Optional[int] = 0,
@@ -185,6 +190,9 @@ def flash_attn_metadata(
     Dispatcher implementation: NPU.
     'PrivateUse1' is dispatch key for custom NPU backends.
     """
+    b_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
+
+    batch_size = -1 if batch_size is None else batch_size
     max_seqlen_q = -1 if max_seqlen_q is None else max_seqlen_q
     max_seqlen_kv = -1 if max_seqlen_kv is None else max_seqlen_kv
     mask_mode = 1 if mask_mode is None else mask_mode
@@ -195,7 +203,6 @@ def flash_attn_metadata(
     layout_out = "BSND" if layout_out is None else layout_out
 
     op_module = flash_attn_op_builder.load()
-    b_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
     metadata_size = _calculate_metadata_size(b_size, num_heads_kv)
     output = torch.empty((metadata_size,), dtype=torch.int32, device="npu")
 
