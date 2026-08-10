@@ -9,65 +9,91 @@
 */
 
 /*!
- * \file mixed_quant_sparse_flash_mla_proto.cpp
+ * \file mixed_quant_sparse_flash_mla_infershape.cpp
  * \brief
  */
 
 #include <graph/utils/type_utils.h>
 #include <register/op_impl_registry.h>
-#include "error/ops_error.h"
+#include "err/ops_err.h"
 #include "mixed_quant_sparse_flash_mla_check.h"
 
 using namespace ge;
+using namespace optiling;
 
 namespace ops {
 constexpr uint32_t QUERY_INPUT_INDEX = 0;
 
+static int64_t GetKvHeadNum(const gert::Shape *kvShape, const std::string &layoutKv)
+{
+    if (layoutKv == "TND") {
+        return kvShape->GetDim(DIM_IDX_ONE);
+    }
+    return kvShape->GetDim(DIM_IDX_TWO);
+}
+
+static std::vector<int64_t> ToVectorFunc(const gert::Shape *shape)
+{
+    size_t shapeSize = shape->GetDimNum();
+    std::vector<int64_t> shapeVec(shapeSize, 0);
+
+    for (size_t i = 0; i < shapeSize; i++) {
+        shapeVec[i] = shape->GetDim(i);
+    }
+    return shapeVec;
+}
+
+static std::string ToStringFunc(const gert::Shape *shape)
+{
+    std::ostringstream oss;
+    auto v = ToVectorFunc(shape);
+    if (v.size() > 0) {
+        for (size_t i = 0; i < v.size() - 1; ++i) {
+            oss << v[i] << ", ";
+        }
+        oss << v[v.size() - 1];
+    }
+    return oss.str();
+}
+
 ge::graphStatus InferShapeMixedQuantSparseFlashMla(gert::InferShapeContext *context)
 {
-    OPS_ERR_IF(context == nullptr, OPS_LOG_E("MixedQuantSparseFlashMla", "InferShapeContext is nullptr"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context == nullptr, OP_LOGE("MixedQuantSparseFlashMla", "InferShapeContext is nullptr"),
+                return ge::GRAPH_FAILED);
     const gert::Shape *queryShape = context->GetInputShape(QUERY_INPUT_INDEX);
-    OPS_LOG_E_IF_NULL(context, queryShape, return ge::GRAPH_FAILED)
+    OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
     gert::Shape *attentionOutShape = context->GetOutputShape(0);
-    OPS_LOG_E_IF_NULL(context, attentionOutShape, return ge::GRAPH_FAILED)
+    OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
     *attentionOutShape = *queryShape;
 
     gert::Shape *softmaxLseShape = context->GetOutputShape(1);
-    OPS_LOG_E_IF_NULL(context, softmaxLseShape, return ge::GRAPH_FAILED)
+    OP_CHECK_NULL_WITH_CONTEXT(context, softmaxLseShape);
     auto attr = context->GetAttrs();
-    OPS_ERR_IF(attr == nullptr, OPS_LOG_E("MixedQuantSparseFlashMla", "attr is nullptr"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_NULL_WITH_CONTEXT(context, attr);
     const bool *returnSoftmaxLsePtr = attr->GetAttrPointer<bool>(ATTR_RETURN_SOFTMAX_LSE_INDEX);
     bool returnSoftmaxLse = (returnSoftmaxLsePtr != nullptr) ? *returnSoftmaxLsePtr : false;
 
     const gert::Shape *kvShape = context->GetInputShape(ORI_KV_INDEX);
-    OPS_LOG_E_IF_NULL(context, kvShape, return ge::GRAPH_FAILED)
+    OP_CHECK_NULL_WITH_CONTEXT(context, kvShape);
     const char *layoutQ = attr->GetStr(ATTR_LAYOUT_Q_INDEX);
     const char *layoutKv = attr->GetStr(ATTR_LAYOUT_KV_INDEX);
     std::string layoutQStr = (layoutQ != nullptr) ? std::string(layoutQ) : "BSND";
     std::string layoutKvStr = (layoutKv != nullptr) ? std::string(layoutKv) : "BSND";
 
+    int64_t kvHeadNum = GetKvHeadNum(kvShape, layoutKvStr);
+    OP_CHECK_IF(kvHeadNum <= 0,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("MixedQuantSparseFlashMla", "ori_kv or cmp_kv",
+            ToStringFunc(kvShape).c_str(),
+            "The head num of ori_kv or cmp_kv should be greater than 0 but got " + std::to_string(kvHeadNum)),
+        return ge::GRAPH_FAILED);
+
     if (returnSoftmaxLse) {
         if (layoutQStr == "TND") {
-            int64_t kvHeadNum;
-            if (layoutKvStr == "PA_BBND") {
-                kvHeadNum = kvShape->GetDim(DIM_IDX_TWO);
-            } else {
-                kvHeadNum = kvShape->GetDim(DIM_IDX_ONE);
-            }
-            OPS_ERR_IF(kvHeadNum <= 0,
-                       OPS_LOG_E("MixedQuantSparseFlashMla", "kvHeadNum must be positive, but got %ld", kvHeadNum),
-                       return ge::GRAPH_FAILED);
             softmaxLseShape->SetDimNum(DIM_NUM_THREE);
             softmaxLseShape->SetDim(DIM_IDX_ZERO, kvHeadNum);
             softmaxLseShape->SetDim(DIM_IDX_ONE, queryShape->GetDim(DIM_IDX_ZERO));
             softmaxLseShape->SetDim(DIM_IDX_TWO, queryShape->GetDim(DIM_IDX_ONE) / kvHeadNum);
         } else {
-            int64_t kvHeadNum = kvShape->GetDim(DIM_IDX_TWO);
-            OPS_ERR_IF(kvHeadNum <= 0,
-                       OPS_LOG_E("MixedQuantSparseFlashMla", "kvHeadNum must be positive, but got %ld", kvHeadNum),
-                       return ge::GRAPH_FAILED);
             softmaxLseShape->SetDimNum(DIM_NUM_FOUR);
             softmaxLseShape->SetDim(DIM_IDX_ZERO, queryShape->GetDim(DIM_IDX_ZERO));
             softmaxLseShape->SetDim(DIM_IDX_ONE, kvHeadNum);
@@ -83,15 +109,15 @@ ge::graphStatus InferShapeMixedQuantSparseFlashMla(gert::InferShapeContext *cont
 
 ge::graphStatus InferDataTypeMixedQuantSparseFlashMla(gert::InferDataTypeContext *context)
 {
-    OPS_ERR_IF(context == nullptr, OPS_LOG_E("MixedQuantSparseFlashMla", "InferShapeContext is nullptr"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context == nullptr, OP_LOGE("MixedQuantSparseFlashMla", "InferShapeContext is nullptr"),
+                return ge::GRAPH_FAILED);
     const auto inputDataType = context->GetInputDataType(QUERY_INPUT_INDEX);
     context->SetOutputDataType(0, inputDataType);
     context->SetOutputDataType(SOFTMAX_LSE_INDEX, ge::DT_FLOAT);
     return ge::GRAPH_SUCCESS;
 }
 
-IMPL_OP(MixedQuantSparseFlashMla)
+IMPL_OP_INFERSHAPE(MixedQuantSparseFlashMla)
     .InferShape(InferShapeMixedQuantSparseFlashMla)
     .InferDataType(InferDataTypeMixedQuantSparseFlashMla);
 } // namespace ops

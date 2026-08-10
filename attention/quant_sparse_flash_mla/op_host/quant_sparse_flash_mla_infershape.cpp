@@ -23,6 +23,37 @@ using namespace ge;
 
 namespace ops {
 constexpr uint32_t QUERY_INPUT_INDEX = 0;
+static std::vector<int64_t> ToVectorFunc(const gert::Shape *shape)
+{
+    size_t shapeSize = shape->GetDimNum();
+    std::vector<int64_t> shapeVec(shapeSize, 0);
+
+    for (size_t i = 0; i < shapeSize; i++) {
+        shapeVec[i] = shape->GetDim(i);
+    }
+    return shapeVec;
+}
+
+static std::string ToStringFunc(const gert::Shape *shape)
+{
+    std::ostringstream oss;
+    auto v = ToVectorFunc(shape);
+    if (v.size() > 0) {
+        for (size_t i = 0; i < v.size() - 1; ++i) {
+            oss << v[i] << ", ";
+        }
+        oss << v[v.size() - 1];
+    }
+    return oss.str();
+}
+
+static int64_t GetKvHeadNum(const gert::Shape *kvShape, const std::string &layoutKv)
+{
+    if (layoutKv == "TND") {
+        return kvShape->GetDim(DIM_IDX_ONE);
+    }
+    return kvShape->GetDim(DIM_IDX_TWO);
+}
 
 ge::graphStatus InferShapeQuantSparseFlashMla(gert::InferShapeContext *context)
 {
@@ -49,20 +80,19 @@ ge::graphStatus InferShapeQuantSparseFlashMla(gert::InferShapeContext *context)
     const char *layoutKv = attr->GetStr(ATTR_LAYOUT_KV_INDEX);
     std::string layoutQStr = (layoutQ != nullptr) ? std::string(layoutQ) : "BSND";
     std::string layoutKvStr = (layoutKv != nullptr) ? std::string(layoutKv) : "BSND";
+    int64_t kvHeadNum = GetKvHeadNum(kvShape, layoutKvStr);
+    OP_CHECK_IF(kvHeadNum <= 0,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("QuantSparseFlashMla", "ori_kv or cmp_kv",
+            ToStringFunc(kvShape).c_str(),
+            "The head num of ori_kv or cmp_kv should be greater than 0 but got " + std::to_string(kvHeadNum)),
+        return ge::GRAPH_FAILED);
     if (returnSoftmaxLse) {
         if (layoutQStr == "TND") {
-            int64_t kvHeadNum;
-            if (layoutKvStr == "PA_BBND") {
-                kvHeadNum = kvShape->GetDim(DIM_IDX_TWO);
-            } else {
-                kvHeadNum = kvShape->GetDim(DIM_IDX_ONE);
-            }
             softmaxLseShape->SetDimNum(DIM_NUM_THREE);
             softmaxLseShape->SetDim(DIM_IDX_ZERO, kvHeadNum);
             softmaxLseShape->SetDim(DIM_IDX_ONE, queryShape->GetDim(DIM_IDX_ZERO));
             softmaxLseShape->SetDim(DIM_IDX_TWO, queryShape->GetDim(DIM_IDX_ONE) / kvHeadNum);
         } else {
-            int64_t kvHeadNum = kvShape->GetDim(DIM_IDX_TWO);
             softmaxLseShape->SetDimNum(DIM_NUM_FOUR);
             softmaxLseShape->SetDim(DIM_IDX_ZERO, queryShape->GetDim(DIM_IDX_ZERO));
             softmaxLseShape->SetDim(DIM_IDX_ONE, kvHeadNum);
