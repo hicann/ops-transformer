@@ -204,26 +204,57 @@ ge::graphStatus MhcSinkhornTiling::CheckInputShape()
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "x, y", dimMsg.c_str(), "y dim must equal x dim");
         return ge::GRAPH_FAILED;
     }
+    for (int64_t d = 0; d < yDimNum_; ++d) {
+        if (yShape.GetDim(d) != xShape.GetDim(d)) {
+            std::string shapeMsg = "y=" + Ops::Base::ToString(yShape) + ", x=" + Ops::Base::ToString(xShape);
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "x, y", shapeMsg.c_str(),
+                                                   "y shape must equal x shape");
+            return ge::GRAPH_FAILED;
+        }
+    }
 
     if (outFlag_ == NUM_ONE) {
         int64_t expectNormSize = DOUBLE_SIZE * num_iters_ * T_ * n_ * N_ALIGN;
         int64_t expectSumSize = DOUBLE_SIZE * num_iters_ * T_ * N_ALIGN;
         auto normOutShapePtr = context_->GetOutputShape(NORM_OUT_IDX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, normOutShapePtr);
-        auto normOutShapeSize = normOutShapePtr->GetStorageShape().GetShapeSize();
-        if (normOutShapeSize != expectNormSize) {
+        auto normOutShape = normOutShapePtr->GetStorageShape();
+        if (static_cast<int64_t>(normOutShape.GetDimNum()) != 1 ||
+            normOutShape.GetShapeSize() != expectNormSize) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "normOut",
-                                                   Ops::Base::ToString(normOutShapePtr->GetStorageShape()).c_str(),
-                                                   "normOut shape size must be 2*numIters*T*n*8");
+                                                   Ops::Base::ToString(normOutShape).c_str(),
+                                                   "normOut shape must be 1-dim and size 2*numIters*T*n*8");
             return ge::GRAPH_FAILED;
         }
         auto sumOutShapePtr = context_->GetOutputShape(SUM_OUT_IDX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, sumOutShapePtr);
-        auto sumOutShapeSize = sumOutShapePtr->GetStorageShape().GetShapeSize();
-        if (sumOutShapeSize != expectSumSize) {
+        auto sumOutShape = sumOutShapePtr->GetStorageShape();
+        if (static_cast<int64_t>(sumOutShape.GetDimNum()) != 1 ||
+            sumOutShape.GetShapeSize() != expectSumSize) {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "sumOut",
-                                                   Ops::Base::ToString(sumOutShapePtr->GetStorageShape()).c_str(),
-                                                   "sumOut shape size must be 2*numIters*T*8");
+                                                   Ops::Base::ToString(sumOutShape).c_str(),
+                                                   "sumOut shape must be 1-dim and size 2*numIters*T*8");
+            return ge::GRAPH_FAILED;
+        }
+    } else {
+        auto normOutShapePtr = context_->GetOutputShape(NORM_OUT_IDX);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, normOutShapePtr);
+        auto normOutShape = normOutShapePtr->GetStorageShape();
+        if (static_cast<int64_t>(normOutShape.GetDimNum()) != 1 ||
+            normOutShape.GetShapeSize() != 1) {
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "normOut",
+                                                   Ops::Base::ToString(normOutShape).c_str(),
+                                                   "out_flag=0, normOut shape must be {1}");
+            return ge::GRAPH_FAILED;
+        }
+        auto sumOutShapePtr = context_->GetOutputShape(SUM_OUT_IDX);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, sumOutShapePtr);
+        auto sumOutShape = sumOutShapePtr->GetStorageShape();
+        if (static_cast<int64_t>(sumOutShape.GetDimNum()) != 1 ||
+            sumOutShape.GetShapeSize() != 1) {
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "sumOut",
+                                                   Ops::Base::ToString(sumOutShape).c_str(),
+                                                   "out_flag=0, sumOut shape must be {1}");
             return ge::GRAPH_FAILED;
         }
     }
