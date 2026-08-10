@@ -371,17 +371,15 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             <tr>
                 <td>ACLNN_ERR_PARAM_NULLPTR</td>
                 <td>161001</td>
-                <td>必选参数或者输出是空指针。</td>
+                <td>参数中存在非法的nullptr。</td>
             </tr>
             <tr>
-                <td>ACLNN_ERR_PARAM_INVALID</td>
-                <td>161002</td>
-                <td>输入变量的数据类型和数据格式不在支持的范围内。</td>
+                <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
+                <td rowspan="2">161002</td>
+                <td>输入的数据类型不满足支持类型。</td>
             </tr>
             <tr>
-                <td>ACLNN_ERR_RUNTIME_ERROR</td>
-                <td>361001</td>
-                <td>API内存调用npu runtime的接口异常。</td>
+                <td>q、k、softmaxLse、softmaxL1Norm必选输入/输出未传。</td>
             </tr>
         </tbody>
     </table>

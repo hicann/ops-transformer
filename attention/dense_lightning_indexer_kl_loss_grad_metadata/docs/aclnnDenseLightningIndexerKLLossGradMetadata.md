@@ -528,7 +528,7 @@ struct ArgContext {
     int64_t headDim { 128 };
     char *layoutQ { nullptr };
     char *layoutK { nullptr };
-    int64_t maskMode { 3 };
+    int64_t maskMode { 0 };
     int64_t cmpRatio { 4 };
 };
 

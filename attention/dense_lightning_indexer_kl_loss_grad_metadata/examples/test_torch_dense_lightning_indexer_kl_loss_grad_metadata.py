@@ -9,6 +9,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 import torch
+import cann_ops_transformer
 
 metadata = torch.ops.cann_ops_transformer.dense_lightning_indexer_kl_loss_grad_metadata(
     cu_seqlens_q=torch.tensor([0, 123, 230, 234, 511], dtype=torch.int32).npu(),
