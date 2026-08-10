@@ -444,7 +444,7 @@
     - conv_states必须是3维[..., K-1, dim]，第0维大小不固定且大于等于batch，同时大于等于cache_indices总维度大小。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cu_seq_len范围[batch, 1024 *1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64* batch, 4G], batch范围[1, 256]。
+    - cu_seq_len范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
     - maxNumBlocks >= ceiv(max_query_len, block_size)。
     - max_query_len > 8。
   - prefill和decode混合场景：
@@ -453,7 +453,7 @@
     - conv_states必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于batch，同时大于等于cache_indices总维度大小。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cu_seq_len范围[batch, 1024 *1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64* batch, 4G], batch范围[1, 256]。
+    - cu_seq_len范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
     - maxNumBlocks >= ceiv(max_query_len, block_size)。
     - max_query_len > 8。
   - decode场景（变长序列）：
@@ -462,7 +462,7 @@
     - conv_states必须是3维[..., k-1+m, dim]，第0维大小不固定且大于等于batch，同时大于等于cache_indices总维度大小。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cu_seq_len范围[batch, batch*8]，每个batch的seq_len范围为[1, 8]。dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
+    - cu_seq_len范围[batch, batch * 8]，每个batch的seq_len范围为[1, 8]。dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
     - maxNumBlocks >= ceiv(max_query_len, block_size)。
     - max_query_len范围[1, 8]。
   - decode场景（固定batch）：
@@ -476,7 +476,7 @@
 
 - 输入值域限制：
   - query_start_loc是累计偏移量，取值范围[0, cu_seq_len]，长度为batch+1，query_start_loc[i]表示第i个序列的起始偏移，query_start_loc[batch+1]表示最后一个序列的结束位置。
-  - blockSize 必须大于等于 2。
+  - blockSize 为0或者大于等于2，apc开启时不为0。
   - blockIdxFirstScheduledToken、blockIdxLastScheduledToken、initialStateIdx、num_computed_tokens和cache_indices均存在时表示APC开启，且满足以下条件（i为batch的索引）：
     - cache_indices为2维
     - initialStateIdx[i] <= blockIdxFirstScheduledToken[i]+1

@@ -53,29 +53,29 @@ constexpr int32_t BLOCK_IDX_FIRST_SCHEDULED_TOKEN_INDEX = 9; // APC: 首个调�
 constexpr int32_t BLOCK_IDX_LAST_SCHEDULED_TOKEN_INDEX = 10; // APC: 最后调度 token 所在 block 索引（可选）
 constexpr int32_t INITIAL_STATE_IDX_INDEX = 11;              // 初始状态索引（可选）
 
-constexpr int32_t Y_INDEX = 0;                    // 输出特征 y（与 x 形状相同）
-constexpr int32_t OUTPUT_CONV_STATES_INDEX = 1;   // 更新后的 conv_states（与输入 conv_states 形状相同）
-constexpr int32_t ATTR_ACTIVATION_MODE_INDEX = 0; // 激活函数模式：0=无，1=silu 等
-constexpr int32_t ATTR_PAD_SLOT_ID_INDEX = 1;     // padding slot id，用于标识 padding 样本
-constexpr int32_t ATTR_RUN_MODE_INDEX = 2;        // 运行模式（预留）
-constexpr int32_t ATTR_MAX_QUERY_LEN_INDEX = 3;   // 2D 输入时的最大序列长度
+constexpr int32_t Y_INDEX = 0;                        // 输出特征 y（与 x 形状相同）
+constexpr int32_t OUTPUT_CONV_STATES_INDEX = 1;       // 更新后的 conv_states（与输入 conv_states 形状相同）
+constexpr int32_t ATTR_ACTIVATION_MODE_INDEX = 0;     // 激活函数模式：0=无，1=silu 等
+constexpr int32_t ATTR_PAD_SLOT_ID_INDEX = 1;         // padding slot id，用于标识 padding 样本
+constexpr int32_t ATTR_RUN_MODE_INDEX = 2;            // 运行模式（预留）
+constexpr int32_t ATTR_MAX_QUERY_LEN_INDEX = 3;       // 2D 输入时的最大序列长度
 constexpr int32_t ATTR_RESIDUAL_CONNECTION_INDEX = 4; // 是否使用残差连接：0=否，1=是
 constexpr int32_t ATTR_BLOCK_SIZE_INDEX = 5;          // APC block 大小（APC 开启时必须非零）
-constexpr int32_t ATTR_CONV_MODE_INDEX = 6; // 卷积模式：0=Qwen3，1=Pangu v2（前 width-1 token 置零）
+constexpr int32_t ATTR_CONV_MODE_INDEX = 6;           // 卷积模式：0=Qwen3，1=Pangu v2（前 width-1 token 置零）
 
-constexpr int64_t DIM_ALIGN_ELEMENT = 128; // dim 方向的最小对齐单元（128 个元素，fp16/bf16 = 256 字节）
+constexpr int64_t DIM_ALIGN_ELEMENT = 128;                      // dim 方向的最小对齐单元（128 个元素，fp16/bf16 = 256 字节）
 constexpr int64_t COARSE_GRAIN_THRESHOLD = 1024;                // dim >= 1024 时切换到粗粒度 tiling 模式
 constexpr int64_t COARSE_GRAIN_ELEMENT = 1024;                  // 粗粒度模式下每块的元素数
 constexpr int64_t COARSE_GRAIN_SIZE = COARSE_GRAIN_ELEMENT * 2; // 粗粒度块字节数（fp16/bf16）
-constexpr int64_t DIM_ALIGN_SIZE = 256; // 细粒度对齐块的字节数（128 元素 × 2 字节）
-constexpr int64_t ALIGN_BYTES = 32;     // NPU 内存地址基本对齐要求（32 字节）
-constexpr int64_t MIN_DIM = 64;         // dim 下限（16 的倍数，最小 64）
-constexpr int64_t MAX_DIM = 16384;      // dim 上限
-constexpr int64_t MIN_BATCH = 1;        // batch 下限
-constexpr int64_t MAX_BATCH = 256;      // batch 上限
-constexpr int64_t MIN_M = 0;            // seqLen-1 的最小值（m 值）
-constexpr int64_t MAX_M = 7;            // seqLen-1 的最大值（F4 扩展至 [0, 7]）
-constexpr int64_t DIM_0 = 0;            // 维度索引常量
+constexpr int64_t DIM_ALIGN_SIZE = 256;                         // 细粒度对齐块的字节数（128 元素 × 2 字节）
+constexpr int64_t ALIGN_BYTES = 32;                             // NPU 内存地址基本对齐要求（32 字节）
+constexpr int64_t MIN_DIM = 64;                                 // dim 下限（16 的倍数，最小 64）
+constexpr int64_t MAX_DIM = 16384;                              // dim 上限
+constexpr int64_t MIN_BATCH = 1;                                // batch 下限
+constexpr int64_t MAX_BATCH = 256;                              // batch 上限
+constexpr int64_t MIN_M = 0;                                    // seqLen-1 的最小值（m 值）
+constexpr int64_t MAX_M = 7;                                    // seqLen-1 的最大值（F4 扩展至 [0, 7]）
+constexpr int64_t DIM_0 = 0;                                    // 维度索引常量
 constexpr int64_t DIM_1 = 1;
 constexpr int64_t DIM_2 = 2;
 constexpr int64_t DIM_3 = 3;
@@ -90,7 +90,8 @@ constexpr int64_t X_INPUT_2D = 1; // 2D 输入 [cu_seq_len, dim]，需配合 que
 class FusedCausalConv1dCutBHTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
     explicit FusedCausalConv1dCutBHTiling(gert::TilingContext *context, bool isInplace = false)
-        : TilingBaseClass(context), isInplace_(isInplace)
+        : TilingBaseClass(context),
+          isInplace_(isInplace)
     {}
 
 protected:
@@ -122,9 +123,6 @@ protected:
     ge::graphStatus ValidateCacheIndicesType();
     ge::graphStatus ValidateNumAcceptedTokenType();
 
-    // ---- APC 开启时的可选输入非 NULL 校验 ----
-    ge::graphStatus ValidateApcOptionalInputs();
-
     // ---- 属性合法性校验 ----
     ge::graphStatus ValidateAttrs();
 
@@ -133,7 +131,7 @@ protected:
 
 private:
     // ---- 核数上限计算 ----
-    int64_t CalculateLimitedCoreNum(); // 细粒度模式：根据数据量限制最大核数（每 256 字节分配 1 核）
+    int64_t CalculateLimitedCoreNum();       // 细粒度模式：根据数据量限制最大核数（每 256 字节分配 1 核）
     int64_t CalculateLimitedCoreNumCoarse(); // 粗粒度模式：根据数据量限制最大核数（每 2048 字节分配 1 核）
 
     // ---- GetShapeAttrsInfo 的子函数 ----
@@ -195,7 +193,7 @@ private:
     int64_t hasAcceptTokenNum_ = 0;  // 是否提供 num_accepted_token 输入：0=否，1=是
     int64_t residualConnection_ = 0; // 是否使用残差连接：0=否，1=是
 
-    int64_t apcEnable_ = 0;            // APC 开关：0=关闭，1=开启（由 blockIdxLast 是否存在推断）
+    int64_t apcEnable_ = 0;            // APC 开关：block_idx_first_scheduled_token 存在即初判开启，缺其余必要条件立即报错
     int64_t blockSize_ = 0;            // APC block 大小（由属性读取）
     int64_t maxNumBlocks_ = 0;         // APC 开启时 cacheIndices 第二维大小
     int64_t hasCacheIndices_ = 0;      // cacheIndices 是否有效：0=无，1=有

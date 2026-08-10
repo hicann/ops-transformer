@@ -29,6 +29,15 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetPlatformInfo()
         // 无运行时平台信息，降级使用编译期 CompileInfo
         auto compileInfoPtr = reinterpret_cast<const FusedCausalConv1dCutBHCompileInfo *>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
+        // 与运行时路径对齐：coreNum/ubSize 必须 > 0，否则后续核内 UB 切分会下溢
+        if (compileInfoPtr->coreNum == 0UL) {
+            OP_LOGE(context_->GetNodeName(), "compile-time coreNum is 0");
+            return ge::GRAPH_FAILED;
+        }
+        if (compileInfoPtr->ubSize == 0UL) {
+            OP_LOGE(context_->GetNodeName(), "compile-time ubSize is 0");
+            return ge::GRAPH_FAILED;
+        }
         totalCoreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
     } else {
@@ -97,7 +106,22 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetShapeInfo()
         auto queryStartLocShape = context_->GetOptionalInputShape(QUERY_START_LOC_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, queryStartLocShape);
         auto queryStartLocOriginShape = queryStartLocShape->GetOriginShape();
-        batchSize_ = queryStartLocOriginShape.GetDim(DIM_0) - 1;
+        // 完整形状校验由 ValidateQueryStartLocShape 完成（要求 dim==1），此处仅保证读 dim0 不越界
+        if (queryStartLocOriginShape.GetDimNum() < DIM_1) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "query_start_loc",
+                                                     std::to_string(queryStartLocOriginShape.GetDimNum()).c_str(),
+                                                     "The shape dim of query_start_loc must be 1");
+            return ge::GRAPH_FAILED;
+        }
+        // query_start_loc 形状为 (batch + 1,)，dim0 必须 >= 2 才能反推非空 batch（README 约束 batch >= 1）
+        int64_t queryStartLocDim0 = queryStartLocOriginShape.GetDim(DIM_0);
+        if (queryStartLocDim0 < 2) {
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context_->GetNodeName(), "query_start_loc", std::to_string(queryStartLocDim0).c_str(),
+                "The dim 0 of query_start_loc must be >= 2 (shape is [batch+1], batch range [1, 256])");
+            return ge::GRAPH_FAILED;
+        }
+        batchSize_ = queryStartLocDim0 - 1;
         seqLen_ = 0; // 2D 模式下 seqLen_ 在 UB 计算时由 maxQueryLen_ 替代
     } else {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "x",
@@ -122,46 +146,73 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetShapeInfo()
     auto convStatesShape = context_->GetInputShape(CONV_STATES_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, convStatesShape);
     auto convStatesOriginShape = convStatesShape->GetOriginShape();
+    if (convStatesOriginShape.GetDimNum() != DIM_3) {
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "conv_states",
+                                                 std::to_string(convStatesOriginShape.GetDimNum()).c_str(),
+                                                 "The shape dim of conv_states must be 3");
+        return ge::GRAPH_FAILED;
+    }
     stateLen_ = convStatesOriginShape.GetDim(DIM_1);
 
-    // 判断 APC 是否开启：blockIdxLastScheduledToken 存在则表示 APC 开启
-    auto blockIdxLastDesc = context_->GetOptionalInputDesc(BLOCK_IDX_LAST_SCHEDULED_TOKEN_INDEX);
-    apcEnable_ = (blockIdxLastDesc != nullptr) ? 1 : 0;
-
-    // 判断 cacheIndices 是否提供
+    // APC 初判：blockIdxFirstScheduledToken 存在即视为用户意图开启 APC，
+    // 随后立即校验全部必要条件，任一不符直接报错（block_size 在 GetAttrInfo 中再校验）
+    auto blockIdxFirstDesc = context_->GetOptionalInputDesc(BLOCK_IDX_FIRST_SCHEDULED_TOKEN_INDEX);
     auto cacheIndicesDesc = context_->GetOptionalInputDesc(CACHE_INDICES_INDEX);
     hasCacheIndices_ = (cacheIndicesDesc != nullptr) ? 1 : 0;
 
-    // 判断 numComputedTokens 是否提供
-    auto numComputedTokensDesc = context_->GetOptionalInputDesc(NUM_COMPUTED_TOKENS_INDEX);
-    hasNumComputedTokens_ = (numComputedTokensDesc != nullptr) ? 1 : 0;
-
-    // APC 开启时解析 maxNumBlocks（cacheIndices 为 2D [batch, maxNumBlocks]）
+    apcEnable_ = (blockIdxFirstDesc != nullptr) ? 1 : 0;
     if (apcEnable_) {
+        auto blockIdxLastDesc = context_->GetOptionalInputDesc(BLOCK_IDX_LAST_SCHEDULED_TOKEN_INDEX);
+        if (blockIdxLastDesc == nullptr) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                context_->GetNodeName(), "block_idx_last_scheduled_token", "nullptr",
+                "block_idx_last_scheduled_token cannot be nullptr when APC");
+            return ge::GRAPH_FAILED;
+        }
+        auto initialStateIdxDesc = context_->GetOptionalInputDesc(INITIAL_STATE_IDX_INDEX);
+        if (initialStateIdxDesc == nullptr) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                context_->GetNodeName(), "initial_state_idx", "nullptr",
+                "initial_state_idx cannot be nullptr when APC");
+            return ge::GRAPH_FAILED;
+        }
         auto cacheIndicesShape = context_->GetOptionalInputShape(CACHE_INDICES_INDEX);
         if (cacheIndicesShape == nullptr) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "cacheIndices", "nullptr",
-                                                  "cacheIndices cannot be nullptr when APC is enabled");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                context_->GetNodeName(), "cache_indices", "nullptr",
+                "cache_indices cannot be nullptr when APC is enabled");
             return ge::GRAPH_FAILED;
         }
         auto cacheIndicesOriginShape = cacheIndicesShape->GetOriginShape();
         if (cacheIndicesOriginShape.GetDimNum() != DIM_2) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "cacheIndices",
-                                                     std::to_string(cacheIndicesOriginShape.GetDimNum()).c_str(),
-                                                     "The shape dim of cacheIndices must be 2 when APC is enabled");
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                context_->GetNodeName(), "cache_indices",
+                std::to_string(cacheIndicesOriginShape.GetDimNum()).c_str(),
+                "The shape dim of cache_indices must be 2 when APC is enabled");
             return ge::GRAPH_FAILED;
         }
         maxNumBlocks_ = cacheIndicesOriginShape.GetDim(DIM_1);
     }
+
+    // 判断 numComputedTokens 是否提供
+    auto numComputedTokensDesc = context_->GetOptionalInputDesc(NUM_COMPUTED_TOKENS_INDEX);
+    hasNumComputedTokens_ = (numComputedTokensDesc != nullptr) ? 1 : 0;
 
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus FusedCausalConv1dCutBHTiling::GetTypeInfo()
 {
-    xDtype_ = context_->GetInputDesc(X_INDEX)->GetDataType();
-    weightDtype_ = context_->GetInputDesc(WEIGHT_INDEX)->GetDataType();
-    convStatesDtype_ = context_->GetInputDesc(CONV_STATES_INDEX)->GetDataType();
+    auto xDesc = context_->GetInputDesc(X_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, xDesc);
+    auto weightDesc = context_->GetInputDesc(WEIGHT_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, weightDesc);
+    auto convStatesDesc = context_->GetInputDesc(CONV_STATES_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, convStatesDesc);
+
+    xDtype_ = xDesc->GetDataType();
+    weightDtype_ = weightDesc->GetDataType();
+    convStatesDtype_ = convStatesDesc->GetDataType();
 
     // 可选输入：query_start_loc
     auto queryStartLocDesc = context_->GetOptionalInputDesc(QUERY_START_LOC_INDEX);
@@ -236,6 +287,13 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetAttrInfo()
         blockSize_ = *blockSizePtr;
     }
 
+    // APC 已初判开启时，block_size 必须非零，否则直接报错
+    if (apcEnable_ && blockSize_ == 0) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "block_size", "0",
+                                              "The value of block_size must not be 0 when APC is enabled");
+        return ge::GRAPH_FAILED;
+    }
+
     // 卷积模式（0=Qwen3 默认，1=Pangu v2 前 width-1 token 置零）
     const int64_t *convModePtr = attrs->GetAttrPointer<int64_t>(ATTR_CONV_MODE_INDEX);
     if (convModePtr != nullptr) {
@@ -244,13 +302,6 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetAttrInfo()
 
     // 原地更新开关：由构造时传入的 isInplace_ 决定（拆分后不再从 attr 读取）
     inplace_ = isInplace_ ? 1 : 0;
-
-    // APC 开启时 blockSize 必须有效
-    if (apcEnable_ && blockSize_ == 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "blockSize", "0",
-                                              "The value of blockSize must be greater than 0 when APC is enabled");
-        return ge::GRAPH_FAILED;
-    }
 
     // convMode!=0 或 apcEnabled 时，必须提供 num_computed_tokens
     if (convMode_ != 0 || apcEnable_) {
@@ -399,12 +450,7 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateConvStatesShape()
     auto convStatesShape = context_->GetInputShape(CONV_STATES_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, convStatesShape);
     auto convStatesOriginShape = convStatesShape->GetOriginShape();
-    if (convStatesOriginShape.GetDimNum() != DIM_3) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "conv_states",
-                                                 std::to_string(convStatesOriginShape.GetDimNum()).c_str(),
-                                                 "The shape dim of conv_states must be 3");
-        return ge::GRAPH_FAILED;
-    }
+    // 维度校验由 GetShapeInfo 完成（line 150 已检查 dim==3），此处不重复
 
     // conv_states shape[0] 必须 >= batch，才能保证每个 batch 都能索引到有效的 cache line
     int64_t convStatesBatch = convStatesOriginShape.GetDim(DIM_0);
@@ -647,49 +693,6 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateNumAcceptedTokenType()
     return ge::GRAPH_SUCCESS;
 }
 
-// APC 开启时，以下可选输入必须全部非 NULL；且 cache_indices 必须是 2D
-ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateApcOptionalInputs()
-{
-    if (!apcEnable_) {
-        return ge::GRAPH_SUCCESS;
-    }
-
-    struct RequiredInput {
-        int32_t idx;
-        const char *name;
-    };
-    const RequiredInput requiredInputs[] = {
-        {INITIAL_STATE_MODE_INDEX, "initial_state_mode"},
-        {BLOCK_IDX_FIRST_SCHEDULED_TOKEN_INDEX, "block_idx_first_scheduled_token"},
-        {BLOCK_IDX_LAST_SCHEDULED_TOKEN_INDEX, "block_idx_last_scheduled_token"},
-        {INITIAL_STATE_IDX_INDEX, "initial_state_idx"},
-    };
-    for (const auto &r : requiredInputs) {
-        if (context_->GetOptionalInputDesc(r.idx) == nullptr) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), r.name, "nullptr",
-                                                  "This input cannot be nullptr when APC is enabled");
-            return ge::GRAPH_FAILED;
-        }
-    }
-
-    // APC 开启时 cache_indices 必须存在且为 2D
-    auto cacheIndicesShape = context_->GetOptionalInputShape(CACHE_INDICES_INDEX);
-    if (cacheIndicesShape == nullptr) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "cache_indices", "nullptr",
-                                              "cache_indices cannot be nullptr when APC is enabled");
-        return ge::GRAPH_FAILED;
-    }
-    auto cacheIndicesOriginShape = cacheIndicesShape->GetOriginShape();
-    if (cacheIndicesOriginShape.GetDimNum() != DIM_2) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "cache_indices",
-                                                 std::to_string(cacheIndicesOriginShape.GetDimNum()).c_str(),
-                                                 "The shape dim of cache_indices must be 2 when APC is enabled");
-        return ge::GRAPH_FAILED;
-    }
-
-    return ge::GRAPH_SUCCESS;
-}
-
 // 属性合法性校验：activation_mode / pad_slot_id / run_mode / residual_connection /
 //                 block_size / max_query_len / conv_mode
 ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateAttrs()
@@ -726,10 +729,10 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateAttrs()
         return ge::GRAPH_FAILED;
     }
 
-    // block_size ∈ [2, INT64_MAX]（属性类型为 int64）
-    if (blockSize_ < 2) {
+    // block_size ∈ {0} ∪ [2, INT64_MAX]（属性类型为 int64）
+    if (blockSize_ != 0 && blockSize_ < 2) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "block_size", std::to_string(blockSize_).c_str(),
-                                              "The value of block_size must be greater than or equal to 2");
+                                              "The value of block_size must be 0 or greater than or equal to 2");
         return ge::GRAPH_FAILED;
     }
 
@@ -788,10 +791,6 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::CheckInputParams()
     if (ValidateCacheIndicesType() != ge::GRAPH_SUCCESS)
         return ge::GRAPH_FAILED;
     if (ValidateNumAcceptedTokenType() != ge::GRAPH_SUCCESS)
-        return ge::GRAPH_FAILED;
-
-    // APC 开启时的可选输入合法性校验
-    if (ValidateApcOptionalInputs() != ge::GRAPH_SUCCESS)
         return ge::GRAPH_FAILED;
 
     // 属性合法性校验

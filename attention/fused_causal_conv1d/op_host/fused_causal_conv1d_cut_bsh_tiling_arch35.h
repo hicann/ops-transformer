@@ -31,7 +31,8 @@ using namespace Ops::Transformer::OpTiling;
 class FusedCausalConv1dCutBSHTiling : public TilingBaseClass {
 public:
     explicit FusedCausalConv1dCutBSHTiling(gert::TilingContext *context, bool isInplace = false)
-        : TilingBaseClass(context), isInplace_(isInplace)
+        : TilingBaseClass(context),
+          isInplace_(isInplace)
     {}
 
 protected:
@@ -53,7 +54,6 @@ protected:
     ge::graphStatus CheckWeightDim();
     ge::graphStatus CheckCacheStatesDim();
     ge::graphStatus CheckCacheIndicesDim();
-    ge::graphStatus CheckApcOptionalInputs();
     ge::graphStatus CheckAttrs();
     ge::graphStatus CheckIndexDims();
     ge::graphStatus Calculate2DTiling(); // 二维切分的tiling计算
@@ -149,7 +149,7 @@ private:
     ge::DataType xType_;
     ge::DataType weightType_;
 
-    uint64_t apcEnabled_ = 0;           // 0/1，等价于 cache_indices 是否为 2D
+    uint64_t apcEnabled_ = 0;           // APC 开关：block_idx_first_scheduled_token 存在即初判开启，缺其余必要条件立即报错
     uint64_t blockSize_ = 0;            // APC block 大小（0 表示未启用）
     uint64_t maxNumBlocks_ = 0;         // cache_indices 第二维大小（APC 模式下 > 0）
     uint64_t convMode_ = 0;             // 0=Qwen3-Next, 1=Pangu v2 输出零填充
