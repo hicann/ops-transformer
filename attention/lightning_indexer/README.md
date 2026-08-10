@@ -121,8 +121,8 @@
           <ul>
                 <li>表示PageAttention中KV存储使用的block映射表。</li>
                 <li>不支持空tensor和非连续。</li>
-                <li>PageAttention场景下，block_table必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（每个batch中最大actual_seq_lengths_key对应的block数量）。</li>
-                <li>shape支持[B, K_S/block_size]。</li>
+                <li>PageAttention场景下，block_table必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（每个batch中最大K_S对应的block数量，即max_K_S/block_size）。</li>
+                <li>shape支持[B, maxBlockNumPerSeq]。</li>
           </ul>
       </td>
       <td>INT32</td>
