@@ -13,12 +13,16 @@
  * \brief
  */
 
+#if ASC_DEVKIT_MAJOR >= 9
+#include "kernel_basic_intf.h"
+#else
 #include "kernel_operator.h"
+#endif
 #include "kv_quant_sparse_flash_attention_template_tiling_key.h"
 #if (__CCE_AICORE__ == 310)
 #include "arch35/kv_quant_sparse_flash_attention_kernel_mla.h"
 #else
-#include "kv_quant_sparse_flash_attention_kernel_mla.h"
+#include "arch22/kv_quant_sparse_flash_attention_kernel_mla.h"
 #endif
 
 using namespace AscendC;

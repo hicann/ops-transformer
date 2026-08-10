@@ -15,7 +15,11 @@
 #ifndef SPARSE_FLASH_ATTENTION_KVCACHE_H
 #define SPARSE_FLASH_ATTENTION_KVCACHE_H
 
+#if ASC_DEVKIT_MAJOR >= 9
+#include "kernel_basic_intf.h"
+#else
 #include "kernel_operator.h"
+#endif
 #include "kernel_operator_list_tensor_intf.h"
 #include "sparse_flash_attention_common_arch35.h"
 #include "./common/util_regbase.h"

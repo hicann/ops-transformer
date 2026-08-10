@@ -13,7 +13,11 @@
  * \brief
  */
 
+#if ASC_DEVKIT_MAJOR >= 9
+#include "kernel_basic_intf.h"
+#else
 #include "kernel_operator.h"
+#endif
 #include "sparse_flash_attention_template_tiling_key.h"
 #if (__CCE_AICORE__ == 310)
 #include "arch35/sparse_flash_attention_kernel_mla.h"

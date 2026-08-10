@@ -20,7 +20,7 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
-#include "../sparse_flash_attention_common.h"
+#include "sparse_flash_attention_common.h"
 
 struct PAShape {
     uint32_t blockSize;
