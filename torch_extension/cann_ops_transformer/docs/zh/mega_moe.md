@@ -49,10 +49,44 @@
     - 全体token的集合为 $\{ \text{token}_i \mid i \in \{0, 1, \dots, \text{total\_num\_tokens} - 1\} \}$。
     - $\text{token}_i$ 的token表示（即隐藏状态向量）为 $\mathbf{x}_i \in \mathbb{R}^{1 \times \text{hidden}}$，且 $\mathbf{x}_i = \mathbf{X}[i,:]$。
     - $\text{token}_i$ 的专家索引为 $e_{i,k} = \mathbf{E}[i,k],\quad k \in \{0,\dots,\text{num\_topk} - 1\},\quad e_{i,k} \in \{0,\dots,\text{num\_experts} - 1\}$。
-    - 激活函数 $\text{SiLU}(z) = z \cdot \sigma(z) = \frac{z}{1+e^{-z}}$，其中 $\sigma$ 为Sigmoid函数。
     - $\mathbb{Z}_4 = \{ x \in \mathbb{Z} \mid -8 \le x \le 7 \}, \quad \mathbb{Z}_8^{\text{sym}} = \{ x \in \mathbb{Z} \mid -127 \le x \le 127 \}, \quad \mathbb{Z}_{32} = \{ x \in \mathbb{Z} \mid -2^{31} \le x \le 2^{31}-1 \}$。其中 $\mathbb{Z}_8^{\text{sym}}$ 的上标 $\text{sym}$ 表示对称量化值域区间：其值域关于 $-127$ 与 $127$ 对称取整，与标准int8 的 $[-128, 127]$ 值域不同，故以 $\text{sym}$ 上标区分。
     - 张量切片操作采用Python风格的 `start:stop:step` 表示法，例如$[0::2, :]$ 代表取偶数行、$[1::2, :]$ 代表取奇数行。
     - $\mathrm{bitcast}_{T}(\mathbf{Z})$ 表示二进制重解释操作，将张量$\mathbf{Z}$的底层二进制数据按目标类型 $T$ 重新解释。
+  - <span id="activation-formulas">激活函数公式：</span>
+    - 记 Linear1 输出拆分后的 gate 分支为 $\mathbf{G}$，up 分支为 $\mathbf{U}$，激活输出为 $\mathbf{A}$。Sigmoid 函数和 SiLU 函数定义为：
+      $$
+      \sigma(z)=\frac{1}{1+e^{-z}}, \qquad
+      \operatorname{SiLU}(z)=z\cdot\sigma(z)=\frac{z}{1+e^{-z}}.
+      $$
+      记截断值为 $c$；未启用截断（未配置或配置为 $0$）时，数学上取 $c=+\infty$。定义
+      $\mathbf{G}_c=\min(\mathbf{G},c)$，$\mathbf{U}_c=\operatorname{clip}(\mathbf{U},-c,c)$。
+    - `swiglu`：
+      $$
+      \mathbf{A}=\operatorname{SwiGLU}(\mathbf{G},\mathbf{U})
+      =\operatorname{Swish}_1(\mathbf{G}_c)\odot\mathbf{U}_c
+      =\operatorname{SiLU}(\mathbf{G}_c)\odot\mathbf{U}_c.
+      $$
+    - `swiglustep`：
+      $$
+      \mathbf{A}=\operatorname{SwiGLUStep}(\mathbf{G},\mathbf{U})=\min\!\left(\operatorname{SiLU}(\mathbf{G}),c\right)\odot\mathbf{U}_c.
+      $$
+    - `swigluoai`：
+      $$
+      \mathbf{A}=\operatorname{SwiGLUOAI}(\mathbf{G},\mathbf{U})=\mathbf{G}_c\odot\sigma(\alpha\mathbf{G}_c)\odot(\mathbf{U}_c+\beta).
+      $$
+    - `situglu`：
+      $$
+      \mathbf{A}=\operatorname{SiTUGLU}(\mathbf{G},\mathbf{U})=\beta\tanh\!\left(\frac{\mathbf{G}}{\beta}\right)\odot\sigma(\mathbf{G})\odot L(\mathbf{U};\beta_{\mathrm{linear}}),
+      $$
+      其中
+      $$
+      L(\mathbf{U};\beta_{\mathrm{linear}})=
+      \begin{cases}
+      \mathbf{U}, & \text{未配置 linear\_beta},\\
+      \beta_{\mathrm{linear}}\tanh\!\left(\dfrac{\mathbf{U}}{\beta_{\mathrm{linear}}}\right),
+      & \text{已配置 linear\_beta}.
+      \end{cases}
+      $$
 
 - 计算说明：
 
@@ -96,17 +130,9 @@
         \mathbf{H}_e = \mathbf{X}_e \cdot \mathbf{W}_1[e]
         \quad\bigl(\in \mathbb{R}^{N_e \times 2\cdot\text{intermediate\_hidden}}\bigr)
         $$
-        **2. SwiGLU激活**
+        **2. 激活**
 
-        首先将 $\mathbf{H}_e$ 沿列维度拆分为 **gate部分** $\mathbf{H}_{\text{gate}}$ 和 **up部分** $\mathbf{H}_{\text{up}}$，然后对gate部分应用SiLU激活函数，再与up部分逐元素相乘，得到专家 $e$ 的中间激活表示 $\mathbf{A}_e$。
-        $$
-        \mathbf{H}_{\text{gate}} = \mathbf{H}_e\bigl[:,\;\text{:intermediate\_hidden}\bigr], \qquad
-        \mathbf{H}_{\text{up}} = \mathbf{H}_e\bigl[:,\;\text{intermediate\_hidden:}\bigr]
-        $$
-        $$
-        \mathbf{A}_e = \text{SiLU}\bigl(\mathbf{H}_{\text{gate}}\bigr) \;\odot\; \mathbf{H}_{\text{up}}
-        \quad\bigl(\in \mathbb{R}^{N_e \times \text{intermediate\_hidden}}\bigr)
-        $$
+        将 $\mathbf{H}_e$ 沿列维度拆分为 gate 分支 $\mathbf{G}_e$ 和 up 分支 $\mathbf{U}_e$，根据 `activation` 计算中间激活表示 $\mathbf{A}_e$；各可选激活类型的计算方式参见[激活函数公式](#activation-formulas)。
 
         **3. Linear2 投影**
 
@@ -173,16 +199,9 @@
         \mathbf{H}_e = \left( \mathbf{C}_e^{\text{int32}} \odot \mathbf{s}^{W1}_e \right) \odot \mathbf{s}^{X}_e \quad \in \mathbb{R}^{N_e \times 2\cdot\text{intermediate\_hidden}}
         $$
 
-        **2. SwiGLU激活**
+        **2. 激活**
 
-        首先将 $\mathbf{H}_e$ 沿列维度拆分为 **gate部分** $\mathbf{H}_{\text{gate}}$ 和 **up部分** $\mathbf{H}_{\text{up}}$，然后对gate部分应用SiLU激活函数，再与up部分逐元素相乘，得到专家 $e$ 的中间激活表示 $\mathbf{A}_e$。
-        $$
-        \mathbf{H}_{\text{gate}} = \mathbf{H}_e[:, :\text{intermediate\_hidden}], \qquad
-        \mathbf{H}_{\text{up}} = \mathbf{H}_e[:, \text{intermediate\_hidden}:]
-        $$
-        $$
-        \mathbf{A}_e = \operatorname{SiLU}(\mathbf{H}_{\text{gate}}) \odot \mathbf{H}_{\text{up}}
-        $$
+        将 $\mathbf{H}_e$ 沿列维度拆分为 gate 分支 $\mathbf{G}_e$ 和 up 分支 $\mathbf{U}_e$，根据 `activation` 计算中间激活表示 $\mathbf{A}_e$；各可选激活类型的计算方式参见[激活函数公式](#activation-formulas)。
 
         **3. Linear2 投影（量化 + int8 矩阵乘 + 反量化）**
 
@@ -325,17 +344,9 @@
 
         其中 $\odot \mathbf{s}^{X}_e$ 表示将矩阵的每一行乘以 $\mathbf{s}^{X}_e$ 中对应的标量。
 
-        **3. SwiGLU激活**
+        **3. 激活**
 
-        首先将 $\mathbf{H}_e$ 沿列维度拆分为 **gate部分** $\mathbf{H}_{\text{gate}}$ 和 **up部分** $\mathbf{H}_{\text{up}}$，然后对gate部分应用SiLU激活函数，再与up部分逐元素相乘，得到专家 $e$ 的中间激活表示 $\mathbf{A}_e$。
-        $$
-        \mathbf{H}_{\text{gate}} = \mathbf{H}_e[:,\; :\!\text{intermediate\_hidden}], \qquad
-        \mathbf{H}_{\text{up}} = \mathbf{H}_e[:,\; \text{intermediate\_hidden}:]
-        $$
-        $$
-        \mathbf{A}_e = \operatorname{SiLU}(\mathbf{H}_{\text{gate}}) \odot \mathbf{H}_{\text{up}}
-        \quad\in \mathbb{R}^{N_e \times \text{intermediate\_hidden}}
-        $$
+        将 $\mathbf{H}_e$ 沿列维度拆分为 gate 分支 $\mathbf{G}_e$ 和 up 分支 $\mathbf{U}_e$，根据 `activation` 计算中间激活表示 $\mathbf{A}_e$；各可选激活类型的计算方式参见[激活函数公式](#activation-formulas)。
 
         **4. Linear2 投影（量化 + int4 × int4 矩阵乘 + 反量化）**
 
@@ -433,23 +444,23 @@
     第二阶段对每个专家执行GMM1 矩阵乘法（将 $W_1$ 沿列方向分为两半分别计算）、SwiGLU激活和MX量化：
 
     $$
-    Z_e^{(x)} = \mathrm{DQ}_{\text{MX}}(\hat{X}_e, S_{X,e}) \cdot \mathrm{DQ}_{\text{MX}}(W_{1,e}^{(x)}, S_{1,e}^{(x)}), \quad Z_e^{(y)} = \mathrm{DQ}_{\text{MX}}(\hat{X}_e, S_{X,e}) \cdot \mathrm{DQ}_{\text{MX}}(W_{1,e}^{(y)}, S_{1,e}^{(y)})
+    G_e = \mathrm{DQ}_{\text{MX}}(\hat{X}_e, S_{X,e}) \cdot \mathrm{DQ}_{\text{MX}}(W_{1,e}^{(G)}, S_{1,e}^{(G)}), \quad U_e = \mathrm{DQ}_{\text{MX}}(\hat{X}_e, S_{X,e}) \cdot \mathrm{DQ}_{\text{MX}}(W_{1,e}^{(U)}, S_{1,e}^{(U)})
     $$
 
     $$
-    U_e = Z_e^{(x)} \odot \sigma\!\left(Z_e^{(x)}\right) \odot Z_e^{(y)}
+    A_e = \operatorname{SwiGLU}(G_e,U_e)
     $$
 
     $$
-    \hat{U}_e,\ S_{U,e} = \mathrm{Q}_{\text{MX}}(U_e)
+    \hat{A}_e,\ S_{A,e} = \mathrm{Q}_{\text{MX}}(A_e)
     $$
 
-    说明：将 $W_1$ 的前 $N/2$ 列 $W_{1,e}^{(x)}$ 和后 $N/2$ 列 $W_{1,e}^{(y)}$ 分别与MX反量化后的输入做矩阵乘法，得到Swish分支 $Z_e^{(x)}$ 和门控分支 $Z_e^{(y)}$。SwiGLU激活对两个分支做逐元素乘积 $x \cdot \sigma(x) \cdot y$，其中 $\sigma$ 为Sigmoid函数，将中间维度从 $N$ 减半为 $N/2$。随后对SwiGLU输出做MX量化，得到GMM2 的量化输入 $\hat{U}_e$。
+    说明：将 $W_1$ 的前 $N/2$ 列 $W_{1,e}^{(G)}$ 和后 $N/2$ 列 $W_{1,e}^{(U)}$ 分别与MX反量化后的输入做矩阵乘法，得到gate分支 $G_e$ 和up分支 $U_e$。SwiGLU的计算方式参见[激活函数公式](#activation-formulas)，其输出维度为 $N/2$。随后对激活输出做MX量化，得到GMM2 的量化输入 $\hat{A}_e$。
 
     第三阶段对每个专家执行GMM2 矩阵乘法，并将结果按目标Rank分发：
 
     $$
-    O_e = \mathrm{DQ}_{\text{MX}}(\hat{U}_e, S_{U,e}) \cdot \mathrm{DQ}_{\text{MX}}(W_{2,e}, S_{2,e})
+    O_e = \mathrm{DQ}_{\text{MX}}(\hat{A}_e, S_{A,e}) \cdot \mathrm{DQ}_{\text{MX}}(W_{2,e}, S_{2,e})
     $$
 
     说明：将量化后的SwiGLU输出与第二组权重 $W_2$ 做MX反量化后的矩阵乘法，将 $N/2$ 维中间表示映射回 $H$ 维隐藏空间，得到每个专家的输出 $O_e$。计算完成后通过RDMA peermem将结果按目标Rank的专家偏移地址写入远端，实现跨Rank聚合。
@@ -469,12 +480,12 @@
     局部变量说明：
     - $\mathcal{T}_e$：被路由到专家 $e$ 的 Token 索引集合，由 `topk_ids` 排序后确定。
     - $\hat{X}_e,\ S_{X,e}$：专家 $e$ 的量化输入及其 MX 缩放因子，第一阶段中间结果。
-    - $W_{1,e}^{(x)}$、$W_{1,e}^{(y)}$：$W_1$ 对应专家 $e$ 的前 $N/2$ 列和后 $N/2$ 列子矩阵，由 `l1_weights` 按 SwiGLU 拆分推导。
-    - $S_{1,e}^{(x)}$、$S_{1,e}^{(y)}$：$W_{1,e}^{(x)}$ 和 $W_{1,e}^{(y)}$ 对应的 MX 缩放因子，从 `l1_weights_sf` 按维度截取。
+    - $W_{1,e}^{(G)}$、$W_{1,e}^{(U)}$：$W_1$ 对应专家 $e$ 的前 $N/2$ 列和后 $N/2$ 列子矩阵，由 `l1_weights` 按gate分支和up分支拆分推导。
+    - $S_{1,e}^{(G)}$、$S_{1,e}^{(U)}$：$W_{1,e}^{(G)}$ 和 $W_{1,e}^{(U)}$ 对应的 MX 缩放因子，从 `l1_weights_sf` 按维度截取。
     - $S_{2,e}$：$W_{2,e}$ 对应的 MX 缩放因子，来自参数 `l2_weights_sf`。
-    - $Z_e^{(x)},\ Z_e^{(y)}$：GMM1 的两路矩阵乘法输出（Swish 分支和门控分支），中间结果。
-    - $U_e$：SwiGLU 激活输出，维度 $m_e \times N/2$，中间结果。
-    - $\hat{U}_e,\ S_{U,e}$：量化后的 SwiGLU 输出及其 MX 缩放因子，中间结果。
+    - $G_e,\ U_e$：GMM1 的gate分支和up分支输出，中间结果。
+    - $A_e$：SwiGLU激活输出，维度 $m_e \times N/2$，中间结果。
+    - $\hat{A}_e,\ S_{A,e}$：量化后的SwiGLU输出及其MX缩放因子，中间结果。
     - $O_e$：GMM2 的专家级输出，维度 $m_e \times H$，中间结果。
     - $\pi(i, k)$：Token $i$ 的第 $k$ 个top-k专家在展开排序后的行索引，由路由排序确定。
     - $\mathrm{Q}_{\text{MX}}(\cdot)$：MX逐组量化操作，block size = 32，输出FP8 数据和E8M0 缩放因子。
@@ -502,24 +513,24 @@
     对专家 \(e\) 收到的 Token，第一层分组矩阵乘和 SwiGLU 计算为：
 
     $$
-    Z_x = \mathrm{DQ}_{\mathrm{MX}}\!\left(\hat{X}_e,S_{X,e}\right)
-          \cdot \mathrm{DQ}_{\mathrm{MX}}\!\left(W_{1,e}^{(x)},S_{1,e}^{(x)}\right),
+    G_e = \mathrm{DQ}_{\mathrm{MX}}\!\left(\hat{X}_e,S_{X,e}\right)
+          \cdot \mathrm{DQ}_{\mathrm{MX}}\!\left(W_{1,e}^{(G)},S_{1,e}^{(G)}\right),
     $$
 
     $$
-    Z_y = \mathrm{DQ}_{\mathrm{MX}}\!\left(\hat{X}_e,S_{X,e}\right)
-          \cdot \mathrm{DQ}_{\mathrm{MX}}\!\left(W_{1,e}^{(y)},S_{1,e}^{(y)}\right),
+    U_e = \mathrm{DQ}_{\mathrm{MX}}\!\left(\hat{X}_e,S_{X,e}\right)
+          \cdot \mathrm{DQ}_{\mathrm{MX}}\!\left(W_{1,e}^{(U)},S_{1,e}^{(U)}\right),
     $$
 
     $$
-    U_e = Z_x \odot \sigma(Z_x) \odot Z_y.
+    A_e = \operatorname{SwiGLU}(G_e,U_e).
     $$
 
-    SwiGLU 输出继续按 32 个元素一组量化为 MXFP8 E4M3，供第二层矩阵乘使用：
+    SwiGLU的计算方式参见[激活函数公式](#activation-formulas)。其输出继续按 32 个元素一组量化为 MXFP8 E4M3，供第二层矩阵乘使用：
 
     $$
-    \hat{U}_e,\;S_{U,e}
-    = \mathrm{Q}_{\mathrm{MX}}\!\left(U_e\right).
+    \hat{A}_e,\;S_{A,e}
+    = \mathrm{Q}_{\mathrm{MX}}\!\left(A_e\right).
     $$
 
     第三阶段（GMM2）：
@@ -527,7 +538,7 @@
     第二层矩阵乘仍为 A8W4，即 FP8 E4M3 激活乘 FP4 E2M1 权重：
 
     $$
-    O_e = \mathrm{DQ}_{\mathrm{MX}}\!\left(\hat{U}_e,S_{U,e}\right)
+    O_e = \mathrm{DQ}_{\mathrm{MX}}\!\left(\hat{A}_e,S_{A,e}\right)
           \cdot \mathrm{DQ}_{\mathrm{MX}}\!\left(W_{2,e},S_{2,e}\right).
     $$
 
@@ -563,24 +574,24 @@
     第一层分组矩阵乘为 A4W4：
 
     $$
-    Z_x = \mathrm{DQ}_{\mathrm{MX}}\!\left(\hat{X}_e,S_{X,e}\right)
-          \cdot \mathrm{DQ}_{\mathrm{MX}}\!\left(W_{1,e}^{(x)},S_{1,e}^{(x)}\right),
+    G_e = \mathrm{DQ}_{\mathrm{MX}}\!\left(\hat{X}_e,S_{X,e}\right)
+          \cdot \mathrm{DQ}_{\mathrm{MX}}\!\left(W_{1,e}^{(G)},S_{1,e}^{(G)}\right),
     $$
 
     $$
-    Z_y = \mathrm{DQ}_{\mathrm{MX}}\!\left(\hat{X}_e,S_{X,e}\right)
-          \cdot \mathrm{DQ}_{\mathrm{MX}}\!\left(W_{1,e}^{(y)},S_{1,e}^{(y)}\right),
+    U_e = \mathrm{DQ}_{\mathrm{MX}}\!\left(\hat{X}_e,S_{X,e}\right)
+          \cdot \mathrm{DQ}_{\mathrm{MX}}\!\left(W_{1,e}^{(U)},S_{1,e}^{(U)}\right),
     $$
 
     $$
-    U_e = Z_x \odot \sigma(Z_x) \odot Z_y.
+    A_e = \operatorname{SwiGLU}(G_e,U_e).
     $$
 
-    这里不能继续把 SwiGLU 输出量化为 FP4。kernel 在 `QuantMode == E2M1_QUANT` 时，将 `SwigluQuantOutType` 指定为 `fp8_e4m3fn_t`，因此输出会提升为 MXFP8 E4M3：
+    SwiGLU的计算方式参见[激活函数公式](#activation-formulas)。这里不能继续把SwiGLU输出量化为FP4。kernel在 `QuantMode == E2M1_QUANT` 时，将 `SwigluQuantOutType` 指定为 `fp8_e4m3fn_t`，因此输出会提升为MXFP8 E4M3：
 
     $$
-    \hat{U}_e,\;S_{U,e}
-    = \mathrm{Q}_{\mathrm{MX}}\!\left(U_e\right).
+    \hat{A}_e,\;S_{A,e}
+    = \mathrm{Q}_{\mathrm{MX}}\!\left(A_e\right).
     $$
 
     第三阶段（A8W4 GMM2）：
@@ -588,7 +599,7 @@
     由于 SwiGLU 量化输出为 FP8 E4M3，而第二层权重仍为 FP4 E2M1，因此第二层矩阵乘实际为 A8W4，而不是 A4W4：
 
     $$
-    O_e = \mathrm{DQ}_{\mathrm{MX}}\!\left(\hat{U}_e,S_{U,e}\right)
+    O_e = \mathrm{DQ}_{\mathrm{MX}}\!\left(\hat{A}_e,S_{A,e}\right)
           \cdot \mathrm{DQ}_{\mathrm{MX}}\!\left(W_{2,e},S_{2,e}\right).
     $$
 
@@ -612,7 +623,7 @@ get_symm_buffer_for_mega_moe(group, num_experts, num_max_tokens_per_rank, num_to
 ```
 
 ```python
-mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_weights_sf=None, l2_weights_sf=None, l1_bias=None, l2_bias=None, x_active_mask=None, activation="swiglu", activation_clamp=None, weight1_type=None, weight2_type=None, shared_l1_weights=None, shared_l2_weights=None, shared_l1_weights_sf=None, shared_l2_weights_sf=None, shared_l1_bias=None, shared_l2_bias=None) -> (Tensor, Tensor)
+mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_weights_sf=None, l2_weights_sf=None, l1_bias=None, l2_bias=None, x_active_mask=None, activation="swiglu", activation_clamp=None, activation_params=None, weight1_type=None, weight2_type=None, shared_l1_weights=None, shared_l2_weights=None, shared_l1_weights_sf=None, shared_l2_weights_sf=None, shared_l1_bias=None, shared_l2_bias=None) -> (Tensor, Tensor)
 ```
 
 ## 参数说明
@@ -902,7 +913,7 @@ mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_we
         <td>activation</td>
         <td>str</td>
         <td>可选</td>
-        <td>激活函数类型，默认值为"swiglu"。当前仅支持"swiglu"。</td>
+        <td>激活函数类型，默认值为"swiglu"。可选值为"swiglu"、"swiglustep"、"swigluoai"和"situglu"。</td>
         <td>str</td>
         <td>不涉及</td>
         <td>不涉及</td>
@@ -911,7 +922,16 @@ mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_we
         <td>activation_clamp</td>
         <td>float</td>
         <td>可选</td>
-        <td>激活函数输入的对称截断阈值，将输入张量限制在 [-activation_clamp, activation_clamp] 区间内。None表示不截断，值需≥0。</td>
+        <td>"swiglu"、"swiglustep"和"swigluoai"的截断值，未配置时使用float最大值。"situglu"忽略该值。值需≥0且不能为NaN。</td>
+        <td>float</td>
+        <td>不涉及</td>
+        <td>不涉及</td>
+    </tr>
+    <tr>
+        <td>activation_params</td>
+        <td>dict[str, float]</td>
+        <td>可选</td>
+        <td>激活函数参数字典，默认值为None。"swiglu"和"swiglustep"无需设置；"swigluoai"支持"alpha"和"beta"，默认值分别为1.702和1.0；"situglu"支持"beta"和"linear_beta"，"beta"默认值为1.0，"linear_beta"未配置时保持up分支不变。</td>
         <td>float</td>
         <td>不涉及</td>
         <td>不涉及</td>
@@ -1360,6 +1380,8 @@ mega_moe(x, topk_ids, topk_weights, l1_weights, l2_weights, sym_buffer, *, l1_we
   <!-- end id17 -->
   <!-- npu="950" id18 -->
   - **Ascend 950PR/Ascend 950DT：**
+    - `activation`仅支持"swiglu"。
+    - `activation_params`无需设置，截断值通过`activation_clamp`传入。
     - num_tokens（x.dim0）范围 [1, +∞)，实际上限受`ccl_buffer_size`约束。算子采用分批处理机制，BS不再受UB容量硬限制，dispatch阶段按固定粒度分批处理。
     - hidden（x.dim1）仅支持1024、2048、3072、4096、5120、6144、7168、8192。
     - num_topk（topk_ids.dim1）支持[1, 32]。

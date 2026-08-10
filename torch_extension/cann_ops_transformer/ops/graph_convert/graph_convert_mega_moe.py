@@ -41,6 +41,8 @@ try:
 except ImportError:
     _TORCHAIR_AVAILABLE = False
 
+from cann_ops_transformer.ops.mega_moe import _normalize_activation_params
+
 if _TORCHAIR_AVAILABLE:
 
     @auto_convert_to_tensor(
@@ -84,7 +86,7 @@ if _TORCHAIR_AVAILABLE:
         comm_alg: str = "",
         num_max_tokens_per_rank: int = 0,
         activation: str = "swiglu",
-        activation_clamp: float = 3.4028234663852886e38,
+        activation_params: Optional[List[float]] = None,
         topk_weights_type: int = 0,
         dependencies=[],
         node_name=None,
@@ -117,8 +119,11 @@ if _TORCHAIR_AVAILABLE:
         .ATTR(comm_alg, String, "")\n
         .ATTR(num_max_tokens_per_rank, Int, 0)\n
         .ATTR(activation, String, "swiglu")\n
-        .ATTR(activation_clamp, Float, 3.4028234663852886e+38)\n
+        .ATTR(activation_params, ListFloat, {})\n
         """
+        if activation_params is None:
+            activation_params = []
+
         inputs = {
             "context": context,
             "x": x,
@@ -145,7 +150,7 @@ if _TORCHAIR_AVAILABLE:
             "comm_alg": attr.Str(comm_alg),
             "num_max_tokens_per_rank": attr.Int(num_max_tokens_per_rank),
             "activation": attr.Str(activation),
-            "activation_clamp": attr.Float(activation_clamp),
+            "activation_params": attr.ListFloat(activation_params),
             "topk_weights_type": attr.Int(topk_weights_type),
         }
 
@@ -194,7 +199,7 @@ if _TORCHAIR_AVAILABLE:
             .attr("comm_alg", attr.Str(""))
             .attr("num_max_tokens_per_rank", attr.Int(0))
             .attr("activation", attr.Str("swiglu"))
-            .attr("activation_clamp", attr.Float(3.4028234663852886e38))
+            .attr("activation_params", attr.ListFloat([]))
             .attr("topk_weights_type", attr.Int(0))
             .output("y", "DT_BF16, DT_FLOAT16")
             .output("expert_token_nums", "DT_INT32"),
@@ -223,13 +228,17 @@ if _TORCHAIR_AVAILABLE:
         comm_alg: str = "",
         num_max_tokens_per_rank: int = 0,
         activation: str = "swiglu",
-        activation_clamp: float = 3.4028234663852886e38,
+        activation_clamp: Optional[float] = None,
+        activation_params: Optional[Dict[str, float]] = None,
         dispatch_quant_out_dtype: int = 28,
         weight1_type: int = 28,
         weight2_type: int = 28,
         topk_weights_type: int = 0,
         meta_outputs: TensorSpec = None,
     ):
+        activation_values = _normalize_activation_params(
+            activation, activation_clamp, activation_params
+        )
         return MegaMoe(
             context=context,
             x=x,
@@ -252,6 +261,6 @@ if _TORCHAIR_AVAILABLE:
             comm_alg=comm_alg,
             num_max_tokens_per_rank=num_max_tokens_per_rank,
             activation=activation,
-            activation_clamp=activation_clamp,
+            activation_params=activation_values,
             topk_weights_type=topk_weights_type,
         )

@@ -593,6 +593,15 @@ inline aclIntArray *ConvertType(const at::IntArrayRef &at_array)
     return array;
 }
 
+inline aclFloatArray *ConvertType(const std::vector<float> &value)
+{
+    static const auto aclCreateFloatArray = GET_OP_API_FUNC(aclCreateFloatArray);
+    if (aclCreateFloatArray == nullptr) {
+        return nullptr;
+    }
+    return aclCreateFloatArray(value.data(), value.size());
+}
+
 template <std::size_t N>
 inline aclBoolArray *ConvertType(const std::array<bool, N> &value)
 {
@@ -791,6 +800,16 @@ inline void Release(aclIntArray *p)
     }
 
     aclDestroyIntArray(p);
+}
+
+inline void Release(aclFloatArray *p)
+{
+    static const auto aclDestroyFloatArray = GET_OP_API_FUNC(aclDestroyFloatArray);
+    if (aclDestroyFloatArray == nullptr) {
+        return;
+    }
+
+    aclDestroyFloatArray(p);
 }
 
 inline void Release(aclBoolArray *p)

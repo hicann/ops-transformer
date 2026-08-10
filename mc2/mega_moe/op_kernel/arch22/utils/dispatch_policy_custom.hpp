@@ -16,6 +16,8 @@
 #ifndef DISPATH_POLICY_CUSTOM_W4A8_HPP
 #define DISPATH_POLICY_CUSTOM_W4A8_HPP
 
+#include "gated_activation.hpp"
+
 namespace Catlass::Gemm {
 
 template <bool ENABLE_UNIT_FLAG_ = false, bool ENABLE_SHUFFLE_K_ = false>
@@ -104,12 +106,16 @@ struct EpilogueAtlasA2PerTokenDequantQuant {
 template <uint32_t UB_STAGES_>
 struct EpilogueAtlasA2PerTokenDequantSwigluQuant {
     using ArchTag = Arch::AtlasA2;
+    using Activation = Catlass::Epilogue::GatedActivation;
+    static constexpr uint32_t TILE_LENGTH = Activation::PREFERRED_TILE_LENGTH;
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
 };
 
 template <uint32_t UB_STAGES_>
 struct EpilogueAtlasA2W4A8PostPerTokenDequantSwigluQuant {
     using ArchTag = Arch::AtlasA2;
+    using Activation = Catlass::Epilogue::GatedActivation;
+    static constexpr uint32_t TILE_LENGTH = Activation::PREFERRED_TILE_LENGTH;
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
 };
 
@@ -134,6 +140,8 @@ struct EpilogueAtlasA2PerTokenDequantBF16 {
 template <uint32_t UB_STAGES_>
 struct EpilogueAtlasA2PerTokenDequantSwigluQuantInt8 {
     using ArchTag = Arch::AtlasA2;
+    using Activation = Catlass::Epilogue::GatedActivation;
+    static constexpr uint32_t TILE_LENGTH = Activation::PREFERRED_TILE_LENGTH;
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
 };
 
@@ -143,6 +151,8 @@ struct EpilogueAtlasA2PerTokenDequantSwigluQuantInt8 {
 template <uint32_t UB_STAGES_>
 struct EpilogueAtlasA2PerTokenDequantSwigluQuantBF16 {
     using ArchTag = Arch::AtlasA2;
+    using Activation = Catlass::Epilogue::GatedActivation;
+    static constexpr uint32_t TILE_LENGTH = Activation::PREFERRED_TILE_LENGTH;
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
 };
 
