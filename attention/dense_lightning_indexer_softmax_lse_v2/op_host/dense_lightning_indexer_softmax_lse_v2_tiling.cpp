@@ -317,6 +317,11 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
                         static_cast<int32_t>(weightDesc->GetDataType())),
                 return ge::GRAPH_PARAM_INVALID);
 
+    // metadata (optional input index 8) is a mandatory input, must be provided
+    OP_CHECK_IF(context->GetOptionalInputShape(8) == nullptr,
+                OP_LOGE(context->GetNodeName(), "metadata must be provided."),
+                return ge::GRAPH_PARAM_INVALID);
+
     const char *optInputNames[] = {"cu_seq_lens_q", "cu_seq_lens_k", "seq_used_q", "seq_used_k", "cmp_residual_k",
                                    "metadata"};
     for (int32_t i = 3; i <= 8; i++) {
