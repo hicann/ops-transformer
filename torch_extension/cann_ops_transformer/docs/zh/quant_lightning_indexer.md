@@ -112,7 +112,7 @@ cann_ops_transformer.quant_lightning_indexer(
 | cu_seqlens_k | Tensor | 可选 | 表示不同batch中k的有效Sequence Length，仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。 | int32 | (b+1, ) |
 | seqused_q | Tensor | 可选 | 表示不同batch中q实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。 | int32 | (b, ) |
 | seqused_k | Tensor | 可选 | 表示不同batch中k实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。 | int32 | (b, ) |
-| cmp_residual_k | Tensor | 可选 | 表示不同batch中cmp_kv压缩后Sequence Length的余数，配合cmp_ratio实现cmp_kv部分的mask和负载计算。cmp_ratio不为1且mask_mode为3场景下必传。需满足cmp_residual_k\[i\] \< cmp_ratio。数据格式为ND，支持非连续的Tensor。 | int32 | (b, ) |
+| cmp_residual_k | Tensor | 可选 | 表示不同batch中cmp_kv压缩后Sequence Length的余数，配合cmp_ratio实现cmp_kv部分的mask和负载计算。cmp_ratio不为1且mask_mode为3场景下必传。需满足0 \<= cmp_residual_k\[i\] \< cmp_ratio。数据格式为ND，支持非连续的Tensor。 | int32 | (b, ) |
 | batch_size | int | 可选 | 表示batch数量，默认值为0。 | int32 | - |
 | max_seqlen_q | int | 可选 | 表示q的最长Sequence Length，-1表示任意可能长度，默认值为-1。 | int32 | - |
 | max_seqlen_k | int | 可选 | 表示k的最长Sequence Length，-1表示任意可能长度，默认值为-1。 | int32 | - |
@@ -136,7 +136,7 @@ cann_ops_transformer.quant_lightning_indexer(
 | cu_seqlens_k | Tensor | 可选 | 当前batch及前序batch中k的有效token数的累加和，后一个元素的值必须大于等于前一个元素的值。仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND。 | int32 | (b+1,) |
 | seqused_q | Tensor | 可选 | 不同batch中q的真实使用长度，每个batch的有效token数不超过q中的维度S大小且不小于0。数据格式为ND。 | int32 | (b,) |
 | seqused_k | Tensor | 可选 | 不同batch中k的真实使用长度，每个batch的有效token数不超过k中的维度S大小且不小于0。数据格式为ND。layout_k为PA_BBND时必须传入。 | int32 | (b,) |
-| cmp_residual_k | Tensor | 可选 | 表示k压缩前token数量除以cmp_ratio的余数，需满足cmp_residual_k\[i\] \< cmp_ratio。需要在mask_mode等于3、cmp_ratio不等于1的场景下使用。数据格式为ND。 | int32 | (b,) |
+| cmp_residual_k | Tensor | 可选 | 表示k压缩前token数量除以cmp_ratio的余数，需满足0 \<= cmp_residual_k\[i\] \< cmp_ratio。需要在mask_mode等于3、cmp_ratio不等于1的场景下使用。数据格式为ND。 | int32 | (b,) |
 | block_table | Tensor | 可选 | 表示PageAttention中KV存储使用的block映射表。不支持空tensor。layout_k为PA_BBND时必须传入。数据格式为ND。 | int32 | (b, k_s_max/block_size) |
 | output_idx_offset | Tensor | 可选 | 表示topK结果输出索引所需要加上的偏移。值必须大于0，加上偏移后topk index不能超过int32最大值。数据格式为ND。 | int32 | (b,) |
 | metadata | Tensor | 可选 | quant_lightning_indexer_metadata算子传入的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。不支持空tensor。数据格式为ND。 | int32 | (1024,) |
@@ -170,7 +170,7 @@ cann_ops_transformer.quant_lightning_indexer(
 - b（batch）表示输入样本批量大小。
 - 参数cu_seqlens_q、cu_seqlens_k要求其值为当前batch与前序batch有效token数的累加值，第一个元素必须为0，且后一个元素的值必须大于等于前一个元素的值。
 - 参数seqused_q、seqused_k要求其值表示每个batch中的有效token数。
-- 参数cmp_residual_k需满足cmp_residual_k\[i\] < cmp_ratio。
+- 参数cmp_residual_k需满足0 <= cmp_residual_k\[i\] < cmp_ratio。
 - mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../../../docs/zh/context/sparse_mode_introduction.md)。
 - pa_kv_cache支持0轴非连续；pa_block_size支持1~1024，且是16的倍数。
 - 参数q、k的数据类型应保持一致。
@@ -200,6 +200,7 @@ cann_ops_transformer.quant_lightning_indexer(
   - 参数metadata必须传入。
   - q、k在quant_mode为1/3时支持float8_e4m3fn，quant_mode为4时支持HIfloat8，quant_mode为5时支持float4_e2m1，quant_mode为2时支持int8。
   - q_descale和k_descale在quant_mode为3/5时支持float8_e8m0，quant_mode为1/4时支持float32，quant_mode为2时支持float16。
+  - w在quant_mode为2时支持float16，quant_mode为1/3/4/5时支持float32。
 <!-- end id8 -->
 
 ### 特性参数组

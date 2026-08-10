@@ -33,9 +33,9 @@
 | key_dequant_scale            | 输入      | 公式中的$Scale_K$，表示Index Key的反量化系数，支持0轴非连续。`quant_mode`为3/5时，shape为将`key`的D轴替换为(D/64, 2) | FLOAT16、FLOAT32、FLOAT8_e8m0       | ND         |
 | cu_seqlens_q                    | 可选输入      | layout_q为TND时必须传入，表示每个Batch中`query`的有效token数前缀和。；layout_q为BSND时不能传入 | INT32       | ND         |
 | cu_seqlens_k                    | 可选输入      | layout_k为TND时必须传入，表示每个Batch中`key`的有效token数前缀和；layout_k为PA_BSND或BSND时不能传入 | INT32       | ND         |
-| seqused_q                    | 可选输入      | layout_q为BSND时可选传入，表示每个Batch中`query`的有效token数，可传入None表示与query的S长度相同 | INT32       | ND         |
+| seqused_q                    | 可选输入      | layout_q为BSND时可选传入，表示每个Batch中`query`的有效token数 | INT32       | ND         |
 | seqused_k                    | 可选输入      | layout_k为PA_BSND或BSND时使用，表示每个Batch中`key`的有效token数。| INT32       | ND         |
-| cmp_residual_k                    | 可选输入      | 压缩场景下Key的残余长度。| INT32       | ND         |
+| cmp_residual_k                    | 可选输入      | 压缩场景下Key的残余长度，需满足0 \<= cmp_residual_k\[i\] \< cmp_ratio。| INT32       | ND         |
 | block_table                    | 可选输入      | 表示PageAttention中KV存储使用的block映射表。 | INT32       | ND         |
 | output_idx_offset                    | 可选输入      | 输出索引的偏移量 | INT32       | ND         |
 | metadata                    | 可选输入      | QuantLightningIndexerV2Metadata算子传入的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。 | INT32       | ND         |
@@ -53,9 +53,12 @@
 ## 约束说明
 
 - <term>Ascend 950PR/Ascend 950DT</term>：
-  - `query`、`key`在`quant_mode`为1/3时支持FLOAT8_e4m3fn，`quant_mode`为4时支持HIFLOAT8，`quant_mode`为5时支持FLOAT4_e2m1，不支持INT8。
-  - `quant_mode`为3/5时，`query_dequant_scale`和`key_dequant_scale`仅支持FLOAT8_e8m0。
-  - `quant_mode`为5时，`query`和`key`的逻辑数据类型为FLOAT4_e2m1，每个物理字节打包两个E2M1逻辑元素。
+  - `query`、`key`在`quant_mode`为1/3时支持FLOAT8_e4m3fn，`quant_mode`为2时支持INT8，`quant_mode`为4时支持HIFLOAT8，`quant_mode`为5时支持FLOAT4_e2m1。
+  - `query_dequant_scale`和`key_dequant_scale`在`quant_mode`为1/4时支持FLOAT32，`quant_mode`为2时支持FLOAT16，`quant_mode`为3/5时支持FLOAT8_e8m0。
+  - `weights`在`quant_mode`为2时支持FLOAT16，`quant_mode`为1/3/4/5时支持FLOAT32。
+  - `quant_mode`为3/5时，`query_dequant_scale`和`key_dequant_scale`的维数分别比`query`和`key`多1，前缀维度保持一致，末两维为(D/64,2)；D必须为64的倍数，每个scale对应连续32个D轴逻辑元素。
+  - `query`的N支持[1, 64]，`key`的N仅支持1。
+  - `topk`支持[1, 8192]。
 
 ## 调用示例
 
