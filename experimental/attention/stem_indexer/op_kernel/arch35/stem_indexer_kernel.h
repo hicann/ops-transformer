@@ -66,6 +66,7 @@ protected:
     uint64_t indiceLenCoreOffset = 0ULL;
     bool isUsedCoreEqZero = false;
     bool needCleanOutput = false;
+    bool useKvSeqLensAsNumPrompt = false;
     // ================================Global Buffer区=================================
 
     GlobalTensor<uint32_t> faMetaDataGm;
@@ -115,6 +116,7 @@ template <typename SIT>
 __aicore__ inline void SIPreload<SIT>::InitTilingData(const StemIndexerTilingData *__restrict tilingData)
 {
     usedCoreNum = tilingData->usedCoreNum;
+    useKvSeqLensAsNumPrompt = tilingData->useKvSeqLensAsNumPrompt != 0U;
     constInfo.usedCoreNum = tilingData->usedCoreNum;
     constInfo.batchSize = tilingData->bSize;
     constInfo.qHeadNum = tilingData->qHeadNum;
@@ -327,7 +329,9 @@ SIPreload<SIT>::Init(__gm__ uint8_t *qflat, __gm__ uint8_t *kflat, __gm__ uint8_
 
     InitTilingData(tiling);
     InitActualSeqLen(qSeqLens, kvSeqLens);
-    numPromptTokensGm.SetGlobalBuffer((__gm__ int32_t *)numPromptTokens, constInfo.batchSize);
+    __gm__ uint8_t *effectiveNumPromptTokens =
+        useKvSeqLensAsNumPrompt ? kvSeqLens : numPromptTokens;
+    numPromptTokensGm.SetGlobalBuffer((__gm__ int32_t *)effectiveNumPromptTokens, constInfo.batchSize);
 
     sectionNum_ = ((__gm__ uint32_t *)metadata)[0];
     if (sectionNum_ == 0U) {
@@ -396,9 +400,13 @@ __aicore__ inline void SIPreload<SIT>::CalcGS1LoopParams(uint32_t bN2LoopIdx)
     GetBN2Idx(bN2LoopIdx);
     tempLoopInfo.s2ValidSize = 0U;
     GetS1S2ActualSeqLen(tempLoopInfo.bIdx, tempLoopInfo.actS1Size, tempLoopInfo.actS2Size);
-    uint64_t promptTokenLen =
-        GetActualSeqLen(tempLoopInfo.bIdx, static_cast<uint32_t>(constInfo.batchSize), numPromptTokensGm, 0U);
-    tempLoopInfo.promptLen = CeilDiv((uint32_t)promptTokenLen, constInfo.stemBlockSize);
+    if (useKvSeqLensAsNumPrompt) {
+        tempLoopInfo.promptLen = tempLoopInfo.actS2Size;
+    } else {
+        uint64_t promptTokenLen =
+            GetActualSeqLen(tempLoopInfo.bIdx, static_cast<uint32_t>(constInfo.batchSize), numPromptTokensGm, 0U);
+        tempLoopInfo.promptLen = CeilDiv((uint32_t)promptTokenLen, constInfo.stemBlockSize);
+    }
     if ((tempLoopInfo.actS2Size == 0) || (tempLoopInfo.actS1Size == 0)) {
         tempLoopInfo.curActSeqLenIsZero = true;
         return;

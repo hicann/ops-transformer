@@ -86,10 +86,16 @@ def customize_inputs(
     vbias.copy_(vbias_data)
 
     if q_seq_lens_list is not None:
-        q_seq_lens.copy_(torch.tensor(q_seq_lens_list, dtype=torch.int32))
+        q_seq_lens.copy_(
+            torch.tensor(q_seq_lens_list, dtype=torch.int32).reshape(q_seq_lens.shape)
+        )
     if kv_seq_lens_list is not None:
-        kv_seq_lens.copy_(torch.tensor(kv_seq_lens_list, dtype=torch.int32))
+        kv_seq_lens.copy_(
+            torch.tensor(kv_seq_lens_list, dtype=torch.int32).reshape(kv_seq_lens.shape)
+        )
     if num_prompt_tokens_list is not None:
-        num_prompt_tokens.copy_(torch.tensor(num_prompt_tokens_list, dtype=torch.int32))
+        num_prompt_tokens.copy_(
+            torch.tensor(num_prompt_tokens_list, dtype=torch.int32).reshape(num_prompt_tokens.shape)
+        )
 
     metadata.copy_(torch.zeros(metadata.shape, dtype=torch.int32))

@@ -55,7 +55,9 @@ single和batch模式当前均维护154条正例case，分别从`ENABLED_PARAMS`�
 当前case表只保留可运行并可与golden比对的正例。
 
 当前StemIndexer主算子使用BNSD布局，`q_seq_lens`和`kv_seq_lens`按batch实际长度传入，
-`num_prompt_tokens`按batch传入动态TopK预算基准长度，正例中保持`num_prompt_tokens >= kv_seq_lens`。
+`num_prompt_tokens`按batch传入动态TopK预算基准长度，正例中保持`num_prompt_tokens >= kv_seq_lens`；
+该输入缺省时由OpHost通过TilingData通知Kernel复用`kv_seq_lens`。`metadata`虽然在接口层声明为可选输入，
+但当前主算子计算必须传入有效Metadata，缺省时会在Tiling阶段返回参数错误。
 测试用例不再单独维护额外token长度辅助字段；
 `qflat`、`kflat`的shape由`q_seq_lens`、`kv_seq_lens`的最大值推导。
 
@@ -122,6 +124,14 @@ batch模式流程与QLI保持一致：
 STEM_INDEXER_CASE_ID=SI_WB_001_1,SI_WB_101_1 \
     python3 batch/stem_indexer_pt_save.py csv/stem_indexer_generalized_cases.csv pt_path
 ```
+
+生成脚本默认使用全部可用CPU核按case并行。大用例并行时内存占用较高，可通过`--workers`限制进程数：
+
+```bash
+python3 batch/stem_indexer_pt_save.py csv/stem_indexer_cases.csv pt_path --workers 8
+```
+
+`--workers 0`表示使用全部可用CPU核，`--workers 1`表示按原方式串行生成。
 
 `.pt`文件和`result.csv`是本地生成产物，不需要提交。
 

@@ -12,7 +12,9 @@
 
 import argparse
 import ast
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import glob
+import multiprocessing
 import os
 import re
 import sys
@@ -187,27 +189,85 @@ def build_pt_payload(case):
     }
 
 
-def save_test_cases(test_cases, output_dir):
+def init_worker():
+    """Keep each case worker single-threaded to avoid CPU oversubscription."""
+    torch.set_num_threads(1)
+    try:
+        torch.set_num_interop_threads(1)
+    except RuntimeError:
+        pass
+
+
+def generate_and_save_case(case, output_path):
+    payload = build_pt_payload(case)
+    torch.save(payload, output_path)
+    return output_path
+
+
+def resolve_worker_count(workers, case_count):
+    if workers < 0:
+        raise ValueError(f"workers must be greater than or equal to 0, but got {workers}")
+    available_cpu_count = os.cpu_count() or 1
+    requested_worker_count = available_cpu_count if workers == 0 else workers
+    return max(1, min(requested_worker_count, max(case_count, 1)))
+
+
+def save_test_cases(test_cases, output_dir, workers):
     os.makedirs(output_dir, exist_ok=True)
     saved_count = 0
     skipped_count = 0
+    pending_cases = []
+    pending_paths = set()
     for case in test_cases:
-        try:
-            output_path = os.path.join(output_dir, f"{sanitize_case_name(case)}.pt")
-            if os.path.exists(output_path):
-                skipped_count += 1
-                print(f"Skipped existing StemIndexer testcase pt: {output_path}")
-                continue
-            print(
-                f"Generating StemIndexer testcase pt for {case.get('case_id', '<unknown>')}: {output_path}"
-            )
-            payload = build_pt_payload(case)
-            torch.save(payload, output_path)
-            saved_count += 1
-            print(f"Saved StemIndexer testcase pt: {output_path}")
-        except Exception as err:
-            print(f"[FAILED] Generate pt for {case.get('case_id', '<unknown>')}: {err}")
-            raise
+        output_path = os.path.join(output_dir, f"{sanitize_case_name(case)}.pt")
+        if os.path.exists(output_path) or output_path in pending_paths:
+            skipped_count += 1
+            print(f"Skipped existing StemIndexer testcase pt: {output_path}")
+            continue
+        pending_paths.add(output_path)
+        pending_cases.append((case, output_path))
+
+    worker_count = resolve_worker_count(workers, len(pending_cases))
+    print(
+        f"Generating {len(pending_cases)} StemIndexer testcase pt files "
+        f"with {worker_count} worker process(es)."
+    )
+    if worker_count == 1:
+        for case, output_path in pending_cases:
+            try:
+                print(
+                    f"Generating StemIndexer testcase pt for {case.get('case_id', '<unknown>')}: {output_path}"
+                )
+                generate_and_save_case(case, output_path)
+                saved_count += 1
+                print(f"Saved StemIndexer testcase pt: {output_path}")
+            except Exception as err:
+                print(f"[FAILED] Generate pt for {case.get('case_id', '<unknown>')}: {err}")
+                raise
+    else:
+        multiprocessing_context = multiprocessing.get_context("spawn")
+        with ProcessPoolExecutor(
+            max_workers=worker_count,
+            mp_context=multiprocessing_context,
+            initializer=init_worker,
+        ) as executor:
+            future_to_case = {}
+            for case, output_path in pending_cases:
+                print(
+                    f"Generating StemIndexer testcase pt for {case.get('case_id', '<unknown>')}: {output_path}"
+                )
+                future = executor.submit(generate_and_save_case, case, output_path)
+                future_to_case[future] = case
+
+            for future in as_completed(future_to_case):
+                case = future_to_case[future]
+                try:
+                    output_path = future.result()
+                    saved_count += 1
+                    print(f"Saved StemIndexer testcase pt: {output_path}")
+                except Exception as err:
+                    print(f"[FAILED] Generate pt for {case.get('case_id', '<unknown>')}: {err}")
+                    raise
     print(
         f"Saved {saved_count}, skipped {skipped_count} existing StemIndexer testcase pt files."
     )
@@ -222,11 +282,17 @@ def main():
         "pt_output_dir", type=str, help="Output directory for pt files."
     )
     parser.add_argument("--device-id", type=int, default=0)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=0,
+        help="Number of case worker processes. 0 uses all available CPU cores.",
+    )
     args = parser.parse_args()
 
     test_cases = load_csv_test_cases(args.csv_path)
     test_cases = select_test_cases(test_cases)
-    save_test_cases(test_cases, args.pt_output_dir)
+    save_test_cases(test_cases, args.pt_output_dir, args.workers)
 
 
 if __name__ == "__main__":

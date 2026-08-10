@@ -16,6 +16,8 @@
 #include <graph/utils/type_utils.h>
 #include <register/op_impl_registry.h>
 
+#include <string>
+
 #include "err/ops_err.h"
 
 using namespace ge;
@@ -40,10 +42,12 @@ static ge::graphStatus InferShapeStemIndexer(gert::InferShapeContext *context)
     OP_CHECK_NULL_WITH_CONTEXT(context, kflatShape);
 
     OP_CHECK_IF(qflatShape->GetDimNum() != DIM_NUM_FOUR,
-                OP_LOGE(context, "qflat dim num should be 4, but got %zu.", qflatShape->GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "qflat",
+                                             (std::to_string(qflatShape->GetDimNum()) + "D").c_str(), "4D"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(kflatShape->GetDimNum() != DIM_NUM_FOUR,
-                OP_LOGE(context, "kflat dim num should be 4, but got %zu.", kflatShape->GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "kflat",
+                                             (std::to_string(kflatShape->GetDimNum()) + "D").c_str(), "4D"),
                 return ge::GRAPH_FAILED);
 
     gert::Shape *sparseIndicesShape = context->GetOutputShape(SPARSE_INDICES_INDEX);
