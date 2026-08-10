@@ -49,7 +49,7 @@
         \frac{x}{1 + \exp\left(-1.595769121 \times \left(x + 0.044715 \times x^3\right)\right)}
         $$
       * $E$ 表示专家数，$M$ 表示总token数，$K$ 表示输入特征维度，$N$ 表示输出特征维度。
-      * $blocksize$ 表示MX量化时共享指数的分组大小，当前仅支持64。
+      * $blocksize$ 表示MX量化结果的存储block大小，当前仅支持64，对应2个MX量化group，每个group包含32个元素。
 
     - **输入**：
 
@@ -81,7 +81,7 @@
 
       - 4.对激活结果进行MX量化，目标数据类型DType由输出Tensor y的数据类型指定：
 
-        - 场景1，当scaleAlg为0时，表示OCP实现，将激活结果$S_i$在N轴按$k=blocksize$分组，一组$k$个数$\{V_j\}_{j=1}^{k}$动态量化为$\{YScale, \{P_j\}_{j=1}^{k}\}$。
+        - 场景1，当scaleAlg为0时，表示OCP实现，将激活结果$S_i$在N轴按$group\_size=32$分组，一组$group\_size$个数$\{V_j\}_{j=1}^{group\_size}$动态量化为$\{YScale, \{P_j\}_{j=1}^{group\_size}\}$。
 
           $$
           shared\_exp = floor(log_2(max_j(|V_j|))) - emax
@@ -92,10 +92,10 @@
           $$
 
           $$
-          P_j = cast\_to\_dst\_type(V_j / YScale, roundMode), \space j \space from \space 1 \space to \space blocksize
+          P_j = cast\_to\_dst\_type(V_j / YScale, roundMode), \space j \space from \space 1 \space to \space group\_size
           $$
 
-          量化后的$P_j$按对应$V_j$的位置组成输出$Y$，$YScale$按对应N轴分组组成输出$YScale$。
+          量化后的$P_j$按对应$V_j$的位置组成输出$Y$，$YScale$按对应N轴的量化group组成输出$YScale$。
 
           - $emax$：对应数据类型的最大正则数的指数位。
 
@@ -104,7 +104,7 @@
             | FLOAT8_E4M3FN | 8 |
             | FLOAT8_E5M2 | 15 |
 
-        - 场景2，当scaleAlg为1时，表示cuBLAS实现，只涉及FP8类型。将激活结果$S_i$在N轴按$k=blocksize$分组，每块单独计算一个块缩放因子$S_{fp32}^b$，再把块内所有元素用同一个$S_{fp32}^b$映射到目标FP8类型。如果最后一块不足$k$个元素，缺失值视为0并按完整块处理。
+        - 场景2，当scaleAlg为1时，表示cuBLAS实现，只涉及FP8类型。将激活结果$S_i$在N轴按存储$blocksize=64$分组，每块单独计算一个块缩放因子$S_{fp32}^b$，再把块内所有元素用同一个$S_{fp32}^b$映射到目标FP8类型。如果最后一块不足$blocksize$个元素，缺失值视为0并按完整块处理。
 
           找到该块中数值的最大绝对值：
 
@@ -558,6 +558,8 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
         </tr>
       </tbody>
       </table>
+
+    - 表中xScale和outputScale的shape第三维为2，表示每个64元素的存储block中包含2个MX量化group，每个group覆盖32个元素。
 
     - N必须为64整数倍。
 
