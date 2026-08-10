@@ -46,7 +46,9 @@ ENABLE_EXPERIMENTAL=FALSE
 ENABLE_TORCH_EXTENSION_ONLY=FALSE
 KERNEL_TEMPLATE_INPUT=""
 ASCEND_SOC_UNITS="ascend910b"
-SUPPORT_COMPUTE_UNIT_SHORT=("ascend910b" "ascend910_93" "ascend950" "ascend310p" "kirinx90" "kirin9030" "mc62")
+# 支持的 SoC 列表(校验用, 单一数据源): 取自 cmake/scripts/util/const_var.py 的 SOC_MAP_EXT keys(出包遍历的 kernel 编译 soc 集合)
+# + CMakeLists.txt SOC_VERSION_LIST 中的 mc62。不在此列表的 soc 会走 CMake 空包流程(cpack_empty_package), 属预期设计
+SUPPORT_COMPUTE_UNIT_SHORT=("ascend910b" "ascend910_93" "ascend950" "ascend310p" "ascend310b" "ascend910" "ascend610lite" "kirinx90" "kirin9030" "mc62")
 CMAKE_BUILD_MODE=""
 BUILD_TYPE=""
 VERSION=""
@@ -351,7 +353,8 @@ function help_info() {
     echo "    --ops Compile specified operator, use snake name, like: --ops=add,add_lora, use ',' to separate different operator"
     echo "    --module Compile specified module, like: --module=mc2,attention, use ',' to separate different modules (supported: mc2,attention,moe,ffn,mhc,posembedding,gmm)"
     echo "    --soc Compile binary with specified Ascend SoC, like: --soc=ascend910b,ascend910_93,ascend950 use ',' to separate different SoC"
-    echo "    --soc supported parameters must only in [ascend910b ascend910_93 ascend950 ascend310p kirinx90 kirin9030 mc62], A3(--soc=ascend910_93)"
+    echo "    --soc supported parameters must only in [$(get_supported_soc_text)], A3(--soc=ascend910_93)"
+    echo "    --list_soc List all supported Ascend SoC"
     echo "    --vendor_name Specify the custom operator package vendor name, like: --vendor_name=customize, default to custom"
     echo "    --opgraph build graph_plugin_transformer.so"
     echo "    --onnxplugin build oponnx_plugin_transformer.so"
@@ -382,6 +385,14 @@ export BASE_PATH=$(
     pwd
 )
 export BUILD_PATH="${BASE_PATH}/build"
+# source SoC 名称校验库, 并复用 SUPPORT_COMPUTE_UNIT_SHORT 作为唯一支持列表(单一数据源)
+if [[ -f "${BASE_PATH}/scripts/util/soc_validator.sh" ]]; then
+    source "${BASE_PATH}/scripts/util/soc_validator.sh"
+else
+    echo "[ERROR] scripts/util/soc_validator.sh not found, please check the repository integrity."
+    exit 1
+fi
+SUPPORTED_SOC_LIST=("${SUPPORT_COMPUTE_UNIT_SHORT[@]}")
 function log() {
     local current_time=`date +"%Y-%m-%d %H:%M:%S"`
     echo "[$current_time] "$1
@@ -891,11 +902,29 @@ function process_soc_input(){
     local value_part="${input_string#*=}"
     ASCEND_SOC_UNITS="${value_part//,/;}"
 
+    # 校验 --soc 输入的每个 SoC 名称, 任一非法立即报错退出
+    if ! validate_soc_list "${ASCEND_SOC_UNITS}"; then
+        if [[ -z "${INVALID_SOC_ITEM}" ]]; then
+            echo "[ERROR] The input soc is empty or contains empty items. Please use one of: $(get_supported_soc_text)"
+        else
+            echo "[ERROR] The input soc ${INVALID_SOC_ITEM} is not supported. Please use one of: $(get_supported_soc_text)"
+        fi
+        exit 1
+    fi
+
+    # 归一化为小写, 与 CMakeLists.txt 中 SOC_VERSION_LIST 的大小写敏感精确匹配保持一致
+    ASCEND_SOC_UNITS="${ASCEND_SOC_UNITS,,}"
+
     declare -A SOC_HARDWARE_MAP=(
+        # 命名依据: README.md(Atlas A2/A3系列产品, Ascend 950PR/Ascend 950DT, KirinX90系列产品)
+        # 与 cmake/scripts/util/const_var.py 的 SOC_MAP_EXT
         [ascend910b]="Atlas A2"
         [ascend910_93]="Atlas A3"
-        [ascend310p]="Atlas Inference"
+        [ascend310p]="Ascend310P3"
         [ascend950]="Ascend 950PR/Ascend 950DT"
+        [kirinx90]="KirinX90"
+        [kirin9030]="Kirin9030"
+        # mc62 在本仓 README/docs/const_var.py 及 ops-nn 仓中均无官方产品命名, 暂不配置, 走通用提示
     )
 
     if [[ ${SOC_HARDWARE_MAP[$ASCEND_SOC_UNITS]} ]]; then
@@ -1115,7 +1144,7 @@ set_example_opt() {
 
 # 所有支持的长选项（不含值），用于参数合法性校验
 SUPPORTED_LONG_OPTS=(
-  "help" "pkg" "static" "jit" "noaicpu" "opkernel_aicpu" "opkernel"
+  "help" "list_soc" "pkg" "static" "jit" "noaicpu" "opkernel_aicpu" "opkernel"
   "experimental" "noexec" "torch_extension_only" "oom" "make_clean"
   "mssanitizer" "dump_cce"
   "ophost" "opapi" "opgraph" "onnxplugin"
@@ -1209,6 +1238,17 @@ assemble_cmake_args() {
   fi
 
   if [ -n "${ascend_compute_unit}" ];then
+    # 校验 -c/--compute-unit 输入的 SoC 名称, 任一非法立即报错退出
+    if ! validate_soc_list "${ascend_compute_unit}"; then
+      if [[ -z "${INVALID_SOC_ITEM}" ]]; then
+        echo "[ERROR] The input soc is empty or contains empty items. Please use one of: $(get_supported_soc_text)"
+      else
+        echo "[ERROR] The input soc ${INVALID_SOC_ITEM} is not supported. Please use one of: $(get_supported_soc_text)"
+      fi
+      exit 1
+    fi
+    # 归一化为小写, 与 CMakeLists.txt 中 SOC_VERSION_LIST 的大小写敏感精确匹配保持一致
+    ascend_compute_unit="${ascend_compute_unit,,}"
     CUSTOM_OPTION="${CUSTOM_OPTION} -DASCEND_COMPUTE_UNIT=${ascend_compute_unit}"
   fi
 
@@ -1474,6 +1514,11 @@ while [[ $# -gt 0 ]]; do
     -h|--help)
         help_info
         exit
+        ;;
+    --list_soc)
+        # 输出当前支持的 SoC 列表(来自单一数据源 SUPPORTED_SOC_LIST), 供用户选择正确的芯片型号
+        echo "Supported SoC list: $(get_supported_soc_text)"
+        exit 0
         ;;
     --pkg)
         ENABLE_BUILD_PKG=TRUE
@@ -1862,35 +1907,32 @@ fi
 
 # 非打包命令调用，打包模式会打进同一个包里
 function set_compute_unit_option() {
-    local IS_SUPPORT_SOC_INPUT=false
-    for support_unit in "${SUPPORT_COMPUTE_UNIT_SHORT[@]}"; do
-        lowercase_word=$(echo "$ASCEND_SOC_UNITS" | tr '[:upper:]' '[:lower:]')
-        if [[ "$lowercase_word" == "$support_unit" ]]; then
-            IS_SUPPORT_SOC_INPUT=true
-            break
-        fi
-    done
-    if [[ "${IS_SUPPORT_SOC_INPUT}" == "true" ]]; then
-        CUSTOM_OPTION="$CUSTOM_OPTION -DASCEND_COMPUTE_UNIT=$ASCEND_SOC_UNITS"
-    else
-        echo "[ERROR] The input soc $ASCEND_SOC_UNITS is not supported."
+    # 使用共享校验库逐项校验 SoC 列表(支持逗号/分号分隔的多个 soc), 替换原有的整串精确匹配
+    if ! validate_soc_list "${ASCEND_SOC_UNITS}"; then
+        echo "[ERROR] The input soc ${INVALID_SOC_ITEM} is not supported. Please use one of: $(get_supported_soc_text)"
         exit 1
     fi
+    CUSTOM_OPTION="$CUSTOM_OPTION -DASCEND_COMPUTE_UNIT=$ASCEND_SOC_UNITS"
 }
 
 # 上面的set_compute_unit_option修改成只能传入一个soc后导致ut有问题，现在复制一份旧的支持多个soc传入，用于ut
 function set_compute_unit_option_ut() {
     IFS=';' read -ra SOC_ARRAY <<< "$ASCEND_SOC_UNITS"  # 分割字符串为数组
     local COMPUTE_UNIT_SHORT=""
+    local soc=""
+    local trimmed_soc=""
     for soc in "${SOC_ARRAY[@]}"; do
-    for support_unit in "${SUPPORT_COMPUTE_UNIT_SHORT[@]}"; do
-        lowercase_word=$(echo "$soc" | tr '[:upper:]' '[:lower:]')
-        if [[ "$lowercase_word" == *"$support_unit"* ]]; then
-        COMPUTE_UNIT_SHORT="$COMPUTE_UNIT_SHORT$support_unit;"
-        break
+        # 裁剪前后空白后, 通过共享校验库逐项精确匹配(替换原有错误的子串匹配逻辑)
+        trimmed_soc="${soc#"${soc%%[![:space:]]*}"}"
+        trimmed_soc="${trimmed_soc%"${trimmed_soc##*[![:space:]]}"}"
+        if soc_is_supported "${trimmed_soc}"; then
+            COMPUTE_UNIT_SHORT="${COMPUTE_UNIT_SHORT}${trimmed_soc,,};"
         fi
     done
-    done
+    if [[ -z "${COMPUTE_UNIT_SHORT}" ]]; then
+        echo "[ERROR] The input soc ${ASCEND_SOC_UNITS} is not supported. Please use one of: $(get_supported_soc_text)"
+        exit 1
+    fi
     CUSTOM_OPTION="$CUSTOM_OPTION -DASCEND_COMPUTE_UNIT=$COMPUTE_UNIT_SHORT"
  }
 
