@@ -50,7 +50,6 @@ constexpr uint64_t SPLIT_BLOCK_SIZE = 512UL;
 constexpr uint64_t SPLIT_BLOCK_COUNT = 128UL; // 128 = SPLIT_BLOCK_SIZE / sizeof(float)
 constexpr uint32_t SYNC_OFFSET = 3U * 1024U;  // 核间软同步偏移地址
 constexpr int32_t FULL_MESH_MAX_UB_SIZE = 190 * 1024;
-constexpr uint32_t COMPARE_COUNT_PER_BLOCK = 256 / sizeof(int32_t);
 constexpr uint32_t SPLIT_BLOCK_DATA_SIZE = 480U;
 constexpr uint32_t SPLIT_BLOCK_DATA_COUNT = 120U; // 120 = SPLIT_BLOCK_DATA_SIZE / sizeof(float)
 constexpr uint32_t AIV_STATE_SIZE = 64U;
@@ -65,6 +64,8 @@ constexpr uint32_t RUNPOS_CALCUMSUM = 2U;
 constexpr uint32_t RUNPOS_CUMSUMFLAG = 3U;
 constexpr uint32_t RUNPOS_ARRIVECNT = 4U;
 constexpr uint8_t VALID_EVENT_FLAG_NUM = 8U;
+constexpr uint8_t LOCAL_COPY_BUFFER_NUM = 2U;
+constexpr uint32_t DATA_COPY_MAX_BLOCK_COUNT = 4095U;
 constexpr uint8_t UB_ALIGN_DATA_COUNT = 8U; // 8 = UB_ALIGN / sizeof(float) = UB_ALIGN / sizeof(int32_t)
 constexpr uint32_t MIN_ACTIVE_BS_FOR_BS_MODE = 16U;
 constexpr uint32_t DURATION_OFFSET = sizeof(int64_t) / sizeof(int32_t);
@@ -140,9 +141,12 @@ private:
     __aicore__ inline void LocalWindowCopy();
     __aicore__ inline void SetValidExpertInfo(uint32_t expInfoSize, uint32_t &validNum);
     __aicore__ inline uint32_t CheckDataArriveWithFlag(uint32_t srcExpDataIdx, int32_t beginIdx, int32_t copyCnt);
-    __aicore__ inline void CopyInAndOut(LocalTensor<int32_t> xOutInt32Tensor, GM_ADDR wAddr, uint32_t index,
-                                        uint32_t dstPosition, uint32_t arriveCount);
+    __aicore__ inline void CopyInAndOut(LocalTensor<XOutType> xTmpTensor, GM_ADDR wAddr, uint32_t index,
+                                        uint32_t dstPosition, uint32_t arriveCount, uint32_t dataBufferId,
+                                        bool isDataBufferReused);
     __aicore__ inline void WaitAndFormatOutput(TBuf<> tBuf, uint32_t validNum);
+    __aicore__ inline uint32_t GetLocalWindowSrcDataBlockIdx(uint32_t srcExpertId, uint32_t localExpertNum);
+    __aicore__ inline void ClearLocalWindowDataFlags(TBuf<> tBuf, uint32_t validNum, uint32_t localExpertNum);
     __aicore__ inline void SetExpertTokenNums();
     __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startTokenId,
                                        uint32_t &endTokenId, uint32_t &sendTokenNum, bool isFront = true);
@@ -211,14 +215,9 @@ private:
     LocalTensor<uint32_t> expertMapTensor_;
     LocalTensor<uint32_t> expertFinishNumTensor_;
     LocalTensor<uint32_t> expertLeftNumTensor_;
-    LocalTensor<uint8_t> flagCompResultU8_;
-    LocalTensor<uint64_t> flagCompResultLtU64_;
-    LocalTensor<uint32_t> flagRecvGatherMask_;
-    LocalTensor<float> cleanUpTensor_;
     LocalTensor<uint32_t> dataStateLocalTensor_;
-    LocalTensor<XOutType> xTmpTensor_;
 
-    LocalTensor<float> flagGatherOutTensor_;
+    LocalTensor<float> flagReduceWorkTensor_;
     LocalTensor<float> flagRecvTensor_;
 
     TBuf<> statusBuf_;
@@ -1797,45 +1796,27 @@ __aicore__ inline uint32_t
 MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::CheckDataArriveWithFlag(uint32_t srcExpDataIdx,
                                                                                       int32_t beginIdx, int32_t copyCnt)
 {
-    uint64_t rsvdCnt = 0;
-    uint32_t arriveFlagNum = 0;
     uint32_t flagNum = blockCntPerToken_ * uint32_t(copyCnt);
-    uint32_t compareCount = Ceil(flagNum, COMPARE_COUNT_PER_BLOCK) * COMPARE_COUNT_PER_BLOCK;
-    uint32_t compResultU64Num = Ceil(flagNum, 64); // 64：按照64bit位进行划分
-    DataCopyExtParams expFlagCopyParams{static_cast<uint16_t>(flagNum), static_cast<uint32_t>(sizeof(float)),
-                                        static_cast<uint32_t>(SPLIT_BLOCK_SIZE - sizeof(float)), 0, 0};
-    DataCopyPadExtParams<float> expFlagPadParams{false, 0U, 0U, 0U};
+    DataCopyParams expFlagCopyParams{static_cast<uint16_t>(flagNum), 1U,
+        static_cast<uint16_t>(SPLIT_BLOCK_DATA_SIZE / UB_ALIGN), 0U};
     GlobalTensor<float> dataFlagGlobal;
-    GM_ADDR wAddr = (__gm__ uint8_t *)(windowGM_) + srcExpDataIdx * expertPerSizeOnWin_ + // 拿到第一个起始位置
-                    beginIdx * hCommuSize_ + SPLIT_BLOCK_DATA_SIZE;
+    GM_ADDR wAddr = (__gm__ uint8_t *)(windowGM_) + srcExpDataIdx * expertPerSizeOnWin_ +
+        beginIdx * hCommuSize_ + SPLIT_BLOCK_DATA_SIZE;
     dataFlagGlobal.SetGlobalBuffer((__gm__ float *)(wAddr));
-    DataCopyPad(flagRecvTensor_, dataFlagGlobal, expFlagCopyParams, expFlagPadParams);
+    DataCopy(flagRecvTensor_, dataFlagGlobal, expFlagCopyParams);
     SyncFunc<AscendC::HardEvent::MTE2_V>();
-    GatherMask(flagGatherOutTensor_, flagRecvTensor_, flagRecvGatherMask_, true, uint32_t(1),
-               {1, (uint16_t)(flagNum), 1, 0}, rsvdCnt);
-    PipeBarrier<PIPE_V>();
-    CompareScalar(flagCompResultU8_, flagGatherOutTensor_, float(1), AscendC::CMPMODE::EQ, compareCount);
+    LocalTensor<float> flagSumOutTensor = scalarBuf_.Get<float>();
+    ReduceSum(flagSumOutTensor, flagRecvTensor_, flagReduceWorkTensor_, 1U, flagNum, 1U);
     SyncFunc<AscendC::HardEvent::V_S>();
-
-    for (uint32_t i = 0; i < compResultU64Num; i++) {
-        uint64_t flagCompMask = flagCompResultLtU64_(i);
-        int64_t firstValidIdx = ScalarGetSFFValue<0>(flagCompMask); // 找到0则表示数据没到
-        if (firstValidIdx == -1) {                                  // 本次数据全到
-            arriveFlagNum += 64U;                                   // 64：ScalarGetSFFValue操作单位为64bit位
-        } else {
-            arriveFlagNum += uint32_t(firstValidIdx);
-            break;
-        }
-    }
-    if (arriveFlagNum > flagNum) {
-        arriveFlagNum = flagNum;
-    }
-    return uint32_t(arriveFlagNum / blockCntPerToken_); // 返回token总数
+    // aicore禁止uint->float的显式转换，借助浮点乘法隐式转换得到期望和
+    float expectFlagSum = 1.0F * flagNum;
+    return flagSumOutTensor.GetValue(0) == expectFlagSum ? static_cast<uint32_t>(copyCnt) : 0U;
 }
 
 template <TemplateMC2TypeFullmeshClass>
 __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::CopyInAndOut(
-    LocalTensor<int32_t> xOutInt32Tensor, GM_ADDR wAddr, uint32_t index, uint32_t dstPosition, uint32_t arriveCount)
+    LocalTensor<XOutType> xTmpTensor, GM_ADDR wAddr, uint32_t index, uint32_t dstPosition, uint32_t arriveCount,
+    uint32_t dataBufferId, bool isDataBufferReused)
 {
     uint32_t hOutElemCount = hOutSize_ / sizeof(XOutType); // expandXOutGlobal申请每个token的GM Buffer空间大小
     GlobalTensor<XOutType> dataFlagGlobal, expandXOutGlobal;
@@ -1854,16 +1835,23 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
         uint16_t(arriveCount), EXPAND_IDX_INFO * sizeof(int32_t),
         static_cast<uint32_t>((blockCntPerToken_ * SPLIT_BLOCK_DATA_SIZE) / UB_ALIGN - 1), 0U, 0U};
     DataCopyPadParams srcTokenPadParams{false, 0U, 0U, 0U};
+    LocalTensor<int32_t> xOutInt32Tensor = xTmpTensor.template ReinterpretCast<int32_t>();
 
-    DataCopyPad(xTmpTensor_, dataFlagGlobal[expertFinishNumTensor_(index) * hCommuSize_ / sizeof(XOutType)],
+    if (isDataBufferReused) {
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(dataBufferId);
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(dataBufferId);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(dataBufferId);
+    }
+    DataCopyPad(xTmpTensor, dataFlagGlobal[expertFinishNumTensor_(index) * hCommuSize_ / sizeof(XOutType)],
                 srcTokenCopyParams, srcTokenPadParams);
-    SyncFunc<AscendC::HardEvent::MTE2_MTE3>();
-    quantInst_.CopyScalesToOut(dstPosition, scaleOutBytes_, xTmpTensor_, scalesCopyParams);
-    DataCopyPad(expandXOutGlobal, xTmpTensor_, tokenCopyParams);
+    AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(dataBufferId);
+    AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(dataBufferId);
+    quantInst_.CopyScalesToOut(dstPosition, scaleOutBytes_, xTmpTensor, scalesCopyParams);
+    DataCopyPad(expandXOutGlobal, xTmpTensor, tokenCopyParams);
     DataCopyPad(expandIdxGMTensor_[dstPosition * EXPAND_IDX_INFO], xOutInt32Tensor[tokenQuantAlign_],
                 expandIdxCopyParams);
     if (hasExpertScalesFlag_) {
-        LocalTensor<float> xOutFloatTensor = xTmpTensor_.template ReinterpretCast<float>();
+        LocalTensor<float> xOutFloatTensor = xTmpTensor.template ReinterpretCast<float>();
         uint32_t expertScaleOffset = expertScaleAlign_ * sizeof(float);
         uint32_t expertScaleWinOffset = expertScaleOffset / SPLIT_BLOCK_DATA_SIZE * SPLIT_BLOCK_SIZE +
             expertScaleOffset % SPLIT_BLOCK_DATA_SIZE;
@@ -1875,10 +1863,70 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
         DataCopyPadExtParams<float> expertScalePadParams{false, 0U, 0U, 0.0f};
         DataCopyExtParams expertScaleCopyOutParams{
             uint16_t(arriveCount), static_cast<uint32_t>(sizeof(float)), 0U, 0U, 0U};
-        SyncFunc<AscendC::HardEvent::MTE3_MTE2>();
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(dataBufferId);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(dataBufferId);
         DataCopyPad(xOutFloatTensor, expertScaleInGlobal, expertScaleCopyInParams, expertScalePadParams);
-        SyncFunc<AscendC::HardEvent::MTE2_MTE3>();
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(dataBufferId);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(dataBufferId);
         DataCopyPad(expandScalesOutGlobal, xOutFloatTensor, expertScaleCopyOutParams);
+    }
+    AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(dataBufferId);
+}
+
+template <TemplateMC2TypeFullmeshClass>
+__aicore__ inline uint32_t
+MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::GetLocalWindowSrcDataBlockIdx(
+    uint32_t srcExpertId, uint32_t localExpertNum)
+{
+    uint32_t srcDataBlockIdx = srcExpertId % epWorldSize_ * localExpertNum + srcExpertId / epWorldSize_;
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+    if (!(isShareExpertRankFlag_ || hasElasticInfoFlag_)) {
+        srcDataBlockIdx = (srcExpertId + epRankId_) % epWorldSize_ * localExpertNum + srcExpertId / epWorldSize_;
+    }
+#endif
+    return srcDataBlockIdx;
+}
+
+template <TemplateMC2TypeFullmeshClass>
+__aicore__ inline void
+MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::ClearLocalWindowDataFlags(
+    TBuf<> tBuf, uint32_t validNum, uint32_t localExpertNum)
+{
+    uint32_t maxCleanRecordNum = 0;
+    for (uint32_t index = 0; index < validNum; ++index) {
+        uint32_t cleanRecordNum = expertFinishNumTensor_(index) * blockCntPerToken_;
+        maxCleanRecordNum = cleanRecordNum > maxCleanRecordNum ? cleanRecordNum : maxCleanRecordNum;
+    }
+
+    uint32_t cleanRecordCapacity = tBufRealSize_ / UB_ALIGN;
+    cleanRecordCapacity = cleanRecordCapacity > DATA_COPY_MAX_BLOCK_COUNT ?
+        DATA_COPY_MAX_BLOCK_COUNT : cleanRecordCapacity;
+    uint32_t cleanRecordNum = maxCleanRecordNum > cleanRecordCapacity ? cleanRecordCapacity : maxCleanRecordNum;
+    if (cleanRecordNum == 0) {
+        return;
+    }
+    LocalTensor<float> cleanUpTensor = tBuf.Get<float>();
+    Duplicate<float>(cleanUpTensor, float(0), cleanRecordNum * UB_ALIGN_DATA_COUNT);
+    SyncFunc<AscendC::HardEvent::V_MTE3>();
+
+    GlobalTensor<float> cleanGlobal;
+    DataCopyParams cleanUpParams{1U, 1U, 0U, SPLIT_BLOCK_DATA_SIZE / UB_ALIGN};
+    for (uint32_t index = 0; index < validNum; ++index) {
+        uint32_t srcExpertId = expertMapTensor_(index);
+        uint32_t srcDataBlockIdx = GetLocalWindowSrcDataBlockIdx(srcExpertId, localExpertNum);
+        GM_ADDR wAddr = (__gm__ uint8_t *)(windowGM_) + srcDataBlockIdx * expertPerSizeOnWin_;
+        cleanGlobal.SetGlobalBuffer((__gm__ float *)(wAddr));
+
+        uint32_t leftRecordNum = expertFinishNumTensor_(index) * blockCntPerToken_;
+        uint32_t recordOffset = 0;
+        while (leftRecordNum > 0) {
+            uint32_t curCleanRecordNum = leftRecordNum > cleanRecordNum ? cleanRecordNum : leftRecordNum;
+            cleanUpParams.blockCount = static_cast<uint16_t>(curCleanRecordNum);
+            uint32_t flagIndex = recordOffset * SPLIT_BLOCK_COUNT + SPLIT_BLOCK_DATA_COUNT;
+            DataCopy(cleanGlobal[flagIndex], cleanUpTensor, cleanUpParams);
+            recordOffset += curCleanRecordNum;
+            leftRecordNum -= curCleanRecordNum;
+        }
     }
 }
 
@@ -1888,49 +1936,63 @@ MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::WaitAndFormatOutpu
 {
     uint32_t index = 0;
     uint32_t finishNum = 0;
-    uint32_t maxCopyTokenCnt = tBufRealSize_ / hCommuSize_;
     uint32_t localExpertNum = isShareExpertRankFlag_ ? 1 : moeExpertNumPerRank_;
     uint32_t srcExpertId, dstPosition, arriveCount, copyCnt, srcDataBlockIdx;
-    uint32_t flagMaxRecvNum = (blockCntPerToken_ * maxCopyTokenCnt * UB_ALIGN) / sizeof(uint32_t);
-    uint32_t gatherOutSize =
-        Ceil(blockCntPerToken_ * maxCopyTokenCnt * sizeof(uint32_t), SIZE_ALIGN_256) * SIZE_ALIGN_256;
-    GlobalTensor<float> cleanGlobal;
-    flagGatherOutTensor_ = tBuf.GetWithOffset<float>(gatherOutSize / sizeof(float), 0); // buf复用
-    flagRecvTensor_ = tBuf.GetWithOffset<float>(flagMaxRecvNum, gatherOutSize);         // buf复用
-    LocalTensor<int32_t> xOutInt32Tensor = xTmpTensor_.template ReinterpretCast<int32_t>();
-    DataCopyParams cleanUpParams = {uint16_t(blockCntPerToken_), 1U, 0U, SPLIT_BLOCK_DATA_SIZE / UB_ALIGN};
+    uint64_t packedTokenSize = static_cast<uint64_t>(blockCntPerToken_) * SPLIT_BLOCK_DATA_SIZE;
+    uint64_t minUbSizePerToken = LOCAL_COPY_BUFFER_NUM * packedTokenSize +
+        static_cast<uint64_t>(blockCntPerToken_) * (UB_ALIGN + sizeof(float));
+    uint32_t maxCopyTokenCnt = static_cast<uint32_t>(tBufRealSize_ / minUbSizePerToken);
+    uint32_t dataBufferSize = 0;
+    uint32_t reduceWorkSize = 0;
+    uint32_t flagRecvSize = 0;
+    while (maxCopyTokenCnt > 0) {
+        dataBufferSize = static_cast<uint32_t>(packedTokenSize * maxCopyTokenCnt);
+        reduceWorkSize =
+            Ceil(blockCntPerToken_ * maxCopyTokenCnt * sizeof(float), SIZE_ALIGN_256) * SIZE_ALIGN_256;
+        flagRecvSize = blockCntPerToken_ * maxCopyTokenCnt * UB_ALIGN;
+        uint64_t totalBufferSize = static_cast<uint64_t>(LOCAL_COPY_BUFFER_NUM) * dataBufferSize +
+            reduceWorkSize + flagRecvSize;
+        if (totalBufferSize <= tBufRealSize_) {
+            break;
+        }
+        --maxCopyTokenCnt;
+    }
+
+    LocalTensor<XOutType> xTmpPingTensor = tBuf.GetWithOffset<XOutType>(dataBufferSize / sizeof(XOutType), 0);
+    LocalTensor<XOutType> xTmpPongTensor =
+        tBuf.GetWithOffset<XOutType>(dataBufferSize / sizeof(XOutType), dataBufferSize);
+    uint32_t flagWorkOffset = LOCAL_COPY_BUFFER_NUM * dataBufferSize;
+    flagReduceWorkTensor_ = tBuf.GetWithOffset<float>(reduceWorkSize / sizeof(float), flagWorkOffset);
+    flagRecvTensor_ =
+        tBuf.GetWithOffset<float>(flagRecvSize / sizeof(float), flagWorkOffset + reduceWorkSize);
+
+    uint32_t copyBatchId = 0;
     while (true) {
         if (expertLeftNumTensor_(index) == 0) { // 当前核负责的不需要收集
             index = (index + 1) % validNum;     // 轮询查询每个有效的index
             continue;
         }
         srcExpertId = expertMapTensor_(index);
-        copyCnt = expertLeftNumTensor_(index) > maxCopyTokenCnt ?
-                      maxCopyTokenCnt :
-                      expertLeftNumTensor_(index); // 按照ub大小一次搬入多个token
-        srcDataBlockIdx =
-            srcExpertId % epWorldSize_ * localExpertNum + srcExpertId / epWorldSize_; // 转换成数据区的排布偏移
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
-        if (!(isShareExpertRankFlag_ || hasElasticInfoFlag_)) {
-            srcDataBlockIdx = (srcExpertId + epRankId_) % epWorldSize_ * localExpertNum + srcExpertId / epWorldSize_;
-        }
-#endif
+        copyCnt = expertLeftNumTensor_(index) > maxCopyTokenCnt ? maxCopyTokenCnt :
+            expertLeftNumTensor_(index); // 按照ub大小一次搬入多个token
+        srcDataBlockIdx = GetLocalWindowSrcDataBlockIdx(srcExpertId, localExpertNum);
         arriveCount = CheckDataArriveWithFlag(srcDataBlockIdx, expertFinishNumTensor_(index), copyCnt);
         if (arriveCount == copyCnt) {
             dstPosition = srcExpertId != 0 ? sendCntTensor_(srcExpertId - 1) : 0;
             dstPosition += expertFinishNumTensor_(index);
             GM_ADDR wAddr = (__gm__ uint8_t *)(windowGM_) + srcDataBlockIdx * expertPerSizeOnWin_;
-            CopyInAndOut(xOutInt32Tensor, wAddr, index, dstPosition, arriveCount);
-            // finish更新并clean
+            uint32_t dataBufferId = copyBatchId % LOCAL_COPY_BUFFER_NUM;
+            LocalTensor<XOutType> xTmpTensor = xTmpPingTensor;
+            if (dataBufferId != 0) {
+                xTmpTensor = xTmpPongTensor;
+            }
+            CopyInAndOut(xTmpTensor, wAddr, index, dstPosition, arriveCount, dataBufferId,
+                copyBatchId >= LOCAL_COPY_BUFFER_NUM);
+            ++copyBatchId;
+            // Update progress here; data flags are cleared in batches after all outputs are issued.
             expertFinishNumTensor_(index) += arriveCount;
             expertLeftNumTensor_(index) -= arriveCount;
-            PipeBarrier<PIPE_ALL>();
             if (expertLeftNumTensor_(index) == 0) {
-                cleanGlobal.SetGlobalBuffer((__gm__ float *)(wAddr));
-                for (uint32_t i = 0; i < expertFinishNumTensor_(index); i++) {
-                    uint32_t flagIndex = i * SPLIT_BLOCK_COUNT * blockCntPerToken_ + SPLIT_BLOCK_DATA_COUNT;
-                    DataCopy(cleanGlobal[flagIndex], cleanUpTensor_, cleanUpParams);
-                }
                 finishNum++;
             }
         } else {
@@ -1940,6 +2002,12 @@ MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::WaitAndFormatOutpu
             break;
         }
     }
+
+    uint32_t usedDataBufferNum = copyBatchId > LOCAL_COPY_BUFFER_NUM ? LOCAL_COPY_BUFFER_NUM : copyBatchId;
+    for (uint32_t dataBufferId = 0; dataBufferId < usedDataBufferNum; ++dataBufferId) {
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(dataBufferId);
+    }
+    ClearLocalWindowDataFlags(tBuf, validNum, localExpertNum);
 }
 
 template <TemplateMC2TypeFullmeshClass>
@@ -1974,18 +2042,15 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
         return;
     }
     // 连续化
-    TBuf<> expertMapBuf, expertFinishBuf, expertLeftBuf, flagMaskBuf, cleanUpBuf, tBuf;
+    TBuf<> expertMapBuf, expertFinishBuf, expertLeftBuf, tBuf;
     uint32_t validNum = 0;
     uint32_t expInfoSize = Ceil(sendNum_ * sizeof(uint32_t), UB_ALIGN) * UB_ALIGN;
     tpipe_->InitBuffer(expertMapBuf, expInfoSize);
     tpipe_->InitBuffer(expertFinishBuf, expInfoSize);
     tpipe_->InitBuffer(expertLeftBuf, expInfoSize);
-    tpipe_->InitBuffer(flagMaskBuf, BUFFER_NUM * UB_ALIGN); // max CompareScalar
-    tpipe_->InitBuffer(cleanUpBuf, blockCntPerToken_ * UB_ALIGN);
     tBufRealSize_ = FULL_MESH_MAX_UB_SIZE - (UB_ALIGN + rscvNumAlign + 2 * aivUsedCumSum_ * UB_ALIGN) -
-                    (expInfoSize * 3) - BUFFER_NUM * UB_ALIGN -
-                    blockCntPerToken_ * UB_ALIGN; // 3为expInfoSize大小buffer申请个数
-    tpipe_->InitBuffer(tBuf, tBufRealSize_);      // 其余buffer空间统一申请
+                    (expInfoSize * 3); // 3为expInfoSize大小buffer申请个数
+    tpipe_->InitBuffer(tBuf, tBufRealSize_); // 其余buffer空间统一申请
     expertMapTensor_ = expertMapBuf.Get<uint32_t>();
     expertFinishNumTensor_ = expertFinishBuf.Get<uint32_t>();
     expertLeftNumTensor_ = expertLeftBuf.Get<uint32_t>();
@@ -1993,18 +2058,7 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
     if (validNum == 0) { // 本核负责的Expert对应rank收到数据
         return;
     }
-    flagCompResultU8_ = flagMaskBuf.Get<uint8_t>();
-    flagCompResultLtU64_ = flagMaskBuf.Get<uint64_t>();
-    flagRecvGatherMask_ = statusCleanBuf.GetWithOffset<uint32_t>(UB_ALIGN / sizeof(uint32_t), 0);
-    cleanUpTensor_ = cleanUpBuf.Get<float>();
-    xTmpTensor_ = tBuf.Get<XOutType>();
-    LocalTensor<uint32_t> flagCompResultLtU32 = flagMaskBuf.Get<uint32_t>();
-    Duplicate<uint32_t>(flagCompResultLtU32, 0, BUFFER_NUM * UB_ALIGN / sizeof(uint32_t));
-    Duplicate<uint32_t>(flagRecvGatherMask_, 0, UB_ALIGN / sizeof(uint32_t));
-    Duplicate<float>(cleanUpTensor_, float(0), blockCntPerToken_ * UB_ALIGN_DATA_COUNT);
     SyncFunc<AscendC::HardEvent::V_S>();
-    flagRecvGatherMask_.SetValue(0, 1);
-    SyncFunc<AscendC::HardEvent::S_V>();
     WaitAndFormatOutput(tBuf, validNum);
     RunPosRecord(RUNPOS_ARRIVECNT); // 维测打点
 }
