@@ -100,6 +100,8 @@ static aclnnStatus ParseBlockShape(const aclIntArray *blockShapeOptional)
 }
 static aclnnStatus ValidateParams(const BSAGParams& params)
 {
+    CHECK_COND(params.qInputLayout != nullptr && params.kvInputLayout != nullptr,
+        ACLNN_ERR_PARAM_INVALID, "qInputLayout or kvInputLayout is nullptr.");
     std::string qLayout(params.qInputLayout);
     std::string kvLayout(params.kvInputLayout);
     CHECK_RET(CheckMandatoryTensors(params.attentionOutGrad, params.query, params.key, params.value,
