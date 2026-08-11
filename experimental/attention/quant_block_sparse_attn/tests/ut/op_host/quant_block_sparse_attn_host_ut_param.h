@@ -71,6 +71,9 @@ struct QuantBlockSparseAttnTilingUtParam : public QuantBlockSparseAttnHostUtPara
     gert::TilingContextPara::TensorDescription metadata = TD_DEFAULT;
     gert::TilingContextPara::TensorDescription attentionOut = TD_DEFAULT;
     gert::TilingContextPara::TensorDescription softmaxLse = TD_DEFAULT;
+    bool provideFp8Strides = true;
+    bool provideFp8Metadata = true;
+    bool mismatchValueStride = false;
 
     explicit QuantBlockSparseAttnTilingUtParam(const csv_map &csvMap) : QuantBlockSparseAttnHostUtParamBase(csvMap)
     {
@@ -92,6 +95,9 @@ struct QuantBlockSparseAttnTilingUtParam : public QuantBlockSparseAttnHostUtPara
         GetTensorGE(csvMap, "metadataShape", "metadataDtype", "metadataFormat", this->metadata);
         GetTensorGE(csvMap, "attentionOutShape", "attentionOutDtype", "attentionOutFormat", this->attentionOut);
         GetTensorGE(csvMap, "softmaxLseShape", "softmaxLseDtype", "softmaxLseFormat", this->softmaxLse);
+        this->provideFp8Strides = StrToBoolIgnoreCase(ReadMap(csvMap, "provideFp8Strides", "true"));
+        this->provideFp8Metadata = StrToBoolIgnoreCase(ReadMap(csvMap, "provideFp8Metadata", "true"));
+        this->mismatchValueStride = StrToBoolIgnoreCase(ReadMap(csvMap, "mismatchValueStride", "false"));
     }
 };
 

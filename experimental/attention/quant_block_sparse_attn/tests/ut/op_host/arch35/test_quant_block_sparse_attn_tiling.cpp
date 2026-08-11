@@ -9,6 +9,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <cstdint>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -28,6 +29,7 @@ using TensorDesc = gert::TilingContextPara::TensorDescription;
 using OpAttr = gert::TilingContextPara::OpAttr;
 
 const TensorDesc EmptyInput(gert::StorageShape({0}, {0}), ge::DT_INT32, ge::FORMAT_ND);
+const TensorDesc DefaultMetadata(gert::StorageShape({1}, {1}), ge::DT_INT32, ge::FORMAT_ND);
 
 static TensorDesc NormalizeTd(const TensorDesc &td)
 {
@@ -37,35 +39,83 @@ static TensorDesc NormalizeTd(const TensorDesc &td)
     return td;
 }
 
-class QuantBlockSparseAttnTilingArch35Test : public testing::TestWithParam<QuantBlockSparseAttnTilingUtParam> {
-protected:
-    static void SetUpTestCase() { std::cout << "QuantBlockSparseAttnTilingArch35Test SetUp" << std::endl; }
-
-    static void TearDownTestCase() { std::cout << "QuantBlockSparseAttnTilingArch35Test TearDown" << std::endl; }
-};
-
-TEST_P(QuantBlockSparseAttnTilingArch35Test, param)
+static void SetStride(TensorDesc &td, uint64_t stride0, uint64_t stride1, uint64_t stride2, uint64_t stride3)
 {
-    auto param = GetParam();
-    std::cout << "[TEST_CASE] " << param.case_name << std::endl;
+    td.stride_.SetStride(0U, stride0);
+    td.stride_.SetStride(1U, stride1);
+    td.stride_.SetStride(2U, stride2);
+    td.stride_.SetStride(3U, stride3);
+    td.stride_.SetDimNum(4U);
+    td.hasStride_ = true;
+}
+
+static bool HasPositiveDims(const gert::Shape &shape)
+{
+    for (size_t i = 0U; i < shape.GetDimNum(); ++i) {
+        if (shape.GetDim(i) <= 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void SetFp8PaStrides(TensorDesc &key, TensorDesc &value, TensorDesc &kDescale)
+{
+    const gert::Shape &keyShape = key.shape_.GetStorageShape();
+    const gert::Shape &valueShape = value.shape_.GetStorageShape();
+    const gert::Shape &kDescaleShape = kDescale.shape_.GetStorageShape();
+    SetStride(key, 1U, 1U, 1U, 1U);
+    SetStride(value, 1U, 1U, 1U, 1U);
+    SetStride(kDescale, 1U, 1U, 1U, 1U);
+    if (keyShape.GetDimNum() != 4U || valueShape.GetDimNum() != 4U || !HasPositiveDims(keyShape) ||
+        !HasPositiveDims(valueShape)) {
+        return;
+    }
+
+    const uint64_t keyN = static_cast<uint64_t>(keyShape.GetDim(1U));
+    const uint64_t keyBlockSize = static_cast<uint64_t>(keyShape.GetDim(2U));
+    const uint64_t keyD = static_cast<uint64_t>(keyShape.GetDim(3U));
+    const uint64_t valueN = static_cast<uint64_t>(valueShape.GetDim(1U));
+    const uint64_t valueBlockSize = static_cast<uint64_t>(valueShape.GetDim(2U));
+    const uint64_t valueD = static_cast<uint64_t>(valueShape.GetDim(3U));
+    uint64_t paBlockStride = keyN * keyBlockSize * keyD + valueN * valueBlockSize * valueD;
+    if (kDescaleShape.GetDimNum() == 4U && HasPositiveDims(kDescaleShape)) {
+        const uint64_t kDescaleN = static_cast<uint64_t>(kDescaleShape.GetDim(1U));
+        const uint64_t kDescaleBlockSize = static_cast<uint64_t>(kDescaleShape.GetDim(2U));
+        const uint64_t kDescaleD = static_cast<uint64_t>(kDescaleShape.GetDim(3U));
+        paBlockStride += kDescaleN * kDescaleBlockSize * kDescaleD * sizeof(float);
+        SetStride(kDescale, paBlockStride / sizeof(float), kDescaleBlockSize * kDescaleD, kDescaleD, 1U);
+    }
+
+    SetStride(key, paBlockStride, keyBlockSize * keyD, keyD, 1U);
+    SetStride(value, paBlockStride, valueBlockSize * valueD, valueD, 1U);
+}
+
+static bool ExecuteCase(QuantBlockSparseAttnTilingUtParam param, TilingInfo &tilingInfo)
+{
+    TensorDesc key = NormalizeTd(param.key);
+    TensorDesc value = NormalizeTd(param.value);
+    TensorDesc kDescale = NormalizeTd(param.kDescale);
+    TensorDesc metadata = NormalizeTd(param.metadata);
+    if (param.quant_mode == 1) {
+        if (param.provideFp8Strides) {
+            SetFp8PaStrides(key, value, kDescale);
+            if (param.mismatchValueStride) {
+                value.stride_.SetStride(0U, value.stride_.GetStride(0U) + 1U);
+            }
+        }
+        if (param.provideFp8Metadata && param.metadata.dtype_ == ge::DT_UNDEFINED) {
+            metadata = DefaultMetadata;
+        } else if (!param.provideFp8Metadata) {
+            metadata = param.metadata;
+        }
+    }
 
     std::vector<TensorDesc> inputTensorDesc({
-        NormalizeTd(param.query),
-        NormalizeTd(param.key),
-        NormalizeTd(param.value),
-        NormalizeTd(param.qDescale),
-        NormalizeTd(param.kDescale),
-        NormalizeTd(param.vDescale),
-        NormalizeTd(param.pScale),
-        NormalizeTd(param.cuSeqlensQ),
-        NormalizeTd(param.cuSeqlensKv),
-        NormalizeTd(param.sequsedQ),
-        NormalizeTd(param.sequsedKv),
-        NormalizeTd(param.sparseIndices),
-        NormalizeTd(param.sparseSeqLen),
-        NormalizeTd(param.blockTable),
-        NormalizeTd(param.attenMask),
-        NormalizeTd(param.metadata),
+        NormalizeTd(param.query), key, value, NormalizeTd(param.qDescale), kDescale, NormalizeTd(param.vDescale),
+        NormalizeTd(param.pScale), NormalizeTd(param.cuSeqlensQ), NormalizeTd(param.cuSeqlensKv),
+        NormalizeTd(param.sequsedQ), NormalizeTd(param.sequsedKv), NormalizeTd(param.sparseIndices),
+        NormalizeTd(param.sparseSeqLen), NormalizeTd(param.blockTable), NormalizeTd(param.attenMask), metadata,
     });
 
     std::vector<TensorDesc> outputTensorDesc({
@@ -88,9 +138,22 @@ TEST_P(QuantBlockSparseAttnTilingArch35Test, param)
 
     gert::TilingContextPara para(OP_NAME, inputTensorDesc, outputTensorDesc, attrs, &compileInfo, "Ascend950", 64,
                                  262144, 65536);
+    return ExecuteTiling(para, tilingInfo);
+}
 
+class QuantBlockSparseAttnTilingArch35Test : public testing::TestWithParam<QuantBlockSparseAttnTilingUtParam> {
+protected:
+    static void SetUpTestCase() { std::cout << "QuantBlockSparseAttnTilingArch35Test SetUp" << std::endl; }
+
+    static void TearDownTestCase() { std::cout << "QuantBlockSparseAttnTilingArch35Test TearDown" << std::endl; }
+};
+
+TEST_P(QuantBlockSparseAttnTilingArch35Test, param)
+{
+    auto param = GetParam();
+    std::cout << "[TEST_CASE] " << param.case_name << std::endl;
     TilingInfo tilingInfo;
-    bool ok = ExecuteTiling(para, tilingInfo);
+    bool ok = ExecuteCase(param, tilingInfo);
 
     if (param.expectResult == ge::GRAPH_SUCCESS) {
         EXPECT_EQ(ok, true);
