@@ -50,8 +50,8 @@ static aclnnStatus PreProcess(const aclTensor *&x, const aclTensor *&cos, const 
 }
 
 static aclnnStatus RotaryPositionEmbeddingCommonProcess(const aclTensor *x, const aclTensor *cos, const aclTensor *sin,
-                                                         const aclTensor *rotate, int64_t mode, aclTensor *out,
-                                                         aclOpExecutor *executor)
+                                                        const aclTensor *rotate, int64_t mode, aclTensor *out,
+                                                        aclOpExecutor *executor)
 {
     const aclTensor *xProcessed = x;
     const aclTensor *cosProcessed = cos;
@@ -73,27 +73,28 @@ static aclnnStatus RotaryPositionEmbeddingCommonProcess(const aclTensor *x, cons
     return ACLNN_SUCCESS;
 }
 
-}
+} // namespace
 
 /* v1 interface - rotate parameter is implicitly nullptr */
-aclnnStatus aclnnRotaryPositionEmbeddingGetWorkspaceSize(const aclTensor* x, const aclTensor* cos, const aclTensor* sin,
-                                                         int64_t mode, aclTensor* out, uint64_t* workspaceSize,
-                                                         aclOpExecutor** executor)
+aclnnStatus aclnnRotaryPositionEmbeddingGetWorkspaceSize(const aclTensor *x, const aclTensor *cos, const aclTensor *sin,
+                                                         int64_t mode, aclTensor *out, uint64_t *workspaceSize,
+                                                         aclOpExecutor **executor)
 {
     L2_DFX_PHASE_1(aclnnRotaryPositionEmbedding,
-        DFX_IN(x, cos, sin, mode),
-        DFX_OUT(out));
+                   DFX_IN(x, cos, sin, mode),
+                   DFX_OUT(out));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
+    OP_CHECK_NULL(out, return ACLNN_ERR_PARAM_NULLPTR);
     if (out->IsEmpty()) {
         *workspaceSize = 0;
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;
     }
 
-    const aclTensor *rotate = nullptr;  // v1接口不支持rotate参数
+    const aclTensor *rotate = nullptr; // v1接口不支持rotate参数
     auto ret = RotaryPositionEmbeddingCommonProcess(x, cos, sin, rotate, mode, out, uniqueExecutor.get());
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
@@ -102,7 +103,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingGetWorkspaceSize(const aclTensor* x, con
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnRotaryPositionEmbedding(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+aclnnStatus aclnnRotaryPositionEmbedding(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                          aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnRotaryPositionEmbedding);
@@ -110,28 +111,30 @@ aclnnStatus aclnnRotaryPositionEmbedding(void* workspace, uint64_t workspaceSize
 }
 
 /* v2 interface - supports rotate parameter */
-aclnnStatus aclnnRotaryPositionEmbeddingV2GetWorkspaceSize(const aclTensor* x, const aclTensor* cos, const aclTensor* sin,
-                                                           int64_t mode, const aclTensor* rotate, aclTensor* out,
-                                                           uint64_t* workspaceSize, aclOpExecutor** executor)
+aclnnStatus aclnnRotaryPositionEmbeddingV2GetWorkspaceSize(const aclTensor *x, const aclTensor *cos,
+                                                           const aclTensor *sin, int64_t mode,
+                                                           const aclTensor *rotate, aclTensor *out,
+                                                           uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     L2_DFX_PHASE_1(aclnnRotaryPositionEmbeddingV2,
-        DFX_IN(x, cos, sin, mode, rotate),
-        DFX_OUT(out));
+                   DFX_IN(x, cos, sin, mode, rotate),
+                   DFX_OUT(out));
 
     if (rotate != nullptr) {
-        CHECK_COND(op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201, 
+        CHECK_COND(op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201,
                    ACLNN_ERR_PARAM_INVALID, "the soc verison is not support");
     }
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
+    OP_CHECK_NULL(out, return ACLNN_ERR_PARAM_NULLPTR);
     if (out->IsEmpty()) {
         *workspaceSize = 0;
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;
     }
-    
+
     auto ret = RotaryPositionEmbeddingCommonProcess(x, cos, sin, rotate, mode, out, uniqueExecutor.get());
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
@@ -140,7 +143,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2GetWorkspaceSize(const aclTensor* x, c
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnRotaryPositionEmbeddingV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+aclnnStatus aclnnRotaryPositionEmbeddingV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                            aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnRotaryPositionEmbeddingV2);
