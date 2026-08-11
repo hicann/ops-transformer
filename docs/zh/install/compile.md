@@ -306,3 +306,7 @@ make: *** [Makefile:462: prepare_build] Error 2
 bash build.sh --pkg --soc=${soc_version} --ops=${op_list} --opkernel_aicpu
 ```
 
+### 编译失败或中断后恢复
+
+编译失败或强制中断可能导致 build 缓存损坏，再次编译异常时，执行 `bash build.sh --make_clean` 清理后重新编译。
+
