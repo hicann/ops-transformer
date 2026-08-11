@@ -96,22 +96,47 @@ def make_combined_kv_views(storage, meta):
     return key, value, k_scale
 
 
-def pack_combined_kv_cache(dense_key, dense_value, dense_k_scale, block_table, block_size,
-                           block_padding_bytes, layout_kv):
+def pack_combined_kv_cache(
+    dense_key,
+    dense_value,
+    dense_k_scale,
+    seqused_kv,
+    block_table,
+    block_size,
+    block_padding_bytes,
+    layout_kv,
+    physical_block_num=None,
+):
     if dense_key.dim() != 4 or dense_value.dim() != 4 or dense_k_scale.dim() != 3:
         raise ValueError("dense key/value/k_scale should have ranks 4/4/3")
     if dense_key.shape[:3] != dense_value.shape[:3] or dense_key.shape[:3] != dense_k_scale.shape:
         raise ValueError("dense key/value/k_scale B/S/N dimensions should match")
 
-    batch, seq_len, n2, d_size = dense_key.shape
+    batch, _, n2, d_size = dense_key.shape
     dv_size = dense_value.shape[-1]
-    block_num = int(block_table.max().item()) + 1
+    if physical_block_num is None:
+        block_num = int(block_table.max().item()) + 1
+    else:
+        if not isinstance(physical_block_num, int) or physical_block_num <= 0:
+            raise ValueError(
+                "physical_block_num should be a positive int, "
+                f"got {physical_block_num}"
+            )
+        block_num = physical_block_num
+    min_block = int(block_table.min().item())
+    max_block = int(block_table.max().item())
+    if min_block < 0 or max_block >= block_num:
+        raise ValueError(
+            f"block_table values should be in [0, {block_num - 1}], "
+            f"got min={min_block}, max={max_block}"
+        )
     meta = make_combined_kv_meta(
         block_num, block_size, n2, d_size, dv_size, block_padding_bytes, layout_kv)
     storage = torch.zeros((block_num * meta["pa_block_stride"],), dtype=torch.uint8)
     key, value, k_scale = make_combined_kv_views(storage, meta)
 
     for batch_idx in range(batch):
+        seq_len = seqused_kv[batch_idx]
         for logical_block in range(block_table.shape[1]):
             physical_block = int(block_table[batch_idx, logical_block].item())
             start = logical_block * block_size

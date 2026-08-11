@@ -63,9 +63,10 @@ def _normalize_params(params):
     normalized.setdefault("quant_mode", 1)
     normalized.setdefault("mask_mode", 3)
     normalized.setdefault("return_softmax_lse", False)
-    normalized.setdefault("actlen_mode", "full")
     normalized.setdefault("S1EQS2", False)
     normalized.setdefault("seed", 0)
+    if normalized.get("sparse_mode") is None:
+        normalized["sparse_mode"] = "random"
     normalized.setdefault("sparse_pattern", "sequential")
     normalized.setdefault("block_table_pattern", "sequential")
     normalized.setdefault("block_num", None)
@@ -84,37 +85,57 @@ def _normalize_params(params):
         "D",
         "sparse_q_block_size",
         "sparse_kv_block_size",
-        "sparse_count",
         "seed",
         "block_num",
+        "max_block_per_batch",
         "pa_block_padding_bytes",
     ):
         if isinstance(normalized.get(key), float) and normalized[key].is_integer():
             normalized[key] = int(normalized[key])
-    normalized["sparse_count"] = normalized.get("sparse_count") or math.ceil(
-        normalized["S2"] / normalized["sparse_kv_block_size"]
-    )
+    sparse_mode = normalized["sparse_mode"]
+    if isinstance(sparse_mode, str):
+        sparse_mode = sparse_mode.strip().lower()
+        normalized["sparse_mode"] = sparse_mode
     normalized["softmax_scale"] = normalized.get("softmax_scale") or (
         1.0 / math.sqrt(normalized["D"])
     )
     return normalized
 
 
-def _make_lengths(batch, max_len, mode, rng):
-    if mode == "full":
-        return [max_len] * batch, max_len
-    if mode != "random":
-        raise ValueError(f"unsupported actlen_mode: {mode}")
-    low = max(1, max_len // 2)
-    res_lens = [rng.randint(low, max_len) for _ in range(batch)]
-    return res_lens, max(res_lens)
+def _make_lengths(case):
+    batch = case["B"]
+    cu_seqlens_q_value = case.get("cu_seqlens_q_value")
+    seqused_kv_value = case.get("seqused_kv_value")
+    if not isinstance(cu_seqlens_q_value, list):
+        raise ValueError("cu_seqlens_q_value should be an integer list")
+    if not isinstance(seqused_kv_value, list):
+        raise ValueError("seqused_kv_value should be an integer list")
+    if len(cu_seqlens_q_value) != batch + 1:
+        raise ValueError(
+            f"cu_seqlens_q_value length should be B + 1, got {len(cu_seqlens_q_value)}"
+        )
+    if len(seqused_kv_value) != batch:
+        raise ValueError(
+            f"seqused_kv_value length should be B, got {len(seqused_kv_value)}"
+        )
+    if any(
+        isinstance(value, bool) or not isinstance(value, int)
+        for value in cu_seqlens_q_value + seqused_kv_value
+    ):
+        raise ValueError("sequence length values should all be integers")
+    if cu_seqlens_q_value[0] != 0:
+        raise ValueError("cu_seqlens_q_value should start at 0")
 
-
-def _prefix(lengths):
-    values = [0]
-    for length in lengths:
-        values.append(values[-1] + int(length))
-    return torch.tensor(values, dtype=torch.int32)
+    q_lengths = [
+        cu_seqlens_q_value[index + 1] - cu_seqlens_q_value[index]
+        for index in range(batch)
+    ]
+    if any(length < 0 or length > case["S1"] for length in q_lengths):
+        raise ValueError(f"query lengths should be in [0, S1], got {q_lengths}")
+    kv_lengths = list(seqused_kv_value)
+    if any(length < 0 or length > case["S2"] for length in kv_lengths):
+        raise ValueError(f"KV lengths should be in [0, S2], got {kv_lengths}")
+    return q_lengths, max(q_lengths), kv_lengths, max(kv_lengths)
 
 
 def _source_absmax():
@@ -197,43 +218,77 @@ def _quantize_value_per_head(tensor, max_abs=FP8_E4M3_MAX):
     return value, (1.0 / quant_scale).reshape(tensor.shape[2]).contiguous()
 
 
-def _physical_ids(start, count, pattern, rng):
-    ids = list(range(start, start + count))
-    if pattern == "reverse":
-        ids.reverse()
-    elif pattern == "random":
-        rng.shuffle(ids)
-    elif pattern != "sequential":
+def _make_block_table(
+    batch,
+    seqused_kv,
+    block_size,
+    pattern,
+    rng,
+    blocknum=None,
+    max_block_per_batch=None,
+):
+    if not isinstance(batch, int) or batch <= 0:
+        raise ValueError(f"batch should be a positive int, got {batch}")
+    if not isinstance(block_size, int) or block_size <= 0:
+        raise ValueError(f"block_size should be a positive int, got {block_size}")
+    if not isinstance(max_block_per_batch, int) or max_block_per_batch <= 0:
+        raise ValueError(
+            "max_block_per_batch should be a positive int, "
+            f"got {max_block_per_batch}"
+        )
+    if not isinstance(blocknum, int) or blocknum <= 0:
+        raise ValueError(f"blocknum should be a positive int, got {blocknum}")
+
+    if pattern not in ("random", "sequential"):
         raise ValueError(f"unsupported block_table_pattern: {pattern}")
-    return ids
 
+    kv_lengths = []
+    for batch_idx in range(batch):
+        seq_len = seqused_kv[batch_idx]
+        if hasattr(seq_len, "item"):
+            seq_len = seq_len.item()
+        kv_lengths.append(seq_len)
 
-def _make_block_table(batch, seq_len, block_size, pattern, rng, blocknum=None, q_block_num=1):
-    kv_block_num = math.ceil(seq_len / block_size)
-    width = kv_block_num
-    needed_block_num = batch * width
+    logical_block_counts = [
+        (seq_len + block_size - 1) // block_size for seq_len in kv_lengths
+    ]
 
-    if blocknum is None or blocknum >= needed_block_num:
-        block_table = torch.empty((batch, kv_block_num), dtype=torch.int32)
-        for batch_idx in range(batch):
-            physical_ids = _physical_ids(
-                batch_idx * kv_block_num, kv_block_num, pattern, rng
-            )
-            for block_idx, physical_block in enumerate(physical_ids):
-                block_table[batch_idx, block_idx] = int(physical_block)
-        return block_table
+    if blocknum < batch:
+        raise ValueError(
+            f"blocknum should be at least batch={batch} so each batch tail block "
+            f"has a dedicated physical block, got {blocknum}"
+        )
+    has_non_tail_block = any(block_count > 1 for block_count in logical_block_counts)
+    if has_non_tail_block and blocknum < batch + 1:
+        raise ValueError(
+            f"blocknum should be at least batch + 1={batch + 1} when non-tail "
+            f"blocks exist, got {blocknum}"
+        )
 
-    if blocknum < width:
-        # 物理块池小于每 batch 的逻辑块数：block_table 前几列共享（全部指向物理块 0），
-        # 其余列指向互不相同的物理块；所有 batch 行一致，总物理块数精确等于 blocknum。
-        shared_cols = width - blocknum + 1
-        if shared_cols <= 0 or shared_cols > width:
-            raise ValueError(f"blocknum={blocknum} out of range [1, {width}]")
-        block_table = torch.zeros((batch, width), dtype=torch.int32)
-        for batch_idx in range(batch):
-            for block_idx in range(shared_cols, width):
-                block_table[batch_idx, block_idx] = block_idx - shared_cols + 1
-        return block_table
+    total_slots = batch * max_block_per_batch
+    non_tail_block_num = blocknum - batch
+    if non_tail_block_num == 0:
+        physical_ids = [
+            batch_idx for batch_idx in range(batch)
+            for _ in range(max_block_per_batch)
+        ]
+    elif pattern == "random":
+        physical_ids = [
+            rng.randrange(non_tail_block_num) for _ in range(total_slots)
+        ]
+    else:
+        physical_ids = [
+            index % non_tail_block_num for index in range(total_slots)
+        ]
+
+    for batch_idx, block_count in enumerate(logical_block_counts):
+        tail_logical_block = block_count - 1
+        tail_slot = batch_idx * max_block_per_batch + tail_logical_block
+        physical_ids[tail_slot] = non_tail_block_num + batch_idx
+
+    return torch.tensor(physical_ids, dtype=torch.int32).reshape(
+        batch, max_block_per_batch
+    )
 
 
 def _allowed_blocks(
@@ -283,13 +338,27 @@ def _make_sparse_indices(case, q_lengths, kv_lengths, rng):
     group = n1 // n2
     qb_max = math.ceil(case["S1"] / case["sparse_q_block_size"])
     kv_max = math.ceil(case["S2"] / case["sparse_kv_block_size"])
-    sparse_count = case["sparse_count"]
+    sparse_mode = case["sparse_mode"]
+    if sparse_mode not in ("full", "random"):
+        raise ValueError(f"unsupported sparse_mode: {sparse_mode}")
+    sparse_counts = []
+    for batch_idx in range(batch):
+        batch_kv_max = math.ceil(
+            kv_lengths[batch_idx] / case["sparse_kv_block_size"]
+        )
+        sparse_count = (
+            batch_kv_max
+            if sparse_mode == "full"
+            else rng.randint(0, batch_kv_max)
+        )
+        sparse_counts.append(sparse_count)
     sparse_indices = torch.full(
         (batch, n1, qb_max, kv_max), fill_value=-1, dtype=torch.int32
     )
     sparse_seq_len = torch.zeros((batch, n1, qb_max), dtype=torch.int32)
 
     for batch_idx in range(batch):
+        sparse_count = sparse_counts[batch_idx]
         qb_batch = math.ceil(q_lengths[batch_idx] / case["sparse_q_block_size"])
         for qb_idx in range(qb_max):
             allowed = _allowed_blocks(
@@ -365,7 +434,11 @@ def _make_fullquant_tensors(case, cu_seqlens_q, seqused_kv, generator):
     dense_value, v_scale = _quantize_value_per_head(dense_value_source, v_max)
     v_scale = v_scale.contiguous()
 
-    p_scale = torch.tensor([float(case["p_scale_value"])], dtype=torch.float32)
+    p_scale = (
+        None
+        if case["p_scale_value"] is None
+        else torch.tensor([float(case["p_scale_value"])], dtype=torch.float32)
+    )
     return query, dense_key, dense_value, q_scale, dense_k_scale, v_scale, p_scale
 
 
@@ -631,7 +704,7 @@ def _reference_attention(
     output_dtype = case["output_dtype"]
     fp8_dtype = _fp8_dtype()
     softmax_scale = float(case["softmax_scale"])
-    p_scale_value = float(p_scale[0].item())
+    p_scale_value = 1.0 if p_scale is None else float(p_scale[0].item())
     ln_p_scale = (
         torch.log(torch.tensor(p_scale_value, dtype=torch.float32)).item()
         if p_scale_value > 0
@@ -868,23 +941,19 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
     sparse_q_block_size = case["sparse_q_block_size"]
     sparse_kv_block_size = case["sparse_kv_block_size"]
 
-    q_lengths, q_max_len = _make_lengths(batch, s1, case["actlen_mode"], rng)
-    kv_lengths, kv_max_len = _make_lengths(batch, s2, case["actlen_mode"], rng)
+    q_lengths, q_max_len, kv_lengths, kv_max_len = _make_lengths(case)
     s1, case["S1"] = q_max_len, q_max_len
     s2, case["S2"] = kv_max_len, kv_max_len
-    if case["S1EQS2"]:
-        kv_lengths = [min(length, s2) for length in q_lengths]
 
-    cu_seqlens_q = _prefix(q_lengths)
-    seqused_q = torch.tensor(q_lengths, dtype=torch.int32)
+    cu_seqlens_q = torch.tensor(case["cu_seqlens_q_value"], dtype=torch.int32)
     seqused_kv = torch.tensor(kv_lengths, dtype=torch.int32)
 
     cu_seqlens_q_input = cu_seqlens_q
 
     block_table = _make_block_table(
-        batch, s2, sparse_kv_block_size, case["block_table_pattern"], rng,
+        batch, seqused_kv, sparse_kv_block_size, case["block_table_pattern"], rng,
         blocknum=case.get("block_num"),
-        q_block_num=math.ceil(case["S1"] / case["sparse_q_block_size"]),
+        max_block_per_batch=case["max_block_per_batch"],
     )
     case["data_generation_mode"] = "fia_style_fullquant"
     case["data_range_left"] = DATA_RANGE_LEFT
@@ -897,10 +966,12 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
         dense_key,
         dense_value,
         dense_k_scale,
+        seqused_kv,
         block_table,
         sparse_kv_block_size,
         case["pa_block_padding_bytes"],
         case["layout_kv"],
+        physical_block_num=case["block_num"],
     )
     combined_kv_cache.assert_combined_kv_views(kv_cache_storage, kv_cache_meta)
     atten_mask = torch.tril(torch.ones((2048, 2048), dtype=torch.uint8)).T.contiguous()
@@ -962,7 +1033,8 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
             "v_descale": v_scale,
             "p_scale": p_scale,
             "cu_seqlens_q": cu_seqlens_q_input,
-            "seqused_q": seqused_q,
+            "cu_seqlens_kv": None,
+            "seqused_q": None,
             "seqused_kv": seqused_kv,
             "sparse_indices": sparse_indices,
             "sparse_seq_len": sparse_seq_len,
