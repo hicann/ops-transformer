@@ -17,6 +17,7 @@ from pathlib import Path
 
 import torch
 import numpy as np
+import gc
 
 
 PYTEST_GOLDEN_MODULE = None
@@ -160,7 +161,8 @@ def run_cpu_compressor(
     golden_state_cache = torch.zeros_like(state_cache_f32)
     golden_state_cache[:, :, :half_dim] = kv_state_golden
     golden_state_cache[:, :, half_dim:] = score_state_golden
-
+    del kv_state_golden, score_state_golden, state_cache_f32
+    gc.collect()
     return (
         cmp_kv.to(x_dtype),
         cmp_kv_mask,
@@ -224,7 +226,7 @@ def cpu_compressor(
     _GOLDEN_CONTEXT["seqused_list"] = seqused_list
     _GOLDEN_CONTEXT["cu_seqlens_list"] = cu_seqlens_list
     _GOLDEN_CONTEXT["is_th"] = is_th
-
+    gc.collect()
     return [
         cmp_kv,
         golden_state_cache,
