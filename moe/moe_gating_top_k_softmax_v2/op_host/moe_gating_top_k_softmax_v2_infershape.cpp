@@ -87,6 +87,7 @@ static ge::graphStatus InferShapeMoeGatingTopKSoftmaxV2(gert::InferShapeContext*
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
     const int64_t* kPtr = attrs->GetAttrPointer<int64_t>(0);
+    OP_CHECK_NULL_WITH_CONTEXT(context, kPtr);
     const int64_t k = *kPtr;
 
     if (k <= 0 || k > MAX_K || (!IsUnknownShape(gatingShape) && k > gatingShape->GetDim(gatingDimNum - 1))) {
