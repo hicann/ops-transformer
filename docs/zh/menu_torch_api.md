@@ -35,3 +35,4 @@
 - [sparse_lightning_indexer_kl_loss_grad](../../torch_extension/cann_ops_transformer/docs/zh/sparse_lightning_indexer_kl_loss_grad.md)
 - [dense_lightning_indexer_kl_loss_grad](../../torch_extension/cann_ops_transformer/docs/zh/dense_lightning_indexer_kl_loss_grad.md)
 - [stem_oam_prep_paged_kv](../../torch_extension/cann_ops_transformer/docs/zh/stem_oam_prep_paged_kv.md)
+- [und_gen_qkv_rms_norm_rope_cache](../../torch_extension/cann_ops_transformer/docs/zh/und_gen_qkv_rms_norm_rope_cache.md)

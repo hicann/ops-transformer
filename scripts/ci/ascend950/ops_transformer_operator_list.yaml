@@ -76,6 +76,7 @@ operator_group_9:
   - fused_infer_attention_score,10-2
   - norm_rope_concat
   - norm_rope_concat_grad
+  - und_gen_qkv_rms_norm_rope_cache
 operator_group_10:
   - allto_allv_grouped_mat_mul
   - grouped_mat_mul_allto_allv

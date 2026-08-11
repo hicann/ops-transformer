@@ -1183,6 +1183,25 @@ posembedding:
     options:
       - qkv_rms_norm_rope_cache
 
+  und_gen_qkv_rms_norm_rope_cache:
+    module: True
+    src:
+      - posembedding/und_gen_qkv_rms_norm_rope_cache
+    exclude:
+      - posembedding/und_gen_qkv_rms_norm_rope_cache/docs
+      - posembedding/und_gen_qkv_rms_norm_rope_cache/README.md
+    # op_host / op_api 有 57 条 UT（tiling 35 + infershape 18 + aclnn 4），纳入覆盖率统计；
+    # op_kernel 目前还没有 UT，先单独排除，补上 tests/ut/op_kernel 后删掉这行
+    ut_cov_exclude:
+      - posembedding/und_gen_qkv_rms_norm_rope_cache/op_kernel
+    # 本算子只出 ascend950 的二进制（op_def 里只 AddConfig("ascend950")），
+    # examples 的 --run_example 需要对应 soc 的实机，这里先关掉，由 950 的 ST 覆盖端到端
+    test:
+      examples: False
+      ut: True
+    options:
+      - und_gen_qkv_rms_norm_rope_cache
+
 mc2:
   matrix:
     all_gather_matmul:
