@@ -823,7 +823,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
       - 当配置Q_S大于1（即MTP）时，仅inputLayout为TND时支持配置actualSeqLengths参数，其他layout不支持。
       - 当query的d等于512时：
-        - queryRope配置时要求query的s为1-16、n为1、2、4、8、16、32、64、128，queryRope的shape中d为64，其余维度与query一致；
+        - queryRope配置时要求query的s为1-16，queryRope的shape中d为64，其余维度与query一致；
         - keyRope配置时要求key的n为1，d为512，keyRope的shape中d为64，其余维度与key一致；
         - sparse：Q_S等于1时只支持sparse=0且attenMask为nullptr，Q_S大于1时只支持sparse=3且传入mask；
         - key&value&keyRope支持ND和NZ输入，当输入NZ时，输入格式为[blockNum, N, D/16, blockSize, 16]；
@@ -840,7 +840,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
     <!-- npu="950" id9 -->
     - Ascend 950PR/Ascend 950DT：
       - 当query的d等于512时：
-        - queryRope配置时要求query的s为1-16，n为1、2、4、8、16、32、64、128，d为512，queryRope的shape中b、n、s与query一致，d为64；
+        - queryRope配置时要求query的s为1-16，d为512，queryRope的shape中b、n、s与query一致，d为64；
         - keyRope配置时要求key的n为1，d为512，keyRope的shape中b、n、s与key一致，d为64；
         - sparse：支持sparse=0，sparse为3且传入mask，sparse为4且传入mask；
         - key&value支持ND输入。
@@ -861,7 +861,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
 
   <!-- npu="950" id10 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
-    - 伪量化和全量化场景下numHeads与numKeyValueHeads的比值不能大于64; MLA decode场景下numHeads与numKeyValueHeads的比值不能大于128;非量化和MLA prefill场景下当且仅当D轴等于64或者128时支持numHeads与numKeyValueHeads的比值大于64，其他D轴不支持。
+    - 伪量化和全量化场景下numHeads与numKeyValueHeads的比值不能大于64; 非量化MLA decode场景下numHeads与numKeyValueHeads的比值无限制;非量化和MLA prefill场景下当且仅当D轴等于64或者128时支持numHeads与numKeyValueHeads的比值大于64，其他D轴不支持。
 
   <!-- end id10 -->
 

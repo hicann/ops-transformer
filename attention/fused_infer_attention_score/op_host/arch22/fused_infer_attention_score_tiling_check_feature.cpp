@@ -682,16 +682,7 @@ ge::graphStatus FiaTilingCheck::CheckFeatureAxisInfo() const
             return ge::GRAPH_FAILED);
     }
 
-    const std::vector<std::int32_t> ropeSplitgSizeSupportList = {
-        1, 2, 4, 8, 16, 32, 64, 128
-    };
-
     if (fiaInfo_.ropeMode == RopeMode::ROPE_SPLIT && vHeadDim_ == HEAD_DIM_512) {
-        OP_CHECK_IF(std::find(ropeSplitgSizeSupportList.begin(), ropeSplitgSizeSupportList.end(), gSize_) == ropeSplitgSizeSupportList.end(),
-        OP_LOGE(opName_, "In %s %s situation, when query|key|value headDim = 512, layout only supports 1, 2, 4, 8, 16, 32, 64, 128, but got %u",
-            QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(), gSize_),
-        return ge::GRAPH_FAILED);
-
         OP_CHECK_IF(n2Size_ != HEAD_NUM_ONE,
         OP_LOGE(opName_, "In %s %s situation, when query|key|value headDim = 512, kvN should be equals to 1.",
             QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str()),

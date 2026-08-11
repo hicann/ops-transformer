@@ -505,13 +505,6 @@ ge::graphStatus RopeChecker::CheckNSize(const FiaTilingInfo &fiaInfo) const
     if (fiaInfo.mlaMode != MlaMode::ROPE_SPLIT_D512) {
         return ge::GRAPH_SUCCESS;
     }
-    static const std::set<uint32_t> supportNumHeadForMLA = {1U, 2U, 4U, 8U, 16U, 32U, 64U, 128U};
-    OP_CHECK_IF((supportNumHeadForMLA.find(fiaInfo.n1Size) == supportNumHeadForMLA.end()),
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                    fiaInfo.opName, "query",
-                    ToStringRaw(fiaInfo.opParamInfo.query.shape->GetStorageShape()).c_str(),
-                    "In MLA decode scenario, the N axis of query must be in {1,2,4,8,16,32,64,128}"),
-                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF((*fiaInfo.opParamInfo.kvHeadNums != NUM1),
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(

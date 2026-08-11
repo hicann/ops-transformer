@@ -650,7 +650,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <td>表示key/value的head个数</td>
         <td>
         <ul>
-            <li>需要满足numHeads整除numKeyValueHeads，GQA非量化场景和Prefill MLA非量化场景下，numHeads与numKeyValueHeads的比值无限制; Decode MLA场景仅支持numHeads与numKeyValueHeads的比值为1、2、4、8、16、32、64、128。</li>
+            <li>需要满足numHeads整除numKeyValueHeads，GQA非量化场景和Prefill MLA场景下，numHeads与numKeyValueHeads的比值无限制; Decode MLA场景下，非量化场景numHeads与numKeyValueHeads的比值无限制，全量化场景仅支持numHeads与numKeyValueHeads的比值为1、2、4、8、16、32、64、128。</li>
             <li>在BSND、TND、BNSD、NTD、BSND_BNSD、BNSD_BSND、NTD_TND场景下，还需要与shape中的key/value的N轴shape值相同，否则执行异常。</li>
         </ul>
         </td>
@@ -1525,14 +1525,10 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
     </thead>
     <tbody>
     <tr>
-        <td rowspan="8">当query的d等于512时</td>
-        <td rowspan="4">通用场景</td>
+        <td rowspan="7">当query的d等于512时</td>
+        <td rowspan="3">通用场景</td>
         <td>inputLayout</td>
         <td>支持TND、TND_NTD;</td>
-    </tr>
-    <tr>
-        <td>numHeads</td>
-        <td>支持1、2、4、8、16、32、64、128</td>
     </tr>
     <tr>
         <td>numKeyValueHeads</td>
@@ -1661,7 +1657,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             <td rowspan="24">query d=512</td>
             <td rowspan="6">通用场景</td>
             <td>query</td>
-            <td>FLOAT16、BFLOAT16；Q_N=[1,2,4,8,16,32,64,128]</td>
+            <td>FLOAT16、BFLOAT16</td>
             <td>-</td>
         </tr>
         <tr>
@@ -1698,7 +1694,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
         <tr>
             <td rowspan="12">全量化</td>
             <td>query</td>
-            <td>INT8，且qs范围为1~16</td>
+            <td>INT8，且qs范围为1~16；Q_N=[1,2,4,8,16,32,64,128]</td>
             <td>-</td>
         </tr>
         <tr>
