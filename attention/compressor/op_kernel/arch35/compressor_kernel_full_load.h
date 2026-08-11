@@ -36,7 +36,8 @@ public:
     __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate,
                                 __gm__ uint8_t *stateCache, __gm__ uint8_t *ape, __gm__ uint8_t *stateBlockTable,
                                 __gm__ uint8_t *cuSeqlens, __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos,
-                                __gm__ uint8_t *cmpKvOut, __gm__ uint8_t *workspace);
+                                __gm__ uint8_t *cmpKvOut, __gm__ uint8_t *softmaxScoreOut,
+                                __gm__ uint8_t *kvOut, __gm__ uint8_t *workspace);
     __aicore__ inline void Process();
 
 private:
@@ -103,8 +104,9 @@ __aicore__ inline void CompressorKernelFullLoad<COMP>::Init(__gm__ uint8_t *x, _
                                                             __gm__ uint8_t *wGate, __gm__ uint8_t *stateCache,
                                                             __gm__ uint8_t *ape, __gm__ uint8_t *stateBlockTable,
                                                             __gm__ uint8_t *cuSeqlens, __gm__ uint8_t *seqUsed,
-                                                            __gm__ uint8_t *startPos, __gm__ uint8_t *cmpKvOut,
-                                                            __gm__ uint8_t *workspace)
+                                                            __gm__ uint8_t *startPos,
+                                                            __gm__ uint8_t *cmpKvOut, __gm__ uint8_t *softmaxScoreOut,
+                                                            __gm__ uint8_t *kvOut, __gm__ uint8_t *workspace)
 {
     if ASCEND_IS_AIV {
         constInfo.aiCoreIdx = GetBlockIdx() / 2;
@@ -147,7 +149,8 @@ __aicore__ inline void CompressorKernelFullLoad<COMP>::Init(__gm__ uint8_t *x, _
         blockCube_.InitGlobalBuffers(mm1KvResGm, mm1ScoreResGm);
     } else {
         blockVec_.InitParams(constInfo, tools_);
-        blockVec_.Init(x, wKv, wGate, stateCache, ape, stateBlockTable, cuSeqlens, seqUsed, startPos, cmpKvOut);
+        blockVec_.Init(x, wKv, wGate, stateCache, ape, stateBlockTable,
+                        cuSeqlens, seqUsed, startPos, cmpKvOut, softmaxScoreOut, kvOut);
         blockVec_.InitBuffers(pipe_);
         blockVec_.InitVec1GlobalTensor(Vec1InputKvGm, Vec1InputScoreGm, vec1KvCacheGm, vec1ScoreCacheGm);
     }

@@ -47,7 +47,7 @@ public:
     __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate,
                                 __gm__ uint8_t *stateCache, __gm__ uint8_t *ape, __gm__ uint8_t *stateBlockTable,
                                 __gm__ uint8_t *cuSeqlens, __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos,
-                                __gm__ uint8_t *cmpKvOut);
+                                __gm__ uint8_t *cmpKvOut, __gm__ uint8_t *softmaxScoreOut, __gm__ uint8_t *kvOut);
     // =================================资源管理=================================
     __aicore__ inline void InitBuffers(TPipe *pipe);
     __aicore__ inline void AllocEventID();
@@ -137,6 +137,9 @@ private:
                                           const StatisticInfo &statisticInfo, const Vec1SliceInfo &originSliceInfo,
                                           uint32_t dStartIdx, uint32_t dDealSize, uint32_t dBaseSize,
                                           uint32_t needDealTcSize);
+    __aicore__ inline void CopyOutMidResToOutput(const LocalTensor<T> &kvLocal, const LocalTensor<T> &scoreLocal,
+                                                 const Vec1SliceInfo &sliceInfo,
+                                                 uint32_t compressTcSize, uint32_t dStartIdx, uint32_t dDealSize);
     __aicore__ inline void CopyOutVec1ResToOutput(const LocalTensor<T> &comperssoredUb, const Vec1SliceInfo &sliceInfo,
                                                   uint32_t compressTcSize, uint32_t dStartIdx, uint32_t dDealSize);
     __aicore__ inline void CalcGroupInfo(const Vec1RunInfo &info, Vec1SplitInfo &splitInfo);
@@ -172,6 +175,8 @@ private:
     GlobalTensor<T> stateCacheGm_;
     GlobalTensor<T> apeGm_;
     GlobalTensor<X_T> cmpKvOutGm_;
+    GlobalTensor<T> softmaxScoreOutGm_;
+    GlobalTensor<T> kvOutGm_;
 
     // ================================Local Buffer区====================================
     // TBuf<TPosition::VECIN> mm1ResUb;
@@ -204,12 +209,15 @@ __aicore__ inline void CompressorBlockVector<COMP>::Init(__gm__ uint8_t *x, __gm
                                                          __gm__ uint8_t *stateCache, __gm__ uint8_t *ape,
                                                          __gm__ uint8_t *stateBlockTable, __gm__ uint8_t *cuSeqlens,
                                                          __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos,
-                                                         __gm__ uint8_t *cmpKvOut)
+                                                         __gm__ uint8_t *cmpKvOut,
+                                                         __gm__ uint8_t *softmaxScoreOut, __gm__ uint8_t *kvOut)
 {
     stateBlockTableGm_.SetGlobalBuffer((__gm__ int32_t *)stateBlockTable);
     stateCacheGm_.SetGlobalBuffer((__gm__ T *)stateCache);
     apeGm_.SetGlobalBuffer((__gm__ T *)ape);
     cmpKvOutGm_.SetGlobalBuffer((__gm__ X_T *)cmpKvOut);
+    softmaxScoreOutGm_.SetGlobalBuffer((__gm__ T *)softmaxScoreOut);
+    kvOutGm_.SetGlobalBuffer((__gm__ T *)kvOut);
     isExistSeqUsed_ = (seqUsed != nullptr);
     isExistStartPos_ = (startPos != nullptr);
     if constexpr (COMP::xLayout == X_LAYOUT::TH) {
@@ -910,6 +918,52 @@ __aicore__ inline void CompressorBlockVector<COMP>::KvMulReduceScore(const Local
     MulReduceSumbaseVF(kvLocal, scoreLocal, dstLocal, coff_, cmpRatio_, dDealSize, tcDealSize);
 }
 
+
+template <typename COMP>
+__aicore__ inline void
+CompressorBlockVector<COMP>::CopyOutMidResToOutput(const LocalTensor<T> &kvLocal, const LocalTensor<T> &scoreLocal,
+                                                   const Vec1SliceInfo &sliceInfo, uint32_t compressTcSize,
+                                                   uint32_t dStartIdx, uint32_t dDealSize)
+{
+    if constexpr (COMP::xLayout == X_LAYOUT::BSH) {
+        uint32_t bOutputScLen = CeilDivT(GetSeqLength(sliceInfo.bIdx), cmpRatio_);
+        uint32_t bIdx = sliceInfo.bIdx;
+        uint32_t sIdx = sliceInfo.sIdx;
+        uint64_t ubOffset = 0;
+        while (compressTcSize > 0) {
+            uint32_t bStartPos = GetStartPos(bIdx);
+            uint32_t preScSize = (sIdx + bStartPos) / cmpRatio_;
+            uint32_t totalScSize = (GetSeqUsed(bIdx) + bStartPos) / cmpRatio_;
+            if (preScSize < totalScSize) {
+                uint32_t curScSize = min(compressTcSize, (totalScSize - preScSize));
+                uint64_t padScIdx = bIdx * bOutputScLen + preScSize - (bStartPos / cmpRatio_);
+                uint64_t outGmOffset = padScIdx * coff_ * cmpRatio_ * constInfo_.headDim + dStartIdx;
+                // ubOffset：跨 batch 时（while 循环多次迭代）scoreLocal/kvLocal 的内容是
+                // 按压缩块连续排布的（PadAlign 的 dstUbOffset = compressoredScCnt×cmpRatio 行），
+                // 第二次迭代必须从 scoreLocal[ubOffset] 拷贝，否则会把第一个 slice 的内容
+                // 重复输出（batch8 尾块内容串写到 batch9 块0 槽位，且末尾块丢失）。
+                // 注意：与 CopyOutVec1ResToOutput 不同（那是 reduce 后每块 1 行），
+                // 这里每块占 coff*cmpRatio 行，ubOffset 推进单位必须乘上行数。
+                DataCopyWithOutputQue(softmaxScoreOutGm_[outGmOffset], scoreLocal[ubOffset],
+                                      curScSize * coff_ * cmpRatio_, dDealSize, dDealSize, constInfo_.headDim);
+                DataCopyWithOutputQue(kvOutGm_[outGmOffset], kvLocal[ubOffset], curScSize * coff_ * cmpRatio_,
+                                      dDealSize, dDealSize, constInfo_.headDim);
+                compressTcSize -= curScSize;
+                ubOffset += curScSize * coff_ * cmpRatio_ * dDealSize;
+            }
+            bIdx++;
+            sIdx = 0;
+        }
+    } else {
+        uint64_t outGmOffset = compressedCnt_ * coff_ * cmpRatio_ * constInfo_.headDim + dStartIdx;
+        DataCopyWithOutputQue(softmaxScoreOutGm_[outGmOffset], scoreLocal,
+                              compressTcSize * coff_ * cmpRatio_, dDealSize, dDealSize,
+                              constInfo_.headDim);
+        DataCopyWithOutputQue(kvOutGm_[outGmOffset], kvLocal, compressTcSize * coff_ * cmpRatio_, dDealSize,
+                              dDealSize, constInfo_.headDim);
+    }
+}
+
 template <typename COMP>
 __aicore__ inline void CompressorBlockVector<COMP>::CopyOutVec1ResToOutput(const LocalTensor<T> &comperssoredUb,
                                                                            const Vec1SliceInfo &sliceInfo,
@@ -1021,8 +1075,13 @@ __aicore__ inline void CompressorBlockVector<COMP>::DealVec1BaseBlock(const Vec1
 
     if (statisticInfo.compressorScCnt > 0) {
         SoftmaxDN(scoreLocal, statisticInfo.compressorScCnt, dDealSize);
-        LocalTensor<T> comperssoredUb = scoreLocal;
         PipeBarrier<PIPE_V>();
+        if constexpr (COMP::gradEnabled == GRAD_ENABLED::ENABLE) {
+            CopyOutMidResToOutput(kvLocal, scoreLocal, originSliceInfo, statisticInfo.compressorScCnt, dStartIdx,
+                                  dDealSize);
+            PipeBarrier<PIPE_V>();
+        }
+        LocalTensor<T> comperssoredUb = scoreLocal;
         KvMulReduceScore(kvLocal, scoreLocal, comperssoredUb, statisticInfo.compressorScCnt, dDealSize);
         PipeBarrier<PIPE_V>();
         CopyOutVec1ResToOutput(comperssoredUb, originSliceInfo, statisticInfo.compressorScCnt, dStartIdx, dDealSize);
@@ -1035,6 +1094,13 @@ __aicore__ inline void CompressorBlockVector<COMP>::CalcGroupInfo(const Vec1RunI
 {
     uint32_t aiCoreNum = constInfo_.usedCoreNum * 2;
     splitInfo.dBaseSize = constInfo_.headDim / min(FloorPow2(aiCoreNum), CeilPow2(CeilDivT(aiCoreNum, info.dealTcNum)));
+    // 32B(8个FP32)对齐的UB列窗口上限。dBaseSize 超过它时 CalcTilingStrategy 会走
+    // dSplitSize = dBaseSize/dLoopCount 整数除法拆分，切出的列窗口非32B对齐
+    // （DataCopy 的 blockLen/srcGap 整数除法错位 → 行间源偏移错误 → 数据错乱）。
+    // clamp 到“不超过 maxDealColNum 的最大2的幂”后，dSplitSize 恒等于 dBaseSize
+    // （2的幂，天然8元素对齐），不再进入拆分分支。
+    uint32_t maxDealColNum = BUFFER_SIZE_BYTE_32K / (cmpRatio_ * coff_ * sizeof(T));
+    splitInfo.dBaseSize = min(splitInfo.dBaseSize, FloorPow2(Trunc(maxDealColNum, BlockElementNum<T>())));
     if (constInfo_.kBaseNum > 1) {
         splitInfo.dBaseSize = max(splitInfo.dBaseSize, FP32_REPEAT_ELEMENT_NUM);
     }

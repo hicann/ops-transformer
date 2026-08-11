@@ -34,7 +34,10 @@ ASCENDC_TPL_ARGS_DECL(compressor, // 算子唯一标识，与opType保持一致
                       // bit:7-8  cache_mode 1:LINEAR_BUFFER 2:RING_BUFFER
                       ASCENDC_TPL_UINT_DECL(CACHE_MODE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 1, 2),
                       // bit:9-10  template_id 0:empty_tensor 1:normal 2:full load
-                      ASCENDC_TPL_UINT_DECL(TEMPLATE_ID, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2), );
+                      ASCENDC_TPL_UINT_DECL(TEMPLATE_ID, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2),
+                      // bit:11  grad_enabled 0:关闭 1:开启 (arch22仅支持0)
+                      ASCENDC_TPL_BOOL_DECL(GRAD_ENABLED, 0, 1),);
+
 
 ASCENDC_TPL_SEL(
 
@@ -43,6 +46,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(COFF, ASCENDC_TPL_UI_LIST, 1, 2),
                          ASCENDC_TPL_UINT_SEL(CACHE_MODE, ASCENDC_TPL_UI_LIST, 1, 2),
                          ASCENDC_TPL_UINT_SEL(TEMPLATE_ID, ASCENDC_TPL_UI_LIST, 0, 1, 2),
+                         ASCENDC_TPL_BOOL_SEL(GRAD_ENABLED, 0),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::CompressorTilingData)), );
 
 #endif // COMPRESSOR_TEMPLATE_TILING_KEY_H

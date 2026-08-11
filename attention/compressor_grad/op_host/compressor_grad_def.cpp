@@ -11,16 +11,12 @@
 #include "register/op_def_registry.h"
 
 namespace ops {
-class Compressor : public OpDef {
+class CompressorGrad : public OpDef {
 public:
-    static constexpr uint32_t ROPE_HEAD_DIM_VALUE = 64;
     static constexpr uint32_t CMP_RATIO_VALUE = 4;
     static constexpr uint32_t COFF_VALUE = 1;
-    static constexpr uint32_t ROTARY_MODE_VALUE = 1;
-    static constexpr uint32_t CACHE_MODE_VALUE = 1;
-    static constexpr uint32_t STATE_CACHE_STRIDE_DIM0 = 0;
 
-    explicit Compressor(const char *name) : OpDef(name)
+    explicit CompressorGrad(const char *name) : OpDef(name)
     {
         this->Input("x")
             .ParamType(REQUIRED)
@@ -37,19 +33,19 @@ public:
             .DataType({ge::DT_BF16, ge::DT_FLOAT16})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
-        this->Input("state_cache")
+        this->Input("d_cmp_kv")
             .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_FLOAT})
-            .FormatList({ge::FORMAT_ND})
-            .IgnoreContiguous(); // state_cache需要支持非连续，不使能aclnn自动转连续的功能
-        this->Input("ape")
-            .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_FLOAT})
+            .DataType({ge::DT_BF16, ge::DT_FLOAT16})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
-        this->Input("state_block_table")
-            .ParamType(OPTIONAL)
-            .DataTypeList({ge::DT_INT32})
+        this->Input("softmax_score")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("kv")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("cu_seqlens")
@@ -67,27 +63,25 @@ public:
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
-        this->Output("cmp_kv")
+        this->Output("d_x")
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16, ge::DT_FLOAT16})
             .FormatList({ge::FORMAT_ND});
-        this->Output("state_cache")
+        this->Output("d_wkv")
             .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_FLOAT})
+            .DataType({ge::DT_BF16, ge::DT_FLOAT16})
             .FormatList({ge::FORMAT_ND});
-        this->Output("softmax_score")
+        this->Output("d_wgate")
             .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_FLOAT})
+            .DataType({ge::DT_BF16, ge::DT_FLOAT16})
             .FormatList({ge::FORMAT_ND});
-        this->Output("kv")
+        this->Output("d_ape")
             .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_FLOAT})
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND});
+
         this->Attr("cmp_ratio").AttrType(REQUIRED).Int(CMP_RATIO_VALUE);
         this->Attr("coff").AttrType(OPTIONAL).Int(COFF_VALUE);
-        this->Attr("cache_mode").AttrType(OPTIONAL).Int(CACHE_MODE_VALUE);
-        this->Attr("state_cache_stride_dim0").AttrType(OPTIONAL).Int(STATE_CACHE_STRIDE_DIM0);
-        this->Attr("grad_enabled").AttrType(OPTIONAL).Bool(false);
         OpAICoreConfig aicore_config;
         aicore_config.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(true)
@@ -96,10 +90,8 @@ public:
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn");   // set value of aclnn support
-        this->AICore().AddConfig("ascend910b", aicore_config);
-        this->AICore().AddConfig("ascend910_93", aicore_config);
         this->AICore().AddConfig("ascend950", aicore_config);
     }
 };
-OP_ADD(Compressor, optiling::CompressorCompileInfo);
+OP_ADD(CompressorGrad, optiling::CompressorGradCompileInfo);
 } // namespace ops

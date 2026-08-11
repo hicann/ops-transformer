@@ -982,6 +982,11 @@ __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::CalcGroupInfo(Vec1Sp
         if (constInfo_.kBaseNum > 1) {
             splitInfo.dBaseSize = max(splitInfo.dBaseSize, FP32_REPEAT_ELEMENT_NUM);
         }
+        // 32B(8个FP32)对齐的UB列窗口上限（同 arch35 修复）：防止 CalcTilingStrategy
+        // 拆出非32B对齐的列窗口（DataCopy blockLen/srcGap 错位）。
+        // cmpRatio<=4 分支无需限制（maxDealColNum >= 2K >= headDim，不触发拆分）。
+        uint32_t maxDealColNum = BUFFER_SIZE_BYTE_32K / (cmpRatio_ * coff_ * sizeof(T));
+        splitInfo.dBaseSize = min(splitInfo.dBaseSize, FloorPow2(Trunc(maxDealColNum, BlockElementNum<T>())));
     }
     // 结果输出到GM前必须转换成X_T，dBaseSize * sizeof(X_T)需32B对齐
     splitInfo.dBaseSize = max(splitInfo.dBaseSize, BlockElementNum<X_T>());

@@ -643,36 +643,91 @@ __aicore__ inline void CompressorVec1SliceIterator<COMP>::IteratorSlice()
     sliceInfo_.sIdx += sliceInfo_.validSeqCnt;
     if (sliceInfo_.sIdx >= sliceInfo_.bSeqUsed) {
         do {
-            uint32_t seqLength = tools_.GetSeqLength(sliceInfo_.bIdx);
+            const uint32_t seqLength = tools_.GetSeqLength(sliceInfo_.bIdx);
             if (sliceInfo_.bSeqUsed < seqLength) {
-                uint64_t nextAlignSIdx = Align(sliceInfo_.bStartPos + sliceInfo_.sIdx, (uint64_t)cmpRatio) -
-                    sliceInfo_.bStartPos;
-                sliceInfo_.dealedSeqCnt += nextAlignSIdx - sliceInfo_.sIdx;
-                uint32_t tcGap = CeilDivT(static_cast<int32_t>(seqLength - nextAlignSIdx),
-                                    static_cast<int32_t>(cmpRatio));
-                if (sliceInfo_.bSeqUsed == 0 && nextAlignSIdx > sliceInfo_.sIdx) {
-                    // 此时bseqused所在压缩块未被纳入计算
-                    tcGap++;
+                // ── (A) tailH 行推进（不消耗任务量）──
+                // slice 处理到 su 为止，su 到下一个压缩块分界点（全局 cr 对齐的"切分点"）
+                // 之间的行是 slice 尾部 padding（tailH）。这些行在任务量上已由 slice 的
+                // dealTcSize 消耗，但 workspace 行号（dealedSeqCnt）尚未推进——必须在此
+                // 推进，否则核起点落在非切分点，后续 slice 从错位位置读数据。
+                //
+                // ★特殊1：仅 sIdx > 0（slice 确实处理过）时才推进 tailH。
+                //   sIdx == 0 表示 seqused == 0 的无效 batch（无 slice），其行全部属于
+                //   空洞（块任务量未消耗）；此时按 tailH 推进会"行超前于任务量"
+                //   （b=53: 全局对齐量 62 行，但 x 行仅 1 行）→ workspace 偏移虚增越界。
+                //
+                // ★特殊2：对齐量 clamp 到空洞内。对齐量（< cmpRatio）可能超过本 batch
+                //   的 x 行剩余（seqLength - sIdx，如无效 batch 的 x 行很短），
+                //   超出的行属于下一个 batch 或窗口外，不得推进。
+                if (sliceInfo_.sIdx > 0) {
+                    uint64_t nextAlignSIdx = Align(sliceInfo_.bStartPos + sliceInfo_.sIdx,
+                                                   static_cast<uint64_t>(cmpRatio)) -
+                                             sliceInfo_.bStartPos;
+                    uint32_t align = min(static_cast<uint32_t>(nextAlignSIdx - sliceInfo_.sIdx),
+                                         seqLength - sliceInfo_.sIdx);
+                    sliceInfo_.dealedSeqCnt += align;
+                    sliceInfo_.sIdx += align;
                 }
-                sliceInfo_.sIdx = nextAlignSIdx;
+
+                // ── 空洞（tailH 之后）对应的压缩块数 tcGap（需消耗的任务量）──
+                // 空洞 = [sIdx, seqLength) 的 x 行，全局位置 [bStartPos+sIdx, bStartPos+seqLength)。
+                // 块数 = 空洞覆盖的全局 cr 块数。
+                //
+                // ★特殊3：sIdx == 0（seqused == 0）时起点块（含头部 padding 的块）
+                //   未被 slice 消耗，块数从 floor(bStartPos/cr) 起算（= tcNum 公式，起点块计入）；
+                //   sIdx > 0（tailH 已推进到切分点）时从 ceil((bStartPos+sIdx)/cr) 起算
+                //   （起点块已由 slice 的 dealTcSize 消耗）。
+                const uint32_t gapRows = seqLength - sliceInfo_.sIdx;
+                uint32_t tcGap;
+                if (sliceInfo_.sIdx == 0) {
+                    tcGap = static_cast<uint32_t>(
+                        CeilDivT(sliceInfo_.bStartPos + seqLength, static_cast<uint64_t>(cmpRatio)) -
+                        sliceInfo_.bStartPos / static_cast<uint64_t>(cmpRatio));
+                } else {
+                    tcGap = static_cast<uint32_t>(
+                        CeilDivT(sliceInfo_.bStartPos + seqLength, static_cast<uint64_t>(cmpRatio)) -
+                        CeilDivT(sliceInfo_.bStartPos + sliceInfo_.sIdx, static_cast<uint64_t>(cmpRatio)));
+                }
+
                 if (needDealTcSize_ < tcGap) {
-                    sliceInfo_.dealedSeqCnt += needDealTcSize_ * cmpRatio;
-                    sliceInfo_.sIdx += needDealTcSize_ * cmpRatio;
+                    // ── (B) 部分跳过：任务量不足以跳过整个空洞 ──
+                    // 只推进任务量对应的行（needTc 个块 = needTc*cmpRatio 行），clamp 到空洞内。
+                    //
+                    // ★特殊4：needTc == 0 时不推进任何行——行推进必须与任务量消耗严格
+                    //   对应；否则核起点"行已推进、块未消耗"，后续核分到无行的块
+                    //   （读窗口外数据 / 输出丢失）。
+                    //
+                    // ★特殊5：needTc*cmpRatio 可能超过空洞行数（尾部块凑不齐一块），
+                    //   clamp 后停在空洞末尾，不越界（"凑不齐也算一块"的任务量不变）。
+                    uint32_t skip = min(needDealTcSize_ * cmpRatio, gapRows);
+                    sliceInfo_.dealedSeqCnt += skip;
+                    sliceInfo_.sIdx += skip;
                     needDealTcSize_ = 0;
-                    break;
+                    break;                       // 任务量耗尽：迭代终止
                 }
-                sliceInfo_.dealedSeqCnt += seqLength - sliceInfo_.sIdx;
+                // ── (C) 完整跳过：推进整个空洞，消耗 tcGap 个 Tc ──
+                // 空洞全部行在本 batch 内，推进后 sIdx 到达 seqLength（batch 末尾），
+                // 随后换到下一个 batch。
+                sliceInfo_.dealedSeqCnt += gapRows;
+                sliceInfo_.sIdx += gapRows;
                 needDealTcSize_ -= tcGap;
             }
             sliceInfo_.bIdx++;
             if (sliceInfo_.bIdx == batch_size_) {
-                sliceInfo_.bIdx = 0;
+                // 终止而非回绕（防死循环；正常遍历不会触发）
+                sliceInfo_.bIdx = batch_size_ - 1;
+                sliceInfo_.sIdx = 0;
+                sliceInfo_.bSeqUsed = 0;
+                sliceInfo_.bStartPos = tools_.GetStartPos(sliceInfo_.bIdx);
+                sliceInfo_.bSeqLength = tools_.GetSeqLength(sliceInfo_.bIdx);
+                needDealTcSize_ = 0;
+                break;
             }
             sliceInfo_.sIdx = 0;
             sliceInfo_.bSeqUsed = tools_.GetSeqUsed(sliceInfo_.bIdx);
-        } while (sliceInfo_.bSeqUsed == 0);
+            sliceInfo_.bStartPos = tools_.GetStartPos(sliceInfo_.bIdx);
             sliceInfo_.bSeqLength = tools_.GetSeqLength(sliceInfo_.bIdx);
-        sliceInfo_.bStartPos = tools_.GetStartPos(sliceInfo_.bIdx);
+        } while (sliceInfo_.bSeqUsed == 0);
     }
     if (isFirst_) {
         isFirst_ = false;
@@ -696,7 +751,10 @@ template <typename COMP>
 __aicore__ inline Vec1SliceInfo& CompressorVec1SliceIterator<COMP>::GetSlice()
 {
     uint32_t cmpRatio = tools_.toolParams_.cmpRatio;
-    if (sliceInfo_.bSeqUsed < sliceInfo_.sIdx) {
+    if (sliceInfo_.bSeqUsed <= sliceInfo_.sIdx) {
+        // sIdx == bSeqUsed 时同样视为无效 slice（含 bSeqUsed==0 的空洞 batch 起点）：
+        // 否则 GetSlice 会生成 headHolder>0/valid=0 的伪 slice（dealTcSize=1）
+        // 每轮白吃 1 个 tc 配额且不推进 → 迭代器卡死在空洞 batch，其后块全部丢失
         sliceInfo_.headHolderSeqCnt = 0;
         sliceInfo_.validSeqCnt = 0;
         sliceInfo_.tailHolderSeqCnt = 0;

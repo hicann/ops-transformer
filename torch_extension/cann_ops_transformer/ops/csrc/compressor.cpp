@@ -46,12 +46,17 @@ std::vector<bool> IsContiguousAxes(const at::Tensor &tensor)
     return result;
 }
 
-at::Tensor ConstructCompressorOutputTensor(const at::Tensor &x, const at::Tensor &wkv,
-                                           const c10::optional<at::Tensor> &cuSeqlens, int64_t cmpRatio, int64_t coff)
+std::tuple<at::Tensor, at::Tensor, at::Tensor> ConstructCompressorOutputTensor(
+    const at::Tensor &x, const at::Tensor &wkv, const at::Tensor &ape,
+    const c10::optional<at::Tensor> &cuSeqlens, int64_t cmpRatio, int64_t coff)
 {
     auto xDim = x.dim();
     at::SmallVector<int64_t, MAX_DIM_SIZE> cmpKvSize;
+    at::SmallVector<int64_t, MAX_DIM_SIZE> softmaxScoreSize;
+    at::SmallVector<int64_t, MAX_DIM_SIZE> kvSize;
     at::Tensor cmpKv;
+    at::Tensor softmaxScore;
+    at::Tensor kv;
     int64_t cmpS = 0;
     int64_t bSize = 0;
 
@@ -64,30 +69,37 @@ at::Tensor ConstructCompressorOutputTensor(const at::Tensor &x, const at::Tensor
     if (xDim == DIM_THREE) {
         cmpS = (x.size(1) + cmpRatio - 1) / cmpRatio;
         cmpKvSize = {x.size(0), cmpS, wkv.size(0) / coff};
+        softmaxScoreSize = {x.size(0), cmpS, coff * cmpRatio, wkv.size(0) / coff};
+        kvSize = {x.size(0), cmpS, coff * cmpRatio, wkv.size(0) / coff};
     } else {
         TORCH_CHECK(cuSeqlens.has_value(), "Check cu_seqlens != nullptr failed");
         bSize = cuSeqlens->size(0) - 1;
         cmpS = std::min(x.size(0), x.size(0) / cmpRatio + bSize);
         cmpKvSize = {cmpS, wkv.size(0) / coff};
+        softmaxScoreSize = {cmpS, coff * cmpRatio, wkv.size(0) / coff};
+        kvSize = {cmpS, coff * cmpRatio, wkv.size(0) / coff};
     }
 
     cmpKv = at::empty(cmpKvSize, x.options().dtype(x.dtype()));
-    return cmpKv;
+    softmaxScore = at::empty(softmaxScoreSize, ape.options().dtype(ape.dtype()));
+    kv = at::empty(kvSize, ape.options().dtype(ape.dtype()));
+    return std::tuple<at::Tensor, at::Tensor, at::Tensor>(cmpKv, softmaxScore, kv);
 }
 
-at::Tensor Compressor(const at::Tensor &x, const at::Tensor &wkv, const at::Tensor &wgate, at::Tensor &stateCache,
-                      const at::Tensor &ape, int64_t cmpRatio, const c10::optional<at::Tensor> &stateBlockTable,
-                      const c10::optional<at::Tensor> &cuSeqlens, const c10::optional<at::Tensor> &seqused,
-                      const c10::optional<at::Tensor> &startPos, int64_t coff, int64_t cacheMode)
+std::tuple<at::Tensor, at::Tensor, at::Tensor> Compressor(
+    const at::Tensor &x, const at::Tensor &wkv, const at::Tensor &wgate,
+    at::Tensor &stateCache, const at::Tensor &ape, int64_t cmpRatio,
+    const c10::optional<at::Tensor> &stateBlockTable,
+    const c10::optional<at::Tensor> &cuSeqlens,
+    const c10::optional<at::Tensor> &seqused, const c10::optional<at::Tensor> &startPos,
+    int64_t coff, int64_t cacheMode, bool gradEnabled)
 {
     TORCH_CHECK(x.defined(), "Check x != nullptr failed");
     auto xDim = x.dim();
     TORCH_CHECK(xDim == DIM_TWO || xDim == DIM_THREE, "x dim num[", xDim, "] should be 2 or 3");
 
     TORCH_CHECK(cmpRatio > VALUE_0, "cmp_ratio should be greater than 0");
-
-    at::Tensor cmpKv = ConstructCompressorOutputTensor(x, wkv, cuSeqlens, cmpRatio, coff);
-
+    auto [cmpKv, softmaxScore, kv] = ConstructCompressorOutputTensor(x, wkv, ape, cuSeqlens, cmpRatio, coff);
     auto stateCacheDim = stateCache.dim();
     TORCH_CHECK(stateCacheDim == DIM_THREE, "state_cache dim num[", stateCacheDim, "] should be 3");
 
@@ -95,15 +107,54 @@ at::Tensor Compressor(const at::Tensor &x, const at::Tensor &wkv, const at::Tens
     int64_t stateCacheStrideDim0 = stateCache.stride(0);
 
     ACLNN_CMD(aclnnCompressor, x, wkv, wgate, stateCache, ape, stateBlockTable, cuSeqlens, seqused, startPos, cmpRatio,
-              coff, cacheMode, stateCacheStrideDim0, cmpKv);
+        coff, cacheMode, stateCacheStrideDim0, gradEnabled, cmpKv, softmaxScore, kv);
 
-    return cmpKv;
+    return std::tuple<at::Tensor, at::Tensor, at::Tensor>(cmpKv, softmaxScore, kv);
 }
 
-at::Tensor CompressorMeta(const at::Tensor &x, const at::Tensor &wkv, const at::Tensor &wgate, at::Tensor &stateCache,
-                          const at::Tensor &ape, int64_t cmpRatio, const c10::optional<at::Tensor> &stateBlockTable,
-                          const c10::optional<at::Tensor> &cuSeqlens, const c10::optional<at::Tensor> &seqused,
-                          const c10::optional<at::Tensor> &startPos, int64_t coff, int64_t cacheMode)
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> CompressorBackward(
+    at::Tensor &dCmpKv, const at::Tensor &x, const at::Tensor &wkv,
+    const at::Tensor &wgate, const at::Tensor &softmaxScore, const at::Tensor &kv,
+    const c10::optional<at::Tensor> &cuSeqlens, const c10::optional<at::Tensor> &seqused,
+    const c10::optional<at::Tensor> &startPos, int64_t cmpRatio, int64_t coff)
+{
+    auto xDim = x.dim();
+    at::SmallVector<int64_t, MAX_DIM_SIZE> dxSize;
+    at::SmallVector<int64_t, MAX_DIM_SIZE> dWkvSize;
+    at::SmallVector<int64_t, MAX_DIM_SIZE> dWgateSize;
+    at::SmallVector<int64_t, MAX_DIM_SIZE> dApeSize;
+    at::Tensor dx;
+    at::Tensor dWkv;
+    at::Tensor dWgate;
+    at::Tensor dApe;
+
+    TORCH_CHECK(x.defined(), "Check x != nullptr failed");
+    TORCH_CHECK(xDim == DIM_TWO || xDim == DIM_THREE, "x dim num[", xDim, "] should be 2 or 3");
+
+    TORCH_CHECK(cmpRatio > VALUE_0, "cmp_ratio should be greater than 0");
+    
+    dxSize = x.sizes().vec();
+    dx = at::empty(dxSize, x.options().dtype(x.dtype()));
+    dWkvSize = wkv.sizes().vec();
+    dWkv = at::empty(dWkvSize, wkv.options().dtype(wkv.dtype()));
+    dWgateSize = wgate.sizes().vec();
+    dWgate = at::empty(dWgateSize, wgate.options().dtype(wgate.dtype()));
+    dApeSize = {cmpRatio, wkv.size(0)};
+    dApe = at::empty(dApeSize, kv.options().dtype(kv.dtype()));
+
+    ACLNN_CMD(aclnnCompressorGrad, x, wkv, wgate, dCmpKv, softmaxScore, kv, cuSeqlens, seqused,
+        startPos, cmpRatio, coff, dx, dWkv, dWgate, dApe);
+
+    return std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>(dx, dWkv, dWgate, dApe);
+}
+
+std::tuple<at::Tensor, at::Tensor, at::Tensor> CompressorMeta(
+    const at::Tensor &x, const at::Tensor &wkv, const at::Tensor &wgate,
+    at::Tensor &stateCache, const at::Tensor &ape, int64_t cmpRatio,
+    const c10::optional<at::Tensor> &stateBlockTable,
+    const c10::optional<at::Tensor> &cuSeqlens,
+    const c10::optional<at::Tensor> &seqused, const c10::optional<at::Tensor> &startPos,
+    int64_t coff, int64_t cacheMode)
 {
     TORCH_CHECK(x.defined(), "Check x != nullptr failed");
     auto xDim = x.dim();
@@ -111,11 +162,13 @@ at::Tensor CompressorMeta(const at::Tensor &x, const at::Tensor &wkv, const at::
 
     TORCH_CHECK(cmpRatio > VALUE_0, "cmp_ratio should be greater than 0");
 
-    return ConstructCompressorOutputTensor(x, wkv, cuSeqlens, cmpRatio, coff);
+    auto [cmpKv, softmaxScore, kv] = ConstructCompressorOutputTensor(x, wkv, ape, cuSeqlens, cmpRatio, coff);
+    return std::tuple<at::Tensor, at::Tensor, at::Tensor>(cmpKv, softmaxScore, kv);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
     m.def("compressor", &Compressor, "compressor");
+    m.def("compressor_backward", &CompressorBackward, "compressor_backward");
 }
 } // namespace op_api

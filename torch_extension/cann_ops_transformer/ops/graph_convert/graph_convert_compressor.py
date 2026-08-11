@@ -61,12 +61,13 @@ if _TORCHAIR_AVAILABLE:
         *,
         coff: int = 1,
         cache_mode: int = 1,
+        grad_enabled: bool = False,
         state_cache_stride_dim0: int = 0,
     ):
         result = x.new_empty(x.size())
         return result
 
-    @register_fx_node_ge_converter(torch.ops.cann_ops_transformer.compressor.default)
+    @register_fx_node_ge_converter(torch.ops.cann_ops_transformer._compressor_forward.default)
     def convert_compressor(
         x: Tensor,
         wkv: Tensor,
@@ -81,6 +82,7 @@ if _TORCHAIR_AVAILABLE:
         *,
         coff: int = 1,
         cache_mode: int = 1,
+        grad_enabled: bool = False,
         state_cache_stride_dim0: int = 0,
     ):
         raise AssertionError(

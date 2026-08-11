@@ -24,6 +24,7 @@
  
 using namespace Compressor;
 
+#if (__CCE_AICORE__ == 220)
 #define INVOKE_COMPRESSOR_GENERAL_OP_IMPL(templateClass, ...)                                                          \
     do {                                                                                                               \
         templateClass<COMPType<__VA_ARGS__>> op(&pipe, tilingData);                                                    \
@@ -31,8 +32,18 @@ using namespace Compressor;
                 cuSeqlens, seqUsed, startPos, cmpKvOut, workspace);                                                    \
         op.Process();                                                                                                  \
     } while (0)
+#else
+#define INVOKE_COMPRESSOR_GENERAL_OP_IMPL(templateClass, ...)                                                          \
+    do {                                                                                                               \
+        templateClass<COMPType<__VA_ARGS__>> op(&pipe, tilingData);                                                    \
+        op.Init(x, wKv, wGate, stateCache, ape, stateBlockTable,  \
+                cuSeqlens, seqUsed, startPos, cmpKvOut, \
+                softmaxScoreOut, kvOut, workspace);                                                    \
+        op.Process();                                                                                                  \
+    } while (0)
+#endif
 
-template<uint8_t XLayout, uint8_t XDType, uint8_t Coff, uint8_t CacheMode, uint8_t TemplateId>
+template<uint8_t XLayout, uint8_t XDType, uint8_t Coff, uint8_t CacheMode, uint8_t TemplateId, uint8_t GradEnabled>
 __global__ __aicore__ void compressor(
     __gm__ uint8_t *x,
     __gm__ uint8_t *wKv,
@@ -45,6 +56,8 @@ __global__ __aicore__ void compressor(
     __gm__ uint8_t *startPos,
     __gm__ uint8_t *cmpKvOut,
     __gm__ uint8_t *stateCacheOut,
+    __gm__ uint8_t *softmaxScoreOut,
+    __gm__ uint8_t *kvOut,
     __gm__ uint8_t *workspace,
     __gm__ uint8_t *tiling) {
     REGISTER_TILING_DEFAULT(optiling::CompressorTilingData);
@@ -66,10 +79,11 @@ __global__ __aicore__ void compressor(
             INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernelPerf, xLayout, xDtype, coff);
         }
     #else
+        constexpr auto gradEnabled = static_cast<GRAD_ENABLED>(GradEnabled);
         if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::FULL_LOAD) {
-            INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernelFullLoad, xLayout, xDtype, coff, cacheMode);
+            INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernelFullLoad, xLayout, xDtype, coff, cacheMode, gradEnabled);
         } else {
-            INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernel, xLayout, xDtype, coff, cacheMode);
+            INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernel, xLayout, xDtype, coff, cacheMode, gradEnabled);
         }
     #endif
 }

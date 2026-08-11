@@ -56,14 +56,17 @@ TEST_F(CompressorInfershape, bsh_c4a_bf16)
                                      },
                                      {
                                          // output 0: cmp_kv (placeholder)
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
+
                                      },
                                      {
                                          // attrs
                                          {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                          {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                      });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{2, 1, 512}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{2, 1, 512}, {}, {2, 1, 8, 512}, {2, 1, 8, 512}};
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -83,13 +86,16 @@ TEST_F(CompressorInfershape, bsh_c4a_fp16)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
+
                                      },
                                      {
                                          {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                          {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                      });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{2, 1, 512}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{2, 1, 512}, {}, {2, 1, 8, 512}, {2, 1, 8, 512}};
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -110,13 +116,16 @@ TEST_F(CompressorInfershape, bsh_c4li_bf16)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
+
                                      },
                                      {
                                          {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                          {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                      });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{2, 1, 128}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{2, 1, 128}, {}, {2, 1, 8, 128}, {2, 1, 8, 128}};
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -137,13 +146,16 @@ TEST_F(CompressorInfershape, bsh_c128a_bf16)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
+
                                      },
                                      {
                                          {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
                                          {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
                                      });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{2, 1, 512}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{2, 1, 512}, {}, {2, 1, 128, 512}, {2, 1, 128, 512}};
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -164,13 +176,16 @@ TEST_F(CompressorInfershape, bsh_non_divisible)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
+
                                      },
                                      {
                                          {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                          {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                      });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{1, 2, 128}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{1, 2, 128}, {}, {1, 2, 8, 128}, {1, 2, 8, 128}};
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -202,13 +217,16 @@ TEST_F(CompressorInfershape, th_c4a_bf16)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // start_pos
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
+
                                      },
                                      {
                                          {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                          {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                      });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 512}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 512}, {}, {4, 8, 512}, {4, 8, 512}};
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -229,13 +247,16 @@ TEST_F(CompressorInfershape, th_c4a_multi_batch)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
+
                                      },
                                      {
                                          {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                          {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                      });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{7, 512}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{7, 512}, {}, {7, 8, 512}, {7, 8, 512}};
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -258,14 +279,17 @@ TEST_F(CompressorInfershape, bsh_empty_batch)
                                          {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                      },
                                      {
-                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+                                         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
+                                         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
+
                                      },
                                      {
                                          {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                          {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                      });
     // B=0, Sr=ceil(4/4)=1, output: [0, 1, 512]
-    std::vector<std::vector<int64_t>> expectOutputShape = {{0, 1, 512}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{0, 1, 512}, {}, {0, 1, 8, 512}, {0, 1, 8, 512}};
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 

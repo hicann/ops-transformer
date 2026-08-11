@@ -364,7 +364,7 @@ ge::graphStatus CompressorTiling::GenTilingKey() const
         layout = 1;
     }
 
-    context_->tilingKey = GET_TPL_TILING_KEY(layout, dtype, coff, cacheMode, templateId);
+    context_->tilingKey = GET_TPL_TILING_KEY(layout, dtype, coff, cacheMode, templateId, 0);
     OP_LOGI(context_->opName, "Compressor dtype:%hhu layout:%hhu  coff:%hhu, cacheMode: %u, template_id:%hhu", dtype,
             layout, coff, cacheMode, templateId);
     OP_LOGI(context_->opName, "Compressor tilingKey:%lu", context_->tilingKey);

@@ -101,7 +101,10 @@ aclnnStatus aclnnCompressorGetWorkspaceSize(
     int64_t          coff,
     int64_t          cacheMode,
     int64_t          stateCacheStrideDim0,
+    bool             gradEnabled,
     const aclTensor *cmpKvOut,
+    const aclTensor *softmaxScoreOut,
+    const aclTensor *kvOut,
     uint64_t        *workspaceSize,
     aclOpExecutor   **executor)
 ```
@@ -125,20 +128,24 @@ aclnnStatus aclnnCompressor(
     | wgate | 输入 | 公式中的$W^{Gate}$，表示gate压缩权重。 |不支持空Tensor。| FLOAT16、BFLOAT16 | ND |[coff* D,H]|×|
     | stateCacheRef | 输入 | 公式中的$\left[kv\_state, score\_state\right]$, 表示kv\_state和score\_state的历史数据。 |不支持空Tensor| FLOAT32     | ND         |[block_num,block_size,2*coff* D]|支持0轴非连续|
     | ape | 输入 | 公式中的$Ape$，表示positional biases。 | 不支持空Tensor。|FLOAT32       | ND         |[cmp_ratio,coff* D]|×|
-    | stateBlockTable | 可选输入 | 表示state\_cache存储使用的block映射表。|当其中元素的值为0时，表示当前位置无需进行更新state\_cache操作；支持S=0,T=0的空Tensor。| INT32 | ND         |cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B]。当其中元素的值为0时，表示当前位置无需进行更新state_cache操作|×|
-    | cuSeqlens | 可选输入 | 表示不同Batch中的有效token数。  |支持B=0,S=0,T=0的空Tensor；当x的shape为[B,S,H]时，参数必须为空。| INT32          | ND         |当x的shape为[T,H]时，输入shape为[B+1,]|×|
-    | seqused | 可选输入 | 表示不同Batch中实际参与压缩的token数。 |如果指定为None时，表示和每个Batch上的Sequence Length长度相同；支持B=0的空Tensor；如果指定为None时，表示和每个Batch上的Sequence Length长度相同。该入参中每个Batch的有效token数要求小于等于对应Sequence Length长度。当x的shape为[B,S,H]时，要求seqused[n] <= S，且不小于0；当x的shape为[T,H]时，要求seqused[n] <= cu\_seqlens[n+1] - cu\_seqlens[n]，且不小于0。| INT32          | ND         |[B,]|×|
-    | startPos | 可选输入 | 表示计算起始位置。 |支持B=0,T=0的空Tensor；当输入为None时，表示从0开始进行计算。| INT32          | ND         |[B,]|×|
+    | stateBlockTableOptional | 可选输入 | 表示state\_cache存储使用的block映射表。|当其中元素的值为0时，表示当前位置无需进行更新state\_cache操作；支持S=0,T=0的空Tensor。| INT32 | ND         |cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B]。当其中元素的值为0时，表示当前位置无需进行更新state_cache操作|×|
+    | cuSeqlensOptional | 可选输入 | 表示不同Batch中的有效token数。  |支持B=0,S=0,T=0的空Tensor；当x的shape为[B,S,H]时，参数必须为空。| INT32          | ND         |当x的shape为[T,H]时，输入shape为[B+1,]|×|
+    | sequsedOptional | 可选输入 | 表示不同Batch中实际参与压缩的token数。 |如果指定为None时，表示和每个Batch上的Sequence Length长度相同；支持B=0的空Tensor；如果指定为None时，表示和每个Batch上的Sequence Length长度相同。该入参中每个Batch的有效token数要求小于等于对应Sequence Length长度。当x的shape为[B,S,H]时，要求seqused[n] <= S，且不小于0；当x的shape为[T,H]时，要求seqused[n] <= cu\_seqlens[n+1] - cu\_seqlens[n]，且不小于0。| INT32          | ND         |[B,]|×|
+    | startPosOptional | 可选输入 | 表示计算起始位置。 |支持B=0,T=0的空Tensor；当输入为None时，表示从0开始进行计算。| INT32          | ND         |[B,]|×|
     | cmpRatio | 输入 | 用于稀疏计算，表示数据压缩率。 |取值范围为[2, 128]内的整数。| INT32          | -         |-|-|
     | coff | 可选输入 | 表示是否进行overlap数据重排。 |取值范围为[1, 2]。当coff=1时，无需进行overlap数据重排。当coff=2时，需要进行overlap数据重排。| INT32          | -         |-|-|
     | cacheMode | 可选输入 | 表示state_cache的存储模式。 |取值范围为[1, 2]；1表示连续buffer，2表示循环buffer。| INT32          | -         |-|-|
     | stateCacheStrideDim0 | 可选输入 | 表示state_cache的0轴stride。 |-| INT32     | -         |-|-|
-    | cmpKv | 输出 | 表示压缩后的数据。 |支持B=0,S=0,T=0的空Tensor。| FLOAT16、BFLOAT16         | ND          |BS合轴：[min(T,T//cmp_ratio+B),D]、BS非合轴：[B,ceil(S/cmp_ratio),D]|×|
+    | gradEnabled | 可选输入 | 表示是否导出softmax\_score/kv中间结果。 | 取值范围为true/false，默认false。当值为true时，算子输出softmax\_score与kv中间结果（供反向传播使用）；值为false时softmax\_score与kv输出内容无效。 | BOOL | - | - | - |
+    | cmpKvOut | 输出 | 表示压缩后的数据。 |支持B=0,S=0,T=0的空Tensor。| FLOAT16、BFLOAT16         | ND          |BS合轴：[min(T,T//cmp_ratio+B),D]、BS非合轴：[B,ceil(S/cmp_ratio),D]|×|
+    | softmaxScoreOut | 输出 | 公式中的$S^\prime$，表示分组softmax结果。 | 仅在gradEnabled为true时输出有效；支持B=0,S=0,T=0的空Tensor。 | FLOAT32 | ND | BS合轴：[min(T,T//cmp_ratio+B), coff*cmp_ratio, D]、BS非合轴：[B,ceil(S/cmp_ratio),coff*cmp_ratio,D] | × |
+    | kvOut | 输出 | 公式中的$(S_H)_i$，表示softmax结果与kv\_state的Hadamard乘积。 | 仅在gradEnabled为true时输出有效；支持B=0,S=0,T=0的空Tensor。 | FLOAT32 | ND | 同softmaxScoreOut | × |
 
 <!-- npu="A3" id6 -->
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
  cacheMode不支持输入2，且不支持0轴非连续。
- cmp_ratio仅支持2/4/8/16/32/64/128
+ cmp_ratio仅支持2/4/8/16/32/64/128。
+ gradEnabled不支持为true。
 
 <!-- end id6 -->
 - **返回值**

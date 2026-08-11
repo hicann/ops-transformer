@@ -39,6 +39,8 @@ namespace ops {
 
     // OUTPUT
     constexpr uint32_t CMP_KV_OUTPUT_INDEX = 0;
+    constexpr uint32_t SOFTMAX_SCORE_OUTPUT_INDEX = 2;
+    constexpr uint32_t KV_OUTPUT_INDEX = 3;
 
     // ATTR DEFAULT VALUE
     constexpr uint32_t CMP_RATIO_VALUE = 4;
@@ -126,16 +128,52 @@ ge::graphStatus SetCompressorShapeDim(const CompressorProtoShapeParam &shapePara
     OP_CHECK_NULL_WITH_CONTEXT(context, cmpKvShape);
     auto attr = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attr);
+    const int64_t *cmpRatioPtr = attr->GetAttrPointer<int64_t>(CMP_RATIO_ATTR_INDEX);
+    int64_t cmpRatio = (cmpRatioPtr != nullptr) ? *cmpRatioPtr : CMP_RATIO_VALUE;
+    const int64_t *coffPtr = attr->GetAttrPointer<int64_t>(COFF_ATTR_INDEX);
+    int64_t coff = (coffPtr != nullptr) ? *coffPtr : COFF_VALUE;
+    int64_t extraDim = coff * cmpRatio;
+
     // Set output shape
     if (!shapeParam.isBsMerge) {
         cmpKvShape->SetDimNum(DIM_NUM_3);                   // (B, Sr, H)
         cmpKvShape->SetDim(DIM_INDEX_0, shapeParam.B);
         cmpKvShape->SetDim(DIM_INDEX_1, shapeParam.Sr);
         cmpKvShape->SetDim(DIM_INDEX_2, shapeParam.D);
+
+        auto softmaxScoreShape = context->GetOutputShape(SOFTMAX_SCORE_OUTPUT_INDEX);
+        OP_CHECK_NULL_WITH_CONTEXT(context, softmaxScoreShape);
+        softmaxScoreShape->SetDimNum(DIM_NUM_4);        // (B, Sr, coff*cmpRatio, D)
+        softmaxScoreShape->SetDim(DIM_INDEX_0, shapeParam.B);
+        softmaxScoreShape->SetDim(DIM_INDEX_1, shapeParam.Sr);
+        softmaxScoreShape->SetDim(DIM_INDEX_2, extraDim);
+        softmaxScoreShape->SetDim(DIM_INDEX_3, shapeParam.D);
+
+        auto kvShape = context->GetOutputShape(KV_OUTPUT_INDEX);
+        OP_CHECK_NULL_WITH_CONTEXT(context, kvShape);
+        kvShape->SetDimNum(DIM_NUM_4);                  // (B, Sr, coff*cmpRatio, D)
+        kvShape->SetDim(DIM_INDEX_0, shapeParam.B);
+        kvShape->SetDim(DIM_INDEX_1, shapeParam.Sr);
+        kvShape->SetDim(DIM_INDEX_2, extraDim);
+        kvShape->SetDim(DIM_INDEX_3, shapeParam.D);
     } else {
         cmpKvShape->SetDimNum(DIM_NUM_2);                   // (T, N, Hckv)
         cmpKvShape->SetDim(DIM_INDEX_0, shapeParam.Sr);
         cmpKvShape->SetDim(DIM_INDEX_1, shapeParam.D);
+
+        auto softmaxScoreShape = context->GetOutputShape(SOFTMAX_SCORE_OUTPUT_INDEX);
+        OP_CHECK_NULL_WITH_CONTEXT(context, softmaxScoreShape);
+        softmaxScoreShape->SetDimNum(DIM_NUM_3);        // (Sr, coff*cmpRatio, D)
+        softmaxScoreShape->SetDim(DIM_INDEX_0, shapeParam.Sr);
+        softmaxScoreShape->SetDim(DIM_INDEX_1, extraDim);
+        softmaxScoreShape->SetDim(DIM_INDEX_2, shapeParam.D);
+
+        auto kvShape = context->GetOutputShape(KV_OUTPUT_INDEX);
+        OP_CHECK_NULL_WITH_CONTEXT(context, kvShape);
+        kvShape->SetDimNum(DIM_NUM_3);                  // (Sr, coff*cmpRatio, D)
+        kvShape->SetDim(DIM_INDEX_0, shapeParam.Sr);
+        kvShape->SetDim(DIM_INDEX_1, extraDim);
+        kvShape->SetDim(DIM_INDEX_2, shapeParam.D);
     }
 
     return GRAPH_SUCCESS;
@@ -149,6 +187,8 @@ ge::graphStatus InferDataTypeCompressor(gert::InferDataTypeContext* context)
     OP_LOGI(context->GetNodeName(), "Enter Compressor inferDataType impl.");
 
     context->SetOutputDataType(CMP_KV_OUTPUT_INDEX, context->GetRequiredInputDataType(TOKEN_X_INPUT_INDEX));
+    context->SetOutputDataType(SOFTMAX_SCORE_OUTPUT_INDEX, ge::DT_FLOAT);
+    context->SetOutputDataType(KV_OUTPUT_INDEX, ge::DT_FLOAT);
 
     return GRAPH_SUCCESS;
 }
