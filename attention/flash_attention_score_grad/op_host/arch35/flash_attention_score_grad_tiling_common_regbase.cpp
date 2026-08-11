@@ -281,7 +281,7 @@ ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase& fBaseParams)
                         fBaseParams.queryType != ge::DT_FLOAT && fBaseParams.d == fBaseParams.d1 &&
                         fBaseParams.pseType == static_cast<uint32_t>(PseType::PSE_OUTER_ADD_MUL_TYPE) && ngs1s2BIsAble;
         int64_t dTypeSize = fBaseParams.queryType == ge::DT_BF16 ?
-                            ge::GetSizeByDataType(static_cast<ge::DataType>(fBaseParams.queryType)) << 1 :
+                            ge::GetSizeByDataType(static_cast<ge::DataType>(fBaseParams.queryType)) * NUM_TWO :
                             ge::GetSizeByDataType(static_cast<ge::DataType>(fBaseParams.queryType));
         int64_t s2Align = AlignTo(fBaseParams.s2 *
                                   ge::GetSizeByDataType(static_cast<ge::DataType>(fBaseParams.queryType)),
@@ -1578,14 +1578,15 @@ bool SetSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoParamsReg
     return false;
 }
 
-void SetSplitAxis(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
+void SetSplitAxis(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams,
+                  TndBaseInfo &tndBaseInfo)
 {
     fBaseParams.isBn2 = (fBaseParams.s1 <= BN2_MAX_S && fBaseParams.s2 <= BN2_MAX_S) &&
                         (fBaseParams.n1 == fBaseParams.n2) &&
                         (fBaseParams.d <= BN2_MAX_D) &&
                         (fBaseParams.queryType != ge::DT_FLOAT) &&
                         !(fBaseParams.queryType == ge::DT_FLOAT8_E5M2 || fBaseParams.queryType == ge::DT_FLOAT8_E4M3FN || fBaseParams.queryType == ge::DT_HIFLOAT8) &&
-                        (fBaseParams.tailZeroCount == 0);
+                        (fBaseParams.tailZeroCount == 0 && !tndBaseInfo.isSeqExistZero);
 
     bool bnLimit = ((fBaseParams.b * fBaseParams.n1) >= BN2_MULTIBLK_BN_256) ||
                     ((fBaseParams.b * fBaseParams.n1) >= BN2_MULTIBLK_BN_128 && (fBaseParams.s1 % ALIGN128 == 0) && (fBaseParams.s2 % ALIGN128 == 0));

@@ -154,8 +154,10 @@ public:
     constexpr static uint32_t DKV_L0_SPLIT_K = GET_DKV_L0_SPLIT_K<INPUT_TYPE, CUBE_BASEN, HEAD_DIM_ALIGN>();
     constexpr static bool ENABLE_UNITFLAG =
         HEAD_DIM_ALIGN <= static_cast<uint16_t>(DTemplateType::Aligned768) && !IS_DETER_OLD(DETER_SPARSE_TYPE);
-    constexpr static bool IS_DV_RESIDENT_L0C = !IS_FP32_INPUT && !IS_ROPE && !IS_DETER_OLD(DETER_SPARSE_TYPE) &&
-                                               SPLIT_AXIS == BN2GS1S2 &&
+    constexpr static bool IS_DV_RESIDENT_L0C = !IS_FP32_INPUT &&
+                                               !IS_ROPE &&
+                                               !IS_DETER_OLD(DETER_SPARSE_TYPE) &&
+                                               (SPLIT_AXIS == BN2GS1S2 || SPLIT_AXIS == BN2S2) &&
                                                HEAD_DIM_ALIGN >= static_cast<uint16_t>(DTemplateType::Aligned192) &&
                                                HEAD_DIM_ALIGN <= static_cast<uint16_t>(DTemplateType::Aligned256);
     constexpr static uint32_t SPLIT_BASE_D = DETER_SPARSE_TYPE == DETER_OLD ?
@@ -292,7 +294,7 @@ __aicore__ inline FAGBlockCube<TEMPLATE_ARGS>::~FAGBlockCube()
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline bool FAGBlockCube<TEMPLATE_ARGS>::IsDqkvSplitNEnabled(uint32_t s1Size, uint32_t s2Size)
 {
-    if constexpr (SPLIT_AXIS != BN2GS1S2 || IS_ROPE) {
+    if constexpr ((SPLIT_AXIS != BN2GS1S2 && SPLIT_AXIS != BN2S2) || IS_ROPE) {
         return false;
     } else if constexpr (IS_FP32_INPUT) {
         return HEAD_DIM_ALIGN > static_cast<uint32_t>(DTemplateType::Aligned256);
@@ -1536,16 +1538,19 @@ __aicore__ inline void FAGBlockCube<TEMPLATE_ARGS>::IterateMmPDyFixpout(
                 }
             } else { // BNS2
                 if (isFixpOut) {
-                    bool needAtomic =
-                        ((!IS_DKV_RESIDENT_L0C) && runInfo.isS2IdxNoChange && !isDkvL0CResidentForD192Dv128) ||
-                        (!runInfo.isFirstBlock && (runInfo.specialS2Index != -1));
+                    bool needAtomic = ((!IS_DKV_RESIDENT_L0C) &&
+                                       runInfo.isS2IdxNoChange &&
+                                       !isDkvL0CResidentForD192Dv128 &&
+                                       !isDvL0CResidentForD192ToD256) ||
+                                      (!runInfo.isFirstBlock && (runInfo.specialS2Index != -1));
                     if (needAtomic) {
                         SetAtomicAdd<CALC_TYPE>();
                     }
                     int64_t offset = (runInfo.specialS2Index != -1) ? (runInfo.specialS2Index * CUBE_BASEN * HEAD_DIM_ALIGN * NUM_TWO + CUBE_BASEN * HEAD_DIM_ALIGN) :
                         GetBlockIdx() * CUBE_BASEM * HEAD_DIM_ALIGN;
-                    Fixpipe<T, CALC_TYPE, DV_FIXPIPE_CONFIG>(outTensor[offset],
-                                                            dvL0CBuffer.GetTensor<CALC_TYPE>(), fixpipeParams);
+                    Fixpipe<T, CALC_TYPE, DV_FIXPIPE_CONFIG>(outTensor[offset + gmNOffset],
+                                                             dvL0CBuffer.GetTensor<CALC_TYPE>(),
+                                                             fixpipeParams);
                     if (needAtomic) {
                         SetAtomicNone();
                     }

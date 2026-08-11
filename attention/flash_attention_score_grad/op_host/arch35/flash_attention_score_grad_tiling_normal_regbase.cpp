@@ -429,7 +429,7 @@ bool FlashAttentionScoreGradTilingNormalRegbase::IsCapable()
 
 ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::DoOpTiling()
 {
-    SetSplitAxis(context_, fBaseParams);
+    SetSplitAxis(context_, fBaseParams, tndBaseInfo);
     DoSplit();
     auto ret = DoSparse();
     if (ret != ge::GRAPH_SUCCESS) {
