@@ -150,7 +150,7 @@ private:
     __aicore__ inline void SetExpertTokenNums();
     __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startTokenId,
                                        uint32_t &endTokenId, uint32_t &sendTokenNum, bool isFront = true);
-    __aicore__ inline void SplitExpertNumToCore(uint32_t &delCurExpertGroupNum, uint32_t &groupIdx);
+    __aicore__ inline void SplitExpertNumToCore();
     __aicore__ inline void FillTriple(LocalTensor<XOutType> &xOutTensor, uint32_t tokenIndex, uint32_t k);
     __aicore__ inline void CalTokenSendExpertCnt(uint32_t dstExpertId, int32_t calCnt, int32_t &curExpertCnt);
     __aicore__ inline void TokenToExpertInQuant(GlobalTensor<XOutType> dstWinGMTensor,
@@ -316,7 +316,6 @@ private:
     uint32_t recStatusNumPerCore_{0};
     uint64_t cumSumUB_{0};
     uint32_t cumSumTimes_{0};
-    uint32_t delLastExpertId_{0};
     uint32_t remainderExpertNum_{0};
     uint32_t aivUsedCumSum_{0};
     uint32_t aivUsedAllToAll_{0};
@@ -754,10 +753,7 @@ MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::CalExpertSendNum(T
     LocalTensor<uint32_t> expertMaskTensorU32 = expertMaskBuf.Get<uint32_t>();
     LocalTensor<int32_t> gatherTempTensor = outBuf.Get<int32_t>();
     for (int32_t expertIndex = 0; expertIndex < sendNum_; expertIndex++) {
-        int32_t dstExpertId = expertIndex + startId_;
-        if ((expertIndex == sendNum_ - 1) && (remainderExpertNum_ != 0)) {
-            dstExpertId = delLastExpertId_;
-        }
+        int32_t dstExpertId = startId_ + expertIndex * static_cast<int32_t>(moeUsedAivNum_); // 步进映射
         CompareScalar(expertMaskTensorU8[maskSizePerExpert_ * expertIndex], validExpertIdsTensor_, dstExpertId,
                       CMPMODE::EQ, compareCount);
         PipeBarrier<PIPE_V>();
@@ -774,21 +770,18 @@ MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::CalExpertSendNum(T
 
 template <TemplateMC2TypeFullmeshClass>
 __aicore__ inline void
-MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::SplitExpertNumToCore(uint32_t &delCurExpertGroupNum,
-                                                                                   uint32_t &groupIdx)
+MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::SplitExpertNumToCore()
 {
-    sendNum_ = moeExpertNum_ / moeUsedAivNum_;
-    remainderExpertNum_ = moeExpertNum_ % moeUsedAivNum_;
-    startId_ = sendNum_ * aivId_;
-    if (remainderExpertNum_ != 0) {
-        int32_t remainderGroupSize = remainderExpertNum_;
-        delLastExpertId_ = aivId_ % remainderExpertNum_;
-        delCurExpertGroupNum = moeUsedAivNum_ / remainderGroupSize;
-        if (delLastExpertId_ < moeUsedAivNum_ % remainderGroupSize) {
-            delCurExpertGroupNum++;
-        }
-        groupIdx = aivId_ / remainderGroupSize;
-        delLastExpertId_ += moeUsedAivNum_ * sendNum_;
+    // 步进分核：core i 拥有全局 MOE 专家 {i, i+stride, i+2*stride,...}（stride=moeUsedAivNum_）。
+    if (moeUsedAivNum_ == 0) {
+        sendNum_ = 0;
+        return;
+    }
+    uint32_t stride = moeUsedAivNum_;
+    remainderExpertNum_ = moeExpertNum_ % stride;
+    sendNum_ = moeExpertNum_ / stride;
+    startId_ = aivId_;
+    if (aivId_ < remainderExpertNum_) { // 余数前段兜底：前 remainder 个核各 +1 专家
         sendNum_ += 1;
     }
 }
@@ -848,9 +841,9 @@ MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::SendToMoeExpert(TQ
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(i % sendTokenBufNum_);
     }
 #else
-    // 按专家分核
-    uint32_t delCurExpertGroupNum, groupIdx, calExpertIdsIdx;
-    SplitExpertNumToCore(delCurExpertGroupNum, groupIdx);
+    // 按专家分核（步进）
+    uint32_t calExpertIdsIdx;
+    SplitExpertNumToCore();
     // 计算专家发送数据量 && 发送
     CalExpertSendNum(outBuf, expertMaskBuf);
     uint32_t maskN64Num = Ceil(expertIdsCnt_, 64); // 64：ScalarGetSFFValue按照64长度一次计算
@@ -858,13 +851,13 @@ MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::SendToMoeExpert(TQ
     LocalTensor<uint64_t> expertMaskTensorU64 = expertMaskBuf.Get<uint64_t>();
     for (int32_t index = 0; index < sendNum_; index++) {
         int32_t dstTokenPreCnt = 0;
-        int32_t expertIndex = (index + epRankId_ % sendNum_) % sendNum_;
+        // 旋转起始叠加 (epRankId_ + aivId_)，使不同源 rank 与同 rank 不同核均错峰遍历自有专家（仍为 [0,sendNum_) 排列）
+        int32_t expertIndex = (index + epRankId_ + static_cast<int32_t>(aivId_)) % static_cast<int32_t>(sendNum_);
         int32_t maskExpertU64Cnt = maskSizePerExpert_ * expertIndex / sizeof(uint64_t);
         if (tokenNumToExpertTensor_(expertIndex) == 0) {
             continue;
         }
-        int32_t dstExpertId = expertIndex + startId_;
-        dstExpertId = ((expertIndex == sendNum_ - 1) && (remainderExpertNum_ != 0)) ? delLastExpertId_ : dstExpertId;
+        int32_t dstExpertId = startId_ + expertIndex * static_cast<int32_t>(moeUsedAivNum_); // 步进映射
         for (int32_t maskIndex = 0; maskIndex < maskN64Num; maskIndex++) {
             uint64_t dstExpInfoMask = expertMaskTensorU64(maskIndex + maskExpertU64Cnt);
             int64_t curValidIdx = ScalarGetSFFValue<1>(dstExpInfoMask);
@@ -884,15 +877,12 @@ MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFunc>::SendToMoeExpert(TQ
                                                                             dstExpertId % moeExpertNumPerRank_)) +
                                                     hCommuSize_ * dstTokenPreCnt); // 计算地址偏移
                 dstWinGMTensor.SetGlobalBuffer((__gm__ XOutType *)rankGM);
-                if (!((expertIndex == sendNum_ - 1) && (remainderExpertNum_ != 0) &&
-                      (dstTokenPreCnt % delCurExpertGroupNum != groupIdx))) {
-                    if constexpr ((QuantMode > UNQUANT) ||
-                                  (QuantMode == UNQUANT && !Std::IsSame<ExpandXOutType, XType>::value)) {
-                        uint32_t quantExpertIdx = dstExpertId + sharedExpertNum_;
-                        TokenToExpertInQuant(dstWinGMTensor, inQueue, srcTokenIndex, topKIndex, quantExpertIdx);
-                    } else {
-                        TokenToExpert(dstWinGMTensor, inQueue, srcTokenIndex, topKIndex);
-                    }
+                if constexpr ((QuantMode > UNQUANT) ||
+                              (QuantMode == UNQUANT && !Std::IsSame<ExpandXOutType, XType>::value)) {
+                    uint32_t quantExpertIdx = dstExpertId + sharedExpertNum_;
+                    TokenToExpertInQuant(dstWinGMTensor, inQueue, srcTokenIndex, topKIndex, quantExpertIdx);
+                } else {
+                    TokenToExpert(dstWinGMTensor, inQueue, srcTokenIndex, topKIndex);
                 }
                 dstTokenPreCnt++;
                 uint64_t cleanMask = ~(uint64_t(1) << curValidIdx);
