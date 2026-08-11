@@ -673,7 +673,7 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessTopK(const QLIV2Common::RunIn
 
     int32_t validAllS2Len = cuRealAcSeq;
     for (uint32_t i = 0; i < curAivS1ProcNum; i++) {
-        if (i > 0 && !info.isNeedLD && returnValueFlag) {
+        if (i > 0) {
             SetFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);
             WaitFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);
         }
