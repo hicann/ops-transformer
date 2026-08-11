@@ -644,12 +644,15 @@ ge::graphStatus PagedAttentionChecker::CheckBlockSizeSupport(const FiaTilingInfo
             return ge::GRAPH_FAILED;
         }
 
-        // mxfp8 仅支持blocksize等于512或者1024
+        // mxfp8 仅支持blocksize等于64、128、256、512或1024
         if (fiaInfo.fullQuantMode == FiaFullQuantMode::QKV_MXFP8_FULL_QUANT &&
-            (fiaInfo.blockSize != BLOCK_SIZE_FOR_MXFP8 && fiaInfo.blockSize != BLOCK_SIZE_1024_FOR_MXFP8)) {
+            (fiaInfo.blockSize != BLOCK_SIZE_64_FOR_MXFP8 && fiaInfo.blockSize != BLOCK_SIZE_128_FOR_MXFP8 &&
+            fiaInfo.blockSize != BLOCK_SIZE_256_FOR_MXFP8 && fiaInfo.blockSize != BLOCK_SIZE_512_FOR_MXFP8 &&
+            fiaInfo.blockSize != BLOCK_SIZE_1024_FOR_MXFP8)) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                 fiaInfo.opName, "block_size", std::to_string(fiaInfo.blockSize).c_str(),
-                "In MXFP8 fullquant scenario, when page attention is enabled, block_size must be 512 or 1024");
+                "In MXFP8 fullquant scenario, when page attention is enabled, "
+                "block_size must be in [64, 128, 256, 512, 1024]");
             return ge::GRAPH_FAILED;
         }
 

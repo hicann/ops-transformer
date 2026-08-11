@@ -90,7 +90,6 @@ ge::graphStatus PagedAttentionChecker::CheckSingleParaBlockTable(const QfaTiling
 ge::graphStatus PagedAttentionChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
 {
     // 文档约束(单参数校验列): block_table 的 dtype/shape
-    // paBlockSize 的 "MxFP8 仅支持 512 或 1024" 属于特性交叉校验列, 不在此处校验。
     // 仅 PA 场景下校验 block_table, 通过 layout_kv 判断
     if (!IsPageAttention(qfaInfo)) {
         return ge::GRAPH_SUCCESS;
@@ -107,7 +106,7 @@ ge::graphStatus PagedAttentionChecker::CheckFeature(const QfaTilingInfo &qfaInfo
     // 文档约束(特性交叉校验列):
     //   - PagedAttention 开启情况下, block_table 必须不为空
     //   - PagedAttention 开启情况下, 必须传入 seqused_kv
-    //   - MxFP8 仅支持 Bs 为 512 或 1024
+    //   - MxFP8 仅支持 Bs 为 64、128、256、512或1024
     const gert::Tensor *blockTableTensor = qfaInfo.opParamInfo.blockTable.tensor;
     if (IsPageAttention(qfaInfo)) {
         // PA 场景: block_table 必须非空
@@ -125,12 +124,13 @@ ge::graphStatus PagedAttentionChecker::CheckFeature(const QfaTilingInfo &qfaInfo
                                                   "When PagedAttention is enabled, seqused_kv must be provided"),
             return ge::GRAPH_FAILED);
 
-        // MxFP8 场景: blockSize 仅支持 512 或 1024
+        // MxFP8 场景: blockSize 仅支持 64、128、256、512或1024
         if (qfaInfo.quantMode == QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
-            OP_CHECK_IF(qfaInfo.blockSize != 512 && qfaInfo.blockSize != 1024,
+            OP_CHECK_IF(qfaInfo.blockSize != 64 && qfaInfo.blockSize != 128 && qfaInfo.blockSize != 256 &&
+                        qfaInfo.blockSize != 512 && qfaInfo.blockSize != 1024,
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                             qfaInfo.opName, "block_size", std::to_string(qfaInfo.blockSize).c_str(),
-                            "When quant_mode is MxFP8, block_size must be 512 or 1024"),
+                            "When quant_mode is MxFP8, block_size must be in [64, 128, 256, 512, 1024]"),
                         return ge::GRAPH_FAILED);
         }
     } else {

@@ -45,7 +45,10 @@ constexpr uint32_t DIM_NUM_5 = 5;
 // PA
 constexpr uint32_t BLOCK_SIZE_MAX = 512;
 constexpr uint32_t BLOCK_SIZE_MAX_FOR_NO_QUANT = 1024;
-constexpr uint32_t BLOCK_SIZE_FOR_MXFP8 = 512;
+constexpr uint32_t BLOCK_SIZE_64_FOR_MXFP8 = 64;
+constexpr uint32_t BLOCK_SIZE_128_FOR_MXFP8 = 128;
+constexpr uint32_t BLOCK_SIZE_256_FOR_MXFP8 = 256;
+constexpr uint32_t BLOCK_SIZE_512_FOR_MXFP8 = 512;
 constexpr uint32_t BLOCK_SIZE_1024_FOR_MXFP8 = 1024;
 constexpr uint32_t BLOCK_SIZE_ALIGN_SIZE_16 = 16;
 constexpr uint32_t BLOCK_SIZE_ALIGN_SIZE_128 = 128;

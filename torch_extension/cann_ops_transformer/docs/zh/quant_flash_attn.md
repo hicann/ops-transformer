@@ -907,7 +907,7 @@ mask_mode参数解释
                 <ul>
                     <li>PagedAttention开启情况下，必须传入seqused_kv</li>
                     <li>Paged Attention开启情况下，block_table必须不为空</li>
-                    <li>MxFP8仅支持Bs为512或1024</li>
+                    <li>MxFP8仅支持Bs为64、128、256、512或1024</li>
                 </ul>
             </td>
         </tr>

@@ -643,7 +643,6 @@ private:
         auto &offsetCalculator = srcTensor.offsetCalculator;
         uint32_t curS2Idx = gmCoord.s2Idx;
         uint32_t copyFinishRowCnt = 0;
-        uint32_t blockElementCnt = 32 / sizeof(K_SCALE_T);
         if constexpr (GM_FORMAT == GmFormat::PA_NZ_K_SCALE) {
             while (copyFinishRowCnt < gmCoord.s2DealSize) {
                 // 获取需要拷贝的行数
@@ -652,7 +651,7 @@ private:
                     copyRowCnt = gmCoord.s2DealSize - copyFinishRowCnt; // 一个block未拷满
                 }
                 uint64_t gmOffset = offsetCalculator.GetOffset(gmCoord.bIdx, gmCoord.n2Idx, curS2Idx, gmCoord.dIdx);
-                uint64_t l1Offset = copyFinishRowCnt * blockElementCnt;
+                uint64_t l1Offset = copyFinishRowCnt * gmCoord.dDealSize;
 
                 // 拷贝数据
                 DataCopyParams intriParams;
@@ -673,7 +672,7 @@ private:
                     copyRowCnt = gmCoord.s2DealSize - copyFinishRowCnt; // 一个block未拷满
                 }
                 uint64_t gmOffset = offsetCalculator.GetOffset(gmCoord.bIdx, gmCoord.n2Idx, curS2Idx, gmCoord.dIdx);
-                uint64_t l1Offset = copyFinishRowCnt * blockElementCnt;
+                uint64_t l1Offset = copyFinishRowCnt * gmCoord.dDealSize;
 
                 // 拷贝数据
                 CopySingleMXScaleDNToNZ(dstTensor.tensor[l1Offset], srcTensor.gmTensor[gmOffset], gmCoord.dDealSize,
