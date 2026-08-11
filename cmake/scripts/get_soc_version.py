@@ -151,7 +151,7 @@ class ParserSoc(Parser):
                 for soc in new_options:
                     soc_test_list_append(soc, soc_test_option_lst)
         if len(soc_test_option_lst) == 0:
-            logging.info("lst is empty, trigger soc ascend910b.")
+            logging.info("lst is empty, trigger soc ascend910b")
             return "ascend910b"
         soc_test_ut_str: str = ""
         for soc in soc_test_option_lst:
