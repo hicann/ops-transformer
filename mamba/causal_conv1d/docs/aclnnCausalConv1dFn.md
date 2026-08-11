@@ -31,7 +31,7 @@
   - 场景一（prefill场景 — 固定batch）：
 
     ```Cpp
-    x: [batch, seqLen, dim]，seqLen > 1
+    x: [batch, seqLen, dim]
     weight: [K, dim]，其中K∈{2,3,4}
     convStatesRef: [numCacheLines, stateLen, dim]
     biasOptional: [dim] 或 nullptr
@@ -146,7 +146,7 @@ aclnnStatus aclnnCausalConv1dFn(
       <td>x（aclTensor*）</td>
       <td>输入</td>
       <td>计算公式中的x，代表输入序列。</td>
-      <td><ul><li>不支持空tensor。</li><li>prefill固定batch场景：shape为[batch, seqLen, dim]，seqLen > 1。</li><li>prefill变长场景：shape为[cuSeqLen, dim]。</li></ul></td>
+      <td><ul><li>不支持空tensor。</li><li>prefill固定batch场景：shape为[batch, seqLen, dim]。</li><li>prefill变长场景：shape为[cuSeqLen, dim]。</li></ul></td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>2-3</td>
@@ -404,10 +404,10 @@ aclnnStatus aclnnCausalConv1dFn(
 
 - 输入shape限制：
   - prefill场景（固定batch）：
-    - x为3维[batch, seqLen, dim]，seqLen > 1。
+    - x为3维[batch, seqLen, dim]，seqLen > 0。
     - weight为2维[K, dim]，K∈{2,3,4}。
     - convStatesRef为3维[numCacheLines, stateLen, dim]，stateLen ≥ K-1，numCacheLines ≥ batch。
-    - dim范围[64, 16384]且满足 (dim * dtypeSize) % 32 == 0，batch范围[1, 1024]，seqLen范围[2, 16384]。
+    - dim范围[64, 16384]且满足 (dim * dtypeSize) % 32 == 0，batch范围[1, 1024]。
   - prefill场景（变长序列）：
     - x为2维[cuSeqLen, dim]。
     - queryStartLocOptional为1维[batch+1]，必须提供。
