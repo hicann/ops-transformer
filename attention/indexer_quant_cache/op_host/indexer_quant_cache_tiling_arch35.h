@@ -16,7 +16,6 @@
 #ifndef INDEXER_QUANT_CACHE_TILING_ARCH35_H
 #define INDEXER_QUANT_CACHE_TILING_ARCH35_H
 
-
 #include <vector>
 #include <iostream>
 #include "register/op_impl_registry.h"
@@ -44,23 +43,23 @@ struct TilingOptionalParaInfo {
 BEGIN_TILING_DATA_DEF(IndexerQuantCacheTilingData)
 TILING_DATA_FIELD_DEF(int64_t, bs);
 TILING_DATA_FIELD_DEF(int64_t, d);
-TILING_DATA_FIELD_DEF(int64_t, scaleCol);  // 一行多少个scale
-TILING_DATA_FIELD_DEF(int64_t, rowOfFormerBlock);  // 头核共需要处理多少行
-TILING_DATA_FIELD_DEF(int64_t, rowOfTailBlock);  // 尾核共需要处理多少行
-TILING_DATA_FIELD_DEF(int64_t, rowLoopOfFormerBlock);   // 头核需要几次ub搬入
-TILING_DATA_FIELD_DEF(int64_t, rowLoopOfTailBlock);  // 尾核需要几次ub搬入
-TILING_DATA_FIELD_DEF(int64_t, rowFactor);  // ub一次标准处理行数
-TILING_DATA_FIELD_DEF(int64_t, tailRowFactorOfFormerBlock);  // 头核最后一次ub处理行数
-TILING_DATA_FIELD_DEF(int64_t, tailRowFactorOfTailBlock);  // 尾核最后一次ub处理行数
+TILING_DATA_FIELD_DEF(int64_t, scaleCol);                   // 一行多少个scale
+TILING_DATA_FIELD_DEF(int64_t, rowOfFormerBlock);           // 头核共需要处理多少行
+TILING_DATA_FIELD_DEF(int64_t, rowOfTailBlock);             // 尾核共需要处理多少行
+TILING_DATA_FIELD_DEF(int64_t, rowLoopOfFormerBlock);       // 头核需要几次ub搬入
+TILING_DATA_FIELD_DEF(int64_t, rowLoopOfTailBlock);         // 尾核需要几次ub搬入
+TILING_DATA_FIELD_DEF(int64_t, rowFactor);                  // ub一次标准处理行数
+TILING_DATA_FIELD_DEF(int64_t, tailRowFactorOfFormerBlock); // 头核最后一次ub处理行数
+TILING_DATA_FIELD_DEF(int64_t, tailRowFactorOfTailBlock);   // 尾核最后一次ub处理行数
 TILING_DATA_FIELD_DEF(int64_t, quantMode);
 TILING_DATA_FIELD_DEF(int64_t, roundScale);
 TILING_DATA_FIELD_DEF(float, scalesAttr);
 // 4D paged layout [blockNum, blockSize, 1, headDim]; blockNum non-contiguous.
-TILING_DATA_FIELD_DEF(int64_t, blockSize);          // blockSize dim (1 => contiguous flat slots)
-TILING_DATA_FIELD_DEF(int64_t, cacheRowStride);     // per-position stride of cache (= headDim elems)
-TILING_DATA_FIELD_DEF(int64_t, cacheBlockStride);   // per-block (blockNum) stride of cache
-TILING_DATA_FIELD_DEF(int64_t, scaleRowStride);     // per-position stride of scale (= scaleCol)
-TILING_DATA_FIELD_DEF(int64_t, scaleBlockStride);   // per-block (blockNum) stride of scale
+TILING_DATA_FIELD_DEF(int64_t, blockSize);        // blockSize dim (1 => contiguous flat slots)
+TILING_DATA_FIELD_DEF(int64_t, cacheRowStride);   // per-position stride of cache (= headDim elems)
+TILING_DATA_FIELD_DEF(int64_t, cacheBlockStride); // per-block (blockNum) stride of cache
+TILING_DATA_FIELD_DEF(int64_t, scaleRowStride);   // per-position stride of scale (= scaleCol)
+TILING_DATA_FIELD_DEF(int64_t, scaleBlockStride); // per-block (blockNum) stride of scale
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(IndexerQuantCache, IndexerQuantCacheTilingData)
@@ -74,7 +73,8 @@ struct IndexerQuantCacheCompileInfo {
 // ----------算子Tiling入参信息解析及check类----------
 class IndexerQuantCacheTiling {
 public:
-    explicit IndexerQuantCacheTiling(gert::TilingContext* tilingContext) : context_(tilingContext)
+    explicit IndexerQuantCacheTiling(gert::TilingContext *tilingContext)
+        : context_(tilingContext)
     {
     }
     ~IndexerQuantCacheTiling() = default;
@@ -90,6 +90,9 @@ public:
     // 4D-only 契约门禁: 校验 inputIdx 张量逻辑 shape 恰为 4D [blockNum, blockSize, 1, headDim]
     // (倒数第二维 == 1), 并回传其末维(headDim, 张量自身元素单位)。失败返回 GRAPH_FAILED。
     ge::graphStatus ValidateCache4D(size_t inputIdx, const char *name, int64_t &lastDim);
+    // MX-FP4 模式下校验 stride(fp4元素单位) 必须为偶数, 否则半字节偏移无法表达
+    ge::graphStatus CheckMxfp4EvenStride(int64_t stride, const char *name);
+
 private:
     gert::TilingContext *context_ = nullptr;
     IndexerQuantCacheTilingData tilingData_;
@@ -119,5 +122,5 @@ private:
     int64_t tilingKey_ = 0;
 };
 
-}  // namespace optiling
-#endif  // INDEXER_QUANT_CACHE_TILING_ARCH35_H
+} // namespace optiling
+#endif // INDEXER_QUANT_CACHE_TILING_ARCH35_H

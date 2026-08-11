@@ -263,6 +263,7 @@ aclnnStatus aclnnIndexerQuantCache(
 - cache/cacheScale**仅在blockNum维支持非连续**（分页）：各block可不紧密排布，但block内（blockSize、headDim维）须连续。
 - **headDim长度约束**：
   - **cache.headDim ≥ d**（MX-FP4模式以fp4元素计，d个fp4值占 ⌈d/2⌉ 字节）。
+  - **MX-FP4（quantMode=3）模式下，cache.headDim 必须为偶数**。
   - **cacheScale.headDim ≥ scaleCol**，scaleCol：MX-FP8/MX-FP4（quantMode=0/3）为 ⌈d/32⌉；Normal/HiFloat8（quantMode=1/2）为 1。
   - 示例：d=128、quantMode=0 → scaleCol=4 → cache.headDim ≥ 128 且 cacheScale.headDim ≥ 4。
 - x的最后一维（d轴）须能被32整除且 d ≤ 8192。
