@@ -16,13 +16,13 @@
 #pragma once
 
 #include "fa_tiling_info.h"
-#include "fa_tiling_shape.h"
 
 namespace optiling {
 namespace flash_attn {
 class FaInfoParser {
 public:
-    explicit FaInfoParser(const gert::TilingContext *context) : context_(context)
+    explicit FaInfoParser(const gert::TilingContext *context)
+        : context_(context)
     {
     }
     ~FaInfoParser() = default;

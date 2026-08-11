@@ -22,6 +22,7 @@
 #include <vector>
 #include <cstdint>
 #include "../../common/op_host/fia_tiling_base.h"
+#include "../../common/op_host/fia_tiling_shape.h"
 
 namespace optiling {
 namespace flash_attn {
@@ -71,16 +72,16 @@ constexpr uint32_t ATTN_MASK_INDEX = 9;
 constexpr uint32_t METADATA_INDEX = 10;
 
 // Attributes Index
-constexpr uint32_t ATTR_SOFTMAX_SCALE_INDEX = 0;  // softmax_mode (scaleValue)
-constexpr uint32_t ATTR_MASK_MODE_INDEX = 1;      // mask_mode
-constexpr uint32_t ATTR_WIN_LEFT_INDEX = 2;       // win_left (preToken)
-constexpr uint32_t ATTR_WIN_RIGHT_INDEX = 3;      // win_right (nextToken)
-constexpr uint32_t ATTR_MAX_SEQLEN_Q_INDEX = 4;   // max_seqlen_q
-constexpr uint32_t ATTR_MAX_SEQLEN_KV_INDEX = 5;  // max_seqlen_kv
-constexpr uint32_t ATTR_LAYOUT_Q_INDEX = 6;       // layout_q
-constexpr uint32_t ATTR_LAYOUT_KV_INDEX = 7;      // layout_kv
-constexpr uint32_t ATTR_LAYOUT_OUT_INDEX = 8;     // layout_out
-constexpr uint32_t ATTR_RETURN_LSE_INDEX = 9;     // return_softmax_lse
+constexpr uint32_t ATTR_SOFTMAX_SCALE_INDEX = 0; // softmax_mode (scaleValue)
+constexpr uint32_t ATTR_MASK_MODE_INDEX = 1;     // mask_mode
+constexpr uint32_t ATTR_WIN_LEFT_INDEX = 2;      // win_left (preToken)
+constexpr uint32_t ATTR_WIN_RIGHT_INDEX = 3;     // win_right (nextToken)
+constexpr uint32_t ATTR_MAX_SEQLEN_Q_INDEX = 4;  // max_seqlen_q
+constexpr uint32_t ATTR_MAX_SEQLEN_KV_INDEX = 5; // max_seqlen_kv
+constexpr uint32_t ATTR_LAYOUT_Q_INDEX = 6;      // layout_q
+constexpr uint32_t ATTR_LAYOUT_KV_INDEX = 7;     // layout_kv
+constexpr uint32_t ATTR_LAYOUT_OUT_INDEX = 8;    // layout_out
+constexpr uint32_t ATTR_RETURN_LSE_INDEX = 9;    // return_softmax_lse
 
 // Legacy aliases for backward compatibility
 constexpr uint32_t ATTR_SCALE_INDEX = ATTR_SOFTMAX_SCALE_INDEX;
@@ -108,16 +109,12 @@ enum class MaskMode : int32_t {
     BAND = 4
 };
 
-enum class FaLayout : uint32_t {
-    BSND = 0,
-    BNSD = 1,
-    TND = 2,
-    PA_BBND = 3,
-    PA_BNBD = 4,
-    PA_NZ = 5,
-    LSE_BNS = 6,
-    LSE_NT = 7
-};
+using FaLayout = FiaLayout;
+using FaAxis = FiaAxis;
+using FaCompareType = FiaCompareType;
+using FaTilingShapeCompareParam = FiaTilingShapeCompareParam;
+using FaTilingShape = FiaTilingShape;
+using FaTilingShapeCompare = FiaTilingShapeCompare;
 
 const std::map<std::string, FaLayout> layoutMap = {{"BSND", FaLayout::BSND},
                                                    {"BNSD", FaLayout::BNSD},
@@ -125,22 +122,6 @@ const std::map<std::string, FaLayout> layoutMap = {{"BSND", FaLayout::BSND},
                                                    {"PA_BBND", FaLayout::PA_BBND},
                                                    {"PA_BNBD", FaLayout::PA_BNBD},
                                                    {"PA_NZ", FaLayout::PA_NZ}};
-
-enum class FaAxis : uint32_t {
-    B = 0,
-    S = 1,
-    N = 2,
-    D = 3,
-    H = 4,
-    T = 5,
-    D1 = 6,
-    D0 = 7,
-    S1 = 8,
-    S2 = 9,
-    Bn = 10,
-    Bs = 11,
-    CONST = 12
-};
 
 enum class FaQuantMode : uint32_t {
     NO_QUANT = 0,
@@ -162,8 +143,6 @@ enum class FaTilingInOutMode : uint32_t {
 // Function declarations
 // ============================================================
 
-std::string LayoutToSerialString(FaLayout layout);
-std::string AxisToSerialString(FaAxis axis);
 std::string QuantModeToSerialString(FaQuantMode faQuantMode);
 
 // ============================================================
@@ -422,9 +401,12 @@ const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {{ge::DT_UNDE
                                                                     {ge::DT_FLOAT4_E2M1, "DT_FLOAT4_E2M1"}};
 
 const std::map<std::string, std::vector<ge::DataType>> DTYPE_SUPPORT_MAP = {
-    {QUERY_NAME, {ge::DT_FLOAT16, ge::DT_BF16}}, {KEY_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
-    {VALUE_NAME, {ge::DT_FLOAT16, ge::DT_BF16}}, {ATTN_MASK_NAME, {ge::DT_INT8}},
-    {BLOCK_TABLE_NAME, {ge::DT_INT32}},          {ATTN_OUT_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
+    {QUERY_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
+    {KEY_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
+    {VALUE_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
+    {ATTN_MASK_NAME, {ge::DT_INT8}},
+    {BLOCK_TABLE_NAME, {ge::DT_INT32}},
+    {ATTN_OUT_NAME, {ge::DT_FLOAT16, ge::DT_BF16}},
     {SOFTMAX_LSE_NAME, {ge::DT_FLOAT}},
 };
 

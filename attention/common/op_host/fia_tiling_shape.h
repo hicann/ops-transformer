@@ -53,6 +53,12 @@ enum class FiaLayout : uint32_t {
     IS1S2 = 20,
     I1S1S2 = 21,
     S1S1 = 22,
+    // flash_attn layouts
+    PA_BBND = 23,
+    PA_BNBD = 24,
+    PA_NZ = 25,
+    LSE_BNS = 26,
+    LSE_NT = 27,
 };
 
 enum class FiaAxis : uint32_t {
@@ -97,7 +103,7 @@ struct FiaTilingShapeCompareParam {
     std::map<FiaAxis, FiaCompareType> compareTypeMap = {};
 };
 
-static std::string GetShapeStr(gert::Shape shape)
+[[maybe_unused]] static std::string GetShapeStr(gert::Shape shape)
 {
     std::ostringstream oss;
     oss << "[";
@@ -120,7 +126,10 @@ class FiaTilingShape {
 public:
     FiaTilingShape(const gert::Shape &shape, FiaLayout layout, std::string name, std::string opName,
                    int64_t N = std::numeric_limits<int64_t>::min())
-        : shape_(shape), layout_(layout), name_(name), opName_(opName)
+        : shape_(shape),
+          layout_(layout),
+          name_(name),
+          opName_(opName)
     {
         if (HasShapeH() && N != std::numeric_limits<int64_t>::min()) {
             N_ = N;
@@ -228,6 +237,10 @@ public:
     {
         return GetAxisNum(FiaAxis::Bs);
     }
+    int64_t GetShapeBlockNum() const
+    {
+        return GetAxisNum(FiaAxis::Bn);
+    }
 
     ge::graphStatus CheckHasShapeB(const std::string &funcName) const
     {
@@ -257,6 +270,10 @@ public:
     {
         return CheckHasAxis(FiaAxis::Bs, funcName);
     }
+    ge::graphStatus CheckHasShapeBlockNum(const std::string &funcName) const
+    {
+        return CheckHasAxis(FiaAxis::Bn, funcName);
+    }
 
 private:
     bool HasAxis(const FiaAxis &axis) const;
@@ -270,7 +287,10 @@ class FiaTilingShapeCompare {
 
 public:
     FiaTilingShapeCompare(const gert::Shape &shape, FiaLayout layout, std::string name, std::string opName)
-        : shape_(shape), layout_(layout), name_(name), opName_(opName) {};
+        : shape_(shape),
+          layout_(layout),
+          name_(name),
+          opName_(opName) {};
 
 public:
     const gert::Shape &shape_;

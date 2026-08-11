@@ -21,7 +21,6 @@
 #include "tiling/tiling_api.h"
 
 #include "../fa_tiling_info.h"
-#include "../fa_tiling_shape.h"
 #include "../flash_attn_tiling_utils.h"
 
 namespace optiling {
