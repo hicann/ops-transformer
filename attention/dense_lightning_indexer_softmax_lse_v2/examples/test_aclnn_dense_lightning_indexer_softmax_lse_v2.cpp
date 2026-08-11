@@ -136,7 +136,7 @@ int main()
     std::vector<aclFloat16> qIndexHostData(B * S1 * N1 * D, aclFloatToFloat16(0.2));
     std::vector<aclFloat16> kIndexHostData(B * S2 * 1 * D, aclFloatToFloat16(0.1));
     std::vector<float> weightHostData(B * S1 * N1, 0.005f);
-    std::vector<float> softmaxLseHostData(B * S1, 0.0f);
+    std::vector<float> softmaxLseHostData(B * N2 * S1, 0.0f);
 
     // 前置metadata算子输出的分核负载均衡信息，shape (64,)，dtype int32
     std::vector<int32_t> metadataHostData(64, 0);

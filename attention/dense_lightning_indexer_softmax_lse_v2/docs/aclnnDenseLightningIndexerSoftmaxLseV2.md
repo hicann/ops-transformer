@@ -183,9 +183,9 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
      </tr>
      <tr>
       <td>metadataOptional（aclTensor*）</td>
-      <td>可选输入</td>
+      <td>输入</td>
       <td>前置 AICPU 算子输出的分核负载均衡信息。</td>
-      <td><ul><li>支持空 Tensor。</li><li>由 aclnnDenseLightningIndexerSoftmaxLseV2Metadata 算子输出，减少 tiling 阶段对 host array 的访问。</li></ul></td>
+      <td><ul><li>必须传入。由 aclnnDenseLightningIndexerSoftmaxLseV2Metadata 算子输出，减少 tiling 阶段对 host array 的访问。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape 为 (64,)</td>
@@ -557,7 +557,7 @@ int main() {
   std::vector<aclFloat16> qIndexHostData(B * S1 * N1 * D, aclFloatToFloat16(0.2));
   std::vector<aclFloat16> kIndexHostData(B * S2 * 1 * D, aclFloatToFloat16(0.1));
   std::vector<float> weightHostData(B * S1 * N1, 0.005f);
-  std::vector<float> softmaxLseHostData(B * S1, 0.0f);
+  std::vector<float> softmaxLseHostData(B * N2 * S1, 0.0f);
   std::vector<int32_t> metadataHostData(64, 0);
 
   ret = CreateAclTensor(qIndexHostData, qIndexShape, &qIndexDeviceAddr, aclDataType::ACL_FLOAT16, &qIndex);
