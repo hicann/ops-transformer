@@ -98,6 +98,7 @@ TILING_DATA_FIELD_DEF(bool, qDownOutFlag);
 TILING_DATA_FIELD_DEF(int64_t, kvCacheBlockSize);
 TILING_DATA_FIELD_DEF(int64_t, kvCacheStride0);
 TILING_DATA_FIELD_DEF(int64_t, kvCacheRopeStride0);
+TILING_DATA_FIELD_DEF(bool, enableRope);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(MlaPreprocess, MlaTilingData)
 REGISTER_TILING_DATA_CLASS(MlaPreprocessV2, MlaTilingData)

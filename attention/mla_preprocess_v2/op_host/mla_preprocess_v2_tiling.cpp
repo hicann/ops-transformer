@@ -28,7 +28,10 @@ namespace optiling {
 ASCENDC_EXTERN_C ge::graphStatus TilingMLAPreprocessV2(gert::TilingContext *context)
 {
     MlaPreprocessTiling mlaTiling;
-    mlaTiling.Init(context);
+    auto status = mlaTiling.Init(context);
+    if (status != ge::GRAPH_SUCCESS) {
+        return status;
+    }
     bool qDownOutFlag = *(context->GetAttrs()->GetAttrPointer<bool>(ATTR_Q_DOWN_OUT_FLAG_IDX));
     mlaTiling.mlaTilingData.set_qDownOutFlag(qDownOutFlag);
     mlaTiling.mlaTilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());

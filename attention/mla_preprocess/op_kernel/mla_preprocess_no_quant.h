@@ -57,6 +57,7 @@ public:
         headNumQ = ropeConcatParams.headNumQ;
         nopeDim_ = ropeConcatParams.mm3.k;
         headDimMm2_ = nopeDim_ + ROPE_SPLIT_SIZE_ONE;
+        enableRope_ = ropeConcatParams.enableRope;
         rotaryCoeff = ropeConcatParams.rotaryCoeff;
         ntokens = ropeConcatParams.ntokens;
         realCore = ropeConcatParams.realCore;
@@ -101,7 +102,11 @@ public:
         if (blockIdx_ >= realCore)
         {
             return;
-        }   
+        }
+        if (!enableRope_) {
+            ProcessRawQ();
+            return;
+        }
         uint64_t startCoreLineIndex = this->blockIdx_ * this->nlCoreRun; // 当前核处理head起始位置
         ExpandNeg(negLocal, this->maxNPerLoopForUb);
         // 遍历处理每轮数据
@@ -161,6 +166,34 @@ public:
             uint64_t outQOffset2 = startHead * this->headDim;
             SET_FLAG(V, MTE3, EVENT_ID1);
             WAIT_FLAG(V, MTE3, EVENT_ID1);
+            if constexpr (CacheMode == CACHE_MODE_KVCACHE) {
+                AscendC::DataCopy(this->outRopeConcatGm_[outQOffset], inputQ, {loopN, headBlockLen, 0, concatBlockLen});
+            } else {
+                AscendC::DataCopy(this->outRopeConcatGm2_[outQOffset2], inputQ, loopN * this->headDim);
+            }
+            SET_FLAG(MTE3, MTE2, EVENT_ID1);
+        }
+        WAIT_FLAG(MTE3, MTE2, EVENT_ID1);
+    }
+
+    __aicore__ inline void ProcessRawQ()
+    {
+        uint64_t startCoreLineIndex = this->blockIdx_ * this->nlCoreRun;
+        SET_FLAG(MTE3, MTE2, EVENT_ID1);
+        for (uint32_t zz = 0; zz < this->loopTime; ++zz) {
+            uint16_t loopN = (zz == this->loopTime - 1) ? this->lastLoopN : this->maxNPerLoopForUb;
+            uint64_t startHead = startCoreLineIndex + zz * this->maxNPerLoopForUb;
+            uint64_t qOffset = startHead * headDimMm2_ + nopeDim_;
+
+            SET_FLAG(S, MTE2, EVENT_ID1);
+            WAIT_FLAG(S, MTE2, EVENT_ID1);
+            WAIT_FLAG(MTE3, MTE2, EVENT_ID1);
+            AscendC::DataCopy(inputQ, this->qGm_[qOffset],
+                              {loopN, headBlockLen, static_cast<uint16_t>(nopeDim_ / ELE_NUM_FP16), 0});
+            SET_FLAG(MTE2, MTE3, EVENT_ID1);
+            uint64_t outQOffset = startHead * outLineOffset + this->concatSize;
+            uint64_t outQOffset2 = startHead * this->headDim;
+            WAIT_FLAG(MTE2, MTE3, EVENT_ID1);
             if constexpr (CacheMode == CACHE_MODE_KVCACHE) {
                 AscendC::DataCopy(this->outRopeConcatGm_[outQOffset], inputQ, {loopN, headBlockLen, 0, concatBlockLen});
             } else {
@@ -238,6 +271,7 @@ private:
     uint32_t headNumQ;
     uint32_t nopeDim_;
     uint32_t headDimMm2_;
+    bool enableRope_{true};
     uint32_t rotaryCoeff;
     uint32_t ntokens;
     uint32_t realCore;
@@ -2096,10 +2130,12 @@ private:
                 continue;
             }
             AscendC::DataCopy(srcTensor, s3GmTensor[offset], SPLIT_SIZE_ONE);
-            AscendC::DataCopy(sinTensor, sin1GmTensor[(row_work * vectorBlockIdx + loop) * SPLIT_RMSNRORM_SIZE_TWO],
-                              SPLIT_RMSNRORM_SIZE_TWO);
-            AscendC::DataCopy(cosTensor, cos1GmTensor[(row_work * vectorBlockIdx + loop) * SPLIT_RMSNRORM_SIZE_TWO],
-                              SPLIT_RMSNRORM_SIZE_TWO);
+            if (mlaParams.enableRope) {
+                AscendC::DataCopy(sinTensor, sin1GmTensor[(row_work * vectorBlockIdx + loop) * SPLIT_RMSNRORM_SIZE_TWO],
+                                  SPLIT_RMSNRORM_SIZE_TWO);
+                AscendC::DataCopy(cosTensor, cos1GmTensor[(row_work * vectorBlockIdx + loop) * SPLIT_RMSNRORM_SIZE_TWO],
+                                  SPLIT_RMSNRORM_SIZE_TWO);
+            }
             SET_FLAG(MTE2, V, EVENT_ID0);
             uint64_t cacheSlot = static_cast<uint64_t>(slotValue);
             uint64_t cacheStart = GetCacheOffset(cacheSlot, SPLIT_SIZE_ONE, kv_cache_stride0_);
@@ -2149,26 +2185,34 @@ private:
             uint64_t revertOffset = SPLIT_RMSNRORM_SIZE_TWO / 2;
             Cast(ropeKTensor, srcTensor[SPLIT_RMSNRORM_SIZE_ONE], AscendC::RoundMode::CAST_NONE,
                  SPLIT_RMSNRORM_SIZE_TWO);
-            Cast(ropeKRevertTensor[revertOffset], srcTensor[SPLIT_RMSNRORM_SIZE_ONE], AscendC::RoundMode::CAST_NONE,
-                 revertOffset);
-            Cast(ropeKRevertTensor, srcTensor[SPLIT_RMSNRORM_SIZE_ONE + revertOffset], AscendC::RoundMode::CAST_NONE,
-                 revertOffset);
-            Duplicate(calTensor, static_cast<float>(-1), revertOffset);
-            Duplicate(calTensor[revertOffset], static_cast<float>(1), revertOffset);
-            AscendC::PipeBarrier<PIPE_V>();
-            Cast(calTensor[SPLIT_RMSNRORM_SIZE_TWO], cosTensor, AscendC::RoundMode::CAST_NONE, SPLIT_RMSNRORM_SIZE_TWO);
-            Cast(calTensor[SPLIT_RMSNRORM_SIZE_TWO * 2], sinTensor, AscendC::RoundMode::CAST_NONE,
-                 SPLIT_RMSNRORM_SIZE_TWO);
-            AscendC::PipeBarrier<PIPE_V>();
-            Mul(ropeKTensor, calTensor[SPLIT_RMSNRORM_SIZE_TWO], ropeKTensor, SPLIT_RMSNRORM_SIZE_TWO);
-            Mul(ropeKRevertTensor, calTensor[SPLIT_RMSNRORM_SIZE_TWO * 2], ropeKRevertTensor, SPLIT_RMSNRORM_SIZE_TWO);
-            AscendC::PipeBarrier<PIPE_V>();
-            Mul(ropeKRevertTensor, calTensor, ropeKRevertTensor, SPLIT_RMSNRORM_SIZE_TWO);
-            AscendC::PipeBarrier<PIPE_V>();
-            Add(ropeKRevertTensor, ropeKTensor, ropeKRevertTensor, SPLIT_RMSNRORM_SIZE_TWO);
-            AscendC::PipeBarrier<PIPE_V>();
-            Cast(outTmpTensor[SPLIT_RMSNRORM_SIZE_ONE], ropeKRevertTensor, AscendC::RoundMode::CAST_RINT,
-                 SPLIT_RMSNRORM_SIZE_TWO);
+            if (mlaParams.enableRope) {
+                Cast(ropeKRevertTensor[revertOffset], srcTensor[SPLIT_RMSNRORM_SIZE_ONE], AscendC::RoundMode::CAST_NONE,
+                     revertOffset);
+                Cast(ropeKRevertTensor, srcTensor[SPLIT_RMSNRORM_SIZE_ONE + revertOffset],
+                     AscendC::RoundMode::CAST_NONE, revertOffset);
+                Duplicate(calTensor, static_cast<float>(-1), revertOffset);
+                Duplicate(calTensor[revertOffset], static_cast<float>(1), revertOffset);
+                AscendC::PipeBarrier<PIPE_V>();
+                Cast(calTensor[SPLIT_RMSNRORM_SIZE_TWO], cosTensor, AscendC::RoundMode::CAST_NONE,
+                     SPLIT_RMSNRORM_SIZE_TWO);
+                Cast(calTensor[SPLIT_RMSNRORM_SIZE_TWO * 2], sinTensor, AscendC::RoundMode::CAST_NONE,
+                     SPLIT_RMSNRORM_SIZE_TWO);
+                AscendC::PipeBarrier<PIPE_V>();
+                Mul(ropeKTensor, calTensor[SPLIT_RMSNRORM_SIZE_TWO], ropeKTensor, SPLIT_RMSNRORM_SIZE_TWO);
+                Mul(ropeKRevertTensor, calTensor[SPLIT_RMSNRORM_SIZE_TWO * 2], ropeKRevertTensor,
+                    SPLIT_RMSNRORM_SIZE_TWO);
+                AscendC::PipeBarrier<PIPE_V>();
+                Mul(ropeKRevertTensor, calTensor, ropeKRevertTensor, SPLIT_RMSNRORM_SIZE_TWO);
+                AscendC::PipeBarrier<PIPE_V>();
+                Add(ropeKRevertTensor, ropeKTensor, ropeKRevertTensor, SPLIT_RMSNRORM_SIZE_TWO);
+                AscendC::PipeBarrier<PIPE_V>();
+                Cast(outTmpTensor[SPLIT_RMSNRORM_SIZE_ONE], ropeKRevertTensor, AscendC::RoundMode::CAST_RINT,
+                     SPLIT_RMSNRORM_SIZE_TWO);
+            } else {
+                AscendC::PipeBarrier<PIPE_V>();
+                Cast(outTmpTensor[SPLIT_RMSNRORM_SIZE_ONE], ropeKTensor, AscendC::RoundMode::CAST_RINT,
+                     SPLIT_RMSNRORM_SIZE_TWO);
+            }
             /* Rope K end */
             // reshapeAndcache
             SET_FLAG(V, MTE3, EVENT_ID0);

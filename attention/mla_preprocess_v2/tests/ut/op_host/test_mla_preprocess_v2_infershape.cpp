@@ -15,7 +15,23 @@
 #include "infer_shape_case_executor.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 
-class MlaPreprocessV2Proto : public testing::Test {
+namespace {
+gert::StorageShape MakeStorageShape(const std::vector<int64_t> &dims)
+{
+    gert::StorageShape shape;
+    auto &originShape = shape.MutableOriginShape();
+    auto &storageShape = shape.MutableStorageShape();
+    originShape.SetDimNum(dims.size());
+    storageShape.SetDimNum(dims.size());
+    for (size_t i = 0; i < dims.size(); ++i) {
+        originShape.SetDim(i, dims[i]);
+        storageShape.SetDim(i, dims[i]);
+    }
+    return shape;
+}
+} // namespace
+
+class MlaPreprocessV2Proto : public testing::TestWithParam<int> {
 protected:
     static void SetUpTestCase()
     {
@@ -28,10 +44,12 @@ protected:
     }
 };
 
-
-TEST_F(MlaPreprocessV2Proto, mla_preprocess_v2_infershape_1)
+TEST_P(MlaPreprocessV2Proto, mla_preprocess_v2_infershape_1)
 {
-    int64_t tokenNum = 8;
+    // 0: both [tokenNum, 64], 1: both [0], 2: mismatched, 3: token dimension mismatch,
+    // 4: tokenNum is zero and both [0, 64] (valid RoPE-on input).
+    const int ropeInputMode = GetParam();
+    int64_t tokenNum = ropeInputMode == 4 ? 0 : 8;
     int64_t hiddenNum = 7168;
     int64_t headNum = 32;
     int64_t blockNum = 192;
@@ -51,6 +69,17 @@ TEST_F(MlaPreprocessV2Proto, mla_preprocess_v2_infershape_1)
     bool doRmsNorm = true;
     bool qDownOutFlag = true;
     int64_t wdkvSplitCount = 1;
+    const std::vector<int64_t> normalRopeShape = {tokenNum, 64};
+    const std::vector<int64_t> disabledRopeShape = {0};
+    const std::vector<int64_t> tokenMismatchShape = {0, 64};
+    const std::vector<int64_t> cosShape =
+        ropeInputMode == 0 || ropeInputMode == 2 || ropeInputMode == 4
+            ? normalRopeShape
+            : (ropeInputMode == 1 ? disabledRopeShape : tokenMismatchShape);
+    const std::vector<int64_t> sinShape =
+        ropeInputMode == 0 || ropeInputMode == 4
+            ? normalRopeShape
+            : (ropeInputMode == 1 || ropeInputMode == 2 ? disabledRopeShape : tokenMismatchShape);
     gert::InfershapeContextPara infershapeContextPara(
         "MlaPreprocessV2",
         {
@@ -72,8 +101,8 @@ TEST_F(MlaPreprocessV2Proto, mla_preprocess_v2_infershape_1)
             {{{headNum * 192}, {headNum * 192}}, ge::DT_INT64, ge::FORMAT_ND},                    // deScale1
             {{{headNum * 192}, {headNum * 192}}, ge::DT_INT32, ge::FORMAT_ND},                    // bias1
             {{{512}, {512}}, ge::DT_FLOAT16, ge::FORMAT_ND},                                      // gamma2
-            {{{tokenNum, 64}, {tokenNum, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},                    // cos
-            {{{tokenNum, 64}, {tokenNum, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},                    // sin
+            {MakeStorageShape(cosShape), ge::DT_FLOAT16, ge::FORMAT_ND},                              // cos
+            {MakeStorageShape(sinShape), ge::DT_FLOAT16, ge::FORMAT_ND},                              // sin
             {{{headNum, 128, 512}, {headNum, 128, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},          // wuk
             {{{blockNum, blockSize, 1, 576}, {blockNum, blockSize, 1, 576}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // kvCache
             {{{blockNum, blockSize, 1, 64}, {blockNum, blockSize, 1, 64}},
@@ -103,10 +132,14 @@ TEST_F(MlaPreprocessV2Proto, mla_preprocess_v2_infershape_1)
             {"cacheMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
             {"quantMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"doRmsNorm", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
-            {"qDownOutFlag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
             {"wdkvSplitCount", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"qDownOutFlag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
         });
     std::vector<std::vector<int64_t>> expectOutputShape = {
         {tokenNum, 1536, 512}, {blockNum, blockSize, 1, 576}, {tokenNum, headNum, 64}, {blockNum, blockSize, 1, 64}};
-    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
+    ExecuteTestCase(infershapeContextPara, ropeInputMode == 2 || ropeInputMode == 3 ? ge::GRAPH_FAILED
+                                                                                   : ge::GRAPH_SUCCESS,
+                    expectOutputShape);
 }
+
+INSTANTIATE_TEST_SUITE_P(RopeModes, MlaPreprocessV2Proto, testing::Values(0, 1, 2, 3, 4));

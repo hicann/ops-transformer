@@ -29,8 +29,7 @@ mla_preprocess_v2(GM_ADDR hiddenStateGm, GM_ADDR gamma1Gm, GM_ADDR beta1Gm, GM_A
                   GM_ADDR keycacheOutGm, GM_ADDR qGm2, GM_ADDR keycacheOutGm2, GM_ADDR qDownGm, GM_ADDR workspace,
                   GM_ADDR tiling);
 
-
-class mla_preprocess_v2_test : public testing::Test {
+class mla_preprocess_v2_test : public testing::TestWithParam<bool> {
 protected:
     static void SetUpTestCase()
     {
@@ -42,8 +41,9 @@ protected:
     }
 };
 
-TEST_F(mla_preprocess_v2_test, test_case_0)
+TEST_P(mla_preprocess_v2_test, test_case_0)
 {
+    const bool enableRope = GetParam();
     AscendC::SetKernelMode(KernelMode::MIX_MODE);
 
     size_t tokenNum = 8;
@@ -217,12 +217,14 @@ TEST_F(mla_preprocess_v2_test, test_case_0)
     tilingData->epsilon = 1e-5f;
     tilingData->doRmsNorm = true;
     tilingData->qDownOutFlag = true;
+    tilingData->enableRope = enableRope;
 
     ICPU_SET_TILING_KEY(56);
     ICPU_RUN_KF(mla_preprocess_v2, blockDim, hiddenStateGm, gamma1Gm, beta1Gm, quantScale1Gm, quantOffset1Gm, wdqkvGm,
                 descale1Gm, bias1Gm, gamma2Gm, beta2Gm, quantScale2Gm, quantOffset2Gm, wuqGm, descale2Gm, bias2Gm,
-                gamma3Gm, cos1Gm, sin1Gm, wukGm, keycacheGm, keycacheRopeGm, slotMappingGm, gmCtkvScale, gmQnopeScale,
-                qGm, keycacheOutGm, qGm2, keycacheOutGm2, qDownGm, workspace, (uint8_t *)(tilingData));
+                gamma3Gm, enableRope ? cos1Gm : nullptr, enableRope ? sin1Gm : nullptr, wukGm, keycacheGm,
+                keycacheRopeGm, slotMappingGm, gmCtkvScale, gmQnopeScale, qGm, keycacheOutGm, qGm2, keycacheOutGm2,
+                qDownGm, workspace, (uint8_t *)(tilingData));
 
     AscendC::GmFree(hiddenStateGm);
     AscendC::GmFree(gamma1Gm);
@@ -259,3 +261,5 @@ TEST_F(mla_preprocess_v2_test, test_case_0)
 
     free(path_);
 }
+
+INSTANTIATE_TEST_SUITE_P(RopeModes, mla_preprocess_v2_test, testing::Bool());

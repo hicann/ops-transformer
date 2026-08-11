@@ -51,6 +51,11 @@ mla_preprocess_v2(GM_ADDR hiddenStateGm, GM_ADDR gamma1Gm, GM_ADDR beta1Gm, GM_A
     SetNdpara(1, 0, 0);
 #endif
     GET_TILING_DATA(tilingData, tiling);
+    // Reuse a valid input as the unused RoPE address when cos and sin are absent.
+    if (!tilingData.enableRope) {
+        cos1Gm = hiddenStateGm;
+        sin1Gm = hiddenStateGm;
+    }
     auto s1Gm = AscendC::GetUserWorkspace(workspace);
     auto s2Gm = s1Gm + tilingData.maxWorkspaceSize;
     auto s3Gm = s2Gm + tilingData.maxWorkspaceSize;

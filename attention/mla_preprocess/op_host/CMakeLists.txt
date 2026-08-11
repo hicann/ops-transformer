@@ -10,7 +10,7 @@
 add_op_to_compiled_list()
 
 if (BUILD_OPEN_PROJECT)
-    target_sources(op_host_aclnn PRIVATE
+    target_sources(op_host_aclnnInner PRIVATE
             mla_preprocess_def.cpp
     )
 
@@ -22,7 +22,9 @@ if (BUILD_OPEN_PROJECT)
     )
 endif()
 if(NOT BUILD_OPS_RTY_KERNEL)
-    add_modules_sources(OPTYPE mla_preprocess ACLNNTYPE aclnn)
+    add_modules_sources(
+        OP_API_INDEPENDENT ON
+        OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
+        OPTYPE mla_preprocess ACLNNTYPE aclnn_inner)
 
 endif()
-

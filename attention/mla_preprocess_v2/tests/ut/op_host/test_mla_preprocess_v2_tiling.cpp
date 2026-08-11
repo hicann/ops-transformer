@@ -17,7 +17,23 @@
 using namespace std;
 using namespace ge;
 
-class MlaPreprocessTilingV2 : public testing::Test {
+namespace {
+gert::StorageShape MakeStorageShape(const std::vector<int64_t> &dims)
+{
+    gert::StorageShape shape;
+    auto &originShape = shape.MutableOriginShape();
+    auto &storageShape = shape.MutableStorageShape();
+    originShape.SetDimNum(dims.size());
+    storageShape.SetDimNum(dims.size());
+    for (size_t i = 0; i < dims.size(); ++i) {
+        originShape.SetDim(i, dims[i]);
+        storageShape.SetDim(i, dims[i]);
+    }
+    return shape;
+}
+} // namespace
+
+class MlaPreprocessTilingV2 : public testing::TestWithParam<int> {
 protected:
     static void SetUpTestCase()
     {
@@ -29,9 +45,10 @@ protected:
     }
 };
 
-
-TEST_F(MlaPreprocessTilingV2, mla_preprocess_v2_test_tiling_case0)
+TEST_P(MlaPreprocessTilingV2, mla_preprocess_v2_test_tiling_case0)
 {
+    // 0: both [tokenNum, 64], 1: both [0], 2: mismatched, 3: token dimension mismatch.
+    const int ropeInputMode = GetParam();
     struct MlaPreProcessCompileInfo {
     } compileInfo; // compileInfo对应算子op_host/op_tiling/${OP_NAME}_tiling.cpp中的
                    // struct ${OP_NAME}CompileInfo
@@ -56,6 +73,17 @@ TEST_F(MlaPreprocessTilingV2, mla_preprocess_v2_test_tiling_case0)
     bool doRmsNorm = true;
     bool qDownOutFlag = true;
     int64_t wdkvSplitCount = 1;
+    const std::vector<int64_t> normalRopeShape = {tokenNum, 64};
+    const std::vector<int64_t> disabledRopeShape = {0};
+    const std::vector<int64_t> tokenMismatchShape = {0, 64};
+    const std::vector<int64_t> cosShape =
+        ropeInputMode == 0 || ropeInputMode == 2
+            ? normalRopeShape
+            : (ropeInputMode == 1 ? disabledRopeShape : tokenMismatchShape);
+    const std::vector<int64_t> sinShape =
+        ropeInputMode == 0
+            ? normalRopeShape
+            : (ropeInputMode == 1 || ropeInputMode == 2 ? disabledRopeShape : tokenMismatchShape);
     gert::TilingContextPara tilingContextPara(
         "MlaPreprocessV2",
         {
@@ -78,8 +106,8 @@ TEST_F(MlaPreprocessTilingV2, mla_preprocess_v2_test_tiling_case0)
             {{{headNum * 192}, {headNum * 192}}, ge::DT_INT64, ge::FORMAT_ND},                    // deScale1
             {{{headNum * 192}, {headNum * 192}}, ge::DT_INT32, ge::FORMAT_ND},                    // bias1
             {{{512}, {512}}, ge::DT_FLOAT16, ge::FORMAT_ND},                                      // gamma2
-            {{{tokenNum, 64}, {tokenNum, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},                    // cos
-            {{{tokenNum, 64}, {tokenNum, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},                    // sin
+            {MakeStorageShape(cosShape), ge::DT_FLOAT16, ge::FORMAT_ND},                              // cos
+            {MakeStorageShape(sinShape), ge::DT_FLOAT16, ge::FORMAT_ND},                              // sin
             {{{headNum, 128, 512}, {headNum, 128, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},          // wuk
             {{{blockNum, blockSize, 1, 576}, {blockNum, blockSize, 1, 576}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // kvCache
             {{{blockNum, blockSize, 1, 64}, {blockNum, blockSize, 1, 64}},
@@ -111,11 +139,13 @@ TEST_F(MlaPreprocessTilingV2, mla_preprocess_v2_test_tiling_case0)
             {"cacheMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
             {"quantMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"doRmsNorm", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
-            {"qDownOutFlag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
             {"wdkvSplitCount", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"qDownOutFlag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
         },
         &compileInfo);
 
     uint64_t expectTilingKey = 56UL;
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+    ExecuteTestCase(tilingContextPara, ropeInputMode >= 2 ? ge::GRAPH_FAILED : ge::GRAPH_SUCCESS, expectTilingKey);
 }
+
+INSTANTIATE_TEST_SUITE_P(RopeInputModes, MlaPreprocessTilingV2, testing::Values(0, 1, 2, 3));

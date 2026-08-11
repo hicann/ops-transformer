@@ -42,13 +42,14 @@ struct MlaPreprocessParam {
     uint64_t kvCacheBlockSize = 128;
     uint64_t kvCacheStride0 = 0;
     uint64_t kvCacheRopeStride0 = 0;
+    bool enableRope = true;
     bool operator==(const MlaPreprocessParam &other) const
     {
         return N == other.N && headNum == other.headNum && cacheMode == other.cacheMode &&
-               quantMode == other.quantMode && qLoraRank == other.qLoraRank &&
-               nopeDim == other.nopeDim && headDimMm2 == other.headDimMm2 &&
-               hiddenStateMm == other.hiddenStateMm && kvCacheBlockSize == other.kvCacheBlockSize &&
-               kvCacheStride0 == other.kvCacheStride0 && kvCacheRopeStride0 == other.kvCacheRopeStride0;
+               quantMode == other.quantMode && qLoraRank == other.qLoraRank && nopeDim == other.nopeDim &&
+               headDimMm2 == other.headDimMm2 && hiddenStateMm == other.hiddenStateMm &&
+               kvCacheBlockSize == other.kvCacheBlockSize && kvCacheStride0 == other.kvCacheStride0 &&
+               kvCacheRopeStride0 == other.kvCacheRopeStride0 && enableRope == other.enableRope;
     }
 };
 } // namespace OpParam
