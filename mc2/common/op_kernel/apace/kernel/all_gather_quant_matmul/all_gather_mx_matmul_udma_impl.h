@@ -166,10 +166,9 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Init(
     allGatherData_.template Init<BARRIER_NONE>(udmaCtx_, teamBarrier_, commTilingData_,
                           aGM_, commBuf.Get(), rankSize_,
                           static_cast<uint32_t>(GetBlockIdx()));
-    allGatherScale_.template Init<BARRIER_DEVICE>(udmaCtx_, teamBarrier_, commTilingScale_,
+    allGatherScale_.Init(udmaCtx_, teamBarrier_, commTilingScale_,
                           aScaleGM_, commScaleBuf.Get(), rankSize_,
                           static_cast<uint32_t>(GetBlockIdx()), dataRegionBytes_);
-    AscendC::SyncAll<true>();
 }
 
 template <typename AType, typename BType, typename CType>
