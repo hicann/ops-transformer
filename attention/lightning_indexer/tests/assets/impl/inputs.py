@@ -229,7 +229,6 @@ class LightningIndexerInputAdapter:
     def golden_data(data):
         return {
             "cpu_result": data["cpu_result"].detach().cpu(),
-            "cpu_result_raw": data["cpu_result_raw"].detach().cpu(),
             "score_values": data["score_values"].detach().cpu(),
             "params": data["params"],
             "topk_value": data["topk_value"].detach().cpu(),

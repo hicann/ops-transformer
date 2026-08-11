@@ -464,17 +464,15 @@ def generate_li_test_data(params):
         block_table = torch.from_numpy(block_table).to(dtype=torch.int32).npu()
 
     # cpu golden生成
-    cpu_result_raw, topk_value = test_li.forward(
+    cpu_result, topk_value = test_li.forward(
         query, key_cpu, weights, actual_seq_lengths_query,
         actual_seq_lengths_key, block_table)
     score_values = test_li.trans_bnsd_to_layout(
         topk_value, list(topk_value.shape), layout_query,
         test_li.actual_seq_lengths_query)
-    cpu_result, _ = torch.sort(cpu_result_raw)
     return {
         "params": params,
         "cpu_result": cpu_result,
-        "cpu_result_raw": cpu_result_raw,
         "topk_value": topk_value,
         "score_values": score_values,
         "query": query,
