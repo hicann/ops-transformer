@@ -97,7 +97,7 @@ class SparseLightningIndexerKLLossGradOpBuilder(OpBuilder):
             dw = w.new_empty(w.shape, dtype=w.dtype, device="meta")
             softmax_out = attn_softmax_l1_norm.new_empty(
                 attn_softmax_l1_norm.shape,
-                dtype=attn_softmax_l1_norm.dtype,
+                dtype=torch.float32,
                 device="meta",
             )
             return dq, dk, dw, softmax_out

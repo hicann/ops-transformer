@@ -143,7 +143,7 @@ class SparseFlashMlaGradOpBuilder(OpBuilder):
             ori_softmax_l1_norm = (
                 ori_sparse_indices.new_empty(
                     ori_sparse_indices.shape,
-                    dtype=ori_sparse_indices.dtype,
+                    dtype=torch.float32,
                     device="meta",
                 )
                 if ori_sparse_indices is not None
@@ -152,7 +152,7 @@ class SparseFlashMlaGradOpBuilder(OpBuilder):
             cmp_softmax_l1_norm = (
                 cmp_sparse_indices.new_empty(
                     cmp_sparse_indices.shape,
-                    dtype=cmp_sparse_indices.dtype,
+                    dtype=torch.float32,
                     device="meta",
                 )
                 if cmp_sparse_indices is not None
