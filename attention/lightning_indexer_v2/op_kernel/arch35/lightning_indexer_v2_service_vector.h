@@ -166,9 +166,9 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::InitBuffers(TPipe *
     pipe->InitBuffer(mrgValueBuf_, (topkCountAlign256_ + trunkLen_) * sizeof(SCORE_T));
     mrgValueLocal_ = mrgValueBuf_.Get<SCORE_T>();
     // returnvalue
-    // 大小：topK * sizeof(float)
+    // 大小：topK * sizeof(float) 64:duplicate刷-1需要额外空间
     if (topkCount_ <= 2048) {
-        pipe->InitBuffer(valueOutBuf_, topkCountAlign256_ * sizeof(float));
+        pipe->InitBuffer(valueOutBuf_, (topkCountAlign256_ + 64) * sizeof(float));
         valueOutLocal_ = valueOutBuf_.Get<float>();
     } else {
         valueOutLocal_ = mrgValueBuf_.Get<float>();
@@ -655,17 +655,17 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessTopK(const L
                 if (validS2Len < topkCount_) {
                     uint64_t mask[1];
                     mask[0] = ~0;
-                    mask[0] = mask[0] << (validS2Len % 16);
+                    mask[0] = mask[0] << (validS2Len % 8);
                     PipeBarrier<PIPE_V>();
-                    Duplicate(valueOutLocal_.template ReinterpretCast<uint32_t>()[validS2Len / 16 * 16],
+                    Duplicate(valueOutLocal_.template ReinterpretCast<uint32_t>()[validS2Len / 8 * 8],
                             constInfo_.NEG_INF_FLOAT, mask, 1, 1, 0);
                 }
             
-                if (validS2Len / 16 * 16 + 64 < topkCount_) {
+                if (validS2Len / 8 * 8 + 64 < topkCount_) {
                     PipeBarrier<PIPE_V>();
-                    Duplicate(valueOutLocal_.template ReinterpretCast<uint32_t>()[validS2Len / 16 * 16 + 64],
+                    Duplicate(valueOutLocal_.template ReinterpretCast<uint32_t>()[validS2Len / 8 * 8 + 64],
                             constInfo_.NEG_INF_FLOAT,
-                            topkCount_ - (validS2Len / 16 * 16 + 64));
+                            topkCount_ - (validS2Len / 8 * 8 + 64));
                 }
                 SetFlag<HardEvent::V_MTE2>(TOPK_V_MTE2_EVENT);
                 SetFlag<HardEvent::V_MTE3>(TOPK_V_MTE3_EVENT);
