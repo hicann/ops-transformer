@@ -93,7 +93,9 @@ def case_name(prefix, idx, b, mtp, nk, nv, dk, dv, sdt_str, non_contig):
 
 
 def contiguous_stride(shape):
-    """计算连续 stride（row-major）。"""
+    """计算连续 stride（row-major），shape 为 None 时返回 None。"""
+    if shape is None:
+        return None
     strides = []
     s = 1
     for dim in reversed(shape):
@@ -106,12 +108,10 @@ def non_contig_fields(tensor_count, state_idx, state_shape, block_num, nv, dv, d
     """构造非连续 state 的 storage/stride/offset 字段。
 
     非 state 张量填连续值（storage=view shape, stride=contiguous, offset=0），
-    state 张量填 padded storage + 跨步 stride（模拟 [::2, ::2, :, :] 切片）。
+    state 张量填 pad+1 storage（dv 维 +1）+ 对应 stride，与 pytest pad+1 方式一致。
     """
-    p0 = block_num * 2
-    p1 = nv * 2
-    nc_storage = (p0, p1, dv, dk)
-    nc_stride = (p1 * dv * dk * 2, dv * dk * 2, dk, 1)
+    nc_storage = (block_num, nv, dv + 1, dk)
+    nc_stride = contiguous_stride(nc_storage)
 
     storage_shapes = []
     view_strides = []

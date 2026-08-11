@@ -39,12 +39,11 @@ class RgdrGraphModule(torch.nn.Module):
         g=None,
         gk=None,
     ):
-        state_out = state.clone()
         output = torch_npu.npu_recurrent_gated_delta_rule(
             query,
             key,
             value,
-            state_out,
+            state,
             beta=beta,
             scale=self.scale,
             actual_seq_lengths=actual_seq_lengths,
@@ -53,4 +52,4 @@ class RgdrGraphModule(torch.nn.Module):
             g=g,
             gk=gk,
         )
-        return output, state_out
+        return output, state
