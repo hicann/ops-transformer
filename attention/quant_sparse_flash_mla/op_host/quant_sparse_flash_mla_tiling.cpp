@@ -75,6 +75,7 @@ ge::graphStatus QSMLAInfoParser::GetNpuInfo()
         OP_LOGE(opName_, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
         return GRAPH_FAILED;
     }
+    OP_LOGD(opName_, "deterministic_level=%d", context_->GetDeterministicLevel());
 
     return ge::GRAPH_SUCCESS;
 }
