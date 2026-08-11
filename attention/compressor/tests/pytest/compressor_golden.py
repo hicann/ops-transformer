@@ -325,7 +325,7 @@ def read_state_page_cache(state, b_idx, start_seq_idx, end_seq_idx, block_table,
 def cpu_compressor(
     x, wkv, wgate, kv_state, score_state, update_kv_position, update_score_position, ape,
     block_table=None, cu_seqlens=None, seqused=None, start_pos=None,
-    cmp_ratio=4, coff=1, cache_mode=1):
+    cmp_ratio=4, coff=1, cache_mode=1, grad_enabled=False):
     x_dtype = x.dtype
     x = x.to(torch.float32).numpy()
     wkv = wkv.to(torch.float32).numpy()
@@ -352,10 +352,18 @@ def cpu_compressor(
         new_kv_state = new_kv_state.reshape(B * S, new_kv_state.shape[-1])
         new_score_state = new_score_state.reshape(B * S, new_score_state.shape[-1])
         cmp_kv = np.zeros(shape=(B, (S + cmp_ratio - 1) // cmp_ratio, head_dim), dtype=matmul_dtype)
+        if grad_enabled:
+            kv = np.zeros(shape=(B, (S + cmp_ratio - 1) // cmp_ratio, coff * cmp_ratio, head_dim), dtype=matmul_dtype)
+            softmax = np.zeros(shape=(B, (S + cmp_ratio - 1) // cmp_ratio, coff * cmp_ratio, head_dim), dtype=matmul_dtype)
     else:
         cmp_kv = np.zeros(shape=(min(x.shape[0], x.shape[0] // cmp_ratio + B), head_dim), dtype=matmul_dtype)
+        if grad_enabled:
+            kv = np.zeros(shape=(min(x.shape[0], x.shape[0] // cmp_ratio + B), coff * cmp_ratio, head_dim), dtype=matmul_dtype)
+            softmax = np.zeros(shape=(min(x.shape[0], x.shape[0] // cmp_ratio + B), coff * cmp_ratio, head_dim), dtype=matmul_dtype)
 
     cmp_kv_mask = np.zeros_like(cmp_kv, dtype=bool)
+    if grad_enabled:
+        mid_result_mask = np.zeros_like(kv, dtype=bool)
     out_cu_seqlen = [0] * (B + 1)
     out_seqused = [0] * B
 
@@ -461,6 +469,15 @@ def cpu_compressor(
                 sc_kv_state = sc_kv_state.reshape(coff * cmp_ratio, head_dim)
                 sc_score_state = sc_score_state.reshape(coff * cmp_ratio, head_dim)
                 sc_score_state = softmax_columns(sc_score_state)
+                if grad_enabled:
+                    if bs_combine_flag == False:
+                        kv[b_idx, batch_out_sc_id, :, :] = sc_kv_state
+                        softmax[b_idx, batch_out_sc_id, :, :] = sc_score_state
+                        mid_result_mask[b_idx, batch_out_sc_id, :, :] = 1
+                    else:
+                        kv[out_sum_sc_cnt, :, :] = sc_kv_state
+                        softmax[out_sum_sc_cnt, :, :] = sc_score_state
+                        mid_result_mask[out_sum_sc_cnt, :, :] = 1
                 # kv * score
                 sc_data = sc_kv_state * sc_score_state
                 # reduce sum
@@ -484,7 +501,12 @@ def cpu_compressor(
     print(f"out_seqused: {out_seqused}")
     print(f"cmp_kv.shape: {cmp_kv.shape}")
     cmp_kv_torch = torch.tensor(cmp_kv).to(x_dtype)
-    return cmp_kv_torch, cmp_kv_mask
+    if grad_enabled:
+        softmax = torch.tensor(softmax)
+        kv = torch.tensor(kv)
+        return cmp_kv_torch, cmp_kv_mask, softmax, kv, mid_result_mask
+    else:
+        return cmp_kv_torch, cmp_kv_mask, None, None, None
 
 def run_compressor_eager(B, S_max, head_dim, coff, cmp_ratio, bs_combine_flag, S = 0, start_pos=None, seqused=None, cu_seqlens=None,
                          block_size = 128, data_type = torch.bfloat16, hidden_size = 4096,

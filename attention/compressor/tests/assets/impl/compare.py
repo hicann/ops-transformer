@@ -41,6 +41,8 @@ _OUTPUT_NAMES = [
     "score_state_update",
     "kv_state_origin",
     "score_state_origin",
+    "softmax_score",
+    "kv",
 ]
 
 _BATCH_CONSISTENCY_CACHE = {}
@@ -417,11 +419,12 @@ def compare_aclnn(*outputs, **kwargs):
             "error_info": "compare expects NPU outputs followed by golden outputs",
         }
 
-    GOLDEN_OUTPUT_COUNT = 2
+    GOLDEN_OUTPUT_COUNT = 4
     golden_outputs = list(outputs[-GOLDEN_OUTPUT_COUNT:])
     npu_outputs = list(outputs[:-GOLDEN_OUTPUT_COUNT])
     cmp_kv_mask = kwargs.get("cmp_kv_mask", None)
-
+    mid_result_mask = kwargs.get("mid_result_mask", None)
+    gradEnabled = kwargs.get("gradEnabled", None)
     # Fallback: single NPU output (cmp_kv only) — compare cmp_kv, skip state_cache
     if len(npu_outputs) == 1:
         results = [
@@ -442,9 +445,9 @@ def compare_aclnn(*outputs, **kwargs):
         return results
 
     npu_cmp_kv = npu_outputs[0].to(torch.float32)
-    npu_state_cache = npu_outputs[1].to(torch.float32)
+    npu_state_cache = npu_outputs[3].to(torch.float32)
     cpu_cmp_kv = golden_outputs[0].to(torch.float32)
-    cpu_state_cache = golden_outputs[1].to(torch.float32)
+    cpu_state_cache = golden_outputs[3].to(torch.float32)
 
     update_kv = kwargs.get("update_kv", None)
     update_score = kwargs.get("update_score", None)
@@ -477,6 +480,16 @@ def compare_aclnn(*outputs, **kwargs):
     golden_sub_outputs.append(
         cpu_state_cache[:, :, cpu_state_cache.shape[2] // 2 :][~update_score]
     )
+
+    if gradEnabled:
+        npu_softmax_out = npu_outputs[1][mid_result_mask].to(torch.float32)
+        npu_kv_out = npu_outputs[2][mid_result_mask].to(torch.float32)
+        cpu_softmax_out = golden_outputs[1][mid_result_mask].to(torch.float32)
+        cpu_kv_out = golden_outputs[2][mid_result_mask].to(torch.float32)
+        npu_sub_outputs.append(npu_softmax_out)
+        npu_sub_outputs.append(npu_kv_out)
+        golden_sub_outputs.append(cpu_softmax_out)
+        golden_sub_outputs.append(cpu_kv_out)
 
     results = []
     for idx in range(len(golden_sub_outputs)):

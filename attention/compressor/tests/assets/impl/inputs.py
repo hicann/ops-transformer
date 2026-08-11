@@ -450,7 +450,10 @@ def aclnn_compressor_input(
     coff,
     cacheMode,
     stateCacheStrideDim0,
+    gradEnabled,
     cmpKv,
+    softmaxScoreOut,
+    kvOut,
     **kwargs,
 ):
     cu_seqlens_list, seqused_list, start_pos_list, B, S, S_max, block_size = (

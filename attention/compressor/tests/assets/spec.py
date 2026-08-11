@@ -73,6 +73,8 @@ class AclnnCompressorSpec:
         kwargs["cu_seqlens_list"] = ctx.get("cu_seqlens_list")
         kwargs["cmp_ratio"] = ctx.get("cmp_ratio")
         kwargs["is_th"] = ctx.get("is_th")
+        kwargs["gradEnabled"] = ctx.get("gradEnabled")
+        kwargs["mid_result_mask"] = ctx.get("mid_result_mask")
         return compare_module.compare_aclnn(*outputs, **kwargs)
 
 

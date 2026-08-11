@@ -110,6 +110,7 @@ def run_cpu_compressor(
     start_pos_list,
     cu_seqlens_list,
     seqused_list,
+    grad_enabled=False,
 ):
     pytest_golden = load_pytest_golden_module()
 
@@ -140,7 +141,7 @@ def run_cpu_compressor(
             B = 1
         start_pos_list = [0] * B
 
-    cmp_kv, cmp_kv_mask = pytest_golden.cpu_compressor(
+    cmp_kv, cmp_kv_mask, softmax, kv, mid_result_mask = pytest_golden.cpu_compressor(
         x,
         wkv,
         wgate,
@@ -156,6 +157,7 @@ def run_cpu_compressor(
         cmp_ratio=cmp_ratio_val,
         coff=coff_val,
         cache_mode=cache_mode_val,
+        grad_enabled=grad_enabled,
     )
 
     golden_state_cache = torch.zeros_like(state_cache_f32)
@@ -170,6 +172,9 @@ def run_cpu_compressor(
         update_kv,
         update_score,
         x_dtype,
+        softmax,
+        kv,
+        mid_result_mask,
     )
 
 
@@ -200,7 +205,7 @@ def cpu_compressor(
     cu_seqlens_list = ttk_tensor_to_list(cu_seqlens) if cu_seqlens is not None else None
     seqused_list = ttk_tensor_to_list(seqused) if seqused is not None else None
 
-    cmp_kv, cmp_kv_mask, golden_state_cache, update_kv, update_score, x_dtype = (
+    cmp_kv, cmp_kv_mask, golden_state_cache, update_kv, update_score, x_dtype, softmax, kv, mid_result_mask  = (
         run_cpu_compressor(
             x_cpu,
             wkv_cpu,
@@ -247,7 +252,10 @@ def aclnn_compressor_golden(
     coff,
     cacheMode,
     stateCacheStrideDim0,
+    gradEnabled,
     cmpKv,
+    softmaxScoreOut,
+    kvOut,
     **kwargs,
 ):
     x_cpu = ttk_to_cpu(x)
@@ -261,7 +269,7 @@ def aclnn_compressor_golden(
     cu_seqlens_list = ttk_tensor_to_list(cuSeqlens) if cuSeqlens is not None else None
     seqused_list = ttk_tensor_to_list(seqused) if seqused is not None else None
 
-    cmp_kv, cmp_kv_mask, golden_state_cache, update_kv, update_score, x_dtype = (
+    cmp_kv, cmp_kv_mask, golden_state_cache, update_kv, update_score, x_dtype, softmax, kv, mid_result_mask = (
         run_cpu_compressor(
             x_cpu,
             wkv_cpu,
@@ -275,6 +283,7 @@ def aclnn_compressor_golden(
             start_pos_list,
             cu_seqlens_list,
             seqused_list,
+            gradEnabled,
         )
     )
 
@@ -288,8 +297,10 @@ def aclnn_compressor_golden(
     _GOLDEN_CONTEXT["seqused_list"] = seqused_list
     _GOLDEN_CONTEXT["cu_seqlens_list"] = cu_seqlens_list
     _GOLDEN_CONTEXT["is_th"] = is_th
+    _GOLDEN_CONTEXT["gradEnabled"] = gradEnabled
+    _GOLDEN_CONTEXT["mid_result_mask"] = mid_result_mask
 
-    return [cmp_kv, golden_state_cache]
+    return [cmp_kv, softmax, kv, golden_state_cache]
 
 
 def get_golden_context():
