@@ -571,7 +571,7 @@ endif()
 
 if(UT_TEST_ALL OR OP_KERNEL_AICPU_UT)
   add_cann_third_party(gtest)
-  if (TARGET GTest::gtest)
+  if (TARGET GTest::gtest AND NOT TARGET gtest)
     add_library(gtest ALIAS GTest::gtest)
   endif()
 

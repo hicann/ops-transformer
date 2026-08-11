@@ -157,7 +157,7 @@ if (ENABLE_TEST)
     set(CMAKE_CXX_COMPILE_OBJECT "<CMAKE_CXX_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -o <OBJECT> -c <SOURCE>")
     set(CMAKE_C_COMPILE_OBJECT "<CMAKE_C_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -o <OBJECT> -c <SOURCE>")
     add_cann_third_party(gtest)
-    if (TARGET GTest::gtest)
+    if (TARGET GTest::gtest AND NOT TARGET gtest)
         add_library(gtest ALIAS GTest::gtest)
     endif()
 
