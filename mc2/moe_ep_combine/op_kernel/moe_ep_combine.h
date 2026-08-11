@@ -631,14 +631,16 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::RecvPhaseRedu
             Cast(ubResultBf16, ubAccFp32_, RoundMode::CAST_RINT, axisH_);
             SyncFunc<AscendC::HardEvent::V_MTE3>();
             DataCopyPad(combinedXGm_[tokenIdx * axisH_], ubResultBf16, xCopyParams);
+
+            GM_ADDR stateGM = GetUrmaStateAddrByRankId(rankId_, combineStateWinOffset_) +
+                tokenIdx * topK_ * WIN_ADDR_ALIGN;;
+            GlobalTensor<uint32_t> stateGMTensor;
+            stateGMTensor.SetGlobalBuffer((__gm__ uint32_t *)stateGM);
+            DataCopyExtParams resetParams = {
+                static_cast<uint16_t>(topK_), UB_ALIGN, 0, WIN_ADDR_ALIGN - UB_ALIGN, 0};
+            DataCopyPad<uint32_t>(stateGMTensor, stateResetTensor_, resetParams);
         }
     }
-    GM_ADDR stateGM = GetUrmaStateAddrByRankId(rankId_, combineStateWinOffset_) + tStart_ * topK_ * WIN_ADDR_ALIGN;;
-    GlobalTensor<uint32_t> stateGMTensor;
-    stateGMTensor.SetGlobalBuffer((__gm__ uint32_t *)stateGM);
-    DataCopyExtParams resetParams = {
-        static_cast<uint16_t>(topK_ * tPerCore_), UB_ALIGN, 0, WIN_ADDR_ALIGN - UB_ALIGN, 0};
-    DataCopyPad<uint32_t>(stateGMTensor, stateResetTensor_, resetParams);
 }
 
 template <TemplateMoeEpCombineTypeClass>
