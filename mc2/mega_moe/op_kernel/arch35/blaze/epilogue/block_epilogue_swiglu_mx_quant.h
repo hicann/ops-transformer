@@ -127,10 +127,50 @@ static constexpr AscendC::MicroAPI::CastTrait CAST_32_TO_83 = {
     DataTypeOut_, DataTypeIn_, DataTypeX2Scale_, DataTypeX1Scale_, IsTensorList_, TileM, TileN, TopkWeightsPrefetch, \
         IsInterleaved_
 
-// 前向声明：激活分块上下文结构体（仅含标量与 UB 指针，可跨函数传递）
-// 完整定义见 BlockEpilogueSwigluMxQuant 类定义之后
+/*
+ * ActivationContext: 激活分块上下文
+ * 仅含标量与 UB 指针（不含 RegTensor），可安全跨函数传递给各 ActivationFlow*
+ * 由 VFDoSwigluAndQuantForMX 填充后分派给具体激活函数
+ */
 template <typename DataTypeInT>
-struct ActivationContext;
+struct ActivationContext {
+    // 源数据地址
+    __ubuf__ DataTypeInT *firstSrc = nullptr;
+    __ubuf__ DataTypeInT *secondSrc = nullptr;
+    __ubuf__ bfloat16_t *gluResAddr = nullptr;
+
+    // 对齐参数
+    uint32_t nSrcUbAligned = 0;
+    uint32_t nDstUbAligned = 0;
+
+    // 分块循环控制
+    uint16_t dim0VfTimes = 0;
+    uint16_t dim1VfTimes = 0;
+    uint32_t dim1Tail = 0;
+    uint16_t dim1TailTimes = 0;
+    uint16_t dim1Tail2 = 0;
+
+    // 尾循环 mask
+    uint32_t mask1Num = 0;
+    uint32_t mask2Num = 0;
+    uint32_t mask3Num = 0;
+
+    // 尾循环地址
+    __ubuf__ DataTypeInT *firstTailAddr = nullptr;
+    __ubuf__ DataTypeInT *secondTailAddr = nullptr;
+    __ubuf__ bfloat16_t *swigluTailAddr1 = nullptr;
+    __ubuf__ bfloat16_t *swigluTailAddr2 = nullptr;
+
+    // 权重预取地址（nullptr 表示不启用 TopkWeightsPrefetch）
+    __ubuf__ float *weightUbAddr = nullptr;
+
+    // 激活参数（beta/alpha 默认 1.0，倒数同步 1.0，兜底为恒等变换）
+    float clampLimit = 0.0f;
+    float beta = 1.0f;
+    float invBeta = 1.0f;
+    float alpha = 1.0f;
+    float invAlpha = 1.0f;
+};
 
 template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_,
           bool IsTensorList_, uint32_t TileM = 256, uint32_t TileN = 256, bool TopkWeightsPrefetch = false,
@@ -258,51 +298,6 @@ private:
     uint8_t actSubMode_{0};
     float activationAlpha_{1.0f};
     float activationBeta_{1.0f};
-};
-
-// ============================================================================
-// ActivationContext: 激活分块上下文
-// 仅含标量与 UB 指针（不含 RegTensor），可安全跨函数传递给各 ActivationFlow*
-// 由 VFDoSwigluAndQuantForMX 填充后分派给具体激活函数
-// ============================================================================
-template <typename DataTypeInT>
-struct ActivationContext {
-    // 源数据地址
-    __ubuf__ DataTypeInT *firstSrc = nullptr;
-    __ubuf__ DataTypeInT *secondSrc = nullptr;
-    __ubuf__ bfloat16_t *gluResAddr = nullptr;
-
-    // 对齐参数
-    uint32_t nSrcUbAligned = 0;
-    uint32_t nDstUbAligned = 0;
-
-    // 分块循环控制
-    uint16_t dim0VfTimes = 0;
-    uint16_t dim1VfTimes = 0;
-    uint32_t dim1Tail = 0;
-    uint16_t dim1TailTimes = 0;
-    uint16_t dim1Tail2 = 0;
-
-    // 尾循环 mask
-    uint32_t mask1Num = 0;
-    uint32_t mask2Num = 0;
-    uint32_t mask3Num = 0;
-
-    // 尾循环地址
-    __ubuf__ DataTypeInT *firstTailAddr = nullptr;
-    __ubuf__ DataTypeInT *secondTailAddr = nullptr;
-    __ubuf__ bfloat16_t *swigluTailAddr1 = nullptr;
-    __ubuf__ bfloat16_t *swigluTailAddr2 = nullptr;
-
-    // 权重预取地址（nullptr 表示不启用 TopkWeightsPrefetch）
-    __ubuf__ float *weightUbAddr = nullptr;
-
-    // 激活参数（beta/alpha 默认 1.0，倒数同步 1.0，兜底为恒等变换）
-    float clampLimit = 0.0f;
-    float beta = 1.0f;
-    float invBeta = 1.0f;
-    float alpha = 1.0f;
-    float invAlpha = 1.0f;
 };
 
 BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
@@ -618,17 +613,17 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeDat
     return;
 }
 
-// ============================================================================
-// COMPUTE_TANH_TWOPATH: 两段式 tanh 宏（多项式路 + sigmoid 分解路）
-//   多项式路(|x|<0.6): x*(1 + c1*x^2 + c2*x^4 + c3*x^6 + c4*x^8), Horner + FusedMulDstAdd
-//   sigmoid路(|x|>=0.6): 2/(1+e^{-2x}) - 1, 天然保号无相消
-//   系数来源: tanh_dag.h / situ_mx_quant_common.h
-//   c1=-0.333327681, c2=0.133152977, c3=-0.0523039624, c4=0.0157396831
-// 用法: COMPUTE_TANH_TWOPATH(result, zReg, msk, oneReg, absReg, sqrReg,
-//                           polyReg, tmpReg, expReg, c1Reg, c2Reg, cmpMask);
-// 注意: 宏在函数内展开，所用寄存器须在调用点函数作用域内声明；
-//       宏会覆盖 sqrReg/polyReg/tmpReg/expReg/absReg/cmpMask，结果写入 result
-// ============================================================================
+/*
+ * COMPUTE_TANH_TWOPATH: 两段式 tanh 宏（多项式路 + sigmoid 分解路）
+ *   多项式路(|x|<0.6): x*(1 + c1*x^2 + c2*x^4 + c3*x^6 + c4*x^8), Horner + FusedMulDstAdd
+ *   sigmoid路(|x|>=0.6): 2/(1+e^{-2x}) - 1, 天然保号无相消
+ *   系数来源: tanh_dag.h / situ_mx_quant_common.h
+ *   c1=-0.333327681, c2=0.133152977, c3=-0.0523039624, c4=0.0157396831
+ * 用法: COMPUTE_TANH_TWOPATH(result, zReg, msk, oneReg, absReg, sqrReg,
+ *                           polyReg, tmpReg, expReg, c1Reg, c2Reg, cmpMask);
+ * 注意: 宏在函数内展开，所用寄存器须在调用点函数作用域内声明；
+ *       宏会覆盖 sqrReg/polyReg/tmpReg/expReg/absReg/cmpMask，结果写入 result
+ */
 #define COMPUTE_TANH_TWOPATH(result, zReg, msk, oneReg, absReg, sqrReg, \
                              polyReg, tmpReg, expReg, c1Reg, c2Reg, cmpMask) \
     do { \
@@ -651,11 +646,11 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeDat
         AscendC::MicroAPI::Select(result, tmpReg, polyReg, cmpMask); \
     } while (0)
 
-// ============================================================================
-// ActivationFlowSwiGLU: SwiGLU 激活完整计算流
-//   swish(x1) * x2, 其中 swish(x) = x / (exp(-x) + 1) = x * sigmoid(x)
-//   含主循环 + 尾循环 + pad 填零，所有寄存器在本函数内声明
-// ============================================================================
+/*
+ * ActivationFlowSwiGLU: SwiGLU 激活完整计算流
+ *   swish(x1) * x2, 其中 swish(x) = x / (exp(-x) + 1) = x * sigmoid(x)
+ *   含主循环 + 尾循环 + pad 填零，所有寄存器在本函数内声明
+ */
 BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
 template <bool IsInterleaved>
 __aicore__ inline void
@@ -665,6 +660,13 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
     const float scalarOne = 1.0f;
     const float negScalarOne = -1.0f;
     bfloat16_t numZero = 0;
+    uint32_t mask1Num = ctx.mask1Num;
+    uint32_t mask2Num = ctx.mask2Num;
+    uint32_t mask3Num = ctx.mask3Num;
+    uint16_t dim0VfTimes = ctx.dim0VfTimes;
+    uint16_t dim1VfTimes = ctx.dim1VfTimes;
+    uint16_t dim1TailTimes = ctx.dim1TailTimes;
+    uint16_t dim1Tail2 = ctx.dim1Tail2;
 
     __VEC_SCOPE__
     {
@@ -681,18 +683,15 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
         AscendC::MicroAPI::RegTensor<bfloat16_t> outTReg;
         AscendC::MicroAPI::RegTensor<bfloat16_t> zeroReg;
         AscendC::MicroAPI::MaskReg mask = AscendC::MicroAPI::CreateMask<float, AscendC::MicroAPI::MaskPattern::ALL>();
-        uint32_t mask1Num = ctx.mask1Num;
-        uint32_t mask2Num = ctx.mask2Num;
-        uint32_t mask3Num = ctx.mask3Num;
         AscendC::MicroAPI::MaskReg mask1 = AscendC::MicroAPI::UpdateMask<float>(mask1Num);
         AscendC::MicroAPI::MaskReg mask2 = AscendC::MicroAPI::UpdateMask<float>(mask2Num);
         AscendC::MicroAPI::MaskReg mask3 = AscendC::MicroAPI::UpdateMask<bfloat16_t>(mask3Num);
-        for (uint16_t dim0vfLoopIdx = 0; dim0vfLoopIdx < ctx.dim0VfTimes; dim0vfLoopIdx++) {
+        for (uint16_t dim0vfLoopIdx = 0; dim0vfLoopIdx < dim0VfTimes; dim0vfLoopIdx++) {
             if constexpr (TopkWeightsPrefetch) {
                 AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
                     weightReg, ctx.weightUbAddr + dim0vfLoopIdx * INT32_PER_256B + WEIGHT_INDEX);
             }
-            for (uint16_t dim1vfLoopIdx = 0; dim1vfLoopIdx < ctx.dim1VfTimes; dim1vfLoopIdx++) {
+            for (uint16_t dim1vfLoopIdx = 0; dim1vfLoopIdx < dim1VfTimes; dim1vfLoopIdx++) {
                 AscendC::MicroAPI::AddrReg srcIdxOffset = AscendC::MicroAPI::CreateAddrReg<DataTypeIn>(
                     dim0vfLoopIdx, ctx.nSrcUbAligned, dim1vfLoopIdx, VF_LEN_FP32);
                 AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
@@ -728,7 +727,7 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
                 AscendC::MicroAPI::CreateAddrReg<DataTypeIn>(dim0vfLoopIdx, ctx.nSrcUbAligned);
             AscendC::MicroAPI::AddrReg outOffset1 =
                 AscendC::MicroAPI::CreateAddrReg<bfloat16_t>(dim0vfLoopIdx, ctx.nDstUbAligned);
-            for (uint16_t aa = 0; aa < ctx.dim1TailTimes; aa++) {
+            for (uint16_t tailIdx = 0; tailIdx < dim1TailTimes; tailIdx++) {
                 AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
                     vregX1, ctx.firstTailAddr, srcIdxOffset1);
                 AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
@@ -756,7 +755,7 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
                 AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
                     ctx.swigluTailAddr1, outTReg, outOffset1, mask2);
             }
-            for (uint16_t cc = 0; cc < ctx.dim1Tail2; cc++) {
+            for (uint16_t padIdx = 0; padIdx < dim1Tail2; padIdx++) {
                 AscendC::MicroAPI::Duplicate(zeroReg, numZero);
                 AscendC::MicroAPI::DataCopy<bfloat16_t>(ctx.swigluTailAddr2, zeroReg, outOffset1, mask3);
             }
@@ -764,26 +763,34 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
     }
 }
 
-// ============================================================================
-// ActivationFlowSiTU: SiTU 激活完整计算流
-//   situ_a = beta * tanh(gate/beta) * sigmoid(gate)
-//   ActSub==LINEAR: out = situ_a * (alpha * tanh(up/alpha))
-//   ActSub==DEFAULT: out = situ_a * up
-//   tanh 采用两段式（多项式路 + sigmoid 分解路），保号无相消
-//   参照 situ_mx_quant_common.h::ComputeVfSitu，含主循环 + 尾循环 + pad 填零
-// ============================================================================
+/*
+ * ActivationFlowSiTU: SiTU 激活完整计算流
+ *   situ_a = beta * tanh(gate/beta) * sigmoid(gate)
+ *   ActSub==LINEAR: out = situ_a * (alpha * tanh(up/alpha))
+ *   ActSub==DEFAULT: out = situ_a * up
+ *   tanh 采用两段式（多项式路 + sigmoid 分解路），保号无相消
+ *   参照 situ_mx_quant_common.h::ComputeVfSitu，含主循环 + 尾循环 + pad 填零
+ */
 BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
 template <ActSubMode ActSub, bool IsInterleaved>
 __aicore__ inline void
 BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ActivationFlowSiTU(
     const ActivationContext<DataTypeIn> &ctx)
 {
-    // 标量常量
-    const float tanhC1 = -0.333327681f;
-    const float tanhC2 = 0.133152977f;
+    // tanh 多项式近似的奇次项系数（8 阶 Padé 近似，仅取奇次项）
+    // 参见 COMPUTE_TANH_TWOPATH 宏注释，c1/c2 对应 x^3/x^5 的系数
+    const float tanhC1 = -0.333327681f;  // c1: tanh 多项式 x^3 项系数，约 -1/3
+    const float tanhC2 = 0.133152977f;   // c2: tanh 多项式 x^5 项系数，约 2/15
     const float scalarOne = 1.0f;
     const float negScalarOne = -1.0f;
     bfloat16_t numZero = 0;
+    uint32_t mask1Num = ctx.mask1Num;
+    uint32_t mask2Num = ctx.mask2Num;
+    uint32_t mask3Num = ctx.mask3Num;
+    uint16_t dim0VfTimes = ctx.dim0VfTimes;
+    uint16_t dim1VfTimes = ctx.dim1VfTimes;
+    uint16_t dim1TailTimes = ctx.dim1TailTimes;
+    uint16_t dim1Tail2 = ctx.dim1Tail2;
 
     __VEC_SCOPE__
     {
@@ -816,9 +823,6 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
         AscendC::MicroAPI::MaskReg cmpMaskReg;
 
         AscendC::MicroAPI::MaskReg mask = AscendC::MicroAPI::CreateMask<float, AscendC::MicroAPI::MaskPattern::ALL>();
-        uint32_t mask1Num = ctx.mask1Num;
-        uint32_t mask2Num = ctx.mask2Num;
-        uint32_t mask3Num = ctx.mask3Num;
         AscendC::MicroAPI::MaskReg mask1 = AscendC::MicroAPI::UpdateMask<float>(mask1Num);
         AscendC::MicroAPI::MaskReg mask2 = AscendC::MicroAPI::UpdateMask<float>(mask2Num);
         AscendC::MicroAPI::MaskReg mask3 = AscendC::MicroAPI::UpdateMask<bfloat16_t>(mask3Num);
@@ -828,12 +832,12 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
         AscendC::MicroAPI::Duplicate(c1Reg, tanhC1);
         AscendC::MicroAPI::Duplicate(c2Reg, tanhC2);
 
-        for (uint16_t dim0vfLoopIdx = 0; dim0vfLoopIdx < ctx.dim0VfTimes; dim0vfLoopIdx++) {
+        for (uint16_t dim0vfLoopIdx = 0; dim0vfLoopIdx < dim0VfTimes; dim0vfLoopIdx++) {
             if constexpr (TopkWeightsPrefetch) {
                 AscendC::MicroAPI::DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(
                     weightReg, ctx.weightUbAddr + dim0vfLoopIdx * INT32_PER_256B + WEIGHT_INDEX);
             }
-            for (uint16_t dim1vfLoopIdx = 0; dim1vfLoopIdx < ctx.dim1VfTimes; dim1vfLoopIdx++) {
+            for (uint16_t dim1vfLoopIdx = 0; dim1vfLoopIdx < dim1VfTimes; dim1vfLoopIdx++) {
                 AscendC::MicroAPI::AddrReg srcIdxOffset = AscendC::MicroAPI::CreateAddrReg<DataTypeIn>(
                     dim0vfLoopIdx, ctx.nSrcUbAligned, dim1vfLoopIdx, VF_LEN_FP32);
                 AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
@@ -892,7 +896,7 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
                 AscendC::MicroAPI::CreateAddrReg<DataTypeIn>(dim0vfLoopIdx, ctx.nSrcUbAligned);
             AscendC::MicroAPI::AddrReg outOffset1 =
                 AscendC::MicroAPI::CreateAddrReg<bfloat16_t>(dim0vfLoopIdx, ctx.nDstUbAligned);
-            for (uint16_t aa = 0; aa < ctx.dim1TailTimes; aa++) {
+            for (uint16_t tailIdx = 0; tailIdx < dim1TailTimes; tailIdx++) {
                 AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
                     vregX1, ctx.firstTailAddr, srcIdxOffset1);
                 AscendC::MicroAPI::DataCopy<DataTypeIn, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(
@@ -935,7 +939,7 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
                 AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
                     ctx.swigluTailAddr1, outTReg, outOffset1, mask2);
             }
-            for (uint16_t cc = 0; cc < ctx.dim1Tail2; cc++) {
+            for (uint16_t padIdx = 0; padIdx < dim1Tail2; padIdx++) {
                 AscendC::MicroAPI::Duplicate(zeroReg, numZero);
                 AscendC::MicroAPI::DataCopy<bfloat16_t>(ctx.swigluTailAddr2, zeroReg, outOffset1, mask3);
             }
@@ -943,13 +947,13 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
     }
 }
 
-// ============================================================================
-// VFDoSwigluAndQuantForMX: 激活 + MX 量化主入口（重构后为分派器）
-//   1. 标量分块计算（对齐、tail、mask）
-//   2. 填充 ActivationContext
-//   3. 按模板参数 Activation 分派到 ActivationFlowSwiGLU / ActivationFlowSiTU
-//   4. MX 量化调度（ComputeMaxExp / ComputeScale / ComputeDataForQuantTargetFp8/Fp4）
-// ============================================================================
+/*
+ * VFDoSwigluAndQuantForMX: 激活 + MX 量化主入口（重构后为分派器）
+ *   1. 标量分块计算（对齐、tail、mask）
+ *   2. 填充 ActivationContext
+ *   3. 按模板参数 Activation 分派到 ActivationFlowSwiGLU / ActivationFlowSiTU
+ *   4. MX 量化调度（ComputeMaxExp / ComputeScale / ComputeDataForQuantTargetFp8/Fp4）
+ */
 BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
 template <SwigluQuantMsg::QuantMode quantMode, bool IsInterleavedSrc, ActMode Activation, ActSubMode ActSub>
 __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoSwigluAndQuantForMX(

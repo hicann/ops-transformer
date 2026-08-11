@@ -356,7 +356,6 @@ def get_symm_buffer_for_mega_moe(
     dispatch_quant_out_dtype: Optional[torch.dtype] = None,
     combine_quant_mode: int = 0,
     comm_alg: str = "",
-    use_ccl_buffer: bool = True,
     topk_weights_type: int = 0,
 ) -> SymmBuffer:
     return SymmBuffer(

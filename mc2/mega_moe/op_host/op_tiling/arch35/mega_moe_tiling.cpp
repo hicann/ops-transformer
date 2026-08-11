@@ -353,27 +353,53 @@ static ge::graphStatus CheckAttrPtrNullptr(const gert::TilingContext *context, M
     OP_TILING_CHECK(commAlgPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "commAlg"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(numMaxTokensPerRankPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "numMaxTokensPerRank"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(activationPtr == nullptr || std::strcmp(activationPtr, "swiglu") != 0,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation", activationPtr == nullptr ? "null" : activationPtr,
-                                              "A5 only supports swiglu"),
+    OP_TILING_CHECK(activationPtr == nullptr,
+                    OP_LOGE_WITH_INVALID_INPUT(nodeName, "activation"), return ge::GRAPH_FAILED);
+    const bool isSwiglu = std::strcmp(activationPtr, "swiglu") == 0;
+    const bool isSituGlu = std::strcmp(activationPtr, "situglu") == 0;
+    OP_TILING_CHECK(!isSwiglu && !isSituGlu,
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation", activationPtr,
+                                              "A5 supports 'swiglu' and 'situglu'"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(activationParamsPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "activationParams"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(activationParamsPtr->GetSize() > 1U,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationParamsSize",
-                                              std::to_string(activationParamsPtr->GetSize()).c_str(),
-                                              "should be 0 or 1 for swiglu"),
+    const size_t paramCount = activationParamsPtr->GetSize();
+    const float *activationParams = activationParamsPtr->GetData();
+    OP_TILING_CHECK(activationParams == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "activationParamsData"),
                     return ge::GRAPH_FAILED);
-    if (activationParamsPtr->GetSize() == 1U) {
-        const float *activationParams = activationParamsPtr->GetData();
-        OP_TILING_CHECK(activationParams == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "activationParamsData"),
+    if (isSwiglu) {
+        OP_TILING_CHECK(paramCount > 1U,
+                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationParamsSize",
+                                                  std::to_string(paramCount).c_str(),
+                                                  "should be 0 or 1 for swiglu"),
                         return ge::GRAPH_FAILED);
-        const float activationClamp = activationParams[0];
-        OP_TILING_CHECK(activationClamp < 0 || std::isnan(activationClamp),
-                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationClamp",
-                                                  std::to_string(activationClamp).c_str(),
-                                                  "should be >= 0 and not NAN"),
+        if (paramCount == 1U) {
+            const float activationClamp = activationParams[0];
+            OP_TILING_CHECK(activationClamp < 0 || std::isnan(activationClamp),
+                            OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationClamp",
+                                                      std::to_string(activationClamp).c_str(),
+                                                      "should be >= 0 and not NAN"),
+                            return ge::GRAPH_FAILED);
+        }
+    } else {
+        OP_TILING_CHECK(paramCount < 1U || paramCount > 2U,
+                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationParamsSize",
+                                                  std::to_string(paramCount).c_str(),
+                                                  "should be 1 or 2 for situglu"),
                         return ge::GRAPH_FAILED);
+        const float beta = activationParams[0];
+        OP_TILING_CHECK(!std::isfinite(beta) || beta == 0.0f,
+                        OP_LOGE_FOR_INVALID_VALUE(nodeName, "situglu_beta", std::to_string(beta).c_str(),
+                                                   "should be finite and non-zero"),
+                        return ge::GRAPH_FAILED);
+        if (paramCount == 2U) {
+            const float linearBeta = activationParams[1];
+            OP_TILING_CHECK(!std::isfinite(linearBeta) || linearBeta == 0.0f,
+                            OP_LOGE_FOR_INVALID_VALUE(nodeName, "situglu_linear_beta",
+                                                      std::to_string(linearBeta).c_str(),
+                                                       "should be finite and non-zero"),
+                            return ge::GRAPH_FAILED);
+        }
     }
 
     return ge::GRAPH_SUCCESS;
@@ -563,6 +589,7 @@ static ge::graphStatus SetAttrParams(const gert::TilingContext *context, MegaMoe
 
     auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>((config.attrEpWorldSizeIndex));
     auto maxRecvTokenNumPtr = attrs->GetAttrPointer<int64_t>((config.attrMaxRecvTokenNumIndex));
+    auto activationPtr = attrs->GetAttrPointer<char>(static_cast<int>(config.attrActivationIndex));
     auto activationParamsPtr = attrs->GetListFloat(config.attrActivationParamsIndex);
 
     tilingData->epWorldSize = *epWorldSizePtr;
@@ -576,12 +603,26 @@ static ge::graphStatus SetAttrParams(const gert::TilingContext *context, MegaMoe
                                                                         tilingData->moeExpertPerRank);
     tilingData->blockNumPerEP = std::max(static_cast<uint32_t>(1), aicNum / tilingData->epWorldSize);
     tilingData->combineQuantMode = GetCombineQuantModeByAttr(context, config);
-    tilingData->clampLimit = activationParamsPtr->GetSize() == 0U ? DEFAULT_ACTIVATION_CLAMP :
-                                                                    activationParamsPtr->GetData()[0];
-    tilingData->actMode = 0U;    // ACT_MODE_SWIGLU, 功能关闭
-    tilingData->actSubMode = 0U; // ACT_SUB_MODE_DEFAULT
-    tilingData->activationAlpha = 1.0f;
-    tilingData->activationBeta = 1.0f;
+    const float *activationParams = activationParamsPtr->GetData();
+    if (std::strcmp(activationPtr, "situglu") == 0) {
+        tilingData->clampLimit = std::numeric_limits<float>::max();
+        tilingData->actMode = 1U;    // ACT_MODE_SITU
+        tilingData->activationBeta = activationParams[0];
+        if (activationParamsPtr->GetSize() == 2U) {
+            tilingData->actSubMode = 1U; // ACT_SUB_MODE_LINEAR
+            tilingData->activationAlpha = activationParams[1];
+        } else {
+            tilingData->actSubMode = 0U; // ACT_SUB_MODE_DEFAULT
+            tilingData->activationAlpha = 0.0f;
+        }
+    } else {
+        tilingData->clampLimit = activationParamsPtr->GetSize() == 0U ? DEFAULT_ACTIVATION_CLAMP :
+                                                                        activationParams[0];
+        tilingData->actMode = 0U;    // ACT_MODE_SWIGLU
+        tilingData->actSubMode = 0U; // ACT_SUB_MODE_DEFAULT
+        tilingData->activationAlpha = 1.0f;
+        tilingData->activationBeta = 1.0f;
+    }
 
     tilingData->sharedExpertNum = static_cast<uint32_t>(
         GetWeightExpertCount(context, config.sharedWeight1Index, tilingData->isPerExpertWeightTensor));
