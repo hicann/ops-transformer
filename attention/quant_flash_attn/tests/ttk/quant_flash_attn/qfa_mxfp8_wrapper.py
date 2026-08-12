@@ -154,5 +154,5 @@ def npu_qfa_mxfp8(
     if not enable_lse:
         lse_out = None
     elif isinstance(lse_out, torch.Tensor) and lse_out.ndim == 2:
- 	    lse_out = lse_out.reshape(lse_out.shape[1], lse_out.shape[0]).contiguous()
+        lse_out = lse_out.reshape(lse_out.shape[1], lse_out.shape[0]).contiguous()
     return atten_out, lse_out
