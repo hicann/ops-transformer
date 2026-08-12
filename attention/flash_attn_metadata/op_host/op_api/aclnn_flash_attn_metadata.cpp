@@ -52,8 +52,9 @@ aclnnStatus aclnnFlashAttnMetadataGetWorkspaceSize(
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     auto ret = FlashAttnMetadataCheck::ParamsCheck(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional,
-        sequsedKvOptional, batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, maskMode, winLeft,
-        winRight, layoutQ, layoutKv, layoutOut, metaData);
+                                                   sequsedKvOptional, batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ,
+                                                   numHeadsKv, headDim, maskMode, winLeft,
+                                                   winRight, layoutQ, layoutKv, layoutOut, metaData);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
@@ -67,13 +68,13 @@ aclnnStatus aclnnFlashAttnMetadataGetWorkspaceSize(
                                           aivCoreNum, metaData, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    *workspaceSize = 0;
+    *workspaceSize = uniqueExecutor->GetWorkspaceSize();
     uniqueExecutor.ReleaseTo(executor);
     return ACLNN_SUCCESS;
 }
 
 aclnnStatus aclnnFlashAttnMetadata(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
-    aclrtStream stream)
+                                   aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnFlashAttnMetadata);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
