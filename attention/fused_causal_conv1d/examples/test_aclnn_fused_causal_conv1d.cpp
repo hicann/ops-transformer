@@ -19,16 +19,16 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_fused_causal_conv1d.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
@@ -108,12 +108,11 @@ int main()
     auto ret = Init(deviceId, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
-    int64_t K = 3;            // kernel width
-    int64_t dim = 128;        // feature dimension
-    int64_t batch = 4;        // number of sequences
-    int64_t numSlots = 8;     // total cache slots (>= batch for non-APC)
-    int64_t stateLen = K - 1; // cache state length per slot (= 2)
-    // prefill: seq_lens = [5, 3, 7, 4], cuSeqLen = 19
+    int64_t K = 3;                // kernel width
+    int64_t dim = 128;            // feature dimension
+    int64_t batch = 4;            // number of sequences
+    int64_t numSlots = 8;         // total cache slots (>= batch for non-APC)
+    int64_t stateLen = 6 + K - 1; // cache state length per slot (decode:m+k-1)
     int64_t cuSeqLen = 19;
 
     // ---- Tensor shapes ----
@@ -204,7 +203,7 @@ int main()
     int64_t activationMode = 0; // 0: None
     int64_t padSlotId = -1;     // -1: no pad-slot skipping
     int64_t runMode = 0;        // 0: prefill
-    int64_t maxQueryLen = cuSeqLen;
+    int64_t maxQueryLen = 7;
     int64_t residualConnection = 0; // 0: no residual
     int64_t blockSize = 0;          // 0: non-APC
     int64_t convMode = 0;           // 0: Qwen/Pangu7B

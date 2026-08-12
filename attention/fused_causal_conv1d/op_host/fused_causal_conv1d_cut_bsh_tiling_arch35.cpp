@@ -374,13 +374,6 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::CheckAttrs()
         return ge::GRAPH_FAILED;
     }
 
-    // run_mode=1（decode）时，num_computed_tokens 必须提供
-    if (runMode_ == 1 && hasNumComputedTokens_ == 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "num_computed_tokens", "nullptr",
-                                              "num_computed_tokens cannot be nullptr when run_mode is 1");
-        return ge::GRAPH_FAILED;
-    }
-
     // residual_connection ∈ {0, 1}
     if (residualConnection_ != 0UL && residualConnection_ != 1UL) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "residual_connection",

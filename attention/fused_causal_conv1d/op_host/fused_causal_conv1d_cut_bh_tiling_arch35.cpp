@@ -395,7 +395,7 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateXShape()
         // 2D 模式下通过属性传入最大序列长度
         if (maxQueryLen_ < 1 || maxQueryLen_ > MAX_M + 1) {
             std::string reasonMsg =
-                "The value of max_query_len must be within the range [1, " + std::to_string(MAX_M + 1) + "]";
+                "The value of max_query_len must be greater than 0";
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "max_query_len",
                                                   std::to_string(maxQueryLen_).c_str(), reasonMsg.c_str());
             return ge::GRAPH_FAILED;
@@ -711,13 +711,6 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateAttrs()
     if (runMode_ != 0 && runMode_ != 1) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "run_mode", std::to_string(runMode_).c_str(),
                                               "The value of run_mode must be 0 or 1");
-        return ge::GRAPH_FAILED;
-    }
-
-    // run_mode=1（decode）时，num_computed_tokens 必须提供
-    if (runMode_ == 1 && hasNumComputedTokens_ == 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "num_computed_tokens", "nullptr",
-                                              "num_computed_tokens cannot be nullptr when run_mode is 1");
         return ge::GRAPH_FAILED;
     }
 
