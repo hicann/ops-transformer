@@ -17,7 +17,7 @@ import cann_ops_transformer
 import numpy as np
 import torch.nn as nn
 
-metadata = torch.ops.cann_ops_transformer.mixed_quant_sparse_flash_mla_metadata(
+metadata = torch.ops.cann_ops_transformer.quant_sparse_flash_mla_metadata(
     cu_seqlens_q=torch.tensor([0, 10], dtype=torch.int32).npu(),
     cu_seqlens_ori_kv=None,
     cu_seqlens_cmp_kv=None,

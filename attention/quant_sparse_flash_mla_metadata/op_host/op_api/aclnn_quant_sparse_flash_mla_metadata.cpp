@@ -84,7 +84,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
                            cmpMaskMode, oriWinLeft, oriWinRight, layoutQOptional, layoutKvOptional, hasOriKv, hasCmpKv,
                            aicCoreNum, aivCoreNum, socVersion, metaData);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    
+
     const aclTensor *cuSeqlensQOptionalContiguous = nullptr;
     if (cuSeqlensQOptional != nullptr) {
         cuSeqlensQOptionalContiguous = l0op::Contiguous(cuSeqlensQOptional, uniqueExecutor.get());

@@ -23,7 +23,7 @@
 #include <vector>
 #include "acl/acl.h"
 #include "aclnnop/aclnn_quant_sparse_flash_mla.h"
-#include "aclnnop/aclnn_mixed_quant_sparse_flash_mla_metadata.h"
+#include "aclnnop/aclnn_quant_sparse_flash_mla_metadata.h"
 
 #define CHECK_RET(cond, return_expr) \
     do { \
@@ -155,7 +155,6 @@ int main()
     int64_t oriMaskMode = 4;
     int64_t cmpMaskMode = 3;
     int64_t quantMode = 1;
-    int64_t ropeHeadDim = 64;
     double softmaxScale = 1.0 / sqrt(static_cast<double>(D));
 
     int64_t kvD = D;
@@ -328,12 +327,12 @@ int main()
     uint64_t metadataWorkspaceSize = 0;
     aclOpExecutor *metadataExecutor = nullptr;
 
-    ret = aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
+    ret = aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
         cuSeqLensQ, cuSeqLensOriKv, cuSeqLensCmpKv, seqUsedQ, seqUsedOriKv, seqUsedCmpKv, cmpResidualKv, nullptr,
-        nullptr, N1, N2, D, quantMode, B, S1, S2, cmpKvLen, 0, K, ropeHeadDim, cmpRatio, oriMaskMode, cmpMaskMode,
+        nullptr, N1, N2, D, quantMode, B, S1, S2, cmpKvLen, 0, K, cmpRatio, oriMaskMode, cmpMaskMode,
         oriWinLeft, oriWinRight, layoutQ, layoutKv, true, true, metadata, &metadataWorkspaceSize, &metadataExecutor);
     CHECK_RET(ret == ACL_SUCCESS,
-              LOG_PRINT("aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
+              LOG_PRINT("aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
     void *metadataWorkspaceAddr = nullptr;
@@ -342,8 +341,8 @@ int main()
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate metadata workspace failed. ERROR: %d\n", ret); return ret);
     }
 
-    ret = aclnnMixedQuantSparseFlashMlaMetadata(metadataWorkspaceAddr, metadataWorkspaceSize, metadataExecutor, stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMixedQuantSparseFlashMlaMetadata failed. ERROR: %d\n", ret);
+    ret = aclnnQuantSparseFlashMlaMetadata(metadataWorkspaceAddr, metadataWorkspaceSize, metadataExecutor, stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnQuantSparseFlashMlaMetadata failed. ERROR: %d\n", ret);
               return ret);
 
     ret = aclrtSynchronizeStream(stream);

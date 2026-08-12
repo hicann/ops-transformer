@@ -88,17 +88,24 @@ bool QuantSparseFlashMlaMetadataCpuKernel::ParamsCheck()
         return false;
     }
     int32_t batchSize = GetQueryBatchSize();
+    return (CheckSeqLen(batchSize) &&
+            CheckCuSeqLen(batchSize) &&
+            CheckTopkLength(batchSize) &&
+            CheckFeature(batchSize));
+}
+
+bool QuantSparseFlashMlaMetadataCpuKernel::CheckCuSeqLen(int32_t batchSize)
+{
     // 校验 cu_seqlens_q 元素
     if (layoutQ_ == "TND") {
         if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
             const int32_t *cuSeqlensQPtr = static_cast<const int32_t *>(cuSeqlensQ_->GetData());
+            // 校验 cu_seqlens_q 首元素为 0
+            if (cuSeqlensQPtr[0] != 0) {
+                KERNEL_LOG_ERROR("The first element of cu_seqlens_q should be 0, but got %d", cuSeqlensQPtr[0]);
+                return false;
+            }
             for (int i = 0; i < batchSize + 1; i++) {
-                // 校验 cu_seqlens_q 元素非负
-                if (cuSeqlensQPtr[i] < 0) {
-                    KERNEL_LOG_ERROR("The elements in cu_seqlens_q should be >= 0, but got cu_seqlens_q[%d] = %d", i,
-                                     cuSeqlensQPtr[i]);
-                    return false;
-                }
                 // 校验 cu_seqlens_q 元素递增
                 if (i > 0 && cuSeqlensQPtr[i - 1] > cuSeqlensQPtr[i]) {
                     KERNEL_LOG_ERROR("The elements in cu_seqlens_q must be in ascending order, "
@@ -109,31 +116,18 @@ bool QuantSparseFlashMlaMetadataCpuKernel::ParamsCheck()
             }
         }
     }
-    // 校验 seqused_q 元素
-    if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
-        const int32_t *sequsedQPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
-        for (int i = 0; i < batchSize; i++) {
-            // 校验 seqused_q 元素非负
-            if (sequsedQPtr[i] < 0) {
-                KERNEL_LOG_ERROR("The elements in seqused_q should be >= 0, but got seqused_q[%d] = %d", i,
-                                 sequsedQPtr[i]);
-                return false;
-            }
-        }
-    }
     if (hasOriKv_) {
         // 校验 cu_seqlens_ori_kv 元素
         if (layoutKv_ == "TND") {
             if (cuSeqlensOriKv_ != nullptr && cuSeqlensOriKv_->GetData() != nullptr) {
                 const int32_t *cuSeqlensOriKvPtr = static_cast<const int32_t *>(cuSeqlensOriKv_->GetData());
+                // 校验 cu_seqlens_ori_kv 首元素为 0
+                if (cuSeqlensOriKvPtr[0] != 0) {
+                    KERNEL_LOG_ERROR("The first element of cu_seqlens_ori_kv should be 0, but got %d",
+                                     cuSeqlensOriKvPtr[0]);
+                    return false;
+                }
                 for (int i = 0; i < batchSize + 1; i++) {
-                    // 校验 cu_seqlens_ori_kv 元素非负
-                    if (cuSeqlensOriKvPtr[i] < 0) {
-                        KERNEL_LOG_ERROR("The elements in cu_seqlens_ori_kv should be >= 0, "
-                                         "but got cu_seqlens_ori_kv[%d] = %d",
-                                         i, cuSeqlensOriKvPtr[i]);
-                        return false;
-                    }
                     // 校验 cu_seqlens_ori_kv 元素递增
                     if (i > 0 && cuSeqlensOriKvPtr[i - 1] > cuSeqlensOriKvPtr[i]) {
                         KERNEL_LOG_ERROR("The elements in cu_seqlens_ori_kv must be in ascending order, "
@@ -144,32 +138,19 @@ bool QuantSparseFlashMlaMetadataCpuKernel::ParamsCheck()
                 }
             }
         }
-        // 校验 seqused_ori_kv 元素
-        if (sequsedOriKv_ != nullptr && sequsedOriKv_->GetData() != nullptr) {
-            const int32_t *sequsedOriKvPtr = static_cast<const int32_t *>(sequsedOriKv_->GetData());
-            for (int i = 0; i < batchSize; i++) {
-                // 校验 seqused_ori_kv 元素非负
-                if (sequsedOriKvPtr[i] < 0) {
-                    KERNEL_LOG_ERROR("The elements in seqused_ori_kv should be >= 0, but got seqused_ori_kv[%d] = %d",
-                                     i, sequsedOriKvPtr[i]);
-                    return false;
-                }
-            }
-        }
     }
     if (hasCmpKv_) {
         if (layoutKv_ == "TND") {
             // 校验 cu_seqlens_cmp_kv 元素
             if (cuSeqlensCmpKv_ != nullptr && cuSeqlensCmpKv_->GetData() != nullptr) {
                 const int32_t *cuSeqlensCmpKvPtr = static_cast<const int32_t *>(cuSeqlensCmpKv_->GetData());
+                // 校验 cu_seqlens_cmp_kv 首元素为 0
+                if (cuSeqlensCmpKvPtr[0] != 0) {
+                    KERNEL_LOG_ERROR("The first element of cu_seqlens_cmp_kv should be 0, but got %d",
+                                     cuSeqlensCmpKvPtr[0]);
+                    return false;
+                }
                 for (int i = 0; i < batchSize + 1; i++) {
-                    // 校验 cu_seqlens_cmp_kv 元素非负
-                    if (cuSeqlensCmpKvPtr[i] < 0) {
-                        KERNEL_LOG_ERROR("The elements in cu_seqlens_cmp_kv should be >= 0, "
-                                         "but got cu_seqlens_cmp_kv[%d] = %d",
-                                         i, cuSeqlensCmpKvPtr[i]);
-                        return false;
-                    }
                     // 校验 cu_seqlens_cmp_kv 元素递增
                     if (i > 0 && cuSeqlensCmpKvPtr[i - 1] > cuSeqlensCmpKvPtr[i]) {
                         KERNEL_LOG_ERROR("The elements in cu_seqlens_cmp_kv must be in ascending order, "
@@ -180,9 +161,86 @@ bool QuantSparseFlashMlaMetadataCpuKernel::ParamsCheck()
                 }
             }
         }
+    }
+    return true;
+}
+
+bool QuantSparseFlashMlaMetadataCpuKernel::CheckSeqLen(int32_t batchSize)
+{
+    // 校验 seqused_q 元素
+    if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
+        const int32_t *sequsedQPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
+        const int32_t *cuSeqlensQPtr = (layoutQ_ == "TND" && cuSeqlensQ_ != nullptr &&
+                                        cuSeqlensQ_->GetData() != nullptr) ?
+                                           static_cast<const int32_t *>(cuSeqlensQ_->GetData()) :
+                                           nullptr;
+        for (int i = 0; i < batchSize; i++) {
+            // 校验 seqused_q 元素非负
+            if (sequsedQPtr[i] < 0) {
+                KERNEL_LOG_ERROR("The elements in seqused_q should be >= 0, but got seqused_q[%d] = %d", i,
+                                 sequsedQPtr[i]);
+                return false;
+            }
+            // 校验 seqused_q 元素不大于 max_seqlen_q (BSND) 或 cu_seqlens_q 序列长度 (TND)
+            if (layoutQ_ == "BSND" && sequsedQPtr[i] > maxSeqlenQ_) {
+                KERNEL_LOG_ERROR("The elements in seqused_q should not be greater than max_seqlen_q %d, "
+                                 "but got seqused_q[%d] = %d",
+                                 maxSeqlenQ_, i, sequsedQPtr[i]);
+                return false;
+            }
+            if (cuSeqlensQPtr != nullptr) {
+                int32_t seqLen = cuSeqlensQPtr[i + 1] - cuSeqlensQPtr[i];
+                if (sequsedQPtr[i] > seqLen) {
+                    KERNEL_LOG_ERROR("The elements in seqused_q should not be greater than the sequence length "
+                                     "from cu_seqlens_q %d, but got seqused_q[%d] = %d",
+                                     seqLen, i, sequsedQPtr[i]);
+                    return false;
+                }
+            }
+        }
+    }
+    if (hasOriKv_) {
+        // 校验 seqused_ori_kv 元素
+        if (sequsedOriKv_ != nullptr && sequsedOriKv_->GetData() != nullptr) {
+            const int32_t *sequsedOriKvPtr = static_cast<const int32_t *>(sequsedOriKv_->GetData());
+            const int32_t *cuSeqlensOriKvPtr = (layoutKv_ == "TND" && cuSeqlensOriKv_ != nullptr &&
+                                                cuSeqlensOriKv_->GetData() != nullptr) ?
+                                                   static_cast<const int32_t *>(cuSeqlensOriKv_->GetData()) :
+                                                   nullptr;
+            for (int i = 0; i < batchSize; i++) {
+                // 校验 seqused_ori_kv 元素非负
+                if (sequsedOriKvPtr[i] < 0) {
+                    KERNEL_LOG_ERROR("The elements in seqused_ori_kv should be >= 0, but got seqused_ori_kv[%d] = %d",
+                                     i, sequsedOriKvPtr[i]);
+                    return false;
+                }
+                // 校验 seqused_ori_kv 元素不大于 max_seqlen_ori_kv (BSND) 或 cu_seqlens_ori_kv 序列长度 (TND)
+                if (layoutKv_ == "BSND" && sequsedOriKvPtr[i] > maxSeqlenOriKv_) {
+                    KERNEL_LOG_ERROR("The elements in seqused_ori_kv should not be greater than "
+                                     "max_seqlen_ori_kv %d, but got seqused_ori_kv[%d] = %d",
+                                     maxSeqlenOriKv_, i, sequsedOriKvPtr[i]);
+                    return false;
+                }
+                if (cuSeqlensOriKvPtr != nullptr) {
+                    int32_t seqLen = cuSeqlensOriKvPtr[i + 1] - cuSeqlensOriKvPtr[i];
+                    if (sequsedOriKvPtr[i] > seqLen) {
+                        KERNEL_LOG_ERROR("The elements in seqused_ori_kv should not be greater than the sequence "
+                                         "length from cu_seqlens_ori_kv %d, but got seqused_ori_kv[%d] = %d",
+                                         seqLen, i, sequsedOriKvPtr[i]);
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    if (hasCmpKv_) {
         // 校验 seqused_cmp_kv 元素
         if (sequsedCmpKv_ != nullptr && sequsedCmpKv_->GetData() != nullptr) {
             const int32_t *sequsedCmpKvPtr = static_cast<const int32_t *>(sequsedCmpKv_->GetData());
+            const int32_t *cuSeqlensCmpKvPtr = (layoutKv_ == "TND" && cuSeqlensCmpKv_ != nullptr &&
+                                                cuSeqlensCmpKv_->GetData() != nullptr) ?
+                                                   static_cast<const int32_t *>(cuSeqlensCmpKv_->GetData()) :
+                                                   nullptr;
             for (int i = 0; i < batchSize; i++) {
                 // 校验 seqused_cmp_kv 元素非负
                 if (sequsedCmpKvPtr[i] < 0) {
@@ -190,22 +248,134 @@ bool QuantSparseFlashMlaMetadataCpuKernel::ParamsCheck()
                                      i, sequsedCmpKvPtr[i]);
                     return false;
                 }
+                // 校验 seqused_cmp_kv 元素不大于 max_seqlen_cmp_kv (BSND) 或 cu_seqlens_cmp_kv 序列长度 (TND)
+                if (layoutKv_ == "BSND" && sequsedCmpKvPtr[i] > maxSeqlenCmpKv_) {
+                    KERNEL_LOG_ERROR("The elements in seqused_cmp_kv should not be greater than "
+                                     "max_seqlen_cmp_kv %d, but got seqused_cmp_kv[%d] = %d",
+                                     maxSeqlenCmpKv_, i, sequsedCmpKvPtr[i]);
+                    return false;
+                }
+                if (cuSeqlensCmpKvPtr != nullptr) {
+                    int32_t seqLen = cuSeqlensCmpKvPtr[i + 1] - cuSeqlensCmpKvPtr[i];
+                    if (sequsedCmpKvPtr[i] > seqLen) {
+                        KERNEL_LOG_ERROR("The elements in seqused_cmp_kv should not be greater than the sequence "
+                                         "length from cu_seqlens_cmp_kv %d, but got seqused_cmp_kv[%d] = %d",
+                                         seqLen, i, sequsedCmpKvPtr[i]);
+                        return false;
+                    }
+                }
             }
         }
-        // 校验 cmp_residual_kv 元素
-        if (cmpResidualKv_ != nullptr && cmpResidualKv_->GetData() != nullptr) {
-            const int32_t *cmpResidualKvPtr = static_cast<const int32_t *>(cmpResidualKv_->GetData());
-            for (int i = 0; i < batchSize; i++) {
-                // 校验 cmp_residual_kv 元素非负
-                if (cmpResidualKvPtr[i] < 0) {
-                    KERNEL_LOG_ERROR("The elements in cmp_residual_kv should be >= 0, but got cmp_residual_kv[%d] = %d",
-                                     i, cmpResidualKvPtr[i]);
+    }
+    return true;
+}
+
+bool QuantSparseFlashMlaMetadataCpuKernel::CheckTopkLength(int32_t batchSize)
+{
+    if (hasOriKv_) {
+        // 校验 ori_topk_length 元素
+        if (oriTopK_ != 0 && oriMaskMode_ == static_cast<int32_t>(SparseMode::DEFAULT_MASK) &&
+            oriTopkLength_ != nullptr && oriTopkLength_->GetData() != nullptr) {
+            // 校验 ori_topk_length 元素数量
+            int32_t sumOfQuerySeq = GetSumOfQuerySeq();
+            const int32_t *oriTopkLengthPtr = static_cast<const int32_t *>(oriTopkLength_->GetData());
+            auto oriTopkLengthShape = oriTopkLength_->GetTensorShape();
+            int32_t oriTopkLengthSize = layoutQ_ == "TND" ?
+                                            oriTopkLengthShape->GetDimSize(0) * oriTopkLengthShape->GetDimSize(1) :
+                                            oriTopkLengthShape->GetDimSize(0) * oriTopkLengthShape->GetDimSize(1) *
+                                                oriTopkLengthShape->GetDimSize(2);
+            if (oriTopkLengthSize < sumOfQuerySeq) {
+                KERNEL_LOG_ERROR("The size of ori_topk_length %d should not be smaller than "
+                                 "the sum of query sequence %d!",
+                                 oriTopkLengthSize, sumOfQuerySeq);
+                return false;
+            }
+            // 校验 ori_topk_length 元素非负
+            for (int i = 0; i < oriTopkLengthSize; i++) {
+                if (oriTopkLengthPtr[i] < 0) {
+                    KERNEL_LOG_ERROR("The elements in ori_topk_length should be >= 0, but got ori_topk_length[%d] = %d",
+                                     i, oriTopkLengthPtr[i]);
+                    return false;
+                }
+            }
+        }
+    }
+    if (hasCmpKv_) {
+        // 校验 cmp_topk_length 元素
+        if (cmpTopK_ != 0 && cmpMaskMode_ == static_cast<int32_t>(SparseMode::DEFAULT_MASK) &&
+            cmpTopkLength_ != nullptr && cmpTopkLength_->GetData() != nullptr) {
+            // 校验 cmp_topk_length 元素数量
+            int32_t sumOfQuerySeq = GetSumOfQuerySeq();
+            const int32_t *cmpTopkLengthPtr = static_cast<const int32_t *>(cmpTopkLength_->GetData());
+            auto cmpTopkLengthShape = cmpTopkLength_->GetTensorShape();
+            int32_t cmpTopkLengthSize = layoutQ_ == "TND" ?
+                                            cmpTopkLengthShape->GetDimSize(0) * cmpTopkLengthShape->GetDimSize(1) :
+                                            cmpTopkLengthShape->GetDimSize(0) * cmpTopkLengthShape->GetDimSize(1) *
+                                                cmpTopkLengthShape->GetDimSize(2);
+            if (cmpTopkLengthSize < sumOfQuerySeq) {
+                KERNEL_LOG_ERROR("The size of cmp_topk_length %d should not be smaller than "
+                                 "the sum of query sequence %d!",
+                                 cmpTopkLengthSize, sumOfQuerySeq);
+                return false;
+            }
+            // 校验 cmp_topk_length 元素非负
+            for (int i = 0; i < cmpTopkLengthSize; i++) {
+                if (cmpTopkLengthPtr[i] < 0) {
+                    KERNEL_LOG_ERROR("The elements in cmp_topk_length should be >= 0, but got cmp_topk_length[%d] = %d",
+                                     i, cmpTopkLengthPtr[i]);
                     return false;
                 }
             }
         }
     }
     return true;
+}
+
+bool QuantSparseFlashMlaMetadataCpuKernel::CheckFeature(int32_t batchSize)
+{
+    // 校验 cmp_residual_kv 元素
+    if (cmpResidualKv_ != nullptr && cmpResidualKv_->GetData() != nullptr) {
+        const int32_t *cmpResidualKvPtr = static_cast<const int32_t *>(cmpResidualKv_->GetData());
+        for (int i = 0; i < batchSize; i++) {
+            // 校验 cmp_residual_kv 元素非负
+            if (cmpResidualKvPtr[i] < 0 || cmpResidualKvPtr[i] >= cmpRatio_) {
+                KERNEL_LOG_ERROR("The elements in cmp_residual_kv should be in [0, cmpRatio_(%d)), but got "
+                                 "cmp_residual_kv[%d] = %d",
+                                 cmpRatio_,
+                                 i, cmpResidualKvPtr[i]);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+int32_t QuantSparseFlashMlaMetadataCpuKernel::GetSumOfQuerySeq()
+{
+    int32_t batchSize = GetQueryBatchSize();
+    // 如果sequsedQ_ 传了，使用sequsedQ_获取 BsSize
+    if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
+        if (sequsedQ_->GetTensorShape() != nullptr) {
+            const int32_t *seqUsedPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
+            int32_t queryBsSize = 0;
+            for (int i = 0; i < batchSize; i++) {
+                queryBsSize += seqUsedPtr[i];
+            }
+            return queryBsSize;
+        }
+    }
+    // sequsedQ_ 没传，判断 Layout
+    if (layoutQ_ == "TND") {
+        // 如果是 TND，尝试使用 cuSeqlensQ_获取 BsSize
+        if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
+            if (cuSeqlensQ_->GetTensorShape() != nullptr) {
+                const int32_t *s1Ptr = static_cast<const int32_t *>(cuSeqlensQ_->GetData());
+                return s1Ptr[batchSize];
+            }
+        }
+    }
+    // 如果不是 TND，或者 cuSeqlensQ_ 为空，使用shape信息计算 BsSize
+    return batchSize_ * maxSeqlenQ_;
 }
 
 int32_t QuantSparseFlashMlaMetadataCpuKernel::GetQueryBatchSize()
@@ -301,13 +471,61 @@ bool QuantSparseFlashMlaMetadataCpuKernel::ParamsInit()
     return true;
 }
 
-uint32_t QuantSparseFlashMlaMetadataCpuKernel::GetOriTopkLength()
+uint32_t QuantSparseFlashMlaMetadataCpuKernel::GetS1Idx(uint32_t s1Size, uint32_t s1GIdx)
 {
+    uint32_t s1GToken = s1GIdx * mBaseSize_;
+    uint32_t s1Idx = 0;
+    if (isS1G_) {
+        s1Idx = s1GToken / static_cast<int64_t>(groupSize_);
+    } else {
+        s1Idx = s1GToken % static_cast<int64_t>(s1Size);
+    }
+    return s1Idx;
+}
+
+uint32_t QuantSparseFlashMlaMetadataCpuKernel::GetBsStride(uint32_t bIdx, uint32_t s1Idx)
+{
+    uint32_t bsStride = 0;
+    if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
+        const int32_t *seqUsedPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
+        for (uint32_t i = 0; i < bIdx; i++) {
+            bsStride += seqUsedPtr[i];
+        }
+        bsStride += s1Idx;
+        return bsStride;
+    }
+    if (layoutQ_ == "TND") {
+        if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
+            const int32_t *s1Ptr = static_cast<const int32_t *>(cuSeqlensQ_->GetData());
+            bsStride = s1Ptr[bIdx] + s1Idx;
+            return bsStride;
+        }
+    }
+    bsStride = bIdx * static_cast<uint32_t>(maxSeqlenQ_) + s1Idx;
+    return bsStride;
+}
+
+uint32_t QuantSparseFlashMlaMetadataCpuKernel::GetOriTopkLength(uint32_t bsStride)
+{
+    // 尝试使用 oriTopkLength_
+    if (oriTopK_ != 0 && oriMaskMode_ == static_cast<int32_t>(SparseMode::DEFAULT_MASK) &&
+        oriTopkLength_ != nullptr && oriTopkLength_->GetData() != nullptr) {
+        const int32_t *oriTopkPtr = static_cast<const int32_t *>(oriTopkLength_->GetData());
+        return static_cast<uint32_t>(oriTopkPtr[bsStride]);
+    }
+    // 如果不是 DEFAULT_MASK，使用 oriTopK_
     return static_cast<uint32_t>(oriTopK_);
 }
 
-uint32_t QuantSparseFlashMlaMetadataCpuKernel::GetCmpTopkLength()
+uint32_t QuantSparseFlashMlaMetadataCpuKernel::GetCmpTopkLength(uint32_t bsStride)
 {
+    // 尝试使用 cmpTopkLength_
+    if (cmpTopK_ != 0 && cmpMaskMode_ == static_cast<int32_t>(SparseMode::DEFAULT_MASK) &&
+        cmpTopkLength_ != nullptr && cmpTopkLength_->GetData() != nullptr) {
+        const int32_t *cmpTopkPtr = static_cast<const int32_t *>(cmpTopkLength_->GetData());
+        return static_cast<uint32_t>(cmpTopkPtr[bsStride]);
+    }
+    // 如果不是 DEFAULT_MASK，使用 cmpTopK_
     return static_cast<uint32_t>(cmpTopK_);
 }
 
@@ -345,8 +563,8 @@ uint32_t QuantSparseFlashMlaMetadataCpuKernel::GetOriS2SeqSize(uint32_t bIdx)
             return static_cast<uint32_t>(s2Ptr[bIdx + 1U] - s2Ptr[bIdx]);
         }
     }
-    // 如果 max_seqlen_ori_kv 没传入，且 ori_kv 为稀疏的，则尝试从 topk 中获取
-    if (maxSeqlenOriKv_ == 0 && isSparseOriKv_) {
+    // 如果是PA场景，或 max_seqlen_ori_kv 没传入，且 ori_kv 为稀疏的，则尝试从 topk 中获取
+    if ((layoutKv_ == "PA_BBND" || maxSeqlenOriKv_ == 0) && isSparseOriKv_) {
         return UINT32_MAX;
     }
     // 使用 max_seqlen_ori_kv
@@ -368,8 +586,8 @@ uint32_t QuantSparseFlashMlaMetadataCpuKernel::GetCmpS2SeqSize(uint32_t bIdx)
             return static_cast<uint32_t>(s2Ptr[bIdx + 1U] - s2Ptr[bIdx]);
         }
     }
-    // 如果 max_seqlen_cmp_kv 没传入，且 cmp_kv 为稀疏的，则尝试从topk中获取
-    if (maxSeqlenCmpKv_ == 0 && isSparseCmpKv_) {
+    // 如果是PA场景，或 max_seqlen_cmp_kv 没传入，且 cmp_kv 为稀疏的，则尝试从topk中获取
+    if ((layoutKv_ == "PA_BBND" || maxSeqlenCmpKv_ == 0) && isSparseCmpKv_) {
         return UINT32_MAX;
     }
     // 使用 max_seqlen_cmp_kv
@@ -668,7 +886,9 @@ void QuantSparseFlashMlaMetadataCpuKernel::CalcOriBlockRange(const Range<int64_t
             Clip(oriS2FirstToken, static_cast<int64_t>(0), static_cast<int64_t>(batchCache.oriS2Size - 1U));
         oriS2LastToken = Clip(oriS2LastToken, static_cast<int64_t>(0), static_cast<int64_t>(batchCache.oriS2Size - 1U));
         // oriS2LastToken 与 topk 取最小
-        uint32_t oriTopkSize = GetOriTopkLength();
+        uint32_t s1Idx = GetS1Idx(batchCache.s1Size, s1GCache.s1GIdx);
+        uint32_t bsStride = GetBsStride(s1GCache.bIdx, s1Idx);
+        uint32_t oriTopkSize = GetOriTopkLength(bsStride);
         uint32_t actOriS2Size = isSparseOriKv_ ?
                                     std::min(static_cast<uint32_t>(oriS2LastToken - oriS2FirstToken + 1), oriTopkSize) :
                                     static_cast<uint32_t>(oriS2LastToken - oriS2FirstToken + 1);
@@ -704,7 +924,9 @@ void QuantSparseFlashMlaMetadataCpuKernel::CalcCmpBlockRange(const Range<int64_t
             (cmpRevertS2FirstToken + 1) / cmpRatio_ == 0 ? 0 : (cmpRevertS2FirstToken + 1) / cmpRatio_ - 1U;
         uint64_t cmpS2LastToken = (cmpRevertS2LastToken + 1) / cmpRatio_ - 1U;
         // cmpS2LastToken 与 topk 取最小
-        uint32_t cmpTopkSize = GetCmpTopkLength();
+        uint32_t s1Idx = GetS1Idx(batchCache.s1Size, s1GCache.s1GIdx);
+        uint32_t bsStride = GetBsStride(s1GCache.bIdx, s1Idx);
+        uint32_t cmpTopkSize = GetCmpTopkLength(bsStride);
         uint32_t actCmpS2Size = isSparseCmpKv_ ?
                                     std::min(static_cast<uint32_t>(cmpS2LastToken - cmpS2FirstToken + 1), cmpTopkSize) :
                                     static_cast<uint32_t>(cmpS2LastToken - cmpS2FirstToken + 1);

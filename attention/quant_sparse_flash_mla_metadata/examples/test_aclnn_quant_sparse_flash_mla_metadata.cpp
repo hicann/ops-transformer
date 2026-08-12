@@ -32,7 +32,7 @@
 // 参考 quant_sparse_flash_mla_metadata.h
 constexpr uint32_t AIC_CORE_MAX_NUM = 36;
 constexpr uint32_t AIV_CORE_MAX_NUM = 72;
-constexpr uint32_t MQSMLA_METADATA_TOTAL_SIZE = 1024;
+constexpr uint32_t QSMLA_METADATA_TOTAL_SIZE = 1024;
 constexpr uint32_t FA_METADATA_SIZE = 9;
 constexpr uint32_t FD_METADATA_SIZE = 8;
 
@@ -56,7 +56,7 @@ constexpr uint32_t FD_WORKSPACE_NUM_INDEX = 4;
 constexpr uint32_t FD_M_START_INDEX = 5;
 constexpr uint32_t FD_M_NUM_INDEX = 6;
 
-struct MqsmlaMetadata {
+struct QsmlaMetadata {
     uint32_t faMetadata[AIC_CORE_MAX_NUM][FA_METADATA_SIZE];
     uint32_t fdMetadata[AIV_CORE_MAX_NUM][FD_METADATA_SIZE];
 };
@@ -229,7 +229,7 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     context.numHeadsKv = 1;
     context.headDim = 512;
     context.quantMode = 1;
-    ret = CreateTensor(aclDataType::ACL_INT32, {MQSMLA_METADATA_TOTAL_SIZE}, context.metadata); // 1024: Fix size
+    ret = CreateTensor(aclDataType::ACL_INT32, {QSMLA_METADATA_TOTAL_SIZE}, context.metadata); // 1024: Fix size
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create metadata failed. Error: %d", ret);
     context.oriTopk = 0;
     context.cmpTopk = 0;
@@ -337,7 +337,7 @@ int main()
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtSynchronizeStream failed. ERROR: %d\n", ret);
 
     // 5. 打印输出
-    MqsmlaMetadata result{};
+    QsmlaMetadata result{};
     ret = aclrtMemcpy(&result, sizeof(result), context.metadata.deviceAddr, sizeof(result), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMemcpy failed. ERROR: %d\n", ret);
 
