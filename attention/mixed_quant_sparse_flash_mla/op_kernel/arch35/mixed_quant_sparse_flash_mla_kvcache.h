@@ -61,12 +61,10 @@ __aicore__ inline void GetSingleCoreParam(
                 actualS2CmpSize = actualSeqCmpKvlenGm.GetValue(bIdx);
             } else if (hasCuSeqlensCmpKv) {
                 actualS2CmpSize = cuSeqlensCmpKvGm.GetValue(bIdx + 1) - cuSeqlensCmpKvGm.GetValue(bIdx);
-            } else {
-                actualS2CmpSize = actualS2OriSize / constInfo.cmpRatio;
             }
         } else {
             actualS2CmpSize =
-                (!hasActualSeqCmpKvlen) ? (actualS2OriSize / constInfo.cmpRatio) : actualSeqCmpKvlenGm.GetValue(bIdx);
+                (!hasActualSeqCmpKvlen) ? constInfo.cmpS2Size : actualSeqCmpKvlenGm.GetValue(bIdx);
         }
     }
 
@@ -122,11 +120,26 @@ __aicore__ inline void ComputeS1LoopInfo(RunParamStr &runParam, const ConstInfo 
     runParam.gs1LoopStartIdx = gS1StartIdx;
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-        if (runParam.nextTokensPerBatchOri < 0) {
-            int64_t gs1LoopStartIdx =
-                runParam.nextTokensPerBatchOri * (-1) / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock;
-            if (gs1LoopStartIdx > gS1StartIdx) {
-                runParam.gs1LoopStartIdx = gs1LoopStartIdx;
+        if constexpr (TEMPLATE_MODE == QSMLATemplateMode::HCA_TEMPLATE_MODE ||
+                      TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE) {
+            int64_t skipThreshold = 0;
+            if (runParam.nextTokensPerBatchOri < 0 && runParam.nextTokensPerBatchCmp < 0) {
+                skipThreshold = Min(-runParam.nextTokensPerBatchOri, -runParam.nextTokensPerBatchCmp);
+            }
+            if (skipThreshold > 0) {
+                int64_t gs1LoopStartIdx =
+                    skipThreshold / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock;
+                if (gs1LoopStartIdx > gS1StartIdx) {
+                    runParam.gs1LoopStartIdx = gs1LoopStartIdx;
+                }
+            }
+        } else {
+            if (runParam.nextTokensPerBatchOri < 0) {
+                int64_t gs1LoopStartIdx =
+                    runParam.nextTokensPerBatchOri * (-1) / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock;
+                if (gs1LoopStartIdx > gS1StartIdx) {
+                    runParam.gs1LoopStartIdx = gs1LoopStartIdx;
+                }
             }
         }
     }
@@ -238,10 +251,24 @@ __aicore__ inline bool ComputeParamS1(RunParamStr &runParam, const ConstInfo &co
 {
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-        if (runParam.nextTokensPerBatchOri < 0) {
-            if (runParam.s1oIdx <
-                (runParam.nextTokensPerBatchOri * (-1)) / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock) {
-                return true;
+        if constexpr (TEMPLATE_MODE == QSMLATemplateMode::HCA_TEMPLATE_MODE ||
+                      TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE) {
+            int64_t skipThreshold = 0;
+            if (runParam.nextTokensPerBatchOri < 0 && runParam.nextTokensPerBatchCmp < 0) {
+                skipThreshold = Min(-runParam.nextTokensPerBatchOri, -runParam.nextTokensPerBatchCmp);
+            }
+            if (skipThreshold > 0) {
+                if (runParam.s1oIdx <
+                    skipThreshold / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock) {
+                    return true;
+                }
+            }
+        } else {
+            if (runParam.nextTokensPerBatchOri < 0) {
+                if (runParam.s1oIdx <
+                    (runParam.nextTokensPerBatchOri * (-1)) / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock) {
+                    return true;
+                }
             }
         }
     }
