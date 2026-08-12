@@ -24,6 +24,7 @@
 #include "../../../op_api/aclnn_grouped_matmul_v4.h"
 #include "../../../op_api/aclnn_grouped_matmul_v5.h"
 #include "../../../op_api/aclnn_grouped_matmul_weight_nz.h"
+#include "../../../op_api/grouped_matmul_weight_quant_950_checker.h"
 #include "op_api_ut_common/array_desc.h"
 #include "op_api_ut_common/op_api_ut.h"
 #include "op_api_ut_common/tensor_desc.h"
@@ -547,6 +548,71 @@ string BuildCaseName(const testing::TestParamInfo<GroupedMatmulOpApiCase> &info)
 }
 
 class grouped_matmul_opapi_csv_test : public testing::TestWithParam<GroupedMatmulOpApiCase> {};
+
+aclnnStatus CheckS8S4Inputs(int64_t groupListType, bool hasOffset, bool nullBiasElement = false,
+                            aclFormat weightFormat = ACL_FORMAT_ND, int64_t scaleGroupNum = 4)
+{
+    auto x = BuildAclTensorListDesc("64:1024", "INT8", "ND").ToAclType();
+    auto weight = BuildAclTensorListDesc({{2, 1024, 256}}, ACL_INT4, weightFormat).ToAclType();
+    auto bias = BuildAclTensorListDesc("2:256", "FLOAT", "ND").ToAclType();
+    const std::string scaleShape = hasOffset ? "2:1:256" : "2:" + std::to_string(scaleGroupNum) + ":256";
+    auto scale = BuildAclTensorListDesc(scaleShape, "UINT64", "ND").ToAclType();
+    auto offset = BuildAclTensorListDesc("2:1:256", "FLOAT", "ND").ToAclType();
+    auto perTokenScale = BuildAclTensorListDesc("64", "FLOAT", "ND").ToAclType();
+    auto out = BuildAclTensorListDesc("64:256", hasOffset ? "FLOAT16" : "BF16", "ND").ToAclType();
+    auto groupList = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).ToAclType();
+    const aclTensor *nullTensor = nullptr;
+    std::unique_ptr<aclTensorList, decltype(&aclDestroyTensorList)> nullBias(
+        aclCreateTensorList(&nullTensor, 1), aclDestroyTensorList);
+
+    gmm::GroupedMatmulParams params;
+    params.x = x.get();
+    params.weight = weight.get();
+    params.biasOptional = nullBiasElement ? nullBias.get() : bias.get();
+    params.groupTensorOptional = groupList.get();
+    params.scaleOptional = scale.get();
+    params.offsetOptional = hasOffset ? offset.get() : nullptr;
+    params.perTokenScaleOptional = perTokenScale.get();
+    params.splitItem = 3;
+    params.groupListType = groupListType;
+    params.activeType = 0;
+    params.apiVersion = gmm::GMMApiVersion::V5;
+    params.groupType = 0;
+    params.y = out.get();
+    params.xDtype = op::DataType::DT_INT8;
+    return gmm::AclnnGroupedMatmulWeightQuantDAV3510Checker(params).CheckGroupedMatmulWeightQuantDAV3510();
+}
+
+TEST(GroupedMatmulS8S4OpApiChecker, OnlyAcceptsCountGroupListType)
+{
+    for (bool hasOffset : {false, true}) {
+        EXPECT_EQ(CheckS8S4Inputs(1, hasOffset), ACLNN_SUCCESS);
+        for (int64_t groupListType : {0L, 2L, 99L}) {
+            EXPECT_EQ(CheckS8S4Inputs(groupListType, hasOffset), ACLNN_ERR_PARAM_INVALID)
+                << "hasOffset=" << hasOffset << ", groupListType=" << groupListType;
+        }
+    }
+}
+
+TEST(GroupedMatmulS8S4OpApiChecker, RejectsNullBiasElementBeforeReadingDtype)
+{
+    EXPECT_EQ(CheckS8S4Inputs(1, false, true), ACLNN_ERR_PARAM_INVALID);
+}
+
+TEST(GroupedMatmulS8S4OpApiChecker, OnlyAcceptsPerGroupSize256)
+{
+    EXPECT_EQ(CheckS8S4Inputs(1, false, false, ACL_FORMAT_ND, 4), ACLNN_SUCCESS);
+    EXPECT_EQ(CheckS8S4Inputs(1, false, false, ACL_FORMAT_ND, 8), ACLNN_ERR_PARAM_INVALID);
+}
+
+TEST(GroupedMatmulS8S4OpApiChecker, UsesA3WeightFormatWhitelist)
+{
+    for (const aclFormat weightFormat : {ACL_FORMAT_ND, ACL_FORMAT_NCL, ACL_FORMAT_NCHW}) {
+        EXPECT_EQ(CheckS8S4Inputs(1, false, false, weightFormat), ACLNN_SUCCESS)
+            << "weightFormat=" << static_cast<int32_t>(weightFormat);
+    }
+    EXPECT_EQ(CheckS8S4Inputs(1, false, false, ACL_FORMAT_NHWC), ACLNN_ERR_PARAM_INVALID);
+}
 
 TEST_P(grouped_matmul_opapi_csv_test, run_case)
 {

@@ -27,7 +27,8 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "lib/matmul_intf.h"
 #if ((defined(__CCE_AICORE__) && (__CCE_AICORE__ == 310)) && !(defined(__NPU_ARCH__) && __NPU_ARCH__ == 3113))
-#if defined(ORIG_DTYPE_X) && defined(DT_INT8) && ORIG_DTYPE_X == DT_INT8
+#if defined(ORIG_DTYPE_X) && defined(DT_INT8) && defined(DT_INT4) && defined(ORIG_DTYPE_WEIGHT) && \
+    (ORIG_DTYPE_X == DT_INT8 || (ORIG_DTYPE_X == DT_INT4 && ORIG_DTYPE_WEIGHT == DT_INT4))
 #define DTYPE_L0C_LOCAL int32_t
 #else
 #define DTYPE_L0C_LOCAL float
@@ -51,6 +52,9 @@
 #if (ORIG_DTYPE_X != DT_INT8 && ORIG_DTYPE_SCALE == DT_FLOAT)
 #define V310_GMM_QUANT_PERTILE
 #endif
+#elif defined(ORIG_DTYPE_X) && defined(ORIG_DTYPE_WEIGHT) && defined(DT_INT4) && \
+    ORIG_DTYPE_X == DT_INT4 && ORIG_DTYPE_WEIGHT == DT_INT4
+#define V310_GMM_QUANT_S4S4
 #else
 #define V310_GMM_QUANT_CUBE
 #endif
@@ -66,6 +70,13 @@
      (ORIG_DTYPE_WEIGHT == DT_FLOAT4_E2M1 || ORIG_DTYPE_WEIGHT == DT_FLOAT4_E1M2 || ORIG_DTYPE_WEIGHT == DT_FLOAT))
 #define V310_GMM_ANTI_QUANT
 #endif
+#endif
+
+// S8S4 with UINT64 scale uses logical INT4 weights; DT_INT32 is only a packed carrier containing eight INT4 values.
+#if defined(V310_GMM_ANTI_QUANT) && defined(ORIG_DTYPE_SCALE) && defined(DT_UINT64) && defined(DT_INT8) && \
+    defined(DT_INT4) && defined(DT_INT32) && ORIG_DTYPE_X == DT_INT8 && \
+    (ORIG_DTYPE_WEIGHT == DT_INT4 || ORIG_DTYPE_WEIGHT == DT_INT32) && ORIG_DTYPE_SCALE == DT_UINT64
+#define V310_GMM_S8S4_UINT64_SCALE
 #endif
 #endif
 

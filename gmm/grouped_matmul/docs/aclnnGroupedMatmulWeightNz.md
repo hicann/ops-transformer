@@ -35,7 +35,7 @@
       - 输入的weight会被接口按AI处理器亲和数据排布格式（FRACTAL_NZ）解析。
       - 新增参数quantGroupSize，整数型参数，代表分组量化（per-group）的分组大小，不涉及分组量化时，填0。
       <!-- npu="950" id7 -->
-      - <term>Ascend 950PR/Ascend 950DT</term>：暂不支持quantGroupSize参数。
+      - <term>Ascend 950PR/Ascend 950DT</term>：支持quantGroupSize参数，综合约束请参见<a href="#约束说明">约束说明</a>。
       <!-- end id7 -->
 
   - **计算公式**：
@@ -360,8 +360,8 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
     <tr>
     <td>tuningConfigOptional（aclIntArray *）</td>
     <td>可选输入</td>
-    <td>第一个数代表各个专家处理的token数的预期值，用于优化tiling。</td>
-    <td>兼容历史版本，用户如不使用该参数，不传（即为nullptr）即可。</td>
+    <td>第一个数代表各个专家处理的token数的预期值；第二个数表示是否开启weight亲和格式（先转置再NZ）。当前仅<a href="#ascend950-weightnz-s8s4场景约束">S8S4</a>场景支持。</td>
+    <td>用户如不使用该参数，不传（即为nullptr）即可。</td>
     <td>INT64</td>
     <td>-</td>
     <td>-</td>
@@ -371,7 +371,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
     <td>quantGroupSize</td>
     <td>输入</td>
     <td>代表分组量化（per-group）的分组大小。</td>
-    <td>不涉及分组量化时，填0。</td>
+    <td>不涉及分组量化时，填0。综合约束请参见<a href="#约束说明">约束说明</a>。</td>
     <td>INT64</td>
     <td>-</td>
     <td>-</td>
@@ -434,9 +434,9 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
     - <term>Ascend 950PR/Ascend 950DT</term>：
       - 上表数据类型列中的角标"1"代表该系列不支持的数据类型。
       - `weight`支持FRACTAL_NZ格式。当最后两根轴其中一根轴为1（即n=1或k=1）时，不支持私有格式，不能调用该接口。可使用aclnnNpuFormatCast接口完成输入Format从ND到AI处理器亲和数据排布格式（NZ）的转换。如原始weight为转置状态且想使用性能更高的非转置通路计算，可使用aclnnPermute接口转为非转置后再调用aclnnNpuFormatCast接口。非全量化场景，当数据类型为FLOAT4_E2M1时，还需要在aclnnNpuFormatCast调用后，调用aclnnCast接口将FLOAT32表示的FLOAT4_E2M1转换为正确的类型。但当为INT4类型时，需要使用aclnnConvertWeightToInt4Pack接口完成数据格式从ND到NZ和数据类型从INT32到INT4的转换。当传入FLOAT32或者INT32时，接口内部每个FLOAT32/INT32识别成8个FLOAT4_E2M1/INT4。
-      - `offsetOptional`、`antiquantOffsetOptional`暂不支持。
+      - `offsetOptional`支持，`antiquantOffsetOptional`暂不支持。综合约束请参见<a href="#约束说明">约束说明</a>。
       - `groupType`支持m轴分组，仅非量化支持不分组。
-      - `quantGroupSize`暂不支持。
+      - `quantGroupSize`支持，综合约束请参见<a href="#约束说明">约束说明</a>。
       - `actType`支持0、1、2、4、5。综合约束请参见<a href="#约束说明">约束说明</a>。
       - 输入参数`x`、`weight`，输出参数`out`在非量化场景支持最多1024个tensor，在伪量化场景支持最多128个tensor。在全量化场景下，输入参数`x`、输出参数`out`最多支持1个tensor；动态量化（mx量化）场景下，输入参数`weight`支持多tensor，最多支持1024个tensor。
     <!-- end id8 -->
@@ -624,6 +624,31 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       |-1/0   |FLOAT16     |FLOAT16     |FLOAT16/FLOAT32/null    | FLOAT16|
 
   - 伪量化场景支持的数据类型为：
+    <a id="ascend950-weightnz-s8s4场景约束"></a>
+
+    **S8S4场景：**
+
+      **数据类型要求：**
+
+      | x | weight | bias | scale | offset | antiquantScale | antiquantOffset | perTokenScale | groupList | activationInput | activationQuantScale | activationQuantOffset | out |
+      |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+      | INT8 | INT4 (NZ) | FLOAT | UINT64 | null | null | null | FLOAT | INT64 | null | null | null | BFLOAT16 |
+      | INT8 | INT4 (NZ) | FLOAT | UINT64 | FLOAT/null | null | null | FLOAT | INT64 | null | null | null | FLOAT16 |
+
+      **约束说明：**
+
+      除公共约束外，S8S4场景其余约束如下：
+
+      - 仅支持groupType=0、splitItem=2/3、actType=0，groupListType仅支持1（count）。
+      - x、weight、scaleOptional、biasOptional、perTokenScaleOptional和out均为长度1的TensorList；x和weight均不支持转置。
+      - x仅支持2维Tensor，shape为`[M,K]`；weight默认支持3维Tensor，shape为`[E,K,N]`；perTokenScaleOptional的shape为`[M]`。
+      - biasOptional为必选输入，数据类型为FLOAT32，shape为`[E,N]`。该输入是INT4权重离线转换的校正量，按`8 × weight × scale`沿K轴规约得到。
+      - 对称per-group场景：offsetOptional为空，scaleOptional为UINT64且shape为`[E,K/256,N]`，quantGroupSize填256，K不大于18432且必须是256的整数倍，out支持FLOAT16或BFLOAT16。
+      - 非对称per-channel场景：offsetOptional为FLOAT32且shape为`[E,1,N]`，scaleOptional为UINT64且shape为`[E,1,N]`，quantGroupSize填0，out仅支持FLOAT16。
+      - antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional和activationFeatureOutOptional必须为空。
+      - S8S4 offsetOptional不为空的per-channel场景下，tuningConfigOptional数组第二个元素可置1。此时weight需按`[E,N,K]`排布并转换为NZ，仅支持长度为1的weight TensorList。
+
+    **其他伪量化场景：**
     - 以下入参为空：offsetOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
     - 不为空的参数支持的数据类型组合要满足下表
 
@@ -714,6 +739,14 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
         |groupType| 使用场景 | shape限制 |
         |:---------:|:---------:| :------ |
         |0|x单tensor|每个tensor 3维，shape为（M, ceil(K / 64), 2）|
+
+  - S4S4（全量化INT4×INT4）场景支持的输入类型为：
+    - 仅支持groupType=0、actType=0，groupListType=0/1/2。
+    - 仅支持x、weight、out均为长度为1的TensorList。
+    - x为INT4、weight为INT4、biasOptional为空、scaleOptional为UINT64、offsetOptional为空、antiquantScaleOptional为空、antiquantOffsetOptional为空、perTokenScaleOptional为空或为FLOAT32、activationInputOptional为空、out为FLOAT16或BFLOAT16。
+    - x不支持转置；weight支持NZ转置输入，即输入为[E,N,K]，但view shape为[E,K,N]以保证算子识别转置状态，转置输入下，$k/G$要求按照64对齐，K按照64对齐，N按照16对齐，ND不支持转置输入。
+    - 支持perchannel和pergroup量化。perchannel场景的scale的shape需为$[E, N]$，pergroup场景需为$[E, G, N]$。
+    - pergroup场景下，$G$必须要能整除$K$，且$k/G$需为偶数。
 
   - 不同groupType支持场景:
 

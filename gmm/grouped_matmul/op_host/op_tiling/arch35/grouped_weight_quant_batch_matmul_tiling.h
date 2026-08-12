@@ -21,6 +21,7 @@
 #include <unordered_set>
 
 #include "../grouped_matmul_tiling.h"
+#include "grouped_quant_matmul_tiling.h"
 #include "../../../op_kernel/arch35/grouped_matmul_tiling_data_apt.h"
 #include "log/log.h"
 #include "register/op_impl_registry.h"
@@ -231,6 +232,76 @@ public:
     }
 
     uint64_t GenTilingKey() const;
+};
+
+class GroupedS8S4BasicApiTiling : public GroupedQmmTiling {
+public:
+    explicit GroupedS8S4BasicApiTiling(gert::TilingContext *context);
+    ~GroupedS8S4BasicApiTiling() override = default;
+
+    void Reset(gert::TilingContext *context) override
+    {
+        Ops::Transformer::OpTiling::TilingBaseClass::Reset(context);
+        Reset();
+    }
+
+protected:
+    bool IsCapable() override;
+    ge::graphStatus GetShapeAttrsInfo() override;
+    ge::graphStatus DoOpTiling() override;
+    ge::graphStatus DoLibApiTiling() override;
+    ge::graphStatus GetWorkspaceSize() override;
+    ge::graphStatus PostTiling() override;
+    bool AnalyzeDtype() override;
+    bool AnalyzeAttrs() override;
+    bool AnalyzeInputs() override;
+    uint64_t GetTilingKey() const override;
+    void Reset() override;
+
+private:
+    enum class DequantMode : uint8_t {
+        SYMMETRIC_PER_GROUP = 0,
+        ASYMMETRIC_PER_CHANNEL = 1,
+    };
+
+    bool CheckTensorLists() const;
+    bool CheckCommonShapes(const gert::Shape &xShape, const gert::Shape &wShape) const;
+    bool CheckBiasShape() const;
+    bool CheckPerTokenScaleShape() const;
+    bool CheckAntiquantInputsEmpty() const;
+    bool CheckWeightStorageShape(const gert::StorageShape &weightShape);
+    bool CheckScaleAndOffsetShapes();
+    bool SetLogicalMKN(const gert::Shape &xShape, const gert::Shape &wShape);
+    void SetBasicBlock();
+    ge::graphStatus ValidateFixedTileResources(uint64_t kL1) const;
+
+    static constexpr uint32_t QUANT_GROUP_SIZE = 256U;
+    static constexpr uint32_t S8S4_BASE_M = 256U;
+    static constexpr uint32_t S8S4_ASYM_BASE_M = 256U;
+    static constexpr uint32_t S8S4_BASE_N = 256U;
+    static constexpr uint32_t S8S4_BASE_K = 128U;
+    static constexpr uint32_t S8S4_PER_GROUP_K_L1 = 256U;
+    static constexpr uint32_t S8S4_PER_CHANNEL_K_L1 = 256U;
+    static constexpr uint64_t MAX_K_PER_GROUP = 18432UL;
+    static constexpr uint64_t PACKED_INT32_RATIO = 8UL;
+    static constexpr uint64_t NZ_BASE_K_ALIGN = 16UL;
+    static constexpr uint64_t NZ_BASE_N_ALIGN = 32UL;
+    static constexpr uint64_t NZ_SPECIAL_K_ALIGN = 32UL;
+    static constexpr uint64_t NZ_SPECIAL_N_ALIGN = 16UL;
+    static constexpr size_t TUNING_CONFIG_EXPECTED_TOKEN_INDEX = 0UL;
+    static constexpr size_t TUNING_CONFIG_WEIGHT_FORMAT_INDEX = 1UL;
+    static constexpr int64_t TUNING_CONFIG_SPECIAL_WEIGHT_FORMAT = 1L;
+    static constexpr int64_t GROUP_LIST_COUNT = 1L;
+    static constexpr int8_t X_SEPARATED = 2;
+    static constexpr int8_t NO_SEPARATED = 3;
+
+    bool hasOffset_ = false;
+    bool specialWeightFormat_ = false;
+    bool weightPackedInt32_ = false;
+    uint32_t expectedTokenNum_ = 0;
+    uint64_t userWorkspaceSize_ = 0;
+    DequantMode dequantMode_ = DequantMode::SYMMETRIC_PER_GROUP;
+    GroupedMatmulTilingData::GMMS8S4BasicApiTilingData tilingData_;
 };
 
 class GroupedWeightQuantBatchMatmulTiling {

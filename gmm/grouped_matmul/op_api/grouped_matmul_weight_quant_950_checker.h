@@ -51,6 +51,9 @@ private:
     aclnnStatus CheckAntiQuantTranspose(size_t idx) const;
     aclnnStatus CheckScaleAndPerTokenScaleShape() const;
     aclnnStatus CheckS8S4NZScaleShape() const;
+    aclnnStatus CheckS8S4ScaleShape() const;
+    aclnnStatus CheckS8S4GroupListType() const;
+    aclnnStatus CheckS8S4GroupSize(size_t idx) const;
     static aclnnStatus CheckOptionalListSize(const aclTensorList *optional, const aclTensorList *reference,
                                              const char *optionalName, const char *referenceName,
                                              const char *opName);
@@ -65,6 +68,9 @@ private:
     bool IsA16W8ND() const;
     bool IsA16F8ND() const;
     bool IsS8S4NZ() const;
+    bool IsS8S4PseudoQuant() const;
+    bool IsS8S4SpecialWeightFormat() const;
+    bool IsS8S4AsymmetricQuant() const;
     bool IsA16W4() const;
     bool IsMultiTensorWeight() const;
     bool IsA16W4Pergroup(const size_t xIdx) const;

@@ -18,6 +18,7 @@
 #include "register/op_impl_registry.h"
 #include "arch35/grouped_weight_quant_batch_matmul_tiling.h"
 #include "arch35/grouped_no_quant_matmul_tiling.h"
+#include "arch35/grouped_quant_basic_api_matmul_tiling.h"
 #include "op_host/tiling_templates_registry.h"
 #include "err/ops_err.h"
 #include "../../op_kernel/grouped_matmul_tiling_key.h"
@@ -53,6 +54,13 @@ static inline auto AlignUp(T num1, T num2) -> T
         return -(-num1 / num2) * num2;
     }
     return (num1 + num2 - 1) / num2 * num2;
+}
+
+static bool IsS8S4PseudoQuant(const gert::TilingContext *context, ge::DataType xDtype, ge::DataType weightDtype)
+{
+    const auto scaleDesc = context->GetDynamicInputDesc(SCALE_INDEX, 0);
+    return xDtype == ge::DT_INT8 && (weightDtype == ge::DT_INT4 || weightDtype == ge::DT_INT32) &&
+           scaleDesc != nullptr && scaleDesc->GetDataType() == ge::DT_UINT64;
 }
 
 constexpr uint32_t GROUP_LIST_SPARSE_M = 2U;
@@ -2369,13 +2377,27 @@ ASCENDC_EXTERN_C ge::graphStatus TilingGMM(gert::TilingContext *context)
     auto compileInfoPtr = context->GetCompileInfo<GMMCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfoPtr);
     if (compileInfoPtr->npuArch == NpuArch::DAV_3510) {
+        const bool isS8S4PseudoQuant = IsS8S4PseudoQuant(context, xDType, weightDtype);
         // 全量化：双8bits或双4bits(不会有A4W2)
-        bool isQuant = xDType == ge::DT_FLOAT4_E2M1 || xDType == ge::DT_INT4 || xDType == ge::DT_FLOAT4_E1M2 ||
-                       (ge::GetSizeByDataType(xDType) == 1 && ge::GetSizeByDataType(weightDtype) == 1);
+        bool isQuant = !isS8S4PseudoQuant &&
+                       (xDType == ge::DT_FLOAT4_E2M1 || xDType == ge::DT_INT4 || xDType == ge::DT_FLOAT4_E1M2 ||
+                        (ge::GetSizeByDataType(xDType) == 1 && ge::GetSizeByDataType(weightDtype) == 1));
         if (isQuant) {
+            if (xDType == ge::DT_INT4 && weightDtype == ge::DT_INT4) {  // S4S4 (INT4×INT4) mix-core
+                GroupedS4S4IntQuantTiling s4s4Tiling(context);
+                ge::graphStatus s4s4Ret = s4s4Tiling.DoTiling();
+                OP_CHECK_IF(s4s4Ret != ge::GRAPH_SUCCESS,
+                            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "S4S4 DoTiling failed."),
+                            return s4s4Ret);
+                return ge::GRAPH_SUCCESS;
+            }
             std::vector<int32_t> registerList = {0, 1};
             return TilingRegistry::GetInstance().DoTilingImpl(context, registerList);
         } else if (xDType != weightDtype) {
+            if (isS8S4PseudoQuant) {
+                std::vector<int32_t> registerList = {2};
+                return TilingRegistry::GetInstance().DoTilingImpl(context, registerList);
+            }
             GroupedWeightQuantBatchMatmulTiling groupedWeightQuantTiling;
             OP_CHECK_IF(!groupedWeightQuantTiling.SetTiling(context),
                         OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "SetTiling failed."),

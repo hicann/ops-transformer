@@ -120,7 +120,7 @@ struct GroupedMatmulInfershapeCase {
             {"group_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(groupType)},
             {"group_list_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(groupListType)},
             {"act_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(actType)},
-            {"tuning_config", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({0})},
+            {"tuning_config", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(GetTuningConfig())},
         };
     }
 
@@ -134,8 +134,14 @@ struct GroupedMatmulInfershapeCase {
             {"group_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(groupType)},
             {"group_list_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(groupListType)},
             {"act_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(actType)},
-            {"tuning_config", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({0})},
+            {"tuning_config", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(GetTuningConfig())},
         };
+    }
+
+    vector<int64_t> GetTuningConfig() const
+    {
+        vector<int64_t> tuningConfig = ParseInt64List(tuningConfigData);
+        return tuningConfig.empty() ? vector<int64_t>{0} : tuningConfig;
     }
 
     void RunInferShape() const
@@ -303,6 +309,7 @@ struct GroupedMatmulInfershapeCase {
     int64_t groupListType = 0;
     int64_t actType = 0;
     string groupListData;
+    string tuningConfigData;
 };
 
 vector<GroupedMatmulInfershapeCase> LoadCases(const string &socVersion)
@@ -388,6 +395,9 @@ vector<GroupedMatmulInfershapeCase> LoadCases(const string &socVersion)
             tc.actType = stoll(Trim(items[idx++]));
             if (idx < items.size()) {
                 tc.groupListData = Trim(items[idx++]);
+            }
+            if (idx < items.size()) {
+                tc.tuningConfigData = Trim(items[idx++]);
             }
             cases.push_back(tc);
         } catch (const std::exception &error) {

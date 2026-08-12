@@ -315,12 +315,13 @@ private:
     bool CheckActiveMode(const gert::Shape &wScaleShape, const gert::StorageShape *xScaleStorageShape);
     virtual bool CheckCoreNum() const;
     bool CheckTransposeAndFormatByGroupType() const;
-    bool CheckPertokenScaleDtypeForWeightNz(bool isA8W8Int, bool isA8W8Fp, bool isA4W4Fp) const;
-    bool CheckWeightNzTransposedDims(const gert::Shape &wShape, uint64_t wShapeDimThird, uint64_t wShapeDimSecond,
-                                     uint32_t weightNzLastDim, uint64_t logicalNSize) const;
+    bool CheckPertokenScaleDtypeForWeightNz(bool isA8W8Int, bool isA8W8Fp, bool isA4W4Fp, bool isA4W4Int) const;
+    bool CheckWeightNzTransposedDims(const gert::Shape &wShape, uint64_t wShapeDimThird,
+                                     uint64_t wShapeDimSecond, uint32_t weightNzLastDim,
+                                     uint64_t logicalNSize) const;
     bool CheckWeightNzDimNum(const gert::Shape &wShape) const;
-    bool CheckWeightNzLastDim(const gert::Shape &wShape, size_t nzDimOffset, uint32_t expectedValue,
-                              bool isWeight4Bit) const;
+    bool CheckWeightNzLastDim(const gert::Shape &wShape, size_t nzDimOffset,
+                              uint32_t expectedValue, const char *dtypeLabel) const;
     bool CheckWeightNzSecondLastDim(const gert::Shape &wShape, size_t nzDimOffset) const;
     bool ValidateAAndWDtype(const std::vector<ge::DataType> &legalInputDtypes) const;
 

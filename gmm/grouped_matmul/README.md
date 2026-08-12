@@ -102,7 +102,7 @@ $$
 | <abbr title="指定分组轴：-1=不分组，0=M轴，2=K轴">groupType</abbr> | 属性 | 代表需要分组的轴 | INT64 | - |
 | <abbr title="代表 groupList输入的分组方式：0=累积和；1=各组大小；2=[组索引, 组大小] 对">groupListType</abbr> | 属性 | 代表 groupList输入的分组方式 | INT64 | - |
 | <abbr title="代表激活函数类型：0=NONE/1=ReLU/2=GELU_TANH/4=FAST_GELU/5=SILU">actType</abbr> | 属性 | 代表激活函数类型 | INT64 | - |
-| tuningConfigOptional | 可选输入 | 第一个数代表各个专家处理的 token数的预期值；第二个数代表 A8W4 可选开启 weight 先转置的 NZ格式；第三个数代表允许额外使用的内存空间 | INT64 | - |
+| tuningConfigOptional | 可选输入 | 第一个数代表各个专家处理的 token数的预期值；第二个数置1时，A8W4可选开启离线按`[E,N,K]`排布并转换为NZ的特殊weight格式（不表示`transposeWeight=true`）；第三个数代表允许额外使用的内存空间 | INT64 | - |
 | out | 输出 | 公式中的输出 $y$ | FLOAT、FLOAT16、INT32、INT8、BFLOAT16 | ND |
 | activationFeatureOutOptional | 输出 | 激活函数的输入数据，当前只支持传入 nullptr | - | - |
 | dynQuantScaleOutOptional | 输出 | 动态量化缩放因子，当前只支持传入 nullptr | - | - |
