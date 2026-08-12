@@ -197,7 +197,7 @@ struct MegaMoeTilingData {
     uint8_t actSubMode;         // 激活子选项：situ下 0=默认, 1=linear; swiglu下忽略
     float activationAlpha;      // linear_beta, 默认 1.0
     float activationBeta;       // beta, 默认 1.0
-    uint32_t expertsPerBatch;
+    uint32_t mGroupsPerWave;    // 每个 routed expert Wave 消费的 256-row M 分组数
     // MoE 和共享专家使用相同布局：true 表示每个专家一个二维 tensor，false 表示单个三维堆叠 tensor。
     bool isPerExpertWeightTensor;
 };

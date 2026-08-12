@@ -98,19 +98,33 @@ __aicore__ inline void ComputeCombineGroupsForCore(uint32_t logicalCoreId, uint3
     groupStride = groupCount < logicalCoreCount ? groupCount : logicalCoreCount;
 }
 
-// 返回当前 wave 的专家数；不足正常 wave 一半的尾块合并到前一个 wave。
-__aicore__ inline uint32_t GetWaveExpertCount(uint32_t waveBegin, uint32_t expertCount, uint32_t expertsPerWave)
+/*
+ * 计算单个专家贡献的独立 M 分组数。不同专家使用不同权重，因此各专家不足
+ * rowsPerMGroup 的尾块也必须分别占用一个分组。
+ */
+__aicore__ inline uint32_t GetMGroupCountForRows(uint64_t rowCount, uint32_t rowsPerMGroup)
 {
-    if (waveBegin >= expertCount) {
+    if (rowCount == 0U || rowsPerMGroup == 0U) {
         return 0U;
     }
-    uint32_t remainingExperts = expertCount - waveBegin;
-    if (expertsPerWave == 0U || remainingExperts <= expertsPerWave) {
-        return remainingExperts;
+    return static_cast<uint32_t>((rowCount - 1U) / rowsPerMGroup + 1U);
+}
+
+// 计算剩余分组预算允许当前 Wave 在本专家内推进到的结束行偏移。
+__aicore__ inline uint32_t GetWaveEndRowOffsetInExpert(uint64_t expertRowCount,
+                                                       uint32_t currentRowOffsetInExpert,
+                                                       uint32_t remainingMGroupCount,
+                                                       uint32_t rowsPerMGroup)
+{
+    if (remainingMGroupCount == 0U || rowsPerMGroup == 0U ||
+        currentRowOffsetInExpert >= expertRowCount) {
+        return currentRowOffsetInExpert;
     }
-    uint32_t tailExperts = remainingExperts - expertsPerWave;
-    bool mergeSmallTail = tailExperts < expertsPerWave && 2U * tailExperts < expertsPerWave;
-    return mergeSmallTail ? remainingExperts : expertsPerWave;
+    uint64_t maxWaveEndRowOffset = static_cast<uint64_t>(currentRowOffsetInExpert) +
+                                   static_cast<uint64_t>(remainingMGroupCount) * rowsPerMGroup;
+    return static_cast<uint32_t>(expertRowCount < maxWaveEndRowOffset ?
+                                     expertRowCount :
+                                     maxWaveEndRowOffset);
 }
 
 // 连续均衡分配 token，前 totalTokens % workerCount 个任务各多处理一个 token。

@@ -715,7 +715,9 @@ __aicore__ inline void Gmm2Aiv0PrologueA8W4(BlockPrologue &blockPrologue, Schedu
 template <uint8_t CombineQuantMode, typename BlockMmad, typename ElementC, bool IsLayered = false,
           bool IsShared = false, typename Scheduler, typename Config>
 __aicore__ inline void Gmm2ExecGeneric(
-    Scheduler &scheduler, const GMMAddrInfo &gmmAddrInfo, const Config &config, uint32_t startLoopIdx, uint32_t tileNum)
+    Scheduler &scheduler, const GMMAddrInfo &gmmAddrInfo, const Config &config, uint32_t startLoopIdx,
+    uint32_t tileNum, PersistentBlockMmadContext<BlockMmad> *persistentContext,
+    bool allowWeightL2Bypass)
 {
     using KernelConfig = typename Config::KernelConfig;
     using ElementA = typename KernelConfig::ElementAType;
@@ -735,6 +737,10 @@ __aicore__ inline void Gmm2ExecGeneric(
     auto gmScaleB = Te::MakeTensor(
         Te::MakeMemPtr<Te::Location::GM>(reinterpret_cast<__gm__ ElementMxScaleB *>(gmmAddrInfo.bScaleGlobal)),
         layouts.scaleB);
+    if constexpr (Config::IS_WAVE_FLAG_GRAINED && g_coreType == AscendC::AIC) {
+        SetWaveWeightL2CacheHint<KernelConfig::IS_WEIGHT_NZ, KernelConfig>(
+            config, allowWeightL2Bypass, gmB, gmScaleB);
+    }
     auto gmBias =
         Te::MakeTensor(Te::MakeMemPtr<Te::Location::GM>(reinterpret_cast<__gm__ BiasType *>(0UL)), layouts.bias);
     auto gmC = Te::MakeTensor(Te::MakeMemPtr<Te::Location::GM>(
@@ -746,14 +752,16 @@ __aicore__ inline void Gmm2ExecGeneric(
     WorkSetType workSet{scheduler, gmA, gmB, gmScaleA, gmScaleB, gmBias, gmC};
 
     if constexpr (g_coreType == AscendC::AIC) {
-        BlockMmad blockMmad;
-        bool enableL0CPingPong = false;
-        typename BlockMmad::BlockShape l0TileShape{config.tileM, L1_TILE_N, L0_TILE_K, 0};
-        typename BlockMmad::ProblemShape matmulShape{config.m, config.n, config.k, 0};
-        blockMmad.Init(matmulShape, l0TileShape, config.l1Params, false, enableL0CPingPong);
-
-        Gmm2AicMmadGeneric<CombineQuantMode, BlockMmad, IsShared, IsLayered>(
-            blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum);
+        if (persistentContext != nullptr) {
+            InitBlockMmad(*persistentContext, config);
+            Gmm2AicMmadGeneric<CombineQuantMode, BlockMmad, IsShared, IsLayered>(
+                persistentContext->blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum);
+        } else {
+            PersistentBlockMmadContext<BlockMmad> localContext;
+            InitBlockMmad(localContext, config);
+            Gmm2AicMmadGeneric<CombineQuantMode, BlockMmad, IsShared, IsLayered>(
+                localContext.blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum);
+        }
     }
 }
 
@@ -825,7 +833,8 @@ template <uint8_t CombineQuantMode, typename ElementA, typename ElementB, typena
           bool IsWaveFlagGrained = false>
 __aicore__ inline void RunGmm2Generic(
     const AscendC::Shape<int64_t, int64_t, int64_t, int64_t> &problemShape,
-    const GMMAddrInfo &gmmAddrInfo, uint32_t &startBlockIdx, const BlockJobContext &blockJob)
+    const GMMAddrInfo &gmmAddrInfo, uint32_t &startBlockIdx, const BlockJobContext &blockJob,
+    void *persistentBlockMmadContext = nullptr, bool allowWeightL2Bypass = false)
 {
     using GmmConfig = GmmKernel::Config<false, CombineQuantMode, ElementA, ElementB, ElementC, ElementMxScaleA,
                                         ElementMxScaleB, IsWeightNZ, TopkWeightsPrefetch, IsShared,
@@ -846,8 +855,11 @@ __aicore__ inline void RunGmm2Generic(
     uint32_t startLoopIdx =
         (config.blockIdx < startBlockIdx ? config.blockIdx + config.blockNum : config.blockIdx) - startBlockIdx;
     using BlockMmad = typename GmmConfig::BlockMmad;
+    using PersistentContext = GmmKernel::PersistentBlockMmadContext<BlockMmad>;
+    auto *persistentContext = reinterpret_cast<PersistentContext *>(persistentBlockMmadContext);
     GmmKernel::Gmm2ExecGeneric<CombineQuantMode, BlockMmad, ElementC, IsLayered, IsShared>(
-        scheduler, gmmAddrInfo, config, startLoopIdx, tileNum);
+        scheduler, gmmAddrInfo, config, startLoopIdx, tileNum, persistentContext,
+        allowWeightL2Bypass);
 
     startBlockIdx = (startBlockIdx + tileNum) % config.blockNum;
 }
@@ -858,14 +870,16 @@ template <uint8_t CombineQuantMode, typename ElementA, typename ElementB, typena
           bool IsGmm1Interleaved = false, bool IsWaveFlagGrained = false>
 __aicore__ inline void RunGmm2Generic(
     const AscendC::Shape<int64_t, int64_t, int64_t, int64_t> &problemShape,
-    const GMMAddrInfo &gmmAddrInfo, uint32_t &startBlockIdx)
+    const GMMAddrInfo &gmmAddrInfo, uint32_t &startBlockIdx, void *persistentBlockMmadContext = nullptr,
+    bool allowWeightL2Bypass = false)
 {
     BlockJobContext blockJob{static_cast<uint32_t>(GetBlockIdx() / GetTaskRation()),
                              static_cast<uint32_t>(GetBlockNum())};
     RunGmm2Generic<CombineQuantMode, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB,
                    IsWeightNZ, IsLayered, Gmm1TileM, TopkWeightsPrefetch, IsShared,
                    IsGmm1Interleaved, IsWaveFlagGrained>(
-        problemShape, gmmAddrInfo, startBlockIdx, blockJob);
+        problemShape, gmmAddrInfo, startBlockIdx, blockJob, persistentBlockMmadContext,
+        allowWeightL2Bypass);
 }
 
 // RunGmm2A8W4：执行 A8W4 prologue（W4→W8）、GMM2 和 Combine。
@@ -957,11 +971,11 @@ __aicore__ inline void AdvanceGmm2ExpertOffsets(Gmm2ExpertLoopState &state)
     Get<IDX_GMM2_OFFSET>(state.baseOffset) += m * k;
 }
 
-// 原型：MegaMoe::UpdateGmm2GroupParams。使用调用方选择的 workspace 槽更新一个 MoE 专家游标。
+// GMM2 沿用 GMM1 已确认就绪的专家 token 总数，并推进到当前 MoE 专家的完整状态。
 template <uint32_t ActivationElementsPerByte, uint32_t WeightElementsPerByte,
           uint32_t SwigluElementsPerByte>
-__aicore__ inline bool UpdateMoeGmm2GroupParams(const Gmm2Config &context, Gmm2Scratch &scratch,
-                                                Gmm2ExpertLoopState &state, uint32_t expertIdx)
+__aicore__ inline bool PrepareMoeExpertGmm2State(const Gmm2Config &context, Gmm2Scratch &scratch,
+                                                 Gmm2ExpertLoopState &state, uint32_t expertIdx)
 {
     if (expertIdx != 0U) {
         AdvanceGmm2ExpertOffsets<ActivationElementsPerByte, WeightElementsPerByte,
@@ -975,11 +989,11 @@ __aicore__ inline bool UpdateMoeGmm2GroupParams(const Gmm2Config &context, Gmm2S
     return Get<M_VALUE>(state.problemShape) != 0;
 }
 
-// 原型：MegaMoe::UpdateSharedGroupParams。使用固定 token 数推进一个共享专家。
+// 使用固定 token 数推进到当前共享专家的完整 GMM2 状态。
 template <uint32_t ActivationElementsPerByte, uint32_t WeightElementsPerByte,
           uint32_t SwigluElementsPerByte>
-__aicore__ inline bool UpdateSharedGmm2GroupParams(const Gmm2Config &context,
-                                                   Gmm2ExpertLoopState &state, uint32_t expertIdx)
+__aicore__ inline bool PrepareSharedExpertGmm2State(const Gmm2Config &context,
+                                                    Gmm2ExpertLoopState &state, uint32_t expertIdx)
 {
     if (expertIdx != 0U) {
         AdvanceGmm2ExpertOffsets<ActivationElementsPerByte, WeightElementsPerByte,
@@ -991,9 +1005,11 @@ __aicore__ inline bool UpdateSharedGmm2GroupParams(const Gmm2Config &context,
 
 template <typename ActivationType, typename SwigluOutType, typename QuantScaleType,
           bool ConfigureGmm2Output, bool ConfigureCombineCounter, bool ConfigureGmmToEpilogue>
-__aicore__ inline void UpdateMoeGmm2GlobalBuffer(const Gmm2Config &context, const WorkspaceInfo &workspace,
-                                                 const ExpertWeightTensorListAddrs &weights, GMMAddrInfo &gmmAddrInfo,
-                                                 const Gmm2ExpertLoopState &state, uint32_t expertIdx)
+__aicore__ inline void UpdateMoeExpertGmm2GlobalBuffer(
+    const Gmm2Config &context, const WorkspaceInfo &workspace,
+    const ExpertWeightTensorListAddrs &weights, GMMAddrInfo &gmmAddrInfo,
+    const Gmm2ExpertLoopState &state, uint32_t expertIdx,
+    uint32_t expertMGroupOffset = 0U)
 {
     if constexpr (ConfigureGmm2Output) {
         gmmAddrInfo.gmm2OutGlobal =
@@ -1019,9 +1035,11 @@ __aicore__ inline void UpdateMoeGmm2GlobalBuffer(const Gmm2Config &context, cons
             expertSyncSlotOffset * static_cast<uint64_t>(INT_CACHELINE);
     }
     gmmAddrInfo.swigluToGmm2Flag = reinterpret_cast<__gm__ int32_t *>(workspace.flagSwiGluToGmm2Ptr) +
-                                   Get<IDX_FLAG_OFFSET>(state.baseOffset) * context.swigluFlagSlotsPerExpert;
+                                   Get<IDX_FLAG_OFFSET>(state.baseOffset) * context.swigluFlagSlotsPerExpert +
+                                   static_cast<uint64_t>(expertMGroupOffset) * INT_CACHELINE;
     gmmAddrInfo.dispatchToGmm1Flag = reinterpret_cast<__gm__ int32_t *>(workspace.flagDispatchToGmm1Ptr) +
-                                     Get<IDX_FLAG_OFFSET>(state.baseOffset) * context.dispatchFlagSlotsPerExpert;
+                                     Get<IDX_FLAG_OFFSET>(state.baseOffset) * context.dispatchFlagSlotsPerExpert +
+                                     static_cast<uint64_t>(expertMGroupOffset) * INT_CACHELINE;
     if constexpr (ConfigureGmmToEpilogue) {
         gmmAddrInfo.gmmToEpilogueFlag = nullptr;
         if (workspace.flagGmmToEpiloguePtr != nullptr) {
@@ -1034,10 +1052,10 @@ __aicore__ inline void UpdateMoeGmm2GlobalBuffer(const Gmm2Config &context, cons
 
 template <typename ActivationType, typename QuantScaleType, uint32_t Gmm1TileM,
           bool ConfigureGmmToEpilogue>
-__aicore__ inline void UpdateSharedGmm2GlobalBuffer(const Gmm2Config &context, const WorkspaceInfo &workspace,
-                                                    const ExpertWeightTensorListAddrs &weights,
-                                                    GMMAddrInfo &gmmAddrInfo,
-                                                    const Gmm2ExpertLoopState &state, uint32_t sharedExpertIdx)
+__aicore__ inline void UpdateSharedExpertGmm2GlobalBuffer(
+    const Gmm2Config &context, const WorkspaceInfo &workspace,
+    const ExpertWeightTensorListAddrs &weights, GMMAddrInfo &gmmAddrInfo,
+    const Gmm2ExpertLoopState &state, uint32_t sharedExpertIdx)
 {
     gmmAddrInfo.gmm2OutGlobal =
         workspace.sharedExpertResultPtr + Get<IDX_GMM2_OFFSET>(state.baseOffset) * sizeof(bfloat16_t);
@@ -1073,7 +1091,8 @@ template <uint8_t CombineMode, typename GenericElementA, typename A8W4ElementA, 
           bool IsWaveFlagGrained = false>
 __aicore__ inline void RunGmm2ByMode(const Gmm2Config &context, const Params &params,
                                      const GMMAddrInfo &gmmAddrInfo, const Gmm2ExpertLoopState &state,
-                                     Gmm2RuntimeState &runtimeState)
+                                     Gmm2RuntimeState &runtimeState, void *persistentBlockMmadContext = nullptr,
+                                     bool allowWeightL2Bypass = false)
 {
     if constexpr (EnableA8W4 || EnableA4W4) {
         RunGmm2A8W4<CombineMode, A8W4ElementA, WeightType, bfloat16_t, QuantScaleType,
@@ -1085,12 +1104,14 @@ __aicore__ inline void RunGmm2ByMode(const Gmm2Config &context, const Params &pa
         RunGmm2Generic<CombineMode, GenericElementA, GenericElementA, bfloat16_t, QuantScaleType,
                        QuantScaleType, true, false, Gmm1TileM, TopkWeightsPrefetch, IsShared,
                        IsGmm1Interleaved, IsWaveFlagGrained>(
-            state.problemShape, gmmAddrInfo, runtimeState.startBlockIdx, context.blockJob);
+            state.problemShape, gmmAddrInfo, runtimeState.startBlockIdx, context.blockJob,
+            persistentBlockMmadContext, allowWeightL2Bypass);
     } else {
         RunGmm2Generic<CombineMode, GenericElementA, GenericElementA, bfloat16_t, QuantScaleType,
                        QuantScaleType, false, false, Gmm1TileM, TopkWeightsPrefetch, IsShared,
                        IsGmm1Interleaved, IsWaveFlagGrained>(
-            state.problemShape, gmmAddrInfo, runtimeState.startBlockIdx, context.blockJob);
+            state.problemShape, gmmAddrInfo, runtimeState.startBlockIdx, context.blockJob,
+            persistentBlockMmadContext, allowWeightL2Bypass);
     }
 }
 
@@ -1103,13 +1124,13 @@ __aicore__ inline bool PrepareMoeExpertGmm2Stage(
     const ExpertWeightTensorListAddrs &weights, Gmm2Scratch &scratch,
     Gmm2ExpertLoopState &state, GMMAddrInfo &gmmAddrInfo, uint32_t expertIdx)
 {
-    if (!UpdateMoeGmm2GroupParams<ActivationElementsPerByte, WeightElementsPerByte,
-                                  SwigluElementsPerByte>(context, scratch, state, expertIdx)) {
+    if (!PrepareMoeExpertGmm2State<ActivationElementsPerByte, WeightElementsPerByte,
+                                   SwigluElementsPerByte>(context, scratch, state, expertIdx)) {
         return false;
     }
-    UpdateMoeGmm2GlobalBuffer<ActivationType, SwigluOutType, QuantScaleType,
-                              ConfigureGmm2Output, ConfigureCombineCounter,
-                              ConfigureGmmToEpilogue>(
+    UpdateMoeExpertGmm2GlobalBuffer<ActivationType, SwigluOutType, QuantScaleType,
+                                    ConfigureGmm2Output, ConfigureCombineCounter,
+                                    ConfigureGmmToEpilogue>(
         context, workspace, weights, gmmAddrInfo, state, expertIdx);
     return true;
 }
@@ -1120,13 +1141,15 @@ template <uint8_t CombineMode, typename GenericElementA, typename A8W4ElementA,
           bool IsGmm1Interleaved, bool IsWaveFlagGrained>
 __aicore__ inline void RunMoeExpertGmm2Stage(
     const Gmm2Config &context, const Params &params, const GMMAddrInfo &gmmAddrInfo,
-    const Gmm2ExpertLoopState &state, Gmm2RuntimeState &runtimeState)
+    const Gmm2ExpertLoopState &state, Gmm2RuntimeState &runtimeState,
+    void *persistentBlockMmadContext = nullptr, bool allowWeightL2Bypass = false)
 {
     RunGmm2ByMode<CombineMode, GenericElementA, A8W4ElementA, WeightType,
                   QuantScaleType, EnableA8W4, EnableA4W4, Gmm1TileM,
                   TopkWeightsPrefetch, false, IsGmm1Interleaved,
                   IsWaveFlagGrained>(
-        context, params, gmmAddrInfo, state, runtimeState);
+        context, params, gmmAddrInfo, state, runtimeState, persistentBlockMmadContext,
+        allowWeightL2Bypass);
 }
 
 template <typename GenericElementA, typename A8W4ElementA, typename WeightType,
@@ -1136,22 +1159,24 @@ template <typename GenericElementA, typename A8W4ElementA, typename WeightType,
 __aicore__ inline bool RunSharedExpertGmm2Stage(
     const Gmm2Config &context, const Params &params,
     const ExpertWeightTensorListAddrs &weights, Gmm2ExpertLoopState &state,
-    GMMAddrInfo &gmmAddrInfo, Gmm2RuntimeState &runtimeState, uint32_t sharedExpertIdx)
+    GMMAddrInfo &gmmAddrInfo, Gmm2RuntimeState &runtimeState, uint32_t sharedExpertIdx,
+    void *persistentBlockMmadContext = nullptr, bool allowWeightL2Bypass = false)
 {
-    if (!UpdateSharedGmm2GroupParams<PackedElementTraits<GenericElementA>::ELEMENTS_PER_BYTE,
-                                     PackedElementTraits<WeightType>::ELEMENTS_PER_BYTE,
-                                     PackedElementTraits<A8W4ElementA>::ELEMENTS_PER_BYTE>(
+    if (!PrepareSharedExpertGmm2State<PackedElementTraits<GenericElementA>::ELEMENTS_PER_BYTE,
+                                      PackedElementTraits<WeightType>::ELEMENTS_PER_BYTE,
+                                      PackedElementTraits<A8W4ElementA>::ELEMENTS_PER_BYTE>(
             context, state, sharedExpertIdx)) {
         return false;
     }
-    UpdateSharedGmm2GlobalBuffer<A8W4ElementA, QuantScaleType, Gmm1TileM,
-                                 EnableA8W4 || EnableA4W4>(
+    UpdateSharedExpertGmm2GlobalBuffer<A8W4ElementA, QuantScaleType, Gmm1TileM,
+                                       EnableA8W4 || EnableA4W4>(
         context, params.workspaceInfo, weights, gmmAddrInfo, state, sharedExpertIdx);
     RunGmm2ByMode<COMBINE_NO_QUANT, GenericElementA, A8W4ElementA, WeightType,
                   QuantScaleType, EnableA8W4, EnableA4W4, Gmm1TileM,
                   TopkWeightsPrefetch, true, IsGmm1Interleaved,
                   IsWaveFlagGrained>(
-        context, params, gmmAddrInfo, state, runtimeState);
+        context, params, gmmAddrInfo, state, runtimeState, persistentBlockMmadContext,
+        allowWeightL2Bypass);
     return true;
 }
 
