@@ -28,9 +28,6 @@ struct MoeEpCommonTilingData {
 struct MoeEpDispatchEpilogueInfo {
     MoeEpCommonTilingData cfg;
     uint32_t aivNum = 0;
-    uint32_t networkMode = 0;
-    uint32_t rankSizePerServer = 1;
-    uint32_t numScaleoutRanks = 1;
     uint64_t totalUbSize = 0;
     uint32_t dispatchNotifyCount = 1;   // slot notify count per rank
     uint64_t winDataOffset = 0; // Win Data Offset

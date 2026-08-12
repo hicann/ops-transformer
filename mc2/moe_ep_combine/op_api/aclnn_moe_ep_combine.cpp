@@ -17,8 +17,8 @@
 using namespace op;
 
 namespace {
-constexpr int64_t DIRECT_MODE = 0;
-constexpr int64_t HYBRID_MODE = 1;
+constexpr int64_t NETWORK_DIRECT = 0;
+constexpr int64_t NETWORK_HYBRID = 1;
 } // namespace
 
 static aclnnStatus CheckNotNull(const aclTensor *context, const aclTensor *x, const aclTensor *topkIdx,
@@ -42,7 +42,7 @@ static aclnnStatus CheckParams(int64_t epWorldSize, int64_t epRankId, int64_t nu
     CHECK_RET(numExperts % epWorldSize == 0, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(numMaxTokensPerRank > 0, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(cclBufferSize > 0, ACLNN_ERR_PARAM_INVALID);
-    CHECK_RET(topoType == DIRECT_MODE || topoType == HYBRID_MODE, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(topoType == NETWORK_DIRECT || topoType == NETWORK_HYBRID, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(rankNumPerServer > 0, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(epWorldSize % rankNumPerServer == 0, ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;

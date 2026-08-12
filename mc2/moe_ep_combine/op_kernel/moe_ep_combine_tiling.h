@@ -34,10 +34,6 @@ struct MoeEpCombineInfo {
     MoeEpCommonTilingData cfg;
     uint32_t hasTopkWeights = 0;
     uint32_t aivNum = 0;
-    uint32_t networkMode = 0;
-    uint32_t rankSizePerServer = 1;
-    uint32_t numScaleoutRanks = 1;
-    uint32_t scaleoutSlotAlignedBytes = 0;
     uint64_t totalWinSizeEp = 0;
     uint64_t totalUbSize = 0;
     uint64_t sendDataWorkspaceSizePerRank = 0; // N * K * actual perSlotBytes

@@ -226,13 +226,13 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::Init(
     moeExpertNum_ = info.cfg.numExperts;
     moeExpertNumPerRank_ = info.cfg.numLocalExperts;
     axisMaxBS_ = info.cfg.numMaxTokensPerRank;
-    scalesBytes_ = info.cfg.scalesBytes;
-    perSlotBytes_ = info.cfg.perSlotBytes;
+    scalesBytes_ = info.scalesBytes;
+    perSlotBytes_ = info.perSlotBytes;
     aivNum_ = info.aivNum;
-    cntWinStateOffset_ = info.cntWinStateOffset;
-    slotWinStateOffset_ = info.slotWinStateOffset;
-    winDataOffset_ = info.winDataOffset;
-    payloadStashWinOffset_ = info.payloadStashWinOffset;
+    cntWinStateOffset_ = info.window.cntWinStateOffset;
+    slotWinStateOffset_ = info.window.slotWinStateOffset;
+    winDataOffset_ = info.window.winDataOffset;
+    payloadStashWinOffset_ = info.window.payloadStashWinOffset;
     dispatchNotifyCount_ = info.dispatchNotifyCount;
     hostPinnedCounterAddrGM_ = reinterpret_cast<GM_ADDR>(info.hostPinnedCounterAddr);
 

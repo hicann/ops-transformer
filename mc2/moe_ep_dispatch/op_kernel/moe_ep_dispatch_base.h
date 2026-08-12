@@ -33,10 +33,6 @@
 #include "kernel_operator.h"
 #endif
 
-#if __has_include("adv_api/hcomm/hcomm.h")
-#include "adv_api/hcomm/hcomm.h"
-#endif
-
 #if __has_include("../common/mc2_moe_context.h")
 #include "../common/mc2_moe_context.h"
 #include "../common/mc2_kernel_utils.h"
@@ -50,8 +46,6 @@ namespace MoeEpDispatchBase {
 #if defined(ENABLE_MOE_EP_KERNEL)
 
 using namespace AscendC;
-
-constexpr uint64_t DISPATCH_CQE_MAX_WRITE_SIZE = 256UL * 1024UL * 1024UL;
 
 // PerExpertCnt Calculation
 template <Reg::HistogramsType htype, typename T, typename U>
@@ -101,38 +95,20 @@ __aicore__ inline uint64_t GetCommHandle(__gm__ Mc2Aclnn::MoeCommContext *contex
 }
 
 // For Hybrid
-__aicore__ inline uint32_t GetCurrentServerIndex(uint32_t epRankId, uint32_t rankSizePerServer)
+__aicore__ inline uint32_t GetCurrentServerIndex(uint32_t epRankId, uint32_t rankNumPerServer)
 {
-    return rankSizePerServer == 0U ? 0U : epRankId / rankSizePerServer;
+    return rankNumPerServer == 0U ? 0U : epRankId / rankNumPerServer;
 }
 
-__aicore__ inline uint32_t GetServerStartRank(uint32_t epRankId, uint32_t rankSizePerServer)
+__aicore__ inline uint32_t GetServerStartRank(uint32_t epRankId, uint32_t rankNumPerServer)
 {
-    return GetCurrentServerIndex(epRankId, rankSizePerServer) * rankSizePerServer;
+    return GetCurrentServerIndex(epRankId, rankNumPerServer) * rankNumPerServer;
 }
 
-__aicore__ inline uint32_t GetServerEndRank(uint32_t epRankId, uint32_t rankSizePerServer, uint32_t epWorldSize)
+__aicore__ inline uint32_t GetServerEndRank(uint32_t epRankId, uint32_t rankNumPerServer, uint32_t epWorldSize)
 {
-    uint32_t serverEndRank = GetServerStartRank(epRankId, rankSizePerServer) + rankSizePerServer;
+    uint32_t serverEndRank = GetServerStartRank(epRankId, rankNumPerServer) + rankNumPerServer;
     return serverEndRank > epWorldSize ? epWorldSize : serverEndRank;
-}
-
-template <typename HcommType>
-__aicore__ inline void WriteRemoteWindowByChunks(HcommType &hcomm, uint64_t commHandle, GM_ADDR remoteWindowAddr,
-                                                 GM_ADDR localWorkspaceAddr, uint64_t sendBytes)
-{
-    // HCCL单次写有CQE大小限制，保持原分片写逻辑
-    uint64_t splitCount = (sendBytes + DISPATCH_CQE_MAX_WRITE_SIZE - 1UL) / DISPATCH_CQE_MAX_WRITE_SIZE;
-    uint64_t dataBytes = DISPATCH_CQE_MAX_WRITE_SIZE;
-    for (uint64_t splitIndex = 0UL; splitIndex < splitCount; splitIndex++) {
-        if (splitIndex == splitCount - 1UL) {
-            dataBytes = sendBytes - splitIndex * DISPATCH_CQE_MAX_WRITE_SIZE;
-        }
-        hcomm.WriteNbi(commHandle, remoteWindowAddr, localWorkspaceAddr, dataBytes);
-        localWorkspaceAddr += dataBytes;
-        remoteWindowAddr += dataBytes;
-    }
-    hcomm.Drain(commHandle);
 }
 
 #endif
