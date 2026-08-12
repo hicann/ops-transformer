@@ -37,6 +37,9 @@ private:
     ge::graphStatus CheckSingleParaBlockTable(const QfaTilingInfo &qfaInfo);
     // 仅通过 layout_kv 判断是否为 PA 场景 (PA_BBND/PA_BNBD/PA_NZ)
     bool IsPageAttention(const QfaTilingInfo &qfaInfo) const;
+    // --- Feature: blockSize 场景化校验 ---
+    ge::graphStatus CheckBlockSizeMxFp8(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckBlockSizeGqaFp8(const QfaTilingInfo &qfaInfo) const;
 };
 
 } // namespace quant_flash_attn

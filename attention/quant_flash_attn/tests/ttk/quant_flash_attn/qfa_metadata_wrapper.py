@@ -42,15 +42,21 @@ _TESTS_DIR = os.path.abspath(
 )
 if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
-import quant_flash_attn_golden as golden_mod
+import quant_flash_attn_golden as mxfp8_golden_mod
+import quant_flash_attn_fp8_golden as fp8_golden_mod
 
 logger = logging.getLogger(__name__)
 
 
-def _apply_golden_globals(params):
-    """把 case 参数注入 golden 模块全局变量。"""
+def _apply_golden_globals(params, quant_mode=1):
+    """把 case 参数注入 golden 模块全局变量 (按 quant_mode 选择目标模块).
+
+    quant_mode=6 → fp8_golden_mod (GQA FP8 全量化路径)
+    其他 → mxfp8_golden_mod (MXFP8 路径)
+    """
+    target = fp8_golden_mod if quant_mode == 6 else mxfp8_golden_mod
     for k, v in params.items():
-        setattr(golden_mod, k, v)
+        setattr(target, k, v)
 
 
 def run_metadata(
@@ -140,7 +146,9 @@ def run_metadata(
             "DATA_RANGE_Q": kwargs.get("data_range_q"),
             "DATA_RANGE_K": kwargs.get("data_range_k"),
             "DATA_RANGE_V": kwargs.get("data_range_v"),
-        }
+            "QUANT_MODE": quant_mode,
+        },
+        quant_mode=quant_mode,
     )
 
     fp8_dtype = torch.float8_e4m3fn
@@ -160,50 +168,86 @@ def run_metadata(
     p_scale_cpu = _to_cpu(p_scale)
     block_table_cpu = _to_cpu(block_table)
 
-    quant_scale_q = golden_mod.get_mxfp8_per_token_group_quant_scale(
-        q_cpu, fp8_dtype, group_size
-    )
-    quant_scale_k = golden_mod.get_mxfp8_per_token_group_quant_scale(
-        k_cpu, fp8_dtype, group_size
-    )
-    quant_scale_v = golden_mod.get_mxfp8_per_channel_group_quant_scale(
-        v_cpu, fp8_dtype, group_size
-    )
+    if quant_mode == 6:
+        # GQA FP8 全量化 (per-token-head Q/K, per-head V, descale=FP32)
+        quant_scale_q = fp8_golden_mod.get_fp8_per_token_head_quant_scale(q_cpu)
+        quant_scale_k = fp8_golden_mod.get_fp8_per_token_head_quant_scale(k_cpu)
+        quant_scale_v = fp8_golden_mod.get_fp8_per_head_quant_scale(v_cpu)
+        deq_q, deq_k, deq_v = fp8_golden_mod.fp8_quant_scales_to_descales(
+            quant_scale_q, quant_scale_k, quant_scale_v
+        )
+        q_fp8 = fp8_golden_mod.quant_fp16_to_fp8(q_cpu, quant_scale_q)
+        k_fp8 = fp8_golden_mod.quant_fp16_to_fp8(k_cpu, quant_scale_k)
+        v_fp8 = fp8_golden_mod.quant_fp16_to_fp8(v_cpu, quant_scale_v)
+    else:
+        # MXFP8 (per-token-group Q/K, per-channel-group V, descale=e8m0)
+        quant_scale_q = mxfp8_golden_mod.get_mxfp8_per_token_group_quant_scale(
+            q_cpu, fp8_dtype, group_size
+        )
+        quant_scale_k = mxfp8_golden_mod.get_mxfp8_per_token_group_quant_scale(
+            k_cpu, fp8_dtype, group_size
+        )
+        quant_scale_v = mxfp8_golden_mod.get_mxfp8_per_channel_group_quant_scale(
+            v_cpu, fp8_dtype, group_size
+        )
+        deq_q = quant_scale_q
+        deq_k = quant_scale_k
+        deq_v = quant_scale_v
+        q_fp8 = (
+            mxfp8_golden_mod.mxfp8_per_token_group_quant(q_cpu, quant_scale_q, group_size)
+            .clamp(-fp8_max, fp8_max)
+            .to(fp8_dtype)
+        )
+        k_fp8 = (
+            mxfp8_golden_mod.mxfp8_per_token_group_quant(k_cpu, quant_scale_k, group_size)
+            .clamp(-fp8_max, fp8_max)
+            .to(fp8_dtype)
+        )
+        v_fp8 = (
+            mxfp8_golden_mod.mxfp8_per_channel_group_quant(v_cpu, quant_scale_v, group_size)
+            .clamp(-fp8_max, fp8_max)
+            .to(fp8_dtype)
+        )
 
-    q_fp8 = (
-        golden_mod.mxfp8_per_token_group_quant(q_cpu, quant_scale_q, group_size)
-        .clamp(-fp8_max, fp8_max)
-        .to(fp8_dtype)
-    )
-    k_fp8 = (
-        golden_mod.mxfp8_per_token_group_quant(k_cpu, quant_scale_k, group_size)
-        .clamp(-fp8_max, fp8_max)
-        .to(fp8_dtype)
-    )
-    v_fp8 = (
-        golden_mod.mxfp8_per_channel_group_quant(v_cpu, quant_scale_v, group_size)
-        .clamp(-fp8_max, fp8_max)
-        .to(fp8_dtype)
-    )
-
-    inputs = golden_mod.prepare_npu_inputs(
-        q_fp8,
-        k_fp8,
-        v_fp8,
-        quant_scale_q,
-        quant_scale_k,
-        quant_scale_v,
-        p_scale_cpu,
-        cu_seqlens_q_list,
-        cu_seqlens_kv_list,
-        list(seqused_q) if seqused_q is not None else None,
-        list(seqused_kv) if seqused_kv is not None else None,
-        max_seqlen_q,
-        max_seqlen_kv,
-        block_table_cpu
-        if isinstance(block_table_cpu, torch.Tensor) and enable_pa
-        else None,
-    )
+    # 按 quant_mode 派发 prepare_npu_inputs (mxfp8 / gqa_fp8 路径 layout 不同)
+    if quant_mode == 6:
+        inputs = fp8_golden_mod.prepare_npu_inputs_gqa_fp8(
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            deq_q,
+            deq_k,
+            deq_v,
+            p_scale_cpu,
+            cu_seqlens_q_list,
+            cu_seqlens_kv_list,
+            list(seqused_q) if seqused_q is not None else None,
+            list(seqused_kv) if seqused_kv is not None else None,
+            max_seqlen_q,
+            max_seqlen_kv,
+            block_table_cpu
+            if isinstance(block_table_cpu, torch.Tensor) and enable_pa
+            else None,
+        )
+    else:
+        inputs = mxfp8_golden_mod.prepare_npu_inputs(
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            deq_q,
+            deq_k,
+            deq_v,
+            p_scale_cpu,
+            cu_seqlens_q_list,
+            cu_seqlens_kv_list,
+            list(seqused_q) if seqused_q is not None else None,
+            list(seqused_kv) if seqused_kv is not None else None,
+            max_seqlen_q,
+            max_seqlen_kv,
+            block_table_cpu
+            if isinstance(block_table_cpu, torch.Tensor) and enable_pa
+            else None,
+        )
 
     cu_seqlens_q_t = (
         torch.tensor(inputs["cu_seqlens_q"], dtype=torch.int32).npu()
@@ -239,7 +283,7 @@ def run_metadata(
             num_heads_q=inputs["q_n"],
             num_heads_kv=inputs["kv_n"],
             head_dim=inputs["q"].shape[-1],
-            quant_mode=1,
+            quant_mode=quant_mode,
             cu_seqlens_q=cu_seqlens_q_t if is_tnd_q else None,
             cu_seqlens_kv=cu_seqlens_kv_t if is_tnd_kv else None,
             seqused_q=seqused_q_t,

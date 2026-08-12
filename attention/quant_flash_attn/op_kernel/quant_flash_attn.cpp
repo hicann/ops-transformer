@@ -18,6 +18,7 @@
 #include "arch35/quant_flash_attn_common_def.h"
 #include "util.h"
 #include "arch35/quant_flash_attn_kernel_mxfp8.h"
+#include "arch35/quant_flash_attn_kernel_fp8.h"
 #include "arch35/quant_flash_attn_template_tiling_key.h"
 #include "arch35/quant_flash_attn_tiling_data.h"
 #if __has_include("../../common/op_kernel/arch35/flash_attention_score_common_regbase.h")
@@ -94,6 +95,72 @@ __aicore__ inline void quant_flash_attn_mxfp8(
     op.Process();
 }
 
+// ─────────────────────────────────────────────────────────
+// quant_flash_attn_kernel_run_gqa: GQA FP8 Fullquant
+// ─────────────────────────────────────────────────────────
+template <typename INPUT_T, typename OUT_T, uint8_t inOutLayoutType, uint8_t KvLayoutType, bool hasAttenMask,
+          uint8_t config>
+inline __aicore__ void
+quant_flash_attn_gqa_fp8(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
+                                __gm__ uint8_t *qDescale, __gm__ uint8_t *kDescale, __gm__ uint8_t *vDescale,
+                                __gm__ uint8_t *blockTable, __gm__ uint8_t *pScale, __gm__ uint8_t *cuSeqLensQ,
+                                __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedKv,
+                                __gm__ uint8_t *sinks, __gm__ uint8_t *metadata, __gm__ uint8_t *attnOut,
+                                __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+{
+    fa_base_matmul::idCounterNum = 0;
+
+    constexpr LayOutTypeEnum inputLayoutType =
+        static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][0]);
+    constexpr LayOutTypeEnum outputLayoutType =
+        static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][1]);
+
+    constexpr S1TemplateType s1TemplateType = static_cast<S1TemplateType>(ConfigValue[config].s1);
+    constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(ConfigValue[config].s2);
+    constexpr DTemplateType dTemplateType = static_cast<DTemplateType>(ConfigValue[config].d);
+    constexpr DTemplateType dVTemplateType = static_cast<DTemplateType>(ConfigValue[config].dv);
+
+    constexpr bool useDn = true;
+
+    using Fp8CubeBlock =
+        BaseApi::QuantFlashAttnBlockCubeGqaFp8<INPUT_T, float, inputLayoutType, s1TemplateType, s2TemplateType,
+                                         dTemplateType, dVTemplateType, KvLayoutType, useDn>;
+    using Fp8VecFaBlock =
+        BaseApi::QuantFlashAttnBlockVecGqaFp8<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType, s1TemplateType,
+                                        s2TemplateType, dTemplateType, dVTemplateType,
+                                        hasAttenMask, KvLayoutType, false, useDn>;
+    using VecFdBlock =
+        BaseApi::QuantFlashAttnBlockVecFlashDecode<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
+            s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask, KvLayoutType, useDn>;
+
+    using Fp8CubeBlockDummy =
+        BaseApi::QuantFlashAttnBlockCubeGqaFp8Dummy<INPUT_T, float, inputLayoutType, s1TemplateType, s2TemplateType,
+                                              dTemplateType, dVTemplateType, KvLayoutType, useDn>;
+    using Fp8VecFaBlockDummy =
+        BaseApi::QuantFlashAttnBlockVecGqaFp8Dummy<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
+                                             s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
+                                             hasAttenMask, KvLayoutType, false, useDn>;
+    using VecFdBlockDummy =
+        BaseApi::QuantFlashAttnBlockVecFlashDecodeDummy<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
+            s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask, KvLayoutType, useDn>;
+
+#ifdef __DAV_C310_CUBE__
+    using Kernel = BaseApi::QuantFlashAttnKernelFp8<Fp8CubeBlock, Fp8VecFaBlockDummy, VecFdBlockDummy>;
+#else
+    using Kernel = BaseApi::QuantFlashAttnKernelFp8<Fp8CubeBlockDummy, Fp8VecFaBlock, VecFdBlock>;
+#endif
+
+    const __gm__ QuantFlashAttnTilingData *__restrict tilingData =
+        (const __gm__ QuantFlashAttnTilingData *__restrict)tiling;
+
+    TPipe tPipe;
+    Kernel op;
+    op.Init(query, key, value, sinks, cuSeqLensQ, cuSeqLensKv, blockTable, qDescale, kDescale, vDescale,
+            pScale, softmaxLse, attnOut, workspace, metadata, sequsedQ, sequsedKv, tilingData,
+            &tPipe);
+    op.Process();
+}
+
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
           bool isFd>
 __global__ __aicore__ void quant_flash_attn(
@@ -111,6 +178,13 @@ __global__ __aicore__ void quant_flash_attn(
         quant_flash_attn_mxfp8<inOutLayoutType, config, quantMode, hasAttenMask, KvLayoutType, isFd>(
             query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue, blockTable, pScale, cuSeqLensQ,
             cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, attnOut, softmaxLse, workspace, tiling);
+    }
+    if constexpr (quantMode == QFA_GQA_FP8_FULLQUANT) {
+        quant_flash_attn_gqa_fp8<fp8_e4m3fn_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask,
+                                        config>(
+            query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue, blockTable, pScale,
+            cuSeqLensQ, cuSeqLensKv, sequsedQ, sequsedKv, sinks, metadata, attnOut, softmaxLse,
+            user, tiling);
     }
 #endif
 }

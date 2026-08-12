@@ -30,5 +30,28 @@ struct QuantFlashAttnCompileInfo {
     platform_ascendc::SocVersion socVersion;
     NpuArch npuArch;
 };
+
+struct QfaTilingKeyInfo {
+    uint64_t inputLayout = 0;
+    uint64_t config = 0;
+    uint64_t quantMode = 0;
+    bool hasAttenMask = false;
+    uint64_t kvLayoutType = 0;
+    bool isFd = false;
+};
+
+struct QfaPlatFormInfo {
+    uint64_t ubSize = 0;
+    uint64_t l2Size = 0;
+    uint64_t l1Size = 0;
+    uint64_t l0cSize = 0;
+    uint64_t l0bSize = 0;
+    uint64_t l0aSize = 0;
+    uint32_t coreNum = 0;
+    uint32_t aicNum = 0;
+    uint32_t aivNum = 0;
+    uint32_t cvRatio = 0;
+    uint64_t defaultSysWorkspaceSize = 0;
+};
 } // namespace quant_flash_attn
 } // namespace optiling

@@ -18,24 +18,29 @@ from typing import List, Optional
 import torch
 import torch_npu
 
-# 复用 quant_flash_attn_golden 的 layout 转换 / e8m0 打包 / prepare_npu_inputs / 全局变量
+# 复用 quant_flash_attn_golden / quant_flash_attn_fp8_golden 的 layout 转换 / e8m0 打包 / prepare_npu_inputs / 全局变量
 _ASSETS_DIR = os.path.dirname(os.path.abspath(__file__))
 _TESTS_DIR = os.path.join(_ASSETS_DIR, "..", "..")
 if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
-import quant_flash_attn_golden as golden_mod
+import quant_flash_attn_golden as mxfp8_golden_mod
+import quant_flash_attn_fp8_golden as fp8_golden_mod
 
 logger = logging.getLogger(__name__)
 
 
-def _apply_golden_globals(params):
-    """把 case 参数注入 golden 模块全局变量 (与 qfa_mxfp8_wrapper 一致).
+def _apply_golden_globals(params, quant_mode=1):
+    """把 case 参数注入 golden 模块全局变量 (按 quant_mode 选择目标模块, 与 qfa_wrapper 一致).
 
-    prepare_npu_inputs 读 golden_mod 的全局变量 (B/N_q/N_kv/D/ENABLE_PA/...),
+    prepare_npu_inputs 读目标 golden_mod 的全局变量 (B/N_q/N_kv/D/ENABLE_PA/...),
     必须在调 prepare_npu_inputs 前把 csv attributes 全部注入.
+
+    quant_mode=6 → fp8_golden_mod (GQA FP8 全量化路径)
+    其他 → mxfp8_golden_mod (MXFP8 路径)
     """
+    target = fp8_golden_mod if quant_mode == 6 else mxfp8_golden_mod
     for k, v in params.items():
-        setattr(golden_mod, k, v)
+        setattr(target, k, v)
 
 
 class QuantFlashAttnAclGraph(torch.nn.Module):
@@ -130,6 +135,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
                 "P_SCALE": p_scale_val,
                 "ENABLE_LSE": enable_lse,
                 "FP8_DTYPE": torch.float8_e4m3fn,
+                "QUANT_MODE": quant_mode,
                 "QUANT_GROUP_SIZE": 32,
                 "INPUT_LAYOUT": input_layout,
                 "IS_CONTIGUOUS": is_contiguous,
@@ -142,7 +148,8 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
                 "DATA_RANGE_Q": kwargs.get("data_range_q", data_range_q),
                 "DATA_RANGE_K": kwargs.get("data_range_k", data_range_k),
                 "DATA_RANGE_V": kwargs.get("data_range_v", data_range_v),
-            }
+            },
+            quant_mode=quant_mode,
         )
 
         # ---- 3. 透传 ----
@@ -174,25 +181,45 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
             enable_pa,
         )
 
-        # ---- 4. prepare_npu_inputs ----
-        inputs = golden_mod.prepare_npu_inputs(
-            q_fp8,
-            k_fp8,
-            v_fp8,
-            dequant_scale_q_cpu,
-            dequant_scale_k_cpu,
-            dequant_scale_v_cpu,
-            p_scale_cpu,
-            cu_seqlens_q_list,
-            cu_seqlens_kv_list,
-            seqused_q_list,
-            seqused_kv_list,
-            max_seqlen_q,
-            max_seqlen_kv,
-            block_table_cpu
-            if isinstance(block_table_cpu, torch.Tensor) and enable_pa
-            else None,
-        )
+        # ---- 4. prepare_npu_inputs (按 quant_mode 派发) ----
+        if quant_mode == 6:
+            inputs = fp8_golden_mod.prepare_npu_inputs_gqa_fp8(
+                q_fp8,
+                k_fp8,
+                v_fp8,
+                dequant_scale_q_cpu,
+                dequant_scale_k_cpu,
+                dequant_scale_v_cpu,
+                p_scale_cpu,
+                cu_seqlens_q_list,
+                cu_seqlens_kv_list,
+                seqused_q_list,
+                seqused_kv_list,
+                max_seqlen_q,
+                max_seqlen_kv,
+                block_table_cpu
+                if isinstance(block_table_cpu, torch.Tensor) and enable_pa
+                else None,
+            )
+        else:
+            inputs = mxfp8_golden_mod.prepare_npu_inputs(
+                q_fp8,
+                k_fp8,
+                v_fp8,
+                dequant_scale_q_cpu,
+                dequant_scale_k_cpu,
+                dequant_scale_v_cpu,
+                p_scale_cpu,
+                cu_seqlens_q_list,
+                cu_seqlens_kv_list,
+                seqused_q_list,
+                seqused_kv_list,
+                max_seqlen_q,
+                max_seqlen_kv,
+                block_table_cpu
+                if isinstance(block_table_cpu, torch.Tensor) and enable_pa
+                else None,
+            )
 
         # ---- 4. cu_seqlens/seqused list → NPU tensor (capture 之外) ----
         layout_q = inputs["layout_q"]

@@ -43,11 +43,28 @@ private:
     ge::graphStatus CheckSingleParaVDescale(const QfaTilingInfo &qfaInfo);
     ge::graphStatus CheckSingleParaPScale(const QfaTilingInfo &qfaInfo);
 
+    // --- SinglePara: descale shape dim 校验 (按量化场景分发) ---
+    ge::graphStatus CheckQDescaleDimMxFp8(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckQDescaleDimGqaFp8(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckKDescaleDimMxFp8(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckKDescaleDimGqaFp8(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckVDescaleDimMxFp8(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckVDescaleDimGqaFp8(const QfaTilingInfo &qfaInfo) const;
+
+    // --- ParaExistence: 场景化必选参数 ---
+    ge::graphStatus CheckParaExistenceGqaFp8(const QfaTilingInfo &qfaInfo) const;
+
     // --- MultiPara: descale shape consistency (descale_shape匹配关系表) ---
     ge::graphStatus CheckDescaleShape(const QfaTilingInfo &qfaInfo);
     ge::graphStatus CheckQDescaleShape(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckQDescaleShapeMxFp8(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckQDescaleShapeGqaFp8(const QfaTilingInfo &qfaInfo) const;
     ge::graphStatus CheckKDescaleShape(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckKDescaleShapeMxFp8(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckKDescaleShapeGqaFp8(const QfaTilingInfo &qfaInfo) const;
     ge::graphStatus CheckVDescaleShape(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckVDescaleShapeMxFp8(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckVDescaleShapeGqaFp8(const QfaTilingInfo &qfaInfo) const;
 
     // --- MultiPara: descale dtype 校验 ---
     // MxFP8 场景下, q/k/v descale 的 tensor_type 仅支持 FLOAT8_E8M0

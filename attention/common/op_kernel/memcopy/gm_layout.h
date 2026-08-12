@@ -441,13 +441,17 @@ struct GmLayout<GmFormat::PA_BnNBs> {
     AscendC::Stride<uint64_t, uint64_t, uint64_t> stride;
 
     __aicore__ inline GmLayout() = default;
-    __aicore__ inline void MakeLayout(uint32_t n, uint32_t blockSize)
+    __aicore__ inline void MakeLayout(uint32_t n, uint32_t blockSize, uint64_t bn2Stride = 0, uint64_t n2Stride = 0)
     {
         shape = AscendC::MakeShape(n, blockSize);
 
         uint64_t bsStride = 1;
         uint64_t nStride = bsStride * blockSize;
         uint64_t bnStride = nStride * n; // blockSize * kvHeadNum
+        if (bn2Stride != 0 && n2Stride != 0) {
+            bnStride = bn2Stride;
+            nStride = n2Stride;
+        }
         stride = AscendC::MakeStride(bnStride, nStride, bsStride);
     }
 };

@@ -89,6 +89,9 @@ quant_flash_attn(const at::Tensor &q, const at::Tensor &k, const at::Tensor &v, 
     if (layout_q == "TND") {
         tSize = q.size(0);
         nSize = q.size(1);
+    } else if (layout_q == "NTD") {
+        nSize = q.size(0);
+        tSize = q.size(1);
     } else if (layout_q == "BSND") {
         bSize = q.size(0);
         sSize = q.size(1);

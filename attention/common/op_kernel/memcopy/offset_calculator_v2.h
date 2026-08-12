@@ -1105,16 +1105,16 @@ struct OffsetCalculatorImpl<FORMAT, FormatCategory::GM_ANTIQ_BnNBs, ACTLEN_T> {
     __aicore__ inline OffsetCalculatorImpl() = default;
 
     __aicore__ inline void Init(uint32_t n, uint32_t blockSize, GlobalTensor<int32_t> blockTableGm,
-                                uint32_t maxblockNumPerBatch)
+                                uint32_t maxblockNumPerBatch, uint64_t bn2Stride = 0, uint64_t n2Stride = 0)
     {
         blockTableParser.Init(blockTableGm, maxblockNumPerBatch);
-        gmLayout.MakeLayout(n, blockSize);
+        gmLayout.MakeLayout(n, blockSize, bn2Stride, n2Stride);
     }
 
     __aicore__ inline uint64_t GetOffset(uint32_t bIdx, uint32_t nIdx, uint32_t sIdx)
     {
-        uint64_t blockIdxInBatch = sIdx / GetStrideBlockSize(); // 获取block table上的索引
-        uint64_t bsIdx = sIdx % GetStrideBlockSize();           // 获取在单个块上超出的行数
+        uint64_t blockIdxInBatch = sIdx / GetDimBlockSize(); // 获取block table上的索引
+        uint64_t bsIdx = sIdx % GetDimBlockSize();           // 获取在单个块上超出的行数
         int32_t blockIdx = blockTableParser.GetBlockIdx(bIdx, blockIdxInBatch);
         uint64_t offset = blockIdx * GetStrideBlockNum() + nIdx * GetStrideN() + bsIdx * GetStrideBlockSize();
 

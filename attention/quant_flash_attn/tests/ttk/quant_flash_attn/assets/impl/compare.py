@@ -22,16 +22,20 @@ _TESTS_DIR = os.path.join(_ASSETS_DIR, "..", "..")
 if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
 import result_compare_method
-import quant_flash_attn_golden as golden_mod
+import quant_flash_attn_golden as mxfp8_golden_mod
+import quant_flash_attn_fp8_golden as fp8_golden_mod
 
 logger = logging.getLogger(__name__)
 
 
 def _resolve_csv_tolerance(idx):
-    """从 golden_mod 读 csv 注入的 precision_tolerances / absolute_precision。
+    """从 golden 模块读 csv 注入的 precision_tolerances / absolute_precision。
 
     ttk 框架不把 testcase 对象直接传给 custom compare, golden 插件在调用前把
-    csv 的 precision_tolerances / absolute_precision 暂存到 golden_mod 上。
+    csv 的 precision_tolerances / absolute_precision 暂存到对应 golden 模块上。
+    按 quant_mode 分流: mxfp8 → mxfp8_golden_mod, gqa_fp8 → fp8_golden_mod。
+    本函数优先检查 fp8_golden_mod (quant_mode=6), 再检查 mxfp8_golden_mod,
+    取首个非 None 的属性 (两个模块不会同时有值, 因一个 case 只走一条路径)。
     返回 (rtol, atol, diff_thd, pct_thd, max_diff_hd); csv 省略时返回 (None,)*5
     由 check_result 用默认值 (rtol/atol 按 dtype 分支, diff_thd=0.005, pct_thd=0.005,
     max_diff_hd=10)。
@@ -42,8 +46,12 @@ def _resolve_csv_tolerance(idx):
                           如 ((0.0078125, 0.0001, 0.005, 0.005, 10),)
     5-tuple 的后三位 None → check_result 用默认值 (0.005/0.005/10)
     """
-    pt = getattr(golden_mod, "_csv_precision_tolerances", None)
-    ap = getattr(golden_mod, "_csv_absolute_precision", None)
+    # 优先检查 fp8_golden_mod (quant_mode=6 路径), 再检查 mxfp8_golden_mod
+    pt = getattr(fp8_golden_mod, "_csv_precision_tolerances", None)
+    ap = getattr(fp8_golden_mod, "_csv_absolute_precision", None)
+    if pt is None and ap is None:
+        pt = getattr(mxfp8_golden_mod, "_csv_precision_tolerances", None)
+        ap = getattr(mxfp8_golden_mod, "_csv_absolute_precision", None)
     rtol = None
     atol = None
     diff_thd = None

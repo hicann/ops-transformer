@@ -123,9 +123,20 @@ ge::graphStatus InferShapeQuantFlashAttn(gert::InferShapeContext *context)
         numHeadsQ = qShape->GetDim(1);
         headDim = qShape->GetDim(2);
         isTND = true;
+    } else if (layoutQStr == "NTD") {
+        if (qShape->GetDimNum() != 3) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "q",
+                std::to_string(qShape->GetDimNum()).c_str(),
+                "The shape dim of q must be 3 when layout_q is NTD");
+            return ge::GRAPH_FAILED;
+        }
+        numHeadsQ = qShape->GetDim(0);
+        seqLenQ   = qShape->GetDim(1);
+        headDim   = qShape->GetDim(2);
+        isTND     = true;
     } else {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "layout_q", layoutQStr.c_str(),
-                                              "The value of layout_q must be in BSND/BNSD/TND");
+                                              "The value of layout_q must be in BSND/BNSD/TND/NTD");
         return ge::GRAPH_FAILED;
     }
 

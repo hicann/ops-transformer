@@ -18,35 +18,13 @@
 #include "register/tilingdata_base.h"
 #include "exe_graph/runtime/tiling_context.h"
 #include "../qfa_tiling_info.h"
+#include "../quant_flash_attn_tiling_common.h"
 #include "tiling/tiling_api.h"
 #include "../../op_kernel/arch35/quant_flash_attn_tiling_data.h"
 #include "../../op_kernel/arch35/quant_flash_attn_template_tiling_key.h"
 
 namespace optiling {
 namespace quant_flash_attn {
-
-struct QfaTilingKeyInfo {
-    uint64_t inputLayout = 0;
-    uint64_t config = 0;
-    uint64_t quantMode = 0;
-    bool hasAttenMask = false;
-    uint64_t kvLayoutType = 0;
-    bool isFd = false;
-};
-
-struct QfaPlatFormInfo {
-    uint64_t ubSize = 0;
-    uint64_t l2Size = 0;
-    uint64_t l1Size = 0;
-    uint64_t l0cSize = 0;
-    uint64_t l0bSize = 0;
-    uint64_t l0aSize = 0;
-    uint32_t coreNum = 0;
-    uint32_t aicNum = 0;
-    uint32_t aivNum = 0;
-    uint32_t cvRatio = 0;
-    uint64_t defaultSysWorkspaceSize = 0;
-};
 
 class QuantFlashAttnTilingImpl : public FiaTilingBase {
 public:

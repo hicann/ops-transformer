@@ -25,6 +25,7 @@ static const std::map<QfaLayout, std::vector<QfaAxis>> QFA_LAYOUT_AXIS_MAP = {
     {QfaLayout::BSND, {QfaAxis::B, QfaAxis::S, QfaAxis::N, QfaAxis::D}},
     {QfaLayout::BNSD, {QfaAxis::B, QfaAxis::N, QfaAxis::S, QfaAxis::D}},
     {QfaLayout::TND, {QfaAxis::T, QfaAxis::N, QfaAxis::D}},
+    {QfaLayout::NTD, {QfaAxis::N, QfaAxis::T, QfaAxis::D}},
     {QfaLayout::PA_BBND, {QfaAxis::Bn, QfaAxis::Bs, QfaAxis::N, QfaAxis::D}},
     {QfaLayout::PA_BNBD, {QfaAxis::Bn, QfaAxis::N, QfaAxis::Bs, QfaAxis::D}},
     {QfaLayout::PA_NZ, {QfaAxis::Bn, QfaAxis::N, QfaAxis::D1, QfaAxis::Bs, QfaAxis::D0}},
@@ -164,6 +165,9 @@ ge::graphStatus QfaTilingShapeCompare::GetExpectedShape(gert::Shape &shapeExpect
             break;
         case QfaLayout::TND:
             shapeExpected = gert::Shape({param.T, param.N, param.D});
+            break;
+        case QfaLayout::NTD:
+            shapeExpected = gert::Shape({param.N, param.T, param.D});
             break;
         case QfaLayout::PA_BBND:
             shapeExpected = gert::Shape({param.Bn, param.Bs, param.N, param.D});

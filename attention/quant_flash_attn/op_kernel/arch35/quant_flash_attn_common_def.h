@@ -97,23 +97,28 @@ enum class inferS2TemplateType {
 //   0=BSND → (BSH, BSH)
 //   1=BNSD → (BNSD, BNSD)
 //   2=TND  → (TND, TND)
-static constexpr inferFaLayOutTypeEnum InOutLayoutTypeValue[3][2] = {
+//   3=NTD  → (NTD, TND)
+static constexpr inferFaLayOutTypeEnum InOutLayoutTypeValue[4][2] = {
     {inferFaLayOutTypeEnum::LAYOUT_BSH, inferFaLayOutTypeEnum::LAYOUT_BSH},
     {inferFaLayOutTypeEnum::LAYOUT_BNSD, inferFaLayOutTypeEnum::LAYOUT_BNSD},
     {inferFaLayOutTypeEnum::LAYOUT_TND, inferFaLayOutTypeEnum::LAYOUT_TND},
+    {inferFaLayOutTypeEnum::LAYOUT_NTD, inferFaLayOutTypeEnum::LAYOUT_TND},
 };
 
 // q_out layout
 //   0: BSND (BSND排布与BSH一样)
 //   1: BNSD
 //   2: TND
+//   3: NTD
 #define InOutLayoutType_BSND 0
 #define InOutLayoutType_BNSD 1
 #define InOutLayoutType_TND 2
+#define InOutLayoutType_NTD 3
 // backward compat
 #define InOutLayoutType_BSND_BSND InOutLayoutType_BSND
 #define InOutLayoutType_BNSD_BNSD InOutLayoutType_BNSD
 #define InOutLayoutType_TND_TND InOutLayoutType_TND
+#define InOutLayoutType_NTD_TND InOutLayoutType_NTD
 
 #define KvLayoutType_NO_PA 0
 #define KvLayoutType_PA_BBND 1
@@ -132,13 +137,17 @@ static constexpr ConfigParams ConfigValue[] = {
      inferDTemplateType::Aligned64},
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned512, inferDTemplateType::Aligned128,
      inferDTemplateType::Aligned128},
+    {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned128,
+     inferDTemplateType::Aligned128},
 };
 
 #define Config_S1Aligned128_S2Aligned512_DAligned64_DVAligned64 0
 #define Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128 1
+#define Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128 2
 
 #define QFA_MXFP8_FP32_PREFILL 1
 #define QFA_MXFP8_FP32_DECODE 2
+#define QFA_GQA_FP8_FULLQUANT 6
 
 #define false 0
 #define true 1
@@ -187,6 +196,11 @@ struct RunInfoX {
     uint64_t kvPaddingBeginOffset = 0;
 };
 
+struct StridesConstInfo {
+    uint64_t bnStride = 0;
+    uint64_t n2Stride = 0;
+};
+
 struct CommonConstInfo {
     uint32_t bSize;
     uint64_t t1Size;
@@ -223,6 +237,11 @@ struct CommonConstInfo {
 
     FA_LAYOUT outputLayout;
     bool needInitOutput;
+
+    StridesConstInfo keyStrides;
+    StridesConstInfo valueStrides;
+    StridesConstInfo kDescaleStrides;
+    StridesConstInfo vDescaleStrides;
 };
 
 struct PAConstInfo {

@@ -263,10 +263,15 @@ ge::graphStatus QfaInfoParser::GetQuantMode()
         return ge::GRAPH_FAILED;
     }
     int64_t quantModeVal = *opParamInfo_.quantMode;
-    if (quantModeVal != static_cast<int64_t>(QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32)) {
+    using QM = QfaQuantMode;
+    if (quantModeVal != static_cast<int64_t>(QM::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) &&
+        quantModeVal != static_cast<int64_t>(
+            QM::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
                                               "quant_mode must be 1 "
-                                              "(A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32)");
+                                              "(A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) or "
+                                              "6 (A8C8_QK_FP8_""E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_"
+                                              "P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32)");
         return ge::GRAPH_FAILED;
     }
     quantMode_ = static_cast<QfaQuantMode>(quantModeVal);
@@ -304,7 +309,7 @@ void QfaInfoParser::GetInOutDataType()
 
 ge::graphStatus QfaInfoParser::GetBatchSize()
 {
-    if (layoutQ_ == QfaLayout::TND) {
+    if (layoutQ_ == QfaLayout::TND || layoutQ_ == QfaLayout::NTD) {
         return GetCuSeqLenQSize(bSize_);
     } else {
         if (queryShape_->CheckHasShapeB(__func__) != ge::GRAPH_SUCCESS) {
@@ -336,7 +341,7 @@ ge::graphStatus QfaInfoParser::GetQkHeadDim()
 
 ge::graphStatus QfaInfoParser::GetS1Size()
 {
-    if (layoutQ_ == QfaLayout::TND) {
+    if (layoutQ_ == QfaLayout::TND || layoutQ_ == QfaLayout::NTD) {
         s1Size_ = (opParamInfo_.maxSeqlenQ == nullptr) ? -1 : *opParamInfo_.maxSeqlenQ;
     } else {
         if (queryShape_->CheckHasShapeS(__func__) != ge::GRAPH_SUCCESS) {
@@ -609,14 +614,24 @@ ge::graphStatus QfaInfoParser::ParseAxisInfo()
     }
 
     uint32_t qDescaleDimNum = opParamInfo_.qDescale.shape->GetStorageShape().GetDimNum();
-    bool isDecode = (layoutQDescale_ == QfaLayout::N2TGD);
-    if (isDecode && qDescaleDimNum != 5) {
-        OP_LOGE(opName_, "q_descale must be 5D in decode mode(layout_q_descale=N2TGD), but got %uD.", qDescaleDimNum);
-        return ge::GRAPH_FAILED;
-    }
-    if (!isDecode && qDescaleDimNum != 4) {
-        OP_LOGE(opName_, "q_descale must be 4D in prefill mode(layout_q_descale=TND), but got %uD.", qDescaleDimNum);
-        return ge::GRAPH_FAILED;
+    using QM = QfaQuantMode;
+    if (quantMode_ == QM::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
+        if (qDescaleDimNum != 2) {
+            OP_LOGE(opName_, "q_descale must be 2D for GQA_FP8_FULLQUANT, but got %uD.", qDescaleDimNum);
+            return ge::GRAPH_FAILED;
+        }
+    } else {
+        bool isDecode = (layoutQDescale_ == QfaLayout::N2TGD);
+        if (isDecode && qDescaleDimNum != 5) {
+            OP_LOGE(opName_,
+                    "q_descale must be 5D in decode mode(layout_q_descale=N2TGD), but got %uD.", qDescaleDimNum);
+            return ge::GRAPH_FAILED;
+        }
+        if (!isDecode && qDescaleDimNum != 4) {
+            OP_LOGE(opName_,
+                    "q_descale must be 4D in prefill mode(layout_q_descale=TND), but got %uD.", qDescaleDimNum);
+            return ge::GRAPH_FAILED;
+        }
     }
 
     return ge::GRAPH_SUCCESS;
@@ -638,10 +653,6 @@ ge::graphStatus QfaInfoParser::ParseFeatureInfo()
     softmaxScale_ = (opParamInfo_.softmaxScale == nullptr) ? 1.0f : *opParamInfo_.softmaxScale;
     maxSeqQ_ = (opParamInfo_.maxSeqlenQ == nullptr) ? -1 : *opParamInfo_.maxSeqlenQ;
     maxSeqKv_ = (opParamInfo_.maxSeqlenKV == nullptr) ? -1 : *opParamInfo_.maxSeqlenKV;
-
-    if (ge::GRAPH_SUCCESS != GetQuantMode()) {
-        return ge::GRAPH_FAILED;
-    }
 
     return ge::GRAPH_SUCCESS;
 }
@@ -666,6 +677,9 @@ ge::graphStatus QfaInfoParser::Parse(QfaTilingInfo &qfaInfo)
     GetKvStorageMode();
     if (emptyTensorFlag_) {
         OP_LOGE(qfaInfo.opName, "empty tensor is not!");
+        return ge::GRAPH_FAILED;
+    }
+    if (ge::GRAPH_SUCCESS != GetQuantMode()) {
         return ge::GRAPH_FAILED;
     }
     if (ge::GRAPH_SUCCESS != ParseAxisInfo()) {

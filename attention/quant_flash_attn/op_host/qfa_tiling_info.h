@@ -119,13 +119,17 @@ enum class QfaLayout : uint32_t {
     PA_NZ = 5,
     LSE_BNS = 6,
     LSE_NT = 7,
-    N2TGD = 8
+    N2TGD = 8,
+    NTD = 9,
+    NT = 10
 };
 
 const std::map<std::string, QfaLayout> qfaLayoutMap = {{"BSND", QfaLayout::BSND},       {"BNSD", QfaLayout::BNSD},
                                                        {"TND", QfaLayout::TND},         {"PA_BBND", QfaLayout::PA_BBND},
                                                        {"PA_BNBD", QfaLayout::PA_BNBD}, {"PA_NZ", QfaLayout::PA_NZ},
-                                                       {"N2TGD", QfaLayout::N2TGD}};
+                                                       {"N2TGD", QfaLayout::N2TGD},
+                                                       {"NTD", QfaLayout::NTD},
+                                                       {"NT", QfaLayout::NT}};
 
 enum class QfaAxis : uint32_t {
     B = 0,
@@ -144,7 +148,8 @@ enum class QfaAxis : uint32_t {
 };
 
 enum class QfaQuantMode : uint32_t {
-    A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 1
+    A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 1,
+    A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 6
 };
 
 enum class KvStorageMode : uint32_t {

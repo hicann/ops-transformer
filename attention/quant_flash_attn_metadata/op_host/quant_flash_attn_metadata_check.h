@@ -75,7 +75,7 @@ QuantFlashAttnMetadataCheck::ParamsCheck(const aclTensor *cuSeqlensQOptional, co
                                          const char *layoutQ, const char *layoutQDescale, const char *layoutKv,
                                          const char *layoutOut, const aclTensor *metadata)
 {
-    (void)vDescaleOptional; // v_descale 校验下沉至 aicpu kernel
+    (void)vDescaleOptional;  // v_descale 校验下沉至 aicpu kernel
     auto ret = CheckBaseAttr(batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, quantMode, layoutQ,
                              layoutQDescale, layoutKv, layoutOut);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -107,10 +107,14 @@ QuantFlashAttnMetadataCheck::CheckBaseAttr(int64_t batchSize, int64_t maxSeqlenQ
 
     // quant_compute_mode 枚举值定义，当前仅支持 mode=1
     constexpr int64_t A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 1;
+    constexpr int64_t QUANT_MODE_GQA_FP8_FULLQUANT = 6;
     static const std::unordered_set<int64_t> quantModeSet = {
-        A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32};
+        A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32,
+        QUANT_MODE_GQA_FP8_FULLQUANT};
     CHECK_COND(quantModeSet.count(quantMode) > 0, ACLNN_ERR_RUNTIME_ERROR,
-               "quantMode only supports 1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32), but got %ld", quantMode);
+               "quantMode only supports 1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) "
+               "and 6(A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) "
+               "but got %ld", quantMode);
 
     // 文档约束(单参数校验): max_seqlen_q / max_seqlen_kv 值域为 -1(默认,表示未传) 或 >=0(有效值)
     // 场景相关的存在性约束由 CheckExistency(特性交叉校验)负责: 非TND时与seqused_q/kv至少传1个
@@ -128,13 +132,13 @@ QuantFlashAttnMetadataCheck::CheckBaseAttr(int64_t batchSize, int64_t maxSeqlenQ
     CHECK_COND(headDimSet.count(headDim) > 0, ACLNN_ERR_RUNTIME_ERROR,
                "headDim only supports %ld, %ld, but got %ld", HEAD_DIM_64, HEAD_DIM_128, headDim);
 
-    static const std::unordered_set<std::string> layoutQSet = {"BSND", "TND", "BNSD"};
+    static const std::unordered_set<std::string> layoutQSet = {"BSND", "TND", "BNSD", "NTD"};
     CHECK_COND(layoutQSet.count(layoutQ) > 0, ACLNN_ERR_RUNTIME_ERROR,
-               "layoutQ only supports BSND, TND, BNSD, but got %s", layoutQ);
+               "layoutQ only supports BSND, TND, BNSD, NTD, but got %s", layoutQ);
 
-    static const std::unordered_set<std::string> layoutQDescaleSet = {"BSND", "TND", "BNSD", "N2TGD"};
+    static const std::unordered_set<std::string> layoutQDescaleSet = {"BSND", "TND", "BNSD", "N2TGD", "NT"};
     CHECK_COND(layoutQDescaleSet.count(layoutQDescale) > 0, ACLNN_ERR_RUNTIME_ERROR,
-               "layoutQDescale only supports BSND, TND, BNSD, N2TGD, but got %s", layoutQDescale);
+               "layoutQDescale only supports BSND, TND, BNSD, N2TGD, NT, but got %s", layoutQDescale);
 
     static const std::unordered_set<std::string> layoutKvSet = {"BSND", "TND", "BNSD", "PA_BNBD", "PA_BBND", "PA_NZ"};
     CHECK_COND(layoutKvSet.count(layoutKv) > 0, ACLNN_ERR_RUNTIME_ERROR,
@@ -171,17 +175,17 @@ QuantFlashAttnMetadataCheck::CheckExistency(int64_t maxSeqlenQ, int64_t maxSeqle
 {
     CHECK_COND(metadata != nullptr, ACLNN_ERR_RUNTIME_ERROR, "metadata should be provided, but got null");
 
-    if (strcmp(layoutQ, "TND") == 0) {
-        // 文档约束: layout_q为TND时, cu_seqlens_q必须传入, seqused_q与max_seqlen_q可选
+    if (strcmp(layoutQ, "TND") == 0 || strcmp(layoutQ, "NTD") == 0) {
+        // 文档约束: layout_q为TND或NTD时, cu_seqlens_q必须传入, seqused_q与max_seqlen_q可选
         CHECK_COND(IsTensorExist(cuSeqlensQOptional), ACLNN_ERR_RUNTIME_ERROR,
-                   "When layoutQ is TND, cuSeqlensQOptional should be provided, but got null");
+                   "When layoutQ is TND or NTD, cuSeqlensQOptional should be provided, but got null");
     } else {
-        // 文档约束: layout_q不为TND时, cu_seqlens_q不支持传入
+        // 文档约束: layout_q不为TND/NTD时, cu_seqlens_q不支持传入
         CHECK_COND(!IsTensorExist(cuSeqlensQOptional), ACLNN_ERR_RUNTIME_ERROR,
-                   "When layoutQ is not TND, cuSeqlensQOptional should not be provided, but got non-null");
-        // 文档约束: layout_q不为TND时, seqused_q与max_seqlen_q至少传入其中一个 (-1表示max_seqlen_q未传)
+                   "When layoutQ is not TND or NTD, cuSeqlensQOptional should not be provided, but got non-null");
+        // 文档约束: layout_q不为TND/NTD时, seqused_q与max_seqlen_q至少传入其中一个 (-1表示max_seqlen_q未传)
         CHECK_COND(((maxSeqlenQ >= 0) || IsTensorExist(sequsedQOptional)), ACLNN_ERR_RUNTIME_ERROR,
-                   "When layoutQ is not TND, at least one of maxSeqlenQ or sequsedQOptional must be provided");
+                   "When layoutQ is not TND or NTD, at least one of maxSeqlenQ or sequsedQOptional must be provided");
     }
 
     if (strcmp(layoutKv, "TND") == 0) {

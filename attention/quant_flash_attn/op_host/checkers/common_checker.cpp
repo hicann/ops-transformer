@@ -40,15 +40,16 @@ using namespace Ops::Base;
 
 ge::graphStatus CommonChecker::CheckSingleParaLayout(const QfaTilingInfo &qfaInfo)
 {
-    const std::vector<QfaLayout> supportedQLayouts = {QfaLayout::BSND, QfaLayout::BNSD, QfaLayout::TND};
-    const std::vector<QfaLayout> supportedKvLayouts = {QfaLayout::BSND,    QfaLayout::BNSD,    QfaLayout::TND,
+    const std::vector<QfaLayout> supportedQLayouts = {QfaLayout::BSND, QfaLayout::BNSD, QfaLayout::TND,
+                                                      QfaLayout::NTD};
+    const std::vector<QfaLayout> supportedKvLayouts = {QfaLayout::BSND, QfaLayout::BNSD, QfaLayout::TND,
                                                        QfaLayout::PA_BBND, QfaLayout::PA_BNBD, QfaLayout::PA_NZ};
     const std::vector<QfaLayout> supportedOutLayouts = {QfaLayout::BSND, QfaLayout::BNSD, QfaLayout::TND};
 
     if (std::find(supportedQLayouts.begin(), supportedQLayouts.end(), qfaInfo.qLayout) == supportedQLayouts.end()) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, "layout_q",
                                               QfaLayoutToSerialString(qfaInfo.qLayout).c_str(),
-                                              "The value of layout_q must be in BSND/BNSD/TND");
+                                              "The value of layout_q must be in BSND/BNSD/TND/NTD");
         return ge::GRAPH_FAILED;
     }
 
@@ -300,10 +301,10 @@ ge::graphStatus CommonChecker::CheckAxis(const QfaTilingInfo &qfaInfo)
     }
 
     OP_CHECK_IF(
-        qfaInfo.s1Size < 0 && qfaInfo.qLayout != QfaLayout::TND,
+        qfaInfo.s1Size < 0 && qfaInfo.qLayout != QfaLayout::TND && qfaInfo.qLayout != QfaLayout::NTD,
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
             qfaInfo.opName, QUERY_NAME.c_str(), ToString(qfaInfo.opParamInfo.query.shape->GetStorageShape()).c_str(),
-            "When layout of query is not TND, S of query must be greater than or equal to 0"),
+            "When layout of query is not TND or NTD, S of query must be greater than or equal to 0"),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(qfaInfo.s2Size < 0,
                 OP_LOGE(qfaInfo.opName, "The axis KV_S must be greater than or equal to 0, the current is %ld.",
