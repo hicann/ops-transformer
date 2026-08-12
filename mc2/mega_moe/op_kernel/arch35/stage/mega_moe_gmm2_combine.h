@@ -944,6 +944,58 @@ __aicore__ inline Gmm2ExpertLoopState CreateGmm2ExpertLoopState(const Gmm2Config
     return {shape, offset, 0};
 }
 
+/*
+ * 动态 Wave 使用 rowOffset 索引紧凑 token buffer，使用 expertIdx 索引定长资源。Dispatch 与 GMM
+ * 以不同 Wave 进度推进时，无需继续累加旧的 Gmm2BlockOffset。
+ */
+template <typename ActivationType, typename WeightType, typename ActivationOutType, typename QuantScaleType,
+          bool ConfigureCombineCounter>
+__aicore__ inline void UpdateA8W4WaveGmm2GlobalBuffer(
+    const Gmm2Config &context, const WorkspaceInfo &workspace, const ExpertWeightTensorListAddrs &weights,
+    GMMAddrInfo &gmmAddrInfo, const ExpertLoopState &state, uint32_t expertIdx)
+{
+    constexpr uint32_t weightElementsPerByte = PackedElementTraits<WeightType>::ELEMENTS_PER_BYTE;
+    constexpr uint32_t activationOutputElementsPerByte =
+        PackedElementTraits<ActivationOutType>::ELEMENTS_PER_BYTE;
+    uint64_t gmm1OutputDim = static_cast<uint64_t>(Get<N_VALUE>(state.problemShape));
+    uint64_t tokenHiddenDim = static_cast<uint64_t>(Get<K_VALUE>(state.problemShape));
+    uint64_t rowOffset = static_cast<uint64_t>(state.rowOffset);
+    uint64_t activationOutputWidth = gmm1OutputDim / ACTIVATION_N_HALF;
+    uint64_t activationScaleWidth =
+        Ops::Base::CeilDiv(activationOutputWidth, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
+
+    gmmAddrInfo.gmm2OutGlobal = workspace.gmm2MmadResPtr + rowOffset * tokenHiddenDim * sizeof(bfloat16_t);
+    gmmAddrInfo.metaInfoGlobal = workspace.metaInfoPtr + rowOffset * META_INFO_SIZE * sizeof(int32_t);
+    gmmAddrInfo.aGlobal =
+        workspace.activationQuantDataPtr +
+        rowOffset * activationOutputWidth / activationOutputElementsPerByte * sizeof(ActivationOutType);
+    gmmAddrInfo.aScaleGlobal =
+        workspace.activationQuantScalePtr + rowOffset * activationScaleWidth * sizeof(QuantScaleType);
+    gmmAddrInfo.bGlobal = GetExpertWeightAddr<ActivationType>(
+        weights.weight2, context.isPerExpertWeightTensor, expertIdx,
+        static_cast<uint64_t>(expertIdx) * tokenHiddenDim * activationOutputWidth / weightElementsPerByte);
+    gmmAddrInfo.bScaleGlobal = GetExpertWeightAddr<QuantScaleType>(
+        weights.weightScales2, context.isPerExpertWeightTensor, expertIdx,
+        static_cast<uint64_t>(expertIdx) * tokenHiddenDim * activationScaleWidth);
+    if constexpr (ConfigureCombineCounter) {
+        uint64_t syncSlotOffset = static_cast<uint64_t>(expertIdx) * context.combineSyncSlotCountPerExpert;
+        gmmAddrInfo.gmm2CombineSyncCounter =
+            reinterpret_cast<__gm__ int32_t *>(workspace.gmm2CombineSyncCounterPtr) +
+            syncSlotOffset * static_cast<uint64_t>(INT_CACHELINE);
+    }
+    gmmAddrInfo.activationToGmm2Flag =
+        reinterpret_cast<__gm__ int32_t *>(workspace.flagActivationToGmm2Ptr) +
+        static_cast<uint64_t>(expertIdx) * context.activationFlagSlotsPerExpert;
+    gmmAddrInfo.dispatchToGmm1Flag = reinterpret_cast<__gm__ int32_t *>(workspace.flagDispatchToGmm1Ptr) +
+                                     static_cast<uint64_t>(expertIdx) * context.dispatchFlagSlotsPerExpert;
+    gmmAddrInfo.gmmToEpilogueFlag = nullptr;
+    if (workspace.flagGmmToEpiloguePtr != nullptr) {
+        gmmAddrInfo.gmmToEpilogueFlag =
+            reinterpret_cast<__gm__ int32_t *>(workspace.flagGmmToEpiloguePtr) +
+            static_cast<uint64_t>(context.blockJob.jobIndex) * INT_CACHELINE;
+    }
+}
+
 template <uint32_t ActivationElementsPerByte, uint32_t WeightElementsPerByte,
           uint32_t ActivationOutputElementsPerByte>
 __aicore__ inline void AdvanceGmm2ExpertOffsets(Gmm2ExpertLoopState &state)

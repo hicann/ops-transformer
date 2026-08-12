@@ -92,6 +92,8 @@ private:
     __aicore__ inline void InitGmm2CombineConfigs(const MoeStageCommonConfig &commonConfig,
                                                   int32_t dispatchFlagSlotsPerExpert);
     __aicore__ inline void InitTokenUnpermuteConfig(const MoeStageCommonConfig &commonConfig);
+
+protected:
     __aicore__ inline SendMaskBufferConfig SendAndQuantBuffInit();
     __aicore__ inline void DispatchBuffInit();
     __aicore__ inline void InitCombineBuffers();
@@ -782,7 +784,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Process()
     QuantizeLocalTokens<QuantMode, QuantOutType, ActivationType, TopkWeightsType, TopkWeightsPrefetch>(
         dispatchPrepareConfig_, params_, quantProcessConfig_, quantScratch_);
     GatherAndSendExpertMasks(dispatchPrepareConfig_, params_, winRankAddr_, sendMaskConfig_, sendMaskScratch_);
-    ResetDispatchWorkspace<TopkWeightsPrefetch>(
+    ResetSyncStatus<TopkWeightsPrefetch>(
         dispatchPrepareConfig_, params_, resetWorkspaceConfig_, resetTensor_);
     if (sharedExpertNum_ > 0) {
         PrepareSharedExpertInput<ActivationType, QuantScaleOutType, A_ELEMS_PER_BYTE>(

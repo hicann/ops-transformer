@@ -1163,7 +1163,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::Process()
     QuantizeLocalTokens<QuantMode, QuantOutType, ActivationType, TopkWeightsType, TopkWeightsPrefetch>(
         dispatchPrepareConfig_, params_, quantProcessConfig_, quantProcessScratch_);
     GatherAndSendExpertMasks(dispatchPrepareConfig_, params_, winRankAddr_, sendMaskConfig_, sendMaskScratch_);
-    ResetDispatchWorkspace<TopkWeightsPrefetch>(
+    ResetSyncStatus<TopkWeightsPrefetch>(
         dispatchPrepareConfig_, params_, resetWorkspaceConfig_, resetTensor_);
     if (sharedExpertNum_ > 0) {
         // 可选：为共享专家拆分连续布局的输入数据与 scale。

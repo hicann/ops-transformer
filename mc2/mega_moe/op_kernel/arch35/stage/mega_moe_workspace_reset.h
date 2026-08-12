@@ -64,10 +64,10 @@ __aicore__ inline int64_t CalcResetFlagElementCount(const MegaMoeTilingData *til
 
 // 清理连续 flag workspace；prefetch 路径额外清理独立分配的 GMM1 tile 状态区。
 template <bool TopkWeightsPrefetch>
-__aicore__ inline void ResetDispatchWorkspace(const DispatchPrepareConfig &context,
-                                              const Params &params,
-                                              const ResetWorkspaceConfig &config,
-                                              LocalTensor<int32_t> &resetTensor)
+__aicore__ inline void ResetSyncStatus(const DispatchPrepareConfig &context,
+                                       const Params &params,
+                                       const ResetWorkspaceConfig &config,
+                                       LocalTensor<int32_t> &resetTensor)
 {
     if constexpr (g_coreType == AIC) {
         return;

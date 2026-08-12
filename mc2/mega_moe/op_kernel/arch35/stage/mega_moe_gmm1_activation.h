@@ -28,13 +28,10 @@ using namespace AscendC;
 constexpr uint32_t MAX_SINGLE_MN_ALIGN32_NUM_256 = 256U * 256U;
 constexpr uint32_t MAX_SINGLE_MN_ALIGN32_NUM_128 = 128U * 256U;
 
-using Gmm1ProblemShape = Shape<int64_t, int64_t, int64_t, int64_t>;
+using Gmm1ProblemShape = ExpertProblemShape;
 using SharedExpertGmm1ProblemShape = Shape<int64_t, int64_t, int64_t, int64_t>;
 
-struct Gmm1ExpertLoopState {
-    Gmm1ProblemShape problemShape;
-    int64_t rowOffset;
-};
+using Gmm1ExpertLoopState = ExpertLoopState;
 
 struct Gmm1ActivationConfig {
     MoeStageCommonConfig common;
