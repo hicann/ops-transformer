@@ -307,10 +307,7 @@ def run_main(
     logger.info("[MAIN_WRAPPER] output=%s", atten_out.shape)
 
     #   enable_lse=False → lse_out=None (与 golden slot 1 None 双向匹配, replay load_goldens 通过)
-    #   enable_lse=True  → NPU lse_out (N_q, T) T-major 列优先 → transpose 成 (T, N_q) T-major
-    #                      contiguous, 与 golden (T, N_q) shape 和内存都对齐。
+    #   enable_lse=True  → NPU lse_out 已是 N-major (N, T), 与 golden (N, T) 对齐, 无需转换
     if not enable_lse:
         lse_out = None
-    elif isinstance(lse_out, torch.Tensor) and lse_out.ndim == 2:
-        lse_out = lse_out.transpose(0, 1).contiguous()
     return atten_out, lse_out

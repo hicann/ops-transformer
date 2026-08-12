@@ -153,6 +153,5 @@ def npu_qfa_mxfp8(
 
     if not enable_lse:
         lse_out = None
-    elif isinstance(lse_out, torch.Tensor) and lse_out.ndim == 2:
-        lse_out = lse_out.reshape(lse_out.shape[1], lse_out.shape[0]).contiguous()
+    # NPU LSE 输出已改为 N-major (N, T), 无需 reshape
     return atten_out, lse_out

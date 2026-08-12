@@ -562,6 +562,10 @@ def cpu_qfa_mxfp8(
 
         if cpu_lse_aligned.ndim == 3 and cpu_lse_aligned.shape[-1] == 1:
             cpu_lse_aligned = cpu_lse_aligned.squeeze(-1).contiguous()
+        # NPU LSE 输出已改为 N-major 排布 (N, T): N 在外, T 在内
+        # CPU golden 经 convert 后是 [T, N] (T-major), TND case 需转成 [N, T] 对齐
+        if compare_layout == "TND" and cpu_lse_aligned.ndim == 2:
+            cpu_lse_aligned = cpu_lse_aligned.permute(1, 0).contiguous()
         result = [cpu_out_aligned, cpu_lse_aligned]
 
     else:
