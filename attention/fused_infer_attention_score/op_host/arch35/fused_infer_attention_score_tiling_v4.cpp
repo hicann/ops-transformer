@@ -15,22 +15,14 @@
 
 #include "../../../common/op_host/fia_tiling_templates_registry.h"
 #include "fused_infer_attention_score_tiling_v4.h"
-#include "fused_infer_attention_score_tiling_impl.h"
 #include "../fused_infer_attention_score_tiling_info_parser.h"
 #include "../checkers/fia_checker.h"
 
-#include "log/log.h"
-#include "err/ops_err.h"
-#include "tiling/tiling_api.h"
-
-using namespace ge;
-using namespace AscendC;
 namespace optiling {
 ge::graphStatus TilingFusedInferAttentionScoreV4(gert::TilingContext *context) {
     // Parse -> Check -> DoOpTiling
     FiaTilingInfo fiaInfo;
     FiaInfoParser fiaInfoParser(context);
-    FusedInferAttentionScoreTilingImpl fiav4(context);
     if (fiaInfoParser.Parse(fiaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
@@ -42,17 +34,7 @@ ge::graphStatus TilingFusedInferAttentionScoreV4(gert::TilingContext *context) {
         return ge::GRAPH_FAILED;
     }
 
-    if (FiaTilingRegistry::GetInstance().DoTilingImpl(context, &fiaInfo) == ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_SUCCESS;
-    } else {        // 假设，老的模板也注册，把else分支和下面的逻辑删掉
-        OP_LOGD(context, "reconstruct template do not support, routing to old template.");
-    }
-
-    if (fiav4.DoOpTiling(context, fiaInfo) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
-
-    return ge::GRAPH_SUCCESS;
+    return FiaTilingRegistry::GetInstance().DoTilingImpl(context, &fiaInfo);
 }
 
 } // namespace optiling

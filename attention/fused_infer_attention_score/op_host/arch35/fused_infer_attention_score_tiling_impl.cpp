@@ -14,6 +14,7 @@
  */
 
 #include "fused_infer_attention_score_tiling_impl.h"
+#include "../../../common/op_host/fia_tiling_templates_registry.h"
 #include "../fused_infer_attention_score_tiling_info_parser.h"
 
 #include "log/log.h"
@@ -2101,5 +2102,9 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::DoOpTiling(gert::TilingConte
 
     return ge::GRAPH_SUCCESS;
 }
+
+// 老模板作为兜底模板注册，优先级最低(值最大)，确保特化模板优先匹配
+REGISTER_TILING_TEMPLATE_FIA(FusedInferAttentionScore, FusedInferAttentionScoreTilingImpl,
+                             std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510)}), 999);
 
 } // namespace optiling
