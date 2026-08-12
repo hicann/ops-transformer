@@ -15,8 +15,8 @@ namespace optiling {
 namespace FA {
 class FlashAttentionScoreTilingVarLen : public FlashAttentionScoreTilingRegbase {
 public:
-    explicit FlashAttentionScoreTilingVarLen(gert::TilingContext *context) :
-        FlashAttentionScoreTilingRegbase(context)
+    explicit FlashAttentionScoreTilingVarLen(gert::TilingContext *context)
+        : FlashAttentionScoreTilingRegbase(context)
     {
         this->templateName = "VarLenConst";
         this->regbase = true;
@@ -29,12 +29,14 @@ protected:
     STemplateType s1TemplateType = STemplateType::STEMPLATEBOTTOM;
     STemplateType s2TemplateType = STemplateType::STEMPLATEBOTTOM;
 
-    ge::graphStatus CheckContext() override {
+    ge::graphStatus CheckContext() override
+    {
         FlashAttentionScoreTilingRegbase::CheckContext();
         return ge::GRAPH_SUCCESS;
     }
 
-    int64_t CalcTotalSize() override {
+    int64_t CalcTotalSize() override
+    {
         int64_t totalSize = bSize * n2Size * gSize * multiCoreParamsRegbase_->get_s1OuterSize();
         if (totalSize < static_cast<int64_t>(aicNum) && implMode != ImplMode::AA_INVALID_LINE_HIGH_PRECISION &&
             inputDtypeBytes != DATA_TYPE_FP32 && dBasicBlock <= NUM_256 && !hasRope) {
@@ -50,13 +52,14 @@ protected:
         return totalSize;
     }
 
-    void CalcDBasicBlock() override {
+    void CalcDBasicBlock() override
+    {
         /* 先确定D的基本块，确定的逻辑是按照64来分档 */
         dBasicBlock = AlignUp(dSize + dSizeRope, D_TEMPLATE_SPLIT_SIZE);
         /* dBasicBlock > 256 直接令D轴大小为768 */
         if (dBasicBlock > NUM_256) {
             dTemplateType = DTemplateType::ALIGNED_768;
-            return ; // 直接返回不往下走
+            return; // 直接返回不往下走
         }
         /* dBasicBlock <= 256, 根据对齐大小选择*/
         switch (dBasicBlock) {
@@ -75,8 +78,8 @@ protected:
             default:
                 dTemplateType = DTemplateType::DTEMPLATEBOTTOM;
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "query and key",
-                    std::to_string(dBasicBlock).c_str(),
-                    "The value of dBasicBlock must be within range (0, 768]");
+                                                      std::to_string(dBasicBlock).c_str(),
+                                                      "The value of dBasicBlock must be within range (0, 768]");
         }
     }
 
@@ -109,21 +112,22 @@ protected:
                     continue;
                 } else {
                     OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context_->GetNodeName(),
-                        "actual_seq_qlen, q_start_idx, actual_seq_kvlen and kv_start_idx",
-                        (std::to_string(actualSeqLenData[0]) + ", " + std::to_string(qStartIdx) + ", " +
-                         std::to_string(actualSeqLenKvData[0]) + " and " + std::to_string(kvStartIdx)).c_str(),
-                        "The following constraint must be met: "
-                        "actualSeqQLen[0] - actualSeqKvLen[0] + q_start_idx - kv_start_idx == 0,"
-                        "when the scenario is inner pse and sparse mode is 8");
+                                                           "actual_seq_qlen, q_start_idx, actual_seq_kvlen and kv_start_idx",
+                                                           (std::to_string(actualSeqLenData[0]) + ", " + std::to_string(qStartIdx) + ", " +
+                                                            std::to_string(actualSeqLenKvData[0]) + " and " + std::to_string(kvStartIdx))
+                                                               .c_str(),
+                                                           "The following constraint must be met: "
+                                                           "actualSeqQLen[0] - actualSeqKvLen[0] + q_start_idx - kv_start_idx == 0,"
+                                                           "when the scenario is inner pse and sparse mode is 8");
                     return false;
                 }
             }
             if (actualSeqLenData[i] != actualSeqLenKvData[i]) {
                 OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context_->GetNodeName(),
-                    "actual_seq_qlen and actual_seq_kvlen",
-                    (std::to_string(actualSeqLenData[i]) + " and " + std::to_string(actualSeqLenKvData[i])).c_str(),
-                    "The following constraint must be met: actual_seq_qlen == actual_seq_kvlen, "
-                    "when the scenario is inner pse and sparse mode is 8");
+                                                       "actual_seq_qlen and actual_seq_kvlen",
+                                                       (std::to_string(actualSeqLenData[i]) + " and " + std::to_string(actualSeqLenKvData[i])).c_str(),
+                                                       "The following constraint must be met: actual_seq_qlen == actual_seq_kvlen, "
+                                                       "when the scenario is inner pse and sparse mode is 8");
                 return false;
             }
         }
@@ -140,16 +144,16 @@ protected:
             pseType == static_cast<int64_t>(PseType::PSE_INNER_MUL_ADD_SQRT_TYPE)) {
             if (inputParamsRegbase_->get_sparseType() == static_cast<uint8_t>(SparseEnum::RIGHT_DOWN_CAUSAL_BAND)) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "sparse_type",
-                    std::to_string(static_cast<int64_t>(inputParamsRegbase_->get_sparseType())).c_str(),
-                    "The value of sparse_type cannot be RIGHT_DOWN_CAUSAL_BAND when pseType is 2 or 3");
+                                                      std::to_string(static_cast<int64_t>(inputParamsRegbase_->get_sparseType())).c_str(),
+                                                      "The value of sparse_type cannot be RIGHT_DOWN_CAUSAL_BAND when pseType is 2 or 3");
                 return false;
             }
             if (inputParamsRegbase_->get_sparseType() == static_cast<uint8_t>(SparseEnum::BAND_LEFT_UP_CAUSAL)) {
                 if (!SetBandLeftUpCausalPseParamsRegbase()) {
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "pse",
-                        std::to_string(static_cast<int64_t>(inputParamsRegbase_->get_sparseType())).c_str(),
-                        "The parameters of input pse should be valid when sparse_mode is BAND_LEFT_UP_CAUSAL "
-                        "and pseType is 2 or 3");
+                                                          std::to_string(static_cast<int64_t>(inputParamsRegbase_->get_sparseType())).c_str(),
+                                                          "The parameters of input pse should be valid when sparse_mode is BAND_LEFT_UP_CAUSAL "
+                                                          "and pseType is 2 or 3");
                     return false;
                 }
                 return true;
@@ -157,11 +161,12 @@ protected:
             for (int64_t i = 0L; i < bSize; ++i) {
                 if (actualSeqLenData[i] != actualSeqLenKvData[i]) {
                     OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context_->GetNodeName(),
-                        "actual_seq_qlen and actual_seq_kvlen",
-                        (std::to_string(actualSeqLenData[i]) + " and " +
-                         std::to_string(actualSeqLenKvData[i])).c_str(),
-                        "The following constraint must be met: actual_seq_qlen == actual_seq_kvlen, "
-                        "when the scenario is inner pse alibi");
+                                                           "actual_seq_qlen and actual_seq_kvlen",
+                                                           (std::to_string(actualSeqLenData[i]) + " and " +
+                                                            std::to_string(actualSeqLenKvData[i]))
+                                                               .c_str(),
+                                                           "The following constraint must be met: actual_seq_qlen == actual_seq_kvlen, "
+                                                           "when the scenario is inner pse alibi");
                     return false;
                 }
             }
@@ -177,20 +182,21 @@ protected:
             for (int64_t i = 0L; i < bSize; ++i) {
                 if (actualSeqLenData[i] != actualSeqLenKvData[i]) {
                     OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context_->GetNodeName(),
-                        "actual_seq_qlen and actual_seq_kvlen",
-                        (std::to_string(actualSeqLenData[i]) + " and " +
-                         std::to_string(actualSeqLenKvData[i])).c_str(),
-                        "The following constraint must be met: actual_seq_qlen == actual_seq_kvlen "
-                        "when the scenario is pse alibi");
+                                                           "actual_seq_qlen and actual_seq_kvlen",
+                                                           (std::to_string(actualSeqLenData[i]) + " and " +
+                                                            std::to_string(actualSeqLenKvData[i]))
+                                                               .c_str(),
+                                                           "The following constraint must be met: actual_seq_qlen == actual_seq_kvlen "
+                                                           "when the scenario is pse alibi");
                     return false;
                 }
             }
             if (inputParamsRegbase_->get_sparseType() != static_cast<uint8_t>(SparseEnum::CAUSAL) &&
                 inputParamsRegbase_->get_sparseType() !=
-                static_cast<uint8_t>(SparseEnum::RIGHT_DOWN_CAUSAL)) {
+                    static_cast<uint8_t>(SparseEnum::RIGHT_DOWN_CAUSAL)) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "sparse_type",
-                    std::to_string(static_cast<int64_t>(inputParamsRegbase_->get_sparseType())).c_str(),
-                    "The value of sparse_type must be CAUSAL or RIGHT_DOWN_CAUSAL when pse alibi is used");
+                                                      std::to_string(static_cast<int64_t>(inputParamsRegbase_->get_sparseType())).c_str(),
+                                                      "The value of sparse_type must be CAUSAL or RIGHT_DOWN_CAUSAL when pse alibi is used");
                 return false;
             }
             pseEncodeType = PseEncodeType::PSE_ENCODE_ALIBI_S2_FULL;
@@ -206,29 +212,28 @@ protected:
     {
         uint8_t pseMode = hasPse ? static_cast<uint8_t>(pseType) : static_cast<uint8_t>(PseType::PSE_NONE_TYPE);
         OP_LOGD(opName, "TND TilingKey info is implMode:%d, s1TemplateType:%d, s2TemplateType:%d, dTemplateType:%d,"
-            "pseMode:%d, hasAttenMask:%d, hasDropOut:%d, hasRope:%d, regbase:%d, optionalDn:%d",
-            static_cast<uint8_t>(implMode), static_cast<uint16_t>(s1TemplateType),
-            static_cast<uint16_t>(s2TemplateType), static_cast<uint16_t>(dTemplateType), pseMode, hasAttenMask,
-            hasDropOut, hasRope, static_cast<uint8_t>(regbase), optionalDn);
+                        "pseMode:%d, hasAttenMask:%d, hasDropOut:%d, hasRope:%d, regbase:%d, optionalDn:%d",
+                static_cast<uint8_t>(implMode), static_cast<uint16_t>(s1TemplateType),
+                static_cast<uint16_t>(s2TemplateType), static_cast<uint16_t>(dTemplateType), pseMode, hasAttenMask,
+                hasDropOut, hasRope, static_cast<uint8_t>(regbase), optionalDn);
 
         // Const 128
         if (dTemplateType == dVTemplateType) {
             return GET_TPL_TILING_KEY(0, static_cast<uint8_t>(implMode), static_cast<uint8_t>(tilingKeyLayout),
-                static_cast<uint16_t>(s1TemplateType), static_cast<uint16_t>(s2TemplateType),
-                static_cast<uint16_t>(dTemplateType), static_cast<uint16_t>(DTemplateType::NONALIGNED),
-                pseMode, hasAttenMask, hasDropOut, hasRope, static_cast<uint8_t>(outDtype),
-                static_cast<uint8_t>(regbase), optionalDn);
+                                      static_cast<uint16_t>(s1TemplateType), static_cast<uint16_t>(s2TemplateType),
+                                      static_cast<uint16_t>(dTemplateType), static_cast<uint16_t>(DTemplateType::NONALIGNED),
+                                      pseMode, hasAttenMask, hasDropOut, hasRope, static_cast<uint8_t>(outDtype),
+                                      static_cast<uint8_t>(regbase), optionalDn);
         }
         return GET_TPL_TILING_KEY(0, static_cast<uint8_t>(implMode), static_cast<uint8_t>(tilingKeyLayout),
-            static_cast<uint16_t>(s1TemplateType), static_cast<uint16_t>(s2TemplateType),
-            static_cast<uint16_t>(dTemplateType), static_cast<uint16_t>(dVTemplateType), pseMode, hasAttenMask,
-            hasDropOut, hasRope, 0, static_cast<uint8_t>(regbase), optionalDn);
+                                  static_cast<uint16_t>(s1TemplateType), static_cast<uint16_t>(s2TemplateType),
+                                  static_cast<uint16_t>(dTemplateType), static_cast<uint16_t>(dVTemplateType), pseMode, hasAttenMask,
+                                  hasDropOut, hasRope, 0, static_cast<uint8_t>(regbase), optionalDn);
     }
 
     void AnalyzeOptionalDn() override
     {
-        if ((hasAttenMask && attenMaskCompressMode != static_cast<uint8_t>(AttenMaskCompressMode::LEFT_UP_CAUSAL_MODE)
-            && attenMaskCompressMode != static_cast<uint8_t>(AttenMaskCompressMode::RIGHT_DOWN_CAUSAL_MODE)) ||
+        if ((hasAttenMask && attenMaskCompressMode != static_cast<uint8_t>(AttenMaskCompressMode::LEFT_UP_CAUSAL_MODE) && attenMaskCompressMode != static_cast<uint8_t>(AttenMaskCompressMode::RIGHT_DOWN_CAUSAL_MODE)) ||
             !hasAttenMask || hasPse || hasRope || hasDropOut || inputDtypeBytes == DATA_TYPE_FP32 ||
             inputDtypeBytes == DATA_TYPE_FP8 || dTemplateType > DTemplateType::ALIGNED_256 ||
             dTemplateType != dVTemplateType || s1TemplateType == STemplateType::ALIGNED_64) {
@@ -240,7 +245,7 @@ protected:
             s1TotalLen += actualSeqLenData[i];
             s2TotalLen += actualSeqLenKvData[i];
         }
-        
+
         int64_t s1AvgLen = s1TotalLen / bSize;
         int64_t s2AvgLen = s2TotalLen / bSize;
         if (s1AvgLen < NUM_1536 || s2AvgLen < NUM_1536) {
@@ -248,7 +253,7 @@ protected:
         }
         optionalDn = true;
     }
-    
+
     bool IsCapable() override
     {
         if (npuArch != NpuArch::DAV_3510) {
@@ -266,9 +271,21 @@ protected:
         (void)coreNum;
         int64_t accumS1BlockNum = 0;
         for (int64_t i = 0; i < bSize; ++i) {
+            if (actualSeqLenKvData[i] == 0) {
+                continue;
+            }
             accumS1BlockNum += CeilDivision(actualSeqLenData[i], s1BasicBlock);
         }
         totalSize = accumS1BlockNum * n2Size * gSize;
+        // 全部batch的KV长度均为0时, totalSize为0, 保留1个no-op核避免kernel侧totalSize/(coreNum*2)除0,
+        // 其余多核参数置0, kernel空跑后安全返回
+        if (totalSize == 0) {
+            multiCoreParamsRegbase_->set_coreNum(1);
+            multiCoreParamsRegbase_->set_totalSize(0);
+            multiCoreParamsRegbase_->set_splitFactorSize(0);
+            multiCoreParamsRegbase_->set_splitFactorTailSize(0);
+            return;
+        }
         int64_t actualUsedCoreNum = std::min(totalSize, static_cast<int64_t>(aicNum));
         multiCoreParamsRegbase_->set_coreNum(static_cast<int32_t>(actualUsedCoreNum));
         multiCoreParamsRegbase_->set_totalSize(totalSize);
@@ -295,7 +312,7 @@ protected:
         bmm2Bytes = AlignUp(bmm2Bytes, GM_ALIGN);
         vec2Bytes = AlignUp(vec2Bytes, GM_ALIGN);
         workspaces[0] = static_cast<size_t>(((bmm2Bytes + vec2Bytes) * PING_PONG_VALUE) *
-            multiCoreParamsRegbase_->get_coreNum());
+                                            multiCoreParamsRegbase_->get_coreNum());
         return ge::GRAPH_SUCCESS;
     }
 
@@ -303,13 +320,13 @@ protected:
     {
         if (preTokens < 0) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "pre_tokens",
-                std::to_string(preTokens).c_str(), "The value of pre_tokens must be greater than or equal to zero");
+                                                  std::to_string(preTokens).c_str(), "The value of pre_tokens must be greater than or equal to zero");
             return false;
         }
         if (nextTokens < 0 && preTokens + nextTokens < 0) {
             OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "pre_tokens and next_tokens",
-                (std::to_string(preTokens) + " and " + std::to_string(nextTokens)).c_str(),
-                "The following constraint must be met: next_tokens >= 0 or pre_tokens + next_tokens >= 0");
+                                                   (std::to_string(preTokens) + " and " + std::to_string(nextTokens)).c_str(),
+                                                   "The following constraint must be met: next_tokens >= 0 or pre_tokens + next_tokens >= 0");
             return false;
         }
         for (int64_t i = 0L; i < bSize; ++i) {
@@ -318,9 +335,9 @@ protected:
             }
             if (actualSeqLenData[i] - nextTokens > actualSeqLenKvData[i]) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "next_tokens",
-                    std::to_string(nextTokens).c_str(),
-                    "The following constraint must be met for each batch: "
-                    "actual_seq_len_q - next_tokens <= actual_seq_len_kv");
+                                                      std::to_string(nextTokens).c_str(),
+                                                      "The following constraint must be met for each batch: "
+                                                      "actual_seq_len_q - next_tokens <= actual_seq_len_kv");
                 return false;
             }
         }
@@ -341,10 +358,11 @@ protected:
             std::string paramMsg = "pre_tokens and next_tokens";
             std::string valMsg = std::to_string(preTokens) + " and " + std::to_string(nextTokens);
             std::string reasonMsg = "In RightDownCausal_Band mode, pre_tokens must not "
-                "be smaller than last valid s2(" + std::to_string(lastS2) + ") "
-                "and next_tokens must not be greater than 0";
+                                    "be smaller than last valid s2(" +
+                                    std::to_string(lastS2) + ") "
+                                                             "and next_tokens must not be greater than 0";
             OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, paramMsg.c_str(),
-                valMsg.c_str(), reasonMsg.c_str());
+                                                   valMsg.c_str(), reasonMsg.c_str());
             return false;
         }
         for (int64_t i = 0L; i < bSize; ++i) {
@@ -353,16 +371,16 @@ protected:
             }
             if (actualSeqLenData[i] > actualSeqLenKvData[i]) {
                 std::string shapeMsg = std::to_string(actualSeqLenData[i]) + " and " +
-                    std::to_string(actualSeqLenKvData[i]);
+                                       std::to_string(actualSeqLenKvData[i]);
                 std::string reasonMsg = "The value of actual_seq_qlen of batch " + std::to_string(i) +
-                    " must not be greater than actual_seq_kvlen";
+                                        " must not be greater than actual_seq_kvlen";
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName, "actual_seq_qlen and actual_seq_kvlen",
-                    shapeMsg.c_str(), reasonMsg.c_str());
+                                                       shapeMsg.c_str(), reasonMsg.c_str());
                 return false;
             }
             if ((i == bandIndex) && (actualSeqLenData[i] - nextTokens > actualSeqLenKvData[i])) {
                 OP_LOGE(context_, "Batch[%ld], s1[%ld], s2[%ld], next_tokens[%ld], has invalid row.", i,
-                            actualSeqLenData[i], actualSeqLenKvData[i], nextTokens);
+                        actualSeqLenData[i], actualSeqLenKvData[i], nextTokens);
                 return false;
             }
         }
@@ -375,9 +393,9 @@ protected:
         if (sparseMode == static_cast<int64_t>(SparseMode::ALL_MASK)) {
             if (preTokens < s1Size - 1 || nextTokens < s2Size - 1) {
                 OP_LOGW(context_,
-                          "preTokens[%ld] and nextTokens[%ld] not match sparseMode[%ld], "
-                          "preTokens and nextTokens will be reset max int value.",
-                          preTokens, nextTokens, sparseMode);
+                        "preTokens[%ld] and nextTokens[%ld] not match sparseMode[%ld], "
+                        "preTokens and nextTokens will be reset max int value.",
+                        preTokens, nextTokens, sparseMode);
                 preTokens = std::numeric_limits<int32_t>::max();
                 nextTokens = std::numeric_limits<int32_t>::max();
             }
@@ -390,11 +408,11 @@ protected:
             for (int64_t i = 0L; i < bSize; ++i) {
                 if (actualSeqLenData[i] > actualSeqLenKvData[i]) {
                     std::string shapeMsg = std::to_string(actualSeqLenData[i]) + " and " +
-                        std::to_string(actualSeqLenKvData[i]);
+                                           std::to_string(actualSeqLenKvData[i]);
                     std::string reasonMsg = "The value of actual_seq_qlen of batch " + std::to_string(i) +
-                        " must not be greater than actual_seq_kvlen";
+                                            " must not be greater than actual_seq_kvlen";
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName, "actual_seq_qlen and actual_seq_kvlen",
-                        shapeMsg.c_str(), reasonMsg.c_str());
+                                                           shapeMsg.c_str(), reasonMsg.c_str());
                     return false;
                 }
             }
@@ -403,31 +421,31 @@ protected:
             sparseType = SparseEnum::RIGHT_DOWN_CAUSAL;
         } else if (sparseMode == static_cast<int64_t>(SparseMode::BAND)) {
             OP_CHECK_IF(!CheckBandPretokenAndNexttoken(sparseType),
-                       OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "pre_tokens and next_tokens",
-                           (std::to_string(preTokens) + " and " + std::to_string(nextTokens)).c_str(),
-                           "The values of pre_tokens and next_tokens must satisfy the band mode constraints"),
-                       return false);
+                        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "pre_tokens and next_tokens",
+                                                               (std::to_string(preTokens) + " and " + std::to_string(nextTokens)).c_str(),
+                                                               "The values of pre_tokens and next_tokens must satisfy the band mode constraints"),
+                        return false);
         } else if (sparseMode == static_cast<int64_t>(SparseMode::RIGHT_DOWN_CAUSAL_BAND)) {
             OP_CHECK_IF(!CheckRightDownCausalBandPretokenAndNexttoken(sparseType),
-                       OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "pre_tokens and next_tokens",
-                           (std::to_string(preTokens) + " and " + std::to_string(nextTokens)).c_str(),
-                           "The values of pre_tokens and next_tokens must satisfy "
-                           "the right down causal band mode constraints"),
-                       return false);
+                        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "pre_tokens and next_tokens",
+                                                               (std::to_string(preTokens) + " and " + std::to_string(nextTokens)).c_str(),
+                                                               "The values of pre_tokens and next_tokens must satisfy "
+                                                               "the right down causal band mode constraints"),
+                        return false);
         } else if (sparseMode == static_cast<int64_t>(SparseMode::BAND_LEFT_UP_CAUSAL)) {
             if (actualSeqLenData[bandIndex] - nextTokens > actualSeqLenKvData[bandIndex]) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "next_tokens",
-                    std::to_string(nextTokens).c_str(),
-                    "The following constraint must be met for the band index batch: "
-                    "actual_seq_len_q - next_tokens <= actual_seq_len_kv");
+                                                      std::to_string(nextTokens).c_str(),
+                                                      "The following constraint must be met for the band index batch: "
+                                                      "actual_seq_len_q - next_tokens <= actual_seq_len_kv");
                 return false;
             }
             int64_t firstS2 = actualSeqLenKvData[bandIndex];
             if (preTokens < firstS2) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "pre_tokens",
-                    std::to_string(preTokens).c_str(),
-                    "The value of pre_tokens must be greater than the first "
-                    "valid actual_seq_len_kv in BAND_LEFT_UP_CAUSAL mode");
+                                                      std::to_string(preTokens).c_str(),
+                                                      "The value of pre_tokens must be greater than the first "
+                                                      "valid actual_seq_len_kv in BAND_LEFT_UP_CAUSAL mode");
                 return false;
             }
             sparseType = SparseEnum::BAND_LEFT_UP_CAUSAL;
@@ -440,8 +458,8 @@ protected:
     {
         if (nextTokens < 0) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "next_tokens",
-                std::to_string(nextTokens).c_str(), "To have valid data blocks, the value of "
-                    "next_tokens must be greater than or equal to zero");
+                                                  std::to_string(nextTokens).c_str(), "To have valid data blocks, the value of "
+                                                                                      "next_tokens must be greater than or equal to zero");
             return false;
         }
         if (preTokens >= maxS1Val && nextTokens >= maxS2Val) {
@@ -453,9 +471,9 @@ protected:
             }
             if (actualSeqLenKvData[i] + preTokens < actualSeqLenData[i]) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "pre_tokens",
-                    std::to_string(preTokens).c_str(),
-                    "The following constraint must be met for each batch: "
-                    "actual_seq_len_kv + pre_tokens >= actual_seq_len_q");
+                                                      std::to_string(preTokens).c_str(),
+                                                      "The following constraint must be met for each batch: "
+                                                      "actual_seq_len_kv + pre_tokens >= actual_seq_len_q");
                 return false;
             }
         }
@@ -475,9 +493,9 @@ protected:
                 return true;
             } else {
                 OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "pre_tokens and next_tokens",
-                    (std::to_string(preTokens) + " and " + std::to_string(nextTokens)).c_str(),
-                    "The following constraint must be met: "
-                    "pre_tokens + next_tokens >= min(actual_seq_len_kv) when pre_tokens < 0");
+                                                       (std::to_string(preTokens) + " and " + std::to_string(nextTokens)).c_str(),
+                                                       "The following constraint must be met: "
+                                                       "pre_tokens + next_tokens >= min(actual_seq_len_kv) when pre_tokens < 0");
                 return false;
             }
         }
@@ -496,15 +514,15 @@ protected:
         if (prefixShape.GetDimNum() != 1) {
             std::string dimStr = std::to_string(prefixShape.GetDimNum()) + "D";
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "prefix",
-                dimStr.c_str(), "The shape dim of input prefix must be 1D");
+                                                     dimStr.c_str(), "The shape dim of input prefix must be 1D");
             return false;
         }
         if (prefixShape.GetDim(0) != bSize) {
             std::string sizeStr = std::to_string(prefixShape.GetDim(0));
             std::string reasonMsg = "The shape size of input prefix should be equal to batch size (" +
-                std::to_string(bSize) + ")";
+                                    std::to_string(bSize) + ")";
             OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(opName, "prefix",
-                sizeStr.c_str(), reasonMsg.c_str());
+                                                      sizeStr.c_str(), reasonMsg.c_str());
             return false;
         }
 
@@ -519,9 +537,9 @@ protected:
             if (actualSeqLenData[i] > actualSeqLenKvData[i]) {
                 if (prefixNData[i] < 0 || prefixNData[i] > actualSeqLenKvData[i]) {
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "prefix_n",
-                        std::to_string(prefixNData[i]).c_str(),
-                        "The value of prefix_n must be [0, actual_seq_len_kv] "
-                        "when actual_seq_len_q > actual_seq_len_kv");
+                                                          std::to_string(prefixNData[i]).c_str(),
+                                                          "The value of prefix_n must be [0, actual_seq_len_kv] "
+                                                          "when actual_seq_len_q > actual_seq_len_kv");
                     return false;
                 }
                 if (prefixNData[i] == 0) {
@@ -532,9 +550,9 @@ protected:
                 if (prefixNData[i] < actualSeqLenKvData[i] - actualSeqLenData[i] ||
                     prefixNData[i] > actualSeqLenKvData[i]) {
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "prefix_n",
-                        std::to_string(prefixNData[i]).c_str(),
-                        "The value of prefix_n must be [actual_seq_len_kv - actual_seq_len_q, "
-                        "actual_seq_len_kv] when actual_seq_len_q <= actual_seq_len_kv");
+                                                          std::to_string(prefixNData[i]).c_str(),
+                                                          "The value of prefix_n must be [actual_seq_len_kv - actual_seq_len_q, "
+                                                          "actual_seq_len_kv] when actual_seq_len_q <= actual_seq_len_kv");
                     return false;
                 }
             }
@@ -548,8 +566,8 @@ protected:
     {
         if (!CheckPretokenAndNexttoken(sparseType)) {
             OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "pre_tokens and next_tokens",
-                (std::to_string(preTokens) + " and " + std::to_string(nextTokens)).c_str(),
-                "The values of pre_tokens and next_tokens must satisfy the sparse mode constraints");
+                                                   (std::to_string(preTokens) + " and " + std::to_string(nextTokens)).c_str(),
+                                                   "The values of pre_tokens and next_tokens must satisfy the sparse mode constraints");
             return false;
         }
 
@@ -564,13 +582,13 @@ protected:
     bool GetSparseInfo(SparseEnum &sparseType) override
     {
         OP_LOGD(context_,
-                  "check sparse feature: preTokens[%ld], nextTokens[%ld], s1[%ld], s2[%ld], attenMaskExist[%d]",
-                  preTokens, nextTokens, s1Size, s2Size, hasAttenMask);
+                "check sparse feature: preTokens[%ld], nextTokens[%ld], s1[%ld], s2[%ld], attenMaskExist[%d]",
+                preTokens, nextTokens, s1Size, s2Size, hasAttenMask);
         if (sparseMode == static_cast<int64_t>(SparseMode::PREFIX) ||
             sparseMode > static_cast<int64_t>(SparseMode::BAND_LEFT_UP_CAUSAL)) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "sparse_mode",
-                std::to_string(sparseMode).c_str(), "The value of sparse_mode must be within "
-                    "the supported range for VarLen mode");
+                                                  std::to_string(sparseMode).c_str(), "The value of sparse_mode must be within "
+                                                                                      "the supported range for VarLen mode");
             return false;
         }
 
@@ -629,10 +647,10 @@ protected:
             IsUseSplitCoreMode(SparseMode::LEFT_UP_CAUSAL)) {
             splitCoreMode = SplitCoreMode::SQ_MULTI_CORE_FIRST;
         } else if ((sparseMode == static_cast<int64_t>(SparseMode::RIGHT_DOWN_CAUSAL)) &&
-            IsUseSplitCoreMode(SparseMode::RIGHT_DOWN_CAUSAL)) {
+                   IsUseSplitCoreMode(SparseMode::RIGHT_DOWN_CAUSAL)) {
             splitCoreMode = SplitCoreMode::SQ_MULTI_CORE_FIRST;
         } else if (sparseMode == static_cast<int64_t>(SparseMode::ALL_MASK) &&
-            IsUseSplitCoreMode(SparseMode::ALL_MASK)) {
+                   IsUseSplitCoreMode(SparseMode::ALL_MASK)) {
             splitCoreMode = SplitCoreMode::SQ_MULTI_CORE_FIRST;
         } else if (sparseMode == static_cast<int64_t>(SparseMode::NO_MASK)) {
             if (!hasAttenMask && IsUseSplitCoreMode(SparseMode::ALL_MASK)) {
@@ -646,7 +664,7 @@ protected:
         multiCoreParamsRegbase_->set_firstFullLoadS1OuterIdx(firstFullLoadS1OuterIdx);
 
         OP_LOGD(context_, "sparseMode: %ld, firstFullLoadS1OuterIdx: %ld, splitCoreMode: %d, s2SizeThreshold: %d.",
-            sparseMode, firstFullLoadS1OuterIdx, splitCoreMode, thresholdS2Size);
+                sparseMode, firstFullLoadS1OuterIdx, splitCoreMode, thresholdS2Size);
     }
 
     int64_t GetS2RealSize(uint8_t sparseType, int32_t bOutIdx, int64_t s1OutIdx)
@@ -666,9 +684,9 @@ protected:
     {
         (void)bIdx;
         OP_CHECK_IF(sparseValidArray.size() == 0,
-                   OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "sparseValidArray", "0",
-                       "The value of size of sparseValidArray must be greater than 0"),
-                   return false);
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "sparseValidArray", "0",
+                                                          "The value of size of sparseValidArray must be greater than 0"),
+                    return false);
 
         // 特殊系数, 代表s2Size=[128, 256, 384, 512, 640, 768, 896, 1024] 对应的真实耗时膨胀值
         // 如 {256, 384, 512, 640, 768, 896, 960, 1024}; {384, 512, 640, 768, 832, 896, 960, 1024};
@@ -678,6 +696,9 @@ protected:
         uint8_t sparseType = inputParamsRegbase_->get_sparseType();
         int64_t localAccumS1BlockNum = 0;
         for (int32_t i = 0; i < bSize; i++) {
+            if (actualSeqLenKvData[i] == 0) {
+                continue;
+            }
             int64_t n2G = n2Size * gSize;
             int64_t s1BlockNum = CeilDivision(actualSeqLenData[i], s1BasicBlock);
             for (int64_t j = 0; j < s1BlockNum; j++) {
@@ -777,9 +798,8 @@ protected:
         int64_t totalSize = multiCoreParamsRegbase.get_totalSize(); // BN2GS1.o
         int64_t *sparseStartIdx = multiCoreParamsRegbase.get_sparseStartIdxPtr();
 
-        OP_CHECK_IF(totalSize <= 0, OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "totalSize",
-                   std::to_string(totalSize).c_str(), "The value of totalSize must be greater than 0"),
-                   return false);
+        OP_CHECK_IF(totalSize <= 0, OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "totalSize", std::to_string(totalSize).c_str(), "The value of totalSize must be greater than 0"),
+                    return false);
 
         // initLoad: 使用均分策略, 保证后续不会比均分差
         int64_t splitFactorSize = multiCoreParamsRegbase.get_splitFactorSize();
@@ -809,7 +829,8 @@ protected:
             if ((start + 1) < tmpsparseStartIdx[idx]) {
                 int64_t redoSingleLoadValue = singleLoadValue - sparseValidArray[tmpsparseStartIdx[idx] - 1];
                 tmpsparseStartIdx[idx] = ((singleLoadValue - avgVal) > (avgVal - redoSingleLoadValue)) ?
-                                         (tmpsparseStartIdx[idx] - 1) : (tmpsparseStartIdx[idx]);
+                                             (tmpsparseStartIdx[idx] - 1) :
+                                             (tmpsparseStartIdx[idx]);
                 singleLoadValue = ((singleLoadValue - avgVal) > (avgVal - redoSingleLoadValue)) ? redoSingleLoadValue :
                                                                                                   singleLoadValue;
                 sparseArraySum -= singleLoadValue;

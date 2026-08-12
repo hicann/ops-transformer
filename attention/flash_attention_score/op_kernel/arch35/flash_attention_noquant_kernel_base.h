@@ -164,6 +164,9 @@ public:
     /* 模板库Block */
     CubeBlockType cubeBlock;
     VecBlockType vecBlock;
+
+private:
+    __aicore__ inline void SkipEmptyKvBatches(RunParamStr<isInfer> &runParam);
 };
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
@@ -634,12 +637,34 @@ __aicore__ inline void FlashAttentionNoQuantKernelBase<ChildClass, CubeBlockType
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void
+FlashAttentionNoQuantKernelBase<ChildClass, CubeBlockType, VecBlockType>::SkipEmptyKvBatches(
+    RunParamStr<isInfer> &runParam)
+{
+    // 跳过空kv batch的s1块计数，但保留偏移累积
+    while (runParam.actualS2Size == 0 && runParam.boIdx < this->sharedParams.bSize) {
+        this->s1SizeAcc += runParam.actualS1Size;
+        this->s2SizeAcc += runParam.actualS2Size;
+        runParam.b1SSOffset += runParam.actualS1Size * runParam.actualS2Size;
+        if constexpr (hasDrop) {
+            runParam.b1SSOffsetAlign16 += runParam.actualS1Size * Align(runParam.actualS2Size);
+        }
+        runParam.boIdx++;
+        if (runParam.boIdx >= this->sharedParams.bSize) {
+            break;
+        }
+        GetSeqQlenKvlenByBoidx(runParam.boIdx, runParam.actualS1Size, runParam.actualS2Size);
+    }
+}
+
+template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void
 FlashAttentionNoQuantKernelBase<ChildClass, CubeBlockType, VecBlockType>::ComputeAxisIdx(int64_t multiCoreInnerIdx,
                                                                                          RunParamStr<isInfer> &runParam)
 {
     // 计算轴的idx
     if constexpr (layout == LayOutTypeEnum::LAYOUT_TND) {
         GetSeqQlenKvlenByBoidx(runParam.boIdx, runParam.actualS1Size, runParam.actualS2Size);
+        SkipEmptyKvBatches(runParam);
         int64_t actualS1Outersize =
             this->s1OuterSizeAcc + (CeilDiv(runParam.actualS1Size, this->s1BaseSize) * constInfo.n2G);
 
@@ -656,6 +681,7 @@ FlashAttentionNoQuantKernelBase<ChildClass, CubeBlockType, VecBlockType>::Comput
                 break;
             }
             GetSeqQlenKvlenByBoidx(runParam.boIdx, runParam.actualS1Size, runParam.actualS2Size);
+            SkipEmptyKvBatches(runParam);
             actualS1Outersize =
                 this->s1OuterSizeAcc + (CeilDiv(runParam.actualS1Size, this->s1BaseSize) * constInfo.n2G);
         }

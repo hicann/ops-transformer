@@ -29,16 +29,17 @@ public:
     ARGS_TRAITS;
     using BaseClass = FlashAttentionNoQuantKernelBase<FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockType>, CubeBlockType, VecBlockType>;
     __aicore__ inline void InitUniqueConstInfo();
-    __aicore__ inline void InitUniqueRunInfo(const RunParamStr<isInfer> &runParam, 
-        RunInfo<isInfer> &runInfo);
+    __aicore__ inline void InitUniqueRunInfo(const RunParamStr<isInfer> &runParam,
+                                             RunInfo<isInfer> &runInfo);
     __aicore__ inline void Process();
+
 private:
     __aicore__ inline void GetAttentionOffset(RunParamStr<isInfer> &runParam);
     __aicore__ inline void CalS1OuterSize(const int64_t &multiCoreInnerOffset, RunParamStr<isInfer> &runParam);
     __aicore__ inline void GetS2LoopRange(RunParamStr<isInfer> &runParam);
     __aicore__ inline int64_t CalcRealTimes(int64_t relativePos, int64_t length);
     __aicore__ inline int64_t CalcRealCoreIdx(int64_t relativePos, int64_t times, int64_t offsetCoreIdx,
-        bool isPartialCalc);
+                                              bool isPartialCalc);
     __aicore__ inline int64_t CalcRealCoreIdxVarlen(int64_t calcLoops, int64_t calcLoopsRemain,
                                                     int64_t cycleCoreNums);
 };
@@ -166,16 +167,16 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
     // 2、非TND场景 S2部分计算的部分，采用对称分核：将N分成一半，上半部分顺序分核，下半部分与上半部分对称分核；
     // 3、TND场景 正倒序循环分核
     int64_t halfN = 0;
-    int64_t partialCalcForwardNum = 0;              // 当前核 在顺序部分计算中分配的S1方向上基本块个数；
-    int64_t partialCalcReverseNum = 0;              // 当前核 在倒序部分计算中分配的S1方向上基本块个数；
-    int64_t partialCalcNum = 0;                     // 当前核 在部分计算中分配的S1方向上基本块个数；
-    int64_t fullCalcForwardNum = 0;                 // 当前核 在全量计算中分配的S1方向上基本块个数；
-    int64_t halfNCoreIdx = 0;                       // 下半部分第一个S1方向基本块对应的核索引；
-    int64_t partialCalcLength = this->sharedParams.firstFullLoadS1OuterIdx + 1;     // 部分计算在单个S1上的长度；
-    int64_t relativePosReverse = 0;                 // 当前核 与第一个S1方向基本块对应的核索引 相差的个数
-    int64_t varlenCalcLoops = 0;                    // TND场景 需要进行计算的循环次数(正序+倒序为一次循环)
+    int64_t partialCalcForwardNum = 0;                                          // 当前核 在顺序部分计算中分配的S1方向上基本块个数；
+    int64_t partialCalcReverseNum = 0;                                          // 当前核 在倒序部分计算中分配的S1方向上基本块个数；
+    int64_t partialCalcNum = 0;                                                 // 当前核 在部分计算中分配的S1方向上基本块个数；
+    int64_t fullCalcForwardNum = 0;                                             // 当前核 在全量计算中分配的S1方向上基本块个数；
+    int64_t halfNCoreIdx = 0;                                                   // 下半部分第一个S1方向基本块对应的核索引；
+    int64_t partialCalcLength = this->sharedParams.firstFullLoadS1OuterIdx + 1; // 部分计算在单个S1上的长度；
+    int64_t relativePosReverse = 0;                                             // 当前核 与第一个S1方向基本块对应的核索引 相差的个数
+    int64_t varlenCalcLoops = 0;                                                // TND场景 需要进行计算的循环次数(正序+倒序为一次循环)
     int64_t varlenCalcLoopsRemain = 0;
-    int64_t varlenCalcTimes = 0;                    // TND场景 需要计算的S1方向上基本块总数
+    int64_t varlenCalcTimes = 0;                                  // TND场景 需要计算的S1方向上基本块总数
     int64_t varlenCycleCoreNums = this->sharedParams.coreNum * 2; // TND场景 一次循环正序+倒序为两倍核数
 
     if (this->sharedParams.splitCoreMode == 1) {
@@ -263,10 +264,10 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
                         realCoreInnerIdx = CalcRealCoreIdx(this->aicIdx, multiCoreInnerIdx, 0, true);
                     } else if (multiCoreInnerIdx >= partialCalcForwardNum && multiCoreInnerIdx < partialCalcNum) {
                         realCoreInnerIdx = CalcRealCoreIdx(relativePosReverse, multiCoreInnerIdx - partialCalcForwardNum,
-                                                        halfN * this->constInfo.s1OuterSize, true);
+                                                           halfN * this->constInfo.s1OuterSize, true);
                     } else {
                         realCoreInnerIdx = CalcRealCoreIdx(this->aicIdx, multiCoreInnerIdx - partialCalcNum,
-                                                        partialCalcLength, false);
+                                                           partialCalcLength, false);
                     }
                 }
             } else {
@@ -286,7 +287,7 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
         }
         if ASCEND_IS_AIV {
             if constexpr (implMode == ImplModeEnum::AA_INVALID_LINE_HIGH_PRECISION ||
-                        IsSameType<INPUT_T, float>::value) {
+                          IsSameType<INPUT_T, float>::value) {
                 if (this->sharedParams.implMode ==
                     static_cast<uint8_t>(ImplModeEnum::AA_INVALID_LINE_HIGH_PRECISION)) {
                     this->constInfo.softMaxCheckRes = true;
@@ -311,7 +312,7 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
                 if ASCEND_IS_AIV {
                     auto &runInfo3 = runInfo[(taskId + 3) & 3];
                     this->vecBlock.ProcessVec1(this->l1PBuffers.Get(), this->bmm1Buffers.Get(), runInfo3,
-                        this->constInfo);
+                                               this->constInfo);
                 }
             }
             if (taskId > 1 && notLast) {
@@ -319,10 +320,10 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
                 if ASCEND_IS_AIC {
                     if constexpr (BaseClass::bmm2Write2Ub) {
                         this->cubeBlock.IterateBmm2(this->bmm2Buffers.Get(), this->l1PBuffers, runInfo2,
-                            this->constInfo);
+                                                    this->constInfo);
                     } else {
                         this->cubeBlock.IterateBmm2(this->bmm2ResGmBuffers.Get(), this->l1PBuffers, runInfo2,
-                            this->constInfo);
+                                                    this->constInfo);
                     }
                 }
             }
@@ -401,13 +402,26 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
     int64_t actualS2Len;
     for (int64_t i = 0; i < this->sharedParams.bSize; ++i) {
         this->GetSeqQlenKvlenByBoidx(i, actualS1Len, actualS2Len);
+        // 跳过空kv batch的s1块计数，但保留偏移累积
+        if (actualS2Len == 0) {
+            this->s1SizeAcc += actualS1Len;
+            this->s2SizeAcc += actualS2Len;
+            runParam.b1SSOffset += actualS1Len * actualS2Len;
+            if constexpr (hasDrop) {
+                runParam.b1SSOffsetAlign16 += actualS1Len * Align(actualS2Len);
+            }
+            runParam.boIdx++;
+            continue;
+        }
         actualS1Outersize += (CeilDiv(actualS1Len, this->s1BaseSize) * this->constInfo.n2G);
         if (multiCoreInnerOffset >= actualS1Outersize) {
             this->s1OuterSizeAcc = actualS1Outersize;
             this->s1SizeAcc += actualS1Len;
             this->s2SizeAcc += actualS2Len;
             runParam.b1SSOffset += actualS1Len * actualS2Len;
-            runParam.b1SSOffsetAlign16 += actualS1Len * Align(actualS2Len);
+            if constexpr (hasDrop) {
+                runParam.b1SSOffsetAlign16 += actualS1Len * Align(actualS2Len);
+            }
             runParam.boIdx++;
             continue;
         }
@@ -561,5 +575,5 @@ __aicore__ inline void FlashAttentionScoreKernelTrain<CubeBlockType, VecBlockTyp
 
     return;
 }
-}
+} // namespace BaseApi
 #endif // FLASH_ATTENTION_SCORE_KERNEL_TRAIN_H_
