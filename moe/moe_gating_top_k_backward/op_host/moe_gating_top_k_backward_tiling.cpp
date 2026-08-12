@@ -64,7 +64,6 @@ const static int64_t DEFAULT_WORKSPACE_SIZE = 16777216; // 预留16M空间
 const static int64_t DIM_ZERO = 0;
 const static int64_t DIM_ONE = 1;
 
-
 class MoeGatingTopKBackwardTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
     explicit MoeGatingTopKBackwardTiling(gert::TilingContext *context)
@@ -237,7 +236,6 @@ ge::graphStatus MoeGatingTopKBackwardTiling::CheckExpertIdx()
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
-
 
 ge::graphStatus MoeGatingTopKBackwardTiling::CheckAttr()
 {

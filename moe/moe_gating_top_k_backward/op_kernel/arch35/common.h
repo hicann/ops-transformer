@@ -12,20 +12,26 @@
  * \file common.h
  * \brief
  */
-#ifndef MOE_GATING_TOP_K_BACKWARD_COMMON_H
-#define MOE_GATING_TOP_K_BACKWARD_COMMON_H
+#ifndef MOE_GATING_TOP_K_BACKWARD_COMMON_H_V35
+#define MOE_GATING_TOP_K_BACKWARD_COMMON_H_V35
 
 #include "kernel_operator.h"
 
-namespace MoeGatingTopKBackward {
+namespace MoeGatingTopKBackwardNs {
 using namespace AscendC;
 
-constexpr int64_t NUM_ONE = 1;
-constexpr int64_t NUM_TWO = 2;
-constexpr int64_t NUM_FOUR = 4;
+constexpr int64_t BLOCK_BYTES = 32;
 constexpr int64_t SIZE_OF_FLOAT32 = 4;
 constexpr int64_t SIZE_OF_INT32 = 4;
-constexpr int64_t BLOCK_BYTES_MINUS_ONE = 31;
+constexpr uint32_t VL_FLOAT_SIZE = VECTOR_REG_WIDTH / sizeof(float);
+
+__aicore__ inline int64_t Align(int64_t elementNum, int64_t bytes)
+{
+    if (bytes == 0) {
+        return 0;
+    }
+    return (elementNum * bytes + BLOCK_BYTES - 1) / BLOCK_BYTES * BLOCK_BYTES / bytes;
+}
 
 __aicore__ inline int64_t Ceil(int64_t a, int64_t b)
 {
@@ -37,15 +43,7 @@ __aicore__ inline int64_t Ceil(int64_t a, int64_t b)
 
 __aicore__ inline int64_t AlignBytes(int64_t elementNum, int64_t bytes)
 {
-    return (elementNum * bytes + BLOCK_BYTES_MINUS_ONE) & ~BLOCK_BYTES_MINUS_ONE;
-}
-
-__aicore__ inline int64_t Align(int64_t elementNum, int64_t bytes)
-{
-    if (bytes == 0) {
-        return 0;
-    }
-    return AlignBytes(elementNum, bytes) / bytes;
+    return (elementNum * bytes + BLOCK_BYTES - 1) / BLOCK_BYTES * BLOCK_BYTES;
 }
 
 template <typename T>
@@ -67,7 +65,6 @@ __aicore__ inline T1 CeilDiv(T1 x, T2 y)
         const T1 quotient = x / y;
         return (x % y != 0 && ((x ^ y) >= 0)) ? (quotient + 1) : quotient;
     }
-
     return x;
 }
 
@@ -79,5 +76,5 @@ __aicore__ inline void SetWaitFlag(HardEvent evt)
     WaitFlag<event>(eventId);
 }
 
-} // namespace MoeGatingTopKBackward
-#endif // MOE_GATING_TOP_K_BACKWARD_COMMON_H
+} // namespace MoeGatingTopKBackwardNs
+#endif // MOE_GATING_TOP_K_BACKWARD_COMMON_H_V35

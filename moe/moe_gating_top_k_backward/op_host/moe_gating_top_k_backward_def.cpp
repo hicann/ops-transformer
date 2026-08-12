@@ -18,7 +18,8 @@ namespace ops {
 
 class MoeGatingTopKBackward : public OpDef {
 public:
-    explicit MoeGatingTopKBackward(const char *name) : OpDef(name)
+    explicit MoeGatingTopKBackward(const char *name)
+        : OpDef(name)
     {
         this->Input("x_norm")
             .ParamType(REQUIRED)

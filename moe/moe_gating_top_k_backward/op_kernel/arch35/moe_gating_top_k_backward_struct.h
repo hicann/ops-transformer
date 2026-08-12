@@ -9,25 +9,22 @@
  */
 
 /*!
- * \file moe_gating_top_k_backward_tiling_def.h
- * \brief arch35 RegBase tiling data struct.
+ * \file moe_gating_top_k_backward_struct.h
+ * \brief Tiling data struct shared between host tiling and kernel
  */
-
-#ifndef MOE_GATING_TOP_K_BACKWARD_TILING_DEF_H
-#define MOE_GATING_TOP_K_BACKWARD_TILING_DEF_H
+#ifndef MOE_GATING_TOP_K_BACKWARD_STRUCT_H
+#define MOE_GATING_TOP_K_BACKWARD_STRUCT_H
 
 #include <cstdint>
 
-struct MoeGatingTopKBackwardRegbaseTilingData {
+struct MoeGatingTopKBackwardA5TilingData {
     int64_t needCoreNum;
     int64_t perCoreRows;
-    int64_t lastCoreRows;
     int64_t baseRows;
     int64_t perLoopTimes;
     int64_t perTailRows;
     int64_t lastLoopTimes;
     int64_t lastTailRows;
-    int64_t tokenCount;
     int64_t expertCount;
     int64_t k;
     int64_t gradYDtypeSize;
@@ -37,4 +34,4 @@ struct MoeGatingTopKBackwardRegbaseTilingData {
     float eps;
 };
 
-#endif // MOE_GATING_TOP_K_BACKWARD_TILING_DEF_H
+#endif // MOE_GATING_TOP_K_BACKWARD_STRUCT_H

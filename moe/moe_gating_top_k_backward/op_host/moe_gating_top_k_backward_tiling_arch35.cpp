@@ -13,21 +13,16 @@
  * \brief
  */
 
-#include "platform/platform_info.h"
-#include "moe_gating_top_k_backward_tiling.h"
+#include "moe_gating_top_k_backward_tiling_arch35.h"
 #include "op_host/tiling_util.h"
 
 namespace optiling {
-// Attribute constants
+
 const static int64_t NORM_TYPE_SIGMOID = 1;
-
-// Tensor dimensions
-const static size_t X_NORM_INPUT_DIMS = 2;     // [m,n]
-const static size_t GRAD_Y_INPUT_DIMS = 2;     // [m,k]
-const static size_t EXPERT_IDX_INPUT_DIMS = 2; // [m,k]
-const static size_t GRAD_X_OUTPUT_DIMS = 2;    // [m,n]
-
-// Indices
+const static size_t X_NORM_INPUT_DIMS = 2;
+const static size_t GRAD_Y_INPUT_DIMS = 2;
+const static size_t EXPERT_IDX_INPUT_DIMS = 2;
+const static size_t GRAD_X_OUTPUT_DIMS = 2;
 const static int64_t X_NORM_INPUT_INDEX = 0;
 const static int64_t GRAD_Y_INPUT_INDEX = 1;
 const static int64_t EXPERT_IDX_INPUT_INDEX = 2;
@@ -39,115 +34,142 @@ const static int64_t EPS_ATTR_INDEX = 3;
 const static int64_t M_DIM_INDEX = 0;
 const static int64_t N_DIM_INDEX = 1;
 const static int64_t K_DIM_INDEX = 1;
-
-// UB related
 const static int64_t DOUBLE_BUFFER_NUM = 2;
 const static int64_t UB_ALIGN_BYTES_MINUS_ONE = 31;
 const static int64_t UB_RESERVE_SPACE = 1024;
-const static int64_t NUM_TWO = 2; // 2 buffers with the same size
-const static int64_t NUM_SIX = 6; // 6 buffers with the same size
-
-// Tiling keys
-const static uint64_t TILING_KEY_REGBASE = 10000;
-
-// Data type sizes
+const static int64_t NUM_TWO = 2;
+const static int64_t MAX_EXPERT_COUNT = 2048;
 const static int64_t SIZE_OF_FLOAT32 = 4;
+const static int64_t SIZE_OF_INT32 = 4;
 const static int64_t NUM_BYTES_FOUR = 4;
 const static int64_t NUM_BYTES_TWO = 2;
-
-// Miscellaneous
-const static int64_t MAX_EXPERT_COUNT = 2048;           // max value for n
-const static int64_t MIN_EXPERT_COUNT = 2;              // min value for n
-const static int64_t MIN_K = 1;                         // min value for k
-const static int64_t DEFAULT_WORKSPACE_SIZE = 16777216; // 预留16M空间
-
-// dim size
+const static int64_t DEFAULT_WORKSPACE_SIZE = 16777216;
+const static uint64_t TILING_KEY_REGBASE = 10000;
 const static int64_t DIM_ZERO = 0;
 const static int64_t DIM_ONE = 1;
-
-
-class MoeGatingTopKBackwardTilingArch35 : public Ops::Transformer::OpTiling::TilingBaseClass {
-public:
-    explicit MoeGatingTopKBackwardTilingArch35(gert::TilingContext *context)
-        : Ops::Transformer::OpTiling::TilingBaseClass(context)
-    {
-    }
-    ~MoeGatingTopKBackwardTilingArch35() override = default;
-
-protected:
-    bool IsCapable() override
-    {
-        return Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_);
-    }
-    // 1、获取平台信息比如CoreNum、UB/L1/L0C资源大小
-    ge::graphStatus GetPlatformInfo() override;
-    // 2、获取INPUT/OUTPUT/ATTR信息
-    ge::graphStatus GetShapeAttrsInfo() override;
-    // 3、计算数据切分TilingData
-    ge::graphStatus DoOpTiling() override;
-    // 4、计算高阶API的TilingData
-    ge::graphStatus DoLibApiTiling() override;
-    // 5、计算TilingKey
-    uint64_t GetTilingKey() const override;
-    // 6、计算Workspace 大小
-    ge::graphStatus GetWorkspaceSize() override;
-    // 7、保存Tiling数据
-    ge::graphStatus PostTiling() override;
-
-private:
-    ge::graphStatus CheckInputShape();
-    ge::graphStatus CheckXNorm();
-    ge::graphStatus CheckGradY();
-    ge::graphStatus CheckExpertIdx();
-    ge::graphStatus CheckAttr();
-    ge::graphStatus CheckOutShape();
-    ge::graphStatus CalcMaxRows();
-    ge::graphStatus SplitRows();
-    void DumpTiling();
-
-    // Shapes
-    const gert::Shape *xNormShape_ = nullptr;
-    const gert::Shape *gradYShape_ = nullptr;
-    const gert::Shape *expertIdxShape_ = nullptr;
-    const gert::Shape *outputGradXShape_ = nullptr;
-
-    // Miscellaneous
-    int64_t inputDtypeSize_;
-    ge::DataType gradYDtype_;
-
-    // Tiling data
-    MoeGatingTopKBackwardRegbaseTilingData MoeGatingTopKBackwardRegbaseTilingData_;
-
-    // Tiling data parameters
-    int64_t needCoreNum_ = 0;
-    int64_t perCoreRows_ = 0;
-    int64_t lastCoreRows_ = 0;
-    int64_t baseRows_ = 0;
-    int64_t perLoopTimes_ = 0;
-    int64_t perTailRows_ = 0;
-    int64_t lastLoopTimes_ = 0;
-    int64_t lastTailRows_ = 0;
-    int64_t tokenCount_ = 0;
-    int64_t expertCount_ = 0;
-    int64_t k_ = 0;
-    int64_t gradYDtypeSize_ = 0;
-    int64_t renorm_ = 0;
-    int64_t normType_ = NORM_TYPE_SIGMOID;
-    float routedScalingFactor_ = 1.0f;
-    float eps_ = 1e-20f;
-};
 
 inline int64_t AlignBytes_(int64_t x)
 {
     return (x + UB_ALIGN_BYTES_MINUS_ONE) & ~UB_ALIGN_BYTES_MINUS_ONE;
 }
 
+MoeGatingTopKBackwardTilingArch35::MoeGatingTopKBackwardTilingArch35(gert::TilingContext *context)
+    : Ops::Transformer::OpTiling::TilingBaseClass(context)
+{
+}
+
+bool MoeGatingTopKBackwardTilingArch35::IsCapable()
+{
+    if (!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_)) {
+        return false;
+    }
+    return true;
+}
+
+ge::graphStatus MoeGatingTopKBackwardTilingArch35::GetPlatformInfo()
+{
+    auto platformInfo = context_->GetPlatformInfo();
+    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "platform_info"),
+                return ge::GRAPH_FAILED);
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
+    aicoreParams_.numBlocks = ascendcPlatform.GetCoreNumAiv();
+    uint64_t ubSizePlatForm;
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
+    aicoreParams_.ubSize = ubSizePlatForm;
+    OP_CHECK_IF(aicoreParams_.numBlocks == 0, OP_LOGE(context_, "coreNum is 0"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(aicoreParams_.ubSize == 0, OP_LOGE(context_, "ubSize is 0"), return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeGatingTopKBackwardTilingArch35::GetShapeAttrsInfo()
+{
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeGatingTopKBackwardTilingArch35::DoOpTiling()
+{
+    auto ret = CheckInputShape();
+    if (ret != ge::GRAPH_SUCCESS) {
+        return ret;
+    }
+    ret = CheckOutShape();
+    if (ret != ge::GRAPH_SUCCESS) {
+        return ret;
+    }
+    ret = CheckAttr();
+    if (ret != ge::GRAPH_SUCCESS) {
+        return ret;
+    }
+    ret = SplitRows();
+    if (ret != ge::GRAPH_SUCCESS) {
+        return ret;
+    }
+
+    DumpTiling();
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeGatingTopKBackwardTilingArch35::DoLibApiTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
+
+uint64_t MoeGatingTopKBackwardTilingArch35::GetTilingKey() const
+{
+    return TILING_KEY_REGBASE;
+}
+
+ge::graphStatus MoeGatingTopKBackwardTilingArch35::GetWorkspaceSize()
+{
+    workspaceSize_ = DEFAULT_WORKSPACE_SIZE;
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeGatingTopKBackwardTilingArch35::PostTiling()
+{
+    context_->SetBlockDim(static_cast<uint32_t>(needCoreNum_));
+    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    currentWorkspace[0] = workspaceSize_;
+
+    MoeGatingTopKBackwardA5TilingData td;
+    td.needCoreNum = needCoreNum_;
+    td.perCoreRows = perCoreRows_;
+    td.baseRows = baseRows_;
+    td.perLoopTimes = perLoopTimes_;
+    td.perTailRows = perTailRows_;
+    td.lastLoopTimes = lastLoopTimes_;
+    td.lastTailRows = lastTailRows_;
+    td.expertCount = expertCount_;
+    td.k = k_;
+    td.gradYDtypeSize = gradYDtypeSize_;
+    td.renorm = renorm_;
+    td.normType = normType_;
+    td.routedScalingFactor = routedScalingFactor_;
+    td.eps = eps_;
+
+    auto tilingDataSize = sizeof(MoeGatingTopKBackwardA5TilingData);
+    errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(),
+                           context_->GetRawTilingData()->GetCapacity(),
+                           reinterpret_cast<void *>(&td), tilingDataSize);
+    if (ret != EOK) {
+        OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
+        return ge::GRAPH_FAILED;
+    }
+    context_->GetRawTilingData()->SetDataSize(tilingDataSize);
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckInputShape()
 {
-    OP_CHECK_IF(CheckXNorm() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "Check XNorm failed"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckGradY() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "Check GradY failed"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckExpertIdx() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "Check ExpertIdx failed"),
-                return ge::GRAPH_FAILED);
+    if (CheckXNorm() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckGradY() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckExpertIdx() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -156,24 +178,39 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckXNorm()
     const gert::StorageShape *xNormShapePtr = context_->GetInputShape(X_NORM_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, xNormShapePtr);
     auto xNormDimSize = xNormShapePtr->GetOriginShape().GetDimNum();
-    OP_CHECK_IF(xNormDimSize != X_NORM_INPUT_DIMS,
-                OP_LOGE(context_, "xNorm: Rank must be 2, but got %lu.", xNormDimSize), return ge::GRAPH_FAILED);
+    if (xNormDimSize != X_NORM_INPUT_DIMS) {
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "x_norm",
+                                                 std::to_string(xNormDimSize) + "D", "The shape of x_norm must be 2D");
+        return ge::GRAPH_FAILED;
+    }
 
     tokenCount_ = xNormShapePtr->GetOriginShape().GetDim(DIM_ZERO);
     expertCount_ = xNormShapePtr->GetOriginShape().GetDim(DIM_ONE);
-    OP_CHECK_IF(
-        expertCount_ > MAX_EXPERT_COUNT,
-        OP_LOGE(context_, "xNorm: Dimension 1 (N) must be less than or equal to 2048, but got %ld.", expertCount_),
-        return ge::GRAPH_FAILED);
+    if (tokenCount_ < 1) {
+        std::string incorrectShape = "[" + std::to_string(tokenCount_) + ", " +
+                                     std::to_string(expertCount_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x_norm",
+                                              incorrectShape.c_str(), "x_norm cannot be an empty tensor");
+        return ge::GRAPH_FAILED;
+    }
+    if (expertCount_ < 2 || expertCount_ > MAX_EXPERT_COUNT) {
+        std::string incorrectShape = "[" + std::to_string(tokenCount_) + ", " +
+                                     std::to_string(expertCount_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x_norm",
+                                              incorrectShape.c_str(),
+                                              "Shape [1] of this parameter must be within the range [2, 2048]");
+        return ge::GRAPH_FAILED;
+    }
 
     auto xNormDesc = context_->GetInputDesc(X_NORM_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, xNormDesc);
     auto xNormDtype = xNormDesc->GetDataType();
-    OP_CHECK_IF(xNormDtype != ge::DataType::DT_FLOAT,
-                OP_LOGE(context_, "xNorm: Unsupported data type. Expected %s, but got %s.",
-                        ge::TypeUtils::DataTypeToSerialString(ge::DataType::DT_FLOAT).c_str(),
-                        ge::TypeUtils::DataTypeToSerialString(xNormDtype).c_str()),
-                return ge::GRAPH_FAILED);
+    if (xNormDtype != ge::DataType::DT_FLOAT) {
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "x_norm",
+                                              ge::TypeUtils::DataTypeToSerialString(xNormDtype).c_str(),
+                                              "The dtype of x_norm must be float32");
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -182,30 +219,42 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckGradY()
     const gert::StorageShape *gradYShapePtr = context_->GetInputShape(GRAD_Y_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, gradYShapePtr);
     auto gradYDimSize = gradYShapePtr->GetOriginShape().GetDimNum();
-    OP_CHECK_IF(gradYDimSize != GRAD_Y_INPUT_DIMS,
-                OP_LOGE(context_, "gradY: Rank must be 2, but got %lu.", gradYDimSize), return ge::GRAPH_FAILED);
+    if (gradYDimSize != GRAD_Y_INPUT_DIMS) {
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "grad_y",
+                                                 std::to_string(gradYDimSize) + "D", "The shape of grad_y must be 2D");
+        return ge::GRAPH_FAILED;
+    }
 
-    OP_CHECK_IF(gradYShapePtr->GetOriginShape().GetDim(DIM_ZERO) != tokenCount_,
-                OP_LOGE(context_, "gradY: Must match xNorm on dimension 0, but got %ld vs %ld.",
-                        gradYShapePtr->GetOriginShape().GetDim(DIM_ZERO), tokenCount_),
-                return ge::GRAPH_FAILED);
+    if (gradYShapePtr->GetOriginShape().GetDim(DIM_ZERO) != tokenCount_) {
+        std::string incorrectShapes = "[" + std::to_string(gradYShapePtr->GetOriginShape().GetDim(DIM_ZERO)) +
+                                      ", " + std::to_string(gradYShapePtr->GetOriginShape().GetDim(DIM_ONE)) + "] and [" +
+                                      std::to_string(tokenCount_) + ", " + std::to_string(expertCount_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "grad_y and x_norm",
+                                               incorrectShapes.c_str(),
+                                               "Shape [0] of grad_y must be equal to shape [0] of x_norm");
+        return ge::GRAPH_FAILED;
+    }
     k_ = gradYShapePtr->GetOriginShape().GetDim(DIM_ONE);
-    OP_CHECK_IF(k_ > expertCount_ || k_ <= 0,
-                OP_LOGE(context_, "gradY: Dimension 1 (K) must be in the range of (0, %ld (N)], but got %ld.",
-                        expertCount_, k_),
-                return ge::GRAPH_FAILED);
+    if (k_ < 1 || k_ > expertCount_) {
+        std::string incorrectShape = "[" + std::to_string(gradYShapePtr->GetOriginShape().GetDim(DIM_ZERO)) +
+                                     ", " + std::to_string(k_) + "]";
+        std::string reason = "Shape [1] of this parameter must be within the range [1, " +
+                             std::to_string(expertCount_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "grad_y",
+                                              incorrectShape.c_str(), reason.c_str());
+        return ge::GRAPH_FAILED;
+    }
 
     auto gradYDesc = context_->GetInputDesc(GRAD_Y_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, gradYDesc);
     gradYDtype_ = gradYDesc->GetDataType();
-    OP_CHECK_IF(gradYDtype_ != ge::DataType::DT_FLOAT && gradYDtype_ != ge::DataType::DT_FLOAT16 &&
-                    gradYDtype_ != ge::DataType::DT_BF16,
-                OP_LOGE(context_, "gradY: Unsupported data type. Expected %s, %s or %s, but got %s.",
-                        ge::TypeUtils::DataTypeToSerialString(ge::DataType::DT_FLOAT).c_str(),
-                        ge::TypeUtils::DataTypeToSerialString(ge::DataType::DT_FLOAT16).c_str(),
-                        ge::TypeUtils::DataTypeToSerialString(ge::DataType::DT_BF16).c_str(),
-                        ge::TypeUtils::DataTypeToSerialString(gradYDtype_).c_str()),
-                return ge::GRAPH_FAILED);
+    if (gradYDtype_ != ge::DataType::DT_FLOAT && gradYDtype_ != ge::DataType::DT_FLOAT16 &&
+        gradYDtype_ != ge::DataType::DT_BF16) {
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "grad_y",
+                                              ge::TypeUtils::DataTypeToSerialString(gradYDtype_).c_str(),
+                                              "The dtype of grad_y must be within the range [float32, float16, bfloat16]");
+        return ge::GRAPH_FAILED;
+    }
     gradYDtypeSize_ = gradYDtype_ == ge::DataType::DT_FLOAT ? NUM_BYTES_FOUR : NUM_BYTES_TWO;
     return ge::GRAPH_SUCCESS;
 }
@@ -215,30 +264,42 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckExpertIdx()
     const gert::StorageShape *expertIdxShapePtr = context_->GetInputShape(EXPERT_IDX_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expertIdxShapePtr);
     auto expertIdxDimSize = expertIdxShapePtr->GetOriginShape().GetDimNum();
-    OP_CHECK_IF(expertIdxDimSize != EXPERT_IDX_INPUT_DIMS,
-                OP_LOGE(context_, "expertIdx: Rank must be 2, but got %lu.", expertIdxDimSize),
-                return ge::GRAPH_FAILED);
+    if (expertIdxDimSize != EXPERT_IDX_INPUT_DIMS) {
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "expert_idx",
+                                                 std::to_string(expertIdxDimSize) + "D", "The shape of expert_idx must be 2D");
+        return ge::GRAPH_FAILED;
+    }
 
-    OP_CHECK_IF(expertIdxShapePtr->GetOriginShape().GetDim(DIM_ZERO) != tokenCount_,
-                OP_LOGE(context_, "expertIdx: Must match xNorm on dimension 0, but got %ld vs %ld.",
-                        expertIdxShapePtr->GetOriginShape().GetDim(DIM_ZERO), tokenCount_),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(expertIdxShapePtr->GetOriginShape().GetDim(DIM_ONE) != k_,
-                OP_LOGE(context_, "expertIdx: Must match gradY on dimension 1, but got %ld vs %ld.",
-                        expertIdxShapePtr->GetOriginShape().GetDim(DIM_ONE), k_),
-                return ge::GRAPH_FAILED);
+    if (expertIdxShapePtr->GetOriginShape().GetDim(DIM_ZERO) != tokenCount_) {
+        std::string incorrectShapes = "[" + std::to_string(expertIdxShapePtr->GetOriginShape().GetDim(DIM_ZERO)) +
+                                      ", " + std::to_string(expertIdxShapePtr->GetOriginShape().GetDim(DIM_ONE)) + "] and [" +
+                                      std::to_string(tokenCount_) + ", " + std::to_string(expertCount_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "expert_idx and x_norm",
+                                               incorrectShapes.c_str(),
+                                               "Shape [0] of expert_idx must be equal to shape [0] of x_norm");
+        return ge::GRAPH_FAILED;
+    }
+    if (expertIdxShapePtr->GetOriginShape().GetDim(DIM_ONE) != k_) {
+        std::string incorrectShapes = "[" + std::to_string(expertIdxShapePtr->GetOriginShape().GetDim(DIM_ZERO)) +
+                                      ", " + std::to_string(expertIdxShapePtr->GetOriginShape().GetDim(DIM_ONE)) + "] and [" +
+                                      std::to_string(tokenCount_) + ", " + std::to_string(k_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "expert_idx and grad_y",
+                                               incorrectShapes.c_str(),
+                                               "Shape [1] of expert_idx must be equal to shape [1] of grad_y");
+        return ge::GRAPH_FAILED;
+    }
 
     auto expertIdxDesc = context_->GetInputDesc(EXPERT_IDX_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expertIdxDesc);
     auto expertIdxDtype = expertIdxDesc->GetDataType();
-    OP_CHECK_IF(expertIdxDtype != ge::DataType::DT_INT32,
-                OP_LOGE(context_, "expertIdx: Unsupported data type. Expected %s, but got %s.",
-                        ge::TypeUtils::DataTypeToSerialString(ge::DataType::DT_INT32).c_str(),
-                        ge::TypeUtils::DataTypeToSerialString(expertIdxDtype).c_str()),
-                return ge::GRAPH_FAILED);
+    if (expertIdxDtype != ge::DataType::DT_INT32) {
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "expert_idx",
+                                              ge::TypeUtils::DataTypeToSerialString(expertIdxDtype).c_str(),
+                                              "The dtype of expert_idx must be int32");
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
-
 
 ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckAttr()
 {
@@ -256,10 +317,12 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckAttr()
         normType_ = *normTypePtr;
     }
     OP_LOGI(context_, "Attr normType: %ld.", normType_);
-
-    OP_CHECK_IF(normType_ != NORM_TYPE_SIGMOID,
-                OP_LOGE(context_, "Attr normType: expected %ld, but got %ld.", NORM_TYPE_SIGMOID, normType_),
-                return ge::GRAPH_FAILED);
+    if (normType_ != NORM_TYPE_SIGMOID) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "norm_type",
+                                              std::to_string(normType_).c_str(),
+                                              "The value of norm_type must be 1");
+        return ge::GRAPH_FAILED;
+    }
 
     const float *routedScalingFactorPtr = attrs->GetAttrPointer<float>(ROUTED_SCALING_FACTOR_ATTR_INDEX);
     if (routedScalingFactorPtr != nullptr) {
@@ -272,32 +335,6 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckAttr()
         eps_ = *epsPtr;
     }
     OP_LOGI(context_, "Attr eps: %f.", eps_);
-
-    return ge::GRAPH_SUCCESS;
-}
-
-ge::graphStatus MoeGatingTopKBackwardTilingArch35::GetShapeAttrsInfo()
-{
-    return ge::GRAPH_SUCCESS;
-}
-
-ge::graphStatus MoeGatingTopKBackwardTilingArch35::GetPlatformInfo()
-{
-    auto platformInfo = context_->GetPlatformInfo();
-    if (platformInfo == nullptr) {
-        auto compileInfoPtr = context_->GetCompileInfo<MoeGatingTopKBackwardCompileInfo>();
-        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compileInfoPtr is null."), return ge::GRAPH_FAILED);
-        aicoreParams_.numBlocks = compileInfoPtr->numBlocks;
-        aicoreParams_.ubSize = compileInfoPtr->ubSize;
-    } else {
-        auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-        aicoreParams_.numBlocks = ascendcPlatform.GetCoreNumAiv();
-        uint64_t ubSizePlatForm;
-        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
-        aicoreParams_.ubSize = ubSizePlatForm;
-        OP_CHECK_IF(aicoreParams_.numBlocks == 0, OP_LOGE(context_, "coreNum is 0"), return ge::GRAPH_FAILED);
-        OP_CHECK_IF(aicoreParams_.ubSize == 0, OP_LOGE(context_, "ubSize is 0"), return ge::GRAPH_FAILED);
-    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -307,87 +344,71 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckOutShape()
     OP_CHECK_NULL_WITH_CONTEXT(context_, gradXShapePtr);
 
     auto gradXDimSize = gradXShapePtr->GetOriginShape().GetDimNum();
-    OP_CHECK_IF(gradXDimSize != GRAD_Y_INPUT_DIMS,
-                OP_LOGE(context_, "gradX: Rank must be 2, but got %lu.", gradXDimSize), return ge::GRAPH_FAILED);
+    if (gradXDimSize != GRAD_X_OUTPUT_DIMS) {
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "grad_x",
+                                                 std::to_string(gradXDimSize) + "D", "The shape of grad_x must be 2D");
+        return ge::GRAPH_FAILED;
+    }
 
-    OP_CHECK_IF(gradXShapePtr->GetOriginShape().GetDim(DIM_ZERO) != tokenCount_,
-                OP_LOGE(context_, "gradX: Must match xNorm on dimension 0, but got %ld vs %ld.",
-                        gradXShapePtr->GetOriginShape().GetDim(DIM_ZERO), tokenCount_),
-                return ge::GRAPH_FAILED);
-
-    OP_CHECK_IF(gradXShapePtr->GetOriginShape().GetDim(DIM_ONE) != expertCount_,
-                OP_LOGE(context_, "gradX: Must match xNorm on dimension 1, but got %ld vs %ld.",
-                        gradXShapePtr->GetOriginShape().GetDim(DIM_ONE), expertCount_),
-                return ge::GRAPH_FAILED);
+    if (gradXShapePtr->GetOriginShape().GetDim(DIM_ZERO) != tokenCount_) {
+        std::string incorrectShapes = "[" + std::to_string(gradXShapePtr->GetOriginShape().GetDim(DIM_ZERO)) +
+                                      ", " + std::to_string(gradXShapePtr->GetOriginShape().GetDim(DIM_ONE)) + "] and [" +
+                                      std::to_string(tokenCount_) + ", " + std::to_string(expertCount_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "grad_x and x_norm",
+                                               incorrectShapes.c_str(),
+                                               "Shape [0] of grad_x must be equal to shape [0] of x_norm");
+        return ge::GRAPH_FAILED;
+    }
+    if (gradXShapePtr->GetOriginShape().GetDim(DIM_ONE) != expertCount_) {
+        std::string incorrectShapes = "[" + std::to_string(gradXShapePtr->GetOriginShape().GetDim(DIM_ZERO)) +
+                                      ", " + std::to_string(gradXShapePtr->GetOriginShape().GetDim(DIM_ONE)) + "] and [" +
+                                      std::to_string(tokenCount_) + ", " + std::to_string(expertCount_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "grad_x and x_norm",
+                                               incorrectShapes.c_str(),
+                                               "Shape [1] of grad_x must be equal to shape [1] of x_norm");
+        return ge::GRAPH_FAILED;
+    }
 
     auto gradXDesc = context_->GetOutputDesc(GRAD_X_OUTPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, gradXDesc);
     auto gradXDtype = gradXDesc->GetDataType();
-
-    OP_CHECK_IF(gradXDtype != gradYDtype_,
-                OP_LOGE(context_, "expertIdx: Mismatched data type. Expected %s, but got %s.",
-                        ge::TypeUtils::DataTypeToSerialString(gradYDtype_).c_str(),
-                        ge::TypeUtils::DataTypeToSerialString(gradXDtype).c_str()),
-                return ge::GRAPH_FAILED);
-
+    if (gradXDtype != gradYDtype_) {
+        std::string incorrectDtypes = std::string(ge::TypeUtils::DataTypeToSerialString(gradYDtype_)) +
+                                      " and " + ge::TypeUtils::DataTypeToSerialString(gradXDtype);
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context_->GetNodeName(), "grad_x and grad_y",
+                                               incorrectDtypes.c_str(),
+                                               "The dtypes of grad_x and grad_y must be the same");
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus MoeGatingTopKBackwardTilingArch35::CalcMaxRows()
 {
     int64_t gradYQuePerTokenSpace = k_ * gradYDtypeSize_;
-    int64_t indicesQuePerTokenSpace = k_ * SIZE_OF_FLOAT32;
+    int64_t indicesQuePerTokenSpace = k_ * SIZE_OF_INT32;
     int64_t xQuePerTokenSpace = expertCount_ * SIZE_OF_FLOAT32;
     int64_t outQuePerTokenSpace = expertCount_ * gradYDtypeSize_;
+    int64_t wPrimeCachePerTokenSpace = k_ * SIZE_OF_FLOAT32;
+    int64_t bufnPerTokenSpace = expertCount_ * SIZE_OF_FLOAT32;
 
-    int64_t bufk0PerTokenSpace = k_ * SIZE_OF_FLOAT32;
-    int64_t bufk1PerTokenSpace = k_ * SIZE_OF_FLOAT32;
-    int64_t bufn2PerTokenSpace = expertCount_ * SIZE_OF_FLOAT32;
-    int64_t bufn3PerTokenSpace = expertCount_ * SIZE_OF_FLOAT32;
-    int64_t bufk4AddPerTokenSpace = k_ * SIZE_OF_FLOAT32;
-    int64_t bufk4IndexPerTokenSpace = k_ * SIZE_OF_FLOAT32;
-    int64_t bufk4RecipSumPerTokenSpace = k_ * SIZE_OF_FLOAT32;
-    int64_t bufk4MaskPerTokenSpace = k_ * SIZE_OF_FLOAT32;
-    int64_t bufsPerTokenSpace = k_ * SIZE_OF_FLOAT32;
-
-    int64_t available_space = aicoreParams_.ubSize - UB_RESERVE_SPACE;
+    int64_t availableSpace = static_cast<int64_t>(aicoreParams_.ubSize) - UB_RESERVE_SPACE;
     int64_t quePerTokenSpace =
         DOUBLE_BUFFER_NUM * (gradYQuePerTokenSpace + indicesQuePerTokenSpace + xQuePerTokenSpace) + outQuePerTokenSpace;
-    int64_t bufPerTokenSpace = bufk0PerTokenSpace + bufk1PerTokenSpace + bufn2PerTokenSpace + bufn3PerTokenSpace +
-                               bufk4AddPerTokenSpace + bufk4IndexPerTokenSpace + bufk4RecipSumPerTokenSpace +
-                               bufk4MaskPerTokenSpace + bufsPerTokenSpace;
-    int64_t maxRows = available_space / (quePerTokenSpace + bufPerTokenSpace);
-    int64_t kAligned = AlignBytes_(k_ * SIZE_OF_FLOAT32) >> NUM_TWO;
-    // queSpace: gradYQueSpace; indicesQueSpace; xQueSpace; outQueSpace
-    // bufSpace: bufk0Space = bufk1Space == bufk4AddSpace == bufk4IndexSpace == bufk4RecipSumSpace == bufk4MaskSpace;
-    //           bufn2Space == bufn3Space; bufsSpace
+
+    int64_t bufPerTokenSpace = bufnPerTokenSpace + wPrimeCachePerTokenSpace;
+    int64_t maxRows = availableSpace / (quePerTokenSpace + bufPerTokenSpace);
+
     while (maxRows > 0) {
-        int64_t queSpace = DOUBLE_BUFFER_NUM * maxRows * AlignBytes_(gradYQuePerTokenSpace) +
-                           DOUBLE_BUFFER_NUM * maxRows * AlignBytes_(indicesQuePerTokenSpace) +
-                           DOUBLE_BUFFER_NUM * AlignBytes_(maxRows * xQuePerTokenSpace) +
-                           AlignBytes_(maxRows * outQuePerTokenSpace);
-        int64_t bufSpace = NUM_SIX * maxRows * AlignBytes_(bufk1PerTokenSpace) +
-                           NUM_TWO * AlignBytes_(maxRows * bufn2PerTokenSpace) +
-                           maxRows * AlignBytes_(bufsPerTokenSpace);
+        int64_t queSpace =
+            DOUBLE_BUFFER_NUM * maxRows * AlignBytes_(gradYQuePerTokenSpace) +
+            DOUBLE_BUFFER_NUM * maxRows * AlignBytes_(indicesQuePerTokenSpace) +
+            DOUBLE_BUFFER_NUM * AlignBytes_(maxRows * xQuePerTokenSpace) +
+            AlignBytes_(maxRows * outQuePerTokenSpace);
+        int64_t bufSpace = AlignBytes_(maxRows * bufnPerTokenSpace) +
+                           maxRows * AlignBytes_(wPrimeCachePerTokenSpace);
 
-        uint32_t reduceSumTmpBuffSpace = 0;
-        uint32_t tmpMaxValue = 0;
-        auto shape = ge::Shape({maxRows, kAligned});
-        AscendC::GetReduceSumMaxMinTmpSize(shape, ge::DataType::DT_FLOAT, AscendC::ReducePattern::AR, true, false,
-                                           tmpMaxValue, reduceSumTmpBuffSpace);
-
-        auto srcShape = ge::Shape({1, kAligned});
-        auto platformInfo = context_->GetPlatformInfo();
-        auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-        uint32_t broadcastTmpBuffSpace = 0;
-        AscendC::GetBroadCastMaxMinTmpSize(ascendcPlatform, srcShape, shape, SIZE_OF_FLOAT32, false, tmpMaxValue,
-                                           broadcastTmpBuffSpace);
-
-        int64_t usedSpace = UB_RESERVE_SPACE + queSpace + bufSpace +
-                            static_cast<int64_t>(std::max(reduceSumTmpBuffSpace, broadcastTmpBuffSpace));
-        OP_LOGD(context_, "queSpace: %ld.\nbufSpace: %ld.\nsharebuf: %ld", queSpace, bufSpace,
-                static_cast<int64_t>(std::max(reduceSumTmpBuffSpace, broadcastTmpBuffSpace)));
-
+        int64_t usedSpace = UB_RESERVE_SPACE + queSpace + bufSpace;
         if (usedSpace <= static_cast<int64_t>(aicoreParams_.ubSize)) {
             break;
         }
@@ -409,86 +430,18 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::SplitRows()
         return ret;
     }
 
-    OP_CHECK_IF(baseRows_ <= 0, OP_LOGE(context_, "baseRows must be > 0, but got %ld.", baseRows_),
-                return ge::GRAPH_FAILED);
+    if (baseRows_ <= 0) {
+        OP_LOGE(context_->GetNodeName(), "UB space is not enough to fit a single token row, "
+                                         "baseRows must be greater than 0, but got %ld. Please reduce N or K.",
+                baseRows_);
+        return ge::GRAPH_FAILED;
+    }
 
     perLoopTimes_ = (perCoreRows_ + baseRows_ - 1) / baseRows_;
     perTailRows_ = perCoreRows_ - (perLoopTimes_ - 1) * baseRows_;
     lastLoopTimes_ = (lastCoreRows_ + baseRows_ - 1) / baseRows_;
     lastTailRows_ = lastCoreRows_ - (lastLoopTimes_ - 1) * baseRows_;
-
     return ge::GRAPH_SUCCESS;
-}
-
-ge::graphStatus MoeGatingTopKBackwardTilingArch35::DoOpTiling()
-{
-    auto ret = CheckInputShape();
-    if (ret != ge::GRAPH_SUCCESS) {
-        return ret;
-    }
-
-    ret = CheckOutShape();
-    if (ret != ge::GRAPH_SUCCESS) {
-        return ret;
-    }
-
-    ret = CheckAttr();
-    if (ret != ge::GRAPH_SUCCESS) {
-        return ret;
-    }
-
-    ret = SplitRows();
-    if (ret != ge::GRAPH_SUCCESS) {
-        return ret;
-    }
-
-    MoeGatingTopKBackwardRegbaseTilingData_.set_needCoreNum(needCoreNum_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_perCoreRows(perCoreRows_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_lastCoreRows(lastCoreRows_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_baseRows(baseRows_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_perLoopTimes(perLoopTimes_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_perTailRows(perTailRows_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_lastLoopTimes(lastLoopTimes_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_lastTailRows(lastTailRows_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_tokenCount(tokenCount_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_expertCount(expertCount_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_k(k_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_gradYDtypeSize(gradYDtypeSize_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_renorm(renorm_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_normType(normType_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_routedScalingFactor(routedScalingFactor_);
-    MoeGatingTopKBackwardRegbaseTilingData_.set_eps(eps_);
-
-    DumpTiling();
-
-    return ge::GRAPH_SUCCESS;
-}
-
-ge::graphStatus MoeGatingTopKBackwardTilingArch35::DoLibApiTiling()
-{
-    return ge::GRAPH_SUCCESS;
-}
-
-ge::graphStatus MoeGatingTopKBackwardTilingArch35::GetWorkspaceSize()
-{
-    workspaceSize_ = DEFAULT_WORKSPACE_SIZE;
-    return ge::GRAPH_SUCCESS;
-}
-
-ge::graphStatus MoeGatingTopKBackwardTilingArch35::PostTiling()
-{
-    context_->SetBlockDim(MoeGatingTopKBackwardRegbaseTilingData_.get_needCoreNum());
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
-    currentWorkspace[0] = workspaceSize_;
-    MoeGatingTopKBackwardRegbaseTilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(),
-                                                         context_->GetRawTilingData()->GetCapacity());
-    context_->GetRawTilingData()->SetDataSize(MoeGatingTopKBackwardRegbaseTilingData_.GetDataSize());
-    return ge::GRAPH_SUCCESS;
-}
-
-uint64_t MoeGatingTopKBackwardTilingArch35::GetTilingKey() const
-{
-    return TILING_KEY_REGBASE;
 }
 
 void MoeGatingTopKBackwardTilingArch35::DumpTiling()
@@ -497,13 +450,11 @@ void MoeGatingTopKBackwardTilingArch35::DumpTiling()
     OP_LOGD(context_, "numBlocks:  %ld", aicoreParams_.numBlocks);
     OP_LOGD(context_, "needCoreNum:  %ld", needCoreNum_);
     OP_LOGD(context_, "perCoreRows:  %ld", perCoreRows_);
-    OP_LOGD(context_, "lastCoreRows:  %ld", lastCoreRows_);
     OP_LOGD(context_, "baseRows:  %ld", baseRows_);
     OP_LOGD(context_, "perLoopTimes:  %ld", perLoopTimes_);
     OP_LOGD(context_, "perTailRows:  %ld", perTailRows_);
     OP_LOGD(context_, "lastLoopTimes:  %ld", lastLoopTimes_);
     OP_LOGD(context_, "lastTailRows:  %ld", lastTailRows_);
-    OP_LOGD(context_, "tokenCount:  %ld", tokenCount_);
     OP_LOGD(context_, "expertCount:  %ld", expertCount_);
     OP_LOGD(context_, "k:  %ld", k_);
     OP_LOGD(context_, "gradYDtypeSize:  %ld", gradYDtypeSize_);
@@ -511,7 +462,6 @@ void MoeGatingTopKBackwardTilingArch35::DumpTiling()
     OP_LOGD(context_, "normType:  %ld", normType_);
     OP_LOGD(context_, "routedScalingFactor:  %f", routedScalingFactor_);
     OP_LOGD(context_, "eps:  %f", eps_);
-    return;
 }
 
 REGISTER_OPS_TILING_TEMPLATE(MoeGatingTopKBackward, MoeGatingTopKBackwardTilingArch35, 1000);
