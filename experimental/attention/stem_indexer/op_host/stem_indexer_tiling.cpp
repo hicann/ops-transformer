@@ -145,8 +145,10 @@ ge::graphStatus StemIndexerInfoParser::GetAndCheckAttrParaInfo()
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(std::isnan(*opParamInfo_.alpha) || (*opParamInfo_.alpha <= ALPHA_MIN) ||
                     (*opParamInfo_.alpha > ALPHA_MAX),
-                 OP_LOGE_WITH_INVALID_ATTR(opName_, "alpha", std::to_string(*opParamInfo_.alpha).c_str(), "(0, 1]"),
-                 return ge::GRAPH_FAILED);
+                OP_LOGE_WITH_INVALID_ATTR(
+                    opName_, "alpha", std::to_string(*opParamInfo_.alpha).c_str(),
+                    ("(" + std::to_string(ALPHA_MIN) + ", " + std::to_string(ALPHA_MAX) + "]").c_str()),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(!IsFloatEqual(*opParamInfo_.kBlockNumRateMedium, K_BLOCK_NUM_RATE_MEDIUM_LIMIT),
                 OP_LOGE_WITH_INVALID_ATTR(opName_, "k_block_num_rate_medium",
                                           std::to_string(*opParamInfo_.kBlockNumRateMedium).c_str(),
@@ -171,7 +173,9 @@ ge::graphStatus StemIndexerInfoParser::GetAndCheckAttrParaInfo()
                     *opParamInfo_.topkScorePrecision != TOPK_SCORE_PRECISION_UINT16,
                 OP_LOGE_WITH_INVALID_ATTR(opName_, "topk_score_precision",
                                           std::to_string(*opParamInfo_.topkScorePrecision).c_str(),
-                                          "1(uint32) or 2(uint16)"),
+                                          (std::to_string(TOPK_SCORE_PRECISION_UINT32) + "(uint32) or " +
+                                           std::to_string(TOPK_SCORE_PRECISION_UINT16) + "(uint16)")
+                                              .c_str()),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -264,9 +268,8 @@ ge::graphStatus StemIndexerInfoParser::GetAndCheckInOutDataType()
     outputType_ = opParamInfo_.sparseIndicesOut.desc->GetDataType();
     seqLenType_ = opParamInfo_.qSeqLens.desc->GetDataType();
     metadataType_ = opParamInfo_.metadata.desc->GetDataType();
-    const ge::DataType numPromptType = useKvSeqLensAsNumPrompt_
-                                           ? opParamInfo_.kvSeqLens.desc->GetDataType()
-                                           : opParamInfo_.numPromptTokens.desc->GetDataType();
+    const auto promptDesc = useKvSeqLensAsNumPrompt_ ? opParamInfo_.kvSeqLens.desc : opParamInfo_.numPromptTokens.desc;
+    const ge::DataType numPromptType = promptDesc->GetDataType();
 
     OP_CHECK_IF(inputQType_ != ge::DT_BF16 || inputKType_ != ge::DT_BF16,
                 OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
@@ -283,7 +286,7 @@ ge::graphStatus StemIndexerInfoParser::GetAndCheckInOutDataType()
                     opName_, "q_seq_lens, kv_seq_lens and num_prompt_tokens",
                     (Ops::Base::ToString(seqLenType_) + ", " +
                      Ops::Base::ToString(opParamInfo_.kvSeqLens.desc->GetDataType()) + " and " +
-                      Ops::Base::ToString(numPromptType))
+                     Ops::Base::ToString(numPromptType))
                         .c_str(),
                     "The dtypes of input q_seq_lens, kv_seq_lens and num_prompt_tokens should be INT32"),
                 return ge::GRAPH_FAILED);
@@ -372,15 +375,23 @@ ge::graphStatus StemIndexerInfoParser::GetBaseShapeInfo()
                         .c_str(),
                     "The batch, maxQb and maxKb dimensions should be greater than 0"),
                 return ge::GRAPH_FAILED);
+    OP_CHECK_IF(bSize_ > BATCH_SIZE_LIMIT,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "qflat", Ops::Base::ToString(opParamInfo_.qflat.shape->GetStorageShape()).c_str(),
+                    "The batch dimension of input qflat should be less than or equal to " +
+                        std::to_string(BATCH_SIZE_LIMIT)),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(!IsSupportedQHeadNum(qHeadNum_),
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                     opName_, "qflat", Ops::Base::ToString(opParamInfo_.qflat.shape->GetStorageShape()).c_str(),
-                    "The q_heads dimension of input qflat should be 32 or 64"),
+                    "The q_heads dimension of input qflat should be " + std::to_string(Q_HEAD_NUM_32) + " or " +
+                        std::to_string(Q_HEAD_NUM_64)),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(!IsSupportedKvHeadNum(kvHeadNum_),
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                     opName_, "kflat", Ops::Base::ToString(opParamInfo_.kflat.shape->GetStorageShape()).c_str(),
-                    "The kv_heads dimension of input kflat should be 2, 4 or 8"),
+                    "The kv_heads dimension of input kflat should be " + std::to_string(KV_HEAD_NUM_2) + ", " +
+                        std::to_string(KV_HEAD_NUM_4) + " or " + std::to_string(KV_HEAD_NUM_8)),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(qHeadNum_ % kvHeadNum_ != 0,
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
@@ -395,7 +406,7 @@ ge::graphStatus StemIndexerInfoParser::GetBaseShapeInfo()
     OP_CHECK_IF(headDim_ != HEAD_DIM_LIMIT,
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                     opName_, "qflat", Ops::Base::ToString(opParamInfo_.qflat.shape->GetStorageShape()).c_str(),
-                    "The last dimension of input qflat should be 2048"),
+                    "The last dimension of input qflat should be " + std::to_string(HEAD_DIM_LIMIT)),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

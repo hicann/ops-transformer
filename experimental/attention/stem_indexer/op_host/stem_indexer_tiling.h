@@ -68,6 +68,7 @@ constexpr uint32_t DIM_NUM_FOUR = 4;
 constexpr uint32_t STEM_BLOCK_SIZE_LIMIT = 128;
 constexpr uint32_t STEM_STRIDE_LIMIT = 16;
 constexpr uint32_t HEAD_DIM_LIMIT = 2048;
+constexpr uint32_t BATCH_SIZE_LIMIT = 65536U;
 constexpr uint32_t INITIAL_BLOCKS_LIMIT = 4;
 constexpr uint32_t WINDOW_SIZE_LIMIT = 4;
 constexpr uint64_t STEM_INDEXER_METADATA_HEADER_ELEMS = 16U;

@@ -78,7 +78,8 @@ npu_stem_indexer_npu(const at::Tensor &qflat, const at::Tensor &kflat, const at:
                 "The last dimensions of qflat and kflat must be equal.");
     TORCH_CHECK(topk_score_precision == TOPK_SCORE_PRECISION_UINT32 ||
                     topk_score_precision == TOPK_SCORE_PRECISION_UINT16,
-                "topk_score_precision must be 1(uint32) or 2(uint16), but got ", topk_score_precision, ".");
+                "topk_score_precision must be ", TOPK_SCORE_PRECISION_UINT32, "(uint32) or ",
+                TOPK_SCORE_PRECISION_UINT16, "(uint16), but got ", topk_score_precision, ".");
 
     // construct the output tensors
     std::tuple<at::Tensor, at::Tensor> outputs = construct_stem_output_tensors(qflat, kflat);
@@ -105,7 +106,8 @@ npu_stem_indexer_meta(const at::Tensor &qflat, const at::Tensor &kflat, const at
 {
     TORCH_CHECK(topk_score_precision == TOPK_SCORE_PRECISION_UINT32 ||
                     topk_score_precision == TOPK_SCORE_PRECISION_UINT16,
-                "topk_score_precision must be 1(uint32) or 2(uint16), but got ", topk_score_precision, ".");
+                "topk_score_precision must be ", TOPK_SCORE_PRECISION_UINT32, "(uint32) or ",
+                TOPK_SCORE_PRECISION_UINT16, "(uint16), but got ", topk_score_precision, ".");
     return construct_stem_output_tensors(qflat, kflat);
 }
 } // namespace custom

@@ -146,7 +146,7 @@ torch.ops.custom.npu_stem_indexer(
 
 ### 一致性约束
 
-- `B`、`max_Qb`和`max_Kb`必须大于0。
+- `B`的取值范围为`[1, 65536]`，`max_Qb`和`max_Kb`必须大于0。
 - `N1`仅支持32或64，`N2`仅支持2、4或8，并满足`N1 % N2 == 0`。
 - `qflat`和`kflat`的Batch维、最后一维必须一致，最后一维固定为2048。
 - `vbias`的shape必须为`(B,N2,max_Kb)`，与`kflat`对应维度一致。

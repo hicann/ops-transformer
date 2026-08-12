@@ -48,8 +48,10 @@ class StemIndexerSpec:
     }
 
     @staticmethod
-    def compare(*outputs, **kwargs):
-        return _load_impl_module("compare").compare(*outputs, **kwargs)
+    def compare(*outputs, compare_context=None, **kwargs):
+        return _load_impl_module("compare").compare(
+            *outputs, compare_context=compare_context, **kwargs
+        )
 
 
 __spec__ = {
