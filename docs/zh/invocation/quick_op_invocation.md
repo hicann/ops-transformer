@@ -46,7 +46,7 @@
   - \$\{pkg_mode\}：表示包模式，目前仅支持cust，即自定义算子包。
   - \$\{example_name\}（可选）：表示待执行样例名，名称为各个算子examples文件夹下的文件名称，去掉`test_aclnn_`前缀和`.cpp`后缀。
   - \$\{vendor\_name\}（可选）：与构建的自定义算子包设置一致，默认名为custom。
-  - \$\{soc_version\}（可选）：表示NPU型号，默认"ascend910b"。当设置为"ascend950"时会运行"arch35"目录下的示例文件。
+  - \$\{soc_version\}（可选）：表示NPU型号，默认"ascend910b"。当设置为"ascend950"时会运行"arch35"目录下的示例文件。产品名对应的取值参考[SoC 取值映射表](../../QUICKSTART.md#soc-version-mapping)，请按实际场景传参。
   - \$\{simulator\}（可选）：表示仿真模式，目前仅支持eager（aclnn调用）场景下使用。仿真模式下，会根据soc_version链接对应的仿真库。
   - \$\{experimental\}（可选）：表示执行用户保存在experimental贡献目录下的算子。
 
@@ -62,7 +62,7 @@
 
   - \$\{op\}：表示待执行算子，算子名为小写下划线形式，如flash_attention_score。
   - \$\{mode\}：表示算子执行模式，目前支持eager（aclnn调用）、graph（图模式调用）。
-  - \$\{soc_version\}（可选）：表示NPU型号，默认"ascend910b"。当设置为"ascend950"时会运行"arch35"目录下的示例文件。
+  - \$\{soc_version\}（可选）：表示NPU型号，默认"ascend910b"。当设置为"ascend950"时会运行"arch35"目录下的示例文件。产品名对应的取值参考[SoC 取值映射表](../../QUICKSTART.md#soc-version-mapping)，请按实际场景传参。
 
 - 基于**ops-transformer静态库**执行算子样例：
 

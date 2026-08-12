@@ -55,11 +55,15 @@
 bash build.sh --pkg --soc=${soc_version} --ops=add_example -j16
 ```
 
+**SoC 取值映射表**<a id="soc-version-mapping"></a>
+
 产品名对应的${soc_version}取值如下，请按实际场景传参。
 
-- Atlas A2 训练系列产品/Atlas A2 推理系列产品：取值为ascend910b
-- Atlas A3 训练系列产品/Atlas A3 推理系列产品：取值为ascend910_93
-- 950系列产品：取值为ascend950
+| 产品系列 | ${soc_version} 取值 |
+| -------- | ------------------- |
+| Atlas A2 系列（训练/推理） | ascend910b |
+| Atlas A3 系列（训练/推理） | ascend910_93 |
+| 950 系列 | ascend950 |
 
 若提示如下信息，说明编译成功。
 
@@ -140,8 +144,10 @@ __aicore__ inline void AddExample<T>::Compute(int32_t progress)
     先回到项目根目录，编译命令如下：
 
     ```bash
-    bash build.sh --pkg --soc=ascend910b --ops=add_example -j16
+    bash build.sh --pkg --soc=${soc_version} --ops=add_example -j16
     ```
+
+    产品名对应的${soc_version}取值参考[SoC 取值映射表](#soc-version-mapping)，请按实际场景传参。
 
 2. **重新安装**：
 
