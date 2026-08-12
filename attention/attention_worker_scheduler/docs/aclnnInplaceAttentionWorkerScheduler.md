@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：Attention和FFN分离部署场景下，Attention侧数据扫描算子。该算子接收来自FFNToAttention算子的输出数据，并对数据进行逐步扫描，确保数据准备就绪。
+- **接口功能**：Attention和FFN分离部署场景下，Attention侧数据扫描算子。该算子接收来自FFNToAttention算子的输出数据，并对数据进行逐步扫描，确保数据准备就绪。
 
   **该算子不建议单独使用，建议与FFNToAttention和AttentionWorkerCombine算子配合使用，形成完整的工作流。**
 
@@ -33,7 +33,7 @@
 
     3. 数据全部准备就绪后，后续可供AttentionWorkerCombine算子使用。
 
-- 计算公式：
+- **计算公式**：
 
   $$
   \text{Initialize:} \quad \text{ready\_count} = 0, \quad \text{flag\_num} = \text{micro\_batch\_size} \times \text{selected\_expert\_num}
