@@ -193,36 +193,6 @@ ge::graphStatus FiaTilingNonQuantArch35::DoOpTiling()
     OP_CHECK_IF(SetPlatMemoryInfo() != ge::GRAPH_SUCCESS, OP_LOGE(fiaInfo_->opName, "Set plat memory info fail."),
                 return ge::GRAPH_FAILED);
 
-    if (fiaInfo_->emptyTensorFlag) {
-        int64_t outSize = fiaInfo_->opParamInfo.attenOut.shape->GetStorageShape().GetShapeSize();
-        int64_t lseSize =
-            fiaInfo_->softmaxLseFlag ? fiaInfo_->opParamInfo.lseOut.shape->GetStorageShape().GetShapeSize() : 0;
-        uint32_t singleCoreSize = (outSize + platformInfo_.aivNum - 1) / (platformInfo_.aivNum);
-        if (fiaInfo_->isOutQuantEnable) {
-            singleCoreSize = AlignUp(singleCoreSize, 2U);
-        }
-        tilingData_.baseTiling.fiaEmptyTensorParams.singleCoreSize = singleCoreSize;
-        tilingData_.baseTiling.fiaEmptyTensorParams.totalOutputSize = outSize;
-        tilingData_.baseTiling.fiaEmptyTensorParams.totalSoftMaxLseOutputSize = lseSize;
-        tilingData_.baseTiling.fiaEmptyTensorParams.needInit = 1;
-
-        tilingKeyInfo_.emptyTensor = true;
-        tilingKey_ = GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.config, tilingKeyInfo_.pseMode,
-                                        tilingKeyInfo_.quantMode, tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.hasRope,
-                                        tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd, tilingKeyInfo_.emptyTensor,
-                                        tilingKeyInfo_.enableKvPrefix, tilingKeyInfo_.enableS1OutSplit);
-
-        workspaceSize_ = platformInfo_.defaultSysWorkspaceSize;
-        CalcNumBlocks(platformInfo_.aicNum);
-
-        if ((SetNumBlocks(numBlocks_) != ge::GRAPH_SUCCESS) || (SetTilingKey(tilingKey_) != ge::GRAPH_SUCCESS) ||
-            (SetWorkspaceSize(workspaceSize_) != ge::GRAPH_SUCCESS) ||
-            (SetTilingData(tilingData_) != ge::GRAPH_SUCCESS)) {
-            return ge::GRAPH_FAILED;
-        }
-        return ge::GRAPH_SUCCESS;
-    }
-
     if (fiaInfo_->isMaxWorkspace) {
         // tiling下沉场景，无法获取到actual_seq，分核结果未知，workspace设置成最大
         CalcMaxWorkspaceSize();
@@ -1023,5 +993,5 @@ void FiaTilingNonQuantArch35::PrintAllTilingData()
 // 3. 个位代表特化模板到泛化模板的优先级排序
 REGISTER_TILING_TEMPLATE_FIA(FusedInferAttentionScore, FiaTilingNonQuantArch35,
                              std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510)}),
-                             28); // 29改28，注册时未区分npu arch，会存在多重定义
+                             28);
 } // namespace optiling
