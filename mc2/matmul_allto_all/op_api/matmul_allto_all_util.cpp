@@ -29,7 +29,7 @@ namespace matmul_allto_all_check {
 using namespace op;
 
 // 校验AlltoAll和Permute数据交换的方向参数, 可以为空和{-1,-2}, 不允许为其他值
-bool CheckAlltoAllAxes(const aclIntArray *alltoAllAxesOptional, bool isMatmulAlltoAll)
+bool CheckAlltoAllAxes(const char *opName, const aclIntArray *alltoAllAxesOptional, bool isMatmulAlltoAll)
 {
     // alltoAllAxesOptional为空时会兼容性处理，不报错
     if (alltoAllAxesOptional == nullptr) {
@@ -39,7 +39,7 @@ bool CheckAlltoAllAxes(const aclIntArray *alltoAllAxesOptional, bool isMatmulAll
     uint64_t alltoallAxesSize = 0U; // alltoallAxes的大小
     aclGetIntArraySize(alltoAllAxesOptional, &alltoallAxesSize);
     if (alltoallAxesSize != TWO_DIMS) {
-        OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "alltoAllAxesOptional.size()",
+        OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional.size()",
                                   std::to_string(alltoallAxesSize).c_str(), "2");
         return false;
     }
@@ -47,23 +47,23 @@ bool CheckAlltoAllAxes(const aclIntArray *alltoAllAxesOptional, bool isMatmulAll
     int64_t data2 = (*alltoAllAxesOptional)[1];
     if (isMatmulAlltoAll) {
         OP_API_CHECK((data1 != NEG_ONE), {
-            OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "alltoAllAxesOptional[0]", std::to_string(data1).c_str(),
+            OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional[0]", std::to_string(data1).c_str(),
                                       "-1");
             return false;
         });
         OP_API_CHECK((data2 != NEG_TWO), {
-            OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "alltoAllAxesOptional[1]", std::to_string(data2).c_str(),
+            OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional[1]", std::to_string(data2).c_str(),
                                       "-2");
             return false;
         });
     } else {
         OP_API_CHECK((data1 != NEG_TWO), {
-            OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "alltoAllAxesOptional[0]", std::to_string(data1).c_str(),
+            OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional[0]", std::to_string(data1).c_str(),
                                       "-2");
             return false;
         });
         OP_API_CHECK((data2 != NEG_ONE), {
-            OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "alltoAllAxesOptional[1]", std::to_string(data2).c_str(),
+            OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional[1]", std::to_string(data2).c_str(),
                                       "-1");
             return false;
         });
@@ -72,25 +72,25 @@ bool CheckAlltoAllAxes(const aclIntArray *alltoAllAxesOptional, bool isMatmulAll
 }
 
 // 校验输入的转置配置，x1不允许转置
-bool CheckTransposeX1(bool transposeX1)
+bool CheckTransposeX1(const char *opName, bool transposeX1)
 {
     OP_API_CHECK(transposeX1, {
-        OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "transposeX1", "true", "false");
+        OP_LOGE_FOR_INVALID_VALUE(opName, "transposeX1", "true", "false");
         return false;
     });
     return true;
 }
 
 // 校验通信域名的字符串长度是否符合要求
-bool CheckGroupLength(const char *group)
+bool CheckGroupLength(const char *opName, const char *group)
 {
     if (group == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT("matmul_allto_all", "group");
+        OP_LOGE_WITH_INVALID_INPUT(opName, "group");
         return false;
     }
     auto len = strnlen(group, MAX_GROUP_LEN);
     if ((len >= MAX_GROUP_LEN) || (len == ZERO)) {
-        OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "group.length()", std::to_string(len).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(opName, "group.length()", std::to_string(len).c_str(),
                                   "in range (0, 128)");
         return false;
     }
@@ -98,23 +98,23 @@ bool CheckGroupLength(const char *group)
 }
 
 // 校验输入tensor的维度
-bool CheckInputDimensions(const aclTensor *x1, const aclTensor *x2, const aclTensor *output,
+bool CheckInputDimensions(const char *opName, const aclTensor *x1, const aclTensor *x2, const aclTensor *output,
                           const aclTensor *alltoAllOutOptional = nullptr)
 {
     if (x1->GetViewShape().GetDimNum() != TWO_DIMS) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("matmul_allto_all", "x1",
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "x1",
                                                  (std::to_string(x1->GetViewShape().GetDimNum()) + "D").c_str(),
                                                  "The shape of x1 must be 2D.");
         return false;
     }
     if (x2->GetViewShape().GetDimNum() != TWO_DIMS) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("matmul_allto_all", "x2",
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "x2",
                                                  (std::to_string(x2->GetViewShape().GetDimNum()) + "D").c_str(),
                                                  "The shape of x2 must be 2D.");
         return false;
     }
     if (output->GetViewShape().GetDimNum() != TWO_DIMS) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("matmul_allto_all", "output",
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "output",
                                                  (std::to_string(output->GetViewShape().GetDimNum()) + "D").c_str(),
                                                  "The shape of output must be 2D.");
         return false;
@@ -122,7 +122,7 @@ bool CheckInputDimensions(const aclTensor *x1, const aclTensor *x2, const aclTen
     if (alltoAllOutOptional != nullptr) {
         if (alltoAllOutOptional->GetViewShape().GetDimNum() != TWO_DIMS) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                "matmul_allto_all", "alltoAllOutOptional",
+                opName, "alltoAllOutOptional",
                 (std::to_string(alltoAllOutOptional->GetViewShape().GetDimNum()) + "D").c_str(),
                 "The shape of alltoAllOutOptional must be 2D.");
             return false;
@@ -132,19 +132,19 @@ bool CheckInputDimensions(const aclTensor *x1, const aclTensor *x2, const aclTen
 }
 
 // 校验bias的维度和shape
-bool CheckBiasShape(const aclTensor *biasOptional, int64_t nVal)
+bool CheckBiasShape(const char *opName, const aclTensor *biasOptional, int64_t nVal)
 {
     if (biasOptional != nullptr) {
         if (biasOptional->GetViewShape().GetDimNum() != ONE_DIM) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                "matmul_allto_all", "biasOptional",
+                opName, "biasOptional",
                 (std::to_string(biasOptional->GetViewShape().GetDimNum()) + "D").c_str(),
                 "The shape of biasOptional must be 1D.");
             return false;
         }
         auto biasDim = biasOptional->GetViewShape().GetDim(0);
         if (biasDim != nVal) {
-            OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "group.length()", std::to_string(biasDim).c_str(),
+            OP_LOGE_FOR_INVALID_VALUE(opName, "group.length()", std::to_string(biasDim).c_str(),
                                       ("should equal x2.n-axis " + std::to_string(nVal)).c_str());
             return false;
         }
@@ -153,10 +153,10 @@ bool CheckBiasShape(const aclTensor *biasOptional, int64_t nVal)
 }
 
 // 校验MatmulAlltoAll和QuantMatmulAlltoAll输入属性shape
-bool CheckShapeMMAA(const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, bool transposeX2,
-                    const aclTensor *output)
+bool CheckShapeMMAA(const char *opName, const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional,
+                    bool transposeX2, const aclTensor *output)
 {
-    if (!CheckInputDimensions(x1, x2, output)) {
+    if (!CheckInputDimensions(opName, x1, x2, output)) {
         return false;
     }
     auto kdimX1 = x1->GetViewShape().GetDim(1);
@@ -167,28 +167,28 @@ bool CheckShapeMMAA(const aclTensor *x1, const aclTensor *x2, const aclTensor *b
             x2->GetViewShape().GetDim(1));
 
     if (kdimX1 != kdimX2) {
-        OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "group.length()", std::to_string(kdimX1).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(opName, "group.length()", std::to_string(kdimX1).c_str(),
                                   ("should equal x2.dimK " + std::to_string(kdimX2)).c_str());
         return false;
     }
     if (kdimX1 < KVALUE_MIN || kdimX1 > KVALUE_MAX) {
-        OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "group.length()", std::to_string(kdimX1).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(opName, "group.length()", std::to_string(kdimX1).c_str(),
                                   "in range [1, 65535]");
         return false;
     }
     auto nVal = transposeX2 ? x2->GetViewShape().GetDim(0) : x2->GetViewShape().GetDim(1);
-    return CheckBiasShape(biasOptional, nVal);
+    return CheckBiasShape(opName, biasOptional, nVal);
 }
 
 // 校验AlltoAllMatmul和AlltoAllQuantMatmul输入属性shape
-bool CheckShapeAAMM(const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, bool transposeX2,
-                    const aclTensor *output, const aclTensor *alltoAllOutOptional)
+bool CheckShapeAAMM(const char *opName, const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional,
+                    bool transposeX2, const aclTensor *output, const aclTensor *alltoAllOutOptional)
 {
-    if (!CheckInputDimensions(x1, x2, output, alltoAllOutOptional)) {
+    if (!CheckInputDimensions(opName, x1, x2, output, alltoAllOutOptional)) {
         return false;
     }
     auto nVal = transposeX2 ? x2->GetViewShape().GetDim(0) : x2->GetViewShape().GetDim(1);
-    return CheckBiasShape(biasOptional, nVal);
+    return CheckBiasShape(opName, biasOptional, nVal);
 }
 
 // 检查tensor是否连续
@@ -215,18 +215,18 @@ bool IsTransposeLastTwoDims(const aclTensor *tensor)
 }
 
 // 检查x2是否合法
-aclnnStatus CheckX2Valid(const aclTensor *x2)
+aclnnStatus CheckX2Valid(const char *opName, const aclTensor *x2)
 {
     if (x2 == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT("matmul_allto_all", "x2");
+        OP_LOGE_WITH_INVALID_INPUT(opName, "x2");
         return ACLNN_ERR_PARAM_NULLPTR;
     }
     if (x2->IsEmpty()) {
-        OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "x2", "empty tensor", "non-empty tensor");
+        OP_LOGE_FOR_INVALID_VALUE(opName, "x2", "empty tensor", "non-empty tensor");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (x2->GetViewShape().GetDimNum() != TWO_DIMS) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("matmul_allto_all", "x2",
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "x2",
                                                  (std::to_string(x2->GetViewShape().GetDimNum()) + "D").c_str(),
                                                  "The shape of x2 must be 2D.");
         return ACLNN_ERR_PARAM_INVALID;
@@ -235,7 +235,8 @@ aclnnStatus CheckX2Valid(const aclTensor *x2)
 }
 
 // 检查commMode参数是否合法，并获取commMode对应枚举值
-aclnnStatus CheckAndHandleCommMode(const char *group, const char *commModeStr, uint8_t &commModeEnum)
+aclnnStatus CheckAndHandleCommMode(const char *opName, const char *group, const char *commModeStr,
+                                   uint8_t &commModeEnum)
 {
     const size_t maxLength = 7UL;
     // 获取通信引擎参数
@@ -245,18 +246,18 @@ aclnnStatus CheckAndHandleCommMode(const char *group, const char *commModeStr, u
         } else if (strncmp(commModeStr, "ccu", maxLength) == 0) {
             commModeEnum = Mc2Comm::COMM_MODE_CCU;
         } else {
-            OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "commMode", commModeStr, "\"ccu\" or \"ai_cpu\"");
+            OP_LOGE_FOR_INVALID_VALUE(opName, "commMode", commModeStr, "\"ccu\" or \"ai_cpu\"");
             return ACLNN_ERR_PARAM_INVALID;
         }
         OP_LOGD("The commMode is [%s].", commModeStr);
     } else if (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910_93) {
         if (strncmp(commModeStr, "ai_cpu", maxLength) != 0) {
-            OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "commMode", commModeStr, "\"ai_cpu\"");
+            OP_LOGE_FOR_INVALID_VALUE(opName, "commMode", commModeStr, "\"ai_cpu\"");
             return ACLNN_ERR_PARAM_INVALID;
         }
     } else if (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B) {
         if (strncmp(commModeStr, "aiv", maxLength) != 0) {
-            OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "commMode", commModeStr, "\"aiv\"");
+            OP_LOGE_FOR_INVALID_VALUE(opName, "commMode", commModeStr, "\"aiv\"");
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
@@ -265,13 +266,13 @@ aclnnStatus CheckAndHandleCommMode(const char *group, const char *commModeStr, u
 }
 
 // 检查是否有alltoallout输出
-bool IsAll2AllOut(const aclTensor *alltoAllOut)
+bool IsAll2AllOut(const char *opName, const aclTensor *alltoAllOut)
 {
     if (alltoAllOut == nullptr) {
         return false;
     }
     if (alltoAllOut->IsEmpty() && op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201) {
-        OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "alltoAllOutOptional", "empty tensor", "non-empty tensor");
+        OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllOutOptional", "empty tensor", "non-empty tensor");
         return false;
     }
     return true;

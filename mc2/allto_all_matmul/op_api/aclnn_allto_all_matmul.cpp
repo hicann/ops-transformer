@@ -37,6 +37,6 @@ extern "C" aclnnStatus aclnnAlltoAllMatmulGetWorkspaceSize(const aclTensor *x1, 
 extern "C" aclnnStatus aclnnAlltoAllMatmul(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                            aclrtStream stream)
 {
-    OP_LOGD("aclnnMatmulAlltoAll start");
+    OP_LOGD("aclnnAlltoAllMatmul start");
     return aclnnAlltoAllMatmulBase(workspace, workspaceSize, executor, stream);
 }

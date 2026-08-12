@@ -87,32 +87,34 @@ enum class QuantModeType : int64_t {
 
 // 校验AlltoAll和Permute数据交换的方向参数, 在alltoallmatmul中可以为空和{-1,-2}, 在matmulalltoall中可以为空和{-2,-1},
 // 不允许为其他值
-bool CheckAlltoAllAxes(const aclIntArray *alltoAllAxesOptional, bool isMatmulAlltoAll);
+bool CheckAlltoAllAxes(const char *opName, const aclIntArray *alltoAllAxesOptional, bool isMatmulAlltoAll);
 
 // 校验输入的转置配置，x1不允许转置
-bool CheckTransposeX1(bool transposeX1);
+bool CheckTransposeX1(const char *opName, bool transposeX1);
 
 // 校验通信域名的字符串长度是否符合要求
-bool CheckGroupLength(const char *group);
+bool CheckGroupLength(const char *opName, const char *group);
 
 // 校验MatmulAlltoAll和QuantMatmulAlltoAll输入属性shape
-bool CheckShapeMMAA(const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, bool transposeX2,
-                    const aclTensor *output);
+bool CheckShapeMMAA(const char *opName, const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional,
+                    bool transposeX2, const aclTensor *output);
 // 校验AlltoAllMatmul和AlltoAllQuantMatmul输入属性shape
-bool CheckShapeAAMM(const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, bool transposeX2,
-                    const aclTensor *output, const aclTensor *alltoAllOutOptional);
+bool CheckShapeAAMM(const char *opName, const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional,
+                    bool transposeX2, const aclTensor *output, const aclTensor *alltoAllOutOptional);
 
 // 检查tensor是否连续
 bool IsTransposeLastTwoDims(const aclTensor *tensor);
 
 // 检查x2是否合法，空指针、空tensor和维度
-aclnnStatus CheckX2Valid(const aclTensor *x2);
+aclnnStatus CheckX2Valid(const char *opName, const aclTensor *x2);
 
 // 检查commMode参数是否合法，并获取commMode对应枚举值
-aclnnStatus CheckAndHandleCommMode(const char *group, const char *commModeStr, uint8_t &commModeEnum);
+// opName 用于日志中标识调用方算子名，由各调用方显式传入
+aclnnStatus CheckAndHandleCommMode(const char *opName, const char *group, const char *commModeStr,
+                                   uint8_t &commModeEnum);
 
 // 检查是否有alltoallout输出
-bool IsAll2AllOut(const aclTensor *alltoAllOut);
+bool IsAll2AllOut(const char *opName, const aclTensor *alltoAllOut);
 
 // 处理支持转置的tensor物理排布不连续问题
 aclTensor *TransX2Tensor(const aclTensor *x2);

@@ -241,7 +241,7 @@ static ge::graphStatus GetQuantMatmulPara(const gert::OpExecuteContext *host_api
  */
 static ge::graphStatus AlltoAllMatmulExecuteFunc(gert::OpExecuteContext *host_api_ctx)
 {
-    OPS_LOG_D(AlltoAllMatmulInfo, "Start to fallback for matmul_allto_all.");
+    OPS_LOG_D(AlltoAllMatmulInfo, "Start to fallback for allto_all_matmul.");
     OPS_ERR_IF(host_api_ctx == nullptr, OPS_LOG_E(AlltoAllMatmulInfo, "host_api_ctx is null"), return ge::GRAPH_FAILED);
     const gert::RuntimeAttrs *attrs = host_api_ctx->GetAttrs();
     OPS_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "attrs"),

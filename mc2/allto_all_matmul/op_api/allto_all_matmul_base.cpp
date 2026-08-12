@@ -94,7 +94,7 @@ static bool CheckAllDtypesValid(const aclTensor *x1, const aclTensor *x2, const 
     OP_CHECK_DTYPE_NOT_SAME(x1, output, return false);
     if (biasOptional != nullptr) {
         if (biasOptional->GetDataType() != op::DataType::DT_FLOAT && biasOptional->GetDataType() != x1->GetDataType()) {
-            OP_LOGE_WITH_INVALID_INPUT_DTYPE("aclnnMatmulAlltoAll", "bias",
+            OP_LOGE_WITH_INVALID_INPUT_DTYPE("aclnnAlltoAllMatmul", "bias",
                                              op::ToString(biasOptional->GetDataType()).GetString(),
                                              "x1Dtype or float32");
             return false;
@@ -192,7 +192,8 @@ static aclnnStatus CheckAndHandleParams(const aclTensor *x1, const aclTensor *x2
     // 2. 检查空tensor
     CHECK_RET(CheckNotEmptyTensor(x1, x2, transposeX2), ACLNN_ERR_PARAM_INVALID);
     // 3. 检查shape
-    CHECK_RET(CheckShapeAAMM(x1, x2, biasOptional, transposeX2, output, alltoAllOutOptional), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckShapeAAMM("allto_all_matmul", x1, x2, biasOptional, transposeX2, output, alltoAllOutOptional),
+              ACLNN_ERR_PARAM_INVALID);
     // 4. 检查输入的数据类型是否在API支持的数据类型范围之内，需要根据api定义校验
     CHECK_RET(CheckAllDtypesValid(x1, x2, biasOptional, output, alltoAllOutOptional), ACLNN_ERR_PARAM_INVALID);
     // 5. 检查输入的数据格式是否为ND
@@ -200,11 +201,11 @@ static aclnnStatus CheckAndHandleParams(const aclTensor *x1, const aclTensor *x2
     // 6. 兼容性处理非ND格式
     CHECK_RET(ReFormatNotND(x1, x2, biasOptional, output, alltoAllOutOptional), ACLNN_ERR_PARAM_INVALID);
     // 7. 检查alltoallAxes是否为空或者[-2,-1]
-    CHECK_RET(CheckAlltoAllAxes(alltoAllAxesOptional, false), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckAlltoAllAxes("allto_all_matmul", alltoAllAxesOptional, false), ACLNN_ERR_PARAM_INVALID);
     // 8. 检查transposeX1是否合法, 目前不能为true
-    CHECK_RET(CheckTransposeX1(transposeX1), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckTransposeX1("allto_all_matmul", transposeX1), ACLNN_ERR_PARAM_INVALID);
     // 9. 检查group长度是否小于等于128
-    CHECK_RET(CheckGroupLength(group), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckGroupLength("allto_all_matmul", group), ACLNN_ERR_PARAM_INVALID);
     // 检查commMode非空指针
     if (commMode == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "commMode should not be nullptr.");
@@ -261,10 +262,10 @@ extern "C" aclnnStatus InnerAlltoAllMatmulGetWorkspaceSize(
     OP_LOGD("AlltoAllMatmul commmode0 is . %s", commMode);
     char *str_commMode = const_cast<char *>(commMode);
     OP_LOGD("AlltoAllMatmul commmode1 is . %s", str_commMode);
-    bool all2AllOutFlag = IsAll2AllOut(alltoAllOutOptional);
+    bool all2AllOutFlag = IsAll2AllOut("allto_all_matmul", alltoAllOutOptional);
 
     uint8_t commModeEnum = 0;
-    aclnnStatus checkCommModeRet = CheckAndHandleCommMode(group, commMode, commModeEnum);
+    aclnnStatus checkCommModeRet = CheckAndHandleCommMode("allto_all_matmul", group, commMode, commModeEnum);
     CHECK_RET(checkCommModeRet == ACLNN_SUCCESS, checkCommModeRet);
     OP_LOGD("AlltoAllMatmul commmode2 is . %s", str_commMode);
 
@@ -277,7 +278,7 @@ extern "C" aclnnStatus InnerAlltoAllMatmulGetWorkspaceSize(
 
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_INNER,
-                "This is an error in launch aicore, aclnnMatmulAlltoAllBaseGetWorkspaceSize interface call failed.");
+                "This is an error in launch aicore, aclnnAlltoAllMatmulBaseGetWorkspaceSize interface call failed.");
     }
 
     if (ret == ACLNN_SUCCESS && *executor != nullptr) {
@@ -295,7 +296,7 @@ extern "C" aclnnStatus aclnnAlltoAllMatmulBaseGetWorkspaceSize(
     const aclTensor *alltoAllOutOptional, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     // 处理非连续Tensor，目前只有支持转置的x2涉及该处理
-    aclnnStatus checkX2Ret = CheckX2Valid(x2);
+    aclnnStatus checkX2Ret = CheckX2Valid("allto_all_matmul", x2);
     CHECK_RET(checkX2Ret == ACLNN_SUCCESS, checkX2Ret);                  // 先检查x2是否合法，避免非法操作
     auto transX2 = x2;                                                   // 复制一个x2
     if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) { // 只有当非连续时，才会涉及到转连续等情况
@@ -331,7 +332,7 @@ extern "C" aclnnStatus aclnnAlltoAllMatmulBaseGetWorkspaceSize(
     }
 
     uint8_t commModeEnum = 0;
-    aclnnStatus checkCommModeRet = CheckAndHandleCommMode(group, commMode, commModeEnum);
+    aclnnStatus checkCommModeRet = CheckAndHandleCommMode("allto_all_matmul", group, commMode, commModeEnum);
     CHECK_RET(checkCommModeRet == ACLNN_SUCCESS, checkCommModeRet);
 
     aclnnStatus ret = InnerAlltoAllMatmulGetWorkspaceSize(x1, transX2, biasOptional, alltoAllAxesOptional, group,
