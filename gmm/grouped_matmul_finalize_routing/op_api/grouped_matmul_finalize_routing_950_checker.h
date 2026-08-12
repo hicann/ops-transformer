@@ -130,6 +130,7 @@ public:
         CHECK_RET(CheckDtypeValid(), ACLNN_ERR_PARAM_INVALID);
         // 3. 校验输入、输出参数维度
         CHECK_RET(CheckInputOutDims() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+        CHECK_RET(CheckAttrs() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
         // 4. 校验输入、输出shape参数
         CHECK_RET(CheckInputOutShape(), ACLNN_ERR_PARAM_INVALID);
         // 5. 校验输入、输出shape参数针对MXFP4
@@ -138,6 +139,31 @@ public:
         }
         // 6. 检查数据形状是否支持
         CHECK_RET(CheckFormat(), ACLNN_ERR_PARAM_INVALID);
+        return ACLNN_SUCCESS;
+    }
+
+    aclnnStatus CheckAttrs()
+    {
+        const std::string offsetNonnegativeReason = "sharedInputOffset must be greater than or equal to 0";
+        GMMFR_CHECK_REPORT(gmmParams_.groupListType == 0 || gmmParams_.groupListType == 1,
+                           return ACLNN_ERR_PARAM_INVALID,
+                           OP_LOGE_FOR_INVALID_VALUE(GMMFR_ACLNN_OP_NAME, "groupListType",
+                                                     std::to_string(gmmParams_.groupListType), "0 or 1"));
+        GMMFR_CHECK_REPORT(gmmParams_.shareInputOffset >= 0, return ACLNN_ERR_PARAM_INVALID,
+                           OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GMMFR_ACLNN_OP_NAME, "sharedInputOffset",
+                                                                 std::to_string(gmmParams_.shareInputOffset),
+                                                                 offsetNonnegativeReason));
+        int64_t batch = gmmParams_.out->GetViewShape().GetDim(ZERO_DIM);
+        const std::string offsetUpperReason =
+            "sharedInputOffset must be less than or equal to batch(" + std::to_string(batch) + ")";
+        GMMFR_CHECK_REPORT(gmmParams_.shareInputOffset <= batch, return ACLNN_ERR_PARAM_INVALID,
+                           OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                               GMMFR_ACLNN_OP_NAME, "sharedInputOffset",
+                               std::to_string(gmmParams_.shareInputOffset),
+                               offsetUpperReason));
+        GMMFR_CHECK_REPORT(!gmmParams_.transposeX1, return ACLNN_ERR_PARAM_INVALID,
+                           OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GMMFR_ACLNN_OP_NAME, "transposeX1", "true",
+                                                                 "x cannot be transposed on Ascend 950"));
         return ACLNN_SUCCESS;
     }
 
@@ -305,6 +331,18 @@ public:
         }
         if (gmmParams_.shareInput != nullptr) {
             int64_t bsdp = gmmParams_.shareInput->GetViewShape().GetDim(0);
+            int64_t batch = gmmParams_.out->GetViewShape().GetDim(0);
+            GMMFR_CHECK_REPORT(bsdp <= batch, return false,
+                               OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                                   GMMFR_ACLNN_OP_NAME, "shareInput", std::to_string(bsdp),
+                                   "shared_input_len must be less than or equal to batch(" +
+                                       std::to_string(batch) + ")"));
+            GMMFR_CHECK_REPORT(gmmParams_.shareInputOffset <= batch - bsdp, return false,
+                               OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                   GMMFR_ACLNN_OP_NAME, "sharedInputOffset",
+                                   std::to_string(gmmParams_.shareInputOffset),
+                                   "sharedInputOffset plus sharedInputLen must be less than or equal to batch(" +
+                                       std::to_string(batch) + ")"));
             op::Shape shareInputExpectShape = {bsdp, n};
             GMMFR_CHECK_SHAPE(gmmParams_.shareInput, "shareInput", shareInputExpectShape, return false);
         }
