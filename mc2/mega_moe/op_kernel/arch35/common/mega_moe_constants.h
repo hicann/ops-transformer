@@ -65,7 +65,7 @@ constexpr uint32_t L1_TILE_M_256 = 256U;
 constexpr uint32_t L1_TILE_M_128 = 128U;
 constexpr uint32_t L1_TILE_N = 256U;
 constexpr uint32_t L0_TILE_K = 128U;
-constexpr uint32_t SWIGLU_N_HALF = 2U;
+constexpr uint32_t ACTIVATION_N_HALF = 2U;
 } // namespace MegaMoeImpl
 
 #endif // MEGA_MOE_CONSTANTS_H

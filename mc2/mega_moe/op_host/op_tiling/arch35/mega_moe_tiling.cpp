@@ -193,11 +193,11 @@ void PrintWorkspaceInfo(const struct WorkspaceInfo *info, const char *nodeName)
 {
     OP_LOGD(nodeName, "dispatchRevDataPtr:         %ld\n", info->dispatchRevDataPtr);
     OP_LOGD(nodeName, "dispatchRevScalePtr:        %ld\n", info->dispatchRevScalePtr);
-    OP_LOGD(nodeName, "swigluQuantDataPtr:         %ld\n", info->swigluQuantDataPtr);
-    OP_LOGD(nodeName, "swigluQuantScalePtr:        %ld\n", info->swigluQuantScalePtr);
+    OP_LOGD(nodeName, "activationQuantDataPtr:         %ld\n", info->activationQuantDataPtr);
+    OP_LOGD(nodeName, "activationQuantScalePtr:        %ld\n", info->activationQuantScalePtr);
     OP_LOGD(nodeName, "expertRevTokenNumsPtr:      %ld\n", info->expertRevTokenNumsPtr);
     OP_LOGD(nodeName, "metaInfoPtr:                %ld\n", info->metaInfoPtr);
-    OP_LOGD(nodeName, "flagSwiGluToGmm2Ptr:        %ld\n", info->flagSwiGluToGmm2Ptr);
+    OP_LOGD(nodeName, "flagActivationToGmm2Ptr:        %ld\n", info->flagActivationToGmm2Ptr);
     OP_LOGD(nodeName, "flagDispatchToGmm1Ptr:      %ld\n", info->flagDispatchToGmm1Ptr);
     OP_LOGD(nodeName, "flagSendCntCalToUpdParamsPtr:      %ld\n", info->flagSendCntCalToUpdParamsPtr);
     OP_LOGD(nodeName, "flagGmmToEpiloguePtr: %ld\n", info->flagGmmToEpiloguePtr);
@@ -380,14 +380,14 @@ static ge::graphStatus CheckAttrPtrNullptr(const gert::TilingContext *context, M
         const float beta = activationParams[0];
         OP_TILING_CHECK(!std::isfinite(beta) || beta == 0.0f,
                         OP_LOGE_FOR_INVALID_VALUE(nodeName, "situglu_beta", std::to_string(beta).c_str(),
-                                                   "should be finite and non-zero"),
+                                                  "should be finite and non-zero"),
                         return ge::GRAPH_FAILED);
         if (paramCount == 2U) {
             const float linearBeta = activationParams[1];
             OP_TILING_CHECK(!std::isfinite(linearBeta) || linearBeta == 0.0f,
                             OP_LOGE_FOR_INVALID_VALUE(nodeName, "situglu_linear_beta",
                                                       std::to_string(linearBeta).c_str(),
-                                                       "should be finite and non-zero"),
+                                                      "should be finite and non-zero"),
                             return ge::GRAPH_FAILED);
         }
     }
@@ -596,7 +596,7 @@ static ge::graphStatus SetAttrParams(const gert::TilingContext *context, MegaMoe
     const float *activationParams = activationParamsPtr->GetData();
     if (std::strcmp(activationPtr, "situglu") == 0) {
         tilingData->clampLimit = std::numeric_limits<float>::max();
-        tilingData->actMode = 1U;    // ACT_MODE_SITU
+        tilingData->actMode = 1U; // ACT_MODE_SITU
         tilingData->activationBeta = activationParams[0];
         if (activationParamsPtr->GetSize() == 2U) {
             tilingData->actSubMode = 1U; // ACT_SUB_MODE_LINEAR
@@ -912,11 +912,11 @@ static uint64_t CalcHostFlagElementCount(const MegaMoeTilingData *tilingData)
         (tilingData->combineQuantMode != COMBINE_NO_QUANT && !useMteA8W8Wave);
     uint64_t maxWavesPerExpert = ops::CeilDiv<uint64_t>(tilingData->maxOutputSize, L1_TILE_M_256);
     uint64_t waveFlagSlotsPerExpert = maxWavesPerExpert * INT_CACHELINE;
-    uint64_t swigluFlagSlotsPerExpert = useMteA8W8Wave ? waveFlagSlotsPerExpert : INT_CACHELINE;
+    uint64_t activationFlagSlotsPerExpert = useMteA8W8Wave ? waveFlagSlotsPerExpert : INT_CACHELINE;
     uint64_t moeExpertCount = tilingData->moeExpertPerRank;
 
     uint64_t flagElementCount =
-        moeExpertCount * (swigluFlagSlotsPerExpert + waveFlagSlotsPerExpert +
+        moeExpertCount * (activationFlagSlotsPerExpert + waveFlagSlotsPerExpert +
                           static_cast<uint64_t>(INT_CACHELINE) * tilingData->aicNum);
     if (tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W4 ||
         tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4 ||

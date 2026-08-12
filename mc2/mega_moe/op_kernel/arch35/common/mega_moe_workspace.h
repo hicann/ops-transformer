@@ -102,11 +102,11 @@ struct WorkspaceInfo {
     GM_ADDR dispatchRevDataPtr;
     GM_ADDR dispatchRevScalePtr;
     GM_ADDR dispatchRevWeightsPtr{nullptr};
-    GM_ADDR swigluQuantDataPtr;
-    GM_ADDR swigluQuantScalePtr;
+    GM_ADDR activationQuantDataPtr;
+    GM_ADDR activationQuantScalePtr;
     GM_ADDR expertRevTokenNumsPtr;
     GM_ADDR metaInfoPtr;
-    GM_ADDR flagSwiGluToGmm2Ptr;
+    GM_ADDR flagActivationToGmm2Ptr;
     GM_ADDR flagDispatchToGmm1Ptr;
     GM_ADDR flagSendCntCalToUpdParamsPtr;
     GM_ADDR flagGmmToEpiloguePtr{nullptr};
@@ -119,8 +119,8 @@ struct WorkspaceInfo {
     GM_ADDR sharedExpertGmm1OutPtr{nullptr};
     GM_ADDR sharedExpertInputDataPtr{nullptr};
     GM_ADDR sharedExpertInputScalePtr{nullptr};
-    GM_ADDR sharedExpertSwigluDataPtr{nullptr};
-    GM_ADDR sharedExpertSwigluScalePtr{nullptr};
+    GM_ADDR sharedExpertActivationDataPtr{nullptr};
+    GM_ADDR sharedExpertActivationScalePtr{nullptr};
     GM_ADDR gmm1TileStatusPtr{nullptr}; // GMM1 tile 就绪状态位区（仅 prefetch 软同步分配）
     GM_ADDR sharedExpertGmm2TileCounterPtr{nullptr};
 
@@ -154,13 +154,13 @@ struct WorkspaceInfo {
                 static_cast<int64_t>(tilingData->maxOutputSize) * static_cast<int64_t>(weightAlignBytes), ALIGN_512);
         }
 
-        swigluQuantDataPtr = base + workspaceSize;
+        activationQuantDataPtr = base + workspaceSize;
         workspaceSize += Ops::Base::CeilAlign(
-            SIZE_INT_8 * tilingData->maxOutputSize * tilingData->hiddenDim / SWIGLU_N_HALF, ALIGN_512);
+            SIZE_INT_8 * tilingData->maxOutputSize * tilingData->hiddenDim / ACTIVATION_N_HALF, ALIGN_512);
 
-        swigluQuantScalePtr = base + workspaceSize;
+        activationQuantScalePtr = base + workspaceSize;
         workspaceSize += Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->maxOutputSize * tilingData->hiddenDim /
-                                                  SWIGLU_N_HALF / MXFP_SCALE_GROUP_NUM,
+                                                  ACTIVATION_N_HALF / MXFP_SCALE_GROUP_NUM,
                                               ALIGN_512);
 
         expertRevTokenNumsPtr = base + workspaceSize;
@@ -183,14 +183,14 @@ struct WorkspaceInfo {
                                static_cast<int64_t>(L1_TILE_M_256));
         int64_t waveFlagSlotsPerExpert = maxWavesPerExpert * static_cast<int64_t>(INT_CACHELINE);
         // 只有 wave 流水会按 256 行粒度消费 SwiGLU；普通和 layered 路径仍为每个专家保留一个 cache line 槽。
-        int64_t swigluFlagSlotsPerExpert =
+        int64_t activationFlagSlotsPerExpert =
             useMteA8W8Wave ? waveFlagSlotsPerExpert : static_cast<int64_t>(INT_CACHELINE);
         int64_t moeExpertCount = static_cast<int64_t>(tilingData->moeExpertPerRank);
 
         // 所有 Scalar 通知都放在同一段连续 workspace 中。每个逻辑槽独占一个 64B cache line，
         // 因而 ResetFlagList 可以按任务分区一次清理完整区域。
-        flagSwiGluToGmm2Ptr = base + workspaceSize;
-        workspaceSize += SIZE_INT_32 * moeExpertCount * swigluFlagSlotsPerExpert;
+        flagActivationToGmm2Ptr = base + workspaceSize;
+        workspaceSize += SIZE_INT_32 * moeExpertCount * activationFlagSlotsPerExpert;
         flagDispatchToGmm1Ptr = base + workspaceSize;
         workspaceSize += SIZE_INT_32 * moeExpertCount * waveFlagSlotsPerExpert;
 
@@ -335,16 +335,16 @@ struct WorkspaceInfo {
                                                                          static_cast<uint32_t>(MXFP_SCALE_GROUP_NUM)) *
                                                       MXFP_MULTI_BASE_SIZE,
                                                   ALIGN_512);
-            // sharedExpertSwigluData：SwiGLU 量化输出 [sharedExpertNum × bs × hiddenDim / 2] FP8。
-            sharedExpertSwigluDataPtr = base + workspaceSize;
+            // sharedExpertActivationData：SwiGLU 量化输出 [sharedExpertNum × bs × hiddenDim / 2] FP8。
+            sharedExpertActivationDataPtr = base + workspaceSize;
             workspaceSize += Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->bs * tilingData->sharedExpertNum *
-                                                      tilingData->hiddenDim / SWIGLU_N_HALF,
+                                                      tilingData->hiddenDim / ACTIVATION_N_HALF,
                                                   ALIGN_512);
-            // sharedExpertSwigluScale：SwiGLU scale [sharedExpertNum × bs × hiddenDim / 2 / 32]。
-            sharedExpertSwigluScalePtr = base + workspaceSize;
+            // sharedExpertActivationScale：SwiGLU scale [sharedExpertNum × bs × hiddenDim / 2 / 32]。
+            sharedExpertActivationScalePtr = base + workspaceSize;
             workspaceSize +=
                 Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->bs * tilingData->sharedExpertNum * tilingData->hiddenDim /
-                                         SWIGLU_N_HALF / MXFP_SCALE_GROUP_NUM,
+                                         ACTIVATION_N_HALF / MXFP_SCALE_GROUP_NUM,
                                      ALIGN_512);
         }
     }

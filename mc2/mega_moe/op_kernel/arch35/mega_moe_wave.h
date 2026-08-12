@@ -27,13 +27,13 @@
 #include "common/mega_moe_types.h"
 #include "common/mega_moe_workspace.h"
 #include "common/mega_moe_utils.h"
-#include "blaze/epilogue/block_epilogue_swiglu_mx_quant.h"
+#include "blaze/epilogue/block_epilogue_activation_mx_quant.h"
 #include "stage/mega_moe_token_quant.h"
 #include "stage/mega_moe_send_mask.h"
 #include "stage/mega_moe_workspace_reset.h"
 #include "stage/mega_moe_shared_expert_input.h"
 #include "stage/mega_moe_token_dispatch.h"
-#include "stage/mega_moe_gmm1_swiglu.h"
+#include "stage/mega_moe_gmm1_activation.h"
 #include "stage/mega_moe_gmm2_combine.h"
 #include "stage/mega_moe_unpermute.h"
 #if __has_include("../../moe_distribute_dispatch_v2/quantize_functions.h")
@@ -119,7 +119,7 @@ private:
         const ExpertRowCursor &currentWaveCursor, const ExpertRowCursor &targetWaveCursor) const;
     __aicore__ inline ExpertRowCursor ProcessGmm1Wave(
         ExpertRowCursor &gmm1WaveCursor, Gmm1ExpertLoopState &gmm1ExpertState,
-        GMMAddrInfo &gmm1AddrInfo, Gmm1SwigluState &runtimeState);
+        GMMAddrInfo &gmm1AddrInfo, Gmm1ActivationState &runtimeState);
     __aicore__ inline void ProcessGmm2Wave(
         ExpertRowCursor &gmm2WaveCursor, const ExpertRowCursor &waveEndCursor,
         Gmm2ExpertLoopState &gmm2ExpertState, GMMAddrInfo &gmm2AddrInfo,
@@ -140,7 +140,7 @@ private:
     QuantProcessConfig quantProcessConfig_;
     SharedExpertPrepareConfig sharedExpertPrepareConfig_;
     TokenDispatchConfig tokenDispatchConfig_;
-    Gmm1SwigluConfig gmm1Config_;
+    Gmm1ActivationConfig gmm1Config_;
     Gmm2Config gmm2Config_;
     WaveCombineConfig waveCombineConfig_;
     TokenUnpermuteConfig tokenUnpermuteConfig_;
@@ -180,7 +180,7 @@ private:
     SharedExpertPrepareScratch<ActivationType> sharedExpertPrepareScratch_;
     SendMaskScratch sendMaskScratch_;
     TokenDispatchScratch<ActivationType> tokenDispatchScratch_;
-    Gmm1SwigluScratch gmm1Scratch_;
+    Gmm1ActivationScratch gmm1Scratch_;
     Gmm2Scratch gmm2Scratch_;
     ExpertTokenCountExportScratch expertTokenCountExportScratch_;
     WaveCombineScratch waveCombineScratch_;
@@ -200,11 +200,11 @@ private:
         GmmKernel::PersistentBlockMmadContext<typename WaveGmmConfig<IsWeightNz>::BlockMmad>;
 
     using BlockEpilogue =
-        BlockEpilogueSwigluMxQuant<ActivationType, bfloat16_t, QuantScaleOutType, QuantScaleOutType, true,
-                                   EPILOGUE_TILE_M, L1_TILE_N, TopkWeightsPrefetch, GMM1_INTERLEAVED>;
+        BlockEpilogueActivationMxQuant<ActivationType, bfloat16_t, QuantScaleOutType, QuantScaleOutType, true,
+                                       EPILOGUE_TILE_M, L1_TILE_N, TopkWeightsPrefetch, GMM1_INTERLEAVED>;
     using SharedBlockEpilogue =
-        BlockEpilogueSwigluMxQuant<ActivationType, bfloat16_t, QuantScaleOutType, QuantScaleOutType, true,
-                                   L1_TILE_M_256, L1_TILE_N, false, GMM1_INTERLEAVED>;
+        BlockEpilogueActivationMxQuant<ActivationType, bfloat16_t, QuantScaleOutType, QuantScaleOutType, true,
+                                       L1_TILE_M_256, L1_TILE_N, false, GMM1_INTERLEAVED>;
     BlockEpilogue epilogueOp_;
     SharedBlockEpilogue sharedEpilogueOp_;
     void *persistentBlockMmadContext_ = nullptr;
@@ -296,7 +296,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::InitGmm1Config(
         .blockJob = {.jobIndex = blockIdx_, .totalJobs = blockNum_},
         .countWorkspace = {.blockIdx = blockIdx_, .blockNum = params_.tilingData->aicNum},
         .dispatchFlagSlotsPerExpert = dispatchFlagSlotsPerExpert,
-        .swigluFlagSlotsPerExpert = dispatchFlagSlotsPerExpert,
+        .activationFlagSlotsPerExpert = dispatchFlagSlotsPerExpert,
         .maxTilesPerExpert = params_.tilingData->maxTilesPerExpert,
         .groupedMatmulMode = params_.tilingData->groupedMatmulMode,
         .isPerExpertWeightTensor = params_.tilingData->isPerExpertWeightTensor};
@@ -310,7 +310,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::InitGmm2Combine
         .common = commonConfig,
         .blockJob = {.jobIndex = blockIdx_, .totalJobs = blockNum_},
         .countWorkspace = {.blockIdx = blockIdx_, .blockNum = params_.tilingData->aicNum},
-        .swigluFlagSlotsPerExpert = dispatchFlagSlotsPerExpert,
+        .activationFlagSlotsPerExpert = dispatchFlagSlotsPerExpert,
         .dispatchFlagSlotsPerExpert = dispatchFlagSlotsPerExpert,
         .combineSyncSlotCountPerExpert = 0U,
         .groupedMatmulMode = params_.tilingData->groupedMatmulMode,
@@ -353,7 +353,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::Init(
     sharedExpertNum_ = tilingData->sharedExpertNum;
     uint32_t gmm1SchedulerWidth = GMM1_INTERLEAVED ?
                                       tilingData->hiddenDim :
-                                      tilingData->hiddenDim / SWIGLU_N_HALF;
+                                      tilingData->hiddenDim / ACTIVATION_N_HALF;
     gmm1TilesPerMGroup_ = Ops::Base::CeilDiv(gmm1SchedulerWidth, static_cast<uint32_t>(L1_TILE_N));
     mGroupsPerWave_ = tilingData->mGroupsPerWave == 0U ? 1U : tilingData->mGroupsPerWave;
     mc2Context_ = reinterpret_cast<__gm__ Mc2MoeContext *>(context);
@@ -381,8 +381,8 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::Init(
     params_.workspaceInfo = WorkspaceInfo(workspaceGM, tilingData);
     params_.peermemInfo = PeermemInfo(winRankAddr_[rankId_], tilingData, 1U);
     params_.tilingData = tilingData;
-    epilogueOp_.Init({.yGmAddr = params_.workspaceInfo.swigluQuantDataPtr,
-                      .yScaleGmAddr = params_.workspaceInfo.swigluQuantScalePtr,
+    epilogueOp_.Init({.yGmAddr = params_.workspaceInfo.activationQuantDataPtr,
+                      .yScaleGmAddr = params_.workspaceInfo.activationQuantScalePtr,
                       .x2ScaleGmAddr = nullptr,
                       .x1ScaleGmAddr = nullptr,
                       .biasGmAddr = nullptr,
@@ -654,8 +654,8 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessSharedEx
         return;
     }
     typename SharedBlockEpilogue::Params epilogueParams{
-        .yGmAddr = params_.workspaceInfo.sharedExpertSwigluDataPtr,
-        .yScaleGmAddr = params_.workspaceInfo.sharedExpertSwigluScalePtr,
+        .yGmAddr = params_.workspaceInfo.sharedExpertActivationDataPtr,
+        .yScaleGmAddr = params_.workspaceInfo.sharedExpertActivationScalePtr,
         .x2ScaleGmAddr = nullptr,
         .x1ScaleGmAddr = nullptr,
         .biasGmAddr = nullptr,
@@ -673,16 +673,16 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessSharedEx
     GMMAddrInfo gmmAddrInfo{};
     int32_t vecSetSyncCom = 0;
     int32_t gmTileSequence = 0;
-    SharedExpertGmm1SwigluState runtimeState{
+    SharedExpertGmm1ActivationState runtimeState{
         startBlockIdx_, vecSetSyncCom, gmTileSequence, gmm1PingPongIdx_};
     for (uint32_t sharedExpertIdx = 0U; sharedExpertIdx < sharedExpertNum_; ++sharedExpertIdx) {
         UpdateSharedExpertGmm1GlobalBuffer<ActivationType, Weight1Type, ActivationType,
                                            QuantScaleOutType, false>(
             gmm1Config_, params_.workspaceInfo, sharedWeightTensorListAddrs_, sharedEpilogueOp_,
             gmmAddrInfo, sharedExpertIdx);
-        RunSharedExpertGmm1SwigluStage<QuantOutType, Weight1Type, ActivationType,
-                                       QuantScaleOutType, false, GMM1_TILE_M,
-                                       GMM1_INTERLEAVED, true>(
+        RunSharedExpertGmm1ActivationStage<QuantOutType, Weight1Type, ActivationType,
+                                           QuantScaleOutType, false, GMM1_TILE_M,
+                                           GMM1_INTERLEAVED, true>(
             gmm1Config_, params_, sharedEpilogueOp_, gmmAddrInfo, problemShape,
             runtimeState, sharedExpertIdx, persistentBlockMmadContext_, true);
     }
@@ -855,9 +855,9 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::SetGmm2ProblemS
     uint64_t inputScaleWidth =
         Ops::Base::CeilDiv(inputWidth, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) *
         MXFP_MULTI_BASE_SIZE;
-    uint64_t swigluOutputWidth = outputWidth / SWIGLU_N_HALF;
-    uint64_t swigluScaleWidth =
-        Ops::Base::CeilDiv(swigluOutputWidth, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) *
+    uint64_t activationOutputWidth = outputWidth / ACTIVATION_N_HALF;
+    uint64_t activationScaleWidth =
+        Ops::Base::CeilDiv(activationOutputWidth, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) *
         MXFP_MULTI_BASE_SIZE;
 
     problemState.expertBeforeCnt += problemStartRowOffset;
@@ -867,9 +867,9 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::SetGmm2ProblemS
     Get<IDX_A_SCALE_OFFSET>(problemState.baseOffset) +=
         static_cast<uint64_t>(problemStartRowOffset) * inputScaleWidth;
     Get<IDX_C_OFFSET>(problemState.baseOffset) +=
-        static_cast<uint64_t>(problemStartRowOffset) * swigluOutputWidth;
+        static_cast<uint64_t>(problemStartRowOffset) * activationOutputWidth;
     Get<IDX_C_SCALE_OFFSET>(problemState.baseOffset) +=
-        static_cast<uint64_t>(problemStartRowOffset) * swigluScaleWidth;
+        static_cast<uint64_t>(problemStartRowOffset) * activationScaleWidth;
     Get<IDX_Y2_OFFSET>(problemState.baseOffset) +=
         static_cast<uint64_t>(problemStartRowOffset) * inputWidth;
     Get<IDX_M_OFFSET>(problemState.baseOffset) += problemStartRowOffset;
@@ -891,7 +891,7 @@ template <TemplateMegaMoeWaveTypeClass>
 __aicore__ inline typename MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ExpertRowCursor
 MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessGmm1Wave(
     ExpertRowCursor &gmm1WaveCursor, Gmm1ExpertLoopState &gmm1ExpertState,
-    GMMAddrInfo &gmm1AddrInfo, Gmm1SwigluState &runtimeState)
+    GMMAddrInfo &gmm1AddrInfo, Gmm1ActivationState &runtimeState)
 {
     if constexpr (g_coreType == AIV) {
         if (GetSubBlockIdx() == 1U) {
@@ -938,9 +938,9 @@ MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessGmm1Wave(
         bool isWholeExpert =
             gmm1WaveCursor.rowOffsetInExpert == 0U &&
             static_cast<uint64_t>(waveEndRowOffsetInExpert) == expertRowCount;
-        RunGmm1SwigluByMode<QuantOutType, Weight1Type, ActivationType, QuantScaleOutType,
-                            false, GMM1_TILE_M, EPILOGUE_TILE_M, TopkWeightsPrefetch,
-                            GMM1_INTERLEAVED, true>(
+        RunGmm1ActivationByMode<QuantOutType, Weight1Type, ActivationType, QuantScaleOutType,
+                                false, GMM1_TILE_M, EPILOGUE_TILE_M, TopkWeightsPrefetch,
+                                GMM1_INTERLEAVED, true>(
             gmm1Config_, params_, epilogueOp_, gmm1AddrInfo, gmm1ProblemState,
             runtimeState, gmm1WaveCursor.expertIdx, persistentBlockMmadContext_, isWholeExpert);
 
@@ -1060,7 +1060,7 @@ __aicore__ inline void MegaMoeWave<TemplateMegaMoeWaveTypeFunc>::ProcessMoeExper
     Gmm2ExpertLoopState combineExpertState = CreateGmm2ExpertLoopState(gmm2Config_);
     int32_t vecSetSyncCom = 0;
     int32_t gmm1TileSequence = 0;
-    Gmm1SwigluState gmm1RuntimeState{
+    Gmm1ActivationState gmm1RuntimeState{
         startBlockIdx_, vecSetSyncCom, gmm1TileSequence, gmm1PingPongIdx_};
 
     ExpertRowCursor waveBeginCursor{};

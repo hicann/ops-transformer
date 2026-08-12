@@ -131,7 +131,7 @@ struct Config {
         uint32_t blockIdx = 0;
         uint32_t scaleK = 0;
         uint32_t tileM = 0;
-        uint32_t swigluTileM = L1_TILE_M_256;
+        uint32_t activationTileM = L1_TILE_M_256;
         typename BlockMmad::L1Params l1Params = DefaultL1Params();
     };
 
@@ -150,7 +150,7 @@ struct Config {
         config.blockNum = blockJob.totalJobs;
         config.blockIdx = blockJob.jobIndex;
         config.scaleK = CeilDiv(config.k, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
-        config.swigluTileM = TopkWeightsPrefetch ? L1_TILE_M_128 : gmm1TileM;
+        config.activationTileM = TopkWeightsPrefetch ? L1_TILE_M_128 : gmm1TileM;
     }
 
     __aicore__ static inline ProblemConfig BuildGmm1ProblemConfig(const ProblemShape &problemShape,
@@ -161,7 +161,7 @@ struct Config {
         config.m = Get<M_VALUE>(problemShape);
         config.n = Get<N_VALUE>(problemShape);
         config.k = Get<K_VALUE>(problemShape);
-        config.outputN = config.n / SWIGLU_N_HALF;
+        config.outputN = config.n / ACTIVATION_N_HALF;
         config.schedulerN = IsGmm1Interleaved ? config.n : config.outputN;
         config.tileM = gmm1TileM;
         FinalizeProblemConfig(config, blockJob, gmm1TileM);
@@ -175,7 +175,7 @@ struct Config {
         ProblemConfig config;
         config.m = Get<M_VALUE>(problemShape);
         config.n = Get<K_VALUE>(problemShape);
-        config.k = Get<N_VALUE>(problemShape) / SWIGLU_N_HALF;
+        config.k = Get<N_VALUE>(problemShape) / ACTIVATION_N_HALF;
         config.outputN = config.n;
         config.schedulerN = config.outputN;
         config.tileM = L1_TILE_M_256;

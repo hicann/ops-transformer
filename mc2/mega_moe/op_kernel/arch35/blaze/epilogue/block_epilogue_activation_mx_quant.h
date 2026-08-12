@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file block_epilogue_swiglu_mx_quant.h
+ * \file block_epilogue_activation_mx_quant.h
  * \brief
  */
 
-#ifndef BLOCK_EPILOGUE_SWIGLU_MX_QUANT_H
-#define BLOCK_EPILOGUE_SWIGLU_MX_QUANT_H
+#ifndef BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_H
+#define BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_H
 
 #if defined(__DAV_C310__)
 #if ASC_DEVKIT_MAJOR >= 9
@@ -24,11 +24,7 @@
 #endif
 #include "../../common/mega_moe_utils.h"
 
-namespace MegaMoeImpl {
-
-using namespace AscendC;
-
-namespace SwigluQuantMsg {
+namespace ActivationQuantMsg {
 enum class QuantMode : uint32_t {
     DEFAULT = 0x0U,
     PERTENSOR_MODE = 0x1U,
@@ -43,7 +39,6 @@ enum class QuantDtype : uint8_t {
     FP8_E4M3FN = 0x1U,
     FP8_E5M2 = 0x1U << 1,
 };
-} // namespace SwigluQuantMsg
 
 enum class ActMode : uint8_t {
     SWIGLU = 0,
@@ -55,10 +50,10 @@ enum class ActSubMode : uint8_t {
     LINEAR = 1,
 };
 
-namespace {
 constexpr int64_t OUT_ELE_NUM_ONE_BLK = 64;
 constexpr uint32_t Y_IDX = 0;
 constexpr uint32_t Y_SCALE_IDX = 1;
+constexpr uint32_t GROUP_FLAG_IDX = 2;
 constexpr uint32_t M_LOC_IDX = 4;
 constexpr uint32_t BLOCK_SIZE = 32;
 constexpr uint16_t MAX_EXP_FOR_BF16 = 0x7f80;
@@ -77,7 +72,6 @@ constexpr int64_t QUANT_ONCE_NUM_FP4 = 128;
 constexpr int64_t SCALE_ONCE_NUM = 8;
 constexpr int64_t CONST_64 = 64;
 constexpr uint32_t VF_LEN_FP32 = AscendC::VECTOR_REG_WIDTH / sizeof(float);
-} // namespace
 
 constexpr AscendC::MicroAPI::CastTrait ctInt322Fp32 = {
     AscendC::MicroAPI::RegLayout::UNKNOWN, AscendC::MicroAPI::SatMode::UNKNOWN,
@@ -120,7 +114,14 @@ static constexpr AscendC::MicroAPI::CastTrait CAST_32_TO_82 = {
 static constexpr AscendC::MicroAPI::CastTrait CAST_32_TO_83 = {
     AscendC::MicroAPI::RegLayout::THREE, AscendC::MicroAPI::SatMode::SAT, AscendC::MicroAPI::MaskMergeMode::ZEROING,
     AscendC::RoundMode::CAST_RINT};
-#define BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS \
+} // namespace ActivationQuantMsg
+
+namespace MegaMoeImpl {
+
+using namespace AscendC;
+using namespace ActivationQuantMsg;
+
+#define BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS \
     template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_, \
               bool IsTensorList_, uint32_t TileM, uint32_t TileN, bool TopkWeightsPrefetch, bool IsInterleaved_>
 #define BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS \
@@ -130,7 +131,7 @@ static constexpr AscendC::MicroAPI::CastTrait CAST_32_TO_83 = {
 /*
  * ActivationContext: 激活分块上下文
  * 仅含标量与 UB 指针（不含 RegTensor），可安全跨函数传递给各 ActivationFlow*
- * 由 VFDoSwigluAndQuantForMX 填充后分派给具体激活函数
+ * 由 VFDoActivationAndQuantForMX 填充后分派给具体激活函数
  */
 template <typename DataTypeInT>
 struct ActivationContext {
@@ -158,8 +159,8 @@ struct ActivationContext {
     // 尾循环地址
     __ubuf__ DataTypeInT *firstTailAddr = nullptr;
     __ubuf__ DataTypeInT *secondTailAddr = nullptr;
-    __ubuf__ bfloat16_t *swigluTailAddr1 = nullptr;
-    __ubuf__ bfloat16_t *swigluTailAddr2 = nullptr;
+    __ubuf__ bfloat16_t *activationTailAddr1 = nullptr;
+    __ubuf__ bfloat16_t *activationTailAddr2 = nullptr;
 
     // 权重预取地址（nullptr 表示不启用 TopkWeightsPrefetch）
     __ubuf__ float *weightUbAddr = nullptr;
@@ -175,9 +176,9 @@ struct ActivationContext {
 template <typename DataTypeOut_, typename DataTypeIn_, typename DataTypeX2Scale_, typename DataTypeX1Scale_,
           bool IsTensorList_, uint32_t TileM = 256, uint32_t TileN = 256, bool TopkWeightsPrefetch = false,
           bool IsInterleaved_ = false>
-class BlockEpilogueSwigluMxQuant {
+class BlockEpilogueActivationMxQuant {
 public:
-    __aicore__ inline BlockEpilogueSwigluMxQuant() {}
+    __aicore__ inline BlockEpilogueActivationMxQuant() {}
 
     static constexpr uint32_t MAX_TILE_M = TileM;
     static constexpr uint32_t MAX_SINGLE_MN = TileM * TileN;
@@ -223,19 +224,19 @@ public:
     __aicore__ inline void UpdateNextProblem(const ProblemShape &problemShape);
 
 private:
-    __aicore__ inline void VFDoSwigluForMX(uint16_t mSize, uint16_t pingpongIdx = 0, uint64_t mLoc = 0);
+    __aicore__ inline void VFDoActivationForMX(uint16_t mSize, uint16_t pingpongIdx = 0, uint64_t mLoc = 0);
 
-    template <SwigluQuantMsg::QuantMode quantMode, bool IsInterleavedSrc = false, ActMode Activation = ActMode::SWIGLU,
-              ActSubMode ActSub = ActSubMode::DEFAULT>
-    __aicore__ inline void VFDoSwigluAndQuantForMX(__ubuf__ int8_t *outputDst, __ubuf__ uint16_t *scaleDst,
-                                                   __ubuf__ DataTypeIn *firstSrc, __ubuf__ DataTypeIn *secondSrc,
-                                                   __ubuf__ bfloat16_t *gluResAddr, __ubuf__ uint16_t *maxExpAddr,
-                                                   __ubuf__ uint16_t *halfScaleLocalAddr, uint16_t mSize,
-                                                   uint16_t nSize, uint64_t mLoc = 0);
+    template <ActivationQuantMsg::QuantMode quantMode, bool IsInterleavedSrc = false,
+              ActMode Activation = ActMode::SWIGLU, ActSubMode ActSub = ActSubMode::DEFAULT>
+    __aicore__ inline void VFDoActivationAndQuantForMX(__ubuf__ int8_t *outputDst, __ubuf__ uint16_t *scaleDst,
+                                                       __ubuf__ DataTypeIn *firstSrc, __ubuf__ DataTypeIn *secondSrc,
+                                                       __ubuf__ bfloat16_t *gluResAddr, __ubuf__ uint16_t *maxExpAddr,
+                                                       __ubuf__ uint16_t *halfScaleLocalAddr, uint16_t mSize,
+                                                       uint16_t nSize, uint64_t mLoc = 0);
 
     // 激活流程独立函数：每种激活一个完整函数，自含全部寄存器声明与 __VEC_SCOPE__
     // （RegTensor 不能跨函数传递，故各激活函数内独立声明寄存器）
-    // 由 VFDoSwigluAndQuantForMX 按模板参数 Activation 分派调用
+    // 由 VFDoActivationAndQuantForMX 按模板参数 Activation 分派调用
     template <bool IsInterleaved>
     __aicore__ inline void ActivationFlowSwiGLU(const ActivationContext<DataTypeIn> &ctx);
 
@@ -300,8 +301,9 @@ private:
     float activationBeta_{1.0f};
 };
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Init(Params const &params)
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline void
+BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Init(Params const &params)
 {
     if constexpr (g_coreType == AscendC::AIC) {
         return;
@@ -327,7 +329,7 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     // 重构UB内存
     // 当前master默认非interleaved，保留完整256x256空间；interleaved预留按half tile + pingpong偏移使用。
     constexpr uint32_t MAX_SINGLE_MN_ALIAS =
-        IsInterleaved_ ? MAX_SINGLE_MN / SWIGLU_N_HALF : MAX_SINGLE_MN;
+        IsInterleaved_ ? MAX_SINGLE_MN / ACTIVATION_N_HALF : MAX_SINGLE_MN;
     constexpr uint32_t gluResOffset = 0;
     gluRes_ = AscendC::LocalTensor<bfloat16_t>(AscendC::TPosition::VECCALC, gluResOffset, MAX_SINGLE_MN_ALIAS);
     constexpr uint32_t quantOutputOffset = gluResOffset + MAX_SINGLE_MN_ALIAS * sizeof(bfloat16_t);
@@ -350,9 +352,9 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     }
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void
-BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(
+BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGlobalAddr(
     const BlockCoord &baseOffset)
 {
     if constexpr (g_coreType == AscendC::AIV) {
@@ -361,8 +363,8 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateGlob
     }
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateNextProblem(
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline void BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::UpdateNextProblem(
     const ProblemShape &problemShape)
 {
     n_ = Get<N_VALUE>(problemShape); // n/2
@@ -371,8 +373,8 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
               MXFP_MULTI_BASE_SIZE;
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::CopyOutputFromUb2Gm(
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline void BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::CopyOutputFromUb2Gm(
     uint64_t blockCount, uint64_t offset, AscendC::LocalTensor<int8_t> &src)
 {
     AscendC::DataCopyExtParams ub2GmParams{1, 0, 0, 0, 0};
@@ -392,8 +394,9 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     AscendC::DataCopyPad(quantOutputGlobal_[offset], src, ub2GmParams);
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::CopyScaleFromUb2GmCompact(
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline void
+BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::CopyScaleFromUb2GmCompact(
     uint64_t blockCount, uint64_t offset, AscendC::LocalTensor<int8_t> &src)
 {
     AscendC::DataCopyExtParams ub2GmParams{0, 0, 0, 0, 0};
@@ -409,8 +412,8 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     AscendC::DataCopyPad<int8_t, AscendC::PaddingMode::Compact>(quantScaleGlobal_[offset], src, ub2GmParams);
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeMaxExp(
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline void BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeMaxExp(
     __ubuf__ bfloat16_t *srcAddr, __ubuf__ uint16_t *maxExpAddr, uint32_t totalCountInUB, uint16_t loopNum)
 {
     int64_t onceNum = QUANT_ONCE_NUM;
@@ -443,8 +446,8 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     return;
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeScale(
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline void BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeScale(
     __ubuf__ uint16_t *maxExpAddr, __ubuf__ uint16_t *mxScaleLocalAddr, __ubuf__ uint16_t *halfScaleLocalAddr,
     uint32_t totalScaleInUB, uint16_t loopNumScale) // 128*8  8
 {
@@ -507,9 +510,9 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     return;
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void
-BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeDataForQuantTargetFp8(
+BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeDataForQuantTargetFp8(
     __ubuf__ bfloat16_t *srcAddr, __ubuf__ uint16_t *halfScaleLocalAddr, __ubuf__ int8_t *outLocalAddr,
     uint32_t totalCountInUB, uint16_t loopNum)
 {
@@ -569,9 +572,9 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeDat
     return;
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
 __aicore__ inline void
-BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeDataForQuantTargetFp4(
+BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeDataForQuantTargetFp4(
     __ubuf__ bfloat16_t *srcAddr, __ubuf__ uint16_t *halfScaleLocalAddr, __ubuf__ int8_t *outLocalAddr,
     uint32_t totalCountInUB, uint16_t loopNum)
 {
@@ -651,10 +654,10 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ComputeDat
  *   swish(x1) * x2, 其中 swish(x) = x / (exp(-x) + 1) = x * sigmoid(x)
  *   含主循环 + 尾循环 + pad 填零，所有寄存器在本函数内声明
  */
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
 template <bool IsInterleaved>
 __aicore__ inline void
-BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ActivationFlowSwiGLU(
+BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ActivationFlowSwiGLU(
     const ActivationContext<DataTypeIn> &ctx)
 {
     const float scalarOne = 1.0f;
@@ -753,11 +756,11 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
 
                 AscendC::MicroAPI::Cast<bfloat16_t, float, CAST_FP32_TO_FP16_BF16>(outTReg, outFReg, mask1);
                 AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
-                    ctx.swigluTailAddr1, outTReg, outOffset1, mask2);
+                    ctx.activationTailAddr1, outTReg, outOffset1, mask2);
             }
             for (uint16_t padIdx = 0; padIdx < dim1Tail2; padIdx++) {
                 AscendC::MicroAPI::Duplicate(zeroReg, numZero);
-                AscendC::MicroAPI::DataCopy<bfloat16_t>(ctx.swigluTailAddr2, zeroReg, outOffset1, mask3);
+                AscendC::MicroAPI::DataCopy<bfloat16_t>(ctx.activationTailAddr2, zeroReg, outOffset1, mask3);
             }
         }
     }
@@ -771,16 +774,16 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
  *   tanh 采用两段式（多项式路 + sigmoid 分解路），保号无相消
  *   参照 situ_mx_quant_common.h::ComputeVfSitu，含主循环 + 尾循环 + pad 填零
  */
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
 template <ActSubMode ActSub, bool IsInterleaved>
 __aicore__ inline void
-BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ActivationFlowSiTU(
+BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::ActivationFlowSiTU(
     const ActivationContext<DataTypeIn> &ctx)
 {
     // tanh 多项式近似的奇次项系数（8 阶 Padé 近似，仅取奇次项）
     // 参见 COMPUTE_TANH_TWOPATH 宏注释，c1/c2 对应 x^3/x^5 的系数
-    const float tanhC1 = -0.333327681f;  // c1: tanh 多项式 x^3 项系数，约 -1/3
-    const float tanhC2 = 0.133152977f;   // c2: tanh 多项式 x^5 项系数，约 2/15
+    const float tanhC1 = -0.333327681f; // c1: tanh 多项式 x^3 项系数，约 -1/3
+    const float tanhC2 = 0.133152977f;  // c2: tanh 多项式 x^5 项系数，约 2/15
     const float scalarOne = 1.0f;
     const float negScalarOne = -1.0f;
     bfloat16_t numZero = 0;
@@ -937,26 +940,27 @@ BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::Activation
 
                 AscendC::MicroAPI::Cast<bfloat16_t, float, CAST_FP32_TO_FP16_BF16>(outTReg, outFReg, mask1);
                 AscendC::MicroAPI::DataCopy<bfloat16_t, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(
-                    ctx.swigluTailAddr1, outTReg, outOffset1, mask2);
+                    ctx.activationTailAddr1, outTReg, outOffset1, mask2);
             }
             for (uint16_t padIdx = 0; padIdx < dim1Tail2; padIdx++) {
                 AscendC::MicroAPI::Duplicate(zeroReg, numZero);
-                AscendC::MicroAPI::DataCopy<bfloat16_t>(ctx.swigluTailAddr2, zeroReg, outOffset1, mask3);
+                AscendC::MicroAPI::DataCopy<bfloat16_t>(ctx.activationTailAddr2, zeroReg, outOffset1, mask3);
             }
         }
     }
 }
 
 /*
- * VFDoSwigluAndQuantForMX: 激活 + MX 量化主入口（重构后为分派器）
+ * VFDoActivationAndQuantForMX: 激活 + MX 量化主入口（重构后为分派器）
  *   1. 标量分块计算（对齐、tail、mask）
  *   2. 填充 ActivationContext
  *   3. 按模板参数 Activation 分派到 ActivationFlowSwiGLU / ActivationFlowSiTU
  *   4. MX 量化调度（ComputeMaxExp / ComputeScale / ComputeDataForQuantTargetFp8/Fp4）
  */
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-template <SwigluQuantMsg::QuantMode quantMode, bool IsInterleavedSrc, ActMode Activation, ActSubMode ActSub>
-__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoSwigluAndQuantForMX(
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
+template <ActivationQuantMsg::QuantMode quantMode, bool IsInterleavedSrc, ActMode Activation, ActSubMode ActSub>
+__aicore__ inline void
+BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoActivationAndQuantForMX(
     __ubuf__ int8_t *outputDst, __ubuf__ uint16_t *scaleDst, __ubuf__ DataTypeIn *firstSrc,
     __ubuf__ DataTypeIn *secondSrc, __ubuf__ bfloat16_t *gluResAddr, __ubuf__ uint16_t *maxExpAddr,
     __ubuf__ uint16_t *halfScaleLocalAddr, uint16_t mSize, uint16_t nSize, uint64_t mLoc)
@@ -983,8 +987,8 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     uint32_t mask3Num = 0;
     __ubuf__ DataTypeIn *firstTailAddr = firstSrc;
     __ubuf__ DataTypeIn *secondTailAddr = secondSrc;
-    __ubuf__ bfloat16_t *swigluTailAddr1 = gluResAddr;
-    __ubuf__ bfloat16_t *swigluTailAddr2 = gluResAddr;
+    __ubuf__ bfloat16_t *activationTailAddr1 = gluResAddr;
+    __ubuf__ bfloat16_t *activationTailAddr2 = gluResAddr;
     if (dim1Tail > 0) {
         mask1Num = dim1Tail;
         dim1TailTimes = 1;
@@ -999,8 +1003,8 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
         uint32_t offsetAlign = dim1VfTimes * VF_LEN_FP32;
         firstTailAddr = firstSrc + offsetAlign;
         secondTailAddr = secondSrc + offsetAlign;
-        swigluTailAddr1 = gluResAddr + offsetAlign;
-        swigluTailAddr2 = gluResAddr + offsetAlign + dim1TailTimes * VF_LEN_FP32;
+        activationTailAddr1 = gluResAddr + offsetAlign;
+        activationTailAddr2 = gluResAddr + offsetAlign + dim1TailTimes * VF_LEN_FP32;
     }
 
     // ---- 填充分块上下文结构体 ----
@@ -1020,8 +1024,8 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     ctx.mask3Num = mask3Num;
     ctx.firstTailAddr = firstTailAddr;
     ctx.secondTailAddr = secondTailAddr;
-    ctx.swigluTailAddr1 = swigluTailAddr1;
-    ctx.swigluTailAddr2 = swigluTailAddr2;
+    ctx.activationTailAddr1 = activationTailAddr1;
+    ctx.activationTailAddr2 = activationTailAddr2;
     ctx.clampLimit = clampLimit_;
     ctx.beta = activationBeta_;
     ctx.invBeta = (activationBeta_ != 0.0f) ? (1.0f / activationBeta_) : 1.0f;
@@ -1059,8 +1063,8 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     return;
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoSwigluForMX(
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline void BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::VFDoActivationForMX(
     uint16_t mSize, uint16_t pingpongIdx, uint64_t mLoc)
 {
     constexpr uint32_t pongElemOf_DataTypeIn = MAX_SINGLE_MN;
@@ -1087,44 +1091,44 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     }
     if (actMode_ == static_cast<uint8_t>(ActMode::SITU)) {
         if (actSubMode_ == static_cast<uint8_t>(ActSubMode::LINEAR)) {
-            VFDoSwigluAndQuantForMX<SwigluQuantMsg::QuantMode::MX_PERGROUP_MODE, IsInterleaved_, ActMode::SITU,
-                                    ActSubMode::LINEAR>(quantOutputInUbAddr, quantScaleOutputInUbAddr, l0cOutUbBase,
-                                                        l0cOutUbSecondAddr, gluResAddr, maxExpAddr, halfScaleAddr,
-                                                        mSize, singleN_, mLoc);
+            VFDoActivationAndQuantForMX<ActivationQuantMsg::QuantMode::MX_PERGROUP_MODE, IsInterleaved_, ActMode::SITU,
+                                        ActSubMode::LINEAR>(quantOutputInUbAddr, quantScaleOutputInUbAddr, l0cOutUbBase,
+                                                            l0cOutUbSecondAddr, gluResAddr, maxExpAddr, halfScaleAddr,
+                                                            mSize, singleN_, mLoc);
         } else {
-            VFDoSwigluAndQuantForMX<SwigluQuantMsg::QuantMode::MX_PERGROUP_MODE, IsInterleaved_, ActMode::SITU,
-                                    ActSubMode::DEFAULT>(quantOutputInUbAddr, quantScaleOutputInUbAddr, l0cOutUbBase,
-                                                         l0cOutUbSecondAddr, gluResAddr, maxExpAddr, halfScaleAddr,
-                                                         mSize, singleN_, mLoc);
+            VFDoActivationAndQuantForMX<ActivationQuantMsg::QuantMode::MX_PERGROUP_MODE, IsInterleaved_,
+                                        ActMode::SITU, ActSubMode::DEFAULT>(
+                quantOutputInUbAddr, quantScaleOutputInUbAddr, l0cOutUbBase,
+                l0cOutUbSecondAddr, gluResAddr, maxExpAddr, halfScaleAddr, mSize, singleN_, mLoc);
         }
     } else {
-        VFDoSwigluAndQuantForMX<SwigluQuantMsg::QuantMode::MX_PERGROUP_MODE, IsInterleaved_, ActMode::SWIGLU,
-                                ActSubMode::DEFAULT>(quantOutputInUbAddr, quantScaleOutputInUbAddr, l0cOutUbBase,
-                                                     l0cOutUbSecondAddr, gluResAddr, maxExpAddr, halfScaleAddr, mSize,
-                                                     singleN_, mLoc);
+        VFDoActivationAndQuantForMX<ActivationQuantMsg::QuantMode::MX_PERGROUP_MODE, IsInterleaved_,
+                                    ActMode::SWIGLU, ActSubMode::DEFAULT>(
+            quantOutputInUbAddr, quantScaleOutputInUbAddr, l0cOutUbBase,
+            l0cOutUbSecondAddr, gluResAddr, maxExpAddr, halfScaleAddr, mSize, singleN_, mLoc);
     }
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline auto BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::GetFirstL0c2UbTensor()
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline auto BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::GetFirstL0c2UbTensor()
 {
     return l0cOutUbFirst_;
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline auto BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::GetSecondL0c2UbTensor()
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline auto BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::GetSecondL0c2UbTensor()
 {
     return l0cOutUbSecond_;
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline auto BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::GetTopkWeightTensor()
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline auto BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::GetTopkWeightTensor()
 {
     return weightUb_;
 }
 
-BLOCK_EPILOGUE_SWIGLU_QUANT_CLASS_LOCAL_PARAMS
-__aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::operator()(
+BLOCK_EPILOGUE_ACTIVATION_QUANT_CLASS_LOCAL_PARAMS
+__aicore__ inline void BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LOCAL_PARAMS>::operator()(
     const BlockShape &blockShape, const BlockCoord &blockCoord, uint16_t pingpongIdx)
 {
     singleM_ = Get<M_VALUE>(blockShape); // 128
@@ -1142,7 +1146,7 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
     uint64_t yOffset = Get<Y_IDX>(blockCoord);
     uint64_t yScaleOffset = Get<Y_SCALE_IDX>(blockCoord);
     uint64_t mLoc = Get<M_LOC_IDX>(blockCoord);
-    VFDoSwigluForMX(singleM_, pingpongIdx, mLoc); // switch(x)*y 计算quant quantScale
+    VFDoActivationForMX(singleM_, pingpongIdx, mLoc); // switch(x)*y 计算quant quantScale
     AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(0);
     AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(0);
     // scale已按compact布局生成，直接copy到GM，省掉原先TransMxScaleLayout重排scale。
@@ -1170,4 +1174,4 @@ __aicore__ inline void BlockEpilogueSwigluMxQuant<BLOCK_EPILOGUE_DEQUANT_FUNC_LO
 } // namespace MegaMoeImpl
 
 #endif // defined(__DAV_C310__)
-#endif // BLOCK_EPILOGUE_SWIGLU_MX_QUANT_H
+#endif // BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_H

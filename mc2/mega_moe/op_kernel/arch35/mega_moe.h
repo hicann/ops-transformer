@@ -27,13 +27,13 @@
 #include "common/mega_moe_types.h"
 #include "common/mega_moe_workspace.h"
 #include "common/mega_moe_utils.h"
-#include "blaze/epilogue/block_epilogue_swiglu_mx_quant.h"
+#include "blaze/epilogue/block_epilogue_activation_mx_quant.h"
 #include "stage/mega_moe_token_quant.h"
 #include "stage/mega_moe_send_mask.h"
 #include "stage/mega_moe_workspace_reset.h"
 #include "stage/mega_moe_shared_expert_input.h"
 #include "stage/mega_moe_token_dispatch.h"
-#include "stage/mega_moe_gmm1_swiglu.h"
+#include "stage/mega_moe_gmm1_activation.h"
 #include "stage/mega_moe_gmm2_combine.h"
 #include "stage/mega_moe_unpermute.h"
 #if __has_include("../../moe_distribute_dispatch_v2/quantize_functions.h")
@@ -107,7 +107,7 @@ private:
     ExpertWeightTensorListAddrs sharedWeightTensorListAddrs_{};
     DispatchPrepareConfig dispatchPrepareConfig_;
     TokenDispatchConfig tokenDispatchConfig_;
-    Gmm1SwigluConfig gmm1Config_;
+    Gmm1ActivationConfig gmm1Config_;
     SendMaskConfig sendMaskConfig_;
     ResetWorkspaceConfig resetWorkspaceConfig_;
     QuantProcessConfig quantProcessConfig_;
@@ -149,24 +149,25 @@ private:
     SendMaskScratch sendMaskScratch_;
     LocalTensor<int32_t> resetTensor_;
 
-    // GMM2 走 A8W4 且 QuantMode 为 a4w4（E2M1）时，SwigluQuant 输出需提升为 fp8_e4m3fn_t。
+    // GMM2 走 A8W4 且 QuantMode 为 a4w4（E2M1）时，ActivationQuant 输出需提升为 fp8_e4m3fn_t。
     // 同时当 Weight2 非 fp4 但 QuantMode==E2M1 时（generic GMM2 路径），也需 promotion，
     // 否则会出现 A=QuantOutType(fp4) vs B=Weight1Type(fp8) 的类型不匹配。
-    using SwigluQuantOutType = typename std::conditional<(QuantMode == E2M1_QUANT), fp8_e4m3fn_t, QuantOutType>::type;
+    using ActivationQuantOutType =
+        typename std::conditional<(QuantMode == E2M1_QUANT), fp8_e4m3fn_t, QuantOutType>::type;
 
-    // SwigluQuant 输出的元素字节密度：fp4 时为 2elem/B，fp8 时为 1elem/B。
-    static constexpr uint32_t C_ELEMS_PER_BYTE = PackedElementTraits<SwigluQuantOutType>::ELEMENTS_PER_BYTE;
+    // ActivationQuant 输出的元素字节密度：fp4 时为 2elem/B，fp8 时为 1elem/B。
+    static constexpr uint32_t C_ELEMS_PER_BYTE = PackedElementTraits<ActivationQuantOutType>::ELEMENTS_PER_BYTE;
 
     using BlockEpilogue =
-        BlockEpilogueSwigluMxQuant<SwigluQuantOutType, bfloat16_t, QuantScaleOutType, QuantScaleOutType, true,
-                                   EPILOGUE_TILE_M, L1_TILE_N, TopkWeightsPrefetch>;
+        BlockEpilogueActivationMxQuant<ActivationQuantOutType, bfloat16_t, QuantScaleOutType, QuantScaleOutType, true,
+                                       EPILOGUE_TILE_M, L1_TILE_N, TopkWeightsPrefetch>;
     using SharedBlockEpilogue =
-        BlockEpilogueSwigluMxQuant<SwigluQuantOutType, bfloat16_t, QuantScaleOutType, QuantScaleOutType, true,
-                                   L1_TILE_M_256, L1_TILE_N, false>;
+        BlockEpilogueActivationMxQuant<ActivationQuantOutType, bfloat16_t, QuantScaleOutType, QuantScaleOutType, true,
+                                       L1_TILE_M_256, L1_TILE_N, false>;
     BlockEpilogue epilogueOp_;
     SharedBlockEpilogue sharedEpilogueOp_;
     TokenDispatchScratch<ActivationType> tokenDispatchScratch_;
-    Gmm1SwigluScratch gmm1SwigluScratch_;
+    Gmm1ActivationScratch gmm1ActivationScratch_;
     Gmm2Scratch gmm2Scratch_;
     TokenUnpermuteScratch tokenUnpermuteScratch_;
 };
@@ -258,7 +259,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitGmm1Config(
         .blockJob = {.jobIndex = blockIdx_, .totalJobs = blockNum_},
         .countWorkspace = {.blockIdx = blockIdx_, .blockNum = params_.tilingData->aicNum},
         .dispatchFlagSlotsPerExpert = dispatchFlagSlotsPerExpert,
-        .swigluFlagSlotsPerExpert = INT_CACHELINE,
+        .activationFlagSlotsPerExpert = INT_CACHELINE,
         .maxTilesPerExpert = params_.tilingData->maxTilesPerExpert,
         .groupedMatmulMode = params_.tilingData->groupedMatmulMode,
         .isPerExpertWeightTensor = params_.tilingData->isPerExpertWeightTensor};
@@ -272,7 +273,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitGmm2CombineConfigs(
         .common = commonConfig,
         .blockJob = {.jobIndex = blockIdx_, .totalJobs = blockNum_},
         .countWorkspace = {.blockIdx = blockIdx_, .blockNum = params_.tilingData->aicNum},
-        .swigluFlagSlotsPerExpert = INT_CACHELINE,
+        .activationFlagSlotsPerExpert = INT_CACHELINE,
         .dispatchFlagSlotsPerExpert = dispatchFlagSlotsPerExpert,
         .combineSyncSlotCountPerExpert = params_.tilingData->combineSyncSlotCountPerExpert,
         .groupedMatmulMode = params_.tilingData->groupedMatmulMode,
@@ -338,8 +339,8 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Init(
     params_.workspaceInfo = WorkspaceInfo(workspaceGM, tilingData);
     params_.peermemInfo = PeermemInfo(winRankAddr_[rankId_], tilingData, A_ELEMS_PER_BYTE);
     params_.tilingData = tilingData;
-    epilogueOp_.Init({.yGmAddr = params_.workspaceInfo.swigluQuantDataPtr,
-                      .yScaleGmAddr = params_.workspaceInfo.swigluQuantScalePtr,
+    epilogueOp_.Init({.yGmAddr = params_.workspaceInfo.activationQuantDataPtr,
+                      .yScaleGmAddr = params_.workspaceInfo.activationQuantScalePtr,
                       .x2ScaleGmAddr = nullptr,
                       .x1ScaleGmAddr = nullptr,
                       .biasGmAddr = nullptr,
@@ -635,8 +636,8 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessSharedExpertGmm1
         return;
     }
     typename SharedBlockEpilogue::Params epilogueParams{
-        .yGmAddr = params_.workspaceInfo.sharedExpertSwigluDataPtr,
-        .yScaleGmAddr = params_.workspaceInfo.sharedExpertSwigluScalePtr,
+        .yGmAddr = params_.workspaceInfo.sharedExpertActivationDataPtr,
+        .yScaleGmAddr = params_.workspaceInfo.sharedExpertActivationScalePtr,
         .x2ScaleGmAddr = nullptr,
         .x1ScaleGmAddr = nullptr,
         .biasGmAddr = nullptr,
@@ -655,15 +656,15 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessSharedExpertGmm1
     uint32_t startBlockIdx = 0U;
     int32_t vecSetSyncCom = 0;
     uint16_t pingpongIdx = 0U;
-    SharedExpertGmm1SwigluState runtimeState{
+    SharedExpertGmm1ActivationState runtimeState{
         startBlockIdx, vecSetSyncCom, gmTileSequence, pingpongIdx};
     for (uint32_t sharedExpertIdx = 0U; sharedExpertIdx < sharedExpertNum_; ++sharedExpertIdx) {
-        UpdateSharedExpertGmm1GlobalBuffer<ActivationType, Weight1Type, SwigluQuantOutType,
+        UpdateSharedExpertGmm1GlobalBuffer<ActivationType, Weight1Type, ActivationQuantOutType,
                                            QuantScaleOutType, ENABLE_A8W4>(
             gmm1Config_, params_.workspaceInfo, sharedWeightTensorListAddrs_, sharedEpilogueOp_,
             gmmAddrInfo, sharedExpertIdx);
-        RunSharedExpertGmm1SwigluStage<QuantOutType, Weight1Type, SwigluQuantOutType,
-                                       QuantScaleOutType, ENABLE_A8W4, GMM1_TILE_M>(
+        RunSharedExpertGmm1ActivationStage<QuantOutType, Weight1Type, ActivationQuantOutType,
+                                           QuantScaleOutType, ENABLE_A8W4, GMM1_TILE_M>(
             gmm1Config_, params_, sharedEpilogueOp_, gmmAddrInfo, problemShape,
             runtimeState, sharedExpertIdx);
     }
@@ -680,7 +681,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessSharedExpertGmm2
     Gmm2ExpertLoopState state = CreateGmm2ExpertLoopState(gmm2Config_);
     GMMAddrInfo gmmAddrInfo{};
     for (uint32_t sharedExpertIdx = 0U; sharedExpertIdx < sharedExpertNum_; ++sharedExpertIdx) {
-        RunSharedExpertGmm2Stage<QuantOutType, SwigluQuantOutType, Weight1Type,
+        RunSharedExpertGmm2Stage<QuantOutType, ActivationQuantOutType, Weight1Type,
                                  QuantScaleOutType, ENABLE_A8W4, ENABLE_A4W4,
                                  GMM1_TILE_M, false, false, false>(
             gmm2Config_, params_, sharedWeightTensorListAddrs_, state, gmmAddrInfo,
@@ -692,14 +693,14 @@ template <TemplateMegaMoeTypeClass>
 __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessMoeExpertStages(int32_t &gmTileSequence)
 {
     DispatchBuffInit();
-    gmm1SwigluScratch_.expertRevNumsGlobalTensor.SetGlobalBuffer(
+    gmm1ActivationScratch_.expertRevNumsGlobalTensor.SetGlobalBuffer(
         reinterpret_cast<__gm__ int32_t *>(params_.workspaceInfo.expertRevTokenNumsPtr));
     Gmm1ExpertLoopState gmm1State = CreateGmm1ExpertLoopState(gmm1Config_);
     GMMAddrInfo gmm1AddrInfo{};
     uint32_t gmm1StartBlockIdx = 0U;
     int32_t gmm1VecSetSyncCom = 0;
     uint16_t gmm1PingPongIdx = 0U;
-    Gmm1SwigluState gmm1RuntimeState{
+    Gmm1ActivationState gmm1RuntimeState{
         gmm1StartBlockIdx, gmm1VecSetSyncCom, gmTileSequence, gmm1PingPongIdx};
     uint64_t currentSendCnt = 0U;
     uint64_t nextSendCnt = 0U;
@@ -714,13 +715,14 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessMoeExpertStages(
                                       TopkWeightsPrefetch>(
                 tokenDispatchConfig_, params_, winRankAddr_, tokenDispatchScratch_, expertIdx + 1U, nextSendCnt);
         }
-        RunMoeExpertGmm1SwigluStage<QuantOutType, ActivationType, Weight1Type, SwigluQuantOutType,
-                                    QuantScaleOutType, ENABLE_A8W4, GMM1_TILE_M, EPILOGUE_TILE_M,
-                                    TopkWeightsPrefetch, false, false>(
-            gmm1Config_, params_, moeWeightTensorListAddrs_, epilogueOp_, gmm1SwigluScratch_, gmm1State, gmm1AddrInfo,
+        RunMoeExpertGmm1ActivationStage<QuantOutType, ActivationType, Weight1Type, ActivationQuantOutType,
+                                        QuantScaleOutType, ENABLE_A8W4, GMM1_TILE_M, EPILOGUE_TILE_M,
+                                        TopkWeightsPrefetch, false, false>(
+            gmm1Config_, params_, moeWeightTensorListAddrs_, epilogueOp_,
+            gmm1ActivationScratch_, gmm1State, gmm1AddrInfo,
             gmm1RuntimeState, expertIdx, currentSendCnt);
     }
-    FinishMoeGmm1SwigluStage<ENABLE_A8W4, TopkWeightsPrefetch>(
+    FinishMoeGmm1ActivationStage<ENABLE_A8W4, TopkWeightsPrefetch>(
         gmm1Config_, params_.workspaceInfo, gmm1RuntimeState);
 
     if constexpr (g_coreType == AIV) {
@@ -745,16 +747,16 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessMoeExpertStages(
         ENABLE_A8W4 || ENABLE_A4W4 || CombineQuantMode != COMBINE_NO_QUANT;
     constexpr bool configureCombineCounter = CombineQuantMode != COMBINE_NO_QUANT;
     for (uint32_t expertIdx = 0U; expertIdx < gmm2Config_.common.moeExpertPerRank; ++expertIdx) {
-        if (!PrepareMoeExpertGmm2Stage < ActivationType, SwigluQuantOutType, QuantScaleOutType,
+        if (!PrepareMoeExpertGmm2Stage < ActivationType, ActivationQuantOutType, QuantScaleOutType,
             PackedElementTraits<QuantOutType>::ELEMENTS_PER_BYTE,
             PackedElementTraits<Weight1Type>::ELEMENTS_PER_BYTE,
-            PackedElementTraits<SwigluQuantOutType>::ELEMENTS_PER_BYTE,
+            PackedElementTraits<ActivationQuantOutType>::ELEMENTS_PER_BYTE,
             configureGmm2Output, configureCombineCounter,
             ENABLE_A8W4 || ENABLE_A4W4 > (gmm2Config_, params_.workspaceInfo, moeWeightTensorListAddrs_, gmm2Scratch_,
                                           gmm2State, gmm2AddrInfo, expertIdx)) {
             continue;
         }
-        RunMoeExpertGmm2Stage<CombineQuantMode, QuantOutType, SwigluQuantOutType,
+        RunMoeExpertGmm2Stage<CombineQuantMode, QuantOutType, ActivationQuantOutType,
                               Weight1Type, QuantScaleOutType, ENABLE_A8W4, ENABLE_A4W4,
                               GMM1_TILE_M, TopkWeightsPrefetch, false, false>(
             gmm2Config_, params_, gmm2AddrInfo, gmm2State, gmm2RuntimeState);
