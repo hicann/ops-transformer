@@ -51,6 +51,8 @@ namespace MhcPreSinkhornNs {
         uint8_t l0PingPongID_{0};
         uint8_t crossPingPongID_{0};
         uint8_t cl0PingPongID_{0};
+        int64_t oriHf32Mode_{0};
+        int64_t oriHf32TransMode_{0};
 
         __aicore__ inline MhcPreSinkhornCubeCompute()
         {
@@ -83,6 +85,8 @@ namespace MhcPreSinkhornNs {
             AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(4);
 
             // hf32 compute
+            oriHf32Mode_ = AscendC::GetCtrlSpr<AscendC::HF32_MODE_BIT, AscendC::HF32_MODE_BIT>();
+            oriHf32TransMode_ = AscendC::GetCtrlSpr<AscendC::HF32_TRANS_MODE_BIT, AscendC::HF32_TRANS_MODE_BIT>();
             AscendC::SetHF32Mode(1);
             AscendC::SetHF32TransMode(1);
         }
@@ -237,7 +241,8 @@ namespace MhcPreSinkhornNs {
             AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(1);
             AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(3);
             AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(4);
-            AscendC::SetHF32Mode(0);
+            AscendC::SetHF32TransMode(oriHf32TransMode_);
+            AscendC::SetHF32Mode(oriHf32Mode_);
         }
     };
 }

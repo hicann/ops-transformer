@@ -236,6 +236,9 @@ public:
                 WaitFlag<HardEvent::MTE3_V>(static_cast<event_t>(1));
             }
         }
+        if ASCEND_IS_AIC {
+            mmService_.End();
+        }
         SyncAll<false>();
     }
 
