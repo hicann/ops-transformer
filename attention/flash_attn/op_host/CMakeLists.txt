@@ -28,7 +28,7 @@ if("${CONDITION_UNIT}" STREQUAL "ascend950")
     )
 endif()
 
-file(GLOB_RECURSE ARCH35_CHECKER_SRC_FILES 
+file(GLOB_RECURSE ARCH35_CHECKER_SRC_FILES
     ../op_host/checkers/*checker*.cpp
 )
 
@@ -50,6 +50,7 @@ else()
     target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
     ${ARCH35_CHECKER_SRC_FILES}
     flash_attn_tiling_info_parser.cpp
+    ../../common/op_host/fia_tiling_shape.cpp
     )
     add_modules_sources_with_soc(
         # 该变量用于判断op_api目录是否从op_host移出
