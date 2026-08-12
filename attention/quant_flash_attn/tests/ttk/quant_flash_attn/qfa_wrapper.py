@@ -182,8 +182,4 @@ def npu_qfa(
 
     if not enable_lse:
         lse_out = None
-    elif isinstance(lse_out, torch.Tensor) and lse_out.ndim == 2:
-        lse_out = lse_out.reshape(lse_out.shape[1], lse_out.shape[0]).contiguous()
-        if lse_out.shape[0] > atten_out.shape[0]:
-            lse_out = lse_out[:atten_out.shape[0], :].contiguous()
     return atten_out, lse_out
