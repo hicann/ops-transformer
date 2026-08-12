@@ -558,6 +558,15 @@ gmm@ops-transformer:
                 - ops/ops-transformer/gmm/grouped_matmul_add/examples
             non_delivery: null
             open_source: null
+    llt:
+        ut_filter:
+            - ops/ops-transformer/gmm/common/cgmct/
+            - ops/ops-transformer/gmm/common/op_host/*.h
+            - ops/ops-transformer/gmm/common/op_kernel/*.h
+            - ops/ops-transformer/gmm/*/op_api/*.h
+            - ops/ops-transformer/gmm/*/op_kernel/
+            - ops/ops-transformer/gmm/*/op_host/*.h
+            - ops/ops-transformer/gmm/*/op_graph/
 
 mc2_moe_advanced@ops-transformer:
     src:
