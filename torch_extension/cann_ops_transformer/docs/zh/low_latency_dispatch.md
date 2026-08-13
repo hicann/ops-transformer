@@ -35,107 +35,189 @@
 
       若`x_smooth_scale`不为None，先按专家维或量化系数进行平滑/缩放；若为None，则直接使用`x`：
 
-         $$
-         \ x\_fp32 =
-         \begin{cases}
-         \ CastToFp32(x) \times \ x\_smooth\_scale, & \quad \text{if } x\_smooth\_scale \ne None \\
-         \ CastToFp32(x), & \quad \text{if } x\_smooth\_scale = None
-         \end{cases}
-         $$
+      $$
+      x\_fp32 =
+      \begin{cases}
+      CastToFp32(x) \times x\_smooth\_scale, & \quad \text{if } x\_smooth\_scale \ne None \\
+      CastToFp32(x), & \quad \text{if } x\_smooth\_scale = None
+      \end{cases}
+      $$
 
       如果quant_mode=0（非量化）
 
-         $$\ quant\_out = x$$
+      $$
+      quant\_out = x
+      $$
 
-         $$\ alltoall\_x\_out = alltoallv(\ quant\_out)$$
+      $$
+      alltoall\_x\_out = alltoallv(quant\_out)
+      $$
 
-         $$\ expand\_x = alltoall\_x\_out$$
+      $$
+      expand\_x = alltoall\_x\_out
+      $$
 
       如果quant_mode=1（静态量化）
 
-         $$\ quant\_out = Cast(CastToFp32(x) \times scales, dstType)$$
+      $$
+      quant\_out = Cast(CastToFp32(x) \times scales, dstType)
+      $$
 
-         $$\ alltoall\_x\_out = alltoallv(quant\_out)$$
+      $$
+      alltoall\_x\_out = alltoallv(quant\_out)
+      $$
 
-         $$\ expand\_x = alltoall\_x\_out$$
+      $$
+      expand\_x = alltoall\_x\_out
+      $$
 
       如果quant_mode=2（动态量化）
-         $$\ x\_fp32 = CastToFp32(x) \times scales$$
 
-         $$\ dynamic\_scales\_value = dst\_type\_max / Max(Abs(x\_fp32))$$
+      $$
+      x\_fp32 = CastToFp32(x) \times scales
+      $$
 
-         $$\ quant\_out = Cast(x\_fp32 \times \ dynamic\_scales\_value, dstType)$$
+      $$
+      dynamic\_scales\_value = dst\_type\_max / Max(Abs(x\_fp32))
+      $$
 
-         $$\ alltoall\_x\_out = alltoallv(quant\_out)$$
+      $$
+      quant\_out = Cast(x\_fp32 \times dynamic\_scales\_value, dstType)
+      $$
 
-         $$\ alltoall\_dynamic\_scales\_out = alltoallv(1.0 / dynamic\_scales\_value)$$
+      $$
+      alltoall\_x\_out = alltoallv(quant\_out)
+      $$
 
-         $$\ expand\_x = alltoall\_x\_out$$
+      $$
+      alltoall\_dynamic\_scales\_out = alltoallv(1.0 / dynamic\_scales\_value)
+      $$
 
-         $$\ dynamic\_scales = alltoall\_dynamic\_scales\_out$$
+      $$
+      expand\_x = alltoall\_x\_out
+      $$
+
+      $$
+      dynamic\_scales = alltoall\_dynamic\_scales\_out
+      $$
 
       如果quant_mode=3（pergroup量化）
 
-         $$\ x\_fp32 = CastToFp32(x) \times scales$$
+      $$
+      x\_fp32 = CastToFp32(x) \times scales
+      $$
 
-         $$\ dynamic\_scales\_value = dst\_type\_max / Max(Abs(x\_fp32))$$
+      $$
+      dynamic\_scales\_value = dst\_type\_max / Max(Abs(x\_fp32))
+      $$
 
-         $$\ quant\_out = Cast(\ x\_fp32 \times \ dynamic\_scales\_value, dstType)$$
+      $$
+      quant\_out = Cast(x\_fp32 \times dynamic\_scales\_value, dstType)
+      $$
 
-         $$\ alltoall\_x\_out = alltoallv(quant\_out)$$
+      $$
+      alltoall\_x\_out = alltoallv(quant\_out)
+      $$
 
-         $$\ alltoall\_dynamic\_scales\_out = alltoallv(1.0 / dynamic\_scales\_value)$$
+      $$
+      alltoall\_dynamic\_scales\_out = alltoallv(1.0 / dynamic\_scales\_value)
+      $$
 
-         $$\ expand\_x = alltoall\_x\_out$$
+      $$
+      expand\_x = alltoall\_x\_out
+      $$
 
-         $$\ dynamic\_scales = alltoall\_dynamic\_scales\_out$$
+      $$
+      dynamic\_scales = alltoall\_dynamic\_scales\_out
+      $$
 
       如果quant_mode=4（mxfp8量化）
 
-         $$\ shared_exp = floor(log_2(max(x))) - emax$$
+      $$
+      shared\_exp = floor(log_2(max(x))) - emax
+      $$
 
-         $$\ dynamic\_scales\_value = 2^{shared\_exp}$$
+      $$
+      dynamic\_scales\_value = 2^{shared\_exp}
+      $$
 
-         $$\ quant\_out = Cast(x / dynamic\_scales\_value, dstType)$$
+      $$
+      quant\_out = Cast(x / dynamic\_scales\_value, dstType)
+      $$
 
-         $$\ alltoall\_x\_out = alltoallv(quant\_out)$$
+      $$
+      alltoall\_x\_out = alltoallv(quant\_out)
+      $$
 
-         $$\ alltoall\_dynamic\_scales\_out = alltoallv(1.0 / dynamic\_scales\_value)$$
+      $$
+      alltoall\_dynamic\_scales\_out = alltoallv(1.0 / dynamic\_scales\_value)
+      $$
 
-         $$\ expand\_x = alltoall\_x\_out$$
+      $$
+      expand\_x = alltoall\_x\_out
+      $$
 
-         $$\ dynamic\_scales = alltoall\_dynamic\_scales\_out$$
+      $$
+      dynamic\_scales = alltoall\_dynamic\_scales\_out
+      $$
 
       如果quant_mode=5（mxfp8量化chip方法）
-         $$\ max\_abs = max(abx(x))$$
-         $$\ max\_abs\_clamp = max(max\_abs, 10^{-4})$$
-         $$\ shared\_exp = ceil(log_2(max\_abs\_clamp / fp8\_max))$$
 
-         $$\ dynamic\_scales\_value = 2^{shared\_exp}$$
+      $$
+      max\_abs = max(abs(x))
+      $$
 
-         $$\ quant\_out = CastToFp8(x / dynamic\_scales\_value)$$
+      $$
+      max\_abs\_clamp = max(max\_abs, 10^{-4})
+      $$
 
-         $$\ alltoall\_x\_out = alltoallv(quant\_out)$$
+      $$
+      shared\_exp = ceil(log_2(max\_abs\_clamp / fp8\_max))
+      $$
 
-         $$\ alltoall\_dynamic\_scales\_out = alltoallv(1.0 / dynamic\_scales\_value)$$
+      $$
+      dynamic\_scales\_value = 2^{shared\_exp}
+      $$
 
-         $$\ expand\_x = alltoall\_x\_out$$
+      $$
+      quant\_out = CastToFp8(x / dynamic\_scales\_value)
+      $$
 
-         $$\ dynamic\_scales = alltoall\_dynamic\_scales\_out$$
+      $$
+      alltoall\_x\_out = alltoallv(quant\_out)
+      $$
+
+      $$
+      alltoall\_dynamic\_scales\_out = alltoallv(1.0 / dynamic\_scales\_value)
+      $$
+
+      $$
+      expand\_x = alltoall\_x\_out
+      $$
+
+      $$
+      dynamic\_scales = alltoall\_dynamic\_scales\_out
+      $$
 
   - 特殊专家场景：
 
       零专家场景，即`zero_Expert_Num`不为0：
 
-         $$Moe(ori\_x)=0$$
+      $$
+      Moe(ori\_x) = 0
+      $$
 
       拷贝专家场景，即`copy_Expert_Num`不为0：
 
-         $$Moe(ori\_x)=ori\_x$$
+      $$
+      Moe(ori\_x) = ori\_x
+      $$
 
       常量专家场景，即`const_expert_num`不为0：
 
-         $$Moe(ori\_x)=const\_expert\_alpha\_1*ori\_x+const\_expert\_alpha\_2*const\_expert\_v$$
+      $$
+      Moe(ori\_x) = const\_expert\_alpha\_1 * ori\_x + const\_expert\_alpha\_2 * const\_expert\_v
+      $$
 
       参数ori\_x、const\_expert\_alpha\_1、const\_expert\_alpha\_2、const\_expert\_v见[low_latency_combine](low_latency_combine.md)文档。
 
