@@ -38,6 +38,7 @@ constexpr uint32_t TOPK_3K = 3072;
 constexpr uint32_t TOPK_4K = 4096;
 constexpr uint32_t TOPK_5K = 5120;
 constexpr uint32_t TOPK_6K = 6144;
+constexpr uint32_t DUPSIZE = 256; // duplicate所需额外地址空间
 
 template <typename QLIV2T>
 class QLIV2Vector {
@@ -210,11 +211,11 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::InitBuffers(TPipe *pipe)
     mrgValueLocal_ = mrgValueBuf_.Get<SCORE_T>();
     valueOutLocal_ = mrgValueBuf_.Get<bfloat16_t>();
 
-    pipe->InitBuffer(indicesOutBuf_, (topkCountAlign256_ + 64) * sizeof(uint32_t));
+    pipe->InitBuffer(indicesOutBuf_, topkCountAlign256_ * sizeof(uint32_t) + DUPSIZE);
     // 大小：(topkCountAlign256_ + 64) * 4  64:duplicate刷-1需要额外空间
     indicesOutLocal_ = indicesOutBuf_.Get<uint32_t>();
 
-    pipe->InitBuffer(scoreOutBuf_, (topkCountAlign256_ + 64) * sizeof(SCORE_T));
+    pipe->InitBuffer(scoreOutBuf_, topkCountAlign256_ * sizeof(SCORE_T) + DUPSIZE);
     // (topkCountAlign256_ + 64) * sizeof(SCORE_T) 64:duplicate刷-1额外空间
     scoreOutLocal_ = scoreOutBuf_.Get<SCORE_T>();
 
