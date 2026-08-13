@@ -18,12 +18,12 @@
 #endif
 #if __has_include("../../moe_distribute_dispatch_v2/moe_distribute_dispatch_v2.h")
 #include "../../moe_distribute_dispatch_v2/moe_distribute_dispatch_v2.h"
-#include "../../moe_distribute_dispatch_v2/moe_distribute_dispatch_v2_full_mesh.h"
+#include "../../moe_distribute_dispatch_v2/arch22/moe_distribute_dispatch_v2_full_mesh.h"
 #include "../../moe_distribute_dispatch_v2/arch22/moe_distribute_dispatch_v2_tiling_key.h"
 #include "../../moe_distribute_dispatch_v2/moe_distribute_dispatch_tiling.h"
 #else
 #include "../../../moe_distribute_dispatch_v2/op_kernel/moe_distribute_dispatch_v2.h"
-#include "../../../moe_distribute_dispatch_v2/op_kernel/moe_distribute_dispatch_v2_full_mesh.h"
+#include "../../../moe_distribute_dispatch_v2/op_kernel/arch22/moe_distribute_dispatch_v2_full_mesh.h"
 #include "../../../moe_distribute_dispatch_v2/op_kernel/arch22/moe_distribute_dispatch_v2_tiling_key.h"
 #include "../../../moe_distribute_dispatch_v2/op_kernel/moe_distribute_dispatch_tiling.h"
 #endif
@@ -56,7 +56,8 @@ moe_distribute_dispatch_v3(GM_ADDR mc2Context, GM_ADDR x, GM_ADDR expertIds, GM_
             return;
         } else if constexpr (FullMesh == TILINGKEY_NO_FULLMESH) {
             MoeDistributeDispatchV2<Mc2Kernel::Mc2MoeContextHolder, DTYPE_X, DTYPE_EXPAND_X,
-                                    Mc2Kernel::UNQUANT, false> op;
+                                    Mc2Kernel::UNQUANT, false>
+                op;
             op.Init(mc2Context, x, expertIds, scales, xActiveMask, expertScales, elasticInfo, performanceInfo,
                     expandXOut, dynamicScalesOut, assistInfoOut, expandScalesOut, expertTokenNumsOut,
                     epSendCountsOut, workspaceGM,
