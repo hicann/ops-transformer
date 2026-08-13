@@ -31,6 +31,7 @@ constexpr uint32_t TRUNK_LEN_4K = 4096;
 constexpr uint32_t TRUNK_LEN_2K = 2048;
 constexpr uint32_t TOPK_LEN_7K = 7168;
 constexpr uint32_t TOPK_LEN_5K = 5120;
+constexpr uint32_t DUPSIZE = 256; // duplicate所需额外地址空间
 
 template<typename Q_T, typename W_T = void>
 struct LightningIndexerTypeTraits {
@@ -162,7 +163,7 @@ __aicore__ inline void LightningIndexerServiceVector<LIT>::InitBuffers(TPipe *pi
     mrgValueLocal_ = mrgValueBuf_.Get<SCORE_T>();
     // returnvalue
     if (topkCount_ <= 2048) {
-        pipe->InitBuffer(valueOutBuf_, topkCountAlign256_ * sizeof(K_T));
+        pipe->InitBuffer(valueOutBuf_, topkCountAlign256_ * sizeof(K_T) + DUPSIZE);
         valueOutLocal_ = valueOutBuf_.Get<K_T>();
     } else { // sparseCount > 2k时，复用return value相关UB
         valueOutLocal_ = mrgValueBuf_.Get<K_T>(); // returnValue float
@@ -170,10 +171,10 @@ __aicore__ inline void LightningIndexerServiceVector<LIT>::InitBuffers(TPipe *pi
 
     // 大小：(topkCountAlign256_ + 64) * 4  64:duplicate刷-1需要额外空间
     pipe->InitBuffer(indicesOutBuf_,
-                    (topkCountAlign256_ + 64) * sizeof(uint32_t));
+                    topkCountAlign256_ * sizeof(uint32_t) + DUPSIZE);
     indicesOutLocal_ = indicesOutBuf_.Get<uint32_t>();
 
-    pipe->InitBuffer(scoreOutBuf_, topkCountAlign256_ * sizeof(SCORE_T));
+    pipe->InitBuffer(scoreOutBuf_, topkCountAlign256_ * sizeof(SCORE_T) + DUPSIZE);
     scoreOutLocal_ = scoreOutBuf_.Get<SCORE_T>();
 
     uint64_t topkSharedTmpSize = topkOp_.GetSharedTmpBufferSize();
@@ -570,17 +571,18 @@ __aicore__ inline void LightningIndexerServiceVector<LIT>::ProcessTopK(const LIC
             }
 
             if (validS2Len < topkCount_) {
-                uint64_t mask[1];
+                uint64_t mask[2];
                 mask[0] = ~0;
                 mask[0] = mask[0] << (validS2Len % 16);
+                mask[1] = ~0;
                 PipeBarrier<PIPE_V>();
                 Duplicate(valueOutLocal_.template ReinterpretCast<uint16_t>()[validS2Len / 16 * 16],
                             constInfo_.INVALID_VAL, mask, 1, 1, 0);
             }
-            if (validS2Len / 16 * 16 + 64 < topkCount_) {
+            if (validS2Len / 16 * 16 + 128 < topkCount_) {
                 PipeBarrier<PIPE_V>();
-                Duplicate(valueOutLocal_.template ReinterpretCast<uint16_t>()[validS2Len / 16 * 16 + 64],
-                            constInfo_.INVALID_VAL, topkCount_ - (validS2Len / 16 * 16 + 64));
+                Duplicate(valueOutLocal_.template ReinterpretCast<uint16_t>()[validS2Len / 16 * 16 + 128],
+                            constInfo_.INVALID_VAL, topkCount_ - (validS2Len / 16 * 16 + 128));
             }
             SetFlag<HardEvent::V_MTE2>(TOPK_V_MTE2_EVENT);
             SetFlag<HardEvent::V_MTE3>(TOPK_V_MTE3_EVENT);
