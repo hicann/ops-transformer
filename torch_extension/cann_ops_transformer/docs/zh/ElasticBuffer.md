@@ -104,11 +104,11 @@ class ElasticBuffer:
 
 | 属性 | 类型 | shape | 说明 |
 |------|------|-------|------|
-| `perm` | `Tensor` | `(T,)` int32 | 桶排列序索引，反向按此重排梯度 |
-| `send_counts` | `Tensor` | `(W*8,)` int32 | 每rank发送的index数量（填充至32字节对齐，前W个元素有效），反向a2a的send量 |
-| `recv_counts` | `Tensor` | `(W,)` int32 | 每rank接收的index数量，反向a2a的recv量 |
-| `recv_local_entry` | `Tensor` | `(R_max,)` int32 | 接收到的local entry索引，反向按此scatter-add |
-| `num_recv` | `Tensor` | `(1,)` int32 | 实际接收行数R |
+| `perm` | `Tensor` | `(num_tokens,)` int32 | 桶排列序索引，反向按此重排梯度 |
+| `send_counts` | `Tensor` | `(world_size*8,)` int32 | 每rank发送的index数量（填充至32字节对齐，前`world_size`个元素有效），反向a2a的send量 |
+| `recv_counts` | `Tensor` | `(world_size,)` int32 | 每rank接收的index数量，反向a2a的recv量 |
+| `recv_local_entry` | `Tensor` | `(R_max,)` int32 | 前向a2a交换收到的全局索引，前 `num_recv` 个元素有效，其中 `R_max = num_max_tokens_per_rank × world_size` |
+| `num_recv` | `Tensor` | `(1,)` int32 | 实际接收的全局索引数量 `num_recv`，其中`num_recv ≤ R_max` |
 
 ## 成员函数说明
 
@@ -184,6 +184,26 @@ $$fetched[i] = EngramTable[rank\_id][local\_idx]$$
 $EngramTable[rank\_id][local\_idx]$ 表示其中第 $local\_idx$ 个条目。
 - $fetched[i]$：输出张量中第 $i$ 个token对应的Engram数据，$i \in [0, num\_tokens)$，$num\_tokens$ 为 `indices` 的长度。
 
+**训练**（`with_grad=True`）的索引映射与推理一致（见上述 $rank\_id$、$local\_idx$ 公式），区别在于通过all-to-all通信完成跨rank数据抓取，并保存反向上下文 [EngramFetchCtx](#engramfetchctx)。前向过程为：
+
+1. 桶排序：按 $rank\_id_i = \lfloor indices[i] / num\_entries \rfloor$ 对 `indices` 分桶，记录桶排列序 $perm$ 与每rank发送量 $send\_counts$：
+
+$$send\_counts[r] = |\{\,i \mid rank\_id_i = r\,\}|, \quad r \in [0, world\_size)$$
+
+2. a2a交换indices：各rank将排序后的indices（全局索引）发送到目标rank，接收其他rank请求的全局索引，得到 $recv\_local\_entry$（均为映射到本rank的全局索引，即 `global_idx / num_entries == rank_id`）、$recv\_counts$，接收总量 $num\_recv = \sum_{r=0}^{world\_size-1} recv\_counts[r]$。
+
+3. 本地gather：将 $recv\_local\_entry$ 中的全局索引按 $local\_idx = recv\_local\_entry[j] \bmod num\_entries$ 转换后，从本地 $EngramTable[rank\_id]$ 读取：
+
+$$local\_data[j] = EngramTable[rank\_id][recv\_local\_entry[j] \bmod num\_entries], \quad j \in [0, num\_recv)$$
+
+4. a2a交换data：将 $local\_data$ 沿原请求路径送回，得到 $recv\_data[i]$，$i \in [0, num\_tokens)$。
+
+5. 还原：按 $perm$ 重排回原始token顺序：
+
+$$fetched[perm[i]] = recv\_data[i], \quad i \in [0, num\_tokens)$$
+
+6. 保存反向上下文 $fetch\_ctx$（即 [EngramFetchCtx](#engramfetchctx)），包含 $perm$、$send\_counts$、$recv\_counts$、$recv\_local\_entry$、$num\_recv$ 五个字段，供反向 [engram_fetch_grad](#engram_fetch_grad) 使用。
+
 **函数原型**：
 
 ```python
@@ -211,6 +231,28 @@ ElasticBuffer.engram_fetch(indices) -> Callable
 
 **功能**：训练反向接口，需与训练模式的 [engram_fetch](#engram_fetch) 配套使用。根据前向保存的 [EngramFetchCtx](#engramfetchctx)，将 `grad_fetched` 沿前向路径反向交换并按local entry稀疏累加，产出稀疏梯度用于优化器更新。
 
+**计算公式**：
+
+反向沿前向路径逆序执行，$fetch\_ctx$ 各字段（$perm$、$send\_counts$、$recv\_counts$、$recv\_local\_entry$、$num\_recv$）均来自前向 [engram_fetch](#engram_fetch) 训练模式返回的 [EngramFetchCtx](#engramfetchctx)。依次为：
+
+1. Unsort：按 $perm$ 将 $grad\_fetched$ 重排回桶排序顺序：
+
+$$grad\_sorted[i] = grad\_fetched[perm[i]], \quad i \in [0, num\_tokens)$$
+
+2. 反向a2a交换：将 $grad\_sorted$ 通过a2a反向交换（$send\_counts$ 为send量，$recv\_counts$ 为recv量），各rank收到对应 $recv\_local\_entry$ 的梯度：
+
+$$grad\_recv[j] \leftrightarrow recv\_local\_entry[j], \quad j \in [0, num\_recv)$$
+
+3. Unique：对 $recv\_local\_entry$ 按 $local\_idx = recv\_local\_entry[j] \bmod num\_entries$ 转换后去重，得到本rank local entry索引集合：
+
+$$unique\_local\_entry = \text{unique}(\{\,recv\_local\_entry[j] \bmod num\_entries \mid j \in [0, num\_recv)\,\})$$
+
+4. ScatterAdd：对每个unique entry，按FP32累加所有映射到该entry的梯度后转回输出dtype：
+
+$$grad\_unique[k] = \text{Cast}_{dtype}\!\left(\sum_{\substack{j \in [0,num\_recv) \\ recv\_local\_entry[j] \bmod num\_entries = unique\_local\_entry[k]}} \text{Cast}_{fp32}(grad\_recv[j])\right)$$
+
+其中 $K$ 为去重后的local entry数量（运行时决定，输出前 $K$ 行有效），$num\_tokens$ 为 `indices` 的长度，$num\_entries$ 为 [engram_write](#engram_write) 时各rank写入的条目数。`grad_unique` 与 `unique_local_entry` 可直接用于优化器稀疏更新。
+
 **函数原型**：
 
 ```python
@@ -224,8 +266,8 @@ ElasticBuffer.engram_fetch_grad(grad_fetched, fetch_ctx) -> (Tensor, Tensor)
 
 **输出说明**：
 
-- **grad_unique** (`Tensor`)：NPU tensor，shape为 `(K, hidden)`，数据类型与 `grad_fetched` 相同（kernel内部按FP32累加后转回输出dtype），数据格式为 $ND$。其中 `K` 为去重后的local entry数量（运行时决定），前 `K` 行有效。
-- **unique_local_entry** (`Tensor`)：NPU tensor，shape为 `(K,)`，数据类型为 `int32`，数据格式为 $ND$。表示 `grad_unique` 每行对应的local entry索引，用于优化器按索引更新 `storage[unique_local_entry] -= lr × grad_unique`。
+- **grad_unique** (`Tensor`)：NPU tensor，shape为 `(K, hidden)`，数据类型与 `grad_fetched` 相同（内部按FP32累加后转回输出dtype），数据格式为 $ND$。其中 `K` 为去重后的local entry数量（运行时决定），前 `K` 行有效。
+- **unique_local_entry** (`Tensor`)：NPU tensor，shape为 `(K,)`，数据类型为 `int32`，数据格式为 $ND$。表示 `grad_unique` 每行对应的local entry索引。
 
 ### barrier
 

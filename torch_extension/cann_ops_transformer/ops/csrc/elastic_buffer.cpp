@@ -52,6 +52,7 @@ constexpr uint32_t HCCL_COMM_LAYERS_UB_MEM = 0;
 constexpr uint32_t GET_LOCAL_SERVER_RANK_SIZE_LAYER = 0;
 constexpr int COMM_PROTOCOL_UBC_CTP_VALUE = 4;
 constexpr int COMM_PROTOCOL_UBC_TP_VALUE = 5;
+constexpr int COMM_PROTOCOL_UBG_VALUE = 9;
 constexpr int64_t NETWORK_DIRECT = 0;
 constexpr int64_t NETWORK_HYBRID = 1;
 constexpr int64_t BUFFER_ALIGNMENT = 2 * 1024 * 1024;
@@ -290,8 +291,10 @@ private:
                     continue;
                 for (uint32_t i = 0; i < listSize && !found; ++i) {
                     const int p = static_cast<int>(linkList[i].linkAttr.linkProtocol);
-                    if (p != COMM_PROTOCOL_UBC_CTP_VALUE && p != COMM_PROTOCOL_UBC_TP_VALUE)
+                    if ((p != COMM_PROTOCOL_UBC_CTP_VALUE) && (p != COMM_PROTOCOL_UBC_TP_VALUE) &&
+                        (p != COMM_PROTOCOL_UBG_VALUE)) {
                         continue;
+                    }
                     for (uint32_t ch = 0; ch < channelsPerRank; ++ch) {
                         HcclChannelDesc desc;
                         HcclResult initRet = HcclChannelDescInit(&desc, 1);
@@ -312,7 +315,7 @@ private:
                     found = true;
                 }
             }
-            TORCH_CHECK(found, "No UBC_CTP/UBC_TP link found for srcRankID ", srcRankId, ", dstRankID ", peer);
+            TORCH_CHECK(found, "No UBC_CTP/UBC_TP/UBG link found for srcRankID ", srcRankId, ", dstRankID ", peer);
         }
     }
 
