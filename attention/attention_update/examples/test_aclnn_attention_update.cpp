@@ -9,7 +9,7 @@
  */
 
 /**
- * @file test_nsa_attention_update.cpp
+ * @file test_aclnn_attention_update.cpp
  */
 
 #include "acl/acl.h"
@@ -18,18 +18,19 @@
 #include <vector>
 
 #define CHECK_RET(cond, return_expr) \
-  do {                               \
-    if (!(cond)) {                   \
-      return_expr;                   \
-    }                                \
-  } while (0)
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
+    } while (0)
 
-#define LOG_PRINT(message, ...)     \
-  do {                              \
-    printf(message, ##__VA_ARGS__); \
-  } while (0)
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
+    } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t>& shape) {
+int64_t GetShapeSize(const std::vector<int64_t> &shape)
+{
     int64_t shape_size = 1;
     for (auto i : shape) {
         shape_size *= i;
@@ -37,7 +38,8 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape) {
     return shape_size;
 }
 
-int Init(int32_t deviceId, aclrtStream* stream) {
+int Init(int32_t deviceId, aclrtStream *stream)
+{
     // 固定写法，AscendCL初始化
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -49,29 +51,31 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor) {
-  auto size = GetShapeSize(shape) * sizeof(T);
-  // 调用aclrtMalloc申请device侧内存
-  auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
-  // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
-  ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
+int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
+                    aclDataType dataType, aclTensor **tensor)
+{
+    auto size = GetShapeSize(shape) * sizeof(T);
+    // 调用aclrtMalloc申请device侧内存
+    auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
+    // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
+    ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
 
-  // 计算连续tensor的stride
-  std::vector<int64_t> stride(shape.size(), 1);
-  for (int64_t i = shape.size() - 2; i >= 0; i--) {
-    stride[i] = shape[i + 1] * stride[i + 1];
-  }
+    // 计算连续tensor的stride
+    std::vector<int64_t> stride(shape.size(), 1);
+    for (int64_t i = shape.size() - 2; i >= 0; i--) {
+        stride[i] = shape[i + 1] * stride[i + 1];
+    }
 
-  // 调用aclCreateTensor接口创建aclTensor
-  *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, stride.data(), 0, aclFormat::ACL_FORMAT_ND,
-                            shape.data(), shape.size(), *deviceAddr);
-  return 0;
+    // 调用aclCreateTensor接口创建aclTensor
+    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, stride.data(), 0, aclFormat::ACL_FORMAT_ND,
+                              shape.data(), shape.size(), *deviceAddr);
+    return 0;
 }
 
-int main() {
+int main()
+{
     constexpr int64_t lse_dim = 32;
     constexpr int64_t local_out_batch = 32;
     constexpr int64_t local_out_feat = 16;
@@ -86,16 +90,16 @@ int main() {
     std::vector<int64_t> localOutShape = {local_out_batch, local_out_feat};
     std::vector<int64_t> outShape = {local_out_batch, local_out_feat};
 
-    void* lseDeviceAddr[2] = {nullptr, nullptr};
-    void* localOutDeviceAddr[2] = {nullptr, nullptr};
-    void* outDeviceAddr = nullptr;
-    void* workspaceAddr = nullptr;
+    void *lseDeviceAddr[2] = {nullptr, nullptr};
+    void *localOutDeviceAddr[2] = {nullptr, nullptr};
+    void *outDeviceAddr = nullptr;
+    void *workspaceAddr = nullptr;
 
-    aclTensor* lse[2] = {nullptr, nullptr};
-    aclTensor* localOut[2] = {nullptr, nullptr};
-    aclTensor* out = nullptr;
-    aclTensorList* lseList = nullptr;
-    aclTensorList* localOutList = nullptr;
+    aclTensor *lse[2] = {nullptr, nullptr};
+    aclTensor *localOut[2] = {nullptr, nullptr};
+    aclTensor *out = nullptr;
+    aclTensorList *lseList = nullptr;
+    aclTensorList *localOutList = nullptr;
 
     std::vector<float> lse1HostData(GetShapeSize(lseShape), 1.0f);
     std::vector<float> lse2HostData(GetShapeSize(lseShape), 1.0f);
@@ -121,7 +125,7 @@ int main() {
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Create out tensor failed. ERROR: %d\n", ret); return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor* executor = nullptr;
+    aclOpExecutor *executor = nullptr;
     ret = aclnnAttentionUpdateGetWorkspaceSize(lseList, localOutList, update_type, out, nullptr,
                                                &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnAttentionUpdateGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);

@@ -25,20 +25,20 @@
 #include "attention_update_tiling.h"
 
 namespace {
-    constexpr uint64_t TILING_KEY_GO_FP32_WITHOUT_MAX_OUT = 10010;
-    constexpr uint64_t TILING_KEY_GO_FP16_WITHOUT_MAX_OUT = 10020;
-    constexpr uint64_t TILING_KEY_GO_BF16_WITHOUT_MAX_OUT = 10030;
+constexpr uint64_t TILING_KEY_GO_FP32_WITHOUT_MAX_OUT = 10010;
+constexpr uint64_t TILING_KEY_GO_FP16_WITHOUT_MAX_OUT = 10020;
+constexpr uint64_t TILING_KEY_GO_BF16_WITHOUT_MAX_OUT = 10030;
 
-    constexpr uint64_t SYS_WORKSPACE_SIZE = 16 * 1024 * 1024UL;
-    constexpr uint32_t LSE_TOTAL_LENGTH_DIM = 0;
-    constexpr uint32_t IN_HD_DIM = 1;
-    constexpr uint32_t LOCAL_OUT_IDNEX = 1;
-    constexpr uint32_t ATTR_UPDATETYPE_INDEX = 0;
-    constexpr uint32_t ATTR_SP_INDEX = 1;
+constexpr uint64_t SYS_WORKSPACE_SIZE = 16 * 1024 * 1024UL;
+constexpr uint32_t LSE_TOTAL_LENGTH_DIM = 0;
+constexpr uint32_t IN_HD_DIM = 1;
+constexpr uint32_t LOCAL_OUT_INDEX = 1;
+constexpr uint32_t ATTR_UPDATETYPE_INDEX = 0;
+constexpr uint32_t ATTR_SP_INDEX = 1;
 
-    //  hDim = 128， spAligned = 8时，单核b*hc最大7，所以取3
-    constexpr uint32_t MIN_BLOCK_LENGTH = 3;
-}
+//  hDim = 128， spAligned = 8时，单核b*hc最大7，所以取3
+constexpr uint32_t MIN_BLOCK_LENGTH = 3;
+} // namespace
 
 namespace optiling {
 
@@ -55,10 +55,11 @@ uint64_t GetTilingKey(uint32_t sp, ge::DataType goType_)
     return tiling_key;
 }
 
-ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context) {
+ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context)
+{
     OP_CHECK_IF(context == nullptr, OP_LOGE("AttentionUpdate", "context is null"),
-           return ge::GRAPH_FAILED);
-    auto compileInfo = reinterpret_cast<const DecodeUpdateCompileInfo*>(context->GetCompileInfo());
+                return ge::GRAPH_FAILED);
+    auto compileInfo = reinterpret_cast<const DecodeUpdateCompileInfo *>(context->GetCompileInfo());
     if (compileInfo->is_ascendc) {
         return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
     }
@@ -66,13 +67,13 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context) {
     OP_LOGD(nodeName, "Tiling initing");
 
     auto attrs = context->GetAttrs();
-    const int64_t* updateTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_UPDATETYPE_INDEX);
-    const int64_t* spPtr = attrs->GetAttrPointer<int64_t>(ATTR_SP_INDEX);
+    const int64_t *updateTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_UPDATETYPE_INDEX);
+    const int64_t *spPtr = attrs->GetAttrPointer<int64_t>(ATTR_SP_INDEX);
 
     auto updateType = *updateTypePtr;
     auto sp = *spPtr;
 
-    ge::DataType goType_ = context->GetInputDesc(LOCAL_OUT_IDNEX * sp)->GetDataType();
+    ge::DataType goType_ = context->GetInputDesc(LOCAL_OUT_INDEX * sp)->GetDataType();
     auto tilingKey = GetTilingKey(sp, goType_);
     context->SetTilingKey(tilingKey);
 
@@ -85,8 +86,8 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context) {
     const uint32_t hd = inShape.GetDim(IN_HD_DIM);
 
     OP_LOGD(nodeName, "TotalLength of b*s*hc is %u, sp is %ld, hd is %u",
-                                            totalLength, sp, hd);
-    
+            totalLength, sp, hd);
+
     uint32_t blockDims = 0;
     uint32_t coreNum = compileInfo->coreNum;
     blockDims = std::min<uint32_t>((totalLength + MIN_BLOCK_LENGTH - 1UL) / MIN_BLOCK_LENGTH, coreNum);
@@ -96,7 +97,8 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context) {
     tilingData.set_tailNum(static_cast<uint32_t>(blockDims - tilingData.get_formerNum()));
     tilingData.set_tailLength(static_cast<uint32_t>(totalLength / blockDims));
     tilingData.set_formerLength(static_cast<uint32_t>(tilingData.get_formerNum() == 0 ?
-                                0 : tilingData.get_tailLength() + 1));
+                                                          0 :
+                                                          tilingData.get_tailLength() + 1));
     tilingData.set_hDim(static_cast<uint32_t>(hd));
     tilingData.set_sp(static_cast<uint32_t>(sp));
     tilingData.set_updateType(static_cast<uint32_t>(updateType));
@@ -111,18 +113,19 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext *context) {
     OP_LOGD(nodeName, "sp is %u", tilingData.get_sp());
     OP_LOGD(nodeName, "totalLength is %u", tilingData.get_totalLength());
 
-    size_t* workspaces = context->GetWorkspaceSizes(1);
+    size_t *workspaces = context->GetWorkspaceSizes(1);
     workspaces[0] = SYS_WORKSPACE_SIZE;
 
     context->SetBlockDim(blockDims);
     tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(),
-                             context->GetRawTilingData()->GetCapacity());
+                            context->GetRawTilingData()->GetCapacity());
     context->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingPrepare4DecodeUpdate(gert::TilingParseContext* context) {
+static ge::graphStatus TilingPrepare4DecodeUpdate(gert::TilingParseContext *context)
+{
     auto compileInfo = context->GetCompiledInfo<DecodeUpdateCompileInfo>();
     OP_CHECK_IF(compileInfo == nullptr,
                 OP_LOGE(context, "compileInfoPtr is null"),
