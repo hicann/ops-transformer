@@ -105,7 +105,6 @@ struct GmLayoutParams<GmFormat::PA_BnBsND> {
     static constexpr FormatCategory CATEGORY = FormatCategory::GM_KV_PA_BNBD;
 };
 
-
 template <>
 struct GmLayoutParams<GmFormat::PA_BnNBsD> {
     static constexpr FormatCategory CATEGORY = FormatCategory::GM_KV_PA_BNBD;
@@ -387,9 +386,11 @@ struct OffsetCalculatorImpl<FORMAT, FormatCategory::GM_KV_BNSD, ACTLEN_T> {
         gmLayout.MakeLayout(b, n2, s2, d);
     }
 
-    __aicore__ inline void Init(const ActualSeqLensParser<ActualSeqLensMode::BY_BATCH, ACTLEN_T> &parser)
+    __aicore__ inline void Init(uint32_t b, uint32_t n2, uint32_t s2, uint32_t d,
+                                const ActualSeqLensParser<ActualSeqLensMode::BY_BATCH, ACTLEN_T> &parser)
     {
         actualSeqLensKVParser = parser;
+        gmLayout.MakeLayout(b, n2, s2, d);
     }
 
     __aicore__ inline uint64_t GetOffset(uint32_t bIdx, uint32_t n2Idx, uint32_t s2Idx, uint32_t dIdx)
@@ -526,7 +527,7 @@ struct OffsetCalculatorImpl<FORMAT, FormatCategory::GM_V_SCALE_TND, ACTLEN_T, WI
         gmLayout.MakeLayout(actualSeqLensKVParser.GetTSize(), n2, d);
     }
 
-    __aicore__ inline void Init(uint32_t n2, uint32_t d, const SeqLensKVParserType& parser)
+    __aicore__ inline void Init(uint32_t n2, uint32_t d, const SeqLensKVParserType &parser)
     {
         actualSeqLensKVParser = parser;
         gmLayout.MakeLayout(actualSeqLensKVParser.GetTSize(), n2, d);
