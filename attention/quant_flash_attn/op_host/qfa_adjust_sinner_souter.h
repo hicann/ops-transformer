@@ -25,6 +25,7 @@ constexpr uint32_t LAYOUT_BNSD = 1;
 constexpr uint32_t LAYOUT_TND = 2;
 
 constexpr uint32_t SOUTER_64 = 64;
+constexpr uint32_t SINNER_256 = 256;
 constexpr uint32_t SINNER_512 = 512;
 
 /**
@@ -51,8 +52,13 @@ inline void AdjustSinnerAndSouter(uint32_t vHeadDim, int64_t maxSeqQ, int64_t ma
     if (maxSeqKv == -1) {
         maxSeqKv = MAX_SEQ_LEN_DEFAULT;
     }
-    sOuterFactor = SOUTER_64;
-    sInnerFactor = SINNER_512;
+    if (vHeadDim == DSIZE_256) {
+        sOuterFactor = SOUTER_64; // mxfp8 D=256 时基本块为128*512
+        sInnerFactor = SINNER_256;
+    } else {
+        sOuterFactor = SOUTER_64; // mxfp8 D=128 时基本块为128*256
+        sInnerFactor = SINNER_512;
+    }
 }
 
 } // namespace qfa_tiling_util

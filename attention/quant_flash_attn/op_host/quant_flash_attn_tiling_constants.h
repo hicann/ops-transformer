@@ -26,6 +26,7 @@ namespace arch35QFA {
 
 constexpr uint32_t SOUTER_64 = 64;
 constexpr uint32_t SOUTER_128 = 128;
+constexpr uint32_t SINNER_256 = 256;
 constexpr uint32_t SINNER_512 = 512;
 constexpr uint32_t DSIZE_64 = 64;
 constexpr uint32_t DSIZE_128 = 128;

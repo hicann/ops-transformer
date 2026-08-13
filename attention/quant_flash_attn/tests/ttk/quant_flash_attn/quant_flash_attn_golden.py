@@ -1249,8 +1249,12 @@ def cpu_mxfp8_golden(
     """CPU Flash Attention golden with MXFP8, C1V1C1V1C2V2 流水"""
     EPSILON = 1e-20
     Q_BLOCK_SIZE = 128
-    K_BLOCK_SIZE = 256
-    V_BLOCK_SIZE = 512
+    if D == 256:
+        K_BLOCK_SIZE = 128
+        V_BLOCK_SIZE = 256
+    else:
+        K_BLOCK_SIZE = 256
+        V_BLOCK_SIZE = 512
 
     if actual_seq_q is None:
         actual_seq_q = _actual_seq_q()

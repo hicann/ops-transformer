@@ -75,7 +75,7 @@ QuantFlashAttnMetadataCheck::ParamsCheck(const aclTensor *cuSeqlensQOptional, co
                                          const char *layoutQ, const char *layoutQDescale, const char *layoutKv,
                                          const char *layoutOut, const aclTensor *metadata)
 {
-    (void)vDescaleOptional;  // v_descale 校验下沉至 aicpu kernel
+    (void)vDescaleOptional; // v_descale 校验下沉至 aicpu kernel
     auto ret = CheckBaseAttr(batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, quantMode, layoutQ,
                              layoutQDescale, layoutKv, layoutOut);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -114,7 +114,8 @@ QuantFlashAttnMetadataCheck::CheckBaseAttr(int64_t batchSize, int64_t maxSeqlenQ
     CHECK_COND(quantModeSet.count(quantMode) > 0, ACLNN_ERR_RUNTIME_ERROR,
                "quantMode only supports 1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) "
                "and 6(A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) "
-               "but got %ld", quantMode);
+               "but got %ld",
+               quantMode);
 
     // 文档约束(单参数校验): max_seqlen_q / max_seqlen_kv 值域为 -1(默认,表示未传) 或 >=0(有效值)
     // 场景相关的存在性约束由 CheckExistency(特性交叉校验)负责: 非TND时与seqused_q/kv至少传1个
@@ -128,9 +129,10 @@ QuantFlashAttnMetadataCheck::CheckBaseAttr(int64_t batchSize, int64_t maxSeqlenQ
 
     constexpr int64_t HEAD_DIM_64 = 64;
     constexpr int64_t HEAD_DIM_128 = 128;
-    static const std::unordered_set<int64_t> headDimSet = {HEAD_DIM_64, HEAD_DIM_128};
+    constexpr int64_t HEAD_DIM_256 = 256;
+    static const std::unordered_set<int64_t> headDimSet = {HEAD_DIM_64, HEAD_DIM_128, HEAD_DIM_256};
     CHECK_COND(headDimSet.count(headDim) > 0, ACLNN_ERR_RUNTIME_ERROR,
-               "headDim only supports %ld, %ld, but got %ld", HEAD_DIM_64, HEAD_DIM_128, headDim);
+               "headDim only supports %ld, %ld, %ld, but got %ld", HEAD_DIM_64, HEAD_DIM_128, HEAD_DIM_256, headDim);
 
     static const std::unordered_set<std::string> layoutQSet = {"BSND", "TND", "BNSD", "NTD"};
     CHECK_COND(layoutQSet.count(layoutQ) > 0, ACLNN_ERR_RUNTIME_ERROR,

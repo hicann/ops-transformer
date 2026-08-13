@@ -93,7 +93,7 @@ public:
     static constexpr uint32_t dBaseSize = (uint32_t)dTemplateType;
     static constexpr uint32_t dVBaseSize = (uint32_t)dVTemplateType;
     static constexpr uint32_t l1BaseD = 128;
-    static constexpr uint32_t s2SplitSize = 256U;
+    static constexpr uint32_t s2SplitSize = (dBaseSize == 256) ? 128U : 256U;
     static constexpr uint32_t MXFP_GROUP_SIZE = 32U;
     static constexpr uint32_t MXFP_DIVISOR_SIZE = 64U;
     static constexpr uint32_t MXFP_MULTI_BASE_SIZE = 2U;
@@ -222,11 +222,17 @@ public:
         constexpr uint32_t s2BaseSizeCur = s2BaseSize >> 1;
         constexpr uint32_t mm1QSize = mBaseSize * dBaseSize * sizeof(INPUT_T);
         constexpr uint32_t mm1QScaleSize = mBaseSize * dBaseSize / MXFP_GROUP_SIZE * sizeof(SCALE_T);
-        constexpr uint32_t mmKVSize = dBaseSize * s2BaseSizeCur * sizeof(INPUT_T);
-        constexpr uint32_t mmKVScaleSize = s2BaseSizeCur * dBaseSize / MXFP_GROUP_SIZE * sizeof(SCALE_T);
-
-        l1QBuffers_.Init((*l1BufferManagerPtr_), mm1QSize + mm1QScaleSize);
-        l1KVBuffers_.Init((*l1BufferManagerPtr_), mmKVSize + mmKVScaleSize);
+        if constexpr (dBaseSize == 256) {
+            constexpr uint32_t mmKVSize = dBaseSize * s2BaseSize * sizeof(INPUT_T); // 按decode方案分配较大的内存
+            constexpr uint32_t mmKVScaleSize = s2BaseSize * dBaseSize / MXFP_GROUP_SIZE * sizeof(SCALE_T);
+            l1QBuffers_.Init((*l1BufferManagerPtr_), mm1QSize + mm1QScaleSize);
+            l1KVBuffers_.Init((*l1BufferManagerPtr_), mmKVSize + mmKVScaleSize);
+        } else {
+            constexpr uint32_t mmKVSize = dBaseSize * s2BaseSizeCur * sizeof(INPUT_T);
+            constexpr uint32_t mmKVScaleSize = s2BaseSizeCur * dBaseSize / MXFP_GROUP_SIZE * sizeof(SCALE_T);
+            l1QBuffers_.Init((*l1BufferManagerPtr_), mm1QSize + mm1QScaleSize);
+            l1KVBuffers_.Init((*l1BufferManagerPtr_), mmKVSize + mmKVScaleSize);
+        }
 
         // L0A B C 当前写死，能否通过基础api获取
         l0aBufferManager_.Init(tPipe_, 65536);  // 64 * 1024
@@ -542,12 +548,10 @@ public:
     /* 针对S1Base=128, S2Base = 256, D = 128场景, L1全载/L0全载, 左矩阵驻留. GS1<=80, S=S1*S2 */
     __aicore__ inline void IterateBmm1Nd(MM1_DBUF_T &outputBuf, RunInfoX &runInfo, uint32_t subLoop)
     {
-        uint32_t s2CurSize;
-        if (runInfo.actSingleLoopS2Size <= s2SplitSize) {
-            s2CurSize = runInfo.actSingleLoopS2Size;
-        } else {
+        uint32_t s2CurSize = s2SplitSize;
+        if (unlikely(runInfo.actSingleLoopS2Size < s2BaseSize)) {
             if (subLoop == 0) {
-                s2CurSize = s2SplitSize;
+                s2CurSize = AttentionCommon::Min((int32_t)s2SplitSize, (int32_t)runInfo.actSingleLoopS2Size);
             } else {
                 s2CurSize = runInfo.actSingleLoopS2Size - s2SplitSize;
             }
@@ -584,11 +588,19 @@ public:
         mm1ResL0C.Wait<HardEvent::FIX_M>();
         MMParam param =
             MakeMMParam((uint32_t)runInfo.actMSize, (uint32_t)s2CurSize, (uint32_t)constInfo_.dSize, false, true);
-        MatmulFullMX<Q_T, KV_T, T, 128, 256, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType, SCALE_T, SCALE_T,
-                     mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
-            mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
-            mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(qScaleOffset),
-            mm1B.GetTensor<SCALE_T>(kScaleOffset));
+        if constexpr (dBaseSize == 256) {
+            MatmulFull<Q_T, KV_T, T, 128, (s2BaseSize >> 1), dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType, SCALE_T, SCALE_T,
+                       mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
+                mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(qScaleOffset),
+                mm1B.GetTensor<SCALE_T>(kScaleOffset));
+        } else {
+            MatmulFullMX<Q_T, KV_T, T, 128, (s2BaseSize >> 1), dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType, SCALE_T, SCALE_T,
+                         mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
+                mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(qScaleOffset),
+                mm1B.GetTensor<SCALE_T>(kScaleOffset));
+        }
 
         if (unlikely(runInfo.isLastS2Loop && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
                                               (runInfo.actSingleLoopS2Size <= s2SplitSize)))) {
@@ -649,12 +661,10 @@ public:
     /* 针对S1Base=128, S2Base = 256, D = 128场景, L1全载/L0全载, K * Q^T, Q矩阵驻留. GS1>80, S=S1*S2 */
     __aicore__ inline void IterateBmm1Dn(MM1_DBUF_T &outputBuf, RunInfoX &runInfo, uint32_t subLoop)
     {
-        uint32_t s2CalcSize;
-        if (runInfo.actSingleLoopS2Size <= s2SplitSize) {
-            s2CalcSize = runInfo.actSingleLoopS2Size;
-        } else {
+        uint32_t s2CalcSize = s2SplitSize;
+        if (unlikely(runInfo.actSingleLoopS2Size < s2BaseSize)) { // unlikely告诉编译器大概率走不到
             if (subLoop == 0) {
-                s2CalcSize = s2SplitSize;
+                s2CalcSize = AttentionCommon::Min((int32_t)s2SplitSize, (int32_t)runInfo.actSingleLoopS2Size);
             } else {
                 s2CalcSize = runInfo.actSingleLoopS2Size - s2SplitSize;
             }
@@ -691,11 +701,19 @@ public:
         mm1ResL0C.Wait<HardEvent::FIX_M>();
         MMParam param =
             MakeMMParam((uint32_t)s2CalcSize, (uint32_t)runInfo.actMSize, (uint32_t)constInfo_.dSize, false, true);
-        MatmulFullMX<Q_T, KV_T, T, 256, 128, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType, SCALE_T, SCALE_T,
-                     mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
-            mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
-            mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(kScaleOffset),
-            mm1B.GetTensor<SCALE_T>(qScaleOffset));
+        if constexpr (dBaseSize == 256) {
+            MatmulFull<Q_T, KV_T, T, (s2BaseSize >> 1), 128, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType, SCALE_T, SCALE_T,
+                       mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
+                mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(kScaleOffset),
+                mm1B.GetTensor<SCALE_T>(qScaleOffset));
+        } else {
+            MatmulFullMX<Q_T, KV_T, T, (s2BaseSize >> 1), 128, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType, SCALE_T, SCALE_T,
+                         mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
+                mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(kScaleOffset),
+                mm1B.GetTensor<SCALE_T>(qScaleOffset));
+        }
 
         if (unlikely(runInfo.isLastS2Loop && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
                                               (runInfo.actSingleLoopS2Size <= s2SplitSize)))) {
@@ -763,10 +781,17 @@ public:
             if constexpr (!USE_DN) {
                 param.realM = (uint32_t)runInfo.actMSize;
             }
-            MatmulFullMX<INPUT_T, KV_T, T, 128, dVBaseSize, baseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
-                         SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
-                mm2A.GetTensor<INPUT_T>()[kIdx * l1BaseKOffset], mm2BTensor, mmL0ABuffers_, mmL0BBuffers_,
-                mm2ResL0C.GetTensor<T>(), param, mm2AScaleFakeTensor[kIdx * l1ScaleOffset], mm2BScaleTensor);
+            if constexpr (dBaseSize == 256) {
+                MatmulFull<INPUT_T, KV_T, T, 128, dVBaseSize, baseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+                           SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                    mm2A.GetTensor<INPUT_T>()[kIdx * l1BaseKOffset], mm2BTensor, mmL0ABuffers_, mmL0BBuffers_,
+                    mm2ResL0C.GetTensor<T>(), param, mm2AScaleFakeTensor[kIdx * l1ScaleOffset], mm2BScaleTensor);
+            } else {
+                MatmulFullMX<INPUT_T, KV_T, T, 128, dVBaseSize, baseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+                             SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                    mm2A.GetTensor<INPUT_T>()[kIdx * l1BaseKOffset], mm2BTensor, mmL0ABuffers_, mmL0BBuffers_,
+                    mm2ResL0C.GetTensor<T>(), param, mm2AScaleFakeTensor[kIdx * l1ScaleOffset], mm2BScaleTensor);
+            }
             mm2B.Set<HardEvent::MTE1_MTE2>();
         }
         mm2ResL0C.Set<HardEvent::M_FIX>();
@@ -847,13 +872,17 @@ public:
             MMParam param =
                 MakeMMParam((uint32_t)mBaseSize, (uint32_t)constInfo_.dSizeV,
                             (realK + 63) / MXFP_DIVISOR_SIZE * MXFP_DIVISOR_SIZE, USE_DN, false, k == 0, k == 0);
-            if constexpr (!USE_DN) {
-                param.realM = (uint32_t)runInfo.actMSize;
+            if constexpr (dBaseSize == 256) {
+                MatmulFull<INPUT_T, KV_T, T, 128, dVBaseSize, baseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+                           SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                    mm2A.GetTensor<INPUT_T>()[k * l1BaseKOffset], mm2BTensor, mmL0ABuffers_, mmL0BBuffers_,
+                    mm2ResL0C.GetTensor<T>(), param, mm2AScaleFakeTensor[k * l1ScaleOffset], mm2BScaleTensor);
+            } else {
+                MatmulFullMX<INPUT_T, KV_T, T, 128, dVBaseSize, baseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+                             SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                    mm2A.GetTensor<INPUT_T>()[k * l1BaseKOffset], mm2BTensor, mmL0ABuffers_, mmL0BBuffers_,
+                    mm2ResL0C.GetTensor<T>(), param, mm2AScaleFakeTensor[k * l1ScaleOffset], mm2BScaleTensor);
             }
-            MatmulFullMX<INPUT_T, KV_T, T, 128, dVBaseSize, baseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
-                         SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
-                mm2A.GetTensor<INPUT_T>()[k * l1BaseKOffset], mm2BTensor, mmL0ABuffers_, mmL0BBuffers_,
-                mm2ResL0C.GetTensor<T>(), param, mm2AScaleFakeTensor[k * l1ScaleOffset], mm2BScaleTensor);
             mm2B.Set<HardEvent::MTE1_MTE2>();
         }
 

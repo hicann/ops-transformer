@@ -80,7 +80,7 @@ public:
                                   IsSameType<INPUT_T, hifloat8_t>::value;
     static constexpr uint32_t DB = 2;
     static constexpr uint32_t PRELOAD_N = 2; // C1 C1 C2
-    static constexpr uint32_t s2SplitSize = 256U;
+    static constexpr uint32_t s2SplitSize = (dTemplateAlign64 == 256) ? 128U : 256U;
     static constexpr uint32_t MXFP_GROUP_SIZE = 32U;
     static constexpr bool HAS_MASK = hasAtten;
     static constexpr bool FLASH_DECODE = isFd;
@@ -388,8 +388,9 @@ public:
         constexpr uint64_t pScaleDataLen = (mBaseSize >> 1) * s2BaseSizeCur / MXFP_GROUP_SIZE;
         constexpr uint16_t pScaleDstStride = s2BaseSizeCur / MXFP_GROUP_SIZE / 2 - 1;
         uint64_t vecOffset = constInfo_.subBlockIdx * pScaleDataLen;
+        constexpr uint32_t copyTimes = s2BaseSizeCur / MXFP_GROUP_SIZE / 2;
         if ((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) {
-            for (uint16_t i = 0; i < 4; i++) {
+            for (uint16_t i = 0; i < copyTimes; i++) {
                 // PScale s2方向block块大小为32，共8个，L1需满足16x2分形，重复拷贝4次
                 DataCopy(mm2AScaleL1Tensor[vecOffset + i * 32], pScaleSubLoop0Tensor, {4, 1, 0, pScaleDstStride});
             }
@@ -408,7 +409,7 @@ public:
             if (constInfo_.subBlockIdx == 1) {
                 dstOffset += s2BaseSizeCur * actVec0Align32;
             }
-            uint32_t srcOffset = i * (65 << 5);
+            uint32_t srcOffset = i * (((s2BaseSizeCur >> 2) + 1) << 5);
             DataCopy(mm2AL1Tensor[dstOffset], stage1CastTensor[srcOffset],
                      {4, s2BaseSizeCur / 4, s2BaseSizeCur / 4 + 2, 0});
         }
@@ -660,8 +661,9 @@ public:
         uint16_t copyCount = actVecMSizeAlign16 / 16;
         uint64_t vecOffset = constInfo_.subBlockIdx * pScaleDataLen;
         uint16_t dstStride = s2BaseSizeCur / MXFP_GROUP_SIZE / 2 - 1;
+        constexpr uint32_t copyTimes = s2BaseSizeCur / MXFP_GROUP_SIZE / 2;
         if ((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) {
-            for (uint16_t i = 0; i < 4; i++) {
+            for (uint16_t i = 0; i < copyTimes; i++) {
                 // PScale s2方向block块大小为32，共256/32=8个，L1需满足16x2分形，重复拷贝4次
                 DataCopy(mm2AScaleL1Tensor[vecOffset + i * 32], pScaleSubLoop0Tensor,
                          {copyCount, 1, 0, pScaleDstStride});
@@ -669,7 +671,7 @@ public:
                          {copyCount, 1, 0, pScaleDstStride});
             }
         } else if (unlikely(runInfo.actSingleLoopS2Size <= s2SplitSize)) {
-            for (uint16_t i = 0; i < 4; i++) {
+            for (uint16_t i = 0; i < copyTimes; i++) {
                 DataCopy(mm2AScaleL1Tensor[vecOffset + i * 32], pScaleSubLoop0Tensor,
                          {copyCount, 1, 0, pScaleDstStride});
             }
@@ -1007,6 +1009,7 @@ public:
     {
         uint32_t mm1ResultSize = mBaseSize / CV_RATIO * s2BaseSize * sizeof(T);
         uint32_t mm2ResultSize = mBaseSize / CV_RATIO * dTemplateAlign64 * sizeof(T);
+        uint32_t attenMaskSize = mBaseSize / CV_RATIO * (s2BaseSize >> 1U);
         SoftmaxInitBuffer();
         tPipe_->InitBuffer(stage2OutBuf_, 64 * dTemplateAlign64 * sizeof(T));
         tPipe_->InitBuffer(stage1OutQue_[0], 1, 16640); // (32 + 1) * (256 / 32) * 64
@@ -1014,7 +1017,7 @@ public:
         tPipe_->InitBuffer(pScaleSubLoop0Que_, 1, 512);
         tPipe_->InitBuffer(commonTBuf_, 512);
         if constexpr (HAS_MASK) {
-            tPipe_->InitBuffer(attenMaskInQue_[0], 1, 16384); // 256 * 64
+            tPipe_->InitBuffer(attenMaskInQue_[0], 1, attenMaskSize); // 256 * 64
         }
 
         if (constInfo_.isSoftmaxLseEnable) {

@@ -997,8 +997,12 @@ def cpu_mxfp8_golden(
     EPSILON = 1e-20
     LN2 = math.log(2.0)
     Q_BLOCK_SIZE = 128
-    K_BLOCK_SIZE = 256
-    V_BLOCK_SIZE = 512
+    if D == 256:
+        K_BLOCK_SIZE = 128
+        V_BLOCK_SIZE = 256
+    else:
+        K_BLOCK_SIZE = 256
+        V_BLOCK_SIZE = 512
 
     if actual_seq_q is None:
         actual_seq_q = _get_seqused_q()

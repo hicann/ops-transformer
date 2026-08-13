@@ -48,10 +48,10 @@ struct MMParam {
     bool cmatrixInitVal = true;
     bool isOutKFisrt = true; // 默认值为true， true：在L1切K轴的场景中，表示首轮K
     uint32_t unitFlag = 0;   // 0：disable: 不配置unitFlag
-                           // 2：enable: 行为在切K接口中（MatmulK），会将mmadParams.unitFlag设置为 0b10
-                           // 3：enable: 行为在切K接口中（MatmulK），在k的最后一轮循环，会将mmadParams.unitFlag设置为
-                           // 0b11 外部使用时，在外层k循环的最后一轮将该参数配置为3
-    uint32_t realM = 0; // bmm2以s1realsize为M轴，不赋值时不影响现有代码逻辑
+                             // 2：enable: 行为在切K接口中（MatmulK），会将mmadParams.unitFlag设置为 0b10
+                             // 3：enable: 行为在切K接口中（MatmulK），在k的最后一轮循环，会将mmadParams.unitFlag设置为
+                             // 0b11 外部使用时，在外层k循环的最后一轮将该参数配置为3
+    uint32_t realM = 0;      // bmm2以s1realsize为M轴，不赋值时不影响现有代码逻辑
 };
 
 __aicore__ inline MMParam MakeMMParam(uint32_t singleM, uint32_t singleN, uint32_t singleK, bool isLeftTranspose,
@@ -100,9 +100,9 @@ template <typename T>
 __aicore__ inline void LoadDataToL0A(LocalTensor<T> &aL0Tensor, const LocalTensor<T> &aL1Tensor, const MMParam &mmParam,
                                      uint64_t L1Aoffset, uint32_t kSplitSize, uint32_t mSplitSize)
 {
-    LoadData2DParamsV2 loadData2DParamsA; // 基础API LoadData的参数结构体
-    loadData2DParamsA.mStartPosition = 0; // 以M*K矩阵为例，源矩阵M轴方向的起始位置，单位为16 element
-    loadData2DParamsA.kStartPosition = 0; // 以M*K矩阵为例，源矩阵K轴方向的起始位置，单位为32B
+    LoadData2DParamsV2 loadData2DParamsA;                    // 基础API LoadData的参数结构体
+    loadData2DParamsA.mStartPosition = 0;                    // 以M*K矩阵为例，源矩阵M轴方向的起始位置，单位为16 element
+    loadData2DParamsA.kStartPosition = 0;                    // 以M*K矩阵为例，源矩阵K轴方向的起始位置，单位为32B
     loadData2DParamsA.ifTranspose = mmParam.isLeftTranspose; // 是否启用转置功能，对每个分型矩阵进行转置
     if (loadData2DParamsA.ifTranspose) {
         loadData2DParamsA.mStep = ((kSplitSize + 15) >> 4 << 4) >> 4; // 以M*K矩阵为例,源矩阵M轴方向搬运长度(S1向上对齐分形(512B),16*16个f16->向上对齐16)，单位为16
@@ -163,14 +163,14 @@ __aicore__ inline void LoadDataToL0A(LocalTensor<T> &aL0Tensor, const LocalTenso
 }
 
 // L1->L0A + 切k/切M/全载
-template <typename T, typename U = T>
+template <typename T, typename U = T, uint32_t baseK>
 __aicore__ inline void LoadDataToL0AMx(LocalTensor<U> &aL0Tensor, const LocalTensor<T> &aL1Tensor,
                                        const LocalTensor<fp8_e8m0_t> &aScaleL1Tensor, const MMParam &mmParam,
                                        uint64_t L1Aoffset, uint32_t kSplitSize, uint32_t mSplitSize)
 {
-    LoadData2DParamsV2 loadData2DParamsA; // 基础API LoadData的参数结构体
-    loadData2DParamsA.mStartPosition = 0; // 以M*K矩阵为例，源矩阵M轴方向的起始位置，单位为16 element
-    loadData2DParamsA.kStartPosition = 0; // 以M*K矩阵为例，源矩阵K轴方向的起始位置，单位为32B
+    LoadData2DParamsV2 loadData2DParamsA;                    // 基础API LoadData的参数结构体
+    loadData2DParamsA.mStartPosition = 0;                    // 以M*K矩阵为例，源矩阵M轴方向的起始位置，单位为16 element
+    loadData2DParamsA.kStartPosition = 0;                    // 以M*K矩阵为例，源矩阵K轴方向的起始位置，单位为32B
     loadData2DParamsA.ifTranspose = mmParam.isLeftTranspose; // 是否启用转置功能，对每个分型矩阵进行转置
     if (loadData2DParamsA.ifTranspose) {
         loadData2DParamsA.mStep = ((kSplitSize + 15) >> 4 << 4) >> 4; // 以M*K矩阵为例,源矩阵M轴方向搬运长度(S1向上对齐分形(512B),16*16个f16->向上对齐16)，单位为16
@@ -193,7 +193,7 @@ __aicore__ inline void LoadDataToL0AMx(LocalTensor<U> &aL0Tensor, const LocalTen
         // 64搬运对齐
         loadData2DParamsA.srcStride =
             loadData2DParamsA.ifTranspose ?
-                256 >> 4 :
+                ((baseK + 63) >> 6 << 6) >> 4 :
                 ((mSplitSize + 31) >> 5 << 5) >>
                     4; // 以M*K矩阵为例，源矩阵K方向前一个分形起始地址与后一个分形起始地址的间隔，单位：512B
     } else {
@@ -243,9 +243,9 @@ template <typename T>
 __aicore__ inline void LoadDataToL0B(LocalTensor<T> &bL0Tensor, const LocalTensor<T> &bL1Tensor, const MMParam &mmParam,
                                      uint64_t L1Boffset, uint32_t kSplitSize, uint32_t nSplitSize, int nLoops = 1)
 {
-    LoadData2DParamsV2 loadData2DParamsB; // 基础API LoadData的参数结构体
-    loadData2DParamsB.mStartPosition = 0; // 以M*K矩阵为例，源矩阵M轴方向的起始位置，单位为16 element
-    loadData2DParamsB.kStartPosition = 0; // 以M*K矩阵为例，源矩阵K轴方向的起始位置，单位为32B
+    LoadData2DParamsV2 loadData2DParamsB;                      // 基础API LoadData的参数结构体
+    loadData2DParamsB.mStartPosition = 0;                      // 以M*K矩阵为例，源矩阵M轴方向的起始位置，单位为16 element
+    loadData2DParamsB.kStartPosition = 0;                      // 以M*K矩阵为例，源矩阵K轴方向的起始位置，单位为32B
     loadData2DParamsB.ifTranspose = !mmParam.isRightTranspose; // 是否启用转置功能，对每个分型矩阵进行转置
     if (loadData2DParamsB.ifTranspose) {
         loadData2DParamsB.mStep = ((kSplitSize + 15) >> 4 << 4) >> 4; // 以M*K矩阵为例,源矩阵M轴方向搬运长度(S1向上对齐分形(512B),16*16个f16->向上对齐16)，单位为16
@@ -312,9 +312,9 @@ __aicore__ inline void LoadDataToL0BMx(LocalTensor<U> &bL0Tensor, const LocalTen
                                        const LocalTensor<Scale_T> &bScaleL1Tensor, const MMParam &mmParam,
                                        uint64_t L1Boffset, uint32_t kSplitSize, uint32_t nSplitSize, int nLoops = 1)
 {
-    LoadData2DParamsV2 loadData2DParamsB; // 基础API LoadData的参数结构体
-    loadData2DParamsB.mStartPosition = 0; // 以M*K矩阵为例，源矩阵M轴方向的起始位置，单位为16 element
-    loadData2DParamsB.kStartPosition = 0; // 以M*K矩阵为例，源矩阵K轴方向的起始位置，单位为32B
+    LoadData2DParamsV2 loadData2DParamsB;                      // 基础API LoadData的参数结构体
+    loadData2DParamsB.mStartPosition = 0;                      // 以M*K矩阵为例，源矩阵M轴方向的起始位置，单位为16 element
+    loadData2DParamsB.kStartPosition = 0;                      // 以M*K矩阵为例，源矩阵K轴方向的起始位置，单位为32B
     loadData2DParamsB.ifTranspose = !mmParam.isRightTranspose; // 是否启用转置功能，对每个分型矩阵进行转置
     if (loadData2DParamsB.ifTranspose) {
         if constexpr (IsSameType<T, fp4x2_e2m1_t>::value || IsSameType<T, hifloat4x2_t>::value) {
@@ -379,8 +379,8 @@ __aicore__ inline void LoadDataToL0BMx(LocalTensor<U> &bL0Tensor, const LocalTen
                 0; // 矩阵X轴方向的起始位置，即M维度方向，单位为1个分形（1个单位代表一个32B的分形）。
             loadData2DMxParamsB.yStartPosition =
                 mmParam.singleN / MX_FP4_PTG_PCG_SCALE_PARAM / 2; // 源矩阵Y轴方向的起始位置，即K维度方向，单位为32B。
-            loadData2DMxParamsB.xStep = (kSplitSize + 15) / 16; // 源矩阵X轴方向搬运长度，即M维度方向，单位为1个分形（1个单位代表一个32B的分形）。取值范围：xStep∈[0,
-                                                                // 255]。
+            loadData2DMxParamsB.xStep = (kSplitSize + 15) / 16;   // 源矩阵X轴方向搬运长度，即M维度方向，单位为1个分形（1个单位代表一个32B的分形）。取值范围：xStep∈[0,
+                                                                  // 255]。
             loadData2DMxParamsB.yStep = (mmParam.singleK + 63) / MX_FP4_PTG_PCG_SCALE_PARAM /
                                         2; // 源矩阵Y轴方向搬运长度，即K维度方向，单位为32B。取值范围：yStep∈[0, 255]。
             loadData2DMxParamsB.srcStride = mmParam.singleM / MX_FP4_PTG_PCG_SCALE_PARAM /
@@ -406,9 +406,9 @@ __aicore__ inline void LoadDataToL0BMx(LocalTensor<U> &bL0Tensor, const LocalTen
             loadData2DMxParamsB.xStartPosition =
                 0; // 矩阵X轴方向的起始位置，即M维度方向，单位为1个分形（1个单位代表一个32B的分形）。
             loadData2DMxParamsB.yStartPosition =
-                mmParam.singleN * 2 / HI_FP4_PTG_PCG_SCALE_PARAM; // 源矩阵Y轴方向的起始位置，即K维度方向，单位为32B。
-            loadData2DMxParamsB.xStep = (kSplitSize + 15) / 16; // 源矩阵X轴方向搬运长度，即M维度方向，单位为1个分形（1个单位代表一个32B的分形）。取值范围：xStep∈[0,
-                                                                // 255]。
+                mmParam.singleN * 2 / HI_FP4_PTG_PCG_SCALE_PARAM;                                // 源矩阵Y轴方向的起始位置，即K维度方向，单位为32B。
+            loadData2DMxParamsB.xStep = (kSplitSize + 15) / 16;                                  // 源矩阵X轴方向搬运长度，即M维度方向，单位为1个分形（1个单位代表一个32B的分形）。取值范围：xStep∈[0,
+                                                                                                 // 255]。
             loadData2DMxParamsB.yStep = (mmParam.singleK + 31) * 2 / HI_FP4_PTG_PCG_SCALE_PARAM; // 1个fp32伪装为2个bf16，故最小分型数量翻倍。源矩阵Y轴方向搬运长度，即K维度方向，单位为32B。取值范围：yStep∈[0,
                                                                                                  // 255]。
             loadData2DMxParamsB.srcStride =
@@ -419,10 +419,10 @@ __aicore__ inline void LoadDataToL0BMx(LocalTensor<U> &bL0Tensor, const LocalTen
             LoadData(bL0Tensor, bL1Tensor, bScaleL1Tensor, loadData2DParamsB, loadData2DMxParamsB);
         } else {
             loadData2DMxParamsB.xStartPosition =
-                mmParam.singleK / 16; // 矩阵X轴方向的起始位置，即M维度方向，单位为1个分形（1个单位代表一个32B的分形）。
-            loadData2DMxParamsB.yStartPosition = 0; // 源矩阵Y轴方向的起始位置，即K维度方向，单位为32B。
-            loadData2DMxParamsB.xStep = (mmParam.singleN + 15) / 16; // 源矩阵X轴方向搬运长度，即M维度方向，单位为1个分形（1个单位代表一个32B的分形）。取值范围：xStep∈[0,
-                                                                     // 255]。
+                mmParam.singleK / 16;                                                       // 矩阵X轴方向的起始位置，即M维度方向，单位为1个分形（1个单位代表一个32B的分形）。
+            loadData2DMxParamsB.yStartPosition = 0;                                         // 源矩阵Y轴方向的起始位置，即K维度方向，单位为32B。
+            loadData2DMxParamsB.xStep = (mmParam.singleN + 15) / 16;                        // 源矩阵X轴方向搬运长度，即M维度方向，单位为1个分形（1个单位代表一个32B的分形）。取值范围：xStep∈[0,
+                                                                                            // 255]。
             loadData2DMxParamsB.yStep = (kSplitSize + 31) * 2 / HI_FP4_PTG_PCG_SCALE_PARAM; // 1个fp32伪装为2个bf16，故最小分型数量翻倍。源矩阵Y轴方向搬运长度，即K维度方向，单位为32B。取值范围：yStep∈[0,
                                                                                             // 255]。
             loadData2DMxParamsB.srcStride =
@@ -449,7 +449,7 @@ __aicore__ inline void MatmulFullMX(const LocalTensor<A> &aL1Tensor, const Local
     l0aBuffer.template Wait<HardEvent::M_MTE1>();
     LocalTensor<L0ADType> L0ATensor = l0aBuffer.template GetTensor<L0ADType>();
     if constexpr (IsSameType<L0ADType, mx_fp8_e4m3_t>::value) {
-        LoadDataToL0AMx<A, L0ADType>(L0ATensor, aL1Tensor, aScaleL1Tensor, param, 0, param.singleK, param.singleM);
+        LoadDataToL0AMx<A, L0ADType, baseK>(L0ATensor, aL1Tensor, aScaleL1Tensor, param, 0, param.singleK, param.singleM);
     } else {
         LoadDataToL0A(L0ATensor, aL1Tensor, param, 0, param.singleK, param.singleM); // s2*d,d,s2
     }
@@ -514,8 +514,8 @@ __aicore__ inline void MatmulKMx(const LocalTensor<A> &aL1Tensor, const LocalTen
         l0aBuffer.template Wait<HardEvent::M_MTE1>(); // mte1等Matmul：上一轮matmul完成后才能搬运新数据到L0A
         LocalTensor<L0ADType> L0ATensor = l0aBuffer.template GetTensor<L0ADType>();
         if constexpr (IsSameType<L0ADType, mx_fp8_e4m3_t>::value) {
-            LoadDataToL0AMx<A, L0ADType>(L0ATensor, aL1Tensor, aScaleL1Tensor, param, k * L1Aoffset, tileK,
-                                         param.singleM); // s2,
+            LoadDataToL0AMx<A, L0ADType, baseK>(L0ATensor, aL1Tensor, aScaleL1Tensor, param, k * L1Aoffset, tileK,
+                                                param.singleM); // s2,
         } else if constexpr (IsSameType<L0ADType, fp8_e4m3fn_t>::value) {
             LoadDataToL0A(L0ATensor, aL1Tensor, param, k * L1Aoffset, tileK, param.singleM);
         }
@@ -599,8 +599,8 @@ __aicore__ inline void MatmulMMx(const LocalTensor<A> &aL1Tensor, const LocalTen
         LocalTensor<L0ADType> L0ATensor = l0aBuffer.template GetTensor<L0ADType>();
         uint64_t loopNum = param.isRightTranspose ? mLoops : 1;
         if constexpr (IsSameType<L0ADType, mx_fp8_e4m3_t>::value) {
-            LoadDataToL0AMx<A, L0ADType>(L0ATensor, aL1Tensor, aScaleL1Tensor, param, m * L1Aoffset, tileM,
-                                         param.singleK);
+            LoadDataToL0AMx<A, L0ADType, baseK>(L0ATensor, aL1Tensor, aScaleL1Tensor, param, m * L1Aoffset, tileM,
+                                                param.singleK);
         }
         l0aBuffer.template Set<HardEvent::MTE1_M>();  // mte1搬运完后，通知可以开始matmul
         l0aBuffer.template Wait<HardEvent::MTE1_M>(); // matmul等mte1：L0A数据搬运完成后才能开始matmul
@@ -662,8 +662,8 @@ __aicore__ inline void LoadDataToL0A(LocalTensor<T> &aL0Tensor, const LocalTenso
         loadData2DParams.repeatTimes =
             (kSplitSize / ONE_FRACTAL_H_ELEMENT) *
             (mmParam.singleM / (ONE_FRACTAL_W_BYTE / sizeof(T))); // 迭代次数，每个迭代可以处理512B数据
-        loadData2DParams.srcStride = 1; // 相邻迭代间，源操作数前一个分型和后一个分型起始地址的间隔（单位512B）
-        loadData2DParams.dstGap = 0; // 相邻迭代间，目的操作数前一个分型的结束地址和后一个分型起始地址的间隔（单位512B）
+        loadData2DParams.srcStride = 1;                           // 相邻迭代间，源操作数前一个分型和后一个分型起始地址的间隔（单位512B）
+        loadData2DParams.dstGap = 0;                              // 相邻迭代间，目的操作数前一个分型的结束地址和后一个分型起始地址的间隔（单位512B）
         loadData2DParams.ifTranspose = true;
         LoadData(aL0Tensor, aL1Tensor[L1Aoffset], loadData2DParams);
     }
@@ -692,7 +692,7 @@ __aicore__ inline void LoadDataToL0B(LocalTensor<T> &bL0Tensor, const LocalTenso
         loadData3DParams.filterW = LOAD3D_FILTER_W;
         loadData3DParams.filterSizeW = false; // 是否在filterW的基础上将卷积核width增加256个元素
         loadData3DParams.filterH = LOAD3D_FILTER_H;
-        loadData3DParams.filterSizeH = false; // 是否在filterH的基础上将卷积核height增加256个元素
+        loadData3DParams.filterSizeH = false;                    // 是否在filterH的基础上将卷积核height增加256个元素
         loadData3DParams.dilationFilterW = LOAD3D_DILA_FILTER_W; // 卷积核width膨胀系数
         loadData3DParams.dilationFilterH = LOAD3D_DILA_FILTER_H; // 卷积核height膨胀系数
         loadData3DParams.enTranspose = 1;                        // 是否启用转置功能
@@ -730,8 +730,8 @@ __aicore__ inline void MatmulFull(const LocalTensor<A> &aL1Tensor, const LocalTe
     LocalTensor<L0ADType> L0ATensor = l0aBuffer.template GetTensor<L0ADType>();
 #if ((__CCE_AICORE__ == 310) || (defined __DAV_310R6__) || (__NPU_ARCH__ == 5102))
     if constexpr (IsSameType<L0ADType, mx_fp8_e4m3_t>::value) {
-        LoadDataToL0AMx<A, L0ADType>(L0ATensor, aL1Tensor, aScaleL1Tensor, param, 0, param.singleK,
-                                     param.singleM); // d,s2
+        LoadDataToL0AMx<A, L0ADType, baseK>(L0ATensor, aL1Tensor, aScaleL1Tensor, param, 0, param.singleK,
+                                            param.singleM); // d,s2
     } else
 #endif
     {
@@ -808,8 +808,8 @@ __aicore__ inline void MatmulK(const LocalTensor<A> &aL1Tensor, const LocalTenso
         LocalTensor<L0ADType> L0ATensor = l0aBuffer.template GetTensor<L0ADType>();
 #if (__CCE_AICORE__ == 310) || (defined __DAV_310R6__)
         if constexpr (IsSameType<L0ADType, mx_fp8_e4m3_t>::value) {
-            LoadDataToL0AMx<A, L0ADType>(L0ATensor, aL1Tensor, aScaleL1Tensor, param, k * L1Aoffset, tileK,
-                                         param.singleM); // s2,
+            LoadDataToL0AMx<A, L0ADType, baseK>(L0ATensor, aL1Tensor, aScaleL1Tensor, param, k * L1Aoffset, tileK,
+                                                param.singleM); // s2,
         } else
 #endif
         {
@@ -869,7 +869,7 @@ __aicore__ inline void MatmulKbias(const LocalTensor<A> &aL1Tensor, const LocalT
         baseK; // 尾块处理，如果dSize不可以被256整除的时候，也就是存在尾块的时候，循环次数需要+1，这里的尾块始终是针对一个基本块计算的视角来看的
     uint32_t tailSize =
         param.singleK %
-        baseK; // 针对dsize维度来说，需要按照256切分，如果不可以整除的话，求出最后一个尾块的dsize，命名为tailSize
+        baseK;                                    // 针对dsize维度来说，需要按照256切分，如果不可以整除的话，求出最后一个尾块的dsize，命名为tailSize
     uint32_t tailK = tailSize ? tailSize : baseK; // 沿着K轴切分的尾块的K
     uint64_t L1Aoffset = param.isLeftTranspose ?
                              baseK << 4 :
@@ -964,8 +964,8 @@ __aicore__ inline void MatmulN(const LocalTensor<A> &aL1Tensor, const LocalTenso
     LocalTensor<L0ADType> L0ATensor = l0aBuffer.template GetTensor<L0ADType>();
 #if (__CCE_AICORE__ == 310) || (defined __DAV_310R6__)
     if constexpr (IsSameType<L0ADType, mx_fp8_e4m3_t>::value) {
-        LoadDataToL0AMx<A, L0ADType>(L0ATensor, aL1Tensor, aScaleL1Tensor, param, 0, param.singleK,
-                                     param.singleM); // d,s2
+        LoadDataToL0AMx<A, L0ADType, baseK>(L0ATensor, aL1Tensor, aScaleL1Tensor, param, 0, param.singleK,
+                                            param.singleM); // d,s2
     } else
 #endif
     {
@@ -1136,9 +1136,9 @@ __aicore__ inline void LoadDataToL0A(LocalTensor<T> &aL0Tensor, const LocalTenso
     if constexpr (AL == ABLayout::MK) {
         LoadData2DParams loadData2DParams;
         loadData2DParams.startIndex = 0; // 分型矩阵ID，表明搬运起始位置为源操作数中第0个分型
-        loadData2DParams.srcStride = 1; // 相邻迭代间，源操作数前一个分型和后一个分型起始地址的间隔（单位512B）
+        loadData2DParams.srcStride = 1;  // 相邻迭代间，源操作数前一个分型和后一个分型起始地址的间隔（单位512B）
         loadData2DParams.dstGap = kSplitSize / blockElementCnt -
-                                  1; // 相邻迭代间，目的操作数前一个分型的结束地址和后一个分型起始地址的间隔（单位512B）
+                                  1;                                       // 相邻迭代间，目的操作数前一个分型的结束地址和后一个分型起始地址的间隔（单位512B）
         loadData2DParams.repeatTimes = mSplitSize / ONE_FRACTAL_H_ELEMENT; // 迭代次数，每个迭代可以处理512B数据
         loadData2DParams.ifTranspose = false;
         uint32_t loopTimes = kSplitSize / blockElementCnt;
@@ -1196,8 +1196,8 @@ __aicore__ inline void LoadDataToL0B(LocalTensor<T> &bL0Tensor, const LocalTenso
     } else if constexpr (BL == ABLayout::NK) {
         LoadData2DParams loadData2DParams;
         loadData2DParams.startIndex = 0; // 分型矩阵ID，表明搬运起始位置为源操作数中第0个分型
-        loadData2DParams.srcStride = 1; // 相邻迭代间，源操作数前一个分型和后一个分型起始地址的间隔（单位512B）
-        loadData2DParams.dstGap = 0; // 相邻迭代间，目的操作数前一个分型的结束地址和后一个分型起始地址的间隔（单位512B）
+        loadData2DParams.srcStride = 1;  // 相邻迭代间，源操作数前一个分型和后一个分型起始地址的间隔（单位512B）
+        loadData2DParams.dstGap = 0;     // 相邻迭代间，目的操作数前一个分型的结束地址和后一个分型起始地址的间隔（单位512B）
         loadData2DParams.ifTranspose = false;
         if (rowSize == kSplitSize) {
             loadData2DParams.repeatTimes = ((nSplitSize + ONE_FRACTAL_H_ELEMENT - 1) / ONE_FRACTAL_H_ELEMENT) *

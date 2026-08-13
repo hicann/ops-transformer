@@ -212,8 +212,13 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
         baseInfo.kvType = load_balance::DataType::INT8;
     }
     if (quantMode_ == 1) { // TODO：用adjust函数代替
-        mBaseSize_ = 64U;
-        s2BaseSize_ = 512U;
+        if (baseInfo.headDim == 256) {
+            mBaseSize_ = 64U;
+            s2BaseSize_ = 256U;
+        } else {
+            mBaseSize_ = 64U;
+            s2BaseSize_ = 512U;
+        }
     } else if (quantMode_ == 6) { // GQA FP8 fullquant: s2BaseSize=256
         mBaseSize_ = 64U;
         s2BaseSize_ = 256U;

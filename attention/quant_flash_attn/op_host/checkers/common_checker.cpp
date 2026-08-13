@@ -311,16 +311,16 @@ ge::graphStatus CommonChecker::CheckAxis(const QfaTilingInfo &qfaInfo)
                         qfaInfo.s2Size),
                 return ge::GRAPH_FAILED);
 
-    const std::vector<int64_t> supportedHeadDims = {64, 128};
+    const std::vector<int64_t> supportedHeadDims = {64, 128, 256};
     OP_CHECK_IF(CheckValueSupport(qfaInfo.qkHeadDim, supportedHeadDims) != ge::GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(qfaInfo.opName, "axis D of query and key",
                                                        std::to_string(qfaInfo.qkHeadDim).c_str(),
-                                                       "The value of axis D of query and key can only be 64/128"),
+                                                       "The value of axis D of query and key can only be 64/128/256"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckValueSupport(qfaInfo.vHeadDim, supportedHeadDims) != ge::GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, "axis D of value",
                                                       std::to_string(qfaInfo.vHeadDim).c_str(),
-                                                      "The value of axis D of value can only be 64/128"),
+                                                      "The value of axis D of value can only be 64/128/256"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
