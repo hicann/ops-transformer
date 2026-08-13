@@ -33,10 +33,13 @@ import torch
 
 
 def _broadcast_dims(dy, cos):
-    """Axes of dy's shape over which cos/sin are broadcast (cos dim == 1)."""
+    """Axes of dy's shape over which cos/sin are broadcast (cos dim == 1).
+
+    Note: a zero-sized dy axis still counts (sum over an empty axis yields zeros,
+    matching dcos/dsin semantics for empty inputs)."""
     ndim = dy.dim()
     cos_shape = [1] * (ndim - cos.dim()) + list(cos.shape)
-    return [i for i in range(ndim) if cos_shape[i] == 1 and dy.shape[i] > 1]
+    return [i for i in range(ndim) if cos_shape[i] == 1 and dy.shape[i] != 1]
 
 
 def _chunk2(t):

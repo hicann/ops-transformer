@@ -72,6 +72,8 @@ struct RopeGradTilingData {
     RopeGradRegbaseABParams ropeGradABParams;
     RotaryXParams rotaryXParams;
     uint32_t dCosFlag;
+    uint32_t isEmptyDy;   // dy/x 为空 tensor：kernel 跳过全部有效计算，仅清零 dcos/dsin
+    int64_t cosShapeSize; // dcos/dsin 的元素个数（清零范围）
 };
 
 #endif
