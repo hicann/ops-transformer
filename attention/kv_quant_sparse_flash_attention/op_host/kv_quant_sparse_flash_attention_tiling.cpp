@@ -869,8 +869,7 @@ ge::graphStatus QSFATilingCheck::CheckBlockTable() const
 {
     if (kvStorageMode_ != KvStorageMode::PAGE_ATTENTION) {
         OP_CHECK_IF(opParamInfo_.blockTable.tensor != nullptr,
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, BLOCK_TABLE_NAME.c_str(),
-                Ops::Base::ToString(opParamInfo_.blockTable.tensor->GetStorageShape()).c_str(),
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, BLOCK_TABLE_NAME.c_str(),
                 "When the layout_kv is " + QSFALayoutToSerialString(kvLayout_) + ", block_table should be null"),
             return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
@@ -982,10 +981,10 @@ ge::graphStatus QSFATilingCheck::CheckKVShape()
         return CheckKVShapeForPageAttention();
     }
 
-    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "key",
-        Ops::Base::ToString(opParamInfo_.key.shape->GetStorageShape()).c_str(),
-        "storage mode of key and value is " + std::to_string(static_cast<int32_t>(kvStorageMode_)) +
+    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "key",
+        "Storage mode of key and value is " + std::to_string(static_cast<int32_t>(kvStorageMode_)) +
         ", it is incorrect");
+
     return ge::GRAPH_FAILED;
 }
 
@@ -1065,7 +1064,7 @@ ge::graphStatus QSFATilingCheck::CheckActualSeqLensDType()
     }
     if (opParamInfo_.actualSeqLengths.desc->GetDataType() != ge::DT_INT32) {
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "actualSeqLengths",
-            QSFADataTypeToSerialString(opParamInfo_.actualSeqLengthsQ.desc->GetDataType()).c_str(),
+            QSFADataTypeToSerialString(opParamInfo_.actualSeqLengths.desc->GetDataType()).c_str(),
             "The dtype of actualSeqLengths must be DT_INT32");
     }
     return ge::GRAPH_SUCCESS;
@@ -1557,8 +1556,7 @@ ge::graphStatus QSFAInfoParser::GetActualSeqLenQSize(uint32_t &size)
 ge::graphStatus QSFAInfoParser::GetOpName()
 {
     if (context_->GetNodeName() == nullptr) {
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("KvQuantSparseFlashAttention", "opName",
-            "opName got from TilingContext is nullptr");
+        OP_LOGE("KvQuantSparseFlashAttention", "opName got from TilingContext is nullptr");
         return ge::GRAPH_FAILED;
     }
     opName_ = context_->GetNodeName();
@@ -2005,8 +2003,7 @@ void QSFAInfoParser::FillTilingInfoAttrsAndLayouts(QSFATilingInfo &qsfaInfo)
 ge::graphStatus QSFAInfoParser::Parse(QSFATilingInfo &qsfaInfo)
 {
     if (context_ == nullptr) {
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("KvQuantSparseFlashAttention", "tiling context",
-            "tiling context is nullptr");
+        OP_LOGE("KvQuantSparseFlashAttention", "tiling context is nullptr");
         return ge::GRAPH_FAILED;
     }
     if (ge::GRAPH_SUCCESS != GetOpName() ||
