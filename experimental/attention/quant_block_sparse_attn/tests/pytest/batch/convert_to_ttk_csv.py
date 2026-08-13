@@ -275,12 +275,12 @@ def _parse_source_record(
             "quant_mode",
             f"FP8 TTK conversion requires 1, got {params['quant_mode']}",
         )
-    if params["sparse_mode"] not in {"random", "full"}:
+    if params["sparse_mode"] not in {"random", "dense"}:
         _fail(
             source_name,
             line_number,
             "sparse_mode",
-            f"expected random or full, got {params['sparse_mode']!r}",
+            f"expected random or dense, got {params['sparse_mode']!r}",
         )
     if params["output_dtype"] not in {"bfloat16", "bf16"}:
         _fail(
@@ -385,6 +385,7 @@ def _tensor_shapes(params: Dict[str, object]) -> Tuple[Tuple[int, ...], ...]:
     total_q = params["cu_seqlens_q_value"][-1]
     q_blocks = math.ceil(params["S1"] / params["sparse_q_block_size"])
     kv_blocks = math.ceil(params["S2"] / params["sparse_kv_block_size"])
+    max_kb = min(kv_blocks, params["max_block_per_batch"])
     query_shape = (
         (total_q, params["N1"], params["D"])
         if params["layout_q"] == "TND"
@@ -413,7 +414,7 @@ def _tensor_shapes(params: Dict[str, object]) -> Tuple[Tuple[int, ...], ...]:
             1,
         ),
         (params["N2"],),
-        (params["B"], params["N1"], q_blocks, kv_blocks),
+        (params["B"], params["N1"], q_blocks, max_kb),
         (params["B"], params["N1"], q_blocks),
         (0,) if params["p_scale_value"] is None else (1,),
         (len(params["cu_seqlens_q_value"]),),
@@ -510,6 +511,16 @@ def _validate_ttk_row(row: Dict[str, str], source_name: str, line_number: int) -
             line_number,
             "TTK tensor contract",
             f"expected four 16-entry fields, got lengths {lengths}",
+        )
+    sparse_indices_shape = parsed["tensor_view_shapes"][6]
+    block_table_shape = parsed["tensor_view_shapes"][13]
+    if sparse_indices_shape[-1] > block_table_shape[1]:
+        _fail(
+            source_name,
+            line_number,
+            "tensor_view_shapes",
+            f"sparseIndices max_Kb {sparse_indices_shape[-1]} exceeds "
+            f"blockTable max_block_per_batch {block_table_shape[1]}",
         )
     if not isinstance(parsed["attributes"], dict):
         _fail(source_name, line_number, "attributes", "expected dictionary")

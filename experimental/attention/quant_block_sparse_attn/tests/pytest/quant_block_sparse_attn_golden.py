@@ -466,13 +466,13 @@ def _make_sparse_indices(case, q_lengths, kv_lengths, rng):
     qb_max = math.ceil(case["S1"] / case["sparse_q_block_size"])
     kv_max = math.ceil(case["S2"] / case["sparse_kv_block_size"])
     sparse_mode = case["sparse_mode"]
-    if sparse_mode not in ("full", "random"):
+    if sparse_mode not in ("dense", "random"):
         raise ValueError(f"unsupported sparse_mode: {sparse_mode}")
     sparse_counts = []
     for batch_idx in range(batch):
         batch_kv_max = math.ceil(kv_lengths[batch_idx] / case["sparse_kv_block_size"])
         sparse_count = (
-            batch_kv_max if sparse_mode == "full" else rng.randint(0, batch_kv_max)
+            batch_kv_max if sparse_mode == "dense" else rng.randint(0, batch_kv_max)
         )
         sparse_counts.append(sparse_count)
     sparse_indices = torch.full(
