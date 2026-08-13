@@ -212,7 +212,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV2(
     - scalesOptional数据类型可以与expandedX不一致。
   <!-- end id8 -->
   <!-- npu="310p" id9 -->
-  - |<term>Atlas 推理系列产品</term>：
+  - <term>Atlas 推理系列产品</term>：
     - expandedX要求是一个2D的Tensor，数据类型支持FLOAT16、FLOAT32，shape要求尾轴H为32对齐。
     - x1Optional、x2Optional、biasOptional、expertIdxOptional仅支持传入nullptr
     - 仅支持dropPadMode传入2。
@@ -247,7 +247,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV2(
     <tr>
     <td>ACLNN_ERR_PARAM_INVALID</td>
     <td>161002</td>
-    <td>输入和输出的数据类型和数据格式不在支持的范围之内。</td>
+    <td>输入和输出的数据类型、数据格式或维度不在支持的范围之内。</td>
     </tr>
     <tr>
     <td rowspan="2">ACLNN_ERR_INNER_NULLPTR</td>

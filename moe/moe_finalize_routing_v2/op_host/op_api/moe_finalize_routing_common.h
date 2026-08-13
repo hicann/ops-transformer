@@ -130,14 +130,94 @@ static inline bool CheckConstExpertDtype(const aclTensor *expandedX, const aclTe
     return true;
 }
 
+static inline bool CheckFormatValid(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
+                                    const aclTensor *x1Optional, const aclTensor *x2Optional,
+                                    const aclTensor *biasOptional, const aclTensor *scalesOptional,
+                                    const aclTensor *expertIdxOptional, const aclTensor *xOptional,
+                                    const aclTensor *alpha1Optional, const aclTensor *alpha2Optional,
+                                    const aclTensor *vOptional, const aclTensor *out)
+{
+    std::vector<const aclTensor *> tensors = {expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional,
+                                              scalesOptional, expertIdxOptional, xOptional, alpha1Optional,
+                                              alpha2Optional, vOptional, out};
+    std::vector<std::string> names = {"expandedX", "expandedRowIdx", "x1", "x2", "bias",
+                                      "scales", "expertIdx", "x", "alpha1", "alpha2", "v", "out"};
+    for (size_t i = 0; i < tensors.size(); ++i) {
+        if (tensors[i] != nullptr && tensors[i]->GetViewShape().GetShapeSize() != 0) {
+            if (tensors[i]->GetStorageFormat() != op::Format::FORMAT_ND) {
+                OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                        "Tensor %s format is %s, only ND format is supported.",
+                        names[i].c_str(), op::ToString(tensors[i]->GetStorageFormat()).GetString());
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static inline bool CheckShapeValid(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
+                                   const aclTensor *x1Optional, const aclTensor *x2Optional,
+                                   const aclTensor *biasOptional, const aclTensor *scalesOptional,
+                                   const aclTensor *expertIdxOptional, const aclTensor *xOptional,
+                                   const aclTensor *alpha1Optional, const aclTensor *alpha2Optional,
+                                   const aclTensor *vOptional, const aclTensor *out, int64_t dropPadMode)
+{
+    size_t expandedXDimNum = expandedX->GetViewShape().GetDimNum();
+    if (dropPadMode == 0 || dropPadMode == 2) {
+        if (expandedXDimNum != 2) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "expandedX should be 2D when dropPadMode is %ld, but got %zuD.", dropPadMode, expandedXDimNum);
+            return false;
+        }
+    } else {
+        if (expandedXDimNum != 3) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "expandedX should be 3D when dropPadMode is %ld, but got %zuD.", dropPadMode, expandedXDimNum);
+            return false;
+        }
+    }
+    if (expandedRowIdx->GetViewShape().GetDimNum() != 1) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "expandedRowIdx should be 1D, but got %zuD.", expandedRowIdx->GetViewShape().GetDimNum());
+        return false;
+    }
+    std::vector<std::pair<const aclTensor *, std::string>> optional2D = {
+        {x1Optional, "x1"}, {x2Optional, "x2"}, {biasOptional, "bias"}, {scalesOptional, "scales"}, {expertIdxOptional, "expertIdx"}, {xOptional, "x"}, {alpha1Optional, "alpha1"}, {alpha2Optional, "alpha2"}, {vOptional, "v"}};
+    for (const auto &item : optional2D) {
+        if (item.first != nullptr && item.first->GetViewShape().GetShapeSize() != 0) {
+            if (item.first->GetViewShape().GetDimNum() != 2) {
+                OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                        "Tensor %s should be 2D, but got %zuD.",
+                        item.second.c_str(), item.first->GetViewShape().GetDimNum());
+                return false;
+            }
+        }
+    }
+    if (out->GetViewShape().GetDimNum() != 2) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "out should be 2D, but got %zuD.", out->GetViewShape().GetDimNum());
+        return false;
+    }
+    return true;
+}
+
 static inline aclnnStatus CheckParams(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
                                       const aclTensor *x1Optional, const aclTensor *x2Optional,
                                       const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                                      const aclTensor *expertIdxOptional, const aclTensor *out)
+                                      const aclTensor *expertIdxOptional, const aclTensor *xOptional,
+                                      const aclTensor *alpha1Optional, const aclTensor *alpha2Optional,
+                                      const aclTensor *vOptional, const aclTensor *out, int64_t dropPadMode)
 {
     CHECK_RET(CheckNotNull(expandedX, expandedRowIdx, out), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
                               expertIdxOptional, out),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckFormatValid(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
+                               expertIdxOptional, xOptional, alpha1Optional, alpha2Optional, vOptional, out),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckShapeValid(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
+                              expertIdxOptional, xOptional, alpha1Optional, alpha2Optional, vOptional, out,
+                              dropPadMode),
               ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;
 }
@@ -145,11 +225,18 @@ static inline aclnnStatus CheckParams(const aclTensor *expandedX, const aclTenso
 static inline aclnnStatus CheckParams310P(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
                                           const aclTensor *x1Optional, const aclTensor *x2Optional,
                                           const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                                          const aclTensor *expertIdxOptional, const aclTensor *out)
+                                          const aclTensor *expertIdxOptional, const aclTensor *out,
+                                          int64_t dropPadMode)
 {
     CHECK_RET(CheckNotNull(expandedX, expandedRowIdx, out), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid310P(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
                                   expertIdxOptional, out),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckFormatValid(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
+                               expertIdxOptional, nullptr, nullptr, nullptr, nullptr, out),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckShapeValid(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
+                              expertIdxOptional, nullptr, nullptr, nullptr, nullptr, out, dropPadMode),
               ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;
 }

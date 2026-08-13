@@ -28,14 +28,16 @@ static aclnnStatus CheckV4(const aclTensor *expandedX, const aclTensor *expanded
                            const aclTensor *biasOptional, const aclTensor *scalesOptional,
                            const aclTensor *expertIdxOptional, const aclTensor *xOptional,
                            const aclTensor *alpha1Optional, const aclTensor *alpha2Optional,
-                           const aclTensor *vOptional, const aclTensor *out)
+                           const aclTensor *vOptional, const aclTensor *out, int64_t dropPadMode)
 {
     if (MoeFinalizeRoutingCheck::Is310P()) {
         return MoeFinalizeRoutingCheck::CheckParams310P(expandedX, expandedRowIdx, x1Optional, x2Optional,
-                                                        biasOptional, scalesOptional, expertIdxOptional, out);
+                                                        biasOptional, scalesOptional, expertIdxOptional, out,
+                                                        dropPadMode);
     } else if (MoeFinalizeRoutingCheck::IsCommonValidationChip()) {
         auto ret = MoeFinalizeRoutingCheck::CheckParams(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional,
-                                                        scalesOptional, expertIdxOptional, out);
+                                                        scalesOptional, expertIdxOptional, xOptional, alpha1Optional,
+                                                        alpha2Optional, vOptional, out, dropPadMode);
         CHECK_RET(ret == ACLNN_SUCCESS, ret);
         CHECK_RET(MoeFinalizeRoutingCheck::CheckConstExpertDtype(expandedX, xOptional, alpha1Optional, alpha2Optional,
                                                                  vOptional),
@@ -69,7 +71,7 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV4GetWorkspaceSize(
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     auto ret = CheckV4(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
-                       expertIdxOptional, xOptional, alpha1Optional, alpha2Optional, vOptional, out);
+                       expertIdxOptional, xOptional, alpha1Optional, alpha2Optional, vOptional, out, dropPadMode);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     auto expandedXContiguous = l0op::Contiguous(expandedX, uniqueExecutor.get());

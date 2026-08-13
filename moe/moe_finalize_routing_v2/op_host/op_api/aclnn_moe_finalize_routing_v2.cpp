@@ -26,14 +26,16 @@ using namespace op;
 static aclnnStatus CheckV2(const aclTensor *expandedX, const aclTensor *expandedRowIdx,
                            const aclTensor *x1Optional, const aclTensor *x2Optional,
                            const aclTensor *biasOptional, const aclTensor *scalesOptional,
-                           const aclTensor *expertIdxOptional, const aclTensor *out)
+                           const aclTensor *expertIdxOptional, const aclTensor *out, int64_t dropPadMode)
 {
     if (MoeFinalizeRoutingCheck::Is310P()) {
         return MoeFinalizeRoutingCheck::CheckParams310P(expandedX, expandedRowIdx, x1Optional, x2Optional,
-                                                        biasOptional, scalesOptional, expertIdxOptional, out);
+                                                        biasOptional, scalesOptional, expertIdxOptional, out,
+                                                        dropPadMode);
     } else if (MoeFinalizeRoutingCheck::IsCommonValidationChip()) {
         return MoeFinalizeRoutingCheck::CheckParams(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional,
-                                                    scalesOptional, expertIdxOptional, out);
+                                                    scalesOptional, expertIdxOptional, nullptr, nullptr, nullptr,
+                                                    nullptr, out, dropPadMode);
     }
     return ACLNN_SUCCESS;
 }
@@ -58,7 +60,7 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV2GetWorkspaceSize(
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     auto ret = CheckV2(expandedX, expandedRowIdx, x1Optional, x2Optional, biasOptional, scalesOptional,
-                       expertIdxOptional, out);
+                       expertIdxOptional, out, dropPadMode);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     // 固定写法，将输入转换成连续的tensor

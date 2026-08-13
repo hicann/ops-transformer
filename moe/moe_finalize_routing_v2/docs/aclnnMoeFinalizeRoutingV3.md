@@ -180,7 +180,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV3(
     <td>-</td>
     <td>与expandedX一致。</td>
     <td>ND</td>
-    <td>(Constant_Expert_Range_Num, H)</td>
+    <td>(constantExpertEnd - constantExpertStart, H)</td>
     <td>√</td>
   </tr>
   <tr>
@@ -190,7 +190,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV3(
     <td>-</td>
     <td>与expandedX一致。</td>
     <td>ND</td>
-    <td>(Constant_Expert_Range_Num, H)</td>
+    <td>(constantExpertEnd - constantExpertStart, H)</td>
     <td>√</td>
   </tr>
   <tr>
@@ -200,13 +200,13 @@ aclnnStatus aclnnMoeFinalizeRoutingV3(
     <td>-</td>
     <td>与expandedX一致。</td>
     <td>ND</td>
-    <td>(Constant_Expert_Range_Num, H)</td>
+    <td>(constantExpertEnd - constantExpertStart, H)</td>
     <td>√</td>
   </tr>
   <tr>
     <td>dropPadMode(int64_t)</td>
     <td>输入</td>
-    <td>表示是否支持丢弃模式，expandedRowIdx的排列方式。</td>
+    <td>可选参数，默认值为0。表示是否支持丢弃模式，expandedRowIdx的排列方式。</td>
     <td>取值范围为[0, 3]。</td>
     <td>-</td>
     <td>-</td>
@@ -216,7 +216,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV3(
   <tr>
     <td>zeroExpertRange(aclIntArray*)</td>
     <td>输入</td>
-    <td>表示zero expert的范围，数组内的值为[zeroExpertStart, zeroExpertEnd]，左闭右开，要求值大于0，并且zeroExpertEnd大于zeroExpertStart，zeroExpertEnd不大于expertIdxOptional的最大值。</td>
+    <td>可选参数。表示zero expert的范围，数组内的值为[zeroExpertStart, zeroExpertEnd]，左闭右开，要求值大于0，并且zeroExpertEnd大于zeroExpertStart，zeroExpertEnd不大于expertIdxOptional的最大值。</td>
     <td>取值范围与expertIdxOptional一致</td>
     <td>-</td>
     <td>2</td>
@@ -225,7 +225,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV3(
   <tr>
     <td>copyExpertRange(aclIntArray*)</td>
     <td>输入</td>
-    <td>表示copy expert的范围。数组内的值为[copyExpertStart, copyExpertEnd]，左闭右开，要求值大于0，并且copyExpertEnd大于copyExpertStart，copyExpertEnd不大于expertIdxOptional的最大值。</td>
+    <td>可选参数。表示copy expert的范围。数组内的值为[copyExpertStart, copyExpertEnd]，左闭右开，要求值大于0，并且copyExpertEnd大于copyExpertStart，copyExpertEnd不大于expertIdxOptional的最大值。</td>
     <td>取值范围与expertIdxOptional一致</td>
     <td>-</td>
     <td>2</td>
@@ -234,7 +234,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV3(
     <tr>
     <td>constantExpertRange(aclIntArray*)</td>
     <td>输入</td>
-    <td>表示costant expert的范围。数组内的值为[constantExpertStart, constantExpertEnd]，左闭右开，要求值大于0，并且constantExpertEnd大于constantExpertStart，constantExpertEnd不大于expertIdxOptional的最大值。</td>
+    <td>可选参数。表示constant expert的范围。数组内的值为[constantExpertStart, constantExpertEnd]，左闭右开，要求值大于0，并且constantExpertEnd大于constantExpertStart，constantExpertEnd不大于expertIdxOptional的最大值。</td>
     <td>取值范围与expertIdxOptional一致</td>
     <td>-</td>
     <td>2</td>
@@ -283,7 +283,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV3(
     - scalesOptional数据类型可以与expandedX不一致。
   <!-- end id8 -->
   <!-- npu="310p" id9 -->
-  - |<term>Atlas 推理系列产品</term>：
+  - <term>Atlas 推理系列产品</term>：
     - expandedX要求是一个2D的Tensor，数据类型支持FLOAT16、FLOAT32，shape要求尾轴H为32对齐。
     - x1Optional、x2Optional、biasOptional、expertIdxOptional仅支持传入nullptr
     - 仅支持dropPadMode传入2。
@@ -318,7 +318,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV3(
     <tr>
     <td>ACLNN_ERR_PARAM_INVALID</td>
     <td>161002</td>
-    <td>输入和输出的数据类型和数据格式不在支持的范围之内。</td>
+    <td>输入和输出的数据类型、数据格式或维度不在支持的范围之内。</td>
     </tr>
     <tr>
     <td rowspan="2">ACLNN_ERR_INNER_TILING_ERROR</td>
