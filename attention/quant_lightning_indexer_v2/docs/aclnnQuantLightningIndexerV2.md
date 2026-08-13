@@ -269,7 +269,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       </td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(B, S2/block_size)</td>
+      <td>(B, S2_max/block_size)</td>
       <td>x</td>
     </tr>
     <tr>
