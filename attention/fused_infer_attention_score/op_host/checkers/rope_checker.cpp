@@ -95,16 +95,15 @@ ge::graphStatus RopeChecker::CheckKRopeContiguous(const FiaTilingInfo &fiaInfo)
         const uint32_t keyRopeDimNum = keyRopeShape.GetDimNum();
         int32_t dimIndex = 0;
         OP_CHECK_IF(((ge::GRAPH_SUCCESS != CheckTensorContiguous(keyRopeDimNum, keyRopeShape, fiaInfo.kRopeStrides, dimIndex)) &&
-                    !fiaInfo.pageAttentionFlag),
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "keyRope",
-                "In non-PA scenarios, MXFP8 full quantization does not support non-contiguous tensors"),
-            return ge::GRAPH_FAILED);
+                     !fiaInfo.pageAttentionFlag),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "keyRope",
+                                                             "In non-PA scenarios, MXFP8 full quantization does not support non-contiguous tensors"),
+                    return ge::GRAPH_FAILED);
         OP_CHECK_IF(((ge::GRAPH_SUCCESS != CheckTensorContiguous(keyRopeDimNum, keyRopeShape, fiaInfo.kRopeStrides, dimIndex)) &&
-                    (dimIndex != 0 && dimIndex != 1) && fiaInfo.pageAttentionFlag),
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "keyRope",
-                "In MXFP8 Fullquant BnNBsD/NZ scenario, only 0th and 1st axis of keyRope can be non-contiguous, the "
-                + std::to_string(dimIndex) + "th axis of keyRope must be contiguous"),
-            return ge::GRAPH_FAILED);
+                     (dimIndex != 0 && dimIndex != 1) && fiaInfo.pageAttentionFlag),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "keyRope",
+                                                             "In MXFP8 Fullquant BnNBsD/NZ scenario, only 0th and 1st axis of keyRope can be non-contiguous, the " + std::to_string(dimIndex) + "th axis of keyRope must be contiguous"),
+                    return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     } else {
         if (!fiaInfo.hasViewStride || fiaInfo.pageAttentionFlag) {
@@ -112,10 +111,10 @@ ge::graphStatus RopeChecker::CheckKRopeContiguous(const FiaTilingInfo &fiaInfo)
         }
 
         OP_CHECK_IF(fiaInfo.keyRopeNonContigDim != -1,
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "keyRope",
-                "In non-PA scenarios, keyRope tensors must be contiguous"),
-            return ge::GRAPH_FAILED);
-        
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "keyRope",
+                                                             "In non-PA scenarios, keyRope tensors must be contiguous"),
+                    return ge::GRAPH_FAILED);
+
         return ge::GRAPH_SUCCESS;
     }
 }
@@ -168,7 +167,7 @@ ge::graphStatus RopeChecker::CheckRopeDtypeConsistency(const FiaTilingInfo &fiaI
 
 // 除D轴外 queryRope/keyRope其余轴需和query/key一致
 ge::graphStatus RopeChecker::CheckQKAndQKRopeShapeConsistency(const FiaTilingInfo &fiaInfo,
-    const gert::Shape shape, const gert::Shape ropeShape, const std::string &inputName) const
+                                                              const gert::Shape shape, const gert::Shape ropeShape, const std::string &inputName) const
 {
     if (inputName == "key" && fiaInfo.kvStorageMode != KvStorageMode::BATCH_CONTINUOUS) {
         return ge::GRAPH_SUCCESS;
@@ -201,17 +200,17 @@ ge::graphStatus RopeChecker::CheckQKAndQKRopeShapeConsistency(const FiaTilingInf
         uint32_t tmpN = static_cast<uint32_t>(shape.GetDim(dimNum - 1) / fiaInfo.qkHeadDim);
         uint32_t ropeN = static_cast<uint32_t>(ropeShape.GetDim(ropeDimNum - 1) / fiaInfo.ropeHeadDim);
         OP_CHECK_IF(tmpN != ropeN,
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(fiaInfo.opName, inputRopeName.c_str(), ToStringRaw(ropeShape),
-                "The N axis of " + inputRopeName + "(" + std::to_string(ropeN) + ") must be equal to " +
-                    inputName + "(" + std::to_string(tmpN) + ")"),
-            return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(fiaInfo.opName, inputRopeName.c_str(), ToStringRaw(ropeShape),
+                                                          "The N axis of " + inputRopeName + "(" + std::to_string(ropeN) + ") must be equal to " +
+                                                              inputName + "(" + std::to_string(tmpN) + ")"),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
 
 // PA场景 除D轴外 keyRope其余轴需和key一致
 ge::graphStatus RopeChecker::CheckPAKeyAndKeyRopeShapeConsistency(const FiaTilingInfo &fiaInfo,
-    const gert::Shape &keyShape, const gert::Shape &keyRopeShape) const
+                                                                  const gert::Shape &keyShape, const gert::Shape &keyRopeShape) const
 {
     if (fiaInfo.kvStorageMode != KvStorageMode::PAGE_ATTENTION) {
         return ge::GRAPH_SUCCESS;
@@ -292,8 +291,8 @@ ge::graphStatus RopeChecker::CheckTensorlistKeyAndKeyRopeShapeConsistency(const 
     const gert::Shape keyRopeShape = fiaInfo.opParamInfo.keyRope.tensor->GetStorageShape();
     if (fiaInfo.kCache.size() != keyRopeShape.GetDim(DIM_NUM_0)) {
         std::string shapeMsg = ToString(keyRopeShape) + " and " + std::to_string(fiaInfo.kCache.size());
-        std::string reason = "The axis B of keyRope(" + std::to_string(keyRopeShape.GetDim(DIM_NUM_0))  +
-            ") must be equal to the tensor number of key(" + std::to_string(fiaInfo.kCache.size()) + ")";
+        std::string reason = "The axis B of keyRope(" + std::to_string(keyRopeShape.GetDim(DIM_NUM_0)) +
+                             ") must be equal to the tensor number of key(" + std::to_string(fiaInfo.kCache.size()) + ")";
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(fiaInfo.opName, "keyRope and key", shapeMsg.c_str(), reason);
         return ge::GRAPH_FAILED;
     }
@@ -309,15 +308,17 @@ ge::graphStatus RopeChecker::CheckTensorlistKeyAndKeyRopeShapeConsistency(const 
             const gert::Shape keyShape = fiaInfo.kCache[i]->GetStorageShape();
             if (keyShape.GetDim(DIM_NUM_2) != keyRopeS) {
                 std::string shapeMsg = ToString(keyRopeShape) + " and " + ToString(keyShape);
-                std::string reason = "The axis S of keyRope(" + std::to_string(keyRopeS)  + ") must be equal to "
-                    "the axis S of key(" + std::to_string(keyShape.GetDim(DIM_NUM_2)) + ")";
+                std::string reason = "The axis S of keyRope(" + std::to_string(keyRopeS) + ") must be equal to "
+                                                                                           "the axis S of key(" +
+                                     std::to_string(keyShape.GetDim(DIM_NUM_2)) + ")";
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(fiaInfo.opName, "keyRope and key", shapeMsg.c_str(), reason);
                 return ge::GRAPH_FAILED;
             }
             if (keyShape.GetDim(DIM_NUM_1) != keyRopeN) {
                 std::string shapeMsg = ToString(keyRopeShape) + " and " + ToString(keyShape);
-                std::string reason = "The axis N of keyRope(" + std::to_string(keyRopeN)  + ") must be equal to "
-                    "the axis N of key(" + std::to_string(keyShape.GetDim(DIM_NUM_1)) + ")";
+                std::string reason = "The axis N of keyRope(" + std::to_string(keyRopeN) + ") must be equal to "
+                                                                                           "the axis N of key(" +
+                                     std::to_string(keyShape.GetDim(DIM_NUM_1)) + ")";
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(fiaInfo.opName, "keyRope and key", shapeMsg.c_str(), reason);
                 return ge::GRAPH_FAILED;
             }
@@ -330,14 +331,16 @@ ge::graphStatus RopeChecker::CheckTensorlistKeyAndKeyRopeShapeConsistency(const 
             if (keyShape.GetDim(DIM_NUM_1) != keyRopeS) {
                 std::string shapeMsg = ToString(keyRopeShape) + " and " + ToString(keyShape);
                 std::string reason = "The axis S of keyRope(" + std::to_string(keyRopeS) + ") must be equal to "
-                    "the axis S of key(" + std::to_string(keyShape.GetDim(DIM_NUM_1)) + ")";
+                                                                                           "the axis S of key(" +
+                                     std::to_string(keyShape.GetDim(DIM_NUM_1)) + ")";
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(fiaInfo.opName, "keyRope and key", shapeMsg.c_str(), reason);
                 return ge::GRAPH_FAILED;
             }
             if (keyShape.GetDim(DIM_NUM_2) / fiaInfo.qkHeadDim != keyRopeN) {
                 std::string shapeMsg = ToString(keyRopeShape) + " and " + ToString(keyShape);
                 std::string reason = "The axis N of keyRope(" + std::to_string(keyRopeN) + ") must be equal to "
-                    "the axis N of key(" + std::to_string(keyShape.GetDim(DIM_NUM_2) / fiaInfo.qkHeadDim) + ")";
+                                                                                           "the axis N of key(" +
+                                     std::to_string(keyShape.GetDim(DIM_NUM_2) / fiaInfo.qkHeadDim) + ")";
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(fiaInfo.opName, "keyRope and key", shapeMsg.c_str(), reason);
                 return ge::GRAPH_FAILED;
             }
@@ -350,14 +353,16 @@ ge::graphStatus RopeChecker::CheckTensorlistKeyAndKeyRopeShapeConsistency(const 
             if (keyShape.GetDim(DIM_NUM_1) != keyRopeS) {
                 std::string shapeMsg = ToString(keyRopeShape) + " and " + ToString(keyShape);
                 std::string reason = "The axis S of keyRope(" + std::to_string(keyRopeS) + ") must be equal to "
-                    "the axis S of key(" + std::to_string(keyShape.GetDim(DIM_NUM_1)) + ")";
+                                                                                           "the axis S of key(" +
+                                     std::to_string(keyShape.GetDim(DIM_NUM_1)) + ")";
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(fiaInfo.opName, "keyRope and key", shapeMsg.c_str(), reason);
                 return ge::GRAPH_FAILED;
             }
             if (keyShape.GetDim(DIM_NUM_2) != keyRopeN) {
                 std::string shapeMsg = ToString(keyRopeShape) + " and " + ToString(keyShape);
                 std::string reason = "The axis N of keyRope(" + std::to_string(keyRopeN) + ") must be equal to "
-                    "the axis N of key(" + std::to_string(keyShape.GetDim(DIM_NUM_2)) + ")";
+                                                                                           "the axis N of key(" +
+                                     std::to_string(keyShape.GetDim(DIM_NUM_2)) + ")";
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(fiaInfo.opName, "keyRope and key", shapeMsg.c_str(), reason);
                 return ge::GRAPH_FAILED;
             }
@@ -376,7 +381,7 @@ ge::graphStatus RopeChecker::CheckRopeExistence(const FiaTilingInfo &fiaInfo) co
         OP_LOGI(fiaInfo.opName, "Rope mode is ROPE_SPLIT.");
         OP_CHECK_IF((queryRopeTensor == nullptr || keyRopeTensor == nullptr),
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "query_rope and key_rope",
-                                                           "When rope exists, queryRope or keyRope cannot be empty"),
+                                                             "When rope exists, queryRope or keyRope cannot be empty"),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -408,12 +413,12 @@ ge::graphStatus RopeChecker::CheckFeatureSupport(const FiaTilingInfo &fiaInfo) c
     // 不支持 prefix
     OP_CHECK_IF(fiaInfo.sysPrefixFlag,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "key_shared_prefix",
-                                                      "When query_rope is not empty, key_shared_prefix must be empty"),
+                                                         "When query_rope is not empty, key_shared_prefix must be empty"),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(fiaInfo.pseShiftFlag,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "pse_shift",
-                                                      "When query_rope is not empty, pse_shift must be empty"),
+                                                         "When query_rope is not empty, pse_shift must be empty"),
                 return ge::GRAPH_FAILED);
 
     // 不支持alibepse
@@ -425,13 +430,13 @@ ge::graphStatus RopeChecker::CheckFeatureSupport(const FiaTilingInfo &fiaInfo) c
     if (fiaInfo.socVersion == platform_ascendc::SocVersion::ASCEND910B) {
         // 不支持左padding
         OP_CHECK_IF(fiaInfo.qPaddingSizeFlag || fiaInfo.kvPaddingSizeFlag,
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "query_padding_size or kv_padding_size",
-                "When query_rope is not empty, query_padding_size and kv_padding_size must both be empty"),
-            return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "query_padding_size or kv_padding_size",
+                                                             "When query_rope is not empty, query_padding_size and kv_padding_size must both be empty"),
+                    return ge::GRAPH_FAILED);
         // 不支持tensorlist
         OP_CHECK_IF(fiaInfo.kvStorageMode == KvStorageMode::TENSOR_LIST,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "key",
-                                                          "When query_rope is not empty, key cannot be TensorList"),
+                                                             "When query_rope is not empty, key cannot be TensorList"),
                     return ge::GRAPH_FAILED);
         // 不支持后量化
         OP_CHECK_IF(fiaInfo.isOutQuantEnable,
@@ -451,13 +456,13 @@ ge::graphStatus RopeChecker::CheckFeatureDecodeMLA(const FiaTilingInfo &fiaInfo)
     }
 
     OP_CHECK_IF(fiaInfo.qPaddingSizeFlag || fiaInfo.kvPaddingSizeFlag,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "query_padding_size and kv_padding_size",
-            "In MLA decode scenario, query_padding_size and kv_padding_size must both be empty"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "query_padding_size and kv_padding_size",
+                                                         "In MLA decode scenario, query_padding_size and kv_padding_size must both be empty"),
+                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(fiaInfo.kvStorageMode == KvStorageMode::TENSOR_LIST,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "key",
-                                                      "When query_rope is not empty, key cannot be TensorList"),
+                                                         "When query_rope is not empty, key cannot be TensorList"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -468,7 +473,7 @@ ge::graphStatus RopeChecker::CheckFeatureAntiQuant(const FiaTilingInfo &fiaInfo)
     // 不支持伪量化
     OP_CHECK_IF(fiaInfo.opParamInfo.queryRope.tensor != nullptr || fiaInfo.opParamInfo.keyRope.tensor != nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "query_rope or key_rope",
-                    "In antiquant mode, query_rope and key_rope must both be empty"),
+                                                         "In antiquant mode, query_rope and key_rope must both be empty"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -504,6 +509,23 @@ ge::graphStatus RopeChecker::CheckNSize(const FiaTilingInfo &fiaInfo) const
 {
     if (fiaInfo.mlaMode != MlaMode::ROPE_SPLIT_D512) {
         return ge::GRAPH_SUCCESS;
+    }
+    static const std::set<uint32_t> supportNumHeadForMLA = {1U, 2U, 4U, 8U, 16U, 32U, 64U, 128U};
+    bool isArch35NonQuant = (enableNonQuant_ && fiaInfo.npuArch == NpuArch::DAV_3510);
+    if (isArch35NonQuant) {
+        OP_CHECK_IF((fiaInfo.n1Size < 1U || fiaInfo.n1Size > 128U),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        fiaInfo.opName, "query",
+                        ToStringRaw(fiaInfo.opParamInfo.query.shape->GetStorageShape()).c_str(),
+                        "In MLA decode scenario, the N axis of query must be in [1, 128]"),
+                    return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF((supportNumHeadForMLA.find(fiaInfo.n1Size) == supportNumHeadForMLA.end()),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        fiaInfo.opName, "query",
+                        ToStringRaw(fiaInfo.opParamInfo.query.shape->GetStorageShape()).c_str(),
+                        "In MLA decode scenario, the N axis of query must be in {1,2,4,8,16,32,64,128}"),
+                    return ge::GRAPH_FAILED);
     }
 
     OP_CHECK_IF((*fiaInfo.opParamInfo.kvHeadNums != NUM1),
@@ -550,7 +572,7 @@ ge::graphStatus RopeChecker::CheckCrossFeature(const FiaTilingInfo &fiaInfo)
 
     if (ge::GRAPH_SUCCESS != CheckAxisSupport(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckKRopeContiguous(fiaInfo)) {
-            return ge::GRAPH_FAILED;
+        return ge::GRAPH_FAILED;
     }
 
     if (enableAntiQuant_) {

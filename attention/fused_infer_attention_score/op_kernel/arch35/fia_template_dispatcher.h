@@ -17,6 +17,7 @@
 #define FIA_TEMPLATE_DISPATCHER_H
 
 #include "fia_kernel_noquant_gqa.h"
+#include "fia_kernel_noquant_mla.h"
 #include "fia_kernel_fullquant_mx.h"
 #include "fia_kernel_fullquant_gqa.h"
 
@@ -60,6 +61,58 @@ inline __aicore__ void run_fia_noquant_gqa_kernel(__gm__ uint8_t *query, __gm__ 
 
     // KernelType
     using Kernel = FlashAttentionNoQuantGqaKernel<CubBlock, VecFaBlock, VecFdBlock>;
+
+    GET_TILING_DATA_MEMBER(FusedInferAttentionScoreTilingData, baseTiling, baseTilingIn, tiling);
+    const NoQuantTilingArch35 *__restrict tilingData = &baseTilingIn;
+    __gm__ uint8_t *fiaMetaData = tiling + offsetof(FusedInferAttentionScoreTilingData, fiaMetaData);
+    TPipe tPipe;
+    Kernel op;
+    op.Init(query, key, value, attenMask, actualSeqLengths, actualSeqLengthsKV, blocktable, queryRope, keyRope,
+            softmaxLse, attentionOut, workspace, fiaMetaData, tilingData, &tPipe);
+    op.Process();
+}
+
+template <typename INPUT_T, typename OUT_T, uint8_t inOutLayoutType, uint16_t config, bool hasAttenMask,
+          uint8_t KvLayoutType, bool isFd, bool emptyTensor, bool enableS1OutSplit>
+inline __aicore__ void run_fia_noquant_mla_kernel(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
+                                                  __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
+                                                  __gm__ uint8_t *actualSeqLengthsKV, __gm__ uint8_t *blocktable,
+                                                  __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
+                                                  __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
+                                                  __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+{
+    PARSE_PARAMS_NoQuant(inOutLayoutType, config, 9, ...); // 9: None
+
+    fa_base_matmul::idCounterNum = 0;
+    // CubBlockType
+    using CubBlockNormal = BaseApi::FANoQuantMlaBlockCube<INPUT_T, float, inputLayoutType, s1TemplateType,
+                                                          s2TemplateType, dTemplateType, dVTemplateType, KvLayoutType>;
+    using CubBlockDummy =
+        BaseApi::FANoQuantMlaBlockCubeDummy<INPUT_T, float, inputLayoutType, s1TemplateType, s2TemplateType,
+                                            dTemplateType, dVTemplateType, KvLayoutType>;
+    using CubBlock = typename std::conditional<g_coreType == AscendC::AIC, CubBlockNormal, CubBlockDummy>::type;
+
+    // VecFaBlockType
+    using VecFaBlockNormal =
+        BaseApi::FANoQuantMlaBlockVec<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType, s1TemplateType,
+                                      s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask, KvLayoutType, isFd>;
+    using VecFaBlockDummy = BaseApi::FANoQuantMlaBlockVecDummy<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
+                                                               s1TemplateType, s2TemplateType, dTemplateType,
+                                                               dVTemplateType, hasAttenMask, KvLayoutType, isFd>;
+    using VecFaBlock = typename std::conditional<g_coreType == AscendC::AIV, VecFaBlockNormal, VecFaBlockDummy>::type;
+
+    // VecFdBlockType
+    using VecFdBlockNormal =
+        BaseApi::FiaBlockVecFlashDecodeMla<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType, s1TemplateType,
+                                           s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask, KvLayoutType>;
+    using VecFdBlockDummy =
+        BaseApi::FiaBlockVecFlashDecodeMlaDummy<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
+                                                s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
+                                                hasAttenMask, KvLayoutType>;
+    using VecFdBlock = typename std::conditional<g_coreType == AscendC::AIV, VecFdBlockNormal, VecFdBlockDummy>::type;
+
+    // KernelType
+    using Kernel = FlashAttentionNoQuantMlaKernel<CubBlock, VecFaBlock, VecFdBlock>;
 
     GET_TILING_DATA_MEMBER(FusedInferAttentionScoreTilingData, baseTiling, baseTilingIn, tiling);
     const NoQuantTilingArch35 *__restrict tilingData = &baseTilingIn;
