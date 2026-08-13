@@ -206,7 +206,10 @@ def display_error_output(real_data, expect_data, err_idx, relative_diff):
                     m_index,
                     expect_data[m_index],
                     real_data[m_index],
-                    abs(np.float64(expect_data[m_index]) - np.float64(real_data[m_index])),
+                    abs(
+                        np.float64(expect_data[m_index])
+                        - np.float64(real_data[m_index])
+                    ),
                     max_error,
                 )
             )
@@ -344,11 +347,19 @@ def _tensor_compare(npu_out, golden_out, name):
 
 
 def _batch_consistency_check(npu_cmp_kv, kwargs):
-    """Compare NPU output slices across cases sharing the same batch_consistency_id.
+    """Compare NPU output slices across cases sharing the same batch consistency group.
 
-    Uses _BATCH_CONSISTENCY_CACHE to keep the base slice from the first case
-    encountered for each (batch_consistency_id, output_idx) pair, then compares
-    subsequent cases via np.array_equal.
+    Two comparison modes:
+    - External: different testcases, each with 1 slice. The first testcase
+      registers a base; subsequent testcases with the same seed+axis compare.
+    - Internal: a single testcase with 2+ slices. The first slice registers a
+      base; subsequent slices in the same call compare.
+
+    Cache key = "{seed}_{axis}" (extracted from kl, ignoring start/stop/step)
+    so that different slice positions with the same seed are grouped together.
+
+    In internal mode, cache entries are cleared before and after processing to
+    prevent pollution of external comparison groups that share the same seed+axis.
     """
     batch_consistency_id = kwargs.get("batch_consistency_id")
     batch_axis = kwargs.get("batch_axis")
@@ -368,10 +379,15 @@ def _batch_consistency_check(npu_cmp_kv, kwargs):
 
     print("=========compare batch consistency============")
     npu_np = as_numpy(npu_cmp_kv)
-    cache_key = batch_consistency_id
     result = []
 
-    for axis_pos, slices, cache_key_idx in zip(batch_axis, batch_slice_info, cache_key):
+    # Pass 1: collect all valid (sl, kl, dl, axis_idx, slices_ref) tuples.
+    # dl = "{seed}_{axis}" — the cache key that groups slices by seed+axis
+    # regardless of start/stop position.
+    valid_slices = []
+    for axis_pos, slices, cache_key_idx in zip(
+        batch_axis, batch_slice_info, batch_consistency_id
+    ):
         if axis_pos is None or slices is None or cache_key_idx is None:
             continue
         for axis_idx, slices_idx, key_idx in zip(axis_pos, slices, cache_key_idx):
@@ -380,67 +396,95 @@ def _batch_consistency_check(npu_cmp_kv, kwargs):
             for sl, kl in zip(slices_idx, key_idx):
                 if sl is None or kl is None:
                     continue
-                start = sl[0]
-                stop = sl[1]
-                length = stop - start
-                if is_th:
-                    b_idx = 0
-                    tc_idx = 0
-                    batch_size = len(cu_seqlens_list) - 1
-                    for b_idx in range(batch_size):
-                        if start >= cu_seqlens_list[b_idx + 1] - cu_seqlens_list[0]:
-                            tc_idx += seqused_list[b_idx] // cmp_ratio
-                            continue
-                        else:
-                            start = start - cu_seqlens_list[b_idx]
-                            stop = start + length
-                            break
-                    headSize = cmp_ratio - (start + start_pos_list[b_idx]) % cmp_ratio
-                    compare_len = (stop - start - headSize % cmp_ratio) // cmp_ratio
-                    cache_len = cmp_ratio - start_pos_list[b_idx] % cmp_ratio
-                    start_idx = (
-                        (start - cache_len) // cmp_ratio + 1
-                        if headSize == cmp_ratio
-                        else (start + headSize + cmp_ratio - 1) // cmp_ratio
-                    )
-                    start_idx += tc_idx
-                    slice_output = npu_np[start_idx : (start_idx + compare_len), :]
+                dl = "_".join(kl.split("_")[:2])
+                valid_slices.append((sl, kl, dl, axis_idx, slices))
+
+    if not valid_slices:
+        return
+
+    # Internal mode: 2+ slices in the same testcase call. Clear cache for
+    # affected dl keys before processing so external bases don't pollute.
+    is_internal = len(valid_slices) >= 2
+    if is_internal:
+        for _, _, dl, _, _ in valid_slices:
+            if dl in _BATCH_CONSISTENCY_CACHE:
+                del _BATCH_CONSISTENCY_CACHE[dl]
+
+    # Pass 2: extract slice_output for each slice and compare via cache.
+    slice_idx = 0
+    for sl, kl, dl, axis_idx, slices_ref in valid_slices:
+        start = sl[0]
+        stop = sl[1]
+        length = stop - start
+        if is_th:
+            b_idx = 0
+            tc_idx = 0
+            batch_size = len(cu_seqlens_list) - 1
+            for b_idx in range(batch_size):
+                if start >= cu_seqlens_list[b_idx + 1] - cu_seqlens_list[0]:
+                    tc_idx += seqused_list[b_idx] // cmp_ratio
+                    continue
                 else:
-                    if axis_idx == 1:
-                        headSize = cmp_ratio - (start + start_pos_list[0]) % cmp_ratio
-                        compare_len = (stop - start - headSize % cmp_ratio) // cmp_ratio
-                        cache_len = cmp_ratio - start_pos_list[0] % cmp_ratio
-                        start_idx = (
-                            (start - cache_len) // cmp_ratio + 1
-                            if headSize == cmp_ratio
-                            else (start + headSize + cmp_ratio - 1) // cmp_ratio
-                        )
-                        slice_output = npu_np[
-                            0, start_idx : (start_idx + compare_len), :
-                        ]
-                    else:
-                        slice_output = npu_np[start:stop, 1:, :]
-                dl = kl
-                if dl not in _BATCH_CONSISTENCY_CACHE:
-                    _BATCH_CONSISTENCY_CACHE[dl] = {
-                        "base": slice_output.copy(),
-                        "comparisons": [],
-                    }
-                    print(f"[batch_consistency]: base for id={kl}")
+                    start = start - cu_seqlens_list[b_idx]
+                    stop = start + length
+                    break
+            headSize = cmp_ratio - (start + start_pos_list[b_idx]) % cmp_ratio
+            compare_len = (stop - start - headSize % cmp_ratio) // cmp_ratio
+            cache_len = cmp_ratio - start_pos_list[b_idx] % cmp_ratio
+            start_idx = (
+                (start - cache_len) // cmp_ratio + 1
+                if headSize == cmp_ratio
+                else (start + headSize + cmp_ratio - 1) // cmp_ratio
+            )
+            start_idx += tc_idx
+            slice_output = npu_np[start_idx : (start_idx + compare_len), :]
+        else:
+            if axis_idx == 1:
+                if slices_ref[0] is None:
+                    bidx = 0
                 else:
-                    cached = _BATCH_CONSISTENCY_CACHE[dl]
-                    compare_result = _tensor_compare(
-                        cached["base"], slice_output, "batch_consisteny"
-                    )
-                    result.append(compare_result)
-                    status = "Pass" if compare_result["pass"] else "Failed"
-                    cached["comparisons"].append(
-                        {
-                            "status": status,
-                            "batch_consistency_id": kl,
-                        }
-                    )
-                    print(f"[batch_consistency]  {status}(id={kl})")
+                    bidx = slices_ref[0][slice_idx][0]
+                    slice_idx += 1
+                headSize = cmp_ratio - (start + start_pos_list[0]) % cmp_ratio
+                compare_len = (stop - start - headSize % cmp_ratio) // cmp_ratio
+                cache_len = cmp_ratio - start_pos_list[0] % cmp_ratio
+                start_idx = (
+                    (start - cache_len) // cmp_ratio + 1
+                    if headSize == cmp_ratio
+                    else (start + headSize + cmp_ratio - 1) // cmp_ratio
+                )
+                slice_output = npu_np[bidx, start_idx : (start_idx + compare_len), :]
+            else:
+                slice_output = npu_np[start:stop, 1:, :]
+
+        cache_key = dl
+        if cache_key not in _BATCH_CONSISTENCY_CACHE:
+            _BATCH_CONSISTENCY_CACHE[cache_key] = {
+                "base": slice_output.copy(),
+                "comparisons": [],
+            }
+            print(f"[batch_consistency]: base for id={kl} (group={dl})")
+        else:
+            cached = _BATCH_CONSISTENCY_CACHE[cache_key]
+            compare_result = _tensor_compare(
+                cached["base"], slice_output, "batch_consisteny"
+            )
+            result.append(compare_result)
+            status = "Pass" if compare_result["pass"] else "Failed"
+            cached["comparisons"].append(
+                {
+                    "status": status,
+                    "batch_consistency_id": kl,
+                }
+            )
+            print(f"[batch_consistency]  {status}(id={kl}, group={dl})")
+
+    # Internal mode: clear cache after processing so this internal group's
+    # base doesn't pollute subsequent external groups with the same seed+axis.
+    if is_internal:
+        for _, _, dl, _, _ in valid_slices:
+            if dl in _BATCH_CONSISTENCY_CACHE:
+                del _BATCH_CONSISTENCY_CACHE[dl]
 
     return result
 
@@ -474,6 +518,9 @@ def compare(*outputs, **kwargs):
                     "error_info": f"{name}: NPU state_cache not captured",
                 }
             )
+        result_consistency = _batch_consistency_check(npu_outputs[0], kwargs)
+        if result_consistency is not None:
+            results.append(result_consistency)
         return results
 
     npu_cmp_kv = npu_outputs[0]
@@ -487,31 +534,46 @@ def compare(*outputs, **kwargs):
     npu_sub_outputs = [npu_cmp_kv[cmp_kv_mask]]
     golden_sub_outputs = [cpu_cmp_kv[cmp_kv_mask]]
 
-    npu_sub_outputs.append(
-        npu_state_cache[:, :, : npu_state_cache.shape[2] // 2][update_kv]
-    )
-    npu_sub_outputs.append(
-        npu_state_cache[:, :, npu_state_cache.shape[2] // 2 :][update_score]
-    )
-    npu_sub_outputs.append(
-        npu_state_cache[:, :, : npu_state_cache.shape[2] // 2][~update_kv]
-    )
-    npu_sub_outputs.append(
-        npu_state_cache[:, :, npu_state_cache.shape[2] // 2 :][~update_score]
-    )
+    if update_kv is not None and update_score is not None:
+        npu_sub_outputs.append(
+            npu_state_cache[:, :, : npu_state_cache.shape[2] // 2][update_kv]
+        )
+        npu_sub_outputs.append(
+            npu_state_cache[:, :, npu_state_cache.shape[2] // 2 :][update_score]
+        )
+        npu_sub_outputs.append(
+            npu_state_cache[:, :, : npu_state_cache.shape[2] // 2][~update_kv]
+        )
+        npu_sub_outputs.append(
+            npu_state_cache[:, :, npu_state_cache.shape[2] // 2 :][~update_score]
+        )
 
-    golden_sub_outputs.append(
-        cpu_state_cache[:, :, : cpu_state_cache.shape[2] // 2][update_kv]
-    )
-    golden_sub_outputs.append(
-        cpu_state_cache[:, :, cpu_state_cache.shape[2] // 2 :][update_score]
-    )
-    golden_sub_outputs.append(
-        cpu_state_cache[:, :, : cpu_state_cache.shape[2] // 2][~update_kv]
-    )
-    golden_sub_outputs.append(
-        cpu_state_cache[:, :, cpu_state_cache.shape[2] // 2 :][~update_score]
-    )
+        golden_sub_outputs.append(
+            cpu_state_cache[:, :, : cpu_state_cache.shape[2] // 2][update_kv]
+        )
+        golden_sub_outputs.append(
+            cpu_state_cache[:, :, cpu_state_cache.shape[2] // 2 :][update_score]
+        )
+        golden_sub_outputs.append(
+            cpu_state_cache[:, :, : cpu_state_cache.shape[2] // 2][~update_kv]
+        )
+        golden_sub_outputs.append(
+            cpu_state_cache[:, :, cpu_state_cache.shape[2] // 2 :][~update_score]
+        )
+    else:
+        npu_sub_outputs.append(npu_state_cache[:, :, : npu_state_cache.shape[2] // 2])
+        npu_sub_outputs.append(npu_state_cache[:, :, npu_state_cache.shape[2] // 2 :])
+        npu_sub_outputs.append(None)
+        npu_sub_outputs.append(None)
+
+        golden_sub_outputs.append(
+            cpu_state_cache[:, :, : cpu_state_cache.shape[2] // 2]
+        )
+        golden_sub_outputs.append(
+            cpu_state_cache[:, :, cpu_state_cache.shape[2] // 2 :]
+        )
+        golden_sub_outputs.append(None)
+        golden_sub_outputs.append(None)
 
     results = []
     for idx in range(len(golden_sub_outputs)):
@@ -535,15 +597,16 @@ def compare(*outputs, **kwargs):
 
     return results
 
+
 def _to_torch(val):
     if val is None:
         return None
     if torch.is_tensor(val):
         return val
     if isinstance(val, np.ndarray):
-        if val.dtype == np.dtype('hifloat8'):
+        if val.dtype == np.dtype("hifloat8"):
             return torch.from_numpy(val.view(np.uint8))
-        if val.dtype.itemsize == 2 and str(val.dtype) == 'bfloat16':
+        if val.dtype.itemsize == 2 and str(val.dtype) == "bfloat16":
             return torch.from_numpy(val.view(np.uint16)).view(torch.bfloat16)
         return torch.from_numpy(val)
     return val
@@ -567,7 +630,9 @@ def compare_aclnn(*outputs, **kwargs):
     if len(npu_outputs) == 1:
         results = [
             _tensor_compare(
-                npu_outputs[0][cmp_kv_mask].to(torch.float32), golden_outputs[0][cmp_kv_mask].to(torch.float32), "cmp_kv"
+                npu_outputs[0][cmp_kv_mask].to(torch.float32),
+                golden_outputs[1][cmp_kv_mask].to(torch.float32),
+                "cmp_kv",
             )
         ]
         for i in range(1, len(golden_outputs)):
@@ -579,12 +644,17 @@ def compare_aclnn(*outputs, **kwargs):
                     "error_info": f"{name}: NPU state_cache not captured",
                 }
             )
+        result_consistency = _batch_consistency_check(npu_outputs[0], kwargs)
+        if result_consistency is not None:
+            results.append(result_consistency)
         return results
 
     npu_state_cache = npu_outputs[0].to(torch.float32)
     npu_cmp_kv = npu_outputs[1].to(torch.float32)
-    cpu_cmp_kv = golden_outputs[0].to(torch.float32)
-    cpu_state_cache = golden_outputs[1].to(torch.float32)
+    # aclnn golden return order aligns with output_tensor_indexes=(3,12):
+    #   golden[0] = state_cache (idx 3), golden[1] = cmp_kv (idx 12)
+    cpu_state_cache = golden_outputs[0].to(torch.float32)
+    cpu_cmp_kv = golden_outputs[1].to(torch.float32)
 
     update_kv = kwargs.get("update_kv", None)
     update_score = kwargs.get("update_score", None)
@@ -592,31 +662,46 @@ def compare_aclnn(*outputs, **kwargs):
     npu_sub_outputs = [npu_cmp_kv[cmp_kv_mask]]
     golden_sub_outputs = [cpu_cmp_kv[cmp_kv_mask]]
 
-    npu_sub_outputs.append(
-        npu_state_cache[:, :, : npu_state_cache.shape[2] // 2][update_kv]
-    )
-    npu_sub_outputs.append(
-        npu_state_cache[:, :, npu_state_cache.shape[2] // 2 :][update_score]
-    )
-    npu_sub_outputs.append(
-        npu_state_cache[:, :, : npu_state_cache.shape[2] // 2][~update_kv]
-    )
-    npu_sub_outputs.append(
-        npu_state_cache[:, :, npu_state_cache.shape[2] // 2 :][~update_score]
-    )
+    if update_kv is not None and update_score is not None:
+        npu_sub_outputs.append(
+            npu_state_cache[:, :, : npu_state_cache.shape[2] // 2][update_kv]
+        )
+        npu_sub_outputs.append(
+            npu_state_cache[:, :, npu_state_cache.shape[2] // 2 :][update_score]
+        )
+        npu_sub_outputs.append(
+            npu_state_cache[:, :, : npu_state_cache.shape[2] // 2][~update_kv]
+        )
+        npu_sub_outputs.append(
+            npu_state_cache[:, :, npu_state_cache.shape[2] // 2 :][~update_score]
+        )
 
-    golden_sub_outputs.append(
-        cpu_state_cache[:, :, : cpu_state_cache.shape[2] // 2][update_kv]
-    )
-    golden_sub_outputs.append(
-        cpu_state_cache[:, :, cpu_state_cache.shape[2] // 2 :][update_score]
-    )
-    golden_sub_outputs.append(
-        cpu_state_cache[:, :, : cpu_state_cache.shape[2] // 2][~update_kv]
-    )
-    golden_sub_outputs.append(
-        cpu_state_cache[:, :, cpu_state_cache.shape[2] // 2 :][~update_score]
-    )
+        golden_sub_outputs.append(
+            cpu_state_cache[:, :, : cpu_state_cache.shape[2] // 2][update_kv]
+        )
+        golden_sub_outputs.append(
+            cpu_state_cache[:, :, cpu_state_cache.shape[2] // 2 :][update_score]
+        )
+        golden_sub_outputs.append(
+            cpu_state_cache[:, :, : cpu_state_cache.shape[2] // 2][~update_kv]
+        )
+        golden_sub_outputs.append(
+            cpu_state_cache[:, :, cpu_state_cache.shape[2] // 2 :][~update_score]
+        )
+    else:
+        npu_sub_outputs.append(npu_state_cache[:, :, : npu_state_cache.shape[2] // 2])
+        npu_sub_outputs.append(npu_state_cache[:, :, npu_state_cache.shape[2] // 2 :])
+        npu_sub_outputs.append(None)
+        npu_sub_outputs.append(None)
+
+        golden_sub_outputs.append(
+            cpu_state_cache[:, :, : cpu_state_cache.shape[2] // 2]
+        )
+        golden_sub_outputs.append(
+            cpu_state_cache[:, :, cpu_state_cache.shape[2] // 2 :]
+        )
+        golden_sub_outputs.append(None)
+        golden_sub_outputs.append(None)
 
     results = []
     for idx in range(len(golden_sub_outputs)):
@@ -634,7 +719,10 @@ def compare_aclnn(*outputs, **kwargs):
         else:
             results.append(_tensor_compare(npu_out, golden_out, name))
 
-    result_consistency = _batch_consistency_check(npu_outputs[0].to(torch.float32), kwargs)
+    # aclnn NPU output order is (state_cache, cmp_kv); batch consistency
+    # compares cmp_kv across cases — must pass cmp_kv (npu_outputs[1]),
+    # not state_cache (npu_outputs[0]).
+    result_consistency = _batch_consistency_check(npu_cmp_kv, kwargs)
     if result_consistency is not None:
         results.append(result_consistency)
 

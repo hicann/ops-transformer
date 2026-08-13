@@ -42,7 +42,21 @@ class QuantCompressorSpec:
         "bfloat16": {"standard": "stat_rel_err"},
     }
 
-    def compare(*outputs, **kwargs):
+    def compare(*outputs, compare_context=None, **kwargs):
+        ctx = golden_module.get_golden_context()
+        # Replay (manual_data) 模式下 golden plugin 不重新执行，_GOLDEN_CONTEXT 为
+        # 空，compare 拿到的 cmp_kv_mask / update_kv / update_score 均为 None，
+        # kv_state_origin / score_state_origin 会退化为 N/A。这里用 TTK 注入的
+        # compare_context（携带 testcase.tensors / testcase.attributes）重跑一次
+        # CPU golden 重建 context。prepare 模式下 ctx 已由 golden plugin 填好，会
+        # 直接走下面的 ctx.get 路径，不会重复计算。
+        #
+        # 批跑时 _GOLDEN_CONTEXT 是模块级全局变量，前一个 case 的 mask 会残留。
+        # 即使 ctx 非空，也必须用当前 case 的 compare_context 重建，否则 mask shape
+        # 可能不匹配（不同 case 的 state_cache shape 可能不同）。
+        golden_module.rebuild_golden_context_from_compare_context(
+            compare_context, api_kind="e2e"
+        )
         ctx = golden_module.get_golden_context()
         kwargs["cmp_kv_mask"] = ctx.get("cmp_kv_mask")
         kwargs["update_kv"] = ctx.get("update_kv")
@@ -63,7 +77,10 @@ class KernelQuantCompressorSpec:
         "bfloat16": {"standard": "stat_rel_err"},
     }
 
-    def compare(*outputs, **kwargs):
+    def compare(*outputs, compare_context=None, **kwargs):
+        golden_module.rebuild_golden_context_from_compare_context(
+            compare_context, api_kind="e2e"
+        )
         ctx = golden_module.get_golden_context()
         kwargs["cmp_kv_mask"] = ctx.get("cmp_kv_mask")
         kwargs["update_kv"] = ctx.get("update_kv")
@@ -84,7 +101,10 @@ class AclnnQuantCompressorSpec:
         "bfloat16": {"standard": "stat_rel_err"},
     }
 
-    def compare(*outputs, **kwargs):
+    def compare(*outputs, compare_context=None, **kwargs):
+        golden_module.rebuild_golden_context_from_compare_context(
+            compare_context, api_kind="aclnn"
+        )
         ctx = golden_module.get_golden_context()
         kwargs["cmp_kv_mask"] = ctx.get("cmp_kv_mask")
         kwargs["update_kv"] = ctx.get("update_kv")

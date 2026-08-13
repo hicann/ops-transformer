@@ -15,6 +15,17 @@ import random
 import numpy as np
 
 
+def _try_hifloat8_dtype():
+    """Return numpy hifloat8 dtype if available (en_dtypes installed), else None."""
+    try:
+        return np.dtype("hifloat8")
+    except TypeError:
+        return None
+
+
+_HIF8_DTYPE = _try_hifloat8_dtype()
+
+
 def _ensure_torch(tensor):
     """Convert numpy array to torch tensor, handling non-native dtypes
     (hifloat8, ml_dtypes.bfloat16) via zero-copy uint view."""
@@ -24,9 +35,9 @@ def _ensure_torch(tensor):
         return tensor
     if isinstance(tensor, np.ndarray):
         itemsize = tensor.dtype.itemsize
-        if tensor.dtype == np.dtype('hifloat8'):
+        if _HIF8_DTYPE is not None and tensor.dtype == _HIF8_DTYPE:
             return torch.from_numpy(tensor.view(np.uint8))
-        if itemsize == 2 and str(tensor.dtype) == 'bfloat16':
+        if itemsize == 2 and str(tensor.dtype) == "bfloat16":
             return torch.from_numpy(tensor.view(np.uint16)).view(torch.bfloat16)
         return torch.from_numpy(tensor)
     return tensor
@@ -110,6 +121,7 @@ def build_block_table(
     cu_seqlens,
     cache_mode,
     S,
+    batch_seed=None,
 ):
     if block_table is None or not torch.is_tensor(block_table):
         return
@@ -152,7 +164,25 @@ def build_block_table(
     elif cache_mode == 2:
         block_table.zero_()
         if B > 0:
-            perm = random.sample(list(range(B)), B)
+            seed_value = None
+            if batch_seed is not None:
+                for tensor_seed in batch_seed:
+                    if tensor_seed is None:
+                        continue
+                    for axis_seed in tensor_seed:
+                        if axis_seed is None:
+                            continue
+                        for s in axis_seed:
+                            if s is not None:
+                                seed_value = int(s)
+                                break
+                    if seed_value is not None:
+                        break
+            if seed_value is None:
+                perm = random.sample(list(range(B)), B)
+            else:
+                rng = np.random.RandomState(seed_value)
+                perm = list(rng.permutation(B))
             for i in range(B):
                 block_table[i] = perm[i]
 
@@ -286,6 +316,7 @@ def apply_batch_slice_seeded(
             lo, hi = -10, 10
 
         # 获取切片后的 shape
+        slice_idx = 0
         for axis_pos in axes:
             if slices[axis_pos] is None or seed[axis_pos] is None:
                 continue
@@ -304,15 +335,24 @@ def apply_batch_slice_seeded(
                         tensor[start:end, :] = torch.from_numpy(data).to(tensor.dtype)
                     else:
                         if axis_pos == 1:
+                            if slices[0] is None:
+                                bidx = 0
+                            else:
+                                bidx = slices[0][slice_idx][0]
+                                slice_idx += 1
                             sliced_shape[0] = 1
                             sliced_shape[axis_pos] = length
-                            data = _gen_slice_data(rng, lo, hi, sliced_shape, tensor.dtype)
-                            tensor[0, start:end, :] = torch.from_numpy(data).to(
+                            data = _gen_slice_data(
+                                rng, lo, hi, sliced_shape, tensor.dtype
+                            )
+                            tensor[bidx, start:end, :] = torch.from_numpy(data).to(
                                 tensor.dtype
                             )
                         else:
                             sliced_shape[axis_pos] = length
-                            data = _gen_slice_data(rng, lo, hi, sliced_shape, tensor.dtype)
+                            data = _gen_slice_data(
+                                rng, lo, hi, sliced_shape, tensor.dtype
+                            )
                             tensor[start:end, :, :] = torch.from_numpy(data).to(
                                 tensor.dtype
                             )
@@ -325,9 +365,10 @@ def apply_batch_slice_seeded(
                                 cache_data = cache_rng.uniform(
                                     cache_lo, cache_hi, size=tuple(cache_shape)
                                 ).astype(np.float32)
-                                state_cache[start:end, :, :] = torch.from_numpy(
-                                    cache_data
-                                ).to(state_cache.dtype)
+                                block_id = state_block_table[start]
+                                state_cache[block_id : (block_id + length), :, :] = (
+                                    torch.from_numpy(cache_data).to(state_cache.dtype)
+                                )
                             else:
                                 cache_shape = list(state_cache.shape)
                                 cache_shape[0] = length * state_block_table.shape[1]
@@ -354,17 +395,24 @@ def apply_batch_slice_seeded(
                         ).to(tensor.dtype)
                     else:
                         if axis_pos == 1:
-                            if start < cmp_ratio:
-                                continue
+                            if slices[0] is None:
+                                bidx = 0
+                            else:
+                                bidx = slices[0][slice_idx][0]
+                                slice_idx += 1
                             sliced_shape[0] = 1
                             sliced_shape[axis_pos] = length + cmp_ratio
-                            data = _gen_slice_data(rng, lo, hi, sliced_shape, tensor.dtype)
-                            tensor[0, (start - cmp_ratio) : end, :] = torch.from_numpy(
-                                data
-                            ).to(tensor.dtype)
+                            data = _gen_slice_data(
+                                rng, lo, hi, sliced_shape, tensor.dtype
+                            )
+                            tensor[bidx, (start - cmp_ratio) : end, :] = (
+                                torch.from_numpy(data).to(tensor.dtype)
+                            )
                         else:
                             sliced_shape[axis_pos] = length
-                            data = _gen_slice_data(rng, lo, hi, sliced_shape, tensor.dtype)
+                            data = _gen_slice_data(
+                                rng, lo, hi, sliced_shape, tensor.dtype
+                            )
                             tensor[start:end, :, :] = torch.from_numpy(data).to(
                                 tensor.dtype
                             )
@@ -377,9 +425,10 @@ def apply_batch_slice_seeded(
                                 cache_data = cache_rng.uniform(
                                     cache_lo, cache_hi, size=tuple(cache_shape)
                                 ).astype(np.float32)
-                                state_cache[start:end, :, :] = torch.from_numpy(
-                                    cache_data
-                                ).to(state_cache.dtype)
+                                block_id = state_block_table[start]
+                                state_cache[block_id : (block_id + length), :, :] = (
+                                    torch.from_numpy(cache_data).to(state_cache.dtype)
+                                )
                             else:
                                 cache_shape = list(state_cache.shape)
                                 cache_shape[0] = length * state_block_table.shape[1]
@@ -462,6 +511,7 @@ def generate_quant_compressor_inputs(
             cu_seqlens_list,
             cache_mode_val,
             S,
+            batch_seed=kwargs.get("batch_seed"),
         )
     # batch一致性切片赋值
     apply_batch_slice_seeded(
@@ -542,6 +592,7 @@ def aclnn_quant_compressor_input(
             cu_seqlens_list,
             cacheMode,
             S,
+            batch_seed=kwargs.get("batch_seed"),
         )
 
     apply_batch_slice_seeded(
@@ -559,15 +610,52 @@ def aclnn_quant_compressor_input(
 
 
 def kernel_quant_compressor_input(
-    x, wkv, wgate, state_cache, ape,
-    x_descale=None, wkv_descale=None, wgate_descale=None,
-    state_block_table=None, cu_seqlens=None, seqused=None, start_pos=None,
+    x,
+    wkv,
+    wgate,
+    state_cache,
+    ape,
+    x_descale=None,
+    wkv_descale=None,
+    wgate_descale=None,
+    state_block_table=None,
+    cu_seqlens=None,
+    seqused=None,
+    start_pos=None,
     **kwargs,
 ):
     """Customize inputs for kernel mode.
 
     Kernel mode passes 12 numpy tensors positionally + attributes as kwargs.
-    Returns the modified input tuple (numpy arrays)."""
+    Returns the modified input tuple (numpy arrays).
+
+    Note: hifloat8 numpy arrays are viewed as uint8 for torch conversion
+    (torch has no native hifloat8). The original hifloat8 dtype is restored
+    on the returned numpy arrays so manual-data bin dtype validation passes
+    (CSV declares hifloat8; uint8 would mismatch)."""
+    # Record original numpy dtypes before torch conversion so we can restore
+    # non-torch-native dtypes (hifloat8) after customize_inputs runs.
+    _hif8 = _HIF8_DTYPE
+    original_dtypes = []
+    for t in (
+        x,
+        wkv,
+        wgate,
+        state_cache,
+        ape,
+        x_descale,
+        wkv_descale,
+        wgate_descale,
+        state_block_table,
+        cu_seqlens,
+        seqused,
+        start_pos,
+    ):
+        if isinstance(t, np.ndarray) and _hif8 is not None and t.dtype == _hif8:
+            original_dtypes.append("hifloat8")
+        else:
+            original_dtypes.append(None)
+
     x = _ensure_torch(x)
     wkv = _ensure_torch(wkv)
     wgate = _ensure_torch(wgate)
@@ -582,7 +670,11 @@ def kernel_quant_compressor_input(
     start_pos = _ensure_torch(start_pos)
 
     generate_quant_compressor_inputs(
-        x, wkv, wgate, state_cache, ape,
+        x,
+        wkv,
+        wgate,
+        state_cache,
+        ape,
         kwargs.get("quant_mode", 1),
         kwargs.get("cmp_ratio", 4),
         x_descale=x_descale,
@@ -594,24 +686,48 @@ def kernel_quant_compressor_input(
         start_pos=start_pos,
         coff=kwargs.get("coff", 1),
         cache_mode=kwargs.get("cache_mode", 1),
-        **{k: v for k, v in kwargs.items()
-           if k not in ("quant_mode", "cmp_ratio", "coff", "cache_mode",
-                        "state_cache_stride_dim0", "full_soc_version",
-                        "short_soc_version")},
+        **{
+            k: v
+            for k, v in kwargs.items()
+            if k
+            not in (
+                "quant_mode",
+                "cmp_ratio",
+                "coff",
+                "cache_mode",
+                "state_cache_stride_dim0",
+                "full_soc_version",
+                "short_soc_version",
+            )
+        },
     )
 
-    def _back_to_numpy(t):
+    def _back_to_numpy(t, restore_dtype=None):
         if t is None:
             return None
         if torch.is_tensor(t):
-            return t.detach().cpu().numpy()
-        return t
+            arr = t.detach().cpu().numpy()
+        else:
+            arr = t
+        if restore_dtype == "hifloat8" and _hif8 is not None and arr.dtype == np.uint8:
+            arr = arr.view(_hif8)
+        return arr
 
-    return (
-        _back_to_numpy(x), _back_to_numpy(wkv), _back_to_numpy(wgate),
-        _back_to_numpy(state_cache), _back_to_numpy(ape),
-        _back_to_numpy(x_descale), _back_to_numpy(wkv_descale),
-        _back_to_numpy(wgate_descale), _back_to_numpy(state_block_table),
-        _back_to_numpy(cu_seqlens), _back_to_numpy(seqused),
-        _back_to_numpy(start_pos),
+    tensors = (
+        x,
+        wkv,
+        wgate,
+        state_cache,
+        ape,
+        x_descale,
+        wkv_descale,
+        wgate_descale,
+        state_block_table,
+        cu_seqlens,
+        seqused,
+        start_pos,
+    )
+    return tuple(
+        _back_to_numpy(t, restore_dtype=original_dtypes[i])
+        for i, t in enumerate(tensors)
     )

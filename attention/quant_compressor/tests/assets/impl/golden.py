@@ -53,7 +53,9 @@ def load_pytest_golden_module():
         cann_stub = types.ModuleType("cann_ops_transformer")
         ops_stub = types.ModuleType("cann_ops_transformer.ops")
         quant_stub = types.ModuleType("cann_ops_transformer.ops.quant_compressor")
-        quant_stub.CacheMode = type("CacheMode", (), {"LINEAR_BUFFER": 1, "RING_BUFFER": 2})
+        quant_stub.CacheMode = type(
+            "CacheMode", (), {"LINEAR_BUFFER": 1, "RING_BUFFER": 2}
+        )
         quant_stub.QuantMode = type(
             "QuantMode", (), {"A8W8_A_HIFP8_PER_TENSOR_W_HIFP8_PER_CHANNEL": 1}
         )
@@ -88,7 +90,7 @@ def ttk_to_cpu(tensor):
     if torch.is_tensor(tensor):
         return tensor.detach().cpu()
     if isinstance(tensor, np.ndarray):
-        if tensor.dtype == np.dtype('hifloat8'):
+        if tensor.dtype == np.dtype("hifloat8"):
             return torch.from_numpy(tensor.view(np.uint8))
         return torch.from_numpy(tensor)
     return tensor
@@ -231,6 +233,17 @@ def cpu_quant_compressor(
     cu_seqlens_list = ttk_tensor_to_list(cu_seqlens) if cu_seqlens is not None else None
     seqused_list = ttk_tensor_to_list(seqused) if seqused is not None else None
 
+    # run_cpu_quant_compressor 内部会在 start_pos_list 为 None 时默认 [0]*B，
+    # 但那个默认值不会返回。这里提前设默认值，确保 _GOLDEN_CONTEXT 拿到非 None。
+    if start_pos_list is None:
+        if cu_seqlens_list is not None:
+            B = len(cu_seqlens_list) - 1
+        elif x_cpu is not None and x_cpu.dim() == 3:
+            B = x_cpu.shape[0]
+        else:
+            B = 1
+        start_pos_list = [0] * B
+
     cmp_kv, cmp_kv_mask, golden_state_cache, update_kv, update_score, out_dtype = (
         run_cpu_quant_compressor(
             x_cpu,
@@ -335,22 +348,183 @@ def aclnn_quant_compressor_golden(
     _GOLDEN_CONTEXT["cu_seqlens_list"] = cu_seqlens_list
     _GOLDEN_CONTEXT["is_th"] = is_th
 
-    return [cmp_kv, golden_state_cache]
+    # Return order MUST align with output_tensor_indexes=(3,12):
+    #   idx 3 = stateCacheRef (inplace output)  -> golden_state_cache
+    #   idx 12 = cmpKvOut (pure output)         -> cmp_kv
+    # load_goldens validates saved golden shape against device output shape in
+    # this same order; a mismatch raises MANUAL_DATA_READ_FAILURE.
+    return [golden_state_cache, cmp_kv]
 
 
 def get_golden_context():
     return _GOLDEN_CONTEXT
 
 
+def rebuild_golden_context(
+    x,
+    wkv,
+    wgate,
+    state_cache,
+    ape,
+    quant_mode,
+    cmp_ratio,
+    *,
+    x_descale=None,
+    wkv_descale=None,
+    wgate_descale=None,
+    state_block_table=None,
+    cu_seqlens=None,
+    seqused=None,
+    start_pos=None,
+    coff=1,
+    cache_mode=1,
+):
+    """Recompute and populate _GOLDEN_CONTEXT (cmp_kv_mask / update_kv / update_score).
+
+    In TTK e2e replay mode the golden plugin is not re-executed (goldens are
+    loaded from bin files), so the module-level _GOLDEN_CONTEXT stays empty and
+    compare() receives None masks, which makes kv_state_origin / score_state_origin
+    fall back to N/A. This helper re-runs the CPU golden on the prepared inputs
+    (already produced by customize_inputs) to restore the masks.
+
+    The context is reset before recomputation: _GOLDEN_CONTEXT is module-level and
+    would otherwise leak across testcases in the same process (case B would reuse
+    case A's masks). In prepare mode the golden plugin runs afterwards and
+    overwrites the context again, so the reset is harmless.
+    """
+    _GOLDEN_CONTEXT.clear()
+    try:
+        cpu_quant_compressor(
+            x,
+            wkv,
+            wgate,
+            state_cache,
+            ape,
+            quant_mode,
+            cmp_ratio,
+            x_descale=x_descale,
+            wkv_descale=wkv_descale,
+            wgate_descale=wgate_descale,
+            state_block_table=state_block_table,
+            cu_seqlens=cu_seqlens,
+            seqused=seqused,
+            start_pos=start_pos,
+            coff=coff,
+            cache_mode=cache_mode,
+        )
+    except Exception:
+        # Best-effort: if context rebuild fails, leave context empty so the
+        # existing N/A fallback behaviour is preserved rather than crashing
+        # the whole comparison.
+        pass
+
+
+def rebuild_golden_context_from_compare_context(compare_context, api_kind="e2e"):
+    """Rebuild _GOLDEN_CONTEXT from a TTK CompareContext (replay mode).
+
+    In TTK e2e/aclnn replay mode the golden plugin is not re-executed (goldens
+    are loaded from bin files), so the module-level _GOLDEN_CONTEXT stays empty
+    and compare() receives None masks, which makes kv_state_origin /
+    score_state_origin fall back to N/A. This helper extracts the prepared
+    inputs + attributes carried by CompareContext (populated from testcase.tensors
+    / testcase.attributes, which are available in both prepare and replay) and
+    re-runs the CPU golden to restore the masks.
+
+    api_kind: "e2e" or "aclnn" — selects the tensor position layout.
+    """
+    if compare_context is None:
+        return
+    try:
+        tensors = compare_context.input_tensors
+        attrs = dict(compare_context.attributes or {})
+        tensors = list(tensors) if tensors is not None else []
+
+        def _t(idx):
+            return tensors[idx] if idx < len(tensors) else None
+
+        # e2e/kernel CSV attributes use snake_case, aclnn CSV uses camelCase
+        # (matching aclnn header parameter names). Fall back to defaults if absent.
+        def _attr(*names, default=None):
+            for n in names:
+                if n in attrs:
+                    return attrs[n]
+            return default
+
+        quant_mode = _attr("quant_mode", "quantMode", default=1)
+        cmp_ratio = _attr("cmp_ratio", "cmpRatio", default=4)
+        coff = _attr("coff", default=1)
+        cache_mode = _attr("cache_mode", "cacheMode", default=1)
+
+        if api_kind == "aclnn":
+            # aclnn signature:
+            # x, wkv, wgate, stateCacheRef, ape, xDescale, wkvDescale, wgateDescale,
+            # stateBlockTable, cuSeqlens, seqused, startPos, ..., cmpKvOut
+            rebuild_golden_context(
+                _t(0),
+                _t(1),
+                _t(2),
+                _t(3),
+                _t(4),
+                quant_mode,
+                cmp_ratio,
+                x_descale=_t(5),
+                wkv_descale=_t(6),
+                wgate_descale=_t(7),
+                state_block_table=_t(8),
+                cu_seqlens=_t(9),
+                seqused=_t(10),
+                start_pos=_t(11),
+                coff=coff,
+                cache_mode=cache_mode,
+            )
+        else:
+            # e2e / kernel signature:
+            # x, wkv, wgate, state_cache, ape, x_descale, wkv_descale, wgate_descale,
+            # state_block_table, cu_seqlens, seqused, start_pos
+            rebuild_golden_context(
+                _t(0),
+                _t(1),
+                _t(2),
+                _t(3),
+                _t(4),
+                quant_mode,
+                cmp_ratio,
+                x_descale=_t(5),
+                wkv_descale=_t(6),
+                wgate_descale=_t(7),
+                state_block_table=_t(8),
+                cu_seqlens=_t(9),
+                seqused=_t(10),
+                start_pos=_t(11),
+                coff=coff,
+                cache_mode=cache_mode,
+            )
+    except Exception:
+        pass
+
+
 def kernel_quant_compressor_golden(
-    x, wkv, wgate, state_cache, ape,
-    x_descale=None, wkv_descale=None, wgate_descale=None,
-    state_block_table=None, cu_seqlens=None, seqused=None, start_pos=None,
+    x,
+    wkv,
+    wgate,
+    state_cache,
+    ape,
+    x_descale=None,
+    wkv_descale=None,
+    wgate_descale=None,
+    state_block_table=None,
+    cu_seqlens=None,
+    seqused=None,
+    start_pos=None,
     **kwargs,
 ):
     """Golden for kernel mode: 12 tensors positionally + attributes as kwargs."""
     return cpu_quant_compressor(
-        x, wkv, wgate, state_cache, ape,
+        x,
+        wkv,
+        wgate,
+        state_cache,
+        ape,
         kwargs.get("quant_mode", 1),
         kwargs.get("cmp_ratio", 4),
         x_descale=x_descale,
@@ -362,8 +536,18 @@ def kernel_quant_compressor_golden(
         start_pos=start_pos,
         coff=kwargs.get("coff", 1),
         cache_mode=kwargs.get("cache_mode", 1),
-        **{k: v for k, v in kwargs.items()
-           if k not in ("quant_mode", "cmp_ratio", "coff", "cache_mode",
-                        "state_cache_stride_dim0", "full_soc_version",
-                        "short_soc_version")},
+        **{
+            k: v
+            for k, v in kwargs.items()
+            if k
+            not in (
+                "quant_mode",
+                "cmp_ratio",
+                "coff",
+                "cache_mode",
+                "state_cache_stride_dim0",
+                "full_soc_version",
+                "short_soc_version",
+            )
+        },
     )
