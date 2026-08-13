@@ -135,7 +135,7 @@ private:
 #endif
                 computeOp.Process(start, actualExpertNum);
                 AscendC::CrossCoreSetFlag<SYNC_MODE_AIC_BARRIER, PIPE_FIX>(SYNC_FLAG_ID_AIC_BARRIER);
-                AscendC::CrossCoreWaitFlag<SYNC_MODE_AIC_BARRIER, PIPE_FIX>(SYNC_FLAG_ID_AIC_BARRIER);
+                AscendC::CrossCoreWaitFlag<SYNC_MODE_AIC_BARRIER, PIPE_S>(SYNC_FLAG_ID_AIC_BARRIER);
             }
         }
     }
