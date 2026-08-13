@@ -823,7 +823,7 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessTopK(const QLIV2Common::RunIn
                     // 如果topk > trunkLen，第一轮调用topk是直接拷贝的，不需要刷0
                     bool isZeroPadding = (topkCount_ > trunkLen_) ? (loopIdx > 1) : true;
                     if (topkCountAlign256_ != topkCount_ && isZeroPadding) {
-                        uint64_t mask[1];
+                        uint64_t mask[2] = {0, 0}; // 0: mask初始化，代表对应位置不需要刷0
                         mask[0] = ~0;
                         mask[0] = mask[0] << (topkCount_ % 64);
                         PipeBarrier<PIPE_V>();
@@ -874,7 +874,7 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessTopK(const QLIV2Common::RunIn
 
         if (!info.isNeedLD) {
             if (validS2Len < topkCount_) {
-                uint64_t mask[1];
+                uint64_t mask[2] = {0, 0};
                 mask[0] = ~0;
                 mask[0] = mask[0] << (validS2Len % 8); // 将`mask[0]`左移`validS2Len % 8`位 对齐
                 PipeBarrier<PIPE_V>();
@@ -894,7 +894,8 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessTopK(const QLIV2Common::RunIn
                 vector1::UIntToFloatReturnValue(valueOutLocal_, scoreOutLocal_, topkCountAlign256_);
                 // 无效值刷-inf
                 if (validS2Len < topkCount_) {
-                    uint64_t mask[1];
+                    // mask[1]=0：bit模式高64位不参与，第一段只刷低64个bf16元素，剩余由下方count版Duplicate补刷
+                    uint64_t mask[2] = {0, 0};
                     mask[0] = ~0;
                     mask[0] = mask[0] << (validS2Len % 16);
                     PipeBarrier<PIPE_V>();
@@ -929,12 +930,12 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessTopK(const QLIV2Common::RunIn
             AscendC::Adds(indicesOutLocal_.ReinterpretCast<int32_t>(), indicesOutLocal_.ReinterpretCast<int32_t>(),
                           static_cast<int32_t>(curS2StartIdx), topkCountAlign16_);
             if (validS2Len < topkCount_) {
-                uint64_t mask[1];
+                uint64_t mask[2] = {0, 0};
                 mask[0] = ~0;
                 mask[0] = mask[0] << (validS2Len % scoreAlign);
                 PipeBarrier<PIPE_V>();
                 Duplicate(scoreOutLocal_[validS2Len / scoreAlign * scoreAlign], zero, mask, 1, 1, 0);
-                uint64_t maskI[1];
+                uint64_t maskI[2] = {0, 0};
                 maskI[0] = ~0;
                 maskI[0] = maskI[0] << (validS2Len % 8);
                 PipeBarrier<PIPE_V>();
@@ -951,12 +952,12 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessTopK(const QLIV2Common::RunIn
                           topkCount_ - (validS2Len / 8 * 8 + 64));
             }
             if (topkCountAlign16_ != topkCount_) {
-                uint64_t mask[1];
+                uint64_t mask[2] = {0, 0};
                 mask[0] = ~0;
                 mask[0] = mask[0] << (topkCount_ % scoreAlign);
                 PipeBarrier<PIPE_V>();
                 Duplicate(scoreOutLocal_[topkCount_ / scoreAlign * scoreAlign], zero, mask, 1, 1, 0);
-                uint64_t maskIndices[1];
+                uint64_t maskIndices[2] = {0, 0};
                 maskIndices[0] = ~0;
                 maskIndices[0] = maskIndices[0] << (topkCount_ % 8);
                 PipeBarrier<PIPE_V>();
@@ -1052,7 +1053,7 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessLD()
 
             // 对非对齐索引和值刷0 -1
             if (s2LenAlign != s2Len) {
-                uint64_t mask[1];
+                uint64_t mask[2] = {0, 0};
                 mask[0] = ~0;
                 mask[0] = mask[0] << (s2Len % 64);
                 Duplicate(mrgValueLocal_[s2Len / 64 * 64], zero, mask, 1, 1, 0);
@@ -1071,12 +1072,12 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessLD()
             topkOp_.LdTopK(mrgValueLocal_, ldIndexLocal_, indicesOutLocal_, scoreOutLocal_, s2LenAlign, j,
                            ldProcessNum);
             if (topkCountAlign256_ != topkCount_) {
-                uint64_t mask[1];
+                uint64_t mask[2] = {0, 0};
                 mask[0] = ~0;
                 mask[0] = mask[0] << (topkCount_ % 64);
                 PipeBarrier<PIPE_V>();
                 Duplicate(scoreOutLocal_[topkCount_ / 64 * 64], zero, mask, 1, 1, 0);
-                uint64_t maskIndices[1];
+                uint64_t maskIndices[2] = {0, 0};
                 maskIndices[0] = ~0;
                 maskIndices[0] = maskIndices[0] << (topkCount_ % 64);
                 PipeBarrier<PIPE_V>();
