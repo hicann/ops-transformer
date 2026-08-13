@@ -219,7 +219,10 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
       <td>groupList（const aclTensor *）</td>
       <td rowspan="1">输入</td>
       <td>表示分组信息，对应公式中的groupList。</td>
-      <td>必选参数。根据groupListType输入不同格式数据。</td>
+      <td><ul>
+      <li>必选参数。根据groupListType输入不同格式数据。当groupListType为0时，最后一个值不大于x中tensor的第一维, 当groupListType为1时，数值的总和不大于x中tensor的第一维。</li>
+      <li>groupList中的值约束了输出数据的有效部分，groupList未指定的部分将不会参与更新。</li>
+      </ul></td>
       <td>INT64</td>
       <td>ND</td>
       <td>1</td>

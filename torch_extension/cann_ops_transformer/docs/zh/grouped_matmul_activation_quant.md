@@ -66,7 +66,7 @@ cann_ops_transformer.grouped_matmul_activation_quant(
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 | --- | --- | --- | --- | --- | --- |
 | `x` | Tensor | 必选 | 左矩阵，表示GroupedMatmul的输入激活。 | `torch.float8_e4m3fn`、`torch.float8_e5m2` | `(M, K)` |
-| `group_list` | Tensor | 必选 | 分组信息。`group_list_type=0`时表示每个group在M轴上的累计结束位置；`group_list_type=1`时表示每个group的M轴长度。 | `torch.int64` | `(E,)` |
+| `group_list` | Tensor | 必选 | 分组信息。`group_list_type=0`时表示每个group在M轴上的累计结束位置, 最后一个值不大于M轴大小；`group_list_type=1`时表示每个group的M轴长度，数值总和不大于M轴大小。 | `torch.int64` | `(E,)` |
 | `weight` | List[Tensor] | 必选 | 右矩阵TensorList，当前MX FP8场景tensorList长度仅支持1。调用者必须传入FRACTAL_NZ格式的`weight`，torch接口按3维逻辑shape解析。 | `torch.float8_e4m3fn` | 非转置：`(E, K, N)`<br>转置：`(E, N, K)` |
 | `weight_scale` | List[Tensor] | 必选 | `weight`的MX量化scale，当前MX FP8场景tensorList长度仅支持1。 | 通过`weight_scale_dtype`按`torch_npu.float8_e8m0fnu`解析 | 非转置：`(E, ceil(K / 64), N, 2)`<br>转置：`(E, N, ceil(K / 64), 2)` |
 | `activation_type` | str | 必选 | 激活函数类型，当前仅支持`"gelu_tanh"`。 | string | - |

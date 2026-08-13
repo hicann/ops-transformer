@@ -400,7 +400,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
         <td>表示每个分组参与计算的Token个数，公式中的grouplist。</td>
         <td><ul>
           <li>长度需与weight的首轴维度相等。</li>
-          <li>grouplist中的最后一个值约束了输出数据的有效部分，详见功能说明中的计算过程部分。</li>
+          <li>当groupListType为0时，最后一个值不大于x中tensor的第一维，当groupListType为1时，数值的总和不大于x中tensor的第一维。</li>
+          <li>groupList中的值约束了输出数据的有效部分，groupList未指定的部分将不会参与更新。</li>
         </ul></td>
         <td>INT64</td>
         <td>ND</td>

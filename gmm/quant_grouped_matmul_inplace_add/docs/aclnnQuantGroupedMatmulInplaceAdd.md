@@ -153,8 +153,8 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
       <td>表示输入和输出分组轴方向的matmul大小分布，Device侧的aclTensor。</td>
       <td>
         <ul>
-          <li>当groupListType为0时，groupList必须为非负单调非递减数列，当groupListType为1时，groupList必须为非负数列。</li>
-          <li>groupList中的最后一个值约束了输出数据的有效部分，groupList中未指定的部分将不会参与更新。</li>
+          <li>当groupListType为0时，groupList必须为非负单调非递减数列，并且最后一个值不大于x中tensor的第一维；当groupListType为1时，groupList必须为非负数列，并且数值的总和不大于x中tensor的第一维。</li>
+          <li>groupList中的值约束了输出数据的有效部分，groupList中未指定的部分将不会参与更新。</li>
         </ul>
       </td>
       <td>INT64</td>
