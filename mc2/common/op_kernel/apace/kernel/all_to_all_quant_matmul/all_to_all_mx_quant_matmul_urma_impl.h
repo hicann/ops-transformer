@@ -17,7 +17,6 @@
  *   AIC: RunMatmul()    等待通信完成后开始cube计算
  */
 
-
 #pragma once
 
 #include "basic_api/kernel_basic_intf.h"
@@ -63,20 +62,20 @@ using ProblemShape = AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>;
  * 3. 通过流水线掩盖通信开销。
  * 4. 计算与通信逻辑合并于此类，便于精细化流水线控制。
  */
-template<typename AType, typename BType, typename CType, bool TransA, bool TransB>
+template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 class AllToAllMxQuantMatmulUrmaImpl {
 public:
-    __aicore__ inline AllToAllMxQuantMatmulUrmaImpl() {};
+    __aicore__ inline AllToAllMxQuantMatmulUrmaImpl(){};
     __aicore__ inline ~AllToAllMxQuantMatmulUrmaImpl() {}
 
     /**
      * @brief 初始化算子状态和参数
      */
     __aicore__ inline void Init(__gm__ CommContext *hcommCtx,
-                    GM_ADDR aGM, GM_ADDR scaleAGM,
-                    GM_ADDR bGM, GM_ADDR scaleBGM,
-                    GM_ADDR cGM,
-                    const allToAllMatmulTilingData *tilingData);
+                                GM_ADDR aGM, GM_ADDR scaleAGM,
+                                GM_ADDR bGM, GM_ADDR scaleBGM,
+                                GM_ADDR cGM,
+                                const allToAllMatmulTilingData *tilingData);
     /**
      * @brief 执行算子逻辑（包含 AIC/AIV 分离逻辑）
      */
@@ -106,12 +105,12 @@ public:
 
     // 组件定义
     using BlockScheduler = Blaze::Gemm::Block::BlockSchedulerQuantBatchMatmulV3<ProblemShape,
-        NONE_FULL_LOAD_MODE, LayoutA, LayoutB, TypeA>;
+                                                                                NONE_FULL_LOAD_MODE, LayoutA, LayoutB, TypeA>;
     using DispatchPolicy = Blaze::Gemm::MatmulWithScaleMx<NONE_FULL_LOAD_MODE, false>;
     using BlockMmad = Blaze::Gemm::Block::BlockMmad<
         DispatchPolicy, TypeA, LayoutA, TypeB, LayoutB, TypeC, LayoutC, BiasType, LayoutBias>;
     using QuantMatmulKernelImpl = Kernel::QuantMatmulMxKernel<ProblemShape, BlockMmad, BlockScheduler,
-        UrmaCommWaitPolicy>;
+                                                              UrmaCommWaitPolicy>;
 
     // 参数类型
     using Params = typename QuantMatmulKernelImpl::Params;
@@ -126,11 +125,12 @@ public:
 
 private:
     // ---------------- 通信相关组件与参数 ----------------
-    __gm__ CommUbmemContext* syncBuffer_{nullptr};
-    __gm__ CommUdmaContext* udmaCtx_{nullptr};
+    __gm__ CommUbmemContext *syncBuffer_{nullptr};
+    __gm__ CommUdmaContext *udmaCtx_{nullptr};
     CollectiveComm<CommCollectiveOp::AllToAll, CommMode::PUT, AType, TeamBarrier> allToAllA_;
     CollectiveComm<
-        CommCollectiveOp::AllToAll, CommMode::PUT, TypeScaleA, TeamBarrier> allToAllScaleA_;
+        CommCollectiveOp::AllToAll, CommMode::PUT, TypeScaleA, TeamBarrier>
+        allToAllScaleA_;
     TeamBarrier teamBarrier_;
 
     struct BaseParams {
@@ -142,32 +142,32 @@ private:
         GM_ADDR cGm{nullptr};
 
         uint32_t rankId{0};
-        int32_t  commTurn{0};     // 总流水步数
+        int32_t commTurn{0};     // 总流水步数
         uint32_t rankSize{0};    // 卡数
-        uint64_t axisM{0};     // M 轴总大小
-        uint64_t axisKa{0};    // K 轴大小
+        uint64_t axisM{0};       // M 轴总大小
+        uint64_t axisKa{0};      // K 轴大小
         uint64_t headMSize{0};   // 长块 M 大小
-        uint64_t scaleKaSize{0};   // Scale 的 K 轴字节长度
+        uint64_t scaleKaSize{0}; // Scale 的 K 轴字节长度
         uint64_t rankDataBytes{0};
     } baseParams_;
 
-    const allToAllMatmulTilingData* tilingData_{nullptr};
+    const allToAllMatmulTilingData *tilingData_{nullptr};
 
     // ---------------- 私有方法 ----------------
     __aicore__ inline void InitBaseParams(const allToAllMatmulTilingData *tilingData);
-    __aicore__ inline void SetupParams(const QuantMatmulTilingData* mmTile,
-                        Params& out, MatmulMode matmulMode);
+    __aicore__ inline void SetupParams(const QuantMatmulTilingData *mmTile,
+                                       Params &out, MatmulMode matmulMode);
 
-    __aicore__ inline void RunAllToAll();  // AIV 通信任务
+    __aicore__ inline void RunAllToAll();    // AIV 通信任务
     __aicore__ inline void RunLocalMatmul(); // AIC 本地计算任务
-    __aicore__ inline void RunMatmul();    // AIC 远程计算任务
+    __aicore__ inline void RunMatmul();      // AIC 远程计算任务
 };
 
 // =================================================================================
 // 公有方法实现
 // =================================================================================
 
-template<typename AType, typename BType, typename CType, bool TransA, bool TransB>
+template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA, TransB>::Init(
     __gm__ CommContext *hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM, GM_ADDR scaleBGM, GM_ADDR cGM,
     const allToAllMatmulTilingData *tilingData)
@@ -196,14 +196,14 @@ __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA
     teamBarrier_.Init(barrierBuf.Get(), syncBuffer_, baseParams_.rankSize, static_cast<uint32_t>(GetBlockIdx()));
 
     allToAllA_.template Init<BARRIER_NONE>(udmaCtx_, teamBarrier_, tilingData->commTilingData, baseParams_.aGm,
-        commBuf.Get(), baseParams_.rankSize, static_cast<uint32_t>(GetBlockIdx()));
+                                           commBuf.Get(), baseParams_.rankSize, static_cast<uint32_t>(GetBlockIdx()));
 
     allToAllScaleA_.Init(udmaCtx_, teamBarrier_, tilingData->scaleCommTilingData, baseParams_.scaleAGm,
-        commScaleBuf.Get(), baseParams_.rankSize, static_cast<uint32_t>(GetBlockIdx()),
-        baseParams_.rankSize * baseParams_.rankDataBytes);
+                         commScaleBuf.Get(), baseParams_.rankSize, static_cast<uint32_t>(GetBlockIdx()),
+                         baseParams_.rankSize * baseParams_.rankDataBytes);
 }
 
-template<typename AType, typename BType, typename CType, bool TransA, bool TransB>
+template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA, TransB>::Run()
 {
     if ASCEND_IS_AIV {
@@ -214,7 +214,7 @@ __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA
         if (tilingData_->localMatmul == 1) {
             RunLocalMatmul(); // AIC local计算前置
         }
-        RunMatmul();    // AIC 通信块计算（带同步等待）
+        RunMatmul(); // AIC 通信块计算（带同步等待）
     }
 }
 
@@ -222,7 +222,7 @@ __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA
 // 通信与流水线控制实现 (AIV 侧)
 // =================================================================================
 
-template<typename AType, typename BType, typename CType, bool TransA, bool TransB>
+template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA, TransB>::RunAllToAll()
 {
     for (uint32_t tid = 0; tid < baseParams_.commTurn; ++tid) {
@@ -239,19 +239,23 @@ __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA
 
     allToAllScaleA_.Finalize();
     allToAllA_.Finalize();
+
+    // 通信接口使用了 channel 内的字段，需要刷新 GM 地址保证跨 kernel launch 的 GM 状态与 aiCore cache 一致
+    // 后续通信接口会内置刷 cache 机制，届时可移除此处调用
+    dcci(reinterpret_cast<__gm__ void *>(udmaCtx_->commBufferAddrs),
+         static_cast<uint64_t>(CacheLine::ENTIRE_DATA_CACHE), static_cast<uint64_t>(DcciDst::CACHELINE_OUT));
 }
 
 // =================================================================================
 // 计算逻辑实现 (AIC 侧)
 // =================================================================================
 
-template<typename AType, typename BType, typename CType, bool TransA, bool TransB>
+template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA, TransB>::InitBaseParams(
     const allToAllMatmulTilingData *tilingData)
 {
     baseParams_.headMSize = tilingData->commTilingData.splitAxisTileSize;
-    baseParams_.commTurn = tilingData->commTilingData.splitAxisTileCnt
-                        + tilingData->commTilingData.splitAxisTailCnt;
+    baseParams_.commTurn = tilingData->commTilingData.splitAxisTileCnt + tilingData->commTilingData.splitAxisTailCnt;
 
     baseParams_.axisM = tilingData->tileQbmmTilingData.m;
     baseParams_.axisKa = tilingData->tileQbmmTilingData.k;
@@ -263,16 +267,16 @@ __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA
     baseParams_.rankDataBytes = baseParams_.axisM * baseParams_.axisKa * sizeof(AType);
 }
 
-template<typename AType, typename BType, typename CType, bool TransA, bool TransB>
+template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA, TransB>::SetupParams(
-    const QuantMatmulTilingData* mmTile, Params& out, MatmulMode matmulMode)
+    const QuantMatmulTilingData *mmTile, Params &out, MatmulMode matmulMode)
 {
     ProblemShape problemShape{mmTile->m, mmTile->n, mmTile->k, 1UL};
     BlockMmadParams mmadParams;
     LocalParams localParams{baseParams_.rankId, baseParams_.rankSize, baseParams_.axisM, baseParams_.aGm,
-        baseParams_.scaleAGm, tilingData_->localMatmul, 1UL, matmulMode, static_cast<uint32_t>(baseParams_.headMSize)};
+                            baseParams_.scaleAGm, tilingData_->localMatmul, 1UL, matmulMode, static_cast<uint32_t>(baseParams_.headMSize)};
     L1Params l1Params{static_cast<uint64_t>(mmTile->stepK) * mmTile->baseK, mmTile->scaleKL1,
-        mmTile->nBufferNum};
+                      mmTile->nBufferNum};
 
     if (matmulMode == MatmulMode::LOCAL) {
         mmadParams.cGmAddr = baseParams_.cGm; // 本地模式直接写入输出
@@ -298,7 +302,7 @@ __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA
     out = {problemShape, mmadParams, l1Params, schedulerParams, qbmmParams, localParams};
 }
 
-template<typename AType, typename BType, typename CType, bool TransA, bool TransB>
+template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA, TransB>::RunLocalMatmul()
 {
     Params localParams;
@@ -306,7 +310,7 @@ __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA
     quantMatmulKernelImpl_(localParams);
 }
 
-template<typename AType, typename BType, typename CType, bool TransA, bool TransB>
+template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA, TransB>::RunMatmul()
 {
     Params params;
