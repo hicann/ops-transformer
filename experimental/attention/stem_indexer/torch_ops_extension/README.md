@@ -1,4 +1,4 @@
-# stem_indexer — PyTorch 接入层 (TorchNPU/ torch_ops_extension)
+# stem_indexer — PyTorch 接入层 (TorchNPU/torch_ops_extension)
 
 将 `stem_indexer` 算子桥接到 PyTorch，注册为 `torch.ops.custom.npu_stem_indexer`
 （同时挂载到 `TorchNPU.npu_stem_indexer`），底层调用 ACLNN 接口 `aclnnStemIndexer`；
@@ -56,7 +56,7 @@ import custom_ops   # 注册 torch.ops.custom.npu_stem_indexer(_metadata) 并挂
 
 metadata = torch.ops.custom.npu_stem_indexer_metadata(
     q_seq_lens, kv_seq_lens, q_heads, kv_heads,
-    causal=True, stem_block_size=128, dim_qkflat=128, window_size=4,
+    causal=True, stem_block_size=128, dim_qkflat=2048, window_size=4,
 )
 sparse_indices, sparse_seq_len = torch.ops.custom.npu_stem_indexer(
     qflat, kflat, vbias, q_seq_lens, kv_seq_lens,

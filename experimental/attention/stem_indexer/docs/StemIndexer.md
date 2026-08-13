@@ -163,18 +163,18 @@ torch.ops.custom.npu_stem_indexer(
 - `metadata`必须由与主算子相同的`q_seq_lens`、`kv_seq_lens`、`N1`、`N2`、`causal`、`stem_block_size`、`D_flat`和`window_size`生成。
 - `metadata`最大Section数为`B * N2`，容量按以下公式计算，单位为INT32元素：
 
-  ```text
-  max_section_num = B * N2
-  required_elems = 16 + max_section_num * (36 + 72) * 16
-  metadata_size = AlignUp(required_elems, 4096)
-  ```
+    ```text
+    max_section_num = B * N2
+    required_elems = 16 + max_section_num * (36 + 72) * 16
+    metadata_size = AlignUp(required_elems, 4096)
+    ```
 
 - `causal=false`时，每个有效Query Block可以在实际KV Block范围内选块。
 - `causal=true`且不是Decode场景时，第`qb`个Query Block的可见KV Block数量为：
 
-  ```text
-  s2_valid = clamp(Kb - Qb + qb + 1, 0, Kb)
-  ```
+    ```text
+    s2_valid = clamp(Kb - Qb + qb + 1, 0, Kb)
+    ```
 
 - Decode场景定义为`q_seq_lens[b] == 1`且`effective_num_prompt_tokens[b] >= kv_seq_lens[b]`，该场景使用完整的实际KV Block范围。
 - Sink Block和Window Block不参与普通TopK候选，最终结果为固定块与动态TopK结果的并集，避免重复索引。
