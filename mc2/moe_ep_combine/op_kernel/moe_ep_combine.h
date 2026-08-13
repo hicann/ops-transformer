@@ -79,7 +79,7 @@ static constexpr struct UrmaWqeEntry DEFAULT_WQE_CONFIG = {
     .odr = 5,
     .fence = 1,
     .se = 0,
-    .cqe = 1,
+    .cqe = 0,
     .inlineEn = 0};
 
 template <TemplateMoeEpCombineTypeClass>
@@ -100,7 +100,7 @@ private:
     __aicore__ inline void CopyTokenToQueue(uint32_t tokenIndex);
     __aicore__ inline void CopyTokenFromQueue(GM_ADDR writeAddr);
     __aicore__ inline void SendSlot(uint32_t tokenIndex, int32_t srcRank, int32_t srcTokenIdx,
-                                           int32_t srcTopKIdx, uint32_t channelIndex);
+                                    int32_t srcTopKIdx, uint32_t channelIndex);
     __aicore__ inline bool WaitDispatch(uint32_t tokenIndex, uint32_t copyCount);
     __aicore__ inline void ProcessTopKToken(uint32_t tokenIndex);
     __aicore__ inline void SendPhaseExpertToToken();
@@ -348,7 +348,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::SendSlot(
     uint64_t commHandle = GetCommHandle(srcRank, channelIndex);
     GM_ADDR remoteRankWinAddr = GetUrmaWinAddrByRankId(srcRank, combineDataWinOffset_);
     GM_ADDR remoteRankStateAddr = GetUrmaStateAddrByRankId(srcRank, combineStateWinOffset_);
-    
+
     if (srcRank != static_cast<int32_t>(rankId_)) {
         GM_ADDR tokenAddr = (GM_ADDR)xGm_.GetPhyAddr(tokenIndex * axisH_);
         uint64_t commHandle = GetCommHandle(srcRank, channelIndex);
@@ -358,7 +358,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::SendSlot(
             DataCopyParams weightCopyParams = {1U, UB_ALIGN, 0U, 0U};
             DataCopyPadParams padParams = {false, 0, 0, 0};
             DataCopyPad(ubWeightTensor, topkWeightsGm_[tokenIndex].template ReinterpretCast<uint32_t>(),
-                weightCopyParams, padParams);
+                        weightCopyParams, padParams);
             SyncFunc<AscendC::HardEvent::MTE2_S>();
             uint64_t weight = static_cast<uint64_t>(ubWeightTensor(0));
             notifyValue |= weight;
@@ -366,7 +366,6 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::SendSlot(
         hcomm_.WriteWithNotifyNbi<true, PIPE_S, PIPE_MTE3, DEFAULT_WQE_CONFIG>(
             commHandle, remoteRankWinAddr + sendTokenOffset, tokenAddr, axisH_ * sizeof(XType),
             remoteRankStateAddr + recvStateOffset, notifyValue);
-        hcomm_.Drain(commHandle);
     } else {
         CopyTokenToQueue(tokenIndex);
         CopyTokenFromQueue(remoteRankWinAddr + sendTokenOffset);
@@ -376,7 +375,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::SendSlot(
             DataCopyParams weightCopyParams = {1U, UB_ALIGN, 0U, 0U};
             DataCopyPadParams padParams = {false, 0, 0, 0};
             DataCopyPad(ubWeightTensor, topkWeightsGm_[tokenIndex].template ReinterpretCast<uint32_t>(),
-                weightCopyParams, padParams);
+                        weightCopyParams, padParams);
             SyncFunc<AscendC::HardEvent::MTE2_S>();
             statusTensor_(0) = ubWeightTensor(0);
             SyncFunc<AscendC::HardEvent::S_MTE3>();
@@ -557,12 +556,12 @@ __aicore__ inline bool MoeEpCombine<TemplateMoeEpCombineTypeFunc>::WaitDispatch(
 
     DataCopyPad<uint32_t>(stateTensor, stateGMTensor, params, padParams);
     SyncFunc<AscendC::HardEvent::MTE2_V>();
-    
+
     LocalTensor<uint32_t> stateSumTensor = stateSumBuf_.Get<uint32_t>();
     uint32_t shape[] = {topK_, UB_ALIGN / sizeof(uint32_t)};
     ReduceSum<uint32_t, AscendC::Pattern::Reduce::RA, false>(stateSumTensor, stateTensor, shape, true);
     SyncFunc<AscendC::HardEvent::V_S>();
-    
+
     uint32_t localState = stateSumTensor(1);
     if (localState == copyCount) {
         return true;
@@ -588,8 +587,8 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::ProcessTopKTo
         Cast(ubTmpFp32_, ubX_, AscendC::RoundMode::CAST_NONE, axisH_);
         Add(ubAccFp32_, ubAccFp32_, ubTmpFp32_, axisH_);
         if constexpr (HasTopkWeight == 1) {
-            GM_ADDR weightAddr = GetUrmaStateAddrByRankId(rankId_, combineStateWinOffset_)
-                 + (tokenIndex * topK_ + topkId) * WIN_ADDR_ALIGN;
+            GM_ADDR weightAddr = GetUrmaStateAddrByRankId(rankId_, combineStateWinOffset_) +
+                                 (tokenIndex * topK_ + topkId) * WIN_ADDR_ALIGN;
             GlobalTensor<float> srcWeightTensor;
             srcWeightTensor.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(weightAddr));
             DataCopyPad(ubWeighted_, srcWeightTensor, weightCopyParams, padParams);
@@ -633,7 +632,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::RecvPhaseRedu
             DataCopyPad(combinedXGm_[tokenIdx * axisH_], ubResultBf16, xCopyParams);
 
             GM_ADDR stateGM = GetUrmaStateAddrByRankId(rankId_, combineStateWinOffset_) +
-                tokenIdx * topK_ * WIN_ADDR_ALIGN;;
+                              tokenIdx * topK_ * WIN_ADDR_ALIGN;
             GlobalTensor<uint32_t> stateGMTensor;
             stateGMTensor.SetGlobalBuffer((__gm__ uint32_t *)stateGM);
             DataCopyExtParams resetParams = {
