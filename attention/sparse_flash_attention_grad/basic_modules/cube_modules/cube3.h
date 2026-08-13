@@ -18,13 +18,13 @@
 template <typename T1>
 __aicore__ inline __attribute__((always_inline)) void
 CubeOp<T1>::cube3ProcessSparse(const int64_t dsGmOffset, const int64_t keyGmOffset, const int64_t indicesGmOffset,
-                         const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx, 
-                         const int64_t lastBlockSize, const bool isLastBasicBlock)
+                               const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx,
+                               const int64_t lastBlockSize, const bool isLastBasicBlock)
 {
     uint32_t dLoopTimes = (dimDTotal + 127) / N_SPLIT_SIZE;
     uint32_t perLoopDSize = N_SPLIT_SIZE;
     uint32_t tailLoopDSize = dimDTotal - (dLoopTimes - 1) * perLoopDSize;
-    uint32_t blockOffset = K_SPLIT_SIZE / selectedBlockSize; 
+    uint32_t blockOffset = K_SPLIT_SIZE / selectedBlockSize;
 
     MMParam mmParam;
     mmParam.singleM = dimG;
@@ -32,7 +32,7 @@ CubeOp<T1>::cube3ProcessSparse(const int64_t dsGmOffset, const int64_t keyGmOffs
     mmParam.isRightTranspose = true;
     mmParam.dstStride = dimDTotal;
 
-    LocalTensor<T1> current_l1_ds_tensor, l1_key_tensor; 
+    LocalTensor<T1> current_l1_ds_tensor, l1_key_tensor;
     uint32_t totalSel = selectedCntOffset * selectedBlockSize;
     if (isLastBasicBlock) {
         totalSel = totalSel - selectedBlockSize + lastBlockSize;
@@ -45,7 +45,7 @@ CubeOp<T1>::cube3ProcessSparse(const int64_t dsGmOffset, const int64_t keyGmOffs
         }
         int64_t currentOutGmOffset = outGmOffset + dIdx * perLoopDSize;
 
-        for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx+=blockOffset) {
+        for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx += blockOffset) {
             int32_t l1Offset = (nIdx - blkCntOffset) * selectedBlockSize * dimGAlign;
             bool isFirstLoop = (nIdx == blkCntOffset);
             bool isLastLoop = (nIdx + blockOffset >= blkCntOffset + selectedCntOffset);
@@ -55,16 +55,32 @@ CubeOp<T1>::cube3ProcessSparse(const int64_t dsGmOffset, const int64_t keyGmOffs
             WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
             current_l1_ds_tensor = l1_ds_tensors[ping_pong_flag_l1_ds_][l1Offset];
             l1_key_tensor = l1_common_tensors[ping_pong_flag_l1_common_];
-            int64_t currentKeyOffset = keyGmOffset + (nIdx - blkCntOffset) * selectedBlockSizeDtotal + dIdx * perLoopDSize;
-            
-            CopyGmToL1(l1_key_tensor, selectedKWorkspaceGm[currentKeyOffset], mmParam.singleK, mmParam.singleN, dimDTotal);
+            int64_t currentKeyOffset;
+            int64_t srcDstride;
+            if constexpr (HAS_ROPE) {
+                if (dIdx == dLoopTimes - 1) {
+                    currentKeyOffset = keyGmOffset + PER_LOOP_BLOCK_SIZE * dimDqk +
+                                       (nIdx - blkCntOffset) * selectedBlockSizeDrope;
+                    srcDstride = dimRope;
+                } else {
+                    currentKeyOffset = keyGmOffset + (nIdx - blkCntOffset) * selectedBlockSizeDqk +
+                                       dIdx * perLoopDSize;
+                    srcDstride = dimDqk;
+                }
+            } else {
+                currentKeyOffset = keyGmOffset + (nIdx - blkCntOffset) * selectedBlockSizeDqk +
+                                   dIdx * perLoopDSize;
+                srcDstride = dimDqk;
+            }
+
+            CopyGmToL1(l1_key_tensor, selectedKWorkspaceGm[currentKeyOffset], mmParam.singleK, mmParam.singleN, srcDstride);
 
             mmParam.isOutKFisrt = isFirstLoop;
             mmParam.isFixOut = isLastLoop;
 
             MmadInnerWithSync<T1, true>(l0cTensor, current_l1_ds_tensor, l1_key_tensor,
-                                aL0TensorPingPong, bL0TensorPingPong,
-                                mmParam, ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true, dqWorkspaceGm[currentOutGmOffset]); 
+                                        aL0TensorPingPong, bL0TensorPingPong,
+                                        mmParam, ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true, dqWorkspaceGm[currentOutGmOffset]);
             SetFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
             UpdatePingPongFlag(ping_pong_flag_l1_common_);
         }
@@ -74,7 +90,7 @@ CubeOp<T1>::cube3ProcessSparse(const int64_t dsGmOffset, const int64_t keyGmOffs
 
 template <typename T1>
 __aicore__ inline __attribute__((always_inline)) void
-CubeOp<T1>::cube3ProcessDense(const int32_t blkCntOffset, const int32_t mmPingPongIdx,const int64_t lastBlockSize, const bool isLastBasicBlock, const RunInfo &runInfo)
+CubeOp<T1>::cube3ProcessDense(const int32_t blkCntOffset, const int32_t mmPingPongIdx, const int64_t lastBlockSize, const bool isLastBasicBlock, const RunInfo &runInfo)
 {
     const int64_t dsGmOffset = runInfo.mm345GmOffset;
     const int64_t keyGmOffset = runInfo.keyGmOffset;
@@ -84,7 +100,7 @@ CubeOp<T1>::cube3ProcessDense(const int32_t blkCntOffset, const int32_t mmPingPo
     uint32_t dLoopTimes = (dimDTotal + 127) / N_SPLIT_SIZE;
     uint32_t perLoopDSize = N_SPLIT_SIZE;
     uint32_t tailLoopDSize = dimDTotal - (dLoopTimes - 1) * perLoopDSize;
-    uint32_t blockOffset = K_SPLIT_SIZE / selectedBlockSize; 
+    uint32_t blockOffset = K_SPLIT_SIZE / selectedBlockSize;
 
     MMParam mmParam;
     mmParam.singleM = dimG;
@@ -92,7 +108,7 @@ CubeOp<T1>::cube3ProcessDense(const int32_t blkCntOffset, const int32_t mmPingPo
     mmParam.isRightTranspose = true;
     mmParam.dstStride = dimDTotal;
 
-    LocalTensor<T1> current_l1_ds_tensor, l1_key_tensor; 
+    LocalTensor<T1> current_l1_ds_tensor, l1_key_tensor;
 
     uint32_t totalSel = selectedCntOffset * selectedBlockSize;
     if (isLastBasicBlock) {
@@ -105,7 +121,7 @@ CubeOp<T1>::cube3ProcessDense(const int32_t blkCntOffset, const int32_t mmPingPo
             mmParam.singleN = tailLoopDSize;
         }
         int64_t currentOutGmOffset = outGmOffset + dIdx * perLoopDSize;
-        for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx+=blockOffset) {
+        for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx += blockOffset) {
             int32_t l1Offset = (nIdx - blkCntOffset) * selectedBlockSize * dimGAlign;
             bool isFirstLoop = (nIdx == blkCntOffset);
             bool isLastLoop = (nIdx + blockOffset >= blkCntOffset + selectedCntOffset);
@@ -134,8 +150,8 @@ CubeOp<T1>::cube3ProcessDense(const int32_t blkCntOffset, const int32_t mmPingPo
             mmParam.isFixOut = isLastLoop;
 
             MmadInnerWithSync<T1, true>(l0cTensor, current_l1_ds_tensor, l1_key_tensor,
-                                aL0TensorPingPong, bL0TensorPingPong,
-                                mmParam, ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true, dqWorkspaceGm[currentOutGmOffset]); 
+                                        aL0TensorPingPong, bL0TensorPingPong,
+                                        mmParam, ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true, dqWorkspaceGm[currentOutGmOffset]);
             SetFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
             UpdatePingPongFlag(ping_pong_flag_l1_common_);
         }
@@ -146,11 +162,11 @@ CubeOp<T1>::cube3ProcessDense(const int32_t blkCntOffset, const int32_t mmPingPo
 template <typename T1>
 __aicore__ inline __attribute__((always_inline)) void
 CubeOp<T1>::cube3Process(const int64_t dsGmOffset, const int64_t keyGmOffset, const int64_t indicesGmOffset,
-                         const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx,const int64_t lastBlockSize, const bool isLastBasicBlock, const RunInfo &runInfo)
+                         const int64_t outGmOffset, const int32_t blkCntOffset, const int32_t mmPingPongIdx, const int64_t lastBlockSize, const bool isLastBasicBlock, const RunInfo &runInfo)
 {
     if (!runInfo.isSmallS2) {
         cube3ProcessSparse(dsGmOffset, keyGmOffset, indicesGmOffset, outGmOffset, blkCntOffset, mmPingPongIdx, lastBlockSize, isLastBasicBlock);
     } else {
-        cube3ProcessDense(blkCntOffset, mmPingPongIdx,lastBlockSize, isLastBasicBlock, runInfo);
+        cube3ProcessDense(blkCntOffset, mmPingPongIdx, lastBlockSize, isLastBasicBlock, runInfo);
     }
 }
