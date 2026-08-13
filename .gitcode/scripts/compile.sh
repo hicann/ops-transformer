@@ -86,15 +86,8 @@ if [ "${task_name}" == "Pre_Compile" ]; then
 else
     if [ "${GE_ST_RT2}X" == "kirinx90X" ]; then
         if [ "${GIT_TARGET_BRANCH}" = "master" ]; then
-            wget -nv https://kiri-obs.obs.cn-north-4.myhuaweicloud.com/Cann%20Large%20Model%20Foundation%208.5.0.beta005/cann-bisheng-compiler_9.0.0_linux-x86_64.run
-            chmod +x *.run
-            wget -nv https://kiri-obs.obs.cn-north-4.myhuaweicloud.com/Cann%20Large%20Model%20Foundation%208.5.0.beta005/cann-bisheng-compiler_9.0.0_linux-x86_64.run || { echo "::error::wget failed"; exit 1; }
-            chmod +x *.run
-            sudo -u jenkins ./cann-bisheng-compiler*.run --full --quiet --install-path=/home/jenkins/Ascend
-            LOG_DO bash build.sh --pkg --soc=kirinx90,kirin9030 --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
+            LOG_DO bash build.sh --pkg --soc=kirinx90 --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
             DP_ASSERT_EQUAL "$?" "0" "Build ${REPOSITORY_NAME}"
-            cd build_out
-            tar -zcf kiri.tar.gz *.run
         else
             echo "not need build mobile_station"
             mkdir build_out
@@ -103,9 +96,6 @@ else
         fi
     elif [ "${GE_ST_RT2}X" == "kirin9030X" ];then
         if [ "${GIT_TARGET_BRANCH}" = "master" ];then
-            wget -nv https://kiri-obs.obs.cn-north-4.myhuaweicloud.com/Cann%20Large%20Model%20Foundation%208.5.0.beta005/cann-bisheng-compiler_9.0.0_linux-x86_64.run
-            chmod +x *.run
-            sudo -u jenkins ./cann-bisheng-compiler*.run --full --quiet --install-path=/home/jenkins/Ascend
             LOG_DO bash build.sh --pkg --soc=kirin9030 --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
             DP_ASSERT_EQUAL "$?" "0" "Build ${REPOSITORY_NAME}"
         else
@@ -113,7 +103,7 @@ else
             mkdir build_out
             touch build_out/cann-ops-transformer-kirin9030_linux-x86_64.run
             exit 0
-        fi      
+        fi
     elif [ "${GE_ST_RT2}X" == "experimentalX" ]; then
         if [ "${GIT_TARGET_BRANCH}" = "master" ]; then
             LOG_DO bash build.sh --experimental --PR_PKG "pr_filelist.txt" --soc=ascend910b -j16 --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH}

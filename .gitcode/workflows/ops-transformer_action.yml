@@ -24,8 +24,8 @@ env:
   MERGE_ID: ${{ atomgit.event.pull_request.number }}
   TARGET_BRANCH: ${{ atomgit.base_ref }}
   SOURCE_BRANCH: ${{ atomgit.head_ref }}
-  obs_path: "${{ vars.OBS_PATH }}/${{ env.MERGE_ID }}"
-  obs_smoke_path: "${{ env.obs_path }}/presmoke/2" 
+  obs_path: "${{ env.org_name }}/${{ env.repo_name }}/ci/package/${{ env.MERGE_ID }}"
+  obs_smoke_path: "${{ env.obs_path }}/presmoke/2"
   online: ${{ vars.APPLY_LABEL }}
 
 stages:
@@ -203,7 +203,7 @@ stages:
           ge_st_rt2: 'experimental_950'
           image_version: ${{ jobs.JOB_image.outputs.Compile_Ascend_ARM_experimental_ubuntu24 }}
           arch: 'arm64'
-          package_name: 'cann-ops-transformer_experimental_950_linux-aarch64_ubuntu24.run' 
+          package_name: 'cann-ops-transformer_experimental_950_linux-aarch64_ubuntu24.run'
       JOB_mobile_station_compile:
         name: Compile_kirinx90
         uses: .gitcode/workflows/compile_action.yml
@@ -411,7 +411,7 @@ stages:
     fail-fast: true
 
 post:
-  jobs: 
-    job_post: 
+  jobs:
+    job_post:
       name: Test_post
       uses: cann/.gitcode/.gitcode/workflows/post_action.yml@master
