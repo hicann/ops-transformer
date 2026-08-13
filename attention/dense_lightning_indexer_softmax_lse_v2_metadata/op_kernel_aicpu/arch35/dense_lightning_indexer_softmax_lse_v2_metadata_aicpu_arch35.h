@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
@@ -47,8 +47,8 @@ inline int64_t DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::CalcTotalSize
 inline bool DenseLightningIndexerSoftmaxLseV2MetadataCpuKernel::BuildMetadata()
 {
     int64_t totalNum = CalcTotalSize();
-    if (totalNum <= 0) {
-        KERNEL_LOG_ERROR("totalNum should be larger than 0, but got %ld", totalNum);
+    if (totalNum < 0) {
+        KERNEL_LOG_ERROR("Total valid sequence should be >= 0, but got %ld", totalNum);
         return false;
     }
 

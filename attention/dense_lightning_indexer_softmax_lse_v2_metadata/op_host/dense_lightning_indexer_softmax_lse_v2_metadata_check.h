@@ -160,11 +160,6 @@ aclnnStatus CheckSingleParamDliSLse(int64_t batchSize, int64_t maxSeqlenQ, int64
                                               "The value of max_seqlen_k must be greater than or equal to 0");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (strcmp(layoutQOptional, "BSND") == 0 && maxSeqlenQ <= 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(DLI_ACLNN_OP_NAME, "max_seqlen_q", std::to_string(maxSeqlenQ),
-                                              "The value of max_seqlen_q must be greater than 0 for BSND layout");
-        return ACLNN_ERR_PARAM_INVALID;
-    }
     if (maskMode != DLI_NO_MASK_MODE && maskMode != DLI_CAUSAL_MASK_MODE) {
         OP_LOGE_FOR_INVALID_VALUE(DLI_ACLNN_OP_NAME, "mask_mode", std::to_string(maskMode), "0 or 3");
         return ACLNN_ERR_PARAM_INVALID;

@@ -53,8 +53,8 @@ inline int64_t SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::CalcTotalSize() con
 inline bool SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::BuildMetadata()
 {
     int64_t totalNum = CalcTotalSize();
-    if (totalNum <= 0) {
-        KERNEL_LOG_ERROR("totalNum should be larger than 0, but got %ld", totalNum);
+    if (totalNum < 0) {
+        KERNEL_LOG_ERROR("Total valid sequence should be >= 0, but got %ld", totalNum);
         return false;
     }
 
