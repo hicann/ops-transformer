@@ -1118,10 +1118,10 @@ bool FlashAttentionScoreTilingRegbase::AnalyzeSinkOptionalInput()
             std::to_string(expectedSinkSize).c_str()),
             return false);
 
-        if (!(inputDtype == ge::DT_FLOAT16 || inputDtype == ge::DT_BF16)) {
+        if (!(inputDtype == ge::DT_FLOAT16 || inputDtype == ge::DT_BF16 || inputDtype == ge::DT_FLOAT)) {
             OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(opName, "query, key and value",
                 Ops::Base::ToString(inputDtype).c_str(),
-                "The dtypes of input query, key and value must be FLOAT16 or BF16 when sink is supported");
+                "The dtypes of input query, key and value must be FLOAT, FLOAT16 or BF16 when sink is supported");
             return false;
         }
     }
