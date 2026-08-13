@@ -99,7 +99,7 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
                     return ge::GRAPH_FAILED);
     const int64_t recvxDim0 = recvxShape->GetStorageShape().GetDim(0);
     const int64_t recvxDim1 = recvxShape->GetStorageShape().GetDim(1);
-    OP_TILING_CHECK(recvxDim0 <= 0, OP_LOGE(nodeName, "x dim0(A) must be positive, but got %ld.", recvxDim0),
+    OP_TILING_CHECK(recvxDim0 < 0, OP_LOGE(nodeName, "x dim0(A) must be positive, but got %ld.", recvxDim0),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         (recvxDim1 < H_MIN) || (recvxDim1 > H_MAX),
@@ -304,7 +304,8 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, const
     info.cfg.numMaxTokensPerRank = static_cast<uint32_t>(*nmtPtr);
     serverNum = static_cast<uint32_t>(epWorldSize / rankNumPerServer);
     networkMode = (requestedNetworkMode == NETWORK_HYBRID && serverNum > 1U) ?
-        NETWORK_HYBRID : NETWORK_DIRECT;
+                      NETWORK_HYBRID :
+                      NETWORK_DIRECT;
 
     return ge::GRAPH_SUCCESS;
 }
