@@ -141,18 +141,24 @@ python experimental/attention/quant_block_sparse_attn/tests/pytest/bsa_fullquant
 head 组合、11 组可实现的 S1/S2 大小关系与对齐状态、`mask_mode=0/3`、不同稀疏模式、block-table
 顺序以及空 Tensor 场景。
 
-case 不再显式配置 `block_num`。物理页数与 common MX 保持一致，根据每个 batch 的实际 KV 长度自动计算：
+`blocknum` 表示可供 `block_table` 映射的物理页池大小。case 显式传入正数时直接使用该值；未传入或传入
+非正数时，才根据每个 batch 的实际 KV 长度推导默认值：
 
 ```text
-block_num = sum(ceil(actual_seq_kv[b] / block_size))
+blocknum = sum(ceil(seqused_kv[b] / block_size))
 ```
 
-每个逻辑页使用唯一物理页；`block_table_pattern` 只控制这些物理页编号的顺序，不改变物理页数量。
+`block_table` 的宽度为
+`max(max_block_per_batch, max(ceil(seqused_kv[b] / block_size)))`，确保每个 batch 的有效逻辑页都可索引。
+表中每个位置从 `[0, blocknum)` 物理页池中有放回随机采样：一次选中的物理页不会从候选池移除，
+因此同一 batch 内或不同 batch 间的多个逻辑页允许映射到同一个 physical ID，用于覆盖物理页共享场景。
+`blocknum` 不要求等于全部逻辑页数量之和：小于逻辑页总数时可以通过复用完成映射，大于逻辑页总数时
+也允许存在未被引用的物理页。超过各 batch 有效 KV 长度的 `block_table` 填充列不会被 kernel 读取。
 
 以下字段仅用于记录用例设计，统一放在 case 属性末尾，不参与 pytest 的类型转换、校验或计算：
 
 ```text
-case_group, s1_base_size, n1_n2_ratio, s1_s2_relation, alignment
+case_group, s1_base_size
 ```
 
 CSV 按列名而非列位置解析，允许保留其他扩展参考列。因此已有外部泛化 CSV 即使列顺序不同或包含
@@ -277,8 +283,8 @@ python experimental/attention/quant_block_sparse_attn/tests/pytest/bsa_fullquant
   8 个 8192。
 - `enable`、`is_contiguous`、`return_softmax_lse`、`empty_actual_seq` 使用 `true/false`。
 - `softmax_scale` 留空时，脚本按 `1 / sqrt(D)` 自动补齐。
-- `N1` 必须能被 `N2` 整除；`n1_n2_ratio` 仅记录用例设计，不参与运行校验。
+- `N1` 必须能被 `N2` 整除。
 - `s2_base_size` 是 golden 划分 C1 子块的必需运行字段，当前 MXFP8 模板固定为 `512`。
 - `sparse_q_block_size` 必须等于 `sparse_kv_block_size`；`block_size`（PA 物理块大小）必须是 `sparse_kv_block_size` 的正整数倍（支持 `block_size = m * sparse_kv_block_size`）。
-- `s1_s2_relation`、`alignment` 和 `s1_base_size` 仅作为覆盖场景说明保留，不参与 pytest 计算或校验。
+- `s1_base_size` 仅作为覆盖场景说明保留，不参与 pytest 计算或校验。
 - CSV 可直接扩展到多行；case 名称在一个或多个输入文件之间都不能重复。

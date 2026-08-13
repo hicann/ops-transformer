@@ -235,11 +235,7 @@ def check_result(expect, npu_result, debug=False):
     b2 = float((1.0 / (1 << 14)) / diff_thd)
     b = torch.maximum(b1, torch.tensor(b2, dtype=torch.float32)) + _EPS
     err_diff = (diff_abs / b)[err_idx]
-    err_diff = torch.where(
-        torch.isnan(err_diff) | torch.isinf(err_diff),
-        torch.tensor(float("inf"), dtype=torch.float32),
-        err_diff,
-    )
+    finite_err_diff = err_diff[torch.isfinite(err_diff)]
 
     fulfill_percent = float(split_count - err_idx.numel()) / float(split_count) * 100.0
 
@@ -248,8 +244,8 @@ def check_result(expect, npu_result, debug=False):
     pct_thd = (1 - pct_thd) * 100.0
     result = "Pass" if (fulfill_percent >= pct_thd) else "Failed"
 
-    if err_diff.numel() > 0:
-        max_error = float(torch.max(err_diff).item())
+    if finite_err_diff.numel() > 0:
+        max_error = float(torch.max(finite_err_diff).item())
         if max_error >= max_diff_hd:
             result = "Failed"
 
@@ -266,7 +262,7 @@ def check_result(expect, npu_result, debug=False):
         )
     )
 
-    if err_diff.numel() > 0:
+    if finite_err_diff.numel() > 0:
         logger.info(
             "Max-RelativeError is: %s. Threshold is: %s.", max_error, max_diff_hd
         )

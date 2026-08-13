@@ -20,6 +20,8 @@ module is not available.
 import importlib.util
 from pathlib import Path
 
+from bsa_ttk_ops import QuantBlockSparseAttnGraph
+
 ASSET_IMPL_DIR = Path(__file__).with_name("impl")
 
 _impl_cache = {}
@@ -51,6 +53,10 @@ class QuantBlockSparseAttnSpec:
     @staticmethod
     def customize_inputs(*args, **kwargs):
         return _load_impl_module("inputs").customize_inputs(*args, **kwargs)
+
+    # TTK constructs this module before torch.compile, so QBSA metadata and
+    # auxiliary tensors are prepared outside ACLGraph GLOBAL capture.
+    torch_graph = QuantBlockSparseAttnGraph
 
     tolerance = {
         "bfloat16": {"standard": "stat_rel_err"},
