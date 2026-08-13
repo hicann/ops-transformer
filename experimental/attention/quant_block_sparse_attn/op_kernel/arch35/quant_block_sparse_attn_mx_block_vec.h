@@ -182,7 +182,7 @@ public:
 
         const uint32_t softmaxBufIdx = runInfo.mLoop % (PRELOAD_N + 1U);
         const uint32_t expBufIdx = runInfo.loop % (PRELOAD_N + 1U);
-        const uint32_t stage1Offset = runInfo.loop % DB;
+        const uint32_t stage1Offset = (runInfo.loop * 2 + subLoop) % DB;
         LocalTensor<float> sumUb = softmaxSumBuf_[softmaxBufIdx].template Get<float>()[0];
         LocalTensor<float> maxUb = softmaxMaxBuf_[softmaxBufIdx].template Get<float>()[0];
         LocalTensor<float> preLoopMaxUb = preLoopMaxBuf_.template Get<float>()[0];
