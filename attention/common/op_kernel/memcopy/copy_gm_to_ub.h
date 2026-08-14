@@ -113,8 +113,7 @@ public:
             ProcessAntiqPerChannelOrPerToken(dstTensor, srcTensor, antiqGmCoord);
         }
         // per token + PA
-        else if constexpr ((GM_FORMAT == GmFormat::PA_BnBs) || (GM_FORMAT == GmFormat::PA_BnNBs) ||
-                           (GM_FORMAT == GmFormat::PA_BnNBs_KS)) {
+        else if constexpr ((GM_FORMAT == GmFormat::PA_BnBs) || (GM_FORMAT == GmFormat::PA_BnNBs)) {
             ProcessAntiqPA(dstTensor, srcTensor, antiqGmCoord);
         }
     }

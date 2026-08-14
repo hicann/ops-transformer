@@ -78,14 +78,13 @@ public:
     static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<layout>();
 
     static constexpr bool USE_DN = useDn;
-    static constexpr uint8_t KV_LAYOUT = 4; // 4: K与K_Scale在同一物理内存中交叉排列
     static constexpr bool IS_PER_TOEKN_HEAD = true;
     static constexpr bool PAGE_ATTENTION = (KvLayoutType > 0);
 
     static constexpr bool POST_QUANT = !IsSameType<OUTPUT_T, half>::value && !IsSameType<OUTPUT_T, bfloat16_t>::value &&
                                        !IsSameType<OUTPUT_T, float>::value;
     static constexpr GmFormat Q_SCALE_FORMAT = GetQueryScaleGmFormat<layout, USE_DN, IS_PER_TOEKN_HEAD>();
-    static constexpr GmFormat K_SCALE_FORMAT = GetKeyScaleGmFormat<layout, KV_LAYOUT, PAGE_ATTENTION>();
+    static constexpr GmFormat K_SCALE_FORMAT = GmFormat::PA_BnNBs;
     using pseShiftType = half;
 
     using mm2ResPos = typename std::conditional<bmm2Write2Ub, Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>,
@@ -148,8 +147,8 @@ public:
     TQue<QuePosition::VECOUT, 1> FDResOutputQue;
     TQue<QuePosition::VECIN, 1> accumOutInputQue;
 
-    TBuf<> queryAntiqScaleInputQue;
-    TBuf<> keyAntiqScaleInputQue[2]; // 2:DB
+    TBuf<> queryAntiqScaleInputBuf;
+    TBuf<> keyAntiqScaleInputBuf[2]; // 2:DB
     const ConstInfoX &constInfo;
     T negativeFloatScalar;
     float pScaleValue{1.0f};
@@ -237,10 +236,8 @@ public:
                                             uint64_t bnStrides, uint64_t n2Strides)
     {
         kScaleGmTensor.gmTensor.SetGlobalBuffer((__gm__ float *)gm);
-        if constexpr (GmLayoutParams<K_SCALE_FORMAT>::CATEGORY == FormatCategory::GM_BnNBs_KS) {
-            kScaleGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, blockTableGm, constInfo.maxBlockNumPerBatch,
-                                                 bnStrides, n2Strides);
-        }
+        kScaleGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, blockTableGm, constInfo.maxBlockNumPerBatch,
+                                             bnStrides, n2Strides);
     }
 
     __aicore__ inline void ProcessVec1(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &outputBuf,
@@ -256,8 +253,6 @@ public:
 
         if constexpr (USE_DN) {
             ProcessVec1Dn(outputBuf, bmm1ResBuf, runInfo);
-        } else {
-            // ProcessVec1Nd(outputBuf, bmm1ResBuf, runInfo);
         }
     }
 
@@ -380,7 +375,7 @@ public:
     __aicore__ inline void ProcessAntiqPA(FaUbTensor<T> &dstTensor, FaGmTensor<float, K_SCALE_FORMAT> &srcTensor,
                                           AntiqGmCoord &antiqGmCoord)
     {
-        OffsetCalculator<K_SCALE_FORMAT> &offsetCal = srcTensor.offsetCalculator;
+        auto &offsetCal = srcTensor.offsetCalculator;
 
         uint64_t dstOffset = 0;
         uint32_t copyFinishElmeCnt = 0;
@@ -441,12 +436,12 @@ public:
         LocalTensor<float> qScaleUbTensor;
         LocalTensor<float> kScaleUbTensor;
         if (unlikely(runInfo.isFirstS2Loop)) {
-            qScaleUbTensor = queryAntiqScaleInputQue.template Get<float>();
+            qScaleUbTensor = queryAntiqScaleInputBuf.template Get<float>();
             CopyQueryScaleTile(qScaleUbTensor, runInfo);
-            kScaleUbTensor = keyAntiqScaleInputQue[kscaleOffset].template Get<float>();
+            kScaleUbTensor = keyAntiqScaleInputBuf[kscaleOffset].template Get<float>();
             CopyKeyScaleTile(kScaleUbTensor, runInfo, false);
         } else {
-            kScaleUbTensor = keyAntiqScaleInputQue[kscaleOffset].template Get<float>();
+            kScaleUbTensor = keyAntiqScaleInputBuf[kscaleOffset].template Get<float>();
         }
 
         event_t mte2VEvtID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
@@ -500,7 +495,7 @@ public:
         }
 
         if (likely(!runInfo.isLastS2Loop)) {
-            LocalTensor<float> kScaleUbNextTensor = keyAntiqScaleInputQue[1 - kscaleOffset].template Get<float>();
+            LocalTensor<float> kScaleUbNextTensor = keyAntiqScaleInputBuf[1 - kscaleOffset].template Get<float>();
             CopyKeyScaleTile(kScaleUbNextTensor, runInfo, true);
         }
 
@@ -848,9 +843,7 @@ public:
             return;
         }
         int64_t calculateSize = runInfo.actVecMSize * fp32BaseSize;
-        // 是否要改成halfMRealSize
         int64_t gmOffset = runInfo.faTmpOutWsPos * mBaseSize * fp32BaseSize + runInfo.vecMbaseIdx * fp32BaseSize;
-        // flashDecodeS2Idx?nBufferStartM?
         // Copy sum to gm
         BroadCastAndCopyOut(runInfo, sumUb, maxUb, gmOffset, calculateSize);
     }
@@ -907,10 +900,10 @@ public:
             tPipe->InitBuffer(mm2InBuf, 32768); // bmm2结果在Gm，vector2开启多层循环，每次处理32KB
         }
         SoftmaxInitBuffer();
-        tPipe->InitBuffer(queryAntiqScaleInputQue, (mBaseSize >> 1U) * sizeof(float));
+        tPipe->InitBuffer(queryAntiqScaleInputBuf, (mBaseSize >> 1U) * sizeof(float));
         // 4: 4份解bank冲突
-        tPipe->InitBuffer(keyAntiqScaleInputQue[0], (s2BaseSize + (FA_BYTE_BLOCK / sizeof(T))) * sizeof(float) * 4);
-        tPipe->InitBuffer(keyAntiqScaleInputQue[1], (s2BaseSize + (FA_BYTE_BLOCK / sizeof(T))) * sizeof(float) * 4);
+        tPipe->InitBuffer(keyAntiqScaleInputBuf[0], (s2BaseSize + (FA_BYTE_BLOCK / sizeof(T))) * sizeof(float) * 4);
+        tPipe->InitBuffer(keyAntiqScaleInputBuf[1], (s2BaseSize + (FA_BYTE_BLOCK / sizeof(T))) * sizeof(float) * 4);
         tPipe->InitBuffer(stage2OutBuf, 64 * dTemplateAlign64 * sizeof(T));
         tPipe->InitBuffer(stage1OutQue[0], 1, 16640); // (32 + 1) * (256 / 32) * 64
         tPipe->InitBuffer(stage1OutQue[1], 1, 16640);

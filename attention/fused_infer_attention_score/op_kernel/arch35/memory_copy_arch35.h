@@ -101,8 +101,6 @@ __aicore__ inline constexpr GmFormat GetKeyScaleGmFormat()
         return GmFormat::PA_BnBsND;
     } else if constexpr (kvLayoutType == 2) { // KvLayoutType_PA_BNBD
         return GmFormat::PA_BnNBsD;
-    } else if constexpr (kvLayoutType == 4) { // KvLayoutType_PA_BNB1
-        return GmFormat::PA_BnNBs_KS;
     } else {
         return GmFormat::PA_NZ_K_SCALE;
     }
