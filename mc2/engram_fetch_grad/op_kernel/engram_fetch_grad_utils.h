@@ -35,6 +35,7 @@ constexpr int32_t ENGRAM_DT_FLOAT16 = 1;
 constexpr int32_t ENGRAM_DT_FLOAT = 0;
 
 constexpr uint32_t ENTRY_BATCH_CAP = 1024U;
+constexpr uint32_t GRAD_SUB_BATCH = 8U;
 constexpr uint32_t SENDCOUNT_STRIDE_RATIO = 8U;
 
 struct EngramCommContext {

@@ -575,6 +575,11 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context, const EngramFe
                     OP_LOGE(nodeName, "workspace overflow: totalRecv=%ld, hiddenDim=%ld",
                             totalRecv, tilingData.hiddenDim),
                     return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(totalRecv > 0 &&
+                        tilingData.hiddenDim > (INT64_MAX / static_cast<int64_t>(sizeof(float))) / totalRecv,
+                    OP_LOGE(nodeName, "workspace overflow: totalRecv=%ld, hiddenDim=%ld",
+                            totalRecv, tilingData.hiddenDim),
+                    return ge::GRAPH_FAILED);
 
     int64_t wsGradSorted = numTokens * hiddenBytes;
     int64_t wsRecvGrad = totalRecv * hiddenBytes;
@@ -582,14 +587,29 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context, const EngramFe
     int64_t wsRdispls = numRanks * UB_ALIGN;
     int64_t wsCounterScratch = static_cast<int64_t>(tilingData.aivNum) * UB_ALIGN;
     int64_t wsFlagScratch = 32;
-    uint32_t segLen = (static_cast<uint32_t>(tilingData.numEntriesPerRank) + tilingData.aivNum - 1U) /
-                      tilingData.aivNum;
-    uint32_t segLenAlign = (segLen * sizeof(int32_t) + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN / sizeof(int32_t);
-    int64_t wsSegUniqueEntry = static_cast<int64_t>(tilingData.aivNum) * segLenAlign * sizeof(int32_t);
     int64_t wsSegCount = static_cast<int64_t>(tilingData.aivNum) * sizeof(int32_t);
 
+    int64_t maxSortCount = totalRecv;
+    OP_TILING_CHECK(maxSortCount > INT64_MAX / static_cast<int64_t>(sizeof(int32_t)),
+                    OP_LOGE(nodeName, "sort temp overflow: totalRecv=%ld", totalRecv),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(maxSortCount > INT64_MAX - 4095,
+                    OP_LOGE(nodeName, "sortTileCount CeilDiv overflow: totalRecv=%ld", totalRecv),
+                    return ge::GRAPH_FAILED);
+    int64_t sortTempSize = (maxSortCount * sizeof(int32_t) + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
+    int64_t sortTileCount = (maxSortCount + 4096 - 1) / 4096;
+    int64_t wsSortTempVal = sortTempSize;
+    int64_t wsSortTempIdx = sortTempSize;
+    int64_t wsSortCompanion = sortTempSize;
+    int64_t wsSortHist = sortTileCount * 256 * sizeof(int32_t);
+    int64_t wsSortPrefix = 256 * sizeof(int32_t);
+    int64_t wsSortOffsets = sortTileCount * 256 * sizeof(int32_t);
+    int64_t wsSortTotal = wsSortTempVal + wsSortTempIdx + wsSortCompanion + wsSortHist + wsSortPrefix + wsSortOffsets;
+
+    int64_t wsGradUniqueFp32 = totalRecv * tilingData.hiddenDim * sizeof(float);
+
     int64_t wsTotal = wsGradSorted + wsRecvGrad + wsSdispls + wsRdispls + wsCounterScratch + wsFlagScratch +
-                      wsSegUniqueEntry + wsSegCount;
+                      wsSegCount + wsSortTotal + wsGradUniqueFp32;
     wsTotal = AlignTo(wsTotal, BUFFER_ALIGNMENT);
     wsTotal += SYSTEM_NEED_WORKSPACE;
 
