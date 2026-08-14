@@ -17,9 +17,9 @@
 
 namespace optiling {
 constexpr uint64_t ROPE_BAB_TILING_PRIORITY = 20000;
-constexpr uint32_t MIN_UB_LOAD_D_NUM = 4;  // x, y或in, cos输入开doubleBuffer
+constexpr uint32_t MIN_UB_LOAD_D_NUM = 4; // x, y或in, cos输入开doubleBuffer
 constexpr uint32_t DOUBLE_BUFFER = 2;
-constexpr int64_t MIN_COPY_BLOCK_COUNT = 4095;
+constexpr int64_t MAX_COPY_BLOCK_COUNT = 4095;
 constexpr size_t WORK_SPACE_SIZE = static_cast<size_t>(16) * 1024 * 1024;
 constexpr int64_t TILING_KEY_BAB = 20020;
 constexpr int64_t TILING_KEY_BAB_BF16_FP32 = 20120;
@@ -107,7 +107,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassBAB::SplitUb()
 
     // Total buffer needed per element: x buffer + cos buffer + sin buffer + output buffer
     // For double buffer mode, need to multiply by DOUBLE_BUFFER
-    int64_t totalDAlign = dAlignX * 2 + dAlignCosSin * 2;  // x/y queue double buffer + cos/sin queue double buffer
+    int64_t totalDAlign = dAlignX * 2 + dAlignCosSin * 2; // x/y queue double buffer + cos/sin queue double buffer
 
     int64_t canLoadDNum = FloorDiv(ubSize_, totalDAlign);
     if (canLoadDNum < MIN_UB_LOAD_D_NUM) {
@@ -116,7 +116,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassBAB::SplitUb()
     }
     canLoadDNum = canLoadDNum / MIN_UB_LOAD_D_NUM;
     int64_t ubLoopNum = CeilDiv(n_, (canLoadDNum - 1));
-    ubFactorN_ = std::min(CeilDiv(n_, ubLoopNum), MIN_COPY_BLOCK_COUNT / dSplitCoef_);
+    ubFactorN_ = std::min(CeilDiv(n_, ubLoopNum), MAX_COPY_BLOCK_COUNT / dSplitCoef_);
     ubLoopNumN_ = CeilDiv(n_, ubFactorN_);
     if (ubFactorN_ == 0) {
         OP_LOGI("InplacePartialRopeRegBaseTilingClassBAB SplitUb error, ubFactorN_ == 0");
@@ -131,36 +131,36 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassBAB::SplitUb()
 void InplacePartialRopeRegBaseTilingClassBAB::PrintTilingData()
 {
     OP_LOGI(context_->GetNodeName(),
-        "InplacePartialRopeRegBaseTilingClassBAB tilingData: useCoreNum is %ld,"
-        "B is %ld, CosB is %ld, S is %ld, D is %ld, N is %ld, blockNumB %ld,"
-        "blockFactorB_ is %ld, blockNumS %ld, blockFactorS is %ld, ubLoopNumS is %ld,"
-        "ubFactorS is %ld, ubTailFactorS %ld, ubLoopNumB is %ld, ubFactorB is %ld,"
-        "ubTailFactorB is %ld, ubLoopNumN is %ld, ubFactorN is %ld, ubTailFactorN is %ld,"
-        "rotaryMode is %ld, tilingKey is %ld, sliceStart is %ld, sliceEnd is %ld, sliceLength is %ld",
-        usedCoreNum_,
-        tilingData_.get_B(),
-        tilingData_.get_CosB(),
-        tilingData_.get_S(),
-        tilingData_.get_D(),
-        tilingData_.get_N(),
-        tilingData_.get_blockNumB(),
-        tilingData_.get_blockFactorB(),
-        tilingData_.get_blockNumS(),
-        tilingData_.get_blockFactorS(),
-        tilingData_.get_ubLoopNumS(),
-        tilingData_.get_ubFactorS(),
-        tilingData_.get_ubTailFactorS(),
-        tilingData_.get_ubLoopNumB(),
-        tilingData_.get_ubFactorB(),
-        tilingData_.get_ubTailFactorB(),
-        tilingData_.get_ubLoopNumN(),
-        tilingData_.get_ubFactorN(),
-        tilingData_.get_ubTailFactorN(),
-        tilingData_.get_rotaryMode(),
-        tilingKey_,
-        tilingData_.get_sliceStart(),
-        tilingData_.get_sliceEnd(),
-        tilingData_.get_sliceLength());
+            "InplacePartialRopeRegBaseTilingClassBAB tilingData: useCoreNum is %ld,"
+            "B is %ld, CosB is %ld, S is %ld, D is %ld, N is %ld, blockNumB %ld,"
+            "blockFactorB_ is %ld, blockNumS %ld, blockFactorS is %ld, ubLoopNumS is %ld,"
+            "ubFactorS is %ld, ubTailFactorS %ld, ubLoopNumB is %ld, ubFactorB is %ld,"
+            "ubTailFactorB is %ld, ubLoopNumN is %ld, ubFactorN is %ld, ubTailFactorN is %ld,"
+            "rotaryMode is %ld, tilingKey is %ld, sliceStart is %ld, sliceEnd is %ld, sliceLength is %ld",
+            usedCoreNum_,
+            tilingData_.get_B(),
+            tilingData_.get_CosB(),
+            tilingData_.get_S(),
+            tilingData_.get_D(),
+            tilingData_.get_N(),
+            tilingData_.get_blockNumB(),
+            tilingData_.get_blockFactorB(),
+            tilingData_.get_blockNumS(),
+            tilingData_.get_blockFactorS(),
+            tilingData_.get_ubLoopNumS(),
+            tilingData_.get_ubFactorS(),
+            tilingData_.get_ubTailFactorS(),
+            tilingData_.get_ubLoopNumB(),
+            tilingData_.get_ubFactorB(),
+            tilingData_.get_ubTailFactorB(),
+            tilingData_.get_ubLoopNumN(),
+            tilingData_.get_ubFactorN(),
+            tilingData_.get_ubTailFactorN(),
+            tilingData_.get_rotaryMode(),
+            tilingKey_,
+            tilingData_.get_sliceStart(),
+            tilingData_.get_sliceEnd(),
+            tilingData_.get_sliceLength());
     return;
 }
 
@@ -211,4 +211,4 @@ uint64_t InplacePartialRopeRegBaseTilingClassBAB::GetTilingKey() const
     return TILING_KEY_BAB;
 }
 
-}  // namespace optiling
+} // namespace optiling

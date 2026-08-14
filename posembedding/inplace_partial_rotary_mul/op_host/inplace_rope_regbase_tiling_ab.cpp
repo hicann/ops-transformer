@@ -17,7 +17,7 @@
 
 namespace optiling {
 
-constexpr size_t RESERVERD_WORKSPACE_SIZE = static_cast<size_t>(16 * 1024 * 1024);
+constexpr size_t RESERVED_WORKSPACE_SIZE = static_cast<size_t>(16 * 1024 * 1024);
 constexpr int64_t MAX_COPY_BLOCK_COUNT = 4095;
 constexpr int64_t CONST_TWO = 2;
 constexpr int64_t CONST_FOUR = 4;
@@ -79,8 +79,8 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAB::DoOpTiling()
         // => ubFactorBS * (ubFactorN + dSizeCosSin/dSizeX) <= ubSize/(4*dSizeX)
         int64_t effectiveCosSinOverhead = CeilDiv(dSizeCosSin, dSizeX);
         OP_CHECK_IF(baseBlockInUb < effectiveCosSinOverhead + 1,
-            OP_LOGI(context_->GetNodeName(), "ubSize can't load mixed precision, d = %ld.", d_),
-            return ge::GRAPH_FAILED);
+                    OP_LOGI(context_->GetNodeName(), "ubSize can't load mixed precision, d = %ld.", d_),
+                    return ge::GRAPH_FAILED);
 
         ubFactorN_ = std::min(blockFactorN_, baseBlockInUb - effectiveCosSinOverhead);
         ubFactorN_ = std::min(ubFactorN_, MAX_COPY_BLOCK_COUNT / dSplitCoef_);
@@ -94,8 +94,8 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAB::DoOpTiling()
         baseBlockInUb =
             FloorAlign(static_cast<int64_t>(aicoreParams_.ubSize / CONST_TWO / DB_FLAG), blockSize_) / baseBufferSize;
         OP_CHECK_IF(baseBlockInUb < 1,
-            OP_LOGI(context_->GetNodeName(), "ubSize can't load 8 d size, d = %ld.", d_),
-            return ge::GRAPH_FAILED);
+                    OP_LOGI(context_->GetNodeName(), "ubSize can't load 8 d size, d = %ld.", d_),
+                    return ge::GRAPH_FAILED);
 
         ubFactorN_ = std::min(blockFactorN_, baseBlockInUb - 1);
         ubFactorN_ = std::min(ubFactorN_, MAX_COPY_BLOCK_COUNT / dSplitCoef_);
@@ -132,35 +132,35 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAB::PostTiling()
     context_->SetTilingKey(GetTilingKey());
     context_->SetBlockDim(blockNumBS_ * blockNumN_);
     size_t *workspaces = context_->GetWorkspaceSizes(1);
-    workspaces[0] = RESERVERD_WORKSPACE_SIZE;
+    workspaces[0] = RESERVED_WORKSPACE_SIZE;
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
 
     OP_LOGI(context_->GetNodeName(),
-        "InplacePartialRopeRegBaseTilingClassAB tilingData is B: %ld, CosB: %ld, S: %ld, D: %ld, N: %ld, kAlign: %ld, "
-        "dSplitCoef: %ld, BlockNumBS: %ld, BlockFactorBS: %ld, BlockTailBS: %ld, BlockNumN: %ld, "
-        "BlockFactorN: %ld, BlockTailN: %ld, UBFactorBS: %ld, UBFactorN: %ld, RotaryMode: %ld, TilingKey: %ld, "
-        "sliceStart is %ld, sliceEnd is %ld, sliceLength is %ld",
-        tilingData_.get_B(),
-        tilingData_.get_CosB(),
-        tilingData_.get_S(),
-        tilingData_.get_D(),
-        tilingData_.get_N(),
-        tilingData_.get_dAlign(),
-        tilingData_.get_dSplitCoef(),
-        tilingData_.get_blockNumBS(),
-        tilingData_.get_blockFactorBS(),
-        tilingData_.get_blockTailBS(),
-        tilingData_.get_blockNumN(),
-        tilingData_.get_blockFactorN(),
-        tilingData_.get_blockTailN(),
-        tilingData_.get_ubFactorBS(),
-        tilingData_.get_ubFactorN(),
-        tilingData_.get_rotaryMode(),
-        GetTilingKey(),
-        tilingData_.get_sliceStart(),
-        tilingData_.get_sliceEnd(),
-        tilingData_.get_sliceLength());
+            "InplacePartialRopeRegBaseTilingClassAB tilingData is B: %ld, CosB: %ld, S: %ld, D: %ld, N: %ld, kAlign: %ld, "
+            "dSplitCoef: %ld, BlockNumBS: %ld, BlockFactorBS: %ld, BlockTailBS: %ld, BlockNumN: %ld, "
+            "BlockFactorN: %ld, BlockTailN: %ld, UBFactorBS: %ld, UBFactorN: %ld, RotaryMode: %ld, TilingKey: %ld, "
+            "sliceStart is %ld, sliceEnd is %ld, sliceLength is %ld",
+            tilingData_.get_B(),
+            tilingData_.get_CosB(),
+            tilingData_.get_S(),
+            tilingData_.get_D(),
+            tilingData_.get_N(),
+            tilingData_.get_dAlign(),
+            tilingData_.get_dSplitCoef(),
+            tilingData_.get_blockNumBS(),
+            tilingData_.get_blockFactorBS(),
+            tilingData_.get_blockTailBS(),
+            tilingData_.get_blockNumN(),
+            tilingData_.get_blockFactorN(),
+            tilingData_.get_blockTailN(),
+            tilingData_.get_ubFactorBS(),
+            tilingData_.get_ubFactorN(),
+            tilingData_.get_rotaryMode(),
+            GetTilingKey(),
+            tilingData_.get_sliceStart(),
+            tilingData_.get_sliceEnd(),
+            tilingData_.get_sliceLength());
 
     return ge::GRAPH_SUCCESS;
 }
@@ -189,4 +189,4 @@ bool InplacePartialRopeRegBaseTilingClassAB::IsCapable()
     return layout_ == InplacePartialRopeLayout::SBND;
 }
 
-}  // namespace optiling
+} // namespace optiling
