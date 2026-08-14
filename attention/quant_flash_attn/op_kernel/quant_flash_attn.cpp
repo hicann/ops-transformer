@@ -55,7 +55,8 @@ __aicore__ inline void quant_flash_attn_mxfp8(
         (static_cast<std::underlying_type_t<inferDTemplateType>>(ConfigValue[config].d) + 63) >> 6 << 6);
     constexpr DTemplateType dVTemplateType = static_cast<DTemplateType>(
         (static_cast<std::underlying_type_t<inferDTemplateType>>(ConfigValue[config].dv) + 63) >> 6 << 6);
-    constexpr bool isDAligned = ConfigValue[config].d == inferDTemplateType::Aligned128;
+    constexpr bool isDAligned = ConfigValue[config].d != inferDTemplateType::NotAligned &&
+                                static_cast<int32_t>(ConfigValue[config].d) % 64 == 0;
 
     constexpr bool isFdConst = false;
     constexpr bool useDn = (quantMode == QFA_MXFP8_FP32_PREFILL);
