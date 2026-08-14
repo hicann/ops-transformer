@@ -94,6 +94,12 @@ private:
     ge::graphStatus CheckShapeEqual(const gert::StorageShape &actual, const std::vector<int64_t> &expected,
                                     const std::string &paraName, const char *opName) const;
 
+    // --- Feature: N1/N2/G 上限校验 (全量化场景) ---
+    ge::graphStatus CheckN1SizeFullquant(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckN2SizeFullquant(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckGSizeFullquant(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckInputAxisFullquant(const QfaTilingInfo &qfaInfo) const;
+
 private:
     std::shared_ptr<QfaTilingShapeCompare> queryShapeCmp_ = nullptr;
     std::shared_ptr<QfaTilingShapeCompare> keyShapeCmp_ = nullptr;

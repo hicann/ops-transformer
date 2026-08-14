@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------------------------------------
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
-# This program is free software; you can redistribute it and/or modify it under the terms and conditions of
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
-# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
@@ -344,21 +344,24 @@ def torch_broadcast_kv(num_heads, num_kv_heads, tensor):
     factor = num_heads // num_kv_heads
     return tensor.repeat_interleave(factor, dim=1).contiguous()
 
+
 def printmm(matrix, layout, z_size):
     import torch.nn.functional as F
+
     d0, d1, d2, d3 = matrix.shape
     if d3 % z_size != 0:
         pad_size = (d3 + z_size - 1) // z_size * z_size - d3
         matrix = F.pad(matrix, (0, pad_size))
         d3 = d3 + pad_size
     if layout == "DN":
-        matrix = matrix.permute(0,1,3,2)
-    matrix = matrix.reshape(d0,d1,d2,d3//z_size,z_size)
-    matrix = matrix.permute(0,1,3,2,4)
+        matrix = matrix.permute(0, 1, 3, 2)
+    matrix = matrix.reshape(d0, d1, d2, d3 // z_size, z_size)
+    matrix = matrix.permute(0, 1, 3, 2, 4)
     # print("---------------matrix print---------------")
     # for val in matrix.flatten():
     #     print(f"{val:.5f}")
     return matrix
+
 
 def cpu_fp8_fullquant_golden(
     q_fp8, k_fp8, v_fp8, deq_q, deq_k, deq_v, p_scale, actual_seq_q, actual_seq_kv
@@ -911,8 +914,12 @@ def prepare_npu_inputs_gqa_fp8(
         block_table_tensor = torch.as_tensor(block_table, dtype=torch.int32)
 
     k_pa = bnsd_to_k_cache(
-        k_fp8, dequant_scale_k, actual_seq_kv, BLOCK_SIZE,
-        block_table, num_blocks=NUM_BLOCKS,
+        k_fp8,
+        dequant_scale_k,
+        actual_seq_kv,
+        BLOCK_SIZE,
+        block_table,
+        num_blocks=NUM_BLOCKS,
     )
     v_pa = bnsd_to_v_cache(
         v_fp8, actual_seq_kv, BLOCK_SIZE, block_table, num_blocks=NUM_BLOCKS
@@ -1017,11 +1024,19 @@ def fa_run_npu(
     # k = k.contiguous().npu()
     # v = v.contiguous().npu()
     # dequant_scale_k = dequant_scale_k.contiguous().npu()
-    logger.info("[NPU] layout_q: %s, layout_kv: %s, mask_mode: %s", LAYOUT_Q, LAYOUT_KV, MASK_MODE)
+    logger.info(
+        "[NPU] layout_q: %s, layout_kv: %s, mask_mode: %s",
+        LAYOUT_Q,
+        LAYOUT_KV,
+        MASK_MODE,
+    )
     logger.info("[NPU] k is_contiguous: %s, stride: %s", k.is_contiguous(), k.stride())
     logger.info("[NPU] v is_contiguous: %s, stride: %s", v.is_contiguous(), v.stride())
-    logger.info("[NPU] dequant_scale_k is_contiguous: %s, stride: %s",
-                dequant_scale_k.is_contiguous(), dequant_scale_k.stride())
+    logger.info(
+        "[NPU] dequant_scale_k is_contiguous: %s, stride: %s",
+        dequant_scale_k.is_contiguous(),
+        dequant_scale_k.stride(),
+    )
 
     atten_out, lse_out = qfa_fp8_torch_npu(
         q,
@@ -1066,9 +1081,15 @@ def npu_fp8_full_quant(
         raise NotImplementedError("QFA GQA 仅支持 PA 模式")
 
     inputs = prepare_npu_inputs_gqa_fp8(
-        q_fp8, k_fp8, v_fp8,
-        dequant_scale_q, dequant_scale_k, dequant_scale_v,
-        p_scale, actual_seq_q, actual_seq_kv,
+        q_fp8,
+        k_fp8,
+        v_fp8,
+        dequant_scale_q,
+        dequant_scale_k,
+        dequant_scale_v,
+        p_scale,
+        actual_seq_q,
+        actual_seq_kv,
         block_table_torch=block_table_torch,
     )
 
@@ -1081,12 +1102,24 @@ def npu_fp8_full_quant(
         cache_info = (k_pa_clone, v_pa_clone, bt_clone)
 
     output = fa_run_npu(
-        inputs["q"], inputs["k"], inputs["v"], inputs["mask"],
-        inputs["cu_seqlens_q"], inputs["seqused_q"], inputs["seqused_kv"],
-        inputs["dequant_scale_q"], inputs["dequant_scale_k"], inputs["dequant_scale_v"],
-        inputs["p_scale"], inputs["block_table"], inputs["block_size"],
-        inputs["q_n"], inputs["kv_n"], inputs["softmax_scale"],
-        inputs["max_seqlen_q"], inputs["max_seqlen_kv"],
+        inputs["q"],
+        inputs["k"],
+        inputs["v"],
+        inputs["mask"],
+        inputs["cu_seqlens_q"],
+        inputs["seqused_q"],
+        inputs["seqused_kv"],
+        inputs["dequant_scale_q"],
+        inputs["dequant_scale_k"],
+        inputs["dequant_scale_v"],
+        inputs["p_scale"],
+        inputs["block_table"],
+        inputs["block_size"],
+        inputs["q_n"],
+        inputs["kv_n"],
+        inputs["softmax_scale"],
+        inputs["max_seqlen_q"],
+        inputs["max_seqlen_kv"],
     )
 
     atten_out = output[0]
@@ -1307,4 +1340,5 @@ if __name__ == "__main__":
     if ENABLE_LSE:
         logger.info("\n[Step 5] LSE 精度对比")
         cpu_lse_tnd_torch = convert_q_bnsd_to_layout(cpu_lse, ACTUAL_SEQ_Q, "TND")
-        result_compare_method.check_result(cpu_lse_tnd_torch, lse_out)
+        cpu_lse_nt_torch = cpu_lse_tnd_torch.squeeze(-1).permute(1, 0).contiguous()
+        result_compare_method.check_result(cpu_lse_nt_torch, lse_out)

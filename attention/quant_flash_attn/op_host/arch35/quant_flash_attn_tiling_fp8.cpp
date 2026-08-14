@@ -13,9 +13,9 @@
  * \brief QuantFlashAttn arch35 tiling implementation (GQA_FP8_FULLQUANT)
  */
 
+#include <vector>
 #include "quant_flash_attn_tiling_fp8.h"
 #include "../quant_flash_attn_tiling.h"
-#include <vector>
 #include <graph/utils/type_utils.h>
 #include "log/log.h"
 #include "../quant_flash_attn_tiling_utils.h"
@@ -375,5 +375,5 @@ void QuantFlashAttnTilingFp8Impl::PrintAllTilingData()
 using quant_flash_attn::QuantFlashAttnTilingFp8Impl;
 
 REGISTER_TILING_TEMPLATE_FIA(QuantFlashAttn, QuantFlashAttnTilingFp8Impl,
-                              std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510)}), 2);
+                             std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510)}), 2);
 } // namespace optiling

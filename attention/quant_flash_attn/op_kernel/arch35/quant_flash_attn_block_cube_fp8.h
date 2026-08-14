@@ -40,7 +40,6 @@ template <typename INPUT_T, typename T, LayOutTypeEnum layout = LayOutTypeEnum::
           bool useDn = false>
 class QuantFlashAttnBlockCubeGqaFp8 {
 public:
-
     /* ============确定L0A的类型============= */
     struct L0ABuffSel {
         using Type = BuffersPolicyDB<BufferType::L0A>;
@@ -64,15 +63,9 @@ public:
     static constexpr uint32_t s2BaseSize = (uint32_t)s2TemplateType;
     static constexpr uint32_t dBaseSize = (uint32_t)dTemplateType;
     static constexpr uint32_t dVBaseSize = (uint32_t)dVTemplateType;
-    static constexpr uint32_t l1BaseD = 128;
-    static constexpr uint32_t s2SplitSize = 256U;
-    static constexpr uint32_t MXFP_GROUP_SIZE = 32U;
-    static constexpr uint32_t MXFP_DIVISOR_SIZE = 64U;
-    static constexpr uint32_t MXFP_MULTI_BASE_SIZE = 2U;
     static constexpr LayOutTypeEnum LAYOUT = layout;
     static constexpr bool PAGE_ATTENTION = (KvLayoutType > 0);
     static constexpr bool USE_DN = useDn;
-    static constexpr uint8_t KV_LAYOUT = 4;
     static constexpr FixpipeConfig BMM2_FIXPIPE_CONFIG = {CO2Layout::ROW_MAJOR, true};
     static constexpr GmFormat Q_FORMAT = GmFormat::NGTD;
     static constexpr GmFormat KV_FORMAT = GmFormat::PA_BnNBsD;
@@ -95,7 +88,7 @@ public:
 
     static constexpr bool IS_TND_LAYOUT =
         (LAYOUT == LayOutTypeEnum::LAYOUT_TND || LAYOUT == LayOutTypeEnum::LAYOUT_NTD);
-    static constexpr bool Q_NEEDS_WZH = true;  // (GmLayoutParams<Q_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_TND);
+    static constexpr bool Q_NEEDS_WZH = true;
     static constexpr bool KV_NEEDS_WZH = (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_TND);
 
     static constexpr ActualSeqLensMode Q_PARSER_MODE = GetQActSeqMode<LAYOUT>();
@@ -147,7 +140,8 @@ public:
     const ConstInfoX &constInfo_;
 
     /* ============================================================================= */
-    __aicore__ inline QuantFlashAttnBlockCubeGqaFp8(ConstInfoX &constInfo) : constInfo_(constInfo){};
+    __aicore__ inline QuantFlashAttnBlockCubeGqaFp8(ConstInfoX &constInfo)
+        : constInfo_(constInfo){};
 
     __aicore__ inline void InitCubeBlock(TPipe *pipe, BufferManager<BufferType::L1> *l1BuffMgr, __gm__ uint8_t *query,
                                          __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *blockTable,
@@ -171,7 +165,7 @@ public:
         // L0A B C 当前写死
         l0aBufferManager_.Init(tPipe_, 65536);  // 64 * 1024
         l0bBufferManager_.Init(tPipe_, 65536);  // 64 * 1024
-        l0cBufferManager_.Init(tPipe_, 262144);  // 256 * 1024
+        l0cBufferManager_.Init(tPipe_, 262144); // 256 * 1024
         mmL0ABuffers_.Init(l0aBufferManager_, 32 * 1024);
         mmL0BBuffers_.Init(l0bBufferManager_, 32 * 1024);
 
@@ -366,7 +360,7 @@ public:
         }
         mm1A.Set<HardEvent::MTE1_MTE2>();   // 释放L1B
         mm1ResL0C.Set<HardEvent::M_FIX>();  // 通知
-        mm1ResL0C.Wait<HardEvent::M_FIX>();  // 等待L0C
+        mm1ResL0C.Wait<HardEvent::M_FIX>(); // 等待L0C
 
         outputBuf.WaitCrossCore();
 
@@ -434,7 +428,7 @@ public:
 
         outputBuf.SetCrossCore();
     }
-};  // QuantFlashAttnBlockCubeGqaFp8
+}; // QuantFlashAttnBlockCubeGqaFp8
 
 template <typename INPUT_T, typename T, LayOutTypeEnum layout = LayOutTypeEnum::None,
           S1TemplateType s1TemplateType = S1TemplateType::Aligned128,

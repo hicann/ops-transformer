@@ -89,13 +89,6 @@ aclnnStatus aclnnQuantFlashAttnGetWorkspaceSize(
     const aclTensor *attnOut, const aclTensor *softmaxLseOptional,
     uint64_t *workspaceSize, aclOpExecutor **executor);
 
-static aclnnStatus CheckTensorContiguous(
-    const aclTensor *k, const aclTensor *v,
-    const aclTensor *kDescale, const aclTensor *vDescale);
-
-// 新版本opbase存在TensorV2的新接口，用弱符号判断当前opbase是新版本还是旧版本，旧版本不支持传入非连续tensor
-bool NnopbaseSupportTensorV2() __attribute__((weak));
-
 /**
  * @brief Second phase of aclnnQuantFlashAttn: execute computation.
  * @param workspace       [IN] Workspace device memory pointer from first phase.

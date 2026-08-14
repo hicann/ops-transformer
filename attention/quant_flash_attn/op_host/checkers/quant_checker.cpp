@@ -861,6 +861,53 @@ ge::graphStatus QuantChecker::CheckFeature(const QfaTilingInfo &qfaInfo)
     if (CheckShapeMatch(qfaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
+    if (CheckInputAxisFullquant(qfaInfo) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QuantChecker::CheckN1SizeFullquant(const QfaTilingInfo &qfaInfo) const
+{
+    OP_CHECK_IF((qfaInfo.n1Size > N1_LIMIT || qfaInfo.n1Size < 1),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    qfaInfo.opName, "num_heads", std::to_string(qfaInfo.n1Size).c_str(),
+                    "num_heads must be within the range [1, 256]"),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QuantChecker::CheckN2SizeFullquant(const QfaTilingInfo &qfaInfo) const
+{
+    OP_CHECK_IF((qfaInfo.n2Size > N2_LIMIT || qfaInfo.n2Size < 1),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    qfaInfo.opName, "num_key_value_heads", std::to_string(qfaInfo.n2Size).c_str(),
+                    "num_key_value_heads must be within the range [1, 256]"),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QuantChecker::CheckGSizeFullquant(const QfaTilingInfo &qfaInfo) const
+{
+    if (qfaInfo.gSize < 1 || qfaInfo.gSize > G_LIMIT) {
+        std::string qShape = ToString(qfaInfo.opParamInfo.query.shape->GetStorageShape());
+        std::string kShape = ToString(qfaInfo.opParamInfo.key.shape->GetStorageShape());
+        std::string shapesStr = qShape + " and " + kShape;
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            qfaInfo.opName, "query and key", shapesStr.c_str(),
+            "the axis G must be within the range [1, 64]");
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QuantChecker::CheckInputAxisFullquant(const QfaTilingInfo &qfaInfo) const
+{
+    if (CheckN1SizeFullquant(qfaInfo) != ge::GRAPH_SUCCESS ||
+        CheckN2SizeFullquant(qfaInfo) != ge::GRAPH_SUCCESS ||
+        CheckGSizeFullquant(qfaInfo) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 

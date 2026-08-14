@@ -182,4 +182,6 @@ def npu_qfa(
 
     if not enable_lse:
         lse_out = None
+    else:
+        lse_out = lse_out[:, : atten_out.shape[0]].contiguous()
     return atten_out, lse_out

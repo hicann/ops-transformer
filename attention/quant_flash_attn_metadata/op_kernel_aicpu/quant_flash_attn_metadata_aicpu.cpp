@@ -195,6 +195,12 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
             baseInfo.kvSeqSize =
                 std::max(static_cast<int64_t>(baseInfo.kvSeqSize), sequsedKv[i]);
         }
+        if (maxSeqlenKv_ >= 0 && baseInfo.kvSeqSize != maxSeqlenKv_) {
+            KERNEL_LOG_ERROR(
+                "max(seqused_kv)=%ld must be equal to max_seqlen_kv=%ld, but got inconsistency",
+                baseInfo.kvSeqSize, maxSeqlenKv_);
+            return false;
+        }
     }
     baseInfo.batchSize = batchSize_;
     baseInfo.queryHeadNum = numHeadsQ_;

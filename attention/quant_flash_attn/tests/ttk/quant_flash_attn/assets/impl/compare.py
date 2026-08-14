@@ -170,6 +170,22 @@ def compare(*outputs, **kwargs):
             pct_thd,
             max_diff_hd,
         )
+        npu_shape = tuple(npu_torch.shape) if hasattr(npu_torch, "shape") else "N/A"
+        npu_dtype = str(npu_torch.dtype) if hasattr(npu_torch, "dtype") else "N/A"
+        golden_shape = (
+            tuple(golden_torch.shape) if hasattr(golden_torch, "shape") else "N/A"
+        )
+        golden_dtype = (
+            str(golden_torch.dtype) if hasattr(golden_torch, "dtype") else "N/A"
+        )
+        logger.info(
+            "[COMPARE] %s: npu_shape=%s npu_dtype=%s | golden_shape=%s golden_dtype=%s",
+            label,
+            npu_shape,
+            npu_dtype,
+            golden_shape,
+            golden_dtype,
+        )
         result, fulfill_percent, max_error = result_compare_method.check_result(
             golden_torch,
             npu_torch,

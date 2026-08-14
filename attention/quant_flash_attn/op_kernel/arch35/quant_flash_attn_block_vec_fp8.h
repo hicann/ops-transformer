@@ -53,20 +53,11 @@ public:
     /* =================编译期常量的基本块信息================= */
     static constexpr uint32_t mBaseSize = (uint32_t)s1TemplateType;
     static constexpr uint32_t s2BaseSize = (uint32_t)s2TemplateType;
-    static constexpr uint32_t vec1S2CopyLenDn = s2BaseSize >> 1;
-    static constexpr uint32_t vec1HalfS1BaseSize = mBaseSize >> 1;
-    static constexpr uint32_t vec1S2CopyCountDn = mBaseSize >> 5;
-    static constexpr uint32_t vec1S2strideDn = s2BaseSize * 8;
-    static constexpr uint32_t vec1ScmBlock = mBaseSize * 8;
-    static constexpr uint32_t vec1ScmBlockFp32 = mBaseSize * 4;
-    static constexpr uint32_t vec1ScmBlockFp8 = mBaseSize * 16;
-    static constexpr uint32_t vec1ResOffsetDn = s2BaseSize * 32 + 64;
-    static constexpr uint32_t vec1Srcstride = (mBaseSize >> 1) + 1;
     static constexpr uint32_t dTemplateAlign64 = Align64Func((uint16_t)dVTemplateType);
     static constexpr bool isFp8 = IsSameType<INPUT_T, fp8_e5m2_t>::value || IsSameType<INPUT_T, fp8_e4m3fn_t>::value ||
                                   IsSameType<INPUT_T, hifloat8_t>::value;
     static constexpr uint32_t DB = 2;
-    static constexpr uint32_t PRELOAD_N = 2;  // C1 C1 C2
+    static constexpr uint32_t PRELOAD_N = 2; // C1 C1 C2
     static constexpr bool HAS_MASK = hasAtten;
     static constexpr bool FLASH_DECODE = isFd;
 
@@ -75,7 +66,6 @@ public:
     static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<layout>();
 
     static constexpr bool USE_DN = useDn;
-    static constexpr uint8_t KV_LAYOUT = 4;  // 4: K与K_Scale在同一物理内存中交叉排列
     static constexpr bool IS_PER_TOEKN_HEAD = true;
     static constexpr bool PAGE_ATTENTION = (KvLayoutType > 0);
 
@@ -124,7 +114,7 @@ public:
     using FaGmTensorKScale = FaGmTensor<float, K_SCALE_FORMAT, int32_t>;
     FaGmTensorQScale queryScaleGm_;
     FaGmTensorKScale keyScaleGm_;
-    quantGmType deScaleVGm_;  // GQA: 1D [N2]的V descale
+    quantGmType deScaleVGm_; // GQA: 1D [N2]的V descale
 
     flashdecodeGmType accumOutGm_;
     flashdecodeGmType softmaxFDSumGm_;
@@ -148,14 +138,15 @@ public:
     TBuf<> lseTmpBuff_;
     TQue<QuePosition::VECOUT, 1> softmaxLseQueue_;
     TBuf<> queryAntiqScaleInputQue_;
-    TBuf<> keyAntiqScaleInputQue_[2];  // 2:DB
+    TBuf<> keyAntiqScaleInputQue_[2]; // 2:DB
     const ConstInfoX &constInfo_;
     T negativeFloatScalar_;
     float pScaleValue_{1.0f};
     bool isSkipMask_{false};
 
     // ==================== Functions ======================
-    __aicore__ inline QuantFlashAttnBlockVecGqaFp8(ConstInfoX &constInfo) : constInfo_(constInfo){};
+    __aicore__ inline QuantFlashAttnBlockVecGqaFp8(ConstInfoX &constInfo)
+        : constInfo_(constInfo){};
 
     __aicore__ inline void InitVecBlock(TPipe *pipe, __gm__ uint8_t *actualSeqQlenAddr,
                                         __gm__ uint8_t *actualSeqKvlenAddr, __gm__ uint8_t *pScale,
@@ -185,9 +176,7 @@ public:
         }
 
         uint64_t actualLenQSize =
-            (layout == LayOutTypeEnum::LAYOUT_TND || layout == LayOutTypeEnum::LAYOUT_NTD)
-                ? constInfo_.cuSeqLensQSize
-                : constInfo_.seqUsedQSize;
+            (layout == LayOutTypeEnum::LAYOUT_TND || layout == LayOutTypeEnum::LAYOUT_NTD) ? constInfo_.cuSeqLensQSize : constInfo_.seqUsedQSize;
         actualSeqLengthsGmQ_.SetGlobalBuffer((__gm__ int32_t *)actualSeqQlenAddr, actualLenQSize);
 
         if (pScale != nullptr) {
@@ -209,7 +198,7 @@ public:
             accumOutGm_.SetGlobalBuffer((__gm__ float *)workspace);
             softmaxFDSumGm_.SetGlobalBuffer((__gm__ float *)workspace + constInfo_.accumOutSize);
             softmaxFDMaxGm_.SetGlobalBuffer((__gm__ float *)workspace + constInfo_.accumOutSize +
-                                           constInfo_.logSumExpSize);
+                                            constInfo_.logSumExpSize);
         }
     }
 
@@ -228,7 +217,7 @@ public:
     {
         kScaleGmTensor.gmTensor.SetGlobalBuffer((__gm__ float *)gm);
         kScaleGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, blockTableGm_, constInfo_.maxBlockNumPerBatch,
-                                                 bnStrides, n2Strides);
+                                             bnStrides, n2Strides);
     }
 
     __aicore__ inline void ProcessVec1(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &outputBuf,
@@ -374,9 +363,9 @@ public:
 
         while (copyFinishElmeCnt < antiqGmCoord.s2DealSize) {
             uint32_t copyElemCnt =
-                offsetCal.GetDimBlockSize() - curS2Idx % offsetCal.GetDimBlockSize();  // 一次只能处理一个block
+                offsetCal.GetDimBlockSize() - curS2Idx % offsetCal.GetDimBlockSize(); // 一次只能处理一个block
             if (copyFinishElmeCnt + copyElemCnt > antiqGmCoord.s2DealSize) {
-                copyElemCnt = antiqGmCoord.s2DealSize - copyFinishElmeCnt;  // 一个block未拷满
+                copyElemCnt = antiqGmCoord.s2DealSize - copyFinishElmeCnt; // 一个block未拷满
             }
 
             uint64_t srcOffset = offsetCal.GetOffset(antiqGmCoord.bIdx, antiqGmCoord.n2Idx, curS2Idx);
@@ -394,7 +383,7 @@ public:
         uint32_t blockElemNum = FA_BYTE_BLOCK / sizeof(T);
 
         DataCopyExtParams dataCopyParams;
-        dataCopyParams.blockCount = static_cast<uint16_t>(4);  // 4: 4份，用于解bank冲突
+        dataCopyParams.blockCount = static_cast<uint16_t>(4); // 4: 4份，用于解bank冲突
         dataCopyParams.blockLen = actDataLen * sizeof(T);
         dataCopyParams.srcStride = -static_cast<int64_t>(dataCopyParams.blockLen);
         dataCopyParams.dstStride = (s2BaseSize + blockElemNum - actDataLen) * sizeof(T) / FA_BYTE_BLOCK;
@@ -551,33 +540,11 @@ public:
         softmaxLseQueue_.template EnQue(lseUb);
         softmaxLseQueue_.DeQue<float>();
 
-        if constexpr (outLayout == LayOutTypeEnum::LAYOUT_TND) {
-            uint32_t prefixBS1 = qActSeqLensParser_->GetTBase(runInfo.bIdx);
-            uint64_t bN2Offset =
-                prefixBS1 * constInfo_.realN2Size * constInfo_.realGSize + runInfo.realN2Idx * constInfo_.realGSize;
-            DataCopySoftmaxLseTNDArch35NoGS1Merge<T, ConstInfoX>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx,
+        uint32_t prefixBS1 = qActSeqLensParser_->GetTBase(runInfo.bIdx);
+        uint64_t bN2Offset =
+            runInfo.realN2Idx * constInfo_.realGSize * constInfo_.t1Size + prefixBS1;
+        DataCopySoftmaxLseTNDtoNTArch35NoGS1Merge<T, ConstInfoX>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx,
                                                                  runInfo.actVecMSize, constInfo_);
-        } else if constexpr (outLayout == LayOutTypeEnum::LAYOUT_NTD) {
-            uint32_t prefixBS1 = qActSeqLensParser_->GetTBase(runInfo.bIdx);
-            uint32_t s1Size = qActSeqLensParser_->GetActualSeqLength(runInfo.bIdx);
-            uint64_t bN2Offset = prefixBS1 * constInfo_.n2Size * constInfo_.gSize + runInfo.n2Idx * constInfo_.gSize;
-            DataCopySoftmaxLseNTDArch35<T, ConstInfoX>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx, runInfo.actVecMSize,
-                                                       constInfo_, s1Size);
-        } else if constexpr (outLayout == LayOutTypeEnum::LAYOUT_BSH) {
-            uint64_t bN2Offset = runInfo.bIdx * constInfo_.n2Size * constInfo_.gSize * constInfo_.s1Size +
-                                 runInfo.n2Idx * constInfo_.gSize * constInfo_.s1Size;
-            uint64_t qActSeqLens = qActSeqLensParser_->GetActualSeqLength(runInfo.bIdx);
-            uint64_t s1LeftPaddingSize = 0;
-            DataCopySoftmaxLseBSNDArch35<T, ConstInfoX>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx, runInfo.actVecMSize,
-                                                        constInfo_, s1LeftPaddingSize);
-        } else {
-            uint64_t bN2Offset = runInfo.bIdx * constInfo_.n2Size * constInfo_.gSize * constInfo_.s1Size +
-                                 runInfo.n2Idx * constInfo_.gSize * constInfo_.s1Size;
-            uint64_t qActSeqLens = qActSeqLensParser_->GetActualSeqLength(runInfo.bIdx);
-            uint64_t s1LeftPaddingSize = 0;
-            DataCopySoftmaxLseBNSDArch35<T, ConstInfoX>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx, runInfo.actVecMSize,
-                                                        constInfo_, qActSeqLens, s1LeftPaddingSize);
-        }
 
         softmaxLseQueue_.FreeTensor(lseUb);
     }
@@ -592,7 +559,7 @@ public:
 
         int64_t vec2CalcSize = runInfo.actVecMSize * dTemplateAlign64;
         int32_t deScaleVOffset = runInfo.n2Idx;
-        float deScaleVValue = this->deScaleVGm_.GetValue(deScaleVOffset);  // GQA: per-head V descale
+        float deScaleVValue = this->deScaleVGm_.GetValue(deScaleVOffset); // GQA: per-head V descale
 
         LocalTensor<T> vec2ResUb = this->stage2OutBuf_.template Get<T>();
         LocalTensor<T> mmRes = bmm2ResBuf.template GetTensor<T>();
