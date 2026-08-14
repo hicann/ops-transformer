@@ -41,35 +41,46 @@ def load_impl_module(stem):
     return module
 
 
+pre_npu_module = load_impl_module("pre_npu")
 golden_module = load_impl_module("golden")
 inputs_module = load_impl_module("inputs")
 compare_module = load_impl_module("compare")
-graph_module = load_impl_module("graph")
 
 
 class QuantLightningIndexerV2Spec:
     golden = golden_module.cpu_quant_lightning_indexer_v2
     customize_inputs = inputs_module.generate_qli_v2_inputs
+    pre_npu = pre_npu_module.run
     tolerance = {
         "float16": {"standard": "stat_rel_err"},
         "bfloat16": {"standard": "stat_rel_err"},
         "float8_e4m3fn": {"standard": "stat_rel_err"},
     }
 
-    def compare(*outputs, compare_context=None, **kwargs):
+    def compare(*outputs, compare_context=None, context: "TtkContext" = None, **kwargs):
         del kwargs
-        testcase_name = None if compare_context is None else compare_context.testcase_name
-        data = golden_module.get_compare_data(testcase_name)
+        testcase_name = (
+            context.testcase_name
+            if context is not None
+            else (None if compare_context is None else compare_context.testcase_name)
+        )
+        data = golden_module.get_compare_data(testcase_name, context)
         if data is None:
             if compare_context is None:
-                raise RuntimeError("QuantLightningIndexerV2 pytest compare requires compare_context")
+                raise RuntimeError(
+                    "QuantLightningIndexerV2 pytest compare requires compare_context"
+                )
             data = inputs_module.rebuild_qli_v2_compare_data(compare_context)
-            golden_module.set_compare_data(compare_context.testcase_name, data)
+            golden_module.set_compare_data(compare_context.testcase_name, data, context)
         return compare_module.compare(*outputs, compare_data=data)
 
-    torch_graph = graph_module.QuantLightningIndexerV2AclGraph
+
+class AclnnQuantLightningIndexerV2Spec(QuantLightningIndexerV2Spec):
+    golden = golden_module.cpu_aclnn_qli_v2
+    customize_inputs = inputs_module.generate_aclnn_qli_v2_inputs
 
 
 __spec__ = {
-    "qli_v2_ttk_ops.quant_lightning_indexer_v2": "QuantLightningIndexerV2Spec",
+    "torch.ops.cann_ops_transformer.quant_lightning_indexer": "QuantLightningIndexerV2Spec",
+    "aclnnQuantLightningIndexerV2": "AclnnQuantLightningIndexerV2Spec",
 }

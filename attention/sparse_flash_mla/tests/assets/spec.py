@@ -41,24 +41,30 @@ def load_impl_module(stem):
     return module
 
 
+pre_npu_module = load_impl_module("pre_npu")
 golden_module = load_impl_module("golden")
 inputs_module = load_impl_module("inputs")
 compare_module = load_impl_module("compare")
-graph_module = load_impl_module("graph")
 
 
 class SparseFlashMlaSpec:
     golden = golden_module.cpu_sparse_flash_mla
     customize_inputs = inputs_module.generate_sparse_flash_mla_inputs
+    pre_npu = pre_npu_module.run
     tolerance = {
         "float16": {"standard": "stat_rel_err"},
         "bfloat16": {"standard": "stat_rel_err"},
     }
 
     compare = staticmethod(compare_module.compare)
-    torch_graph = graph_module.SparseFlashMlaAclGraph
+
+
+class AclnnSparseFlashMlaSpec(SparseFlashMlaSpec):
+    golden = golden_module.cpu_aclnn_sparse_flash_mla
+    customize_inputs = inputs_module.generate_aclnn_sparse_flash_mla_inputs
 
 
 __spec__ = {
-    "smla_ttk_ops.sparse_flash_mla_ttk": "SparseFlashMlaSpec",
+    "torch.ops.cann_ops_transformer.sparse_flash_mla": "SparseFlashMlaSpec",
+    "aclnnSparseFlashMla": "AclnnSparseFlashMlaSpec",
 }

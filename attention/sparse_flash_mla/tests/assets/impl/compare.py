@@ -96,9 +96,9 @@ class PytestResultComparator:
         return {
             "pass": passed,
             "precision": float(precision),
-            "error_info": None if passed else (
-                f"pytest check_result output[{output_index}] returned {status!r}"
-            ),
+            "error_info": None
+            if passed
+            else (f"pytest check_result output[{output_index}] returned {status!r}"),
         }
 
     def compare(self, *outputs):
@@ -112,18 +112,23 @@ class PytestResultComparator:
         half = len(outputs) // 2
         results = []
         for output_index, (npu_output, golden) in enumerate(
-                zip(outputs[:half], outputs[half:])):
+            zip(outputs[:half], outputs[half:])
+        ):
             if golden is None:
                 results.append({"pass": True, "precision": "SUPPRESSED"})
                 continue
             if npu_output is None:
-                results.append({
-                    "pass": False,
-                    "precision": "NO_OUTPUT",
-                    "error_info": f"NPU output[{output_index}] is None",
-                })
+                results.append(
+                    {
+                        "pass": False,
+                        "precision": "NO_OUTPUT",
+                        "error_info": f"NPU output[{output_index}] is None",
+                    }
+                )
                 continue
-            result = module.check_result(self.to_torch(golden), self.to_torch(npu_output))
+            result = module.check_result(
+                self.to_torch(golden), self.to_torch(npu_output)
+            )
             results.append(self.normalize_result(result, output_index))
         return results
 
@@ -155,8 +160,9 @@ class SparseFlashMlaBatchComparator:
         array = np.ascontiguousarray(np.asarray(value))
         return tuple(array.shape), array.dtype.str, array.view(np.uint8).tobytes()
 
-    def parse_relations(self, batch_consistency_id, batch_axis,
-                        batch_slice_info, batch_seed):
+    def parse_relations(
+        self, batch_consistency_id, batch_axis, batch_slice_info, batch_seed
+    ):
         fields = (batch_consistency_id, batch_axis, batch_slice_info, batch_seed)
         if all(field is None for field in fields):
             return None, None
@@ -184,8 +190,7 @@ class SparseFlashMlaBatchComparator:
                     f"{self.OPERATOR_NAME} batch compare supports q seeds only"
                 )
             axes = tuple(batch_axis[0])
-            if (len(batch_slice_info[0]) != len(axes)
-                    or len(batch_seed[0]) != len(axes)):
+            if len(batch_slice_info[0]) != len(axes) or len(batch_seed[0]) != len(axes):
                 raise ValueError(
                     f"{self.OPERATOR_NAME} q slice/seed groups must match logical axes"
                 )
@@ -194,7 +199,8 @@ class SparseFlashMlaBatchComparator:
             axis_seeds = batch_seed[0]
             sample_count = len(axis_slices[0])
             if not sample_count or any(
-                    len(values) != sample_count for values in (*axis_slices, *axis_seeds)):
+                len(values) != sample_count for values in (*axis_slices, *axis_seeds)
+            ):
                 raise ValueError(
                     f"{self.OPERATOR_NAME} q axis sample counts differ or are empty"
                 )
@@ -207,10 +213,15 @@ class SparseFlashMlaBatchComparator:
                 for axis_group, axis in enumerate(axes):
                     slice_value = axis_slices[axis_group][sample_index]
                     seed_value = axis_seeds[axis_group][sample_index]
-                    if not isinstance(slice_value, (tuple, list)) or len(slice_value) != 3:
+                    if (
+                        not isinstance(slice_value, (tuple, list))
+                        or len(slice_value) != 3
+                    ):
                         raise ValueError(f"invalid q axis {axis} slice {slice_value!r}")
                     if not all(isinstance(value, Integral) for value in slice_value):
-                        raise ValueError(f"q slice must contain integers: {slice_value!r}")
+                        raise ValueError(
+                            f"q slice must contain integers: {slice_value!r}"
+                        )
                     if not isinstance(seed_value, Integral):
                         raise ValueError(f"q seed must be an integer: {seed_value!r}")
                     start, stop, step = (int(value) for value in slice_value)
@@ -221,12 +232,15 @@ class SparseFlashMlaBatchComparator:
                             f"{slice_value!r}"
                         )
                     if seed is not None and seed_value != seed:
-                        raise ValueError("logical B and S slices must use the same seed")
+                        raise ValueError(
+                            "logical B and S slices must use the same seed"
+                        )
                     seed = seed_value
                     parsed_slices.append((start, stop, step))
-                    expected_axes[axis_group].append(
-                        f"{seed}_{axis}_{start}_{stop}_{step}"
-                    )
+                    # The framework groups matching relations across different
+                    # logical B/S offsets, so only the relation length is stable.
+                    length = len(range(start, stop, step))
+                    expected_axes[axis_group].append(f"{seed}_{axis}_{length}_{step}")
                 if axes == (0, 1) and parsed_slices[0][1] - parsed_slices[0][0] != 1:
                     raise ValueError("logical (B,S) relation requires one B per sample")
                 relations.append((tuple(parsed_slices), seed, axes))
@@ -247,8 +261,7 @@ class SparseFlashMlaBatchComparator:
         batch_slice = slices[0]
         sequence_slice = slices[1] if axes == (0, 1) else None
         attributes = (
-            dict(compare_context.attributes)
-            if compare_context is not None else {}
+            dict(compare_context.attributes) if compare_context is not None else {}
         )
         layout_q = attributes.get("layout_q", "BSND")
         batch_start, batch_stop, _ = batch_slice
@@ -283,9 +296,15 @@ class SparseFlashMlaBatchComparator:
         selector.extend([slice(None)] * (npu.ndim - len(selector)))
         return tuple(selector)
 
-    def compare_same_case(self, npu_output, batch_consistency_id,
-                          batch_axis, batch_slice_info, batch_seed,
-                          compare_context=None):
+    def compare_same_case(
+        self,
+        npu_output,
+        batch_consistency_id,
+        batch_axis,
+        batch_slice_info,
+        batch_seed,
+        compare_context=None,
+    ):
         relations, error = self.parse_relations(
             batch_consistency_id, batch_axis, batch_slice_info, batch_seed
         )
@@ -296,7 +315,11 @@ class SparseFlashMlaBatchComparator:
         if npu_output is None:
             return self.config_failure(f"{self.OPERATOR_NAME} batch output is None")
 
-        npu = npu_output.detach().cpu() if torch.is_tensor(npu_output) else np.asarray(npu_output)
+        npu = (
+            npu_output.detach().cpu()
+            if torch.is_tensor(npu_output)
+            else np.asarray(npu_output)
+        )
         if npu.ndim == 0:
             return self.config_failure(
                 f"{self.OPERATOR_NAME} batch output must have a batch axis"
@@ -335,15 +358,25 @@ class SparseFlashMlaBatchComparator:
 BATCH_COMPARATOR = SparseFlashMlaBatchComparator()
 
 
-def compare(*outputs, batch_consistency_id=None, batch_axis=None,
-            batch_slice_info=None, batch_seed=None, compare_context=None):
+def compare(
+    *outputs,
+    batch_consistency_id=None,
+    batch_axis=None,
+    batch_slice_info=None,
+    batch_seed=None,
+    compare_context=None,
+):
     """Run pytest precision comparison before exact same-case batch checks."""
     results = COMPARATOR.compare(*outputs)
     if not isinstance(results, list) or not all(result["pass"] for result in results):
         return results
 
     batch_result = BATCH_COMPARATOR.compare_same_case(
-        outputs[0], batch_consistency_id, batch_axis, batch_slice_info, batch_seed,
+        outputs[0],
+        batch_consistency_id,
+        batch_axis,
+        batch_slice_info,
+        batch_seed,
         compare_context,
     )
     if batch_result is not None:

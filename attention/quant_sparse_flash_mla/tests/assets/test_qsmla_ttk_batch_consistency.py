@@ -35,13 +35,21 @@ def batch_kwargs(slices, seed, sequence_slices=None):
     axes = (0,) if sequence_slices is None else (0, 1)
     slice_groups = (tuple(slices),)
     seed_groups = (tuple(seed for _ in slices),)
-    ids = [tuple(f"{seed}_0_{start}_{stop}_{step}"
-                 for start, stop, step in slices)]
+    ids = [
+        tuple(
+            f"{seed}_0_{len(range(start, stop, step))}_{step}"
+            for start, stop, step in slices
+        )
+    ]
     if sequence_slices is not None:
         slice_groups += (tuple(sequence_slices),)
         seed_groups += (tuple(seed for _ in sequence_slices),)
-        ids.append(tuple(f"{seed}_1_{start}_{stop}_{step}"
-                         for start, stop, step in sequence_slices))
+        ids.append(
+            tuple(
+                f"{seed}_1_{len(range(start, stop, step))}_{step}"
+                for start, stop, step in sequence_slices
+            )
+        )
     return {
         "batch_consistency_id": (tuple(ids),),
         "batch_axis": (axes,),
@@ -89,16 +97,18 @@ def test_qsmla_batch_random_context_repeats_declared_batch_slices():
     context = INPUTS_MODULE.QuantSparseFlashMlaBatchRandomContext.from_case(
         q, None, None, fields
     )
-    context.validate_params({
-        "template_run_mode": "CSA",
-        "quant_mode": 1,
-        "ori_sparse_indices_mode": "full",
-        "cmp_sparse_indices_mode": "full",
-        "ori_kv_topk_mode": "fullK",
-        "cmp_kv_topk_mode": "fullK",
-        "seqused_q": [1, 1, 1],
-        "N2": 1,
-    })
+    context.validate_params(
+        {
+            "template_run_mode": "CSA",
+            "quant_mode": 1,
+            "ori_sparse_indices_mode": "full",
+            "cmp_sparse_indices_mode": "full",
+            "ori_kv_topk_mode": "fullK",
+            "cmp_kv_topk_mode": "fullK",
+            "seqused_q": [1, 1, 1],
+            "N2": 1,
+        }
+    )
     original_rand = torch.rand
     original_randperm = torch.randperm
 
@@ -122,12 +132,14 @@ def test_cross_case_changes_background_but_keeps_relation_slice():
 
     fields["testcase_name"] = "QSMLA_CASE_A"
     with INPUTS_MODULE.QuantSparseFlashMlaBatchRandomContext.from_case(
-            q, None, None, fields):
+        q, None, None, fields
+    ):
         first = torch.rand(q.shape)
 
     fields["testcase_name"] = "QSMLA_CASE_B"
     with INPUTS_MODULE.QuantSparseFlashMlaBatchRandomContext.from_case(
-            q, None, None, fields):
+        q, None, None, fields
+    ):
         second = torch.rand(q.shape)
 
     assert torch.equal(first[0], first[2])
@@ -138,25 +150,29 @@ def test_cross_case_changes_background_but_keeps_relation_slice():
 def test_qsmla_sparse_randperm_maps_nonuniform_batch_call_offsets():
     q = torch.empty((3, 2, 1, 1), dtype=torch.float32)
     fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001)
-    fields.update({
-        "layout_q": "BSND",
-        "layout_kv": "BSND",
-        "quant_mode": 1,
-        "seqused_q_values": [2, 1, 2],
-    })
+    fields.update(
+        {
+            "layout_q": "BSND",
+            "layout_kv": "BSND",
+            "quant_mode": 1,
+            "seqused_q_values": [2, 1, 2],
+        }
+    )
     context = INPUTS_MODULE.QuantSparseFlashMlaBatchRandomContext.from_case(
         q, None, None, fields
     )
-    context.validate_params({
-        "template_run_mode": "ORI_SPARSE",
-        "quant_mode": 1,
-        "ori_sparse_indices_mode": "full",
-        "cmp_sparse_indices_mode": "full",
-        "ori_kv_topk_mode": "fullK",
-        "cmp_kv_topk_mode": "fullK",
-        "seqused_q": [2, 1, 2],
-        "N2": 1,
-    })
+    context.validate_params(
+        {
+            "template_run_mode": "ORI_SPARSE",
+            "quant_mode": 1,
+            "ori_sparse_indices_mode": "full",
+            "cmp_sparse_indices_mode": "full",
+            "ori_kv_topk_mode": "fullK",
+            "cmp_kv_topk_mode": "fullK",
+            "seqused_q": [2, 1, 2],
+            "N2": 1,
+        }
+    )
 
     with context:
         permutations = [torch.randperm(8) for _ in range(5)]
@@ -168,11 +184,13 @@ def test_qsmla_sparse_randperm_maps_nonuniform_batch_call_offsets():
 def test_qsmla_bsnd_batch_context_ignores_auxiliary_q_prefix():
     q = torch.empty((2, 1, 1, 1), dtype=torch.uint8)
     fields = batch_kwargs(((0, 1, 1), (1, 2, 1)), 7001)
-    fields.update({
-        "layout_q": "BSND",
-        "layout_kv": "BSND",
-        "cu_seqlens_q_values": [0, 14, 28],
-    })
+    fields.update(
+        {
+            "layout_q": "BSND",
+            "layout_kv": "BSND",
+            "cu_seqlens_q_values": [0, 14, 28],
+        }
+    )
 
     context = INPUTS_MODULE.QuantSparseFlashMlaBatchRandomContext.from_case(
         q, None, None, fields
@@ -187,18 +205,20 @@ def test_qsmla_tnd_random_context_maps_logical_batch_and_token_ranges():
     ori_kv = torch.empty((12, 1, 1), dtype=torch.uint8)
     cmp_kv = torch.empty((4, 1, 1), dtype=torch.uint8)
     fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001)
-    fields.update({
-        "layout_q": "TND",
-        "layout_kv": "TND",
-        "quant_mode": 1,
-        "cu_seqlens_q_values": [0, 2, 4, 6, 8],
-        "cu_seqlens_ori_kv_values": [0, 3, 6, 9, 12],
-        "cu_seqlens_cmp_kv_values": [0, 1, 2, 3, 4],
-        "seqused_q_values": [2, 2, 2, 2],
-        "seqused_ori_kv_values": [3, 3, 3, 3],
-        "seqused_cmp_kv_values": [1, 1, 1, 1],
-        "cmp_residual_kv_values": [0, 0, 0, 0],
-    })
+    fields.update(
+        {
+            "layout_q": "TND",
+            "layout_kv": "TND",
+            "quant_mode": 1,
+            "cu_seqlens_q_values": [0, 2, 4, 6, 8],
+            "cu_seqlens_ori_kv_values": [0, 3, 6, 9, 12],
+            "cu_seqlens_cmp_kv_values": [0, 1, 2, 3, 4],
+            "seqused_q_values": [2, 2, 2, 2],
+            "seqused_ori_kv_values": [3, 3, 3, 3],
+            "seqused_cmp_kv_values": [1, 1, 1, 1],
+            "cmp_residual_kv_values": [0, 0, 0, 0],
+        }
+    )
     context = INPUTS_MODULE.QuantSparseFlashMlaBatchRandomContext.from_case(
         q, ori_kv, cmp_kv, fields
     )
@@ -216,18 +236,18 @@ def test_qsmla_tnd_random_context_maps_logical_batch_and_token_ranges():
 def test_qsmla_tnd_sequence_relation_maps_logical_bs_to_physical_tokens():
     q = torch.empty((12, 1, 1), dtype=torch.uint8)
     ori_kv = torch.empty((15, 1, 1), dtype=torch.uint8)
-    fields = batch_kwargs(
-        ((0, 1, 1), (2, 3, 1)), 7001, ((1, 3, 1), (1, 3, 1))
+    fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001, ((1, 3, 1), (1, 3, 1)))
+    fields.update(
+        {
+            "layout_q": "TND",
+            "layout_kv": "TND",
+            "quant_mode": 1,
+            "cu_seqlens_q_values": [0, 4, 8, 12],
+            "cu_seqlens_ori_kv_values": [0, 5, 10, 15],
+            "seqused_q_values": [4, 4, 4],
+            "seqused_ori_kv_values": [5, 5, 5],
+        }
     )
-    fields.update({
-        "layout_q": "TND",
-        "layout_kv": "TND",
-        "quant_mode": 1,
-        "cu_seqlens_q_values": [0, 4, 8, 12],
-        "cu_seqlens_ori_kv_values": [0, 5, 10, 15],
-        "seqused_q_values": [4, 4, 4],
-        "seqused_ori_kv_values": [5, 5, 5],
-    })
     context = INPUTS_MODULE.QuantSparseFlashMlaBatchRandomContext.from_case(
         q, ori_kv, None, fields
     )
@@ -384,6 +404,13 @@ def test_qsmla_batch_input_adapter_generates_equal_hca_slices():
     assert cmp_residual_kv.tolist() == [0, 0]
     data = INPUTS_MODULE.INPUT_ADAPTER.load_golden_store().CASE_DATA.get(testcase_name)
     assert data is not None
+    assert data["op_input"]["cu_seqlens_q"] is None
+    assert data["op_input"]["cu_seqlens_ori_kv"] is None
+    assert data["op_input"]["cu_seqlens_cmp_kv"] is None
+    assert data["metadata_input"]["ori_topk_length"] is None
+    assert data["metadata_input"]["cmp_topk_length"] is None
+    assert data["cpu_output"] is None
+    INPUTS_MODULE.INPUT_ADAPTER.load_golden_store().materialize_golden(data)
     assert data["cpu_output"] is not None
 
 

@@ -2121,7 +2121,9 @@ def save_test_case(input_data, output_dir):
     return input_filepath
 
 
-def generate_and_save_testdata(params, save_pt=False, save_path=""):
+def generate_and_save_testdata(
+    params, save_pt=False, save_path="", generate_golden=True
+):
     """
     生成input param及cpuout
     runNpu: 生成完毕后执行npu计算
@@ -2471,58 +2473,57 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
     #             stride=[stride_n, stride_bs, stride_n2, stride_d],
     #             storage_offset=block_size1 * N2 * (d_combined + pad_d))
 
-    test_qsmla = GeneralizedSFAQuant(
-        layout_q,
-        layout_kv,
-        q_type,
-        ori_kv_type,
-        cmp_kv_type,
-        B,
-        S1,
-        T1,
-        N1,
-        N2,
-        D,
-        K,
-        block_num1,
-        block_num2,
-        block_size1,
-        block_size2,
-        cu_seqlens_q,
-        seqused_q,
-        seqused_ori_kv,
-        seqused_cmp_kv,
-        cu_seqlens_ori_kv,
-        cu_seqlens_cmp_kv,
-        cmp_residual_kv,
-        softmax_scale,
-        cmp_ratio,
-        ori_mask_mode,
-        cmp_mask_mode,
-        ori_win_left,
-        ori_win_right,
-        quant_mode,
-        tile_size,
-        rope_head_dim,
-        ori_topk_length,
-        cmp_topk_length,
-        template_run_mode,
-    )
-    cpu_result, cpu_lse = test_qsmla.forward(
-        q,
-        ori_k_bnsd,
-        cmp_k_bnsd,
-        ori_sparse_indices,
-        cmp_sparse_indices,
-        cu_seqlens_q,
-        seqused_ori_kv,
-        seqused_cmp_kv,
-        cmp_residual_kv,
-        sinks,
-        ori_topk_length,
-        cmp_topk_length,
-        return_softmax_lse,
-    )
+    golden_state = {
+        "layout_q": layout_q,
+        "layout_kv": layout_kv,
+        "q_type": q_type,
+        "ori_kv_type": ori_kv_type,
+        "cmp_kv_type": cmp_kv_type,
+        "B": B,
+        "S1": S1,
+        "T1": T1,
+        "N1": N1,
+        "N2": N2,
+        "D": D,
+        "K": K,
+        "block_num1": block_num1,
+        "block_num2": block_num2,
+        "block_size1": block_size1,
+        "block_size2": block_size2,
+        "cu_seqlens_q": cu_seqlens_q,
+        "seqused_q": seqused_q,
+        "seqused_ori_kv": seqused_ori_kv,
+        "seqused_cmp_kv": seqused_cmp_kv,
+        "cu_seqlens_ori_kv": cu_seqlens_ori_kv,
+        "cu_seqlens_cmp_kv": cu_seqlens_cmp_kv,
+        "cmp_residual_kv": cmp_residual_kv,
+        "softmax_scale": softmax_scale,
+        "cmp_ratio": cmp_ratio,
+        "ori_mask_mode": ori_mask_mode,
+        "cmp_mask_mode": cmp_mask_mode,
+        "ori_win_left": ori_win_left,
+        "ori_win_right": ori_win_right,
+        "quant_mode": quant_mode,
+        "tile_size": tile_size,
+        "rope_head_dim": rope_head_dim,
+        "ori_topk_length": ori_topk_length,
+        "cmp_topk_length": cmp_topk_length,
+        "template_run_mode": template_run_mode,
+        "q": q,
+        "ori_k_bnsd": ori_k_bnsd,
+        "cmp_k_bnsd": cmp_k_bnsd,
+        "ori_sparse_indices": ori_sparse_indices,
+        "cmp_sparse_indices": cmp_sparse_indices,
+        "sinks": sinks,
+        "return_softmax_lse": return_softmax_lse,
+    }
+    if generate_golden:
+        generate_cpu_golden({"golden_state": golden_state})
+        cpu_result = golden_state["cpu_output"]
+        cpu_lse = golden_state["cpu_lse"]
+    else:
+        cpu_result = None
+        cpu_lse = None
 
     print("mode:%s\n", template_run_mode)
 
@@ -2574,11 +2575,13 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
             "head_dim": D,
             "cu_seqlens_q": cu_seqlens_q,
             "seqused_q": seqused_q,
-            "cu_seqlens_ori_kv": cu_seqlens_ori_kv,
-            "cu_seqlens_cmp_kv": cu_seqlens_cmp_kv,
-            "seqused_ori_kv": seqused_ori_kv,
-            "seqused_cmp_kv": seqused_cmp_kv,
+            "cu_seqlens_ori_kv": op_cu_seqlens_ori_kv,
+            "cu_seqlens_cmp_kv": op_cu_seqlens_cmp_kv,
+            "seqused_ori_kv": op_seqused_ori_kv,
+            "seqused_cmp_kv": op_seqused_cmp_kv,
             "cmp_residual_kv": cmp_residual_kv,
+            "ori_topk_length": ori_topk_length,
+            "cmp_topk_length": cmp_topk_length,
             "batch_size": B,
             "max_seqlen_q": max_seqlen_q,
             "max_seqlen_ori_kv": max_seqlen_ori_kv,
@@ -2599,6 +2602,7 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
             "has_ori_kv": True,
             "has_cmp_kv": False if template_run_mode in ("SWA", "ORI_SPARSE") else True,
             "quant_mode": quant_mode,
+            "rope_head_dim": rope_head_dim,
         },
         "op_input": {
             "q": q,
@@ -2634,6 +2638,7 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
             "topk_value_mode": topk_value_mode,
             "return_softmax_lse": return_softmax_lse,
         },
+        "golden_state": golden_state,
         "cpu_output": cpu_result,
         "cpu_lse": cpu_lse if return_softmax_lse else None,
     }
@@ -2642,3 +2647,65 @@ def generate_and_save_testdata(params, save_pt=False, save_path=""):
         save_test_case(input_data, save_path)
 
     return input_data
+
+
+def generate_cpu_golden(input_data):
+    """Calculate MQSMLA CPU Golden from input-stage state without new random data."""
+    state = input_data["golden_state"]
+    test_qsmla = GeneralizedSFAQuant(
+        state["layout_q"],
+        state["layout_kv"],
+        state["q_type"],
+        state["ori_kv_type"],
+        state["cmp_kv_type"],
+        state["B"],
+        state["S1"],
+        state["T1"],
+        state["N1"],
+        state["N2"],
+        state["D"],
+        state["K"],
+        state["block_num1"],
+        state["block_num2"],
+        state["block_size1"],
+        state["block_size2"],
+        state["cu_seqlens_q"],
+        state["seqused_q"],
+        state["seqused_ori_kv"],
+        state["seqused_cmp_kv"],
+        state["cu_seqlens_ori_kv"],
+        state["cu_seqlens_cmp_kv"],
+        state["cmp_residual_kv"],
+        state["softmax_scale"],
+        state["cmp_ratio"],
+        state["ori_mask_mode"],
+        state["cmp_mask_mode"],
+        state["ori_win_left"],
+        state["ori_win_right"],
+        state["quant_mode"],
+        state["tile_size"],
+        state["rope_head_dim"],
+        state["ori_topk_length"],
+        state["cmp_topk_length"],
+        state["template_run_mode"],
+    )
+    cpu_output, cpu_lse = test_qsmla.forward(
+        state["q"],
+        state["ori_k_bnsd"],
+        state["cmp_k_bnsd"],
+        state["ori_sparse_indices"],
+        state["cmp_sparse_indices"],
+        state["cu_seqlens_q"],
+        state["seqused_ori_kv"],
+        state["seqused_cmp_kv"],
+        state["cmp_residual_kv"],
+        state["sinks"],
+        state["ori_topk_length"],
+        state["cmp_topk_length"],
+        state["return_softmax_lse"],
+    )
+    state["cpu_output"] = cpu_output
+    state["cpu_lse"] = cpu_lse
+    input_data["cpu_output"] = cpu_output
+    input_data["cpu_lse"] = cpu_lse
+    return cpu_output, cpu_lse

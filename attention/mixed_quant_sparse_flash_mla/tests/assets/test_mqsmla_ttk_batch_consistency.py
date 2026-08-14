@@ -36,13 +36,21 @@ def batch_kwargs(slices, seed, sequence_slices=None):
     axes = (0,) if sequence_slices is None else (0, 1)
     slice_groups = (tuple(slices),)
     seed_groups = (tuple(seed for _ in slices),)
-    ids = [tuple(f"{seed}_0_{start}_{stop}_{step}"
-                 for start, stop, step in slices)]
+    ids = [
+        tuple(
+            f"{seed}_0_{len(range(start, stop, step))}_{step}"
+            for start, stop, step in slices
+        )
+    ]
     if sequence_slices is not None:
         slice_groups += (tuple(sequence_slices),)
         seed_groups += (tuple(seed for _ in sequence_slices),)
-        ids.append(tuple(f"{seed}_1_{start}_{stop}_{step}"
-                         for start, stop, step in sequence_slices))
+        ids.append(
+            tuple(
+                f"{seed}_1_{len(range(start, stop, step))}_{step}"
+                for start, stop, step in sequence_slices
+            )
+        )
     return {
         "batch_consistency_id": (tuple(ids),),
         "batch_axis": (axes,),
@@ -93,10 +101,12 @@ def test_same_case_batch_compare_maps_tnd_logical_sequence_slices():
         7001,
         ((2, 4, 1), (3, 5, 1)),
     )
-    context = SimpleNamespace(attributes={
-        "layout_q": "TND",
-        "cu_seqlens_q_values": [0, 4, 9],
-    })
+    context = SimpleNamespace(
+        attributes={
+            "layout_q": "TND",
+            "cu_seqlens_q_values": [0, 4, 9],
+        }
+    )
 
     result = COMPARE_MODULE.compare(
         output, output.copy(), compare_context=context, **fields
@@ -139,46 +149,48 @@ def test_cross_case_changes_background_but_keeps_relation_slice():
 def test_sparse_modes_map_randperm_and_accept_quant_mode_two():
     q = torch.empty((3, 2, 1, 1), dtype=torch.float32)
     fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001)
-    fields.update({
-        "layout_q": "BSND",
-        "layout_kv": "BSND",
-        "seqused_q_values": [2, 1, 2],
-    })
+    fields.update(
+        {
+            "layout_q": "BSND",
+            "layout_kv": "BSND",
+            "seqused_q_values": [2, 1, 2],
+        }
+    )
 
     for mode in ("CSA", "ORI_SPARSE", "ORI_CMP_SPARSE"):
-        context = INPUTS_MODULE.NumpyBatchRandomContext.from_case(
-            q, None, None, fields
+        context = INPUTS_MODULE.NumpyBatchRandomContext.from_case(q, None, None, fields)
+        context.validate_params(
+            {
+                "template_run_mode": mode,
+                "quant_mode": 1,
+                "ori_sparse_indices_mode": "full",
+                "cmp_sparse_indices_mode": "full",
+                "ori_kv_topk_mode": "fullK",
+                "cmp_kv_topk_mode": "fullK",
+                "seqused_q": [2, 1, 2],
+                "S1": 2,
+                "N2": 1,
+            }
         )
-        context.validate_params({
-            "template_run_mode": mode,
-            "quant_mode": 1,
-            "ori_sparse_indices_mode": "full",
-            "cmp_sparse_indices_mode": "full",
-            "ori_kv_topk_mode": "fullK",
-            "cmp_kv_topk_mode": "fullK",
-            "seqused_q": [2, 1, 2],
-            "S1": 2,
-            "N2": 1,
-        })
         with context:
             permutations = [torch.randperm(8) for _ in range(5)]
         assert torch.equal(permutations[0], permutations[3])
         assert torch.equal(permutations[1], permutations[4])
 
-    quant_two = INPUTS_MODULE.NumpyBatchRandomContext.from_case(
-        q, None, None, fields
-    )
+    quant_two = INPUTS_MODULE.NumpyBatchRandomContext.from_case(q, None, None, fields)
     quant_two.validate_params({"template_run_mode": "SWA", "quant_mode": 2})
 
 
 def test_bsnd_batch_context_ignores_auxiliary_q_prefix():
     q = torch.empty((2, 1, 1, 1), dtype=torch.float32)
     fields = batch_kwargs(((0, 1, 1), (1, 2, 1)), 7001)
-    fields.update({
-        "layout_q": "BSND",
-        "layout_kv": "BSND",
-        "cu_seqlens_q_values": [0, 14, 28],
-    })
+    fields.update(
+        {
+            "layout_q": "BSND",
+            "layout_kv": "BSND",
+            "cu_seqlens_q_values": [0, 14, 28],
+        }
+    )
 
     context = INPUTS_MODULE.NumpyBatchRandomContext.from_case(q, None, None, fields)
 
@@ -191,20 +203,21 @@ def test_tnd_batch_random_context_maps_logical_batch_and_token_ranges():
     ori_kv = torch.empty((12, 1, 1), dtype=torch.float32)
     cmp_kv = torch.empty((4, 1, 1), dtype=torch.float32)
     fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001)
-    fields.update({
-        "layout_q": "TND",
-        "layout_kv": "TND",
-        "cu_seqlens_q_values": [0, 2, 4, 6, 8],
-        "cu_seqlens_ori_kv_values": [0, 3, 6, 9, 12],
-        "cu_seqlens_cmp_kv_values": [0, 1, 2, 3, 4],
-        "seqused_q_values": [2, 2, 2, 2],
-        "seqused_ori_kv_values": [3, 3, 3, 3],
-        "seqused_cmp_kv_values": [1, 1, 1, 1],
-        "cmp_residual_kv_values": [0, 0, 0, 0],
-    })
+    fields.update(
+        {
+            "layout_q": "TND",
+            "layout_kv": "TND",
+            "cu_seqlens_q_values": [0, 2, 4, 6, 8],
+            "cu_seqlens_ori_kv_values": [0, 3, 6, 9, 12],
+            "cu_seqlens_cmp_kv_values": [0, 1, 2, 3, 4],
+            "seqused_q_values": [2, 2, 2, 2],
+            "seqused_ori_kv_values": [3, 3, 3, 3],
+            "seqused_cmp_kv_values": [1, 1, 1, 1],
+            "cmp_residual_kv_values": [0, 0, 0, 0],
+        }
+    )
 
-    with INPUTS_MODULE.NumpyBatchRandomContext.from_case(
-            q, ori_kv, cmp_kv, fields):
+    with INPUTS_MODULE.NumpyBatchRandomContext.from_case(q, ori_kv, cmp_kv, fields):
         q_value = np.random.uniform(-1.0, 1.0, (8, 2))
         ori_value = np.random.uniform(-1.0, 1.0, (12, 2))
         batch_value = np.random.uniform(-1.0, 1.0, (4, 2, 2))
@@ -222,14 +235,16 @@ def test_tnd_sequence_relation_maps_logical_bs_to_physical_tokens():
         7001,
         ((1, 3, 1), (0, 2, 1)),
     )
-    fields.update({
-        "layout_q": "TND",
-        "layout_kv": "TND",
-        "cu_seqlens_q_values": [0, 4, 8, 12],
-        "cu_seqlens_ori_kv_values": [0, 5, 10, 15],
-        "seqused_q_values": [4, 4, 4],
-        "seqused_ori_kv_values": [5, 5, 5],
-    })
+    fields.update(
+        {
+            "layout_q": "TND",
+            "layout_kv": "TND",
+            "cu_seqlens_q_values": [0, 4, 8, 12],
+            "cu_seqlens_ori_kv_values": [0, 5, 10, 15],
+            "seqused_q_values": [4, 4, 4],
+            "seqused_ori_kv_values": [5, 5, 5],
+        }
+    )
 
     with INPUTS_MODULE.NumpyBatchRandomContext.from_case(q, ori_kv, None, fields):
         q_value = np.random.uniform(-1.0, 1.0, (12, 2))
@@ -243,14 +258,16 @@ def test_tnd_context_distinguishes_q_and_kv_with_the_same_token_extent():
     q = torch.empty((8, 2), dtype=torch.float32)
     ori_kv = torch.empty((8, 3), dtype=torch.float32)
     fields = batch_kwargs(((0, 1, 1), (2, 3, 1)), 7001)
-    fields.update({
-        "layout_q": "TND",
-        "layout_kv": "TND",
-        "cu_seqlens_q_values": [0, 2, 4, 6, 8],
-        "cu_seqlens_ori_kv_values": [0, 1, 4, 5, 8],
-        "seqused_q_values": [2, 2, 2, 2],
-        "seqused_ori_kv_values": [1, 3, 1, 3],
-    })
+    fields.update(
+        {
+            "layout_q": "TND",
+            "layout_kv": "TND",
+            "cu_seqlens_q_values": [0, 2, 4, 6, 8],
+            "cu_seqlens_ori_kv_values": [0, 1, 4, 5, 8],
+            "seqused_q_values": [2, 2, 2, 2],
+            "seqused_ori_kv_values": [1, 3, 1, 3],
+        }
+    )
 
     with INPUTS_MODULE.NumpyBatchRandomContext.from_case(q, ori_kv, None, fields):
         q_value = np.random.uniform(-1.0, 1.0, q.shape)
@@ -263,12 +280,8 @@ def test_tnd_context_distinguishes_q_and_kv_with_the_same_token_extent():
 def test_tnd_pa_input_adapter_preserves_relation_through_block_tables():
     batch_size = 4
     q = torch.empty((batch_size, 64, 512), dtype=torch.bfloat16)
-    ori_kv = torch.empty(
-        (batch_size, 128, 1, 608), dtype=torch.float8_e4m3fn
-    )
-    cmp_kv = torch.empty(
-        (batch_size, 16, 1, 608), dtype=torch.float8_e4m3fn
-    )
+    ori_kv = torch.empty((batch_size, 128, 1, 608), dtype=torch.float8_e4m3fn)
+    cmp_kv = torch.empty((batch_size, 16, 1, 608), dtype=torch.float8_e4m3fn)
     ori_block_table = torch.empty((batch_size, 1), dtype=torch.int32)
     cmp_block_table = torch.empty((batch_size, 1), dtype=torch.int32)
     cu_seqlens_q = torch.empty((batch_size + 1,), dtype=torch.int32)
@@ -350,6 +363,62 @@ def test_non_batch_case_does_not_invent_pytest_geometry():
     assert "tile_size" not in params
 
 
+def test_quant_mode_two_uses_pytest_logical_pa_key_without_assets_rebuild():
+    q = torch.empty((1, 1, 1, 512), dtype=torch.bfloat16)
+    ori_kv = torch.empty((1, 2, 1, 584), dtype=torch.float8_e4m3fn)
+    ori_block_table = torch.empty((1, 1), dtype=torch.int32)
+    seqused_q = torch.empty((1,), dtype=torch.int32)
+    seqused_ori_kv = torch.empty((1,), dtype=torch.int32)
+    sinks = torch.empty((1,), dtype=torch.float32)
+
+    data = INPUTS_MODULE.generate_mixed_quant_sparse_flash_mla_inputs(
+        q,
+        ori_kv=ori_kv,
+        ori_block_table=ori_block_table,
+        seqused_q=seqused_q,
+        seqused_ori_kv=seqused_ori_kv,
+        sinks=sinks,
+        testcase_name="MQSMLA_Q2_REPLAY_DECODER",
+        layout_q="BSND",
+        layout_kv="PA_BBND",
+        S1=1,
+        S2=2,
+        block_num1=1,
+        block_num2=0,
+        block_size1=2,
+        block_size2=2,
+        quant_mode=2,
+        tile_size=64,
+        rope_head_dim=64,
+        softmax_scale=0.04419417,
+        cmp_ratio=1,
+        ori_mask_mode=4,
+        cmp_mask_mode=0,
+        ori_win_left=127,
+        ori_win_right=0,
+        return_softmax_lse=False,
+        has_ori_kv=True,
+        has_cmp_kv=False,
+        template_run_mode="SWA",
+        cu_seqlens_q_values=[0, 1],
+        seqused_q_values=[1],
+        seqused_ori_kv_values=[2],
+        cu_seqlens_ori_kv_values=[0, 2],
+        input_ranges=((-1, 1), (-1, 1), None),
+    )
+    assert data["metadata_input"]["quant_mode"] == 2
+    assert data["metadata_input"]["rope_head_dim"] == 64
+    assert data["metadata_input"]["cu_seqlens_ori_kv"] is None
+    assert data["metadata_input"]["cu_seqlens_cmp_kv"] is None
+    assert data["metadata_input"]["ori_topk_length"] is None
+    assert data["metadata_input"]["cmp_topk_length"] is None
+    assert torch.equal(
+        ori_kv.contiguous().view(torch.uint8),
+        data["op_input"]["ori_kv"].contiguous().view(torch.uint8),
+    )
+    assert data["golden_state"]["ori_k_bnsd"] is not None
+
+
 def test_batch_input_adapter_generates_equal_full_case_slices():
     batch_size = 2
     q = torch.empty((batch_size, 1, 64, 512), dtype=torch.bfloat16)
@@ -390,12 +459,63 @@ def test_batch_input_adapter_generates_equal_full_case_slices():
         seqused_cmp_kv_values=[2, 2],
         cmp_residual_kv_values=[0, 0],
         input_ranges=((-10, 10), (-5, 5), (-5, 5)),
-        batch_axis=((0,), (0,), (0,), None, None, None, None, None, None, None,
-                    (0,), (0,), (0,), (0,), None, None, None),
-        batch_slice_info=((((0, 1, 1), (1, 2, 1)),), None, None, None, None, None,
-                          None, None, None, None, None, None, None, None, None, None, None),
-        batch_seed=(((74123, 74123),), None, None, None, None, None, None, None,
-                    None, None, None, None, None, None, None, None, None),
+        batch_axis=(
+            (0,),
+            (0,),
+            (0,),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            (0,),
+            (0,),
+            (0,),
+            (0,),
+            None,
+            None,
+            None,
+        ),
+        batch_slice_info=(
+            (((0, 1, 1), (1, 2, 1)),),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ),
+        batch_seed=(
+            ((74123, 74123),),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ),
     )
 
     def storage_equal(first, second):
@@ -413,4 +533,13 @@ def test_batch_input_adapter_generates_equal_full_case_slices():
     assert cmp_residual_kv.tolist() == [0, 0]
     data = INPUTS_MODULE.INPUT_ADAPTER.load_golden_store().CASE_DATA.get(testcase_name)
     assert data is not None
+    assert data["op_input"]["cu_seqlens_q"] is None
+    assert data["op_input"]["cu_seqlens_ori_kv"] is None
+    assert data["op_input"]["cu_seqlens_cmp_kv"] is None
+    assert data["metadata_input"]["cu_seqlens_ori_kv"] is None
+    assert data["metadata_input"]["cu_seqlens_cmp_kv"] is None
+    assert data["metadata_input"]["ori_topk_length"] is None
+    assert data["metadata_input"]["cmp_topk_length"] is None
+    assert data["cpu_output"] is None
+    INPUTS_MODULE.INPUT_ADAPTER.load_golden_store().materialize_golden(data)
     assert data["cpu_output"] is not None

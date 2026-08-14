@@ -22,6 +22,7 @@ import tempfile
 from collections import Counter, defaultdict
 from pathlib import Path
 
+
 class BatchOutputComparator:
     """Validate same-case and cross-case relations from raw output bins."""
 
@@ -32,9 +33,13 @@ class BatchOutputComparator:
         "cu_seqlens_ori_kv_values",
         "cu_seqlens_cmp_kv_values",
     )
-    STATIC_SEQUENCE_ATTRIBUTE_NAMES = frozenset((
-        "q_datarange", "ori_kv_datarange", "cmp_kv_datarange",
-    ))
+    STATIC_SEQUENCE_ATTRIBUTE_NAMES = frozenset(
+        (
+            "q_datarange",
+            "ori_kv_datarange",
+            "cmp_kv_datarange",
+        )
+    )
     BLOCK_COUNT_ATTRIBUTE_NAMES = frozenset(("block_num1", "block_num2"))
 
     BYTE_WIDTHS = {
@@ -57,9 +62,17 @@ class BatchOutputComparator:
         "complex128": 16,
     }
 
-    def __init__(self, case_csv, result_csv, dump_dir, report_path,
-                 output_index, require_intra_case, require_cross_case,
-                 excel_path=None):
+    def __init__(
+        self,
+        case_csv,
+        result_csv,
+        dump_dir,
+        report_path,
+        output_index,
+        require_intra_case,
+        require_cross_case,
+        excel_path=None,
+    ):
         self.case_csv = Path(case_csv)
         self.result_csv = Path(result_csv)
         self.dump_dir = Path(dump_dir)
@@ -83,9 +96,7 @@ class BatchOutputComparator:
             return ast.literal_eval(value)
         except (SyntaxError, ValueError) as error:
             testcase_name = row.get("testcase_name", "<unknown>")
-            raise ValueError(
-                f"{testcase_name}: invalid {name}: {error}"
-            ) from error
+            raise ValueError(f"{testcase_name}: invalid {name}: {error}") from error
 
     @staticmethod
     def case_is_enabled(row):
@@ -100,9 +111,7 @@ class BatchOutputComparator:
             return bool(ast.literal_eval(normalized))
         except (SyntaxError, ValueError) as error:
             testcase_name = row.get("testcase_name", "<unknown>")
-            raise ValueError(
-                f"{testcase_name}: invalid is_enabled: {error}"
-            ) from error
+            raise ValueError(f"{testcase_name}: invalid is_enabled: {error}") from error
 
     @staticmethod
     def normalize_value(value):
@@ -135,27 +144,31 @@ class BatchOutputComparator:
         for index, value in enumerate(ranges):
             # Prefix storage range scales with B + 1 and is not relation identity.
             normalized.append(
-                None if index in self.PREFIX_LENGTH_INPUT_INDEXES
+                None
+                if index in self.PREFIX_LENGTH_INPUT_INDEXES
                 else self.normalize_value(value)
             )
         return normalized
 
     @staticmethod
     def normalize_prefix(value, start, stop):
-        selected = [int(item) for item in value[start:stop + 1]]
+        selected = [int(item) for item in value[start : stop + 1]]
         base = selected[0]
         return [item - base for item in selected]
 
-    def normalize_attributes(self, attributes, start, stop, batch_size,
-                             relation_token_lengths):
+    def normalize_attributes(
+        self, attributes, start, stop, batch_size, relation_token_lengths
+    ):
         normalized = {}
         for key, value in attributes.items():
             if key in self.PREFIX_ATTRIBUTE_NAMES and isinstance(value, (list, tuple)):
                 normalized[key] = self.normalize_prefix(value, start, stop)
             elif key in self.STATIC_SEQUENCE_ATTRIBUTE_NAMES:
                 normalized[key] = self.normalize_value(value)
-            elif (key in self.BLOCK_COUNT_ATTRIBUTE_NAMES
-                  and attributes.get("layout_kv") != "PA_BBND"):
+            elif (
+                key in self.BLOCK_COUNT_ATTRIBUTE_NAMES
+                and attributes.get("layout_kv") != "PA_BBND"
+            ):
                 continue
             elif isinstance(value, (list, tuple)) and len(value) == batch_size:
                 normalized[key] = self.normalize_value(value[start:stop])
@@ -175,7 +188,9 @@ class BatchOutputComparator:
         attributes = self.parse_cell(row, "attributes", {})
         layout_q = attributes.get("layout_q", "BSND")
         if layout_q not in ("BSND", "TND"):
-            raise ValueError(f"{row['testcase_name']}: unsupported layout_q={layout_q!r}")
+            raise ValueError(
+                f"{row['testcase_name']}: unsupported layout_q={layout_q!r}"
+            )
         prefixes = {}
         for name in self.PREFIX_ATTRIBUTE_NAMES:
             value = attributes.get(name)
@@ -211,9 +226,7 @@ class BatchOutputComparator:
                     if name == "cu_seqlens_q_values"
                     else "non-decreasing"
                 )
-                raise ValueError(
-                    f"{row['testcase_name']}: {name} must be {order}"
-                )
+                raise ValueError(f"{row['testcase_name']}: {name} must be {order}")
         return attributes, batch_size, q_prefix, prefixes
 
     @staticmethod
@@ -254,7 +267,7 @@ class BatchOutputComparator:
     def expected_byte_count(cls, output_shape, output_dtype):
         dtype_name = str(output_dtype).lower()
         if dtype_name.startswith("torch."):
-            dtype_name = dtype_name[len("torch."):]
+            dtype_name = dtype_name[len("torch.") :]
         byte_width = cls.BYTE_WIDTHS.get(dtype_name)
         if byte_width is None:
             raise ValueError(f"unsupported output dtype for raw bin: {output_dtype!r}")
@@ -268,7 +281,9 @@ class BatchOutputComparator:
     @staticmethod
     def parse_slice(testcase_name, axis, value):
         if not isinstance(value, (tuple, list)) or len(value) != 3:
-            raise ValueError(f"{testcase_name}: invalid logical axis {axis} slice {value!r}")
+            raise ValueError(
+                f"{testcase_name}: invalid logical axis {axis} slice {value!r}"
+            )
         if not all(isinstance(item, int) for item in value):
             raise ValueError(f"{testcase_name}: logical slice must contain integers")
         start, stop, step = (int(item) for item in value)
@@ -288,38 +303,55 @@ class BatchOutputComparator:
                 f"{row['testcase_name']}: batch_axis, batch_slice_info and batch_seed are required"
             )
         if not (len(batch_axis) == len(batch_slices) == len(batch_seed)):
-            raise ValueError(f"{row['testcase_name']}: batch metadata top-level counts differ")
+            raise ValueError(
+                f"{row['testcase_name']}: batch metadata top-level counts differ"
+            )
         if not batch_axis or tuple(batch_axis[0]) not in ((0,), (0, 1)):
             raise ValueError(
                 f"{row['testcase_name']}: q must use logical axes (0,) or (0, 1)"
             )
         if batch_slices[0] is None or batch_seed[0] is None:
-            raise ValueError(f"{row['testcase_name']}: q slices and q seeds are required")
+            raise ValueError(
+                f"{row['testcase_name']}: q slices and q seeds are required"
+            )
         if any(value is not None for value in batch_slices[1:]):
             raise ValueError(f"{row['testcase_name']}: only q relations are supported")
         if any(value is not None for value in batch_seed[1:]):
-            raise ValueError(f"{row['testcase_name']}: only q relation seeds are supported")
+            raise ValueError(
+                f"{row['testcase_name']}: only q relation seeds are supported"
+            )
         axes = tuple(batch_axis[0])
         axis_slices = batch_slices[0]
         axis_seeds = batch_seed[0]
         if len(axis_slices) != len(axes) or len(axis_seeds) != len(axes):
-            raise ValueError(f"{row['testcase_name']}: q groups must match logical axes")
+            raise ValueError(
+                f"{row['testcase_name']}: q groups must match logical axes"
+            )
         sample_count = len(axis_slices[0])
         if not sample_count or any(
-                len(values) != sample_count for values in (*axis_slices, *axis_seeds)):
-            raise ValueError(f"{row['testcase_name']}: q axis sample counts differ or are empty")
+            len(values) != sample_count for values in (*axis_slices, *axis_seeds)
+        ):
+            raise ValueError(
+                f"{row['testcase_name']}: q axis sample counts differ or are empty"
+            )
 
         relations = []
         for sample_index in range(sample_count):
             slices = []
             seed = None
             for axis_group, axis in enumerate(axes):
-                slices.append(self.parse_slice(
-                    row["testcase_name"], axis, axis_slices[axis_group][sample_index]
-                ))
+                slices.append(
+                    self.parse_slice(
+                        row["testcase_name"],
+                        axis,
+                        axis_slices[axis_group][sample_index],
+                    )
+                )
                 seed_value = axis_seeds[axis_group][sample_index]
                 if not isinstance(seed_value, int):
-                    raise ValueError(f"{row['testcase_name']}: q seed must be an integer")
+                    raise ValueError(
+                        f"{row['testcase_name']}: q seed must be an integer"
+                    )
                 if seed is not None and seed != seed_value:
                     raise ValueError(
                         f"{row['testcase_name']}: logical B and S must use the same seed"
@@ -352,15 +384,14 @@ class BatchOutputComparator:
         )
         batch_slice = relation["slices"][0]
         batch_start, batch_stop, _ = batch_slice
-        sequence_slice = (
-            relation["slices"][1] if relation["axes"] == (0, 1) else None
-        )
+        sequence_slice = relation["slices"][1] if relation["axes"] == (0, 1) else None
         token_lengths = self.relation_token_lengths(prefixes, batch_start, batch_stop)
         if sequence_slice is not None:
             token_lengths["q"] = sequence_slice[1] - sequence_slice[0]
         feature_shape = (
             output_shape[2:]
-            if attributes.get("layout_q", "BSND") == "BSND" and sequence_slice is not None
+            if attributes.get("layout_q", "BSND") == "BSND"
+            and sequence_slice is not None
             else output_shape[1:]
         )
         sequence_context = None
@@ -400,10 +431,10 @@ class BatchOutputComparator:
         batch_slice = relation["slices"][0]
         batch_start, batch_stop, _ = batch_slice
         if batch_stop > batch_size:
-            raise ValueError(f"{row['testcase_name']}: logical B slice exceeds B={batch_size}")
-        sequence_slice = (
-            relation["slices"][1] if relation["axes"] == (0, 1) else None
-        )
+            raise ValueError(
+                f"{row['testcase_name']}: logical B slice exceeds B={batch_size}"
+            )
+        sequence_slice = relation["slices"][1] if relation["axes"] == (0, 1) else None
         byte_width = self.expected_byte_count((1,), output_dtype)
         if attributes.get("layout_q", "BSND") == "BSND":
             if len(output_shape) < 2:
@@ -418,14 +449,20 @@ class BatchOutputComparator:
                 sample_shape = [batch_stop - batch_start, *output_shape[1:]]
             else:
                 if sequence_slice[1] > sequence_extent:
-                    raise ValueError(f"{row['testcase_name']}: logical S slice exceeds output S")
+                    raise ValueError(
+                        f"{row['testcase_name']}: logical S slice exceeds output S"
+                    )
                 element_start = (
                     batch_start * sequence_extent + sequence_slice[0]
                 ) * trailing_count
                 element_stop = (
                     batch_start * sequence_extent + sequence_slice[1]
                 ) * trailing_count
-                sample_shape = [1, sequence_slice[1] - sequence_slice[0], *output_shape[2:]]
+                sample_shape = [
+                    1,
+                    sequence_slice[1] - sequence_slice[0],
+                    *output_shape[2:],
+                ]
         else:
             trailing_count = 1
             for dimension in output_shape[1:]:
@@ -443,7 +480,7 @@ class BatchOutputComparator:
             element_stop = token_stop * trailing_count
             sample_shape = [token_stop - token_start, *output_shape[1:]]
         return (
-            output_bytes[element_start * byte_width:element_stop * byte_width],
+            output_bytes[element_start * byte_width : element_stop * byte_width],
             sample_shape,
         )
 
@@ -466,14 +503,17 @@ class BatchOutputComparator:
                 continue
             result = result_by_case.get(testcase_name)
             if result is None:
-                raise ValueError(f"{testcase_name}: result CSV has no matching testcase")
+                raise ValueError(
+                    f"{testcase_name}: result CSV has no matching testcase"
+                )
             if result.get("precision_status") != "PASS":
                 raise ValueError(
                     f"{testcase_name}: precision_status is "
                     f"{result.get('precision_status')!r}, expected PASS"
                 )
             if self.require_intra_case and "batch_intra=PASS" not in (
-                    result.get("eager_precision") or ""):
+                result.get("eager_precision") or ""
+            ):
                 raise ValueError(
                     f"{testcase_name}: eager_precision lacks batch_intra=PASS"
                 )
@@ -487,8 +527,12 @@ class BatchOutputComparator:
             output_shape = tuple(shapes[self.output_index])
             output_dtype = dtypes[self.output_index]
             if not output_shape or output_shape[0] <= 0:
-                raise ValueError(f"{testcase_name}: output 0 requires a non-empty batch axis")
-            output_path = self.dump_dir / f"{testcase_name}_output_{self.output_index}.bin"
+                raise ValueError(
+                    f"{testcase_name}: output 0 requires a non-empty batch axis"
+                )
+            output_path = (
+                self.dump_dir / f"{testcase_name}_output_{self.output_index}.bin"
+            )
             if not output_path.is_file():
                 raise ValueError(f"{testcase_name}: missing output dump {output_path}")
             output_bytes = output_path.read_bytes()
@@ -503,8 +547,7 @@ class BatchOutputComparator:
                     row, logical_relation, output_shape, output_dtype, output_bytes
                 )
                 logical_sizes = tuple(
-                    stop - start
-                    for start, stop, _step in logical_relation["slices"]
+                    stop - start for start, stop, _step in logical_relation["slices"]
                 )
                 relation = (
                     self.output_index,
@@ -512,24 +555,27 @@ class BatchOutputComparator:
                     logical_relation["seed"],
                     logical_sizes,
                 )
-                samples.append({
-                    "testcase_name": testcase_name,
-                    "relation": relation,
-                    "slice": {
-                        "B": list(logical_relation["slices"][0]),
-                        "S": (
-                            list(logical_relation["slices"][1])
-                            if logical_relation["axes"] == (0, 1) else None
+                samples.append(
+                    {
+                        "testcase_name": testcase_name,
+                        "relation": relation,
+                        "slice": {
+                            "B": list(logical_relation["slices"][0]),
+                            "S": (
+                                list(logical_relation["slices"][1])
+                                if logical_relation["axes"] == (0, 1)
+                                else None
+                            ),
+                        },
+                        "shape": sample_shape,
+                        "dtype": str(output_dtype),
+                        "context": self.build_context(
+                            row, logical_relation, output_shape, output_dtype
                         ),
-                    },
-                    "shape": sample_shape,
-                    "dtype": str(output_dtype),
-                    "context": self.build_context(
-                        row, logical_relation, output_shape, output_dtype
-                    ),
-                    "digest": hashlib.sha256(value).hexdigest(),
-                    "value": value,
-                })
+                        "digest": hashlib.sha256(value).hexdigest(),
+                        "value": value,
+                    }
+                )
         if not samples:
             raise ValueError("case CSV has no batch-consistency relations")
         return samples
@@ -538,7 +584,10 @@ class BatchOutputComparator:
         reference = samples[0]
         errors = []
         for sample in samples[1:]:
-            if sample["shape"] != reference["shape"] or sample["dtype"] != reference["dtype"]:
+            if (
+                sample["shape"] != reference["shape"]
+                or sample["dtype"] != reference["dtype"]
+            ):
                 errors.append(
                     f"{sample['testcase_name']}: relation shape/dtype differs from "
                     f"{reference['testcase_name']}"
@@ -556,10 +605,13 @@ class BatchOutputComparator:
 
         case_counts = Counter(sample["testcase_name"] for sample in samples)
         if self.require_intra_case:
-            incomplete_cases = sorted(name for name, count in case_counts.items() if count < 2)
+            incomplete_cases = sorted(
+                name for name, count in case_counts.items() if count < 2
+            )
             if incomplete_cases:
                 errors.append(
-                    "same-case relation has fewer than two slices: " + ", ".join(incomplete_cases)
+                    "same-case relation has fewer than two slices: "
+                    + ", ".join(incomplete_cases)
                 )
         if self.require_cross_case and len(case_counts) < 2:
             errors.append("relation appears in fewer than two testcases")
@@ -591,16 +643,34 @@ class BatchOutputComparator:
         summary.title = "Summary"
         summary.append(("Field", "Value"))
         for key in (
-            "status", "case_csv", "result_csv", "dump_dir", "output_index",
-            "require_intra_case", "require_cross_case", "group_count", "sample_count",
+            "status",
+            "case_csv",
+            "result_csv",
+            "dump_dir",
+            "output_index",
+            "require_intra_case",
+            "require_cross_case",
+            "group_count",
+            "sample_count",
         ):
             summary.append((key, str(report[key])))
 
         details = workbook.create_sheet("Relations")
         headers = (
-            "Group", "Output", "Logical axes", "Seed", "Logical size", "Status",
-            "Case count", "Sample count", "Testcase", "Slice", "Shape",
-            "Dtype", "SHA-256", "Errors",
+            "Group",
+            "Output",
+            "Logical axes",
+            "Seed",
+            "Logical size",
+            "Status",
+            "Case count",
+            "Sample count",
+            "Testcase",
+            "Slice",
+            "Shape",
+            "Dtype",
+            "SHA-256",
+            "Errors",
         )
         details.append(headers)
         for group_id, group in enumerate(report["groups"], start=1):
@@ -608,12 +678,24 @@ class BatchOutputComparator:
             output_index, batch_axis, seed, slice_length = group["relation"]
             errors = "\n".join(group["errors"])
             for sample in group["samples"]:
-                details.append((
-                    group_id, output_index, repr(batch_axis), seed, repr(slice_length),
-                    group["status"], group["case_count"], group["sample_count"],
-                    sample["testcase_name"], repr(sample["slice"]),
-                    repr(sample["shape"]), sample["dtype"], sample["sha256"], errors,
-                ))
+                details.append(
+                    (
+                        group_id,
+                        output_index,
+                        repr(batch_axis),
+                        seed,
+                        repr(slice_length),
+                        group["status"],
+                        group["case_count"],
+                        group["sample_count"],
+                        sample["testcase_name"],
+                        repr(sample["slice"]),
+                        repr(sample["shape"]),
+                        sample["dtype"],
+                        sample["sha256"],
+                        errors,
+                    )
+                )
             last_row = details.max_row
             if last_row > first_row:
                 for column in (*range(1, 9), 14):
@@ -641,9 +723,20 @@ class BatchOutputComparator:
         details.freeze_panes = "I2"
         details.auto_filter.ref = details.dimensions
         for column, width in {
-            "A": 9, "B": 9, "C": 8, "D": 12, "E": 14, "F": 10,
-            "G": 12, "H": 14, "I": 54, "J": 20, "K": 24, "L": 16,
-            "M": 68, "N": 58,
+            "A": 9,
+            "B": 9,
+            "C": 8,
+            "D": 12,
+            "E": 14,
+            "F": 10,
+            "G": 12,
+            "H": 14,
+            "I": 54,
+            "J": 20,
+            "K": 24,
+            "L": 16,
+            "M": 68,
+            "N": 58,
         }.items():
             details.column_dimensions[column].width = width
         summary.column_dimensions["A"].width = 28
@@ -651,8 +744,10 @@ class BatchOutputComparator:
 
         self.excel_path.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
-            prefix=f".{self.excel_path.stem}.", suffix=".xlsx",
-            dir=self.excel_path.parent, delete=False,
+            prefix=f".{self.excel_path.stem}.",
+            suffix=".xlsx",
+            dir=self.excel_path.parent,
+            delete=False,
         ) as stream:
             temporary = Path(stream.name)
         try:
@@ -671,11 +766,10 @@ class BatchOutputComparator:
         result_rows = self.read_rows(self.result_csv)
         disabled_cases = [
             row.get("testcase_name", "<unknown>")
-            for row in case_rows if not self.case_is_enabled(row)
+            for row in case_rows
+            if not self.case_is_enabled(row)
         ]
-        enabled_case_rows = [
-            row for row in case_rows if self.case_is_enabled(row)
-        ]
+        enabled_case_rows = [row for row in case_rows if self.case_is_enabled(row)]
         samples = self.build_samples(enabled_case_rows, result_rows)
         grouped_samples = defaultdict(list)
         for sample in samples:
@@ -714,10 +808,14 @@ def build_parser():
     )
     parser.add_argument("--csv", required=True, help="E2E case CSV")
     parser.add_argument("--result", required=True, help="TTK result CSV")
-    parser.add_argument("--dump-dir", required=True, help="Directory set through NPU_DUMP_PATH")
+    parser.add_argument(
+        "--dump-dir", required=True, help="Directory set through NPU_DUMP_PATH"
+    )
     parser.add_argument("--report", required=True, help="JSON report path")
     parser.add_argument("--excel", help="Optional grouped Excel report path")
-    parser.add_argument("--output-index", type=int, default=0, help="Output index dumped by E2E")
+    parser.add_argument(
+        "--output-index", type=int, default=0, help="Output index dumped by E2E"
+    )
     parser.add_argument(
         "--require-intra-case",
         action="store_true",

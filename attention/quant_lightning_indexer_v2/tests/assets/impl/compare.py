@@ -92,14 +92,16 @@ class PytestV2TopKComparator:
         return {
             "pass": passed,
             "precision": float(precision),
-            "error_info": None if passed else (
-                f"pytest QuantLightningIndexerV2 {stage} returned {status!r}"
-            ),
+            "error_info": None
+            if passed
+            else (f"pytest QuantLightningIndexerV2 {stage} returned {status!r}"),
         }
 
     def compare(self, *outputs, compare_data=None):
         if compare_data is None:
-            raise ValueError("QuantLightningIndexerV2 pytest compare data is unavailable")
+            raise ValueError(
+                "QuantLightningIndexerV2 pytest compare data is unavailable"
+            )
         if len(outputs) < 2 or len(outputs) % 2 != 0:
             return {
                 "pass": False,
@@ -109,11 +111,15 @@ class PytestV2TopKComparator:
         params = compare_data.get("params")
         topk_value = compare_data.get("topk_value")
         if params is None or topk_value is None:
-            raise ValueError("QuantLightningIndexerV2 pytest compare data lacks params or topk_value")
+            raise ValueError(
+                "QuantLightningIndexerV2 pytest compare data lacks params or topk_value"
+            )
         half = len(outputs) // 2
         npu_outputs = outputs[:half]
         golden_outputs = outputs[half:]
-        if tuple(getattr(npu_outputs[0], "shape", ())) != tuple(getattr(golden_outputs[0], "shape", ())):
+        if tuple(getattr(npu_outputs[0], "shape", ())) != tuple(
+            getattr(golden_outputs[0], "shape", ())
+        ):
             return {
                 "pass": False,
                 "precision": "shape_mismatch",
@@ -132,7 +138,9 @@ class PytestV2TopKComparator:
             }
         npu_values = npu_outputs[1] if half > 1 else torch.empty(0)
         golden_values = golden_outputs[1] if half > 1 else torch.empty(0)
-        if return_value and tuple(getattr(npu_values, "shape", ())) != tuple(getattr(golden_values, "shape", ())):
+        if return_value and tuple(getattr(npu_values, "shape", ())) != tuple(
+            getattr(golden_values, "shape", ())
+        ):
             return {
                 "pass": False,
                 "precision": "shape_mismatch",

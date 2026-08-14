@@ -10,13 +10,28 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""CPU golden adapter for QuantLightningIndexer V2 TTK cases."""
+"""CPU Golden adapter for QuantLightningIndexer V2 TTK cases."""
 
+import importlib.util
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+import numpy as np
 import torch
+
+if TYPE_CHECKING:
+    from ttk.test_spec import TtkContext
+
+
+OPERATOR = "quant_lightning_indexer_v2"
+DATA_STATE_KEY = f"{OPERATOR}.pytest_data"
+PYTEST_MODULE_NAME = "qli_v2_pytest_golden"
+PYTEST_MODULE_FILE = "quant_lightning_indexer_v2_golden.py"
 
 
 class CaseDataStore:
-    """Share one pytest-generated case between input, golden, and compare callbacks."""
+    """Share pytest data in-process and return compact metadata API inputs."""
 
     def __init__(self):
         self.case_data = {}
@@ -28,45 +43,206 @@ class CaseDataStore:
 
     def put(self, testcase_name, data):
         if testcase_name is not None:
-            self.clear()
-            self.case_data = {str(testcase_name): data}
+            self.case_data[str(testcase_name)] = data
 
-    def activate(self, testcase_name):
-        data = self.case_data.get(str(testcase_name)) if testcase_name is not None else None
+    def persist(self, testcase_name, context):
+        if context is None or testcase_name is None:
+            return
+        name = str(testcase_name)
+        data = self.case_data.pop(name, None)
         if data is None:
             raise RuntimeError(
-                "QuantLightningIndexer V2 TTK golden requires customize_inputs "
-                "to generate pytest data first"
+                "QuantLightningIndexer V2 pytest case data is unavailable"
             )
-        self.active_testcase_name = str(testcase_name)
-        return data
+        metadata_input = data.get("metadata_input")
+        if not isinstance(metadata_input, dict):
+            raise ValueError(
+                "QuantLightningIndexer V2 pytest data lacks metadata_input"
+            )
+
+        context.state[DATA_STATE_KEY] = {"testcase_name": name, "data": data}
+        return metadata_input
+
+    def get(self, testcase_name, context=None):
+        if testcase_name is None:
+            return None
+        name = str(testcase_name)
+        if context is None:
+            return self.case_data.get(name)
+        entry = context.state.get(DATA_STATE_KEY)
+        if entry is None:
+            return None
+        if entry.get("testcase_name") != name:
+            raise ValueError(
+                "QuantLightningIndexer V2 context data belongs to a different testcase"
+            )
+        return entry.get("data")
 
 
 CASE_DATA = CaseDataStore()
 
 
-def get_compare_data(testcase_name):
-    """Return pytest comparison context for the active or replayed case."""
+def load_pytest_golden():
+    """Load the pytest CPU reference only when the Golden stage needs it."""
+    if PYTEST_MODULE_NAME in sys.modules:
+        return sys.modules[PYTEST_MODULE_NAME]
+    pytest_dir = Path(__file__).resolve().parents[2] / "pytest"
+    path = pytest_dir / PYTEST_MODULE_FILE
+    inserted = str(pytest_dir) not in sys.path
+    if inserted:
+        sys.path.insert(0, str(pytest_dir))
+    try:
+        spec = importlib.util.spec_from_file_location(PYTEST_MODULE_NAME, path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot create import spec for {path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[PYTEST_MODULE_NAME] = module
+        spec.loader.exec_module(module)
+        return module
+    except Exception as exc:
+        sys.modules.pop(PYTEST_MODULE_NAME, None)
+        raise RuntimeError(
+            "Failed to load QuantLightningIndexer V2 pytest Golden module; "
+            f"module={path.resolve()}; original error: {type(exc).__name__}: {exc}"
+        ) from exc
+    finally:
+        if inserted:
+            sys.path.remove(str(pytest_dir))
+
+
+def get_case_data(testcase_name, context=None):
+    return CASE_DATA.get(testcase_name, context)
+
+
+def materialize_golden(data):
+    if data.get("cpu_result") is None:
+        load_pytest_golden().generate_cpu_golden(data)
+    return data
+
+
+def activate_case_data(testcase_name, context):
+    data = CASE_DATA.get(testcase_name, context)
+    if data is None:
+        if context is not None and context.manual_case_dir is not None:
+            raise RuntimeError(
+                "QuantLightningIndexer V2 cannot generate Golden from replayed input "
+                "files; prepare and replay an in,golden dataset"
+            )
+        raise RuntimeError(
+            "QuantLightningIndexer V2 Golden requires pytest data from the input-stage context"
+        )
+    CASE_DATA.active_testcase_name = str(testcase_name)
+    return materialize_golden(data)
+
+
+def get_compare_data(testcase_name, context=None):
     if testcase_name is None:
         testcase_name = CASE_DATA.active_testcase_name
     if testcase_name is None:
         return None
-    return CASE_DATA.case_data.get(str(testcase_name))
+    data = CASE_DATA.get(testcase_name, context)
+    return None if data is None else materialize_golden(data)
 
 
-def set_compare_data(testcase_name, data):
-    CASE_DATA.active_testcase_name = str(testcase_name)
-    CASE_DATA.case_data = {str(testcase_name): data}
+def set_compare_data(testcase_name, data, context=None):
+    name = str(testcase_name)
+    CASE_DATA.active_testcase_name = name
+    if context is None:
+        CASE_DATA.case_data[name] = data
+        return
+    context.state[DATA_STATE_KEY] = {"testcase_name": name, "data": data}
 
 
-def cpu_quant_lightning_indexer_v2(query, key, weights, query_dequant_scale,
-                                   key_dequant_scale, *, return_value=0,
-                                   testcase_name=None, **kwargs):
-    """Return the CPU outputs produced while generating this exact pytest case."""
-    del query, key, weights, query_dequant_scale, key_dequant_scale, kwargs
-    data = CASE_DATA.activate(testcase_name)
+def cpu_quant_lightning_indexer_v2(
+    query,
+    key,
+    weights,
+    query_dequant_scale,
+    key_dequant_scale,
+    topk,
+    quant_mode,
+    *,
+    return_value=0,
+    testcase_name=None,
+    context: "TtkContext" = None,
+    **kwargs,
+):
+    """Materialize Golden from the exact pytest data produced by input."""
+    del query, key, weights, query_dequant_scale, key_dequant_scale
+    del topk, quant_mode, kwargs
+    data = activate_case_data(testcase_name, context)
     if int(return_value):
         sparse_value = data["cpu_topk_value"]
     else:
         sparse_value = torch.zeros(0, dtype=data["topk_value"].dtype)
     return data["cpu_result"], sparse_value
+
+
+def cpu_aclnn_qli_v2(
+    query,
+    key,
+    weights,
+    query_dequant_scale,
+    key_dequant_scale,
+    cu_seqlens_q,
+    cu_seqlens_k,
+    seqused_q,
+    seqused_k,
+    cmp_residual_k,
+    block_table,
+    output_idx_offset,
+    metadata,
+    topk,
+    quant_mode,
+    max_seqlen_q,
+    layout_q,
+    layout_k,
+    mask_mode,
+    cmp_ratio,
+    return_value,
+    sparse_indices_out,
+    sparse_values_out,
+    testcase_name=None,
+    context: "TtkContext" = None,
+    **kwargs,
+):
+    """Return the pytest Golden for the ACLNN C API parameter order."""
+    del (
+        cu_seqlens_q,
+        cu_seqlens_k,
+        seqused_q,
+        seqused_k,
+        cmp_residual_k,
+        block_table,
+        output_idx_offset,
+        metadata,
+        max_seqlen_q,
+        layout_q,
+        layout_k,
+        mask_mode,
+        cmp_ratio,
+        sparse_indices_out,
+    )
+    sparse_indices, sparse_values = cpu_quant_lightning_indexer_v2(
+        query,
+        key,
+        weights,
+        query_dequant_scale,
+        key_dequant_scale,
+        topk,
+        quant_mode,
+        return_value=return_value,
+        testcase_name=testcase_name,
+        context=context,
+        **kwargs,
+    )
+    if not int(return_value):
+        if sparse_values_out is None:
+            raise ValueError("ACLNN QLI_V2 requires the sparseValuesOut tensor slot")
+        if torch.is_tensor(sparse_values_out):
+            sparse_values = torch.zeros(
+                tuple(sparse_values_out.shape), dtype=sparse_values_out.dtype
+            )
+        else:
+            sparse_values = np.zeros_like(np.asarray(sparse_values_out))
+    return sparse_indices, sparse_values

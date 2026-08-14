@@ -17,8 +17,12 @@ import importlib.util
 import sys
 from bisect import bisect_right
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import torch
+
+if TYPE_CHECKING:
+    from ttk.test_spec import TtkContext
 
 
 class TorchBatchRandomContext:
@@ -44,7 +48,9 @@ class TorchBatchRandomContext:
             if self.q_prefix is not None
             else [int(q.shape[1])] * self.batch_size
         )
-        self.effective_q_lengths = self.list_value(kwargs, "seqused_q") or self.q_lengths
+        self.effective_q_lengths = (
+            self.list_value(kwargs, "seqused_q") or self.q_lengths
+        )
         self.relations = self.parse_relations(kwargs)
         self.batch_relations = [
             (batch_slice, seed) for batch_slice, _sequence_slice, seed in self.relations
@@ -69,9 +75,7 @@ class TorchBatchRandomContext:
                     "cmp_kv",
                 )
         self.relation_seed = self.relations[0][2]
-        self.base_seed = self.case_seed(
-            kwargs.get("testcase_name"), self.relation_seed
-        )
+        self.base_seed = self.case_seed(kwargs.get("testcase_name"), self.relation_seed)
         self.call_index = 0
         self.randperm_call_index = 0
         self.randperm_batch_offsets = None
@@ -89,9 +93,10 @@ class TorchBatchRandomContext:
 
     @classmethod
     def from_case(cls, q, ori_kv, cmp_kv, kwargs):
-        fields = tuple(kwargs.get(name) for name in (
-            "batch_axis", "batch_slice_info", "batch_seed"
-        ))
+        fields = tuple(
+            kwargs.get(name)
+            for name in ("batch_axis", "batch_slice_info", "batch_seed")
+        )
         if all(field is None for field in fields):
             return None
         if any(field is None for field in fields):
@@ -101,9 +106,13 @@ class TorchBatchRandomContext:
         layout_q = kwargs.get("layout_q", "BSND")
         layout_kv = kwargs.get("layout_kv", "BSND")
         if layout_q not in ("BSND", "TND"):
-            raise ValueError(f"SMLA batch consistency does not support layout_q={layout_q!r}")
+            raise ValueError(
+                f"SMLA batch consistency does not support layout_q={layout_q!r}"
+            )
         if layout_kv not in ("BSND", "TND", "PA_BBND"):
-            raise ValueError(f"SMLA batch consistency does not support layout_kv={layout_kv!r}")
+            raise ValueError(
+                f"SMLA batch consistency does not support layout_kv={layout_kv!r}"
+            )
         return cls(q, ori_kv, cmp_kv, kwargs)
 
     @staticmethod
@@ -124,7 +133,9 @@ class TorchBatchRandomContext:
         value = cls.list_value(kwargs, name)
         if value is None:
             if required:
-                raise ValueError(f"SMLA batch consistency requires explicit {name}_values")
+                raise ValueError(
+                    f"SMLA batch consistency requires explicit {name}_values"
+                )
             return None
         if len(value) < 2 or value[0] != 0 or value[-1] != expected_total:
             raise ValueError(
@@ -162,7 +173,9 @@ class TorchBatchRandomContext:
         if not (len(batch_axis) == len(batch_slices) == len(batch_seed)):
             raise ValueError("SMLA batch metadata top-level counts differ")
         if any(value is not None for value in batch_slices[1:]):
-            raise ValueError("SMLA batch consistency relations must be declared on q only")
+            raise ValueError(
+                "SMLA batch consistency relations must be declared on q only"
+            )
         if any(value is not None for value in batch_seed[1:]):
             raise ValueError("SMLA batch consistency seeds must be declared on q only")
 
@@ -188,9 +201,13 @@ class TorchBatchRandomContext:
             sequence_slice = None
             if axes == (0, 1):
                 if axis_seeds[1][index] != seed:
-                    raise ValueError("SMLA logical B and S slices must use the same seed")
+                    raise ValueError(
+                        "SMLA logical B and S slices must use the same seed"
+                    )
                 if batch_slice[1] - batch_slice[0] != 1:
-                    raise ValueError("SMLA logical (B,S) relation requires one B per sample")
+                    raise ValueError(
+                        "SMLA logical (B,S) relation requires one B per sample"
+                    )
                 batch_index = batch_slice[0]
                 sequence_slice = self.parse_slice(
                     axis_slices[1][index],
@@ -199,7 +216,9 @@ class TorchBatchRandomContext:
                 )
             relations.append((batch_slice, sequence_slice, int(seed)))
         if len({seed for _batch, _sequence, seed in relations}) != 1:
-            raise ValueError("SMLA batch consistency supports one relation seed per case")
+            raise ValueError(
+                "SMLA batch consistency supports one relation seed per case"
+            )
         return relations
 
     def map_query_relations(self):
@@ -214,11 +233,13 @@ class TorchBatchRandomContext:
                 selector = [(self.q_prefix[batch_start], self.q_prefix[batch_stop], 1)]
             else:
                 sequence_start, sequence_stop, _ = sequence_slice
-                selector = [(
-                    self.q_prefix[batch_start] + sequence_start,
-                    self.q_prefix[batch_start] + sequence_stop,
-                    1,
-                )]
+                selector = [
+                    (
+                        self.q_prefix[batch_start] + sequence_start,
+                        self.q_prefix[batch_start] + sequence_stop,
+                        1,
+                    )
+                ]
             selectors.append(tuple(selector))
         return selectors
 
@@ -228,7 +249,8 @@ class TorchBatchRandomContext:
         reference_sequence = self.relations[0][1]
         reference_sequence_count = (
             reference_sequence[1] - reference_sequence[0]
-            if reference_sequence is not None else None
+            if reference_sequence is not None
+            else None
         )
         vector_names = (
             "seqused_q",
@@ -241,14 +263,20 @@ class TorchBatchRandomContext:
             for name in vector_names
             if self.list_value(kwargs, name) is not None
         }
-        prefixes = [value for value in (
-            self.q_prefix,
-            self.list_value(kwargs, "cu_seqlens_ori_kv"),
-            self.list_value(kwargs, "cu_seqlens_cmp_kv"),
-        ) if value is not None]
+        prefixes = [
+            value
+            for value in (
+                self.q_prefix,
+                self.list_value(kwargs, "cu_seqlens_ori_kv"),
+                self.list_value(kwargs, "cu_seqlens_cmp_kv"),
+            )
+            if value is not None
+        ]
         for name, value in vectors.items():
             if len(value) != self.batch_size:
-                raise ValueError(f"SMLA {name}_values length must equal B={self.batch_size}")
+                raise ValueError(
+                    f"SMLA {name}_values length must equal B={self.batch_size}"
+                )
         for value in prefixes:
             if len(value) != self.batch_size + 1:
                 raise ValueError("SMLA prefix-length vector length must equal B + 1")
@@ -257,25 +285,33 @@ class TorchBatchRandomContext:
             start, stop, _ = batch_slice
             signature = []
             for value in prefixes:
-                signature.append(tuple(
-                    value[index + 1] - value[index] for index in range(start, stop)
-                ))
+                signature.append(
+                    tuple(
+                        value[index + 1] - value[index] for index in range(start, stop)
+                    )
+                )
             for value in vectors.values():
                 signature.append(tuple(value[start:stop]))
             return tuple(signature)
 
         reference_signature = relation_signature(reference_slice)
         for relation, (batch_slice, _seed) in zip(
-                self.relations[1:], self.batch_relations[1:]):
+            self.relations[1:], self.batch_relations[1:]
+        ):
             if batch_slice[1] - batch_slice[0] != reference_count:
-                raise ValueError("SMLA relation slices must contain the same logical batch count")
+                raise ValueError(
+                    "SMLA relation slices must contain the same logical batch count"
+                )
             sequence_slice = relation[1]
             sequence_count = (
                 sequence_slice[1] - sequence_slice[0]
-                if sequence_slice is not None else None
+                if sequence_slice is not None
+                else None
             )
             if sequence_count != reference_sequence_count:
-                raise ValueError("SMLA relation slices must contain the same logical S count")
+                raise ValueError(
+                    "SMLA relation slices must contain the same logical S count"
+                )
             if relation_signature(batch_slice) != reference_signature:
                 raise ValueError(
                     "SMLA relation slices require identical q/KV lengths and residual values"
@@ -295,7 +331,9 @@ class TorchBatchRandomContext:
         selectors = []
         for (start, stop, _), _seed in self.batch_relations:
             selectors.append((prefix[start], prefix[stop], 1))
-        self.register_extent(prefix[-1], tuple((value, 0) for value in selectors), source)
+        self.register_extent(
+            prefix[-1], tuple((value, 0) for value in selectors), source
+        )
 
     def validate_params(self, params):
         mode = params.get("template_mode")
@@ -307,15 +345,11 @@ class TorchBatchRandomContext:
         for name in ("ori_sparse_indices_mode", "cmp_sparse_indices_mode"):
             value = params.get(name)
             if value is not None and value != "full":
-                raise ValueError(
-                    "SMLA batch consistency requires full sparse indices"
-                )
+                raise ValueError("SMLA batch consistency requires full sparse indices")
         for name in ("ori_kv_topk_mode", "cmp_kv_topk_mode"):
             value = params.get(name)
             if value is not None and value not in ("full", "fullK", "no"):
-                raise ValueError(
-                    "SMLA batch consistency excludes random topk lengths"
-                )
+                raise ValueError("SMLA batch consistency excludes random topk lengths")
         self.validate_sequence_masks(params)
         self.configure_randperm(params)
 
@@ -327,7 +361,8 @@ class TorchBatchRandomContext:
         if self.has_cmp_kv:
             mask_names.append("cmp_mask_mode")
         invalid = {
-            name: params.get(name) for name in mask_names
+            name: params.get(name)
+            for name in mask_names
             if params.get(name) not in (None, 0)
         }
         if invalid:
@@ -354,8 +389,9 @@ class TorchBatchRandomContext:
         if len(sequence_lengths) != self.batch_size:
             raise ValueError("SMLA sparse batch q lengths must contain B values")
 
-        calls_per_batch = [int(length) * int(params["N2"])
-                           for length in sequence_lengths]
+        calls_per_batch = [
+            int(length) * int(params["N2"]) for length in sequence_lengths
+        ]
         offsets = [0]
         for count in calls_per_batch:
             offsets.append(offsets[-1] + count)
@@ -365,22 +401,30 @@ class TorchBatchRandomContext:
         n2 = int(params["N2"])
         for batch_slice, sequence_slice, seed in self.relations:
             batch_start, batch_stop, _ = batch_slice
-            for relative_batch, batch_index in enumerate(range(batch_start, batch_stop)):
+            for relative_batch, batch_index in enumerate(
+                range(batch_start, batch_stop)
+            ):
                 token_start = 0 if sequence_slice is None else sequence_slice[0]
                 token_stop = (
                     int(sequence_lengths[batch_index])
-                    if sequence_slice is None else sequence_slice[1]
+                    if sequence_slice is None
+                    else sequence_slice[1]
                 )
                 for token_index in range(token_start, token_stop):
                     for head_index in range(n2):
                         local_index = token_index * n2 + head_index
                         key = (batch_index, local_index)
                         relation_key = (
-                            seed, relative_batch, token_index - token_start, head_index
+                            seed,
+                            relative_batch,
+                            token_index - token_start,
+                            head_index,
                         )
                         existing = self.randperm_relation_keys.get(key)
                         if existing is not None and existing != relation_key:
-                            raise ValueError("SMLA sparse relation slices overlap ambiguously")
+                            raise ValueError(
+                                "SMLA sparse relation slices overlap ambiguously"
+                            )
                         self.randperm_relation_keys[key] = relation_key
 
     @classmethod
@@ -399,7 +443,8 @@ class TorchBatchRandomContext:
         call_kwargs = dict(kwargs)
         device = call_kwargs.get("device") or "cpu"
         requested_rank = (
-            len(size[0]) if len(size) == 1 and isinstance(size[0], (tuple, list))
+            len(size[0])
+            if len(size) == 1 and isinstance(size[0], (tuple, list))
             else len(size)
         )
         seed = self.base_seed if requested_rank >= 2 else self.relation_seed
@@ -417,7 +462,8 @@ class TorchBatchRandomContext:
         if selectors is None:
             return value
         for selector_values, (_batch_slice, _sequence_slice, seed) in zip(
-                selectors, self.relations):
+            selectors, self.relations
+        ):
             selector = tuple(slice(*item) for item in selector_values)
             selector += (slice(None),) * (value.ndim - len(selector_values))
             piece = value[selector]
@@ -447,9 +493,13 @@ class TorchBatchRandomContext:
             seed_index = 3000017 + call_index
         else:
             seed, relative_batch, relative_token, head_index = relation
-            seed_index = (2000003 + cycle_index * 1000000007
-                          + relative_batch * 1000003
-                          + relative_token * 1009 + head_index)
+            seed_index = (
+                2000003
+                + cycle_index * 1000000007
+                + relative_batch * 1000003
+                + relative_token * 1009
+                + head_index
+            )
         call_kwargs = dict(kwargs)
         device = call_kwargs.get("device") or "cpu"
         call_kwargs["generator"] = self.create_generator(
@@ -521,6 +571,26 @@ class SparseFlashMlaInputAdapter:
             ) from exc
         return module
 
+    @staticmethod
+    def load_pre_npu_module():
+        name = "smla_ttk_pre_npu"
+        if name in sys.modules:
+            return sys.modules[name]
+        path = Path(__file__).with_name("pre_npu.py")
+        try:
+            spec = importlib.util.spec_from_file_location(name, path)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"cannot create import spec for {path}")
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[name] = module
+            spec.loader.exec_module(module)
+        except Exception as exc:
+            sys.modules.pop(name, None)
+            raise SparseFlashMlaInputAdapter.module_load_error(
+                "assets pre-NPU state", path, exc
+            ) from exc
+        return module
+
     def load_pytest_module(self, stem, filename):
         if stem in self.pytest_modules:
             return self.pytest_modules[stem]
@@ -574,6 +644,18 @@ class SparseFlashMlaInputAdapter:
             return None
         return repr(list(value))
 
+    @staticmethod
+    def select_topk_override(name, tensor, mask_mode, context):
+        """Distinguish explicit CSV values from TTK's generated destination tensor."""
+        if context is None:
+            return tensor
+        attributes = getattr(context, "attributes", None) or {}
+        if name in attributes:
+            return attributes[name]
+        if mask_mode != 0:
+            return tensor
+        return None
+
     @classmethod
     def select_template_mode(cls, kwargs):
         mode = kwargs.get("template_run_mode") or kwargs.get("template_mode")
@@ -595,8 +677,17 @@ class SparseFlashMlaInputAdapter:
         if mode in ("HCA", "CSA", "ORI_CMP_SPARSE") and cmp_kv is None:
             raise ValueError(f"{mode} requires cmp_kv in the CSV")
 
-    def build_case_params(self, q, ori_kv, cmp_kv, ori_sparse_indices,
-                          cmp_sparse_indices, layout_q, layout_kv, kwargs):
+    def build_case_params(
+        self,
+        q,
+        ori_kv,
+        cmp_kv,
+        ori_sparse_indices,
+        cmp_sparse_indices,
+        layout_q,
+        layout_kv,
+        kwargs,
+    ):
         cu_q = self.list_value(kwargs, "cu_seqlens_q")
         cu_ori = self.list_value(kwargs, "cu_seqlens_ori_kv")
         cu_cmp = self.list_value(kwargs, "cu_seqlens_cmp_kv")
@@ -644,7 +735,9 @@ class SparseFlashMlaInputAdapter:
             cmp_total = sum(seq_cmp or [])
         mode = self.select_template_mode(kwargs)
         if mode is not None:
-            self.verify_template_inputs(mode, ori_sparse_indices, cmp_sparse_indices, cmp_kv)
+            self.verify_template_inputs(
+                mode, ori_sparse_indices, cmp_sparse_indices, cmp_kv
+            )
 
         input_ranges = kwargs.get("input_ranges") or ()
         params = dict(kwargs)
@@ -653,40 +746,52 @@ class SparseFlashMlaInputAdapter:
             "ori_kv_datarange": self.data_range(input_ranges, 1),
             "cmp_kv_datarange": self.data_range(input_ranges, 2),
         }
-        params.update({
-            "testcase_name": kwargs.get("testcase_name"),
-            "layout_q": layout_q,
-            "layout_kv": layout_kv,
-            "q_type": q.dtype,
-            "ori_kv_type": ori_kv.dtype,
-            "cmp_kv_type": cmp_kv.dtype if cmp_kv is not None else None,
-            "B": batch_size,
-            "S1": q_seq,
-            "S2": kv_seq,
-            "T1": q_total,
-            "T2": kv_total,
-            "T3": cmp_total,
-            "N1": q_heads,
-            "N2": kv_heads,
-            "D": head_dim,
-            "K1": int(ori_sparse_indices.shape[-1]) if ori_sparse_indices is not None else None,
-            "K": int(cmp_sparse_indices.shape[-1]) if cmp_sparse_indices is not None else None,
-            "block_num1": block_num1,
-            "block_num2": block_num2,
-            "block_size1": block_size1,
-            "block_size2": block_size2,
-            "cu_seqlens_q": cu_q,
-            "cu_seqlens_ori_kv": cu_ori,
-            "cu_seqlens_cmp_kv": cu_cmp,
-            "seqused_q": seq_q,
-            "seqused_ori_kv": seq_ori,
-            "seqused_cmp_kv": seq_cmp,
-            "cmp_residual_kv": residual,
-            "template_mode": mode,
-            "cmp_ratio": kwargs.get("cmp_ratio"),
-            "cmp_mask_mode": kwargs.get("cmp_mask_mode"),
-        })
-        params.update({name: value for name, value in data_ranges.items() if value is not None})
+        params.update(
+            {
+                "testcase_name": kwargs.get("testcase_name"),
+                "layout_q": layout_q,
+                "layout_kv": layout_kv,
+                "q_type": q.dtype,
+                "ori_kv_type": ori_kv.dtype,
+                "cmp_kv_type": cmp_kv.dtype if cmp_kv is not None else None,
+                "B": batch_size,
+                "S1": q_seq,
+                "S2": kv_seq,
+                "T1": q_total,
+                "T2": kv_total,
+                "T3": cmp_total,
+                "N1": q_heads,
+                "N2": kv_heads,
+                "D": head_dim,
+                "K1": int(ori_sparse_indices.shape[-1])
+                if ori_sparse_indices is not None
+                else None,
+                "K": int(cmp_sparse_indices.shape[-1])
+                if cmp_sparse_indices is not None
+                else None,
+                "block_num1": block_num1,
+                "block_num2": block_num2,
+                "block_size1": block_size1,
+                "block_size2": block_size2,
+                "cu_seqlens_q": cu_q,
+                "cu_seqlens_ori_kv": cu_ori,
+                "cu_seqlens_cmp_kv": cu_cmp,
+                "seqused_q": seq_q,
+                "seqused_ori_kv": seq_ori,
+                "seqused_cmp_kv": seq_cmp,
+                "cmp_residual_kv": residual,
+                "template_mode": mode,
+                "cmp_ratio": (
+                    kwargs.get("pytest_cmp_ratio")
+                    if "pytest_cmp_ratio" in kwargs
+                    else kwargs.get("cmp_ratio")
+                ),
+                "cmp_mask_mode": kwargs.get("cmp_mask_mode"),
+            }
+        )
+        params.update(
+            {name: value for name, value in data_ranges.items() if value is not None}
+        )
         return params
 
     @staticmethod
@@ -698,7 +803,9 @@ class SparseFlashMlaInputAdapter:
                 )
             return
         if src is None:
-            raise ValueError(f"{name} is present in CSV but pytest generator returned None")
+            raise ValueError(
+                f"{name} is present in CSV but pytest generator returned None"
+            )
         src_cpu = src.detach().cpu() if torch.is_tensor(src) else torch.as_tensor(src)
         if tuple(dst.shape) != tuple(src_cpu.shape):
             raise ValueError(
@@ -715,27 +822,43 @@ class SparseFlashMlaInputAdapter:
             raise ValueError(
                 f"expected one pytest parameter combination, got {len(param_combinations)}"
             )
-        case_params = pytest_utils.generate_case_with_default_param(param_combinations[0])
+        case_params = pytest_utils.generate_case_with_default_param(
+            param_combinations[0]
+        )
         if batch_random is None:
             data = pytest_golden.gen_data(
-                case_params, prepare_device_storage=False
+                case_params, prepare_device_storage=False, generate_golden=False
             )
         else:
             batch_random.validate_params(case_params)
             with batch_random:
                 data = pytest_golden.gen_data(
-                    case_params, prepare_device_storage=False
+                    case_params, prepare_device_storage=False, generate_golden=False
                 )
             batch_random.normalize_block_tables(data)
-        testcase_name = params.get("testcase_name") or case_params.get("testcase_name")
-        self.load_golden_store().CASE_DATA.put(testcase_name, data)
         return data
 
-    def customize(self, q, ori_kv, cmp_kv, ori_sparse_indices,
-                  cmp_sparse_indices, layout_q, layout_kv, kwargs, batch_random=None):
+    def customize(
+        self,
+        q,
+        ori_kv,
+        cmp_kv,
+        ori_sparse_indices,
+        cmp_sparse_indices,
+        layout_q,
+        layout_kv,
+        kwargs,
+        batch_random=None,
+    ):
         params = self.build_case_params(
-            q, ori_kv, cmp_kv, ori_sparse_indices, cmp_sparse_indices,
-            layout_q, layout_kv, kwargs
+            q,
+            ori_kv,
+            cmp_kv,
+            ori_sparse_indices,
+            cmp_sparse_indices,
+            layout_q,
+            layout_kv,
+            kwargs,
         )
         return self.generate_case(params, batch_random)
 
@@ -743,24 +866,80 @@ class SparseFlashMlaInputAdapter:
 INPUT_ADAPTER = SparseFlashMlaInputAdapter()
 
 
-def generate_sparse_flash_mla_inputs(q, *, ori_kv=None, cmp_kv=None, ori_sparse_indices=None,
-                                     cmp_sparse_indices=None, ori_block_table=None, cmp_block_table=None,
-                                     cu_seqlens_q=None, cu_seqlens_ori_kv=None,
-                                     cu_seqlens_cmp_kv=None, seqused_q=None,
-                                     seqused_ori_kv=None, seqused_cmp_kv=None,
-                                     cmp_residual_kv=None, ori_topk_length=None,
-                                     cmp_topk_length=None, sinks=None, **kwargs):
-    """Reuse the pytest parameter and input processing for a TTK case."""
-    batch_random = TorchBatchRandomContext.from_case(q, ori_kv, cmp_kv, kwargs)
+def zero_metadata(metadata):
+    if metadata is None:
+        return
+    if torch.is_tensor(metadata):
+        metadata.zero_()
+    else:
+        metadata[...] = 0
+
+
+def generate_sparse_flash_mla_inputs(
+    q,
+    *,
+    ori_kv=None,
+    cmp_kv=None,
+    ori_sparse_indices=None,
+    cmp_sparse_indices=None,
+    ori_block_table=None,
+    cmp_block_table=None,
+    cu_seqlens_q=None,
+    cu_seqlens_ori_kv=None,
+    cu_seqlens_cmp_kv=None,
+    seqused_q=None,
+    seqused_ori_kv=None,
+    seqused_cmp_kv=None,
+    cmp_residual_kv=None,
+    ori_topk_length=None,
+    cmp_topk_length=None,
+    sinks=None,
+    metadata=None,
+    softmax_scale=1.0,
+    cmp_ratio=1,
+    ori_mask_mode=4,
+    cmp_mask_mode=3,
+    ori_win_left=127,
+    ori_win_right=0,
+    layout_q="BSND",
+    layout_kv="BSND",
+    topk_value_mode=1,
+    return_softmax_lse=False,
+    context: "TtkContext" = None,
+    **kwargs,
+):
+    """Populate pytest-derived inputs and leave metadata for the pre-NPU stage."""
+    params = dict(kwargs)
+    params.update(
+        {
+            "softmax_scale": softmax_scale,
+            "cmp_ratio": cmp_ratio,
+            "ori_mask_mode": ori_mask_mode,
+            "cmp_mask_mode": cmp_mask_mode,
+            "ori_win_left": ori_win_left,
+            "ori_win_right": ori_win_right,
+            "layout_q": layout_q,
+            "layout_kv": layout_kv,
+            "topk_value_mode": topk_value_mode,
+            "return_softmax_lse": return_softmax_lse,
+            "ori_topk_length": INPUT_ADAPTER.select_topk_override(
+                "ori_topk_length", ori_topk_length, ori_mask_mode, context
+            ),
+            "cmp_topk_length": INPUT_ADAPTER.select_topk_override(
+                "cmp_topk_length", cmp_topk_length, cmp_mask_mode, context
+            ),
+        }
+    )
+    batch_random = TorchBatchRandomContext.from_case(q, ori_kv, cmp_kv, params)
     data = INPUT_ADAPTER.customize(
         q,
         ori_kv,
         cmp_kv,
         ori_sparse_indices,
         cmp_sparse_indices,
-        kwargs.get("layout_q"),
-        kwargs.get("layout_kv"),
-        kwargs,
+        layout_q,
+        layout_kv,
+        params,
         batch_random,
     )
     op_input = data["input"]
@@ -785,6 +964,87 @@ def generate_sparse_flash_mla_inputs(q, *, ori_kv=None, cmp_kv=None, ori_sparse_
         ("sinks", sinks),
     ):
         source = op_input.get(name)
+        if name == "cu_seqlens_q" and layout_q != "TND":
+            source = None
         if name in ("ori_topk_length", "cmp_topk_length") and source is None:
             source = metadata_input.get(name)
         INPUT_ADAPTER.copy_tensor(tensor, source, name)
+    zero_metadata(metadata)
+    case_data = INPUT_ADAPTER.load_golden_store().CASE_DATA
+    testcase_name = params.get("testcase_name")
+    case_data.put(testcase_name, data)
+    metadata_input = case_data.persist(testcase_name, context)
+    INPUT_ADAPTER.load_pre_npu_module().persist_metadata_inputs(
+        testcase_name, metadata_input, context
+    )
+    return data
+
+
+def generate_aclnn_sparse_flash_mla_inputs(
+    q,
+    ori_kv,
+    cmp_kv,
+    ori_sparse_indices,
+    cmp_sparse_indices,
+    ori_block_table,
+    cmp_block_table,
+    cu_seqlens_q,
+    cu_seqlens_ori_kv,
+    cu_seqlens_cmp_kv,
+    seqused_q,
+    seqused_ori_kv,
+    seqused_cmp_kv,
+    cmp_residual_kv,
+    ori_topk_length,
+    cmp_topk_length,
+    sinks,
+    metadata,
+    softmax_scale,
+    cmp_ratio,
+    ori_mask_mode,
+    cmp_mask_mode,
+    ori_win_left,
+    ori_win_right,
+    layout_q,
+    layout_kv,
+    topk_value_mode,
+    return_softmax_lse,
+    attn_out,
+    softmax_lse_out,
+    context: "TtkContext" = None,
+    **kwargs,
+):
+    """Map the ACLNN C signature to the canonical pytest input adapter."""
+    del attn_out, softmax_lse_out
+    return generate_sparse_flash_mla_inputs(
+        q,
+        ori_kv=ori_kv,
+        cmp_kv=cmp_kv,
+        ori_sparse_indices=ori_sparse_indices,
+        cmp_sparse_indices=cmp_sparse_indices,
+        ori_block_table=ori_block_table,
+        cmp_block_table=cmp_block_table,
+        cu_seqlens_q=cu_seqlens_q,
+        cu_seqlens_ori_kv=cu_seqlens_ori_kv,
+        cu_seqlens_cmp_kv=cu_seqlens_cmp_kv,
+        seqused_q=seqused_q,
+        seqused_ori_kv=seqused_ori_kv,
+        seqused_cmp_kv=seqused_cmp_kv,
+        cmp_residual_kv=cmp_residual_kv,
+        ori_topk_length=ori_topk_length,
+        cmp_topk_length=cmp_topk_length,
+        sinks=sinks,
+        metadata=metadata,
+        softmax_scale=softmax_scale,
+        cmp_ratio=cmp_ratio,
+        ori_mask_mode=ori_mask_mode,
+        cmp_mask_mode=cmp_mask_mode,
+        ori_win_left=ori_win_left,
+        ori_win_right=ori_win_right,
+        layout_q=layout_q,
+        layout_kv=layout_kv,
+        topk_value_mode=topk_value_mode,
+        return_softmax_lse=return_softmax_lse,
+        context=context,
+        **kwargs,
+    )
