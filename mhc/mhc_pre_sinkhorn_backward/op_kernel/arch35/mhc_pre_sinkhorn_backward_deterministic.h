@@ -229,8 +229,6 @@ private:
     TQue<QuePosition::VECIN, DOUBLE_BUFFER> normOutQue_;
 
     int64_t usedAivNum_ = 0;
-    int64_t batchSize_ = 0;
-    int64_t seqLength_ = 0;
     int64_t bsCount_ = 0;
     uint16_t n_ = 0;
     uint16_t nn_ = 0;
@@ -294,11 +292,9 @@ __aicore__ inline void MhcPreSinkhornBackwardDeterministic<X_T, GRADHIN_T, U>::I
 {
     tilingData_ = tilingData;
     pipe_ = pipe;
-    batchSize_ = tilingData->batchSize;
-    seqLength_ = tilingData->seqLength;
+    bsCount_ = tilingData->bs;
     n_ = static_cast<uint16_t>(tilingData->n);
     nn_ = n_ * n_;
-    bsCount_ = batchSize_ * seqLength_;
     c_ = tilingData->c;
     cLoopDataLen_ = tilingData->cLoopDataLen;
     bsLoopDataLen_ = tilingData->bsLoopDataLen;
@@ -337,18 +333,18 @@ __aicore__ inline void MhcPreSinkhornBackwardDeterministic<X_T, GRADHIN_T, U>::I
     phiGm_.SetGlobalBuffer(reinterpret_cast<__gm__ U *>(phi));
     gradPhiGm_.SetGlobalBuffer(reinterpret_cast<__gm__ U *>(gradPhi));
     constexpr int64_t FP32_BYTE_SIZE = sizeof(U);
-    int64_t gradAlphaOffset = batchSize_ * seqLength_ * c_ * n_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
+    int64_t gradAlphaOffset = bsCount_ * c_ * n_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
     int64_t gradBiasOffset = gradAlphaOffset + 3 * usedAivNum_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
     int64_t gradXFromHinOffset =
         gradBiasOffset + (2 * usedAivNum_ * n_ + usedAivNum_ * n_ * n_) + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
     int64_t gradXFromRmsOffset =
-        gradXFromHinOffset + batchSize_ * seqLength_ * n_ * c_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
+        gradXFromHinOffset + bsCount_ * n_ * c_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
     int64_t gradXFromMatmulOffset =
-        gradXFromRmsOffset + batchSize_ * seqLength_ * n_ * c_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
+        gradXFromRmsOffset + bsCount_ * n_ * c_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
     int64_t gradHcBeforeNormOffset =
-        gradXFromMatmulOffset + batchSize_ * seqLength_ * n_ * c_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
+        gradXFromMatmulOffset + bsCount_ * n_ * c_ + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
     int64_t gradNormOutOffset =
-        gradHcBeforeNormOffset + batchSize_ * seqLength_ * (2 * n_ + n_ * n_) + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
+        gradHcBeforeNormOffset + bsCount_ * (2 * n_ + n_ * n_) + WS_BUFFER_INTERVAL / FP32_BYTE_SIZE;
 
     xFp32Ws_.SetGlobalBuffer(reinterpret_cast<__gm__ U *>(workspace));
     gradAlphaWs_.SetGlobalBuffer(reinterpret_cast<__gm__ U *>(workspace) + gradAlphaOffset);
@@ -421,10 +417,10 @@ __aicore__ inline void MhcPreSinkhornBackwardDeterministic<X_T, GRADHIN_T, U>::I
 
     if ASCEND_IS_AIC {
         mm1K_ = n_ * n_ + 2 * n_;
-        mm1M_ = batchSize_ * seqLength_;
+        mm1M_ = bsCount_;
         mm1N_ = n_ * c_;
 
-        mm2K_ = batchSize_ * seqLength_;
+        mm2K_ = bsCount_;
         mm2M_ = n_ * n_ + 2 * n_;
         mm2N_ = n_ * c_;
     }
@@ -784,7 +780,7 @@ __aicore__ inline void MhcPreSinkhornBackwardDeterministic<X_T, GRADHIN_T, U>::C
                     AscendC::MicroAPI::DataCopy<X_T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(xReg, xAddrStart);
                     AscendC::MicroAPI::Cast<U, X_T, castTrait16ToFloat>(xCastReg, xReg, valueMaskReg);
                     AscendC::MicroAPI::Muls(gradXFromHinReg, gradHInCastReg, hPre,
-                                            valueMaskReg); // grad_h_in_f32 * h_pre
+                                            valueMaskReg);                                       // grad_h_in_f32 * h_pre
                     AscendC::MicroAPI::Mul(gradHPreReg, xCastReg, gradHInCastReg, valueMaskReg); // x_f32 *
                                                                                                  // grad_h_in_f32
                     AscendC::MicroAPI::Reduce<MicroAPI::ReduceType::SUM, U, U>(gradHPreReg, gradHPreReg,
@@ -1457,7 +1453,7 @@ __aicore__ inline void MhcPreSinkhornBackwardDeterministic<X_T, GRADHIN_T, U>::P
     // === Phase D: AIC Matmul ===
     if ASCEND_IS_AIC {
         CrossCoreWaitFlag<AIV_AIC_MODE>(PIPE_MTE3_FLAG);
-        int64_t totalSize = batchSize_ * seqLength_;
+        int64_t totalSize = bsCount_;
         int64_t taskNumPerCore = Ops::Base::CeilDiv(totalSize, aicNum_);
         int64_t taskOffset = blockIdx_ * taskNumPerCore;
         taskNumPerCore = MinValue(taskNumPerCore, totalSize - blockIdx_ * taskNumPerCore);

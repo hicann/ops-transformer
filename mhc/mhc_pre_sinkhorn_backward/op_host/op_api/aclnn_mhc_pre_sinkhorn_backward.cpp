@@ -27,6 +27,12 @@
 
 using namespace op;
 
+constexpr size_t DIM_NUM_1D = 1;
+constexpr size_t DIM_NUM_2D = 2;
+constexpr size_t DIM_NUM_3D = 3;
+constexpr size_t DIM_NUM_4D = 4;
+constexpr size_t DIM_NUM_5D = 5;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -165,18 +171,35 @@ static bool CheckDimNum(const aclTensor *tensor, size_t expected, const char *na
 
 static bool CheckInputDims(const AclnnMhcPreSinkhornBackwardParams &params)
 {
-    return CheckDimNum(params.gradHin, 3, "gradHin") && CheckDimNum(params.gradHPost, 3, "gradHPost") &&
-           CheckDimNum(params.gradHRes, 4, "gradHRes", true, 3) && CheckDimNum(params.x, 4, "x") &&
-           CheckDimNum(params.phi, 2, "phi") && CheckDimNum(params.alpha, 1, "alpha") &&
-           CheckDimNum(params.bias, 1, "bias") && CheckDimNum(params.hPre, 3, "hPre") &&
-           CheckDimNum(params.hcBeforeNorm, 3, "hcBeforeNorm") && CheckDimNum(params.invRms, 3, "invRms") &&
-           CheckDimNum(params.sumOut, 4, "sumOut") && CheckDimNum(params.normOut, 5, "normOut");
+    bool is3D = params.x->GetViewShape().GetDimNum() == DIM_NUM_3D;
+    if (is3D) {
+        return CheckDimNum(params.gradHin, DIM_NUM_2D, "gradHin") &&
+               CheckDimNum(params.gradHPost, DIM_NUM_2D, "gradHPost") &&
+               CheckDimNum(params.gradHRes, DIM_NUM_3D, "gradHRes", true, DIM_NUM_2D) &&
+               CheckDimNum(params.x, DIM_NUM_3D, "x") && CheckDimNum(params.phi, DIM_NUM_2D, "phi") &&
+               CheckDimNum(params.alpha, DIM_NUM_1D, "alpha") && CheckDimNum(params.bias, DIM_NUM_1D, "bias") &&
+               CheckDimNum(params.hPre, DIM_NUM_2D, "hPre") &&
+               CheckDimNum(params.hcBeforeNorm, DIM_NUM_2D, "hcBeforeNorm") &&
+               CheckDimNum(params.invRms, DIM_NUM_2D, "invRms") &&
+               CheckDimNum(params.sumOut, DIM_NUM_3D, "sumOut") && CheckDimNum(params.normOut, DIM_NUM_4D, "normOut");
+    }
+    return CheckDimNum(params.gradHin, DIM_NUM_3D, "gradHin") && CheckDimNum(params.gradHPost, DIM_NUM_3D, "gradHPost") &&
+           CheckDimNum(params.gradHRes, DIM_NUM_4D, "gradHRes", true, DIM_NUM_3D) &&
+           CheckDimNum(params.x, DIM_NUM_4D, "x") && CheckDimNum(params.phi, DIM_NUM_2D, "phi") &&
+           CheckDimNum(params.alpha, DIM_NUM_1D, "alpha") && CheckDimNum(params.bias, DIM_NUM_1D, "bias") &&
+           CheckDimNum(params.hPre, DIM_NUM_3D, "hPre") &&
+           CheckDimNum(params.hcBeforeNorm, DIM_NUM_3D, "hcBeforeNorm") &&
+           CheckDimNum(params.invRms, DIM_NUM_3D, "invRms") &&
+           CheckDimNum(params.sumOut, DIM_NUM_4D, "sumOut") && CheckDimNum(params.normOut, DIM_NUM_5D, "normOut");
 }
 
 static bool CheckOutputDims(const AclnnMhcPreSinkhornBackwardParams &params)
 {
-    return CheckDimNum(params.gradX, 4, "gradX") && CheckDimNum(params.gradPhi, 2, "gradPhi") &&
-           CheckDimNum(params.gradAlpha, 1, "gradAlpha") && CheckDimNum(params.gradBias, 1, "gradBias");
+    bool is3D = params.x->GetViewShape().GetDimNum() == DIM_NUM_3D;
+    size_t gradXExpected = is3D ? DIM_NUM_3D : DIM_NUM_4D;
+    return CheckDimNum(params.gradX, gradXExpected, "gradX") && CheckDimNum(params.gradPhi, DIM_NUM_2D, "gradPhi") &&
+           CheckDimNum(params.gradAlpha, DIM_NUM_1D, "gradAlpha") &&
+           CheckDimNum(params.gradBias, DIM_NUM_1D, "gradBias");
 }
 
 static bool CheckInputOutDims(const AclnnMhcPreSinkhornBackwardParams &params)
@@ -194,14 +217,127 @@ static bool CheckShapeDim(const gert::Shape &shape, uint64_t index, uint64_t exp
     return true;
 }
 
+static bool CheckShape3D(const AclnnMhcPreSinkhornBackwardParams &params)
+{
+    auto &xShape = params.x->GetViewShape();
+    auto &gradHInShape = params.gradHin->GetViewShape();
+    uint64_t batch = gradHInShape.GetDim(0);
+    uint64_t numsResidual = xShape.GetDim(1);
+    uint64_t dimen = xShape.GetDim(2);
+
+    if (!CheckShapeDim(xShape, 0, batch, "x tensor shape must be [T, N, C]") ||
+        !CheckShapeDim(xShape, 1, numsResidual, "x tensor shape must be [T, N, C]") ||
+        !CheckShapeDim(xShape, 2, dimen, "x tensor shape must be [T, N, C]")) {
+        return false;
+    }
+
+    uint64_t nD = numsResidual * dimen;
+    auto &phiShape = params.phi->GetViewShape();
+    uint64_t fusionSize = phiShape.GetDim(0);
+    if (!CheckShapeDim(phiShape, 1, nD, "phi tensor second dim must be N*C")) {
+        return false;
+    }
+
+    auto &gradHPostShape = params.gradHPost->GetViewShape();
+    if (!CheckShapeDim(gradHPostShape, 0, batch, "gradHPost shape must be [T, N]") ||
+        !CheckShapeDim(gradHPostShape, 1, numsResidual, "gradHPost shape must be [T, N]")) {
+        return false;
+    }
+
+    auto &gradHResShape = params.gradHRes->GetViewShape();
+    if (!CheckShapeDim(gradHResShape, 0, batch, "gradHRes shape must be [T, N, N] or [T, N*N]")) {
+        return false;
+    }
+    if (gradHResShape.GetDimNum() == 3) {
+        if (!CheckShapeDim(gradHResShape, 1, numsResidual, "gradHRes shape must be [T, N, N]") ||
+            !CheckShapeDim(gradHResShape, 2, numsResidual, "gradHRes shape must be [T, N, N]")) {
+            return false;
+        }
+    } else {
+        if (!CheckShapeDim(gradHResShape, 1, numsResidual * numsResidual, "gradHRes shape must be [T, N*N]")) {
+            return false;
+        }
+    }
+
+    auto &alphaShape = params.alpha->GetViewShape();
+    if (!CheckShapeDim(alphaShape, 0, 3, "alpha tensor shape must be (3)")) {
+        return false;
+    }
+
+    auto &biasShape = params.bias->GetViewShape();
+    if (!CheckShapeDim(biasShape, 0, fusionSize, "bias tensor shape must be (2N+N^2)")) {
+        return false;
+    }
+
+    auto &hPreShape = params.hPre->GetViewShape();
+    if (!CheckShapeDim(hPreShape, 0, batch, "hPre shape must be [T, N]") ||
+        !CheckShapeDim(hPreShape, 1, numsResidual, "hPre shape must be [T, N]")) {
+        return false;
+    }
+
+    auto &hcBeforeNormShape = params.hcBeforeNorm->GetViewShape();
+    if (!CheckShapeDim(hcBeforeNormShape, 0, batch, "hcBeforeNorm shape must be [T, 2N+N^2]") ||
+        !CheckShapeDim(hcBeforeNormShape, 1, fusionSize, "hcBeforeNorm shape must be [T, 2N+N^2]")) {
+        return false;
+    }
+
+    auto &invRmsShape = params.invRms->GetViewShape();
+    if (!CheckShapeDim(invRmsShape, 0, batch, "invRms shape must be [T, 1]") ||
+        !CheckShapeDim(invRmsShape, 1, 1, "invRms shape must be [T, 1]")) {
+        return false;
+    }
+
+    auto &sumOutShape = params.sumOut->GetViewShape();
+    if (!CheckShapeDim(sumOutShape, 1, batch, "sumOut shape must be [2*sk_iter_count, T, N]") ||
+        !CheckShapeDim(sumOutShape, 2, numsResidual, "sumOut shape must be [2*sk_iter_count, T, N]")) {
+        return false;
+    }
+
+    auto &normOutShape = params.normOut->GetViewShape();
+    if (!CheckShapeDim(normOutShape, 1, batch, "normOut shape must be [2*sk_iter_count, T, N, N]") ||
+        !CheckShapeDim(normOutShape, 2, numsResidual, "normOut shape must be [2*sk_iter_count, T, N, N]") ||
+        !CheckShapeDim(normOutShape, 3, numsResidual, "normOut shape must be [2*sk_iter_count, T, N, N]")) {
+        return false;
+    }
+
+    auto &gradXShape = params.gradX->GetViewShape();
+    if (!CheckShapeDim(gradXShape, 0, batch, "gradX shape must be [T, N, C]") ||
+        !CheckShapeDim(gradXShape, 1, numsResidual, "gradX shape must be [T, N, C]") ||
+        !CheckShapeDim(gradXShape, 2, dimen, "gradX shape must be [T, N, C]")) {
+        return false;
+    }
+
+    auto &gradPhiShape = params.gradPhi->GetViewShape();
+    if (!CheckShapeDim(gradPhiShape, 0, fusionSize, "gradPhi shape must be [2N+N^2, N*C]") ||
+        !CheckShapeDim(gradPhiShape, 1, nD, "gradPhi shape must be [2N+N^2, N*C]")) {
+        return false;
+    }
+
+    auto &gradAlphaShape = params.gradAlpha->GetViewShape();
+    if (!CheckShapeDim(gradAlphaShape, 0, 3, "gradAlpha shape must be (3)")) {
+        return false;
+    }
+
+    auto &gradBiasShape = params.gradBias->GetViewShape();
+    if (!CheckShapeDim(gradBiasShape, 0, fusionSize, "gradBias shape must be (2N+N^2)")) {
+        return false;
+    }
+
+    return true;
+}
+
 static bool CheckShape(const AclnnMhcPreSinkhornBackwardParams &params)
 {
+    auto &xShape = params.x->GetViewShape();
+    if (xShape.GetDimNum() == 3) {
+        return CheckShape3D(params);
+    }
+
     auto &gradHInShape = params.gradHin->GetViewShape();
     uint64_t batch = gradHInShape.GetDim(0);
     uint64_t sequence = gradHInShape.GetDim(1);
     uint64_t dimen = gradHInShape.GetDim(2);
 
-    auto &xShape = params.x->GetViewShape();
     if (!CheckShapeDim(xShape, 0, batch, "x tensor shape must be [B, S, N, C]") ||
         !CheckShapeDim(xShape, 1, sequence, "x tensor shape must be [B, S, N, C]")) {
         return false;
@@ -371,6 +507,21 @@ static aclnnStatus CheckParams(const AclnnMhcPreSinkhornBackwardParams &params)
     // 4. 检查输入的数据类型是否在支持的数据类型范围之内
     CHECK_RET(CheckDtypeValid(params), ACLNN_ERR_PARAM_INVALID);
 
+    // 5. 校验N、C取值范围（需在IsEmpty检查之前，避免C=0/N=0被误判为空tensor）
+    auto &xShape = params.x->GetViewShape();
+    bool is3D = xShape.GetDimNum() == 3;
+    int64_t nVal = is3D ? xShape.GetDim(1) : xShape.GetDim(2);
+    int64_t cVal = is3D ? xShape.GetDim(2) : xShape.GetDim(3);
+    if (nVal <= 0 || nVal > 8) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "N must be > 0 and <= 8, but got %ld", nVal);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (cVal <= 0 || cVal >= 100000 || cVal % 128 != 0) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "C must be > 0, < 100000 and divisible by 128, but got %ld", cVal);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+
     return ACLNN_SUCCESS;
 }
 
@@ -449,6 +600,8 @@ aclnnStatus aclnnMhcPreSinkhornBackwardGetWorkspaceSize(
         DFX_IN(gradHin, gradHPost, gradHRes, x, phi, alpha, bias, hPre, hcBeforeNorm, invRms, sumOut, normOut),
         DFX_OUT(gradX, gradPhi, gradAlpha, gradBias));
     auto uniqueExecutor = CREATE_EXECUTOR();
+    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
+
     AclnnMhcPreSinkhornBackwardParams params = AclnnMhcPreSinkhornBackward::Create()
                                                    .SetGradInput(gradHin, gradHPost, gradHRes)
                                                    .SetInput(x, phi, alpha, bias)
@@ -456,7 +609,21 @@ aclnnStatus aclnnMhcPreSinkhornBackwardGetWorkspaceSize(
                                                    .SetAttr(hcEps)
                                                    .SetOutput(gradX, gradPhi, gradAlpha, gradBias)
                                                    .Build();
-    auto ret = mhcPreSinkhornBackwardCommonProcess(params, uniqueExecutor.get());
+
+    auto ret = CheckParams(params);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+
+    // Check if input tensors are empty
+    if (gradHin->IsEmpty() || gradHPost->IsEmpty() || gradHRes->IsEmpty() || x->IsEmpty() ||
+        hPre->IsEmpty() || hcBeforeNorm->IsEmpty() || invRms->IsEmpty() || sumOut->IsEmpty() ||
+        normOut->IsEmpty()) {
+        OP_LOGW("[aclnnMhcPreSinkhornBackward] Input tensor is empty, skip computation and return success.");
+        *workspaceSize = 0;
+        uniqueExecutor.ReleaseTo(executor);
+        return ACLNN_SUCCESS;
+    }
+
+    ret = mhcPreSinkhornBackwardCommonProcess(params, uniqueExecutor.get());
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
     uniqueExecutor.ReleaseTo(executor);

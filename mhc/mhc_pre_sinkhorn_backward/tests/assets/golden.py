@@ -59,7 +59,30 @@ MhcPreSinkhornBackward 算子 Golden实现
 ================================================================================
 """
 
+import numpy as np
 import torch
+from ml_dtypes import bfloat16 as np_bfloat16
+
+
+def _torch_to_numpy(t):
+    """torch.Tensor -> numpy.ndarray，支持 bf16（通过 view(int16) 桥接）"""
+    if t is None:
+        return None
+    if t.dtype == torch.bfloat16:
+        return t.view(torch.int16).numpy().view(np_bfloat16)
+    return t.numpy()
+
+
+def _numpy_to_torch(t, dtype=torch.float32):
+    """numpy.ndarray -> torch.Tensor，支持 bf16 输入（先 view int16 读出再转目标 dtype）"""
+    if t is None:
+        return None
+    if isinstance(t, np.ndarray) and t.dtype == np_bfloat16:
+        return torch.from_numpy(t.view(np.int16).copy()).view(torch.bfloat16).to(dtype)
+    if hasattr(t, "numpy"):
+        return t.to(dtype)
+    return torch.from_numpy(t).to(dtype)
+
 
 __golden__ = {
     "kernel": {"mhc_pre_sinkhorn_backward": "mhc_pre_sinkhorn_backward_golden"},
@@ -129,25 +152,30 @@ def mhc_pre_sinkhorn_backward_golden(
     所有输入均为 numpy.ndarray，返回 numpy.ndarray。
     """
 
-    def _to_torch(t, dtype=torch.float32):
-        if t is None:
-            return None
-        if hasattr(t, "numpy"):
-            return t.to(dtype)
-        return torch.from_numpy(t).to(dtype)
+    grad_hin_t = _numpy_to_torch(grad_hin)
+    grad_h_post_t = _numpy_to_torch(grad_h_post)
+    grad_h_res_t = _numpy_to_torch(grad_h_res)
+    x_t = _numpy_to_torch(x)
+    phi_t = _numpy_to_torch(phi)
+    alpha_t = _numpy_to_torch(alpha)
+    bias_t = _numpy_to_torch(bias)
+    h_pre_t = _numpy_to_torch(h_pre)
+    hc_before_norm_t = _numpy_to_torch(hc_before_norm)
+    inv_rms_t = _numpy_to_torch(inv_rms)
+    sum_out_t = _numpy_to_torch(sum_out)
+    norm_out_t = _numpy_to_torch(norm_out)
 
-    grad_hin_t = _to_torch(grad_hin)
-    grad_h_post_t = _to_torch(grad_h_post)
-    grad_h_res_t = _to_torch(grad_h_res)
-    x_t = _to_torch(x)
-    phi_t = _to_torch(phi)
-    alpha_t = _to_torch(alpha)
-    bias_t = _to_torch(bias)
-    h_pre_t = _to_torch(h_pre)
-    hc_before_norm_t = _to_torch(hc_before_norm)
-    inv_rms_t = _to_torch(inv_rms)
-    sum_out_t = _to_torch(sum_out)
-    norm_out_t = _to_torch(norm_out)
+    is_3d = x_t.dim() == 3
+    if is_3d:
+        x_t = x_t.unsqueeze(0)
+        grad_hin_t = grad_hin_t.unsqueeze(0)
+        grad_h_post_t = grad_h_post_t.unsqueeze(0)
+        grad_h_res_t = grad_h_res_t.unsqueeze(0)
+        h_pre_t = h_pre_t.unsqueeze(0)
+        hc_before_norm_t = hc_before_norm_t.unsqueeze(0)
+        inv_rms_t = inv_rms_t.unsqueeze(0)
+        sum_out_t = sum_out_t.unsqueeze(1)
+        norm_out_t = norm_out_t.unsqueeze(1)
 
     B, S, n, d = x_t.shape
 
@@ -195,9 +223,17 @@ def mhc_pre_sinkhorn_backward_golden(
         grad_x_from_hin.view(x_t.shape)
         + grad_x_from_rms.view(x_t.shape)
         + grad_x_from_matmul.view(x_t.shape)
-    ).to(x.dtype if torch.is_tensor(x) else torch.float32)
+    )
 
-    grad_x_np = grad_x.numpy()
+    if is_3d:
+        grad_x = grad_x.view(-1, n, d)
+
+    is_bf16 = isinstance(x, np.ndarray) and x.dtype == np_bfloat16
+    if is_bf16:
+        grad_x = grad_x.to(torch.bfloat16)
+        grad_x_np = _torch_to_numpy(grad_x)
+    else:
+        grad_x_np = grad_x.numpy()
     grad_phi_np = grad_phi.numpy()
     grad_alpha_np = grad_alpha.numpy()
     grad_bias_np = grad_bias.numpy()
@@ -240,29 +276,39 @@ def aclnn_mhc_pre_sinkhorn_backward_golden(
         Output tensors: gradX, gradPhi, gradAlpha, gradBias
     """
 
-    def _to_numpy(t):
-        if t is None:
-            return None
-        if hasattr(t, "numpy"):
-            if t.dtype == torch.bfloat16:
-                return t.float().numpy()
-            return t.numpy()
-        return t
+    if isinstance(x, torch.Tensor):
+        x_dtype = x.dtype
+    elif isinstance(x, np.ndarray) and x.dtype == np_bfloat16:
+        x_dtype = torch.bfloat16
+    elif isinstance(x, np.ndarray):
+        x_dtype = None
+    else:
+        x_dtype = None
 
-    x_dtype = x.dtype if isinstance(x, torch.Tensor) else None
-
-    grad_hin_np = _to_numpy(gradHin)
-    grad_h_post_np = _to_numpy(gradHPost)
-    grad_h_res_np = _to_numpy(gradHRes)
-    x_np = _to_numpy(x)
-    phi_np = _to_numpy(phi)
-    alpha_np = _to_numpy(alpha)
-    bias_np = _to_numpy(bias)
-    h_pre_np = _to_numpy(hPre)
-    hc_before_norm_np = _to_numpy(hcBeforeNorm)
-    inv_rms_np = _to_numpy(invRms)
-    sum_out_np = _to_numpy(sumOut)
-    norm_out_np = _to_numpy(normOut)
+    grad_hin_np = (
+        _torch_to_numpy(gradHin) if isinstance(gradHin, torch.Tensor) else gradHin
+    )
+    grad_h_post_np = (
+        _torch_to_numpy(gradHPost) if isinstance(gradHPost, torch.Tensor) else gradHPost
+    )
+    grad_h_res_np = (
+        _torch_to_numpy(gradHRes) if isinstance(gradHRes, torch.Tensor) else gradHRes
+    )
+    x_np = _torch_to_numpy(x) if isinstance(x, torch.Tensor) else x
+    phi_np = _torch_to_numpy(phi) if isinstance(phi, torch.Tensor) else phi
+    alpha_np = _torch_to_numpy(alpha) if isinstance(alpha, torch.Tensor) else alpha
+    bias_np = _torch_to_numpy(bias) if isinstance(bias, torch.Tensor) else bias
+    h_pre_np = _torch_to_numpy(hPre) if isinstance(hPre, torch.Tensor) else hPre
+    hc_before_norm_np = (
+        _torch_to_numpy(hcBeforeNorm)
+        if isinstance(hcBeforeNorm, torch.Tensor)
+        else hcBeforeNorm
+    )
+    inv_rms_np = _torch_to_numpy(invRms) if isinstance(invRms, torch.Tensor) else invRms
+    sum_out_np = _torch_to_numpy(sumOut) if isinstance(sumOut, torch.Tensor) else sumOut
+    norm_out_np = (
+        _torch_to_numpy(normOut) if isinstance(normOut, torch.Tensor) else normOut
+    )
 
     hc_eps_val = float(hcEps) if hcEps is not None else 1e-6
 
@@ -284,10 +330,10 @@ def aclnn_mhc_pre_sinkhorn_backward_golden(
         )
     )
 
-    grad_x_tensor = torch.from_numpy(grad_x_np)
-    grad_phi_tensor = torch.from_numpy(grad_phi_np)
-    grad_alpha_tensor = torch.from_numpy(grad_alpha_np)
-    grad_bias_tensor = torch.from_numpy(grad_bias_np)
+    grad_x_tensor = _numpy_to_torch(grad_x_np)
+    grad_phi_tensor = _numpy_to_torch(grad_phi_np)
+    grad_alpha_tensor = _numpy_to_torch(grad_alpha_np)
+    grad_bias_tensor = _numpy_to_torch(grad_bias_np)
 
     if x_dtype == torch.bfloat16:
         grad_x_tensor = grad_x_tensor.to(torch.bfloat16)

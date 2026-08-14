@@ -38,8 +38,7 @@ struct MhcPreSinkhornBackwardArch35TilingData {
 };
 
 struct MhcPreSinkhornBackwardArch35DeterminiticTilingData {
-    int64_t batchSize = 0;
-    int64_t seqLength = 0;
+    int64_t bs = 0;
     int64_t c = 0;
     int64_t n = 0;
     int64_t usedAivNum = 0;
@@ -49,11 +48,11 @@ struct MhcPreSinkhornBackwardArch35DeterminiticTilingData {
     int64_t skIterCount = 0;
     int64_t bsTaskCount = 0;
     int64_t tailBsTaskCount = 0;
-    //reset后
-    int64_t cBlockLoops = 0; // B*S*N*C，切核，总循环次数
-    int64_t cBlockTailLoops = 0; // B*S*N*C，切核，尾核循环次数
-    int64_t cBlockCount = 0; // B*S*N*C，切核，普通核尾循环处理元素个数
-    int64_t cBlockTailCount = 0; // B*S*N*C，切核，普通核尾核循环次数
+    // reset后
+    int64_t cBlockLoops = 0;         // B*S*N*C，切核，总循环次数
+    int64_t cBlockTailLoops = 0;     // B*S*N*C，切核，尾核循环次数
+    int64_t cBlockCount = 0;         // B*S*N*C，切核，普通核尾循环处理元素个数
+    int64_t cBlockTailCount = 0;     // B*S*N*C，切核，普通核尾核循环次数
     int64_t cBlockTailTailCount = 0; // B*S*N*C，切核，尾核尾循环处理个数
     int64_t finalUsedAivNum = 0;
     float eps = 0;

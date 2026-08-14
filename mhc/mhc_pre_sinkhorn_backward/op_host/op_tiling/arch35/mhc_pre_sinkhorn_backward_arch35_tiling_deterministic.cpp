@@ -51,10 +51,20 @@ constexpr int64_t DOUBLE_BUFFER = 2;
 constexpr uint8_t BF16_BYTE_SIZE = 2;
 constexpr int64_t ALPHA_SIZE_3 = 3;
 constexpr int64_t N_SIZE_4 = 4;
+constexpr int64_t MAX_N = 8;
+constexpr int64_t EXPECTED_SK_ITER_COUNT = 20;
+constexpr int64_t MAX_C_VALUE = 100000;
+constexpr int64_t C_ALIGNMENT = 128;
+constexpr int64_t ITER_COUNT_DIVISOR = 2;
 constexpr int64_t ALIGN_32 = 32;
 constexpr int64_t FP32_BYTE_SIZE = 4;
 constexpr uint64_t UB_RESERVE_SIZE = 256;
 constexpr int64_t WS_BUFFER_INTERVAL = 1024;
+constexpr int64_t GRAD_X_FROM_BUF_COUNT = 3;
+constexpr int64_t GRAD_ALPHA_BUF_COUNT = 3;
+constexpr int64_t N_SQUARE_GRAD_BUF_COUNT = 5;
+constexpr int64_t N_SQUARE_FINAL_BUF_COUNT = 4;
+constexpr int64_t N_SQUARE_TAIL_BUF_COUNT = 4;
 
 template <typename T>
 constexpr T AlignUp(T value, T align)
@@ -82,9 +92,10 @@ ge::graphStatus MhcPreSinkhornBackwardArch35DeterminiticTiling::GetShapeAttrsInf
         return ge::GRAPH_FAILED;
     }
     auto xShape = xShapePtr->GetStorageShape();
-    OP_CHECK_IF(xShape.GetDimNum() != 4,
+    auto xDimNum = xShape.GetDimNum();
+    OP_CHECK_IF(xDimNum != 3 && xDimNum != 4,
                 OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
-                                            "xShape verify failed, x must be 4D, but got %lu dims", xShape.GetDimNum()),
+                                            "xShape verify failed, x must be 3D or 4D, but got %lu dims", xDimNum),
                 return ge::GRAPH_FAILED);
     auto skSumShape = skSumPtr->GetStorageShape();
 
@@ -96,25 +107,38 @@ ge::graphStatus MhcPreSinkhornBackwardArch35DeterminiticTiling::GetShapeAttrsInf
     auto epsPtr = attrsPtr->GetAttrPointer<float>(0);
     hcEps_ = (epsPtr != nullptr) ? static_cast<float>(*epsPtr) : DEFAULT_EPS;
 
-    batchSize_ = xShape.GetDim(BATCH_SIZE_DIM_IDX);
-    seqLength_ = xShape.GetDim(SEQ_LENGTH_DIM_IDX);
-    n_ = xShape.GetDim(N_DIM_IDX);
-    c_ = xShape.GetDim(C_DIM_IDX);
-    skIterCount_ = skSumShape.GetDim(ITER_COUNT_IDX) / 2;
+    if (xDimNum == 3) {
+        bs_ = xShape.GetDim(0);
+        n_ = xShape.GetDim(1);
+        c_ = xShape.GetDim(2);
+        OP_CHECK_IF(CheckShapeBase(bs_, 1, n_, c_, true) != ge::GRAPH_SUCCESS,
+                    OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "CheckShape3D failed"),
+                    return ge::GRAPH_FAILED);
+    } else {
+        int64_t batchSize = xShape.GetDim(BATCH_SIZE_DIM_IDX);
+        int64_t seqLength = xShape.GetDim(SEQ_LENGTH_DIM_IDX);
+        bs_ = batchSize * seqLength;
+        n_ = xShape.GetDim(N_DIM_IDX);
+        c_ = xShape.GetDim(C_DIM_IDX);
+        OP_CHECK_IF(CheckShapeBase(batchSize, seqLength, n_, c_) != ge::GRAPH_SUCCESS,
+                    OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "CheckShape failed"),
+                    return ge::GRAPH_FAILED);
+    }
+    skIterCount_ = skSumShape.GetDim(ITER_COUNT_IDX) / ITER_COUNT_DIVISOR;
 
-    OP_CHECK_IF(n_ > 8,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "n must be less than or equal 8, but got %ld", n_),
+    OP_CHECK_IF(n_ <= 0 || n_ > MAX_N,
+                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "n must be > 0 and <= %ld, but got %ld", MAX_N, n_),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShapeBase(batchSize_, seqLength_, n_, c_) != ge::GRAPH_SUCCESS,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "CheckShape failed"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(
-        skIterCount_ != 20,
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "sk_iter_count must be 20, but got %ld", skIterCount_),
+        skIterCount_ != EXPECTED_SK_ITER_COUNT,
+        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "sk_iter_count must be %ld, but got %ld",
+                                    EXPECTED_SK_ITER_COUNT, skIterCount_),
         return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(c_ <= 0 || c_ >= 100000 || c_ % 128 != 0,
+    OP_CHECK_IF(c_ <= 0 || c_ >= MAX_C_VALUE || c_ % C_ALIGNMENT != 0,
                 OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
-                                            "c must be > 0, < 100000 and divisible by 128, but got %ld", c_),
+                                            "c must be > 0, < %ld and divisible by %ld, but got %ld", MAX_C_VALUE,
+                                            C_ALIGNMENT, c_),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -130,12 +154,13 @@ ge::graphStatus MhcPreSinkhornBackwardArch35DeterminiticTiling::SetTilingData()
 
     auto floatDataType = matmul_tiling::DataType::DT_FLOAT;
 
-    mm1K_ = n_ * n_ + 2 * n_;
-    mm1M_ = batchSize_ * seqLength_;
+    int64_t hcMix = n_ * n_ + 2 * n_;
+    mm1K_ = hcMix;
+    mm1M_ = bs_;
     mm1N_ = n_ * c_;
 
-    mm2K_ = batchSize_ * seqLength_;
-    mm2M_ = n_ * n_ + 2 * n_;
+    mm2K_ = bs_;
+    mm2M_ = hcMix;
     mm2N_ = n_ * c_;
 
     matmul_tiling::MatmulApiTiling mm1Tiling(ascendPlatformInfo);
@@ -165,8 +190,7 @@ ge::graphStatus MhcPreSinkhornBackwardArch35DeterminiticTiling::SetTilingData()
         return ge::GRAPH_FAILED;
     }
 
-    tilingData->batchSize = batchSize_;
-    tilingData->seqLength = seqLength_;
+    tilingData->bs = bs_;
     tilingData->c = c_;
     tilingData->n = n_;
     tilingData->usedAivNum = usedAivNum_;
@@ -189,7 +213,7 @@ ge::graphStatus MhcPreSinkhornBackwardArch35DeterminiticTiling::SetTilingData()
 
 void MhcPreSinkhornBackwardArch35DeterminiticTiling::DoUbTiling()
 {
-    int64_t totalBs = batchSize_ * seqLength_;
+    int64_t totalBs = bs_;
     bsTaskCount_ = Ops::Base::CeilDiv(totalBs, static_cast<int64_t>(coreNumAiv_));
     usedAivNum_ = Ops::Base::CeilDiv(totalBs, bsTaskCount_);
     tailBsTaskCount_ = totalBs - bsTaskCount_ * (usedAivNum_ - 1);
@@ -198,6 +222,7 @@ void MhcPreSinkhornBackwardArch35DeterminiticTiling::DoUbTiling()
     ubBlock_ = static_cast<int64_t>(Ops::Base::GetUbBlockSize(context_));
     ubSize_ = ubSize_ - UB_RESERVE_SIZE;
     auto restSize = static_cast<int64_t>(-1);
+    int64_t hcMix = n_ * n_ + 2 * n_;
 
     /* UB分布：x、h_pre And grad_h_pre、grad_h_in、hc_before_norm、inv_rms、
                grad_h_res、xFP32、grad_x_from_in、grad_alpha And grad_bias、
@@ -217,15 +242,16 @@ void MhcPreSinkhornBackwardArch35DeterminiticTiling::DoUbTiling()
             Ops::Base::CeilAlign(n_ * n_ * FP32_BYTE_SIZE, ubBlock_) + ubBlock_ +
             Ops::Base::CeilAlign(bsLoopDataLen_ * n_ * FP32_BYTE_SIZE, ubBlock_) +
             Ops::Base::CeilAlign(bsLoopDataLen_ * n_ * n_ * FP32_BYTE_SIZE, ubBlock_) +
-            Ops::Base::CeilAlign((2 * n_ + n_ * n_) * FP32_BYTE_SIZE, ubBlock_) +
+            Ops::Base::CeilAlign(hcMix * FP32_BYTE_SIZE, ubBlock_) +
             Ops::Base::CeilAlign(bsLoopDataLen_ * n_ * n_ * FP32_BYTE_SIZE, ubBlock_) +
             Ops::Base::CeilAlign(bsLoopDataLen_ * n_ * n_ * FP32_BYTE_SIZE, ubBlock_) +
-            Ops::Base::CeilAlign((2 * n_ + n_ * n_) * FP32_BYTE_SIZE, ubBlock_) +
-            Ops::Base::CeilAlign((2 * n_ + n_ * n_) * FP32_BYTE_SIZE, ubBlock_) +
-            5 * Ops::Base::CeilAlign(bsLoopDataLen_ * n_ * n_ * FP32_BYTE_SIZE, ubBlock_) +
-            DOUBLE_BUFFER * 2 * skIterCount_ * bsLoopDataLen_ * Ops::Base::CeilAlign(n_ * FP32_BYTE_SIZE, ubBlock_) +
+            Ops::Base::CeilAlign(hcMix * FP32_BYTE_SIZE, ubBlock_) +
+            Ops::Base::CeilAlign(hcMix * FP32_BYTE_SIZE, ubBlock_) +
+            N_SQUARE_GRAD_BUF_COUNT * Ops::Base::CeilAlign(bsLoopDataLen_ * n_ * n_ * FP32_BYTE_SIZE, ubBlock_) +
+            DOUBLE_BUFFER * ITER_COUNT_DIVISOR * skIterCount_ * bsLoopDataLen_ *
+                Ops::Base::CeilAlign(n_ * FP32_BYTE_SIZE, ubBlock_) +
             DOUBLE_BUFFER * skIterCount_ * bsLoopDataLen_ * Ops::Base::CeilAlign(n_ * n_ * FP32_BYTE_SIZE, ubBlock_) +
-            4 * bsLoopDataLen_ * Ops::Base::CeilAlign(n_ * n_ * FP32_BYTE_SIZE, ubBlock_);
+            N_SQUARE_TAIL_BUF_COUNT * bsLoopDataLen_ * Ops::Base::CeilAlign(n_ * n_ * FP32_BYTE_SIZE, ubBlock_);
 
         restSize = ubSize_ - occupy;
         if (restSize <= 0 && bsLoopDataLen_ > 1) {
@@ -243,11 +269,11 @@ void MhcPreSinkhornBackwardArch35DeterminiticTiling::DoUbTiling()
     cBlockTailCount_ = tailBsncTaskCount_;
     restSize = static_cast<int64_t>(-1);
     while (restSize <= 0) {
-        int64_t occupy = 4 * DOUBLE_BUFFER * Ops::Base::CeilAlign(cBlockCount_ * FP32_BYTE_SIZE, ubBlock_) +
+        int64_t occupy = N_SQUARE_FINAL_BUF_COUNT * DOUBLE_BUFFER * Ops::Base::CeilAlign(cBlockCount_ * FP32_BYTE_SIZE, ubBlock_) +
                          DOUBLE_BUFFER * Ops::Base::CeilAlign(usedAivNum_ * FP32_BYTE_SIZE, ubBlock_) + ubBlock_ +
                          usedAivNum_ * Ops::Base::CeilAlign(n_ * n_ * FP32_BYTE_SIZE, ubBlock_) +
-                         2 * Ops::Base::CeilAlign((2 * n_ + n_ * n_) * FP32_BYTE_SIZE, ubBlock_) +
-                         2 * DOUBLE_BUFFER * Ops::Base::CeilAlign(cLoopDataLen_ * FP32_BYTE_SIZE, ubBlock_);
+                         ITER_COUNT_DIVISOR * Ops::Base::CeilAlign(hcMix * FP32_BYTE_SIZE, ubBlock_) +
+                         ITER_COUNT_DIVISOR * DOUBLE_BUFFER * Ops::Base::CeilAlign(cLoopDataLen_ * FP32_BYTE_SIZE, ubBlock_);
         restSize = ubSize_ - occupy;
         if (restSize <= 0 && cBlockCount_ > 1) {
             cBlockCount_--;
@@ -284,13 +310,15 @@ ge::graphStatus MhcPreSinkhornBackwardArch35DeterminiticTiling::GetWorkspaceSize
     auto platformInfo = context_->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(opName, "fail to get platform info"), return ge::GRAPH_FAILED);
     auto ascendPlatformInfo = platform_ascendc::PlatformAscendC(platformInfo);
+    int64_t hcMix = n_ * n_ + 2 * n_;
     size_t userWorkspaceSize =
-        batchSize_ * seqLength_ * n_ * c_ * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL +              // xFP32
-        3 * usedAivNum_ * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL +                                // gradAlpha
-        (2 * usedAivNum_ * n_ + usedAivNum_ * n_ * n_) * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL + // gradBias
-        batchSize_ * seqLength_ * n_ * c_ * FP32_BYTE_SIZE * 3 + 3 * WS_BUFFER_INTERVAL +      // gradXFrom
-        batchSize_ * seqLength_ * (2 * n_ + n_ * n_) * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL +   // grad_hc_before_norm
-        batchSize_ * seqLength_ * (2 * n_ + n_ * n_) * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL;    // grad_norm_out
+        bs_ * n_ * c_ * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL +                      // xFP32
+        GRAD_ALPHA_BUF_COUNT * usedAivNum_ * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL + // gradAlpha
+        usedAivNum_ * hcMix * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL +                // gradBias
+        bs_ * n_ * c_ * FP32_BYTE_SIZE * GRAD_X_FROM_BUF_COUNT +
+        GRAD_X_FROM_BUF_COUNT * WS_BUFFER_INTERVAL +        // gradXFrom
+        bs_ * hcMix * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL + // grad_hc_before_norm
+        bs_ * hcMix * FP32_BYTE_SIZE + WS_BUFFER_INTERVAL;  // grad_norm_out
 
     size_t systemWorkspaceSize = ascendPlatformInfo.GetLibApiWorkSpaceSize();
     size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
@@ -303,8 +331,7 @@ ge::graphStatus MhcPreSinkhornBackwardArch35DeterminiticTiling::GetWorkspaceSize
 void MhcPreSinkhornBackwardArch35DeterminiticTiling::DumpTilingInfo()
 {
     std::ostringstream info;
-    info << "batchSize: " << batchSize_ << std::endl;
-    info << "seqLength: " << seqLength_ << std::endl;
+    info << "bs: " << bs_ << std::endl;
     info << "c: " << c_ << std::endl;
     info << "n: " << n_ << std::endl;
     info << "aivNum: " << coreNumAiv_ << std::endl;
