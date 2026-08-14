@@ -140,7 +140,13 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::GetShapeInfo()
                                                  "The shape dim of weight must be 2");
         return ge::GRAPH_FAILED;
     }
+
     kernelSize_ = weightOriginShape.GetDim(DIM_0);
+    if (kernelSize_ != 3) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "weight", std::to_string(kernelSize_).c_str(),
+                                              "The dim 0 of weight must be equal to 3");
+        return ge::GRAPH_FAILED;
+    }
 
     // 获取 conv_states 形状，提取 stateLen_（= kernel_size - 1 + max_seq_len）
     auto convStatesShape = context_->GetInputShape(CONV_STATES_INDEX);
@@ -450,18 +456,6 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateConvStatesShape()
     auto convStatesShape = context_->GetInputShape(CONV_STATES_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, convStatesShape);
     auto convStatesOriginShape = convStatesShape->GetOriginShape();
-    // 维度校验由 GetShapeInfo 完成（line 150 已检查 dim==3），此处不重复
-
-    // conv_states shape[0] 必须 >= batch，才能保证每个 batch 都能索引到有效的 cache line
-    int64_t convStatesBatch = convStatesOriginShape.GetDim(DIM_0);
-    if (convStatesBatch < batchSize_) {
-        std::string reasonMsg =
-            "Shape [0] of conv_states must be greater than or equal to batch_size (" + std::to_string(batchSize_) + ")";
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "conv_states",
-                                              std::to_string(convStatesBatch).c_str(), reasonMsg.c_str());
-        return ge::GRAPH_FAILED;
-    }
-
     // conv_states shape: [-1, K-1+m, dim]，state_len 需能容纳所有历史状态
     if (xInputMode_ == X_INPUT_3D) {
         int64_t expectedCacheLen = kernelSize_ + seqLen_ - 2; // = (K-1) + (seqLen-1)
@@ -528,24 +522,6 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateCacheIndicesShape()
                                                   std::to_string(indicesLen).c_str(), reasonMsg.c_str());
             return ge::GRAPH_FAILED;
         }
-    }
-
-    // conv_states.shape[0] 必须 >= cache_indices 总元素数（cache_indices 中保存的是 conv_states 的 line 索引）
-    // 1D 时总元素数 = dim0；2D 时总元素数 = dim0 * dim1
-    int64_t cacheIndicesTotal = indicesOriginShape.GetDim(DIM_0);
-    if (indicesOriginShape.GetDimNum() == DIM_2) {
-        cacheIndicesTotal *= indicesOriginShape.GetDim(DIM_1);
-    }
-    auto convStatesShape = context_->GetInputShape(CONV_STATES_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, convStatesShape);
-    int64_t convStatesBatch = convStatesShape->GetOriginShape().GetDim(DIM_0);
-    if (convStatesBatch < cacheIndicesTotal) {
-        std::string reasonMsg = "Shape [0] of conv_states (" + std::to_string(convStatesBatch) +
-                                ") must be greater than or equal to the total element count of cache_indices (" +
-                                std::to_string(cacheIndicesTotal) + ")";
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "cache_indices",
-                                              std::to_string(cacheIndicesTotal).c_str(), reasonMsg.c_str());
-        return ge::GRAPH_FAILED;
     }
 
     return ge::GRAPH_SUCCESS;

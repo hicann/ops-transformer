@@ -239,15 +239,6 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::CheckCacheStatesDim()
                                                  "The shape dim of cache_states must be 3");
         return ge::GRAPH_FAILED;
     }
-    // cache_states shape[0] 必须 >= batch，保证每个 batch 都能索引到 cache line
-    uint64_t cacheStatesDim0 = cacheStatesShape_.GetDim(DIM_0);
-    if (cacheStatesDim0 < batch_) {
-        std::string reasonMsg =
-            "Shape [0] of cache_states must be greater than or equal to batch (" + std::to_string(batch_) + ")";
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "cache_states",
-                                              std::to_string(cacheStatesDim0).c_str(), reasonMsg.c_str());
-        return ge::GRAPH_FAILED;
-    }
     uint64_t cacheStatesDim1 = cacheStatesShape_.GetDim(DIM_1);
     if (cacheStatesDim1 < (kernelWidth_ - 1)) {
         std::string reasonMsg =
@@ -323,22 +314,6 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::CheckCacheIndicesDim()
         std::string reasonMsg = "Shape [0] of cache_indices must be equal to batch (" + std::to_string(batch_) + ")";
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "cache_indices",
                                               std::to_string(cacheIndicesDim0).c_str(), reasonMsg.c_str());
-        return ge::GRAPH_FAILED;
-    }
-
-    // cache_states.shape[0] 必须 >= cache_indices 总元素数（cache_indices 中保存的是 cache_states 的 line 索引）
-    // 1D 时总元素数 = dim0；2D 时总元素数 = dim0 * dim1
-    uint64_t cacheIndicesTotal = cacheIndicesDim0;
-    if (cacheIndicesDimNum == DIM_2) {
-        cacheIndicesTotal *= static_cast<uint64_t>(cacheIndicesShape.GetDim(DIM_1));
-    }
-    uint64_t cacheStatesDim0 = cacheStatesShape_.GetDim(DIM_0);
-    if (cacheStatesDim0 < cacheIndicesTotal) {
-        std::string reasonMsg = "Shape [0] of cache_states (" + std::to_string(cacheStatesDim0) +
-                                ") must be greater than or equal to the total element count of cache_indices (" +
-                                std::to_string(cacheIndicesTotal) + ")";
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "cache_indices",
-                                              std::to_string(cacheIndicesTotal).c_str(), reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;

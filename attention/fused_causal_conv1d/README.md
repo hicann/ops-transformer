@@ -441,7 +441,7 @@
   - prefill场景：
     - x支持2维[cu_seq_len, dim]。
     - weight必须是2维[K, dim]，其中K固定为3。
-    - conv_states必须是3维[..., K-1, dim]，第0维大小不固定且大于等于batch，同时大于等于cache_indices总维度大小。
+    - conv_states必须是3维[..., K-1, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
     - cu_seq_len范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
@@ -450,7 +450,7 @@
   - prefill和decode混合场景：
     - x支持2维[cu_seq_len, dim]。
     - weight必须是2维[K, dim]，其中K固定为3。
-    - conv_states必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于batch，同时大于等于cache_indices总维度大小。
+    - conv_states必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
     - cu_seq_len范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
@@ -459,7 +459,7 @@
   - decode场景（变长序列）：
     - x支持2维[cu_seq_len, dim]。
     - weight必须是2维[K, dim]，其中K固定为3。
-    - conv_states必须是3维[..., k-1+m, dim]，第0维大小不固定且大于等于batch，同时大于等于cache_indices总维度大小。
+    - conv_states必须是3维[..., k-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
     - cu_seq_len范围[batch, batch * 8]，每个batch的seq_len范围为[1, 8]。dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
@@ -468,7 +468,7 @@
   - decode场景（固定batch）：
     - x支持3维[batch, m+1, dim]。
     - weight必须是2维[K, dim]，其中K固定为3。
-    - conv_states必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于batch，同时大于等于cache_indices总维度大小。
+    - conv_states必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
     - cache_indices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
     - m范围[0, 7]，dim范围[64, 16384]且是16的倍数，batch范围[1, 256]。
     - maxNumBlocks >= ceiv(max_query_len, block_size)。
@@ -485,7 +485,7 @@
     - blockIdxLastScheduledToken[i] < maxNumBlocks
   - num_accepted_tokens分为None和非None，非None情况下长度为batch，prefile对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seq_len-1。
   - num_computed_tokens中每个元素取值大于等于0。
-  - cache_indices的取值范围为[0, conv_states.dim[0]-1],且元素均不能相等。
+  - cache_indices的取值范围为[0, conv_states.dim[0]-1],且值均不能相等（除非等于pad_slot_id）。
   - max_query_len = batch中的最大seq_len。
   - Pangu V2 模式（conv_mode = 1）下，num_computed_tokens不能为 None。
   - 算子入参与中间计算结果，在对应数据类型（float16/bfloat16）下，数值均不会超出该类型值域范围。
