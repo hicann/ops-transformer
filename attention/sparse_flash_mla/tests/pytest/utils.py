@@ -217,24 +217,24 @@ def save_result(
     # 检查文件是否存在
     result_path.parent.mkdir(parents=True, exist_ok=True)
     if result_path.exists():
-        # 读取现有数据
         df = pd.read_excel(result_path)
-
-        # 检查列名是否一致
         if set(df.columns) != set(row_data.keys()):
-            print("警告：变量名与Excel列名不匹配！")
+            print("信息：列名不一致，将自动对齐（缺失填NaN，新增列自动扩展）")
             print(f"Excel列名: {list(df.columns)}")
             print(f"变量名: {list(row_data.keys())}")
-            print("请检查变量名或Excel文件")
-            return False
-
         # 追加新行
         new_df = pd.DataFrame([row_data])
-        df = pd.concat([df, new_df], ignore_index=True)
+        df = pd.concat([df, new_df], ignore_index=True, sort=False)
     else:
         # 文件不存在，创建新的DataFrame
         df = pd.DataFrame([row_data])
 
+    # ---------- 新增：固定最后两列 ----------
+    # 取出除 result 和 fulfill_percent 外的所有列（保持原有顺序）
+    other_cols = [col for col in df.columns if col not in ("result", "fulfill_percent")]
+    # 重新排列：其他列在前，最后两列固定
+    df = df[other_cols + ["result", "fulfill_percent"]]
+    # -------------------------------------
     # 保存到Excel
     df.to_excel(result_path, index=False)
 

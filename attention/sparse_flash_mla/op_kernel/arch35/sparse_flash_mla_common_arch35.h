@@ -21,12 +21,16 @@
 constexpr uint64_t BLOCK_BYTE = 32;
 constexpr uint32_t NEGATIVE_MIN_VAULE_FP32 = 0xFF7FFFFF;
 
-constexpr uint32_t L0AB_SHARED_SIZE_64K = 65536; // 65536表示64*1024
+constexpr uint32_t L0AB_SHARED_SIZE_64K = 65536;  // 65536表示64*1024
 constexpr uint32_t L0C_SHARED_SIZE_256K = 262144; // 262144表示256 * 1024
 
-constexpr uint32_t BUFFER_SIZE_16K = 16384; // 16384表示16 * 1024
-constexpr uint32_t BUFFER_SIZE_32K = 32768; // 32768表示32 * 1024
+constexpr uint32_t BUFFER_SIZE_8K = 8192;     // 8192表示8 * 1024
+constexpr uint32_t BUFFER_SIZE_16K = 16384;   // 16384表示16 * 1024
+constexpr uint32_t BUFFER_SIZE_32K = 32768;   // 32768表示32 * 1024
+constexpr uint32_t BUFFER_SIZE_64K = 65536;   // 65536表示64 * 1024
+constexpr uint32_t BUFFER_SIZE_96K = 98304;   // 98304表示96 * 1024
 constexpr uint32_t BUFFER_SIZE_128K = 131072; // 131072表示128 * 1024
+constexpr uint32_t BUFFER_SIZE_256K = 262144; // 262144表示256 * 1024
 
 constexpr uint32_t CV_RATIO = 2;
 constexpr uint64_t SYNC_MODE = 4;
@@ -52,21 +56,23 @@ __aicore__ constexpr uint64_t Align64Func(uint64_t data)
 {
     return (data + 63UL) >> 6UL << 6UL; // 向上64对齐, +63移位6
 }
-}
+} // namespace SMLAKernel
 
 #define TEMPLATE_INTF \
     template <typename Q_T, typename KV_T, typename T, typename OUTPUT_T, \
-    bool IS_FD, SMLA_LAYOUT LAYOUT_T, \
-    SMLA_LAYOUT KV_LAYOUT_T, SMLATemplateMode TEMPLATE_MODE, bool IS_SPLIT_G, bool IS_BATCH_CONSISTENCY>
+              bool IS_FD, SMLA_LAYOUT LAYOUT_T, \
+              SMLA_LAYOUT KV_LAYOUT_T, SMLATemplateMode TEMPLATE_MODE, bool IS_SPLIT_G, bool IS_BATCH_CONSISTENCY, \
+              bool IS_VEC_S2PHYADDR>
 
 #define TEMPLATE_INTF_ARGS \
-    Q_T, KV_T, T, OUTPUT_T, IS_FD, LAYOUT_T, KV_LAYOUT_T, TEMPLATE_MODE, IS_SPLIT_G, IS_BATCH_CONSISTENCY
+    Q_T, KV_T, T, OUTPUT_T, IS_FD, LAYOUT_T, KV_LAYOUT_T, TEMPLATE_MODE, IS_SPLIT_G, IS_BATCH_CONSISTENCY, \
+        IS_VEC_S2PHYADDR
 
 #define CUBE_BLOCK_TRAITS_TYPE_FIELDS(X) \
     X(Q_T) \
     X(KV_T) \
     X(T) \
-    X(OUTPUT_T) \
+    X(OUTPUT_T)
 
 #define CUBE_BLOCK_TRAITS_CONST_FIELDS(X) \
     X(IS_FD, bool, false) \
@@ -75,27 +81,28 @@ __aicore__ constexpr uint64_t Align64Func(uint64_t data)
     X(TEMPLATE_MODE, SMLATemplateMode, SMLATemplateMode::CSA_TEMPLATE_MODE) \
     X(IS_SPLIT_G, bool, false) \
     X(IS_BATCH_CONSISTENCY, bool, false) \
-
+    X(IS_VEC_S2PHYADDR, bool, false)
 
 /* 1. 生成带默认值的模版Template */
 #define GEN_TYPE_PARAM(name) typename name,
 #define GEN_CONST_PARAM(name, type, default_val) type name = default_val,
 
 #define TEMPLATES_DEF \
-template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TYPE_PARAM) \
-    CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_CONST_PARAM) bool end = true>
+    template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TYPE_PARAM) \
+                  CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_CONST_PARAM) bool end = true>
 
 /* 2. 生成不带带默认值的模版Template */
 #define GEN_TEMPLATE_TYPE_NODEF(name) typename name,
 #define GEN_TEMPLATE_CONST_NODEF(name, type, default_val) type name,
 #define TEMPLATES_DEF_NO_DEFAULT \
-template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TEMPLATE_TYPE_NODEF) \
-    CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TEMPLATE_CONST_NODEF) bool end>
+    template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TEMPLATE_TYPE_NODEF) \
+                  CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TEMPLATE_CONST_NODEF) bool end>
 
 /* 3. 生成有默认值的Args */
 #define GEN_ARG_NAME(name, ...) name,
 #define TEMPLATE_ARGS \
     CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARG_NAME) \
-    CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARG_NAME) end
+    CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARG_NAME) \
+    end
 
 #endif

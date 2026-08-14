@@ -889,7 +889,6 @@ ge::graphStatus SMLAInfoParser::GetValueHeadDim()
     return ge::GRAPH_SUCCESS;
 }
 
-
 ge::graphStatus SMLAInfoParser::GetSparseBlockCount()
 {
     if (opParamInfo_.oriSparseIndices.tensor != nullptr) {
@@ -1990,7 +1989,7 @@ void SparseFlashMlaTiling::CalcUbBmm(SMLATilingInfo *tilingInfo)
         cubeMSize = maxMSize;
     }
     mmResUbSize_ = sInnerSizeAlign_ * Align(cubeMSize, 16U); // kernel按照16对齐写出，tiling按照这个原则分配内存
-    bmm2ResUbSize_ = headDimAlign_ * Align(cubeMSize, 16U); // kernel按照16对齐写出，tiling按照这个原则分配内存
+    bmm2ResUbSize_ = headDimAlign_ * Align(cubeMSize, 16U);  // kernel按照16对齐写出，tiling按照这个原则分配内存
 }
 
 void SparseFlashMlaTiling::SplitBalanced(SMLATilingInfo *tilingInfo)
@@ -2037,6 +2036,63 @@ uint64_t SparseFlashMlaTiling::CalcFdStagingWorkspaceSize(const SMLATilingInfo *
         return (intraCoreSlots + crossCoreSlots) * bytesPerSlot;
     }
     return logicalCoreSlots * FD_MAX_S2_SPLIT_NUM * bytesPerSlot;
+}
+
+uint64_t SparseFlashMlaTiling::CalcVectorizeKvPhyAddrWorkspaceSize(const SMLATilingInfo *tilingInfo,
+                                                                   uint32_t &vectorizeFlag) const
+{
+    vectorizeFlag = 0U;
+    if (tilingInfo->npuArch != NpuArch::DAV_3510) {
+        return 0ULL;
+    }
+    constexpr uint32_t SPARSE_BLOCK_ALIGN_NUM = 128;
+    constexpr uint32_t UB_SIZE = 248 * 1024;
+    uint32_t alignedOriSparseBlockCount =
+        (tilingInfo->oriSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) / SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
+    uint32_t alignedCmpSparseBlockCount =
+        (tilingInfo->cmpSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) / SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
+    bool isPa = (tilingInfo->kvLayout == SMLALayout::PA_BBND);
+    uint32_t oriBlocksizeFlag =
+        static_cast<uint32_t>((tilingInfo->oriBlockSize & (tilingInfo->oriBlockSize - 1)) == 0);
+    uint32_t cmpBlocksizeFlag =
+        static_cast<uint32_t>((tilingInfo->cmpBlockSize & (tilingInfo->cmpBlockSize - 1)) == 0);
+    uint32_t blocksizeFlag = isPa ? ((tilingInfo->perfMode == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) ?
+                                         oriBlocksizeFlag :
+                                         (oriBlocksizeFlag && cmpBlocksizeFlag)) :
+                                    1U;
+    uint64_t paExtraUb = std::max(
+        static_cast<uint64_t>(tilingInfo->oriMaxBlockNumPerBatch) * sizeof(int32_t),
+        static_cast<uint64_t>(tilingInfo->cmpMaxBlockNumPerBatch) * sizeof(int32_t));
+    uint64_t cmpUbSize = (isPa ? paExtraUb : 0U) +
+                         static_cast<uint64_t>(alignedCmpSparseBlockCount) * sizeof(int32_t) +
+                         static_cast<uint64_t>(alignedCmpSparseBlockCount) * sizeof(int64_t);
+    uint64_t oriUbSize = (isPa ? paExtraUb : 0U) +
+                         static_cast<uint64_t>(alignedOriSparseBlockCount) * sizeof(int32_t) +
+                         static_cast<uint64_t>(alignedOriSparseBlockCount) * sizeof(int64_t);
+    uint64_t vectorizeUbSize = std::max(cmpUbSize, oriUbSize);
+    vectorizeFlag = static_cast<uint32_t>(
+        (tilingInfo->perfMode == SMLATemplateMode::CSA_TEMPLATE_MODE ||
+         tilingInfo->perfMode == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+         tilingInfo->perfMode == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
+        (vectorizeUbSize <= UB_SIZE) && blocksizeFlag);
+
+    if (vectorizeFlag == 0U) {
+        return 0ULL;
+    }
+    uint32_t totalBS1 = (tilingInfo->qLayout == SMLALayout::TND) ?
+                            tilingInfo->s1Size :
+                            (tilingInfo->bSize * tilingInfo->s1Size);
+    uint64_t oriPhyAddrSize = 0;
+    if (tilingInfo->perfMode == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+        tilingInfo->perfMode == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
+        oriPhyAddrSize = static_cast<uint64_t>(totalBS1) * alignedOriSparseBlockCount * sizeof(int64_t);
+    }
+    uint64_t cmpPhyAddrSize = 0;
+    if (tilingInfo->perfMode == SMLATemplateMode::CSA_TEMPLATE_MODE ||
+        tilingInfo->perfMode == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
+        cmpPhyAddrSize = static_cast<uint64_t>(totalBS1) * alignedCmpSparseBlockCount * sizeof(int64_t);
+    }
+    return oriPhyAddrSize + cmpPhyAddrSize;
 }
 
 // --------------------------SparseFlashMlaTiling类成员函数定义----------------------
@@ -2087,6 +2143,11 @@ ge::graphStatus SparseFlashMlaTiling::DoOpTiling(SMLATilingInfo *tilingInfo)
             workspaceSize += MERGE_CACHE_GM_BUF_NUM * 512 * 512 * 2 * aicNum;
         }
     }
+
+    // 计算vectorizeFlag (稀疏KV物理地址向量化)
+    uint32_t vectorizeFlag = 0U;
+    workspaceSize += CalcVectorizeKvPhyAddrWorkspaceSize(tilingInfo, vectorizeFlag);
+
     workspaceSize += CalcFdStagingWorkspaceSize(tilingInfo, aicNum);
     size_t *workSpaces = context_->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
@@ -2147,7 +2208,7 @@ ge::graphStatus SparseFlashMlaTiling::DoOpTiling(SMLATilingInfo *tilingInfo)
         splitG = static_cast<uint32_t>(tilingInfo->gSize > 64);
     }
     tilingKey = GET_TPL_TILING_KEY(0U, qLayout, inputKvLayout, static_cast<uint32_t>(tilingInfo->perfMode), splitG,
-                                   headRatioOne, static_cast<uint32_t>(tilingInfo->batchConsistency));
+                                   headRatioOne, static_cast<uint32_t>(tilingInfo->batchConsistency), vectorizeFlag);
     context_->SetScheduleMode(1);
     context_->SetTilingKey(tilingKey);
 
