@@ -21,8 +21,7 @@
 namespace MoeFinalizeRoutingV2Regbase {
 using namespace AscendC;
 template <typename T, typename S, int32_t dropPadMode>
-class MoeFinalizeRoutingV2HFullLoad
-{
+class MoeFinalizeRoutingV2HFullLoad {
 public:
     __aicore__ inline MoeFinalizeRoutingV2HFullLoad()
     {}
@@ -30,8 +29,8 @@ public:
     __aicore__ inline void Init(
         GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR scales,
         GM_ADDR expertIdx, GM_ADDR x, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR v,
-        GM_ADDR y, GM_ADDR workspace, const MoeFinalizeRoutingV2RegbaseTilingData* tilingDataPtr,
-        TPipe* pipePtr)
+        GM_ADDR y, GM_ADDR workspace, const MoeFinalizeRoutingV2RegbaseTilingData *tilingDataPtr,
+        TPipe *pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
@@ -44,19 +43,19 @@ public:
         hasX = x != nullptr;
         hasConstExpert = (constExpertAlpha1 != nullptr) && (constExpertAlpha2 != nullptr) && (v != nullptr);
 
-        expandedXGm.SetGlobalBuffer((__gm__ T*)expandedX);
-        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx);
-        x1Gm.SetGlobalBuffer((__gm__ T*)x1);
-        x2Gm.SetGlobalBuffer((__gm__ T*)x2);
+        expandedXGm.SetGlobalBuffer((__gm__ T *)expandedX);
+        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx);
+        x1Gm.SetGlobalBuffer((__gm__ T *)x1);
+        x2Gm.SetGlobalBuffer((__gm__ T *)x2);
 
-        biasGm.SetGlobalBuffer((__gm__ T*)bias);
-        scalesGm.SetGlobalBuffer((__gm__ S*)scales);
-        expertIdxGm.SetGlobalBuffer((__gm__ int32_t*)expertIdx);
-        xGm.SetGlobalBuffer((__gm__ T*)x);
-        constExpertAlpha1Gm.SetGlobalBuffer((__gm__ T*)constExpertAlpha1);
-        constExpertAlpha2Gm.SetGlobalBuffer((__gm__ T*)constExpertAlpha2);
-        vGm.SetGlobalBuffer((__gm__ T*)v);
-        yGm.SetGlobalBuffer((__gm__ T*)y);
+        biasGm.SetGlobalBuffer((__gm__ T *)bias);
+        scalesGm.SetGlobalBuffer((__gm__ S *)scales);
+        expertIdxGm.SetGlobalBuffer((__gm__ int32_t *)expertIdx);
+        xGm.SetGlobalBuffer((__gm__ T *)x);
+        constExpertAlpha1Gm.SetGlobalBuffer((__gm__ T *)constExpertAlpha1);
+        constExpertAlpha2Gm.SetGlobalBuffer((__gm__ T *)constExpertAlpha2);
+        vGm.SetGlobalBuffer((__gm__ T *)v);
+        yGm.SetGlobalBuffer((__gm__ T *)y);
 
         int32_t rowFactorHAlignedT = RoundUp<T>(tilingData->rowFactor * tilingData->h);
         int32_t rowFactorHAlignedFloat = RoundUp<float>(tilingData->rowFactor * tilingData->h);
@@ -256,18 +255,17 @@ private:
             SetOffsetForExpertIdx(kOuterIdx, rowOuterIdx, rowInnerIdx, kInnerIdx);
             expertIdx = expertIdxGm.GetValue(expertIdxOffset);
         }
-        
+
         if (hasX && hasExpertIdx) {
             if (expertIdx >= tilingData->zeroExpertStart && expertIdx < tilingData->zeroExpertEnd) {
                 return;
             } else if (expertIdx >= tilingData->copyExpertStart && expertIdx < tilingData->copyExpertEnd) {
                 CopyCopyExpertToExpandedX(rowOuterIdx, rowInnerIdx);
-            } else if (hasConstExpert && expertIdx >= tilingData->constantExpertStart && expertIdx <
-                tilingData->constantExpertEnd) {
+            } else if (hasConstExpert && expertIdx >= tilingData->constantExpertStart && expertIdx < tilingData->constantExpertEnd) {
                 CopyConstantExpertToExpandedX(rowOuterIdx, rowInnerIdx, expertIdx);
             } else {
                 CopyIn(expandedXGm[gmValueOfExpandedRowIdx * tilingData->h],
-                    expandedXLocal[validK * tilingData->hAligned], 1, tilingData->h);
+                       expandedXLocal[validK * tilingData->hAligned], 1, tilingData->h);
             }
         } else {
             CopyIn(
@@ -275,6 +273,9 @@ private:
                 expandedXLocal[validK * tilingData->hAligned], 1, tilingData->h);
         }
         if (hasBiasAndExpertIdx) {
+            if (expertIdx < 0 || expertIdx >= tilingData->e) {
+                return;
+            }
             int64_t biasGmOffset = expertIdx * tilingData->h;
             CopyIn(biasGm[biasGmOffset], biasLocal[validK * tilingData->hAligned], 1, tilingData->h);
         }
@@ -327,9 +328,9 @@ private:
         int64_t kOuterIdx, int64_t rowOuterIdx, int64_t rowInnerIdx, int64_t kInnerIdx)
     {
         if constexpr (dropPadMode == DROPLESS_COLUMN || dropPadMode == DROP_PAD_COLUMN) {
-            expertIdxOffset = rowInnerIdx * tilingData->k + kOuterIdx * tilingData->kFactor + kInnerIdx + 
-                GetBlockIdx() * tilingData->rowOfFormerBlock * tilingData->k +
-                rowOuterIdx * tilingData->rowFactor * tilingData->k;
+            expertIdxOffset = rowInnerIdx * tilingData->k + kOuterIdx * tilingData->kFactor + kInnerIdx +
+                              GetBlockIdx() * tilingData->rowOfFormerBlock * tilingData->k +
+                              rowOuterIdx * tilingData->rowFactor * tilingData->k;
             return;
         }
         expertIdxOffset = expandedRowIdxOffset;
@@ -337,8 +338,8 @@ private:
     }
 
 private:
-    TPipe* pipe;
-    const MoeFinalizeRoutingV2RegbaseTilingData* tilingData;
+    TPipe *pipe;
+    const MoeFinalizeRoutingV2RegbaseTilingData *tilingData;
 
     int64_t expandedRowIdxOffset{0};
     int64_t expertIdxOffset{0};

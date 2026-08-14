@@ -20,17 +20,16 @@
 namespace MoeFinalizeRoutingV2Regbase {
 using namespace AscendC;
 template <typename T, typename S, int32_t dropPadMode>
-class MoeFinalizeRoutingV2HPartialLoad
-{
+class MoeFinalizeRoutingV2HPartialLoad {
 public:
     __aicore__ inline MoeFinalizeRoutingV2HPartialLoad()
     {}
 
     __aicore__ inline void Init(
         GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR scales,
-        GM_ADDR expertIdx,  GM_ADDR x, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR v,
-        GM_ADDR y, GM_ADDR workspace, const MoeFinalizeRoutingV2RegbaseTilingData* tilingDataPtr,
-        TPipe* pipePtr)
+        GM_ADDR expertIdx, GM_ADDR x, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR v,
+        GM_ADDR y, GM_ADDR workspace, const MoeFinalizeRoutingV2RegbaseTilingData *tilingDataPtr,
+        TPipe *pipePtr)
     {
         hasBiasAndExpertIdx = (bias != nullptr) && (expertIdx != nullptr);
         hasScales = scales != nullptr;
@@ -43,18 +42,18 @@ public:
         hasX = x != nullptr;
         hasConstExpert = (constExpertAlpha1 != nullptr) && (constExpertAlpha2 != nullptr) && (v != nullptr);
 
-        expandedXGm.SetGlobalBuffer((__gm__ T*)expandedX);
-        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx);
-        biasGm.SetGlobalBuffer((__gm__ T*)bias);
-        scalesGm.SetGlobalBuffer((__gm__ S*)scales);
-        x1Gm.SetGlobalBuffer((__gm__ T*)x1);
-        x2Gm.SetGlobalBuffer((__gm__ T*)x2);
-        expertIdxGm.SetGlobalBuffer((__gm__ int32_t*)expertIdx);
-        xGm.SetGlobalBuffer((__gm__ T*)x);
-        constExpertAlpha1Gm.SetGlobalBuffer((__gm__ T*)constExpertAlpha1);
-        constExpertAlpha2Gm.SetGlobalBuffer((__gm__ T*)constExpertAlpha2);
-        vGm.SetGlobalBuffer((__gm__ T*)v);
-        yGm.SetGlobalBuffer((__gm__ T*)y);
+        expandedXGm.SetGlobalBuffer((__gm__ T *)expandedX);
+        expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx);
+        biasGm.SetGlobalBuffer((__gm__ T *)bias);
+        scalesGm.SetGlobalBuffer((__gm__ S *)scales);
+        x1Gm.SetGlobalBuffer((__gm__ T *)x1);
+        x2Gm.SetGlobalBuffer((__gm__ T *)x2);
+        expertIdxGm.SetGlobalBuffer((__gm__ int32_t *)expertIdx);
+        xGm.SetGlobalBuffer((__gm__ T *)x);
+        constExpertAlpha1Gm.SetGlobalBuffer((__gm__ T *)constExpertAlpha1);
+        constExpertAlpha2Gm.SetGlobalBuffer((__gm__ T *)constExpertAlpha2);
+        vGm.SetGlobalBuffer((__gm__ T *)v);
+        yGm.SetGlobalBuffer((__gm__ T *)y);
 
         int32_t hFactorAlignedT = RoundUp<T>(tilingData->hFactor);
         int32_t hFactorAlignedFloat = RoundUp<float>(tilingData->hFactor);
@@ -124,7 +123,7 @@ public:
     }
 
 private:
-__aicore__ inline void ProcessYWithInput(int64_t rowOuterIdx, int64_t hIdx, int64_t hFactor)
+    __aicore__ inline void ProcessYWithInput(int64_t rowOuterIdx, int64_t hIdx, int64_t hFactor)
     {
         for (int64_t kIdx = 0; kIdx < tilingData->k; kIdx += 1) {
             ProcessInnerLoopBody(rowOuterIdx, hIdx, hFactor, kIdx);
@@ -163,8 +162,10 @@ __aicore__ inline void ProcessYWithInput(int64_t rowOuterIdx, int64_t hIdx, int6
         expandedXQue.EnQue(expandedXLocal);
         expandedXLocal = expandedXQue.DeQue<T>();
         if (hasBiasAndExpertIdx) {
-            int64_t biasGmOffset =
-                expertIdxGm.GetValue(expertIdxOffset) * tilingData->h + hIdx * tilingData->hFactor;
+            if (expertIdx < 0 || expertIdx >= tilingData->e) {
+                return;
+            }
+            int64_t biasGmOffset = expertIdx * tilingData->h + hIdx * tilingData->hFactor;
             biasLocal = biasQue.AllocTensor<T>();
             CopyIn(biasGm[biasGmOffset], biasLocal, 1, hFactor);
             biasQue.EnQue(biasLocal);
@@ -185,7 +186,7 @@ __aicore__ inline void ProcessYWithInput(int64_t rowOuterIdx, int64_t hIdx, int6
     }
 
     __aicore__ inline bool LoadExpandedXByExpertType(int64_t rowOuterIdx, int64_t hIdx, int64_t hFactor,
-                                                      int64_t expertIdx, int64_t expandedRowIdxGmValue)
+                                                     int64_t expertIdx, int64_t expandedRowIdxGmValue)
     {
         if (expertIdx >= tilingData->zeroExpertStart && expertIdx < tilingData->zeroExpertEnd) {
             return false;
@@ -194,7 +195,7 @@ __aicore__ inline void ProcessYWithInput(int64_t rowOuterIdx, int64_t hIdx, int6
         if (expertIdx >= tilingData->copyExpertStart && expertIdx < tilingData->copyExpertEnd) {
             CopyCopyExpert(rowOuterIdx, hIdx, hFactor);
         } else if (hasConstExpert && expertIdx >= tilingData->constantExpertStart &&
-            expertIdx < tilingData->constantExpertEnd) {
+                   expertIdx < tilingData->constantExpertEnd) {
             CopyConstantExpert(rowOuterIdx, hIdx, hFactor, expertIdx);
         } else {
             CopyIn(
@@ -216,12 +217,12 @@ __aicore__ inline void ProcessYWithInput(int64_t rowOuterIdx, int64_t hIdx, int6
         constExpertAlpha1Local = constExpertAlpha1Que.AllocTensor<T>();
         constExpertAlpha2Local = constExpertAlpha2Que.AllocTensor<T>();
         vLocal = vQue.AllocTensor<T>();
-        
+
         int64_t xGmOffset = GetBlockIdx() * tilingData->rowOfFormerBlock * tilingData->h +
                             rowOuterIdx * tilingData->h + hIdx * tilingData->hFactor;
         CopyIn(xGm[xGmOffset], expandedXLocal, 1, hFactor);
         int64_t constExpertGmOffset = (expertIdx - tilingData->constantExpertStart) * tilingData->h +
-            hIdx * tilingData->hFactor;
+                                      hIdx * tilingData->hFactor;
         CopyIn(constExpertAlpha1Gm[constExpertGmOffset], constExpertAlpha1Local, 1, hFactor);
         CopyIn(constExpertAlpha2Gm[constExpertGmOffset], constExpertAlpha2Local, 1, hFactor);
         CopyIn(vGm[constExpertGmOffset], vLocal, 1, hFactor);
@@ -229,7 +230,7 @@ __aicore__ inline void ProcessYWithInput(int64_t rowOuterIdx, int64_t hIdx, int6
         vLocal = vLocal * constExpertAlpha2Local;
         expandedXLocal = expandedXLocal * constExpertAlpha1Local;
         expandedXLocal = expandedXLocal + vLocal;
-    
+
         constExpertAlpha1Que.EnQue(constExpertAlpha1Local);
         constExpertAlpha1Local = constExpertAlpha1Que.DeQue<T>();
         constExpertAlpha2Que.EnQue(constExpertAlpha2Local);
@@ -279,8 +280,8 @@ __aicore__ inline void ProcessYWithInput(int64_t rowOuterIdx, int64_t hIdx, int6
     }
 
 private:
-    TPipe* pipe;
-    const MoeFinalizeRoutingV2RegbaseTilingData* tilingData;
+    TPipe *pipe;
+    const MoeFinalizeRoutingV2RegbaseTilingData *tilingData;
     GlobalTensor<T> expandedXGm;
     GlobalTensor<int32_t> expandedRowIdxGm;
     GlobalTensor<int32_t> expertIdxGm;
