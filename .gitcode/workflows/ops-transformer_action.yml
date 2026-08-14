@@ -352,6 +352,19 @@ stages:
               file_path: ${{ steps.process_checkout.outputs.path }}/ci/smoke-conf/smoke-A2.yaml
         if: "${{ default() }}"
         runs-on: ['self-hosted','arch=arm','smoke=204']
+      PreSmoke_harmony-infer-chs-transformer:
+        name: PreSmoke_harmony-infer-chs-transformer
+        if: env.TARGET_BRANCH == 'master'
+        runs-on: [self-hosted, arch=x64, os=ubuntu, type=chs_phone]
+        steps:
+          - name: Checkout
+            identifier: process_checkout
+            uses: checkout
+            with:
+              ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+              token: ${{secrets.GIT_TOKEN}}
+          - name: 执行 Kirin PreSmoke_harmony-infer-chs-transformer 测试
+            run: bash .gitcode/scripts/kirin_smoke_chs.sh
     pre:
     - type: auto
     fail-fast: false
