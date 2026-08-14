@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file platform.h
+ * \file kv_rms_norm_rope_cache_regbase_platform.h
  * \brief platform apator
  */
 #include "kernel_operator.h"
@@ -27,7 +27,7 @@ __aicore__ inline int64_t CeilDiv(int64_t x, int64_t y)
 __aicore__ inline int64_t FloorDiv(int64_t x, int64_t y)
 {
     if (y == 0) {
-        return 0; 
+        return 0;
     }
     return x / y;
 }
@@ -40,18 +40,18 @@ __aicore__ inline int64_t Aligned(int64_t x, int64_t y)
     return (x + y - 1) / y * y;
 }
 
-}  // namespace ops
+} // namespace ops
 
 namespace platform {
 
 __aicore__ inline constexpr uint32_t GetVRegSize()
 {
-   return AscendC::VECTOR_REG_WIDTH;
+    return AscendC::VECTOR_REG_WIDTH;
 }
 
 __aicore__ inline constexpr uint32_t GetUbBlockSize()
 {
-   return 32U;
+    return 32U;
 }
 
-}  // namespace platform
+} // namespace platform

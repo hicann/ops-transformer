@@ -14,7 +14,7 @@
  */
 #ifndef _KV_RMS_NORM_ROPE_CACHE_COMM_H_
 #define _KV_RMS_NORM_ROPE_CACHE_COMM_H_
-#include "platform.h"
+#include "kv_rms_norm_rope_cache_platform.h"
 
 namespace KvRmsNormRopeCache {
 using namespace AscendC;
@@ -62,7 +62,8 @@ template <bool isPagedAttention, typename KV_DTYPE, typename K_DTYPE, typename V
 class KernelKvRmsNormRopeCacheBase {
 public:
     __aicore__ inline KernelKvRmsNormRopeCacheBase(TPipe *pipe, const KvRmsNormRopeCacheTilingData *tiling)
-        : pipe_(pipe), tilingData_(tiling)
+        : pipe_(pipe),
+          tilingData_(tiling)
     {
     }
 
