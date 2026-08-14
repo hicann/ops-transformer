@@ -28,6 +28,7 @@
 #include "../../../common/op_kernel/arch35/vf/vf_div_cast.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode.h"
 #include "../../../common/op_kernel/vector_common.h"
+#include "../../../common/op_kernel/arch35/util_regbase.h"
 #else
 #include "../../common/op_kernel/arch35/attenmask_gs1.h"
 #include "../../common/op_kernel/arch35/flash_attention_score_common_regbase.h"
@@ -37,6 +38,7 @@
 #include "../../common/op_kernel/arch35/vf/vf_div_cast.h"
 #include "../../common/op_kernel/arch35/vf/vf_flash_decode.h"
 #include "../../common/op_kernel/vector_common.h"
+#include "../../common/op_kernel/arch35/util_regbase.h"
 #endif
 
 using namespace AscendC;
@@ -80,7 +82,7 @@ public:
                                   IsSameType<INPUT_T, hifloat8_t>::value;
     static constexpr uint32_t DB = 2;
     static constexpr uint32_t PRELOAD_N = 2; // C1 C1 C2
-    static constexpr uint32_t s2SplitSize = (dTemplateAlign64 == 256) ? 128U : 256U;
+    static constexpr uint32_t s2SplitSize = (dTemplateAlign64 == static_cast<uint32_t>(DTemplateType::Aligned256)) ? 128U : 256U;
     static constexpr uint32_t MXFP_GROUP_SIZE = 32U;
     static constexpr bool HAS_MASK = hasAtten;
     static constexpr bool FLASH_DECODE = isFd;

@@ -53,10 +53,10 @@ inline void AdjustSinnerAndSouter(uint32_t vHeadDim, int64_t maxSeqQ, int64_t ma
         maxSeqKv = MAX_SEQ_LEN_DEFAULT;
     }
     if (vHeadDim == DSIZE_256) {
-        sOuterFactor = SOUTER_64; // mxfp8 D=256 时基本块为128*512
+        sOuterFactor = SOUTER_64; // mxfp8 D=256 时基本块为128*256
         sInnerFactor = SINNER_256;
     } else {
-        sOuterFactor = SOUTER_64; // mxfp8 D=128 时基本块为128*256
+        sOuterFactor = SOUTER_64; // mxfp8 D=128 时基本块为128*512
         sInnerFactor = SINNER_512;
     }
 }

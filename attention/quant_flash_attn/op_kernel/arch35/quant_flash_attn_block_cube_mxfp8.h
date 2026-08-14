@@ -20,12 +20,14 @@
 #include "../../../common/op_kernel/FixpipeOut.h"
 #include "../../../common/op_kernel/arch35/infer_flash_attention_comm.h"
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase.h"
+#include "../../../common/op_kernel/arch35/util_regbase.h"
 #else
 #include "../../common/op_kernel/offset_calculator.h"
 #include "../../common/op_kernel/matmul.h"
 #include "../../common/op_kernel/FixpipeOut.h"
 #include "../../common/op_kernel/arch35/infer_flash_attention_comm.h"
 #include "../../common/op_kernel/arch35/flash_attention_score_common_regbase.h"
+#include "../../common/op_kernel/arch35/util_regbase.h"
 #endif
 #include "kernel_operator_list_tensor_intf.h"
 #include "memory_copy_arch35.h"
@@ -93,7 +95,7 @@ public:
     static constexpr uint32_t dBaseSize = (uint32_t)dTemplateType;
     static constexpr uint32_t dVBaseSize = (uint32_t)dVTemplateType;
     static constexpr uint32_t l1BaseD = 128;
-    static constexpr uint32_t s2SplitSize = (dBaseSize == 256) ? 128U : 256U;
+    static constexpr uint32_t s2SplitSize = (dBaseSize == static_cast<uint32_t>(DTemplateType::Aligned256)) ? 128U : 256U;
     static constexpr uint32_t MXFP_GROUP_SIZE = 32U;
     static constexpr uint32_t MXFP_DIVISOR_SIZE = 64U;
     static constexpr uint32_t MXFP_MULTI_BASE_SIZE = 2U;
@@ -222,7 +224,7 @@ public:
         constexpr uint32_t s2BaseSizeCur = s2BaseSize >> 1;
         constexpr uint32_t mm1QSize = mBaseSize * dBaseSize * sizeof(INPUT_T);
         constexpr uint32_t mm1QScaleSize = mBaseSize * dBaseSize / MXFP_GROUP_SIZE * sizeof(SCALE_T);
-        if constexpr (dBaseSize == 256) {
+        if constexpr (dBaseSize == static_cast<uint32_t>(DTemplateType::Aligned256)) {
             constexpr uint32_t mmKVSize = dBaseSize * s2BaseSize * sizeof(INPUT_T); // 按decode方案分配较大的内存
             constexpr uint32_t mmKVScaleSize = s2BaseSize * dBaseSize / MXFP_GROUP_SIZE * sizeof(SCALE_T);
             l1QBuffers_.Init((*l1BufferManagerPtr_), mm1QSize + mm1QScaleSize);
@@ -596,7 +598,7 @@ public:
         mm1ResL0C.Wait<HardEvent::FIX_M>();
         MMParam param =
             MakeMMParam((uint32_t)runInfo.actMSize, (uint32_t)s2CurSize, dBaseSize, false, true);
-        if constexpr (dBaseSize == 256) {
+        if constexpr (dBaseSize == static_cast<uint32_t>(DTemplateType::Aligned256)) {
             MatmulFull<Q_T, KV_T, T, 128, (s2BaseSize >> 1), dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType, SCALE_T, SCALE_T,
                        mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
                 mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
@@ -717,7 +719,7 @@ public:
         mm1ResL0C.Wait<HardEvent::FIX_M>();
         MMParam param =
             MakeMMParam((uint32_t)s2CalcSize, (uint32_t)runInfo.actMSize, dBaseSize, false, true);
-        if constexpr (dBaseSize == 256) {
+        if constexpr (dBaseSize == static_cast<uint32_t>(DTemplateType::Aligned256)) {
             MatmulFull<Q_T, KV_T, T, (s2BaseSize >> 1), 128, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType, SCALE_T, SCALE_T,
                        mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
                 mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
@@ -801,7 +803,7 @@ public:
             if constexpr (!USE_DN) {
                 param.realM = (uint32_t)runInfo.actMSize;
             }
-            if constexpr (dBaseSize == 256) {
+            if constexpr (dBaseSize == static_cast<uint32_t>(DTemplateType::Aligned256)) {
                 MatmulFull<INPUT_T, KV_T, T, 128, dVBaseSize, baseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
                            SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
                     mm2A.GetTensor<INPUT_T>()[kIdx * l1BaseKOffset], mm2BTensor, mmL0ABuffers_, mmL0BBuffers_,
@@ -896,7 +898,7 @@ public:
             MMParam param =
                 MakeMMParam((uint32_t)mBaseSize, dVBaseSize,
                             (realK + 63) / MXFP_DIVISOR_SIZE * MXFP_DIVISOR_SIZE, USE_DN, false, k == 0, k == 0);
-            if constexpr (dBaseSize == 256) {
+            if constexpr (dBaseSize == static_cast<uint32_t>(DTemplateType::Aligned256)) {
                 MatmulFull<INPUT_T, KV_T, T, 128, dVBaseSize, baseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
                            SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
                     mm2A.GetTensor<INPUT_T>()[k * l1BaseKOffset], mm2BTensor, mmL0ABuffers_, mmL0BBuffers_,
