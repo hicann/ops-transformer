@@ -23,7 +23,6 @@
 #include "compressor_block_cube_perf.h"
 #include "compressor_block_vec_perf.h"
 
-
 using namespace AscendC;
 
 namespace Compressor {
@@ -32,7 +31,8 @@ template <typename COMP>
 class CompressorKernelPerf {
 public:
     __aicore__ inline CompressorKernelPerf(TPipe *pipe, const optiling::CompressorTilingData *__restrict tilingData)
-        : pipe_(pipe), tilingData_(tilingData)
+        : pipe_(pipe),
+          tilingData_(tilingData)
     {
     }
 
@@ -173,6 +173,7 @@ __aicore__ inline void CompressorKernelPerf<COMP>::InitTilingData()
     constInfo.blockNum = tilingData_->pageAttentionParams.blockNum;
     constInfo.blockSize = tilingData_->pageAttentionParams.blockSize;
     constInfo.maxBlockNumPerBatch = tilingData_->pageAttentionParams.maxBlockNumPerBatch;
+    constInfo.stateCacheStrideDim0 = tilingData_->baseParams.stateCacheStrideDim0;
 
     constInfo.nSize = tilingData_->baseParams.nSize;
     constInfo.vec1TailCacheSize = tilingData_->workspaceParams.vec1TailCacheSize;
@@ -240,7 +241,6 @@ __aicore__ inline void CompressorKernelPerf<COMP>::SetBaseSize()
     }
 }
 
-
 template <typename COMP>
 __aicore__ inline void CompressorKernelPerf<COMP>::SkipInvalidBatch(BatchInfo &batchInfo)
 {
@@ -267,7 +267,6 @@ __aicore__ inline void CompressorKernelPerf<COMP>::SkipInvalidBatch(BatchInfo &b
                                                batchInfo.bStartPos / constInfo.cmpRatio);
     }
 }
-
 
 template <typename COMP>
 __aicore__ inline void CompressorKernelPerf<COMP>::UpdateCurGroup(BasicBlockInfo &basicBlockInfo, BatchInfo batchInfo,
@@ -361,7 +360,6 @@ __aicore__ inline BasicBlockInfo CompressorKernelPerf<COMP>::SkipOneLoop(BatchIn
 
     return basicBlockInfo;
 }
-
 
 template <typename COMP>
 __aicore__ inline uint32_t CompressorKernelPerf<COMP>::GetLoopTimes()

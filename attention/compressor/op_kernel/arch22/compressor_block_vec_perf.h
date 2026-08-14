@@ -21,7 +21,6 @@
 #include "compressor_vector_comm.h"
 #include "soft_max.h"
 
-
 using namespace AscendC;
 
 namespace Compressor {
@@ -190,7 +189,6 @@ private:
     // out queue
     TQue<QuePosition::VECOUT, 1> outputQue1;
 };
-
 
 template <typename COMP>
 __aicore__ inline void CompressorBlockVectorPerf<COMP>::InitParams(const ConstInfo &constInfo,
@@ -495,7 +493,6 @@ CompressorBlockVectorPerf<COMP>::PadAlign(const LocalTensor<T> dstLocal, const L
                         dstSingleRowCount);
 }
 
-
 template <typename COMP>
 template <bool IS_SCORE>
 __aicore__ inline void
@@ -619,21 +616,24 @@ __aicore__ inline void CompressorBlockVectorPerf<COMP>::ReadFromCacheState(
     uint32_t curSeqIdx = startSeqIdx;
     uint32_t copyFinishRowCnt = 0;
     uint32_t seqCnt = endSeqIdx - startSeqIdx;
+    uint64_t stateCacheStrideDim0 = constInfo_.stateCacheStrideDim0;
+    uint32_t blockSize = constInfo_.blockSize;
+    uint32_t headDim = constInfo_.headDim;
     while (copyFinishRowCnt < seqCnt) {
-        uint64_t blockIdOffset = curSeqIdx / constInfo_.blockSize;
-        uint64_t remainRowCnt = curSeqIdx % constInfo_.blockSize;
+        uint64_t blockIdOffset = curSeqIdx / blockSize;
+        uint64_t remainRowCnt = curSeqIdx % blockSize;
         uint64_t idInBlockTable = blockTableGm.GetValue(blockTablebaseOffset + blockIdOffset);
-        uint32_t copyRowCount = constInfo_.blockSize - remainRowCnt;
+        uint32_t copyRowCount = blockSize - remainRowCnt;
         if (copyFinishRowCnt + copyRowCount > seqCnt) {
             copyRowCount = seqCnt - copyFinishRowCnt;
         }
         uint64_t stateOffset =
-            idInBlockTable * constInfo_.blockSize * STATE_INTERLEAVE_FACTOR * coff_ * constInfo_.headDim +
-            remainRowCnt * STATE_INTERLEAVE_FACTOR * coff_ * constInfo_.headDim +
-            stateIdx * coff_ * constInfo_.headDim + dStartIdx;
+            idInBlockTable * stateCacheStrideDim0 +
+            remainRowCnt * STATE_INTERLEAVE_FACTOR * coff_ * headDim +
+            stateIdx * coff_ * headDim + dStartIdx;
 
         DataCopyAlignGmToUb(output[copyFinishRowCnt * coff_ * dDealSize], state[stateOffset], copyRowCount,
-                                dDealSize, STATE_INTERLEAVE_FACTOR * coff_ * constInfo_.headDim, coff_ * dDealSize);
+                            dDealSize, STATE_INTERLEAVE_FACTOR * coff_ * constInfo_.headDim, coff_ * dDealSize);
         copyFinishRowCnt += copyRowCount;
         curSeqIdx += copyRowCount;
     }
@@ -648,21 +648,24 @@ __aicore__ inline void CompressorBlockVectorPerf<COMP>::WriteToCacheState(
     uint32_t curSeqIdx = startSeqIdx;
     uint32_t copyFinishRowCnt = 0;
     uint32_t seqCnt = endSeqIdx - startSeqIdx;
+    uint64_t stateCacheStrideDim0 = constInfo_.stateCacheStrideDim0;
+    uint32_t blockSize = constInfo_.blockSize;
+    uint32_t headDim = constInfo_.headDim;
     while (copyFinishRowCnt < seqCnt) {
-        uint64_t blockIdOffset = curSeqIdx / constInfo_.blockSize;
-        uint64_t remainRowCnt = curSeqIdx % constInfo_.blockSize;
+        uint64_t blockIdOffset = curSeqIdx / blockSize;
+        uint64_t remainRowCnt = curSeqIdx % blockSize;
         uint64_t idInBlockTable = blockTableGm.GetValue(blockTablebaseOffset + blockIdOffset);
-        uint32_t copyRowCount = constInfo_.blockSize - remainRowCnt;
+        uint32_t copyRowCount = blockSize - remainRowCnt;
         if (copyFinishRowCnt + copyRowCount > seqCnt) {
             copyRowCount = seqCnt - copyFinishRowCnt;
         }
-        if (idInBlockTable != 0) { // 32
+        if (idInBlockTable != 0) {
             uint64_t stateOffset =
-                idInBlockTable * constInfo_.blockSize * STATE_INTERLEAVE_FACTOR * coff_ * constInfo_.headDim +
-                remainRowCnt * STATE_INTERLEAVE_FACTOR * coff_ * constInfo_.headDim +
-                stateIdx * coff_ * constInfo_.headDim + dStartIdx;
+                idInBlockTable * stateCacheStrideDim0 +
+                remainRowCnt * STATE_INTERLEAVE_FACTOR * coff_ * headDim +
+                stateIdx * coff_ * headDim + dStartIdx;
             DataCopyWithOutputQue(state[stateOffset], input[copyFinishRowCnt * coff_ * dDealSize], copyRowCount,
-                                    dDealSize, coff_ * dDealSize, STATE_INTERLEAVE_FACTOR * coff_ * constInfo_.headDim);
+                                  dDealSize, coff_ * dDealSize, STATE_INTERLEAVE_FACTOR * coff_ * headDim);
         }
 
         copyFinishRowCnt += copyRowCount;
@@ -708,7 +711,6 @@ CompressorBlockVectorPerf<COMP>::DuplicateFirstBlock(const LocalTensor<T> &dstLo
         }
     }
 }
-
 
 template <typename COMP>
 template <bool IS_SCORE>
@@ -792,9 +794,9 @@ CompressorBlockVectorPerf<COMP>::KvMulReduceScore(const LocalTensor<T> &kvLocal,
 
 template <typename COMP>
 __aicore__ inline void CompressorBlockVectorPerf<COMP>::CopyOutVec1ResToOutput(const LocalTensor<T> &comperssoredUb,
-                                                                            const Vec1SliceInfo &sliceInfo,
-                                                                            uint32_t compressTcSize,
-                                                                            uint32_t dStartIdx, uint32_t dDealSize)
+                                                                               const Vec1SliceInfo &sliceInfo,
+                                                                               uint32_t compressTcSize,
+                                                                               uint32_t dStartIdx, uint32_t dDealSize)
 {
     LocalTensor<X_T> outputUb = outputQue1.AllocTensor<X_T>();
     Cast(outputUb, comperssoredUb, RoundMode::CAST_ROUND, compressTcSize * dDealSize);
@@ -1039,7 +1041,6 @@ __aicore__ inline void CompressorBlockVectorPerf<COMP>::ComputeVec1(const Vec1Ru
     loopInfo.coreColIdx = GetBlockIdx() % splitInfo.vec1GroupSize;
     loopInfo.isCoreRowLast = loopInfo.coreRowIdx == splitInfo.vec1GroupNum - 1;
     loopInfo.isCoreRowFirst = loopInfo.coreRowIdx == 0;
-
 
     CompressorVec1SliceIterator sliceIterator(tools_);
     sliceIterator.SetMaxBatchSize(constInfo_.batchSize);

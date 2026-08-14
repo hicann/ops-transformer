@@ -19,7 +19,7 @@
 using namespace std;
 
 // 构造版本
-std::string Compressor_tiling_A3SocInfo = 
+std::string Compressor_tiling_A3SocInfo =
     "{\n"
     "  \"hardware_info\": {\n"
     "    \"BT_SIZE\": 0,\n"
@@ -86,6 +86,107 @@ TEST_F(CompressorTilingArch22, test1)
         &compileInfo, "Ascend910_93", Compressor_tiling_A3SocInfo, 4096);
     int64_t expectTilingKey = 32;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// ====================================================================
+// Non-contiguous state_cache stride0 tests
+// ====================================================================
+
+// NC dim0: state_cache_stride_dim0 = 2x contiguous (262144*2=524288)
+// state_cache shape [4, 128, 2048], contiguous stride0 = 128*2048 = 262144
+TEST_F(CompressorTilingArch22, test11_nc_dim0_stride2x)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(524288)},
+        },
+        &compileInfo, "Ascend910_93", Compressor_tiling_A3SocInfo, 4096);
+    int64_t expectTilingKey = 32;
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// NC dim0: state_cache_stride_dim0 = 3x contiguous (262144*3=786432)
+TEST_F(CompressorTilingArch22, test12_nc_dim0_stride3x)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(786432)},
+        },
+        &compileInfo, "Ascend910_93", Compressor_tiling_A3SocInfo, 4096);
+    int64_t expectTilingKey = 32;
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// Invalid: state_cache_stride_dim0 < contiguous stride (131072 < 262144)
+TEST_F(CompressorTilingArch22, test13_invalid_stride_too_small)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(131072)},
+        },
+        &compileInfo, "Ascend910_93", Compressor_tiling_A3SocInfo, 4096);
+    int64_t expectTilingKey = 32;
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey);
 }
 
 // C4A fp16: B=2, S=8, H=4096, D=512, coff=2, cmp_ratio=4
@@ -398,7 +499,7 @@ TEST_F(CompressorTilingArch22, test_bad_block_size_zero)
             {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{4, 0, 2048}, {4, 0, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},      // blockSize=0
+            {{{4, 0, 2048}, {4, 0, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND}, // blockSize=0
             {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
@@ -432,7 +533,7 @@ TEST_F(CompressorTilingArch22, test_bsh_with_cu_seqlens)
             {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND},                       // cu_seqlens present in BSH
+            {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND}, // cu_seqlens present in BSH
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
         },
@@ -458,7 +559,7 @@ TEST_F(CompressorTilingArch22, test_dtype_consistency_wkv)
         "Compressor",
         {
             {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{1024, 4096}, {1024, 4096}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // wkv fp16, x bf16
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // wkv fp16, x bf16
             {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
@@ -488,7 +589,7 @@ TEST_F(CompressorTilingArch22, test_bad_dtype_x)
     gert::TilingContextPara tilingContextPara(
         "Compressor",
         {
-            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_FLOAT, ge::FORMAT_ND},      // x DT_FLOAT unsupported
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_FLOAT, ge::FORMAT_ND}, // x DT_FLOAT unsupported
             {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
@@ -519,7 +620,7 @@ TEST_F(CompressorTilingArch22, test_dimnum_consistency_cmpkv)
     gert::TilingContextPara tilingContextPara(
         "Compressor",
         {
-            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},       // x 3D
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND}, // x 3D
             {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
@@ -530,7 +631,7 @@ TEST_F(CompressorTilingArch22, test_dimnum_consistency_cmpkv)
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
         },
         {
-            {{{2, 512}, {2, 512}}, ge::DT_BF16, ge::FORMAT_ND},              // cmpKv 2D, x 3D
+            {{{2, 512}, {2, 512}}, ge::DT_BF16, ge::FORMAT_ND}, // cmpKv 2D, x 3D
             {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
@@ -583,7 +684,7 @@ TEST_F(CompressorTilingArch22, test_empty_wkv)
         "Compressor",
         {
             {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{0, 4096}, {0, 4096}}, ge::DT_BF16, ge::FORMAT_ND},            // wkv empty
+            {{{0, 4096}, {0, 4096}}, ge::DT_BF16, ge::FORMAT_ND}, // wkv empty
             {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},

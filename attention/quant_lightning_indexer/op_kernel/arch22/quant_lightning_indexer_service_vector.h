@@ -135,7 +135,7 @@ __aicore__ inline void QLIVector<QLIT>::GetKeyScale(const QLICommon::RunInfo &ru
             copyInParams.blockLen = firstPartLen * sizeof(half);
             int32_t blockId = blockTableGm.GetValue(blockTableBatchOffset + startBlockTableIdx);
             SetWaitFlag<HardEvent::S_MTE2>(HardEvent::S_MTE2);
-            AscendC::DataCopyPad(resUb, kScaleGm[blockId * kCacheBlockSize_ + startBlockTableOffset],
+            AscendC::DataCopyPad(resUb, kScaleGm[blockId * constInfo_.keyDequantScaleStride0 + startBlockTableOffset],
                                  copyInParams, padParams);
             startBlockTableIdx++;
             getLen = getLen - firstPartLen;
@@ -149,7 +149,8 @@ __aicore__ inline void QLIVector<QLIT>::GetKeyScale(const QLICommon::RunInfo &ru
             }
             int32_t blockId = blockTableGm.GetValue(blockTableBatchOffset + startBlockTableIdx + i);
             SetWaitFlag<HardEvent::S_MTE2>(HardEvent::S_MTE2);
-            AscendC::DataCopyPad(resUb[resUbBaseOffset + i * kCacheBlockSize_], kScaleGm[blockId * kCacheBlockSize_],
+            uint64_t kScaleOffset = blockId * constInfo_.keyDequantScaleStride0;
+            AscendC::DataCopyPad(resUb[resUbBaseOffset + i * kCacheBlockSize_], kScaleGm[kScaleOffset],
                                  copyInParams, padParams);
         }
     } else {
@@ -165,12 +166,12 @@ __aicore__ inline void QLIVector<QLIT>::GetKeyScale(const QLICommon::RunInfo &ru
 template <typename QLIT>
 __aicore__ inline void QLIVector<QLIT>::InitBuffers(TPipe *pipe)
 {
-    pipe->InitBuffer(paramBuf_, LD_PARAM_NUM * sizeof(int64_t));                                        // 1 KB
-    pipe->InitBuffer(inQueue_, 2, s2BaseSize_ * sizeof(float) * 2);                                     // 32KB
-    pipe->InitBuffer(outQueue_, 1, BASE_TOPK * sizeof(float));                                          // 8 KB
-    pipe->InitBuffer(indexBuf_, s2BaseSize_ * sizeof(int32_t));                                         // 8 KB
-    pipe->InitBuffer(tmpBuf_, 64 * 1024);                                                               // 64KB
-    pipe->InitBuffer(sortOutBuf_, CeilDiv(s1BaseSize_, 2) * BASE_TOPK_VALUE_IDX_SIZE * sizeof(float));  // 32KB
+    pipe->InitBuffer(paramBuf_, LD_PARAM_NUM * sizeof(int64_t));                                       // 1 KB
+    pipe->InitBuffer(inQueue_, 2, s2BaseSize_ * sizeof(float) * 2);                                    // 32KB
+    pipe->InitBuffer(outQueue_, 1, BASE_TOPK * sizeof(float));                                         // 8 KB
+    pipe->InitBuffer(indexBuf_, s2BaseSize_ * sizeof(int32_t));                                        // 8 KB
+    pipe->InitBuffer(tmpBuf_, 64 * 1024);                                                              // 64KB
+    pipe->InitBuffer(sortOutBuf_, CeilDiv(s1BaseSize_, 2) * BASE_TOPK_VALUE_IDX_SIZE * sizeof(float)); // 32KB
 
     globalTopkIndice_ = indexBuf_.Get<int32_t>();
     globalTopkUb_ = sortOutBuf_.Get<float>();
@@ -189,8 +190,8 @@ __aicore__ inline void QLIVector<QLIT>::InitBuffers(TPipe *pipe)
     Duplicate(tmpBuff.template ReinterpretCast<int32_t>(), -1, 2 * (s1BaseSize_ / 2) * paramNum_ * 2);
     outQueue_.EnQue<float>(tmpBuff);
     tmpBuff = outQueue_.DeQue<float>();
-    int64_t wsInfoOffset = (blockId_ / 2) * s1BaseSize_ * 2 * paramNum_ +       // 2个AIV共同地址偏移
-                           (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * paramNum_;  // 每个AIV的地址偏移，S1方向
+    int64_t wsInfoOffset = (blockId_ / 2) * s1BaseSize_ * 2 * paramNum_ +      // 2个AIV共同地址偏移
+                           (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * paramNum_; // 每个AIV的地址偏移，S1方向
     DataCopyPad(vec1ParamGm[wsInfoOffset], tmpBuff.template ReinterpretCast<int64_t>(),
                 {1, static_cast<uint16_t>((s1BaseSize_ / 2) * 2 * paramNum_ * sizeof(int64_t)), 0, 0});
     outQueue_.FreeTensor(tmpBuff);
@@ -218,8 +219,8 @@ __aicore__ inline void QLIVector<QLIT>::InitParams(const struct QLICommon::Const
     qHeadNum_ = constInfo.qHeadNum;
     kHeadNum_ = constInfo.kHeadNum;
     // define MMBase para
-    s1BaseSize_ = constInfo.s1BaseSize;  // 4
-    s2BaseSize_ = constInfo.s2BaseSize;  // 2048
+    s1BaseSize_ = constInfo.s1BaseSize; // 4
+    s2BaseSize_ = constInfo.s2BaseSize; // 2048
     kCacheBlockSize_ = constInfo.kCacheBlockSize;
     maxBlockNumPerBatch_ = constInfo.maxBlockNumPerBatch;
     blockId_ = GetBlockIdx();
@@ -427,12 +428,12 @@ __aicore__ inline void QLIVector<QLIT>::ProcessVec1(const QLICommon::RunInfo &in
                 //     16 = [needFd, s2AcSeq, s2Start, s2End, isS2End, bn2idx, s1Idx, S1ProcNum, ......]
 
                 int64_t wsOffset =
-                    (blockId_ / 2) * s1BaseSize_ * 2 * BASE_TOPK_VALUE_IDX_SIZE +        // 2个AIV共同地址偏移
-                    (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * BASE_TOPK_VALUE_IDX_SIZE +  // 每个AIV的地址偏移，S1方向
+                    (blockId_ / 2) * s1BaseSize_ * 2 * BASE_TOPK_VALUE_IDX_SIZE +       // 2个AIV共同地址偏移
+                    (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * BASE_TOPK_VALUE_IDX_SIZE + // 每个AIV的地址偏移，S1方向
                     (ldS1Offset + innerS1Idx) * 2 * BASE_TOPK_VALUE_IDX_SIZE;
                 int64_t wsInfoOffset =
-                    (blockId_ / 2) * s1BaseSize_ * 2 * paramNum_ +        // 2个AIV共同地址偏移
-                    (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * paramNum_ +  // 每个AIV的地址偏移，S1方向
+                    (blockId_ / 2) * s1BaseSize_ * 2 * paramNum_ +       // 2个AIV共同地址偏移
+                    (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * paramNum_ + // 每个AIV的地址偏移，S1方向
                     (ldS1Offset + innerS1Idx) * 2 * paramNum_;
 
                 LocalTensor<int64_t> tmpiBuff = paramBuf_.Get<int64_t>();
@@ -450,11 +451,11 @@ __aicore__ inline void QLIVector<QLIT>::ProcessVec1(const QLICommon::RunInfo &in
                 // [head, tail]
                 // head: 与前面规约，与前后规约
                 // tail: 与后面规约
-                bool isTailReduce = blockS2StartIdx_ == 0;  // 一定是isLastTile
+                bool isTailReduce = blockS2StartIdx_ == 0; // 一定是isLastTile
                 // WS偏移规则 blockS2StartIdx_ != 0
                 // 跟前面块做规约 写到0偏移 不用做计算 blockS2StartIdx_ == 0 and !isS2End
                 // 跟后面块做规约 写到1偏移  需要 + s1BaseSize_, BASE_TOPK*2
-                if (isTailReduce) {  // S2不是最后结束的数据就需要往后做规约，放入第二块ws
+                if (isTailReduce) { // S2不是最后结束的数据就需要往后做规约，放入第二块ws
                     wsInfoOffset += paramNum_;
                     wsOffset += BASE_TOPK_VALUE_IDX_SIZE;
                 }
@@ -557,7 +558,7 @@ __aicore__ inline void QLIVector<QLIT>::ProcessLD()
         valueOffset = 0;
 
         // 搬入数据
-        wsOffset = tmpCubeId * s1BaseSize_ * 2 * BASE_TOPK_VALUE_IDX_SIZE +  // 2个AIV共同地址偏移
+        wsOffset = tmpCubeId * s1BaseSize_ * 2 * BASE_TOPK_VALUE_IDX_SIZE + // 2个AIV共同地址偏移
                    innerS1Idx * 2 * BASE_TOPK_VALUE_IDX_SIZE + BASE_TOPK_VALUE_IDX_SIZE;
         SetWaitFlag<HardEvent::V_MTE2>(HardEvent::V_MTE2);
         SetWaitFlag<HardEvent::S_MTE2>(HardEvent::S_MTE2);
@@ -576,7 +577,7 @@ __aicore__ inline void QLIVector<QLIT>::ProcessLD()
 
         while (needFd == 1) {
             // 搬入头规约数据
-            wsOffset = tmpCubeId * s1BaseSize_ * 2 * BASE_TOPK_VALUE_IDX_SIZE +  // 2个AIV共同地址偏移
+            wsOffset = tmpCubeId * s1BaseSize_ * 2 * BASE_TOPK_VALUE_IDX_SIZE + // 2个AIV共同地址偏移
                        innerS1Idx * 2 * BASE_TOPK_VALUE_IDX_SIZE;
             SetWaitFlag<HardEvent::V_MTE2>(HardEvent::V_MTE2);
             SetWaitFlag<HardEvent::S_MTE2>(HardEvent::S_MTE2);
@@ -661,5 +662,5 @@ __aicore__ inline void QLIVector<QLIT>::ProcessLD()
         SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);
     }
 }
-}  // namespace QLIKernel
+} // namespace QLIKernel
 #endif
