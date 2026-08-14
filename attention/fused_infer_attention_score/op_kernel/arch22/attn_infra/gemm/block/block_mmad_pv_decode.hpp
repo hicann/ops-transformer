@@ -99,18 +99,16 @@ public:
     static_assert(std::is_same_v<LayoutC, layout::RowMajor>, "LayoutC only support RowMajor yet!");
 
     /// Construct
-    __aicore__ inline
-    BlockMmad() {}
+    __aicore__ inline BlockMmad() {}
 
-    __aicore__ inline
-    void init(Arch::Resource<ArchTag> &resource, uint32_t nDynamic, uint32_t kDynamic, uint32_t l1BufAddrStart = 0)
+    __aicore__ inline void init(Arch::Resource<ArchTag> &resource, uint32_t nDynamic, uint32_t kDynamic, uint32_t l1BufAddrStart = 0)
     {
         // Allocate L1 memory space
         l1BTensor = resource.l1Buf.template GetBufferByByte<ElementB>(l1BufAddrStart +
-            L1TileShape::M * kDynamic * sizeof(ElementA) * STAGES);
+                                                                      L1TileShape::M * kDynamic * sizeof(ElementA) * STAGES);
         for (uint32_t i = 0; i < STAGES; i++) {
             l1ATensor[i] = resource.l1Buf.template GetBufferByByte<ElementA>(l1BufAddrStart +
-                L1TileShape::M * kDynamic * sizeof(ElementA) * i);
+                                                                             L1TileShape::M * kDynamic * sizeof(ElementA) * i);
             l0ATensor[i] = resource.l0ABuf.template GetBufferByByte<ElementA>(L0A_PINGPONG_BUF_SIZE * i);
             l0BTensor[i] = resource.l0BBuf.template GetBufferByByte<ElementB>(L0B_PINGPONG_BUF_SIZE * i);
             l0CTensor[i] = resource.l0CBuf.template GetBufferByByte<ElementAccumulator>(L0C_PINGPONG_BUF_SIZE * i);
@@ -120,11 +118,9 @@ public:
     }
 
     /// Destructor
-    __aicore__ inline
-    ~BlockMmad() {}
-    
-    __aicore__ inline
-    void getBlockShape(
+    __aicore__ inline ~BlockMmad() {}
+
+    __aicore__ inline void getBlockShape(
         GemmCoord &actualShape, uint32_t &nowNIdx, uint32_t &nLoop, uint32_t &kvSeqlen, uint32_t &blockSize)
     {
         uint32_t nSplitSize = blockSize;
@@ -134,33 +130,35 @@ public:
         actualShape[COORD_DIM2] = nSplitSize;
     }
 
-    __aicore__ inline
-    void getKVOffset(AscendC::GlobalTensor<int32_t> &gBlockTable, uint32_t &kOffset, uint32_t &nowNIdx,
-        uint32_t &strideKV, uint32_t &blockSize)
+    __aicore__ inline void getKVOffset(AscendC::GlobalTensor<int32_t> &gBlockTable, uint64_t &kOffset, uint32_t &nowNIdx,
+                                       uint32_t &strideKV, uint32_t &blockSize, uint64_t valueBnStride)
     {
         if constexpr (PAGED_CACHE_FLAG_) {
             uint32_t blockTableId = gBlockTable.GetValue(nowNIdx);
-            kOffset = blockTableId * blockSize * strideKV;
+            if (valueBnStride != 0) {
+                kOffset = blockTableId * valueBnStride;
+            } else {
+                kOffset = blockTableId * blockSize * strideKV;
+            }
         } else {
             kOffset = nowNIdx * blockSize * strideKV;
         }
     }
 
-    __aicore__ inline
-    void operator()(
+    __aicore__ inline void operator()(
         AscendC::GlobalTensor<ElementA> gA,
         AscendC::GlobalTensor<ElementB> gB,
         AscendC::GlobalTensor<ElementC> gC,
         AscendC::GlobalTensor<int32_t> gBlockTable,
-        LayoutA layoutA, LayoutB layoutB, LayoutC layoutC,GemmCoord actualOriShape,
+        LayoutA layoutA, LayoutB layoutB, LayoutC layoutC, GemmCoord actualOriShape,
         uint32_t &nIdx, uint32_t &nLoop, uint32_t &blockSize, uint32_t kvSeqlen, uint32_t strideKV,
-        uint32_t blockStackNum, Arch::CrossCoreFlag softmaxFlag, uint32_t crossCoreSyncTrigger)
+        uint32_t blockStackNum, Arch::CrossCoreFlag softmaxFlag, uint32_t crossCoreSyncTrigger, uint64_t valueBnStride)
     {
         uint32_t rowNum = actualOriShape[COORD_DIM0];
         uint32_t embed = actualOriShape[COORD_DIM1];
         uint32_t stackSeqTile = actualOriShape[COORD_DIM2];
         GemmCoord actualShape{rowNum, embed, 0};
-        uint32_t gBOffset = 0;
+        uint64_t gBOffset = 0;
 
         LayoutBInL1 layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(stackSeqTile, embed);
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(EVENT_ID4);
@@ -168,7 +166,7 @@ public:
              blockStackIdx++) {
             uint32_t nowNIdx = nIdx + blockStackIdx;
             getBlockShape(actualShape, nowNIdx, nLoop, kvSeqlen, blockSize);
-            getKVOffset(gBlockTable, gBOffset, nowNIdx, strideKV, blockSize);
+            getKVOffset(gBlockTable, gBOffset, nowNIdx, strideKV, blockSize, valueBnStride);
             auto layoutBTile = layoutB.GetTileLayout(MakeCoord(actualShape.k(), actualShape.n()));
             MatrixCoord l1BTileCoord{blockStackIdx * blockSize, 0};
             auto l1BTile = l1BTensor[layoutBInL1.GetOffset(l1BTileCoord)];
@@ -228,12 +226,12 @@ public:
                         bool initMmad = (kL1Idx == 0U) && (kL0Idx == 0U);
                         uint32_t mL0AlignUp = (mL1ActualTemp + BLOCK_SIZE - 1U) / BLOCK_SIZE * BLOCK_SIZE;
                         tileMmad(l0CTensor[l0CPingPongFlag],
-                            l0ATensor[l0ABPingPongFlag],
-                            l0BTensor[l0ABPingPongFlag],
-                            mL0AlignUp,
-                            nL1Actual,
-                            kL0Actual,
-                            initMmad);
+                                 l0ATensor[l0ABPingPongFlag],
+                                 l0BTensor[l0ABPingPongFlag],
+                                 mL0AlignUp,
+                                 nL1Actual,
+                                 kL0Actual,
+                                 initMmad);
                         AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag);
                         AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag + 2U);
                         l0ABPingPongFlag = 1U - l0ABPingPongFlag;
@@ -252,7 +250,7 @@ public:
         }
         AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(EVENT_ID4);
     }
- 
+
 protected:
     /// Data members
     AscendC::LocalTensor<ElementA> l1ATensor[STAGES];

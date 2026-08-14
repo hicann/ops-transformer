@@ -14,6 +14,7 @@
 #include "opdev/platform.h"
 #include "opdev/op_def.h"
 #include "opdev/op_log.h"
+#include "opdev/op_dfx.h"
 #include "fused_infer_attention_score_inner.h"
 #include "aclnnInner_fused_infer_attention_score.h" // 该文件为自动生成，在build/autogen/inner路径下
 
@@ -47,8 +48,6 @@ __attribute__((visibility("default"))) aclnnStatus aclnnFusedInferAttentionScore
     int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode, int64_t valueAntiquantMode,
     const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor);
 
-extern "C" aclnnStatus __attribute__((weak)) NnopbaseDisableOptionalInput(void *executor, const size_t irIndex);
-
 struct FiaActualSeqInArrays {
     const aclIntArray *actualSeqLengthsOptional = nullptr;
     const aclIntArray *actualSeqLengthsKvOptional = nullptr;
@@ -61,7 +60,8 @@ struct FiaActualSeqOutTensors {
     aclTensor *actualSharedPrefixLenOptional = nullptr;
 };
 
-aclnnStatus FakeFiaActualSeqArrays(const FiaActualSeqInArrays &inArrays,  FiaActualSeqOutTensors &outTensors) {
+aclnnStatus FakeFiaActualSeqArrays(const FiaActualSeqInArrays &inArrays, FiaActualSeqOutTensors &outTensors)
+{
     // nullptr不处理， nullptr是空指针，这样不会影响原来就不传入actual seq length为空的逻辑
     aclnnStatus ret = FakeArray(inArrays.actualSeqLengthsOptional, outTensors.actualSeqLengthsOptional);
     CHECK_RET_CODE(ret, "Try alloc fake actualSeqLengthsOptional failed");
@@ -185,6 +185,19 @@ aclnnStatus aclnnFusedInferAttentionScoreV3GetWorkspaceSize(
     int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode, int64_t valueAntiquantMode,
     const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
+    L2_DFX_PHASE_1(aclnnFusedInferAttentionScoreV3,
+                   DFX_IN(query, key, value, pseShiftOptional, attenMaskOptional, actualSeqLengthsOptional,
+                          actualSeqLengthsKvOptional, deqScale1Optional, quantScale1Optional, deqScale2Optional,
+                          quantScale2Optional, quantOffset2Optional, antiquantScaleOptional, antiquantOffsetOptional,
+                          blockTableOptional, queryPaddingSizeOptional, kvPaddingSizeOptional,
+                          keyAntiquantScaleOptional, keyAntiquantOffsetOptional, valueAntiquantScaleOptional,
+                          valueAntiquantOffsetOptional, keySharedPrefixOptional, valueSharedPrefixOptional,
+                          actualSharedPrefixLenOptional, queryRopeOptional, keyRopeOptional,
+                          keyRopeAntiquantScaleOptional, numHeads, scaleValue, preTokens, nextTokens, inputLayout,
+                          numKeyValueHeads, sparseMode, innerPrecise, blockSize, antiquantMode, softmaxLseFlag,
+                          keyAntiquantMode, valueAntiquantMode),
+                   DFX_OUT(attentionOut, softmaxLse));
+
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "Interface aclnnFusedInferAttentionScore versions V1 to V4 are no longer supported on Ascend950.");
         return ACLNN_ERR_RUNTIME_ERROR;
@@ -208,7 +221,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV3GetWorkspaceSize(
     const aclTensor *tempTensor = nullptr;
     FusedInferAttentionScoreProcessSoftmaxLse(softmaxLseFlag, softmaxLse, tempTensor, placeHolder);
 
-    aclnnStatus ret = aclnnInnerFusedInferAttentionScoreGetWorkspaceSize(
+    aclnnStatus ret = InnerFusedInferAttentionScoreGetWorkspaceSize(
         query, tensorListKey, tensorListValue, pseShiftOptional, attenMaskOptional, actualSeqLengthsOptional,
         actualSeqLengthsKvOptional, deqScale1Optional, quantScale1Optional, deqScale2Optional, quantScale2Optional,
         quantOffset2Optional, antiquantScaleOptional, antiquantOffsetOptional, blockTableOptional,
@@ -220,14 +233,6 @@ aclnnStatus aclnnFusedInferAttentionScoreV3GetWorkspaceSize(
         keyAntiquantMode, valueAntiquantMode, 0, 0, 0, attentionOut, placeHolder, workspaceSize, executor);
     if (softmaxLseFlag == false) {
         aclDestroyTensor(tempTensor);
-    }
-    if (ret == 0) {
-        if (NnopbaseDisableOptionalInput != nullptr) {
-            NnopbaseDisableOptionalInput(*executor, 27U); // 27 is input irIndex
-            NnopbaseDisableOptionalInput(*executor, 28U); // 28 is input irIndex
-            NnopbaseDisableOptionalInput(*executor, 29U); // 29 is input irIndex，占位符
-            NnopbaseDisableOptionalInput(*executor, 30U); // 30 is input irIndex
-        }
     }
     return ret;
 }
@@ -246,7 +251,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(void *workspace, uint64_t workspaceS
                 "We apologize for any inconvenience caused and appreciate your timely migration to the new interface.");
         isFirstCall = false;
     }
-    return aclnnInnerFusedInferAttentionScore(workspace, workspaceSize, executor, stream);
+    return InnerFusedInferAttentionScore(workspace, workspaceSize, executor, stream);
 }
 
 } // namespace
