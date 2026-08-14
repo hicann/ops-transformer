@@ -106,10 +106,7 @@ const std::vector<std::vector<uint32_t>> SUPPORTED_TYPES_WITH_BIAS = {
     {ge::DT_FLOAT16, ge::DT_INT4, ge::DT_FLOAT, ge::DT_FLOAT16},
     {ge::DT_FLOAT16, ge::DT_INT4, ge::DT_FLOAT16, ge::DT_FLOAT16}};
 const std::vector<std::vector<uint32_t>> SUPPORTED_TYPES_WITHOUT_BIAS = {
-    {ge::DT_BF16, ge::DT_BF16, ge::DT_BF16}, {ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16},
-    {ge::DT_BF16, ge::DT_INT8, ge::DT_BF16}, {ge::DT_FLOAT16, ge::DT_INT8, ge::DT_FLOAT16},
-    {ge::DT_INT4, ge::DT_INT4, ge::DT_BF16}, {ge::DT_INT4, ge::DT_INT4, ge::DT_FLOAT16},
-    {ge::DT_BF16, ge::DT_INT4, ge::DT_BF16}, {ge::DT_FLOAT16, ge::DT_INT4, ge::DT_FLOAT16}};
+    {ge::DT_BF16, ge::DT_BF16, ge::DT_BF16}, {ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16}, {ge::DT_BF16, ge::DT_INT8, ge::DT_BF16}, {ge::DT_FLOAT16, ge::DT_INT8, ge::DT_FLOAT16}, {ge::DT_INT4, ge::DT_INT4, ge::DT_BF16}, {ge::DT_INT4, ge::DT_INT4, ge::DT_FLOAT16}, {ge::DT_BF16, ge::DT_INT4, ge::DT_BF16}, {ge::DT_FLOAT16, ge::DT_INT4, ge::DT_FLOAT16}};
 } // namespace
 
 namespace MC2Tiling {
@@ -119,22 +116,22 @@ struct BaseBlock {
     static_assert((SIZE & (SIZE - 1)) == 0, "Invalid block size");
     static constexpr size_t size = SIZE / sizeof(T);
 
-    static __aicore__ inline size_t Count(size_t len)
+    static inline size_t Count(size_t len)
     {
         return (len + size - 1) / size;
     }
 
-    static __aicore__ inline bool IsAligned(size_t len)
+    static inline bool IsAligned(size_t len)
     {
         return len % size == 0;
     }
 
-    static __aicore__ inline size_t AlignUp(size_t len)
+    static inline size_t AlignUp(size_t len)
     {
         return (len + size - 1) & ~(size - 1);
     }
 
-    static __aicore__ inline size_t AlignDown(size_t len)
+    static inline size_t AlignDown(size_t len)
     {
         return len & ~(size - 1);
     }
@@ -160,7 +157,8 @@ int32_t RoundNum(int32_t num, int32_t rnd)
 template <typename T>
 T ClampValue(T value, T minVal, T maxVal)
 {
-    return (value < minVal) ? minVal : (value > maxVal) ? maxVal : value;
+    return (value < minVal) ? minVal : (value > maxVal) ? maxVal :
+                                                          value;
 }
 
 static std::map<int, std::vector<std::vector<int>>> g_alltoallmatmulTwoRankFP16UbsizeMap = {
@@ -1496,9 +1494,9 @@ ge::graphStatus AlltoAllMatmulTiling910b::DoOpTiling()
     auto cclRet = mc2tiling::GetCclBufferSize(group, &hcclBuffSize, opName_);
     if (cclRet == ge::GRAPH_SUCCESS) {
         OP_TILING_CHECK(hcclBuffSize < MAX_BUFF_BYTES,
-            OP_LOGE(opName_, "HCCL_BUFFSIZE (%lu Bytes) too small, min required %lu Bytes (%dMB)",
-                hcclBuffSize, MAX_BUFF_BYTES, MAX_BUFF_BYTES / MB_BYTES),
-            return ge::GRAPH_FAILED);
+                        OP_LOGE(opName_, "HCCL_BUFFSIZE (%lu Bytes) too small, min required %lu Bytes (%dMB)",
+                                hcclBuffSize, MAX_BUFF_BYTES, MAX_BUFF_BYTES / MB_BYTES),
+                        return ge::GRAPH_FAILED);
     } else {
         OP_LOGW(opName_, "Can't get HCCL_BUFFSIZE, skip CCL buffer size validation.");
     }
@@ -1547,13 +1545,13 @@ void AlltoAllMatmulTiling910b::CalcQuantTokenNumPerUb(const CoCTiling &cocTiling
     int32_t maxUBPingPongSize = cocTilingData.ubMoveNum / 2;
     int32_t tokenSize = info.K * rankSize; // 加上padding后，此处需要使用k_align
     int32_t tokenPerCore =
-        (cocTilingData.m0 * cocTilingData.pValue) / (cocTilingData.allToAllSendCoreNum); // 每个核需要处理的token数
-    int32_t quantScaleSize = Block32B<float>::AlignUp(tokenPerCore);                     // 用于存储quantScale
+        (cocTilingData.m0 * cocTilingData.pValue) / (cocTilingData.allToAllSendCoreNum);    // 每个核需要处理的token数
+    int32_t quantScaleSize = Block32B<float>::AlignUp(tokenPerCore);                        // 用于存储quantScale
     int32_t smoothScaleSize = info.isSmoothQuant ? Block32B<float>::AlignUp(tokenSize) : 0; // 用于存储smoothScale
     int32_t absTensorSize = Block32B<float>::AlignUp(tokenSize);
     int32_t reduceMaxSize = BLOCK_ALIGN_BYTES / sizeof(float); // 用于存储reduceMax的结果，存放某个token的max的值
     int32_t doubleBufferSize = (USED_UB_SIZE / sizeof(float) - quantScaleSize - smoothScaleSize) /
-                               UB_PINGPONG_SIZE; // 存放quantScale和smoothScale不使用doubleBuffer
+                               UB_PINGPONG_SIZE;                                    // 存放quantScale和smoothScale不使用doubleBuffer
     int32_t ubLeftForCopyTensor = doubleBufferSize - reduceMaxSize - absTensorSize; // 剩余用来存放copyTensor的空间
     int32_t copyTokenNum = ubLeftForCopyTensor / Block32B<float>::AlignUp(tokenSize);
     int32_t copyTimes = 0;
@@ -1589,7 +1587,7 @@ void AlltoAllMatmulTiling910b::CalcQuantWorkspaceSize(const CoCTiling &cocTiling
         int64_t quantSize = static_cast<int64_t>(numPerRankM) * midOutputKSize * MAX_BLOCK_COUNT;
         info.quantSize = quantType == TILINGKEY_TPL_A16W8 ?
                              quantSize :
-                             (quantSize + 1) / 2; // int8类型每个元素占用1个字节，int4类型每两个元素占用1个字节
+                             (quantSize + 1) / 2;                                        // int8类型每个元素占用1个字节，int4类型每两个元素占用1个字节
         info.quantScaleSize = Block32B<float>::AlignUp(orgM) * sizeof(float) / rankSize; // A反量化参数所需要的空间大小
 
         quantWorkspaceSize = info.quantSize + info.quantScaleSize + info.dequantSize;
@@ -1658,7 +1656,8 @@ ge::graphStatus AlltoAllMatmulTiling910b::PostTiling()
  *
  * @param context
  */
-AlltoAllMatmulTiling910b::AlltoAllMatmulTiling910b(gert::TilingContext *context) : AllToAllMatmulTilingBase(context)
+AlltoAllMatmulTiling910b::AlltoAllMatmulTiling910b(gert::TilingContext *context)
+    : AllToAllMatmulTilingBase(context)
 {
 }
 

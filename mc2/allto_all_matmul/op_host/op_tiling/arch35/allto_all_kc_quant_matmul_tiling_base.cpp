@@ -253,7 +253,7 @@ ge::graphStatus AllToAllKcQuantMatmulTilingBase::SetHcclTiling()
     // reducetype接口附带的数据类型优先于调用通信接口传入的数据类型，因此这里需要设置
     AscendC::Mc2CcTilingConfig allToAllTilingConfig =
         allToAllBuilder
-            .withReduceType(opName_, AscendC::HcclReduceOp::HCCL_REDUCE_SUM, contextInfo_.hcclGeType,
+            .withReduceType(opName_, mc2tiling::HcclReduceOp::HCCL_REDUCE_SUM, contextInfo_.hcclGeType,
                             contextInfo_.hcclGeType)
             .withCommEngine(hcclServerEngine)
             .build();
@@ -378,7 +378,8 @@ AlltoAllKcQuantMatmulHelper::AlltoAllKcQuantMatmulHelper(
     AllToAllKcQuantMatmulTilingBase &allToAllKcQuantMatmulTilingBase,
     DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &data, uint64_t &mm_mvalue_len)
     : Mc2AdaptiveSlidingWindowTiling(allToAllKcQuantMatmulTilingBase.context_, &data),
-      tilingProcesser_(allToAllKcQuantMatmulTilingBase), mm_len(mm_mvalue_len)
+      tilingProcesser_(allToAllKcQuantMatmulTilingBase),
+      mm_len(mm_mvalue_len)
 {
 }
 

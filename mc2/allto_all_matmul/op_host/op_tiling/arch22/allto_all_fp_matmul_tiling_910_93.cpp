@@ -237,7 +237,7 @@ ge::graphStatus AllToAllFpMatmulTilingBaseA3::SetHcclTiling()
     // reducetype接口附带的数据类型优先于调用通信接口传入的数据类型，因此这里需要设置
     AscendC::Mc2CcTilingConfig allToAllTilingConfig =
         allToAllBuilder
-            .withReduceType(opName_, AscendC::HcclReduceOp::HCCL_REDUCE_SUM, contextInfo_.args_.geAType,
+            .withReduceType(opName_, mc2tiling::HcclReduceOp::HCCL_REDUCE_SUM, contextInfo_.args_.geAType,
                             contextInfo_.args_.geAType)
             .build();
     if (!allToAllBuilder.isSuccess()) {
@@ -422,7 +422,8 @@ ge::graphStatus AllToAllFpMatmulHelper::GetShapeAttrsInfo()
 
 AllToAllFpMatmulHelper::AllToAllFpMatmulHelper(AllToAllFpMatmulTilingBaseA3 &alltoAllMatmulTilingA3,
                                                Mc2MatmulV3TilingData &data)
-    : Mc2MatmulV3BaseTiling(alltoAllMatmulTilingA3.context_, &data), tilingProcesser_(alltoAllMatmulTilingA3)
+    : Mc2MatmulV3BaseTiling(alltoAllMatmulTilingA3.context_, &data),
+      tilingProcesser_(alltoAllMatmulTilingA3)
 {
 }
 

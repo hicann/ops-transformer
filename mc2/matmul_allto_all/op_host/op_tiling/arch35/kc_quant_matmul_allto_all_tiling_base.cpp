@@ -151,7 +151,7 @@ ge::graphStatus KcQuantMatmulAllToAllTilingBase::SetHcclTiling()
     // reducetype接口附带的数据类型优先于调用通信接口传入的数据类型，因此这里需要设置
     AscendC::Mc2CcTilingConfig allToAllTilingConfig =
         allToAllBuilder
-            .withReduceType(opName_, AscendC::HcclReduceOp::HCCL_REDUCE_SUM, contextInfo.args_.geCType,
+            .withReduceType(opName_, mc2tiling::HcclReduceOp::HCCL_REDUCE_SUM, contextInfo.args_.geCType,
                             contextInfo.args_.geCType)
             .withCommEngine(engineType)
             .build();
@@ -307,7 +307,8 @@ KcQuantMatmulAlltoAllHelper::KcQuantMatmulAlltoAllHelper(
     KcQuantMatmulAllToAllTilingBase &kcQuantMatmulAllToAllTilingBase,
     DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &data, uint64_t &mmMvalueLen)
     : Mc2AdaptiveSlidingWindowTiling(kcQuantMatmulAllToAllTilingBase.context_, &data),
-      tilingProcesser_(kcQuantMatmulAllToAllTilingBase), mmLen(mmMvalueLen)
+      tilingProcesser_(kcQuantMatmulAllToAllTilingBase),
+      mmLen(mmMvalueLen)
 {
 }
 
@@ -508,7 +509,7 @@ CutResult KcQuantMatmulAllToAllTilingBase::GetTilingResult()
                                                         engineType) != ge::GRAPH_SUCCESS) {
         OP_LOGD(opName_, "GetTilingResult: failed to get commMode, default to AICPU.");
     }
-    
+
     uint8_t commMode = (engineType == mc2tiling::A5_CCU_ENGINE) ? Mc2Comm::COMM_MODE_CCU : Mc2Comm::COMM_MODE_AICPU;
     return GetArch35TilingResult(contextInfo.args_, KernelType::ALL_TO_ALL, SocVersion::SOC950, npuArch_,
                                  QuantMode::KC_QUANT, commMode);

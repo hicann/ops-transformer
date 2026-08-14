@@ -186,7 +186,7 @@ ge::graphStatus FpMatmulAllToAllTilingBase::SetHcclTiling()
     // reducetype接口附带的数据类型优先于调用通信接口传入的数据类型，因此这里需要设置
     AscendC::Mc2CcTilingConfig allToAllTilingConfig =
         allToAllBuilder.withCommEngine(engineType)
-            .withReduceType(opName_, AscendC::HcclReduceOp::HCCL_REDUCE_SUM, contextInfo.args_.geCType,
+            .withReduceType(opName_, mc2tiling::HcclReduceOp::HCCL_REDUCE_SUM, contextInfo.args_.geCType,
                             contextInfo.args_.geCType)
             .build();
     if (!allToAllBuilder.isSuccess()) {
@@ -357,7 +357,7 @@ CutResult FpMatmulAllToAllTilingBase::GetTilingResult()
                                                         engineType) != ge::GRAPH_SUCCESS) {
         OP_LOGD(opName_, "GetTilingResult: failed to get commMode, default to AICPU.");
     }
-    
+
     uint8_t commMode = (engineType == mc2tiling::A5_CCU_ENGINE) ? Mc2Comm::COMM_MODE_CCU : Mc2Comm::COMM_MODE_AICPU;
     return GetArch35TilingResult(contextInfo.args_, KernelType::ALL_TO_ALL, SocVersion::SOC950, npuArch_,
                                  contextInfo.quantMode, commMode);
@@ -368,7 +368,8 @@ CutResult FpMatmulAllToAllTilingBase::GetTilingResult()
  *
  * @param context
  */
-FpMatmulAllToAllTilingBase::FpMatmulAllToAllTilingBase(gert::TilingContext *context) : MatmulAllToAllTilingBase(context)
+FpMatmulAllToAllTilingBase::FpMatmulAllToAllTilingBase(gert::TilingContext *context)
+    : MatmulAllToAllTilingBase(context)
 {
 }
 

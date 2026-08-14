@@ -636,7 +636,7 @@ ge::graphStatus MxQuantMatmulAllToAllTilingBase::SetHcclTiling()
 
     AscendC::Mc2CcTilingConfig matmulAllToAllTilingConfig =
         matmulAllToAllBuilder
-            .withReduceType(opName_, AscendC::HcclReduceOp::HCCL_REDUCE_SUM, contextInfo.args_.geCType,
+            .withReduceType(opName_, mc2tiling::HcclReduceOp::HCCL_REDUCE_SUM, contextInfo.args_.geCType,
                             contextInfo.args_.geCType)
             .withCommEngine(engineType)
             .build();
@@ -795,7 +795,8 @@ MxQuantMatmulAlltoAllHelper::MxQuantMatmulAlltoAllHelper(
     MxQuantMatmulAllToAllTilingBase &mxQuantMatmulAllToAllTilingBase,
     DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &data, uint64_t &mmMvalueLen)
     : Mc2AdaptiveSlidingWindowTiling(mxQuantMatmulAllToAllTilingBase.context_, &data),
-      tilingProcesser_(mxQuantMatmulAllToAllTilingBase), mmLen_(mmMvalueLen)
+      tilingProcesser_(mxQuantMatmulAllToAllTilingBase),
+      mmLen_(mmMvalueLen)
 {
 }
 
@@ -995,7 +996,7 @@ CutResult MxQuantMatmulAllToAllTilingBase::GetTilingResult()
                                                         engineType) != ge::GRAPH_SUCCESS) {
         OP_LOGD(opName_, "GetTilingResult: failed to get commMode, default to AICPU.");
     }
-    
+
     uint8_t commMode = (engineType == mc2tiling::A5_CCU_ENGINE) ? Mc2Comm::COMM_MODE_CCU : Mc2Comm::COMM_MODE_AICPU;
     return GetArch35TilingResult(contextInfo.args_, KernelType::ALL_TO_ALL, SocVersion::SOC950, npuArch_,
                                  QuantMode::MX_QUANT, commMode);
