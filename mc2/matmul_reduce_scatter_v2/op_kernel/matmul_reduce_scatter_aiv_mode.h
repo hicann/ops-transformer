@@ -46,8 +46,8 @@ using namespace padding;
 namespace MatmulReduceScatterV2Impl {
 
 // MMA2A : MatmulAllToAll
-#define TemplateMMReduceScatterV2Class                                                                                 \
-    typename AType, typename BType, typename biasType, typename x2ScaleType, typename cType, bool hasBias,             \
+#define TemplateMMReduceScatterV2Class \
+    typename AType, typename BType, typename biasType, typename x2ScaleType, typename cType, bool hasBias, \
         bool weight_nz, bool TA, bool TB
 #define TemplateMMReduceScatterV2Func AType, BType, biasType, x2ScaleType, cType, hasBias, weight_nz, TA, TB
 
@@ -61,6 +61,8 @@ public:
 
 protected:
     static constexpr bool quantFlag = (std::is_same<AType, int8_t>::value) && (std::is_same<BType, int8_t>::value);
+    static constexpr bool needCastBias = !quantFlag && hasBias && std::is_same_v<AType, bfloat16_t> &&
+                                         std::is_same_v<BType, bfloat16_t> && std::is_same_v<biasType, bfloat16_t>;
     __aicore__ inline void Padding();
     __aicore__ inline void StartBeforeFirstStep();
     __aicore__ inline void EndFirstStep();
@@ -112,10 +114,12 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
     aGM_ = aGM;
     bGM_ = bGM;
     cGM_ = cGM;
-    biasGM_ = biasGM;
+    biasSrcGM_ = biasGM;
     perChannelScaleGM_ = perChannelScale;
     perTokenScaleGM_ = perTokenScale;
     CommBase::SetArgs(tilingData);
+    biasCastGM_ = needCastBias ? workspaceGM + aAlignSize + bAlignSize + dequantSize : biasGM;
+    biasGM_ = needCastBias ? biasCastGM_ : biasSrcGM_;
     hasBAlign = weight_nz ? false : hasBAlign;
     gm_a_align = reinterpret_cast<GM_ADDR>(hasAAlign ? workspaceGM : 0);
     gm_b_align = reinterpret_cast<GM_ADDR>(hasBAlign ? workspaceGM + aAlignSize : 0);
@@ -179,7 +183,7 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
         using ElementA = AType;
         using ElementB = BType;
         using ElementC = typename std::conditional<quantFlag, int32_t, cType>::type;
-        using ElementBias = biasType;
+        using ElementBias = std::conditional_t<needCastBias, float, biasType>;
 
         using LayoutA = typename std::conditional<TA, layout::ColumnMajor, layout::RowMajor>::type;
         using LayoutC = layout::RowMajor;
@@ -414,7 +418,7 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
 template <TemplateMMReduceScatterV2Class, typename Derived>
 __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func, Derived>::Padding()
 {
-    if (!aligned_a && !aligned_b) {
+    if (!aligned_a && !aligned_b && !needCastBias) {
         Catlass::Arch::CrossCoreBarrier<0x0, PIPE_MTE3>();
         Arch::CrossCoreFlag flagAivFinishPadding{AIC_WAIT_AIV_FINISH_ALIGN_FLAG_ID};
         Catlass::Arch::CrossCoreSetFlag<0x2, PIPE_MTE3>(flagAivFinishPadding);
@@ -436,6 +440,10 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
     GM_ADDR gmB = reinterpret_cast<GM_ADDR>(bGM_);
     GM_ADDR gmAAlign = reinterpret_cast<GM_ADDR>(gm_a_align);
     GM_ADDR gmBAlign = reinterpret_cast<GM_ADDR>(gm_b_align);
+    bool castBias = needCastBias;
+    uint32_t biasLength = n;
+    GM_ADDR gmBias = biasSrcGM_;
+    GM_ADDR gmBiasCast = biasCastGM_;
     PaddingRunner<AType, BType> padding_runner;
     padding_runner.Run(PADDING_ARGS_CALL());
 }

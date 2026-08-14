@@ -39,7 +39,7 @@ constexpr uint32_t X1_SCALE_INDEX = 3;
 constexpr uint32_t X2_SCALE_INDEX = 4;
 constexpr uint32_t C_INDEX = 0;
 constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16 * 1024 * 1024;
-constexpr uint32_t USER_WORKSPACE_A2 = 1 * 1024 * 1024; // moeExpertNum_ * sizeof(uint32_t) + epWorldSize_ * 2 * 32
+constexpr uint32_t USER_WORKSPACE_A2 = 1 * 1024 * 1024;         // moeExpertNum_ * sizeof(uint32_t) + epWorldSize_ * 2 * 32
 constexpr uint64_t CCL_BUFFER_MIN_BYTES = 200ULL * 1024 * 1024; // 校验HCCL BUFF空间大小
 constexpr uint32_t MB_BYTES = 1024 * 1024;
 constexpr uint64_t TILINGKEY_BIAS = 1U;
@@ -1009,7 +1009,7 @@ inline ge::graphStatus checkAndResetTilingData_SmallM(CoCTiling &cocTilingData, 
     return ge::GRAPH_SUCCESS;
 }
 void GetUsrWorkSpaceSize(uint32_t elementSize, uint32_t numBlocks, uint64_t &userWorkSpaceSize,
-                         MatmulReduceScatterV2AivModeInfo &info, CoCTiling &cocTilingData)
+                         MatmulReduceScatterV2AivModeInfo &info, CoCTiling &cocTilingData, bool needCastBias)
 {
     constexpr int32_t TWO = 2;
     constexpr uint32_t NUMSIZE_ONE = 1;
@@ -1023,6 +1023,7 @@ void GetUsrWorkSpaceSize(uint32_t elementSize, uint32_t numBlocks, uint64_t &use
     info.aAlignSize = 0;
     info.bAlignSize = 0;
     info.dequantSize = 0;
+    info.biasCastSize = 0;
     info.hasAAlign = hasAAlign;
     info.hasBAlign = hasBAlign;
     if (info.hasAAlign) {
@@ -1048,6 +1049,12 @@ void GetUsrWorkSpaceSize(uint32_t elementSize, uint32_t numBlocks, uint64_t &use
         }
     }
     userWorkSpaceSize += info.dequantSize;
+    if (needCastBias) {
+        const uint64_t biasBytes = static_cast<uint64_t>(info.N) * sizeof(float);
+        info.biasCastSize =
+            (biasBytes + HALF_KBYTE - 1) & ~(static_cast<uint64_t>(HALF_KBYTE) - 1);
+        userWorkSpaceSize += info.biasCastSize;
+    }
 }
 
 static bool CheckDtype_X1(const gert::TilingContext *context)
@@ -1095,6 +1102,7 @@ static void PrintTilingDataInfo(MatmulReduceScatterV2AivModeInfo &info, CoCTilin
     OP_LOGD("MatmulReduceScatterV2AivModeTiling", "tiling.isTransposeB %d", info.isTransposeB);
     OP_LOGD("MatmulReduceScatterV2AivModeTiling", "tiling.aAlignSize %lu", info.aAlignSize);
     OP_LOGD("MatmulReduceScatterV2AivModeTiling", "tiling.bAlignSize %lu", info.bAlignSize);
+    OP_LOGD("MatmulReduceScatterV2AivModeTiling", "tiling.biasCastSize %lu", info.biasCastSize);
     OP_LOGD("MatmulReduceScatterV2AivModeTiling", "tiling.quantFlag %d", info.quantFlag);
     OP_LOGD("MatmulReduceScatterV2AivModeTiling", "tiling.is910C %d", info.is910C);
     OP_LOGD("MatmulReduceScatterV2AivModeTiling", "tiling.isX2ScaleTypeInt64 %d", info.isX2ScaleTypeInt64);
@@ -1171,6 +1179,9 @@ ge::graphStatus MatmulReduceScatterTilingV2AivModeFunc(gert::TilingContext *cont
     auto cType = context->GetOutputDesc(0)->GetDataType();
     info.quantFlag =
         (aType == ge::DT_INT8) && (bType == ge::DT_INT8) && (cType == ge::DT_BF16 || cType == ge::DT_FLOAT16);
+    const auto biasDesc = context->GetOptionalInputDesc(BIAS_INDEX);
+    const bool needCastBias = !info.quantFlag && aType == ge::DT_BF16 && bType == ge::DT_BF16 &&
+                              biasDesc != nullptr && biasDesc->GetDataType() == ge::DT_BF16;
 
     // 3. 配置平台信息，GetTilingKey
     info.is910C = false;
@@ -1215,7 +1226,7 @@ ge::graphStatus MatmulReduceScatterTilingV2AivModeFunc(gert::TilingContext *cont
 
     uint32_t elementSize = D_TYPE_SIZE_MAP.at(aType);
     uint64_t userWorkSpaceSize = 0;
-    GetUsrWorkSpaceSize(elementSize, numBlocks, userWorkSpaceSize, info, tilingData->cocTiling);
+    GetUsrWorkSpaceSize(elementSize, numBlocks, userWorkSpaceSize, info, tilingData->cocTiling, needCastBias);
     workSpaces[0] = SYSTEM_NEED_WORKSPACE + userWorkSpaceSize;
 
     PrintTilingDataInfo(info, tilingData->cocTiling);

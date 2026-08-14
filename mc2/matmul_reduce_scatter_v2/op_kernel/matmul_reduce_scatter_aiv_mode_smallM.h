@@ -70,6 +70,8 @@ public:
                                      MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV2Func>>::n0;
     using MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
                                      MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV2Func>>::quantFlag;
+    using MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
+                                     MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV2Func>>::needCastBias;
 
     using MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
                                      MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV2Func>>::gm_a_src;
@@ -314,7 +316,7 @@ __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV
         using ElementA = AType;
         using ElementB = BType;
         using ElementC = typename std::conditional<quantFlag, int32_t, cType>::type;
-        using ElementBias = biasType;
+        using ElementBias = std::conditional_t<needCastBias, float, biasType>;
 
         using LayoutA = layout::RowMajor;
         using LayoutC = layout::RowMajor;

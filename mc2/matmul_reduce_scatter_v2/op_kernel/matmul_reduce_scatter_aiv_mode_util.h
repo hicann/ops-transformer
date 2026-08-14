@@ -20,20 +20,20 @@ using namespace AscendC;
 using namespace matmulReduceScatterV2_aivmode_tiling;
 
 namespace matmulReduceScatterV2_util {
-#define PADDING_ARGS_CALL()                                                                                            \
-    transA, transB, alignedA, alignedB, matrixAM, matrixAK, matrixBK, matrixBN, matrixAMAlign, matrixAKAlign,          \
-        matrixBKAlign, matrixBNAlign, gmA, gmB, gmAAlign, gmBAlign
+#define PADDING_ARGS_CALL() \
+    transA, transB, alignedA, alignedB, matrixAM, matrixAK, matrixBK, matrixBN, matrixAMAlign, matrixAKAlign, \
+        matrixBKAlign, matrixBNAlign, gmA, gmB, gmAAlign, gmBAlign, castBias, biasLength, gmBias, gmBiasCast
 
-#define DEQUANT_ARGS_CALL()                                                                                            \
-    rowNum, colNum, perChannelScale, perTokenScale, workspace, reinterpret_cast<GM_ADDR>(peerMem),                     \
-        reinterpret_cast<GM_ADDR>(output), reinterpret_cast<GM_ADDR>(biasptr), tileM0, tileN0, pValue, swizzlDirect,   \
+#define DEQUANT_ARGS_CALL() \
+    rowNum, colNum, perChannelScale, perTokenScale, workspace, reinterpret_cast<GM_ADDR>(peerMem), \
+        reinterpret_cast<GM_ADDR>(output), reinterpret_cast<GM_ADDR>(biasptr), tileM0, tileN0, pValue, swizzlDirect, \
         swizzlCount, coreIdx, coreNum, rankIdx, rankSize, calIdx, resource, needPerChannel, needPerToken
 
-#define DEQUANT_ARGS_FUN()                                                                                             \
-    uint32_t rowNum, uint32_t colNum, __gm__ float32_t *perChannelScale, __gm__ float32_t *perTokenScale,              \
+#define DEQUANT_ARGS_FUN() \
+    uint32_t rowNum, uint32_t colNum, __gm__ float32_t *perChannelScale, __gm__ float32_t *perTokenScale, \
         __gm__ int32_t *workspace, GM_ADDR peerMem, GM_ADDR output, GM_ADDR biasptr, uint32_t tileM0, uint32_t tileN0, \
-        uint32_t pValue, uint32_t swizzlDirect, uint32_t swizzlCount, uint32_t coreIdx, uint32_t coreNum,              \
-        uint32_t rankIdx, uint32_t rankSize, uint32_t calIdx, Arch::Resource<Arch::AtlasA2> resource,                  \
+        uint32_t pValue, uint32_t swizzlDirect, uint32_t swizzlCount, uint32_t coreIdx, uint32_t coreNum, \
+        uint32_t rankIdx, uint32_t rankSize, uint32_t calIdx, Arch::Resource<Arch::AtlasA2> resource, \
         bool needPerChannel = false, bool needPerToken = false
 
 constexpr int32_t MAX_BLOCK_COUNT = 2;
@@ -207,6 +207,7 @@ public:
         aAlignSize = tilingData.matmulReduceScatterV2AivModeInfo.aAlignSize;
         bAlignSize = tilingData.matmulReduceScatterV2AivModeInfo.bAlignSize;
         dequantSize = tilingData.matmulReduceScatterV2AivModeInfo.dequantSize;
+        biasCastSize = tilingData.matmulReduceScatterV2AivModeInfo.biasCastSize;
         hasAAlign = tilingData.matmulReduceScatterV2AivModeInfo.hasAAlign;
         hasBAlign = tilingData.matmulReduceScatterV2AivModeInfo.hasBAlign;
         dequant_type = tilingData.matmulReduceScatterV2AivModeInfo.dequant_type;
@@ -446,11 +447,14 @@ public:
     GM_ADDR bGM_;
     GM_ADDR cGM_;
     GM_ADDR biasGM_;
+    GM_ADDR biasSrcGM_;
+    GM_ADDR biasCastGM_;
     GM_ADDR perChannelScaleGM_;
     GM_ADDR perTokenScaleGM_;
     uint64_t aAlignSize;
     uint64_t bAlignSize;
     uint64_t dequantSize;
+    uint64_t biasCastSize;
     bool hasAAlign;
     bool hasBAlign;
     bool nAlign16;
@@ -470,8 +474,11 @@ private:
 
 public:
     __aicore__ explicit CommColumnSplitter(int32_t batchSize, int32_t unitBlocksM, int32_t unitBlocksN, int32_t n_max)
-        : m_batchSize(batchSize), m_unitBlocksM(unitBlocksM), m_unitBlocksN(unitBlocksN),
-          m_totalUnitBlocks(unitBlocksM * unitBlocksN), m_n_max(n_max)
+        : m_batchSize(batchSize),
+          m_unitBlocksM(unitBlocksM),
+          m_unitBlocksN(unitBlocksN),
+          m_totalUnitBlocks(unitBlocksM * unitBlocksN),
+          m_n_max(n_max)
     {
     }
 
