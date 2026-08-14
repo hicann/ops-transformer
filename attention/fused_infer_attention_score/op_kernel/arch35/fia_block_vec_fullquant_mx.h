@@ -69,7 +69,7 @@ public:
     static constexpr bool isFp8 = IsSameType<INPUT_T, fp8_e5m2_t>::value || IsSameType<INPUT_T, fp8_e4m3fn_t>::value ||
                                   IsSameType<INPUT_T, hifloat8_t>::value;
     static constexpr uint32_t DB = 2;
-    static constexpr uint32_t PRELOAD_N = 2; // C1 C1 C2
+    static constexpr uint32_t PRELOAD_N = 3; // C1 C1 C1 C2
     static constexpr uint32_t s2SplitSize = 256U;
     static constexpr uint32_t MXFP_GROUP_SIZE = 32U;
     static constexpr bool HAS_MASK = hasAtten;
@@ -137,9 +137,9 @@ public:
     TBuf<> stage2OutBuf;
     TEventID mte3ToVId[2]; // 存放MTE3_V的eventId, 2份表示可能存在pingpong
     TEventID vToMte3Id[2]; // 存放V_MTE3的eventId, 2份表示可能存在pingpong
-    TBuf<> softmaxMaxBuf[PRELOAD_N + 1];
-    TBuf<> softmaxSumBuf[PRELOAD_N + 1];
-    TBuf<> softmaxExpBuf[PRELOAD_N + 1];
+    TBuf<> softmaxMaxBuf[PRELOAD_N];
+    TBuf<> softmaxSumBuf[PRELOAD_N];
+    TBuf<> softmaxExpBuf[PRELOAD_N];
     TBuf<> preLoopMaxBuf;
     TBuf<> preLoopSumBuf;
     TBuf<> firstLoopSumBuf;
@@ -315,8 +315,8 @@ public:
         if (isFullMask) {
             maskLine = -256;
         }
-        uint32_t softmaxBufIdx = runInfo.mloop % (PRELOAD_N + 1);
-        uint32_t expBufIdx = runInfo.loop % (PRELOAD_N + 1);
+        uint32_t softmaxBufIdx = runInfo.mloop % PRELOAD_N;
+        uint32_t expBufIdx = runInfo.loop % PRELOAD_N;
         int64_t stage1Offset = subLoop % DB;
 
         LocalTensor<float> sumUb = this->softmaxSumBuf[softmaxBufIdx].template Get<float>()[0];
@@ -528,9 +528,9 @@ public:
             AttenMaskCopyIn(attenMaskUb, 0, actVecMSizeAlign16, runInfo, subLoop); // 全量拷贝
         }
 
-        LocalTensor<float> sumUb = this->softmaxSumBuf[runInfo.mloop % (PRELOAD_N + 1)].template Get<float>();
-        LocalTensor<float> maxUb = this->softmaxMaxBuf[runInfo.mloop % (PRELOAD_N + 1)].template Get<float>();
-        LocalTensor<float> expUb = this->softmaxExpBuf[runInfo.loop % (PRELOAD_N + 1)].template Get<T>();
+        LocalTensor<float> sumUb = this->softmaxSumBuf[runInfo.mloop % PRELOAD_N].template Get<float>();
+        LocalTensor<float> maxUb = this->softmaxMaxBuf[runInfo.mloop % PRELOAD_N].template Get<float>();
+        LocalTensor<float> expUb = this->softmaxExpBuf[runInfo.loop % PRELOAD_N].template Get<T>();
         // Loop 0拷贝一次全局, Loop 1用来计算update_mul
         LocalTensor<float> preLoopMaxUb = this->preLoopMaxBuf.template Get<float>();
         // 两轮循环前的sum值
@@ -704,7 +704,7 @@ public:
         if (unlikely(runInfo.isFirstS2Loop)) {
             DataCopy(vec2ResUb, mmRes, vec2CalcSize);
         } else {
-            LocalTensor<T> expUb = softmaxExpBuf[runInfo.loop % (PRELOAD_N + 1)].template Get<T>();
+            LocalTensor<T> expUb = softmaxExpBuf[runInfo.loop % PRELOAD_N].template Get<T>();
             LocalTensor<T> pScaleUb;
 
             constexpr float deSCalePreVValue = 1.0f;
@@ -712,7 +712,7 @@ public:
                 FlashUpdateNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, false, false>(
                     vec2ResUb, mmRes, vec2ResUb, expUb, pScaleUb, vecMSize, dTemplateAlign64, 1.0f, 1.0f);
             } else {
-                LocalTensor<float> sumUb = this->softmaxSumBuf[runInfo.mloop % (PRELOAD_N + 1)].template Get<float>();
+                LocalTensor<float> sumUb = this->softmaxSumBuf[runInfo.mloop % PRELOAD_N].template Get<float>();
                 FlashUpdateLastNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, false, false>(
                     vec2ResUb, mmRes, vec2ResUb, expUb, pScaleUb, sumUb, vecMSize, dTemplateAlign64, 1.0f, 1.0f);
             }
@@ -720,7 +720,7 @@ public:
         bmm2ResBuf.SetCrossCore();
         if (unlikely(runInfo.isLastS2Loop)) {
             if (unlikely(runInfo.isFirstS2Loop)) {
-                LocalTensor<float> sumUb = this->softmaxSumBuf[runInfo.mloop % (PRELOAD_N + 1)].template Get<float>();
+                LocalTensor<float> sumUb = this->softmaxSumBuf[runInfo.mloop % PRELOAD_N].template Get<float>();
                 LastDivNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, false>(vec2ResUb, vec2ResUb, sumUb, vecMSize,
                                                                           (uint16_t)dTemplateAlign64, deSCaleVValue);
             }
@@ -842,7 +842,7 @@ public:
 
             if (blockNeedRowInvalid) {
                 LocalTensor<float> maxTensor =
-                    softmaxMaxBuf[runInfo.mloop % (PRELOAD_N + 1)].template Get<float>()[mStartVec];
+                    softmaxMaxBuf[runInfo.mloop % PRELOAD_N].template Get<float>()[mStartVec];
                 if constexpr (!POST_QUANT) {
                     RowInvalidUpdateVF<float>(vec2ResUb, maxTensor, mDealSize, constInfo.dSizeV,
                                               static_cast<uint32_t>(dSizeAligned64), minValue);
