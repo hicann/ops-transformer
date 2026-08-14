@@ -166,12 +166,30 @@ def display_error_output_torch(real_data, expect_data, err_idx, relative_diff):
     )
 
 
-def check_result(expect, npu_result):
-    diff_thd = 0.005
-    pct_thd = 0.005
-    max_diff_hd = 10
-    rtol = 0.005
-    atol = 0.000025
+def check_result(
+    expect,
+    npu_result,
+    rtol=None,
+    atol=None,
+    diff_thd=None,
+    pct_thd=None,
+    max_diff_hd=None,
+):
+    # 默认值与 ttk result_compare_method.check_result 保持一致:
+    # diff_thd=0.005, pct_thd=0.005, max_diff_hd=10
+    # rtol/atol 按 dtype 分支(bf16 0.0078125/0.0001, 否则 0.005/0.000025)
+    # 调用方可显式传入 rtol/atol 覆盖默认值(例如 LSE 对齐 ttk replay 模式)
+    _diff_thd_default = 0.005
+    _pct_thd_default = 0.005
+    _max_diff_hd_default = 10
+    _rtol_default = 0.005
+    _atol_default = 0.000025
+
+    diff_thd = _diff_thd_default if diff_thd is None else diff_thd
+    pct_thd = _pct_thd_default if pct_thd is None else pct_thd
+    max_diff_hd = _max_diff_hd_default if max_diff_hd is None else max_diff_hd
+    rtol = _rtol_default if rtol is None else rtol
+    atol = _atol_default if atol is None else atol
 
     real_data = npu_result.detach().cpu().flatten()
     expect_data = (
