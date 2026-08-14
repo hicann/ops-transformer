@@ -39,9 +39,9 @@ namespace {
 //   MxFP8: FLOAT8_E8M0; GQA_FP8_FULLQUANT: FLOAT32
 const std::map<QfaQuantMode, std::pair<ge::DataType, std::string>> DESCALE_DTYPE_TABLE = {
     {QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32,
-        {ge::DT_FLOAT8_E8M0, "FLOAT8_E8M0"}},
+     {ge::DT_FLOAT8_E8M0, "FLOAT8_E8M0"}},
     {QfaQuantMode::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32,
-        {ge::DT_FLOAT, "FLOAT32"}},
+     {ge::DT_FLOAT, "FLOAT32"}},
 };
 } // namespace
 
@@ -90,7 +90,7 @@ ge::graphStatus QuantChecker::CheckQDescaleDimGqaFp8(const QfaTilingInfo &qfaInf
     // GQA: q_descale 为 2D [N1, T]
     OP_CHECK_IF(dimNum != DIM_NUM_2,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, Q_DESCALE_NAME.c_str(),
-                    (std::to_string(dimNum) + "D").c_str(), "2D"),
+                                             (std::to_string(dimNum) + "D").c_str(), "2D"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -148,7 +148,7 @@ ge::graphStatus QuantChecker::CheckKDescaleDimGqaFp8(const QfaTilingInfo &qfaInf
     // GQA: k_descale 为 3D [Bn, N2, Bs]
     OP_CHECK_IF(dimNum != DIM_NUM_3,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, K_DESCALE_NAME.c_str(),
-                    (std::to_string(dimNum) + "D").c_str(), "3D"),
+                                             (std::to_string(dimNum) + "D").c_str(), "3D"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -206,7 +206,7 @@ ge::graphStatus QuantChecker::CheckVDescaleDimGqaFp8(const QfaTilingInfo &qfaInf
     // GQA: v_descale 为 1D [N2]
     OP_CHECK_IF(dimNum != DIM_NUM_1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, V_DESCALE_NAME.c_str(),
-                    (std::to_string(dimNum) + "D").c_str(), "1D"),
+                                             (std::to_string(dimNum) + "D").c_str(), "1D"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -354,14 +354,14 @@ ge::graphStatus QuantChecker::CheckQDescaleShapeMxFp8(const QfaTilingInfo &qfaIn
     //   其中 G = Q_N / KV_N
     const gert::StorageShape *shape = qfaInfo.opParamInfo.qDescale.shape;
     int64_t D = qfaInfo.qkHeadDim;
-    int64_t DPerGroup = D / 64; // MxFP8 block size = 64
+    int64_t dPerGroup = (D + 63) / 64; // MxFP8 block size = 64
     uint32_t dimNum = shape->GetStorageShape().GetDimNum();
 
     std::vector<int64_t> expected;
     if (dimNum == DIM_NUM_4) {
-        expected = {qfaInfo.qTSize, qfaInfo.n1Size, DPerGroup, 2};
+        expected = {qfaInfo.qTSize, qfaInfo.n1Size, dPerGroup, 2};
     } else if (dimNum == DIM_NUM_5) {
-        expected = {qfaInfo.n2Size, qfaInfo.qTSize, qfaInfo.gSize, DPerGroup, 2};
+        expected = {qfaInfo.n2Size, qfaInfo.qTSize, qfaInfo.gSize, dPerGroup, 2};
     } else {
         OP_LOGE(qfaInfo.opName, "q_descale shape dim %u is unsupported, expected 4D or 5D.", dimNum);
         return ge::GRAPH_FAILED;
@@ -434,16 +434,16 @@ ge::graphStatus QuantChecker::CheckKDescaleShapeMxFp8(const QfaTilingInfo &qfaIn
     //   PA_NZ:    (Bn, KV_N, Bs/16, D/64, 16, 2)     - 6D
     const gert::StorageShape *shape = qfaInfo.opParamInfo.kDescale.shape;
     int64_t D = qfaInfo.qkHeadDim;
-    int64_t DPerGroup = D / 64;
+    int64_t dPerGroup = (D + 63) / 64;
     uint32_t dimNum = shape->GetStorageShape().GetDimNum();
 
     std::vector<int64_t> expected;
     if (qfaInfo.kvLayout == QfaLayout::TND) {
-        expected = {qfaInfo.kTSize, qfaInfo.n2Size, DPerGroup, 2};
+        expected = {qfaInfo.kTSize, qfaInfo.n2Size, dPerGroup, 2};
     } else if (qfaInfo.kvLayout == QfaLayout::PA_BNBD) {
-        expected = {qfaInfo.totalBlockNum, qfaInfo.n2Size, qfaInfo.blockSize, DPerGroup, 2};
+        expected = {qfaInfo.totalBlockNum, qfaInfo.n2Size, qfaInfo.blockSize, dPerGroup, 2};
     } else if (qfaInfo.kvLayout == QfaLayout::PA_NZ) {
-        expected = {qfaInfo.totalBlockNum, qfaInfo.n2Size, qfaInfo.blockSize / 16, DPerGroup, 16, 2};
+        expected = {qfaInfo.totalBlockNum, qfaInfo.n2Size, qfaInfo.blockSize / 16, dPerGroup, 16, 2};
     } else {
         OP_LOGE(qfaInfo.opName, "k_descale shape check: kv_layout %s is unsupported.",
                 QfaLayoutToSerialString(qfaInfo.kvLayout).c_str());
@@ -512,7 +512,7 @@ ge::graphStatus QuantChecker::CheckVDescaleShapeMxFp8(const QfaTilingInfo &qfaIn
     } else if (qfaInfo.kvLayout == QfaLayout::PA_BNBD) {
         expected = {qfaInfo.totalBlockNum, qfaInfo.n2Size, qfaInfo.blockSize / 64, D, 2};
     } else if (qfaInfo.kvLayout == QfaLayout::PA_NZ) {
-        expected = {qfaInfo.totalBlockNum, qfaInfo.n2Size, D / 16, qfaInfo.blockSize / 64, 16, 2};
+        expected = {qfaInfo.totalBlockNum, qfaInfo.n2Size, (D + 15) / 16, qfaInfo.blockSize / 64, 16, 2};
     } else {
         OP_LOGE(qfaInfo.opName, "v_descale shape check: kv_layout %s is unsupported.",
                 QfaLayoutToSerialString(qfaInfo.kvLayout).c_str());
@@ -590,7 +590,7 @@ ge::graphStatus QuantChecker::CheckDescaleDtype(const QfaTilingInfo &qfaInfo) co
     //   GQA_FP8_FULLQUANT 场景下, q/k/v descale 的 tensor_type 仅支持 FLOAT32
     if (qfaInfo.quantMode != QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 &&
         qfaInfo.quantMode !=
-        QfaQuantMode::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
+            QfaQuantMode::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
         return ge::GRAPH_SUCCESS;
     }
 
@@ -599,7 +599,7 @@ ge::graphStatus QuantChecker::CheckDescaleDtype(const QfaTilingInfo &qfaInfo) co
     const std::string expectedDtypeStr = it->second.second;
 
     const auto CheckDescaleDtype = [&qfaInfo, this, expectedDtype, &expectedDtypeStr](const QfaRequiredParaInfo &slot,
-                                                    const std::string &paraName) -> ge::graphStatus {
+                                                                                      const std::string &paraName) -> ge::graphStatus {
         const gert::CompileTimeTensorDesc *desc = slot.desc;
         if (desc == nullptr) {
             return ge::GRAPH_SUCCESS; // 存在性校验负责

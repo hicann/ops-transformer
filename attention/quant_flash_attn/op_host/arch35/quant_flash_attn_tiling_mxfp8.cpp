@@ -138,6 +138,8 @@ void QuantFlashAttnTilingImpl::UpdateTilingKeyConfig()
 
     if (dSize <= DSIZE_64) {
         dSize = DSIZE_64;
+    } else if (dSize <= 72) {
+        dSize = DSIZE_72;
     } else if (dSize <= DSIZE_128) {
         dSize = DSIZE_128;
     } else if (dSize <= DSIZE_256) {
@@ -150,6 +152,8 @@ void QuantFlashAttnTilingImpl::UpdateTilingKeyConfig()
 
     if (dVsize <= DSIZE_64) {
         dVsize = DSIZE_64;
+    } else if (dVsize <= 72) {
+        dVsize = DSIZE_72;
     } else if (dVsize <= DSIZE_128) {
         dVsize = DSIZE_128;
     } else if (dVsize <= DSIZE_256) {
@@ -160,6 +164,8 @@ void QuantFlashAttnTilingImpl::UpdateTilingKeyConfig()
 
     if (sOuter == SOUTER_128 && sInner == SINNER_512 && dSize == DSIZE_64 && dVsize == DSIZE_64) {
         tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned512_DAligned64_DVAligned64;
+    } else if (sOuter == SOUTER_128 && sInner == SINNER_512 && dSize == DSIZE_72 && dVsize == DSIZE_72) {
+        tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned512_DAligned72_DVAligned72;
     } else if (sOuter == SOUTER_128 && sInner == SINNER_512 && dSize == DSIZE_128 && dVsize == DSIZE_128) {
         tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128;
     } else if (sOuter == SOUTER_128 && sInner == SINNER_256 && dSize == DSIZE_256 && dVsize == DSIZE_256) {

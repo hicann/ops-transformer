@@ -128,11 +128,13 @@ QuantFlashAttnMetadataCheck::CheckBaseAttr(int64_t batchSize, int64_t maxSeqlenQ
     CHECK_COND(numHeadsKv > 0, ACLNN_ERR_RUNTIME_ERROR, "numHeadsKv must be greater than 0, but got %ld", numHeadsKv);
 
     constexpr int64_t HEAD_DIM_64 = 64;
+    constexpr int64_t HEAD_DIM_72 = 72;
     constexpr int64_t HEAD_DIM_128 = 128;
     constexpr int64_t HEAD_DIM_256 = 256;
-    static const std::unordered_set<int64_t> headDimSet = {HEAD_DIM_64, HEAD_DIM_128, HEAD_DIM_256};
+    static const std::unordered_set<int64_t> headDimSet = {HEAD_DIM_64, HEAD_DIM_72, HEAD_DIM_128, HEAD_DIM_256};
     CHECK_COND(headDimSet.count(headDim) > 0, ACLNN_ERR_RUNTIME_ERROR,
-               "headDim only supports %ld, %ld, %ld, but got %ld", HEAD_DIM_64, HEAD_DIM_128, HEAD_DIM_256, headDim);
+               "headDim only supports %ld, %ld, %ld, %ld, but got %ld",
+               HEAD_DIM_64, HEAD_DIM_72, HEAD_DIM_128, HEAD_DIM_256, headDim);
 
     static const std::unordered_set<std::string> layoutQSet = {"BSND", "TND", "BNSD", "NTD"};
     CHECK_COND(layoutQSet.count(layoutQ) > 0, ACLNN_ERR_RUNTIME_ERROR,
