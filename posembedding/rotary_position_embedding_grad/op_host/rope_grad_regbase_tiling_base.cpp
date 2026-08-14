@@ -181,9 +181,24 @@ ge::graphStatus RopeGradRegBaseTilingClass::CheckShapeAllPositive() const
     return ge::GRAPH_SUCCESS;
 }
 
+bool RopeGradRegBaseTilingClass::Is3dBsdBroadcastLayout(const gert::Shape &xShape, const gert::Shape &cosShape) const
+{
+    // 识别 dy（TND）cos（1ND）场景
+    return xShape.GetDimNum() == DIM_NUM_TND && cosShape.GetDimNum() == DIM_NUM_TND &&
+           xShape.GetDim(DIM_1) != 1 && cosShape.GetDim(DIM_0) == 1 &&
+           cosShape.GetDim(DIM_1) == xShape.GetDim(DIM_1) && cosShape.GetDim(DIM_2) == xShape.GetDim(DIM_2);
+}
+
 ge::graphStatus RopeGradRegBaseTilingClass::JudgeLayoutByShape(const gert::Shape &xShape, const gert::Shape &cosShape)
 {
     isTndLayout_ = (xShape.GetDimNum() == DIM_NUM_TND);
+    is3dBsdLayout_ = false;
+    // TND的广播场景需要打上标记后续做分核优化
+    if (Is3dBsdBroadcastLayout(xShape, cosShape)) {
+        layout_ = RopeLayout::BSND;
+        is3dBsdLayout_ = true;
+        return ge::GRAPH_SUCCESS;
+    }
     uint64_t xShape0 = isTndLayout_ ? 1 : xShape.GetDim(DIM_0);
     uint64_t xShape1 = isTndLayout_ ? xShape.GetDim(DIM_0) : xShape.GetDim(DIM_1);
     uint64_t xShape2 = isTndLayout_ ? xShape.GetDim(DIM_1) : xShape.GetDim(DIM_2);
@@ -455,6 +470,15 @@ ge::graphStatus RopeGradRegBaseTilingClass::CheckRotaryModeShapeRelation(const i
     return ge::GRAPH_SUCCESS;
 }
 
+void RopeGradRegBaseTilingClass::Set3dBsdShapeAttrs(const gert::Shape &xShape)
+{
+    // TND的广播场景需要映射成为BS1D，用于分核优化
+    b_ = xShape.GetDim(DIM_0);
+    cosb_ = 1; // 实际就为1
+    s_ = xShape.GetDim(DIM_1);
+    n_ = 1;
+}
+
 ge::graphStatus RopeGradRegBaseTilingClass::GetShapeAttrsInfo()
 {
     const gert::RuntimeAttrs *attrs = context_->GetAttrs();
@@ -481,7 +505,9 @@ ge::graphStatus RopeGradRegBaseTilingClass::GetShapeAttrsInfo()
         OP_LOGE(context_, "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
 
     d_ = isTndLayout_ ? dyShape_.GetDim(DIM_2) : dyShape_.GetDim(DIM_3);
-    if (isTndLayout_) {
+    if (is3dBsdLayout_) {
+        Set3dBsdShapeAttrs(dyShape_);
+    } else if (isTndLayout_) {
         // TND: (T, N, D) -> b=1, s=T, n=N, d=D, cosb=1
         b_ = 1;
         cosb_ = 1;

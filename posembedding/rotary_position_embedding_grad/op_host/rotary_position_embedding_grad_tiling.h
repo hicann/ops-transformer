@@ -205,6 +205,8 @@ private:
     ge::graphStatus CheckOptionalInput() const;
     ge::graphStatus CheckShapeDim() const;
     ge::graphStatus JudgeLayoutByShape(const gert::Shape &xShape, const gert::Shape &cosShape);
+    bool Is3dBsdBroadcastLayout(const gert::Shape &xShape, const gert::Shape &cosShape) const;
+    void Set3dBsdShapeAttrs(const gert::Shape &xShape);
     ge::graphStatus CheckRotaryModeShapeRelation(const int64_t d);
     ge::graphStatus CheckInPutShapeAllPositive(const int64_t idx) const;
     ge::graphStatus CheckOutPutShapeAllPositive(const int64_t idx) const;
@@ -269,6 +271,8 @@ protected:
     uint32_t dCosFlag_{0};
     bool is1snd_ = false;
     bool isTndLayout_ = false;
+    // 3D BSD: dy=(B,S,D), cos/sin=(1,S,D), mapped to BSND with N=1.
+    bool is3dBsdLayout_ = false;
     bool isEmptyDy_ = false; // dy/x 为空 tensor（空进空出），kernel 仅对 dcos/dsin 清零
 };
 
