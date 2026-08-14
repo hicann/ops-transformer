@@ -205,21 +205,38 @@ def cpu_compressor(
     cu_seqlens_list = ttk_tensor_to_list(cu_seqlens) if cu_seqlens is not None else None
     seqused_list = ttk_tensor_to_list(seqused) if seqused is not None else None
 
-    cmp_kv, cmp_kv_mask, golden_state_cache, update_kv, update_score, x_dtype, softmax, kv, mid_result_mask  = (
-        run_cpu_compressor(
-            x_cpu,
-            wkv_cpu,
-            wgate_cpu,
-            state_cache_cpu,
-            ape_cpu,
-            block_table,
-            cmp_ratio,
-            coff,
-            cache_mode,
-            start_pos_list,
-            cu_seqlens_list,
-            seqused_list,
-        )
+    if start_pos_list is None:
+        if cu_seqlens_list is not None:
+            B = len(cu_seqlens_list) - 1
+        elif x_cpu is not None and x_cpu.dim() == 3:
+            B = x_cpu.shape[0]
+        else:
+            B = 1
+        start_pos_list = [0] * B
+
+    (
+        cmp_kv,
+        cmp_kv_mask,
+        golden_state_cache,
+        update_kv,
+        update_score,
+        x_dtype,
+        softmax,
+        kv,
+        mid_result_mask,
+    ) = run_cpu_compressor(
+        x_cpu,
+        wkv_cpu,
+        wgate_cpu,
+        state_cache_cpu,
+        ape_cpu,
+        block_table,
+        cmp_ratio,
+        coff,
+        cache_mode,
+        start_pos_list,
+        cu_seqlens_list,
+        seqused_list,
     )
     is_th = x_cpu.dim() == 2
     _GOLDEN_CONTEXT["cmp_kv_mask"] = cmp_kv_mask
@@ -269,22 +286,30 @@ def aclnn_compressor_golden(
     cu_seqlens_list = ttk_tensor_to_list(cuSeqlens) if cuSeqlens is not None else None
     seqused_list = ttk_tensor_to_list(seqused) if seqused is not None else None
 
-    cmp_kv, cmp_kv_mask, golden_state_cache, update_kv, update_score, x_dtype, softmax, kv, mid_result_mask = (
-        run_cpu_compressor(
-            x_cpu,
-            wkv_cpu,
-            wgate_cpu,
-            state_cache_cpu,
-            ape_cpu,
-            block_table,
-            cmpRatio,
-            coff,
-            cacheMode,
-            start_pos_list,
-            cu_seqlens_list,
-            seqused_list,
-            gradEnabled,
-        )
+    (
+        cmp_kv,
+        cmp_kv_mask,
+        golden_state_cache,
+        update_kv,
+        update_score,
+        x_dtype,
+        softmax,
+        kv,
+        mid_result_mask,
+    ) = run_cpu_compressor(
+        x_cpu,
+        wkv_cpu,
+        wgate_cpu,
+        state_cache_cpu,
+        ape_cpu,
+        block_table,
+        cmpRatio,
+        coff,
+        cacheMode,
+        start_pos_list,
+        cu_seqlens_list,
+        seqused_list,
+        gradEnabled,
     )
 
     is_th = x_cpu.dim() == 2 if x_cpu is not None else False
@@ -305,3 +330,94 @@ def aclnn_compressor_golden(
 
 def get_golden_context():
     return _GOLDEN_CONTEXT
+
+
+def rebuild_golden_context(
+    x,
+    wkv,
+    wgate,
+    state_cache,
+    ape,
+    cmp_ratio,
+    *,
+    state_block_table=None,
+    cu_seqlens=None,
+    seqused=None,
+    start_pos=None,
+    coff=1,
+    cache_mode=1,
+):
+    _GOLDEN_CONTEXT.clear()
+    try:
+        cpu_compressor(
+            x,
+            wkv,
+            wgate,
+            state_cache,
+            ape,
+            cmp_ratio,
+            state_block_table=state_block_table,
+            cu_seqlens=cu_seqlens,
+            seqused=seqused,
+            start_pos=start_pos,
+            coff=coff,
+            cache_mode=cache_mode,
+        )
+    except Exception:
+        pass
+
+
+def rebuild_golden_context_from_compare_context(compare_context, api_kind="e2e"):
+    if compare_context is None:
+        return
+    try:
+        tensors = compare_context.input_tensors
+        attrs = dict(compare_context.attributes or {})
+        tensors = list(tensors) if tensors is not None else []
+
+        def _t(idx):
+            return tensors[idx] if idx < len(tensors) else None
+
+        def _attr(*names, default=None):
+            for n in names:
+                if n in attrs:
+                    return attrs[n]
+            return default
+
+        cmp_ratio = _attr("cmp_ratio", "cmpRatio", default=4)
+        coff = _attr("coff", default=1)
+        cache_mode = _attr("cache_mode", "cacheMode", default=1)
+        grad_enabled = _attr("grad_enabled", "gradEnabled", default=False)
+
+        if api_kind == "aclnn":
+            rebuild_golden_context(
+                _t(0),
+                _t(1),
+                _t(2),
+                _t(3),
+                _t(4),
+                cmp_ratio,
+                state_block_table=_t(5),
+                cu_seqlens=_t(6),
+                seqused=_t(7),
+                start_pos=_t(8),
+                coff=coff,
+                cache_mode=cache_mode,
+            )
+        else:
+            rebuild_golden_context(
+                _t(0),
+                _t(1),
+                _t(2),
+                _t(3),
+                _t(4),
+                cmp_ratio,
+                state_block_table=_t(5),
+                cu_seqlens=_t(6),
+                seqused=_t(7),
+                start_pos=_t(8),
+                coff=coff,
+                cache_mode=cache_mode,
+            )
+    except Exception:
+        pass
