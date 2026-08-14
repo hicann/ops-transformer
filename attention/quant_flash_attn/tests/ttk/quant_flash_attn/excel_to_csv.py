@@ -31,7 +31,13 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from _xlsx_minireader import col_to_idx, load_sheet, load_sheet1, list_sheet_names, header_to_name_idx
+from _xlsx_minireader import (
+    col_to_idx,
+    load_sheet,
+    load_sheet1,
+    list_sheet_names,
+    header_to_name_idx,
+)
 
 _XLSX = os.path.join(_HERE, "redline.xlsx")
 
@@ -62,7 +68,11 @@ CSV_PROFILES_MXFP8 = [
 # 仅 CSV 文件名和 testcase 后缀区分, 避免与 mxfp8 testcase 重名。
 CSV_PROFILES_GQA_FP8 = [
     ("qfa_gqa_fp8_excel.csv", "qfa_wrapper.npu_qfa", "_gqa_fp8"),
-    ("qfa_gqa_fp8_excel_metadata.csv", "qfa_metadata_wrapper.run_metadata", "_gqa_fp8_metadata"),
+    (
+        "qfa_gqa_fp8_excel_metadata.csv",
+        "qfa_metadata_wrapper.run_metadata",
+        "_gqa_fp8_metadata",
+    ),
     ("qfa_gqa_fp8_excel_main.csv", "qfa_main_wrapper.run_main", "_gqa_fp8_main"),
 ]
 
@@ -242,6 +252,7 @@ def _build_col_by_name(header_row: dict) -> dict:
         elif logical_key in COL:
             col_by_name[logical_key] = COL[logical_key]
     return col_by_name
+
 
 ABSOLUTE_PRECISION_DEFAULT = 1e-8
 
@@ -442,13 +453,20 @@ def _build_attributes(row, col_by_name):
     _set("p_scale_value", _str_to_float(row.get(col_by_name["AL_p_scale_value"])))
     # cu_seqlens value → list，shape/dtype 不传（由 NPU 推）
     # cu_seqlens_q/kv 是 wrapper 必选参数（无默认值），空则写 None（PA 模式 kv 可能为空）
-    _set_force("cu_seqlens_q", _str_to_int_list(row.get(col_by_name["AP_cu_seqlens_q_value"])))
     _set_force(
-        "cu_seqlens_kv", _str_to_int_list(row.get(col_by_name["AT_cu_seqlens_kv_value"]))
+        "cu_seqlens_q", _str_to_int_list(row.get(col_by_name["AP_cu_seqlens_q_value"]))
+    )
+    _set_force(
+        "cu_seqlens_kv",
+        _str_to_int_list(row.get(col_by_name["AT_cu_seqlens_kv_value"])),
     )
     # seqused_q/kv：空则写 None（wrapper 无默认值，需要 key 存在，golden 透传 None 给 NPU）
-    _set_force("seqused_q", _str_to_int_list(row.get(col_by_name["AX_seqused_q_value"])))
-    _set_force("seqused_kv", _str_to_int_list(row.get(col_by_name["BB_seqused_kv_value"])))
+    _set_force(
+        "seqused_q", _str_to_int_list(row.get(col_by_name["AX_seqused_q_value"]))
+    )
+    _set_force(
+        "seqused_kv", _str_to_int_list(row.get(col_by_name["BB_seqused_kv_value"]))
+    )
     _set("quant_mode", _str_to_int(row.get(col_by_name["BO_quant_mode"])))
     _set("softmax_scale", _str_to_float(row.get(col_by_name["BP_softmax_scale"])))
     _set("mask_mode", _str_to_int(row.get(col_by_name["BQ_mask_mode"])))
@@ -458,7 +476,9 @@ def _build_attributes(row, col_by_name):
     _set_force("max_seqlen_q", _str_to_int(row.get(col_by_name["BT_max_seqlen_q"])))
     _set_force("max_seqlen_kv", _str_to_int(row.get(col_by_name["BU_max_seqlen_kv"])))
     _set("layout_q", _strip_or_none(row.get(col_by_name["BV_layout_q"])))
-    _set("layout_q_descale", _strip_or_none(row.get(col_by_name["BW_layout_q_descale"])))
+    _set(
+        "layout_q_descale", _strip_or_none(row.get(col_by_name["BW_layout_q_descale"]))
+    )
     _set("layout_kv", _strip_or_none(row.get(col_by_name["BX_layout_kv"])))
     _set("layout_out", _strip_or_none(row.get(col_by_name["BY_layout_out"])))
     _set("enable_lse", _bool_to_int(row.get(col_by_name["BZ_return_softmax_lse"])))
@@ -469,12 +489,14 @@ def _build_attributes(row, col_by_name):
     # --- wrapper 接口适配参数（不是 op 参数推导，是 wrapper 签名必选参数） ---
     layout_kv = _strip_or_none(row.get(col_by_name["BX_layout_kv"]))
     layout_q_descale = _strip_or_none(row.get(col_by_name["BW_layout_q_descale"]))
-    # B: Excel CA 列，空则从 cu_seqlens_q 推（len-1，与 wrapper 约定一致）
-    B_val = _str_to_int(row.get(col_by_name["CA_batch_size"]))
-    if B_val is None:
-        cu_q = _str_to_int_list(row.get(col_by_name["AP_cu_seqlens_q_value"]))
-        B_val = max(1, len(cu_q) - 1) if cu_q and len(cu_q) >= 2 else 1
-    _set_force("B", B_val)
+    # batch_size: Excel CA 列纯透传（可为 -1/正整数/None），直接传给 metadata 的 batch_size。
+    # wrapper 内部从 cu_seqlens_q 推导正整数 B 供 inputs/golden 生成 BNSD 张量。
+    _set_force(
+        "batch_size",
+        _str_to_int(row.get(col_by_name["CA_batch_size"]))
+        if row.get(col_by_name["CA_batch_size"]) is not None
+        else None,
+    )
     # enable_pa: 从 layout_kv 前缀推导（接口适配，不是 op 参数推导）
     _set_force("enable_pa", isinstance(layout_kv, str) and layout_kv.startswith("PA_"))
     # kv_cache_layout: Excel layout_kv → wrapper 参数名
@@ -631,7 +653,9 @@ def main():
                 writer.writerow(_row_to_csv(row, api_name, suffix, col_by_name))
         print(f"wrote {out_path}")
 
-    print(f"\n3 csv files written ({mode_label}), each with {len(data_rows)} case rows.")
+    print(
+        f"\n3 csv files written ({mode_label}), each with {len(data_rows)} case rows."
+    )
 
 
 if __name__ == "__main__":

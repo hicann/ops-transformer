@@ -72,6 +72,10 @@
 >
 > Q、K、V数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size、S（Seq-Length）表示输入样本序列长度、H（Hidden-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸headdim，且满足D=H/N、Q_T表示所有query Batch输入样本序列长度的累加和，KV_T表示所有K、V Batch输入样本序列长度的累加和。Q_S表示输入q tensor的序列长度，Q_N表示输入q tensor的头数，KV_S表示输入k/v tensor的序列长度，KV_N表示输入k/v tensor的头数。
 
+> [!NOTE]
+>
+> MxFP8场景（`quant_mode=1`）下，Head-Dim（D），新增支持D=72。D=72在布局、Paged Attention block_size、PA布局等方面有额外约束，详见各参数组约束中的D=72说明。
+
 ## 函数原型
 
 调用quant_flash_attn接口之前，请先调用前置接口quant_flash_attn_metadata，完成quant_flash_attn负载均衡的计算。
@@ -336,7 +340,7 @@ cann_ops_transformer.quant_flash_attn(
                     <li>65536 > B > 0</li>
                     <li>Q_S ≥ 0；KV_S ≥ 0</li>
                     <li>Q_T ≥ 0、KV_T ≥ 0</li>
-                    <li>D仅支持64、128或256</li>
+                    <li>D仅支持64、72、128或256；其中D=72仅MxFP8场景支持</li>
                     <li>Q_N % KV_N == 0且Q_N / KV_N > 0</li>
                     <li>Q_N ≤ 256；KV_N ≤ 256</li>
                 </ul>
@@ -376,7 +380,7 @@ cann_ops_transformer.quant_flash_attn(
         </tr>
         <tr>
             <td>layout_kv</td>
-            <td>支持TND/PA_BNBD/PA_NZ</td>
+            <td>支持TND/PA_BNBD/PA_NZ（D=72时不支持PA_NZ，仅支持TND与PA_BNBD）</td>
         </tr>
         <tr>
             <td>layout_out</td>
@@ -525,7 +529,7 @@ cann_ops_transformer.quant_flash_attn(
                 <ul>
                     <li>TND</li>
                     <li>PA_BNBD</li>
-                    <li>PA_NZ</li>
+                    <li>PA_NZ（D=72时不支持）</li>
                 </ul>
             </td>
             <td>TND</td>
@@ -975,7 +979,7 @@ mask_mode参数解释
                 <ul>
                     <li>PagedAttention开启情况下，必须传入seqused_kv</li>
                     <li>Paged Attention开启情况下，block_table必须不为空</li>
-                    <li>MxFP8仅支持Bs为64、128、256、512或1024</li>
+                    <li>MxFP8仅支持Bs为64、128、256、512或1024；当D=72时，Bs仅支持512或1024</li>
                     <li>FP8（quant_mode=6）强制PA场景，block_table必选，且Bs固定为128</li>
                 </ul>
             </td>

@@ -63,6 +63,7 @@ GRAPH_PATH = int(_os.environ.get("GRAPH_PATH", "0"))
 # 零内部推导：不在此处硬编码任何 op 参数，不从其他参数推导缺失参数
 # ==============================================================================
 B = None
+BATCH_SIZE = None
 N_q = None
 N_kv = None
 D = None
@@ -176,7 +177,8 @@ def get_mxfp8_per_token_group_quant_scale(tensor, fp8_dtype, group_size=32):
     emax_elem = _EMAX_MAP[fp8_dtype]
 
     dim1, dim2, dim3, dim4 = tensor.shape
-    num_groups = math.ceil(dim4 / group_size)
+    dim4_align = (dim4 + 63) // 64 * 64
+    num_groups = math.ceil(dim4_align / group_size)
     pad_size = num_groups * group_size - dim4
     if pad_size > 0:
         tensor = torch.nn.functional.pad(tensor, (0, pad_size))
@@ -1307,13 +1309,13 @@ def cpu_mxfp8_golden(
     # dequant_scale 按 group_size 扩展，用于逐元素反量化
     dequant_scale_q_expanded = dequant_scale_q.repeat_interleave(
         QUANT_GROUP_SIZE, dim=-1
-    )
+    )[:, :, :, :D]
     dequant_scale_k_expanded = dequant_scale_k.repeat_interleave(
         QUANT_GROUP_SIZE, dim=-1
-    )
+    )[:, :, :, :D]
     dequant_scale_v_expanded = dequant_scale_v.repeat_interleave(
         QUANT_GROUP_SIZE, dim=2
-    )
+    )[:, :, :, :D]
 
     logger.info(
         "[CPU Golden] TILES_Q=%d, TILES_KV=%d, Sq=%d, Skv=%d",
@@ -1490,6 +1492,7 @@ def _call_npu_fa_op(
         seqused_q=seqused_q_t,
         seqused_kv=seqused_kv_t,
         v_descale=dequant_scale_v,
+        batch_size=BATCH_SIZE,
         mask_mode=sparse_mode,
         layout_q=layout_q,
         layout_q_descale=layout_q_descale,
@@ -1580,6 +1583,7 @@ class Network(nn.Module):
             seqused_q=seqused_q,
             seqused_kv=seqused_kv,
             v_descale=dequant_scale_v,
+            batch_size=BATCH_SIZE,
             mask_mode=sparse_mode,
             layout_q=layout_q,
             layout_q_descale=layout_q_descale,

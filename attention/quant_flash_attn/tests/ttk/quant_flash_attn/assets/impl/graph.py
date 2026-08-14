@@ -69,7 +69,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         p_scale: torch.Tensor,
         block_table: torch.Tensor,
         *,
-        B: int,
+        batch_size: int,
         N_q: int,
         N_kv: int,
         D: int,
@@ -114,10 +114,19 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         seqused_q_list = list(seqused_q) if seqused_q is not None else None
         seqused_kv_list = list(seqused_kv) if seqused_kv is not None else None
 
+        # batch_size: CSV 原始值 (可为 -1), 透传给 metadata 的 batch_size;
+        # B: 从 cu_seqlens_q 推导的正整数, 供 prepare_npu_inputs 生成 BNSD 张量。
+        B = (
+            max(1, len(cu_seqlens_q_list) - 1)
+            if cu_seqlens_q_list and len(cu_seqlens_q_list) >= 2
+            else 1
+        )
+
         # ---- 2. 注入 golden 全局变量 (prepare_npu_inputs 依赖) ----
         _apply_golden_globals(
             {
                 "B": B,
+                "BATCH_SIZE": batch_size,
                 "N_q": N_q,
                 "N_kv": N_kv,
                 "D": D,
@@ -253,8 +262,8 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         # ---- 5. metadata 构建 (capture 之前) ----
         # metadata 是 int32 tensor (4096,), 不含可微参数, 在 __init__ 构建.
         # 参数名与传参方式严格对齐 golden_mod._call_npu_fa_op (line 1222-1239):
-        #   - dequant_scale_v (不是 v_descale, 与运行时 schema 一致)
-        #   - 不传 batch_size/win_left/win_right (用 schema 默认, 与 golden 一致)
+        #   - batch_size 透传 CSV 原始值 (可为 -1)
+        #   - 不传 win_left/win_right (用 schema 默认, 与 golden 一致)
         logger.info("[GRAPH] 构建 metadata (quant_flash_attn_metadata)")
         self.metadata = torch.ops.cann_ops_transformer.quant_flash_attn_metadata(
             int(inputs["q_n"]),
@@ -266,6 +275,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
             seqused_q=seqused_q_t,
             seqused_kv=seqused_kv_t,
             v_descale=inputs["dequant_scale_v"],
+            batch_size=batch_size,
             mask_mode=int(inputs["sparse_mode"]),
             layout_q=layout_q,
             layout_q_descale=inputs["layout_q_descale"],

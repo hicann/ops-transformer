@@ -57,7 +57,7 @@ def npu_qfa(
     p_scale: torch.Tensor,
     block_table: torch.Tensor,
     *,
-    B: int,
+    batch_size: int,
     N_q: int,
     N_kv: int,
     D: int,
@@ -95,9 +95,18 @@ def npu_qfa(
     cu_seqlens_q_list = list(cu_seqlens_q) if cu_seqlens_q is not None else None
     cu_seqlens_kv_list = list(cu_seqlens_kv) if cu_seqlens_kv is not None else None
 
+    # batch_size: CSV 原始值 (可为 -1), 透传给 metadata 的 batch_size;
+    # B: 从 cu_seqlens_q 推导的正整数, 供 inputs/golden 生成 BNSD 张量。
+    B = (
+        max(1, len(cu_seqlens_q_list) - 1)
+        if cu_seqlens_q_list and len(cu_seqlens_q_list) >= 2
+        else 1
+    )
+
     _apply_golden_globals(
         {
             "B": B,
+            "BATCH_SIZE": batch_size,
             "N_q": N_q,
             "N_kv": N_kv,
             "D": D,

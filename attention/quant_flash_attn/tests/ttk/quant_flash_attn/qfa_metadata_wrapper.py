@@ -69,7 +69,7 @@ def run_metadata(
     p_scale: torch.Tensor,
     block_table: torch.Tensor,
     *,
-    B: int,
+    batch_size: int,
     N_q: int,
     N_kv: int,
     D: int,
@@ -114,9 +114,18 @@ def run_metadata(
     cu_seqlens_q_list = list(cu_seqlens_q) if cu_seqlens_q is not None else [0]
     cu_seqlens_kv_list = list(cu_seqlens_kv) if cu_seqlens_kv is not None else [0]
 
+    # batch_size: CSV 原始值 (可为 -1), 透传给 metadata 的 batch_size;
+    # B: 从 cu_seqlens_q 推导的正整数, 供 inputs/golden 生成 BNSD 张量。
+    B = (
+        max(1, len(cu_seqlens_q_list) - 1)
+        if cu_seqlens_q_list and len(cu_seqlens_q_list) >= 2
+        else 1
+    )
+
     _apply_golden_globals(
         {
             "B": B,
+            "BATCH_SIZE": batch_size,
             "N_q": N_q,
             "N_kv": N_kv,
             "D": D,
@@ -194,17 +203,23 @@ def run_metadata(
         deq_k = quant_scale_k
         deq_v = quant_scale_v
         q_fp8 = (
-            mxfp8_golden_mod.mxfp8_per_token_group_quant(q_cpu, quant_scale_q, group_size)
+            mxfp8_golden_mod.mxfp8_per_token_group_quant(
+                q_cpu, quant_scale_q, group_size
+            )
             .clamp(-fp8_max, fp8_max)
             .to(fp8_dtype)
         )
         k_fp8 = (
-            mxfp8_golden_mod.mxfp8_per_token_group_quant(k_cpu, quant_scale_k, group_size)
+            mxfp8_golden_mod.mxfp8_per_token_group_quant(
+                k_cpu, quant_scale_k, group_size
+            )
             .clamp(-fp8_max, fp8_max)
             .to(fp8_dtype)
         )
         v_fp8 = (
-            mxfp8_golden_mod.mxfp8_per_channel_group_quant(v_cpu, quant_scale_v, group_size)
+            mxfp8_golden_mod.mxfp8_per_channel_group_quant(
+                v_cpu, quant_scale_v, group_size
+            )
             .clamp(-fp8_max, fp8_max)
             .to(fp8_dtype)
         )
@@ -288,7 +303,8 @@ def run_metadata(
             cu_seqlens_kv=cu_seqlens_kv_t if is_tnd_kv else None,
             seqused_q=seqused_q_t,
             seqused_kv=seqused_kv_t,
-            dequant_scale_v=inputs["dequant_scale_v"],
+            v_descale=inputs["dequant_scale_v"],
+            batch_size=batch_size,
             mask_mode=inputs["sparse_mode"],
             layout_q=layout_q,
             layout_q_descale=inputs["layout_q_descale"],
