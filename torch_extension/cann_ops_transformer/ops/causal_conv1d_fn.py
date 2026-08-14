@@ -28,7 +28,7 @@ class CausalConv1dFnOpBuilder(OpBuilder):
         return (
             "causal_conv1d_fn("
             "Tensor x, Tensor weight, Tensor? bias, "
-            "Tensor conv_states, "
+            "Tensor(a!) conv_states, "
             "Tensor query_start_loc, "
             "*, "
             "Tensor? cache_indices=None, "

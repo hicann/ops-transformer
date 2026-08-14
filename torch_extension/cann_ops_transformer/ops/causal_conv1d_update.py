@@ -27,10 +27,10 @@ class CausalConv1dUpdateOpBuilder(OpBuilder):
         """PyTorch operator schema."""
         return (
             "causal_conv1d_update("
-            "Tensor x, Tensor conv_state, Tensor weight, "
+            "Tensor x, Tensor(a!) conv_state, Tensor weight, "
             "*, "
             "Tensor? bias=None, "
-            "str activation=\"silu\", "
+            'str activation="silu", '
             "Tensor? conv_state_indices=None, "
             "Tensor? num_accepted_tokens=None, "
             "Tensor? query_start_loc=None, "

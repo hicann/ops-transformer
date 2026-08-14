@@ -139,11 +139,6 @@ static bool CheckXShape(const aclTensor *x, int64_t &dim)
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "x dim num must be 2 (varlen) or 3 (fixed batch), but got %zuD.", xDimNum);
         return false;
     }
-    if (xDimNum == 3 && xShape.GetDim(1) != 1) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "3D x seqLen must be 1 for decode scenario, but got %ld.",
-                xShape.GetDim(1));
-        return false;
-    }
     dim = (xDimNum == 3) ? xShape.GetDim(2) : xShape.GetDim(1);
     return true;
 }
