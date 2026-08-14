@@ -435,7 +435,11 @@ def _mxfp8_customize_inputs(
     )
     # Golden owns MXFP8 validation and all input construction, including the
     # random block table. TTK only supplies CSV attributes and allocated shapes.
-    data = module.generate_mxfp8_inputs(case, max_block_per_batch=max_block_per_batch)
+    data = module.generate_mxfp8_inputs(
+        case,
+        max_block_per_batch=max_block_per_batch,
+        atten_mask_shape=(tuple(atten_mask.shape) if atten_mask is not None else None),
+    )
 
     q_scale = module.fp32_to_e8m0fnu_safe(
         module.pack_q_scale_tnd_for_npu(data["q_descale"], data["q_lengths"]),
@@ -461,12 +465,8 @@ def _mxfp8_customize_inputs(
         )
     _inplace_copy(sparse_indices, data["sparse_indices"])
     _inplace_copy(sparse_seq_len, data["sparse_seq_len"])
-    _inplace_copy(
-        atten_mask,
-        torch.tril(
-            torch.ones(tuple(atten_mask.shape), dtype=torch.uint8)
-        ).T.contiguous(),
-    )
+    if atten_mask is not None and _numel(atten_mask) > 0:
+        _inplace_copy(atten_mask, data["atten_mask"])
 
     cache = getattr(module, "_TTK_MXFP8_CACHE", {})
     cache[testcase_name or "__default__"] = {"case": case, "data": data}
