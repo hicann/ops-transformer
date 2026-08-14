@@ -24,6 +24,7 @@ from typing import Any, Dict, Optional
 
 try:
     import torch_npu  # noqa: F401
+
     _HAS_TORCH_NPU = True
 except ImportError:
     _HAS_TORCH_NPU = False
@@ -38,7 +39,11 @@ def _valid_block_mask(cmp_kv, cu_seqlens, seqused, start_pos, cmp_ratio, seq_siz
     TH (rows, D) 前 totalValid 行有效（块索引全局连续）。
     """
     d3 = cmp_kv.dim() == 3
-    B = cmp_kv.shape[0] if d3 else (int(cu_seqlens.shape[0] - 1) if cu_seqlens is not None else 0)
+    B = (
+        cmp_kv.shape[0]
+        if d3
+        else (int(cu_seqlens.shape[0] - 1) if cu_seqlens is not None else 0)
+    )
     valid = torch.zeros_like(cmp_kv, dtype=torch.bool)
     if d3:  # BSH: (B, blocks, D)
         for i in range(B):
@@ -52,12 +57,19 @@ def _valid_block_mask(cmp_kv, cu_seqlens, seqused, start_pos, cmp_ratio, seq_siz
         total = 0
         for i in range(B):
             sp = int(start_pos[i]) if start_pos is not None else 0
-            sq = int(seqused[i]) if seqused is not None else \
-                 (int(cu_seqlens[i + 1] - cu_seqlens[i]) if cu_seqlens is not None else 0)
+            sq = (
+                int(seqused[i])
+                if seqused is not None
+                else (
+                    int(cu_seqlens[i + 1] - cu_seqlens[i])
+                    if cu_seqlens is not None
+                    else 0
+                )
+            )
             cmp_limit = (sp + sq) // cmp_ratio * cmp_ratio
             if cmp_limit > sp:
                 total += (cmp_limit - sp + cmp_ratio - 1) // cmp_ratio
-        valid[:min(total, rows), :] = True
+        valid[: min(total, rows), :] = True
     return valid
 
 
@@ -105,7 +117,7 @@ class NPUBackend:
                 x:             输入张量   [T, H] 或 [B, S, H]
                 wkv:          KV 投影权重 (coff * D, H)
                 wgate:          Gate 投影权重 (coff * D, H)
-                state_cache:   state cache (block_num, block_size, 2*coff*D) 
+                state_cache:   state cache (block_num, block_size, 2*coff*D)
                 ape:           位置编码   (cmp_ratio, coff * D)
                 block_table:   cache 模式 1 的 block table
                 cmp_ratio:     压缩率 (默认 4)
@@ -156,13 +168,21 @@ class NPUBackend:
         wkv.requires_grad_(True)
         wgate.requires_grad_(True)
         ape.requires_grad_(True)
-       
-        cmp_kv, softmax_score, kv = _compressor_forward(
-            x, wkv, wgate, state_cache, ape,
+
+        cmp_kv, softmax_score, kv, _ = _compressor_forward(
+            x,
+            wkv,
+            wgate,
+            state_cache,
+            ape,
             state_block_table=block_table,
-            cu_seqlens=cu_seqlens, seqused=seqused, start_pos=start_pos,
-            cmp_ratio=cmp_ratio, coff=coff, cache_mode=cache_mode,
-            grad_enabled=True
+            cu_seqlens=cu_seqlens,
+            seqused=seqused,
+            start_pos=start_pos,
+            cmp_ratio=cmp_ratio,
+            coff=coff,
+            cache_mode=cache_mode,
+            grad_enabled=True,
         )
         # backward 会释放 autograd 保存的中间量（sm/kv）→ 提前 clone 脱离图
         softmax_score_saved = softmax_score.detach().clone()
@@ -172,9 +192,18 @@ class NPUBackend:
         # 用上游梯度 d_cpm_kv 构造 loss → backward 自动调用 compressor_grad
         # ⚠️ 只对有效压缩块计算：padding 无效块在 cmp_kv 中未写（可能垃圾/NaN），
         #    必须 mask 掉，否则其值污染 loss 与梯度（参考正向 cmp_mask 语义）
-        loss = (cmp_kv * d_cpm_kv * _valid_block_mask(cmp_kv, cu_seqlens, seqused,
-                                                      start_pos, cmp_ratio,
-                                                      seq_size=x.shape[1] if x.dim() == 3 else None)).sum()
+        loss = (
+            cmp_kv
+            * d_cpm_kv
+            * _valid_block_mask(
+                cmp_kv,
+                cu_seqlens,
+                seqused,
+                start_pos,
+                cmp_ratio,
+                seq_size=x.shape[1] if x.dim() == 3 else None,
+            )
+        ).sum()
         loss.backward(retain_graph=True)
         torch.npu.synchronize()
 
@@ -190,7 +219,9 @@ class NPUBackend:
         if d_wgate is None:
             d_wgate = torch.zeros_like(wgate)
         if d_ape is None:
-            d_ape = torch.zeros(cmp_ratio, wkv.size(0), device=self._device, dtype=torch.float32)
+            d_ape = torch.zeros(
+                cmp_ratio, wkv.size(0), device=self._device, dtype=torch.float32
+            )
 
         return {
             "d_x": d_x,

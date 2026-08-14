@@ -28,6 +28,7 @@
 - [aclnnChunkGatedDeltaRule](../../attention/chunk_gated_delta_rule/docs/aclnnChunkGatedDeltaRule.md)
 - [aclnnChunkKdaFwd](../../attention/chunk_kda_fwd/docs/aclnnChunkKdaFwd.md)
 - [aclnnCompressor](../../attention/compressor/docs/aclnnCompressor.md)
+- [aclnnCompressorGrad](../../attention/compressor_grad/docs/aclnnCompressorGrad.md)
 - [aclnnDenseLightningIndexerGradKLLoss](../../attention/dense_lightning_indexer_grad_kl_loss/docs/aclnnDenseLightningIndexerGradKLLoss.md)
 - [aclnnDenseLightningIndexerSoftmaxLse](../../attention/dense_lightning_indexer_softmax_lse/docs/aclnnDenseLightningIndexerSoftmaxLse.md)
 - [aclnnDequantRopeQuantKvcache](../../posembedding/dequant_rope_quant_kvcache/docs/aclnnDequantRopeQuantKvcache.md)

@@ -138,6 +138,8 @@ int main()
     std::vector<int64_t> startPosShape = {B};
     int64_t Sr = (S + cmpRatio - 1) / cmpRatio;
     std::vector<int64_t> cmpKvShape = {B, Sr, headDim};
+    std::vector<int64_t> softmaxScoreShape = {B, Sr, coff * cmpRatio, headDim};
+    std::vector<int64_t> kvShape = {B, Sr, coff * cmpRatio, headDim};
 
     // 3. 构造 host 数据
     int64_t xSize = GetShapeSize(xShape);
@@ -158,6 +160,10 @@ int main()
     }
     std::vector<int32_t> startPosHostData(B, 0);
     std::vector<bfloat16> cmpKvHostData(cmpKvSize, bfloat16(0.0f));
+    int64_t softmaxScoreSize = GetShapeSize(softmaxScoreShape);
+    int64_t kvSize = GetShapeSize(kvShape);
+    std::vector<float_t> softmaxScoreHostData(softmaxScoreSize, 0.0f);
+    std::vector<float_t> kvHostData(kvSize, 0.0f);
 
     // 4. 创建 aclTensor
     void *xDeviceAddr = nullptr;
@@ -168,6 +174,8 @@ int main()
     void *stateBlockTableDeviceAddr = nullptr;
     void *startPosDeviceAddr = nullptr;
     void *cmpKvDeviceAddr = nullptr;
+    void *softmaxScoreDeviceAddr = nullptr;
+    void *kvDeviceAddr = nullptr;
 
     aclTensor *x = nullptr;
     aclTensor *wkv = nullptr;
@@ -177,6 +185,8 @@ int main()
     aclTensor *stateBlockTable = nullptr;
     aclTensor *startPos = nullptr;
     aclTensor *cmpKvOut = nullptr;
+    aclTensor *softmaxScoreOut = nullptr;
+    aclTensor *kvOut = nullptr;
 
     ret = CreateAclTensor(xHostData, xShape, &xDeviceAddr, aclDataType::ACL_BF16, &x);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -196,14 +206,21 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(cmpKvHostData, cmpKvShape, &cmpKvDeviceAddr, aclDataType::ACL_BF16, &cmpKvOut);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
+    ret = CreateAclTensor(softmaxScoreHostData, softmaxScoreShape, &softmaxScoreDeviceAddr, aclDataType::ACL_FLOAT,
+                          &softmaxScoreOut);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    ret = CreateAclTensor(kvHostData, kvShape, &kvDeviceAddr, aclDataType::ACL_FLOAT, &kvOut);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     // 5. 调用 aclnnCompressorGetWorkspaceSize
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
 
+    bool gradEnabled = false;
+
     ret = aclnnCompressorGetWorkspaceSize(x, wkv, wgate, stateCacheRef, ape, stateBlockTable, nullptr, nullptr,
-                                          startPos, cmpRatio, coff, cacheMode, stateCacheStrideDim0, cmpKvOut,
-                                          &workspaceSize, &executor);
+                                          startPos, cmpRatio, coff, cacheMode, stateCacheStrideDim0, gradEnabled,
+                                          cmpKvOut, softmaxScoreOut, kvOut, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCompressorGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
@@ -235,6 +252,8 @@ int main()
     aclDestroyTensor(stateBlockTable);
     aclDestroyTensor(startPos);
     aclDestroyTensor(cmpKvOut);
+    aclDestroyTensor(softmaxScoreOut);
+    aclDestroyTensor(kvOut);
 
     aclrtFree(xDeviceAddr);
     aclrtFree(wkvDeviceAddr);
@@ -244,6 +263,8 @@ int main()
     aclrtFree(stateBlockTableDeviceAddr);
     aclrtFree(startPosDeviceAddr);
     aclrtFree(cmpKvDeviceAddr);
+    aclrtFree(softmaxScoreDeviceAddr);
+    aclrtFree(kvDeviceAddr);
     if (workspaceSize > 0) {
         aclrtFree(workspaceAddr);
     }

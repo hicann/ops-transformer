@@ -26,6 +26,9 @@ def compressor_grad_golden(
     start_pos: Optional[torch.Tensor] = None,
     cmp_ratio: int = 4,
     coff: int = 1,
+    device: str = "cpu",
+    compute_dtype: torch.dtype = torch.float32,
+    matmul_mode: str = "two",
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Compressor 算子的反向传播。
@@ -70,7 +73,7 @@ def compressor_grad_golden(
     #       此时 cu_seqlens 提供每个 batch 在 T 维的起止边界
     #   BSH 布局 (is_th_layout=False): x shape (B, S, H)，batch 独立存储
     #       此时不需要 cu_seqlens，直接用 b_idx * S 定位
-    is_th_layout = (cu_seqlens is not None)
+    is_th_layout = cu_seqlens is not None
 
     # B: batch 数量。start_pos 为 None 时默认全 0
     if start_pos is None:
@@ -83,10 +86,18 @@ def compressor_grad_golden(
         num_batches = start_pos.shape[0]
         start_positions = start_pos.tolist()
 
-    # 前向计算全部使用 float32（与 golden 一致，保证数值精度）
-    x_f32 = x.float()
-    wkv_f32 = wkv.float()
-    wgate_f32 = wgate.float()
+    # 统一计算设备（三方 B 在 NPU 上跑 / 两方与三方 C 在 CPU 上跑）
+    dev = x.device if device == "cpu" else device
+    x = x.to(dev)
+    wkv = wkv.to(dev)
+    wgate = wgate.to(dev)
+    d_cpm_kv = d_cpm_kv.to(dev)
+    softmax_score = softmax_score.to(dev)
+    kv = kv.to(dev)
+    # matmul 输入：two/high 口径提升到 compute_dtype；same 口径保持 io_dtype 不提升
+    x_f32 = x.to(compute_dtype) if matmul_mode != "same" else x
+    wkv_f32 = wkv.to(compute_dtype) if matmul_mode != "same" else wkv
+    wgate_f32 = wgate.to(compute_dtype) if matmul_mode != "same" else wgate
 
     # 确定总 token 数和 batch/seq 维度（仅 BSH 布局需要保留 shape 信息用于最后 reshape）
     if is_th_layout:
@@ -112,13 +123,17 @@ def compressor_grad_golden(
     # 维度约定: T=total_tokens, C=coff*head_dim, H=hidden_size
     #
     # d_new_kv:    (T, C)  ∂Loss/∂new_kv — 仅来自 matmul 反向
-    d_new_kv = torch.zeros(total_tokens, coff * head_dim, device=x.device)
+    d_new_kv = torch.zeros(
+        total_tokens, coff * head_dim, device=dev, dtype=compute_dtype
+    )
 
     # d_new_score: (T, C)  ∂Loss/∂new_score — 同时流入 matmul 反向和 APE 反向
-    d_new_score = torch.zeros(total_tokens, coff * head_dim, device=x.device)
+    d_new_score = torch.zeros(
+        total_tokens, coff * head_dim, device=dev, dtype=compute_dtype
+    )
 
     # d_ape:       (cmp_ratio, C)  ∂Loss/∂ape
-    d_ape = torch.zeros(cmp_ratio, coff * head_dim, device=x.device)
+    d_ape = torch.zeros(cmp_ratio, coff * head_dim, device=dev, dtype=compute_dtype)
 
     # ══════════════════════════════════════════════════════════════════════
     # 阶段 C: 逐 batch、逐压缩块进行反向传播
@@ -140,7 +155,9 @@ def compressor_grad_golden(
         if seqused is not None:
             batch_seq_used = seqused[batch_idx].item()
         elif is_th_layout:
-            batch_seq_used = int(cu_seqlens[batch_idx + 1].item() - cu_seqlens[batch_idx].item())
+            batch_seq_used = int(
+                cu_seqlens[batch_idx + 1].item() - cu_seqlens[batch_idx].item()
+            )
         else:
             batch_seq_used = x.shape[1]
 
@@ -176,14 +193,16 @@ def compressor_grad_golden(
 
             # ── 获取当前块的上游梯度和前向中间变量 ──
             if is_th_layout:
-                d_compressed_kv = d_cpm_kv[grad_output_index].float()
-                saved_kv = kv[grad_output_index].float()
-                saved_softmax = softmax_score[grad_output_index].float()
+                d_compressed_kv = d_cpm_kv[grad_output_index].to(compute_dtype)
+                saved_kv = kv[grad_output_index].to(compute_dtype)
+                saved_softmax = softmax_score[grad_output_index].to(compute_dtype)
                 grad_output_index += 1
             else:
-                d_compressed_kv = d_cpm_kv[batch_idx, bsh_block_idx].float()
-                saved_kv = kv[batch_idx, bsh_block_idx].float()
-                saved_softmax = softmax_score[batch_idx, bsh_block_idx].float()
+                d_compressed_kv = d_cpm_kv[batch_idx, bsh_block_idx].to(compute_dtype)
+                saved_kv = kv[batch_idx, bsh_block_idx].to(compute_dtype)
+                saved_softmax = softmax_score[batch_idx, bsh_block_idx].to(
+                    compute_dtype
+                )
                 bsh_block_idx += 1
 
             # ══════════════════════════════════════════════════════════
@@ -195,8 +214,8 @@ def compressor_grad_golden(
             # 反向: dK_i = dC ⊙ W_i,  dW_i = dC ⊙ K_i  (广播: dC (1,hd)→(N,hd))
 
             d_compressed_kv_2d = d_compressed_kv.unsqueeze(0)  # (1,hd) → (N,hd)
-            d_kv_block = d_compressed_kv_2d * saved_softmax     # (N,hd)
-            d_score_weighted = d_compressed_kv_2d * saved_kv    # (N,hd)
+            d_kv_block = d_compressed_kv_2d * saved_softmax  # (N,hd)
+            d_score_weighted = d_compressed_kv_2d * saved_kv  # (N,hd)
             # ══════════════════════════════════════════════════════════
             # 【反步 2】softmax 反向 (dim=0, 每列独立)
             # ══════════════════════════════════════════════════════════
@@ -207,8 +226,12 @@ def compressor_grad_golden(
             #   column_sum → (1,hd)
             #   dZ → (N,hd)
 
-            softmax_backward_sum = (saved_softmax * d_score_weighted).sum(dim=0, keepdim=True)  # (1,hd)
-            d_score_block = saved_softmax * (d_score_weighted - softmax_backward_sum)  # (N,hd)
+            softmax_backward_sum = (saved_softmax * d_score_weighted).sum(
+                dim=0, keepdim=True
+            )  # (1,hd)
+            d_score_block = saved_softmax * (
+                d_score_weighted - softmax_backward_sum
+            )  # (N,hd)
             d_score_block = d_score_block.view(cmp_ratio, coff, head_dim)
             d_kv_block = d_kv_block.view(cmp_ratio, coff, head_dim)
 
@@ -225,7 +248,8 @@ def compressor_grad_golden(
 
             # flat 偏移: 当前块在展平 (T, C) 数组中的 token 行范围
             flat_offset_base = (
-                int(cu_seqlens[batch_idx].item()) if is_th_layout
+                int(cu_seqlens[batch_idx].item())
+                if is_th_layout
                 else batch_idx * x.shape[1]
             )
             flat_offset_start = flat_offset_base + (block_seq_start - batch_start)
@@ -247,18 +271,20 @@ def compressor_grad_golden(
             d_new_kv[
                 flat_offset_start:flat_offset_end,
                 current_dim_start:current_dim_end,
-            ] += d_kv_block[current_tokens_from_cache:cmp_ratio, coff-1, :]
+            ] += d_kv_block[current_tokens_from_cache:cmp_ratio, coff - 1, :]
 
             d_new_score[
                 flat_offset_start:flat_offset_end,
                 current_dim_start:current_dim_end,
-            ] += d_score_block[current_tokens_from_cache:cmp_ratio, coff-1, :]
+            ] += d_score_block[current_tokens_from_cache:cmp_ratio, coff - 1, :]
 
             # d_ape: (cmp_ratio, C)  按 pos%cmp_ratio 累加 d_score_block 对应行
             ape_offset = block_seq_start % cmp_ratio
             n_pos = block_seq_end - block_seq_start
 
-            d_ape[ape_offset:ape_offset + n_pos, current_dim_start:current_dim_end] += d_score_block[current_tokens_from_cache:cmp_ratio, coff-1, :]
+            d_ape[
+                ape_offset : ape_offset + n_pos, current_dim_start:current_dim_end
+            ] += d_score_block[current_tokens_from_cache:cmp_ratio, coff - 1, :]
 
             # ── 3b  前一个 overlap 槽位 (overlap_id = 0, 仅 coff == 2) ──
             if coff == 2:
@@ -277,7 +303,9 @@ def compressor_grad_golden(
                 block_row_start = prev_tokens_from_cache
                 block_row_end = cmp_ratio
 
-                prev_flat_offset_start = flat_offset_start - (cmp_ratio - prev_tokens_from_cache)
+                prev_flat_offset_start = flat_offset_start - (
+                    cmp_ratio - prev_tokens_from_cache
+                )
                 prev_flat_offset_end = flat_offset_start
 
                 # (N,hd)子块 → (T,C)子块，前一块列偏移 [0, hd)
@@ -292,7 +320,9 @@ def compressor_grad_golden(
                 ] += d_score_block[prev_tokens_from_cache:cmp_ratio, 0, :]
 
                 n_pos = cmp_ratio - prev_tokens_from_cache
-                d_ape[prev_tokens_from_cache:cmp_ratio, prev_dim_start:prev_dim_end] += d_score_block[prev_tokens_from_cache:cmp_ratio, 0, :]
+                d_ape[
+                    prev_tokens_from_cache:cmp_ratio, prev_dim_start:prev_dim_end
+                ] += d_score_block[prev_tokens_from_cache:cmp_ratio, 0, :]
 
     # ══════════════════════════════════════════════════════════════════════
     # 阶段 D: Matmul 反向
@@ -314,26 +344,42 @@ def compressor_grad_golden(
     #   d_wkv   = d_new_kv.T @ x_flat   → (C, T) @ (T, H) = (C, H)
     #   d_wgate = d_new_score.T @ x_flat → (C, T) @ (T, H) = (C, H)
 
-    x_flat = x_f32 if is_th_layout else x_f32.reshape(total_tokens, x.shape[-1])  # (T, H)
+    x_flat = (
+        x_f32 if is_th_layout else x_f32.reshape(total_tokens, x.shape[-1])
+    )  # (T, H)
     iodtype = x.dtype
-    d_new_kv = d_new_kv.to(iodtype).float()
-    d_new_score = d_new_score.to(iodtype).float()
-    # print(d_new_kv.shape)
-    # print("dkv:", d_new_kv[0])
-    # print("d_new_kv @ wkv_f32:")
-    # print((d_new_kv @ wkv_f32).shape, (d_new_kv @ wkv_f32)[0])
-    # print("d_new_score @ wgate_f32:")
-    # print((d_new_score @ wgate_f32).shape, (d_new_score @ wgate_f32)[0])
-    d_x_flat = d_new_kv @ wkv_f32 + d_new_score @ wgate_f32  # (T, H)
-    # print("d_x_flat:")
-    # print(d_x_flat.shape, d_x_flat[0])
-    d_wkv = d_new_kv.T @ x_flat                                # (C, H)
-    d_wgate = d_new_score.T @ x_flat                            # (C, H)
-
-    # 根据原始输入布局恢复 d_x 的形状，并转换回输入的 dtype
-    if is_th_layout:
-        d_x = d_x_flat.to(x.dtype)
+    if matmul_mode == "two":
+        # 两方口径（现状）：d_new_kv 量化到 iodtype 后提升回 compute_dtype（模拟 kernel
+        # 中间量 FP16/BF16 存储）；wkv/wgate/x 已提升 compute_dtype → FP32 matmul
+        d_new_kv_q = d_new_kv.to(iodtype).to(compute_dtype)
+        d_new_score_q = d_new_score.to(iodtype).to(compute_dtype)
+    elif matmul_mode == "same":
+        # 三方 B 口径（same）：仅量化到 iodtype（模拟中间存储），权重不提升 → BF16 进 BF16 出
+        d_new_kv_q = d_new_kv.to(iodtype)
+        d_new_score_q = d_new_score.to(iodtype)
+    else:  # "high"
+        # 三方 C 口径：全程 compute_dtype（float64），无量化、无提升
+        d_new_kv_q = d_new_kv
+        d_new_score_q = d_new_score
+    if matmul_mode == "same":
+        # BF16 进 BF16 出（torch: bf16@bf16 → bf16），golden 内不再 cast，输出即 io_dtype
+        d_x_flat = d_new_kv_q @ wkv + d_new_score_q @ wgate  # (T, H)
+        d_wkv = d_new_kv_q.T @ x_flat  # (C, H)
+        d_wgate = d_new_score_q.T @ x_flat  # (C, H)
     else:
-        d_x = d_x_flat.reshape(batch_size, seq_len, hidden_size).to(x.dtype)
+        d_x_flat = d_new_kv_q @ wkv_f32 + d_new_score_q @ wgate_f32  # (T, H)
+        d_wkv = d_new_kv_q.T @ x_flat  # (C, H)
+        d_wgate = d_new_score_q.T @ x_flat  # (C, H)
 
-    return d_x, d_wkv.to(wkv.dtype), d_wgate.to(wgate.dtype), d_ape
+    # 根据原始输入布局恢复 d_x 的形状，并转换回输入的 dtype；统一回 CPU 返回
+    if is_th_layout:
+        d_x = d_x_flat.to(x.dtype).cpu()
+    else:
+        d_x = d_x_flat.reshape(batch_size, seq_len, hidden_size).to(x.dtype).cpu()
+
+    return (
+        d_x,
+        d_wkv.to(wkv.dtype).cpu(),
+        d_wgate.to(wgate.dtype).cpu(),
+        d_ape.float().cpu(),
+    )

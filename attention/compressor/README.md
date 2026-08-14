@@ -181,10 +181,31 @@
     <td>-</td>
   </tr>
   <tr>
+    <td>grad_enabled</td>
+    <td>可选属性</td>
+    <td>是否导出softmax_score/kv中间结果（供反向CompressorGrad使用）。true时导出，false时不导出。默认值为false。</td>
+    <td>BOOL</td>
+    <td>-</td>
+  </tr>
+  <tr>
     <td>cmp_kv</td>
     <td>输出</td>
     <td>表示压缩后的数据。</td>
     <td>FLOAT16、BFLOAT16</td>
+    <td>ND</td>
+  </tr>
+  <tr>
+    <td>softmax_score</td>
+    <td>输出</td>
+    <td>压缩块的softmax权重中间结果。仅在grad_enabled为true时输出有效。</td>
+    <td>FLOAT</td>
+    <td>ND</td>
+  </tr>
+  <tr>
+    <td>kv</td>
+    <td>输出</td>
+    <td>softmax权重与kv_state的Hadamard乘积中间结果。仅在grad_enabled为true时输出有效。</td>
+    <td>FLOAT</td>
     <td>ND</td>
   </tr>
 </tbody>
@@ -248,7 +269,7 @@
       - C128A：D=512，coff=1，cmp_ratio=128。
 - 确定性计算与batch一致性：
   - 默认确定性实现，相同输入多次调用结果一致。
-  - <term>Ascend 950PR/Ascend 950DT</term>：通过SetDeterministicLevel配置确定性级别为3开启batch一致性，开启后可以满足计算结果和所在批次大小和所在批次位置无关。
+  - <term>Ascend 950PR/Ascend 950DT</term>：batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
 
 ## 调用说明
 

@@ -4,14 +4,14 @@
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
 /*!
- * \file test_aclnn_compressor.cpp
- * \brief Compressor 算子 aclnn 调用示例（A3 / ascend910_93）
- *        场景：C4A（D=512, coff=2, cmp_ratio=4, cache_mode=1, BSH layout, BF16）
+ * \file test_aclnn_compressor_grad.cpp
+ * \brief CompressorGrad 算子 aclnn 调用示例（A5 / ascend950）
+ *        场景：C4A（D=512, coff=2, cmp_ratio=4, BSH layout, BF16）
  */
 
 #include <algorithm>
@@ -21,7 +21,7 @@
 #include <numeric>
 #include <vector>
 #include "acl/acl.h"
-#include "aclnnop/aclnn_compressor.h"
+#include "aclnnop/aclnn_compressor_grad.h"
 #include "opdev/bfloat16.h"
 
 #define CHECK_RET(cond, return_expr) \
@@ -96,7 +96,19 @@ void PrintBf16Result(const std::vector<int64_t> &shape, void **deviceAddr)
                            size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
     for (int64_t i = 0; i < size && i < 10; i++) { // 10: max print
-        LOG_PRINT("cmp_kv[%ld] is: %f\n", i, static_cast<float>(resultData[i]));
+        LOG_PRINT("result[%ld] is: %f\n", i, static_cast<float>(resultData[i]));
+    }
+}
+
+void PrintF32Result(const std::vector<int64_t> &shape, void **deviceAddr)
+{
+    auto size = GetShapeSize(shape);
+    std::vector<float_t> resultData(size, 0.0f);
+    auto ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), *deviceAddr,
+                           size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
+    for (int64_t i = 0; i < size && i < 10; i++) { // 10: max print
+        LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
     }
 }
 
@@ -111,81 +123,78 @@ int main()
     auto ret = Init(deviceId, &context, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
-    // 场景参数: C4A (D=512, coff=2, cmp_ratio=4, cache_mode=1, BSH layout, BF16)
+    // 场景参数: C4A (D=512, coff=2, cmp_ratio=4, BSH layout, BF16)
     int64_t B = 1;
     int64_t S = 4;
     int64_t hiddenSize = 4096;
     int64_t headDim = 512;
     int64_t coff = 2;
     int64_t cmpRatio = 4;
-    int64_t cacheMode = 1; // 1: 连续buffer (LINEAR_BUFFER)
-    int64_t blockSize = 128;
 
-    int64_t Smax = S;
-    int64_t maxBlockNumPerBatch = (Smax + blockSize - 1) / blockSize;
-    int64_t blockNum = B * maxBlockNumPerBatch;
     int64_t coffD = coff * headDim;
-    int64_t stateCacheStrideDim0 = blockSize * 2 * coffD; // state_cache 0轴 stride = dim1 * dim2
+    int64_t Sr = (S + cmpRatio - 1) / cmpRatio;
 
     // 2. 构造输入与输出 shape
     std::vector<int64_t> xShape = {B, S, hiddenSize};
     std::vector<int64_t> wkvShape = {coffD, hiddenSize};
     std::vector<int64_t> wgateShape = {coffD, hiddenSize};
-    std::vector<int64_t> stateCacheShape = {blockNum, blockSize, 2 * coffD};
-    std::vector<int64_t> apeShape = {cmpRatio, coffD};
-    std::vector<int64_t> stateBlockTableShape = {B, maxBlockNumPerBatch};
-    std::vector<int64_t> startPosShape = {B};
-    int64_t Sr = (S + cmpRatio - 1) / cmpRatio;
-    std::vector<int64_t> cmpKvShape = {B, Sr, headDim};
+    std::vector<int64_t> dCmpKvShape = {B, Sr, headDim};
     std::vector<int64_t> softmaxScoreShape = {B, Sr, coff * cmpRatio, headDim};
     std::vector<int64_t> kvShape = {B, Sr, coff * cmpRatio, headDim};
+    std::vector<int64_t> startPosShape = {B};
+    std::vector<int64_t> dXShape = {B, S, hiddenSize};
+    std::vector<int64_t> dWkvShape = {coffD, hiddenSize};
+    std::vector<int64_t> dWgateShape = {coffD, hiddenSize};
+    std::vector<int64_t> dApeShape = {cmpRatio, coffD};
 
     // 3. 构造 host 数据
     int64_t xSize = GetShapeSize(xShape);
     int64_t wkvSize = GetShapeSize(wkvShape);
     int64_t wgateSize = GetShapeSize(wgateShape);
-    int64_t stateCacheSize = GetShapeSize(stateCacheShape);
-    int64_t apeSize = GetShapeSize(apeShape);
-    int64_t cmpKvSize = GetShapeSize(cmpKvShape);
+    int64_t dCmpKvSize = GetShapeSize(dCmpKvShape);
+    int64_t softmaxScoreSize = GetShapeSize(softmaxScoreShape);
+    int64_t kvSize = GetShapeSize(kvShape);
+    int64_t dXSize = GetShapeSize(dXShape);
+    int64_t dWkvSize = GetShapeSize(dWkvShape);
+    int64_t dWgateSize = GetShapeSize(dWgateShape);
+    int64_t dApeSize = GetShapeSize(dApeShape);
 
     std::vector<bfloat16> xHostData(xSize, bfloat16(0.1f));
     std::vector<bfloat16> wkvHostData(wkvSize, bfloat16(0.1f));
     std::vector<bfloat16> wgateHostData(wgateSize, bfloat16(0.1f));
-    std::vector<float_t> stateCacheHostData(stateCacheSize, 0.1f);
-    std::vector<float_t> apeHostData(apeSize, 0.1f);
-    std::vector<int32_t> stateBlockTableHostData;
-    for (int64_t i = 0; i < B * maxBlockNumPerBatch; i++) {
-        stateBlockTableHostData.push_back(static_cast<int32_t>(i + 1));
-    }
+    std::vector<bfloat16> dCmpKvHostData(dCmpKvSize, bfloat16(0.1f));
+    std::vector<float_t> softmaxScoreHostData(softmaxScoreSize, 0.1f);
+    std::vector<float_t> kvHostData(kvSize, 0.1f);
     std::vector<int32_t> startPosHostData(B, 0);
-    std::vector<bfloat16> cmpKvHostData(cmpKvSize, bfloat16(0.0f));
-    int64_t softmaxScoreSize = GetShapeSize(softmaxScoreShape);
-    int64_t kvSize = GetShapeSize(kvShape);
-    std::vector<float_t> softmaxScoreHostData(softmaxScoreSize, 0.0f);
-    std::vector<float_t> kvHostData(kvSize, 0.0f);
+    std::vector<bfloat16> dXHostData(dXSize, bfloat16(0.0f));
+    std::vector<bfloat16> dWkvHostData(dWkvSize, bfloat16(0.0f));
+    std::vector<bfloat16> dWgateHostData(dWgateSize, bfloat16(0.0f));
+    std::vector<float_t> dApeHostData(dApeSize, 0.0f);
 
     // 4. 创建 aclTensor
     void *xDeviceAddr = nullptr;
     void *wkvDeviceAddr = nullptr;
     void *wgateDeviceAddr = nullptr;
-    void *stateCacheDeviceAddr = nullptr;
-    void *apeDeviceAddr = nullptr;
-    void *stateBlockTableDeviceAddr = nullptr;
-    void *startPosDeviceAddr = nullptr;
-    void *cmpKvDeviceAddr = nullptr;
+    void *dCmpKvDeviceAddr = nullptr;
     void *softmaxScoreDeviceAddr = nullptr;
     void *kvDeviceAddr = nullptr;
+    void *startPosDeviceAddr = nullptr;
+    void *dXDeviceAddr = nullptr;
+    void *dWkvDeviceAddr = nullptr;
+    void *dWgateDeviceAddr = nullptr;
+    void *dApeDeviceAddr = nullptr;
 
     aclTensor *x = nullptr;
     aclTensor *wkv = nullptr;
     aclTensor *wgate = nullptr;
-    aclTensor *stateCacheRef = nullptr;
-    aclTensor *ape = nullptr;
-    aclTensor *stateBlockTable = nullptr;
+    aclTensor *dCmpKv = nullptr;
+    aclTensor *softmaxScore = nullptr;
+    aclTensor *kv = nullptr;
     aclTensor *startPos = nullptr;
-    aclTensor *cmpKvOut = nullptr;
-    aclTensor *softmaxScoreOut = nullptr;
-    aclTensor *kvOut = nullptr;
+    aclTensor *dX = nullptr;
+    aclTensor *dWkv = nullptr;
+    aclTensor *dWgate = nullptr;
+    aclTensor *dApe = nullptr;
 
     ret = CreateAclTensor(xHostData, xShape, &xDeviceAddr, aclDataType::ACL_BF16, &x);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -193,34 +202,31 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(wgateHostData, wgateShape, &wgateDeviceAddr, aclDataType::ACL_BF16, &wgate);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(stateCacheHostData, stateCacheShape, &stateCacheDeviceAddr, aclDataType::ACL_FLOAT,
-                          &stateCacheRef);
+    ret = CreateAclTensor(dCmpKvHostData, dCmpKvShape, &dCmpKvDeviceAddr, aclDataType::ACL_BF16, &dCmpKv);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(apeHostData, apeShape, &apeDeviceAddr, aclDataType::ACL_FLOAT, &ape);
+    ret = CreateAclTensor(softmaxScoreHostData, softmaxScoreShape, &softmaxScoreDeviceAddr, aclDataType::ACL_FLOAT,
+                          &softmaxScore);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(stateBlockTableHostData, stateBlockTableShape, &stateBlockTableDeviceAddr,
-                          aclDataType::ACL_INT32, &stateBlockTable);
+    ret = CreateAclTensor(kvHostData, kvShape, &kvDeviceAddr, aclDataType::ACL_FLOAT, &kv);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(startPosHostData, startPosShape, &startPosDeviceAddr, aclDataType::ACL_INT32, &startPos);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(cmpKvHostData, cmpKvShape, &cmpKvDeviceAddr, aclDataType::ACL_BF16, &cmpKvOut);
+    ret = CreateAclTensor(dXHostData, dXShape, &dXDeviceAddr, aclDataType::ACL_BF16, &dX);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(softmaxScoreHostData, softmaxScoreShape, &softmaxScoreDeviceAddr, aclDataType::ACL_FLOAT,
-                          &softmaxScoreOut);
+    ret = CreateAclTensor(dWkvHostData, dWkvShape, &dWkvDeviceAddr, aclDataType::ACL_BF16, &dWkv);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(kvHostData, kvShape, &kvDeviceAddr, aclDataType::ACL_FLOAT, &kvOut);
+    ret = CreateAclTensor(dWgateHostData, dWgateShape, &dWgateDeviceAddr, aclDataType::ACL_BF16, &dWgate);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    ret = CreateAclTensor(dApeHostData, dApeShape, &dApeDeviceAddr, aclDataType::ACL_FLOAT, &dApe);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    // 5. 调用 aclnnCompressorGetWorkspaceSize
+    // 5. 调用 aclnnCompressorGradGetWorkspaceSize
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
 
-    bool gradEnabled = false;
-
-    ret = aclnnCompressorGetWorkspaceSize(x, wkv, wgate, stateCacheRef, ape, stateBlockTable, nullptr, nullptr,
-                                          startPos, cmpRatio, coff, cacheMode, stateCacheStrideDim0, gradEnabled,
-                                          cmpKvOut, softmaxScoreOut, kvOut, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCompressorGetWorkspaceSize failed. ERROR: %d\n", ret);
+    ret = aclnnCompressorGradGetWorkspaceSize(x, wkv, wgate, dCmpKv, softmaxScore, kv, nullptr, nullptr, startPos,
+                                              cmpRatio, coff, dX, dWkv, dWgate, dApe, &workspaceSize, &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCompressorGradGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
     // 6. 申请 workspace
@@ -230,40 +236,45 @@ int main()
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
     }
 
-    // 7. 调用 aclnnCompressor
-    ret = aclnnCompressor(workspaceAddr, workspaceSize, executor, stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCompressor failed. ERROR: %d\n", ret); return ret);
+    // 7. 调用 aclnnCompressorGrad
+    ret = aclnnCompressorGrad(workspaceAddr, workspaceSize, executor, stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCompressorGrad failed. ERROR: %d\n", ret); return ret);
 
     // 8. 同步等待
     ret = aclrtSynchronizeStream(stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
     // 9. 获取输出
-    LOG_PRINT("Compressor execution succeeded.\n");
-    PrintBf16Result(cmpKvShape, &cmpKvDeviceAddr);
+    LOG_PRINT("CompressorGrad execution succeeded.\n");
+    PrintBf16Result(dXShape, &dXDeviceAddr);
+    PrintBf16Result(dWkvShape, &dWkvDeviceAddr);
+    PrintBf16Result(dWgateShape, &dWgateDeviceAddr);
+    PrintF32Result(dApeShape, &dApeDeviceAddr);
 
     // 10. 释放资源
     aclDestroyTensor(x);
     aclDestroyTensor(wkv);
     aclDestroyTensor(wgate);
-    aclDestroyTensor(stateCacheRef);
-    aclDestroyTensor(ape);
-    aclDestroyTensor(stateBlockTable);
+    aclDestroyTensor(dCmpKv);
+    aclDestroyTensor(softmaxScore);
+    aclDestroyTensor(kv);
     aclDestroyTensor(startPos);
-    aclDestroyTensor(cmpKvOut);
-    aclDestroyTensor(softmaxScoreOut);
-    aclDestroyTensor(kvOut);
+    aclDestroyTensor(dX);
+    aclDestroyTensor(dWkv);
+    aclDestroyTensor(dWgate);
+    aclDestroyTensor(dApe);
 
     aclrtFree(xDeviceAddr);
     aclrtFree(wkvDeviceAddr);
     aclrtFree(wgateDeviceAddr);
-    aclrtFree(stateCacheDeviceAddr);
-    aclrtFree(apeDeviceAddr);
-    aclrtFree(stateBlockTableDeviceAddr);
-    aclrtFree(startPosDeviceAddr);
-    aclrtFree(cmpKvDeviceAddr);
+    aclrtFree(dCmpKvDeviceAddr);
     aclrtFree(softmaxScoreDeviceAddr);
     aclrtFree(kvDeviceAddr);
+    aclrtFree(startPosDeviceAddr);
+    aclrtFree(dXDeviceAddr);
+    aclrtFree(dWkvDeviceAddr);
+    aclrtFree(dWgateDeviceAddr);
+    aclrtFree(dApeDeviceAddr);
     if (workspaceSize > 0) {
         aclrtFree(workspaceAddr);
     }
