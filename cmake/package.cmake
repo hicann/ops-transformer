@@ -152,5 +152,5 @@ function(pack_built_in)
   message(STATUS "current compute_unit is: ${compute_unit}")
 
   # ============= CPack =============
-  set_cann_cpack_config(ops-transformer COMPUTE_UNIT ${compute_unit} SHARE_INFO_NAME ops_transformer NO_COMPONENT_INSTALL OUTPUT ${CMAKE_INSTALL_PREFIX})
+  set_cann_cpack_config(ops-transformer COMPUTE_UNIT ${compute_unit} SHARE_INFO_NAME ops_transformer PACKAGE_TYPE "${PACKAGE_TYPE}")
 endfunction()

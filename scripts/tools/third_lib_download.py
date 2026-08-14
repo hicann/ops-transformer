@@ -63,7 +63,7 @@ if __name__ == "__main__":
             "20230802.1/abseil-cpp-20230802.1.tar.gz"
         ),
         "https://gitcode.com/cann/opbase.git",  # Git 仓库
-        "https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake/cmake-master-026.tar.gz",
+        "https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake/cmake-master-046.tar.gz",
         "https://gitcode.com/cann/ops-tensor.git",
     ]
 

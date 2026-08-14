@@ -16,6 +16,7 @@ OS_ARCH=$(uname -m)
 PKG_NAME=""
 SOC=""
 OPP_PREFIX="opp"
+PKG_TYPE=""
 
 # -----------------------------
 # 函数定义
@@ -47,6 +48,9 @@ parse_args() {
                 ;;
             --pkg_name=*)
                 PKG_NAME="${arg#*=}"
+                ;;
+            --pkg-type=*)
+                PKG_TYPE="${arg#*=}"
                 ;;
             # 处理未知参数
             *)
@@ -299,6 +303,15 @@ python3 "$PACKAGE_SCRIPT" \
 
 log "Packaging completed successfully!"
 
+# 9.5 生成 RPM/DEB 包
+if [[ -n "$PKG_TYPE" && "$PKG_TYPE" != "run" ]]; then
+    bash "${TOP_DIR}/vendor/hisi/build/scripts/ops_generate_rpm_deb.sh" \
+        --top_dir="$TOP_DIR" \
+        --pkg_path="$PKG_PATH" \
+        --pkg_name="$PKG_NAME" \
+        --soc="$SOC" \
+        --pkg-type="$PKG_TYPE"
+fi
 
 # 10. 归档全量构建算子编译包至hdfs目录
 ensure_dir "$ARCHIVE_RUN_DIR"

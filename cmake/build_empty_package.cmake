@@ -21,6 +21,9 @@ function(cpack_empty_package)
       message(WARNING "Unknown architecture: ${CMAKE_SYSTEM_PROCESSOR}")
   endif ()
 
+  # 空包早于 variables.cmake return，需自行设置默认 component（deb/rpm staging 依赖）
+  set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME ops-transformer)
+
   # CPack config
   install(FILES ${CMAKE_BINARY_DIR}/version.ops-transformer.info
       DESTINATION share/info/ops_transformer
@@ -47,5 +50,6 @@ function(cpack_empty_package)
       set(compute_unit "${ASCEND_COMPUTE_UNIT}")
   endif()
   set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/build_out)
-  set_cann_cpack_config(ops-transformer COMPUTE_UNIT ${compute_unit} SHARE_INFO_NAME ops_transformer NO_COMPONENT_INSTALL OUTPUT ${CMAKE_INSTALL_PREFIX})
+  set_cann_cpack_config(ops-transformer COMPUTE_UNIT ${compute_unit} SHARE_INFO_NAME ops_transformer
+      OUTPUT ${CMAKE_INSTALL_PREFIX} PACKAGE_TYPE "${PACKAGE_TYPE}")
 endfunction()

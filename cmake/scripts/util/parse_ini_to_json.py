@@ -465,3 +465,8 @@ if __name__ == "__main__":
         if not parse_ini_to_json(parse_ini_list, OUTPUT_FILE_PATH):
             sys.exit(1)
         sys.exit(0)
+
+    # 当前 SOC 无算子注册时无 ini；写空 ops-info，避免编包 cp 失败
+    print(f"WARNING: no ops-info.ini for output {OUTPUT_FILE_PATH}, write empty json.")
+    write_json_file({}, OUTPUT_FILE_PATH)
+    sys.exit(0)

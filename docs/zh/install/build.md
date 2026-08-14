@@ -54,6 +54,7 @@ bash build.sh --help
 | --opkernel       | 可选     | 编译二进制内核。                                                                     |
 | --opkernel_aicpu | 可选     | 编译AICPU算子内核。                                                                   |
 | --pkg        | 可选     | 生成安装包，不可与-u（UT模式）或--ophost、--opapi、--opgraph同时使用。                            |
+| --pkg-type       | 可选     | 指定打包类型，取值：run/rpm/deb/all，默认为run，仅可与--pkg同时使用。                                  |
 | --make_clean     | 可选     | 执行基础清理操作（清理编译产物），执行后脚本退出。                                                    |
 | --asan           | 可选     | 启用ASAN（AddressSanitizer）内存检测功能。                                            |
 | --ophost         | 可选     | 编译libophost_transformer.so库，不可与--pkg、--ops同时使用。                                     |
