@@ -182,7 +182,6 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::CalcKPoolingRange(uint32_t 
     uint32_t extraYCores = constInfo.extraYCores;
     uint32_t yBlocksPerCore = constInfo.yBlocksPerCore;
 
-
     if (coreIdx < extraYCores || extraYCores == 0) {
         startKBlock = coreIdx * yBlocksPerCore;
         endKBlock = startKBlock + yBlocksPerCore;
@@ -330,7 +329,6 @@ BSASelectBlockMaskBase<BSAT>::Init(__gm__ uint8_t *query, __gm__ uint8_t *key, _
         vectorService.InitGM(qCmpGm, kCmpGm, attnScoreFp16Gm, scoreFp32Gm, queryGm, keyGm, actualBlockLenQGm,
                              actualBlockLenKVGm, actualSeqLensQGm, actualSeqLensKVGm);
 
-
         radixTopKService.InitParams(constInfo, tilingData);
         radixTopKService.InitBuffers(pipe);
         radixTopKService.InitGM(attnScoreFp16Gm, topkWorkspaceGm, maskOutGmU8);
@@ -382,7 +380,9 @@ __aicore__ inline void BSASelectBlockMaskBase<BSAT>::Process()
         uint32_t validYBlocks = BSACeilDiv(curBatchSkv, static_cast<uint32_t>(constInfo.blockShapeY));
 
         if ASCEND_IS_AIV {
-            radixTopKService.UpdateRuntimeParams(validXBlocks, validYBlocks);
+            if (tilingData->baseParams.useActualSeqLenQ || tilingData->baseParams.useActualSeqLenK) {
+                radixTopKService.UpdateRuntimeParams(validXBlocks, validYBlocks);
+            }
         }
 
         // D2: dynamic partition by validXBlocks

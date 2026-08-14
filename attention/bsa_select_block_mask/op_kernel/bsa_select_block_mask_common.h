@@ -23,7 +23,7 @@ using namespace AscendC;
 constexpr uint8_t SYNC_V1_TO_C1_FLAG[2] = {0, 1};
 constexpr uint8_t SYNC_C1_TO_V1_FLAG[9] = {2, 3, 4, 5, 6, 7, 8, 9, 10};
 constexpr uint32_t SYNC_C1_TO_V1_FLAG_NUMS = 9;
-constexpr uint32_t CV_EXEC_RATIO = 5;
+constexpr uint32_t CV_EXEC_RATIO = 4;
 constexpr uint8_t SYNC_MODE = 2;
 constexpr uint32_t BSA_FIXPIPE_SYNC_ANCHOR_M = 16;
 constexpr uint32_t BSA_FIXPIPE_SYNC_ANCHOR_N = 16;
@@ -103,7 +103,7 @@ struct BSAConstInfo {
     uint32_t aivNum;
     uint32_t aicNum;
     uint32_t activeYVecCoreNum;
-    
+
     uint32_t batchSize;
     uint32_t numHeads;
     uint32_t maxQSeqlen;
@@ -148,7 +148,7 @@ struct BSARunInfo {
 template <typename T>
 __aicore__ inline T BSACeilDiv(T num, T rnd)
 {
-    return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd)));
+    return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd)));
 }
 
 template <typename T1, typename T2>
