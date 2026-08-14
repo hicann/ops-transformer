@@ -126,6 +126,7 @@ std::tuple<at::Tensor, at::Tensor> MakeSparseFlashMlaOutputs(const at::Tensor &q
     }
 
     int64_t kvHeadNum = GetKvHeadNum(oriKv, cmpKv, layoutKvStr);
+    TORCH_CHECK(kvHeadNum > 0, "head num of ori_kv or cmp_kv must be greater than 0, but got ", kvHeadNum);
     if (layoutQStr == "BSND") {
         softmaxLse = at::empty({q.size(DIM_0), kvHeadNum, q.size(DIM_1), q.size(DIM_2) / kvHeadNum},
                                q.options().dtype(torch::kFloat32));

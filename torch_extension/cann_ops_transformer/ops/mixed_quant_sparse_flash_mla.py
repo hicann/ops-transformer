@@ -132,10 +132,10 @@ class MixedQuantSparseFlashMlaOpBuilder(OpBuilder):
             key_dtype=None,
             value_dtype=None,
         ):
-            if q.size() == 0:
-                raise ValueError(f"The shape size of q should not be 0")
-            if ori_kv is not None and ori_kv.size() == 0:
-                raise ValueError(f"The shape size of ori_kv should not be 0")
+            if q.numel() == 0:
+                raise ValueError("The shape size of q should not be 0")
+            if ori_kv is not None and ori_kv.numel() == 0:
+                raise ValueError("The shape size of ori_kv should not be 0")
             attn_out = torch.empty(q.shape, dtype=q.dtype, device="meta")
             if return_softmax_lse:
                 if layout_q == "TND":

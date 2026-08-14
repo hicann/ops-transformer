@@ -19,9 +19,7 @@ QSMLA_METADATA_OP_NAME = "quant_sparse_flash_mla_metadata"
 
 class QuantSparseFlashMlaOpBuilder(OpBuilder):
     def __init__(self):
-        super(QuantSparseFlashMlaOpBuilder, self).__init__(
-            "quant_sparse_flash_mla"
-        )
+        super(QuantSparseFlashMlaOpBuilder, self).__init__("quant_sparse_flash_mla")
 
     def sources(self):
         """Path to C++ source code."""
@@ -131,13 +129,15 @@ class QuantSparseFlashMlaOpBuilder(OpBuilder):
             layout_q="BSND",
             layout_kv="BSND",
             topk_value_mode=1,
-            return_softmax_lse=False
+            return_softmax_lse=False,
         ):
-            if q.size() == 0:
-                raise ValueError(f"The shape size of q should not be 0")
-            if ori_kv is not None and ori_kv.size() == 0:
-                raise ValueError(f"The shape size of ori_kv should not be 0")
-            attn_out = torch.empty(q.shape, dtype=torch.bfloat16, device="meta") # 暂只支持bf16
+            if q.numel() == 0:
+                raise ValueError("The shape size of q should not be 0")
+            if ori_kv is not None and ori_kv.numel() == 0:
+                raise ValueError("The shape size of ori_kv should not be 0")
+            attn_out = torch.empty(
+                q.shape, dtype=torch.bfloat16, device="meta"
+            )  # 暂只支持bf16
             if return_softmax_lse:
                 if layout_q == "TND":
                     if layout_kv == "PA_BBND":
@@ -174,6 +174,7 @@ class QuantSparseFlashMlaOpBuilder(OpBuilder):
             else:
                 softmax_lse = torch.empty([], dtype=torch.float32, device="meta")
             return (attn_out, softmax_lse)
+
 
 # Instantiate the builder
 quant_sparse_flash_mla_op_builder = QuantSparseFlashMlaOpBuilder()
@@ -364,7 +365,7 @@ def quant_sparse_flash_mla(
     layout_q="BSND",
     layout_kv="BSND",
     topk_value_mode=1,
-    return_softmax_lse=False
+    return_softmax_lse=False,
 ):
     """
     dispatcher implementation for NPU
@@ -403,5 +404,5 @@ def quant_sparse_flash_mla(
         layout_q,
         layout_kv,
         topk_value_mode,
-        return_softmax_lse
+        return_softmax_lse,
     )
