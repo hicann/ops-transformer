@@ -64,6 +64,7 @@ struct MQSMLATilingRequiredParaInfo {
 struct MQSMLATilingOptionalParaInfo {
     const gert::CompileTimeTensorDesc *desc;
     const gert::Tensor *tensor;
+    const gert::StorageShape *shape;
 };
 
 enum class MQSMLALayout : uint32_t {
@@ -345,7 +346,8 @@ public:
 
 class MQSMLAInfoParser {
 public:
-    explicit MQSMLAInfoParser(gert::TilingContext *context) : context_(context)
+    explicit MQSMLAInfoParser(gert::TilingContext *context)
+        : context_(context)
     {
     }
     ~MQSMLAInfoParser() = default;
@@ -455,7 +457,8 @@ public:
 
 class MQSMLATilingCheck {
 public:
-    explicit MQSMLATilingCheck(const MQSMLATilingInfo &qsmlaInfo) : qsmlaInfo_(qsmlaInfo) {};
+    explicit MQSMLATilingCheck(const MQSMLATilingInfo &qsmlaInfo)
+        : qsmlaInfo_(qsmlaInfo) {};
     ~MQSMLATilingCheck() = default;
     virtual ge::graphStatus Process();
 

@@ -26,3 +26,15 @@ add_ops_compile_options(
 )
 
 add_modules_sources(OPTYPE sparse_flash_mla ACLNNTYPE aclnn)
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/checkers/checker_sources.cmake)
+set(SPARSE_MLA_CHECKER_SRC_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/checkers/sparse_flash_mla_checker.cpp
+)
+
+add_tiling_modules()
+add_sparse_mla_common_checker_sources(${OPHOST_NAME}_tiling_obj)
+target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
+    ${SPARSE_MLA_CHECKER_SRC_FILES}
+    sparse_flash_mla_tiling.cpp
+)

@@ -64,9 +64,14 @@ struct QSMLATilingRequiredParaInfo {
 struct QSMLATilingOptionalParaInfo {
     const gert::CompileTimeTensorDesc *desc;
     const gert::Tensor *tensor;
+    const gert::StorageShape *shape;
 };
 
-enum class QSMLALayout : uint32_t { BSND = 0, TND = 1, PA_BBND = 2 };
+enum class QSMLALayout : uint32_t {
+    BSND = 0,
+    TND = 1,
+    PA_BBND = 2
+};
 
 enum class QSMLAAxis : uint32_t {
     B = 0,
@@ -87,7 +92,11 @@ enum class QSMLATemplateMode : uint32_t {
     ORI_CMP_SPARSE_TEMPLATE_MODE = 4
 };
 
-enum class KvStorageMode : uint32_t { BATCH_CONTINUOUS = 0, TENSOR_LIST = 1, PAGE_ATTENTION = 2 };
+enum class KvStorageMode : uint32_t {
+    BATCH_CONTINUOUS = 0,
+    TENSOR_LIST = 1,
+    PAGE_ATTENTION = 2
+};
 
 struct QSMLATilingShapeCompareParam {
     int64_t B = 1;
@@ -226,6 +235,9 @@ struct QSMLAParaInfo {
     QSMLATilingRequiredParaInfo q = {nullptr, nullptr};
     QSMLATilingOptionalParaInfo oriKv = {nullptr, nullptr};
     QSMLATilingOptionalParaInfo cmpKv = {nullptr, nullptr};
+    QSMLATilingOptionalParaInfo qDescale = {nullptr, nullptr};
+    QSMLATilingOptionalParaInfo oriKvDescale = {nullptr, nullptr};
+    QSMLATilingOptionalParaInfo cmpKvDescale = {nullptr, nullptr};
     QSMLATilingOptionalParaInfo oriSparseIndices = {nullptr, nullptr};
     QSMLATilingOptionalParaInfo cmpSparseIndices = {nullptr, nullptr};
     QSMLATilingOptionalParaInfo oriBlockTable = {nullptr, nullptr};
@@ -242,6 +254,7 @@ struct QSMLAParaInfo {
     QSMLATilingOptionalParaInfo sinks = {nullptr, nullptr};
     QSMLATilingOptionalParaInfo metadata = {nullptr, nullptr};
     QSMLATilingRequiredParaInfo attnOut = {nullptr, nullptr};
+    QSMLATilingRequiredParaInfo softmaxLse = {nullptr, nullptr};
 
     const int64_t *quantMode = nullptr;
     const float *softmaxScale = nullptr;
@@ -331,7 +344,9 @@ public:
 
 class QSMLAInfoParser {
 public:
-    explicit QSMLAInfoParser(gert::TilingContext *context) : context_(context) {}
+    explicit QSMLAInfoParser(gert::TilingContext *context)
+        : context_(context)
+    {}
     ~QSMLAInfoParser() = default;
 
     ge::graphStatus CheckRequiredInOutExistence() const;
@@ -438,7 +453,8 @@ public:
 
 class QSMLATilingCheck {
 public:
-    explicit QSMLATilingCheck(const QSMLATilingInfo &qsmlaInfo) : qsmlaInfo_(qsmlaInfo) {};
+    explicit QSMLATilingCheck(const QSMLATilingInfo &qsmlaInfo)
+        : qsmlaInfo_(qsmlaInfo) {};
     ~QSMLATilingCheck() = default;
     virtual ge::graphStatus Process();
 

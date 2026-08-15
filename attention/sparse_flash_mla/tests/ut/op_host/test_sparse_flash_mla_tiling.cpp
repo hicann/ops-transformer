@@ -32,9 +32,9 @@ constexpr int64_t kMetadataSize = optiling::SMLA_META_SIZE;
 void FillMockSmlaMetadata(int64_t *metadataData)
 {
     smla_ut::InitMetadataGm(reinterpret_cast<int32_t *>(metadataData), static_cast<uint32_t>(kBatchSize),
-                           static_cast<uint32_t>(kNumHeadsKv));
+                            static_cast<uint32_t>(kNumHeadsKv));
 }
-}  // namespace
+} // namespace
 
 class SparseFlashMlaTiling : public testing::Test {
 protected:
@@ -80,13 +80,13 @@ TEST_F(SparseFlashMlaTiling, test_tiling_swa_only_ori_kv_fp16_tnd_pa_nd)
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{512, 64, 1}, {512, 64, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {"softmax_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.04419417381615906f)},
-            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
             {"ori_mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-            {"cmp_mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+            {"cmp_mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"ori_win_left", Ops::Transformer::AnyValue::CreateFrom<int64_t>(127)},
             {"ori_win_right", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
@@ -129,13 +129,13 @@ TEST_F(SparseFlashMlaTiling, test_tiling_swa_only_ori_kv_bf16_tnd_pa_nd)
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{512, 64, 1}, {512, 64, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {"softmax_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.04419417381615906f)},
-            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
             {"ori_mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-            {"cmp_mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+            {"cmp_mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"ori_win_left", Ops::Transformer::AnyValue::CreateFrom<int64_t>(127)},
             {"ori_win_right", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
@@ -152,6 +152,8 @@ TEST_F(SparseFlashMlaTiling, test_tiling_hca_ori_and_cmp_kv_fp16_tnd_pa_nd)
     SMLACompileInfo compileInfo = {};
     int64_t cuSeqLensQData[] = {0, 128, 256, 384, 512};
     int64_t seqUsedOriKvData[] = {4096, 4096, 4096, 4096};
+    int64_t seqUsedCmpKvData[] = {4096, 4096, 4096, 4096};
+    int64_t cmpResidualKvData[] = {0, 0, 0, 0};
     int64_t metadataData[kMetadataSize] = {0};
     FillMockSmlaMetadata(metadataData);
     gert::TilingContextPara tilingContextPara(
@@ -169,8 +171,8 @@ TEST_F(SparseFlashMlaTiling, test_tiling_hca_ori_and_cmp_kv_fp16_tnd_pa_nd)
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND, true, seqUsedOriKvData},
-            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
-            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND, true, seqUsedCmpKvData},
+            {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND, true, cmpResidualKvData},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
@@ -178,11 +180,11 @@ TEST_F(SparseFlashMlaTiling, test_tiling_hca_ori_and_cmp_kv_fp16_tnd_pa_nd)
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{512, 64, 1}, {512, 64, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {"softmax_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.04419417381615906f)},
-            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
             {"ori_mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"cmp_mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
             {"ori_win_left", Ops::Transformer::AnyValue::CreateFrom<int64_t>(127)},
@@ -201,6 +203,8 @@ TEST_F(SparseFlashMlaTiling, test_tiling_csa_with_sparse_indices_fp16_tnd_pa_nd)
     SMLACompileInfo compileInfo = {};
     int64_t cuSeqLensQData[] = {0, 128, 256, 384, 512};
     int64_t seqUsedOriKvData[] = {4096, 4096, 4096, 4096};
+    int64_t seqUsedCmpKvData[] = {4096, 4096, 4096, 4096};
+    int64_t cmpResidualKvData[] = {0, 0, 0, 0};
     int64_t metadataData[kMetadataSize] = {0};
     FillMockSmlaMetadata(metadataData);
     gert::TilingContextPara tilingContextPara(
@@ -218,8 +222,8 @@ TEST_F(SparseFlashMlaTiling, test_tiling_csa_with_sparse_indices_fp16_tnd_pa_nd)
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND, true, seqUsedOriKvData},
-            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
-            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND, true, seqUsedCmpKvData},
+            {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND, true, cmpResidualKvData},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
@@ -227,7 +231,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_csa_with_sparse_indices_fp16_tnd_pa_nd)
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{512, 64, 1}, {512, 64, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {"softmax_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.04419417381615906f)},
@@ -250,6 +254,8 @@ TEST_F(SparseFlashMlaTiling, test_tiling_csa_with_sparse_indices_bf16_tnd_pa_nd)
     SMLACompileInfo compileInfo = {};
     int64_t cuSeqLensQData[] = {0, 128, 256, 384, 512};
     int64_t seqUsedOriKvData[] = {4096, 4096, 4096, 4096};
+    int64_t seqUsedCmpKvData[] = {4096, 4096, 4096, 4096};
+    int64_t cmpResidualKvData[] = {0, 0, 0, 0};
     int64_t metadataData[kMetadataSize] = {0};
     FillMockSmlaMetadata(metadataData);
     gert::TilingContextPara tilingContextPara(
@@ -267,8 +273,8 @@ TEST_F(SparseFlashMlaTiling, test_tiling_csa_with_sparse_indices_bf16_tnd_pa_nd)
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND, true, seqUsedOriKvData},
-            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
-            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND, true, seqUsedCmpKvData},
+            {{{4}, {4}}, ge::DT_INT32, ge::FORMAT_ND, true, cmpResidualKvData},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
@@ -276,7 +282,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_csa_with_sparse_indices_bf16_tnd_pa_nd)
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{512, 64, 1}, {512, 64, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {"softmax_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.04419417381615906f)},
@@ -325,7 +331,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_n1_not_64_failed)
         },
         {
             {{{512, 32, 512}, {512, 32, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{512, 32, 1}, {512, 32, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {"softmax_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.04419417381615906f)},
@@ -374,7 +380,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_ori_kv_null_failed)
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{512, 64, 1}, {512, 64, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {"softmax_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.04419417381615906f)},
@@ -423,7 +429,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_cmp_sparse_indices_without_cmp_kv_faile
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{512, 64, 1}, {512, 64, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {"softmax_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.04419417381615906f)},
@@ -472,7 +478,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_unsupported_dtype_failed)
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{512, 64, 1}, {512, 64, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {"softmax_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.04419417381615906f)},
