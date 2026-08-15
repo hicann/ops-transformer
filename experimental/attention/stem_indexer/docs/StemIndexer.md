@@ -15,44 +15,55 @@
 
 StemIndexer是推理场景下稀疏Attention的前处理算子，承担块级打分与动态选块职责。对于每个Query Block，算子基于`qflat`与`kflat`的相关性，并叠加Value量值偏置`vbias`（OAM，Output-Aware Metric）进行打分；随后按Position-Decay动态TopK预算选出关键Key Block，输出`sparse_indices`与`sparse_seq_len`供下游Block Sparse Attention算子使用。
 
-当前固定参数为：
+令$B_s$表示`stem_block_size`，$T_s$表示`stem_stride`，$D$表示原始Q/K Head Dim，$D_f$表示`qflat`和`kflat`的最后一维。当前固定参数为：
 
-```text
-stem_block_size = 128
-stem_stride = 16
-R = stem_block_size / stem_stride = 8
-D = 128
-D_flat = stem_stride * D = 2048
-```
+$$
+B_s=128,\quad T_s=16,\quad R=\frac{B_s}{T_s}=8,\quad D=128,\quad D_f=T_sD=2048
+$$
 
-上游预处理将一个包含128个Token的Q/K Block组织为`[R, stem_stride, D] = [8, 16, 128]`，沿R轴聚合后得到16个代表向量，再展平为长度2048的`qflat`或`kflat`。每个Q代表和K代表均聚合8个Token，因此一次代表向量点积展开后包含`8 * 8 = 64`个Token Pair贡献。
+上游预处理将一个包含128个Token的Q/K Block组织为$[R,T_s,D]=[8,16,128]$，沿$R$轴聚合后得到16个代表向量，再展平为长度2048的`qflat`或`kflat`。每个Q代表和K代表均聚合8个Token，因此一次代表向量点积展开后包含$8\times8=64$个Token Pair贡献。
 
 计算公式如下：
 
 $$
-\text{score} = \text{qflat} \cdot \text{kflat}^{T} \cdot \text{rSquare} + \text{vbias}
+S_{i,j}=\frac{\langle Q_i,K_j\rangle}{R^2}+V_j
 $$
 
 $$
-\text{rSquare}
-= \frac{1}{(\text{stem\_block\_size}/\text{stem\_stride})^2}
-= \frac{1}{(128/16)^2}
-= \frac{1}{64}
+\frac{1}{R^2}=\frac{1}{(B_s/T_s)^2}=\frac{1}{(128/16)^2}=\frac{1}{64}
 $$
 
-即Q/K代表的点积结果乘以`rSquare=1/64`，等价于除以64，对每组内部的64个Token Pair贡献进行归一化。完整的`qflat * kflat`包含16组代表向量的点积。
+其中，$S_{i,j}$表示第$i$个Query Block与第$j$个Key Block的分数，$Q_i$和$K_j$分别表示对应的块级压缩向量，$V_j$表示对应Key Block的`vbias`。Q/K代表的点积结果乘以$1/R^2=1/64$，对每组内部的64个Token Pair贡献进行归一化；完整的$Q_iK_j^T$包含16组代表向量的点积。
+
+对第$i$个Query Block，令$\mathcal{V}_i$为当前可见Key Block集合，$\mathcal{S}_i$为固定保留的Sink Block集合，$\mathcal{W}_i$为固定保留的Window Block集合，则普通TopK候选集合为：
+
+$$
+\mathcal{C}_i=\mathcal{V}_i\setminus(\mathcal{S}_i\cup\mathcal{W}_i)
+$$
+
+根据Position-Decay得到当前Query Block的动态TopK预算$K_i$后，令$\widehat{K}_i=\min(K_i,256,|\mathcal{C}_i|)$表示实际普通TopK数量，则普通TopK结果及最终输出集合为：
+
+$$
+\mathcal{T}_i=\operatorname{TopK}_{\widehat{K}_i}\left\{S_{i,j}\mid j\in\mathcal{C}_i\right\}
+$$
+
+$$
+\mathcal{I}_i=\mathcal{S}_i\mathbin{\Vert}\mathcal{T}_i\mathbin{\Vert}\mathcal{W}_i,\qquad L_i=\left|\mathcal{I}_i\right|
+$$
+
+其中，$\Vert$表示顺序拼接，$\mathcal{I}_i$写入`sparse_indices`的有效前缀，$L_i$写入`sparse_seq_len`。实现不会额外执行去重；普通TopK候选集合$\mathcal{C}_i$已预先排除Sink Block和Window Block。
 
 主要计算过程如下：
 
 1. `qflat`与`kflat`做矩阵乘，得到每个Query Block与各Key Block的相关性分数。
-2. 乘以`rSquare`完成聚合尺度归一化，并叠加`vbias`，避免纯QK相关性漏选对输出贡献较大的Key Block。
-3. 根据`num_prompt_tokens`计算Position-Decay动态TopK预算，并按Query位置进行线性衰减。
-4. 在动态TopK结果之外，固定保留开头的`initial_blocks`个Sink Block和末尾的`window_size`个Window Block。
+2. 乘以$1/R^2$完成聚合尺度归一化，并叠加`vbias`，避免纯QK相关性漏选对输出贡献较大的Key Block。
+3. 根据`num_prompt_tokens`计算Position-Decay动态TopK预算$K_i$，并按Query位置进行线性衰减。
+4. 从排除Sink Block和Window Block后的普通候选集合中选择分数最高的$K_i$个Key Block，再按Sink Block、普通TopK结果、Window Block的顺序拼接输出。
 5. 输出选中的Key Block逻辑索引及每个Query Block对应的有效索引数量。
 
 ## 接口说明
 
-该算子提供底层ACLNN接口`aclnnStemIndexer`，并通过PyTorch扩展注册为`torch.ops.custom.npu_stem_indexer`。PyTorch入口负责创建输出Tensor并调用底层ACLNN接口。
+该算子通过PyTorch扩展注册为`torch.ops.custom.npu_stem_indexer`。
 
 ### PyTorch接口原型
 
@@ -84,32 +95,32 @@ torch.ops.custom.npu_stem_indexer(
 
 维度符号说明：
 
-- `B`：Batch size。
-- `N1`：Query Head数量。
-- `N2`：KV Head数量。
-- `D`：原始Q/K Head Dim，当前固定为128。
-- `R`：每个代表向量聚合的Token数，`R = stem_block_size / stem_stride`，当前固定为8。
-- `D_flat`：`qflat`和`kflat`的最后一维，`D_flat = stem_stride * D`，当前固定为2048。
-- `max_Qb`：最大Query Block数，对应`qflat`第2维。
-- `max_Kb`：最大KV Block数，对应`kflat`第2维。
-- `actual_Qb`：单个Batch的实际Query Block数，`actual_Qb = ceil(q_seq_lens / stem_block_size)`。
-- `actual_Kb`：单个Batch的实际KV Block数，`actual_Kb = ceil(kv_seq_lens / stem_block_size)`。
-- `actual_visible_Kb`：考虑Causal语义后，当前Query Block实际可见的KV Block数。
-- `metadata_size`：Metadata Tensor的INT32元素数量。
+- $B$：Batch size。
+- $N_q$：Query Head数量。
+- $N_k$：KV Head数量。
+- $D$：原始Q/K Head Dim，当前固定为128。
+- $R$：每个代表向量聚合的Token数，$R=B_s/T_s$，当前固定为8。
+- $D_f$：`qflat`和`kflat`的最后一维，$D_f=T_sD$，当前固定为2048。
+- $Q_{\max}$：最大Query Block数，对应`qflat`第2维。
+- $K_{\max}$：最大KV Block数，对应`kflat`第2维。
+- $Q_b$：第$b$个Batch的有效Query Block数，$Q_b=\lceil L_b^q/B_s\rceil$，其中$L_b^q$为`q_seq_lens[b]`。
+- $K_b$：第$b$个Batch的有效KV Block数，$K_b=\lceil L_b^k/B_s\rceil$，其中$L_b^k$为`kv_seq_lens[b]`。
+- $K_{b,i}^{\mathrm{vis}}$：考虑Causal语义后，第$b$个Batch中第$i$个Query Block实际可见的KV Block数。
+- $M$：Metadata Tensor的INT32元素数量。
 
 | 参数名 | 输入/输出 | 描述 | 使用说明 | 数据类型 | 数据格式 | 维度（shape） |
 | :--- | :---: | :--- | :--- | :---: | :---: | :--- |
-| `qflat` | 输入 | Q侧块级压缩表示。 | Kernel按连续布局处理；标准执行路径声明了AutoContiguous。 | BF16 | ND | `(B,N1,max_Qb,D_flat)` |
-| `kflat` | 输入 | K侧块级压缩表示。 | 最后一维必须与`qflat`一致。Kernel按连续布局处理；标准执行路径声明了AutoContiguous。 | BF16 | ND | `(B,N2,max_Kb,D_flat)` |
-| `vbias` | 输入 | Value量值偏置，即OAM项。 | Batch、KV Head和KV Block维度必须与`kflat`一致。 | FLOAT32 | ND | `(B,N2,max_Kb)` |
-| `q_seq_lens` | 输入 | 每个Batch中Query的有效Token数。 | 每个元素按`stem_block_size`向上取整为实际Query Block数。 | INT32 | ND | `(B)` |
-| `kv_seq_lens` | 输入 | 每个Batch中KV的有效Token数。 | 每个元素按`stem_block_size`向上取整为实际KV Block数。 | INT32 | ND | `(B)` |
-| `num_prompt_tokens` | 可选输入 | 每个Batch的Prompt Token数。 | 用于Position-Decay动态TopK预算分档；未传入时复用`kv_seq_lens`。 | INT32 | ND | `(B)` |
-| `metadata` | 可选输入 | 分核调度信息。 | 接口声明为可选输入，但当前计算必须使用有效Metadata；未传入时Tiling返回参数错误。 | INT32 | ND | `(metadata_size)` |
+| `qflat` | 输入 | Q侧块级压缩表示。 | Kernel按连续布局处理；标准执行路径声明了AutoContiguous。 | BF16 | ND | $(B,N_q,Q_{\max},D_f)$ |
+| `kflat` | 输入 | K侧块级压缩表示。 | 最后一维必须与`qflat`一致。Kernel按连续布局处理；标准执行路径声明了AutoContiguous。 | BF16 | ND | $(B,N_k,K_{\max},D_f)$ |
+| `vbias` | 输入 | Value量值偏置，即OAM项。 | Batch、KV Head和KV Block维度必须与`kflat`一致。 | FLOAT32 | ND | $(B,N_k,K_{\max})$ |
+| `q_seq_lens` | 输入 | 每个Batch中Query的有效Token数，不是Query Block数。 | 算子按$Q_b=\lceil\text{q\_seq\_lens}[b]/B_s\rceil$计算该Batch参与计算的有效Query Block数；不足一个完整Block的尾部Token计为一个有效Block。 | INT32 | ND | $(B)$ |
+| `kv_seq_lens` | 输入 | 每个Batch中KV的有效Token数，不是KV Block数。 | 算子按$K_b=\lceil\text{kv\_seq\_lens}[b]/B_s\rceil$计算该Batch参与计算的有效KV Block数；不足一个完整Block的尾部Token计为一个有效Block。 | INT32 | ND | $(B)$ |
+| `num_prompt_tokens` | 可选输入 | 每个Batch的Prompt Token数。 | 用于Position-Decay动态TopK预算分档；未传入时复用`kv_seq_lens`。 | INT32 | ND | $(B)$ |
+| `metadata` | 可选输入 | 分核调度信息。 | 接口声明为可选输入，但当前计算必须使用有效Metadata；未传入时Tiling返回参数错误。 | INT32 | ND | $(M)$ |
 | `causal` | 输入属性 | 是否采用Right-down Causal语义。 | 默认值为`true`。 | BOOL | - | - |
 | `stem_block_size` | 输入属性 | 一个Stem Block包含的原始Token数。 | 当前仅支持128，默认值为128。 | INT64 | - | - |
 | `stem_stride` | 输入属性 | Stem Block内部的分组数/聚合Stride。 | 当前仅支持16，默认值为16。 | INT64 | - | - |
-| `alpha` | 输入属性 | 控制动态TopK预算随Query位置的衰减程度。 | `k_start`表示序列前部Query Block的初始TopK块数；随着Query位置向后移动，TopK预算线性衰减，结束预算为`k_end = k_start * alpha`。取值范围为`(0,1]`，默认值为1.0；`alpha=1.0`表示不衰减，值越小表示衰减越强、序列后部选择的Key Block越少。 | FLOAT32 | - | - |
+| `alpha` | 输入属性 | 控制动态TopK预算随Query位置的衰减程度。 | $K_s$表示序列前部Query Block的初始TopK块数；随着Query位置向后移动，TopK预算线性衰减，结束预算为$K_e=K_s\alpha$。取值范围为$(0,1]$，默认值为1.0；$\alpha=1.0$表示不衰减，值越小表示衰减越强、序列后部选择的Key Block越少。 | FLOAT32 | - | - |
 | `initial_blocks` | 输入属性 | 开头固定保留的Sink Block数。 | 当前仅支持4，默认值为4。 | INT64 | - | - |
 | `window_size` | 输入属性 | 末尾固定保留的Window Block数。 | 当前仅支持4，默认值为4。 | INT64 | - | - |
 | `k_block_num_rate_medium` | 输入属性 | 中等长度Prompt的TopK预算系数。 | 当前仅支持0.2，默认值为0.2。 | FLOAT32 | - | - |
@@ -117,8 +128,8 @@ torch.ops.custom.npu_stem_indexer(
 | `k_block_num_rate_large` | 输入属性 | 长Prompt的TopK预算系数。 | 当前仅支持0.1，默认值为0.1。 | FLOAT32 | - | - |
 | `k_block_num_bias_large` | 输入属性 | 长Prompt的TopK预算偏置。 | 当前仅支持30，默认值为30。 | INT64 | - | - |
 | `topk_score_precision` | 输入属性 | TopK内部可排序Score的存储精度。 | 1表示UINT32，2表示UINT16，默认值为1；不改变输出Tensor的数据类型。 | INT64 | - | - |
-| `sparse_indices` | 输出 | 选中的Key Block逻辑索引。 | 每行仅前`sparse_seq_len`项有效，尾部无效区填充为-1；调用者不应依赖有效索引的排列顺序。 | INT32 | ND | `(B,N1,max_Qb,max_Kb)` |
-| `sparse_seq_len` | 输出 | 每个Query Block对应的有效Key Block数量。 | 无有效Query/KV任务时对应值为0。 | INT32 | ND | `(B,N1,max_Qb)` |
+| `sparse_indices` | 输出 | 选中的Key Block逻辑索引。 | 每行仅前`sparse_seq_len`项有效，尾部无效区填充为-1；调用者不应依赖有效索引的排列顺序。 | INT32 | ND | $(B,N_q,Q_{\max},K_{\max})$ |
+| `sparse_seq_len` | 输出 | 每个Query Block对应的有效Key Block数量。 | 无有效Query/KV任务时对应值为0。 | INT32 | ND | $(B,N_q,Q_{\max})$ |
 
 ## 约束说明
 
@@ -130,7 +141,7 @@ torch.ops.custom.npu_stem_indexer(
 - `vbias`仅支持FLOAT32、ND格式和3D Tensor。
 - `q_seq_lens`、`kv_seq_lens`仅支持INT32、ND格式和1D Tensor；传入`num_prompt_tokens`或`metadata`时同样仅支持INT32、ND格式和1D Tensor。
 - `sparse_indices`、`sparse_seq_len`的数据类型固定为INT32，数据格式为ND。
-- `stem_block_size`固定为128，`stem_stride`固定为16，因此`R=8`、`D_flat=2048`。
+- `stem_block_size`固定为128，`stem_stride`固定为16，因此$R=8$、$D_f=2048$。
 - `initial_blocks`固定为4，`window_size`固定为4。
 - `k_block_num_rate_medium`固定为0.2，`k_block_num_bias_medium`固定为30。
 - `k_block_num_rate_large`固定为0.1，`k_block_num_bias_large`固定为30。
@@ -146,69 +157,68 @@ torch.ops.custom.npu_stem_indexer(
 
 ### 一致性约束
 
-- `B`的取值范围为`[1, 65536]`，`max_Qb`和`max_Kb`必须大于0。
-- `N1`仅支持32或64，`N2`仅支持2、4或8，并满足`N1 % N2 == 0`。
+- $B$的取值范围为$[1,65536]$，$Q_{\max}$和$K_{\max}$必须大于0。
+- $N_q$仅支持32或64，$N_k$仅支持2、4或8，并满足$N_q\bmod N_k=0$。
 - `qflat`和`kflat`的Batch维、最后一维必须一致，最后一维固定为2048。
-- `vbias`的shape必须为`(B,N2,max_Kb)`，与`kflat`对应维度一致。
-- `q_seq_lens`和`kv_seq_lens`的shape必须为`(B)`；传入`num_prompt_tokens`时，其shape也必须为`(B)`。
-- `q_seq_lens[b]`应满足`0 <= q_seq_lens[b] <= max_Qb * stem_block_size`。
-- `kv_seq_lens[b]`应满足`0 <= kv_seq_lens[b] <= max_Kb * stem_block_size`。
+- `vbias`的shape必须为$(B,N_k,K_{\max})$，与`kflat`对应维度一致。
+- `q_seq_lens`和`kv_seq_lens`的shape必须为$(B)$；传入`num_prompt_tokens`时，其shape也必须为$(B)$。
+- `q_seq_lens[b]`应满足$0\leq\text{q\_seq\_lens}[b]\leq Q_{\max}B_s$。
+- `kv_seq_lens[b]`应满足$0\leq\text{kv\_seq\_lens}[b]\leq K_{\max}B_s$。
 - 有效Prompt Token数应为非负值，并满足`effective_num_prompt_tokens[b] >= kv_seq_lens[b]`；其中传入`num_prompt_tokens`时取其值，未传入时`effective_num_prompt_tokens = kv_seq_lens`。
-- `sparse_indices`的shape由输入推导为`(B,N1,max_Qb,max_Kb)`；`sparse_seq_len`的shape由输入推导为`(B,N1,max_Qb)`。
-- `sparse_indices`有效前缀中的元素为Key Block逻辑索引，取值范围为`[0, actual_Kb - 1]`。
-- `sparse_seq_len`每个元素的取值范围为`[0, actual_visible_Kb]`，并且不大于对应输出行的`max_Kb`。
+- `sparse_indices`的shape由输入推导为$(B,N_q,Q_{\max},K_{\max})$；`sparse_seq_len`的shape由输入推导为$(B,N_q,Q_{\max})$。
+- `sparse_indices`有效前缀中的元素为Key Block逻辑索引，第$b$个Batch中的取值范围为$[0,K_b-1]$。
+- `sparse_seq_len`每个元素的取值范围为$[0,K_{b,i}^{\mathrm{vis}}]$，并且不大于对应输出行的$K_{\max}$。
 
 ### 特性交叉约束
 
-- `metadata`必须由与主算子相同的`q_seq_lens`、`kv_seq_lens`、`N1`、`N2`、`causal`、`stem_block_size`、`D_flat`和`window_size`生成。
-- `metadata`最大Section数为`B * N2`，容量按以下公式计算，单位为INT32元素：
+- `metadata`必须由与主算子相同的`q_seq_lens`、`kv_seq_lens`、$N_q$、$N_k$、`causal`、`stem_block_size`、$D_f$和`window_size`生成。
+- `metadata`最大Section数为$BN_k$。令$C_{\max}$表示最大Section数、$E$表示对齐前所需元素数，则容量$M$按以下公式计算，单位为INT32元素：
 
-    ```text
-    max_section_num = B * N2
-    required_elems = 16 + max_section_num * (36 + 72) * 16
-    metadata_size = AlignUp(required_elems, 4096)
-    ```
+    $$
+    C_{\max}=BN_k,\qquad E=16+C_{\max}(36+72)\times16,\qquad M=\operatorname{AlignUp}(E,4096)
+    $$
 
-- `causal=false`时，每个有效Query Block可以在实际KV Block范围内选块。
-- `causal=true`且不是Decode场景时，第`qb`个Query Block的可见KV Block数量为：
-
-    ```text
-    s2_valid = clamp(Kb - Qb + qb + 1, 0, Kb)
-    ```
-
-- Decode场景定义为`q_seq_lens[b] == 1`且`effective_num_prompt_tokens[b] >= kv_seq_lens[b]`，该场景使用完整的实际KV Block范围。
-- Sink Block和Window Block不参与普通TopK候选，最终结果为固定块与动态TopK结果的并集，避免重复索引。
+- `causal=false`时，每个有效Query Block可以在实际KV Block范围内选块；`causal=true`时按Right-down Causal语义限制可见范围。
+- Sink Block和Window Block不参与普通TopK候选，最终按Sink Block、普通TopK结果、Window Block的顺序拼接；实现不执行额外的去重操作。
 - `topk_score_precision`只影响内部Score排序精度；无论取1还是2，`sparse_indices`与`sparse_seq_len`均为INT32。
 - Tensor元素值相关约束由调用者保证；接口的Shape/Dtype校验不能替代对输入Tensor内容的合法性检查。
 
 ## 动态TopK预算说明
 
-首先将Prompt Token数转换为Prompt Block数：
+令$L_b^p$表示第$b$个Batch的有效Prompt Token数，首先将其转换为Prompt Block数：
 
-```text
-prompt_block_num = ceil(num_prompt_tokens / stem_block_size)
-```
+$$
+P_b=\left\lceil\frac{L_b^p}{B_s}\right\rceil
+$$
 
-根据Prompt Block数计算初始预算`k_start`：
+根据$P_b$计算初始预算$K_s$：
 
-```text
-prompt_block_num < 56:
-    k_start = prompt_block_num
-
-56 <= prompt_block_num < 160:
-    k_start = floor(prompt_block_num * 0.2 + 30)
-
-prompt_block_num >= 160:
-    k_start = floor(prompt_block_num * 0.1 + 30)
-```
+$$
+K_s=
+\begin{cases}
+P_b, & P_b<56,\\
+\lfloor0.2P_b+30\rfloor, & 56\leq P_b<160,\\
+\lfloor0.1P_b+30\rfloor, & P_b\geq160.
+\end{cases}
+$$
 
 位置衰减终点为：
 
-```text
-k_end = k_start * alpha
-```
+$$
+K_e=\alpha K_s
+$$
 
-在衰减区间内，当前Query Block的动态预算按照`k_start`到`k_end`线性插值后向下取整，并限制在`[1,k_start]`范围内。动态TopK最多选择256个普通候选块，此外固定保留最多4个Sink Block和4个Window Block；最终有效索引数量不超过当前Query Block的实际可见KV Block数量。
+对于第$i$个Query Block，令$p_i=i+K_b-Q_b$表示其Right-down对齐位置，$\Delta_b=P_b-K_s$表示衰减区间长度。当$p_i<K_s$或$\Delta_b\leq1$时，$K_i=K_s$；否则：
+
+$$
+t_i=\frac{p_i-K_s}{\Delta_b-1}
+$$
+
+$$
+K_i=\operatorname{clamp}\left(\left\lfloor K_s+t_i(K_e-K_s)\right\rfloor,1,K_s\right)
+$$
+
+实际普通TopK数量还会限制为不超过256。最终结果额外固定保留最多4个Sink Block和4个Window Block，并且有效索引数量不超过当前Query Block的实际可见KV Block数量。
 
 ## Ascend 950PR/Ascend 950DT调用示例
 
