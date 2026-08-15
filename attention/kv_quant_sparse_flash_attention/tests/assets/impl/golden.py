@@ -30,7 +30,9 @@ class CaseDataStore:
 
     def put(self, testcase_name, data):
         if testcase_name is None:
-            raise RuntimeError("KvQuantSparseFlashAttention requires testcase_name for pytest-backed golden")
+            raise RuntimeError(
+                "KvQuantSparseFlashAttention requires testcase_name for pytest-backed golden"
+            )
         self.cases = {str(testcase_name): data}
 
     def get(self, testcase_name):
@@ -169,25 +171,31 @@ class KvQuantSparseFlashAttentionPytestAdapter:
             if f"pytest_{name}" not in attributes
         ]
         if missing:
-            raise ValueError(
-                f"QSFA CSV is missing explicit pytest fields: {missing}"
-            )
+            raise ValueError(f"QSFA CSV is missing explicit pytest fields: {missing}")
         pytest_params = {
             name: copy.deepcopy(attributes.get(f"pytest_{name}"))
             for name in cls.REQUIRED_PARAM_NAMES
         }
-        for name in ("T1", "T2", "block_size", "block_num"):
+        for name in ("T1", "T2", "block_size", "block_num", "enable_sinks"):
             key = f"pytest_{name}"
             if key in attributes:
                 pytest_params[name] = copy.deepcopy(attributes[key])
         for name in (
-            "range_query", "range_key", "range_query_rope", "range_key_rope",
-            "range_dequant_scale", "Testcase_Number",
+            "range_query",
+            "range_key",
+            "range_query_rope",
+            "range_key_rope",
+            "range_dequant_scale",
+            "Testcase_Number",
+            "range_sinks",
         ):
             key = f"pytest_{name}"
             if key in attributes:
                 pytest_params[name] = copy.deepcopy(attributes[key])
-        if pytest_params["actual_seq_q"] is None or pytest_params["actual_seq_kv"] is None:
+        if (
+            pytest_params["actual_seq_q"] is None
+            or pytest_params["actual_seq_kv"] is None
+        ):
             raise ValueError(
                 "QSFA CSV must provide actual_seq_q and actual_seq_kv; "
                 "random sequence generation is not allowed during TTK conversion"
@@ -201,11 +209,29 @@ class KvQuantSparseFlashAttentionPytestAdapter:
         return params, pytest_golden
 
 
-def cpu_kv_quant_sparse_flash_attention(query, key, value, sparse_indices, scale_value,
-                                         key_quant_mode, value_quant_mode, *,
-                                         testcase_name=None, **kwargs):
+def cpu_kv_quant_sparse_flash_attention(
+    query,
+    key,
+    value,
+    sparse_indices,
+    scale_value,
+    key_quant_mode,
+    value_quant_mode,
+    *,
+    testcase_name=None,
+    **kwargs,
+):
     """Return the pytest CPU golden that was generated for this exact case."""
-    del query, key, value, sparse_indices, scale_value, key_quant_mode, value_quant_mode, kwargs
+    del (
+        query,
+        key,
+        value,
+        sparse_indices,
+        scale_value,
+        key_quant_mode,
+        value_quant_mode,
+        kwargs,
+    )
     return CASE_DATA.get(testcase_name)["golden"]
 
 

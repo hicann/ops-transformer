@@ -406,7 +406,7 @@ def get_param_fus(input_tensor_dict, params):
         params["dtype_input"]["dequant_scale"]
     )
     fa_param["v_dequant_scale_tensor"] = input_tensor_dict["dequant_scale"]
-    
+
     fa_param["sinks_tensor"] = input_tensor_dict.get("sinks")
 
     # >> out info
@@ -524,7 +524,7 @@ def generate_input_tensors(params):
     raw = {}
     for key in tensor_keys:
         raw[key] = generate_tensor_data.gen_tensor_data(params, key).to("npu")
-    
+
     sinks = None
     if params.get("enable_sinks", False):
         sinks = generate_tensor_data.gen_tensor_data(params, "sinks").to("npu")
@@ -1019,11 +1019,10 @@ def _t_increattention_bnsd(fa_param):
                     continue
                 bmm1Res = torch.matmul(q_curr.float(), k_sparse.float().T)
                 scaleRes = bmm1Res * scaleValue
-                cur_sinks = None
                 if sinks_tensor is None:
                     softmax_res = softmax(scaleRes)
                 else:
-                    cur_sinks = sinks_tensor[n2Idx * g: (n2Idx + 1) * g]
+                    cur_sinks = sinks_tensor[n2Idx * g : (n2Idx + 1) * g]
                     softmax_res = softmax_sinks(scaleRes, cur_sinks)
                 if fa_param["q_dtype"] == "float16":
                     bmm2Res = torch.matmul(
@@ -1068,7 +1067,9 @@ def kv_concat_pa_preprocessing(input_tensor_dict, fa_param, params):
     k_dequant_scale_cache_shape[-1] = 512 // 128
 
     k_cache = torch.zeros(k_cache_shape, dtype=k_torch_dtype)
-    k_rope_cache = torch.zeros(k_rope_cache_shape, dtype=torch.bfloat16)
+    k_rope_cache = torch.zeros(
+        k_rope_cache_shape, dtype=fa_param.get("_raw_key_rope").dtype
+    )
     k_dequant_scale_cache = torch.zeros(
         k_dequant_scale_cache_shape, dtype=torch.float32
     )
@@ -1232,11 +1233,15 @@ def kv_concat_pa_preprocessing(input_tensor_dict, fa_param, params):
         block_num = params.get("block_num", blockTableShape[0])
         kv_dim = k_cache_concat.shape[-1]
         blocksize_with_stride = blockSize + key_stride
-        blockFusion = torch.zeros((block_num, blocksize_with_stride * kv_dim), dtype=k_cache_concat.dtype)
+        blockFusion = torch.zeros(
+            (block_num, blocksize_with_stride * kv_dim), dtype=k_cache_concat.dtype
+        )
         base_flat = k_cache_concat.reshape(block_num, blockSize * kv_dim)
         blockFusion[:, : blockSize * kv_dim] = base_flat
         blockFusion = blockFusion.npu()
-        base_kv_nc = blockFusion[:, : blockSize * kv_dim].view(block_num, blockSize, 1, kv_dim)
+        base_kv_nc = blockFusion[:, : blockSize * kv_dim].view(
+            block_num, blockSize, 1, kv_dim
+        )
         input_tensor_dict["key_cache"] = base_kv_nc
         input_tensor_dict["value_cache"] = base_kv_nc
 

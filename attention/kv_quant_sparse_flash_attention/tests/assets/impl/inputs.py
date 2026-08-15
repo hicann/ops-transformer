@@ -57,12 +57,18 @@ class KvQuantSparseFlashAttentionInputAdapter:
             return
         if source is None:
             raise ValueError(f"{name} is declared by CSV but pytest did not produce it")
-        source_cpu = source.detach().cpu() if torch.is_tensor(source) else torch.as_tensor(source)
+        source_cpu = (
+            source.detach().cpu()
+            if torch.is_tensor(source)
+            else torch.as_tensor(source)
+        )
         if tuple(destination.shape) != tuple(source_cpu.shape):
             raise ValueError(
                 f"{name} shape mismatch: TTK={tuple(destination.shape)}, pytest={tuple(source_cpu.shape)}"
             )
-        destination.copy_(source_cpu.to(dtype=destination.dtype, device=destination.device))
+        destination.copy_(
+            source_cpu.to(dtype=destination.dtype, device=destination.device)
+        )
 
     @staticmethod
     def copy_sequence(destination, values, name):
@@ -73,8 +79,12 @@ class KvQuantSparseFlashAttentionInputAdapter:
                 )
             return
         if values is None:
-            raise ValueError(f"{name} is declared by CSV but pytest parameter conversion returned None")
-        source = torch.tensor(values, dtype=destination.dtype, device=destination.device)
+            raise ValueError(
+                f"{name} is declared by CSV but pytest parameter conversion returned None"
+            )
+        source = torch.tensor(
+            values, dtype=destination.dtype, device=destination.device
+        )
         if source.numel() != destination.numel():
             raise ValueError(
                 f"{name} size mismatch: TTK={destination.numel()}, pytest={source.numel()}"
@@ -82,10 +92,20 @@ class KvQuantSparseFlashAttentionInputAdapter:
         destination.copy_(source.reshape(destination.shape))
 
     @staticmethod
-    def validate_api_attributes(params, scale_value, key_quant_mode, value_quant_mode,
-                                sparse_block_size, layout_query, layout_kv, sparse_mode,
-                                attention_mode, quant_scale_repo_mode, tile_size,
-                                rope_head_dim):
+    def validate_api_attributes(
+        params,
+        scale_value,
+        key_quant_mode,
+        value_quant_mode,
+        sparse_block_size,
+        layout_query,
+        layout_kv,
+        sparse_mode,
+        attention_mode,
+        quant_scale_repo_mode,
+        tile_size,
+        rope_head_dim,
+    ):
         expected = {
             "scalevalue": scale_value,
             "key_quant_mode": key_quant_mode,
@@ -106,18 +126,36 @@ class KvQuantSparseFlashAttentionInputAdapter:
         }
         if mismatches:
             raise ValueError(
-                "QSFA API attributes differ from explicit pytest fields: "
-                f"{mismatches}"
+                f"QSFA API attributes differ from explicit pytest fields: {mismatches}"
             )
 
-    def generate(self, query, key, value, sparse_indices, scale_value,
-                 key_quant_mode, value_quant_mode, *, key_dequant_scale=None,
-                 value_dequant_scale=None, block_table=None,
-                 actual_seq_lengths_query=None, actual_seq_lengths_kv=None,
-                 sparse_block_size=1, layout_query="BSND", layout_kv="BSND",
-                 sparse_mode=3, attention_mode=0, quant_scale_repo_mode=1,
-                 tile_size=128, rope_head_dim=64, testcase_name=None,
-                 **kwargs):
+    def generate(
+        self,
+        query,
+        key,
+        value,
+        sparse_indices,
+        scale_value,
+        key_quant_mode,
+        value_quant_mode,
+        *,
+        key_dequant_scale=None,
+        value_dequant_scale=None,
+        block_table=None,
+        sinks=None,
+        actual_seq_lengths_query=None,
+        actual_seq_lengths_kv=None,
+        sparse_block_size=1,
+        layout_query="BSND",
+        layout_kv="BSND",
+        sparse_mode=3,
+        attention_mode=0,
+        quant_scale_repo_mode=1,
+        tile_size=128,
+        rope_head_dim=64,
+        testcase_name=None,
+        **kwargs,
+    ):
         """Generate final packed API tensors and the CPU golden through pytest."""
         golden_module = self.golden_module()
         params, pytest_golden = (
@@ -154,14 +192,23 @@ class KvQuantSparseFlashAttentionInputAdapter:
         self.copy_tensor(query, generated.get("query_cache"), "query")
         self.copy_tensor(key, generated.get("key_cache"), "key")
         self.copy_tensor(value, generated.get("value_cache"), "value")
-        self.copy_tensor(sparse_indices, generated.get("sparse_indices"), "sparse_indices")
+        self.copy_tensor(
+            sparse_indices, generated.get("sparse_indices"), "sparse_indices"
+        )
         # Pytest creates an internal block table for its CPU model even for non-PA layouts.
         if block_table is not None:
             self.copy_tensor(block_table, generated.get("block_table"), "block_table")
         elif layout_kv == "PA_BSND":
             raise ValueError("PA_BSND requires block_table to be declared by the CSV")
-        self.copy_sequence(actual_seq_lengths_query, params["actualseqlengths"], "actual_seq_lengths_query")
-        self.copy_sequence(actual_seq_lengths_kv, params["actualseqlengthskv"], "actual_seq_lengths_kv")
+        self.copy_sequence(
+            actual_seq_lengths_query,
+            params["actualseqlengths"],
+            "actual_seq_lengths_query",
+        )
+        self.copy_sequence(
+            actual_seq_lengths_kv, params["actualseqlengthskv"], "actual_seq_lengths_kv"
+        )
+        self.copy_tensor(sinks, generated.get("sinks"), "sinks")
 
         golden_module.CASE_DATA.put(
             testcase_name,
@@ -169,14 +216,32 @@ class KvQuantSparseFlashAttentionInputAdapter:
         )
 
 
-def generate_qsfa_inputs(query, key, value, sparse_indices, scale_value,
-                         key_quant_mode, value_quant_mode, *, key_dequant_scale=None,
-                         value_dequant_scale=None, block_table=None,
-                         actual_seq_lengths_query=None, actual_seq_lengths_kv=None,
-                         sparse_block_size=1, layout_query="BSND", layout_kv="BSND",
-                         sparse_mode=3, attention_mode=0, quant_scale_repo_mode=1,
-                         tile_size=128, rope_head_dim=64, testcase_name=None,
-                         **kwargs):
+def generate_qsfa_inputs(
+    query,
+    key,
+    value,
+    sparse_indices,
+    scale_value,
+    key_quant_mode,
+    value_quant_mode,
+    *,
+    key_dequant_scale=None,
+    value_dequant_scale=None,
+    block_table=None,
+    sinks=None,
+    actual_seq_lengths_query=None,
+    actual_seq_lengths_kv=None,
+    sparse_block_size=1,
+    layout_query="BSND",
+    layout_kv="BSND",
+    sparse_mode=3,
+    attention_mode=0,
+    quant_scale_repo_mode=1,
+    tile_size=128,
+    rope_head_dim=64,
+    testcase_name=None,
+    **kwargs,
+):
     return INPUT_ADAPTER.generate(
         query,
         key,
@@ -190,6 +255,7 @@ def generate_qsfa_inputs(query, key, value, sparse_indices, scale_value,
         block_table=block_table,
         actual_seq_lengths_query=actual_seq_lengths_query,
         actual_seq_lengths_kv=actual_seq_lengths_kv,
+        sinks=sinks,
         sparse_block_size=sparse_block_size,
         layout_query=layout_query,
         layout_kv=layout_kv,

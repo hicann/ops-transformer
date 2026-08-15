@@ -57,7 +57,11 @@ class SparseFlashAttentionInputAdapter:
             return
         if source is None:
             raise ValueError(f"{name} is declared by CSV but pytest did not produce it")
-        source_cpu = source.detach().cpu() if torch.is_tensor(source) else torch.as_tensor(source)
+        source_cpu = (
+            source.detach().cpu()
+            if torch.is_tensor(source)
+            else torch.as_tensor(source)
+        )
         if tuple(destination.shape) != tuple(source_cpu.shape):
             raise ValueError(
                 f"{name} shape mismatch: TTK={tuple(destination.shape)}, pytest={tuple(source_cpu.shape)}"
@@ -81,7 +85,9 @@ class SparseFlashAttentionInputAdapter:
             raise ValueError(
                 f"{name} is declared by CSV but pytest parameter conversion returned None"
             )
-        source = torch.tensor(values, dtype=destination.dtype, device=destination.device)
+        source = torch.tensor(
+            values, dtype=destination.dtype, device=destination.device
+        )
         if source.numel() != destination.numel():
             raise ValueError(
                 f"{name} size mismatch: TTK={destination.numel()}, pytest={source.numel()}"
@@ -89,10 +95,17 @@ class SparseFlashAttentionInputAdapter:
         destination.copy_(source.reshape(destination.shape))
 
     @staticmethod
-    def validate_api_attributes(params, scale_value, sparse_block_size,
-                                layout_query, layout_kv, sparse_mode,
-                                attention_mode, return_softmax_lse,
-                                rope_head_dim):
+    def validate_api_attributes(
+        params,
+        scale_value,
+        sparse_block_size,
+        layout_query,
+        layout_kv,
+        sparse_mode,
+        attention_mode,
+        return_softmax_lse,
+        rope_head_dim,
+    ):
         expected = {
             "scalevalue": scale_value,
             "sparse_blocksize": sparse_block_size,
@@ -114,12 +127,30 @@ class SparseFlashAttentionInputAdapter:
                 f"fields: {mismatches}"
             )
 
-    def generate(self, query, key, value, sparse_indices, scale_value, *, block_table=None,
-                 actual_seq_lengths_query=None, actual_seq_lengths_kv=None,
-                 query_rope=None, key_rope=None, sparse_block_size=1,
-                 layout_query="BSND", layout_kv="BSND", sparse_mode=3,
-                 attention_mode=0, return_softmax_lse=False, testcase_name=None,
-                 input_ranges=None, **kwargs):
+    def generate(
+        self,
+        query,
+        key,
+        value,
+        sparse_indices,
+        scale_value,
+        *,
+        block_table=None,
+        actual_seq_lengths_query=None,
+        actual_seq_lengths_kv=None,
+        query_rope=None,
+        key_rope=None,
+        sinks=None,
+        sparse_block_size=1,
+        layout_query="BSND",
+        layout_kv="BSND",
+        sparse_mode=3,
+        attention_mode=0,
+        return_softmax_lse=False,
+        testcase_name=None,
+        input_ranges=None,
+        **kwargs,
+    ):
         """Generate final API tensors and the CPU golden through pytest."""
         del input_ranges
         golden_module = self.golden_module()
@@ -148,17 +179,33 @@ class SparseFlashAttentionInputAdapter:
 
         self.copy_tensor(query, generated.get("query"), "query")
         self.copy_tensor(key, generated.get("key_cache", generated.get("key")), "key")
-        self.copy_tensor(value, generated.get("value_cache", generated.get("value")), "value")
-        self.copy_tensor(sparse_indices, generated.get("sparse_indices"), "sparse_indices")
+        self.copy_tensor(
+            value, generated.get("value_cache", generated.get("value")), "value"
+        )
+        self.copy_tensor(
+            sparse_indices, generated.get("sparse_indices"), "sparse_indices"
+        )
         # Pytest creates an internal block table for its CPU model even for non-PA layouts.
         if block_table is not None:
             self.copy_tensor(block_table, generated.get("block_table"), "block_table")
         elif layout_kv == "PA_BSND":
             raise ValueError("PA_BSND requires block_table to be declared by the CSV")
-        self.copy_sequence(actual_seq_lengths_query, params["actualseqlengths"], "actual_seq_lengths_query")
-        self.copy_sequence(actual_seq_lengths_kv, params["actualseqlengthskv"], "actual_seq_lengths_kv")
+        self.copy_sequence(
+            actual_seq_lengths_query,
+            params["actualseqlengths"],
+            "actual_seq_lengths_query",
+        )
+        self.copy_sequence(
+            actual_seq_lengths_kv, params["actualseqlengthskv"], "actual_seq_lengths_kv"
+        )
         self.copy_tensor(query_rope, generated.get("query_rope"), "query_rope")
-        self.copy_tensor(key_rope, generated.get("key_rope_cache", generated.get("key_rope")), "key_rope")
+        self.copy_tensor(
+            key_rope,
+            generated.get("key_rope_cache", generated.get("key_rope")),
+            "key_rope",
+        )
+        if sinks is not None:
+            self.copy_tensor(sinks, generated.get("sinks"), "sinks")
 
         golden_module.CASE_DATA.put(
             testcase_name,
@@ -170,12 +217,29 @@ class SparseFlashAttentionInputAdapter:
         )
 
 
-def generate_sfa_inputs(query, key, value, sparse_indices, scale_value, *, block_table=None,
-                        actual_seq_lengths_query=None, actual_seq_lengths_kv=None,
-                        query_rope=None, key_rope=None, sparse_block_size=1,
-                        layout_query="BSND", layout_kv="BSND", sparse_mode=3,
-                        attention_mode=0, return_softmax_lse=False, testcase_name=None,
-                        input_ranges=None, **kwargs):
+def generate_sfa_inputs(
+    query,
+    key,
+    value,
+    sparse_indices,
+    scale_value,
+    *,
+    block_table=None,
+    actual_seq_lengths_query=None,
+    actual_seq_lengths_kv=None,
+    query_rope=None,
+    key_rope=None,
+    sinks=None,
+    sparse_block_size=1,
+    layout_query="BSND",
+    layout_kv="BSND",
+    sparse_mode=3,
+    attention_mode=0,
+    return_softmax_lse=False,
+    testcase_name=None,
+    input_ranges=None,
+    **kwargs,
+):
     return INPUT_ADAPTER.generate(
         query,
         key,
@@ -187,6 +251,7 @@ def generate_sfa_inputs(query, key, value, sparse_indices, scale_value, *, block
         actual_seq_lengths_kv=actual_seq_lengths_kv,
         query_rope=query_rope,
         key_rope=key_rope,
+        sinks=sinks,
         sparse_block_size=sparse_block_size,
         layout_query=layout_query,
         layout_kv=layout_kv,
