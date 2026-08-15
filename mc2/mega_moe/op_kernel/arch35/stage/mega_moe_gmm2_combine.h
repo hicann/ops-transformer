@@ -570,9 +570,9 @@ __aicore__ inline void Gmm2AicMmadGeneric(BlockMmad &blockMmad, WorkSet &workSet
         // current tile's address calculation is not inserted into the compute critical path.
         auto gmBlockA = workSet.gmA.Slice(Te::MakeCoord(mLoc, kLoc),
                                           Te::MakeShape(Get<M_VALUE>(actualShape), Get<K_VALUE>(actualShape)));
+        /* E8M0 scales are padded to an even count because GM->L1 moves 64-K scale pairs as b16. */
         auto gmBlockScaleA = workSet.gmScaleA.Slice(
-            Te::MakeCoord(mLoc, kLoc / MXFP_SCALE_GROUP_NUM),
-            Te::MakeShape(Get<M_VALUE>(actualShape), CeilDiv(Get<K_VALUE>(actualShape), MXFP_SCALE_GROUP_NUM)));
+            Te::MakeCoord(mLoc, 0), Te::MakeShape(Get<M_VALUE>(actualShape), config.scaleK));
 
         if constexpr (std::remove_reference_t<decltype(config)>::IS_WAVE_FLAG_GRAINED) {
             uint32_t waveIdx = mLoc / L1_TILE_M_256;
@@ -590,8 +590,7 @@ __aicore__ inline void Gmm2AicMmadGeneric(BlockMmad &blockMmad, WorkSet &workSet
         auto gmBlockB = workSet.gmB.Slice(Te::MakeCoord(kLoc, nLoc),
                                           Te::MakeShape(Get<K_VALUE>(actualShape), Get<N_VALUE>(actualShape)));
         auto gmBlockScaleB = workSet.gmScaleB.Slice(
-            Te::MakeCoord(kLoc / MXFP_SCALE_GROUP_NUM, nLoc),
-            Te::MakeShape(CeilDiv(Get<K_VALUE>(actualShape), MXFP_SCALE_GROUP_NUM), Get<N_VALUE>(actualShape)));
+            Te::MakeCoord(0, nLoc), Te::MakeShape(config.scaleK, Get<N_VALUE>(actualShape)));
         auto gmBlockC = workSet.gmC.Slice(Te::MakeCoord(mLoc, nLoc),
                                           Te::MakeShape(Get<M_VALUE>(actualShape), Get<N_VALUE>(actualShape)));
         blockMmad(gmBlockA, gmBlockB, gmBlockScaleA, gmBlockScaleB, workSet.gmBias, gmBlockC, singleShape);
@@ -707,7 +706,8 @@ __aicore__ inline void Gmm2Aiv0PrologueA8W4(BlockPrologue &blockPrologue, Schedu
         uint32_t nLoc = Get<N_VALUE>(blockCoord);
         auto mL1Size = Get<M_VALUE>(actualShape);
         auto nL1Size = Get<N_VALUE>(actualShape);
-        blockPrologue(gmB, mL1Size, config.k, nL1Size, nLoc, config.n, config.l1Params.kL1);
+        blockPrologue(gmB, mL1Size, config.k, nL1Size, nLoc, config.n,
+                      config.blockMmadTiling.l1Params.kL1);
     }
 }
 
@@ -716,7 +716,7 @@ template <uint8_t CombineQuantMode, typename BlockMmad, typename ElementC, bool 
           bool IsShared = false, typename Scheduler, typename Config>
 __aicore__ inline void Gmm2ExecGeneric(
     Scheduler &scheduler, const GMMAddrInfo &gmmAddrInfo, const Config &config, uint32_t startLoopIdx,
-    uint32_t tileNum, PersistentBlockMmadContext<BlockMmad> *persistentContext,
+    uint32_t tileNum, BlockMmadContext<BlockMmad> *blockMmadContext,
     bool allowWeightL2Bypass)
 {
     using KernelConfig = typename Config::KernelConfig;
@@ -752,15 +752,15 @@ __aicore__ inline void Gmm2ExecGeneric(
     WorkSetType workSet{scheduler, gmA, gmB, gmScaleA, gmScaleB, gmBias, gmC};
 
     if constexpr (g_coreType == AscendC::AIC) {
-        if (persistentContext != nullptr) {
-            InitBlockMmad(*persistentContext, config);
+        if (blockMmadContext != nullptr) {
+            InitBlockMmad(*blockMmadContext, config);
             Gmm2AicMmadGeneric<CombineQuantMode, BlockMmad, IsShared, IsLayered>(
-                persistentContext->blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum);
+                blockMmadContext->blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum);
         } else {
-            PersistentBlockMmadContext<BlockMmad> localContext;
-            InitBlockMmad(localContext, config);
+            BlockMmadContext<BlockMmad> localBlockMmadContext;
+            InitBlockMmad(localBlockMmadContext, config);
             Gmm2AicMmadGeneric<CombineQuantMode, BlockMmad, IsShared, IsLayered>(
-                localContext.blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum);
+                localBlockMmadContext.blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum);
         }
     }
 }
@@ -802,9 +802,13 @@ __aicore__ inline void Gmm2ExecA8W4(
 
     if constexpr (g_coreType == AscendC::AIC) {
         BlockMmad blockMmad{};
-        typename BlockMmad::BlockShape l0TileShape{config.tileM, L1_TILE_N, L0_TILE_K, 0};
+        typename BlockMmad::BlockShape l0TileShape{
+            config.blockMmadTiling.tileM,
+            config.blockMmadTiling.tileN,
+            L0_TILE_K,
+            0};
         typename BlockMmad::ProblemShape matmulShape{config.m, config.outputN, config.k, 0};
-        blockMmad.Init(matmulShape, l0TileShape, config.l1Params);
+        blockMmad.Init(matmulShape, l0TileShape, config.blockMmadTiling.l1Params);
         Gmm2AicMmadA8W4<CombineQuantMode, IsShared, IsLayered, BlockMmad, decltype(workSet.scheduler),
                         decltype(workSet.gmA), decltype(workSet.gmScaleA), decltype(workSet.gmScaleB),
                         std::remove_reference_t<decltype(workSet.gmC)>, Config>(
@@ -834,7 +838,7 @@ template <uint8_t CombineQuantMode, typename ElementA, typename ElementB, typena
 __aicore__ inline void RunGmm2Generic(
     const AscendC::Shape<int64_t, int64_t, int64_t, int64_t> &problemShape,
     const GMMAddrInfo &gmmAddrInfo, uint32_t &startBlockIdx, const BlockJobContext &blockJob,
-    void *persistentBlockMmadContext = nullptr, bool allowWeightL2Bypass = false)
+    void *blockMmadContext = nullptr, bool allowWeightL2Bypass = false)
 {
     using GmmConfig = GmmKernel::Config<false, CombineQuantMode, ElementA, ElementB, ElementC, ElementMxScaleA,
                                         ElementMxScaleB, IsWeightNZ, TopkWeightsPrefetch, IsShared,
@@ -855,10 +859,10 @@ __aicore__ inline void RunGmm2Generic(
     uint32_t startLoopIdx =
         (config.blockIdx < startBlockIdx ? config.blockIdx + config.blockNum : config.blockIdx) - startBlockIdx;
     using BlockMmad = typename GmmConfig::BlockMmad;
-    using PersistentContext = GmmKernel::PersistentBlockMmadContext<BlockMmad>;
-    auto *persistentContext = reinterpret_cast<PersistentContext *>(persistentBlockMmadContext);
+    using MmadContext = GmmKernel::BlockMmadContext<BlockMmad>;
+    auto *typedBlockMmadContext = reinterpret_cast<MmadContext *>(blockMmadContext);
     GmmKernel::Gmm2ExecGeneric<CombineQuantMode, BlockMmad, ElementC, IsLayered, IsShared>(
-        scheduler, gmmAddrInfo, config, startLoopIdx, tileNum, persistentContext,
+        scheduler, gmmAddrInfo, config, startLoopIdx, tileNum, typedBlockMmadContext,
         allowWeightL2Bypass);
 
     startBlockIdx = (startBlockIdx + tileNum) % config.blockNum;
@@ -870,7 +874,7 @@ template <uint8_t CombineQuantMode, typename ElementA, typename ElementB, typena
           bool IsGmm1Interleaved = false, bool IsWaveFlagGrained = false>
 __aicore__ inline void RunGmm2Generic(
     const AscendC::Shape<int64_t, int64_t, int64_t, int64_t> &problemShape,
-    const GMMAddrInfo &gmmAddrInfo, uint32_t &startBlockIdx, void *persistentBlockMmadContext = nullptr,
+    const GMMAddrInfo &gmmAddrInfo, uint32_t &startBlockIdx, void *blockMmadContext = nullptr,
     bool allowWeightL2Bypass = false)
 {
     BlockJobContext blockJob{static_cast<uint32_t>(GetBlockIdx() / GetTaskRation()),
@@ -878,7 +882,7 @@ __aicore__ inline void RunGmm2Generic(
     RunGmm2Generic<CombineQuantMode, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB,
                    IsWeightNZ, IsLayered, Gmm1TileM, TopkWeightsPrefetch, IsShared,
                    IsGmm1Interleaved, IsWaveFlagGrained>(
-        problemShape, gmmAddrInfo, startBlockIdx, blockJob, persistentBlockMmadContext,
+        problemShape, gmmAddrInfo, startBlockIdx, blockJob, blockMmadContext,
         allowWeightL2Bypass);
 }
 
@@ -1143,7 +1147,7 @@ template <uint8_t CombineMode, typename GenericElementA, typename A8W4ElementA, 
           bool IsWaveFlagGrained = false>
 __aicore__ inline void RunGmm2ByMode(const Gmm2Config &context, const Params &params,
                                      const GMMAddrInfo &gmmAddrInfo, const Gmm2ExpertLoopState &state,
-                                     Gmm2RuntimeState &runtimeState, void *persistentBlockMmadContext = nullptr,
+                                     Gmm2RuntimeState &runtimeState, void *blockMmadContext = nullptr,
                                      bool allowWeightL2Bypass = false)
 {
     if constexpr (EnableA8W4 || EnableA4W4) {
@@ -1157,13 +1161,13 @@ __aicore__ inline void RunGmm2ByMode(const Gmm2Config &context, const Params &pa
                        QuantScaleType, true, false, Gmm1TileM, TopkWeightsPrefetch, IsShared,
                        IsGmm1Interleaved, IsWaveFlagGrained>(
             state.problemShape, gmmAddrInfo, runtimeState.startBlockIdx, context.blockJob,
-            persistentBlockMmadContext, allowWeightL2Bypass);
+            blockMmadContext, allowWeightL2Bypass);
     } else {
         RunGmm2Generic<CombineMode, GenericElementA, GenericElementA, bfloat16_t, QuantScaleType,
                        QuantScaleType, false, false, Gmm1TileM, TopkWeightsPrefetch, IsShared,
                        IsGmm1Interleaved, IsWaveFlagGrained>(
             state.problemShape, gmmAddrInfo, runtimeState.startBlockIdx, context.blockJob,
-            persistentBlockMmadContext, allowWeightL2Bypass);
+            blockMmadContext, allowWeightL2Bypass);
     }
 }
 
@@ -1194,13 +1198,13 @@ template <uint8_t CombineMode, typename GenericElementA, typename A8W4ElementA,
 __aicore__ inline void RunMoeExpertGmm2Stage(
     const Gmm2Config &context, const Params &params, const GMMAddrInfo &gmmAddrInfo,
     const Gmm2ExpertLoopState &state, Gmm2RuntimeState &runtimeState,
-    void *persistentBlockMmadContext = nullptr, bool allowWeightL2Bypass = false)
+    void *blockMmadContext = nullptr, bool allowWeightL2Bypass = false)
 {
     RunGmm2ByMode<CombineMode, GenericElementA, A8W4ElementA, WeightType,
                   QuantScaleType, EnableA8W4, EnableA4W4, Gmm1TileM,
                   TopkWeightsPrefetch, false, IsGmm1Interleaved,
                   IsWaveFlagGrained>(
-        context, params, gmmAddrInfo, state, runtimeState, persistentBlockMmadContext,
+        context, params, gmmAddrInfo, state, runtimeState, blockMmadContext,
         allowWeightL2Bypass);
 }
 
@@ -1212,7 +1216,7 @@ __aicore__ inline bool RunSharedExpertGmm2Stage(
     const Gmm2Config &context, const Params &params,
     const ExpertWeightTensorListAddrs &weights, Gmm2ExpertLoopState &state,
     GMMAddrInfo &gmmAddrInfo, Gmm2RuntimeState &runtimeState, uint32_t sharedExpertIdx,
-    void *persistentBlockMmadContext = nullptr, bool allowWeightL2Bypass = false)
+    void *blockMmadContext = nullptr, bool allowWeightL2Bypass = false)
 {
     if (!PrepareSharedExpertGmm2State<PackedElementTraits<GenericElementA>::ELEMENTS_PER_BYTE,
                                       PackedElementTraits<WeightType>::ELEMENTS_PER_BYTE,
@@ -1227,7 +1231,7 @@ __aicore__ inline bool RunSharedExpertGmm2Stage(
                   QuantScaleType, EnableA8W4, EnableA4W4, Gmm1TileM,
                   TopkWeightsPrefetch, true, IsGmm1Interleaved,
                   IsWaveFlagGrained>(
-        context, params, gmmAddrInfo, state, runtimeState, persistentBlockMmadContext,
+        context, params, gmmAddrInfo, state, runtimeState, blockMmadContext,
         allowWeightL2Bypass);
     return true;
 }

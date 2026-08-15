@@ -107,20 +107,170 @@ struct Config {
     using BlockPrologue =
         Std::conditional_t<IsA8W4, Blaze::Gemm::Prologue::BlockPrologue<DispatchPolicy, ElementA, ElementB>, void>;
 
+    static __aicore__ inline typename BlockMmad::L1Params MakeL1Params(uint64_t kL1, uint64_t scaleKL1)
+    {
+        if constexpr (IsA8W4) {
+            return typename BlockMmad::L1Params{.kL1 = kL1, .scaleKL1 = scaleKL1};
+        } else {
+            return typename BlockMmad::L1Params{.kL1 = kL1, .scaleKL1 = scaleKL1, .l1BufNum = 2};
+        }
+    }
+
+    static __aicore__ inline typename BlockMmad::L1Params DefaultL1Params()
+    {
+        if constexpr (IsA8W4) {
+            return MakeL1Params(L1_TILE_K, Blaze::Gemm::MX_FP8FP4_SCALE_K_L1_SIZE);
+        } else {
+            return MakeL1Params(L1_TILE_K, L1_TILE_K * SCALE_K_L1_RATE);
+        }
+    }
+
+    // 外层 scheduler 继续使用固定的 256 x 256 分块；该配置只控制 BlockMmad 内部基本块和 L1 搬运窗口。
+    struct BlockMmadTilingConfig {
+        uint32_t tileM;
+        uint32_t tileN;
+        typename BlockMmad::L1Params l1Params;
+    };
+
+    static __aicore__ inline BlockMmadTilingConfig MakeBaselineBlockMmadTilingConfig(uint32_t tileM)
+    {
+        return BlockMmadTilingConfig{tileM, L1_TILE_N, DefaultL1Params()};
+    }
+
+    /*
+     * 容量模型（只表示占用关系，不表示 BlockMmad 的实际地址顺序）：
+     *
+     * +----------------------------------------+----------------------------------------+
+     * | buffer 0: A(kL1) + B(kL1)             | buffer 1: A(kL1) + B(kL1)             |
+     * |           + scaleA/B(scaleKL1) + free |           + scaleA/B(scaleKL1) + free |
+     * +----------------------------------------+----------------------------------------+
+     * |<-------------- halfL1Size ------------>|<-------------- halfL1Size ------------>|
+     *
+     * K 轴覆盖关系：
+     * A/B data: |--- kL1 ---|--- kL1 ---|--- kL1 ---| ... | tail |
+     * MX scale: |<------------ scaleKL1 ------------>| ... | tail |
+     *                         scaleKL1 = scaleFactor * kL1
+     *
+     * 在 A/B 数据占用之外，用半片 L1 的剩余空间尽可能放大 scaleFactor，从而减少 MX scale 搬运轮数。
+     * K 尾块不计入可复用的完整窗口，避免 scaleKL1 跨过实际 K 后再从大窗口内部读取 tail scale。
+     */
+    static __aicore__ inline typename BlockMmad::L1Params CalcAdaptiveL1Params(uint32_t blockM, uint32_t blockN,
+                                                                               uint32_t k)
+    {
+        constexpr uint64_t halfL1Size = AscendC::TOTAL_L1_SIZE / 2U;
+        constexpr uint64_t scaleGroupK = 64U;
+        constexpr uint64_t scaleBytesPerGroup = MXFP_MULTI_BASE_SIZE;
+        constexpr uint64_t scaleTransferBytes = 64U * 1024U;
+        constexpr uint64_t maxScaleFactor = 127U;
+        constexpr uint64_t maxKL1Units = 2U;
+        constexpr uint64_t aElementsPerByte = Blaze::Gemm::IsFp4<ElementA>() ? 2U : 1U;
+        constexpr uint64_t bElementsPerByte = Blaze::Gemm::IsFp4<ElementB>() ? 2U : 1U;
+
+        const uint64_t blockM64 = blockM;
+        const uint64_t blockN64 = blockN;
+        /*
+         * 先计算一个 256K 基础窗口的字节数。当前只允许 kL1=256/512，且 256 同时是
+         * FP4 打包和 MX scale group 的整数倍，因此 512K 窗口的占用严格等于两倍基础窗口。
+         */
+        const uint64_t dataBytesPerUnit = Ops::Base::CeilDiv(blockM64 * L1_TILE_K, aElementsPerByte) +
+                                          Ops::Base::CeilDiv(blockN64 * L1_TILE_K, bElementsPerByte);
+        const uint64_t scaleKBytesPerUnit =
+            Ops::Base::CeilDiv(static_cast<uint64_t>(L1_TILE_K), scaleGroupK) * scaleBytesPerGroup;
+        const uint64_t scaleABytesPerUnit = blockM64 * scaleKBytesPerUnit;
+        const uint64_t scaleBBytesPerUnit = blockN64 * scaleKBytesPerUnit;
+        const uint64_t scaleBytesPerUnit = scaleABytesPerUnit + scaleBBytesPerUnit;
+
+        /*
+         * K>256 时，若两个基础窗口的 A/B 和至少一个 scale 窗口可同时放入半片 L1，
+         * 且单侧 scale 不超过 64 KiB 搬运限制，则直接选择 512K；否则使用 256K。
+         */
+        const uint64_t doubleDataBytes = dataBytesPerUnit * maxKL1Units;
+        const uint64_t doubleScaleABytes = scaleABytesPerUnit * maxKL1Units;
+        const uint64_t doubleScaleBBytes = scaleBBytesPerUnit * maxKL1Units;
+        const uint64_t doubleScaleBytes = scaleBytesPerUnit * maxKL1Units;
+        const bool canUseDoubleKL1 = doubleDataBytes + doubleScaleBytes <= halfL1Size &&
+                                     doubleScaleABytes <= scaleTransferBytes &&
+                                     doubleScaleBBytes <= scaleTransferBytes;
+        const uint64_t kL1Units = canUseDoubleKL1 ? maxKL1Units : 1U;
+        const uint64_t kL1 = static_cast<uint64_t>(L1_TILE_K) * kL1Units;
+        const uint64_t dataBytes = dataBytesPerUnit * kL1Units;
+        const uint64_t scaleABytes = scaleABytesPerUnit * kL1Units;
+        const uint64_t scaleBBytes = scaleBBytesPerUnit * kL1Units;
+        const uint64_t scaleBytes = scaleBytesPerUnit * kL1Units;
+
+        /*
+         * scaleFactor = min(floor((halfL1Size - dataBytes) / scaleBytes),
+         *                   floor(64 KiB / scaleABytes), floor(64 KiB / scaleBBytes),
+         *                   max(1, floor(K / kL1)), 127)
+         * K 约束必须使用 floor 而不是 ceil：尾 K 不足一个完整窗口，必须在下一次 scale
+         * 搬运中从窗口起点处理，不能挂在前一个 scaleKL1 窗口的末尾复用。
+         */
+        uint64_t scaleFactor = (halfL1Size - dataBytes) / scaleBytes;
+        const uint64_t scaleFactorByA = scaleTransferBytes / scaleABytes;
+        const uint64_t scaleFactorByB = scaleTransferBytes / scaleBBytes;
+        const uint64_t fullKWindowCount = static_cast<uint64_t>(k) / kL1;
+        const uint64_t scaleFactorByK = fullKWindowCount == 0U ? 1U : fullKWindowCount;
+        scaleFactor = Blaze::Gemm::Min(scaleFactor, scaleFactorByA);
+        scaleFactor = Blaze::Gemm::Min(scaleFactor, scaleFactorByB);
+        scaleFactor = Blaze::Gemm::Min(scaleFactor, scaleFactorByK);
+        scaleFactor = Blaze::Gemm::Min(scaleFactor, maxScaleFactor);
+        return MakeL1Params(kL1, scaleFactor * kL1);
+    }
+
+    static __aicore__ inline BlockMmadTilingConfig MakeAdaptiveBlockMmadTilingConfig(uint32_t m, uint32_t k)
+    {
+        constexpr uint32_t blockMAlign = 16U;
+        // blockM 是 BlockMmad 的容量上限；实际 MMAD 仍使用 actualShape 中的有效 M，不会补算对齐行。
+        const uint32_t blockM = Ops::Base::CeilAlign(m, blockMAlign);
+        return BlockMmadTilingConfig{blockM, L1_TILE_N, CalcAdaptiveL1Params(blockM, L1_TILE_N, k)};
+    }
+
+    static __aicore__ inline BlockMmadTilingConfig SelectBlockMmadTilingConfig(uint32_t m, uint32_t k,
+                                                                               uint32_t tileM)
+    {
+        BlockMmadTilingConfig baselineConfig = MakeBaselineBlockMmadTilingConfig(tileM);
+        if (m == 0U || m >= tileM) {
+            return baselineConfig;
+        }
+
+        if constexpr (IsA8W4) {
+            /*
+             * kL1=0 让 BlockMmad 与 AIV prologue 按相同规则、基于实际 tile M/N 自动选择 kbL1；
+             * BlockMmad 还会独立按实际 M/N 选择 kaL1。scale 使用专用实现固定的 4096K 窗口。
+             */
+            return BlockMmadTilingConfig{
+                tileM,
+                L1_TILE_N,
+                typename BlockMmad::L1Params{
+                    .kL1 = 0U, .scaleKL1 = Blaze::Gemm::MX_FP8FP4_SCALE_K_L1_SIZE}};
+        }
+
+        if constexpr (g_coreType == AscendC::AIC) {
+            // K<=256 时所有配置都只搬运一轮，保留基线可避免无收益的 Init。
+            if (k <= L1_TILE_K) {
+                return baselineConfig;
+            }
+
+            BlockMmadTilingConfig adaptiveConfig = MakeAdaptiveBlockMmadTilingConfig(m, k);
+            // 512K 一旦可用，必然比 256K 减少 A/B 的 K 搬运轮数。
+            if (adaptiveConfig.l1Params.kL1 > baselineConfig.l1Params.kL1) {
+                return adaptiveConfig;
+            }
+
+            // kL1 不能增大时，仅在扩大 scale 窗口能减少搬运轮数时采用动态配置。
+            const uint64_t adaptiveScaleLoops =
+                Ops::Base::CeilDiv(static_cast<uint64_t>(k), adaptiveConfig.l1Params.scaleKL1);
+            const uint64_t baselineScaleLoops =
+                Ops::Base::CeilDiv(static_cast<uint64_t>(k), baselineConfig.l1Params.scaleKL1);
+            return adaptiveScaleLoops < baselineScaleLoops ? adaptiveConfig : baselineConfig;
+        }
+        return baselineConfig;
+    }
+
     struct ProblemConfig {
         using KernelConfig = Config;
         static constexpr bool SOURCE_GMM1_INTERLEAVED = IsGmm1Interleaved;
         static constexpr bool IS_WAVE_FLAG_GRAINED = IsWaveFlagGrained;
-
-        static __aicore__ inline typename BlockMmad::L1Params DefaultL1Params()
-        {
-            if constexpr (IsA8W4) {
-                return typename BlockMmad::L1Params{.kL1 = L1_TILE_K, .scaleKL1 = 4096};
-            } else {
-                return typename BlockMmad::L1Params{
-                    .kL1 = L1_TILE_K, .scaleKL1 = L1_TILE_K * SCALE_K_L1_RATE, .l1BufNum = 2};
-            }
-        }
 
         uint32_t m = 0;
         uint32_t n = 0;
@@ -132,7 +282,7 @@ struct Config {
         uint32_t scaleK = 0;
         uint32_t tileM = 0;
         uint32_t activationTileM = L1_TILE_M_256;
-        typename BlockMmad::L1Params l1Params = DefaultL1Params();
+        BlockMmadTilingConfig blockMmadTiling{};
     };
 
     struct LayoutBundle {
@@ -151,6 +301,7 @@ struct Config {
         config.blockIdx = blockJob.jobIndex;
         config.scaleK = CeilDiv(config.k, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
         config.activationTileM = TopkWeightsPrefetch ? L1_TILE_M_128 : gmm1TileM;
+        config.blockMmadTiling = SelectBlockMmadTilingConfig(config.m, config.k, config.tileM);
     }
 
     __aicore__ static inline ProblemConfig BuildGmm1ProblemConfig(const ProblemShape &problemShape,
@@ -196,25 +347,48 @@ struct Config {
     }
 };
 
-// Wave 流程可持有同一个 BlockMmad，避免在 wave 边界反复构造和析构。
-template <typename T>
-struct PersistentBlockMmadContext {
-    T blockMmad;
-    uint32_t initializedK = 0U;
+// 统一描述一次 BlockMmad::Init 的可变配置，避免 Context 分散保存并逐字段比较。
+// 通用 MX BlockMmad 的 l1BufNum 始终固定为 2，A8W4 L1Params 则没有该字段，因此不纳入运行时状态。
+struct BlockMmadInitConfig {
+    uint32_t problemK = 0U;
+    uint32_t tileM = 0U;
+    uint32_t tileN = 0U;
+    uint64_t kL1 = 0U;
+    uint64_t scaleKL1 = 0U;
+
+    __aicore__ inline bool operator!=(const BlockMmadInitConfig &other) const
+    {
+        return problemK != other.problemK || tileM != other.tileM || tileN != other.tileN || kL1 != other.kL1 ||
+               scaleKL1 != other.scaleKL1;
+    }
+};
+
+// Wave 流程可持有同一个 BlockMmad；普通路径也复用该结构完成一致的初始化。
+template <typename BlockMmad>
+struct BlockMmadContext {
+    BlockMmad blockMmad;
+    BlockMmadInitConfig initConfig{};
     bool initialized = false;
 };
 
-// GMM1 与 GMM2 的逻辑 K 可能不同；仅在首次使用或 K 改变时刷新 Generic 配置。
-template <typename PersistentContext, typename ProblemConfig>
-__aicore__ inline void InitBlockMmad(PersistentContext &context, const ProblemConfig &config)
+// 仅当 BlockMmad::Init 消费的配置发生变化时刷新，problem 的实际 M/N 由每次 MMAD 调用传入。
+template <typename MmadContext, typename ProblemConfig>
+__aicore__ inline void InitBlockMmad(MmadContext &context, const ProblemConfig &config)
 {
     using BlockMmad = decltype(context.blockMmad);
-    if (!context.initialized || context.initializedK != config.k) {
-        typename BlockMmad::BlockShape l0TileShape{config.tileM, L1_TILE_N, L0_TILE_K, 0};
+    const auto &tilingConfig = config.blockMmadTiling;
+    const BlockMmadInitConfig requestedConfig{
+        config.k,
+        tilingConfig.tileM,
+        tilingConfig.tileN,
+        tilingConfig.l1Params.kL1,
+        tilingConfig.l1Params.scaleKL1};
+    if (!context.initialized || context.initConfig != requestedConfig) {
+        typename BlockMmad::BlockShape l0TileShape{tilingConfig.tileM, tilingConfig.tileN, L0_TILE_K, 0};
         typename BlockMmad::ProblemShape matmulShape{config.m, config.n, config.k, 0};
         constexpr bool enableL0CPingPong = false;
-        context.blockMmad.Init(matmulShape, l0TileShape, config.l1Params, false, enableL0CPingPong);
-        context.initializedK = config.k;
+        context.blockMmad.Init(matmulShape, l0TileShape, tilingConfig.l1Params, false, enableL0CPingPong);
+        context.initConfig = requestedConfig;
         context.initialized = true;
     }
 }

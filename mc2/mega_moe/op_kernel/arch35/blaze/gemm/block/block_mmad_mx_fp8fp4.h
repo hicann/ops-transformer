@@ -491,7 +491,14 @@ __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CalcDynamicKBlock(ui
                                               MX_FP8FP4_L1_K_CONFIG_256);
     if (mL1Size < nL1Size) {
         uint64_t mL1Align = CeilAlign(mL1Size, static_cast<uint64_t>(BLOCK_CUBE));
-        kaL1Size = (A_L1_SINGLE_BUF_SIZE / sizeof(AType)) / (mL1Align * kbL1Size) * kbL1Size;
+        /*
+         * 小 M 时若直接填满 128 KiB A 槽位，首个 MMAD 会等待一个过深的 A 搬运窗口。
+         * 按 N / (2M) 选择 ka 深度，使 A 搬运更细地与连续的 B/prologue 窗口重叠；物理容量仅作为上限。
+         */
+        uint64_t balancedKaDepth = CeilDiv(nL1Size, mL1Align * DOUBLE_BUFFER);
+        uint64_t maxKaDepth = (A_L1_SINGLE_BUF_SIZE / sizeof(AType)) / (mL1Align * kbL1Size);
+        uint64_t kaDepth = balancedKaDepth < maxKaDepth ? balancedKaDepth : maxKaDepth;
+        kaL1Size = kaDepth * kbL1Size;
     } else {
         kaL1Size = kbL1Size;
     }
