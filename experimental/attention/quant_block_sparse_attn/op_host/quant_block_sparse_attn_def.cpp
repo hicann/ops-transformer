@@ -18,7 +18,8 @@
 namespace ops {
 class QuantBlockSparseAttn : public OpDef {
 public:
-    explicit QuantBlockSparseAttn(const char *name) : OpDef(name)
+    explicit QuantBlockSparseAttn(const char *name)
+        : OpDef(name)
     {
         this->Input("query")
             .ParamType(REQUIRED)
@@ -106,7 +107,7 @@ public:
         this->Attr("softmax_scale").AttrType(REQUIRED).Float(1.0);
         this->Attr("sparse_q_block_size").AttrType(REQUIRED).Int(128);
         this->Attr("sparse_kv_block_size").AttrType(REQUIRED).Int(128);
-        this->Attr("layout_kv").AttrType(REQUIRED).String("PA_BNSD");
+        this->Attr("layout_kv").AttrType(REQUIRED).String("PA_BNBD");
         this->Attr("layout_q").AttrType(REQUIRED).String("TND");
         this->Attr("layout_sparse_indices").AttrType(REQUIRED).String("B_N_Qb_Kb");
         this->Attr("layout_out").AttrType(REQUIRED).String("TND");

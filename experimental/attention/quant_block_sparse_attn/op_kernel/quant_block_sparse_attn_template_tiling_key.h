@@ -20,12 +20,12 @@
 
 // Template tiling key macros: values match QBSALayout enum (in quant_block_sparse_attn_const.h)
 // for ASCENDC_TPL_ARGS compile-time dispatch.
-#define QBSA_LAYOUT_TND 2       // == QBSALayout::TND
-#define QBSA_LAYOUT_NTD 5       // == QBSALayout::NTD
+#define QBSA_LAYOUT_TND 2 // == QBSALayout::TND
+#define QBSA_LAYOUT_NTD 5 // == QBSALayout::NTD
 
 #define QBSA_KV_LAYOUT_CONTIGUOUS 0
 #define QBSA_KV_LAYOUT_PA_ND 1
-#define QBSA_KV_LAYOUT_PA_BNSD 3  // == QBSALayout::PA_BNSD
+#define QBSA_KV_LAYOUT_PA_BNSD 3 // == QBSALayout::PA_BNBD
 
 #define QBSA_MASK_NONE 0
 #define QBSA_MASK_CAUSAL 3
@@ -53,7 +53,7 @@ ASCENDC_TPL_ARGS_DECL(
     ASCENDC_TPL_UINT_DECL(Config, QBSA_TPL_4_BW, ASCENDC_TPL_UI_LIST,
                           Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128,
                           Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128),
-    ASCENDC_TPL_UINT_DECL(QUANT_MODE, QBSA_TPL_4_BW, ASCENDC_TPL_UI_LIST, FP8QuantMode, MXFullQuantMode),);
+    ASCENDC_TPL_UINT_DECL(QUANT_MODE, QBSA_TPL_4_BW, ASCENDC_TPL_UI_LIST, FP8QuantMode, MXFullQuantMode), );
 
 ASCENDC_TPL_SEL(
     ASCENDC_TPL_ARGS_SEL(
@@ -73,6 +73,6 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(RETURN_SOFTMAX_LSE, 0, 1),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
                                               Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128),
-                         ASCENDC_TPL_UINT_SEL(QUANT_MODE, ASCENDC_TPL_UI_LIST, MXFullQuantMode)),);
+                         ASCENDC_TPL_UINT_SEL(QUANT_MODE, ASCENDC_TPL_UI_LIST, MXFullQuantMode)), );
 
 #endif // QUANT_BLOCK_SPARSE_ATTN_TEMPLATE_TILING_KEY_H

@@ -38,7 +38,7 @@ private:
     {
         int64_t byteOffset1 = 0;
         int64_t byteOffset2 = 0;
-        if constexpr (GM_FORMAT == QBSALayout::PA_BNSD) {
+        if constexpr (GM_FORMAT == QBSALayout::PA_BNBD) {
             DataCopyExtParams dataCopyParams;
             dataCopyParams.blockCount = 1;
 

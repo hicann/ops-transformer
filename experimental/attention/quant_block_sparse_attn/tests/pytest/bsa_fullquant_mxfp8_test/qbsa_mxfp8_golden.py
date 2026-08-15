@@ -1166,12 +1166,12 @@ def _validate_direct_pa_kv_shapes(key, value, k_descale, v_descale):
     ]
     if stride_mismatches:
         raise ValueError(
-            "direct PA_BNSD input stride mismatch; " + "; ".join(stride_mismatches)
+            "direct PA_BNBD input stride mismatch; " + "; ".join(stride_mismatches)
         )
 
 
 def _materialize_pa_bnsd(tensor):
-    """Copy a rank-4 PA tensor into the exact segmented PA_BNSD strides.
+    """Copy a rank-4 PA tensor into the exact segmented PA_BNBD strides.
 
     PyTorch may preserve a non-canonical stride on singleton dimensions after
     ``permute(...).contiguous()`` because such a tensor is already considered
@@ -1180,7 +1180,7 @@ def _materialize_pa_bnsd(tensor):
     """
     if tensor.dim() != 4:
         raise ValueError(
-            f"PA_BNSD tensor must be rank 4, got shape {tuple(tensor.shape)}"
+            f"PA_BNBD tensor must be rank 4, got shape {tuple(tensor.shape)}"
         )
     _, num_heads, block_size, head_dim = tensor.shape
     expected_stride = (
@@ -1366,7 +1366,7 @@ def generate_data():
 # ==============================================================================
 # CPU Golden
 # 参考 quant_block_sparse_attn_golden.py 的 sparse block 计算流：
-#   - Q/QDescale 公共输入为 TND；K/V 与 K/V descale 使用 PA_BNSD
+#   - Q/QDescale 公共输入为 TND；K/V 与 K/V descale 使用 PA_BNBD
 #   - 按 sparse_indices 中记录的 KV block 顺序收集 positions，并按 256-token C1 粒度做 online 累加
 #   - Q/K 使用 per-token D-group descale；V 使用 per-channel S-group descale
 #   - 输出 OUT 固定 TND，MXFP8 TND LSE 固定 TN

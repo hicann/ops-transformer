@@ -7,19 +7,56 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 
 from typing import (
-    Any, Callable, ContextManager, Iterator, List, Literal, NamedTuple, Optional, Sequence, Tuple, TypeVar,
-    Union, overload,
+    Any,
+    Callable,
+    ContextManager,
+    Iterator,
+    List,
+    Literal,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    overload,
 )
 
 import torch
 import torchair
 from torch import Generator, contiguous_format, inf, strided, SymInt
-from torch.types import Device, Number, _bool, _complex, _device, _dtype, _float, _int, _layout, _qscheme, _size
+from torch.types import (
+    Device,
+    Number,
+    _bool,
+    _complex,
+    _device,
+    _dtype,
+    _float,
+    _int,
+    _layout,
+    _qscheme,
+    _size,
+)
 from torchair._ge_concrete_graph import ge_apis as ge
-from torchair._ge_concrete_graph.fx2ge_converter import declare_supported, register_fx_node_ge_converter
+from torchair._ge_concrete_graph.fx2ge_converter import (
+    declare_supported,
+    register_fx_node_ge_converter,
+)
 from torchair.ge._ge_graph import Tensor, TensorSpec, DataType
-from torchair._ge_concrete_graph.supported_declaration import _TypedTensor, F32, F16, F64, I32, I16, I64, I8, U8, \
-    BOOL, Support
+from torchair._ge_concrete_graph.supported_declaration import (
+    _TypedTensor,
+    F32,
+    F16,
+    F64,
+    I32,
+    I16,
+    I64,
+    I8,
+    U8,
+    BOOL,
+    Support,
+)
 from torchair.ge import attr
 
 
@@ -47,7 +84,7 @@ def convert_npu_quant_block_sparse_attn(
     seqused_kv: Optional[Tensor] = None,
     block_table: Optional[Tensor] = None,
     metadata: Optional[Tensor] = None,
-    layout_kv: str = "PA_BNSD",
+    layout_kv: str = "PA_BNBD",
     layout_q: str = "TND",
     layout_sparse_indices: str = "B_N_Qb_Kb",
     layout_out: str = "TND",
@@ -58,33 +95,35 @@ def convert_npu_quant_block_sparse_attn(
 ):
     return torchair.ge.custom_op(
         "QuantBlockSparseAttn",
-        inputs={"query": query,
-                "key": key,
-                "value": value,
-                "q_descale": q_descale,
-                "k_descale": k_descale,
-                "v_descale": v_descale,
-                "p_scale": p_scale,
-                "cu_seqlens_q": cu_seqlens_q,
-                "cu_seqlens_kv": cu_seqlens_kv,
-                "seqused_q": seqused_q,
-                "seqused_kv": seqused_kv,
-                "sparse_indices": sparse_indices,
-                "sparse_seq_len": sparse_seq_len,
-                "block_table": block_table,
-                "atten_mask": atten_mask,
-                "metadata": metadata,
-               },
-        attrs={"softmax_scale": attr.Float(softmax_scale),
-               "sparse_q_block_size": attr.Int(sparse_q_block_size),
-               "sparse_kv_block_size": attr.Int(sparse_kv_block_size),
-               "layout_kv": attr.Str(layout_kv),
-               "layout_q": attr.Str(layout_q),
-               "layout_sparse_indices": attr.Str(layout_sparse_indices),
-               "layout_out": attr.Str(layout_out),
-               "quant_mode": attr.Int(quant_mode),
-               "mask_mode": attr.Int(mask_mode),
-               "return_softmax_lse": attr.Bool(return_softmax_lse),
-               },
-        outputs=['attention_out', 'softmax_lse']
+        inputs={
+            "query": query,
+            "key": key,
+            "value": value,
+            "q_descale": q_descale,
+            "k_descale": k_descale,
+            "v_descale": v_descale,
+            "p_scale": p_scale,
+            "cu_seqlens_q": cu_seqlens_q,
+            "cu_seqlens_kv": cu_seqlens_kv,
+            "seqused_q": seqused_q,
+            "seqused_kv": seqused_kv,
+            "sparse_indices": sparse_indices,
+            "sparse_seq_len": sparse_seq_len,
+            "block_table": block_table,
+            "atten_mask": atten_mask,
+            "metadata": metadata,
+        },
+        attrs={
+            "softmax_scale": attr.Float(softmax_scale),
+            "sparse_q_block_size": attr.Int(sparse_q_block_size),
+            "sparse_kv_block_size": attr.Int(sparse_kv_block_size),
+            "layout_kv": attr.Str(layout_kv),
+            "layout_q": attr.Str(layout_q),
+            "layout_sparse_indices": attr.Str(layout_sparse_indices),
+            "layout_out": attr.Str(layout_out),
+            "quant_mode": attr.Int(quant_mode),
+            "mask_mode": attr.Int(mask_mode),
+            "return_softmax_lse": attr.Bool(return_softmax_lse),
+        },
+        outputs=["attention_out", "softmax_lse"],
     )

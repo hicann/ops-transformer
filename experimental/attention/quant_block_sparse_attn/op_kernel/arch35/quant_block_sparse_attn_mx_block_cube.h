@@ -49,8 +49,8 @@ public:
     static constexpr uint32_t S2_SPLIT = 256U;
     static constexpr uint32_t D_BASE = static_cast<uint32_t>(dTemplateType);
     static constexpr uint32_t DV_BASE = static_cast<uint32_t>(dVTemplateType);
-    static_assert(LAYOUT == QBSALayout::TND && KV_LAYOUT == QBSALayout::PA_BNSD && IS_PA,
-                  "MX cube currently only supports TND query and PA_BNSD KV");
+    static_assert(LAYOUT == QBSALayout::TND && KV_LAYOUT == QBSALayout::PA_BNBD && IS_PA,
+                  "MX cube currently only supports TND query and PA_BNBD KV");
     static_assert(M_BASE == 128U && S2_BASE == 512U && D_BASE == 128U && DV_BASE == 128U,
                   "MX cube currently only supports S1=128, S2=512, D=128 and DV=128");
     // 每 32 个 fp8 数据元素对应一个 e8m0 scale。

@@ -169,7 +169,7 @@ def _normalize_params(params):
     normalized = dict(params)
     normalized.setdefault("Testcase_Name", None)
     normalized.setdefault("layout_q", "TND")
-    normalized.setdefault("layout_kv", "PA_BNSD")
+    normalized.setdefault("layout_kv", "PA_BNBD")
     normalized.setdefault("output_dtype", torch.bfloat16)
     normalized.setdefault("sparse_q_block_size", 128)
     normalized.setdefault("sparse_kv_block_size", 128)

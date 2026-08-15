@@ -15,7 +15,7 @@ import torch
 
 COMMON = {
     "Testcase_Name": [None],
-    "layout_kv": ["PA_BNSD"],
+    "layout_kv": ["PA_BNBD"],
     "output_dtype": [torch.bfloat16],
     "N1": [32],
     "N2": [4],

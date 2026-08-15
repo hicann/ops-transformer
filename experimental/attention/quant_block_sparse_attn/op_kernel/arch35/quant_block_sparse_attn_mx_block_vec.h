@@ -55,8 +55,8 @@ public:
     static constexpr uint32_t VEC_M_BASE = M_BASE >> 1U;
     static constexpr uint32_t D_BASE = static_cast<uint32_t>(dTemplateType);
     static constexpr uint32_t DV_BASE = static_cast<uint32_t>(dVTemplateType);
-    static_assert(LAYOUT == QBSALayout::TND && KV_LAYOUT == QBSALayout::PA_BNSD && IS_PA,
-                  "MX vector currently only supports TND query and PA_BNSD KV");
+    static_assert(LAYOUT == QBSALayout::TND && KV_LAYOUT == QBSALayout::PA_BNBD && IS_PA,
+                  "MX vector currently only supports TND query and PA_BNBD KV");
     static_assert(M_BASE == 128U && S2_BASE == 512U && D_BASE == 128U && DV_BASE == 128U,
                   "MX vector currently only supports S1=128, S2=512, D=128 and DV=128");
     static constexpr uint32_t DB = 2U;

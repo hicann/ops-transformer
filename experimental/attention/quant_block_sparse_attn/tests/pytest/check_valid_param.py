@@ -46,7 +46,7 @@ def check_valid_param(params):
     params = dict(params)
     params.setdefault("sparse_q_block_size", 128)
     params.setdefault("sparse_kv_block_size", 128)
-    params.setdefault("layout_kv", "PA_BNSD")
+    params.setdefault("layout_kv", "PA_BNBD")
     params.setdefault("layout_sparse_indices", "B_N_Qb_Kb")
     params.setdefault("layout_out", "TND")
     params.setdefault("quant_mode", 1)
@@ -138,7 +138,7 @@ def check_valid_param(params):
     if params["layout_q"] not in ("TND", "NTD"):
         raise ValueError(f"unsupported layout_q: {params['layout_q']}")
 
-    if params.get("layout_kv") != "PA_BNSD" and params.get("layout_out") != "PA_BNBD":
+    if params.get("layout_kv") != "PA_BNBD":
         raise ValueError(f"unsupported layout_kv: {params.get('layout_kv')}")
 
     if params.get("layout_sparse_indices") != "B_N_Qb_Kb":
