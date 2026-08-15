@@ -22,6 +22,7 @@ else
     fi
 fi
 gcc --version
+rm -rf /home/jenkins/opensource/json
 
 if [ -z "${ASCEND_3RD_LIB_PATH}" ]; then
     export ASCEND_3RD_LIB_PATH=/home/jenkins/opensource

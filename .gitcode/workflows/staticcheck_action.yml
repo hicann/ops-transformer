@@ -61,6 +61,6 @@ jobs:
             ${{ steps.process_checkout.outputs.path }}/StaticCheck_*.json
           object-prefix: ${{ env.obs_path }}/
     if: "${{ default() }}"
-    runs-on: [dedicate-hosted, x64, medium]
+    runs-on: ["self-hosted", "arch=x64", "spec=medium"]
     container:
       image: swr.cn-north-4.myhuaweicloud.com/static_check/${{ inputs.image_version }}

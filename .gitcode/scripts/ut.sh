@@ -14,6 +14,7 @@ REPOSITORY_NAME="ops-transformer"
 sudo update-alternatives --set gcc /usr/bin/gcc-14
 export PATH=/opt/buildtools/python-3.10.2/bin:$PATH
 gcc --version
+rm -rf /home/jenkins/opensource/json
 
 if [ -z "${ASCEND_3RD_LIB_PATH}" ]; then
     export ASCEND_3RD_LIB_PATH=/home/jenkins/opensource
