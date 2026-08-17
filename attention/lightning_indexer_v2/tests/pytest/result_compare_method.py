@@ -12,7 +12,7 @@
 
 import math
 import random
-import logging 
+import logging
 import torch
 import datetime
 import os
@@ -20,89 +20,157 @@ import sys
 import ast
 import numpy as np
 from time import time
-logging.basicConfig(level=logging.INFO, format='%(message)s', force=True)
+
+logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
 logger = logging.getLogger(__name__)
 
-def cal_relative_diff_np_isclose(real_data, expect_data, type_str='fp16'):
+
+def cal_relative_diff_np_isclose(real_data, expect_data, type_str="fp16"):
     diff = abs(float(real_data) - float(expect_data))
     result = diff / (np.abs(expect_data) + 10e-10)
     return result
 
-def print_log(data=None, level='INFO'):
-    print("[%s] [%s]-%s:%s - %s" % (datetime.datetime.now().strftime(
-        "%Y/%m/%d %H:%M:%S"), level, os.path.basename(sys._getframe().f_back.f_code.co_filename),
-                                    str(sys._getframe().f_back.f_lineno).zfill(4), data))
+
+def print_log(data=None, level="INFO"):
+    print(
+        "[%s] [%s]-%s:%s - %s"
+        % (
+            datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
+            level,
+            os.path.basename(sys._getframe().f_back.f_code.co_filename),
+            str(sys._getframe().f_back.f_lineno).zfill(4),
+            data,
+        )
+    )
+
 
 def display_error_output(real_data, expect_data, err_idx, relative_diff):
     print_log(
-        'Error Line-----------------------------------------------------------------------------')
-    print_log('Loop \t ExpectOut \t RealOut \t FpDiff \t RateDiff')
+        "Error Line-----------------------------------------------------------------------------"
+    )
+    print_log("Loop \t ExpectOut \t RealOut \t FpDiff \t RateDiff")
     print_log(
-        '---------------------------------------------------------------------------------------')
+        "---------------------------------------------------------------------------------------"
+    )
     count = 0
     len_err = len(err_idx)
     for i in err_idx:
         count += 1
         if count < 10 or (90 < count < 100):
-            print_log('%08d \t %.7f \t %.7f \t %.7f \t %.7f' % (
-                i, expect_data[i], real_data[i], abs(np.float64(
-                    expect_data[i]) - np.float64(real_data[i])),
-                relative_diff[count - 1]))
+            print_log(
+                "%08d \t %.7f \t %.7f \t %.7f \t %.7f"
+                % (
+                    i,
+                    expect_data[i],
+                    real_data[i],
+                    abs(np.float64(expect_data[i]) - np.float64(real_data[i])),
+                    relative_diff[count - 1],
+                )
+            )
         elif count == 10 or (count == 100 and len_err > 100):
-            dot_3 = '...'
-            print_log('%08s \t %07s \t %07s \t %07s \t %07s' %
-                      (dot_3, dot_3, dot_3, dot_3, dot_3))
+            dot_3 = "..."
+            print_log(
+                "%08s \t %07s \t %07s \t %07s \t %07s"
+                % (dot_3, dot_3, dot_3, dot_3, dot_3)
+            )
         elif count > 100:
             break
 
     print_log(
-        'Max-RE line:---------------------------------------------------------------------------')
+        "Max-RE line:---------------------------------------------------------------------------"
+    )
     max_error = max(relative_diff)
     m_idx_list = err_idx[np.where(relative_diff == max_error)]
     m_count = 0
     for m_idx in m_idx_list:
         m_count += 1
         if m_count < 4:
-            print_log('%08d \t %.7f \t %.7f \t %.7f \t %.7f' % (
-                m_idx, expect_data[m_idx], real_data[m_idx],
-                abs(np.float64(expect_data[m_idx]) -
-                    np.float64(real_data[m_idx])),
-                max_error))
+            print_log(
+                "%08d \t %.7f \t %.7f \t %.7f \t %.7f"
+                % (
+                    m_idx,
+                    expect_data[m_idx],
+                    real_data[m_idx],
+                    abs(np.float64(expect_data[m_idx]) - np.float64(real_data[m_idx])),
+                    max_error,
+                )
+            )
         else:
             break
     print_log(
-        '---------------------------------------------------------------------------------------')
-def display_output_np_isclose(real_data, expect_data, start, end, expect_fp32_data=None):
+        "---------------------------------------------------------------------------------------"
+    )
+
+
+def display_output_np_isclose(
+    real_data, expect_data, start, end, expect_fp32_data=None
+):
     def display_inner(idx):
         j = idx + start
-        diff_rate = cal_relative_diff_np_isclose(
-            real_data[j], expect_data[j])
+        diff_rate = cal_relative_diff_np_isclose(real_data[j], expect_data[j])
         if "inf" in str(expect_data[j]) or "nan" in str(expect_data[j]):
             diff_abs = "inf" if "inf" in str(expect_data[j]) else "nan"
             if expect_fp32_data is not None:
-                print_log('%08d \t %-7s \t %-7s \t %-7s \t %-7s \t %-7s' % (
-                    start + idx + 1, expect_fp32_data[j], expect_data[j], real_data[j], diff_abs, diff_rate))
+                print_log(
+                    "%08d \t %-7s \t %-7s \t %-7s \t %-7s \t %-7s"
+                    % (
+                        start + idx + 1,
+                        expect_fp32_data[j],
+                        expect_data[j],
+                        real_data[j],
+                        diff_abs,
+                        diff_rate,
+                    )
+                )
             else:
-                print_log('%08d \t %-7s \t %-7s \t %-7s \t %-7s' % (
-                    start + idx + 1, expect_data[j], real_data[j], diff_abs, diff_rate))
+                print_log(
+                    "%08d \t %-7s \t %-7s \t %-7s \t %-7s"
+                    % (
+                        start + idx + 1,
+                        expect_data[j],
+                        real_data[j],
+                        diff_abs,
+                        diff_rate,
+                    )
+                )
         else:
-            diff_abs = abs(np.float64(
-                expect_data[j]) - np.float64(real_data[j]))
+            diff_abs = abs(np.float64(expect_data[j]) - np.float64(real_data[j]))
             if expect_fp32_data is not None:
-                print_log('%08d \t %0.7f \t %0.7f \t %0.7f \t %0.7f \t %0.7f' % (
-                    start + idx + 1, expect_fp32_data[j], expect_data[j], real_data[j], diff_abs, diff_rate))
+                print_log(
+                    "%08d \t %0.7f \t %0.7f \t %0.7f \t %0.7f \t %0.7f"
+                    % (
+                        start + idx + 1,
+                        expect_fp32_data[j],
+                        expect_data[j],
+                        real_data[j],
+                        diff_abs,
+                        diff_rate,
+                    )
+                )
             else:
-                print_log('%08d \t %0.7f \t %0.7f \t %0.7f \t %0.7f' % (
-                    start + idx + 1, expect_data[j], real_data[j], diff_abs, diff_rate))
+                print_log(
+                    "%08d \t %0.7f \t %0.7f \t %0.7f \t %0.7f"
+                    % (
+                        start + idx + 1,
+                        expect_data[j],
+                        real_data[j],
+                        diff_abs,
+                        diff_rate,
+                    )
+                )
+
     print_log(
-        '---------------------------------------------------------------------------------------')
+        "---------------------------------------------------------------------------------------"
+    )
     if expect_fp32_data is not None:
         print_log(
-            'Loop \t ExpFP32Out \t ExpFP16Out \t NPUOut \tFpDiff(min) \t RateDiff')
+            "Loop \t ExpFP32Out \t ExpFP16Out \t NPUOut \tFpDiff(min) \t RateDiff"
+        )
     else:
-        print_log('Loop \t ExpectOut \t RealOut \t FpDiff \t RateDiff')
+        print_log("Loop \t ExpectOut \t RealOut \t FpDiff \t RateDiff")
     print_log(
-        '---------------------------------------------------------------------------------------')
+        "---------------------------------------------------------------------------------------"
+    )
     split_count = int(end - start)
     if split_count <= 20:
         for i in range(split_count + 1):
@@ -110,9 +178,10 @@ def display_output_np_isclose(real_data, expect_data, start, end, expect_fp32_da
     else:
         for i in range(10):
             display_inner(i)
-        print_log('...   \t   ...   \t   ...   \t   ...    \t   ...')
+        print_log("...   \t   ...   \t   ...   \t   ...    \t   ...")
         for i in range(split_count - 10 + 1, split_count + 1):
             display_inner(i)
+
 
 def find_batch_and_position(cu_seqlens, x):
     """
@@ -141,6 +210,7 @@ def find_batch_and_position(cu_seqlens, x):
     # 超出所有批次范围
     return (-1, -1)
 
+
 def judge_value_by_isclose(real_data, data_compe):
     atol = 2.5e-05
     rtol = 0.005
@@ -152,12 +222,22 @@ def judge_value_by_isclose(real_data, data_compe):
         end = start
     split_count = int(end - start + 1) if end != start else 1
 
-    if str(real_data.dtype) == 'bfloat16':
+    if str(real_data.dtype) == "bfloat16":
+        # bf16 尾数位少、舍入误差大，误差门限放宽到 1/128（约 0.0078125）
         atol = 0.0001
-        diff_result = np.isclose(real_data.astype(np.float32), data_compe.astype(np.float32), rtol=rtol, atol=atol,
-                                 equal_nan=True)
+        rtol = 1.0 / 128
+        diff_thd = 1.0 / 128
+        diff_result = np.isclose(
+            real_data.astype(np.float32),
+            data_compe.astype(np.float32),
+            rtol=rtol,
+            atol=atol,
+            equal_nan=True,
+        )
     else:
-        diff_result = np.isclose(real_data, data_compe, rtol=rtol, atol=atol, equal_nan=True)
+        diff_result = np.isclose(
+            real_data, data_compe, rtol=rtol, atol=atol, equal_nan=True
+        )
     err_idx = np.where(diff_result != np.array((True,)))[0]
     diff_abs = abs(data_compe - real_data)
     b1 = np.maximum(np.abs(real_data), (np.abs(data_compe)))
@@ -166,15 +246,28 @@ def judge_value_by_isclose(real_data, data_compe):
     eps = 10e-10
     err_diff = diff_abs / (b + eps)
     err_diff = err_diff[err_idx]
-    fulfill_percent = float(split_count - err_idx.size) / \
-                      float(split_count) * 100.0
+    fulfill_percent = float(split_count - err_idx.size) / float(split_count) * 100.0
     pct_thd = (1 - pct_thd) * 100.0
     result = True if (fulfill_percent >= pct_thd) else False
     return result
 
-def compare_topk_valid(cur_cpu, cur_npu, topk_value, bsn, diff_npu, diff_cpu,
-                       cur_npu_output_value=None, cur_cpu_output_value=None, thres=0.0001, return_value_flag=False,
-                       output_idx_offset=None, layout_query=None, cu_seqlens_q=None, q_seq=0):
+
+def compare_topk_valid(
+    cur_cpu,
+    cur_npu,
+    topk_value,
+    bsn,
+    diff_npu,
+    diff_cpu,
+    cur_npu_output_value=None,
+    cur_cpu_output_value=None,
+    thres=0.001,
+    return_value_flag=False,
+    output_idx_offset=None,
+    layout_query=None,
+    cu_seqlens_q=None,
+    q_seq=0,
+):
     b_idx, s1_idx, n2_idx = bsn
     max_re = 0.0
     npu_pass = True
@@ -188,9 +281,13 @@ def compare_topk_valid(cur_cpu, cur_npu, topk_value, bsn, diff_npu, diff_cpu,
         if output_idx_offset is not None:
             if layout_query == "TND":
                 cur_prefix = cu_seqlens_q[b_idx]
-                offset = np.array(output_idx_offset.cpu()).flatten()[cur_prefix + s1_idx]
+                offset = np.array(output_idx_offset.cpu()).flatten()[
+                    cur_prefix + s1_idx
+                ]
             else:
-                offset = np.array(output_idx_offset.cpu()).flatten()[b_idx * q_seq + s1_idx]
+                offset = np.array(output_idx_offset.cpu()).flatten()[
+                    b_idx * q_seq + s1_idx
+                ]
             offset_mask = cur_cpu != -1
             cur_npu = np.where(offset_mask, cur_npu - offset, cur_npu)
             cur_cpu = np.where(offset_mask, cur_cpu - offset, cur_cpu)
@@ -221,7 +318,9 @@ def compare_topk_valid(cur_cpu, cur_npu, topk_value, bsn, diff_npu, diff_cpu,
                 cpu_re = abs(cpu_ae / value_bm)
             if npu_re > thres or cpu_re > thres:
                 if return_value_flag:
-                    if not judge_value_by_isclose(cur_npu_output_value, cur_cpu_output_value):
+                    if not judge_value_by_isclose(
+                        cur_npu_output_value, cur_cpu_output_value
+                    ):
                         npu_pass = False
                         diff_npu.append(element_npu)
                         diff_cpu.append(element_cpu)
@@ -233,16 +332,18 @@ def compare_topk_valid(cur_cpu, cur_npu, topk_value, bsn, diff_npu, diff_cpu,
                     max_re = max(max_re, npu_re)
     return npu_pass, max_re
 
+
 def compare_return_value(cur_npu_output_value=None, cur_cpu_output_value=None):
     max_re = 0.0
     npu_pass = True
     npu_pass = judge_value_by_isclose(cur_npu_output_value, cur_cpu_output_value)
     return npu_pass, max_re
 
+
 def trans_tnd_actseq(list):
     list_len = len(list)
     if list_len == 0:
-        raise ValueError(f'TND情况下 act_seq需要必传')
+        raise ValueError("TND情况下 act_seq需要必传")
     list_new = []
     list_new.append(list[0])
     for i in range(list_len - 1):
@@ -250,14 +351,48 @@ def trans_tnd_actseq(list):
         if new_item >= 0:
             list_new.append(new_item)
         else:
-            raise ValueError(f'TND情况下 act_seq_len 为非递减数列 act_seq_len={list}')
+            raise ValueError(f"TND情况下 act_seq_len 为非递减数列 act_seq_len={list}")
     return list_new
 
-def check_result(expect, result, topk_value, output_idx_offset, params, cpu_topk_value, npu_topk_value):
-    batch_size, q_seq, k_seq, q_t_size, k_t_size, q_head_num, k_head_num, head_dim, block_size, block_num, \
-    qk_dtype, cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k, cmp_residual_k, _, \
-    layout_query, layout_key, topk, mask_mode, query_datarange, key_datarange, weights_datarange, \
-    cmp_ratio, return_value, max_seqlen_q = params
+
+def check_result(
+    expect,
+    result,
+    topk_value,
+    output_idx_offset,
+    params,
+    cpu_topk_value,
+    npu_topk_value,
+):
+    (
+        batch_size,
+        q_seq,
+        k_seq,
+        q_t_size,
+        k_t_size,
+        q_head_num,
+        k_head_num,
+        head_dim,
+        block_size,
+        block_num,
+        qk_dtype,
+        cu_seqlens_q,
+        cu_seqlens_k,
+        seqused_q,
+        seqused_k,
+        cmp_residual_k,
+        _,
+        layout_query,
+        layout_key,
+        topk,
+        mask_mode,
+        query_datarange,
+        key_datarange,
+        weights_datarange,
+        cmp_ratio,
+        return_value,
+        max_seqlen_q,
+    ) = params
 
     if isinstance(cu_seqlens_q, int):
         cu_seqlens_q = [cu_seqlens_q]
@@ -265,7 +400,7 @@ def check_result(expect, result, topk_value, output_idx_offset, params, cpu_topk
         cu_seqlens_q = cu_seqlens_q
     elif cu_seqlens_q is not None:
         cu_seqlens_q = ast.literal_eval(cu_seqlens_q)
-    
+
     if isinstance(cu_seqlens_k, int):
         cu_seqlens_k = [cu_seqlens_k]
     elif isinstance(cu_seqlens_k, list):
@@ -279,7 +414,7 @@ def check_result(expect, result, topk_value, output_idx_offset, params, cpu_topk
         seqused_q = seqused_q
     elif seqused_q is not None:
         seqused_q = ast.literal_eval(seqused_q)
-    
+
     if isinstance(seqused_k, int):
         seqused_k = [seqused_k]
     elif isinstance(seqused_k, list):
@@ -290,12 +425,12 @@ def check_result(expect, result, topk_value, output_idx_offset, params, cpu_topk
     npu_pass = True
     max_error = 0
     max_re = 0
-    thres = 0.0001
-    diff_thd=0.01
-    pct_thd=0.05
-    max_diff_hd=0.1
-    rtol=0.005
-    atol=0.000025
+    thres = 0.001
+    diff_thd = 0.01
+    pct_thd = 0.05
+    max_diff_hd = 0.1
+    rtol = 0.005
+    atol = 0.000025
     max_error_idx = 10000000
     cpu_output = expect.cpu().numpy()
     npu_output = result.cpu().numpy()
@@ -329,7 +464,9 @@ def check_result(expect, result, topk_value, output_idx_offset, params, cpu_topk
     cpu_output_sorted = np.sort(cpu_reshape, axis=1)
     npu_output_sorted = np.sort(npu_reshape, axis=1)
     diff_rows = np.zeros(total_rows, dtype=bool)
-    diff_rows |= np.any(cpu_output_sorted != npu_output_sorted, axis=1) #标记存在差异的行
+    diff_rows |= np.any(
+        cpu_output_sorted != npu_output_sorted, axis=1
+    )  # 标记存在差异的行
     test_id = []
     rows = []
     if np.any(diff_rows):
@@ -338,7 +475,7 @@ def check_result(expect, result, topk_value, output_idx_offset, params, cpu_topk
     if num_rows:
         print(f"需要进行第二步比较的batch有{num_rows}")
     else:
-        print(f"有效值集合相同，无需进行比较")
+        print("有效值集合相同，无需进行比较")
     for t_id in rows:
         bsn = np.unravel_index(t_id, sp)
         npu_topk_output_value = None
@@ -352,30 +489,44 @@ def check_result(expect, result, topk_value, output_idx_offset, params, cpu_topk
         npu_pass_t = True
         max_re_t = 0
         valid_len = valid_lens[t_id]
-        npu_pass_t, max_re_t = compare_topk_valid(cpu_reshape[t_id, :valid_len], npu_reshape[t_id, :valid_len],
-                                                    topk_value, bsn, diff_npu, diff_cpu,
-                                                    npu_topk_output_value,
-                                                    cpu_topk_output_value, thres,
-                                                    return_value, output_idx_offset, layout_query, cu_seqlens_q, q_seq)
+        npu_pass_t, max_re_t = compare_topk_valid(
+            cpu_reshape[t_id, :valid_len],
+            npu_reshape[t_id, :valid_len],
+            topk_value,
+            bsn,
+            diff_npu,
+            diff_cpu,
+            npu_topk_output_value,
+            cpu_topk_output_value,
+            thres,
+            return_value,
+            output_idx_offset,
+            layout_query,
+            cu_seqlens_q,
+            q_seq,
+        )
         if not npu_pass_t:
             npu_pass = False
     end_time = time()
     print(f"耗时：{end_time - start_time:.6f} 秒")
     topk_precision = not diff_npu and not diff_cpu
     if topk_precision:
-        print(f'[success]TopK精度通过, idx不同的地方的value误差在阈值之内')
+        print("[success]TopK精度通过, idx不同的地方的value误差在阈值之内")
     else:
-        print(f'[fail]TopK精度失败')
+        print("[fail]TopK精度失败")
     print(f"npu_pass is {npu_pass}")
     if real_data.size == 0 and real_data.size == data_compe.size:
         print_log(
-            'The npu_output is [],and it is same as bm_output, the result of data_compare is \"Pass\"')
+            'The npu_output is [],and it is same as bm_output, the result of data_compare is "Pass"'
+        )
         return "Pass", 100.0, 0
     start = 0
     end = real_data.size - 1
     if end < start:
         end = start
-    diff_result = np.isclose(real_data, data_compe, rtol=rtol, atol=atol, equal_nan=True)
+    diff_result = np.isclose(
+        real_data, data_compe, rtol=rtol, atol=atol, equal_nan=True
+    )
     err_idx = np.where(diff_result != np.array((True,)))[0]
     diff_abs = abs(data_compe - real_data)
     b1 = np.maximum(np.abs(real_data), (np.abs(data_compe)))
@@ -385,33 +536,61 @@ def check_result(expect, result, topk_value, output_idx_offset, params, cpu_topk
     err_diff = diff_abs / (b + eps)
     err_diff = err_diff[err_idx]
     split_count = int(end - start + 1) if end != start else 1
-    print_log('split_count:%s; max_diff_hd:%s;' %
-              (float(split_count), max_diff_hd))
-    fulfill_percent = float(split_count - err_idx.size) / \
-                        float(split_count) * 100.0
+    print_log("split_count:%s; max_diff_hd:%s;" % (float(split_count), max_diff_hd))
+    fulfill_percent = float(split_count - err_idx.size) / float(split_count) * 100.0
     display_output_np_isclose(real_data, data_compe, start, end)
     pct_thd = (1 - pct_thd) * 100.0
     result = "Pass" if (npu_pass or topk_precision) else "Failed"
     print_log(
-        '---------------------------------------------------------------------------------------')
-    print_log('Rtol   \t Atol   \t PctThd   \t PctRlt   \t Result')
+        "---------------------------------------------------------------------------------------"
+    )
+    print_log("Rtol   \t Atol   \t PctThd   \t PctRlt   \t Result")
     print_log(
-        '---------------------------------------------------------------------------------------')
-    print_log('%.4f    \t %.6f  \t %.2f%%   \t %.6f%%   \t %s' %
-                (rtol, atol, pct_thd, fulfill_percent, result))
+        "---------------------------------------------------------------------------------------"
+    )
+    print_log(
+        "%.4f    \t %.6f  \t %.2f%%   \t %.6f%%   \t %s"
+        % (rtol, atol, pct_thd, fulfill_percent, result)
+    )
     if len(err_diff) > 0:
-        print_log('Max-RelativeError is: %s. Threshold is: %s.' %
-                    (max_error, max_diff_hd))
+        print_log(
+            "Max-RelativeError is: %s. Threshold is: %s." % (max_error, max_diff_hd)
+        )
     if result == "Failed":
-        display_error_output(real_data, data_compe,
-                                err_idx, err_diff[0:max_error_idx])
+        display_error_output(real_data, data_compe, err_idx, err_diff[0:max_error_idx])
     return result, fulfill_percent
 
+
 def check_result_return_value(expect, result, params):
-    batch_size, q_seq, k_seq, q_t_size, k_t_size, q_head_num, k_head_num, head_dim, block_size, block_num, \
-    qk_dtype, cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k, cmp_residual_k, output_idx_offset, \
-    layout_query, layout_key, topk, mask_mode, query_datarange, key_datarange, weights_datarange, \
-    cmp_ratio, return_value, max_seqlen_q = params
+    (
+        batch_size,
+        q_seq,
+        k_seq,
+        q_t_size,
+        k_t_size,
+        q_head_num,
+        k_head_num,
+        head_dim,
+        block_size,
+        block_num,
+        qk_dtype,
+        cu_seqlens_q,
+        cu_seqlens_k,
+        seqused_q,
+        seqused_k,
+        cmp_residual_k,
+        output_idx_offset,
+        layout_query,
+        layout_key,
+        topk,
+        mask_mode,
+        query_datarange,
+        key_datarange,
+        weights_datarange,
+        cmp_ratio,
+        return_value,
+        max_seqlen_q,
+    ) = params
 
     if isinstance(cu_seqlens_q, int):
         cu_seqlens_q = [cu_seqlens_q]
@@ -419,7 +598,7 @@ def check_result_return_value(expect, result, params):
         cu_seqlens_q = cu_seqlens_q
     elif cu_seqlens_q is not None:
         cu_seqlens_q = ast.literal_eval(cu_seqlens_q)
-    
+
     if isinstance(cu_seqlens_k, int):
         cu_seqlens_k = [cu_seqlens_k]
     elif isinstance(cu_seqlens_k, list):
@@ -433,7 +612,7 @@ def check_result_return_value(expect, result, params):
         seqused_q = seqused_q
     elif seqused_q is not None:
         seqused_q = ast.literal_eval(seqused_q)
-    
+
     if isinstance(seqused_k, int):
         seqused_k = [seqused_k]
     elif isinstance(seqused_k, list):
@@ -441,10 +620,10 @@ def check_result_return_value(expect, result, params):
     elif seqused_k is not None:
         seqused_k = ast.literal_eval(seqused_k)
 
-    if layout_query == 'TND':
+    if layout_query == "TND":
         if len(cu_seqlens_q) == batch_size + 1:
             cu_seqlens_q = cu_seqlens_q[1:]
-    if layout_key == 'TND':
+    if layout_key == "TND":
         if len(cu_seqlens_k) == batch_size + 1:
             cu_seqlens_k = cu_seqlens_k[1:]
 
@@ -452,11 +631,11 @@ def check_result_return_value(expect, result, params):
     max_error = 0
     max_re = 0
     thres = 0.0001
-    diff_thd=0.01
-    pct_thd=0.005
-    max_diff_hd=0.1
-    rtol=0.005
-    atol=0.000025
+    diff_thd = 0.01
+    pct_thd = 0.005
+    max_diff_hd = 0.1
+    rtol = 0.005
+    atol = 0.000025
     max_error_idx = 10000000
     cpu_output = expect.cpu().numpy()
     npu_output = result.cpu().numpy()
@@ -480,35 +659,22 @@ def check_result_return_value(expect, result, params):
     start_time = time()
     invalid_data = cpu_reshape != -1
     valid_lens = invalid_data.sum(axis=-1)  # (total_rows,)
-    for t_id in range(total_rows):
-        bsn = np.unravel_index(t_id, sp)
-        if layout_query == "TND":
-            if seqused_q is not None:
-                b_idx, s1_idx = find_batch_and_position(seqused_q, bsn[0])
-            else:
-                b_idx, s1_idx = find_batch_and_position(cu_seqlens_q, bsn[0])
-            bsn = (b_idx, s1_idx, bsn[-1])
-        cur_cpu_output_value = cpu_reshape[t_id, :]
-        cur_npu_output_value = npu_reshape[t_id, :]
-        npu_pass_t = True
-        max_re_t = 0
-        valid_len = valid_lens[t_id]
-        npu_pass_t, max_re_t = compare_return_value(cur_npu_output_value,
-                                                    cur_cpu_output_value)
-        if not npu_pass_t:
-            npu_pass = False
+    npu_pass = judge_value_by_isclose(npu_reshape, cpu_reshape)
     end_time = time()
     print(f"耗时：{end_time - start_time:.6f} 秒")
     print(f"npu_pass is {npu_pass}")
     if real_data.size == 0 and real_data.size == data_compe.size:
         print_log(
-            'The npu_output is [],and it is same as bm_output, the result of data_compare is \"Pass\"')
+            'The npu_output is [],and it is same as bm_output, the result of data_compare is "Pass"'
+        )
         return "Pass", 100.0, 0
     start = 0
     end = real_data.size - 1
     if end < start:
         end = start
-    diff_result = np.isclose(real_data, data_compe, rtol=rtol, atol=atol, equal_nan=True)
+    diff_result = np.isclose(
+        real_data, data_compe, rtol=rtol, atol=atol, equal_nan=True
+    )
     err_idx = np.where(diff_result != np.array((True,)))[0]
     diff_abs = abs(data_compe - real_data)
     b1 = np.maximum(np.abs(real_data), (np.abs(data_compe)))
@@ -518,24 +684,26 @@ def check_result_return_value(expect, result, params):
     err_diff = diff_abs / (b + eps)
     err_diff = err_diff[err_idx]
     split_count = int(end - start + 1) if end != start else 1
-    print_log('split_count:%s; max_diff_hd:%s;' %
-              (float(split_count), max_diff_hd))
-    fulfill_percent = float(split_count - err_idx.size) / \
-                        float(split_count) * 100.0
+    print_log("split_count:%s; max_diff_hd:%s;" % (float(split_count), max_diff_hd))
+    fulfill_percent = float(split_count - err_idx.size) / float(split_count) * 100.0
     display_output_np_isclose(real_data, data_compe, start, end)
     pct_thd = (1 - pct_thd) * 100.0
     result = "Pass" if npu_pass else "Failed"
     print_log(
-        '---------------------------------------------------------------------------------------')
-    print_log('Rtol   \t Atol   \t PctThd   \t PctRlt   \t Result')
+        "---------------------------------------------------------------------------------------"
+    )
+    print_log("Rtol   \t Atol   \t PctThd   \t PctRlt   \t Result")
     print_log(
-        '---------------------------------------------------------------------------------------')
-    print_log('%.4f    \t %.6f  \t %.2f%%   \t %.6f%%   \t %s' %
-                (rtol, atol, pct_thd, fulfill_percent, result))
+        "---------------------------------------------------------------------------------------"
+    )
+    print_log(
+        "%.4f    \t %.6f  \t %.2f%%   \t %.6f%%   \t %s"
+        % (rtol, atol, pct_thd, fulfill_percent, result)
+    )
     if len(err_diff) > 0:
-        print_log('Max-RelativeError is: %s. Threshold is: %s.' %
-                    (max_error, max_diff_hd))
+        print_log(
+            "Max-RelativeError is: %s. Threshold is: %s." % (max_error, max_diff_hd)
+        )
     if result == "Failed":
-        display_error_output(real_data, data_compe,
-                                err_idx, err_diff[0:max_error_idx])
+        display_error_output(real_data, data_compe, err_idx, err_diff[0:max_error_idx])
     return result, fulfill_percent

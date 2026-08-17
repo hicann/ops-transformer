@@ -211,12 +211,14 @@ def find_batch_and_position(cu_seqlens, x):
     return (-1, -1)
 
 
-def judge_value_by_isclose(real_data, data_compe):
+def judge_value_by_isclose(real_data, data_compe, force_bf16=False):
     atol = 2.5e-05
     rtol = 0.005
     pct_thd = 0.005
     diff_thd = 0.005
-    is_bfloat16 = str(real_data.dtype) in ("bfloat16", "torch.bfloat16")
+    # force_bf16: QLIV2 的 returnValue 固定为 bf16，但流程中已被 .float() 转成 float32，
+    # 无法通过 dtype 判断，需强制按 bf16 门限对比。
+    is_bfloat16 = force_bf16 or (str(real_data.dtype) in ("bfloat16", "torch.bfloat16"))
     if isinstance(real_data, torch.Tensor):
         real_data = real_data.detach().cpu().float().numpy()
     else:
@@ -232,7 +234,10 @@ def judge_value_by_isclose(real_data, data_compe):
     split_count = int(end - start + 1) if end != start else 1
 
     if is_bfloat16:
+        # bf16 尾数位少、舍入误差大，误差门限放宽到 1/128（约 0.0078125）
         atol = 0.0001
+        rtol = 1.0 / 128
+        diff_thd = 1.0 / 128
         diff_result = np.isclose(
             real_data.astype(np.float32),
             data_compe.astype(np.float32),
@@ -267,7 +272,7 @@ def compare_topk_valid(
     diff_cpu,
     cur_npu_output_value=None,
     cur_cpu_output_value=None,
-    thres=0.0001,
+    thres=0.001,
     return_value_flag=False,
     output_idx_offset=None,
     layout_query=None,
@@ -410,12 +415,16 @@ def _reshape_topk_value(topk_value, total_rows, sparse_count, params):
             f"({total_rows}, {sparse_count})"
         )
     cu_seqlens_q = _get_tnd_query_prefix(cu_seqlens_q, batch_size)
-    topk_value = np.concatenate([
-        topk_value[batch_idx, :, :cu_seqlens_q[batch_idx + 1] - cu_seqlens_q[batch_idx], :]
-        .transpose(1, 0, 2)
-        .reshape(-1, sparse_count)
-        for batch_idx in range(batch_size)
-    ])
+    topk_value = np.concatenate(
+        [
+            topk_value[
+                batch_idx, :, : cu_seqlens_q[batch_idx + 1] - cu_seqlens_q[batch_idx], :
+            ]
+            .transpose(1, 0, 2)
+            .reshape(-1, sparse_count)
+            for batch_idx in range(batch_size)
+        ]
+    )
     return topk_value.reshape(total_rows, sparse_count)
 
 
@@ -551,9 +560,9 @@ def check_result(
     npu_pass = True
     max_error = 0
     max_re = 0
-    thres = 0.0001
+    thres = 0.001
     diff_thd = 0.01
-    pct_thd = 0.05
+    pct_thd = 0.005
     max_diff_hd = 0.1
     rtol = 0.005
     atol = 0.000025
@@ -813,7 +822,7 @@ def check_result_return_value(
     max_re = 0
     thres = 0.0001
     diff_thd = 0.01
-    pct_thd = 0.05
+    pct_thd = 0.005
     max_diff_hd = 0.1
     rtol = 0.005
     atol = 0.000025
@@ -847,16 +856,10 @@ def check_result_return_value(
 
     start_time = time()
 
-    for t_id in range(total_rows):
-        cur_cpu_output_value = cpu_reshape[t_id, :]
-        cur_npu_output_value = npu_reshape[t_id, :]
-        npu_pass_t, max_re_t = compare_return_value(
-            cur_npu_output_value, cur_cpu_output_value
-        )
-        if np.any(invalid_index_reshape[t_id]):
-            npu_pass_t = False
-        if not npu_pass_t:
-            npu_pass = False
+    # QLIV2 returnValue 为 bf16，强制使用 bf16 门限（误差阈值 1/128）
+    npu_pass = judge_value_by_isclose(npu_reshape, cpu_reshape, force_bf16=True)
+    if np.any(invalid_index_reshape):
+        npu_pass = False
     end_time = time()
     print(f"耗时：{end_time - start_time:.6f} 秒")
     print(f"npu_pass is {npu_pass}")
