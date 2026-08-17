@@ -57,22 +57,22 @@ static ge::graphStatus InferShapeQuantLightningIndexerV2(gert::InferShapeContext
     std::string inputLayoutQueryPtrStr = std::string(inputLayoutQueryPtr);
     std::string inputLayoutKeyPtrStr = std::string(inputLayoutKeyPtr);
     if (inputLayoutQueryPtrStr != "TND" && inputLayoutQueryPtrStr != "BSND") {
-        OP_LOGE(context, "The input layout query should be TND or BSND, but got %s.", inputLayoutQueryPtrStr.c_str());
+        OP_LOGE_FOR_INVALID_VALUE("QuantLightningIndexerV2", "layout_q", inputLayoutQueryPtrStr.c_str(), "BSND or TND");
         return GRAPH_FAILED;
     }
 
     int64_t keyHeadNum = (inputLayoutKeyPtrStr == "TND") ? keyShape->GetDim(1) : keyShape->GetDim(2);
     if (inputLayoutQueryPtrStr == "BSND") {
         sparseIndicesShape->SetDimNum(DIM_NUM_4);
-        sparseIndicesShape->SetDim(0, queryShape->GetDim(0));  // 0:Dim B
-        sparseIndicesShape->SetDim(1, queryShape->GetDim(1));  // 1:Dim S
-        sparseIndicesShape->SetDim(2, keyHeadNum);             // 2:Dim N
-        sparseIndicesShape->SetDim(3, *sparse_count);          // 3:Dim K
+        sparseIndicesShape->SetDim(0, queryShape->GetDim(0)); // 0:Dim B
+        sparseIndicesShape->SetDim(1, queryShape->GetDim(1)); // 1:Dim S
+        sparseIndicesShape->SetDim(2, keyHeadNum);            // 2:Dim N
+        sparseIndicesShape->SetDim(3, *sparse_count);         // 3:Dim K
     } else {
         sparseIndicesShape->SetDimNum(DIM_NUM_3);
-        sparseIndicesShape->SetDim(0, queryShape->GetDim(0));  // 0:Dim T
-        sparseIndicesShape->SetDim(1, keyHeadNum);             // 1:output shape's N Dim, 2: key shape's N Dim
-        sparseIndicesShape->SetDim(2, *sparse_count);          // 2:Dim K
+        sparseIndicesShape->SetDim(0, queryShape->GetDim(0)); // 0:Dim T
+        sparseIndicesShape->SetDim(1, keyHeadNum);            // 1:output shape's N Dim, 2: key shape's N Dim
+        sparseIndicesShape->SetDim(2, *sparse_count);         // 2:Dim K
     }
     const int32_t *return_value = attrs->GetAttrPointer<int32_t>(ATTR_RETURN_VALUE_INDEX);
     bool returnValueFlag = (return_value != nullptr) ? (*return_value != 0) : false;
@@ -104,4 +104,4 @@ static ge::graphStatus InferDataTypeQuantLightningIndexerV2(gert::InferDataTypeC
 IMPL_OP_INFERSHAPE(QuantLightningIndexerV2)
     .InferShape(InferShapeQuantLightningIndexerV2)
     .InferDataType(InferDataTypeQuantLightningIndexerV2);
-}  // namespace ops
+} // namespace ops

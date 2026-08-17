@@ -13,6 +13,7 @@
  * \brief
  */
 
+#include "log/log.h"
 #include "opdev/format_utils.h"
 #include "opdev/op_log.h"
 #include "opdev/data_type_utils.h"
@@ -24,6 +25,8 @@ extern "C" {
 #endif
 
 namespace {
+
+static constexpr const char *QLI_V2_ACLNN_OP_NAME = "QuantLightningIndexerV2Metadata";
 
 inline constexpr int64_t QLI_V2_QUANT_MODE_1 = 1;
 inline constexpr int64_t QLI_V2_QUANT_MODE_2 = 2;
@@ -63,38 +66,54 @@ aclDataType GetDataTypeQliV2(const aclTensor *tensor)
     return dataType;
 }
 
+inline bool IsTensorSourceQLiV2(const std::string &source) { return source != "batch_size"; }
+
+inline int64_t GetRawShapeSizeQLiV2(const std::string &source, int64_t batchValue)
+{
+    if (source.find("cu_seqlens") != std::string::npos) {
+        return batchValue + 1;
+    }
+    return batchValue;
+}
+
 int64_t GetQueryBatchSizeQliV2(int64_t batchSize, const aclTensor *cuSeqlensQOptional,
-                               const aclTensor *sequsedQOptional, const char *layoutQOptional)
+                               const aclTensor *sequsedQOptional, const char *layoutQOptional, std::string &source)
 {
     // 1. 如果sequsedQOptional 传了，使用sequsedQOptional获取BatchSize
     if (IsTensorExistQliV2(sequsedQOptional)) {
+        source = "seqused_q";
         return sequsedQOptional->GetViewShape().GetDim(0);
     }
     // 2. 如果sequsedQOptional 没传，使用cuSeqlensQOptional获取BatchSize
     if (strcmp(layoutQOptional, "TND") == 0) {
         if (IsTensorExistQliV2(
                 cuSeqlensQOptional)) { // 前序校验已保证layout_q = TND时，cu_seqlens_q必须传入，此通路必达
+            source = "cu_seqlens_q";
             return cuSeqlensQOptional->GetViewShape().GetDim(0) - 1;
         }
     }
+    source = "batch_size";
     // 3. 使用batchSize
     return batchSize;
 }
 
 int64_t GetKeyBatchSizeQliV2(int64_t batchSize, const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedKOptional,
-                             const char *layoutKOptional)
+                             const char *layoutKOptional, std::string &source)
 {
     // 1. 如果sequsedKOptional 传了，使用sequsedKOptional获取BatchSize
     if (IsTensorExistQliV2(sequsedKOptional)) {
+        source = "seqused_q";
         return sequsedKOptional->GetViewShape().GetDim(0);
     }
     // 如果是 TND，必须使用 cuSeqlensKOptional获取BatchSize
     if (strcmp(layoutKOptional, "TND") == 0) {
         if (IsTensorExistQliV2(
                 cuSeqlensKOptional)) { // 前序校验已保证layout_k = TND时，cu_seqlens_k必须传入，此通路必达
+            source = "cu_seqlens_q";
             return cuSeqlensKOptional->GetViewShape().GetDim(0) - 1;
         }
     }
+    source = "batch_size";
     // 3. 使用batchSize
     return batchSize;
 }
@@ -106,89 +125,138 @@ aclnnStatus CheckSingleParamQliV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t 
                                   const std::string &socVersion)
 {
     // num_heads_k 校验
-    CHECK_COND(numHeadsK == 1, ACLNN_ERR_PARAM_INVALID, "num_heads_kv should only be 1, but got %lld", numHeadsK);
+    if (numHeadsK != 1) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "num_heads_kv", std::to_string(numHeadsK),
+                                              "The value of num_heads_kv should be 1");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     // head_dim 校验
-    CHECK_COND(headDim == 128, ACLNN_ERR_PARAM_INVALID,
-               "head_dim should be 128, but got %lld", headDim);
+    if (headDim != 128) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "head_dim", std::to_string(numHeadsK),
+                                              "The value of head_dim should be 128");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     // batch_size 非负校验
-    CHECK_COND(batchSize >= 0, ACLNN_ERR_PARAM_INVALID, "batch_size should not be negative, but got %lld", batchSize);
+    if (batchSize < 0) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "batch_size", std::to_string(batchSize),
+                                              "The value of batch_size should not be negative");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     // max_seqlen_q 校验
-    CHECK_COND(maxSeqlenQ >= -1, ACLNN_ERR_PARAM_INVALID, "max_seqlen_q should be >= -1, but got %lld", maxSeqlenQ);
+    if (maxSeqlenQ < -1) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "max_seqlen_q", std::to_string(maxSeqlenQ),
+                                              "The value of max_seqlen_q should be >= -1");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     // max_seqlen_k 校验
-    CHECK_COND(maxSeqlenK >= -1, ACLNN_ERR_PARAM_INVALID, "max_seqlen_k should be >= -1, but got %lld", maxSeqlenK);
+    if (maxSeqlenK < -1) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "max_seqlen_k", std::to_string(maxSeqlenK),
+                                              "The value of max_seqlen_k should be >= -1");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     // mask_mode 校验
-    CHECK_COND((maskMode == QLI_V2_NO_MASK_MODE) || (maskMode == QLI_V2_CAUSAL_MASK_MODE), ACLNN_ERR_PARAM_INVALID,
-               "mask_mode should be %lld/%lld, but got %lld", QLI_V2_NO_MASK_MODE, QLI_V2_CAUSAL_MASK_MODE, maskMode);
+    if ((maskMode != QLI_V2_NO_MASK_MODE) && (maskMode != QLI_V2_CAUSAL_MASK_MODE)) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "mask_mode", std::to_string(maskMode),
+                                              "The value of mask_mode should be " +
+                                                  std::to_string(QLI_V2_NO_MASK_MODE) + " or " +
+                                                  std::to_string(QLI_V2_CAUSAL_MASK_MODE));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     // layout_q 校验
-    CHECK_COND((layoutQOptional != nullptr), ACLNN_ERR_PARAM_INVALID, "layout_q is null!");
-    CHECK_COND((strcmp(layoutQOptional, "TND") == 0) || (strcmp(layoutQOptional, "BSND") == 0), ACLNN_ERR_PARAM_INVALID,
-               "layout_q must be TND or BSND, but got %s", layoutQOptional);
+    if (layoutQOptional == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "layout_q", "Layout_q is null");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if ((strcmp(layoutQOptional, "TND") != 0) && (strcmp(layoutQOptional, "BSND") != 0)) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "layout_q", layoutQOptional,
+                                              "The value of layout_q must be TND or BSND");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     // layout_k 校验
-    CHECK_COND((layoutKOptional != nullptr), ACLNN_ERR_PARAM_INVALID, "layout_k is null!");
-    if ((strcmp(layoutKOptional, "PA_BBND") != 0)) {
-        CHECK_COND((strcmp(layoutQOptional, layoutKOptional) == 0), ACLNN_ERR_PARAM_INVALID,
-                   "For layout_k != PA_BBND, layout_q and layout_k must be the same!");
+    if (layoutKOptional == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "layout_k", "Layout_k is null");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if ((strcmp(layoutKOptional, "PA_BBND") != 0) && (strcmp(layoutQOptional, layoutKOptional) != 0)) {
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "layout_q and layout_k",
+                                               std::string(layoutQOptional) + " and " + std::string(layoutKOptional),
+                                               "For layout_k != PA_BBND, layout_q and layout_k must be the same");
+        return ACLNN_ERR_PARAM_INVALID;
     }
     // 校验 A2/A3 参数
     if (socVersion.find("Ascend950") == std::string::npos) {
         // num_heads_q 校验
         CHECK_COND(numHeadsQ == QLI_V2_NUM_HEADS_Q_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
-                   "num_heads_q should be %lld, but got %lld", QLI_V2_NUM_HEADS_Q_UPPER_BOUND,
-                   numHeadsQ);
+                   "num_heads_q should be %lld, but got %lld", QLI_V2_NUM_HEADS_Q_UPPER_BOUND, numHeadsQ);
         // topk 校验
         CHECK_COND(topk >= QLI_V2_TOPK_LOWER_BOUND && topk <= QLI_V2_A3_TOPK_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
-                   "topk should be [%lld, %lld], but got %lld", QLI_V2_TOPK_LOWER_BOUND,
-                   QLI_V2_A3_TOPK_UPPER_BOUND, topk);
+                   "topk should be [%lld, %lld], but got %lld", QLI_V2_TOPK_LOWER_BOUND, QLI_V2_A3_TOPK_UPPER_BOUND,
+                   topk);
         // quant_mode 校验
-        CHECK_COND(quantMode == QLI_V2_QUANT_MODE_2, ACLNN_ERR_PARAM_INVALID,
-                   "quant_mode should be 2, but got %lld", quantMode);
+        CHECK_COND(quantMode == QLI_V2_QUANT_MODE_2, ACLNN_ERR_PARAM_INVALID, "quant_mode should be 2, but got %lld",
+                   quantMode);
         // cmp_ratio 校验
         CHECK_COND((cmpRatio >= QLI_V2_CMP_RATIO_LOWER_BOUND) && (cmpRatio <= QLI_V2_CMP_RATIO_UPPER_BOUND) &&
                        ((cmpRatio & (cmpRatio - 1)) == 0),
-                   ACLNN_ERR_PARAM_INVALID, "cmp_ratio should be 1/2/4/8/16/32/64/128, but got %lld",
-                   cmpRatio);
+                   ACLNN_ERR_PARAM_INVALID, "cmp_ratio should be 1/2/4/8/16/32/64/128, but got %lld", cmpRatio);
         CHECK_COND(strcmp(layoutKOptional, "PA_BBND") == 0, ACLNN_ERR_PARAM_INVALID,
                    "layout_k must be PA_BBND, but got %s", layoutKOptional);
     } else { // 校验 A5参数
         // num_heads_q 校验
-        CHECK_COND(numHeadsQ >= QLI_V2_NUM_HEADS_Q_LOWER_BOUND && numHeadsQ <= QLI_V2_NUM_HEADS_Q_UPPER_BOUND,
-                   ACLNN_ERR_PARAM_INVALID,
-                   "num_heads_q should be [%lld, %lld], but got %lld",
-                   QLI_V2_NUM_HEADS_Q_LOWER_BOUND, QLI_V2_NUM_HEADS_Q_UPPER_BOUND, numHeadsQ);
+        if (numHeadsQ < QLI_V2_NUM_HEADS_Q_LOWER_BOUND || numHeadsQ > QLI_V2_NUM_HEADS_Q_UPPER_BOUND) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "num_heads_q", std::to_string(numHeadsQ),
+                                                  "The value of num_heads_q should be in range [" +
+                                                      std::to_string(QLI_V2_NUM_HEADS_Q_LOWER_BOUND) + ", " +
+                                                      std::to_string(QLI_V2_NUM_HEADS_Q_UPPER_BOUND) + "]");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
         // topk 校验
-        CHECK_COND(topk >= QLI_V2_TOPK_LOWER_BOUND && topk <= QLI_V2_A5_TOPK_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
-                   "topk should be [%lld, %lld], but got %lld", QLI_V2_TOPK_LOWER_BOUND,
-                   QLI_V2_A5_TOPK_UPPER_BOUND, topk);
+        if (topk < QLI_V2_TOPK_LOWER_BOUND || topk > QLI_V2_A5_TOPK_UPPER_BOUND) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "topk", std::to_string(topk),
+                                                  "The value of topk should be in range [" +
+                                                      std::to_string(QLI_V2_TOPK_LOWER_BOUND) + ", " +
+                                                      std::to_string(QLI_V2_A5_TOPK_UPPER_BOUND) + "]");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
         // quant_mode 校验
-        CHECK_COND((quantMode == QLI_V2_QUANT_MODE_1) || (quantMode == QLI_V2_QUANT_MODE_2) ||
-                       (quantMode == QLI_V2_QUANT_MODE_3) || (quantMode == QLI_V2_QUANT_MODE_4) ||
-                       (quantMode == QLI_V2_QUANT_MODE_5),
-                   ACLNN_ERR_PARAM_INVALID,
-                   "quant_mode should be %lld/%lld/%lld/%lld/%lld, but got %lld",
-                   QLI_V2_QUANT_MODE_1, QLI_V2_QUANT_MODE_2, QLI_V2_QUANT_MODE_3, QLI_V2_QUANT_MODE_4,
-                   QLI_V2_QUANT_MODE_5, quantMode);
+        if ((quantMode != QLI_V2_QUANT_MODE_1) && (quantMode != QLI_V2_QUANT_MODE_2) &&
+            (quantMode != QLI_V2_QUANT_MODE_3) && (quantMode != QLI_V2_QUANT_MODE_4) &&
+            (quantMode != QLI_V2_QUANT_MODE_5)) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                QLI_V2_ACLNN_OP_NAME, "quant_mode", std::to_string(quantMode),
+                "The value of quant_mode should be in [" + std::to_string(QLI_V2_QUANT_MODE_1) + ", " +
+                    std::to_string(QLI_V2_QUANT_MODE_2) + ", " + std::to_string(QLI_V2_QUANT_MODE_3) + ", " +
+                    std::to_string(QLI_V2_QUANT_MODE_4) + ", " + std::to_string(QLI_V2_QUANT_MODE_5) + "]");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
         // cmp_ratio 校验
-        CHECK_COND((cmpRatio >= QLI_V2_CMP_RATIO_LOWER_BOUND) && (cmpRatio <= QLI_V2_CMP_RATIO_UPPER_BOUND),
-                   ACLNN_ERR_PARAM_INVALID,
-                   "cmp_ratio should be between [%lld, %lld], "
-                   "but got %lld",
-                   QLI_V2_CMP_RATIO_LOWER_BOUND, QLI_V2_CMP_RATIO_UPPER_BOUND, cmpRatio);
-        CHECK_COND((strcmp(layoutKOptional, "TND") == 0) || (strcmp(layoutKOptional, "BSND") == 0) ||
-                       (strcmp(layoutKOptional, "PA_BBND") == 0),
-                   ACLNN_ERR_PARAM_INVALID,
-                   "layout_k must be TND/BSND/PA_BBND, but got %s", layoutKOptional);
+        if ((cmpRatio < QLI_V2_CMP_RATIO_LOWER_BOUND) || (cmpRatio > QLI_V2_CMP_RATIO_UPPER_BOUND)) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "cmp_ratio", std::to_string(cmpRatio),
+                                                  "The value of cmp_ratio should be in range [" +
+                                                      std::to_string(QLI_V2_CMP_RATIO_LOWER_BOUND) + ", " +
+                                                      std::to_string(QLI_V2_CMP_RATIO_UPPER_BOUND) + "]");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if ((strcmp(layoutKOptional, "TND") != 0) && (strcmp(layoutKOptional, "BSND") != 0) &&
+            (strcmp(layoutKOptional, "PA_BBND") != 0)) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "layout_k", layoutKOptional,
+                                                  "The value of layout_k must be in [TND, BSND, PA_BBND]");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     // 校验 layout_q 为 BSND 时，max_seqlen_q 必须大于 0
-    if (strcmp(layoutQOptional, "BSND") == 0) {
-        CHECK_COND(maxSeqlenQ > 0, ACLNN_ERR_PARAM_INVALID,
-                   "When layout_q is BSND, the value of max_seqlen_q "
-                   "must be equal to the size of the second axis of q, but got %lld", maxSeqlenQ);
+    if ((strcmp(layoutQOptional, "BSND") == 0) && (maxSeqlenQ <= 0)) {
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "max_seqlen_q", std::to_string(maxSeqlenQ),
+                                               "When layout_q is BSND, the value of max_seqlen_q "
+                                               "must be equal to the size of the second axis of q");
+        return ACLNN_ERR_PARAM_INVALID;
     }
     // 校验 layout_k 为 BSND 时，max_seqlen_k 必须大于 0
-    if (strcmp(layoutKOptional, "BSND") == 0) {
-        CHECK_COND(maxSeqlenK > 0, ACLNN_ERR_PARAM_INVALID,
-                   "When layout_k is BSND, the value of max_seqlen_k "
-                   "must be equal to the size of the second axis of k, but got %lld", maxSeqlenK);
+    if ((strcmp(layoutKOptional, "BSND") == 0) && (maxSeqlenK <= 0)) {
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "max_seqlen_k", std::to_string(maxSeqlenK),
+                                               "When layout_k is BSND, the value of max_seqlen_k "
+                                               "must be equal to the size of the second axis of k");
+        return ACLNN_ERR_PARAM_INVALID;
     }
     // 核心数校验
     CHECK_COND(aicCoreNum > 0, ACLNN_ERR_PARAM_INVALID, "AIC num should be larger than 0, but got %u", aicCoreNum);
@@ -207,37 +275,50 @@ aclnnStatus CheckExistenceQliV2(int64_t maskMode, int64_t cmpRatio, const aclTen
                                 const char *layoutKOptional, const aclTensor *metadata)
 {
     // cu_seqlens_q 存在性校验
-    if (strcmp(layoutQOptional, "TND") == 0) {
-        CHECK_COND(IsTensorExistQliV2(cuSeqlensQOptional), ACLNN_ERR_PARAM_INVALID,
-                   "For layout_q TND, cu_seqlens_q must be provided!");
+    if ((strcmp(layoutQOptional, "TND") == 0) && !IsTensorExistQliV2(cuSeqlensQOptional)) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "cu_seqlens_q",
+                                                 "When layout_q is TND, cu_seqlens_q must be provided");
+        return ACLNN_ERR_PARAM_INVALID;
     }
     // layout_q BSND, seqused_q 不存在时，max_seqlen_q 不能为-1
-    if (strcmp(layoutQOptional, "BSND") == 0 && !IsTensorExistQliV2(sequsedQOptional)) {
-        CHECK_COND(maxSeqlenQ > -1, ACLNN_ERR_PARAM_INVALID,
-                   "When layout_q is BSND and seqused_q is not provided, max_seqlen_q can not be -1!");
+    if (strcmp(layoutQOptional, "BSND") == 0 && !IsTensorExistQliV2(sequsedQOptional) && (maxSeqlenQ <= -1)) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            QLI_V2_ACLNN_OP_NAME, "max_seqlen_q", std::to_string(maxSeqlenQ),
+            "When layout_q is BSND and seqused_q is not provided, max_seqlen_q can not be -1");
+        return ACLNN_ERR_PARAM_INVALID;
     }
     // cu_seqlens_k 存在性校验
-    if (strcmp(layoutKOptional, "TND") == 0) {
-        CHECK_COND(IsTensorExistQliV2(cuSeqlensKOptional), ACLNN_ERR_PARAM_INVALID,
-                   "For layout_k TND, cu_seqlens_k must be provided!");
+    if ((strcmp(layoutKOptional, "TND") == 0) && !IsTensorExistQliV2(cuSeqlensKOptional)) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "cu_seqlens_k",
+                                                 "When layout_k is TND, cu_seqlens_k must be provided");
+        return ACLNN_ERR_PARAM_INVALID;
     }
     // seqused_k 存在性校验
-    if (strcmp(layoutKOptional, "PA_BBND") == 0) {
-        CHECK_COND(IsTensorExistQliV2(sequsedKOptional), ACLNN_ERR_PARAM_INVALID,
-                   "For layout_k PA_BBND, seqused_k must be provided!");
+    if ((strcmp(layoutKOptional, "PA_BBND") == 0) && !IsTensorExistQliV2(sequsedKOptional)) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "seqused_k",
+                                                 "When layout_k is PA_BBND, seqused_k must be provided");
+        return ACLNN_ERR_PARAM_INVALID;
     }
     // layout_k BSND, seqused_k 不存在时，max_seqlen_k 不能为-1
-    if (strcmp(layoutKOptional, "BSND") == 0 && !IsTensorExistQliV2(sequsedKOptional)) {
-        CHECK_COND(maxSeqlenK > -1, ACLNN_ERR_PARAM_INVALID,
-                   "When layout_k is BSND and seqused_k is not provided, max_seqlen_k can not be -1!");
+    if (strcmp(layoutKOptional, "BSND") == 0 && !IsTensorExistQliV2(sequsedKOptional) && maxSeqlenK <= -1) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            QLI_V2_ACLNN_OP_NAME, "max_seqlen_k", std::to_string(maxSeqlenK),
+            "When layout_k is BSND and seqused_k is not provided, max_seqlen_k can not be -1");
+        return ACLNN_ERR_PARAM_INVALID;
     }
     // cmp_residual_k 存在性校验
-    if (cmpRatio != QLI_V2_CMP_RATIO_LOWER_BOUND && maskMode == QLI_V2_CAUSAL_MASK_MODE) {
-        CHECK_COND(IsTensorExistQliV2(cmpResidualKOptional), ACLNN_ERR_PARAM_INVALID,
-                   "When cmp_ratio is not 1 and mask_mode is CAUSAL, cmp_residual_k must be provided!");
+    if ((cmpRatio != QLI_V2_CMP_RATIO_LOWER_BOUND) && (maskMode == QLI_V2_CAUSAL_MASK_MODE) &&
+        !IsTensorExistQliV2(cmpResidualKOptional)) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            QLI_V2_ACLNN_OP_NAME, "cmp_residual_k",
+            "When cmp_ratio is not 1 and mask_mode is CAUSAL, cmp_residual_k must be provided");
+        return ACLNN_ERR_PARAM_INVALID;
     }
     // metadata 存在性校验
-    CHECK_COND(IsTensorExistQliV2(metadata), ACLNN_ERR_PARAM_INVALID, "Output metadata is nullptr!");
+    if (!IsTensorExistQliV2(metadata)) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "metadata", "Metadata is nullptr");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     return ACLNN_SUCCESS;
 }
 
@@ -252,51 +333,87 @@ aclnnStatus CheckConsistencyQliV2(int64_t batchSize, const aclTensor *cuSeqlensQ
     // 校验 cu_seqlens_q
     if (IsTensorExistQliV2(cuSeqlensQOptional)) {
         dimNum = GetDimNumQliV2(cuSeqlensQOptional);
-        CHECK_COND(dimNum == 1, ACLNN_ERR_PARAM_INVALID, "The dim num of cu_seqlens_q must be 1, but got %lld", dimNum);
+        if (dimNum != 1) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM(QLI_V2_ACLNN_OP_NAME, "cu_seqlens_q", std::to_string(dimNum), "1");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
         dataType = GetDataTypeQliV2(cuSeqlensQOptional);
-        CHECK_COND(dataType == aclDataType::ACL_INT32, ACLNN_ERR_PARAM_INVALID,
-                   "The data type of cu_seqlens_q must be int32, but got %d", static_cast<int32_t>(dataType));
+        if (dataType != aclDataType::ACL_INT32) {
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "cu_seqlens_q", ToString(dataType).GetString(),
+                                                  "The dtype of cu_seqlens_q must be int32");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     // 校验 cu_seqlens_k
     if (IsTensorExistQliV2(cuSeqlensKOptional)) {
         dimNum = GetDimNumQliV2(cuSeqlensKOptional);
-        CHECK_COND(dimNum == 1, ACLNN_ERR_PARAM_INVALID, "The dim num of cu_seqlens_k must be 1, but got %lld", dimNum);
+        if (dimNum != 1) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM(QLI_V2_ACLNN_OP_NAME, "cu_seqlens_k", std::to_string(dimNum), "1");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
         dataType = GetDataTypeQliV2(cuSeqlensKOptional);
-        CHECK_COND(dataType == aclDataType::ACL_INT32, ACLNN_ERR_PARAM_INVALID,
-                   "The data type of cu_seqlens_k must be int32, but got %d", static_cast<int32_t>(dataType));
+        if (dataType != aclDataType::ACL_INT32) {
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "cu_seqlens_k", ToString(dataType).GetString(),
+                                                  "The dtype of cu_seqlens_k must be int32");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     // 校验 seqused_q
     if (IsTensorExistQliV2(sequsedQOptional)) {
         dimNum = GetDimNumQliV2(sequsedQOptional);
-        CHECK_COND(dimNum == 1, ACLNN_ERR_PARAM_INVALID, "The dim num of seqused_q must be 1, but got %lld", dimNum);
+        if (dimNum != 1) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM(QLI_V2_ACLNN_OP_NAME, "seqused_q", std::to_string(dimNum), "1");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
         dataType = GetDataTypeQliV2(sequsedQOptional);
-        CHECK_COND(dataType == aclDataType::ACL_INT32, ACLNN_ERR_PARAM_INVALID,
-                   "The data type of seqused_q must be int32, but got %d", static_cast<int32_t>(dataType));
+        if (dataType != aclDataType::ACL_INT32) {
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "seqused_q", ToString(dataType).GetString(),
+                                                  "The dtype of seqused_q must be int32");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     // 校验 seqused_k
     if (IsTensorExistQliV2(sequsedKOptional)) {
         dimNum = GetDimNumQliV2(sequsedKOptional);
-        CHECK_COND(dimNum == 1, ACLNN_ERR_PARAM_INVALID, "The dim num of seqused_k must be 1, but got %lld", dimNum);
+        if (dimNum != 1) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM(QLI_V2_ACLNN_OP_NAME, "seqused_k", std::to_string(dimNum), "1");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
         dataType = GetDataTypeQliV2(sequsedKOptional);
-        CHECK_COND(dataType == aclDataType::ACL_INT32, ACLNN_ERR_PARAM_INVALID,
-                   "The data type of seqused_k must be int32, but got %d", static_cast<int32_t>(dataType));
+        if (dataType != aclDataType::ACL_INT32) {
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "seqused_k", ToString(dataType).GetString(),
+                                                  "The dtype of seqused_k must be int32");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     // 校验 cmp_residual_k
     if (IsTensorExistQliV2(cmpResidualKOptional)) {
         dimNum = GetDimNumQliV2(cmpResidualKOptional);
-        CHECK_COND(dimNum == 1, ACLNN_ERR_PARAM_INVALID, "The dim num of cmp_residual_k must be 1, but got %lld",
-                   dimNum);
+        if (dimNum != 1) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM(QLI_V2_ACLNN_OP_NAME, "cmp_residual_k", std::to_string(dimNum), "1");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
         dataType = GetDataTypeQliV2(cmpResidualKOptional);
-        CHECK_COND(dataType == aclDataType::ACL_INT32, ACLNN_ERR_PARAM_INVALID,
-                   "The data type of cmp_residual_k must be int32, but got %d", static_cast<int32_t>(dataType));
+        if (dataType != aclDataType::ACL_INT32) {
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "cmp_residual_k",
+                                                  ToString(dataType).GetString(),
+                                                  "The dtype of cmp_residual_k must be int32");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     // 校验 metadata
     if (IsTensorExistQliV2(metadata)) {
         dimNum = GetDimNumQliV2(metadata);
-        CHECK_COND(dimNum == 1, ACLNN_ERR_PARAM_INVALID, "The dim num of metadata must be 1, but got %lld", dimNum);
+        if (dimNum != 1) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM(QLI_V2_ACLNN_OP_NAME, "metadata", std::to_string(dimNum), "1");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
         dataType = GetDataTypeQliV2(metadata);
-        CHECK_COND(dataType == aclDataType::ACL_INT32, ACLNN_ERR_PARAM_INVALID,
-                   "The data type of metadata must be int32, but got %d", static_cast<int32_t>(dataType));
+        if (dataType != aclDataType::ACL_INT32) {
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "metadata", ToString(dataType).GetString(),
+                                                  "The dtype of metadata must be int32");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
         // 校验 metadata 元素数
         if (metadata->GetViewShape().GetDim(0) != optiling::QLI_V2_METADATA_TOTAL_SIZE) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The element num of metadata must be %u, but got %lld",
@@ -305,11 +422,35 @@ aclnnStatus CheckConsistencyQliV2(int64_t batchSize, const aclTensor *cuSeqlensQ
         }
     }
     // 校验batch
-    int64_t queryBatchSize = GetQueryBatchSizeQliV2(batchSize, cuSeqlensQOptional, sequsedQOptional, layoutQOptional);
-    int64_t keyBatchSize = GetKeyBatchSizeQliV2(batchSize, cuSeqlensKOptional, sequsedKOptional, layoutKOptional);
-    CHECK_COND(queryBatchSize == keyBatchSize, ACLNN_ERR_PARAM_INVALID,
-               "The batch_size obtained from query should be the same as that obtained from key, but got %lld and %lld",
-               queryBatchSize, keyBatchSize);
+    std::string querySource;
+    std::string keySource;
+    int64_t queryBatchSize =
+        GetQueryBatchSizeQliV2(batchSize, cuSeqlensQOptional, sequsedQOptional, layoutQOptional, querySource);
+    int64_t keyBatchSize =
+        GetKeyBatchSizeQliV2(batchSize, cuSeqlensKOptional, sequsedKOptional, layoutKOptional, keySource);
+    if (queryBatchSize != keyBatchSize) {
+        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+            QLI_V2_ACLNN_OP_NAME, querySource + " and " + keySource,
+            std::to_string(GetRawShapeSizeQLiV2(querySource, queryBatchSize)) + " and " +
+                std::to_string(GetRawShapeSizeQLiV2(keySource, keyBatchSize)),
+            "The batch_size obtained from query should be the same as that obtained from key");
+        if (IsTensorSourceQLiV2(querySource) && IsTensorSourceQLiV2(keySource)) {
+            OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                QLI_V2_ACLNN_OP_NAME, querySource + " and " + keySource,
+                std::to_string(GetRawShapeSizeQLiV2(querySource, queryBatchSize)) + " and " +
+                    std::to_string(GetRawShapeSizeQLiV2(keySource, keyBatchSize)),
+                "The batch_size obtained from query should be the same as that obtained from key");
+        } else if (IsTensorSourceQLiV2(querySource)) {
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                QLI_V2_ACLNN_OP_NAME, querySource, std::to_string(GetRawShapeSizeQLiV2(querySource, queryBatchSize)),
+                "The batch_size obtained from query should be the same as that obtained from key");
+        } else {
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                QLI_V2_ACLNN_OP_NAME, keySource, std::to_string(GetRawShapeSizeQLiV2(keySource, keyBatchSize)),
+                "The batch_size obtained from query should be the same as that obtained from key");
+        }
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     // 校验TND场景q维度一致性
     if (strcmp(layoutQOptional, "TND") == 0 && IsTensorExistQliV2(sequsedQOptional)) {
         int64_t cuSeqlensQBatchSize = cuSeqlensQOptional->GetViewShape().GetDim(0) - 1;
@@ -318,22 +459,44 @@ aclnnStatus CheckConsistencyQliV2(int64_t batchSize, const aclTensor *cuSeqlensQ
             "When layout_q is TND and seqused_q is passed, The batch_size obtained from cu_seqlens_q should be the "
             "same as that obtained from seqused_q, but got %lld and %lld",
             cuSeqlensQBatchSize, queryBatchSize);
+        if (cuSeqlensQBatchSize != queryBatchSize) {
+            OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                QLI_V2_ACLNN_OP_NAME, "cu_seqlens_q and seqused_q",
+                std::to_string(cuSeqlensQBatchSize) + " and " + std::to_string(queryBatchSize),
+                "When layout_q is TND and seqused_q is passed, "
+                "the shape size of cu_seqlens_q minus 1 must be equal to "
+                "the shape size of seqused_q");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     // 校验TND场景k维度一致性
     if (strcmp(layoutKOptional, "TND") == 0 && IsTensorExistQliV2(sequsedKOptional)) {
         int64_t cuSeqlensKBatchSize = cuSeqlensKOptional->GetViewShape().GetDim(0) - 1;
-        CHECK_COND(
-            cuSeqlensKBatchSize == keyBatchSize, ACLNN_ERR_PARAM_INVALID,
-            "When layout_k is TND and seqused_k is passed, The batch_size obtained from cu_seqlens_k should be the "
-            "same as that obtained from seqused_k, but got %lld and %lld",
-            cuSeqlensKBatchSize, keyBatchSize);
+        if (cuSeqlensKBatchSize != keyBatchSize) {
+            OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                QLI_V2_ACLNN_OP_NAME, "cu_seqlens_k and seqused_k",
+                std::to_string(cuSeqlensKBatchSize) + " and " + std::to_string(keyBatchSize),
+                "When layout_k is TND and seqused_k is passed, "
+                "the shape size of cu_seqlens_k minus 1 must be equal to "
+                "the shape size of seqused_k");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     // 校验 cmp_residual_k 元素数
-    if (IsTensorExistQliV2(cmpResidualKOptional)) {
-        auto cmpResidualKBatch = cmpResidualKOptional->GetViewShape().GetDim(0);
-        CHECK_COND(cmpResidualKBatch == queryBatchSize, ACLNN_ERR_PARAM_INVALID,
-                   "The batch_size of cmp_residual_k should match the valid batch size, but got %lld and %lld",
-                   cmpResidualKBatch, queryBatchSize);
+    auto cmpResidualKBatch = cmpResidualKOptional->GetViewShape().GetDim(0);
+    if (IsTensorExistQliV2(cmpResidualKOptional) && (cmpResidualKBatch != queryBatchSize)) {
+        if (IsTensorSourceQLiV2(querySource)) {
+            OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                QLI_V2_ACLNN_OP_NAME, "cmp_residual_k and " + querySource,
+                std::to_string(cmpResidualKBatch) + " and " +
+                    std::to_string(GetRawShapeSizeQLiV2(querySource, queryBatchSize)),
+                "The batch_size of cmp_residual_k should match the valid batch size");
+        } else {
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                QLI_V2_ACLNN_OP_NAME, "cmp_residual_k", std::to_string(cmpResidualKBatch),
+                "The batch_size of cmp_residual_k should match the valid batch size");
+        }
+        return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
 }

@@ -58,7 +58,8 @@ ge::graphStatus MQSMLAInfoParser::CheckRequiredInOutExistence() const
 
 ge::graphStatus MQSMLAInfoParser::CheckRequiredAttrExistence() const
 {
-    OP_CHECK_IF(opParamInfo_.quantMode == nullptr, OP_LOGE(opName_, "quantMode attr is nullptr."),
+    OP_CHECK_IF(opParamInfo_.quantMode == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "quant_mode", "Quant_mode is nullptr"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -108,18 +109,14 @@ void MQSMLAInfoParser::GetOptionalInputParaInfo()
 {
     sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_KV_INDEX, opParamInfo_.oriKv);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_KV_INDEX, opParamInfo_.cmpKv);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_SPARSE_INDICES_INDEX,
-                                                    opParamInfo_.oriSparseIndices);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_SPARSE_INDICES_INDEX,
-                                                    opParamInfo_.cmpSparseIndices);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_SPARSE_INDICES_INDEX, opParamInfo_.oriSparseIndices);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_SPARSE_INDICES_INDEX, opParamInfo_.cmpSparseIndices);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_BLOCK_TABLE_INDEX, opParamInfo_.oriBlockTable);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_BLOCK_TABLE_INDEX, opParamInfo_.cmpBlockTable);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, SINKS_INDEX, opParamInfo_.sinks);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_Q_INDEX, opParamInfo_.cuSeqLensQ);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_ORI_KV_INDEX,
-                                                    opParamInfo_.cuSeqLensOriKv);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_CMP_KV_INDEX,
-                                                    opParamInfo_.cuSeqLensCmpKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_ORI_KV_INDEX, opParamInfo_.cuSeqLensOriKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_CMP_KV_INDEX, opParamInfo_.cuSeqLensCmpKv);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_Q_INDEX, opParamInfo_.seqUsedQ);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_ORI_KV_INDEX, opParamInfo_.sequsedOriKv);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_CMP_KV_INDEX, opParamInfo_.sequsedCmpKv);
@@ -207,7 +204,7 @@ ge::graphStatus MQSMLAInfoParser::GetQueryAndOutLayout()
         qLayout_ = it->second.first;
         outLayout_ = it->second.second;
     } else {
-        OP_LOGE(opName_, "layout of Q is %s, it is unsupported.", layout.c_str());
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "layout_q", layout.c_str(), "BSND or TND");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -226,7 +223,7 @@ ge::graphStatus MQSMLAInfoParser::GetKvLayout()
     if (it != layoutKVMap.end()) {
         kvLayout_ = it->second;
     } else {
-        OP_LOGE(opName_, "layoutKV is %s, it is unsupported.", layout.c_str());
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "layout_kv", layout.c_str(), "BSND, PA_BBND or TND");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -311,13 +308,15 @@ ge::graphStatus MQSMLAInfoParser::GetActualSeqLenSize(uint32_t &size, const gert
                                                       const std::string &name) const
 {
     if ((tensor == nullptr)) {
-        OP_LOGE(opName_, "when layout of q is %s, %s must be provided.", MQSMLALayoutToSerialString(layout).c_str(),
-                name.c_str());
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName_, name.c_str(),
+            "When layout_q is " + MQSMLALayoutToSerialString(layout) + ", " + name + " must be provided");
         return ge::GRAPH_FAILED;
     }
     int64_t shapeSize = tensor->GetShapeSize();
     if (shapeSize <= 0) {
-        OP_LOGE(opName_, "the shape size of %s is %ld, it should be greater than 0.", name.c_str(), shapeSize);
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(opName_, name.c_str(), std::to_string(shapeSize).c_str(),
+                                                  "The shape size of " + name + " should be greater than 0");
         return ge::GRAPH_FAILED;
     }
     size = static_cast<uint32_t>(shapeSize);
@@ -329,7 +328,9 @@ ge::graphStatus MQSMLAInfoParser::GetActualSeqLenQSize(uint32_t &size)
     if (opParamInfo_.cuSeqLensQ.tensor != nullptr) {
         int64_t shapeSize = opParamInfo_.cuSeqLensQ.tensor->GetShapeSize();
         if (shapeSize <= 1) {
-            OP_LOGE(opName_, "the shape size of cuSeqLensQ is %ld, it should be greater than 1.", shapeSize);
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                opName_, "cu_seqlens_q", std::to_string(opParamInfo_.cuSeqLensQ.tensor->GetShapeSize()).c_str(),
+                "The shape size of cu_seqlens_q should be greater than 1");
             return ge::GRAPH_FAILED;
         }
         size = static_cast<uint32_t>(shapeSize - 1);
@@ -379,19 +380,20 @@ ge::graphStatus MQSMLAInfoParser::GetMaxBlockNumPerBatch()
         return ge::GRAPH_SUCCESS;
     }
     if (opParamInfo_.oriBlockTable.tensor == nullptr) {
-        OP_LOGE(opName_, "the layout_kv is %s, blockTable must be provided.",
-                MQSMLALayoutToSerialString(kvLayout_).c_str());
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName_, "ori_block_table",
+            "The layout_kv is " + MQSMLALayoutToSerialString(kvLayout_) + ", ori_block_table must be provided");
         return ge::GRAPH_FAILED;
     }
     uint32_t oriDimNum = opParamInfo_.oriBlockTable.tensor->GetStorageShape().GetDimNum();
     if (oriDimNum != DIM_NUM_TWO) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM(opName_, "ori_block_table",
-                                     std::to_string(oriDimNum).c_str(), std::to_string(DIM_NUM_TWO).c_str());
+        OP_LOGE_FOR_INVALID_SHAPEDIM(opName_, "ori_block_table", std::to_string(oriDimNum).c_str(),
+                                     std::to_string(DIM_NUM_TWO).c_str());
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo_.oriBlockTable.tensor->GetStorageShape().GetDim(1) <= 0) {
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, ORI_BLOCK_TABLE_NAME.c_str(),
-                                              Ops::Base::ToString(opParamInfo_.oriBlockTable.tensor->GetStorageShape()).c_str(),
+                                              ToStringRaw(opParamInfo_.oriBlockTable.tensor->GetStorageShape()).c_str(),
                                               ORI_BLOCK_TABLE_NAME + "'s second dimension should be greater than 0");
         return ge::GRAPH_FAILED;
     }
@@ -400,14 +402,15 @@ ge::graphStatus MQSMLAInfoParser::GetMaxBlockNumPerBatch()
     if (opParamInfo_.cmpBlockTable.tensor != nullptr) {
         uint32_t cmpDimNum = opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDimNum();
         if (cmpDimNum != DIM_NUM_TWO) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM(opName_, "cmp_block_table",
-                                         std::to_string(cmpDimNum).c_str(), std::to_string(DIM_NUM_TWO).c_str());
+            OP_LOGE_FOR_INVALID_SHAPEDIM(opName_, "cmp_block_table", std::to_string(cmpDimNum).c_str(),
+                                         std::to_string(DIM_NUM_TWO).c_str());
             return ge::GRAPH_FAILED;
         }
         if (opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(1) <= 0) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, CMP_BLOCK_TABLE_NAME.c_str(),
-                                                  Ops::Base::ToString(opParamInfo_.cmpBlockTable.tensor->GetStorageShape()).c_str(),
-                                                  CMP_BLOCK_TABLE_NAME + "'s second dimension should be greater than 0");
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName_, CMP_BLOCK_TABLE_NAME.c_str(),
+                ToStringRaw(opParamInfo_.cmpBlockTable.tensor->GetStorageShape()).c_str(),
+                CMP_BLOCK_TABLE_NAME + "'s second dimension should be greater than 0");
             return ge::GRAPH_FAILED;
         }
         cmpMaxBlockNumPerBatch_ = opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(1);
@@ -619,9 +622,11 @@ static ge::graphStatus TilingPrepareForMixedQuantSparseFlashMla(gert::TilingPars
 ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo *tilingInfo)
 {
     if (tilingInfo->opParamInfo.cmpKv.tensor == nullptr) {
-        OP_CHECK_IF(tilingInfo->opParamInfo.cmpSparseIndices.tensor != nullptr,
-                    OP_LOGE("MixedQuantSparseFlashMla", "cmpSparseIndices must be empty when cmpKv is not provided."),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            tilingInfo->opParamInfo.cmpSparseIndices.tensor != nullptr,
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("MixedQuantSparseFlashMla", "cmp_sparse_indices",
+                                                     "Cmp_sparse_indices must be empty when cmpKv is not provided"),
+            return ge::GRAPH_FAILED);
         if (tilingInfo->opParamInfo.oriSparseIndices.tensor != nullptr) {
             perfMode_ = QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE;
         } else {
@@ -666,31 +671,33 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo *til
                          static_cast<uint64_t>(alignedOriSparseBlockCount) * (sizeof(int32_t) + sizeof(int64_t));
     uint64_t cmpUbSize = static_cast<uint64_t>(tilingInfo->cmpMaxBlockNumPerBatch) * sizeof(int32_t) +
                          static_cast<uint64_t>(alignedCmpSparseBlockCount) * (sizeof(int32_t) + sizeof(int64_t));
-    bool oriBlockSizePowerOfTwo = tilingInfo->oriBlockSize > 0 &&
-                                  (tilingInfo->oriBlockSize & (tilingInfo->oriBlockSize - 1)) == 0;
-    bool cmpBlockSizePowerOfTwo = tilingInfo->cmpBlockSize > 0 &&
-                                  (tilingInfo->cmpBlockSize & (tilingInfo->cmpBlockSize - 1)) == 0;
-    bool blockSizeSupported =
-        (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE && cmpBlockSizePowerOfTwo) ||
-        (perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE && oriBlockSizePowerOfTwo) ||
-        (perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE &&
-         oriBlockSizePowerOfTwo && cmpBlockSizePowerOfTwo);
-    uint64_t vectorizeUbSize = (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE) ? cmpUbSize :
-                                                                                     ((perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) ? oriUbSize : std::max(oriUbSize, cmpUbSize));
-    uint32_t vectorizeFlag = static_cast<uint32_t>(
-        (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
-         perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
-         perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
-        tilingInfo->quantMode == QUANT_CONTIGUOUS_MODE &&
-        tilingInfo->kvLayout == MQSMLALayout::PA_BBND && blockSizeSupported && vectorizeUbSize <= UB_SIZE);
+    bool oriBlockSizePowerOfTwo =
+        tilingInfo->oriBlockSize > 0 && (tilingInfo->oriBlockSize & (tilingInfo->oriBlockSize - 1)) == 0;
+    bool cmpBlockSizePowerOfTwo =
+        tilingInfo->cmpBlockSize > 0 && (tilingInfo->cmpBlockSize & (tilingInfo->cmpBlockSize - 1)) == 0;
+    bool blockSizeSupported = (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE && cmpBlockSizePowerOfTwo) ||
+                              (perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE && oriBlockSizePowerOfTwo) ||
+                              (perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE && oriBlockSizePowerOfTwo &&
+                               cmpBlockSizePowerOfTwo);
+    uint64_t vectorizeUbSize =
+        (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE) ?
+            cmpUbSize :
+            ((perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) ? oriUbSize : std::max(oriUbSize, cmpUbSize));
+    uint32_t vectorizeFlag = static_cast<uint32_t>((perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
+                                                    perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+                                                    perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
+                                                   tilingInfo->quantMode == QUANT_CONTIGUOUS_MODE &&
+                                                   tilingInfo->kvLayout == MQSMLALayout::PA_BBND &&
+                                                   blockSizeSupported && vectorizeUbSize <= UB_SIZE);
 
     size_t workspaceSize = static_cast<size_t>(ascendcPlatform.GetLibApiWorkSpaceSize());
     bool isSplitG = tilingInfo->gSize > 64; // gSize超过64时采用Split-G
     workspaceSize += static_cast<size_t>(S2_BASE_SIZE) * D_SIZE * VEC_RES_ELEM_SIZE * TRIPLE_BUFFER_NUM *
                      (isSplitG ? (aicNum >> 1) : aicNum);
     if (vectorizeFlag != 0) {
-        uint64_t totalBS1 = (tilingInfo->qLayout == MQSMLALayout::TND) ? tilingInfo->s1Size :
-                                                                         static_cast<uint64_t>(tilingInfo->bSize) * tilingInfo->s1Size;
+        uint64_t totalBS1 = (tilingInfo->qLayout == MQSMLALayout::TND) ?
+                                tilingInfo->s1Size :
+                                static_cast<uint64_t>(tilingInfo->bSize) * tilingInfo->s1Size;
         if (perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
             perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
             workspaceSize += totalBS1 * alignedOriSparseBlockCount * sizeof(int64_t);
@@ -706,14 +713,14 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo *til
         size_t combineElemSize = static_cast<size_t>(fdStagingMSize) * D_SIZE +
                                  static_cast<size_t>(FD_MAX_SUM_REGION_NUM) * fdStagingMSize * FD_BLOCK_ELEM;
         workspaceSize += 2ULL * fdStagingSlotNum * combineElemSize * FLOAT_ELEM_SIZE;
-        workspaceSize += static_cast<size_t>(aicNum) * BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM *
-                         combineElemSize * FLOAT_ELEM_SIZE;
+        workspaceSize +=
+            static_cast<size_t>(aicNum) * BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM * combineElemSize * FLOAT_ELEM_SIZE;
     } else {
         // 末尾的2对应每个split分别暂存max和sum。
-        size_t s2SplitStagingPerSlot = static_cast<size_t>(fdStagingMSize) * D_SIZE * FLOAT_ELEM_SIZE *
-                                           MAX_S2_SPLIT_NUM +
-                                       static_cast<size_t>(fdStagingMSize) * FD_BLOCK_ELEM * FLOAT_ELEM_SIZE *
-                                           MAX_S2_SPLIT_NUM * FD_MAX_SUM_REGION_NUM;
+        size_t s2SplitStagingPerSlot =
+            static_cast<size_t>(fdStagingMSize) * D_SIZE * FLOAT_ELEM_SIZE * MAX_S2_SPLIT_NUM +
+            static_cast<size_t>(fdStagingMSize) * FD_BLOCK_ELEM * FLOAT_ELEM_SIZE * MAX_S2_SPLIT_NUM *
+                FD_MAX_SUM_REGION_NUM;
         workspaceSize += s2SplitStagingPerSlot * fdStagingSlotNum;
     }
     size_t *workSpaces = context_->GetWorkspaceSizes(1);

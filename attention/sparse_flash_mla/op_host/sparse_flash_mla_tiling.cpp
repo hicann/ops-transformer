@@ -51,6 +51,31 @@ constexpr uint32_t FD_MAX_S2_SPLIT_NUM = 2U;
 constexpr uint32_t BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM = 33U;
 constexpr uint32_t FD_BROADCAST_ELEMS = 8U;
 constexpr int64_t BATCH_CONSISTENCY_LEVEL = 3;
+
+static std::vector<int64_t> ToVector(const gert::Shape &shape)
+{
+    size_t shapeSize = shape.GetDimNum();
+    std::vector<int64_t> shapeVec(shapeSize, 0);
+
+    for (size_t i = 0; i < shapeSize; i++) {
+        shapeVec[i] = shape.GetDim(i);
+    }
+    return shapeVec;
+}
+
+static std::string ToStringRaw(const gert::Shape &shape)
+{
+    std::ostringstream oss;
+    auto v = ToVector(shape);
+    if (v.size() > 0) {
+        for (size_t i = 0; i < v.size() - 1; ++i) {
+            oss << v[i] << ", ";
+        }
+        oss << v[v.size() - 1];
+    }
+    return oss.str();
+}
+
 static bool IsNonEmptyOptionalTensor(const gert::Tensor *tensor)
 {
     return tensor != nullptr && tensor->GetShapeSize() > 0;
@@ -61,10 +86,7 @@ static bool IsPowerOfTwoInRange(uint32_t value, uint32_t minValue, uint32_t maxV
     return value >= minValue && value <= maxValue && (value & (value - 1U)) == 0U;
 }
 
-static bool IsA5Arch(NpuArch npuArch)
-{
-    return npuArch == NpuArch::DAV_3510;
-}
+static bool IsA5Arch(NpuArch npuArch) { return npuArch == NpuArch::DAV_3510; }
 
 static bool IsPaBlockSizeSupport(NpuArch npuArch, int32_t blockSize)
 {
@@ -286,36 +308,40 @@ static std::string SMLADataTypeToSerialString(ge::DataType type)
 // --------------------------SMLAInfoParser类成员函数定义------------------------------------
 ge::graphStatus SMLAInfoParser::CheckRequiredInOutExistence() const
 {
-    OP_CHECK_IF(opParamInfo_.q.shape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "Shape of tensor query"),
+    OP_CHECK_IF(opParamInfo_.q.shape == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query", "The shape of query is nullptr"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(opParamInfo_.q.desc == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "Desc of tensor query"),
+    OP_CHECK_IF(opParamInfo_.q.desc == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query", "The desc of query is nullptr"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(opParamInfo_.oriKv.tensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "tensor of oriKv"),
+    OP_CHECK_IF(opParamInfo_.oriKv.tensor == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "ori_kv", "The tensor of ori_kv is nullptr"),
                 return ge::GRAPH_FAILED);
     if (std::string(opParamInfo_.layoutKv) == "PA_BBND") {
         OP_CHECK_IF(
             opParamInfo_.oriBlockTable.tensor == nullptr,
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "tensor of oriBlockTable",
-                                                     "tensor of oriBlockTable is nullptr when layoutKv is PA_BBND"),
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                opName_, "ori_block_table", "The tensor of ori_block_table is nullptr when layoutKv is PA_BBND"),
             return ge::GRAPH_FAILED);
     }
     if (perfMode_ == SMLATemplateMode::HCA_TEMPLATE_MODE) {
-        OP_CHECK_IF(opParamInfo_.cmpKv.tensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "tensor of cmpKv"),
+        OP_CHECK_IF(opParamInfo_.cmpKv.tensor == nullptr,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "cmp_kv", "The tensor of cmp_kv is nullptr"),
                     return ge::GRAPH_FAILED);
     }
     if (perfMode_ == SMLATemplateMode::CSA_TEMPLATE_MODE) {
-        OP_CHECK_IF(opParamInfo_.cmpKv.tensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "tensor of cmpKv"),
+        OP_CHECK_IF(opParamInfo_.cmpKv.tensor == nullptr,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "cmp_kv", "The tensor of cmp_kv is nullptr"),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(opParamInfo_.cmpSparseIndices.tensor == nullptr,
-                    OP_LOGE_WITH_INVALID_INPUT(opName_, "cmpSparseIndices"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "cmp_sparse_indices",
+                                                             "The tensor of cmp_sparse_indices is nullptr"),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SMLAInfoParser::CheckRequiredAttrExistence() const
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus SMLAInfoParser::CheckRequiredAttrExistence() const { return ge::GRAPH_SUCCESS; }
 
 ge::graphStatus SMLAInfoParser::CheckRequiredParaExistence() const
 {
@@ -326,15 +352,12 @@ ge::graphStatus SMLAInfoParser::CheckRequiredParaExistence() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SMLAInfoParser::CheckUnrequiredParaExistence() const
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus SMLAInfoParser::CheckUnrequiredParaExistence() const { return ge::GRAPH_SUCCESS; }
 
 ge::graphStatus SMLAInfoParser::GetOpName()
 {
     if (context_->GetNodeName() == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT("SparseFlashMla", "opName got from TilingContext");
+        OP_LOGE("SparseFlashMla", "opName got from TilingContext is nullptr");
         return ge::GRAPH_FAILED;
     }
     opName_ = context_->GetNodeName();
@@ -366,18 +389,14 @@ void SMLAInfoParser::GetOptionalInputParaInfo()
 {
     sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_KV_INDEX, opParamInfo_.oriKv);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_KV_INDEX, opParamInfo_.cmpKv);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_SPARSE_INDICES_INDEX,
-                                                    opParamInfo_.oriSparseIndices);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_SPARSE_INDICES_INDEX,
-                                                    opParamInfo_.cmpSparseIndices);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_SPARSE_INDICES_INDEX, opParamInfo_.oriSparseIndices);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_SPARSE_INDICES_INDEX, opParamInfo_.cmpSparseIndices);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_BLOCK_TABLE_INDEX, opParamInfo_.oriBlockTable);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_BLOCK_TABLE_INDEX, opParamInfo_.cmpBlockTable);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, SINKS_INDEX, opParamInfo_.sinks);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_Q_INDEX, opParamInfo_.cuSeqLensQ);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_ORI_KV_INDEX,
-                                                    opParamInfo_.cuSeqLensOriKv);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_CMP_KV_INDEX,
-                                                    opParamInfo_.cuSeqLensCmpKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_ORI_KV_INDEX, opParamInfo_.cuSeqLensOriKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_CMP_KV_INDEX, opParamInfo_.cuSeqLensCmpKv);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_Q_INDEX, opParamInfo_.seqUsedQ);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_ORI_KV_INDEX, opParamInfo_.sequsedOriKv);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_CMP_KV_INDEX, opParamInfo_.sequsedCmpKv);
@@ -510,8 +529,7 @@ ge::graphStatus SMLAInfoParser::GetSMLATemplateMode(SMLATilingInfo &smlaInfo)
                 } else {
                     // DSpark: oriMaskMode=0 + ori_sparse_indices on SWA kernel path.
                     if (opParamInfo_.oriMaskMode == nullptr || *opParamInfo_.oriMaskMode != 0U) {
-                        OP_LOGE(opName_,
-                                "SWA ori sparse (DSpark) requires oriMaskMode 0, but got %u.",
+                        OP_LOGE(opName_, "SWA ori sparse (DSpark) requires oriMaskMode 0, but got %u.",
                                 opParamInfo_.oriMaskMode != nullptr ? *opParamInfo_.oriMaskMode : UINT32_MAX);
                         return ge::GRAPH_FAILED;
                     }
@@ -521,18 +539,20 @@ ge::graphStatus SMLAInfoParser::GetSMLATemplateMode(SMLATilingInfo &smlaInfo)
                 perfMode_ = SMLATemplateMode::SWA_TEMPLATE_MODE;
             }
         } else {
-            OP_LOGE(opName_, "When cmpSparseIndices is not nullptr, cmpKv cannot be nullptr.");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                opName_, "cmp_kv", "When cmp_sparse_indices is not nullptr, cmp_kv cannot be nullptr");
             return ge::GRAPH_FAILED;
         }
         if (perfMode_ == SMLATemplateMode::HCA_TEMPLATE_MODE || perfMode_ == SMLATemplateMode::CSA_TEMPLATE_MODE) {
             if (kvLayout_ == SMLALayout::TND && opParamInfo_.cuSeqLensCmpKv.tensor == nullptr) {
-                OP_LOGE(opName_, "the layout_kv is %s, seqlens_cmp_kv must be provided.",
-                        SMLALayoutToSerialString(kvLayout_).c_str());
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    opName_, "cu_seqlens_cmp_kv",
+                    "The layout_kv is" + SMLALayoutToSerialString(kvLayout_) + ", seqlens_cmp_kv must be provided");
                 return ge::GRAPH_FAILED;
             }
         }
     } else {
-        OP_LOGE(opName_, "oriKv is nullptr");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "ori_kv", "ori_kv is nullptr");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -552,15 +572,13 @@ ge::graphStatus SMLAInfoParser::GetQueryAndOutLayout()
         oriSparseIndicesLayout_ = qLayout_;
         cmpSparseIndicesLayout_ = qLayout_;
     } else {
-        OP_LOGE(opName_, "layout of Q is %s, it is unsupported.", layout.c_str());
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "layout_q", layout.c_str(), "BSND or TND");
         return ge::GRAPH_FAILED;
     }
     if (qLayout_ == SMLALayout::BSND) {
         OP_CHECK_IF(opParamInfo_.cuSeqLensQ.tensor != nullptr,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        opName_, "cuSeqLensQ",
-                        Ops::Base::ToString(opParamInfo_.cuSeqLensQ.tensor->GetStorageShape()).c_str(),
-                        "when query's layout is BSND, cuSeqLensQ should be null"),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "cu_seqlens_q",
+                                                             "When layout_q is BSND, cu_seqlens_q should be null"),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -578,14 +596,14 @@ ge::graphStatus SMLAInfoParser::GetKvLayout()
     if (it != layoutKVMap.end()) {
         kvLayout_ = it->second;
     } else {
-        OP_LOGE(opName_, "layoutKV is %s, it is unsupported.", layout.c_str());
+        OP_LOGE_FOR_INVALID_VALUE(opName_, "layout_kv", layout.c_str(), "BSND, PA_BBND or TND");
         return ge::GRAPH_FAILED;
     }
     if (kvLayout_ != SMLALayout::PA_BBND && qLayout_ != kvLayout_) {
-        OP_LOGE(opName_,
-                "layout_q and layout_kv only support BSND/BSND, TND/TND, BSND/PA_BBND "
-                "or TND/PA_BBND, but got %s/%s.",
-                SMLALayoutToSerialString(qLayout_).c_str(), SMLALayoutToSerialString(kvLayout_).c_str());
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            opName_, "layout_q and layout_kv",
+            SMLALayoutToSerialString(qLayout_) + " and " + SMLALayoutToSerialString(kvLayout_),
+            "Layout_q and layout_kv only support BSND/BSND, TND/TND, BSND/PA_BBND or TND/PA_BBND");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -629,7 +647,7 @@ void SMLAInfoParser::SetSMLAShape()
     if (opParamInfo_.oriKv.tensor != nullptr) {
         oriKvShape_ = opParamInfo_.oriKv.tensor->GetStorageShape();
     } else {
-        OP_LOGE(opName_, "query tensor is nullptr, please check input parameters.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "q", "Q is nullptr, please check input parameters");
     }
     if (opParamInfo_.cmpKv.tensor != nullptr) {
         cmpKvShape_ = opParamInfo_.cmpKv.tensor->GetStorageShape();
@@ -644,7 +662,8 @@ void SMLAInfoParser::SetSMLAShape()
         if (opParamInfo_.cmpSparseIndices.tensor != nullptr) {
             cmpSparseIndicesShape_ = opParamInfo_.cmpSparseIndices.tensor->GetStorageShape();
         } else {
-            OP_LOGE(opName_, "cmpSparseIndices tensor is nullptr, please check input parameters.");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "cmp_sparse_indices",
+                                                     "Cmp_sparse_indices is nullptr, please check input parameters");
         }
     }
 
@@ -678,8 +697,10 @@ ge::graphStatus SMLAInfoParser::CheckContiguous() const
             oriExpectedStrides = {dim1 * dim2, dim2, 1};
         }
         OP_CHECK_IF(oriKeyStridesVec_.size() != oriExpectedStrides.size(),
-                    OP_LOGE(opName_, "oriKey strideVec size[%zu] not match kvLayout expect len[%zu].",
-                            oriKeyStridesVec_.size(), oriExpectedStrides.size()),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "ori_kv",
+                        "Ori_kv strideVec size[" + std::to_string(oriKeyStridesVec_.size()) +
+                            "] not match layout_kv expect len[" + std::to_string(oriExpectedStrides.size()) + "]"),
                     return ge::GRAPH_FAILED);
         oriKeyNonContiguous =
             static_cast<uint64_t>(oriKeyStridesVec_[checkStartIdx]) != oriExpectedStrides[checkStartIdx];
@@ -698,16 +719,22 @@ ge::graphStatus SMLAInfoParser::CheckContiguous() const
             cmpExpectedStrides = {dim1 * dim2, dim2, 1};
         }
         OP_CHECK_IF(cmpKeyStridesVec_.size() != cmpExpectedStrides.size(),
-                    OP_LOGE(opName_, "cmpKey strideVec size[%zu] not match kvLayout expect len[%zu].",
-                            cmpKeyStridesVec_.size(), cmpExpectedStrides.size()),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "cmp_kv",
+                        "Cmp_kv strideVec size[" + std::to_string(cmpKeyStridesVec_.size()) +
+                            "] not match kvLayout expect len[" + std::to_string(cmpExpectedStrides.size()) + "]"),
                     return ge::GRAPH_FAILED);
         cmpKeyNonContiguous =
             static_cast<uint64_t>(cmpKeyStridesVec_[checkStartIdx]) != cmpExpectedStrides[checkStartIdx];
     }
 
-    OP_CHECK_IF(oriKeyNonContiguous, OP_LOGE(opName_, "oriKey only support non-continuous keying on the 0-axis."),
+    OP_CHECK_IF(oriKeyNonContiguous,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "ori_kv",
+                                                         "Ori_kv only support non-continuous keying on the 0-axis"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(cmpKeyNonContiguous, OP_LOGE(opName_, "cmpKey only support non-continuous keying on the 0-axis."),
+    OP_CHECK_IF(cmpKeyNonContiguous,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "cmp_kv",
+                                                         "Cmp_kv only support non-continuous keying on the 0-axis"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -742,13 +769,15 @@ ge::graphStatus SMLAInfoParser::GetActualSeqLenSize(uint32_t &size, const gert::
                                                     const std::string &name) const
 {
     if ((tensor == nullptr)) {
-        OP_LOGE(opName_, "when layout of q is %s, %s must be provided.", SMLALayoutToSerialString(layout).c_str(),
-                name.c_str());
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName_, name.c_str(),
+            "When layout_q is " + SMLALayoutToSerialString(layout) + ", " + name + " must be provided");
         return ge::GRAPH_FAILED;
     }
     int64_t shapeSize = tensor->GetShapeSize();
     if (shapeSize <= 0) {
-        OP_LOGE(opName_, "the shape size of %s is %ld, it should be greater than 0.", name.c_str(), shapeSize);
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(opName_, name.c_str(), std::to_string(shapeSize).c_str(),
+                                                  "The shape size of " + name + " should be greater than 0");
         return ge::GRAPH_FAILED;
     }
     size = static_cast<uint32_t>(shapeSize) - 1;
@@ -757,7 +786,7 @@ ge::graphStatus SMLAInfoParser::GetActualSeqLenSize(uint32_t &size, const gert::
 
 ge::graphStatus SMLAInfoParser::GetActualSeqLenQSize(uint32_t &size)
 {
-    return GetActualSeqLenSize(size, opParamInfo_.cuSeqLensQ.tensor, qLayout_, "cuSeqLensQ");
+    return GetActualSeqLenSize(size, opParamInfo_.cuSeqLensQ.tensor, qLayout_, "cu_seqlens_q");
 }
 
 ge::graphStatus SMLAInfoParser::GetBatchSize()
@@ -793,12 +822,18 @@ ge::graphStatus SMLAInfoParser::GetS1Size()
         perfMode_ == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         if (cmpSparseIndicesLayout_ == SMLALayout::TND) {
             uint32_t cmpSparseIndicesT = GetAxisNum(cmpSparseIndicesShape_, SMLAAxis::T, cmpSparseIndicesLayout_);
-            OP_CHECK_IF(cmpSparseIndicesT != s1Size_, OP_LOGE(opName_, "T size check failed !"),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                cmpSparseIndicesT != s1Size_,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "cmp_sparse_indices", Ops::Base::ToString(cmpSparseIndicesShape_), "T size check failed"),
+                return ge::GRAPH_FAILED);
         } else {
             uint32_t cmpSparseIndicesS1 = GetAxisNum(cmpSparseIndicesShape_, SMLAAxis::S, cmpSparseIndicesLayout_);
-            OP_CHECK_IF(cmpSparseIndicesS1 != s1Size_, OP_LOGE(opName_, "s1 size check failed !"),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                cmpSparseIndicesS1 != s1Size_,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "cmp_sparse_indices", Ops::Base::ToString(cmpSparseIndicesShape_), "S1 size check failed"),
+                return ge::GRAPH_FAILED);
         }
     }
     return ge::GRAPH_SUCCESS;
@@ -816,8 +851,11 @@ ge::graphStatus SMLAInfoParser::GetMaxBlockNumPerBatch()
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo_.oriBlockTable.tensor->GetStorageShape().GetDim(1) < 0) {
-        OP_LOGE(opName_, "%s's second dimension(%ld) should be non-negative number.", ORI_BLOCK_TABLE_NAME.c_str(),
-                opParamInfo_.oriBlockTable.tensor->GetStorageShape().GetDim(1));
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            opName_, "ori_block_table", ToStringRaw(opParamInfo_.oriBlockTable.tensor->GetStorageShape()).c_str(),
+            "Ori_block_table's second dimension(" +
+                std::to_string(opParamInfo_.oriBlockTable.tensor->GetStorageShape().GetDim(1)) +
+                ") should be non-negative number");
         return ge::GRAPH_FAILED;
     }
     oriMaxBlockNumPerBatch_ = opParamInfo_.oriBlockTable.tensor->GetStorageShape().GetDim(1);
@@ -831,14 +869,21 @@ ge::graphStatus SMLAInfoParser::GetMaxBlockNumPerBatch()
         }
         if (qLayout_ == SMLALayout::TND || qLayout_ == SMLALayout::BSND) {
             if (opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(0) != bSize_) {
-                OP_LOGE(opName_, "cmp_block_table's first dimension(%ld) should be equal to query's B(%u).",
-                        opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(0), bSize_);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "cmp_block_table",
+                    ToStringRaw(opParamInfo_.cmpBlockTable.tensor->GetStorageShape()).c_str(),
+                    "Cmp_block_table's first dimension(" +
+                        std::to_string(opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(0)) +
+                        ") should be equal to query's B(" + std::to_string(bSize_) + ")");
                 return ge::GRAPH_FAILED;
             }
         }
         if (opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(1) <= 0) {
-            OP_LOGE(opName_, "%s's second dimension(%ld) should be greater than 0", CMP_BLOCK_TABLE_NAME.c_str(),
-                    opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(1));
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName_, "cmp_block_table", ToStringRaw(opParamInfo_.cmpBlockTable.tensor->GetStorageShape()).c_str(),
+                "cmp_block_table's second dimension(" +
+                    std::to_string(opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(1)) +
+                    ") should be greater than 0");
             return ge::GRAPH_FAILED;
         }
         cmpMaxBlockNumPerBatch_ = opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(1);
@@ -912,7 +957,7 @@ ge::graphStatus SMLAInfoParser::GetSparseBlockCount()
 ge::graphStatus SMLAInfoParser::GetSinks()
 {
     if (opParamInfo_.sinks.tensor == nullptr) {
-        OP_LOGE(opName_, "%s must be provided!", SINKS_NAME.c_str());
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sinks", "sinks must be provided");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -924,13 +969,15 @@ ge::graphStatus SMLAInfoParser::GetActualseqInfo()
     if (qLayout_ == SMLALayout::TND) {
         if (opParamInfo_.cuSeqLensQ.tensor != nullptr) {
             if (opParamInfo_.cuSeqLensQ.tensor->GetShapeSize() != bSize_ + 1) {
-                OP_LOGE(opName_, "cu_seqlens_q's dimension should be equal to %u, but now it's %ld.", bSize_ + 1,
-                        opParamInfo_.cuSeqLensQ.tensor->GetShapeSize());
+                OP_LOGE_FOR_INVALID_SHAPESIZE(opName_, "cu_seqlens_q",
+                                              std::to_string(opParamInfo_.cuSeqLensQ.tensor->GetShapeSize()).c_str(),
+                                              std::to_string(bSize_ + 1));
                 return ge::GRAPH_FAILED;
             }
             actualLenDimsQ_ = opParamInfo_.cuSeqLensQ.tensor->GetShapeSize() - 1; // cuSeqLensQ shape is B+1
         } else {
-            OP_LOGE(opName_, "When qLayout is TND,  input cu_seqlens_q must be provided");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "cu_seqlens_q",
+                                                     "When layout_q is TND, cu_seqlens_q must be provided");
             return ge::GRAPH_FAILED;
         }
     } else {
@@ -939,7 +986,8 @@ ge::graphStatus SMLAInfoParser::GetActualseqInfo()
         }
     }
     if (kvLayout_ != SMLALayout::PA_BBND && kvLayout_ != SMLALayout::BSND && kvLayout_ != SMLALayout::TND) {
-        OP_LOGE(opName_, "ori_kv and cmp_kv only support PA_BBND, BSND and TND layout.");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "layout_kv", SMLALayoutToSerialString(kvLayout_),
+                                              "Ori_kv and cmp_kv only support PA_BBND, BSND and TND");
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo_.sequsedOriKv.tensor != nullptr) {
@@ -948,16 +996,18 @@ ge::graphStatus SMLAInfoParser::GetActualseqInfo()
     if (opParamInfo_.sequsedCmpKv.tensor != nullptr) {
         actualLenDimsCmpKV_ = opParamInfo_.sequsedCmpKv.tensor->GetShapeSize();
         if (opParamInfo_.sequsedCmpKv.tensor->GetShapeSize() != bSize_) {
-            OP_LOGE(opName_, "sequsedCmpKv's dimension should be equal to %u, but got %ld.", bSize_,
-                    opParamInfo_.sequsedCmpKv.tensor->GetShapeSize());
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                opName_, "seqused_cmp_kv", std::to_string(opParamInfo_.sequsedCmpKv.tensor->GetShapeSize()),
+                "Seqused_cmp_kv's dimension should be equal to " + std::to_string(bSize_));
             return ge::GRAPH_FAILED;
         }
     }
     if (opParamInfo_.cmpResidualKv.tensor != nullptr) {
         cmpResidualKVSize_ = opParamInfo_.cmpResidualKv.tensor->GetShapeSize();
         if (opParamInfo_.cmpResidualKv.tensor->GetShapeSize() != bSize_) {
-            OP_LOGE(opName_, "cmpResidualKv's dimension should be equal to %u, but got %ld.", bSize_,
-                    opParamInfo_.cmpResidualKv.tensor->GetShapeSize());
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                opName_, "cmp_residual_kv", std::to_string(opParamInfo_.sequsedCmpKv.tensor->GetShapeSize()),
+                "Cmp_residual_kv's dimension should be equal to " + std::to_string(bSize_));
             return ge::GRAPH_FAILED;
         }
     }
@@ -970,29 +1020,32 @@ ge::graphStatus SMLAInfoParser::GetActualseqInfo()
         if (opParamInfo_.sequsedOriKv.tensor != nullptr) {
             if (qLayout_ == SMLALayout::BSND) {
                 if (opParamInfo_.sequsedOriKv.tensor->GetShapeSize() != bSize_) {
-                    OP_LOGE(opName_, "sequsedOriKv's dimension should be equal to %u, but got %ld.", bSize_,
-                            opParamInfo_.sequsedOriKv.tensor->GetShapeSize());
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                        opName_, "seqused_ori_kv", std::to_string(opParamInfo_.sequsedOriKv.tensor->GetShapeSize()),
+                        "Seqused_ori_kv's dimension should be equal to " + std::to_string(bSize_));
                     return ge::GRAPH_FAILED;
                 }
             } else {
                 if (opParamInfo_.sequsedOriKv.tensor->GetShapeSize() != bSize_) {
-                    OP_LOGE(opName_, "sequsedOriKv's dimension should be equal to bSize(%u), but got %ld.", bSize_,
-                            opParamInfo_.sequsedOriKv.tensor->GetShapeSize());
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                        opName_, "seqused_ori_kv", std::to_string(opParamInfo_.sequsedOriKv.tensor->GetShapeSize()),
+                        "Seqused_ori_kv's dimension should be equal to " + std::to_string(bSize_));
                     return ge::GRAPH_FAILED;
                 }
             }
             actualLenDimsKV_ = opParamInfo_.sequsedOriKv.tensor->GetShapeSize();
         } else if (perfMode_ != SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
                    perfMode_ != SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-            OP_LOGE(opName_, "Input sequsedOriKv must be provided when kv layout is PA_BBND");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "seqused_ori_kv",
+                                                     "Seqused_ori_kv must be provided when layout_kv is PA_BBND");
             return ge::GRAPH_FAILED;
         }
     } else if (kvLayout_ == SMLALayout::TND) {
     } else if (kvLayout_ == SMLALayout::BSND) {
         actualLenDimsKV_ = actualLenDimsOriKV_;
     } else {
-        OP_LOGE(opName_, "oriKV and cmpKv only support PA_BBND, TND and BSND layout, but got %s.",
-                SMLALayoutToSerialString(kvLayout_).c_str());
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "layout_kv", SMLALayoutToSerialString(kvLayout_),
+                                              "Ori_kv and cmp_kv only support PA_BBND, TND and BSND");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -1152,8 +1205,8 @@ void SMLATilingCheck::LogErrorDtypeSupport(const std::vector<ge::DataType> &expe
             oss << ", ";
         }
     }
-    OP_LOGE(opName_, "Tensor %s only supports dtype %s, but got %s", name.c_str(), oss.str().c_str(),
-            SMLADataTypeToSerialString(actualDtype).c_str());
+    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, name.c_str(), SMLADataTypeToSerialString(actualDtype).c_str(),
+                                          "The dtype of " + name + " only supports " + oss.str());
 }
 
 ge::graphStatus SMLATilingCheck::CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc,
@@ -1165,9 +1218,9 @@ ge::graphStatus SMLATilingCheck::CheckDtypeSupport(const gert::CompileTimeTensor
                     OP_LOGE(opName_, "%s datatype support list should be specify in DTYPE_SUPPORT_MAP", name.c_str()),
                     return ge::GRAPH_FAILED);
         auto &expectDtypeList = it->second;
-        OP_CHECK_IF(std::find(expectDtypeList.begin(), expectDtypeList.end(), desc->GetDataType()) ==
-                        expectDtypeList.end(),
-                    LogErrorDtypeSupport(expectDtypeList, desc->GetDataType(), name), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            std::find(expectDtypeList.begin(), expectDtypeList.end(), desc->GetDataType()) == expectDtypeList.end(),
+            LogErrorDtypeSupport(expectDtypeList, desc->GetDataType(), name), return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -1182,8 +1235,8 @@ void SMLATilingCheck::LogErrorLayoutSupport(const std::vector<SMLALayout> &expec
             oss << ", ";
         }
     }
-    OP_LOGE(opName_, "Tensor %s only supports layout %s, but got %s", name.c_str(), oss.str().c_str(),
-            SMLALayoutToSerialString(actualLayout).c_str());
+    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, name.c_str(), SMLALayoutToSerialString(actualLayout).c_str(),
+                                          "Tensor " + name + " only supports layout " + oss.str());
 }
 
 ge::graphStatus SMLATilingCheck::CheckLayoutSupport(const SMLALayout &actualLayout, const std::string &name) const
@@ -1243,9 +1296,10 @@ ge::graphStatus SMLATilingCheck::CheckDimNumInLayoutSupport(const SMLALayout &la
 {
     const auto &dimIt = SMLA_LAYOUT_DIM_MAP.find(layout);
     OP_CHECK_IF(shape->GetStorageShape().GetDimNum() != dimIt->second,
-                OP_LOGE(opName_, "When layout is %s, %s dimension should be %zu, but got %zu",
-                        SMLALayoutToSerialString(layout).c_str(), name.c_str(), dimIt->second,
-                        shape->GetStorageShape().GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName_, name.c_str(), std::to_string(shape->GetStorageShape().GetDimNum()).c_str(),
+                    "When layout is " + SMLALayoutToSerialString(layout) + ", the shape dim of " + name +
+                        " should be " + std::to_string(dimIt->second)),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -1253,7 +1307,7 @@ ge::graphStatus SMLATilingCheck::CheckDimNumInLayoutSupport(const SMLALayout &la
 ge::graphStatus SMLATilingCheck::CheckSingleParaQuery() const
 {
     if (opParamInfo_.q.desc == nullptr || opParamInfo_.q.shape == nullptr) {
-        OP_LOGE(opName_, "%s must be provided!", QUERY_NAME.c_str());
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "q", "Q must be provided");
         return ge::GRAPH_FAILED;
     }
     const std::vector<size_t> queryDimNumList = {DIM_NUM_THREE, DIM_NUM_FOUR};
@@ -1277,10 +1331,13 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaOriKv() const
         return ge::GRAPH_FAILED;
     }
     if (kvLayout_ == SMLALayout::BSND) {
-        OP_CHECK_IF(opParamInfo_.oriKv.tensor->GetStorageShape().GetDim(0) != bSize_,
-                    OP_LOGE(opName_, "%s's batch dimension(%lld) should be equal to B(%u).", ORI_KV_NAME.c_str(),
-                            opParamInfo_.oriKv.tensor->GetStorageShape().GetDim(0), bSize_),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            opParamInfo_.oriKv.tensor->GetStorageShape().GetDim(0) != bSize_,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName_, "ori_kv", ToStringRaw(opParamInfo_.oriKv.tensor->GetStorageShape()),
+                "Ori_kv's batch dimension(" + std::to_string(opParamInfo_.oriKv.tensor->GetStorageShape().GetDim(0)) +
+                    ") should be equal to B(" + std::to_string(bSize_) + ")"),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -1301,8 +1358,11 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCmpKv() const
         }
         if (kvLayout_ == SMLALayout::BSND) {
             OP_CHECK_IF(opParamInfo_.cmpKv.tensor->GetStorageShape().GetDim(0) != bSize_,
-                        OP_LOGE(opName_, "%s's batch dimension(%lld) should be equal to B(%u).", CMP_KV_NAME.c_str(),
-                                opParamInfo_.cmpKv.tensor->GetStorageShape().GetDim(0), bSize_),
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            opName_, "cmp_kv", ToStringRaw(opParamInfo_.cmpKv.tensor->GetStorageShape()),
+                            "Cmp_kv's batch dimension(" +
+                                std::to_string(opParamInfo_.cmpKv.tensor->GetStorageShape().GetDim(0)) +
+                                ") should be equal to B(" + std::to_string(bSize_) + ")"),
                         return ge::GRAPH_FAILED);
         }
     }
@@ -1321,8 +1381,9 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCuSeqLensQ() const
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(opParamInfo_.cuSeqLensQ.tensor->GetShapeSize() != bSize_ + 1,
-                OP_LOGE(opName_, "Input cuSeqLensQ's shapeSize is not equal to B + 1: %u, it is %ld", bSize_ + 1,
-                        opParamInfo_.cuSeqLensQ.tensor->GetShapeSize()),
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    opName_, "cu_seqlens_q", std::to_string(opParamInfo_.cuSeqLensQ.tensor->GetShapeSize()).c_str(),
+                    "The shape size of cu_seqlens_q is not equal to B + 1:" + std::to_string(bSize_ + 1)),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -1338,10 +1399,12 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCuSeqLensOriKv() const
             CheckDimNumSupport(&opParamInfo_.cuSeqLensOriKv.tensor->GetShape(), dimNumList, CU_SEQLENS_ORI_KV_NAME)) {
         return ge::GRAPH_FAILED;
     }
-    OP_CHECK_IF(opParamInfo_.cuSeqLensOriKv.tensor->GetShapeSize() != bSize_ + 1,
-                OP_LOGE(opName_, "Input cuSeqLensOriKv's shapeSize is not equal to B + 1: %u, it is %ld", bSize_ + 1,
-                        opParamInfo_.cuSeqLensOriKv.tensor->GetShapeSize()),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        opParamInfo_.cuSeqLensOriKv.tensor->GetShapeSize() != bSize_ + 1,
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            opName_, "cu_seqlens_ori_kv", std::to_string(opParamInfo_.cuSeqLensOriKv.tensor->GetShapeSize()).c_str(),
+            "The shape size of cu_seqlens_ori_kv is not equal to B + 1:" + std::to_string(bSize_ + 1)),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1356,22 +1419,18 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCuSeqLensCmpKv() const
             CheckDimNumSupport(&opParamInfo_.cuSeqLensCmpKv.tensor->GetShape(), dimNumList, CU_SEQLENS_CMP_KV_NAME)) {
         return ge::GRAPH_FAILED;
     }
-    OP_CHECK_IF(opParamInfo_.cuSeqLensCmpKv.tensor->GetShapeSize() != bSize_ + 1,
-                OP_LOGE(opName_, "Input cuSeqLensCmpKv's shapeSize is not equal to B + 1: %u, it is %ld", bSize_ + 1,
-                        opParamInfo_.cuSeqLensCmpKv.tensor->GetShapeSize()),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        opParamInfo_.cuSeqLensCmpKv.tensor->GetShapeSize() != bSize_ + 1,
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            opName_, "cu_seqlens_cmp_kv", std::to_string(opParamInfo_.cuSeqLensCmpKv.tensor->GetShapeSize()).c_str(),
+            "The shape size of cu_seqlens_cmp_kv is not equal to B + 1:" + std::to_string(bSize_ + 1)),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SMLATilingCheck::CheckSingleParaNumHeads() const
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus SMLATilingCheck::CheckSingleParaNumHeads() const { return ge::GRAPH_SUCCESS; }
 
-ge::graphStatus SMLATilingCheck::CheckSingleParaKvHeadNums() const
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus SMLATilingCheck::CheckSingleParaKvHeadNums() const { return ge::GRAPH_SUCCESS; }
 
 ge::graphStatus SMLATilingCheck::CheckSingleParaOriSparseIndices() const
 {
@@ -1380,14 +1439,15 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaOriSparseIndices() const
     }
     if (!IsA5Arch(npuArch_)) {
         OP_CHECK_IF(smlaInfo_.perfMode != SMLATemplateMode::SWA_TEMPLATE_MODE,
-                    OP_LOGE(opName_, "ori_sparse_indices is only supported in SWA mode."),
-                    return ge::GRAPH_FAILED);
+                    OP_LOGE(opName_, "ori_sparse_indices is only supported in SWA mode."), return ge::GRAPH_FAILED);
         OP_CHECK_IF(opParamInfo_.oriMaskMode == nullptr || *opParamInfo_.oriMaskMode != 0U,
                     OP_LOGE(opName_, "ori_sparse_indices SWA (DSpark) requires oriMaskMode 0."),
                     return ge::GRAPH_FAILED);
     }
     OP_CHECK_IF(opParamInfo_.oriSparseIndices.tensor->GetStorageShape().GetShapeSize() == 0,
-                OP_LOGE(opName_, "ori_sparse_indices cannot be empty tensor."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "ori_sparse_indices",
+                                                         "Ori_sparse_indices cannot be empty tensor"),
+                return ge::GRAPH_FAILED);
     const std::vector<size_t> oriSparseIndicesDimNumList = {DIM_NUM_THREE, DIM_NUM_FOUR};
     if (ge::GRAPH_SUCCESS != CheckDtypeSupport(opParamInfo_.oriSparseIndices.desc, ORI_SPARSE_INDICES) ||
         ge::GRAPH_SUCCESS != CheckLayoutSupport(oriSparseIndicesLayout_, ORI_SPARSE_INDICES) ||
@@ -1399,10 +1459,14 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaOriSparseIndices() const
         return ge::GRAPH_FAILED;
     }
     if (oriSparseIndicesLayout_ == SMLALayout::BSND) {
-        OP_CHECK_IF(opParamInfo_.oriSparseIndices.tensor->GetStorageShape().GetDim(0) != bSize_,
-                    OP_LOGE(opName_, "%s's batch dimension(%lld) should be equal to B(%u).", ORI_SPARSE_INDICES.c_str(),
-                            opParamInfo_.oriSparseIndices.tensor->GetStorageShape().GetDim(0), bSize_),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            opParamInfo_.oriSparseIndices.tensor->GetStorageShape().GetDim(0) != bSize_,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName_, "ori_sparse_indices", ToStringRaw(opParamInfo_.oriSparseIndices.tensor->GetStorageShape()),
+                "Ori_sparse_indices's batch dimension(" +
+                    std::to_string(opParamInfo_.oriSparseIndices.tensor->GetStorageShape().GetDim(0)) +
+                    ") should be equal to B(" + std::to_string(bSize_) + ")"),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -1411,10 +1475,11 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCmpSparseIndices() const
 {
     if (smlaInfo_.perfMode == optiling::SMLATemplateMode::CSA_TEMPLATE_MODE ||
         smlaInfo_.perfMode == optiling::SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-        OP_CHECK_IF(
-            opParamInfo_.cmpSparseIndices.tensor->GetStorageShape().GetShapeSize() == 0,
-            OP_LOGE(opName_, "when cmp_sparse_indices is not nullptr(CSA), cmp_sparse_indices cannot be empty tensor."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(opParamInfo_.cmpSparseIndices.tensor->GetStorageShape().GetShapeSize() == 0,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "cmp_sparse_indices",
+                        "When cmp_sparse_indices is not nullptr(CSA), cmp_sparse_indices cannot be empty tensor"),
+                    return ge::GRAPH_FAILED);
         const std::vector<size_t> cmpSparseIndicesDimNumList = {DIM_NUM_THREE, DIM_NUM_FOUR};
         if (ge::GRAPH_SUCCESS != CheckDtypeSupport(opParamInfo_.cmpSparseIndices.desc, CMP_SPARSE_INDICES) ||
             ge::GRAPH_SUCCESS != CheckLayoutSupport(cmpSparseIndicesLayout_, CMP_SPARSE_INDICES) ||
@@ -1426,11 +1491,14 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCmpSparseIndices() const
             return ge::GRAPH_FAILED;
         }
         if (cmpSparseIndicesLayout_ == SMLALayout::BSND) {
-            OP_CHECK_IF(opParamInfo_.cmpSparseIndices.tensor->GetStorageShape().GetDim(0) != bSize_,
-                        OP_LOGE(opName_, "%s's batch dimension(%lld) should be equal to B(%u).",
-                                CMP_SPARSE_INDICES.c_str(),
-                                opParamInfo_.cmpSparseIndices.tensor->GetStorageShape().GetDim(0), bSize_),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                opParamInfo_.cmpSparseIndices.tensor->GetStorageShape().GetDim(0) != bSize_,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "cmp_sparse_indices", ToStringRaw(opParamInfo_.cmpSparseIndices.tensor->GetStorageShape()),
+                    "Cmp_sparse_indices's batch dimension(" +
+                        std::to_string(opParamInfo_.cmpSparseIndices.tensor->GetStorageShape().GetDim(0)) +
+                        ") should be equal to B(" + std::to_string(bSize_) + ")"),
+                return ge::GRAPH_FAILED);
         }
     }
     return ge::GRAPH_SUCCESS;
@@ -1448,13 +1516,17 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaOriBlockTable() const
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(opParamInfo_.oriBlockTable.tensor->GetStorageShape().GetDim(0) != bSize_,
-                OP_LOGE(opName_, "%s's first dimension(%lld) should be equal to B(%u).", ORI_BLOCK_TABLE_NAME.c_str(),
-                        opParamInfo_.oriBlockTable.tensor->GetStorageShape().GetDim(0), bSize_),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "ori_block_table", ToStringRaw(opParamInfo_.oriBlockTable.tensor->GetStorageShape()),
+                    "Ori_block_table's first dimension(" +
+                        std::to_string(opParamInfo_.oriBlockTable.tensor->GetStorageShape().GetDim(0)) +
+                        ") should be equal to B(" + std::to_string(bSize_) + ")"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(!IsPaBlockSizeSupport(npuArch_, oriBlockSize_),
-                OP_LOGE(opName_,
-                        "oriBlockSize_ should be in [1, 1024] on %s or 16-aligned [16, 1024] on %s, but got: %d.",
-                        A5_PLATFORM_LOG.c_str(), A2_A3_PLATFORM_LOG.c_str(), oriBlockSize_),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "ori_kv", ToStringRaw(opParamInfo_.oriKv.tensor->GetStorageShape()).c_str(),
+                    "OriBlockSize_ should be in [1, 1024] on " + A5_PLATFORM_LOG + " or 16-aligned [16, 1024] on " +
+                        A2_A3_PLATFORM_LOG + ", but got: " + std::to_string(oriBlockSize_)),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -1468,8 +1540,9 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCmpBlockTable() const
         smlaInfo_.perfMode == optiling::SMLATemplateMode::HCA_TEMPLATE_MODE ||
         smlaInfo_.perfMode == optiling::SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         OP_CHECK_IF(opParamInfo_.cmpBlockTable.tensor == nullptr,
-                    OP_LOGE(opName_, "%s must be provided when kvLayout is PA_BBND in CSA/HCA/ORI_CMP_SPARSE mode.",
-                            CMP_BLOCK_TABLE_NAME.c_str()),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "cmp_block_table",
+                        "Cmp_block_table must be provided when layout_kv is PA_BBND in CSA/HCA/ORI_CMP_SPARSE mode"),
                     return ge::GRAPH_FAILED);
         const std::vector<size_t> cmpBlockTableDimNumList = {DIM_NUM_TWO};
         if (ge::GRAPH_SUCCESS != CheckDtypeSupport(opParamInfo_.cmpBlockTable.desc, CMP_BLOCK_TABLE_NAME) ||
@@ -1478,15 +1551,17 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCmpBlockTable() const
             return ge::GRAPH_FAILED;
         }
         OP_CHECK_IF(opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(0) != bSize_,
-                    OP_LOGE(opName_, "%s's first dimension(%lld) should be equal to B(%u).",
-                            CMP_BLOCK_TABLE_NAME.c_str(),
-                            opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(0), bSize_),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName_, "cmp_block_table", ToStringRaw(opParamInfo_.cmpBlockTable.tensor->GetStorageShape()),
+                        "cmp_block_table's first dimension(" +
+                            std::to_string(opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(0)) +
+                            ") should be equal to B(" + std::to_string(bSize_) + ")"),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(!IsPaBlockSizeSupport(npuArch_, cmpBlockSize_),
-                    OP_LOGE(opName_,
-                            "cmpBlockSize should be in [1, 1024] on %s or 16-aligned [16, 1024] on %s, "
-                            "but got: %d.",
-                            A5_PLATFORM_LOG.c_str(), A2_A3_PLATFORM_LOG.c_str(), cmpBlockSize_),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName_, "cmp_kv", ToStringRaw(opParamInfo_.oriKv.tensor->GetStorageShape()).c_str(),
+                        "CmpBlockSize should be in [1, 1024] on " + A5_PLATFORM_LOG + " or 16-aligned [16, 1024] on " +
+                            A2_A3_PLATFORM_LOG + ", but got: " + std::to_string(cmpBlockSize_)),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -1495,7 +1570,8 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCmpBlockTable() const
 ge::graphStatus SMLATilingCheck::CheckSingleParaSinks() const
 {
     OP_CHECK_IF(opParamInfo_.sinks.tensor->GetStorageShape().GetShapeSize() == 0,
-                OP_LOGE(opName_, "sinks cannot be empty tensor."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sinks", "Sinks cannot be empty tensor"),
+                return ge::GRAPH_FAILED);
     if (opParamInfo_.sinks.tensor->GetStorageShape().GetDimNum() != DIM_NUM_ONE) {
         OP_LOGE_FOR_INVALID_SHAPEDIM(opName_, SINKS_NAME.c_str(),
                                      std::to_string(opParamInfo_.sinks.tensor->GetStorageShape().GetDimNum()).c_str(),
@@ -1503,19 +1579,24 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaSinks() const
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo_.sinks.tensor->GetStorageShape().GetDim(0) != n1Size_) {
-        OP_LOGE(opName_, "%s's dimension(%ld) should be equal to query head num(%u).", SINKS_NAME.c_str(),
-                opParamInfo_.sinks.tensor->GetStorageShape().GetDim(0), n1Size_);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            opName_, "sinks", ToStringRaw(opParamInfo_.sinks.tensor->GetStorageShape()),
+            "Sinks's dimension(" + std::to_string(opParamInfo_.sinks.tensor->GetStorageShape().GetDim(0)) +
+                ") should be equal to the head num of query(" + std::to_string(n1Size_) + ")");
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(opParamInfo_.sinks.desc->GetDataType() != ge::DT_FLOAT,
-                OP_LOGE(opName_, "sinks's dtype must be DT_FLOAT."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    opName_, "sinks", SMLADataTypeToSerialString(opParamInfo_.sinks.desc->GetDataType()).c_str(),
+                    "The dtype of sinks must be DT_FLOAT"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus SMLATilingCheck::CheckSingleParaMetadata() const
 {
     if (opParamInfo_.metadata.tensor == nullptr) {
-        OP_LOGE(opName_, "%s must be provided!", METADATA_NAME.c_str());
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "metadata", "Metadata must be provided");
         return ge::GRAPH_FAILED;
     }
     const std::vector<size_t> dimNumList = {DIM_NUM_ONE};
@@ -1523,9 +1604,15 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaMetadata() const
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF((opParamInfo_.metadata.tensor->GetShapeSize() != METADATA_LIMIT),
-                OP_LOGE(opName_, "input metadata dim 0 must be %u.", METADATA_LIMIT), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "metadata",
+                                                      ToStringRaw(opParamInfo_.metadata.tensor->GetStorageShape()),
+                                                      "metadata dim 0 must be" + std::to_string(METADATA_LIMIT)),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.metadata.desc->GetDataType() != ge::DT_INT32,
-                OP_LOGE(opName_, "metadata's dtype must be DT_INT32."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    opName_, "metadata", SMLADataTypeToSerialString(opParamInfo_.metadata.desc->GetDataType()).c_str(),
+                    "The dtype of metadata must be DT_INT32"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1533,10 +1620,11 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCmpRatio() const
 {
     if (IsA5Arch(npuArch_)) {
         if (opParamInfo_.cmpKv.tensor != nullptr) {
-            OP_CHECK_IF(cmpRatio_ < 1 || cmpRatio_ > 128,
-                        OP_LOGE(opName_, "cmpRatio should be in range [1, 128] on %s, but got %ld.",
-                                A5_PLATFORM_LOG.c_str(), cmpRatio_),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                cmpRatio_ < 1 || cmpRatio_ > 128,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "cmp_ratio", std::to_string(cmpRatio_).c_str(),
+                                                      "Cmp_ratio should be in range [1, 128] on " + A5_PLATFORM_LOG),
+                return ge::GRAPH_FAILED);
         }
     } else {
         uint32_t expectedCmpRatio = 1;
@@ -1559,20 +1647,15 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCmpRatio() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SMLATilingCheck::CheckSingleParaOriMaskMode() const
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus SMLATilingCheck::CheckSingleParaOriMaskMode() const { return ge::GRAPH_SUCCESS; }
 
-ge::graphStatus SMLATilingCheck::CheckSingleParaCmpMaskMode() const
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus SMLATilingCheck::CheckSingleParaCmpMaskMode() const { return ge::GRAPH_SUCCESS; }
 
 ge::graphStatus SMLATilingCheck::CheckSingleParaOriWinLeft() const
 {
     OP_CHECK_IF(oriWinLeft_ < -1,
-                OP_LOGE(opName_, "oriWinLeft should be -1(unlimited) or non-negative, but got %lld", oriWinLeft_),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "ori_win_left", std::to_string(oriWinLeft_).c_str(),
+                                                      "Ori_win_left should be -1(unlimited) or non-negative"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -1580,7 +1663,8 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaOriWinLeft() const
 ge::graphStatus SMLATilingCheck::CheckSingleParaOriWinRight() const
 {
     OP_CHECK_IF(oriWinRight_ < -1,
-                OP_LOGE(opName_, "oriWinRight should be -1(unlimited) or non-negative, but got %lld", oriWinRight_),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "ori_win_right", std::to_string(oriWinRight_).c_str(),
+                                                      "Ori_win_right should be -1(unlimited) or non-negative"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -1590,9 +1674,11 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCmpResidualKv() const
     bool isCmpTemplate = smlaInfo_.perfMode == SMLATemplateMode::HCA_TEMPLATE_MODE ||
                          smlaInfo_.perfMode == SMLATemplateMode::CSA_TEMPLATE_MODE;
     if (isCmpTemplate && *opParamInfo_.cmpMaskMode == 3 && cmpRatio_ != 1) {
-        OP_CHECK_IF(opParamInfo_.cmpResidualKv.tensor == nullptr,
-                    OP_LOGE(opName_, "cmp_residual_kv is required when cmp_mask_mode=3 and cmp_ratio != 1"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            opParamInfo_.cmpResidualKv.tensor == nullptr,
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                opName_, "cmp_residual_kv", "Cmp_residual_kv is required when cmp_mask_mode=3 and cmp_ratio != 1"),
+            return ge::GRAPH_FAILED);
     }
     if (opParamInfo_.cmpResidualKv.tensor == nullptr) {
         return ge::GRAPH_SUCCESS;
@@ -1603,10 +1689,13 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCmpResidualKv() const
             CheckDimNumSupport(&opParamInfo_.cmpResidualKv.tensor->GetShape(), dimNumList, CMP_RESIDUAL_KV_NAME)) {
         return ge::GRAPH_FAILED;
     }
-    OP_CHECK_IF(opParamInfo_.cmpResidualKv.tensor->GetShapeSize() != bSize_,
-                OP_LOGE(opName_, "%s's first dimension(%ld) should be equal to B(%u).", CMP_RESIDUAL_KV_NAME.c_str(),
-                        opParamInfo_.cmpResidualKv.tensor->GetShapeSize(), bSize_),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        opParamInfo_.cmpResidualKv.tensor->GetShapeSize() != bSize_,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            opName_, "cmp_residual_kv", ToStringRaw(opParamInfo_.cmpResidualKv.tensor->GetStorageShape()),
+            "Cmp_residual_kv's first dimension(" + std::to_string(opParamInfo_.cmpResidualKv.tensor->GetShapeSize()) +
+                ") should be equal to B(" + std::to_string(bSize_) + ")"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1621,7 +1710,10 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaTopkLength() const
                 return ge::GRAPH_FAILED;
             }
             OP_CHECK_IF(opParamInfo_.oriTopkLength.desc->GetDataType() != ge::DT_INT32,
-                        OP_LOGE(opName_, "%s's dtype must be DT_INT32.", ORI_TOPK_LENGTH_NAME.c_str()),
+                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                            opName_, "ori_topk_length",
+                            SMLADataTypeToSerialString(opParamInfo_.oriTopkLength.desc->GetDataType()).c_str(),
+                            "The dtype of ori_topk_length must be DT_INT32"),
                         return ge::GRAPH_FAILED);
         }
         if (opParamInfo_.cmpTopkLength.tensor != nullptr) {
@@ -1632,49 +1724,68 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaTopkLength() const
                 return ge::GRAPH_FAILED;
             }
             OP_CHECK_IF(opParamInfo_.cmpTopkLength.desc->GetDataType() != ge::DT_INT32,
-                        OP_LOGE(opName_, "%s's dtype must be DT_INT32.", CMP_TOPK_LENGTH_NAME.c_str()),
+                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                            opName_, "cmp_topk_length",
+                            SMLADataTypeToSerialString(opParamInfo_.cmpTopkLength.desc->GetDataType()).c_str(),
+                            "The dtype of cmp_topk_length must be DT_INT32"),
                         return ge::GRAPH_FAILED);
         }
         return ge::GRAPH_SUCCESS;
     }
     if (IsNonEmptyOptionalTensor(opParamInfo_.cmpTopkLength.tensor)) {
         OP_CHECK_IF(smlaInfo_.perfMode != SMLATemplateMode::CSA_TEMPLATE_MODE,
-                    OP_LOGE(opName_, "cmp_topk_length is only supported in CSA mode."),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "cmp_topk_length",
+                                                             "Cmp_topk_length is only supported in CSA mode"),
                     return ge::GRAPH_FAILED);
     }
     if (!IsNonEmptyOptionalTensor(opParamInfo_.oriTopkLength.tensor)) {
         OP_CHECK_IF(hasOriSparseIndices_ && smlaInfo_.perfMode == SMLATemplateMode::SWA_TEMPLATE_MODE,
-                    OP_LOGE(opName_, "ori_topk_length is required for SWA ori sparse."),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "ori_topk_length",
+                                                             "Ori_topk_length is required for SWA ori sparse"),
                     return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
     OP_CHECK_IF(opParamInfo_.oriSparseIndices.tensor == nullptr,
-                OP_LOGE(opName_, "ori_topk_length requires ori_sparse_indices."),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "ori_sparse_indices",
+                                                         "Ori_topk_length requires ori_sparse_indices"),
                 return ge::GRAPH_FAILED);
     if (ge::GRAPH_SUCCESS != CheckDtypeSupport(opParamInfo_.oriTopkLength.desc, ORI_TOPK_LENGTH_NAME)) {
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(opParamInfo_.oriTopkLength.desc->GetDataType() != ge::DT_INT32,
-                OP_LOGE(opName_, "%s's dtype must be DT_INT32.", ORI_TOPK_LENGTH_NAME.c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    opName_, "ori_topk_length",
+                    SMLADataTypeToSerialString(opParamInfo_.oriTopkLength.desc->GetDataType()).c_str(),
+                    "The dtype of ori_topk_length must be DT_INT32"),
                 return ge::GRAPH_FAILED);
     const gert::Shape &topkLenShape = opParamInfo_.oriTopkLength.tensor->GetStorageShape();
     const gert::Shape &sparseShape = opParamInfo_.oriSparseIndices.tensor->GetStorageShape();
     if (oriSparseIndicesLayout_ == SMLALayout::TND) {
         OP_CHECK_IF(topkLenShape.GetDimNum() != 2 || sparseShape.GetDimNum() != 3,
-                    OP_LOGE(opName_, "TND ori_topk_length shape must be [T, N2], ori_sparse_indices [T, N2, K]."),
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        opName_, "ori_topk_length and ori_sparse_indices",
+                        Ops::Base::ToString(topkLenShape) + " and " + Ops::Base::ToString(sparseShape),
+                        "TND ori_topk_length shape must be [T, N2], ori_sparse_indices [T, N2, K]"),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(topkLenShape.GetDim(0) != sparseShape.GetDim(0) ||
-                        topkLenShape.GetDim(1) != sparseShape.GetDim(1),
-                    OP_LOGE(opName_, "ori_topk_length shape must match ori_sparse_indices without K dim."),
+        OP_CHECK_IF(topkLenShape.GetDim(0) != sparseShape.GetDim(0) || topkLenShape.GetDim(1) != sparseShape.GetDim(1),
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        opName_, "ori_topk_length and ori_sparse_indices",
+                        Ops::Base::ToString(topkLenShape) + " and " + Ops::Base::ToString(sparseShape),
+                        "Ori_topk_length shape must match ori_sparse_indices without K dim"),
                     return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(topkLenShape.GetDimNum() != 3 || sparseShape.GetDimNum() != 4,
-                    OP_LOGE(opName_, "BSND ori_topk_length shape must be [B, S1, N2]."),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            topkLenShape.GetDimNum() != 3 || sparseShape.GetDimNum() != 4,
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "ori_topk_length", Ops::Base::ToString(topkLenShape),
+                                                   "BSND ori_topk_length shape must be [B, S1, N2]"),
+            return ge::GRAPH_FAILED);
         OP_CHECK_IF(topkLenShape.GetDim(0) != sparseShape.GetDim(0) ||
                         topkLenShape.GetDim(1) != sparseShape.GetDim(1) ||
                         topkLenShape.GetDim(2) != sparseShape.GetDim(2),
-                    OP_LOGE(opName_, "ori_topk_length shape must match ori_sparse_indices without K dim."),
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        opName_, "ori_topk_length and ori_sparse_indices",
+                        Ops::Base::ToString(topkLenShape) + " and " + Ops::Base::ToString(sparseShape),
+                        "Ori_topk_length shape must match ori_sparse_indices without K dim"),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -1700,13 +1811,17 @@ ge::graphStatus SMLATilingCheck::CheckSinglePara() const
 
 ge::graphStatus SMLATilingCheck::CheckExists(const void *pointer, const std::string &name) const
 {
-    OP_CHECK_IF(pointer == nullptr, OP_LOGE(opName_, "%s should not be null", name.c_str()), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(pointer == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, name.c_str(), name + " should not be null"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus SMLATilingCheck::CheckNotExists(const void *pointer, const std::string &name) const
 {
-    OP_CHECK_IF(pointer != nullptr, OP_LOGE(opName_, "%s should be null", name.c_str()), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(pointer != nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, name.c_str(), name + " should not be null"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1746,7 +1861,9 @@ ge::graphStatus SMLATilingCheck::CheckParaExistence() const
 {
     if (npuArch_ == NpuArch::DAV_3510) {
         OP_CHECK_IF((kvLayout_ == SMLALayout::TND && opParamInfo_.cuSeqLensOriKv.tensor == nullptr),
-                    OP_LOGE(opName_, "cuSeqLensOriKv must be provided when kv layout is TND"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "cu_seqlens_ori_kv", "cu_seqlens_ori_kv must be provided when kv layout is TND"),
+                    return ge::GRAPH_FAILED);
     } else {
         if (kvLayout_ == SMLALayout::PA_BBND) {
             std::map<std::string, const void *> ParamExistMap = {
@@ -1764,18 +1881,33 @@ ge::graphStatus SMLATilingCheck::CheckParaExistence() const
 
 ge::graphStatus SMLATilingCheck::CheckFeatureShape() const
 {
-    OP_CHECK_IF(bSize_ <= 0, OP_LOGE(opName_, "batch_size should be greater than 0, but got %u", bSize_),
-                return ge::GRAPH_FAILED);
+    if (qLayout_ == SMLALayout::TND) {
+        OP_CHECK_IF(bSize_ <= 0,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName_, "cu_seqlens_q", ToStringRaw(opParamInfo_.cuSeqLensQ.tensor->GetStorageShape()).c_str(),
+                        "Batch_size should be greater than 0, but got " + std::to_string(bSize_)),
+                    return ge::GRAPH_FAILED);
+    } else { // BSND
+        OP_CHECK_IF(bSize_ <= 0,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName_, "q", ToStringRaw(opParamInfo_.q.shape->GetStorageShape()).c_str(),
+                        "Batch_size should be greater than 0, but got " + std::to_string(bSize_)),
+                    return ge::GRAPH_FAILED);
+    }
 
     OP_CHECK_IF(qTSize_ <= 0 && (qLayout_ == SMLALayout::TND),
-                OP_LOGE(opName_, "T_size of query should be greater than 0, but got %u", qTSize_),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "q", ToStringRaw(opParamInfo_.q.shape->GetStorageShape()).c_str(),
+                    "T_size of q should be greater than 0, but got " + std::to_string(qTSize_)),
                 return ge::GRAPH_FAILED);
 
     if (IsA5Arch(npuArch_)) {
-        OP_CHECK_IF(
-            n1Size_ < 1 || n1Size_ > 128,
-            OP_LOGE(opName_, "q_head_num should be in [1, 128] on %s, but got %u", A5_PLATFORM_LOG.c_str(), n1Size_),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(n1Size_ < 1 || n1Size_ > 128,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "q",
+                                                          ToStringRaw(opParamInfo_.q.shape->GetStorageShape()).c_str(),
+                                                          "The head num of q should be in [1, 128] on" +
+                                                              A5_PLATFORM_LOG + ", but got " + std::to_string(n1Size_)),
+                    return ge::GRAPH_FAILED);
     } else {
         OP_CHECK_IF(!IsPowerOfTwoInRange(n1Size_, 1, 128),
                     OP_LOGE(opName_, "q_head_num should be power of two in [1, 128] on %s, but got %u",
@@ -1783,17 +1915,62 @@ ge::graphStatus SMLATilingCheck::CheckFeatureShape() const
                     return ge::GRAPH_FAILED);
     }
 
-    OP_CHECK_IF(n2Size_ != 1, OP_LOGE(opName_, "kv_head_num should be 1, but got %u", n2Size_),
-                return ge::GRAPH_FAILED);
+    if (opParamInfo_.oriKv.tensor != nullptr) {
+        OP_CHECK_IF(n2Size_ != 1,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName_, "ori_kv", ToStringRaw(opParamInfo_.oriKv.tensor->GetStorageShape()).c_str(),
+                        "The head num of ori_kv should be 1, but got " + std::to_string(n2Size_)),
+                    return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(n1Size_ % n2Size_ != 0,
-                OP_LOGE(opName_, "q_head_num(%u) must be divisible by kv_head_num(%u)", n1Size_, n2Size_),
-                return ge::GRAPH_FAILED);
+        OP_CHECK_IF(n1Size_ % n2Size_ != 0,
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        opName_, "q and ori_kv",
+                        Ops::Base::ToString(opParamInfo_.q.shape->GetStorageShape()) + " and " +
+                            Ops::Base::ToString(opParamInfo_.oriKv.tensor->GetStorageShape()),
+                        "The head num of q(" + std::to_string(n1Size_) +
+                            ") must be divisible by the head num of ori_kv(" + std::to_string(n2Size_) + ")"),
+                    return ge::GRAPH_FAILED);
+    }
+    if (opParamInfo_.cmpKv.tensor != nullptr) {
+        OP_CHECK_IF(n2Size_ != 1,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName_, "cmp_kv", ToStringRaw(opParamInfo_.cmpKv.tensor->GetStorageShape()).c_str(),
+                        "The head num of cmp_kv should be 1, but got " + std::to_string(n2Size_)),
+                    return ge::GRAPH_FAILED);
+
+        OP_CHECK_IF(n1Size_ % n2Size_ != 0,
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        opName_, "q and cmp_kv",
+                        Ops::Base::ToString(opParamInfo_.q.shape->GetStorageShape()) + " and " +
+                            Ops::Base::ToString(opParamInfo_.cmpKv.tensor->GetStorageShape()),
+                        "The head num of q(" + std::to_string(n1Size_) +
+                            ") must be divisible by the head num of cmp_kv(" + std::to_string(n2Size_) + ")"),
+                    return ge::GRAPH_FAILED);
+    }
+
     if (IsA5Arch(npuArch_)) {
-        OP_CHECK_IF(
-            gSize_ < 1 || gSize_ > 128,
-            OP_LOGE(opName_, "group num should be in [1, 128] on %s, but got %u", A5_PLATFORM_LOG.c_str(), gSize_),
-            return ge::GRAPH_FAILED);
+        if (opParamInfo_.oriKv.tensor != nullptr) {
+            OP_CHECK_IF(gSize_ < 1 || gSize_ > 128,
+                        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                            opName_, "q and ori_kv",
+                            Ops::Base::ToString(opParamInfo_.q.shape->GetStorageShape()) + " and " +
+                                Ops::Base::ToString(opParamInfo_.oriKv.tensor->GetStorageShape()),
+                            "The value of (the head num of q ceildivided by the head num of ori_kv) "
+                            "should be in [1, 128] on " +
+                                A5_PLATFORM_LOG + ", but got " + std::to_string(gSize_)),
+                        return ge::GRAPH_FAILED);
+        }
+        if (opParamInfo_.cmpKv.tensor != nullptr) {
+            OP_CHECK_IF(gSize_ < 1 || gSize_ > 128,
+                        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                            opName_, "q and cmp_kv",
+                            Ops::Base::ToString(opParamInfo_.q.shape->GetStorageShape()) + " and " +
+                                Ops::Base::ToString(opParamInfo_.cmpKv.tensor->GetStorageShape()),
+                            "The value of (the head num of q ceildivided by the head num of cmp_kv) "
+                            "should be in [1, 128] on " +
+                                A5_PLATFORM_LOG + ", but got " + std::to_string(gSize_)),
+                        return ge::GRAPH_FAILED);
+        }
     } else {
         OP_CHECK_IF(!IsPowerOfTwoInRange(gSize_, 1, 128),
                     OP_LOGE(opName_, "group num should be power of two in [1, 128] on %s, but got %u",
@@ -1801,53 +1978,69 @@ ge::graphStatus SMLATilingCheck::CheckFeatureShape() const
                     return ge::GRAPH_FAILED);
     }
 
-    OP_CHECK_IF(qHeadDim_ != DIM_LIMIT,
-                OP_LOGE(opName_, "q_head_dim only support %u, but got %u", DIM_LIMIT, qHeadDim_),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        qHeadDim_ != DIM_LIMIT,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            opName_, "q", ToStringRaw(opParamInfo_.q.shape->GetStorageShape()).c_str(),
+            "The head num of q only support " + std::to_string(DIM_LIMIT) + ", but got " + std::to_string(qHeadDim_)),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(oriKvHeadDim_ != DIM_LIMIT,
-                OP_LOGE(opName_, "oriKvHeadDim only support %u, but got %u", DIM_LIMIT, oriKvHeadDim_),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "ori_kv", ToStringRaw(opParamInfo_.oriKv.tensor->GetStorageShape()).c_str(),
+                    "The head num of ori_kv only support " + std::to_string(DIM_LIMIT) + ", but got " +
+                        std::to_string(oriKvHeadDim_)),
                 return ge::GRAPH_FAILED);
     if (!(smlaInfo_.perfMode == SMLATemplateMode::SWA_TEMPLATE_MODE ||
           smlaInfo_.perfMode == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE)) {
         OP_CHECK_IF(cmpKvHeadDim_ != DIM_LIMIT,
-                    OP_LOGE(opName_, "cmpKvHeadDim only support %u, but got %u", DIM_LIMIT, cmpKvHeadDim_),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName_, "cmp_kv", ToStringRaw(opParamInfo_.cmpKv.tensor->GetStorageShape()).c_str(),
+                        "The head num of cmp_kv only support " + std::to_string(DIM_LIMIT) + ", but got " +
+                            std::to_string(cmpKvHeadDim_)),
                     return ge::GRAPH_FAILED);
     }
 
     OP_CHECK_IF(!(qType_ == oriKvType_),
-                OP_LOGE(opName_,
-                        "Head dimension data type check failed! qType[%s] must be the same with oriKvType[%s].",
-                        SMLADataTypeToSerialString(qType_).c_str(), SMLADataTypeToSerialString(oriKvType_).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                    opName_, "q and ori_kv",
+                    SMLADataTypeToSerialString(qType_) + " and " + SMLADataTypeToSerialString(oriKvType_),
+                    "The dtype of q and ori_kv must be same"),
                 return ge::GRAPH_FAILED);
 
     if (IsA5Arch(npuArch_)) {
         OP_CHECK_IF(*opParamInfo_.oriMaskMode != 0 && *opParamInfo_.oriMaskMode != 3 && *opParamInfo_.oriMaskMode != 4,
-                    OP_LOGE(opName_, "oriMaskMode should be {0, 3, 4} on %s, but got %u", A5_PLATFORM_LOG.c_str(),
-                            *opParamInfo_.oriMaskMode),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "ori_mask_mode",
+                                                          std::to_string(*opParamInfo_.oriMaskMode).c_str(),
+                                                          "Ori_mask_mode should be {0, 3, 4} on " + A5_PLATFORM_LOG),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(*opParamInfo_.cmpMaskMode != 0 && *opParamInfo_.cmpMaskMode != 3,
-                    OP_LOGE(opName_, "cmpMaskMode should be {0, 3} on %s, but got %u", A5_PLATFORM_LOG.c_str(),
-                            *opParamInfo_.cmpMaskMode),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "cmp_mask_mode",
+                                                          std::to_string(*opParamInfo_.cmpMaskMode).c_str(),
+                                                          "Cmp_mask_mode should be {0, 3} on " + A5_PLATFORM_LOG),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(topkValueMode_ != 1, OP_LOGE(opName_, "topkValueMode should be 1, but got %ld", topkValueMode_),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            topkValueMode_ != 1,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "topk_value_mode", std::to_string(topkValueMode_).c_str(),
+                                                  "Topk_value_mode should be 1"),
+            return ge::GRAPH_FAILED);
         OP_CHECK_IF(oriWinLeft_ < -1,
-                    OP_LOGE(opName_, "oriWinLeft_ should be -1(unlimited) or non-negative on %s, but got %ld",
-                            A5_PLATFORM_LOG.c_str(), oriWinLeft_),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "ori_win_left", std::to_string(oriWinLeft_).c_str(),
+                        "Ori_win_left should be -1(unlimited) or non-negative on " + A5_PLATFORM_LOG),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(oriWinRight_ < -1,
-                    OP_LOGE(opName_, "oriWinRight_ should be -1(unlimited) or non-negative on %s, but got %ld",
-                            A5_PLATFORM_LOG.c_str(), oriWinRight_),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "ori_win_right", std::to_string(oriWinRight_).c_str(),
+                        "Ori_win_right should be -1(unlimited) or non-negative on " + A5_PLATFORM_LOG),
                     return ge::GRAPH_FAILED);
     } else {
         OP_CHECK_IF(*opParamInfo_.cmpMaskMode != 3,
-                    OP_LOGE(opName_, "cmpMaskMode should be 3 on %s, but got %u",
-                            A2_A3_PLATFORM_LOG.c_str(), *opParamInfo_.cmpMaskMode),
+                    OP_LOGE(opName_, "cmpMaskMode should be 3 on %s, but got %u", A2_A3_PLATFORM_LOG.c_str(),
+                            *opParamInfo_.cmpMaskMode),
                     return ge::GRAPH_FAILED);
         if (hasOriSparseIndices_) {
             OP_CHECK_IF(*opParamInfo_.oriMaskMode != 0U,
-                        OP_LOGE(opName_,
-                                "oriMaskMode must be 0 for SWA ori sparse (DSpark) on %s, but got %u.",
+                        OP_LOGE(opName_, "oriMaskMode must be 0 for SWA ori sparse (DSpark) on %s, but got %u.",
                                 A2_A3_PLATFORM_LOG.c_str(), *opParamInfo_.oriMaskMode),
                         return ge::GRAPH_FAILED);
             OP_CHECK_IF(oriWinLeft_ < 0 || oriWinRight_ < 0,
@@ -1859,10 +2052,11 @@ ge::graphStatus SMLATilingCheck::CheckFeatureShape() const
                         OP_LOGE(opName_, "oriMaskMode should be 4 on %s when ori_sparse_indices is empty, but got %u",
                                 A2_A3_PLATFORM_LOG.c_str(), *opParamInfo_.oriMaskMode),
                         return ge::GRAPH_FAILED);
-            OP_CHECK_IF(oriWinLeft_ != 127,
-                        OP_LOGE(opName_, "oriWinLeft_ should be 127 on %s when ori_sparse_indices is empty, but got %ld",
-                                A2_A3_PLATFORM_LOG.c_str(), oriWinLeft_),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                oriWinLeft_ != 127,
+                OP_LOGE(opName_, "oriWinLeft_ should be 127 on %s when ori_sparse_indices is empty, but got %ld",
+                        A2_A3_PLATFORM_LOG.c_str(), oriWinLeft_),
+                return ge::GRAPH_FAILED);
             OP_CHECK_IF(oriWinRight_ != 0,
                         OP_LOGE(opName_, "oriWinRight_ should be 0 on %s when ori_sparse_indices is empty, but got %ld",
                                 A2_A3_PLATFORM_LOG.c_str(), oriWinRight_),
@@ -1878,7 +2072,8 @@ ge::graphStatus SMLATilingCheck::CheckFeatureLayout() const
     std::string layoutQuery = opParamInfo_.layoutQ;
     OP_CHECK_IF(std::find(layoutQuerySupportList.begin(), layoutQuerySupportList.end(), layoutQuery) ==
                     layoutQuerySupportList.end(),
-                OP_LOGE(opName_, "layoutQuery only supports BSND/TND, but got %s", layoutQuery.c_str()),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "layout_q", layoutQuery.c_str(),
+                                                      "Layout_q only supports BSND or TND"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -1886,17 +2081,15 @@ ge::graphStatus SMLATilingCheck::CheckFeatureLayout() const
 ge::graphStatus SMLATilingCheck::CheckFeatureDtype() const
 {
     OP_CHECK_IF(qType_ != ge::DT_BF16 && qType_ != ge::DT_FLOAT16,
-                OP_LOGE(opName_, "query dtype only support %s and %s, but got %s",
-                        SMLADataTypeToSerialString(ge::DT_BF16).c_str(),
-                        SMLADataTypeToSerialString(ge::DT_FLOAT16).c_str(), SMLADataTypeToSerialString(qType_).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "q", SMLADataTypeToSerialString(qType_).c_str(),
+                                                      "The dtype of q only supports " +
+                                                          SMLADataTypeToSerialString(ge::DT_BF16) + " and " +
+                                                          SMLADataTypeToSerialString(ge::DT_FLOAT16)),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SMLATilingCheck::CheckFeaturePa() const
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus SMLATilingCheck::CheckFeaturePa() const { return ge::GRAPH_SUCCESS; }
 
 ge::graphStatus SMLATilingCheck::CheckFeature() const
 {
@@ -1931,8 +2124,9 @@ ge::graphStatus SMLATilingCheck::CheckDTypeConsistency(const ge::DataType &actua
                                                        const std::string &name) const
 {
     if (actualDtype != expectDtype) {
-        OP_LOGE(opName_, "%s dtype should be the same to %s, but it's %s.", name.c_str(),
-                SMLADataTypeToSerialString(expectDtype).c_str(), SMLADataTypeToSerialString(actualDtype).c_str());
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            opName_, name.c_str(), SMLADataTypeToSerialString(actualDtype).c_str(),
+            "The dtype of " + name + " should be " + SMLADataTypeToSerialString(expectDtype));
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -1953,7 +2147,7 @@ ge::graphStatus SMLATilingCheck::CheckOriAndCmpKv() const
 ge::graphStatus SMLATilingCheck::CheckAttenOut() const
 {
     if (opParamInfo_.attnOut.desc == nullptr) {
-        OP_LOGE(opName_, "%s must be provided!", ATTEN_OUT_NAME.c_str());
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "attn_out", "Attn_out must be provided");
         return ge::GRAPH_FAILED;
     }
     const std::vector<size_t> dimNumList = {DIM_NUM_THREE, DIM_NUM_FOUR};
@@ -1978,8 +2172,10 @@ ge::graphStatus SMLATilingCheck::CheckActualSeqLensQ() const
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(opParamInfo_.seqUsedQ.tensor->GetShapeSize() != bSize_,
-                OP_LOGE(opName_, "%s's first dimension(%ld) should be equal to B(%u).", SEQUSED_Q_NAME.c_str(),
-                        opParamInfo_.seqUsedQ.tensor->GetShapeSize(), bSize_),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "seqused_q", ToStringRaw(opParamInfo_.seqUsedQ.tensor->GetStorageShape()),
+                    "Seqused_q's first dimension(" + std::to_string(opParamInfo_.seqUsedQ.tensor->GetShapeSize()) +
+                        ") should be equal to B(" + std::to_string(bSize_) + ")"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -1993,10 +2189,13 @@ ge::graphStatus SMLATilingCheck::CheckActualSeqLens() const
                 CheckDimNumSupport(&opParamInfo_.sequsedOriKv.tensor->GetShape(), dimNumList, SEQUSED_ORI_KV_NAME)) {
             return ge::GRAPH_FAILED;
         }
-        OP_CHECK_IF(opParamInfo_.sequsedOriKv.tensor->GetShapeSize() != bSize_,
-                    OP_LOGE(opName_, "%s's first dimension(%ld) should be equal to B(%u).", SEQUSED_ORI_KV_NAME.c_str(),
-                            opParamInfo_.sequsedOriKv.tensor->GetShapeSize(), bSize_),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            opParamInfo_.sequsedOriKv.tensor->GetShapeSize() != bSize_,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName_, "seqused_ori_kv", ToStringRaw(opParamInfo_.sequsedOriKv.tensor->GetStorageShape()),
+                "Seqused_ori_kv's first dimension(" + std::to_string(opParamInfo_.sequsedOriKv.tensor->GetShapeSize()) +
+                    ") should be equal to B(" + std::to_string(bSize_) + ")"),
+            return ge::GRAPH_FAILED);
     }
     if (opParamInfo_.sequsedCmpKv.tensor != nullptr) {
         const std::vector<size_t> dimNumList = {DIM_NUM_ONE};
@@ -2005,17 +2204,17 @@ ge::graphStatus SMLATilingCheck::CheckActualSeqLens() const
                 CheckDimNumSupport(&opParamInfo_.sequsedCmpKv.tensor->GetShape(), dimNumList, SEQUSED_CMP_KV_NAME)) {
             return ge::GRAPH_FAILED;
         }
-        OP_CHECK_IF(opParamInfo_.sequsedCmpKv.tensor->GetShapeSize() != bSize_,
-                    OP_LOGE(opName_, "%s's first dimension(%ld) should be equal to B(%u).", SEQUSED_CMP_KV_NAME.c_str(),
-                            opParamInfo_.sequsedCmpKv.tensor->GetShapeSize(), bSize_),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            opParamInfo_.sequsedCmpKv.tensor->GetShapeSize() != bSize_,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName_, "seqused_cmp_kv", ToStringRaw(opParamInfo_.sequsedCmpKv.tensor->GetStorageShape()),
+                "Seqused_cmp_kv's first dimension(" + std::to_string(opParamInfo_.sequsedCmpKv.tensor->GetShapeSize()) +
+                    ") should be equal to B(" + std::to_string(bSize_) + ")"),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus SMLATilingCheck::CheckBlockTable() const
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus SMLATilingCheck::CheckBlockTable() const { return ge::GRAPH_SUCCESS; }
 
 ge::graphStatus SMLATilingCheck::CheckMultiParaConsistency()
 {
@@ -2046,7 +2245,7 @@ void SparseFlashMlaTiling::CalcUbBmm(SMLATilingInfo *tilingInfo)
         cubeMSize = maxMSize;
     }
     mmResUbSize_ = sInnerSizeAlign_ * Align(cubeMSize, 16U); // kernel按照16对齐写出，tiling按照这个原则分配内存
-    bmm2ResUbSize_ = headDimAlign_ * Align(cubeMSize, 16U);  // kernel按照16对齐写出，tiling按照这个原则分配内存
+    bmm2ResUbSize_ = headDimAlign_ * Align(cubeMSize, 16U); // kernel按照16对齐写出，tiling按照这个原则分配内存
 }
 
 void SparseFlashMlaTiling::SplitBalanced(SMLATilingInfo *tilingInfo)
@@ -2057,8 +2256,7 @@ void SparseFlashMlaTiling::SplitBalanced(SMLATilingInfo *tilingInfo)
                          tilingInfo->gSize :
                          (256 / tilingInfo->gSize) * tilingInfo->gSize;
         // DSpark ori_sparse_indices are per query token; keep one S1 row per M block.
-        if (tilingInfo->hasOriSparseIndices &&
-            tilingInfo->perfMode == SMLATemplateMode::SWA_TEMPLATE_MODE) {
+        if (tilingInfo->hasOriSparseIndices && tilingInfo->perfMode == SMLATemplateMode::SWA_TEMPLATE_MODE) {
             mBaseSize_ = tilingInfo->gSize;
         }
     }
@@ -2092,8 +2290,7 @@ uint64_t SparseFlashMlaTiling::CalcFdStagingWorkspaceSize(const SMLATilingInfo *
         // Intra-core reduction ping-pongs by multiCoreIdxMod2. Cross-core staging
         // keeps one reduce-block range for every physical AIC.
         const uint64_t intraCoreSlots = 2ULL * logicalCoreSlots;
-        const uint64_t crossCoreSlots =
-            static_cast<uint64_t>(aicNum) * BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM;
+        const uint64_t crossCoreSlots = static_cast<uint64_t>(aicNum) * BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM;
         return (intraCoreSlots + crossCoreSlots) * bytesPerSlot;
     }
     return logicalCoreSlots * FD_MAX_S2_SPLIT_NUM * bytesPerSlot;
@@ -2108,41 +2305,34 @@ uint64_t SparseFlashMlaTiling::CalcVectorizeKvPhyAddrWorkspaceSize(const SMLATil
     }
     constexpr uint32_t SPARSE_BLOCK_ALIGN_NUM = 128;
     constexpr uint32_t UB_SIZE = 248 * 1024;
-    uint32_t alignedOriSparseBlockCount =
-        (tilingInfo->oriSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) / SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
-    uint32_t alignedCmpSparseBlockCount =
-        (tilingInfo->cmpSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) / SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
+    uint32_t alignedOriSparseBlockCount = (tilingInfo->oriSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) /
+                                          SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
+    uint32_t alignedCmpSparseBlockCount = (tilingInfo->cmpSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) /
+                                          SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
     bool isPa = (tilingInfo->kvLayout == SMLALayout::PA_BBND);
-    uint32_t oriBlocksizeFlag =
-        static_cast<uint32_t>((tilingInfo->oriBlockSize & (tilingInfo->oriBlockSize - 1)) == 0);
-    uint32_t cmpBlocksizeFlag =
-        static_cast<uint32_t>((tilingInfo->cmpBlockSize & (tilingInfo->cmpBlockSize - 1)) == 0);
+    uint32_t oriBlocksizeFlag = static_cast<uint32_t>((tilingInfo->oriBlockSize & (tilingInfo->oriBlockSize - 1)) == 0);
+    uint32_t cmpBlocksizeFlag = static_cast<uint32_t>((tilingInfo->cmpBlockSize & (tilingInfo->cmpBlockSize - 1)) == 0);
     uint32_t blocksizeFlag = isPa ? ((tilingInfo->perfMode == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) ?
                                          oriBlocksizeFlag :
                                          (oriBlocksizeFlag && cmpBlocksizeFlag)) :
                                     1U;
-    uint64_t paExtraUb = std::max(
-        static_cast<uint64_t>(tilingInfo->oriMaxBlockNumPerBatch) * sizeof(int32_t),
-        static_cast<uint64_t>(tilingInfo->cmpMaxBlockNumPerBatch) * sizeof(int32_t));
-    uint64_t cmpUbSize = (isPa ? paExtraUb : 0U) +
-                         static_cast<uint64_t>(alignedCmpSparseBlockCount) * sizeof(int32_t) +
+    uint64_t paExtraUb = std::max(static_cast<uint64_t>(tilingInfo->oriMaxBlockNumPerBatch) * sizeof(int32_t),
+                                  static_cast<uint64_t>(tilingInfo->cmpMaxBlockNumPerBatch) * sizeof(int32_t));
+    uint64_t cmpUbSize = (isPa ? paExtraUb : 0U) + static_cast<uint64_t>(alignedCmpSparseBlockCount) * sizeof(int32_t) +
                          static_cast<uint64_t>(alignedCmpSparseBlockCount) * sizeof(int64_t);
-    uint64_t oriUbSize = (isPa ? paExtraUb : 0U) +
-                         static_cast<uint64_t>(alignedOriSparseBlockCount) * sizeof(int32_t) +
+    uint64_t oriUbSize = (isPa ? paExtraUb : 0U) + static_cast<uint64_t>(alignedOriSparseBlockCount) * sizeof(int32_t) +
                          static_cast<uint64_t>(alignedOriSparseBlockCount) * sizeof(int64_t);
     uint64_t vectorizeUbSize = std::max(cmpUbSize, oriUbSize);
-    vectorizeFlag = static_cast<uint32_t>(
-        (tilingInfo->perfMode == SMLATemplateMode::CSA_TEMPLATE_MODE ||
-         tilingInfo->perfMode == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
-         tilingInfo->perfMode == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
-        (vectorizeUbSize <= UB_SIZE) && blocksizeFlag);
+    vectorizeFlag = static_cast<uint32_t>((tilingInfo->perfMode == SMLATemplateMode::CSA_TEMPLATE_MODE ||
+                                           tilingInfo->perfMode == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+                                           tilingInfo->perfMode == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
+                                          (vectorizeUbSize <= UB_SIZE) && blocksizeFlag);
 
     if (vectorizeFlag == 0U) {
         return 0ULL;
     }
-    uint32_t totalBS1 = (tilingInfo->qLayout == SMLALayout::TND) ?
-                            tilingInfo->s1Size :
-                            (tilingInfo->bSize * tilingInfo->s1Size);
+    uint32_t totalBS1 =
+        (tilingInfo->qLayout == SMLALayout::TND) ? tilingInfo->s1Size : (tilingInfo->bSize * tilingInfo->s1Size);
     uint64_t oriPhyAddrSize = 0;
     if (tilingInfo->perfMode == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
         tilingInfo->perfMode == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {

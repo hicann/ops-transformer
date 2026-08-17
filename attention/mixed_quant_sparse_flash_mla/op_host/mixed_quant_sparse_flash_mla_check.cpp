@@ -22,17 +22,6 @@ using std::pair;
 using std::string;
 namespace optiling {
 
-std::string MQSMLADataTypeToSerialString(ge::DataType type)
-{
-    const auto it = DATATYPE_TO_STRING_MAP.find(type);
-    if (it != DATATYPE_TO_STRING_MAP.end()) {
-        return it->second;
-    } else {
-        OP_LOGE("MixedQuantSparseFlashMla ", "datatype %d not support", type);
-        return "UNDEFINED";
-    }
-}
-
 std::string MQSMLALayoutToSerialString(MQSMLALayout layout)
 {
     switch (layout) {
@@ -44,6 +33,17 @@ std::string MQSMLALayoutToSerialString(MQSMLALayout layout)
             return "PA_BBND";
         default:
             return "UNKNOWN";
+    }
+}
+
+std::string MQSMLADataTypeToSerialString(ge::DataType type)
+{
+    const auto it = DATATYPE_TO_STRING_MAP.find(type);
+    if (it != DATATYPE_TO_STRING_MAP.end()) {
+        return it->second;
+    } else {
+        OP_LOGE("MixedQuantSparseFlashMla ", "datatype %d not support", type);
+        return "UNDEFINED";
     }
 }
 
