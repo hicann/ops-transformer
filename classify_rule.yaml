@@ -602,15 +602,6 @@ mc2_moe_advanced@ops-transformer:
                 - ops/ops-transformer/mc2/engram_fetch_wait/op_api/
                 - ops/ops-transformer/mc2/engram_fetch_wait/op_kernel/
                 - ops/ops-transformer/mc2/engram_fetch_wait/CMakeLists.txt
-                - ops/ops-transformer/mc2/mega_moe/op_host/mega_moe_def.cpp
-                - ops/ops-transformer/mc2/mega_moe/op_host/mega_moe_infershape.cpp
-                - ops/ops-transformer/mc2/mega_moe/op_host/CMakeLists.txt
-                - ops/ops-transformer/mc2/mega_moe/op_host/op_tiling/arch35/
-                - ops/ops-transformer/mc2/mega_moe/op_api/
-                - ops/ops-transformer/mc2/mega_moe/op_graph/
-                - ops/ops-transformer/mc2/mega_moe/op_kernel/arch35/
-                - ops/ops-transformer/mc2/mega_moe/CMakeLists.txt
-                - ops/ops-transformer/mc2/mega_moe/README.md
                 - ops/ops-transformer/mc2/moe_distribute_combine/op_host/op_tiling/arch35/
                 - ops/ops-transformer/mc2/moe_distribute_combine/op_api/
                 - ops/ops-transformer/mc2/moe_distribute_combine/op_graph/
@@ -709,7 +700,6 @@ mc2_moe_advanced@ops-transformer:
                 - ops/ops-transformer/mc2/distribute_barrier_extend/tests/
                 - ops/ops-transformer/mc2/engram_fetch/tests/
                 - ops/ops-transformer/mc2/engram_fetch_grad/tests/
-                - ops/ops-transformer/mc2/mega_moe/tests/
                 - ops/ops-transformer/mc2/moe_distribute_combine/tests/
                 - ops/ops-transformer/mc2/moe_distribute_combine/examples/
                 - ops/ops-transformer/mc2/moe_distribute_combine/docs/
@@ -740,7 +730,6 @@ mc2_moe_advanced@ops-transformer:
                 - ops/ops-transformer/mc2/moe_update_expert/tests/
                 - ops/ops-transformer/mc2/moe_update_expert/examples/
                 - ops/ops-transformer/mc2/moe_update_expert/docs/
-                - ops/ops-transformer/mc2/tools/bandwidth_test/tests/
             non_delivery: null
             open_source:
                 - ops/ops-transformer/mc2/3rd/mat_mul_v3/
@@ -749,37 +738,20 @@ mc2_moe@ops-transformer:
     src:
         release:
             huawei_style:
-                - ops/ops-transformer/mc2/moe_distribute_buffer_reset/op_host/
-                - ops/ops-transformer/mc2/moe_distribute_buffer_reset/op_api/
-                - ops/ops-transformer/mc2/moe_distribute_buffer_reset/op_graph/
-                - ops/ops-transformer/mc2/moe_distribute_buffer_reset/op_kernel/
-                - ops/ops-transformer/mc2/moe_distribute_buffer_reset/CMakeLists.txt
-                - ops/ops-transformer/mc2/moe_distribute_buffer_reset/README.md
-                - ops/ops-transformer/mc2/elastic_receivable_test/op_host/
-                - ops/ops-transformer/mc2/elastic_receivable_test/op_api/
-                - ops/ops-transformer/mc2/elastic_receivable_test/op_graph/
-                - ops/ops-transformer/mc2/elastic_receivable_test/op_kernel/
-                - ops/ops-transformer/mc2/elastic_receivable_test/CMakeLists.txt
-                - ops/ops-transformer/mc2/elastic_receivable_test/README.md
-                - ops/ops-transformer/mc2/elastic_receivable_info_collect/op_host/
-                - ops/ops-transformer/mc2/elastic_receivable_info_collect/op_api/
-                - ops/ops-transformer/mc2/elastic_receivable_info_collect/op_graph/
-                - ops/ops-transformer/mc2/elastic_receivable_info_collect/op_kernel/
-                - ops/ops-transformer/mc2/elastic_receivable_info_collect/CMakeLists.txt
-                - ops/ops-transformer/mc2/elastic_receivable_info_collect/README.md
+                - ops/ops-transformer/mc2/mega_moe/op_host/mega_moe_def.cpp
+                - ops/ops-transformer/mc2/mega_moe/op_host/mega_moe_infershape.cpp
+                - ops/ops-transformer/mc2/mega_moe/op_host/CMakeLists.txt
+                - ops/ops-transformer/mc2/mega_moe/op_host/op_tiling/arch35/
+                - ops/ops-transformer/mc2/mega_moe/op_api/
+                - ops/ops-transformer/mc2/mega_moe/op_graph/
+                - ops/ops-transformer/mc2/mega_moe/op_kernel/arch35/
+                - ops/ops-transformer/mc2/mega_moe/CMakeLists.txt
+                - ops/ops-transformer/mc2/mega_moe/README.md
             opensource_style: null
             kernel_style: null
         unrelease:
             test_code:
-                - ops/ops-transformer/mc2/moe_distribute_buffer_reset/tests/
-                - ops/ops-transformer/mc2/moe_distribute_buffer_reset/examples/
-                - ops/ops-transformer/mc2/moe_distribute_buffer_reset/docs/
-                - ops/ops-transformer/mc2/elastic_receivable_test/tests/
-                - ops/ops-transformer/mc2/elastic_receivable_test/examples/
-                - ops/ops-transformer/mc2/elastic_receivable_test/docs/
-                - ops/ops-transformer/mc2/elastic_receivable_info_collect/tests/
-                - ops/ops-transformer/mc2/elastic_receivable_info_collect/examples/
-                - ops/ops-transformer/mc2/elastic_receivable_info_collect/docs/
+                - ops/ops-transformer/mc2/mega_moe/tests/
             non_delivery: null
             open_source:
                 - ops/ops-transformer/mc2/3rd/batch_mat_mul_v3/
@@ -1249,8 +1221,6 @@ mc2_infer@ops-transformer:
                 - ops/ops-transformer/mc2/3rd/common/
                 - ops/ops-transformer/mc2/3rd/ops_legacy/
                 - ops/ops-transformer/mc2/3rd/CMakeLists.txt
-                - ops/ops-transformer/mc2/common/inc/
-                - ops/ops-transformer/mc2/common/src/
             opensource_style: null
             kernel_style: null
         unrelease:
