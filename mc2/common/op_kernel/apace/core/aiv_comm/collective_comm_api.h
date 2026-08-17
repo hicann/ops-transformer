@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file collective_comm_api.h
@@ -36,23 +36,23 @@ enum class CommMode {
     PUT
 };
 
-template<CommCollectiveOp Op, CommMode Mode, typename T, typename Barrier>
+template <CommCollectiveOp Op, CommMode Mode, typename T, typename Barrier>
 struct CollectiveCommHelper;
 
-template<typename T, typename Barrier>
+template <typename T, typename Barrier>
 struct CollectiveCommHelper<CommCollectiveOp::AllToAll, CommMode::GET, T, Barrier> {
     using type = AllToAllCommGetImpl<T, Barrier>;
 };
-template<typename T, typename Barrier>
+template <typename T, typename Barrier>
 struct CollectiveCommHelper<CommCollectiveOp::AllToAll, CommMode::PUT, T, Barrier> {
     using type = AllToAllCommPutImpl<T, Barrier>;
 };
-template<typename T, typename Barrier>
+template <typename T, typename Barrier>
 struct CollectiveCommHelper<CommCollectiveOp::AllGather, CommMode::PUT, T, Barrier> {
     using type = AllGatherCommPutImpl<T, Barrier>;
 };
 
-template<CommCollectiveOp Op, CommMode Mode, typename T, typename Barrier>
+template <CommCollectiveOp Op, CommMode Mode, typename T, typename Barrier>
 using CollectiveComm = typename CollectiveCommHelper<Op, Mode, T, Barrier>::type;
 
 } // namespace AivComm

@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file common_utils.h
@@ -31,12 +31,12 @@ enum class DataType {
 } // namespace mm
 
 #define ERROR_LOG(fmt, args...) fprintf(stdout, "[ERROR]  " fmt "\n", ##args)
-#define CHECK_COND(cond, msg)                                                                                  \
-    do {                                                                                                       \
-        if (!(cond)) {                                                                                         \
-            throw std::runtime_error(                                                                          \
+#define CHECK_COND(cond, msg) \
+    do { \
+        if (!(cond)) { \
+            throw std::runtime_error( \
                 std::string("Error: ") + msg + "\nFile: " + __FILE__ + "\nLine: " + std::to_string(__LINE__)); \
-        }                                                                                                      \
+        } \
     } while (0)
 
 template <typename T>
@@ -68,7 +68,7 @@ enum class DataType {
     FP8
 };
 
-inline uint64_t ParsePositiveUint64(const char* arg, const char* name)
+inline uint64_t ParsePositiveUint64(const char *arg, const char *name)
 {
     std::string value(arg);
     if (value.empty() || value.find_first_not_of("0123456789") != std::string::npos) {
@@ -81,12 +81,12 @@ inline uint64_t ParsePositiveUint64(const char* arg, const char* name)
             throw std::invalid_argument(std::string("ERROR: ") + name + " must be greater than 0");
         }
         return parsed;
-    } catch (const std::out_of_range&) {
+    } catch (const std::out_of_range &) {
         throw std::invalid_argument(std::string("ERROR: ") + name + " is out of range for uint64_t");
     }
 }
 
-inline void CheckUint32Shape(uint64_t value, const char* name)
+inline void CheckUint32Shape(uint64_t value, const char *name)
 {
     // QuantMatmulTilingData serializes public shape fields as uint32_t.
     constexpr uint64_t uint32Max = static_cast<uint64_t>(std::numeric_limits<uint32_t>::max());
@@ -95,7 +95,7 @@ inline void CheckUint32Shape(uint64_t value, const char* name)
     }
 }
 
-inline void PrintUsage(const std::string& programName)
+inline void PrintUsage(const std::string &programName)
 {
     if (programName == "./matmul_a16w16_swat") {
         std::cerr << "Usage: " << programName << " m k n transA transB" << std::endl;
@@ -112,11 +112,11 @@ inline void PrintUsage(const std::string& programName)
     }
     std::cerr << "Example: " << programName << " 100 50 200" << std::endl;
     if (programName == "./matmul_a16w16_swat") {
-        std::cerr << "Example: " << programName << " 100 50 200 false true"<< std::endl;
+        std::cerr << "Example: " << programName << " 100 50 200 false true" << std::endl;
     }
 }
 
-inline void ParseArguments(int argc, char* argv[], uint64_t& m, uint64_t& k, uint64_t& n)
+inline void ParseArguments(int argc, char *argv[], uint64_t &m, uint64_t &k, uint64_t &n)
 {
     if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
         PrintUsage(argv[0]);
@@ -133,7 +133,7 @@ inline void ParseArguments(int argc, char* argv[], uint64_t& m, uint64_t& k, uin
     CheckUint32Shape(n, "n");
 }
 
-inline void ParseArguments(int argc, char* argv[], uint64_t& m, uint64_t& k, uint64_t& n, bool& transA, bool& transB)
+inline void ParseArguments(int argc, char *argv[], uint64_t &m, uint64_t &k, uint64_t &n, bool &transA, bool &transB)
 {
     if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
         PrintUsage(argv[0]);
@@ -178,4 +178,3 @@ constexpr T GetSizeWithDataType(T shape)
         return shape;
     }
 }
-

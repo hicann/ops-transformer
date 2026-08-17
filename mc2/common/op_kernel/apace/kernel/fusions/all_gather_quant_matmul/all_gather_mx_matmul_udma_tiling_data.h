@@ -9,28 +9,32 @@
  */
 
 /*!
- * \file fragment_tensor_api.h
- * \brief FragmentTensor API 总入口
+ * \file all_gather_mx_matmul_udma_tiling_data.h
+ * \brief Tiling data for AllGather + QuantMatmul fusion kernel (prefill variant)
  */
 
 #pragma once
 
-#include "fragment_tensor.h"
+#include <cstdint>
+#include "apace/tiling/quant_matmul_tiling_data.h"
+#include "apace/tiling/comm_tiling_data.h"
+#include "apace/core/aiv_comm/collective_comm_context.h"
 
 namespace Apace {
-namespace Basic {
-
-/*!
- * \brief 创建FragmentTensor
- */
-template <uint32_t Dims, uint32_t MaxFragments = MAX_FRAGMENT_COUNT,
-          typename LayoutFactory = void, typename ElementType = uint8_t>
-__aicore__ inline auto MakeFragmentTensor(
-    const FragmentParam<Dims> &fragParam,
-    GM_ADDR const *addrList)
-{
-    return FragmentTensor<Dims, MaxFragments, LayoutFactory, ElementType>(fragParam, addrList);
-}
-
-} // namespace Basic
+namespace AivComm {
+// Convenience wrapper so the kernel receives one pointer instead of two.
+struct CommContext {
+    CommUdmaContext udmaCtx;
+    CommUbmemContext ubmemCtx;
+};
+} // namespace AivComm
 } // namespace Apace
+
+using Apace::AivComm::CommContext;
+
+#pragma pack(push, 8)
+struct alignas(8) AllGatherMxMatmulUdmaTilingData {
+    QuantMatmulTilingData mmTile;
+    CommTilingData commTile;
+};
+#pragma pack(pop)

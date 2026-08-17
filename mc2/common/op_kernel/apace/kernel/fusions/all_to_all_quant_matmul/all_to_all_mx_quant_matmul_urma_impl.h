@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file all_to_all_mx_matmul_urma_impl.h
@@ -29,13 +29,13 @@
 #include "blaze/gemm/block/block_mmad_qbmm_mx.h"
 #include "blaze/gemm/block/block_scheduler_qbmm.h"
 #include "blaze/gemm/policy/dispatch_policy.h"
-#include "quant_matmul_mx_kernel.h"
+#include "../../matmul/quant_batch_matmul/all_to_all_qbmm_mx_kernel.h"
 #include "all_to_all_matmul_tiling_data.h"
 
-#include "apace/block/aiv_comm/collective_comm_api.h"
-#include "apace/block/aiv_comm/collective_comm_context.h"
+#include "apace/core/aiv_comm/collective_comm_api.h"
+#include "apace/core/aiv_comm/collective_comm_context.h"
 #include "apace/tiling/comm_tiling_data.h"
-#include "apace/block/aiv_comm/barrier/barrier_ubmem.h"
+#include "apace/core/aiv_comm/barrier/barrier_ubmem.h"
 
 namespace Apace {
 
@@ -109,8 +109,8 @@ public:
     using DispatchPolicy = Blaze::Gemm::MatmulWithScaleMx<NONE_FULL_LOAD_MODE, false>;
     using BlockMmad = Blaze::Gemm::Block::BlockMmad<
         DispatchPolicy, TypeA, LayoutA, TypeB, LayoutB, TypeC, LayoutC, BiasType, LayoutBias>;
-    using QuantMatmulKernelImpl = Kernel::QuantMatmulMxKernel<ProblemShape, BlockMmad, BlockScheduler,
-                                                              UrmaCommWaitPolicy>;
+    using QuantMatmulKernelImpl = Kernel::AllToAllQbmmMxKernel<ProblemShape, BlockMmad, BlockScheduler,
+                                                               UrmaCommWaitPolicy>;
 
     // 参数类型
     using Params = typename QuantMatmulKernelImpl::Params;

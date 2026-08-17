@@ -32,9 +32,9 @@
 #include "apace/utils/comm_channel_builder.h"
 #include "../../utils/root_info_exchanger.h"
 #include "apace/tiling/quant_matmul_tiling_swat.h"
-#include "apace/kernel/all_to_all_quant_matmul/all_to_all_matmul_tiling_data.h"
+#include "apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_matmul_tiling_data.h"
 #include "kernel_launcher.h"
-#include "apace/block/aiv_comm/collective_comm_context.h"
+#include "apace/core/aiv_comm/collective_comm_context.h"
 
 #define HCCL_CHECK(status) \
     do { \

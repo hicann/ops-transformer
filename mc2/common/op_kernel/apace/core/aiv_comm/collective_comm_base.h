@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file collective_comm_base.h
@@ -30,19 +30,20 @@ constexpr uint8_t BARRIER_DEVICE = 1;
 constexpr uint8_t BARRIER_CORE = 2;
 constexpr uint8_t BARRIER_BOTH = BARRIER_DEVICE | BARRIER_CORE;
 
-template<typename Impl, typename Dtype, typename Barrier>
+template <typename Impl, typename Dtype, typename Barrier>
 class CollectiveCommBase {
     friend Impl;
+
 public:
     __aicore__ inline CollectiveCommBase() {}
 
-    template<uint8_t BarrierMode = BARRIER_BOTH>
+    template <uint8_t BarrierMode = BARRIER_BOTH>
     __aicore__ inline void Init(
-        __gm__ CommUdmaContext* udmaCtx,
-        Barrier& barrier,
-        const CommTilingData& tilingData,
+        __gm__ CommUdmaContext *udmaCtx,
+        Barrier &barrier,
+        const CommTilingData &tilingData,
         GM_ADDR localAddr,
-        __ubuf__ uint8_t* commbuf,
+        __ubuf__ uint8_t *commbuf,
         uint32_t totalJobs,
         uint32_t jobIndex,
         uint64_t winOffset = 0)
@@ -81,16 +82,18 @@ public:
 
         chunkBytes_ = chunkSize * nonSplitAxisBytes;
         tileMaxByteSize_ = (tilingData_->splitAxisTileSize > tilingData_->splitAxisTailSize ?
-            tilingData_->splitAxisTileSize : tilingData_->splitAxisTailSize) * nonSplitAxisBytes;
+                                tilingData_->splitAxisTileSize :
+                                tilingData_->splitAxisTailSize) *
+                           nonSplitAxisBytes;
         currentTileIdx_ = 0;
         tileByteOffset_ = 0;
         remainingChunkSize_ = chunkSize;
         slotByteOffset_ = 0;
         chunkByteOffset_ = 0;
-        static_cast<Impl*>(this)->template PostInit<BarrierMode>();
+        static_cast<Impl *>(this)->template PostInit<BarrierMode>();
     }
 
-    template<uint8_t BarrierMode = BARRIER_BOTH>
+    template <uint8_t BarrierMode = BARRIER_BOTH>
     __aicore__ inline void Commit()
     {
         if (remainingChunkSize_ <= 0) {
@@ -116,7 +119,7 @@ public:
 
             for (uint32_t i = 0; i < targetRankCnt; i++) {
                 uint32_t targetRankId = targetRankStart + i;
-                static_cast<Impl*>(this)->template DoCommit<BarrierMode>(
+                static_cast<Impl *>(this)->template DoCommit<BarrierMode>(
                     targetRankId, currentTileByteSize);
             }
         }
@@ -128,8 +131,8 @@ public:
         remainingChunkSize_ -= currentTileSize;
     }
 
-    template<uint8_t BarrierMode = BARRIER_BOTH>
-    __aicore__ inline void Wait(bool waitLast=false)
+    template <uint8_t BarrierMode = BARRIER_BOTH>
+    __aicore__ inline void Wait(bool waitLast = false)
     {
         uint64_t totalTiles = tilingData_->splitAxisTileCnt + tilingData_->splitAxisTailCnt;
         if (waitLast && currentTileIdx_ != totalTiles - 1) {
@@ -137,7 +140,7 @@ public:
         }
         for (uint32_t i = 0; i < targetRankCnt_; i++) {
             uint32_t targetRankId = targetRankStart_ + i;
-            static_cast<Impl*>(this)->template DoWait<BarrierMode>(targetRankId);
+            static_cast<Impl *>(this)->template DoWait<BarrierMode>(targetRankId);
         }
     }
 
@@ -151,20 +154,20 @@ public:
         return tilingData_->splitAxisTileCnt + tilingData_->splitAxisTailCnt;
     }
 
-    template<uint8_t BarrierMode = BARRIER_BOTH>
+    template <uint8_t BarrierMode = BARRIER_BOTH>
     __aicore__ inline void Finalize()
     {
-        static_cast<Impl*>(this)->template DoFinalize<BarrierMode>();
+        static_cast<Impl *>(this)->template DoFinalize<BarrierMode>();
     }
 
 protected:
-    __gm__ CommUdmaContext* udmaCtx_;
-    const CommTilingData* tilingData_;
+    __gm__ CommUdmaContext *udmaCtx_;
+    const CommTilingData *tilingData_;
     Barrier barrier_;
 
     Hcomm<AscendC::COMM_PROTOCOL_UBC_CTP> comm_;
     GM_ADDR localAddr_;
-    __ubuf__ uint8_t* commBuf_;
+    __ubuf__ uint8_t *commBuf_;
     uint64_t winOffset_;
 
     uint64_t chunkBytes_;

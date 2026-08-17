@@ -17,7 +17,6 @@ set(BLAZE_COMMON "${OPS_TENSOR_INCLUDE_DIR}")
 set(KERNEL_INCLUDES
     ${OP_KERNEL_ROOT}                                                       # apace/ 头文件
     ${APACE_ROOT}
-    ${APACE_ROOT}/kernel/all_to_all_quant_matmul
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../utils                                    # utils.h
     ${BLAZE_COMMON}                                                         # blaze/（apace_blaze_api 也提供，此处冗余但无害）

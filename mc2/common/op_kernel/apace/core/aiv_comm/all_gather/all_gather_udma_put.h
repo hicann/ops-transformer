@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file all_gather_udma_put.h
@@ -23,12 +23,12 @@ namespace AivComm {
 
 using namespace AscendC;
 
-template<typename Dtype, typename Barrier = TeamBarrier>
+template <typename Dtype, typename Barrier = TeamBarrier>
 class AllGatherCommPutImpl : public CollectiveCommBase<AllGatherCommPutImpl<Dtype, Barrier>, Dtype, Barrier> {
     friend class CollectiveCommBase<AllGatherCommPutImpl<Dtype, Barrier>, Dtype, Barrier>;
 
 private:
-    template<uint8_t BarrierMode>
+    template <uint8_t BarrierMode>
     __aicore__ inline void PostInit()
     {
         if constexpr (BarrierMode & BARRIER_DEVICE) {
@@ -39,7 +39,7 @@ private:
         }
     }
 
-    template<uint8_t BarrierMode>
+    template <uint8_t BarrierMode>
     __aicore__ inline void DoCommit(uint32_t targetRankId, uint64_t tileByteSize)
     {
         if (targetRankId == this->udmaCtx_->rankId) {
@@ -48,14 +48,14 @@ private:
         GM_ADDR srcAddr = this->localAddr_ + this->tileByteOffset_;
 
         GM_ADDR dstAddr = reinterpret_cast<GM_ADDR>(this->udmaCtx_->commBufferAddrs[targetRankId] + this->winOffset_) +
-            this->udmaCtx_->rankId * this->chunkBytes_ + this->tileByteOffset_;
+                          this->udmaCtx_->rankId * this->chunkBytes_ + this->tileByteOffset_;
 
         int32_t ret = this->comm_.WriteNbi(
             static_cast<ChannelHandle>(this->udmaCtx_->channelHandles[targetRankId]), dstAddr, srcAddr, tileByteSize);
         ascendc_assert(ret == 0, "Urma writeNbi failed, ret=%d, targetRankId=%u", ret, targetRankId);
     }
 
-    template<uint8_t BarrierMode>
+    template <uint8_t BarrierMode>
     __aicore__ inline void DoWait(uint32_t targetRankId)
     {
         if (targetRankId != this->udmaCtx_->rankId) {
@@ -70,8 +70,9 @@ private:
         }
     }
 
-    template<uint8_t BarrierMode>
-    __aicore__ inline void DoFinalize() {}
+    template <uint8_t BarrierMode>
+    __aicore__ inline void DoFinalize()
+    {}
 };
 
 } // namespace AivComm

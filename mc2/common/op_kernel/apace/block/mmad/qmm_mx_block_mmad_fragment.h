@@ -1,15 +1,15 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
- * \file block_mmad_qbmm_mx.h
+ * \file qmm_mx_block_mmad_fragment.h
  * \brief
  */
 
@@ -149,9 +149,8 @@ public:
     }
 
 public:
-
     __aicore__ inline void Init(
-        const ProblemShape& problemShape, const BlockShape& l0TileShape, const L1Params& l1Params, bool isBias,
+        const ProblemShape &problemShape, const BlockShape &l0TileShape, const L1Params &l1Params, bool isBias,
         bool dbL0C, uint64_t splitKNum = 1)
     {
         k_ = AscendC::Te::Get<IDX_K_IDX>(problemShape);
@@ -209,7 +208,7 @@ public:
 
     template <typename TensorScaleA, typename TensorScaleB>
     __aicore__ inline auto CopyScalesInL1(
-        TensorScaleA const& gmScaleA, TensorScaleB const& gmScaleB, TileL1L0Param& tileL1L0Param, uint64_t scaleL1BufId,
+        TensorScaleA const &gmScaleA, TensorScaleB const &gmScaleB, TileL1L0Param &tileL1L0Param, uint64_t scaleL1BufId,
         uint64_t iter0)
     {
         uint64_t kL1Offset = iter0 * kL1_;
@@ -217,14 +216,16 @@ public:
             Blaze::Gemm::CeilDiv(scaleKL1_, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE, tileL1L0Param.curN);
         auto tensorScaleBL1 = AscendC::Te::MakeTensor(
             AscendC::Te::MakeMemPtr<AscendC::Te::Location::L1, fp8_e8m0_t>(
-                l1BufferScaleBOffset_[scaleL1BufId]), layoutScaleBL1);
+                l1BufferScaleBOffset_[scaleL1BufId]),
+            layoutScaleBL1);
         auto CopyScaleGM2L1 = AscendC::Te::MakeCopy(AscendC::Te::CopyGM2L1{});
         if constexpr (DispatchPolicy::FULL_LOAD_MODE == 0) {
             auto layoutScaleAL1 = AscendC::Te::MakeFrameLayout<AscendC::Te::ZZLayoutPtn, AscendC::Std::Int<SCALE_C0>>(
                 tileL1L0Param.curM, Blaze::Gemm::CeilDiv(scaleKL1_, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE);
             auto tensorScaleAL1 = AscendC::Te::MakeTensor(
                 AscendC::Te::MakeMemPtr<AscendC::Te::Location::L1, fp8_e8m0_t>(
-                    l1BufferScaleAOffset_[scaleL1BufId]), layoutScaleAL1);
+                    l1BufferScaleAOffset_[scaleL1BufId]),
+                layoutScaleAL1);
             if (iter0 % (scaleKL1_ / kL1_) == 0) {
                 AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SCALE_BUFFER_FLAG_0 + scaleL1BufId);
                 uint64_t curScaleKL1 = scaleKL1_;
@@ -236,7 +237,7 @@ public:
                 auto blockScaleA = gmScaleA.Slice(
                     AscendC::Te::MakeCoord(0, scaleKStart),
                     AscendC::Te::MakeShape(tileL1L0Param.curM, scaleKLength));
-                    FragmentSliceCopy<false>(CopyScaleGM2L1, tensorScaleAL1, blockScaleA);
+                FragmentSliceCopy<false>(CopyScaleGM2L1, tensorScaleAL1, blockScaleA);
 
                 auto gmBlockScaleB = gmScaleB.Slice(
                     AscendC::Te::MakeCoord(scaleKStart, 0),
@@ -250,7 +251,8 @@ public:
                 tileL1L0Param.curM, Blaze::Gemm::CeilDiv(k_, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE);
             auto tensorScaleAL1 = AscendC::Te::MakeTensor(
                 AscendC::Te::MakeMemPtr<AscendC::Te::Location::L1, fp8_e8m0_t>(
-                    l1BufferScaleAOffset_[0]), layoutScaleAL1);
+                    l1BufferScaleAOffset_[0]),
+                layoutScaleAL1);
             if (iter0 % (scaleKL1_ / kL1_) == 0) {
                 AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(SCALE_BUFFER_FLAG_0 + scaleL1BufId);
                 uint64_t curScaleKL1 = scaleKL1_;
@@ -265,7 +267,7 @@ public:
                 AscendC::Te::Copy(CopyScaleGM2L1, tensorScaleBL1, gmBlockScaleB);
             }
             if (abL1LoopCnt_ == 0) {
-                    FragmentSliceCopy<false>(CopyScaleGM2L1, tensorScaleAL1, gmScaleA);
+                FragmentSliceCopy<false>(CopyScaleGM2L1, tensorScaleAL1, gmScaleA);
             }
             return ScalePair<decltype(tensorScaleAL1), decltype(tensorScaleBL1)>{
                 tensorScaleAL1, tensorScaleBL1};
@@ -273,7 +275,7 @@ public:
     }
 
     template <typename TensorA>
-    __aicore__ inline auto CopyAInL1(TensorA const& gmA, TileL1L0Param& tileL1L0Param, uint64_t l1BufId, uint64_t iter0)
+    __aicore__ inline auto CopyAInL1(TensorA const &gmA, TileL1L0Param &tileL1L0Param, uint64_t l1BufId, uint64_t iter0)
     {
         auto copyGM2L1 = AscendC::Te::MakeCopy(AscendC::Te::CopyGM2L1{});
         if constexpr (DispatchPolicy::FULL_LOAD_MODE == 0) {
@@ -284,13 +286,14 @@ public:
                 AscendC::Te::MakeCoord(0, iter0 * kL1_),
                 AscendC::Te::MakeShape(tileL1L0Param.curM, tileL1L0Param.curGmAKL1));
             Apace::Basic::PadMxKAL1Zero(tensorAL1, tileL1L0Param.curGmAKL1);
-                FragmentSliceCopy<false>(copyGM2L1, tensorAL1, blockA);
+            FragmentSliceCopy<false>(copyGM2L1, tensorAL1, blockA);
             return tensorAL1;
         } else {
             auto layoutAL1 = MakeLayoutAL1{}(tileL1L0Param.curM, Blaze::Gemm::CeilAlign(k_, MXFP_DIVISOR_SIZE));
             auto tensorTotalAL1 =
                 AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::L1, AType>(
-                    l1BufferAOffset_[0]), layoutAL1);
+                                            l1BufferAOffset_[0]),
+                                        layoutAL1);
             auto tensorAL1 = tensorTotalAL1.Slice(
                 AscendC::Te::MakeCoord(0, iter0 * kL1_),
                 AscendC::Te::MakeShape(tileL1L0Param.curM, tileL1L0Param.curPadAKL1));
@@ -299,7 +302,7 @@ public:
                     AscendC::Te::MakeCoord(0, iter0 * kL1_),
                     AscendC::Te::MakeShape(tileL1L0Param.curM, tileL1L0Param.curGmAKL1));
                 Apace::Basic::PadMxKAL1Zero(tensorAL1, tileL1L0Param.curGmAKL1);
-                    FragmentSliceCopy<false>(copyGM2L1, tensorAL1, blockA);
+                FragmentSliceCopy<false>(copyGM2L1, tensorAL1, blockA);
             }
             return tensorAL1;
         }
@@ -309,9 +312,9 @@ public:
         typename TensorScaleAL1, typename TensorScaleBL1, typename TensorAL1, typename TensorBL1,
         typename TensorBiasL1, typename TensorL0C>
     __aicore__ inline void Iterate(
-        TileL1L0Param& tileL1L0Param, uint64_t iter0, TensorScaleAL1& tensorScaleAL1,
-        TensorScaleBL1& tensorScaleBL1, TensorAL1& tensorAL1, TensorBL1& tensorBL1,
-        TensorBiasL1& tensorBiasL1, TensorL0C& tensorL0C, uint64_t splitKIdx)
+        TileL1L0Param &tileL1L0Param, uint64_t iter0, TensorScaleAL1 &tensorScaleAL1,
+        TensorScaleBL1 &tensorScaleBL1, TensorAL1 &tensorAL1, TensorBL1 &tensorBL1,
+        TensorBiasL1 &tensorBiasL1, TensorL0C &tensorL0C, uint64_t splitKIdx)
     {
         // 从scaleKL1中切出kL1_对应的部分
         auto scaleKL1Len = Blaze::Gemm::CeilDiv(kL1_, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
@@ -404,11 +407,11 @@ public:
         typename TensorA, typename TensorB, typename TensorScaleA, typename TensorScaleB, typename TensorBias,
         typename TensorC = int>
     __aicore__ inline void operator()(
-        TensorA const& gmA, TensorB const& gmB, TensorScaleA const& gmScaleA, TensorScaleB const& gmScaleB,
-        TensorBias const& gmBias, GM_ADDR* cFragAddrs, uint64_t mPerRank, uint64_t tileM,
+        TensorA const &gmA, TensorB const &gmB, TensorScaleA const &gmScaleA, TensorScaleB const &gmScaleB,
+        TensorBias const &gmBias, GM_ADDR *cFragAddrs, uint64_t mPerRank, uint64_t tileM,
         uint64_t tileCnt, uint64_t tailM, uint64_t remoteRankCnt, int64_t cRowStride,
-        BlockShape const& singleShape, int64_t mPosGlobal, int64_t nPosGlobal,
-        uint64_t splitKIdx = 0, TensorC const& gmC = 0)
+        BlockShape const &singleShape, int64_t mPosGlobal, int64_t nPosGlobal,
+        uint64_t splitKIdx = 0, TensorC const &gmC = 0)
     {
         TileL1L0Param tileL1L0Param;
         tileL1L0Param.curM = AscendC::Te::Get<IDX_M_TILEIDX>(singleShape);
@@ -424,8 +427,8 @@ public:
 
             // scaleA, scaleB GM->L1
             auto scalePair = CopyScalesInL1(gmScaleA, gmScaleB, tileL1L0Param, scaleL1BufId, iter0);
-            auto& tensorScaleAL1 = scalePair.scaleA;
-            auto& tensorScaleBL1 = scalePair.scaleB;
+            auto &tensorScaleAL1 = scalePair.scaleA;
+            auto &tensorScaleBL1 = scalePair.scaleB;
 
             AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BufId);
             biasBufId_ = scaleL1BufId;
@@ -444,7 +447,8 @@ public:
                 1UL, Blaze::Gemm::CeilAlign(tileL1L0Param.curN, BLOCK_CUBE));
             auto tensorBiasL1 = AscendC::Te::MakeTensor(
                 AscendC::Te::MakeMemPtr<AscendC::Te::Location::L1, BiasType>(
-                    l1BufferBiasOffset_[biasBufId_]), layoutBiasL1);
+                    l1BufferBiasOffset_[biasBufId_]),
+                layoutBiasL1);
             if (isBias_ && iter0 == 0 && splitKIdx == 0) {
                 AscendC::Te::Copy(copyGM2L1, tensorBiasL1, gmBias);
             }
@@ -478,7 +482,7 @@ public:
     }
 
     template <typename TensorC, typename TensorL0C>
-    __aicore__ inline void ScatterL0C2GM(TensorC const& gmC, TensorL0C& tensorL0C)
+    __aicore__ inline void ScatterL0C2GM(TensorC const &gmC, TensorL0C &tensorL0C)
     {
         auto copyL0C2GM = AscendC::Te::MakeCopy(AscendC::Te::CopyL0C2GM{});
         FragmentSliceCopy<true>(copyL0C2GM.with(AscendC::Te::FixpipeParams(3)), tensorL0C, gmC);
@@ -495,8 +499,8 @@ private:
 
     template <typename TensorL0CType, typename TensorAL0, typename TensorBL0, typename TensorBT>
     __aicore__ inline void Mmad(
-        TileL1L0Param& tileL1L0Param, uint64_t iter0, uint64_t iter1, uint64_t kL0Iter, uint64_t curKL0,
-        TensorL0CType& tensorL0C, TensorAL0 const& tensorAL0, TensorBL0 const& tensorBL0, TensorBT const& tensorBt,
+        TileL1L0Param &tileL1L0Param, uint64_t iter0, uint64_t iter1, uint64_t kL0Iter, uint64_t curKL0,
+        TensorL0CType &tensorL0C, TensorAL0 const &tensorAL0, TensorBL0 const &tensorBL0, TensorBT const &tensorBt,
         uint64_t splitKIdx)
     {
         AscendC::Te::MmadParams params;
@@ -504,7 +508,8 @@ private:
         params.k = static_cast<uint16_t>(Blaze::Gemm::CeilAlign(curKL0, MXFP_DIVISOR_SIZE));
         params.n = static_cast<uint16_t>(tileL1L0Param.curN);
         params.unitFlag = (iter0 + 1 == kL1Iter_ && iter1 + 1 == kL0Iter && (splitKIdx == splitKNum_ - 1)) ?
-                          FINAL_ACCUMULATION : NON_FINAL_ACCUMULATION;
+                              FINAL_ACCUMULATION :
+                              NON_FINAL_ACCUMULATION;
         params.cmatrixInitVal = (iter0 == 0 && iter1 == 0 && splitKIdx == 0 && !isBias_);
         if (NeedBias(iter0, iter1, splitKIdx)) {
             AscendC::Te::Mmad(

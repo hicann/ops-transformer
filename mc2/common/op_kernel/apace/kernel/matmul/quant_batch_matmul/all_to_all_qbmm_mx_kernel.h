@@ -1,15 +1,15 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
- * \file quant_matmul_mx_kernel.h
+ * \file all_to_all_qbmm_mx_kernel.h
  * \brief mxfp8 场景 quantMatmul 实现。
  */
 
@@ -48,11 +48,11 @@ using AscendC::Te::Get;
 
 template <class ProblemShape, class BlockMmad, class BlockScheduler,
           class CommPolicy>
-class QuantMatmulMxKernel {
+class AllToAllQbmmMxKernel {
 public:
-    __aicore__ inline QuantMatmulMxKernel()
+    __aicore__ inline AllToAllQbmmMxKernel()
     {}
-    __aicore__ inline ~QuantMatmulMxKernel()
+    __aicore__ inline ~AllToAllQbmmMxKernel()
     {}
 
     static constexpr bool weightNz = BlockMmad::WEIGHT_NZ;
@@ -115,9 +115,9 @@ public:
     struct LocalParams {
         uint32_t rankId;
         uint32_t rankSize;
-        uint64_t originalM;    // 单卡负责的总 M 行数
-        GM_ADDR  localAGmAddr;
-        GM_ADDR  localScaleAGmAddr;
+        uint64_t originalM; // 单卡负责的总 M 行数
+        GM_ADDR localAGmAddr;
+        GM_ADDR localScaleAGmAddr;
         uint32_t localMatmul; // 1 means local matmul
         uint32_t splitKNum;
         MatmulMode matmulMode; // 1: LOCAL, 2: REMOTE, 3: DEFERRED_SYNC
@@ -144,18 +144,18 @@ public:
         Run(params);
     }
 
-    __aicore__ inline CommPolicy& GetCommPolicy() { return commPolicy_; }
+    __aicore__ inline CommPolicy &GetCommPolicy() { return commPolicy_; }
 
 private:
     __aicore__ inline void ResetGmAddr(const Params &params);
-    __aicore__ inline void ProcessSingleBatch(const Params &params, BlockScheduler& bs,
-                            uint64_t restBatch, bool isTailRound);
+    __aicore__ inline void ProcessSingleBatch(const Params &params, BlockScheduler &bs,
+                                              uint64_t restBatch, bool isTailRound);
     __aicore__ inline int32_t CalcDependTileIdx(int64_t mPos, uint32_t headTileSize, uint32_t totalTiles) const;
 
     template <typename TensorB, typename TensorScaleB, typename TensorC>
     __aicore__ inline void SetL2Cache(
-        const ProblemShape &problemShape, uint64_t curBaseM, uint64_t baseN, uint64_t scaleKL1, TensorB& gmB,
-        TensorScaleB &gmScaleB, TensorC& gmC);
+        const ProblemShape &problemShape, uint64_t curBaseM, uint64_t baseN, uint64_t scaleKL1, TensorB &gmB,
+        TensorScaleB &gmScaleB, TensorC &gmC);
 
     template <typename TensorScaleB>
     __aicore__ inline void SetScaleL2Cache(
@@ -165,12 +165,12 @@ private:
     BlockMmad mmadOp_;
     CommPolicy commPolicy_;
 
-    __gm__ AType *aGmAddr_;               // 远程数据基址（通信缓冲区）
-    __gm__ AType *localAGmAddr_;          // 本地数据基址
+    __gm__ AType *aGmAddr_;      // 远程数据基址（通信缓冲区）
+    __gm__ AType *localAGmAddr_; // 本地数据基址
     __gm__ BType *bGmAddr_;
-    __gm__ CType *cGmAddr_;               // 输出基址（已根据流水步偏移）
+    __gm__ CType *cGmAddr_; // 输出基址（已根据流水步偏移）
     __gm__ BiasType *biasGmAddr_ = nullptr;
-    __gm__ ::fp8_e8m0_t *scaleAGmAddr_;     // 远程 Scale 基址
+    __gm__ ::fp8_e8m0_t *scaleAGmAddr_; // 远程 Scale 基址
     __gm__ ::fp8_e8m0_t *localScaleAGmAddr_;
     __gm__ ::fp8_e8m0_t *scaleBGmAddr_;
 
@@ -180,7 +180,7 @@ private:
 };
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Run(const Params &params)
+__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Run(const Params &params)
 {
     Init(params);
 
@@ -191,7 +191,7 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Run(
 
     BlockShape l0TileShape{params.qbmmParams.baseM, params.qbmmParams.baseN, params.qbmmParams.baseK, 0};
     mmadOp_.Init(params.problemShape, l0TileShape, params.l1Params, isBias_, params.qbmmParams.dbL0C > 1,
-        params.localParams.splitKNum);
+                 params.localParams.splitKNum);
 
     ProcessSingleBatch(params, bs, 0, true);
 
@@ -202,7 +202,7 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Run(
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
 template <typename TensorScaleB>
-__aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::SetScaleL2Cache(
+__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::SetScaleL2Cache(
     const ProblemShape &problemShape, uint64_t baseN, uint64_t scaleKL1, TensorScaleB &gmScaleB)
 {
     if (Te::Get<MNK_B>(problemShape) != 1) {
@@ -215,7 +215,7 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::SetS
         const int64_t scaleKL1RowBytes = Blaze::Gemm::CeilDiv(scaleKL1, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
         // 0x7f: 128B cache line alignment for mx scale GM streaming
         const bool scaleAlignForL2Stream = (scaleKRowBytes & kCacheLineAlignMask) == 0 &&
-            (scaleKL1RowBytes & kCacheLineAlignMask) == 0;
+                                           (scaleKL1RowBytes & kCacheLineAlignMask) == 0;
         gmScaleB.SetL2CacheHint(
             scaleAlignForL2Stream ? Te::CacheMode::CACHE_MODE_DISABLE : Te::CacheMode::CACHE_MODE_NORMAL);
     } else {
@@ -223,7 +223,7 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::SetS
         const int64_t scaleBaseNStrideBytes = baseN * MXFP_MULTI_BASE_SIZE;
         // 0x7f: 128B cache line alignment for mx scale GM streaming
         const bool scaleAlignForL2Stream = (scaleNStrideBytes & kCacheLineAlignMask) == 0 &&
-            (scaleBaseNStrideBytes & kCacheLineAlignMask) == 0;
+                                           (scaleBaseNStrideBytes & kCacheLineAlignMask) == 0;
         gmScaleB.SetL2CacheHint(
             scaleAlignForL2Stream ? Te::CacheMode::CACHE_MODE_DISABLE : Te::CacheMode::CACHE_MODE_NORMAL);
     }
@@ -231,9 +231,9 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::SetS
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
 template <typename TensorB, typename TensorScaleB, typename TensorC>
-__aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::SetL2Cache(
-    const ProblemShape &problemShape, uint64_t curBaseM, uint64_t baseN, uint64_t scaleKL1, TensorB& gmB,
-    TensorScaleB &gmScaleB, TensorC& gmC)
+__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::SetL2Cache(
+    const ProblemShape &problemShape, uint64_t curBaseM, uint64_t baseN, uint64_t scaleKL1, TensorB &gmB,
+    TensorScaleB &gmScaleB, TensorC &gmC)
 {
     if (isAtomicAdd_) {
         gmC.SetL2CacheHint(Te::CacheMode::CACHE_MODE_DISABLE);
@@ -263,7 +263,7 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::SetL
 }
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Init(const Params &params)
+__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Init(const Params &params)
 {
     if ASCEND_IS_AIV {
         return;
@@ -280,25 +280,25 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Init
 }
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::ResetGmAddr(const Params &params)
+__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::ResetGmAddr(const Params &params)
 {
     if ASCEND_IS_AIV {
         return;
     }
-    aGmAddr_ = reinterpret_cast<__gm__ AType*>(params.mmadParams.aGmAddr);
-    bGmAddr_ = reinterpret_cast<__gm__ BType*>(params.mmadParams.bGmAddr);
-    cGmAddr_ = reinterpret_cast<__gm__ CType*>(params.mmadParams.cGmAddr);
-    localAGmAddr_ = reinterpret_cast<__gm__ AType*>(params.localParams.localAGmAddr);
-    localScaleAGmAddr_ = reinterpret_cast<__gm__ ::fp8_e8m0_t*>(params.localParams.localScaleAGmAddr);
-    scaleAGmAddr_ = reinterpret_cast<__gm__ ::fp8_e8m0_t*>(params.mmadParams.scaleAGmAddr);
-    scaleBGmAddr_ = reinterpret_cast<__gm__ ::fp8_e8m0_t*>(params.mmadParams.scaleBGmAddr);
+    aGmAddr_ = reinterpret_cast<__gm__ AType *>(params.mmadParams.aGmAddr);
+    bGmAddr_ = reinterpret_cast<__gm__ BType *>(params.mmadParams.bGmAddr);
+    cGmAddr_ = reinterpret_cast<__gm__ CType *>(params.mmadParams.cGmAddr);
+    localAGmAddr_ = reinterpret_cast<__gm__ AType *>(params.localParams.localAGmAddr);
+    localScaleAGmAddr_ = reinterpret_cast<__gm__ ::fp8_e8m0_t *>(params.localParams.localScaleAGmAddr);
+    scaleAGmAddr_ = reinterpret_cast<__gm__ ::fp8_e8m0_t *>(params.mmadParams.scaleAGmAddr);
+    scaleBGmAddr_ = reinterpret_cast<__gm__ ::fp8_e8m0_t *>(params.mmadParams.scaleBGmAddr);
     if (isBias_) {
-        biasGmAddr_ = reinterpret_cast<__gm__ BiasType*>(params.mmadParams.biasGmAddr);
+        biasGmAddr_ = reinterpret_cast<__gm__ BiasType *>(params.mmadParams.biasGmAddr);
     }
 }
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline int32_t QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::CalcDependTileIdx(
+__aicore__ inline int32_t AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::CalcDependTileIdx(
     int64_t mPos, uint32_t headTileSize, uint32_t totalTiles) const
 {
     int32_t tileIdx = static_cast<int32_t>(mPos / headTileSize);
@@ -309,8 +309,8 @@ __aicore__ inline int32_t QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::C
 }
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::ProcessSingleBatch(
-    const Params &params, BlockScheduler& bs, uint64_t restBatch, bool isTailRound)
+__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::ProcessSingleBatch(
+    const Params &params, BlockScheduler &bs, uint64_t restBatch, bool isTailRound)
 {
     auto rankId = params.localParams.rankId;
     auto rankSize = params.localParams.rankSize;
@@ -347,11 +347,11 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Proc
     auto gmC = Te::MakeTensor(Te::MakeMemPtr<Te::Location::GM>(cGmAddr_), layoutC);
 
     // 尾块更新逻辑
-    auto& mTailTile = params.schParams.mTailTile;
-    auto& nTailTile = params.schParams.nTailTile;
+    auto &mTailTile = params.schParams.mTailTile;
+    auto &nTailTile = params.schParams.nTailTile;
     if (needUpdateTail_ ||
         (isTailRound && ((bs.GetEndBlockIdx() + 1) + (restBatch * bs.GetTotalCnt())) * mTailTile * nTailTile <=
-                AscendC::GetBlockNum())) {
+                            AscendC::GetBlockNum())) {
         needUpdateTail_ = true;
         bs.UpdateTailTile(mTailTile, nTailTile);
     }
@@ -377,7 +377,7 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Proc
         // 切分输出块：地址基址已在外部按流水步偏移，此处仅按调度器位置切局部块
         auto gmBlockC =
             gmC.Slice(AscendC::Te::MakeCoord(mPos, nPos),
-                AscendC::Te::MakeShape(Get<MNK_M>(singleShape), Get<MNK_N>(singleShape)));
+                      AscendC::Te::MakeShape(Get<MNK_M>(singleShape), Get<MNK_N>(singleShape)));
         auto gmBlockBias =
             gmBias.Slice(Te::MakeCoord(0L, nPos), Te::MakeShape(1L, Te::Get<IDX_N_TILEIDX>(singleShape)));
 
@@ -386,13 +386,13 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Proc
             auto actualMPos = rankId * oriM + mPos;
             auto gmBlockA =
                 gmALocal.Slice(AscendC::Te::MakeCoord(actualMPos, kPos),
-                    AscendC::Te::MakeShape(Get<MNK_M>(singleShape), Get<MNK_K>(params.problemShape)));
+                               AscendC::Te::MakeShape(Get<MNK_M>(singleShape), Get<MNK_K>(params.problemShape)));
             auto gmBlockScaleA = gmScaleALocal.Slice(AscendC::Te::MakeCoord(actualMPos, kPos),
-                    AscendC::Te::MakeShape(Get<MNK_M>(singleShape), scaleKLen));
+                                                     AscendC::Te::MakeShape(Get<MNK_M>(singleShape), scaleKLen));
             auto gmBlockB = gmB.Slice(AscendC::Te::MakeCoord(rankId * Get<MNK_K>(params.problemShape), nPos),
-                AscendC::Te::MakeShape(Get<MNK_K>(params.problemShape), Get<MNK_N>(singleShape)));
+                                      AscendC::Te::MakeShape(Get<MNK_K>(params.problemShape), Get<MNK_N>(singleShape)));
             auto gmBlockScaleB = gmScaleB.Slice(AscendC::Te::MakeCoord(rankId * scaleKLen, nPos),
-                AscendC::Te::MakeShape(scaleKLen, Get<MNK_N>(singleShape)));
+                                                AscendC::Te::MakeShape(scaleKLen, Get<MNK_N>(singleShape)));
 
             mmadOp_(gmBlockA, gmBlockB, gmBlockScaleA, gmBlockScaleB, gmBlockBias, gmBlockC, singleShape, 0);
         } else if (deferredSync) {
@@ -404,13 +404,13 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Proc
             auto selfMPos = rankId * oriM + mPos;
             auto gmBlockA_self =
                 gmALocal.Slice(AscendC::Te::MakeCoord(selfMPos, kPos),
-                    AscendC::Te::MakeShape(Get<MNK_M>(singleShape), Get<MNK_K>(params.problemShape)));
+                               AscendC::Te::MakeShape(Get<MNK_M>(singleShape), Get<MNK_K>(params.problemShape)));
             auto gmBlockScaleA_self = gmScaleALocal.Slice(AscendC::Te::MakeCoord(selfMPos, kPos),
-                    AscendC::Te::MakeShape(Get<MNK_M>(singleShape), scaleKLen));
+                                                          AscendC::Te::MakeShape(Get<MNK_M>(singleShape), scaleKLen));
             auto gmBlockB_self = gmB.Slice(AscendC::Te::MakeCoord(rankId * Get<MNK_K>(params.problemShape), nPos),
-                AscendC::Te::MakeShape(Get<MNK_K>(params.problemShape), Get<MNK_N>(singleShape)));
+                                           AscendC::Te::MakeShape(Get<MNK_K>(params.problemShape), Get<MNK_N>(singleShape)));
             auto gmBlockScaleB_self = gmScaleB.Slice(AscendC::Te::MakeCoord(rankId * scaleKLen, nPos),
-                AscendC::Te::MakeShape(scaleKLen, Get<MNK_N>(singleShape)));
+                                                     AscendC::Te::MakeShape(scaleKLen, Get<MNK_N>(singleShape)));
             mmadOp_(gmBlockA_self, gmBlockB_self, gmBlockScaleA_self, gmBlockScaleB_self,
                     gmBlockBias, gmBlockC, singleShape, 0);
 
@@ -422,17 +422,18 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Proc
             // Phase 3: 遍历其它 rank，在 L0C 上累加（最后一个 rank 触发 fixpipe）
             uint32_t remoteRankCnt = 1;
             for (uint64_t rank = 0; rank < rankSize; rank++) {
-                if (rank == rankId) continue;
+                if (rank == rankId)
+                    continue;
                 auto actualMPos = rank * oriM + mPos;
                 auto gmBlockA_remote =
                     gmA.Slice(AscendC::Te::MakeCoord(actualMPos, kPos),
-                        AscendC::Te::MakeShape(Get<MNK_M>(singleShape), Get<MNK_K>(params.problemShape)));
+                              AscendC::Te::MakeShape(Get<MNK_M>(singleShape), Get<MNK_K>(params.problemShape)));
                 auto gmBlockScaleA_remote = gmScaleA.Slice(AscendC::Te::MakeCoord(actualMPos, kPos),
-                        AscendC::Te::MakeShape(Get<MNK_M>(singleShape), scaleKLen));
+                                                           AscendC::Te::MakeShape(Get<MNK_M>(singleShape), scaleKLen));
                 auto gmBlockB_r = gmB.Slice(AscendC::Te::MakeCoord(rank * Get<MNK_K>(params.problemShape), nPos),
-                    AscendC::Te::MakeShape(Get<MNK_K>(params.problemShape), Get<MNK_N>(singleShape)));
+                                            AscendC::Te::MakeShape(Get<MNK_K>(params.problemShape), Get<MNK_N>(singleShape)));
                 auto gmBlockScaleB_r = gmScaleB.Slice(AscendC::Te::MakeCoord(rank * scaleKLen, nPos),
-                    AscendC::Te::MakeShape(scaleKLen, Get<MNK_N>(singleShape)));
+                                                      AscendC::Te::MakeShape(scaleKLen, Get<MNK_N>(singleShape)));
                 mmadOp_(gmBlockA_remote, gmBlockB_r, gmBlockScaleA_remote, gmBlockScaleB_r,
                         gmBlockBias, gmBlockC, singleShape, remoteRankCnt);
                 remoteRankCnt++;
@@ -452,29 +453,29 @@ __aicore__ inline void QuantMatmulMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Proc
                 // 从通信buffer上切片
                 auto gmBlockA =
                     gmA.Slice(AscendC::Te::MakeCoord(actualMPos, kPos),
-                        AscendC::Te::MakeShape(Get<MNK_M>(singleShape), Get<MNK_K>(params.problemShape)));
+                              AscendC::Te::MakeShape(Get<MNK_M>(singleShape), Get<MNK_K>(params.problemShape)));
                 auto gmBlockScaleA = gmScaleA.Slice(AscendC::Te::MakeCoord(actualMPos, kPos),
-                        AscendC::Te::MakeShape(Get<MNK_M>(singleShape), scaleKLen));
+                                                    AscendC::Te::MakeShape(Get<MNK_M>(singleShape), scaleKLen));
 
                 if (rank == rankId) {
                     if (params.localParams.localMatmul == 1) {
                         continue;
                     } else {
                         gmBlockA = gmALocal.Slice(AscendC::Te::MakeCoord(actualMPos, kPos),
-                            AscendC::Te::MakeShape(Get<MNK_M>(singleShape), Get<MNK_K>(params.problemShape)));
+                                                  AscendC::Te::MakeShape(Get<MNK_M>(singleShape), Get<MNK_K>(params.problemShape)));
                         gmBlockScaleA = gmScaleALocal.Slice(AscendC::Te::MakeCoord(actualMPos, kPos),
-                            AscendC::Te::MakeShape(Get<MNK_M>(singleShape), scaleKLen));
+                                                            AscendC::Te::MakeShape(Get<MNK_M>(singleShape), scaleKLen));
                     }
                 }
 
                 auto gmBlockB = gmB.Slice(AscendC::Te::MakeCoord(rank * Get<MNK_K>(params.problemShape), nPos),
-                    AscendC::Te::MakeShape(Get<MNK_K>(params.problemShape), Get<MNK_N>(singleShape)));
+                                          AscendC::Te::MakeShape(Get<MNK_K>(params.problemShape), Get<MNK_N>(singleShape)));
                 auto gmBlockScaleB = gmScaleB.Slice(AscendC::Te::MakeCoord(rank * scaleKLen, nPos),
-                    AscendC::Te::MakeShape(scaleKLen, Get<MNK_N>(singleShape)));
+                                                    AscendC::Te::MakeShape(scaleKLen, Get<MNK_N>(singleShape)));
 
                 // L0C上累加
                 mmadOp_(gmBlockA, gmBlockB, gmBlockScaleA, gmBlockScaleB, gmBlockBias, gmBlockC,
-                    singleShape, remoteRankCnt);
+                        singleShape, remoteRankCnt);
                 remoteRankCnt++;
             }
         }
