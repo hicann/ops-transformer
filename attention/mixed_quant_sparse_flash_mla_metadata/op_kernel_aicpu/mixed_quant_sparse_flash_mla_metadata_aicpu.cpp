@@ -73,6 +73,7 @@ bool MixedQuantSparseFlashMlaMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
     GetAttrValueOpt(ctx, "layout_kv", layoutKv_);
     GetAttrValueOpt(ctx, "has_ori_kv", hasOriKv_);
     GetAttrValueOpt(ctx, "has_cmp_kv", hasCmpKv_);
+    GetAttrValueOpt(ctx, "is_batch_consistency", isBatchConsistency_);
     return (ParamsCheck() && ParamsInit());
 }
 
@@ -112,7 +113,8 @@ bool MixedQuantSparseFlashMlaMetadataCpuKernel::ParamsCheck()
         const int32_t *sequsedQPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
         const int32_t *cuSeqlensQPtr = (layoutQ_ == "TND" && cuSeqlensQ_ != nullptr &&
                                         cuSeqlensQ_->GetData() != nullptr) ?
-                                           static_cast<const int32_t *>(cuSeqlensQ_->GetData()) : nullptr;
+                                           static_cast<const int32_t *>(cuSeqlensQ_->GetData()) :
+                                           nullptr;
         for (int i = 0; i < batchSize; i++) {
             // 校验 seqused_q 元素非负
             if (sequsedQPtr[i] < 0) {
@@ -123,14 +125,16 @@ bool MixedQuantSparseFlashMlaMetadataCpuKernel::ParamsCheck()
             // 校验 seqused_q 元素不大于 max_seqlen_q (BSND) 或 cu_seqlens_q 序列长度 (TND)
             if (layoutQ_ == "BSND" && sequsedQPtr[i] > maxSeqlenQ_) {
                 KERNEL_LOG_ERROR("The elements in seqused_q should not be greater than max_seqlen_q %d, "
-                                 "but got seqused_q[%d] = %d", maxSeqlenQ_, i, sequsedQPtr[i]);
+                                 "but got seqused_q[%d] = %d",
+                                 maxSeqlenQ_, i, sequsedQPtr[i]);
                 return false;
             }
             if (cuSeqlensQPtr != nullptr) {
                 int32_t seqLen = cuSeqlensQPtr[i + 1] - cuSeqlensQPtr[i];
                 if (sequsedQPtr[i] > seqLen) {
                     KERNEL_LOG_ERROR("The elements in seqused_q should not be greater than the sequence length "
-                                     "from cu_seqlens_q %d, but got seqused_q[%d] = %d", seqLen, i, sequsedQPtr[i]);
+                                     "from cu_seqlens_q %d, but got seqused_q[%d] = %d",
+                                     seqLen, i, sequsedQPtr[i]);
                     return false;
                 }
             }
@@ -277,7 +281,8 @@ bool MixedQuantSparseFlashMlaMetadataCpuKernel::ParamsCheck()
             for (int i = 0; i < batchSize; i++) {
                 if (cmpResidualKvPtr[i] < 0 || cmpResidualKvPtr[i] >= cmpRatio_) {
                     KERNEL_LOG_ERROR("The elements in cmp_residual_kv should be in [0, cmpRatio_(%d)), but got "
-                                     "cmp_residual_kv[%d] = %d", cmpRatio_,
+                                     "cmp_residual_kv[%d] = %d",
+                                     cmpRatio_,
                                      i, cmpResidualKvPtr[i]);
                     return false;
                 }
@@ -1382,7 +1387,7 @@ void MixedQuantSparseFlashMlaMetadataCpuKernel::AssignBlocksToCore(const SplitCo
     // 更新S2切分信息
     if (assignContext.curS2Idx > assignContext.s1GCache.s2Start &&
         assignContext.curS2Idx <= assignContext.s1GCache.s2End) {
-        if (isBatchConsistency_) {                             // batch一致性场景
+        if (isBatchConsistency_) {                              // batch一致性场景
             if (isFirstReductionBlock(assignContext, result)) { // 首个规约切分
                 assignContext.curKvSplitPart++;
             } else { // 非首个规约切分

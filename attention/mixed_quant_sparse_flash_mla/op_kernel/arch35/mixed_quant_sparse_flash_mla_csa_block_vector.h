@@ -344,6 +344,7 @@ private:
     TEventID fdVToMte2Id[2];
     TEventID fdMte2ToVId;
     TEventID fdMte3ToVId;
+    TEventID fdMte3ToMte2Id;
     TBuf<> softmaxMaxBuf[2];
     TBuf<> softmaxSumBuf[2];
     TBuf<> softmaxFinalMaxBuf[2];
@@ -1453,6 +1454,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ReduceIntraBlockAndStage(
         intraLseMte3ToMte2Id[runInfo.multiCoreIdxMod2]);
     WaitFlag<HardEvent::MTE3_MTE2>(
         intraAttnOutMte3ToMte2Id[runInfo.multiCoreIdxMod2]);
+    LocalTensor<T> sinkUb;
     int64_t startRow = 0;
     while (startRow < runInfo.vec2MRealSize) {
         int64_t dealRowCount = intraLayout.chunkRows;
@@ -1469,7 +1471,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ReduceIntraBlockAndStage(
                                                                          intraCoreCombineBase, intraWorkspaceIdx, stagingMOffset + startRow,
                                                                          dealRowCount, static_cast<int64_t>(constInfo.dSizeV), chunkMaxUb, chunkSumUb,
                                                                          chunkCurrent, blockMaxUb, blockSumUb, partialTmpUb, lseBroadcastUb, sumBroadcastUb,
-                                                                         reduceMaxSumVToMte2Id, intraPartialOVToMte2Id, reduceMte2ToVId);
+                                                                         sinkUb, reduceMaxSumVToMte2Id, intraPartialOVToMte2Id, reduceMte2ToVId);
 
         AttentionCommon::StageBroadcastMaxSum(intraLayout, intraCoreCombineBase, intraWorkspaceIdx,
                                               stagingMOffset + startRow, dealRowCount, lseBroadcastUb, sumBroadcastUb,
@@ -1678,20 +1680,35 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessFlashDecode(FdRunInfo 
             dealRowCount = fdRunInfo.mNum - startRow;
         }
         WaitFlag<HardEvent::MTE3_V>(fdMte3ToVId);
-        AttentionCommon::ReduceWithLse<T, dTemplateAlign64>(stagingLayout, fdStagingBase,
-                                                            fdRunInfo.workspaceIdx, fdRunInfo.workspaceNum,
-                                                            static_cast<int64_t>(fdRunInfo.mStartIdx) + startRow, dealRowCount,
-                                                            static_cast<int64_t>(constInfo.dSizeV),
-                                                            accumulatedO, lseExpUb, blockMaxUb, blockSumUb, partialOFp32,
-                                                            constInfo.isSoftmaxLseEnable, softmaxLseGm, softmaxLseOffset + startRow,
-                                                            fdVToMte2Id[0], fdVToMte2Id[1], fdMte2ToVId,
-                                                            vToMte3LseOutId, mte3ToVLseOutId);
+        if constexpr (IS_BATCH_CONSISTENCY) {
+            WaitFlag<HardEvent::MTE3_MTE2>(fdMte3ToMte2Id);
+            AttentionCommon::ReducePairwiseWithLse<T, dTemplateAlign64>(stagingLayout, fdStagingBase,
+                                                                        fdRunInfo.workspaceIdx, fdRunInfo.workspaceNum,
+                                                                        static_cast<int64_t>(fdRunInfo.mStartIdx) + startRow, dealRowCount,
+                                                                        static_cast<int64_t>(constInfo.dSizeV),
+                                                                        accumulatedO, lseExpUb, blockMaxUb, blockSumUb, partialOFp32,
+                                                                        constInfo.isSoftmaxLseEnable, softmaxLseGm, softmaxLseOffset + startRow,
+                                                                        fdVToMte2Id[0], fdVToMte2Id[1], fdMte2ToVId,
+                                                                        vToMte3LseOutId, mte3ToVLseOutId);
+        } else {
+            AttentionCommon::ReduceWithLse<T, dTemplateAlign64>(stagingLayout, fdStagingBase,
+                                                                fdRunInfo.workspaceIdx, fdRunInfo.workspaceNum,
+                                                                static_cast<int64_t>(fdRunInfo.mStartIdx) + startRow, dealRowCount,
+                                                                static_cast<int64_t>(constInfo.dSizeV),
+                                                                accumulatedO, lseExpUb, blockMaxUb, blockSumUb, partialOFp32,
+                                                                constInfo.isSoftmaxLseEnable, softmaxLseGm, softmaxLseOffset + startRow,
+                                                                fdVToMte2Id[0], fdVToMte2Id[1], fdMte2ToVId,
+                                                                vToMte3LseOutId, mte3ToVLseOutId);
+        }
 
         RunInfo runInfo;
         runInfo.vec2MRealSize = dealRowCount;
         runInfo.attentionOutOffset = attentionOutOffset + startRow * attentionOutRowStride;
         int64_t vec2CalcSize = dealRowCount * dTemplateAlign64;
         this->CopyOutAttentionOut(runInfo, constInfo, accumulatedO, 0, vec2CalcSize);
+        if constexpr (IS_BATCH_CONSISTENCY) {
+            SetFlag<HardEvent::MTE3_MTE2>(fdMte3ToMte2Id);
+        }
         SetFlag<HardEvent::MTE3_V>(fdMte3ToVId);
         startRow += dealRowCount;
     }
@@ -2309,6 +2326,10 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe *pipe, 
     SetFlag<HardEvent::V_MTE2>(fdVToMte2Id[0]);
     SetFlag<HardEvent::V_MTE2>(fdVToMte2Id[1]);
     SetFlag<HardEvent::MTE3_V>(fdMte3ToVId);
+    if constexpr (IS_BATCH_CONSISTENCY) {
+        fdMte3ToMte2Id = GetTPipePtr()->AllocEventID<HardEvent::MTE3_MTE2>();
+        SetFlag<HardEvent::MTE3_MTE2>(fdMte3ToMte2Id);
+    }
 
     if (this->isSinks) {
         InitSinksBuffer(constInfo);
