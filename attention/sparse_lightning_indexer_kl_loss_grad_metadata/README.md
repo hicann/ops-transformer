@@ -175,7 +175,7 @@
   - layout_q=BSND场景
     - max_seqlen_q必须传入S1的值。
   - layout_q=TND场景
-    - cu_seqlens_q必需传入。
+    - cu_seqlens_q必须传入。
   - Batch取值规则
     - layout_q为BSND时，优先通过seqused_q的shape推导batch，seqused_q未传入则通过batch_size获取batch数。
     - layout_q为TND时，优先通过seqused_q的shape推导batch，seqused_q未传入则通过cu_seqlens_q的shape推导batch。

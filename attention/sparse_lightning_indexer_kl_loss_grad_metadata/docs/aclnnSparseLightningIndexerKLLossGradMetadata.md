@@ -391,7 +391,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
     - layoutQOptional=BSND场景
       - maxSeqlenQ必须传入S1的值。
     - layoutQOptional=TND场景
-      - cuSeqlensQOptional必需传入。
+      - cuSeqlensQOptional必须传入。
   <!-- end id10 -->
   <!-- npu="A3" id11 -->
   - Atlas A3 训练系列产品/Atlas A3 推理系列产品约束：
@@ -444,10 +444,6 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
 
   <!-- npu="950" id13 -->
   - Ascend 950PR/Ascend 950DT约束：
-      - layoutQOptional=BSND场景
-        - maxSeqlenQ必须传入S1的值。
-      - layoutQOptional=TND场景
-        - cuSeqlensQOptional必须传入。
       - Batch取值规则
         - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batch_size获取batch数。
         - layoutQOptional为TND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过cuSeqlensQOptional的shape推导batch。
