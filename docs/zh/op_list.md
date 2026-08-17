@@ -248,6 +248,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/lightning_indexer_kl_loss/README.md">lightning_indexer_kl_loss</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算Lightning Indexer中teacher分布与student分布之间的KL散度损失。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/lightning_indexer_v2/README.md">lightning_indexer_v2</a></td>
     <td>✓</td>
     <td>✓</td>

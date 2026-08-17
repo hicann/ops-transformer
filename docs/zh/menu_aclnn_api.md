@@ -106,6 +106,7 @@
 - [aclnnKvRmsNormRopeCacheV2](../../posembedding/kv_rms_norm_rope_cache/docs/aclnnKvRmsNormRopeCacheV2.md)
 - [aclnnLightningIndexer](../../attention/lightning_indexer/docs/aclnnLightningIndexer.md)
 - [aclnnLightningIndexerGrad](../../attention/lightning_indexer_grad/docs/aclnnLightningIndexerGrad.md)
+- [aclnnLightningIndexerKLLoss](../../attention/lightning_indexer_kl_loss/docs/aclnnLightningIndexerKLLoss.md)
 - [aclnnLightningIndexerV2](../../attention/lightning_indexer_v2/docs/aclnnLightningIndexerV2.md)
 - [aclnnLightningIndexerV2Metadata](../../attention/lightning_indexer_v2_metadata/docs/aclnnLightningIndexerV2Metadata.md)
 - [aclnnMaskedCausalConv1d](../../attention/masked_causal_conv1d/docs/aclnnMaskedCausalConv1d.md)
