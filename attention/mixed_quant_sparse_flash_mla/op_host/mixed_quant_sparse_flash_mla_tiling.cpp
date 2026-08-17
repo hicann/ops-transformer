@@ -18,6 +18,7 @@
 #include "../../sparse_flash_mla/op_host/checkers/checker_adapter.h"
 #include "../op_kernel/mixed_quant_sparse_flash_mla_template_tiling_key.h"
 #include "mixed_quant_sparse_flash_mla_tiling.h"
+#include <algorithm>
 
 using namespace ge;
 using namespace AscendC;
@@ -647,18 +648,57 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo *til
     constexpr uint32_t TRIPLE_BUFFER_NUM = 3;
     constexpr uint32_t S2_BASE_SIZE = 128; // S2轴基本块大小
     constexpr uint32_t D_SIZE = 512;
-    constexpr uint32_t VEC_RES_ELEM_SIZE = 2;     // 2: fp16/bf16字节数
-    constexpr uint32_t TOPK_MAX_SIZE = 2048;      // TopK选取个数
+    constexpr uint32_t VEC_RES_ELEM_SIZE = 2; // 2: fp16/bf16字节数
+    constexpr uint32_t TOPK_MAX_SIZE = 2048;  // TopK选取个数
+    constexpr uint32_t UB_SIZE = 248 * 1024;
+    constexpr uint32_t SPARSE_BLOCK_ALIGN_NUM = 128;
+    constexpr int64_t QUANT_CONTIGUOUS_MODE = 1;
     constexpr uint32_t MAX_S2_SPLIT_NUM = 2;      // 每核最多S2切分次数
     constexpr uint32_t FLOAT_ELEM_SIZE = 4;       // sizeof(float)
     constexpr uint32_t FD_BLOCK_ELEM = 8;         // FD广播份数
     constexpr uint32_t FD_MAX_SUM_REGION_NUM = 2; // max和sum两个区域
     constexpr uint32_t BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM = 33;
+    uint32_t alignedOriSparseBlockCount = (tilingInfo->oriSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) /
+                                          SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
+    uint32_t alignedCmpSparseBlockCount = (tilingInfo->cmpSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) /
+                                          SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
+    uint64_t oriUbSize = static_cast<uint64_t>(tilingInfo->oriMaxBlockNumPerBatch) * sizeof(int32_t) +
+                         static_cast<uint64_t>(alignedOriSparseBlockCount) * (sizeof(int32_t) + sizeof(int64_t));
+    uint64_t cmpUbSize = static_cast<uint64_t>(tilingInfo->cmpMaxBlockNumPerBatch) * sizeof(int32_t) +
+                         static_cast<uint64_t>(alignedCmpSparseBlockCount) * (sizeof(int32_t) + sizeof(int64_t));
+    bool oriBlockSizePowerOfTwo = tilingInfo->oriBlockSize > 0 &&
+                                  (tilingInfo->oriBlockSize & (tilingInfo->oriBlockSize - 1)) == 0;
+    bool cmpBlockSizePowerOfTwo = tilingInfo->cmpBlockSize > 0 &&
+                                  (tilingInfo->cmpBlockSize & (tilingInfo->cmpBlockSize - 1)) == 0;
+    bool blockSizeSupported =
+        (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE && cmpBlockSizePowerOfTwo) ||
+        (perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE && oriBlockSizePowerOfTwo) ||
+        (perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE &&
+         oriBlockSizePowerOfTwo && cmpBlockSizePowerOfTwo);
+    uint64_t vectorizeUbSize = (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE) ? cmpUbSize :
+                                                                                     ((perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) ? oriUbSize : std::max(oriUbSize, cmpUbSize));
+    uint32_t vectorizeFlag = static_cast<uint32_t>(
+        (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
+         perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+         perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
+        tilingInfo->quantMode == QUANT_CONTIGUOUS_MODE &&
+        tilingInfo->kvLayout == MQSMLALayout::PA_BBND && blockSizeSupported && vectorizeUbSize <= UB_SIZE);
+
     size_t workspaceSize = static_cast<size_t>(ascendcPlatform.GetLibApiWorkSpaceSize());
     bool isSplitG = tilingInfo->gSize > 64; // gSize超过64时采用Split-G
-    if (isSplitG) {
-        workspaceSize += static_cast<size_t>(S2_BASE_SIZE) * D_SIZE * VEC_RES_ELEM_SIZE *
-                         TRIPLE_BUFFER_NUM * (aicNum >> 1);
+    workspaceSize += static_cast<size_t>(S2_BASE_SIZE) * D_SIZE * VEC_RES_ELEM_SIZE * TRIPLE_BUFFER_NUM *
+                     (isSplitG ? (aicNum >> 1) : aicNum);
+    if (vectorizeFlag != 0) {
+        uint64_t totalBS1 = (tilingInfo->qLayout == MQSMLALayout::TND) ? tilingInfo->s1Size :
+                                                                         static_cast<uint64_t>(tilingInfo->bSize) * tilingInfo->s1Size;
+        if (perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+            perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
+            workspaceSize += totalBS1 * alignedOriSparseBlockCount * sizeof(int64_t);
+        }
+        if (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
+            perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
+            workspaceSize += totalBS1 * alignedCmpSparseBlockCount * sizeof(int64_t);
+        }
     }
     uint32_t fdStagingMSize = tilingInfo->gSize;
     uint32_t fdStagingSlotNum = isSplitG ? (aicNum >> 1) : aicNum;
@@ -706,6 +746,7 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo *til
     tilingData_.baseParams.set_dSize(tilingInfo->dSize);
     tilingData_.baseParams.set_dSizeVInput(tilingInfo->dSizeVInput);
     tilingData_.baseParams.set_returnSoftmaxLse(tilingInfo->returnSoftmaxLse);
+    tilingData_.baseParams.set_useVecS2PhyAddr(vectorizeFlag);
 
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());

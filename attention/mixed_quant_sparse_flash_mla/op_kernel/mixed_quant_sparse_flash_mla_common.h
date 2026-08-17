@@ -16,7 +16,12 @@
 #ifndef MIXED_QUANT_SPARSE_FLASH_MLA_COMMON_H
 #define MIXED_QUANT_SPARSE_FLASH_MLA_COMMON_H
 
+#if ASC_DEVKIT_MAJOR >= 9
+#include "kernel_vec_intf.h"
+#include "kernel_cube_intf.h"
+#else
 #include "kernel_operator.h"
+#endif
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
 #include "mixed_quant_sparse_flash_mla_metadata.h"
