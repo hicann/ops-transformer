@@ -350,7 +350,6 @@ def _mxfp8_assemble_case(
         "layout_sparse_indices": layout_sparse_indices,
         "layout_out": layout_out,
         "kv_cache_layout": "BnNBsD",
-        "is_contiguous": True,
         "p_scale_value": (None if p_scale_value is None else float(p_scale_value)),
         "softmax_scale": float(softmax_scale),
         "return_softmax_lse": bool(return_softmax_lse),
@@ -465,7 +464,10 @@ def _mxfp8_customize_inputs(
         )
     _inplace_copy(sparse_indices, data["sparse_indices"])
     _inplace_copy(sparse_seq_len, data["sparse_seq_len"])
-    if atten_mask is not None and _numel(atten_mask) > 0:
+    # mask_mode=0 does not consume atten_mask.  TTK may intentionally allocate
+    # an arbitrary-rank/shape uint8 tensor to cover the ignored-input contract,
+    # so only materialize the fixed causal mask for mask_mode=3.
+    if int(mask_mode) == 3 and atten_mask is not None and _numel(atten_mask) > 0:
         _inplace_copy(atten_mask, data["atten_mask"])
 
     cache = getattr(module, "_TTK_MXFP8_CACHE", {})
