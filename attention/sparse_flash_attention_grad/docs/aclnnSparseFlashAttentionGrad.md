@@ -656,7 +656,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         </tr>
         <tr>
             <td>S1、S2</td>
-            <td>1~128K</td>
+            <td>S1支持1~128K，S2支持1~1M</td>
             <td>S1、S2支持不等长</td>
         </tr>
         <tr>
