@@ -33,22 +33,22 @@ struct MlaPrologBaseParams {
     uint32_t headSizeCq;         // head size of Latent Query 1536（潜在Query的头维度）
     uint32_t headSizeCkv;        // head size of Latent KeyValue 512（潜在KeyValue的头维度）
     uint32_t headSizeQc;         // head size of Query = dimHeadSizeQc * numHeadSize = 128 * 32（Query总头维度）
-    uint32_t headSizeQr;         // head size of Query Rope = dimHeadRope * numHeadSize = 64 * 32（带RoPE的Query头维度）
-    uint32_t headSizeKr;         // head size of Key Rope 64（带RoPE的Key头维度）
-    uint32_t numHeadSize;        // number of head 32（头数量）
-    uint32_t numHeadKvSize;      // number of headkv（KeyValue的头数量）
-    uint32_t dimHeadSizeQc;      // dim size per query head 128（单个Query头的维度）
-    uint32_t dimHeadRope;        // dim size per rope head 64（单个带RoPE头的维度）
-    uint32_t blockNum;           // pa block num（PA格式的块数量）
-    uint32_t blockSize;          // pa block size 128（PA格式的块大小）
-    uint32_t mm1BlockNum;        // 24  Cq（矩阵乘1的块数量，对应Cq计算）
-    uint32_t mm2BlockNum;        // 9   Ckv（矩阵乘2的块数量，对应Ckv计算）
-    uint32_t mm3BlockNum;        // 24  QcQr（矩阵乘3的块数量，对应QcQr计算）
-    uint32_t mm4BlockNum;        // 24  Qn（矩阵乘4的块数量，对应Qn计算）
-    uint32_t vectorBlockNum;     // 32（向量计算的块数量）
-    uint32_t mm1SingleCoreN;     // single headSizeCq（单核心矩阵乘1的N维度大小，对应单个Cq头维度）
-    uint32_t mm2SingleCoreN;     // single headSizeCkv+headSizeKr（单核心矩阵乘2的N维度大小，Ckv+Kr头维度之和）
-    uint32_t mm3SingleCoreN;     // single headSizeQc+headSizeQr（单核心矩阵乘3的N维度大小，Qc+Qr头维度之和）
+    uint32_t headSizeQr;  // head size of Query Rope = dimHeadRope * numHeadSize = 64 * 32（带RoPE的Query头维度）
+    uint32_t headSizeKr;  // head size of Key Rope 64（带RoPE的Key头维度）
+    uint32_t numHeadSize; // number of head 32（头数量）
+    uint32_t numHeadKvSize;  // number of headkv（KeyValue的头数量）
+    uint32_t dimHeadSizeQc;  // dim size per query head 128（单个Query头的维度）
+    uint32_t dimHeadRope;    // dim size per rope head 64（单个带RoPE头的维度）
+    uint32_t blockNum;       // pa block num（PA格式的块数量）
+    uint32_t blockSize;      // pa block size 128（PA格式的块大小）
+    uint32_t mm1BlockNum;    // 24  Cq（矩阵乘1的块数量，对应Cq计算）
+    uint32_t mm2BlockNum;    // 9   Ckv（矩阵乘2的块数量，对应Ckv计算）
+    uint32_t mm3BlockNum;    // 24  QcQr（矩阵乘3的块数量，对应QcQr计算）
+    uint32_t mm4BlockNum;    // 24  Qn（矩阵乘4的块数量，对应Qn计算）
+    uint32_t vectorBlockNum; // 32（向量计算的块数量）
+    uint32_t mm1SingleCoreN; // single headSizeCq（单核心矩阵乘1的N维度大小，对应单个Cq头维度）
+    uint32_t mm2SingleCoreN; // single headSizeCkv+headSizeKr（单核心矩阵乘2的N维度大小，Ckv+Kr头维度之和）
+    uint32_t mm3SingleCoreN; // single headSizeQc+headSizeQr（单核心矩阵乘3的N维度大小，Qc+Qr头维度之和）
     uint32_t mm4SingleCoreBatch; // single numHeadSize（单核心矩阵乘4的批大小，对应单个头数量）
     uint32_t dtileSize;
     uint32_t kvQuantMode;
@@ -65,6 +65,8 @@ struct MlaPrologBaseParams {
     float kcScale;              // kv 的尺度矫正因子
     uint16_t isQcQrScaleEnable; // query 的尺度矫正因子是否生效（默认是1.0的时候不生效）
     uint16_t isKcScaleEnable;   // kv 的尺度矫正因子是否生效（默认是1.0的时候不生效）
+    uint64_t kvCacheStride0;    // kv cache first-axis stride in elements
+    uint64_t krCacheStride0;    // kr cache first-axis stride in elements
 };
 
 // 2. 完整分块数据结构体（对应 MlaPrologTilingData 宏定义，嵌套基础参数）
