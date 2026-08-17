@@ -315,7 +315,7 @@ stages:
               bucket: "ascend-ci"
               access-key: ${{ secrets.AK }}
               secret-key: ${{ secrets.SK }}
-              artifact-path: "${{ steps.process_checkout.outputs.path }}/slog.tar.gz"
+              artifact-path: "${{ steps.process_checkout.outputs.path }}/slog*.tar.gz"
               object-prefix: ${{ env.obs_smoke_path }}/plog/
         if: env.TARGET_BRANCH == 'master'
         runs-on: ['self-hosted','npu=2','smoke=204']
