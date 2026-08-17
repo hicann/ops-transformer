@@ -201,10 +201,10 @@ aclnnStatus CheckSingleParamSmla(int64_t batchSize, int64_t maxSeqlenQ, int64_t 
                                                   "greater than or equal to 0");
             return ACLNN_ERR_PARAM_INVALID;
         }
-        if (!(socVersion != nullptr && strstr(socVersion, "Ascend950") != nullptr) && oriTopk != 0) {
+        if (!(socVersion != nullptr && strstr(socVersion, "Ascend950") != nullptr) && oriTopk != 0 && hasCmpKv) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLA_ACLNN_OP_NAME, "ori_topk", std::to_string(oriTopk),
                                                   "ori_topk is reserved and "
-                                                  "the value of ori_topk must be 0");
+                                                  "the value of ori_topk must be 0 when has_cmp_kv is true");
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (socVersion != nullptr && strstr(socVersion, "Ascend950") != nullptr) {
@@ -228,18 +228,34 @@ aclnnStatus CheckSingleParamSmla(int64_t batchSize, int64_t maxSeqlenQ, int64_t 
                 return ACLNN_ERR_PARAM_INVALID;
             }
         } else {
-            if (oriMaskMode != static_cast<int64_t>(SparseModeSmla::BAND)) {
-                OP_LOGE_FOR_INVALID_VALUE(SMLA_ACLNN_OP_NAME, "ori_mask_mode", std::to_string(oriMaskMode),
-                                          "4");
-                return ACLNN_ERR_PARAM_INVALID;
-            }
-            if (oriWinLeft != 127 || oriWinRight != 0) {
-                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(SMLA_ACLNN_OP_NAME, "ori_win_left and ori_win_right",
-                                                       std::to_string(oriWinLeft) + " and " +
-                                                           std::to_string(oriWinRight),
-                                                       "When has_ori_kv is true, the value of ori_win_left "
-                                                       "must be 127 and the value of ori_win_right must be 0");
-                return ACLNN_ERR_PARAM_INVALID;
+            if (oriTopk != 0) {
+                if (oriMaskMode != static_cast<int64_t>(SparseModeSmla::DEFAULT_MASK)) {
+                    OP_LOGE_FOR_INVALID_VALUE(SMLA_ACLNN_OP_NAME, "ori_mask_mode", std::to_string(oriMaskMode),
+                                              "0");
+                    return ACLNN_ERR_PARAM_INVALID;
+                }
+                if (oriWinLeft < 0 || oriWinRight < 0) {
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(SMLA_ACLNN_OP_NAME, "ori_win_left, ori_win_right",
+                                                           std::to_string(oriWinLeft) + ", " +
+                                                               std::to_string(oriWinRight),
+                                                           "When has_ori_kv is true and ori_topk is non-zero (DSpark), "
+                                                           "ori_win_left and ori_win_right must be non-negative");
+                    return ACLNN_ERR_PARAM_INVALID;
+                }
+            } else {
+                if (oriMaskMode != static_cast<int64_t>(SparseModeSmla::BAND)) {
+                    OP_LOGE_FOR_INVALID_VALUE(SMLA_ACLNN_OP_NAME, "ori_mask_mode", std::to_string(oriMaskMode),
+                                              "4");
+                    return ACLNN_ERR_PARAM_INVALID;
+                }
+                if (oriWinLeft != 127 || oriWinRight != 0) {
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(SMLA_ACLNN_OP_NAME, "ori_win_left and ori_win_right",
+                                                           std::to_string(oriWinLeft) + " and " +
+                                                               std::to_string(oriWinRight),
+                                                           "When has_ori_kv is true, the value of ori_win_left "
+                                                           "must be 127 and the value of ori_win_right must be 0");
+                    return ACLNN_ERR_PARAM_INVALID;
+                }
             }
         }
     }
@@ -632,8 +648,7 @@ aclnnStatus CheckConsistencySmla(const aclTensor *cuSeqlensQOptional, const aclT
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     int64_t dimNum = -1;
     if (!(socVersion != nullptr && strstr(socVersion, "Ascend950") != nullptr)) {
-        if (CheckReservedOptionalTensorSmla(oriTopkLengthOptional, "ori_topk_length") != ACLNN_SUCCESS ||
-            CheckReservedOptionalTensorSmla(cmpTopkLengthOptional, "cmp_topk_length") != ACLNN_SUCCESS) {
+        if (CheckReservedOptionalTensorSmla(cmpTopkLengthOptional, "cmp_topk_length") != ACLNN_SUCCESS) {
             return ACLNN_ERR_PARAM_INVALID;
         }
     }

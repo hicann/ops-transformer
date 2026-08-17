@@ -172,6 +172,8 @@ TILING_DATA_FIELD_DEF(uint32_t, actualLenDimsCmpKV)
 TILING_DATA_FIELD_DEF(uint32_t, cmpResidualKVSize)
 TILING_DATA_FIELD_DEF(uint32_t, kvHeadNum)
 TILING_DATA_FIELD_DEF(uint32_t, oriKeyStride0) // A5
+TILING_DATA_FIELD_DEF(uint32_t, hasOriSparseIndices)
+TILING_DATA_FIELD_DEF(uint32_t, oriSparseIndexWidth)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(SparseFlashMlaSwaParamsOp, SparseFlashMlaSwaParams)
 
@@ -278,6 +280,8 @@ public:
     int64_t oriSparseBlockCount = 0;
     int64_t cmpSparseBlockCount = 0;
     int64_t sparseBlockCount = 0; // A2/A3
+    bool hasOriSparseIndices = false;
+    uint32_t oriSparseIndexWidth = 0;
 
     int64_t topkValueMode = 0;
     // Mask
@@ -421,6 +425,8 @@ private:
     uint32_t sparseBlockCount_ = 0;    // A2/A3
     int64_t oriWinLeft_ = 0;
     int64_t oriWinRight_ = 0;
+    bool hasOriSparseIndices_ = false;
+    uint32_t oriSparseIndexWidth_ = 0;
 
     int64_t topkValueMode_;
 
@@ -540,6 +546,8 @@ public:
     int64_t sparseBlockCount_ = 0;    // A2/A3
     int64_t oriWinLeft_ = 0;
     int64_t oriWinRight_ = 0;
+    bool hasOriSparseIndices_ = false;
+    uint32_t oriSparseIndexWidth_ = 0;
     int64_t topkValueMode_ = 0;
     uint32_t maxActualseq_ = 0;
     bool isSameSeqAllKVTensor_ = true;

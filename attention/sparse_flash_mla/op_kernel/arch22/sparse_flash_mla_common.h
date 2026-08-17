@@ -89,8 +89,8 @@ __aicore__ inline size_t BlockAlign(size_t s)
 
 struct PAShape {
     uint32_t blockSize;
-    uint32_t headNum;             // 一般为kv的head num，对应n2
-    uint32_t headDim;             // 512 对应d
+    uint32_t headNum; // 一般为kv的head num，对应n2
+    uint32_t headDim; // 512 对应d
     uint32_t kvStride;
     uint32_t maxblockNumPerBatch; // block table 每一行的最大个数
     uint32_t actHeadDim;          // 实际拷贝col大小,考虑到N切块   s*d, 对应d
@@ -176,6 +176,37 @@ __aicore__ inline void DataCopyPA(LocalTensor<T> &dstTensor,  // l1
     }
 }
 
+template <typename T>
+__aicore__ inline void DataCopyPABySlots(LocalTensor<T> &dstTensor,
+                                         GlobalTensor<T> &srcTensor,
+                                         GlobalTensor<int32_t> &blockTableGm,
+                                         GlobalTensor<int32_t> &sparseIndicesGm,
+                                         const PAShape &shape,
+                                         const Position &startPos,
+                                         uint64_t sparseIndexBaseOffset,
+                                         uint32_t sparseIndexStart)
+{
+    uint32_t blockElementCnt = 32 / sizeof(T);
+    uint64_t blockTableBaseOffset = startPos.bIdx * shape.maxblockNumPerBatch;
+    for (uint32_t row = 0; row < shape.copyRowNum; ++row) {
+        int32_t logicalIdx = sparseIndicesGm.GetValue(sparseIndexBaseOffset + sparseIndexStart + row);
+        if (logicalIdx < 0) {
+            continue;
+        }
+        uint64_t blockTableIdx = static_cast<uint64_t>(logicalIdx) / shape.blockSize;
+        uint64_t inBlockIdx = static_cast<uint64_t>(logicalIdx) % shape.blockSize;
+        uint64_t idInBlockTable = blockTableGm.GetValue(blockTableBaseOffset + blockTableIdx);
+        uint64_t offset = idInBlockTable * shape.kvStride;
+        offset += static_cast<uint64_t>(startPos.n2Idx * shape.headDim * shape.blockSize) +
+                  inBlockIdx * shape.headDim + startPos.dIdx;
+
+        LocalTensor<T> tmpDstTensor = dstTensor[row * blockElementCnt];
+        GlobalTensor<T> tmpSrcTensor = srcTensor[offset];
+        DataCopyGmNDToL1<T>(tmpDstTensor, tmpSrcTensor, 1, shape.copyRowNumAlign,
+                            shape.actHeadDim, shape.headDim);
+    }
+}
+
 struct RunInfo {
     uint32_t loop = 0;
     uint32_t cmpLoop = 0; // 用于判断取 用于merge的4块GM 中的哪一块
@@ -193,6 +224,7 @@ struct RunInfo {
     uint64_t tensorAOffset = 0;
     uint64_t tensorBOffset = 0;
     uint64_t attenOutOffset = 0;
+    uint64_t qTokenOffset = 0;
     uint64_t attenMaskOffset = 0;
     uint64_t topKBaseOffset = 0;
     uint32_t actualSingleProcessSInnerSize = 0;
@@ -269,6 +301,7 @@ struct ConstInfo {
     uint32_t mmResUbSize = 0U;   // Matmul1输出结果GM上的大小
     uint32_t vec1ResUbSize = 0U; // Vector1输出结果GM上的大小
     uint32_t bmm2ResUbSize = 0U; // Matmul2输出结果GM上的大小
+    uint32_t usedCoreNum = 0U;
     uint64_t batchSize = 0ULL;
     uint64_t gSize = 0ULL;
     uint64_t qHeadNum = 0ULL;
@@ -284,7 +317,7 @@ struct ConstInfo {
     uint32_t oriMaxBlockNumPerBatch = 0; // PA场景的最大单batch block number
     uint32_t cmpMaxBlockNumPerBatch = 0;
     uint32_t splitKVNum = 0U; // S2核间切分的切分份数
-    SMLA_LAYOUT outputLayout;  // 输出的Transpose格式
+    SMLA_LAYOUT outputLayout; // 输出的Transpose格式
     uint32_t oriMaskMode = 0;
     uint32_t cmpMaskMode = 0;
     uint64_t oriKvStride0 = 0;
@@ -321,6 +354,9 @@ struct ConstInfo {
     // sparse attr
     int64_t sparseBlockSize = 0;
     uint32_t sparseBlockCount = 0;
+    bool hasOriSparseIndices = false;
+    bool hasOriTopkLength = false;
+    uint32_t oriSparseIndexWidth = 0;
 
     // cmp attr
     int64_t cmpRatio = 0;
