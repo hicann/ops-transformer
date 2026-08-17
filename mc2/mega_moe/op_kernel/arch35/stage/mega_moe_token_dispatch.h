@@ -24,6 +24,9 @@ struct TokenDispatchConfig {
     BlockJobContext blockJob;
     BlockWorkspaceContext countWorkspace;
     uint64_t maxOutputSize;
+    // 全卡一致的单卡 token 数上界, 决定远端 mask 的扫描宽度(上界*topK);
+    // common.tokenNum 保持本卡真实 bs, 两者在可变 bs 下不可混用。
+    uint64_t numMaxTokensPerRank;
     MegaMoeDispatchBufferConfig bufferConfig;
     uint32_t maskAlignSize;
     uint64_t quantWinOffset;
@@ -295,7 +298,7 @@ __aicore__ inline void DispatchRankTokens(
         int32_t validRouteCount = bufferConfig.routeItemsPerBatch;
         int32_t maskSliceBytes = bufferConfig.routeItemsPerBatch / 8;
         if (isLastBatch) {
-            uint64_t sendTotalNum = static_cast<uint64_t>(context.common.tokenNum) * context.common.topK;
+            uint64_t sendTotalNum = context.numMaxTokensPerRank * context.common.topK;
             validRouteCount = static_cast<int32_t>(sendTotalNum - static_cast<uint64_t>(batchRouteBegin));
             if (batchRouteBegin / 8 + maskSliceBytes > static_cast<int32_t>(context.maskAlignSize)) {
                 maskSliceBytes = static_cast<int32_t>(context.maskAlignSize) - batchRouteBegin / 8;

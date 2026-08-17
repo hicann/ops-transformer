@@ -43,12 +43,20 @@ __aicore__ inline void GatherAndSendExpertMaskBatch(
     uint32_t maskSlotSize = config.maskAlignSize + static_cast<uint32_t>(ALIGN_32);
     int32_t batchStart = batchIdx * bufferConfig.routeItemsPerBatch;
     bool isLastBatch = batchIdx == bufferConfig.routeBatchCount - 1;
+    // 批网格按全卡一致的上界(numMaxTokensPerRank*topK)划分, 本卡真实路由数是 tokenNum*topK,
+    // 可能小于网格覆盖量, 装载长度逐批夹紧, 避免越界读本卡 topkIds。
+    // validLen 之后的 UB 残留数据经 CompareScalar 可能产生无效 mask 位; 这些位排在有效位之后,
+    // 且 GatherMask 只统计 validLen 内的匹配, 槽尾 count 不含无效位, 接收端按 count 做序数
+    // 夹紧时会跳过它们(见 token_dispatch.h DispatchExpertTokens), 因此不需要额外清零。
+    int32_t realSendTotalNum = static_cast<int32_t>(common.tokenNum * common.topK);
+    int32_t realRemain = realSendTotalNum - batchStart;
     int32_t validLen = bufferConfig.routeItemsPerBatch;
+    if (realRemain < validLen) {
+        validLen = realRemain > 0 ? realRemain : 0;
+    }
     int32_t sliceBytes = bufferConfig.routeItemsPerBatch / 8;
     int32_t pushBytes = sliceBytes;
     if (isLastBatch) {
-        uint64_t sendTotalNum = static_cast<uint64_t>(common.tokenNum) * common.topK;
-        validLen = static_cast<int32_t>(sendTotalNum - static_cast<uint64_t>(batchStart));
         if (batchStart / 8 + sliceBytes > static_cast<int32_t>(config.maskAlignSize)) {
             sliceBytes = static_cast<int32_t>(config.maskAlignSize) - batchStart / 8;
         }
@@ -56,9 +64,11 @@ __aicore__ inline void GatherAndSendExpertMaskBatch(
     }
 
     SyncFuncStatic<AscendC::HardEvent::V_MTE2, SYNC_EVENT_ID1>();
-    DataCopyExtParams loadParams{1U, static_cast<uint32_t>(validLen * sizeof(int32_t)), 0U, 0U, 0U};
-    DataCopyPadExtParams<int32_t> loadPad{false, 0U, 0U, 0U};
-    DataCopyPad(scratch.topkIdsTensor, topkIdsGm[batchStart], loadParams, loadPad);
+    if (validLen > 0) {
+        DataCopyExtParams loadParams{1U, static_cast<uint32_t>(validLen * sizeof(int32_t)), 0U, 0U, 0U};
+        DataCopyPadExtParams<int32_t> loadPad{false, 0U, 0U, 0U};
+        DataCopyPad(scratch.topkIdsTensor, topkIdsGm[batchStart], loadParams, loadPad);
+    }
     SyncFuncStatic<AscendC::HardEvent::MTE2_V, SYNC_EVENT_ID1>();
 
     int32_t jobIndex = static_cast<int32_t>(job.jobIndex);
@@ -76,8 +86,11 @@ __aicore__ inline void GatherAndSendExpertMaskBatch(
         CompareScalar(maskBuf, scratch.topkIdsTensor, globalExpertId, AscendC::CMPMODE::EQ,
                       bufferConfig.routeItemsPerBatch);
         uint64_t batchMatchedRouteCount = 0;
-        GatherMask(scratch.sendGatherOutTensor, scratch.topkIdsTensor, maskBufU32, true,
-                   static_cast<uint32_t>(validLen), {1, 1, 0, 0}, batchMatchedRouteCount);
+        // validLen==0 表示本批全在真实路由之外(上界网格的富余批), 没有匹配计数, 仍推送全 0 mask(末批带 count)
+        if (validLen > 0) {
+            GatherMask(scratch.sendGatherOutTensor, scratch.topkIdsTensor, maskBufU32, true,
+                       static_cast<uint32_t>(validLen), {1, 1, 0, 0}, batchMatchedRouteCount);
+        }
         SyncFuncStatic<AscendC::HardEvent::V_S, SYNC_EVENT_ID2>();
 
         int32_t expertMatchedRouteCount =

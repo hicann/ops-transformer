@@ -201,8 +201,10 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitInputPrepareConfigs
         .quantTokenScaleAlignBytes = quantTokenScaleAlignBytes,
         .quantScaleNumAlignPerToken = quantScaleNumAlignPerToken};
 
+    // mask 槽几何是跨卡共用的布局, 各卡必须一致, 按上界 numMaxTokensPerRank 计算(attr=0 时上界=bs);
+    // 本卡真实路由数用 common.tokenNum(=bs) 推导, 发送装载在 stage/send_mask 里逐批夹紧。
     int32_t compareCount =
-        Ops::Base::CeilAlign(static_cast<int64_t>(params_.tilingData->bs) *
+        Ops::Base::CeilAlign(static_cast<int64_t>(params_.tilingData->numMaxTokensPerRank) *
                                  static_cast<int64_t>(params_.tilingData->topK) *
                                  static_cast<int64_t>(sizeof(int32_t)),
                              static_cast<int64_t>(ALIGN_256)) /
@@ -243,6 +245,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitTokenDispatchConfig
         .blockJob = {.jobIndex = blockIdx_, .totalJobs = blockNum_},
         .countWorkspace = {.blockIdx = blockIdx_, .blockNum = params_.tilingData->aicNum},
         .maxOutputSize = params_.tilingData->maxOutputSize,
+        .numMaxTokensPerRank = params_.tilingData->numMaxTokensPerRank,
         .bufferConfig = params_.tilingData->dispatchBufferConfig,
         .maskAlignSize = sendMaskConfig_.maskAlignSize,
         .quantWinOffset = quantWinOffset,

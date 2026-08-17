@@ -26,7 +26,8 @@
 namespace ops {
 class MegaMoe : public OpDef {
 public:
-    explicit MegaMoe(const char *name) : OpDef(name)
+    explicit MegaMoe(const char *name)
+        : OpDef(name)
     {
         this->Input("context")
             .ParamType(REQUIRED)

@@ -57,7 +57,9 @@ struct PeermemInfo {
         rankSyncInWorldPtr = base;
         int64_t offset = PEERMEM_DATA_OFFSET;
         maskRecvPtr = base + offset;
-        int64_t sendTotalNum = static_cast<int64_t>(tilingData->bs) * tilingData->topK;
+        // 窗口各区尺寸一律按全卡一致的 numMaxTokensPerRank 上界开设(可变 bs 下各卡真实 bs 可不同,
+        // 但跨卡读写共用同一套偏移, 布局必须逐字节一致); attr=0 时上界=bs, 与原布局逐位等价。
+        int64_t sendTotalNum = static_cast<int64_t>(tilingData->numMaxTokensPerRank) * tilingData->topK;
         int64_t compareCount = Ops::Base::CeilAlign(sendTotalNum * static_cast<int64_t>(sizeof(int32_t)), ALIGN_256) /
                                static_cast<int64_t>(sizeof(int32_t));
         int64_t maskAlignSize = Ops::Base::CeilAlign(compareCount / 8, ALIGN_32);
@@ -79,7 +81,7 @@ struct PeermemInfo {
         if (tilingData->topoType == TOPO_TYPE_MTE) {
             quantTokenScalePtr = base + offset;
             offset += Ops::Base::CeilAlign(
-                static_cast<int64_t>(tilingData->bs) * static_cast<int64_t>(tokenScaleBytes) *
+                static_cast<int64_t>(tilingData->numMaxTokensPerRank) * static_cast<int64_t>(tokenScaleBytes) *
                     static_cast<int64_t>(sizeof(int8_t)),
                 ALIGN_512);
         } else {
