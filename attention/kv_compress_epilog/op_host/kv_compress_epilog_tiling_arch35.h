@@ -65,6 +65,11 @@ constexpr int64_t SLICE_SIZE = 64;
 constexpr int64_t BLOCK_SIZE = 32;
 constexpr int64_t REPEAT_SIZE = 256;
 constexpr int64_t DOUBLE_BUFFER = 2;
+constexpr int64_t MIN_ROW_PER_CORE = 1;
+constexpr int64_t X_BUFFER_ALIGN = 16;
+constexpr int64_t X_ELEMENT_BYTES = 2;
+constexpr int64_t TMP_BUFFER_ALIGN = 8;
+constexpr int64_t TMP_BUFFER_ELEMENT_BYTES = 4;
 // 4D-only cache contract: cache 逻辑 shape 必须恰为 4D [blockNum, blockSize, 1, headDim]。
 //   - dim0 blockNum: 仅此维支持非连续(分页); dim1 blockSize: 每 block 的 token 数;
 //   - dim2 固定为 1 (每 token 写出一个压缩向量, 该轴不支持为变量);
@@ -72,7 +77,7 @@ constexpr int64_t DOUBLE_BUFFER = 2;
 constexpr size_t CACHE_VIEW_DIM_NUM = 4;
 constexpr size_t CACHE_BLOCKNUM_DIM = 0;
 constexpr size_t CACHE_BLOCKSIZE_DIM = 1;
-constexpr size_t CACHE_ONE_DIM = 2;       // 倒数第二维, 必须 == 1
+constexpr size_t CACHE_ONE_DIM = 2; // 倒数第二维, 必须 == 1
 constexpr int64_t CACHE_ONE_DIM_VALUE = 1;
 // per_block量化,每128个f16需要量化出一个scale, 因此切分尾轴时，以128为factor进行切分
 
@@ -111,7 +116,9 @@ struct KvCompressEpilogCompileInfo {
 // ---------- Tiling Class ----------
 class KvCompressEpilogTilingArch35 {
 public:
-    explicit KvCompressEpilogTilingArch35(gert::TilingContext* context) : context_(context) {}
+    explicit KvCompressEpilogTilingArch35(gert::TilingContext *context)
+        : context_(context)
+    {}
     ~KvCompressEpilogTilingArch35() = default;
 
     ge::graphStatus RunTiling();
@@ -141,7 +148,7 @@ protected:
 
 private:
     // Context
-    gert::TilingContext* context_ = nullptr;
+    gert::TilingContext *context_ = nullptr;
     KvCompressEpilogTilingData tilingData_;
     uint64_t tilingKey_ = 0;
 
@@ -152,13 +159,13 @@ private:
     uint64_t ubSize_ = 0;
 
     // Shape info from inputs
-    int64_t bs_ = 0;  // First dimension of x (to be partitioned)
-    int64_t d_ = 0;  // Second dimension of x
-    int64_t kvCacheCol_ = 0;  // kvCache cols (bytes written per token row == headDim)
-    int64_t kvCacheRowStride_ = 0;  // within-block per-token row stride (physical headDim)
-    int64_t kvCacheBlockSize_ = 1;  // tokens per block (logical); 1 for the 2D layout
-    int64_t kvCacheBlockStride_ = 0;  // physical stride between consecutive blocks (non-contiguous blockNum)
-    int64_t scaleCol_ = 0;  // scale cols
+    int64_t bs_ = 0;                 // First dimension of x (to be partitioned)
+    int64_t d_ = 0;                  // Second dimension of x
+    int64_t kvCacheCol_ = 0;         // kvCache cols (bytes written per token row == headDim)
+    int64_t kvCacheRowStride_ = 0;   // within-block per-token row stride (physical headDim)
+    int64_t kvCacheBlockSize_ = 1;   // tokens per block (logical); 1 for the 2D layout
+    int64_t kvCacheBlockStride_ = 0; // physical stride between consecutive blocks (non-contiguous blockNum)
+    int64_t scaleCol_ = 0;           // scale cols
 
     int64_t rowOfFormerBlock_ = 0;
     int64_t rowOfTailBlock_ = 0;
@@ -180,6 +187,6 @@ private:
     ge::DataType kvCacheDtype_ = ge::DT_FLOAT8_E5M2;
 };
 
-}  // namespace optiling
+} // namespace optiling
 
-#endif  // KV_COMPRESS_EPILOG_TILING_ARCH35_H
+#endif // KV_COMPRESS_EPILOG_TILING_ARCH35_H

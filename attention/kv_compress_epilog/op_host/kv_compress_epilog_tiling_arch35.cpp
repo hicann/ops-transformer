@@ -303,8 +303,7 @@ ge::graphStatus KvCompressEpilogTilingArch35::DoOpTiling()
                         "cache headDim(%ld) must be >= padded length kvCacheCol(%ld)", kvCacheRowStride_, kvCacheCol_),
                 return ge::GRAPH_FAILED);
 
-    int64_t minRowPerCore = 1;
-    int64_t rowOnceLoop = std::min(rowOfFormerBlock_, minRowPerCore);
+    int64_t rowOnceLoop = std::min(rowOfFormerBlock_, MIN_ROW_PER_CORE);
 
     int64_t scratchRowBytes = 0;
     if (quantMode_ == QUANT_MODE_HIF8_FP4) {
@@ -312,26 +311,24 @@ ge::graphStatus KvCompressEpilogTilingArch35::DoOpTiling()
         scratchRowBytes = numChunks * FP4_SCRATCH_SLOTS_PER_CHUNK * FP4_SCALE_BYTES;
     }
 
-    int64_t xSize = rowOnceLoop * RoundUp(d_, 16) * 2 * DOUBLE_BUFFER;
-    int64_t ySize = rowOnceLoop * RoundUp(kvCacheCol_, 32) * 1 * DOUBLE_BUFFER;
-    int64_t tmpBufferSize = RoundUp(rowOnceLoop, 8) * 4;
-    int64_t scratchSize = rowOnceLoop * scratchRowBytes;
-    int64_t totalSize = xSize + ySize + tmpBufferSize + scratchSize;
     rowFactor_ = rowOnceLoop;
-    // d全载,尝试搬入更多的bs
-    while (rowFactor_ <= rowOfFormerBlock_) {
-        xSize = rowFactor_ * RoundUp(d_, 16) * 2 * DOUBLE_BUFFER;
-        ySize = rowFactor_ * RoundUp(kvCacheCol_, 32) * 1 * DOUBLE_BUFFER;
-        tmpBufferSize = RoundUp(rowFactor_, 8) * 4;
-        scratchSize = rowFactor_ * scratchRowBytes;
-        totalSize = xSize + ySize + tmpBufferSize + scratchSize;
-        if (totalSize > ubSize_) {
-            rowFactor_ = rowFactor_ - 1;
-            break;
+    // d全载,通过二分查找尝试搬入更多的bs
+    int64_t lo = rowOnceLoop;
+    int64_t hi = rowOfFormerBlock_;
+    while (lo <= hi) {
+        int64_t mid = lo + (hi - lo) / 2;
+        int64_t xSize = mid * RoundUp(d_, X_BUFFER_ALIGN) * X_ELEMENT_BYTES * DOUBLE_BUFFER;
+        int64_t ySize = mid * RoundUp(kvCacheCol_, BLOCK_SIZE) * DOUBLE_BUFFER;
+        int64_t tmpBufferSize = RoundUp(mid, TMP_BUFFER_ALIGN) * TMP_BUFFER_ELEMENT_BYTES;
+        int64_t scratchSize = mid * scratchRowBytes;
+        int64_t totalSize = xSize + ySize + tmpBufferSize + scratchSize;
+        if (totalSize <= static_cast<int64_t>(ubSize_)) {
+            rowFactor_ = mid;
+            lo = mid + 1;
+        } else {
+            hi = mid - 1;
         }
-        rowFactor_ = rowFactor_ + 1;
     }
-    rowFactor_ = rowFactor_ > rowOfFormerBlock_ ? rowFactor_ - 1 : rowFactor_;
 
     rowLoopOfFormerBlock_ = CeilDiv(rowOfFormerBlock_, rowFactor_);
     rowLoopOfTailBlock_ = CeilDiv(rowOfTailBlock_, rowFactor_);
