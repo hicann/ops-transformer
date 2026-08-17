@@ -435,8 +435,8 @@ aclnnStatus aclnnIncreFlashAttentionV3(
 - 确定性计算：
   - aclnnIncreFlashAttentionV3默认确定性实现。
 
-<!-- npu="950,910b" id6 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：
+<!-- npu="910b" id6 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
   - 支持B轴小于等于65536，N轴小于等于256，D轴小于等于512。
   - query数据类型支持FLOAT16、BFLOAT16，attentionOut、key和value数据类型支持FLOAT16、INT8、BFLOAT16。
   - dequantScale1、dequantScale2数据类型支持UINT64、FLOAT32。

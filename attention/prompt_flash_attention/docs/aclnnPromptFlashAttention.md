@@ -353,8 +353,8 @@ aclnnStatus aclnnPromptFlashAttention(
 
   - 输入shape限制：
 
-    <!-- npu="950,910b" id6 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：
+    <!-- npu="910b" id6 -->
+    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
 
       - 支持B轴小于等于65536(64k)，输入类型包含INT8时D轴非32对齐或输入类型为FLOAT16或BFLOAT16时D轴非16对齐时，B轴仅支持到128。
 
@@ -431,8 +431,8 @@ aclnnStatus aclnnPromptFlashAttention(
         - 支持D轴小于等于512。
   - 输入数据类型限制：
 
-    <!-- npu="950,910b" id8 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持FLOAT16、BFLOAT16。
+    <!-- npu="910b" id8 -->
+    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT16、BFLOAT16。
     <!-- end id8 -->
 
     <!-- npu="310p" id16 -->
@@ -441,8 +441,8 @@ aclnnStatus aclnnPromptFlashAttention(
 - pseShift功能使用限制如下：
   - 输入数据类型限制：
 
-    <!-- npu="950,910b" id9 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持FLOAT16、BFLOAT16。
+    <!-- npu="910b" id9 -->
+    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT16、BFLOAT16。
     <!-- end id9 -->
     <!-- npu="310p" id17 -->
     - <term>Atlas 推理系列产品</term>：仅支持nullptr。
@@ -451,8 +451,8 @@ aclnnStatus aclnnPromptFlashAttention(
   - 输入shape限制：通常建议shape输入Q_S, KV_S; B, Q_S, KV_S; 1, Q_S, KV_S; B, 1, Q_S, KV_S; 1, 1, Q_S, KV_S，其中Q_S为query的shape中的S，KV_S为key和value的shape中的S。
   - 输入数据类型限制：
 
-    <!-- npu="950,910b" id10 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持BOOL、INT8、UINT8。
+    <!-- npu="910b" id10 -->
+    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持BOOL、INT8、UINT8。
     <!-- end id10 -->
     <!-- npu="310p" id18 -->
     - <term>Atlas 推理系列产品</term>：仅支持BOOL。
@@ -462,8 +462,8 @@ aclnnStatus aclnnPromptFlashAttention(
   - 输入值域限制：该入参中每个batch中的有效Sequence Length应该不大于query中对应batch的Sequence Length。
   - 输入数据类型限制：
 
-    <!-- npu="950,910b" id11 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持INT64。
+    <!-- npu="910b" id11 -->
+    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64。
     <!-- end id11 -->
     <!-- npu="310p" id19 -->
     - <term>Atlas 推理系列产品</term>：数据类型支持INT64。
@@ -471,8 +471,8 @@ aclnnStatus aclnnPromptFlashAttention(
 - preTokens输入，功能使用限制如下：
   - 输入数据类型限制：
 
-    <!-- npu="950,910b" id12 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持INT64。
+    <!-- npu="910b" id12 -->
+    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64。
     <!-- end id12 -->
     <!-- npu="310p" id20 -->
     - <term>Atlas 推理系列产品</term>：仅支持取值2147483647。
@@ -480,8 +480,8 @@ aclnnStatus aclnnPromptFlashAttention(
 - nextTokens输入，功能使用限制如下：
   - 输入数据类型限制：
 
-    <!-- npu="950,910b" id13 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持INT64。
+    <!-- npu="910b" id13 -->
+    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64。
     <!-- end id13 -->
     <!-- npu="310p" id21 -->
     - <term>Atlas 推理系列产品</term>：仅支持取值0和2147483647。
@@ -493,8 +493,8 @@ aclnnStatus aclnnPromptFlashAttention(
   - 输入属性限制：需要满足numHeads整除numKeyValueHeads，且在BSND、BNSD、BNSD_BSND场景下，需要与shape中的key/value的N轴shape值相同，否则报错。
   - 输入数据类型限制：
 
-    <!-- npu="950,910b" id14 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持INT64。
+    <!-- npu="910b" id14 -->
+    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64。
     <!-- end id14 -->
     <!-- npu="310p" id22 -->
     - <term>Atlas 推理系列产品</term>：仅支持取值0。
@@ -503,8 +503,8 @@ aclnnStatus aclnnPromptFlashAttention(
   - shape限制：当inputLayout为BNSD_BSND时，输入query的shape是BNSD，输出shape为BSND；其余情况该入参的shape需要与入参query的shape保持一致。
   - 数据类型限制：
 
-    <!-- npu="950,910b" id15 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：数据类型支持FLOAT16、BFLOAT16。
+    <!-- npu="910b" id15 -->
+    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT16、BFLOAT16。
     <!-- end id15 -->
     <!-- npu="310p" id23 -->
     - <term>Atlas 推理系列产品</term>：仅支持FLOAT16。
