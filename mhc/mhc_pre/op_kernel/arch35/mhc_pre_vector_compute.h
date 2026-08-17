@@ -639,6 +639,9 @@ public:
                 MicroAPI::Div<P, &MHC_PRE_DIV_ZEROING_MODE>(sigmoidReg, oneReg, addOneReg, mask);
 
                 MicroAPI::Muls(resultReg, sigmoidReg, scalarValue, mask);
+                if constexpr (RESI_MODE == MHC_PRE_NO_RESI) {
+                    MicroAPI::Adds(resultReg, resultReg, matrixInfo_.hcEps, mask);
+                }
                 MicroAPI::StoreAlign(hPostOutAddr + elemOffset, resultReg, mask);
             }
         }
