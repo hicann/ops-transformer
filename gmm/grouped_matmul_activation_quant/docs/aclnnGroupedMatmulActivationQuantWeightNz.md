@@ -562,7 +562,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
       </tbody>
       </table>
 
-    - 表中xScale和outputScale的shape第三维为2，表示每个64元素的存储block中包含2个MX量化group，每个group覆盖32个元素。
+    - 表中xScale、weightScale、outputScale的shape最后一维为2，表示每个64元素的存储block中包含2个MX量化group，每个group覆盖32个元素。
 
     - N必须为64整数倍。
 
