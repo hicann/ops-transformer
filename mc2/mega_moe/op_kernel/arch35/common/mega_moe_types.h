@@ -22,12 +22,13 @@ namespace MegaMoeImpl {
 
 using namespace AscendC;
 
-using ExpertProblemShape = Shape<int64_t, int64_t, int64_t, int64_t>;
+using ProblemShape = Shape<int64_t, int64_t, int64_t, int64_t>;
 
-// GMM1/GMM2 逐专家遍历的公共状态：problemShape 保存当前问题规模，rowOffset 保存前序 token 行数。
+// GMM1/GMM2 逐专家遍历的公共状态。globalTokenStartIndex 表示当前专家在本卡 MoE 专家
+// 紧凑 token 序列中的起始索引。
 struct ExpertLoopState {
-    ExpertProblemShape problemShape;
-    int64_t rowOffset = 0;
+    ProblemShape problemShape;
+    int64_t globalTokenStartIndex = 0;
 };
 
 struct Mc2MoeContext {
@@ -123,6 +124,21 @@ struct MoeStageCommonConfig {
     uint32_t topK;
     uint32_t tokenHiddenDim;
     uint32_t gmm1OutputDim;
+};
+
+// GMM1/GMM2 共用的执行方式：当前 block 的任务分工、矩阵模板模式和专家权重布局。
+struct GmmExecutionConfig {
+    BlockJobContext blockJob;
+    int32_t groupedMatmulMode;
+    bool isPerExpertWeightTensor;
+};
+
+// 各流水阶段在同步 workspace 中为每个专家预留的 slot 数量。
+struct MoeSyncWorkspaceLayout {
+    int32_t dispatchFlagSlotCountPerExpert;
+    int32_t activationFlagSlotCountPerExpert;
+    uint32_t gmm1TileStatusCountPerExpert;
+    uint64_t combineSyncSlotCountPerExpert;
 };
 
 struct DispatchPrepareConfig {
