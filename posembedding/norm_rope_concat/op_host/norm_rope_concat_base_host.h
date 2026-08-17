@@ -9,11 +9,11 @@
  */
 
 /* !
- * \file norm_rope_concat_base.h
+ * \file norm_rope_concat_base_host.h
  * \brief
  */
-#ifndef _NORM_ROPE_CONCAT_BASE_H_
-#define _NORM_ROPE_CONCAT_BASE_H_
+#ifndef _NORM_ROPE_CONCAT_BASE_HOST_H_
+#define _NORM_ROPE_CONCAT_BASE_HOST_H_
 #include <cstddef>
 #include <numeric>
 #include <algorithm>
@@ -56,7 +56,7 @@ enum class NormType : int64_t {
 inline bool IsNormTypeValid(int64_t normType)
 {
     return normType >= static_cast<int64_t>(NormType::NONE) &&
-        normType <= static_cast<int64_t>(NormType::RMS_NORM_AFFINE);
+           normType <= static_cast<int64_t>(NormType::RMS_NORM_AFFINE);
 }
 
 // read_store

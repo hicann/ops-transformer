@@ -9,17 +9,16 @@
  */
 
 /*!
- * \file ffn.h
+ * \file ffn_kernel.h
  * \brief
  */
 
-#ifndef ASCENDC_FFN_H
-#define ASCENDC_FFN_H
+#ifndef ASCENDC_FFN_KERNEL_H
+#define ASCENDC_FFN_KERNEL_H
 
 #include "kernel_tiling/kernel_tiling.h"
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
-
 
 namespace FFN {
 using namespace AscendC;
@@ -72,25 +71,25 @@ public:
     GluActiveFuncPtr<T> gluFuncPointer;
 };
 
-constexpr float BETA_ = 1.0;                          // beta param of swiglu
-constexpr uint32_t MAX_EXPERT_PARALLELISM = 10;       // allow `MAX_EXPERT_PARALLELISM` experts to compute together
-constexpr uint32_t UB_BLOCK_UNIT_SIZE = 32;           // 32: a block has 32 bytes data
-constexpr uint32_t CUBE_BASE_ALIGN_FACTOR = 16;       // 16: baseM align requirement for ai cube
-constexpr uint32_t CUBE_QUANT_BASE_ALIGN_FACTOR = 32; // 32: quant matmul baseM align requirement for ai cube
-constexpr uint32_t INT8_BITS = 8;                     // 8: a int8 data has 8 bits
+constexpr float BETA_ = 1.0;                                // beta param of swiglu
+constexpr uint32_t MAX_EXPERT_PARALLELISM = 10;             // allow `MAX_EXPERT_PARALLELISM` experts to compute together
+constexpr uint32_t UB_BLOCK_UNIT_SIZE = 32;                 // 32: a block has 32 bytes data
+constexpr uint32_t CUBE_BASE_ALIGN_FACTOR = 16;             // 16: baseM align requirement for ai cube
+constexpr uint32_t CUBE_QUANT_BASE_ALIGN_FACTOR = 32;       // 32: quant matmul baseM align requirement for ai cube
+constexpr uint32_t INT8_BITS = 8;                           // 8: a int8 data has 8 bits
 constexpr uint32_t FP16_INT8_BEST_DATACOPY_BASE_SIZE = 512; // 512: can copy 512 elements of fp16 int8 type every time
 constexpr uint32_t BF16_INT8_BEST_DATACOPY_BASE_SIZE = 256; // 256: can copy 256 elements of bf16 int8 type every time
-constexpr uint32_t INT8_SYNC_N1_SIZE = 256; // 256: when n1 is small than 256, should enable SyncbeforeMM1
+constexpr uint32_t INT8_SYNC_N1_SIZE = 256;                 // 256: when n1 is small than 256, should enable SyncbeforeMM1
 // a unit block can contain `EXPERT_NUM_ALIGN` int64_t elements
 constexpr uint32_t EXPERT_NUM_ALIGN = UB_BLOCK_UNIT_SIZE / sizeof(int64_t);
 constexpr uint32_t ANTIQUANT_MSD_STEP = 2;
 constexpr uint32_t NUM_ALIGN_TO_THIRTYTWO = 31;                  // used to align to 32
 constexpr uint32_t NUM_ALIGN_TO_SIXTEEN = 15;                    // used to align to 16
 constexpr uint32_t NUM_ALIGN_TO_ONE_HUNDRED_TWEENTY_EIGHT = 127; // used to align to 128
-constexpr uint32_t FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE = 8; // a float type num need to duplicate 8 times to align 32
-constexpr uint32_t DATASIZE_EACH_REPEAT_TIME = 256;      // each repeat time can calc 256Byte data
-constexpr uint32_t MSD_EACH_UB_BLOCK_SIZR = 6 * 1024;    // each repeat time can calc 256Byte data
-constexpr uint32_t DATABLOCK_NUM_IN_GATHER = 8;          // In Gather API, each repeat collects 8 data blocks
+constexpr uint32_t FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE = 8;         // a float type num need to duplicate 8 times to align 32
+constexpr uint32_t DATASIZE_EACH_REPEAT_TIME = 256;              // each repeat time can calc 256Byte data
+constexpr uint32_t MSD_EACH_UB_BLOCK_SIZR = 6 * 1024;            // each repeat time can calc 256Byte data
+constexpr uint32_t DATABLOCK_NUM_IN_GATHER = 8;                  // In Gather API, each repeat collects 8 data blocks
 
 template <class T>
 __aicore__ inline constexpr uint32_t GetNumInUbBlock()
@@ -122,7 +121,8 @@ __aicore__ inline T AlignUp(T a, T base)
     return (a + base - 1) / base * base;
 }
 
-template <typename T> __aicore__ inline T AlignDown(T a, T base)
+template <typename T>
+__aicore__ inline T AlignDown(T a, T base)
 {
     if (unlikely(base == 0)) {
         return a;

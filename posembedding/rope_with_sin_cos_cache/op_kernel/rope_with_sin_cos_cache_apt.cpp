@@ -13,8 +13,8 @@
  * \brief 950 (A5) 平台入口文件，复用 membase 实现逻辑
  */
 #include "kernel_operator.h"
-#include "arch35/rope_with_sin_cos_cache_fp32.h"
-#include "arch35/rope_with_sin_cos_cache_f_bf16.h"
+#include "arch35/rope_with_sin_cos_cache_fp32_arch35.h"
+#include "arch35/rope_with_sin_cos_cache_f_bf16_arch35.h"
 
 using namespace AscendC;
 using namespace RopeWithSinCosCache;
@@ -28,7 +28,7 @@ extern "C" __global__ __aicore__ void rope_with_sin_cos_cache(
     TPipe pipe;
 #if ORIG_DTYPE_QUERYIN == DT_BF16
     if (TILING_KEY_IS(20)) {
-        TPipe* ptr = &pipe;
+        TPipe *ptr = &pipe;
         if (ptr != nullptr) {
             RopeWithSinCosCacheFP16<bfloat16_t> op;
             op.Init(position_id, query_in, key_in, cos_sin_cache, query_out, key_out, tilingData, ptr);
@@ -37,7 +37,7 @@ extern "C" __global__ __aicore__ void rope_with_sin_cos_cache(
     }
 #elif ORIG_DTYPE_QUERYIN == DT_FLOAT16
     if (TILING_KEY_IS(21)) {
-        TPipe* ptr = &pipe;
+        TPipe *ptr = &pipe;
         if (ptr != nullptr) {
             RopeWithSinCosCacheFP16<half> op;
             op.Init(position_id, query_in, key_in, cos_sin_cache, query_out, key_out, tilingData, ptr);
@@ -46,7 +46,7 @@ extern "C" __global__ __aicore__ void rope_with_sin_cos_cache(
     }
 #elif ORIG_DTYPE_QUERYIN == DT_FLOAT
     if (TILING_KEY_IS(22)) {
-        TPipe* ptr = &pipe;
+        TPipe *ptr = &pipe;
         if (ptr != nullptr) {
             RopeWithSinCosCacheF32<float> op;
             op.Init(position_id, query_in, key_in, cos_sin_cache, query_out, key_out, tilingData, ptr);
@@ -55,4 +55,3 @@ extern "C" __global__ __aicore__ void rope_with_sin_cos_cache(
     }
 #endif
 }
-

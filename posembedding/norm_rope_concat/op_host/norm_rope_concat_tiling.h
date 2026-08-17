@@ -15,13 +15,12 @@
 #ifndef _NORM_ROPE_CONCAT_TILING_H_
 #define _NORM_ROPE_CONCAT_TILING_H_
 
-
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
 #include "op_host/tiling_base.h"
 #include "exe_graph/runtime/tiling_context.h"
 #include "register/op_def_registry.h"
-#include "norm_rope_concat_base.h"
+#include "norm_rope_concat_base_host.h"
 #include "../op_kernel/norm_rope_concat_tiling_key.h"
 
 template <typename T>
@@ -137,7 +136,6 @@ struct NormRopeConcatContext {
     const bool *isTraining;
 };
 
-
 class NormRopeConcatTiling {
 public:
     NormRopeConcatTiling() = default;
@@ -194,6 +192,5 @@ private:
 };
 
 } // namespace optiling
-
 
 #endif // _NORM_ROPE_CONCAT_TILING_H_

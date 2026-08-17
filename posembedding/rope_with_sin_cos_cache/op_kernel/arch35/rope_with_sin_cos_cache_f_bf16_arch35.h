@@ -9,26 +9,25 @@
  */
 
 /*!
- * \file rope_with_sin_cos_cache_f_bf16.h
+ * \file rope_with_sin_cos_cache_f_bf16_arch35.h
  * \brief rope_with_sin_cos_cache_f_bf16.h
  */
 
 #ifndef ROPE_WITH_SIN_COS_CACHE_ARCH35_BF16_H
 #define ROPE_WITH_SIN_COS_CACHE_ARCH35_BF16_H
 
-#include "rope_with_sin_cos_cache_base.h"
+#include "rope_with_sin_cos_cache_base_arch35.h"
 
 namespace RopeWithSinCosCache {
 using namespace AscendC;
 
 template <typename T>
-class RopeWithSinCosCacheFP16 : public RopeWithSinCosCacheBase<T>
-{
+class RopeWithSinCosCacheFP16 : public RopeWithSinCosCacheBase<T> {
 public:
     __aicore__ inline RopeWithSinCosCacheFP16(){};
     __aicore__ inline void Init(
         GM_ADDR position_id, GM_ADDR query_in, GM_ADDR key_in, GM_ADDR cos_sin_cache, GM_ADDR query_out,
-        GM_ADDR key_out, const RopeWithSinCosCacheTilingData& tiling_data, TPipe* pipe);
+        GM_ADDR key_out, const RopeWithSinCosCacheTilingData &tiling_data, TPipe *pipe);
     __aicore__ inline void Process();
     __aicore__ inline void Compute(uint64_t index, uint64_t loopN);
     __aicore__ inline void ComputeAlongHeads(uint64_t indexToken, uint64_t indexHeads);
@@ -72,7 +71,7 @@ protected:
 template <typename T>
 __aicore__ inline void RopeWithSinCosCacheFP16<T>::Init(
     GM_ADDR position_id, GM_ADDR query_in, GM_ADDR key_in, GM_ADDR cos_sin_cache, GM_ADDR query_out, GM_ADDR key_out,
-    const RopeWithSinCosCacheTilingData& tiling_data, TPipe* pipe)
+    const RopeWithSinCosCacheTilingData &tiling_data, TPipe *pipe)
 {
     this->InitData(tiling_data);
     headBlockLen = static_cast<uint16_t>(this->head_size / ELE_NUM_FP32);
@@ -87,13 +86,13 @@ __aicore__ inline void RopeWithSinCosCacheFP16<T>::Init(
                       (this->blockIdx_ - this->front_core) * this->num_tokens_each_tail_core;
     }
 
-    position_id_GM.SetGlobalBuffer((__gm__ uint64_t*)position_id + blockOffset);
-    query_in_GM.SetGlobalBuffer((__gm__ T*)query_in + blockOffset * this->q_leading_dimension);
-    key_in_GM.SetGlobalBuffer((__gm__ T*)key_in + blockOffset * this->k_leading_dimension);
-    cos_sin_cache_GM.SetGlobalBuffer((__gm__ T*)cos_sin_cache);
+    position_id_GM.SetGlobalBuffer((__gm__ uint64_t *)position_id + blockOffset);
+    query_in_GM.SetGlobalBuffer((__gm__ T *)query_in + blockOffset * this->q_leading_dimension);
+    key_in_GM.SetGlobalBuffer((__gm__ T *)key_in + blockOffset * this->k_leading_dimension);
+    cos_sin_cache_GM.SetGlobalBuffer((__gm__ T *)cos_sin_cache);
 
-    queryGM.SetGlobalBuffer((__gm__ T*)query_out + blockOffset * this->num_q_heads * this->head_size);
-    keyGM.SetGlobalBuffer((__gm__ T*)key_out + blockOffset * this->num_kv_heads * this->head_size);
+    queryGM.SetGlobalBuffer((__gm__ T *)query_out + blockOffset * this->num_q_heads * this->head_size);
+    keyGM.SetGlobalBuffer((__gm__ T *)key_out + blockOffset * this->num_kv_heads * this->head_size);
 
     num_heads_max = (this->num_q_heads > this->num_kv_heads) ? this->num_q_heads : this->num_kv_heads;
     if (this->loop_for_one_token == 0) {
@@ -440,12 +439,13 @@ __aicore__ inline void RopeWithSinCosCacheFP16<T>::Compute(uint64_t index, uint6
 }
 
 template <typename T>
-__aicore__ inline void RopeWithSinCosCacheFP16<T>::ComputeAlongHeads(uint64_t indexToken, uint64_t indexHeads){
+__aicore__ inline void RopeWithSinCosCacheFP16<T>::ComputeAlongHeads(uint64_t indexToken, uint64_t indexHeads)
+{
     q_size = this->num_q_heads * this->head_size;
     k_size = this->num_kv_heads * this->head_size;
     uint64_t offsetQHead = indexHeads * this->num_qheads_each_loop * this->head_size;
     uint64_t offsetKHead = indexHeads * this->num_kheads_each_loop * this->head_size;
-    uint64_t offset = indexToken * q_size + offsetQHead;//非连续?
+    uint64_t offset = indexToken * q_size + offsetQHead; // 非连续?
     uint64_t offsetk = indexToken * k_size + offsetKHead;
     uint64_t query_in_offset = indexToken * this->q_leading_dimension + offsetQHead;
     uint64_t key_in_offset = indexToken * this->k_leading_dimension + offsetKHead;
@@ -560,23 +560,23 @@ __aicore__ inline void RopeWithSinCosCacheFP16<T>::ComputeAlongHeads(uint64_t in
 
         if (this->head_size != this->rotary_dim) {
             DataCopy(outQueAfterCastLocal, inQueCalLocal,
-                     {static_cast<uint16_t>(loopNQhead), static_cast<uint16_t>(rotaryBlockLen/2), 0,
-                      static_cast<uint16_t>(headBlockLen/2 - rotaryBlockLen/2)});
+                     {static_cast<uint16_t>(loopNQhead), static_cast<uint16_t>(rotaryBlockLen / 2), 0,
+                      static_cast<uint16_t>(headBlockLen / 2 - rotaryBlockLen / 2)});
             PipeBarrier<PIPE_ALL>();
             DataCopy(outQueAfterCastLocal[this->rotary_dim], inQQueBeforeCastLocal[this->rotary_dim],
-                     {static_cast<uint16_t>(loopNQhead), static_cast<uint16_t>(headBlockLen/2 - rotaryBlockLen/2),
-                      static_cast<uint16_t>(rotaryBlockLen/2), static_cast<uint16_t>(rotaryBlockLen/2)});
+                     {static_cast<uint16_t>(loopNQhead), static_cast<uint16_t>(headBlockLen / 2 - rotaryBlockLen / 2),
+                      static_cast<uint16_t>(rotaryBlockLen / 2), static_cast<uint16_t>(rotaryBlockLen / 2)});
             PipeBarrier<PIPE_ALL>();
         } else {
             DataCopy(outQueAfterCastLocal, inQueCalLocal,
-                     {static_cast<uint16_t>(loopNQhead), static_cast<uint16_t>(headBlockLen/2), 0, 0});
+                     {static_cast<uint16_t>(loopNQhead), static_cast<uint16_t>(headBlockLen / 2), 0, 0});
             PipeBarrier<PIPE_ALL>();
         }
         DataCopy(queryGM[offset], outQueAfterCastLocal,
-                 {static_cast<uint16_t>(loopNQhead), static_cast<uint16_t>(headBlockLen/2), 0, 0});
+                 {static_cast<uint16_t>(loopNQhead), static_cast<uint16_t>(headBlockLen / 2), 0, 0});
         PipeBarrier<PIPE_ALL>();
     }
-    //key
+    // key
     if (indexHeads < this->loop_along_kheads) {
         uint64_t loopNKhead = (indexHeads == this->loop_along_kheads - 1 && this->num_kheads_last_loop != 0) ?
                                   this->num_kheads_last_loop :

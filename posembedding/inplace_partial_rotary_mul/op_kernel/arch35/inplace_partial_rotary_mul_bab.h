@@ -9,14 +9,14 @@
  */
 
 /*!
- * \file rotary_position_embedding_bab.h
+ * \file inplace_partial_rotary_mul_bab.h
  * \brief
  */
 
-#ifndef ROTARY_POSITION_EMBEDDING_BAB_H
-#define ROTARY_POSITION_EMBEDDING_BAB_H
+#ifndef INPLACE_PARTIAL_ROTARY_MUL_BAB_H
+#define INPLACE_PARTIAL_ROTARY_MUL_BAB_H
 
-#include "apply_rotary_pos_emb_common.h"
+#include "inplace_partial_rotary_mul_arpe_common.h"
 
 namespace InplacePartialRotaryMul {
 using namespace AscendC;
@@ -24,15 +24,16 @@ using namespace AscendC;
 template <typename T>
 class RotaryPositionEmbeddingBAB {
 public:
-    __aicore__ inline RotaryPositionEmbeddingBAB(TPipe* pipe, const InplacePartialRopeRegbaseTilingData* tiling)
-        : pipe_(pipe), tilingData_(tiling){};
+    __aicore__ inline RotaryPositionEmbeddingBAB(TPipe *pipe, const InplacePartialRopeRegbaseTilingData *tiling)
+        : pipe_(pipe),
+          tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR cos, GM_ADDR sin, GM_ADDR y);
     __aicore__ inline void Process();
 
 private:
     constexpr static int32_t bufferNum = 2;
-    const InplacePartialRopeRegbaseTilingData* tilingData_;
-    TPipe* pipe_;
+    const InplacePartialRopeRegbaseTilingData *tilingData_;
+    TPipe *pipe_;
     int64_t blockIdx_ = 0;
     int64_t dSplitCoef_ = 1; // 切分系数初始化为1
     uint32_t dSplitSize_ = 0;
@@ -57,10 +58,10 @@ private:
     __aicore__ inline void PrePareParams();
     __aicore__ inline void ProcessNLoop(const uint32_t bIdx, const uint32_t sIdx, const uint32_t currSNum);
     __aicore__ inline void Compute(
-        const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, const LocalTensor<T>& inTensor,
-        const LocalTensor<T>& outTensor, const uint32_t currSNum, const uint32_t currDNum);
+        const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor, const LocalTensor<T> &inTensor,
+        const LocalTensor<T> &outTensor, const uint32_t currSNum, const uint32_t currDNum);
     __aicore__ inline void ProcessN(
-        const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, const uint32_t bIdx, const uint32_t sIdx,
+        const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor, const uint32_t bIdx, const uint32_t sIdx,
         const uint32_t currSNum);
 };
 
@@ -76,13 +77,14 @@ __aicore__ inline void RotaryPositionEmbeddingBAB<T>::Init(GM_ADDR x, GM_ADDR co
     }
     this->dSplitSize_ = tilingData_->sliceLength / dSplitCoef_ * sizeof(T);
     this->dAlign_ = ops::CeilAlign<int64_t>(tilingData_->sliceLength / dSplitCoef_,
-        BLOCK_TYPE_SIZE / sizeof(T)) * dSplitCoef_;
+                                            BLOCK_TYPE_SIZE / sizeof(T)) *
+                    dSplitCoef_;
     ubFactorN_ = tilingData_->ubFactorN;
     ubFactorS_ = tilingData_->ubFactorS;
-    this->xGm_.SetGlobalBuffer((__gm__ T*)x);
-    this->cosGm_.SetGlobalBuffer((__gm__ T*)cos);
-    this->sinGm_.SetGlobalBuffer((__gm__ T*)sin);
-    this->yOutGm_.SetGlobalBuffer((__gm__ T*)y);
+    this->xGm_.SetGlobalBuffer((__gm__ T *)x);
+    this->cosGm_.SetGlobalBuffer((__gm__ T *)cos);
+    this->sinGm_.SetGlobalBuffer((__gm__ T *)sin);
+    this->yOutGm_.SetGlobalBuffer((__gm__ T *)y);
     this->pipe_->InitBuffer(xInQue_, bufferNum, ubFactorS_ * ubFactorN_ * dAlign_ * sizeof(T));
     this->pipe_->InitBuffer(cosInQue_, bufferNum, ubFactorS_ * dAlign_ * sizeof(T));
     this->pipe_->InitBuffer(sinInQue_, bufferNum, ubFactorS_ * dAlign_ * sizeof(T));
@@ -141,7 +143,7 @@ __aicore__ inline void RotaryPositionEmbeddingBAB<T>::ProcessNLoop(
 
 template <typename T>
 __aicore__ inline void RotaryPositionEmbeddingBAB<T>::ProcessN(
-    const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, const uint32_t bIdx, const uint32_t sIdx,
+    const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor, const uint32_t bIdx, const uint32_t sIdx,
     const uint32_t currSNum)
 {
     LocalTensor<T> xTensor;
@@ -152,15 +154,14 @@ __aicore__ inline void RotaryPositionEmbeddingBAB<T>::ProcessN(
         int64_t offset = baseOffset + idxN * ubFactorN_ * tilingData_->D;
         xTensor = xInQue_.AllocTensor<T>();
         DataCopyExtParams copyInParams{static_cast<uint16_t>(currSNum * currDNum * dSplitCoef_), dSplitSize_,
-            static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(T)), 0, 0};
+                                       static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(T)), 0, 0};
         DataCopyExtParams copyOutParams{static_cast<uint16_t>(currSNum * currDNum * dSplitCoef_), dSplitSize_, 0,
-            static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(T)), 0};
+                                        static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(T)), 0};
         // deepseekInterleave 场景，copyIn时按照D对齐，copyOut 时，按照 d/2 对齐
         if (
-            tilingData_->rotaryMode == static_cast<int64_t>(InplacePartialRotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE))
-        {
+            tilingData_->rotaryMode == static_cast<int64_t>(InplacePartialRotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE)) {
             copyInParams = {static_cast<uint16_t>(currSNum * currDNum), tilingData_->sliceLength * sizeof(T),
-                static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(T)), 0, 0};
+                            static_cast<uint32_t>((tilingData_->D - tilingData_->sliceLength) * sizeof(T)), 0, 0};
         }
         DataCopyPadExtParams<T> padParams{false, 0, 0, 0};
         DataCopyPad(xTensor, xGm_[offset], copyInParams, padParams);
@@ -178,20 +179,20 @@ __aicore__ inline void RotaryPositionEmbeddingBAB<T>::ProcessN(
 
 template <typename T>
 __aicore__ inline void RotaryPositionEmbeddingBAB<T>::Compute(
-    const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, const LocalTensor<T>& inTensor,
-    const LocalTensor<T>& outTensor, const uint32_t currSNum, const uint32_t currDNum)
+    const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor, const LocalTensor<T> &inTensor,
+    const LocalTensor<T> &outTensor, const uint32_t currSNum, const uint32_t currDNum)
 {
     if (tilingData_->rotaryMode == static_cast<int64_t>(InplacePartialRotaryPosEmbeddingMode::HALF)) {
         HalfAlignVF<T>(sinTensor, cosTensor, inTensor, outTensor, tilingData_->sliceLength, dAlign_, currSNum,
-            currDNum);
+                       currDNum);
     } else if (tilingData_->rotaryMode == static_cast<int64_t>(InplacePartialRotaryPosEmbeddingMode::INTERLEAVE)) {
         InterleaveModeVF<T>(sinTensor, cosTensor, inTensor, outTensor, tilingData_->sliceLength, currSNum, currDNum);
     } else if (tilingData_->rotaryMode == static_cast<int64_t>(InplacePartialRotaryPosEmbeddingMode::QUARTER)) {
         QuarterAlignVF<T>(sinTensor, cosTensor, inTensor, outTensor, tilingData_->sliceLength, dAlign_, currSNum,
-            currDNum);
+                          currDNum);
     } else {
         DeepSeekInterleaveModeVF<T>(sinTensor, cosTensor, inTensor, outTensor, tilingData_->sliceLength, currSNum,
-            currDNum);
+                                    currDNum);
     }
 }
 

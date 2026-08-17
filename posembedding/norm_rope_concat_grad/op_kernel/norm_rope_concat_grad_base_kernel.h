@@ -9,12 +9,12 @@
  */
 
 /* !
- * \file norm_rope_concat_grad_base.h
+ * \file norm_rope_concat_grad_base_kernel.h
  * \brief
  */
 
-#ifndef NORM_ROPE_CONCAT_GRAD_BASE_H
-#define NORM_ROPE_CONCAT_GRAD_BASE_H
+#ifndef NORM_ROPE_CONCAT_GRAD_BASE_KERNEL_H
+#define NORM_ROPE_CONCAT_GRAD_BASE_KERNEL_H
 
 #include "kernel_operator.h"
 
@@ -112,7 +112,10 @@ public:
     __aicore__ inline RopeOperation(TBufPool<TPosition::VECCALC, BUF_ID_SIZE> &bufPool, GM_ADDR sin, GM_ADDR cos,
                                     GM_ADDR y, uint32_t actualSeq, uint32_t curSeq, uint32_t ropeDim,
                                     uint32_t alignedRopeDim)
-        : ropeDim_(ropeDim), alignedRopeDim_(alignedRopeDim), isActive_(curSeq < actualSeq), actualSeq_(actualSeq)
+        : ropeDim_(ropeDim),
+          alignedRopeDim_(alignedRopeDim),
+          isActive_(curSeq < actualSeq),
+          actualSeq_(actualSeq)
     {
         yGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)y);
         if constexpr (ropeType == RopeType::NONE) {
@@ -191,7 +194,7 @@ public:
             DataCopyPad(rope, sinGm_[curSeq * ropeDim_], params, padParams);
             DataCopyPad(rope[alignedRopeDim_], cosGm_[curSeq * ropeDim_], params, padParams);
         }
-        
+
         ropeQueue_.EnQue(rope);
         LocalTensor<DTYPE_ROPE_SIN> deQue = ropeQueue_.DeQue<DTYPE_ROPE_SIN>();
         if (sizeof(DTYPE_ROPE_SIN) < sizeof(float)) {
@@ -262,7 +265,11 @@ public:
     __aicore__ inline NormOperation(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR mean, GM_ADDR rstd, float eps,
                                     float scale, uint32_t normDim, uint32_t normNum, uint32_t alignedNormDim,
                                     uint32_t alignedNormNum)
-        : eps_(eps), scale_(scale), normDim_(normDim), normNum_(normNum), alignedNormDim_(alignedNormDim),
+        : eps_(eps),
+          scale_(scale),
+          normDim_(normDim),
+          normNum_(normNum),
+          alignedNormDim_(alignedNormDim),
           alignedNormNum_(alignedNormNum)
     {
         xGm_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)x);

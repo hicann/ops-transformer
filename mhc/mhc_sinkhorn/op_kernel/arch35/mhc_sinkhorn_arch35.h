@@ -8,12 +8,12 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 /*!
- * \file mhc_sinkhorn.h
+ * \file mhc_sinkhorn_arch35.h
  * \brief mhc_sinkhorn
  */
 
-#ifndef ASCENDC_MHC_SINKHORN_H
-#define ASCENDC_MHC_SINKHORN_H
+#ifndef ASCENDC_MHC_SINKHORN_ARCH35_H
+#define ASCENDC_MHC_SINKHORN_ARCH35_H
 
 #include "kernel_operator.h"
 #include "op_kernel/math_util.h"
@@ -42,7 +42,8 @@ template <typename T, bool OUT_FLAG>
 class MhcSinkhornSimd {
 public:
     __aicore__ inline MhcSinkhornSimd(TPipe &pipe, const MhcSinkhornTilingData &tilingData)
-        : pipe_(pipe), tilingData_(tilingData){};
+        : pipe_(pipe),
+          tilingData_(tilingData){};
     __aicore__ inline void Init(GM_ADDR h_res, GM_ADDR y, GM_ADDR norm_out, GM_ADDR sum_out, GM_ADDR tiling);
     __aicore__ inline void Process();
 
@@ -382,7 +383,6 @@ __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::CalcRowNorm(int32_t handleN
     sumColQue_.EnQue(sumColLocal);
     sumRowQue_.EnQue(sumRowLocal);
 }
-
 
 template <typename T, bool OUT_FLAG>
 __aicore__ inline void MhcSinkhornSimd<T, OUT_FLAG>::ScatterOutFromNorm(int32_t handleNum)

@@ -9,13 +9,12 @@
  */
 
 /* !
- * \file norm_rope_concat_base.h
+ * \file norm_rope_concat_base_kernel.h
  * \brief
  */
 
-
-#ifndef _NORM_ROPE_CONCAT_BASE_H_
-#define _NORM_ROPE_CONCAT_BASE_H_
+#ifndef _NORM_ROPE_CONCAT_BASE_KERNEL_H_
+#define _NORM_ROPE_CONCAT_BASE_KERNEL_H_
 
 #include "kernel_operator.h"
 
@@ -92,13 +91,16 @@ public:
     __aicore__ inline RopeOperation(TPipe *pipe, GM_ADDR sin, GM_ADDR cos, uint32_t actualSeq,
                                     uint32_t ropeDim, uint32_t ropeNum,
                                     uint32_t alignedRopeDim)
-        : ropeDim_(ropeDim), ropeNum_(ropeNum), alignedRopeDim_(alignedRopeDim),
-          totalRopeDim_(ropeNum * alignedRopeDim), actualSeq_(actualSeq)
+        : ropeDim_(ropeDim),
+          ropeNum_(ropeNum),
+          alignedRopeDim_(alignedRopeDim),
+          totalRopeDim_(ropeNum * alignedRopeDim),
+          actualSeq_(actualSeq)
     {
         if constexpr (ropeType == RopeType::NONE) {
             return;
         }
-        
+
         sinGm_.SetGlobalBuffer((__gm__ DTYPE_ROPE_SIN *)sin);
         cosGm_.SetGlobalBuffer((__gm__ DTYPE_ROPE_SIN *)cos);
         pipe->InitBuffer(ropeQueue_, SINGLE_BUFFER, totalRopeDim_ * NUM_TWO * sizeof(DTYPE_ROPE_SIN));
@@ -212,7 +214,11 @@ class NormOperation {
 public:
     __aicore__ inline NormOperation(float eps, float scale, uint32_t normDim, uint32_t normNum, uint32_t alignedNormDim,
                                     uint32_t alignedNormNum)
-        : eps_(eps), scale_(scale), normDim_(normDim), normNum_(normNum), alignedNormDim_(alignedNormDim),
+        : eps_(eps),
+          scale_(scale),
+          normDim_(normDim),
+          normNum_(normNum),
+          alignedNormDim_(alignedNormDim),
           alignedNormNum_(alignedNormNum)
     {
     }

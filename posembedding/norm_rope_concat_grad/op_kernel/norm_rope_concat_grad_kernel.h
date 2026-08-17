@@ -9,13 +9,13 @@
  */
 
 /* !
- * \file norm_rope_concat_grad.h
+ * \file norm_rope_concat_grad_kernel.h
  * \brief
  */
-#ifndef NORM_ROPE_CONCAT_GRAD_H
-#define NORM_ROPE_CONCAT_GRAD_H
+#ifndef NORM_ROPE_CONCAT_GRAD_KERNEL_H
+#define NORM_ROPE_CONCAT_GRAD_KERNEL_H
 
-#include "norm_rope_concat_grad_base.h"
+#include "norm_rope_concat_grad_base_kernel.h"
 using namespace AscendC;
 
 namespace nrcg {
@@ -29,7 +29,8 @@ public:
                                             uint32_t alignedNormNum, uint32_t affineBlockNums, uint32_t avgHeadsLow)
         : NormOperation<normType>(x, weight, bias, mean, rstd, eps, scale, normDim, normNum, alignedNormDim,
                                   alignedNormNum),
-          affineBlockNums_(affineBlockNums), avgHeadsLow_(avgHeadsLow)
+          affineBlockNums_(affineBlockNums),
+          avgHeadsLow_(avgHeadsLow)
     {
         xGradGM_.SetGlobalBuffer((__gm__ DTYPE_QUERY *)xGrad);
         outParams_.blockLen = normDim * sizeof(DTYPE_QUERY);
@@ -500,19 +501,41 @@ public:
         GM_ADDR grad_norm_query_bias, GM_ADDR grad_norm_key_weight, GM_ADDR grad_norm_key_bias,
         GM_ADDR grad_norm_added_query_weight, GM_ADDR grad_norm_added_query_bias, GM_ADDR grad_norm_added_key_weight,
         GM_ADDR grad_norm_added_key_bias, GM_ADDR workspace)
-        : gradQueryOutput_(grad_query_output), gradKeyOutput_(grad_key_output), gradValueOutput_(grad_value_output),
-          query_(query), key_(key), encoderQuery_(encoder_query), encoderKey_(encoder_key),
-          normQueryWeight_(norm_query_weight), normQueryMean_(norm_query_mean), normQueryRstd_(norm_query_rstd),
-          normKeyWeight_(norm_key_weight), normKeyMean_(norm_key_mean), normKeyRstd_(norm_key_rstd),
-          normAddedQueryWeight_(norm_added_query_weight), normAddedQueryMean_(norm_added_query_mean),
-          normAddedQueryRstd_(norm_added_query_rstd), normAddedKeyWeight_(norm_added_key_weight),
-          normAddedKeyMean_(norm_added_key_mean), normAddedKeyRstd_(norm_added_key_rstd), ropeSin_(rope_sin),
-          ropeCos_(rope_cos), gradQuery_(grad_query), gradKey_(grad_key), gradValue_(grad_value),
-          gradEncoderQuery_(grad_encoderquery), gradEncoderKey_(grad_encoderkey), gradEncoderValue_(grad_encodervalue),
-          gradNormQueryWeight_(grad_norm_query_weight), gradNormQueryBias_(grad_norm_query_bias),
-          gradNormKeyWeight_(grad_norm_key_weight), gradNormKeyBias_(grad_norm_key_bias),
-          gradNormAddedQueryWeight_(grad_norm_added_query_weight), gradNormAddedQueryBias_(grad_norm_added_query_bias),
-          gradNormAddedKeyWeight_(grad_norm_added_key_weight), gradNormAddedKeyBias_(grad_norm_added_key_bias),
+        : gradQueryOutput_(grad_query_output),
+          gradKeyOutput_(grad_key_output),
+          gradValueOutput_(grad_value_output),
+          query_(query),
+          key_(key),
+          encoderQuery_(encoder_query),
+          encoderKey_(encoder_key),
+          normQueryWeight_(norm_query_weight),
+          normQueryMean_(norm_query_mean),
+          normQueryRstd_(norm_query_rstd),
+          normKeyWeight_(norm_key_weight),
+          normKeyMean_(norm_key_mean),
+          normKeyRstd_(norm_key_rstd),
+          normAddedQueryWeight_(norm_added_query_weight),
+          normAddedQueryMean_(norm_added_query_mean),
+          normAddedQueryRstd_(norm_added_query_rstd),
+          normAddedKeyWeight_(norm_added_key_weight),
+          normAddedKeyMean_(norm_added_key_mean),
+          normAddedKeyRstd_(norm_added_key_rstd),
+          ropeSin_(rope_sin),
+          ropeCos_(rope_cos),
+          gradQuery_(grad_query),
+          gradKey_(grad_key),
+          gradValue_(grad_value),
+          gradEncoderQuery_(grad_encoderquery),
+          gradEncoderKey_(grad_encoderkey),
+          gradEncoderValue_(grad_encodervalue),
+          gradNormQueryWeight_(grad_norm_query_weight),
+          gradNormQueryBias_(grad_norm_query_bias),
+          gradNormKeyWeight_(grad_norm_key_weight),
+          gradNormKeyBias_(grad_norm_key_bias),
+          gradNormAddedQueryWeight_(grad_norm_added_query_weight),
+          gradNormAddedQueryBias_(grad_norm_added_query_bias),
+          gradNormAddedKeyWeight_(grad_norm_added_key_weight),
+          gradNormAddedKeyBias_(grad_norm_added_key_bias),
           workspace_(workspace)
     {
     }
@@ -984,7 +1007,7 @@ __aicore__ inline void NormRopeConcatGrad<normType, addedNormType, ropeType, con
             ropeOp.PreProcess(s);
             for (uint32_t b = 0; b < batch_; ++b) {
                 uint64_t outGradOffset = static_cast<uint64_t>(b) * headNum_ * totalSeq * headDim_ +
-                                        static_cast<uint64_t>(outputSeq + s) * headDim_;
+                                         static_cast<uint64_t>(outputSeq + s) * headDim_;
                 uint64_t inOffset = static_cast<uint64_t>(b * xSeq + s) * headNum_ * headDim_;
                 uint64_t normOffset = static_cast<uint64_t>(b * xSeq + s) * headNum_;
                 for (uint32_t n = 0; n < splitHeadNum_ - 1; ++n) {

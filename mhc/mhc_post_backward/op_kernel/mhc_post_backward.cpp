@@ -13,7 +13,7 @@
  * \brief
  */
 
-#include "./arch22/mhc_post_backward.h"
+#include "./arch22/mhc_post_backward_arch22.h"
 #include "./arch22/mhc_post_backward_tiling_data_arch22.h"
 #include "./arch22/mhc_post_backward_tiling_key_arch22.h"
 #include "kernel_operator.h"

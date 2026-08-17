@@ -16,7 +16,7 @@
 #ifndef ASCENDC_FFN_BASE_H
 #define ASCENDC_FFN_BASE_H
 
-#include "ffn.h"
+#include "ffn_kernel.h"
 
 namespace FFN {
 
@@ -67,7 +67,9 @@ protected:
 
 public:
     /** @brief constructor */
-    __aicore__ inline FFNBase(typename mm1Type::MT &mm1_, typename mm2Type::MT &mm2_) : mm1(mm1_), mm2(mm2_)
+    __aicore__ inline FFNBase(typename mm1Type::MT &mm1_, typename mm2Type::MT &mm2_)
+        : mm1(mm1_),
+          mm2(mm2_)
     {
     }
 

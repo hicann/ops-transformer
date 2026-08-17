@@ -16,15 +16,16 @@
 #ifndef ASCENDC_FFN_QUANT_H
 #define ASCENDC_FFN_QUANT_H
 
-#include "ffn.h"
-
+#include "ffn_kernel.h"
 
 namespace FFN {
 template <typename T, typename mm1Type, typename mm2Type, typename c1T, typename c2T, typename biasT, typename actT,
           typename dequantT, bool isSmooth = false>
 class FFNQuant {
 public:
-    __aicore__ inline FFNQuant(mm1Type &mm1_, mm2Type &mm2_) : mm1(mm1_), mm2(mm2_){};
+    __aicore__ inline FFNQuant(mm1Type &mm1_, mm2Type &mm2_)
+        : mm1(mm1_),
+          mm2(mm2_){};
     __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
                                 __gm__ uint8_t *expertTokens, __gm__ uint8_t *bias1, __gm__ uint8_t *bias2,
                                 __gm__ uint8_t *scale, __gm__ uint8_t *offset, __gm__ uint8_t *deqScale1,

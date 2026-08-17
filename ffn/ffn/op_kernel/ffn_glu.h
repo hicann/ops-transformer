@@ -16,8 +16,7 @@
 #ifndef ASCENDC_FFN_GLU_H
 #define ASCENDC_FFN_GLU_H
 
-#include "ffn.h"
-
+#include "ffn_kernel.h"
 
 namespace FFN {
 using namespace matmul;

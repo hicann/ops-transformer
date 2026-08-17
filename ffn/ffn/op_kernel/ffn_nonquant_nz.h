@@ -16,7 +16,7 @@
 #ifndef ASCENDC_FFN_NONQUANT_NZ_H
 #define ASCENDC_FFN_NONQUANT_NZ_H
 
-#include "ffn.h"
+#include "ffn_kernel.h"
 
 namespace FFN {
 
@@ -39,7 +39,8 @@ private:
 
 public:
     /** @brief constructor */
-    __aicore__ inline FFNProcess(ComputeType &computeOp_) : computeOp(computeOp_)
+    __aicore__ inline FFNProcess(ComputeType &computeOp_)
+        : computeOp(computeOp_)
     {
     }
 
@@ -189,7 +190,9 @@ private:
 
 public:
     /** @brief constructor */
-    __aicore__ inline FFNCompute(typename mm1Type::MT &mm1_, typename mm2Type::MT &mm2_) : mm1(mm1_), mm2(mm2_)
+    __aicore__ inline FFNCompute(typename mm1Type::MT &mm1_, typename mm2Type::MT &mm2_)
+        : mm1(mm1_),
+          mm2(mm2_)
     {
     }
 

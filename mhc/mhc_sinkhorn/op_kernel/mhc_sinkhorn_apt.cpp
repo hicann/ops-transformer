@@ -10,16 +10,16 @@
 /*!
  * \file mhc_sinkhorn_apt.cpp
  * \brief mhc_sinkhorn
- */ 
+ */
 
-#include "arch35/mhc_sinkhorn.h"
+#include "arch35/mhc_sinkhorn_arch35.h"
 
 using namespace AscendC;
 using namespace MhcSinkhorn;
 
 template <int64_t TEMPLATE_MODE>
-__global__ __aicore__ void mhc_sinkhorn(GM_ADDR h_res, GM_ADDR y, GM_ADDR norm_out, 
-                                            GM_ADDR sum_out, GM_ADDR workSpace, GM_ADDR tiling)
+__global__ __aicore__ void mhc_sinkhorn(GM_ADDR h_res, GM_ADDR y, GM_ADDR norm_out,
+                                        GM_ADDR sum_out, GM_ADDR workSpace, GM_ADDR tiling)
 {
     GM_ADDR user = GetUserWorkspace(workSpace);
     if (user == nullptr) {

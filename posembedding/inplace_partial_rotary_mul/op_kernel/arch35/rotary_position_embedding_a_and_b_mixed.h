@@ -15,7 +15,7 @@
 #ifndef ROTARY_POSITION_EMBEDDING_A_AND_B_MIXED_H
 #define ROTARY_POSITION_EMBEDDING_A_AND_B_MIXED_H
 
-#include "apply_rotary_pos_emb_common.h"
+#include "inplace_partial_rotary_mul_arpe_common.h"
 
 namespace InplacePartialRotaryMul {
 using namespace AscendC;
@@ -28,7 +28,7 @@ public:
     __aicore__ inline ~RotaryPositionEmbeddingAAndBMixed(){};
 
     __aicore__ inline void Init(GM_ADDR q, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut, GM_ADDR workspace,
-        const InplacePartialRopeRegbaseTilingData *tilingData, TPipe *pipe);
+                                const InplacePartialRopeRegbaseTilingData *tilingData, TPipe *pipe);
 
     __aicore__ inline void Process();
 
@@ -75,7 +75,7 @@ private:
 
 template <typename TX, bool IsBoardCast>
 __aicore__ inline void RotaryPositionEmbeddingAAndBMixed<TX, IsBoardCast>::Init(GM_ADDR q, GM_ADDR cos, GM_ADDR sin,
-    GM_ADDR qOut, GM_ADDR workspace, const InplacePartialRopeRegbaseTilingData *tilingData, TPipe *pipe)
+                                                                                GM_ADDR qOut, GM_ADDR workspace, const InplacePartialRopeRegbaseTilingData *tilingData, TPipe *pipe)
 {
     this->tilingData_ = tilingData;
     this->pipe_ = pipe;
@@ -116,7 +116,7 @@ __aicore__ inline void RotaryPositionEmbeddingAAndBMixed<TX, IsBoardCast>::InitA
         if constexpr (!IsBoardCast) {
             this->ubCopyInStride =
                 (this->dAlign_ * sizeof(TX) -
-                    ops::CeilAlign<int64_t>(tilingData_->sliceLength * sizeof(TX), BLOCK_TYPE_SIZE)) /
+                 ops::CeilAlign<int64_t>(tilingData_->sliceLength * sizeof(TX), BLOCK_TYPE_SIZE)) /
                 BLOCK_TYPE_SIZE;
         }
     }
@@ -152,22 +152,22 @@ __aicore__ inline void RotaryPositionEmbeddingAAndBMixed<TX, IsBoardCast>::Proce
         LocalTensor<float> sinUb = this->sinInQueue_.template DeQue<float>();
         for (int64_t ubLoopIdx = 0; ubLoopIdx < ubLoopCount; ubLoopIdx++) {
             this->ProcessInLoop(cosUb,
-                sinUb,
-                bBlockStart_ + ubLoopIdx * ubFactorB_,
-                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_);
+                                sinUb,
+                                bBlockStart_ + ubLoopIdx * ubFactorB_,
+                                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_);
         }
         this->cosInQueue_.FreeTensor(cosUb);
         this->sinInQueue_.FreeTensor(sinUb);
     } else {
         for (int64_t ubLoopIdx = 0; ubLoopIdx < ubLoopCount; ubLoopIdx++) {
             this->CopyInCosAndSin(bBlockStart_ + ubLoopIdx * ubFactorB_,
-                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_);
+                                  ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_);
             LocalTensor<float> cosUb = this->cosInQueue_.template DeQue<float>();
             LocalTensor<float> sinUb = this->sinInQueue_.template DeQue<float>();
             this->ProcessInLoop(cosUb,
-                sinUb,
-                bBlockStart_ + ubLoopIdx * ubFactorB_,
-                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_);
+                                sinUb,
+                                bBlockStart_ + ubLoopIdx * ubFactorB_,
+                                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_);
             this->cosInQueue_.FreeTensor(cosUb);
             this->sinInQueue_.FreeTensor(sinUb);
         }
@@ -252,22 +252,22 @@ __aicore__ inline void RotaryPositionEmbeddingAAndBMixed<TX, IsBoardCast>::Compu
         InterleaveModeVFMixed<TX>(inUb, cos, sin, outUb, tilingData_->sliceLength, 1, bLength);
     } else {
         BatchInterleaveModeVFMixed<TX, IsBoardCast>((__ubuf__ TX *)inUb.GetPhyAddr(),
-            (__ubuf__ float *)cos.GetPhyAddr(),
-            (__ubuf__ float *)sin.GetPhyAddr(),
-            (__ubuf__ TX *)outUb.GetPhyAddr(),
-            bLength,
-            1,
-            1,
-            tilingData_->sliceLength,
-            dAlign_,
-            dAlignFloat_,
-            ubFactorB_,
-            1);
+                                                    (__ubuf__ float *)cos.GetPhyAddr(),
+                                                    (__ubuf__ float *)sin.GetPhyAddr(),
+                                                    (__ubuf__ TX *)outUb.GetPhyAddr(),
+                                                    bLength,
+                                                    1,
+                                                    1,
+                                                    tilingData_->sliceLength,
+                                                    dAlign_,
+                                                    dAlignFloat_,
+                                                    ubFactorB_,
+                                                    1);
     }
 
     this->qInQueue_.FreeTensor(inUb);
     this->qOutQueue_.template EnQue(outUb);
 }
-}  // namespace InplacePartialRotaryMul
+} // namespace InplacePartialRotaryMul
 
 #endif

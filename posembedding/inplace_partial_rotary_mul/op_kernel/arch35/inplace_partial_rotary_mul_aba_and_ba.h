@@ -9,13 +9,13 @@
  */
 
 /*!
- * \file rotary_position_embedding_aba_and_ba.h
+ * \file inplace_partial_rotary_mul_aba_and_ba.h
  * \brief
  */
-#ifndef ROTARY_POSITION_EMBEDDING_ABA_AND_BA_H
-#define ROTARY_POSITION_EMBEDDING_ABA_AND_BA_H
+#ifndef INPLACE_PARTIAL_ROTARY_MUL_ABA_AND_BA_H
+#define INPLACE_PARTIAL_ROTARY_MUL_ABA_AND_BA_H
 
-#include "apply_rotary_pos_emb_common.h"
+#include "inplace_partial_rotary_mul_arpe_common.h"
 
 namespace InplacePartialRotaryMul {
 using namespace AscendC;

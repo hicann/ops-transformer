@@ -9,27 +9,23 @@
  */
 
 /*!
- * \file mhc_post.h
+ * \file mhc_post_arch35.h
  * \brief MhcPost kernel implementation
  * Formula: x_{l+1} = (H_{l}^{res})^{T} * x_l + h_{l}^{out} * H_{t}^{post}
  *          where: (H_{l}^{res})^{T} * x_l represents matrix multiplication with transposed h_res
  *                h_{l}^{out} * H_{t}^{post} represents element-wise multiplication and broadcasting
  */
 
-#ifndef ASCENDC_MHC_POST_H
-#define ASCENDC_MHC_POST_H
+#ifndef ASCENDC_MHC_POST_ARCH35_H
+#define ASCENDC_MHC_POST_ARCH35_H
 
 #include "kernel_operator.h"
-#include "kernel_utils.h"
 #include "kernel_tiling/kernel_tiling.h"
 #include "mhc_post_tiling_data.h"
 #include "mhc_post_tiling_key.h"
 
 namespace MhcPost {
 using namespace AscendC;
-
-// Double Buffer configuration - Double Buffer提升Memory Bound算子性能
-constexpr uint32_t DOUBLE_BUFFER_DEPTH = 2;  // Double Buffer depth for data tiles
 
 #define TEMPLATE_DECLARE template <typename T, uint16_t USE_PERMANENT_X>
 #define TEMPLATE_ARGS T, USE_PERMANENT_X
@@ -111,11 +107,6 @@ __aicore__ inline void MhcPostKernel<TEMPLATE_ARGS>::Init(GM_ADDR x, GM_ADDR hRe
     hResGm_.SetGlobalBuffer((__gm__ float *)hRes);
     hPostGm_.SetGlobalBuffer((__gm__ float *)hPost);
     outputGm_.SetGlobalBuffer((__gm__ T *)output);
-
-    xGm_.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
-    hOutGm_.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
-    hResGm_.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
-    hPostGm_.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
     // Initialize input queues - Double Buffer with depth=DOUBLE_BUFFER_DEPTH for data tiles
     pipe_->InitBuffer(hOutTileQueue_, DOUBLE_BUFFER_DEPTH, tilingData_->dInner * sizeof(T));
@@ -220,9 +211,7 @@ __aicore__ inline void MhcPostKernel<TEMPLATE_ARGS>::ComputeCopyOutAllX(int64_t 
 
         Muls(outF32, hOutF32, hPostGm_.GetValue(hPostBase + i), dNum);
         for (int64_t j = 0; j < tilingData_->n; j++) {
-            PipeBarrier<PIPE_V>();
             Axpy(outF32, xF32[j * dNumAlign], hResGm_.GetValue(hResBase + j * tilingData_->n + i), dNum);
-            PipeBarrier<PIPE_V>();
         }
 
         Cast(outputTile, outF32, RoundMode::CAST_RINT, dNum);
@@ -268,6 +257,6 @@ __aicore__ inline void MhcPostKernel<TEMPLATE_ARGS>::CopyOutTile(int64_t bsIdx, 
     outputTileQueue_.FreeTensor(outputTile);
 }
 
-}  // namespace MhcPost
+} // namespace MhcPost
 
-#endif  // ASCENDC_MHC_POST_H
+#endif // ASCENDC_MHC_POST_H

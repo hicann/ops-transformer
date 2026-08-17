@@ -16,7 +16,7 @@
 #ifndef ROTARY_POSITION_EMBEDDING_ABA_AND_BA_MIXED_H
 #define ROTARY_POSITION_EMBEDDING_ABA_AND_BA_MIXED_H
 
-#include "apply_rotary_pos_emb_common.h"
+#include "inplace_partial_rotary_mul_arpe_common.h"
 
 namespace InplacePartialRotaryMul {
 using namespace AscendC;
@@ -28,7 +28,7 @@ public:
     __aicore__ inline ~RotaryPositionEmbeddingABAAndBAMixed(){};
 
     __aicore__ inline void Init(GM_ADDR q, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut, GM_ADDR workspace,
-        const InplacePartialRopeRegbaseTilingData *tilingData, TPipe *pipe);
+                                const InplacePartialRopeRegbaseTilingData *tilingData, TPipe *pipe);
     __aicore__ inline void Process();
 
 private:
@@ -37,15 +37,15 @@ private:
     __aicore__ inline void InitLoopParams();
     __aicore__ inline void ProcessInSLoop(int64_t sUbStart, int64_t sUbLength);
     __aicore__ inline void ProcessInSBLoop(int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength,
-        LocalTensor<TX> &cos, LocalTensor<TX> &sin);
+                                           LocalTensor<TX> &cos, LocalTensor<TX> &sin);
     __aicore__ inline void ProcessInSBNLoop(int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength,
-        int64_t nUbStart, int64_t nUbLength, int64_t nTotalSize, LocalTensor<float> &cosFloat,
-        LocalTensor<float> &sinFloat, GlobalTensor<TX> &in, GlobalTensor<TX> &out);
+                                            int64_t nUbStart, int64_t nUbLength, int64_t nTotalSize, LocalTensor<float> &cosFloat,
+                                            LocalTensor<float> &sinFloat, GlobalTensor<TX> &in, GlobalTensor<TX> &out);
     __aicore__ inline void CopyInCosAndSin(int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength);
     __aicore__ inline void CopyInQ(GlobalTensor<TX> &source, int64_t sStart, int64_t sLength, int64_t bStart,
-        int64_t bLength, int64_t nStart, int64_t nLength, int64_t nTotalSize);
+                                   int64_t bLength, int64_t nStart, int64_t nLength, int64_t nTotalSize);
     __aicore__ inline void CopyOutQ(GlobalTensor<TX> &target, int64_t sStart, int64_t sLength, int64_t bStart,
-        int64_t bLength, int64_t nStart, int64_t nLength, int64_t nTotalSize);
+                                    int64_t bLength, int64_t nStart, int64_t nLength, int64_t nTotalSize);
     __aicore__ inline void Compute(
         LocalTensor<float> &cos, LocalTensor<float> &sin, int64_t sLength, int64_t bLength, int64_t nLength);
 
@@ -82,7 +82,7 @@ private:
 
 template <typename TX, bool IsBBoardcast>
 __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::Init(GM_ADDR q, GM_ADDR cos, GM_ADDR sin,
-    GM_ADDR qOut, GM_ADDR workspace, const InplacePartialRopeRegbaseTilingData *tilingData, TPipe *pipe)
+                                                                                    GM_ADDR qOut, GM_ADDR workspace, const InplacePartialRopeRegbaseTilingData *tilingData, TPipe *pipe)
 {
     this->tilingData_ = tilingData;
     this->blockIdx_ = GetBlockIdx();
@@ -123,7 +123,7 @@ __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::I
     if (tilingData_->rotaryMode == static_cast<int64_t>(InplacePartialRotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE)) {
         this->copyInQSplitCoef_ = 1;
         this->ubCopyInStride = (this->dAlign_ * sizeof(TX) -
-                                   ops::CeilAlign<int64_t>(tilingData_->sliceLength * sizeof(TX), BLOCK_TYPE_SIZE)) /
+                                ops::CeilAlign<int64_t>(tilingData_->sliceLength * sizeof(TX), BLOCK_TYPE_SIZE)) /
                                BLOCK_TYPE_SIZE;
     }
     this->pipe_->InitBuffer(
@@ -164,7 +164,7 @@ __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::P
     int64_t ubLoopCount = ops::CeilDiv(sBlockLength_, ubFactorS_);
     for (int64_t ubLoopIdx = 0; ubLoopIdx < ubLoopCount; ubLoopIdx++) {
         this->ProcessInSLoop(sBlockStart_ + ubLoopIdx * ubFactorS_,
-            ubLoopIdx != ubLoopCount - 1 ? ubFactorS_ : sBlockLength_ - ubLoopIdx * ubFactorS_);
+                             ubLoopIdx != ubLoopCount - 1 ? ubFactorS_ : sBlockLength_ - ubLoopIdx * ubFactorS_);
     }
 }
 
@@ -181,30 +181,30 @@ __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::P
         LocalTensor<TX> sinUb = sinUbFloat.template ReinterpretCast<TX>();
         for (int64_t ubLoopIdx = 0; ubLoopIdx < ubLoopCount; ubLoopIdx++) {
             this->ProcessInSBLoop(sUbStart,
-                sUbLength,
-                bBlockStart_ + ubLoopIdx * ubFactorB_,
-                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_,
-                cosUb,
-                sinUb);
+                                  sUbLength,
+                                  bBlockStart_ + ubLoopIdx * ubFactorB_,
+                                  ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_,
+                                  cosUb,
+                                  sinUb);
         }
         this->sinInQueue_.FreeTensor(sinUbFloat);
         this->cosInQueue_.FreeTensor(cosUbFloat);
     } else {
         for (int64_t ubLoopIdx = 0; ubLoopIdx < ubLoopCount; ubLoopIdx++) {
             this->CopyInCosAndSin(sUbStart,
-                sUbLength,
-                bBlockStart_ + ubLoopIdx * ubFactorB_,
-                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_);
+                                  sUbLength,
+                                  bBlockStart_ + ubLoopIdx * ubFactorB_,
+                                  ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_);
             LocalTensor<float> cosUbFloat = this->cosInQueue_.template DeQue<float>();
             LocalTensor<float> sinUbFloat = this->sinInQueue_.template DeQue<float>();
             LocalTensor<TX> cosUb = cosUbFloat.template ReinterpretCast<TX>();
             LocalTensor<TX> sinUb = sinUbFloat.template ReinterpretCast<TX>();
             this->ProcessInSBLoop(sUbStart,
-                sUbLength,
-                bBlockStart_ + ubLoopIdx * ubFactorB_,
-                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_,
-                cosUb,
-                sinUb);
+                                  sUbLength,
+                                  bBlockStart_ + ubLoopIdx * ubFactorB_,
+                                  ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_,
+                                  cosUb,
+                                  sinUb);
             this->cosInQueue_.FreeTensor(cosUbFloat);
             this->sinInQueue_.FreeTensor(sinUbFloat);
         }
@@ -213,30 +213,30 @@ __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::P
 
 template <typename TX, bool IsBBoardcast>
 __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::ProcessInSBLoop(int64_t sUbStart,
-    int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, LocalTensor<TX> &cos, LocalTensor<TX> &sin)
+                                                                                               int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, LocalTensor<TX> &cos, LocalTensor<TX> &sin)
 {
     int64_t qUbLoopCount = ops::CeilDiv(tilingData_->N, ubFactorN_);
     LocalTensor<float> cosFloat = cos.template ReinterpretCast<float>();
     LocalTensor<float> sinFloat = sin.template ReinterpretCast<float>();
     for (int64_t ubLoopIdx = 0; ubLoopIdx < qUbLoopCount; ubLoopIdx++) {
         this->ProcessInSBNLoop(sUbStart,
-            sUbLength,
-            bUbStart,
-            bUbLength,
-            ubLoopIdx * ubFactorN_,
-            ubLoopIdx != qUbLoopCount - 1 ? ubFactorN_ : tilingData_->N - ubLoopIdx * ubFactorN_,
-            tilingData_->N,
-            cosFloat,
-            sinFloat,
-            qGm_,
-            qOutGm_);
+                               sUbLength,
+                               bUbStart,
+                               bUbLength,
+                               ubLoopIdx * ubFactorN_,
+                               ubLoopIdx != qUbLoopCount - 1 ? ubFactorN_ : tilingData_->N - ubLoopIdx * ubFactorN_,
+                               tilingData_->N,
+                               cosFloat,
+                               sinFloat,
+                               qGm_,
+                               qOutGm_);
     }
 }
 
 template <typename TX, bool IsBBoardcast>
 __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::ProcessInSBNLoop(int64_t sUbStart,
-    int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, int64_t nUbStart, int64_t nUbLength, int64_t nTotalSize,
-    LocalTensor<float> &cosFloat, LocalTensor<float> &sinFloat, GlobalTensor<TX> &in, GlobalTensor<TX> &out)
+                                                                                                int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, int64_t nUbStart, int64_t nUbLength, int64_t nTotalSize,
+                                                                                                LocalTensor<float> &cosFloat, LocalTensor<float> &sinFloat, GlobalTensor<TX> &in, GlobalTensor<TX> &out)
 {
     CopyInQ(in, sUbStart, sUbLength, bUbStart, bUbLength, nUbStart, nUbLength, nTotalSize);
     Compute(cosFloat, sinFloat, sUbLength, bUbLength, nUbLength);
@@ -268,13 +268,13 @@ __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::C
     copyExtParams.srcStride = 0;
     copyExtParams.dstStride = 0;
     DataCopyPad(cosUb,
-        this->cosGm_[bStart * tilingData_->S * tilingData_->sliceLength + sStart * tilingData_->sliceLength],
-        copyExtParams,
-        copyPadExtparams);
+                this->cosGm_[bStart * tilingData_->S * tilingData_->sliceLength + sStart * tilingData_->sliceLength],
+                copyExtParams,
+                copyPadExtparams);
     DataCopyPad(sinUb,
-        this->sinGm_[bStart * tilingData_->S * tilingData_->sliceLength + sStart * tilingData_->sliceLength],
-        copyExtParams,
-        copyPadExtparams);
+                this->sinGm_[bStart * tilingData_->S * tilingData_->sliceLength + sStart * tilingData_->sliceLength],
+                copyExtParams,
+                copyPadExtparams);
     ResetLoopModePara(DataCopyMVType::OUT_TO_UB);
     this->cosInQueue_.template EnQue(cosUb);
     this->sinInQueue_.template EnQue(sinUb);
@@ -282,8 +282,8 @@ __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::C
 
 template <typename TX, bool IsBBoardcast>
 __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::CopyInQ(GlobalTensor<TX> &source,
-    int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart, int64_t nLength,
-    int64_t nTotalSize)
+                                                                                       int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart, int64_t nLength,
+                                                                                       int64_t nTotalSize)
 {
     LocalTensor<TX> target = this->qInQueue_.template AllocTensor<TX>();
     LoopModeParams loopParams;
@@ -310,8 +310,8 @@ __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::C
 
 template <typename TX, bool IsBBoardcast>
 __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::CopyOutQ(GlobalTensor<TX> &target,
-    int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart, int64_t nLength,
-    int64_t nTotalSize)
+                                                                                        int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart, int64_t nLength,
+                                                                                        int64_t nTotalSize)
 {
     LocalTensor<TX> source = this->qOutQueue_.template DeQue<TX>();
     LoopModeParams loopParams;
@@ -343,22 +343,22 @@ __aicore__ inline void RotaryPositionEmbeddingABAAndBAMixed<TX, IsBBoardcast>::C
     int64_t totalLength = sLength * bLength * nLength * tilingData_->sliceLength;
 
     BatchInterleaveModeVFMixed<TX, IsBBoardcast>((__ubuf__ TX *)inUb.GetPhyAddr(),
-        (__ubuf__ float *)cos.GetPhyAddr(),
-        (__ubuf__ float *)sin.GetPhyAddr(),
-        (__ubuf__ TX *)outUb.GetPhyAddr(),
-        sLength,
-        bLength,
-        nLength,
-        tilingData_->sliceLength,
-        dAlign_,
-        dAlignFloat_,
-        ubFactorS_,
-        ubFactorN_);
+                                                 (__ubuf__ float *)cos.GetPhyAddr(),
+                                                 (__ubuf__ float *)sin.GetPhyAddr(),
+                                                 (__ubuf__ TX *)outUb.GetPhyAddr(),
+                                                 sLength,
+                                                 bLength,
+                                                 nLength,
+                                                 tilingData_->sliceLength,
+                                                 dAlign_,
+                                                 dAlignFloat_,
+                                                 ubFactorS_,
+                                                 ubFactorN_);
 
     this->qInQueue_.FreeTensor(inUb);
     this->qOutQueue_.template EnQue(outUb);
 }
 
-}  // namespace InplacePartialRotaryMul
+} // namespace InplacePartialRotaryMul
 
-#endif  // ROTARY_POSITION_EMBEDDING_ABA_AND_BA_MIXED_H
+#endif // ROTARY_POSITION_EMBEDDING_ABA_AND_BA_MIXED_H

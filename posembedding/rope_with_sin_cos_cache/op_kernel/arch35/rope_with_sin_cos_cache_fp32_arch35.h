@@ -9,33 +9,32 @@
  */
 
 /*!
- * \file rope_with_sin_cos_cache_fp32.h
+ * \file rope_with_sin_cos_cache_fp32_arch35.h
  * \brief rope_with_sin_cos_cache_fp32.h
  */
 
 #ifndef ROPE_WITH_SIN_COS_CACHE_ARCH35_FP32_H
 #define ROPE_WITH_SIN_COS_CACHE_ARCH35_FP32_H
 
-#include "rope_with_sin_cos_cache_base.h"
+#include "rope_with_sin_cos_cache_base_arch35.h"
 
 namespace RopeWithSinCosCache {
 using namespace AscendC;
 
 template <typename T>
-class RopeWithSinCosCacheF32 : public RopeWithSinCosCacheBase<T>
-{
+class RopeWithSinCosCacheF32 : public RopeWithSinCosCacheBase<T> {
 public:
     __aicore__ inline RopeWithSinCosCacheF32(){};
     __aicore__ inline void Init(
         GM_ADDR position_id, GM_ADDR query_in, GM_ADDR key_in, GM_ADDR cos_sin_cache, GM_ADDR query_out,
-        GM_ADDR key_out, const RopeWithSinCosCacheTilingData& tiling_data, TPipe* pipe);
+        GM_ADDR key_out, const RopeWithSinCosCacheTilingData &tiling_data, TPipe *pipe);
     __aicore__ inline void Process();
     __aicore__ inline void Compute(uint64_t index, uint64_t loopN);
     __aicore__ inline void ComputeAlongHeads(uint64_t indexToken, uint64_t indexHeads);
     __aicore__ inline void GetCosSinCache(
-                                          LocalTensor<T> copyBuf0Local, LocalTensor<float> inCosSin,
-                                          LocalTensor<float> CosSin, uint64_t offsetPos, uint64_t cosSinOffset, uint64_t localStartAddr,
-                                          uint32_t (&rcShape_)[2], uint32_t (&dstShape_)[2]);
+        LocalTensor<T> copyBuf0Local, LocalTensor<float> inCosSin,
+        LocalTensor<float> CosSin, uint64_t offsetPos, uint64_t cosSinOffset, uint64_t localStartAddr,
+        uint32_t (&rcShape_)[2], uint32_t (&dstShape_)[2]);
 
 protected:
     static constexpr uint64_t BLOCK_SIZE = 32;
@@ -68,7 +67,7 @@ protected:
 template <typename T>
 __aicore__ inline void RopeWithSinCosCacheF32<T>::Init(
     GM_ADDR position_id, GM_ADDR query_in, GM_ADDR key_in, GM_ADDR cos_sin_cache, GM_ADDR query_out, GM_ADDR key_out,
-    const RopeWithSinCosCacheTilingData& tiling_data, TPipe* pipe)
+    const RopeWithSinCosCacheTilingData &tiling_data, TPipe *pipe)
 {
     this->InitData(tiling_data);
     headBlockLen = static_cast<uint16_t>(this->head_size / ELE_NUM_FP32);
@@ -83,16 +82,16 @@ __aicore__ inline void RopeWithSinCosCacheF32<T>::Init(
                       (this->blockIdx_ - this->front_core) * this->num_tokens_each_tail_core;
     }
 
-    position_id_GM.SetGlobalBuffer((__gm__ uint64_t*)position_id + blockOffset);
-    query_in_GM.SetGlobalBuffer((__gm__ T*)query_in + blockOffset * this->num_q_heads * this->head_size);	
-    key_in_GM.SetGlobalBuffer((__gm__ T*)key_in + blockOffset * this->num_kv_heads * this->head_size);
-    cos_sin_cache_GM.SetGlobalBuffer((__gm__ T*)cos_sin_cache);
+    position_id_GM.SetGlobalBuffer((__gm__ uint64_t *)position_id + blockOffset);
+    query_in_GM.SetGlobalBuffer((__gm__ T *)query_in + blockOffset * this->num_q_heads * this->head_size);
+    key_in_GM.SetGlobalBuffer((__gm__ T *)key_in + blockOffset * this->num_kv_heads * this->head_size);
+    cos_sin_cache_GM.SetGlobalBuffer((__gm__ T *)cos_sin_cache);
 
-    queryGM.SetGlobalBuffer((__gm__ T*)query_out + blockOffset * this->num_q_heads * this->head_size);
-    keyGM.SetGlobalBuffer((__gm__ T*)key_out + blockOffset * this->num_kv_heads * this->head_size);
+    queryGM.SetGlobalBuffer((__gm__ T *)query_out + blockOffset * this->num_q_heads * this->head_size);
+    keyGM.SetGlobalBuffer((__gm__ T *)key_out + blockOffset * this->num_kv_heads * this->head_size);
 
-    pipe->InitBuffer(copyBuf0,  this->rotary_dim / 2 * sizeof(T));
-    if(this->loop_for_one_token==0){
+    pipe->InitBuffer(copyBuf0, this->rotary_dim / 2 * sizeof(T));
+    if (this->loop_for_one_token == 0) {
         pipe->InitBuffer(
             inQQue, BUFFER_NUM, this->num_tokens_each_loop_current_core * num_heads_max * this->head_size * sizeof(T));
         pipe->InitBuffer(
@@ -105,7 +104,7 @@ __aicore__ inline void RopeWithSinCosCacheF32<T>::Init(
         pipe->InitBuffer(cosSinBuf, this->num_tokens_each_loop_current_core * num_heads_max * this->rotary_dim * sizeof(T));
         pipe->InitBuffer(
             inQueCalBuf, this->num_tokens_each_loop_current_core * num_heads_max * this->rotary_dim * sizeof(T));
-        
+
         if (this->is_neox_style == 0) {
             pipe->InitBuffer(temp1, this->num_tokens_each_loop_current_core * num_heads_max * this->rotary_dim * sizeof(T));
             pipe->InitBuffer(offsetBuf, this->rotary_dim * sizeof(uint32_t));
@@ -159,7 +158,7 @@ RopeWithSinCosCacheF32<T>::GetCosSinCache(LocalTensor<T> copyBuf0Local, LocalTen
                                      static_cast<uint16_t>(this->mrope_section0 + this->mrope_section1) + cosSinOffset],
                     {1, static_cast<uint16_t>(this->mrope_section2 * sizeof(T)), 0, 0}, {true, padding2, 0, 0});
         PipeBarrier<PIPE_ALL>();
-        
+
         // 如果mrope_section不是32B对齐，DataCopyPad接口会自动填充，同时为了兼容旧版16 24 24做法，避免该场景性能劣化
         uint8_t padding1 = (this->mrope_section0 * sizeof(T) % BLOCK_SIZE) / sizeof(T);
         if (this->mrope_section1 % MROPE_SECTION_BASE_SIZE == 0) {
@@ -319,7 +318,7 @@ __aicore__ inline void RopeWithSinCosCacheF32<T>::Compute(uint64_t index, uint64
     } else {
         DataCopy(
             outLocal, inQueCalLocal,
-            {static_cast<uint16_t>(loopN), static_cast<uint16_t>(this->num_q_heads * headBlockLen), 0, 0});       
+            {static_cast<uint16_t>(loopN), static_cast<uint16_t>(this->num_q_heads * headBlockLen), 0, 0});
     }
     PipeBarrier<PIPE_ALL>();
     DataCopy(
@@ -423,12 +422,13 @@ __aicore__ inline void RopeWithSinCosCacheF32<T>::Compute(uint64_t index, uint64
 }
 
 template <typename T>
-__aicore__ inline void RopeWithSinCosCacheF32<T>::ComputeAlongHeads(uint64_t indexToken, uint64_t indexHeads){
+__aicore__ inline void RopeWithSinCosCacheF32<T>::ComputeAlongHeads(uint64_t indexToken, uint64_t indexHeads)
+{
     q_size = this->num_q_heads * this->head_size;
     k_size = this->num_kv_heads * this->head_size;
     uint64_t offsetQHead = indexHeads * this->num_qheads_each_loop * this->head_size;
     uint64_t offsetKHead = indexHeads * this->num_kheads_each_loop * this->head_size;
-    uint64_t offset = indexToken * q_size + offsetQHead;//非连续?
+    uint64_t offset = indexToken * q_size + offsetQHead; // 非连续?
     uint64_t offsetk = indexToken * k_size + offsetKHead;
 
     uint32_t dstShape_[2] = {static_cast<uint32_t>(this->num_heads_each_loop), static_cast<uint32_t>(this->rotary_dim)};
@@ -546,7 +546,7 @@ __aicore__ inline void RopeWithSinCosCacheF32<T>::ComputeAlongHeads(uint64_t ind
                  {static_cast<uint16_t>(loopNQhead), static_cast<uint16_t>(headBlockLen), 0, 0});
         PipeBarrier<PIPE_ALL>();
     }
-    //key
+    // key
     if (indexHeads < this->loop_along_kheads) {
         uint64_t loopNKhead = (indexHeads == this->loop_along_kheads - 1 && this->num_kheads_last_loop != 0) ?
                                   this->num_kheads_last_loop :
@@ -631,7 +631,7 @@ __aicore__ inline void RopeWithSinCosCacheF32<T>::ComputeAlongHeads(uint64_t ind
                  {static_cast<uint16_t>(loopNKhead), static_cast<uint16_t>(headBlockLen), 0, 0});
         PipeBarrier<PIPE_ALL>();
     }
-    
+
     inQueueCosSinCache.FreeTensor(inCosSin);
     inQQue.FreeTensor(inLocal);
     outQue.FreeTensor(outLocal);
@@ -640,7 +640,7 @@ __aicore__ inline void RopeWithSinCosCacheF32<T>::ComputeAlongHeads(uint64_t ind
 template <typename T>
 __aicore__ inline void RopeWithSinCosCacheF32<T>::Process()
 {
-    if(this->loop_for_one_token==0){
+    if (this->loop_for_one_token == 0) {
         for (uint64_t n = 0; n < this->loop_time_current_core - 1; n++) {
             Compute(n, this->num_tokens_each_loop_current_core);
         }
@@ -650,13 +650,12 @@ __aicore__ inline void RopeWithSinCosCacheF32<T>::Process()
         } else {
             Compute(this->loop_time_current_core - 1, this->num_tokens_last_loop_current_core);
         }
-    }
-    else{
+    } else {
         uint64_t loop_along_heads =
             this->loop_along_qheads > this->loop_along_kheads ? this->loop_along_qheads : this->loop_along_kheads;
-        for(uint64_t n=0;n<this->num_tokens_current_core;n++){
-            for(uint64_t m=0;m<loop_along_heads;m++){
-                ComputeAlongHeads(n,m);
+        for (uint64_t n = 0; n < this->num_tokens_current_core; n++) {
+            for (uint64_t m = 0; m < loop_along_heads; m++) {
+                ComputeAlongHeads(n, m);
             }
         }
     }

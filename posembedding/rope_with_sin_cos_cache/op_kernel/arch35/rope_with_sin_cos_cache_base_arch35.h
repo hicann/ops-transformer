@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file rope_with_sin_cos_cache_base.h
+ * \file rope_with_sin_cos_cache_base_arch35.h
  * \brief rope_with_sin_cos_cache_base.h
  */
 #ifndef ROPE_WITH_SIN_COS_CACHE_ARCH35_BASE_H
@@ -23,12 +23,11 @@ using AscendC::Duplicate;
 using AscendC::HardEvent;
 
 template <typename T>
-class RopeWithSinCosCacheBase
-{
+class RopeWithSinCosCacheBase {
 public:
     // 构造函数
     __aicore__ inline RopeWithSinCosCacheBase(){};
-    __aicore__ inline void InitData(const RopeWithSinCosCacheTilingData& tilingData);
+    __aicore__ inline void InitData(const RopeWithSinCosCacheTilingData &tilingData);
     __aicore__ inline void SToMTE2Sync();
     __aicore__ inline void MTE2ToSSync();
     __aicore__ inline void SToMTE3Sync();
@@ -72,7 +71,7 @@ protected:
 };
 
 template <typename T>
-__aicore__ inline void RopeWithSinCosCacheBase<T>::InitData(const RopeWithSinCosCacheTilingData& tilingData)
+__aicore__ inline void RopeWithSinCosCacheBase<T>::InitData(const RopeWithSinCosCacheTilingData &tilingData)
 {
     blockIdx_ = AscendC::GetBlockIdx();
 
@@ -170,4 +169,3 @@ __aicore__ inline void RopeWithSinCosCacheBase<T>::MTE2ToVSync()
 } // namespace RopeWithSinCosCache
 
 #endif // namespace RopeWithSinCosCache
-

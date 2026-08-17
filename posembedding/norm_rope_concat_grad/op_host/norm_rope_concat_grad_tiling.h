@@ -24,7 +24,7 @@
 #include "tiling/tiling_api.h"
 #include "exe_graph/runtime/tiling_context.h"
 #include "register/op_def_registry.h"
-#include "norm_rope_concat_grad_base.h"
+#include "norm_rope_concat_grad_base_host.h"
 
 using namespace NormRopeConcatGrad;
 

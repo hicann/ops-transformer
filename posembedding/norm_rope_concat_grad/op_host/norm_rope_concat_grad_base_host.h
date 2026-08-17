@@ -9,7 +9,7 @@
  */
 
 /* !
- * \file norm_rope_concat_grad_base.h
+ * \file norm_rope_concat_grad_base_host.h
  * \brief
  */
 

@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file apply_rotary_pos_emb_common.h
+ * \file inplace_partial_rotary_mul_arpe_common.h
  * \brief
  */
-#ifndef APPLY_ROTARY_POS_EMB_COMMON_H
-#define APPLY_ROTARY_POS_EMB_COMMON_H
+#ifndef INPLACE_PARTIAL_ROTARY_MUL_ARPE_COMMON_H
+#define INPLACE_PARTIAL_ROTARY_MUL_ARPE_COMMON_H
 
 #include "inplace_partial_rotary_mul_common.h"
 
@@ -53,8 +53,8 @@ struct InplacePartialRotaryPosEmbeddingMode {
 */
 template <typename T>
 __aicore__ inline void HalfAlignVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-    const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen, uint32_t dAlign, uint16_t currSNum,
-    uint16_t currDNum)
+                                   const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen, uint32_t dAlign, uint16_t currSNum,
+                                   uint16_t currDNum)
 {
     __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
     __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
@@ -120,8 +120,8 @@ __aicore__ inline void HalfAlignVF(const LocalTensor<T> &sinTensor, const LocalT
 */
 template <typename T>
 __aicore__ inline void QuarterAlignVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-    const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen, uint32_t dAlign, uint16_t currSNum,
-    uint16_t currDNum)
+                                      const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen, uint32_t dAlign, uint16_t currSNum,
+                                      uint16_t currDNum)
 {
     __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
     __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
@@ -204,8 +204,8 @@ __aicore__ inline void QuarterAlignVF(const LocalTensor<T> &sinTensor, const Loc
 
 template <typename T>
 __aicore__ inline void InterleaveModeVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-    const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen, uint16_t currSNum,
-    uint16_t currDNum)
+                                        const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen, uint16_t currSNum,
+                                        uint16_t currDNum)
 {
     __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
     __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
@@ -318,8 +318,8 @@ __aicore__ inline void InterleaveModeVF(const LocalTensor<T> &sinTensor, const L
 
 template <typename T>
 __aicore__ inline void DeepSeekInterleaveModeVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
-    const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen, uint16_t currSNum,
-    uint16_t currDNum)
+                                                const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen, uint16_t currSNum,
+                                                uint16_t currDNum)
 {
     __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
     __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
@@ -367,13 +367,13 @@ __aicore__ inline void DeepSeekInterleaveModeVF(const LocalTensor<T> &sinTensor,
                     uint32_t halfOffset = offset + halfDAlign;
                     uint32_t inOffset = offset * HALF_INTERLEAVE_COEF;
                     ops::LoadTwoTensorForDtypeT<T>(currInUb,
-                        currInUb,
-                        vregIn,
-                        vregHalfIn,
-                        pregFull,
-                        pregFull,
-                        inOffset,
-                        inOffset + VL_FLOAT32_SIZE);
+                                                   currInUb,
+                                                   vregIn,
+                                                   vregHalfIn,
+                                                   pregFull,
+                                                   pregFull,
+                                                   inOffset,
+                                                   inOffset + VL_FLOAT32_SIZE);
                     ops::LoadTwoTensorForDtypeT<T>(
                         currSinUb, currSinUb, vregSin, vregHalfSin, pregFull, pregFull, offset, halfOffset);
                     ops::LoadTwoTensorForDtypeT<T>(
@@ -398,13 +398,13 @@ __aicore__ inline void DeepSeekInterleaveModeVF(const LocalTensor<T> &sinTensor,
                     uint32_t halfOffset = offset + halfDAlign;
                     uint32_t inOffset = offset * HALF_INTERLEAVE_COEF;
                     ops::LoadTwoTensorForDtypeT<T>(currInUb,
-                        currInUb,
-                        vregIn,
-                        vregHalfIn,
-                        pregFull,
-                        pregTail,
-                        inOffset,
-                        inOffset + VL_FLOAT32_SIZE);
+                                                   currInUb,
+                                                   vregIn,
+                                                   vregHalfIn,
+                                                   pregFull,
+                                                   pregTail,
+                                                   inOffset,
+                                                   inOffset + VL_FLOAT32_SIZE);
                     ops::LoadTwoTensorForDtypeT<T>(
                         currSinUb, currSinUb, vregSin, vregHalfSin, pregHalfTail, pregHalfTail, offset, halfOffset);
                     ops::LoadTwoTensorForDtypeT<T>(
@@ -452,8 +452,8 @@ __aicore__ inline void DeepSeekInterleaveModeVF(const LocalTensor<T> &sinTensor,
 
 template <typename T, bool IsBBoardcast>
 __aicore__ inline void BatchHalfAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin,
-    __ubuf__ T *out, uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign,
-    int64_t ubFactorS, int64_t ubFactorN)
+                                        __ubuf__ T *out, uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign,
+                                        int64_t ubFactorS, int64_t ubFactorN)
 {
     uint32_t dHalfSize = d / HALF_INTERLEAVE_COEF;
     uint16_t dLoopCount = (dHalfSize + VL_FLOAT32_SIZE - 1) / VL_FLOAT32_SIZE;
@@ -519,8 +519,8 @@ __aicore__ inline void BatchHalfAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf_
 
 template <typename T, bool IsBBoardcast>
 __aicore__ inline void BatchQuarterAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin,
-    __ubuf__ T *out, uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign,
-    int64_t ubFactorS, int64_t ubFactorN)
+                                           __ubuf__ T *out, uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign,
+                                           int64_t ubFactorS, int64_t ubFactorN)
 {
     uint32_t dQuarterSize = d / QUARTER_MODE_COEF;
     uint16_t dLoopCount = (dQuarterSize + VL_FLOAT32_SIZE - 1) / VL_FLOAT32_SIZE;
@@ -566,53 +566,53 @@ __aicore__ inline void BatchQuarterAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ub
                         pregLoop = Reg::UpdateMask<float>(count);
                         // 拷贝到RegBase内
                         ops::LoadTwoTensorForDtypeT<T>(currInUb,
-                            currInUb,
-                            inPart1Reg,
-                            inPart2Reg,
-                            pregLoop,
-                            pregLoop,
-                            i * VL_FLOAT32_SIZE,
-                            i * VL_FLOAT32_SIZE + dQuarterOffset);
+                                                       currInUb,
+                                                       inPart1Reg,
+                                                       inPart2Reg,
+                                                       pregLoop,
+                                                       pregLoop,
+                                                       i * VL_FLOAT32_SIZE,
+                                                       i * VL_FLOAT32_SIZE + dQuarterOffset);
                         ops::LoadTwoTensorForDtypeT<T>(currInUb,
-                            currInUb,
-                            inPart3Reg,
-                            inPart4Reg,
-                            pregLoop,
-                            pregLoop,
-                            i * VL_FLOAT32_SIZE + dHalfOffset,
-                            i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
+                                                       currInUb,
+                                                       inPart3Reg,
+                                                       inPart4Reg,
+                                                       pregLoop,
+                                                       pregLoop,
+                                                       i * VL_FLOAT32_SIZE + dHalfOffset,
+                                                       i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
                         ops::LoadTwoTensorForDtypeT<T>(currCosUb,
-                            currCosUb,
-                            cosPart1Reg,
-                            cosPart2Reg,
-                            pregLoop,
-                            pregLoop,
-                            i * VL_FLOAT32_SIZE,
-                            i * VL_FLOAT32_SIZE + dQuarterOffset);
+                                                       currCosUb,
+                                                       cosPart1Reg,
+                                                       cosPart2Reg,
+                                                       pregLoop,
+                                                       pregLoop,
+                                                       i * VL_FLOAT32_SIZE,
+                                                       i * VL_FLOAT32_SIZE + dQuarterOffset);
                         ops::LoadTwoTensorForDtypeT<T>(currCosUb,
-                            currCosUb,
-                            cosPart3Reg,
-                            cosPart4Reg,
-                            pregLoop,
-                            pregLoop,
-                            i * VL_FLOAT32_SIZE + dHalfOffset,
-                            i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
+                                                       currCosUb,
+                                                       cosPart3Reg,
+                                                       cosPart4Reg,
+                                                       pregLoop,
+                                                       pregLoop,
+                                                       i * VL_FLOAT32_SIZE + dHalfOffset,
+                                                       i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
                         ops::LoadTwoTensorForDtypeT<T>(currSinUb,
-                            currSinUb,
-                            sinPart1Reg,
-                            sinPart2Reg,
-                            pregLoop,
-                            pregLoop,
-                            i * VL_FLOAT32_SIZE,
-                            i * VL_FLOAT32_SIZE + dQuarterOffset);
+                                                       currSinUb,
+                                                       sinPart1Reg,
+                                                       sinPart2Reg,
+                                                       pregLoop,
+                                                       pregLoop,
+                                                       i * VL_FLOAT32_SIZE,
+                                                       i * VL_FLOAT32_SIZE + dQuarterOffset);
                         ops::LoadTwoTensorForDtypeT<T>(currSinUb,
-                            currSinUb,
-                            sinPart3Reg,
-                            sinPart4Reg,
-                            pregLoop,
-                            pregLoop,
-                            i * VL_FLOAT32_SIZE + dHalfOffset,
-                            i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
+                                                       currSinUb,
+                                                       sinPart3Reg,
+                                                       sinPart4Reg,
+                                                       pregLoop,
+                                                       pregLoop,
+                                                       i * VL_FLOAT32_SIZE + dHalfOffset,
+                                                       i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
                         // 计算
                         Reg::Mul(cosPart1Reg, inPart1Reg, cosPart1Reg, pregLoop);
                         Reg::Mul(sinPart1Reg, inPart2Reg, sinPart1Reg, pregLoop);
@@ -643,8 +643,8 @@ __aicore__ inline void BatchQuarterAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ub
 
 template <typename T, bool IsBBoardcast>
 __aicore__ inline void BatchInterleaveModeVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin,
-    __ubuf__ T *out, uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign,
-    int64_t ubFactorS, int64_t ubFactorN)
+                                             __ubuf__ T *out, uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign,
+                                             int64_t ubFactorS, int64_t ubFactorN)
 {
     uint32_t loopSize = 2 * VL_FLOAT32_SIZE;
     uint16_t dLoopCount = (d + loopSize - 1) / loopSize;
@@ -726,8 +726,8 @@ __aicore__ inline void BatchInterleaveModeVF(__ubuf__ T *in, __ubuf__ T *cos, __
 
 template <typename T, bool IsBBoardcast>
 __aicore__ inline void BatchDeepSeekInterleaveModeVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin,
-    __ubuf__ T *out, uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign,
-    int64_t ubFactorS, int64_t ubFactorN)
+                                                     __ubuf__ T *out, uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign,
+                                                     int64_t ubFactorS, int64_t ubFactorN)
 {
     uint32_t loopSize = 2 * VL_FLOAT32_SIZE;
     uint16_t dLoopCount = (d + loopSize - 1) / loopSize;
@@ -810,8 +810,8 @@ __aicore__ inline void BatchDeepSeekInterleaveModeVF(__ubuf__ T *in, __ubuf__ T 
 // Mixed precision: TX is half/bfloat16 for input, cos/sin are float
 template <typename TX>
 __aicore__ inline void InterleaveModeVFMixed(const LocalTensor<TX> &inTensor, const LocalTensor<float> &cosTensor,
-    const LocalTensor<float> &sinTensor, const LocalTensor<TX> &outTensor, uint32_t dLen, uint16_t currSNum,
-    uint16_t currDNum)
+                                             const LocalTensor<float> &sinTensor, const LocalTensor<TX> &outTensor, uint32_t dLen, uint16_t currSNum,
+                                             uint16_t currDNum)
 {
     __ubuf__ TX *inUb = (__ubuf__ TX *)inTensor.GetPhyAddr();
     __ubuf__ float *cosUb = (__ubuf__ float *)cosTensor.GetPhyAddr();
@@ -919,8 +919,8 @@ __aicore__ inline void InterleaveModeVFMixed(const LocalTensor<TX> &inTensor, co
 // Mixed precision BatchInterleaveModeVF for ABA layout
 template <typename TX, bool IsBBoardcast>
 __aicore__ inline void BatchInterleaveModeVFMixed(__ubuf__ TX *in, __ubuf__ float *cos,
-    __ubuf__ float *sin, __ubuf__ TX *out, uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d,
-    int64_t dAlign, int64_t dAlignFloat, int64_t ubFactorS, int64_t ubFactorN)
+                                                  __ubuf__ float *sin, __ubuf__ TX *out, uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d,
+                                                  int64_t dAlign, int64_t dAlignFloat, int64_t ubFactorS, int64_t ubFactorN)
 {
     uint32_t loopSize = 2 * VL_FLOAT32_SIZE;
     uint16_t dLoopCount = (d + loopSize - 1) / loopSize;
@@ -976,9 +976,9 @@ __aicore__ inline void BatchInterleaveModeVFMixed(__ubuf__ TX *in, __ubuf__ floa
                         // Load/Store的offset是TX元素偏移，需与cos/sin逻辑下标对齐，不能按dtype字节数换算。
                         ops::LoadOneTensorForDtypeT<TX>(currInUb, inPart1Reg, pregPart1, i * loopSize);
                         ops::LoadOneTensorForDtypeT<TX>(currInUb,
-                            inPart2Reg,
-                            pregPart2,
-                            i * loopSize + VL_FLOAT32_SIZE);
+                                                        inPart2Reg,
+                                                        pregPart2,
+                                                        i * loopSize + VL_FLOAT32_SIZE);
                         ops::LoadOneTensorForDtypeT<float>(currCosUb, cosPart1Reg, pregPart1, i * loopSize);
                         ops::LoadOneTensorForDtypeT<float>(
                             currCosUb, cosPart2Reg, pregPart2, i * loopSize + VL_FLOAT32_SIZE);
@@ -996,9 +996,9 @@ __aicore__ inline void BatchInterleaveModeVFMixed(__ubuf__ TX *in, __ubuf__ floa
                         Reg::Add(cosPart2Reg, cosPart2Reg, sinPart2Reg, pregPart2);
                         ops::StoreOneTensorForDtypeT<TX>(currOutUb, cosPart1Reg, pregPart1, i * loopSize);
                         ops::StoreOneTensorForDtypeT<TX>(currOutUb,
-                            cosPart2Reg,
-                            pregPart2,
-                            i * loopSize + VL_FLOAT32_SIZE);
+                                                         cosPart2Reg,
+                                                         pregPart2,
+                                                         i * loopSize + VL_FLOAT32_SIZE);
                     }
                 }
             }
@@ -1006,4 +1006,4 @@ __aicore__ inline void BatchInterleaveModeVFMixed(__ubuf__ TX *in, __ubuf__ floa
     }
 }
 
-#endif  // APPLY_ROTARY_POS_EMB_COMMON_H
+#endif // APPLY_ROTARY_POS_EMB_COMMON_H

@@ -15,13 +15,13 @@
 
 #include <register/op_impl_registry.h>
 #include "log/log.h"
-#include "norm_rope_concat_base.h"
+#include "norm_rope_concat_base_host.h"
 
 using namespace ge;
 using namespace nrc;
 namespace ops {
 static ge::graphStatus CheckShape(gert::InferShapeContext *context, const gert::Shape *shape, int64_t batch, int64_t head,
-                           int64_t dim, int64_t &seq)
+                                  int64_t dim, int64_t &seq)
 {
     if (shape->GetDimNum() != INPUT_DIM_NUM) {
         OP_LOGE(context->GetNodeName(), "Input must be 4D tensors(B, S, H, D).");
@@ -35,7 +35,7 @@ static ge::graphStatus CheckShape(gert::InferShapeContext *context, const gert::
     return ge::GRAPH_SUCCESS;
 }
 
-static  ge::graphStatus InferShape4NormRopeConcat(gert::InferShapeContext *context)
+static ge::graphStatus InferShape4NormRopeConcat(gert::InferShapeContext *context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("NormRopeConcat", "context is nullptr"), return ge::GRAPH_FAILED);
     OP_LOGD(context, "Enter InferShape4NormRopeConcat.");
