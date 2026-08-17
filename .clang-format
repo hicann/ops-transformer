@@ -13,7 +13,7 @@
 #     clang-format -i -style=file <file>
 
 BasedOnStyle: Google
-ColumnLimit: 0
+ColumnLimit: 120
 AccessModifierOffset: -4
 SortIncludes: false
 SortUsingDeclarations: false
