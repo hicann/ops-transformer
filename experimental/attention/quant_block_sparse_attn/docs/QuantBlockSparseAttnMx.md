@@ -77,7 +77,7 @@ torch.ops.custom.npu_quant_block_sparse_attn(
 
 - `B`：Batch size。
 - `S1`：单个 batch 的 Query 最大长度，`S1 <= max_Qb * sparse_q_block_size`。
-- `S2`：单个 batch 的 KV 最大长度，`S2 <= max_Kb * pa_block_size`。
+- `S2`：单个 batch 的 KV 最大长度，`S2 <= max_Kb * sparse_kv_block_size`。
 - `T1`：所有 batch 的 Query 有效 token 数之和。
 - `N1`：Query head 数。
 - `N2`：KV head 数。
