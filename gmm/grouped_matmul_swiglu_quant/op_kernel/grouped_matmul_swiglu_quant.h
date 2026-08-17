@@ -32,7 +32,8 @@ public:
     constexpr static bool transposeW = mmType::BT::isTrans;
 
     /** @brief constructor */
-    __aicore__ inline GMMSwigluCompute(typename mmType::MT &mm_) : mm(mm_)
+    __aicore__ inline GMMSwigluCompute(typename mmType::MT &mm_)
+        : mm(mm_)
     {
     }
 
@@ -406,7 +407,7 @@ __aicore__ inline void GMMSwigluCompute<mmType, sync, CHANNELDTYPE>::UpdateChann
 {
     // 更新perChannel
     if (unlikely(vecConfig.nextUpadteInterVal == 0)) {
-        int64_t loop = gmmSwiglu->groupListLen - vecConfig.curGroupIdx;
+        int64_t loop = gmmSwiglu->groupListLen - vecConfig.curGroupIdx - 1;
         while (loop--) {
             int64_t curTemp = groupListGM.GetValue(vecConfig.curGroupIdx);
             vecConfig.curGroupIdx++;
