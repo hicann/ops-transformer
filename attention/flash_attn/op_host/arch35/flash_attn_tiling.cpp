@@ -121,6 +121,12 @@ void FlashAttnTilingImpl::SplitPolicy()
         winLeft = MASK_MODE_INT_MAX;
         winRight = MASK_MODE_INT_MAX;
     }
+    if (winLeft == -1) {
+        winLeft = MASK_MODE_INT_MAX;
+    }
+    if (winRight == -1) {
+        winRight = MASK_MODE_INT_MAX;
+    }
     fa_tiling_util::AdjustSinnerAndSouter(static_cast<uint32_t>(faInfo_->vHeadDim),
                                           faInfo_->maxSeqQ, faInfo_->maxSeqKv,
                                           static_cast<int32_t>(faInfo_->maskMode), winLeft, winRight,
