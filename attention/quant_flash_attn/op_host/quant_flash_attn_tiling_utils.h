@@ -26,6 +26,15 @@
 
 namespace optiling {
 
+template <typename T>
+inline auto CeilDivision(T num1, T num2) -> T
+{
+    if (num2 == 0) {
+        return 0;
+    }
+    return (num1 + num2 - 1) / num2;
+}
+
 static std::vector<int64_t> ToVector(const gert::Shape &shape)
 {
     size_t shapeSize = shape.GetDimNum();

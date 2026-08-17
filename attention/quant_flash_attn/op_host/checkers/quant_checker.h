@@ -75,12 +75,12 @@ private:
     int64_t CalcVDescaleTndDim0(const QfaTilingInfo &qfaInfo) const;
 
     // --- Feature: 非连续 Tensor 支持校验 ---
-    // 仅 PA 场景(layout_kv 为 PA_BNBD 或 PA_NZ)时，k/v/k_descale/v_descale
+    // 仅 PA 场景(layout_kv 为 PA_BBND、PA_BNBD 或 PA_NZ)时，k/v/k_descale/v_descale
     // 仅支持 0 轴和 1 轴非连续，其余轴必须连续；非 PA 场景均不支持非连续。
     ge::graphStatus CheckNonContiguousSupport(const QfaTilingInfo &qfaInfo) const;
 
     // --- Feature: layout 匹配关系校验 (文档: layout匹配关系表) ---
-    // MxFP8: layout_q=TND, layout_kv∈{TND,PA_BNBD,PA_NZ}, layout_out=TND, layout_q_descale∈{TND,N2TGD}
+    // MxFP8: layout_q=TND, layout_kv∈{TND,PA_BBND,PA_BNBD,PA_NZ}, layout_out=TND, layout_q_descale∈{TND,N2TGD}
     ge::graphStatus CheckLayoutConstraint(const QfaTilingInfo &qfaInfo) const;
 
     // --- Feature: q/k/v/attn_out shape 校验 (文档: q/k/v/attn_out shape匹配关系表) ---

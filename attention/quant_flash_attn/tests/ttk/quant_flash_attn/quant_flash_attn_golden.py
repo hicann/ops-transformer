@@ -1705,7 +1705,7 @@ def prepare_npu_inputs(
             else torch.as_tensor(block_table_torch, dtype=torch.int32).npu()
         )
 
-        _pa_layout_kv_map = {"BnNBsD": "PA_BNBD", "PA_NZ": "PA_NZ"}
+        _pa_layout_kv_map = {"BnNBsD": "PA_BNBD", "BnBsND": "PA_BBND", "PA_NZ": "PA_NZ"}
         pa_layout_kv = _pa_layout_kv_map.get(KV_CACHE_LAYOUT, "PA_BNBD")
 
         logger.info("[NPU] prepare PA inputs done.")

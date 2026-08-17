@@ -528,6 +528,7 @@ cann_ops_transformer.quant_flash_attn(
             <td>
                 <ul>
                     <li>TND</li>
+                    <li>PA_BBND</li>
                     <li>PA_BNBD</li>
                     <li>PA_NZ（D=72时不支持）</li>
                 </ul>
@@ -647,10 +648,14 @@ cann_ops_transformer.quant_flash_attn(
         </thead>
         <tbody>
             <tr>
-                <td rowspan="6">1</td>
-                <td rowspan="3">k_descale</td>
+                <td rowspan="8">1</td>
+                <td rowspan="4">k_descale</td>
                 <td>TND</td>
                 <td>(KV_T, KV_N, D/64, 2)</td>
+            </tr>
+            <tr>
+                <td>PA_BBND</td>
+                <td>(Bn, Bs, KV_N, D/64, 2)</td>
             </tr>
             <tr>
                 <td>PA_BNBD</td>
@@ -661,9 +666,13 @@ cann_ops_transformer.quant_flash_attn(
                 <td>(Bn, KV_N, Bs/16, D/64, 16, 2)</td>
             </tr>
             <tr>
-                <td rowspan="3">v_descale</td>
+                <td rowspan="4">v_descale</td>
                 <td>TND</td>
                 <td>(KV_T/64, KV_N, D, 2)</td>
+            </tr>
+            <tr>
+                <td>PA_BBND</td>
+                <td>(Bn, Bs/64, KV_N, D, 2)</td>
             </tr>
             <tr>
                 <td>PA_BNBD</td>
@@ -710,15 +719,19 @@ cann_ops_transformer.quant_flash_attn(
         </thead>
         <tbody>
             <tr>
-                <td rowspan="5">1</td>
+                <td rowspan="6">1</td>
                 <td>q</td>
                 <td>TND</td>
                 <td>(Q_T, Q_N, D)</td>
             </tr>
             <tr>
-                <td rowspan="3">k/v</td>
+                <td rowspan="4">k/v</td>
                 <td>TND</td>
                 <td>(KV_T, KV_N, D)</td>
+            </tr>
+            <tr>
+                <td>PA_BBND</td>
+                <td>(Bn, Bs, KV_N, D)</td>
             </tr>
             <tr>
                 <td>PA_BNBD</td>
