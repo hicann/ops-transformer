@@ -16,6 +16,7 @@ TND, N2=1 flow:
   2. Pass attn_softmax_l1_norm into the fused op.
   3. Compare dq, dk, dw, and softmax_out with the CPU reference.
 """
+
 import argparse
 import math
 import sys
@@ -82,7 +83,9 @@ def normalize_residuals(residuals, batch_size):
         return (residuals,) * batch_size
     residuals = tuple(residuals)
     if len(residuals) != batch_size:
-        raise ValueError(f"cmp_residual_k batch mismatch: {residuals}, batch_size={batch_size}")
+        raise ValueError(
+            f"cmp_residual_k batch mismatch: {residuals}, batch_size={batch_size}"
+        )
     return residuals
 
 
@@ -99,7 +102,9 @@ def dtype_from_name(name):
 
 def print_slig_metadata(metadata):
     print("========= metadata output =========")
-    print(f"device={metadata.device}, dtype={metadata.dtype}, shape={tuple(metadata.shape)}")
+    print(
+        f"device={metadata.device}, dtype={metadata.dtype}, shape={tuple(metadata.shape)}"
+    )
     meta_cpu = metadata.detach().cpu().view(-1)
     if meta_cpu.numel() < SLI_META_BS1_INDEX_BASE + SLI_METADATA_MAX_CORE_NUM:
         print(f"metadata length too short: {meta_cpu.numel()}")
@@ -114,7 +119,9 @@ def print_slig_metadata(metadata):
         for i in range(SLI_METADATA_MAX_CORE_NUM)
     ]
 
-    print(f"coreNum={core_num}, totalSize={total_size}, splitFactorSize={split_factor_size}")
+    print(
+        f"coreNum={core_num}, totalSize={total_size}, splitFactorSize={split_factor_size}"
+    )
     print(f"reserved={reserved}")
     print(f"bS1Index all={b_s1_index}")
     if core_num > 0:
@@ -174,7 +181,9 @@ class TndCase:
     @property
     def batch_size(self):
         if len(self.q_lens_tuple) != len(self.kv_lens_tuple):
-            raise ValueError(f"q_lens and kv_lens batch mismatch: {self.q_lens_tuple} vs {self.kv_lens_tuple}")
+            raise ValueError(
+                f"q_lens and kv_lens batch mismatch: {self.q_lens_tuple} vs {self.kv_lens_tuple}"
+            )
         return len(self.q_lens_tuple)
 
     @property
@@ -212,7 +221,9 @@ DEFAULT_CASES = (
     TndCase(name="single_int_lengths_c4", q_lens=128, kv_lens=32),
     TndCase(name="single_kv_extra", q_lens=(128,), kv_lens=(128,)),
     TndCase(name="multi_kv_extra", q_lens=(16, 64, 128), kv_lens=(8, 32, 128)),
-    TndCase(name="single_scaled_l1_c4", q_lens=(512,), kv_lens=(128,), attn_l1_scale=0.37),
+    TndCase(
+        name="single_scaled_l1_c4", q_lens=(512,), kv_lens=(128,), attn_l1_scale=0.37
+    ),
 )
 
 
@@ -239,7 +250,9 @@ def select_cases(case_selector, cases):
     matched = [case for case in cases if case.name == case_selector]
     if not matched:
         names = ", ".join(case.name for case in cases)
-        raise ValueError(f"unknown case '{case_selector}', available: all, 0..{len(cases) - 1}, {names}")
+        raise ValueError(
+            f"unknown case '{case_selector}', available: all, 0..{len(cases) - 1}, {names}"
+        )
     return matched
 
 
@@ -252,11 +265,17 @@ def make_tensor(shape, dtype, seed, low=None, high=None):
 
 
 def make_sparse_indices(case, cmp_ratio):
-    sparse_indices = torch.full((case.total_q, case.n_key, case.topk), -1, dtype=torch.int32)
+    sparse_indices = torch.full(
+        (case.total_q, case.n_key, case.topk), -1, dtype=torch.int32
+    )
     q_start = 0
-    for q_len, kv_len, cmp_residual_k in zip(case.q_lens_tuple, case.kv_lens_tuple, case.cmp_residual_tuple):
+    for q_len, kv_len, cmp_residual_k in zip(
+        case.q_lens_tuple, case.kv_lens_tuple, case.cmp_residual_tuple
+    ):
         for local_q_idx in range(q_len):
-            real_k = valid_k_count(local_q_idx, kv_len, q_len, cmp_ratio, cmp_residual_k)
+            real_k = valid_k_count(
+                local_q_idx, kv_len, q_len, cmp_ratio, cmp_residual_k
+            )
             if real_k <= 0:
                 continue
             used_k = min(real_k, case.topk)
@@ -273,7 +292,9 @@ def make_inputs(case, cmp_ratio):
     k = make_tensor((case.total_kv, case.n_key, case.d), dtype, 43)
     q_index = make_tensor((case.total_q, case.n_query_index, case.d_index), dtype, 44)
     k_index = make_tensor((case.total_kv, case.n_key, case.d_index), dtype, 45)
-    weights = make_tensor((case.total_q, case.n_query_index), torch.float32, 48) * (0.1 / 6.0)
+    weights = make_tensor((case.total_q, case.n_query_index), torch.float32, 48) * (
+        0.1 / 6.0
+    )
     return {
         "q": q,
         "k": k,
@@ -317,7 +338,9 @@ class SparseLightningIndexerKLLossGradRef:
         self.sparse_indices = sparse_indices
         self.actual_q_len = list(actual_q_len)
         self.actual_kv_len = list(actual_kv_len)
-        self.cmp_residual_k = list(normalize_residuals(cmp_residual_k, len(self.actual_q_len)))
+        self.cmp_residual_k = list(
+            normalize_residuals(cmp_residual_k, len(self.actual_q_len))
+        )
         self.cu_q = get_cu_seqlens(self.actual_q_len)
         self.cu_kv = get_cu_seqlens(self.actual_kv_len)
         self.cmp_ratio = cmp_ratio
@@ -364,7 +387,9 @@ class SparseLightningIndexerKLLossGradRef:
             sparse = sparse_b.squeeze(1)
             valid = (sparse >= 0) & (sparse < kv_len)
             safe_id = sparse.clamp(0, kv_len - 1)
-            invalid_topk_mask = make_invalid_mask(q_len, kv_len, topk, self.cmp_ratio, cmp_residual_k)
+            invalid_topk_mask = make_invalid_mask(
+                q_len, kv_len, topk, self.cmp_ratio, cmp_residual_k
+            )
 
             k_main = k_b.squeeze(1)
             k_topk = k_main[safe_id].masked_fill(~valid.unsqueeze(-1), 0.0)
@@ -383,7 +408,9 @@ class SparseLightningIndexerKLLossGradRef:
             relu_s = torch.relu(s_logits)
             s_weighted = relu_s * weights_b.unsqueeze(-1)
             s_reduce = s_weighted.reshape(q_len, nk, group_index, topk).sum(dim=2)
-            s_reduce = s_reduce.masked_fill(invalid_topk_mask.unsqueeze(1), float("-inf"))
+            s_reduce = s_reduce.masked_fill(
+                invalid_topk_mask.unsqueeze(1), float("-inf")
+            )
             s_softmax = nn.functional.softmax(s_reduce, dim=-1)
             s_softmax = s_softmax.masked_fill(invalid_topk_mask.unsqueeze(1), 0.0)
             s_softmax = s_softmax.masked_fill(invalid_row.unsqueeze(-1), 0.0)
@@ -395,7 +422,9 @@ class SparseLightningIndexerKLLossGradRef:
             dw = torch.einsum("tjs,ts->tj", relu_s, ds_sq)
             dw = dw.masked_fill(invalid_row, 0.0)
 
-            d_s_logits = ds_sq.unsqueeze(1) * weights_b.unsqueeze(-1) * (relu_s > 0).to(dt)
+            d_s_logits = (
+                ds_sq.unsqueeze(1) * weights_b.unsqueeze(-1) * (relu_s > 0).to(dt)
+            )
             d_s_logits_lp = d_s_logits.to(in_dt).to(dt)
 
             dqi = torch.einsum("tjs,tsd->tjd", d_s_logits_lp, k_index_topk)
@@ -452,7 +481,9 @@ def run_golden(case, tensors, cmp_ratio):
 def run_fused_op(case, tensors, golden, device, cmp_ratio):
     cu_seqlens_q = make_cu_seqlens(case.q_lens_tuple, device)
     cu_seqlens_k = make_cu_seqlens(case.kv_lens_tuple, device)
-    cmp_residual_k = torch.tensor(case.cmp_residual_tuple, dtype=torch.int32, device=device)
+    cmp_residual_k = torch.tensor(
+        case.cmp_residual_tuple, dtype=torch.int32, device=device
+    )
 
     q = tensors["q_index"].contiguous().to(device)
     k = tensors["k_index"].contiguous().to(device)
@@ -465,45 +496,53 @@ def run_fused_op(case, tensors, golden, device, cmp_ratio):
     print("k(k_index):", k.shape, k.dtype)
     print("w:", w.shape, w.dtype)
     print("sparse_indices:", sparse_indices.shape, sparse_indices.dtype)
-    print("attn_softmax_l1_norm:", attn_softmax_l1_norm.shape, attn_softmax_l1_norm.dtype)
+    print(
+        "attn_softmax_l1_norm:", attn_softmax_l1_norm.shape, attn_softmax_l1_norm.dtype
+    )
     print("cu_seqlens_q:", cu_seqlens_q.tolist())
     print("cu_seqlens_k:", cu_seqlens_k.tolist())
     print("cmp_residual_k:", cmp_residual_k.tolist())
-    print("layout:", case.layout, "mask_mode:", case.sparse_mode, "cmp_ratio:", cmp_ratio)
+    print(
+        "layout:", case.layout, "mask_mode:", case.sparse_mode, "cmp_ratio:", cmp_ratio
+    )
     print("##################### END fused inputs #######################")
 
-    metadata = torch.ops.cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad_metadata(
-        case.n_query_index,
-        case.n_key,
-        case.d_index,
-        cu_seqlens_q=cu_seqlens_q,
-        cu_seqlens_k=cu_seqlens_k,
-        cmp_residual_k=cmp_residual_k,
-        batch_size=case.batch_size,
-        max_seqlen_q=max(case.q_lens_tuple),
-        max_seqlen_k=max(case.kv_lens_tuple),
-        topk=case.topk,
-        layout_q=case.layout,
-        layout_k=case.layout,
-        mask_mode=case.sparse_mode,
-        cmp_ratio=cmp_ratio,
+    metadata = (
+        torch.ops.cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad_metadata(
+            case.n_query_index,
+            case.n_key,
+            case.d_index,
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_k=cu_seqlens_k,
+            cmp_residual_k=cmp_residual_k,
+            batch_size=case.batch_size,
+            max_seqlen_q=max(case.q_lens_tuple),
+            max_seqlen_k=max(case.kv_lens_tuple),
+            topk=case.topk,
+            layout_q=case.layout,
+            layout_k=case.layout,
+            mask_mode=case.sparse_mode,
+            cmp_ratio=cmp_ratio,
+        )
     )
     print_slig_metadata(metadata)
 
-    dq, dk, dw, softmax_out = torch.ops.cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
-        q,
-        k,
-        w,
-        sparse_indices,
-        attn_softmax_l1_norm,
-        cu_seqlens_q=cu_seqlens_q,
-        cu_seqlens_k=cu_seqlens_k,
-        cmp_residual_k=cmp_residual_k,
-        metadata=metadata,
-        layout_q=case.layout,
-        layout_k=case.layout,
-        mask_mode=case.sparse_mode,
-        cmp_ratio=cmp_ratio,
+    dq, dk, dw, softmax_out = (
+        torch.ops.cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
+            q,
+            k,
+            w,
+            sparse_indices,
+            attn_softmax_l1_norm,
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_k=cu_seqlens_k,
+            cmp_residual_k=cmp_residual_k,
+            metadata=metadata,
+            layout_q=case.layout,
+            layout_k=case.layout,
+            mask_mode=case.sparse_mode,
+            cmp_ratio=cmp_ratio,
+        )
     )
     torch.npu.synchronize()
     return {
@@ -525,20 +564,34 @@ def relative_diff(actual, expected, diff_thd):
     )
 
 
-def compare_tensors(name, actual, expected, diff_thd=0.005, pct_thd=0.005, max_diff_thd=0.1):
+def compare_tensors(
+    name, actual, expected, diff_thd=0.005, pct_thd=0.005, max_diff_thd=0.1
+):
     actual_flat = actual.float().contiguous().view(-1)
     expected_flat = expected.float().contiguous().view(-1)
     if actual_flat.numel() != expected_flat.numel():
-        print(f"{name}: failed, shape mismatch a={actual_flat.shape} e={expected_flat.shape}")
+        print(
+            f"{name}: failed, shape mismatch a={actual_flat.shape} e={expected_flat.shape}"
+        )
         return {"name": name, "result": "failed", "pct": 0.0, "max_error": float("inf")}
 
     rel = relative_diff(actual_flat, expected_flat, diff_thd)
     errors = rel[rel > diff_thd]
     pct = (actual_flat.numel() - errors.numel()) / max(actual_flat.numel(), 1) * 100.0
     max_error = float(errors.max().item()) if errors.numel() else 0.0
-    max_abs = float(torch.abs(actual_flat - expected_flat).max().item()) if actual_flat.numel() else 0.0
-    result = "success" if pct >= (1 - pct_thd) * 100.0 and max_error < max_diff_thd else "failed"
-    print(f"{name}: {result}, pct={pct:.6f}%, max_abs_diff={max_abs:.8f}, max_error={max_error}")
+    max_abs = (
+        float(torch.abs(actual_flat - expected_flat).max().item())
+        if actual_flat.numel()
+        else 0.0
+    )
+    result = (
+        "success"
+        if pct >= (1 - pct_thd) * 100.0 and max_error < max_diff_thd
+        else "failed"
+    )
+    print(
+        f"{name}: {result}, pct={pct:.6f}%, max_abs_diff={max_abs:.8f}, max_error={max_error}"
+    )
     return {"name": name, "result": result, "pct": pct, "max_error": max_error}
 
 
@@ -569,9 +622,17 @@ def run_one_case(case, device, cmp_ratio, detail_compare):
 
     print("\n[4/4] Compare")
     results = [
-        compare_tensors("d_query_index", fused["d_query_index"], golden["d_query_index"]),
+        compare_tensors(
+            "d_query_index", fused["d_query_index"], golden["d_query_index"]
+        ),
         compare_tensors("d_key_index", fused["d_key_index"], golden["d_key_index"]),
-        compare_tensors("d_weights", fused["d_weights"], golden["d_weights"], diff_thd=0.05, pct_thd=0.05),
+        compare_tensors(
+            "d_weights",
+            fused["d_weights"],
+            golden["d_weights"],
+            diff_thd=0.05,
+            pct_thd=0.05,
+        ),
         compare_tensors("softmax_out", fused["softmax_out"], golden["softmax_out"]),
     ]
 
@@ -579,16 +640,29 @@ def run_one_case(case, device, cmp_ratio, detail_compare):
         try:
             from precision_compare import data_compare
 
-            data_compare(fused["d_query_index"].float().numpy(), golden["d_query_index"].float().numpy())
-            data_compare(fused["d_key_index"].float().numpy(), golden["d_key_index"].float().numpy())
-            data_compare(fused["d_weights"].float().numpy(), golden["d_weights"].float().numpy())
-            data_compare(fused["softmax_out"].float().numpy(), golden["softmax_out"].float().numpy())
+            data_compare(
+                fused["d_query_index"].float().numpy(),
+                golden["d_query_index"].float().numpy(),
+            )
+            data_compare(
+                fused["d_key_index"].float().numpy(),
+                golden["d_key_index"].float().numpy(),
+            )
+            data_compare(
+                fused["d_weights"].float().numpy(), golden["d_weights"].float().numpy()
+            )
+            data_compare(
+                fused["softmax_out"].float().numpy(),
+                golden["softmax_out"].float().numpy(),
+            )
         except ImportError:
             print("precision_compare is not available; skipped detailed data_compare.")
 
     print("\ncase compare summary:")
     for item in results:
-        print(f"{item['name']}: {item['result']}, pct={item['pct']:.6f}%, max_error={item['max_error']}")
+        print(
+            f"{item['name']}: {item['result']}, pct={item['pct']:.6f}%, max_error={item['max_error']}"
+        )
     return results
 
 
@@ -608,7 +682,9 @@ def make_cp_q_ranges(total_q, cp_parts, random_splits=False, seed=2026, min_firs
 
     points = sorted(set(max(1, min(total_q - 1, point)) for point in points))
     boundaries = [0] + points + [total_q]
-    return [(boundaries[idx], boundaries[idx + 1]) for idx in range(len(boundaries) - 1)]
+    return [
+        (boundaries[idx], boundaries[idx + 1]) for idx in range(len(boundaries) - 1)
+    ]
 
 
 def make_cp_shard_case(q_start, q_end, cmp_ratio, attn_l1_scale=1.0):
@@ -655,7 +731,9 @@ def run_cp_validation(device, cmp_ratio, cp_parts=4, random_splits=False, cp_see
         attn_l1_scale=0.37,
     )
     full_inputs = make_inputs(full_case, cmp_ratio)
-    cp_ranges = make_cp_q_ranges(full_case.total_q, cp_parts, random_splits, cp_seed, min_first=cmp_ratio)
+    cp_ranges = make_cp_q_ranges(
+        full_case.total_q, cp_parts, random_splits, cp_seed, min_first=cmp_ratio
+    )
 
     print("[CP 1/5] Full CPU reference")
     print_case_summary(full_case)
@@ -664,8 +742,14 @@ def run_cp_validation(device, cmp_ratio, cp_parts=4, random_splits=False, cp_see
     print("[CP 2/5] Full fused op without CP")
     full_fused = run_fused_op(full_case, full_inputs, full_golden, device, cmp_ratio)
     full_checks = [
-        compare_tensors("cp_full_d_query_index", full_fused["d_query_index"], full_golden["d_query_index"]),
-        compare_tensors("cp_full_d_key_index", full_fused["d_key_index"], full_golden["d_key_index"]),
+        compare_tensors(
+            "cp_full_d_query_index",
+            full_fused["d_query_index"],
+            full_golden["d_query_index"],
+        ),
+        compare_tensors(
+            "cp_full_d_key_index", full_fused["d_key_index"], full_golden["d_key_index"]
+        ),
         compare_tensors(
             "cp_full_d_weights",
             full_fused["d_weights"],
@@ -673,7 +757,9 @@ def run_cp_validation(device, cmp_ratio, cp_parts=4, random_splits=False, cp_see
             diff_thd=0.05,
             pct_thd=0.05,
         ),
-        compare_tensors("cp_full_softmax_out", full_fused["softmax_out"], full_golden["softmax_out"]),
+        compare_tensors(
+            "cp_full_softmax_out", full_fused["softmax_out"], full_golden["softmax_out"]
+        ),
     ]
 
     cp_dq_parts = []
@@ -688,23 +774,39 @@ def run_cp_validation(device, cmp_ratio, cp_parts=4, random_splits=False, cp_see
         cp_case = make_cp_shard_case(q_start, q_end, cmp_ratio, full_case.attn_l1_scale)
         kv_end = cp_case.kv_lens_tuple[0]
         cp_inputs = slice_cp_inputs(full_inputs, q_start, q_end, kv_end)
-        print(f"\n---- CP shard {shard_idx}: q=[{q_start}, {q_end}), kv=[0, {kv_end}) ----")
+        print(
+            f"\n---- CP shard {shard_idx}: q=[{q_start}, {q_end}), kv=[0, {kv_end}) ----"
+        )
         print_case_summary(cp_case)
         cp_golden = run_golden(cp_case, cp_inputs, cmp_ratio)
         cp_fused = run_fused_op(cp_case, cp_inputs, cp_golden, device, cmp_ratio)
 
-        shard_checks.extend([
-            compare_tensors(f"cp_shard_{shard_idx}_d_query_index", cp_fused["d_query_index"], cp_golden["d_query_index"]),
-            compare_tensors(f"cp_shard_{shard_idx}_d_key_index", cp_fused["d_key_index"], cp_golden["d_key_index"]),
-            compare_tensors(
-                f"cp_shard_{shard_idx}_d_weights",
-                cp_fused["d_weights"],
-                cp_golden["d_weights"],
-                diff_thd=0.05,
-                pct_thd=0.05,
-            ),
-            compare_tensors(f"cp_shard_{shard_idx}_softmax_out", cp_fused["softmax_out"], cp_golden["softmax_out"]),
-        ])
+        shard_checks.extend(
+            [
+                compare_tensors(
+                    f"cp_shard_{shard_idx}_d_query_index",
+                    cp_fused["d_query_index"],
+                    cp_golden["d_query_index"],
+                ),
+                compare_tensors(
+                    f"cp_shard_{shard_idx}_d_key_index",
+                    cp_fused["d_key_index"],
+                    cp_golden["d_key_index"],
+                ),
+                compare_tensors(
+                    f"cp_shard_{shard_idx}_d_weights",
+                    cp_fused["d_weights"],
+                    cp_golden["d_weights"],
+                    diff_thd=0.05,
+                    pct_thd=0.05,
+                ),
+                compare_tensors(
+                    f"cp_shard_{shard_idx}_softmax_out",
+                    cp_fused["softmax_out"],
+                    cp_golden["softmax_out"],
+                ),
+            ]
+        )
 
         cp_dq_parts.append(cp_fused["d_query_index"])
         cp_dw_parts.append(cp_fused["d_weights"])
@@ -720,8 +822,18 @@ def run_cp_validation(device, cmp_ratio, cp_parts=4, random_splits=False, cp_see
 
     print("[CP 4/5] Compare merged CP outputs with full fused outputs")
     merged_vs_full_checks = [
-        compare_tensors("cp_vs_full_d_query_index", cp_merged["d_query_index"], full_fused["d_query_index"]),
-        compare_tensors("cp_vs_full_d_key_index", cp_merged["d_key_index"], full_fused["d_key_index"]),
+        compare_tensors(
+            "cp_vs_full_d_query_index",
+            cp_merged["d_query_index"],
+            full_fused["d_query_index"],
+        ),
+        compare_tensors(
+            "cp_vs_full_d_key_index",
+            cp_merged["d_key_index"],
+            full_fused["d_key_index"],
+            diff_thd=0.05,
+            pct_thd=0.05,
+        ),
         compare_tensors(
             "cp_vs_full_d_weights",
             cp_merged["d_weights"],
@@ -729,13 +841,25 @@ def run_cp_validation(device, cmp_ratio, cp_parts=4, random_splits=False, cp_see
             diff_thd=0.05,
             pct_thd=0.05,
         ),
-        compare_tensors("cp_vs_full_softmax_out", cp_merged["softmax_out"], full_fused["softmax_out"]),
+        compare_tensors(
+            "cp_vs_full_softmax_out",
+            cp_merged["softmax_out"],
+            full_fused["softmax_out"],
+        ),
     ]
 
     print("[CP 5/5] Compare merged CP outputs with full CPU reference")
     merged_vs_golden_checks = [
-        compare_tensors("cp_vs_golden_d_query_index", cp_merged["d_query_index"], full_golden["d_query_index"]),
-        compare_tensors("cp_vs_golden_d_key_index", cp_merged["d_key_index"], full_golden["d_key_index"]),
+        compare_tensors(
+            "cp_vs_golden_d_query_index",
+            cp_merged["d_query_index"],
+            full_golden["d_query_index"],
+        ),
+        compare_tensors(
+            "cp_vs_golden_d_key_index",
+            cp_merged["d_key_index"],
+            full_golden["d_key_index"],
+        ),
         compare_tensors(
             "cp_vs_golden_d_weights",
             cp_merged["d_weights"],
@@ -743,10 +867,17 @@ def run_cp_validation(device, cmp_ratio, cp_parts=4, random_splits=False, cp_see
             diff_thd=0.05,
             pct_thd=0.05,
         ),
-        compare_tensors("cp_vs_golden_softmax_out", cp_merged["softmax_out"], full_golden["softmax_out"]),
+        compare_tensors(
+            "cp_vs_golden_softmax_out",
+            cp_merged["softmax_out"],
+            full_golden["softmax_out"],
+        ),
     ]
 
-    return full_case, full_checks + shard_checks + merged_vs_full_checks + merged_vs_golden_checks
+    return (
+        full_case,
+        full_checks + shard_checks + merged_vs_full_checks + merged_vs_golden_checks,
+    )
 
 
 def main():
@@ -779,7 +910,9 @@ def main():
         cases = select_cases(args.case, DEFAULT_CASES)
         detail_compare = args.detail_compare or len(cases) == 1
         for case_idx, case in enumerate(cases):
-            print(f"\n================ Case {case_idx + 1}/{len(cases)}: {case.name} ================")
+            print(
+                f"\n================ Case {case_idx + 1}/{len(cases)}: {case.name} ================"
+            )
             results = run_one_case(case, device, args.cmp_ratio, detail_compare)
             all_results.append((case, results))
 

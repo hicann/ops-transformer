@@ -83,11 +83,9 @@ bool SparseLightningIndexerKLLossGradTilingBase::AnalyzeAttrs()
     dKeyRopeSize = 0;
 
     OP_CHECK_IF(sparseMode != MASK_MODE_NO_MASK && sparseMode != MASK_MODE_CAUSAL,
-                OP_LOGE(opName, "mask_mode only supports 0 or 3, but got [%d].", sparseMode),
-                return false);
+                OP_LOGE(opName, "mask_mode only supports 0 or 3, but got [%d].", sparseMode), return false);
     OP_CHECK_IF(cmpRatio < 1 || cmpRatio > 128,
-                OP_LOGE(opName, "cmp_ratio must be in [1, 128], but got [%ld].", cmpRatio),
-                return false);
+                OP_LOGE(opName, "cmp_ratio must be in [1, 128], but got [%ld].", cmpRatio), return false);
     OP_LOGD(context_, "attrs: layout_q[%s], layout_k[%s], mask_mode[%d], cmp_ratio[%ld], deterministic[%d].",
             inputLayout, keyLayout, sparseMode, cmpRatio, deterministic);
     return true;
@@ -114,12 +112,12 @@ bool SparseLightningIndexerKLLossGradTilingBase::AnalyzeDtype()
 
     auto qDtype = qDesc->GetDataType();
     auto kDtype = kDesc->GetDataType();
-    OP_CHECK_IF(!((qDtype == ge::DT_FLOAT16 && kDtype == ge::DT_FLOAT16) ||
-                  (qDtype == ge::DT_BF16 && kDtype == ge::DT_BF16)),
-                OP_LOGE(opName, "q/k dtype must be both fp16 or both bf16, but got q[%s], k[%s].",
-                        ge::TypeUtils::DataTypeToSerialString(qDtype).c_str(),
-                        ge::TypeUtils::DataTypeToSerialString(kDtype).c_str()),
-                return false);
+    OP_CHECK_IF(
+        !((qDtype == ge::DT_FLOAT16 && kDtype == ge::DT_FLOAT16) || (qDtype == ge::DT_BF16 && kDtype == ge::DT_BF16)),
+        OP_LOGE(opName, "q/k dtype must be both fp16 or both bf16, but got q[%s], k[%s].",
+                ge::TypeUtils::DataTypeToSerialString(qDtype).c_str(),
+                ge::TypeUtils::DataTypeToSerialString(kDtype).c_str()),
+        return false);
     OP_CHECK_IF(wDesc->GetDataType() != ge::DT_FLOAT,
                 OP_LOGE(opName, "w dtype must be fp32, but got [%s].",
                         ge::TypeUtils::DataTypeToSerialString(wDesc->GetDataType()).c_str()),
@@ -133,10 +131,9 @@ bool SparseLightningIndexerKLLossGradTilingBase::AnalyzeDtype()
                         ge::TypeUtils::DataTypeToSerialString(softmaxDesc->GetDataType()).c_str()),
                 return false);
 
-    const gert::CompileTimeTensorDesc *int32OptionalInputs[] = {
-        cuSeqQDesc, cuSeqKDesc, seqUsedQDesc, seqUsedKDesc, cmpResidualKDesc, metadataDesc};
-    const char *inputNames[] = {
-        "cu_seqlens_q", "cu_seqlens_k", "seqused_q", "seqused_k", "cmp_residual_k", "metadata"};
+    const gert::CompileTimeTensorDesc *int32OptionalInputs[] = {cuSeqQDesc,   cuSeqKDesc,       seqUsedQDesc,
+                                                                seqUsedKDesc, cmpResidualKDesc, metadataDesc};
+    const char *inputNames[] = {"cu_seqlens_q", "cu_seqlens_k", "seqused_q", "seqused_k", "cmp_residual_k", "metadata"};
     for (size_t i = 0; i < sizeof(int32OptionalInputs) / sizeof(int32OptionalInputs[0]); ++i) {
         if (int32OptionalInputs[i] != nullptr && int32OptionalInputs[i]->GetDataType() != ge::DT_INT32) {
             OP_LOGE(opName, "%s dtype must be int32, but got [%s].", inputNames[i],
@@ -161,38 +158,32 @@ bool SparseLightningIndexerKLLossGradTilingBase::AnalyzeLayout()
                 OP_LOGE(opName, "Invalid q/k layout. layout_q[%s], layout_k[%s].", inputLayout, keyLayout),
                 return false);
     OP_CHECK_IF(qLayoutLen != kLayoutLen,
-                OP_LOGE(opName, "layout_q/layout_k rank must be the same in current implementation."),
+                OP_LOGE(opName, "layout_q/layout_k rank must be the same in current implementation."), return false);
+    OP_CHECK_IF(wShape.GetDimNum() + 1 != qShape.GetDimNum(), OP_LOGE(opName, "w rank must be q rank - 1."),
                 return false);
-    OP_CHECK_IF(wShape.GetDimNum() + 1 != qShape.GetDimNum(),
-                OP_LOGE(opName, "w rank must be q rank - 1."), return false);
-    OP_CHECK_IF(sparseShape.GetDimNum() != qShape.GetDimNum() ||
-                    softmaxShape.GetDimNum() != sparseShape.GetDimNum(),
-                OP_LOGE(opName, "sparse_indices and attn_softmax_l1_norm rank mismatch."),
-                return false);
+    OP_CHECK_IF(sparseShape.GetDimNum() != qShape.GetDimNum() || softmaxShape.GetDimNum() != sparseShape.GetDimNum(),
+                OP_LOGE(opName, "sparse_indices and attn_softmax_l1_norm rank mismatch."), return false);
 
     bool qTnd = (qLayoutLen == 3UL && inputLayout[0] == 'T' && inputLayout[1] == 'N' && inputLayout[2] == 'D');
-    bool qBsnd = (qLayoutLen == 4UL && inputLayout[0] == 'B' && inputLayout[1] == 'S' &&
-                  inputLayout[2] == 'N' && inputLayout[3] == 'D');
+    bool qBsnd = (qLayoutLen == 4UL && inputLayout[0] == 'B' && inputLayout[1] == 'S' && inputLayout[2] == 'N' &&
+                  inputLayout[3] == 'D');
     bool kTnd = (kLayoutLen == 3UL && keyLayout[0] == 'T' && keyLayout[1] == 'N' && keyLayout[2] == 'D');
-    bool kBsnd = (kLayoutLen == 4UL && keyLayout[0] == 'B' && keyLayout[1] == 'S' &&
-                  keyLayout[2] == 'N' && keyLayout[3] == 'D');
-    OP_CHECK_IF(!(qTnd || qBsnd) || !(kTnd || kBsnd),
-                OP_LOGE(opName, "layout_q/layout_k only support TND or BSND."), return false);
+    bool kBsnd =
+        (kLayoutLen == 4UL && keyLayout[0] == 'B' && keyLayout[1] == 'S' && keyLayout[2] == 'N' && keyLayout[3] == 'D');
+    OP_CHECK_IF(!(qTnd || qBsnd) || !(kTnd || kBsnd), OP_LOGE(opName, "layout_q/layout_k only support TND or BSND."),
+                return false);
 
     if (qTnd) {
         auto cuSeqQShape = context_->GetOptionalInputShape(CU_SEQLENS_QUERY_INPUT_INDEX);
         auto cuSeqKShape = context_->GetOptionalInputShape(CU_SEQLENS_KEY_INPUT_INDEX);
         OP_CHECK_IF(cuSeqQShape == nullptr || cuSeqKShape == nullptr,
-                    OP_LOGE(opName, "TND layout requires cu_seqlens_q/cu_seqlens_k tensor inputs."),
-                    return false);
+                    OP_LOGE(opName, "TND layout requires cu_seqlens_q/cu_seqlens_k tensor inputs."), return false);
         auto &cuSeqQStorageShape = cuSeqQShape->GetStorageShape();
         auto &cuSeqKStorageShape = cuSeqKShape->GetStorageShape();
         OP_CHECK_IF(cuSeqQStorageShape.GetDimNum() != 1 || cuSeqKStorageShape.GetDimNum() != 1,
-                    OP_LOGE(opName, "cu_seqlens_q/cu_seqlens_k must be 1D tensors in TND layout."),
-                    return false);
+                    OP_LOGE(opName, "cu_seqlens_q/cu_seqlens_k must be 1D tensors in TND layout."), return false);
         OP_CHECK_IF(cuSeqQStorageShape.GetDim(0) <= 1 || cuSeqQStorageShape.GetDim(0) != cuSeqKStorageShape.GetDim(0),
-                    OP_LOGE(opName, "cu_seqlens_q/cu_seqlens_k length must be equal and larger than 1."),
-                    return false);
+                    OP_LOGE(opName, "cu_seqlens_q/cu_seqlens_k length must be equal and larger than 1."), return false);
         bSize = cuSeqQStorageShape.GetDim(0) - 1;
         realT1Size = qShape.GetDim(0);
         accumS1 = qShape.GetDim(0);
@@ -223,22 +214,21 @@ bool SparseLightningIndexerKLLossGradTilingBase::AnalyzeLayout()
 
     OP_CHECK_IF(n2Size <= 0 || qShape.GetDim(qLayoutLen - 2) % n2Size != 0,
                 OP_LOGE(opName, "q N dimension must be divisible by k N dimension."), return false);
-    OP_CHECK_IF(n2Size != 1,
-                OP_LOGE(opName, "current kernel path only supports N2 == 1, but got [%d].", n2Size),
+    OP_CHECK_IF(n2Size != 1, OP_LOGE(opName, "current kernel path only supports N2 == 1, but got [%d].", n2Size),
                 return false);
-    OP_CHECK_IF(gSizeQueryIndex != 8 && gSizeQueryIndex != 16 && gSizeQueryIndex != 32 && gSizeQueryIndex != 64,
-                OP_LOGE(opName, "current kernel path only supports N1/N2 in {8, 16, 32, 64}, but got [%d].",
-                        gSizeQueryIndex),
+    OP_CHECK_IF(
+        gSizeQueryIndex != 8 && gSizeQueryIndex != 16 && gSizeQueryIndex != 32 && gSizeQueryIndex != 64,
+        OP_LOGE(opName, "current kernel path only supports N1/N2 in {8, 16, 32, 64}, but got [%d].", gSizeQueryIndex),
+        return false);
+    OP_CHECK_IF(dSizeQueryIndex != kShape.GetDim(kLayoutLen - 1), OP_LOGE(opName, "q/k D dimension must be equal."),
                 return false);
-    OP_CHECK_IF(dSizeQueryIndex != kShape.GetDim(kLayoutLen - 1),
-                OP_LOGE(opName, "q/k D dimension must be equal."), return false);
+    OP_CHECK_IF(dSizeQueryIndex != 128, OP_LOGE(opName, "q/k D dimension must be equal to 128."), return false);
     OP_CHECK_IF(wShape.GetDim(wShape.GetDimNum() - 1) != qShape.GetDim(qLayoutLen - 2),
                 OP_LOGE(opName, "w N dimension must equal q N dimension."), return false);
     OP_CHECK_IF(sparseShape.GetDim(sparseShape.GetDimNum() - 2) != n2Size ||
                     softmaxShape.GetDim(softmaxShape.GetDimNum() - 2) != n2Size ||
                     softmaxShape.GetDim(softmaxShape.GetDimNum() - 1) != kSize,
-                OP_LOGE(opName, "sparse_indices/attn_softmax_l1_norm N2/K shape mismatch."),
-                return false);
+                OP_LOGE(opName, "sparse_indices/attn_softmax_l1_norm N2/K shape mismatch."), return false);
     OP_CHECK_IF(kSize > BUFFER_SIZE_BYTE_8K || (kSize != 512 && kSize % BUFFER_SIZE_BYTE_1K != 0),
                 OP_LOGE(opName, "K(%d) should be <=8192 and be 512 or an integer multiple of 1024.", kSize),
                 return false);
@@ -250,9 +240,9 @@ ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::GetPlatformInfo()
 {
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const SparseLightningIndexerKLLossGradCompileInfo *>(context_->GetCompileInfo());
-        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(opName, "compileInfoPtr is null."),
-                   return ge::GRAPH_FAILED);
+        auto compileInfoPtr =
+            reinterpret_cast<const SparseLightningIndexerKLLossGradCompileInfo *>(context_->GetCompileInfo());
+        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(opName, "compileInfoPtr is null."), return ge::GRAPH_FAILED);
         aivNum = compileInfoPtr->aivNum;
         aicNum = compileInfoPtr->aicNum;
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
@@ -269,7 +259,7 @@ ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::GetPlatformInfo()
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, l2CacheSize);
     }
     OP_LOGI(context_, "get platform from compileInfo.aivNum(%u) aicNum(%u) ubSize(%lu) l1Size(%lu) l0cSize(%lu).",
-              aivNum, aicNum, aicoreParams_.ubSize, aicoreParams_.l1Size, aicoreParams_.l0cSize);
+            aivNum, aicNum, aicoreParams_.ubSize, aicoreParams_.l1Size, aicoreParams_.l0cSize);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -277,10 +267,9 @@ ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::GetShapeAttrsInfo()
 {
     opName = context_->GetNodeName();
     OP_LOGD(opName, "TilingContext: %s.", GetTilingContextDebugStr().c_str());
-    OP_CHECK_IF(CheckContext() != ge::GRAPH_SUCCESS, OP_LOGE(opName, "invalid context."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckContext() != ge::GRAPH_SUCCESS, OP_LOGE(opName, "invalid context."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(!AnalyzeAttrs() || !AnalyzeDtype() || !AnalyzeLayout(),
-               OP_LOGE(opName, "fail to analyze context info."), return ge::GRAPH_FAILED);
+                OP_LOGE(opName, "fail to analyze context info."), return ge::GRAPH_FAILED);
 
     sliGradkllossBaseParams_->set_bSize(bSize);
     sliGradkllossBaseParams_->set_n2Size(n2Size);
@@ -296,7 +285,9 @@ ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::GetShapeAttrsInfo()
     sliGradkllossBaseParams_->set_cmpRatio(cmpRatio);
     sliGradkllossBaseParams_->set_hasSoftmaxInput(hasSoftmaxInput);
 
-    OP_LOGW(context_, "INPUTPARAM bSize:[%d], n2Size:[%d], gSizeQuery:[%d], gSizeQueryIndex:[%d], s1Size:[%d], s2Size:[%d], dSize:[%d], kSize:[%d], maskMode:[%d], cmpRatio:[%ld].",
+    OP_LOGW(context_,
+            "INPUTPARAM bSize:[%d], n2Size:[%d], gSizeQuery:[%d], gSizeQueryIndex:[%d], s1Size:[%d], s2Size:[%d], "
+            "dSize:[%d], kSize:[%d], maskMode:[%d], cmpRatio:[%ld].",
             bSize, n2Size, gSizeQuery, gSizeQueryIndex, s1Size, s2Size, dSizeQueryIndex, kSize, sparseMode, cmpRatio);
     return ge::GRAPH_SUCCESS;
 }
@@ -379,10 +370,11 @@ ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::DoOpTiling()
 uint64_t SparseLightningIndexerKLLossGradTilingBase::GetTilingKey() const
 {
     LayoutType qLayout = (tilingKeyLayout == LayoutType::LAYOUT_TND) ? LayoutType::LAYOUT_TND : LayoutType::LAYOUT_BSND;
-    LayoutType kLayout = (keyLayout != nullptr && keyLayout[0] == 'T') ? LayoutType::LAYOUT_TND : LayoutType::LAYOUT_BSND;
+    LayoutType kLayout =
+        (keyLayout != nullptr && keyLayout[0] == 'T') ? LayoutType::LAYOUT_TND : LayoutType::LAYOUT_BSND;
     return GET_TPL_TILING_KEY(static_cast<uint8_t>(false), static_cast<uint32_t>(topkSize),
-        static_cast<uint8_t>(qLayout), static_cast<uint8_t>(kLayout),
-        static_cast<uint8_t>(sparseMode), static_cast<uint8_t>(deterministic));
+                              static_cast<uint8_t>(qLayout), static_cast<uint8_t>(kLayout),
+                              static_cast<uint8_t>(sparseMode), static_cast<uint8_t>(deterministic));
 }
 
 ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::GetWorkspaceSize()
@@ -396,13 +388,19 @@ ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::GetWorkspaceSize()
     int64_t psySyncSize = (static_cast<int64_t>(kSize) * 2 + 32 / sizeof(float)) * sizeof(float);
     int64_t bmm3Size = static_cast<int64_t>(kSize) * dSizeQueryIndex * sizeof(float);
     int64_t scatterAddOutSize = (tilingKeyLayout == LayoutType::LAYOUT_TND) ?
-        accumS2 * dSizeQueryIndex * sizeof(float) :
-        static_cast<int64_t>(bSize) * s2Size * dSizeQueryIndex * sizeof(float);
+                                    accumS2 * dSizeQueryIndex * sizeof(float) :
+                                    static_cast<int64_t>(bSize) * s2Size * dSizeQueryIndex * sizeof(float);
 
-    int64_t singleCoreTotalSize = PING_PONG_VALUE *
-        (pSize + bmm1Size + bmm2Size + reluGradSize + sySize + psySyncSize + bmm3Size);
-    int64_t multiCoreTotalSize = singleCoreTotalSize *
-        static_cast<int64_t>(sliGradkllossMultiCoreParams_->get_coreNum()) + scatterAddOutSize;
+    int64_t singleCoreTotalSize =
+        PING_PONG_VALUE * (pSize + bmm1Size + bmm2Size + reluGradSize + sySize + psySyncSize + bmm3Size);
+    int64_t multiCoreTotalSize = 0;
+    if (deterministic) {
+        multiCoreTotalSize = singleCoreTotalSize * static_cast<int64_t>(sliGradkllossMultiCoreParams_->get_coreNum()) +
+                             scatterAddOutSize * static_cast<int64_t>(SLI_DETER_SCATTER_BANK_NUM);
+    } else {
+        multiCoreTotalSize = singleCoreTotalSize * static_cast<int64_t>(sliGradkllossMultiCoreParams_->get_coreNum()) +
+                             scatterAddOutSize;
+    }
     workspaces[0] = static_cast<size_t>(multiCoreTotalSize) + WORK_SPACE_RESERVE_SIZE;
     OP_LOGW(context_, "workspace size:[%zu], multicoreTotalSize:[%ld]", workspaces[0], multiCoreTotalSize);
     return ge::GRAPH_SUCCESS;

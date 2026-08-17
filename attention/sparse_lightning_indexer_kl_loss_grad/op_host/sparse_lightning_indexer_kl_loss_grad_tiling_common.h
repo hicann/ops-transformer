@@ -52,7 +52,6 @@ constexpr uint32_t LAYOUT_Q_ATTR_INDEX = 0;
 constexpr uint32_t LAYOUT_K_ATTR_INDEX = 1;
 constexpr uint32_t MASK_MODE_ATTR_INDEX = 2;
 constexpr uint32_t CMP_RATIO_ATTR_INDEX = 3;
-constexpr uint32_t DETERMINISTIC_ATTR_INDEX = 4;
 
 // Dim Num
 constexpr size_t DIM_NUM_TWO = 2;

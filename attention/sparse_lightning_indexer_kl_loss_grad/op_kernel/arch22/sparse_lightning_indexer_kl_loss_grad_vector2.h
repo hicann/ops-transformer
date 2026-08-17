@@ -42,18 +42,24 @@ public:
 
     static constexpr SLILayout LAYOUT_T = SLIT::inputQLayout;
     static constexpr SLILayout KV_LAYOUT_T = SLIT::inputKLayout;
+    static constexpr bool deterministic = SLIT::deterministic;
+
+    using scatterAddGmType = typename std::conditional<deterministic, GlobalTensor<MM3_OUT_T>, int8_t>::type;
 
     __aicore__ inline SLIKLLossVector2Service(){};
-    __aicore__ inline void InitParams(const struct SLIKLLossGradConstInfo &vecConstInfo,
+    __aicore__ inline void InitParams(
+        const struct SLIKLLossGradConstInfo &vecConstInfo,
         const optiling::SparseLightningIndexerKLLossGradTilingData *__restrict tilingData);
     __aicore__ inline void InitBuffers(TPipe *pipe);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
 
     // =============== vector 2 functions ==============
-    __aicore__ inline void InitVector2GM(const GlobalTensor<MM3_OUT_T> &bmm3Res, const GlobalTensor<int32_t> &topK,
-        const GlobalTensor<OUT_T> &dKeyIndexGm, GlobalTensor<int32_t> &actualSeqLengthsQ,
-        GlobalTensor<int32_t> &actualSeqLengthsKV);
+    __aicore__ inline void InitVector2GM(const GlobalTensor<MM3_OUT_T> &scatterAddBank0,
+                                         const GlobalTensor<int32_t> &topK, const GlobalTensor<OUT_T> &dKeyIndexGm,
+                                         GlobalTensor<int32_t> &actualSeqLengthsQ,
+                                         GlobalTensor<int32_t> &actualSeqLengthsKV,
+                                         scatterAddGmType scatterAddBanks[SLI_DETER_SCATTER_BANK_NUM]);
     __aicore__ inline void ProcessVector2();
 
 private:
@@ -69,12 +75,15 @@ private:
     GlobalTensor<int32_t> actualSeqLengthsQGm;
     GlobalTensor<int32_t> actualSeqLengthsKVGm;
     GlobalTensor<OUT_T> dKeyIndexGm;
+    scatterAddGmType scatterAddResGmBanks[SLI_DETER_SCATTER_BANK_NUM];
 
     // local tensor
-    TBuf<> mm3TBuf;         // 64K, 64 * 128 * 4 * 2(DB)
-    TBuf<> topKTBuf;        // 16KB, 2048 * 4 * 2(DB)
-    TBuf<> castOutTBuf;     // 32KB, 64 * 128 * 4 * 2(DB)
+    TBuf<> mm3TBuf; // 64K, 64 * 128 * 4 * 2(DB)
+    TBuf<> scatterAddPongTBuf;
+    TBuf<> topKTBuf;    // 16KB, 2048 * 4 * 2(DB)
+    TBuf<> castOutTBuf; // 32KB, 64 * 128 * 4 * 2(DB)
     LocalTensor<MM3_OUT_T> mm3ResUb;
+    LocalTensor<MM3_OUT_T> scatterAddPongUb;
     LocalTensor<int32_t> topKUb;
     LocalTensor<OUT_T> castOutUb;
 
@@ -84,7 +93,8 @@ private:
 };
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVector2Service<SLIT>::InitParams(const struct SLIKLLossGradConstInfo &vecConstInfo,
+__aicore__ inline void SLIKLLossVector2Service<SLIT>::InitParams(
+    const struct SLIKLLossGradConstInfo &vecConstInfo,
     const optiling::SparseLightningIndexerKLLossGradTilingData *__restrict tilingData)
 {
     this->constInfo = vecConstInfo;
@@ -92,29 +102,42 @@ __aicore__ inline void SLIKLLossVector2Service<SLIT>::InitParams(const struct SL
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVector2Service<SLIT>::InitVector2GM(const GlobalTensor<MM3_OUT_T> &bmm3Res,
-    const GlobalTensor<int32_t> &topK, const GlobalTensor<OUT_T> &dKeyIndexGm,
-    GlobalTensor<int32_t> &actualSeqLengthsQ, GlobalTensor<int32_t> &actualSeqLengthsKV)
+__aicore__ inline void SLIKLLossVector2Service<SLIT>::InitVector2GM(
+    const GlobalTensor<MM3_OUT_T> &scatterAddBank0, const GlobalTensor<int32_t> &topK,
+    const GlobalTensor<OUT_T> &dKeyIndexGm, GlobalTensor<int32_t> &actualSeqLengthsQ,
+    GlobalTensor<int32_t> &actualSeqLengthsKV, scatterAddGmType scatterAddBanks[SLI_DETER_SCATTER_BANK_NUM])
 {
-    this->bmm3ResGm = bmm3Res;
+    this->bmm3ResGm = scatterAddBank0;
     this->topKGm = topK;
     this->actualSeqLengthsQGm = actualSeqLengthsQ;
     this->actualSeqLengthsKVGm = actualSeqLengthsKV;
     this->dKeyIndexGm = dKeyIndexGm;
+    if constexpr (deterministic) {
+        for (int32_t bank = 0; bank < SLI_DETER_SCATTER_BANK_NUM; ++bank) {
+            this->scatterAddResGmBanks[bank] = scatterAddBanks[bank];
+        }
+    }
 }
 
 template <typename SLIT>
 __aicore__ inline void SLIKLLossVector2Service<SLIT>::InitBuffers(TPipe *pipe)
 {
     pipe->Reset();
-    pipe->InitBuffer(mm3TBuf, SLIKLLossGradConstInfo::BUFFER_SIZE_BYTE_32K * 2);  // 2:pingpong
-    pipe->InitBuffer(castOutTBuf, SLIKLLossGradConstInfo::BUFFER_SIZE_BYTE_16K * 2);  // 2:pingpong
+    pipe->InitBuffer(mm3TBuf, SLIKLLossGradConstInfo::BUFFER_SIZE_BYTE_32K * 2); // 2:pingpong
+    if constexpr (deterministic) {
+        pipe->InitBuffer(scatterAddPongTBuf, SLIKLLossGradConstInfo::BUFFER_SIZE_BYTE_32K * 2);
+    }
+    pipe->InitBuffer(castOutTBuf, SLIKLLossGradConstInfo::BUFFER_SIZE_BYTE_16K * 2); // 2:pingpong
 
     mm3ResUb = mm3TBuf.Get<MM3_OUT_T>();
+    if constexpr (deterministic) {
+        scatterAddPongUb = scatterAddPongTBuf.Get<MM3_OUT_T>();
+    }
     castOutUb = castOutTBuf.Get<OUT_T>();
 }
 
-template <typename SLIT> __aicore__ inline void SLIKLLossVector2Service<SLIT>::AllocEventID()
+template <typename SLIT>
+__aicore__ inline void SLIKLLossVector2Service<SLIT>::AllocEventID()
 {
     SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_SCATTER_BUF_FLAG);
     SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_SCATTER_BUF_PONG_FLAG);
@@ -122,7 +145,8 @@ template <typename SLIT> __aicore__ inline void SLIKLLossVector2Service<SLIT>::A
     SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_SCATTER_BUF_PONG_FLAG);
 }
 
-template <typename SLIT> __aicore__ inline void SLIKLLossVector2Service<SLIT>::FreeEventID()
+template <typename SLIT>
+__aicore__ inline void SLIKLLossVector2Service<SLIT>::FreeEventID()
 {
     WaitFlag<AscendC::HardEvent::V_MTE2>(SYNC_SCATTER_BUF_FLAG);
     WaitFlag<AscendC::HardEvent::V_MTE2>(SYNC_SCATTER_BUF_PONG_FLAG);
@@ -155,6 +179,7 @@ __aicore__ inline void SLIKLLossVector2Service<SLIT>::ProcessVector2()
     int32_t pingPongIdx = 0;
 
     LocalTensor<MM3_OUT_T> copyInUb;
+    LocalTensor<MM3_OUT_T> copyInPongUb;
     LocalTensor<OUT_T> copyOutUb;
 
     for (int32_t t2Idx = t2Start; t2Idx < t2End; t2Idx += UB_ROW_SIZE) {
@@ -164,21 +189,38 @@ __aicore__ inline void SLIKLLossVector2Service<SLIT>::ProcessVector2()
 
         WaitFlag<AscendC::HardEvent::V_MTE2>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
         copyInUb = mm3ResUb[pingPongIdx * (UB_ROW_SIZE * constInfo.dSizeQueryIndex)];
-        DataCopy(copyInUb, bmm3ResGm[t2Idx * constInfo.dSizeQueryIndex], t2ProcessSize * constInfo.dSizeQueryIndex);
-
-        SetFlag<AscendC::HardEvent::MTE2_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
-        WaitFlag<AscendC::HardEvent::MTE2_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+        if constexpr (deterministic) {
+            DataCopy(copyInUb, scatterAddResGmBanks[0][t2Idx * constInfo.dSizeQueryIndex],
+                     t2ProcessSize * constInfo.dSizeQueryIndex);
+            copyInPongUb = scatterAddPongUb[pingPongIdx * (UB_ROW_SIZE * constInfo.dSizeQueryIndex)];
+            for (int32_t bank = 1; bank < SLI_DETER_SCATTER_BANK_NUM; ++bank) {
+                if (bank > 1) {
+                    SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+                    WaitFlag<AscendC::HardEvent::V_MTE2>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+                }
+                DataCopy(copyInPongUb, scatterAddResGmBanks[bank][t2Idx * constInfo.dSizeQueryIndex],
+                         t2ProcessSize * constInfo.dSizeQueryIndex);
+                SetFlag<AscendC::HardEvent::MTE2_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+                WaitFlag<AscendC::HardEvent::MTE2_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+                Add(copyInUb, copyInUb, copyInPongUb, t2ProcessSize * constInfo.dSizeQueryIndex);
+                PipeBarrier<PIPE_V>();
+            }
+        } else {
+            DataCopy(copyInUb, bmm3ResGm[t2Idx * constInfo.dSizeQueryIndex], t2ProcessSize * constInfo.dSizeQueryIndex);
+            SetFlag<AscendC::HardEvent::MTE2_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+            WaitFlag<AscendC::HardEvent::MTE2_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
+        }
 
         WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
         copyOutUb = castOutUb[pingPongIdx * (UB_ROW_SIZE * constInfo.dSizeQueryIndex)];
         Cast(copyOutUb, copyInUb, RoundMode::CAST_ROUND, t2ProcessSize * constInfo.dSizeQueryIndex);
-        SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);       // 释放copyInUb
+        SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_SCATTER_BUF_FLAG + pingPongIdx); // 释放copyInUb
 
         SetFlag<AscendC::HardEvent::V_MTE3>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
         WaitFlag<AscendC::HardEvent::V_MTE3>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);
 
         DataCopy(dKeyIndexGm[t2Idx * constInfo.dSizeQueryIndex], copyOutUb, t2ProcessSize * constInfo.dSizeQueryIndex);
-        SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx);       // 释放copyOutUb
+        SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_SCATTER_BUF_FLAG + pingPongIdx); // 释放copyOutUb
 
         pingPongIdx = 1 - pingPongIdx;
     }
