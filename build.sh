@@ -892,7 +892,9 @@ build_static_lib() {
     if echo "${all_targets}" | grep -wq "ophost_transformer_static"; then
         cmake --build . --target ophost_transformer_static ${JOB_NUM} ${option}
     fi
-    cmake --build . --target opapi_transformer_static ${JOB_NUM} ${option}
+    if echo "${all_targets}" | grep -wq "opapi_transformer_static"; then
+        cmake --build . --target opapi_transformer_static ${JOB_NUM} ${option}
+    fi
     local jit_command=""
     if [[ "$ENABLE_BUILT_JIT" == "TRUE" ]]; then
         jit_command="-j"
@@ -903,7 +905,9 @@ build_static_lib() {
     python3 "${BASE_PATH}/scripts/util/build_opp_kernel_static.py" StaticCompile -s ${unit} -b ${BUILD_PATH} -n=0 -a=${ARCH_INFO} ${jit_command}
 
     cd "${BUILD_PATH}" && cmake ${CUSTOM_OPTION} .. -DENABLE_STATIC=ON -DASCEND_COMPUTE_UNIT=${unit}
-    cmake --build . --target cann_transformer_static ${JOB_NUM} ${option}
+    if echo "${all_targets}" | grep -wq "cann_transformer_static"; then
+        cmake --build . --target cann_transformer_static ${JOB_NUM} ${option}
+    fi
     echo "Build static lib success!"
 }
 
@@ -940,7 +944,6 @@ package_static() {
     fi
     # Get filename of *.run file and set new directory name
     local run_file=$(basename "${run_files[0]}")
-    echo "Found .run file: $run_file"
     if [[ "$run_file" != *"ops-transformer"* ]]; then
         echo "Error: Filename '$run_file' does not contain 'ops-transformer'."
         return 1
@@ -951,8 +954,7 @@ package_static() {
     # Check weather $BUILD_PATH/static_library_files directory exists and not empty
     local static_files_dir="$BUILD_PATH/static_library_files"
     if [ ! -d "$static_files_dir" ]; then
-        echo "Error: Directory $static_files_dir does not exist."
-        return 1
+        return 0
     fi
     if [ -z "$(ls -A "$static_files_dir")" ]; then
         echo "Error: Directory $static_files_dir is empty."
