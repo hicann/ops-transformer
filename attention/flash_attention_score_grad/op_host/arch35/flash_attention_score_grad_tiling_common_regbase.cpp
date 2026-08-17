@@ -30,7 +30,7 @@ ge::graphStatus CheckSoftmaxMaxShape(const gert::TilingContext *context, int64_t
     auto softmaxMaxShapeDim = softmaxMaxShape->GetStorageShape().GetDimNum();
     if (softmaxMaxShapeDim != 4) { // softmaxMax only support 4 dimensions
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("FlashAttentionScoreGrad", "softmaxMaxOptional",
-            std::to_string(softmaxMaxShapeDim).c_str(), "The shape dim of softmaxMaxOptional must be 4");
+                                                 std::to_string(softmaxMaxShapeDim).c_str(), "The shape dim of softmaxMaxOptional must be 4");
         return ge::GRAPH_FAILED;
     }
     auto dim0 = softmaxMaxShape->GetStorageShape().GetDim(0); // 0:b
@@ -41,9 +41,9 @@ ge::graphStatus CheckSoftmaxMaxShape(const gert::TilingContext *context, int64_t
     std::string reasonMsg = "The shape of softmaxMaxOptional must be [" + std::to_string(b) + ", " +
                             std::to_string(n1) + ", " + std::to_string(s1) + ", " + std::to_string(validDim3) + "]";
     OP_CHECK_IF((dim0 != b || dim1 != n1 || dim2 != s1 || dim3 != validDim3),
-              OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "softmaxMaxOptional",
-                    Ops::Base::ToString(softmaxMaxShape->GetStorageShape()).c_str(), reasonMsg.c_str()),
-              return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "softmaxMaxOptional",
+                                                       Ops::Base::ToString(softmaxMaxShape->GetStorageShape()).c_str(), reasonMsg.c_str()),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -57,7 +57,7 @@ ge::graphStatus CheckSoftmaxSumShape(const gert::TilingContext *context, int64_t
     auto softmaxSumShapeDim = softmaxSumShape->GetStorageShape().GetDimNum();
     if (softmaxSumShapeDim != 4) { // softmaxSum only support 4 dimensions
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("FlashAttentionScoreGrad", "softmaxSumOptional",
-            std::to_string(softmaxSumShapeDim).c_str(), "The shape dim of softmaxSumOptional must be 4");
+                                                 std::to_string(softmaxSumShapeDim).c_str(), "The shape dim of softmaxSumOptional must be 4");
         return ge::GRAPH_FAILED;
     }
     auto dim0 = softmaxSumShape->GetStorageShape().GetDim(0); // 0:b
@@ -68,9 +68,9 @@ ge::graphStatus CheckSoftmaxSumShape(const gert::TilingContext *context, int64_t
     std::string reasonMsg = "The shape of softmaxSumOptional must be [" + std::to_string(b) + ", " +
                             std::to_string(n1) + ", " + std::to_string(s1) + ", " + std::to_string(validDim3) + "]";
     OP_CHECK_IF((dim0 != b || dim1 != n1 || dim2 != s1 || dim3 != validDim3),
-              OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "softmaxSumOptional",
-                    Ops::Base::ToString(softmaxSumShape->GetStorageShape()).c_str(), reasonMsg.c_str()),
-              return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "softmaxSumOptional",
+                                                       Ops::Base::ToString(softmaxSumShape->GetStorageShape()).c_str(), reasonMsg.c_str()),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -93,7 +93,7 @@ ge::graphStatus CheckSoftmaxMaxSumTndShape(const gert::TilingContext *context, i
         auto softmaxMaxShapeDim = softmaxMaxShape->GetStorageShape().GetDimNum();
         if (softmaxMaxShapeDim != DIM_3) { // softmax TND only support 3 dimensions
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("FlashAttentionScoreGrad", "softmaxMaxOptional",
-                std::to_string(softmaxMaxShapeDim).c_str(), "The shape dim of softmaxMaxOptional must be 3");
+                                                     std::to_string(softmaxMaxShapeDim).c_str(), "The shape dim of softmaxMaxOptional must be 3");
             return ge::GRAPH_FAILED;
         }
         auto dim0 = softmaxMaxShape->GetStorageShape().GetDim(DIM_0); // 0:t1
@@ -103,14 +103,14 @@ ge::graphStatus CheckSoftmaxMaxSumTndShape(const gert::TilingContext *context, i
                                 std::to_string(n1) + ", " + std::to_string(BIT_NUMS) + "]";
         OP_CHECK_IF((dim0 != t1 || dim1 != n1 || dim2 != BIT_NUMS),
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "softmaxMaxOptional",
-                        Ops::Base::ToString(softmaxMaxShape->GetStorageShape()).c_str(), reasonMsg.c_str()),
+                                                           Ops::Base::ToString(softmaxMaxShape->GetStorageShape()).c_str(), reasonMsg.c_str()),
                     return ge::GRAPH_FAILED);
     }
     if (softmaxSumShape != nullptr) {
         auto softmaxSumShapeDim = softmaxSumShape->GetStorageShape().GetDimNum();
         if (softmaxSumShapeDim != DIM_3) { // softmax TND only support 3 dimensions
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("FlashAttentionScoreGrad", "softmaxSumOptional",
-                std::to_string(softmaxSumShapeDim).c_str(), "The shape dim of softmaxSumOptional must be 3");
+                                                     std::to_string(softmaxSumShapeDim).c_str(), "The shape dim of softmaxSumOptional must be 3");
             return ge::GRAPH_FAILED;
         }
         auto dim0 = softmaxSumShape->GetStorageShape().GetDim(DIM_0); // 0:t1
@@ -120,7 +120,7 @@ ge::graphStatus CheckSoftmaxMaxSumTndShape(const gert::TilingContext *context, i
                                 std::to_string(n1) + ", " + std::to_string(BIT_NUMS) + "]";
         OP_CHECK_IF((dim0 != t1 || dim1 != n1 || dim2 != BIT_NUMS),
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "softmaxSumOptional",
-                        Ops::Base::ToString(softmaxSumShape->GetStorageShape()).c_str(), reasonMsg.c_str()),
+                                                           Ops::Base::ToString(softmaxSumShape->GetStorageShape()).c_str(), reasonMsg.c_str()),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -138,7 +138,7 @@ ge::graphStatus CheckAttentionInShape(const gert::TilingContext *context)
     if (attentionInShapeDim != queryShapeDim) {
         std::string shapeDimMsg = std::to_string(queryShapeDim) + ", " + std::to_string(attentionInShapeDim);
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("FlashAttentionScoreGrad", "query, attentionInOptional",
-            shapeDimMsg.c_str(), "The shape dims of query and attentionInOptional must be same");
+                                                 shapeDimMsg.c_str(), "The shape dims of query and attentionInOptional must be same");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -157,11 +157,11 @@ ge::graphStatus CheckSoftmaxDtype(const gert::TilingContext *context)
 
     bool softmaxTypeCheck = (softmaxMaxType == softmaxSumType) && (softmaxMaxType == ge::DT_FLOAT);
     std::string dtypeMsg = "{" + ge::TypeUtils::DataTypeToSerialString(softmaxMaxType) + ", " +
-                            ge::TypeUtils::DataTypeToSerialString(softmaxSumType) + "}";
+                           ge::TypeUtils::DataTypeToSerialString(softmaxSumType) + "}";
     OP_CHECK_IF(softmaxTypeCheck != true,
                 OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON("FlashAttentionScoreGrad",
-                    "softmaxMaxOptional, softmaxSumOptional", dtypeMsg.c_str(),
-                    "The dtype of softmaxMaxOptional and softmaxSumOptional must be FLOAT32"),
+                                                       "softmaxMaxOptional, softmaxSumOptional", dtypeMsg.c_str(),
+                                                       "The dtype of softmaxMaxOptional and softmaxSumOptional must be FLOAT32"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -182,11 +182,11 @@ ge::graphStatus CheckAttentionInDtype(const gert::TilingContext *context)
     }
 
     std::string dtypeMsg = "{" + ge::TypeUtils::DataTypeToSerialString(queryType) + ", " +
-                            ge::TypeUtils::DataTypeToSerialString(attentionInType) + "}";
+                           ge::TypeUtils::DataTypeToSerialString(attentionInType) + "}";
     OP_CHECK_IF(queryType != attentionInType,
                 OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON("FlashAttentionScoreGrad",
-                    "query, attentionInOptional", dtypeMsg.c_str(),
-                    "The dtype of query and attentionInOptional must be the same"),
+                                                       "query, attentionInOptional", dtypeMsg.c_str(),
+                                                       "The dtype of query and attentionInOptional must be the same"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -198,7 +198,7 @@ ge::graphStatus CheckShapeValid(const gert::TilingContext *context, int64_t b, i
                            std::to_string(d);
     OP_CHECK_IF(isShapeInValid,
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "query", shapeMsg.c_str(),
-                    "All axes of query must be postitive numbers"),
+                                                      "All axes of query must be postitive numbers"),
                 return ge::GRAPH_FAILED);
 
     auto queryType = context->GetInputDesc(0)->GetDataType();
@@ -230,7 +230,7 @@ ge::graphStatus CheckTndShapeValid(const gert::TilingContext *context, int64_t t
     std::string shapeMsg = std::to_string(t1) + ", " + std::to_string(n1) + ", " + std::to_string(d);
     OP_CHECK_IF(isShapeInValid,
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "query", shapeMsg.c_str(),
-                    "All axes of query must be postitive numbers"),
+                                                      "All axes of query must be postitive numbers"),
                 return ge::GRAPH_FAILED);
 
     auto ret = CheckAttentionInShape(context);
@@ -265,28 +265,29 @@ ge::graphStatus CheckDtypeValid(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase& fBaseParams)
+ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     // check atten_mask shape when enable atten_mask_compress
     if (fBaseParams.attenMaskCompressMode == 0) {
         constexpr int64_t BEST_BASIC_BLOCK_NUM = ALIGN64 * ALIGN128;
         constexpr uint32_t MAX_KV_SEQLEN = 1536;
         auto bestBasicBlockNum = fBaseParams.s1 >= FP32_BYTES ?
-                                 (BEST_BASIC_BLOCK_NUM / FP32_BYTES * (FP32_BYTES - 1)) : BEST_BASIC_BLOCK_NUM;
+                                     (BEST_BASIC_BLOCK_NUM / FP32_BYTES * (FP32_BYTES - 1)) :
+                                     BEST_BASIC_BLOCK_NUM;
         bool ngs1s2BIsAble = (fBaseParams.n2 * fBaseParams.g *
-                             AlignTo(fBaseParams.s1, static_cast<int64_t>(ConstAxisTemplateNum::NUM16)) *
-                             AlignTo(fBaseParams.s2, static_cast<int64_t>(ConstAxisTemplateNum::NUM16))) <=
+                              AlignTo(fBaseParams.s1, static_cast<int64_t>(ConstAxisTemplateNum::NUM16)) *
+                              AlignTo(fBaseParams.s2, static_cast<int64_t>(ConstAxisTemplateNum::NUM16))) <=
                              bestBasicBlockNum;
         bool isBCaple = fBaseParams.attenMaskOptional != EMPTY_TENSOR && fBaseParams.layoutType != INPUT_FORMAT_TND &&
                         fBaseParams.queryType != ge::DT_FLOAT && fBaseParams.d == fBaseParams.d1 &&
                         fBaseParams.pseType == static_cast<uint32_t>(PseType::PSE_OUTER_ADD_MUL_TYPE) && ngs1s2BIsAble;
         int64_t dTypeSize = fBaseParams.queryType == ge::DT_BF16 ?
-                            ge::GetSizeByDataType(static_cast<ge::DataType>(fBaseParams.queryType)) * NUM_TWO :
-                            ge::GetSizeByDataType(static_cast<ge::DataType>(fBaseParams.queryType));
+                                ge::GetSizeByDataType(static_cast<ge::DataType>(fBaseParams.queryType)) * NUM_TWO :
+                                ge::GetSizeByDataType(static_cast<ge::DataType>(fBaseParams.queryType));
         int64_t s2Align = AlignTo(fBaseParams.s2 *
-                                  ge::GetSizeByDataType(static_cast<ge::DataType>(fBaseParams.queryType)),
+                                      ge::GetSizeByDataType(static_cast<ge::DataType>(fBaseParams.queryType)),
                                   static_cast<int64_t>(ConstAxisTemplateNum::NUM32)) /
-                                  ge::GetSizeByDataType(static_cast<ge::DataType>(fBaseParams.queryType));
+                          ge::GetSizeByDataType(static_cast<ge::DataType>(fBaseParams.queryType));
         int64_t s2AlignVecSize = AlignTo(s2Align * dTypeSize, static_cast<int64_t>(ConstAxisTemplateNum::NUM32));
         bool ngs1s2BnIsAble = ((fBaseParams.g * fBaseParams.s1 * s2AlignVecSize) != 0) && (fBaseParams.g == 1) &&
                               (s2AlignVecSize <= MAX_KV_SEQLEN) &&
@@ -296,12 +297,12 @@ ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase& fBaseParams)
                          fBaseParams.pseType == static_cast<uint32_t>(PseType::PSE_OUTER_ADD_MUL_TYPE) &&
                          ngs1s2BnIsAble;
         bool invalid = (static_cast<int64_t>(fBaseParams.attenMaskS1Size) *
-                        static_cast<int64_t>(fBaseParams.attenMaskS2Size) <
+                            static_cast<int64_t>(fBaseParams.attenMaskS2Size) <
                         static_cast<int64_t>(fBaseParams.s1) * static_cast<int64_t>(fBaseParams.s2));
         bool attenMaskInvalid = (static_cast<int64_t>(fBaseParams.attenMaskS1Size) !=
-                                static_cast<int64_t>(fBaseParams.s1)) ||
+                                 static_cast<int64_t>(fBaseParams.s1)) ||
                                 (static_cast<int64_t>(fBaseParams.attenMaskS2Size) !=
-                                static_cast<int64_t>(fBaseParams.s2));
+                                 static_cast<int64_t>(fBaseParams.s2));
         if ((isBNCaple || isBCaple) && invalid) {
             std::string shapeSizeMsg = std::to_string(fBaseParams.attenMaskS1Size) + " * " +
                                        std::to_string(fBaseParams.attenMaskS2Size);
@@ -309,17 +310,18 @@ ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase& fBaseParams)
                                     "the shape size of attenMaskOptional cannot be less than " +
                                     std::to_string(fBaseParams.s1) + " * " + std::to_string(fBaseParams.s2);
             OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON("FlashAttentionScoreGrad", "attenMaskOptional",
-                shapeSizeMsg.c_str(), reasonMsg.c_str());
+                                                      shapeSizeMsg.c_str(), reasonMsg.c_str());
             return ge::GRAPH_FAILED;
         } else if (fBaseParams.attenMaskOptional != EMPTY_TENSOR && fBaseParams.layoutType != INPUT_FORMAT_TND &&
-            attenMaskInvalid && (!(isBNCaple || isBCaple))) {
+                   attenMaskInvalid && (!(isBNCaple || isBCaple))) {
             std::string shapeMsg = std::to_string(fBaseParams.attenMaskS1Size) + ", " +
-                                       std::to_string(fBaseParams.attenMaskS2Size);
+                                   std::to_string(fBaseParams.attenMaskS2Size);
             std::string reasonMsg = "When attenMaskOptional is not empty tensor and inputLayout is not TND, "
-                                    "the shape of attenMaskOptional must be [" + std::to_string(fBaseParams.s1) + ", " +
+                                    "the shape of attenMaskOptional must be [" +
+                                    std::to_string(fBaseParams.s1) + ", " +
                                     std::to_string(fBaseParams.s2) + "]";
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "attenMaskOptional", shapeMsg.c_str(),
-                reasonMsg.c_str());
+                                                  reasonMsg.c_str());
             return ge::GRAPH_FAILED;
         }
         return ge::GRAPH_SUCCESS;
@@ -331,7 +333,7 @@ ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase& fBaseParams)
             std::string shapeMsg = std::to_string(fBaseParams.attenMaskS1Size) + ", " +
                                    std::to_string(fBaseParams.attenMaskS2Size);
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "attenMaskOptional", shapeMsg.c_str(),
-                "When sparseMode is 6, the shape of attenMaskOptional must be [3072, 2048]");
+                                                  "When sparseMode is 6, the shape of attenMaskOptional must be [3072, 2048]");
             return ge::GRAPH_FAILED;
         }
         return ge::GRAPH_SUCCESS;
@@ -341,7 +343,7 @@ ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase& fBaseParams)
         std::string shapeMsg = std::to_string(fBaseParams.attenMaskS1Size) + ", " +
                                std::to_string(fBaseParams.attenMaskS2Size);
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "attenMaskOptional", shapeMsg.c_str(),
-            "Sq of attenMaskOptional must be equal to Skv of attenMaskOptional");
+                                              "Sq of attenMaskOptional must be equal to Skv of attenMaskOptional");
         return ge::GRAPH_FAILED;
     }
 
@@ -349,14 +351,14 @@ ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase& fBaseParams)
         std::string shapeMsg = std::to_string(fBaseParams.attenMaskS1Size) + ", " +
                                std::to_string(fBaseParams.attenMaskS2Size);
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "attenMaskOptional", shapeMsg.c_str(),
-            "Skv of attenMaskOptional must be equal to 2048");
+                                              "Skv of attenMaskOptional must be equal to 2048");
         return ge::GRAPH_FAILED;
     }
 
     return ge::GRAPH_SUCCESS;
 }
 
-bool CheckIsLargeInvalidBlk(const FuzzyBaseInfoParamsRegbase& fBaseParams)
+bool CheckIsLargeInvalidBlk(const FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     if ((fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::LEFT_UP_CAUSAL)) &&
         (fBaseParams.s1Outer >= 0 && fBaseParams.s2Outer >= 0) &&
@@ -367,9 +369,9 @@ bool CheckIsLargeInvalidBlk(const FuzzyBaseInfoParamsRegbase& fBaseParams)
     return false;
 }
 
-void JudgeIsNeedDeter(FuzzyBaseInfoParamsRegbase& fBaseParams, std::array<int64_t, CORE_LIST_NUM>& dqOffset, std::array<int64_t, CORE_LIST_NUM>& dkDvOffset, std::array<int64_t, CORE_LIST_NUM>& dqOffsetpre,
-    std::array<int64_t, CORE_LIST_NUM>& dkDvOffsetpre, int64_t calcNum, bool &noNeedDeter, bool &dqNeedDeterpre, bool &dkDvNeedDeterpre)
-{   
+void JudgeIsNeedDeter(FuzzyBaseInfoParamsRegbase &fBaseParams, std::array<int64_t, CORE_LIST_NUM> &dqOffset, std::array<int64_t, CORE_LIST_NUM> &dkDvOffset, std::array<int64_t, CORE_LIST_NUM> &dqOffsetpre,
+                      std::array<int64_t, CORE_LIST_NUM> &dkDvOffsetpre, int64_t calcNum, bool &noNeedDeter, bool &dqNeedDeterpre, bool &dkDvNeedDeterpre)
+{
     bool dqNeedDeter = false;
     bool dkDvNeedDeter = false;
     for (uint16_t i = 0; i < fBaseParams.blockOuter - 1; i++) {
@@ -382,6 +384,41 @@ void JudgeIsNeedDeter(FuzzyBaseInfoParamsRegbase& fBaseParams, std::array<int64_
             }
         }
     }
+
+    // Adjacent rounds are pipelined. Even if neither round has an intra-round conflict, two different cores can
+    // atomically accumulate to the same output across the round boundary. Mark both rounds as deterministic so
+    // that the earlier normal atomic path cannot overlap the later round.
+    bool dqCrossRoundConflict = false;
+    bool dkDvCrossRoundConflict = false;
+    if (calcNum != 0) {
+        for (uint16_t i = 0; i < fBaseParams.blockOuter && (!dqCrossRoundConflict || !dkDvCrossRoundConflict); i++) {
+            for (uint16_t j = 0; j < fBaseParams.blockOuter; j++) {
+                if (i == j) {
+                    continue;
+                }
+                if (!dqCrossRoundConflict && dqOffset[i] == dqOffsetpre[j] && dqOffset[i] != OUTINDEX) {
+                    dqCrossRoundConflict = true;
+                }
+                if (!dkDvCrossRoundConflict && dkDvOffset[i] == dkDvOffsetpre[j] && dkDvOffset[i] != OUTINDEX) {
+                    dkDvCrossRoundConflict = true;
+                }
+            }
+        }
+
+        int64_t previousIndex = (calcNum - 1) / ALIGN64;
+        int64_t previousBitPosition = (calcNum - 1) % ALIGN64;
+        dqNeedDeter = dqNeedDeter || dqCrossRoundConflict;
+        dkDvNeedDeter = dkDvNeedDeter || dkDvCrossRoundConflict;
+        if (previousIndex >= 0 && previousIndex < INT64_NUM) {
+            if (dqCrossRoundConflict) {
+                fBaseParams.dqIsNeedDeter[previousIndex] |= (1ULL << previousBitPosition);
+            }
+            if (dkDvCrossRoundConflict) {
+                fBaseParams.dkDvIsNeedDeter[previousIndex] |= (1ULL << previousBitPosition);
+            }
+        }
+    }
+
     if (calcNum != 0 && ((!dqNeedDeter && dqNeedDeterpre) || (!dkDvNeedDeter && dkDvNeedDeterpre))) {
         for (uint16_t i = 0; i < fBaseParams.blockOuter; i++) {
             for (uint16_t j = 0; j < fBaseParams.blockOuter; j++) {
@@ -404,8 +441,8 @@ void JudgeIsNeedDeter(FuzzyBaseInfoParamsRegbase& fBaseParams, std::array<int64_
     }
     noNeedDeter = noNeedDeter && !dqNeedDeter && !dkDvNeedDeter;
     // caculate index and position
-    int64_t index = calcNum / 64;
-    int64_t bitPosition = calcNum % 64;
+    int64_t index = calcNum / ALIGN64;
+    int64_t bitPosition = calcNum % ALIGN64;
     if (index >= 0 && index < INT64_NUM) {
         if (dqNeedDeter) {
             fBaseParams.dqIsNeedDeter[index] |= (1ULL << bitPosition);
@@ -422,8 +459,8 @@ void JudgeIsNeedDeter(FuzzyBaseInfoParamsRegbase& fBaseParams, std::array<int64_
     }
 }
 
-void GetOffset(FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t &currentDqOffset, int64_t &currentDkDvOffset,
-                                                           int64_t blockIdx)
+void GetOffset(FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t &currentDqOffset, int64_t &currentDkDvOffset,
+               int64_t blockIdx)
 {
     int64_t boIdx = 0;
     int64_t bDimTail = 0;
@@ -522,11 +559,11 @@ void GetOffset(FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t &currentDqOffset
     }
 }
 
-int64_t GetTotalPerBatchNum(FuzzyBaseInfoParamsRegbase& fBaseParams, uint8_t sparseType)
+int64_t GetTotalPerBatchNum(FuzzyBaseInfoParamsRegbase &fBaseParams, uint8_t sparseType)
 {
     int64_t totalPerBatchNum = 0;
     if (sparseType == static_cast<uint8_t>(SparseType::DENSE)) {
-        totalPerBatchNum =  fBaseParams.s1Outer * fBaseParams.s2Outer;
+        totalPerBatchNum = fBaseParams.s1Outer * fBaseParams.s2Outer;
     } else if (sparseType == static_cast<uint8_t>(SparseType::CASUAL)) {
         if (fBaseParams.s1 < fBaseParams.s2) {
             if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::RIGHT_DOWN_CAUSAL)) {
@@ -547,42 +584,44 @@ int64_t GetTotalPerBatchNum(FuzzyBaseInfoParamsRegbase& fBaseParams, uint8_t spa
             int64_t xMax = (fBaseParams.s1Outer - 1) > (s2oIdx + p) ? (s2oIdx + p) : (fBaseParams.s1Outer - 1);
             int64_t length = (xMax >= xMin) ? (xMax - xMin + 1) : 0;
             if (length > 0) {
-                totalPerBatchNum += length;   
+                totalPerBatchNum += length;
             }
         }
     }
     return totalPerBatchNum;
 }
 
-void PrintShapeInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
+void PrintShapeInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     OP_LOGI(context_,
-              "FAG s1s2_bn2gs1s2 with shape b[%ld] n2[%ld] g[%ld] s1[%ld] s2[%ld] d[%ld] preToken[%ld] nextToken[%ld]!",
-              fBaseParams.b, fBaseParams.n2, fBaseParams.g, fBaseParams.s1, fBaseParams.s2, fBaseParams.d,
-              fBaseParams.s1Token, fBaseParams.s2Token);
+            "FAG s1s2_bn2gs1s2 with shape b[%ld] n2[%ld] g[%ld] s1[%ld] s2[%ld] d[%ld] preToken[%ld] nextToken[%ld]!",
+            fBaseParams.b, fBaseParams.n2, fBaseParams.g, fBaseParams.s1, fBaseParams.s2, fBaseParams.d,
+            fBaseParams.s1Token, fBaseParams.s2Token);
 }
 
-bool CheckSparseModeValue(FuzzyBaseInfoParamsRegbase& fBaseParams) {
+bool CheckSparseModeValue(FuzzyBaseInfoParamsRegbase &fBaseParams)
+{
     if (fBaseParams.sparseMode > static_cast<uint32_t>(SparseMode::PREFIX_COMPRESS)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "sparseMode",
-            std::to_string(fBaseParams.sparseMode).c_str(), "the value of sparseMode cannot be greater than 6");
+                                              std::to_string(fBaseParams.sparseMode).c_str(), "the value of sparseMode cannot be greater than 6");
         return false;
     }
     return true;
 }
 
-bool CheckVarLenSparseModeValue(FuzzyBaseInfoParamsRegbase& fBaseParams) {
+bool CheckVarLenSparseModeValue(FuzzyBaseInfoParamsRegbase &fBaseParams)
+{
     if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::PREFIX) ||
         fBaseParams.sparseMode > static_cast<uint32_t>(SparseMode::BAND_LEFT_UP_CASUAL)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "sparseMode",
-            std::to_string(fBaseParams.sparseMode).c_str(),
-            "When inputLayout is TND, the value of sparseMode cannot be 5 or greater than 8");
+                                              std::to_string(fBaseParams.sparseMode).c_str(),
+                                              "When inputLayout is TND, the value of sparseMode cannot be 5 or greater than 8");
         return false;
     }
     return true;
 }
 
-ge::graphStatus CheckUnpadTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams)
+ge::graphStatus CheckUnpadTokensInfo(FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     // 7  8
     if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::RIGHT_DOWN_CASUAL_BAND) ||
@@ -592,14 +631,15 @@ ge::graphStatus CheckUnpadTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams)
         if (-fBaseParams.s1Token > actualS1Len || -fBaseParams.s2Token > actualS2Len ||
             (fBaseParams.s1Token + fBaseParams.s2Token) <= 0) {
             std::string s1s2ValueMsg = "{" + std::to_string(fBaseParams.s1Token) + ", " +
-                                        std::to_string(fBaseParams.s2Token) + ", " +
-                                        std::to_string(fBaseParams.s1Token + fBaseParams.s2Token) + "}";
+                                       std::to_string(fBaseParams.s2Token) + ", " +
+                                       std::to_string(fBaseParams.s1Token + fBaseParams.s2Token) + "}";
             std::string s1s2ReasonMsg = "When inputLayout is TND and sparseMode is 7 or 8, the values of nextTokens, "
-                                        "preTokens cannot be less than " + std::to_string(-actualS1Len) + ", " +
+                                        "preTokens cannot be less than " +
+                                        std::to_string(-actualS1Len) + ", " +
                                         std::to_string(-actualS2Len) +
                                         ", the value of nextTokens + preTokens must be greater than 0";
             OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad",
-                "nextTokens, preTokens, nextTokens+preTokens", s1s2ValueMsg.c_str(), s1s2ReasonMsg.c_str());
+                                                   "nextTokens, preTokens, nextTokens+preTokens", s1s2ValueMsg.c_str(), s1s2ReasonMsg.c_str());
             return ge::GRAPH_FAILED;
         }
         return ge::GRAPH_SUCCESS;
@@ -616,14 +656,15 @@ ge::graphStatus CheckUnpadTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams)
             if (-fBaseParams.s1Token > actualS2Len || -fBaseParams.s2Token > actualS1Len ||
                 (fBaseParams.s1Token + fBaseParams.s2Token) <= 0) {
                 std::string valuesMsg = "{" + std::to_string(fBaseParams.s1Token) + ", " +
-                                            std::to_string(fBaseParams.s2Token) + ", " +
-                                            std::to_string(fBaseParams.s1Token + fBaseParams.s2Token) + "}";
+                                        std::to_string(fBaseParams.s2Token) + ", " +
+                                        std::to_string(fBaseParams.s1Token + fBaseParams.s2Token) + "}";
                 std::string reasonMsg = "When inputLayout is TND and sparseMode is 0, the values of nextTokens, "
-                                        "preTokens cannot be less than " + std::to_string(-actualS2Len) + ", " +
+                                        "preTokens cannot be less than " +
+                                        std::to_string(-actualS2Len) + ", " +
                                         std::to_string(-actualS1Len) +
                                         ", the value of nextTokens + preTokens must be greater than 0";
                 OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad",
-                    "nextTokens, preTokens, nextTokens+preTokens", valuesMsg.c_str(), reasonMsg.c_str());
+                                                       "nextTokens, preTokens, nextTokens+preTokens", valuesMsg.c_str(), reasonMsg.c_str());
                 return ge::GRAPH_FAILED;
             }
         }
@@ -631,14 +672,15 @@ ge::graphStatus CheckUnpadTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams)
             if (-fBaseParams.s1Token > actualS1Len || -fBaseParams.s2Token > actualS2Len ||
                 (fBaseParams.s1Token + fBaseParams.s2Token) <= 0) {
                 std::string valuesMsg = "{" + std::to_string(fBaseParams.s1Token) + ", " +
-                                            std::to_string(fBaseParams.s2Token) + ", " +
-                                            std::to_string(fBaseParams.s1Token + fBaseParams.s2Token) + "}";
+                                        std::to_string(fBaseParams.s2Token) + ", " +
+                                        std::to_string(fBaseParams.s1Token + fBaseParams.s2Token) + "}";
                 std::string reasonMsg = "When inputLayout is TND and sparseMode is 4, the values of nextTokens, "
-                                        "preTokens cannot be less than " + std::to_string(-actualS1Len) + ", " +
+                                        "preTokens cannot be less than " +
+                                        std::to_string(-actualS1Len) + ", " +
                                         std::to_string(-actualS2Len) +
                                         ", the value of nextTokens + preTokens must be greater than 0";
                 OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad",
-                    "nextTokens, preTokens, nextTokens+preTokens", valuesMsg.c_str(), reasonMsg.c_str());
+                                                       "nextTokens, preTokens, nextTokens+preTokens", valuesMsg.c_str(), reasonMsg.c_str());
                 return ge::GRAPH_FAILED;
             }
         }
@@ -646,7 +688,7 @@ ge::graphStatus CheckUnpadTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams)
     return ge::GRAPH_SUCCESS;
 }
 
-int64_t FindBandIdx(FuzzyBaseInfoParamsRegbase& fBaseParams)
+int64_t FindBandIdx(FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::RIGHT_DOWN_CASUAL_BAND)) {
         for (int64_t i = fBaseParams.b - 1; i >= 0; i--) {
@@ -664,15 +706,15 @@ int64_t FindBandIdx(FuzzyBaseInfoParamsRegbase& fBaseParams)
     return 0;
 }
 
-bool IsNewDeter(const FuzzyBaseInfoParamsRegbase& fBaseParams)
+bool IsNewDeter(const FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     return fBaseParams.deterSparseType >= static_cast<uint32_t>(DeterSparseType::DETER_DENSE) &&
-           fBaseParams.deterSparseType <= static_cast<uint32_t>(DeterSparseType::DETER_BAND) && 
+           fBaseParams.deterSparseType <= static_cast<uint32_t>(DeterSparseType::DETER_BAND) &&
            (fBaseParams.layoutType == INPUT_FORMAT_TND);
 }
 
-bool CheckPrefixNExist(FuzzyBaseInfoParamsRegbase& fBaseParams,
-    const int64_t bIdx, const int64_t prefixN, std::vector<std::vector<std::pair<int64_t, int64_t>>> &s1ValidIdx)
+bool CheckPrefixNExist(FuzzyBaseInfoParamsRegbase &fBaseParams,
+                       const int64_t bIdx, const int64_t prefixN, std::vector<std::vector<std::pair<int64_t, int64_t>>> &s1ValidIdx)
 {
     for (int64_t i = 0; i < bIdx; ++i) {
         if (fBaseParams.prefixN[i] == prefixN) {
@@ -684,7 +726,7 @@ bool CheckPrefixNExist(FuzzyBaseInfoParamsRegbase& fBaseParams,
     return false;
 }
 
-void CalcleBandDeterParam(FuzzyBaseInfoParamsRegbase& fBaseParams)
+void CalcleBandDeterParam(FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     int64_t m{fBaseParams.s1Outer}, n{fBaseParams.s2Outer}, k{static_cast<int64_t>(fBaseParams.aicNum)}, b{fBaseParams.b * fBaseParams.n2};
     int64_t actualCalcS1Token{fBaseParams.s1Token}, actualCalcS2Token{fBaseParams.s2Token};
@@ -734,14 +776,15 @@ void CalcleBandDeterParam(FuzzyBaseInfoParamsRegbase& fBaseParams)
     fBaseParams.deterMaxRound = r1 + r2;
 }
 
-void CalcleCausalDeterParam(FuzzyBaseInfoParamsRegbase& fBaseParams)
+void CalcleCausalDeterParam(FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     int64_t m{fBaseParams.s1Outer}, n{fBaseParams.s2Outer}, k{static_cast<int64_t>(fBaseParams.aicNum)}, b{fBaseParams.b * fBaseParams.n2};
     if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::RIGHT_DOWN_CAUSAL) && m > n) {
         int64_t skipM = (fBaseParams.s1 - fBaseParams.s2) / (fBaseParams.s1Inner * fBaseParams.s1CvRatio);
         m -= skipM;
     } else if ((fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::NO_MASK) ||
-               fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::LEFT_UP_CAUSAL)) && n > m) {
+                fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::LEFT_UP_CAUSAL)) &&
+               n > m) {
         n = m;
     } else if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::RIGHT_DOWN_CAUSAL) && m < n) {
         fBaseParams.deterSparseType = static_cast<uint32_t>(DeterSparseType::DETER_BAND);
@@ -789,9 +832,9 @@ void CalcleCausalDeterParam(FuzzyBaseInfoParamsRegbase& fBaseParams)
     fBaseParams.deterMaxRound = rUpper;
 }
 
-void SetSparsePrefixBlockInterval(const FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t bIdx,
-    int64_t nIdx, std::vector<std::vector<std::pair<int64_t, int64_t>>> &s1ValidIdx,
-    int64_t (&blockStarts)[CORE_LIST_NUM], int64_t (&blockEnds)[CORE_LIST_NUM], uint32_t &coreNum, int64_t &tmepBlock)
+void SetSparsePrefixBlockInterval(const FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t bIdx,
+                                  int64_t nIdx, std::vector<std::vector<std::pair<int64_t, int64_t>>> &s1ValidIdx,
+                                  int64_t (&blockStarts)[CORE_LIST_NUM], int64_t (&blockEnds)[CORE_LIST_NUM], uint32_t &coreNum, int64_t &tmepBlock)
 {
     for (int64_t gIdx = 0; gIdx < fBaseParams.g; ++gIdx) {
         for (int64_t s2Idx = 0; s2Idx < fBaseParams.s2Outer; ++s2Idx) {
@@ -809,42 +852,42 @@ void SetSparsePrefixBlockInterval(const FuzzyBaseInfoParamsRegbase& fBaseParams,
     return;
 }
 
-std::pair<uint32_t, uint32_t> GetS1S2TemplateType(FuzzyBaseInfoParamsRegbase& fBaseParams)
+std::pair<uint32_t, uint32_t> GetS1S2TemplateType(FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     if (fBaseParams.queryType == ge::DT_FLOAT && fBaseParams.d > static_cast<uint32_t>(ConstAxisTemplateNum::NUM256)) {
         fBaseParams.s1TemplateType = ConstAxisTemplateNum::NUM64;
         fBaseParams.s2TemplateType = ConstAxisTemplateNum::NUM128;
         return std::make_pair(static_cast<uint32_t>(ConstAxisTemplateNum::NUM64),
-            static_cast<uint32_t>(ConstAxisTemplateNum::NUM128));
+                              static_cast<uint32_t>(ConstAxisTemplateNum::NUM128));
     } else if (fBaseParams.queryType == ge::DT_FLOAT8_E5M2 || fBaseParams.queryType == ge::DT_FLOAT8_E4M3FN) {
         // FP8场景基本块修改
         fBaseParams.s1TemplateType = ConstAxisTemplateNum::NUM64;
         fBaseParams.s2TemplateType = ConstAxisTemplateNum::NUM256;
         return std::make_pair(static_cast<uint32_t>(ConstAxisTemplateNum::NUM64),
-            static_cast<uint32_t>(ConstAxisTemplateNum::NUM256));
+                              static_cast<uint32_t>(ConstAxisTemplateNum::NUM256));
     } else if (fBaseParams.queryType == ge::DT_HIFLOAT8) {
         fBaseParams.s1TemplateType = ConstAxisTemplateNum::NUM512;
         fBaseParams.s2TemplateType = ConstAxisTemplateNum::NUM512;
         return std::make_pair(static_cast<uint32_t>(ConstAxisTemplateNum::NUM512),
-            static_cast<uint32_t>(ConstAxisTemplateNum::NUM512));
+                              static_cast<uint32_t>(ConstAxisTemplateNum::NUM512));
     } else if ((AlignTo(fBaseParams.s1, static_cast<int64_t>(ConstAxisTemplateNum::NUM16)) >
-                static_cast<int64_t>(ConstAxisTemplateNum::NUM16) ||
+                    static_cast<int64_t>(ConstAxisTemplateNum::NUM16) ||
                 AlignTo(fBaseParams.s2, static_cast<int64_t>(ConstAxisTemplateNum::NUM16)) >
-                static_cast<int64_t>(ConstAxisTemplateNum::NUM16)) &&
-                AlignTo(fBaseParams.s1, static_cast<int64_t>(ConstAxisTemplateNum::NUM16)) *
-                AlignTo(fBaseParams.s2, static_cast<int64_t>(ConstAxisTemplateNum::NUM16)) >=
-                static_cast<int64_t>(ConstAxisTemplateNum::NUM128) *
-                static_cast<int64_t>(ConstAxisTemplateNum::NUM128)) {
+                    static_cast<int64_t>(ConstAxisTemplateNum::NUM16)) &&
+               AlignTo(fBaseParams.s1, static_cast<int64_t>(ConstAxisTemplateNum::NUM16)) *
+                       AlignTo(fBaseParams.s2, static_cast<int64_t>(ConstAxisTemplateNum::NUM16)) >=
+                   static_cast<int64_t>(ConstAxisTemplateNum::NUM128) *
+                       static_cast<int64_t>(ConstAxisTemplateNum::NUM128)) {
         fBaseParams.s1TemplateType = ConstAxisTemplateNum::NUM128;
         fBaseParams.s2TemplateType = ConstAxisTemplateNum::NUM128;
         return std::make_pair(static_cast<uint32_t>(ConstAxisTemplateNum::NUM128),
-            static_cast<uint32_t>(ConstAxisTemplateNum::NUM128));
+                              static_cast<uint32_t>(ConstAxisTemplateNum::NUM128));
     }
     return std::make_pair(static_cast<uint32_t>(ConstAxisTemplateNum::NUM128),
-        static_cast<uint32_t>(ConstAxisTemplateNum::NUM128));
+                          static_cast<uint32_t>(ConstAxisTemplateNum::NUM128));
 }
 
-uint32_t GetDTemplateType(FuzzyBaseInfoParamsRegbase& fBaseParams)
+uint32_t GetDTemplateType(FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     if (fBaseParams.hasRope) {
         fBaseParams.dTemplateType = ConstAxisTemplateNum::NUM192;
@@ -869,8 +912,8 @@ uint32_t GetDTemplateType(FuzzyBaseInfoParamsRegbase& fBaseParams)
     return static_cast<uint32_t>(ConstAxisTemplateNum::NUM768);
 }
 
-void GetCommS1S2OuterInfo(FuzzyBaseInfoParamsRegbase& fBaseParams,
-    const int64_t prefixN, std::vector<std::pair<int64_t, int64_t>> &s1ValidIdx)
+void GetCommS1S2OuterInfo(FuzzyBaseInfoParamsRegbase &fBaseParams,
+                          const int64_t prefixN, std::vector<std::pair<int64_t, int64_t>> &s1ValidIdx)
 {
     for (int64_t i = 0; i < fBaseParams.s2Outer; i++) {
         int64_t s1Start = 0;
@@ -891,8 +934,8 @@ void GetCommS1S2OuterInfo(FuzzyBaseInfoParamsRegbase& fBaseParams,
     }
 }
 
-void GetCommonS1S2OuterIndex(const FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t (*parseInfo)[ARRAY_LENGTH],
-    int64_t gTail, int64_t& s1oIdx, int64_t& s2oIdx)
+void GetCommonS1S2OuterIndex(const FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t (*parseInfo)[ARRAY_LENGTH],
+                             int64_t gTail, int64_t &s1oIdx, int64_t &s2oIdx)
 {
     int64_t preSize = 0;
     int64_t nextSize = 0;
@@ -903,7 +946,7 @@ void GetCommonS1S2OuterIndex(const FuzzyBaseInfoParamsRegbase& fBaseParams, int6
                 s2oIdx = i;
                 s1oIdx = parseInfo[i][BEGIN_IDX] + gTail - preSize - 1;
                 OP_LOGD("Sparse", " s1oIdx = %ld, s2oIdx = %ld, preSize = %ld, nextSize = %ld", s1oIdx, s2oIdx,
-                            preSize, nextSize);
+                        preSize, nextSize);
                 break;
             }
             preSize = parseInfo[i][LENGTH_IDX];
@@ -911,7 +954,8 @@ void GetCommonS1S2OuterIndex(const FuzzyBaseInfoParamsRegbase& fBaseParams, int6
     }
 }
 
-void CalcleActualToken(FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t batchIdx, int64_t &actualCalcS1Token, int64_t &actualCalcS2Token) {
+void CalcleActualToken(FuzzyBaseInfoParamsRegbase &fBaseParams, int64_t batchIdx, int64_t &actualCalcS1Token, int64_t &actualCalcS2Token)
+{
     int64_t actualS1Len = fBaseParams.actualSeqQlen[batchIdx];
     int64_t actualS2Len = fBaseParams.actualSeqKvlen[batchIdx];
     // 对unpad场景的token值做二次校正
@@ -919,9 +963,9 @@ void CalcleActualToken(FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t batchIdx
     actualCalcS1Token = fBaseParams.s1Token;
     actualCalcS2Token = fBaseParams.s2Token;
     if ((fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::RIGHT_DOWN_CASUAL_BAND) &&
-        batchIdx != fBaseParams.bandIdx) ||
+         batchIdx != fBaseParams.bandIdx) ||
         (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::BAND_LEFT_UP_CASUAL) &&
-        batchIdx != fBaseParams.bandIdx)) {
+         batchIdx != fBaseParams.bandIdx)) {
         actualCalcS1Token = INT32_MAX;
         actualCalcS2Token = 0;
     }
@@ -929,14 +973,14 @@ void CalcleActualToken(FuzzyBaseInfoParamsRegbase& fBaseParams, int64_t batchIdx
         fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::BAND) ||
         fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::RIGHT_DOWN_CASUAL_BAND) ||
         (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::BAND_LEFT_UP_CASUAL) &&
-        batchIdx == fBaseParams.bandIdx)) {
+         batchIdx == fBaseParams.bandIdx)) {
         actualCalcS1Token = actualCalcS1Token + actualS1Len - actualS2Len;
         actualCalcS2Token = actualCalcS2Token - actualS1Len + actualS2Len;
     }
 }
 
 ge::graphStatus ProcessSinkInfo(
-    const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
+    const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     auto sinkShape = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SINK_IDX));
     auto dsinkShape = context_->GetOutputShape(DSINKOUT_IDX);
@@ -947,36 +991,36 @@ ge::graphStatus ProcessSinkInfo(
     }
     std::string sinkReasonMsg = "The shape of sinkInOptional must be [" + std::to_string(fBaseParams.n1) + "]";
     OP_CHECK_IF((sinkShape->GetStorageShape().GetDimNum() != 1 ||
-        sinkShape->GetStorageShape().GetDim(0) != fBaseParams.n1),
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "sinkInOptional",
-            Ops::Base::ToString(sinkShape->GetStorageShape()).c_str(), sinkReasonMsg.c_str()),
-        return ge::GRAPH_FAILED);
+                 sinkShape->GetStorageShape().GetDim(0) != fBaseParams.n1),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "sinkInOptional",
+                                                       Ops::Base::ToString(sinkShape->GetStorageShape()).c_str(), sinkReasonMsg.c_str()),
+                return ge::GRAPH_FAILED);
     std::string dsinkReasonMsg = "The shape of dsinkOut must be [" + std::to_string(fBaseParams.n1) + "]";
     OP_CHECK_IF((dsinkShape->GetStorageShape().GetDimNum() != 1 ||
-        dsinkShape->GetStorageShape().GetDim(0) != fBaseParams.n1),
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "dsinkOut",
-            Ops::Base::ToString(dsinkShape->GetStorageShape()).c_str(), dsinkReasonMsg.c_str()),
-        return ge::GRAPH_FAILED);
+                 dsinkShape->GetStorageShape().GetDim(0) != fBaseParams.n1),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "dsinkOut",
+                                                       Ops::Base::ToString(dsinkShape->GetStorageShape()).c_str(), dsinkReasonMsg.c_str()),
+                return ge::GRAPH_FAILED);
     auto sinkInput = context_->GetOptionalInputDesc(static_cast<size_t>(InputIndex::SINK_IDX));
     if (sinkInput != nullptr) {
         auto sinkDtype = sinkInput->GetDataType();
         OP_CHECK_IF(sinkDtype != ge::DT_FLOAT,
-            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON("FlashAttention", "sinkInOptional",
-                ge::TypeUtils::DataTypeToSerialString(sinkDtype).c_str(),
-                "The dtype of sinkInOptional must be FLOAT32"),
-            return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON("FlashAttention", "sinkInOptional",
+                                                          ge::TypeUtils::DataTypeToSerialString(sinkDtype).c_str(),
+                                                          "The dtype of sinkInOptional must be FLOAT32"),
+                    return ge::GRAPH_FAILED);
     }
 
     OP_CHECK_IF(!(fBaseParams.queryType == ge::DT_FLOAT16 || fBaseParams.queryType == ge::DT_BF16),
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON("FlashAttention", "query", "Non-FLOAT16 or Non-BFLOAT16",
-            "When optional parameter sinkInOptional exists, the dtype of query must be FLOAT16 or BFLOAT16"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON("FlashAttention", "query", "Non-FLOAT16 or Non-BFLOAT16",
+                                                      "When optional parameter sinkInOptional exists, the dtype of query must be FLOAT16 or BFLOAT16"),
+                return ge::GRAPH_FAILED);
     fBaseParams.sinkOptional = NORMAL_TENSOR;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ProcessOptionalInput(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
-{    
+ge::graphStatus ProcessOptionalInput(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
+{
     const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
     if (strcmp(inputLayout, "TND") == 0) {
         fBaseParams.qSize = static_cast<uint64_t>(fBaseParams.t1) * fBaseParams.n2 * fBaseParams.g * fBaseParams.d;
@@ -1048,7 +1092,7 @@ ge::graphStatus ProcessOptionalInput(const gert::TilingContext *context_, FuzzyB
 
     fBaseParams.isSparse = SetSparseParams(context_, fBaseParams);
     OP_LOGD("Sparse FLAG", "FAG Us1s2Bbn2gs1s2 sparse mode = %u, sparse %s.", fBaseParams.sparseMode,
-              fBaseParams.isSparse ? "enable" : "disable");
+            fBaseParams.isSparse ? "enable" : "disable");
 
     if (fBaseParams.isSparse == false && fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::PREFIX_COMPRESS)) {
         OP_LOGE(context_, "Sparse capability must be supported under prefix compress mode, pls check input params");
@@ -1058,7 +1102,7 @@ ge::graphStatus ProcessOptionalInput(const gert::TilingContext *context_, FuzzyB
         // 与71处理逻辑保持一致
         OP_LOGD("Sparse FLAG", "Set sparse_mode from PREFIX to ALL_MASK because of empty or nullptr prefixN.");
         fBaseParams.sparseMode = static_cast<uint32_t>(SparseMode::ALL_MASK);
- 	}
+    }
 
     ret = ProcessSinkInfo(context_, fBaseParams);
     if (ret != ge::GRAPH_SUCCESS) {
@@ -1078,7 +1122,7 @@ ge::graphStatus ProcessOptionalInput(const gert::TilingContext *context_, FuzzyB
                CheckShapeValid(context_, fBaseParams.b, fBaseParams.n1, fBaseParams.s1, fBaseParams.d);
 }
 
-void ProcessDropoutIsDivisibleBy8(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
+void ProcessDropoutIsDivisibleBy8(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
     if (strcmp(inputLayout, "TND") == 0) {
@@ -1095,7 +1139,7 @@ void ProcessDropoutIsDivisibleBy8(const gert::TilingContext *context_, FuzzyBase
     return;
 }
 
-ge::graphStatus ProcessDropoutInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
+ge::graphStatus ProcessDropoutInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     bool hasDrop = fBaseParams.keepProb < 1;
     // dropout mask
@@ -1111,16 +1155,16 @@ ge::graphStatus ProcessDropoutInfo(const gert::TilingContext *context_, FuzzyBas
     if (dropMask != nullptr && dropMaskShape != nullptr && dropMaskShape->GetStorageShape().GetDimNum() != 0) {
         if (!hasDrop) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "keepProb",
-                std::to_string(fBaseParams.keepProb).c_str(),
-                "When optional parameter dropMaskOptional exists, the value of keepProb must be less than 1");
+                                                  std::to_string(fBaseParams.keepProb).c_str(),
+                                                  "When optional parameter dropMaskOptional exists, the value of keepProb must be less than 1");
             return ge::GRAPH_FAILED;
         }
         auto dropMaskDType = dropMask->GetDataType();
         OP_CHECK_IF(dropMaskDType != ge::DT_UINT8,
-            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON("FlashAttentionScoreGrad", "dropMaskOptional",
-                ge::TypeUtils::DataTypeToSerialString(dropMaskDType).c_str(),
-                "The dtype of dropMaskOptional must be uint8"),
-            return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON("FlashAttentionScoreGrad", "dropMaskOptional",
+                                                          ge::TypeUtils::DataTypeToSerialString(dropMaskDType).c_str(),
+                                                          "The dtype of dropMaskOptional must be uint8"),
+                    return ge::GRAPH_FAILED);
         uint64_t dropMaskDim = dropMaskShape->GetStorageShape().GetDimNum();
         uint64_t dropMaskShapeSize = 1;
         for (uint64_t i = 0; i < dropMaskDim; ++i) {
@@ -1132,7 +1176,7 @@ ge::graphStatus ProcessDropoutInfo(const gert::TilingContext *context_, FuzzyBas
             std::string reasonMsg = "The shape size of dropMaskOptional cannot be less than " +
                                     std::to_string(shapeSize);
             OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON("FlashAttentionScoreGrad", "dropMaskOptional",
-                std::to_string(dropMaskShapeSize).c_str(), reasonMsg.c_str());
+                                                      std::to_string(dropMaskShapeSize).c_str(), reasonMsg.c_str());
             return ge::GRAPH_FAILED;
         }
         fBaseParams.dropMaskOuter = true;
@@ -1142,7 +1186,7 @@ ge::graphStatus ProcessDropoutInfo(const gert::TilingContext *context_, FuzzyBas
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ProcessQuantInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
+ge::graphStatus ProcessQuantInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     DetermineMode(fBaseParams);
     if (fBaseParams.queryType == ge::DT_FLOAT8_E5M2 || fBaseParams.queryType == ge::DT_FLOAT8_E4M3FN ||
@@ -1150,10 +1194,10 @@ ge::graphStatus ProcessQuantInfo(const gert::TilingContext *context_, FuzzyBaseI
         fBaseParams.queryType == ge::DT_QINT8 || fBaseParams.queryType == ge::DT_HIFLOAT8) {
         auto queryDType = context_->GetInputDesc(0)->GetDataType();
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON("FlashAttentionScoreGrad", "query",
-            ge::TypeUtils::DataTypeToSerialString(queryDType).c_str(), "The dtype of query is invalid");
+                                               ge::TypeUtils::DataTypeToSerialString(queryDType).c_str(), "The dtype of query is invalid");
         return ge::GRAPH_FAILED;
     }
-    
+
     if (fBaseParams.queryType != ge::DT_HIFLOAT8) {
         auto deqScaleQShape = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::D_SCALE_Q));
         auto deqScaleKShape = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::D_SCALE_K));
@@ -1161,21 +1205,25 @@ ge::graphStatus ProcessQuantInfo(const gert::TilingContext *context_, FuzzyBaseI
         auto deqScaleDyShape = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::D_SCALE_DY));
         std::string dScaleShapesMsg = "{";
         dScaleShapesMsg += deqScaleQShape != nullptr ?
-            Ops::Base::ToString(deqScaleQShape->GetStorageShape()) + ", " : "nullptr, ";
+                               Ops::Base::ToString(deqScaleQShape->GetStorageShape()) + ", " :
+                               "nullptr, ";
         dScaleShapesMsg += deqScaleKShape != nullptr ?
-            Ops::Base::ToString(deqScaleKShape->GetStorageShape()) + ", " : "nullptr, ";
+                               Ops::Base::ToString(deqScaleKShape->GetStorageShape()) + ", " :
+                               "nullptr, ";
         dScaleShapesMsg += deqScaleVShape != nullptr ?
-            Ops::Base::ToString(deqScaleVShape->GetStorageShape()) + ", " : "nullptr, ";
+                               Ops::Base::ToString(deqScaleVShape->GetStorageShape()) + ", " :
+                               "nullptr, ";
         dScaleShapesMsg += deqScaleDyShape != nullptr ?
-            Ops::Base::ToString(deqScaleDyShape->GetStorageShape()) + "}" : "nullptr}";
+                               Ops::Base::ToString(deqScaleDyShape->GetStorageShape()) + "}" :
+                               "nullptr}";
         OP_CHECK_IF((deqScaleQShape != nullptr && deqScaleQShape->GetStorageShape().GetDimNum() != 0) ||
-                    (deqScaleKShape != nullptr && deqScaleKShape->GetStorageShape().GetDimNum() != 0) ||
-                    (deqScaleVShape != nullptr && deqScaleVShape->GetStorageShape().GetDimNum() != 0) ||
-                    (deqScaleDyShape != nullptr && deqScaleDyShape->GetStorageShape().GetDimNum() != 0),
+                        (deqScaleKShape != nullptr && deqScaleKShape->GetStorageShape().GetDimNum() != 0) ||
+                        (deqScaleVShape != nullptr && deqScaleVShape->GetStorageShape().GetDimNum() != 0) ||
+                        (deqScaleDyShape != nullptr && deqScaleDyShape->GetStorageShape().GetDimNum() != 0),
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad",
-                        "dScaleQOptional, dScaleKOptional, dScaleVOptional, dScaleDyOptional", dScaleShapesMsg.c_str(),
-                        "When the dType of input is not HIFLOAT8, "
-                        "dScaleQOptional, dScaleKOptional, dScaleVOptional and dScaleDyOptional should be nullptr now"),
+                                                           "dScaleQOptional, dScaleKOptional, dScaleVOptional, dScaleDyOptional", dScaleShapesMsg.c_str(),
+                                                           "When the dType of input is not HIFLOAT8, "
+                                                           "dScaleQOptional, dScaleKOptional, dScaleVOptional and dScaleDyOptional should be nullptr now"),
                     return ge::GRAPH_FAILED);
     }
 
@@ -1183,7 +1231,7 @@ ge::graphStatus ProcessQuantInfo(const gert::TilingContext *context_, FuzzyBaseI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ProcessSparseModeInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
+ge::graphStatus ProcessSparseModeInfo(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     // 新增SPARSE_MODE属性，上库兼容处理
     auto attrs = context_->GetAttrs();
@@ -1196,9 +1244,9 @@ ge::graphStatus ProcessSparseModeInfo(const gert::TilingContext *context_, Fuzzy
         fBaseParams.layoutType = INPUT_FORMAT_BS2N2GD;
         OP_LOGD("inputLayout = TND, but all s1 s2 same, inputLayout set BSND");
     }
-    
+
     if (!(fBaseParams.layoutType == INPUT_FORMAT_TND ? CheckVarLenSparseModeValue(fBaseParams) :
-            CheckSparseModeValue(fBaseParams))) {
+                                                       CheckSparseModeValue(fBaseParams))) {
         return ge::GRAPH_FAILED;
     }
     fBaseParams.attenMaskCompressMode = 0;
@@ -1242,8 +1290,8 @@ ge::graphStatus ProcessSparseModeInfo(const gert::TilingContext *context_, Fuzzy
         auto attenMaskType = attenMask->GetDataType();
         OP_CHECK_IF(attenMaskType != ge::DT_BOOL && attenMaskType != ge::DT_UINT8,
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON("FlashAttentionScoreGrad", "attenMaskOptional",
-                        ge::TypeUtils::DataTypeToSerialString(attenMaskType).c_str(),
-                        "The dtype of attenMaskOptional must be bool or uint8"),
+                                                          ge::TypeUtils::DataTypeToSerialString(attenMaskType).c_str(),
+                                                          "The dtype of attenMaskOptional must be bool or uint8"),
                     return ge::GRAPH_FAILED);
         fBaseParams.attenMaskDtype = static_cast<uint32_t>(AttenDataType::ATTEN_MASK_TYPE_U8_BOOL);
     }
@@ -1253,10 +1301,10 @@ ge::graphStatus ProcessSparseModeInfo(const gert::TilingContext *context_, Fuzzy
 }
 
 // 以下场景对外部输入token屏蔽，重新设置token值并做校验
-ge::graphStatus ProcessTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams)
+ge::graphStatus ProcessTokensInfo(FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     OP_LOGD("ProcessTokensInfo", " Before correction ,the value of s1Token = %ld and the value of s2Token %ld.",
-              fBaseParams.s1Token, fBaseParams.s2Token);
+            fBaseParams.s1Token, fBaseParams.s2Token);
 
     // 自动校正left和right causal的token值，token信息仅用于sparse分核计算
     if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::LEFT_UP_CAUSAL) ||
@@ -1269,7 +1317,7 @@ ge::graphStatus ProcessTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams)
     // sparse_mode =4 (band)时 或者sparse_mode ==3 (RIGHT_DOWN_CAUSAL) 时，token以右下角为基准，需要校正
     if (fBaseParams.layoutType != INPUT_FORMAT_TND &&
         (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::RIGHT_DOWN_CAUSAL) ||
-        fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::BAND))) {
+         fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::BAND))) {
         fBaseParams.s1Token = fBaseParams.s1Token + fBaseParams.s1 - fBaseParams.s2;
         fBaseParams.s2Token = fBaseParams.s2Token - fBaseParams.s1 + fBaseParams.s2;
     }
@@ -1281,7 +1329,7 @@ ge::graphStatus ProcessTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams)
     }
 
     OP_LOGD("ProcessTokensInfo", " the corrected s1Token = %ld, s2Token %ld.", fBaseParams.s1Token,
-              fBaseParams.s2Token);
+            fBaseParams.s2Token);
 
     // 1  2  3  5  6  不校验
     if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::ALL_MASK) ||
@@ -1297,12 +1345,13 @@ ge::graphStatus ProcessTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams)
         (-fBaseParams.s1Token > int64_t(fBaseParams.s2) || -fBaseParams.s2Token > int64_t(fBaseParams.s1) ||
          (fBaseParams.s1Token + fBaseParams.s2Token) < 0)) {
         std::string valueMsg = "{" + std::to_string(fBaseParams.s1Token) + ", " + std::to_string(fBaseParams.s2Token) +
-                                ", " + std::to_string(fBaseParams.s1Token + fBaseParams.s2Token) + "}";
+                               ", " + std::to_string(fBaseParams.s1Token + fBaseParams.s2Token) + "}";
         std::string reasonMsg = "When inputLayout is TND, the valud of nextTokens, preTokens, nextToKens + preTokens "
-                                "cannot be less than {" + std::to_string(int64_t(-fBaseParams.s2)) + ", " +
+                                "cannot be less than {" +
+                                std::to_string(int64_t(-fBaseParams.s2)) + ", " +
                                 std::to_string(int64_t(-fBaseParams.s1)) + ", 0}";
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad", "nextTokens, preTokens, nextToKens",
-            valueMsg.c_str(), reasonMsg.c_str());
+                                               valueMsg.c_str(), reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -1316,7 +1365,7 @@ ge::graphStatus ProcessTokensInfo(FuzzyBaseInfoParamsRegbase& fBaseParams)
     return ge::GRAPH_SUCCESS;
 }
 
-void SetQKVStartIdx(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
+void SetQKVStartIdx(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     fBaseParams.qStartIdx = 0;
     fBaseParams.kvStartIdx = 0;
@@ -1357,7 +1406,7 @@ ge::graphStatus ProcessPseNormal(const gert::TilingContext *context_, FuzzyBaseI
     auto pseShapeDim = pseShape->GetStorageShape().GetDimNum();
     if (pseShapeDim != PSE_NORMAL_SHAPE_DIM) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("FlashAttentionScoreGrad", "pseShiftOptional",
-            std::to_string(pseShapeDim).c_str(), "The shape dim of pseShiftOptional must be 4");
+                                                 std::to_string(pseShapeDim).c_str(), "The shape dim of pseShiftOptional must be 4");
         return ge::GRAPH_PARAM_INVALID;
     }
 
@@ -1412,9 +1461,9 @@ ge::graphStatus ProcessPseNormal(const gert::TilingContext *context_, FuzzyBaseI
                                     std::to_string(fBaseParams.s2) + "] or [" + std::to_string(fBaseParams.b) + ", " +
                                     std::to_string(fBaseParams.n1) + ", 1, " + std::to_string(fBaseParams.s2) +
                                     "] or [" + std::to_string(fBaseParams.b) + ", " + std::to_string(fBaseParams.n1) +
-                                    ", " + std::to_string(fBaseParams.s1) + ", "+ std::to_string(fBaseParams.s2) +
+                                    ", " + std::to_string(fBaseParams.s1) + ", " + std::to_string(fBaseParams.s2) +
                                     "] or [1, " + std::to_string(fBaseParams.n1) + ", " +
-                                    std::to_string(fBaseParams.s1) + ", "+ std::to_string(fBaseParams.s2) + "]";
+                                    std::to_string(fBaseParams.s1) + ", " + std::to_string(fBaseParams.s2) + "]";
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "pseShiftOptional", shapeMsg.c_str(),
                                                   reasonMsg.c_str());
         } else if (!isTnd) {
@@ -1423,18 +1472,18 @@ ge::graphStatus ProcessPseNormal(const gert::TilingContext *context_, FuzzyBaseI
             std::string reasonMsg = "The shape of pseShiftOptional must be [" + std::to_string(fBaseParams.b) + ", " +
                                     std::to_string(fBaseParams.n1) + ", 1, " + std::to_string(fBaseParams.s2) +
                                     "] or [" + std::to_string(fBaseParams.b) + ", " + std::to_string(fBaseParams.n1) +
-                                    ", " + std::to_string(fBaseParams.s1) + ", "+ std::to_string(fBaseParams.s2) +
+                                    ", " + std::to_string(fBaseParams.s1) + ", " + std::to_string(fBaseParams.s2) +
                                     "] or [1, " + std::to_string(fBaseParams.n1) + ", " +
-                                    std::to_string(fBaseParams.s1) + ", "+ std::to_string(fBaseParams.s2) + "]";
+                                    std::to_string(fBaseParams.s1) + ", " + std::to_string(fBaseParams.s2) + "]";
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "pseShiftOptional", shapeMsg.c_str(),
                                                   reasonMsg.c_str());
         } else {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "pseShiftOptional",
-                Ops::Base::ToString(pseShape->GetStorageShape()),
-                "When inputLayout is TND, Sq of pseShiftOptional cannot be less than 1024 and must be equal to Skv");
+                                                   Ops::Base::ToString(pseShape->GetStorageShape()),
+                                                   "When inputLayout is TND, Sq of pseShiftOptional cannot be less than 1024 and must be equal to Skv");
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "sparseMode",
-                std::to_string(fBaseParams.sparseMode),
-                "When inputLayout is TND and pseShiftOptional is supported, the sparseMode must be 0 or 2 or 3");
+                                                  std::to_string(fBaseParams.sparseMode),
+                                                  "When inputLayout is TND and pseShiftOptional is supported, the sparseMode must be 0 or 2 or 3");
         }
         return ge::GRAPH_PARAM_INVALID;
     }
@@ -1448,7 +1497,7 @@ ge::graphStatus ProcessPseInfo(const gert::TilingContext *context_, FuzzyBaseInf
         fBaseParams.pseType = *(context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::PSETYPE))); // 8
         if (fBaseParams.pseType >= static_cast<uint32_t>(PseType::PSE_INVALID_TYPE)) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "pseType",
-                std::to_string(fBaseParams.pseType).c_str(), "The value of pseType must be less than 4");
+                                                  std::to_string(fBaseParams.pseType).c_str(), "The value of pseType must be less than 4");
             return ge::GRAPH_FAILED;
         }
     }
@@ -1467,8 +1516,8 @@ ge::graphStatus ProcessPseInfo(const gert::TilingContext *context_, FuzzyBaseInf
             bool pseTypeCheckResult = (fBaseParams.outDtype == DtypeEnum::FLOAT16_PRECISION) ? (pse->GetDataType() == ge::DT_FLOAT16) : (pse->GetDataType() == ge::DT_BF16);
             OP_CHECK_IF(!pseTypeCheckResult,
                         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON("FlashAttentionScoreGrad", "pseShifOptional",
-                            ge::TypeUtils::DataTypeToSerialString(pse->GetDataType()).c_str(),
-                            "The dtype of pseShifOptional must be the same as dtype of output"),
+                                                              ge::TypeUtils::DataTypeToSerialString(pse->GetDataType()).c_str(),
+                                                              "The dtype of pseShifOptional must be the same as dtype of output"),
                         return ge::GRAPH_FAILED);
         } else {
             std::string dTypesMsg = ge::TypeUtils::DataTypeToSerialString(pse->GetDataType()) + ", " +
@@ -1476,14 +1525,14 @@ ge::graphStatus ProcessPseInfo(const gert::TilingContext *context_, FuzzyBaseInf
                                         context_->GetInputDesc(static_cast<size_t>(InputIndex::QUERY))->GetDataType());
             OP_CHECK_IF(pse->GetDataType() != context_->GetInputDesc(static_cast<size_t>(InputIndex::QUERY))->GetDataType(),
                         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON("FlashAttentionScoreGrad", "pseShifOptional, query",
-                            dTypesMsg.c_str(), "The dtypes of pseShifOptional and query must be the same"),
-                        return ge::GRAPH_FAILED);         
+                                                               dTypesMsg.c_str(), "The dtypes of pseShifOptional and query must be the same"),
+                        return ge::GRAPH_FAILED);
         }
     } else {
         OP_CHECK_IF(pse->GetDataType() != ge::DT_FLOAT,
                     OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON("FlashAttentionScoreGrad", "pseShifOptional",
-                        ge::TypeUtils::DataTypeToSerialString(pse->GetDataType()).c_str(),
-                        "The dtype of pseShifOptional must be FLOAT32"),
+                                                           ge::TypeUtils::DataTypeToSerialString(pse->GetDataType()).c_str(),
+                                                           "The dtype of pseShifOptional must be FLOAT32"),
                     return ge::GRAPH_FAILED);
     }
 
@@ -1505,8 +1554,8 @@ ge::graphStatus ProcessPseInfo(const gert::TilingContext *context_, FuzzyBaseInf
             fBaseParams.pseShapeType = static_cast<uint32_t>(PseShapeType::PSE_SHAPE_TYPE_BNSS);
         } else {
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "pseShifOptional",
-                Ops::Base::ToString(pseShape->GetStorageShape()).c_str(),
-                "When pseType is 0 or 1 and inputLayout is TND, the shape of pseShifOptional is unspported");
+                                                   Ops::Base::ToString(pseShape->GetStorageShape()).c_str(),
+                                                   "When pseType is 0 or 1 and inputLayout is TND, the shape of pseShifOptional is unspported");
             return ge::GRAPH_FAILED;
         }
     } else {
@@ -1519,7 +1568,7 @@ ge::graphStatus ProcessPseInfo(const gert::TilingContext *context_, FuzzyBaseInf
     return ge::GRAPH_SUCCESS;
 }
 
-void SetPseLayout(FuzzyBaseInfoParamsRegbase& fBaseParams)
+void SetPseLayout(FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     if (fBaseParams.pseShapeType == static_cast<uint32_t>(PseShapeType::PSE_SHAPE_TYPE_1NSS) ||
         fBaseParams.pseShapeType == static_cast<uint32_t>(PseShapeType::PSE_SHAPE_TYPE_BNHS) ||
@@ -1535,7 +1584,7 @@ void SetPseLayout(FuzzyBaseInfoParamsRegbase& fBaseParams)
     }
 }
 
-bool SetSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
+bool SetSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::PREFIX) ||
         fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::PREFIX_COMPRESS)) {
@@ -1589,11 +1638,11 @@ void SetSplitAxis(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbas
                         (fBaseParams.tailZeroCount == 0 && !tndBaseInfo.isSeqExistZero);
 
     bool bnLimit = ((fBaseParams.b * fBaseParams.n1) >= BN2_MULTIBLK_BN_256) ||
-                    ((fBaseParams.b * fBaseParams.n1) >= BN2_MULTIBLK_BN_128 && (fBaseParams.s1 % ALIGN128 == 0) && (fBaseParams.s2 % ALIGN128 == 0));
+                   ((fBaseParams.b * fBaseParams.n1) >= BN2_MULTIBLK_BN_128 && (fBaseParams.s1 % ALIGN128 == 0) && (fBaseParams.s2 % ALIGN128 == 0));
     bool bnSparseLimit = bnLimit &&
-                        (fBaseParams.layoutType != INPUT_FORMAT_TND) &&
-                        (fBaseParams.sparseMode != static_cast<uint32_t>(SparseMode::PREFIX)) &&
-                        (fBaseParams.sparseMode != static_cast<uint32_t>(SparseMode::PREFIX_COMPRESS));
+                         (fBaseParams.layoutType != INPUT_FORMAT_TND) &&
+                         (fBaseParams.sparseMode != static_cast<uint32_t>(SparseMode::PREFIX)) &&
+                         (fBaseParams.sparseMode != static_cast<uint32_t>(SparseMode::PREFIX_COMPRESS));
     fBaseParams.isBn2MultiBlk = bnSparseLimit &&
                                 (fBaseParams.s1 > BN2_MAX_S || fBaseParams.s2 > BN2_MAX_S) &&
                                 (fBaseParams.s1 <= BN2_MULTIBLK_SEQ && fBaseParams.s2 <= BN2_MULTIBLK_SEQ) &&
@@ -1602,14 +1651,14 @@ void SetSplitAxis(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbas
                                 (fBaseParams.queryType != ge::DT_FLOAT) &&
                                 (fBaseParams.d == fBaseParams.d1) &&
                                 !(fBaseParams.queryType == ge::DT_FLOAT8_E5M2 ||
-                                fBaseParams.queryType == ge::DT_FLOAT8_E4M3FN ||
-                                fBaseParams.queryType == ge::DT_HIFLOAT8) &&
+                                  fBaseParams.queryType == ge::DT_FLOAT8_E4M3FN ||
+                                  fBaseParams.queryType == ge::DT_HIFLOAT8) &&
                                 !fBaseParams.hasRope;
     fBaseParams.isBn2 = fBaseParams.isBn2MultiBlk ? true : fBaseParams.isBn2; // 多基本块场景是原始bn2的子集
     if (fBaseParams.isBn2 && !fBaseParams.isBn2MultiBlk) {
         fBaseParams.isDeterministic = false;
         if ((fBaseParams.layoutType == INPUT_FORMAT_TND && fBaseParams.d > ALIGN128) ||
-                fBaseParams.dropMaskOuter) {
+            fBaseParams.dropMaskOuter) {
             fBaseParams.isBn2 = false;
             fBaseParams.isDeterministic = (context_->GetDeterministic() == 1);
         }
@@ -1624,11 +1673,11 @@ void SetSplitAxis(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbas
     }
 
     bool bn2S2NotTndLimit = (fBaseParams.s1 < fBaseParams.s2) &&
-        (fBaseParams.s2 <= BN2S2_MAX_S) &&
-        (fBaseParams.s2 - fBaseParams.s1 >= BN2_MAX_S) &&
-        (fBaseParams.d <= BN2S2_WRITE_UB_D) &&
-        (!fBaseParams.isSparse) &&
-        (!fBaseParams.isDeterministic);
+                            (fBaseParams.s2 <= BN2S2_MAX_S) &&
+                            (fBaseParams.s2 - fBaseParams.s1 >= BN2_MAX_S) &&
+                            (fBaseParams.d <= BN2S2_WRITE_UB_D) &&
+                            (!fBaseParams.isSparse) &&
+                            (!fBaseParams.isDeterministic);
     bool bn2S2RouteLimit =
         !fBaseParams.hasRope && fBaseParams.d <= BN2_MAX_D &&
         (fBaseParams.layoutType == INPUT_FORMAT_TND || (fBaseParams.isAllSame && !fBaseParams.isDeterministic) ||
@@ -1649,7 +1698,7 @@ void SetSplitAxis(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbas
     }
 }
 
-void DetermineMode(FuzzyBaseInfoParamsRegbase& fBaseParams)
+void DetermineMode(FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     // 当前fp16都走高精度
     if (fBaseParams.queryType == ge::DT_FLOAT) {
@@ -1657,23 +1706,24 @@ void DetermineMode(FuzzyBaseInfoParamsRegbase& fBaseParams)
     } else if (fBaseParams.queryType == ge::DT_BF16) {
         fBaseParams.inputDtype = DtypeEnum::BFLOAT16;
     } else if (fBaseParams.queryType == ge::DT_FLOAT8_E5M2) {
-        fBaseParams.inputDtype = static_cast<optiling::DtypeEnum>(DTYPE_ENUM_INDEX_4);    // DtypeEnum::FLOAT8_E5M2
+        fBaseParams.inputDtype = static_cast<optiling::DtypeEnum>(DTYPE_ENUM_INDEX_4); // DtypeEnum::FLOAT8_E5M2
     } else if (fBaseParams.queryType == ge::DT_FLOAT8_E4M3FN) {
-        fBaseParams.inputDtype = static_cast<optiling::DtypeEnum>(DTYPE_ENUM_INDEX_5);    // DtypeEnum::FLOAT8_E4M3
+        fBaseParams.inputDtype = static_cast<optiling::DtypeEnum>(DTYPE_ENUM_INDEX_5); // DtypeEnum::FLOAT8_E4M3
     } else if (fBaseParams.queryType == ge::DT_HIFLOAT8) {
-        fBaseParams.inputDtype = static_cast<optiling::DtypeEnum>(DTYPE_ENUM_INDEX_6);    // DtypeEnum::HIFLOAT8
+        fBaseParams.inputDtype = static_cast<optiling::DtypeEnum>(DTYPE_ENUM_INDEX_6); // DtypeEnum::HIFLOAT8
     } else {
         fBaseParams.inputDtype = DtypeEnum::FLOAT16_PRECISION;
     }
 }
 
-bool SupportTrans2BS2N2GD(const FuzzyBaseInfoParamsRegbase& fBaseParams) {
+bool SupportTrans2BS2N2GD(const FuzzyBaseInfoParamsRegbase &fBaseParams)
+{
     return (fBaseParams.sparseMode <= static_cast<uint32_t>(SparseMode::PREFIX_COMPRESS)) && fBaseParams.isAllSame &&
-         (fBaseParams.layoutType == INPUT_FORMAT_TND);
+           (fBaseParams.layoutType == INPUT_FORMAT_TND);
 }
 
-ge::graphStatus SetAttenMaskShapeType(FuzzyBaseInfoParamsRegbase& fBaseParams, const gert::StorageShape *attenMaskShape,
-    size_t dimNum)
+ge::graphStatus SetAttenMaskShapeType(FuzzyBaseInfoParamsRegbase &fBaseParams, const gert::StorageShape *attenMaskShape,
+                                      size_t dimNum)
 {
     if (dimNum == ATTEN_MASK_DIM_LENGTH_2) {
         fBaseParams.attenMaskShapeType = static_cast<uint32_t>(AttenMaskShapeType::ATTENMASKS1S2);
@@ -1694,12 +1744,12 @@ ge::graphStatus SetAttenMaskShapeType(FuzzyBaseInfoParamsRegbase& fBaseParams, c
                                     std::to_string(fBaseParams.s2) + "] or [1, 1, " + std::to_string(fBaseParams.s1) +
                                     std::to_string(fBaseParams.s2) + "]";
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "attenMaskOptional",
-                Ops::Base::ToString(attenMaskShape->GetStorageShape()).c_str(), reasonMsg.c_str());
+                                                   Ops::Base::ToString(attenMaskShape->GetStorageShape()).c_str(), reasonMsg.c_str());
             return ge::GRAPH_FAILED;
         }
     } else {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("FlashAttentionScoreGrad", "attenMaskOptional",
-            std::to_string(dimNum).c_str(), "The shape dim of attenMaskOptional must be 2 or 4");
+                                                 std::to_string(dimNum).c_str(), "The shape dim of attenMaskOptional must be 2 or 4");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -1711,9 +1761,9 @@ ge::graphStatus ProcessInnerPseInfo(const gert::TilingContext *context_, FuzzyBa
     auto pseShape = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::PSE_SHIFT));
     // sparse mode 7 不支持 pse inner
     OP_CHECK_IF(fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::RIGHT_DOWN_CASUAL_BAND),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "pseShifOptional",
-            std::to_string(fBaseParams.pseType).c_str(), "When sparseMode is 7, the value of pseType cannot be 2 or 3"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "pseShifOptional",
+                                                      std::to_string(fBaseParams.pseType).c_str(), "When sparseMode is 7, the value of pseType cannot be 2 or 3"),
+                return ge::GRAPH_FAILED);
     // sparse mode 8 支持pse inner的条件
     if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::BAND_LEFT_UP_CASUAL)) {
         auto ret = ProcessPseSparseMode8(fBaseParams);
@@ -1727,7 +1777,7 @@ ge::graphStatus ProcessInnerPseInfo(const gert::TilingContext *context_, FuzzyBa
         std::string reasonMsg = "The shape of pseShifOptional must be [" + std::to_string(fBaseParams.n1) + "]";
         OP_CHECK_IF(dim0 != fBaseParams.n1,
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "pseShifOptional",
-                        Ops::Base::ToString(pseShape->GetStorageShape()).c_str(), reasonMsg.c_str()),
+                                                           Ops::Base::ToString(pseShape->GetStorageShape()).c_str(), reasonMsg.c_str()),
                     return ge::GRAPH_FAILED);
         fBaseParams.pseShapeType = static_cast<uint32_t>(PseShapeType::PSE_1_N2_G_SLOPE);
     } else if (pseShapeDim == PSE_DIM_NUM_2) {
@@ -1737,18 +1787,18 @@ ge::graphStatus ProcessInnerPseInfo(const gert::TilingContext *context_, FuzzyBa
                                 std::to_string(fBaseParams.n1) + "]";
         OP_CHECK_IF(dim0 != fBaseParams.b || dim1 != fBaseParams.n1,
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "pseShifOptional",
-                        Ops::Base::ToString(pseShape->GetStorageShape()).c_str(), reasonMsg.c_str()),
+                                                           Ops::Base::ToString(pseShape->GetStorageShape()).c_str(), reasonMsg.c_str()),
                     return ge::GRAPH_FAILED);
         fBaseParams.pseShapeType = static_cast<uint32_t>(PseShapeType::PSE_B_N2_G_SLOPE);
     } else {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("FlashAttentionScoreGrad", "pseShifOptional",
-            std::to_string(pseShapeDim).c_str(), "The shape dim of pseShifOptional must be 1 or 2");
+                                                 std::to_string(pseShapeDim).c_str(), "The shape dim of pseShifOptional must be 1 or 2");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ProcessPseSparseMode8(FuzzyBaseInfoParamsRegbase& fBaseParams)
+ge::graphStatus ProcessPseSparseMode8(FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     for (int64_t boIdx = 0; boIdx < fBaseParams.b; boIdx++) {
         int64_t actualS1Len = fBaseParams.actualSeqQlen[boIdx];
@@ -1761,24 +1811,24 @@ ge::graphStatus ProcessPseSparseMode8(FuzzyBaseInfoParamsRegbase& fBaseParams)
                                         std::to_string(fBaseParams.qStartIdx) + ", " +
                                         std::to_string(fBaseParams.kvStartIdx) + "}";
                 OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad",
-                    "actualSeqQLenOptional, actualSeqKLenOptional, qStartIdxOptional, kvStartIdxOptional",
-                    valuesMsg.c_str(), "When pseTye is 2 or 3 and sparseMode is 8, the value of "
-                    "actualSeqQLenOptional - actualSeqKLenOptional + qStartIdxOptional - kvStartIdxOptional must be 0");
+                                                       "actualSeqQLenOptional, actualSeqKLenOptional, qStartIdxOptional, kvStartIdxOptional",
+                                                       valuesMsg.c_str(), "When pseTye is 2 or 3 and sparseMode is 8, the value of "
+                                                                          "actualSeqQLenOptional - actualSeqKLenOptional + qStartIdxOptional - kvStartIdxOptional must be 0");
                 return ge::GRAPH_FAILED;
             }
         }
         if (actualS1Len != actualS2Len) {
             std::string valuesMsg = "{" + std::to_string(actualS1Len) + ", " + std::to_string(actualS2Len) + "}";
             OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad",
-                "actualSeqQLenOptional, actualSeqKLenOptional", valuesMsg.c_str(), "When pseType is 2 or 3 and "
-                "sparseMode is 8, the value of actualSeqQLenOptional must be equal to value of actualSeqKLenOptional");
+                                                   "actualSeqQLenOptional, actualSeqKLenOptional", valuesMsg.c_str(), "When pseType is 2 or 3 and "
+                                                                                                                      "sparseMode is 8, the value of actualSeqQLenOptional must be equal to value of actualSeqKLenOptional");
             return ge::GRAPH_FAILED;
         }
     }
     return ge::GRAPH_SUCCESS;
 }
 
-bool SetPrefixSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase& fBaseParams)
+bool SetPrefixSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoParamsRegbase &fBaseParams)
 {
     auto prefixNTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::PREFIX_N));
     if (prefixNTensor == nullptr) {
@@ -1791,7 +1841,7 @@ bool SetPrefixSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoPar
         std::string reasonMsg = "When sparseMode is 5, the shape of prefixOptional must be [" +
                                 std::to_string(fBaseParams.b) + "]";
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "prefixOptional",
-            Ops::Base::ToString(prefixShape).c_str(), reasonMsg.c_str());
+                                               Ops::Base::ToString(prefixShape).c_str(), reasonMsg.c_str());
         return false;
     }
 
@@ -1813,10 +1863,10 @@ bool SetPrefixSparseParams(const gert::TilingContext *context_, FuzzyBaseInfoPar
         std::string reasonMsg = "When sparseMode is 5, the shape size of prefixOptional should be equal to " +
                                 std::to_string(fBaseParams.b) + " and cannot be greater than 2048";
         OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON("FlashAttentionScoreGrad", "prefixOptional",
-            std::to_string(prefixN.size()).c_str(), reasonMsg.c_str());
+                                                  std::to_string(prefixN.size()).c_str(), reasonMsg.c_str());
         return false;
     }
 }
 
-}
+} // namespace fag
 } // namespace optiling
