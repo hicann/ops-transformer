@@ -17,7 +17,7 @@
 
 #include "grouped_matmul_utils.h"
 #include "kernel_operator.h"
-#include "grouped_matmul.h"
+#include "grouped_matmul_kernel.h"
 
 #if defined(GMM_QUANT_BF16) || defined(GMM_QUANT_FLOAT16)
 namespace GROUPED_MATMUL {

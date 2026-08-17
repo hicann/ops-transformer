@@ -34,7 +34,7 @@
 #endif
 
 #ifdef ENABLE_TENSOR_API
-#include "mega_moe.h"
+#include "mega_moe_arch35.h"
 #include "mega_moe_wave_a8w4.h"
 #include "mega_moe_wave.h"
 #endif

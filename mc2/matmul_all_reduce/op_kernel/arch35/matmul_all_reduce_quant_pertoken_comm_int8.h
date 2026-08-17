@@ -24,10 +24,10 @@
 #include "../common.h"
 
 #include "../../../3rd/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mix_online_dynamic.h"
-#include "matmul_all_reduce_add_x3.h"
-#include "matmul_all_reduce_quant_perchannel.h"
-#include "matmul_all_reduce_quant_reduce_sum.h"
-#include "matmul_all_reduce_dequant_perchannel.h"
+#include "matmul_all_reduce_add_x3_arch35.h"
+#include "matmul_all_reduce_quant_perchannel_arch35.h"
+#include "matmul_all_reduce_quant_reduce_sum_arch35.h"
+#include "matmul_all_reduce_dequant_perchannel_arch35.h"
 
 namespace MatmulAllReduceImpl {
 constexpr uint32_t MAX_HANDLE_ID_NUM = 16;

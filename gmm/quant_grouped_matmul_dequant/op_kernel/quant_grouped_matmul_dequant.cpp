@@ -14,7 +14,7 @@
  */
 
 #include "quant_matmul_dequant_grouped.h"
-#include "quant_grouped_matmul_dequant.h"
+#include "quant_grouped_matmul_dequant_kernel.h"
 #include "quant_grouped_matmul_dequant_staged_run.h"
 
 using namespace AscendC;

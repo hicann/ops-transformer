@@ -18,7 +18,7 @@
 
 #include "../template_linear_algebra_v2/catlass.hpp"
 #include "../template_linear_algebra_v2/arch/resource.hpp"
-#include "../template_linear_algebra_v2/coord.hpp"
+#include "../template_linear_algebra_v2/tla_v2_coord.hpp"
 #include "../template_linear_algebra_v2/gemm_coord.hpp"
 #include "../template_linear_algebra_v2/gemm/dispatch_policy.hpp"
 #include "../template_linear_algebra_v2/gemm/helper.hpp"

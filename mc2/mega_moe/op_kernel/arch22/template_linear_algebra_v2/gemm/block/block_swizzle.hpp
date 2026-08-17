@@ -12,7 +12,7 @@
 #define CATLASS_GEMM_BLOCK_BLOCK_SWIZZLE_HPP
 
 #include "../../../template_linear_algebra_v2/catlass.hpp"
-#include "../../../template_linear_algebra_v2/detail/alignment.hpp"
+#include "../../../template_linear_algebra_v2/detail/tla_v2_alignment.hpp"
 #include "../../../template_linear_algebra_v2/gemm_coord.hpp"
 #include "../../../template_linear_algebra_v2/matrix_coord.hpp"
 

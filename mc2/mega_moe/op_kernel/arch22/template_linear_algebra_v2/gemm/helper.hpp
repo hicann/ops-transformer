@@ -12,7 +12,7 @@
 #define CATLASS_GEMM_HELPER_HPP
 
 #include "../../template_linear_algebra_v2/catlass.hpp"
-#include "../../template_linear_algebra_v2/numeric_size.hpp"
+#include "../../template_linear_algebra_v2/tla_v2_numeric_size.hpp"
 #include "../../template_linear_algebra_v2/layout/layout.hpp"
 #include "../../template_linear_algebra_v2/gemm/gemm_type.hpp"
 

@@ -11,7 +11,7 @@
 #ifndef CATLASS_CONV_COORD_HPP
 #define CATLASS_CONV_COORD_HPP
 
-#include "../template_linear_algebra_v2/coord.hpp"
+#include "../template_linear_algebra_v2/tla_v2_coord.hpp"
 
 namespace Catlass {
 

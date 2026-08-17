@@ -13,7 +13,7 @@
  * \brief
  */
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 220
-#include "grouped_matmul_finalize_routing.h"
+#include "grouped_matmul_finalize_routing_kernel.h"
 #include "grouped_matmul_finalize_routing_antiquant_a8w4_msd_pre.h"
 #include "grouped_matmul_finalize_routing_antiquant_a8w4_msd.h"
 #include "grouped_matmul_finalize_routing_antiquant_a8w4_msd_l1_opt.h"

@@ -42,7 +42,7 @@
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/tile/tile_swizzle.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/tile/tile_copy.hpp"
 
-#include "matmul.hpp"
+#include "allto_all_matmul.hpp"
 
 using namespace AscendC;
 using namespace Catlass;

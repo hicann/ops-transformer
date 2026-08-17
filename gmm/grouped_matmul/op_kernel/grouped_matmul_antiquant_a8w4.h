@@ -17,7 +17,7 @@
 #define ASCENDC_GROUPED_MATMUL_ANTIQUANT_A8W4_H
 
 #include "grouped_matmul_utils.h"
-#include "grouped_matmul.h"
+#include "grouped_matmul_kernel.h"
 #include "kernel_operator.h"
 
 #ifdef GMM_ANTI_QUANT_A8W4

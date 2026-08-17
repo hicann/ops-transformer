@@ -17,7 +17,7 @@
 #define __ALL_GATHER_MATMUL_TILING_V2__
 
 #pragma once
-#include "../all_gather_matmul_tiling_base.h"
+#include "../all_gather_matmul_tiling_base_v2.h"
 #include "register/tilingdata_base.h"
 #include "mat_mul_v3/op_host/op_tiling/matmul_v3_base_tiling.h"
 #include "mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_compile_info_advanced.h"

@@ -15,7 +15,7 @@
 #ifndef ASCENDC_GROUPED_MATMUL_ANTIQUANT_H
 #define ASCENDC_GROUPED_MATMUL_ANTIQUANT_H
 
-#include "grouped_matmul.h"
+#include "grouped_matmul_kernel.h"
 
 #ifdef GMM_ANTI_QUANT
 namespace GROUPED_MATMUL {

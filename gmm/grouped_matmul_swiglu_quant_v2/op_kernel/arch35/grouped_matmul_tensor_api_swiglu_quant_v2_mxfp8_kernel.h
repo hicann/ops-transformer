@@ -29,7 +29,7 @@
 #include "blaze/gemm/policy/dispatch_policy.h"
 #include "blaze/gemm/kernel/kernel_qgmm_swiglu_mx.h"
 #include "blaze/epilogue/block/block_epilogue_swiglu_mx_quant.h"
-#include "../grouped_matmul_swiglu_quant_v2_utils.h"
+#include "../grouped_matmul_swiglu_quant_v2_utils_kernel.h"
 #include "grouped_matmul_swiglu_quant_v2_tensor_api_tiling_data.h"
 
 template <typename layoutA, typename layoutB>

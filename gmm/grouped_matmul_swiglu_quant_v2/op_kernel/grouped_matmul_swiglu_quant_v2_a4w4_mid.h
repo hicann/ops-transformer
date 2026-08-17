@@ -16,7 +16,7 @@
 #ifndef OP_KERNEL_GROUPED_MATMUL_SWIGLU_QUANT_V2_A4W4_MID_H
 #define OP_KERNEL_GROUPED_MATMUL_SWIGLU_QUANT_V2_A4W4_MID_H
 
-#include "grouped_matmul_swiglu_quant_v2_utils.h"
+#include "grouped_matmul_swiglu_quant_v2_utils_kernel.h"
 
 #ifdef GMM_SWIGLU_QUANT_V2_A4W4
 

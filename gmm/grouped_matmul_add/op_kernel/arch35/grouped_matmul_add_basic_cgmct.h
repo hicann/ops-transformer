@@ -18,7 +18,7 @@
 
 #include "cgmct/kernel/kernel_grouped_matmul_add.h"
 #include "cgmct/block/block_scheduler_grouped_matmul_aswt.h"
-#include "../grouped_matmul_add.h"
+#include "../grouped_matmul_add_kernel.h"
 #include "grouped_matmul_add_tiling_data.h"
 
 using namespace Cgmct::Gemm;

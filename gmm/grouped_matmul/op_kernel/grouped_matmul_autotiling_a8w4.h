@@ -17,7 +17,7 @@
 
 #include "grouped_matmul_utils.h"
 #include "kernel_operator.h"
-#include "grouped_matmul.h"
+#include "grouped_matmul_kernel.h"
 
 //内存设置别名
 #define GlobalMem               TPosition::GM

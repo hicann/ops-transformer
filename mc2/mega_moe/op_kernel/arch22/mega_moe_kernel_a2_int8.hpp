@@ -16,10 +16,10 @@
 #include "utils/copy_l0c_to_gm_custom.hpp"
 
 #include "template_linear_algebra_v2/catlass.hpp"
-#include "template_linear_algebra_v2/arch/cross_core_sync.hpp"
+#include "template_linear_algebra_v2/arch/tla_v2_cross_core_sync.hpp"
 #include "template_linear_algebra_v2/arch/resource.hpp"
-#include "template_linear_algebra_v2/coord.hpp"
-#include "template_linear_algebra_v2/detail/callback.hpp"
+#include "template_linear_algebra_v2/tla_v2_coord.hpp"
+#include "template_linear_algebra_v2/detail/tla_v2_callback.hpp"
 #include "template_linear_algebra_v2/gemm_coord.hpp"
 #include "template_linear_algebra_v2/matrix_coord.hpp"
 #include "template_linear_algebra_v2/epilogue/tile/tile_copy.hpp"

@@ -13,7 +13,7 @@
 
 #include "../../../template_linear_algebra_v2/catlass.hpp"
 #include "../../../template_linear_algebra_v2/arch/resource.hpp"
-#include "../../../template_linear_algebra_v2/arch/cross_core_sync.hpp"
+#include "../../../template_linear_algebra_v2/arch/tla_v2_cross_core_sync.hpp"
 #include "../../../template_linear_algebra_v2/layout/layout.hpp"
 #include "../../../template_linear_algebra_v2/gemm_coord.hpp"
 #include "../../../template_linear_algebra_v2/matrix_coord.hpp"

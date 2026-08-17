@@ -16,7 +16,7 @@
 #define ASCENDC_GROUPED_MATMUL_ANTIQUANT_A16W8_MSD_H
 
 #include "grouped_matmul_utils.h"
-#include "grouped_matmul.h"
+#include "grouped_matmul_kernel.h"
 #include "kernel_operator.h"
 
 #if defined(GMM_ANTI_QUANT) && defined(ORIG_DTYPE_WEIGHT) && defined(DT_INT8) && \

@@ -16,7 +16,7 @@
 #include "grouped_matmul_antiquant.h"
 #include "grouped_matmul_vector.h"
 #include "grouped_matmul_tiling_key.h"
-#include "grouped_matmul.h"
+#include "grouped_matmul_kernel.h"
 
 #include "kernel_operator.h"
 #if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))

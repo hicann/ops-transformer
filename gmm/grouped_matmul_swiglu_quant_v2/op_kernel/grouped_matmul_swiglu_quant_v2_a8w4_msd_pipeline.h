@@ -19,7 +19,7 @@
 #include "grouped_matmul_swiglu_quant_v2_a8w4_msd_pre.h"
 #include "grouped_matmul_swiglu_quant_v2_a8w4_msd_mid.h"
 #include "grouped_matmul_swiglu_quant_v2_a8w4_msd_post.h"
-#include "grouped_matmul_swiglu_quant_v2_utils.h"
+#include "grouped_matmul_swiglu_quant_v2_utils_kernel.h"
 
 using namespace AscendC;
 using namespace matmul;

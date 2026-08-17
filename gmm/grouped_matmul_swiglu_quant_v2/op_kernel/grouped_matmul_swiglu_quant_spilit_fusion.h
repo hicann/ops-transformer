@@ -18,7 +18,7 @@
 
 #include "kernel_tiling/kernel_tiling.h"
 #include "lib/matmul_intf.h"
-#include "grouped_matmul_swiglu_quant_v2_utils.h"
+#include "grouped_matmul_swiglu_quant_v2_utils_kernel.h"
 
 namespace GroupedMatmulDequantSwigluQuant {
 using namespace AscendC;

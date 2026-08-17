@@ -22,7 +22,7 @@
 #include "../template_linear_algebra_v2/gemm_coord.hpp"
 #include "../template_linear_algebra_v2/matrix_coord.hpp"
 #include "../template_linear_algebra_v2/layout/layout.hpp"
-#include "../template_linear_algebra_v2/detail/callback.hpp"
+#include "../template_linear_algebra_v2/detail/tla_v2_callback.hpp"
 
 #include "dispatch_policy_custom.hpp"
 #include "block_epilogue_pertoken_v2.hpp"

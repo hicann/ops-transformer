@@ -42,9 +42,9 @@
     ORIG_DTYPE_X != DT_FLOAT4_E1M2 && ORIG_DTYPE_X != DT_FLOAT4_E2M1
 #include "arch35/grouped_matmul_finalize_routing_pertoken_dequant.h"
 #elif ORIG_DTYPE_X == DT_FLOAT4_E1M2 || ORIG_DTYPE_X == DT_FLOAT4_E2M1
-#include "arch35/grouped_matmul_finalize_routing.h"
+#include "arch35/grouped_matmul_finalize_routing_arch35.h"
 #else
-#include "arch35/grouped_matmul_finalize_routing.h"
+#include "arch35/grouped_matmul_finalize_routing_arch35.h"
 #include "arch35/grouped_matmul_finalize_routing_pertoken_dequant.h"
 #endif
 #endif

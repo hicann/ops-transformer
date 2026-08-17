@@ -17,7 +17,7 @@
  #define ASCENDC_GROUPED_MATMUL_A4W4_H
  
  #include "grouped_matmul_utils.h"
- #include "grouped_matmul.h"
+ #include "grouped_matmul_kernel.h"
  #include "kernel_operator.h"
  
  #ifdef GMM_A4W4

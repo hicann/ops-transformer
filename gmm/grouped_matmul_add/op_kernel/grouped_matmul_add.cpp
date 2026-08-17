@@ -22,7 +22,7 @@
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
 #include "arch35/grouped_matmul_add_basic_cgmct.h"
 #else
-#include "grouped_matmul_add.h"
+#include "grouped_matmul_add_kernel.h"
 #endif
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"

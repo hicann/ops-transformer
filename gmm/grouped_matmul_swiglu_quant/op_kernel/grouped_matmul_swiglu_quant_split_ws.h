@@ -15,7 +15,7 @@
 #ifndef ASCENDC_GROUPED_MATMUL_SWIGLU_QUANT_SPLIT_WS_H
 #define ASCENDC_GROUPED_MATMUL_SWIGLU_QUANT_SPLIT_WS_H
 
-#include "grouped_matmul_swiglu_quant_utils.h"
+#include "grouped_matmul_swiglu_quant_utils_kernel.h"
 namespace GROUPED_MATMUL_SWIGLU_QUANT {
 /** @brief intenal computation class
  */

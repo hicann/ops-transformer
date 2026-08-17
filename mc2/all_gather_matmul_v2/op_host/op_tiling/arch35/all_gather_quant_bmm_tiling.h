@@ -17,7 +17,7 @@
 #define __ALL_GATHER_QUANT_BMM_TILING_H__
 
 #pragma once
-#include "../all_gather_matmul_tiling_base.h"
+#include "../all_gather_matmul_tiling_base_v2.h"
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
 #include "mat_mul_v3/op_host/op_tiling/matmul_v3_base_tiling.h"

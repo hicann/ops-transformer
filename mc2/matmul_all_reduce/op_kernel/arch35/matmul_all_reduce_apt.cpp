@@ -20,16 +20,16 @@
 #endif
 #include "lib/matmul_intf.h"
 #include "../common.h"
-#include "matmul_all_reduce_empty_tensor_k_general.h"
+#include "matmul_all_reduce_empty_tensor_k_general_arch35.h"
 #include "matmul_all_reduce_apt_tiling_key.h"
 
 // david非量化
 #if ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && ((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16)))
-#include "matmul_all_reduce_910_general.h"
+#include "matmul_all_reduce_910_general_arch35.h"
 #endif
 
 #if defined(WEIGHT_W4_W8)
-#include "matmul_all_reduce_weight_quant.h"
+#include "matmul_all_reduce_weight_quant_arch35.h"
 #endif
 
 #if defined(WEIGHT_F8) || defined(WEIGHT_W4_W8)
@@ -53,7 +53,7 @@ static constexpr Mc2WeightQuantBatchMatmulV2::Arch35::VecAntiQuantConfig VEC_ANT
     ((ORIG_DTYPE_X1 == DT_FLOAT4_E2M1) && (ORIG_DTYPE_X2 == DT_FLOAT4_E2M1))
 #include "matmul_all_reduce_quant_pertoken.h"
 #include "matmul_all_reduce_quant_pertoken_comm_int8.h"
-#include "matmul_all_reduce_quant.h"
+#include "matmul_all_reduce_quant_arch35.h"
 #include "matmul_all_reduce_quant_comm_int8.h"
 #include "matmul_all_reduce_quant_perblock.h"
 #include "matmul_all_reduce_quant_commfp8_mixed_calc.h"

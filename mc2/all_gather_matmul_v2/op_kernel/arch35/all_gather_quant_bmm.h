@@ -23,7 +23,7 @@
 #include "lib/matmul_intf.h"
 #include "../common.h"
 #include "lib/hccl/hccl.h"
-#include "all_gather_matmul_base.h"
+#include "all_gather_matmul_base_v2.h"
 #include "../../../3rd/quant_batch_matmul_v3/op_kernel/arch35/qbmm_cube_on_the_fly.h"
 #include "../../../common/op_kernel/mc2_quant_batch_matmul.h"
 #include "../all_gather_matmul_tiling_data.h"

@@ -12,9 +12,9 @@
  * \file grouped_matmul_swiglu_quant.cpp
  * \brief
  */
-#include "grouped_matmul_swiglu_quant.h"
+#include "grouped_matmul_swiglu_quant_kernel.h"
 #include "grouped_matmul_swiglu_pipeline.h"
-#include "grouped_matmul_swiglu_quant_utils.h"
+#include "grouped_matmul_swiglu_quant_utils_kernel.h"
 #include <typeinfo>
 #include "grouped_matmul_swiglu_quant_split_ws.h"
 using namespace AscendC;

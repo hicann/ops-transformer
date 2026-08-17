@@ -15,7 +15,7 @@
 #ifndef GROUPED_MATMUL_WEIGHT_QUANT_A16W4_MSD_CONTROLLER_H
 #define GROUPED_MATMUL_WEIGHT_QUANT_A16W4_MSD_CONTROLLER_H
 
-#include "../grouped_matmul.h"
+#include "../grouped_matmul_kernel.h"
 #include "../grouped_matmul_utils.h"
 #include "kernel_operator.h"
 #include "grouped_matmul_weight_quant_a16w4_msd_basic_block_config.h"

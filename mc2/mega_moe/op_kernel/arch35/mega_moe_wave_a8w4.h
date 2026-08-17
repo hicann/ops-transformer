@@ -17,7 +17,7 @@
 #define MEGA_MOE_WAVE_A8W4_H
 
 #include "common/mega_moe_utils.h"
-#include "mega_moe.h"
+#include "mega_moe_arch35.h"
 
 namespace MegaMoeImpl {
 

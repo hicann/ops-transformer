@@ -12,8 +12,8 @@
 #define CATLASS_LAYOUT_VECTOR_HPP
 
 #include "../../template_linear_algebra_v2/catlass.hpp"
-#include "../../template_linear_algebra_v2/coord.hpp"
-#include "../../template_linear_algebra_v2/numeric_size.hpp"
+#include "../../template_linear_algebra_v2/tla_v2_coord.hpp"
+#include "../../template_linear_algebra_v2/tla_v2_numeric_size.hpp"
 
 namespace Catlass::layout {
 

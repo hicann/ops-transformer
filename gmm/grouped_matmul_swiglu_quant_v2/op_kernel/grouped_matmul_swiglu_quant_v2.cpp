@@ -19,7 +19,7 @@
 #include "grouped_matmul_swiglu_quant_spilit_fusion.h"
 #include "grouped_matmul_swiglu_quant_v2_a8w4_msd_pipeline.h"
 #include "grouped_matmul_swiglu_quant_v2_a4w4_pipeline.h"
-#include "grouped_matmul_swiglu_quant_v2_utils.h"
+#include "grouped_matmul_swiglu_quant_v2_utils_kernel.h"
 using namespace AscendC;
 using namespace matmul;
 using namespace GroupedMatmulDequantSwigluQuant;

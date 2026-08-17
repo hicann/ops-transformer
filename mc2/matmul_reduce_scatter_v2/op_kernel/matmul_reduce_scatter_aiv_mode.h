@@ -33,7 +33,7 @@
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/dispatch_policy.hpp"
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/gemm_type.hpp"
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm_coord.hpp"
-#include "matmul.hpp"
+#include "matmul_reduce_scatter_v2_matmul.hpp"
 #include "matmul_reduce_scatter_aiv_mode_padding.h"
 #include "matmul_reduce_scatter_aiv_mode_dequant.h"
 

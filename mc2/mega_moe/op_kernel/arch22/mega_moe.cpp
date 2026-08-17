@@ -24,7 +24,7 @@
 #include "mega_moe_tiling_a2a3.h"
 #include "mega_moe_tiling_key.h"
 #include "mega_moe_a2.h"
-#include "mega_moe.h"
+#include "mega_moe_arch22.h"
 
 using namespace AscendC;
 using namespace MegaMoeImpl;

@@ -14,7 +14,7 @@
  */
 #ifndef __QUANT_BMM_REDUCE_SCATTER_TILING_H__
 #define __QUANT_BMM_REDUCE_SCATTER_TILING_H__
-#include "../matmul_reduce_scatter_tiling_base.h"
+#include "../matmul_reduce_scatter_tiling_base_v2.h"
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
 #include "../../../op_kernel/matmul_reduce_scatter_v2_c_tiling.h"

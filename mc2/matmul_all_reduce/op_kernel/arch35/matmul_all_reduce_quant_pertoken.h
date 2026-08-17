@@ -26,7 +26,7 @@
 #include "matmul_all_reduce_based_a2a_rs_ag.h"
 #include "matmul_all_reduce_based_all_reduce.h"
 #include "../../../3rd/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mix_online_dynamic.h"
-#include "matmul_all_reduce_add_x3.h"
+#include "matmul_all_reduce_add_x3_arch35.h"
 
 namespace MatmulAllReduceImpl {
 using namespace AscendC;

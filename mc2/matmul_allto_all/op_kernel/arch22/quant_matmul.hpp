@@ -24,7 +24,7 @@
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/detail/callback.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm_coord.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/matrix_coord.hpp"
-#include "matmul_allto_all_util.h"
+#include "matmul_allto_all_util_arch22.h"
 
 namespace Catlass::Gemm::Kernel {
 template <class BlockMmad_, class BlockEpilogue_, class BlockScheduler_, uint32_t WORKSPACE_STAGES_>

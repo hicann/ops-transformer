@@ -24,7 +24,7 @@
 #include <cstdint>
 
 #include "all_gather_matmul_v2_formulaic_tiling.h"
-#include "all_gather_matmul_tiling_base.h"
+#include "all_gather_matmul_tiling_base_v2.h"
 #include "../../op_kernel/all_gather_matmul_v2_apt_tiling_key.h"
 #include "graph/utils/type_utils.h"
 #include "mc2_comm_utils.h"
