@@ -210,6 +210,9 @@ __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, F
     constInfo.qHeadNum = constInfo.gSize * constInfo.kvHeadNum;
     constInfo.kvSeqSize = tilingData->baseParams.s2Size;
     constInfo.qSeqSize = tilingData->baseParams.s1Size;
+    constInfo.keyBnStride = tilingData->kvStrideParams.keyBnStride;
+    constInfo.valueBnStride = tilingData->kvStrideParams.valueBnStride;
+    constInfo.keyRopeBnStride = tilingData->kvStrideParams.keyRopeBnStride;
     constInfo.attenMaskFlag = (tilingData->maskParams.attenMaskFlag != 0) ? true : false;
     constInfo.attenMaskBatchStride = tilingData->maskParams.attenMaskBatchStride;
     constInfo.attenMaskStride = tilingData->maskParams.attenMaskStride;

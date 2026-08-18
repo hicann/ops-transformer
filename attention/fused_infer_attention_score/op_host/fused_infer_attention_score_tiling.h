@@ -51,7 +51,7 @@ TILING_DATA_FIELD_DEF(uint32_t, needInit)
 TILING_DATA_FIELD_DEF(uint32_t, slidingFlag)
 TILING_DATA_FIELD_DEF(uint32_t, l2CacheOffFlag)
 TILING_DATA_FIELD_DEF(uint32_t, isLegacyIfa)
-TILING_DATA_FIELD_DEF(bool, isEmptyBatchOverHalf)   // 临时变量，用于检查是否超过一半的batch为空batch
+TILING_DATA_FIELD_DEF(bool, isEmptyBatchOverHalf) // 临时变量，用于检查是否超过一半的batch为空batch
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionBaseParamsOp, FusedInferAttentionBaseParams)
 
@@ -103,16 +103,16 @@ REGISTER_TILING_DATA_CLASS(FusedInferAttentionOuterSplitParamsOp, FusedInferAtte
 BEGIN_TILING_DATA_DEF(FusedInferAttentionFlashDecodeParams)
 TILING_DATA_FIELD_DEF(uint32_t, numOfFdHead)
 TILING_DATA_FIELD_DEF(uint32_t, reserved)
-TILING_DATA_FIELD_DEF(uint32_t, gS1BaseSizeOfFd)                                    // FD负载均衡中，每个FD任务按gS1切分的基本size
-TILING_DATA_FIELD_DEF(uint32_t, usedVecNumOfFd)                                     // FD负载均衡中，用到的vector数
+TILING_DATA_FIELD_DEF(uint32_t, gS1BaseSizeOfFd) // FD负载均衡中，每个FD任务按gS1切分的基本size
+TILING_DATA_FIELD_DEF(uint32_t, usedVecNumOfFd)  // FD负载均衡中，用到的vector数
 TILING_DATA_FIELD_DEF_ARR(uint32_t, FIA_MAX_AIC_CORE_NUM, bN2IdxOfFdHead)
 TILING_DATA_FIELD_DEF_ARR(uint32_t, FIA_MAX_AIC_CORE_NUM, gS1IdxOfFdHead)
 TILING_DATA_FIELD_DEF_ARR(uint32_t, FIA_MAX_AIC_CORE_NUM, s2SplitNumOfFdHead)
 TILING_DATA_FIELD_DEF_ARR(uint32_t, FIA_MAX_AIC_CORE_NUM, s2SplitStartIdxOfCore)
-TILING_DATA_FIELD_DEF_ARR(uint32_t, FIA_MAX_AIC_CORE_NUM, gS1SplitNumOfFdHead)          // FD负载均衡中，每个FD任务按gS1基本size切分后的份数
-TILING_DATA_FIELD_DEF_ARR(uint32_t, FIA_MAX_AIC_CORE_NUM, gS1LastPartSizeOfFdHead)      // FD负载均衡中，每个FD任务按gS1基本size切分后，最后一份的gS1大小，即尾块大小
-TILING_DATA_FIELD_DEF_ARR(uint32_t, FIA_MAX_AIC_CORE_NUM * 2, gS1IdxEndOfFdHead)        // FD负载均衡中，每个vector核处理的最后一个FD任务的序号
-TILING_DATA_FIELD_DEF_ARR(uint32_t, FIA_MAX_AIC_CORE_NUM * 2, gS1IdxEndOfFdHeadSplit)   // FD负载均衡中，每个vector核处理的最后一个FD任务的子划分的序号
+TILING_DATA_FIELD_DEF_ARR(uint32_t, FIA_MAX_AIC_CORE_NUM, gS1SplitNumOfFdHead)        // FD负载均衡中，每个FD任务按gS1基本size切分后的份数
+TILING_DATA_FIELD_DEF_ARR(uint32_t, FIA_MAX_AIC_CORE_NUM, gS1LastPartSizeOfFdHead)    // FD负载均衡中，每个FD任务按gS1基本size切分后，最后一份的gS1大小，即尾块大小
+TILING_DATA_FIELD_DEF_ARR(uint32_t, FIA_MAX_AIC_CORE_NUM * 2, gS1IdxEndOfFdHead)      // FD负载均衡中，每个vector核处理的最后一个FD任务的序号
+TILING_DATA_FIELD_DEF_ARR(uint32_t, FIA_MAX_AIC_CORE_NUM * 2, gS1IdxEndOfFdHeadSplit) // FD负载均衡中，每个vector核处理的最后一个FD任务的子划分的序号
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionFlashDecodeParamsOp, FusedInferAttentionFlashDecodeParams)
 
@@ -145,7 +145,15 @@ TILING_DATA_FIELD_DEF(uint32_t, isOutQuantTypeBf16)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionPostQuantParamsOp, FusedInferAttentionPostQuantParams)
 
-//MLA非量化模板TilingData
+// PageAttention cache dim0 strides, in elements. Zero keeps the original dense-layout address calculation.
+BEGIN_TILING_DATA_DEF(FusedInferAttentionKvStrideParams)
+TILING_DATA_FIELD_DEF(uint64_t, keyBnStride)
+TILING_DATA_FIELD_DEF(uint64_t, valueBnStride)
+TILING_DATA_FIELD_DEF(uint64_t, keyRopeBnStride)
+END_TILING_DATA_DEF
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionKvStrideParamsOp, FusedInferAttentionKvStrideParams)
+
+// MLA非量化模板TilingData
 BEGIN_TILING_DATA_DEF(FusedInferAttentionScoreTilingData)
 TILING_DATA_FIELD_DEF_STRUCT(FusedInferAttentionBaseParams, baseParams);
 TILING_DATA_FIELD_DEF_STRUCT(FusedInferAttentionPageAttentionParams, pageAttenParams);
@@ -158,6 +166,7 @@ TILING_DATA_FIELD_DEF_STRUCT(FusedInferAttentionPrefixParams, prefixParams);
 TILING_DATA_FIELD_DEF_STRUCT(FusedInferAttentionPseParams, pseParams);
 TILING_DATA_FIELD_DEF_STRUCT(FusedInferAttentionLeftPaddingParams, leftPaddingParams);
 TILING_DATA_FIELD_DEF_STRUCT(FusedInferAttentionPostQuantParams, postquantParams);
+TILING_DATA_FIELD_DEF_STRUCT(FusedInferAttentionKvStrideParams, kvStrideParams);
 END_TILING_DATA_DEF
 
 // empty tenmsor 模板TilingData

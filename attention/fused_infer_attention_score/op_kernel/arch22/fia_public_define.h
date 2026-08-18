@@ -171,8 +171,11 @@ struct ConstInfo {
     uint64_t headDim = 0;
     uint64_t headDimRope = 0;
     uint64_t headDimAlign = 0;
-    uint64_t kvSeqSize = 0ULL; // kv最大S长度
-    uint64_t qSeqSize = 1ULL;  // q最大S长度
+    uint64_t kvSeqSize = 0ULL;       // kv最大S长度
+    uint64_t qSeqSize = 1ULL;        // q最大S长度
+    uint64_t keyBnStride = 0ULL;     // PageAttention key cache dim0 stride, in elements
+    uint64_t valueBnStride = 0ULL;   // PageAttention value cache dim0 stride, in elements
+    uint64_t keyRopeBnStride = 0ULL; // PageAttention keyRope cache dim0 stride, in elements
     int64_t preToken = 0;
     int64_t nextToken = 0;
     uint64_t systemPrefixMaxLen = 0;

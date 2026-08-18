@@ -26,6 +26,13 @@ using namespace ge;
 using namespace AscendC;
 namespace optiling {
 
+void FillArch22MlaKvStrideParams(FusedInferAttentionKvStrideParams &params, const FiaTilingInfo &fiaInfo)
+{
+    params.set_keyBnStride(fiaInfo.keyNonContigDim == 0 ? fiaInfo.keyBnStride : 0);
+    params.set_valueBnStride(fiaInfo.valueNonContigDim == 0 ? fiaInfo.valueBnStride : 0);
+    params.set_keyRopeBnStride(fiaInfo.keyRopeNonContigDim == 0 ? fiaInfo.kRopeBnStride : 0);
+}
+
 constexpr uint64_t PRE_LOAD_NUM_MLA = 2;
 
 constexpr uint64_t FIA_TILINGKEYOFFSET = uint64_t(100000000000000000UL);         // 10^17
@@ -128,7 +135,7 @@ bool FiaTilingNonQuantMla::IsCapable()
 
     // 支持的input_layout范围
     std::string layout = fiaInfo_->opParamInfo.layOut;
-    const std::vector<std::string> layoutSupportList = {"BSH",      "BSND",      "BNSD",      "TND",
+    const std::vector<std::string> layoutSupportList = {"BSH", "BSND", "BNSD", "TND",
                                                         "BSH_NBSD", "BSND_NBSD", "BNSD_NBSD", "TND_NTD"};
     if (std::find(layoutSupportList.begin(), layoutSupportList.end(), layout) == layoutSupportList.end()) {
         return false;
@@ -439,6 +446,7 @@ void FiaTilingNonQuantMla::FillTilingBaseParams()
     tilingData_.baseParams.set_usedCoreNum(usedCoreNum_);
     tilingData_.baseParams.set_softmaxLseFlag(fiaInfo_->softmaxLseFlag ? 1 : 0);
     tilingData_.baseParams.set_isEmptyBatchOverHalf(false);
+    FillArch22MlaKvStrideParams(tilingData_.kvStrideParams, *fiaInfo_);
 }
 
 void FiaTilingNonQuantMla::FillTilingPageAttenParams()

@@ -2232,6 +2232,126 @@ static ge::graphStatus CheckInputLayout(gert::TilingContext *context, const stri
     return ge::GRAPH_SUCCESS;
 }
 
+static bool IsTensorContiguous(const gert::StorageShape *storageShape, const gert::Stride *strides)
+{
+    if (storageShape == nullptr || strides == nullptr || strides->GetDimNum() == 0) {
+        return true;
+    }
+    const gert::Shape &shape = storageShape->GetStorageShape();
+    if (strides->GetDimNum() < shape.GetDimNum()) {
+        return false;
+    }
+    uint64_t expectedStride = 1;
+    for (int32_t dim = static_cast<int32_t>(shape.GetDimNum()) - 1; dim >= 0; --dim) {
+        if (shape.GetDim(dim) != 1 && strides->GetStride(dim) != expectedStride) {
+            return false;
+        }
+        expectedStride *= static_cast<uint64_t>(shape.GetDim(dim));
+    }
+    return true;
+}
+
+static bool IsDynamicInputContiguous(const gert::TilingContext *context, size_t inputIndex)
+{
+    for (uint32_t tensorIndex = 0;; ++tensorIndex) {
+        const gert::StorageShape *storageShape = context->GetDynamicInputShape(inputIndex, tensorIndex);
+        if (storageShape == nullptr) {
+            break;
+        }
+        const gert::Stride *strides = context->GetDynamicInputStride(inputIndex, tensorIndex);
+        if (!IsTensorContiguous(storageShape, strides)) {
+            return false;
+        }
+        if (tensorIndex == 0 && context->InputIsView(inputIndex) &&
+            (strides == nullptr || strides->GetDimNum() == 0)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool IsTensorDim0StrideCompatible(const gert::StorageShape *storageShape, const gert::Stride *strides)
+{
+    if (storageShape == nullptr || strides == nullptr || strides->GetDimNum() == 0) {
+        return true;
+    }
+    const gert::Shape &shape = storageShape->GetStorageShape();
+    if (strides->GetDimNum() < shape.GetDimNum()) {
+        return false;
+    }
+    if (shape.GetDimNum() > 0 && shape.GetDim(0) > 1 && strides->GetStride(0) <= 0) {
+        return false;
+    }
+    int64_t expectedStride = 1;
+    for (int32_t dim = static_cast<int32_t>(shape.GetDimNum()) - 1; dim >= 1; --dim) {
+        if (shape.GetDim(dim) != 1 && strides->GetStride(dim) != expectedStride) {
+            return false;
+        }
+        expectedStride *= shape.GetDim(dim);
+    }
+    return true;
+}
+
+static bool IsDynamicInputDim0StrideCompatible(const gert::TilingContext *context, size_t inputIndex)
+{
+    for (uint32_t tensorIndex = 0;; ++tensorIndex) {
+        const gert::StorageShape *storageShape = context->GetDynamicInputShape(inputIndex, tensorIndex);
+        if (storageShape == nullptr) {
+            break;
+        }
+        const gert::Stride *strides = context->GetDynamicInputStride(inputIndex, tensorIndex);
+        if (!IsTensorDim0StrideCompatible(storageShape, strides)) {
+            return false;
+        }
+        if (tensorIndex == 0 && context->InputIsView(inputIndex) &&
+            (strides == nullptr || strides->GetDimNum() == 0)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool IsSupportedRegularFiaCacheStrideInput(const gert::TilingContext *context)
+{
+    if (context->GetOptionalInputShape(BLOCK_TABLE_INDEX) == nullptr || context->GetAttrs() == nullptr ||
+        context->GetInputShape(QUERY_INDEX) == nullptr || context->GetInputShape(KEY_INDEX) == nullptr ||
+        context->GetInputShape(VALUE_INDEX) == nullptr || context->GetInputDesc(QUERY_INDEX) == nullptr ||
+        !CheckSpecConditions(context)) {
+        return false;
+    }
+    const gert::StorageShape *keyRopeShape = context->GetOptionalInputShape(KEY_ROPE_INDEX);
+    const gert::Stride *keyRopeStride = context->GetOptionalInputStride(KEY_ROPE_INDEX);
+    const bool keyRopeMissingViewStride = keyRopeShape != nullptr && context->InputIsView(KEY_ROPE_INDEX) &&
+                                          (keyRopeStride == nullptr || keyRopeStride->GetDimNum() == 0);
+    return IsDynamicInputDim0StrideCompatible(context, KEY_INDEX) &&
+           IsDynamicInputDim0StrideCompatible(context, VALUE_INDEX) && !keyRopeMissingViewStride &&
+           IsTensorContiguous(keyRopeShape, keyRopeStride);
+}
+
+static bool HasNonContiguousCacheInput(const gert::TilingContext *context)
+{
+    const gert::StorageShape *keyRopeShape = context->GetOptionalInputShape(KEY_ROPE_INDEX);
+    const gert::Stride *keyRopeStride = context->GetOptionalInputStride(KEY_ROPE_INDEX);
+    bool hasAnyStrideMetadata = keyRopeStride != nullptr && keyRopeStride->GetDimNum() != 0;
+    for (size_t inputIndex : {KEY_INDEX, VALUE_INDEX}) {
+        for (uint32_t tensorIndex = 0; context->GetDynamicInputShape(inputIndex, tensorIndex) != nullptr;
+             ++tensorIndex) {
+            const gert::Stride *strides = context->GetDynamicInputStride(inputIndex, tensorIndex);
+            hasAnyStrideMetadata = hasAnyStrideMetadata || (strides != nullptr && strides->GetDimNum() != 0);
+        }
+    }
+    // TensorV1 cannot export strides and may still mark an explicit Contiguous
+    // result as a view.  With no cache stride metadata at all, preserve the
+    // legacy dense route; partial TensorV2 metadata is still validated below.
+    if (!hasAnyStrideMetadata) {
+        return false;
+    }
+    const bool keyRopeMissingViewStride = keyRopeShape != nullptr && context->InputIsView(KEY_ROPE_INDEX) &&
+                                          (keyRopeStride == nullptr || keyRopeStride->GetDimNum() == 0);
+    return !IsDynamicInputContiguous(context, KEY_INDEX) || !IsDynamicInputContiguous(context, VALUE_INDEX) ||
+           keyRopeMissingViewStride || !IsTensorContiguous(keyRopeShape, keyRopeStride);
+}
+
 ge::graphStatus TilingFusedInferAttentionScore(gert::TilingContext *context)
 {
     if (context == nullptr) {
@@ -2242,6 +2362,11 @@ ge::graphStatus TilingFusedInferAttentionScore(gert::TilingContext *context)
     if (RouteToFia(context)) {
         return TilingFusedInferAttentionScoreV3(context);
     }
+
+    OP_CHECK_IF(HasNonContiguousCacheInput(context) && !IsSupportedRegularFiaCacheStrideInput(context),
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
+                                            "Non-contiguous cache is supported only by the arch22 regular FAI or D512 MLA PA routes."),
+                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(CheckQKV(*context) != ge::GRAPH_SUCCESS,
                 OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "check query/key/value failed"), return ge::GRAPH_FAILED);
@@ -2305,6 +2430,10 @@ FIA_EXTERN_C ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingCont
     if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
         return TilingFusedInferAttentionScoreV4(context);
     } else if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_5102) {
+        OP_CHECK_IF(HasNonContiguousCacheInput(context),
+                    OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
+                                                "Non-contiguous key/value/keyRope cache is not supported by the arch38 route."),
+                    return ge::GRAPH_FAILED);
         return TilingFusedInferAttentionScoreArch38(context);
     } else {
         return TilingFusedInferAttentionScore(context);

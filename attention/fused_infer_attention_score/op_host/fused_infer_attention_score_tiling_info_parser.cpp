@@ -32,10 +32,14 @@ namespace optiling {
 namespace {
 // 判断tensor是否连续，逻辑与 BaseChecker::CheckTensorContiguous 一致
 ge::graphStatus CheckTensorContiguousLocal(const uint32_t &tensorDimNum, const gert::Shape &inputShape,
-    const gert::Stride *strides, int32_t &index)
+                                           const gert::Stride *strides, int32_t &index)
 {
     if (strides == nullptr || strides->GetDimNum() == 0) {
         return ge::GRAPH_SUCCESS;
+    }
+    if (strides->GetDimNum() < tensorDimNum) {
+        index = static_cast<int32_t>(tensorDimNum);
+        return ge::GRAPH_FAILED;
     }
     if (tensorDimNum == 0 || tensorDimNum == 1) {
         return ge::GRAPH_SUCCESS;
@@ -52,34 +56,88 @@ ge::graphStatus CheckTensorContiguousLocal(const uint32_t &tensorDimNum, const g
     }
     return ge::GRAPH_SUCCESS;
 }
+
+ge::graphStatus ValidateStrideLocal(const char *opName, const char *tensorName, const gert::Shape &inputShape,
+                                    const gert::Stride *strides)
+{
+    OP_CHECK_IF(strides == nullptr,
+                OP_LOGE(opName, "Failed to get stride metadata for view input %s.", tensorName),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(strides->GetDimNum() < inputShape.GetDimNum(),
+                OP_LOGE(opName, "The stride rank of %s is %zu, which is smaller than its input rank %zu.", tensorName,
+                        static_cast<size_t>(strides->GetDimNum()), static_cast<size_t>(inputShape.GetDimNum())),
+                return ge::GRAPH_FAILED);
+    for (uint32_t dim = 0; dim < inputShape.GetDimNum(); ++dim) {
+        OP_CHECK_IF(inputShape.GetDim(dim) > 1 && strides->GetStride(dim) <= 0,
+                    OP_LOGE(opName, "The stride of %s at non-singleton dimension %u must be greater than 0.", tensorName,
+                            dim),
+                    return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+void BuildContiguousStride(const gert::Shape &shape, gert::Stride &strides)
+{
+    strides.SetDimNum(shape.GetDimNum());
+    uint64_t stride = 1;
+    for (int32_t dim = static_cast<int32_t>(shape.GetDimNum()) - 1; dim >= 0; --dim) {
+        strides.SetStride(dim, stride);
+        stride *= static_cast<uint64_t>(shape.GetDim(dim));
+    }
+}
+
+ge::graphStatus ValidateForwardedStrideRankLocal(const char *opName, const char *tensorName,
+                                                 const gert::Stride *strides, uint32_t requiredRank)
+{
+    OP_CHECK_IF(strides == nullptr || strides->GetDimNum() < requiredRank,
+                OP_LOGE(opName, "The stride rank of %s must be at least %u for the selected PA layout.", tensorName,
+                        requiredRank),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+bool HasUsableStride(const gert::Stride *stride)
+{
+    return stride != nullptr && stride->GetDimNum() > 0;
+}
+
+bool HasStrideMetadata(const std::vector<gert::Stride *> &strides)
+{
+    for (const gert::Stride *stride : strides) {
+        if (HasUsableStride(stride)) {
+            return true;
+        }
+    }
+    return false;
+}
 } // namespace
 
 ge::graphStatus FiaInfoParser::CheckRequiredInOutExistence() const
 {
     OP_CHECK_IF(opParamInfo_.query.shape == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query", "shape of query cannot be empty"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query", "shape of query cannot be empty"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.query.desc == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query", "desc of query cannot be empty"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query", "desc of query cannot be empty"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.key.shape == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "key", "shape of key cannot be empty"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "key", "shape of key cannot be empty"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.key.desc == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "key", "desc of key cannot be empty"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "key", "desc of key cannot be empty"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.value.shape == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "value", "shape of value cannot be empty"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "value", "shape of value cannot be empty"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.value.desc == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "value", "desc of value cannot be empty"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "value", "desc of value cannot be empty"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.attenOut.shape == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "output", "shape of output cannot be empty"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "output", "shape of output cannot be empty"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.attenOut.desc == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "output", "desc of output cannot be empty"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "output", "desc of output cannot be empty"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -154,11 +212,11 @@ ge::graphStatus FiaInfoParser::GetEmptyTensorFlag()
         (opParamInfo_.query.shape->GetStorageShape().GetShapeSize() != 0 &&
          opParamInfo_.attenOut.shape->GetStorageShape().GetShapeSize() == 0)) {
         std::string sizesStr = std::to_string(opParamInfo_.query.shape->GetStorageShape().GetShapeSize()) + " and " +
-            std::to_string(opParamInfo_.attenOut.shape->GetStorageShape().GetShapeSize());
+                               std::to_string(opParamInfo_.attenOut.shape->GetStorageShape().GetShapeSize());
         std::string reason = "The shape sizes of query and attention_out must "
-            "be both greater than 0 or both equal to 0";
+                             "be both greater than 0 or both equal to 0";
         OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(opName_, "query and attention_out",
-            sizesStr.c_str(), reason.c_str());
+                                                   sizesStr.c_str(), reason.c_str());
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo_.query.shape->GetStorageShape().GetShapeSize() == 0 &&
@@ -171,7 +229,7 @@ ge::graphStatus FiaInfoParser::GetEmptyTensorFlag()
             (opParamInfo_.lseOut.shape->GetStorageShape().GetShapeSize() == 0)) {
             std::string reason = "The shape size of softmax_lse should be greater than 0 when lse Flag is 1";
             OP_LOGE_FOR_INVALID_SHAPESIZE(opName_, "softmax_lse", std::to_string(0).c_str(),
-                reason.c_str());
+                                          reason.c_str());
             return ge::GRAPH_FAILED;
         }
     }
@@ -224,13 +282,13 @@ ge::graphStatus FiaInfoParser::GetActualSeqLenQSize(uint32_t &size)
 {
     if (opParamInfo_.actualSeqLengthsQ.tensor == nullptr) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "actualSeqLengths",
-            "When inputLayout is " + LayoutToSerialString(qLayout_) + ", actualSeqLengths cannot be empty");
+                                                 "When inputLayout is " + LayoutToSerialString(qLayout_) + ", actualSeqLengths cannot be empty");
         return ge::GRAPH_FAILED;
     }
     int64_t shapeSize = opParamInfo_.actualSeqLengthsQ.tensor->GetShapeSize();
     if (shapeSize <= 0) {
         OP_LOGE_FOR_INVALID_SHAPESIZE(opName_, "actual_seq_lengths",
-            std::to_string(shapeSize).c_str(), "greater than 0");
+                                      std::to_string(shapeSize).c_str(), "greater than 0");
         return ge::GRAPH_FAILED;
     }
     size = static_cast<uint32_t>(shapeSize);
@@ -249,19 +307,129 @@ ge::graphStatus FiaInfoParser::GetOpName()
 
 ge::graphStatus FiaInfoParser::GetStrides()
 {
-    // 用opbase版本判断，老版本opbase为tensorv1
-    if (context_->InputIsView(KEY_INDEX) == false) {
-        hasViewStride_ = false;
+    const bool hasKeyRope = opParamInfo_.keyRope.desc != nullptr && opParamInfo_.keyRope.tensor != nullptr;
+    const bool hasKeyScale = opParamInfo_.keyAntiquantScale.tensor != nullptr;
+    const bool hasValueScale = opParamInfo_.valueAntiquantScale.tensor != nullptr;
+    // PageAttention has one tensor in each dynamic K/V list, so IR input indices and actual input indices align.
+    // TensorList remains outside the target feature and is rejected by the checker.
+    const bool hasSingleKvTensor = kCache_.size() == 1 && vCache_.size() == 1;
+    const bool keyIsView = hasSingleKvTensor && context_->InputIsView(KEY_INDEX);
+    const bool valueIsView = hasSingleKvTensor && context_->InputIsView(VALUE_INDEX);
+    const bool keyRopeIsView = hasSingleKvTensor && hasKeyRope && context_->InputIsView(KEY_ROPE_INDEX);
+    const bool keyScaleIsView =
+        hasSingleKvTensor && hasKeyScale && context_->InputIsView(KEY_ANTIQUANT_SCALE_INDEX);
+    const bool valueScaleIsView =
+        hasSingleKvTensor && hasValueScale && context_->InputIsView(VALUE_ANTIQUANT_SCALE_INDEX);
+
+    if (hasKeyRope) {
+        kRopeStrides_ = context_->GetOptionalInputStride(KEY_ROPE_INDEX);
+    }
+    if (!HasUsableStride(kRopeStrides_)) {
+        kRopeStrides_ = nullptr;
+    }
+
+    // Cache view routing is scoped to K/V/KeyRope. KScale/VScale remain AutoContiguous in the OpDef,
+    // so scale-only TensorV2 metadata must not change the legacy Arch35 cache-stride behavior.
+    hasViewStride_ = HasStrideMetadata(kStrideCache_) || HasStrideMetadata(vStrideCache_) ||
+                     kRopeStrides_ != nullptr;
+    // TensorV1 can report InputIsView=true for the result of an explicit
+    // Contiguous node, but it cannot expose any stride metadata.  In that
+    // all-or-nothing case the OpAPI has already materialized K/V/KeyRope, so
+    // keep the legacy contiguous path.  Once any TensorV2 stride is present,
+    // missing metadata for another view remains an error instead of being
+    // silently interpreted as dense.
+    if (!hasViewStride_) {
         return ge::GRAPH_SUCCESS;
     }
-    keyStrides_ = context_->GetDynamicInputStride(KEY_INDEX, 0);
-    valueStrides_ = context_->GetDynamicInputStride(VALUE_INDEX, 0);
-    if (opParamInfo_.keyAntiquantScale.tensor != nullptr || opParamInfo_.valueAntiquantScale.tensor != nullptr) {
+
+    if (hasKeyScale) {
         kScaleStrides_ = context_->GetOptionalInputStride(KEY_ANTIQUANT_SCALE_INDEX);
+    }
+    if (hasValueScale) {
         vScaleStrides_ = context_->GetOptionalInputStride(VALUE_ANTIQUANT_SCALE_INDEX);
     }
-    if (opParamInfo_.keyRope.desc != nullptr) {
-        kRopeStrides_ = context_->GetOptionalInputStride(KEY_ROPE_INDEX);
+    if (!HasUsableStride(kScaleStrides_)) {
+        kScaleStrides_ = nullptr;
+    }
+    if (!HasUsableStride(vScaleStrides_)) {
+        vScaleStrides_ = nullptr;
+    }
+
+    OP_CHECK_IF(keyIsView && !HasStrideMetadata(kStrideCache_),
+                OP_LOGE(opName_, "Failed to get stride metadata for view input key."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(valueIsView && !HasStrideMetadata(vStrideCache_),
+                OP_LOGE(opName_, "Failed to get stride metadata for view input value."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(keyRopeIsView && kRopeStrides_ == nullptr,
+                OP_LOGE(opName_, "Failed to get stride metadata for view input keyRope."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(keyScaleIsView && kScaleStrides_ == nullptr,
+                OP_LOGE(opName_, "Failed to get stride metadata for view input keyAntiquantScale."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(valueScaleIsView && vScaleStrides_ == nullptr,
+                OP_LOGE(opName_, "Failed to get stride metadata for view input valueAntiquantScale."),
+                return ge::GRAPH_FAILED);
+
+    if (HasUsableStride(kStrideCache_[0])) {
+        keyStrides_ = kStrideCache_[0];
+    } else {
+        BuildContiguousStride(opParamInfo_.key.shape->GetStorageShape(), keyContiguousStrides_);
+        keyStrides_ = &keyContiguousStrides_;
+    }
+    if (HasUsableStride(vStrideCache_[0])) {
+        valueStrides_ = vStrideCache_[0];
+    } else {
+        BuildContiguousStride(opParamInfo_.value.shape->GetStorageShape(), valueContiguousStrides_);
+        valueStrides_ = &valueContiguousStrides_;
+    }
+    if (ValidateStrideLocal(opName_, "key", opParamInfo_.key.shape->GetStorageShape(), keyStrides_) !=
+            ge::GRAPH_SUCCESS ||
+        ValidateStrideLocal(opName_, "value", opParamInfo_.value.shape->GetStorageShape(), valueStrides_) !=
+            ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    for (size_t index = 0; index < kStrideCache_.size(); ++index) {
+        if (HasUsableStride(kStrideCache_[index]) &&
+            ValidateStrideLocal(opName_, "key", kCache_[index]->GetStorageShape(), kStrideCache_[index]) !=
+                ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
+    }
+    for (size_t index = 0; index < vStrideCache_.size(); ++index) {
+        if (HasUsableStride(vStrideCache_[index]) &&
+            ValidateStrideLocal(opName_, "value", vCache_[index]->GetStorageShape(), vStrideCache_[index]) !=
+                ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
+    }
+    if (hasKeyScale) {
+        if (kScaleStrides_ == nullptr) {
+            BuildContiguousStride(opParamInfo_.keyAntiquantScale.tensor->GetStorageShape(), keyScaleContiguousStrides_);
+            kScaleStrides_ = &keyScaleContiguousStrides_;
+        }
+        if (ValidateStrideLocal(opName_, "keyAntiquantScale",
+                                opParamInfo_.keyAntiquantScale.tensor->GetStorageShape(), kScaleStrides_) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
+    }
+    if (hasValueScale) {
+        if (vScaleStrides_ == nullptr) {
+            BuildContiguousStride(
+                opParamInfo_.valueAntiquantScale.tensor->GetStorageShape(), valueScaleContiguousStrides_);
+            vScaleStrides_ = &valueScaleContiguousStrides_;
+        }
+        if (ValidateStrideLocal(opName_, "valueAntiquantScale",
+                                opParamInfo_.valueAntiquantScale.tensor->GetStorageShape(), vScaleStrides_) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
+    }
+    if (hasKeyRope) {
+        if (kRopeStrides_ == nullptr) {
+            BuildContiguousStride(opParamInfo_.keyRope.tensor->GetStorageShape(), keyRopeContiguousStrides_);
+            kRopeStrides_ = &keyRopeContiguousStrides_;
+        }
+        if (ValidateStrideLocal(opName_, "keyRope", opParamInfo_.keyRope.tensor->GetStorageShape(),
+                                kRopeStrides_) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -269,7 +437,7 @@ ge::graphStatus FiaInfoParser::GetStrides()
 void FiaInfoParser::GetKvIsContiguous()
 {
     if (!hasViewStride_) {
-        return ;
+        return;
     }
     for (size_t i = 0; i < kStrideCache_.size(); ++i) {
         int32_t dim = 0;
@@ -297,10 +465,17 @@ void FiaInfoParser::GetKvIsContiguous()
     }
 }
 
-void FiaInfoParser::GetKvStrideValues()
+ge::graphStatus FiaInfoParser::GetKvStrideValues()
 {
-    if (!hasViewStride_) {
-        return;
+    if (!hasViewStride_ || kvStorageMode_ != KvStorageMode::PAGE_ATTENTION) {
+        return ge::GRAPH_SUCCESS;
+    }
+    const uint32_t requiredRank = kvLayout_ == FiaLayout::BnBsH ? 1U : 2U;
+    if (ValidateForwardedStrideRankLocal(opName_, "key", keyStrides_, requiredRank) != ge::GRAPH_SUCCESS ||
+        ValidateForwardedStrideRankLocal(opName_, "value", valueStrides_, requiredRank) != ge::GRAPH_SUCCESS ||
+        (kRopeStrides_ != nullptr &&
+         ValidateForwardedStrideRankLocal(opName_, "keyRope", kRopeStrides_, requiredRank) != ge::GRAPH_SUCCESS)) {
+        return ge::GRAPH_FAILED;
     }
     if (kvLayout_ == FiaLayout::BnBsH) {
         if (keyStrides_ != nullptr) {
@@ -326,6 +501,7 @@ void FiaInfoParser::GetKvStrideValues()
             kRopeN2Stride_ = kRopeStrides_->GetStride(1);
         }
     }
+    return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus FiaInfoParser::GetNpuInfo()
@@ -618,7 +794,7 @@ ge::graphStatus FiaInfoParser::GetKvCache()
     if (kCache_.size() != vCache_.size()) {
         std::string numsStr = std::to_string(kCache_.size()) + " and " + std::to_string(vCache_.size());
         OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(context_->GetNodeName(), "key and value",
-            numsStr.c_str(), "The tensor nums in key and value must be the same");
+                                                   numsStr.c_str(), "The tensor nums in key and value must be the same");
         return ge::GRAPH_FAILED;
     }
 
@@ -772,8 +948,8 @@ ge::graphStatus FiaInfoParser::GetKvLayout()
         kvLayout_ = qLayout_;
     } else {
         OP_CHECK_IF(kCache_.empty() || kCache_[0] == nullptr,
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "kCache", "kCache cannot be empty"),
-            return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "kCache", "kCache cannot be empty"),
+                    return ge::GRAPH_FAILED);
         uint32_t keyDimNum = kCache_[0]->GetStorageShape().GetDimNum();
         if (keyDimNum == 3U) {
             kvLayout_ = FiaLayout::BnBsH;
@@ -783,9 +959,9 @@ ge::graphStatus FiaInfoParser::GetKvLayout()
             kvLayout_ = FiaLayout::NZ;
         } else {
             std::string reason = "The shape dim of key in the 1st tensor must be within the range "
-                "{3, 4, 5} when page attention is enabled";
+                                 "{3, 4, 5} when page attention is enabled";
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "key in the 1st tensor",
-                std::to_string(keyDimNum).c_str(), reason.c_str());
+                                                     std::to_string(keyDimNum).c_str(), reason.c_str());
             return ge::GRAPH_FAILED;
         }
     }
@@ -982,18 +1158,18 @@ ge::graphStatus FiaInfoParser::GetRopeMode()
     }
     if (qkHeadDim_ < vHeadDim_) {
         std::string shapeStr = ToString(opParamInfo_.query.shape->GetStorageShape()) + " and " +
-            ToString(opParamInfo_.value.shape->GetStorageShape());
+                               ToString(opParamInfo_.value.shape->GetStorageShape());
         std::string reason = "D of query must be greater than or equal to axis D of value";
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "query and value", shapeStr.c_str(),
-            reason.c_str());
+                                               reason.c_str());
         return ge::GRAPH_FAILED;
     } else if (qkHeadDim_ > vHeadDim_) {
         if (existSplitRopeTensor) {
             std::string shapeStr = ToString(opParamInfo_.query.shape->GetStorageShape()) + " and " +
-                ToString(opParamInfo_.value.shape->GetStorageShape());
+                                   ToString(opParamInfo_.value.shape->GetStorageShape());
             std::string reason = "D of query must be equal to the same axis of value when query_rope exists";
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "query and value", shapeStr.c_str(),
-                reason.c_str());
+                                                   reason.c_str());
             return ge::GRAPH_FAILED;
         } else {
             ropeMode_ = RopeMode::ROPE_COMBINE;
@@ -1048,10 +1224,10 @@ ge::graphStatus FiaInfoParser::GetRopeHeadDim()
         uint32_t keyRopeHeadDim = static_cast<uint32_t>(keyRopeShape_->GetShapeD());
         if (queryRopeHeadDim != keyRopeHeadDim) {
             std::string shapesStr = ToString(opParamInfo_.queryRope.tensor->GetStorageShape()) + " and " +
-                ToString(opParamInfo_.keyRope.tensor->GetStorageShape());
+                                    ToString(opParamInfo_.keyRope.tensor->GetStorageShape());
             std::string reason = "D of query_rope must be equal to D of key_rope";
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "query_rope and key_rope",
-                shapesStr.c_str(), reason.c_str());
+                                                   shapesStr.c_str(), reason.c_str());
             return GRAPH_FAILED;
         }
         ropeHeadDim_ = queryRopeHeadDim;
@@ -1064,13 +1240,7 @@ ge::graphStatus FiaInfoParser::GetQueryAndOutLayout()
     // 获取query和attentionOut的Layout基准值
     // inputLayout: {qLayout, outLayout}
     const map<string, pair<FiaLayout, FiaLayout>> layoutMap = {
-        {"BSH", {FiaLayout::BSH, FiaLayout::BSH}},         {"BSND", {FiaLayout::BSND, FiaLayout::BSND}},
-        {"BNSD", {FiaLayout::BNSD, FiaLayout::BNSD}},      {"TND", {FiaLayout::TND, FiaLayout::TND}},
-        {"BSH_NBSD", {FiaLayout::BSH, FiaLayout::NBSD}},   {"BSND_NBSD", {FiaLayout::BSND, FiaLayout::NBSD}},
-        {"BNSD_NBSD", {FiaLayout::BNSD, FiaLayout::NBSD}}, {"TND_NTD", {FiaLayout::TND, FiaLayout::NTD}},
-        {"NTD_TND", {FiaLayout::NTD, FiaLayout::TND}},     {"BNSD_BSND", {FiaLayout::BNSD, FiaLayout::BSND}},
-        {"BSND_BNSD", {FiaLayout::BSND, FiaLayout::BNSD}}, {"BSH_BNSD", {FiaLayout::BSH, FiaLayout::BNSD}},
-        {"NTD", {FiaLayout::NTD, FiaLayout::NTD}}};
+        {"BSH", {FiaLayout::BSH, FiaLayout::BSH}}, {"BSND", {FiaLayout::BSND, FiaLayout::BSND}}, {"BNSD", {FiaLayout::BNSD, FiaLayout::BNSD}}, {"TND", {FiaLayout::TND, FiaLayout::TND}}, {"BSH_NBSD", {FiaLayout::BSH, FiaLayout::NBSD}}, {"BSND_NBSD", {FiaLayout::BSND, FiaLayout::NBSD}}, {"BNSD_NBSD", {FiaLayout::BNSD, FiaLayout::NBSD}}, {"TND_NTD", {FiaLayout::TND, FiaLayout::NTD}}, {"NTD_TND", {FiaLayout::NTD, FiaLayout::TND}}, {"BNSD_BSND", {FiaLayout::BNSD, FiaLayout::BSND}}, {"BSND_BNSD", {FiaLayout::BSND, FiaLayout::BNSD}}, {"BSH_BNSD", {FiaLayout::BSH, FiaLayout::BNSD}}, {"NTD", {FiaLayout::NTD, FiaLayout::NTD}}};
 
     std::string layout(opParamInfo_.layOut);
     auto it = layoutMap.find(layout);
@@ -1079,8 +1249,8 @@ ge::graphStatus FiaInfoParser::GetQueryAndOutLayout()
         outLayout_ = it->second.second;
     } else {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "input_layout", layout.c_str(),
-            "Input layout must be within the range {BSH, BSND, BNSD, TND, BSH_NBSD, BSND_NBSD, "
-            "BNSD_NBSD, TND_NTD, NTD_TND, BNSD_BSND, BSND_BNSD, BSH_BNSD, NTD}");
+                                              "Input layout must be within the range {BSH, BSND, BNSD, TND, BSH_NBSD, BSND_NBSD, "
+                                              "BNSD_NBSD, TND_NTD, NTD_TND, BNSD_BSND, BSND_BNSD, BSH_BNSD, NTD}");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -1092,7 +1262,7 @@ ge::graphStatus FiaInfoParser::GetN1Size()
     int32_t numHeads = *(opParamInfo_.numHeads);
     if (numHeads <= 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "num_heads", std::to_string(numHeads).c_str(),
-            "The value of num_heads must be greater than 0");
+                                              "The value of num_heads must be greater than 0");
         return ge::GRAPH_FAILED;
     }
     n1Size_ = static_cast<uint32_t>(numHeads);
@@ -1105,7 +1275,7 @@ ge::graphStatus FiaInfoParser::GetN2Size()
     int32_t kvHeadNums = *(opParamInfo_.kvHeadNums);
     if (kvHeadNums < 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "num_key_value_heads", std::to_string(kvHeadNums).c_str(),
-            "The value of num_key_value_heads must be greater than or equal to 0");
+                                              "The value of num_key_value_heads must be greater than or equal to 0");
         return ge::GRAPH_FAILED;
     }
     n2Size_ = (kvHeadNums == 0) ? n1Size_ : static_cast<uint32_t>(kvHeadNums);
@@ -1126,9 +1296,9 @@ ge::graphStatus FiaInfoParser::GetGSize()
     // 获取G基准值
     if (n1Size_ % n2Size_ != 0U) {
         std::string reason = "The value of num_heads must be a multiple of num_key_value_heads(" +
-            std::to_string(n2Size_) + ")";
+                             std::to_string(n2Size_) + ")";
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "num_heads", std::to_string(n1Size_).c_str(),
-            reason.c_str());
+                                              reason.c_str());
         return ge::GRAPH_FAILED;
     }
     gSize_ = n1Size_ / n2Size_;
@@ -1149,7 +1319,7 @@ ge::graphStatus FiaInfoParser::GetAttenMaskSparse9Info()
         } else {
             std::string maskDimStr = std::to_string(maskDimNum) + "D";
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "atten_mask", maskDimStr.c_str(),
-                "The shape dim of atten_mask must be 1 when the layout is TND or NTD");
+                                                     "The shape dim of atten_mask must be 1 when the layout is TND or NTD");
         }
     } else {
         if (maskDimNum == 3U) {
@@ -1159,7 +1329,7 @@ ge::graphStatus FiaInfoParser::GetAttenMaskSparse9Info()
         } else {
             std::string maskDimStr3 = std::to_string(maskDimNum) + "D";
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "atten_mask", maskDimStr3.c_str(),
-                "The shape dim of atten_mask must be 3 when the layout is not TND or NTD");
+                                                     "The shape dim of atten_mask must be 3 when the layout is not TND or NTD");
         }
     }
     return ge::GRAPH_SUCCESS;
@@ -1195,8 +1365,8 @@ ge::graphStatus FiaInfoParser::GetAntiQuantInfo()
         if (systemPrefixFlag_) {
             if (tmpAntiquant.GetDimNum() != 5) {
                 OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "antiquant",
-                    std::to_string(tmpAntiquant.GetDimNum()).c_str(),
-                    "The shape dim of antiquant must be 5 when per-token-group mode is enabled");
+                                                         std::to_string(tmpAntiquant.GetDimNum()).c_str(),
+                                                         "The shape dim of antiquant must be 5 when per-token-group mode is enabled");
                 return ge::GRAPH_FAILED;
             }
             antiquantParaSeqSize_ = tmpAntiquant.GetDim(3);
@@ -1204,16 +1374,16 @@ ge::graphStatus FiaInfoParser::GetAntiQuantInfo()
     } else if (tmpAntiquantMode == 1) {
         if (tmpAntiquant.GetDimNum() != 2 && tmpAntiquant.GetDimNum() != 3) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "antiquant",
-                std::to_string(tmpAntiquant.GetDimNum()).c_str(),
-                "The shape dim of antiquant must be 2 or 3 when per-token mode is enabled");
+                                                     std::to_string(tmpAntiquant.GetDimNum()).c_str(),
+                                                     "The shape dim of antiquant must be 2 or 3 when per-token mode is enabled");
             return ge::GRAPH_FAILED;
         }
         antiquantParaSeqSize_ = tmpAntiquant.GetDimNum() == 3U ? tmpAntiquant.GetDim(2) : tmpAntiquant.GetDim(1);
     } else if (tmpAntiquantMode == 3) {
         if (tmpAntiquant.GetDimNum() != 3) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "antiquant",
-                std::to_string(tmpAntiquant.GetDimNum()).c_str(),
-                "The shape dim of antiquant must be 3 when per-token-head mode is enabled");
+                                                     std::to_string(tmpAntiquant.GetDimNum()).c_str(),
+                                                     "The shape dim of antiquant must be 3 when per-token-head mode is enabled");
             return ge::GRAPH_FAILED;
         }
         antiquantParaSeqSize_ = tmpAntiquant.GetDim(2);
@@ -1250,7 +1420,7 @@ ge::graphStatus FiaInfoParser::GetAttenMaskInfo()
         } else {
             std::string reason = "The shape dim of atten_mask must be within the range 2/3/4";
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "atten_mask",
-                std::to_string(maskDimNum).c_str(), reason.c_str());
+                                                     std::to_string(maskDimNum).c_str(), reason.c_str());
         }
         if (*opParamInfo_.sparseMode == 0U || *opParamInfo_.sparseMode == 1U) {
             attenMaskStride_ = maskTensor->GetStorageShape().GetDim(maskTensor->GetStorageShape().GetDimNum() - 1);
@@ -1305,7 +1475,7 @@ ge::graphStatus FiaInfoParser::GetPseShiftFlag()
         pseType_ = *opParamInfo_.pseType;
         if (pseType_ != static_cast<int64_t>(IfaPseType::PSE_OUTER_MUL_ADD_TYPE)) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "pse_type", std::to_string(pseType_).c_str(),
-                "The value of pse_type must be 0");
+                                                  "The value of pse_type must be 0");
             return ge::GRAPH_FAILED;
         }
     }
@@ -1349,7 +1519,7 @@ ge::graphStatus FiaInfoParser::GetSystemPrefix()
             if (prefixShape != opParamInfo_.actualSharedPrefixLen.tensor->GetStorageShape()) {
                 std::string reason = "The shape of actual_shared_prefix_len must be {1} when system prefix is enabled";
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "actual_shared_prefix_len",
-                    ToString(opParamInfo_.actualSharedPrefixLen.tensor->GetStorageShape()).c_str(), reason.c_str());
+                                                      ToString(opParamInfo_.actualSharedPrefixLen.tensor->GetStorageShape()).c_str(), reason.c_str());
                 return ge::GRAPH_FAILED;
             }
             if (opParamInfo_.actualSharedPrefixLen.tensor->GetData<int64_t>() != nullptr) {
@@ -1466,8 +1636,8 @@ ge::graphStatus FiaInfoParser::GetFullQuantMode()
         if (*opParamInfo_.queryQuantMode == 7 && *opParamInfo_.keyAntiquantMode == 7 &&
             *opParamInfo_.valueAntiquantMode == 7) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "QuantMode",
-                std::to_string(*opParamInfo_.queryQuantMode).c_str(),
-                "In the fullquant scenario, per-block(QuantMode == 7) is not supported");
+                                                  std::to_string(*opParamInfo_.queryQuantMode).c_str(),
+                                                  "In the fullquant scenario, per-block(QuantMode == 7) is not supported");
             return ge::GRAPH_FAILED;
         } else if (*opParamInfo_.queryQuantMode == 6 && *opParamInfo_.keyAntiquantMode == 6 &&
                    *opParamInfo_.valueAntiquantMode == 8) {
@@ -1489,10 +1659,14 @@ ge::graphStatus FiaInfoParser::GetFullQuantMode()
 TilingKeyLayout FiaInfoParser::MapStringToLayout(FiaLayout &layoutString) const
 {
     const std::map<FiaLayout, TilingKeyLayout> layoutMap = {
-        {FiaLayout::BSH, TilingKeyLayout::BSH_BSND}, {FiaLayout::BSND, TilingKeyLayout::BSH_BSND},
-        {FiaLayout::BNSD, TilingKeyLayout::BNSD},    {FiaLayout::NZ, TilingKeyLayout::NZ},
-        {FiaLayout::TND, TilingKeyLayout::TND},      {FiaLayout::NBSD, TilingKeyLayout::NBSD},
-        {FiaLayout::NTD, TilingKeyLayout::NTD},      {FiaLayout::BnBsH, TilingKeyLayout::BSH_BSND},
+        {FiaLayout::BSH, TilingKeyLayout::BSH_BSND},
+        {FiaLayout::BSND, TilingKeyLayout::BSH_BSND},
+        {FiaLayout::BNSD, TilingKeyLayout::BNSD},
+        {FiaLayout::NZ, TilingKeyLayout::NZ},
+        {FiaLayout::TND, TilingKeyLayout::TND},
+        {FiaLayout::NBSD, TilingKeyLayout::NBSD},
+        {FiaLayout::NTD, TilingKeyLayout::NTD},
+        {FiaLayout::BnBsH, TilingKeyLayout::BSH_BSND},
         {FiaLayout::BnNBsD, TilingKeyLayout::BNSD},
     };
 
@@ -1680,7 +1854,9 @@ ge::graphStatus FiaInfoParser::Parse(FiaTilingInfo &fiaInfo)
     if (ge::GRAPH_SUCCESS != GetQueryAndOutLayout() || ge::GRAPH_SUCCESS != GetKvLayout()) {
         return ge::GRAPH_FAILED;
     }
-    GetKvStrideValues();
+    if (ge::GRAPH_SUCCESS != GetKvStrideValues()) {
+        return ge::GRAPH_FAILED;
+    }
     if (ge::GRAPH_SUCCESS != GetEmptyTensorFlag()) {
         return ge::GRAPH_FAILED;
     }

@@ -577,11 +577,7 @@ struct OffsetCalculatorImpl<FORMAT, FormatCategory::GM_KV_PA_BNBD, ACTLEN_T> {
                                 uint32_t maxblockNumPerBatch, uint64_t bn2Stride = 0, uint64_t n2Stride = 0)
     {
         blockTableParser.Init(blockTableGm, maxblockNumPerBatch);
-#if ((__CCE_AICORE__ == 310) || (defined __DAV_310R6__))
         gmLayout.MakeLayout(n2, blockSize, d, bn2Stride, n2Stride);
-#else
-        gmLayout.MakeLayout(n2, blockSize, d);
-#endif
     }
 
     __aicore__ inline uint64_t GetOffset(uint32_t bIdx, uint32_t n2Idx, uint32_t s2Idx, uint32_t dIdx)
@@ -645,11 +641,7 @@ struct OffsetCalculatorImpl<FORMAT, FormatCategory::GM_KV_PA_NZ, ACTLEN_T> {
                                 uint64_t bn2Stride = 0, uint64_t n2Stride = 0)
     {
         blockTableParser.Init(blockTableGm, maxblockNumPerBatch);
-#if ((__CCE_AICORE__ == 310) || (defined __DAV_310R6__))
         gmLayout.MakeLayout(n2, blockSize, d1, d0, bn2Stride, n2Stride);
-#else
-        gmLayout.MakeLayout(n2, blockSize, d1, d0);
-#endif
     }
 
     __aicore__ inline uint64_t GetOffset(uint32_t bIdx, uint32_t n2Idx, uint32_t s2Idx, uint32_t dIdx)

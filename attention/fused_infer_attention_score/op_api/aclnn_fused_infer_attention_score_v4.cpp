@@ -204,7 +204,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4GetWorkspaceSize(
     const aclTensor *tempTensor = nullptr;
     FusedInferAttentionScoreProcessSoftmaxLse(softmaxLseFlag, softmaxLse, tempTensor, placeHolder);
 
-    aclnnStatus ret = InnerFusedInferAttentionScoreGetWorkspaceSize(
+    aclnnStatus ret = InnerFusedInferAttentionScoreV4GetWorkspaceSize(
         query, tensorListKey, tensorListValue, pseShiftOptional, attenMaskOptional, actualSeqLengthsOptional,
         actualSeqLengthsKvOptional, deqScale1Optional, quantScale1Optional, deqScale2Optional, quantScale2Optional,
         quantOffset2Optional, antiquantScaleOptional, antiquantOffsetOptional, blockTableOptional,
