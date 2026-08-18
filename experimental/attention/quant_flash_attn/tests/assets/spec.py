@@ -30,11 +30,56 @@ def load_impl_module(stem):
 golden_module = load_impl_module("golden")
 inputs_module = load_impl_module("inputs")
 compare_module = load_impl_module("compare")
+graph_module = load_impl_module("graph")
 
 
 class QfaMxfp4Spec:
     """quant_flash_attn (MXFP4) 测试规范."""
 
+    golden = golden_module.cpu_qfa_mxfp4
+    customize_inputs = inputs_module.generate_qfa_mxfp4_inputs
+    compare = compare_module.compare
+
+    torch_graph = graph_module.QuantFlashAttnMxfp4AclGraph
+
+    tolerance = {
+        "bfloat16": {
+            "standard": "stat_rel_err",
+            "rtol": 0.0078125,
+            "ptol": 0.005,
+            "atol": 0.0001,
+        },
+        "float16": {
+            "standard": "stat_rel_err",
+            "rtol": 0.005,
+            "ptol": 0.005,
+            "atol": 0.000025,
+        },
+    }
+
+
+class QfaMxfp4MetadataSpec:
+    golden = golden_module.cpu_qfa_mxfp4
+    customize_inputs = inputs_module.generate_qfa_mxfp4_inputs
+    compare = compare_module.compare
+
+    tolerance = {
+        "bfloat16": {
+            "standard": "stat_rel_err",
+            "rtol": 0.0078125,
+            "ptol": 0.005,
+            "atol": 0.0001,
+        },
+        "float16": {
+            "standard": "stat_rel_err",
+            "rtol": 0.005,
+            "ptol": 0.005,
+            "atol": 0.000025,
+        },
+    }
+
+
+class QfaMxfp4MainSpec:
     golden = golden_module.cpu_qfa_mxfp4
     customize_inputs = inputs_module.generate_qfa_mxfp4_inputs
     compare = compare_module.compare
@@ -57,4 +102,6 @@ class QfaMxfp4Spec:
 
 __spec__ = {
     "qfa_mxfp4_wrapper.npu_qfa_mxfp4": "QfaMxfp4Spec",
+    "qfa_mxfp4_metadata_wrapper.run_metadata": "QfaMxfp4MetadataSpec",
+    "qfa_mxfp4_main_wrapper.run_main": "QfaMxfp4MainSpec",
 }

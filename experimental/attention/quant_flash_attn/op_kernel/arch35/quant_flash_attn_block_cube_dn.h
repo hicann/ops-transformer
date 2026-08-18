@@ -12,8 +12,8 @@
  * \file quant_flash_atten_block_cube_dn.h
  * \brief
  */
-#ifndef QUANT_FLASH_ATTN_NOQUANT_BLOCK_CUBE_DN_H_
-#define QUANT_FLASH_ATTN_NOQUANT_BLOCK_CUBE_DN_H_
+#ifndef QUANT_FLASH_ATTN_BLOCK_CUBE_DN_H_
+#define QUANT_FLASH_ATTN_BLOCK_CUBE_DN_H_
 
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_vec_intf.h"
@@ -56,9 +56,9 @@ __aicore__ inline constexpr GmFormat GetKVGmFormat()
             return GmFormat::PA_BnNBsD;
         }
     } else {
-        static_assert((LAYOUT_KV == QFA_LAYOUT::BSND) || (LAYOUT_KV == QFA_LAYOUT::BNSD) ||
-                          (LAYOUT_KV == QFA_LAYOUT::TND),
-                      "Get Key or Value GmFormat fail, LAYOUT_KV is incorrect when KV Continuous");
+        static_assert(
+            (LAYOUT_KV == QFA_LAYOUT::BSND) || (LAYOUT_KV == QFA_LAYOUT::BNSD) || (LAYOUT_KV == QFA_LAYOUT::TND),
+            "Get Key or Value GmFormat fail, LAYOUT_KV is incorrect when KV Continuous");
         if constexpr (LAYOUT_KV == QFA_LAYOUT::BSND) {
             return GmFormat::BSND;
         } else if constexpr (LAYOUT_KV == QFA_LAYOUT::BNSD) {
@@ -93,9 +93,9 @@ __aicore__ inline constexpr GmFormat GetKeyScaleGmFormat()
             return GmFormat::PA_BnNBsD;
         }
     } else {
-        static_assert((LAYOUT_KV == QFA_LAYOUT::BSND) || (LAYOUT_KV == QFA_LAYOUT::BNSD) ||
-                          (LAYOUT_KV == QFA_LAYOUT::TND),
-                      "Get Key DeScale GmFormat fail, LAYOUT_KV is incorrect when KV Continuous");
+        static_assert(
+            (LAYOUT_KV == QFA_LAYOUT::BSND) || (LAYOUT_KV == QFA_LAYOUT::BNSD) || (LAYOUT_KV == QFA_LAYOUT::TND),
+            "Get Key DeScale GmFormat fail, LAYOUT_KV is incorrect when KV Continuous");
         if constexpr (LAYOUT_KV == QFA_LAYOUT::BSND) {
             return GmFormat::BSND;
         } else if constexpr (LAYOUT_KV == QFA_LAYOUT::BNSD) {
@@ -118,9 +118,9 @@ __aicore__ inline constexpr GmFormat GetValueScaleGmFormat()
             return GmFormat::PA_BnNBsD;
         }
     } else {
-        static_assert((LAYOUT_KV == QFA_LAYOUT::BSND) || (LAYOUT_KV == QFA_LAYOUT::BNSD) ||
-                          (LAYOUT_KV == QFA_LAYOUT::TND),
-                      "Get Key DeScale GmFormat fail, LAYOUT_KV is incorrect when KV Continuous");
+        static_assert(
+            (LAYOUT_KV == QFA_LAYOUT::BSND) || (LAYOUT_KV == QFA_LAYOUT::BNSD) || (LAYOUT_KV == QFA_LAYOUT::TND),
+            "Get Key DeScale GmFormat fail, LAYOUT_KV is incorrect when KV Continuous");
         if constexpr (LAYOUT_KV == QFA_LAYOUT::BSND) {
             return GmFormat::BSND;
         } else if constexpr (LAYOUT_KV == QFA_LAYOUT::BNSD) {
@@ -179,8 +179,8 @@ private:
     static constexpr bool KV_IS_TND = IS_TND<LAYOUT_KV>();
     using COMPUTE_T = float;
     using DATA_T = uint8_t;
-    static constexpr uint32_t VEC0 = 0;
-    static constexpr uint32_t VEC1 = 1;
+    static constexpr uint8_t VEC0 = 0;
+    static constexpr uint8_t VEC1 = 1;
 
     const ConstInfo &constInfo;
     const SeqLensTool<LAYOUT_Q, SEQLEN_T> &qSeqLensTool;
@@ -283,7 +283,9 @@ private:
 public:
     __aicore__ inline QuantFlashAttnBlockCubeDn(ConstInfo &constInfo, SeqLensTool<LAYOUT_Q, SEQLEN_T> &qSeqLensTool,
                                                 SeqLensTool<LAYOUT_KV, SEQLEN_T> &kvSeqLensTool)
-        : constInfo(constInfo), qSeqLensTool(qSeqLensTool), kvSeqLensTool(kvSeqLensTool){};
+        : constInfo(constInfo),
+          qSeqLensTool(qSeqLensTool),
+          kvSeqLensTool(kvSeqLensTool){};
 
     __aicore__ inline void InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
                                      __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *dequantScaleKey,
@@ -304,8 +306,10 @@ public:
                          constInfo.dSize / MXFP_GROUP_SIZE, qSeqLensTool, queryScaleGm, dequantScaleQuery);
         InitKScaleBuffer(constInfo.bSize, constInfo.s2Size, constInfo.n2Size, constInfo.blockSize,
                          constInfo.dSize / MXFP_GROUP_SIZE, kvSeqLensTool, keyScaleGm, dequantScaleKey);
-        InitVScaleBuffer(constInfo.bSize, (constInfo.s2Size + 63) / 64 * 64 / (2 * MXFP_GROUP_SIZE), constInfo.n2Size,
-                         constInfo.blockSize, 2 * constInfo.dSize, kvSeqLensTool, valueScaleGm, dequantScaleValue);
+
+        InitVScaleBuffer(
+            constInfo.bSize, static_cast<uint32_t>((constInfo.maxSeqlenKv + 63) / 64 * 64 / (2 * MXFP_GROUP_SIZE)),
+            constInfo.n2Size, constInfo.blockSize, 2 * constInfo.dSize, kvSeqLensTool, valueScaleGm, dequantScaleValue);
     }
 
     __aicore__ inline void InitTensors()
@@ -369,10 +373,7 @@ public:
         peerGlobalMaxUB = LocalTensor<half>(TPosition::VECCALC, 229888, 128 * 4);
     }
 
-    __aicore__ inline void ReleaseTensors()
-    {
-        FreeEventID();
-    }
+    __aicore__ inline void ReleaseTensors() { FreeEventID(); }
 
     __aicore__ inline void ComputeMm1(const RunInfo &info)
     {
@@ -464,6 +465,9 @@ public:
             }
             {
                 WaitFlag<HardEvent::M_MTE1>(PV_L0AB_EVENT0 + pvL0abBufId);
+                if (info.isLastS2Loop) {
+                    InitL0BufferForReduceSum();
+                }
                 LoadPToL0(info);
                 LoadVToL0(info);
                 SetFlag<HardEvent::MTE1_M>(PV_L0AB_EVENT0 + pvL0abBufId);
@@ -480,9 +484,6 @@ public:
         }
         SetFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + kvBufId);
         kvBufId = (kvBufId + 1) % L1_KV_BUFCNT;
-        if (info.isLastSecondS2Loop) {
-            InitL0BufferForReduceSum();
-        }
     }
 
     __aicore__ inline void CopyGMaxL1ToUb(const RunInfo &runInfo)
@@ -491,13 +492,14 @@ public:
         LocalTensor<half> localGlobalMax1 = localGlobalMaxL1[runInfo.tileMaxIdx * 256 + L1_SINGLE_GLOBAL_MAX_SIZE];
         LocalTensor<half> peerGlobalMax = peerGlobalMaxUB[runInfo.tileMaxIdx * 128];
 
+        DataCopyParams intriParams;
+        intriParams.blockCount = 1;
+        intriParams.blockLen = 8;
+        intriParams.srcGap = 0;
+        intriParams.dstGap = 0;
 
-        __cbuf__ half *localGlobalMax0Cbuf = (__cbuf__ half *)localGlobalMax0.GetPhyAddr();
-        __cbuf__ half *localGlobalMax1Cbuf = (__cbuf__ half *)localGlobalMax1.GetPhyAddr();
-        __ubuf__ half *peerGlobalMaxUBUbuf = (__ubuf__ half *)peerGlobalMax.GetPhyAddr();
-
-        DataCopyL1ToUB(peerGlobalMaxUBUbuf, localGlobalMax0Cbuf, VEC0, 1, 8, 0, 0);
-        DataCopyL1ToUB(peerGlobalMaxUBUbuf, localGlobalMax1Cbuf, VEC1, 1, 8, 0, 0);
+        DataCopyL1ToUB<half, VEC0>(peerGlobalMax, localGlobalMax0, intriParams);
+        DataCopyL1ToUB<half, VEC1>(peerGlobalMax, localGlobalMax1, intriParams);
     }
 
 private:
@@ -621,20 +623,21 @@ private:
 
     __aicore__ inline void InitL0BufferForReduceSum()
     {
-        WaitFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + kvBufId);
+        uint32_t tmpBufId = (kvBufId + 3) % 4;
+        WaitFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + tmpBufId);
 
         InitConstValueParams<uint16_t> vL1InitParams(1, static_cast<uint16_t>(PV_L0A_SIZE / 32), 0, 0x6666);
-        uint64_t l1BaseOffset = kvBufId * (L1_KV_SIZE / sizeof(DATA_T));
+        uint32_t l1BaseOffset = tmpBufId * (L1_KV_SIZE / sizeof(DATA_T));
         Fill(kvL1Tensor[l1BaseOffset].template ReinterpretCast<uint16_t>(), vL1InitParams);
 
         PipeBarrier<PIPE_MTE2>();
 
         InitConstValueParams<uint16_t> vScaleL1InitParams(1, static_cast<uint16_t>(V_SCALE_L0A_SIZE / 32), 0, 0x7d7d);
-        uint32_t vScaleL1Offset = kvBufId * (L1_KV_DESCALE_SIZE / sizeof(SCALE_T));
+        uint32_t vScaleL1Offset = tmpBufId * (L1_KV_DESCALE_SIZE / sizeof(SCALE_T));
         Fill(kvDescaleL1Tensor[vScaleL1Offset].template ReinterpretCast<uint16_t>(), vScaleL1InitParams);
 
-        SetFlag<HardEvent::MTE2_MTE1>(KV_EVENT0 + kvBufId);
-        WaitFlag<HardEvent::MTE2_MTE1>(KV_EVENT0 + kvBufId);
+        SetFlag<HardEvent::MTE2_MTE1>(KV_EVENT0 + tmpBufId);
+        WaitFlag<HardEvent::MTE2_MTE1>(KV_EVENT0 + tmpBufId);
 
         LoadData2DParamsV2 loadData2DParamsA;
         loadData2DParamsA.mStartPosition = 0;
@@ -659,8 +662,8 @@ private:
                  kvL1Tensor[l1BaseOffset].ReinterpretCast<QUANT_T>(), kvDescaleL1Tensor[vScaleL1Offset],
                  loadData2DParamsA, loadData2DMXParamsA);
         SetFlag<HardEvent::M_MTE1>(PV_L0AB_EVENT0 + pvL0abBufId);
-        SetFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + kvBufId);
-        kvBufId = (kvBufId + 1) % L1_KV_BUFCNT;
+        SetFlag<HardEvent::MTE1_MTE2>(KV_EVENT0 + tmpBufId);
+        tmpBufId = (tmpBufId + 1) % L1_KV_BUFCNT;
     }
 
     __aicore__ inline void CopyQGmToL1(const RunInfo &info)
@@ -868,7 +871,7 @@ private:
         LoadData2DMxParams load2DMxParamsB;
         load2DMxParamsB.xStartPosition = 0;
         load2DMxParamsB.yStartPosition = 0;
-        load2DMxParamsB.xStep = constInfo.dSize / 16;
+        load2DMxParamsB.xStep = info.actMSizeAlign128 / 16;
         load2DMxParamsB.yStep = (info.actSingleLoopS2SizeAlign64 + 63) / 64;
         load2DMxParamsB.srcStride =
             5; // S2BaseSIze=256，5由s2BaseSize / 64 + 1得到，1为解UB Bank冲突预留的一个Block，一次全拷过来

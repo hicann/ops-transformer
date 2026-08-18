@@ -29,13 +29,12 @@ __golden__ = {"e2e": {"qfa_mxfp4_wrapper.npu_qfa_mxfp4": "cpu_qfa_mxfp4"}}
 
 
 def _apply_golden_globals(attrs):
-    """把 case attributes 注入 golden 模块全局变量 (与 inputs.py 一致)."""
     for k, v in attrs.items():
         setattr(golden_mod, k, v)
 
 
 def cpu_qfa_mxfp4(
-    # ========== Tensor inputs (TTK 占位, 真实数据从 golden_mod._cached_data 取) ==========
+    # ========== Tensor inputs (TTK 占位, 真实数据由 golden_mod.generate_data 重新生成) ==========
     q: torch.Tensor,
     k: torch.Tensor,
     v: torch.Tensor,
@@ -103,11 +102,6 @@ def cpu_qfa_mxfp4(
     softmax_lse_dtype: str = None,
     **kwargs,
 ):
-    """CPU golden: 从 golden_mod._cached_data 取真实 MXFP4 数据, 调 cpu_mxfp4_golden 算参考输出.
-
-    参数签名须与 npu_qfa_mxfp4 wrapper 保持一致 (TTK 按 wrapper 签名透传位置参数).
-    """
-    # 注入 golden 全局变量 (cpu_mxfp4_golden 读这些)
     _apply_golden_globals(
         {
             "B": B,
@@ -139,13 +133,12 @@ def cpu_qfa_mxfp4(
             "DATA_RANGE_Q": data_range_q,
             "DATA_RANGE_K": data_range_k,
             "DATA_RANGE_V": data_range_v,
-            "ACT_SEQ_LENS_Q": list(act_seq_lens_q),
-            "ACT_SEQ_LENS_KV": list(act_seq_lens_kv),
+            "ACT_SEQ_LENS_Q": list(act_seq_lens_q) if act_seq_lens_q else [],
+            "ACT_SEQ_LENS_KV": list(act_seq_lens_kv) if act_seq_lens_kv else [],
             "MAX_SEQLEN_Q": max_seqlen_q,
             "MAX_SEQLEN_KV": max_seqlen_kv,
             "CU_SEQLENS_Q": list(cu_seqlens_q) if cu_seqlens_q else [],
             "CU_SEQLENS_KV": list(cu_seqlens_kv) if cu_seqlens_kv else [],
-            # 可选 tensor 入参 (shape 为空 -> golden 传 None)
             "BLOCK_TABLE_SHAPE": list(block_table_shape) if block_table_shape else [],
             "BLOCK_TABLE_DTYPE": block_table_dtype,
             "P_SCALE_VALUE": p_scale_value,
@@ -158,7 +151,6 @@ def cpu_qfa_mxfp4(
             "ATTN_MASK_SHAPE": list(attn_mask_shape) if attn_mask_shape else [],
             "ATTN_MASK_DTYPE": attn_mask_dtype,
             "ATTN_MASK_DATARANGE": attn_mask_datarange,
-            # dtype 透传 (表格不传 -> None, golden 侧用默认值)
             "Q_DESCALE_DTYPE": q_descale_dtype,
             "K_DESCALE_DTYPE": k_descale_dtype,
             "V_DESCALE_DTYPE": v_descale_dtype,
@@ -170,13 +162,16 @@ def cpu_qfa_mxfp4(
         }
     )
 
-    cached = getattr(golden_mod, "_cached_data", None)
-    if cached is None:
-        logger.warning("[GOLDEN] _cached_data 为空, 重新生成数据")
-        cached = golden_mod.generate_data()
-        golden_mod._cached_data = cached
-
-    cpu_out, cpu_lse = golden_mod.cpu_mxfp4_golden(cached)
+    golden_mod._inject_physical_s_override(q, v, input_layout, layout_kv)
+    try:
+        try:
+            data_dict = golden_mod.generate_data()
+        except Exception:
+            golden_mod._clear_physical_s_override()
+            data_dict = golden_mod.generate_data()
+    finally:
+        golden_mod._clear_physical_s_override()
+    cpu_out, cpu_lse = golden_mod.cpu_mxfp4_golden(data_dict)
 
     if enable_lse and cpu_lse is not None:
         return [cpu_out, cpu_lse]

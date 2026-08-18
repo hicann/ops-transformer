@@ -9,12 +9,6 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
-"""
-python3 gen_csv_from_excel.py [--excel B008QFA_红线用例.xlsx]
-                              [--sheet mxfp4]
-                              [--output qfa_mxfp4.csv]
-
-"""
 
 import argparse
 import csv
@@ -27,7 +21,12 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-API_NAME = "qfa_mxfp4_wrapper.npu_qfa_mxfp4"
+# 3 个 csv 的 api_name 和 testcase_name 后缀 (对齐参考工程 CSV_PROFILES)
+CSV_PROFILES = [
+    ("qfa_mxfp4.csv", "qfa_mxfp4_wrapper.npu_qfa_mxfp4", ""),
+    ("qfa_mxfp4_metadata.csv", "qfa_mxfp4_metadata_wrapper.run_metadata", "_metadata"),
+    ("qfa_mxfp4_main.csv", "qfa_mxfp4_main_wrapper.run_main", "_main"),
+]
 
 # 字段 key -> Excel 表头名 (列位置无关, 启动时按表头名动态查列号)
 # 注意: Excel C-I 列 (B/Q_N/KV_N/Q_S/KV_S/D/G) 是给开发人员看的汇总信息, 不读取;
@@ -194,10 +193,12 @@ def _build_col_map(ws):
     return col_map
 
 
-def excel_row_to_csv_row(ws, row_idx, col_map):
+def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
     """读 Excel 一行 -> CSV 行 (10 列).
 
     col_map: _build_col_map 返回的 字段key -> 列号 映射 (含可选精度列).
+    api_name: 本行使用的 wrapper api 名 (qfa_mxfp4_wrapper.npu_qfa_mxfp4 / qfa_mxfp4_metadata_wrapper.run_metadata / qfa_mxfp4_main_wrapper.run_main)
+    testcase_suffix: testcase_name 后缀 ("", "_metadata", "_main")
     """
 
     def g(key):
@@ -207,7 +208,7 @@ def excel_row_to_csv_row(ws, row_idx, col_map):
         col = col_map.get(key)
         return ws.cell(row=row_idx, column=col).value if col is not None else None
 
-    name = str(g("name")).strip()
+    name = str(g("name")).strip() + testcase_suffix
     B = int(g("batch_size"))
     N_q = int(g("num_heads_q"))
     N_kv = int(g("num_heads_kv"))
@@ -252,15 +253,13 @@ def excel_row_to_csv_row(ws, row_idx, col_map):
     q_descale_shape = _parse_shape(g("q_descale_shape"))
     k_descale_shape = _parse_shape(g("k_descale_shape"))
 
-    # v_descale: golden 重算校验, 不一致则用 golden 并告警
     v_descale_excel = _parse_shape(g("v_descale_shape"))
     v_descale_golden = _compute_v_descale_shape(B, N_kv, V_D, skv, max_seqlen_kv)
     if v_descale_excel != v_descale_golden:
         print(
-            f"[WARN] {name}: Excel v_descale={v_descale_excel} 与 golden={v_descale_golden} "
-            f"不一致, 使用 golden (Excel 公式疑似用 v_shape 的 S 而非 max(seqused_kv))"
+            f"[WARN] {name}: Excel v_descale={v_descale_excel} 与 golden={v_descale_golden} 不一致, 保留 Excel 值"
         )
-    v_descale_shape = v_descale_golden
+    v_descale_shape = v_descale_excel
 
     block_table_shape = (
         0,
@@ -405,7 +404,7 @@ def excel_row_to_csv_row(ws, row_idx, col_map):
 
     return [
         name,
-        API_NAME,
+        api_name,
         tensor_view_shapes,
         tensor_dtypes,
         "",
@@ -419,18 +418,19 @@ def excel_row_to_csv_row(ws, row_idx, col_map):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Excel mxfp4 sheet -> TTK e2e CSV (批量转换交付件)"
+        description="Excel mxfp4 sheet -> TTK e2e CSV (批量转换交付件, 输出 3 个 csv: e2e/metadata/main)"
     )
     parser.add_argument("--excel", default="B008QFA_红线用例.xlsx", help="Excel 路径")
     parser.add_argument("--sheet", default="mxfp4", help="sheet 名 (默认 mxfp4)")
-    parser.add_argument("--output", default="qfa_mxfp4.csv", help="输出 CSV 路径")
+    parser.add_argument(
+        "--output",
+        default=None,
+        help="输出 CSV 路径 (已废弃, 现固定输出 3 个 csv: qfa_mxfp4.csv / qfa_mxfp4_metadata.csv / qfa_mxfp4_main.csv)",
+    )
     args = parser.parse_args()
 
     excel_path = (
         args.excel if os.path.isabs(args.excel) else os.path.join(_HERE, args.excel)
-    )
-    out_path = (
-        args.output if os.path.isabs(args.output) else os.path.join(_HERE, args.output)
     )
 
     wb = openpyxl.load_workbook(excel_path, data_only=True)
@@ -462,21 +462,30 @@ def main():
         "precision_tolerances",
         "absolute_precision",
     ]
-    rows = []
     name_col = col_map["name"]
-    for r in range(2, ws.max_row + 1):
-        if ws.cell(row=r, column=name_col).value is None:
-            continue
-        rows.append(excel_row_to_csv_row(ws, r, col_map))
-        print(f"[Excel] {rows[-1][0]}")
+    data_row_indices = [
+        r
+        for r in range(2, ws.max_row + 1)
+        if ws.cell(row=r, column=name_col).value is not None
+    ]
 
-    with open(out_path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(header)
-        for row in rows:
-            writer.writerow(row)
+    # 输出 3 个 csv (e2e / metadata / main), 每个用相同 Excel 数据但不同 api_name + 后缀
+    for fname, api_name, suffix in CSV_PROFILES:
+        out_path = os.path.join(_HERE, fname)
+        rows = []
+        for r in data_row_indices:
+            row = excel_row_to_csv_row(ws, r, col_map, api_name, suffix)
+            rows.append(row)
+            print(f"[Excel] {row[0]}")
 
-    print(f"\n生成 {len(rows)} 条用例 -> {out_path}")
+        with open(out_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            for row in rows:
+                writer.writerow(row)
+        print(f"-> wrote {out_path} ({len(rows)} cases, api_name={api_name})")
+
+    print(f"\n3 csv files written, each with {len(data_row_indices)} case rows.")
 
 
 if __name__ == "__main__":

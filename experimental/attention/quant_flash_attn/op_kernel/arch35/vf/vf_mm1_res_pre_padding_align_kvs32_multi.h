@@ -40,12 +40,11 @@ __simd_vf__ inline void mm1_res_pre_padding_align_kvs32_nulti_vf(__ubuf__ T *s, 
     uint16_t s2Idx = 0;
     // uint16_t idx2 = 0;
     RegTensor<T> padding_tensor1;
-    RegTensor<T> padding_tensor2;
     Duplicate(padding_tensor1, MIN_VALUE, mask_reg);
-    // Duplicate(padding_tensor2, MIN_VALUE, mask_reg);
+    Muls(padding_tensor1, padding_tensor1, TWO_VALE, mask_reg);
     for (s2Idx = actSingleLoopS2Size; s2Idx < actSingleLoopS2SizeAlign32 - 1; s2Idx += 2) {
         StoreAlign(s + (s2Idx * S1Base) * 2, padding_tensor1, mask_reg);
-        StoreAlign(s + (s2Idx * S1Base + 1 * S1Base) * 2, padding_tensor2, mask_reg);
+        StoreAlign(s + (s2Idx * S1Base + 1 * S1Base) * 2, padding_tensor1, mask_reg);
     }
 
     for (uint16_t idx = s2Idx; idx < actSingleLoopS2SizeAlign32; ++idx) {

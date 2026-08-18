@@ -42,9 +42,9 @@ namespace QFA_KERNEL {
 template <QFA_LAYOUT LAYOUT_OUT>
 __aicore__ inline constexpr GmFormat GetAttentionOutGmFormat()
 {
-    static_assert((LAYOUT_OUT == QFA_LAYOUT::BSND) || (LAYOUT_OUT == QFA_LAYOUT::BNSD) ||
-                      (LAYOUT_OUT == QFA_LAYOUT::TND),
-                  "Get OUT GmFormat fail, LAYOUT_OUT is incorrect");
+    static_assert(
+        (LAYOUT_OUT == QFA_LAYOUT::BSND) || (LAYOUT_OUT == QFA_LAYOUT::BNSD) || (LAYOUT_OUT == QFA_LAYOUT::TND),
+        "Get OUT GmFormat fail, LAYOUT_OUT is incorrect");
     if constexpr (LAYOUT_OUT == QFA_LAYOUT::BSND) {
         return GmFormat::BSNGD;
     } else if constexpr (LAYOUT_OUT == QFA_LAYOUT::BNSD) {
@@ -57,9 +57,9 @@ __aicore__ inline constexpr GmFormat GetAttentionOutGmFormat()
 template <QFA_LAYOUT LAYOUT_OUT>
 __aicore__ inline constexpr UbFormat GetOutUbFormat()
 {
-    static_assert((LAYOUT_OUT == QFA_LAYOUT::BNSD) || (LAYOUT_OUT == QFA_LAYOUT::BSND) ||
-                      (LAYOUT_OUT == QFA_LAYOUT::TND),
-                  "Get OutAttention UB GmFormat fail, LAYOUT is incorrect");
+    static_assert(
+        (LAYOUT_OUT == QFA_LAYOUT::BNSD) || (LAYOUT_OUT == QFA_LAYOUT::BSND) || (LAYOUT_OUT == QFA_LAYOUT::TND),
+        "Get OutAttention UB GmFormat fail, LAYOUT is incorrect");
     if constexpr (LAYOUT_OUT == QFA_LAYOUT::BSND || LAYOUT_OUT == QFA_LAYOUT::TND) {
         return UbFormat::S1G;
     } else if constexpr (LAYOUT_OUT == QFA_LAYOUT::BNSD) {
@@ -187,7 +187,9 @@ public:
     // 初始化 Vec Block 层
     __aicore__ inline QuantFlashAttnBlockVectorDn(ConstInfo &constInfo, SeqLensTool<LAYOUT_Q, SEQLEN_T> &qSeqLensTool,
                                                   SeqLensTool<LAYOUT_KV, SEQLEN_T> &kvSeqLensTool)
-        : constInfo(constInfo), qSeqLensTool(qSeqLensTool), kvSeqLensTool(kvSeqLensTool){};
+        : constInfo(constInfo),
+          qSeqLensTool(qSeqLensTool),
+          kvSeqLensTool(kvSeqLensTool){};
 
     __aicore__ inline void InitInput(__gm__ uint8_t *attentionOut)
     {
@@ -266,10 +268,7 @@ public:
         Mxfp4Api::InitIndexesAndDuplicateCallVF<half>(nd2nzIndexUB, localGlobalMaxUB);
     }
 
-    __aicore__ inline void ReleaseTensors()
-    {
-        FreeEventID();
-    }
+    __aicore__ inline void ReleaseTensors() { FreeEventID(); }
 
     __aicore__ inline void ComputeVec1(const RunInfo &runInfo)
     {
@@ -384,10 +383,10 @@ public:
         LocalTensor<half> localGlobalMax1 = GetLocalGlobalMaxUbByCurIdx(runInfo.tileMaxIdx);
         LocalTensor<half> localGlobalMax2 = GetPeerGlobalMaxUbByCurIdx(runInfo.tileMaxIdx);
         LocalTensor<half> softmaxMaxOld = softmaxMaxUB;
-        LocalTensor<float> urs = GetUpdateScaleByCurIdx(runInfo.updateScaleIdx);
+        LocalTensor<float> urs = GetUpdateScaleByCurIdx(runInfo.updateScaleNum);
 
         if (runInfo.s2FirstStartVecCore != constInfo.subBlockIdx && runInfo.isC2Sync) {
-            if (runInfo.curS2LoopIdx / 16 == 0) {
+            if (unlikely(runInfo.curS2LoopIdx / 16 == 0)) {
                 Mxfp4Api::computeOnlyScale<true, half, s1BaseSize>(localGlobalMax1, localGlobalMax2, softmaxMaxOld, urs,
                                                                    constInfo.subBlockIdx);
             } else {
@@ -412,7 +411,7 @@ public:
 
         WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_VEC1_RES_BUF0_FLAG);
         WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_VEC1_RES_BUF1_FLAG);
-        if (runInfo.curS2LoopIdx / 16 == 0) {
+        if (unlikely(runInfo.curS2LoopIdx / 16 == 0)) {
             Mxfp4Api::computePscale<true, half, s1BaseSize>(pscale1, pscale2, localGroupMax1, localGroupMax2,
                                                             localGlobalMax1, localGlobalMax2, softmaxMaxOld, urs,
                                                             firstLoop, secondLoop, constInfo.subBlockIdx);
@@ -439,9 +438,9 @@ public:
 
     __aicore__ inline void ComputeVec2(const RunInfo &runInfo)
     {
-        LocalTensor<float> urs = GetUpdateScaleByCurIdx(runInfo.updateScaleIdx);
+        LocalTensor<float> urs = GetUpdateScaleByCurIdx(runInfo.updateScaleNum);
 
-        if (runInfo.curS2LoopIdx / 16 == 0) {
+        if (unlikely(runInfo.curS2LoopIdx / 16 == 0)) {
             WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_ATTN_BUF_FLAG);
             Mxfp4Api::processUpdate<false>(attentionOutUB, mm2ResUB, urs, globalRowsumUB, localRowsumUB);
         } else {
@@ -508,7 +507,7 @@ public:
         int64_t tailSize = totalOutputSize - constInfo.aivIdx * singleCoreSize;
         int64_t singleInitOutputSize = tailSize < singleCoreSize ? tailSize : singleCoreSize;
 
-        if (singleInitOutputSize > 0) {
+        if (likely(singleInitOutputSize > 0)) {
             WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_INIT_OUTPUT);
             constexpr int64_t initChunkSize = INIT_OUTPUT_UB_BYTES / sizeof(OUT_T);
             LocalTensor<OUT_T> initUb = mm1ResUB.template ReinterpretCast<OUT_T>();

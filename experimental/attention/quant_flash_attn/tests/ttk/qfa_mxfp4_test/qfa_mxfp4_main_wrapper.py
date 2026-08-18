@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------------------------------------
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
-# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# This program is free software: you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
@@ -10,7 +10,6 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-import gc
 import logging
 import os
 import sys
@@ -19,7 +18,6 @@ from typing import List, Optional
 import torch
 import torch_npu
 
-# 复用 common/ 里的 golden 模块 (generate_data/cpu_mxfp4_golden/npu_mxfp4_fa + 配置区)
 _TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
@@ -28,44 +26,13 @@ from common import qfa_mxfp4_golden as golden_mod
 logger = logging.getLogger(__name__)
 
 
-# 环境变量 QFA_SKIP_GENERATE=1 时跳过 golden_mod.generate_data(),
-# 直接用 CSV/manual-data 传入的 tensor 拼装 data_dict。
-# manual-data replay (python3 -m ttk e2e --manual-data-dirs ...) 必须打开,
-# 否则 CSV 占位 tensor 是随机数据, 跑出来的结果无意义。
-_SKIP_GENERATE = os.environ.get("QFA_SKIP_GENERATE", "").lower() in ("1", "true", "yes")
-
-
 def _apply_golden_globals(attrs):
-    """把 case attributes 注入 golden 模块全局变量 (B, N_q, ...)."""
+    """把 case attributes 注入 golden 模块全局变量."""
     for k, v in attrs.items():
         setattr(golden_mod, k, v)
 
 
-def _inject_replay_qkv(q, k, v, q_descale, k_descale, v_descale):
-    """manual-data replay 优化: 把 bin 加载的 6 个 packed tensor 注入 golden_mod
-    的 _REPLAY_QKV_OVERRIDE slot。后续 generate_data() 检测到 slot 非空就跳过
-    FP32 生成 + mxfp4 量化 + rearrange (大 case 几百秒), 直接用 bin 数据;
-    其余字段 (block_table/p_scale/sinks/attn_mask/cu_seqlens/layouts/num_heads/
-    softmax_scale/fp32_bnsd) 仍按原逻辑生成, 保证参数完整性。
-
-    用完必须清空 slot, 否则会污染同进程后续 case。
-    """
-    golden_mod._REPLAY_QKV_OVERRIDE = {
-        "q": q,
-        "k": k,
-        "v": v,
-        "q_descale": q_descale,
-        "k_descale": k_descale,
-        "v_descale": v_descale,
-    }
-
-
-def _clear_replay_qkv():
-    """清空 replay slot, 避免污染同进程后续 case。"""
-    golden_mod._REPLAY_QKV_OVERRIDE = {}
-
-
-def npu_qfa_mxfp4(
+def run_main(
     # ========== Tensor inputs (TTK 占位, 真实数据由 golden_mod.generate_data 重新生成) ==========
     q: torch.Tensor,
     k: torch.Tensor,
@@ -134,19 +101,18 @@ def npu_qfa_mxfp4(
     softmax_lse_dtype: str = None,
     **kwargs,
 ):
-    # 优先级: 环境变量 GRAPH_PATH > CSV graph_path 属性 > 默认值 0
+    """重建 metadata 后调 quant_flash_attn 主算子, 返回 [atten_out, lse_out]。
+
+    分离测试入口: 验证主算子 + metadata 完整链路。
+    metadata 不跨 testcase 传递, 本函数内部重新调 metadata 算子重建。
+    """
+    torch_npu.npu.set_device(int(device_id))
+
     env_graph_path = os.environ.get("GRAPH_PATH")
     if env_graph_path is not None and env_graph_path.strip() != "":
         graph_path = int(env_graph_path)
-        logger.info(
-            "[WRAPPER] 使用环境变量 GRAPH_PATH=%d (覆盖 CSV graph_path)", graph_path
-        )
-    else:
-        logger.info(
-            "[WRAPPER] 环境变量 GRAPH_PATH 未设置, 使用 CSV graph_path=%d", graph_path
-        )
+        logger.info("[MAIN_WRAPPER] 使用环境变量 GRAPH_PATH=%d", graph_path)
 
-    # 注入 golden 全局变量 (generate_data / cpu_mxfp4_golden / npu_mxfp4_fa 都读这些)
     _apply_golden_globals(
         {
             "B": B,
@@ -154,7 +120,7 @@ def npu_qfa_mxfp4(
             "N_kv": N_kv,
             "G": G,
             "D": D,
-            "V_D": V_D,
+            "V_D": V_D if V_D is not None else D,
             "Rope_D": Rope_D,
             "INPUT_LAYOUT": input_layout,
             "LAYOUT_Q_DESCALE": layout_q_descale,
@@ -172,19 +138,18 @@ def npu_qfa_mxfp4(
             "ENABLE_MASK": enable_mask,
             "ENABLE_LSE": enable_lse,
             "INNER_PRECISE": inner_precise,
-            "DEVICE_ID": torch.npu.current_device(),
+            "DEVICE_ID": device_id,
             "GRAPH_PATH": graph_path,
             "SOFTMAX_SCALE": softmax_scale,
             "DATA_RANGE_Q": data_range_q,
             "DATA_RANGE_K": data_range_k,
             "DATA_RANGE_V": data_range_v,
-            "ACT_SEQ_LENS_Q": list(act_seq_lens_q),
-            "ACT_SEQ_LENS_KV": list(act_seq_lens_kv),
+            "ACT_SEQ_LENS_Q": list(act_seq_lens_q) if act_seq_lens_q else [],
+            "ACT_SEQ_LENS_KV": list(act_seq_lens_kv) if act_seq_lens_kv else [],
             "MAX_SEQLEN_Q": max_seqlen_q,
             "MAX_SEQLEN_KV": max_seqlen_kv,
             "CU_SEQLENS_Q": list(cu_seqlens_q) if cu_seqlens_q else [],
             "CU_SEQLENS_KV": list(cu_seqlens_kv) if cu_seqlens_kv else [],
-            # 可选 tensor 入参 (shape 为空 -> golden 传 None)
             "BLOCK_TABLE_SHAPE": list(block_table_shape) if block_table_shape else [],
             "BLOCK_TABLE_DTYPE": block_table_dtype,
             "P_SCALE_VALUE": p_scale_value,
@@ -197,7 +162,6 @@ def npu_qfa_mxfp4(
             "ATTN_MASK_SHAPE": list(attn_mask_shape) if attn_mask_shape else [],
             "ATTN_MASK_DTYPE": attn_mask_dtype,
             "ATTN_MASK_DATARANGE": attn_mask_datarange,
-            # dtype 透传 (表格不传 -> None, golden 侧用默认值)
             "Q_DESCALE_DTYPE": q_descale_dtype,
             "K_DESCALE_DTYPE": k_descale_dtype,
             "V_DESCALE_DTYPE": v_descale_dtype,
@@ -209,8 +173,6 @@ def npu_qfa_mxfp4(
         }
     )
 
-    if _SKIP_GENERATE:
-        _inject_replay_qkv(q, k, v, q_descale, k_descale, v_descale)
     golden_mod._inject_physical_s_override(q, v, input_layout, layout_kv)
     try:
         try:
@@ -220,8 +182,6 @@ def npu_qfa_mxfp4(
             data_dict = golden_mod.generate_data()
     finally:
         golden_mod._clear_physical_s_override()
-        if _SKIP_GENERATE:
-            _clear_replay_qkv()
     golden_mod._apply_csv_shape_override(
         data_dict,
         {
@@ -234,25 +194,26 @@ def npu_qfa_mxfp4(
         },
     )
     logger.info(
-        "[WRAPPER] graph_path=%d, layout=%s, B=%d, N_q=%d, N_kv=%d, D=%d, skip_generate=%s",
+        "[MAIN_WRAPPER] graph_path=%d, layout=%s, B=%d, N_q=%d, N_kv=%d, D=%d",
         graph_path,
         input_layout,
         B,
         N_q,
         N_kv,
         D,
-        _SKIP_GENERATE,
     )
     try:
-        atten_out, lse_out = golden_mod.npu_mxfp4_fa(data_dict)
+        atten_out, lse_out = golden_mod.call_npu_main(data_dict)
     except Exception as e:
-        logger.error("[WRAPPER] NPU 调用失败: %s", str(e))
-        torch.npu.synchronize()
-        gc.collect()
-        torch.npu.empty_cache()
+        logger.error("[MAIN_WRAPPER] quant_flash_attn 主算子调用失败: %s", str(e))
         raise
 
-    gc.collect()
-    torch.npu.empty_cache()
+    # lse 处理 (与 e2e wrapper 一致):
+    #   enable_lse=False → lse_out=None (与 golden slot 1 None 双向匹配)
+    #   enable_lse=True  → NPU lse_out (N_q, T) T-major 列优先 → transpose 成 (T, N_q) T-major
+    if not enable_lse:
+        lse_out = None
+    elif isinstance(lse_out, torch.Tensor) and lse_out.ndim == 2:
+        lse_out = lse_out.transpose(0, 1).contiguous()
 
     return atten_out, lse_out

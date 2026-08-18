@@ -112,6 +112,7 @@ def _blockwise_quantize_p_eff(
     seqk_dim: int,
     mx_block_size: int = 32,
     mx_mode: str = "baseline",
+    softmax_scale: float = 1.0,
 ):
     NEG_INF = float("-inf")
     device = S.device
@@ -134,13 +135,15 @@ def _blockwise_quantize_p_eff(
     n_blk = S_moved.shape[-1] // mx_block_size
     S_reshape = S_moved.reshape(*other_shape, n_blk, mx_block_size)
 
-    m_block = S_reshape.max(dim=-1).values  # [..., n_blk], s_dtype
+    scale_s = np.float16(softmax_scale)
+    m_block = S_reshape.max(dim=-1).values  # max of UNSCALED S
+    m_block_scaled = m_block * scale_s  # NPU: Muls(max, dScale)
     m_block_safe = torch.where(
-        torch.isinf(m_block) & (m_block < 0),
-        torch.zeros_like(m_block),
-        m_block,
+        torch.isinf(m_block_scaled) & (m_block_scaled < 0),
+        torch.zeros_like(m_block_scaled),
+        m_block_scaled,
     )
-    m_ij = m_block.max(dim=-1).values  # [...], s_dtype
+    m_ij = m_block_safe.max(dim=-1).values  # [...], s_dtype
 
     m_ij_fp32 = m_ij.float()
     if m_running is None:
@@ -155,7 +158,9 @@ def _blockwise_quantize_p_eff(
 
     m_safe_new_s = m_safe_new_fp32.to(src_dtype)
 
-    P_local_r = torch.exp(S_reshape - m_block_safe.unsqueeze(-1))  # [..., n_blk, 32]
+    P_local_r = torch.exp(
+        S_reshape * scale_s - m_block_safe.unsqueeze(-1)
+    )  # [..., n_blk, 32]
     # flatten 回 seqk 长度并 strip pad, 然后 move 回原 seqk_dim
     P_local_padded_moved = P_local_r.reshape(*other_shape, n_blk * mx_block_size)
     P_local_moved = P_local_padded_moved[..., :seqk_len]
@@ -186,6 +191,7 @@ def _blockwise_snap_local_quantize_p_eff(
     seqk_dim: int,
     mx_block_size: int = 32,
     mx_mode: str = "baseline",
+    softmax_scale: float = 1.0,
 ):
     NEG_INF = float("-inf")
     device = S.device
@@ -194,6 +200,7 @@ def _blockwise_snap_local_quantize_p_eff(
     seqk_dim_pos = seqk_dim if seqk_dim >= 0 else ndim + seqk_dim
     seqk_len = S.shape[seqk_dim_pos]
     LN2 = math.log(2.0)
+    LN2 = torch.tensor(LN2, dtype=torch.float16, device=device)
 
     pad = (mx_block_size - seqk_len % mx_block_size) % mx_block_size
     if pad > 0:
@@ -209,14 +216,19 @@ def _blockwise_snap_local_quantize_p_eff(
     n_blk = S_moved.shape[-1] // mx_block_size
     S_reshape = S_moved.reshape(*other_shape, n_blk, mx_block_size)
 
-    m_block_raw = S_reshape.max(dim=-1).values  # [..., n_blk]
+    # ★ 与 NPU 对齐: 先对 unscaled S 取 max, 再施加 softmax_scale (fp16)
+    #   NPU: Max(curr_group_max, src) → Muls(curr_group_max, dScale)
+    scale_s = np.float16(softmax_scale)
+    m_block_raw = S_reshape.max(dim=-1).values  # max of UNSCALED S
     m_block_raw_safe = torch.where(
         torch.isinf(m_block_raw) & (m_block_raw < 0),
         torch.zeros_like(m_block_raw),
         m_block_raw,
     )
-    # snap: floor(m / ln 2) × ln 2, 落到全局 log2 网格上
-    K_block = torch.floor(m_block_raw_safe / LN2)
+    # NPU: Muls(curr_group_max, dScale) — 对 max 施加 scale
+    m_block_scaled = m_block_raw_safe * scale_s
+    # snap: floor(m_scaled / ln 2) × ln 2, 落到全局 log2 网格上
+    K_block = torch.floor(m_block_scaled / LN2)
 
     ### local_group_max
     local_group_max = K_block.T
@@ -225,7 +237,7 @@ def _blockwise_snap_local_quantize_p_eff(
 
     m_block_snap = (K_block - 2) * LN2  # [..., n_blk], on log2 grid
 
-    P_local_r = torch.exp(S_reshape - m_block_snap.unsqueeze(-1))
+    P_local_r = torch.exp(S_reshape * scale_s - m_block_snap.unsqueeze(-1))
 
     levels = _FP4_POS_LEVELS_FP32.to(device=device, dtype=src_dtype)
     midpoints = _FP4_POS_MIDPOINTS_FP32.to(device=device, dtype=src_dtype)
@@ -507,7 +519,10 @@ def _flash_attn_single_batch_kernel(
                 # torch.save(S_ij, 'qk_result_padded.pt')
                 # print(f'mm1Res.shape={S_ij.shape} mm1Res.dtype={S_ij.dtype}')
 
-                S_ij = S_ij * np.float16(softmax_scale)
+                # ★ 不在此处对 S 施加 softmax_scale, 与 NPU 行为对齐:
+                #   NPU 先对 unscaled S 取 max, 再对 max 施加 dScale (fp16),
+                #   然后在 Sub 循环里对 S 逐元素施加 dScale。
+                #   scale 的施加时机推迟到 helper / else 分支内部。
 
                 # (2) causal mask
                 if causal:
@@ -538,11 +553,14 @@ def _flash_attn_single_batch_kernel(
                         seqk_dim=seqk_dim,
                         mx_block_size=mx_block_size,
                         mx_mode=mx_mode,
+                        softmax_scale=softmax_scale,
                     )
                     P_fp32 = P_eff_s.float()
                 else:
-                    # global quantize_p 或 quantize_p=False, S 在 s_dtype
-                    m_ij_s = S_ij.max(dim=seqk_dim).values  # s_dtype
+                    # global quantize_p 或 quantize_p=False, S 在 s_dtype (unscaled)
+                    # 与 NPU 对齐: 先取 max(S), 再 * scale
+                    scale_s = np.float16(softmax_scale)
+                    m_ij_s = S_ij.max(dim=seqk_dim).values * scale_s  # max(S) * scale
                     # m_new 在 FP32 (供 alpha); 通过 m_ij.float() 与 m_i 合并
                     m_new = torch.maximum(m_i, m_ij_s.float())  # FP32
                     m_safe_fp32 = torch.where(
@@ -552,9 +570,13 @@ def _flash_attn_single_batch_kernel(
                     )
                     m_safe_s = m_safe_fp32.to(s_torch_dtype)
                     if s_layout == "ND":
-                        P_ij = torch.exp(S_ij - m_safe_s.unsqueeze(-1))  # s_dtype
+                        P_ij = torch.exp(
+                            S_ij * scale_s - m_safe_s.unsqueeze(-1)
+                        )  # s_dtype
                     else:
-                        P_ij = torch.exp(S_ij - m_safe_s.unsqueeze(0))  # s_dtype
+                        P_ij = torch.exp(
+                            S_ij * scale_s - m_safe_s.unsqueeze(0)
+                        )  # s_dtype
 
                     if quantize_p:
                         # qdq FP32 内部, round-trip 到 s_dtype
@@ -689,11 +711,11 @@ def attention_cpu_golden_varlen(
         Kh = Kb.transpose(0, 1)  # [Hq, sk, D]
         Vh = Vb.transpose(0, 1)  # [Hq, sk, D_v]
 
-        # S 矩阵: matmul 累加在 FP32, ND = Q@K^T; DN = K@Q^T
+        # S 矩阵: matmul 累加在 FP32, ND = Q@K^T; DN = K@Q^T (unscaled, 与 NPU 对齐)
         if s_layout == "ND":
-            S = (Qh @ Kh.transpose(-1, -2)) * softmax_scale  # FP32 [Hq, sq, sk]
+            S = Qh @ Kh.transpose(-1, -2)  # FP32 [Hq, sq, sk]
         else:
-            S = (Kh @ Qh.transpose(-1, -2)) * softmax_scale  # FP32 [Hq, sk, sq]
+            S = Kh @ Qh.transpose(-1, -2)  # FP32 [Hq, sk, sq]
 
         S = S.to(s_torch_dtype)
 
@@ -726,6 +748,7 @@ def attention_cpu_golden_varlen(
                 seqk_dim=seqk_dim,
                 mx_block_size=mx_block_size,
                 mx_mode=mx_mode,
+                softmax_scale=softmax_scale,
             )
             P_eff_s = torch.nan_to_num(P_eff_s, nan=0.0)
             # ★ FP32 做 sum 与 PV matmul
@@ -738,9 +761,10 @@ def attention_cpu_golden_varlen(
                 Ob = (P_fp32.transpose(-1, -2) @ Vh) / l_safe.transpose(-1, -2)
         elif quantize and quantize_p:
             # global quantize_p: max/exp/P 全在 s_dtype, qdq FP32 round-trip
-            m = S.max(dim=seqk_dim, keepdim=True).values  # s_dtype
+            scale_s = np.float16(softmax_scale)
+            m = S.max(dim=seqk_dim, keepdim=True).values * scale_s  # max(S) * scale
             m_safe = torch.where(torch.isinf(m) & (m < 0), torch.zeros_like(m), m)
-            P = torch.exp(S - m_safe)  # s_dtype
+            P = torch.exp(S * scale_s - m_safe)  # s_dtype
             P = torch.nan_to_num(P, nan=0.0)
             P = mxfp4_qdq(
                 P.float(), axis=seqk_dim, block_size=mx_block_size, mode=mx_mode
@@ -756,9 +780,10 @@ def attention_cpu_golden_varlen(
         else:
             # 不量化 P: 手动 softmax (max/exp/normalize 沿 s_dtype) 以便 s_dtype 生效
             # 注: 与 torch.softmax 在 FP32 下完全等价 (atol 1e-7), 但允许 s_dtype 透传
-            m = S.max(dim=seqk_dim, keepdim=True).values  # s_dtype
+            scale_s = np.float16(softmax_scale)
+            m = S.max(dim=seqk_dim, keepdim=True).values * scale_s  # max(S) * scale
             m_safe = torch.where(torch.isinf(m) & (m < 0), torch.zeros_like(m), m)
-            P = torch.exp(S - m_safe)  # s_dtype
+            P = torch.exp(S * scale_s - m_safe)  # s_dtype
             P = torch.nan_to_num(P, nan=0.0)
             # ★ FP32 做 sum 与归一化
             P_fp32 = P.float()

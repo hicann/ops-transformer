@@ -10,6 +10,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+import gc
 import logging
 import math
 import os
@@ -127,6 +128,142 @@ E8M0_MIN_POSITIVE_BYTE = E8M0_BIAS + E8M0_MIN_POSITIVE_EXP  # 0
 SEED_Q = 54
 SEED_K = 3
 SEED_V = 4
+
+# manual-data replay 优化 slot: wrapper 在 replay 时把 bin 加载的 6 个 packed
+# tensor 注入这里, generate_data() 检测到非空就跳过 FP32 生成 + mxfp4 量化 +
+# rearrange (大 case 几百秒), 直接用 bin 数据; 其余字段仍按原逻辑生成。
+# 非 replay 场景保持空 dict, 走原路径, 零影响。
+_REPLAY_QKV_OVERRIDE = {}
+
+# 物理 S override: wrapper/inputs 从 CSV 分配的 q/k/v tensor shape 推导物理 S 后注入,
+# generate_data 优先用这两个值作为物理 S (生成 query/key/value 的 S 维),
+# 而不是 max(ACT_SEQ_LENS) / MAX_SEQLEN (后者只决定有效长度).
+# 非 override 场景保持 None, 走原逻辑 (物理 S = 有效长度).
+_PHYSICAL_S_Q_OVERRIDE = None
+_PHYSICAL_S_KV_OVERRIDE = None
+
+
+def _infer_physical_s_from_tensor(tensor, layout):
+    """从 packed tensor shape 推导物理 S (BNSD 的 S 维).
+
+    Args:
+        tensor: packed q/k/v tensor (最后一维已 //2)
+        layout: query_layout / kv_layout (BSND/BNSD/BSH/TND)
+
+    Returns:
+        物理 S (int), 无法推导时返回 None (如 TND 的 T = sum(act) != 物理 S)
+    """
+    if tensor is None:
+        return None
+    layout_upper = (layout or "").upper()
+    try:
+        if layout_upper in ("BSND", "BSH"):
+            if tensor.dim() < 2:
+                return None
+            return int(tensor.shape[1])
+        if layout_upper == "BNSD":
+            if tensor.dim() < 3:
+                return None
+            return int(tensor.shape[2])
+    except (IndexError, TypeError):
+        return None
+    # TND: (T, N, D/2), T = sum(act), 无法反推单 batch 物理 S
+    return None
+
+
+def _resolve_s_with_effective(
+    act_seq_lens, max_seqlen, physical_s_override, b_size, tag
+):
+    """解析物理 S 和有效长度, 并做校验.
+
+    优先级:
+        有效长度: max(act_seq_lens) if act_seq_lens else max_seqlen
+        物理 S: override > 有效长度
+
+    校验:
+        - act_seq_lens 和 max_seqlen 都未传 -> 报错
+        - 物理 S < 有效长度 -> 报错
+
+    Returns:
+        (s_physical, s_effective, act_seq_effective)
+    """
+    if act_seq_lens:
+        s_effective = max(act_seq_lens)
+        act_seq_effective = list(act_seq_lens)
+    elif max_seqlen is not None and max_seqlen >= 0:
+        s_effective = int(max_seqlen)
+        act_seq_effective = [s_effective] * b_size
+    else:
+        raise RuntimeError(
+            f"{tag}: act_seq_lens 和 max_seqlen 都未传, 无法确定有效长度"
+        )
+
+    if physical_s_override is not None:
+        s_physical = int(physical_s_override)
+        if s_physical < s_effective:
+            raise RuntimeError(
+                f"{tag}: 物理 S ({s_physical}) < 有效长度 ({s_effective}), "
+                f"tensor 的 S 维不足以容纳有效数据"
+            )
+    else:
+        s_physical = s_effective
+
+    return s_physical, s_effective, act_seq_effective
+
+
+def _inject_physical_s_override(q_tensor, v_tensor, query_layout, kv_layout):
+    """从 q/v packed tensor shape 推导物理 S 并注入 override.
+
+    在 generate_data 之前调用; generate_data 内部 _resolve_s_with_effective
+    会优先使用这两个值作为物理 S. 调用方负责在 generate_data 之后调
+    _clear_physical_s_override 清空, 避免污染同进程后续 case.
+    """
+    global _PHYSICAL_S_Q_OVERRIDE, _PHYSICAL_S_KV_OVERRIDE
+    _PHYSICAL_S_Q_OVERRIDE = _infer_physical_s_from_tensor(q_tensor, query_layout)
+    _PHYSICAL_S_KV_OVERRIDE = _infer_physical_s_from_tensor(v_tensor, kv_layout)
+
+
+def _clear_physical_s_override():
+    """清空物理 S override (generate_data 之后调用)."""
+    global _PHYSICAL_S_Q_OVERRIDE, _PHYSICAL_S_KV_OVERRIDE
+    _PHYSICAL_S_Q_OVERRIDE = None
+    _PHYSICAL_S_KV_OVERRIDE = None
+
+
+_CSV_SHAPE_OVERRIDE_SLOTS = ("q", "k", "v", "q_descale", "k_descale", "v_descale")
+
+
+def _adapt_tensor_to_shape(src, dst_shape):
+    dst_shape = tuple(int(x) for x in dst_shape)
+    src_flat = src.flatten()
+    dst_numel = 1
+    for d in dst_shape:
+        dst_numel *= d
+    if src_flat.numel() >= dst_numel:
+        adapted = src_flat[:dst_numel]
+    else:
+        adapted = torch.zeros(dst_numel, dtype=src.dtype, device=src.device)
+        adapted[: src_flat.numel()] = src_flat
+    return adapted.reshape(dst_shape).to(src.dtype)
+
+
+def _apply_csv_shape_override(data_dict, csv_tensors):
+    for name in _CSV_SHAPE_OVERRIDE_SLOTS:
+        csv_t = csv_tensors.get(name)
+        if csv_t is None:
+            continue
+        golden_t = data_dict.get(name)
+        if golden_t is None:
+            continue
+        if tuple(csv_t.shape) == tuple(golden_t.shape):
+            continue
+        logger.warning(
+            "[GOLDEN] %s CSV shape %s != golden shape %s, 用 CSV shape 重构",
+            name,
+            tuple(csv_t.shape),
+            tuple(golden_t.shape),
+        )
+        data_dict[name] = _adapt_tensor_to_shape(golden_t, csv_t.shape).contiguous()
 
 
 def _get_npu_fa_kwargs():
@@ -304,13 +441,6 @@ def update_act_seq_lens_for_tnd(layout, b, act_seq_lens):
 
 
 def transpose_kscale(k_scale, layout):
-    """K scale: BNSD [B,N,S,D] -> layout 适配 (TND reshape D//2,2, BSND/BNSD reshape D//2,2)
-
-    所有 layout 统一输出 5D (末两维 D//2, 2), 与 transpose_qscale 的 5D 风格保持一致.
-    BNSD 下量化后 k_scale = (B,N,S, ceil(D/32)), reshape 成 (B,N,S, D//2, 2):
-      乘积不变 (ceil(D/32) == D//2 当 D 是 32 倍数且 D//2 个 scale 在 D//2 维上排布),
-      存储排列不变 (row-major 下末维 4 -> (2,2) 是连续拆分), 数据语义不变.
-    """
     if k_scale is None:
         raise ValueError("k_scale cannot be None")
     if not isinstance(k_scale, torch.Tensor):
@@ -421,11 +551,6 @@ def _gen_range_tensor(shape, lo, hi, seed):
 
 
 def _gen_opt_tensor(shape, dtype_str, datarange_str, seed):
-    """按 shape 生成随机 tensor; shape 为空 -> 返回 None.
-
-    dtype_str: None -> 默认 float32; 支持 float16/bfloat16/float32/int32/uint8
-    datarange_str: None -> (-1,1); 支持 'min,max' 或 float 对称区间
-    """
     if not shape:
         return None
     # 解析 dtype
@@ -453,55 +578,21 @@ def _gen_opt_tensor(shape, dtype_str, datarange_str, seed):
     return t.contiguous()
 
 
-# ==============================================================================
-# 数据生成: BNSD FP32 Q/K/V -> MXFP4 量化 + scale 转换 + layout 重排
-# 与原 quant_flash_attn_golden.py 中 run_fia_eager 数据生成段一致
-# ==============================================================================
 def generate_data():
-    """生成 BNSD FP32 Q/K/V -> MXFP4 量化 -> layout 转换 -> 缓存结果.
-
-    返回 dict:
-      q_packed:        uint8, MXFP4 packed (last dim = D // 2)
-      k_packed:        uint8, MXFP4 packed
-      v_packed:        uint8, MXFP4 packed (按 act_seq_lens_kv 分批量化再拼回)
-      q_descale:       uint8, E8M0 scale, 已转好 layout & N2TGD-like 排布
-      k_descale:       uint8, E8M0 scale, 已转好 layout & (D//2,2) packing
-      v_descale:       uint8, E8M0 scale, 已转好 layout & (Sg//2,D,2) packing
-      block_table:     None (本适配只支持 continue KV)
-      cu_seqlens_q:    python list, TND 才需要, 否则 None
-      cu_seqlens_kv:   python list, TND 才需要, 否则 None
-      act_seq_lens_q:  python list
-      act_seq_lens_kv: python list
-    """
     n2 = N_kv
     g = G
     num_heads = n2 * g
-    # 物理 S 维: 有 seqused 取 max(seqused), 否则用 max_seqlen (seqused 为空时用 max 透传)
-    s1 = (
-        max(ACT_SEQ_LENS_Q)
-        if ACT_SEQ_LENS_Q
-        else (MAX_SEQLEN_Q if MAX_SEQLEN_Q >= 0 else 0)
+    # 有效长度: act 传入时用 act (不看 max_seqlen), 否则用 max_seqlen (每 batch 等长);
+    # 都没传则报错. 物理 S 优先用 override (从 q/k/v tensor shape 推导), 否则等于有效长度.
+    # 校验: 物理 S >= 有效长度 (tensor S 维必须能容纳有效数据).
+    s1, s1_effective, act_seq_q_eff = _resolve_s_with_effective(
+        ACT_SEQ_LENS_Q, MAX_SEQLEN_Q, _PHYSICAL_S_Q_OVERRIDE, B, "Q"
     )
-    s2 = (
-        max(ACT_SEQ_LENS_KV)
-        if ACT_SEQ_LENS_KV
-        else (MAX_SEQLEN_KV if MAX_SEQLEN_KV >= 0 else 0)
+    s2, s2_effective, act_seq_kv_eff = _resolve_s_with_effective(
+        ACT_SEQ_LENS_KV, MAX_SEQLEN_KV, _PHYSICAL_S_KV_OVERRIDE, B, "KV"
     )
     v_d = V_D
     qk_d = D
-
-    # Q/K/V FP32 数据按 DATA_RANGE_Q/K/V 生成: randn 后 clamp 到 [lo, hi]
-    # (DATA_RANGE_* 来自 wrapper 注入, 支持 float 对称区间或 'min,max' 字符串)
-    q_lo, q_hi = _parse_datarange(DATA_RANGE_Q)
-    k_lo, k_hi = _parse_datarange(DATA_RANGE_K)
-    v_lo, v_hi = _parse_datarange(DATA_RANGE_V)
-    query = _gen_range_tensor((B, num_heads, s1, qk_d), q_lo, q_hi, SEED_Q)
-    key = _gen_range_tensor((B, n2, s2, qk_d), k_lo, k_hi, SEED_K)
-    value = _gen_range_tensor((B, n2, s2, v_d), v_lo, v_hi, SEED_V)
-
-    # 缓存原始 FP32 BNSD Q/K/V 给 CPU golden 用 (与原 pytest cpu_golden_qkv_mxfp4_flash_attn
-    # 一致: golden 接收 FP32, 内部 _apply_input_quant 做量化反量化)
-    golden_mod_self._cached_fp32_bnsd = (query, key, value)
 
     query_layout = get_query_layout(INPUT_LAYOUT)
     # attn_out_layout: 优先用表格 LAYOUT_OUT, 否则从 INPUT_LAYOUT 推导
@@ -513,21 +604,61 @@ def generate_data():
     # kv_layout: 优先用表格 LAYOUT_KV, 否则等于 query_layout
     kv_layout = get_query_layout(LAYOUT_KV) if LAYOUT_KV else query_layout
 
-    # Q/K: 沿 D 维量化, V: 沿 S 维量化
-    query_packed, q_descale = mxfp4_quantize_pack_last(
-        query, quant_axis=-1, mode="baseline"
-    )
-    key_packed, k_descale = mxfp4_quantize_pack_last(
-        key, quant_axis=-1, mode="baseline"
-    )
+    # manual-data replay 优化: wrapper 注入了预生成 bin tensor 时,
+    # 跳过 FP32 生成 + mxfp4 量化 + rearrange (大 case 几百秒),
+    # 直接用 bin 数据; 其余字段 (block_table/p_scale/sinks/attn_mask/
+    # cu_seqlens/layouts/num_heads/softmax_scale/fp32_bnsd) 仍按原逻辑生成。
+    # fp32_bnsd 在此路径下置 None (replay 不走 CPU golden, 用 bin 里的 golden)。
+    override = _REPLAY_QKV_OVERRIDE
+    if override:
+        query_packed = override["q"]
+        key_packed = override["k"]
+        value_packed = override["v"]
+        q_descale = override["q_descale"]
+        k_descale = override["k_descale"]
+        v_descale = override["v_descale"]
+        fp32_bnsd = None
+    else:
+        # Q/K/V FP32 数据按 DATA_RANGE_Q/K/V 生成: randn 后 clamp 到 [lo, hi]
+        # (DATA_RANGE_* 来自 wrapper 注入, 支持 float 对称区间或 'min,max' 字符串)
+        q_lo, q_hi = _parse_datarange(DATA_RANGE_Q)
+        k_lo, k_hi = _parse_datarange(DATA_RANGE_K)
+        v_lo, v_hi = _parse_datarange(DATA_RANGE_V)
+        query = _gen_range_tensor((B, num_heads, s1, qk_d), q_lo, q_hi, SEED_Q)
+        key = _gen_range_tensor((B, n2, s2, qk_d), k_lo, k_hi, SEED_K)
+        value = _gen_range_tensor((B, n2, s2, v_d), v_lo, v_hi, SEED_V)
 
-    # V 按 act_seq_lens_kv 分批量化, padding 区域用 e8m0=127 (scale=1.0) 填充
-    if any(sk < s2 for sk in ACT_SEQ_LENS_KV) and len(ACT_SEQ_LENS_KV) > 1:
-        n_blocks_full = (s2 + 31) // 32
+        # 原始 FP32 BNSD Q/K/V 随返回 dict 传给 CPU golden (与原 pytest cpu_golden_qkv_mxfp4_flash_attn
+        # 一致: golden 接收 FP32, 内部 _apply_input_quant 做量化反量化)
+        fp32_bnsd = (query, key, value)
+
+        # Q/K padding 区域 (act_seq 之外) FP32 置 0: 量化后 packed=0/scale=127,
+        # 避免 NPU 按 actSeq 向上取整分块时 padding 脏数据污染有效区域.
+        # V 的 padding 由后续 per-batch 量化处理 (packed 填 0, scale 填 127).
+        for b_idx in range(B):
+            sq = min(act_seq_q_eff[b_idx], s1)
+            if sq < s1:
+                query[b_idx, :, sq:, :] = 0
+            sk = min(act_seq_kv_eff[b_idx], s2)
+            if sk < s2:
+                key[b_idx, :, sk:, :] = 0
+
+        # Q/K: 沿 D 维量化, V: 沿 S 维量化
+        query_packed, q_descale = mxfp4_quantize_pack_last(
+            query, quant_axis=-1, mode="baseline"
+        )
+        key_packed, k_descale = mxfp4_quantize_pack_last(
+            key, quant_axis=-1, mode="baseline"
+        )
+
+        # V 按 act_seq_lens_kv 分批量化: padding 区域 packed 填 0, descale 只覆盖有效区域.
+        # v_descale 的 S 维基于 s2_effective (= max(act_kv)), 与 NPU kernel stride
+        # (基于 maxSeqlenKv) 及 metadata 校验 (ceil(max(seqused_kv)/64)) 对齐.
+        n_blocks_effective = (s2_effective + 31) // 32
         packed_value_list = []
         v_descale_list = []
         for b_idx in range(B):
-            sk = min(ACT_SEQ_LENS_KV[b_idx], s2)
+            sk = min(act_seq_kv_eff[b_idx], s2)
             v_b = value[b_idx : b_idx + 1, :, :sk, :]
             v_b_packed, v_b_scale = mxfp4_quantize_pack_last(
                 v_b, quant_axis=-2, mode="baseline"
@@ -537,82 +668,67 @@ def generate_data():
             packed_value_list.append(packed_padded)
             n_blocks_actual = v_b_scale.shape[2]
             scale_padded = torch.full(
-                (1, n2, n_blocks_full, v_d), 127, dtype=v_b_scale.dtype
+                (1, n2, n_blocks_effective, v_d), 127, dtype=v_b_scale.dtype
             )
             scale_padded[:, :, :n_blocks_actual, :] = v_b_scale
             v_descale_list.append(scale_padded)
         value_packed = torch.cat(packed_value_list, dim=0)
         v_descale = torch.cat(v_descale_list, dim=0)
-    else:
-        value_packed, v_descale = mxfp4_quantize_pack_last(
-            value, quant_axis=-2, mode="baseline"
+
+        # V scale: n_blocks 奇数时 pad 一个 block, 然后 reshape (Sg//2, D*2)
+        if v_descale.shape[2] % 2 != 0:
+            pad_block = torch.full(
+                (v_descale.shape[0], v_descale.shape[1], 1, v_descale.shape[3]),
+                127,
+                dtype=v_descale.dtype,
+            )
+            v_descale = torch.cat([v_descale, pad_block], dim=2)
+        v_descale = (
+            v_descale.reshape(
+                v_descale.shape[0],
+                v_descale.shape[1],
+                v_descale.shape[2] // 2,
+                2,
+                v_descale.shape[3],
+            )
+            .transpose(-1, -2)
+            .reshape(
+                v_descale.shape[0],
+                v_descale.shape[1],
+                v_descale.shape[2] // 2,
+                v_descale.shape[3] * 2,
+            )
         )
 
-    # V scale: n_blocks 奇数时 pad 一个 block, 然后 reshape (Sg//2, D*2)
-    if v_descale.shape[2] % 2 != 0:
-        pad_block = torch.full(
-            (v_descale.shape[0], v_descale.shape[1], 1, v_descale.shape[3]),
-            127,
-            dtype=v_descale.dtype,
-        )
-        v_descale = torch.cat([v_descale, pad_block], dim=2)
-    v_descale = (
-        v_descale.reshape(
-            v_descale.shape[0],
-            v_descale.shape[1],
-            v_descale.shape[2] // 2,
-            2,
-            v_descale.shape[3],
-        )
-        .transpose(-1, -2)
-        .reshape(
-            v_descale.shape[0],
-            v_descale.shape[1],
-            v_descale.shape[2] // 2,
-            v_descale.shape[3] * 2,
-        )
-    )
+        # Layout 转换 (Q packed + scale 用 query_layout; K/V packed + scale 用 kv_layout)
+        query_packed = rearrange_by_layout(query_packed, query_layout, B, act_seq_q_eff)
+        key_packed = rearrange_by_layout(key_packed, kv_layout, B, act_seq_kv_eff)
+        value_packed = rearrange_by_layout(value_packed, kv_layout, B, act_seq_kv_eff)
 
-    # Layout 转换 (Q packed + scale 用 query_layout; K/V packed + scale 用 kv_layout)
-    query_packed = rearrange_by_layout(query_packed, query_layout, B, ACT_SEQ_LENS_Q)
-    key_packed = rearrange_by_layout(key_packed, kv_layout, B, ACT_SEQ_LENS_KV)
-    value_packed = rearrange_by_layout(value_packed, kv_layout, B, ACT_SEQ_LENS_KV)
+        q_descale = rearrange_by_layout(q_descale, query_layout, B, act_seq_q_eff)
+        q_descale = transpose_qscale(q_descale, query_layout, n2)
 
-    q_descale = rearrange_by_layout(q_descale, query_layout, B, ACT_SEQ_LENS_Q)
-    q_descale = transpose_qscale(q_descale, query_layout, n2)
+        aligned_seq_lens_kv_k = [(x + 31) // 32 for x in act_seq_kv_eff]
+        k_descale = rearrange_by_layout(k_descale, kv_layout, B, aligned_seq_lens_kv_k)
+        k_descale = transpose_kscale(k_descale, kv_layout)
 
-    aligned_seq_lens_kv_k = [(x + 31) // 32 for x in ACT_SEQ_LENS_KV]
-    k_descale = rearrange_by_layout(k_descale, kv_layout, B, aligned_seq_lens_kv_k)
-    k_descale = transpose_kscale(k_descale, kv_layout)
+        aligned_seq_lens_kv_v = [(x + 63) // 64 for x in act_seq_kv_eff]
+        v_descale = rearrange_by_layout(v_descale, kv_layout, B, aligned_seq_lens_kv_v)
 
-    aligned_seq_lens_kv_v = [(x + 63) // 64 for x in ACT_SEQ_LENS_KV]
-    v_descale = rearrange_by_layout(v_descale, kv_layout, B, aligned_seq_lens_kv_v)
+        # V descale 最后再 view 出 (*shape, -1, 2) 末尾两维
+        v_descale = v_descale.view(*v_descale.shape[:-1], -1, 2)
 
-    # V descale 最后再 view 出 (*shape, -1, 2) 末尾两维
-    v_descale = v_descale.view(*v_descale.shape[:-1], -1, 2)
-
-    # 在 layout 转换之前, 先缓存原始 BNSD 形式的 packed + scales,
-    # 供 CPU golden 内部 mxfp4_qdq 直接使用 (它期望 BNSD 4D)
-    query_packed_bnsd = query_packed
-    key_packed_bnsd = key_packed
-    value_packed_bnsd = value_packed
-    # scales 在量化后还是 BNSD 形式 (transpose_qscale/transpose_kscale 还没调)
-    # 这里缓存 transpose 之前的 BNSD scales
-    q_descale_bnsd = q_descale
-    k_descale_bnsd = k_descale
-    v_descale_bnsd = v_descale
-
-    # cu_seqlens (TND only): 表格传了就用表格的, 否则自动推导
+    # cu_seqlens (TND only): 表格传了就用表格的, 否则用有效长度自动推导
     cu_seqlens_q = (
         CU_SEQLENS_Q
         if CU_SEQLENS_Q
-        else update_act_seq_lens_for_tnd(query_layout, B, ACT_SEQ_LENS_Q)
+        else update_act_seq_lens_for_tnd(query_layout, B, act_seq_q_eff)
     )
     cu_seqlens_kv = (
         CU_SEQLENS_KV
         if CU_SEQLENS_KV
         else (
-            update_act_seq_lens_for_tnd(query_layout, B, ACT_SEQ_LENS_KV)
+            update_act_seq_lens_for_tnd(query_layout, B, act_seq_kv_eff)
             if KV_STORAGE_MODE == "continue"
             else None
         )
@@ -643,16 +759,6 @@ def generate_data():
         ATTN_MASK_SHAPE, ATTN_MASK_DTYPE or "int8", ATTN_MASK_DATARANGE, seed=103
     )
 
-    # 缓存 BNSD packed + scales 给 CPU golden 用
-    golden_mod_self._cached_bnsd_inputs = [
-        query_packed_bnsd,
-        key_packed_bnsd,
-        value_packed_bnsd,
-        q_descale_bnsd,
-        k_descale_bnsd,
-        v_descale_bnsd,
-    ]
-
     return dict(
         q=query_packed.contiguous(),
         k=key_packed.contiguous(),
@@ -668,6 +774,12 @@ def generate_data():
         cu_seqlens_kv=cu_seqlens_kv,
         act_seq_lens_q=list(ACT_SEQ_LENS_Q),
         act_seq_lens_kv=list(ACT_SEQ_LENS_KV),
+        s1_physical=s1,
+        s2_physical=s2,
+        s1_effective=s1_effective,
+        s2_effective=s2_effective,
+        act_seq_q_eff=act_seq_q_eff,
+        act_seq_kv_eff=act_seq_kv_eff,
         query_layout=query_layout,
         kv_layout=kv_layout,
         attn_out_layout=attn_out_layout,
@@ -676,6 +788,7 @@ def generate_data():
         softmax_scale=SOFTMAX_SCALE
         if SOFTMAX_SCALE is not None
         else 1.0 / math.sqrt(qk_d),
+        fp32_bnsd=fp32_bnsd,
     )
 
 
@@ -683,17 +796,10 @@ def generate_data():
 # CPU Golden: 复用 flash_attention_cpu_golden_varlen, 与原 run_fia_eager 一致
 # 输入: generate_data() 输出的 dict (其中 q/k/v 是 MXFP4 packed 字节, 这里
 #       不做反量化, 直接喂给 cpu golden, 由其内部 mxfp4_qdq 处理)
+#       FP32 BNSD Q/K/V 通过 dict["fp32_bnsd"] 传入 (确定性种子生成, 无跨用例缓存)
 # 输出: attn_out 在 attn_out_layout 下, 已转好 layout
 # ==============================================================================
 def cpu_mxfp4_golden(data_dict):
-    """CPU flash-attention golden, 输出 attn_out 在 attn_out_layout 下.
-
-    与原 pytest cpu_golden_qkv_mxfp4_flash_attn (quant_flash_attn_golden.py:700) 完全一致:
-      - 取原始 FP32 BNSD Q/K/V (generate_data 缓存的 _cached_fp32_bnsd)
-      - bnsd_to_bsnd -> .to(float32) -> flatten(B,N) -> [T, N, D]  (D = qk_d, 未量化)
-      - 调 flash_attention_cpu_golden_varlen (内部 _apply_input_quant 做 MXFP4 量化反量化)
-      - 输出 reshape 回 [B, s1, N, qk_d] -> permute -> attn_out_layout
-    """
     act_seq_q = data_dict["act_seq_lens_q"]
     act_seq_kv = data_dict["act_seq_lens_kv"]
     softmax_scale = data_dict["softmax_scale"]
@@ -701,24 +807,38 @@ def cpu_mxfp4_golden(data_dict):
     b = B
     n1 = data_dict["num_heads"]
     qk_d = D
-    # seqused 为空时 (表格只传 max_seqlen), CPU golden 按 "全 batch 用满 S" 处理
-    s1 = max(act_seq_q) if act_seq_q else (MAX_SEQLEN_Q if MAX_SEQLEN_Q >= 0 else 0)
-    s2 = max(act_seq_kv) if act_seq_kv else (MAX_SEQLEN_KV if MAX_SEQLEN_KV >= 0 else 0)
-    if not act_seq_q:
-        act_seq_q = [s1] * b
-    if not act_seq_kv:
-        act_seq_kv = [s2] * b
+    # 物理 S: 优先用 generate_data 解析的 s1_physical/s2_physical (从 q/k/v tensor shape 来),
+    # 否则回退到有效长度 (act 或 max_seqlen).
+    # cu_seqlens 基于物理 S (每 batch 物理 S 个 token, padding 区域补 0);
+    # seq_used (act_seq_q_eff) 是有效长度, flash_attention_cpu_golden_varlen 只算有效区域.
+    s1 = data_dict.get("s1_physical")
+    s2 = data_dict.get("s2_physical")
+    act_seq_q_eff = data_dict.get("act_seq_q_eff")
+    act_seq_kv_eff = data_dict.get("act_seq_kv_eff")
+    if s1 is None:
+        s1 = max(act_seq_q) if act_seq_q else (MAX_SEQLEN_Q if MAX_SEQLEN_Q >= 0 else 0)
+    if s2 is None:
+        s2 = (
+            max(act_seq_kv)
+            if act_seq_kv
+            else (MAX_SEQLEN_KV if MAX_SEQLEN_KV >= 0 else 0)
+        )
+    if act_seq_q_eff is None:
+        act_seq_q_eff = list(act_seq_q) if act_seq_q else [s1] * b
+    if act_seq_kv_eff is None:
+        act_seq_kv_eff = list(act_seq_kv) if act_seq_kv else [s2] * b
 
     cu_seqlens_q = [i * s1 for i in range(b + 1)]
     cu_seqlens_kv = [i * s2 for i in range(b + 1)]
 
     # 取原始 FP32 BNSD Q/K/V (与原 pytest 一致, golden 接收 FP32, 内部做量化反量化)
-    cached_fp32 = getattr(golden_mod_self, "_cached_fp32_bnsd", None)
-    if cached_fp32 is None:
+    # FP32 由 generate_data 用确定性种子 (SEED_Q/K/V) 生成, 与 inputs.py 同源, 无需跨用例缓存
+    fp32_bnsd = data_dict.get("fp32_bnsd")
+    if fp32_bnsd is None:
         raise RuntimeError(
-            "_cached_fp32_bnsd is None, generate_data must be called first"
+            "data_dict['fp32_bnsd'] is None, generate_data must include fp32_bnsd"
         )
-    query_fp32, key_fp32, value_fp32 = cached_fp32
+    query_fp32, key_fp32, value_fp32 = fp32_bnsd
 
     # BNSD -> BSND -> flatten(B,N) -> [T, N, D]  (与原 pytest cpu_golden_qkv_mxfp4_flash_attn 一致)
     query_bsnd = (
@@ -737,8 +857,8 @@ def cpu_mxfp4_golden(data_dict):
         value_bsnd,
         cu_seqlens_q,
         cu_seqlens_kv,
-        act_seq_q,
-        act_seq_kv,
+        act_seq_q_eff,
+        act_seq_kv_eff,
         softmax_scale=softmax_scale,
         quantize=True,
         quantize_p=True,
@@ -751,8 +871,9 @@ def cpu_mxfp4_golden(data_dict):
     )
 
     # 输出 reshape 回 BNSD 再转 attn_out_layout (与原 pytest 一致)
+    # s1 是物理 S, attn_out padding 区域为 0 (flash_attention_cpu_golden_varlen 只算有效区域)
     attn_out = attn_out.reshape(b, s1, n1, qk_d).permute(0, 2, 1, 3)  # -> BNSD
-    attn_out = rearrange_by_layout(attn_out, attn_out_layout, b, act_seq_q)
+    attn_out = rearrange_by_layout(attn_out, attn_out_layout, b, act_seq_q_eff)
 
     return attn_out.to(get_dtype(OUT_DTYPE)), None
 
@@ -767,7 +888,6 @@ def _to_npu(tensor):
 
 
 def _call_npu_fa_op(data_dict):
-    """eager 模式直接调 quant_flash_attn_metadata + quant_flash_attn"""
     q = _to_npu(data_dict["q"])
     k = _to_npu(data_dict["k"])
     v = _to_npu(data_dict["v"])
@@ -883,15 +1003,13 @@ def _call_npu_fa_op(data_dict):
     )
     main_kwargs.update(_get_npu_fa_kwargs())
     npu_attn_out, npu_lse = quant_flash_attn(**main_kwargs)
+    gc.collect()
+    torch.npu.empty_cache()
     torch.npu.synchronize()
     return npu_attn_out, npu_lse
 
 
 class Network(nn.Module):
-    """aclgraph 编译目标: forward 只调两个 torch.library op.
-    所有 Python 预处理 (tensor().npu(), metadata 构造外的 list->tensor) 在编译区域外完成.
-    """
-
     def __init__(self):
         super(Network, self).__init__()
 
@@ -1101,6 +1219,202 @@ def npu_mxfp4_fa(data_dict):
     if GRAPH_PATH == 0:
         return _call_npu_fa_op(data_dict)
     return _mxfp4_fa_torch_npu(data_dict)
+
+
+def call_npu_metadata(data_dict):
+    """只调 quant_flash_attn_metadata, 返回 [metadata] 对象.
+
+    分离测试入口: 验证 metadata 算子独立正确性, 不调主算子。
+    """
+    v_descale = _to_npu(data_dict["v_descale"])
+
+    cu_seqlens_q = data_dict["cu_seqlens_q"]
+    cu_seqlens_kv = data_dict["cu_seqlens_kv"]
+    seqused_q = data_dict["act_seq_lens_q"]
+    seqused_kv = data_dict["act_seq_lens_kv"]
+
+    cu_seqlens_q_t = (
+        torch.tensor(
+            cu_seqlens_q, dtype=get_dtype(CU_SEQLENS_Q_DTYPE) or torch.int32
+        ).npu()
+        if cu_seqlens_q is not None
+        else None
+    )
+    cu_seqlens_kv_t = (
+        torch.tensor(
+            cu_seqlens_kv, dtype=get_dtype(CU_SEQLENS_KV_DTYPE) or torch.int32
+        ).npu()
+        if cu_seqlens_kv is not None
+        else None
+    )
+    seqused_q_t = (
+        torch.tensor(seqused_q, dtype=get_dtype(SEQUSED_Q_DTYPE) or torch.int32).npu()
+        if seqused_q
+        else None
+    )
+    seqused_kv_t = (
+        torch.tensor(seqused_kv, dtype=get_dtype(SEQUSED_KV_DTYPE) or torch.int32).npu()
+        if seqused_kv
+        else None
+    )
+
+    query_layout = data_dict["query_layout"]
+    kv_layout = data_dict.get("kv_layout", query_layout)
+    attn_out_layout = data_dict["attn_out_layout"]
+
+    torch_npu.npu.set_device(int(DEVICE_ID))
+    torch.npu.synchronize()
+
+    logger.info("[NPU_METADATA] 调用 quant_flash_attn_metadata")
+    metadata = quant_flash_attn_metadata(
+        num_heads_q=data_dict["num_heads"],
+        num_heads_kv=data_dict["num_key_value_heads"],
+        head_dim=D,
+        quant_mode=Q_QUANT_MODE,
+        cu_seqlens_q=cu_seqlens_q_t,
+        cu_seqlens_kv=cu_seqlens_kv_t,
+        seqused_q=seqused_q_t,
+        seqused_kv=seqused_kv_t,
+        v_descale=v_descale,
+        batch_size=B,
+        max_seqlen_q=MAX_SEQLEN_Q,
+        max_seqlen_kv=MAX_SEQLEN_KV,
+        mask_mode=SPARSE_MODE,
+        win_left=PRE_TOKENS,
+        win_right=NEXT_TOKENS,
+        layout_q=query_layout,
+        layout_q_descale=LAYOUT_Q_DESCALE,
+        layout_kv=kv_layout,
+        layout_out=attn_out_layout,
+    )
+    torch.npu.synchronize()
+    return [metadata]
+
+
+def call_npu_main(data_dict):
+    """内部重建 metadata 后调 quant_flash_attn 主算子, 返回 (atten_out, lse_out).
+
+    分离测试入口: 验证主算子 + metadata 完整链路 (metadata 在本函数内部重建, 不跨用例传递)。
+    """
+    q = _to_npu(data_dict["q"])
+    k = _to_npu(data_dict["k"])
+    v = _to_npu(data_dict["v"])
+    q_descale = _to_npu(data_dict["q_descale"])
+    k_descale = _to_npu(data_dict["k_descale"])
+    v_descale = _to_npu(data_dict["v_descale"])
+    block_table = (
+        _to_npu(data_dict.get("block_table"))
+        if data_dict.get("block_table") is not None
+        else None
+    )
+    p_scale = (
+        _to_npu(data_dict.get("p_scale"))
+        if data_dict.get("p_scale") is not None
+        else None
+    )
+    sinks = (
+        _to_npu(data_dict.get("sinks")) if data_dict.get("sinks") is not None else None
+    )
+    attn_mask = (
+        _to_npu(data_dict.get("attn_mask"))
+        if data_dict.get("attn_mask") is not None
+        else None
+    )
+
+    cu_seqlens_q = data_dict["cu_seqlens_q"]
+    cu_seqlens_kv = data_dict["cu_seqlens_kv"]
+    seqused_q = data_dict["act_seq_lens_q"]
+    seqused_kv = data_dict["act_seq_lens_kv"]
+
+    cu_seqlens_q_t = (
+        torch.tensor(
+            cu_seqlens_q, dtype=get_dtype(CU_SEQLENS_Q_DTYPE) or torch.int32
+        ).npu()
+        if cu_seqlens_q is not None
+        else None
+    )
+    cu_seqlens_kv_t = (
+        torch.tensor(
+            cu_seqlens_kv, dtype=get_dtype(CU_SEQLENS_KV_DTYPE) or torch.int32
+        ).npu()
+        if cu_seqlens_kv is not None
+        else None
+    )
+    seqused_q_t = (
+        torch.tensor(seqused_q, dtype=get_dtype(SEQUSED_Q_DTYPE) or torch.int32).npu()
+        if seqused_q
+        else None
+    )
+    seqused_kv_t = (
+        torch.tensor(seqused_kv, dtype=get_dtype(SEQUSED_KV_DTYPE) or torch.int32).npu()
+        if seqused_kv
+        else None
+    )
+
+    query_layout = data_dict["query_layout"]
+    kv_layout = data_dict.get("kv_layout", query_layout)
+    attn_out_layout = data_dict["attn_out_layout"]
+
+    torch_npu.npu.set_device(int(DEVICE_ID))
+    torch.npu.synchronize()
+
+    logger.info("[NPU_MAIN] 重建 metadata (调 quant_flash_attn_metadata)")
+    metadata = quant_flash_attn_metadata(
+        num_heads_q=data_dict["num_heads"],
+        num_heads_kv=data_dict["num_key_value_heads"],
+        head_dim=D,
+        quant_mode=Q_QUANT_MODE,
+        cu_seqlens_q=cu_seqlens_q_t,
+        cu_seqlens_kv=cu_seqlens_kv_t,
+        seqused_q=seqused_q_t,
+        seqused_kv=seqused_kv_t,
+        v_descale=v_descale,
+        batch_size=B,
+        max_seqlen_q=MAX_SEQLEN_Q,
+        max_seqlen_kv=MAX_SEQLEN_KV,
+        mask_mode=SPARSE_MODE,
+        win_left=PRE_TOKENS,
+        win_right=NEXT_TOKENS,
+        layout_q=query_layout,
+        layout_q_descale=LAYOUT_Q_DESCALE,
+        layout_kv=kv_layout,
+        layout_out=attn_out_layout,
+    )
+
+    main_kwargs = dict(
+        q=q,
+        k=k,
+        v=v,
+        q_descale=q_descale,
+        k_descale=k_descale,
+        v_descale=v_descale,
+        quant_mode=Q_QUANT_MODE,
+        block_table=block_table,
+        p_scale=p_scale,
+        cu_seqlens_q=cu_seqlens_q_t,
+        cu_seqlens_kv=cu_seqlens_kv_t,
+        seqused_q=seqused_q_t,
+        seqused_kv=seqused_kv_t,
+        sinks=sinks,
+        attn_mask=attn_mask,
+        metadata=metadata,
+        softmax_scale=data_dict["softmax_scale"],
+        mask_mode=SPARSE_MODE,
+        win_left=PRE_TOKENS,
+        win_right=NEXT_TOKENS,
+        max_seqlen_q=MAX_SEQLEN_Q,
+        max_seqlen_kv=MAX_SEQLEN_KV,
+        layout_q=query_layout,
+        layout_q_descale=LAYOUT_Q_DESCALE,
+        layout_kv=kv_layout,
+        layout_out=attn_out_layout,
+    )
+    main_kwargs.update(_get_npu_fa_kwargs())
+
+    logger.info("[NPU_MAIN] 调用 quant_flash_attn 主算子")
+    npu_attn_out, npu_lse = quant_flash_attn(**main_kwargs)
+    torch.npu.synchronize()
+    return npu_attn_out, npu_lse
 
 
 # 自引用, 用于 _apply_golden_globals (避免循环 import)

@@ -19,11 +19,9 @@
  * \brief
  */
 
-
 #ifndef QUANT_FLASH_ATTN_COMMON_DEF_H_
 #define QUANT_FLASH_ATTN_COMMON_DEF_H_
 
-#include "asc_simd.h"
 #include "quant_flash_attn_template_tiling_key.h"
 #include "../../common/op_kernel/memcopy/parser.h"
 
@@ -123,15 +121,13 @@ struct RunInfo {
     bool isValid = false;
     bool isFirstS2Loop = false;
     bool isLastS2Loop = false;
-    bool isLastSecondS2Loop = false;
     bool isUpdatePScale = false;
     bool isC2Sync = false;            // s2上16个softmax是一个tile，这是每一个tile的第一个softmax 任务
     uint32_t s2FirstStartVecCore = 0; // s2上第一个softmax分给哪个vec core
     uint32_t tileBuffIdx = 0;         // 当前tile分给哪个buff
     uint32_t tileMaxIdx = 0;
-    uint32_t updateScaleIdx = 0;
+    uint32_t pscaleNum = 0;
     bool isS2FirstTilePerCore = false; // 16个softmax均分在两个core, 当前任务是否是分在当前core上的第一个，
-
 
     uint32_t bIdx = 0;
     uint32_t n2Idx = 0;
@@ -147,6 +143,7 @@ struct RunInfo {
     uint32_t actMSizeAlign128 = 0; // GS1 方向上长度对齐对齐128
     uint32_t actVecMSize = 0;      // VEC 视角, 基本块GS1方向长度，每个核的M长度
     uint32_t vecMbaseIdx = 0;      // VEC 对应的M 轴起始位置,V0 为0， V1 为 V0的actVecMSize
+    uint32_t updateScaleNum = 0;
 
     uint32_t actSingleLoopS2Size = 0;        // 单个softmaxS2方向长度
     uint32_t actSingleLoopS2SizeAlign = 0;   // 对齐到32
@@ -193,12 +190,6 @@ public:
         }
     }
 };
-
-__aicore__ inline void DataCopyL1ToUB(__ubuf__ void *ub, __cbuf__ void *l1, uint64_t vecCoreId, uint64_t blockCount,
-                                      uint64_t blockNum, uint64_t srcGap, uint64_t destGap)
-{
-    asc_copy_l12ub_sync(ub, l1, vecCoreId, blockCount, blockNum, srcGap, destGap);
-}
 
 } // namespace QFA_KERNEL
 
