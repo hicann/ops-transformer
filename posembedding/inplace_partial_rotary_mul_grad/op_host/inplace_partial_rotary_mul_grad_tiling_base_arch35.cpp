@@ -130,6 +130,10 @@ bool InplacePartialRotaryMulGradRegbaseTiling::IsInplacePartialRotaryMulGradMode
 
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckShapeAllPositive() const
 {
+    if (isNoOp_) {
+        // No-op: empty slice or empty dy/cos/sin, nothing to compute -> positive-shape checks skipped.
+        return ge::GRAPH_SUCCESS;
+    }
     OP_CHECK_IF(CheckInPutShapeAllPositive(DY_INPUT_INDEX) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_, "the dy input has non positive shape."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckInPutShapeAllPositive(COS_INDEX) != ge::GRAPH_SUCCESS,
@@ -230,6 +234,8 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckShapeLimit()
 
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckShape()
 {
+    // Shape checks still run for the no-op case: they enforce 4D and pass for the
+    // valid no-op inputs (cos==sin, dy==out, cosD<=dyD all hold for empty shapes too).
     auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
     auto &dyInputShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
     OP_CHECK_IF(CheckShapeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape dim fail."),
@@ -324,26 +330,24 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckRotaryModeShapeRe
         return ge::GRAPH_FAILED;
     }
 
-    if (sliceLen != 0) {
-        if (rotaryMode_ == InplacePartialRotaryMulGradMode::HALF ||
-            rotaryMode_ == InplacePartialRotaryMulGradMode::INTERLEAVE ||
-            rotaryMode_ == InplacePartialRotaryMulGradMode::INTERLEAVE_HALF) {
-            if (sliceLen % HALF_INTERLEAVE_MODE_COEF != 0) {
-                std::string reasonMsg = "The slice length (partial_slice's end - start) should be divisible by " +
-                                        std::to_string(HALF_INTERLEAVE_MODE_COEF) +
-                                        " when the attr mode is half, interleave or interleave-half";
-                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "partial_slice", std::to_string(sliceLen).c_str(),
-                                          reasonMsg.c_str());
-                return ge::GRAPH_FAILED;
-            }
-        } else if (rotaryMode_ == InplacePartialRotaryMulGradMode::QUARTER) {
-            if (sliceLen % QUARTER_MODE_COEF != 0) {
-                std::string reasonMsg = "The slice length (partial_slice's end - start) should be divisible by " +
-                                        std::to_string(QUARTER_MODE_COEF) + " when the attr mode is quarter";
-                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "partial_slice", std::to_string(sliceLen).c_str(),
-                                          reasonMsg.c_str());
-                return ge::GRAPH_FAILED;
-            }
+    if (rotaryMode_ == InplacePartialRotaryMulGradMode::HALF ||
+        rotaryMode_ == InplacePartialRotaryMulGradMode::INTERLEAVE ||
+        rotaryMode_ == InplacePartialRotaryMulGradMode::INTERLEAVE_HALF) {
+        if (sliceLen % HALF_INTERLEAVE_MODE_COEF != 0) {
+            std::string reasonMsg = "The slice length (partial_slice's end - start) should be divisible by " +
+                                    std::to_string(HALF_INTERLEAVE_MODE_COEF) +
+                                    " when the attr mode is half, interleave or interleave-half";
+            OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "partial_slice", std::to_string(sliceLen).c_str(),
+                                      reasonMsg.c_str());
+            return ge::GRAPH_FAILED;
+        }
+    } else if (rotaryMode_ == InplacePartialRotaryMulGradMode::QUARTER) {
+        if (sliceLen % QUARTER_MODE_COEF != 0) {
+            std::string reasonMsg = "The slice length (partial_slice's end - start) should be divisible by " +
+                                    std::to_string(QUARTER_MODE_COEF) + " when the attr mode is quarter";
+            OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "partial_slice", std::to_string(sliceLen).c_str(),
+                                      reasonMsg.c_str());
+            return ge::GRAPH_FAILED;
         }
     }
 
@@ -361,6 +365,7 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckRotaryModeShapeRe
 
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckAttr()
 {
+    isNoOp_ = false; // reset across tiling instances
     const gert::RuntimeAttrs *attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
@@ -379,17 +384,28 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckAttr()
     sliceEnd_ = partialSlicePtr->GetData()[1];
     sliceLength_ = sliceEnd_ - sliceStart_;
 
-    if (sliceLength_ != 0) {
-        auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
-        int64_t cosD = cosShape.GetDim(DIM_3);
-        if (sliceLength_ != cosD) {
-            std::string sliceStr = "[" + std::to_string(sliceStart_) + ", " + std::to_string(sliceEnd_) + ")";
-            std::string reasonMsg =
-                "The D axis of input cos should be equal to the slice length (partial_slice's end - start)";
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), sliceStr.c_str(),
-                                                  std::to_string(cosD).c_str(), reasonMsg.c_str());
-            return ge::GRAPH_FAILED;
-        }
+    // No-op: empty slice (start == end) or any of dy/cos/sin is an empty tensor
+    // (some dim is 0). Nothing to compute, the kernel goes through TILING_KEY_EMPTY
+    // and returns, dx == dy (in-place). Use total element count so an empty
+    // B/S/N dim of cos/sin is caught too, not just an empty D dim.
+    auto &dyShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
+    auto &cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+    auto &sinShape = context_->GetInputShape(SIN_INDEX)->GetStorageShape();
+    int64_t cosD = cosShape.GetDim(DIM_3);
+    int64_t dySize = dyShape.GetShapeSize();
+    int64_t cosSize = cosShape.GetShapeSize();
+    int64_t sinSize = sinShape.GetShapeSize();
+    if (sliceLength_ == 0 || dySize == 0 || cosSize == 0 || sinSize == 0) {
+        isNoOp_ = true;
+        return ge::GRAPH_SUCCESS;
+    }
+    if (sliceLength_ != cosD) {
+        std::string sliceStr = "[" + std::to_string(sliceStart_) + ", " + std::to_string(sliceEnd_) + ")";
+        std::string reasonMsg =
+            "The D axis of input cos should be equal to the slice length (partial_slice's end - start)";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), sliceStr.c_str(), std::to_string(cosD).c_str(),
+                                              reasonMsg.c_str());
+        return ge::GRAPH_FAILED;
     }
 
     OP_CHECK_IF(CheckRotaryModeShapeRelation(sliceLength_) != ge::GRAPH_SUCCESS,
@@ -412,6 +428,14 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckParam()
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::GetShapeAttrsInfo()
 {
     OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check param fail."), return ge::GRAPH_FAILED);
+    if (isNoOp_) {
+        // No-op: kernel returns at TILING_KEY_EMPTY and ignores the tiling data. Set a
+        // valid layout so the template dispatch (TilingRegistry) selects a capable class
+        // (A&B handles BROADCAST_BSN), then skip JudgeLayoutByShape — an empty B/S/N dim
+        // of cos/sin has no valid broadcast pattern and would fail there.
+        layout_ = InplacePartialRotaryMulGradLayout::BROADCAST_BSN;
+        return ge::GRAPH_SUCCESS;
+    }
 
     auto &dyInputShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
     auto &cosInputShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
@@ -447,9 +471,6 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::GetShapeAttrsInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-uint64_t InplacePartialRotaryMulGradRegbaseTiling::GetTilingKey() const
-{
-    return tilingKey_;
-}
+uint64_t InplacePartialRotaryMulGradRegbaseTiling::GetTilingKey() const { return tilingKey_; }
 
 } // namespace optiling

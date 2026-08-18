@@ -23,7 +23,8 @@ the leading (B, S, N) dims of dy.
 """
 
 __golden__ = {
-    "kernel": {"inplace_partial_rotary_mul_grad": "InplacePartialRotaryMulGrad"}
+    "kernel": {"inplace_partial_rotary_mul_grad": "InplacePartialRotaryMulGrad"},
+    "aclnn": {"aclnnInplacePartialRotaryMulGrad": "AclnnInplacePartialRotaryMulGrad"},
 }
 
 import numpy as np
@@ -46,6 +47,9 @@ def InplacePartialRotaryMulGrad(
         )
 
     slice_len = end - start
+    # Empty dy / cos / sin -> device treats as no-op (TILING_KEY_EMPTY, dx == dy).
+    if dy.size == 0 or cos.size == 0 or sin.size == 0:
+        return dx.astype(out_dtype)
     d = dx[..., start:end]  # (..., L)
     c = np.asarray(cos, dtype=np.float32)[..., :slice_len]  # (..., L)
     s = np.asarray(sin, dtype=np.float32)[..., :slice_len]
@@ -61,3 +65,34 @@ def InplacePartialRotaryMulGrad(
 
     dx[..., start:end] = out
     return dx.astype(out_dtype)
+
+
+def AclnnInplacePartialRotaryMulGrad(
+    dyRef, cos, sin, rotaryMode=0, partialSlice=None, *args, **kwargs
+):
+    """aclnn 流程 golden（torch 入参，dyRef 原地输入/输出）。
+
+    Parameters follow aclnnInplacePartialRotaryMulGradGetWorkspaceSize
+    (without workspaceSize & executor): dyRef, cos, sin, rotaryMode, partialSlice.
+    """
+    import torch
+
+    def _np(t):
+        if t is None:
+            return None
+        if t.dtype == torch.bfloat16:
+            t = t.float()
+        return t.detach().cpu().numpy()
+
+    sl = (
+        (0, 0) if partialSlice is None else (int(partialSlice[0]), int(partialSlice[1]))
+    )
+    return [
+        InplacePartialRotaryMulGrad(
+            _np(dyRef),
+            _np(cos),
+            _np(sin),
+            rotary_mode=int(rotaryMode),
+            partial_slice=sl,
+        )
+    ]

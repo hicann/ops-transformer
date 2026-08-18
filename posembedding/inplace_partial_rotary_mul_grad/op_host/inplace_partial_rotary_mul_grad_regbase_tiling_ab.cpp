@@ -23,8 +23,7 @@ class InplacePartialRotaryMulGradRegbaseTilingAb : public InplacePartialRotaryMu
 public:
     explicit InplacePartialRotaryMulGradRegbaseTilingAb(gert::TilingContext *context)
         : InplacePartialRotaryMulGradRegbaseTiling(context)
-    {
-    }
+    {}
 
 protected:
     ge::graphStatus DoOpTiling() override;
@@ -55,7 +54,7 @@ private:
 
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTilingAb::DoOpTiling()
 {
-    if (sliceLength_ == 0) {
+    if (isNoOp_) {
         usedCoreNum_ = 1;
         return ge::GRAPH_SUCCESS;
     }
@@ -165,7 +164,7 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTilingAb::PostTiling()
     tilingDataAb_.SaveToBuffer(rawTilingDataPtr->GetData(), rawTilingDataPtr->GetCapacity());
     rawTilingDataPtr->SetDataSize(tilingDataAb_.GetDataSize());
 
-    tilingKey_ = ((sliceLength_ == 0) ? TILING_KEY_EMPTY : static_cast<uint64_t>(TILING_KEY_AB));
+    tilingKey_ = (isNoOp_ ? TILING_KEY_EMPTY : static_cast<uint64_t>(TILING_KEY_AB));
     context_->SetTilingKey(tilingKey_);
     context_->SetBlockDim(usedCoreNum_);
 

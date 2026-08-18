@@ -24,8 +24,7 @@ class InplacePartialRotaryMulGradRegbaseTilingAAndB : public InplacePartialRotar
 public:
     explicit InplacePartialRotaryMulGradRegbaseTilingAAndB(gert::TilingContext *context)
         : InplacePartialRotaryMulGradRegbaseTiling(context)
-    {
-    }
+    {}
 
 protected:
     ge::graphStatus DoOpTiling() override;
@@ -54,7 +53,7 @@ private:
 
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTilingAAndB::DoOpTiling()
 {
-    if (sliceLength_ == 0) {
+    if (isNoOp_) {
         usedCoreNum_ = 1;
         return ge::GRAPH_SUCCESS;
     }
@@ -121,11 +120,11 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTilingAAndB::ComputeUbFactor()
             return ge::GRAPH_FAILED;
         }
         int64_t numOfDAvailable = Ops::Base::FloorDiv(availableForDy, UB_FACTOR * dSizeDy);
-        OP_CHECK_IF(numOfDAvailable < 1,
-                    OP_LOGE(context_->GetNodeName(),
-                            "ubSize can't load slice, sliceLength=%ld, dSizeDy=%ld, dSizeCos=%ld.", sliceLength_,
-                            dSizeDy, dSizeCos),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            numOfDAvailable < 1,
+            OP_LOGE(context_->GetNodeName(), "ubSize can't load slice, sliceLength=%ld, dSizeDy=%ld, dSizeCos=%ld.",
+                    sliceLength_, dSizeDy, dSizeCos),
+            return ge::GRAPH_FAILED);
         ubFactorB_ = std::min(blockFactorB_, numOfDAvailable);
     }
     ubFactorB_ = std::min(ubFactorB_, MAX_COPY_BLOCK_COUNT / dSplitCoef_);
@@ -185,9 +184,9 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTilingAAndB::PostTiling()
     rawTilingDataPtr->SetDataSize(tilingDataAAndB_.GetDataSize());
 
     if (layout_ == InplacePartialRotaryMulGradLayout::NO_BROADCAST) {
-        tilingKey_ = ((sliceLength_ == 0) ? TILING_KEY_EMPTY : static_cast<uint64_t>(TILING_KEY_A));
+        tilingKey_ = (isNoOp_ ? TILING_KEY_EMPTY : static_cast<uint64_t>(TILING_KEY_A));
     } else {
-        tilingKey_ = ((sliceLength_ == 0) ? TILING_KEY_EMPTY : static_cast<uint64_t>(TILING_KEY_B));
+        tilingKey_ = (isNoOp_ ? TILING_KEY_EMPTY : static_cast<uint64_t>(TILING_KEY_B));
     }
 
     context_->SetTilingKey(tilingKey_);

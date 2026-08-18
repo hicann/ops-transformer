@@ -120,6 +120,10 @@ def inplace_partial_rotary_mul_backward(
     replaced by the RoPE gradient, while elements outside the slice are
     left unchanged.
 
+    When the slice length is 0 (``partial_slice``'s start equals end, e.g.
+    ``[0, 0]``) or any of ``grad_output``/``r1``/``r2`` is an empty tensor
+    (some dim is 0), this is a no-op: ``grad_output`` is left unchanged.
+
     Args:
         grad_output (Tensor): Gradient of the loss w.r.t. the output of
             the forward pass (i.e. the modified ``x``).

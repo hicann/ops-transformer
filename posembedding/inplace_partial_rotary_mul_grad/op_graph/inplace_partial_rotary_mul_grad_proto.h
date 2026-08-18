@@ -44,10 +44,11 @@ namespace ge {
  * interleave-half=3) are not implemented yet.
  * Let (B, S, N, D) represents the shape of the input "dy". Under this
  * representation, the shape constraints of each parameter can be described as follows:
- * @li The D of "dy" must be equal and less or equal to 1024. The D of "cos", "sin"
- * must be equal to the slice length ("partial_slice"'s end - start).
- * @li B, S, N of "cos", "sin" must broadcast to match the B, S, N of "dy". The D of these
- * tensors equals ("partial_slice"'s end - start). Specifically, B, S, N must meet one of the following four conditions:
+ * @li The D of "dy" must be equal and less or equal to 1024. When the slice length is greater than 0, the D of
+ * "cos", "sin" must be equal to the slice length ("partial_slice"'s end - start).
+ * @li B, S, N of "cos", "sin" must broadcast to match the B, S, N of "dy". When the slice length is greater than 0,
+ * the D of these tensors equals ("partial_slice"'s end - start). Specifically, B, S, N must meet one of the following
+ * four conditions:
  *  - B, S, N are 1, means the shape is (1, 1, 1, end-start).
  *  - B, S, N are the same as that of "dy", means the shape is (B, S, N, end-start).
  *  - One of S and N is 1, the remaining one dimension and B are the same as that of "dy", means the shape is (B, 1, N,
@@ -55,8 +56,11 @@ namespace ge {
  *  - Two of B, S and N are 1, the remaining one dimension is the same as that of "dy", means the shape is (1, 1, N,
  * end-start), (1, S, 1, end-start) or (B, 1, 1, end-start).
  * @li Let the value of "partial_slice" be [start, end]. "start" must be in range [0, D], "end" must be in range
- * ["start", D]. In half, interleave and interleave-half mode, ("end" - "start") must be a multiple of 2. In quarter
- * mode, ("end" - "start") must be a multiple of 4. The case where "start" equals "end" is not supported.
+ * ["start", D]. When the slice length is greater than 0: in half, interleave and interleave-half mode,
+ * ("end" - "start") must be a multiple of 2; in quarter mode, ("end" - "start") must be a multiple of 4.
+ * @li Empty-input support: when the slice length is 0 ("partial_slice"'s start equals end, e.g. [0, 0]), or any of
+ * "dy"/"cos"/"sin" is an empty tensor (some dim is 0), the operator performs a no-op: no rotary grad is computed and
+ * the output equals the input (in-place).
  */
 
 REG_OP(InplacePartialRotaryMulGrad)

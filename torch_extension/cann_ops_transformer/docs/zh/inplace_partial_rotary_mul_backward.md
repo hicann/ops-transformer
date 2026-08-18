@@ -82,13 +82,13 @@ cann_ops_transformer.inplace_partial_rotary_mul_backward(grad_output, r1, r2, *,
 - 该接口支持单算子模式和TorchAir图模式调用。
 - 该算子仅支持连续Tensor，不支持非连续Tensor。
 - **该算子当前版本仅支持interleave模式（`rotary_mode="interleave"`）**。half（0）、quarter（2）、interleave-half（3）模式暂未实现。
-- 该算子不支持输入空Tensor（任意维度不能为0），不支持 `partial_slice` 的切片长度为零（即 `end == start`）的场景。
+- **空输入支持**：当切片长度为0（`partial_slice`的start等于end，如`[0, 0]`），或`grad_output`、`r1`、`r2`中存在空Tensor（某维大小为0）时，算子执行no-op操作，不做旋转位置编码梯度计算，直接返回。
 - `grad_output`最后一维D大小不超过1024。
 - `partial_slice`必须包含两个整数，满足`start >= 0`、`end >= 0`、`end <= D`、`end - start >= 0`。
-- `partial_slice`切片长度（即`end - start`）必须为2的倍数，且必须大于0。
-- `r1`、`r2`最后一维大小必须相同，且必须等于`partial_slice`的切片长度（即`end - start`）。
+- 当切片长度（即`end - start`）大于0时，切片长度必须为2的倍数。
+- 当切片长度（即`end - start`）大于0时，`r1`、`r2`最后一维大小必须相同，且必须等于切片长度。
 - `r1`、`r2`的shape必须与`grad_output[..., start:end]`满足广播关系，且`r1`、`r2`shape当前只支持BSND、B1ND、B11D、111D排布。
-- `grad_output`、`r1`、`r2` 的各维度值必须大于0。
+- 当切片长度（即`end - start`）大于0时，`grad_output`、`r1`、`r2` 的各维度值必须大于0。
 
 ## 确定性计算
 

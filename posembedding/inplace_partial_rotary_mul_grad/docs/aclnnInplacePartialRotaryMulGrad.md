@@ -331,18 +331,18 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
 - 该算子仅支持Ascend 950 AI Processor。
 - 该算子仅支持连续Tensor，不支持非连续Tensor。
 - **该算子当前版本仅支持 interleave 模式（`rotary_mode=1`）**。half（0）、quarter（2）、interleave-half（3）模式暂未实现。
-- 该算子不支持输入空Tensor（任意维度大小不能为0），不支持 slice 长度为零（即 `partial_slice[0] == partial_slice[1]`，也就是 `start == end`）的场景。
 
 - 确定性计算：
   - aclnnInplacePartialRotaryMulGrad默认确定性实现。
 
 - 输入张量dyRef支持BSND排布以及其B/S/N维度的广播变体（如111D、1SND、B1ND、BS1D、11ND、B11D、1S1D等）。各参数的shape约束可以描述如下：
   - 输入张量dyRef的最后一维大小D必须小于等于1024。
-  - 输入张量cos、sin的最后一维大小必须等于切片长度(end - start)。
+  - 当切片长度(end - start)大于0时，输入张量cos、sin的最后一维大小必须等于切片长度。
   - 输入张量cos和sin的shape必须完全相同，cos和sin的B、S、N维度需要与dyRef满足[broadcast关系](../../../docs/zh/context/broadcast_relationship.md)，且广播后的B、S、N必须等于dyRef的B、S、N。
-  - half、interleave和interleave-half模式下，切片长度(end - start)必须能被2整除。
-  - quarter模式下，切片长度(end - start)必须能被4整除。
+  - half、interleave和interleave-half模式下，当切片长度(end - start)大于0时，切片长度必须能被2整除。
+  - quarter模式下，当切片长度(end - start)大于0时，切片长度必须能被4整除。
   - 输入张量cos和sin的数据类型必须相同。
+- **空输入支持**：当切片长度为0（`partial_slice`的start等于end，如`[0, 0]`），或dyRef、cos、sin中存在空Tensor（某维大小为0）时，算子执行no-op操作，不做旋转位置编码计算，直接返回。
 
 ## 调用示例
 

@@ -94,44 +94,26 @@ enum class InplacePartialRotaryMulGradMode : int64_t {
 
 class InplacePartialRotaryMulGradRegbaseTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit InplacePartialRotaryMulGradRegbaseTiling(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-    }
+    explicit InplacePartialRotaryMulGradRegbaseTiling(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
 
-    void Reset(gert::TilingContext *context) override
-    {
-        TilingBaseClass::Reset(context);
-    }
+    void Reset(gert::TilingContext *context) override { TilingBaseClass::Reset(context); }
 
 protected:
     ge::graphStatus GetPlatformInfo() override;
     ge::graphStatus GetShapeAttrsInfo() override;
-    ge::graphStatus GetWorkspaceSize() override
-    {
-        return ge::GRAPH_SUCCESS;
-    }
+    ge::graphStatus GetWorkspaceSize() override { return ge::GRAPH_SUCCESS; }
 
-    ge::graphStatus DoLibApiTiling() override
-    {
-        return ge::GRAPH_SUCCESS;
-    }
+    ge::graphStatus DoLibApiTiling() override { return ge::GRAPH_SUCCESS; }
 
-    ge::graphStatus DoOpTiling() override
-    {
-        return ge::GRAPH_SUCCESS;
-    }
+    ge::graphStatus DoOpTiling() override { return ge::GRAPH_SUCCESS; }
 
     uint64_t GetTilingKey() const override;
 
-    ge::graphStatus PostTiling() override
-    {
-        return ge::GRAPH_SUCCESS;
-    }
+    ge::graphStatus PostTiling() override { return ge::GRAPH_SUCCESS; }
 
-    bool IsCapable() override
-    {
-        return true;
-    }
+    bool IsCapable() override { return true; }
     const static int64_t MAX_COPY_BLOCK_COUNT = 4095;
     int64_t b_{0};
     int64_t s_{0};
@@ -153,6 +135,9 @@ protected:
     int64_t sliceEnd_{0};
     int64_t sliceLength_{0};
     bool is1snd_ = false;
+    // No-op: empty slice (start == end) or empty dy/cos/sin -> nothing to compute,
+    // kernel goes through TILING_KEY_EMPTY and returns, output dx == dy (in-place).
+    bool isNoOp_{false};
 
 private:
     bool IsInplacePartialRotaryMulGradMode(const int32_t mode) const;
