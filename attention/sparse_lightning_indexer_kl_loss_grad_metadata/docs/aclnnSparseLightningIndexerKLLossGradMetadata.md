@@ -394,7 +394,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       - cuSeqlensQOptional必须传入。
   <!-- end id10 -->
   <!-- npu="A3" id11 -->
-  - Atlas A3 训练系列产品/Atlas A3 推理系列产品约束：
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>约束：
     - BSND场景
       - 必传batchSize、maxSeqlenQ、maxSeqlenK和topk参数，以获取shape信息。
     - TND场景
@@ -402,7 +402,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       - 当batchSize为0时，通过cuSeqLensQOptional的shape推导batch。
   <!-- end id11 -->
   <!-- npu="910b" id12 -->
-  - Atlas A2 训练系列产品/Atlas A2 推理系列产品约束：
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>约束：
     - BSND场景
       - 必传batchSize、maxSeqlenQ、maxSeqlenK和topk参数，以获取shape信息。
     - TND场景

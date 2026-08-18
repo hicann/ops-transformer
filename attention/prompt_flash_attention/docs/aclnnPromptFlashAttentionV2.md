@@ -494,7 +494,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - 支持D轴小于等于512。inputLayout为BSH或者BSND时，要求N*D小于65535。
 
   <!-- end id6 -->
-  - Atlas 推理系列产品：
+  - <term>Atlas 推理系列产品</term>：
       - 在inputLayout为BSH时，支持B轴小于等于300，其余情况B轴小于等于128；
       - 支持N轴小于等于256；
       - 支持S轴小于等于65535(64k), Q_S或KV_S非128对齐，Q_S和KV_S不等长的场景不支持配置atten_mask；
@@ -506,7 +506,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT16、BFLOAT16、INT8
     <!-- end id7 -->
     <!-- npu="310p" id19 -->
-    - Atlas 推理系列产品：数据类型仅支持FLOAT16
+    - <term>Atlas 推理系列产品</term>：数据类型仅支持FLOAT16
     <!-- end id19 -->
 
 - pseShift功能使用限制如下：
@@ -518,7 +518,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT16、BFLOAT16
     <!-- end id8 -->
     <!-- npu="310p" id20 -->
-    - Atlas 推理系列产品：仅支持nullptr
+    - <term>Atlas 推理系列产品</term>：仅支持nullptr
     <!-- end id20 -->
 
 - attenMask功能使用限制如下：
@@ -530,7 +530,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持BOOL、INT8和UINT8。
     <!-- end id9 -->
     <!-- npu="310p" id21 -->
-    - Atlas 推理系列产品：仅支持BOOL。
+    - <term>Atlas 推理系列产品</term>：仅支持BOOL。
     <!-- end id21 -->
   - 当attenMask数据类型取INT8、UINT8时，其tensor中的值需要为0或1。
 
@@ -546,7 +546,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64。
     <!-- end id10 -->
     <!-- npu="310p" id22 -->
-    - Atlas 推理系列产品：数据类型支持INT64。
+    - <term>Atlas 推理系列产品</term>：数据类型支持INT64。
     <!-- end id22 -->
 
 - deqScale1，deqScale2输入，功能使用限制如下：
@@ -557,7 +557,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持UINT64、FLOAT32。
     <!-- end id11 -->
     <!-- npu="310p" id23 -->
-    - Atlas 推理系列产品：仅支持nullptr。
+    - <term>Atlas 推理系列产品</term>：仅支持nullptr。
     <!-- end id23 -->
 
 - quantScale1输入，功能使用限制如下：
@@ -568,7 +568,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT32。
     <!-- end id12 -->
     <!-- npu="310p" id24 -->
-    - Atlas 推理系列产品：仅支持nullptr。
+    - <term>Atlas 推理系列产品</term>：仅支持nullptr。
     <!-- end id24 -->
 
 - quantScale2，quantOffset2输入，功能使用限制如下：
@@ -579,7 +579,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT32和BFLOAT16。
     <!-- end id13 -->
     <!-- npu="310p" id25 -->
-    - Atlas 推理系列产品：仅支持nullptr。
+    - <term>Atlas 推理系列产品</term>：仅支持nullptr。
     <!-- end id25 -->
 
 - preTokens输入，功能使用限制如下：
@@ -590,7 +590,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64。
     <!-- end id14 -->
     <!-- npu="310p" id26 -->
-    - Atlas 推理系列产品：仅支持取值2147483647。
+    - <term>Atlas 推理系列产品</term>：仅支持取值2147483647。
     <!-- end id26 -->
 - nextTokens输入，功能使用限制如下：
 
@@ -600,7 +600,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64。
     <!-- end id15 -->
     <!-- npu="310p" id27 -->
-    - Atlas 推理系列产品：仅支持取值0和2147483647。
+    - <term>Atlas 推理系列产品</term>：仅支持取值0和2147483647。
     <!-- end id27 -->
 - inputLayout输入，功能使用限制如下：
 
@@ -617,7 +617,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持INT64。
     <!-- end id16 -->
     <!-- npu="310p" id28 -->
-    - Atlas 推理系列产品：仅支持取值0。
+    - <term>Atlas 推理系列产品</term>：仅支持取值0。
     <!-- end id28 -->
 
 - sparseMode输入，功能使用限制如下：
@@ -633,7 +633,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
 
   <!-- end id17 -->
   <!-- npu="310p" id29 -->
-  - Atlas 推理系列产品：仅支持取值0
+  - <term>Atlas 推理系列产品</term>：仅支持取值0
   <!-- end id29 -->
 
 - attentionOut输出，功能使用限制如下：
@@ -645,7 +645,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT16、BFLOAT16、INT8。
     <!-- end id18 -->
     <!-- npu="310p" id30 -->
-    - Atlas 推理系列产品：仅支持FLOAT16。
+    - <term>Atlas 推理系列产品</term>：仅支持FLOAT16。
     <!-- end id30 -->
 
 - 其它约束：
