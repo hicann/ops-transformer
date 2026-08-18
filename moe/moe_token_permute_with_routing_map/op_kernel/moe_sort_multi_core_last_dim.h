@@ -15,9 +15,9 @@
 #ifndef MOE_TOKEN_PREMUTE_MOE_SORT_MULTI_CORE_LAST_H
 #define MOE_TOKEN_PREMUTE_MOE_SORT_MULTI_CORE_LAST_H
 
-#include "moe_sort_base.h"
-#include "moe_mrgsort.h"
-#include "moe_mrgsort_out.h"
+#include "moe_sort_base_with_routing_map.h"
+#include "moe_mrgsort_with_routing_map.h"
+#include "moe_mrgsort_out_with_routing_map.h"
 
 namespace MoeTokenPermute {
 using namespace AscendC;

@@ -17,7 +17,7 @@
 
 #include "kernel_operator.h"
 #include "vf_topk.h"
-#include "vf_topk_16_gather.h"
+#include "vf_topk_16_gather_quant_v2.h"
 
 namespace topk {
 template<typename T>

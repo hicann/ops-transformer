@@ -13,10 +13,10 @@
  * \brief
  */
 #include "kernel_operator.h"
-#include "arch35/moe_gating_top_k_softmax_v2_ek_fullload.h"
-#include "arch35/moe_gating_top_k_softmax_v2_k_fullload.h"
-#include "arch35/moe_gating_top_k_softmax_v2_k_renorm.h"
-#include "arch35/moe_gating_top_k_softmax_v2_perf.h"
+#include "arch35/moe_gating_top_k_softmax_v2_ek_fullload_arch35.h"
+#include "arch35/moe_gating_top_k_softmax_v2_k_fullload_arch35.h"
+#include "arch35/moe_gating_top_k_softmax_v2_k_renorm_arch35.h"
+#include "arch35/moe_gating_top_k_softmax_v2_perf_arch35.h"
 
 using namespace MoeGatingTopKSoftmaxV2;
 

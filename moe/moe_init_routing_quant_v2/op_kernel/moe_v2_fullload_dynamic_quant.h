@@ -15,7 +15,7 @@
 #ifndef MOE_V2_FULL_LOAD_DYNAMIC_QUANT_H
 #define MOE_V2_FULL_LOAD_DYNAMIC_QUANT_H
 
-#include "inner/moe_v2_mrgsort.h"
+#include "inner/moe_v2_mrgsort_inner.h"
 
 namespace MoeInitRoutingQuantV2 {
 using namespace AscendC;

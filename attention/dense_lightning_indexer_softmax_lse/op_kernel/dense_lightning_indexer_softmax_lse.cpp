@@ -16,7 +16,7 @@
 #include "kernel_operator.h"
 
 #if (__CCE_AICORE__ == 310)
-    #include "arch35/dense_lightning_indexer_softmax_lse.h"
+    #include "arch35/dense_lightning_indexer_softmax_lse_arch35.h"
 #else
     #include "dense_lightning_indexer_softmax_lse.h"
 #endif

@@ -14,7 +14,7 @@
  */
 #include "arch35/moe_init_routing_v2_grad_full_load.h"
 #include "arch35/moe_init_routing_v2_grad_split_h.h"
-#include "arch35/moe_init_routing_v2_grad.h"
+#include "arch35/moe_init_routing_v2_grad_arch35.h"
 
 using namespace AscendC;
 using namespace MoeInitRoutingV2Grad;

@@ -18,10 +18,10 @@
 #include "lightning_indexer_template_tiling_key.h"
 
 #if (__CCE_AICORE__ == 310)
-    #include "arch35/lightning_indexer_kernel.h"
+    #include "arch35/lightning_indexer_kernel_arch35.h"
 
 #else
-    #include "arch22/lightning_indexer_kernel.h"
+    #include "arch22/lightning_indexer_kernel_arch22.h"
 #endif
 
 using namespace LIKernel;

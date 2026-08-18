@@ -16,7 +16,7 @@
 #ifndef COMPRESSOR_BLOCK_VEC_FULL_LOAD_H
 #define COMPRESSOR_BLOCK_VEC_FULL_LOAD_H
 
-#include "compressor_comm.h"
+#include "compressor_comm_arch22.h"
 #include "compressor_tools.h"
 #include "compressor_vector_comm.h"
 #include "soft_max.h"

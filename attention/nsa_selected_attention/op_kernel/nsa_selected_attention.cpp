@@ -14,7 +14,7 @@
  */
 
 #include "kernel_operator.h"
-#include "nsa_selected_attention.h"
+#include "nsa_selected_attention_kernel.h"
 
 using namespace AscendC;
 

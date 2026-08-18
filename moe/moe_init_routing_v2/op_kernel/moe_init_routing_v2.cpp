@@ -15,13 +15,13 @@
 
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
-#include "arch35/moe_v2_mrgsort_out.h"
-#include "arch35/moe_v2_mrgsort.h"
-#include "arch35/moe_v2_sort_multi_core.h"
-#include "arch35/moe_v2_sort_one_core.h"
+#include "arch35/moe_v2_mrgsort_out_arch35.h"
+#include "arch35/moe_v2_mrgsort_arch35.h"
+#include "arch35/moe_v2_sort_multi_core_arch35.h"
+#include "arch35/moe_v2_sort_one_core_arch35.h"
 #include "arch35/moe_v2_expert_token_out_regbase.h"
 #include "arch35/moe_v2_expert_token_out_simt.h"
-#include "arch35/moe_v2_src_to_dst_op_simt.h"
+#include "arch35/moe_v2_src_to_dst_op_simt_arch35.h"
 #include "arch35/moe_v2_src_to_dst_with_capacity_simt.h"
 #include "arch35/moe_v2_gather_out_for_simt.h"
 #include "arch35/moe_v2_scatter_out_batch_row.h"

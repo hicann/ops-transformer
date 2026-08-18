@@ -13,7 +13,7 @@
  * \brief KV compress epilog kernel implementation
  */
 
-#include "kv_compress_epilog.h"
+#include "kv_compress_epilog_kernel.h"
 
 using namespace AscendC;
 

@@ -12,15 +12,15 @@
  * \file moe_init_routing.cpp
  * \brief
  */
-#include "arch35/moe_gather_out.h"
-#include "arch35/moe_mrgsort_out.h"
-#include "arch35/moe_mrgsort.h"
-#include "arch35/moe_sort_multi_core.h"
-#include "arch35/moe_sort_one_core.h"
-#include "arch35/moe_src_to_dst_op.h"
-#include "arch35/moe_gather_out.h"
-#include "arch35/moe_gather_out_small_activate_row.h"
-#include "arch35/moe_init_routing_fullload.h"
+#include "arch35/moe_gather_out_arch35.h"
+#include "arch35/moe_mrgsort_out_arch35.h"
+#include "arch35/moe_mrgsort_arch35.h"
+#include "arch35/moe_sort_multi_core_arch35.h"
+#include "arch35/moe_sort_one_core_arch35.h"
+#include "arch35/moe_src_to_dst_op_arch35.h"
+#include "arch35/moe_gather_out_arch35.h"
+#include "arch35/moe_gather_out_small_activate_row_arch35.h"
+#include "arch35/moe_init_routing_fullload_arch35.h"
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
 #include "arch35/moe_src_to_dst_simt_op.h"
 #endif

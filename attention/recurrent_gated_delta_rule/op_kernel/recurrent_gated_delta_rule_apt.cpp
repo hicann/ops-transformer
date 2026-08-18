@@ -12,7 +12,7 @@
  * \file recurrent_gated_delta_rule_apt.cpp
  * \brief
  */
-#include "arch35/recurrent_gated_delta_rule.h"
+#include "arch35/recurrent_gated_delta_rule_arch35.h"
 #include "recurrent_gated_delta_rule_tiling_data.h"
 #include "recurrent_gated_delta_rule_tiling_key.h"
 

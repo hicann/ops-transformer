@@ -13,7 +13,7 @@
  * \brief
  */
 
-#include "arch22/chunk_gated_delta_rule.h"
+#include "arch22/chunk_gated_delta_rule_arch22.h"
 #include "chunk_gated_delta_rule_tiling_data.h"
 
 using namespace AscendC;

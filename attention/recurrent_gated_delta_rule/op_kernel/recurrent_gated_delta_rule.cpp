@@ -12,7 +12,7 @@
  * \file recurrent_gated_delta_rule.cpp
  * \brief
  */
-#include "arch22/recurrent_gated_delta_rule.h"
+#include "arch22/recurrent_gated_delta_rule_arch22.h"
 #include "recurrent_gated_delta_rule_tiling_data.h"
 #include "recurrent_gated_delta_rule_tiling_key.h"
 

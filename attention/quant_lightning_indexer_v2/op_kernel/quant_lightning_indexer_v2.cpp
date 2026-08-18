@@ -16,9 +16,9 @@
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
 #if (__CCE_AICORE__ == 310)
-#include "arch35/quant_lightning_indexer_v2_kernel.h"
+#include "arch35/quant_lightning_indexer_v2_kernel_arch35.h"
 #else
-#include "arch22/quant_lightning_indexer_v2_kernel.h"
+#include "arch22/quant_lightning_indexer_v2_kernel_arch22.h"
 #endif
 #include "quant_lightning_indexer_v2_template_tiling_key.h"
 using namespace QLIV2Kernel;

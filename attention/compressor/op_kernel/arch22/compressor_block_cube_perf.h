@@ -16,7 +16,7 @@
 #ifndef COMPRESSOR_BLOCK_CUBE_PERF_H
 #define COMPRESSOR_BLOCK_CUBE_PERF_H
 
-#include "compressor_comm.h"
+#include "compressor_comm_arch22.h"
 #include "compressor_tools.h"
 
 using namespace AscendC;

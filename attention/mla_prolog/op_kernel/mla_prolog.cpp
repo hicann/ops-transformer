@@ -15,9 +15,9 @@
 
 #define MLA_PROLOG_VERSION 1
 #if __CCE_AICORE__ == 310
-#include "arch35/kernel_mla_prolog_split_n.h"
+#include "arch35/kernel_mla_prolog_split_n_arch35.h"
 #else
-#include "arch22/kernel_mla_prolog_split_n.h"
+#include "arch22/kernel_mla_prolog_split_n_arch22.h"
 #endif
 using namespace MlaProlog;
 

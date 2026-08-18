@@ -12,15 +12,15 @@
  * \file moe_init_routing_quant_v2_apt.cpp
  * \brief
  */
-#include "arch35/moe_v2_sort_one_core.h"
-#include "arch35/moe_v2_sort_multi_core.h"
-#include "arch35/moe_v2_mrgsort_out.h"
-#include "arch35/moe_v2_mrgsort.h"
+#include "arch35/moe_v2_sort_one_core_quant_arch35.h"
+#include "arch35/moe_v2_sort_multi_core_quant_arch35.h"
+#include "arch35/moe_v2_mrgsort_out_quant_arch35.h"
+#include "arch35/moe_v2_mrgsort_quant_arch35.h"
 
-#include "arch35/moe_v2_expert_token_out_simt.h"
+#include "arch35/moe_v2_expert_token_out_simt_quant_v2.h"
 #include "arch35/moe_v2_expert_token_out_regbase.h"
-#include "arch35/moe_v2_src_to_dst_op_simt.h"
-#include "arch35/moe_v2_src_to_dst_with_capacity_simt.h"
+#include "arch35/moe_v2_src_to_dst_op_simt_quant_arch35.h"
+#include "arch35/moe_v2_src_to_dst_with_capacity_simt_quant_v2.h"
 #include "arch35/moe_v2_gather_quant_simt.h"
 #include "arch35/moe_v2_gather_dynamic_quant_droppad.h"
 #include "arch35/moe_v2_gather_dynamic_quant_dropless.h"

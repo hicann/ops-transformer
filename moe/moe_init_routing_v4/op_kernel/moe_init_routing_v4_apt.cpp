@@ -13,20 +13,20 @@
  * \brief MoeInitRoutingV4 kernel entry, reuses MoeInitRoutingV3 arch35 kernel implementation.
  *        If MoeInitRoutingV3 kernel is modified, MoeInitRoutingV4 must be adapted accordingly.
  */
-#if __has_include("../moe_init_routing_v3/arch35/moe_v3_mrgsort_out.h")
+#if __has_include("../moe_init_routing_v3/arch35/moe_v3_mrgsort_out_arch35.h")
 #define MOE_V3_INC(path) <../moe_init_routing_v3/arch35/path>
 #else
 #define MOE_V3_INC(path) <../../moe_init_routing_v3/op_kernel/arch35/path>
 #endif
-#include MOE_V3_INC(moe_v3_mrgsort_out.h)
-#include MOE_V3_INC(moe_v3_mrgsort.h)
-#include MOE_V3_INC(moe_v3_sort_one_core.h)
-#include MOE_V3_INC(moe_v3_sort_multi_core.h)
-#include MOE_V3_INC(moe_v3_expert_tokens_count.h)
-#include MOE_V3_INC(moe_v3_row_idx_gather.h)
-#include MOE_V3_INC(moe_v3_gather_out.h)
-#include MOE_V3_INC(moe_v3_gather_static_quant.h)
-#include MOE_V3_INC(moe_v3_gather_dynamic_quant.h)
+#include MOE_V3_INC(moe_v3_mrgsort_out_arch35.h)
+#include MOE_V3_INC(moe_v3_mrgsort_arch35.h)
+#include MOE_V3_INC(moe_v3_sort_one_core_arch35.h)
+#include MOE_V3_INC(moe_v3_sort_multi_core_arch35.h)
+#include MOE_V3_INC(moe_v3_expert_tokens_count_arch35.h)
+#include MOE_V3_INC(moe_v3_row_idx_gather_arch35.h)
+#include MOE_V3_INC(moe_v3_gather_out_arch35.h)
+#include MOE_V3_INC(moe_v3_gather_static_quant_arch35.h)
+#include MOE_V3_INC(moe_v3_gather_dynamic_quant_arch35.h)
 #include MOE_V3_INC(moe_v3_gather_mxfp8_quant.h)
 #include MOE_V3_INC(moe_v3_gather_fp8_perblock_quant.h)
 #include MOE_V3_INC(moe_v3_gather_fp8_group_quant.h)
@@ -36,11 +36,11 @@
 #include MOE_V3_INC(moe_v3_gather_out_mxfp8.h)
 #include MOE_V3_INC(moe_v3_gather_out_mxfp4.h)
 #include MOE_V3_INC(moe_v3_gather_mxfp4_quant.h)
-#include MOE_V3_INC(moe_v3_full_load_unquantized.h)
-#include MOE_V3_INC(moe_v3_full_load_dynamic_quant.h)
-#include MOE_V3_INC(moe_v3_full_load_static_quant.h)
-#include MOE_V3_INC(moe_v3_row_idx_gather_droppad.h)
-#include MOE_V3_INC(moe_v3_gather_out_droppad.h)
+#include MOE_V3_INC(moe_v3_full_load_unquantized_arch35.h)
+#include MOE_V3_INC(moe_v3_full_load_dynamic_quant_arch35.h)
+#include MOE_V3_INC(moe_v3_full_load_static_quant_arch35.h)
+#include MOE_V3_INC(moe_v3_row_idx_gather_droppad_arch35.h)
+#include MOE_V3_INC(moe_v3_gather_out_droppad_arch35.h)
 #include MOE_V3_INC(moe_v3_topk_weight_out.h)
 
 /*

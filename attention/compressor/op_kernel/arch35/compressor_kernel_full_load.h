@@ -16,7 +16,7 @@
 #ifndef COMPRESSOR_KERNEL_FULL_LOAD_H
 #define COMPRESSOR_KERNEL_FULL_LOAD_H
 
-#include "compressor_comm.h"
+#include "compressor_comm_arch35.h"
 #include "compressor_template_tiling_key.h"
 #include "compressor_tiling_data.h"
 #include "compressor_tools.h"

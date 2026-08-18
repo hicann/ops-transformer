@@ -16,7 +16,7 @@
 #include "kernel_operator.h"
 #include "nsa_compress_seq_manager.h"
 #include "nsa_compress_tiling.h"
-#include "nsa_compress.h"
+#include "nsa_compress_kernel.h"
 
 
 using namespace NASCompress;

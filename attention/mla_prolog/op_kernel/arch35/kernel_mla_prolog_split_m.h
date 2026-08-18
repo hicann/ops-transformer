@@ -16,15 +16,15 @@
 #ifndef KERNEL_MLA_PROLOG_SPLIT_M_H
 #define KERNEL_MLA_PROLOG_SPLIT_M_H
 
-#include "mla_prolog_comm.h"
-#include "mla_prolog_vector_comm.h"
-#include "service_matmul.h"
-#include "service_rms_norm.h"
-#include "service_gather_sin_cos.h"
-#include "service_rotary_position_embedding.h"
-#include "service_scatter_cache.h"
-#include "service_dequant.h"
-#include "service_dynamic_quant_qn_mul_qr.h"
+#include "mla_prolog_comm_arch35.h"
+#include "mla_prolog_vector_comm_arch35.h"
+#include "service_matmul_arch35.h"
+#include "service_rms_norm_arch35.h"
+#include "service_gather_sin_cos_arch35.h"
+#include "service_rotary_position_embedding_arch35.h"
+#include "service_scatter_cache_arch35.h"
+#include "service_dequant_arch35.h"
+#include "service_dynamic_quant_qn_mul_qr_arch35.h"
 #include "../mla_prolog_tiling_data.h"
 #include "../mla_prolog_template_tiling_key.h"
 

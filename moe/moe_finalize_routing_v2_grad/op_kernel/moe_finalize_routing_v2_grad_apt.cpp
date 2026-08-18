@@ -12,8 +12,8 @@
  * \file moe_finalize_routing_v2_grad_apt.cpp
  * \brief
  */
-#include "arch35/moe_finalize_routing_v2_grad_without_scale_cut_h.h"
-#include "arch35/moe_finalize_routing_v2_grad_without_scale_not_cut_h.h"
+#include "arch35/moe_finalize_routing_v2_grad_without_scale_cut_h_arch35.h"
+#include "arch35/moe_finalize_routing_v2_grad_without_scale_not_cut_h_arch35.h"
 #include "arch35/moe_finalize_routing_v2_grad_regbase_not_cut_h.h"
 #include "arch35/moe_finalize_routing_v2_grad_regbase_cut_h.h"
 

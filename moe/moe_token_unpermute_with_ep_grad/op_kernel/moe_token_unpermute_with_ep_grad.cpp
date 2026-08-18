@@ -12,8 +12,8 @@
  * \file moe_token_unpermute_with_ep_grad.cpp
  * \brief
  */
-#include "moe_token_unpermute_grad_prob_none.h"
-#include "moe_token_unpermute_grad_prob_not_none.h"
+#include "moe_token_unpermute_grad_prob_none_with_ep.h"
+#include "moe_token_unpermute_grad_prob_not_none_with_ep.h"
 using namespace AscendC;
 using namespace MoeTokenUnpermuteWithEpGrad;
 extern "C" __global__ __aicore__ void moe_token_unpermute_with_ep_grad(

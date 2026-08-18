@@ -13,7 +13,7 @@
  * \brief
  */
 
-#include "ring_attention_update.h"
+#include "ring_attention_update_kernel.h"
 #include "ring_attention_update_tnd.h"
 using namespace AscendC;
 

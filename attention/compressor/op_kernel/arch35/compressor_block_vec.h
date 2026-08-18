@@ -16,7 +16,7 @@
 #ifndef COMPRESSOR_BLOCK_VEC_H
 #define COMPRESSOR_BLOCK_VEC_H
 
-#include "compressor_comm.h"
+#include "compressor_comm_arch35.h"
 #include "compressor_tools.h"
 #include "vf/vf_softmax.h"
 #include "vf/vf_add.h"

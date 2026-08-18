@@ -18,10 +18,10 @@
 
 #include "quant_compressor_comm.h"
 #include "quant_compressor_tools.h"
-#include "vf/vf_softmax.h"
-#include "vf/vf_add.h"
-#include "vf/vf_mul.h"
-#include "vf/vf_dequant.h"
+#include "vf/vf_softmax_quant_compressor.h"
+#include "vf/vf_add_quant_compressor.h"
+#include "vf/vf_mul_quant_compressor.h"
+#include "vf/vf_dequant_quant_compressor.h"
 #include <cstdint>
 
 using namespace AscendC;

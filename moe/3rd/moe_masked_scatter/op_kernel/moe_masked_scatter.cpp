@@ -14,7 +14,7 @@
  */
 
 #include "kernel_operator.h"
-#include "arch35/moe_masked_scatter.h"
+#include "arch35/moe_masked_scatter_arch35.h"
 
 using namespace MoeMaskedScatter;
 

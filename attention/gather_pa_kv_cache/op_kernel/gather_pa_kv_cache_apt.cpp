@@ -12,7 +12,7 @@
  * \file gather_pa_kv_cache_apt.cpp
  * \brief gather_pa_kv_cache
  */
-#include "arch35/gather_pa_kv_cache_nd.h"
+#include "arch35/gather_pa_kv_cache_nd_arch35.h"
 #include "arch35/gather_pa_kv_cache_nz.h"
 
 #define TILING_KEY_1111 1111

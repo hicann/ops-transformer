@@ -17,18 +17,18 @@
 #define GLOBAL_OVERFLOW_MODE_CTRL 60
 
 #if __CCE_AICORE__ == 310
-#if __has_include("../../mla_prolog/op_kernel/arch35/kernel_mla_prolog_split_n.h")
-#include "../../mla_prolog/op_kernel/arch35/kernel_mla_prolog_split_n.h"
+#if __has_include("../../mla_prolog/op_kernel/arch35/kernel_mla_prolog_split_n_arch35.h")
+#include "../../mla_prolog/op_kernel/arch35/kernel_mla_prolog_split_n_arch35.h"
 #include "../../mla_prolog/op_kernel/arch35/kernel_mla_prolog_split_m.h"
 #else
-#include "../mla_prolog/arch35/kernel_mla_prolog_split_n.h"
+#include "../mla_prolog/arch35/kernel_mla_prolog_split_n_arch35.h"
 #include "../mla_prolog/arch35/kernel_mla_prolog_split_m.h"
 #endif
 #else
-#if __has_include("../../mla_prolog/op_kernel/arch22/kernel_mla_prolog_split_n.h")
-#include "../../mla_prolog/op_kernel/arch22/kernel_mla_prolog_split_n.h"
+#if __has_include("../../mla_prolog/op_kernel/arch22/kernel_mla_prolog_split_n_arch22.h")
+#include "../../mla_prolog/op_kernel/arch22/kernel_mla_prolog_split_n_arch22.h"
 #else
-#include "../mla_prolog/arch22/kernel_mla_prolog_split_n.h"
+#include "../mla_prolog/arch22/kernel_mla_prolog_split_n_arch22.h"
 #endif
 #endif
 using namespace MlaProlog;

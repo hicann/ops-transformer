@@ -9,7 +9,7 @@
  */
 
 #include "kernel_operator.h"
-#include "arch35/stem_oam_prep_varlen_q.h"
+#include "arch35/stem_oam_prep_varlen_q_arch35.h"
 #include "arch35/stem_oam_prep_varlen_q_tiling_data.h"
 
 extern "C" __global__ __aicore__ void stem_oam_prep_varlen_q(GM_ADDR q, GM_ADDR qSeqLens, GM_ADDR cuSeqLensQ,

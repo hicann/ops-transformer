@@ -13,10 +13,10 @@
  * \brief
  */
 
-#include "moe_token_unpermute.h"
+#include "moe_token_unpermute_routing_map_grad.h"
 #include "kernel_operator.h"
 #include "kernel_tiling/kernel_tiling.h"
-#include "moe_token_permute_with_routing_map_grad.h"
+#include "moe_token_permute_with_routing_map_grad_kernel.h"
 
 extern "C" __global__ __aicore__ void moe_token_permute_with_routing_map_grad(
     GM_ADDR permutedTokenOutPutGrad, GM_ADDR permutedProbsOutPutGradOptional, GM_ADDR sortedIndices,

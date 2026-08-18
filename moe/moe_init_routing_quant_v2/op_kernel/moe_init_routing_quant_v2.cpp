@@ -12,13 +12,13 @@
  * \file moe_init_routing_quant_v2.cpp
  * \brief
  */
-#include "inner/moe_v2_sort_one_core.h"
-#include "inner/moe_v2_sort_multi_core.h"
-#include "inner/moe_v2_mrgsort_out.h"
-#include "inner/moe_v2_mrgsort.h"
-#include "inner/moe_v2_expert_token_out.h"
-#include "inner/moe_v2_src_to_dst_op.h"
-#include "inner/moe_v2_src_to_dst_with_capacity.h"
+#include "inner/moe_v2_sort_one_core_inner.h"
+#include "inner/moe_v2_sort_multi_core_inner.h"
+#include "inner/moe_v2_mrgsort_out_inner.h"
+#include "inner/moe_v2_mrgsort_inner.h"
+#include "inner/moe_v2_expert_token_out_inner.h"
+#include "inner/moe_v2_src_to_dst_op_inner.h"
+#include "inner/moe_v2_src_to_dst_with_capacity_inner.h"
 #include "moe_v2_fullload_quant.h"
 #include "moe_v2_fullload_dynamic_quant.h"
 #include "moe_v2_gather_quant.h"

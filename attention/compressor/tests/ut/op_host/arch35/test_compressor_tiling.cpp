@@ -12,7 +12,7 @@
 #include <iostream>
 #include <limits>
 
-#include "../../../../op_host/arch35/compressor_tiling.h"
+#include "../../../../op_host/arch35/compressor_tiling_arch35.h"
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 

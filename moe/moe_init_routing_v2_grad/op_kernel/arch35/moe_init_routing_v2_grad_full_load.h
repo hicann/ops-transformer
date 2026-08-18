@@ -15,7 +15,7 @@
 #ifndef MOE_INIT_ROUTING_V2_GRAD_FULL_LOAD_COMPUTE_H
 #define MOE_INIT_ROUTING_V2_GRAD_FULL_LOAD_COMPUTE_H
 
-#include "moe_init_routing_v2_grad_base.h"
+#include "moe_init_routing_v2_grad_base_arch35.h"
 
 namespace MoeInitRoutingV2Grad {
 template <typename T, int64_t Mode = 0>

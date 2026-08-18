@@ -20,7 +20,7 @@
 #include <graph/utils/type_utils.h>
 #include "log/log.h"
 #include "register/op_def_registry.h"
-#include "compressor_tiling.h"
+#include "compressor_tiling_arch22.h"
 
 using namespace ge;
 using namespace AscendC;

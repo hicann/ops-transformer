@@ -16,7 +16,7 @@
 #ifndef COMPRESSOR_TOOLS_H
 #define COMPRESSOR_TOOLS_H
 
-#include "compressor_comm.h"
+#include "compressor_comm_arch35.h"
 
 using namespace AscendC;
 

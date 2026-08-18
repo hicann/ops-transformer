@@ -12,12 +12,12 @@
  * \file moe_token_permute_with_routing_map.cpp
  * \brief
  */
-#include "moe_mrgsort_out.h"
-#include "moe_mrgsort.h"
-#include "moe_sort_multi_core.h"
+#include "moe_mrgsort_out_with_routing_map.h"
+#include "moe_mrgsort_with_routing_map.h"
+#include "moe_sort_multi_core_with_routing_map.h"
 #include "moe_sort_multi_core_last_dim.h"
-#include "moe_sort_one_core.h"
-#include "moe_index_copy.h"
+#include "moe_sort_one_core_with_routing_map.h"
+#include "moe_index_copy_with_routing_map.h"
 #include "moe_index_copy_split_d.h"
 #include "masked_select_v3.h"
 #include "moe_permute_prob.h"
