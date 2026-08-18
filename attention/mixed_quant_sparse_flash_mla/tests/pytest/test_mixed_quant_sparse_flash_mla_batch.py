@@ -10,38 +10,41 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-import itertools
 import torch
 import pytest
-import random
 import pandas as pd
 from pathlib import Path
-import numpy as np
-import math
 import os
-import multiprocessing as mp
 import concurrent.futures
 import result_compare_method
-import check_valid_param
 from batch import mixed_quant_sparse_flash_mla_process
 import utils
 
 testcase_path = os.environ.get("MQSMLA_PT_DIR", "mqsmla_testcase")
-batch_test_mode = int(os.environ.get("MQSMLA_BATCH_TEST_MODE", 0))  # 0:路径下全量批跑，1:按表格中case批跑
-excel_path = os.environ.get("MQSMLA_EXCEL_PATH", os.path.join(os.path.dirname(__file__), "excel", "testcase.xlsx"))
-result_path = os.environ.get("MQSMLA_RESULT_SAVE_PATH", './mqsmla_result.xlsx')
+batch_test_mode = int(
+    os.environ.get("MQSMLA_BATCH_TEST_MODE", 0)
+)  # 0:路径下全量批跑，1:按表格中case批跑
+excel_path = os.environ.get(
+    "MQSMLA_EXCEL_PATH",
+    os.path.join(os.path.dirname(__file__), "excel", "testcase.xlsx"),
+)
+result_path = os.environ.get("MQSMLA_RESULT_SAVE_PATH", "./mqsmla_result.xlsx")
 device_id = int(os.environ.get("MQSMLA_DEVICE_ID", 0))
 
 testcase_files = []
 if os.path.isdir(testcase_path):
     if batch_test_mode == 1:
         df = pd.read_excel(excel_path)
-        target_names = [str(name) for name in df['Testcase_Name'].dropna().tolist() if str(name) != 'None']
+        target_names = [
+            str(name)
+            for name in df["Testcase_Name"].dropna().tolist()
+            if str(name) != "None"
+        ]
         if not target_names:
             print(f"错误: 表格中没有有效的Testcase_Name: {excel_path}")
         else:
             print(f"从表格中读取到 {len(target_names)} 个目标用例名")
-            pt_files = [f for f in os.listdir(testcase_path) if f.endswith('.pt')]
+            pt_files = [f for f in os.listdir(testcase_path) if f.endswith(".pt")]
             for target_name in target_names:
                 matched = [f for f in pt_files if target_name in f]
                 if matched:
@@ -53,7 +56,7 @@ if os.path.isdir(testcase_path):
                     print(f"警告: 用例名 '{target_name}' 未匹配到任何.pt文件")
             print(f"按表格筛选后共 {len(testcase_files)} 个测试用例文件")
     else:
-        pt_files = [f for f in os.listdir(testcase_path) if f.endswith('.pt')]
+        pt_files = [f for f in os.listdir(testcase_path) if f.endswith(".pt")]
         if not pt_files:
             print(f"错误: 目录中没有找到.pt文件: {testcase_path}")
         else:
@@ -64,22 +67,28 @@ if os.path.isdir(testcase_path):
 else:
     print(f"错误: 输出目录不存在: {testcase_path}")
 
+
 def mqsmla(testcase_files):
     test_data = torch.load(testcase_files, map_location="cpu", weights_only=False)
     npu_error_msg = None
     try:
-        npu_result, cpu_quant_result, cpu_lse, npu_lse = mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(
-            test_data, device_id=device_id)
-        attn_result, attn_percent = result_compare_method.check_result(cpu_quant_result, npu_result)
+        npu_result, cpu_quant_result, cpu_lse, npu_lse = (
+            mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(
+                test_data, device_id=device_id
+            )
+        )
+        attn_result, attn_percent = result_compare_method.check_result(
+            cpu_quant_result, npu_result
+        )
         lse_res, lse_pct = None, None
         fail_info = []
         min_fulfill = attn_percent  # 修复：main_pct → attn_percent
 
-        if test_data['params'].get('return_softmax_lse'):
+        if test_data["params"].get("return_softmax_lse"):
             print("return_softmax_lse is true!!!")
             lse_res, lse_pct = result_compare_method.check_result(cpu_lse, npu_lse)
             min_fulfill = min(min_fulfill, lse_pct)
-        
+
         if attn_result != "Pass":
             fail_info.append(f"MAIN_FAILED:{attn_result}")
         # LSE失败记录
@@ -98,14 +107,20 @@ def mqsmla(testcase_files):
         result = "NPU ERROR"
         fulfill_percent = 0
 
-    utils.save_result(test_data['params'], result, fulfill_percent, Path(result_path))
+    utils.save_result(test_data["params"], result, fulfill_percent, Path(result_path))
 
-    if result == "Failed":
-        pytest.fail(f"用例精度失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%")
     if result == "NPU ERROR":
-        pytest.fail(f"用例执行失败:{test_data['Testcase_Name']} NPU ERROR: {npu_error_msg}")
+        pytest.fail(
+            f"用例执行失败:{test_data['Testcase_Name']} NPU ERROR: {npu_error_msg}"
+        )
+    elif result != "Pass":
+        pytest.fail(
+            f"用例精度失败:{test_data['Testcase_Name']} 精度:{fulfill_percent:.2f}%"
+        )
+
 
 testcase_ids = [os.path.splitext(os.path.basename(f))[0] for f in testcase_files]
+
 
 @pytest.mark.ci
 @pytest.mark.parametrize("testcase_files", testcase_files, ids=testcase_ids)
@@ -116,6 +131,6 @@ def test_mixed_quant_sparse_flash_mla(testcase_files):
         # 等待并获取结果
         for future in concurrent.futures.as_completed([futures]):
             try:
-                result = future.result()
-            except Exception as e:
-                pytest.fail(f"当前用例线程执行失败")
+                future.result()
+            except Exception:
+                pytest.fail("当前用例线程执行失败")

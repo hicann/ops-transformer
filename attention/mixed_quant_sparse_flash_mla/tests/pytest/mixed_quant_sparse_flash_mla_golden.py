@@ -12,9 +12,6 @@
 
 import os
 import torch
-import torch_npu
-import check_valid_param
-import pytest
 import random
 import numpy as np
 import math
@@ -233,13 +230,6 @@ class GeneralizedSFAQuant:
                         print(
                             f"      进度：{current_pct:.1f}% | 步数：{i_S1:>{len(str(cur_act_q))}}/{cur_act_q}"
                         )
-                    if (
-                        self.ori_mask_mode == 3 and i_S1 < cur_act_q - cur_ori_act_kv
-                    ):  # 根据 win_kv 判断行无效
-                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(
-                            [G, self.D], dtype=torch.float
-                        )
-                        continue
                     ori_threshold = cur_ori_act_kv - cur_act_q + i_S1 + 1
                     if self.ori_mask_mode == 3:
                         ori_win_start = 0
@@ -263,13 +253,14 @@ class GeneralizedSFAQuant:
                         ori_win_end = cur_ori_act_kv
                     ori_win_start = min(ori_win_start, cur_ori_act_kv)
 
-                    if ori_win_start >= ori_win_end:  # 根据 win_kv 判断行无效
-                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(
-                            [G, self.D], dtype=torch.float
+                    if ori_win_start >= ori_win_end:
+                        cur_ori_k_bnsd = torch.zeros(
+                            [0, self.D], dtype=ori_k_bnsd.dtype
                         )
-                        continue
-
-                    cur_ori_k_bnsd = ori_k_bnsd[i_B, i_N2, ori_win_start:ori_win_end, :]
+                    else:
+                        cur_ori_k_bnsd = ori_k_bnsd[
+                            i_B, i_N2, ori_win_start:ori_win_end, :
+                        ]
 
                     if (
                         self.template_run_mode == "CSA"
@@ -351,6 +342,12 @@ class GeneralizedSFAQuant:
                         cmp_s2_loop_time = math.ceil(cur_cmp_k.size(0) / s2_base_size)
                         cur_cmp_k_fp32 = cur_cmp_k.to(dtype=torch.float32)
 
+                    if cur_ori_k_bnsd.size(0) == 0 and cur_cmp_k == []:
+                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(
+                            [G, self.D], dtype=torch.float
+                        )
+                        continue
+
                     cur_attn_out = attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :]
                     q_curr = q_bnsd[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :]
                     q_curr_fp32 = q_curr.to(dtype=torch.float32)
@@ -364,13 +361,17 @@ class GeneralizedSFAQuant:
 
                         mm1_res = torch.matmul(q_curr_fp32, k_concat_fp32.T)
                         scale_res = mm1_res * self.softmax_scale
-                        softmax_res, softmax_sum = self.sinks_softmax(
+                        softmax_res, x_max, softmax_sum = self.sinks_softmax(
                             scale_res, cur_sinks_expand
                         )
                         softmax_res = softmax_res.to(q_bnsd.dtype).to(torch.float32)
                         mm2_res = torch.matmul(softmax_res, v_concat_fp32)
                         v2_res = torch.div(mm2_res, softmax_sum)
                         attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = v2_res
+                        if return_softmax_lse:
+                            softmax_lse[i_B, i_N2, i_S1, :] = x_max[:, 0] + torch.log(
+                                softmax_sum[:, 0] + 1e-10
+                            )
                     elif RUN_MODE == 1:
                         ori_s2_loop_time = math.ceil(
                             cur_ori_k_bnsd.size(0) / s2_base_size
@@ -559,7 +560,7 @@ class GeneralizedSFAQuant:
         x_sub = x - x_max
         y = torch.exp(x_sub)
         x_sum = y.sum(dim=-1, keepdims=True) + torch.exp(sinks - x_max)
-        return y, x_sum
+        return y, x_max, x_sum
 
     def trans_shape_to_bnsd(
         self, tensor, shape, layout, cu_seqlens_q=None, seqused_q=None

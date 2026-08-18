@@ -25,6 +25,15 @@ DATA_RANGE_RIGHT = 10
 
 RUN_MODE = 1
 
+
+def is_empty(obj):
+    if isinstance(obj, list):
+        return len(obj) == 0
+    if isinstance(obj, torch.Tensor):
+        return obj.nelement() == 0
+    return obj is None
+
+
 # np.random.seed(42)
 # torch.manual_seed(42)
 
@@ -118,24 +127,6 @@ class GeneralizedSFA:
         attn_out = torch.zeros(q_bnsd.shape, dtype=q_bnsd.dtype)
         softmax_lse = None
         if return_softmax_lse:
-            softmax_max = torch.zeros(
-                (
-                    q_bnsd.shape[0],
-                    ori_k_bnsd.shape[1],
-                    q_bnsd.shape[2],
-                    q_bnsd.shape[1] // ori_k_bnsd.shape[1],
-                ),
-                dtype=torch.float32,
-            )
-            softmax_sum = torch.zeros(
-                (
-                    q_bnsd.shape[0],
-                    ori_k_bnsd.shape[1],
-                    q_bnsd.shape[2],
-                    q_bnsd.shape[1] // ori_k_bnsd.shape[1],
-                ),
-                dtype=torch.float32,
-            )
             softmax_lse = torch.zeros(
                 (
                     q_bnsd.shape[0],
@@ -184,14 +175,6 @@ class GeneralizedSFA:
                         print(
                             f"      进度：{current_pct:.1f}% | 步数：{i_S1:>{len(str(cur_act_q))}}/{cur_act_q}"
                         )
-                    if (
-                        self.ori_mask_mode == 3
-                    ) and i_S1 < cur_act_q - cur_ori_act_kv:  # 根据 ori_kv 判断行无效
-                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(
-                            [G, self.D], dtype=torch.float
-                        )
-                        continue
-
                     q_curr = q_bnsd[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :]
                     q_curr_fp32 = q_curr.to(dtype=torch.float32)
 
@@ -234,7 +217,7 @@ class GeneralizedSFA:
                                 self.cmp_ratio,
                                 cur_cmp_act_kv,
                             )
-                        if cur_cmp_k == []:
+                        if is_empty(cur_cmp_k):
                             cmp_s2_loop_time = 0
                             cur_cmp_k_fp32 = []
                         else:
@@ -265,7 +248,7 @@ class GeneralizedSFA:
                             1,
                             cur_ori_act_kv,
                         )
-                        if cur_ori_k_bnsd == []:
+                        if is_empty(cur_ori_k_bnsd):
                             ori_s2_loop_time = 0
                         else:
                             ori_s2_loop_time = math.ceil(
@@ -289,23 +272,42 @@ class GeneralizedSFA:
                                 )
                         elif self.ori_mask_mode == 3:
                             ori_threshold = cur_ori_act_kv - cur_act_q + i_S1 + 1
-                            ori_win_end = ori_threshold
+                            ori_win_end = max(ori_threshold, 0)
                             ori_win_start = 0
                         elif self.ori_mask_mode == 0:
                             ori_win_start = 0
                             ori_win_end = cur_ori_act_kv
 
-                        cur_ori_k_bnsd = ori_k_bnsd[
-                            i_B, i_N2, ori_win_start:ori_win_end, :
-                        ]
-                        empty_flag_ori = False
+                        if ori_win_start >= ori_win_end:
+                            cur_ori_k_bnsd = []
+                            empty_flag_ori = True
+                        else:
+                            cur_ori_k_bnsd = ori_k_bnsd[
+                                i_B, i_N2, ori_win_start:ori_win_end, :
+                            ]
+                            empty_flag_ori = False
+
+                    if is_empty(cur_ori_k_bnsd) and is_empty(cur_cmp_k):
+                        attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = torch.zeros(
+                            [G, self.D], dtype=torch.float
+                        )
+                        continue
 
                     cur_attn_out = attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :]
                     if RUN_MODE == 0:
                         if empty_flag:
-                            k_concat = cur_ori_k_bnsd
+                            k_concat = (
+                                cur_ori_k_bnsd
+                                if not is_empty(cur_ori_k_bnsd)
+                                else cur_cmp_k
+                            )
                         else:
-                            k_concat = torch.concat([cur_ori_k_bnsd, cur_cmp_k], dim=0)
+                            if is_empty(cur_ori_k_bnsd):
+                                k_concat = cur_cmp_k
+                            else:
+                                k_concat = torch.concat(
+                                    [cur_ori_k_bnsd, cur_cmp_k], dim=0
+                                )
 
                         k_concat_fp32 = k_concat.to(dtype=torch.float32)
                         v_concat_fp32 = k_concat_fp32.clone()
@@ -323,15 +325,18 @@ class GeneralizedSFA:
                             dtype=q_bnsd.dtype
                         )
                         if return_softmax_lse:
-                            softmax_max[batch, n2Idx, s1Idx, :] = x_max[:, 0]
-                            softmax_sum[batch, n2Idx, s1Idx, :] = x_sum[:, 0]
+                            softmax_lse[i_B, i_N2, i_S1, :] = x_max[:, 0] + torch.log(
+                                x_sum[:, 0] + 1e-10
+                            )
                     elif RUN_MODE == 1:
                         if empty_flag_ori:
                             ori_s2_loop_time = 0
-                            total_s2_loop_time = 0
+                            total_s2_loop_time = cmp_s2_loop_time
                             row_sum = torch.empty((G), dtype=torch.float32).uniform_(
                                 1.0, 1.0
                             )
+                            row_max = torch.empty((G, 1), dtype=torch.float32)
+                            row_max = cur_sinks
                         else:
                             ori_s2_loop_time = math.ceil(
                                 cur_ori_k_bnsd.size(0) / s2_base_size
@@ -502,6 +507,10 @@ class GeneralizedSFA:
                         attn_out[i_B, i_N2 * G : (i_N2 + 1) * G, i_S1, :] = (
                             O_flash / row_sum_expand / tmp_scale_16_expand
                         ).to(dtype=q_bnsd.dtype)
+                        if return_softmax_lse:
+                            softmax_lse[i_B, i_N2, i_S1, :] = row_max + torch.log(
+                                row_sum + 1e-10
+                            )
                     else:
                         raise ValueError(f"unsupported RUN_MODE:{RUN_MODE}")
         return attn_out, softmax_lse
@@ -556,7 +565,7 @@ class GeneralizedSFA:
 
         empty_flag = False
         if len(s2_sparse) == 0:
-            cur_cmp_k = torch.tensor([])
+            cur_cmp_k = []
             empty_flag = True
         else:
             cur_cmp_k = k_tensor[i_B, i_N2, s2_sparse, :]
