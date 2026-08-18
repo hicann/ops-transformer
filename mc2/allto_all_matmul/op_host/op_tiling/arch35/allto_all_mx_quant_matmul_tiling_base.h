@@ -20,6 +20,8 @@
 #include "../../../op_kernel/arch35/allto_all_matmul_tiling_key.h"
 #include "../allto_all_matmul_tiling_base.h"
 #include "./allto_all_matmul_fit_balance_tiling.h"
+#include "apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_matmul_tiling_data.h"
+#include "apace/tiling/quant_matmul_tiling_swat.h"
 #include "mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_common_advanced.h"
 #include "mat_mul_v3/op_host/op_tiling/arch35/matmul_v3_tiling_strategy.h"
 #include "mc2/matmul_allto_all/op_host/op_tiling/common/matmul_allto_all_util_tiling.h"
@@ -58,6 +60,7 @@ protected:
     ge::graphStatus GetWorkspaceSize() override;
     uint64_t GetTilingKey() const override;
     CutResult GetCutResOfCommAndCompute() override;
+    void AlignCutResForKernel(CutResult &cutRes, uint64_t mValue) const;
     ge::graphStatus CheckMxQuantTensorDataType(const gert::TilingContext *context, const char *opName);
     ge::graphStatus CheckX2Transpose(const gert::TilingContext *context, const char *opName,
                                      const OpAttrIndexSchema &indexSchema);
@@ -75,11 +78,15 @@ protected:
                                       TilingContextInfo &contextInfo);
 
     void SetTilingInfo(AlltoAllMatmulTilingInfo &tilingInfo) const;
+    void SetHcommTilingInfo(CommTilingData &tilingInfo) const;
+    ge::graphStatus DoHcommMxQuantMMTiling();
     void PrintAlltoAllMxQuantMatmulTilingData(AlltoAllQuantMatmulTilingData &outTilingData);
 
 private:
     AlltoAllQuantMatmulTilingData localTilingData_;
+    hcommAllToAllMatmulTilingData hcommTilingData_;
     bool isMxFp4_ = false;
+    bool usingApaceImpl_ = false;
     uint64_t mmMvalueLen_ = 0;
     QuantType matmulQuantType_ = QuantType::MXFP8_QUANT;
     void PrintAlltoAllMxQuantMatmulTilingInfo(const std::string &opName, AlltoAllMatmulTilingInfo &tilingInfo);

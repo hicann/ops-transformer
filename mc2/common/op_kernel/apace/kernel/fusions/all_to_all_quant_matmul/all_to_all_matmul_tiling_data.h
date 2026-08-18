@@ -33,8 +33,8 @@ struct CommContext {
     Apace::AivComm::CommUbmemContext ubmemCtx;
 };
 
-// Ccu通信MX量化tiling结构体
-struct ccuAllToAllMatmulTilingData {
+// Hcomm通信MX量化tiling结构体
+struct hcommAllToAllMatmulTilingData {
     Mc2InitTiling mc2InitTiling;
     Mc2CcTiling mc2CcTiling;
     CommTilingData commTilingData;
