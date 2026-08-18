@@ -445,7 +445,6 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     - 输出为2维，其shape为\(m/rank\_size, n\), rank\_size为卡数。
     - 不支持空tensor。
     - x1和x2的数据类型需要保持一致。
-    - bias数据类型与x1关联：当x1和x2数据类型为FLOAT16时，bias数据类型必须为FLOAT16；当x1和x2数据类型为BFLOAT16时，bias数据类型必须为BFLOAT16；当x1和x2数据类型为INT8时，bias数据类型必须为FLOAT。
     - 支持2、4、8卡。
 
 <!-- end id15 -->
