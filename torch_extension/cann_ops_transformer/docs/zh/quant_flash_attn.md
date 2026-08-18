@@ -159,7 +159,7 @@ cann_ops_transformer.quant_flash_attn(
 
 > [!NOTE]
 >
-> 枚举为 `IntEnum`，可直接作为 int 传入底层算子；接口同时兼容传入枚举名对应的字符串（不区分大小写）与 int 值。当前不支持 mask_mode = 4（`SLIDING_WINDOW`）。
+> 枚举为 `IntEnum`，可直接作为 int 传入底层算子；接口仅支持传入枚举或对应 int 值。当前不支持 mask_mode = 4（`SLIDING_WINDOW`）。
 
 ## 基准信息说明
 
@@ -175,9 +175,8 @@ cann_ops_transformer.quant_flash_attn(
 |     Q_T     |          输入q tensor所有batch序列长度的累加和          |
 |     KV_T     |          输入k/v tensor所有batch序列长度的累加和          |
 |     D     |          输入q/k/v tensor以及输出attn_out隐藏层最小的单元尺寸headdim         |
-|     G     |          G = Q_N / KV_N，group query attention的组数          |
 |     Bs     |          Paged Attention场景下的KV cache的块大小          |
-|     Bn     |          Paged Attention场景下KV cache的块数，由KV cache中最长序列确定，Bn = ⌈KV cache中最长序列 / Bs⌉          |
+|     Bn     |          Paged Attention场景下KV cache的块数。在k/v的shape中Bn为KV cache物理存储的总块数，Bn = Σ ⌈各batch KV序列长度 / Bs⌉；在block_table的shape中Bn为单个batch的最大块数，Bn = max ⌈各batch KV序列长度 / Bs⌉          |
 
 ## 参数说明
 
@@ -342,7 +341,7 @@ cann_ops_transformer.quant_flash_attn(
                     <li>Q_T ≥ 0、KV_T ≥ 0</li>
                     <li>D仅支持64、72、128或256；其中D=72仅MxFP8场景支持</li>
                     <li>Q_N % KV_N == 0且Q_N / KV_N > 0</li>
-                    <li>Q_N ≤ 256；KV_N ≤ 256</li>
+                    <li>Q_N ≤ 256；KV_N ≤ 256；Q_N / KV_N ≤ 64</li>
                 </ul>
             </td>
         </tr>
@@ -489,7 +488,7 @@ cann_ops_transformer.quant_flash_attn(
                         <li>shape仅支持(1)</li>
                     </ul>
                 </td>
-                <td>可选参数，默认值为[1.0f]</td>
+                <td>可选参数</td>
                 <td>无</td>
             </tr>
         </tbody>
