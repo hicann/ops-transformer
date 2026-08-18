@@ -253,6 +253,10 @@ if [ ! -d ${targetdir}/vendors ];then
         fi
 fi
 chmod u+w ${targetdir}/vendors
+if [ $? -ne 0 ];then
+    log "[ERROR] chmod u+w ${targetdir}/vendors failed, please check the directory owner (current user: $(whoami)) and retry, or use --install-path to install into a writable directory"
+    exit 1
+fi
 
 log "[INFO] upgrade framework"
 upgrade framework
@@ -315,10 +319,18 @@ else
     config_file=${targetdir}/vendors/config.ini
     if [ ! -f ${config_file} ]; then
         touch ${config_file}
+        if [ $? -ne 0 ];then
+            log "[ERROR] touch ${config_file} failed, please check write permission of ${targetdir}/vendors (current user: $(whoami))"
+            exit 1
+        fi
         chmod 640 ${config_file}
+        if [ $? -ne 0 ];then
+            log "[ERROR] chmod 640 ${config_file} failed"
+            exit 1
+        fi
         echo "load_priority=$vendor_name" > ${config_file}
         if [ $? -ne 0 ];then
-            log "[ERROR] echo load_priority failed"
+            log "[ERROR] write load_priority to ${config_file} failed"
             exit 1
         fi
     else
@@ -327,13 +339,22 @@ else
         vendor=$(echo $found_vendor | tr -s ' ' ',')
         if [ "$vendor" != "" ]; then
             sed -i "/load_priority=$found_vendors/s@load_priority=$found_vendors@load_priority=$vendor_name,$vendor@g" "$config_file"
+            if [ $? -ne 0 ];then
+                log "[ERROR] sed update load_priority in ${config_file} failed, please check write permission of config.ini (current user: $(whoami))"
+                exit 1
+            fi
         fi
     fi
     if test $INSTALL_FOR_ALL = "y"; then
         chmod 755 ${config_file}
+        if [ $? -ne 0 ];then
+            log "[ERROR] chmod 755 ${config_file} failed"
+            exit 1
+        fi
     fi
     log "[INFO] using requirements: when custom module install finished or before you run the custom module, \
         execute the command [ export LD_LIBRARY_PATH=${_ASCEND_CUSTOM_OPP_PATH}/op_api/lib/:\${LD_LIBRARY_PATH} ] to set the environment path"
+    log "[INFO] verify install: run [ grep load_priority ${config_file} ] to confirm the vendor is loaded"
 fi
 
 if [ -d ${targetdir}/$vendordir/op_impl/cpu/aicpu_kernel/impl/ ]; then

@@ -81,6 +81,8 @@ Self-extractable archive "cann-ops-transformer-custom_linux.${arch}.run" success
 
 `AddExample`安装在```${ASCEND_HOME_PATH}/opp/vendors```路径中，```${ASCEND_HOME_PATH}```表示CANN软件安装目录。
 
+> 安装后执行 `grep load_priority ${ASCEND_HOME_PATH}/opp/vendors/config.ini` 校验，预期输出含本 vendor。若无输出，通常是 `${ASCEND_HOME_PATH}/opp/vendors` 属主或权限不对，请排查后重新安装。
+
 ### 4. 配置环境变量
 
 将自定义算子包的路径加入环境变量，确保运行时能够找到。
