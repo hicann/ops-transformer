@@ -70,7 +70,7 @@
         <td>yOut</td>
         <td>输出</td>
         <td>公式中的`yOut`，表示softmax的topk结果。</td>
-        <td>INT32</td>
+        <td>FLOAT16、BFLOAT16、FLOAT32</td>
         <td>ND</td>
       </tr>
       <tr>
