@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef CATLASS_ALIGNMENT_HPP
-#define CATLASS_ALIGNMENT_HPP
+#ifndef CATLASS_KDA_ALIGNMENT_HPP
+#define CATLASS_KDA_ALIGNMENT_HPP
 
 #include "catlass/detail/macros.hpp"
 #include "tla/numeric/integral_constant.hpp"
@@ -100,4 +100,4 @@ CATLASS_HOST_DEVICE constexpr auto Min(T const &a, U const &b)
     }
 }
 
-#endif // CATLASS_ALIGNMENT_HPP
+#endif // CATLASS_KDA_ALIGNMENT_HPP

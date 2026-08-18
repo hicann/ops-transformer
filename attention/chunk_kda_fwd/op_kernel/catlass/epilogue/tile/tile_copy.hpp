@@ -18,7 +18,7 @@
 #include "catlass/epilogue/tile/copy_ub_to_gm.hpp"
 #include "catlass/epilogue/tile/copy_gm_to_ub_tla.hpp"
 #include "catlass/epilogue/tile/copy_ub_to_gm_tla.hpp"
-#include "tla/tensor.hpp"
+#include "tla/kda_tensor.hpp"
 
 #if (defined(CATLASS_ARCH) && CATLASS_ARCH == 3510)
 #include "catlass/epilogue/tile/copy_ub_to_l1_tla.hpp"

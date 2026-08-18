@@ -11,8 +11,8 @@
 #define CATLASS_LAYOUT_TENSOR_HPP
 
 #include "catlass/catlass.hpp"
-#include "catlass/conv_coord.hpp"
-#include "catlass/detail/alignment.hpp"
+#include "catlass/kda_conv_coord.hpp"
+#include "catlass/detail/kda_alignment.hpp"
 
 namespace Catlass::layout {
 

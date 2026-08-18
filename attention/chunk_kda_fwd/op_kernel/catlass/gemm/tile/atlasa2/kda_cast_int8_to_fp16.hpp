@@ -8,12 +8,12 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef CATLASS_GEMM_TILE_ATLASA2_CAST_INT8_TO_FP16_HPP
-#define CATLASS_GEMM_TILE_ATLASA2_CAST_INT8_TO_FP16_HPP
+#ifndef CATLASS_GEMM_TILE_ATLASA2_KDA_CAST_INT8_TO_FP16_HPP
+#define CATLASS_GEMM_TILE_ATLASA2_KDA_CAST_INT8_TO_FP16_HPP
 
 #include "catlass/catlass.hpp"
 #include "catlass/arch/resource.hpp"
-#include "catlass/coord.hpp"
+#include "catlass/kda_coord.hpp"
 #include "catlass/gemm_coord.hpp"
 #include "catlass/gemm/dispatch_policy.hpp"
 #include "catlass/gemm/helper.hpp"
@@ -185,4 +185,4 @@ protected:
 
 } // namespace Catlass::Gemm::Tile
 
-#endif // CATLASS_GEMM_TILE_ATLASA2_CAST_INT8_TO_FP16_HPP
+#endif // CATLASS_GEMM_TILE_ATLASA2_KDA_CAST_INT8_TO_FP16_HPP

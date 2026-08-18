@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef CATLASS_DEBUG_HPP
-#define CATLASS_DEBUG_HPP
+#ifndef CATLASS_KDA_DEBUG_HPP
+#define CATLASS_KDA_DEBUG_HPP
 
 #include <functional>
 #include <iostream>
@@ -70,4 +70,4 @@ namespace Adx {
 void AdumpPrintWorkSpace(const void *dumpBufferAddr, const size_t dumpBufferSize, aclrtStream stream, const char *opType);
 } // namespace Adx
 
-#endif // CATLASS_DEBUG_HPP
+#endif // CATLASS_KDA_DEBUG_HPP

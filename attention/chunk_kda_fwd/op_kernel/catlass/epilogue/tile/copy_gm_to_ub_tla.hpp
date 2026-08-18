@@ -13,7 +13,7 @@
 
 #include "catlass/catlass.hpp"
 #include "catlass/arch/arch.hpp"
-#include "tla/tensor.hpp"
+#include "tla/kda_tensor.hpp"
 #include "tla/layout.hpp"
 
 namespace Catlass::Epilogue::Tile {

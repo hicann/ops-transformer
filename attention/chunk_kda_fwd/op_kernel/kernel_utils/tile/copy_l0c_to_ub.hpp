@@ -16,7 +16,7 @@
 #if defined(CATLASS_ARCH) && CATLASS_ARCH == 3510
 #include "catlass/gemm/tile/ascend950/copy_l0c_to_dst.hpp"
 #endif
-#include "tla/tensor.hpp"
+#include "tla/kda_tensor.hpp"
 #include "catlass/detail/tag_to_layout.hpp"
 
 namespace Common::Tile {

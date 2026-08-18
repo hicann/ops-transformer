@@ -8,10 +8,10 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef CATLASS_CONV_COORD_HPP
-#define CATLASS_CONV_COORD_HPP
+#ifndef CATLASS_KDA_CONV_COORD_HPP
+#define CATLASS_KDA_CONV_COORD_HPP
 
-#include "catlass/coord.hpp"
+#include "catlass/kda_coord.hpp"
 
 namespace Catlass {
 
@@ -1317,4 +1317,4 @@ public:
 
 } // namespace Catlass
 
-#endif // CATLASS_CONV_COORD_HPP
+#endif // CATLASS_KDA_CONV_COORD_HPP

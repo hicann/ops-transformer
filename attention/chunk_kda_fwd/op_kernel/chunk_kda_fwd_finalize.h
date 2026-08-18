@@ -15,7 +15,7 @@
 #endif
 
 #include "catlass/arch/arch.hpp"
-#include "catlass/arch/cross_core_sync.hpp"
+#include "catlass/arch/kda_cross_core_sync.hpp"
 #include "catlass/arch/resource.hpp"
 #include "catlass/catlass.hpp"
 #include "catlass/gemm/block/block_mmad.hpp"
@@ -27,7 +27,7 @@
 #include "kernel_operator.h"
 #include "chunk_kda_fwd_varlen.h"
 #include "tla/layout.hpp"
-#include "tla/tensor.hpp"
+#include "tla/kda_tensor.hpp"
 
 using namespace AscendC;
 

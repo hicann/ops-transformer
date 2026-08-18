@@ -17,7 +17,7 @@
 #include <kernel_operator.h>
 #endif
 
-#include "catlass/detail/alignment.hpp"
+#include "catlass/detail/kda_alignment.hpp"
 #include "catlass/detail/dependent_false.hpp"
 #include "catlass/detail/macros.hpp"
 

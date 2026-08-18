@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef CATLASS_ARCH_CROSS_CORE_SYNC_HPP
-#define CATLASS_ARCH_CROSS_CORE_SYNC_HPP
+#ifndef CATLASS_ARCH_KDA_CROSS_CORE_SYNC_HPP
+#define CATLASS_ARCH_KDA_CROSS_CORE_SYNC_HPP
 
 #include "catlass/catlass.hpp"
 
@@ -123,4 +123,4 @@ CATLASS_DEVICE void CrossCoreWaitFlagWithReverse(CrossCoreFlagWithReverse<REVERS
 
 } // namespace Catlass::Arch
 
-#endif // CATLASS_ARCH_CROSS_CORE_SYNC_HPP
+#endif // CATLASS_ARCH_KDA_CROSS_CORE_SYNC_HPP

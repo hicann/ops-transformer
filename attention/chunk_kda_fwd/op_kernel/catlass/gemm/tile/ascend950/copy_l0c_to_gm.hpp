@@ -14,7 +14,7 @@
 #include "catlass/arch/arch.hpp"
 #include "catlass/catlass.hpp"
 #include "catlass/gemm/tile/ascend950/copy_l0c_to_dst.hpp"
-#include "tla/tensor.hpp"
+#include "tla/kda_tensor.hpp"
 
 namespace Catlass::Gemm::Tile {
 

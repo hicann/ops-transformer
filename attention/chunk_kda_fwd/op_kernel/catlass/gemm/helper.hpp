@@ -13,7 +13,7 @@
 
 #include "catlass/arch/arch.hpp"
 #include "catlass/catlass.hpp"
-#include "catlass/numeric_size.hpp"
+#include "catlass/kda_numeric_size.hpp"
 #include "catlass/layout/layout.hpp"
 #include "catlass/gemm/gemm_type.hpp"
 #include "tla/layout.hpp"

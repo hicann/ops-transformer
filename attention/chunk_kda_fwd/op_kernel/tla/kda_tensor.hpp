@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef TLA_TENSOR_HPP
-#define TLA_TENSOR_HPP
+#ifndef TLA_KDA_TENSOR_HPP
+#define TLA_KDA_TENSOR_HPP
 
 #include "catlass/arch/arch.hpp"
 #include "tla/layout.hpp"                    // tla::Shape
@@ -410,4 +410,4 @@ CATLASS_HOST_DEVICE constexpr auto MakeTensorLike(BuiltinTensor const &builtinTe
 
 } // end namespace tla
 
-#endif // TLA_TENSOR_HPP
+#endif // TLA_KDA_TENSOR_HPP

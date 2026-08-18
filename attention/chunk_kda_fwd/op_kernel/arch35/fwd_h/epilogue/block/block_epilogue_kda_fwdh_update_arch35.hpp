@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef CATLASS_EPILOGUE_BLOCK_BLOCK_EPILOGUE_KDA_FWDH_UPDATE_HPP
-#define CATLASS_EPILOGUE_BLOCK_BLOCK_EPILOGUE_KDA_FWDH_UPDATE_HPP
+#ifndef CATLASS_EPILOGUE_BLOCK_BLOCK_EPILOGUE_KDA_FWDH_UPDATE_ARCH35_HPP
+#define CATLASS_EPILOGUE_BLOCK_BLOCK_EPILOGUE_KDA_FWDH_UPDATE_ARCH35_HPP
 #include "catlass/catlass.hpp"
 #include "catlass/arch/resource.hpp"
 #include "../kda_fwd_h_epilogue_policies.hpp"

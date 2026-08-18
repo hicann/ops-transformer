@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef CATLASS_DETAIL_CALLBACK_HPP
-#define CATLASS_DETAIL_CALLBACK_HPP
+#ifndef CATLASS_DETAIL_KDA_CALLBACK_HPP
+#define CATLASS_DETAIL_KDA_CALLBACK_HPP
 
 #include "catlass/detail/macros.hpp"
 
@@ -58,4 +58,4 @@ CATLASS_DEVICE
     return callback;
 }
 
-#endif // CATLASS_DETAIL_CALLBACK_HPP
+#endif // CATLASS_DETAIL_KDA_CALLBACK_HPP

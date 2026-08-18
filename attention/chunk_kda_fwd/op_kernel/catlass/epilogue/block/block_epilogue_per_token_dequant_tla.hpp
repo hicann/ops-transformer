@@ -18,9 +18,9 @@
 #include "catlass/gemm/gemm_type.hpp"
 #include "catlass/matrix_coord.hpp"
 #include "catlass/layout/layout.hpp"
-#include "catlass/detail/callback.hpp"
+#include "catlass/detail/kda_callback.hpp"
 #include "tla/layout.hpp"
-#include "tla/tensor.hpp"
+#include "tla/kda_tensor.hpp"
 
 namespace Catlass::Epilogue::Block {
 

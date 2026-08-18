@@ -29,7 +29,7 @@
 #include "catlass/gemm/tile/copy_l1_to_l0b.hpp"
 #include "catlass/gemm/tile/copy_ub_to_gm.hpp"
 #include "catlass/gemm/tile/tile_copy_tla.hpp"
-#include "tla/tensor.hpp"
+#include "tla/kda_tensor.hpp"
 
 namespace Catlass::Gemm::Tile {
 

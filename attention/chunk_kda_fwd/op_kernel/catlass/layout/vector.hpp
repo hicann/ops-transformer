@@ -12,8 +12,8 @@
 #define CATLASS_LAYOUT_VECTOR_HPP
 
 #include "catlass/catlass.hpp"
-#include "catlass/coord.hpp"
-#include "catlass/numeric_size.hpp"
+#include "catlass/kda_coord.hpp"
+#include "catlass/kda_numeric_size.hpp"
 
 namespace Catlass::layout {
 

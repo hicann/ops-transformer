@@ -14,7 +14,7 @@
 #include "catlass/arch/arch.hpp"
 #include "catlass/catlass.hpp"
 #include "catlass/gemm/tile/ascend950/copy_l0c_to_dst.hpp"
-#include "tla/tensor.hpp"
+#include "tla/kda_tensor.hpp"
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
 constexpr AscendC::FixpipeConfig CFG_ROW_MAJOR_UB = {AscendC::CO2Layout::ROW_MAJOR, true};

@@ -12,11 +12,11 @@
 #define CATLASS_LAYOUT_MATRIX_HPP
 
 #include "catlass/catlass.hpp"
-#include "catlass/coord.hpp"
-#include "catlass/numeric_size.hpp"
-#include "catlass/detail/alignment.hpp"
+#include "catlass/kda_coord.hpp"
+#include "catlass/kda_numeric_size.hpp"
+#include "catlass/detail/kda_alignment.hpp"
 #include "catlass/matrix_coord.hpp"
-#include "catlass/conv_coord.hpp"
+#include "catlass/kda_conv_coord.hpp"
 
 namespace Catlass::layout {
 

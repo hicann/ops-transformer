@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef CATLASS_COORD_HPP
-#define CATLASS_COORD_HPP
+#ifndef CATLASS_KDA_COORD_HPP
+#define CATLASS_KDA_COORD_HPP
 
 #include "catlass/catlass.hpp"
 
@@ -333,4 +333,4 @@ CATLASS_HOST_DEVICE constexpr Coord<7, T> MakeCoord(T dim0, T dim1, T dim2, T di
 
 } // namespace Catlass
 
-#endif // CATLASS_COORD_HPP
+#endif // CATLASS_KDA_COORD_HPP

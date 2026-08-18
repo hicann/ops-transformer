@@ -11,16 +11,16 @@
 #define CATLASS_ARCH 3510
 
 #include "catlass/arch/arch.hpp"
-#include "catlass/arch/cross_core_sync.hpp"
+#include "catlass/arch/kda_cross_core_sync.hpp"
 #include "catlass/arch/resource.hpp"
 #include "catlass/catlass.hpp"
-#include "catlass/debug.hpp"
-#include "../block/block_scheduler_kda_fwd_h.hpp"
+#include "catlass/kda_debug.hpp"
+#include "../block/block_scheduler_kda_fwd_h_arch35.hpp"
 #include "catlass/epilogue/block/block_epilogue.hpp"
-#include "../../epilogue/block/block_epilogue_kda_fwdh_update.hpp"
-#include "../../epilogue/block/block_epilogue_kda_fwdh_vnew.hpp"
+#include "../../epilogue/block/block_epilogue_kda_fwdh_update_arch35.hpp"
+#include "../../epilogue/block/block_epilogue_kda_fwdh_vnew_arch35.hpp"
 #include "catlass/gemm/block/block_mmad.hpp"
-#include "../../../../kernel_utils/block/block_mmad_pingpong_tla.hpp"
+#include "../../../../kernel_utils/block/block_mmad_pingpong_tla_kernel_utils.hpp"
 #include "../../../../kernel_utils/block/block_mmad_pingpong_tla_multi.hpp"
 #include "../../../../kernel_utils/block/block_mmad_pingpong_tla_preloadA_l1B.hpp"
 #include "catlass/gemm/block/block_swizzle.hpp"
@@ -28,9 +28,9 @@
 #include "catlass/gemm/gemm_type.hpp"
 #include "catlass/layout/layout.hpp"
 #include "catlass/gemm_coord.hpp"
-#include "tla/tensor.hpp"
+#include "tla/kda_tensor.hpp"
 #include "tla/layout.hpp"
-#include "tla/tensor.hpp"
+#include "tla/kda_tensor.hpp"
 
 using _0 = tla::Int<0>;
 using _1 = tla::Int<1>;

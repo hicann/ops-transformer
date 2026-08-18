@@ -12,9 +12,9 @@
 #define CATLASS_GEMM_BLOCK_BLOCK_MMAD_MLA_PV_TP1_SPEC_HPP
 
 #include "catlass/catlass.hpp"
-#include "catlass/arch/cross_core_sync.hpp"
+#include "catlass/arch/kda_cross_core_sync.hpp"
 #include "catlass/arch/resource.hpp"
-#include "catlass/coord.hpp"
+#include "catlass/kda_coord.hpp"
 #include "catlass/gemm/dispatch_policy.hpp"
 #include "catlass/gemm/helper.hpp"
 #include "catlass/gemm_coord.hpp"

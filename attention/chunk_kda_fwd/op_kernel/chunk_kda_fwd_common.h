@@ -13,9 +13,9 @@
 #include "kernel_operator.h"
 #include "kda_gate_cumsum_kernel.h"
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
-#include "arch35/chunk_kda_fwd_prepare.h"
-#include "arch35/chunk_kda_fwd_post_wu.h"
-#include "arch35/chunk_kda_fwd_finalize.h"
+#include "arch35/chunk_kda_fwd_prepare_arch35.h"
+#include "arch35/chunk_kda_fwd_post_wu_arch35.h"
+#include "arch35/chunk_kda_fwd_finalize_arch35.h"
 #else
 #include "chunk_kda_fwd_prepare.h"
 #include "chunk_kda_fwd_post_wu.h"
@@ -23,9 +23,9 @@
 #endif
 
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
-#include "arch35/fwd_h/gemm/kernel/kda_fwd_h_kernel.hpp"
+#include "arch35/fwd_h/gemm/kernel/kda_fwd_h_kernel_arch35.hpp"
 #else
-#include "arch22/fwd_h/gemm/kernel/kda_fwd_h_kernel.hpp"
+#include "arch22/fwd_h/gemm/kernel/kda_fwd_h_kernel_arch22.hpp"
 #endif
 
 namespace KdaForward {

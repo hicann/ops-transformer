@@ -12,7 +12,7 @@
 #define CATLASS_GEMM_BLOCK_BLOCK_SWIZZLE_HPP
 
 #include "catlass/catlass.hpp"
-#include "catlass/detail/alignment.hpp"
+#include "catlass/detail/kda_alignment.hpp"
 #include "catlass/gemm_coord.hpp"
 #include "catlass/matrix_coord.hpp"
 

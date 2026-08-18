@@ -15,7 +15,7 @@
 #include "catlass/arch/arch.hpp"
 #include "catlass/layout/layout.hpp"
 #include "catlass/gemm/gemm_type.hpp"
-#include "tla/tensor.hpp"
+#include "tla/kda_tensor.hpp"
 
 using namespace tla;
 

@@ -12,7 +12,7 @@
 #define CATLASS_GEMM_TILE_CAST_FP8_TO_FP16_HPP
 
 #if (defined(CATLASS_ARCH) && CATLASS_ARCH == 2201)
-#include "catlass/gemm/tile/atlasa2/cast_fp8_to_fp16.hpp"
+#include "catlass/gemm/tile/atlasa2/kda_cast_fp8_to_fp16.hpp"
 #endif
 
 #endif

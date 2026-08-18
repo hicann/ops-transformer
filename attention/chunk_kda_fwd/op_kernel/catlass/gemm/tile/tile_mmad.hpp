@@ -13,7 +13,7 @@
 
 #include "catlass/catlass.hpp"
 #include "catlass/gemm/helper.hpp"
-#include "tla/tensor.hpp"
+#include "tla/kda_tensor.hpp"
 namespace Catlass::Gemm::Tile {
 
 ///////////////////////////////////////////////////////////
