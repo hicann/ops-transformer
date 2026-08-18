@@ -2034,10 +2034,13 @@ ge::graphStatus SMLATilingCheck::CheckFeatureShape() const
                         "Ori_win_right should be -1(unlimited) or non-negative on " + A5_PLATFORM_LOG),
                     return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(*opParamInfo_.cmpMaskMode != 3,
-                    OP_LOGE(opName_, "cmpMaskMode should be 3 on %s, but got %u", A2_A3_PLATFORM_LOG.c_str(),
-                            *opParamInfo_.cmpMaskMode),
-                    return ge::GRAPH_FAILED);
+        if (smlaInfo_.perfMode == SMLATemplateMode::CSA_TEMPLATE_MODE ||
+            smlaInfo_.perfMode == SMLATemplateMode::HCA_TEMPLATE_MODE) {
+            OP_CHECK_IF(*opParamInfo_.cmpMaskMode != 3,
+                        OP_LOGE(opName_, "cmpMaskMode should be 3 on %s, but got %u", A2_A3_PLATFORM_LOG.c_str(),
+                                *opParamInfo_.cmpMaskMode),
+                        return ge::GRAPH_FAILED);
+        }
         if (hasOriSparseIndices_) {
             OP_CHECK_IF(*opParamInfo_.oriMaskMode != 0U,
                         OP_LOGE(opName_, "oriMaskMode must be 0 for SWA ori sparse (DSpark) on %s, but got %u.",
