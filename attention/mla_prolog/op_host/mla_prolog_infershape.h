@@ -27,6 +27,7 @@ namespace ops {
 constexpr uint32_t TOKEN_X_INDEX = 0;
 constexpr uint32_t WEIGHT_UK_INDEX = 3;
 constexpr uint32_t ROPE_SIN_INDEX = 7;
+constexpr uint32_t ROPE_COS_INDEX = 8;
 constexpr uint32_t KV_CACHE_INDEX = 10;
 constexpr uint32_t KR_CACHE_INDEX = 11;
 constexpr uint32_t KV_CACHE_INDEX_V3 = 9;
@@ -50,21 +51,21 @@ constexpr uint32_t DIM_INDEX_3 = 3;
 constexpr uint32_t FP8_E4M3_BLOCK_SIZE = 32; // Mxfp8全量化场景下 block_size = 32
 
 struct MlaPrologProtoShapeParam {
-    bool isBsMerge { false };
-    int64_t B { 0 };
-    int64_t T { 0 };
-    int64_t S { 0 };
-    int64_t N { 0 };
-    int64_t Hckv { 0 };
-    int64_t He { 0 };
-    int64_t Dr { 0 };
-    int64_t Hcq { 0 };
+    bool isBsMerge{false};
+    int64_t B{0};
+    int64_t T{0};
+    int64_t S{0};
+    int64_t N{0};
+    int64_t Hckv{0};
+    int64_t He{0};
+    int64_t Dr{0};
+    int64_t Hcq{0};
 };
 
 ge::graphStatus GetMlaPrologShapeDim(const gert::InferShapeContext *context, MlaPrologProtoShapeParam &shapeParam);
 ge::graphStatus SetMlaPrologShapeDim(const MlaPrologProtoShapeParam &shapeParam, gert::InferShapeContext *context);
 ge::graphStatus InferShapeMlaProlog(gert::InferShapeContext *context);
 ge::graphStatus InferDataTypeMlaProlog(gert::InferDataTypeContext *context);
-}  // namespace ops
+} // namespace ops
 
 #endif // MLA_PROLOG_INFERSHAPE_H

@@ -33,38 +33,38 @@ constexpr uint32_t MAX_BLOCK_SIZE = 1024U;
 constexpr uint32_t ALIGN_BLOCK_SIZE = 16U;
 constexpr uint32_t MXFP8_BLOCK_SIZE = 32U;
 
-constexpr int64_t  NZ_H0_SIZE = 16U;
+constexpr int64_t NZ_H0_SIZE = 16U;
 
-constexpr char TOKEN_X_NAME[] {"tokenX"};
-constexpr char WEIGHT_DQ_NAME[] {"weightDq"};
-constexpr char WEIGHT_UQ_QR_NAME[] {"weightUqQr"};
-constexpr char WEIGHT_UK_NAME[] {"weightUk"};
-constexpr char WEIGHT_DKV_KR_NAME[] {"weightDkvKr"};
-constexpr char RMSNORM_GAMMA_CQ_NAME[] {"rmsnormGammaCq"};
-constexpr char RMSNORM_GAMMA_CKV_NAME[] {"rmsnormGammaCkv"};
-constexpr char ROPE_SIN_NAME[] {"ropeSin"};
-constexpr char ROPE_COS_NAME[] {"ropeCos"};
-constexpr char CACHE_INDEX_NAME[] {"cacheIndex"};
-constexpr char KV_CACHE_NAME[] {"kvCache"};
-constexpr char KR_CACHE_NAME[] {"krCache"};
-constexpr char DEQUANT_SCALE_X_NAME[] {"dequantScaleX"};
-constexpr char DEQUANT_SCALE_W_DQ_NAME[] {"dequantScaleWDq"};
-constexpr char DEQUANT_SCALE_W_UQ_QR_NAME[] {"dequantScaleWUqQr"};
-constexpr char DEQUANT_SCALE_W_DKV_KR_NAME[] {"dequantScaleWDkvKr"};
-constexpr char QUANT_SCALE_CKV_NAME[] {"quantScaleCkv"};
-constexpr char QUANT_SCALE_CKR_NAME[] {"quantScaleCkr"};
-constexpr char SMOOTH_SCALES_CQ_NAME[] {"smoothScalesCq"};
-constexpr char ACTUAL_SEQ_LEN_NAME[] {"actualSeqLen"};
-constexpr char K_NOPE_CLIP_ALPHA_NAME[] {"kNopeClipAlpha"};
-constexpr char QUERY_NAME[] {"query"};
-constexpr char QUERY_ROPE_NAME[] {"queryRope"};
-constexpr char KV_CACHE_OUT_NAME[] {"kvCacheOut"};
-constexpr char KR_CACHE_OUT_NAME[] {"krCacheOut"};
-constexpr char DEQUANT_SCALE_Q_NOPE_NAME[] {"dequantScaleQNope"};
-constexpr char QUERY_NORM_NAME[] {"queryNorm"};
-constexpr char DEQUANT_SCALE_Q_NORM_NAME[] {"dequantScaleQNorm"};
+constexpr char TOKEN_X_NAME[]{"tokenX"};
+constexpr char WEIGHT_DQ_NAME[]{"weightDq"};
+constexpr char WEIGHT_UQ_QR_NAME[]{"weightUqQr"};
+constexpr char WEIGHT_UK_NAME[]{"weightUk"};
+constexpr char WEIGHT_DKV_KR_NAME[]{"weightDkvKr"};
+constexpr char RMSNORM_GAMMA_CQ_NAME[]{"rmsnormGammaCq"};
+constexpr char RMSNORM_GAMMA_CKV_NAME[]{"rmsnormGammaCkv"};
+constexpr char ROPE_SIN_NAME[]{"ropeSin"};
+constexpr char ROPE_COS_NAME[]{"ropeCos"};
+constexpr char CACHE_INDEX_NAME[]{"cacheIndex"};
+constexpr char KV_CACHE_NAME[]{"kvCache"};
+constexpr char KR_CACHE_NAME[]{"krCache"};
+constexpr char DEQUANT_SCALE_X_NAME[]{"dequantScaleX"};
+constexpr char DEQUANT_SCALE_W_DQ_NAME[]{"dequantScaleWDq"};
+constexpr char DEQUANT_SCALE_W_UQ_QR_NAME[]{"dequantScaleWUqQr"};
+constexpr char DEQUANT_SCALE_W_DKV_KR_NAME[]{"dequantScaleWDkvKr"};
+constexpr char QUANT_SCALE_CKV_NAME[]{"quantScaleCkv"};
+constexpr char QUANT_SCALE_CKR_NAME[]{"quantScaleCkr"};
+constexpr char SMOOTH_SCALES_CQ_NAME[]{"smoothScalesCq"};
+constexpr char ACTUAL_SEQ_LEN_NAME[]{"actualSeqLen"};
+constexpr char K_NOPE_CLIP_ALPHA_NAME[]{"kNopeClipAlpha"};
+constexpr char QUERY_NAME[]{"query"};
+constexpr char QUERY_ROPE_NAME[]{"queryRope"};
+constexpr char KV_CACHE_OUT_NAME[]{"kvCacheOut"};
+constexpr char KR_CACHE_OUT_NAME[]{"krCacheOut"};
+constexpr char DEQUANT_SCALE_Q_NOPE_NAME[]{"dequantScaleQNope"};
+constexpr char QUERY_NORM_NAME[]{"queryNorm"};
+constexpr char DEQUANT_SCALE_Q_NORM_NAME[]{"dequantScaleQNorm"};
 
-constexpr uint32_t PARAM_MAP_INIT_RESERVE_NUM = 28;  // 预分配所有key的个数，避免使用时动态扩容
+constexpr uint32_t PARAM_MAP_INIT_RESERVE_NUM = 28; // 预分配所有key的个数，避免使用时动态扩容
 
 struct ParamInfo {
     ParamInfo() = default;
@@ -73,7 +73,8 @@ struct ParamInfo {
     explicit ParamInfo(ParamInfo &&) = default;
     ParamInfo &operator=(ParamInfo &&other) = default;
     ~ParamInfo() = default;
-    ParamInfo(const gert::CompileTimeTensorDesc *actualDesc, const gert::StorageShape *actualShape) {
+    ParamInfo(const gert::CompileTimeTensorDesc *actualDesc, const gert::StorageShape *actualShape)
+    {
         if (actualDesc != nullptr && actualShape != nullptr) {
             isValid = true;
             dtype = actualDesc->GetDataType();
@@ -86,7 +87,9 @@ struct ParamInfo {
             }
         }
     }
-    explicit ParamInfo(const BaseParaInfo &info) : ParamInfo(info.desc, info.shape) {}
+    explicit ParamInfo(const BaseParaInfo &info)
+        : ParamInfo(info.desc, info.shape)
+    {}
     explicit ParamInfo(const std::vector<uint32_t> &expectedShape)
     {
         isValid = true;
@@ -98,7 +101,8 @@ struct ParamInfo {
         }
     }
 
-    bool operator == (const ParamInfo &other) const {
+    bool operator==(const ParamInfo &other) const
+    {
         if (!isValid && !other.isValid) {
             return true;
         }
@@ -107,17 +111,14 @@ struct ParamInfo {
             format != other.format) {
             return false;
         }
-        return (isValid == other.isValid && dtype == other.dtype &&
-            dimNum == other.dimNum && shape == other.shape);
+        return (isValid == other.isValid && dtype == other.dtype && dimNum == other.dimNum && shape == other.shape);
     }
-    bool operator != (const ParamInfo &other) const {
-        return !(*this == other);
-    }
+    bool operator!=(const ParamInfo &other) const { return !(*this == other); }
 
-    bool isValid {};
-    ge::DataType dtype {ge::DT_MAX};
-    ge::Format format {ge::FORMAT_MAX};
-    size_t dimNum {};
+    bool isValid{};
+    ge::DataType dtype{ge::DT_MAX};
+    ge::Format format{ge::FORMAT_MAX};
+    size_t dimNum{};
     std::vector<int64_t> shape;
 };
 
@@ -127,7 +128,10 @@ class MlaPrologTilingCheck {
 public:
     MlaPrologTilingCheck(const MlaPrologContext &context, const MlaPrologBaseShapeInfo &baseShapeInfo,
                          const MlaPrologScenarioInfo &scenarioInfo)
-        : context_(context), baseShapeInfo_(baseShapeInfo), scenarioInfo_(scenarioInfo) {}
+        : context_(context),
+          baseShapeInfo_(baseShapeInfo),
+          scenarioInfo_(scenarioInfo)
+    {}
     ge::graphStatus CheckSingleRequiredParam() const;
     ge::graphStatus CheckCacheMode() const;
     ge::graphStatus CheckQuantMode() const;
@@ -150,8 +154,7 @@ private:
     ge::graphStatus CheckDtileSize() const;
     // ==================================单参数校验==================================
     bool IsSingleParamValid(const BaseParaInfo &param, const std::string &paramName,
-                            const std::set<ge::DataType> &expectedDtype,
-                            const std::set<ge::Format> &expectedFormat,
+                            const std::set<ge::DataType> &expectedDtype, const std::set<ge::Format> &expectedFormat,
                             const std::set<size_t> &expectedDimNum) const;
     bool CheckTokenX() const;
     bool CheckWDq() const;
@@ -166,6 +169,8 @@ private:
     bool CheckKvCache() const;
     bool CheckKrCache() const;
     bool CheckActSeqLen() const;
+    bool IsRopeDisabled() const;
+    bool IsEmptyTensor(const BaseParaInfo &param) const;
     // ==================================单参数校验==================================
 
     // =================================全量参数校验=================================
@@ -174,7 +179,7 @@ private:
     void FillRequiredParamShapeWithDims();
     void FillOptionalOutputParamShapeWithDims();
     void FillOptionalOutputParamShapeWithDimsV2();
- 	void FillOptionalOutputParamShapeWithDimsV3();
+    void FillOptionalOutputParamShapeWithDimsV3();
     void FillScenarioParamInfo();
     void FillQueryNormScaleShape();
     void FillQueryNormDtypes();
@@ -210,6 +215,6 @@ private:
     ParamInfoMap actualParamInfo_ = ParamInfoMap(PARAM_MAP_INIT_RESERVE_NUM);
 };
 
-}  // namespace optiling
+} // namespace optiling
 
 #endif

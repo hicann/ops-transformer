@@ -24,6 +24,8 @@ ge::graphStatus GetMlaPrologV3ShapeDim(const gert::InferShapeContext *context, M
     OP_CHECK_NULL_WITH_CONTEXT(context, ropeSinShape);
     auto weightDqShape = context->GetRequiredInputShape(WEIGHT_DQ_INDEX); // (He, Hcq)
     OP_CHECK_NULL_WITH_CONTEXT(context, weightDqShape);
+    auto weightDkvKrShape = context->GetRequiredInputShape(WEIGHT_DKV_KR_INDEX); // (He, Hckv+Dr)
+    OP_CHECK_NULL_WITH_CONTEXT(context, weightDkvKrShape);
     auto kvCacheShape = context->GetRequiredInputShape(KV_CACHE_INDEX_V3); // (B, Nkv, Skv, Hckv)
     OP_CHECK_NULL_WITH_CONTEXT(context, kvCacheShape);
     auto krCacheShape = context->GetRequiredInputShape(KR_CACHE_INDEX_V3); // (B, Nkv, Skv, Dr)
@@ -37,10 +39,17 @@ ge::graphStatus GetMlaPrologV3ShapeDim(const gert::InferShapeContext *context, M
                 OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "weightUk",
                                              std::to_string(weightUkShape->GetDimNum()) + "D", "3D"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(((ropeSinShape->GetDimNum() != DIM_NUM_2) && (ropeSinShape->GetDimNum() != DIM_NUM_3)),
-                OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "ropeSin",
-                                             std::to_string(ropeSinShape->GetDimNum()) + "D", "2D or 3D"),
-                return ge::GRAPH_FAILED);
+    auto attrs = context->GetAttrs();
+    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    const bool *doRopePtr = attrs->GetAttrPointer<bool>(ATTR_DO_ROPE_INDEX);
+    const bool doRope = (doRopePtr == nullptr) ? true : *doRopePtr;
+    const bool ropeSinEmpty = (ropeSinShape->GetShapeSize() == 0);
+    // do_rope=false 且 rope 为空 tensor 时跳过 ropeSin 常规维度校验
+    OP_CHECK_IF(
+        (!ropeSinEmpty) && ((ropeSinShape->GetDimNum() != DIM_NUM_2) && (ropeSinShape->GetDimNum() != DIM_NUM_3)),
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "ropeSin", std::to_string(ropeSinShape->GetDimNum()) + "D",
+                                     "2D or 3D"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF((weightDqShape->GetDimNum() != DIM_NUM_2),
                 OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "weightDq",
                                              std::to_string(weightDqShape->GetDimNum()) + "D", "2D"),
@@ -55,16 +64,28 @@ ge::graphStatus GetMlaPrologV3ShapeDim(const gert::InferShapeContext *context, M
                                              std::to_string(krCacheShape->GetDimNum()) + "D", "1D or 3D or 4D"),
                 return ge::GRAPH_FAILED);
 
+    if (doRope && !ropeSinEmpty) {
+        if (tokenXShape->GetDimNum() == DIM_NUM_3) { // BS
+            shapeParam.Dr = ropeSinShape->GetDim(DIM_INDEX_2);
+        } else { // T
+            shapeParam.Dr = ropeSinShape->GetDim(DIM_INDEX_1);
+        }
+    } else {
+        // do_rope=false 时 rope 输入可为空，Dr 由 weightDkvKr(Hckv+Dr) 与 weightUk(Hckv) 推导
+        const int64_t hckvPlusDr = (weightDkvKrShape->GetDimNum() == DIM_NUM_4) ?
+                                       weightDkvKrShape->GetDim(DIM_INDEX_0) * weightDkvKrShape->GetDim(DIM_INDEX_3) :
+                                       weightDkvKrShape->GetDim(DIM_INDEX_1);
+        shapeParam.Dr = hckvPlusDr - weightUkShape->GetDim(DIM_INDEX_2);
+    }
+
     if (tokenXShape->GetDimNum() == DIM_NUM_3) { // BS
         shapeParam.isBsMerge = false;
         shapeParam.B = tokenXShape->GetDim(DIM_INDEX_0);
         shapeParam.S = tokenXShape->GetDim(DIM_INDEX_1);
-        shapeParam.Dr = ropeSinShape->GetDim(DIM_INDEX_2);
         shapeParam.T = shapeParam.B * shapeParam.S;
     } else { // T
         shapeParam.isBsMerge = true;
         shapeParam.T = tokenXShape->GetDim(DIM_INDEX_0);
-        shapeParam.Dr = ropeSinShape->GetDim(DIM_INDEX_1);
     }
 
     shapeParam.N = weightUkShape->GetDim(DIM_INDEX_0);
@@ -76,8 +97,7 @@ ge::graphStatus GetMlaPrologV3ShapeDim(const gert::InferShapeContext *context, M
 
 static bool IsWeightFullQuantFamily(int64_t weightQuantMode)
 {
-    return weightQuantMode == WEIGHT_QUANT_MODE_FULL_QUANT ||
-           weightQuantMode == WEIGHT_QUANT_MODE_FULL_QUANT_FP8 ||
+    return weightQuantMode == WEIGHT_QUANT_MODE_FULL_QUANT || weightQuantMode == WEIGHT_QUANT_MODE_FULL_QUANT_FP8 ||
            weightQuantMode == WEIGHT_QUANT_MODE_FULL_QUANT_HIF8 ||
            weightQuantMode == WEIGHT_QUANT_MODE_MXFP8_FULL_QUANT;
 }

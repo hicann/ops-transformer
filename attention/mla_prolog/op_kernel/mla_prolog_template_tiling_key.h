@@ -44,6 +44,13 @@
 #define MLA_PROLOG_VERSION (-1)
 #endif
 
+// V3: ENABLE_ROPE 可选 0/1；V1/V2: 仅编译开启
+#if MLA_PROLOG_VERSION == 3
+#define MLA_PROLOG_ENABLE_ROPE_SEL ASCENDC_TPL_BOOL_SEL(ENABLE_ROPE, 0, 1)
+#else
+#define MLA_PROLOG_ENABLE_ROPE_SEL ASCENDC_TPL_BOOL_SEL(ENABLE_ROPE, 1)
+#endif
+
 #include "ascendc/host_api/tiling/template_argument.h"
 
 #define ASCENDC_TPL_2_BW 2 // 每个参数占用2个bit位
@@ -51,35 +58,37 @@
 #define ASCENDC_TPL_6_BW 6 // 每个参数占用6个bit位
 
 // 可表示的tilingkey范围为64bit，注意不可超过限制
-ASCENDC_TPL_ARGS_DECL(
-    mla_prolog, // 算子唯一标识，与opType保持一致
-                // bit:0-3 CACHE_MODE：0-ND 1-PA_BSND 2-PA_NZ 3-PA_BLK_BSND 4-PA_BLK_NZ
-    ASCENDC_TPL_UINT_DECL(CACHE_MODE, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4),
-    // bit:4-5 场景标识：0-FP16(预留) 1-BF16  2-量化场景
-    ASCENDC_TPL_UINT_DECL(SCENARIO, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2),
-    // bit:6-11 量化场景：0-非量化 1-MMQcQr量化 2-MMQcQr量化+KVcache量化 3-MMcqCkvKr量化+MMQcQr量化
-    // 4-MMCqCkvkr量化+MMQcQr量化+KVcache量化 5-MMQcQr量化+KVcache pertoken-pergroup量化
-    // 6-MMCqCkvkr量化+MMQcQr量化+KVcache pertoken-pergroup量化
-    // 7-Mxfp8量化+MMCqCkvkr量化+MMQcQr量化 8-Mxfp8量化+MMCqCkvkr量化+MMQcQr量化+KVcache量化
-    // 9-Mxfp8量化+MMCqCkvkr量化+MMQcQr量化+KVcache pertoken-pergroup量化
-    // 10-fp8量化+MMcqCkvKr量化+MMQcQr量化 11-fp8量化+MMCqCkvkr量化+MMQcQr量化+KVcache量化
-    // 12-hif8量化+MMcqCkvKr量化+MMQcQr量化 13-hif8量化+MMCqCkvkr量化+MMQcQr量化+KVcache量化
-    // 14-fp8量化+MMcqCkvKr量化+MMQcQr量化+KVcache pertoken-pergroup量化
-    // 15-hif8量化+MMCqCkvkr量化+MMQcQr量化+KVcache pertoken-pergroup量化
-    ASCENDC_TPL_UINT_DECL(QUANT_MODE, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-                          13, 14, 15),
-    // bit:12 反量化使能：0-关闭 1-开启
-    ASCENDC_TPL_BOOL_DECL(ENABLE_DEQUANT_OPTIONAL, 0, 1),
-    // bit:13 量化算力分组：0-关闭 1-开启
-    ASCENDC_TPL_BOOL_DECL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0, 1),
-    // bit:14-15 空tensor场景：0-无空tensor  1-kv_cache/kr_cache为空  2-query为空且不更新cache
-    ASCENDC_TPL_UINT_DECL(EMPTY_TENSOR_MODE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2),
-    // bit:16-17 actualSeqLen使能场景 0-关闭 1-使能actualSeqLen
-    ASCENDC_TPL_UINT_DECL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1),
-    // bit:18-19 切M模式 0-关闭(切N) 1-使能(切M)
-    ASCENDC_TPL_UINT_DECL(SPLIT_M_MODE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1),
-    // bit:20-25 cv分核模式 ASCENDC_TPL_MIX_AIC_1_1(6)-1:1 ASCENDC_TPL_MIX_AIC_1_2(7)-1:2
-    ASCENDC_TPL_KERNEL_TYPE_DECL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2));
+ASCENDC_TPL_ARGS_DECL(mla_prolog, // 算子唯一标识，与opType保持一致
+                                  // bit:0-3 CACHE_MODE：0-ND 1-PA_BSND 2-PA_NZ 3-PA_BLK_BSND 4-PA_BLK_NZ
+                      ASCENDC_TPL_UINT_DECL(CACHE_MODE, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4),
+                      // bit:4-5 场景标识：0-FP16(预留) 1-BF16  2-量化场景
+                      ASCENDC_TPL_UINT_DECL(SCENARIO, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2),
+                      // bit:6-11 量化场景：0-非量化 1-MMQcQr量化 2-MMQcQr量化+KVcache量化 3-MMcqCkvKr量化+MMQcQr量化
+                      // 4-MMCqCkvkr量化+MMQcQr量化+KVcache量化 5-MMQcQr量化+KVcache pertoken-pergroup量化
+                      // 6-MMCqCkvkr量化+MMQcQr量化+KVcache pertoken-pergroup量化
+                      // 7-Mxfp8量化+MMCqCkvkr量化+MMQcQr量化 8-Mxfp8量化+MMCqCkvkr量化+MMQcQr量化+KVcache量化
+                      // 9-Mxfp8量化+MMCqCkvkr量化+MMQcQr量化+KVcache pertoken-pergroup量化
+                      // 10-fp8量化+MMcqCkvKr量化+MMQcQr量化 11-fp8量化+MMCqCkvkr量化+MMQcQr量化+KVcache量化
+                      // 12-hif8量化+MMcqCkvKr量化+MMQcQr量化 13-hif8量化+MMCqCkvkr量化+MMQcQr量化+KVcache量化
+                      // 14-fp8量化+MMcqCkvKr量化+MMQcQr量化+KVcache pertoken-pergroup量化
+                      // 15-hif8量化+MMCqCkvkr量化+MMQcQr量化+KVcache pertoken-pergroup量化
+                      ASCENDC_TPL_UINT_DECL(QUANT_MODE, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4, 5, 6, 7,
+                                            8, 9, 10, 11, 12, 13, 14, 15),
+                      // bit:12 反量化使能：0-关闭 1-开启
+                      ASCENDC_TPL_BOOL_DECL(ENABLE_DEQUANT_OPTIONAL, 0, 1),
+                      // bit:13 量化算力分组：0-关闭 1-开启
+                      ASCENDC_TPL_BOOL_DECL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0, 1),
+                      // bit:14-15 空tensor场景：0-无空tensor  1-kv_cache/kr_cache为空  2-query为空且不更新cache
+                      ASCENDC_TPL_UINT_DECL(EMPTY_TENSOR_MODE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1, 2),
+                      // bit:16-17 actualSeqLen使能场景 0-关闭 1-使能actualSeqLen
+                      ASCENDC_TPL_UINT_DECL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1),
+                      // bit:18-19 切M模式 0-关闭(切N) 1-使能(切M)
+                      ASCENDC_TPL_UINT_DECL(SPLIT_M_MODE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, 0, 1),
+                      // bit:20 RoPE 开关：0-关闭(passthrough) 1-开启；仅 V4 可选关，V1/V2/V3 仅编译开启
+                      // 注意：KERNEL_TYPE_DECL 必须保持 ARGS_DECL 末位，新增模板参数加在其前
+                      ASCENDC_TPL_BOOL_DECL(ENABLE_ROPE, 0, 1),
+                      // bit:21-29 cv分核模式 ASCENDC_TPL_MIX_AIC_1_1(6)-1:1 ASCENDC_TPL_MIX_AIC_1_2(7)-1:2
+                      ASCENDC_TPL_KERNEL_TYPE_DECL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2));
 
 ASCENDC_TPL_SEL(
 
@@ -94,7 +103,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -105,7 +114,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -116,7 +125,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
@@ -131,7 +140,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0, 1),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -142,7 +151,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0, 1),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -153,7 +162,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -164,7 +173,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -175,7 +184,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0, 1),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -186,7 +195,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
@@ -203,7 +212,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0, 1),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -214,7 +223,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0, 1),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -225,7 +234,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -236,7 +245,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -247,7 +256,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0, 1),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -258,7 +267,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
@@ -275,7 +284,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -286,7 +295,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -297,7 +306,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
@@ -314,7 +323,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -325,7 +334,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -336,13 +345,13 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
 #endif
 
-#if MLA_PROLOG_VERSION == -1 || MLA_PROLOG_VERSION == 3
+#if MLA_PROLOG_VERSION == -1 || MLA_PROLOG_VERSION == 3 || MLA_PROLOG_VERSION == 4
 // -------------------------- 半量化kv pertoken-pergroup量化 --------------------------
 #if ORIG_DTYPE_TOKEN_X == -1 || ORIG_DTYPE_WEIGHT_UQ_QR == -1 || ORIG_DTYPE_KV_CACHE == -1 || \
     (ORIG_DTYPE_TOKEN_X == DT_BF16 && ORIG_DTYPE_WEIGHT_UQ_QR == DT_INT8 && ORIG_DTYPE_KV_CACHE == DT_INT8)
@@ -353,7 +362,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -364,7 +373,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
@@ -381,7 +390,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
@@ -400,7 +409,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_2),
-                         ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
+                         MLA_PROLOG_ENABLE_ROPE_SEL, ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
 
 // -------------------------- Mxfp8全量化kv量化 --------------------------
@@ -418,7 +427,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_2),
-                         ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
+                         MLA_PROLOG_ENABLE_ROPE_SEL, ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
 
 // -------------------------- Mxfp8全量化kv pertoken-pergroup量化 --------------------------
@@ -435,7 +444,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_2),
-                         ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
+                         MLA_PROLOG_ENABLE_ROPE_SEL, ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
 
 // -------------------------- fp8全量化kv非量化 --------------------------
@@ -450,7 +459,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -461,7 +470,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -472,7 +481,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
@@ -490,7 +499,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -501,7 +510,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -512,7 +521,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
@@ -526,7 +535,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -537,7 +546,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -548,7 +557,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
@@ -565,7 +574,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -576,7 +585,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -587,7 +596,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
@@ -604,7 +613,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -615,7 +624,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
@@ -632,7 +641,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 
@@ -643,7 +652,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0, 1),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)),
 #endif
@@ -657,7 +666,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(ENABLE_GROUP_COMPUTE_OPTIONAL, 0),
                          ASCENDC_TPL_UINT_SEL(EMPTY_TENSOR_MODE, ASCENDC_TPL_UI_LIST, 2),
                          ASCENDC_TPL_UINT_SEL(ACTUAL_SEQ_LEN_MODE, ASCENDC_TPL_UI_LIST, 0),
-                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(SPLIT_M_MODE, ASCENDC_TPL_UI_LIST, 0), MLA_PROLOG_ENABLE_ROPE_SEL,
                          ASCENDC_TPL_SHARED_KERNEL_TYPE_SEL(CV_MODE, ASCENDC_TPL_MIX_AIC_1_1, ASCENDC_TPL_MIX_AIC_1_2),
                          ASCENDC_TPL_TILING_STRUCT_SEL(optiling::MlaPrologTilingData)));
 
