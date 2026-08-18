@@ -15,16 +15,16 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_grouped_matmul_swiglu_quant_weight_nz_v2.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
@@ -160,24 +160,25 @@ int main()
 
     ret = CreateAclTensor<uint8_t>(weightHostData, weightLogicalShape, weightStorageShape, &weightDeviceAddr,
                                    ACL_FLOAT8_E4M3FN, ACL_FORMAT_FRACTAL_NZ, &weightTensor);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> weightTensorListPtr(weight,
-                                                                                               aclDestroyTensorList);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> weightTensorPtr(weightTensor, aclDestroyTensor);
     std::unique_ptr<void, aclError (*)(void *)> weightDeviceAddrPtr(weightDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-
     aclTensor *weightArray[] = {weightTensor};
     weight = aclCreateTensorList(weightArray, 1);
     CHECK_RET(weight != nullptr, LOG_PRINT("aclCreateTensorList(weight) failed\n"); return ACL_ERROR_FAILURE);
-
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> weightTensorListPtr(weight,
+                                                                                               aclDestroyTensorList);
     ret = CreateAclTensorND<int8_t>(weightScaleHostData, weightScaleShape, &weightScaleDeviceAddr, ACL_FLOAT8_E8M0,
                                     &weightScaleTensor);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> weightScaleTensorListPtr(
-        weightScale, aclDestroyTensorList);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> weightScaleTensorPtr(weightScaleTensor,
+                                                                                        aclDestroyTensor);
     std::unique_ptr<void, aclError (*)(void *)> weightScaleDeviceAddrPtr(weightScaleDeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     aclTensor *weightScaleArray[] = {weightScaleTensor};
     weightScale = aclCreateTensorList(weightScaleArray, 1);
     CHECK_RET(weightScale != nullptr, LOG_PRINT("aclCreateTensorList(weightScale) failed\n"); return ACL_ERROR_FAILURE);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> weightScaleTensorListPtr(
+        weightScale, aclDestroyTensorList);
 
     ret = CreateAclTensorND<int8_t>(xScaleHostData, xScaleShape, &xScaleDeviceAddr, ACL_FLOAT8_E8M0, &xScale);
     std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> xScaleTensorPtr(xScale, aclDestroyTensor);
@@ -234,24 +235,28 @@ int main()
 
     PrintVector<int8_t>(outputScaleHostData, "outputScale", 64);
 
-    aclrtFree(workspaceAddr);
-    aclDestroyTensorList(weight);
-    aclDestroyTensorList(weightScale);
-    aclDestroyTensor(x);
-    aclDestroyTensor(weightTensor);
-    aclDestroyTensor(weightScaleTensor);
-    aclDestroyTensor(xScale);
-    aclDestroyTensor(groupList);
-    aclDestroyTensor(output);
-    aclDestroyTensor(outputScale);
+    if (workspaceSize > 0) {
+        aclrtFree(workspaceAddr);
+    }
 
-    aclrtFree(xDeviceAddr);
-    aclrtFree(weightDeviceAddr);
-    aclrtFree(weightScaleDeviceAddr);
-    aclrtFree(xScaleDeviceAddr);
-    aclrtFree(groupListDeviceAddr);
-    aclrtFree(outputDeviceAddr);
-    aclrtFree(outputScaleDeviceAddr);
+    // Release ACL objects and device buffers before resetting the device in Finalize.
+    weightScaleTensorListPtr.reset();
+    weightTensorListPtr.reset();
+    outputScaleTensorPtr.reset();
+    outputTensorPtr.reset();
+    groupListTensorPtr.reset();
+    xScaleTensorPtr.reset();
+    weightScaleTensorPtr.reset();
+    weightTensorPtr.reset();
+    xTensorPtr.reset();
+
+    outputScaleDeviceAddrPtr.reset();
+    outputDeviceAddrPtr.reset();
+    groupListDeviceAddrPtr.reset();
+    xScaleDeviceAddrPtr.reset();
+    weightScaleDeviceAddrPtr.reset();
+    weightDeviceAddrPtr.reset();
+    xDeviceAddrPtr.reset();
 
     Finalize(deviceId, stream);
     return 0;
