@@ -400,7 +400,7 @@ static ge::graphStatus InferDataTypeMoeDistributeDispatchV2(gert::InferDataTypeC
         int64_t yDtype = *yDtypePtr;
         OP_LOGD(context->GetNodeName(), "specified y_dtype = %lld.", yDtype);
         OP_CHECK_IF(CheckQuantMode(context, quantMode, yDtype) == ge::GRAPH_FAILED,
-                    OP_LOGE(context->GetNodeName(), "CheckQuantMode fail"), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "CheckQuantMode fail"), return ge::GRAPH_FAILED);
         expandXDtype = static_cast<ge::DataType>(yDtype);
     }
     context->SetOutputDataType(DISPATCH_OUTPUT_EXPAND_X_INDEX, expandXDtype);

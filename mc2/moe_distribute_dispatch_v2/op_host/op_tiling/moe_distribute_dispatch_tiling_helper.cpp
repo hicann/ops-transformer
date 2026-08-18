@@ -37,12 +37,12 @@ inline bool MoeDistributeDispatchTilingHelper::CheckInputTensorDim(const gert::T
     const gert::StorageShape *expertIdStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
     OP_TILING_CHECK(expertIdStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertIdShape"),
                     return false);
-    OP_TILING_CHECK(expertIdStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                        nodeName, "expertIdShape",
-                        std::to_string(expertIdStorageShape->GetStorageShape().GetDimNum()).c_str(),
-                        "The shape dim of expertIdShape must be 2D."),
-                    return false);
+    OP_TILING_CHECK(
+        expertIdStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            nodeName, "expertIdShape", std::to_string(expertIdStorageShape->GetStorageShape().GetDimNum()).c_str(),
+            "The shape dim of expertIdShape must be 2D."),
+        return false);
     OP_LOGD(nodeName, "expertId dim0 = %ld", expertIdStorageShape->GetStorageShape().GetDim(0));
     OP_LOGD(nodeName, "expertId dim1 = %ld", expertIdStorageShape->GetStorageShape().GetDim(1));
     // 如果scales不为空进行shape维度检查
@@ -117,12 +117,12 @@ inline bool MoeDistributeDispatchTilingHelper::CheckOutputTensorDim(gert::Tiling
 {
     const gert::StorageShape *expandXStorageShape = context->GetOutputShape(OUTPUT_EXPAND_X_INDEX);
     OP_TILING_CHECK(expandXStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandXShape"), return false);
-    OP_TILING_CHECK(expandXStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                        nodeName, "expandXShape",
-                        std::to_string(expandXStorageShape->GetStorageShape().GetDimNum()).c_str(),
-                        "The shape dim of expandXShape must be 2D."),
-                    return false);
+    OP_TILING_CHECK(
+        expandXStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            nodeName, "expandXShape", std::to_string(expandXStorageShape->GetStorageShape().GetDimNum()).c_str(),
+            "The shape dim of expandXShape must be 2D."),
+        return false);
     OP_LOGD(nodeName, "expandX dim0 = %ld", expandXStorageShape->GetStorageShape().GetDim(0));
     OP_LOGD(nodeName, "expandX dim1 = %ld", expandXStorageShape->GetStorageShape().GetDim(1));
 
@@ -138,12 +138,12 @@ inline bool MoeDistributeDispatchTilingHelper::CheckOutputTensorDim(gert::Tiling
     const gert::StorageShape *expandIdxStorageShape = context->GetOutputShape(OUTPUT_EXPAND_IDX_INDEX);
     OP_TILING_CHECK(expandIdxStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandIdxShape"),
                     return false);
-    OP_TILING_CHECK(expandIdxStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                        nodeName, "expandIdxShape",
-                        std::to_string(expandIdxStorageShape->GetStorageShape().GetDimNum()).c_str(),
-                        "The shape dim of expandIdxShape must be 1D."),
-                    return false);
+    OP_TILING_CHECK(
+        expandIdxStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            nodeName, "expandIdxShape", std::to_string(expandIdxStorageShape->GetStorageShape().GetDimNum()).c_str(),
+            "The shape dim of expandIdxShape must be 1D."),
+        return false);
     OP_LOGD(nodeName, "expandIdx dim0 = %ld", expandIdxStorageShape->GetStorageShape().GetDim(0));
 
     const gert::StorageShape *expertTokenNumsStorageShape = context->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
@@ -285,13 +285,13 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorDataType(gert::TilingContext 
 {
     auto xDesc = context->GetInputDesc(X_INDEX);
     OP_TILING_CHECK(!CheckInputTensorDataType(context, nodeName, isScales),
-                    OP_LOGE(nodeName, "Input param data type is invalid."), return false);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "Input param data type is invalid."), return false);
     auto expandXDesc = context->GetOutputDesc(OUTPUT_EXPAND_X_INDEX);
     OP_TILING_CHECK(expandXDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandXDesc"), return false);
     if (quantMode != static_cast<uint32_t>(QuantModeA5::NON_QUANT)) {
         OP_TILING_CHECK(expandXDesc->GetDataType() != ge::DT_INT8,
-                        OP_LOGE(nodeName, "expandX datatype is invalid, datatype should be int8, but is %s.",
-                                Ops::Base::ToString(expandXDesc->GetDataType()).c_str()),
+                        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "expand_x",
+                                                  Ops::Base::ToString(expandXDesc->GetDataType()).c_str(), "INT8"),
                         return false);
     } else {
         if (expandXDesc->GetDataType() != xDesc->GetDataType()) {
@@ -307,14 +307,15 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorDataType(gert::TilingContext 
         auto dynamicScalesDesc = context->GetOutputDesc(OUTPUT_DYNAMIC_SCALES_INDEX);
         OP_TILING_CHECK(dynamicScalesDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "dynamicScalesDesc"),
                         return false);
-        OP_TILING_CHECK(dynamicScalesDesc->GetDataType() != ge::DT_FLOAT,
-                        OP_LOGE(nodeName, "dynamicScales datatype is invalid, datatype should be float, but is %s.",
-                                Ops::Base::ToString(dynamicScalesDesc->GetDataType()).c_str()),
-                        return false);
+        OP_TILING_CHECK(
+            dynamicScalesDesc->GetDataType() != ge::DT_FLOAT,
+            OP_LOGE_FOR_INVALID_DTYPE(nodeName, "dynamic_scales",
+                                      Ops::Base::ToString(dynamicScalesDesc->GetDataType()).c_str(), "FLOAT"),
+            return false);
     }
 
     OP_TILING_CHECK(!CheckCommonOutputTensorDataType(context, nodeName),
-                    OP_LOGE(nodeName, "CheckCommonOutputTensorDataType failed."), return false);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "CheckCommonOutputTensorDataType failed."), return false);
     return true;
 }
 
@@ -326,9 +327,8 @@ inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeNoScales(const
     auto expandXDesc = context->GetOutputDesc(OUTPUT_EXPAND_X_INDEX);
     OP_TILING_CHECK(expandXDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandXDesc"), return false);
     OP_TILING_CHECK((NON_QUANT_DTYPE.find(static_cast<ge::DataType>(xDesc->GetDataType())) == NON_QUANT_DTYPE.end()),
-                    OP_LOGE(nodeName,
-                            "x datatype is invalid, datatype should be one of bf16/fp16/e5m2/e4m3fn/hif8, but is %s.",
-                            Ops::Base::ToString(xDesc->GetDataType()).c_str()),
+                    OP_LOGE_FOR_INVALID_DTYPE(nodeName, "x", Ops::Base::ToString(xDesc->GetDataType()).c_str(),
+                                              "BF16, FLOAT16, FLOAT8_E5M2, FLOAT8_E4M3FN, or HIFLOAT8"),
                     return false);
     // ExpandX: the same as X
     if (expandXDesc->GetDataType() != xDesc->GetDataType()) {
@@ -349,20 +349,19 @@ inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeNoScales(const
         OP_TILING_CHECK(dynamicScalesDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "dynamicScalesDesc"),
                         return false);
         OP_TILING_CHECK((xDesc->GetDataType() == ge::DT_HIFLOAT8) && (scalesDesc->GetDataType() != ge::DT_FLOAT),
-                        OP_LOGE(nodeName, "scales datatype is invalid, datatype should be float, but is %s.",
-                                Ops::Base::ToString(scalesDesc->GetDataType()).c_str()),
-                        return false);
-        OP_TILING_CHECK((scalesDesc->GetDataType() != ge::DT_FLOAT) &&
-                            (scalesDesc->GetDataType() != ge::DT_FLOAT8_E8M0),
-                        OP_LOGE(nodeName, "scales datatype is invalid, datatype should be float or e8m0, but is %s.",
-                                Ops::Base::ToString(scalesDesc->GetDataType()).c_str()),
+                        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "scales",
+                                                  Ops::Base::ToString(scalesDesc->GetDataType()).c_str(), "FLOAT"),
                         return false);
         OP_TILING_CHECK(
+            (scalesDesc->GetDataType() != ge::DT_FLOAT) && (scalesDesc->GetDataType() != ge::DT_FLOAT8_E8M0),
+            OP_LOGE_FOR_INVALID_DTYPE(nodeName, "scales", Ops::Base::ToString(scalesDesc->GetDataType()).c_str(),
+                                      "FLOAT or FLOAT8_E8M0"),
+            return false);
+        OP_TILING_CHECK(
             dynamicScalesDesc->GetDataType() != scalesDesc->GetDataType(),
-            OP_LOGE(nodeName,
-                    "dynamicScales datatype is invalid, datatype should be equal to scales dataType %s, but is %s.",
-                    Ops::Base::ToString(scalesDesc->GetDataType()).c_str(),
-                    Ops::Base::ToString(dynamicScalesDesc->GetDataType()).c_str()),
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                nodeName, "dynamic_scales", Ops::Base::ToString(dynamicScalesDesc->GetDataType()).c_str(),
+                (std::string("must match scales dtype ") + Ops::Base::ToString(scalesDesc->GetDataType())).c_str()),
             return false);
     }
     return true;
@@ -376,23 +375,23 @@ inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeStaticOrDynami
     auto dynamicScalesDesc = context->GetOutputDesc(OUTPUT_DYNAMIC_SCALES_INDEX);
     OP_TILING_CHECK(dynamicScalesDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "dynamicScalesDesc"),
                     return false);
-    OP_TILING_CHECK((xDesc->GetDataType() != ge::DT_BF16) && (xDesc->GetDataType() != ge::DT_FLOAT16),
-                    OP_LOGE(nodeName, "x datatype is invalid, datatype should be bf16 or float16, but is %s.",
-                            Ops::Base::ToString(xDesc->GetDataType()).c_str()),
-                    return false);
+    OP_TILING_CHECK(
+        (xDesc->GetDataType() != ge::DT_BF16) && (xDesc->GetDataType() != ge::DT_FLOAT16),
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "x", Ops::Base::ToString(xDesc->GetDataType()).c_str(), "BF16 or FLOAT16"),
+        return false);
     // Scales: fp32, optional for dynamic/pertoken/pertile, required for static/hif8
     // isScales has been checked in CheckQuantModeAndScales
     if (isScales) {
         auto scalesDesc = context->GetOptionalInputDesc(SCALES_INDEX);
         OP_TILING_CHECK(scalesDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "scalesDesc"), return false);
         OP_TILING_CHECK((scalesDesc->GetDataType() != ge::DT_FLOAT),
-                        OP_LOGE(nodeName, "scales datatype is invalid, datatype should be float, but is %s.",
-                                Ops::Base::ToString(scalesDesc->GetDataType()).c_str()),
+                        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "scales",
+                                                  Ops::Base::ToString(scalesDesc->GetDataType()).c_str(), "FLOAT"),
                         return false);
     }
     OP_TILING_CHECK(dynamicScalesDesc->GetDataType() != ge::DT_FLOAT,
-                    OP_LOGE(nodeName, "dynamicScales datatype is invalid, datatype should be float, but is %s.",
-                            Ops::Base::ToString(dynamicScalesDesc->GetDataType()).c_str()),
+                    OP_LOGE_FOR_INVALID_DTYPE(nodeName, "dynamic_scales",
+                                              Ops::Base::ToString(dynamicScalesDesc->GetDataType()).c_str(), "FLOAT"),
                     return false);
     return true;
 }
@@ -405,15 +404,16 @@ inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeMxfp8(const ge
     auto dynamicScalesDesc = context->GetOutputDesc(OUTPUT_DYNAMIC_SCALES_INDEX);
     OP_TILING_CHECK(dynamicScalesDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "dynamicScalesDesc"),
                     return false);
-    OP_TILING_CHECK((xDesc->GetDataType() != ge::DT_BF16) && (xDesc->GetDataType() != ge::DT_FLOAT16),
-                    OP_LOGE(nodeName, "x datatype is invalid, datatype should be bf16 or float16, but is %s.",
-                            Ops::Base::ToString(xDesc->GetDataType()).c_str()),
-                    return false);
+    OP_TILING_CHECK(
+        (xDesc->GetDataType() != ge::DT_BF16) && (xDesc->GetDataType() != ge::DT_FLOAT16),
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "x", Ops::Base::ToString(xDesc->GetDataType()).c_str(), "BF16 or FLOAT16"),
+        return false);
     // No Scales input
-    OP_TILING_CHECK(dynamicScalesDesc->GetDataType() != ge::DT_FLOAT8_E8M0,
-                    OP_LOGE(nodeName, "dynamicScales datatype is invalid, datatype should be e8m0, but is %s.",
-                            Ops::Base::ToString(dynamicScalesDesc->GetDataType()).c_str()),
-                    return false);
+    OP_TILING_CHECK(
+        dynamicScalesDesc->GetDataType() != ge::DT_FLOAT8_E8M0,
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "dynamic_scales",
+                                  Ops::Base::ToString(dynamicScalesDesc->GetDataType()).c_str(), "FLOAT8_E8M0"),
+        return false);
     return true;
 }
 
@@ -423,15 +423,18 @@ inline bool MoeDistributeDispatchTilingHelper::CheckDistinctTensorDataType(gert:
 {
     if (quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) {
         OP_TILING_CHECK(!CheckTensorDataTypeNoScales(context, nodeName, isScales),
-                        OP_LOGE(nodeName, "CheckTensorDataType for nonquant mode failed."), return false);
+                        OP_LOGE_WITHOUT_REPORT(nodeName, "CheckTensorDataType for nonquant mode failed."),
+                        return false);
     } else if ((quantMode == static_cast<uint32_t>(QuantModeA5::MX_QUANT)) ||
                (quantMode == static_cast<uint32_t>(QuantModeA5::MX_QUANT_CLIP))) {
         OP_TILING_CHECK(!CheckTensorDataTypeMxfp8(context, nodeName),
-                        OP_LOGE(nodeName, "CheckTensorDataType for mx quant mode failed."), return false);
+                        OP_LOGE_WITHOUT_REPORT(nodeName, "CheckTensorDataType for mx quant mode failed."),
+                        return false);
     } else {
         // static/dynamic/pertolen/pertile/hif8
         OP_TILING_CHECK(!CheckTensorDataTypeStaticOrDynamic(context, nodeName, isScales),
-                        OP_LOGE(nodeName, "CheckTensorDataType for quantMode %u failed.", quantMode), return false);
+                        OP_LOGE_WITHOUT_REPORT(nodeName, "CheckTensorDataType for quantMode %u failed.", quantMode),
+                        return false);
     }
     return true;
 }
@@ -451,10 +454,10 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeA5(gert::TilingContex
     }
 
     OP_TILING_CHECK(!CheckDistinctTensorDataType(context, nodeName, isScales, quantMode),
-                    OP_LOGE(nodeName, "CheckDistinctTensorDataType failed."), return false);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "CheckDistinctTensorDataType failed."), return false);
 
     OP_TILING_CHECK(!CheckCommonOutputTensorDataType(context, nodeName),
-                    OP_LOGE(nodeName, "CheckCommonOutputTensorDataType failed."), return false);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "CheckCommonOutputTensorDataType failed."), return false);
     return true;
 }
 
@@ -593,7 +596,7 @@ ge::graphStatus MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispa
     OP_TILING_CHECK(!CheckTensorFormat(context, nodeName, isScales, quantMode),
                     OP_LOGE_WITH_INVALID_INPUT(nodeName, "params format"), return ge::GRAPH_FAILED);
     if ((opVersion != OP_VERSION_1) && isTokenMask) {
-        OP_TILING_CHECK(!CheckTokenMask(context, nodeName), OP_LOGE(nodeName, "xActiveMask is invalid."),
+        OP_TILING_CHECK(!CheckTokenMask(context, nodeName), OP_LOGE_WITHOUT_REPORT(nodeName, "xActiveMask is invalid."),
                         return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
