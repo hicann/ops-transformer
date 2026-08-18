@@ -17,7 +17,7 @@
 
 #include "quant_block_sch.h"
 #include "quant_utils.h"
-#include "grouped_matmul_utils.h"
+#include "mc2_3rd_grouped_matmul_utils.h"
 #include "grouped_matmul_tiling_data_apt.h"
 using GMMQuantParams = Mc2GroupedMatmulTilingData::GMMQuantParams;
 

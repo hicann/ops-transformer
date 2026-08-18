@@ -15,7 +15,7 @@
 #ifndef INFER_FLASH_ATTENTION_SPARSE_H
 #define INFER_FLASH_ATTENTION_SPARSE_H
 
-#include "infer_flash_attention_comm.h"
+#include "infer_flash_attention_comm_arch38.h"
 
 TEMPLATE_INTF
 __aicore__ inline void GetSparseParam(const ConstInfo<isInfer, hasRope> &constInfo, const AttenMaskInfo &attenMaskInfo,

@@ -17,7 +17,7 @@
 #include "../pipeline/pipeline_stage_singlecore_copy_in_advance.h"
 #include "../pipeline/pipeline_state.h"
 #include "../simd/a16w4_pergroup_kn_nz.h"
-#include "../tile/copy_gm_to_ub.h"
+#include "../tile/mc2_3rd_copy_gm_to_ub.h"
 #include "../tile/copy_ub_to_l1.h"
 #include "../utils/constant.h"
 #include "../utils/device_utils.h"

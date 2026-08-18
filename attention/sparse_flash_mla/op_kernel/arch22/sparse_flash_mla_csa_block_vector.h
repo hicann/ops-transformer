@@ -20,7 +20,7 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
-#include "sparse_flash_mla_common.h"
+#include "sparse_flash_mla_common_arch22.h"
 
 namespace SMLAKernel {
 using AscendC::CrossCoreSetFlag;

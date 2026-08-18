@@ -17,10 +17,10 @@
 #define SPARSE_FLASH_MLA_GRAD_BLOCK_VEC_H
 
 #include "sparse_flash_mla_grad_common.h"
-#include "vector_api/cast_softmax_grad.h"
-#include "vector_api/pse_atten_mask_muls_simple_softmax.h"
-#include "vector_api/vf_broadcast_sub_mul.h"
-#include "vector_api/vf_cast_transdata_deconflict.h"
+#include "vector_api/cast_softmax_grad_sfmg.h"
+#include "vector_api/pse_atten_mask_muls_simple_softmax_sfmg.h"
+#include "vector_api/vf_broadcast_sub_mul_sfmg.h"
+#include "vector_api/vf_cast_transdata_deconflict_sfmg.h"
 #include "vector_api/vf_cal_dsink.h"
 #include "vector_api/vf_cal_softmax_sink.h"
 namespace SfagBaseApi {

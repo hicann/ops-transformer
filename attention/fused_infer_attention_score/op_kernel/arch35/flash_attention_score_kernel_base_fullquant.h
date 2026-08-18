@@ -17,13 +17,13 @@
 #define FLASH_ATTENTION_SCORE_KERNEL_BASE_FULLQUANT_H_
 #include "flash_attention_score_block_cube_mla_fullquant.h"
 #include "flash_attention_score_block_vec_infer_mla_fullquant.h"
-#include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase.h"
+#include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
 #else
 #include "kernel_operator.h"
 #endif
-#include "../../../common/op_kernel/arch35/attenmask.h"
+#include "../../../common/op_kernel/arch35/attenmask_arch35.h"
 
 // 线上编包
 #include "../../../common/op_kernel/matmul.h"
@@ -31,7 +31,7 @@
 #include "../../../common/op_kernel/CopyInL1.h"
 
 #include "../../../common/op_kernel/arch35/pse.h"
-#include "../../../common/op_kernel/arch35/infer_flash_attention_comm.h"
+#include "../../../common/op_kernel/arch35/infer_flash_attention_comm_arch35.h"
 #include "kernel_operator_list_tensor_intf.h"
 #include "adv_api/utils/init_global_memory.h"
 

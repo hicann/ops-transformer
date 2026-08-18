@@ -21,7 +21,7 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
-#include "sparse_flash_mla_common.h"
+#include "sparse_flash_mla_common_arch22.h"
 #include "sparse_flash_mla_swa_block_cube.h"
 #include "sparse_flash_mla_swa_block_vector.h"
 #include "sparse_flash_mla_metadata.h"

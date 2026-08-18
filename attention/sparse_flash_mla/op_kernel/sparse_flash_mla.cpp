@@ -17,8 +17,8 @@
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
 #include "sparse_flash_mla_template_tiling_key.h"
-#include "arch35/sparse_flash_mla_csa_kernel.h"
-#include "arch35/sparse_flash_mla_swa_kernel.h"
+#include "arch35/sparse_flash_mla_csa_kernel_arch35.h"
+#include "arch35/sparse_flash_mla_swa_kernel_arch35.h"
 #include "sparse_flash_mla_metadata.h"
 #else
 #include "kernel_operator.h"

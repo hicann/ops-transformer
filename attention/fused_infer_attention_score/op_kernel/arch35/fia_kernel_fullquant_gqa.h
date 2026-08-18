@@ -19,7 +19,7 @@
 #include "fia_public_define_arch35.h"
 #include "fia_block_cube_fullquant_gqa.h"
 #include "fia_block_vec_fullquant_gqa.h"
-#include "memory_copy_arch35.h"
+#include "memory_copy_arch35_fused_infer.h"
 #include "fia_block_vec_flashdecode_fullquant.h"
 
 #if ASC_DEVKIT_MAJOR >= 9

@@ -22,8 +22,8 @@
 #include "../../../template_linear_algebra_v2/gemm/tile/copy_gm_to_ub.hpp"
 #include "../../../template_linear_algebra_v2/gemm/tile/copy_ub_to_gm.hpp"
 #include "../../../template_linear_algebra_v2/gemm/tile/cast_int4_to_int8.hpp"
-#include "../../../template_linear_algebra_v2/gemm/tile/cast_int8_to_fp16.hpp"
-#include "../../../template_linear_algebra_v2/gemm/tile/cast_fp8_to_fp16.hpp"
+#include "../../../template_linear_algebra_v2/gemm/tile/tla_v2_cast_int8_to_fp16.hpp"
+#include "../../../template_linear_algebra_v2/gemm/tile/tla_v2_cast_fp8_to_fp16.hpp"
 #include "../../../template_linear_algebra_v2/gemm/helper.hpp"
 
 

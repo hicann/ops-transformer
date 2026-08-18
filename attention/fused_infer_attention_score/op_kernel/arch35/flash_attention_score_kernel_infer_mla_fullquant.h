@@ -16,10 +16,10 @@
 #ifndef FLASH_ATTENTION_SCORE_KERNEL_INFER_MLA_FULLQUANT_H_
 #define FLASH_ATTENTION_SCORE_KERNEL_INFER_MLA_FULLQUANT_H_
 #include "flash_attention_score_kernel_base_fullquant.h"
-#include "../../../common/op_kernel/arch35/vf/vf_flash_decode.h"
-#include "../../../common/op_kernel/arch35/infer_flash_attention_comm.h"
-#include "infer_flash_attention_kvcache.h"
-#include "infer_flash_attention_sparse.h"
+#include "../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
+#include "../../../common/op_kernel/arch35/infer_flash_attention_comm_arch35.h"
+#include "infer_flash_attention_kvcache_fused_infer.h"
+#include "infer_flash_attention_sparse_fused_infer.h"
 
 namespace BaseApi {
 template <typename CubeBlockType, typename VecBlockType>

@@ -32,9 +32,9 @@
 #include "utils/const_args.hpp"
 #include "utils/layout3d.hpp"
 
-#include "moe_init_routing_v2/moe_init_routing_v2_tiling.h"
+#include "moe_init_routing_v2/mc2_mega_moe_moe_init_routing_v2_tiling.h"
 #include "moe_init_routing_v2/moe_init_routing_v2.hpp"
-#include "unpermute/moe_token_unpermute.h"
+#include "unpermute/mc2_mega_moe_moe_token_unpermute.h"
 #include "utils/get_tensor_addr.hpp"
 #include "mega_moe_exception_dump_policy.h"
 

@@ -16,7 +16,7 @@
 #define MC2_QUANT_UTILS_H
 
 #include "kernel_basic_intf.h"
-#include "grouped_matmul_utils.h"
+#include "mc2_3rd_grouped_matmul_utils.h"
 #include "lib/matmul_intf.h"
 
 #define LOCAL_TEMPLATE_CLASS_PARAMS                                                                                    \

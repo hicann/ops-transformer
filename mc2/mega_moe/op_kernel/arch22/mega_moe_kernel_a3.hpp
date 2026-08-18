@@ -46,14 +46,14 @@
 #include "utils/layout3d.hpp"
 
 #include "moe_init_routing_quant_v2/moe_init_routing_quant_v2_tiling.h"
-#include "moe_init_routing_v2/moe_init_routing_v2_tiling.h"
+#include "moe_init_routing_v2/mc2_mega_moe_moe_init_routing_v2_tiling.h"
 #include "moe_init_routing_quant_v2/moe_init_routing_quant_v2.hpp"
 // Non-quant routing dispatcher (used by the BF16/FP16 weight path).
 // Lives alongside the quant dispatcher in the same `moe_init_routing_quant_v2`
 // directory so it can share all sort/expert-token/srcToDst helpers.
 #include "moe_init_routing_v2/moe_init_routing_v2.hpp"
-#include "moe_init_routing_quant_v2/moe_v2_fullload_dynamic_quant.h"
-#include "unpermute/moe_token_unpermute.h"
+#include "moe_init_routing_quant_v2/mc2_mega_moe_quant_moe_v2_fullload_dynamic_quant.h"
+#include "unpermute/mc2_mega_moe_moe_token_unpermute.h"
 #include "utils/get_tensor_addr.hpp"
 #include "mega_moe_exception_dump_policy.h"
 

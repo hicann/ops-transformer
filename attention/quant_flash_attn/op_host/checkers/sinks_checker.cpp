@@ -20,7 +20,7 @@
 #include "log/error_code.h"
 #include "register/op_def_registry.h"
 #include "../qfa_tiling_info.h"
-#include "sinks_checker.h"
+#include "sinks_checker_quant_flash_attn.h"
 
 namespace optiling {
 namespace quant_flash_attn {

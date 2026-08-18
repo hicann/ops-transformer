@@ -17,10 +17,10 @@
 #define SPARSE_FLASH_ATTENTION_GRAD_BLOCK_VEC_H
  
 #include "sparse_flash_attention_grad_common.h"
-#include "vector_api/cast_softmax_grad.h"
-#include "vector_api/pse_atten_mask_muls_simple_softmax.h"
-#include "vector_api/vf_broadcast_sub_mul.h"
-#include "vector_api/vf_cast_transdata_deconflict.h"
+#include "vector_api/cast_softmax_grad_sfag.h"
+#include "vector_api/pse_atten_mask_muls_simple_softmax_sfag.h"
+#include "vector_api/vf_broadcast_sub_mul_sfag.h"
+#include "vector_api/vf_cast_transdata_deconflict_sfag.h"
 namespace SfagBaseApi {
 constexpr uint32_t NUM_TWO = 2;
 constexpr uint32_t SYNC_V0_V1_DS_A_MAX_DONE_FLAG = 10;

@@ -385,9 +385,9 @@ __aicore__ inline void CubeOp<SMLAGT>::InitLocalTensor()
     cL0TensorPingPong[1] = asdopsBuf.GetBuffer<BufferType::ASCEND_L0C, float>(128 * 128 * sizeof(float));
 }
 
-#include "./cube_modules/cube1.h"
-#include "./cube_modules/cube2.h"
-#include "./cube_modules/cube3.h"
-#include "./cube_modules/cube4.h"
-#include "./cube_modules/cube5.h"
+#include "./cube_modules/cube1_sfmg_arch22.h"
+#include "./cube_modules/cube2_sfmg_arch22.h"
+#include "./cube_modules/cube3_sfmg_arch22.h"
+#include "./cube_modules/cube4_sfmg_arch22.h"
+#include "./cube_modules/cube5_sfmg_arch22.h"
 } // namespace SMLAG_BASIC

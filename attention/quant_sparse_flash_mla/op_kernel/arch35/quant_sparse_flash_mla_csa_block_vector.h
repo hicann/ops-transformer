@@ -26,10 +26,10 @@
 #include "kernel_operator.h"
 #endif
 using AscendC::Reg::StoreDist;
-#if __has_include("../../common/op_kernel/arch35/vf/vf_flash_decode.h")
-#include "../../common/op_kernel/arch35/vf/vf_flash_decode.h"
+#if __has_include("../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h")
+#include "../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
 #else
-#include "../common/arch35/vf/vf_flash_decode.h"
+#include "../common/arch35/vf/vf_flash_decode_arch35.h"
 #endif
 
 #if __has_include("../../common/op_kernel/buffers_policy.h")

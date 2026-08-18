@@ -22,8 +22,8 @@
 #include "./basic_modules/vec_modules/vec_sfmg.h"
 #include "./basic_modules/vec_modules/vec_post.h"
 #include "./basic_modules/vec_modules/vec_addr.h"
-#include "./basic_modules/cube_op.h"
-#include "./basic_modules/vec_op.h"
+#include "./basic_modules/cube_op_fasg_arch22.h"
+#include "./basic_modules/vec_op_fasg_arch22.h"
 using namespace AscendC;
 
 template <typename TYPE, class TILING_CLASS>

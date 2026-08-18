@@ -17,9 +17,9 @@
 #define FLASH_ATTENTION_SCORE_KERNEL_BASE_H_
 #include "flash_attention_score_block_cube.h"
 #include "flash_attention_score_block_vec_infer.h"
-#include "flash_attention_score_common_regbase.h"
+#include "flash_attention_score_common_regbase_arch38.h"
 #include "kernel_operator.h"
-#include "attenmask.h"
+#include "attenmask_arch38.h"
 
 // 线上编包
 #include "../matmul.h"
@@ -27,7 +27,7 @@
 #include "../CopyInL1.h"
 
 #include "pse.h"
-#include "infer_flash_attention_comm.h"
+#include "infer_flash_attention_comm_arch38.h"
 #include "kernel_operator_list_tensor_intf.h"
 
 using matmul::MatmulType;

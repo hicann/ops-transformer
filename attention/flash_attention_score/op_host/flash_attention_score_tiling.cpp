@@ -19,7 +19,7 @@
 #include <register/op_impl_registry.h>
 #include "log/log.h"
 #include "op_common/log/log.h"
-#include "../../common/op_kernel/arch35/flash_attention_score_tiling_regbase.h"
+#include "../../common/op_kernel/arch35/flash_attention_score_tiling_regbase_arch35.h"
 #include "op_host/data_copy_transpose_tiling.h"
 #include "op_host/tiling_templates_registry.h"
 #include "flash_attention_score_tiling_common.h"

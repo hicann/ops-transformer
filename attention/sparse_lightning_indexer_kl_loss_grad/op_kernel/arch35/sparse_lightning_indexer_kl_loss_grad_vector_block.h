@@ -16,14 +16,14 @@
 #ifndef SPARSE_LIGHTNING_INDEXER_KL_LOSS_GRAD_VECTOR_BLOCK_H
 #define SPARSE_LIGHTNING_INDEXER_KL_LOSS_GRAD_VECTOR_BLOCK_H
 #include "sparse_lightning_indexer_kl_loss_grad_regbase_common.h"
-#include "vf/vf_process_vec0.h"
-#include "vf/vf_process_vec1.h"
-#include "vf/vf_process_vec2.h"
-#include "vf/vf_process_vec4.h"
-#include "vf/vf_process_vec5.h"
-#include "vf/vf_process_vec6.h"
-#include "vf/vf_cast_dup.h"
-#include "vf/vf_reduce_sum.h"
+#include "vf/vf_process_vec0_kl_loss_grad.h"
+#include "vf/vf_process_vec1_kl_loss_grad.h"
+#include "vf/vf_process_vec2_kl_loss_grad.h"
+#include "vf/vf_process_vec4_kl_loss_grad.h"
+#include "vf/vf_process_vec5_kl_loss_grad.h"
+#include "vf/vf_process_vec6_kl_loss_grad.h"
+#include "vf/vf_cast_dup_kl_loss_grad.h"
+#include "vf/vf_reduce_sum_kl_loss_grad.h"
 
 namespace Slig {
 TEMPLATES_DEF

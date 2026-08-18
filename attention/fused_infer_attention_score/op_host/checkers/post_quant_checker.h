@@ -17,7 +17,7 @@
 #define POST_QUANT_CHECKER_H
 
 #include "tiling/tiling_api.h"
-#include "base_checker.h"
+#include "base_checker_fused_infer.h"
 
 namespace optiling {
 

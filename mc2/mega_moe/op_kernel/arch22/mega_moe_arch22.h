@@ -42,7 +42,7 @@ using namespace AscendC;
 #endif
 
 #include "mega_moe_tiling_a2a3.h"
-#include "moe_init_routing_v2/moe_init_routing_v2_tiling.h"
+#include "moe_init_routing_v2/mc2_mega_moe_moe_init_routing_v2_tiling.h"
 
 #include "template_linear_algebra_v2/catlass.hpp"
 #include "template_linear_algebra_v2/arch/arch.hpp"

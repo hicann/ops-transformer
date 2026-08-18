@@ -15,18 +15,18 @@
 
 #ifndef MC2_MOE_INIT_ROUTING_QUANT_V2_HPP
 #define MC2_MOE_INIT_ROUTING_QUANT_V2_HPP
-#include "moe_v2_sort_one_core.h"
-#include "moe_v2_sort_multi_core.h"
-#include "moe_v2_mrgsort_out.h"
-#include "moe_v2_mrgsort.h"
-#include "moe_v2_expert_token_out.h"
-#include "moe_v2_src_to_dst_op.h"
-#include "moe_v2_src_to_dst_with_capacity.h"
-#include "moe_v2_fullload_quant.h"
-#include "moe_v2_fullload_dynamic_quant.h"
-#include "moe_v2_gather_quant.h"
-#include "moe_v2_gather_dynamic_quant.h"
-#include "moe_v2_src_to_dst_and_gather.h"
+#include "mc2_mega_moe_quant_moe_v2_sort_one_core.h"
+#include "mc2_mega_moe_quant_moe_v2_sort_multi_core.h"
+#include "mc2_mega_moe_quant_moe_v2_mrgsort_out.h"
+#include "mc2_mega_moe_quant_moe_v2_mrgsort.h"
+#include "mc2_mega_moe_quant_moe_v2_expert_token_out.h"
+#include "mc2_mega_moe_quant_moe_v2_src_to_dst_op.h"
+#include "mc2_mega_moe_quant_moe_v2_src_to_dst_with_capacity.h"
+#include "mc2_mega_moe_quant_moe_v2_fullload_quant.h"
+#include "mc2_mega_moe_quant_moe_v2_fullload_dynamic_quant.h"
+#include "mc2_mega_moe_quant_moe_v2_gather_quant.h"
+#include "mc2_mega_moe_quant_moe_v2_gather_dynamic_quant.h"
+#include "mc2_mega_moe_quant_moe_v2_src_to_dst_and_gather.h"
 
 using namespace AscendC;
 using namespace MoeInitRoutingQuantV2;

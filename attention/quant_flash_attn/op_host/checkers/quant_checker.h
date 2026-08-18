@@ -20,7 +20,7 @@
 #include <memory>
 #include <numeric>
 #include "tiling/tiling_api.h"
-#include "base_checker.h"
+#include "base_checker_quant_flash_attn.h"
 #include "../qfa_tiling_shape.h"
 
 namespace optiling {

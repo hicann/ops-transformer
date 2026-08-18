@@ -21,7 +21,7 @@
 #include "log/log.h"
 #include "register/op_def_registry.h"
 #include "../fused_infer_attention_score_tiling_constants.h"
-#include "paged_attention_checker.h"
+#include "paged_attention_checker_fused_infer.h"
 
 namespace optiling {
 using std::map;

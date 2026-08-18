@@ -16,10 +16,10 @@
 #define FLASH_ATTENTION_SCORE_BLOCK_VEC_INFER_H_
 #include "flash_attention_score_block_vec_base.h"
 #include "util_regbase.h"
-#include "flash_attention_score_common_regbase.h"
+#include "flash_attention_score_common_regbase_arch38.h"
 #include "kernel_operator_list_tensor_intf.h"
-#include "vf/vf_flash_decode.h"
-#include "vf/vf_post_quant.h"
+#include "vf/vf_flash_decode_arch38.h"
+#include "vf/vf_post_quant_arch38.h"
 using namespace AscendC;
 using namespace AscendC::Impl::Detail;
 using namespace regbaseutil;

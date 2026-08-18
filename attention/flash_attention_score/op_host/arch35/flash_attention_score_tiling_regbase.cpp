@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "flash_attention_score_tiling_regbase.h"
+#include "flash_attention_score_tiling_regbase_host.h"
 #include "../flash_attention_score_tiling_common.h"
 #include "op_common/log/log.h"
 

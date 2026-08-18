@@ -16,8 +16,8 @@
 
 #if (__CCE_AICORE__ == 310)
 #pragma message("[BSASelectBlockMask] compiling arch35 kernel path")
-#include "arch35/bsa_select_block_mask_base.h"
-#include "arch35/bsa_select_block_mask_common.h"
+#include "arch35/bsa_select_block_mask_base_arch35.h"
+#include "arch35/bsa_select_block_mask_common_arch35.h"
 #else
 #include "bsa_select_block_mask_base.h"
 #include "bsa_select_block_mask_common.h"

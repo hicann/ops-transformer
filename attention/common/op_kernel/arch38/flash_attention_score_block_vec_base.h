@@ -15,8 +15,8 @@
 #ifndef FLASH_ATTENTION_SCORE_BLOCK_VEC_BASE_H_
 #define FLASH_ATTENTION_SCORE_BLOCK_VEC_BASE_H_
 #include "util_regbase.h"
-#include "infer_flash_attention_comm.h"
-#include "flash_attention_score_common_regbase.h"
+#include "infer_flash_attention_comm_arch38.h"
+#include "flash_attention_score_common_regbase_arch38.h"
 #include "kernel_operator_list_tensor_intf.h"
 #include "vf/vf_mul_sel_softmaxflashv2_cast_nz_regbase_v2.h"
 #include "vf/vf_mul_sel_softmaxflashv2_cast_nz_dn_regbase_v2.h"

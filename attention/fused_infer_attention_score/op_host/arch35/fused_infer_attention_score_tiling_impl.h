@@ -19,7 +19,7 @@
 #include "../../../common/op_host/fia_tiling_base.h"
 #include "../fia_tiling_info.h"
 #include "tiling/tiling_api.h"  //这个头文件顺序必须在手写的tiling data前
-#include "../../../common/op_kernel/arch35/flash_attention_score_tiling_regbase.h"
+#include "../../../common/op_kernel/arch35/flash_attention_score_tiling_regbase_arch35.h"
 #include "../../op_kernel/arch35/fused_infer_attention_score_template_tiling_key.h"
 
 namespace optiling {

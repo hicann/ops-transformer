@@ -15,7 +15,7 @@
 
 #ifndef FLASH_ATTENTION_SCORE_ANTIQUANT_BLOCK_CUBE_H_
 #define FLASH_ATTENTION_SCORE_ANTIQUANT_BLOCK_CUBE_H_
-#include "../../../common/op_kernel/arch35/flash_attention_score_tiling_regbase.h"
+#include "../../../common/op_kernel/arch35/flash_attention_score_tiling_regbase_arch35.h"
 using namespace regbaseutil;
 using namespace optiling;
 namespace BaseApi {

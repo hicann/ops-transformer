@@ -17,25 +17,25 @@
 #define MC2_MOE_INIT_ROUTING_V2_HPP
 
 #ifdef __DAV_C310__
-#include "arch35/moe_v2_mrgsort_out.h"
-#include "arch35/moe_v2_mrgsort.h"
-#include "arch35/moe_v2_sort_multi_core.h"
-#include "arch35/moe_v2_sort_one_core.h"
+#include "arch35/moe_v2_mrgsort_out_arch35.h"
+#include "arch35/moe_v2_mrgsort_arch35.h"
+#include "arch35/moe_v2_sort_multi_core_arch35.h"
+#include "arch35/moe_v2_sort_one_core_arch35.h"
 #include "arch35/moe_v2_expert_token_out_regbase.h"
 #include "arch35/moe_v2_expert_token_out_simt.h"
-#include "arch35/moe_v2_src_to_dst_op_simt.h"
+#include "arch35/moe_v2_src_to_dst_op_simt_arch35.h"
 #include "arch35/moe_v2_src_to_dst_with_capacity_simt.h"
 #include "arch35/moe_v2_gather_out_for_simt.h"
 #else
-#include "moe_v2_mrgsort_out.h"
-#include "moe_v2_mrgsort.h"
-#include "moe_v2_sort_multi_core.h"
-#include "moe_v2_sort_one_core.h"
-#include "moe_v2_expert_token_out.h"
-#include "moe_v2_src_to_dst_op.h"
-#include "moe_v2_src_to_dst_with_capacity.h"
-#include "moe_v2_gather_out.h"
-#include "moe_v2_init_routing_fullload.h"
+#include "mc2_mega_moe_moe_v2_mrgsort_out.h"
+#include "mc2_mega_moe_moe_v2_mrgsort.h"
+#include "mc2_mega_moe_moe_v2_sort_multi_core.h"
+#include "mc2_mega_moe_moe_v2_sort_one_core.h"
+#include "mc2_mega_moe_moe_v2_expert_token_out.h"
+#include "mc2_mega_moe_moe_v2_src_to_dst_op.h"
+#include "mc2_mega_moe_moe_v2_src_to_dst_with_capacity.h"
+#include "mc2_mega_moe_moe_v2_gather_out.h"
+#include "mc2_mega_moe_moe_v2_init_routing_fullload.h"
 #endif
 
 using namespace AscendC;

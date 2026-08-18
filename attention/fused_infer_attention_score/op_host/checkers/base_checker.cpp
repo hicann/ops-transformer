@@ -17,7 +17,7 @@
 #include <numeric>
 #include "tiling/tiling_api.h"
 #include "../fused_infer_attention_score_tiling_constants.h"
-#include "base_checker.h"
+#include "base_checker_fused_infer.h"
 namespace optiling {
 using std::map;
 using std::string;

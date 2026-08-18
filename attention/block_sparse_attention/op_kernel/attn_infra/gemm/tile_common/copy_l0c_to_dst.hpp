@@ -14,7 +14,7 @@
 #include "../../../attn_infra/bsa_base_defs.hpp"
 #include "../../../attn_infra/arch/bsa_arch.hpp"
 #include "../../../attn_infra/gemm/bsa_gemm_type.hpp"
-#include "../../../tla/tensor.hpp"
+#include "../../../tla/tensor_bsa.hpp"
 
 namespace NpuArch::Gemm::Tile {
 

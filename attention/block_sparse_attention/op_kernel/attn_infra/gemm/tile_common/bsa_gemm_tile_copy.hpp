@@ -14,7 +14,7 @@
 #include <type_traits>
 #include "../../../attn_infra/bsa_base_defs.hpp"
 #include "../../../attn_infra/detail/tag_to_layout.hpp"
-#include "../../../tla/tensor.hpp"
+#include "../../../tla/tensor_bsa.hpp"
 #if (__CCE_AICORE__ == 310)
 #include "../../../attn_infra/gemm/tile_common/copy_gm_to_l1_a5.hpp"
 #include "../../../attn_infra/gemm/tile_common/copy_l0c_to_ub_a5.hpp"

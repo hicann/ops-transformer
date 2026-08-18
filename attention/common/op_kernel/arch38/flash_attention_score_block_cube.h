@@ -20,8 +20,8 @@
 #include "../FixpipeOut.h"
 #include "../CopyInL1.h"
 
-#include "infer_flash_attention_comm.h"
-#include "flash_attention_score_common_regbase.h"
+#include "infer_flash_attention_comm_arch38.h"
+#include "flash_attention_score_common_regbase_arch38.h"
 #include "kernel_operator_list_tensor_intf.h"
 using namespace AscendC;
 using namespace AscendC::Impl::Detail;

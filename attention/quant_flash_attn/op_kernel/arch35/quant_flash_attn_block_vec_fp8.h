@@ -16,16 +16,16 @@
 #ifndef QUANT_FLASH_ATTN_BLOCK_VEC_FP8_H_
 #define QUANT_FLASH_ATTN_BLOCK_VEC_FP8_H_
 #include "../../../common/op_kernel/offset_calculator.h"
-#include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase.h"
-#include "../../../common/op_kernel/arch35/attenmask_gs1.h"
+#include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
+#include "../../../common/op_kernel/arch35/attenmask_gs1_arch35.h"
 #include "adv_api/activation/softmax.h"
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz.h"
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flashupdate_new.h"
-#include "../../../common/op_kernel/arch35/vf/vf_div_cast.h"
-#include "../../../common/op_kernel/arch35/infer_flash_attention_comm.h"
+#include "../../../common/op_kernel/arch35/vf/vf_div_cast_arch35.h"
+#include "../../../common/op_kernel/arch35/infer_flash_attention_comm_arch35.h"
 #include "../../../common/op_kernel/vector_common.h"
-#include "memory_copy_arch35.h"
+#include "memory_copy_arch35_quant_flash_attn.h"
 
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"

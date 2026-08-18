@@ -17,7 +17,7 @@
 #include "../../../attn_infra/epilogue/tile_common/bsa_epilogue_tile_copy.hpp"
 #include "../../../attn_infra/bsa_gemm_coord.hpp"
 #include "../../../attn_infra/bsa_matrix_coord.hpp"
-#include "../../../tla/tensor.hpp"
+#include "../../../tla/tensor_bsa.hpp"
 #include "../../../tla/layout.hpp"
 
 namespace NpuArch::Epilogue::Block {
