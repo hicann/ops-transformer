@@ -14,7 +14,7 @@ if (BUILD_OPEN_PROJECT)
     )
     add_ops_compile_options(
         OP_NAME GroupedMatmulSwigluQuant
-        OPTIONS --cce-auto-sync=on
+        OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
                 -Werror
     )

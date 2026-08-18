@@ -21,20 +21,20 @@
 
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 220
 // A8W4 MSD场景
-#if defined(ORIG_DTYPE_X) && defined(DT_INT8) && ORIG_DTYPE_X == DT_INT8 && defined(ORIG_DTYPE_WEIGHT) &&              \
+#if defined(ORIG_DTYPE_X) && defined(DT_INT8) && ORIG_DTYPE_X == DT_INT8 && defined(ORIG_DTYPE_WEIGHT) && \
     defined(DT_INT4) && ORIG_DTYPE_WEIGHT == DT_INT4
-        #define GMM_SWIGLU_QUANT_A8W4_MSD
-        using DTYPE_X_A8W4_MSD = AscendC::int4b_t;
+#define GMM_SWIGLU_QUANT_A8W4_MSD
+using DTYPE_X_A8W4_MSD = AscendC::int4b_t;
 // A8W8 场景
-#elif defined(ORIG_DTYPE_X) && defined(DT_INT8) && ORIG_DTYPE_X == DT_INT8 && defined(ORIG_DTYPE_WEIGHT) &&            \
+#elif defined(ORIG_DTYPE_X) && defined(DT_INT8) && ORIG_DTYPE_X == DT_INT8 && defined(ORIG_DTYPE_WEIGHT) && \
     defined(DT_INT8) && ORIG_DTYPE_WEIGHT == DT_INT8
-        #define GMM_SWIGLU_QUANT_A8W8
+#define GMM_SWIGLU_QUANT_A8W8
 #endif // 场景分类
 
 #if defined(FORMAT_WEIGHT) && FORMAT_WEIGHT == FORMAT_FRACTAL_NZ
-    constexpr CubeFormat wFormat = CubeFormat::NZ;
+constexpr CubeFormat wFormat = CubeFormat::NZ;
 #elif defined(FORMAT_WEIGHT) && FORMAT_WEIGHT == FORMAT_ND
-    constexpr CubeFormat wFormat = CubeFormat::ND;
+constexpr CubeFormat wFormat = CubeFormat::ND;
 #endif // weight格式分类
 
 #endif // 芯片型号分类
@@ -100,6 +100,25 @@ constexpr static MatmulApiStaticTiling GetMMTiling(const MatmulApiStaticTiling &
     tiling.isBias = NO_BIAS;
     return tiling;
 }
+
+template <HardEvent event>
+__aicore__ inline void GmmsqSetWaitFlag()
+{
+    event_t eventId = static_cast<event_t>(GetTPipePtr()->FetchEventID(event));
+    SetFlag<event>(eventId);
+    WaitFlag<event>(eventId);
+}
+
+// These barriers protect GM workspace stages shared by all cube and vector cores.
+// A paired CrossCoreSetFlag/CrossCoreWaitFlag only models one producer-consumer edge,
+// so it is not equivalent until the workspace is partitioned into per-producer slots.
+__aicore__ inline void GmmsqAllCoreCubeVecStageBarrier() { SyncAll<false>(); }
+
+__aicore__ inline void GmmsqAllCoreWorkspaceReuseBarrier() { SyncAll<false>(); }
+
+__aicore__ inline void GmmsqAllCorePipelineStageBarrier() { SyncAll<false>(); }
+
+__aicore__ inline void GmmsqAllCorePipelineWorkspaceBarrier() { SyncAll<true>(); }
 
 template <class AT_, class BT_, class CT_>
 struct MMImplTypeStatic {

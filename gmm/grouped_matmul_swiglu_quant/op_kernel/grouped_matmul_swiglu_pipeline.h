@@ -54,9 +54,12 @@ public:
     __aicore__ inline GMMSwigluQuantPipelineSchedule(typename mmType::MT &mm_,
                                                      const GMMSwigluBaseParams *__restrict gmmBaseParamsIN,
                                                      const GMMSwiglu *__restrict gmmSwigluIN, TPipe *tPipeIN)
-        : mm(mm_), midProcess(mm), gmmBaseParams(gmmBaseParamsIN), gmmSwiglu(gmmSwigluIN), pipe(tPipeIN)
-    {
-    }
+        : mm(mm_),
+          midProcess(mm),
+          gmmBaseParams(gmmBaseParamsIN),
+          gmmSwiglu(gmmSwigluIN),
+          pipe(tPipeIN)
+    {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR weightScale, GM_ADDR xScale,
                                 GM_ADDR weightAssistanceMatrix, GM_ADDR groupList, GM_ADDR y, GM_ADDR yScale,
                                 GM_ADDR workspace);
@@ -103,14 +106,14 @@ __aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::Process()
             pipe->Reset();
         }
 
-        SyncAll<false>();
+        GmmsqAllCorePipelineStageBarrier();
         // 2.第n次中处理 && 第n+1次前处理 && 第n-1次后处理 并行
         midProcess.Process(workspaceSplitConfig, workspaceSplitLoopIdx);
 
         preProcess.Process(workspaceSplitConfig, workspaceSplitLoopIdx + 1, pipe);
         if ASCEND_IS_AIV {
             pipe->Reset();
-            SyncAll<true>();
+            GmmsqAllCorePipelineWorkspaceBarrier();
         }
         postProcess.Process(tempWorkspaceSplitConfig, workspaceSplitLoopIdx - 1, pipe);
         // 3.第n-1次后处理需要保留第n次的切分数据
@@ -119,14 +122,14 @@ __aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::Process()
         if ASCEND_IS_AIV {
             pipe->Reset();
         }
-        SyncAll<false>();
+        GmmsqAllCorePipelineStageBarrier();
         // 3.前一次后处理 && 后一次MM 并行
     }
     // reset
     if ASCEND_IS_AIV {
         pipe->Reset();
     }
-    SyncAll<false>();
+    GmmsqAllCorePipelineStageBarrier();
     // // 4.最后一次后处理
     postProcess.Process(workspaceSplitConfig, workspaceSplitConfig.loopCount - 1, pipe);
     if ASCEND_IS_AIV {
@@ -135,8 +138,8 @@ __aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::Process()
 }
 
 template <class mmType>
-__aicore__ inline void
-GMMSwigluQuantPipelineSchedule<mmType>::InitWorkSpaceSplitConfig(WorkSpaceSplitConfig &workspaceSplitConfig)
+__aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::InitWorkSpaceSplitConfig(
+    WorkSpaceSplitConfig &workspaceSplitConfig)
 {
     workspaceSplitConfig.M = groupListGM.GetValue(gmmSwiglu->groupListLen - 1);
     workspaceSplitConfig.loopCount = Ceil(workspaceSplitConfig.M, gmmBaseParams->mLimit);
@@ -150,9 +153,8 @@ GMMSwigluQuantPipelineSchedule<mmType>::InitWorkSpaceSplitConfig(WorkSpaceSplitC
 }
 
 template <class mmType>
-__aicore__ inline void
-GMMSwigluQuantPipelineSchedule<mmType>::UpdateWorkSpaceSplitConfig(WorkSpaceSplitConfig &workspaceSplitConfig,
-                                                                   int32_t workspaceSplitLoopIdx)
+__aicore__ inline void GMMSwigluQuantPipelineSchedule<mmType>::UpdateWorkSpaceSplitConfig(
+    WorkSpaceSplitConfig &workspaceSplitConfig, int32_t workspaceSplitLoopIdx)
 {
     if (workspaceSplitLoopIdx < 0)
         return;
