@@ -219,11 +219,17 @@ aclnnStatus aclnnSparseFlashMla(
     <tr>
       <td>oriSparseIndicesOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>代表离散取oriKvCache的索引。</td>
-      <td>当前暂不支持，必须传入nullptr。</td>
+      <td>代表离散取oriKvCache的逻辑索引，-1表示无效或填充slot。</td>
+      <td>SWA稀疏ori_kv场景必须传入，其他场景不传入。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>-</td>
+      <td>
+        <ul>
+          <li>layoutQ为BSND时：(B, S1, N2, K)</li>
+          <li>layoutQ为TND时：(T1, N2, K)</li>
+        </ul>
+        其中K为oriKv的TopK稀疏选择数。
+      </td>
       <td>√</td>
     </tr>
     <tr>
@@ -335,11 +341,11 @@ aclnnStatus aclnnSparseFlashMla(
     <tr>
       <td>oriTopkLengthOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>预留输入，当前版本不支持传入非空Tensor。</td>
-      <td>必须传入nullptr或空Tensor；传入非空Tensor会返回参数错误。</td>
+      <td>表示不同q token对应的oriKv关键稀疏token的实际个数。</td>
+      <td>SWA稀疏ori_kv场景必须传入，其他场景传入nullptr或空Tensor。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>-</td>
+      <td>layoutQ为BSND时：(B, S1, N2)；layoutQ为TND时：(T1, N2)。shape必须与oriSparseIndicesOptional去掉最后一维K后保持一致。</td>
       <td>√</td>
     </tr>
     <tr>
@@ -522,7 +528,7 @@ aclnnStatus aclnnSparseFlashMla(
   </table>
 
   <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：N1/N2支持1、2、4、8、16、32、64、128；cmp_ratio在SWA场景保持默认值1，CSA支持传入4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；ori_sparse_indices当前暂不支持，cmp_sparse_indices的最后一维K2当前支持512或1024。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：N1/N2支持1、2、4、8、16、32、64、128；cmp_ratio在SWA场景保持默认值1，CSA支持传入4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏ori_kv场景支持ori_sparse_indices及ori_topk_length，oriWinLeft和oriWinRight支持非负数，cmp_sparse_indices的最后一维K2当前支持512或1024。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：N1/N2支持2、4、8、16、32、64、128，不支持1。
@@ -568,13 +574,13 @@ aclnnStatus aclnnSparseFlashMla(
         <td>D不为512。</td>
       </tr>
       <tr>
-        <td>oriMaskMode不为4，或cmpMaskMode不为3。</td>
+        <td>非SWA稀疏ori_kv场景oriMaskMode不为4，SWA稀疏ori_kv场景oriMaskMode不为0，或cmpMaskMode不为3。</td>
       </tr>
       <tr>
         <td>SWA场景cmpRatio不为1，或cmpRatio与CSA、HCA场景不匹配。</td>
       </tr>
       <tr>
-        <td>oriWinLeft不为127，或oriWinRight不为0。</td>
+        <td>非SWA稀疏ori_kv场景oriWinLeft不为127，或oriWinRight不为0；SWA稀疏ori_kv场景oriWinLeft或oriWinRight为负数。</td>
       </tr>
       <tr>
         <td>layoutQOptional、layoutKvOptional、topkValueMode、cmpSparseIndicesOptional、metadataOptional、sinksOptional、cuSeqlens或seqused相关参数规格不在支持范围内。</td>
@@ -683,8 +689,9 @@ aclnnStatus aclnnSparseFlashMla(
 
 - 使用约束
 
-  - 资料支持范围内暂不支持对`oriKvOptional`进行稀疏计算，设置`oriSparseIndicesOptional`无效。
-  - 除`oriTopkLengthOptional`和`cmpTopkLengthOptional`等预留输入可传入nullptr或空Tensor外，其余已传入Tensor不支持为空。
+  - SWA稀疏ori_kv场景仅支持SWA模板，仅传入`oriKvOptional`，同时传入`oriSparseIndicesOptional`和`oriTopkLengthOptional`；配套Metadata接口的`oriTopk`为oriSparseIndicesOptional最后一维K，`oriMaskMode`必须为0，`oriWinLeft`和`oriWinRight`为非负数，且`cmpKvOptional`不传入。
+  - SWA稀疏ori_kv场景下，`oriTopkLengthOptional`的元素表示实际有效索引条目数，取值应在[0, K]范围内。对每个q token和KV head，`oriSparseIndicesOptional`的[0, oriTopkLengthOptional)区间为左对齐的有效索引条目，[oriTopkLengthOptional, K)区间为无效或填充条目，建议填-1；其他场景`oriTopkLengthOptional`传入nullptr或空Tensor。
+  - 除`cmpTopkLengthOptional`等预留输入可传入nullptr或空Tensor外，其余已传入Tensor不支持为空。
   - `metadataOptional`参数必须传入，由`aclnnSparseFlashMlaMetadata`算子生成，shape固定为(1024,)。
   - `cmpResidualKvOptional`为主算子和`aclnnSparseFlashMlaMetadata`的可选入参；传入后用于按`cmp_len * cmpRatio + residual`恢复cmp侧mask使用的压缩前长度。
 

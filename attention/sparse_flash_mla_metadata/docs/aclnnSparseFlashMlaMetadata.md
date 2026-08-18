@@ -218,7 +218,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>oriTopkLengthOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同q token对应的oriKvOptional部分关键稀疏token的个数。</td>
-      <td><ul><li>支持空Tensor。</li><li>shape为(B, S1, N2)或(T1, N2)。</li></ul></td>
+      <td><ul><li>SWA稀疏ori_kv场景必须传入，其他场景支持空Tensor。</li><li>shape为(B, S1, N2)或(T1, N2)。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>2维、3维</td>
@@ -308,7 +308,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>oriTopk（int64_t）</td>
       <td>输入</td>
       <td>从oriKv中筛选的稀疏token个数。</td>
-      <td>建议值为0。</td>
+      <td>SWA稀疏ori_kv场景为主算子oriSparseIndicesOptional最后一维K，且必须大于0；其他场景建议值为0。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -449,10 +449,10 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
 
   <ul>
     <!-- npu="A3" id7 -->
-    <li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：不支持sequsedQOptional、oriTopkLengthOptional、cmpTopkLengthOptional，numHeadsQ/numHeadsKv仅支持1、2、4、8、16、32、64、128，oriTopk仅支持0，cmpTopk仅支持0、512、1024，oriMaskMode仅支持4，cmpMaskMode仅支持3，oriWinLeft仅支持127，oriWinRight仅支持0，cmpRatio仅支持1、4、128。</li>
+    <li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：不支持sequsedQOptional、cmpTopkLengthOptional，numHeadsQ/numHeadsKv仅支持1、2、4、8、16、32、64、128；SWA稀疏ori_kv场景支持oriTopkLengthOptional、oriTopk大于0及oriMaskMode为0，oriWinLeft和oriWinRight支持非负数；其他SWA场景oriTopk为0、oriMaskMode为4、oriWinLeft为127、oriWinRight为0；cmpTopk仅支持0、512、1024，cmpMaskMode仅支持3，cmpRatio仅支持1、4、128。</li>
     <!-- end id7 -->
     <!-- npu="910b" id8 -->
-    <li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：不支持sequsedQOptional、oriTopkLengthOptional、cmpTopkLengthOptional，numHeadsQ/numHeadsKv仅支持1、2、4、8、16、32、64、128，oriTopk仅支持0，cmpTopk仅支持0、512、1024，oriMaskMode仅支持4，cmpMaskMode仅支持3，oriWinLeft仅支持127，oriWinRight仅支持0，cmpRatio仅支持1、4、128。</li>
+    <li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：不支持sequsedQOptional、cmpTopkLengthOptional，numHeadsQ/numHeadsKv仅支持1、2、4、8、16、32、64、128；SWA稀疏ori_kv场景支持oriTopkLengthOptional、oriTopk大于0及oriMaskMode为0，oriWinLeft和oriWinRight支持非负数；其他SWA场景oriTopk为0、oriMaskMode为4、oriWinLeft为127、oriWinRight为0；cmpTopk仅支持0、512、1024，cmpMaskMode仅支持3，cmpRatio仅支持1、4、128。</li>
     <!-- end id8 -->
   </ul>
 
@@ -555,10 +555,10 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
         <td>headDim不为512。</td>
       </tr>
       <tr>
-        <td>oriMaskMode不为4，或cmpMaskMode不为3。</td>
+        <td>非SWA稀疏ori_kv场景oriMaskMode不为4，SWA稀疏ori_kv场景oriMaskMode不为0，或cmpMaskMode不为3。</td>
       </tr>
       <tr>
-        <td>oriWinLeft不为127，或oriWinRight不为0。</td>
+        <td>非SWA稀疏ori_kv场景oriWinLeft不为127，或oriWinRight不为0；SWA稀疏ori_kv场景oriWinLeft或oriWinRight为负数。</td>
       </tr>
       <tr>
         <td>SWA场景cmpRatio不为1，或cmpRatio与CSA、HCA场景不匹配。</td>
@@ -567,7 +567,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
         <td>cmpTopk不为0、512或1024。</td>
       </tr>
       <tr>
-        <td>oriTopkLengthOptional或cmpTopkLengthOptional传入非空Tensor。</td>
+        <td>SWA稀疏ori_kv场景未传入oriTopkLengthOptional，或oriTopkLengthOptional的shape、数据类型不符合规格；cmpTopkLengthOptional传入非空Tensor。</td>
       </tr>
       <tr>
         <td>layoutQOptional、layoutKvOptional、cuSeqlens、seqused或metaData的shape、数据类型、必选关系不在支持范围内。</td>
@@ -613,10 +613,10 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
         <td>headDim不为512。</td>
       </tr>
       <tr>
-        <td>oriMaskMode不为4，或cmpMaskMode不为3。</td>
+        <td>非SWA稀疏ori_kv场景oriMaskMode不为4，SWA稀疏ori_kv场景oriMaskMode不为0，或cmpMaskMode不为3。</td>
       </tr>
       <tr>
-        <td>oriWinLeft不为127，或oriWinRight不为0。</td>
+        <td>非SWA稀疏ori_kv场景oriWinLeft不为127，或oriWinRight不为0；SWA稀疏ori_kv场景oriWinLeft或oriWinRight为负数。</td>
       </tr>
       <tr>
         <td>SWA场景cmpRatio不为1，或cmpRatio与CSA、HCA场景不匹配。</td>
@@ -625,7 +625,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
         <td>cmpTopk不为0、512或1024。</td>
       </tr>
       <tr>
-        <td>oriTopkLengthOptional或cmpTopkLengthOptional传入非空Tensor。</td>
+        <td>SWA稀疏ori_kv场景未传入oriTopkLengthOptional，或oriTopkLengthOptional的shape、数据类型不符合规格；cmpTopkLengthOptional传入非空Tensor。</td>
       </tr>
       <tr>
         <td>layoutQOptional、layoutKvOptional、cuSeqlens、seqused或metaData的shape、数据类型、必选关系不在支持范围内。</td>
@@ -725,6 +725,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
 <!-- end id12 -->
 <!-- npu="A3" id13 -->
 - Atlas A3 训练系列产品/Atlas A3 推理系列产品约束：
+  - SWA稀疏ori_kv场景下，仅支持SWA模板，`hasOriKv`为true、`hasCmpKv`为false、`oriTopk`大于0、`oriMaskMode`为0，`oriWinLeft`和`oriWinRight`为非负数，且必须传入`oriTopkLengthOptional`。`oriTopk`应与配套主算子oriSparseIndicesOptional最后一维K保持一致；`oriTopkLengthOptional`表示每个q token和KV head的左对齐有效索引条目数，取值应在[0, K]范围内；Metadata仅使用`oriTopkLengthOptional`生成任务切分。配套主算子在PA_BBND场景仍要求传入`sequsedOriKvOptional`。
   - layoutQOptional为TND时，`cuSeqlensQOptional`必须传入。
   - layoutKvOptional为PA_BBND时，`sequsedOriKvOptional`必须传入。BSND场景可选传入`sequsedOriKvOptional`覆盖每个batch的oriKv有效长度；TND场景使用`cuSeqlensOriKvOptional`表达oriKv序列边界。
   - layoutKvOptional为TND时，`cuSeqlensOriKvOptional`必须传入；若hasCmpKv为true，`cuSeqlensCmpKvOptional`也必须传入。
@@ -733,6 +734,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
 <!-- end id13 -->
 <!-- npu="910b" id14 -->
 - Atlas A2 训练系列产品/Atlas A2 推理系列产品约束：
+  - SWA稀疏ori_kv场景下，仅支持SWA模板，`hasOriKv`为true、`hasCmpKv`为false、`oriTopk`大于0、`oriMaskMode`为0，`oriWinLeft`和`oriWinRight`为非负数，且必须传入`oriTopkLengthOptional`。`oriTopk`应与配套主算子oriSparseIndicesOptional最后一维K保持一致；`oriTopkLengthOptional`表示每个q token和KV head的左对齐有效索引条目数，取值应在[0, K]范围内；Metadata仅使用`oriTopkLengthOptional`生成任务切分。配套主算子在PA_BBND场景仍要求传入`sequsedOriKvOptional`。
   - layoutQOptional为TND时，`cuSeqlensQOptional`必须传入。
   - layoutKvOptional为PA_BBND时，`sequsedOriKvOptional`必须传入。BSND场景可选传入`sequsedOriKvOptional`覆盖每个batch的oriKv有效长度；TND场景使用`cuSeqlensOriKvOptional`表达oriKv序列边界。
   - layoutKvOptional为TND时，`cuSeqlensOriKvOptional`必须传入；若hasCmpKv为true，`cuSeqlensCmpKvOptional`也必须传入。
