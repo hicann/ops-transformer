@@ -48,6 +48,8 @@ public:
 
     static constexpr bool hasRope = SLIT::hasRope;
     static constexpr bool deterministic = SLIT::deterministic;
+    static constexpr bool hasSequsedQ = SLIT::hasSequsedQ;
+    static constexpr bool hasSequsedK = SLIT::hasSequsedK;
     static constexpr uint32_t topKSize = static_cast<uint32_t>(SLIT::topKRange);
     static constexpr SLILayout LAYOUT_T = SLIT::inputQLayout;
     static constexpr SLILayout KV_LAYOUT_T = SLIT::inputKLayout;
@@ -75,6 +77,7 @@ private:
     __aicore__ inline int32_t GetActualSeqLens(int32_t bIdx, int32_t defaultLens,
                                                GlobalTensor<int32_t> &actualSeqLensGm, SLILayout layout,
                                                int64_t &accumLen);
+    __aicore__ inline int32_t GetUsedSeqLens(int32_t bIdx, int32_t defaultLens, GlobalTensor<int32_t> &seqUsedGm);
     __aicore__ inline int32_t GetCmpResidualK(int32_t bIdx);
     __aicore__ inline int64_t GetPreCompressS2Len(int32_t bIdx, int32_t actualSeqLensK);
     __aicore__ inline int32_t GetS2SparseLen(int32_t bIdx, int32_t s1Idx, int32_t actualSeqLensQ,
@@ -88,6 +91,7 @@ private:
                                                 int64_t rowSize);
     __aicore__ inline void InitInvalidS1Outputs();
     __aicore__ inline int64_t FindBIndex(int64_t bIndex, int64_t curIndex, int64_t &accumulateLen);
+    __aicore__ inline int64_t FindBIndexBySeqUsed(int64_t bIndex, int64_t curIndex, int64_t &accumulateLen);
     __aicore__ inline int64_t GetEndS1(int64_t bIdx);
     __aicore__ inline int64_t GetMetadataTotalSize();
     __aicore__ inline int64_t GetMetadataBS1Index(uint32_t coreIdx);
@@ -135,6 +139,7 @@ private:
     GlobalTensor<T> attnSoftmaxL1NormGm;
     GlobalTensor<int32_t> topKIndexGm;
     GlobalTensor<int32_t> actualSeqLengthsQueryGm, actualSeqLengthsKeyGm;
+    GlobalTensor<int32_t> seqUsedQueryGm, seqUsedKeyGm;
     GlobalTensor<int32_t> cmpResidualKeyGm;
     GlobalTensor<int32_t> metadataGm;
     // output GM
@@ -171,8 +176,6 @@ __aicore__ inline void SparseLightningIndexerKLLossGradBase<SLIT>::Init(
     InitConstInfo();
 
     // init input global buffer
-    (void)sequsedQ;
-    (void)sequsedK;
     queryGm.SetGlobalBuffer((__gm__ Q_T *)q);
     keyGm.SetGlobalBuffer((__gm__ KV_T *)k);
     queryIndexGm.SetGlobalBuffer((__gm__ Q_T *)q);
@@ -199,6 +202,16 @@ __aicore__ inline void SparseLightningIndexerKLLossGradBase<SLIT>::Init(
     } else {
         cmpResidualKeyGm.SetGlobalBuffer((__gm__ int32_t *)cmpResidualK, 0);
     }
+    if (sequsedQ != nullptr) {
+        seqUsedQueryGm.SetGlobalBuffer((__gm__ int32_t *)sequsedQ, constInfo.bSize);
+    } else {
+        seqUsedQueryGm.SetGlobalBuffer((__gm__ int32_t *)sequsedQ, 0);
+    }
+    if (sequsedK != nullptr) {
+        seqUsedKeyGm.SetGlobalBuffer((__gm__ int32_t *)sequsedK, constInfo.bSize);
+    } else {
+        seqUsedKeyGm.SetGlobalBuffer((__gm__ int32_t *)sequsedK, 0);
+    }
     hasMetadata = metadata != nullptr;
     if (hasMetadata) {
         metadataGm.SetGlobalBuffer((__gm__ int32_t *)metadata, optiling::SLI_METADATA_SIZE);
@@ -215,6 +228,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradBase<SLIT>::Init(
     if ASCEND_IS_AIV {
         // InitVecOP
         vectorService.InitParams(constInfo, tilingData, metadataGm, cmpResidualKeyGm, hasMetadata);
+        vectorService.InitSeqUsedGM(seqUsedQueryGm, seqUsedKeyGm);
         vectorService.InitVector0GM(keyGm, keyRopeGm, keyIndexGm, topKIndexGm, actualSeqLengthsQueryGm,
                                     actualSeqLengthsKeyGm, gatherPRes, gatherSYRes);
         vectorService.InitVector1GM(attnSoftmaxL1NormGm, bmm2Res, weightGm, psySyncGm, softmaxOutGm, dWeightGm, reluGm,
@@ -352,9 +366,14 @@ __aicore__ inline void SparseLightningIndexerKLLossGradBase<SLIT>::InitWorkspace
         int32_t t2EndQ = Min(t2StartQ + avgCostQ, totalCostQ);
         int64_t qBaseOffset = constInfo.gSizeQuery * constInfo.dSizeQuery;
 
-        // AscendC::InitOutput(dQueryIndexGm[t2StartQ * qBaseOffset], qBaseOffset * (t2EndQ - t2StartQ),
-        // static_cast<T>(0)); AscendC::InitOutput(dWeightGm[t2Start * constInfo.gSizeQuery], constInfo.gSizeQuery *
-        // (t2End - t2Start), static_cast<T>(0));
+        if constexpr (hasSequsedQ || hasSequsedK) {
+            int64_t dwRowSize = static_cast<int64_t>(constInfo.n2Size) * constInfo.gSizeQueryIndex;
+            AscendC::InitOutput(dQueryIndexGm[t2StartQ * qBaseOffset], qBaseOffset * (t2EndQ - t2StartQ),
+                                static_cast<OUT_T>(0));
+            AscendC::InitOutput(dWeightGm[t2StartQ * dwRowSize], dwRowSize * (t2EndQ - t2StartQ), static_cast<T>(0));
+            AscendC::InitOutput(softmaxOutGm[t2StartQ * constInfo.n2Size * topKSize],
+                                constInfo.n2Size * topKSize * (t2EndQ - t2StartQ), static_cast<T>(0));
+        }
         AscendC::InitOutput(scatterAddRes[t2Start * constInfo.dSizeQueryIndex],
                             constInfo.dSizeQueryIndex * (t2End - t2Start), static_cast<T>(0));
         if constexpr (deterministic) {
@@ -624,7 +643,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradBase<SLIT>::InitInvalidS1
     } else if ASCEND_IS_AIV {
         int64_t totalCoreNum = GetBlockNum() * GetTaskRation();
         int64_t qRowSize = constInfo.gSizeQuery * constInfo.dSizeQuery;
-        int64_t dwRowSize = constInfo.gSizeQueryIndex;
+        int64_t dwRowSize = static_cast<int64_t>(constInfo.n2Size) * constInfo.gSizeQueryIndex;
         int64_t softmaxRowSize = constInfo.n2Size * topKSize;
         int64_t totalInvalidS1Size = 0;
 
@@ -725,6 +744,30 @@ __aicore__ inline int64_t SparseLightningIndexerKLLossGradBase<SLIT>::FindBIndex
 }
 
 template <typename SLIT>
+__aicore__ inline int64_t SparseLightningIndexerKLLossGradBase<SLIT>::FindBIndexBySeqUsed(int64_t bIndex,
+                                                                                          int64_t curIndex,
+                                                                                          int64_t &accumulateLen)
+{
+    int64_t usedAccum = accumulateLen;
+    for (int index = bIndex; index < constInfo.bSize; index++) {
+        int64_t usedLen = GetUsedSeqLens(index, constInfo.s1Size, seqUsedQueryGm);
+        if constexpr (LAYOUT_T == SLILayout::TND) {
+            int64_t allocAccum = 0;
+            usedLen = GetUsedSeqLens(
+                index, GetActualSeqLens(index, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T, allocAccum),
+                seqUsedQueryGm);
+        }
+        if (curIndex < usedAccum + usedLen) {
+            accumulateLen = usedAccum;
+            return index;
+        }
+        usedAccum += usedLen;
+    }
+    accumulateLen = usedAccum;
+    return GetMetadataTotalSize() > curIndex ? constInfo.bSize : -1;
+}
+
+template <typename SLIT>
 __aicore__ inline int64_t SparseLightningIndexerKLLossGradBase<SLIT>::GetEndS1(int64_t bIdx)
 {
     int64_t end =
@@ -782,15 +825,29 @@ __aicore__ inline void SparseLightningIndexerKLLossGradBase<SLIT>::CalcMultiCore
         return;
     }
     if constexpr (LAYOUT_T == SLILayout::TND) {
-        bStartIdx = FindBIndex(0, bS1Index, actualSum);
-        s1StartIdx = bS1Index - actualSum;
-        bEndIdx = FindBIndex(bStartIdx, bS1EndIndex - 1, actualSum);
-        s1EndIdx = bS1EndIndex - actualSum;
+        if constexpr (hasSequsedQ) {
+            bStartIdx = FindBIndexBySeqUsed(0, bS1Index, actualSum);
+            s1StartIdx = bS1Index - actualSum;
+            bEndIdx = FindBIndexBySeqUsed(bStartIdx, bS1EndIndex - 1, actualSum);
+            s1EndIdx = bS1EndIndex - actualSum;
+        } else {
+            bStartIdx = FindBIndex(0, bS1Index, actualSum);
+            s1StartIdx = bS1Index - actualSum;
+            bEndIdx = FindBIndex(bStartIdx, bS1EndIndex - 1, actualSum);
+            s1EndIdx = bS1EndIndex - actualSum;
+        }
     } else {
-        bStartIdx = bS1Index / constInfo.s1Size;
-        bEndIdx = (bS1EndIndex - 1) / constInfo.s1Size;
-        s1StartIdx = bS1Index - bStartIdx * constInfo.s1Size;
-        s1EndIdx = bS1EndIndex - bEndIdx * constInfo.s1Size;
+        if constexpr (hasSequsedQ) {
+            bStartIdx = FindBIndexBySeqUsed(0, bS1Index, actualSum);
+            s1StartIdx = bS1Index - actualSum;
+            bEndIdx = FindBIndexBySeqUsed(bStartIdx, bS1EndIndex - 1, actualSum);
+            s1EndIdx = bS1EndIndex - actualSum;
+        } else {
+            bStartIdx = bS1Index / constInfo.s1Size;
+            bEndIdx = (bS1EndIndex - 1) / constInfo.s1Size;
+            s1StartIdx = bS1Index - bStartIdx * constInfo.s1Size;
+            s1EndIdx = bS1EndIndex - bEndIdx * constInfo.s1Size;
+        }
     }
 }
 
@@ -978,21 +1035,25 @@ __aicore__ inline void SparseLightningIndexerKLLossGradBase<SLIT>::MainProcess()
         int32_t actualSeqLensQ = 0;
         int32_t actualSeqLensK = 0;
         if constexpr (LAYOUT_T == SLILayout::TND) {
-            actualSeqLensQ = GetActualSeqLens(bIdx, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T, accumS1Len);
+            int32_t allocatedSeqLensQ =
+                GetActualSeqLens(bIdx, constInfo.s1Size, actualSeqLengthsQueryGm, LAYOUT_T, accumS1Len);
+            actualSeqLensQ = hasSequsedQ ? GetUsedSeqLens(bIdx, allocatedSeqLensQ, seqUsedQueryGm) : allocatedSeqLensQ;
             if constexpr (KV_LAYOUT_T == SLILayout::TND) {
-                actualSeqLensK =
+                int32_t allocatedSeqLensK =
                     GetActualSeqLens(bIdx, constInfo.s2Size, actualSeqLengthsKeyGm, KV_LAYOUT_T, accumS2Len);
+                actualSeqLensK =
+                    hasSequsedK ? GetUsedSeqLens(bIdx, allocatedSeqLensK, seqUsedKeyGm) : allocatedSeqLensK;
             } else {
-                actualSeqLensK = constInfo.s2Size;
                 accumS2Len = bIdx * constInfo.s2Size;
+                actualSeqLensK = hasSequsedK ? GetUsedSeqLens(bIdx, constInfo.s2Size, seqUsedKeyGm) : constInfo.s2Size;
             }
             s1StartIdxThisBatch = (bIdx == bStartIdx) ? s1StartIdx : 0;
             s1EndIdxThisBatch = (!lastB) ? actualSeqLensQ : s1EndIdx;
         } else if constexpr (LAYOUT_T == SLILayout::BSND) {
             s1StartIdxThisBatch = (bIdx == bStartIdx) ? s1StartIdx : 0;
-            s1EndIdxThisBatch = (!lastB) ? constInfo.s1Size : s1EndIdx;
-            actualSeqLensQ = constInfo.s1Size;
-            actualSeqLensK = constInfo.s2Size;
+            actualSeqLensQ = hasSequsedQ ? GetUsedSeqLens(bIdx, constInfo.s1Size, seqUsedQueryGm) : constInfo.s1Size;
+            actualSeqLensK = hasSequsedK ? GetUsedSeqLens(bIdx, constInfo.s2Size, seqUsedKeyGm) : constInfo.s2Size;
+            s1EndIdxThisBatch = (!lastB) ? actualSeqLensQ : s1EndIdx;
         }
         int64_t invalidS1Size = GetInvalidS1Size(bIdx, actualSeqLensQ, actualSeqLensK);
         s1StartIdxThisBatch = Min(Max(s1StartIdxThisBatch, invalidS1Size), s1EndIdxThisBatch);
@@ -1081,6 +1142,16 @@ __aicore__ inline int32_t SparseLightningIndexerKLLossGradBase<SLIT>::GetActualS
 }
 
 template <typename SLIT>
+__aicore__ inline int32_t SparseLightningIndexerKLLossGradBase<SLIT>::GetUsedSeqLens(int32_t bIdx, int32_t defaultLens,
+                                                                                     GlobalTensor<int32_t> &seqUsedGm)
+{
+    if (seqUsedGm.GetSize() <= 0) {
+        return defaultLens;
+    }
+    return seqUsedGm.GetValue(bIdx);
+}
+
+template <typename SLIT>
 __aicore__ inline int32_t SparseLightningIndexerKLLossGradBase<SLIT>::GetCmpResidualK(int32_t bIdx)
 {
     if (cmpResidualKeyGm.GetSize() <= 0) {
@@ -1138,8 +1209,8 @@ __aicore__ inline void SparseLightningIndexerKLLossGradBase<SLIT>::GetRunInfo(
         runInfo.accumS1Idx = accumS1Len + s1Idx;
         runInfo.accumS2Idx = accumS2Len;
     } else if constexpr (LAYOUT_T == SLILayout::BSND) {
-        runInfo.actS1Size = constInfo.s1Size;
-        runInfo.actS2Size = constInfo.s2Size;
+        runInfo.actS1Size = actualSeqLensQ;
+        runInfo.actS2Size = actualSeqLensK;
         runInfo.accumS1Idx = bIdx * constInfo.s1Size + s1Idx;
         runInfo.accumS2Idx = bIdx * constInfo.s2Size;
     }

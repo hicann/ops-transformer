@@ -49,6 +49,8 @@ public:
     static constexpr uint32_t PSY_SYNC_STRIDE = PSY_SYNC_SUM_P_OFFSET + PSY_SYNC_BLOCK_FLOAT_NUM;
     static constexpr SLILayout LAYOUT_T = SLIT::inputQLayout;
     static constexpr SLILayout KV_LAYOUT_T = SLIT::inputKLayout;
+    static constexpr bool hasSequsedQ = SLIT::hasSequsedQ;
+    static constexpr bool hasSequsedK = SLIT::hasSequsedK;
     static constexpr UBAllocPolicy<isTopkLess2k> ubAllocPolicy;
     static constexpr bool deterministic = SLIT::deterministic;
 
@@ -59,6 +61,7 @@ public:
                                       const optiling::SparseLightningIndexerKLLossGradTilingData *__restrict tilingData,
                                       GlobalTensor<int32_t> metadataGm, GlobalTensor<int32_t> cmpResidualKeyGm,
                                       bool hasMetadata);
+    __aicore__ inline void InitSeqUsedGM(GlobalTensor<int32_t> &seqUsedQ, GlobalTensor<int32_t> &seqUsedK);
     __aicore__ inline void InitBuffers(TPipe *pipe);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
@@ -134,6 +137,7 @@ private:
     __aicore__ inline int32_t GetActualSeqLens(int32_t bIdx, int32_t defaultLens,
                                                GlobalTensor<int32_t> &actualSeqLensGm, SLILayout layout,
                                                int64_t &accumLen);
+    __aicore__ inline int32_t GetUsedSeqLens(int32_t bIdx, int32_t defaultLens, GlobalTensor<int32_t> &seqUsedGm);
     __aicore__ inline int32_t GetCmpResidualK(int32_t bIdx);
     __aicore__ inline int64_t GetPreCompressS2Len(int32_t bIdx, int32_t actualSeqLensK);
     __aicore__ inline int32_t GetS2SparseLen(int32_t bIdx, int32_t s1Idx, int32_t actualSeqLensQ,
@@ -192,6 +196,8 @@ private:
 
     GlobalTensor<int32_t> actualSeqLengthsQueryGm;
     GlobalTensor<int32_t> actualSeqLengthsKeyGm;
+    GlobalTensor<int32_t> seqUsedQueryGm;
+    GlobalTensor<int32_t> seqUsedKeyGm;
 
     // local tensor
     TBuf<> mm1Tbuf;
@@ -310,6 +316,14 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::InitParams(
     this->metadataGm = metadataGm;
     this->cmpResidualKeyGm = cmpResidualKeyGm;
     this->hasMetadata = hasMetadata;
+}
+
+template <typename SLIT>
+__aicore__ inline void SLIKLLossVectorService<SLIT>::InitSeqUsedGM(GlobalTensor<int32_t> &seqUsedQ,
+                                                                   GlobalTensor<int32_t> &seqUsedK)
+{
+    this->seqUsedQueryGm = seqUsedQ;
+    this->seqUsedKeyGm = seqUsedK;
 }
 
 template <typename SLIT>
@@ -819,6 +833,16 @@ __aicore__ inline int32_t SLIKLLossVectorService<SLIT>::GetActualSeqLens(int32_t
 }
 
 template <typename SLIT>
+__aicore__ inline int32_t SLIKLLossVectorService<SLIT>::GetUsedSeqLens(int32_t bIdx, int32_t defaultLens,
+                                                                       GlobalTensor<int32_t> &seqUsedGm)
+{
+    if (seqUsedGm.GetSize() <= 0) {
+        return defaultLens;
+    }
+    return seqUsedGm.GetValue(bIdx);
+}
+
+template <typename SLIT>
 __aicore__ inline int32_t SLIKLLossVectorService<SLIT>::GetCmpResidualK(int32_t bIdx)
 {
     if (cmpResidualKeyGm.GetSize() <= 0) {
@@ -997,8 +1021,10 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::GetRunInfo(int64_t taskId, 
         runInfo.accumS1Idx = accumS1Len + s1Idx;
         runInfo.accumS2Idx = accumS2Len;
     } else if constexpr (LAYOUT_T == SLILayout::BSND) {
-        runInfo.actS1Size = constInfo.s1Size;
-        runInfo.actS2Size = constInfo.s2Size;
+        runInfo.actS1Size =
+            hasSequsedQ ? GetUsedSeqLens(runInfo.bIdx, constInfo.s1Size, seqUsedQueryGm) : constInfo.s1Size;
+        runInfo.actS2Size =
+            hasSequsedK ? GetUsedSeqLens(runInfo.bIdx, constInfo.s2Size, seqUsedKeyGm) : constInfo.s2Size;
         runInfo.accumS1Idx = bIdx * constInfo.s1Size + s1Idx;
         runInfo.accumS2Idx = bIdx * constInfo.s2Size;
     }

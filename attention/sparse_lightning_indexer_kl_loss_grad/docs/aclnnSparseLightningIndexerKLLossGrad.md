@@ -236,7 +236,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>seqUsedQOptional</td>
                 <td>可选输入</td>
                 <td>表示每个batch实际使用的q长度。</td>
-                <td>长度为B。</td>
+                <td>长度为B。每个值必须大于等于0，且不能超过对应batch的q分配长度。</td>
                 <td>INT32</td>
                 <td>ND</td>
                 <td>(B,)</td>
@@ -246,7 +246,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>seqUsedKOptional</td>
                 <td>可选输入</td>
                 <td>表示每个batch实际使用的k长度。</td>
-                <td>长度为B。</td>
+                <td>长度为B。每个值必须大于等于0，且不能超过对应batch的k分配长度。</td>
                 <td>INT32</td>
                 <td>ND</td>
                 <td>(B,)</td>
@@ -375,10 +375,6 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
         </tbody>
     </table>
 
-<!-- npu="A3,910b" id7 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：暂不支持seqUsedQOptional、seqUsedKOptional字段。
-
-<!-- end id7 -->
 - **返回值：**
 
     返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
@@ -480,7 +476,8 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
   - 参数sparseIndices、cuSeqLensQOptional、cuSeqLensKOptional、seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional、metadataOptional的数据类型应为INT32。
   - layoutQ和layoutK当前支持BSND和TND。
   - 当layoutQ为TND时，需要传入cuSeqLensQOptional；当layoutK为TND时，需要传入cuSeqLensKOptional。
-  - sparseIndices中有效位置必须位于当前batch的key序列范围内；无效位置使用-1填充。
+  - seqUsedQOptional、seqUsedKOptional存在时，每个值必须位于对应batch的分配长度范围内；BSND的分配长度分别为S1、S2，TND的分配长度为对应cuSeqLens相邻元素之差。
+  - sparseIndices中有效位置必须位于当前batch的有效key序列范围内；传入seqUsedKOptional时以seqUsedKOptional对应值为上界，无效位置使用-1填充。
   - attnSoftmaxL1Norm的无效top-k位置建议置零，并与sparseIndices的有效位置保持一致。
 
     <table style="undefined;table-layout: fixed; width: 942px">

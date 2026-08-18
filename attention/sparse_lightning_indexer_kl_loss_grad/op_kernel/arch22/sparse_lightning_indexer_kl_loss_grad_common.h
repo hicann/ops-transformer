@@ -83,7 +83,8 @@ struct GatherParams {
 template <typename InputQT, typename InputKT, typename OutT, SLITopKRange TopKRange,
           SLILayout LayoutQT = SLILayout::TND, SLILayout LayoutKT = SLILayout::TND,
           SLISparseMode SparseMode = SLISparseMode::RightDown, const bool HasRope = false,
-          const bool Deterministic = false, typename... Args>
+          const bool HasSequsedQ = false, const bool HasSequsedK = false, const bool Deterministic = false,
+          typename... Args>
 struct SLIType {
     using inputQT = InputQT;
     using inputKT = InputKT;
@@ -93,6 +94,8 @@ struct SLIType {
     static constexpr SLILayout inputKLayout = LayoutKT;
     static constexpr SLISparseMode sparseMode = SparseMode;
     static constexpr bool hasRope = HasRope;
+    static constexpr bool hasSequsedQ = HasSequsedQ;
+    static constexpr bool hasSequsedK = HasSequsedK;
     static constexpr bool deterministic = Deterministic;
 };
 /// @}
