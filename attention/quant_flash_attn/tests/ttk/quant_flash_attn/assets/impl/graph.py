@@ -268,7 +268,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         self.metadata = torch.ops.cann_ops_transformer.quant_flash_attn_metadata(
             int(inputs["q_n"]),
             int(inputs["kv_n"]),
-            int(inputs["q"].shape[-1]),
+            int(D),
             int(quant_mode),
             cu_seqlens_q=cu_seqlens_q_t if is_tnd_q else None,
             cu_seqlens_kv=cu_seqlens_kv_t if is_tnd_kv else None,

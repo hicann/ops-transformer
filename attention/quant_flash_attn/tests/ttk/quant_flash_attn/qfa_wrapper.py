@@ -82,6 +82,10 @@ def npu_qfa(
     data_range_q: float = 1.0,
     data_range_k: float = 1.0,
     data_range_v: float = 1.0,
+    layout_q: str = "TND",
+    layout_q_descale: str = "TND",
+    layout_kv: str = "TND",
+    layout_out: str = "TND",
     **kwargs,
 ):
     torch_npu.npu.set_device(int(device_id))
@@ -133,6 +137,10 @@ def npu_qfa(
             "DEVICE_ID": device_id,
             "GRAPH_PATH": graph_path,
             "SOFTMAX_SCALE": softmax_scale,
+            "LAYOUT_Q": layout_q,
+            "LAYOUT_Q_DESCALE": layout_q_descale,
+            "LAYOUT_KV": layout_kv,
+            "LAYOUT_OUT": layout_out,
         },
         quant_mode=quant_mode,
     )

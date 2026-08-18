@@ -69,6 +69,10 @@ def generate_qfa_mxfp8_inputs(
     data_range_q: float = 1.0,
     data_range_k: float = 1.0,
     data_range_v: float = 1.0,
+    layout_q: str = "TND",
+    layout_q_descale: str = "TND",
+    layout_kv: str = "TND",
+    layout_out: str = "TND",
     **kwargs,
 ):
     # cu_seqlens -> actual_seq (差分还原)
@@ -114,6 +118,10 @@ def generate_qfa_mxfp8_inputs(
         ("BLOCK_SIZE", block_size),
         ("Q_SCALE_LAYOUT", q_scale_layout),
         ("INPUT_LAYOUT", input_layout),
+        ("LAYOUT_Q", layout_q),
+        ("LAYOUT_Q_DESCALE", layout_q_descale),
+        ("LAYOUT_KV", layout_kv),
+        ("LAYOUT_OUT", layout_out),
     ]:
         setattr(mxfp8_golden_mod, gkey, gval)
 

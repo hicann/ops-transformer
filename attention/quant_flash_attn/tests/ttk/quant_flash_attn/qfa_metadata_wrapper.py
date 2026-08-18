@@ -297,7 +297,7 @@ def run_metadata(
         metadata = quant_flash_attn_metadata(
             num_heads_q=inputs["q_n"],
             num_heads_kv=inputs["kv_n"],
-            head_dim=inputs["q"].shape[-1],
+            head_dim=D,
             quant_mode=quant_mode,
             cu_seqlens_q=cu_seqlens_q_t if is_tnd_q else None,
             cu_seqlens_kv=cu_seqlens_kv_t if is_tnd_kv else None,

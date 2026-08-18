@@ -821,7 +821,7 @@ def _call_npu_qfa_op(
     metadata = quant_flash_attn_metadata(
         num_heads_q=q_n,
         num_heads_kv=kv_n,
-        head_dim=q.shape[-1],
+        head_dim=D,
         quant_mode=QUANT_MODE,
         cu_seqlens_q=cu_seqlens_q_t,
         cu_seqlens_kv=None,
