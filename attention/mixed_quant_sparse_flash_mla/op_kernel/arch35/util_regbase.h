@@ -95,15 +95,19 @@ struct RunParamStr { // 分核与切块需要使用到参数
     int64_t n2oIdx = 0; /* n2轴的index */ \
     int64_t goIdx = 0;  /* g轴的index */ \
     int32_t s1RealSize; \
-    int32_t halfS1RealSize;      /* vector侧实际的s1基本块大小，如果Cube基本块=128，那么halfS1RealSize=64 */ \
-    int32_t firstHalfS1RealSize; /* 当s1RealSize不是2的整数倍时，v0比v1少计算一行，计算subblock偏移的时候需要使用v0的s1 size */ \
+    int32_t halfS1RealSize; /* vector侧实际的s1基本块大小，如果Cube基本块=128，那么halfS1RealSize=64 */ \
+    int32_t \
+        firstHalfS1RealSize; /* 当s1RealSize不是2的整数倍时，v0比v1少计算一行，计算subblock偏移的时候需要使用v0的s1 \
+                                size */ \
     int32_t mRealSize; \
     int32_t halfMRealSize; \
     int32_t firstHalfMRealSize; \
     int32_t s2RealSize;     /* s2方向基本块的真实长度 */ \
     int64_t s2AlignedSize;  /* s2方向基本块对齐到16之后的长度 */ \
     int32_t vec2S1BaseSize; /* vector2侧开循环之后，经过切分的S1大小，例如把64切分成两份32 */ \
-    int32_t vec2S1RealSize; /* vector2侧开循环之后，经过切分的S1的尾块大小，例如把63切分成两份32和31，第二份的实际大小是31 */ \
+    int32_t \
+        vec2S1RealSize; /* vector2侧开循环之后，经过切分的S1的尾块大小，例如把63切分成两份32和31，第二份的实际大小是31 \
+                         */ \
     int32_t vec2MBaseSize; \
     int32_t vec2MRealSize; \
     int64_t taskId; \
@@ -226,7 +230,6 @@ struct RunInfo {
     uint32_t cmpSparseBlockCount; \
     uint32_t alignedOriSparseBlockCount; \
     uint32_t alignedCmpSparseBlockCount; \
-    bool useVecS2PhyAddr; \
     uint32_t actualSeqLenSize; /* 用户输入的actualseq的长度 */ \
     /* service mm1 mm2 pageAttention */ \
     uint32_t oriBlockSize; \
