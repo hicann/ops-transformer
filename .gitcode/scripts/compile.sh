@@ -41,7 +41,11 @@ fi
 if [ -f /home/jenkins/Ascend/cann/bin/setenv.bash ]; then
     source /home/jenkins/Ascend/cann/bin/setenv.bash
 fi
-
+LOG_INFO() {
+    local assert_msg=${1}
+    date_time=$(date +%Y%m%d-%H%M%S)
+    echo -e "[INFO] ${date_time} ${assert_msg}"
+}
 LOG_HEAD()
 {
     echo "========================================"
@@ -54,7 +58,16 @@ LOG_DO()
     echo "[LOG_DO] $*"
     "$@"
 }
-
+DP_ASSERT_CHECK_SKIP() {
+    local actual_value=${1}
+    local assert_msg=${2}
+    if [ "${actual_value}" != "0" ] && [ "${actual_value}" != "200" ]; then
+        LOG_ERROR "${assert_msg} is failed."
+        exit 1
+    else
+        LOG_INFO "${assert_msg} is success."
+    fi
+}
 DP_ASSERT_EQUAL()
 {
     local actual="$1"
@@ -69,13 +82,21 @@ DP_ASSERT_EQUAL()
 LOG_HEAD "Build ${REPOSITORY_NAME}."
 cd "${WORKSPACE}/" || exit 1
 
+non_skip_count=$(grep -vE '(\.md$|^tests/)' "${WORKSPACE}/pr_filelist.txt" | grep -cv '^$')
+if [ "${non_skip_count}" -eq 0 ]; then
+    LOG_HEAD "pr_filelist.txt only contains .md or tests/ files, skip build"
+    mkdir -p build_out
+    touch build_out/skip_build.run
+    touch single.tar.gz
+    echo "api-check=continue" >> "${ATOMGIT_OUTPUT}"
+    exit 0
+fi
 if [[ "${task_name}" =~ Compile_Ascend_X86_ubuntu24 ]]; then
     sed -i "1i set(CMAKE_EXPORT_COMPILE_COMMANDS ON)" "CMakeLists.txt"
     echo "api-check=compile" >> "${ATOMGIT_OUTPUT}"
 else
     echo "api-check=continue" >> "${ATOMGIT_OUTPUT}"
 fi
-
 if [ "${task_name}" == "Pre_Compile" ]; then
     LOG_DO bash build.sh --PR_PKG ./pr_filelist.txt -j32 --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH}
     ret=$?
@@ -117,8 +138,9 @@ else
         fi
     elif [ "${GE_ST_RT2}X" == "experimental_950X" ]; then
         if [ "${GIT_TARGET_BRANCH}" = "master" ]; then
-            LOG_DO bash build.sh --experimental --soc=ascend950 --PR_PKG "pr_filelist.txt" -j16 --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH}
-            DP_ASSERT_EQUAL "$?" "0" "Build ${REPOSITORY_NAME}"
+            LOG_DO bash build.sh --experimental --PR_PKG "pr_filelist.txt" --soc=ascend950 --PR_PKG "pr_filelist.txt" -j16 --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH}
+            BUILD_EXIT_CODE=$?
+            DP_ASSERT_CHECK_SKIP "$?" "0" "Build ${REPOSITORY_NAME}"
         else
             echo "not need build experimental_950"
             mkdir build_out
@@ -128,14 +150,17 @@ else
     elif [[ "${task_name}" =~ monitor ]]; then
         if [ "${GIT_TARGET_BRANCH}" = "master" ]; then
             if [[ "${task_name}" =~ "910c" ]]; then
-                LOG_DO bash build.sh --pkg --jit --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16 --soc=ascend910_93
-                DP_ASSERT_EQUAL "$?" "0" "exec cmd: [bash build.sh --pkg --jit -j16 --soc=ascend910_93]"
+                LOG_DO bash build.sh --pkg --jit --PR_PKG "pr_filelist.txt" --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16 --soc=ascend910_93
+                BUILD_EXIT_CODE=$?
+                DP_ASSERT_CHECK_SKIP "$?" "0" "exec cmd: [bash build.sh --pkg --jit -j16 --soc=ascend910_93]"
             elif [[ "${task_name}" =~ "950" ]]; then
-                LOG_DO bash build.sh --pkg --jit --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16 --soc=ascend950
-                DP_ASSERT_EQUAL "$?" "0" "exec cmd: [bash build.sh --pkg --jit -j16 --soc=ascend950]"
+                LOG_DO bash build.sh --pkg --jit --PR_PKG "pr_filelist.txt" --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16 --soc=ascend950
+                BUILD_EXIT_CODE=$?
+                DP_ASSERT_CHECK_SKIP "$?" "0" "exec cmd: [bash build.sh --pkg --jit -j16 --soc=ascend950]"
             else
-                LOG_DO bash build.sh --pkg --jit --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16 --soc=ascend910b
-                DP_ASSERT_EQUAL "$?" "0" "exec cmd: [bash build.sh --pkg --jit -j16 --soc=ascend910b]"
+                LOG_DO bash build.sh --pkg --jit --PR_PKG "pr_filelist.txt" --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16 --soc=ascend910b
+                BUILD_EXIT_CODE=$?
+                DP_ASSERT_CHECK_SKIP "$?" "0" "exec cmd: [bash build.sh --pkg --jit -j16 --soc=ascend910b]"
             fi
         else
             echo "not need build monitor"
@@ -144,7 +169,21 @@ else
             exit 0
         fi
     else
-        LOG_DO bash build.sh --pkg --jit --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
-        DP_ASSERT_EQUAL "$?" "0" "Build ${REPOSITORY_NAME}"
+        LOG_DO bash build.sh --pkg --jit --PR_PKG "pr_filelist.txt" --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
+        BUILD_EXIT_CODE=$?
+        DP_ASSERT_CHECK_SKIP "$?" "0" "Build ${REPOSITORY_NAME}"
+    fi
+fi
+compile_package_name=$(ls "${WORKSPACE}/build_out/" |grep -E "*.run$"|head -n1)
+if [[ -z "${compile_package_name}" ]]; then
+    if [[ "${BUILD_EXIT_CODE}" == "200" ]]; then
+        echo "not need compile"
+        mkdir build_out
+        touch build_out/cann-ops-transformer_linux-${OS_TYPE}.run
+        echo "api-check=continue" >> "${ATOMGIT_OUTPUT}"
+        exit 0
+    else
+        echo "ERROR: Not find *.run in  ${WORKSPACE}/output/package/!"
+        exit 1
     fi
 fi

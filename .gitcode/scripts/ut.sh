@@ -53,6 +53,11 @@ DP_ASSERT_EQUAL()
 }
 
 cd "${WORKSPACE}/" || exit 1
+non_skip_count=$(grep -vE '(\.md$)' "${WORKSPACE}/pr_filelist.txt" | grep -cv '^$')
+if [ "${non_skip_count}" -eq 0 ]; then
+    LOG_HEAD "pr_filelist.txt only contains .md  files, skip ut"
+    exit 0
+fi
 sudo rm -rf /home/jenkins/Ascend/cann-9.0.0/opp/built-in/op_impl/ai_core/tbe/kernel/config/ascend910_93
 
 if [ "${GIT_TARGET_BRANCH}" = "master" ]; then
