@@ -8,13 +8,13 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 from typing import Optional, Tuple
+
 import torch
 import torch_npu
 from torch.library import impl
 from torch_npu.utils._error_code import ErrCode, ops_error
-from cann_ops_transformer.op_builder.builder import OpBuilder
-from cann_ops_transformer.op_builder.builder import AS_LIBRARY
 
+from cann_ops_transformer.op_builder.builder import AS_LIBRARY, OpBuilder
 
 _DTYPE_HIFLOAT8 = torch_npu.hifloat8
 _DTYPE_FLOAT4_E2M1 = torch_npu.float4_e2m1fn_x2
@@ -34,33 +34,59 @@ class _MoeReRoutingOpBuilder(OpBuilder):
         super(_MoeReRoutingOpBuilder, self).__init__("moe_re_routing")
 
     def sources(self):
-        return ['ops/csrc/moe_re_routing.cpp']
+        return ["ops/csrc/moe_re_routing.cpp"]
 
     def schema(self) -> str:
-        return "moe_re_routing(Tensor tokens, Tensor expert_token_num_per_rank, " \
-            "*, Tensor? per_token_scales=None, Tensor? expert_topk_weight=None, " \
-            "int expert_token_num_type=1, int idx_type=0, " \
-            "int? tokens_dtype=None) " \
+        return (
+            "moe_re_routing(Tensor tokens, Tensor expert_token_num_per_rank, "
+            "*, Tensor? per_token_scales=None, Tensor? expert_topk_weight=None, "
+            "int expert_token_num_type=1, int idx_type=0, "
+            "int? tokens_dtype=None) "
             "-> (Tensor, Tensor, Tensor, Tensor, Tensor)"
+        )
 
     def register_meta(self):
         @impl(AS_LIBRARY, self.name, "Meta")
-        def moe_re_routing_meta(tokens, expert_token_num_per_rank,
-                                      per_token_scales=None, expert_topk_weight=None,
-                                      expert_token_num_type=1, idx_type=0, tokens_dtype=None):
-            torch._check(tokens.dim() > 1,
-                lambda: f"tokens dim should larger than 1, but got {tokens.dim()}D.{ops_error(ErrCode.VALUE)}")
-            torch._check(expert_token_num_per_rank.dim() > 1,
-                lambda: f"expert_token_num_per_rank dim should larger than 1, "
-                        f"but got {expert_token_num_per_rank.dim()}D.{ops_error(ErrCode.VALUE)}")
-            torch._check(expert_token_num_type in (0, 1),
-                lambda: f"expert_token_num_type must be 0 or 1, got {expert_token_num_type}.{ops_error(ErrCode.VALUE)}")
-            torch._check(idx_type in (0, 1),
-                lambda: f"idx_type must be 0 or 1, got {idx_type}.{ops_error(ErrCode.VALUE)}")
+        def moe_re_routing_meta(
+            tokens,
+            expert_token_num_per_rank,
+            per_token_scales=None,
+            expert_topk_weight=None,
+            expert_token_num_type=1,
+            idx_type=0,
+            tokens_dtype=None,
+        ):
+            torch._check(
+                tokens.dim() > 1,
+                lambda: (
+                    f"tokens dim should larger than 1, but got {tokens.dim()}D.{ops_error(ErrCode.VALUE)}"
+                ),
+            )
+            torch._check(
+                expert_token_num_per_rank.dim() > 1,
+                lambda: (
+                    f"expert_token_num_per_rank dim should larger than 1, "
+                    f"but got {expert_token_num_per_rank.dim()}D.{ops_error(ErrCode.VALUE)}"
+                ),
+            )
+            torch._check(
+                expert_token_num_type in (0, 1),
+                lambda: (
+                    f"expert_token_num_type must be 0 or 1, got {expert_token_num_type}.{ops_error(ErrCode.VALUE)}"
+                ),
+            )
+            torch._check(
+                idx_type in (0, 1),
+                lambda: f"idx_type must be 0 or 1, got {idx_type}.{ops_error(ErrCode.VALUE)}",
+            )
             if tokens_dtype is not None:
-                torch._check(tokens_dtype in _TOKENS_DTYPE_ALLOWLIST,
-                    lambda: f"tokens_dtype only supports hifloat8, float4_e2m1fn_x2, "
-                            f"float4_e1m2fn_x2 or None.{ops_error(ErrCode.VALUE)}")
+                torch._check(
+                    tokens_dtype in _TOKENS_DTYPE_ALLOWLIST,
+                    lambda: (
+                        f"tokens_dtype only supports hifloat8, float4_e2m1fn_x2, "
+                        f"float4_e1m2fn_x2 or None.{ops_error(ErrCode.VALUE)}"
+                    ),
+                )
 
             permute_tokens_size = list(tokens.size())
             if per_token_scales is None:
@@ -70,44 +96,81 @@ class _MoeReRoutingOpBuilder(OpBuilder):
                 permute_per_token_scales_size = list(per_token_scales.size())
                 permute_per_token_scales_dtype = per_token_scales.dtype
 
-            permute_tokens_dtype = TORCH_DTYPE_ENUM_VALUE_TO_SCALAR_TYPE_MAP.get(tokens_dtype, tokens.dtype) \
-                if tokens_dtype is not None else tokens.dtype
+            permute_tokens_dtype = (
+                TORCH_DTYPE_ENUM_VALUE_TO_SCALAR_TYPE_MAP.get(
+                    tokens_dtype, tokens.dtype
+                )
+                if tokens_dtype is not None
+                else tokens.dtype
+            )
 
             permute_token_idx_size = [tokens.size(0)]
             expert_token_num_size = [expert_token_num_per_rank.size(1)]
 
             if expert_topk_weight is not None:
-                permute_topk_weight = expert_topk_weight.new_empty(expert_topk_weight.size(),
-                                                                     dtype=expert_topk_weight.dtype)
+                permute_topk_weight = expert_topk_weight.new_empty(
+                    expert_topk_weight.size(), dtype=expert_topk_weight.dtype
+                )
             else:
                 permute_topk_weight = tokens.new_empty((0,), dtype=torch.float32)
 
-            return (torch.empty(permute_tokens_size, dtype=permute_tokens_dtype, device=tokens.device),
-                    torch.empty(permute_per_token_scales_size,
-                                dtype=permute_per_token_scales_dtype, device=tokens.device),
-                    torch.empty(permute_token_idx_size, dtype=torch.int32, device=tokens.device),
-                    torch.empty(expert_token_num_size, dtype=expert_token_num_per_rank.dtype, device=tokens.device),
-                    permute_topk_weight)
+            return (
+                torch.empty(
+                    permute_tokens_size,
+                    dtype=permute_tokens_dtype,
+                    device=tokens.device,
+                ),
+                torch.empty(
+                    permute_per_token_scales_size,
+                    dtype=permute_per_token_scales_dtype,
+                    device=tokens.device,
+                ),
+                torch.empty(
+                    permute_token_idx_size, dtype=torch.int32, device=tokens.device
+                ),
+                torch.empty(
+                    expert_token_num_size,
+                    dtype=expert_token_num_per_rank.dtype,
+                    device=tokens.device,
+                ),
+                permute_topk_weight,
+            )
 
 
 _moe_re_routing_op_builder = _MoeReRoutingOpBuilder()
-_op_module = _moe_re_routing_op_builder.load()
 
 
 @impl(AS_LIBRARY, _moe_re_routing_op_builder.name, "PrivateUse1")
-def _moe_re_routing(tokens, expert_token_num_per_rank,
-                         per_token_scales=None, expert_topk_weight=None,
-                         expert_token_num_type=1, idx_type=0, tokens_dtype=None):
-    return _op_module.moe_re_routing(tokens, expert_token_num_per_rank, per_token_scales,
-                                          expert_topk_weight, expert_token_num_type, idx_type, tokens_dtype)
+def _moe_re_routing(
+    tokens,
+    expert_token_num_per_rank,
+    per_token_scales=None,
+    expert_topk_weight=None,
+    expert_token_num_type=1,
+    idx_type=0,
+    tokens_dtype=None,
+):
+    _op_module = _moe_re_routing_op_builder.load()
+    return _op_module.moe_re_routing(
+        tokens,
+        expert_token_num_per_rank,
+        per_token_scales,
+        expert_topk_weight,
+        expert_token_num_type,
+        idx_type,
+        tokens_dtype,
+    )
 
 
-def moe_re_routing(tokens: torch.Tensor, expert_token_num_per_rank: torch.Tensor,
-                   per_token_scales: Optional[torch.Tensor] = None,
-                   expert_topk_weight: Optional[torch.Tensor] = None,
-                   expert_token_num_type: int = 1, idx_type: int = 0,
-                   tokens_dtype: Optional[int] = None
-                   ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+def moe_re_routing(
+    tokens: torch.Tensor,
+    expert_token_num_per_rank: torch.Tensor,
+    per_token_scales: Optional[torch.Tensor] = None,
+    expert_topk_weight: Optional[torch.Tensor] = None,
+    expert_token_num_type: int = 1,
+    idx_type: int = 0,
+    tokens_dtype: Optional[int] = None,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """moe_re_routing operator.
 
     Rearranges tokens from rank-order to expert-order for MoE (Mixture of Experts)
@@ -136,6 +199,11 @@ def moe_re_routing(tokens: torch.Tensor, expert_token_num_per_rank: torch.Tensor
                     expert_token_num, permute_topk_weight).
     """
     return torch.ops.cann_ops_transformer.moe_re_routing(
-        tokens, expert_token_num_per_rank, per_token_scales=per_token_scales,
-        expert_topk_weight=expert_topk_weight, expert_token_num_type=expert_token_num_type,
-        idx_type=idx_type, tokens_dtype=tokens_dtype)
+        tokens,
+        expert_token_num_per_rank,
+        per_token_scales=per_token_scales,
+        expert_topk_weight=expert_topk_weight,
+        expert_token_num_type=expert_token_num_type,
+        idx_type=idx_type,
+        tokens_dtype=tokens_dtype,
+    )

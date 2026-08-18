@@ -8,10 +8,11 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 from typing import Optional, Tuple
+
 import torch
 from torch.library import impl
-from cann_ops_transformer.op_builder.builder import OpBuilder
-from cann_ops_transformer.op_builder.builder import AS_LIBRARY
+
+from cann_ops_transformer.op_builder.builder import AS_LIBRARY, OpBuilder
 
 
 class CompressorOpBuilder(OpBuilder):
@@ -35,7 +36,6 @@ class CompressorOpBuilder(OpBuilder):
 
 
 compressor_op_builder = CompressorOpBuilder()
-op_module = compressor_op_builder.load()
 
 
 # ===========================================================================
@@ -59,6 +59,7 @@ def _compressor_forward(
     cache_mode: Optional[int] = 1,
     grad_enabled: Optional[bool] = False,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    op_module = compressor_op_builder.load()
     cmp_kv, softmax_score, kv = op_module.compressor(
         x,
         wkv,
@@ -139,6 +140,7 @@ def _compressor_backward(
     cmp_ratio: int = 4,
     coff: Optional[int] = 1,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    op_module = compressor_op_builder.load()
     d_x = torch.empty_like(x)
     d_wkv = torch.empty_like(wkv)
     d_wgate = torch.empty_like(wgate)

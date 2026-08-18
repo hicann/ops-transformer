@@ -7,14 +7,15 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
-from typing import Optional, Tuple, List, Union
 import math
+from typing import List, Optional, Tuple, Union
+
 import torch
 import torch_npu
 from torch.library import impl
 from torch_npu.utils._error_code import ErrCode, ops_error
-from cann_ops_transformer.op_builder.builder import OpBuilder
-from cann_ops_transformer.op_builder.builder import AS_LIBRARY
+
+from cann_ops_transformer.op_builder.builder import AS_LIBRARY, OpBuilder
 
 ALIGN_BASE = 64
 THREE_DIM_NUM = 3
@@ -33,171 +34,351 @@ class _MoeInitRoutingOpBuilder(OpBuilder):
     def _validate_scale_no_quant(x, scale, is_fp8_or_fp4_dtype, is_float4_case):
         scale_dim = scale.dim()
         if is_fp8_or_fp4_dtype:
-            torch._check(scale_dim == THREE_DIM_NUM,
-                lambda: f"the scale shape support only 3D in no quant mode and x type is "
-                        f"float8_e5m2, float8_e4m3fn or float4_e2m1.{ops_error(ErrCode.VALUE)}")
-            torch._check(x.size(0) == scale.size(0),
-                lambda: f"the first dim of scale and the first dim of x "
-                        f"should be the same.{ops_error(ErrCode.VALUE)}")
+            torch._check(
+                scale_dim == THREE_DIM_NUM,
+                lambda: (
+                    f"the scale shape support only 3D in no quant mode and x type is "
+                    f"float8_e5m2, float8_e4m3fn or float4_e2m1.{ops_error(ErrCode.VALUE)}"
+                ),
+            )
+            torch._check(
+                x.size(0) == scale.size(0),
+                lambda: (
+                    f"the first dim of scale and the first dim of x "
+                    f"should be the same.{ops_error(ErrCode.VALUE)}"
+                ),
+            )
             if is_float4_case:
-                torch._check((x.size(1) * 2 + ALIGN_BASE - 1) // ALIGN_BASE == scale.size(1),
-                    lambda: f"the scale and x must have compatible second dimensions "
-                            f"(x aligned to 64).{ops_error(ErrCode.VALUE)}")
+                torch._check(
+                    (x.size(1) * 2 + ALIGN_BASE - 1) // ALIGN_BASE == scale.size(1),
+                    lambda: (
+                        f"the scale and x must have compatible second dimensions "
+                        f"(x aligned to 64).{ops_error(ErrCode.VALUE)}"
+                    ),
+                )
             else:
-                torch._check((x.size(1) + ALIGN_BASE - 1) // ALIGN_BASE == scale.size(1),
-                    lambda: f"the scale and x must have compatible second dimensions "
-                            f"(x aligned to 64).{ops_error(ErrCode.VALUE)}")
-            torch._check(MXFPX_SCALE_THIRD_DIM_SIZE == scale.size(2),
-                lambda: f"the third dim of scale should be 2.{ops_error(ErrCode.VALUE)}")
+                torch._check(
+                    (x.size(1) + ALIGN_BASE - 1) // ALIGN_BASE == scale.size(1),
+                    lambda: (
+                        f"the scale and x must have compatible second dimensions "
+                        f"(x aligned to 64).{ops_error(ErrCode.VALUE)}"
+                    ),
+                )
+            torch._check(
+                MXFPX_SCALE_THIRD_DIM_SIZE == scale.size(2),
+                lambda: f"the third dim of scale should be 2.{ops_error(ErrCode.VALUE)}",
+            )
         else:
-            torch._check(scale_dim == 1,
-                lambda: f"the scale shape support only 1D in no quant mode.{ops_error(ErrCode.VALUE)}")
-            torch._check(x.size(0) == scale.size(0),
-                lambda: f"the first dim of scale and the first dim of x "
-                        f"should be the same.{ops_error(ErrCode.VALUE)}")
+            torch._check(
+                scale_dim == 1,
+                lambda: (
+                    f"the scale shape support only 1D in no quant mode.{ops_error(ErrCode.VALUE)}"
+                ),
+            )
+            torch._check(
+                x.size(0) == scale.size(0),
+                lambda: (
+                    f"the first dim of scale and the first dim of x "
+                    f"should be the same.{ops_error(ErrCode.VALUE)}"
+                ),
+            )
 
     @staticmethod
     def _validate_scale_static_quant(scale, offset):
-        torch._check(scale.dim() == 1,
-            lambda: f"the scale shape support only 1D in static quant mode.{ops_error(ErrCode.VALUE)}")
-        torch._check(scale.size(0) == 1,
-            lambda: f"the shape of scale should be 1.{ops_error(ErrCode.VALUE)}")
+        torch._check(
+            scale.dim() == 1,
+            lambda: (
+                f"the scale shape support only 1D in static quant mode.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
+        torch._check(
+            scale.size(0) == 1,
+            lambda: f"the shape of scale should be 1.{ops_error(ErrCode.VALUE)}",
+        )
         if offset is not None:
-            torch._check(offset.dim() == 1,
-                lambda: f"the offset shape support only 1D.{ops_error(ErrCode.VALUE)}")
-            torch._check(scale.size(0) == offset.size(0),
-                lambda: f"the 1st dim of offset and the 1st dim of scale "
-                        f"should be the same.{ops_error(ErrCode.VALUE)}")
+            torch._check(
+                offset.dim() == 1,
+                lambda: f"the offset shape support only 1D.{ops_error(ErrCode.VALUE)}",
+            )
+            torch._check(
+                scale.size(0) == offset.size(0),
+                lambda: (
+                    f"the 1st dim of offset and the 1st dim of scale "
+                    f"should be the same.{ops_error(ErrCode.VALUE)}"
+                ),
+            )
 
     @staticmethod
     def _validate_scale_dynamic_quant(x, scale, expert_range_length):
-        torch._check(scale.dim() == 2,
-            lambda: f"the scale shape support only 2D in dynamic quant mode.{ops_error(ErrCode.VALUE)}")
-        torch._check(scale.size(0) in [expert_range_length, 1],
-            lambda: f"the first dim of scale must be in "
-                    f"[expert_range_length, 1].{ops_error(ErrCode.VALUE)}")
-        torch._check(x.size(1) == scale.size(1),
-            lambda: f"the 2nd dim of scale should be the same "
-                    f"with the 2nd dim of x.{ops_error(ErrCode.VALUE)}")
+        torch._check(
+            scale.dim() == 2,
+            lambda: (
+                f"the scale shape support only 2D in dynamic quant mode.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
+        torch._check(
+            scale.size(0) in [expert_range_length, 1],
+            lambda: (
+                f"the first dim of scale must be in "
+                f"[expert_range_length, 1].{ops_error(ErrCode.VALUE)}"
+            ),
+        )
+        torch._check(
+            x.size(1) == scale.size(1),
+            lambda: (
+                f"the 2nd dim of scale should be the same "
+                f"with the 2nd dim of x.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
 
     @staticmethod
     def _validate_scale_int4_dynamic_quant(x, scale):
-        torch._check(scale.dim() == 2,
-            lambda: f"the scale shape support only 2D in "
-                    f"INT4 dynamic quant mode.{ops_error(ErrCode.VALUE)}")
-        torch._check(scale.size(0) == 1,
-            lambda: f"the first dim of scale must be 1 in "
-                    f"INT4 dynamic quant mode.{ops_error(ErrCode.VALUE)}")
-        torch._check(scale.dtype == torch.float32,
-            lambda: f"the scale dtype must be float32 in "
-                    f"INT4 dynamic quant mode.{ops_error(ErrCode.TYPE)}")
-        torch._check(x.size(1) == scale.size(1),
-            lambda: f"the 2nd dim of scale should be the same "
-                    f"with the 2nd dim of x.{ops_error(ErrCode.VALUE)}")
+        torch._check(
+            scale.dim() == 2,
+            lambda: (
+                f"the scale shape support only 2D in "
+                f"INT4 dynamic quant mode.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
+        torch._check(
+            scale.size(0) == 1,
+            lambda: (
+                f"the first dim of scale must be 1 in "
+                f"INT4 dynamic quant mode.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
+        torch._check(
+            scale.dtype == torch.float32,
+            lambda: (
+                f"the scale dtype must be float32 in "
+                f"INT4 dynamic quant mode.{ops_error(ErrCode.TYPE)}"
+            ),
+        )
+        torch._check(
+            x.size(1) == scale.size(1),
+            lambda: (
+                f"the 2nd dim of scale should be the same "
+                f"with the 2nd dim of x.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
 
     @staticmethod
     def _validate_scale_hif8_pertensor(scale):
-        torch._check(scale.dim() == 1,
-            lambda: f"the scale shape support only 1D in "
-                    f"HIF8 pertensor quant mode.{ops_error(ErrCode.VALUE)}")
+        torch._check(
+            scale.dim() == 1,
+            lambda: (
+                f"the scale shape support only 1D in "
+                f"HIF8 pertensor quant mode.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
 
     @staticmethod
     def _validate_int4_dynamic_quant(x, offset, drop_pad_mode, x_dtype):
-        torch._check(drop_pad_mode == 0,
-            lambda: f"INT4 dynamic quantization only supports drop_pad_mode=0.{ops_error(ErrCode.VALUE)}")
-        torch._check(x.dtype in [torch.float32, torch.bfloat16],
-            lambda: f"INT4 dynamic quantization only supports float32 or bfloat16 x.{ops_error(ErrCode.TYPE)}")
-        torch._check(offset is None,
-            lambda: f"INT4 dynamic quantization does not support offset.{ops_error(ErrCode.VALUE)}")
-        torch._check(x.size(1) % INT4_IN_UINT8 == 0,
-            lambda: f"INT4 dynamic quantization requires x.size(1) to be even.{ops_error(ErrCode.VALUE)}")
-        torch._check(x_dtype is None or x_dtype == torch_npu.int4,
-            lambda: f"x_dtype must be torch_npu.int4 or None when quant_mode=13.{ops_error(ErrCode.VALUE)}")
+        torch._check(
+            drop_pad_mode == 0,
+            lambda: (
+                f"INT4 dynamic quantization only supports drop_pad_mode=0.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
+        torch._check(
+            x.dtype in [torch.float32, torch.bfloat16],
+            lambda: (
+                f"INT4 dynamic quantization only supports float32 or bfloat16 x.{ops_error(ErrCode.TYPE)}"
+            ),
+        )
+        torch._check(
+            offset is None,
+            lambda: f"INT4 dynamic quantization does not support offset.{ops_error(ErrCode.VALUE)}",
+        )
+        torch._check(
+            x.size(1) % INT4_IN_UINT8 == 0,
+            lambda: (
+                f"INT4 dynamic quantization requires x.size(1) to be even.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
+        torch._check(
+            x_dtype is None or x_dtype == torch_npu.int4,
+            lambda: (
+                f"x_dtype must be torch_npu.int4 or None when quant_mode=13.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
 
     @staticmethod
     def _validate_topk_weight(topk_weight, x, expert_idx):
-        torch._check(topk_weight.dtype == torch.float32,
-            lambda: f"topk_weight only supports float32, but got {topk_weight.dtype}.{ops_error(ErrCode.TYPE)}")
-        torch._check(topk_weight.dim() == 2,
-            lambda: f"topk_weight must be 2D, but got {topk_weight.dim()}D.{ops_error(ErrCode.VALUE)}")
-        torch._check(topk_weight.size(0) == x.size(0),
-            lambda: f"topk_weight.size(0) must equal x.size(0).{ops_error(ErrCode.VALUE)}")
-        torch._check(topk_weight.size(1) == expert_idx.size(1),
-            lambda: f"topk_weight.size(1) must equal expert_idx.size(1).{ops_error(ErrCode.VALUE)}")
+        torch._check(
+            topk_weight.dtype == torch.float32,
+            lambda: (
+                f"topk_weight only supports float32, but got {topk_weight.dtype}.{ops_error(ErrCode.TYPE)}"
+            ),
+        )
+        torch._check(
+            topk_weight.dim() == 2,
+            lambda: (
+                f"topk_weight must be 2D, but got {topk_weight.dim()}D.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
+        torch._check(
+            topk_weight.size(0) == x.size(0),
+            lambda: f"topk_weight.size(0) must equal x.size(0).{ops_error(ErrCode.VALUE)}",
+        )
+        torch._check(
+            topk_weight.size(1) == expert_idx.size(1),
+            lambda: f"topk_weight.size(1) must equal expert_idx.size(1).{ops_error(ErrCode.VALUE)}",
+        )
 
     @staticmethod
     def _validate_active_expert_range(active_expert_range, expert_num):
         if active_expert_range is None:
             return expert_num
-        torch._check(isinstance(active_expert_range, list) and len(active_expert_range) == 2,
-            lambda: f"active_expert_range must be a list of 2 ints.{ops_error(ErrCode.VALUE)}")
-        torch._check(active_expert_range[1] > active_expert_range[0],
-            lambda: f"active_expert_range must be increasing.{ops_error(ErrCode.VALUE)}")
-        torch._check(active_expert_range[0] >= 0 and active_expert_range[1] <= 10240,
-            lambda: f"active_expert_range must be within [0, 10240].{ops_error(ErrCode.VALUE)}")
+        torch._check(
+            isinstance(active_expert_range, list) and len(active_expert_range) == 2,
+            lambda: f"active_expert_range must be a list of 2 ints.{ops_error(ErrCode.VALUE)}",
+        )
+        torch._check(
+            active_expert_range[1] > active_expert_range[0],
+            lambda: f"active_expert_range must be increasing.{ops_error(ErrCode.VALUE)}",
+        )
+        torch._check(
+            active_expert_range[0] >= 0 and active_expert_range[1] <= 10240,
+            lambda: f"active_expert_range must be within [0, 10240].{ops_error(ErrCode.VALUE)}",
+        )
         return active_expert_range[1] - active_expert_range[0]
 
     @staticmethod
-    def _validate_inputs(x, expert_idx, scale, offset, active_num,
-                         expert_num, expert_capacity, drop_pad_mode, expert_tokens_num_type,
-                         quant_mode, active_expert_range,
-                         row_idx_type, x_dtype, topk_weight):
-        torch._check(x.dim() == 2,
-            lambda: f"x must be 2D, but got {x.dim()}D.{ops_error(ErrCode.VALUE)}")
-        torch._check(expert_idx.dim() == 2,
-            lambda: f"expert_idx must be 2D, but got {expert_idx.dim()}D.{ops_error(ErrCode.VALUE)}")
-        torch._check(x.size(0) == expert_idx.size(0),
-            lambda: f"the first dim of expert_idx and x should be the same.{ops_error(ErrCode.VALUE)}")
-        torch._check(expert_num > 0,
-            lambda: f"expert_num must be greater than 0.{ops_error(ErrCode.VALUE)}")
+    def _validate_inputs(
+        x,
+        expert_idx,
+        scale,
+        offset,
+        active_num,
+        expert_num,
+        expert_capacity,
+        drop_pad_mode,
+        expert_tokens_num_type,
+        quant_mode,
+        active_expert_range,
+        row_idx_type,
+        x_dtype,
+        topk_weight,
+    ):
+        torch._check(
+            x.dim() == 2,
+            lambda: f"x must be 2D, but got {x.dim()}D.{ops_error(ErrCode.VALUE)}",
+        )
+        torch._check(
+            expert_idx.dim() == 2,
+            lambda: (
+                f"expert_idx must be 2D, but got {expert_idx.dim()}D.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
+        torch._check(
+            x.size(0) == expert_idx.size(0),
+            lambda: (
+                f"the first dim of expert_idx and x should be the same.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
+        torch._check(
+            expert_num > 0,
+            lambda: f"expert_num must be greater than 0.{ops_error(ErrCode.VALUE)}",
+        )
         expert_range_length = _MoeInitRoutingOpBuilder._validate_active_expert_range(
-            active_expert_range, expert_num)
-        torch._check(drop_pad_mode in [0, 1],
-            lambda: f"drop_pad_mode must be 0 or 1.{ops_error(ErrCode.VALUE)}")
+            active_expert_range, expert_num
+        )
+        torch._check(
+            drop_pad_mode in [0, 1],
+            lambda: f"drop_pad_mode must be 0 or 1.{ops_error(ErrCode.VALUE)}",
+        )
         if drop_pad_mode == 1:
-            torch._check(expert_capacity > 0,
-                lambda: f"expert_capacity must be greater than 0 when drop_pad_mode=1.{ops_error(ErrCode.VALUE)}")
-        torch._check(expert_tokens_num_type in [0, 1, 2],
-            lambda: f"expert_tokens_num_type must be 0, 1 or 2.{ops_error(ErrCode.VALUE)}")
-        torch._check(quant_mode in [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17],
-            lambda: f"quant_mode must be in [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, "
-                    f"14, 15, 16, 17].{ops_error(ErrCode.VALUE)}")
-        torch._check(row_idx_type in [0, 1],
-            lambda: f"row_idx_type must be 0 or 1.{ops_error(ErrCode.VALUE)}")
-        is_float4_case = (hasattr(torch, 'float4_e2m1fn_x2') and x.dtype == torch.float4_e2m1fn_x2) \
-                         or x_dtype == torch_npu.float4_e2m1fn_x2
-        is_fp8_or_fp4_dtype = x.dtype == torch.float8_e5m2 or x.dtype == torch.float8_e4m3fn or is_float4_case
+            torch._check(
+                expert_capacity > 0,
+                lambda: (
+                    f"expert_capacity must be greater than 0 when drop_pad_mode=1.{ops_error(ErrCode.VALUE)}"
+                ),
+            )
+        torch._check(
+            expert_tokens_num_type in [0, 1, 2],
+            lambda: f"expert_tokens_num_type must be 0, 1 or 2.{ops_error(ErrCode.VALUE)}",
+        )
+        torch._check(
+            quant_mode
+            in [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17],
+            lambda: (
+                f"quant_mode must be in [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, "
+                f"14, 15, 16, 17].{ops_error(ErrCode.VALUE)}"
+            ),
+        )
+        torch._check(
+            row_idx_type in [0, 1],
+            lambda: f"row_idx_type must be 0 or 1.{ops_error(ErrCode.VALUE)}",
+        )
+        is_float4_case = (
+            hasattr(torch, "float4_e2m1fn_x2") and x.dtype == torch.float4_e2m1fn_x2
+        ) or x_dtype == torch_npu.float4_e2m1fn_x2
+        is_fp8_or_fp4_dtype = (
+            x.dtype == torch.float8_e5m2
+            or x.dtype == torch.float8_e4m3fn
+            or is_float4_case
+        )
         is_dynamic_int4_output = quant_mode == 13
-        torch._check(not (quant_mode == 1 and x_dtype == torch_npu.int4),
-            lambda: f"INT4 dynamic quantization uses quant_mode=13. "
-                    f"quant_mode=1 only supports INT8 dynamic quantization.{ops_error(ErrCode.VALUE)}")
+        torch._check(
+            not (quant_mode == 1 and x_dtype == torch_npu.int4),
+            lambda: (
+                f"INT4 dynamic quantization uses quant_mode=13. "
+                f"quant_mode=1 only supports INT8 dynamic quantization.{ops_error(ErrCode.VALUE)}"
+            ),
+        )
         if is_dynamic_int4_output:
-            _MoeInitRoutingOpBuilder._validate_int4_dynamic_quant(x, offset, drop_pad_mode, x_dtype)
+            _MoeInitRoutingOpBuilder._validate_int4_dynamic_quant(
+                x, offset, drop_pad_mode, x_dtype
+            )
         if scale is not None:
             _MoeInitRoutingOpBuilder._validate_scale_params(
-                x, scale, offset, quant_mode, expert_range_length,
-                is_fp8_or_fp4_dtype, is_float4_case)
+                x,
+                scale,
+                offset,
+                quant_mode,
+                expert_range_length,
+                is_fp8_or_fp4_dtype,
+                is_float4_case,
+            )
         if topk_weight is not None:
             _MoeInitRoutingOpBuilder._validate_topk_weight(topk_weight, x, expert_idx)
-        return is_float4_case, is_fp8_or_fp4_dtype, is_dynamic_int4_output, expert_range_length
+        return (
+            is_float4_case,
+            is_fp8_or_fp4_dtype,
+            is_dynamic_int4_output,
+            expert_range_length,
+        )
 
     @staticmethod
-    def _validate_scale_params(x, scale, offset, quant_mode, expert_range_length,
-                               is_fp8_or_fp4_dtype, is_float4_case):
+    def _validate_scale_params(
+        x,
+        scale,
+        offset,
+        quant_mode,
+        expert_range_length,
+        is_fp8_or_fp4_dtype,
+        is_float4_case,
+    ):
         if quant_mode == -1:
-            _MoeInitRoutingOpBuilder._validate_scale_no_quant(x, scale, is_fp8_or_fp4_dtype, is_float4_case)
+            _MoeInitRoutingOpBuilder._validate_scale_no_quant(
+                x, scale, is_fp8_or_fp4_dtype, is_float4_case
+            )
         elif quant_mode == 0:
             _MoeInitRoutingOpBuilder._validate_scale_static_quant(scale, offset)
         elif quant_mode == 1:
-            _MoeInitRoutingOpBuilder._validate_scale_dynamic_quant(x, scale, expert_range_length)
+            _MoeInitRoutingOpBuilder._validate_scale_dynamic_quant(
+                x, scale, expert_range_length
+            )
         elif quant_mode == 13:
             _MoeInitRoutingOpBuilder._validate_scale_int4_dynamic_quant(x, scale)
         if quant_mode == 7:
             _MoeInitRoutingOpBuilder._validate_scale_hif8_pertensor(scale)
 
     @staticmethod
-    def _compute_output_dtypes(x, x_dtype, quant_mode, is_fp8_or_fp4_dtype,
-                               is_dynamic_int4_output):
+    def _compute_output_dtypes(
+        x, x_dtype, quant_mode, is_fp8_or_fp4_dtype, is_dynamic_int4_output
+    ):
         expanded_x_dtype = x.dtype
         expanded_scale_dtype = torch.float32
         if x_dtype == torch_npu.hifloat8:
@@ -226,9 +407,20 @@ class _MoeInitRoutingOpBuilder(OpBuilder):
         return expanded_x_dtype, expanded_scale_dtype
 
     @staticmethod
-    def _compute_output_dims(x, h, bs, k, expert_num, expert_capacity, active_num,
-                             drop_pad_mode, quant_mode, is_fp8_or_fp4_dtype,
-                             is_dynamic_int4_output, scale):
+    def _compute_output_dims(
+        x,
+        h,
+        bs,
+        k,
+        expert_num,
+        expert_capacity,
+        active_num,
+        drop_pad_mode,
+        quant_mode,
+        is_fp8_or_fp4_dtype,
+        is_dynamic_int4_output,
+        scale,
+    ):
         expanded_x_dim_list = []
         expanded_scale_dim_list = []
 
@@ -240,7 +432,11 @@ class _MoeInitRoutingOpBuilder(OpBuilder):
             expanded_x_dim_list = [num_expanded_rows, x.size(1)]
             if quant_mode in [2, 3, 16, 17]:
                 scale_cols = (h + MXQUANT_BLOCK_SIZE - 1) // MXQUANT_BLOCK_SIZE
-                scale_cols = (scale_cols + PAD_TO_EVEN_FACTOR - 1) // PAD_TO_EVEN_FACTOR * PAD_TO_EVEN_FACTOR
+                scale_cols = (
+                    (scale_cols + PAD_TO_EVEN_FACTOR - 1)
+                    // PAD_TO_EVEN_FACTOR
+                    * PAD_TO_EVEN_FACTOR
+                )
                 expanded_scale_dim_list = [num_expanded_rows, scale_cols]
             elif quant_mode == -1 and is_fp8_or_fp4_dtype and scale is not None:
                 scale_cols = (h + ALIGN_BASE - 1) // ALIGN_BASE
@@ -257,9 +453,16 @@ class _MoeInitRoutingOpBuilder(OpBuilder):
             elif quant_mode in [11, 12]:
                 block_size = FP8_QUANT_BLOCK_SIZE * PAD_TO_EVEN_FACTOR
                 scale_cols = math.ceil(h / block_size)
-                expanded_scale_dim_list = [num_expanded_rows, scale_cols, PAD_TO_EVEN_FACTOR]
+                expanded_scale_dim_list = [
+                    num_expanded_rows,
+                    scale_cols,
+                    PAD_TO_EVEN_FACTOR,
+                ]
             elif quant_mode in [4, 5, 14, 15]:
-                expanded_scale_dim_list = [num_expanded_rows, math.ceil(h / FP8_QUANT_BLOCK_SIZE)]
+                expanded_scale_dim_list = [
+                    num_expanded_rows,
+                    math.ceil(h / FP8_QUANT_BLOCK_SIZE),
+                ]
 
         if quant_mode in [0, 6, 7]:
             expanded_scale_dim_list = []
@@ -267,42 +470,87 @@ class _MoeInitRoutingOpBuilder(OpBuilder):
         return expanded_x_dim_list, expanded_scale_dim_list
 
     def sources(self):
-        return ['ops/csrc/moe_init_routing.cpp']
+        return ["ops/csrc/moe_init_routing.cpp"]
 
     def schema(self) -> str:
-        return "moe_init_routing(Tensor x, Tensor expert_idx, " \
-            "*, Tensor? scale=None, Tensor? offset=None, Tensor? topk_weight=None, " \
-            "SymInt active_num=-1, int expert_capacity=-1, int expert_num=-1, " \
-            "int drop_pad_mode=0, int expert_tokens_num_type=0, bool expert_tokens_num_flag=False, " \
-            "int quant_mode=-1, int[]? active_expert_range=None, int row_idx_type=0, " \
-            "int? x_dtype=None) " \
+        return (
+            "moe_init_routing(Tensor x, Tensor expert_idx, "
+            "*, Tensor? scale=None, Tensor? offset=None, Tensor? topk_weight=None, "
+            "SymInt active_num=-1, int expert_capacity=-1, int expert_num=-1, "
+            "int drop_pad_mode=0, int expert_tokens_num_type=0, bool expert_tokens_num_flag=False, "
+            "int quant_mode=-1, int[]? active_expert_range=None, int row_idx_type=0, "
+            "int? x_dtype=None) "
             "-> (Tensor, Tensor, Tensor, Tensor, Tensor)"
+        )
 
     def register_meta(self):
         @impl(AS_LIBRARY, self.name, "Meta")
-        def moe_init_routing_meta(x, expert_idx, scale=None, offset=None, topk_weight=None,
-                                  active_num=-1, expert_capacity=-1, expert_num=-1,
-                                  drop_pad_mode=0, expert_tokens_num_type=0, expert_tokens_num_flag=False,
-                                  quant_mode=-1, active_expert_range=None, row_idx_type=0, x_dtype=None):
-            is_float4_case, is_fp8_or_fp4_dtype, is_dynamic_int4_output, expert_range_length = \
-                _MoeInitRoutingOpBuilder._validate_inputs(
-                    x, expert_idx, scale, offset, active_num,
-                    expert_num, expert_capacity, drop_pad_mode, expert_tokens_num_type,
-                    quant_mode, active_expert_range,
-                    row_idx_type, x_dtype, topk_weight)
+        def moe_init_routing_meta(
+            x,
+            expert_idx,
+            scale=None,
+            offset=None,
+            topk_weight=None,
+            active_num=-1,
+            expert_capacity=-1,
+            expert_num=-1,
+            drop_pad_mode=0,
+            expert_tokens_num_type=0,
+            expert_tokens_num_flag=False,
+            quant_mode=-1,
+            active_expert_range=None,
+            row_idx_type=0,
+            x_dtype=None,
+        ):
+            (
+                is_float4_case,
+                is_fp8_or_fp4_dtype,
+                is_dynamic_int4_output,
+                expert_range_length,
+            ) = _MoeInitRoutingOpBuilder._validate_inputs(
+                x,
+                expert_idx,
+                scale,
+                offset,
+                active_num,
+                expert_num,
+                expert_capacity,
+                drop_pad_mode,
+                expert_tokens_num_type,
+                quant_mode,
+                active_expert_range,
+                row_idx_type,
+                x_dtype,
+                topk_weight,
+            )
             bs = x.size(0)
             h = x.size(1)
             if is_float4_case:
                 h = x.size(1) * 2
             k = expert_idx.size(1)
 
-            expanded_x_dtype, expanded_scale_dtype = _MoeInitRoutingOpBuilder._compute_output_dtypes(
-                x, x_dtype, quant_mode, is_fp8_or_fp4_dtype, is_dynamic_int4_output)
+            expanded_x_dtype, expanded_scale_dtype = (
+                _MoeInitRoutingOpBuilder._compute_output_dtypes(
+                    x, x_dtype, quant_mode, is_fp8_or_fp4_dtype, is_dynamic_int4_output
+                )
+            )
 
-            expanded_x_dim_list, expanded_scale_dim_list = _MoeInitRoutingOpBuilder._compute_output_dims(
-                x, h, bs, k, expert_num, expert_capacity, active_num,
-                drop_pad_mode, quant_mode, is_fp8_or_fp4_dtype,
-                is_dynamic_int4_output, scale)
+            expanded_x_dim_list, expanded_scale_dim_list = (
+                _MoeInitRoutingOpBuilder._compute_output_dims(
+                    x,
+                    h,
+                    bs,
+                    k,
+                    expert_num,
+                    expert_capacity,
+                    active_num,
+                    drop_pad_mode,
+                    quant_mode,
+                    is_fp8_or_fp4_dtype,
+                    is_dynamic_int4_output,
+                    scale,
+                )
+            )
 
             expanded_row_idx_dim_list = [bs * k]
 
@@ -318,42 +566,81 @@ class _MoeInitRoutingOpBuilder(OpBuilder):
                     topk_weight_rows = expert_num * expert_capacity
                 else:
                     topk_weight_rows = bs * k
-                expanded_topk_weight = x.new_empty((topk_weight_rows, 1), dtype=torch.float32)
+                expanded_topk_weight = x.new_empty(
+                    (topk_weight_rows, 1), dtype=torch.float32
+                )
             else:
                 expanded_topk_weight = x.new_empty((0,), dtype=torch.float32)
 
-            return (x.new_empty(tuple(expanded_x_dim_list), dtype=expanded_x_dtype),
-                    x.new_empty(tuple(expanded_row_idx_dim_list), dtype=torch.int32),
-                    x.new_empty(tuple(expert_token_cumsum_or_count_dim_list), dtype=torch.int64),
-                    x.new_empty(tuple(expanded_scale_dim_list), dtype=expanded_scale_dtype),
-                    expanded_topk_weight)
+            return (
+                x.new_empty(tuple(expanded_x_dim_list), dtype=expanded_x_dtype),
+                x.new_empty(tuple(expanded_row_idx_dim_list), dtype=torch.int32),
+                x.new_empty(
+                    tuple(expert_token_cumsum_or_count_dim_list), dtype=torch.int64
+                ),
+                x.new_empty(tuple(expanded_scale_dim_list), dtype=expanded_scale_dtype),
+                expanded_topk_weight,
+            )
 
 
 _moe_init_routing_op_builder = _MoeInitRoutingOpBuilder()
-_op_module = _moe_init_routing_op_builder.load()
 
 
 @impl(AS_LIBRARY, _moe_init_routing_op_builder.name, "PrivateUse1")
-def _moe_init_routing(x, expert_idx, scale=None, offset=None, topk_weight=None,
-                      active_num=-1, expert_capacity=-1, expert_num=-1,
-                      drop_pad_mode=0, expert_tokens_num_type=0, expert_tokens_num_flag=False,
-                      quant_mode=-1, active_expert_range=None, row_idx_type=0, x_dtype=None):
-    return _op_module.moe_init_routing(x, expert_idx, scale, offset, topk_weight,
-                                       active_num, expert_capacity, expert_num, drop_pad_mode,
-                                       expert_tokens_num_type, expert_tokens_num_flag, quant_mode,
-                                       active_expert_range, row_idx_type, x_dtype)
+def _moe_init_routing(
+    x,
+    expert_idx,
+    scale=None,
+    offset=None,
+    topk_weight=None,
+    active_num=-1,
+    expert_capacity=-1,
+    expert_num=-1,
+    drop_pad_mode=0,
+    expert_tokens_num_type=0,
+    expert_tokens_num_flag=False,
+    quant_mode=-1,
+    active_expert_range=None,
+    row_idx_type=0,
+    x_dtype=None,
+):
+    _op_module = _moe_init_routing_op_builder.load()
+    return _op_module.moe_init_routing(
+        x,
+        expert_idx,
+        scale,
+        offset,
+        topk_weight,
+        active_num,
+        expert_capacity,
+        expert_num,
+        drop_pad_mode,
+        expert_tokens_num_type,
+        expert_tokens_num_flag,
+        quant_mode,
+        active_expert_range,
+        row_idx_type,
+        x_dtype,
+    )
 
 
-def moe_init_routing(x: torch.Tensor, expert_idx: torch.Tensor,
-                     scale: Optional[torch.Tensor] = None, offset: Optional[torch.Tensor] = None,
-                     topk_weight: Optional[torch.Tensor] = None,
-                     active_num: Union[int, torch.SymInt] = -1,
-                     expert_capacity: int = -1, expert_num: int = -1,
-                     drop_pad_mode: int = 0, expert_tokens_num_type: int = 0,
-                     expert_tokens_num_flag: bool = False, quant_mode: int = -1,
-                     active_expert_range: Optional[List[int]] = None, row_idx_type: int = 0,
-                     x_dtype: Optional[int] = None
-                     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+def moe_init_routing(
+    x: torch.Tensor,
+    expert_idx: torch.Tensor,
+    scale: Optional[torch.Tensor] = None,
+    offset: Optional[torch.Tensor] = None,
+    topk_weight: Optional[torch.Tensor] = None,
+    active_num: Union[int, torch.SymInt] = -1,
+    expert_capacity: int = -1,
+    expert_num: int = -1,
+    drop_pad_mode: int = 0,
+    expert_tokens_num_type: int = 0,
+    expert_tokens_num_flag: bool = False,
+    quant_mode: int = -1,
+    active_expert_range: Optional[List[int]] = None,
+    row_idx_type: int = 0,
+    x_dtype: Optional[int] = None,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """moe_init_routing operator.
 
     Performs MoE (Mixture of Experts) init routing, expanding tokens to their
@@ -416,9 +703,19 @@ def moe_init_routing(x: torch.Tensor, expert_idx: torch.Tensor,
                 - topk_weight not provided: shape (0,), dtype float32.
     """
     return torch.ops.cann_ops_transformer.moe_init_routing(
-        x, expert_idx, scale=scale, offset=offset, topk_weight=topk_weight,
-        active_num=active_num, expert_capacity=expert_capacity, expert_num=expert_num,
-        drop_pad_mode=drop_pad_mode, expert_tokens_num_type=expert_tokens_num_type,
-        expert_tokens_num_flag=expert_tokens_num_flag, quant_mode=quant_mode,
-        active_expert_range=active_expert_range, row_idx_type=row_idx_type,
-        x_dtype=x_dtype)
+        x,
+        expert_idx,
+        scale=scale,
+        offset=offset,
+        topk_weight=topk_weight,
+        active_num=active_num,
+        expert_capacity=expert_capacity,
+        expert_num=expert_num,
+        drop_pad_mode=drop_pad_mode,
+        expert_tokens_num_type=expert_tokens_num_type,
+        expert_tokens_num_flag=expert_tokens_num_flag,
+        quant_mode=quant_mode,
+        active_expert_range=active_expert_range,
+        row_idx_type=row_idx_type,
+        x_dtype=x_dtype,
+    )
