@@ -19,7 +19,8 @@
  *         计算与写出逐 token，计算中间量走 vreg 不落 UB。
  *         cat_indices / slot_mapping / positions 在 GM 上连续，按 IDX_WINDOW_TOKENS
  *         大小的滑窗跨 tile 批量搬进 idxBuf_，标量读全部落在 UB 上，不逐 token 打 GM。
- *   流水：CopyIn 提前一个 tile 发出，tile i+1 的 MTE2 与 tile i 的 VF 重叠。
+ *   流水：三段式软件流水，见 Process。Compute 发完 VF 就走，CopyIn 预取下一 tile 与之重叠，
+ *         CopyOut 写的是上一拍已算完的 tile，DeQue 不会阻塞在刚发出的 VF 上。
  *
  * 每个 out_t 的计算流程：
  *   1) src_t = cat_indices[out_t]；isUnd = (src_t < undLen)
@@ -47,7 +48,8 @@ using namespace AscendC;
 
 constexpr static int64_t MROPE_AXIS_NUM = 3;
 constexpr static int64_t DIGIT_TWO = 2;
-constexpr static int64_t WEIGHT_NUM = 4;          // und_q / und_k / gen_q / gen_k
+constexpr static int64_t DIGIT_THREE = 3;
+constexpr static int64_t WEIGHT_NUM = 4; // und_q / und_k / gen_q / gen_k
 constexpr static int64_t BLOCK_ALIGN_BYTES = 32;
 constexpr static int64_t BUFFER_NUM_DB = 2;
 constexpr static int64_t BUFFER_NUM_SINGLE = 1;
@@ -75,17 +77,17 @@ constexpr static event_t EVT_S_TO_MTE2_WINDOW_REUSE = EVENT_ID2;
 // 预取才立得住。窗口至少要能同时装下"在算的"和"在预取的"两个 tile。
 constexpr static int64_t IDX_REGION_NUM = 5;
 constexpr static int64_t IDX_WINDOW_TOKENS = 256;
-constexpr static int64_t IDX_REGION_CAT = 0;   // cat_indices[winBegin .. +winLen)
-constexpr static int64_t IDX_REGION_SLOT = 1;  // slot_mapping[winBegin .. +winLen)
-constexpr static int64_t IDX_REGION_POS = 2;   // positions[axis, winBegin .. +winLen)，占 3 个区
+constexpr static int64_t IDX_REGION_CAT = 0;  // cat_indices[winBegin .. +winLen)
+constexpr static int64_t IDX_REGION_SLOT = 1; // slot_mapping[winBegin .. +winLen)
+constexpr static int64_t IDX_REGION_POS = 2;  // positions[axis, winBegin .. +winLen)，占 3 个区
 constexpr static int64_t UND_MASK_BITS = static_cast<int64_t>(sizeof(uint64_t) * 8);
 static_assert(IDX_REGION_POS + MROPE_AXIS_NUM == IDX_REGION_NUM, "index regions must be contiguous and exhaustive");
 static_assert(IDX_WINDOW_TOKENS * static_cast<int64_t>(sizeof(int64_t)) % BLOCK_ALIGN_BYTES == 0,
               "index region stride must be 32B-aligned for DataCopyPad");
-// ubFactor 上限是 undMask_ 的位宽（host 的 MAX_UB_FACTOR），窗口要同时容纳当前 tile 与
-// 预取中的下一 tile，否则 CopyOut 读 slot 时窗口可能已被下一 tile 的换窗覆盖
-static_assert(IDX_WINDOW_TOKENS >= DIGIT_TWO * UND_MASK_BITS,
-              "index window must hold both the in-flight tile and the prefetched one");
+// ubFactor 上限是 undMask_ 的位宽（host 的 MAX_UB_FACTOR）。窗口要同时容纳
+// pend / 在算 / 预取三个 tile，否则 CopyOut 读 pend 的 slot 时可能已被换窗覆盖
+static_assert(IDX_WINDOW_TOKENS >= DIGIT_THREE * UND_MASK_BITS,
+              "index window must hold the pending, in-flight and prefetched tiles");
 
 /**
  * @brief UndGenQkvRmsNormRopeCache regbase 模板
@@ -95,8 +97,9 @@ static_assert(IDX_WINDOW_TOKENS >= DIGIT_TWO * UND_MASK_BITS,
 template <typename T_QKV, typename T_CACHE>
 class UndGenQkvRmsNormRopeCacheRegbase {
 public:
-    __aicore__ inline UndGenQkvRmsNormRopeCacheRegbase(TPipe* pipe, const UndGenQkvRmsNormRopeCacheTilingData* tiling)
-        : pipe_(pipe), tiling_(tiling)
+    __aicore__ inline UndGenQkvRmsNormRopeCacheRegbase(TPipe *pipe, const UndGenQkvRmsNormRopeCacheTilingData *tiling)
+        : pipe_(pipe),
+          tiling_(tiling)
     {}
 
     __aicore__ inline void Init(GM_ADDR undQkv, GM_ADDR undWeightsQ, GM_ADDR undWeightsK, GM_ADDR cosSinCache,
@@ -112,47 +115,58 @@ public:
 
     __aicore__ inline void Process()
     {
-        // 权重每核只搬一次，常驻到整个 tile 循环结束。走 VECIN 队列而不是裸 TBuf，
-        // 是为了拿到 EnQue/DeQue 提供的 MTE2->V 同步，保证搬运落地后计算才读
+        // 没分到 token 的核直接退出
+        if (coreStart_ >= coreEnd_) {
+            return;
+        }
+
+        // 权重每核只搬一次，常驻到整个 tile 循环结束
         PrepareWeights();
         // axisLut 与 token 无关，每核只建一次
         BuildMropeGatherIndex();
 
-        // 两段式流水：每轮先把下一 tile 的搬运发出去，再算当前 tile，
-        // 于是 tile i+1 的 MTE2 与 tile i 的 VF 在硬件上重叠。qkvInQue_/cosSinInQue_ 的
-        // depth 必须是 2——稳态下 tile i 与 tile i+1 会同时处于"已 EnQue 未 DeQue"。
-        // 索引不参与这个乒乓：它走跨 tile 的滑窗，见 EnsureIndexWindow。
-        if (coreStart_ >= coreEnd_) {
-            wInQue_.FreeTensor(wBf16Local_);
-            return;
-        }
+        // 三段式软件流水，稳态下每轮同时经手三个 tile。行序即循环体内的执行顺序
+        //
+        //   轮次       序幕   i=0    i=1    i=2    收尾
+        //   Compute    --     T0     T1     T2     --     发 VF，发完就走，VF 自己跑
+        //   CopyIn     T0     T1     T2     --     --     预取下一个，被 MTE2 队列反压时与 VF 并行
+        //   CopyOut    --     --     T0     T1     T2     写上一拍的，其 VF 早已完成，DeQue 不阻塞
+        //
+        Tile cur;
+        cur.start = coreStart_;
+        cur.num = TileTokenNum(coreStart_);
+        Tile pend; // 已算完、待写出的那个 tile；pend.Valid() 为假表示还没有
 
-        int64_t slot = 0;
-        int64_t tileStart = coreStart_;
-        int64_t tokenNum = TileTokenNum(tileStart);
-        EnsureIndexWindow(tileStart, tileStart + tokenNum);
-        CopyIn(tileStart, tokenNum, slot);
+        EnsureIndexWindow(cur.start, cur.start + cur.num);
+        CopyIn(cur);
 
-        while (tileStart < coreEnd_) {
-            const int64_t nextStart = tileStart + tokenNum;
-            const int64_t nextTokenNum = (nextStart < coreEnd_) ? TileTokenNum(nextStart) : 0;
-            if (nextTokenNum > 0) {
-                // anchor 用 tileStart 而不是 nextStart：本 tile 的 slot 要到下面 CopyOut
-                // 才读，换窗时必须把它一起留在窗口里
-                EnsureIndexWindow(tileStart, nextStart + nextTokenNum);
-                CopyIn(nextStart, nextTokenNum, slot ^ 1);
+        while (cur.Valid()) {
+            const Tile next = NextTile(cur);
+            Compute(cur);
+            if (next.Valid()) {
+                // anchor 取最早一个还要读索引的 tile：CopyOut 还要读 pend 的 slot_mapping
+                EnsureIndexWindow(pend.Valid() ? pend.start : cur.start, next.start + next.num);
+                CopyIn(next);
             }
-            Compute(tokenNum, slot);
-            CopyOut(tileStart, tokenNum);
-            tileStart = nextStart;
-            tokenNum = nextTokenNum;
-            slot ^= 1;
+            if (pend.Valid()) {
+                CopyOut(pend);
+            }
+            pend = cur;
+            cur = next;
+        }
+        // 收尾：最后一个 tile 的结果还挂在 outQue_ 上
+        if (pend.Valid()) {
+            CopyOut(pend);
         }
 
         wInQue_.FreeTensor(wBf16Local_);
     }
 
 private:
+    /*
+    把 tilingData 里的标量取到成员变量，并预算出 halfDim_ / reciprocal_ 等派生量，
+    同时填好 vfShape_ —— 它与 tile 无关，Compute 每轮直接复用
+    */
     __aicore__ inline void ParseTiling()
     {
         totalTokens_ = tiling_->totalTokens;
@@ -181,8 +195,8 @@ private:
 
         headNumQK_ = numHeadQ_ + numHeadK_; // V 不参与 RMSNorm/RoPE
         halfDim_ = headDim_ / DIGIT_TWO;
-        rowElems_ = numHead_ * headDim_;    // 单 token 的 QKV 元素数
-        maxSlot_ = blockNum_ * blockSize_;  // slot_mapping 的合法上界（不含）
+        rowElems_ = numHead_ * headDim_;   // 单 token 的 QKV 元素数
+        maxSlot_ = blockNum_ * blockSize_; // slot_mapping 的合法上界（不含）
 
         // VF 的 shape 参数全部由 shape/attr 决定，与 tile 无关，这里填一次给 Compute 复用
         vfShape_.qHeadNum = static_cast<uint16_t>(numHeadQ_);
@@ -199,28 +213,32 @@ private:
         vfShape_.reciprocal = reciprocal_;
     }
 
+    /*
+    把 13 个 GM 地址绑定到 GlobalTensor 成员，参数与 aclnn 接口同名同序
+    k_cache / v_cache 是原地更新的入参，绑定后由 CopyOut 按 slot_mapping 散写
+    */
     __aicore__ inline void BindGlobalTensors(GM_ADDR undQkv, GM_ADDR undWeightsQ, GM_ADDR undWeightsK,
                                              GM_ADDR cosSinCache, GM_ADDR kCache, GM_ADDR vCache, GM_ADDR slotMapping,
                                              GM_ADDR positions, GM_ADDR genQkv, GM_ADDR genWeightsQ,
                                              GM_ADDR genWeightsK, GM_ADDR catIndices, GM_ADDR q)
     {
-        undQkvGm_.SetGlobalBuffer((__gm__ T_QKV*)undQkv);
-        undWeightsQGm_.SetGlobalBuffer((__gm__ T_QKV*)undWeightsQ);
-        undWeightsKGm_.SetGlobalBuffer((__gm__ T_QKV*)undWeightsK);
-        cosSinCacheGm_.SetGlobalBuffer((__gm__ float*)cosSinCache);
-        kCacheGm_.SetGlobalBuffer((__gm__ T_CACHE*)kCache);
-        vCacheGm_.SetGlobalBuffer((__gm__ T_CACHE*)vCache);
-        slotMappingGm_.SetGlobalBuffer((__gm__ int64_t*)slotMapping);
-        positionsGm_.SetGlobalBuffer((__gm__ int64_t*)positions);
+        undQkvGm_.SetGlobalBuffer((__gm__ T_QKV *)undQkv);
+        undWeightsQGm_.SetGlobalBuffer((__gm__ T_QKV *)undWeightsQ);
+        undWeightsKGm_.SetGlobalBuffer((__gm__ T_QKV *)undWeightsK);
+        cosSinCacheGm_.SetGlobalBuffer((__gm__ float *)cosSinCache);
+        kCacheGm_.SetGlobalBuffer((__gm__ T_CACHE *)kCache);
+        vCacheGm_.SetGlobalBuffer((__gm__ T_CACHE *)vCache);
+        slotMappingGm_.SetGlobalBuffer((__gm__ int64_t *)slotMapping);
+        positionsGm_.SetGlobalBuffer((__gm__ int64_t *)positions);
         if (hasGen_) {
-            genQkvGm_.SetGlobalBuffer((__gm__ T_QKV*)genQkv);
-            genWeightsQGm_.SetGlobalBuffer((__gm__ T_QKV*)genWeightsQ);
-            genWeightsKGm_.SetGlobalBuffer((__gm__ T_QKV*)genWeightsK);
+            genQkvGm_.SetGlobalBuffer((__gm__ T_QKV *)genQkv);
+            genWeightsQGm_.SetGlobalBuffer((__gm__ T_QKV *)genWeightsQ);
+            genWeightsKGm_.SetGlobalBuffer((__gm__ T_QKV *)genWeightsK);
         }
         if (hasCatIndices_) {
-            catIndicesGm_.SetGlobalBuffer((__gm__ int64_t*)catIndices);
+            catIndicesGm_.SetGlobalBuffer((__gm__ int64_t *)catIndices);
         }
-        qGm_.SetGlobalBuffer((__gm__ T_QKV*)q);
+        qGm_.SetGlobalBuffer((__gm__ T_QKV *)q);
     }
 
     // 多核切分：前 formerCoreNum 个核多处理 1 个 token，与 host CalBlockTiling 一致
@@ -305,28 +323,75 @@ private:
         WaitFlag<HardEvent::S_V>(EVT_S_TO_V_INDEX_READY);
     }
 
-    // 本 tile 的 token 数：尾块不足 ubFactor 时按实际数量
+    /*
+    一个 tile 的身份，Process 的三段流水按它传递
+    start：本 tile 第一个 token 在本核区间内的绝对下标（out_t 口径）
+    num：本 tile 的 token 数，num == 0 表示该 tile 不存在
+    maskSlot：本 tile 的 und/gen 位图存放在 undMask_ 的哪一份，取值 0/1
+    */
+    struct Tile {
+        int64_t start = 0;
+        int64_t num = 0;
+        int64_t maskSlot = 0;
+        __aicore__ inline bool Valid() const { return num > 0; }
+    };
+
+    /*
+    算一个 tile 能放多少 token
+    tileStart：该 tile 的起始 out_t
+    返回 min(ubFactor_, coreEnd_ - tileStart)，即满 tile 取 ubFactor、核尾取剩余
+    */
     __aicore__ inline int64_t TileTokenNum(int64_t tileStart)
     {
         const int64_t rest = coreEnd_ - tileStart;
         return rest > ubFactor_ ? ubFactor_ : rest;
     }
 
-    // 窗口内第 region 个区里、第 outT 个 token 的元素下标
+    /*
+    推进一拍，maskSlot 一并翻转，调用方不必关心乒乓
+    cur：当前 tile
+    返回紧接其后的 tile；已越过 coreEnd_ 时返回 num = 0 的 Tile 表示没有下一个
+    */
+    __aicore__ inline Tile NextTile(const Tile &cur)
+    {
+        Tile t;
+        t.start = cur.start + cur.num;
+        t.num = (t.start < coreEnd_) ? TileTokenNum(t.start) : 0;
+        t.maskSlot = cur.maskSlot ^ 1;
+        return t;
+    }
+
+    /*
+    算索引滑窗内某个元素的 UB 下标
+    region：区号，取 IDX_REGION_CAT / IDX_REGION_SLOT / IDX_REGION_POS+axis
+    outT：输出 token 的绝对下标，必须落在当前窗口 [winBegin_, winEnd_) 内
+    返回 idxLocal_ 上的元素下标，调用方直接拿去 GetValue
+    */
     __aicore__ inline int64_t IdxAt(int64_t region, int64_t outT)
     {
         return region * IDX_WINDOW_TOKENS + (outT - winBegin_);
     }
 
-    __aicore__ inline void CopyIndexToUb(const LocalTensor<int64_t>& dst, const GlobalTensor<int64_t>& src,
-                                         int64_t num)
+    /*
+    gm->ub 拷入一段 int64 索引
+    dst：目标 UB 位置，须落在 idxBuf_ 的某个区起址上（区跨度已保证 32B 对齐）
+    src：源 GM 位置，调用方自行偏移到起始 token
+    num：拷贝的元素个数
+    走 DataCopyPad，不足 32B 的尾部由硬件补齐，不需要调用方对齐 num
+    */
+    __aicore__ inline void CopyIndexToUb(const LocalTensor<int64_t> &dst, const GlobalTensor<int64_t> &src, int64_t num)
     {
         DataCopyExtParams params{1, static_cast<uint32_t>(num * sizeof(int64_t)), 0, 0, 0};
         DataCopyPadExtParams<int64_t> padParams{false, 0, 0, 0};
         DataCopyPad(dst, src, params, padParams);
     }
 
-    // 把 [begin, begin+len) 这段 token 的 5 组索引搬进窗口。len 已由调用方夹在窗口容量内。
+    /*
+    换窗：把 [begin, begin+len) 这段 token 的 5 组索引搬进 idxBuf_
+    begin：新窗口的起始 out_t
+    len：窗口内的 token 数，调用方须保证不超过 IDX_WINDOW_TOKENS
+    返回时 winBegin_/winEnd_ 已更新，且索引已落地可被标量读
+    */
     __aicore__ inline void LoadIndexWindow(int64_t begin, int64_t len)
     {
         // 旧窗口的内容还可能刚被标量读过，覆盖前先等标量走到这里
@@ -350,9 +415,13 @@ private:
         WaitFlag<HardEvent::MTE2_S>(EVT_MTE2_TO_S_INDEX_READY);
     }
 
-    // 保证 [anchor, needEnd) 都在窗口内。anchor 传的是"还没写出的那个 tile"的起点，
-    // 而不是待预取 tile 的起点：CopyOut 在预取之后才读 slot，若按预取 tile 起点换窗，
-    // 正在算的那个 tile 的 slot 就被覆盖了。static_assert 保证两个 tile 一定装得下。
+    /*
+    保证 [anchor, needEnd) 落在当前窗口内，不满足则换窗
+    anchor：最早一个还要读索引的 token，即 pend tile 的起点而非待预取 tile 的起点，
+            否则正在算的与待写出的 tile 的 slot 会被换窗覆盖
+    needEnd：最晚一个还要读索引的 token 的下一个位置
+    命中现有窗口时直接返回，不发任何搬运
+    */
     __aicore__ inline void EnsureIndexWindow(int64_t anchor, int64_t needEnd)
     {
         if (winBegin_ >= 0 && anchor >= winBegin_ && needEnd <= winEnd_) {
@@ -365,7 +434,12 @@ private:
         LoadIndexWindow(anchor, len);
     }
 
-    // 取 out_t 对应的源 token 下标；越界一律回落到 0，避免非法 GM 访问
+    /*
+    取输出 token 对应的源 token 下标
+    outT：输出侧 token 下标，须在当前索引窗口内
+    返回 cat_indices[outT]；未传 cat_indices 时退化为 outT。
+    取值越界一律回落到 0，避免非法 GM 访问（这是运行期数据，host 校验不到）
+    */
     __aicore__ inline int64_t GetSrcIndex(int64_t outT)
     {
         int64_t srcT = hasCatIndices_ ? idxLocal_.GetValue(IdxAt(IDX_REGION_CAT, outT)) : outT;
@@ -375,11 +449,18 @@ private:
         return srcT;
     }
 
-    // 逐 token 搬入：cat_indices 乱序导致各 token 的源行不连续，只能一 token 一笔。
-    // 索引已由 EnsureIndexWindow 批量搬进 UB，下面所有 GetValue 都是 UB 上的短延迟标量读。
-    // 本函数只发 MTE2 不等它落地，由 Process 提前一个 tile 调用，与上一 tile 的 VF 重叠
-    __aicore__ inline void CopyIn(int64_t tileStart, int64_t tokenNum, int64_t slot)
+    /*
+    gm->ub 搬入一个 tile 的 qkv 与三轴 cos_sin
+    tile：待搬入的 tile，用 start/num 定位 token 区间，maskSlot 定位位图存放处
+    cat_indices 乱序使各 token 的源行不连续，qkv 只能一 token 一笔；cos_sin 每 token
+    三轴各一笔。所有 GetValue 读的是 EnsureIndexWindow 已搬进 UB 的索引
+    只发 MTE2 不等落地，落地由 Compute 的 DeQue 保证；
+    返回时 undMask_[tile.maskSlot] 已填好本 tile 的 und/gen 位图供 VF 选 gamma
+    */
+    __aicore__ inline void CopyIn(const Tile &tile)
     {
+        const int64_t tileStart = tile.start;
+        const int64_t tokenNum = tile.num;
         LocalTensor<T_QKV> qkvLocal = qkvInQue_.AllocTensor<T_QKV>();
         // 顺带产出本 tile 的 und/gen 位图给 VF 选 gamma 用：srcT 这里本来就要读，
         // 不必在别处再读一次 cat_indices。
@@ -404,20 +485,24 @@ private:
                 if (pos < 0 || pos >= maxPos_) { // 运行期数据，host 校验不到，这里兜底
                     pos = 0;
                 }
-                DataCopy(cosSinLocal[(i * MROPE_AXIS_NUM + axis) * headDim_], cosSinCacheGm_[pos * headDim_],
-                         headDim_);
+                DataCopy(cosSinLocal[(i * MROPE_AXIS_NUM + axis) * headDim_], cosSinCacheGm_[pos * headDim_], headDim_);
             }
         }
         cosSinInQue_.EnQue(cosSinLocal);
-        undMask_[slot] = mask;
+        undMask_[tile.maskSlot] = mask;
     }
 
-    // 整个 tile 只发一次 VF：Q/K 在 UB 上本就是同一行 token 内相邻的 head，
-    // 合在一个 VF 里 token 循环只走一趟、cos/sin 只 Gather 一次。
-    // und/gen 的差异在 VF 内按 undMask 逐 token 算 gamma 基址解决，所以 cat_indices
-    // 无论怎么交错，一个 tile 始终只发一次 VF。
-    __aicore__ inline void Compute(int64_t tokenNum, int64_t slot)
+    /*
+    一个 tile 的 RMSNorm + MRoPE + Cast，整个 tile 只发一次 VF
+    tile：待计算的 tile，其输入须已由 CopyIn 搬入并 EnQue
+    Q/K 在 UB 上是同一行 token 内相邻的 head，合在一个 VF 里 token 循环只走一趟、
+    cos/sin 只 Gather 一次；und/gen 的差异在 VF 内按 undMask_[tile.maskSlot] 逐 token
+    选 gamma，所以 cat_indices 无论怎么交错都只发一次 VF。V 不参与，直通
+    发完 VF 即返回不等它算完，结果已 EnQue 到 outQue_ 等 CopyOut 取走
+    */
+    __aicore__ inline void Compute(const Tile &tile)
     {
+        const int64_t tokenNum = tile.num;
         LocalTensor<T_QKV> qkvLocal = qkvInQue_.DeQue<T_QKV>();
         LocalTensor<float> cosSinLocal = cosSinInQue_.DeQue<float>();
         LocalTensor<T_QKV> outLocal = outQue_.AllocTensor<T_QKV>();
@@ -428,24 +513,31 @@ private:
         // Q/K 的 RMSNorm+MRoPE 与 V 的直通都在这次 VF 里完成。
         // shape 参数在 ParseTiling 就填好了，这里只组本 tile 的地址
         QkvMropeTileAddr addr;
-        addr.qkvIn = (__ubuf__ bfloat16_t*)qkvLocal.GetPhyAddr();
-        addr.gammaAll = (__ubuf__ float*)wFp32Local_.GetPhyAddr();
-        addr.rawCosSin = (__ubuf__ float*)cosSinLocal.GetPhyAddr();
-        addr.gatherIndex = (__ubuf__ uint32_t*)gatherIdxLocal_.GetPhyAddr();
-        addr.qOut = (__ubuf__ bfloat16_t*)outLocal.GetPhyAddr();
-        addr.kOut = (__ubuf__ bfloat16_t*)outLocal[kSegBase].GetPhyAddr();
-        addr.vOut = (__ubuf__ bfloat16_t*)outLocal[vSegBase].GetPhyAddr();
-        QkRmsNormMropeTileVF(addr, vfShape_, static_cast<uint16_t>(tokenNum), undMask_[slot]);
+        addr.qkvIn = (__ubuf__ bfloat16_t *)qkvLocal.GetPhyAddr();
+        addr.gammaAll = (__ubuf__ float *)wFp32Local_.GetPhyAddr();
+        addr.rawCosSin = (__ubuf__ float *)cosSinLocal.GetPhyAddr();
+        addr.gatherIndex = (__ubuf__ uint32_t *)gatherIdxLocal_.GetPhyAddr();
+        addr.qOut = (__ubuf__ bfloat16_t *)outLocal.GetPhyAddr();
+        addr.kOut = (__ubuf__ bfloat16_t *)outLocal[kSegBase].GetPhyAddr();
+        addr.vOut = (__ubuf__ bfloat16_t *)outLocal[vSegBase].GetPhyAddr();
+        QkRmsNormMropeTileVF(addr, vfShape_, static_cast<uint16_t>(tokenNum), undMask_[tile.maskSlot]);
 
         outQue_.EnQue(outLocal);
         qkvInQue_.FreeTensor(qkvLocal);
         cosSinInQue_.FreeTensor(cosSinLocal);
     }
 
-    // outLocal 按 [ubFactor 个 q | ubFactor 个 k | ubFactor 个 v] 分段：
-    // q 的输出下标 out_t 连续，可一笔写出；k/v 按 slot_mapping 散写，只能逐 token
-    __aicore__ inline void CopyOut(int64_t tileStart, int64_t tokenNum)
+    /*
+    ub->gm 写出一个 tile 的结果
+    tile：待写出的 tile，其结果须已由 Compute EnQue（DeQue 会等它的 VF 算完）
+    outLocal 按 [ubFactor 个 q | ubFactor 个 k | ubFactor 个 v] 分段：q 的输出下标
+    out_t 连续可一笔写出，k/v 按 slot_mapping 散写只能逐 token
+    slot 越界的 token 跳过写入而不是踩内存（运行期数据，host 校验不到）
+    */
+    __aicore__ inline void CopyOut(const Tile &tile)
     {
+        const int64_t tileStart = tile.start;
+        const int64_t tokenNum = tile.num;
         LocalTensor<T_QKV> outLocal = outQue_.DeQue<T_QKV>();
 
         const int64_t qSegElems = numHeadQ_ * headDim_;
@@ -468,22 +560,25 @@ private:
         outQue_.FreeTensor(outLocal);
     }
 
-    __aicore__ inline int64_t AlignUp(int64_t value, int64_t align)
-    {
-        return (value + align - 1) / align * align;
-    }
+    /*
+    向上对齐
+    value：待对齐的值
+    align：对齐粒度，须为正
+    返回不小于 value 的最小 align 整数倍
+    */
+    __aicore__ inline int64_t AlignUp(int64_t value, int64_t align) { return (value + align - 1) / align * align; }
 
 private:
-    TPipe* pipe_ = nullptr;
-    const UndGenQkvRmsNormRopeCacheTilingData* tiling_ = nullptr;
+    TPipe *pipe_ = nullptr;
+    const UndGenQkvRmsNormRopeCacheTilingData *tiling_ = nullptr;
 
-    // 模板参数是 queue depth（同时"已 EnQue 未 DeQue"的句柄数），不是 buffer 数。
-    // Process 是两段式流水，稳态下 tile i 与 tile i+1 同时挂着，所以输入队列 depth 取 2；
-    // 物理 buffer 数仍由 InitUbBuffers 的 BUFFER_NUM_DB 决定，UB 占用不受 depth 影响。
-    // outQue_ 在同一轮里 EnQue 完立刻 DeQue，outstanding 恒为 1，保持 depth 1
+    // 模板参数是 queue depth（同时"已 EnQue 未 DeQue"的句柄数），不是 buffer 数；
+    // 物理 buffer 数由 InitUbBuffers 的 BUFFER_NUM_DB 决定，UB 占用不受 depth 影响。
+    // outQue_ 的 CopyOut 延后一拍，稳态 outstanding 为 2，depth 必须取 2；
+    // 输入队列是 Compute 先 DeQue、CopyIn 再 EnQue，outstanding 只有 1，depth 2 是余量
     TQue<QuePosition::VECIN, DIGIT_TWO> qkvInQue_;
     TQue<QuePosition::VECIN, DIGIT_TWO> cosSinInQue_;
-    TQue<QuePosition::VECOUT, 1> outQue_;
+    TQue<QuePosition::VECOUT, DIGIT_TWO> outQue_;
     TQue<QuePosition::VECIN, 1> wInQue_;
 
     TBuf<TPosition::VECCALC> wFp32Buf_;
@@ -539,8 +634,8 @@ private:
 
     // VF 的 shape 入参，ParseTiling 期填一次，整个 Process 复用
     QkvMropeTileShape vfShape_ = {};
-    // 各 token 的 und/gen 标志位图，CopyIn 产出、Compute 消费。两段式流水下 CopyIn 会跑在
-    // Compute 前面一个 tile，所以必须按槽位存两份，否则下一 tile 会把还没用的位图冲掉
+    // 各 token 的 und/gen 标志位图，CopyIn 产出、Compute 消费。CopyIn 预取的是下一个 tile，
+    // 必须按槽位存两份，否则下一 tile 会把还没用的位图冲掉；CopyOut 不读它，两份就够
     uint64_t undMask_[DIGIT_TWO] = {0, 0};
 
     // 索引滑窗当前覆盖的 token 区间 [winBegin_, winEnd_)；winBegin_ < 0 表示尚未装载

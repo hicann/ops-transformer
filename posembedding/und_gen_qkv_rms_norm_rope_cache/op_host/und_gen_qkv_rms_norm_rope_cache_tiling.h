@@ -22,17 +22,17 @@
 namespace optiling {
 BEGIN_TILING_DATA_DEF(UndGenQkvRmsNormRopeCacheTilingData)
 // ---- shape 信息 ----
-TILING_DATA_FIELD_DEF(int64_t, totalTokens);   // T = und_len + gen_len，与 slot_mapping/positions 一致
-TILING_DATA_FIELD_DEF(int64_t, undLen);        // und_qkv 的 token 数
-TILING_DATA_FIELD_DEF(int64_t, genLen);        // gen_qkv 的 token 数，无 gen 时为 0
-TILING_DATA_FIELD_DEF(int64_t, numHead);       // N = Hq + Hk + Hv
-TILING_DATA_FIELD_DEF(int64_t, numHeadQ);      // Hq
-TILING_DATA_FIELD_DEF(int64_t, numHeadK);      // Hk
-TILING_DATA_FIELD_DEF(int64_t, numHeadV);      // Hv
-TILING_DATA_FIELD_DEF(int64_t, headDim);       // D
-TILING_DATA_FIELD_DEF(int64_t, maxPos);        // cos_sin_cache 的行数
-TILING_DATA_FIELD_DEF(int64_t, blockNum);      // KV Cache 页数 Bn
-TILING_DATA_FIELD_DEF(int64_t, blockSize);     // KV Cache 页内行数 Bs
+TILING_DATA_FIELD_DEF(int64_t, totalTokens); // T = und_len + gen_len，与 slot_mapping/positions 一致
+TILING_DATA_FIELD_DEF(int64_t, undLen);      // und_qkv 的 token 数
+TILING_DATA_FIELD_DEF(int64_t, genLen);      // gen_qkv 的 token 数，无 gen 时为 0
+TILING_DATA_FIELD_DEF(int64_t, numHead);     // N = Hq + Hk + Hv
+TILING_DATA_FIELD_DEF(int64_t, numHeadQ);    // Hq
+TILING_DATA_FIELD_DEF(int64_t, numHeadK);    // Hk
+TILING_DATA_FIELD_DEF(int64_t, numHeadV);    // Hv
+TILING_DATA_FIELD_DEF(int64_t, headDim);     // D
+TILING_DATA_FIELD_DEF(int64_t, maxPos);      // cos_sin_cache 的行数
+TILING_DATA_FIELD_DEF(int64_t, blockNum);    // KV Cache 页数 Bn
+TILING_DATA_FIELD_DEF(int64_t, blockSize);   // KV Cache 页内行数 Bs
 // ---- 可选输入分支标志 ----
 TILING_DATA_FIELD_DEF(int64_t, hasGen);        // gen_qkv/gen_weights 是否存在
 TILING_DATA_FIELD_DEF(int64_t, hasCatIndices); // cat_indices 是否存在，否则 src_t = out_t
@@ -41,14 +41,14 @@ TILING_DATA_FIELD_DEF(int64_t, mropeSectionT);
 TILING_DATA_FIELD_DEF(int64_t, mropeSectionH);
 TILING_DATA_FIELD_DEF(int64_t, mropeSectionW);
 // ---- 标量参数 ----
-TILING_DATA_FIELD_DEF(float, epsilon);         // RMSNorm eps
-TILING_DATA_FIELD_DEF(float, reciprocal);      // 1 / D
+TILING_DATA_FIELD_DEF(float, epsilon);    // RMSNorm eps
+TILING_DATA_FIELD_DEF(float, reciprocal); // 1 / D
 // ---- 切分结果 ----
 TILING_DATA_FIELD_DEF(int64_t, usedCoreNum);
-TILING_DATA_FIELD_DEF(int64_t, formerCoreNum);  // 前 formerCoreNum 个核多处理 1 个 token
-TILING_DATA_FIELD_DEF(int64_t, blockFactor);    // 前 formerCoreNum 个核的 token 数
+TILING_DATA_FIELD_DEF(int64_t, formerCoreNum);   // 前 formerCoreNum 个核多处理 1 个 token
+TILING_DATA_FIELD_DEF(int64_t, blockFactor);     // 前 formerCoreNum 个核的 token 数
 TILING_DATA_FIELD_DEF(int64_t, tailBlockFactor); // 其余核的 token 数
-TILING_DATA_FIELD_DEF(int64_t, ubFactor);       // 单次 UB 内处理的 token 数
+TILING_DATA_FIELD_DEF(int64_t, ubFactor);        // 单次 UB 内处理的 token 数
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(UndGenQkvRmsNormRopeCache, UndGenQkvRmsNormRopeCacheTilingData)
@@ -116,7 +116,7 @@ constexpr int64_t UINT32_BYTES = 4;
 constexpr int64_t INT64_BYTES = 8;
 constexpr int64_t DOUBLE_BUFFER = 2;
 constexpr int64_t BLOCK_ALIGN_BYTES = 32;
-constexpr int64_t WEIGHT_NUM = 4;           // und_q / und_k / gen_q / gen_k
+constexpr int64_t WEIGHT_NUM = 4; // und_q / und_k / gen_q / gen_k
 // kernel 把索引批量搬进 UB 的一个跨 tile 滑窗（见 regbase 的 idxBuf_）：
 // 5 个区 = cat_indices / slot_mapping / positions 的 3 个轴，各 IDX_WINDOW_TOKENS 个 int64。
 // 窗口越大，kernel 侧换窗时那道 MTE2->S 屏障越稀疏（它会挡住标量流水、拖垮预取），
@@ -137,9 +137,10 @@ static_assert(MAX_UB_FACTOR <= UND_MASK_BITS,
 // DataCopyPad 对 UB 落点的 32B 对齐要求，host 这边也不用为对齐留余量、预算保持精确。
 static_assert(IDX_WINDOW_TOKENS * INT64_BYTES % BLOCK_ALIGN_BYTES == 0,
               "index regions must stay 32B-aligned so DataCopyPad needs no per-region padding");
-// kernel 预取下一 tile 时，当前 tile 的 slot 还没写出，两个 tile 必须同时在窗口里
-static_assert(IDX_WINDOW_TOKENS >= 2 * MAX_UB_FACTOR,
-              "index window must hold both the in-flight tile and the prefetched one");
+// 窗口要同时容纳 pend / 在算 / 预取三个 tile。与 op_kernel/arch35/..._regbase.h
+// 里同名的 static_assert 是同一不变量，改这里必须同步改那边
+static_assert(IDX_WINDOW_TOKENS >= DIM_NUM_THREE * MAX_UB_FACTOR,
+              "index window must hold the pending, in-flight and prefetched tiles");
 
 /* UB 划分（kernel 侧必须按同一套公式分配，改这里要同步改 kernel）
  *
@@ -172,10 +173,10 @@ static_assert(IDX_WINDOW_TOKENS >= 2 * MAX_UB_FACTOR,
 
 class UndGenQkvRmsNormRopeCacheTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit UndGenQkvRmsNormRopeCacheTilingBase(gert::TilingContext* tilingContext) : TilingBaseClass(tilingContext)
+    explicit UndGenQkvRmsNormRopeCacheTilingBase(gert::TilingContext *tilingContext)
+        : TilingBaseClass(tilingContext)
     {}
-    ~UndGenQkvRmsNormRopeCacheTilingBase() override
-    {}
+    ~UndGenQkvRmsNormRopeCacheTilingBase() override {}
     uint64_t tilingKey_{0};
     int64_t coreNum_ = 0;
     int64_t ubSize_ = 0;
@@ -199,22 +200,10 @@ public:
 protected:
     ge::graphStatus GetShapeAttrsInfo() override;
     ge::graphStatus GetPlatformInfo() override;
-    bool IsCapable() override
-    {
-        return false;
-    }
-    ge::graphStatus DoOpTiling() override
-    {
-        return ge::GRAPH_SUCCESS;
-    }
-    ge::graphStatus DoLibApiTiling() override
-    {
-        return ge::GRAPH_SUCCESS;
-    }
-    ge::graphStatus GetWorkspaceSize() override
-    {
-        return ge::GRAPH_SUCCESS;
-    }
+    bool IsCapable() override { return false; }
+    ge::graphStatus DoOpTiling() override { return ge::GRAPH_SUCCESS; }
+    ge::graphStatus DoLibApiTiling() override { return ge::GRAPH_SUCCESS; }
+    ge::graphStatus GetWorkspaceSize() override { return ge::GRAPH_SUCCESS; }
     uint64_t GetTilingKey() const override;
 
     ge::graphStatus CheckDtypeValid();
@@ -232,11 +221,10 @@ protected:
 
 class UndGenQkvRmsNormRopeCacheRegbaseTiling : virtual public UndGenQkvRmsNormRopeCacheTilingBase {
 public:
-    explicit UndGenQkvRmsNormRopeCacheRegbaseTiling(gert::TilingContext* tilingContext)
+    explicit UndGenQkvRmsNormRopeCacheRegbaseTiling(gert::TilingContext *tilingContext)
         : UndGenQkvRmsNormRopeCacheTilingBase(tilingContext)
     {}
-    ~UndGenQkvRmsNormRopeCacheRegbaseTiling()
-    {}
+    ~UndGenQkvRmsNormRopeCacheRegbaseTiling() {}
 
 protected:
     bool IsCapable() override;
