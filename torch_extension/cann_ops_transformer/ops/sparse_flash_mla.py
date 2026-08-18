@@ -50,8 +50,8 @@ class SparseFlashMlaOpBuilder(OpBuilder):
             "Tensor? ori_topk_length=None, Tensor? cmp_topk_length=None, "
             "Tensor? sinks=None, Tensor? metadata=None, "
             "float softmax_scale=1.0, int cmp_ratio=1, "
-            "int ori_mask_mode=4, int cmp_mask_mode=3, "
-            "int ori_win_left=127, int ori_win_right=0, "
+            "int ori_mask_mode=0, int cmp_mask_mode=0, "
+            "int ori_win_left=-1, int ori_win_right=-1, "
             "str layout_q=\"BSND\", str layout_kv=\"BSND\", "
             "int topk_value_mode=1, bool return_softmax_lse=False) -> (Tensor, Tensor)"
         ]
@@ -89,8 +89,8 @@ class SparseFlashMlaOpBuilder(OpBuilder):
                                                 ori_topk_length=None, cmp_topk_length=None,
                                                 sinks=None, metadata=None,
                                                 softmax_scale=1.0, cmp_ratio=1,
-                                                ori_mask_mode=4, cmp_mask_mode=3,
-                                                ori_win_left=127, ori_win_right=0,
+                                                ori_mask_mode=0, cmp_mask_mode=0,
+                                                ori_win_left=-1, ori_win_right=-1,
                                                 layout_q='BSND', layout_kv='BSND',
                                                 topk_value_mode=1, return_softmax_lse=False):
             key_headnum = ori_kv.shape[1] if layout_kv == "TND" else ori_kv.shape[2]
@@ -192,8 +192,8 @@ def sparse_flash_mla(q,
                                     ori_topk_length=None, cmp_topk_length=None,
                                     sinks=None, metadata=None,
                                     softmax_scale=1.0, cmp_ratio=1,
-                                    ori_mask_mode=4, cmp_mask_mode=3,
-                                    ori_win_left=127, ori_win_right=0,
+                                    ori_mask_mode=0, cmp_mask_mode=0,
+                                    ori_win_left=-1, ori_win_right=-1,
                                     layout_q='BSND', layout_kv='BSND',
                                     topk_value_mode=1, return_softmax_lse=False):
     """

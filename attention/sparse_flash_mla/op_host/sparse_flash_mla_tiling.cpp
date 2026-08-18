@@ -1621,10 +1621,13 @@ ge::graphStatus SMLATilingCheck::CheckFeatureShape() const
                     OP_LOGE(opName_, "oriMaskMode should be 4 on %s, but got %u",
                         A2_A3_PLATFORM_LOG.c_str(), *opParamInfo_.oriMaskMode),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(*opParamInfo_.cmpMaskMode != 3,
-                    OP_LOGE(opName_, "cmpMaskMode should be 3 on %s, but got %u",
-                        A2_A3_PLATFORM_LOG.c_str(), *opParamInfo_.cmpMaskMode),
-                    return ge::GRAPH_FAILED);
+        if (smlaInfo_.perfMode == SMLATemplateMode::CFA_TEMPLATE_MODE ||
+            smlaInfo_.perfMode == SMLATemplateMode::SCFA_TEMPLATE_MODE) {
+            OP_CHECK_IF(*opParamInfo_.cmpMaskMode != 3,
+                        OP_LOGE(opName_, "cmpMaskMode should be 3 on %s, but got %u",
+                            A2_A3_PLATFORM_LOG.c_str(), *opParamInfo_.cmpMaskMode),
+                        return ge::GRAPH_FAILED);
+        }
         OP_CHECK_IF(oriWinLeft_ != 127,
                     OP_LOGE(opName_, "oriWinLeft_ should be 127 on %s, but got %ld",
                         A2_A3_PLATFORM_LOG.c_str(), oriWinLeft_),
