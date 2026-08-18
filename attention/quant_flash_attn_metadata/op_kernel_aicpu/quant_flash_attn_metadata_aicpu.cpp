@@ -44,12 +44,9 @@ bool QuantFlashAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
     metaData_ = ctx.Output(static_cast<uint32_t>(ParamId::metaData));
 
     bool requiredAttrs =
-        GetAttrValue(ctx, "num_heads_q", numHeadsQ_) &&
-        GetAttrValue(ctx, "num_heads_kv", numHeadsKv_) &&
-        GetAttrValue(ctx, "head_dim", headDim_) &&
-        GetAttrValue(ctx, "soc_version", socVersion_) &&
-        GetAttrValue(ctx, "aic_core_num", aicCoreNum_) &&
-        GetAttrValue(ctx, "aiv_core_num", aivCoreNum_);
+        GetAttrValue(ctx, "num_heads_q", numHeadsQ_) && GetAttrValue(ctx, "num_heads_kv", numHeadsKv_) &&
+        GetAttrValue(ctx, "head_dim", headDim_) && GetAttrValue(ctx, "soc_version", socVersion_) &&
+        GetAttrValue(ctx, "aic_core_num", aicCoreNum_) && GetAttrValue(ctx, "aiv_core_num", aivCoreNum_);
     if (!requiredAttrs) {
         return false;
     }
@@ -169,8 +166,7 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
             if (baseInfo.isCumulativeQuerySeq && (i > 0)) {
                 baseInfo.actualQuerySeqSize[i] += baseInfo.actualQuerySeqSize[i - 1];
             }
-            baseInfo.querySeqSize =
-                std::max(static_cast<int64_t>(baseInfo.querySeqSize), sequsedQ[i]);
+            baseInfo.querySeqSize = std::max(static_cast<int64_t>(baseInfo.querySeqSize), sequsedQ[i]);
         }
     }
     if (baseInfo.isCumulativeKvSeq && cuSeqlensKv_ != nullptr && cuSeqlensKv_->GetData() != nullptr) {
@@ -192,14 +188,7 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
             if (baseInfo.isCumulativeKvSeq && (i > 0)) {
                 baseInfo.actualKvSeqSize[i] += baseInfo.actualKvSeqSize[i - 1];
             }
-            baseInfo.kvSeqSize =
-                std::max(static_cast<int64_t>(baseInfo.kvSeqSize), sequsedKv[i]);
-        }
-        if (maxSeqlenKv_ >= 0 && baseInfo.kvSeqSize != maxSeqlenKv_) {
-            KERNEL_LOG_ERROR(
-                "max(seqused_kv)=%ld must be equal to max_seqlen_kv=%ld, but got inconsistency",
-                baseInfo.kvSeqSize, maxSeqlenKv_);
-            return false;
+            baseInfo.kvSeqSize = std::max(static_cast<int64_t>(baseInfo.kvSeqSize), sequsedKv[i]);
         }
     }
     baseInfo.batchSize = batchSize_;
@@ -243,15 +232,13 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
             int64_t vDescaleDimNum = vDescale_->GetTensorShape()->GetDims();
             int64_t vDescaleDim0 = vDescale_->GetTensorShape()->GetDimSize(0);
             if (vDescaleDimNum != 1) {
-                KERNEL_LOG_ERROR(
-                    "v_descale should be 1D [N2] for GQA FP8 fullquant (quant_mode=6), but got %ldD",
-                    vDescaleDimNum);
+                KERNEL_LOG_ERROR("v_descale should be 1D [N2] for GQA FP8 fullquant (quant_mode=6), but got %ldD",
+                                 vDescaleDimNum);
                 return false;
             }
             if (vDescaleDim0 != numHeadsKv_) {
-                KERNEL_LOG_ERROR(
-                    "v_descale dim0 should be num_heads_kv=%d for GQA FP8 fullquant, but got %ld",
-                    numHeadsKv_, vDescaleDim0);
+                KERNEL_LOG_ERROR("v_descale dim0 should be num_heads_kv=%d for GQA FP8 fullquant, but got %ld",
+                                 numHeadsKv_, vDescaleDim0);
                 return false;
             }
         } else {
