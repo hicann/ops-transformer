@@ -572,6 +572,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
 #include "acl/acl.h"
 #include "aclnn/opdev/fp16_t.h"
 #include "aclnnop/aclnn_sparse_flash_attention_v2.h"
+#include "aclnn/opdev/platform.h"
 
 #define CHECK_RET(cond, return_expr) \
     do {                               \
@@ -643,6 +644,9 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
 }
 
 int main() {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+        return 0;
+    }
     // 1. （固定写法）device/context/stream初始化，参考AscendCL对外接口列表
     // 根据自己的实际device填写deviceId
     int32_t deviceId = 0;
