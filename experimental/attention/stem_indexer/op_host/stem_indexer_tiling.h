@@ -96,10 +96,9 @@ constexpr int64_t TOPK_SCORE_PRECISION_UINT16 = 2;
 constexpr uint64_t CalcStemIndexerMetadataCapacity(uint64_t batchSize, uint64_t kvHeadNum)
 {
     uint64_t maxSectionNum = batchSize * kvHeadNum;
-    uint64_t requiredElems =
-        STEM_INDEXER_METADATA_HEADER_ELEMS +
-        maxSectionNum * (STEM_INDEXER_METADATA_AIC_CORE_NUM + STEM_INDEXER_METADATA_AIV_CORE_NUM) *
-            STEM_INDEXER_METADATA_CORE_STRIDE;
+    uint64_t requiredElems = STEM_INDEXER_METADATA_HEADER_ELEMS +
+                             maxSectionNum * (STEM_INDEXER_METADATA_AIC_CORE_NUM + STEM_INDEXER_METADATA_AIV_CORE_NUM) *
+                                 STEM_INDEXER_METADATA_CORE_STRIDE;
     return (requiredElems + STEM_INDEXER_METADATA_ALIGN_ELEMS - 1U) / STEM_INDEXER_METADATA_ALIGN_ELEMS *
            STEM_INDEXER_METADATA_ALIGN_ELEMS;
 }
@@ -189,9 +188,9 @@ public:
 
 class StemIndexerInfoParser {
 public:
-    explicit StemIndexerInfoParser(gert::TilingContext *context) : context_(context)
-    {
-    }
+    explicit StemIndexerInfoParser(gert::TilingContext *context)
+        : context_(context)
+    {}
     ~StemIndexerInfoParser() = default;
 
     ge::graphStatus GetOpName();
@@ -209,9 +208,9 @@ public:
     void GenerateInfo(StemIndexerTilingInfo &stemInfo);
 
 private:
-    bool IsFloatEqual(float lhs, float rhs) const;
-    bool IsSupportedQHeadNum(uint32_t qHeadNum) const;
-    bool IsSupportedKvHeadNum(uint32_t kvHeadNum) const;
+    __attribute__((noinline)) bool IsFloatEqual(float lhs, float rhs) const;
+    __attribute__((noinline)) bool IsSupportedQHeadNum(uint32_t qHeadNum) const;
+    __attribute__((noinline)) bool IsSupportedKvHeadNum(uint32_t kvHeadNum) const;
 
 private:
     gert::TilingContext *context_ = nullptr;
@@ -237,9 +236,9 @@ private:
 
 class StemIndexerTiling {
 public:
-    explicit StemIndexerTiling(gert::TilingContext *context) : context_(context)
-    {
-    }
+    explicit StemIndexerTiling(gert::TilingContext *context)
+        : context_(context)
+    {}
     ge::graphStatus DoTiling(const StemIndexerTilingInfo *tilingInfo);
 
 private:
