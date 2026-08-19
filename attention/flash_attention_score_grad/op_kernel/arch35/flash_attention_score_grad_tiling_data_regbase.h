@@ -22,6 +22,16 @@ namespace optiling {
 namespace fag {
 constexpr uint32_t MAX_CORE_NUM = 36;
 constexpr uint32_t TND_SWIZZLE_PREFIX_NUM = 129;
+
+// Schedule selected for the non-TND deterministic BAND implementation. isSplitByBlockIdx keeps
+// its original boolean meaning and only controls whether block-index splitting is enabled.
+enum class DeterBandScheduleMode : uint8_t {
+    DISABLED = 0,
+    CAUSAL = 1,
+    DENSE = 2,
+    BAND = 3
+};
+
 class FlashAttentionScoreGradEmptyTensorTilingDataRegbase {
 public:
     uint32_t formerDqNum;
@@ -42,7 +52,7 @@ public:
     uint64_t tailCoreDqRopeNum;
     uint64_t singleCoreDkRopeNum;
     uint64_t tailCoreDkRopeNum;
-    uint64_t isRope = 0; 
+    uint64_t isRope = 0;
 
     uint32_t get_formerDqNum() const { return formerDqNum; }
     uint32_t get_formerDkNum() const { return formerDkNum; }
@@ -77,9 +87,15 @@ public:
     void set_tailCoreDvNum(uint64_t tailCoreDvNumParam) { this->tailCoreDvNum = tailCoreDvNumParam; }
     void set_singleCoreDpseNum(uint64_t singleCoreDpseNumParam) { this->singleCoreDpseNum = singleCoreDpseNumParam; }
     void set_tailCoreDpseNum(uint64_t tailCoreDpseNumParam) { this->tailCoreDpseNum = tailCoreDpseNumParam; }
-    void set_singleCoreDqRopeNum(uint64_t singleCoreDqRopeNumParam) { this->singleCoreDqRopeNum = singleCoreDqRopeNumParam; }
+    void set_singleCoreDqRopeNum(uint64_t singleCoreDqRopeNumParam)
+    {
+        this->singleCoreDqRopeNum = singleCoreDqRopeNumParam;
+    }
     void set_tailCoreDqRopeNum(uint64_t tailCoreDqRopeNumParam) { this->tailCoreDqRopeNum = tailCoreDqRopeNumParam; }
-    void set_singleCoreDkRopeNum(uint64_t singleCoreDkRopeNumParam) { this->singleCoreDkRopeNum = singleCoreDkRopeNumParam; }
+    void set_singleCoreDkRopeNum(uint64_t singleCoreDkRopeNumParam)
+    {
+        this->singleCoreDkRopeNum = singleCoreDkRopeNumParam;
+    }
     void set_tailCoreDkRopeNum(uint64_t tailCoreDkRopeNumParam) { this->tailCoreDkRopeNum = tailCoreDkRopeNumParam; }
 };
 
@@ -120,39 +136,41 @@ public:
     bool enablePreSfmg;
     uint64_t s1SinkOuter;
     uint64_t s2SinkOuter;
+    uint8_t deterBandScheduleMode;
 
-    int64_t get_coreNum() const {return coreNum;}
-    int64_t get_b() const {return b;}
-    int64_t get_n2() const {return n2;}
-    int64_t get_g() const {return g;}
-    int64_t get_s1() const {return s1;}
-    int64_t get_s2() const {return s2;}
-    int64_t get_d() const {return d;}
-    int64_t get_d1() const {return d1;}
-    float get_scaleValue() const {return scaleValue;}
-    float get_keepProb() const {return keepProb;}
-    int64_t get_keepProbUint8() const {return keepProbUint8;}
-    uint8_t get_dropMaskOuter() const {return dropMaskOuter;}
-    uint32_t get_layout() const {return layout;}
-    uint32_t get_tndMaxSumLayout() const {return tndMaxSumLayout;}
-    uint32_t get_pseType() const {return pseType;}
-    uint32_t get_qStartIdx() const {return qStartIdx;}
-    uint32_t get_kvStartIdx() const {return kvStartIdx;}
-    uint32_t get_attenMaskShapeType() const {return attenMaskShapeType;}
-    int64_t get_s1Token() const {return s1Token;}
-    int64_t get_s2Token() const {return s2Token;}
-    uint32_t get_sparseMode() const {return sparseMode;}
-    int64_t get_seed() const {return seed;}
-    int64_t get_offset() const {return offset;}
-    uint32_t get_attenMaskCompressMode() const {return attenMaskCompressMode;}
-    uint32_t get_attenMaskS2Size() const {return attenMaskS2Size;}
-    uint8_t get_isSplitByBlockIdx() const {return isSplitByBlockIdx;}
-    int64_t get_totalPerBatchNum() const {return totalPerBatchNum;}
-    uint8_t get_sparseType() const {return sparseType;}
-    bool get_enablePreSfmg() const {return enablePreSfmg;}
-    uint32_t get_sinkOptional() const {return sinkOptional;}
-    uint64_t get_s1SinkOuter() const {return s1SinkOuter;}
-    uint64_t get_s2SinkOuter() const {return s2SinkOuter;}
+    int64_t get_coreNum() const { return coreNum; }
+    int64_t get_b() const { return b; }
+    int64_t get_n2() const { return n2; }
+    int64_t get_g() const { return g; }
+    int64_t get_s1() const { return s1; }
+    int64_t get_s2() const { return s2; }
+    int64_t get_d() const { return d; }
+    int64_t get_d1() const { return d1; }
+    float get_scaleValue() const { return scaleValue; }
+    float get_keepProb() const { return keepProb; }
+    int64_t get_keepProbUint8() const { return keepProbUint8; }
+    uint8_t get_dropMaskOuter() const { return dropMaskOuter; }
+    uint32_t get_layout() const { return layout; }
+    uint32_t get_tndMaxSumLayout() const { return tndMaxSumLayout; }
+    uint32_t get_pseType() const { return pseType; }
+    uint32_t get_qStartIdx() const { return qStartIdx; }
+    uint32_t get_kvStartIdx() const { return kvStartIdx; }
+    uint32_t get_attenMaskShapeType() const { return attenMaskShapeType; }
+    int64_t get_s1Token() const { return s1Token; }
+    int64_t get_s2Token() const { return s2Token; }
+    uint32_t get_sparseMode() const { return sparseMode; }
+    int64_t get_seed() const { return seed; }
+    int64_t get_offset() const { return offset; }
+    uint32_t get_attenMaskCompressMode() const { return attenMaskCompressMode; }
+    uint32_t get_attenMaskS2Size() const { return attenMaskS2Size; }
+    uint8_t get_isSplitByBlockIdx() const { return isSplitByBlockIdx; }
+    int64_t get_totalPerBatchNum() const { return totalPerBatchNum; }
+    uint8_t get_sparseType() const { return sparseType; }
+    bool get_enablePreSfmg() const { return enablePreSfmg; }
+    uint32_t get_sinkOptional() const { return sinkOptional; }
+    uint64_t get_s1SinkOuter() const { return s1SinkOuter; }
+    uint64_t get_s2SinkOuter() const { return s2SinkOuter; }
+    uint8_t get_deterBandScheduleMode() const { return deterBandScheduleMode; }
 
     void set_coreNum(int64_t coreNumParam) { this->coreNum = coreNumParam; }
     void set_b(int64_t bParam) { this->b = bParam; }
@@ -174,13 +192,19 @@ public:
     void set_pseDtype(uint32_t pseDtypeParam) { this->pseDtype = pseDtypeParam; }
     void set_qStartIdx(uint32_t qStartIdxParam) { this->qStartIdx = qStartIdxParam; }
     void set_kvStartIdx(uint32_t kvStartIdxParam) { this->kvStartIdx = kvStartIdxParam; }
-    void set_attenMaskShapeType(uint32_t attenMaskShapeTypeParam) { this->attenMaskShapeType = attenMaskShapeTypeParam; }
+    void set_attenMaskShapeType(uint32_t attenMaskShapeTypeParam)
+    {
+        this->attenMaskShapeType = attenMaskShapeTypeParam;
+    }
     void set_s1Token(int64_t s1TokenParam) { this->s1Token = s1TokenParam; }
     void set_s2Token(int64_t s2TokenParam) { this->s2Token = s2TokenParam; }
     void set_sparseMode(uint32_t sparseModeParam) { this->sparseMode = sparseModeParam; }
     void set_seed(int64_t seedParam) { this->seed = seedParam; }
     void set_offset(int64_t offsetParam) { this->offset = offsetParam; }
-    void set_attenMaskCompressMode(uint32_t attenMaskCompressModeParam) { this->attenMaskCompressMode = attenMaskCompressModeParam; }
+    void set_attenMaskCompressMode(uint32_t attenMaskCompressModeParam)
+    {
+        this->attenMaskCompressMode = attenMaskCompressModeParam;
+    }
     void set_attenMaskS2Size(uint32_t attenMaskS2SizeParam) { this->attenMaskS2Size = attenMaskS2SizeParam; }
     void set_isSplitByBlockIdx(uint8_t isSplitByBlockIdxParam) { this->isSplitByBlockIdx = isSplitByBlockIdxParam; }
     void set_totalPerBatchNum(int64_t totalPerBatchNumParam) { this->totalPerBatchNum = totalPerBatchNumParam; }
@@ -189,6 +213,10 @@ public:
     void set_sinkOptional(uint32_t sinkOptionalParam) { this->sinkOptional = sinkOptionalParam; }
     void set_s1SinkOuter(uint64_t s1SinkOuterParam) { this->s1SinkOuter = s1SinkOuterParam; }
     void set_s2SinkOuter(uint64_t s2SinkOuterParam) { this->s2SinkOuter = s2SinkOuterParam; }
+    void set_deterBandScheduleMode(uint8_t deterBandScheduleModeParam)
+    {
+        this->deterBandScheduleMode = deterBandScheduleModeParam;
+    }
 };
 
 class FlashAttentionScoreGradS1S2BNGS1S2SplitCoreParamsRegbase {
@@ -235,17 +263,19 @@ public:
     int64_t blockStarts[MAX_CORE_NUM];
     int64_t blockEnds[MAX_CORE_NUM];
 
-    const int64_t* get_blockStarts() const { return blockStarts;}
+    const int64_t *get_blockStarts() const { return blockStarts; }
     int64_t get_blockStarts(int index) const { return blockStarts[index]; }
-    const int64_t* get_blockEnds() const { return blockEnds; }
+    const int64_t *get_blockEnds() const { return blockEnds; }
     int64_t get_blockEnds(int index) const { return blockEnds[index]; }
-    void set_blockStarts(const int64_t* val) {
+    void set_blockStarts(const int64_t *val)
+    {
         for (uint i = 0; i < MAX_CORE_NUM; ++i) {
             blockStarts[i] = val[i];
         }
     }
     void set_blockStarts(int index, int64_t val) { blockStarts[index] = val; }
-    void set_blockEnds(const int64_t* val) {
+    void set_blockEnds(const int64_t *val)
+    {
         for (uint i = 0; i < MAX_CORE_NUM; ++i) {
             blockEnds[i] = val[i];
         }
@@ -322,18 +352,18 @@ public:
     uint32_t get_dropoutIsDivisibleBy8() const { return dropoutIsDivisibleBy8; }
     bool get_sValueZeroUnderTND() const { return sValueZeroUnderTND; }
     bool get_hasInvalidCol() const { return hasInvalidCol; }
-    uint32_t get_sfmgUsedCoreNum() const {return sfmgUsedCoreNum;}
-    uint32_t get_sfmgDyBufferLen() const {return sfmgDyBufferLen;}
-    uint32_t get_sfmgYBufferLen() const {return sfmgYBufferLen;}
-    uint32_t get_sfmgOutputBufferLen() const {return sfmgOutputBufferLen;}
-    uint64_t get_singleLoopNBurstNum() const {return singleLoopNBurstNum;}
-    uint64_t get_normalCoreLoopTimes() const {return normalCoreLoopTimes;}
-    uint64_t get_tailCoreLoopTimes() const {return tailCoreLoopTimes;}
-    uint64_t get_normalCoreLastLoopNBurstNum() const {return normalCoreLastLoopNBurstNum;}
-    uint64_t get_tailCoreLastLoopNBurstNum() const {return tailCoreLastLoopNBurstNum;}
-    uint64_t get_normalCoreNBurstNums() const {return normalCoreNBurstNums;}
-    uint64_t get_tailCoreNBurstNums() const {return tailCoreNBurstNums;}
-    uint64_t get_normalAxisSize() const {return normalAxisSize;}
+    uint32_t get_sfmgUsedCoreNum() const { return sfmgUsedCoreNum; }
+    uint32_t get_sfmgDyBufferLen() const { return sfmgDyBufferLen; }
+    uint32_t get_sfmgYBufferLen() const { return sfmgYBufferLen; }
+    uint32_t get_sfmgOutputBufferLen() const { return sfmgOutputBufferLen; }
+    uint64_t get_singleLoopNBurstNum() const { return singleLoopNBurstNum; }
+    uint64_t get_normalCoreLoopTimes() const { return normalCoreLoopTimes; }
+    uint64_t get_tailCoreLoopTimes() const { return tailCoreLoopTimes; }
+    uint64_t get_normalCoreLastLoopNBurstNum() const { return normalCoreLastLoopNBurstNum; }
+    uint64_t get_tailCoreLastLoopNBurstNum() const { return tailCoreLastLoopNBurstNum; }
+    uint64_t get_normalCoreNBurstNums() const { return normalCoreNBurstNums; }
+    uint64_t get_tailCoreNBurstNums() const { return tailCoreNBurstNums; }
+    uint64_t get_normalAxisSize() const { return normalAxisSize; }
 
     void set_maskSingleCoreNum(uint64_t val) { maskSingleCoreNum = val; }
     void set_qPreBlockFactor(uint64_t val) { qPreBlockFactor = val; }
@@ -363,7 +393,7 @@ public:
     void set_sfmgUsedCoreNum(uint32_t val) { sfmgUsedCoreNum = val; }
     void set_sfmgDyBufferLen(uint32_t val) { sfmgDyBufferLen = val; }
     void set_sfmgYBufferLen(uint32_t val) { sfmgYBufferLen = val; }
-    void set_sfmgOutputBufferLen(uint32_t val) {sfmgOutputBufferLen = val;}
+    void set_sfmgOutputBufferLen(uint32_t val) { sfmgOutputBufferLen = val; }
     void set_singleLoopNBurstNum(uint64_t val) { singleLoopNBurstNum = val; }
     void set_normalCoreLoopTimes(uint64_t val) { normalCoreLoopTimes = val; }
     void set_tailCoreLoopTimes(uint64_t val) { tailCoreLoopTimes = val; }
@@ -415,12 +445,12 @@ public:
     uint64_t get_dkWorkSpaceOffset() const { return dkWorkSpaceOffset; }
     uint64_t get_dvWorkSpaceOffset() const { return dvWorkSpaceOffset; }
     uint64_t get_dropMaskGmOffset() const { return dropMaskGmOffset; }
-    uint64_t get_sfmgWorkSpaceOffset() const {return sfmgWorkSpaceOffset;}
-    uint64_t get_dsinkWorkSpaceOffset() const {return dsinkWorkSpaceOffset;}
+    uint64_t get_sfmgWorkSpaceOffset() const { return sfmgWorkSpaceOffset; }
+    uint64_t get_dsinkWorkSpaceOffset() const { return dsinkWorkSpaceOffset; }
     uint64_t get_sinkReduceAxis() const { return sinkReduceAxis; }
     uint64_t get_sinkPostBlockTotal() const { return sinkPostBlockTotal; }
     uint64_t get_sinkPostBlockFactor() const { return sinkPostBlockFactor; }
-    uint64_t get_sinkPostTailNum() const {return sinkPostTailNum;}
+    uint64_t get_sinkPostTailNum() const { return sinkPostTailNum; }
 
     void set_qPostBlockFactor(uint64_t value) { qPostBlockFactor = value; }
     void set_qPostBlockTotal(uint64_t value) { qPostBlockTotal = value; }
@@ -461,26 +491,24 @@ public:
     uint64_t get_deterGmOffset() const { return deterGmOffset; }
     uint64_t get_deterWorkSpaceOffset() const { return deterWorkSpaceOffset; }
     uint64_t get_dqIsNeedDeter(int index) const { return dqIsNeedDeter[index]; }
-    const uint64_t* get_dqIsNeedDeter() const { return dqIsNeedDeter; }
-    const uint64_t* get_dkDvIsNeedDeter() const { return dkDvIsNeedDeter; }
+    const uint64_t *get_dqIsNeedDeter() const { return dqIsNeedDeter; }
+    const uint64_t *get_dkDvIsNeedDeter() const { return dkDvIsNeedDeter; }
     uint64_t get_dkDvIsNeedDeter(int index) const { return dkDvIsNeedDeter[index]; }
 
     void set_noNeedDeter(uint32_t val) { noNeedDeter = val; }
     void set_deterMaxRound(int64_t value) { deterMaxRound = value; }
     void set_deterGmOffset(uint64_t value) { deterGmOffset = value; }
     void set_deterWorkSpaceOffset(uint64_t value) { deterWorkSpaceOffset = value; }
-    void set_dqIsNeedDeter(const uint64_t* val)
+    void set_dqIsNeedDeter(const uint64_t *val)
     {
-        for (uint i = 0; i < MAX_CORE_NUM; ++i)
-        {
+        for (uint i = 0; i < MAX_CORE_NUM; ++i) {
             dqIsNeedDeter[i] = val[i];
         }
     }
     void set_dqIsNeedDeter(int index, uint64_t val) { dqIsNeedDeter[index] = val; }
-    void set_dkDvIsNeedDeter(const uint64_t* val)
+    void set_dkDvIsNeedDeter(const uint64_t *val)
     {
-        for (uint i = 0; i < MAX_CORE_NUM; ++i)
-        {
+        for (uint i = 0; i < MAX_CORE_NUM; ++i) {
             dkDvIsNeedDeter[i] = val[i];
         }
     }
@@ -492,9 +520,9 @@ public:
     constexpr static int64_t DETER_PREFIX_NUM = 132;
 
     bool coreDivide;
-    uint8_t reserved1; // tilingData需要8字节对齐
-    uint8_t reserved2; // tilingData需要8字节对齐
-    uint8_t reserved3; // tilingData需要8字节对齐
+    uint8_t reserved1;  // tilingData需要8字节对齐
+    uint8_t reserved2;  // tilingData需要8字节对齐
+    uint8_t reserved3;  // tilingData需要8字节对齐
     uint32_t reserved4; // tilingData需要8字节对齐
     int64_t deterPrefixStep;
     int64_t deterPrefix[DETER_PREFIX_NUM];
@@ -517,31 +545,36 @@ public:
     int64_t get_deterPrefix2(int index) const { return deterPrefix2[index]; }
     void set_coreDivide(bool value) { coreDivide = value; }
     void set_deterPrefixStep(int64_t value) { deterPrefixStep = value; }
-    void set_deterPrefix(const int64_t *val) {
+    void set_deterPrefix(const int64_t *val)
+    {
         for (int i = 0; i < DETER_PREFIX_NUM; ++i) {
             deterPrefix[i] = val[i];
         }
     }
     void set_deterPrefix(int index, int64_t val) { deterPrefix[index] = val; }
-    void set_deterPrefixAlign(const int64_t *val) {
+    void set_deterPrefixAlign(const int64_t *val)
+    {
         for (int i = 0; i < DETER_PREFIX_NUM; ++i) {
             deterPrefixAlign[i] = val[i];
         }
     }
     void set_deterPrefixAlign(int index, int64_t val) { deterPrefixAlign[index] = val; }
-    void set_deterPrefix0(const int64_t *val) {
+    void set_deterPrefix0(const int64_t *val)
+    {
         for (int i = 0; i < DETER_PREFIX_NUM; ++i) {
             deterPrefix0[i] = val[i];
         }
     }
     void set_deterPrefix0(int index, int64_t val) { deterPrefix0[index] = val; }
-    void set_deterPrefix1(const int64_t *val) {
+    void set_deterPrefix1(const int64_t *val)
+    {
         for (int i = 0; i < DETER_PREFIX_NUM; ++i) {
             deterPrefix1[i] = val[i];
         }
     }
     void set_deterPrefix1(int index, int64_t val) { deterPrefix1[index] = val; }
-    void set_deterPrefix2(const int64_t *val) {
+    void set_deterPrefix2(const int64_t *val)
+    {
         for (int i = 0; i < DETER_PREFIX_NUM; ++i) {
             deterPrefix2[i] = val[i];
         }
@@ -607,8 +640,8 @@ public:
     }
 };
 
-template<const bool isDeter = false, const bool isNewDeter = false,
-    const bool isTnd = false, const bool isTndSwizzle = false>
+template <const bool isDeter = false, const bool isNewDeter = false, const bool isTnd = false,
+          const bool isTndSwizzle = false>
 class FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase {
 public:
     FlashAttentionScoreGradS1S2BNGS1S2BaseParamsRegbase s1s2BNGS1S2BaseParams;
@@ -621,6 +654,6 @@ public:
     typename std::conditional<!isNewDeter && isTnd, TndParamRegbase, std::nullptr_t>::type tndParam;
     typename std::conditional<isTndSwizzle, TndSwizzleParamRegbase, std::nullptr_t>::type tndSwizzleParam;
 };
-}  // namespace fag
-}  // namespace optiling
+} // namespace fag
+} // namespace optiling
 #endif
