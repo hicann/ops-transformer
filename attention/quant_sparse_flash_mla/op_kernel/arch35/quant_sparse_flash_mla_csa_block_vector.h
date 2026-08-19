@@ -150,6 +150,7 @@ public:
                                         GlobalTensor<int32_t> cmpResidualKvGm, GlobalTensor<int32_t> actualSeqQlenGm,
                                         GlobalTensor<int32_t> cuSeqlensQGm, __gm__ uint8_t *workspace,
                                         ConstInfo &constInfo);
+    __aicore__ inline void FreeEvent(ConstInfo &constInfo);
 
 private:
     __aicore__ inline void ProcessSparseKv(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &outputL1,
@@ -841,7 +842,6 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessVec1(
     this->stage1OutQue[stage1Offset].template EnQue(stage1CastTensor);
     this->stage1OutQue[stage1Offset].template DeQue<Q_T>();
 
-    outputBuf.WaitCrossCore();
     LocalTensor<Q_T> mm2AL1Tensor = outputBuf.GetTensor<Q_T>();
     if (likely(runInfo.halfMRealSize != 0)) {
         DataCopy(mm2AL1Tensor[constInfo.subBlockIdx * (BLOCK_BYTE / sizeof(Q_T)) *
@@ -1664,6 +1664,19 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe *pipe, 
     for (int i = 0; i < 64; i++) {
         vselrIndexesTensor.SetValue(i, i * 4);
     }
+}
+
+TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::FreeEvent(ConstInfo &constInfo)
+{
+    if (constInfo.isSoftmaxLseEnable) {
+        WaitFlag<HardEvent::MTE3_V>(mte3ToVLseOutId);
+    }
+    WaitFlag<HardEvent::MTE3_V>(mte3ToVId);
+    WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[0]);
+    WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[1]);
+    WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[0]);
+    WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[1]);
 }
 
 TEMPLATES_DEF_NO_DEFAULT

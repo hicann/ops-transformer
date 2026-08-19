@@ -98,6 +98,7 @@ private:
                                       int64_t s2LoopLimit, int64_t multiCoreInnerIdx);
     __aicore__ inline void ComputeBmm1Tail(RunInfo &runInfo, RunParamStr &runParam);
     __aicore__ inline void InitUniqueConstInfo();
+    __aicore__ inline void FreeEvent();
     __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr &runParam);
     __aicore__ inline void InitUniqueRunInfo(const RunParamStr &runParam, RunInfo &runInfo);
     __aicore__ inline void ParseFdRunInfo(FdRunInfo &fdRunInfo);
@@ -529,6 +530,7 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
             this->vecBlock.ProcessFlashDecode(fdRunInfo, this->constInfo);
         }
     }
+    FreeEvent();
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -856,6 +858,19 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     const RunParamStr &runParam, RunInfo &runInfo)
 {
     InitTaskParamByRun<TEMPLATE_INTF_ARGS>(runParam, runInfo);
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::FreeEvent()
+{
+    if ASCEND_IS_AIC {
+        bmm1Buffers.Get().WaitCrossCore();
+        bmm1Buffers.Get().WaitCrossCore();
+        bmm2Buffers.Get().WaitCrossCore();
+        this->cubeBlock.FreeEvent();
+    } else {
+        this->vecBlock.FreeEvent(constInfo);
+    }
 }
 
 template <typename CubeBlockType, typename VecBlockType>

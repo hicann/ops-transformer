@@ -77,6 +77,7 @@ public:
                                        Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm,
                                        bool notLastTwoLoop, RunInfo &runInfoNext, RunInfo &runInfo,
                                        ConstInfo &constInfo);
+    __aicore__ inline void FreeEvent();
 
     __aicore__ inline void IterateBmm2(
         Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf,
@@ -181,6 +182,21 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitLocalBuffer(BufferManage
     SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId);
     SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 1);
     SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 2);
+}
+
+TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::FreeEvent()
+{
+    mmL0ABuffers.Uninit(l0aBufferManager);
+    mmL0BBuffers.Uninit(l0bBufferManager);
+    WaitFlag<HardEvent::FIX_M>(l0CFixToMFlagId);
+    WaitFlag<HardEvent::FIX_M>(l0CFixToMFlagId + 1);
+    WaitFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId);
+    WaitFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 1);
+    WaitFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 2);
+    WaitFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId);
+    WaitFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 1);
+    WaitFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 2);
 }
 
 /* 初始化GmTensor,设置shape信息并计算strides */

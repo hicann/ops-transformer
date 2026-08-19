@@ -139,6 +139,7 @@ public:
     __aicore__ inline void InitFDBuffers(FdRunInfo &fdRunInfo);
     // 初始化attentionOutGM
     __aicore__ inline void CleanOutput(__gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, ConstInfo &constInfo);
+    __aicore__ inline void FreeEvent(ConstInfo &constInfo);
     __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV,
                                             __gm__ uint8_t *oriSparseIndices, __gm__ uint8_t *cmpSparseIndices,
                                             __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
@@ -1300,7 +1301,6 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessVec1(
     this->stage1OutQue[stage1Offset].template EnQue(stage1CastTensor);
     this->stage1OutQue[stage1Offset].template DeQue<Q_T>();
 
-    outputBuf.WaitCrossCore();
     LocalTensor<Q_T> mm2AL1Tensor = outputBuf.GetTensor<Q_T>();
     if (likely(runInfo.halfMRealSize != 0)) {
         DataCopy(mm2AL1Tensor[constInfo.subBlockIdx * (BLOCK_BYTE / sizeof(Q_T)) *
@@ -2289,6 +2289,26 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe *pipe, 
     if (this->isSinks) {
         InitSinksBuffer(constInfo);
     }
+}
+
+TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::FreeEvent(ConstInfo &constInfo)
+{
+    if constexpr (IS_BATCH_CONSISTENCY) {
+        WaitFlag<HardEvent::V_MTE2>(intraPartialOVToMte2Id);
+        WaitFlag<HardEvent::V_MTE2>(reduceMaxSumVToMte2Id);
+    }
+    WaitFlag<HardEvent::MTE3_V>(mte3ToVId);
+    if (constInfo.isSoftmaxLseEnable) {
+        WaitFlag<HardEvent::MTE3_V>(mte3ToVLseOutId);
+    }
+    WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[0]);
+    WaitFlag<HardEvent::V_MTE2>(vToMte2V0Id[1]);
+    WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[0]);
+    WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[1]);
+    WaitFlag<HardEvent::V_MTE2>(fdVToMte2Id[0]);
+    WaitFlag<HardEvent::V_MTE2>(fdVToMte2Id[1]);
+    WaitFlag<HardEvent::MTE3_V>(fdMte3ToVId);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
