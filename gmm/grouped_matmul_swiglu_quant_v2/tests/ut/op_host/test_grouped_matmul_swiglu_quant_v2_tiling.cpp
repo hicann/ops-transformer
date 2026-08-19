@@ -40,7 +40,6 @@ using namespace std;
 using namespace ge;
 using namespace optiling;
 
-
 namespace {
 
 using ops::ut::ParseBool;
@@ -102,10 +101,10 @@ vector<TensorDescParam> ParseTensorDescList(const string &origin, const string &
     vector<TensorDescParam> tensors;
     tensors.reserve(originList.size());
     for (size_t i = 0; i < originList.size(); ++i) {
-        tensors.push_back(
-            {ops::ut::ParseDims(originList[i]), ops::ut::ParseDims(GetRepeatedField(storageList, i, "storage")),
-             ops::ut::ParseGeDtype(GetRepeatedField(dtypeList, i, "dtype")),
-             ops::ut::ParseGeFormat(GetRepeatedField(formatList, i, "format"))});
+        tensors.push_back({ops::ut::ParseDims(originList[i]),
+                           ops::ut::ParseDims(GetRepeatedField(storageList, i, "storage")),
+                           ops::ut::ParseGeDtype(GetRepeatedField(dtypeList, i, "dtype")),
+                           ops::ut::ParseGeFormat(GetRepeatedField(formatList, i, "format"))});
     }
     return tensors;
 }
@@ -219,7 +218,6 @@ vector<GroupedMatmulSwigluQuantV2TilingCase> LoadCases(const string &socVersion)
             continue;
         }
 
-
         try {
             size_t idx = 0;
             GroupedMatmulSwigluQuantV2TilingCase tc;
@@ -243,13 +241,13 @@ vector<GroupedMatmulSwigluQuantV2TilingCase> LoadCases(const string &socVersion)
             };
 
             for (size_t tensorIdx = 0; tensorIdx < kInputTensorCount; ++tensorIdx) {
-                tc.inputs[tensorIdx] = ParseTensorDescList(
-                    Trim(items[idx]), Trim(items[idx + 1U]), Trim(items[idx + 2U]), Trim(items[idx + 3U]));
+                tc.inputs[tensorIdx] = ParseTensorDescList(Trim(items[idx]), Trim(items[idx + 1U]),
+                                                           Trim(items[idx + 2U]), Trim(items[idx + 3U]));
                 idx += kTensorFieldCount;
             }
             for (size_t tensorIdx = 0; tensorIdx < kOutputTensorCount; ++tensorIdx) {
-                tc.outputs[tensorIdx] = ParseTensorDescList(
-                    Trim(items[idx]), Trim(items[idx + 1U]), Trim(items[idx + 2U]), Trim(items[idx + 3U]));
+                tc.outputs[tensorIdx] = ParseTensorDescList(Trim(items[idx]), Trim(items[idx + 1U]),
+                                                            Trim(items[idx + 2U]), Trim(items[idx + 3U]));
                 idx += kTensorFieldCount;
             }
 
@@ -279,7 +277,6 @@ namespace GroupedMatmulSwigluQuantV2UT {
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TestGroupedMatmulSwigluQuantV2Tiling950);
 
-
 const vector<GroupedMatmulSwigluQuantV2TilingCase> &GetAscend950Cases()
 {
     static const vector<GroupedMatmulSwigluQuantV2TilingCase> cases = LoadCases("Ascend950");
@@ -294,21 +291,12 @@ const vector<GroupedMatmulSwigluQuantV2TilingCase> &GetAscend910BCases()
 
 class TestGroupedMatmulSwigluQuantV2Tiling950 : public testing::TestWithParam<GroupedMatmulSwigluQuantV2TilingCase> {
 protected:
-    static void SetUpTestCase()
-    {
-        std::cout << "GroupedMatmulSwigluQuantV2Tiling950 SetUp" << std::endl;
-    }
+    static void SetUpTestCase() { std::cout << "GroupedMatmulSwigluQuantV2Tiling950 SetUp" << std::endl; }
 
-    static void TearDownTestCase()
-    {
-        std::cout << "GroupedMatmulSwigluQuantV2Tiling950 TearDown" << std::endl;
-    }
+    static void TearDownTestCase() { std::cout << "GroupedMatmulSwigluQuantV2Tiling950 TearDown" << std::endl; }
 };
 
-TEST_P(TestGroupedMatmulSwigluQuantV2Tiling950, csvDrivenCase)
-{
-    GetParam().Run();
-}
+TEST_P(TestGroupedMatmulSwigluQuantV2Tiling950, csvDrivenCase) { GetParam().Run(); }
 
 INSTANTIATE_TEST_SUITE_P(GMMSQ_V2_TILING_950, TestGroupedMatmulSwigluQuantV2Tiling950,
                          testing::ValuesIn(GetAscend950Cases()), MakeParamName);
@@ -316,9 +304,30 @@ INSTANTIATE_TEST_SUITE_P(GMMSQ_V2_TILING_950, TestGroupedMatmulSwigluQuantV2Tili
 const GroupedMatmulSwigluQuantV2TilingCase *FindAscend950Case(const string &prefix)
 {
     const auto &cases = GetAscend950Cases();
-    const auto iter = find_if(cases.begin(), cases.end(),
-                              [&prefix](const auto &item) { return item.prefix == prefix; });
+    const auto iter =
+        find_if(cases.begin(), cases.end(), [&prefix](const auto &item) { return item.prefix == prefix; });
     return iter == cases.end() ? nullptr : &(*iter);
+}
+
+TEST(TestGroupedMatmulSwigluQuantV2Tiling950WhiteBox, RequiredInputNullptrErrorCase)
+{
+    const auto *testCase = FindAscend950Case("test_mxa8w4_sms_wb002_wq_nz_ws_nd_g2_glt1_min_k_n");
+    ASSERT_NE(testCase, nullptr);
+
+    const array<pair<uint32_t, const char *>, 5> requiredInputs = {
+        {{optiling::GroupedMatmulSwigluQuantV2Tiling::X_INDEX, "x"},
+         {optiling::GroupedMatmulSwigluQuantV2Tiling::X_SCALE_INDEX, "xScale"},
+         {optiling::GroupedMatmulSwigluQuantV2Tiling::GROUPLIST_INDEX, "groupList"},
+         {optiling::GroupedMatmulSwigluQuantV2Tiling::WEIGHT_INDEX, "weight"},
+         {optiling::GroupedMatmulSwigluQuantV2Tiling::WEIGHT_SCALE_INDEX, "weightScale"}}};
+    for (const auto &[inputIndex, inputName] : requiredInputs) {
+        SCOPED_TRACE(inputName);
+        auto nullInputCase = *testCase;
+        nullInputCase.inputs[inputIndex].clear();
+        auto compileInfoForRun = nullInputCase.compileInfo;
+        auto tilingContextPara = nullInputCase.BuildContext(&compileInfoForRun);
+        ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+    }
 }
 
 TEST(TestGroupedMatmulSwigluQuantV2Tiling950WhiteBox, SmsTilingKeyAndDataFields)
@@ -369,21 +378,12 @@ TEST(TestGroupedMatmulSwigluQuantV2Tiling950WhiteBox, NonSmsTilingKeyAndDataFiel
 
 class TestGroupedMatmulSwigluQuantV2Tiling910B : public testing::TestWithParam<GroupedMatmulSwigluQuantV2TilingCase> {
 protected:
-    static void SetUpTestCase()
-    {
-        std::cout << "GroupedMatmulSwigluQuantV2Tiling910B SetUp" << std::endl;
-    }
+    static void SetUpTestCase() { std::cout << "GroupedMatmulSwigluQuantV2Tiling910B SetUp" << std::endl; }
 
-    static void TearDownTestCase()
-    {
-        std::cout << "GroupedMatmulSwigluQuantV2Tiling910B TearDown" << std::endl;
-    }
+    static void TearDownTestCase() { std::cout << "GroupedMatmulSwigluQuantV2Tiling910B TearDown" << std::endl; }
 };
 
-TEST_P(TestGroupedMatmulSwigluQuantV2Tiling910B, csvDrivenCase)
-{
-    GetParam().Run();
-}
+TEST_P(TestGroupedMatmulSwigluQuantV2Tiling910B, csvDrivenCase) { GetParam().Run(); }
 
 INSTANTIATE_TEST_SUITE_P(GMMSQ_V2_TILING_910B, TestGroupedMatmulSwigluQuantV2Tiling910B,
                          testing::ValuesIn(GetAscend910BCases()), MakeParamName);
