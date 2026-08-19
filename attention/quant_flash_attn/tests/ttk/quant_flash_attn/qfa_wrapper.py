@@ -13,7 +13,7 @@
 import logging
 import os
 import sys
-from typing import List
+from typing import List, Optional
 
 import torch
 import torch_npu
@@ -53,9 +53,9 @@ def npu_qfa(
     v: torch.Tensor,
     dequant_scale_q: torch.Tensor,
     dequant_scale_k: torch.Tensor,
-    dequant_scale_v: torch.Tensor,
-    p_scale: torch.Tensor,
-    block_table: torch.Tensor,
+    dequant_scale_v: Optional[torch.Tensor] = None,
+    p_scale: Optional[torch.Tensor] = None,
+    block_table: Optional[torch.Tensor] = None,
     *,
     batch_size: int,
     N_q: int,
@@ -79,6 +79,8 @@ def npu_qfa(
     is_contiguous: bool = True,
     device_id: int = 0,
     softmax_scale: float = None,
+    win_left: int = -1,
+    win_right: int = -1,
     data_range_q: float = 1.0,
     data_range_k: float = 1.0,
     data_range_v: float = 1.0,
@@ -137,6 +139,8 @@ def npu_qfa(
             "DEVICE_ID": device_id,
             "GRAPH_PATH": graph_path,
             "SOFTMAX_SCALE": softmax_scale,
+            "WIN_LEFT": win_left,
+            "WIN_RIGHT": win_right,
             "LAYOUT_Q": layout_q,
             "LAYOUT_Q_DESCALE": layout_q_descale,
             "LAYOUT_KV": layout_kv,

@@ -124,6 +124,8 @@ LAYOUT_KV = "TND"
 LAYOUT_OUT = "TND"
 
 SOFTMAX_SCALE = None
+WIN_LEFT = None
+WIN_RIGHT = None
 
 # PA KV Cache Layout
 # BnNBsD: [BlockNum, N, BlockSize, D]
@@ -1502,6 +1504,8 @@ def _call_npu_fa_op(
         v_descale=dequant_scale_v,
         batch_size=BATCH_SIZE,
         mask_mode=sparse_mode,
+        win_left=WIN_LEFT if WIN_LEFT is not None else -1,
+        win_right=WIN_RIGHT if WIN_RIGHT is not None else -1,
         layout_q=layout_q,
         layout_q_descale=layout_q_descale,
         layout_kv=layout_kv,
@@ -1593,6 +1597,8 @@ class Network(nn.Module):
             v_descale=dequant_scale_v,
             batch_size=BATCH_SIZE,
             mask_mode=sparse_mode,
+            win_left=WIN_LEFT if WIN_LEFT is not None else -1,
+            win_right=WIN_RIGHT if WIN_RIGHT is not None else -1,
             layout_q=layout_q,
             layout_q_descale=layout_q_descale,
             layout_kv=layout_kv,
@@ -1699,20 +1705,27 @@ def prepare_npu_inputs(
                 f"[NPU] key is_contiguous={k_npu.is_contiguous()}, value is_contiguous={v_npu.is_contiguous()}"
             )
             fake_kscale_tensor = torch.ones_like(dequant_scale_k)
-            fake_vscale_tensor = torch.ones_like(dequant_scale_v)
             double_kscale = torch.stack([dequant_scale_k, fake_kscale_tensor], dim=2)
-            double_vscale = torch.stack([dequant_scale_v, fake_vscale_tensor], dim=2)
             double_kscale = double_kscale.npu()
-            double_vscale = double_vscale.npu()
             deq_k_npu = double_kscale[:, :, 0]
-            deq_v_npu = double_vscale[:, :, 0]
+            if dequant_scale_v is not None:
+                fake_vscale_tensor = torch.ones_like(dequant_scale_v)
+                double_vscale = torch.stack(
+                    [dequant_scale_v, fake_vscale_tensor], dim=2
+                )
+                double_vscale = double_vscale.npu()
+                deq_v_npu = double_vscale[:, :, 0]
             logger.info(
-                f"[NPU] deq_k_scale is_contiguous={deq_k_npu.is_contiguous()}, deq_v_scale is_contiguous={deq_v_npu.is_contiguous()}"
+                f"[NPU] deq_k_scale is_contiguous={deq_k_npu.is_contiguous()}, deq_v_scale is_contiguous={deq_v_npu.is_contiguous() if deq_v_npu is not None else 'N/A'}"
             )
 
         logger.info("[NPU PA] kv_layout=%s", KV_CACHE_LAYOUT)
         logger.info("[NPU PA] k=%s, v=%s", k_npu.shape, v_npu.shape)
-        logger.info("[NPU PA] deq_k=%s, deq_v=%s", deq_k_npu.shape, deq_v_npu.shape)
+        logger.info(
+            "[NPU PA] deq_k=%s, deq_v=%s",
+            deq_k_npu.shape,
+            deq_v_npu.shape if deq_v_npu is not None else None,
+        )
 
         block_table_npu = (
             block_table_torch.npu()
@@ -1759,13 +1772,19 @@ def prepare_npu_inputs(
     K_DTYPE = k_fp8.dtype
     V_DTYPE = v_fp8.dtype
     DK_DTYPE = dequant_scale_k.dtype
-    DV_DTYPE = dequant_scale_v.dtype
+    DV_DTYPE = dequant_scale_v.dtype if dequant_scale_v is not None else None
     k_npu = k_fp8.contiguous().view(K_DTYPE).npu()
     v_npu = v_fp8.contiguous().view(V_DTYPE).npu()
     deq_k_npu = dequant_scale_k.view(DK_DTYPE).npu()
-    deq_v_npu = dequant_scale_v.view(DV_DTYPE).npu()
+    deq_v_npu = (
+        dequant_scale_v.view(DV_DTYPE).npu() if dequant_scale_v is not None else None
+    )
     logger.info("[NPU TND] k=%s, v=%s", k_npu.shape, v_npu.shape)
-    logger.info("[NPU TND] deq_k=%s, deq_v=%s", deq_k_npu.shape, deq_v_npu.shape)
+    logger.info(
+        "[NPU TND] deq_k=%s, deq_v=%s",
+        deq_k_npu.shape,
+        deq_v_npu.shape if deq_v_npu is not None else None,
+    )
 
     logger.info("[NPU] prepare non-PA inputs done.")
     return dict(

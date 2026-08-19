@@ -806,6 +806,7 @@ mask_mode参数解释
                 <ul>
                     <li>当mask_mode为0时，不支持传入attn_mask</li>
                     <li>当mask_mode为3时，必须传入attn_mask矩阵</li>
+                    <li>当mask_mode不为4时，win_left与win_right必须为-1</li>
                 </ul>
             </td>
             <td rowspan="3">
@@ -878,6 +879,7 @@ mask_mode参数解释
             <td>
                 <ul>
                     <li>当layout_q不为TND且不为NTD时，seqused_q与max_seqlen_q至少传入其中一个</li>
+                    <li>当layout_q为TND/NTD或layout_kv为TND时，不支持传入batch_size</li>
                 </ul>
             </td>
         </tr>
@@ -954,6 +956,10 @@ mask_mode参数解释
         </tr>
     </tbody>
 </table>
+
+> [!NOTE]
+>
+> 算子不校验 `seqused_kv` 中的最大值是否与 `max_seqlen_kv` 一致。若同时传入这两个参数，用户需自行保证 `max(seqused_kv) <= max_seqlen_kv`。
 
 #### Paged Attention参数组
 

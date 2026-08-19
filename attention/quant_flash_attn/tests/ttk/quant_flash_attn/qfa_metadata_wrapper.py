@@ -19,7 +19,7 @@
 import logging
 import os
 import sys
-from typing import List
+from typing import List, Optional
 
 import torch
 import torch_npu
@@ -65,9 +65,9 @@ def run_metadata(
     v: torch.Tensor,
     dequant_scale_q: torch.Tensor,
     dequant_scale_k: torch.Tensor,
-    dequant_scale_v: torch.Tensor,
-    p_scale: torch.Tensor,
-    block_table: torch.Tensor,
+    dequant_scale_v: Optional[torch.Tensor] = None,
+    p_scale: Optional[torch.Tensor] = None,
+    block_table: Optional[torch.Tensor] = None,
     *,
     batch_size: int,
     N_q: int,
@@ -91,6 +91,8 @@ def run_metadata(
     is_contiguous: bool = True,
     device_id: int = 0,
     softmax_scale: float = None,
+    win_left: int = -1,
+    win_right: int = -1,
     data_range_q: float = 1.0,
     data_range_k: float = 1.0,
     data_range_v: float = 1.0,
@@ -149,6 +151,8 @@ def run_metadata(
             "DEVICE_ID": device_id,
             "GRAPH_PATH": graph_path,
             "SOFTMAX_SCALE": softmax_scale,
+            "WIN_LEFT": win_left,
+            "WIN_RIGHT": win_right,
             "SEED_Q": kwargs.get("seed_q"),
             "SEED_K": kwargs.get("seed_k"),
             "SEED_V": kwargs.get("seed_v"),
@@ -201,7 +205,7 @@ def run_metadata(
         )
         deq_q = quant_scale_q
         deq_k = quant_scale_k
-        deq_v = quant_scale_v
+        deq_v = quant_scale_v if dequant_scale_v is not None else None
         q_fp8 = (
             mxfp8_golden_mod.mxfp8_per_token_group_quant(
                 q_cpu, quant_scale_q, group_size

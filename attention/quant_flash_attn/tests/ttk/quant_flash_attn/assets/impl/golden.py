@@ -283,6 +283,8 @@ def _apply_golden_globals(attrs, quant_mode=1):
         "max_seqlen_q": "MAX_SEQLEN_Q",
         "max_seqlen_kv": "MAX_SEQLEN_KV",
         "softmax_scale": "SOFTMAX_SCALE",
+        "win_left": "WIN_LEFT",
+        "win_right": "WIN_RIGHT",
     }
     for attr_key, golden_key in mapping.items():
         if attr_key in attrs:
@@ -339,6 +341,8 @@ def cpu_qfa_mxfp8(
     is_contiguous: bool = True,
     device_id: int = 0,
     softmax_scale: float = None,
+    win_left: int = -1,
+    win_right: int = -1,
     data_range_q: float = 1.0,
     data_range_k: float = 1.0,
     data_range_v: float = 1.0,
@@ -407,6 +411,8 @@ def cpu_qfa_mxfp8(
             "graph_path": graph_path,
             "softmax_scale": softmax_scale,
             "p_scale_value": p_scale_value,
+            "win_left": win_left,
+            "win_right": win_right,
         },
         quant_mode=1,
     )
@@ -490,15 +496,22 @@ def cpu_qfa_mxfp8(
         )
 
         # V scale: e8m0 -> fp32 -> reverse layout -> out_cache (Bn,N,pack_bs,D,2) -> grouped BNSD
-        dv_e8m0 = _to_torch_e8m0(dequant_scale_v)
-        _assert_no_e8m0_nan(dv_e8m0, "descale_v")
-        dv_fp32 = mxfp8_golden_mod.e8m0_to_fp32(dv_e8m0)
-        dv_cache = _reverse_layout_to_cache(
-            dv_fp32, kv_cache_layout, is_scale=True, is_vscale=True
-        )
-        dv_bnsd_grouped = _pa_v_scale_to_bnsd_grouped(
-            dv_cache, actual_seq_kv, block_size, bt, group_size=group_size
-        )
+        if dequant_scale_v is not None:
+            dv_e8m0 = _to_torch_e8m0(dequant_scale_v)
+            _assert_no_e8m0_nan(dv_e8m0, "descale_v")
+            dv_fp32 = mxfp8_golden_mod.e8m0_to_fp32(dv_e8m0)
+            dv_cache = _reverse_layout_to_cache(
+                dv_fp32, kv_cache_layout, is_scale=True, is_vscale=True
+            )
+            dv_bnsd_grouped = _pa_v_scale_to_bnsd_grouped(
+                dv_cache, actual_seq_kv, block_size, bt, group_size=group_size
+            )
+        else:
+            Sg_max_tmp = math.ceil(max_skv / group_size) if max_skv > 0 else 0
+            dv_bnsd_grouped = torch.ones((B, N_kv, Sg_max_tmp, D), dtype=torch.float32)
+            logger.info(
+                "[GOLDEN] dequant_scale_v is None, CPU golden uses ones V scale"
+            )
         # V scale grouped: (B, N_kv, Sg_max, D), Sg_max = ceil(max_skv/32)
         # PA_NZ 布局 V scale 的 D 维会 16 对齐 padding (如 D=72→80),
         # 物理 D >= logical D, 裁剪到 logical D 排除 padding (fill_value=E8M0_MIN_POSITIVE).
@@ -544,12 +557,22 @@ def cpu_qfa_mxfp8(
         )
 
         # V scale: e8m0 -> fp32 -> TND v-scale grouped -> BNSD grouped
-        dv_e8m0 = _to_torch_e8m0(dequant_scale_v)
-        _assert_no_e8m0_nan(dv_e8m0, "descale_v")
-        dv_fp32 = mxfp8_golden_mod.e8m0_to_fp32(dv_e8m0)
-        dv_bnsd_grouped = _tnd_v_scale_to_bnsd_grouped(
-            dv_fp32, actual_seq_kv, cu_seqlens=cu_seqlens_kv_list, group_size=group_size
-        )
+        if dequant_scale_v is not None:
+            dv_e8m0 = _to_torch_e8m0(dequant_scale_v)
+            _assert_no_e8m0_nan(dv_e8m0, "descale_v")
+            dv_fp32 = mxfp8_golden_mod.e8m0_to_fp32(dv_e8m0)
+            dv_bnsd_grouped = _tnd_v_scale_to_bnsd_grouped(
+                dv_fp32,
+                actual_seq_kv,
+                cu_seqlens=cu_seqlens_kv_list,
+                group_size=group_size,
+            )
+        else:
+            Sg_max_tmp = math.ceil(max_skv / group_size) if max_skv > 0 else 0
+            dv_bnsd_grouped = torch.ones((B, N_kv, Sg_max_tmp, D), dtype=torch.float32)
+            logger.info(
+                "[GOLDEN] dequant_scale_v is None, CPU golden uses ones V scale"
+            )
         Sg_max = math.ceil(max_skv / group_size) if max_skv > 0 else 0
         # TND V scale D 维可能因对齐 padding 而大于 logical D, 同 PA 分支处理.
         assert dv_bnsd_grouped.shape[:3] == (B, N_kv, Sg_max), (
@@ -654,6 +677,8 @@ def cpu_qfa_gqa_fp8(
     is_contiguous: bool = True,
     device_id: int = 0,
     softmax_scale: float = None,
+    win_left: int = -1,
+    win_right: int = -1,
     data_range_q: float = 1.0,
     data_range_k: float = 1.0,
     data_range_v: float = 1.0,
@@ -731,6 +756,8 @@ def cpu_qfa_gqa_fp8(
             "graph_path": graph_path,
             "softmax_scale": softmax_scale,
             "p_scale_value": p_scale_value,
+            "win_left": win_left,
+            "win_right": win_right,
             "QUANT_MODE": 6,
             "SPARSE_MODE": mask_mode,
             "BLOCK_SIZE": block_size,

@@ -252,6 +252,12 @@ def quant_flash_attn_metadata(
     Dispatcher implementation: NPU.
     'PrivateUse1' is dispatch key for custom NPU backends.
     """
+
+    if layout_q == "TND":
+        torch._check(
+            batch_size == None,
+            lambda: f"When the layout of query is TND, the attribute batch_size of quant_flash_attn_metadata must be None, but got {batch_size}.",
+        )
     batch_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
     max_seqlen_q = -1 if max_seqlen_q is None else max_seqlen_q
     max_seqlen_kv = -1 if max_seqlen_kv is None else max_seqlen_kv
