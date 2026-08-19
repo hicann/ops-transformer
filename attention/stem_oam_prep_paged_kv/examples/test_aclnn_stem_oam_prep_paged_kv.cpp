@@ -85,7 +85,7 @@ int main()
     int64_t stemStride = 16;
     int64_t maxKb = 2;
     int64_t kflatDim = stemStride * dimQk;
-    const char *kvLayout = "BNBD";
+    char *kvLayout = "BNBD";
 
     std::vector<int64_t> kCacheShape = {totalBlocks, numKvHeads, 64, dimQk};
     std::vector<int64_t> kvIndicesShape = {batch, maxKvBlocks};
@@ -146,8 +146,8 @@ int main()
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor;
     ret = aclnnStemOamPrepPagedKvGetWorkspaceSize(kCache, vCache, kvIndices, kvSeqLens, kScaleCache, vScale, 0.3,
-                                                  kvLayout, stemBlockSize, stemStride, kFlat, vBias,
-                                                  &workspaceSize, &executor);
+                                                  kvLayout, stemBlockSize, stemStride, kFlat, vBias, &workspaceSize,
+                                                  &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 
     void *workspaceAddr = nullptr;
