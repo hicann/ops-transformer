@@ -1063,7 +1063,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
                         size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
       CHECK_FREE_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret);
                     return ret);
-      for (int64_t i = 0; i < size; i++) {
+      for (int64_t i = 0; i < 10 && i < size; i++) {
           LOG_PRINT("result[%lld] is: %f\n", static_cast<long long>(i), resultData[i]);
       }
 

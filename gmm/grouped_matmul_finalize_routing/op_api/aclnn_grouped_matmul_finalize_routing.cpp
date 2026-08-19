@@ -1133,7 +1133,9 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(void *workspace, uint64_t 
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
 }
 
-static inline aclnnStatus CheckNullptrForXAndweight(const aclTensor *x, const aclTensor *weight)
+static inline aclnnStatus CheckInputParamsForWeightNzV2(const aclTensor *x, const aclTensor *weight,
+                                                        const aclTensor *antiquantScaleOptional,
+                                                        const aclTensor *antiquantOffsetOptional)
 {
     if (x == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "GroupedMatmulFinalizeRoutingWeightNzV2: x should not be nullptr.");
@@ -1141,6 +1143,16 @@ static inline aclnnStatus CheckNullptrForXAndweight(const aclTensor *x, const ac
     }
     if (weight == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "GroupedMatmulFinalizeRoutingWeightNzV2: weight should not be nullptr.");
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
+    if (antiquantScaleOptional != nullptr) {
+        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
+                "GroupedMatmulFinalizeRoutingWeightNzV2 does not support antiquantScaleOptional, it must be nullptr.");
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
+    if (antiquantOffsetOptional != nullptr) {
+        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
+                "GroupedMatmulFinalizeRoutingWeightNzV2 does not support antiquantOffsetOptional, it must be nullptr.");
         return ACLNN_ERR_PARAM_NULLPTR;
     }
     return ACLNN_SUCCESS;
@@ -1160,11 +1172,9 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize(
                    DFX_IN(x1, x2, scale, bias, pertokenScaleOptional, groupList, sharedInput, logit, rowIndex, dtype,
                           sharedInputWeight, sharedInputOffset, transposeX1, transposeX2, groupListType),
                    DFX_OUT(out));
-    (void)antiquantScaleOptional;
-    (void)antiquantOffsetOptional;
-    // 对x和weight为空提前拦截
-    auto retxweightnullptr = CheckNullptrForXAndweight(x1, x2);
-    CHECK_RET(retxweightnullptr == ACLNN_SUCCESS, retxweightnullptr);
+    auto checkInputRet =
+        CheckInputParamsForWeightNzV2(x1, x2, antiquantScaleOptional, antiquantOffsetOptional);
+    CHECK_RET(checkInputRet == ACLNN_SUCCESS, checkInputRet);
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 && dtype != 0) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "GroupedMatmulFinalizeRoutingWeightNzV2 dtype must be 0 (FLOAT32), but is %lld.", dtype);

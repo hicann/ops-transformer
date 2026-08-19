@@ -8,7 +8,6 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -16,24 +15,24 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_grouped_matmul_finalize_routing_v3.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define CHECK_FREE_RET(cond, return_expr)                                                                              \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            Finalize(deviceId, stream);                                                                                \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_FREE_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            Finalize(deviceId, stream); \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
@@ -293,35 +292,35 @@ int main()
     ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), outDeviceAddr,
                       size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
-    for (int64_t i = 0; i < size; i++) {
+    for (int64_t i = 0; i < 10 && i < size; i++) {
         LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
     }
 
-    // 6. 释放aclTensor和aclTensor，需要根据具体API的接口定义修改
-    aclDestroyTensor(x);
-    aclDestroyTensor(w);
-    aclDestroyTensor(scale);
-    aclDestroyTensor(bias);
-    aclDestroyTensor(offset);
-    aclDestroyTensor(pertokenScale);
-    aclDestroyTensor(groupList);
-    aclDestroyTensor(sharedInput);
-    aclDestroyTensor(logit);
-    aclDestroyTensor(rowIndex);
-    aclDestroyTensor(out);
+    // 6. Release tensors managed by unique_ptr before shutting down the ACL runtime.
+    outTensorPtr.reset();
+    rowIndexTensorPtr.reset();
+    logitTensorPtr.reset();
+    sharedInputTensorPtr.reset();
+    groupListTensorPtr.reset();
+    pertokenScaleTensorPtr.reset();
+    offsetTensorPtr.reset();
+    biasTensorPtr.reset();
+    scaleTensorPtr.reset();
+    wTensorPtr.reset();
+    xTensorPtr.reset();
 
-    // 7.释放device资源，需要根据具体API的接口定义修改
-    aclrtFree(xDeviceAddr);
-    aclrtFree(wDeviceAddr);
-    aclrtFree(scaleDeviceAddr);
-    aclrtFree(biasDeviceAddr);
-    aclrtFree(offsetDeviceAddr);
-    aclrtFree(pertokenScaleDeviceAddr);
-    aclrtFree(groupListDeviceAddr);
-    aclrtFree(sharedInputDeviceAddr);
-    aclrtFree(logitDeviceAddr);
-    aclrtFree(rowIndexDeviceAddr);
-    aclrtFree(outDeviceAddr);
+    // 7. Release device buffers managed by unique_ptr before shutting down the ACL runtime.
+    outDeviceAddrPtr.reset();
+    rowIndexDeviceAddrPtr.reset();
+    logitDeviceAddrPtr.reset();
+    sharedInputDeviceAddrPtr.reset();
+    groupListDeviceAddrPtr.reset();
+    pertokenScaleDeviceAddrPtr.reset();
+    offsetDeviceAddrPtr.reset();
+    biasDeviceAddrPtr.reset();
+    scaleDeviceAddrPtr.reset();
+    wDeviceAddrPtr.reset();
+    xDeviceAddrPtr.reset();
     if (workspaceSize > 0) {
         aclrtFree(workspaceAddr);
     }
