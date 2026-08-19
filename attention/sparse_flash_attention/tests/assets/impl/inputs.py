@@ -174,8 +174,6 @@ class SparseFlashAttentionInputAdapter:
         outputs, generated, _ = pytest_golden.compute_cpu(generated, params)
         if outputs is None:
             raise RuntimeError("SparseFlashAttention pytest compute_cpu failed")
-        if hasattr(torch, "npu"):
-            torch.npu.synchronize()
 
         self.copy_tensor(query, generated.get("query"), "query")
         self.copy_tensor(key, generated.get("key_cache", generated.get("key")), "key")
