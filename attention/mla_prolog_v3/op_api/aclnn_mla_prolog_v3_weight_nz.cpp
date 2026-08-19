@@ -31,6 +31,8 @@ using namespace op;
 extern "C" {
 #endif
 
+namespace {
+
 extern aclnnStatus aclnnInnerMlaPrologV3GetWorkspaceSize(
     const aclTensor *tokenX, const aclTensor *weightDq, const aclTensor *weightUqQr, const aclTensor *weightUk,
     const aclTensor *weightDkvKr, const aclTensor *rmsnormGammaCq, const aclTensor *rmsnormGammaCkv,
@@ -48,12 +50,6 @@ extern aclnnStatus aclnnInnerMlaPrologV3GetWorkspaceSize(
 
 extern aclnnStatus aclnnInnerMlaPrologV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                          const aclrtStream stream);
-
-#ifdef __cplusplus
-}
-#endif
-
-namespace {
 
 class TensorHolder {
 public:
@@ -189,12 +185,6 @@ bool CheckQueryQuantModeValidity(int64_t queryQuantMode)
     return true;
 }
 
-} // namespace
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
     const aclTensor *tokenX, const aclTensor *weightDq, const aclTensor *weightUqQr, const aclTensor *weightUk,
     const aclTensor *weightDkvKr, const aclTensor *rmsnormGammaCq, const aclTensor *rmsnormGammaCkv,
@@ -287,6 +277,8 @@ aclnnStatus aclnnMlaPrologV3WeightNz(void *workspace, uint64_t workspaceSize, ac
 {
     return aclnnInnerMlaPrologV3(workspace, workspaceSize, executor, stream);
 }
+
+} // namespace
 
 #ifdef __cplusplus
 }

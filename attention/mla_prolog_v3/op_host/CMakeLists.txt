@@ -28,5 +28,5 @@ if (NOT BUILD_OPS_RTY_KERNEL)
     add_modules_sources(
         OP_API_INDEPENDENT ON
         OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
-        OPTYPE mla_prolog_v3 ACLNNTYPE aclnn_inner ACLNN_EXTRA_VERSION v1)
+        OPTYPE mla_prolog_v3 ACLNNTYPE aclnn_inner)
 endif()

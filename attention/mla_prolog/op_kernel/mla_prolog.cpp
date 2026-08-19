@@ -22,7 +22,7 @@
 using namespace MlaProlog;
 
 template <uint8_t CacheMode, uint8_t Scenario, uint8_t QuantMode, bool EnableDequantOpt, bool EnableGroupComputeOpt,
-          uint8_t EmptyTensorMode, uint8_t ActualSeqLenMode, uint8_t SplitMMode, bool EnableRope, uint8_t CvMode>
+          uint8_t EmptyTensorMode, uint8_t ActualSeqLenMode, uint8_t SplitMMode, uint8_t CvMode>
 __global__ __aicore__ void mla_prolog(__gm__ uint8_t *tokenX, __gm__ uint8_t *weightDq, __gm__ uint8_t *weightUqQr,
                                       __gm__ uint8_t *weightUk, __gm__ uint8_t *weightDkvKr,
                                       __gm__ uint8_t *rmsnormGammaCq, __gm__ uint8_t *rmsnormGammaCkv,
@@ -55,7 +55,7 @@ __global__ __aicore__ void mla_prolog(__gm__ uint8_t *tokenX, __gm__ uint8_t *we
 
     if constexpr (static_cast<SCENARIO>(Scenario) == SCENARIO::NO_QUANT) {
         MlaPrologVecS1CubS2<MLAPType<bfloat16_t, bfloat16_t, bfloat16_t, float, cacheMode, EnableDequantOpt,
-                                     EnableGroupComputeOpt, emptyMode, actualSeqLenMode, false, cvRatio, EnableRope>>
+                                     EnableGroupComputeOpt, emptyMode, actualSeqLenMode, false, cvRatio>>
             op(&pipe, tilingData, tilingDataBaseParams);
         op.Init(tokenX, weightDq, weightUqQr, weightUk, weightDkvKr, rmsnormGammaCq, rmsnormGammaCkv, ropeSin, ropeCos,
                 cacheIndex, kvCacheOut, krCacheOut, dequantScaleX, dequantScaleWDq, dequantScaleWUqQr,
@@ -66,7 +66,7 @@ __global__ __aicore__ void mla_prolog(__gm__ uint8_t *tokenX, __gm__ uint8_t *we
     } else if constexpr (static_cast<SCENARIO>(Scenario) == SCENARIO::QUANT &&
                          static_cast<QUANT_MODE>(QuantMode) == QUANT_MODE::PARTIAL_QUANT_KV_NO_QUANT) {
         MlaPrologVecS1CubS2<MLAPType<bfloat16_t, int8_t, bfloat16_t, float, cacheMode, EnableDequantOpt,
-                                     EnableGroupComputeOpt, emptyMode, actualSeqLenMode, false, cvRatio, EnableRope>>
+                                     EnableGroupComputeOpt, emptyMode, actualSeqLenMode, false, cvRatio>>
             op(&pipe, tilingData, tilingDataBaseParams);
         op.Init(tokenX, weightDq, weightUqQr, weightUk, weightDkvKr, rmsnormGammaCq, rmsnormGammaCkv, ropeSin, ropeCos,
                 cacheIndex, kvCacheOut, krCacheOut, dequantScaleX, dequantScaleWDq, dequantScaleWUqQr,
@@ -77,7 +77,7 @@ __global__ __aicore__ void mla_prolog(__gm__ uint8_t *tokenX, __gm__ uint8_t *we
     } else if constexpr (static_cast<SCENARIO>(Scenario) == SCENARIO::QUANT &&
                          static_cast<QUANT_MODE>(QuantMode) == QUANT_MODE::PARTIAL_QUANT_KV_QUANT_PER_CHANNEL) {
         MlaPrologVecS1CubS2<MLAPType<bfloat16_t, int8_t, int8_t, float, cacheMode, EnableDequantOpt,
-                                     EnableGroupComputeOpt, emptyMode, actualSeqLenMode, false, cvRatio, EnableRope>>
+                                     EnableGroupComputeOpt, emptyMode, actualSeqLenMode, false, cvRatio>>
             op(&pipe, tilingData, tilingDataBaseParams);
         op.Init(tokenX, weightDq, weightUqQr, weightUk, weightDkvKr, rmsnormGammaCq, rmsnormGammaCkv, ropeSin, ropeCos,
                 cacheIndex, kvCacheOut, krCacheOut, dequantScaleX, dequantScaleWDq, dequantScaleWUqQr,

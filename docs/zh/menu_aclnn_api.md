@@ -137,7 +137,6 @@
 - [aclnnMlaProlog](../../attention/mla_prolog/docs/aclnnMlaProlog.md)
 - [aclnnMlaPrologV2WeightNz](../../attention/mla_prolog_v2/docs/aclnnMlaPrologV2WeightNz.md)
 - [aclnnMlaPrologV3WeightNz](../../attention/mla_prolog_v3/docs/aclnnMlaPrologV3WeightNz.md)
-- [aclnnMlaPrologV4WeightNz](../../attention/mla_prolog_v3/docs/aclnnMlaPrologV4WeightNz.md)
 - [aclnnMoeComputeExpertTokens](../../moe/moe_compute_expert_tokens/docs/aclnnMoeComputeExpertTokens.md)
 - [aclnnMoeDistributeCombine](../../mc2/moe_distribute_combine/docs/aclnnMoeDistributeCombine.md)
 - [aclnnMoeDistributeCombineAddRmsNorm](../../mc2/moe_distribute_combine_add_rms_norm/docs/aclnnMoeDistributeCombineAddRmsNorm.md)
