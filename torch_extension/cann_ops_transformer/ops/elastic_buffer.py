@@ -195,14 +195,17 @@ def _get_moe_ep_window_layout(
     dispatch_count_size = world_size * _inline_align(
         local_experts_num * state_dtype_size, win_addr_align
     )
-    dispatch_notify_count = _inline_align(num_max_tokens_per_rank, notify_cnt_align) // notify_cnt_align
-    dispatch_notify_size = world_size * win_addr_align + world_size * dispatch_notify_count * win_addr_align
+    dispatch_notify_count = (
+        _inline_align(num_max_tokens_per_rank, notify_cnt_align) // notify_cnt_align
+    )
+    dispatch_notify_size = (
+        world_size * win_addr_align
+        + world_size * dispatch_notify_count * win_addr_align
+    )
     combine_state_size = (
         num_max_tokens_per_rank * topk * win_addr_align + world_size * win_addr_align
     )
-    state_buffer_size = (
-        dispatch_count_size + dispatch_notify_size + combine_state_size
-    )
+    state_buffer_size = dispatch_count_size + dispatch_notify_size + combine_state_size
 
     metadata_bytes = _inline_align(topk * metadata_dtype_size, ub_align)
     hidden_align = _inline_align(hidden * max_out_dtype_size, ub_align)
@@ -412,9 +415,7 @@ class ElasticBuffer:
                 win_addr_align,
             )
             scaleout_recv_data_size = (
-                scaleout_rank_count
-                * num_max_tokens_per_rank
-                * scaleout_per_slot_bytes
+                scaleout_rank_count * num_max_tokens_per_rank * scaleout_per_slot_bytes
             )
             scaleout_recv_status_size = (
                 scaleout_rank_count * num_max_tokens_per_rank * win_addr_align
@@ -462,6 +463,12 @@ class ElasticBuffer:
         buffer_alignment = 2 * 1024 * 1024
         _torch_check((group is not None), lambda: ("group must not be None."))
         _torch_check(
+            isinstance(num_cpu_bytes, int) and not isinstance(num_cpu_bytes, bool),
+            lambda: (
+                f"num_cpu_bytes must be an int, got {type(num_cpu_bytes).__name__}: {num_cpu_bytes!r}."
+            ),
+        )
+        _torch_check(
             (num_cpu_bytes >= 0 and num_cpu_bytes % buffer_alignment == 0),
             lambda: (
                 f"num_cpu_bytes must be non-negative and 2MB-aligned, got {num_cpu_bytes=}, "
@@ -476,7 +483,7 @@ class ElasticBuffer:
                 and num_max_tokens_per_rank > 0,
                 lambda: (
                     "num_max_tokens_per_rank must be a positive int when with_grad=True, "
-                    f"got {num_max_tokens_per_rank}."
+                    f"got {type(num_max_tokens_per_rank).__name__}: {num_max_tokens_per_rank!r}."
                 ),
             )
         else:
@@ -620,12 +627,113 @@ class ElasticBuffer:
                 unique_local_entry (K,) int32 — 1D sparse index。
         """
         _torch_check(
+            self._with_grad,
+            lambda: "engram_fetch_grad requires ElasticBuffer to be initialized with with_grad=True",
+        )
+        _torch_check(
             grad_fetched.device.type == torch.device("npu").type,
             lambda: f"grad_fetched must be on NPU, got device: {grad_fetched.device}",
         )
         _torch_check(
             grad_fetched.dim() == 2,
             lambda: f"grad_fetched must be 2D, got dimensions: {grad_fetched.dim()}",
+        )
+        _torch_check(
+            not self._engram_fetch_in_progress,
+            lambda: (
+                "engram_fetch_grad must be called after the callable returned by engram_fetch."
+            ),
+        )
+        _torch_check(
+            self._engram_context_tensor is not None,
+            lambda: "engram_fetch_grad must be called after at least one engram_write",
+        )
+        expected_dtype = _ENGRAM_INT_TO_DTYPE[self._engram_dtype_int]
+        _torch_check(
+            grad_fetched.dtype == expected_dtype,
+            lambda: (
+                f"grad_fetched dtype must match storage dtype ({expected_dtype}), "
+                f"got {grad_fetched.dtype}"
+            ),
+        )
+        _torch_check(
+            fetch_ctx.perm.dim() == 1,
+            lambda: f"fetch_ctx.perm must be 1D, got dimensions: {fetch_ctx.perm.dim()}",
+        )
+        expected_num_tokens = fetch_ctx.perm.size(0)
+        _torch_check(
+            grad_fetched.size(0) == expected_num_tokens,
+            lambda: (
+                f"grad_fetched row count ({grad_fetched.size(0)}) must match the number of tokens "
+                f"fetched in forward pass ({expected_num_tokens})"
+            ),
+        )
+        _torch_check(
+            grad_fetched.size(1) == self._engram_hidden_size,
+            lambda: (
+                f"grad_fetched hidden size ({grad_fetched.size(1)}) must match storage hidden size "
+                f"({self._engram_hidden_size})"
+            ),
+        )
+        _torch_check(
+            grad_fetched.size(1) % 128 == 0,
+            lambda: (
+                f"grad_fetched hidden size must be 128-aligned, got {grad_fetched.size(1)}"
+            ),
+        )
+        for _name, _tensor in (
+            ("perm", fetch_ctx.perm),
+            ("send_counts", fetch_ctx.send_counts),
+            ("recv_counts", fetch_ctx.recv_counts),
+            ("recv_local_entry", fetch_ctx.recv_local_entry),
+            ("num_recv", fetch_ctx.num_recv),
+        ):
+            _torch_check(
+                _tensor.dtype == torch.int32,
+                lambda _n=_name, _t=_tensor: (
+                    f"fetch_ctx.{_n} dtype must be int32, got {_t.dtype}"
+                ),
+            )
+            _torch_check(
+                _tensor.device.type == torch.device("npu").type,
+                lambda _n=_name, _t=_tensor: (
+                    f"fetch_ctx.{_n} must be on NPU, got device: {_t.device}"
+                ),
+            )
+            _torch_check(
+                _tensor.dim() == 1,
+                lambda _n=_name, _t=_tensor: (
+                    f"fetch_ctx.{_n} must be 1D, got dimensions: {_t.dim()}"
+                ),
+            )
+        expected_send_counts_len = self._rank_size * 8
+        _torch_check(
+            fetch_ctx.send_counts.size(0) == expected_send_counts_len,
+            lambda: (
+                f"fetch_ctx.send_counts length ({fetch_ctx.send_counts.size(0)}) must equal "
+                f"rank_size * 8 = {expected_send_counts_len}"
+            ),
+        )
+        _torch_check(
+            fetch_ctx.recv_counts.size(0) == self._rank_size,
+            lambda: (
+                f"fetch_ctx.recv_counts length ({fetch_ctx.recv_counts.size(0)}) must equal "
+                f"rank_size ({self._rank_size})"
+            ),
+        )
+        expected_recv_local_entry_len = self._num_max_tokens_per_rank * self._rank_size
+        _torch_check(
+            fetch_ctx.recv_local_entry.size(0) == expected_recv_local_entry_len,
+            lambda: (
+                f"fetch_ctx.recv_local_entry length ({fetch_ctx.recv_local_entry.size(0)}) must equal "
+                f"num_max_tokens_per_rank * rank_size = {expected_recv_local_entry_len}"
+            ),
+        )
+        _torch_check(
+            fetch_ctx.num_recv.size(0) == 1,
+            lambda: (
+                f"fetch_ctx.num_recv length ({fetch_ctx.num_recv.size(0)}) must be 1"
+            ),
         )
         return self._runtime.engram_fetch_grad(
             grad_fetched,
@@ -726,24 +834,22 @@ class ElasticBuffer:
             route_count,
             route_dst_scaleout,
             route_scaleout_slot,
-        ) = (
-            self._runtime.moe_ep_dispatch(
-                args.x,
-                args.topk_idx,
-                topk_weights,
-                args.scales,
-                args.cached_dst_slot_idx,
-                args.cached_route_count,
-                args.cached_route_dst_scaleout,
-                args.cached_route_scaleout_slot,
-                self._ep_world_size,
-                self._rank_id,
-                args.num_experts,
-                args.num_max_tokens_per_rank,
-                args.expert_alignment,
-                args.do_cpu_sync,
-                hp_addr,
-            )
+        ) = self._runtime.moe_ep_dispatch(
+            args.x,
+            args.topk_idx,
+            topk_weights,
+            args.scales,
+            args.cached_dst_slot_idx,
+            args.cached_route_count,
+            args.cached_route_dst_scaleout,
+            args.cached_route_scaleout_slot,
+            self._ep_world_size,
+            self._rank_id,
+            args.num_experts,
+            args.num_max_tokens_per_rank,
+            args.expert_alignment,
+            args.do_cpu_sync,
+            hp_addr,
         )
 
         actual_a = self._get_dispatch_recv_count(args)
@@ -812,18 +918,16 @@ class ElasticBuffer:
             lambda: ("bias is not supported, please set bias to None."),
         )
 
-        combined_x, combined_topk_weights = (
-            self._runtime.moe_ep_combine(
-                x,
-                handle.topk_idx,
-                handle.recv_src_metadata,
-                handle.num_recv_tokens_per_expert,
-                topk_weights,
-                self._ep_world_size,
-                self._rank_id,
-                handle.num_experts,
-                handle.num_max_tokens_per_rank,
-            )
+        combined_x, combined_topk_weights = self._runtime.moe_ep_combine(
+            x,
+            handle.topk_idx,
+            handle.recv_src_metadata,
+            handle.num_recv_tokens_per_expert,
+            topk_weights,
+            self._ep_world_size,
+            self._rank_id,
+            handle.num_experts,
+            handle.num_max_tokens_per_rank,
         )
         return combined_x, combined_topk_weights
 
