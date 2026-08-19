@@ -37,14 +37,13 @@ constexpr CastTrait CAST_TRAIT_F32_TO_FP8 = {RegLayout::ZERO, SatMode::SAT, Mask
                                              RoundMode::CAST_RINT};
 
 template <typename T>
-__simd_callee__ inline void LoadFp8GroupInput(RegTensor<float> &dst, __local_mem__ T *src, MaskReg mask,
-                                              uint32_t offset)
+__simd_callee__ inline void LoadFp8GroupInput(RegTensor<float> &dst, __ubuf__ T *src, MaskReg mask, uint32_t offset)
 {
     if constexpr (IsSameType<T, float>::value) {
-        DataCopy(dst, src + offset);
+        LoadAlign(dst, src + offset);
     } else {
         RegTensor<T> tmp;
-        DataCopy<T, LoadDist::DIST_UNPACK_B16>(tmp, src + offset);
+        LoadAlign<T, LoadDist::DIST_UNPACK_B16>(tmp, src + offset);
         Cast<float, T, CAST_TRAIT_B16_TO_F32>(dst, tmp, mask);
     }
 }
@@ -77,13 +76,13 @@ __simd_vf__ inline void VfComputeAmax(__ubuf__ T *xAddr, __ubuf__ float *amaxOut
             Abs(absLeftReg, xLeftReg, maskAll);
             Abs(absRightReg, xRightReg, maskAll);
             Max(absLeftReg, absLeftReg, absRightReg, maskAll);
-            ReduceMax(maxReg, absLeftReg, maskAll);
+            Reduce<ReduceType::MAX>(maxReg, absLeftReg, maskAll);
             Duplicate(maxReg, maxReg, maskAll);
             if constexpr (CLAMP_AMAX) {
                 Maxs(maxReg, maxReg, 0.0001f, maskAll);
             }
 
-            DataCopy<float, StoreDist::DIST_FIRST_ELEMENT_B32>(amaxOutAddr + groupIdx, maxReg, maskAll);
+            StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(amaxOutAddr + groupIdx, maxReg, maskAll);
         }
 
         if (tailElemNum > 0) {
@@ -98,19 +97,19 @@ __simd_vf__ inline void VfComputeAmax(__ubuf__ T *xAddr, __ubuf__ float *amaxOut
                 Abs(absLeftReg, xLeftReg, maskAll);
                 Abs(absRightReg, xRightReg, maskRight);
                 Max<float, MaskMergeMode::MERGING>(absLeftReg, absLeftReg, absRightReg, maskRight);
-                ReduceMax(maxReg, absLeftReg, maskAll);
+                Reduce<ReduceType::MAX>(maxReg, absLeftReg, maskAll);
             } else {
                 maskLoop = UpdateMask<float>(tailElemNum);
                 LoadFp8GroupInput<T>(xLeftReg, xAddr + groupOffset, maskLoop, 0);
                 Abs(absLeftReg, xLeftReg, maskLoop);
-                ReduceMax(maxReg, absLeftReg, maskLoop);
+                Reduce<ReduceType::MAX>(maxReg, absLeftReg, maskLoop);
             }
             Duplicate(maxReg, maxReg, maskAll);
             if constexpr (CLAMP_AMAX) {
                 Maxs(maxReg, maxReg, 0.0001f, maskAll);
             }
 
-            DataCopy<float, StoreDist::DIST_FIRST_ELEMENT_B32>(amaxOutAddr + fullGroupNum, maxReg, maskAll);
+            StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(amaxOutAddr + fullGroupNum, maxReg, maskAll);
         }
     }
 }
@@ -160,7 +159,7 @@ __simd_vf__ inline void VfComputeRoundScale(__ubuf__ float *amaxInAddr, __ubuf__
             uint32_t remaining = static_cast<uint32_t>(groupNum - i * vfLen);
             maskGroupNum = UpdateMask<float>(remaining);
 
-            DataCopy<float, PostLiteral::POST_MODE_UPDATE>(maxReg, amaxInAddr, vfLen);
+            LoadAlign<float, PostLiteral::POST_MODE_UPDATE>(maxReg, amaxInAddr, vfLen);
 
             ShiftRights(expBitsReg, (RegTensor<uint32_t> &)maxReg, FP32_EXPONENT_SHIFT, maskAllUint);
             And(expBitsReg, expBitsReg, expMaskReg, maskAllUint);
@@ -175,10 +174,10 @@ __simd_vf__ inline void VfComputeRoundScale(__ubuf__ float *amaxInAddr, __ubuf__
             Select(roundedExpBitsReg, oneIntReg, roundedExpBitsReg, maskClamp);
             ShiftLefts((RegTensor<uint32_t> &)roundScaleReg, roundedExpBitsReg, FP32_EXPONENT_SHIFT, maskAllUint);
 
-            DataCopy<float, PostLiteral::POST_MODE_UPDATE>(scaleOutAddr, roundScaleReg, vfLen, maskGroupNum);
+            StoreAlign<float, PostLiteral::POST_MODE_UPDATE>(scaleOutAddr, roundScaleReg, vfLen, maskGroupNum);
             Sub<uint32_t>(invExpBitsReg, invExpSubReg, roundedExpBitsReg, maskAllUint);
             ShiftLefts((RegTensor<uint32_t> &)invScaleReg, invExpBitsReg, FP32_EXPONENT_SHIFT, maskAllUint);
-            DataCopy<float, PostLiteral::POST_MODE_UPDATE>(invScaleOutAddr, invScaleReg, vfLen, maskGroupNum);
+            StoreAlign<float, PostLiteral::POST_MODE_UPDATE>(invScaleOutAddr, invScaleReg, vfLen, maskGroupNum);
         }
     }
 }
@@ -208,21 +207,21 @@ __simd_vf__ inline void VfComputeData(__ubuf__ T *xAddr, __ubuf__ float *invScal
         for (uint16_t groupIdx = 0; groupIdx < fullGroupNum; groupIdx++) {
             uint32_t groupOffset = groupIdx * FP8_GROUP_QUANT_SIZE;
 
-            DataCopy<float, LoadDist::DIST_BRC_B32>(invScaleReg, invScaleInAddr + groupIdx);
+            LoadAlign<float, LoadDist::DIST_BRC_B32>(invScaleReg, invScaleInAddr + groupIdx);
             LoadFp8GroupInput<T>(xLeftReg, xAddr + groupOffset, maskAll, 0);
             LoadFp8GroupInput<T>(xRightReg, xAddr + groupOffset, maskAll, vfLen);
             Mul(quantLeftReg, xLeftReg, invScaleReg, maskAll);
             Mul(quantRightReg, xRightReg, invScaleReg, maskAll);
             Cast<U, float, CAST_TRAIT_F32_TO_FP8>(outLeftReg, quantLeftReg, maskAll);
             Cast<U, float, CAST_TRAIT_F32_TO_FP8>(outRightReg, quantRightReg, maskAll);
-            DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + groupOffset, outLeftReg, maskAll);
-            DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + groupOffset + vfLen, outRightReg, maskAll);
+            StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + groupOffset, outLeftReg, maskAll);
+            StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + groupOffset + vfLen, outRightReg, maskAll);
         }
 
         if (tailElemNum > 0) {
             uint32_t groupOffset = fullGroupNum * FP8_GROUP_QUANT_SIZE;
 
-            DataCopy<float, LoadDist::DIST_BRC_B32>(invScaleReg, invScaleInAddr + fullGroupNum);
+            LoadAlign<float, LoadDist::DIST_BRC_B32>(invScaleReg, invScaleInAddr + fullGroupNum);
 
             if (tailElemNum > vfLen) {
                 uint32_t rightElemNum = tailElemNum - vfLen;
@@ -233,14 +232,14 @@ __simd_vf__ inline void VfComputeData(__ubuf__ T *xAddr, __ubuf__ float *invScal
                 Mul(quantRightReg, xRightReg, invScaleReg, maskRight);
                 Cast<U, float, CAST_TRAIT_F32_TO_FP8>(outLeftReg, quantLeftReg, maskAll);
                 Cast<U, float, CAST_TRAIT_F32_TO_FP8>(outRightReg, quantRightReg, maskRight);
-                DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + groupOffset, outLeftReg, maskAll);
-                DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + groupOffset + vfLen, outRightReg, maskRight);
+                StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + groupOffset, outLeftReg, maskAll);
+                StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + groupOffset + vfLen, outRightReg, maskRight);
             } else {
                 maskLoop = UpdateMask<float>(tailElemNum);
                 LoadFp8GroupInput<T>(xLeftReg, xAddr + groupOffset, maskLoop, 0);
                 Mul(quantLeftReg, xLeftReg, invScaleReg, maskLoop);
                 Cast<U, float, CAST_TRAIT_F32_TO_FP8>(outLeftReg, quantLeftReg, maskLoop);
-                DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + groupOffset, outLeftReg, maskLoop);
+                StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + groupOffset, outLeftReg, maskLoop);
             }
         }
     }

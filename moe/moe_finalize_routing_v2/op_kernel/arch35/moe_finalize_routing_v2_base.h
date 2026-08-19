@@ -16,7 +16,7 @@
 #ifndef MOE_FINALIZE_ROUTING_V2_BASE_H_
 #define MOE_FINALIZE_ROUTING_V2_BASE_H_
 #include "kernel_operator.h"
-#include "op_kernel/platform_util.h"	
+#include "op_kernel/platform_util.h"
 #include "op_kernel/math_util.h"
 
 namespace MoeFinalizeRoutingV2Regbase {
@@ -24,7 +24,8 @@ using namespace AscendC;
 using namespace AscendC::MicroAPI;
 using AscendC::MicroAPI::MaskReg;
 using AscendC::MicroAPI::RegTensor;
-using AscendC::MicroAPI::UnalignReg;
+using AscendC::MicroAPI::UnalignRegForLoad;
+using AscendC::MicroAPI::UnalignRegForStore;
 
 constexpr int32_t DROPLESS_COLUMN = 0; // 按列读取
 constexpr int32_t DROP_PAD_COLUMN = 1; // 按列读取
@@ -51,73 +52,73 @@ constexpr AscendC::MicroAPI::CastTrait castTraitB322B16Even = {
 template <typename T>
 __aicore__ inline int32_t RoundUp(int32_t num)
 {
-    int32_t elemNum = Ops::Base::GetUbBlockSize() / sizeof(T);	
+    int32_t elemNum = Ops::Base::GetUbBlockSize() / sizeof(T);
     return Ops::Base::CeilAlign(num, elemNum);
 }
 
 template <typename T>
-__aicore__ inline void LoadInputData(RegTensor<float>& dst, __local_mem__ T* src, MaskReg pregLoop, uint32_t srcOffset)
+__aicore__ inline void LoadInputData(RegTensor<float> &dst, __ubuf__ T *src, MaskReg pregLoop, uint32_t srcOffset)
 {
     if constexpr (IsSameType<T, float>::value) {
-        DataCopy(dst, src + srcOffset);
+        LoadAlign(dst, src + srcOffset);
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
-        DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(tmp, src + srcOffset);
+        LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(tmp, src + srcOffset);
         Cast<float, T, castTraitB162B32Even>(dst, tmp, pregLoop);
     }
 }
 
 template <typename T>
-__aicore__ inline void LoadInputDataUnalign(
-    RegTensor<float>& dst, __local_mem__ T*& src, UnalignReg& uSrc, MaskReg pregLoop, uint32_t postUpdateStride)
+__aicore__ inline void LoadInputDataUnalign(RegTensor<float> &dst, __ubuf__ T *&src, UnalignRegForLoad &uSrc,
+                                            MaskReg pregLoop, uint32_t postUpdateStride)
 {
     if constexpr (IsSameType<T, float>::value) {
-        DataCopyUnAlign(dst, uSrc, src, postUpdateStride);
+        LoadUnAlign(dst, uSrc, src, postUpdateStride);
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
         RegTensor<T> tmpUnPack;
-        DataCopyUnAlign(tmp, uSrc, src, postUpdateStride);
-        UnPack((RegTensor<uint32_t>&)tmpUnPack, (RegTensor<uint16_t>&)tmp);
+        LoadUnAlign(tmp, uSrc, src, postUpdateStride);
+        UnPack((RegTensor<uint32_t> &)tmpUnPack, (RegTensor<uint16_t> &)tmp);
         Cast<float, T, castTraitB162B32Even>(dst, tmpUnPack, pregLoop);
     }
 }
 
 template <typename T>
-__aicore__ inline void LoadInputDataWithBrc(
-    RegTensor<float>& dst, __local_mem__ T* src, MaskReg pregLoop, uint32_t srcOffset)
+__aicore__ inline void LoadInputDataWithBrc(RegTensor<float> &dst, __ubuf__ T *src, MaskReg pregLoop,
+                                            uint32_t srcOffset)
 {
     if constexpr (IsSameType<T, float>::value) {
-        DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(dst, src + srcOffset);
+        LoadAlign<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(dst, src + srcOffset);
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
-        DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_BRC_B16>(tmp, src + srcOffset);
+        LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_BRC_B16>(tmp, src + srcOffset);
         Cast<float, T, castTraitB162B32Even>(dst, tmp, pregLoop);
     }
 }
 
 template <typename T>
-__aicore__ inline void StoreOuputDataUnalign(
-    RegTensor<float>& src, __local_mem__ T*& dst, UnalignReg& uDst, MaskReg pregLoop, uint32_t postUpdateStride)
+__aicore__ inline void StoreOuputDataUnalign(RegTensor<float> &src, __ubuf__ T *&dst, UnalignRegForStore &uDst,
+                                             MaskReg pregLoop, uint32_t postUpdateStride)
 {
     if constexpr (IsSameType<T, float>::value) {
-        DataCopyUnAlign(dst, src, uDst, postUpdateStride);
+        StoreUnAlign(dst, src, uDst, postUpdateStride);
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
         RegTensor<T> tmpPack;
         Cast<T, float, castTraitB322B16Even>(tmpPack, src, pregLoop);
-        Pack((RegTensor<uint16_t>&)tmpPack, (RegTensor<uint32_t>&)tmp);
-        DataCopyUnAlign(dst, tmpPack, uDst, postUpdateStride);
+        Pack((RegTensor<uint16_t> &)tmpPack, (RegTensor<uint32_t> &)tmp);
+        StoreUnAlign(dst, tmpPack, uDst, postUpdateStride);
     }
 }
 
 template <typename T, bool hasX2>
-__aicore__ inline void VFProcessX1AndX2(
-    const LocalTensor<float>& yLocal, const LocalTensor<T>& x1Local, const LocalTensor<T>& x2Local, uint16_t processLen)
+__aicore__ inline void VFProcessX1AndX2(const LocalTensor<float> &yLocal, const LocalTensor<T> &x1Local,
+                                        const LocalTensor<T> &x2Local, uint16_t processLen)
 {
-    __local_mem__ float* yLocalAddr = (__local_mem__ float*)yLocal.GetPhyAddr();
-    __local_mem__ T* x1LocalAddr = (__local_mem__ T*)x1Local.GetPhyAddr();
-    __local_mem__ T* x2LocalAddr = (__local_mem__ T*)x2Local.GetPhyAddr();
-    uint16_t loopCount = Ops::Base::CeilDiv<uint16_t>(processLen, VL_FP32);	
+    __ubuf__ float *yLocalAddr = (__ubuf__ float *)yLocal.GetPhyAddr();
+    __ubuf__ T *x1LocalAddr = (__ubuf__ T *)x1Local.GetPhyAddr();
+    __ubuf__ T *x2LocalAddr = (__ubuf__ T *)x2Local.GetPhyAddr();
+    uint16_t loopCount = Ops::Base::CeilDiv<uint16_t>(processLen, VL_FP32);
     __VEC_SCOPE__
     {
         RegTensor<float> x1;
@@ -131,18 +132,17 @@ __aicore__ inline void VFProcessX1AndX2(
             if constexpr (hasX2) {
                 LoadInputData<T>(x2, x2LocalAddr, pregLoop, i * VL_FP32);
                 Add(y, x1, x2, pregLoop);
-                DataCopy(yLocalAddr + i * VL_FP32, y, pregLoop);
+                StoreAlign(yLocalAddr + i * VL_FP32, y, pregLoop);
             } else {
-                DataCopy(yLocalAddr + i * VL_FP32, x1, pregLoop);
+                StoreAlign(yLocalAddr + i * VL_FP32, x1, pregLoop);
             }
         }
     }
 }
 
 template <typename T>
-__aicore__ inline void ProcessX1AndX2(
-    const LocalTensor<float>& yLocal, const LocalTensor<T>& x1Local, const LocalTensor<T>& x2Local, uint16_t processLen,
-    bool hasX1, bool hasX2)
+__aicore__ inline void ProcessX1AndX2(const LocalTensor<float> &yLocal, const LocalTensor<T> &x1Local,
+                                      const LocalTensor<T> &x2Local, uint16_t processLen, bool hasX1, bool hasX2)
 {
     if (hasX1 && hasX2) {
         VFProcessX1AndX2<T, true>(yLocal, x1Local, x2Local, processLen);
@@ -154,18 +154,17 @@ __aicore__ inline void ProcessX1AndX2(
 }
 
 template <typename T, typename S, bool hasBias, bool hasScale>
-__aicore__ inline void VFProcessExpandXBiasScale(
-    const LocalTensor<float> yLocal, const LocalTensor<T>& expandedXLocal, const LocalTensor<T>& biasLocal, S scale,
-    uint16_t processLen)
+__aicore__ inline void VFProcessExpandXBiasScale(const LocalTensor<float> yLocal, const LocalTensor<T> &expandedXLocal,
+                                                 const LocalTensor<T> &biasLocal, S scale, uint16_t processLen)
 {
-    __local_mem__ float* yLocalAddr = (__local_mem__ float*)yLocal.GetPhyAddr();
-    __local_mem__ float* srcLocalAddr = yLocalAddr;
-    __local_mem__ T* expandedXLocalAddr = (__local_mem__ T*)expandedXLocal.GetPhyAddr();
-    __local_mem__ T* biasLocalAddr = hasBias ? (__local_mem__ T*)biasLocal.GetPhyAddr() : nullptr;
+    __ubuf__ float *yLocalAddr = (__ubuf__ float *)yLocal.GetPhyAddr();
+    __ubuf__ float *srcLocalAddr = yLocalAddr;
+    __ubuf__ T *expandedXLocalAddr = (__ubuf__ T *)expandedXLocal.GetPhyAddr();
+    __ubuf__ T *biasLocalAddr = hasBias ? (__ubuf__ T *)biasLocal.GetPhyAddr() : nullptr;
 
     uint16_t loopCount = processLen / VL_FP32;
     uint16_t tailNum = processLen - loopCount * VL_FP32;
-    uint16_t tailLoop = Ops::Base::CeilDiv<uint16_t>(tailNum, VL_FP32);	
+    uint16_t tailLoop = Ops::Base::CeilDiv<uint16_t>(tailNum, VL_FP32);
     __VEC_SCOPE__
     {
         RegTensor<float> expandedX;
@@ -176,14 +175,14 @@ __aicore__ inline void VFProcessExpandXBiasScale(
         RegTensor<S> tmp;
         MaskReg pregLoop;
         MaskReg pregMain = CreateMask<S, AscendC::MicroAPI::MaskPattern::ALL>();
-        UnalignReg uSrc;
-        UnalignReg uExpandedX;
-        UnalignReg uBias;
-        UnalignReg uDst;
-        DataCopyUnAlignPre<float>(uSrc, srcLocalAddr);
-        DataCopyUnAlignPre<T>(uExpandedX, expandedXLocalAddr);
+        UnalignRegForLoad uSrc;
+        UnalignRegForLoad uExpandedX;
+        UnalignRegForLoad uBias;
+        UnalignRegForStore uDst;
+        LoadUnAlignPre<float>(uSrc, srcLocalAddr);
+        LoadUnAlignPre<T>(uExpandedX, expandedXLocalAddr);
         if constexpr (hasBias) {
-            DataCopyUnAlignPre<T>(uBias, biasLocalAddr);
+            LoadUnAlignPre<T>(uBias, biasLocalAddr);
         }
         if constexpr (hasScale) {
             if constexpr (IsSameType<S, float>::value) {
@@ -222,14 +221,14 @@ __aicore__ inline void VFProcessExpandXBiasScale(
             Add(y, src, expandedX, pregLoop);
             StoreOuputDataUnalign<float>(y, yLocalAddr, uDst, pregLoop, tailNum);
         }
-        DataCopyUnAlignPost(yLocalAddr, uDst, 0);
+        StoreUnAlignPost(yLocalAddr, uDst, 0);
     }
 }
 
 template <typename T, typename S>
-__aicore__ inline void ProcessExpandXBiasScale(
-    const LocalTensor<float> yLocal, const LocalTensor<T>& expandedXLocal, const LocalTensor<T>& biasLocal, S scale,
-    uint16_t processLen, bool hasBias, bool hasScale)
+__aicore__ inline void ProcessExpandXBiasScale(const LocalTensor<float> yLocal, const LocalTensor<T> &expandedXLocal,
+                                               const LocalTensor<T> &biasLocal, S scale, uint16_t processLen,
+                                               bool hasBias, bool hasScale)
 {
     if (hasBias && hasScale) {
         VFProcessExpandXBiasScale<T, S, true, true>(yLocal, expandedXLocal, biasLocal, scale, processLen);
@@ -243,20 +242,22 @@ __aicore__ inline void ProcessExpandXBiasScale(
 }
 
 template <typename T, typename S, bool hasBias, bool hasScale>
-__aicore__ inline void VFProcessExpandXBiasScaleOptimized(
-    const LocalTensor<float>& yLocal, const LocalTensor<T>& expandedXLocal, const LocalTensor<T>& biasLocal,
-    const LocalTensor<S>& scalesLocal, uint16_t validK, uint16_t processLen)
+__aicore__ inline void VFProcessExpandXBiasScaleOptimized(const LocalTensor<float> &yLocal,
+                                                          const LocalTensor<T> &expandedXLocal,
+                                                          const LocalTensor<T> &biasLocal,
+                                                          const LocalTensor<S> &scalesLocal, uint16_t validK,
+                                                          uint16_t processLen)
 {
-    __local_mem__ float* yOriginAddr = (__local_mem__ float*)yLocal.GetPhyAddr();
-    __local_mem__ float* yLocalAddr = yOriginAddr;
-    __local_mem__ float* srcLocalAddr = yOriginAddr;
-    __local_mem__ T* expandedXLocalAddr = (__local_mem__ T*)expandedXLocal.GetPhyAddr();
-    __local_mem__ T* biasLocalAddr = hasBias ? (__local_mem__ T*)biasLocal.GetPhyAddr() : nullptr;
-    __local_mem__ S* scalesLocalAddr = hasScale ? (__local_mem__ S*)scalesLocal.GetPhyAddr() : nullptr;
+    __ubuf__ float *yOriginAddr = (__ubuf__ float *)yLocal.GetPhyAddr();
+    __ubuf__ float *yLocalAddr = yOriginAddr;
+    __ubuf__ float *srcLocalAddr = yOriginAddr;
+    __ubuf__ T *expandedXLocalAddr = (__ubuf__ T *)expandedXLocal.GetPhyAddr();
+    __ubuf__ T *biasLocalAddr = hasBias ? (__ubuf__ T *)biasLocal.GetPhyAddr() : nullptr;
+    __ubuf__ S *scalesLocalAddr = hasScale ? (__ubuf__ S *)scalesLocal.GetPhyAddr() : nullptr;
 
     uint16_t loopCount = processLen / VL_FP32;
     uint16_t tailNum = processLen - loopCount * VL_FP32;
-    uint16_t tailLoop = Ops::Base::CeilDiv<uint16_t>(tailNum, VL_FP32);	
+    uint16_t tailLoop = Ops::Base::CeilDiv<uint16_t>(tailNum, VL_FP32);
     uint16_t processLenAlign = RoundUp<T>(processLen);
     __VEC_SCOPE__
     {
@@ -268,15 +269,15 @@ __aicore__ inline void VFProcessExpandXBiasScaleOptimized(
         RegTensor<T> tmp;
         MaskReg pregLoop;
         MaskReg pregMain = CreateMask<T, AscendC::MicroAPI::MaskPattern::ALL>();
-        UnalignReg uSrc;
-        UnalignReg uExpandedX;
-        UnalignReg uBias;
-        UnalignReg uDst;
+        UnalignRegForLoad uSrc;
+        UnalignRegForLoad uExpandedX;
+        UnalignRegForLoad uBias;
+        UnalignRegForStore uDst;
 
         for (uint16_t k = 0; k < validK; k++) {
             srcLocalAddr = yOriginAddr;
             yLocalAddr = yOriginAddr;
-            DataCopyUnAlignPre<float>(uSrc, srcLocalAddr);
+            LoadUnAlignPre<float>(uSrc, srcLocalAddr);
             if constexpr (hasScale) {
                 LoadInputDataWithBrc<S>(scaleReg, scalesLocalAddr, pregMain, k);
             }
@@ -308,35 +309,37 @@ __aicore__ inline void VFProcessExpandXBiasScaleOptimized(
                 Add(y, src, expandedX, pregLoop);
                 StoreOuputDataUnalign<float>(y, yLocalAddr, uDst, pregLoop, tailNum);
             }
-            DataCopyUnAlignPost(yLocalAddr, uDst, 0);
+            StoreUnAlignPost(yLocalAddr, uDst, 0);
             LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
         }
     }
 }
 
 template <typename T, typename S>
-__aicore__ inline void ProcessExpandXBiasScaleOptimized(
-    const LocalTensor<float>& yLocal, const LocalTensor<T>& expandedXLocal, const LocalTensor<T>& biasLocal,
-    const LocalTensor<S>& scalesLocal, uint16_t validK, uint16_t processLen, bool hasBias, bool hasScale)
+__aicore__ inline void ProcessExpandXBiasScaleOptimized(const LocalTensor<float> &yLocal,
+                                                        const LocalTensor<T> &expandedXLocal,
+                                                        const LocalTensor<T> &biasLocal,
+                                                        const LocalTensor<S> &scalesLocal, uint16_t validK,
+                                                        uint16_t processLen, bool hasBias, bool hasScale)
 {
     if (hasBias && hasScale) {
-        VFProcessExpandXBiasScaleOptimized<T, S, true, true>(
-            yLocal, expandedXLocal, biasLocal, scalesLocal, validK, processLen);
+        VFProcessExpandXBiasScaleOptimized<T, S, true, true>(yLocal, expandedXLocal, biasLocal, scalesLocal, validK,
+                                                             processLen);
     } else if (hasBias && !hasScale) {
-        VFProcessExpandXBiasScaleOptimized<T, S, true, false>(
-            yLocal, expandedXLocal, biasLocal, scalesLocal, validK, processLen);
+        VFProcessExpandXBiasScaleOptimized<T, S, true, false>(yLocal, expandedXLocal, biasLocal, scalesLocal, validK,
+                                                              processLen);
     } else if (!hasBias && hasScale) {
-        VFProcessExpandXBiasScaleOptimized<T, S, false, true>(
-            yLocal, expandedXLocal, biasLocal, scalesLocal, validK, processLen);
+        VFProcessExpandXBiasScaleOptimized<T, S, false, true>(yLocal, expandedXLocal, biasLocal, scalesLocal, validK,
+                                                              processLen);
     } else {
-        VFProcessExpandXBiasScaleOptimized<T, S, false, false>(
-            yLocal, expandedXLocal, biasLocal, scalesLocal, validK, processLen);
+        VFProcessExpandXBiasScaleOptimized<T, S, false, false>(yLocal, expandedXLocal, biasLocal, scalesLocal, validK,
+                                                               processLen);
     }
 }
 
 template <typename T>
-__aicore__ inline void CopyIn(
-    const GlobalTensor<T>& inputGm, const LocalTensor<T>& inputTensor, const uint16_t nBurst, const uint32_t copyLen)
+__aicore__ inline void CopyIn(const GlobalTensor<T> &inputGm, const LocalTensor<T> &inputTensor, const uint16_t nBurst,
+                              const uint32_t copyLen)
 {
     DataCopyPadExtParams<T> dataCopyPadExtParams;
     dataCopyPadExtParams.isPad = false;
@@ -353,8 +356,8 @@ __aicore__ inline void CopyIn(
 }
 
 template <typename T>
-__aicore__ inline void CopyOut(
-    const LocalTensor<T>& outputTensor, const GlobalTensor<T>& outputGm, const uint16_t nBurst, const uint32_t copyLen)
+__aicore__ inline void CopyOut(const LocalTensor<T> &outputTensor, const GlobalTensor<T> &outputGm,
+                               const uint16_t nBurst, const uint32_t copyLen)
 {
     DataCopyExtParams dataCopyParams;
     dataCopyParams.blockCount = nBurst;

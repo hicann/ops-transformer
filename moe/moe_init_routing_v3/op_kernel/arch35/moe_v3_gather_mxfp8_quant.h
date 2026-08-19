@@ -53,7 +53,7 @@ __simd_vf__ inline void vfComputeAmax(__ubuf__ T *xAddr, __ubuf__ uint16_t *amax
     MaskReg maskAllB16 = CreateMask<uint16_t, MaskPattern::ALL>();
     MaskReg mask0, mask1, mask0FP16NanInf, mask1FP16NanInf;
     // 非对齐搬出至UB用
-    UnalignReg uReg;
+    UnalignRegForStore uReg;
 
     for (uint16_t i = 0; i < vfLoopNum; i++) {
         mask0 = UpdateMask<T>(xElemNum);
@@ -61,7 +61,7 @@ __simd_vf__ inline void vfComputeAmax(__ubuf__ T *xAddr, __ubuf__ uint16_t *amax
         MaskDeInterleave<T>(mask0, mask1, mask0, mask1);
 
         // 双搬入，奇数位放x0、偶数位放x1
-        DataCopy<T, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_DINTLV_B16>(x0, x1, xAddr, vlForT * 2);
+        LoadAlign<T, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_DINTLV_B16>(x0, x1, xAddr, vlForT * 2);
 
         if constexpr (IsSameType<T, half>::value) {
             // 单独提取fp16中inf/nan的元素
@@ -89,12 +89,12 @@ __simd_vf__ inline void vfComputeAmax(__ubuf__ T *xAddr, __ubuf__ uint16_t *amax
         // 由于mask0和mask1相同或是比mask1多一个元素，使用mask0保证不漏元素
         Max(amax, abs0, abs1, mask0);
         // 再每32B（对于T来说就是每16个元素）取一个最大值，此时amax里放的是每2个元素的最大值，且末尾数据为0，因此用MaskALL
-        ReduceMaxWithDataBlock(amax, amax, maskAllB16);
+        ReduceDataBlock<ReduceType::MAX>(amax, amax, maskAllB16);
         // 非对齐搬出，每次写出numVRegBlocks个元素（ReduceMaxWithDataBlock后放在amax头部）
-        DataCopyUnAlign<uint16_t, PostLiteral::POST_MODE_UPDATE>(amaxOutAddr, amax, uReg, numVRegBlocks);
+        StoreUnAlign<uint16_t, PostLiteral::POST_MODE_UPDATE>(amaxOutAddr, amax, uReg, numVRegBlocks);
     }
     // 非对齐搬出收尾，尾部多出的位置写0
-    DataCopyUnAlignPost(amaxOutAddr, uReg, 0);
+    StoreUnAlignPost(amaxOutAddr, uReg, 0);
 }
 
 template <typename T, typename U, bool CLAMP_AMAX>
@@ -143,7 +143,7 @@ __simd_vf__ inline void vfComputeRoundScale(__ubuf__ uint16_t *amaxInAddr, __ubu
         maskLoop = UpdateMask<uint16_t>(scaleElemNum);
         maskValid = UpdateMask<uint16_t>(validScaleElemNum);
         // 拷入vfComputeAmax算好的amax
-        DataCopy<uint16_t, PostLiteral::POST_MODE_UPDATE>(amax, amaxInAddr, vlForT);
+        LoadAlign<uint16_t, PostLiteral::POST_MODE_UPDATE>(amax, amaxInAddr, vlForT);
 
         Duplicate(mxScale, 0, maskLoop);
         Duplicate(invScale, 0, maskLoop);
@@ -176,8 +176,8 @@ __simd_vf__ inline void vfComputeRoundScale(__ubuf__ uint16_t *amaxInAddr, __ubu
 
         // 拷出算好的mxScale，即为算子输出expandedScale的值。
         // 对于每个uint16的mxScale，都只拷出其低8位，也就是以uint8的长度拷出，实际上存储的就是float8_e8m0类型的二进制值，因此POST_MODE_UPDATE的数目为vlForT/2。
-        DataCopy<uint16_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK_B16>(mxScaleOutAddr, mxScale, vlForT / 2,
-                                                                                    maskLoop);
+        StoreAlign<uint16_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK_B16>(mxScaleOutAddr, mxScale,
+                                                                                      vlForT / 2, maskLoop);
 
         // 2.计算并拷出invScale（bfloat16）
 
@@ -193,7 +193,7 @@ __simd_vf__ inline void vfComputeRoundScale(__ubuf__ uint16_t *amaxInAddr, __ubu
         Select<uint16_t>(invScale, specialMinE8M0, invScale, maskSpecialMin);
 
         // 拷出算好的invScale，用于在后续量化xQuant=invScale*x，以uint16的长度拷出，实际存储的为bfloat16类型的二进制值
-        DataCopy<uint16_t, PostLiteral::POST_MODE_UPDATE>(invScaleOutAddr, invScale, vlForT, maskLoop);
+        StoreAlign<uint16_t, PostLiteral::POST_MODE_UPDATE>(invScaleOutAddr, invScale, vlForT, maskLoop);
     }
 }
 
@@ -234,11 +234,11 @@ __simd_vf__ inline void vfComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t *invS
         maskXQuant3B32 = UpdateMask<float>(xElemNum);
 
         // 拷入待量化的x：x0存放偶数位的值，x1存放奇数位的值，双搬共拷入vlForT*2个元素
-        DataCopy<T, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_DINTLV_B16>(x0, x1, xAddr, vlForT * 2);
+        LoadAlign<T, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_DINTLV_B16>(x0, x1, xAddr, vlForT * 2);
         // 拷入invScale，类型为uint16（计算时翻译成bfloat16），其中每个元素广播至32B，这里就是每个元素重复16次，共256B/32B=8个元素，也就是numVRegBlocks的值
         // 应该是加载(256/32=8)B的元素
-        DataCopy<uint16_t, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_E2B_B16>(invScale, invScaleInAddr,
-                                                                                  numVRegBlocks);
+        LoadAlign<uint16_t, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_E2B_B16>(invScale, invScaleInAddr,
+                                                                                   numVRegBlocks);
         if constexpr (IsSameType<T, half>::value) {
             // 对于T为float16，先把x和invScale转成float32，再计算x*invScale后转为float8对应类型
 
@@ -301,13 +301,13 @@ __simd_vf__ inline void vfComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t *invS
         }
 
         // 拷出xQuant到xOutAddr。OUT_ELE_NUM_ONE_BLK=64，即一个VL下有64个float32->fp8的元素，一次拷出64个元素
-        DataCopy<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
+        StoreAlign<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
             xQuantOutAddr, (RegTensor<int8_t> &)xQuant0, OUT_ELE_NUM_ONE_BLK, maskXQuant0B32);
-        DataCopy<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
+        StoreAlign<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
             xQuantOutAddr, (RegTensor<int8_t> &)xQuant1, OUT_ELE_NUM_ONE_BLK, maskXQuant1B32);
-        DataCopy<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
+        StoreAlign<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
             xQuantOutAddr, (RegTensor<int8_t> &)xQuant2, OUT_ELE_NUM_ONE_BLK, maskXQuant2B32);
-        DataCopy<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
+        StoreAlign<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
             xQuantOutAddr, (RegTensor<int8_t> &)xQuant3, OUT_ELE_NUM_ONE_BLK, maskXQuant3B32);
     }
 }

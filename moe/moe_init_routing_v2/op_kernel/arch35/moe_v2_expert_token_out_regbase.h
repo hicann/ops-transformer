@@ -68,7 +68,7 @@ private:
     __aicore__ inline void CopyOutTokenGm();
     __aicore__ inline void CopyOutExpertTokens(GlobalTensor<int32_t> &output);
     template <bool cumsum>
-    __aicore__ inline void CalcHistVF(__local_mem__ int32_t *expertSeqs, __local_mem__ int32_t *expertTokenIdxOutLocal,
+    __aicore__ inline void CalcHistVF(__ubuf__ int32_t *expertSeqs, __ubuf__ int32_t *expertTokenIdxOutLocal,
                                       uint32_t count);
 
 private:
@@ -129,8 +129,8 @@ __aicore__ inline void CHist(MicroAPI::RegTensor<uint16_t> &dst0, MicroAPI::RegT
 }
 
 template <bool cumsum>
-__aicore__ inline void MoeV2ExpertTokenOutRegBase::CalcHistVF(__local_mem__ int32_t *expertSeqs,
-                                                              __local_mem__ int32_t *tokenIdxOut, uint32_t count)
+__aicore__ inline void MoeV2ExpertTokenOutRegBase::CalcHistVF(__ubuf__ int32_t *expertSeqs,
+                                                              __ubuf__ int32_t *tokenIdxOut, uint32_t count)
 {
     uint16_t loopCount = CeilDiv(count, VL_INT32);
 
@@ -153,7 +153,7 @@ __aicore__ inline void MoeV2ExpertTokenOutRegBase::CalcHistVF(__local_mem__ int3
         MicroAPI::Duplicate(histHighU16, 0, pregAll);
         for (uint16_t i = 0; i < (uint16_t)(loopCount - 1); i++) {
             pregLoop = MicroAPI::UpdateMask<int32_t>(count);
-            DataCopy(expertIdxS32, expertSeqs + i * VL_INT32);
+            LoadAlign(expertIdxS32, expertSeqs + i * VL_INT32);
             Cast<uint8_t, int32_t, castTraitS322U8>(expertIdxU8, expertIdxS32, pregLoop);
             if constexpr (cumsum) {
                 CHist(histLowU16, histHighU16, expertIdxU8, histMask);
@@ -166,9 +166,9 @@ __aicore__ inline void MoeV2ExpertTokenOutRegBase::CalcHistVF(__local_mem__ int3
         MicroAPI::MaskReg tempMask = MicroAPI::UpdateMask<int8_t>(count4);
         for (uint16_t i = (uint16_t)(loopCount - 1); i < loopCount; i++) {
             pregLoop = MicroAPI::UpdateMask<int32_t>(count);
-            DataCopy(expertIdxS32, expertSeqs + i * VL_INT32);
+            LoadAlign(expertIdxS32, expertSeqs + i * VL_INT32);
             Cast<uint8_t, int32_t, castTraitS322U8>(expertIdxU8, expertIdxS32, pregLoop);
-            MicroAPI::MaskAnd(histMask, histMask, tempMask, pregAll);
+            MicroAPI::And(histMask, histMask, tempMask, pregAll);
             if constexpr (cumsum) {
                 CHist(histLowU16, histHighU16, expertIdxU8, histMask);
             } else {
@@ -182,18 +182,18 @@ __aicore__ inline void MoeV2ExpertTokenOutRegBase::CalcHistVF(__local_mem__ int3
         Cast<uint32_t, uint16_t, castTraitU162U32Even>(histHighU32Even, histHighU16, pregAllU16);
         Cast<uint32_t, uint16_t, castTraitU162U32Odd>(histHighU32Odd, histHighU16, pregAllU16);
         MicroAPI::Interleave<uint32_t>(hist[2], hist[3], histHighU32Even, histHighU32Odd);
-        DataCopy(src[0], (__local_mem__ uint32_t *)tokenIdxOut);
+        LoadAlign(src[0], (__ubuf__ uint32_t *)tokenIdxOut);
         Add<uint32_t>(hist[0], hist[0], src[0], pregAll);
-        DataCopy((__local_mem__ uint32_t *)tokenIdxOut, hist[0], pregAll);
-        DataCopy(src[1], (__local_mem__ uint32_t *)tokenIdxOut + VL_INT32);
+        StoreAlign((__ubuf__ uint32_t *)tokenIdxOut, hist[0], pregAll);
+        LoadAlign(src[1], (__ubuf__ uint32_t *)tokenIdxOut + VL_INT32);
         Add<uint32_t>(hist[1], hist[1], src[1], pregAll);
-        DataCopy((__local_mem__ uint32_t *)tokenIdxOut + VL_INT32, hist[1], pregAll);
-        DataCopy(src[2], (__local_mem__ uint32_t *)tokenIdxOut + 2 * VL_INT32);
+        StoreAlign((__ubuf__ uint32_t *)tokenIdxOut + VL_INT32, hist[1], pregAll);
+        LoadAlign(src[2], (__ubuf__ uint32_t *)tokenIdxOut + 2 * VL_INT32);
         Add<uint32_t>(hist[2], hist[2], src[2], pregAll);
-        DataCopy((__local_mem__ uint32_t *)tokenIdxOut + 2 * VL_INT32, hist[2], pregAll);
-        DataCopy(src[3], (__local_mem__ uint32_t *)tokenIdxOut + 3 * VL_INT32);
+        StoreAlign((__ubuf__ uint32_t *)tokenIdxOut + 2 * VL_INT32, hist[2], pregAll);
+        LoadAlign(src[3], (__ubuf__ uint32_t *)tokenIdxOut + 3 * VL_INT32);
         Add<uint32_t>(hist[3], hist[3], src[3], pregAll);
-        DataCopy((__local_mem__ uint32_t *)tokenIdxOut + 3 * VL_INT32, hist[3], pregAll);
+        StoreAlign((__ubuf__ uint32_t *)tokenIdxOut + 3 * VL_INT32, hist[3], pregAll);
     }
 }
 
@@ -201,11 +201,11 @@ __aicore__ inline void MoeV2ExpertTokenOutRegBase::Compute(int64_t progress, Loc
 {
     LocalTensor<int32_t> inLocal = copyInQueue.DeQue<int32_t>();
     if (this->dropPadMode == DROPLESS_MODE && expertTokensCountOrCumsumFlag == EXERPT_TOKENS_CUMSUM) {
-        CalcHistVF<true>((__local_mem__ int32_t *)inLocal.GetPhyAddr(),
-                         (__local_mem__ int32_t *)tokenIdxOut.GetPhyAddr(), (uint32_t)currentLoopRows);
+        CalcHistVF<true>((__ubuf__ int32_t *)inLocal.GetPhyAddr(), (__ubuf__ int32_t *)tokenIdxOut.GetPhyAddr(),
+                         (uint32_t)currentLoopRows);
     } else {
-        CalcHistVF<false>((__local_mem__ int32_t *)inLocal.GetPhyAddr(),
-                          (__local_mem__ int32_t *)tokenIdxOut.GetPhyAddr(), (uint32_t)currentLoopRows);
+        CalcHistVF<false>((__ubuf__ int32_t *)inLocal.GetPhyAddr(), (__ubuf__ int32_t *)tokenIdxOut.GetPhyAddr(),
+                          (uint32_t)currentLoopRows);
     }
     copyInQueue.FreeTensor(inLocal);
 }
@@ -262,9 +262,9 @@ __aicore__ inline void MoeV2ExpertTokenOutRegBase::Init(GM_ADDR expertTokensCoun
         expertTokensBeforeCapacityGm.SetGlobalBuffer((__gm__ int32_t *)expertTokensBeforeCapacity, this->expertNum);
     }
 
-    expandedExpertIdxGm.SetGlobalBuffer((__gm__ int32_t *)workspace +
-                                            this->blockIdx * this->srcToDstTilingData->perCoreRows,
-                                        Align(this->coreRows, sizeof(int32_t)));
+    expandedExpertIdxGm.SetGlobalBuffer(
+        (__gm__ int32_t *)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
+        Align(this->coreRows, sizeof(int32_t)));
 
     this->expertNumUbAlign = EXPERT_NUM;
     pipe->InitBuffer(copyInQueue, 1, this->perLoopRows * BLOCK_BYTES);

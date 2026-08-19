@@ -46,7 +46,7 @@ __simd_vf__ inline void vfMxfp4ComputeMaxExp(__ubuf__ T *xAddr, __ubuf__ uint16_
     MaskReg maskAllB16 = CreateMask<uint16_t, MaskPattern::ALL>();
     MaskReg mask0, mask1, mask0FP16NanInf, mask1FP16NanInf;
     // 非对齐搬出至UB用
-    UnalignReg uReg;
+    UnalignRegForStore uReg;
 
     for (uint16_t i = 0; i < vfLoopNum; i++) {
         mask0 = UpdateMask<T>(xElemNum);
@@ -54,7 +54,7 @@ __simd_vf__ inline void vfMxfp4ComputeMaxExp(__ubuf__ T *xAddr, __ubuf__ uint16_
         MaskDeInterleave<T>(mask0, mask1, mask0, mask1);
 
         // 双搬入，奇数位放x0、偶数位放x1
-        DataCopy<T, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_DINTLV_B16>(x0, x1, xAddr, vlForT * 2);
+        LoadAlign<T, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_DINTLV_B16>(x0, x1, xAddr, vlForT * 2);
 
         if constexpr (IsSameType<T, half>::value) {
             // 单独提取fp16中inf/nan的元素
@@ -82,12 +82,12 @@ __simd_vf__ inline void vfMxfp4ComputeMaxExp(__ubuf__ T *xAddr, __ubuf__ uint16_
         // 由于mask0和mask1相同或是比mask1多一个元素，使用mask0保证不漏元素
         Max(maxExp, exp0, exp1, mask0);
         // 再每32B（对于T来说就是每16个元素）取一个最大值，此时maskExp里放的是每2个元素的最大值，且末尾数据为0，因此用MaskALL
-        ReduceMaxWithDataBlock(maxExp, maxExp, maskAllB16);
+        ReduceDataBlock<ReduceType::MAX>(maxExp, maxExp, maskAllB16);
         // 非对齐搬出，每次写出numVRegBlocks个元素（ReduceMaxWithDataBlock后放在maxExp头部）
-        DataCopyUnAlign<uint16_t, PostLiteral::POST_MODE_UPDATE>(maxExpOutAddr, maxExp, uReg, numVRegBlocks);
+        StoreUnAlign<uint16_t, PostLiteral::POST_MODE_UPDATE>(maxExpOutAddr, maxExp, uReg, numVRegBlocks);
     }
     // 非对齐搬出收尾，尾部多出的位置写0
-    DataCopyUnAlignPost(maxExpOutAddr, uReg, 0);
+    StoreUnAlignPost(maxExpOutAddr, uReg, 0);
 }
 
 template <typename T, typename U>
@@ -130,7 +130,7 @@ __simd_vf__ inline void vfMxfp4ComputeScale(__ubuf__ uint16_t *maxExpInAddr, __u
         maskLoop = UpdateMask<uint16_t>(scaleElemNum);
         maskValid = UpdateMask<uint16_t>(validScaleElemNum);
         // 拷入vfComputeMaxExp算好的maxExp
-        DataCopy<uint16_t, PostLiteral::POST_MODE_UPDATE>(maxExp, maxExpInAddr, vlForT);
+        LoadAlign<uint16_t, PostLiteral::POST_MODE_UPDATE>(maxExp, maxExpInAddr, vlForT);
 
         // 1.计算并拷出mxScale（float8_e8m0）
 
@@ -153,8 +153,8 @@ __simd_vf__ inline void vfMxfp4ComputeScale(__ubuf__ uint16_t *maxExpInAddr, __u
 
         // 拷出算好的mxScale，即为算子输出expandedScale的值。
         // 对于每个uint16的mxScale，都只拷出其低8位，也就是以uint8的长度拷出，实际上存储的就是float8_e8m0类型的二进制值，因此POST_MODE_UPDATE的数目为vlForT/2。
-        DataCopy<uint16_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK_B16>(mxScaleOutAddr, mxScale, vlForT / 2,
-                                                                                    maskLoop);
+        StoreAlign<uint16_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK_B16>(mxScaleOutAddr, mxScale,
+                                                                                      vlForT / 2, maskLoop);
 
         // 2.计算并拷出invScale（bfloat16）
 
@@ -169,7 +169,7 @@ __simd_vf__ inline void vfMxfp4ComputeScale(__ubuf__ uint16_t *maxExpInAddr, __u
         Select<uint16_t>(invScale, specialMinE8M0, invScale, maskSpecialMin);
 
         // 拷出算好的invScale，用于在后续量化xQuant=invScale*x，以uint16的长度拷出，实际存储的为bfloat16类型的二进制值
-        DataCopy<uint16_t, PostLiteral::POST_MODE_UPDATE>(invScaleOutAddr, invScale, vlForT, maskLoop);
+        StoreAlign<uint16_t, PostLiteral::POST_MODE_UPDATE>(invScaleOutAddr, invScale, vlForT, maskLoop);
     }
 }
 
@@ -216,12 +216,12 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
         maskXQuant = UpdateMask<float>(xElemNum);
 
         // 拷入待量化的x：x0存放偶数位的值，x1存放奇数位的值，双搬共拷入vlForT*2个元素
-        DataCopy<T, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_DINTLV_B16>(x0, x1, xAddr, vlForT * 2);
+        LoadAlign<T, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_DINTLV_B16>(x0, x1, xAddr, vlForT * 2);
 
         // 拷入invScale，类型为uint16（计算时翻译成bfloat16），其中每个元素广播至32B，这里就是每个元素重复16次，共256B/32B=8个元素，也就是numVRegBlocks的值
         // 应该是加载(256/32=8)B的元素
-        DataCopy<uint16_t, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_E2B_B16>(invScale, invScaleInAddr,
-                                                                                  numVRegBlocks);
+        LoadAlign<uint16_t, PostLiteral::POST_MODE_UPDATE, LoadDist::DIST_E2B_B16>(invScale, invScaleInAddr,
+                                                                                   numVRegBlocks);
 
         if constexpr (IsSameType<T, half>::value) {
             // 对于T为fp16，先把x和invScale转成fp32，再计算x*invScale后做类型转换：fp32->bf16->float4
@@ -263,12 +263,12 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
             Mul(vdExp0ZeroFP32, vdExp0ZeroFP32, (RegTensor<float> &)exp1FP321, pregAll321);
             Adds(exp0FP321, exp0FP321, FP32_BIAS, pregAll321);
             ShiftLefts(exp0FP321, exp0FP321, FP32_EXP_SHR_BITS, pregAll321);
-            CompareScalar<float, CMPMODE::LT>(specialMask1, vdExp0ZeroFP32, 0, pregAll321);
+            Compares<float, CMPMODE::LT>(specialMask1, vdExp0ZeroFP32, 0, pregAll321);
             Truncate<float, RoundMode::CAST_RINT>(vdExp0ZeroFP32, vdExp0ZeroFP32, pregAll321);
             Mul(vdExp0ZeroFP32, vdExp0ZeroFP32, (RegTensor<float> &)exp0FP321, pregAll321);
-            CompareScalar<float, CMPMODE::EQ>(zeroMask1, vdExp0ZeroFP32, 0, pregAll321);
-            MaskAnd(zeroMask1, specialMask1, zeroMask1, pregAll321);
-            MaskOr(zeroMask1, negInfMask1, zeroMask1, pregAll321);
+            Compares<float, CMPMODE::EQ>(zeroMask1, vdExp0ZeroFP32, 0, pregAll321);
+            And(zeroMask1, specialMask1, zeroMask1, pregAll321);
+            Or(zeroMask1, negInfMask1, zeroMask1, pregAll321);
             Select<int32_t>((RegTensor<int32_t> &)vdExp0ZeroFP32, negZero1, (RegTensor<int32_t> &)vdExp0ZeroFP32,
                             zeroMask1);
 
@@ -297,12 +297,12 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
             Mul(vdExp0OneFP32, vdExp0OneFP32, (RegTensor<float> &)exp1FP322, pregAll322);
             Adds(exp0FP322, exp0FP322, FP32_BIAS, pregAll322);
             ShiftLefts(exp0FP322, exp0FP322, FP32_EXP_SHR_BITS, pregAll322);
-            CompareScalar<float, CMPMODE::LT>(specialMask2, vdExp0OneFP32, 0, pregAll322);
+            Compares<float, CMPMODE::LT>(specialMask2, vdExp0OneFP32, 0, pregAll322);
             Truncate<float, RoundMode::CAST_RINT>(vdExp0OneFP32, vdExp0OneFP32, pregAll322);
             Mul(vdExp0OneFP32, vdExp0OneFP32, (RegTensor<float> &)exp0FP322, pregAll322);
-            CompareScalar<float, CMPMODE::EQ>(zeroMask2, vdExp0OneFP32, 0, pregAll322);
-            MaskAnd(zeroMask2, specialMask2, zeroMask2, pregAll322);
-            MaskOr(zeroMask2, negInfMask2, zeroMask2, pregAll322);
+            Compares<float, CMPMODE::EQ>(zeroMask2, vdExp0OneFP32, 0, pregAll322);
+            And(zeroMask2, specialMask2, zeroMask2, pregAll322);
+            Or(zeroMask2, negInfMask2, zeroMask2, pregAll322);
             Select<int32_t>((RegTensor<int32_t> &)vdExp0OneFP32, negZero2, (RegTensor<int32_t> &)vdExp0OneFP32,
                             zeroMask2);
 
@@ -351,12 +351,12 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
             Mul(vdExp1ZeroFP32, vdExp1ZeroFP32, (RegTensor<float> &)exp1FP323, pregAll323);
             Adds(exp0FP323, exp0FP323, FP32_BIAS, pregAll323);
             ShiftLefts(exp0FP323, exp0FP323, FP32_EXP_SHR_BITS, pregAll323);
-            CompareScalar<float, CMPMODE::LT>(specialMask3, vdExp1ZeroFP32, 0, pregAll323);
+            Compares<float, CMPMODE::LT>(specialMask3, vdExp1ZeroFP32, 0, pregAll323);
             Truncate<float, RoundMode::CAST_RINT>(vdExp1ZeroFP32, vdExp1ZeroFP32, pregAll323);
             Mul(vdExp1ZeroFP32, vdExp1ZeroFP32, (RegTensor<float> &)exp0FP323, pregAll323);
-            CompareScalar<float, CMPMODE::EQ>(zeroMask3, vdExp1ZeroFP32, 0, pregAll323);
-            MaskAnd(zeroMask3, specialMask3, zeroMask3, pregAll323);
-            MaskOr(zeroMask3, negInfMask3, zeroMask3, pregAll323);
+            Compares<float, CMPMODE::EQ>(zeroMask3, vdExp1ZeroFP32, 0, pregAll323);
+            And(zeroMask3, specialMask3, zeroMask3, pregAll323);
+            Or(zeroMask3, negInfMask3, zeroMask3, pregAll323);
             Select<int32_t>((RegTensor<int32_t> &)vdExp1ZeroFP32, negZero3, (RegTensor<int32_t> &)vdExp1ZeroFP32,
                             zeroMask3);
 
@@ -385,12 +385,12 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
             Mul(vdExp1OneFP32, vdExp1OneFP32, (RegTensor<float> &)exp1FP324, pregAll324);
             Adds(exp0FP324, exp0FP324, FP32_BIAS, pregAll324);
             ShiftLefts(exp0FP324, exp0FP324, FP32_EXP_SHR_BITS, pregAll324);
-            CompareScalar<float, CMPMODE::LT>(specialMask4, vdExp1OneFP32, 0, pregAll324);
+            Compares<float, CMPMODE::LT>(specialMask4, vdExp1OneFP32, 0, pregAll324);
             Truncate<float, RoundMode::CAST_RINT>(vdExp1OneFP32, vdExp1OneFP32, pregAll324);
             Mul(vdExp1OneFP32, vdExp1OneFP32, (RegTensor<float> &)exp0FP324, pregAll324);
-            CompareScalar<float, CMPMODE::EQ>(zeroMask4, vdExp1OneFP32, 0, pregAll324);
-            MaskAnd(zeroMask4, specialMask4, zeroMask4, pregAll324);
-            MaskOr(zeroMask4, negInfMask4, zeroMask4, pregAll324);
+            Compares<float, CMPMODE::EQ>(zeroMask4, vdExp1OneFP32, 0, pregAll324);
+            And(zeroMask4, specialMask4, zeroMask4, pregAll324);
+            Or(zeroMask4, negInfMask4, zeroMask4, pregAll324);
             Select<int32_t>((RegTensor<int32_t> &)vdExp1OneFP32, negZero4, (RegTensor<int32_t> &)vdExp1OneFP32,
                             zeroMask4);
 
@@ -424,9 +424,9 @@ __simd_vf__ inline void vfMxfp4ComputeData(__ubuf__ T *xAddr, __ubuf__ uint16_t 
         }
 
         // 拷出xQuant到xOutAddr。OUT_ELE_NUM_ONE_BLK=64，即一个VL下有64个float32->fp4的元素，一次拷出64个元素
-        DataCopy<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
+        StoreAlign<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
             xQuantOutAddr, (RegTensor<int8_t> &)xQuant0, OUT_ELE_NUM_ONE_BLK, maskXQuant);
-        DataCopy<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
+        StoreAlign<int8_t, PostLiteral::POST_MODE_UPDATE, StoreDist::DIST_PACK4_B32>(
             xQuantOutAddr, (RegTensor<int8_t> &)xQuant1, OUT_ELE_NUM_ONE_BLK, maskXQuant);
     }
 }

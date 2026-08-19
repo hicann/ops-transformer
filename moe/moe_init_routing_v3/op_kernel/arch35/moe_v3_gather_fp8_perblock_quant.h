@@ -71,53 +71,53 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
             uint32_t blockOffset = pairIdx * FP8_PERBLOCK_BLOCK_SIZE * 2;
 
             // --- block 0 ---
-            DataCopy(vreg0, xAddr + blockOffset);
+            LoadAlign(vreg0, xAddr + blockOffset);
             Duplicate(maxReg0, static_cast<T>(0));
             And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg0, (RegTensor<uint16_t> &)vreg2, maskAll);
             Max<T>(maxReg0, maxReg0, vreg3, maskAll);
-            ReduceMax<uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0, maskAll);
+            Reduce<ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0, maskAll);
             Duplicate(maxReg0, maxReg0, maskAll);
             Cast<float, T, castTrait0>(scaleReg0, maxReg0, maskAll);
             Div<float, &mode>(scaleReg0, scaleReg0, fp8MaxReg, maskAll);
-            DataCopy<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2, scaleReg0, maskAll);
+            StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2, scaleReg0, maskAll);
 
             // --- block 1 ---
-            DataCopy(vreg1, xAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE);
+            LoadAlign(vreg1, xAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE);
             Duplicate(maxReg1, static_cast<T>(0));
             And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg1, (RegTensor<uint16_t> &)vreg2, maskAll);
             Max<T>(maxReg1, maxReg1, vreg3, maskAll);
-            ReduceMax<uint16_t>((RegTensor<uint16_t> &)maxReg1, (RegTensor<uint16_t> &)maxReg1, maskAll);
+            Reduce<ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg1, (RegTensor<uint16_t> &)maxReg1, maskAll);
             Duplicate(maxReg1, maxReg1, maskAll);
             Cast<float, T, castTrait0>(scaleReg1, maxReg1, maskAll);
             Div<float, &mode>(scaleReg1, scaleReg1, fp8MaxReg, maskAll);
-            DataCopy<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2 + 1, scaleReg1, maskAll);
+            StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2 + 1, scaleReg1, maskAll);
 
             // --- 量化 block 0 ---
-            DataCopy<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + blockOffset);
+            LoadAlign<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + blockOffset);
             Cast<float, T, castTrait0>(yReg2, yReg1, maskAll);
             Div<float, &mode>(yReg3, yReg2, scaleReg0, maskAll);
             Cast<U, float, castTrait32tofp8>(outReg, yReg3, maskAll);
-            DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset, outReg, maskAll);
+            StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset, outReg, maskAll);
 
-            DataCopy<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + blockOffset + vfNum);
+            LoadAlign<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + blockOffset + vfNum);
             Cast<float, T, castTrait0>(yReg2, yReg1, maskAll);
             Div<float, &mode>(yReg3, yReg2, scaleReg0, maskAll);
             Cast<U, float, castTrait32tofp8>(outReg, yReg3, maskAll);
-            DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset + vfNum, outReg, maskAll);
+            StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset + vfNum, outReg, maskAll);
 
             // --- 量化 block 1 ---
-            DataCopy<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE);
+            LoadAlign<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE);
             Cast<float, T, castTrait0>(yReg2, yReg1, maskAll);
             Div<float, &mode>(yReg3, yReg2, scaleReg1, maskAll);
             Cast<U, float, castTrait32tofp8>(outReg, yReg3, maskAll);
-            DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE, outReg, maskAll);
+            StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE, outReg, maskAll);
 
-            DataCopy<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE + vfNum);
+            LoadAlign<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE + vfNum);
             Cast<float, T, castTrait0>(yReg2, yReg1, maskAll);
             Div<float, &mode>(yReg3, yReg2, scaleReg1, maskAll);
             Cast<U, float, castTrait32tofp8>(outReg, yReg3, maskAll);
-            DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE + vfNum, outReg,
-                                                   maskAll);
+            StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE + vfNum, outReg,
+                                                     maskAll);
         }
 
         // === 处理包含 partial block 的最后一个 pair（在循环外）===
@@ -126,54 +126,54 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
             uint32_t blockOffset = pairIdx * FP8_PERBLOCK_BLOCK_SIZE * 2;
 
             // --- block 0（完整）---
-            DataCopy(vreg0, xAddr + blockOffset);
+            LoadAlign(vreg0, xAddr + blockOffset);
             Duplicate(maxReg0, static_cast<T>(0));
             And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg0, (RegTensor<uint16_t> &)vreg2, maskAll);
             Max<T>(maxReg0, maxReg0, vreg3, maskAll);
-            ReduceMax<uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0, maskAll);
+            Reduce<ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0, maskAll);
             Duplicate(maxReg0, maxReg0, maskAll);
             Cast<float, T, castTrait0>(scaleReg0, maxReg0, maskAll);
             Div<float, &mode>(scaleReg0, scaleReg0, fp8MaxReg, maskAll);
-            DataCopy<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2, scaleReg0, maskAll);
+            StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2, scaleReg0, maskAll);
 
             // --- block 1（partial，精确掩码）---
-            DataCopy(vreg1, xAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE);
+            LoadAlign(vreg1, xAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE);
             uint32_t partialInputNum = lastBlockElemNum;
             preg0 = UpdateMask<T>(partialInputNum);
             Duplicate(maxReg1, static_cast<T>(0));
             And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg1, (RegTensor<uint16_t> &)vreg2, preg0);
             Max<T, MaskMergeMode::MERGING>(maxReg1, maxReg1, vreg3, preg0);
-            ReduceMax<uint16_t>((RegTensor<uint16_t> &)maxReg1, (RegTensor<uint16_t> &)maxReg1, maskAll);
+            Reduce<ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg1, (RegTensor<uint16_t> &)maxReg1, maskAll);
             Duplicate(maxReg1, maxReg1, maskAll);
             Cast<float, T, castTrait0>(scaleReg1, maxReg1, maskAll);
             Div<float, &mode>(scaleReg1, scaleReg1, fp8MaxReg, maskAll);
-            DataCopy<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2 + 1, scaleReg1, maskAll);
+            StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2 + 1, scaleReg1, maskAll);
 
             // --- 量化 block 0（完整）---
-            DataCopy<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + blockOffset);
+            LoadAlign<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + blockOffset);
             Cast<float, T, castTrait0>(yReg2, yReg1, maskAll);
             Div<float, &mode>(yReg3, yReg2, scaleReg0, maskAll);
             Cast<U, float, castTrait32tofp8>(outReg, yReg3, maskAll);
-            DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset, outReg, maskAll);
+            StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset, outReg, maskAll);
 
-            DataCopy<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + blockOffset + vfNum);
+            LoadAlign<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + blockOffset + vfNum);
             Cast<float, T, castTrait0>(yReg2, yReg1, maskAll);
             Div<float, &mode>(yReg3, yReg2, scaleReg0, maskAll);
             Cast<U, float, castTrait32tofp8>(outReg, yReg3, maskAll);
-            DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset + vfNum, outReg, maskAll);
+            StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset + vfNum, outReg, maskAll);
 
             // --- 量化 block 1（partial，精确掩码）---
             uint32_t partialOutputNum = lastBlockElemNum;
             uint16_t outputVfLoop = (lastBlockElemNum + vfNum - 1) / vfNum;
             for (uint16_t i = 0; i < outputVfLoop; i++) {
                 yMaskReg = UpdateMask<float>(partialOutputNum);
-                DataCopy<T, LoadDist::DIST_UNPACK_B16>(yReg1,
-                                                       xAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE + i * vfNum);
+                LoadAlign<T, LoadDist::DIST_UNPACK_B16>(yReg1,
+                                                        xAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE + i * vfNum);
                 Cast<float, T, castTrait0>(yReg2, yReg1, yMaskReg);
                 Div<float, &mode>(yReg3, yReg2, scaleReg1, yMaskReg);
                 Cast<U, float, castTrait32tofp8>(outReg, yReg3, yMaskReg);
-                DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE + i * vfNum,
-                                                       outReg, yMaskReg);
+                StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + blockOffset + FP8_PERBLOCK_BLOCK_SIZE + i * vfNum,
+                                                         outReg, yMaskReg);
             }
         }
 
@@ -188,24 +188,24 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
             // 加载并计算 max（按 blockElemNum 限制有效范围）
             Duplicate(maxReg0, static_cast<T>(0));
             preg0 = UpdateMask<T>(inputNum);
-            DataCopy(vreg0, xAddr + lastBlockOffset);
+            LoadAlign(vreg0, xAddr + lastBlockOffset);
             And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg0, (RegTensor<uint16_t> &)vreg2, preg0);
             Max<T, MaskMergeMode::MERGING>(maxReg0, maxReg0, vreg3, preg0);
-            ReduceMax<uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0, maskAll);
+            Reduce<ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0, maskAll);
             Duplicate(maxReg0, maxReg0, maskAll);
             Cast<float, T, castTrait0>(scaleReg0, maxReg0, maskAll);
             Div<float, &mode>(scaleReg0, scaleReg0, fp8MaxReg, maskAll);
-            DataCopy<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + lastBlockIdx, scaleReg0, maskAll);
+            StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + lastBlockIdx, scaleReg0, maskAll);
 
             // 量化（按 blockElemNum 限制有效输出范围）
             uint16_t outputVfLoop = (blockElemNum + vfNum - 1) / vfNum;
             for (uint16_t i = 0; i < outputVfLoop; i++) {
                 yMaskReg = UpdateMask<float>(outputNum);
-                DataCopy<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + lastBlockOffset + i * vfNum);
+                LoadAlign<T, LoadDist::DIST_UNPACK_B16>(yReg1, xAddr + lastBlockOffset + i * vfNum);
                 Cast<float, T, castTrait0>(yReg2, yReg1, yMaskReg);
                 Div<float, &mode>(yReg3, yReg2, scaleReg0, yMaskReg);
                 Cast<U, float, castTrait32tofp8>(outReg, yReg3, yMaskReg);
-                DataCopy<U, StoreDist::DIST_PACK4_B32>(yAddr + lastBlockOffset + i * vfNum, outReg, yMaskReg);
+                StoreAlign<U, StoreDist::DIST_PACK4_B32>(yAddr + lastBlockOffset + i * vfNum, outReg, yMaskReg);
             }
         }
     }

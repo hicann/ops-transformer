@@ -98,7 +98,7 @@ __aicore__ inline void MoeSortMultiCore::UBSortCompute(int64_t progress, int64_t
 
     uint16_t repeatTimes = Ceil(sortNum, FLOAT_REG_TENSOR_LENGTH);
     uint32_t sreg = static_cast<uint32_t>(sortNum);
-    __local_mem__ float *inUbAddr = (__local_mem__ float *)expertForSourceRowLocalFp32.GetPhyAddr();
+    __ubuf__ float *inUbAddr = (__ubuf__ float *)expertForSourceRowLocalFp32.GetPhyAddr();
     float cmpScalar = static_cast<float>(expertStart_);
     float negone = static_cast<float>(-1);
 
@@ -112,11 +112,11 @@ __aicore__ inline void MoeSortMultiCore::UBSortCompute(int64_t progress, int64_t
 
         for (uint16_t i = 0; i < repeatTimes; i++) {
             maskRegLoop = MicroAPI::UpdateMask<float>(sreg);
-            MicroAPI::DataCopy(inRegToFloat, inUbAddr + i * FLOAT_REG_TENSOR_LENGTH);
-            MicroAPI::CompareScalar<float, CMPMODE::LT>(cmpMaskReg, inRegToFloat, cmpScalar, maskRegLoop);
+            MicroAPI::LoadAlign(inRegToFloat, inUbAddr + i * FLOAT_REG_TENSOR_LENGTH);
+            MicroAPI::Compares<float, CMPMODE::LT>(cmpMaskReg, inRegToFloat, cmpScalar, maskRegLoop);
             MicroAPI::Muls(inRegToFloat, inRegToFloat, negone, maskRegLoop);
             MicroAPI::Select(vDstReg0, infFloat, inRegToFloat, cmpMaskReg);
-            MicroAPI::DataCopy(inUbAddr + i * FLOAT_REG_TENSOR_LENGTH, vDstReg0, maskRegLoop);
+            MicroAPI::StoreAlign(inUbAddr + i * FLOAT_REG_TENSOR_LENGTH, vDstReg0, maskRegLoop);
         }
     }
 
@@ -339,9 +339,9 @@ __aicore__ inline void MoeSortMultiCore::Init(GM_ADDR expertIdx, GM_ADDR expande
 {
     InitBasicParams(tilingData);
     this->pipe = tPipe;
-    expertIdxGm.SetGlobalBuffer((__gm__ int32_t *)expertIdx +
-                                this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
-                                this->sortTotalLength);
+    expertIdxGm.SetGlobalBuffer(
+        (__gm__ int32_t *)expertIdx + this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
+        this->sortTotalLength);
     sortedexpertIdxGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace),
                                       Align(this->totalLength, sizeof(int32_t)));
     if (rowIdxType_ == SCATTER) {
@@ -352,20 +352,20 @@ __aicore__ inline void MoeSortMultiCore::Init(GM_ADDR expertIdx, GM_ADDR expande
     }
 
     if (GetBlockIdx() == 0) {
-        expertCountTempGm.SetGlobalBuffer((__gm__ int32_t *)workspace +
-                                          Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2,
-                                          tilingData->actualExpertNum);
+        expertCountTempGm.SetGlobalBuffer(
+            (__gm__ int32_t *)workspace + Align(tilingData->n * tilingData->k, sizeof(int32_t)) * 2,
+            tilingData->actualExpertNum);
         InitGlobalMemory(expertCountTempGm, tilingData->actualExpertNum, 0);
         SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
     }
 
     int64_t kvFactor = 2;
-    workspaceGms[0].SetGlobalBuffer((__gm__ float *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2 +
-                                    tilingData->actualExpertNum,
-                                    Align(this->totalLength, sizeof(int32_t)) * kvFactor);
+    workspaceGms[0].SetGlobalBuffer(
+        (__gm__ float *)workspace + Align(this->totalLength, sizeof(int32_t)) * 2 + tilingData->actualExpertNum,
+        Align(this->totalLength, sizeof(int32_t)) * kvFactor);
     workspaceGms[1].SetGlobalBuffer((__gm__ float *)workspace +
-                                    Align(this->totalLength, sizeof(int32_t)) * (kvFactor + 2) +
-                                    tilingData->actualExpertNum,
+                                        Align(this->totalLength, sizeof(int32_t)) * (kvFactor + 2) +
+                                        tilingData->actualExpertNum,
                                     Align(this->totalLength, sizeof(int32_t)) * kvFactor);
 
     int64_t bufferSize = Ceil(Max(this->sortOutTilingData->oneLoopMaxElements * MAX_MRGSORT_LIST, sortCoreLoopElements),

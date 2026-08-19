@@ -19,16 +19,15 @@
 
 namespace MoeInitRoutingV2Grad {
 template <typename T, int64_t Mode = 0>
-class MoeInitRoutingV2GradFullLoadCompute
-{
+class MoeInitRoutingV2GradFullLoadCompute {
 public:
     __aicore__ inline MoeInitRoutingV2GradFullLoadCompute(
-        const MoeInitRoutingV2GradRegbaseFullLoadTilingData* tilingData)
+        const MoeInitRoutingV2GradRegbaseFullLoadTilingData *tilingData)
     {
         td_ = tilingData;
     }
 
-    __aicore__ inline void Init(GM_ADDR gradExpandedX, GM_ADDR expandedRowIdx, GM_ADDR gradX, TPipe* tPipe)
+    __aicore__ inline void Init(GM_ADDR gradExpandedX, GM_ADDR expandedRowIdx, GM_ADDR gradX, TPipe *tPipe)
     {
         auto blockIdx = GetBlockIdx();
 
@@ -36,9 +35,9 @@ public:
             (blockIdx == td_->numBlocks - 1) ? (td_->n - td_->nBlockFactor * (td_->numBlocks - 1)) : td_->nBlockFactor;
         int64_t indexGmOffset = td_->nBlockFactor * blockIdx * td_->k;
         int64_t outputGmOffset = td_->nBlockFactor * blockIdx * td_->h;
-        inputGm.SetGlobalBuffer((__gm__ T*)gradExpandedX);
-        indexGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + indexGmOffset);
-        outputGm.SetGlobalBuffer((__gm__ T*)gradX + outputGmOffset);
+        inputGm.SetGlobalBuffer((__gm__ T *)gradExpandedX);
+        indexGm.SetGlobalBuffer((__gm__ int32_t *)expandedRowIdx + indexGmOffset);
+        outputGm.SetGlobalBuffer((__gm__ T *)gradX + outputGmOffset);
 
         tPipe->InitBuffer(inputQueue, DOUBLE_BUFFER, td_->nUbFactor * td_->k * td_->hUbFactor * sizeof(T));
         tPipe->InitBuffer(outputQueue, 1, td_->nUbFactor * td_->hUbFactor * sizeof(T));
@@ -66,17 +65,16 @@ public:
     }
 
 private:
-    __aicore__ inline void ProcessUB(
-        int64_t indexOffset, int64_t inputOffset, int64_t outputOffset, int64_t currentN, int64_t currentH,
-        int64_t currentHAlign)
+    __aicore__ inline void ProcessUB(int64_t indexOffset, int64_t inputOffset, int64_t outputOffset, int64_t currentN,
+                                     int64_t currentH, int64_t currentHAlign)
     {
         CopyIn(indexOffset, inputOffset, currentN, currentH, currentHAlign);
         Compute(currentN, currentH, currentHAlign);
         CopyOut(outputOffset, currentN, currentH, currentHAlign);
     }
 
-    __aicore__ inline void CopyIn(
-        int64_t indexOffset, int64_t inputOffset, int64_t currentN, int64_t currentH, int64_t currentHAlign)
+    __aicore__ inline void CopyIn(int64_t indexOffset, int64_t inputOffset, int64_t currentN, int64_t currentH,
+                                  int64_t currentHAlign)
     {
         LocalTensor<T> inputUb = inputQueue.AllocTensor<T>();
         for (int64_t nIdx = 0; nIdx < currentN; nIdx++) {
@@ -100,9 +98,8 @@ private:
                 dataCopyPadExtParams.leftPadding = 0;
                 dataCopyPadExtParams.rightPadding = 0;
                 dataCopyPadExtParams.paddingValue = 0;
-                DataCopyPad(
-                    inputUb[nInputOffset + kIdx * currentHAlign], inputGm[curInputOffset], copyInParams,
-                    dataCopyPadExtParams);
+                DataCopyPad(inputUb[nInputOffset + kIdx * currentHAlign], inputGm[curInputOffset], copyInParams,
+                            dataCopyPadExtParams);
             }
         }
         inputQueue.EnQue(inputUb);
@@ -112,8 +109,8 @@ private:
     {
         LocalTensor<T> inputUb = inputQueue.template DeQue<T>();
         LocalTensor<T> outputUb = outputQueue.AllocTensor<T>();
-        __local_mem__ T* inputUbAddr = (__local_mem__ T*)inputUb.GetPhyAddr();
-        __local_mem__ T* outputUbAddr = (__local_mem__ T*)outputUb.GetPhyAddr();
+        __ubuf__ T *inputUbAddr = (__ubuf__ T *)inputUb.GetPhyAddr();
+        __ubuf__ T *outputUbAddr = (__ubuf__ T *)outputUb.GetPhyAddr();
 
         SequenceReduceSum<T, T, true>(inputUbAddr, outputUbAddr, currentN, td_->k, currentH, currentHAlign, td_->k);
 
@@ -134,7 +131,7 @@ private:
         outputQueue.FreeTensor(outputUb);
     }
 
-    const MoeInitRoutingV2GradRegbaseFullLoadTilingData* __restrict td_;
+    const MoeInitRoutingV2GradRegbaseFullLoadTilingData *__restrict td_;
     GlobalTensor<T> inputGm;
     GlobalTensor<int32_t> indexGm;
     GlobalTensor<T> outputGm;
