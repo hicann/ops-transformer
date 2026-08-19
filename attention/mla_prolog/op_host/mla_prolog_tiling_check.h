@@ -169,8 +169,6 @@ private:
     bool CheckKvCache() const;
     bool CheckKrCache() const;
     bool CheckActSeqLen() const;
-    bool IsRopeDisabled() const;
-    bool IsEmptyTensor(const BaseParaInfo &param) const;
     // ==================================单参数校验==================================
 
     // =================================全量参数校验=================================

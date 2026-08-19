@@ -266,18 +266,8 @@ ge::graphStatus MlaPrologTiling::SetShapeInfo()
             weightDqAxisSize_ * context_->weightDq.shape->GetStorageShape().GetDim(MLA_PROLOG_DIM_INDEX_0);
     }
     baseShapeInfo_.nSize = context_->weightUk.shape->GetStorageShape().GetDim(MLA_PROLOG_DIM_INDEX_0);
-    if (context_->doRope != nullptr && !(*(context_->doRope))) {
-        // do_rope=false 时 ropeSin/ropeCos 为空 tensor，dr 由 weightDkvKr 的 (Hckv+Dr) 与 weightUk 的 Hckv 推导
-        const auto &weightDkvKrShape = context_->weightDkvKr.shape->GetStorageShape();
-        uint32_t hckvPlusDr =
-            (weightDkvKrShape.GetDimNum() == MLA_PROLOG_DIM_NUM_4) ?
-                weightDkvKrShape.GetDim(MLA_PROLOG_DIM_INDEX_0) * weightDkvKrShape.GetDim(MLA_PROLOG_DIM_INDEX_3) :
-                weightDkvKrShape.GetDim(MLA_PROLOG_DIM_INDEX_1);
-        baseShapeInfo_.drSize = hckvPlusDr - context_->weightUk.shape->GetStorageShape().GetDim(MLA_PROLOG_DIM_INDEX_2);
-    } else {
-        baseShapeInfo_.drSize = context_->ropeCos.shape->GetStorageShape().GetDim(
-            context_->ropeCos.shape->GetStorageShape().GetDimNum() - 1);
-    }
+    baseShapeInfo_.drSize =
+        context_->ropeCos.shape->GetStorageShape().GetDim(context_->ropeCos.shape->GetStorageShape().GetDimNum() - 1);
     baseShapeInfo_.dSize = context_->weightUk.shape->GetStorageShape().GetDim(MLA_PROLOG_DIM_INDEX_1);
     baseShapeInfo_.headSizeQc = baseShapeInfo_.dSize * baseShapeInfo_.nSize;
     baseShapeInfo_.headSizeQr = baseShapeInfo_.drSize * baseShapeInfo_.nSize;
@@ -371,11 +361,6 @@ ge::graphStatus MlaPrologTiling::SetAttrInfo()
         tileSize_ = static_cast<uint32_t>(*(context_->tileSize));
         qcQrScale_ = *(context_->qcQrScale);
         kcScale_ = *(context_->kcScale);
-    }
-    // rope 开关由 do_rope attr 控制（默认 true），未设置时强制开启
-    enableRope_ = true;
-    if (context_->doRope != nullptr) {
-        enableRope_ = *(context_->doRope);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -683,23 +668,23 @@ ge::graphStatus MlaPrologTiling::GenTilingKey() const
     }
 
     if (scenarioInfo_.emptyTensorMode_ == EMPTY_TENSOR_MODE::EMPTY_QUERY) {
-        context_->tilingKey = GET_TPL_TILING_KEY(
-            0, 0, 0, false, false, static_cast<uint8_t>(scenarioInfo_.emptyTensorMode_), 0, 0, true, cvMode);
+        context_->tilingKey = GET_TPL_TILING_KEY(0, 0, 0, false, false,
+                                                 static_cast<uint8_t>(scenarioInfo_.emptyTensorMode_), 0, 0, cvMode);
     } else {
         uint8_t cacheMode =
             scenarioInfo_.cacheMode_ == CACHE_MODE::TND ? 0 : static_cast<uint8_t>(scenarioInfo_.cacheMode_);
         context_->tilingKey = GET_TPL_TILING_KEY(
             static_cast<uint8_t>(cacheMode), typeValue, quantType, enableDequantOpt_, enableGroupComputeOpt_,
             static_cast<uint8_t>(scenarioInfo_.emptyTensorMode_), static_cast<uint8_t>(scenarioInfo_.actualSeqMode_),
-            static_cast<uint8_t>(scenarioInfo_.splitMFlag_), enableRope_, cvMode);
+            static_cast<uint8_t>(scenarioInfo_.splitMFlag_), cvMode);
         OP_LOGI(
             context_->opName,
             "MlaProlog tilingKey args: "
             "CACHE_MODE:%u, SCENARIO:%u, QUANT_MODE:%u, ENABLE_DEQUANT_OPTIONAL:%u, ENABLE_GROUP_COMPUTE_OPTIONAL:%u, "
-            "EMPTY_TENSOR_MODE:%u, ACTUAL_SEQ_LEN_MODE:%u, SPLIT_M_MODE:%u, ENABLE_ROPE:%u, CV_MODE:%u",
+            "EMPTY_TENSOR_MODE:%u, ACTUAL_SEQ_LEN_MODE:%u, SPLIT_M_MODE:%u, CV_MODE:%u",
             static_cast<uint8_t>(cacheMode), typeValue, quantType, enableDequantOpt_, enableGroupComputeOpt_,
             static_cast<uint8_t>(scenarioInfo_.emptyTensorMode_), static_cast<uint8_t>(scenarioInfo_.actualSeqMode_),
-            static_cast<uint8_t>(scenarioInfo_.splitMFlag_), static_cast<uint8_t>(enableRope_), cvMode);
+            static_cast<uint8_t>(scenarioInfo_.splitMFlag_), cvMode);
     }
     OP_LOGI(context_->opName, "MlaProlog tilingKey:%lu", context_->tilingKey);
     return ge::GRAPH_SUCCESS;
@@ -800,12 +785,6 @@ ge::graphStatus MlaPrologTiling::ConvertContext(gert::TilingContext &context, Ml
         mlaPrologContext.tileSize = attrs->GetAttrPointer<int64_t>(TILE_SIZE_ATTR_INDEX);
         mlaPrologContext.qcQrScale = attrs->GetAttrPointer<float>(QC_QR_SCALE_ATTR_INDEX);
         mlaPrologContext.kcScale = attrs->GetAttrPointer<float>(KC_SCALE_ATTR_INDEX);
-        // RoPE 开关：由 do_rope attr 控制；默认开启
-        mlaPrologContext.doRope = attrs->GetAttrPointer<bool>(DO_ROPE_ATTR_INDEX);
-        if (mlaPrologContext.doRope == nullptr) {
-            mlaPrologContext.doRopeValue = true;
-            mlaPrologContext.doRope = &mlaPrologContext.doRopeValue;
-        }
     } else {
         mlaPrologContext.queryNormFlag = nullptr;
         mlaPrologContext.weightQuantMode = nullptr;
@@ -816,8 +795,6 @@ ge::graphStatus MlaPrologTiling::ConvertContext(gert::TilingContext &context, Ml
         mlaPrologContext.tileSize = nullptr;
         mlaPrologContext.qcQrScale = nullptr;
         mlaPrologContext.kcScale = nullptr;
-        mlaPrologContext.doRopeValue = true;
-        mlaPrologContext.doRope = nullptr;
     }
 
     OP_CHECK_IF(context.GetWorkspaceSizes(1) == nullptr,

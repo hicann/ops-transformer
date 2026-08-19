@@ -125,7 +125,6 @@ TEST_F(MlaPrologV2Kernel, test_case_v2_semiQuantKVNoQuant)
                              0, // EMPTY_TENSOR_MODE
                              0, // ACTUAL_SEQ_LEN_MODE
                              0, // SPLIT_M_MODE
-                             1, // ENABLE_ROPE
                              7  // CV_MODE
                              >(PARAM_LIST);
     };
@@ -250,7 +249,6 @@ TEST_F(MlaPrologV2Kernel, test_case_v2_semiQuantKVQuant)
                              0, // EMPTY_TENSOR_MODE
                              0, // ACTUAL_SEQ_LEN_MODE
                              0, // SPLIT_M_MODE
-                             1, // ENABLE_ROPE
                              7  // CV_MODE
                              >(PARAM_LIST);
     };
@@ -375,7 +373,6 @@ TEST_F(MlaPrologV2Kernel, test_case_v2_QuantKVNoQuant)
                              0, // EMPTY_TENSOR_MODE
                              0, // ACTUAL_SEQ_LEN_MODE
                              0, // SPLIT_M_MODE
-                             1, // ENABLE_ROPE
                              7  // CV_MODE
                              >(PARAM_LIST);
     };
@@ -500,7 +497,6 @@ TEST_F(MlaPrologV2Kernel, test_case_v2_QuantKVQuant)
                              0, // EMPTY_TENSOR_MODE
                              0, // ACTUAL_SEQ_LEN_MODE
                              0, // SPLIT_M_MODE
-                             1, // ENABLE_ROPE
                              7  // CV_MODE
                              >(PARAM_LIST);
     };
