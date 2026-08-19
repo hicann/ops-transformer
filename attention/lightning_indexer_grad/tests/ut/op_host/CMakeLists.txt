@@ -8,9 +8,9 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-set(_LightningIndexerGrad_TilingSourcesExt
-        ${OPS_TRANSFORMER_DIR}/attention/lightning_indexer_grad/op_host/lightning_indexer_grad_tiling.cpp
-)
+if(UT_TEST_ALL OR OP_HOST_UT)
+    add_modules_ut_sources(UT_NAME ${OP_INFERSHAPE_MODULE_NAME} MODE PRIVATE DIR ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
 
 file(GLOB CURRENT_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*)
 foreach(SUB_DIR ${CURRENT_DIRS})
