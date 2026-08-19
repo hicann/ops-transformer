@@ -613,11 +613,11 @@ cann_ops_transformer.quant_flash_attn(
                 <td rowspan="2">1</td>
                 <td rowspan="2">q_descale</td>
                 <td>TND</td>
-                <td>(Q_T, Q_N, D/64, 2)<br>用于Prefill场景，仅支持G*Q_S > 80时传入</td>
+                <td>(Q_T, Q_N, D/64, 2)<br>用于Prefill场景，推荐G*Q_S > 80时传入</td>
             </tr>
             <tr>
                 <td>N2TGD</td>
-                <td>(KV_N, Q_T, G, D/64, 2)<br>用于Decode场景，仅支持G*Q_S <= 80时传入</td>
+                <td>(KV_N, Q_T, G, D/64, 2)<br>用于Decode场景，推荐G*Q_S <= 80时传入</td>
             </tr>
             <tr>
                 <td>6</td>
