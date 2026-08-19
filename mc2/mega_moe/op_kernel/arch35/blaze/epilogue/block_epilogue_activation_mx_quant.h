@@ -551,12 +551,14 @@ __aicore__ inline void BlockEpilogueActivationMxQuant<BLOCK_EPILOGUE_DEQUANT_FUN
 {
     uint32_t nSrcUbAligned;
     if constexpr (IsInterleaved_) {
-        // interleaved源布局为[x1, x2]连续存放在同一行，下一行stride是2*nSize
+        // interleaved源布局为[x1, x2]连续存放在同一行，下一行stride是2*nSize。
+        // 注意：2*nSize==实际行距(TileN) 仅在满 tile 成立；tiling 已约束 hiddenDim%256==0，
+        // 交织调度宽度为完整 hiddenDim，故交织路径不会出现尾 tile；若未来放宽须改用 TileN。
         nSrcUbAligned = static_cast<uint32_t>(nSize) * 2U;
     } else {
-        // 非交织源布局将两个输入存放在独立的 UB 中。
-        nSrcUbAligned = Ops::Base::CeilAlign(static_cast<uint32_t>(nSize),
-                                             static_cast<uint32_t>(AscendC::ONE_BLK_SIZE / sizeof(DataTypeIn)));
+        // 非交织源是两块独立 UB tile，生产端按固定行距 TileN 写入（MakeLayoutC(tileM, L1_TILE_N)）；
+        // 尾块 nSize < TileN 时行距不随 nSize 收缩，否则第 1 行起整行错位。
+        nSrcUbAligned = TileN;
     }
     uint16_t dim0VfTimes = mSize;
     uint16_t dim1VfTimes = nSize / ActivationImpl::VF_LEN_FP32;

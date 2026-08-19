@@ -59,6 +59,10 @@ const static int64_t H_ALIGN = 32LL;
 const static int64_t W4_K_ALIGN = 64LL;
 const static int64_t HIDDEN_DIM_BASE = 1024LL;
 const static int64_t MAX_HIDDEN_DIM = 8LL * 1024LL; // 8K
+// MTE 路径 N 泛化：hiddenDim(=GMM1 输出维，含 gate/up 两半) 按 GMM_TILE_N(256) 粒度放宽，
+// 下限 512 保证非交织模式 gate/up 半宽至少覆盖 1 个完整 256 tile；URMA 路径维持 1K 约束不变。
+const static int64_t MTE_MIN_HIDDEN_DIM = 512LL;
+const static int64_t MTE_HIDDEN_DIM_ALIGN = 256LL;
 const static int64_t MIN_EP_WORLD_SIZE = 2LL;
 const static int64_t MAX_EP_WORLD_SIZE = 1024LL;
 const static int64_t MAX_MOE_EXPERT_NUM = 2048LL;
@@ -80,7 +84,8 @@ uint32_t CalcMGroupsPerWave(const MegaMoeTilingData *tilingData, uint32_t aicNum
     /*
      * hiddenDim 包含 gate/up 两部分。交织模式每核至少调度 4 个独立 N tile；非交织模式
      * 每个物理任务成对处理 gate/up，原先每核 2 个物理任务同样等价于 4 个逻辑 N tile。
-     * hiddenDim 已校验为 1024 的倍数，因此两种 kernel 编译模式使用同一个 Host 公式。
+     * hiddenDim 已校验为 GMM_TILE_N(256) 的倍数（MTE；URMA 仍为 1024），CeilDiv 对
+     * 非交织半宽产生的尾 tile 只影响 wave 粒度估算，不影响正确性，两种编译模式共用本公式。
      */
     uint64_t gmm1LogicalTilesPerMGroup = ops::CeilDiv<uint64_t>(tilingData->hiddenDim, GMM_TILE_N);
     uint64_t gmm2TilesPerMGroup = ops::CeilDiv<uint64_t>(tilingData->h, GMM_TILE_N);
@@ -1918,15 +1923,18 @@ static ge::graphStatus CheckInputParam(const gert::TilingContext *context, MegaM
 
     int64_t hiddenDim =
         GetSingleExpertTensorDimSize(weightOneStorageShape, WEIGHT_MATRIX_ROW_DIM_INDEX, isPerExpertWeightTensor);
-    OP_TILING_CHECK(hiddenDim < HIDDEN_DIM_BASE || hiddenDim > MAX_HIDDEN_DIM,
+    // URMA 保持 1K 下限/1K 对齐；MTE 泛化到 [512, 8K] 且 256 对齐（gate/up 半宽按 128 对齐）。
+    const int64_t minHiddenDim = *topoTypePtr == TOPO_TYPE_URMA ? HIDDEN_DIM_BASE : MTE_MIN_HIDDEN_DIM;
+    const int64_t hiddenDimAlign = *topoTypePtr == TOPO_TYPE_URMA ? HIDDEN_DIM_BASE : MTE_HIDDEN_DIM_ALIGN;
+    OP_TILING_CHECK(hiddenDim < minHiddenDim || hiddenDim > MAX_HIDDEN_DIM,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "hiddenDim", std::to_string(hiddenDim).c_str(),
-                                              (std::string("should in [") + std::to_string(HIDDEN_DIM_BASE) + ", " +
+                                              (std::string("should in [") + std::to_string(minHiddenDim) + ", " +
                                                std::to_string(MAX_HIDDEN_DIM) + "]")
                                                   .c_str()),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(hiddenDim % HIDDEN_DIM_BASE != 0,
+    OP_TILING_CHECK(hiddenDim % hiddenDimAlign != 0,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "hiddenDim", std::to_string(hiddenDim).c_str(),
-                                              (std::string("multiple of ") + std::to_string(HIDDEN_DIM_BASE)).c_str()),
+                                              (std::string("multiple of ") + std::to_string(hiddenDimAlign)).c_str()),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
