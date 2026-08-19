@@ -289,25 +289,13 @@ __aicore__ inline ExpertLoopState CreateExpertLoopState(const MoeStageCommonConf
 }
 
 // 按专家顺序推进紧凑 token 行偏移，并用当前专家的 token 数更新 M 维度。
-__aicore__ inline bool UpdateExpertLoopState(ExpertLoopState &state, uint32_t expertIdx, uint64_t expertTokenCount)
+__aicore__ inline void UpdateExpertLoopState(ExpertLoopState &state, uint32_t expertIdx, uint64_t expertTokenCount)
 {
-    if (expertIdx != 0U) {
+    if (expertIdx != state.expertIdx) {
         state.globalTokenStartIndex += Get<M_VALUE>(state.problemShape);
     }
+    state.expertIdx = expertIdx;
     Get<M_VALUE>(state.problemShape) = static_cast<int64_t>(expertTokenCount);
-    return expertTokenCount != 0U;
-}
-
-// 从当前 expert/block 的 count 槽读取 token 数后更新专家遍历状态。
-// 调用方须按 expertIdx 递增调用，并在调用前保证当前 count 已发布。
-__aicore__ inline bool UpdateExpertLoopStateFromWorkspace(const WorkspaceInfo &workspace,
-                                                          const BlockWorkspaceContext &countWorkspace,
-                                                          ExpertLoopState &state, uint32_t expertIdx)
-{
-    uint64_t countSlotIndex = static_cast<uint64_t>(expertIdx) * countWorkspace.blockNum + countWorkspace.blockIdx;
-    __gm__ int32_t *expertTokenCountAddr =
-        reinterpret_cast<__gm__ int32_t *>(workspace.expertRevTokenNumsPtr) + countSlotIndex * INT32_PER_256B;
-    return UpdateExpertLoopState(state, expertIdx, AscendC::ReadGmByPassDCache(expertTokenCountAddr));
 }
 
 // 轮询 GM 中的 int32 ready flag，并在两次读取之间加入短暂退避。
@@ -319,6 +307,30 @@ __aicore__ inline void WaitUntilGmFlagIsNonZero(__gm__ int32_t *flagAddr)
         while (AscendC::GetSystemCycle() - startCycle < pollBackoffCycles) {
         }
     }
+}
+
+/*
+ * 等待 Dispatch 发布当前 expert/block 的 token 总数。这里只同步专家级元数据；每个 256-row group
+ * 的 Dispatch 数据就绪依赖由 WaitForGmm1InputReady 处理。
+ */
+__aicore__ inline void WaitForMoeExpertTokenCountReady(GM_ADDR tokenCountReadyFlagWorkspace,
+                                                       const BlockWorkspaceContext &countWorkspace, uint32_t expertIdx)
+{
+    __gm__ int32_t *tokenCountReadyFlag = reinterpret_cast<__gm__ int32_t *>(tokenCountReadyFlagWorkspace) +
+                                          static_cast<uint64_t>(expertIdx) * countWorkspace.blockNum * INT_CACHELINE +
+                                          static_cast<uint64_t>(countWorkspace.blockIdx) * INT_CACHELINE;
+    WaitUntilGmFlagIsNonZero(tokenCountReadyFlag);
+}
+
+// 从当前 expert/block 对应的稳定 workspace 槽读取专家 token 数。
+__aicore__ inline uint32_t GetExpertTokenCountFromWorkspace(GM_ADDR expertTokenCountWorkspace,
+                                                            const BlockWorkspaceContext &countWorkspace,
+                                                            uint32_t expertIdx)
+{
+    uint64_t countSlotIndex = static_cast<uint64_t>(expertIdx) * countWorkspace.blockNum + countWorkspace.blockIdx;
+    __gm__ int32_t *expertTokenCountAddr =
+        reinterpret_cast<__gm__ int32_t *>(expertTokenCountWorkspace) + countSlotIndex * INT32_PER_256B;
+    return static_cast<uint32_t>(AscendC::ReadGmByPassDCache(expertTokenCountAddr));
 }
 
 template <AscendC::HardEvent event, int32_t eventId>

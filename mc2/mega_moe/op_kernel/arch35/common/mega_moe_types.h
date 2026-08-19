@@ -24,11 +24,18 @@ using namespace AscendC;
 
 using ProblemShape = Shape<int64_t, int64_t, int64_t, int64_t>;
 
-// GMM1/GMM2 逐专家遍历的公共状态。globalTokenStartIndex 表示当前专家在本卡 MoE 专家
-// 紧凑 token 序列中的起始索引。
+// GMM1/GMM2 逐专家遍历的公共状态。expertIdx 标识当前专家，globalTokenStartIndex 表示该专家
+// 在本卡 MoE 专家紧凑 token 序列中的起始索引。
 struct ExpertLoopState {
     ProblemShape problemShape;
     int64_t globalTokenStartIndex = 0;
+    uint32_t expertIdx = 0U;
+};
+
+// 标识 MoE 专家序列中的二维 token 位置。
+struct ExpertTokenPosition {
+    uint32_t expertIdx = 0U;
+    uint32_t tokenIndexInExpert = 0U;
 };
 
 struct Mc2MoeContext {

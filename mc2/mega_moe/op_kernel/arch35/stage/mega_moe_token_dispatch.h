@@ -472,7 +472,7 @@ __aicore__ inline void DispatchExpertTokensByRows(const TokenDispatchConfig &con
 template <typename ActivationType, bool EnableA8W4, bool TopkWeightsPrefetch>
 __aicore__ inline void ComputeExpertTokenCountAndNotify(const TokenDispatchConfig &context, const Params &params,
                                                         TokenDispatchScratch<ActivationType> &scratch,
-                                                        uint32_t localExpertId, uint64_t &sendCnt)
+                                                        uint32_t localExpertId, uint32_t &sendCnt)
 {
     sendCnt = 0;
     uint32_t maskSlotSize = context.maskAlignSize + static_cast<uint32_t>(ALIGN_32);
@@ -501,7 +501,7 @@ __aicore__ inline void ComputeExpertTokenCountAndNotify(const TokenDispatchConfi
     constexpr int32_t countStrideI32 = ALIGN_32 / sizeof(int32_t);
     for (uint32_t rankIdx = 0; rankIdx < context.common.worldSize; ++rankIdx) {
         int32_t rankCount = scratch.sendCntTensor.GetValue(rankIdx * countStrideI32);
-        sendCnt += static_cast<uint64_t>(rankCount);
+        sendCnt += static_cast<uint32_t>(rankCount);
         scratch.cumsumRevCntInRank += static_cast<uint64_t>(rankCount);
         scratch.cumsumInfoTensor.SetValue(localExpertId * context.common.worldSize + rankIdx,
                                           static_cast<int32_t>(scratch.cumsumRevCntInRank));
@@ -601,7 +601,7 @@ template <typename ActivationType, typename QuantScaleType, bool EnableA8W4, uin
 __aicore__ inline void RunMoeExpertDispatchStage(const TokenDispatchConfig &context,
                                                  const MoeSyncWorkspaceLayout &syncLayout, const Params &params,
                                                  GM_ADDR *winRankAddr, TokenDispatchScratch<ActivationType> &scratch,
-                                                 uint32_t expertIdx, uint64_t &sendCnt)
+                                                 uint32_t expertIdx, uint32_t &sendCnt)
 {
     sendCnt = 0U;
     if constexpr (g_coreType == AIV) {
