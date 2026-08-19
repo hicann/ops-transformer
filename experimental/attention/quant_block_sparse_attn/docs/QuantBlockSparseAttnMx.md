@@ -245,7 +245,7 @@ torch.ops.custom.npu_quant_block_sparse_attn(
       <td>block_table</td>
       <td>输入</td>
       <td>PageAttention block 映射表。</td>
-      <td>第 1 维必须等于 B。第二维度大于等于 max_Kb。</td>
+      <td>第 1 维必须等于 B。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,max_block_num_per_batch)</td>
