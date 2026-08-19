@@ -8,11 +8,11 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 /*!
- * \file moe_sort_base_with_routing_map.h
+ * \file moe_sort_base_with_routing_map_unpermute.h
  * \brief
  */
-#ifndef MOE_SORT_BASE_WITH_ROUTING_MAP_H
-#define MOE_SORT_BASE_WITH_ROUTING_MAP_H
+#ifndef MOE_SORT_BASE_WITH_ROUTING_MAP_UNPERMUTE_H
+#define MOE_SORT_BASE_WITH_ROUTING_MAP_UNPERMUTE_H
 
 #include "kernel_operator.h"
 
@@ -152,4 +152,4 @@ __aicore__ inline void MoeSortBase::SyncAll() {
 }
 
 }  // namespace MoeTokenPermuteWithRoutingMap
-#endif  // MOE_SORT_BASE_H
+#endif  // MOE_SORT_BASE_WITH_ROUTING_MAP_UNPERMUTE_H

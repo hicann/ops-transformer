@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef LIGHTNING_INDEXER_KL_LOSS_H
-#define LIGHTNING_INDEXER_KL_LOSS_H
+#ifndef LIGHTNING_INDEXER_KL_LOSS_KERNEL_H
+#define LIGHTNING_INDEXER_KL_LOSS_KERNEL_H
 
 #include "kernel_operator.h"
 #include "kernel_tiling/kernel_tiling.h"
@@ -410,4 +410,4 @@ __aicore__ inline void LightningIndexerKLLoss<T, isDeterministic, weightType>::W
 }
 
 } // namespace NsLightningIndexerKLLoss
-#endif // LIGHTNING_INDEXER_KL_LOSS_H
+#endif // LIGHTNING_INDEXER_KL_LOSS_KERNEL_H

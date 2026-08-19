@@ -12,8 +12,8 @@
 
 #include <initializer_list>
 
-#include "../../../../op_host/arch22/fia_tiling_nonquant_mla.h"
-#include "../../../../op_host/checkers/paged_attention_checker.h"
+#include "../../../../op_host/arch22/fia_tiling_nonquant_mla_arch22.h"
+#include "../../../../op_host/checkers/paged_attention_checker_fused_infer.h"
 #include "../../../../op_host/fused_infer_attention_score_tiling_info_parser.h"
 
 namespace FusedInferAttentionScoreUT {

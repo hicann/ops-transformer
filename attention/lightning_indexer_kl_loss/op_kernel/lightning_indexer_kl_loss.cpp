@@ -13,7 +13,7 @@
  * \brief AscendC kernel entry for LightningIndexerKL_Loss
  */
 
-#include "lightning_indexer_kl_loss.h"
+#include "lightning_indexer_kl_loss_kernel.h"
 #include "lightning_indexer_kl_loss_tiling_key.h"
 
 using namespace NsLightningIndexerKLLoss;
