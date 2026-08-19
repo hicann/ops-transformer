@@ -47,7 +47,8 @@ class GatherPaKvCacheNz {
 
 public:
     __aicore__ inline GatherPaKvCacheNz(TPipe *pipe, const GatherPaKvCacheTilingDataV35 *__restrict tiling)
-        : pipe_(pipe), tl_(tiling){};
+        : pipe_(pipe),
+          tl_(tiling){};
 
     __aicore__ inline void Init(GM_ADDR key_cache, GM_ADDR value_cache, GM_ADDR block_tables, GM_ADDR seq_lens,
                                 GM_ADDR key_in, GM_ADDR value_in, GM_ADDR seq_offset, GM_ADDR key_out,
@@ -204,8 +205,8 @@ public:
 
             // 搬运key
             uint64_t keyOffset = (nonContiguousFlag_ & (1 << 2)) ?
-                (batchOffset * keyOutStride0_ * sizeof(DTYPE_KEY)) :
-                (batchOffset * hiddenSizeK_);
+                                     (batchOffset * keyOutStride0_ * sizeof(DTYPE_KEY)) :
+                                     (batchOffset * hiddenSizeK_);
             for (int j = 0; j < blockCount; j++) {
                 uint32_t curLen = blockSize_; // 4
                 if (j == blockCount - 1) {
@@ -229,8 +230,8 @@ public:
                     }
                 }
                 keyCacheOffset = (nonContiguousFlag_ & 1) ?
-                    (blockId * kCacheStride0_ * sizeof(DTYPE_KEY)) :
-                    (blockId * blockSize_ * hiddenSizeK_);
+                                     (blockId * kCacheStride0_ * sizeof(DTYPE_KEY)) :
+                                     (blockId * blockSize_ * hiddenSizeK_);
 
                 if (isSmallShape) {
                     DataCopyFromeCache(curLen, keyCacheOffset, keyOffset, isFulledWithZero, true);
@@ -239,18 +240,19 @@ public:
                     RestoreFromCache(outKeyGm_[keyOffset], keyCacheGm_[keyCacheOffset], hiddenSizeK_, curLen,
                                      isFulledWithZero,
                                      (nonContiguousFlag_ & (1 << 2)) ?
-                                         (keyOutStride0_ * sizeof(DTYPE_KEY)) : hiddenSizeK_);
+                                         (keyOutStride0_ * sizeof(DTYPE_KEY)) :
+                                         hiddenSizeK_);
                 }
 
                 keyOffset += (nonContiguousFlag_ & (1 << 2)) ?
-                    (curLen * keyOutStride0_ * sizeof(DTYPE_KEY)) :
-                    (curLen * hiddenSizeK_);
+                                 (curLen * keyOutStride0_ * sizeof(DTYPE_KEY)) :
+                                 (curLen * hiddenSizeK_);
             }
 
             // 搬运value
             uint64_t valueOffset = (nonContiguousFlag_ & (1 << 3)) ?
-                (batchOffset * valueOutStride0_ * sizeof(DTYPE_VALUE)) :
-                (batchOffset * hiddenSizeV_);
+                                       (batchOffset * valueOutStride0_ * sizeof(DTYPE_VALUE)) :
+                                       (batchOffset * hiddenSizeV_);
 
             for (int j = 0; j < blockCount; j++) {
                 uint32_t curLen = blockSize_;
@@ -274,9 +276,9 @@ public:
                     }
                 }
                 valueCacheOffset = (nonContiguousFlag_ & 2) ?
-                    (blockId * vCacheStride0_ * sizeof(DTYPE_VALUE)) :
-                    (blockId * blockSize_ * hiddenSizeV_);
-                
+                                       (blockId * vCacheStride0_ * sizeof(DTYPE_VALUE)) :
+                                       (blockId * blockSize_ * hiddenSizeV_);
+
                 if (isSmallShape) {
                     DataCopyFromeCache(curLen, valueCacheOffset, valueOffset, isFulledWithZero, false);
                 } else {
@@ -284,12 +286,13 @@ public:
                     RestoreFromCache(outValueGm_[valueOffset], valueCacheGm_[valueCacheOffset], hiddenSizeV_, curLen,
                                      isFulledWithZero,
                                      (nonContiguousFlag_ & (1 << 3)) ?
-                                         (valueOutStride0_ * sizeof(DTYPE_VALUE)) : hiddenSizeV_);
+                                         (valueOutStride0_ * sizeof(DTYPE_VALUE)) :
+                                         hiddenSizeV_);
                 }
 
                 valueOffset += (nonContiguousFlag_ & (1 << 3)) ?
-                    (curLen * valueOutStride0_ * sizeof(DTYPE_VALUE)) :
-                    (curLen * hiddenSizeV_);
+                                   (curLen * valueOutStride0_ * sizeof(DTYPE_VALUE)) :
+                                   (curLen * hiddenSizeV_);
             }
         }
     }
@@ -345,8 +348,8 @@ private:
             scrGm = valueCacheGm_;
             dstGm = outValueGm_;
         }
-        static constexpr MultiCopyConfig config = {false};
-        AscendC::MultiCopyLoopInfo<DIM_THREE> copyLoopInfo;
+        static constexpr NdDmaConfig config = {false};
+        AscendC::NdDmaLoopInfo<DIM_THREE> copyLoopInfo;
         copyLoopInfo.loopSrcStride[0] = blockSize_ * eleNumPerBlk;
         copyLoopInfo.loopSrcStride[1] = eleNumPerBlk;
         copyLoopInfo.loopSrcStride[DIM_TWO] = CONST_ONE;
@@ -356,7 +359,7 @@ private:
         copyLoopInfo.loopSize[0] = hiddenSize / eleNumPerBlk;
         copyLoopInfo.loopSize[1] = blockSize_;
         copyLoopInfo.loopSize[DIM_TWO] = eleNumPerBlk;
-        AscendC::MultiCopyParams<T, DIM_THREE> params = {copyLoopInfo, 0};
+        AscendC::NdDmaParams<T, DIM_THREE> params = {copyLoopInfo, 0};
 
         LocalTensor<T> cacheLocal = cacheQueue_.AllocTensor<T>();
         if (isFulledWithZero) {
