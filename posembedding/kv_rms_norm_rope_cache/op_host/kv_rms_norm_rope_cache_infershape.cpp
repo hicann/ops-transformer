@@ -35,7 +35,7 @@ constexpr size_t EXPECT_DIM_NUM = 4;
 constexpr int64_t UNKNOWN_DIM_VALUE_ = -1LL;
 constexpr int64_t RMS_NORM_LENGTH_V2 = 192;
 
-inline ge::graphStatus SetAllUnknownDim(const int64_t rank, gert::Shape* output_shape)
+inline ge::graphStatus SetAllUnknownDim(const int64_t rank, gert::Shape *output_shape)
 {
     output_shape->SetDimNum(rank);
     for (int64_t i = 0; i < rank; ++i) {
@@ -44,25 +44,25 @@ inline ge::graphStatus SetAllUnknownDim(const int64_t rank, gert::Shape* output_
     return ge::GRAPH_SUCCESS;
 }
 
-graphStatus InferShape4KvRmsNormRopeCache(gert::InferShapeContext* context)
+graphStatus InferShape4KvRmsNormRopeCache(gert::InferShapeContext *context)
 {
     OP_LOGI(context, "Begin to do InferShape4KvRmsNormRopeCache.");
 
-    const gert::Shape* kCacheInputShape = context->GetInputShape(INPUT_IDX_K_CACHE);
+    const gert::Shape *kCacheInputShape = context->GetInputShape(INPUT_IDX_K_CACHE);
     OP_CHECK_NULL_WITH_CONTEXT(context, kCacheInputShape);
-    const gert::Shape* vCacheInputShape = context->GetInputShape(INPUT_IDX_V_CACHE);
+    const gert::Shape *vCacheInputShape = context->GetInputShape(INPUT_IDX_V_CACHE);
     OP_CHECK_NULL_WITH_CONTEXT(context, vCacheInputShape);
-    const gert::Shape* kvInputShape = context->GetInputShape(INPUT_IDX_KV);
+    const gert::Shape *kvInputShape = context->GetInputShape(INPUT_IDX_KV);
     OP_CHECK_NULL_WITH_CONTEXT(context, kvInputShape);
-    const gert::Shape* cosInputShape = context->GetInputShape(INPUT_IDX_COS);
+    const gert::Shape *cosInputShape = context->GetInputShape(INPUT_IDX_COS);
     OP_CHECK_NULL_WITH_CONTEXT(context, cosInputShape);
-    const gert::Shape* gammaInputShape = context->GetInputShape(INPUT_IDX_GAMMA);
+    const gert::Shape *gammaInputShape = context->GetInputShape(INPUT_IDX_GAMMA);
     OP_CHECK_NULL_WITH_CONTEXT(context, gammaInputShape);
 
-    gert::Shape* kCacheShape = context->GetOutputShape(OUTPUT_IDX_K_CACHE);
-    gert::Shape* vCacheShape = context->GetOutputShape(OUTPUT_IDX_CKV_CACHE);
-    gert::Shape* kRopeShape = context->GetOutputShape(OUTPUT_IDX_K_ROPE);
-    gert::Shape* cKvShape = context->GetOutputShape(OUTPUT_IDX_C_KV);
+    gert::Shape *kCacheShape = context->GetOutputShape(OUTPUT_IDX_K_CACHE);
+    gert::Shape *vCacheShape = context->GetOutputShape(OUTPUT_IDX_CKV_CACHE);
+    gert::Shape *kRopeShape = context->GetOutputShape(OUTPUT_IDX_K_ROPE);
+    gert::Shape *cKvShape = context->GetOutputShape(OUTPUT_IDX_C_KV);
     OP_CHECK_NULL_WITH_CONTEXT(context, kCacheShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, vCacheShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, kRopeShape);
@@ -85,13 +85,13 @@ graphStatus InferShape4KvRmsNormRopeCache(gert::InferShapeContext* context)
         // 非-2场景校验输入shape为4维
     } else {
         if (kvDimSize != EXPECT_DIM_NUM) {
-            OP_LOGE(context, "don't support kv dimSize != 4 , infershape failed");
+            OP_LOGE(context, "don't support kv dimSize != 4, infershape failed");
             return ge::GRAPH_FAILED;
         }
     }
-    
+
     if (methodMode == 0) {
-         // v1版本根据gamma和cos的最后1维设置kRopeShape和cKvShape的最后1维
+        // v1版本根据gamma和cos的最后1维设置kRopeShape和cKvShape的最后1维
         if (!Ops::Base::IsUnknownRank(*cosInputShape)) {
             kRopeShape->SetDim(HEAD_SIZE_SHAPE_IDX, cosInputShape->GetDim(cosDimSize - 1));
         }
@@ -99,7 +99,7 @@ graphStatus InferShape4KvRmsNormRopeCache(gert::InferShapeContext* context)
             cKvShape->SetDim(HEAD_SIZE_SHAPE_IDX, gammaInputShape->GetDim(gammaDimSize - 1));
         }
     } else {
-         // v2版本根据gamma和vCache的最后1维设置kRopeShape和cKvShape的最后1维
+        // v2版本根据gamma和vCache的最后1维设置kRopeShape和cKvShape的最后1维
         if (!Ops::Base::IsUnknownRank(*gammaInputShape)) {
             kRopeShape->SetDim(HEAD_SIZE_SHAPE_IDX, gammaInputShape->GetDim(gammaDimSize - 1));
         }
@@ -112,7 +112,7 @@ graphStatus InferShape4KvRmsNormRopeCache(gert::InferShapeContext* context)
     return GRAPH_SUCCESS;
 }
 
-graphStatus InferDtype4KvRmsNormRopeCache(gert::InferDataTypeContext* context)
+graphStatus InferDtype4KvRmsNormRopeCache(gert::InferDataTypeContext *context)
 {
     OP_LOGD(context, "InferDtype4KvRmsNormRopeCache enter");
 
