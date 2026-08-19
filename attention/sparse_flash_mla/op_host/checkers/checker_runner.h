@@ -13,7 +13,7 @@
 
 #include <memory>
 #include <vector>
-#include "base_checker.h"
+#include "base_checker_sparse_flash_mla.h"
 
 namespace optiling {
 namespace sparse_mla_checker {

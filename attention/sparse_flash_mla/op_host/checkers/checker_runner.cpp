@@ -9,13 +9,13 @@
  */
 
 #include "checker_runner.h"
-#include "common_checker.h"
-#include "mask_checker.h"
-#include "metadata_checker.h"
-#include "paged_attention_checker.h"
-#include "seq_len_checker.h"
-#include "sinks_checker.h"
-#include "softmax_lse_checker.h"
+#include "common_checker_sparse_flash_mla.h"
+#include "mask_checker_sparse_flash_mla.h"
+#include "metadata_checker_sparse_flash_mla.h"
+#include "paged_attention_checker_sparse_flash_mla.h"
+#include "seq_len_checker_sparse_flash_mla.h"
+#include "sinks_checker_sparse_flash_mla.h"
+#include "softmax_lse_checker_sparse_flash_mla.h"
 #include "sparse_compression_checker.h"
 
 namespace optiling {

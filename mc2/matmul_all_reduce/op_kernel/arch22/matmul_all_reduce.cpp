@@ -25,7 +25,7 @@
 #ifdef MC2_QUANT
 #include "../quant_matmul_all_reduce_tiling_data.h"
 #include "matmul_all_reduce_quant.h"
-#include "matmul_all_reduce_quant_pertoken_comm_int8.h"
+#include "matmul_all_reduce_quant_pertoken_comm_int8_arch22.h"
 #ifdef MC2_QUANT_FP16
 #include "matmul_all_reduce_quant_fp16_comm_int8.h"
 #else

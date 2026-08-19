@@ -19,7 +19,7 @@
 #include <algorithm>
 #include <graph/utils/type_utils.h>
 #include "err/ops_err.h"
-#include "fia_tiling_nonquant_mla.h"
+#include "fia_tiling_nonquant_mla_arch22.h"
 #include "../../../common/op_host/fia_tiling_templates_registry.h"
 
 using namespace ge;

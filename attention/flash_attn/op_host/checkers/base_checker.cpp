@@ -17,7 +17,7 @@
 #include <numeric>
 #include "tiling/tiling_api.h"
 #include "../fa_tiling_info.h"
-#include "base_checker.h"
+#include "base_checker_flash_attn.h"
 #include "log/log.h"
 namespace optiling {
 namespace flash_attn {

@@ -35,7 +35,7 @@ AA_David@ops-transformer:
                 - ops/ops-transformer/attention/common/op_kernel/arch35/flash_attention_score_block_vec_train.h
                 - ops/ops-transformer/attention/common/op_kernel/arch35/flash_attention_score_kernel_base.h
                 - ops/ops-transformer/attention/common/op_kernel/arch35/infer_flash_attention_comm.h
-                - ops/ops-transformer/attention/common/op_kernel/arch35/pse.h
+                - ops/ops-transformer/attention/common/op_kernel/arch35/pse_arch35.h
                 - ops/ops-transformer/attention/common/op_kernel/arch35/util_regbase.h
                 - ops/ops-transformer/attention/common/op_kernel/offset_calculator.h
             opensource_style: null

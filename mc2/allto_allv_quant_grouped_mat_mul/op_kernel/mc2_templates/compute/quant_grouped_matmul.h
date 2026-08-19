@@ -20,7 +20,7 @@
 #include "../common/a2av_common_tiling.h"
 #include "kernel_operator.h"
 
-#include "../../../../3rd/grouped_matmul/op_kernel/gqmm_cube_on_the_fly.h"
+#include "../../../../3rd/grouped_matmul/op_kernel/mc2_3rd_gqmm_cube_on_the_fly.h"
 
 using namespace AscendC;
 

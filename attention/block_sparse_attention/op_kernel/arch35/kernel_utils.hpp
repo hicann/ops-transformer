@@ -23,7 +23,7 @@
 #include "../attn_infra/epilogue/block/bsa_block_epilogue.hpp"
 #include "../attn_infra/epilogue/bsa_epilogue_dispatch_policy.hpp"
 #include "../tla/tensor_bsa.hpp"
-#include "../tla/layout.hpp"
+#include "../tla/layout_bsa.hpp"
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
 #include "kernel_tiling/kernel_tiling.h"

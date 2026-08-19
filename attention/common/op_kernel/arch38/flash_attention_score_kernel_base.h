@@ -26,7 +26,7 @@
 #include "../FixpipeOut.h"
 #include "../CopyInL1.h"
 
-#include "pse.h"
+#include "pse_arch38.h"
 #include "infer_flash_attention_comm_arch38.h"
 #include "kernel_operator_list_tensor_intf.h"
 

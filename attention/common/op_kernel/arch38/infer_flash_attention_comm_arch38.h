@@ -17,7 +17,7 @@
 #include <type_traits>
 #include "kernel_tiling/kernel_tiling.h"
 #include "attenmask_arch38.h"
-#include "pse.h"
+#include "pse_arch38.h"
 
 constexpr static int64_t SPARSE_MODE_INT_DEFAULT = 2147483647;
 

@@ -14,7 +14,7 @@
 #include "../../../attn_infra/bsa_base_defs.hpp"
 #include "../../../attn_infra/arch/bsa_arch.hpp"
 #include "../../../tla/tensor_bsa.hpp"
-#include "../../../tla/layout.hpp"
+#include "../../../tla/layout_bsa.hpp"
 
 namespace NpuArch::Epilogue::Tile
 {

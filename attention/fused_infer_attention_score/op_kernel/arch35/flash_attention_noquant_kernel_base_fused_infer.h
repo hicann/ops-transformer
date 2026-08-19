@@ -30,7 +30,7 @@
 #include "../../../common/op_kernel/FixpipeOut.h"
 #include "../../../common/op_kernel/CopyInL1.h"
 
-#include "../../../common/op_kernel/arch35/pse.h"
+#include "../../../common/op_kernel/arch35/pse_arch35.h"
 #include "../../../common/op_kernel/arch35/infer_flash_attention_comm_arch35.h"
 #include "kernel_operator_list_tensor_intf.h"
 #include "adv_api/utils/init_global_memory.h"

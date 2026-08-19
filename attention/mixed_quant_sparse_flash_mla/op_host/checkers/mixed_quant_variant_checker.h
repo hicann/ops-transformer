@@ -11,7 +11,7 @@
 #ifndef MIXED_QUANT_SPARSE_MLA_VARIANT_CHECKER_H
 #define MIXED_QUANT_SPARSE_MLA_VARIANT_CHECKER_H
 
-#include "../../../sparse_flash_mla/op_host/checkers/base_checker.h"
+#include "../../../sparse_flash_mla/op_host/checkers/base_checker_sparse_flash_mla.h"
 
 namespace optiling {
 namespace sparse_mla_checker {

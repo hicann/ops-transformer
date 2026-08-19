@@ -13,7 +13,7 @@
  * \brief MLA D512 non-quant tiling template (d=512, rope=64, v=512, no mask)
  */
 
-#include "fia_tiling_nonquant_mla.h"
+#include "fia_tiling_nonquant_mla_arch35.h"
 #include <map>
 #include <vector>
 #include <tuple>

@@ -32,7 +32,7 @@
 #include "kernel_common.h"
 #include "fia_block_vec_nonquant_mla.h"
 #include "fia_block_cube_nonquant_mla.h"
-#include "fia_block_vec_flashdecode.h"
+#include "fia_block_vec_flashdecode_arch22.h"
 #include "../../common/op_kernel/const_def.h"
 
 using namespace matmul;

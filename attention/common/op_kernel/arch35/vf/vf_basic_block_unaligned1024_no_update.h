@@ -17,7 +17,7 @@
 
 #include "vf_basic_block_utils.h"
 #include "vf_basic_block_unaligned1024_common.h"
-#include "../pse.h"
+#include "../pse_arch35.h"
 
 using namespace regbaseutil;
 

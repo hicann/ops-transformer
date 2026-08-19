@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "common_checker.h"
+#include "common_checker_sparse_flash_mla.h"
 #include <cmath>
 #include <vector>
 #include "log/log.h"

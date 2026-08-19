@@ -27,7 +27,7 @@
 #include "../../../attn_infra/bsa_gemm_coord.hpp"
 #include "../../../attn_infra/gemm/tile_common/bsa_gemm_tile_copy.hpp"
 #include "../../../attn_infra/gemm/tile_common/bsa_tile_mmad.hpp"
-#include "../../../tla/layout.hpp"
+#include "../../../tla/layout_bsa.hpp"
 #include "../../../tla/tensor_bsa.hpp"
 
 ////////////////////////////////////////////////////////////////////

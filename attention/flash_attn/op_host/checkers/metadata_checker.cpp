@@ -20,7 +20,7 @@
 #include "log/error_code.h"
 #include "register/op_def_registry.h"
 #include "../fa_tiling_info.h"
-#include "metadata_checker.h"
+#include "metadata_checker_flash_attn.h"
 
 namespace optiling {
 namespace flash_attn {

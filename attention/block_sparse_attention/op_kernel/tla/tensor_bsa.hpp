@@ -12,9 +12,9 @@
 #define TLA_TENSOR_HPP
 
 #include "../attn_infra/arch/bsa_arch.hpp"
-#include "../tla/layout.hpp"                     // tla::Shape
-#include "../tla/numeric/integral_constant.hpp"  // tla::is_integral
-#include "../tla/int_tuple.hpp"
+#include "../tla/layout_bsa.hpp"                     // tla::Shape
+#include "../tla/numeric/integral_constant_bsa.hpp"  // tla::is_integral
+#include "../tla/int_tuple_bsa.hpp"
 
 namespace tla {
 //

@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "seq_len_checker.h"
+#include "seq_len_checker_sparse_flash_mla.h"
 #include "log/log.h"
 
 namespace optiling {

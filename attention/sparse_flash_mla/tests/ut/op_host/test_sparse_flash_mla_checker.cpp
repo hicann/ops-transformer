@@ -10,10 +10,10 @@
 
 #include <gtest/gtest.h>
 #include "../../../op_host/checkers/checker_adapter.h"
-#include "../../../op_host/checkers/mask_checker.h"
-#include "../../../op_host/checkers/paged_attention_checker.h"
-#include "../../../op_host/checkers/seq_len_checker.h"
-#include "../../../op_host/checkers/softmax_lse_checker.h"
+#include "../../../op_host/checkers/mask_checker_sparse_flash_mla.h"
+#include "../../../op_host/checkers/paged_attention_checker_sparse_flash_mla.h"
+#include "../../../op_host/checkers/seq_len_checker_sparse_flash_mla.h"
+#include "../../../op_host/checkers/softmax_lse_checker_sparse_flash_mla.h"
 #include "../../../op_host/checkers/sparse_compression_checker.h"
 
 namespace {

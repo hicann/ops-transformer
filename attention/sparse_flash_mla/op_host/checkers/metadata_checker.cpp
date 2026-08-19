@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "metadata_checker.h"
+#include "metadata_checker_sparse_flash_mla.h"
 #include "log/log.h"
 
 namespace optiling {

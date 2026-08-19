@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "base_checker.h"
+#include "base_checker_sparse_flash_mla.h"
 #include <algorithm>
 #include <sstream>
 #include "log/log.h"

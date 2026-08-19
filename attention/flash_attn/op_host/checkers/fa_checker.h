@@ -20,15 +20,15 @@
 #include <vector>
 #include <functional>
 #include "tiling/tiling_api.h"
-#include "base_checker.h"
+#include "base_checker_flash_attn.h"
 
-#include "./seq_len_checker.h"
-#include "./common_checker.h"
-#include "./mask_checker.h"
-#include "./metadata_checker.h"
-#include "./paged_attention_checker.h"
-#include "./sinks_checker.h"
-#include "./softmax_lse_checker.h"
+#include "seq_len_checker_flash_attn.h"
+#include "common_checker_flash_attn.h"
+#include "mask_checker_flash_attn.h"
+#include "metadata_checker_flash_attn.h"
+#include "paged_attention_checker_flash_attn.h"
+#include "sinks_checker_flash_attn.h"
+#include "softmax_lse_checker_flash_attn.h"
 
 namespace optiling {
 namespace flash_attn {

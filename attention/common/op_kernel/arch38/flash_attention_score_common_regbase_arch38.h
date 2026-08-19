@@ -19,7 +19,7 @@
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
 #include "stdarg.h"
-#include "pse.h"
+#include "pse_arch38.h"
 
 using matmul::MatmulType;
 using namespace AscendC;

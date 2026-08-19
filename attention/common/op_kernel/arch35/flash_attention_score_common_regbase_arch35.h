@@ -22,7 +22,7 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "lib/matmul_intf.h"
 #include "stdarg.h"
-#include "pse.h"
+#include "pse_arch35.h"
 #include "util_regbase.h"
 
 using matmul::MatmulType;
