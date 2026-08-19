@@ -123,6 +123,7 @@ def customize_inputs(
     layout_out="TND",
     layout_sparse_indices="B_N_Qb_Kb",
     return_softmax_lse=False,
+    quant_matmul=False,
     sparse_mode=None,
     seed=None,
     input_ranges=None,
@@ -130,6 +131,7 @@ def customize_inputs(
     **kwargs,
 ):
     """Convert the shared CSV attributes into the operator input tensors."""
+    del quant_matmul  # Golden-only switch; it must not enter either input generator.
     _require_empty_input(metadata, "metadata")
     cu_q = _list_attr(cu_seqlens_q_value, "cu_seqlens_q_value")
     cu_kv_values = _list_attr(cu_seqlens_kv_value, "cu_seqlens_kv_value")

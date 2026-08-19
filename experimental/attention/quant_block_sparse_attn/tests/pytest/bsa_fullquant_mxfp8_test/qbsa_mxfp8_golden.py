@@ -1414,9 +1414,12 @@ LN2 = 0.6931471806
 INV_LN2 = 1.4426950409
 
 
-def _align_up_to_ln2(value):
-    value_npu = value.to(torch.float32).contiguous().npu()
-    return (torch.ceil(value_npu * INV_LN2) * LN2).cpu()
+def _align_up_to_ln2(value, use_quant_matmul):
+    value_fp32 = value.to(torch.float32).contiguous()
+    if use_quant_matmul:
+        value_fp32 = value_fp32.npu()
+    result = torch.ceil(value_fp32 * INV_LN2) * LN2
+    return result.cpu() if use_quant_matmul else result
 
 
 def _qk_matmul_cpu(q_block, q_scale_block, k_mat, k_scale_mat, head_dim, softmax_scale):
@@ -1509,6 +1512,15 @@ def _npu_exp_sub(lhs, rhs):
     lhs_npu = lhs.to(torch.float32).contiguous().npu()
     rhs_npu = rhs.to(torch.float32).contiguous().npu()
     return torch.exp(lhs_npu - rhs_npu).cpu()
+
+
+def _exp_sub(lhs, rhs, use_quant_matmul):
+    """Evaluate exp(lhs - rhs) on the selected golden backend."""
+    if use_quant_matmul:
+        return _npu_exp_sub(lhs, rhs)
+    lhs_fp32 = lhs.to(torch.float32)
+    rhs_fp32 = rhs.to(torch.float32)
+    return torch.exp(lhs_fp32 - rhs_fp32)
 
 
 def _npu_mxfp8_pv_matmul_impl(p_fp8, v_fp8, p_scale, v_scale):
@@ -1969,7 +1981,7 @@ def cpu_mxfp8_golden(
                             # VF order: score max -> softmax scale -> ceil to
                             # an ln2 multiple -> merge with the online max.
                             local_max = masked_scores.max(dim=-1).values
-                            local_max = _align_up_to_ln2(local_max)
+                            local_max = _align_up_to_ln2(local_max, use_quant_matmul)
                             subloop_started = m_subloop != neg_inf
                             m_candidate = torch.where(
                                 subloop_started,
@@ -1982,8 +1994,10 @@ def cpu_mxfp8_golden(
                             # immediately before FusedExpSub. Therefore the
                             # generated probability is
                             # exp(score - aligned_max + ln(pScale)).
-                            p_subloop = _npu_exp_sub(
-                                s_subloop, m_subloop.view(nq, 1) - ln_p_scale
+                            p_subloop = _exp_sub(
+                                s_subloop,
+                                m_subloop.view(nq, 1) - ln_p_scale,
+                                use_quant_matmul,
                             )
                             p_subloop = torch.where(
                                 vm_subloop & subloop_has.view(nq, 1),
@@ -2003,7 +2017,9 @@ def cpu_mxfp8_golden(
 
                         m_new = m_subloop
                         run_started = m_before_round != neg_inf
-                        history_rescale = _npu_exp_sub(m_before_round, m_new)
+                        history_rescale = _exp_sub(
+                            m_before_round, m_new, use_quant_matmul
+                        )
                         history_rescale = torch.where(
                             run_started & torch.isfinite(m_new),
                             history_rescale,
