@@ -17,8 +17,6 @@ E2E customize_inputs contract: modify tensors in-place via x.copy_(value).
 
 import torch
 
-HEAD_DIM = 128
-
 
 def _make_float_tensor(shape, dtype, pattern, seed=17):
     if pattern == "zeros":
@@ -95,7 +93,9 @@ def customize_inputs(
         )
     if num_prompt_tokens_list is not None:
         num_prompt_tokens.copy_(
-            torch.tensor(num_prompt_tokens_list, dtype=torch.int32).reshape(num_prompt_tokens.shape)
+            torch.tensor(num_prompt_tokens_list, dtype=torch.int32).reshape(
+                num_prompt_tokens.shape
+            )
         )
 
     metadata.copy_(torch.zeros(metadata.shape, dtype=torch.int32))

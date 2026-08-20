@@ -18,6 +18,7 @@ from pathlib import Path
 import torch
 
 _CUSTOM_OPS_LOADED = False
+HEAD_DIM = 128
 
 
 def _ensure_custom_ops():
@@ -70,7 +71,7 @@ def stem_indexer(
             kv_heads,
             causal=causal,
             stem_block_size=stem_block_size,
-            dim_qkflat=128,
+            dim_qkflat=stem_stride * HEAD_DIM,
             window_size=window_size,
         )
     elif metadata_mode == "none":
