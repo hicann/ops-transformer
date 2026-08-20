@@ -924,12 +924,10 @@ def gen_sparse_indices_bsnd(
                     if kv_topk_mode == "fullK":
                         topk_length[i_B, i_S1, i_N2] = min(cur_valid_s2_max_update, K)
                     elif kv_topk_mode == "random":
-                        if K > 1:
-                            topk_length[i_B, i_S1, i_N2] = min(
-                                torch.randint(1, K, (1, 1))[0], cur_valid_s2_max_update
-                            )
-                        else:
-                            topk_length[i_B, i_S1, i_N2] = 1
+                        # torch.randint范围 [1, K + 1)左开右闭
+                        topk_length[i_B, i_S1, i_N2] = min(
+                            torch.randint(1, K + 1, (1, 1))[0], cur_valid_s2_max_update
+                        )
 
     return sparse_data, topk_length
 
@@ -1012,12 +1010,10 @@ def gen_sparse_indices_tnd(
                             cur_valid_s2_max_update, K
                         )
                     elif kv_topk_mode == "random":
-                        if K > 1:
-                            topk_length[s1_prefix + i_S1, i_N2] = min(
-                                torch.randint(1, K, (1, 1))[0], cur_valid_s2_max_update
-                            )
-                        else:
-                            topk_length[s1_prefix + i_S1, i_N2] = 1
+                        # torch.randint范围 [1, K + 1)左开右闭
+                        topk_length[s1_prefix + i_S1, i_N2] = min(
+                            torch.randint(1, K + 1, (1, 1))[0], cur_valid_s2_max_update
+                        )
 
     return sparse_data, topk_length
 
