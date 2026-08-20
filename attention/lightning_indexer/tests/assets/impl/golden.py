@@ -30,7 +30,11 @@ class CaseDataStore:
             self.case_data = {str(testcase_name): data}
 
     def activate(self, testcase_name):
-        data = self.case_data.get(str(testcase_name)) if testcase_name is not None else None
+        data = (
+            self.case_data.get(str(testcase_name))
+            if testcase_name is not None
+            else None
+        )
         if data is None:
             raise RuntimeError(
                 "LightningIndexer TTK golden requires customize_inputs "
@@ -55,19 +59,27 @@ def set_compare_data(testcase_name, data):
     CASE_DATA.case_data = {str(testcase_name): data}
 
 
-__golden__ = {
-    "e2e": {
-        "torch_npu.npu_lightning_indexer": "cpu_lightning_indexer"
-    }
-}
+__golden__ = {"e2e": {"torch_npu.npu_lightning_indexer": "cpu_lightning_indexer"}}
 
 
-def cpu_lightning_indexer(query, key, weights, *, actual_seq_lengths_query=None,
-                          actual_seq_lengths_key=None, block_table=None,
-                          layout_query="BSND", layout_key="BSND", sparse_count=2048,
-                          sparse_mode=3, pre_tokens=(1 << 63) - 1,
-                          next_tokens=(1 << 63) - 1, return_value=False,
-                          testcase_name=None, **kwargs):
+def cpu_lightning_indexer(
+    query,
+    key,
+    weights,
+    *,
+    actual_seq_lengths_query=None,
+    actual_seq_lengths_key=None,
+    block_table=None,
+    layout_query="BSND",
+    layout_key="BSND",
+    sparse_count=2048,
+    sparse_mode=3,
+    pre_tokens=(1 << 63) - 1,
+    next_tokens=(1 << 63) - 1,
+    return_value=False,
+    testcase_name=None,
+    **kwargs,
+):
     """Return the CPU outputs produced while generating this exact pytest case."""
     del query, key, weights, actual_seq_lengths_query, actual_seq_lengths_key
     del block_table, layout_query, layout_key, sparse_count, sparse_mode
@@ -75,10 +87,12 @@ def cpu_lightning_indexer(query, key, weights, *, actual_seq_lengths_query=None,
     data = CASE_DATA.activate(testcase_name)
     return_value = bool(return_value or kwargs.get("return_values", False))
     if return_value:
-        indices = data["cpu_result_raw"]
+        indices = data["cpu_result"]
         gather_idx = indices.clamp_min(0).to(torch.long)
         values = torch.gather(data["score_values"], -1, gather_idx)
         values = values.to(data["value_dtype"])
-        values = torch.where(indices < 0, torch.full_like(values, -float("inf")), values)
+        values = torch.where(
+            indices < 0, torch.full_like(values, -float("inf")), values
+        )
         return data["cpu_result"], values
     return data["cpu_result"], torch.zeros(0, dtype=data["score_values"].dtype)
