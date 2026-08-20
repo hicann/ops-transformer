@@ -77,7 +77,8 @@ lightning_indexer_kl_loss(
 
 ## 约束说明
 
-- `target_score` 与 `index_probs` 的数据类型必须一致，维度相同（BSK 或 TKC），且最后一维 `K` 相等。
+- `target_score` 与 `index_probs` 的数据类型必须一致，且shape一致。
+- 支持 shape 为 (B, S, K) 或 (T, K)，B的取值范围为1\~512，最后一维 K 的取值范围为 1\~8192。
 - `eps` 必须大于 0。
 - `weight_type` 必须为 `'logits'` 或 `'probs'`。
 - `target_score` 与 `index_probs` 需在同一 NPU 设备上。
