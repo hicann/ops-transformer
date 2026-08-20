@@ -285,7 +285,7 @@ aclnnStatus CheckSingleParamMqsmla(int64_t batchSize, int64_t maxSeqlenQ, int64_
         return ACLNN_ERR_PARAM_INVALID;
     }
     // 校验切g模板核数
-    if (numHeadsQ == 128) {
+    if (numHeadsQ == 128U) {
         if (aicCoreNum == 1 || aivCoreNum == 1) {
             OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
                 MQSMLA_ACLNN_OP_NAME, "num_heads_q and aic_core_num and aiv_core_num",
@@ -583,7 +583,7 @@ aclnnStatus CheckConsistencyMqsmla(const aclTensor *cuSeqlensQOptional, const ac
             // 校验 ori_topk_length 维度
             dimNum = GetDimNumMqsmla(oriTopkLengthOptional);
             if (strcmp(layoutQOptional, "TND") == 0) {
-                if (dimNum != 2) {
+                if (dimNum != 2U) {
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(MQSMLA_ACLNN_OP_NAME, "ori_topk_length",
                                                              std::to_string(dimNum),
                                                              "The shape dim of ori_topk_length must be 2 "
@@ -591,7 +591,7 @@ aclnnStatus CheckConsistencyMqsmla(const aclTensor *cuSeqlensQOptional, const ac
                     return ACLNN_ERR_PARAM_INVALID;
                 }
             } else if (strcmp(layoutQOptional, "BSND") == 0) {
-                if (dimNum != 3) {
+                if (dimNum != 3U) {
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(MQSMLA_ACLNN_OP_NAME, "ori_topk_length",
                                                              std::to_string(dimNum),
                                                              "The shape dim of ori_topk_length must be 3 "
@@ -668,7 +668,7 @@ aclnnStatus CheckConsistencyMqsmla(const aclTensor *cuSeqlensQOptional, const ac
             // 校验 cmp_topk_length 维度
             dimNum = GetDimNumMqsmla(cmpTopkLengthOptional);
             if (strcmp(layoutQOptional, "TND") == 0) {
-                if (dimNum != 2) {
+                if (dimNum != 2U) {
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(MQSMLA_ACLNN_OP_NAME, "cmp_topk_length",
                                                              std::to_string(dimNum),
                                                              "The shape dim of cmp_topk_length must be 2 "
@@ -676,7 +676,7 @@ aclnnStatus CheckConsistencyMqsmla(const aclTensor *cuSeqlensQOptional, const ac
                     return ACLNN_ERR_PARAM_INVALID;
                 }
             } else if (strcmp(layoutQOptional, "BSND") == 0) {
-                if (dimNum != 3) {
+                if (dimNum != 3U) {
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(MQSMLA_ACLNN_OP_NAME, "cmp_topk_length",
                                                              std::to_string(dimNum),
                                                              "The shape dim of cmp_topk_length must be 3 "

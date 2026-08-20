@@ -128,7 +128,7 @@ struct RunParamStr { // 分核与切块需要使用到参数
     bool isCmp; \
     bool isCrossCoreSplit = false; \
     int64_t s2SplitIdx = 0; \
-    bool isFirstS2SplitCore = true;
+    bool isFirstS2SplitCore = true
 
 struct RunInfo {
     COMMON_RUN_INFO;
@@ -220,7 +220,7 @@ struct RunInfo {
     uint32_t aivIdx; \
     uint8_t subBlockIdx; \
     bool hasOriTopkLength; \
-    bool hasCmpTopkLength;
+    bool hasCmpTopkLength
 
 #define INFER_CONST_INFO \
     /* 推理 */ \

@@ -178,10 +178,10 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitLocalBuffer(BufferManage
     SetFlag<HardEvent::FIX_M>(l0CFixToMFlagId + 1);
     SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId);
     SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 1);
-    SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 2);
+    SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 2U);
     SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId);
     SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 1);
-    SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 2);
+    SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 2U);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -238,8 +238,8 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::CopyQGmToL1(RunInfo &runInfo
 {
     uint64_t gmOffset = this->queryGm.offsetCalculator.GetOffset(runInfo.boIdx, runInfo.n2oIdx, runInfo.goIdx,
                                                                  runInfo.s1oIdx * runInfo.qSNumInOneBlock, 0);
-    for (uint32_t i = 0; i < 2; i++) {
-        uint32_t curL1QBufId = (l1QBufId + i) % 3;
+    for (uint32_t i = 0; i < 2U; i++) {
+        uint32_t curL1QBufId = (l1QBufId + i) % 3U;
         WaitFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + curL1QBufId);
         uint64_t curGmOffset = gmOffset + i * (constInfo.dSize >> 1);
         CopyToL1Nd2Nz<Q_T>(l1QTensor[curL1QBufId * BUFFER_SIZE_16K], this->queryGm.gmTensor[curGmOffset],
@@ -260,13 +260,13 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateLoadQK(
     LocalTensor<Q_T> dst = l1RightTensor[runInfo.taskIdMod3 * rightBufSingleSize];
     v0ResGm.WaitCrossCore();
     if constexpr (IS_SPLIT_G) {
-        CrossCoreSetFlag<0, PIPE_MTE2>(15);
-        CrossCoreWaitFlag<0, PIPE_MTE2>(15);
+        CrossCoreSetFlag<0, PIPE_MTE2>(15U);
+        CrossCoreWaitFlag<0, PIPE_MTE2>(15U);
     }
     GlobalTensor<Q_T> v0ResGmTensor = v0ResGm.template GetTensor<Q_T>();
     DataCopy(dst, v0ResGmTensor, Align16Func(runInfo.s2RealSize) * constInfo.dSize);
     SetFlag<HardEvent::MTE2_MTE1>(l1KMte2ToMte1FlagId + l1KLoadBufId);
-    l1KLoadBufId = (l1KLoadBufId + 1) % 3;
+    l1KLoadBufId = (l1KLoadBufId + 1) % 3U;
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -276,7 +276,7 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
     RunInfo &runInfo, ConstInfo &constInfo)
 {
     WaitFlag<HardEvent::MTE2_MTE1>(l1KMte2ToMte1FlagId + l1KMatmul1BufId);
-    l1KMatmul1BufId = (l1KMatmul1BufId + 1) % 3;
+    l1KMatmul1BufId = (l1KMatmul1BufId + 1) % 3U;
     WaitFlag<HardEvent::FIX_M>(l0CFixToMFlagId + l0CBufId);
     MMParam param = {
         static_cast<uint32_t>(runInfo.mRealSize),    // singleM
@@ -294,7 +294,7 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
         l1QTensor[curL1QBufId * BUFFER_SIZE_16K], curL1RightTensor, mmL0ABuffers, mmL0BBuffers,
         mmL0CTensor[BUFFER_SIZE_32K * l0CBufId], param);
 
-    curL1QBufId = (curL1QBufId + 1) % 3;
+    curL1QBufId = (curL1QBufId + 1) % 3U;
     if (unlikely(runInfo.s2LoopCount == 0)) {
         WaitFlag<HardEvent::MTE2_MTE1>(l1QMte2ToMte1FlagId + curL1QBufId);
     }
@@ -307,7 +307,7 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
     if (unlikely(runInfo.s2LoopCount == runInfo.s2LoopLimit)) {
         SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + l1QBufId);
         SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + curL1QBufId);
-        l1QBufId = (l1QBufId + 2) % 3;
+        l1QBufId = (l1QBufId + 2U) % 3U;
         if (notLastTwoLoop) {
             CopyQGmToL1(runInfoNext, constInfo);
         }

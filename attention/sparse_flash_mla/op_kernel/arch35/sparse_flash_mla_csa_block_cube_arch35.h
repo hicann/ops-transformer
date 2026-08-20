@@ -232,10 +232,10 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitLocalBuffer()
     SetFlag<HardEvent::FIX_M>(l0CFixToMFlagId + 1);
     SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId); // {0, 1, 2}, 用于l1Q
     SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 1);
-    SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 2);
+    SetFlag<HardEvent::MTE1_MTE2>(l1QMte1ToMte2FlagId + 2U);
     SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId); // {3, 4, 5}, 用于l1K
     SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 1);
-    SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 2);
+    SetFlag<HardEvent::MTE1_MTE2>(l1KMte1ToMte2FlagId + 2U);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -355,7 +355,7 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::LoadKGmToL1(LocalTensor<KV_T
         shape.actHeadDim = constInfo.dSize;
         shape.maxblockNumPerBatch = maxBlockNumPerBatch;
         shape.copyRowNum = runInfo.s2RealSize;
-        shape.copyRowNumAlign = (runInfo.s2RealSize + 15) >> 4 << 4;
+        shape.copyRowNumAlign = (runInfo.s2RealSize + 15U) >> 4U << 4U;
         shape.pageStride = runInfo.isCmp ? constInfo.cmpKeyStride0 : constInfo.oriKeyStride0;
         GmCopyInToL1PA<KV_T>(inputRightTensor, curKvGm.gmTensor, blockTableGm, KVLAYOUT::BBH, shape, startPos);
     } else {

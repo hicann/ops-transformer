@@ -85,7 +85,7 @@ ge::graphStatus MQSMLATilingCheck::CheckCmpSparseIndicesExistence()
                     opName_, "cmpSparseIndices",
                     ToStringRaw(opParamInfo_.cmpSparseIndices.tensor->GetStorageShape()).c_str(),
                     "When qLayout is TND, topK should be greater than 0, but got " +
-                        std::to_string(opParamInfo_.cmpSparseIndices.tensor->GetStorageShape().GetDim(2)));
+                        std::to_string(opParamInfo_.cmpSparseIndices.tensor->GetStorageShape().GetDim(DIM_2)));
                 return ge::GRAPH_FAILED;
             }
             if (opParamInfo_.cmpSparseIndices.tensor->GetStorageShape().GetDim(DIM_0) != qTSize_) {

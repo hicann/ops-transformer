@@ -767,25 +767,27 @@ ge::graphStatus QSFATilingCheck::CheckSingleParaSinks() const
         return ge::GRAPH_SUCCESS;
     }
 
-    OP_CHECK_IF(!isA5_,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, SINKS_NAME.c_str(),
-            "sinks is not supported on the current platform. It should be nullptr."),
+    OP_CHECK_IF(
+        !isA5_,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName_, SINKS_NAME.c_str(), "sinks is not supported on the current platform. It should be nullptr."),
         return ge::GRAPH_FAILED);
-    
+
     if (ge::GRAPH_SUCCESS != CheckDtypeSupport(opParamInfo_.sinks.desc, SINKS_NAME)) {
         return ge::GRAPH_FAILED;
     }
 
     const gert::Shape &sinksShape = opParamInfo_.sinks.tensor->GetStorageShape();
     OP_CHECK_IF(sinksShape.GetDimNum() != DIM_NUM_ONE,
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, SINKS_NAME.c_str(),
-            std::to_string(sinksShape.GetDimNum()).c_str(), "The shape dim of sinks must be 1"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, SINKS_NAME.c_str(),
+                                                         std::to_string(sinksShape.GetDimNum()).c_str(),
+                                                         "The shape dim of sinks must be 1"),
+                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(sinksShape.GetShapeSize() != n1Size_,
-        OP_LOGE_FOR_INVALID_SHAPE(opName_, SINKS_NAME.c_str(), GetShapeStr(sinksShape).c_str(),
-            GetShapeStr(gert::Shape({n1Size_})).c_str()),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPE(opName_, SINKS_NAME.c_str(), GetShapeStr(sinksShape).c_str(),
+                                          GetShapeStr(gert::Shape({n1Size_})).c_str()),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -845,20 +847,20 @@ ge::graphStatus QSFATilingCheck::CheckParaExistenceMlaAntiquant() const
     if (kvLayout_ == QSFALayout::BSND) {
         return ge::GRAPH_SUCCESS;
     } else if (kvLayout_ == QSFALayout::TND) {
-        OP_CHECK_IF(opParamInfo_.actualSeqLengths.tensor == nullptr,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                        opName_, "actual_seq_lengths_kv",
-                        "When layout_kv is TND, actual_seq_lengths_kv must not be null"),
-                    return ge::GRAPH_FAILED);
-    } else if (kvLayout_ == QSFALayout::PA_BSND) {
         OP_CHECK_IF(
             opParamInfo_.actualSeqLengths.tensor == nullptr,
             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "actual_seq_lengths_kv",
-                "When layout_kv is PA_BSND, actual_seq_lengths_kv must not be null"),
+                                                     "When layout_kv is TND, actual_seq_lengths_kv must not be null"),
+            return ge::GRAPH_FAILED);
+    } else if (kvLayout_ == QSFALayout::PA_BSND) {
+        OP_CHECK_IF(
+            opParamInfo_.actualSeqLengths.tensor == nullptr,
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                opName_, "actual_seq_lengths_kv", "When layout_kv is PA_BSND, actual_seq_lengths_kv must not be null"),
             return ge::GRAPH_FAILED);
         OP_CHECK_IF(opParamInfo_.blockTable.tensor == nullptr,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "block_table",
-                        "When layout_kv is PA_BSND, block_table must not be null"),
+                                                             "When layout_kv is PA_BSND, block_table must not be null"),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -917,8 +919,7 @@ ge::graphStatus QSFATilingCheck::CheckBlockTable() const
     OP_CHECK_IF(
         blockTableBatch != bSize_,
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            opName_, BLOCK_TABLE_NAME.c_str(),
-            ToStringRaw(opParamInfo_.blockTable.tensor->GetStorageShape()).c_str(),
+            opName_, BLOCK_TABLE_NAME.c_str(), ToStringRaw(opParamInfo_.blockTable.tensor->GetStorageShape()).c_str(),
             "The first dim of " + BLOCK_TABLE_NAME + " should be equal to batch size " + std::to_string(bSize_)),
         return ge::GRAPH_FAILED);
 
@@ -1022,8 +1023,9 @@ ge::graphStatus QSFATilingCheck::CheckKVShape()
     }
 
     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "key",
-        "Storage mode of key and value is " + std::to_string(static_cast<int32_t>(kvStorageMode_)) +
-            ", it is incorrect");
+                                             "Storage mode of key and value is " +
+                                                 std::to_string(static_cast<int32_t>(kvStorageMode_)) +
+                                                 ", it is incorrect");
     return ge::GRAPH_FAILED;
 }
 
@@ -1069,9 +1071,8 @@ ge::graphStatus QSFATilingCheck::CheckActualSeqLensQDType()
 ge::graphStatus QSFATilingCheck::CheckActualSeqLensQShape()
 {
     uint32_t qsfaShapeSize = 0;
-    if (GetActualSeqLenSize(qsfaShapeSize, opParamInfo_.actualSeqLengthsQ.tensor,
-        "actual_seq_lengths_query", opName_) !=
-        ge::GRAPH_SUCCESS) {
+    if (GetActualSeqLenSize(qsfaShapeSize, opParamInfo_.actualSeqLengthsQ.tensor, "actual_seq_lengths_query",
+                            opName_) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (qsfaShapeSize != bSize_) {
@@ -1191,7 +1192,8 @@ ge::graphStatus QSFATilingCheck::CheckFeatureMlaAntiquantShapeSizes() const
                         Ops::Base::ToString(opParamInfo_.query.shape->GetStorageShape()) + " and " +
                             Ops::Base::ToString(opParamInfo_.key.shape->GetStorageShape()),
                         "The value of (the head num of query ceildivided by the head num of key) "
-                        "should be in [1, 2, 4, 8, 16, 32, 48, 64, 128], but got " + std::to_string(gSize_)),
+                        "should be in [1, 2, 4, 8, 16, 32, 48, 64, 128], but got " +
+                            std::to_string(gSize_)),
                     return ge::GRAPH_FAILED);
     } else {
         std::vector<uint32_t> gSizeSupportList = {1, 2, 4, 8, 16, 32, 64, 128};
@@ -1201,7 +1203,8 @@ ge::graphStatus QSFATilingCheck::CheckFeatureMlaAntiquantShapeSizes() const
                         Ops::Base::ToString(opParamInfo_.query.shape->GetStorageShape()) + " and " +
                             Ops::Base::ToString(opParamInfo_.key.shape->GetStorageShape()),
                         "The value of (the head num of query ceildivided by the head num of key) "
-                        "should be in [1, 2, 4, 8, 16, 32, 64, 128], but got " + std::to_string(gSize_)),
+                        "should be in [1, 2, 4, 8, 16, 32, 64, 128], but got " +
+                            std::to_string(gSize_)),
                     return ge::GRAPH_FAILED);
     }
 
@@ -1212,13 +1215,13 @@ ge::graphStatus QSFATilingCheck::CheckFeatureMlaAntiquantShapeSparseAndHeadDim()
 {
     if (isA5_) {
         if (inputKvType_ == ge::DT_HIFLOAT8) {
-            OP_CHECK_IF(sparseBlockCount_ != 2048,
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                            opName_, "sparse_indices",
-                            ToStringRaw(opParamInfo_.sparseIndices.shape->GetStorageShape()).c_str(),
-                            "When the dtypes of key and value are hifloat8, sparse block count must be 2048, but got " +
-                                std::to_string(sparseBlockCount_)),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                sparseBlockCount_ != 2048,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "sparse_indices", ToStringRaw(opParamInfo_.sparseIndices.shape->GetStorageShape()).c_str(),
+                    "When the dtypes of key and value are hifloat8, sparse block count must be 2048, but got " +
+                        std::to_string(sparseBlockCount_)),
+                return ge::GRAPH_FAILED);
         }
         OP_CHECK_IF(
             sparseBlockSize_ != 1,
@@ -1487,13 +1490,12 @@ ge::graphStatus QSFAInfoParser::CheckTensorShapes() const
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         opParamInfo_.sparseIndices.shape == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sparse_indices",
-            "The shape of sparse_indices is nullptr"),
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sparse_indices", "The shape of sparse_indices is nullptr"),
         return ge::GRAPH_FAILED);
-    OP_CHECK_IF(opParamInfo_.attenOut.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "attention_out",
-                    "The shape of attention_out is nullptr"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        opParamInfo_.attenOut.shape == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "attention_out", "The shape of attention_out is nullptr"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1513,10 +1515,10 @@ ge::graphStatus QSFAInfoParser::CheckTensorDescriptions() const
         opParamInfo_.sparseIndices.desc == nullptr,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sparse_indices", "The desc of sparse_indices is nullptr"),
         return ge::GRAPH_FAILED);
-    OP_CHECK_IF(opParamInfo_.attenOut.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "attention_out",
-                    "The desc of attention_out is nullptr"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        opParamInfo_.attenOut.desc == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "attention_out", "The desc of attention_out is nullptr"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1544,10 +1546,9 @@ ge::graphStatus QSFAInfoParser::CheckRequiredAttrExistence() const
     OP_CHECK_IF(opParamInfo_.layoutKV == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "layout_kv", "Layout_kv is nullptr"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        opParamInfo_.sparseBlockSize == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sparse_block_size", "Sparse_block_size is nullptr"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(opParamInfo_.sparseBlockSize == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sparse_block_size", "Sparse_block_size is nullptr"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.scaleValue == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "scale_value", "Scale_value is nullptr"),
                 return ge::GRAPH_FAILED);
@@ -1811,9 +1812,9 @@ ge::graphStatus QSFAInfoParser::GetMaxBlockNumPerBatch()
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo_.blockTable.tensor->GetStorageShape().GetDim(1) <= 0) {
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            opName_, "block_table", ToStringRaw(opParamInfo_.blockTable.tensor->GetStorageShape()).c_str(),
-            "The second dim of block_table should be greater than 0");
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "block_table",
+                                              ToStringRaw(opParamInfo_.blockTable.tensor->GetStorageShape()).c_str(),
+                                              "The second dim of block_table should be greater than 0");
         return ge::GRAPH_FAILED;
     }
     maxBlockNumPerBatch_ = opParamInfo_.blockTable.tensor->GetStorageShape().GetDim(1);
@@ -1951,20 +1952,19 @@ ge::graphStatus QSFAInfoParser::CheckContiguous() const
 
         if (kvLayout_ == QSFALayout::PA_BSND) {
             totalElements = keyStride1_ * static_cast<uint64_t>(keyShape_.GetDim(1));
-            shapeSize = static_cast<uint64_t>(keyShape_.GetDim(1)) *
-                        static_cast<uint64_t>(keyShape_.GetDim(2)) *
-                        static_cast<uint64_t>(keyShape_.GetDim(3));
+            shapeSize = static_cast<uint64_t>(keyShape_.GetDim(1)) * static_cast<uint64_t>(keyShape_.GetDim(2U)) *
+                        static_cast<uint64_t>(keyShape_.GetDim(3U));
         } else {
             totalElements = keyStride0_ * static_cast<uint64_t>(keyShape_.GetDim(0));
-            shapeSize = context_->GetOptionalInputTensor(KEY_INPUT_INDEX)->GetShapeSize();
+            shapeSize = static_cast<uint64_t>(context_->GetOptionalInputTensor(KEY_INPUT_INDEX)->GetShapeSize());
         }
         keyNonContiguous = (shapeSize != totalElements);
     }
 
     OP_CHECK_IF(keyNonContiguous,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "key",
-            "Key only supports non-contiguous tensor on the 0-axis in PA scenarios"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    opName_, "key", "Key only supports non-contiguous tensor on the 0-axis in PA scenarios"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -2019,14 +2019,14 @@ void QSFAInfoParser::GenerateInfo(QSFATilingInfo &qsfaInfo)
     qsfaInfo.maxBlockNumPerBatch = maxBlockNumPerBatch_;
 
     if (npuArch_ != NpuArch::DAV_3510) {
-        qsfaInfo.keyStride0 = 0;  // 910无需使用stride
+        qsfaInfo.keyStride0 = 0; // 910无需使用stride
     } else {
         if (keyStride0_ != 0) {
             qsfaInfo.keyStride0 = keyStride0_;
         } else if (kvLayout_ == QSFALayout::PA_BSND) {
             qsfaInfo.keyStride0 = blockSize_ * dSizeKV_;
         } else {
-            qsfaInfo.keyStride0 = 0;  // 非PA无需使用stride
+            qsfaInfo.keyStride0 = 0; // 非PA无需使用stride
         }
     }
 

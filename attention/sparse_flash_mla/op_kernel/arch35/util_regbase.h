@@ -54,7 +54,7 @@ enum class VselrIndexEnum {
     int32_t actualS1Size;       /* Q的actualSeqLength */ \
     int32_t actualS2OriSize;    /* ori_kv的真实使用长度 */ \
     int32_t actualS2CmpSize;    /* cmp_kv的真实使用长度 */ \
-    int32_t cmpResidual;        /* cmp的余数，用于mask计算 */
+    int32_t cmpResidual         /* cmp的余数，用于mask计算 */
 
 struct RunParamStr { // 分核与切块需要使用到参数
     COMMON_RUN_PARAM;
@@ -134,7 +134,7 @@ struct RunParamStr { // 分核与切块需要使用到参数
     bool isCrossCoreSplit = false; \
     int64_t s2SplitIdx = 0; \
     bool isFirstS2SplitCore = true; \
-    int64_t baseBlockNumPerReductionBlock = 1;
+    int64_t baseBlockNumPerReductionBlock = 1
 
 struct RunInfo {
     COMMON_RUN_INFO;
@@ -231,7 +231,7 @@ struct RunInfo {
     bool hasCmpTopkLength; \
     /* nonContiguous */ \
     int64_t oriKeyStride0; \
-    int64_t cmpKeyStride0;
+    int64_t cmpKeyStride0
 
 #define INFER_CONST_INFO \
     /* 推理 */ \

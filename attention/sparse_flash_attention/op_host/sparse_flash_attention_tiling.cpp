@@ -419,7 +419,7 @@ void SFAMlaTiling::FillTilingSplitKVMla()
 {
     tilingData_.splitKVParams.set_s2(kvSplitPart_);
 
-    tilingData_.splitKVParams.set_accumOutSize(aicNum_ * 2 * sfaInfo_->n2Size * mBaseSize_ *
+    tilingData_.splitKVParams.set_accumOutSize(aicNum_ * 2U * sfaInfo_->n2Size * mBaseSize_ *
                                                headDimAlign_); // 2:每个核可能有头规约和尾规约，一共两份规约信息
     tilingData_.splitKVParams.set_logSumExpSize(2 * aicNum_ * 2 * sfaInfo_->n2Size *
                                                 mBaseSize_ * // 2:每个核可能有头规约和尾规约，一共两份规约信息;sum + max
@@ -781,8 +781,8 @@ ge::graphStatus SFATilingCheck::CheckSingleParaSparseBlockSize() const
     OP_CHECK_IF((*opParamInfo_.sparseBlockSize <= 0 || *opParamInfo_.sparseBlockSize > 128 ||
                  (static_cast<uint64_t>(*opParamInfo_.sparseBlockSize) &
                   static_cast<uint64_t>(*opParamInfo_.sparseBlockSize - 1L)) != 0UL),
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "sparse_block_size",
-                    std::to_string(*opParamInfo_.sparseBlockSize).c_str(),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    opName_, "sparse_block_size", std::to_string(*opParamInfo_.sparseBlockSize).c_str(),
                     "Sparse_block_size must be in range [1, 128] and be a power of 2"),
                 return ge::GRAPH_FAILED);
 
@@ -855,8 +855,8 @@ ge::graphStatus SFATilingCheck::CheckRopeExistence()
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         opParamInfo_.keyRope.desc == nullptr || opParamInfo_.queryRope.desc == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query_rope and key_rope",
-            "In Mla situation, desc of query_rope and key_rope should not be null"),
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName_, "query_rope and key_rope", "In Mla situation, desc of query_rope and key_rope should not be null"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -1006,8 +1006,7 @@ ge::graphStatus SFATilingCheck::CheckBlockTable() const
     OP_CHECK_IF(
         blockTableBatch != bSize_,
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            opName_, BLOCK_TABLE_NAME.c_str(),
-            ToStringRaw(opParamInfo_.blockTable.tensor->GetStorageShape()).c_str(),
+            opName_, BLOCK_TABLE_NAME.c_str(), ToStringRaw(opParamInfo_.blockTable.tensor->GetStorageShape()).c_str(),
             "The first dim of " + BLOCK_TABLE_NAME + " should be equal to batch size " + std::to_string(bSize_)),
         return ge::GRAPH_FAILED);
 
@@ -1136,12 +1135,12 @@ ge::graphStatus SFATilingCheck::CheckSoftmaxMax()
                 opName_, "softmax_max", "When return_softmax_lse is true, softmax_max tensor cannot be empty tensor"),
             return ge::GRAPH_FAILED);
         // type类型校验
-        OP_CHECK_IF(opParamInfo_.softmaxMax.desc->GetDataType() != ge::DT_FLOAT,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        opName_, "softmax_max",
-                        SFADataTypeToSerialString(opParamInfo_.softmaxMax.desc->GetDataType()).c_str(),
-                        "The dtype of softmax_max must be FLOAT"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            opParamInfo_.softmaxMax.desc->GetDataType() != ge::DT_FLOAT,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                opName_, "softmax_max", SFADataTypeToSerialString(opParamInfo_.softmaxMax.desc->GetDataType()).c_str(),
+                "The dtype of softmax_max must be FLOAT"),
+            return ge::GRAPH_FAILED);
         // shape和维度校验
         if (ge::GRAPH_SUCCESS != CheckAttenOutShape()) {
             return ge::GRAPH_FAILED;
@@ -1162,12 +1161,12 @@ ge::graphStatus SFATilingCheck::CheckSoftmaxSum()
             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                 opName_, "softmax_sum", "When return_softmax_lse is true, softmax_sum tensor cannot be empty tensor"),
             return ge::GRAPH_FAILED);
-        OP_CHECK_IF(opParamInfo_.softmaxSum.desc->GetDataType() != ge::DT_FLOAT,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        opName_, "softmax_sum",
-                        SFADataTypeToSerialString(opParamInfo_.softmaxSum.desc->GetDataType()).c_str(),
-                        "The dtype of softmax_sum must be FLOAT"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            opParamInfo_.softmaxSum.desc->GetDataType() != ge::DT_FLOAT,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                opName_, "softmax_sum", SFADataTypeToSerialString(opParamInfo_.softmaxSum.desc->GetDataType()).c_str(),
+                "The dtype of softmax_sum must be FLOAT"),
+            return ge::GRAPH_FAILED);
     } else {
         if (opParamInfo_.softmaxSum.shape->GetStorageShape().GetShapeSize() != 0) {
             OP_LOGW(opName_, "When return_softmax_lse is false, softmax_sum tensor must be empty tensor.");
@@ -1254,8 +1253,9 @@ ge::graphStatus SFATilingCheck::CheckVAndKRopeShape()
     }
 
     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "key",
-        "Storage mode of key and value is " + std::to_string(static_cast<int32_t>(kvStorageMode_)) +
-            ", it is incorrect");
+                                             "Storage mode of key and value is " +
+                                                 std::to_string(static_cast<int32_t>(kvStorageMode_)) +
+                                                 ", it is incorrect");
     return ge::GRAPH_FAILED;
 }
 
@@ -1305,8 +1305,7 @@ ge::graphStatus SFATilingCheck::CheckActualSeqLensQShape()
         return ge::GRAPH_SUCCESS;
     }
     uint32_t sfaShapeSize = 0;
-    if (GetActualSeqLenSize(sfaShapeSize, opParamInfo_.actualSeqLengthsQ.tensor,
-        "actual_seq_lengths_query", opName_) !=
+    if (GetActualSeqLenSize(sfaShapeSize, opParamInfo_.actualSeqLengthsQ.tensor, "actual_seq_lengths_query", opName_) !=
         ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
@@ -1365,9 +1364,9 @@ ge::graphStatus SFATilingCheck::CheckActualSeqLensShape()
         return ge::GRAPH_FAILED;
     }
     if (sfaShapeSizeKv != bSize_) {
-        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(opName_, "actual_seq_lengths_kv", std::to_string(sfaShapeSizeKv),
-            "The shape size of actual_seq_lengths_kv should be equal to batch size " +
-            std::to_string(bSize_));
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            opName_, "actual_seq_lengths_kv", std::to_string(sfaShapeSizeKv),
+            "The shape size of actual_seq_lengths_kv should be equal to batch size " + std::to_string(bSize_));
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -1453,19 +1452,17 @@ ge::graphStatus SFATilingCheck::CheckFeatureMlaNoQuantShape() const
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                     opName_, "query, key and value",
                     Ops::Base::ToString(opParamInfo_.query.shape->GetStorageShape()) + ", " +
-                    Ops::Base::ToString(opParamInfo_.key.shape->GetStorageShape()) + " and " +
+                        Ops::Base::ToString(opParamInfo_.key.shape->GetStorageShape()) + " and " +
                         Ops::Base::ToString(opParamInfo_.value.shape->GetStorageShape()),
                     "The head num of query and key[" + std::to_string(qkHeadDim_) +
-                    "] should be equal to the head num of value[" +
-                        std::to_string(vHeadDim_) + "]"),
+                        "] should be equal to the head num of value[" + std::to_string(vHeadDim_) + "]"),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(
-        ropeHeadDim_ != 64,
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            opName_, "query_rope", ToStringRaw(opParamInfo_.queryRope.tensor->GetStorageShape()).c_str(),
-            "The head num of query_rope should be 64, but got " + std::to_string(ropeHeadDim_)),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ropeHeadDim_ != 64,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "query_rope", ToStringRaw(opParamInfo_.queryRope.tensor->GetStorageShape()).c_str(),
+                    "The head num of query_rope should be 64, but got " + std::to_string(ropeHeadDim_)),
+                return ge::GRAPH_FAILED);
 
     if (isA5_) {
         OP_CHECK_IF(s1Size_ <= 0 && (qLayout_ == SFALayout::BSND),
@@ -1654,26 +1651,20 @@ ge::graphStatus SFAInfoParser::CheckTensorShapes() const
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         opParamInfo_.sparseIndices.shape == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sparse_indices",
-            "The shape of sparse_indices is nullptr"),
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sparse_indices", "The shape of sparse_indices is nullptr"),
         return ge::GRAPH_FAILED);
-    OP_CHECK_IF(opParamInfo_.attenOut.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_,
-                    "attention_out", "The shape of attention_out is nullptr"),
+    OP_CHECK_IF(
+        opParamInfo_.attenOut.shape == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "attention_out", "The shape of attention_out is nullptr"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(opParamInfo_.softmaxMax.shape == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "softmax_max", "The shape of softmax_max is nullptr"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        opParamInfo_.softmaxMax.shape == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "softmax_max",
-            "The shape of softmax_max is nullptr"),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        opParamInfo_.softmaxSum.shape == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "softmax_sum",
-            "The shape of softmax_sum is nullptr"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(opParamInfo_.softmaxSum.shape == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "softmax_sum", "The shape of softmax_sum is nullptr"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.queryRope.tensor == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query_rope",
-                    "The shape of query_rope is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query_rope", "The shape of query_rope is nullptr"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -1692,24 +1683,20 @@ ge::graphStatus SFAInfoParser::CheckTensorDescriptions() const
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         opParamInfo_.sparseIndices.desc == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sparse_indices",
-            "The desc of sparse_indices is nullptr"),
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sparse_indices", "The desc of sparse_indices is nullptr"),
         return ge::GRAPH_FAILED);
-    OP_CHECK_IF(opParamInfo_.attenOut.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "attention_out",
-                    "The desc of attention_out is nullptr"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        opParamInfo_.attenOut.desc == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "attention_out", "The desc of attention_out is nullptr"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.softmaxMax.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "softmax_max",
-                    "The desc of softmax_max is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "softmax_max", "The desc of softmax_max is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.softmaxSum.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "softmax_sum",
-                    "The desc of softmax_sum is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "softmax_sum", "The desc of softmax_sum is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.queryRope.desc == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query_rope",
-                    "The desc of query_rope is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query_rope", "The desc of query_rope is nullptr"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -1738,10 +1725,9 @@ ge::graphStatus SFAInfoParser::CheckRequiredAttrExistence() const
     OP_CHECK_IF(opParamInfo_.layoutKV == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "layout_kv", "Layout_kv is nullptr"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        opParamInfo_.sparseBlockSize == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sparse_block_size", "Sparse_block_size is nullptr"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(opParamInfo_.sparseBlockSize == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sparse_block_size", "Sparse_block_size is nullptr"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.sparseMode == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "sparse_mode", "Sparse_mode is nullptr"),
                 return ge::GRAPH_FAILED);
@@ -2010,9 +1996,9 @@ ge::graphStatus SFAInfoParser::GetMaxBlockNumPerBatch()
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo_.blockTable.tensor->GetStorageShape().GetDim(1) <= 0) {
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            opName_, "block_table", ToStringRaw(opParamInfo_.blockTable.tensor->GetStorageShape()).c_str(),
-            "The second dim of block_table should be greater than 0");
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "block_table",
+                                              ToStringRaw(opParamInfo_.blockTable.tensor->GetStorageShape()).c_str(),
+                                              "The second dim of block_table should be greater than 0");
         return ge::GRAPH_FAILED;
     }
     maxBlockNumPerBatch_ = opParamInfo_.blockTable.tensor->GetStorageShape().GetDim(1);
@@ -2169,20 +2155,19 @@ ge::graphStatus SFAInfoParser::CheckContiguous() const
 
         if (kvLayout_ == SFALayout::PA_BSND) {
             totalElements = keyStride1_ * static_cast<uint64_t>(keyShape_.GetDim(1));
-            shapeSize = static_cast<uint64_t>(keyShape_.GetDim(1)) *
-                        static_cast<uint64_t>(keyShape_.GetDim(2)) *
-                        static_cast<uint64_t>(keyShape_.GetDim(3));
+            shapeSize = static_cast<uint64_t>(keyShape_.GetDim(1)) * static_cast<uint64_t>(keyShape_.GetDim(2U)) *
+                        static_cast<uint64_t>(keyShape_.GetDim(3U));
         } else {
             totalElements = keyStride0_ * static_cast<uint64_t>(keyShape_.GetDim(0));
-            shapeSize = context_->GetOptionalInputTensor(KEY_INPUT_INDEX)->GetShapeSize();
+            shapeSize = static_cast<uint64_t>(context_->GetOptionalInputTensor(KEY_INPUT_INDEX)->GetShapeSize());
         }
         keyNonContiguous = (shapeSize != totalElements);
     }
 
     OP_CHECK_IF(keyNonContiguous,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "key",
-            "Key only supports non-contiguous tensor on the 0-axis in PA scenarios"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    opName_, "key", "Key only supports non-contiguous tensor on the 0-axis in PA scenarios"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -2226,14 +2211,14 @@ void SFAInfoParser::GenerateInfo(SFATilingInfo &sfaInfo)
     sfaInfo.maxBlockNumPerBatch = maxBlockNumPerBatch_;
 
     if (npuArch_ != NpuArch::DAV_3510) {
-        sfaInfo.keyStride0 = 0;  // 910无需使用stride
+        sfaInfo.keyStride0 = 0; // 910无需使用stride
     } else {
-        if (keyStride0_ != 0) {
+        if ((keyStride0_ != 0) && (n2Size_ != 0) && (qkHeadDim_ != 0)) {
             sfaInfo.keyStride0 = keyStride0_ / (n2Size_ * qkHeadDim_);
         } else if (kvLayout_ == SFALayout::PA_BSND) {
             sfaInfo.keyStride0 = blockSize_;
         } else {
-            sfaInfo.keyStride0 = 0;  // 非PA无需使用stride
+            sfaInfo.keyStride0 = 0; // 非PA无需使用stride
         }
     }
 

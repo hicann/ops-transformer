@@ -541,7 +541,7 @@ void MQSMLAInfoParser::GenerateInfo(MQSMLATilingInfo &qsmlaInfo)
     qsmlaInfo.cmpKvType = cmpKvType_;
     qsmlaInfo.outputType = outputType_;
     qsmlaInfo.dSize = dSizeQ_;
-    qsmlaInfo.dSizeV = 512;
+    qsmlaInfo.dSizeV = 512U;
     qsmlaInfo.dSizeVInput = dSizeKV_;
 
     qsmlaInfo.totalBlockNum =
@@ -557,7 +557,7 @@ void MQSMLAInfoParser::GenerateInfo(MQSMLATilingInfo &qsmlaInfo)
     qsmlaInfo.batchConsistency = batchConsistency_;
 
     qsmlaInfo.quantMode = *opParamInfo_.quantMode;
-    qsmlaInfo.tileSize = 64;
+    qsmlaInfo.tileSize = 64U;
     qsmlaInfo.ropeHeadDim = *opParamInfo_.ropeHeadDim;
     qsmlaInfo.softmaxScale = *opParamInfo_.softmaxScale;
     qsmlaInfo.oriKvStride = oriKvStride_;
@@ -764,7 +764,7 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo *til
     uint32_t outputType = static_cast<uint32_t>(tilingInfo->outputType);
     uint32_t qLayout = static_cast<uint32_t>(tilingInfo->qLayout);
     uint32_t inputKvLayout = static_cast<uint32_t>(tilingInfo->kvLayout);
-    uint32_t tilingKey =
+    uint64_t tilingKey =
         GET_TPL_TILING_KEY(0U, qLayout, inputKvLayout, static_cast<uint32_t>(perfMode_),
                            static_cast<uint32_t>(isSplitG), static_cast<uint32_t>(tilingInfo->quantMode),
                            ((oriKvType == ge::DT_FLOAT8_E4M3FN) ? DTYPE_FP8_E4M3FN : DTYPE_HIF8),

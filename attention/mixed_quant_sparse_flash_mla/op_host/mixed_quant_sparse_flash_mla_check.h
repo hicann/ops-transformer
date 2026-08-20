@@ -423,7 +423,7 @@ public:
     bool HasAxis(const MQSMLAAxis &axis, const MQSMLALayout &layout, const gert::Shape &shape) const;
     size_t GetAxisIdx(const MQSMLAAxis &axis, const MQSMLALayout &layout) const;
     uint32_t GetAxisNum(const gert::Shape &shape, const MQSMLAAxis &axis, const MQSMLALayout &layout) const;
-    static constexpr int64_t invalidDimValue_ = std::numeric_limits<int64_t>::min();
+    static constexpr uint32_t invalidDimValue_ = std::numeric_limits<uint32_t>::min();
 
     // BaseParams
     uint32_t bSize_ = 0;
@@ -490,7 +490,7 @@ private:
     bool HasAxis(const MQSMLAAxis &axis, const MQSMLALayout &layout, const gert::Shape &shape) const;
     size_t GetAxisIdx(const MQSMLAAxis &axis, const MQSMLALayout &layout) const;
     uint32_t GetAxisNum(const gert::Shape &shape, const MQSMLAAxis &axis, const MQSMLALayout &layout) const;
-    static constexpr int64_t invalidDimValue_ = std::numeric_limits<int64_t>::min();
+    static constexpr uint32_t invalidDimValue_ = std::numeric_limits<uint32_t>::min();
 
     void LogErrorDtypeSupport(const std::vector<ge::DataType> &expectDtypeList, const ge::DataType &actualDtype,
                               const std::string &name) const;

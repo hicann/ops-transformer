@@ -19,12 +19,12 @@ const char *Op(const CheckContext &context) { return context.opName == nullptr ?
 
 ge::graphStatus MaskChecker::CheckSinglePara(const CheckContext &context) const
 {
-    OP_CHECK_IF(context.oriMaskMode != 0 && context.oriMaskMode != 3 && context.oriMaskMode != 4,
+    OP_CHECK_IF(context.oriMaskMode != 0 && context.oriMaskMode != 3U && context.oriMaskMode != 4U,
                 OP_LOGE_FOR_INVALID_VALUE(Op(context), "ori_mask_mode", std::to_string(context.oriMaskMode).c_str(),
                                           "0, 3 or 4"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
-        context.cmpMaskMode != 0 && context.cmpMaskMode != 3,
+        context.cmpMaskMode != 0 && context.cmpMaskMode != 3U,
         OP_LOGE_FOR_INVALID_VALUE(Op(context), "cmp_mask_mode", std::to_string(context.cmpMaskMode).c_str(), "0 or 3"),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(context.oriWinLeft < -1 || context.oriWinRight < -1,
@@ -38,7 +38,7 @@ ge::graphStatus MaskChecker::CheckSinglePara(const CheckContext &context) const
 
 ge::graphStatus MaskChecker::CheckFeature(const CheckContext &context) const
 {
-    if (context.oriMaskMode != 4) {
+    if (context.oriMaskMode != 4U) {
         OP_CHECK_IF(context.oriWinLeft != -1 || context.oriWinRight != -1,
                     OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
                         Op(context), "ori_win_left and ori_win_right",
