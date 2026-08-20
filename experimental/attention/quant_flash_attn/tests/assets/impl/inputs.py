@@ -29,6 +29,14 @@ logger = logging.getLogger(__name__)
 __input__ = {"e2e": {"qfa_mxfp4_wrapper.npu_qfa_mxfp4": "generate_qfa_mxfp4_inputs"}}
 
 
+# 环境变量 QFA_PASS_THROUGH=1 时跳过 golden_mod.generate_data() (含 _resolve_s /
+# transpose_qscale / rearrange_by_layout / v_descale.view 等所有会报错的步骤),
+# CSV 框架分配的 tensor 槽位保持原样透传给 wrapper, 由 wrapper 的 _PASS_THROUGH 分支
+# 或 op_host checker 处理. 用于异常用例测试 (s=0 / kv shape 不一致 / D 不支持 /
+# descale 维度异常 / seq 缺失 等), 在 CSV 配异常 shape + 设本开关即可.
+_PASS_THROUGH = os.environ.get("QFA_PASS_THROUGH", "").lower() in ("1", "true", "yes")
+
+
 def _apply_golden_globals(attrs):
     for k, v in attrs.items():
         setattr(golden_mod, k, v)
@@ -159,6 +167,9 @@ def generate_qfa_mxfp4_inputs(
     cu_seqlens_q_dtype: str = None,
     cu_seqlens_kv_dtype: str = None,
     softmax_lse_dtype: str = None,
+    # metadata 伪 tensor 入参 (对齐 run_main 签名, PASS_THROUGH 时按表格构造)
+    metadata_shape: List[int] = None,
+    metadata_dtype: str = None,
     **kwargs,
 ):
     # 注入 golden 全局变量 (generate_data 读这些配置)
@@ -219,16 +230,32 @@ def generate_qfa_mxfp4_inputs(
             "CU_SEQLENS_Q_DTYPE": cu_seqlens_q_dtype,
             "CU_SEQLENS_KV_DTYPE": cu_seqlens_kv_dtype,
             "SOFTMAX_LSE_DTYPE": softmax_lse_dtype,
+            "METADATA_SHAPE": list(metadata_shape) if metadata_shape else [],
+            "METADATA_DTYPE": metadata_dtype,
         }
     )
 
+    # 数据准备分两种模式:
+    #   1) QFA_PASS_THROUGH=1: 跳过 generate_data, CSV 框架分配的 tensor 槽位保持原样
+    #      (随机/零初始化) 透传给 wrapper, 由 wrapper 的 _PASS_THROUGH 分支拼 fallback
+    #      data_dict 喂 NPU 算子, op_host 拦截非法输入. 用于异常用例.
+    #   2) 都不设: 走 generate_data 完整流程; 任意异常也跳过原位写 (CSV tensor 保持原样),
+    #      由 wrapper 的 try/except 兜底回退到 fallback data_dict.
+    if _PASS_THROUGH:
+        logger.info(
+            "[INPUTS] QFA_PASS_THROUGH=1, 跳过 generate_data, CSV tensor 保持原样透传给 wrapper"
+        )
+        return
+
     golden_mod._inject_physical_s_override(q, v, input_layout, layout_kv)
     try:
-        try:
-            data_dict = golden_mod.generate_data()
-        except Exception:
-            golden_mod._clear_physical_s_override()
-            data_dict = golden_mod.generate_data()
+        data_dict = golden_mod.generate_data()
+    except Exception as e:
+        logger.warning(
+            "[INPUTS] generate_data 失败: %s, CSV tensor 保持原样透传给 wrapper",
+            str(e),
+        )
+        return
     finally:
         golden_mod._clear_physical_s_override()
 

@@ -199,8 +199,8 @@ def _blockwise_snap_local_quantize_p_eff(
     ndim = S.dim()
     seqk_dim_pos = seqk_dim if seqk_dim >= 0 else ndim + seqk_dim
     seqk_len = S.shape[seqk_dim_pos]
-    LN2 = math.log(2.0)
-    LN2 = torch.tensor(LN2, dtype=torch.float16, device=device)
+    LN2 = torch.tensor(math.log(2.0), dtype=torch.float16, device=device)
+    INV_LN2 = torch.tensor(1.0 / math.log(2.0), dtype=torch.float16, device=device)
 
     pad = (mx_block_size - seqk_len % mx_block_size) % mx_block_size
     if pad > 0:
@@ -228,11 +228,11 @@ def _blockwise_snap_local_quantize_p_eff(
     # NPU: Muls(curr_group_max, dScale) — 对 max 施加 scale
     m_block_scaled = m_block_raw_safe * scale_s
     # snap: floor(m_scaled / ln 2) × ln 2, 落到全局 log2 网格上
-    K_block = torch.floor(m_block_scaled / LN2)
+    K_block = (m_block_scaled * INV_LN2).floor()
 
     ### local_group_max
     local_group_max = K_block.T
-    local_group_max.numpy().tofile("dump_data/local_group_max.bin")
+    # local_group_max.numpy().tofile("dump_data/local_group_max.bin")
     # print(f'local_group_max.shape={local_group_max.shape} K_block.dtype={local_group_max.dtype}')
 
     m_block_snap = (K_block - 2) * LN2  # [..., n_blk], on log2 grid
@@ -253,7 +253,7 @@ def _blockwise_snap_local_quantize_p_eff(
     p_packed_x4 = _pack_fp4_e2m1_along_last(
         idx_padded_r.reshape(*other_shape, n_blk * mx_block_size).T
     )
-    p_packed_x4.numpy().tofile("dump_data/p_packed_x4.bin")
+    # p_packed_x4.numpy().tofile("dump_data/p_packed_x4.bin")
     # p_packed_x4_nz = p_packed_x4.reshape(p_packed_x4.shape[0] // 256, 256 , 2, 32).transpose(2, 1)
     # p_packed_x4_nz.numpy().tofile('dump_data/p_packed_x4_nz.bin')
     # torch.save(p_packed_x4_nz, 'p_packed_x4_nz.pt')
@@ -284,14 +284,14 @@ def _blockwise_snap_local_quantize_p_eff(
 
     K_new_s = m_new.to(src_dtype)
     ### global_max
-    K_new_s.numpy().tofile("dump_data/global_max.bin")
+    # K_new_s.numpy().tofile("dump_data/global_max.bin")
     # print(f'K_new_s.shape={K_new_s.shape} K_new_s.dtype={K_new_s.dtype}')
 
     K_diff = K_block - K_new_s.unsqueeze(-1)  # ≤ 0, s_dtype 整数
     corr = torch.exp2(K_diff - 2.0)  # 2^(K_diff - 2), 精确
     ### p_scale_e8m0
     p_scale_e8m0 = _to_e8m0_uint8(K_diff.to(torch.int32) - 2).T.contiguous()
-    p_scale_e8m0.numpy().tofile("dump_data/p_scale_e8m0.bin")
+    # p_scale_e8m0.numpy().tofile("dump_data/p_scale_e8m0.bin")
     # print(f'p_scale_e8m0.shape={p_scale_e8m0.shape} p_scale_e8m0.dtype={p_scale_e8m0.dtype}')
     # p_scale_e8m0_nz = p_scale_e8m0.view(p_scale_e8m0.shape[0], p_scale_e8m0.shape[1] // 16, 16).transpose(1, 0)
     # p_scale_e8m0_nz = p_scale_e8m0_nz.view(p_scale_e8m0.shape[1] // 16, p_scale_e8m0.shape[0] // 2, 2, 16).transpose(3, 2)
@@ -515,7 +515,7 @@ def _flash_attn_single_batch_kernel(
                 # ★ S 转入 s_dtype, 后续 max/exp/P 都在 s_dtype 算
                 S_ij = S_ij.to(s_torch_dtype)
 
-                S_ij.numpy().tofile("dump_data/mm1Res.bin")
+                # S_ij.numpy().tofile("dump_data/mm1Res.bin")
                 # torch.save(S_ij, 'qk_result_padded.pt')
                 # print(f'mm1Res.shape={S_ij.shape} mm1Res.dtype={S_ij.dtype}')
 
@@ -600,21 +600,25 @@ def _flash_attn_single_batch_kernel(
                     m_new,
                 )
                 if quantize_p and quantize_p_mode == "blockwise_snap_local":
-                    alpha = torch.exp2(
-                        m_i_safe_fp32 - m_new_safe_fp32
-                    )  # 2^K_diff, 精确
+                    K_diff = m_i_safe_fp32 - m_new_safe_fp32
+                    first_tile = torch.isinf(m_i) & (m_i < 0)  # m_i 还是 -inf 未 clamp
+                    alpha = torch.where(
+                        first_tile,
+                        torch.zeros_like(K_diff),
+                        torch.exp2(K_diff),
+                    )
                 else:
                     alpha = torch.exp(m_i_safe_fp32 - m_new_safe_fp32)  # FP32
 
                 mm2ReduceSum = P_fp32.sum(dim=seqk_dim)
-                mm2ReduceSum.numpy().tofile("dump_data/mm2ReduceSum.bin")
+                # mm2ReduceSum.numpy().tofile("dump_data/mm2ReduceSum.bin")
                 # print(f'mm2ReduceSum.shape={mm2ReduceSum.shape} mm2ReduceSum.dtype={mm2ReduceSum.dtype}')
                 l_i = alpha * l_i + P_fp32.sum(dim=seqk_dim)
                 if s_layout == "ND":
                     O_i = alpha.unsqueeze(-1) * O_i + P_fp32 @ V_j
                 else:
                     PV_i = V_j.t() @ P_fp32
-                    PV_i.numpy().tofile("dump_data/mm2Res_1.bin")
+                    # PV_i.numpy().tofile("dump_data/mm2Res_1.bin")
                     # print(f'mm2Res.shape={PV_i.shape} mm2Res.dtype={PV_i.dtype}')
                     O_i = alpha.unsqueeze(-1) * O_i + P_fp32.t() @ V_j
 

@@ -33,8 +33,14 @@ CSV_PROFILES = [
 #       实际从 batch_size/num_heads_q/num_heads_kv/head_dim (BU-CC 列) 取值.
 HEADER = {
     "name": "testcase_name",
+    "custom_info": "custom_info",
     # 基本信息 (从 J 列起, 跳过 C-I 汇总列)
     "out_dtype": "attn_out_dtype",
+    # 输出信息 (透传查看用, 实际输出 shape/dtype 由算子决定)
+    "attn_out_shape": "attn_out_shape",
+    "attn_out_datarange": "attn_out_datarange",
+    "softmax_lse_shape": "softmax_lse_shape",
+    "softmax_lse_datarange": "softmax_lse_datarange",
     # q/k/v 数据
     "q_shape": "q_shape",
     "q_dtype": "q_dtype",
@@ -48,13 +54,17 @@ HEADER = {
     # q/k/v descale
     "q_descale_shape": "q_descale_shape",
     "q_descale_dtype": "q_descale_dtype",
+    "q_descale_datarange": "q_descale_datarange",
     "k_descale_shape": "k_descale_shape",
     "k_descale_dtype": "k_descale_dtype",
+    "k_descale_datarange": "k_descale_datarange",
     "v_descale_shape": "v_descale_shape",
     "v_descale_dtype": "v_descale_dtype",
+    "v_descale_datarange": "v_descale_datarange",
     # 可选 tensor 入参 (shape 为空 -> golden 传 None)
     "block_table_shape": "block_table_shape",
     "block_table_dtype": "block_table_dtype",
+    "block_table_datarange": "block_table_datarange",
     "p_scale_value": "p_scale_value",
     "p_scale_shape": "p_scale_shape",
     "p_scale_dtype": "p_scale_dtype",
@@ -65,15 +75,27 @@ HEADER = {
     "attn_mask_shape": "attn_mask_shape",
     "attn_mask_dtype": "attn_mask_dtype",
     "attn_mask_datarange": "attn_mask_datarange",
-    # seq 信息
+    # metadata (main wrapper 伪 tensor 入参: shape/dtype 来自表格, golden 按此构造)
+    "metadata_shape": "metadata_shape",
+    "metadata_dtype": "metadata_dtype",
+    "metadata_datarange": "metadata_datarange",
+    # seq 信息 (value 是实际内容, shape/datarange 透传查看用)
     "cu_seqlens_q_value": "cu_seqlens_q_value",
+    "cu_seqlens_q_shape": "cu_seqlens_q_shape",
     "cu_seqlens_q_dtype": "cu_seqlens_q_dtype",
+    "cu_seqlens_q_datarange": "cu_seqlens_q_datarange",
     "cu_seqlens_kv_value": "cu_seqlens_kv_value",
+    "cu_seqlens_kv_shape": "cu_seqlens_kv_shape",
     "cu_seqlens_kv_dtype": "cu_seqlens_kv_dtype",
+    "cu_seqlens_kv_datarange": "cu_seqlens_kv_datarange",
     "seqused_q_value": "seqused_q_value",
+    "seqused_q_shape": "seqused_q_shape",
     "seqused_q_dtype": "seqused_q_dtype",
+    "seqused_q_datarange": "seqused_q_datarange",
     "seqused_kv_value": "seqused_kv_value",
+    "seqused_kv_shape": "seqused_kv_shape",
     "seqused_kv_dtype": "seqused_kv_dtype",
+    "seqused_kv_datarange": "seqused_kv_datarange",
     # softmax_lse 输出 dtype
     "softmax_lse_dtype": "softmax_lse_dtype",
     # 算子配置
@@ -326,8 +348,42 @@ def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
     else:
         p_scale_value = None
 
+    def _raw_str(v):
+        """Excel 单元格 -> 原样字符串, None/空 -> None."""
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s if s != "" else None
+
     # enable_mask: attn_mask_shape 有值 -> True, 否则 False
     enable_mask = len(attn_mask_info["shape"]) > 0
+
+    # metadata: main wrapper 伪 tensor 入参, shape/dtype 直接取表格 (空 -> 默认 4096/int32)
+    metadata_shape = list(_parse_shape(g("metadata_shape"))) or [4096]
+    metadata_dtype = _norm_dtype(g("metadata_dtype")) or "int32"
+
+    # 全表透传列 (含表格里原先没读的 shape/datarange 列), 统一进 attrs:
+    # QFA_PASS_THROUGH=1 时 golden/wrapper 按这些值构造入参, 其余场景供查看/比对.
+    passthrough_extra = {
+        "custom_info": _raw_str(g("custom_info")) or "",
+        "attn_out_shape": list(_parse_shape(g("attn_out_shape"))),
+        "attn_out_datarange": _raw_str(g("attn_out_datarange")),
+        "softmax_lse_shape": list(_parse_shape(g("softmax_lse_shape"))),
+        "softmax_lse_datarange": _raw_str(g("softmax_lse_datarange")),
+        "q_descale_datarange": _raw_str(g("q_descale_datarange")),
+        "k_descale_datarange": _raw_str(g("k_descale_datarange")),
+        "v_descale_datarange": _raw_str(g("v_descale_datarange")),
+        "block_table_datarange": _raw_str(g("block_table_datarange")),
+        "cu_seqlens_q_shape": list(_parse_shape(g("cu_seqlens_q_shape"))),
+        "cu_seqlens_q_datarange": _raw_str(g("cu_seqlens_q_datarange")),
+        "cu_seqlens_kv_shape": list(_parse_shape(g("cu_seqlens_kv_shape"))),
+        "cu_seqlens_kv_datarange": _raw_str(g("cu_seqlens_kv_datarange")),
+        "seqused_q_shape": list(_parse_shape(g("seqused_q_shape"))),
+        "seqused_q_datarange": _raw_str(g("seqused_q_datarange")),
+        "seqused_kv_shape": list(_parse_shape(g("seqused_kv_shape"))),
+        "seqused_kv_datarange": _raw_str(g("seqused_kv_datarange")),
+        "metadata_datarange": _raw_str(g("metadata_datarange")),
+    }
 
     attrs = {
         "B": B,
@@ -377,6 +433,9 @@ def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
         "attn_mask_shape": attn_mask_info["shape"],
         "attn_mask_dtype": attn_mask_info["dtype"],
         "attn_mask_datarange": attn_mask_info["datarange"],
+        # metadata (main wrapper 按此 shape/dtype 构造伪 tensor)
+        "metadata_shape": metadata_shape,
+        "metadata_dtype": metadata_dtype,
         # dtype 透传 (表格不传 -> None, golden 侧用默认值)
         "q_descale_dtype": _norm_dtype(g("q_descale_dtype")),
         "k_descale_dtype": _norm_dtype(g("k_descale_dtype")),
@@ -390,6 +449,7 @@ def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
         "data_range_k": str(g("k_datarange")) if g("k_datarange") is not None else 1.0,
         "data_range_v": str(g("v_datarange")) if g("v_datarange") is not None else 1.0,
     }
+    attrs.update(passthrough_extra)
     attributes = repr(attrs)
 
     # 精度阈值: Excel 有对应列则原样透传字符串, 否则用默认值

@@ -115,6 +115,34 @@ CU_SEQLENS_Q_DTYPE = None
 CU_SEQLENS_KV_DTYPE = None
 SOFTMAX_LSE_DTYPE = None
 
+# metadata 伪 tensor 入参 (main wrapper 用): 表格 metadata_shape/metadata_dtype,
+# 不传则默认 4096/int32 (对应 quant_flash_attn_metadata 输出)
+METADATA_SHAPE = [4096]
+METADATA_DTYPE = None
+METADATA_DATARANGE = None
+
+# 表格全量透传列 (QFA_PASS_THROUGH=1 时按表格构造入参; 其余用于查看/比对):
+# 输出/附加信息
+CUSTOM_INFO = ""
+ATTN_OUT_SHAPE = []
+ATTN_OUT_DATARANGE = None
+SOFTMAX_LSE_SHAPE = []
+SOFTMAX_LSE_DATARANGE = None
+# descale / block_table datarange
+Q_DESCALE_DATARANGE = None
+K_DESCALE_DATARANGE = None
+V_DESCALE_DATARANGE = None
+BLOCK_TABLE_DATARANGE = None
+# cu_seqlens / seqused 附加列
+CU_SEQLENS_Q_SHAPE = []
+CU_SEQLENS_KV_SHAPE = []
+CU_SEQLENS_Q_DATARANGE = None
+CU_SEQLENS_KV_DATARANGE = None
+SEQUSED_Q_SHAPE = []
+SEQUSED_KV_SHAPE = []
+SEQUSED_Q_DATARANGE = None
+SEQUSED_KV_DATARANGE = None
+
 QUANT_MODE_MXFP4 = 3
 FP4_DTYPE_UINT8 = torch.uint8  # 打包后 fp4 张量用 uint8 存
 SCALE_DTYPE_UINT8 = torch.uint8  # e8m0 scale 用 uint8 存
@@ -333,6 +361,27 @@ _GOLDEN_GLOBALS_MAP = {
     "cu_seqlens_q_dtype": "CU_SEQLENS_Q_DTYPE",
     "cu_seqlens_kv_dtype": "CU_SEQLENS_KV_DTYPE",
     "softmax_lse_dtype": "SOFTMAX_LSE_DTYPE",
+    "metadata_shape": "METADATA_SHAPE",
+    "metadata_dtype": "METADATA_DTYPE",
+    # 表格全量透传列 (warpper kwargs 经 _apply_kwargs_globals 注入)
+    "custom_info": "CUSTOM_INFO",
+    "attn_out_shape": "ATTN_OUT_SHAPE",
+    "attn_out_datarange": "ATTN_OUT_DATARANGE",
+    "softmax_lse_shape": "SOFTMAX_LSE_SHAPE",
+    "softmax_lse_datarange": "SOFTMAX_LSE_DATARANGE",
+    "metadata_datarange": "METADATA_DATARANGE",
+    "q_descale_datarange": "Q_DESCALE_DATARANGE",
+    "k_descale_datarange": "K_DESCALE_DATARANGE",
+    "v_descale_datarange": "V_DESCALE_DATARANGE",
+    "block_table_datarange": "BLOCK_TABLE_DATARANGE",
+    "cu_seqlens_q_shape": "CU_SEQLENS_Q_SHAPE",
+    "cu_seqlens_kv_shape": "CU_SEQLENS_KV_SHAPE",
+    "cu_seqlens_q_datarange": "CU_SEQLENS_Q_DATARANGE",
+    "cu_seqlens_kv_datarange": "CU_SEQLENS_KV_DATARANGE",
+    "seqused_q_shape": "SEQUSED_Q_SHAPE",
+    "seqused_kv_shape": "SEQUSED_KV_SHAPE",
+    "seqused_q_datarange": "SEQUSED_Q_DATARANGE",
+    "seqused_kv_datarange": "SEQUSED_KV_DATARANGE",
 }
 
 
@@ -341,6 +390,17 @@ def _apply_golden_globals(attrs):
     for attr_key, golden_key in _GOLDEN_GLOBALS_MAP.items():
         if attr_key in attrs:
             setattr(golden_mod_self, golden_key, attrs[attr_key])
+
+
+def _apply_kwargs_globals(kwargs):
+    """把 wrapper 透传的额外 attrs (kwargs, 未显式签名到 wrapper 参数) 注入 golden 全局变量.
+
+    QFA_PASS_THROUGH=1 时表格全量透传列 (custom_info/attn_out_*/softmax_lse_*/
+    *_datarange/*_shape/metadata_datarange 等) 由此进入 golden, 供按表格构造入参.
+    """
+    for attr_key, golden_key in _GOLDEN_GLOBALS_MAP.items():
+        if attr_key in kwargs:
+            setattr(golden_mod_self, golden_key, kwargs[attr_key])
 
 
 # ==============================================================================
@@ -715,8 +775,9 @@ def generate_data():
         aligned_seq_lens_kv_v = [(x + 63) // 64 for x in act_seq_kv_eff]
         v_descale = rearrange_by_layout(v_descale, kv_layout, B, aligned_seq_lens_kv_v)
 
-        # V descale 最后再 view 出 (*shape, -1, 2) 末尾两维
-        v_descale = v_descale.view(*v_descale.shape[:-1], -1, 2)
+        # V descale 最后再 view 出 (*shape, V_D, 2) 末尾两维
+        # 用显式 V_D 替代 -1: s2=0 时 tensor 0 元素, -1 推断歧义会报错
+        v_descale = v_descale.view(*v_descale.shape[:-1], V_D, 2)
 
     # cu_seqlens (TND only): 表格传了就用表格的, 否则用有效长度自动推导
     cu_seqlens_q = (
@@ -737,7 +798,7 @@ def generate_data():
     # 可选 tensor 入参: 有 shape 则按形状生成随机 tensor, 无 shape 传 None
     # 默认 dtype: block_table=int32, p_scale=fp32, sinks=fp32, attn_mask=int8
     block_table_t = _gen_opt_tensor(
-        BLOCK_TABLE_SHAPE, BLOCK_TABLE_DTYPE or "int32", None, seed=100
+        BLOCK_TABLE_SHAPE, BLOCK_TABLE_DTYPE or "int32", BLOCK_TABLE_DATARANGE, seed=100
     )
     # p_scale: 表格传了标量值 (P_SCALE_VALUE) 则用之 (按 P_SCALE_DTYPE 生成标量 tensor);
     #         否则按 P_SCALE_SHAPE 随机生成 (P_SCALE_SHAPE 为空 -> None)
@@ -1358,27 +1419,12 @@ def call_npu_main(data_dict):
     torch_npu.npu.set_device(int(DEVICE_ID))
     torch.npu.synchronize()
 
-    logger.info("[NPU_MAIN] 重建 metadata (调 quant_flash_attn_metadata)")
-    metadata = quant_flash_attn_metadata(
-        num_heads_q=data_dict["num_heads"],
-        num_heads_kv=data_dict["num_key_value_heads"],
-        head_dim=D,
-        quant_mode=Q_QUANT_MODE,
-        cu_seqlens_q=cu_seqlens_q_t,
-        cu_seqlens_kv=cu_seqlens_kv_t,
-        seqused_q=seqused_q_t,
-        seqused_kv=seqused_kv_t,
-        v_descale=v_descale,
-        batch_size=B,
-        max_seqlen_q=MAX_SEQLEN_Q,
-        max_seqlen_kv=MAX_SEQLEN_KV,
-        mask_mode=SPARSE_MODE,
-        win_left=PRE_TOKENS,
-        win_right=NEXT_TOKENS,
-        layout_q=query_layout,
-        layout_q_descale=LAYOUT_Q_DESCALE,
-        layout_kv=kv_layout,
-        layout_out=attn_out_layout,
+    logger.info("[NPU_MAIN] 重建 metadata (按表格 metadata_shape/metadata_dtype 构造)")
+    metadata_shape = tuple(METADATA_SHAPE) if METADATA_SHAPE else (4096,)
+    metadata = torch.ones(
+        metadata_shape,
+        dtype=get_dtype(METADATA_DTYPE) or torch.int32,
+        device="npu",
     )
 
     main_kwargs = dict(

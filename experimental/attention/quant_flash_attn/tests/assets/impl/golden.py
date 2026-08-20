@@ -28,6 +28,13 @@ logger = logging.getLogger(__name__)
 __golden__ = {"e2e": {"qfa_mxfp4_wrapper.npu_qfa_mxfp4": "cpu_qfa_mxfp4"}}
 
 
+# 环境变量 QFA_PASS_THROUGH=1 时跳过 CPU golden (generate_data + cpu_mxfp4_golden),
+# 直接返回 CSV q tensor 作为占位输出. 用于异常用例测试 (s=0 / kv shape 不一致 /
+# D 不支持 / descale 维度异常 / seq 缺失 等), NPU 算子由 op_host 拦截非法输入,
+# CPU golden 无意义且 generate_data 会抛错, 跳过避免终止程序. compare 会 fail 但不挂.
+_PASS_THROUGH = os.environ.get("QFA_PASS_THROUGH", "").lower() in ("1", "true", "yes")
+
+
 def _apply_golden_globals(attrs):
     for k, v in attrs.items():
         setattr(golden_mod, k, v)
@@ -100,6 +107,9 @@ def cpu_qfa_mxfp4(
     cu_seqlens_q_dtype: str = None,
     cu_seqlens_kv_dtype: str = None,
     softmax_lse_dtype: str = None,
+    # metadata 伪 tensor 入参 (对齐 run_main 签名, PASS_THROUGH 时按表格构造)
+    metadata_shape: List[int] = None,
+    metadata_dtype: str = None,
     **kwargs,
 ):
     _apply_golden_globals(
@@ -159,19 +169,40 @@ def cpu_qfa_mxfp4(
             "CU_SEQLENS_Q_DTYPE": cu_seqlens_q_dtype,
             "CU_SEQLENS_KV_DTYPE": cu_seqlens_kv_dtype,
             "SOFTMAX_LSE_DTYPE": softmax_lse_dtype,
+            "METADATA_SHAPE": list(metadata_shape) if metadata_shape else [],
+            "METADATA_DTYPE": metadata_dtype,
         }
     )
 
+    # 数据准备分两种模式:
+    #   1) QFA_PASS_THROUGH=1: 跳过 generate_data + cpu_mxfp4_golden, 返回 CSV q tensor
+    #      占位. 用于异常用例 (NPU 算子由 op_host 拦截, CPU golden 无意义且会抛错).
+    #   2) 都不设: 走 generate_data + cpu_mxfp4_golden; 任意异常也返回占位避免终止程序.
+    if _PASS_THROUGH:
+        logger.info(
+            "[GOLDEN] QFA_PASS_THROUGH=1, 跳过 CPU golden, 返回 CSV q tensor 占位"
+        )
+        return [q]
+
     golden_mod._inject_physical_s_override(q, v, input_layout, layout_kv)
     try:
-        try:
-            data_dict = golden_mod.generate_data()
-        except Exception:
-            golden_mod._clear_physical_s_override()
-            data_dict = golden_mod.generate_data()
+        data_dict = golden_mod.generate_data()
+    except Exception as e:
+        logger.warning(
+            "[GOLDEN] generate_data 失败: %s, 返回 CSV q tensor 占位 (异常用例 NPU 由 op_host 拦截)",
+            str(e),
+        )
+        return [q]
     finally:
         golden_mod._clear_physical_s_override()
-    cpu_out, cpu_lse = golden_mod.cpu_mxfp4_golden(data_dict)
+    try:
+        cpu_out, cpu_lse = golden_mod.cpu_mxfp4_golden(data_dict)
+    except Exception as e:
+        logger.warning(
+            "[GOLDEN] cpu_mxfp4_golden 失败: %s, 返回 CSV q tensor 占位",
+            str(e),
+        )
+        return [q]
 
     if enable_lse and cpu_lse is not None:
         return [cpu_out, cpu_lse]

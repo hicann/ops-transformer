@@ -26,10 +26,148 @@ from common import qfa_mxfp4_golden as golden_mod
 logger = logging.getLogger(__name__)
 
 
+# 环境变量 QFA_PASS_THROUGH=1 时完全跳过 golden_mod.generate_data() (含 _resolve_s /
+# transpose_qscale / rearrange_by_layout / v_descale.view 等所有会报错的步骤),
+# 直接用 CSV 定义的 tensor shape 透传给 NPU metadata 算子, 由 op_host checker 拦截非法输入。
+# 用途: 异常用例测试 (s=0 / k v shape 不一致 / D 不支持 / descale 维度异常 / seq 缺失 等),
+#       在 CSV 里配异常 shape + 设 QFA_PASS_THROUGH=1 即可, 框架按 CSV shape 随机生成 tensor
+#       原样透传, 不进 golden。
+_PASS_THROUGH = os.environ.get("QFA_PASS_THROUGH", "").lower() in ("1", "true", "yes")
+
+
 def _apply_golden_globals(attrs):
     """把 case attributes 注入 golden 模块全局变量."""
     for k, v in attrs.items():
         setattr(golden_mod, k, v)
+
+
+def _build_fallback_data_dict(
+    q,
+    k,
+    v,
+    q_descale,
+    k_descale,
+    v_descale,
+    block_table,
+    B,
+    N_q,
+    N_kv,
+    D,
+    V_D,
+    act_seq_lens_q,
+    act_seq_lens_kv,
+    input_layout,
+    layout_kv,
+    layout_out,
+    softmax_scale,
+    cu_seqlens_q,
+    cu_seqlens_kv,
+    max_seqlen_q=-1,
+    max_seqlen_kv=-1,
+):
+    """异常用例回退: generate_data 失败或 QFA_PASS_THROUGH=1 时用 CSV tensor 直接拼
+    最小 data_dict, 跳过 golden 让 NPU metadata 算子先跑, 交给 op_host 拦截非法输入
+    (如 s2=0 / seq 完全未指定).
+
+    block_table/p_scale/sinks/attn_mask: 透传或按 CSV attributes 生成, 保证异常 shape
+    能传到算子让 op_host checker 拦截.
+
+    seq_lens 处理:
+      - CSV 传了 act_seq_lens -> 用之
+      - CSV 没传 act 但 max>=0 -> 用 max * B
+      - CSV act=[] 且 max<0 -> 保持空 list, 让算子拦截 "seq 完全未指定"
+    """
+    import math
+
+    qk_d = D
+    s1_phys = q.shape[2] if q.ndim >= 3 and q.shape[0] == B else None
+    s2_phys = k.shape[2] if k.ndim >= 3 and k.shape[0] == B else None
+
+    # Q seq: act 优先, 否则用 max (>=0), 都没给则留空让算子拦截
+    if act_seq_lens_q:
+        act_q_eff = list(act_seq_lens_q)
+    elif max_seqlen_q is not None and max_seqlen_q >= 0:
+        act_q_eff = [int(max_seqlen_q)] * B
+    else:
+        act_q_eff = []
+    # KV seq: 同上
+    if act_seq_lens_kv:
+        act_kv_eff = list(act_seq_lens_kv)
+    elif max_seqlen_kv is not None and max_seqlen_kv >= 0:
+        act_kv_eff = [int(max_seqlen_kv)] * B
+    else:
+        act_kv_eff = []
+
+    # 可选 tensor: 透传 block_table; 按 golden 全局变量生成 p_scale/sinks/attn_mask
+    # 这样 CSV 配的异常 shape (如 p_scale_shape=[2,3]) 也能传到算子被 checker 拦截
+    block_table_t = (
+        block_table
+        if block_table is not None
+        else golden_mod._gen_opt_tensor(
+            golden_mod.BLOCK_TABLE_SHAPE,
+            golden_mod.BLOCK_TABLE_DTYPE or "int32",
+            golden_mod.BLOCK_TABLE_DATARANGE,
+            seed=100,
+        )
+    )
+    if golden_mod.P_SCALE_VALUE is not None:
+        p_scale_dt = golden_mod.get_dtype(golden_mod.P_SCALE_DTYPE) or torch.float32
+        p_scale_t = torch.tensor(
+            [float(golden_mod.P_SCALE_VALUE)], dtype=p_scale_dt
+        ).reshape([1] * len(golden_mod.P_SCALE_SHAPE or [1]))
+        if golden_mod.P_SCALE_SHAPE:
+            p_scale_t = p_scale_t.reshape(golden_mod.P_SCALE_SHAPE)
+    else:
+        p_scale_t = golden_mod._gen_opt_tensor(
+            golden_mod.P_SCALE_SHAPE,
+            golden_mod.P_SCALE_DTYPE or "float32",
+            golden_mod.P_SCALE_DATARANGE,
+            seed=101,
+        )
+    sinks_t = golden_mod._gen_opt_tensor(
+        golden_mod.SINKS_SHAPE,
+        golden_mod.SINKS_DTYPE or "float32",
+        golden_mod.SINKS_DATARANGE,
+        seed=102,
+    )
+    attn_mask_t = golden_mod._gen_opt_tensor(
+        golden_mod.ATTN_MASK_SHAPE,
+        golden_mod.ATTN_MASK_DTYPE or "int8",
+        golden_mod.ATTN_MASK_DATARANGE,
+        seed=103,
+    )
+
+    return dict(
+        q=q.contiguous(),
+        k=k.contiguous(),
+        v=v.contiguous(),
+        q_descale=q_descale.contiguous(),
+        k_descale=k_descale.contiguous(),
+        v_descale=v_descale.contiguous(),
+        block_table=block_table_t,
+        p_scale=p_scale_t,
+        sinks=sinks_t,
+        attn_mask=attn_mask_t,
+        cu_seqlens_q=list(cu_seqlens_q) if cu_seqlens_q else None,
+        cu_seqlens_kv=list(cu_seqlens_kv) if cu_seqlens_kv else None,
+        act_seq_lens_q=act_q_eff,
+        act_seq_lens_kv=act_kv_eff,
+        s1_physical=s1_phys,
+        s2_physical=s2_phys,
+        s1_effective=max(act_q_eff) if act_q_eff else (s1_phys or 0),
+        s2_effective=max(act_kv_eff) if act_kv_eff else (s2_phys or 0),
+        act_seq_q_eff=act_q_eff,
+        act_seq_kv_eff=act_kv_eff,
+        query_layout=input_layout,
+        kv_layout=layout_kv,
+        attn_out_layout=layout_out,
+        num_heads=N_q,
+        num_key_value_heads=N_kv,
+        softmax_scale=softmax_scale
+        if softmax_scale is not None
+        else 1.0 / math.sqrt(qk_d),
+        fp32_bnsd=None,
+    )
 
 
 def run_metadata(
@@ -168,34 +306,98 @@ def run_metadata(
         }
     )
 
-    golden_mod._inject_physical_s_override(q, v, input_layout, layout_kv)
-    try:
+    # 表格全量透传列 (CSV attrs 里的 extra keys 走 kwargs) 注入 golden,
+    # QFA_PASS_THROUGH=1 时按表格值构造算子入参
+    golden_mod._apply_kwargs_globals(kwargs)
+
+    # 数据准备分两种模式:
+    #   1) QFA_PASS_THROUGH=1: 完全跳过 generate_data, CSV tensor 原样透传给 NPU metadata 算子,
+    #      由 op_host 拦截非法输入. 用于异常用例 (s=0 / kv shape 不一致 / D 不支持 /
+    #      descale 维度异常 / seq 缺失 等), 在 CSV 配异常 shape + 设本开关即可.
+    #   2) 都不设: 走 generate_data 完整流程; 任意异常也回退到 CSV tensor 透传 (try/except 兜底).
+    if _PASS_THROUGH:
+        logger.info(
+            "[METADATA_WRAPPER] QFA_PASS_THROUGH=1, 跳过 generate_data, CSV tensor 直接透传给 NPU metadata 算子"
+        )
+        data_dict = _build_fallback_data_dict(
+            q,
+            k,
+            v,
+            q_descale,
+            k_descale,
+            v_descale,
+            block_table,
+            B,
+            N_q,
+            N_kv,
+            D,
+            V_D,
+            act_seq_lens_q,
+            act_seq_lens_kv,
+            input_layout,
+            layout_kv,
+            layout_out,
+            softmax_scale,
+            cu_seqlens_q,
+            cu_seqlens_kv,
+            max_seqlen_q=max_seqlen_q,
+            max_seqlen_kv=max_seqlen_kv,
+        )
+    else:
+        golden_mod._inject_physical_s_override(q, v, input_layout, layout_kv)
         try:
             data_dict = golden_mod.generate_data()
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                "[METADATA_WRAPPER] generate_data 失败: %s, 回退到 CSV tensor 透传给 NPU metadata 算子让 op_host 拦截",
+                str(e),
+            )
+            data_dict = _build_fallback_data_dict(
+                q,
+                k,
+                v,
+                q_descale,
+                k_descale,
+                v_descale,
+                block_table,
+                B,
+                N_q,
+                N_kv,
+                D,
+                V_D,
+                act_seq_lens_q,
+                act_seq_lens_kv,
+                input_layout,
+                layout_kv,
+                layout_out,
+                softmax_scale,
+                cu_seqlens_q,
+                cu_seqlens_kv,
+                max_seqlen_q=max_seqlen_q,
+                max_seqlen_kv=max_seqlen_kv,
+            )
+        finally:
             golden_mod._clear_physical_s_override()
-            data_dict = golden_mod.generate_data()
-    finally:
-        golden_mod._clear_physical_s_override()
-    golden_mod._apply_csv_shape_override(
-        data_dict,
-        {
-            "q": q,
-            "k": k,
-            "v": v,
-            "q_descale": q_descale,
-            "k_descale": k_descale,
-            "v_descale": v_descale,
-        },
-    )
+        golden_mod._apply_csv_shape_override(
+            data_dict,
+            {
+                "q": q,
+                "k": k,
+                "v": v,
+                "q_descale": q_descale,
+                "k_descale": k_descale,
+                "v_descale": v_descale,
+            },
+        )
     logger.info(
-        "[METADATA_WRAPPER] graph_path=%d, layout=%s, B=%d, N_q=%d, N_kv=%d, D=%d",
+        "[METADATA_WRAPPER] graph_path=%d, layout=%s, B=%d, N_q=%d, N_kv=%d, D=%d, pass_through=%s",
         graph_path,
         input_layout,
         B,
         N_q,
         N_kv,
         D,
+        _PASS_THROUGH,
     )
     try:
         metadata_list = golden_mod.call_npu_metadata(data_dict)

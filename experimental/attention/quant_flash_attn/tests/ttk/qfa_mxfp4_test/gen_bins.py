@@ -141,6 +141,7 @@ def _apply_golden_globals(attrs):
         "cu_seqlens_kv": "CU_SEQLENS_KV",
         "block_table_shape": "BLOCK_TABLE_SHAPE",
         "block_table_dtype": "BLOCK_TABLE_DTYPE",
+        "block_table_datarange": "BLOCK_TABLE_DATARANGE",
         "p_scale_value": "P_SCALE_VALUE",
         "p_scale_shape": "P_SCALE_SHAPE",
         "p_scale_dtype": "P_SCALE_DTYPE",

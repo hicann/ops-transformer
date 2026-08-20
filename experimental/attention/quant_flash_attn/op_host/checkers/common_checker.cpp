@@ -83,12 +83,12 @@ ge::graphStatus CommonChecker::CheckSingleParaDtype(const QuantFlashAttnTilingIn
     const gert::CompileTimeTensorDesc *keyDesc = qfaInfo.opParamInfo.key.desc;
     if (keyDesc != nullptr) {
         const std::vector<ge::DataType> supportedQkvDtypes = {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1};
-        OP_CHECK_IF(std::find(supportedQkvDtypes.begin(), supportedQkvDtypes.end(), keyDesc->GetDataType()) ==
-                        supportedQkvDtypes.end(),
-                    OP_LOGE_FOR_INVALID_DTYPE(qfaInfo.opName, KEY_NAME.c_str(),
-                                              DataTypeToSerialStr(keyDesc->GetDataType()).c_str(),
-                                              "FLOAT8_E4M3FN/FLOAT4_E2M1"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            std::find(supportedQkvDtypes.begin(), supportedQkvDtypes.end(), keyDesc->GetDataType()) ==
+                supportedQkvDtypes.end(),
+            OP_LOGE_FOR_INVALID_DTYPE(qfaInfo.opName, KEY_NAME.c_str(),
+                                      DataTypeToSerialStr(keyDesc->GetDataType()).c_str(), "FLOAT8_E4M3FN/FLOAT4_E2M1"),
+            return ge::GRAPH_FAILED);
         if (CheckFormatSupport(keyDesc, KEY_NAME) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
@@ -170,10 +170,23 @@ ge::graphStatus CommonChecker::CheckSingleParaShapeDim(const QuantFlashAttnTilin
     const gert::StorageShape *attnOutShape = qfaInfo.opParamInfo.attnOut.shape;
     if (attnOutShape != nullptr) {
         uint32_t attnOutDimNum = attnOutShape->GetStorageShape().GetDimNum();
-        OP_CHECK_IF(std::find(supportedOutDims.begin(), supportedOutDims.end(), attnOutDimNum) ==
-                        supportedOutDims.end(),
-                    OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, ATTEN_OUT_NAME.c_str(),
-                                                 (std::to_string(attnOutDimNum) + "D").c_str(), "3D/4D"),
+        OP_CHECK_IF(
+            std::find(supportedOutDims.begin(), supportedOutDims.end(), attnOutDimNum) == supportedOutDims.end(),
+            OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, ATTEN_OUT_NAME.c_str(),
+                                         (std::to_string(attnOutDimNum) + "D").c_str(), "3D/4D"),
+            return ge::GRAPH_FAILED);
+    }
+
+    const gert::Tensor *metadataTensor = qfaInfo.opParamInfo.metadata.tensor;
+    if (metadataTensor != nullptr) {
+        uint32_t dimNum = metadataTensor->GetStorageShape().GetDimNum();
+        OP_CHECK_IF(dimNum != DIM_NUM_1,
+                    OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, METADATA_NAME.c_str(),
+                                                 (std::to_string(dimNum) + "D").c_str(), "1D"),
+                    return ge::GRAPH_FAILED);
+
+        int64_t dim0 = metadataTensor->GetStorageShape().GetDim(0);
+        OP_CHECK_IF(dim0 <= 0, OP_LOGE(qfaInfo.opName, "metadata shape dim0(%ld) must be greater than 0", dim0),
                     return ge::GRAPH_FAILED);
     }
 
@@ -286,12 +299,12 @@ ge::graphStatus CommonChecker::CheckAxis(const QuantFlashAttnTilingInfo &qfaInfo
             return ge::GRAPH_FAILED);
     }
 
-    OP_CHECK_IF(qfaInfo.s1Size < 0 && qfaInfo.layoutQ != FiaLayout::TND,
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                    qfaInfo.opName, QUERY_NAME.c_str(),
-                    ToString(qfaInfo.opParamInfo.query.shape->GetStorageShape()).c_str(),
-                    "When layout of query is not TND, S of query must be greater than or equal to 0"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        qfaInfo.s1Size < 0 && qfaInfo.layoutQ != FiaLayout::TND,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            qfaInfo.opName, QUERY_NAME.c_str(), ToString(qfaInfo.opParamInfo.query.shape->GetStorageShape()).c_str(),
+            "When layout of query is not TND, S of query must be greater than or equal to 0"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(qfaInfo.s2Size < 0,
                 OP_LOGE(qfaInfo.opName, "The axis KV_S must be greater than or equal to 0, the current is %ld.",
                         qfaInfo.s2Size),

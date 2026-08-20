@@ -351,6 +351,10 @@ ge::graphStatus QuantFlashAttnTilingInfoParser::GetN2Size()
 ge::graphStatus QuantFlashAttnTilingInfoParser::GetGSize()
 {
     // 获取G基准值
+    if (tilingInfo_.n2Size == 0) {
+        OP_LOGE(tilingInfo_.opName, "Kv Heads(%ld) should not be 0.", tilingInfo_.n2Size);
+        return ge::GRAPH_FAILED;
+    }
     if (tilingInfo_.n1Size % tilingInfo_.n2Size != 0) {
         OP_LOGE(tilingInfo_.opName, "Q numHeads(%ld) should be a multiple of Kv Heads(%ld).", tilingInfo_.n1Size,
                 tilingInfo_.n2Size);
@@ -541,14 +545,12 @@ ge::graphStatus QuantFlashAttnTilingInfoParser::GetInAndOutLayout()
     if (tilingInfo_.opParamInfo.layoutKV == nullptr) {
         tilingInfo_.layoutKV = FiaLayout::BSND;
     } else {
-        const std::map<std::string, FiaLayout> kvLayoutMap = {{"BSND", FiaLayout::BSND},
-                                                              {"BNSD", FiaLayout::BNSD},
-                                                              {"TND", FiaLayout::TND},
-                                                              {"PA_BBND", FiaLayout::BnBsH},
-                                                              {"PA_BNBD", FiaLayout::BnNBsD}};
+        const std::map<std::string, FiaLayout> kvLayoutMap = {
+            {"BSND", FiaLayout::BSND},     {"BNSD", FiaLayout::BNSD},      {"TND", FiaLayout::TND},
+            {"PA_BBND", FiaLayout::BnBsH}, {"PA_BNBD", FiaLayout::BnNBsD}, {"PA_NZ", FiaLayout::NZ}};
         auto itKV = kvLayoutMap.find(tilingInfo_.opParamInfo.layoutKV);
         if (itKV == kvLayoutMap.end()) {
-            OP_LOGE(tilingInfo_.opName, "Invalid layoutKV: %s, only support BSND/BNSD/TND/PA_BBND/PA_BNBD",
+            OP_LOGE(tilingInfo_.opName, "Invalid layoutKV: %s, only support BSND/BNSD/TND/PA_BBND/PA_BNBD/PA_NZ",
                     tilingInfo_.opParamInfo.layoutKV);
             return ge::GRAPH_FAILED;
         }
@@ -610,7 +612,10 @@ void QuantFlashAttnTilingInfoParser::SetFaShape()
 
 void QuantFlashAttnTilingInfoParser::GetKvStorageMode()
 {
-    if (tilingInfo_.opParamInfo.blockTable.tensor != nullptr) {
+    bool isPaLayout = (tilingInfo_.layoutKV == FiaLayout::BnBsH || tilingInfo_.layoutKV == FiaLayout::BnNBsD ||
+                       tilingInfo_.layoutKV == FiaLayout::NZ);
+
+    if (isPaLayout) {
         tilingInfo_.kvStorageMode = KvStorageMode::PAGE_ATTENTION;
     } else {
         tilingInfo_.kvStorageMode = KvStorageMode::BATCH_CONTINUOUS;
