@@ -15,7 +15,7 @@
 ENABLED_PARAMS = [
     # SI_WB_001 basic_prefill_32k_kv_no_tail
     # 覆盖: 基础链路；prefill；kv/prompt为32K token；causal=true
-    # 设计: query长度保持原基础case，只把KV和prompt拉到32K token基准线。
+    # 设计: query长度为3968 token，KV和prompt覆盖32K token基准线。
     {
         "case_id": "SI_WB_001",
         "testcase_name": "basic_prefill_32k_kv_no_tail",
@@ -590,8 +590,8 @@ ENABLED_PARAMS = [
         "special_setting": "",
     },
     # SI_WB_018 m_base_exact_g4
-    # 覆盖: g=4；max_Qb=24；M=max_Qb*g=96正好baseM
-    # 设计: 覆盖 M 方向正好一个基本块，无 M 尾块。
+    # 覆盖: g=4；max_Qb=24；M=96；M尾块32行
+    # 设计: baseM=64，覆盖一个完整M块和32行尾块。
     {
         "case_id": "SI_WB_018",
         "testcase_name": "m_base_exact_g4",
@@ -615,8 +615,8 @@ ENABLED_PARAMS = [
         "special_setting": "",
     },
     # SI_WB_019 m_base_tail_g4
-    # 覆盖: g=4；max_Qb=25；M=100；M尾块
-    # 设计: M 比 baseM=96 多 4 行，覆盖 query/GQA 合批后的 M 尾块。
+    # 覆盖: g=4；max_Qb=25；M=100；M尾块36行
+    # 设计: baseM=64，覆盖一个完整M块和36行尾块。
     {
         "case_id": "SI_WB_019",
         "testcase_name": "m_base_tail_g4",
@@ -640,8 +640,8 @@ ENABLED_PARAMS = [
         "special_setting": "",
     },
     # SI_WB_020 m_base_exact_g32
-    # 覆盖: g=32；max_Qb=3；M=96正好baseM
-    # 设计: 最大 GQA 组下 M 正好一个基本块，验证 GQA 合批和 baseM 对齐。
+    # 覆盖: g=32；max_Qb=3；M=96；M尾块32行
+    # 设计: 最大GQA组下，覆盖一个完整M块和32行尾块。
     {
         "case_id": "SI_WB_020",
         "testcase_name": "m_base_exact_g32",
@@ -665,8 +665,8 @@ ENABLED_PARAMS = [
         "special_setting": "",
     },
     # SI_WB_021 m_base_tail_g32
-    # 覆盖: g=32；max_Qb=4；M=128；M尾块32行
-    # 设计: 大 GQA 组下 M 跨过 baseM，覆盖第二个 M 基本块尾段。
+    # 覆盖: g=32；max_Qb=4；M=128；正好两个完整M块
+    # 设计: baseM=64，覆盖两个完整M块，无M尾块。
     {
         "case_id": "SI_WB_021",
         "testcase_name": "m_base_tail_g32",
@@ -1562,7 +1562,7 @@ ENABLED_PARAMS = [
     },
     # SI_WB_043 gqa_q64_kv8_m_tail
     # 覆盖: q_heads=64；kv_heads=8；g=8；M方向尾块
-    # 设计: actS1=13时actS1*g=104，覆盖mBase=96后的尾块处理。
+    # 设计: actS1=13时actS1*g=104，覆盖mBase=64后的40行M尾块处理。
     {
         "case_id": "SI_WB_043",
         "testcase_name": "gqa_q64_kv8_m_tail",
@@ -5209,7 +5209,7 @@ ENABLED_PARAMS = [
     },
     # SI_WB_118 m_base_exact_g4_topk_uint16
     # 覆盖: uint16 TopK score路径；镜像SI_WB_018的完整功能场景。
-    # 设计: 保持输入和属性不变，仅切换topk_score_precision=2，用于与原场景进行精度分支配对。
+    # 设计: topk_score_precision=2，M=96，baseM=64，覆盖32行M尾块。
     {
         "case_id": "SI_WB_118",
         "testcase_name": "m_base_exact_g4_topk_uint16",
@@ -5234,7 +5234,7 @@ ENABLED_PARAMS = [
     },
     # SI_WB_119 m_base_tail_g4_topk_uint16
     # 覆盖: uint16 TopK score路径；镜像SI_WB_019的完整功能场景。
-    # 设计: 保持输入和属性不变，仅切换topk_score_precision=2，用于与原场景进行精度分支配对。
+    # 设计: topk_score_precision=2，M=100，baseM=64，覆盖36行M尾块。
     {
         "case_id": "SI_WB_119",
         "testcase_name": "m_base_tail_g4_topk_uint16",
@@ -5259,7 +5259,7 @@ ENABLED_PARAMS = [
     },
     # SI_WB_120 m_base_exact_g32_topk_uint16
     # 覆盖: uint16 TopK score路径；镜像SI_WB_020的完整功能场景。
-    # 设计: 保持输入和属性不变，仅切换topk_score_precision=2，用于与原场景进行精度分支配对。
+    # 设计: topk_score_precision=2，M=96，baseM=64，覆盖32行M尾块。
     {
         "case_id": "SI_WB_120",
         "testcase_name": "m_base_exact_g32_topk_uint16",
@@ -5284,7 +5284,7 @@ ENABLED_PARAMS = [
     },
     # SI_WB_121 m_base_tail_g32_topk_uint16
     # 覆盖: uint16 TopK score路径；镜像SI_WB_021的完整功能场景。
-    # 设计: 保持输入和属性不变，仅切换topk_score_precision=2，用于与原场景进行精度分支配对。
+    # 设计: topk_score_precision=2，M=128，baseM=64，覆盖两个完整M块，无M尾块。
     {
         "case_id": "SI_WB_121",
         "testcase_name": "m_base_tail_g32_topk_uint16",

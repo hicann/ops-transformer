@@ -39,7 +39,7 @@ public:
     __aicore__ inline void InitVecInputTensor(GlobalTensor<float> vbiasGm, GlobalTensor<int32_t> sparseIndicesGm,
                                               GlobalTensor<int32_t> sparseSeqLenGm);
     __aicore__ inline void InitSparseIndicesToNegOne(uint32_t gS1Idx, uint32_t actMBaseSize, uint32_t actS1Size,
-                                                     uint64_t indiceOutOffset);
+                                                     int64_t indiceOutOffset);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
 
@@ -67,7 +67,7 @@ private:
     __aicore__ inline void CleanOutput();
     __aicore__ inline void InitOutputSingleCore(GlobalTensor<int32_t> &outputGm, uint64_t totalSize, int32_t value);
     __aicore__ inline uint32_t CalcDynamicTopkCount(uint32_t s1Idx, int64_t kbOffset, int32_t numPromptK);
-    __aicore__ inline void WriteDirectIndices(uint32_t outputLen, uint64_t baseLenOffset, uint64_t baseOutOffset,
+    __aicore__ inline void WriteDirectIndices(uint32_t outputLen, int64_t baseLenOffset, int64_t baseOutOffset,
                                               uint32_t curAivGSize, int64_t curAivGS1ProcNum, uint32_t actS1Size,
                                               uint32_t s1Idx, LocalTensor<uint32_t> &indicesOutLocal);
     __aicore__ inline void CopyOutPackedResults(const SICommon::RunInfo &info, int64_t curAivGS1Idx,
@@ -91,6 +91,9 @@ private:
 
     TBuf<TPosition::VECCALC> globalIndexBuf_;
     LocalTensor<uint32_t> globalIndexLocal_;
+
+    TBuf<TPosition::VECCALC> histogramBuf_;
+    LocalTensor<uint32_t> histogramLocal_;
 
     TBuf<TPosition::VECCALC> indiceLenBuf_;
     LocalTensor<uint32_t> indiceLenLocal_;
@@ -116,12 +119,12 @@ template <typename SIT>
 __aicore__ inline void SIVector<SIT>::InitBuffers(TPipe *pipe, bool needCleanOutput)
 {
     needCleanOutput_ = needCleanOutput;
-    // 当前配置为2 * ((96 + 1) >> 1) * 256 * 4B = 96KB。
-    pipe->InitBuffer(resMm1Buf_, 2 * ((constInfo_.mBaseSize + 1U) >> 1U) * s2BaseSize_ * sizeof(QK_T));
+    // 三缓冲，每槽32KB；TopK histogram已拆为独立UB。
+    pipe->InitBuffer(resMm1Buf_, SICommon::MM1_RES_BUFFER_NUM * SICommon::MM1_RES_SLOT_BYTES);
     resMm1Local_ = resMm1Buf_.Get<QK_T>(); // qk
 
-    // 当前配置为2 * 256 * 4B = 2KB。
-    pipe->InitBuffer(vBiasBuf_, 2 * s2BaseSize_ * sizeof(float));
+    // vBias与MM1结果使用相同的三缓冲槽号。
+    pipe->InitBuffer(vBiasBuf_, SICommon::VBIAS_BUFFER_NUM * s2BaseSize_ * sizeof(float));
     vBiasLocal_ = vBiasBuf_.Get<float>(); // vBias
 
     // Topk
@@ -134,14 +137,19 @@ __aicore__ inline void SIVector<SIT>::InitBuffers(TPipe *pipe, bool needCleanOut
     pipe->InitBuffer(globalIndexBuf_, ((constInfo_.mBaseSize + 1U) >> 1U) * MAX_TOPK_COUNT * sizeof(uint32_t));
     globalIndexLocal_ = globalIndexBuf_.Get<uint32_t>();
 
+    // TopK batch4 histogram独立申请，不再复用resMm1结果槽。
+    pipe->InitBuffer(histogramBuf_, SIKernel::StemIndexerTopk<SCORE_T>::HISTOGRAM_SIZE_U32 * sizeof(uint32_t));
+    histogramLocal_ = histogramBuf_.Get<uint32_t>();
+
     // indice_len
     // 每行长度独占一个32B槽位，满足UB地址对齐要求并支持多行连续搬出。
     pipe->InitBuffer(indiceLenBuf_, ((constInfo_.mBaseSize + 1U) >> 1U) * INDICE_LEN_ROW_STRIDE * sizeof(uint32_t));
     indiceLenLocal_ = indiceLenBuf_.Get<uint32_t>();
 
-    // 两个ping-pong槽初始均归Cube使用。
+    // 三个流水槽初始均归Cube使用。
     CrossCoreSetFlag<SICommon::SI_SYNC_MODE4, PIPE_V>(SICommon::CROSS_VC_EVENT + 0U);
     CrossCoreSetFlag<SICommon::SI_SYNC_MODE4, PIPE_V>(SICommon::CROSS_VC_EVENT + 1U);
+    CrossCoreSetFlag<SICommon::SI_SYNC_MODE4, PIPE_V>(SICommon::CROSS_VC_EVENT + 2U);
     if (needCleanOutput_) {
         CleanOutput();
     }
@@ -167,9 +175,9 @@ __aicore__ inline void SIVector<SIT>::InitOutputSingleCore(GlobalTensor<int32_t>
     uint64_t coreIdx = static_cast<uint64_t>(blockId_);
     uint64_t singleCoreSize =
         SICommon::Align((totalSize + aivCoreNum - 1U) / aivCoreNum, static_cast<uint64_t>(OUTPUT_INIT_ALIGN_ELEMS));
-    uint64_t offset = coreIdx * singleCoreSize;
-    if (offset < totalSize) {
-        uint64_t initSize = Min(singleCoreSize, totalSize - offset);
+    int64_t offset = static_cast<int64_t>(coreIdx) * static_cast<int64_t>(singleCoreSize);
+    if (offset < static_cast<int64_t>(totalSize)) {
+        uint64_t initSize = Min(singleCoreSize, totalSize - static_cast<uint64_t>(offset));
         InitOutput<int32_t>(outputGm[offset], initSize, value);
     }
 }
@@ -206,6 +214,7 @@ __aicore__ inline void SIVector<SIT>::AllocEventID()
 {
     SetFlag<HardEvent::V_MTE2>(VEC1_V_MTE2_EVENT + 0);
     SetFlag<HardEvent::V_MTE2>(VEC1_V_MTE2_EVENT + 1);
+    SetFlag<HardEvent::V_MTE2>(VEC1_V_MTE2_EVENT + 2);
     SetFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
 }
 
@@ -214,27 +223,28 @@ __aicore__ inline void SIVector<SIT>::FreeEventID()
 {
     WaitFlag<HardEvent::V_MTE2>(VEC1_V_MTE2_EVENT + 0);
     WaitFlag<HardEvent::V_MTE2>(VEC1_V_MTE2_EVENT + 1);
+    WaitFlag<HardEvent::V_MTE2>(VEC1_V_MTE2_EVENT + 2);
     WaitFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
 }
 
 template <typename SIT>
 __aicore__ inline void SIVector<SIT>::InitSparseIndicesToNegOne(uint32_t gS1Idx, uint32_t actMBaseSize,
-                                                                uint32_t actS1Size, uint64_t indiceOutOffset)
+                                                                uint32_t actS1Size, int64_t indiceOutOffset)
 {
     if (actS1Size == 0U) {
         return;
     }
     // 当前处理的GS1行起始索引（全局位置）
-    int64_t curGS1Idx = gS1Idx * mBaseSize_;
+    int64_t curGS1Idx = static_cast<int64_t>(gS1Idx) * static_cast<int64_t>(mBaseSize_);
     // 当前GS1行需要处理的数量（可能小于mBaseSize_，处理尾块）
     int64_t curGS1ProcNum = actMBaseSize;
     // 当前AIV核处理的GS1起始索引（双核分工）
     uint32_t aivParity = static_cast<uint32_t>(blockId_) & 1U;
-    int64_t curAivGS1Idx = curGS1Idx + aivParity * ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U);
+    int64_t curAivGS1Idx =
+        curGS1Idx + static_cast<int64_t>(aivParity) * ((static_cast<int64_t>(curGS1ProcNum) + 1LL) >> 1U);
     // 当前AIV核需要处理的GS1行数量
-    int64_t curAivGS1ProcNum = (aivParity == 0U) ?
-                                   ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U) :
-                                   (static_cast<uint64_t>(curGS1ProcNum) >> 1U);
+    int64_t curAivGS1ProcNum = (aivParity == 0U) ? ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U) :
+                                                   (static_cast<uint64_t>(curGS1ProcNum) >> 1U);
     if (curAivGS1ProcNum == 0) {
         return;
     }
@@ -243,11 +253,13 @@ __aicore__ inline void SIVector<SIT>::InitSparseIndicesToNegOne(uint32_t gS1Idx,
     int64_t lastAivGS1Idx = curAivGS1Idx + curAivGS1ProcNum - 1;
     uint32_t lastGlobalGIdx = lastAivGS1Idx / actS1Size;
     uint32_t lastGlobalS1Idx = lastAivGS1Idx % actS1Size;
-    uint64_t startPhysicalRow = static_cast<uint64_t>(curGlobalGIdx) * constInfo_.qSeqSize + curGlobalS1Idx;
-    uint64_t endPhysicalRow = static_cast<uint64_t>(lastGlobalGIdx) * constInfo_.qSeqSize + lastGlobalS1Idx;
-    uint64_t clearRowNum = endPhysicalRow - startPhysicalRow + 1;
+    int64_t startPhysicalRow = static_cast<int64_t>(curGlobalGIdx) * static_cast<int64_t>(constInfo_.qSeqSize) +
+                               static_cast<int64_t>(curGlobalS1Idx);
+    int64_t endPhysicalRow = static_cast<int64_t>(lastGlobalGIdx) * static_cast<int64_t>(constInfo_.qSeqSize) +
+                             static_cast<int64_t>(lastGlobalS1Idx);
+    uint64_t clearRowNum = static_cast<uint64_t>(endPhysicalRow - startPhysicalRow + 1LL);
     int32_t neg = -1;
-    uint64_t outSplit1Offset = indiceOutOffset + startPhysicalRow * constInfo_.kSeqSize;
+    int64_t outSplit1Offset = indiceOutOffset + startPhysicalRow * static_cast<int64_t>(constInfo_.kSeqSize);
     GlobalTensor<int32_t> indiceSplitOut = sparseIndicesGm[outSplit1Offset];
     AscendC::InitGlobalMemory(indiceSplitOut, clearRowNum * constInfo_.kSeqSize, neg);
 }
@@ -255,38 +267,41 @@ __aicore__ inline void SIVector<SIT>::InitSparseIndicesToNegOne(uint32_t gS1Idx,
 template <typename SIT>
 __aicore__ inline void SIVector<SIT>::ProcessVec1(const SICommon::RunInfo &info)
 {
-    auto pingpong = info.loop & 1U;
+    auto bufferIdx = info.loop % SICommon::MM1_RES_BUFFER_NUM;
     int64_t gS1BasePerVecSize_ = (constInfo_.mBaseSize + 1U) >> 1U; // 当前每个vec核上分到的mbase/2行
-    int64_t curS2Idx = info.s2Idx * s2BaseSize_;
-    WaitFlag<HardEvent::V_MTE2>(VEC1_V_MTE2_EVENT + pingpong);
+    int64_t curS2Idx = static_cast<int64_t>(info.s2Idx) * static_cast<int64_t>(s2BaseSize_);
+    WaitFlag<HardEvent::V_MTE2>(VEC1_V_MTE2_EVENT + bufferIdx);
     // vBiasGm --> vBiasLocal_ 搬运vBias
-    uint64_t vBiasGmOffset = info.tensorVBiasOffset + curS2Idx;
+    int64_t vBiasGmOffset = info.tensorVBiasOffset + curS2Idx;
     DataCopyPadExtParams<float> padVBiasParams{false, 0, 0, 0};
     DataCopyExtParams vBiasDataCopyExtParams;
     vBiasDataCopyExtParams.blockCount = 1;
     vBiasDataCopyExtParams.blockLen = info.actualSingleProcessSInnerSize * sizeof(float);
     vBiasDataCopyExtParams.srcStride = 0;
     vBiasDataCopyExtParams.dstStride = 0;
-    DataCopyPad(vBiasLocal_[pingpong * s2BaseSize_], vBiasGm[vBiasGmOffset], vBiasDataCopyExtParams, padVBiasParams);
+    const int64_t vBiasLocalOffset = static_cast<int64_t>(bufferIdx) * static_cast<int64_t>(s2BaseSize_);
+    DataCopyPad(vBiasLocal_[vBiasLocalOffset], vBiasGm[vBiasGmOffset], vBiasDataCopyExtParams, padVBiasParams);
 
-    SetFlag<HardEvent::MTE2_V>(VEC1_MTE2_V_EVENT + pingpong);
-    WaitFlag<HardEvent::MTE2_V>(VEC1_MTE2_V_EVENT + pingpong);
+    SetFlag<HardEvent::MTE2_V>(VEC1_MTE2_V_EVENT + bufferIdx);
+    WaitFlag<HardEvent::MTE2_V>(VEC1_MTE2_V_EVENT + bufferIdx);
 
     if (info.isFirstS2InnerLoop) {
         WaitFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
     }
     // CV同步：V核等待C核完成mm1并将结果搬运到UB。
-    CrossCoreWaitFlag<SICommon::SI_SYNC_MODE4, PIPE_V>(SICommon::CROSS_CV_EVENT + pingpong);
+    CrossCoreWaitFlag<SICommon::SI_SYNC_MODE4, PIPE_V>(SICommon::CROSS_CV_EVENT + bufferIdx);
 
-    auto qkBase = resMm1Local_[pingpong * (gS1BasePerVecSize_ * s2BaseSize_)];
-    auto outBase = mrgValueLocal_[MAX_TOPK_COUNT];
-    auto vBiasBase = vBiasLocal_[pingpong * s2BaseSize_];
+    const int64_t resMm1Offset =
+        static_cast<int64_t>(bufferIdx) * static_cast<int64_t>(SICommon::MM1_RES_SLOT_BYTES / sizeof(QK_T));
+    auto qkBase = resMm1Local_[resMm1Offset];
+    auto outBase = mrgValueLocal_[static_cast<int64_t>(MAX_TOPK_COUNT)];
+    auto vBiasBase = vBiasLocal_[vBiasLocalOffset];
 
     vector1::MulRSquareAndAddVBiasVF(outBase, qkBase, vBiasBase, constInfo_.rSquare, gS1BasePerVecSize_, s2BaseSize_,
                                      mrgRowStride_);
     PipeBarrier<PIPE_V>();
 
-    SetFlag<HardEvent::V_MTE2>(VEC1_V_MTE2_EVENT + pingpong);
+    SetFlag<HardEvent::V_MTE2>(VEC1_V_MTE2_EVENT + bufferIdx);
 }
 
 template <typename SIT>
@@ -320,16 +335,15 @@ __aicore__ inline uint32_t SIVector<SIT>::CalcDynamicTopkCount(uint32_t s1Idx, i
     float interpolatedTopkCount = kStartFloat + t * (kEnd - kStartFloat);
 
     // 正数转有符号整数等价于 floor；外推到负数时先钳制，避免无符号转换。
-    int32_t dynamicTopkCount =
-        interpolatedTopkCount < 1.0f ? 1 : static_cast<int32_t>(interpolatedTopkCount);
+    int32_t dynamicTopkCount = interpolatedTopkCount < 1.0f ? 1 : static_cast<int32_t>(interpolatedTopkCount);
     dynamicTopkCount = Min(dynamicTopkCount, kStart);
 
     return static_cast<uint32_t>(dynamicTopkCount);
 }
 
 template <typename SIT>
-__aicore__ inline void SIVector<SIT>::WriteDirectIndices(uint32_t outputLen, uint64_t baseLenOffset,
-                                                         uint64_t baseOutOffset, uint32_t curAivGSize,
+__aicore__ inline void SIVector<SIT>::WriteDirectIndices(uint32_t outputLen, int64_t baseLenOffset,
+                                                         int64_t baseOutOffset, uint32_t curAivGSize,
                                                          int64_t curAivGS1ProcNum, uint32_t actS1Size, uint32_t s1Idx,
                                                          LocalTensor<uint32_t> &indicesOutLocal)
 {
@@ -355,10 +369,12 @@ __aicore__ inline void SIVector<SIT>::WriteDirectIndices(uint32_t outputLen, uin
         if (mInnerIdx >= curAivGS1ProcNum) {
             break;
         }
-        DataCopyPad(sparseSeqLenGm[baseLenOffset + static_cast<uint64_t>(gIdx) * constInfo_.qSeqSize],
-                    indiceLenLocal_.ReinterpretCast<int32_t>(), indiceLenCp);
         DataCopyPad(
-            sparseIndicesGm[baseOutOffset + static_cast<uint64_t>(gIdx) * constInfo_.qSeqSize * constInfo_.kSeqSize],
+            sparseSeqLenGm[baseLenOffset + static_cast<int64_t>(gIdx) * static_cast<int64_t>(constInfo_.qSeqSize)],
+            indiceLenLocal_.ReinterpretCast<int32_t>(), indiceLenCp);
+        DataCopyPad(
+            sparseIndicesGm[baseOutOffset + static_cast<int64_t>(gIdx) * static_cast<int64_t>(constInfo_.qSeqSize) *
+                                                static_cast<int64_t>(constInfo_.kSeqSize)],
             indicesOutLocal.ReinterpretCast<int32_t>(), copyOut);
     }
     SetFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
@@ -392,23 +408,26 @@ __aicore__ inline void SIVector<SIT>::CopyOutPackedResults(const SICommon::RunIn
     uint32_t localRowStart = 0U;
     const uint32_t rowNum = static_cast<uint32_t>(curAivGS1ProcNum);
     while (localRowStart < rowNum) {
-        uint64_t globalGS1Idx = static_cast<uint64_t>(curAivGS1Idx) + localRowStart;
+        int64_t globalGS1Idx = curAivGS1Idx + static_cast<int64_t>(localRowStart);
         uint32_t globalGIdx = static_cast<uint32_t>(globalGS1Idx / info.actS1Size);
         uint32_t globalS1Idx = static_cast<uint32_t>(globalGS1Idx % info.actS1Size);
         uint32_t segmentRowNum = Min(rowNum - localRowStart, info.actS1Size - globalS1Idx);
-        uint64_t baseOutOffset =
-            info.indiceOutOffset +
-            (static_cast<uint64_t>(globalGIdx) * constInfo_.qSeqSize + globalS1Idx) * constInfo_.kSeqSize;
-        uint64_t baseLenOffset =
-            info.indiceLenOffset + static_cast<uint64_t>(globalGIdx) * constInfo_.qSeqSize + globalS1Idx;
+        int64_t baseOutOffset =
+            info.indiceOutOffset + (static_cast<int64_t>(globalGIdx) * static_cast<int64_t>(constInfo_.qSeqSize) +
+                                    static_cast<int64_t>(globalS1Idx)) *
+                                       static_cast<int64_t>(constInfo_.kSeqSize);
+        int64_t baseLenOffset = info.indiceLenOffset +
+                                static_cast<int64_t>(globalGIdx) * static_cast<int64_t>(constInfo_.qSeqSize) +
+                                static_cast<int64_t>(globalS1Idx);
+        const int64_t mrgValueOffset = static_cast<int64_t>(localRowStart) * static_cast<int64_t>(mrgRowStride_);
+        const int64_t indiceLenLocalOffset =
+            static_cast<int64_t>(localRowStart) * static_cast<int64_t>(INDICE_LEN_ROW_STRIDE);
 
         packedCopyParams.blockCount = static_cast<uint16_t>(segmentRowNum);
-        DataCopyPad(sparseIndicesGm[baseOutOffset],
-                    mrgValueLocal_[localRowStart * mrgRowStride_].template ReinterpretCast<int32_t>(),
+        DataCopyPad(sparseIndicesGm[baseOutOffset], mrgValueLocal_[mrgValueOffset].template ReinterpretCast<int32_t>(),
                     packedCopyParams);
         packedLenCopyParams.blockCount = static_cast<uint16_t>(segmentRowNum);
-        DataCopyPad(sparseSeqLenGm[baseLenOffset],
-                    indiceLenLocal_[localRowStart * INDICE_LEN_ROW_STRIDE].ReinterpretCast<int32_t>(),
+        DataCopyPad(sparseSeqLenGm[baseLenOffset], indiceLenLocal_[indiceLenLocalOffset].ReinterpretCast<int32_t>(),
                     packedLenCopyParams);
         localRowStart += segmentRowNum;
     }
@@ -416,10 +435,11 @@ __aicore__ inline void SIVector<SIT>::CopyOutPackedResults(const SICommon::RunIn
 }
 
 template <typename SIT>
-__aicore__ inline void
-SIVector<SIT>::RunTopKBatchRows(const SICommon::RunInfo &info, bool isFirstS2InnerLoop, bool isLastS2InnerLoop,
-                                const SICommon::RowIdx4 &rowIdx4, const SICommon::TopkNum4 &topkNum4,
-                                const SICommon::S2ValidLen4 &s2ValidLen4, uint32_t batchRowNum, int64_t curAivGS1Idx)
+__aicore__ inline void SIVector<SIT>::RunTopKBatchRows(const SICommon::RunInfo &info, bool isFirstS2InnerLoop,
+                                                       bool isLastS2InnerLoop, const SICommon::RowIdx4 &rowIdx4,
+                                                       const SICommon::TopkNum4 &topkNum4,
+                                                       const SICommon::S2ValidLen4 &s2ValidLen4, uint32_t batchRowNum,
+                                                       int64_t curAivGS1Idx)
 {
     // padding（各行按自身 s2BlockValidLen 补齐到 TRUNK_LEN_256，非零行结果一致）
     if (isFirstS2InnerLoop) {
@@ -432,13 +452,13 @@ SIVector<SIT>::RunTopKBatchRows(const SICommon::RunInfo &info, bool isFirstS2Inn
     uint32_t inputOffset = isFirstS2InnerLoop ? TOPK_ALIGN_SIZE : 0U;
     uint32_t validLen = isFirstS2InnerLoop ? SICommon::TRUNK_LEN_256 : (TOPK_ALIGN_SIZE + SICommon::TRUNK_LEN_256);
 
-    LocalTensor<uint32_t> reuseMm1ResLocal =
-        resMm1Local_[(info.loop & 1U) * (((constInfo_.mBaseSize + 1U) >> 1U) * s2BaseSize_)]
-            .ReinterpretCast<uint32_t>();
+    const int64_t reuseMm1ResOffset = static_cast<int64_t>(info.loop % SICommon::MM1_RES_BUFFER_NUM) *
+                                      static_cast<int64_t>(SICommon::MM1_RES_SLOT_BYTES / sizeof(QK_T));
+    LocalTensor<uint32_t> reuseMm1ResLocal = resMm1Local_[reuseMm1ResOffset].ReinterpretCast<uint32_t>();
     PipeBarrier<PIPE_V>();
 
-    topkOp_.Batch4Rows(mrgValueLocal_, reuseMm1ResLocal, globalIndexLocal_, rowIdx4, topkNum4, batchRowNum,
-                       mrgRowStride_, inputOffset, validLen, info.s2Idx, info.s2LoopEnd + 1);
+    topkOp_.Batch4Rows(mrgValueLocal_, reuseMm1ResLocal, histogramLocal_, globalIndexLocal_, rowIdx4, topkNum4,
+                       batchRowNum, mrgRowStride_, inputOffset, validLen, info.s2Idx, info.s2LoopEnd + 1);
 
     if (!isLastS2InnerLoop) {
         return;
@@ -456,13 +476,15 @@ SIVector<SIT>::RunTopKBatchRows(const SICommon::RunInfo &info, bool isFirstS2Inn
         }
 
         uint32_t topkSelectNum = Min(SICommon::GetLane(topkNum4, rowIdx), MAX_TOPK_COUNT);
-        uint64_t mrgValueOffset = static_cast<uint64_t>(mInnerIdx) * mrgRowStride_;
-        uint64_t globalIndexOffset = static_cast<uint64_t>(mInnerIdx) * MAX_TOPK_COUNT;
+        int64_t mrgValueOffset = static_cast<int64_t>(mInnerIdx) * static_cast<int64_t>(mrgRowStride_);
+        int64_t globalIndexOffset = static_cast<int64_t>(mInnerIdx) * static_cast<int64_t>(MAX_TOPK_COUNT);
         LocalTensor<uint32_t> packedRow = mrgValueLocal_[mrgValueOffset].template ReinterpretCast<uint32_t>();
         TopkUtils::PackSparseIndicesU32VF(packedRow, globalIndexLocal_[globalIndexOffset], packedOutputLen,
                                           initialBlocks_, topkSelectNum, windowSize_, curS1RealS2Len - windowSize_);
 
-        Duplicate(indiceLenLocal_[mInnerIdx * INDICE_LEN_ROW_STRIDE], initialBlocks_ + topkSelectNum + windowSize_, 1);
+        const int64_t indiceLenLocalOffset =
+            static_cast<int64_t>(mInnerIdx) * static_cast<int64_t>(INDICE_LEN_ROW_STRIDE);
+        Duplicate(indiceLenLocal_[indiceLenLocalOffset], initialBlocks_ + topkSelectNum + windowSize_, 1);
     }
 }
 
@@ -471,16 +493,16 @@ __aicore__ inline void SIVector<SIT>::ProcessTopK(const SICommon::RunInfo &info,
                                                   bool isLastS2InnerLoop)
 {
     // 当前处理的GS1行起始索引（全局位置）
-    int64_t curGS1Idx = info.gS1Idx * mBaseSize_;
+    int64_t curGS1Idx = static_cast<int64_t>(info.gS1Idx) * static_cast<int64_t>(mBaseSize_);
     // 当前GS1行需要处理的数量（可能小于mBaseSize_，处理尾块）
     int64_t curGS1ProcNum = info.actMBaseSize;
     // 当前AIV核处理的GS1起始索引（双核分工）
     uint32_t aivParity = static_cast<uint32_t>(blockId_) & 1U;
-    int64_t curAivGS1Idx = curGS1Idx + aivParity * ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U);
+    int64_t curAivGS1Idx =
+        curGS1Idx + static_cast<int64_t>(aivParity) * ((static_cast<int64_t>(curGS1ProcNum) + 1LL) >> 1U);
     // 当前AIV核需要处理的GS1行数量
-    int64_t curAivGS1ProcNum = (aivParity == 0U) ?
-                                   ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U) :
-                                   (static_cast<uint64_t>(curGS1ProcNum) >> 1U);
+    int64_t curAivGS1ProcNum = (aivParity == 0U) ? ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U) :
+                                                   (static_cast<uint64_t>(curGS1ProcNum) >> 1U);
 
     // S2 基本块信息
     uint32_t s2BlockStart = info.s2Idx * s2BaseSize_;
@@ -527,13 +549,15 @@ __aicore__ inline void SIVector<SIT>::ProcessTopK(const SICommon::RunInfo &info,
                     if (mInnerIdx >= curAivGS1ProcNum) {
                         break;
                     }
-                    uint64_t mrgValueOffset = static_cast<uint64_t>(mInnerIdx) * mrgRowStride_;
-                    uint64_t globalIndexOffset = static_cast<uint64_t>(mInnerIdx) * MAX_TOPK_COUNT;
+                    int64_t mrgValueOffset = static_cast<int64_t>(mInnerIdx) * static_cast<int64_t>(mrgRowStride_);
+                    int64_t globalIndexOffset = static_cast<int64_t>(mInnerIdx) * static_cast<int64_t>(MAX_TOPK_COUNT);
                     LocalTensor<uint32_t> packedRow =
                         mrgValueLocal_[mrgValueOffset].template ReinterpretCast<uint32_t>();
                     TopkUtils::PackSparseIndicesU32VF(packedRow, globalIndexLocal_[globalIndexOffset], packedOutputLen,
                                                       0U, 0U, directOutputLen, 0U);
-                    Duplicate(indiceLenLocal_[mInnerIdx * INDICE_LEN_ROW_STRIDE], directOutputLen, 1);
+                    const int64_t indiceLenLocalOffset =
+                        static_cast<int64_t>(mInnerIdx) * static_cast<int64_t>(INDICE_LEN_ROW_STRIDE);
+                    Duplicate(indiceLenLocal_[indiceLenLocalOffset], directOutputLen, 1);
                 }
             }
             continue;
@@ -574,7 +598,8 @@ __aicore__ inline void SIVector<SIT>::ProcessTopK(const SICommon::RunInfo &info,
                          curAivGS1Idx);
     }
     // TopK已不再访问当前resMm1Local_槽，先归还给Cube，使下一轮MM1可与最终MTE3搬出并行。
-    CrossCoreSetFlag<SICommon::SI_SYNC_MODE4, PIPE_V>(SICommon::CROSS_VC_EVENT + (info.loop & 1U));
+    CrossCoreSetFlag<SICommon::SI_SYNC_MODE4, PIPE_V>(SICommon::CROSS_VC_EVENT +
+                                                      (info.loop % SICommon::MM1_RES_BUFFER_NUM));
     if (isLastS2InnerLoop) {
         CopyOutPackedResults(info, curAivGS1Idx, curAivGS1ProcNum);
     }
@@ -587,29 +612,32 @@ __aicore__ inline void SIVector<SIT>::ProcessDirectOutput(const SICommon::TempLo
         uint32_t actMBaseSize = tempLoopInfo.actMBaseSize;
         uint32_t actS1Size = tempLoopInfo.actS1Size;
         uint32_t actS2Size = tempLoopInfo.actS2Size;
-        uint64_t qFlatBase = static_cast<uint64_t>(tempLoopInfo.bIdx) * constInfo_.qSeqSize * constInfo_.qHeadNum +
-                             static_cast<uint64_t>(tempLoopInfo.n2Idx) * constInfo_.gSize * constInfo_.qSeqSize;
-        uint64_t indiceLenOffset = qFlatBase;
-        uint64_t indiceOutOffset = qFlatBase * constInfo_.kSeqSize;
+        int64_t qFlatBase = static_cast<int64_t>(tempLoopInfo.bIdx) * static_cast<int64_t>(constInfo_.qSeqSize) *
+                                static_cast<int64_t>(constInfo_.qHeadNum) +
+                            static_cast<int64_t>(tempLoopInfo.n2Idx) * static_cast<int64_t>(constInfo_.gSize) *
+                                static_cast<int64_t>(constInfo_.qSeqSize);
+        int64_t indiceLenOffset = qFlatBase;
+        int64_t indiceOutOffset = qFlatBase * static_cast<int64_t>(constInfo_.kSeqSize);
 
         if (!needCleanOutput_) {
             InitSparseIndicesToNegOne(gS1Idx, actMBaseSize, actS1Size, indiceOutOffset);
         }
 
-        LocalTensor<uint32_t> indicesOutLocal =
-            resMm1Local_[0].ReinterpretCast<uint32_t>()[SIKernel::StemIndexerTopk<SCORE_T>::REUSE_INDICES_OUT_OFFSET];
+        // DirectOutput不参与MM1槽同步，复用空闲的TopK索引区，
+        // 避免混合DirectOutput/MM1场景下与后续Cube Fixpipe写resMm1Local_[0]产生冲突。
+        LocalTensor<uint32_t> indicesOutLocal = globalIndexLocal_;
 
         // 当前处理的gS1行起始索引（全局位置）
-        int64_t curGS1Idx = gS1Idx * mBaseSize_;
+        int64_t curGS1Idx = static_cast<int64_t>(gS1Idx) * static_cast<int64_t>(mBaseSize_);
         // 当前gS1行需要处理的数量（可能小于mBaseSize_，处理尾块）
         int64_t curGS1ProcNum = actMBaseSize;
         // 当前AIV核处理的gS1起始索引（双核分工）
         uint32_t aivParity = static_cast<uint32_t>(blockId_) & 1U;
-        int64_t curAivGS1Idx = curGS1Idx + aivParity * ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U);
+        int64_t curAivGS1Idx =
+            curGS1Idx + static_cast<int64_t>(aivParity) * ((static_cast<int64_t>(curGS1ProcNum) + 1LL) >> 1U);
         // 当前AIV核需要处理的gS1行数量
-        int64_t curAivGS1ProcNum = (aivParity == 0U) ?
-                                       ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U) :
-                                       (static_cast<uint64_t>(curGS1ProcNum) >> 1U);
+        int64_t curAivGS1ProcNum = (aivParity == 0U) ? ((static_cast<uint64_t>(curGS1ProcNum) + 1U) >> 1U) :
+                                                       (static_cast<uint64_t>(curGS1ProcNum) >> 1U);
 
         uint32_t curS1RealS2Len = actS2Size;
         uint32_t curAivGSize = CeilDiv(curAivGS1ProcNum, actS1Size);
@@ -621,11 +649,13 @@ __aicore__ inline void SIVector<SIT>::ProcessDirectOutput(const SICommon::TempLo
             uint32_t nowCurAivGS1Idx = curAivGS1Idx + s1Idx;
             uint32_t globalGIdx = nowCurAivGS1Idx / actS1Size;
             uint32_t globalS1Idx = nowCurAivGS1Idx % actS1Size;
-            uint64_t baseLenOffset =
-                indiceLenOffset + static_cast<uint64_t>(globalGIdx) * constInfo_.qSeqSize + globalS1Idx;
-            uint64_t baseOutOffset =
-                indiceOutOffset +
-                (static_cast<uint64_t>(globalGIdx) * constInfo_.qSeqSize + globalS1Idx) * constInfo_.kSeqSize;
+            int64_t baseLenOffset = indiceLenOffset +
+                                    static_cast<int64_t>(globalGIdx) * static_cast<int64_t>(constInfo_.qSeqSize) +
+                                    static_cast<int64_t>(globalS1Idx);
+            int64_t baseOutOffset =
+                indiceOutOffset + (static_cast<int64_t>(globalGIdx) * static_cast<int64_t>(constInfo_.qSeqSize) +
+                                   static_cast<int64_t>(globalS1Idx)) *
+                                      static_cast<int64_t>(constInfo_.kSeqSize);
             if (constInfo_.attenMaskFlag) {
                 int32_t curS1RealS2LenTmp = static_cast<int32_t>(actS2Size) - static_cast<int32_t>(actS1Size) +
                                             static_cast<int32_t>(globalS1Idx) + 1;

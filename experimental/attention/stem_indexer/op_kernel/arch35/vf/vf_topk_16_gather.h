@@ -87,14 +87,12 @@ __simd_vf__ void HistogramsHighVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf__
     HistogramsHighProcessRow<T>(histogramsBuf, inputBuf, vfLoop, offset, 3, rowIdx3);
 }
 
-__simd_callee__ inline void FindHighTargetBinProcessRow(__ubuf__ uint32_t *idxHighBuf, __ubuf__ uint32_t *nkValueBuf,
-                                                        __ubuf__ uint32_t *histogramsBuf, uint32_t topK,
-                                                        uint32_t validLen, uint32_t rowSlot)
+__simd_callee__ inline void FindHighTargetBinStoreRow(__ubuf__ uint32_t *idxHighBuf, __ubuf__ uint32_t *histogramsBuf,
+                                                      uint32_t topK, uint32_t validLen, uint32_t rowSlot)
 {
     MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
 
     __ubuf__ uint32_t *roundIdxHighBuf = idxHighBuf + rowSlot * HISTOGRAM_BIN_COUNT;
-    __ubuf__ uint32_t *roundNkValueBuf = nkValueBuf + rowSlot * VF_B32_ELEMS;
     __ubuf__ uint32_t *roundHistBuf = histogramsBuf + rowSlot * HISTOGRAM_BIN_COUNT;
 
     MicroAPI::MaskReg pregGE;
@@ -127,8 +125,24 @@ __simd_callee__ inline void FindHighTargetBinProcessRow(__ubuf__ uint32_t *idxHi
                                                                                   alignIdxHigh);
     }
     MicroAPI::StoreUnAlignPost(roundIdxHighBuf, alignIdxHigh);
+}
 
-    MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
+__simd_callee__ inline void FindHighTargetBinFinishRow(__ubuf__ uint32_t *idxHighBuf, __ubuf__ uint32_t *nkValueBuf,
+                                                       __ubuf__ uint32_t *histogramsBuf, uint32_t topK,
+                                                       uint32_t validLen, uint32_t rowSlot)
+{
+    MicroAPI::MaskReg pregB32 = MicroAPI::CreateMask<uint32_t, MicroAPI::MaskPattern::ALL>();
+
+    __ubuf__ uint32_t *roundIdxHighBuf = idxHighBuf + rowSlot * HISTOGRAM_BIN_COUNT;
+    __ubuf__ uint32_t *roundNkValueBuf = nkValueBuf + rowSlot * VF_B32_ELEMS;
+    __ubuf__ uint32_t *roundHistBuf = histogramsBuf + rowSlot * HISTOGRAM_BIN_COUNT;
+
+    MicroAPI::RegTensor<uint32_t> topKReg;
+    MicroAPI::Duplicate(topKReg, topK);
+    MicroAPI::RegTensor<uint32_t> validLenPlus1;
+    MicroAPI::Duplicate(validLenPlus1, validLen + 1);
+    MicroAPI::RegTensor<uint32_t> btmK;
+    MicroAPI::Sub(btmK, validLenPlus1, topKReg, pregB32);
 
     MicroAPI::RegTensor<uint32_t> idxHigh;
     MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_BRC_B8>(idxHigh, roundIdxHighBuf);
@@ -158,10 +172,17 @@ __simd_vf__ void FindHighTargetBinVFImpl(__ubuf__ uint32_t *idxHighBuf, __ubuf__
                                          __ubuf__ uint32_t *histogramsBuf, uint32_t validLen, uint32_t topK0,
                                          uint32_t topK1, uint32_t topK2, uint32_t topK3)
 {
-    FindHighTargetBinProcessRow(idxHighBuf, nkValueBuf, histogramsBuf, topK0, validLen, 0);
-    FindHighTargetBinProcessRow(idxHighBuf, nkValueBuf, histogramsBuf, topK1, validLen, 1);
-    FindHighTargetBinProcessRow(idxHighBuf, nkValueBuf, histogramsBuf, topK2, validLen, 2);
-    FindHighTargetBinProcessRow(idxHighBuf, nkValueBuf, histogramsBuf, topK3, validLen, 3);
+    FindHighTargetBinStoreRow(idxHighBuf, histogramsBuf, topK0, validLen, 0);
+    FindHighTargetBinStoreRow(idxHighBuf, histogramsBuf, topK1, validLen, 1);
+    FindHighTargetBinStoreRow(idxHighBuf, histogramsBuf, topK2, validLen, 2);
+    FindHighTargetBinStoreRow(idxHighBuf, histogramsBuf, topK3, validLen, 3);
+
+    MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
+
+    FindHighTargetBinFinishRow(idxHighBuf, nkValueBuf, histogramsBuf, topK0, validLen, 0);
+    FindHighTargetBinFinishRow(idxHighBuf, nkValueBuf, histogramsBuf, topK1, validLen, 1);
+    FindHighTargetBinFinishRow(idxHighBuf, nkValueBuf, histogramsBuf, topK2, validLen, 2);
+    FindHighTargetBinFinishRow(idxHighBuf, nkValueBuf, histogramsBuf, topK3, validLen, 3);
 }
 
 template <typename T>
@@ -248,7 +269,6 @@ __simd_vf__ void FindKthVFImpl(__ubuf__ uint32_t *kValue, __ubuf__ uint32_t *his
     for (uint16_t m = 0; m < loopM; ++m) {
         __ubuf__ uint32_t *roundKValue = kValue + m * VF_B32_ELEMS;
         __ubuf__ uint32_t *roundHistBuf = histogramsBuf + m * HISTOGRAM_BIN_COUNT;
-        __ubuf__ uint32_t *roundIdxHighBuf = idxHighBuf + m * HISTOGRAM_BIN_COUNT;
         __ubuf__ uint32_t *roundIdxLowBuf = idxLowBuf + m * HISTOGRAM_BIN_COUNT;
 
         MicroAPI::MaskReg pregGE;
@@ -277,16 +297,22 @@ __simd_vf__ void FindKthVFImpl(__ubuf__ uint32_t *kValue, __ubuf__ uint32_t *his
                                                                                       alignIdxLow);
         }
         MicroAPI::StoreUnAlignPost(roundIdxLowBuf, alignIdxLow);
+    }
 
-        MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
+    MicroAPI::LocalMemBar<AscendC::MicroAPI::MemType::VEC_STORE, AscendC::MicroAPI::MemType::VEC_LOAD>();
+
+    MicroAPI::RegTensor<uint16_t> idxTmp;
+    MicroAPI::Duplicate(idxTmp, 0xff00);
+
+    for (uint16_t m = 0; m < loopM; ++m) {
+        __ubuf__ uint32_t *roundKValue = kValue + m * VF_B32_ELEMS;
+        __ubuf__ uint32_t *roundIdxHighBuf = idxHighBuf + m * HISTOGRAM_BIN_COUNT;
+        __ubuf__ uint32_t *roundIdxLowBuf = idxLowBuf + m * HISTOGRAM_BIN_COUNT;
 
         MicroAPI::RegTensor<uint32_t> idxHigh;
         MicroAPI::RegTensor<uint32_t> idxLow;
         MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_BRC_B8>(idxHigh, roundIdxHighBuf);
         MicroAPI::LoadAlign<uint32_t, MicroAPI::LoadDist::DIST_BRC_B16>(idxLow, roundIdxLowBuf);
-
-        MicroAPI::RegTensor<uint16_t> idxTmp;
-        MicroAPI::Duplicate(idxTmp, 0xff00);
 
         MicroAPI::And(idxHigh, idxHigh, (MicroAPI::RegTensor<uint32_t> &)idxTmp, pregB32);
 

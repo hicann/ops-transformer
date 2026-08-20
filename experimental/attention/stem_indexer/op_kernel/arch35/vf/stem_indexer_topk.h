@@ -41,24 +41,23 @@ public:
     static constexpr uint64_t INDICES_OUT_SIZE_U32 = MAX_LOOP_M * TOPK_ALIGN_SIZE;
 
     static constexpr uint64_t REUSE_INDICES_OUT_OFFSET =
-        IDX_WORKSPACE_SIZE_U32 + HISTOGRAM_SIZE_U32 + NK_VALUE_SIZE_U32 + TMP_INDEX_SIZE_U32;
+        IDX_WORKSPACE_SIZE_U32 + NK_VALUE_SIZE_U32 + TMP_INDEX_SIZE_U32;
     static constexpr uint64_t REUSE_SCORE_OUT_OFFSET_U32 = REUSE_INDICES_OUT_OFFSET + INDICES_OUT_SIZE_U32;
     static constexpr uint64_t REUSE_SCORE_OUT_OFFSET = REUSE_SCORE_OUT_OFFSET_U32 * sizeof(uint32_t) / sizeof(SCORE_T);
 
     __aicore__ inline void InitBuffers(const LocalTensor<uint32_t> &reuseMm1ResLocal,
+                                       const LocalTensor<uint32_t> &histogramLocal,
                                        const LocalTensor<uint32_t> &reuseGlobalIndexLocal)
     {
-        // reuseMm1ResLocal按idx -> histogram -> nk -> tmpIndex -> indicesOut -> scoreOut排布。
+        // reuseMm1ResLocal按idx -> nk -> tmpIndex -> indicesOut -> scoreOut排布；histogram独立申请。
         idx0Local = reuseMm1ResLocal;
         idx1Local = idx0Local[IDX_BUFFER_SIZE_U32];
-        if constexpr (std::is_same_v<SCORE_T, uint16_t>) {
-            histogramsLocal = idx1Local[IDX_BUFFER_SIZE_U32];
-        } else {
+        if constexpr (!std::is_same_v<SCORE_T, uint16_t>) {
             idx2Local = idx1Local[IDX_BUFFER_SIZE_U32];
             idx3Local = idx2Local[IDX_BUFFER_SIZE_U32];
-            histogramsLocal = idx3Local[IDX_BUFFER_SIZE_U32];
         }
-        nkValueLocal = histogramsLocal[HISTOGRAM_SIZE_U32];
+        histogramsLocal = histogramLocal;
+        nkValueLocal = reuseMm1ResLocal[IDX_WORKSPACE_SIZE_U32];
         tmpIndexLocal = nkValueLocal[NK_VALUE_SIZE_U32];
         indicesOutLocal = reuseMm1ResLocal[REUSE_INDICES_OUT_OFFSET];
         hisValueLocal = reuseMm1ResLocal[REUSE_SCORE_OUT_OFFSET_U32].ReinterpretCast<SCORE_T>();
@@ -70,6 +69,7 @@ public:
 
     __aicore__ inline void Batch4Rows(const LocalTensor<SCORE_T> &mrgValueLocal,
                                       const LocalTensor<uint32_t> &reuseMm1ResLocal,
+                                      const LocalTensor<uint32_t> &histogramLocal,
                                       const LocalTensor<uint32_t> &reuseGlobalIndexLocal,
                                       const SICommon::RowIdx4 &rowIdx4, const SICommon::TopkNum4 &topkNum4,
                                       uint32_t batchRowNum, uint32_t mrgRowStride, uint32_t inputOffset,
@@ -78,7 +78,7 @@ public:
         const uint32_t offset = mrgRowStride;
         const uint32_t topkAlign = 256U;
         const uint32_t tmpIdxStride16 = topkAlign + SICommon::TRUNK_LEN_256;
-        InitBuffers(reuseMm1ResLocal, reuseGlobalIndexLocal);
+        InitBuffers(reuseMm1ResLocal, histogramLocal, reuseGlobalIndexLocal);
 
         LocalTensor<SCORE_T> inputValueLocal = mrgValueLocal[inputOffset];
 
