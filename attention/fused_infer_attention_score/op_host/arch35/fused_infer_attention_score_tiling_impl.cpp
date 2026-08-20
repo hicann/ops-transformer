@@ -645,7 +645,6 @@ void FusedInferAttentionScoreTilingImpl::ComputeSplitNBSeq(const FiaTilingInfo &
     faRunTilingAdapter_.multiCoreParamsRegbase.set_sparseStartIdx(gS1StartIdx.data());
 }
 
-
 /*
  * 计算同时参与计算所需的L2 cache大小
  * 算法思路：
@@ -1565,8 +1564,6 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::SetWorkspaceAntiQuant(const 
                           sizeof(float); // 2 : sMax 和 sSum
     }
 
-    workspaceSize_ += 100 * 1024 * 1024; // 100*1024*1024: extra workspace for dump in david
-
     if (fiaInfo.kvStorageMode == KvStorageMode::PAGE_ATTENTION) {
         workspaceSize_ += platformInfo_.coreNum * 64 * 2; // bmm1 bmm2 2份
     }
@@ -1672,7 +1669,6 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::SetMaskTilingData(const FiaT
     inputParams.set_attenMaskS2Size(maskS2Size);
     return ge::GRAPH_SUCCESS;
 }
-
 
 uint8_t FusedInferAttentionScoreTilingImpl::ComputeSparseType(const FiaTilingInfo &fiaInfo) const
 {
@@ -1920,7 +1916,6 @@ void FusedInferAttentionScoreTilingImpl::SetFATilingDataInitOutput(const FiaTili
     initOutputParams.set_needInit(fiaInfo.needInit || needInit_);
     initOutputParams.set_isOneN(0); // 默认值,当前未使用
 }
-
 
 ge::graphStatus FusedInferAttentionScoreTilingImpl::SetTilingData(gert::TilingContext *context,
                                                                   const FiaTilingInfo &fiaInfo)
