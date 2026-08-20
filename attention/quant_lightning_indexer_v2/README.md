@@ -59,6 +59,7 @@
   - `quant_mode`为3/5时，`query_dequant_scale`和`key_dequant_scale`的维数分别比`query`和`key`多1，前缀维度保持一致，末两维为(D/64,2)；D必须为64的倍数，每个scale对应连续32个D轴逻辑元素。
   - `query`的N支持[1, 64]，`key`的N仅支持1。
   - `topk`支持[1, 8192]。
+  - 当传入的参数layout_query为TND时，必须传入cu_seqlens_q，如果也传入seqused_q，应保证由seqused_q传入的各个batch的query长度不超过根据cu_seqlens_q计算出的各个batch的q序列长度。当某个batch由seqused_q传入的q序列长度seqlen1小于由cu_seqlens_q计算出的query长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的query输出的sparse_indices和sparse_values全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
 
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
   - `quant_mode`仅支持2。

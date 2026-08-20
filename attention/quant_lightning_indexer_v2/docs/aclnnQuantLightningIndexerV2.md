@@ -561,6 +561,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 - block_size 取值为 16 的倍数，最大支持 1024。
 - 当 `layout_key` 不为 PA_BSND 时，`layout_query` 和 `layout_key` 必须一致。
 - 当 `quant_mode` 为 3/5 时，`queryDequantScale` 和 `keyDequantScale` 的维数分别比 `query` 和 `key` 多 1，前缀维度保持一致，末两维为(D/64, 2)；D必须为64的倍数，每个scale对应D轴上连续32个逻辑元素。
+- 当传入的参数layout_query为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的query长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的query长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的query输出的sparseIndices和sparseValues全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
 - **确定性说明：** aclnnQuantLightningIndexerV2 默认确定性实现。
 
 ## 调用示例
