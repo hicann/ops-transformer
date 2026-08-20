@@ -702,6 +702,69 @@ __aicore__ inline void CalCausalSwizzleIndex(int64_t k, int64_t m, int64_t n, in
     }
 }
 
+__aicore__ inline int64_t CalLeftUpCausalSwizzleMaxRound(int64_t k, int64_t m, int64_t n, int64_t b)
+{
+    int64_t pairCount = b >> 1;
+    if (k <= 0 || m <= 0 || n <= 0 || pairCount <= 0) {
+        return 0;
+    }
+
+    int64_t virtualM = m;
+    int64_t virtualN = m + 1;
+    int64_t activeK = Min(k, m * pairCount);
+    if (m > n) {
+        virtualM = NUM_TWO * m - n + 1;
+        virtualN = n;
+        activeK = Min(k, n * pairCount);
+    }
+    return virtualM * Ceil<int64_t>(virtualN * pairCount, activeK);
+}
+
+__aicore__ inline void CalLeftUpCausalSwizzleIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t j, int64_t r,
+                                                   CoordinateInfo &coordinate)
+{
+    coordinate.batchId = -1;
+    int64_t pairCount = b >> 1;
+    if (k <= 0 || m <= 0 || n <= 0 || pairCount <= 0 || j < 1 || r < 1) {
+        return;
+    }
+
+    if (m <= n) {
+        int64_t activeK = Min(k, m * pairCount);
+        if (j > activeK) {
+            return;
+        }
+        CalCausalSwizzleIndex(activeK, m, m, b, j, r, coordinate);
+        return;
+    }
+
+    int64_t virtualM = NUM_TWO * m - n + 1;
+    int64_t activeK = Min(k, n * pairCount);
+    if (j > activeK) {
+        return;
+    }
+    int64_t columnId = (r - 1) / virtualM * activeK + j - 1;
+    if (columnId >= n * pairCount) {
+        return;
+    }
+
+    int64_t pairId = columnId / n + 1;
+    int64_t virtualS2 = columnId % n + 1;
+    int64_t virtualS1 = (r - 1) % virtualM + 1;
+    int64_t oddBatchLen = m - virtualS2 + 1;
+    if (virtualS1 <= oddBatchLen) {
+        coordinate.batchId = NUM_TWO * pairId - 1;
+        coordinate.s1Idx = virtualS2 + virtualS1 - 1;
+        coordinate.s2Idx = virtualS2;
+        return;
+    }
+
+    int64_t evenBatchOffset = virtualS1 - oddBatchLen;
+    coordinate.batchId = NUM_TWO * pairId;
+    coordinate.s1Idx = m - evenBatchOffset + 1;
+    coordinate.s2Idx = n - virtualS2 + 1;
+}
+
 __aicore__ inline void CalGQACausalIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t j, int64_t r, int64_t g,
                                          CoordinateInfo &coordinate)
 {
