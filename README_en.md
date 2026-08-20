@@ -1,5 +1,7 @@
 # ops-transformer
 
+English | [简体中文](./README.md)
+
 ## 🔥Latest News
 
 - [2026/02] Newly supported operators [mhc_post](experimental/mhc/mhc_post), [mhc_pre](experimental/mhc/mhc_pre), [mhc_res](experimental/mhc/mhc_res).

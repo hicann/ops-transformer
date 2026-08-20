@@ -1,5 +1,7 @@
 # ops-transformer
 
+简体中文 | [English](./README_en.md)
+
 ## 🔥Latest News
 
 - [2026/02] 新支持算子[mhc_post](experimental/mhc/mhc_post)、[mhc_pre](experimental/mhc/mhc_pre)、[mhc_res](experimental/mhc/mhc_res)。
@@ -99,4 +101,3 @@ ops-transformer是[CANN](https://hiascend.com/software/cann) （Compute Architec
     |技术专题|样例|
     |----|----|
     |算子性能优化实践|[FA算子性能优化实践和效果分析](https://gitcode.com/cann/ops-transformer/wiki/FA%E7%AE%97%E5%AD%90%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5%E5%92%8C%E6%95%88%E6%9E%9C%E5%88%86%E6%9E%90.md)|
-    
