@@ -508,6 +508,7 @@ aclnn_mla_preprocess_v2.h
 aclnn_mla_prolog.h
 aclnn_mla_prolog_v2_weight_nz.h
 aclnn_mla_prolog_v3_weight_nz.h
+aclnn_mla_prolog_v4_weight_nz.h
 aclnn_mm.h
 aclnn_modulate_backward.h
 aclnn_modulate.h
