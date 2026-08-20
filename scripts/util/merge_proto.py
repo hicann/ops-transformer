@@ -17,29 +17,34 @@ import argparse
 
 
 def match_op_proto(file_path):
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    op_def_pattern = re.compile(r"REG_OP\((.+)\).*OP_END_FACTORY_REG\(\1\)", re.DOTALL)
-    match = op_def_pattern.search(content)
-
-    if match:
+    op_defs = []
+    op_def_pattern = re.compile(
+        r"REG_OP\((\w+)\).*?OP_END_FACTORY_REG\(\1\)", re.DOTALL
+    )
+    for match in op_def_pattern.finditer(content):
         op_name = match.group(1)
         op_def = match.group(0)
-        return op_name, op_def
-    else:
-        return None, None
+        op_defs.append((op_name, op_def))
+
+    return op_defs
 
 
 def merge_op_proto(protos_path, output_file):
     op_defs = []
+    seen = set()
     for proto_path in protos_path:
-        if not proto_path.endswith("_proto.h"):
+        if not (
+            proto_path.endswith("_proto.h") or proto_path.endswith("_proto_extend.h")
+        ):
             continue
         print(f"proto_path: {proto_path}")
-        op_name, op_def = match_op_proto(proto_path)
-        if op_def:
-            op_defs.append(op_def)
+        for op_name, op_def in match_op_proto(proto_path):
+            if op_name not in seen:
+                seen.add(op_name)
+                op_defs.append(op_def)
 
     # merge op_proto
     merged_content = f"""#ifndef OP_TRANSFORMER_PROTO_H_
@@ -50,13 +55,13 @@ def merge_op_proto(protos_path, output_file):
 
 namespace ge{{
 
-{os.linesep.join([f'{op_def}{os.linesep}' for op_def in op_defs])}
+{os.linesep.join([f"{op_def}{os.linesep}" for op_def in op_defs])}
 }}  // namespace ge
 
 #endif // OP_TRANSFORMER_PROTO_H_
 """
 
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         f.write(merged_content)
 
     print(f"merged op transformer proto file: {output_file}")
@@ -64,14 +69,14 @@ namespace ge{{
 
 def parse_args(argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument("protos", nargs='+')
+    parser.add_argument("protos", nargs="+")
     parser.add_argument("--output-file", nargs=1, default=None)
     return parser.parse_args(argv)
 
 
 if __name__ == "__main__":
     args = parse_args(sys.argv)
-    
+
     protos_path = args.protos[1:]
     output_file = args.output_file[0]
     merge_op_proto(protos_path, output_file)

@@ -108,6 +108,7 @@ if (BUILD_OPEN_PROJECT)
     )
 
     add_subdirectory(src/framework)
+    add_subdirectory(include/op_graph)
 else()
     add_library(${COMMON_NAME}_obj OBJECT)
 
@@ -130,6 +131,7 @@ else()
       $<BUILD_INTERFACE:intf_pub_cxx17>
       tiling_api
     )
+    add_subdirectory(include/op_graph)
 endif()
 
 if (ENABLE_TILING_SINK)
