@@ -13,16 +13,16 @@
 
 - 接口功能：融合GroupedMatmul 、dquant、swiglu和quant，详细解释见计算公式。
 - 计算公式：
-  
+
   - **定义**：
-    
+
     * **⋅** 表示矩阵乘法。
     * **⊙** 表示逐元素乘法。
     * $\left \lfloor x\right \rceil$ 表示将x四舍五入到最近的整数。
     * $\mathbb{Z_8} = \{ x \in \mathbb{Z} | −128≤x≤127 \}$
     * $\mathbb{Z_{32}} = \{ x \in \mathbb{Z} | -2147483648≤x≤2147483647 \}$
   - **输入**：
-    
+
     * $X∈\mathbb{Z_8}^{M \times K}$：输入矩阵（左矩阵），M是总token数，K是特征维度。
     * $W∈\mathbb{Z_8}^{E \times K \times N}$：分组权重矩阵（右矩阵），E是专家个数，K是特征维度，N是输出维度。
     * $bias∈\mathbb{Z_{32}}^{E  \times N}$：矩阵乘计算的偏移值，E是专家个数，N是输出维度。
@@ -31,14 +31,14 @@
     * $x\_scale∈\mathbb{R}^{M}$：输入矩阵（左矩阵）的逐token缩放因子，M是总token数。
     * $groupList∈\mathbb{N}^{E}$：前缀和的分组索引列表。
   - **输出**：
-    
+
     * $Q∈\mathbb{Z_8}^{M \times N / 2}$：量化后的输出矩阵。
     * $Q\_scale∈\mathbb{R}^{M}$：量化缩放因子。
     * $Q\_offset∈\mathbb{R}^{M}$：量化偏移因子。
   - **计算过程**
-    
+
     - 1.根据groupList[i]确定当前分组的token ，$i \in [0,Len(groupList)]$。
-    
+
       >例子：假设groupList=[3,4,4,6]，从0开始计数。
       >
       >第0个右矩阵`W[0,:,:]`，对应索引位置[0,3)的token`x[0:3]`（共3-0=3个token），对应`x_scale[0:3]`、`w_scale[0]`、`bias[0]`、`offset[0]`、`Q[0:3]`、`Q_scale[0:3]`、`Q_offset[0:3]`；
@@ -70,7 +70,7 @@
       >$C_{i} =(X_{i}\cdot W_{i} + bias_{i\ BroadCast})\odot x\_scale_{i\ BroadCast} \odot w\_scale_{i\ BroadCast}+offset_{i\ BroadCast}$
 
     - 3.确定量化方式
-      
+
       - 当量化方式为对称量化时：
 
         $Q\_scale_{i} = \frac{max(|S_{i}|)}{127}$
@@ -150,8 +150,8 @@
 <tr>
 <td style="white-space: nowrap">output</td>
 <td style="white-space: nowrap">输出</td>
-<td style="white-space: nowrap">输出的量化因子，公式中的Q。</td>
-<td style="white-space: nowrap">FLOAT</td>
+<td style="white-space: nowrap">输出的量化结果，公式中的Q。</td>
+<td style="white-space: nowrap">INT8</td>
 <td style="white-space: nowrap">ND</td>
 </tr>
 <tr>
