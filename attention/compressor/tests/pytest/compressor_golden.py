@@ -396,7 +396,7 @@ def read_state_page_cache(
     state, b_idx, start_seq_idx, end_seq_idx, block_table, d_start, d_end, cache_mode=1
 ):
     result = np.zeros(
-        shape=(end_seq_idx - start_seq_idx, d_end - d_start), dtype=np.float32
+        shape=(end_seq_idx - start_seq_idx, d_end - d_start), dtype=state.dtype
     )
     block_size = state.shape[1]  # 应该从state，不是从block_table
     seq_cnt = end_seq_idx - start_seq_idx
@@ -423,6 +423,326 @@ def read_state_page_cache(
         ]
         finish_cnt = finish_cnt + can_read_seq_cnt
     return result
+
+
+def cpu_compressor_fp64(
+    x,
+    wkv,
+    wgate,
+    kv_state,
+    score_state,
+    update_kv_position,
+    update_score_position,
+    ape,
+    block_table=None,
+    cu_seqlens=None,
+    seqused=None,
+    start_pos=None,
+    cmp_ratio=4,
+    coff=1,
+    cache_mode=1,
+    grad_enabled=False,
+):
+    x_dtype = x.dtype
+    x = x.to(torch.float64).numpy()
+    wkv = wkv.to(torch.float64).numpy()
+    wgate = wgate.to(torch.float64).numpy()
+    kv_state = kv_state.numpy()
+    score_state = score_state.numpy()
+    ape = ape.numpy()
+    matmul_dtype = np.float64
+    for i in range(wkv.shape[1] // 128):
+        leftH = i * 128
+        rightH = (i + 1) * 128
+    new_kv_state = np.matmul(x, wkv.T, dtype=matmul_dtype)
+    new_score_state = np.matmul(x, wgate.T, dtype=matmul_dtype)
+
+    B = len(start_pos)
+    head_dim = wkv.shape[0] // coff
+    bs_combine_flag = False
+    if cu_seqlens is not None:
+        bs_combine_flag = True
+
+    if bs_combine_flag == False:
+        S = x.shape[1]
+        new_kv_state = new_kv_state.reshape(B * S, new_kv_state.shape[-1])
+        new_score_state = new_score_state.reshape(B * S, new_score_state.shape[-1])
+        cmp_kv = np.zeros(
+            shape=(B, (S + cmp_ratio - 1) // cmp_ratio, head_dim), dtype=matmul_dtype
+        )
+        if grad_enabled:
+            kv = np.zeros(
+                shape=(B, (S + cmp_ratio - 1) // cmp_ratio, coff * cmp_ratio, head_dim),
+                dtype=matmul_dtype,
+            )
+            softmax = np.zeros(
+                shape=(B, (S + cmp_ratio - 1) // cmp_ratio, coff * cmp_ratio, head_dim),
+                dtype=matmul_dtype,
+            )
+    else:
+        cmp_kv = np.zeros(
+            shape=(min(x.shape[0], x.shape[0] // cmp_ratio + B), head_dim),
+            dtype=matmul_dtype,
+        )
+        if grad_enabled:
+            kv = np.zeros(
+                shape=(
+                    min(x.shape[0], x.shape[0] // cmp_ratio + B),
+                    coff * cmp_ratio,
+                    head_dim,
+                ),
+                dtype=matmul_dtype,
+            )
+            softmax = np.zeros(
+                shape=(
+                    min(x.shape[0], x.shape[0] // cmp_ratio + B),
+                    coff * cmp_ratio,
+                    head_dim,
+                ),
+                dtype=matmul_dtype,
+            )
+
+    cmp_kv_mask = np.zeros_like(cmp_kv, dtype=bool)
+    if grad_enabled:
+        mid_result_mask = np.zeros_like(kv, dtype=bool)
+    out_cu_seqlen = [0] * (B + 1)
+    out_seqused = [0] * B
+
+    out_sum_sc_cnt = 0
+    for b_idx in range(B):
+        batch_out_sc_id = 0
+        batch_start_pos = start_pos[b_idx]
+        if seqused is not None:
+            batch_seq_used = seqused[b_idx]
+        else:
+            if bs_combine_flag == False:
+                batch_seq_used = x.shape[1]
+            else:
+                batch_seq_used = cu_seqlens[b_idx + 1] - cu_seqlens[b_idx]
+        compress_seq_id = (batch_start_pos + batch_seq_used) // cmp_ratio * cmp_ratio
+
+        batch_seq_idx = 0
+        while batch_seq_idx < batch_seq_used:
+            start_seq_idx = batch_start_pos + batch_seq_idx
+            end_seq_idx = start_seq_idx // cmp_ratio * cmp_ratio + cmp_ratio
+            if end_seq_idx > (batch_start_pos + batch_seq_used):
+                end_seq_idx = batch_start_pos + batch_seq_used
+
+            base_offset = cu_seqlens[b_idx] if bs_combine_flag else b_idx * x.shape[1]
+            start_offset = base_offset + (start_seq_idx - batch_start_pos)
+            end_offset = base_offset + (end_seq_idx - batch_start_pos)
+
+            start_seq_id_in_sc = start_seq_idx % cmp_ratio
+            end_seq_idx_in_sc = start_seq_id_in_sc + (end_seq_idx - start_seq_idx)
+            new_score_state[start_offset:end_offset, :] = np.add(
+                new_score_state[start_offset:end_offset, :],
+                ape[start_seq_id_in_sc:end_seq_idx_in_sc, :],
+            )
+
+            if cache_mode == 1:
+                save_flag = True
+            else:
+                save_flag = (
+                    True
+                    if start_seq_idx >= (compress_seq_id - (coff - 1) * cmp_ratio)
+                    else False
+                )
+            compress_flag = True if start_seq_idx < compress_seq_id else False
+
+            if save_flag:
+                tmp_kv_state = new_kv_state[start_offset:end_offset, :]
+                tmp_score_state = new_score_state[start_offset:end_offset, :]
+                write_state_page_cache(
+                    kv_state,
+                    update_kv_position,
+                    tmp_kv_state,
+                    b_idx,
+                    start_seq_idx,
+                    end_seq_idx,
+                    block_table,
+                    cache_mode=cache_mode,
+                )
+                write_state_page_cache(
+                    score_state,
+                    update_score_position,
+                    tmp_score_state,
+                    b_idx,
+                    start_seq_idx,
+                    end_seq_idx,
+                    block_table,
+                    cache_mode=cache_mode,
+                )
+
+            if compress_flag:
+                sc_kv_state = np.zeros(
+                    shape=(coff, cmp_ratio, head_dim), dtype=matmul_dtype
+                )
+                sc_score_state = np.full(
+                    shape=(coff, cmp_ratio, head_dim),
+                    fill_value=-float("inf"),
+                    dtype=matmul_dtype,
+                )
+
+                coff_id = coff - 1
+                d_start = coff_id * head_dim
+                d_end = (coff_id + 1) * head_dim
+                cnt_from_state = 0
+                if batch_start_pos == start_seq_idx:
+                    cnt_from_state = batch_start_pos % cmp_ratio
+                    if cnt_from_state > 0:
+                        copy_start_seq_id = batch_start_pos - cnt_from_state
+                        copy_end_seq_id = batch_start_pos
+                        sc_kv_state[coff_id, 0:cnt_from_state, :] = (
+                            read_state_page_cache(
+                                kv_state,
+                                b_idx,
+                                copy_start_seq_id,
+                                copy_end_seq_id,
+                                block_table,
+                                d_start,
+                                d_end,
+                                cache_mode=cache_mode,
+                            )
+                        )
+                        sc_score_state[coff_id, 0:cnt_from_state, :] = (
+                            read_state_page_cache(
+                                score_state,
+                                b_idx,
+                                copy_start_seq_id,
+                                copy_end_seq_id,
+                                block_table,
+                                d_start,
+                                d_end,
+                                cache_mode=cache_mode,
+                            )
+                        )
+                sc_kv_state[coff_id, cnt_from_state:cmp_ratio, :] = new_kv_state[
+                    start_offset:end_offset, d_start:d_end
+                ]
+                sc_score_state[coff_id, cnt_from_state:cmp_ratio, :] = new_score_state[
+                    start_offset:end_offset, d_start:d_end
+                ]
+
+                if coff == 2:
+                    coff_id = 0
+                    d_start = coff_id * head_dim
+                    d_end = (coff_id + 1) * head_dim
+                    cnt_from_state = 0
+                    if batch_start_pos == start_seq_idx:
+                        cnt_from_state = cmp_ratio
+                        if batch_start_pos >= cmp_ratio:
+                            copy_start_seq_id = (
+                                batch_start_pos
+                                - batch_start_pos % cmp_ratio
+                                - cmp_ratio
+                            )
+                            copy_end_seq_id = copy_start_seq_id + cnt_from_state
+                            sc_kv_state[coff_id, 0:cnt_from_state, :] = (
+                                read_state_page_cache(
+                                    kv_state,
+                                    b_idx,
+                                    copy_start_seq_id,
+                                    copy_end_seq_id,
+                                    block_table,
+                                    d_start,
+                                    d_end,
+                                    cache_mode=cache_mode,
+                                )
+                            )
+                            sc_score_state[coff_id, 0:cnt_from_state, :] = (
+                                read_state_page_cache(
+                                    score_state,
+                                    b_idx,
+                                    copy_start_seq_id,
+                                    copy_end_seq_id,
+                                    block_table,
+                                    d_start,
+                                    d_end,
+                                    cache_mode=cache_mode,
+                                )
+                            )
+                    elif start_seq_idx - cmp_ratio < batch_start_pos:
+                        cnt_from_state = batch_start_pos % cmp_ratio
+                        if cnt_from_state > 0:
+                            copy_start_seq_id = (
+                                batch_start_pos - batch_start_pos % cmp_ratio
+                            )
+                            copy_end_seq_id = batch_start_pos
+                            sc_kv_state[coff_id, 0:cnt_from_state, :] = (
+                                read_state_page_cache(
+                                    kv_state,
+                                    b_idx,
+                                    copy_start_seq_id,
+                                    copy_end_seq_id,
+                                    block_table,
+                                    d_start,
+                                    d_end,
+                                    cache_mode=cache_mode,
+                                )
+                            )
+                            sc_score_state[coff_id, 0:cnt_from_state, :] = (
+                                read_state_page_cache(
+                                    score_state,
+                                    b_idx,
+                                    copy_start_seq_id,
+                                    copy_end_seq_id,
+                                    block_table,
+                                    d_start,
+                                    d_end,
+                                    cache_mode=cache_mode,
+                                )
+                            )
+                    if cnt_from_state < cmp_ratio:
+                        pre_start_offset = start_offset - (cmp_ratio - cnt_from_state)
+                        pre_end_offset = start_offset
+                        sc_kv_state[coff_id, cnt_from_state:cmp_ratio, :] = (
+                            new_kv_state[pre_start_offset:pre_end_offset, d_start:d_end]
+                        )
+                        sc_score_state[coff_id, cnt_from_state:cmp_ratio, :] = (
+                            new_score_state[
+                                pre_start_offset:pre_end_offset, d_start:d_end
+                            ]
+                        )
+
+                sc_kv_state = sc_kv_state.reshape(coff * cmp_ratio, head_dim)
+                sc_score_state = sc_score_state.reshape(coff * cmp_ratio, head_dim)
+
+                z_max = np.max(sc_score_state, axis=0, keepdims=True)
+                z_stable = sc_score_state - z_max
+                exp_z = np.exp(z_stable)
+                sc_score_state = exp_z / np.sum(exp_z, axis=0, keepdims=True)
+
+                if grad_enabled:
+                    if bs_combine_flag == False:
+                        kv[b_idx, batch_out_sc_id, :, :] = sc_kv_state
+                        softmax[b_idx, batch_out_sc_id, :, :] = sc_score_state
+                        mid_result_mask[b_idx, batch_out_sc_id, :, :] = 1
+                    else:
+                        kv[out_sum_sc_cnt, :, :] = sc_kv_state
+                        softmax[out_sum_sc_cnt, :, :] = sc_score_state
+                        mid_result_mask[out_sum_sc_cnt, :, :] = 1
+                sc_data = sc_kv_state * sc_score_state
+                sc_cmp_kv = np.sum(sc_data, axis=0, keepdims=True)
+                if bs_combine_flag == False:
+                    cmp_kv[b_idx, batch_out_sc_id, :] = sc_cmp_kv
+                    cmp_kv_mask[b_idx, batch_out_sc_id, :] = 1
+                else:
+                    cmp_kv[out_sum_sc_cnt, :] = sc_cmp_kv
+                    cmp_kv_mask[out_sum_sc_cnt, :] = 1
+                batch_out_sc_id = batch_out_sc_id + 1
+                out_sum_sc_cnt = out_sum_sc_cnt + 1
+
+            batch_seq_idx = end_seq_idx - batch_start_pos
+        out_cu_seqlen[b_idx + 1] = out_sum_sc_cnt
+        out_seqused[b_idx] = batch_out_sc_id
+
+    cmp_kv_torch = torch.tensor(cmp_kv).to(x_dtype)
+    if grad_enabled:
+        softmax = torch.tensor(softmax)
+        kv = torch.tensor(kv)
+        return cmp_kv_torch, cmp_kv_mask, softmax, kv, mid_result_mask
+    else:
+        return cmp_kv_torch, cmp_kv_mask, None, None, None
 
 
 def cpu_compressor(
