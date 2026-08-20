@@ -236,7 +236,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>seqUsedQOptional</td>
                 <td>可选输入</td>
                 <td>表示每个batch实际使用的q长度。</td>
-                <td>长度为B。每个值必须大于等于0，且不能超过对应batch的q分配长度。</td>
+                <td>长度为B。每个值必须大于等于0，且不能超过对应batch的q分配长度；允许多个batch取0，但不支持所有batch均为0。</td>
                 <td>INT32</td>
                 <td>ND</td>
                 <td>(B,)</td>
