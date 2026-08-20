@@ -100,6 +100,29 @@ TEST(SparseFlashMlaChecker, RejectsOriSparseIndicesWithoutTopkLength)
     EXPECT_EQ(compressionChecker.CheckParaExistence(context), ge::GRAPH_FAILED);
 }
 
+TEST(SparseFlashMlaChecker, RejectsCmpSparseIndicesWithoutTopkLength)
+{
+    CheckContext context = MakeSparseContext();
+    context.cmpKv.present = true;
+    context.cmpSparseIndices.present = true;
+
+    SparseCompressionChecker compressionChecker;
+    EXPECT_EQ(compressionChecker.CheckParaExistence(context), ge::GRAPH_FAILED);
+}
+
+TEST(SparseFlashMlaChecker, AcceptsTopkLengthAsSequsedReplacementInPaModeWithoutSparseIndices)
+{
+    CheckContext context = MakeSparseContext();
+    context.kvLayout = Layout::PA_BBND;
+    context.oriTopkLength.present = true;
+    context.oriBlockTable.present = true;
+
+    SeqLenChecker seqLenChecker;
+    PagedAttentionChecker pagedAttentionChecker;
+    EXPECT_EQ(seqLenChecker.CheckParaExistence(context), ge::GRAPH_SUCCESS);
+    EXPECT_EQ(pagedAttentionChecker.CheckParaExistence(context), ge::GRAPH_SUCCESS);
+}
+
 TEST(SparseFlashMlaChecker, AcceptsOriCmpSparseTopkLengthPairs)
 {
     CheckContext context = MakeSparseContext();
@@ -162,7 +185,7 @@ TEST(SparseFlashMlaChecker, AcceptsOriTopkLengthWithoutSequsedOriKvInOriSparsePa
     EXPECT_EQ(pagedAttentionChecker.CheckParaExistence(context), ge::GRAPH_SUCCESS);
 }
 
-TEST(SparseFlashMlaChecker, RejectsCmpTopkLengthAsSequsedReplacementOutsideOriCmpSparseMode)
+TEST(SparseFlashMlaChecker, AcceptsCmpTopkLengthAsSequsedReplacementInPaMode)
 {
     CheckContext context = MakeSparseContext();
     context.kvLayout = Layout::PA_BBND;
@@ -175,11 +198,11 @@ TEST(SparseFlashMlaChecker, RejectsCmpTopkLengthAsSequsedReplacementOutsideOriCm
 
     SeqLenChecker seqLenChecker;
     PagedAttentionChecker pagedAttentionChecker;
-    EXPECT_EQ(seqLenChecker.CheckParaExistence(context), ge::GRAPH_FAILED);
-    EXPECT_EQ(pagedAttentionChecker.CheckParaExistence(context), ge::GRAPH_FAILED);
+    EXPECT_EQ(seqLenChecker.CheckParaExistence(context), ge::GRAPH_SUCCESS);
+    EXPECT_EQ(pagedAttentionChecker.CheckParaExistence(context), ge::GRAPH_SUCCESS);
 }
 
-TEST(SparseFlashMlaChecker, RejectsTopkLengthsAsSequsedReplacementWhenMaskModeIsNotZero)
+TEST(SparseFlashMlaChecker, AcceptsTopkLengthsAsSequsedReplacementRegardlessOfMaskMode)
 {
     CheckContext context = MakeSparseContext();
     context.kvLayout = Layout::PA_BBND;
@@ -194,6 +217,6 @@ TEST(SparseFlashMlaChecker, RejectsTopkLengthsAsSequsedReplacementWhenMaskModeIs
 
     SeqLenChecker seqLenChecker;
     PagedAttentionChecker pagedAttentionChecker;
-    EXPECT_EQ(seqLenChecker.CheckParaExistence(context), ge::GRAPH_FAILED);
-    EXPECT_EQ(pagedAttentionChecker.CheckParaExistence(context), ge::GRAPH_FAILED);
+    EXPECT_EQ(seqLenChecker.CheckParaExistence(context), ge::GRAPH_SUCCESS);
+    EXPECT_EQ(pagedAttentionChecker.CheckParaExistence(context), ge::GRAPH_SUCCESS);
 }

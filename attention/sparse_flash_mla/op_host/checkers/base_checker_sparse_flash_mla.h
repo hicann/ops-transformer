@@ -39,9 +39,6 @@ protected:
     ge::graphStatus CheckSameShape(const CheckContext &context, const TensorParam &left, const char *leftName,
                                    const TensorParam &right, const char *rightName) const;
     int64_t GetDim(const TensorParam &param, size_t index) const;
-    bool HasCmpKv(const CheckContext &context) const;
-    bool IsOriSparse(const CheckContext &context) const;
-    bool IsOriCmpSparse(const CheckContext &context) const;
     bool CanOmitSequsedOriKv(const CheckContext &context) const;
     bool CanOmitSequsedCmpKv(const CheckContext &context) const;
 };

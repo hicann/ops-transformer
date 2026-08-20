@@ -16,10 +16,7 @@
 namespace optiling {
 namespace sparse_mla_checker {
 namespace {
-const char *GetOpName(const CheckContext &context)
-{
-    return context.opName == nullptr ? "SparseMla" : context.opName;
-}
+const char *GetOpName(const CheckContext &context) { return context.opName == nullptr ? "SparseMla" : context.opName; }
 
 std::string ShapeToString(const gert::Shape *shape)
 {
@@ -87,17 +84,16 @@ ge::graphStatus BaseChecker::CheckTensorDesc(const CheckContext &context, const 
     OP_CHECK_IF(param.desc == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GetOpName(context), name, "Tensor desc cannot be null"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(param.desc->GetOriginFormat() != ge::FORMAT_ND,
-                OP_LOGE_FOR_INVALID_FORMAT(GetOpName(context), name,
-                                           std::to_string(static_cast<int32_t>(param.desc->GetOriginFormat())).c_str(),
-                                           "ND"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        param.desc->GetOriginFormat() != ge::FORMAT_ND,
+        OP_LOGE_FOR_INVALID_FORMAT(GetOpName(context), name,
+                                   std::to_string(static_cast<int32_t>(param.desc->GetOriginFormat())).c_str(), "ND"),
+        return ge::GRAPH_FAILED);
     const ge::DataType actual = param.desc->GetDataType();
     const std::string expectedDtypes = ValuesToString(dtypes);
     OP_CHECK_IF(std::find(dtypes.begin(), dtypes.end(), actual) == dtypes.end(),
                 OP_LOGE_FOR_INVALID_DTYPE(GetOpName(context), name,
-                                          std::to_string(static_cast<int32_t>(actual)).c_str(),
-                                          expectedDtypes.c_str()),
+                                          std::to_string(static_cast<int32_t>(actual)).c_str(), expectedDtypes.c_str()),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -113,10 +109,10 @@ ge::graphStatus BaseChecker::CheckDimNum(const CheckContext &context, const Tens
                 return ge::GRAPH_FAILED);
     const size_t actual = param.shape->GetDimNum();
     const std::string expectedDimNums = ValuesToString(dimNums);
-    OP_CHECK_IF(std::find(dimNums.begin(), dimNums.end(), actual) == dimNums.end(),
-                OP_LOGE_FOR_INVALID_SHAPEDIM(GetOpName(context), name, std::to_string(actual).c_str(),
-                                             expectedDimNums.c_str()),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        std::find(dimNums.begin(), dimNums.end(), actual) == dimNums.end(),
+        OP_LOGE_FOR_INVALID_SHAPEDIM(GetOpName(context), name, std::to_string(actual).c_str(), expectedDimNums.c_str()),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -131,8 +127,7 @@ ge::graphStatus BaseChecker::CheckNoEmptyDim(const CheckContext &context, const 
                 return ge::GRAPH_FAILED);
     for (size_t i = 0; i < param.shape->GetDimNum(); ++i) {
         OP_CHECK_IF(param.shape->GetDim(i) <= 0,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(GetOpName(context), name,
-                                                          ShapeToString(param.shape).c_str(),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(GetOpName(context), name, ShapeToString(param.shape).c_str(),
                                                           "Each dimension must be greater than 0"),
                     return ge::GRAPH_FAILED);
     }
@@ -146,33 +141,29 @@ ge::graphStatus BaseChecker::CheckShape(const CheckContext &context, const Tenso
         return ge::GRAPH_SUCCESS;
     }
     OP_CHECK_IF(param.shape == nullptr || param.shape->GetDimNum() != expected.size(),
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(GetOpName(context), name,
-                                                      ShapeToString(param.shape).c_str(),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(GetOpName(context), name, ShapeToString(param.shape).c_str(),
                                                       "Shape dim number does not match the documented shape"),
                 return ge::GRAPH_FAILED);
     size_t index = 0;
     for (const int64_t value : expected) {
         OP_CHECK_IF(param.shape->GetDim(index) != value,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(GetOpName(context), name,
-                                                          ShapeToString(param.shape).c_str(),
-                                                          ("Dimension " + std::to_string(index) + " must be " +
-                                                           std::to_string(value))
-                                                              .c_str()),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        GetOpName(context), name, ShapeToString(param.shape).c_str(),
+                        ("Dimension " + std::to_string(index) + " must be " + std::to_string(value)).c_str()),
                     return ge::GRAPH_FAILED);
         ++index;
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BaseChecker::CheckSameShape(const CheckContext &context, const TensorParam &left,
-                                            const char *leftName, const TensorParam &right,
-                                            const char *rightName) const
+ge::graphStatus BaseChecker::CheckSameShape(const CheckContext &context, const TensorParam &left, const char *leftName,
+                                            const TensorParam &right, const char *rightName) const
 {
-    OP_CHECK_IF(left.shape == nullptr || right.shape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GetOpName(context),
-                                                         (std::string(leftName) + " and " + rightName).c_str(),
-                                                         "Tensor shape cannot be null"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        left.shape == nullptr || right.shape == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            GetOpName(context), (std::string(leftName) + " and " + rightName).c_str(), "Tensor shape cannot be null"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(left.shape->GetDimNum() != right.shape->GetDimNum(),
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                     GetOpName(context), (std::string(leftName) + " and " + rightName).c_str(),
@@ -198,34 +189,9 @@ int64_t BaseChecker::GetDim(const TensorParam &param, size_t index) const
     return param.shape->GetDim(index);
 }
 
-bool BaseChecker::HasCmpKv(const CheckContext &context) const
-{
-    return context.cmpKv.present;
-}
+bool BaseChecker::CanOmitSequsedOriKv(const CheckContext &context) const { return context.oriTopkLength.present; }
 
-bool BaseChecker::IsOriSparse(const CheckContext &context) const
-{
-    return context.oriSparseIndices.present && !HasCmpKv(context) && !context.cmpSparseIndices.present;
-}
-
-bool BaseChecker::IsOriCmpSparse(const CheckContext &context) const
-{
-    return context.oriSparseIndices.present && HasCmpKv(context) && context.cmpSparseIndices.present;
-}
-
-bool BaseChecker::CanOmitSequsedOriKv(const CheckContext &context) const
-{
-    const bool oriSparseWithoutMask = IsOriSparse(context) && context.oriMaskMode == 0;
-    const bool oriCmpSparseWithoutMask =
-        IsOriCmpSparse(context) && context.oriMaskMode == 0 && context.cmpMaskMode == 0;
-    return (oriSparseWithoutMask || oriCmpSparseWithoutMask) && context.oriTopkLength.present;
-}
-
-bool BaseChecker::CanOmitSequsedCmpKv(const CheckContext &context) const
-{
-    return IsOriCmpSparse(context) && context.oriMaskMode == 0 && context.cmpMaskMode == 0 &&
-           context.cmpTopkLength.present;
-}
+bool BaseChecker::CanOmitSequsedCmpKv(const CheckContext &context) const { return context.cmpTopkLength.present; }
 
 } // namespace sparse_mla_checker
 } // namespace optiling
