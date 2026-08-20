@@ -67,10 +67,10 @@ enum class SASAxis : uint32_t {
     S = 1,
     N = 2,
     D = 3,
-    K = 3,  // sparse_indices的K和key的D枚举值相同，表达相同位置, 最后一维
+    K = 3, // sparse_indices的K和key的D枚举值相同，表达相同位置, 最后一维
     T = 5,
     Bn = 6, // block number
-    Bs = 7 // block size
+    Bs = 7  // block size
 };
 
 enum class SASTemplateMode : uint32_t {
@@ -220,7 +220,7 @@ struct KvQuantSASParaInfo {
     SASTilingOptionalParaInfo cmpBlockTable = {nullptr, nullptr};
     SASTilingOptionalParaInfo cuSeqLensQ = {nullptr, nullptr};
     SASTilingOptionalParaInfo cuSeqLensOriKv = {nullptr, nullptr};
- 	SASTilingOptionalParaInfo cuSeqLensCmpKv = {nullptr, nullptr};
+    SASTilingOptionalParaInfo cuSeqLensCmpKv = {nullptr, nullptr};
     SASTilingOptionalParaInfo seqUsedQ = {nullptr, nullptr};
     SASTilingOptionalParaInfo sequsedKv = {nullptr, nullptr};
     SASTilingOptionalParaInfo sinks = {nullptr, nullptr};
@@ -287,7 +287,7 @@ public:
     int32_t sparseMode = 0;
     // Others Flag
     uint32_t sparseCount = 0;
-    
+
     // PageAttention
     uint32_t blockTypeSize = 0;
     uint32_t oriMaxBlockNumPerBatch = 0;
@@ -308,17 +308,21 @@ public:
     SASLayout outLayout = SASLayout::BSND;
 };
 
+SASTemplateMode SelectSASTemplateMode(const KvQuantSASTilingInfo &sasInfo);
+
 class KvQuantSASInfoParser {
 public:
-    explicit KvQuantSASInfoParser(gert::TilingContext *context) : context_(context) {}
+    explicit KvQuantSASInfoParser(gert::TilingContext *context)
+        : context_(context)
+    {}
     ~KvQuantSASInfoParser() = default;
 
     ge::graphStatus CheckRequiredInOutExistence() const;
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckRequiredParaExistence() const;
 
-    ge::graphStatus GetActualSeqLenSize(uint32_t &size, const gert::Tensor *tensor,
-        SASLayout &layout, const std::string &name) const;
+    ge::graphStatus GetActualSeqLenSize(uint32_t &size, const gert::Tensor *tensor, SASLayout &layout,
+                                        const std::string &name) const;
     ge::graphStatus GetActualSeqLenQSize(uint32_t &size);
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
@@ -360,7 +364,7 @@ public:
 
     bool HasAxis(const SASAxis &axis, const SASLayout &layout, const gert::Shape &shape) const;
     size_t GetAxisIdx(const SASAxis &axis, const SASLayout &layout) const;
-    uint32_t GetAxisNum(const gert::Shape &shape, const SASAxis &axis,const SASLayout &layout) const;
+    uint32_t GetAxisNum(const gert::Shape &shape, const SASAxis &axis, const SASLayout &layout) const;
     static constexpr int64_t invalidDimValue_ = std::numeric_limits<int64_t>::min();
 
     // BaseParams
@@ -411,7 +415,8 @@ public:
 
 class KvQuantSASTilingCheck {
 public:
-    explicit KvQuantSASTilingCheck(const KvQuantSASTilingInfo &sasInfo) : sasInfo_(sasInfo) {};
+    explicit KvQuantSASTilingCheck(const KvQuantSASTilingInfo &sasInfo)
+        : sasInfo_(sasInfo) {};
     ~KvQuantSASTilingCheck() = default;
     virtual ge::graphStatus Process();
 
@@ -419,29 +424,30 @@ private:
     void Init();
     bool HasAxis(const SASAxis &axis, const SASLayout &layout, const gert::Shape &shape) const;
     size_t GetAxisIdx(const SASAxis &axis, const SASLayout &layout) const;
-    uint32_t GetAxisNum(const gert::Shape &shape, const SASAxis &axis,const SASLayout &layout) const;
+    uint32_t GetAxisNum(const gert::Shape &shape, const SASAxis &axis, const SASLayout &layout) const;
     static constexpr int64_t invalidDimValue_ = std::numeric_limits<int64_t>::min();
 
-    void LogErrorDtypeSupport(const std::vector<ge::DataType> &expectDtypeList,
-        const ge::DataType &actualDtype, const std::string &name) const;
-    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc,
-        const std::string &name) const;
-    template <typename T> void LogErrorNumberSupport(const std::vector<T> &expectNumberList,
-        const T &actualValue, const std::string &name, const std::string subName) const;
-    template <typename T> void LogErrorDimNumSupport(const std::vector<T> &expectNumberList,
-        const T &actualValue, const std::string &name) const;
-    ge::graphStatus CheckDimNumSupport(const gert::StorageShape *shape,
-        const std::vector<size_t> &expectDimNumList, const std::string &name) const;
+    void LogErrorDtypeSupport(const std::vector<ge::DataType> &expectDtypeList, const ge::DataType &actualDtype,
+                              const std::string &name) const;
+    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
+    template <typename T>
+    void LogErrorNumberSupport(const std::vector<T> &expectNumberList, const T &actualValue, const std::string &name,
+                               const std::string subName) const;
+    template <typename T>
+    void LogErrorDimNumSupport(const std::vector<T> &expectNumberList, const T &actualValue,
+                               const std::string &name) const;
+    ge::graphStatus CheckDimNumSupport(const gert::StorageShape *shape, const std::vector<size_t> &expectDimNumList,
+                                       const std::string &name) const;
     ge::graphStatus CheckShapeNumSupport(const gert::StorageShape *shape,
-        const std::vector<int64_t> &expectShapeNumList, const std::string &name) const;
-    ge::graphStatus CheckDimNumInLayoutSupport(const SASLayout &layout,
-        const gert::StorageShape *shape, const std::string &name) const;
-    void LogErrorLayoutSupport(const std::vector<SASLayout> &expectLayoutList,
-        const SASLayout &actualLayout, const std::string &name) const;
-    ge::graphStatus GetExpectedShape(gert::Shape &shapeExpected,
-    const KvQuantSASTilingShapeCompareParam &param, const SASLayout &layout) const;
-    ge::graphStatus CompareShape(KvQuantSASTilingShapeCompareParam &param,
-        const gert::Shape &shape, const SASLayout &layout, const std::string &name) const;
+                                         const std::vector<int64_t> &expectShapeNumList, const std::string &name) const;
+    ge::graphStatus CheckDimNumInLayoutSupport(const SASLayout &layout, const gert::StorageShape *shape,
+                                               const std::string &name) const;
+    void LogErrorLayoutSupport(const std::vector<SASLayout> &expectLayoutList, const SASLayout &actualLayout,
+                               const std::string &name) const;
+    ge::graphStatus GetExpectedShape(gert::Shape &shapeExpected, const KvQuantSASTilingShapeCompareParam &param,
+                                     const SASLayout &layout) const;
+    ge::graphStatus CompareShape(KvQuantSASTilingShapeCompareParam &param, const gert::Shape &shape,
+                                 const SASLayout &layout, const std::string &name) const;
     ge::graphStatus CheckLayoutSupport(const SASLayout &actualLayout, const std::string &name) const;
     ge::graphStatus CheckSingleParaQuery() const;
     ge::graphStatus CheckSingleParaKey() const;
@@ -461,8 +467,8 @@ private:
     ge::graphStatus CheckCmpSparseIndicesExistence();
     ge::graphStatus CheckParaExistence();
     ge::graphStatus CheckCmpRatioExistence();
-    ge::graphStatus GetActualSeqLenSize(uint32_t &size, const gert::Tensor *tensor,
-        const SASLayout &layout, const std::string &name) const;
+    ge::graphStatus GetActualSeqLenSize(uint32_t &size, const gert::Tensor *tensor, const SASLayout &layout,
+                                        const std::string &name) const;
     ge::graphStatus CheckSWAExistence();
     ge::graphStatus CheckCFAExistence();
     ge::graphStatus CheckSCFAExistence();
@@ -476,8 +482,8 @@ private:
     ge::graphStatus CheckTopK();
     ge::graphStatus CheckTopkShape();
     ge::graphStatus CheckBlockTable() const;
-    ge::graphStatus CheckDTypeConsistency(const ge::DataType &actualDtype,
-    const ge::DataType &expectDtype, const std::string &name) const;
+    ge::graphStatus CheckDTypeConsistency(const ge::DataType &actualDtype, const ge::DataType &expectDtype,
+                                          const std::string &name) const;
 
     ge::graphStatus CheckAttenOut();
     ge::graphStatus CheckAttenOutShape();
@@ -515,7 +521,7 @@ private:
     uint32_t qkHeadDim_ = 0;
     uint32_t vHeadDim_ = 0;
     int64_t ropeHeadDim_ = 0;
-    uint32_t qTSize_ = 0; // 仅TND时生效
+    uint32_t qTSize_ = 0;  // 仅TND时生效
     uint32_t kvTSize_ = 0; // 仅TND时生效
     KvStorageMode kvStorageMode_ = KvStorageMode::BATCH_CONTINUOUS;
     uint32_t sparseBlockCount_ = 0;
@@ -541,7 +547,7 @@ private:
     uint32_t dSize_ = sasInfo_.dSize;
     uint32_t dSizeV_ = sasInfo_.dSizeV;
     uint32_t dSizeVInput_ = sasInfo_.dSizeVInput;
-    
+
     uint32_t dSizeOriKvInput_ = 0;
     uint32_t dSizeCmpKvInput_ = 0;
 

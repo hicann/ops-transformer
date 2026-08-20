@@ -36,11 +36,40 @@ std::string SASDataTypeToSerialString(ge::DataType type)
 std::string KvQuantSASLayoutToSerialString(SASLayout layout)
 {
     switch (layout) {
-        case SASLayout::BSND: return "BSND";
-        case SASLayout::TND: return "TND";
-        case SASLayout::PA_ND: return "PA_ND";
-        default: return "UNKNOWN";
+        case SASLayout::BSND:
+            return "BSND";
+        case SASLayout::TND:
+            return "TND";
+        case SASLayout::PA_ND:
+            return "PA_ND";
+        default:
+            return "UNKNOWN";
     }
+}
+
+SASTemplateMode SelectSASTemplateMode(const KvQuantSASTilingInfo &sasInfo)
+{
+    if (sasInfo.opParamInfo.cmpKv.tensor == nullptr) {
+        return SASTemplateMode::SWA_TEMPLATE_MODE;
+    }
+    if (sasInfo.opParamInfo.cmpSparseIndices.tensor == nullptr) {
+        return SASTemplateMode::CFA_TEMPLATE_MODE;
+    }
+
+    // QLI returns the complete compressed-token set when the candidate count
+    // does not exceed TopK. In that case only the traversal order differs, so
+    // CFA can skip sparse-index copies and address gathering. Compute the
+    // coverage from runtime attributes because both TopK and cmpRatio are
+    // model parameters. The kernel uses floor(s2 / cmpRatio) for cmp tokens.
+    if (sasInfo.s2Size >= 0 && sasInfo.sparseBlockCount > 0 && sasInfo.cmpRatio > 0) {
+        const uint64_t s2Size = static_cast<uint64_t>(sasInfo.s2Size);
+        const uint64_t cmpRatio = static_cast<uint64_t>(sasInfo.cmpRatio);
+        const uint64_t maxCmpTokenCount = s2Size / cmpRatio;
+        if (maxCmpTokenCount <= static_cast<uint64_t>(sasInfo.sparseBlockCount)) {
+            return SASTemplateMode::CFA_TEMPLATE_MODE;
+        }
+    }
+    return SASTemplateMode::SCFA_TEMPLATE_MODE;
 }
 
 std::string GetShapeStr(gert::Shape shape)
@@ -59,17 +88,17 @@ std::string GetShapeStr(gert::Shape shape)
 
 bool KvQuantSASTilingCheck::HasAxis(const SASAxis &axis, const SASLayout &layout, const gert::Shape &shape) const
 {
-    const auto& layoutIt = SAS_LAYOUT_AXIS_MAP.find(layout);
+    const auto &layoutIt = SAS_LAYOUT_AXIS_MAP.find(layout);
     if (layoutIt == SAS_LAYOUT_AXIS_MAP.end()) {
         return false;
     }
 
-    const std::vector<SASAxis>& axes = layoutIt->second;
-    const auto& axisIt = std::find(axes.begin(), axes.end(), axis);
+    const std::vector<SASAxis> &axes = layoutIt->second;
+    const auto &axisIt = std::find(axes.begin(), axes.end(), axis);
     if (axisIt == axes.end()) {
         return false;
     }
-    const auto& dimIt = SAS_LAYOUT_DIM_MAP.find(layout);
+    const auto &dimIt = SAS_LAYOUT_DIM_MAP.find(layout);
     if (dimIt == SAS_LAYOUT_DIM_MAP.end() || dimIt->second != shape.GetDimNum()) {
         return false;
     }
@@ -78,12 +107,12 @@ bool KvQuantSASTilingCheck::HasAxis(const SASAxis &axis, const SASLayout &layout
 
 size_t KvQuantSASTilingCheck::GetAxisIdx(const SASAxis &axis, const SASLayout &layout) const
 {
-    const std::vector<SASAxis>& axes = SAS_LAYOUT_AXIS_MAP.find(layout)->second;
-    const auto& axisIt = std::find(axes.begin(), axes.end(), axis);
+    const std::vector<SASAxis> &axes = SAS_LAYOUT_AXIS_MAP.find(layout)->second;
+    const auto &axisIt = std::find(axes.begin(), axes.end(), axis);
     return std::distance(axes.begin(), axisIt);
 }
 
-uint32_t KvQuantSASTilingCheck::GetAxisNum(const gert::Shape &shape, const SASAxis &axis,const SASLayout &layout) const
+uint32_t KvQuantSASTilingCheck::GetAxisNum(const gert::Shape &shape, const SASAxis &axis, const SASLayout &layout) const
 {
     return HasAxis(axis, layout, shape) ? shape.GetDim(GetAxisIdx(axis, layout)) : invalidDimValue_;
 }
@@ -145,24 +174,17 @@ void KvQuantSASTilingCheck::Init()
     kvLayout_ = sasInfo_.kvLayout;
     outLayout_ = sasInfo_.outLayout;
 
-    if (opParamInfo_.cmpKv.tensor == nullptr) {
-        perfMode_ = SASTemplateMode::SWA_TEMPLATE_MODE;
-    } else if (opParamInfo_.cmpSparseIndices.tensor != nullptr) {
-        perfMode_ = SASTemplateMode::SCFA_TEMPLATE_MODE;
-    } else {
-        perfMode_ = SASTemplateMode::CFA_TEMPLATE_MODE;
-    }
+    perfMode_ = SelectSASTemplateMode(sasInfo_);
 }
 
 ge::graphStatus KvQuantSASTilingCheck::Process()
 {
     Init();
-    if (CheckSinglePara() != ge::GRAPH_SUCCESS ||
-        CheckParaExistence() != ge::GRAPH_SUCCESS ||
+    if (CheckSinglePara() != ge::GRAPH_SUCCESS || CheckParaExistence() != ge::GRAPH_SUCCESS ||
         CheckFeature() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
 
-}
+} // namespace optiling
