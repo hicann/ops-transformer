@@ -288,7 +288,7 @@ constexpr uint32_t L0C_PP_SIZE = 64 * 1024;
 
 template <typename X_T, typename W_T, typename C_T, typename D_S, CACHE_MODE C_M, bool ENABLE_DEQUANT_OPT,
           bool ENABLE_GROUP_COMPUTE_OPT, EMPTY_TENSOR_MODE EMPTY_MODE, ACTUAL_SEQ_MODE SEQ_MODE,
-          bool IS_PERTILE = false, uint32_t CV_RATIO = 2, typename... Args>
+          bool IS_PERTILE = false, uint32_t CV_RATIO = 2, bool ENABLE_ROPE = true, typename... Args>
 struct MLAPType {
     // 如果是 FP8 或 HIF8，输出 float；如果是 int8，输出 int32_t；否则输出 bfloat16_t
     template <typename T>
@@ -327,6 +327,7 @@ struct MLAPType {
     static constexpr ACTUAL_SEQ_MODE actualSeqMode = SEQ_MODE;
     static constexpr bool isPertile = IS_PERTILE;
     static constexpr uint32_t cvRatio = CV_RATIO; // 默认C:V 1:2
+    static constexpr bool enableRope = ENABLE_ROPE;
 };
 
 struct MMParams {

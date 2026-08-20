@@ -220,7 +220,7 @@ constexpr uint32_t L0C_PP_SIZE = 64 * 1024;
 
 template <typename X_T, typename W_T, typename C_T, typename D_S, CACHE_MODE C_M, bool ENABLE_DEQUANT_OPT,
           bool ENABLE_GROUP_COMPUTE_OPT, EMPTY_TENSOR_MODE EMPTY_MODE, ACTUAL_SEQ_MODE SEQ_MODE,
-          bool IS_PERTILE = false, uint32_t CV_RATIO = 2, typename... Args>
+          bool IS_PERTILE = false, uint32_t CV_RATIO = 2, bool ENABLE_ROPE = true, typename... Args>
 struct MLAPType {
     using mmQcQrInputType = W_T;
     using mmInputType = X_T;          // tokenX的类型与weight的类型一致
@@ -255,6 +255,7 @@ struct MLAPType {
     static constexpr EMPTY_TENSOR_MODE emptyMode = EMPTY_MODE;
     static constexpr ACTUAL_SEQ_MODE actualSeqMode = SEQ_MODE;
     static constexpr bool isPertile = IS_PERTILE;
+    static constexpr bool enableRope = ENABLE_ROPE;
 };
 
 struct CastQcQrSplitNParams {

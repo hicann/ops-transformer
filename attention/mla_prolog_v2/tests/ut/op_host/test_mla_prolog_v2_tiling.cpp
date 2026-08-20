@@ -83,7 +83,7 @@ TEST_F(MlaPrologV2, MlaProlog_tiling_test0)
             {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
         },
         &compileInfo, "Ascend910_B3", MlaPrologV2_tiling_A2SocInfo, 4096);
-    int64_t expectTilingKey = 1836321;
+    int64_t expectTilingKey = 3933473;
     string expectTilingData = "";
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData);
 }
@@ -129,7 +129,7 @@ TEST_F(MlaPrologV2, MlaProlog_tiling_test1)
             {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
         },
         &compileInfo, "Ascend910_B3", MlaPrologV2_tiling_A2SocInfo, 4096);
-    int64_t expectTilingKey = 1836257;
+    int64_t expectTilingKey = 3933409;
     string expectTilingData = "";
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData);
 }
@@ -175,7 +175,7 @@ TEST_F(MlaPrologV2, MlaProlog_tiling_test2)
             {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
         },
         &compileInfo, "Ascend910_B3", MlaPrologV2_tiling_A2SocInfo, 4096);
-    int64_t expectTilingKey = 1836193;
+    int64_t expectTilingKey = 3933345;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
@@ -220,6 +220,6 @@ TEST_F(MlaPrologV2, MlaProlog_tiling_test3)
             {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
         },
         &compileInfo, "Ascend910_B3", MlaPrologV2_tiling_A2SocInfo, 4096);
-    int64_t expectTilingKey = 1836129;
+    int64_t expectTilingKey = 3933281;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }

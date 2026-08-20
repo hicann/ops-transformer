@@ -10,9 +10,10 @@
 #include <cstring>
 #include <string>
 #include <map>
+#include <memory>
 #include <set>
 #include "graph/types.h"
-#include "aclnn_mla_prolog_v3_weight_nz.h"
+#include "aclnn_mla_prolog_v4_weight_nz.h"
 #include "log/log.h"
 #include "opdev/make_op_executor.h"
 #include "opdev/op_dfx.h"
@@ -81,11 +82,11 @@ public:
     bool CheckTensorConditionalNotNull(bool conditional) const
     {
         if (inner_ && conditional) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MlaPrologV3", name_.c_str(), "null",
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnMlaPrologV4", name_.c_str(), "null",
                                                   "this parameter is required under current configuration");
             return false;
         } else if (!inner_ && !conditional) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MlaPrologV3", name_.c_str(), "not null",
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnMlaPrologV4", name_.c_str(), "not null",
                                                   "this parameter should be empty under current configuration");
             return false;
         }
@@ -126,7 +127,7 @@ bool CheckWeightQuantModeValidity(int64_t weightQuantMode)
             supportedStr.pop_back();
             supportedStr.pop_back();
         }
-        OP_LOGE_FOR_INVALID_VALUE("MlaPrologV3", "weightQuantMode", std::to_string(weightQuantMode), supportedStr);
+        OP_LOGE_FOR_INVALID_VALUE("aclnnMlaPrologV4", "weightQuantMode", std::to_string(weightQuantMode), supportedStr);
         return false;
     }
     return true;
@@ -172,7 +173,7 @@ bool CheckKvCacheQuantModeValidity(int64_t weightQuantMode, int64_t kvCacheQuant
             supportedStr.pop_back();
         }
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            "MlaPrologV3", "kvCacheQuantMode", std::to_string(kvCacheQuantMode),
+            "aclnnMlaPrologV4", "kvCacheQuantMode", std::to_string(kvCacheQuantMode),
             "When weightQuantMode==" + std::to_string(weightQuantMode) + ", must be within " + supportedStr);
         return false;
     }
@@ -183,7 +184,7 @@ bool CheckQueryQuantModeValidity(int64_t queryQuantMode)
 {
     std::set<int64_t> supportedQueryQuantMode = {0LL, 1LL};
     if (supportedQueryQuantMode.find(queryQuantMode) == supportedQueryQuantMode.end()) {
-        OP_LOGE_FOR_INVALID_VALUE("MlaPrologV3", "queryQuantMode", std::to_string(queryQuantMode), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE("aclnnMlaPrologV4", "queryQuantMode", std::to_string(queryQuantMode), "0 or 1");
         return false;
     }
     return true;
@@ -195,7 +196,7 @@ bool CheckQueryQuantModeValidity(int64_t queryQuantMode)
 extern "C" {
 #endif
 
-aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
+aclnnStatus aclnnMlaPrologV4WeightNzGetWorkspaceSize(
     const aclTensor *tokenX, const aclTensor *weightDq, const aclTensor *weightUqQr, const aclTensor *weightUk,
     const aclTensor *weightDkvKr, const aclTensor *rmsnormGammaCq, const aclTensor *rmsnormGammaCkv,
     const aclTensor *ropeSin, const aclTensor *ropeCos, aclTensor *kvCacheRef, aclTensor *krCacheRef,
@@ -206,7 +207,7 @@ aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
     const aclTensor *actualSeqLenOptional, const aclTensor *kNopeClipAlphaOptional, double rmsnormEpsilonCq,
     double rmsnormEpsilonCkv, char *cacheModeOptional, int64_t weightQuantMode, int64_t kvCacheQuantMode,
     int64_t queryQuantMode, int64_t ckvkrRepoMode, int64_t quantScaleRepoMode, int64_t tileSize, double qcQrScale,
-    double kcScale, const aclTensor *queryOut, const aclTensor *queryRopeOut,
+    double kcScale, bool doRope, const aclTensor *queryOut, const aclTensor *queryRopeOut,
     const aclTensor *dequantScaleQNopeOutOptional, const aclTensor *queryNormOutOptional,
     const aclTensor *dequantScaleQNormOutOptional, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
@@ -230,6 +231,34 @@ aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
         return ge::GRAPH_FAILED;
     };
 
+    // do_rope开启时 ropeSin/ropeCos 不允许为空（null 或空 tensor）；
+    // 关闭时 ropeSin/ropeCos 必须同时为空，并利用 TensorHolder 将 null 转为空 tensor 传入 inner，
+    std::unique_ptr<TensorHolder> ropeSinHolder;
+    std::unique_ptr<TensorHolder> ropeCosHolder;
+    auto IsRopeInputEmpty = [](const aclTensor *rope) {
+        return rope == nullptr || rope->GetViewShape().GetShapeSize() == 0;
+    };
+    if (doRope) {
+        if (IsRopeInputEmpty(ropeSin)) {
+            OP_LOGE_WITH_INVALID_INPUT("aclnnMlaPrologV4", "ropeSin");
+            return ge::GRAPH_FAILED;
+        }
+        if (IsRopeInputEmpty(ropeCos)) {
+            OP_LOGE_WITH_INVALID_INPUT("aclnnMlaPrologV4", "ropeCos");
+            return ge::GRAPH_FAILED;
+        }
+    } else {
+        if (!IsRopeInputEmpty(ropeSin)) {
+            OP_LOGE_WITH_INVALID_INPUT("aclnnMlaPrologV4", "ropeSin");
+            return ge::GRAPH_FAILED;
+        }
+        if (!IsRopeInputEmpty(ropeCos)) {
+            OP_LOGE_WITH_INVALID_INPUT("aclnnMlaPrologV4", "ropeCos");
+            return ge::GRAPH_FAILED;
+        }
+        ropeSinHolder = std::make_unique<TensorHolder>(ropeSin, aclDataType::ACL_BF16, std::string("ropeSin"));
+        ropeCosHolder = std::make_unique<TensorHolder>(ropeCos, aclDataType::ACL_BF16, std::string("ropeCos"));
+    }
     auto dequantScaleQNopeHolder =
         TensorHolder(dequantScaleQNopeOutOptional, aclDataType::ACL_FLOAT, std::string("dequantScaleQNopeOut"));
     aclDataType queryNormDataType =
@@ -245,15 +274,15 @@ aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
     auto dequantScaleQNormHolder =
         TensorHolder(dequantScaleQNormOutOptional, dequantScaleQNormDataType, std::string("dequantScaleQNormOut"));
     if (dequantScaleQNopeOutOptional == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT("MlaPrologV3", "dequantScaleQNopeOut");
+        OP_LOGE_WITH_INVALID_INPUT("aclnnMlaPrologV4", "dequantScaleQNopeOut");
         return ge::GRAPH_FAILED;
     }
     if (queryNormOutOptional == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT("MlaPrologV3", "queryNormOut");
+        OP_LOGE_WITH_INVALID_INPUT("aclnnMlaPrologV4", "queryNormOut");
         return ge::GRAPH_FAILED;
     }
     if (dequantScaleQNormOutOptional == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT("MlaPrologV3", "dequantScaleQNormOut");
+        OP_LOGE_WITH_INVALID_INPUT("aclnnMlaPrologV4", "dequantScaleQNormOut");
         return ge::GRAPH_FAILED;
     }
     // weightQuantMode == 2,4,5:全量化场景(int8,fp8,hif8)
@@ -272,6 +301,7 @@ aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
                                                                queryNormFlag)) {
         return ge::GRAPH_FAILED;
     }
+
     return aclnnInnerMlaPrologV3GetWorkspaceSize(
         tokenX, weightDq, weightUqQr, weightUk, weightDkvKr, rmsnormGammaCq, rmsnormGammaCkv, ropeSin, ropeCos,
         kvCacheRef, krCacheRef, cacheIndexOptional, dequantScaleXOptional, dequantScaleWDqOptional,
@@ -282,7 +312,7 @@ aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
         queryNormOutOptional, dequantScaleQNormOutOptional, workspaceSize, executor);
 }
 
-aclnnStatus aclnnMlaPrologV3WeightNz(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMlaPrologV4WeightNz(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                      const aclrtStream stream)
 {
     return aclnnInnerMlaPrologV3(workspace, workspaceSize, executor, stream);

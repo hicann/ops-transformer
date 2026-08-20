@@ -7,6 +7,9 @@
 |<term>Ascend 950PR/Ascend 950DT</term>|      √     |
 |<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
 |<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
+|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
+|<term>Atlas 推理系列产品</term>|      ×     |
+|<term>Atlas 训练系列产品</term>|      ×     |
 
 ## 功能说明
 
@@ -275,6 +278,18 @@
     <a href="./docs/aclnnMlaPrologV3WeightNz.md">aclnnMlaPrologV3WeightNz
     </a>
     接口方式调用算子
+    </td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">
+    <a href="./examples/test_aclnn_mla_prolog_v4.cpp">MlaPrologV4WeightNz接口测试用例代码
+    </a>
+    </td>
+    <td class="tg-lboi" rowspan="6">
+    通过
+    <a href="./docs/aclnnMlaPrologV4WeightNz.md">aclnnMlaPrologV4WeightNz
+    </a>
+    接口方式调用算子（新增doRope开关控制是否执行旋转位置编码）
     </td>
   </tr>
 </tbody></table>
