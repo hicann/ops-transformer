@@ -122,10 +122,6 @@ bool CheckWeightQuantModeValidity(int64_t weightQuantMode)
             supportedStr += std::to_string(mode);
             idx++;
         }
-        if (!supportedStr.empty()) {
-            supportedStr.pop_back();
-            supportedStr.pop_back();
-        }
         OP_LOGE_FOR_INVALID_VALUE("MlaPrologV3", "weightQuantMode", std::to_string(weightQuantMode), supportedStr);
         return false;
     }
@@ -166,10 +162,6 @@ bool CheckKvCacheQuantModeValidity(int64_t weightQuantMode, int64_t kvCacheQuant
             }
             supportedStr += std::to_string(mode);
             idx++;
-        }
-        if (!supportedStr.empty()) {
-            supportedStr.pop_back();
-            supportedStr.pop_back();
         }
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             "MlaPrologV3", "kvCacheQuantMode", std::to_string(kvCacheQuantMode),
