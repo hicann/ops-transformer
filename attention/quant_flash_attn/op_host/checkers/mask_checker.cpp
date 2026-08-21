@@ -75,8 +75,10 @@ ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const QfaTilingInfo &qfaInf
     const int64_t ATTN_MASK_DIM0 = 2048;
     const int64_t ATTN_MASK_DIM1 = 2048;
     OP_CHECK_IF(shape.GetDim(0) != ATTN_MASK_DIM0 || shape.GetDim(1) != ATTN_MASK_DIM1,
-                OP_LOGE(qfaInfo.opName, "%s shape must be (%ld, %ld), but got (%ld, %ld).", ATTN_MASK_NAME.c_str(),
-                        ATTN_MASK_DIM0, ATTN_MASK_DIM1, shape.GetDim(0), shape.GetDim(1)),
+                OP_LOGE_FOR_INVALID_SHAPE(
+                    qfaInfo.opName, ATTN_MASK_NAME.c_str(),
+                    ("[" + std::to_string(shape.GetDim(0)) + ", " + std::to_string(shape.GetDim(1)) + "]").c_str(),
+                    ("[" + std::to_string(ATTN_MASK_DIM0) + ", " + std::to_string(ATTN_MASK_DIM1) + "]").c_str()),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -133,9 +135,11 @@ ge::graphStatus MaskChecker::CheckMaskModeAttnMaskConsistency(const QfaTilingInf
     bool attnMaskExists =
         (qfaInfo.opParamInfo.attnMask.tensor != nullptr && qfaInfo.opParamInfo.attnMask.desc != nullptr);
     if (qfaInfo.maskMode == static_cast<int64_t>(MaskMode::NO_MASK)) {
-        OP_CHECK_IF(attnMaskExists,
-                    OP_LOGE(qfaInfo.opName, "When mask_mode is 0 (NO_MASK), attn_mask should not be provided."),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            attnMaskExists,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, ATTN_MASK_NAME.c_str(), "provided",
+                                                  "When mask_mode is 0 (NO_MASK), attn_mask should not be provided"),
+            return ge::GRAPH_FAILED);
     } else {
         // mask_mode 为 3 (CAUSAL) 或 4 (SLIDING_WINDOW) 时，必须传入 attn_mask
         OP_CHECK_IF(!attnMaskExists, OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, ATTN_MASK_NAME.c_str()),

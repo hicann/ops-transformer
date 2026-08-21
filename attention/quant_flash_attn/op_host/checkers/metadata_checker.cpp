@@ -61,7 +61,10 @@ ge::graphStatus MetadataChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
 
     // shape dim0 必须 > 0（shape 由 quant_flash_attn_metadata 动态计算，不应为空）
     int64_t dim0 = metadataTensor->GetStorageShape().GetDim(0);
-    OP_CHECK_IF(dim0 <= 0, OP_LOGE(qfaInfo.opName, "metadata shape dim0(%ld) must be greater than 0", dim0),
+    OP_CHECK_IF(dim0 <= 0,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(qfaInfo.opName, METADATA_NAME.c_str(),
+                                                      ("[" + std::to_string(dim0) + "]").c_str(),
+                                                      "The value of dim0 of metadata shape must be greater than 0"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;

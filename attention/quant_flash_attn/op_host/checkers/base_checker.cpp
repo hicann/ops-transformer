@@ -34,10 +34,11 @@ ge::graphStatus QfaBaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorD
 {
     if (desc != nullptr) {
         const auto &it = DTYPE_SUPPORT_MAP.find(name);
-        OP_CHECK_IF(
-            it == DTYPE_SUPPORT_MAP.end(),
-            OP_LOGE("QuantFlashAttn", "%s datatype support list should be specify in DTYPE_SUPPORT_MAP", name.c_str()),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(it == DTYPE_SUPPORT_MAP.end(),
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        "QuantFlashAttn", name.c_str(), DataTypeToSerialString(desc->GetDataType()).c_str(),
+                        "The datatype support list of this parameter should be specified in DTYPE_SUPPORT_MAP"),
+                    return ge::GRAPH_FAILED);
         auto &expectDtypeList = it->second;
         if (std::find(expectDtypeList.begin(), expectDtypeList.end(), desc->GetDataType()) == expectDtypeList.end()) {
             std::string dtypeStr = DataTypeToSerialString(desc->GetDataType());
@@ -74,7 +75,8 @@ std::string QfaBaseChecker::DataTypeToSerialString(ge::DataType type) const
     if (it != DATATYPE_TO_STRING_MAP.end()) {
         return it->second;
     } else {
-        OP_LOGE("QuantFlashAttn", "datatype %d not support", type);
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON("QuantFlashAttn", "datatype", std::to_string(type).c_str(),
+                                              "The datatype is not supported");
         return "UNDEFINED";
     }
 }
