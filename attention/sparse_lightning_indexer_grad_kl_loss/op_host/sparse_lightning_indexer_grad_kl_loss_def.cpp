@@ -7,7 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
- 
+
 /*!
  * \file sparse_lightning_indexer_grad_kl_loss_def.cpp
  * \brief
@@ -18,7 +18,8 @@
 namespace ops {
 class SparseLightningIndexerGradKLLoss : public OpDef {
 public:
-    explicit SparseLightningIndexerGradKLLoss(const char *name) : OpDef(name)
+    explicit SparseLightningIndexerGradKLLoss(const char *name)
+        : OpDef(name)
     {
         this->Input("query")
             .ParamType(REQUIRED)
@@ -82,6 +83,11 @@ public:
             .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
             .ValueDepend(OPTIONAL)
             .AutoContiguous();
+        this->Input("sinks")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
+            .AutoContiguous();
         this->Output("d_query_index")
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16})
@@ -99,11 +105,11 @@ public:
             .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
         this->Attr("scale_value").AttrType(REQUIRED).Float(1.0);
-        this->Attr("layout").AttrType(OPTIONAL).String("BSND");         // BSND, TND
-        this->Attr("sparse_mode").AttrType(OPTIONAL).Int(3);            // 3:默认值，只计算下三角
+        this->Attr("layout").AttrType(OPTIONAL).String("BSND"); // BSND, TND
+        this->Attr("sparse_mode").AttrType(OPTIONAL).Int(3);    // 3:默认值，只计算下三角
         this->Attr("pre_tokens").AttrType(OPTIONAL).Int(2147483647);
         this->Attr("next_tokens").AttrType(OPTIONAL).Int(2147483647);
-        this->Attr("deterministic").AttrType(OPTIONAL).Bool(false);     // true, false
+        this->Attr("deterministic").AttrType(OPTIONAL).Bool(false); // true, false
         OpAICoreConfig aicore_config_95;
         aicore_config_95.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(true)
@@ -176,6 +182,11 @@ public:
             .DataType({ge::DT_INT64, ge::DT_INT64, ge::DT_INT64, ge::DT_INT64})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
             .ValueDepend(OPTIONAL)
+            .AutoContiguous();
+        aicore_config.Input("sinks")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
             .AutoContiguous();
         aicore_config.Output("d_query_index")
             .ParamType(REQUIRED)

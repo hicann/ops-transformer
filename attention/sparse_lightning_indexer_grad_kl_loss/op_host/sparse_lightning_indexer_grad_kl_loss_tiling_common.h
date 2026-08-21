@@ -41,6 +41,7 @@ constexpr uint32_t QUERY_ROPE_INPUT_INDEX = 8;
 constexpr uint32_t KEY_ROPE_INPUT_INDEX = 9;
 constexpr uint32_t ACTUAL_SEQ_LENGTHS_QUERY_INPUT_INDEX = 10;
 constexpr uint32_t ACTUAL_SEQ_LENGTHS_KEY_INPUT_INDEX = 11;
+constexpr uint32_t SINKS_INPUT_INDEX = 12;
 
 // Outputs Index
 constexpr uint32_t D_QUERY_INDEX_OUTPUT_INDEX = 0;
@@ -72,7 +73,7 @@ struct InnerSplitParams {
 };
 
 enum class SparseMode : uint32_t {
-    RIGHT_DOWN_CAUSAL = 3  // 右下角点划分的下三角部分
+    RIGHT_DOWN_CAUSAL = 3 // 右下角点划分的下三角部分
 };
 
 struct AiCoreParams {
@@ -98,9 +99,10 @@ struct SparseLightningIndexerGradKLLossCompileInfo {
     NpuArch npuArch;
 };
 
-template <typename T> inline T Align(T num, T rnd)
+template <typename T>
+inline T Align(T num, T rnd)
 {
-    return (((rnd) == 0) ? 0 : (((num) + (rnd) - 1) / (rnd) * (rnd)));
+    return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
 }
 
 } // namespace optiling
