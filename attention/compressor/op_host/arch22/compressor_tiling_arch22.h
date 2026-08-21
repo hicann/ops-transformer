@@ -80,14 +80,14 @@ constexpr uint32_t MAX_BLOCK_SIZE = 1024;
 
 constexpr uint32_t BATCH_MODE_SCHEDULE = 1;
 
-static const std::string X_NAME = "query";
+static const std::string X_NAME = "x";
 static const std::string WKV_NAME = "wkv";
 static const std::string WGATE_NAME = "wgate";
 static const std::string STATE_CACHE_NAME = "state_cache";
 static const std::string APE_NAME = "ape";
 static const std::string STATE_BLOCK_TABLE_NAME = "state_block_table";
 static const std::string CU_SEQLENS_NAME = "cu_seqlens";
-static const std::string SEQUSED_NAME = "seq_used";
+static const std::string SEQUSED_NAME = "seqused";
 static const std::string START_POS_NAME = "start_pos";
 static const std::string CMP_RATIO_NAME = "cmp_ratio";
 static const std::string COFF_NAME = "coff";
@@ -176,9 +176,16 @@ struct OptionalParaInfo {
     const gert::Tensor *tensor;
 };
 
-enum class LayoutType { LAYOUT_BSH, LAYOUT_TH };
+enum class LayoutType {
+    LAYOUT_BSH,
+    LAYOUT_TH
+};
 
-enum class TemplateId : uint8_t { NORMAL = 0, EMPTY_X = 1, FULL_LOAD = 2 };
+enum class TemplateId : uint8_t {
+    NORMAL = 0,
+    EMPTY_X = 1,
+    FULL_LOAD = 2
+};
 
 struct CompressorBaseShapeInfo {
     uint32_t bSize = 0;    // B
@@ -202,7 +209,10 @@ const std::vector<int> CMP_RATIO{2, 4, 8, 16, 32, 64, 128};
 const std::vector<uint32_t> HEAD_DIM{128, 512};
 const std::vector<int> CACHE_MODE{1};
 
-enum class CACHE_MODE : uint8_t { LINEAR_BUFFER = 1, RING_BUFFER = 2 };
+enum class CACHE_MODE : uint8_t {
+    LINEAR_BUFFER = 1,
+    RING_BUFFER = 2
+};
 
 struct CompressorContext {
     const char *opName;
@@ -236,7 +246,9 @@ struct CompressorContext {
 
 class CompressorTiling {
 public:
-    explicit CompressorTiling(CompressorContext *context) : context_(context) {}
+    explicit CompressorTiling(CompressorContext *context)
+        : context_(context)
+    {}
     ~CompressorTiling() = default;
 
     static ge::graphStatus ConvertContext(gert::TilingContext &context, CompressorContext &compressorContext);
@@ -323,7 +335,7 @@ private:
     CompressorWorkspaceParams *workspaceParams_ = nullptr;
 };
 
-} // namespace anonymous
+} // namespace
 
 CMP_EXTERN_C ge::graphStatus TilingCompressorArch22(gert::TilingContext *context);
 } // namespace optiling

@@ -773,7 +773,7 @@ TEST_F(QuantCompressorTiling, quant_compressor_tiling_th_without_cu_seqlens)
     gert::TilingContextPara tilingContextPara(
         "QuantCompressor",
         {
-            {{{128, 4096}, {128, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},        // TH layout
+            {{{128, 4096}, {128, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND}, // TH layout
             {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
             {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
             {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
@@ -782,12 +782,152 @@ TEST_F(QuantCompressorTiling, quant_compressor_tiling_th_without_cu_seqlens)
             {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},                              // cu_seqlens absent in TH
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND}, // cu_seqlens absent in TH
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
         },
         {
             {{{32, 128}, {32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo, "Ascend950");
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// x dimNum mismatch with layout: x is 2D but layout is BSH (expects 3D) -> EZ0011
+TEST_F(QuantCompressorTiling, quant_compressor_tiling_bsh_x_wrong_dimnum)
+{
+    QuantCompressorUtCompileInfo compileInfo{};
+    gert::TilingContextPara tilingContextPara(
+        "QuantCompressor",
+        {
+            {{{128, 4096}, {128, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND}, // x 2D but no cu_seqlens -> BSH expected 3D
+            {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 256}, {4, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+        },
+        {
+            {{{1, 32, 128}, {1, 32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo, "Ascend950");
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// RING_BUFFER: state_block_table is 2D (should be 1D) -> EZ0011
+TEST_F(QuantCompressorTiling, quant_compressor_tiling_ring_sbt_wrong_dim)
+{
+    QuantCompressorUtCompileInfo compileInfo{};
+    gert::TilingContextPara tilingContextPara(
+        "QuantCompressor",
+        {
+            {{{1, 128, 4096}, {1, 128, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{1, 256, 1024}, {1, 256, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 256}, {4, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+        },
+        {
+            {{{1, 32, 128}, {1, 32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1, 256, 1024}, {1, 256, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo, "Ascend950");
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// LINEAR_BUFFER: state_block_table is 1D (should be 2D) -> EZ0011
+TEST_F(QuantCompressorTiling, quant_compressor_tiling_linear_sbt_wrong_dim)
+{
+    QuantCompressorUtCompileInfo compileInfo{};
+    gert::TilingContextPara tilingContextPara(
+        "QuantCompressor",
+        {
+            {{{1, 128, 4096}, {1, 128, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 256}, {4, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+        },
+        {
+            {{{1, 32, 128}, {1, 32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo, "Ascend950");
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// wkv wrong dimNum (1D instead of 2D) -> EZ0012 CheckDimNumSupport
+TEST_F(QuantCompressorTiling, quant_compressor_tiling_wkv_wrong_dimnum)
+{
+    QuantCompressorUtCompileInfo compileInfo{};
+    gert::TilingContextPara tilingContextPara(
+        "QuantCompressor",
+        {
+            {{{1, 128, 4096}, {1, 128, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
+            {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 256}, {4, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
+        },
+        {
+            {{{1, 32, 128}, {1, 32, 128}}, ge::DT_BF16, ge::FORMAT_ND},
             {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
@@ -813,7 +953,7 @@ TEST_F(QuantCompressorTiling, quant_compressor_tiling_quant_mode1_without_xdesca
             {{{256, 4096}, {256, 4096}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},
             {{{1, 128, 512}, {1, 128, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{4, 256}, {4, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},                              // x_descale absent
+            {{}, ge::DT_UNDEFINED, ge::FORMAT_ND}, // x_descale absent
             {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
             {{{1, 1}, {1, 1}}, ge::DT_INT32, ge::FORMAT_ND},
