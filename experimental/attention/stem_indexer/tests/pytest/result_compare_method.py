@@ -10,7 +10,11 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+import datetime
 import math
+import os
+import sys
+from time import time
 
 import torch
 
@@ -21,6 +25,125 @@ TOPK_BOUNDARY_RE_TOLERANCE = 1e-3
 TOPK_BOUNDARY_ABS_TOLERANCE = 2.5e-5
 MAX_BOUNDARY_RE_EXCEED_RATIO = 5e-3
 MAX_PRINT_FAILURES = 8
+
+
+def print_log(data=None, level="INFO"):
+    print(
+        "[%s] [%s]-%s:%s - %s"
+        % (
+            datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
+            level,
+            os.path.basename(sys._getframe().f_back.f_code.co_filename),
+            str(sys._getframe().f_back.f_lineno).zfill(4),
+            data,
+        )
+    )
+
+
+def cal_relative_diff_np_isclose(real_data, expect_data):
+    diff = abs(float(real_data) - float(expect_data))
+    return diff / (abs(float(expect_data)) + 1e-9)
+
+
+COMPARE_SEPARATOR = "-" * 78
+COMPARE_HEADER = (
+    f"{'Loop':>10} {'ExpectOut':>16} {'RealOut':>16} {'FpDiff':>16} {'RateDiff':>16}"
+)
+
+
+def print_compare_row(loop, real_value, expect_value, rate_diff):
+    expect_value = float(expect_value)
+    real_value = float(real_value)
+    abs_diff = abs(expect_value - real_value)
+    print_log(
+        f"{loop:>10d} {expect_value:>16.7f} {real_value:>16.7f} "
+        f"{abs_diff:>16.7f} {rate_diff:>16.7f}"
+    )
+
+
+def display_output_np_isclose(real_data, expect_data, start, end):
+    def display_inner(index):
+        data_index = index + start
+        rate_diff = cal_relative_diff_np_isclose(
+            real_data[data_index], expect_data[data_index]
+        )
+        print_compare_row(
+            start + index + 1,
+            real_data[data_index],
+            expect_data[data_index],
+            rate_diff,
+        )
+
+    print_log(COMPARE_SEPARATOR)
+    print_log(COMPARE_HEADER)
+    print_log(COMPARE_SEPARATOR)
+    split_count = int(end - start)
+    if split_count <= 20:
+        for index in range(split_count + 1):
+            display_inner(index)
+    else:
+        for index in range(10):
+            display_inner(index)
+        print_log(f"{'...':>10} {'...':>16} {'...':>16} {'...':>16} {'...':>16}")
+        for index in range(split_count - 10 + 1, split_count + 1):
+            display_inner(index)
+
+
+def display_error_output(real_data, expect_data, err_idx, relative_diff):
+    def print_error_row(index, rate_diff):
+        print_compare_row(index, real_data[index], expect_data[index], rate_diff)
+
+    print_log(f"Error Line{COMPARE_SEPARATOR[len('Error Line') :]}")
+    print_log(COMPARE_HEADER)
+    print_log(COMPARE_SEPARATOR)
+    count = 0
+    len_err = len(err_idx)
+    for index in err_idx:
+        count += 1
+        if count < 10 or 90 < count < 100:
+            print_error_row(index, relative_diff[count - 1])
+        elif count == 10 or (count == 100 and len_err > 100):
+            print_log(f"{'...':>10} {'...':>16} {'...':>16} {'...':>16} {'...':>16}")
+        elif count > 100:
+            break
+
+    print_log(f"Max-RE line:{COMPARE_SEPARATOR[len('Max-RE line:') :]}")
+    max_error = max(relative_diff)
+    max_count = 0
+    for position, rate_diff in enumerate(relative_diff):
+        if rate_diff == max_error:
+            print_error_row(err_idx[position], max_error)
+            max_count += 1
+            if max_count >= 3:
+                break
+    print_log(COMPARE_SEPARATOR)
+
+
+def get_flattened_indices(actual_indices, expected_indices):
+    return actual_indices.flatten().tolist(), expected_indices.flatten().tolist()
+
+
+def display_index_output(actual_indices, expected_indices):
+    real_data, expect_data = get_flattened_indices(actual_indices, expected_indices)
+    if not real_data and not expect_data:
+        return
+    display_output_np_isclose(real_data, expect_data, 0, len(real_data) - 1)
+
+
+def display_index_errors(actual_indices, expected_indices):
+    real_data, expect_data = get_flattened_indices(actual_indices, expected_indices)
+    err_idx = [
+        index
+        for index, (real_value, expect_value) in enumerate(zip(real_data, expect_data))
+        if real_value != expect_value
+    ]
+    if not err_idx:
+        return
+    relative_diff = [
+        cal_relative_diff_np_isclose(real_data[index], expect_data[index])
+        for index in err_idx
+    ]
+    display_error_output(real_data, expect_data, err_idx, relative_diff)
 
 
 def normalize_npu_result(npu_result):
@@ -208,18 +331,40 @@ def explain_topk_mismatch(
 def assert_stem_indexer_result(
     expected_indices, expected_seq_len, npu_result, case, inputs=None
 ):
+    start_time = time()
     actual_indices, actual_seq_len = normalize_npu_result(npu_result)
     expected_indices = expected_indices.to(torch.int32)
     expected_seq_len = expected_seq_len.to(torch.int32)
 
+    print_log(f"total_line is {expected_seq_len.numel()}")
+    if tuple(actual_seq_len.shape) != tuple(expected_seq_len.shape):
+        print_log(
+            f"{case['case_id']} sparse_seq_len shape mismatch: "
+            f"actual={tuple(actual_seq_len.shape)}, expected={tuple(expected_seq_len.shape)}",
+            level="ERROR",
+        )
     assert tuple(actual_seq_len.shape) == tuple(expected_seq_len.shape), (
         f"{case['case_id']} sparse_seq_len shape mismatch: "
         f"actual={tuple(actual_seq_len.shape)}, expected={tuple(expected_seq_len.shape)}"
     )
+    if tuple(actual_indices.shape) != tuple(expected_indices.shape):
+        print_log(
+            f"{case['case_id']} sparse_indices shape mismatch: "
+            f"actual={tuple(actual_indices.shape)}, expected={tuple(expected_indices.shape)}",
+            level="ERROR",
+        )
     assert tuple(actual_indices.shape) == tuple(expected_indices.shape), (
         f"{case['case_id']} sparse_indices shape mismatch: "
         f"actual={tuple(actual_indices.shape)}, expected={tuple(expected_indices.shape)}"
     )
+    if not torch.equal(actual_seq_len, expected_seq_len):
+        seq_len_diff = torch.nonzero(actual_seq_len != expected_seq_len, as_tuple=False)
+        print_log(
+            f"{case['case_id']} sparse_seq_len mismatch: "
+            f"diff_count={seq_len_diff.shape[0]}, "
+            f"first={seq_len_diff[:MAX_PRINT_FAILURES].tolist()}",
+            level="ERROR",
+        )
     assert torch.equal(actual_seq_len, expected_seq_len), (
         f"{case['case_id']} sparse_seq_len mismatch"
     )
@@ -300,6 +445,38 @@ def assert_stem_indexer_result(
                 }
             )
 
+    exceeded_difference_ratio = (
+        total_exceeded_difference_count / total_valid_topk_count
+        if total_valid_topk_count > 0
+        else 0.0
+    )
+    compare_pass = (
+        bad_padding_count == 0
+        and failed_row_count == 0
+        and exceeded_difference_ratio <= MAX_BOUNDARY_RE_EXCEED_RATIO
+    )
+    display_index_output(actual_indices, expected_indices)
+    print_log(f"耗时：{time() - start_time:.6f} 秒")
+    if compare_pass:
+        print_log("[success]StemIndexer TopK精度通过")
+    else:
+        print_log("[fail]StemIndexer TopK精度失败", level="ERROR")
+    print_log(COMPARE_SEPARATOR)
+    print_log(
+        f"{'BadPadding':>12} {'FailedRows':>12} {'ExceedDiff':>12} "
+        f"{'PctThd':>12} {'PctRlt':>12} {'Result':>10}"
+    )
+    print_log(COMPARE_SEPARATOR)
+    print_log(
+        f"{bad_padding_count:>12d} {failed_row_count:>12d} "
+        f"{total_exceeded_difference_count:>12d} "
+        f"{(1 - MAX_BOUNDARY_RE_EXCEED_RATIO) * 100:>11.6f}% "
+        f"{(1 - exceeded_difference_ratio) * 100:>11.6f}% "
+        f"{('Pass' if compare_pass else 'Failed'):>10}"
+    )
+    if not compare_pass:
+        display_index_errors(actual_indices, expected_indices)
+
     assert bad_padding_count == 0, (
         f"{case['case_id']} sparse_indices padding mismatch: "
         f"bad_padding_count={bad_padding_count}, expected padding value=-1, failures={padding_failures}"
@@ -312,11 +489,6 @@ def assert_stem_indexer_result(
         f"failures={failures}"
     )
 
-    exceeded_difference_ratio = (
-        total_exceeded_difference_count / total_valid_topk_count
-        if total_valid_topk_count > 0
-        else 0.0
-    )
     assert exceeded_difference_ratio <= MAX_BOUNDARY_RE_EXCEED_RATIO, (
         f"{case['case_id']} sparse_indices TopK boundary mismatch ratio exceeds tolerance: "
         f"mismatched_row_count={mismatched_row_count}, "
