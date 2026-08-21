@@ -17,12 +17,7 @@ import importlib.util
 import sys
 from bisect import bisect_right
 from pathlib import Path
-from typing import TYPE_CHECKING
-
 import torch
-
-if TYPE_CHECKING:
-    from ttk.test_spec import TtkContext
 
 
 class TorchBatchRandomContext:
@@ -572,11 +567,11 @@ class SparseFlashMlaInputAdapter:
         return module
 
     @staticmethod
-    def load_pre_npu_module():
-        name = "smla_ttk_pre_npu"
+    def load_metadata_protocol():
+        name = "smla_ttk_metadata_protocol"
         if name in sys.modules:
             return sys.modules[name]
-        path = Path(__file__).with_name("pre_npu.py")
+        path = Path(__file__).with_name("metadata_protocol.py")
         try:
             spec = importlib.util.spec_from_file_location(name, path)
             if spec is None or spec.loader is None:
@@ -587,7 +582,7 @@ class SparseFlashMlaInputAdapter:
         except Exception as exc:
             sys.modules.pop(name, None)
             raise SparseFlashMlaInputAdapter.module_load_error(
-                "assets pre-NPU state", path, exc
+                "assets metadata protocol", path, exc
             ) from exc
         return module
 
@@ -645,11 +640,13 @@ class SparseFlashMlaInputAdapter:
         return repr(list(value))
 
     @staticmethod
-    def select_topk_override(name, tensor, mask_mode, context):
-        """Distinguish explicit CSV values from TTK's generated destination tensor."""
-        if context is None:
+    def select_topk_override(name, tensor, mask_mode, attributes):
+        """Use an explicit CSV override, otherwise keep pytest's generated value."""
+        if attributes is None:
             return tensor
-        attributes = getattr(context, "attributes", None) or {}
+        if hasattr(attributes, "attributes"):
+            attributes = attributes.attributes
+        attributes = attributes or {}
         if name in attributes:
             return attributes[name]
         if mask_mode != 0:
@@ -905,10 +902,9 @@ def generate_sparse_flash_mla_inputs(
     layout_kv="BSND",
     topk_value_mode=1,
     return_softmax_lse=False,
-    context: "TtkContext" = None,
     **kwargs,
 ):
-    """Populate pytest-derived inputs and leave metadata for the pre-NPU stage."""
+    """Populate pytest-derived inputs; metadata is filled by npu_preprocess."""
     params = dict(kwargs)
     params.update(
         {
@@ -923,10 +919,10 @@ def generate_sparse_flash_mla_inputs(
             "topk_value_mode": topk_value_mode,
             "return_softmax_lse": return_softmax_lse,
             "ori_topk_length": INPUT_ADAPTER.select_topk_override(
-                "ori_topk_length", ori_topk_length, ori_mask_mode, context
+                "ori_topk_length", ori_topk_length, ori_mask_mode, params
             ),
             "cmp_topk_length": INPUT_ADAPTER.select_topk_override(
-                "cmp_topk_length", cmp_topk_length, cmp_mask_mode, context
+                "cmp_topk_length", cmp_topk_length, cmp_mask_mode, params
             ),
         }
     )
@@ -973,9 +969,8 @@ def generate_sparse_flash_mla_inputs(
     case_data = INPUT_ADAPTER.load_golden_store().CASE_DATA
     testcase_name = params.get("testcase_name")
     case_data.put(testcase_name, data)
-    metadata_input = case_data.persist(testcase_name, context)
-    INPUT_ADAPTER.load_pre_npu_module().persist_metadata_inputs(
-        testcase_name, metadata_input, context
+    INPUT_ADAPTER.load_metadata_protocol().save_metadata_inputs(
+        "sparse_flash_mla", testcase_name, metadata_input
     )
     return data
 
@@ -1011,7 +1006,6 @@ def generate_aclnn_sparse_flash_mla_inputs(
     return_softmax_lse,
     attn_out,
     softmax_lse_out,
-    context: "TtkContext" = None,
     **kwargs,
 ):
     """Map the ACLNN C signature to the canonical pytest input adapter."""
@@ -1045,6 +1039,5 @@ def generate_aclnn_sparse_flash_mla_inputs(
         layout_kv=layout_kv,
         topk_value_mode=topk_value_mode,
         return_softmax_lse=return_softmax_lse,
-        context=context,
         **kwargs,
     )

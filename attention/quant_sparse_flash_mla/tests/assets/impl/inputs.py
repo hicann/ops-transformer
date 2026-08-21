@@ -18,13 +18,9 @@ import random
 import sys
 from bisect import bisect_right
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
-
-if TYPE_CHECKING:
-    from ttk.test_spec import TtkContext
 
 
 class QuantSparseFlashMlaBatchRandomContext:
@@ -600,11 +596,11 @@ class QuantSparseFlashMlaInputAdapter:
         return module
 
     @staticmethod
-    def load_pre_npu_module():
-        name = "qsmla_ttk_pre_npu"
+    def load_metadata_protocol():
+        name = "qsmla_ttk_metadata_protocol"
         if name in sys.modules:
             return sys.modules[name]
-        path = Path(__file__).with_name("pre_npu.py")
+        path = Path(__file__).with_name("metadata_protocol.py")
         try:
             spec = importlib.util.spec_from_file_location(name, path)
             if spec is None or spec.loader is None:
@@ -615,7 +611,7 @@ class QuantSparseFlashMlaInputAdapter:
         except Exception as exc:
             sys.modules.pop(name, None)
             raise QuantSparseFlashMlaInputAdapter.module_load_error(
-                "assets pre-NPU state", path, exc
+                "assets metadata protocol", path, exc
             ) from exc
         return module
 
@@ -925,10 +921,9 @@ def generate_quant_sparse_flash_mla_inputs(
     layout_kv="BSND",
     topk_value_mode=1,
     return_softmax_lse=False,
-    context: "TtkContext" = None,
     **kwargs,
 ):
-    """Populate pytest-derived inputs and leave metadata for the pre-NPU stage."""
+    """Populate pytest-derived inputs and leave metadata for npu_preprocess."""
     if quant_mode is None:
         raise ValueError("QSMLA direct API requires quant_mode from CSV")
     params = dict(kwargs)
@@ -990,9 +985,8 @@ def generate_quant_sparse_flash_mla_inputs(
     case_data = INPUT_ADAPTER.load_golden_store().CASE_DATA
     testcase_name = params.get("testcase_name")
     case_data.put(testcase_name, data)
-    metadata_input = case_data.persist(testcase_name, context)
-    INPUT_ADAPTER.load_pre_npu_module().persist_metadata_inputs(
-        testcase_name, metadata_input, context
+    INPUT_ADAPTER.load_metadata_protocol().save_metadata_inputs(
+        "quant_sparse_flash_mla", testcase_name, data.get("metadata_input")
     )
     return data
 
@@ -1032,7 +1026,6 @@ def generate_aclnn_quant_sparse_flash_mla_inputs(
     return_softmax_lse,
     attn_out,
     softmax_lse_out,
-    context: "TtkContext" = None,
     **kwargs,
 ):
     """Map the ACLNN C signature to the canonical pytest input adapter."""
@@ -1070,6 +1063,5 @@ def generate_aclnn_quant_sparse_flash_mla_inputs(
         layout_kv=layout_kv,
         topk_value_mode=topk_value_mode,
         return_softmax_lse=return_softmax_lse,
-        context=context,
         **kwargs,
     )

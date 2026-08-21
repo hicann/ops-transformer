@@ -15,16 +15,9 @@
 import importlib.util
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import torch
 
-if TYPE_CHECKING:
-    from ttk.test_spec import TtkContext
-
-
-OPERATOR = "lightning_indexer_v2"
-DATA_STATE_KEY = f"{OPERATOR}.pytest_data"
 PYTEST_MODULE_NAME = "li_v2_pytest_golden"
 PYTEST_MODULE_FILE = "lightning_indexer_v2_golden.py"
 
@@ -44,35 +37,15 @@ class CaseDataStore:
         if testcase_name is not None:
             self.case_data[str(testcase_name)] = data
 
-    def persist(self, testcase_name, context):
-        """Publish raw pytest data to context and return compact metadata inputs."""
-        if context is None or testcase_name is None:
-            return
-        name = str(testcase_name)
-        data = self.case_data.pop(name, None)
-        if data is None:
-            raise RuntimeError("LightningIndexer V2 pytest case data is unavailable")
-        metadata_input = data.get("metadata_input")
-        if not isinstance(metadata_input, dict):
-            raise ValueError("LightningIndexer V2 pytest data lacks metadata_input")
-
-        context.state[DATA_STATE_KEY] = {"testcase_name": name, "data": data}
-        return metadata_input
-
-    def get(self, testcase_name, context=None):
+    def get(self, testcase_name):
         if testcase_name is None:
             return None
-        name = str(testcase_name)
-        if context is None:
-            return self.case_data.get(name)
-        entry = context.state.get(DATA_STATE_KEY)
-        if entry is None:
-            return None
-        if entry.get("testcase_name") != name:
-            raise ValueError(
-                "LightningIndexer V2 context data belongs to a different testcase"
-            )
-        return entry.get("data")
+        return self.case_data.get(str(testcase_name))
+
+    def discard(self, data):
+        for testcase_name, stored in tuple(self.case_data.items()):
+            if stored is data:
+                self.case_data.pop(testcase_name, None)
 
 
 CASE_DATA = CaseDataStore()
@@ -82,11 +55,6 @@ def load_pytest_golden():
     """Load the pytest CPU reference only when the Golden stage needs it."""
     if PYTEST_MODULE_NAME in sys.modules:
         return sys.modules[PYTEST_MODULE_NAME]
-    from ttk.utilities.torch_ops_package_loader import TorchOpsPackageLoader
-
-    TorchOpsPackageLoader.ensure_registered(
-        "torch.ops.cann_ops_transformer.lightning_indexer"
-    )
     pytest_dir = Path(__file__).resolve().parents[2] / "pytest"
     path = pytest_dir / PYTEST_MODULE_FILE
     inserted = str(pytest_dir) not in sys.path
@@ -111,8 +79,8 @@ def load_pytest_golden():
             sys.path.remove(str(pytest_dir))
 
 
-def get_case_data(testcase_name, context=None):
-    return CASE_DATA.get(testcase_name, context)
+def get_case_data(testcase_name):
+    return CASE_DATA.get(testcase_name)
 
 
 def materialize_golden(data):
@@ -121,37 +89,34 @@ def materialize_golden(data):
     return data
 
 
-def activate_case_data(testcase_name, context):
-    data = CASE_DATA.get(testcase_name, context)
+def activate_case_data(testcase_name):
+    data = CASE_DATA.get(testcase_name)
     if data is None:
-        if context is not None and context.manual_case_dir is not None:
-            raise RuntimeError(
-                "LightningIndexer V2 cannot generate Golden from replayed input "
-                "files; prepare and replay an in,golden dataset"
-            )
         raise RuntimeError(
-            "LightningIndexer V2 Golden requires pytest data from the input-stage context"
+            "LightningIndexer V2 Golden requires pytest data from the input stage"
         )
     CASE_DATA.active_testcase_name = str(testcase_name)
     return materialize_golden(data)
 
 
-def get_compare_data(testcase_name, context=None):
+def get_compare_data(testcase_name):
     if testcase_name is None:
         testcase_name = CASE_DATA.active_testcase_name
     if testcase_name is None:
         return None
-    data = CASE_DATA.get(testcase_name, context)
+    data = CASE_DATA.get(testcase_name)
     return None if data is None else materialize_golden(data)
 
 
-def set_compare_data(testcase_name, data, context=None):
+def set_compare_data(testcase_name, data):
     name = str(testcase_name)
     CASE_DATA.active_testcase_name = name
-    if context is None:
-        CASE_DATA.case_data[name] = data
-        return
-    context.state[DATA_STATE_KEY] = {"testcase_name": name, "data": data}
+    CASE_DATA.case_data[name] = data
+
+
+def discard_compare_data(data):
+    CASE_DATA.discard(data)
+    CASE_DATA.active_testcase_name = None
 
 
 def cpu_lightning_indexer_v2(
@@ -162,12 +127,11 @@ def cpu_lightning_indexer_v2(
     *,
     return_value=0,
     testcase_name=None,
-    context: "TtkContext" = None,
     **kwargs,
 ):
     """Materialize Golden from the exact pytest data produced by input."""
     del q, k, w, topk, kwargs
-    data = activate_case_data(testcase_name, context)
+    data = activate_case_data(testcase_name)
     if int(return_value):
         sparse_value = data["cpu_topk_value"]
     else:
@@ -197,7 +161,6 @@ def cpu_aclnn_li_v2(
     sparse_indices_out,
     sparse_values_out,
     testcase_name=None,
-    context: "TtkContext" = None,
     **kwargs,
 ):
     """Return the pytest Golden for the ACLNN C API parameter order."""
@@ -224,7 +187,6 @@ def cpu_aclnn_li_v2(
         topk,
         return_value=return_value,
         testcase_name=testcase_name,
-        context=context,
         **kwargs,
     )
     if not int(return_value):

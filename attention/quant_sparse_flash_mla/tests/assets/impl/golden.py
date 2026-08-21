@@ -15,22 +15,14 @@
 import importlib.util
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-import torch
-
-if TYPE_CHECKING:
-    from ttk.test_spec import TtkContext
 
 
-OPERATOR = "quant_sparse_flash_mla"
-DATA_STATE_KEY = f"{OPERATOR}.pytest_data"
 PYTEST_MODULE_NAME = "qsmla_pytest_golden"
 PYTEST_MODULE_FILE = "quant_sparse_flash_mla_golden.py"
 
 
 class CaseDataStore:
-    """Share pytest data in-process and return compact metadata API inputs."""
+    """Share one input-to-Golden handoff without framework state."""
 
     def __init__(self):
         self.case_data = {}
@@ -39,34 +31,15 @@ class CaseDataStore:
         if testcase_name is not None:
             self.case_data[str(testcase_name)] = data
 
-    def persist(self, testcase_name, context):
-        if context is None or testcase_name is None:
-            return
-        name = str(testcase_name)
-        data = self.case_data.pop(name, None)
-        if data is None:
-            raise RuntimeError("QuantSparseFlashMla pytest case data is unavailable")
-        metadata_input = data.get("metadata_input")
-        if not isinstance(metadata_input, dict):
-            raise ValueError("QuantSparseFlashMla pytest data lacks metadata_input")
-
-        context.state[DATA_STATE_KEY] = {"testcase_name": name, "data": data}
-        return metadata_input
-
-    def get(self, testcase_name, context=None):
+    def get(self, testcase_name):
         if testcase_name is None:
             return None
-        name = str(testcase_name)
-        if context is None:
-            return self.case_data.get(name)
-        entry = context.state.get(DATA_STATE_KEY)
-        if entry is None:
-            return None
-        if entry.get("testcase_name") != name:
-            raise ValueError(
-                "QuantSparseFlashMla context data belongs to a different testcase"
-            )
-        return entry.get("data")
+        return self.case_data.get(str(testcase_name))
+
+    def discard(self, data):
+        for testcase_name, stored in tuple(self.case_data.items()):
+            if stored is data:
+                self.case_data.pop(testcase_name, None)
 
 
 CASE_DATA = CaseDataStore()
@@ -100,26 +73,22 @@ def load_pytest_golden():
             sys.path.remove(str(pytest_dir))
 
 
-def get_case_data(testcase_name, context=None):
-    return CASE_DATA.get(testcase_name, context)
+def get_case_data(testcase_name):
+    return CASE_DATA.get(testcase_name)
 
 
 def materialize_golden(data):
     if data.get("cpu_output") is None:
         load_pytest_golden().generate_cpu_golden(data)
+    CASE_DATA.discard(data)
     return data
 
 
-def activate_case_data(testcase_name, context):
-    data = CASE_DATA.get(testcase_name, context)
+def activate_case_data(testcase_name):
+    data = CASE_DATA.get(testcase_name)
     if data is None:
-        if context is not None and context.manual_case_dir is not None:
-            raise RuntimeError(
-                "QuantSparseFlashMla cannot generate Golden from replayed input "
-                "files; prepare and replay an in,golden dataset"
-            )
         raise RuntimeError(
-            "QuantSparseFlashMla Golden requires pytest data from the input-stage context"
+            "QuantSparseFlashMla Golden requires pytest data from the input stage"
         )
     return materialize_golden(data)
 
@@ -129,11 +98,10 @@ def cpu_quant_sparse_flash_mla(
     *,
     return_softmax_lse=False,
     testcase_name=None,
-    context: "TtkContext" = None,
     **kwargs,
 ):
     del q, kwargs
-    data = activate_case_data(testcase_name, context)
+    data = activate_case_data(testcase_name)
     softmax_lse = data.get("cpu_lse") if bool(return_softmax_lse) else None
     return data["cpu_output"], softmax_lse
 
@@ -174,7 +142,6 @@ def cpu_aclnn_quant_sparse_flash_mla(
     attn_out,
     softmax_lse_out,
     testcase_name=None,
-    context: "TtkContext" = None,
     **kwargs,
 ):
     """Return the pytest Golden for the ACLNN C API parameter order."""
@@ -216,6 +183,5 @@ def cpu_aclnn_quant_sparse_flash_mla(
         q,
         return_softmax_lse=return_softmax_lse,
         testcase_name=testcase_name,
-        context=context,
         **kwargs,
     )

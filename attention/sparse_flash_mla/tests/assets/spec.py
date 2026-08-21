@@ -41,16 +41,17 @@ def load_impl_module(stem):
     return module
 
 
-pre_npu_module = load_impl_module("pre_npu")
+npu_preprocess_module = load_impl_module("npu_preprocess")
 golden_module = load_impl_module("golden")
 inputs_module = load_impl_module("inputs")
+metadata_inputs_module = load_impl_module("metadata_inputs")
 compare_module = load_impl_module("compare")
 
 
 class SparseFlashMlaSpec:
     golden = golden_module.cpu_sparse_flash_mla
     customize_inputs = inputs_module.generate_sparse_flash_mla_inputs
-    pre_npu = pre_npu_module.run
+    npu_preprocess = npu_preprocess_module.run
     tolerance = {
         "float16": {"standard": "stat_rel_err"},
         "bfloat16": {"standard": "stat_rel_err"},
@@ -62,9 +63,17 @@ class SparseFlashMlaSpec:
 class AclnnSparseFlashMlaSpec(SparseFlashMlaSpec):
     golden = golden_module.cpu_aclnn_sparse_flash_mla
     customize_inputs = inputs_module.generate_aclnn_sparse_flash_mla_inputs
+    npu_preprocess = None
+
+
+class SparseFlashMlaMetadataSpec:
+    customize_inputs = metadata_inputs_module.generate_sparse_flash_mla_metadata_inputs
 
 
 __spec__ = {
     "torch.ops.cann_ops_transformer.sparse_flash_mla": "SparseFlashMlaSpec",
+    "torch.ops.cann_ops_transformer.sparse_flash_mla_metadata": (
+        "SparseFlashMlaMetadataSpec"
+    ),
     "aclnnSparseFlashMla": "AclnnSparseFlashMlaSpec",
 }
