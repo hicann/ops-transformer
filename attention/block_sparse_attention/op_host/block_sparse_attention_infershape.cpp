@@ -54,41 +54,41 @@ static ge::graphStatus InferShapeBlockSparseAttention(gert::InferShapeContext *c
         OP_LOGE("BlockSparseAttention", "context is nullptr!");
         return ge::GRAPH_FAILED;
     }
-    
+
     OP_LOGD(context->GetNodeName(), "Enter BlockSparseAttention InferShape impl.");
-    
+
     // 获取Query shape
     const gert::Shape *queryShape = context->GetInputShape(QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    
+
     // 获取Key shape
     const gert::Shape *keyShape = context->GetInputShape(KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    
+
     // 获取Value shape
     const gert::Shape *valueShape = context->GetInputShape(VALUE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
-    
+
     // 获取输出shape
     gert::Shape *attentionOutShape = context->GetOutputShape(ATTENTION_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
-    
+
     gert::Shape *softmaxLseShape = context->GetOutputShape(SOFTMAX_LSE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxLseShape);
-    
+
     // 获取属性
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    
+
     const char *qInputLayoutPtr = attrs->GetAttrPointer<char>(ATTR_Q_INPUT_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, qInputLayoutPtr);
-    
+
     const char *kvInputLayoutPtr = attrs->GetAttrPointer<char>(ATTR_KV_INPUT_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, kvInputLayoutPtr);
-    
+
     const int64_t *numKvHeadsPtr = attrs->GetInt(ATTR_NUM_KV_HEADS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numKvHeadsPtr);
-    
+
     // UNKNOWN DIM处理
     if ((queryShape->GetDimNum() == 1 && queryShape->GetDim(0) == UNKNOWN_DIMS) ||
         (keyShape->GetDimNum() == 1 && keyShape->GetDim(0) == UNKNOWN_DIMS) ||
@@ -99,10 +99,10 @@ static ge::graphStatus InferShapeBlockSparseAttention(gert::InferShapeContext *c
         (*softmaxLseShape)[0] = UNKNOWN_DIMS;
         return ge::GRAPH_SUCCESS;
     }
-    
+
     // 设置AttentionOut shape (与Query shape相同)
     *attentionOutShape = *queryShape;
-    
+
     // 验证Q layout和KV layout
     std::string qLayout(qInputLayoutPtr);
     std::string kvLayout(kvInputLayoutPtr);
@@ -250,7 +250,7 @@ ge::graphStatus InferDataTypeBlockSparseAttention(gert::InferDataTypeContext *co
         return ge::GRAPH_FAILED;
     }
     auto dtype = context->GetInputDataType(QUERY_INDEX);
-    if (dtype == ge::DT_FLOAT8_E4M3FN) {
+    if (dtype == ge::DT_FLOAT8_E4M3FN || dtype == ge::DT_FLOAT4_E2M1) {
         dtype = context->GetOutputDataType(ATTENTION_OUT_INDEX);
     }
     context->SetOutputDataType(ATTENTION_OUT_INDEX, dtype);
@@ -263,5 +263,4 @@ IMPL_OP_INFERSHAPE(BlockSparseAttention)
     .InferShape(InferShapeBlockSparseAttention)
     .InferDataType(InferDataTypeBlockSparseAttention);
 
-}  // namespace ops
-
+} // namespace ops

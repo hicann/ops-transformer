@@ -17,32 +17,15 @@
 namespace l0op {
 
 const std::array<const aclTensor *, 2> BlockSparseAttention(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *blockSparseMaskOptional,
-    const aclTensor *attenMaskOptional,
-    const aclIntArray *blockShapeOptional,
-    const aclIntArray *actualSeqLengthsOptional,
-    const aclIntArray *actualSeqLengthsKvOptional,
-    const aclTensor *blockTableOptional,
-    const aclTensor *qDequantScaleOptional,
-    const aclTensor *kDequantScaleOptional,
-    const aclTensor *vDequantScaleOptional,
-    const char *qInputLayout,
-    const char *kvInputLayout,
-    int64_t numKeyValueHeads,
-    int64_t maskType,
-    double scaleValue,
-    int64_t innerPrecise,
-    int64_t blockSize,
-    int64_t preTokens,
-    int64_t nextTokens,
-    int64_t softmaxLseFlag,
-    const aclTensor *attentionOut,
-    aclOpExecutor *executor);
+    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *blockSparseMaskOptional,
+    const aclTensor *attenMaskOptional, const aclIntArray *blockShapeOptional,
+    const aclIntArray *actualSeqLengthsOptional, const aclIntArray *actualSeqLengthsKvOptional,
+    const aclTensor *blockTableOptional, const aclTensor *qDequantScaleOptional, const aclTensor *kDequantScaleOptional,
+    const aclTensor *vDequantScaleOptional, const aclTensor *pQuantScaleOptional, const char *qInputLayout,
+    const char *kvInputLayout, int64_t numKeyValueHeads, int64_t maskType, double scaleValue, int64_t innerPrecise,
+    int64_t blockSize, int64_t preTokens, int64_t nextTokens, int64_t softmaxLseFlag, int64_t quantMode,
+    double dstTypeMax, const aclTensor *attentionOut, aclOpExecutor *executor);
 
 } // namespace l0op
 
-#endif  // BLOCK_SPARSE_ATTENTION_H_
-
+#endif // BLOCK_SPARSE_ATTENTION_H_

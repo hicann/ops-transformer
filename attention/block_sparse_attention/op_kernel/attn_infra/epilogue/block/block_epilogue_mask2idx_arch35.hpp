@@ -19,17 +19,8 @@
 
 namespace NpuArch::Epilogue::Block {
 
-template <
-    class ElementSparseMask_,
-    class ElementSparseIdx_,
-    class ElementSparseCount_
->
-class BlockEpilogue <
-    EpilogueBsaMask2Idx,
-    ElementSparseMask_,
-    ElementSparseIdx_,
-    ElementSparseCount_>
-{
+template <class ElementSparseMask_, class ElementSparseIdx_, class ElementSparseCount_>
+class BlockEpilogue<EpilogueBsaMask2Idx, ElementSparseMask_, ElementSparseIdx_, ElementSparseCount_> {
 public:
     using DispatchPolicy = EpilogueBsaMask2Idx;
     using ArchTag = typename DispatchPolicy::ArchTag;
@@ -42,15 +33,14 @@ public:
     static constexpr uint32_t PRE_COL_TILE = 64;
     static constexpr uint32_t PRE_ELEM_NUM_PER_LOOP = PRE_ROW_TILE * PRE_COL_TILE;
 
-    __aicore__ inline
-    BlockEpilogue(Arch::Resource<ArchTag> &resource)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource)
     {
         constexpr uint32_t MASK_PAT_IN_UINT8 = 0;
         constexpr uint32_t MASK_PAT_IN_FP16 = 2 * PRE_ELEM_NUM_PER_LOOP;
-        constexpr uint32_t MASK_PAT_IN_FP32 = 4 * PRE_ELEM_NUM_PER_LOOP; // 2(db)+2
-        constexpr uint32_t MASK_PAT_IN_BIT = 8 * PRE_ELEM_NUM_PER_LOOP; // 1+2+4
-        constexpr uint32_t MASK_IDX = 9 * PRE_ELEM_NUM_PER_LOOP; // 1+2+4+1
-        constexpr uint32_t RSVD_SPARSE_IDX = 13 * PRE_ELEM_NUM_PER_LOOP; // 1+2+4+1+4
+        constexpr uint32_t MASK_PAT_IN_FP32 = 4 * PRE_ELEM_NUM_PER_LOOP;   // 2(db)+2
+        constexpr uint32_t MASK_PAT_IN_BIT = 8 * PRE_ELEM_NUM_PER_LOOP;    // 1+2+4
+        constexpr uint32_t MASK_IDX = 9 * PRE_ELEM_NUM_PER_LOOP;           // 1+2+4+1
+        constexpr uint32_t RSVD_SPARSE_IDX = 13 * PRE_ELEM_NUM_PER_LOOP;   // 1+2+4+1+4
         constexpr uint32_t RSVD_SPARSE_COUNT = 21 * PRE_ELEM_NUM_PER_LOOP; // 1+2+4+1+4+8(db)
 
         for (uint32_t i = 0; i < IO_STAGES; i++) {
@@ -68,21 +58,17 @@ public:
         maskIdxUb = resource.ubBuf.template GetBufferByByte<ElementSparseIdx>(MASK_IDX);
     }
 
-    __aicore__ inline
-    void operator()(
-        AscendC::GlobalTensor<ElementSparseMask> gSparseMask,
-        AscendC::GlobalTensor<ElementSparseIdx> gSparseIdx,
-        AscendC::GlobalTensor<ElementSparseCount> gSparseCount,
-        uint32_t totalRowNumBlockMask,
-        uint32_t yBlockNumAligned,
-        uint32_t avgRowPerSubCore,
-        uint32_t preActiveSubCoreNum)
+    __aicore__ inline void operator()(AscendC::GlobalTensor<ElementSparseMask> gSparseMask,
+                                      AscendC::GlobalTensor<ElementSparseIdx> gSparseIdx,
+                                      AscendC::GlobalTensor<ElementSparseCount> gSparseCount,
+                                      uint32_t totalRowNumBlockMask, uint32_t yBlockNumAligned,
+                                      uint32_t avgRowPerSubCore, uint32_t preActiveSubCoreNum)
     {
         uint32_t subCoreIdx = AscendC::GetBlockIdx();
         uint32_t curSubCoreRowOffset = subCoreIdx * avgRowPerSubCore;
-        uint32_t actDealtRow = (subCoreIdx == preActiveSubCoreNum - 1) ?
-            (totalRowNumBlockMask - curSubCoreRowOffset) : avgRowPerSubCore;
-        
+        uint32_t actDealtRow =
+            (subCoreIdx == preActiveSubCoreNum - 1) ? (totalRowNumBlockMask - curSubCoreRowOffset) : avgRowPerSubCore;
+
         if (subCoreIdx < preActiveSubCoreNum) {
             uint32_t rowLoop = CeilDiv(actDealtRow, PRE_ROW_TILE);
             uint32_t colLoop = CeilDiv(yBlockNumAligned, PRE_COL_TILE);
@@ -100,66 +86,53 @@ public:
                     uint32_t actDealtColCurLoop =
                         (j == colLoop - 1) ? (yBlockNumAligned - curLoopColOffset) : PRE_COL_TILE;
                     uint32_t actDealtColCurLoop32 = CeilDiv(actDealtColCurLoop, 32) * 32;
-                    AscendC::CreateVecIndex(
-                        maskIdxUb, static_cast<int32_t>(curLoopColOffset), actDealtColCurLoop);
+                    AscendC::CreateVecIndex(maskIdxUb, static_cast<int32_t>(curLoopColOffset), actDealtColCurLoop);
                     AscendC::PipeBarrier<PIPE_V>();
                     AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(IdxPingPongFlag);
                     AscendC::DataCopyPad(
-                        maskPatUb8[IdxPingPongFlag],
-                        gSparseMask[globalRowOffset * yBlockNumAligned + curLoopColOffset],
-                        AscendC::DataCopyExtParams(
-                            actDealtRowCurLoop,
-                            actDealtColCurLoop * sizeof(ElementSparseMask),
-                            (yBlockNumAligned - actDealtColCurLoop) * sizeof(ElementSparseMask),
-                            0, 0),
+                        maskPatUb8[IdxPingPongFlag], gSparseMask[globalRowOffset * yBlockNumAligned + curLoopColOffset],
+                        AscendC::DataCopyExtParams(actDealtRowCurLoop, actDealtColCurLoop * sizeof(ElementSparseMask),
+                                                   (yBlockNumAligned - actDealtColCurLoop) * sizeof(ElementSparseMask),
+                                                   0, 0),
                         AscendC::DataCopyPadExtParams<ElementSparseMask>(
                             true, 0, (actDealtColCurLoop32 - actDealtColCurLoop), 0));
                     AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(0);
                     AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(0);
-                    AscendC::Cast(
-                        maskPatUb16, maskPatUb8[IdxPingPongFlag],
-                        AscendC::RoundMode::CAST_NONE, actDealtRowCurLoop * actDealtColCurLoop32);
+                    AscendC::Cast(maskPatUb16, maskPatUb8[IdxPingPongFlag], AscendC::RoundMode::CAST_NONE,
+                                  actDealtRowCurLoop * actDealtColCurLoop32);
                     AscendC::PipeBarrier<PIPE_V>();
                     AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(IdxPingPongFlag);
 
-                    AscendC::Cast(
-                        maskPatUb32, maskPatUb16,
-                        AscendC::RoundMode::CAST_NONE, actDealtRowCurLoop * actDealtColCurLoop32);
+                    AscendC::Cast(maskPatUb32, maskPatUb16, AscendC::RoundMode::CAST_NONE,
+                                  actDealtRowCurLoop * actDealtColCurLoop32);
                     AscendC::PipeBarrier<PIPE_V>();
                     for (uint32_t k = 0; k < actDealtRowCurLoop; k++) {
-                        AscendC::CompareScalar(
-                            maskPatInBitUb8[k * PRE_COL_TILE],
-                            maskPatUb32[k * actDealtColCurLoop32],
-                            static_cast<float>(1.0), AscendC::CMPMODE::GE, actDealtColCurLoop);
+                        AscendC::CompareScalar(maskPatInBitUb8[k * PRE_COL_TILE], maskPatUb32[k * actDealtColCurLoop32],
+                                               static_cast<float>(1.0), AscendC::CMPMODE::GE, actDealtColCurLoop);
                         AscendC::PipeBarrier<PIPE_V>();
                         if (k == 0) {
                             AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(IdxPingPongFlag);
                         }
-                        AscendC::GatherMask(
-                            sparseIdxUb[IdxPingPongFlag][k * PRE_COL_TILE],
-                            maskIdxUb,
-                            maskPatInBitUb32[k * PRE_COL_TILE / 4],
-                            true, actDealtColCurLoop, {1, 1, 0, 0}, rsvdCountPerRowCurColLoop[k]);
+                        AscendC::GatherMask(sparseIdxUb[IdxPingPongFlag][k * PRE_COL_TILE], maskIdxUb,
+                                            maskPatInBitUb32[k * PRE_COL_TILE / 4], true, actDealtColCurLoop,
+                                            {1, 1, 0, 0}, rsvdCountPerRowCurColLoop[k]);
                         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(0);
-
 
                         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(0);
                         if (k == 0) {
                             AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(0);
                         }
                         AscendC::DataCopyPad(
-                            gSparseIdx[
-                                globalRowOffset * yBlockNumAligned + k * yBlockNumAligned +
-                                rsvdCountPerRow[k]],
+                            gSparseIdx[globalRowOffset * yBlockNumAligned + k * yBlockNumAligned + rsvdCountPerRow[k]],
                             sparseIdxUb[IdxPingPongFlag][k * PRE_COL_TILE],
-                            AscendC::DataCopyExtParams(
-                                1, rsvdCountPerRowCurColLoop[k] * sizeof(ElementSparseIdx), 0, 0, 0));
+                            AscendC::DataCopyExtParams(1, rsvdCountPerRowCurColLoop[k] * sizeof(ElementSparseIdx), 0, 0,
+                                                       0));
                         if (k == actDealtRowCurLoop - 1) {
                             AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(IdxPingPongFlag);
                         }
-                        AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(0);
+                        AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(2);
 
-                        AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(0);
+                        AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(2);
                         rsvdCountPerRow[k] += rsvdCountPerRowCurColLoop[k];
                         if (k == actDealtRowCurLoop - 1) {
                             AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(0);
@@ -174,8 +147,7 @@ public:
                 AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(CountPingPongFlag + 2);
                 AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(CountPingPongFlag + 2);
                 AscendC::DataCopyPad(
-                    gSparseCount[globalRowOffset],
-                    sparseCountUb[CountPingPongFlag],
+                    gSparseCount[globalRowOffset], sparseCountUb[CountPingPongFlag],
                     AscendC::DataCopyExtParams(1, actDealtRowCurLoop * sizeof(ElementSparseCount), 0, 0, 0));
                 AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(CountPingPongFlag);
 
@@ -183,17 +155,18 @@ public:
             }
         }
     }
+
 private:
     AscendC::LocalTensor<uint8_t> maskPatUb8[IO_STAGES];
     AscendC::LocalTensor<int32_t> sparseCountUb[IO_STAGES];
     AscendC::LocalTensor<uint8_t> maskPatInBitUb8;
     AscendC::LocalTensor<uint32_t> maskPatInBitUb32;
-    
+
     AscendC::LocalTensor<int32_t> maskIdxUb;
     AscendC::LocalTensor<int32_t> sparseIdxUb[IO_STAGES];
     AscendC::LocalTensor<half> maskPatUb16;
     AscendC::LocalTensor<float> maskPatUb32;
 };
 
-}  // namespace NpuArch::Epilogue::Block
+} // namespace NpuArch::Epilogue::Block
 #endif

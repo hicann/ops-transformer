@@ -20,14 +20,8 @@ using namespace ge;
 
 class block_sparse_attention_tiling_ut : public testing::Test {
 protected:
-    static void SetUpTestCase()
-    {
-        cout << "block_sparse_attention_tiling_ut SetUp" << endl;
-    }
-    static void TearDownTestCase()
-    {
-        cout << "block_sparse_attention_tiling_ut TearDown" << endl;
-    }
+    static void SetUpTestCase() { cout << "block_sparse_attention_tiling_ut SetUp" << endl; }
+    static void TearDownTestCase() { cout << "block_sparse_attention_tiling_ut TearDown" << endl; }
 };
 
 namespace {
@@ -1735,7 +1729,8 @@ TEST_F(block_sparse_attention_tiling_ut, A5_fp8_dequantScale_is_null)
          {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
          {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"quantMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}},
         &compileInfo, "Ascend950", 56, 262144, 16384);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
@@ -1939,7 +1934,8 @@ TEST_F(block_sparse_attention_tiling_ut, A5_fp8_blockShapeX_is_not_128)
          {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
          {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"quantMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}},
         &compileInfo, "Ascend950", 56, 262144, 16384);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 9050000030400012);
 }
@@ -2035,7 +2031,8 @@ TEST_F(block_sparse_attention_tiling_ut, A5_fp8_small_blockShape_16_64_tnd_norma
          {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
          {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"quantMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}},
         &compileInfo, "Ascend950", 56, 262144, 16384);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 9050000030400012);
 }
@@ -2083,7 +2080,8 @@ TEST_F(block_sparse_attention_tiling_ut, A5_fp8_small_blockShape_64_64_tnd_norma
          {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
          {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"quantMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}},
         &compileInfo, "Ascend950", 56, 262144, 16384);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 9050000030400012);
 }
@@ -2123,7 +2121,8 @@ TEST_F(block_sparse_attention_tiling_ut, A5_fp8_attentionOut_dtype_fp16)
          {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
          {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"quantMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}},
         &compileInfo, "Ascend950", 56, 262144, 16384);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 9050000030400012);
 }
@@ -2163,7 +2162,8 @@ TEST_F(block_sparse_attention_tiling_ut, A5_fp8_attentionOut_dtype_bf16)
          {"blockSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"preTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
          {"nextTokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+         {"softmaxLseFlag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"quantMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}},
         &compileInfo, "Ascend950", 56, 262144, 16384);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 9050000030400022);
 }

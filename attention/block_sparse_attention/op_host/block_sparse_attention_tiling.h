@@ -59,6 +59,7 @@ TILING_DATA_FIELD_DEF(uint32_t, blockSize);
 TILING_DATA_FIELD_DEF(uint32_t, maxNumBlocksPerBatch);
 TILING_DATA_FIELD_DEF(uint32_t, firstBatchTaskNum);
 TILING_DATA_FIELD_DEF(uint32_t, totalTaskNum);
+TILING_DATA_FIELD_DEF(uint32_t, coreTaskNum); // 向下取整: totalTaskNum / blockDim
 TILING_DATA_FIELD_DEF(uint32_t, maskType);
 TILING_DATA_FIELD_DEF(float, scaleValue);
 TILING_DATA_FIELD_DEF(uint32_t, totalQBlocks);   // T: 所有batch中Q方向切块的总数
@@ -73,7 +74,6 @@ TILING_DATA_FIELD_DEF(uint32_t, maxKvBlockNum); // 最大KV块数量（selectIdx
 TILING_DATA_FIELD_DEF(uint32_t, maxQBlockNum);  // 最大KV块数量（selectIdx的最后一维）
 TILING_DATA_FIELD_DEF(uint32_t, avgRowNumPerSubCore);
 TILING_DATA_FIELD_DEF(uint32_t, preActivateSubCoreNum);
-
 
 // query Layout: 0=TND, 1=BNSD, 2=BSND
 TILING_DATA_FIELD_DEF(uint32_t, queryLayout);
@@ -99,6 +99,10 @@ TILING_DATA_FIELD_DEF(uint64_t, smOnlineOutSize);
 TILING_DATA_FIELD_DEF(uint64_t, mm2OutSize);
 TILING_DATA_FIELD_DEF(uint64_t, updateSize);
 TILING_DATA_FIELD_DEF(uint64_t, workSpaceSize);
+
+// V3 新增:量化参数
+TILING_DATA_FIELD_DEF(float, log2Cx);
+TILING_DATA_FIELD_DEF(float, log2CxCeil);
 
 TILING_DATA_FIELD_DEF_STRUCT(BsaMask2IdxTiling, BsaMask2IdxTileInfo);
 TILING_DATA_FIELD_DEF_STRUCT(BsaBaseTiling, BsaBaseTileInfo);
@@ -184,6 +188,7 @@ private:
     ge::graphStatus ParseBlockTable(gert::TilingContext *bsaContext);
     ge::graphStatus CheckSparsePattern(gert::TilingContext *bsaContext, const int64_t defaultShape);
     ge::graphStatus ValidateGenericDequantScale(gert::TilingContext *bsaContext, const int parameterIndex);
+    ge::graphStatus ValidateMxfp4DequantScale(gert::TilingContext *bsaContext, const int parameterIndex);
     ge::graphStatus ValidateQDequantScale(gert::TilingContext *bsaContext);
     ge::graphStatus ValidateKDequantScale(gert::TilingContext *bsaContext);
     ge::graphStatus ValidateVDequantScale(gert::TilingContext *bsaContext);
@@ -216,6 +221,11 @@ private:
     uint32_t maskType_ = 0;
     uint32_t innerPrecise_ = 1; // 0=float32 softmax, 1=fp16 softmax
     bool softmaxLseFlag_ = false;
+    // V3 新增:量化参数
+    uint32_t quantMode_ = 0;
+    float dstTypeMax_ = 0.0f; // 中间计算用,不下发 tiling
+    float log2Cx_ = 0.0f;
+    float log2CxCeil_ = 0.0f;
 
     uint32_t totalQBlocks_ = 0;
     uint32_t maxKvBlockNum_ = 0;
@@ -225,6 +235,7 @@ private:
     uint32_t firstQBlockNum_ = 0;
     uint32_t firstBatchTaskNum_ = 0;
     uint32_t totalTaskNum_ = 0;
+    uint32_t coreTaskNum_ = 0; // 向下取整: totalTaskNum_ / blockDim_
     uint32_t maxNumBlocksPerBatch_ = 0;
     const int64_t *qSeqLenList_ = nullptr;
     const int64_t *kvSeqLenList_ = nullptr;
@@ -254,6 +265,7 @@ private:
     uint32_t maxKvSeqlen_ = 0;  // BNSD/BSND格式KV的S维度
     int64_t totalTokensT_ = 0;  // TND格式Q的第一维（T维度，总token数）
     int64_t totalTokensKv_ = 0; // TND格式KV的第一维（T维度，总token数）
+    uint32_t btKvTokens_ = 0; // [TND mxfp4] BTkv = sum_b CeilDiv(S2_b, 64), V-scale TND dim0(ParseSeqlensInTND 累加)
 
     // mask2idx tile info
     uint32_t xBlockNumAligned_;

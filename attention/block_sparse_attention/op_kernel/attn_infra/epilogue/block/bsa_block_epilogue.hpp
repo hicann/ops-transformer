@@ -15,15 +15,12 @@
 
 namespace NpuArch::Epilogue::Block {
 
-template <
-    class DispatchPolicy,
-    class... Args
->
+template <class DispatchPolicy, class... Args>
 class BlockEpilogue {
     static_assert(DEPENDENT_FALSE<DispatchPolicy>, "Could not find an epilogue specialization");
 };
 
-}  // namespace NpuArch::Epilogue::Block
+} // namespace NpuArch::Epilogue::Block
 #if (__CCE_AICORE__ == 220)
 #include "../../../attn_infra/epilogue/block/bsa_block_epilogue_online_softmax.hpp"
 #include "../../../attn_infra/epilogue/block/bsa_block_epilogue_online_softmax_low_prec.hpp"
@@ -33,7 +30,11 @@ class BlockEpilogue {
 #if (__CCE_AICORE__ == 310)
 #include "../../../attn_infra/epilogue/block/block_epilogue_mask2idx_arch35.hpp"
 #include "../../../attn_infra/epilogue/block/block_epilogue_rescale_o_arch35_reg_high_prec.hpp"
+#include "../../../attn_infra/epilogue/block/block_epilogue_rescale_o_arch35_reg_high_prec_mxfp4.hpp"
 #include "../../../attn_infra/epilogue/block/block_epilogue_online_softmax_arch35_reg_low_prec.hpp"
 #include "../../../attn_infra/epilogue/block/block_epilogue_online_softmax_arch35_reg_low_prec_bf16.hpp"
+#include "../../../attn_infra/epilogue/block/block_epilogue_online_softmax_arch35_reg_low_prec_fp16_mxfp4.hpp"
+#include "../../../attn_infra/epilogue/block/block_epilogue_compute_pscale_arch35_mxfp4.hpp"
+#include "../../../attn_infra/epilogue/block/block_epilogue_copy_global_max_ub_to_l1_arch35_mxfp4.hpp"
 #endif
-#endif  // EPILOGUE_BLOCK_BLOCK_EPILOGUE_HPP
+#endif // EPILOGUE_BLOCK_BLOCK_EPILOGUE_HPP
