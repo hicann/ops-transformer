@@ -11,13 +11,13 @@
 #ifndef CATLASS_EPILOGUE_BLOCK_BLOCK_EPILOGUE_ONLINE_SOFTMAX_NO_MASK_HPP
 #define CATLASS_EPILOGUE_BLOCK_BLOCK_EPILOGUE_ONLINE_SOFTMAX_NO_MASK_HPP
 
-#include "catlass/catlass.hpp"
+#include "catlass/kda_catlass.hpp"
 #include "catlass/arch/kda_cross_core_sync.hpp"
-#include "catlass/arch/resource.hpp"
-#include "catlass/epilogue/dispatch_policy.hpp"
+#include "catlass/arch/kda_resource.hpp"
+#include "catlass/epilogue/kda_dispatch_policy.hpp"
 #include "catlass/epilogue/tile/tile_copy.hpp"
-#include "catlass/gemm_coord.hpp"
-#include "catlass/matrix_coord.hpp"
+#include "catlass/kda_gemm_coord.hpp"
+#include "catlass/kda_matrix_coord.hpp"
 
 namespace Catlass::Epilogue::Block {
 

@@ -10,11 +10,11 @@
 
 #ifndef CATLASS_EPILOGUE_BLOCK_BLOCK_EPILOGUE_KDA_FWDH_UPDATE_ARCH22_HPP
 #define CATLASS_EPILOGUE_BLOCK_BLOCK_EPILOGUE_KDA_FWDH_UPDATE_ARCH22_HPP
-#include "catlass/catlass.hpp"
-#include "catlass/arch/resource.hpp"
+#include "catlass/kda_catlass.hpp"
+#include "catlass/arch/kda_resource.hpp"
 #include "../kda_fwd_h_epilogue_policies.hpp"
-#include "catlass/gemm_coord.hpp"
-#include "catlass/matrix_coord.hpp"
+#include "catlass/kda_gemm_coord.hpp"
+#include "catlass/kda_matrix_coord.hpp"
 #include "catlass/epilogue/tile/tile_copy.hpp"
 
 namespace Catlass::Epilogue::Block {

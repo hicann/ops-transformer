@@ -10,7 +10,7 @@
 #ifndef CATLASS_KDA_NUMERIC_SIZE_HPP
 #define CATLASS_KDA_NUMERIC_SIZE_HPP
 
-#include "catlass/catlass.hpp"
+#include "catlass/kda_catlass.hpp"
 
 namespace Catlass {
 

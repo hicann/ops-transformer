@@ -11,7 +11,7 @@
 #ifndef CATLASS_KDA_COORD_HPP
 #define CATLASS_KDA_COORD_HPP
 
-#include "catlass/catlass.hpp"
+#include "catlass/kda_catlass.hpp"
 
 namespace Catlass {
 

@@ -11,14 +11,14 @@
 #ifndef CATLASS_GEMM_BLOCK_MMAD_QK_TAIL_TLA_HPP
 #define CATLASS_GEMM_BLOCK_MMAD_QK_TAIL_TLA_HPP
 
-#include "catlass/catlass.hpp"
-#include "catlass/arch/resource.hpp"
+#include "catlass/kda_catlass.hpp"
+#include "catlass/arch/kda_resource.hpp"
 #include "catlass/kda_coord.hpp"
 #include "catlass/gemm/dispatch_policy.hpp"
-#include "catlass/gemm/helper.hpp"
-#include "catlass/gemm_coord.hpp"
+#include "catlass/gemm/kda_gemm_helper.hpp"
+#include "catlass/kda_gemm_coord.hpp"
 #include "catlass/gemm/tile/tile_copy.hpp"
-#include "catlass/gemm/tile/tile_mmad.hpp"
+#include "catlass/gemm/tile/kda_tile_mmad.hpp"
 #include "tla/layout.hpp"
 #include "tla/kda_tensor.hpp"
 

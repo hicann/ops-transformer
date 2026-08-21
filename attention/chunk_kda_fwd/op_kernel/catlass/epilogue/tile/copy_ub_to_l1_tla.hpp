@@ -11,8 +11,8 @@
 #ifndef CATLASS_EPILOGUE_TILE_COPY_UB_TO_L1_TLA_HPP
 #define CATLASS_EPILOGUE_TILE_COPY_UB_TO_L1_TLA_HPP
 
-#include "catlass/catlass.hpp"
-#include "catlass/arch/arch.hpp"
+#include "catlass/kda_catlass.hpp"
+#include "catlass/arch/kda_arch.hpp"
 #include "tla/kda_tensor.hpp"
 #include "tla/layout.hpp"
 

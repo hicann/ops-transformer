@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "catlass/gemm_coord.hpp"
+#include "catlass/kda_gemm_coord.hpp"
 #include "../../../../chunk_kda_fwd_h_runtime_tiling.h"
 using namespace Catlass;
 

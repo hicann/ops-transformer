@@ -10,13 +10,13 @@
 #ifndef CATLASS_GEMM_BLOCK_BLOCK_MMAD_PRELOAD_ASYNC_WITH_CALLBACK_TLA_HPP
 #define CATLASS_GEMM_BLOCK_BLOCK_MMAD_PRELOAD_ASYNC_WITH_CALLBACK_TLA_HPP
 
-#include "catlass/arch/resource.hpp"
-#include "catlass/catlass.hpp"
+#include "catlass/arch/kda_resource.hpp"
+#include "catlass/kda_catlass.hpp"
 #include "catlass/kda_coord.hpp"
 #include "catlass/detail/kda_callback.hpp"
 #include "catlass/gemm/dispatch_policy.hpp"
-#include "catlass/gemm/helper.hpp"
-#include "catlass/gemm_coord.hpp"
+#include "catlass/gemm/kda_gemm_helper.hpp"
+#include "catlass/kda_gemm_coord.hpp"
 #include "tla/layout.hpp"
 #include "tla/kda_tensor.hpp"
 

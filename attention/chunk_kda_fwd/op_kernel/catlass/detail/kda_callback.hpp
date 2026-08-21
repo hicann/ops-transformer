@@ -11,7 +11,7 @@
 #ifndef CATLASS_DETAIL_KDA_CALLBACK_HPP
 #define CATLASS_DETAIL_KDA_CALLBACK_HPP
 
-#include "catlass/detail/macros.hpp"
+#include "catlass/detail/kda_macros.hpp"
 
 /// @brief Callback is an alternative to std::function<void(void)>, providing a general carrier
 /// of callable structure with no parameters and no return value. Compared with function pointers

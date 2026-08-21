@@ -11,12 +11,12 @@
 #ifndef TLA_LAYOUT_HPP
 #define TLA_LAYOUT_HPP
 
-#include "catlass/catlass.hpp"
+#include "catlass/kda_catlass.hpp"
 #include "tla/numeric/integral_constant.hpp"
 #include "tla/numeric/math.hpp"
 #include "tla/tuple.hpp"
 #include "tla/int_tuple.hpp"
-#include "catlass/layout/layout.hpp"
+#include "catlass/layout/kda_layout.hpp"
 
 namespace tla {
 

@@ -11,7 +11,7 @@
 #ifndef CATLASS_EPILOGUE_KDA_FWD_H_EPILOGUE_POLICIES_HPP
 #define CATLASS_EPILOGUE_KDA_FWD_H_EPILOGUE_POLICIES_HPP
 
-#include "catlass/catlass.hpp"
+#include "catlass/kda_catlass.hpp"
 
 namespace Catlass::Epilogue {
 

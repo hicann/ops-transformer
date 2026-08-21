@@ -18,17 +18,17 @@
 #endif
 #endif
 
-#include "catlass/arch/arch.hpp"
+#include "catlass/arch/kda_arch.hpp"
 #include "catlass/arch/kda_cross_core_sync.hpp"
-#include "catlass/arch/resource.hpp"
-#include "catlass/catlass.hpp"
-#include "catlass/gemm/block/block_mmad.hpp"
+#include "catlass/arch/kda_resource.hpp"
+#include "catlass/kda_catlass.hpp"
+#include "catlass/gemm/block/kda_block_mmad.hpp"
 #include "catlass/gemm/dispatch_policy.hpp"
 #include "catlass/gemm/tile/tile_copy.hpp"
-#include "catlass/gemm/tile/tile_mmad.hpp"
-#include "catlass/gemm_coord.hpp"
+#include "catlass/gemm/tile/kda_tile_mmad.hpp"
+#include "catlass/kda_gemm_coord.hpp"
 #include "../kernel_utils/block/block_mmad_pingpong_tla_multi.hpp"
-#include "catlass/layout/layout.hpp"
+#include "catlass/layout/kda_layout.hpp"
 #include "kernel_operator.h"
 #include "../chunk_kda_fwd_varlen.h"
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310

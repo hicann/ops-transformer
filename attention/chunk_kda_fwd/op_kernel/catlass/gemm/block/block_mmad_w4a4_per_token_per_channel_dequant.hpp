@@ -10,15 +10,15 @@
 #ifndef CATLASS_GEMM_BLOCK_BLOCK_MMAD_W4A4_HPP
 #define CATLASS_GEMM_BLOCK_BLOCK_MMAD_W4A4_HPP
 
-#include "catlass/arch/resource.hpp"
-#include "catlass/catlass.hpp"
+#include "catlass/arch/kda_resource.hpp"
+#include "catlass/kda_catlass.hpp"
 #include "catlass/kda_coord.hpp"
 #include "catlass/detail/kda_callback.hpp"
 #include "catlass/gemm/dispatch_policy.hpp"
-#include "catlass/gemm/helper.hpp"
+#include "catlass/gemm/kda_gemm_helper.hpp"
 #include "catlass/gemm/tile/tile_copy.hpp"
-#include "catlass/gemm/tile/tile_mmad.hpp"
-#include "catlass/gemm_coord.hpp"
+#include "catlass/gemm/tile/kda_tile_mmad.hpp"
+#include "catlass/kda_gemm_coord.hpp"
 
 namespace Catlass::Gemm::Block {
 

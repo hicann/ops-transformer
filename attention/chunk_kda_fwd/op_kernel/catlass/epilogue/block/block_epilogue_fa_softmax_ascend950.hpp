@@ -11,12 +11,12 @@
 #ifndef CATLASS_EPILOGUE_BLOCK_BLOCK_EPILOGUE_FA_SOFTMAX_A5
 #define CATLASS_EPILOGUE_BLOCK_BLOCK_EPILOGUE_FA_SOFTMAX_A5
 
-#include "catlass/catlass.hpp"
+#include "catlass/kda_catlass.hpp"
 #include "catlass/arch/kda_cross_core_sync.hpp"
-#include "catlass/arch/resource.hpp"
-#include "catlass/epilogue/dispatch_policy.hpp"
-#include "catlass/gemm_coord.hpp"
-#include "catlass/matrix_coord.hpp"
+#include "catlass/arch/kda_resource.hpp"
+#include "catlass/epilogue/kda_dispatch_policy.hpp"
+#include "catlass/kda_gemm_coord.hpp"
+#include "catlass/kda_matrix_coord.hpp"
 #include "tla/kda_tensor.hpp"
 #include "tla/layout.hpp"
 

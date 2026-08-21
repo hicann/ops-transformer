@@ -11,7 +11,7 @@
 #ifndef TLA_NUMERIC_MATH_HPP
 #define TLA_NUMERIC_MATH_HPP
 
-#include "catlass/detail/macros.hpp"
+#include "catlass/detail/kda_macros.hpp"
 #include "tla/type_traits.hpp"
 
 namespace tla {

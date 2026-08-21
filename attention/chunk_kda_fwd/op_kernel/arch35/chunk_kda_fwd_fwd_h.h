@@ -12,9 +12,9 @@
 #define CHUNK_KDA_FWD_ARCH35_FWD_H_H
 
 #include "kernel_operator.h"
-#include "catlass/arch/resource.hpp"
+#include "catlass/arch/kda_resource.hpp"
 #include "catlass/gemm/tile/tile_copy.hpp"
-#include "catlass/gemm/tile/tile_mmad.hpp"
+#include "catlass/gemm/tile/kda_tile_mmad.hpp"
 #include "../kernel_utils/tile/copy_l0c_to_ub.hpp"
 
 namespace KdaForward::arch35 {

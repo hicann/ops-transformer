@@ -11,9 +11,9 @@
 #ifndef CATLASS_GEMM_TILE_ASCEND950_COPY_L0C_TO_UB_950_HPP
 #define CATLASS_GEMM_TILE_ASCEND950_COPY_L0C_TO_UB_950_HPP
 
-#include "catlass/arch/arch.hpp"
-#include "catlass/catlass.hpp"
-#include "catlass/gemm/tile/ascend950/copy_l0c_to_dst.hpp"
+#include "catlass/arch/kda_arch.hpp"
+#include "catlass/kda_catlass.hpp"
+#include "catlass/gemm/tile/ascend950/kda_ascend950_copy_l0c_to_dst.hpp"
 #include "tla/kda_tensor.hpp"
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)

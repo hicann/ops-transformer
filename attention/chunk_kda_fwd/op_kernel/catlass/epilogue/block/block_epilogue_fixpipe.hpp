@@ -11,14 +11,14 @@
 #ifndef CATLASS_EPILOGUE_BLOCK_EPILOGUE_FIXPIPE_HPP
 #define CATLASS_EPILOGUE_BLOCK_EPILOGUE_FIXPIPE_HPP
 
-#include "catlass/catlass.hpp"
-#include "catlass/arch/resource.hpp"
-#include "catlass/epilogue/dispatch_policy.hpp"
-#include "catlass/gemm_coord.hpp"
-#include "catlass/matrix_coord.hpp"
+#include "catlass/kda_catlass.hpp"
+#include "catlass/arch/kda_resource.hpp"
+#include "catlass/epilogue/kda_dispatch_policy.hpp"
+#include "catlass/kda_gemm_coord.hpp"
+#include "catlass/kda_matrix_coord.hpp"
 #include "catlass/epilogue/tile/tile_copy.hpp"
-#include "catlass/gemm/helper.hpp"
-#include "catlass/epilogue/tile/copy_ub_to_gm_tla.hpp"
+#include "catlass/gemm/kda_gemm_helper.hpp"
+#include "catlass/epilogue/tile/kda_copy_ub_to_gm_tla.hpp"
 
 namespace Catlass::Epilogue::Block {
 

@@ -11,12 +11,12 @@
 #ifndef CATLASS_GEMM_TILE_ATLASA2_KDA_CAST_INT8_TO_FP16_HPP
 #define CATLASS_GEMM_TILE_ATLASA2_KDA_CAST_INT8_TO_FP16_HPP
 
-#include "catlass/catlass.hpp"
-#include "catlass/arch/resource.hpp"
+#include "catlass/kda_catlass.hpp"
+#include "catlass/arch/kda_resource.hpp"
 #include "catlass/kda_coord.hpp"
-#include "catlass/gemm_coord.hpp"
+#include "catlass/kda_gemm_coord.hpp"
 #include "catlass/gemm/dispatch_policy.hpp"
-#include "catlass/gemm/helper.hpp"
+#include "catlass/gemm/kda_gemm_helper.hpp"
 
 namespace Catlass::Gemm::Tile {
 

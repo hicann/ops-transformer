@@ -11,13 +11,13 @@
 #ifndef CATLASS_EPILOGUE_TILE_TILE_COPY_HPP
 #define CATLASS_EPILOGUE_TILE_TILE_COPY_HPP
 
-#include "catlass/catlass.hpp"
-#include "catlass/arch/arch.hpp"
-#include "catlass/detail/tag_to_layout.hpp"
-#include "catlass/epilogue/tile/copy_gm_to_ub.hpp"
-#include "catlass/epilogue/tile/copy_ub_to_gm.hpp"
-#include "catlass/epilogue/tile/copy_gm_to_ub_tla.hpp"
-#include "catlass/epilogue/tile/copy_ub_to_gm_tla.hpp"
+#include "catlass/kda_catlass.hpp"
+#include "catlass/arch/kda_arch.hpp"
+#include "catlass/detail/kda_tag_to_layout.hpp"
+#include "catlass/epilogue/tile/kda_copy_gm_to_ub.hpp"
+#include "catlass/epilogue/tile/kda_copy_ub_to_gm.hpp"
+#include "catlass/epilogue/tile/kda_copy_gm_to_ub_tla.hpp"
+#include "catlass/epilogue/tile/kda_copy_ub_to_gm_tla.hpp"
 #include "tla/kda_tensor.hpp"
 
 #if (defined(CATLASS_ARCH) && CATLASS_ARCH == 3510)

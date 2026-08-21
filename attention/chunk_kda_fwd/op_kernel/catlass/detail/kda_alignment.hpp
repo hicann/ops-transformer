@@ -11,7 +11,7 @@
 #ifndef CATLASS_KDA_ALIGNMENT_HPP
 #define CATLASS_KDA_ALIGNMENT_HPP
 
-#include "catlass/detail/macros.hpp"
+#include "catlass/detail/kda_macros.hpp"
 #include "tla/numeric/integral_constant.hpp"
 
 template <uint32_t ALIGN, typename T>

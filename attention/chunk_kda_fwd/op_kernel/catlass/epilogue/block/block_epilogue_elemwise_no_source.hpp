@@ -11,13 +11,13 @@
 #ifndef CATLASS_EPILOGUE_BLOCK_EPILOGUE_ELEMWISE_NO_SOURCE_HPP
 #define CATLASS_EPILOGUE_BLOCK_EPILOGUE_ELEMWISE_NO_SOURCE_HPP
 
-#include "catlass/catlass.hpp"
-#include "catlass/arch/resource.hpp"
-#include "catlass/epilogue/dispatch_policy.hpp"
-#include "catlass/gemm_coord.hpp"
-#include "catlass/matrix_coord.hpp"
-#include "catlass/layout/layout.hpp"
-#include "catlass/epilogue/tile/tile_cast.hpp"
+#include "catlass/kda_catlass.hpp"
+#include "catlass/arch/kda_resource.hpp"
+#include "catlass/epilogue/kda_dispatch_policy.hpp"
+#include "catlass/kda_gemm_coord.hpp"
+#include "catlass/kda_matrix_coord.hpp"
+#include "catlass/layout/kda_layout.hpp"
+#include "catlass/epilogue/tile/kda_tile_cast.hpp"
 
 namespace Catlass::Epilogue::Block {
 template <
