@@ -29,7 +29,8 @@ class InplacePartialRotaryMulGradAAndB {
 public:
     __aicore__ inline InplacePartialRotaryMulGradAAndB(TPipe *pipe,
                                                        const InplacePartialRotaryMulGradRegbaseTilingData *tiling)
-        : pipe_(pipe), tilingData_(tiling){};
+        : pipe_(pipe),
+          tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR dy, GM_ADDR cos, GM_ADDR sin, GM_ADDR dx);
     __aicore__ inline void Process();
 
@@ -227,10 +228,10 @@ __aicore__ inline void InplacePartialRotaryMulGradAAndB<TDY, TCOS, IsBroadCast>:
     } else {
         // cos/sin bLength rows, dy bLength rows: treat B as "S" dimension
         BatchInterleaveModeGradVF<TDY, TCOS, IsBroadCast>(
-            (__local_mem__ TDY *)inUb.GetPhyAddr(), (__local_mem__ TCOS *)cosUb.GetPhyAddr(),
-            (__local_mem__ TCOS *)sinUb.GetPhyAddr(), (__local_mem__ TDY *)outUb.GetPhyAddr(),
-            static_cast<uint16_t>(bLength), static_cast<uint16_t>(1), static_cast<uint16_t>(1),
-            tilingData_->sliceLength, dAlignDy_, dAlignCos_, ubFactorB_, static_cast<int64_t>(1));
+            (__ubuf__ TDY *)inUb.GetPhyAddr(), (__ubuf__ TCOS *)cosUb.GetPhyAddr(), (__ubuf__ TCOS *)sinUb.GetPhyAddr(),
+            (__ubuf__ TDY *)outUb.GetPhyAddr(), static_cast<uint16_t>(bLength), static_cast<uint16_t>(1),
+            static_cast<uint16_t>(1), tilingData_->sliceLength, dAlignDy_, dAlignCos_, ubFactorB_,
+            static_cast<int64_t>(1));
     }
 
     dyInQue_.FreeTensor(inUb);

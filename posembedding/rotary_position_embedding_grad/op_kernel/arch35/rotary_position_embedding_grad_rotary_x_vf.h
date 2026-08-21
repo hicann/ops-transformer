@@ -26,8 +26,7 @@ constexpr uint32_t HALF_INTERLEAVE_COEF = 2;
 constexpr uint32_t QUARTER_MODE_COEF = 4;
 constexpr uint32_t DOUBLE_BUFFER = 2;
 
-enum class RotaryPosEmbeddingMode : int64_t
-{
+enum class RotaryPosEmbeddingMode : int64_t {
     HALF = 0,
     INTERLEAVE = 1,
     QUARTER = 2,
@@ -38,14 +37,13 @@ enum class RotaryPosEmbeddingMode : int64_t
     x = [-x[1], x[0]]
 */
 template <typename T>
-__aicore__ inline void HalfRotaryVF(
-    const LocalTensor<T>& inTensor, const LocalTensor<T>& rotaryTensor, const uint32_t dLen, const uint32_t dAlign,
-    const uint16_t currDNum)
+__aicore__ inline void HalfRotaryVF(const LocalTensor<T> &inTensor, const LocalTensor<T> &rotaryTensor,
+                                    const uint32_t dLen, const uint32_t dAlign, const uint16_t currDNum)
 {
-    __local_mem__ T* inUb = (__local_mem__ T*)inTensor.GetPhyAddr();
-    __local_mem__ T* outUb = (__local_mem__ T*)rotaryTensor.GetPhyAddr();
-    __local_mem__ T* currInUb;
-    __local_mem__ T* currOutUb;
+    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
+    __ubuf__ T *outUb = (__ubuf__ T *)rotaryTensor.GetPhyAddr();
+    __ubuf__ T *currInUb;
+    __ubuf__ T *currOutUb;
     uint32_t vecLen = Ops::Base::GetVRegSize() / sizeof(T);
     uint32_t halfD = dLen / HALF_INTERLEAVE_COEF;
     uint32_t halfDAlign = Ops::Base::CeilAlign(halfD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
@@ -69,11 +67,11 @@ __aicore__ inline void HalfRotaryVF(
                 preg = MicroAPI::UpdateMask<T>(updateCnt);
                 int32_t offset = i * vecLen;
                 int32_t halfOffset = offset + halfDAlign;
-                MicroAPI::DataCopy(vregIn, currInUb + offset);
-                MicroAPI::DataCopy(vregHalfIn, currInUb + halfOffset);
+                MicroAPI::LoadAlign(vregIn, currInUb + offset);
+                MicroAPI::LoadAlign(vregHalfIn, currInUb + halfOffset);
                 MicroAPI::Mul(vregHalfIn, vregHalfIn, vregNeg, preg);
-                MicroAPI::DataCopy(currOutUb + offset, vregHalfIn, preg);
-                MicroAPI::DataCopy(currOutUb + halfOffset, vregIn, preg);
+                MicroAPI::StoreAlign(currOutUb + offset, vregHalfIn, preg);
+                MicroAPI::StoreAlign(currOutUb + halfOffset, vregIn, preg);
             }
         }
     }
@@ -83,14 +81,13 @@ __aicore__ inline void HalfRotaryVF(
     x = [-q1, q0, -q3, q2]
 */
 template <typename T>
-__aicore__ inline void QuarterRotaryVF(
-    const LocalTensor<T>& inTensor, const LocalTensor<T>& rotaryTensor, const uint32_t dLen, const uint32_t dAlign,
-    const uint16_t currDNum)
+__aicore__ inline void QuarterRotaryVF(const LocalTensor<T> &inTensor, const LocalTensor<T> &rotaryTensor,
+                                       const uint32_t dLen, const uint32_t dAlign, const uint16_t currDNum)
 {
-    __local_mem__ T* inUb = (__local_mem__ T*)inTensor.GetPhyAddr();
-    __local_mem__ T* outUb = (__local_mem__ T*)rotaryTensor.GetPhyAddr();
-    __local_mem__ T* currInUb;
-    __local_mem__ T* currOutUb;
+    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
+    __ubuf__ T *outUb = (__ubuf__ T *)rotaryTensor.GetPhyAddr();
+    __ubuf__ T *currInUb;
+    __ubuf__ T *currOutUb;
     uint32_t vecLen = Ops::Base::GetVRegSize() / sizeof(T);
     uint32_t quarterD = dLen / QUARTER_MODE_COEF;
     uint32_t quarterDAlign = Ops::Base::CeilAlign(quarterD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
@@ -120,16 +117,16 @@ __aicore__ inline void QuarterRotaryVF(
                 int32_t q1Offset = offset + quarterDAlign;
                 int32_t q2Offset = q1Offset + quarterDAlign;
                 int32_t q3Offset = q2Offset + quarterDAlign;
-                MicroAPI::DataCopy(vregIn, currInUb + offset);
-                MicroAPI::DataCopy(vregQ1In, currInUb + q1Offset);
-                MicroAPI::DataCopy(vregQ2In, currInUb + q2Offset);
-                MicroAPI::DataCopy(vregQ3In, currInUb + q3Offset);
+                MicroAPI::LoadAlign(vregIn, currInUb + offset);
+                MicroAPI::LoadAlign(vregQ1In, currInUb + q1Offset);
+                MicroAPI::LoadAlign(vregQ2In, currInUb + q2Offset);
+                MicroAPI::LoadAlign(vregQ3In, currInUb + q3Offset);
                 MicroAPI::Mul(vregQ1In, vregQ1In, vregNeg, preg);
                 MicroAPI::Mul(vregQ3In, vregQ3In, vregNeg, preg);
-                MicroAPI::DataCopy(currOutUb + offset, vregQ1In, preg);
-                MicroAPI::DataCopy(currOutUb + q1Offset, vregIn, preg);
-                MicroAPI::DataCopy(currOutUb + q2Offset, vregQ3In, preg);
-                MicroAPI::DataCopy(currOutUb + q3Offset, vregQ2In, preg);
+                MicroAPI::StoreAlign(currOutUb + offset, vregQ1In, preg);
+                MicroAPI::StoreAlign(currOutUb + q1Offset, vregIn, preg);
+                MicroAPI::StoreAlign(currOutUb + q2Offset, vregQ3In, preg);
+                MicroAPI::StoreAlign(currOutUb + q3Offset, vregQ2In, preg);
             }
         }
     }
@@ -141,13 +138,13 @@ __aicore__ inline void QuarterRotaryVF(
     x = [x_odd, - x_even]
 */
 template <typename T>
-__aicore__ inline void InterleaveRotaryVF(
-    const LocalTensor<T>& inTensor, const LocalTensor<T>& rotaryTensor, const uint32_t dLen, const uint16_t currDNum)
+__aicore__ inline void InterleaveRotaryVF(const LocalTensor<T> &inTensor, const LocalTensor<T> &rotaryTensor,
+                                          const uint32_t dLen, const uint16_t currDNum)
 {
-    __local_mem__ T* inUb = (__local_mem__ T*)inTensor.GetPhyAddr();
-    __local_mem__ T* outUb = (__local_mem__ T*)rotaryTensor.GetPhyAddr();
-    __local_mem__ T* currInUb;
-    __local_mem__ T* currOutUb;
+    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
+    __ubuf__ T *outUb = (__ubuf__ T *)rotaryTensor.GetPhyAddr();
+    __ubuf__ T *currInUb;
+    __ubuf__ T *currOutUb;
     uint32_t vecLen = Ops::Base::GetVRegSize() / sizeof(T);
     uint32_t dAlignLen = Ops::Base::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint32_t loopSize = vecLen * HALF_INTERLEAVE_COEF;
@@ -185,26 +182,26 @@ __aicore__ inline void InterleaveRotaryVF(
                 int32_t offset = i * loopSize;
                 pregPart1 = MicroAPI::UpdateMask<T>(part1Cnt);
                 pregPart2 = MicroAPI::UpdateMask<T>(part2Cnt);
-                MicroAPI::DataCopy(vregFormerIn, currInUb + offset);
-                MicroAPI::DataCopy(vregLatterIn, currInUb + offset + vecLen);
+                MicroAPI::LoadAlign(vregFormerIn, currInUb + offset);
+                MicroAPI::LoadAlign(vregLatterIn, currInUb + offset + vecLen);
                 MicroAPI::DeInterleave<T>(vregEven, vregOdd, vregFormerIn, vregLatterIn);
                 MicroAPI::Mul(vregOdd, vregOdd, vregNeg, pregLoop);
                 MicroAPI::Interleave<T>(vregFormerIn, vregLatterIn, vregOdd, vregEven);
-                MicroAPI::DataCopy(currOutUb + offset, vregFormerIn, pregPart1);
-                MicroAPI::DataCopy(currOutUb + offset + vecLen, vregLatterIn, pregPart2);
+                MicroAPI::StoreAlign(currOutUb + offset, vregFormerIn, pregPart1);
+                MicroAPI::StoreAlign(currOutUb + offset + vecLen, vregLatterIn, pregPart2);
             }
         }
     }
 }
 
 template <typename T>
-__aicore__ inline void DSDSinInterleaveHalfVF(
-    const LocalTensor<T>& inTensor, const LocalTensor<T>& rotaryTensor, const uint32_t dLen, const uint16_t currDNum)
+__aicore__ inline void DSDSinInterleaveHalfVF(const LocalTensor<T> &inTensor, const LocalTensor<T> &rotaryTensor,
+                                              const uint32_t dLen, const uint16_t currDNum)
 {
-    __local_mem__ T* inUb = (__local_mem__ T*)inTensor.GetPhyAddr();
-    __local_mem__ T* outUb = (__local_mem__ T*)rotaryTensor.GetPhyAddr();
-    __local_mem__ T* currInUb;
-    __local_mem__ T* currOutUb;
+    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
+    __ubuf__ T *outUb = (__ubuf__ T *)rotaryTensor.GetPhyAddr();
+    __ubuf__ T *currInUb;
+    __ubuf__ T *currOutUb;
 
     uint32_t vecLen = Ops::Base::GetVRegSize() / sizeof(T);
     uint32_t dAlignLen = Ops::Base::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
@@ -241,25 +238,25 @@ __aicore__ inline void DSDSinInterleaveHalfVF(
                 int32_t outOffset = i * vecLen;
                 pregPart1 = MicroAPI::UpdateMask<T>(part1Cnt);
                 pregPart2 = MicroAPI::UpdateMask<T>(part2Cnt);
-                MicroAPI::DataCopy(vregFormerIn, currInUb + inOffset);
-                MicroAPI::DataCopy(vregLatterIn, currInUb + inOffset + vecLen);
+                MicroAPI::LoadAlign(vregFormerIn, currInUb + inOffset);
+                MicroAPI::LoadAlign(vregLatterIn, currInUb + inOffset + vecLen);
                 MicroAPI::DeInterleave<T>(vregEven, vregOdd, vregFormerIn, vregLatterIn);
                 MicroAPI::Mul(vregOdd, vregOdd, vregNeg, pregLoop);
-                MicroAPI::DataCopy(currOutUb + outOffset, vregOdd, pregPart1);
-                MicroAPI::DataCopy(currOutUb + outOffset + halfDAlign, vregEven, pregPart2);
+                MicroAPI::StoreAlign(currOutUb + outOffset, vregOdd, pregPart1);
+                MicroAPI::StoreAlign(currOutUb + outOffset + halfDAlign, vregEven, pregPart2);
             }
         }
     }
 }
 
 template <typename T>
-__aicore__ inline void DSCosInterleaveHalfVF(
-    const LocalTensor<T>& inTensor, const LocalTensor<T>& rotaryTensor, const uint32_t dLen, const uint16_t currDNum)
+__aicore__ inline void DSCosInterleaveHalfVF(const LocalTensor<T> &inTensor, const LocalTensor<T> &rotaryTensor,
+                                             const uint32_t dLen, const uint16_t currDNum)
 {
-    __local_mem__ T* inUb = (__local_mem__ T*)inTensor.GetPhyAddr();
-    __local_mem__ T* outUb = (__local_mem__ T*)rotaryTensor.GetPhyAddr();
-    __local_mem__ T* currInUb;
-    __local_mem__ T* currOutUb;
+    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
+    __ubuf__ T *outUb = (__ubuf__ T *)rotaryTensor.GetPhyAddr();
+    __ubuf__ T *currInUb;
+    __ubuf__ T *currOutUb;
 
     uint32_t vecLen = Ops::Base::GetVRegSize() / sizeof(T);
     uint32_t dAlignLen = Ops::Base::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
@@ -294,11 +291,11 @@ __aicore__ inline void DSCosInterleaveHalfVF(
                 int32_t outOffset = i * vecLen;
                 pregPart1 = MicroAPI::UpdateMask<T>(part1Cnt);
                 pregPart2 = MicroAPI::UpdateMask<T>(part2Cnt);
-                MicroAPI::DataCopy(vregFormerIn, currInUb + inOffset);
-                MicroAPI::DataCopy(vregLatterIn, currInUb + inOffset + vecLen);
+                MicroAPI::LoadAlign(vregFormerIn, currInUb + inOffset);
+                MicroAPI::LoadAlign(vregLatterIn, currInUb + inOffset + vecLen);
                 MicroAPI::DeInterleave<T>(vregEven, vregOdd, vregFormerIn, vregLatterIn);
-                MicroAPI::DataCopy(currOutUb + outOffset, vregEven, pregPart1);
-                MicroAPI::DataCopy(currOutUb + outOffset + halfDAlign, vregOdd, pregPart2);
+                MicroAPI::StoreAlign(currOutUb + outOffset, vregEven, pregPart1);
+                MicroAPI::StoreAlign(currOutUb + outOffset + halfDAlign, vregOdd, pregPart2);
             }
         }
     }

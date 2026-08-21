@@ -22,11 +22,11 @@ namespace RotaryPositionEmbeddingGrad {
 using namespace AscendC;
 
 template <typename T, bool IsBBoardcast>
-class RotaryPositionEmbeddingGradABAAndBA
-{
+class RotaryPositionEmbeddingGradABAAndBA {
 public:
-    __aicore__ inline RotaryPositionEmbeddingGradABAAndBA(TPipe* pipe, const RopeGradRegbaseParams* tiling)
-        : pipe_(pipe), tilingData_(tiling){};
+    __aicore__ inline RotaryPositionEmbeddingGradABAAndBA(TPipe *pipe, const RopeGradRegbaseParams *tiling)
+        : pipe_(pipe),
+          tilingData_(tiling){};
 
     __aicore__ inline ~RotaryPositionEmbeddingGradABAAndBA(){};
 
@@ -40,31 +40,28 @@ private:
     __aicore__ inline void InitAllBuffer();
     __aicore__ inline void InitLoopParams();
     // 各个层级的Process函数
-    __aicore__ inline void ProcessInSLoop(
-        int64_t sUbStart,
-        int64_t sUbLength); // 第一重循环体，给定S范围，沿B轴进行遍历处理
-    __aicore__ inline void ProcessInSBLoop(
-        int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, LocalTensor<T>& cos,
-        LocalTensor<T>& sin); // 第二重循环体，给定BS范围，沿N轴进行遍历处理
-    __aicore__ inline void ProcessInSBNLoop(
-        int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, int64_t nUbStart, int64_t nUbLength,
-        int64_t nTotalSize, LocalTensor<T>& cos, LocalTensor<T>& sin, GlobalTensor<T>& in,
-        GlobalTensor<T>& out); // 第三重循环体，给定BSN范围，计算其中数据的rope
+    __aicore__ inline void ProcessInSLoop(int64_t sUbStart,
+                                          int64_t sUbLength); // 第一重循环体，给定S范围，沿B轴进行遍历处理
+    __aicore__ inline void ProcessInSBLoop(int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength,
+                                           LocalTensor<T> &cos,
+                                           LocalTensor<T> &sin); // 第二重循环体，给定BS范围，沿N轴进行遍历处理
+    __aicore__ inline void ProcessInSBNLoop(int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength,
+                                            int64_t nUbStart, int64_t nUbLength, int64_t nTotalSize,
+                                            LocalTensor<T> &cos, LocalTensor<T> &sin, GlobalTensor<T> &in,
+                                            GlobalTensor<T> &out); // 第三重循环体，给定BSN范围，计算其中数据的rope
     // 拷入拷出函数
     __aicore__ inline void CopyInCosAndSin(int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength);
-    __aicore__ inline void CopyIn(
-        GlobalTensor<T>& source, int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart,
-        int64_t nLength, int64_t nTotalSize);
-    __aicore__ inline void CopyOut(
-        GlobalTensor<T>& target, int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart,
-        int64_t nLength, int64_t nTotalSize);
+    __aicore__ inline void CopyIn(GlobalTensor<T> &source, int64_t sStart, int64_t sLength, int64_t bStart,
+                                  int64_t bLength, int64_t nStart, int64_t nLength, int64_t nTotalSize);
+    __aicore__ inline void CopyOut(GlobalTensor<T> &target, int64_t sStart, int64_t sLength, int64_t bStart,
+                                   int64_t bLength, int64_t nStart, int64_t nLength, int64_t nTotalSize);
 
     // 计算函数
-    __aicore__ inline void Compute(
-        LocalTensor<T>& cos, LocalTensor<T>& sin, int64_t sLength, int64_t bLength, int64_t nLength);
+    __aicore__ inline void Compute(LocalTensor<T> &cos, LocalTensor<T> &sin, int64_t sLength, int64_t bLength,
+                                   int64_t nLength);
 
 private:
-    TPipe* pipe_;
+    TPipe *pipe_;
 
     // GlobalMemory
     GlobalTensor<T> gradGm_;
@@ -86,7 +83,7 @@ private:
     int64_t sBlockLength_ = 0;
 
     // TilingData
-    const RopeGradRegbaseParams* tilingData_;
+    const RopeGradRegbaseParams *tilingData_;
     int64_t ubFactorB_ = 0;
     int64_t ubFactorS_ = 0;
     int64_t ubFactorN_ = 0;
@@ -100,8 +97,8 @@ private:
 };
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Init(
-    GM_ADDR grad, GM_ADDR cos, GM_ADDR sin, GM_ADDR xGrad)
+__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Init(GM_ADDR grad, GM_ADDR cos,
+                                                                                  GM_ADDR sin, GM_ADDR xGrad)
 {
     if (GetBlockIdx() >= tilingData_->usedCoreNum) {
         return;
@@ -113,13 +110,15 @@ __aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Ini
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::InitAllGlobalBuffer(
-    GM_ADDR grad, GM_ADDR cos, GM_ADDR sin, GM_ADDR xGrad)
+__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::InitAllGlobalBuffer(GM_ADDR grad,
+                                                                                                 GM_ADDR cos,
+                                                                                                 GM_ADDR sin,
+                                                                                                 GM_ADDR xGrad)
 {
-    this->gradGm_.SetGlobalBuffer((__gm__ T*)grad);
-    this->cosGm_.SetGlobalBuffer((__gm__ T*)cos);
-    this->sinGm_.SetGlobalBuffer((__gm__ T*)sin);
-    this->xGradOutGm_.SetGlobalBuffer((__gm__ T*)xGrad);
+    this->gradGm_.SetGlobalBuffer((__gm__ T *)grad);
+    this->cosGm_.SetGlobalBuffer((__gm__ T *)cos);
+    this->sinGm_.SetGlobalBuffer((__gm__ T *)sin);
+    this->xGradOutGm_.SetGlobalBuffer((__gm__ T *)xGrad);
 }
 
 template <typename T, bool IsBBoardcast>
@@ -140,12 +139,13 @@ __aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Ini
     if (tilingData_->rotaryMode == static_cast<int64_t>(RotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE)) {
         this->copyOutSplitCoef_ = 1;
         this->ubCopyOutStride =
-            (this->dAlign_ * sizeof(T) - Ops::Base::CeilAlign<int64_t>(D_ * sizeof(T), BLOCK_TYPE_SIZE)) / BLOCK_TYPE_SIZE;
+            (this->dAlign_ * sizeof(T) - Ops::Base::CeilAlign<int64_t>(D_ * sizeof(T), BLOCK_TYPE_SIZE)) /
+            BLOCK_TYPE_SIZE;
     }
-    this->pipe_->InitBuffer(
-        this->gradInQueue_, DOUBLE_BUFFER, ubFactorB_ * ubFactorS_ * ubFactorN_ * dAlign_ * sizeof(T));
-    this->pipe_->InitBuffer(
-        this->xGradOutQueue_, DOUBLE_BUFFER, ubFactorB_ * ubFactorS_ * ubFactorN_ * dAlign_ * sizeof(T));
+    this->pipe_->InitBuffer(this->gradInQueue_, DOUBLE_BUFFER,
+                            ubFactorB_ * ubFactorS_ * ubFactorN_ * dAlign_ * sizeof(T));
+    this->pipe_->InitBuffer(this->xGradOutQueue_, DOUBLE_BUFFER,
+                            ubFactorB_ * ubFactorS_ * ubFactorN_ * dAlign_ * sizeof(T));
     if constexpr (IsBBoardcast) {
         this->pipe_->InitBuffer(this->cosInQueue_, DOUBLE_BUFFER, ubFactorS_ * dAlign_ * sizeof(T));
         this->pipe_->InitBuffer(this->sinInQueue_, DOUBLE_BUFFER, ubFactorS_ * dAlign_ * sizeof(T));
@@ -181,15 +181,14 @@ __aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Pro
     // 在S轴进行循环
     int64_t ubLoopCount = Ops::Base::CeilDiv(sBlockLength_, ubFactorS_);
     for (int64_t ubLoopIdx = 0; ubLoopIdx < ubLoopCount; ubLoopIdx++) {
-        this->ProcessInSLoop(
-            sBlockStart_ + ubLoopIdx * ubFactorS_,
-            ubLoopIdx != ubLoopCount - 1 ? ubFactorS_ : sBlockLength_ - ubLoopIdx * ubFactorS_);
+        this->ProcessInSLoop(sBlockStart_ + ubLoopIdx * ubFactorS_,
+                             ubLoopIdx != ubLoopCount - 1 ? ubFactorS_ : sBlockLength_ - ubLoopIdx * ubFactorS_);
     }
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::ProcessInSLoop(
-    int64_t sUbStart, int64_t sUbLength)
+__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::ProcessInSLoop(int64_t sUbStart,
+                                                                                            int64_t sUbLength)
 {
     // 在B轴进行循环
     int64_t ubLoopCount = Ops::Base::CeilDiv(bBlockLength_, ubFactorB_);
@@ -199,23 +198,22 @@ __aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Pro
         LocalTensor<T> cosUb = this->cosInQueue_.template DeQue<T>();
         LocalTensor<T> sinUb = this->sinInQueue_.template DeQue<T>();
         for (int64_t ubLoopIdx = 0; ubLoopIdx < ubLoopCount; ubLoopIdx++) {
-            this->ProcessInSBLoop(
-                sUbStart, sUbLength, bBlockStart_ + ubLoopIdx * ubFactorB_,
-                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_, cosUb, sinUb);
+            this->ProcessInSBLoop(sUbStart, sUbLength, bBlockStart_ + ubLoopIdx * ubFactorB_,
+                                  ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_,
+                                  cosUb, sinUb);
         }
         this->sinInQueue_.FreeTensor(cosUb);
         this->cosInQueue_.FreeTensor(sinUb);
     } else {
         // sin和cos无需在B轴广播的情况
         for (int64_t ubLoopIdx = 0; ubLoopIdx < ubLoopCount; ubLoopIdx++) {
-            this->CopyInCosAndSin(
-                sUbStart, sUbLength, bBlockStart_ + ubLoopIdx * ubFactorB_,
-                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_);
+            this->CopyInCosAndSin(sUbStart, sUbLength, bBlockStart_ + ubLoopIdx * ubFactorB_,
+                                  ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_);
             LocalTensor<T> cosUb = this->cosInQueue_.template DeQue<T>();
             LocalTensor<T> sinUb = this->sinInQueue_.template DeQue<T>();
-            this->ProcessInSBLoop(
-                sUbStart, sUbLength, bBlockStart_ + ubLoopIdx * ubFactorB_,
-                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_, cosUb, sinUb);
+            this->ProcessInSBLoop(sUbStart, sUbLength, bBlockStart_ + ubLoopIdx * ubFactorB_,
+                                  ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_,
+                                  cosUb, sinUb);
             this->cosInQueue_.FreeTensor(cosUb);
             this->sinInQueue_.FreeTensor(sinUb);
         }
@@ -224,22 +222,21 @@ __aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Pro
 
 template <typename T, bool IsBBoardcast>
 __aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::ProcessInSBLoop(
-    int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, LocalTensor<T>& cos, LocalTensor<T>& sin)
+    int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, LocalTensor<T> &cos, LocalTensor<T> &sin)
 {
     // 循环处理
     int64_t ubLoopCount = Ops::Base::CeilDiv(tilingData_->n, ubFactorN_);
     for (int64_t ubLoopIdx = 0; ubLoopIdx < ubLoopCount; ubLoopIdx++) {
-        this->ProcessInSBNLoop(
-            sUbStart, sUbLength, bUbStart, bUbLength, ubLoopIdx * ubFactorN_,
-            ubLoopIdx != ubLoopCount - 1 ? ubFactorN_ : tilingData_->n - ubLoopIdx * ubFactorN_, tilingData_->n, cos,
-            sin, gradGm_, xGradOutGm_);
+        this->ProcessInSBNLoop(sUbStart, sUbLength, bUbStart, bUbLength, ubLoopIdx * ubFactorN_,
+                               ubLoopIdx != ubLoopCount - 1 ? ubFactorN_ : tilingData_->n - ubLoopIdx * ubFactorN_,
+                               tilingData_->n, cos, sin, gradGm_, xGradOutGm_);
     }
 }
 
 template <typename T, bool IsBBoardcast>
 __aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::ProcessInSBNLoop(
     int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, int64_t nUbStart, int64_t nUbLength,
-    int64_t nTotalSize, LocalTensor<T>& cos, LocalTensor<T>& sin, GlobalTensor<T>& in, GlobalTensor<T>& out)
+    int64_t nTotalSize, LocalTensor<T> &cos, LocalTensor<T> &sin, GlobalTensor<T> &in, GlobalTensor<T> &out)
 {
     CopyIn(in, sUbStart, sUbLength, bUbStart, bUbLength, nUbStart, nUbLength, nTotalSize);
     Compute(cos, sin, sUbLength, bUbLength, nUbLength);
@@ -247,8 +244,10 @@ __aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Pro
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::CopyInCosAndSin(
-    int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength)
+__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::CopyInCosAndSin(int64_t sStart,
+                                                                                             int64_t sLength,
+                                                                                             int64_t bStart,
+                                                                                             int64_t bLength)
 {
     LocalTensor<T> cosUb = this->cosInQueue_.template AllocTensor<T>();
     LocalTensor<T> sinUb = this->sinInQueue_.template AllocTensor<T>();
@@ -278,9 +277,11 @@ __aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Cop
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::CopyIn(
-    GlobalTensor<T>& source, int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart,
-    int64_t nLength, int64_t nTotalSize)
+__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::CopyIn(GlobalTensor<T> &source,
+                                                                                    int64_t sStart, int64_t sLength,
+                                                                                    int64_t bStart, int64_t bLength,
+                                                                                    int64_t nStart, int64_t nLength,
+                                                                                    int64_t nTotalSize)
 {
     LocalTensor<T> target = this->gradInQueue_.template AllocTensor<T>();
     // 数据格式为BNSD，B->N->S->D
@@ -302,17 +303,18 @@ __aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Cop
     copyPadExtparams.leftPadding = 0;
     copyPadExtparams.rightPadding = 0;
     copyPadExtparams.paddingValue = 0;
-    DataCopyPad(
-        target, source[bStart * nTotalSize * tilingData_->s * D_ + nStart * tilingData_->s * D_ + sStart * D_],
-        copyExtParams, copyPadExtparams);
+    DataCopyPad(target, source[bStart * nTotalSize * tilingData_->s * D_ + nStart * tilingData_->s * D_ + sStart * D_],
+                copyExtParams, copyPadExtparams);
     ResetLoopModePara(DataCopyMVType::OUT_TO_UB);
     this->gradInQueue_.template EnQue(target);
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::CopyOut(
-    GlobalTensor<T>& target, int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart,
-    int64_t nLength, int64_t nTotalSize)
+__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::CopyOut(GlobalTensor<T> &target,
+                                                                                     int64_t sStart, int64_t sLength,
+                                                                                     int64_t bStart, int64_t bLength,
+                                                                                     int64_t nStart, int64_t nLength,
+                                                                                     int64_t nTotalSize)
 {
     LocalTensor<T> source = this->xGradOutQueue_.template DeQue<T>();
     // 数据格式为BNSD，B->N->S->D
@@ -329,35 +331,36 @@ __aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Cop
     copyExtParams.blockLen = D_ * sizeof(T) / copyOutSplitCoef_;
     copyExtParams.srcStride = ubCopyOutStride;
     copyExtParams.dstStride = 0;
-    DataCopyPad(
-        target[bStart * nTotalSize * tilingData_->s * D_ + nStart * tilingData_->s * D_ + sStart * D_], source,
-        copyExtParams);
+    DataCopyPad(target[bStart * nTotalSize * tilingData_->s * D_ + nStart * tilingData_->s * D_ + sStart * D_], source,
+                copyExtParams);
     ResetLoopModePara(DataCopyMVType::UB_TO_OUT);
     this->xGradOutQueue_.FreeTensor(source);
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Compute(
-    LocalTensor<T>& cos, LocalTensor<T>& sin, int64_t sLength, int64_t bLength, int64_t nLength)
+__aicore__ inline void RotaryPositionEmbeddingGradABAAndBA<T, IsBBoardcast>::Compute(LocalTensor<T> &cos,
+                                                                                     LocalTensor<T> &sin,
+                                                                                     int64_t sLength, int64_t bLength,
+                                                                                     int64_t nLength)
 {
     LocalTensor<T> inUb = this->gradInQueue_.template DeQue<T>();
     LocalTensor<T> outUb = this->xGradOutQueue_.template AllocTensor<T>();
     if (tilingData_->rotaryMode == static_cast<int64_t>(RotaryPosEmbeddingMode::HALF)) {
-        BatchHalfGradAlignVF<T, IsBBoardcast>(
-            (__local_mem__ T*)inUb.GetPhyAddr(), (__local_mem__ T*)cos.GetPhyAddr(), (__local_mem__ T*)sin.GetPhyAddr(),
-            (__local_mem__ T*)outUb.GetPhyAddr(), sLength, bLength, nLength, D_, dAlign_, ubFactorS_, ubFactorN_);
+        BatchHalfGradAlignVF<T, IsBBoardcast>((__ubuf__ T *)inUb.GetPhyAddr(), (__ubuf__ T *)cos.GetPhyAddr(),
+                                              (__ubuf__ T *)sin.GetPhyAddr(), (__ubuf__ T *)outUb.GetPhyAddr(), sLength,
+                                              bLength, nLength, D_, dAlign_, ubFactorS_, ubFactorN_);
     } else if (tilingData_->rotaryMode == static_cast<int64_t>(RotaryPosEmbeddingMode::INTERLEAVE)) {
-        BatchInterleaveModeGradVF<T, IsBBoardcast>(
-            (__local_mem__ T*)inUb.GetPhyAddr(), (__local_mem__ T*)cos.GetPhyAddr(), (__local_mem__ T*)sin.GetPhyAddr(),
-            (__local_mem__ T*)outUb.GetPhyAddr(), sLength, bLength, nLength, D_, dAlign_, ubFactorS_, ubFactorN_);
+        BatchInterleaveModeGradVF<T, IsBBoardcast>((__ubuf__ T *)inUb.GetPhyAddr(), (__ubuf__ T *)cos.GetPhyAddr(),
+                                                   (__ubuf__ T *)sin.GetPhyAddr(), (__ubuf__ T *)outUb.GetPhyAddr(),
+                                                   sLength, bLength, nLength, D_, dAlign_, ubFactorS_, ubFactorN_);
     } else if (tilingData_->rotaryMode == static_cast<int64_t>(RotaryPosEmbeddingMode::QUARTER)) {
-        BatchQuarterGradAlignVF<T, IsBBoardcast>(
-            (__local_mem__ T*)inUb.GetPhyAddr(), (__local_mem__ T*)cos.GetPhyAddr(), (__local_mem__ T*)sin.GetPhyAddr(),
-            (__local_mem__ T*)outUb.GetPhyAddr(), sLength, bLength, nLength, D_, dAlign_, ubFactorS_, ubFactorN_);
+        BatchQuarterGradAlignVF<T, IsBBoardcast>((__ubuf__ T *)inUb.GetPhyAddr(), (__ubuf__ T *)cos.GetPhyAddr(),
+                                                 (__ubuf__ T *)sin.GetPhyAddr(), (__ubuf__ T *)outUb.GetPhyAddr(),
+                                                 sLength, bLength, nLength, D_, dAlign_, ubFactorS_, ubFactorN_);
     } else {
         BatchDeepSeekInterleaveModeGradVF<T, IsBBoardcast>(
-            (__local_mem__ T*)inUb.GetPhyAddr(), (__local_mem__ T*)cos.GetPhyAddr(), (__local_mem__ T*)sin.GetPhyAddr(),
-            (__local_mem__ T*)outUb.GetPhyAddr(), sLength, bLength, nLength, D_, dAlign_, ubFactorS_, ubFactorN_);
+            (__ubuf__ T *)inUb.GetPhyAddr(), (__ubuf__ T *)cos.GetPhyAddr(), (__ubuf__ T *)sin.GetPhyAddr(),
+            (__ubuf__ T *)outUb.GetPhyAddr(), sLength, bLength, nLength, D_, dAlign_, ubFactorS_, ubFactorN_);
     }
     this->gradInQueue_.FreeTensor(inUb);
     this->xGradOutQueue_.template EnQue(outUb);

@@ -19,7 +19,7 @@ using namespace AscendC;
 using namespace AscendC::MicroAPI;
 using AscendC::MicroAPI::MaskReg;
 using AscendC::MicroAPI::RegTensor;
-using AscendC::MicroAPI::UnalignReg;
+using AscendC::MicroAPI::UnalignRegForLoad;
 constexpr int32_t BLOCK_SIZE = 32;
 constexpr int32_t VL_FP32 = 64;
 constexpr int32_t C0_SIZE = 8;
@@ -43,10 +43,7 @@ __aicore__ inline uint64_t CeilDiv(uint64_t a, uint64_t b)
     return (a + b - 1) / b;
 }
 
-__aicore__ inline uint64_t CeilAlign(uint64_t a, uint64_t b)
-{
-    return CeilDiv(a, b) * b;
-}
+__aicore__ inline uint64_t CeilAlign(uint64_t a, uint64_t b) { return CeilDiv(a, b) * b; }
 
 template <typename T>
 __aicore__ inline int32_t RoundUp(int32_t num)
@@ -78,59 +75,56 @@ __aicore__ inline void SetWaitFlag(HardEvent evt)
 }
 
 template <typename T>
-__aicore__ inline void LoadInputData(RegTensor<float>& dst, __local_mem__ T* src, MaskReg pregLoop,
-    uint32_t srcOffset)
+__aicore__ inline void LoadInputData(RegTensor<float> &dst, __ubuf__ T *src, MaskReg pregLoop, uint32_t srcOffset)
 {
     if constexpr (IsSameType<T, float>::value) {
-        DataCopy(dst, src + srcOffset);
+        LoadAlign(dst, src + srcOffset);
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
-        DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(tmp, src + srcOffset);
+        LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_UNPACK_B16>(tmp, src + srcOffset);
         Cast<float, T, castTraitB162B32Even>(dst, tmp, pregLoop);
     }
 }
 
 template <typename T>
-__aicore__ inline void StoreOutputData(__local_mem__ T* dst, RegTensor<float>& src, MaskReg pregLoop,
-    uint32_t dstOffset)
+__aicore__ inline void StoreOutputData(__ubuf__ T *dst, RegTensor<float> &src, MaskReg pregLoop, uint32_t dstOffset)
 {
     if constexpr (IsSameType<T, float>::value) {
-        DataCopy(dst + dstOffset, src, pregLoop);
+        StoreAlign(dst + dstOffset, src, pregLoop);
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
         Cast<T, float, castTraitB322B16Even>(tmp, src, pregLoop);
-        DataCopy<T, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(dst + dstOffset, tmp, pregLoop);
+        StoreAlign<T, AscendC::MicroAPI::StoreDist::DIST_PACK_B32>(dst + dstOffset, tmp, pregLoop);
     }
 }
 
 template <typename T>
-__aicore__ inline void LoadInputDataWithBrc(RegTensor<float>& dst, __local_mem__ T* src, MaskReg pregLoop,
-    uint32_t srcOffset)
+__aicore__ inline void LoadInputDataWithBrc(RegTensor<float> &dst, __ubuf__ T *src, MaskReg pregLoop,
+                                            uint32_t srcOffset)
 {
     if constexpr (IsSameType<T, float>::value) {
-        DataCopy<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(dst, src + srcOffset);
+        LoadAlign<float, AscendC::MicroAPI::LoadDist::DIST_BRC_B32>(dst, src + srcOffset);
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
-        DataCopy<T, AscendC::MicroAPI::LoadDist::DIST_BRC_B16>(tmp, src + srcOffset);
+        LoadAlign<T, AscendC::MicroAPI::LoadDist::DIST_BRC_B16>(tmp, src + srcOffset);
         Cast<float, T, castTraitB162B32Even>(dst, tmp, pregLoop);
     }
 }
 
 template <typename T>
-__aicore__ inline void LoadInputDataUnalign(RegTensor<float>& dst, __local_mem__ T*& src, UnalignReg& uSrc,
-    MaskReg pregLoop, uint32_t postUpdateStride)
+__aicore__ inline void LoadInputDataUnalign(RegTensor<float> &dst, __ubuf__ T *&src, UnalignRegForLoad &uSrc,
+                                            MaskReg pregLoop, uint32_t postUpdateStride)
 {
     if constexpr (IsSameType<T, float>::value) {
-        DataCopyUnAlign(dst, uSrc, src, postUpdateStride);
+        LoadUnAlign(dst, uSrc, src, postUpdateStride);
     } else if constexpr (IsSameType<T, half>::value || IsSameType<T, bfloat16_t>::value) {
         RegTensor<T> tmp;
         RegTensor<T> tmpUnPack;
-        DataCopyUnAlign(tmp, uSrc, src, postUpdateStride);
-        UnPack((RegTensor<uint32_t>&)tmpUnPack, (RegTensor<uint16_t>&)tmp);
+        LoadUnAlign(tmp, uSrc, src, postUpdateStride);
+        UnPack((RegTensor<uint32_t> &)tmpUnPack, (RegTensor<uint16_t> &)tmp);
         Cast<float, T, castTraitB162B32Even>(dst, tmpUnPack, pregLoop);
     }
 }
-
 
 __aicore__ inline void VFSigmoid(RegTensor<float> &y, RegTensor<float> &x, RegTensor<float> &one, MaskReg pregLoop)
 {
@@ -140,11 +134,11 @@ __aicore__ inline void VFSigmoid(RegTensor<float> &y, RegTensor<float> &x, RegTe
     Div(y, one, x, pregLoop);
 }
 
-__aicore__ inline void VFTransND2NZ(const LocalTensor<float>& yLocal, const LocalTensor<float>& xLocal,
-    const uint16_t curRowNum, const uint16_t curColNum)
+__aicore__ inline void VFTransND2NZ(const LocalTensor<float> &yLocal, const LocalTensor<float> &xLocal,
+                                    const uint16_t curRowNum, const uint16_t curColNum)
 {
-    __local_mem__ float* yLocalAddr = (__local_mem__ float*)yLocal.GetPhyAddr();
-    __local_mem__ float* xLocalAddr = (__local_mem__ float*)xLocal.GetPhyAddr();
+    __ubuf__ float *yLocalAddr = (__ubuf__ float *)yLocal.GetPhyAddr();
+    __ubuf__ float *xLocalAddr = (__ubuf__ float *)xLocal.GetPhyAddr();
     // NZ分享要求M,N方向按照16对齐
     uint16_t curRowNumAlign = CeilAlign(curRowNum, C0_SIZE);
     uint16_t c1Size = BLOCK_SIZE / sizeof(float);
@@ -162,10 +156,10 @@ __aicore__ inline void VFTransND2NZ(const LocalTensor<float>& yLocal, const Loca
             MaskReg pregMain = CreateMask<float>();
             for (uint16_t i = 0; i < curRowMainCount; i++) {
                 for (uint16_t j = 0; j < loopCount; j++) {
-                    DataCopy<float, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(x,
-                        xLocalAddr + i * C0_SIZE * (curColNumAlign + BLOCK_SIZE / sizeof(float)) + j * c1Size,
+                    LoadAlign<float, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(
+                        x, xLocalAddr + i * C0_SIZE * (curColNumAlign + BLOCK_SIZE / sizeof(float)) + j * c1Size,
                         dataBlockStride, pregMain);
-                    DataCopy(yLocalAddr + i * C0_SIZE * c1Size + j * curRowNumAlign * c1Size, x, pregMain);
+                    StoreAlign(yLocalAddr + i * C0_SIZE * c1Size + j * curRowNumAlign * c1Size, x, pregMain);
                 }
             }
         }
@@ -179,29 +173,29 @@ __aicore__ inline void VFTransND2NZ(const LocalTensor<float>& yLocal, const Loca
             MaskReg pregLoop = UpdateMask<float>(sreg);
             for (uint16_t i = 0; i < curRowMainCount; i++) {
                 for (uint16_t j = 0; j < loopCount; j++) {
-                    DataCopy<float, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(x,
-                        xLocalAddr + i * C0_SIZE * (curColNumAlign + BLOCK_SIZE / sizeof(float)) + j * c1Size,
+                    LoadAlign<float, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(
+                        x, xLocalAddr + i * C0_SIZE * (curColNumAlign + BLOCK_SIZE / sizeof(float)) + j * c1Size,
                         dataBlockStride, pregMain);
-                    DataCopy(yLocalAddr + i * C0_SIZE * c1Size + j * curRowNumAlign * c1Size, x, pregMain);
+                    StoreAlign(yLocalAddr + i * C0_SIZE * c1Size + j * curRowNumAlign * c1Size, x, pregMain);
                 }
             }
             xLocalAddr = xLocalAddr + curRowMainCount * C0_SIZE * (curColNumAlign + BLOCK_SIZE / sizeof(float));
             yLocalAddr = yLocalAddr + curRowMainCount * C0_SIZE * c1Size;
             for (uint16_t i = 0; i < loopCount; i++) {
-                DataCopy<float, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(x, xLocalAddr + i * c1Size,
-                    dataBlockStride, pregLoop);
-                DataCopy(yLocalAddr + i * curRowNumAlign * c1Size, x, pregLoop);
+                LoadAlign<float, AscendC::MicroAPI::DataCopyMode::DATA_BLOCK_COPY>(x, xLocalAddr + i * c1Size,
+                                                                                   dataBlockStride, pregLoop);
+                StoreAlign(yLocalAddr + i * curRowNumAlign * c1Size, x, pregLoop);
             }
         }
     }
 }
 
 template <typename T>
-__aicore__ inline void VFProcessCast(const LocalTensor<float>& yLocal, const LocalTensor<T>& xLocal,
-    const uint16_t curRowNum, const uint16_t curColNum)
+__aicore__ inline void VFProcessCast(const LocalTensor<float> &yLocal, const LocalTensor<T> &xLocal,
+                                     const uint16_t curRowNum, const uint16_t curColNum)
 {
-    __local_mem__ float* yLocalAddr = (__local_mem__ float*)yLocal.GetPhyAddr();
-    __local_mem__ T* xLocalAddr = (__local_mem__ T*)xLocal.GetPhyAddr();
+    __ubuf__ float *yLocalAddr = (__ubuf__ float *)yLocal.GetPhyAddr();
+    __ubuf__ T *xLocalAddr = (__ubuf__ T *)xLocal.GetPhyAddr();
     uint16_t loopCount = CeilDiv(curColNum, VL_FP32);
     uint16_t curColNumAlign = RoundUp<T>(curColNum);
     uint16_t dstCurColNumAlign = RoundUp<float>(curColNum) + BLOCK_SIZE / sizeof(float);
@@ -236,13 +230,13 @@ __aicore__ inline void VFProcessCast(const LocalTensor<float>& yLocal, const Loc
 }
 
 template <typename T, bool WithUbReduce = false>
-__aicore__ inline void VFProcessCastAndInvRmsPart1(const LocalTensor<float>& rmsNormLocal,
-    const LocalTensor<float>& xCastLocal, const LocalTensor<T>& xLocal, float coeff,
-    const uint16_t curRowNum, const uint16_t curColNum)
+__aicore__ inline void VFProcessCastAndInvRmsPart1(const LocalTensor<float> &rmsNormLocal,
+                                                   const LocalTensor<float> &xCastLocal, const LocalTensor<T> &xLocal,
+                                                   float coeff, const uint16_t curRowNum, const uint16_t curColNum)
 {
-    __local_mem__ float* rmsNormLocalAddr = (__local_mem__ float*)rmsNormLocal.GetPhyAddr();
-    __local_mem__ float* xCastLocalAddr = (__local_mem__ float*)xCastLocal.GetPhyAddr();
-    __local_mem__ T* xLocalAddr = (__local_mem__ T*)xLocal.GetPhyAddr();
+    __ubuf__ float *rmsNormLocalAddr = (__ubuf__ float *)rmsNormLocal.GetPhyAddr();
+    __ubuf__ float *xCastLocalAddr = (__ubuf__ float *)xCastLocal.GetPhyAddr();
+    __ubuf__ T *xLocalAddr = (__ubuf__ T *)xLocal.GetPhyAddr();
     uint16_t loopCount = CeilDiv(curColNum, VL_FP32);
     uint16_t curColNumAlign = RoundUp<T>(curColNum);
     uint16_t dstCurColNumAlign = RoundUp<float>(curColNum) + BLOCK_SIZE / sizeof(float);
@@ -272,14 +266,14 @@ __aicore__ inline void VFProcessCastAndInvRmsPart1(const LocalTensor<float>& rms
                     StoreOutputData(xCastLocalAddr, x, pregLoop, i * dstCurColNumAlign + j * VL_FP32);
                 }
                 Muls(sum, sum, coeff, pregMain);
-                ReduceSum(sum, sum, pregMain);
+                Reduce<ReduceType::SUM>(sum, sum, pregMain);
                 if constexpr (WithUbReduce) {
                     Add(y, y, sum, pregMerge);
-                    DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                        rmsNormLocalAddr + i, y, pregMerge);
+                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, y,
+                                                                                            pregMerge);
                 } else {
-                    DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                        rmsNormLocalAddr + i, sum, pregMerge);
+                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, sum,
+                                                                                            pregMerge);
                 }
             }
         }
@@ -305,27 +299,26 @@ __aicore__ inline void VFProcessCastAndInvRmsPart1(const LocalTensor<float>& rms
                 Mul(x1, x, x, pregLoop);
                 Add(sum, sum, x1, pregLoop);
                 Muls(sum, sum, coeff, pregLoop);
-                ReduceSum(sum, sum, pregLoop);
+                Reduce<ReduceType::SUM>(sum, sum, pregLoop);
                 if constexpr (WithUbReduce) {
                     Add(y, y, sum, pregMerge);
-                    DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                        rmsNormLocalAddr + i, y, pregMerge);
+                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, y,
+                                                                                            pregMerge);
                 } else {
-                    DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                        rmsNormLocalAddr + i, sum, pregMerge);
+                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(rmsNormLocalAddr + i, sum,
+                                                                                            pregMerge);
                 }
             }
         }
     }
 }
 
-
 template <bool WithUbReduce = false>
-__aicore__ inline void VFProcessInvRmsPart1(const LocalTensor<float>& yLocal, const LocalTensor<float>& xLocal,
-    float coeff, uint16_t curRowNum, uint32_t curColNum)
+__aicore__ inline void VFProcessInvRmsPart1(const LocalTensor<float> &yLocal, const LocalTensor<float> &xLocal,
+                                            float coeff, uint16_t curRowNum, uint32_t curColNum)
 {
-    __local_mem__ float* yLocalAddr = (__local_mem__ float*)yLocal.GetPhyAddr();
-    __local_mem__ float* xLocalAddr = (__local_mem__ float*)xLocal.GetPhyAddr();
+    __ubuf__ float *yLocalAddr = (__ubuf__ float *)yLocal.GetPhyAddr();
+    __ubuf__ float *xLocalAddr = (__ubuf__ float *)xLocal.GetPhyAddr();
 
     uint16_t loopCount = CeilDiv(curColNum, VL_FP32);
     uint16_t curColNumAlign = RoundUp<float>(curColNum) + BLOCK_SIZE / sizeof(float);
@@ -353,14 +346,14 @@ __aicore__ inline void VFProcessInvRmsPart1(const LocalTensor<float>& yLocal, co
                     Add(sum, sum, x, pregMain);
                 }
                 Muls(sum, sum, coeff, pregMain);
-                ReduceSum(sum, sum, pregMain);
+                Reduce<ReduceType::SUM>(sum, sum, pregMain);
                 if constexpr (WithUbReduce) {
                     Add(y, y, sum, pregMerge);
-                    DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                        yLocalAddr + i, y, pregMerge);
+                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, y,
+                                                                                            pregMerge);
                 } else {
-                    DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                        yLocalAddr + i, sum, pregMerge);
+                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, sum,
+                                                                                            pregMerge);
                 }
             }
         }
@@ -384,14 +377,14 @@ __aicore__ inline void VFProcessInvRmsPart1(const LocalTensor<float>& yLocal, co
                 Mul(x, x, x, pregLoop);
                 Add(sum, sum, x, pregLoop);
                 Muls(sum, sum, coeff, pregLoop);
-                ReduceSum(sum, sum, pregLoop);
+                Reduce<ReduceType::SUM>(sum, sum, pregLoop);
                 if constexpr (WithUbReduce) {
                     Add(y, y, sum, pregMerge);
-                    DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                        yLocalAddr + i, y, pregMerge);
+                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, y,
+                                                                                            pregMerge);
                 } else {
-                    DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                        yLocalAddr + i, sum, pregMerge);
+                    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, sum,
+                                                                                            pregMerge);
                 }
             }
         }
@@ -400,11 +393,11 @@ __aicore__ inline void VFProcessInvRmsPart1(const LocalTensor<float>& yLocal, co
 
 // (bs, k) --> (bs, 1)
 // k 为Matmul K轴切分时的分核数，必然小于64
-__aicore__ inline void VFProcessInvRmsPart2(const LocalTensor<float>& yLocal, const LocalTensor<float>& xLocal,
-    float eps, uint16_t curRowNum, uint32_t curColNum)
+__aicore__ inline void VFProcessInvRmsPart2(const LocalTensor<float> &yLocal, const LocalTensor<float> &xLocal,
+                                            float eps, uint16_t curRowNum, uint32_t curColNum)
 {
-    __local_mem__ float* yLocalAddr = (__local_mem__ float*)yLocal.GetPhyAddr();
-    __local_mem__ float* xLocalAddr = (__local_mem__ float*)xLocal.GetPhyAddr();
+    __ubuf__ float *yLocalAddr = (__ubuf__ float *)yLocal.GetPhyAddr();
+    __ubuf__ float *xLocalAddr = (__ubuf__ float *)xLocal.GetPhyAddr();
     uint16_t curColNumAlign = RoundUp<float>(curColNum);
     __VEC_SCOPE__
     {
@@ -418,33 +411,32 @@ __aicore__ inline void VFProcessInvRmsPart2(const LocalTensor<float>& yLocal, co
         Duplicate(one, static_cast<float>(1.0), pregMerge);
         for (uint16_t i = 0; i < curRowNum; i++) {
             LoadInputData(x, xLocalAddr, pregLoop, i * curColNumAlign);
-            ReduceSum(sum, x, pregLoop);
+            Reduce<ReduceType::SUM>(sum, x, pregLoop);
             Adds(sum, sum, eps, pregMerge);
             Sqrt(sum, sum, pregMerge);
             Div(y, one, sum, pregMerge);
-            DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                yLocalAddr + i, y, pregMerge);
+            StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(yLocalAddr + i, y, pregMerge);
         }
     }
 }
-
 
 // (k, bs, hc_mix) * (k, bs, 1) = (bs, hc_mix)
 // for循环组织形式如下:
 /*
     for (i, 0, bs)
-        
+
         for (j, 0, k)
             for (h, 0, hc_mix)
 */
 // hcMix小于64，因此直接去掉内层for循环
-__aicore__ inline void VFProcessInvRmsPart3WithGroupReduce(const LocalTensor<float>& yLocal,
-    const LocalTensor<float>& mmLocal, const LocalTensor<float>& xLocal, float eps, uint16_t groupK,
-    uint16_t bs, uint32_t hcMix)
+__aicore__ inline void VFProcessInvRmsPart3WithGroupReduce(const LocalTensor<float> &yLocal,
+                                                           const LocalTensor<float> &mmLocal,
+                                                           const LocalTensor<float> &xLocal, float eps, uint16_t groupK,
+                                                           uint16_t bs, uint32_t hcMix)
 {
-    __local_mem__ float* yLocalAddr = (__local_mem__ float*)yLocal.GetPhyAddr();
-    __local_mem__ float* mmLocalAddr = (__local_mem__ float*)mmLocal.GetPhyAddr();
-    __local_mem__ float* xLocalAddr = (__local_mem__ float*)xLocal.GetPhyAddr();
+    __ubuf__ float *yLocalAddr = (__ubuf__ float *)yLocal.GetPhyAddr();
+    __ubuf__ float *mmLocalAddr = (__ubuf__ float *)mmLocal.GetPhyAddr();
+    __ubuf__ float *xLocalAddr = (__ubuf__ float *)xLocal.GetPhyAddr();
     uint32_t hcMixAlign = RoundUp<float>(hcMix);
     uint32_t bsAlign = RoundUp<float>(bs);
     uint16_t fourLoopNum = groupK / FOUR_UNFOLD;
@@ -469,8 +461,7 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduce(const LocalTensor<flo
                 for (uint16_t j = 0; j < groupK; j++) {
                     LoadInputDataWithBrc<float>(x, xLocalAddr, pregMerge, i + j * bsAlign);
                     Add(sum1, sum1, x, pregMerge);
-                    LoadInputData<float>(mm, mmLocalAddr, pregLoop,
-                        i * hcMixAlign + j * bs * hcMixAlign);
+                    LoadInputData<float>(mm, mmLocalAddr, pregLoop, i * hcMixAlign + j * bs * hcMixAlign);
                     Add(sum2, sum2, mm, pregLoop);
                 }
                 Adds(sum1, sum1, eps, pregMerge);
@@ -519,34 +510,30 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduce(const LocalTensor<flo
                 for (uint16_t j = 0; j < fourLoopNum; j++) {
                     LoadInputDataWithBrc<float>(x1, xLocalAddr, pregMerge, i + 4 * j * bsAlign);
                     Add(sumX1, sumX1, x1, pregMerge);
-                    LoadInputData<float>(mm1, mmLocalAddr, pregLoop,
-                        i * hcMixAlign + 4 * j * bs * hcMixAlign);
+                    LoadInputData<float>(mm1, mmLocalAddr, pregLoop, i * hcMixAlign + 4 * j * bs * hcMixAlign);
                     Add(sumM1, sumM1, mm1, pregLoop);
 
                     LoadInputDataWithBrc<float>(x2, xLocalAddr, pregMerge, i + (4 * j + 1) * bsAlign);
                     Add(sumX2, sumX2, x2, pregMerge);
-                    LoadInputData<float>(mm2, mmLocalAddr, pregLoop,
-                        i * hcMixAlign + (4 * j + 1) * bs * hcMixAlign);
+                    LoadInputData<float>(mm2, mmLocalAddr, pregLoop, i * hcMixAlign + (4 * j + 1) * bs * hcMixAlign);
                     Add(sumM2, sumM2, mm2, pregLoop);
 
                     LoadInputDataWithBrc<float>(x3, xLocalAddr, pregMerge, i + (4 * j + 2) * bsAlign);
                     Add(sumX3, sumX3, x3, pregMerge);
-                    LoadInputData<float>(mm3, mmLocalAddr, pregLoop,
-                        i * hcMixAlign + (4 * j + 2) * bs * hcMixAlign);
+                    LoadInputData<float>(mm3, mmLocalAddr, pregLoop, i * hcMixAlign + (4 * j + 2) * bs * hcMixAlign);
                     Add(sumM3, sumM3, mm3, pregLoop);
 
                     LoadInputDataWithBrc<float>(x4, xLocalAddr, pregMerge, i + (4 * j + 3) * bsAlign);
                     Add(sumX4, sumX4, x4, pregMerge);
-                    LoadInputData<float>(mm4, mmLocalAddr, pregLoop,
-                        i * hcMixAlign + (4 * j + 3) * bs * hcMixAlign);
+                    LoadInputData<float>(mm4, mmLocalAddr, pregLoop, i * hcMixAlign + (4 * j + 3) * bs * hcMixAlign);
                     Add(sumM4, sumM4, mm4, pregLoop);
                 }
                 for (uint16_t j = 0; j < tailLoopNum; j++) {
                     LoadInputDataWithBrc<float>(x1, xLocalAddr, pregMerge,
-                        i + (fourLoopNum * FOUR_UNFOLD + j) * bsAlign);
+                                                i + (fourLoopNum * FOUR_UNFOLD + j) * bsAlign);
                     Add(sumX1, sumX1, x1, pregMerge);
                     LoadInputData<float>(mm1, mmLocalAddr, pregLoop,
-                        i * hcMixAlign + (fourLoopNum * FOUR_UNFOLD + j) * bs * hcMixAlign);
+                                         i * hcMixAlign + (fourLoopNum * FOUR_UNFOLD + j) * bs * hcMixAlign);
                     Add(sumM1, sumM1, mm1, pregLoop);
                 }
                 Add(sumX1, sumX1, sumX4, pregMerge);
@@ -567,17 +554,18 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduce(const LocalTensor<flo
     }
 }
 
-
-__aicore__ inline void VFProcessInvRmsPart3WithGroupReduceGradout(const LocalTensor<float>& yLocal,
-    const LocalTensor<float>& hcBeforeNormLocal, const LocalTensor<float>& invRmsOutLocal,
-    const LocalTensor<float>& mmLocal, const LocalTensor<float>& xLocal, float eps, uint16_t groupK,
-    uint16_t bs, uint32_t hcMix)
+__aicore__ inline void VFProcessInvRmsPart3WithGroupReduceGradout(const LocalTensor<float> &yLocal,
+                                                                  const LocalTensor<float> &hcBeforeNormLocal,
+                                                                  const LocalTensor<float> &invRmsOutLocal,
+                                                                  const LocalTensor<float> &mmLocal,
+                                                                  const LocalTensor<float> &xLocal, float eps,
+                                                                  uint16_t groupK, uint16_t bs, uint32_t hcMix)
 {
-    __local_mem__ float* yLocalAddr = (__local_mem__ float*)yLocal.GetPhyAddr();
-    __local_mem__ float* mmLocalAddr = (__local_mem__ float*)mmLocal.GetPhyAddr();
-    __local_mem__ float* xLocalAddr = (__local_mem__ float*)xLocal.GetPhyAddr();
-    __local_mem__ float* hcBeforeNormLocalAddr = (__local_mem__ float*)hcBeforeNormLocal.GetPhyAddr();
-    __local_mem__ float* invRmsOutLocalAddr = (__local_mem__ float*)invRmsOutLocal.GetPhyAddr();
+    __ubuf__ float *yLocalAddr = (__ubuf__ float *)yLocal.GetPhyAddr();
+    __ubuf__ float *mmLocalAddr = (__ubuf__ float *)mmLocal.GetPhyAddr();
+    __ubuf__ float *xLocalAddr = (__ubuf__ float *)xLocal.GetPhyAddr();
+    __ubuf__ float *hcBeforeNormLocalAddr = (__ubuf__ float *)hcBeforeNormLocal.GetPhyAddr();
+    __ubuf__ float *invRmsOutLocalAddr = (__ubuf__ float *)invRmsOutLocal.GetPhyAddr();
     uint32_t hcMixAlign = RoundUp<float>(hcMix);
     uint32_t bsAlign = RoundUp<float>(bs);
     uint16_t fourLoopNum = groupK / FOUR_UNFOLD;
@@ -602,16 +590,15 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduceGradout(const LocalTen
                 for (uint16_t j = 0; j < groupK; j++) {
                     LoadInputDataWithBrc<float>(x, xLocalAddr, pregMerge, i + j * bsAlign);
                     Add(sum1, sum1, x, pregMerge);
-                    LoadInputData<float>(mm, mmLocalAddr, pregLoop,
-                        i * hcMixAlign + j * bs * hcMixAlign);
+                    LoadInputData<float>(mm, mmLocalAddr, pregLoop, i * hcMixAlign + j * bs * hcMixAlign);
                     Add(sum2, sum2, mm, pregLoop);
                 }
                 Adds(sum1, sum1, eps, pregMerge);
                 Sqrt(sum1, sum1, pregMerge);
                 Div(rsqrt, one, sum1, pregMerge);
                 // store invRmsOut
-                DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                    invRmsOutLocalAddr + i, rsqrt, pregMerge);
+                StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(invRmsOutLocalAddr + i, rsqrt,
+                                                                                        pregMerge);
                 Duplicate(rsqrt, rsqrt, pregLoop);
                 Mul(y, sum2, rsqrt, pregLoop);
                 // store hcBeforeNorm
@@ -657,34 +644,30 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduceGradout(const LocalTen
                 for (uint16_t j = 0; j < fourLoopNum; j++) {
                     LoadInputDataWithBrc<float>(x1, xLocalAddr, pregMerge, i + 4 * j * bsAlign);
                     Add(sumX1, sumX1, x1, pregMerge);
-                    LoadInputData<float>(mm1, mmLocalAddr, pregLoop,
-                        i * hcMixAlign + 4 * j * bs * hcMixAlign);
+                    LoadInputData<float>(mm1, mmLocalAddr, pregLoop, i * hcMixAlign + 4 * j * bs * hcMixAlign);
                     Add(sumM1, sumM1, mm1, pregLoop);
 
                     LoadInputDataWithBrc<float>(x2, xLocalAddr, pregMerge, i + (4 * j + 1) * bsAlign);
                     Add(sumX2, sumX2, x2, pregMerge);
-                    LoadInputData<float>(mm2, mmLocalAddr, pregLoop,
-                        i * hcMixAlign + (4 * j + 1) * bs * hcMixAlign);
+                    LoadInputData<float>(mm2, mmLocalAddr, pregLoop, i * hcMixAlign + (4 * j + 1) * bs * hcMixAlign);
                     Add(sumM2, sumM2, mm2, pregLoop);
 
                     LoadInputDataWithBrc<float>(x3, xLocalAddr, pregMerge, i + (4 * j + 2) * bsAlign);
                     Add(sumX3, sumX3, x3, pregMerge);
-                    LoadInputData<float>(mm3, mmLocalAddr, pregLoop,
-                        i * hcMixAlign + (4 * j + 2) * bs * hcMixAlign);
+                    LoadInputData<float>(mm3, mmLocalAddr, pregLoop, i * hcMixAlign + (4 * j + 2) * bs * hcMixAlign);
                     Add(sumM3, sumM3, mm3, pregLoop);
 
                     LoadInputDataWithBrc<float>(x4, xLocalAddr, pregMerge, i + (4 * j + 3) * bsAlign);
                     Add(sumX4, sumX4, x4, pregMerge);
-                    LoadInputData<float>(mm4, mmLocalAddr, pregLoop,
-                        i * hcMixAlign + (4 * j + 3) * bs * hcMixAlign);
+                    LoadInputData<float>(mm4, mmLocalAddr, pregLoop, i * hcMixAlign + (4 * j + 3) * bs * hcMixAlign);
                     Add(sumM4, sumM4, mm4, pregLoop);
                 }
                 for (uint16_t j = 0; j < tailLoopNum; j++) {
                     LoadInputDataWithBrc<float>(x1, xLocalAddr, pregMerge,
-                        i + (fourLoopNum * FOUR_UNFOLD + j) * bsAlign);
+                                                i + (fourLoopNum * FOUR_UNFOLD + j) * bsAlign);
                     Add(sumX1, sumX1, x1, pregMerge);
                     LoadInputData<float>(mm1, mmLocalAddr, pregLoop,
-                        i * hcMixAlign + (fourLoopNum * FOUR_UNFOLD + j) * bs * hcMixAlign);
+                                         i * hcMixAlign + (fourLoopNum * FOUR_UNFOLD + j) * bs * hcMixAlign);
                     Add(sumM1, sumM1, mm1, pregLoop);
                 }
                 Add(sumX1, sumX1, sumX4, pregMerge);
@@ -698,8 +681,8 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduceGradout(const LocalTen
                 Sqrt(sumX1, sumX1, pregMerge);
                 Div(rsqrt, one, sumX1, pregMerge);
                 // store invRmsOut
-                DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                    invRmsOutLocalAddr + i, rsqrt, pregMerge);
+                StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(invRmsOutLocalAddr + i, rsqrt,
+                                                                                        pregMerge);
                 Duplicate(rsqrt, rsqrt, pregLoop);
                 Mul(y, sumM1, rsqrt, pregLoop);
                 // store hcBeforeNorm
@@ -710,14 +693,12 @@ __aicore__ inline void VFProcessInvRmsPart3WithGroupReduceGradout(const LocalTen
     }
 }
 
-
-__aicore__ inline void VFProcessInvRmsPart3(const LocalTensor<float>& yLocal,
-    const LocalTensor<float>& mmLocal, const LocalTensor<float>& xLocal, float eps,
-    uint16_t bs, uint32_t hcMix)
+__aicore__ inline void VFProcessInvRmsPart3(const LocalTensor<float> &yLocal, const LocalTensor<float> &mmLocal,
+                                            const LocalTensor<float> &xLocal, float eps, uint16_t bs, uint32_t hcMix)
 {
-    __local_mem__ float* yLocalAddr = (__local_mem__ float*)yLocal.GetPhyAddr();
-    __local_mem__ float* mmLocalAddr = (__local_mem__ float*)mmLocal.GetPhyAddr();
-    __local_mem__ float* xLocalAddr = (__local_mem__ float*)xLocal.GetPhyAddr();
+    __ubuf__ float *yLocalAddr = (__ubuf__ float *)yLocal.GetPhyAddr();
+    __ubuf__ float *mmLocalAddr = (__ubuf__ float *)mmLocal.GetPhyAddr();
+    __ubuf__ float *xLocalAddr = (__ubuf__ float *)xLocal.GetPhyAddr();
     uint32_t hcMixAlign = RoundUp<float>(hcMix);
     uint32_t bsAlign = RoundUp<float>(bs);
     __VEC_SCOPE__
@@ -744,15 +725,15 @@ __aicore__ inline void VFProcessInvRmsPart3(const LocalTensor<float>& yLocal,
     }
 }
 
-
-__aicore__ inline void VFProcessInvRmsPart3Gradout(const LocalTensor<float>& invRmsOutLocal,
-    const LocalTensor<float>& yLocal, const LocalTensor<float>& mmLocal,
-    const LocalTensor<float>& xLocal, float eps, uint16_t bs, uint32_t hcMix)
+__aicore__ inline void VFProcessInvRmsPart3Gradout(const LocalTensor<float> &invRmsOutLocal,
+                                                   const LocalTensor<float> &yLocal, const LocalTensor<float> &mmLocal,
+                                                   const LocalTensor<float> &xLocal, float eps, uint16_t bs,
+                                                   uint32_t hcMix)
 {
-    __local_mem__ float* invRmsOutLocalAddr = (__local_mem__ float*)invRmsOutLocal.GetPhyAddr();
-    __local_mem__ float* yLocalAddr = (__local_mem__ float*)yLocal.GetPhyAddr();
-    __local_mem__ float* mmLocalAddr = (__local_mem__ float*)mmLocal.GetPhyAddr();
-    __local_mem__ float* xLocalAddr = (__local_mem__ float*)xLocal.GetPhyAddr();
+    __ubuf__ float *invRmsOutLocalAddr = (__ubuf__ float *)invRmsOutLocal.GetPhyAddr();
+    __ubuf__ float *yLocalAddr = (__ubuf__ float *)yLocal.GetPhyAddr();
+    __ubuf__ float *mmLocalAddr = (__ubuf__ float *)mmLocal.GetPhyAddr();
+    __ubuf__ float *xLocalAddr = (__ubuf__ float *)xLocal.GetPhyAddr();
     uint32_t hcMixAlign = RoundUp<float>(hcMix);
     uint32_t bsAlign = RoundUp<float>(bs);
     __VEC_SCOPE__
@@ -774,23 +755,22 @@ __aicore__ inline void VFProcessInvRmsPart3Gradout(const LocalTensor<float>& inv
             Adds(x, x, eps, pregLoop);
             Sqrt(x, x, pregLoop);
             Div(rsqrt, one, x, pregLoop);
-            DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
-                invRmsOutLocalAddr + i, rsqrt, pregOne);
+            StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(invRmsOutLocalAddr + i, rsqrt,
+                                                                                    pregOne);
             Mul(y, mm, rsqrt, pregLoop);
             StoreOutputData(yLocalAddr, y, pregLoop, i * hcMixAlign);
         }
     }
 }
 
-
 // Matmul的结果会直接FixPipe到UB上，不会在搬运时完成Split动作，因此需要在UB内完成Split动作
-__aicore__ inline void VFProcessPre(const LocalTensor<float>& preLocal, const LocalTensor<float>& mixLocal,
-    const LocalTensor<float>& hcBaseLocal, float scale, float eps, uint16_t curRowNum,
-    uint16_t curColNum, uint16_t hcMix)
+__aicore__ inline void VFProcessPre(const LocalTensor<float> &preLocal, const LocalTensor<float> &mixLocal,
+                                    const LocalTensor<float> &hcBaseLocal, float scale, float eps, uint16_t curRowNum,
+                                    uint16_t curColNum, uint16_t hcMix)
 {
-    __local_mem__ float* preLocalAddr = (__local_mem__ float*)preLocal.GetPhyAddr();
-    __local_mem__ float* mixLocalAddr = (__local_mem__ float*)mixLocal.GetPhyAddr();
-    __local_mem__ float* hcBaseLocalAddr = (__local_mem__ float*)hcBaseLocal.GetPhyAddr();
+    __ubuf__ float *preLocalAddr = (__ubuf__ float *)preLocal.GetPhyAddr();
+    __ubuf__ float *mixLocalAddr = (__ubuf__ float *)mixLocal.GetPhyAddr();
+    __ubuf__ float *hcBaseLocalAddr = (__ubuf__ float *)hcBaseLocal.GetPhyAddr();
     uint16_t loopCount = CeilDiv(curColNum, VL_FP32);
     uint32_t curColNumAlign = RoundUp<float>(curColNum);
     uint32_t hcMixAlign = RoundUp<float>(hcMix);
@@ -838,14 +818,14 @@ __aicore__ inline void VFProcessPre(const LocalTensor<float>& preLocal, const Lo
     }
 }
 
-__aicore__ inline void VFProcessPost(const LocalTensor<float>& postLocal, const LocalTensor<float>& mixLocal,
-    const LocalTensor<float>& hcBaseLocal, float scale, float eps, uint16_t curRowNum,
-    uint16_t curColNum, uint16_t hcMix)
+__aicore__ inline void VFProcessPost(const LocalTensor<float> &postLocal, const LocalTensor<float> &mixLocal,
+                                     const LocalTensor<float> &hcBaseLocal, float scale, float eps, uint16_t curRowNum,
+                                     uint16_t curColNum, uint16_t hcMix)
 {
-    __local_mem__ float* postLocalAddr = (__local_mem__ float*)postLocal.GetPhyAddr();
-    __local_mem__ float* mixOriginLocalAddr = (__local_mem__ float*)mixLocal.GetPhyAddr();
-    __local_mem__ float* hcBaseLocalAddr = (__local_mem__ float*)hcBaseLocal.GetPhyAddr();
-    __local_mem__ float *mixLocalAddr = mixOriginLocalAddr;
+    __ubuf__ float *postLocalAddr = (__ubuf__ float *)postLocal.GetPhyAddr();
+    __ubuf__ float *mixOriginLocalAddr = (__ubuf__ float *)mixLocal.GetPhyAddr();
+    __ubuf__ float *hcBaseLocalAddr = (__ubuf__ float *)hcBaseLocal.GetPhyAddr();
+    __ubuf__ float *mixLocalAddr = mixOriginLocalAddr;
     uint16_t loopCount = CeilDiv(curColNum, VL_FP32);
     uint32_t curColNumAlign = RoundUp<float>(curColNum);
     uint32_t hcMixAlign = RoundUp<float>(hcMix);
@@ -855,11 +835,11 @@ __aicore__ inline void VFProcessPost(const LocalTensor<float>& postLocal, const 
             RegTensor<float> mix;
             RegTensor<float> base;
             RegTensor<float> one;
-            UnalignReg uMix;
+            UnalignRegForLoad uMix;
             MaskReg pregLoop = CreateMask<float>();
             uint32_t sreg = curColNum;
             Duplicate(one, static_cast<float>(1), pregLoop);
-            DataCopyUnAlignPre<float>(uMix, mixLocalAddr);
+            LoadUnAlignPre<float>(uMix, mixLocalAddr);
             for (uint16_t i = 0; i < loopCount; i++) {
                 mixLocalAddr = mixOriginLocalAddr + i * VL_FP32;
                 pregLoop = UpdateMask<float>(sreg);
@@ -880,11 +860,11 @@ __aicore__ inline void VFProcessPost(const LocalTensor<float>& postLocal, const 
             RegTensor<float> mix;
             RegTensor<float> base;
             RegTensor<float> one;
-            UnalignReg uMix;
+            UnalignRegForLoad uMix;
             uint32_t sreg = curColNum;
             MaskReg pregLoop = UpdateMask<float>(sreg);
             Duplicate(one, static_cast<float>(1), pregLoop);
-            DataCopyUnAlignPre<float>(uMix, mixLocalAddr);
+            LoadUnAlignPre<float>(uMix, mixLocalAddr);
             LoadInputData<float>(base, hcBaseLocalAddr, pregLoop, 0);
             for (uint16_t i = 0; i < curRowNum; i++) {
                 LoadInputDataUnalign(mix, mixLocalAddr, uMix, pregLoop, hcMixAlign);
@@ -899,14 +879,16 @@ __aicore__ inline void VFProcessPost(const LocalTensor<float>& postLocal, const 
 }
 
 // dim2是R轴，R轴小于64, 不需要回写UB
-__aicore__ inline void VFProcessCombFragRLessVL(const LocalTensor<float>& combFragLocal,
-    const LocalTensor<float>& mixLocal, const LocalTensor<float>& hcBaseLocal, float scale, float eps,
-    uint16_t iters, uint16_t dim0, uint16_t dim1, uint16_t dim2, uint16_t hcMix)
+__aicore__ inline void VFProcessCombFragRLessVL(const LocalTensor<float> &combFragLocal,
+                                                const LocalTensor<float> &mixLocal,
+                                                const LocalTensor<float> &hcBaseLocal, float scale, float eps,
+                                                uint16_t iters, uint16_t dim0, uint16_t dim1, uint16_t dim2,
+                                                uint16_t hcMix)
 {
-    __local_mem__ float* combFragLocalAddr = (__local_mem__ float*)combFragLocal.GetPhyAddr();
-    __local_mem__ float* mixLocalOriginAddr = (__local_mem__ float*)mixLocal.GetPhyAddr();
-    __local_mem__ float* hcBaseLocalAddr = (__local_mem__ float*)hcBaseLocal.GetPhyAddr();
-    __local_mem__ float *mixLocalAddr = mixLocalOriginAddr;
+    __ubuf__ float *combFragLocalAddr = (__ubuf__ float *)combFragLocal.GetPhyAddr();
+    __ubuf__ float *mixLocalOriginAddr = (__ubuf__ float *)mixLocal.GetPhyAddr();
+    __ubuf__ float *hcBaseLocalAddr = (__ubuf__ float *)hcBaseLocal.GetPhyAddr();
+    __ubuf__ float *mixLocalAddr = mixLocalOriginAddr;
     uint32_t dim2Align = RoundUp<float>(dim2);
     uint32_t hcMixAlign = RoundUp<float>(hcMix);
     __VEC_SCOPE__
@@ -917,10 +899,10 @@ __aicore__ inline void VFProcessCombFragRLessVL(const LocalTensor<float>& combFr
         RegTensor<float> max;
         RegTensor<float> sum;
         RegTensor<float> sum1;
-        UnalignReg uMix;
+        UnalignRegForLoad uMix;
         uint32_t sreg = dim2;
         MaskReg pregLoop = UpdateMask<float>(sreg);
-        DataCopyUnAlignPre<float>(uMix, mixLocalAddr);
+        LoadUnAlignPre<float>(uMix, mixLocalAddr);
         for (uint16_t i = 0; i < dim0; i++) {
             Duplicate(sum1, static_cast<float>(0), pregLoop);
             for (uint16_t j = 0; j < dim1; j++) {
@@ -929,11 +911,11 @@ __aicore__ inline void VFProcessCombFragRLessVL(const LocalTensor<float>& combFr
                 LoadInputDataUnalign<float>(mix, mixLocalAddr, uMix, pregLoop, VL_FP32);
                 Muls(mix, mix, scale, pregLoop);
                 Add(mix, mix, base, pregLoop);
-                ReduceMax(max, mix, pregLoop);
+                Reduce<ReduceType::MAX>(max, mix, pregLoop);
                 Duplicate(max, max, pregLoop);
                 Sub(mix, mix, max, pregLoop);
                 Exp(mix, mix, pregLoop);
-                ReduceSum(sum, mix, pregLoop);
+                Reduce<ReduceType::SUM>(sum, mix, pregLoop);
                 Duplicate(sum, sum, pregLoop);
                 Div(mix, mix, sum, pregLoop);
                 Adds(mix, mix, eps, pregLoop);
@@ -954,7 +936,7 @@ __aicore__ inline void VFProcessCombFragRLessVL(const LocalTensor<float>& combFr
                 Duplicate(sum1, static_cast<float>(0), pregLoop);
                 for (uint16_t k = 0; k < dim1; k++) {
                     LoadInputData<float>(mix, combFragLocalAddr, pregLoop, j * dim1 * dim2Align + k * dim2Align);
-                    ReduceSum(sum, mix, pregLoop);
+                    Reduce<ReduceType::SUM>(sum, mix, pregLoop);
                     Duplicate(sum, sum, pregLoop);
                     Adds(sum, sum, eps, pregLoop);
                     Div(mix, mix, sum, pregLoop);
@@ -976,21 +958,23 @@ __aicore__ inline void VFProcessCombFragRLessVL(const LocalTensor<float>& combFr
 __aicore__ inline void VFProcessIteration(RegTensor<float> &sum0, RegTensor<float> &sum1, RegTensor<float> &mix,
                                           float eps, MaskReg pregLoop)
 {
-    ReduceSum(sum1, mix, pregLoop);
+    Reduce<ReduceType::SUM>(sum1, mix, pregLoop);
     Duplicate(sum1, sum1, pregLoop);
     Adds(sum1, sum1, eps, pregLoop);
     Div(mix, mix, sum1, pregLoop);
     Add(sum0, sum0, mix, pregLoop);
 }
 
-__aicore__ inline void VFProcessCombFragRLessVLUseFourUnfold(const LocalTensor<float>& combFragLocal,
-    const LocalTensor<float>& mixLocal, const LocalTensor<float>& hcBaseLocal, float scale, float eps,
-    uint16_t iters, uint16_t dim0, uint16_t dim1, uint16_t dim2, uint16_t hcMix)
+__aicore__ inline void VFProcessCombFragRLessVLUseFourUnfold(const LocalTensor<float> &combFragLocal,
+                                                             const LocalTensor<float> &mixLocal,
+                                                             const LocalTensor<float> &hcBaseLocal, float scale,
+                                                             float eps, uint16_t iters, uint16_t dim0, uint16_t dim1,
+                                                             uint16_t dim2, uint16_t hcMix)
 {
-    __local_mem__ float* combFragLocalAddr = (__local_mem__ float*)combFragLocal.GetPhyAddr();
-    __local_mem__ float* mixLocalOriginAddr = (__local_mem__ float*)mixLocal.GetPhyAddr();
-    __local_mem__ float* hcBaseLocalAddr = (__local_mem__ float*)hcBaseLocal.GetPhyAddr();
-    __local_mem__ float *mixLocalAddr = mixLocalOriginAddr;
+    __ubuf__ float *combFragLocalAddr = (__ubuf__ float *)combFragLocal.GetPhyAddr();
+    __ubuf__ float *mixLocalOriginAddr = (__ubuf__ float *)mixLocal.GetPhyAddr();
+    __ubuf__ float *hcBaseLocalAddr = (__ubuf__ float *)hcBaseLocal.GetPhyAddr();
+    __ubuf__ float *mixLocalAddr = mixLocalOriginAddr;
     uint32_t dim2Align = RoundUp<float>(dim2);
     uint32_t hcMixAlign = RoundUp<float>(hcMix);
     __VEC_SCOPE__
@@ -1007,10 +991,10 @@ __aicore__ inline void VFProcessCombFragRLessVLUseFourUnfold(const LocalTensor<f
         RegTensor<float> sum2;
         RegTensor<float> sum3;
         RegTensor<float> sum4;
-        UnalignReg uMix;
+        UnalignRegForLoad uMix;
         uint32_t sreg = dim2;
         MaskReg pregLoop = UpdateMask<float>(sreg);
-        DataCopyUnAlignPre<float>(uMix, mixLocalAddr);
+        LoadUnAlignPre<float>(uMix, mixLocalAddr);
         for (uint16_t i = 0; i < dim0; i++) {
             Duplicate(sum1, static_cast<float>(0), pregLoop);
             for (uint16_t j = 0; j < dim1; j++) {
@@ -1019,11 +1003,11 @@ __aicore__ inline void VFProcessCombFragRLessVLUseFourUnfold(const LocalTensor<f
                 LoadInputDataUnalign<float>(mix, mixLocalAddr, uMix, pregLoop, VL_FP32);
                 Muls(mix, mix, scale, pregLoop);
                 Add(mix, mix, base, pregLoop);
-                ReduceMax(max, mix, pregLoop);
+                Reduce<ReduceType::MAX>(max, mix, pregLoop);
                 Duplicate(max, max, pregLoop);
                 Sub(mix, mix, max, pregLoop);
                 Exp(mix, mix, pregLoop);
-                ReduceSum(sum, mix, pregLoop);
+                Reduce<ReduceType::SUM>(sum, mix, pregLoop);
                 Duplicate(sum, sum, pregLoop);
                 Div(mix, mix, sum, pregLoop);
                 Adds(mix, mix, eps, pregLoop);
@@ -1064,40 +1048,41 @@ __aicore__ inline void VFProcessCombFragRLessVLUseFourUnfold(const LocalTensor<f
     }
 }
 
-
-__aicore__ inline void VFProcessIterationGradout(RegTensor<float>& sum, RegTensor<float>& sum1,
-    RegTensor<float>& mix1, float eps, MaskReg pregLoop, MaskReg pregOne, uint16_t i, uint16_t j,
-    uint16_t curDim1, uint16_t dim0, uint16_t dim1, uint16_t dim2Align,
-    __local_mem__ float* sumOutLocalAddr, __local_mem__ float* normOutLocalAddr)
+__aicore__ inline void VFProcessIterationGradout(RegTensor<float> &sum, RegTensor<float> &sum1, RegTensor<float> &mix1,
+                                                 float eps, MaskReg pregLoop, MaskReg pregOne, uint16_t i, uint16_t j,
+                                                 uint16_t curDim1, uint16_t dim0, uint16_t dim1, uint16_t dim2Align,
+                                                 __ubuf__ float *sumOutLocalAddr, __ubuf__ float *normOutLocalAddr)
 {
-    ReduceSum(sum1, mix1, pregLoop);
+    Reduce<ReduceType::SUM>(sum1, mix1, pregLoop);
     Duplicate(sum1, sum1, pregLoop);
     Adds(sum1, sum1, eps, pregLoop);
     // store sumOut[2j][dim1] dim1:0,1,2,3
-    DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
+    StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
         sumOutLocalAddr + 2 * j * dim0 * dim2Align + i * dim2Align + curDim1, sum1, pregOne);
     Div(mix1, mix1, sum1, pregLoop);
     // store normOut[2j][dim1] dim1:0,1,2,3
     StoreOutputData(normOutLocalAddr, mix1, pregLoop,
-        2 * j * dim0 * dim1 * dim2Align + i * dim1 * dim2Align + curDim1 * dim2Align);
+                    2 * j * dim0 * dim1 * dim2Align + i * dim1 * dim2Align + curDim1 * dim2Align);
     Add(sum, sum, mix1, pregLoop);
 }
 
-__aicore__ inline void VFProcessCombFragRLessVLUseFourUnfoldGradout(const LocalTensor<float>& combFragLocal,
-    const LocalTensor<float>& mixLocal, const LocalTensor<float>& hcBaseLocal, float scale,
-    float eps, uint16_t iters, uint16_t dim0, uint16_t dim1, uint16_t dim2, uint16_t hcMix,
-    uint16_t rowInnerFactor)
+__aicore__ inline void VFProcessCombFragRLessVLUseFourUnfoldGradout(const LocalTensor<float> &combFragLocal,
+                                                                    const LocalTensor<float> &mixLocal,
+                                                                    const LocalTensor<float> &hcBaseLocal, float scale,
+                                                                    float eps, uint16_t iters, uint16_t dim0,
+                                                                    uint16_t dim1, uint16_t dim2, uint16_t hcMix,
+                                                                    uint16_t rowInnerFactor)
 {
-    __local_mem__ float* combFragLocalAddr = (__local_mem__ float*)combFragLocal.GetPhyAddr();
-    __local_mem__ float* mixLocalOriginAddr = (__local_mem__ float*)mixLocal.GetPhyAddr();
-    __local_mem__ float* hcBaseLocalAddr = (__local_mem__ float*)hcBaseLocal.GetPhyAddr();
-    __local_mem__ float *mixLocalAddr = mixLocalOriginAddr;
+    __ubuf__ float *combFragLocalAddr = (__ubuf__ float *)combFragLocal.GetPhyAddr();
+    __ubuf__ float *mixLocalOriginAddr = (__ubuf__ float *)mixLocal.GetPhyAddr();
+    __ubuf__ float *hcBaseLocalAddr = (__ubuf__ float *)hcBaseLocal.GetPhyAddr();
+    __ubuf__ float *mixLocalAddr = mixLocalOriginAddr;
     uint32_t dim2Align = RoundUp<float>(dim2);
     uint32_t hcMixAlign = RoundUp<float>(hcMix);
     // normOutLocal shape [2*iter, rowInnerFactor, dim1, dim2Align]
     // sumOutLocal shape [2*iter, rowInnerFactor, dim2Align]
-    __local_mem__ float *normOutLocalAddr = combFragLocalAddr + rowInnerFactor * dim2 * dim2Align;
-    __local_mem__ float *sumOutLocalAddr = normOutLocalAddr + iters * 2 * rowInnerFactor * dim2 * dim2Align;
+    __ubuf__ float *normOutLocalAddr = combFragLocalAddr + rowInnerFactor * dim2 * dim2Align;
+    __ubuf__ float *sumOutLocalAddr = normOutLocalAddr + iters * 2 * rowInnerFactor * dim2 * dim2Align;
     __VEC_SCOPE__
     {
         RegTensor<float> base;
@@ -1113,10 +1098,10 @@ __aicore__ inline void VFProcessCombFragRLessVLUseFourUnfoldGradout(const LocalT
         RegTensor<float> sum3;
         RegTensor<float> sum4;
         RegTensor<float> sumOut;
-        UnalignReg uMix;
+        UnalignRegForLoad uMix;
         uint32_t sreg = dim2;
         MaskReg pregLoop = UpdateMask<float>(sreg);
-        DataCopyUnAlignPre<float>(uMix, mixLocalAddr);
+        LoadUnAlignPre<float>(uMix, mixLocalAddr);
         MaskReg pregOne = CreateMask<float, AscendC::MicroAPI::MaskPattern::VL1>();
         for (uint16_t i = 0; i < dim0; i++) {
             Duplicate(sum1, static_cast<float>(0), pregLoop);
@@ -1126,14 +1111,14 @@ __aicore__ inline void VFProcessCombFragRLessVLUseFourUnfoldGradout(const LocalT
                 LoadInputDataUnalign<float>(mix, mixLocalAddr, uMix, pregLoop, VL_FP32);
                 Muls(mix, mix, scale, pregLoop);
                 Add(mix, mix, base, pregLoop);
-                ReduceMax(max, mix, pregLoop);
+                Reduce<ReduceType::MAX>(max, mix, pregLoop);
                 Duplicate(max, max, pregLoop);
                 Sub(mix, mix, max, pregLoop);
                 Exp(mix, mix, pregLoop);
-                ReduceSum(sum, mix, pregLoop);
+                Reduce<ReduceType::SUM>(sum, mix, pregLoop);
                 // store sumOut[0][j] j -> 1~dim1
                 Adds(sumOut, sum, eps, pregOne);
-                DataCopy<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
+                StoreAlign<float, AscendC::MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(
                     sumOutLocalAddr + i * dim2Align + j, sumOut, pregOne);
                 Duplicate(sum, sum, pregLoop);
                 Div(mix, mix, sum, pregLoop);
@@ -1165,14 +1150,14 @@ __aicore__ inline void VFProcessCombFragRLessVLUseFourUnfoldGradout(const LocalT
             for (uint16_t j = 1; j < iters; j++) { // j: [1~iter-1]
                 Duplicate(sum, static_cast<float>(0), pregLoop);
 
-                VFProcessIterationGradout(sum, sum1, mix1, eps, pregLoop, pregOne, i, j, 0, dim0, dim1,
-                        dim2Align, sumOutLocalAddr, normOutLocalAddr);
-                VFProcessIterationGradout(sum, sum2, mix2, eps, pregLoop, pregOne, i, j, 1, dim0, dim1,
-                        dim2Align, sumOutLocalAddr, normOutLocalAddr);
-                VFProcessIterationGradout(sum, sum3, mix3, eps, pregLoop, pregOne, i, j, 2, dim0, dim1,
-                        dim2Align, sumOutLocalAddr, normOutLocalAddr);
-                VFProcessIterationGradout(sum, sum4, mix4, eps, pregLoop, pregOne, i, j, 3, dim0, dim1,
-                        dim2Align, sumOutLocalAddr, normOutLocalAddr);
+                VFProcessIterationGradout(sum, sum1, mix1, eps, pregLoop, pregOne, i, j, 0, dim0, dim1, dim2Align,
+                                          sumOutLocalAddr, normOutLocalAddr);
+                VFProcessIterationGradout(sum, sum2, mix2, eps, pregLoop, pregOne, i, j, 1, dim0, dim1, dim2Align,
+                                          sumOutLocalAddr, normOutLocalAddr);
+                VFProcessIterationGradout(sum, sum3, mix3, eps, pregLoop, pregOne, i, j, 2, dim0, dim1, dim2Align,
+                                          sumOutLocalAddr, normOutLocalAddr);
+                VFProcessIterationGradout(sum, sum4, mix4, eps, pregLoop, pregOne, i, j, 3, dim0, dim1, dim2Align,
+                                          sumOutLocalAddr, normOutLocalAddr);
 
                 Adds(sum, sum, eps, pregLoop);
                 // store sumOut[2j + 1]
@@ -1183,13 +1168,13 @@ __aicore__ inline void VFProcessCombFragRLessVLUseFourUnfoldGradout(const LocalT
                 Div(mix4, mix4, sum, pregLoop);
                 // store normOut[2j + 1]
                 StoreOutputData(normOutLocalAddr, mix1, pregLoop,
-                    (2 * j + 1) * dim0 * dim1 * dim2Align + i * dim1 * dim2Align + 0 * dim2Align);
+                                (2 * j + 1) * dim0 * dim1 * dim2Align + i * dim1 * dim2Align + 0 * dim2Align);
                 StoreOutputData(normOutLocalAddr, mix2, pregLoop,
-                    (2 * j + 1) * dim0 * dim1 * dim2Align + i * dim1 * dim2Align + 1 * dim2Align);
+                                (2 * j + 1) * dim0 * dim1 * dim2Align + i * dim1 * dim2Align + 1 * dim2Align);
                 StoreOutputData(normOutLocalAddr, mix3, pregLoop,
-                    (2 * j + 1) * dim0 * dim1 * dim2Align + i * dim1 * dim2Align + 2 * dim2Align);
+                                (2 * j + 1) * dim0 * dim1 * dim2Align + i * dim1 * dim2Align + 2 * dim2Align);
                 StoreOutputData(normOutLocalAddr, mix4, pregLoop,
-                    (2 * j + 1) * dim0 * dim1 * dim2Align + i * dim1 * dim2Align + 3 * dim2Align);
+                                (2 * j + 1) * dim0 * dim1 * dim2Align + i * dim1 * dim2Align + 3 * dim2Align);
             }
             StoreOutputData(combFragLocalAddr, mix1, pregLoop, i * dim1 * dim2Align);
             StoreOutputData(combFragLocalAddr, mix2, pregLoop, i * dim1 * dim2Align + 1 * dim2Align);
@@ -1199,14 +1184,14 @@ __aicore__ inline void VFProcessCombFragRLessVLUseFourUnfoldGradout(const LocalT
     }
 }
 
-
 template <typename T>
-__aicore__ inline void VFProcessY(const LocalTensor<T>& yLocal, const LocalTensor<float>& mixLocal,
-    const LocalTensor<T>& xLocal, uint16_t bs, uint16_t hcMult, uint16_t d, uint16_t hcMix)
+__aicore__ inline void VFProcessY(const LocalTensor<T> &yLocal, const LocalTensor<float> &mixLocal,
+                                  const LocalTensor<T> &xLocal, uint16_t bs, uint16_t hcMult, uint16_t d,
+                                  uint16_t hcMix)
 {
-    __local_mem__ T* yLocalAddr = (__local_mem__ T*)yLocal.GetPhyAddr();
-    __local_mem__ float* mixLocalAddr = (__local_mem__ float*)mixLocal.GetPhyAddr();
-    __local_mem__ T* xLocalAddr = (__local_mem__ T*)xLocal.GetPhyAddr();
+    __ubuf__ T *yLocalAddr = (__ubuf__ T *)yLocal.GetPhyAddr();
+    __ubuf__ float *mixLocalAddr = (__ubuf__ float *)mixLocal.GetPhyAddr();
+    __ubuf__ T *xLocalAddr = (__ubuf__ T *)xLocal.GetPhyAddr();
     uint32_t dAlign = RoundUp<T>(d);
     uint16_t loopCount = CeilDiv(d, VL_FP32);
     uint32_t hcMixAlign = RoundUp<float>(hcMix);
@@ -1224,8 +1209,7 @@ __aicore__ inline void VFProcessY(const LocalTensor<T>& yLocal, const LocalTenso
                     Duplicate(sum, static_cast<float>(0), pregLoop);
                     for (uint16_t k = 0; k < hcMult; k++) {
                         LoadInputDataWithBrc<float>(mix, mixLocalAddr, pregLoop, i * hcMixAlign + k);
-                        LoadInputData<T>(x, xLocalAddr, pregLoop,
-                            i * hcMult * dAlign + j * VL_FP32 + k * dAlign);
+                        LoadInputData<T>(x, xLocalAddr, pregLoop, i * hcMult * dAlign + j * VL_FP32 + k * dAlign);
                         Mul(x, mix, x, pregLoop);
                         Add(sum, sum, x, pregLoop);
                     }
@@ -1245,8 +1229,7 @@ __aicore__ inline void VFProcessY(const LocalTensor<T>& yLocal, const LocalTenso
                 Duplicate(sum, static_cast<float>(0), pregLoop);
                 for (uint16_t j = 0; j < hcMult; j++) {
                     LoadInputDataWithBrc<float>(mix, mixLocalAddr, pregLoop, i * hcMixAlign + j);
-                    LoadInputData<T>(x, xLocalAddr, pregLoop,
-                        i * hcMult * dAlign + j * dAlign);
+                    LoadInputData<T>(x, xLocalAddr, pregLoop, i * hcMult * dAlign + j * dAlign);
                     Mul(x, mix, x, pregLoop);
                     Add(sum, sum, x, pregLoop);
                 }
@@ -1257,8 +1240,8 @@ __aicore__ inline void VFProcessY(const LocalTensor<T>& yLocal, const LocalTenso
 }
 
 template <typename T>
-__aicore__ inline void CopyIn(const GlobalTensor<T>& inputGm, const LocalTensor<T>& inputTensor,
-    const uint16_t nBurst, const uint32_t copyLen, uint32_t srcStride = 0)
+__aicore__ inline void CopyIn(const GlobalTensor<T> &inputGm, const LocalTensor<T> &inputTensor, const uint16_t nBurst,
+                              const uint32_t copyLen, uint32_t srcStride = 0)
 {
     DataCopyPadExtParams<T> dataCopyPadExtParams;
     dataCopyPadExtParams.isPad = false;
@@ -1275,16 +1258,16 @@ __aicore__ inline void CopyIn(const GlobalTensor<T>& inputGm, const LocalTensor<
 }
 
 template <typename T>
-__aicore__ inline void CopyToL1(const LocalTensor<T>& srcTensor, const LocalTensor<T>& dstTensor,
-    const DataCopyParams dataCopyXParams)
+__aicore__ inline void CopyToL1(const LocalTensor<T> &srcTensor, const LocalTensor<T> &dstTensor,
+                                const DataCopyParams dataCopyXParams)
 {
     DataCopy(dstTensor, srcTensor, dataCopyXParams);
 }
 
 template <typename T>
-__aicore__ inline void CopyInWithLoopMode(const GlobalTensor<T>& inputGm, const LocalTensor<T>& inputTensor,
-    const uint16_t outerLoop, const uint16_t nBurst, const uint32_t copyLen, const uint32_t gmLastDim,
-    uint32_t srcStride = 0)
+__aicore__ inline void CopyInWithLoopMode(const GlobalTensor<T> &inputGm, const LocalTensor<T> &inputTensor,
+                                          const uint16_t outerLoop, const uint16_t nBurst, const uint32_t copyLen,
+                                          const uint32_t gmLastDim, uint32_t srcStride = 0)
 {
     uint16_t copyLenAlign = RoundUp<T>(copyLen);
     LoopModeParams loopParams;
@@ -1312,8 +1295,9 @@ __aicore__ inline void CopyInWithLoopMode(const GlobalTensor<T>& inputGm, const 
 }
 
 template <typename T>
-__aicore__ inline void CopyOut(const LocalTensor<T>& outputTensor, const GlobalTensor<T>& outputGm,
-    const uint16_t nBurst, const uint32_t copyLen, uint32_t dstStride = 0, uint32_t srcStride = 0)
+__aicore__ inline void CopyOut(const LocalTensor<T> &outputTensor, const GlobalTensor<T> &outputGm,
+                               const uint16_t nBurst, const uint32_t copyLen, uint32_t dstStride = 0,
+                               uint32_t srcStride = 0)
 {
     DataCopyExtParams dataCopyParams;
     dataCopyParams.blockCount = nBurst;
@@ -1324,8 +1308,9 @@ __aicore__ inline void CopyOut(const LocalTensor<T>& outputTensor, const GlobalT
 }
 
 template <typename T>
-__aicore__ inline void CopyOut(const LocalTensor<T>& outputTensor, const LocalTensor<T>& outputGm,
-    const uint16_t nBurst, const uint32_t copyLen, uint32_t dstStride = 0, uint32_t srcStride = 0)
+__aicore__ inline void CopyOut(const LocalTensor<T> &outputTensor, const LocalTensor<T> &outputGm,
+                               const uint16_t nBurst, const uint32_t copyLen, uint32_t dstStride = 0,
+                               uint32_t srcStride = 0)
 {
     DataCopyParams dataCopyParams;
     dataCopyParams.blockCount = nBurst;
@@ -1335,12 +1320,12 @@ __aicore__ inline void CopyOut(const LocalTensor<T>& outputTensor, const LocalTe
     DataCopy(outputGm, outputTensor, dataCopyParams);
 }
 
-
 template <typename T>
-__aicore__ inline void CopyOutWithLoopMode(const LocalTensor<T>& outputTensor, const GlobalTensor<T>& outputGm,
-    const uint32_t outerLoop, const uint64_t outerLoopDstStride, const uint32_t innerLoop,
-    const uint64_t innerLoopDstStride, const uint16_t nBurst, const uint32_t copyLen,
-    uint32_t srcStride = 0, uint32_t dstStride = 0)
+__aicore__ inline void CopyOutWithLoopMode(const LocalTensor<T> &outputTensor, const GlobalTensor<T> &outputGm,
+                                           const uint32_t outerLoop, const uint64_t outerLoopDstStride,
+                                           const uint32_t innerLoop, const uint64_t innerLoopDstStride,
+                                           const uint16_t nBurst, const uint32_t copyLen, uint32_t srcStride = 0,
+                                           uint32_t dstStride = 0)
 {
     uint16_t copyLenAlign = RoundUp<T>(copyLen);
     LoopModeParams loopParams;
@@ -1360,7 +1345,6 @@ __aicore__ inline void CopyOutWithLoopMode(const LocalTensor<T>& outputTensor, c
     DataCopyPad(outputGm, outputTensor, dataCoptExtParams);
     ResetLoopModePara(DataCopyMVType::UB_TO_OUT);
 }
-
 
 } // namespace MhcPreSinkhornNs
 

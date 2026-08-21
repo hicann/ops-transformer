@@ -23,7 +23,8 @@ using namespace AscendC;
 using namespace AscendC::Reg;
 using AscendC::Reg::MaskReg;
 using AscendC::Reg::RegTensor;
-using AscendC::Reg::UnalignReg;
+using AscendC::Reg::UnalignRegForLoad;
+using AscendC::Reg::UnalignRegForStore;
 constexpr int32_t BLOCK_SIZE = 32;
 constexpr int32_t VL_FP32 = 64;
 constexpr int32_t PER_BLOCK_FP16 = 128;
@@ -54,10 +55,7 @@ __aicore__ inline int32_t CeilDiv(int32_t a, int b)
     return (a + b - 1) / b;
 }
 
-__aicore__ inline int32_t CeilAlign(int32_t a, int b)
-{
-    return CeilDiv(a, b) * b;
-}
+__aicore__ inline int32_t CeilAlign(int32_t a, int b) { return CeilDiv(a, b) * b; }
 
 template <typename T>
 __aicore__ inline int32_t RoundUp(int32_t num)
@@ -121,8 +119,8 @@ __simd_callee__ inline void LoadInputData(RegTensor<float> &dst, __ubuf__ T *src
 }
 
 template <typename T>
-__simd_callee__ inline void StoreOutputData(
-    __ubuf__ T *dst, RegTensor<float> &src, MaskReg pregLoop, uint32_t dstOffset)
+__simd_callee__ inline void StoreOutputData(__ubuf__ T *dst, RegTensor<float> &src, MaskReg pregLoop,
+                                            uint32_t dstOffset)
 {
     if constexpr (IsSameType<T, float>::value) {
         StoreAlign(dst + dstOffset, src, pregLoop);
@@ -139,12 +137,10 @@ __simd_callee__ inline void StoreOutputData(
 
 template <typename T0, typename T1, bool roundScale = true, bool castBf16 = false>
 __simd_vf__ inline void VFProcessFP8PerGroupQuantVF(
-    __ubuf__ T1 *yLocalAddr, __ubuf__ T0 *xLocalAddr, __ubuf__ T1 *scaleLocalAddr,
-    __ubuf__ T0 *scaleLocalBf16Addr, __ubuf__ T0 *ropeYLocalAddr,
-    float coeff, float fp8Min, float fp8Max, const uint16_t curRowNum, const uint32_t quantColNum,
-    const uint16_t ropeNum, const uint16_t loopCount, const uint32_t curColNumAlign,
-    const uint32_t dstCurColNumAlign, const uint32_t concatColNum, const uint32_t padColNum,
-    const uint32_t sregNum)
+    __ubuf__ T1 *yLocalAddr, __ubuf__ T0 *xLocalAddr, __ubuf__ T1 *scaleLocalAddr, __ubuf__ T0 *scaleLocalBf16Addr,
+    __ubuf__ T0 *ropeYLocalAddr, float coeff, float fp8Min, float fp8Max, const uint16_t curRowNum,
+    const uint32_t quantColNum, const uint16_t ropeNum, const uint16_t loopCount, const uint32_t curColNumAlign,
+    const uint32_t dstCurColNumAlign, const uint32_t concatColNum, const uint32_t padColNum, const uint32_t sregNum)
 {
     {
         RegTensor<float> x0;
@@ -167,8 +163,8 @@ __simd_vf__ inline void VFProcessFP8PerGroupQuantVF(
         RegTensor<T0> ropeReg;
         RegTensor<uint8_t> scaleTmp1;
         RegTensor<bfloat16_t> scaleTmp1Bf16;
-        UnalignRegForStore ureg0;
-        UnalignRegForLoad ureg1;
+        UnalignRegForLoad ureg0;
+        UnalignRegForStore ureg1;
         UnalignRegForStore ureg2;
         MaskReg pregLoop;
         MaskReg preg1 = CreateMask<T0, AscendC::Reg::MaskPattern::VL1>();
@@ -196,14 +192,14 @@ __simd_vf__ inline void VFProcessFP8PerGroupQuantVF(
                 Maxs(max2, max0, static_cast<float>(1e-4), pregMerge);
                 Muls(max2, max2, coeff, pregMerge);
                 if constexpr (roundScale) {
-                    ShiftRights(vreg1, (RegTensor<uint32_t> &)max2,
-                                static_cast<int16_t>(FAST_LOG_SHIFT_BITS), pregMerge);
+                    ShiftRights(vreg1, (RegTensor<uint32_t> &)max2, static_cast<int16_t>(FAST_LOG_SHIFT_BITS),
+                                pregMerge);
                     And(vreg2, (RegTensor<uint32_t> &)max2, tmp1, pregMerge);
                     Compare<uint32_t, AscendC::CMPMODE::NE>(cmpMask, vreg2, zero, pregMerge);
                     Select(vreg4, one, zero, cmpMask);
                     Add(vreg1, vreg1, vreg4, pregMerge);
-                    ShiftLefts((RegTensor<int32_t> &)max2, (RegTensor<int32_t> &)vreg1,
-                               static_cast<int16_t>(23), pregMerge);
+                    ShiftLefts((RegTensor<int32_t> &)max2, (RegTensor<int32_t> &)vreg1, static_cast<int16_t>(23),
+                               pregMerge);
                 }
                 Duplicate(dupScale, max2, pregMain);
                 Div(x0, x0, dupScale, pregLoop);
@@ -222,12 +218,12 @@ __simd_vf__ inline void VFProcessFP8PerGroupQuantVF(
                         (RegTensor<bfloat16_t> &)scaleTmp1Bf16, preg1);
                 } else {
                     RegTensor<uint32_t> scaleTmp0;
-                    ShiftRights(
-                        scaleTmp0, (RegTensor<uint32_t> &)max2, static_cast<int16_t>(FAST_LOG_SHIFT_BITS), preg1);
+                    ShiftRights(scaleTmp0, (RegTensor<uint32_t> &)max2, static_cast<int16_t>(FAST_LOG_SHIFT_BITS),
+                                preg1);
                     Cast<uint8_t, uint32_t, castTraitB322B8Even>(scaleTmp1, scaleTmp0, preg1);
                     StoreAlign<T1, AscendC::Reg::StoreDist::DIST_FIRST_ELEMENT_B8>(
-                        scaleLocalAddr + quantColNum + ropeNum + j + i * dstCurColNumAlign,
-                        (RegTensor<T1> &)scaleTmp1, preg1);
+                        scaleLocalAddr + quantColNum + ropeNum + j + i * dstCurColNumAlign, (RegTensor<T1> &)scaleTmp1,
+                        preg1);
                 }
             }
             LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
@@ -241,10 +237,10 @@ __simd_vf__ inline void VFProcessFP8PerGroupQuantVF(
 }
 
 template <typename T0, typename T1, bool roundScale = true, bool castBf16 = false>
-__aicore__ inline void VFProcessFP8PerGroupQuant(
-    const LocalTensor<T1> &yLocal, const LocalTensor<T0> &xLocal,
-    float coeff, float fp8Min, float fp8Max, const uint16_t curRowNum, const uint32_t curColNum,
-    const uint32_t concatColNum, const uint32_t padColNum)
+__aicore__ inline void VFProcessFP8PerGroupQuant(const LocalTensor<T1> &yLocal, const LocalTensor<T0> &xLocal,
+                                                 float coeff, float fp8Min, float fp8Max, const uint16_t curRowNum,
+                                                 const uint32_t curColNum, const uint32_t concatColNum,
+                                                 const uint32_t padColNum)
 {
     __ubuf__ T1 *yLocalAddr = (__ubuf__ T1 *)yLocal.GetPhyAddr();
     __ubuf__ T0 *xLocalAddr = (__ubuf__ T0 *)xLocal.GetPhyAddr();
@@ -270,15 +266,13 @@ __aicore__ inline void VFProcessFP8PerGroupQuant(
     uint32_t scaleColNumAlign = RoundUp<T0>(scaleColNum);
     uint32_t sregNum = quantColNum;
     VFProcessFP8PerGroupQuantVF<T0, T1, roundScale, castBf16>(
-        yLocalAddr, xLocalAddr, scaleLocalAddr, scaleLocalBf16Addr, ropeYLocalAddr,
-        coeff, fp8Min, fp8Max, curRowNum, quantColNum, ropeNum, loopCount, curColNumAlign,
-        dstCurColNumAlign, concatColNum, padColNum, sregNum);
+        yLocalAddr, xLocalAddr, scaleLocalAddr, scaleLocalBf16Addr, ropeYLocalAddr, coeff, fp8Min, fp8Max, curRowNum,
+        quantColNum, ropeNum, loopCount, curColNumAlign, dstCurColNumAlign, concatColNum, padColNum, sregNum);
 }
 
 template <typename T>
-__aicore__ inline void CopyIn(
-    const GlobalTensor<T> &inputGm, const LocalTensor<T> &inputTensor, const uint16_t nBurst, const uint32_t copyLen,
-    uint32_t srcStride = 0)
+__aicore__ inline void CopyIn(const GlobalTensor<T> &inputGm, const LocalTensor<T> &inputTensor, const uint16_t nBurst,
+                              const uint32_t copyLen, uint32_t srcStride = 0)
 {
     DataCopyPadExtParams<T> dataCopyPadExtParams;
     dataCopyPadExtParams.isPad = false;
@@ -295,9 +289,8 @@ __aicore__ inline void CopyIn(
 }
 
 template <typename T, AscendC::PaddingMode mode = AscendC::PaddingMode::Normal>
-__aicore__ inline void CopyOut(
-    const LocalTensor<T> &outputTensor, const GlobalTensor<T> &outputGm, const uint16_t nBurst, const uint32_t copyLen,
-    uint32_t dstStride = 0)
+__aicore__ inline void CopyOut(const LocalTensor<T> &outputTensor, const GlobalTensor<T> &outputGm,
+                               const uint16_t nBurst, const uint32_t copyLen, uint32_t dstStride = 0)
 {
     DataCopyExtParams dataCopyParams;
     dataCopyParams.blockCount = nBurst;
@@ -347,9 +340,8 @@ struct Hif8Fp4RowDesc {
 };
 
 template <typename T0, typename T1>
-__simd_callee__ inline void Hif8Fp4Rope(
-    __ubuf__ hifloat8_t *yHif8Addr, __ubuf__ T0 *xAddr, uint32_t rowByteBase, uint32_t rowElemBase,
-    uint32_t nopeElems, float scalesAttr, MaskReg pregRope)
+__simd_callee__ inline void Hif8Fp4Rope(__ubuf__ hifloat8_t *yHif8Addr, __ubuf__ T0 *xAddr, uint32_t rowByteBase,
+                                        uint32_t rowElemBase, uint32_t nopeElems, float scalesAttr, MaskReg pregRope)
 {
     RegTensor<float> ropeF32;
     RegTensor<hifloat8_t> ropeHif8;
@@ -360,9 +352,8 @@ __simd_callee__ inline void Hif8Fp4Rope(
 }
 
 template <typename T1>
-__simd_callee__ inline void Hif8Fp4Pad(
-    __ubuf__ T1 *yByteAddr, uint32_t rowByteBase, uint32_t concatCol, uint32_t padCol,
-    RegTensor<uint8_t> &zeroU8, UnalignRegForStore &upadReg)
+__simd_callee__ inline void Hif8Fp4Pad(__ubuf__ T1 *yByteAddr, uint32_t rowByteBase, uint32_t concatCol,
+                                       uint32_t padCol, RegTensor<uint8_t> &zeroU8, UnalignRegForStore &upadReg)
 {
     if (padCol > 0) {
         __ubuf__ T1 *padAddr = yByteAddr + rowByteBase + concatCol;
@@ -372,8 +363,8 @@ __simd_callee__ inline void Hif8Fp4Pad(
 }
 
 template <typename T0, typename T1>
-__simd_vf__ inline void VFProcessHif8Fp4G64VF(
-    __ubuf__ T1 *yByteAddr, __ubuf__ T0 *xAddr, const Hif8Fp4RowDesc desc, const uint16_t curRowNum)
+__simd_vf__ inline void VFProcessHif8Fp4G64VF(__ubuf__ T1 *yByteAddr, __ubuf__ T0 *xAddr, const Hif8Fp4RowDesc desc,
+                                              const uint16_t curRowNum)
 {
     static constexpr AscendC::Reg::DivSpecificMode divMode = {AscendC::Reg::MaskMergeMode::ZEROING, false};
     {
@@ -441,8 +432,8 @@ __simd_vf__ inline void VFProcessHif8Fp4G64VF(
                 Max(xqChunk, xqChunk, fp4MinBf16, mask64);
                 Cast<fp4x2_e2m1_t, T0, castTraitBf16toFp4>(fp4Out, xqChunk, mask64);
                 StoreAlign<int8_t, AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-                    reinterpret_cast<__ubuf__ int8_t *>(
-                        yByteAddr + rowByteBase + desc.fp4ByteOff + c * (FP4_CHUNK_ELEMS / 2)),
+                    reinterpret_cast<__ubuf__ int8_t *>(yByteAddr + rowByteBase + desc.fp4ByteOff +
+                                                        c * (FP4_CHUNK_ELEMS / 2)),
                     (RegTensor<int8_t> &)fp4Out, mask64);
             }
 
@@ -452,10 +443,10 @@ __simd_vf__ inline void VFProcessHif8Fp4G64VF(
 }
 
 template <typename T0, typename T1, uint32_t GROUPS_PER_CHUNK>
-__simd_callee__ inline void Hif8Fp4ScaleToScratch(
-    __ubuf__ T0 *yBf16Addr, __ubuf__ T0 *scratchChunkAddr, uint32_t scaleElemBase,
-    RegTensor<uint16_t> &amaxBits, RegTensor<float> &six, MaskReg maskK, MaskReg maskScratch,
-    UnalignRegForStore &uScale)
+__simd_callee__ inline void Hif8Fp4ScaleToScratch(__ubuf__ T0 *yBf16Addr, __ubuf__ T0 *scratchChunkAddr,
+                                                  uint32_t scaleElemBase, RegTensor<uint16_t> &amaxBits,
+                                                  RegTensor<float> &six, MaskReg maskK, MaskReg maskScratch,
+                                                  UnalignRegForStore &uScale)
 {
     static constexpr AscendC::Reg::DivSpecificMode divMode = {AscendC::Reg::MaskMergeMode::ZEROING, false};
     RegTensor<uint16_t> amaxSpread;
@@ -494,9 +485,8 @@ __simd_callee__ inline void Hif8Fp4ScaleToScratch(
 }
 
 template <typename T0, typename T1>
-__simd_vf__ inline void VFProcessHif8Fp4G16VF(
-    __ubuf__ T1 *yByteAddr, __ubuf__ T0 *xAddr, __ubuf__ T0 *scratchAddr,
-    const Hif8Fp4RowDesc desc, const uint16_t curRowNum)
+__simd_vf__ inline void VFProcessHif8Fp4G16VF(__ubuf__ T1 *yByteAddr, __ubuf__ T0 *xAddr, __ubuf__ T0 *scratchAddr,
+                                              const Hif8Fp4RowDesc desc, const uint16_t curRowNum)
 {
     {
         __ubuf__ hifloat8_t *yHif8Addr = reinterpret_cast<__ubuf__ hifloat8_t *>(yByteAddr);
@@ -550,8 +540,8 @@ __simd_vf__ inline void VFProcessHif8Fp4G16VF(
 
                 uint32_t scaleElemBase = rowByteBase / 2 + scaleElemBaseRow0 + c * FOUR_UNFOLD_FP4;
                 __ubuf__ T0 *scratchChunkAddr = scratchAddr + rowScratchBase + c * SCRATCH_BLK_PER_CHUNK;
-                Hif8Fp4ScaleToScratch<T0, T1, 4>(
-                    yBf16Addr, scratchChunkAddr, scaleElemBase, amaxBits, six, maskK, maskScratch, uScale);
+                Hif8Fp4ScaleToScratch<T0, T1, 4>(yBf16Addr, scratchChunkAddr, scaleElemBase, amaxBits, six, maskK,
+                                                 maskScratch, uScale);
             }
 
             LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
@@ -570,8 +560,8 @@ __simd_vf__ inline void VFProcessHif8Fp4G16VF(
                 Max(xqChunk, xqChunk, fp4MinBf16, mask64);
                 Cast<fp4x2_e2m1_t, T0, castTraitBf16toFp4>(fp4Out, xqChunk, mask64);
                 StoreAlign<int8_t, AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-                    reinterpret_cast<__ubuf__ int8_t *>(
-                        yByteAddr + rowByteBase + desc.fp4ByteOff + c * (FP4_CHUNK_ELEMS / 2)),
+                    reinterpret_cast<__ubuf__ int8_t *>(yByteAddr + rowByteBase + desc.fp4ByteOff +
+                                                        c * (FP4_CHUNK_ELEMS / 2)),
                     (RegTensor<int8_t> &)fp4Out, mask64);
             }
 
@@ -581,9 +571,8 @@ __simd_vf__ inline void VFProcessHif8Fp4G16VF(
 }
 
 template <typename T0, typename T1>
-__simd_vf__ inline void VFProcessHif8Fp4G32VF(
-    __ubuf__ T1 *yByteAddr, __ubuf__ T0 *xAddr, __ubuf__ T0 *scratchAddr,
-    const Hif8Fp4RowDesc desc, const uint16_t curRowNum)
+__simd_vf__ inline void VFProcessHif8Fp4G32VF(__ubuf__ T1 *yByteAddr, __ubuf__ T0 *xAddr, __ubuf__ T0 *scratchAddr,
+                                              const Hif8Fp4RowDesc desc, const uint16_t curRowNum)
 {
     {
         __ubuf__ hifloat8_t *yHif8Addr = reinterpret_cast<__ubuf__ hifloat8_t *>(yByteAddr);
@@ -645,8 +634,8 @@ __simd_vf__ inline void VFProcessHif8Fp4G32VF(
 
                 uint32_t scaleElemBase = rowByteBase / 2 + scaleElemBaseRow0 + c * GROUPS_PER_CHUNK_G32;
                 __ubuf__ T0 *scratchChunkAddr = scratchAddr + rowScratchBase + c * SCRATCH_BLK_PER_CHUNK;
-                Hif8Fp4ScaleToScratch<T0, T1, GROUPS_PER_CHUNK_G32>(
-                    yBf16Addr, scratchChunkAddr, scaleElemBase, amaxBits, six, maskK, maskScratch, uScale);
+                Hif8Fp4ScaleToScratch<T0, T1, GROUPS_PER_CHUNK_G32>(yBf16Addr, scratchChunkAddr, scaleElemBase,
+                                                                    amaxBits, six, maskK, maskScratch, uScale);
             }
 
             LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
@@ -664,8 +653,8 @@ __simd_vf__ inline void VFProcessHif8Fp4G32VF(
                 Max(xqChunk, xqChunk, fp4MinBf16, mask64);
                 Cast<fp4x2_e2m1_t, T0, castTraitBf16toFp4>(fp4Out, xqChunk, mask64);
                 StoreAlign<int8_t, AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-                    reinterpret_cast<__ubuf__ int8_t *>(
-                        yByteAddr + rowByteBase + desc.fp4ByteOff + c * (FP4_CHUNK_ELEMS / 2)),
+                    reinterpret_cast<__ubuf__ int8_t *>(yByteAddr + rowByteBase + desc.fp4ByteOff +
+                                                        c * (FP4_CHUNK_ELEMS / 2)),
                     (RegTensor<int8_t> &)fp4Out, mask64);
             }
 
@@ -675,10 +664,10 @@ __simd_vf__ inline void VFProcessHif8Fp4G32VF(
 }
 
 template <typename T0, typename T1>
-__aicore__ inline void VFProcessHif8Fp4(
-    const LocalTensor<T1> &yLocal, const LocalTensor<T0> &xLocal, const LocalTensor<T0> &scratchLocal,
-    float scalesAttr, const uint16_t curRowNum, const uint32_t d, const uint32_t nGroup, const uint32_t groupSize,
-    const uint32_t dstRowStride, const uint32_t concatCol, const uint32_t padCol)
+__aicore__ inline void VFProcessHif8Fp4(const LocalTensor<T1> &yLocal, const LocalTensor<T0> &xLocal,
+                                        const LocalTensor<T0> &scratchLocal, float scalesAttr, const uint16_t curRowNum,
+                                        const uint32_t d, const uint32_t nGroup, const uint32_t groupSize,
+                                        const uint32_t dstRowStride, const uint32_t concatCol, const uint32_t padCol)
 {
     __ubuf__ T1 *yByteAddr = (__ubuf__ T1 *)yLocal.GetPhyAddr();
     __ubuf__ T0 *xAddr = (__ubuf__ T0 *)xLocal.GetPhyAddr();

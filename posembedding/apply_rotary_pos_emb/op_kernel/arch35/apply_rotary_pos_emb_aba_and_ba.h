@@ -28,43 +28,40 @@ public:
 
     __aicore__ inline ~ApplyRotaryPosEmbABAAndBA(){};
 
-    __aicore__ inline void Init(
-        GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut, GM_ADDR kOut, GM_ADDR workspace,
-        const ApplyRotaryPosEmbRegbaseTilingData* tilingData, TPipe* pipe);
+    __aicore__ inline void Init(GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut, GM_ADDR kOut,
+                                GM_ADDR workspace, const ApplyRotaryPosEmbRegbaseTilingData *tilingData, TPipe *pipe);
 
     __aicore__ inline void Process();
 
 private:
     // Init过程中使用的内部函数
-    __aicore__ inline void InitAllGlobalBuffer(
-        GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut, GM_ADDR kOut);
+    __aicore__ inline void InitAllGlobalBuffer(GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut,
+                                               GM_ADDR kOut);
     __aicore__ inline void InitAllBuffer();
     __aicore__ inline void InitLoopParams();
     // 各个层级的Process函数
-    __aicore__ inline void ProcessInSLoop(
-        int64_t sUbStart,
-        int64_t sUbLength); // 第一重循环体，给定S范围，沿B轴进行遍历处理
-    __aicore__ inline void ProcessInSBLoop(
-        int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, LocalTensor<T>& cos,
-        LocalTensor<T>& sin); // 第二重循环体，给定BS范围，沿Q和K的N轴进行遍历处理
-    __aicore__ inline void ProcessInSBNLoop(
-        int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, int64_t nUbStart, int64_t nUbLength,
-        int64_t nTotalSize, LocalTensor<T>& cos, LocalTensor<T>& sin, GlobalTensor<T>& in,
-        GlobalTensor<T>& out); // 第三重循环体，给定BSN范围，计算其中数据的rope
+    __aicore__ inline void ProcessInSLoop(int64_t sUbStart,
+                                          int64_t sUbLength); // 第一重循环体，给定S范围，沿B轴进行遍历处理
+    __aicore__ inline void ProcessInSBLoop(int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength,
+                                           LocalTensor<T> &cos,
+                                           LocalTensor<T> &sin); // 第二重循环体，给定BS范围，沿Q和K的N轴进行遍历处理
+    __aicore__ inline void ProcessInSBNLoop(int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength,
+                                            int64_t nUbStart, int64_t nUbLength, int64_t nTotalSize,
+                                            LocalTensor<T> &cos, LocalTensor<T> &sin, GlobalTensor<T> &in,
+                                            GlobalTensor<T> &out); // 第三重循环体，给定BSN范围，计算其中数据的rope
     // 拷入拷出函数
     __aicore__ inline void CopyInCosAndSin(int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength);
-    __aicore__ inline void CopyInQOrK(
-        GlobalTensor<T>& source, int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart,
-        int64_t nLength, int64_t nTotalSize);
-    __aicore__ inline void CopyOutQOrK(
-        GlobalTensor<T>& target, int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart,
-        int64_t nLength, int64_t nTotalSize);
+    __aicore__ inline void CopyInQOrK(GlobalTensor<T> &source, int64_t sStart, int64_t sLength, int64_t bStart,
+                                      int64_t bLength, int64_t nStart, int64_t nLength, int64_t nTotalSize);
+    __aicore__ inline void CopyOutQOrK(GlobalTensor<T> &target, int64_t sStart, int64_t sLength, int64_t bStart,
+                                       int64_t bLength, int64_t nStart, int64_t nLength, int64_t nTotalSize);
 
     // 计算函数
-    __aicore__ inline void Compute(
-        LocalTensor<T>& cos, LocalTensor<T>& sin, int64_t sLength, int64_t bLength, int64_t nLength);
+    __aicore__ inline void Compute(LocalTensor<T> &cos, LocalTensor<T> &sin, int64_t sLength, int64_t bLength,
+                                   int64_t nLength);
+
 private:
-    TPipe* pipe_;
+    TPipe *pipe_;
 
     // GlobalMemory
     GlobalTensor<T> qGm_;
@@ -88,7 +85,7 @@ private:
     int64_t sBlockLength_ = 0;
 
     // TilingData
-    const ApplyRotaryPosEmbRegbaseTilingData* tilingData_;
+    const ApplyRotaryPosEmbRegbaseTilingData *tilingData_;
     int64_t ubFactorB_ = 0;
     int64_t ubFactorS_ = 0;
     int64_t ubFactorN_ = 0;
@@ -100,7 +97,7 @@ private:
 template <typename T, bool IsBBoardcast>
 __aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::Init(
     GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut, GM_ADDR kOut, GM_ADDR workspace,
-    const ApplyRotaryPosEmbRegbaseTilingData* tilingData, TPipe* pipe)
+    const ApplyRotaryPosEmbRegbaseTilingData *tilingData, TPipe *pipe)
 {
     this->tilingData_ = tilingData;
     this->pipe_ = pipe;
@@ -111,15 +108,16 @@ __aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::Init(
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::InitAllGlobalBuffer(
-    GM_ADDR q, GM_ADDR k, GM_ADDR cos, GM_ADDR sin, GM_ADDR qOut, GM_ADDR kOut)
+__aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::InitAllGlobalBuffer(GM_ADDR q, GM_ADDR k,
+                                                                                       GM_ADDR cos, GM_ADDR sin,
+                                                                                       GM_ADDR qOut, GM_ADDR kOut)
 {
-    this->qGm_.SetGlobalBuffer((__gm__ T*)q);
-    this->kGm_.SetGlobalBuffer((__gm__ T*)k);
-    this->cosGm_.SetGlobalBuffer((__gm__ T*)cos);
-    this->sinGm_.SetGlobalBuffer((__gm__ T*)sin);
-    this->qOutGm_.SetGlobalBuffer((__gm__ T*)qOut);
-    this->kOutGm_.SetGlobalBuffer((__gm__ T*)kOut);
+    this->qGm_.SetGlobalBuffer((__gm__ T *)q);
+    this->kGm_.SetGlobalBuffer((__gm__ T *)k);
+    this->cosGm_.SetGlobalBuffer((__gm__ T *)cos);
+    this->sinGm_.SetGlobalBuffer((__gm__ T *)sin);
+    this->qOutGm_.SetGlobalBuffer((__gm__ T *)qOut);
+    this->kOutGm_.SetGlobalBuffer((__gm__ T *)kOut);
 }
 
 template <typename T, bool IsBBoardcast>
@@ -134,11 +132,13 @@ __aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::InitAllBuffer
     } else if (tilingData_->rotaryMode == static_cast<int64_t>(ApplyRotaryPosEmbRotaryMode::QUARTER)) {
         this->dSplitCoef_ = QUARTER_MODE_COEF;
     }
-    this->dAlign_ = Ops::Base::CeilAlign<int64_t>(this->tilingData_->realDim / dSplitCoef_, BLOCK_TYPE_SIZE / sizeof(T)) * dSplitCoef_;
+    this->dAlign_ =
+        Ops::Base::CeilAlign<int64_t>(this->tilingData_->realDim / dSplitCoef_, BLOCK_TYPE_SIZE / sizeof(T)) *
+        dSplitCoef_;
 
     this->pipe_->InitBuffer(this->qInQueue_, DOUBLE_BUFFER, ubFactorB_ * ubFactorS_ * ubFactorN_ * dAlign_ * sizeof(T));
-    this->pipe_->InitBuffer(
-        this->qOutQueue_, DOUBLE_BUFFER, ubFactorB_ * ubFactorS_ * ubFactorN_ * dAlign_ * sizeof(T));
+    this->pipe_->InitBuffer(this->qOutQueue_, DOUBLE_BUFFER,
+                            ubFactorB_ * ubFactorS_ * ubFactorN_ * dAlign_ * sizeof(T));
     if constexpr (IsBBoardcast) {
         this->pipe_->InitBuffer(this->cosInQueue_, DOUBLE_BUFFER, ubFactorS_ * dAlign_ * sizeof(T));
         this->pipe_->InitBuffer(this->sinInQueue_, DOUBLE_BUFFER, ubFactorS_ * dAlign_ * sizeof(T));
@@ -171,9 +171,8 @@ __aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::Process()
     // 在S轴进行循环
     int64_t ubLoopCount = Ops::Base::CeilDiv(sBlockLength_, ubFactorS_);
     for (int64_t ubLoopIdx = 0; ubLoopIdx < ubLoopCount; ubLoopIdx++) {
-        this->ProcessInSLoop(
-            sBlockStart_ + ubLoopIdx * ubFactorS_,
-            ubLoopIdx != ubLoopCount - 1 ? ubFactorS_ : sBlockLength_ - ubLoopIdx * ubFactorS_);
+        this->ProcessInSLoop(sBlockStart_ + ubLoopIdx * ubFactorS_,
+                             ubLoopIdx != ubLoopCount - 1 ? ubFactorS_ : sBlockLength_ - ubLoopIdx * ubFactorS_);
     }
 }
 
@@ -188,23 +187,22 @@ __aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::ProcessInSLoo
         LocalTensor<T> cosUb = this->cosInQueue_.template DeQue<T>();
         LocalTensor<T> sinUb = this->sinInQueue_.template DeQue<T>();
         for (int64_t ubLoopIdx = 0; ubLoopIdx < ubLoopCount; ubLoopIdx++) {
-            this->ProcessInSBLoop(
-                sUbStart, sUbLength, bBlockStart_ + ubLoopIdx * ubFactorB_,
-                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_, cosUb, sinUb);
+            this->ProcessInSBLoop(sUbStart, sUbLength, bBlockStart_ + ubLoopIdx * ubFactorB_,
+                                  ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_,
+                                  cosUb, sinUb);
         }
         this->sinInQueue_.FreeTensor(cosUb);
         this->cosInQueue_.FreeTensor(sinUb);
     } else {
         // sin和cos无需在B轴广播的情况
         for (int64_t ubLoopIdx = 0; ubLoopIdx < ubLoopCount; ubLoopIdx++) {
-            this->CopyInCosAndSin(
-                sUbStart, sUbLength, bBlockStart_ + ubLoopIdx * ubFactorB_,
-                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_);
+            this->CopyInCosAndSin(sUbStart, sUbLength, bBlockStart_ + ubLoopIdx * ubFactorB_,
+                                  ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_);
             LocalTensor<T> cosUb = this->cosInQueue_.template DeQue<T>();
             LocalTensor<T> sinUb = this->sinInQueue_.template DeQue<T>();
-            this->ProcessInSBLoop(
-                sUbStart, sUbLength, bBlockStart_ + ubLoopIdx * ubFactorB_,
-                ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_, cosUb, sinUb);
+            this->ProcessInSBLoop(sUbStart, sUbLength, bBlockStart_ + ubLoopIdx * ubFactorB_,
+                                  ubLoopIdx != ubLoopCount - 1 ? ubFactorB_ : bBlockLength_ - ubLoopIdx * ubFactorB_,
+                                  cosUb, sinUb);
             this->cosInQueue_.FreeTensor(cosUb);
             this->sinInQueue_.FreeTensor(sinUb);
         }
@@ -212,31 +210,31 @@ __aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::ProcessInSLoo
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::ProcessInSBLoop(
-    int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, LocalTensor<T>& cos, LocalTensor<T>& sin)
+__aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::ProcessInSBLoop(int64_t sUbStart, int64_t sUbLength,
+                                                                                   int64_t bUbStart, int64_t bUbLength,
+                                                                                   LocalTensor<T> &cos,
+                                                                                   LocalTensor<T> &sin)
 {
     // 循环处理Q
     int64_t qUbLoopCount = Ops::Base::CeilDiv(tilingData_->QN, ubFactorN_);
     for (int64_t ubLoopIdx = 0; ubLoopIdx < qUbLoopCount; ubLoopIdx++) {
-        this->ProcessInSBNLoop(
-            sUbStart, sUbLength, bUbStart, bUbLength, ubLoopIdx * ubFactorN_,
-            ubLoopIdx != qUbLoopCount - 1 ? ubFactorN_ : tilingData_->QN - ubLoopIdx * ubFactorN_, tilingData_->QN, cos,
-            sin, qGm_, qOutGm_);
+        this->ProcessInSBNLoop(sUbStart, sUbLength, bUbStart, bUbLength, ubLoopIdx * ubFactorN_,
+                               ubLoopIdx != qUbLoopCount - 1 ? ubFactorN_ : tilingData_->QN - ubLoopIdx * ubFactorN_,
+                               tilingData_->QN, cos, sin, qGm_, qOutGm_);
     }
     // 循环处理K
     int64_t kUbLoopCount = Ops::Base::CeilDiv(tilingData_->KN, ubFactorN_);
     for (int64_t ubLoopIdx = 0; ubLoopIdx < kUbLoopCount; ubLoopIdx++) {
-        this->ProcessInSBNLoop(
-            sUbStart, sUbLength, bUbStart, bUbLength, ubLoopIdx * ubFactorN_,
-            ubLoopIdx != kUbLoopCount - 1 ? ubFactorN_ : tilingData_->KN - ubLoopIdx * ubFactorN_, tilingData_->KN, cos,
-            sin, kGm_, kOutGm_);
+        this->ProcessInSBNLoop(sUbStart, sUbLength, bUbStart, bUbLength, ubLoopIdx * ubFactorN_,
+                               ubLoopIdx != kUbLoopCount - 1 ? ubFactorN_ : tilingData_->KN - ubLoopIdx * ubFactorN_,
+                               tilingData_->KN, cos, sin, kGm_, kOutGm_);
     }
 }
 
 template <typename T, bool IsBBoardcast>
 __aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::ProcessInSBNLoop(
     int64_t sUbStart, int64_t sUbLength, int64_t bUbStart, int64_t bUbLength, int64_t nUbStart, int64_t nUbLength,
-    int64_t nTotalSize, LocalTensor<T>& cos, LocalTensor<T>& sin, GlobalTensor<T>& in, GlobalTensor<T>& out)
+    int64_t nTotalSize, LocalTensor<T> &cos, LocalTensor<T> &sin, GlobalTensor<T> &in, GlobalTensor<T> &out)
 {
     CopyInQOrK(in, sUbStart, sUbLength, bUbStart, bUbLength, nUbStart, nUbLength, nTotalSize);
     Compute(cos, sin, sUbLength, bUbLength, nUbLength);
@@ -244,8 +242,8 @@ __aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::ProcessInSBNL
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::CopyInCosAndSin(
-    int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength)
+__aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::CopyInCosAndSin(int64_t sStart, int64_t sLength,
+                                                                                   int64_t bStart, int64_t bLength)
 {
     LocalTensor<T> cosUb = this->cosInQueue_.template AllocTensor<T>();
     LocalTensor<T> sinUb = this->sinInQueue_.template AllocTensor<T>();
@@ -267,17 +265,22 @@ __aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::CopyInCosAndS
     copyExtParams.blockLen = this->tilingData_->realDim * sizeof(T) / dSplitCoef_;
     copyExtParams.srcStride = 0;
     copyExtParams.dstStride = 0;
-    DataCopyPad(cosUb, this->cosGm_[bStart * tilingData_->S * this->tilingData_->realDim + sStart * this->tilingData_->realDim], copyExtParams, copyPadExtparams);
-    DataCopyPad(sinUb, this->sinGm_[bStart * tilingData_->S * this->tilingData_->realDim + sStart * this->tilingData_->realDim], copyExtParams, copyPadExtparams);
+    DataCopyPad(
+        cosUb, this->cosGm_[bStart * tilingData_->S * this->tilingData_->realDim + sStart * this->tilingData_->realDim],
+        copyExtParams, copyPadExtparams);
+    DataCopyPad(
+        sinUb, this->sinGm_[bStart * tilingData_->S * this->tilingData_->realDim + sStart * this->tilingData_->realDim],
+        copyExtParams, copyPadExtparams);
     ResetLoopModePara(DataCopyMVType::OUT_TO_UB);
     this->cosInQueue_.template EnQue(cosUb);
     this->sinInQueue_.template EnQue(sinUb);
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::CopyInQOrK(
-    GlobalTensor<T>& source, int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart,
-    int64_t nLength, int64_t nTotalSize)
+__aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::CopyInQOrK(GlobalTensor<T> &source, int64_t sStart,
+                                                                              int64_t sLength, int64_t bStart,
+                                                                              int64_t bLength, int64_t nStart,
+                                                                              int64_t nLength, int64_t nTotalSize)
 {
     LocalTensor<T> target = this->qInQueue_.template AllocTensor<T>();
     // 数据格式为BNSD，B->N->S->D
@@ -289,20 +292,22 @@ __aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::CopyInQOrK(
     loopParams.loop1SrcStride = tilingData_->S * D_ * sizeof(T);
     loopParams.loop1DstStride = ubFactorS_ * dAlign_ * sizeof(T);
     SetLoopModePara(loopParams, DataCopyMVType::OUT_TO_UB);
-    
+
     DataCopyPadExtParams<T> copyPadExtparams;
     copyPadExtparams.isPad = false;
     copyPadExtparams.leftPadding = 0;
     copyPadExtparams.rightPadding = 0;
     copyPadExtparams.paddingValue = 0;
-    
+
     int64_t offset = bStart * nTotalSize * tilingData_->S * D_ + nStart * tilingData_->S * D_ + sStart * D_;
     int64_t blockLen = tilingData_->realDim * sizeof(T) / dSplitCoef_;
     if (tilingData_->isPartialRope) {
         if (tilingData_->rotaryMode == static_cast<int64_t>(ApplyRotaryPosEmbRotaryMode::HALF)) {
-            CopyInHalfMode(target, source, offset, sLength, blockLen, copyPadExtparams, D_, tilingData_->realDim, dSplitCoef_);
+            CopyInHalfMode(target, source, offset, sLength, blockLen, copyPadExtparams, D_, tilingData_->realDim,
+                           dSplitCoef_);
         } else if (tilingData_->rotaryMode == static_cast<int64_t>(ApplyRotaryPosEmbRotaryMode::QUARTER)) {
-            CopyInQuarterMode(target, source, offset, sLength, blockLen, copyPadExtparams, D_, tilingData_->realDim, dSplitCoef_); 
+            CopyInQuarterMode(target, source, offset, sLength, blockLen, copyPadExtparams, D_, tilingData_->realDim,
+                              dSplitCoef_);
         } else {
             CopyInInterleaveMode(target, source, offset, sLength, blockLen, copyPadExtparams, D_, tilingData_->realDim);
         }
@@ -320,9 +325,10 @@ __aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::CopyInQOrK(
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::CopyOutQOrK(
-    GlobalTensor<T>& target, int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart,
-    int64_t nLength, int64_t nTotalSize)
+__aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::CopyOutQOrK(GlobalTensor<T> &target, int64_t sStart,
+                                                                               int64_t sLength, int64_t bStart,
+                                                                               int64_t bLength, int64_t nStart,
+                                                                               int64_t nLength, int64_t nTotalSize)
 {
     LocalTensor<T> source = this->qOutQueue_.template DeQue<T>();
     // 数据格式为BNSD，B->N->S->D
@@ -360,23 +366,25 @@ __aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::CopyOutQOrK(
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::Compute(
-    LocalTensor<T>& cos, LocalTensor<T>& sin, int64_t sLength, int64_t bLength, int64_t nLength)
+__aicore__ inline void ApplyRotaryPosEmbABAAndBA<T, IsBBoardcast>::Compute(LocalTensor<T> &cos, LocalTensor<T> &sin,
+                                                                           int64_t sLength, int64_t bLength,
+                                                                           int64_t nLength)
 {
     LocalTensor<T> inUb = this->qInQueue_.template DeQue<T>();
     LocalTensor<T> outUb = this->qOutQueue_.template AllocTensor<T>();
     if (tilingData_->rotaryMode == static_cast<int64_t>(ApplyRotaryPosEmbRotaryMode::HALF)) {
-        BatchHalfAlignVF<T, IsBBoardcast>(
-            (__local_mem__ T*)inUb.GetPhyAddr(), (__local_mem__ T*)cos.GetPhyAddr(), (__local_mem__ T*)sin.GetPhyAddr(),
-            (__local_mem__ T*)outUb.GetPhyAddr(), sLength, bLength, nLength, tilingData_->realDim, dAlign_, ubFactorS_, ubFactorN_);
+        BatchHalfAlignVF<T, IsBBoardcast>((__ubuf__ T *)inUb.GetPhyAddr(), (__ubuf__ T *)cos.GetPhyAddr(),
+                                          (__ubuf__ T *)sin.GetPhyAddr(), (__ubuf__ T *)outUb.GetPhyAddr(), sLength,
+                                          bLength, nLength, tilingData_->realDim, dAlign_, ubFactorS_, ubFactorN_);
     } else if (tilingData_->rotaryMode == static_cast<int64_t>(ApplyRotaryPosEmbRotaryMode::INTERLEAVE)) {
-        BatchInterleaveModeVF<T, IsBBoardcast>(
-            (__local_mem__ T*)inUb.GetPhyAddr(), (__local_mem__ T*)cos.GetPhyAddr(), (__local_mem__ T*)sin.GetPhyAddr(),
-            (__local_mem__ T*)outUb.GetPhyAddr(), sLength, bLength, nLength, tilingData_->realDim, dAlign_, ubFactorS_, ubFactorN_);
+        BatchInterleaveModeVF<T, IsBBoardcast>((__ubuf__ T *)inUb.GetPhyAddr(), (__ubuf__ T *)cos.GetPhyAddr(),
+                                               (__ubuf__ T *)sin.GetPhyAddr(), (__ubuf__ T *)outUb.GetPhyAddr(),
+                                               sLength, bLength, nLength, tilingData_->realDim, dAlign_, ubFactorS_,
+                                               ubFactorN_);
     } else {
-        BatchQuarterAlignVF<T, IsBBoardcast>(
-            (__local_mem__ T*)inUb.GetPhyAddr(), (__local_mem__ T*)cos.GetPhyAddr(), (__local_mem__ T*)sin.GetPhyAddr(),
-            (__local_mem__ T*)outUb.GetPhyAddr(), sLength, bLength, nLength, tilingData_->realDim, dAlign_, ubFactorS_, ubFactorN_);
+        BatchQuarterAlignVF<T, IsBBoardcast>((__ubuf__ T *)inUb.GetPhyAddr(), (__ubuf__ T *)cos.GetPhyAddr(),
+                                             (__ubuf__ T *)sin.GetPhyAddr(), (__ubuf__ T *)outUb.GetPhyAddr(), sLength,
+                                             bLength, nLength, tilingData_->realDim, dAlign_, ubFactorS_, ubFactorN_);
     }
     this->qInQueue_.FreeTensor(inUb);
     this->qOutQueue_.template EnQue(outUb);

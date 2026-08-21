@@ -26,10 +26,7 @@ using namespace AscendC;
 constexpr uint32_t HALF_INTERLEAVE_COEF = 2;
 constexpr uint32_t QUARTER_MODE_COEF = 4;
 
-__aicore__ inline constexpr uint32_t GetUbBlockSize()
-{
-    return 32U;
-}
+__aicore__ inline constexpr uint32_t GetUbBlockSize() { return 32U; }
 
 constexpr uint32_t BLOCK_TYPE_SIZE = GetUbBlockSize();
 constexpr uint32_t VREG_SIZE_BITS = 256U;                            // Ascend950 vector register width
@@ -51,10 +48,10 @@ __aicore__ inline void InterleaveModeGradVF(const LocalTensor<TCOS> &sinTensor, 
                                             const LocalTensor<TDY> &inTensor, const LocalTensor<TDY> &outTensor,
                                             uint16_t dLen, uint16_t dSplitCoef_, uint16_t currSNum, uint16_t currNNum)
 {
-    __local_mem__ TCOS *sinUb = (__local_mem__ TCOS *)sinTensor.GetPhyAddr();
-    __local_mem__ TCOS *cosUb = (__local_mem__ TCOS *)cosTensor.GetPhyAddr();
-    __local_mem__ TDY *inUb = (__local_mem__ TDY *)inTensor.GetPhyAddr();
-    __local_mem__ TDY *outUb = (__local_mem__ TDY *)outTensor.GetPhyAddr();
+    __ubuf__ TCOS *sinUb = (__ubuf__ TCOS *)sinTensor.GetPhyAddr();
+    __ubuf__ TCOS *cosUb = (__ubuf__ TCOS *)cosTensor.GetPhyAddr();
+    __ubuf__ TDY *inUb = (__ubuf__ TDY *)inTensor.GetPhyAddr();
+    __ubuf__ TDY *outUb = (__ubuf__ TDY *)outTensor.GetPhyAddr();
     uint16_t loopSize = 2 * VL_FLOAT32_SIZE;
     uint16_t loopNum = (dLen + loopSize - 1) / (2 * VL_FLOAT32_SIZE);
     uint16_t dAlignLenDy = Ops::Base::CeilAlign(static_cast<uint16_t>(dLen / dSplitCoef_),
@@ -63,7 +60,6 @@ __aicore__ inline void InterleaveModeGradVF(const LocalTensor<TCOS> &sinTensor, 
     uint16_t dAlignLenCos = Ops::Base::CeilAlign(static_cast<uint16_t>(dLen / dSplitCoef_),
                                                  static_cast<uint16_t>(BLOCK_TYPE_SIZE / sizeof(TCOS))) *
                             dSplitCoef_;
-
 
     uint32_t halfNum = dLen / 2;
     uint32_t part1Num = (loopNum - 1) * VL_FLOAT32_SIZE;
@@ -76,8 +72,8 @@ __aicore__ inline void InterleaveModeGradVF(const LocalTensor<TCOS> &sinTensor, 
         part1Num += tailNum;
     }
 
-    __local_mem__ TDY *currInUb, *currOutUb;
-    __local_mem__ TCOS *currSinUb, *currCosUb;
+    __ubuf__ TDY *currInUb, *currOutUb;
+    __ubuf__ TCOS *currSinUb, *currCosUb;
 
     __VEC_SCOPE__
     {
@@ -126,10 +122,10 @@ __aicore__ inline void InterleaveModeGradVF(const LocalTensor<TCOS> &sinTensor, 
 // Batch version supporting mixed precision (TDY for dy/dx, TCOS for cos/sin).
 // UB layout: in/out are [B][N][S][dAlignDy], cos/sin are [B or 1][S][dAlignCos].
 template <typename TDY, typename TCOS, bool IsBroadCast>
-__aicore__ inline void BatchInterleaveModeGradVF(__local_mem__ TDY *in, __local_mem__ TCOS *cos,
-                                                 __local_mem__ TCOS *sin, __local_mem__ TDY *out, uint16_t sLength,
-                                                 uint16_t bLength, uint16_t nLength, int64_t dLen, int64_t dAlignDy,
-                                                 int64_t dAlignCos, int64_t ubFactorS, int64_t ubFactorN)
+__aicore__ inline void BatchInterleaveModeGradVF(__ubuf__ TDY *in, __ubuf__ TCOS *cos, __ubuf__ TCOS *sin,
+                                                 __ubuf__ TDY *out, uint16_t sLength, uint16_t bLength,
+                                                 uint16_t nLength, int64_t dLen, int64_t dAlignDy, int64_t dAlignCos,
+                                                 int64_t ubFactorS, int64_t ubFactorN)
 {
     uint32_t loopSize = 2 * VL_FLOAT32_SIZE;
     uint16_t dLoopCount = (dLen + loopSize - 1) / loopSize;
@@ -158,8 +154,8 @@ __aicore__ inline void BatchInterleaveModeGradVF(__local_mem__ TDY *in, __local_
         MicroAPI::RegTensor<float> cosPart1Reg, cosPart2Reg;
         MicroAPI::RegTensor<float> sinPart1Reg, sinPart2Reg;
         MicroAPI::MaskReg pregLoop, pregPart1, pregPart2;
-        __local_mem__ TDY *currInUb, *currOutUb;
-        __local_mem__ TCOS *currSinUb, *currCosUb;
+        __ubuf__ TDY *currInUb, *currOutUb;
+        __ubuf__ TCOS *currSinUb, *currCosUb;
         for (uint16_t bIdx = 0; bIdx < bLength; bIdx++) {
             for (uint16_t nIdx = 0; nIdx < nLength; nIdx++) {
                 for (uint16_t sIdx = 0; sIdx < sLength; sIdx++) {

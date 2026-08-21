@@ -30,10 +30,7 @@ __aicore__ inline constexpr uint32_t GetVRegSize()
 #endif
 }
 
-__aicore__ inline constexpr uint32_t GetUbBlockSize()
-{
-    return 32U;
-}
+__aicore__ inline constexpr uint32_t GetUbBlockSize() { return 32U; }
 
 constexpr uint32_t VL_FLOAT32_SIZE = GetVRegSize() / sizeof(float);
 constexpr uint32_t VL_FLOAT16_SIZE = GetVRegSize() / sizeof(half);
@@ -63,21 +60,21 @@ enum class RotaryPosEmbeddingMode : int64_t {
     qOut[1] = q[1] * cos[1] + q[0] * sin[1]
 */
 template <typename T>
-__aicore__ inline void HalfAlignVF(
-    const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, const LocalTensor<T>& inTensor,
-    const LocalTensor<T>& outTensor, uint32_t dLen, uint32_t dAlign, uint16_t currSNum, uint16_t currDNum)
+__aicore__ inline void HalfAlignVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
+                                   const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen,
+                                   uint32_t dAlign, uint16_t currSNum, uint16_t currDNum)
 {
-    __local_mem__ T* sinUb = (__local_mem__ T*)sinTensor.GetPhyAddr();
-    __local_mem__ T* cosUb = (__local_mem__ T*)cosTensor.GetPhyAddr();
-    __local_mem__ T* inUb = (__local_mem__ T*)inTensor.GetPhyAddr();
-    __local_mem__ T* outUb = (__local_mem__ T*)outTensor.GetPhyAddr();
+    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
+    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
+    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
+    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
     uint32_t halfD = dLen / HALF_INTERLEAVE_COEF;
     uint32_t halfDAlign = Ops::Base::CeilAlign(halfD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint16_t repeatTimes = Ops::Base::CeilDiv(halfD, VL_FLOAT32_SIZE);
-    __local_mem__ T* currInUb;
-    __local_mem__ T* currOutUb;
-    __local_mem__ T* currSinUb;
-    __local_mem__ T* currCosUb;
+    __ubuf__ T *currInUb;
+    __ubuf__ T *currOutUb;
+    __ubuf__ T *currSinUb;
+    __ubuf__ T *currCosUb;
 
     __VEC_SCOPE__
     {
@@ -101,12 +98,12 @@ __aicore__ inline void HalfAlignVF(
                     preg = MicroAPI::UpdateMask<float>(updateCnt);
                     uint32_t offset = i * VL_FLOAT32_SIZE;
                     uint32_t halfOffset = offset + halfDAlign;
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currInUb, currInUb, vregIn, vregHalfIn, preg, preg, offset, halfOffset);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currSinUb, currSinUb, vregSin, vregHalfSin, preg, preg, offset, halfOffset);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currCosUb, currCosUb, vregCos, vregHalfCos, preg, preg, offset, halfOffset);
+                    ops::LoadTwoTensorForDtypeT<T>(currInUb, currInUb, vregIn, vregHalfIn, preg, preg, offset,
+                                                   halfOffset);
+                    ops::LoadTwoTensorForDtypeT<T>(currSinUb, currSinUb, vregSin, vregHalfSin, preg, preg, offset,
+                                                   halfOffset);
+                    ops::LoadTwoTensorForDtypeT<T>(currCosUb, currCosUb, vregCos, vregHalfCos, preg, preg, offset,
+                                                   halfOffset);
 
                     Mul(vregSin, vregSin, vregHalfIn, preg);
                     Mul(vregHalfOut, vregHalfSin, vregIn, preg);
@@ -130,21 +127,21 @@ __aicore__ inline void HalfAlignVF(
     qOut[3] = q[3] * cos[3] + q[2] * sin[3]
 */
 template <typename T>
-__aicore__ inline void QuarterAlignVF(
-    const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, const LocalTensor<T>& inTensor,
-    const LocalTensor<T>& outTensor, uint32_t dLen, uint32_t dAlign, uint16_t currSNum, uint16_t currDNum)
+__aicore__ inline void QuarterAlignVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
+                                      const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen,
+                                      uint32_t dAlign, uint16_t currSNum, uint16_t currDNum)
 {
-    __local_mem__ T* sinUb = (__local_mem__ T*)sinTensor.GetPhyAddr();
-    __local_mem__ T* cosUb = (__local_mem__ T*)cosTensor.GetPhyAddr();
-    __local_mem__ T* inUb = (__local_mem__ T*)inTensor.GetPhyAddr();
-    __local_mem__ T* outUb = (__local_mem__ T*)outTensor.GetPhyAddr();
+    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
+    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
+    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
+    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
     uint32_t quarterD = dLen / QUARTER_MODE_COEF;
     uint32_t quarterDAlign = Ops::Base::CeilAlign(quarterD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint16_t repeatTimes = Ops::Base::CeilDiv(quarterD, VL_FLOAT32_SIZE);
-    __local_mem__ T* currInUb;
-    __local_mem__ T* currOutUb;
-    __local_mem__ T* currSinUb;
-    __local_mem__ T* currCosUb;
+    __ubuf__ T *currInUb;
+    __ubuf__ T *currOutUb;
+    __ubuf__ T *currSinUb;
+    __ubuf__ T *currCosUb;
 
     __VEC_SCOPE__
     {
@@ -179,16 +176,16 @@ __aicore__ inline void QuarterAlignVF(
                     uint32_t q2Offset = q1Offset + quarterDAlign;
                     uint32_t q3Offset = q2Offset + quarterDAlign;
                     ops::LoadTwoTensorForDtypeT<T>(currInUb, currInUb, vregIn, vregQ1In, preg, preg, offset, q1Offset);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currInUb, currInUb, vregQ2In, vregQ3In, preg, preg, q2Offset, q3Offset);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currSinUb, currSinUb, vregSin, vregQ1Sin, preg, preg, offset, q1Offset);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currSinUb, currSinUb, vregQ2Sin, vregQ3Sin, preg, preg, q2Offset, q3Offset);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currCosUb, currCosUb, vregCos, vregQ1Cos, preg, preg, offset, q1Offset);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currCosUb, currCosUb, vregQ2Cos, vregQ3Cos, preg, preg, q2Offset, q3Offset);
+                    ops::LoadTwoTensorForDtypeT<T>(currInUb, currInUb, vregQ2In, vregQ3In, preg, preg, q2Offset,
+                                                   q3Offset);
+                    ops::LoadTwoTensorForDtypeT<T>(currSinUb, currSinUb, vregSin, vregQ1Sin, preg, preg, offset,
+                                                   q1Offset);
+                    ops::LoadTwoTensorForDtypeT<T>(currSinUb, currSinUb, vregQ2Sin, vregQ3Sin, preg, preg, q2Offset,
+                                                   q3Offset);
+                    ops::LoadTwoTensorForDtypeT<T>(currCosUb, currCosUb, vregCos, vregQ1Cos, preg, preg, offset,
+                                                   q1Offset);
+                    ops::LoadTwoTensorForDtypeT<T>(currCosUb, currCosUb, vregQ2Cos, vregQ3Cos, preg, preg, q2Offset,
+                                                   q3Offset);
 
                     Mul(vregSin, vregSin, vregQ1In, preg);
                     Mul(vregQ1Out, vregQ1Sin, vregIn, preg);
@@ -214,14 +211,14 @@ __aicore__ inline void QuarterAlignVF(
 }
 
 template <typename T>
-__aicore__ inline void InterleaveModeVF(
-    const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, const LocalTensor<T>& inTensor,
-    const LocalTensor<T>& outTensor, uint32_t dLen, uint16_t currSNum, uint16_t currDNum)
+__aicore__ inline void InterleaveModeVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
+                                        const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor, uint32_t dLen,
+                                        uint16_t currSNum, uint16_t currDNum)
 {
-    __local_mem__ T* sinUb = (__local_mem__ T*)sinTensor.GetPhyAddr();
-    __local_mem__ T* cosUb = (__local_mem__ T*)cosTensor.GetPhyAddr();
-    __local_mem__ T* inUb = (__local_mem__ T*)inTensor.GetPhyAddr();
-    __local_mem__ T* outUb = (__local_mem__ T*)outTensor.GetPhyAddr();
+    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
+    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
+    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
+    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
     uint16_t repeatTimes = dLen / VL_FLOAT32_SIZE;
     uint32_t dAlignLen = Ops::Base::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint16_t loopNum = repeatTimes / 2;
@@ -229,12 +226,12 @@ __aicore__ inline void InterleaveModeVF(
     uint16_t tailTwoVL = tailNum / VL_FLOAT32_SIZE;
     uint16_t tailOneVL = (tailTwoVL == 1) ? 0 : 1;
     uint32_t tailLen = tailNum % VL_FLOAT32_SIZE;
-    __local_mem__ T* currInUb;
-    __local_mem__ T* currOutUb;
-    __local_mem__ T* currSinUb;
-    __local_mem__ T* currCosUb;
-    __local_mem__ T* tailSinUb;
-    __local_mem__ T* tailCosUb;
+    __ubuf__ T *currInUb;
+    __ubuf__ T *currOutUb;
+    __ubuf__ T *currSinUb;
+    __ubuf__ T *currCosUb;
+    __ubuf__ T *tailSinUb;
+    __ubuf__ T *tailCosUb;
 
     __VEC_SCOPE__
     {
@@ -328,14 +325,14 @@ __aicore__ inline void InterleaveModeVF(
 }
 
 template <typename T>
-__aicore__ inline void DeepSeekInterleaveModeVF(
-    const LocalTensor<T>& sinTensor, const LocalTensor<T>& cosTensor, const LocalTensor<T>& inTensor,
-    const LocalTensor<T>& outTensor, uint32_t dLen, uint16_t currSNum, uint16_t currDNum)
+__aicore__ inline void DeepSeekInterleaveModeVF(const LocalTensor<T> &sinTensor, const LocalTensor<T> &cosTensor,
+                                                const LocalTensor<T> &inTensor, const LocalTensor<T> &outTensor,
+                                                uint32_t dLen, uint16_t currSNum, uint16_t currDNum)
 {
-    __local_mem__ T* sinUb = (__local_mem__ T*)sinTensor.GetPhyAddr();
-    __local_mem__ T* cosUb = (__local_mem__ T*)cosTensor.GetPhyAddr();
-    __local_mem__ T* inUb = (__local_mem__ T*)inTensor.GetPhyAddr();
-    __local_mem__ T* outUb = (__local_mem__ T*)outTensor.GetPhyAddr();
+    __ubuf__ T *sinUb = (__ubuf__ T *)sinTensor.GetPhyAddr();
+    __ubuf__ T *cosUb = (__ubuf__ T *)cosTensor.GetPhyAddr();
+    __ubuf__ T *inUb = (__ubuf__ T *)inTensor.GetPhyAddr();
+    __ubuf__ T *outUb = (__ubuf__ T *)outTensor.GetPhyAddr();
     uint32_t dAlign = Ops::Base::CeilAlign(dLen, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
     uint32_t halfD = dLen / HALF_INTERLEAVE_COEF;
     uint32_t halfDAlign = Ops::Base::CeilAlign(halfD, static_cast<uint32_t>(BLOCK_TYPE_SIZE / sizeof(T)));
@@ -345,10 +342,10 @@ __aicore__ inline void DeepSeekInterleaveModeVF(
     uint16_t tailOneVL = tailTwoNum > 0 ? (1 - tailTwoVL) : 0;
     uint32_t halfTailNum = tailTwoNum / HALF_INTERLEAVE_COEF;
     uint32_t tailNum = tailTwoNum - tailTwoVL * VL_FLOAT32_SIZE;
-    __local_mem__ T* currInUb;
-    __local_mem__ T* currOutUb;
-    __local_mem__ T* currSinUb;
-    __local_mem__ T* currCosUb;
+    __ubuf__ T *currInUb;
+    __ubuf__ T *currOutUb;
+    __ubuf__ T *currSinUb;
+    __ubuf__ T *currCosUb;
 
     __VEC_SCOPE__
     {
@@ -377,13 +374,12 @@ __aicore__ inline void DeepSeekInterleaveModeVF(
                     uint32_t offset = i * VL_FLOAT32_SIZE;
                     uint32_t halfOffset = offset + halfDAlign;
                     uint32_t inOffset = offset * HALF_INTERLEAVE_COEF;
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currInUb, currInUb, vregIn, vregHalfIn, pregFull, pregFull, inOffset,
-                        inOffset + VL_FLOAT32_SIZE);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currSinUb, currSinUb, vregSin, vregHalfSin, pregFull, pregFull, offset, halfOffset);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currCosUb, currCosUb, vregCos, vregHalfCos, pregFull, pregFull, offset, halfOffset);
+                    ops::LoadTwoTensorForDtypeT<T>(currInUb, currInUb, vregIn, vregHalfIn, pregFull, pregFull, inOffset,
+                                                   inOffset + VL_FLOAT32_SIZE);
+                    ops::LoadTwoTensorForDtypeT<T>(currSinUb, currSinUb, vregSin, vregHalfSin, pregFull, pregFull,
+                                                   offset, halfOffset);
+                    ops::LoadTwoTensorForDtypeT<T>(currCosUb, currCosUb, vregCos, vregHalfCos, pregFull, pregFull,
+                                                   offset, halfOffset);
 
                     DeInterleave<float>(vregIn, vregHalfIn, vregIn, vregHalfIn);
 
@@ -403,13 +399,12 @@ __aicore__ inline void DeepSeekInterleaveModeVF(
                     uint32_t offset = repeatTimes * VL_FLOAT32_SIZE;
                     uint32_t halfOffset = offset + halfDAlign;
                     uint32_t inOffset = offset * HALF_INTERLEAVE_COEF;
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currInUb, currInUb, vregIn, vregHalfIn, pregFull, pregTail, inOffset,
-                        inOffset + VL_FLOAT32_SIZE);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currSinUb, currSinUb, vregSin, vregHalfSin, pregHalfTail, pregHalfTail, offset, halfOffset);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currCosUb, currCosUb, vregCos, vregHalfCos, pregHalfTail, pregHalfTail, offset, halfOffset);
+                    ops::LoadTwoTensorForDtypeT<T>(currInUb, currInUb, vregIn, vregHalfIn, pregFull, pregTail, inOffset,
+                                                   inOffset + VL_FLOAT32_SIZE);
+                    ops::LoadTwoTensorForDtypeT<T>(currSinUb, currSinUb, vregSin, vregHalfSin, pregHalfTail,
+                                                   pregHalfTail, offset, halfOffset);
+                    ops::LoadTwoTensorForDtypeT<T>(currCosUb, currCosUb, vregCos, vregHalfCos, pregHalfTail,
+                                                   pregHalfTail, offset, halfOffset);
 
                     DeInterleave<float>(vregIn, vregHalfIn, vregIn, vregHalfIn);
 
@@ -430,10 +425,10 @@ __aicore__ inline void DeepSeekInterleaveModeVF(
                     uint32_t halfOffset = offset + halfDAlign;
                     uint32_t inOffset = offset * HALF_INTERLEAVE_COEF;
                     ops::LoadOneTensorForDtypeT<T>(currInUb, vregIn, pregTail, inOffset);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currSinUb, currSinUb, vregSin, vregHalfSin, pregHalfTail, pregHalfTail, offset, halfOffset);
-                    ops::LoadTwoTensorForDtypeT<T>(
-                        currCosUb, currCosUb, vregCos, vregHalfCos, pregHalfTail, pregHalfTail, offset, halfOffset);
+                    ops::LoadTwoTensorForDtypeT<T>(currSinUb, currSinUb, vregSin, vregHalfSin, pregHalfTail,
+                                                   pregHalfTail, offset, halfOffset);
+                    ops::LoadTwoTensorForDtypeT<T>(currCosUb, currCosUb, vregCos, vregHalfCos, pregHalfTail,
+                                                   pregHalfTail, offset, halfOffset);
 
                     DeInterleave<float>(vregIn, vregHalfIn, vregIn, vregHalfIn);
                     Mul(vregOut, vregCos, vregIn, pregHalfTail);
@@ -452,9 +447,9 @@ __aicore__ inline void DeepSeekInterleaveModeVF(
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchHalfAlignVF(
-    __local_mem__ T* in, __local_mem__ T* cos, __local_mem__ T* sin, __local_mem__ T* out, uint16_t sLength,
-    uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
+__aicore__ inline void BatchHalfAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin, __ubuf__ T *out,
+                                        uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign,
+                                        int64_t ubFactorS, int64_t ubFactorN)
 {
     uint32_t dHalfSize = d / HALF_INTERLEAVE_COEF;
     uint16_t dLoopCount = (dHalfSize + VL_FLOAT32_SIZE - 1) / VL_FLOAT32_SIZE;
@@ -474,7 +469,7 @@ __aicore__ inline void BatchHalfAlignVF(
         MicroAPI::RegTensor<float> sinPart1Reg;
         MicroAPI::RegTensor<float> sinPart2Reg;
         MicroAPI::MaskReg pregLoop;
-        __local_mem__ T *currInUb, *currOutUb, *currSinUb, *currCosUb;
+        __ubuf__ T *currInUb, *currOutUb, *currSinUb, *currCosUb;
         for (uint16_t bIdx = 0; bIdx < bLength; bIdx++) {
             for (uint16_t nIdx = 0; nIdx < nLength; nIdx++) {
                 for (uint16_t sIdx = 0; sIdx < sLength; sIdx++) {
@@ -492,14 +487,14 @@ __aicore__ inline void BatchHalfAlignVF(
                         pregLoop = MicroAPI::UpdateMask<float>(count);
                         // 拷贝到RegBase内
                         ops::LoadOneTensorForDtypeT<T>(currInUb, inPart1Reg, pregLoop, i * VL_FLOAT32_SIZE);
-                        ops::LoadOneTensorForDtypeT<T>(
-                            currInUb, inPart2Reg, pregLoop, i * VL_FLOAT32_SIZE + dHalfOffset);
+                        ops::LoadOneTensorForDtypeT<T>(currInUb, inPart2Reg, pregLoop,
+                                                       i * VL_FLOAT32_SIZE + dHalfOffset);
                         ops::LoadOneTensorForDtypeT<T>(currCosUb, cosPart1Reg, pregLoop, i * VL_FLOAT32_SIZE);
-                        ops::LoadOneTensorForDtypeT<T>(
-                            currCosUb, cosPart2Reg, pregLoop, i * VL_FLOAT32_SIZE + dHalfOffset);
+                        ops::LoadOneTensorForDtypeT<T>(currCosUb, cosPart2Reg, pregLoop,
+                                                       i * VL_FLOAT32_SIZE + dHalfOffset);
                         ops::LoadOneTensorForDtypeT<T>(currSinUb, sinPart1Reg, pregLoop, i * VL_FLOAT32_SIZE);
-                        ops::LoadOneTensorForDtypeT<T>(
-                            currSinUb, sinPart2Reg, pregLoop, i * VL_FLOAT32_SIZE + dHalfOffset);
+                        ops::LoadOneTensorForDtypeT<T>(currSinUb, sinPart2Reg, pregLoop,
+                                                       i * VL_FLOAT32_SIZE + dHalfOffset);
                         // 计算
                         Mul(cosPart1Reg, inPart1Reg, cosPart1Reg, pregLoop);
                         Mul(sinPart1Reg, inPart2Reg, sinPart1Reg, pregLoop);
@@ -509,8 +504,8 @@ __aicore__ inline void BatchHalfAlignVF(
                         Add(cosPart2Reg, cosPart2Reg, sinPart2Reg, pregLoop);
                         // 拷贝回UB
                         ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart1Reg, pregLoop, i * VL_FLOAT32_SIZE);
-                        ops::StoreOneTensorForDtypeT<T>(
-                            currOutUb, cosPart2Reg, pregLoop, i * VL_FLOAT32_SIZE + dHalfOffset);
+                        ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart2Reg, pregLoop,
+                                                        i * VL_FLOAT32_SIZE + dHalfOffset);
                     }
                 }
             }
@@ -519,9 +514,9 @@ __aicore__ inline void BatchHalfAlignVF(
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchQuarterAlignVF(
-    __local_mem__ T* in, __local_mem__ T* cos, __local_mem__ T* sin, __local_mem__ T* out, uint16_t sLength,
-    uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
+__aicore__ inline void BatchQuarterAlignVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin, __ubuf__ T *out,
+                                           uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d,
+                                           int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
 {
     uint32_t dQuarterSize = d / QUARTER_MODE_COEF;
     uint16_t dLoopCount = (dQuarterSize + VL_FLOAT32_SIZE - 1) / VL_FLOAT32_SIZE;
@@ -549,7 +544,7 @@ __aicore__ inline void BatchQuarterAlignVF(
         MicroAPI::RegTensor<float> sinPart3Reg;
         MicroAPI::RegTensor<float> sinPart4Reg;
         MicroAPI::MaskReg pregLoop;
-        __local_mem__ T *currInUb, *currOutUb, *currSinUb, *currCosUb;
+        __ubuf__ T *currInUb, *currOutUb, *currSinUb, *currCosUb;
         for (uint16_t bIdx = 0; bIdx < bLength; bIdx++) {
             for (uint16_t nIdx = 0; nIdx < nLength; nIdx++) {
                 for (uint16_t sIdx = 0; sIdx < sLength; sIdx++) {
@@ -566,24 +561,23 @@ __aicore__ inline void BatchQuarterAlignVF(
                     for (uint16_t i = 0; i < dLoopCount; i++) {
                         pregLoop = MicroAPI::UpdateMask<float>(count);
                         // 拷贝到RegBase内
-                        ops::LoadTwoTensorForDtypeT<T>(
-                            currInUb, currInUb, inPart1Reg, inPart2Reg, pregLoop, pregLoop, i * VL_FLOAT32_SIZE,
-                            i * VL_FLOAT32_SIZE + dQuarterOffset);
-                        ops::LoadTwoTensorForDtypeT<T>(
-                            currInUb, currInUb, inPart3Reg, inPart4Reg, pregLoop, pregLoop,
-                            i * VL_FLOAT32_SIZE + dHalfOffset, i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
-                        ops::LoadTwoTensorForDtypeT<T>(
-                            currCosUb, currCosUb, cosPart1Reg, cosPart2Reg, pregLoop, pregLoop, i * VL_FLOAT32_SIZE,
-                            i * VL_FLOAT32_SIZE + dQuarterOffset);
-                        ops::LoadTwoTensorForDtypeT<T>(
-                            currCosUb, currCosUb, cosPart3Reg, cosPart4Reg, pregLoop, pregLoop,
-                            i * VL_FLOAT32_SIZE + dHalfOffset, i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
-                        ops::LoadTwoTensorForDtypeT<T>(
-                            currSinUb, currSinUb, sinPart1Reg, sinPart2Reg, pregLoop, pregLoop, i * VL_FLOAT32_SIZE,
-                            i * VL_FLOAT32_SIZE + dQuarterOffset);
-                        ops::LoadTwoTensorForDtypeT<T>(
-                            currSinUb, currSinUb, sinPart3Reg, sinPart4Reg, pregLoop, pregLoop,
-                            i * VL_FLOAT32_SIZE + dHalfOffset, i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
+                        ops::LoadTwoTensorForDtypeT<T>(currInUb, currInUb, inPart1Reg, inPart2Reg, pregLoop, pregLoop,
+                                                       i * VL_FLOAT32_SIZE, i * VL_FLOAT32_SIZE + dQuarterOffset);
+                        ops::LoadTwoTensorForDtypeT<T>(currInUb, currInUb, inPart3Reg, inPart4Reg, pregLoop, pregLoop,
+                                                       i * VL_FLOAT32_SIZE + dHalfOffset,
+                                                       i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
+                        ops::LoadTwoTensorForDtypeT<T>(currCosUb, currCosUb, cosPart1Reg, cosPart2Reg, pregLoop,
+                                                       pregLoop, i * VL_FLOAT32_SIZE,
+                                                       i * VL_FLOAT32_SIZE + dQuarterOffset);
+                        ops::LoadTwoTensorForDtypeT<T>(currCosUb, currCosUb, cosPart3Reg, cosPart4Reg, pregLoop,
+                                                       pregLoop, i * VL_FLOAT32_SIZE + dHalfOffset,
+                                                       i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
+                        ops::LoadTwoTensorForDtypeT<T>(currSinUb, currSinUb, sinPart1Reg, sinPart2Reg, pregLoop,
+                                                       pregLoop, i * VL_FLOAT32_SIZE,
+                                                       i * VL_FLOAT32_SIZE + dQuarterOffset);
+                        ops::LoadTwoTensorForDtypeT<T>(currSinUb, currSinUb, sinPart3Reg, sinPart4Reg, pregLoop,
+                                                       pregLoop, i * VL_FLOAT32_SIZE + dHalfOffset,
+                                                       i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
                         // 计算
                         Mul(cosPart1Reg, inPart1Reg, cosPart1Reg, pregLoop);
                         Mul(sinPart1Reg, inPart2Reg, sinPart1Reg, pregLoop);
@@ -599,12 +593,12 @@ __aicore__ inline void BatchQuarterAlignVF(
                         Add(cosPart4Reg, cosPart4Reg, sinPart4Reg, pregLoop);
                         // 拷贝回UB
                         ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart1Reg, pregLoop, i * VL_FLOAT32_SIZE);
-                        ops::StoreOneTensorForDtypeT<T>(
-                            currOutUb, cosPart2Reg, pregLoop, i * VL_FLOAT32_SIZE + dQuarterOffset);
-                        ops::StoreOneTensorForDtypeT<T>(
-                            currOutUb, cosPart3Reg, pregLoop, i * VL_FLOAT32_SIZE + dHalfOffset);
-                        ops::StoreOneTensorForDtypeT<T>(
-                            currOutUb, cosPart4Reg, pregLoop, i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
+                        ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart2Reg, pregLoop,
+                                                        i * VL_FLOAT32_SIZE + dQuarterOffset);
+                        ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart3Reg, pregLoop,
+                                                        i * VL_FLOAT32_SIZE + dHalfOffset);
+                        ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart4Reg, pregLoop,
+                                                        i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
                     }
                 }
             }
@@ -613,9 +607,9 @@ __aicore__ inline void BatchQuarterAlignVF(
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchInterleaveModeVF(
-    __local_mem__ T* in, __local_mem__ T* cos, __local_mem__ T* sin, __local_mem__ T* out, uint16_t sLength,
-    uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
+__aicore__ inline void BatchInterleaveModeVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin, __ubuf__ T *out,
+                                             uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d,
+                                             int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
 {
     uint32_t loopSize = 2 * VL_FLOAT32_SIZE;
     uint16_t dLoopCount = (d + loopSize - 1) / loopSize;
@@ -648,7 +642,7 @@ __aicore__ inline void BatchInterleaveModeVF(
         MicroAPI::MaskReg pregLoop;
         MicroAPI::MaskReg pregPart1;
         MicroAPI::MaskReg pregPart2;
-        __local_mem__ T *currInUb, *currOutUb, *currSinUb, *currCosUb;
+        __ubuf__ T *currInUb, *currOutUb, *currSinUb, *currCosUb;
         for (uint16_t bIdx = 0; bIdx < bLength; bIdx++) {
             for (uint16_t nIdx = 0; nIdx < nLength; nIdx++) {
                 for (uint16_t sIdx = 0; sIdx < sLength; sIdx++) {
@@ -671,11 +665,11 @@ __aicore__ inline void BatchInterleaveModeVF(
                         ops::LoadOneTensorForDtypeT<T>(currInUb, inPart1Reg, pregPart1, i * loopSize);
                         ops::LoadOneTensorForDtypeT<T>(currInUb, inPart2Reg, pregPart2, i * loopSize + VL_FLOAT32_SIZE);
                         ops::LoadOneTensorForDtypeT<T>(currCosUb, cosPart1Reg, pregPart1, i * loopSize);
-                        ops::LoadOneTensorForDtypeT<T>(
-                            currCosUb, cosPart2Reg, pregPart2, i * loopSize + VL_FLOAT32_SIZE);
+                        ops::LoadOneTensorForDtypeT<T>(currCosUb, cosPart2Reg, pregPart2,
+                                                       i * loopSize + VL_FLOAT32_SIZE);
                         ops::LoadOneTensorForDtypeT<T>(currSinUb, sinPart1Reg, pregPart1, i * loopSize);
-                        ops::LoadOneTensorForDtypeT<T>(
-                            currSinUb, sinPart2Reg, pregPart2, i * loopSize + VL_FLOAT32_SIZE);
+                        ops::LoadOneTensorForDtypeT<T>(currSinUb, sinPart2Reg, pregPart2,
+                                                       i * loopSize + VL_FLOAT32_SIZE);
                         Mul(cosPart1Reg, cosPart1Reg, inPart1Reg, pregPart1);
                         Mul(cosPart2Reg, cosPart2Reg, inPart2Reg, pregPart2);
                         MicroAPI::DeInterleave<float>(inPart1Reg, inPart2Reg, inPart1Reg, inPart2Reg);
@@ -686,8 +680,8 @@ __aicore__ inline void BatchInterleaveModeVF(
                         Mul(sinPart2Reg, sinPart2Reg, inPart2Reg, pregPart2);
                         Add(cosPart2Reg, cosPart2Reg, sinPart2Reg, pregPart2);
                         ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart1Reg, pregPart1, i * loopSize);
-                        ops::StoreOneTensorForDtypeT<T>(
-                            currOutUb, cosPart2Reg, pregPart2, i * loopSize + VL_FLOAT32_SIZE);
+                        ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart2Reg, pregPart2,
+                                                        i * loopSize + VL_FLOAT32_SIZE);
                     }
                 }
             }
@@ -696,9 +690,9 @@ __aicore__ inline void BatchInterleaveModeVF(
 }
 
 template <typename T, bool IsBBoardcast>
-__aicore__ inline void BatchDeepSeekInterleaveModeVF(
-    __local_mem__ T* in, __local_mem__ T* cos, __local_mem__ T* sin, __local_mem__ T* out, uint16_t sLength,
-    uint16_t bLength, uint16_t nLength, int64_t d, int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
+__aicore__ inline void BatchDeepSeekInterleaveModeVF(__ubuf__ T *in, __ubuf__ T *cos, __ubuf__ T *sin, __ubuf__ T *out,
+                                                     uint16_t sLength, uint16_t bLength, uint16_t nLength, int64_t d,
+                                                     int64_t dAlign, int64_t ubFactorS, int64_t ubFactorN)
 {
     uint32_t loopSize = 2 * VL_FLOAT32_SIZE;
     uint16_t dLoopCount = (d + loopSize - 1) / loopSize;
@@ -732,7 +726,7 @@ __aicore__ inline void BatchDeepSeekInterleaveModeVF(
         MicroAPI::MaskReg pregLoop;
         MicroAPI::MaskReg pregPart1;
         MicroAPI::MaskReg pregPart2;
-        __local_mem__ T *currInUb, *currOutUb, *currSinUb, *currCosUb;
+        __ubuf__ T *currInUb, *currOutUb, *currSinUb, *currCosUb;
         for (uint16_t bIdx = 0; bIdx < bLength; bIdx++) {
             for (uint16_t nIdx = 0; nIdx < nLength; nIdx++) {
                 for (uint16_t sIdx = 0; sIdx < sLength; sIdx++) {
@@ -755,11 +749,11 @@ __aicore__ inline void BatchDeepSeekInterleaveModeVF(
                         ops::LoadOneTensorForDtypeT<T>(currInUb, inPart1Reg, pregPart1, i * loopSize);
                         ops::LoadOneTensorForDtypeT<T>(currInUb, inPart2Reg, pregPart2, i * loopSize + VL_FLOAT32_SIZE);
                         ops::LoadOneTensorForDtypeT<T>(currCosUb, cosPart1Reg, pregLoop, i * VL_FLOAT32_SIZE);
-                        ops::LoadOneTensorForDtypeT<T>(
-                            currCosUb, cosPart2Reg, pregLoop, i * VL_FLOAT32_SIZE + dHalfOffset);
+                        ops::LoadOneTensorForDtypeT<T>(currCosUb, cosPart2Reg, pregLoop,
+                                                       i * VL_FLOAT32_SIZE + dHalfOffset);
                         ops::LoadOneTensorForDtypeT<T>(currSinUb, sinPart1Reg, pregLoop, i * VL_FLOAT32_SIZE);
-                        ops::LoadOneTensorForDtypeT<T>(
-                            currSinUb, sinPart2Reg, pregLoop, i * VL_FLOAT32_SIZE + dHalfOffset);
+                        ops::LoadOneTensorForDtypeT<T>(currSinUb, sinPart2Reg, pregLoop,
+                                                       i * VL_FLOAT32_SIZE + dHalfOffset);
                         MicroAPI::DeInterleave<float>(inPart1Reg, inPart2Reg, inPart1Reg, inPart2Reg);
                         Mul(cosPart1Reg, cosPart1Reg, inPart1Reg, pregLoop);
                         Mul(cosPart2Reg, cosPart2Reg, inPart2Reg, pregLoop);
@@ -769,8 +763,8 @@ __aicore__ inline void BatchDeepSeekInterleaveModeVF(
                         Mul(sinPart2Reg, sinPart2Reg, inPart1Reg, pregLoop);
                         Add(cosPart2Reg, cosPart2Reg, sinPart2Reg, pregLoop);
                         ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart1Reg, pregLoop, i * VL_FLOAT32_SIZE);
-                        ops::StoreOneTensorForDtypeT<T>(
-                            currOutUb, cosPart2Reg, pregLoop, i * VL_FLOAT32_SIZE + dHalfOffset);
+                        ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart2Reg, pregLoop,
+                                                        i * VL_FLOAT32_SIZE + dHalfOffset);
                     }
                 }
             }
@@ -779,10 +773,10 @@ __aicore__ inline void BatchDeepSeekInterleaveModeVF(
 }
 
 template <typename T>
-__aicore__ inline void CopyInHalfMode(
-    LocalTensor<T>& inTensor, GlobalTensor<T>& gmTensor, const int64_t offset,
-    const uint32_t blockCount, const uint32_t blockLen, const DataCopyPadExtParams<T>& padParams,
-    const int64_t D, const int64_t realDim, const uint32_t dSplitCoef)
+__aicore__ inline void CopyInHalfMode(LocalTensor<T> &inTensor, GlobalTensor<T> &gmTensor, const int64_t offset,
+                                      const uint32_t blockCount, const uint32_t blockLen,
+                                      const DataCopyPadExtParams<T> &padParams, const int64_t D, const int64_t realDim,
+                                      const uint32_t dSplitCoef)
 {
     DataCopyExtParams copyParams;
     copyParams.blockCount = blockCount;
@@ -796,10 +790,9 @@ __aicore__ inline void CopyInHalfMode(
 }
 
 template <typename T>
-__aicore__ inline void CopyOutHalfMode(
-    LocalTensor<T>& outTensor, GlobalTensor<T>& gmTensor, const int64_t offset,
-    const uint32_t blockCount, const uint32_t blockLen,
-    const int64_t D, const int64_t realDim, const uint32_t dSplitCoef)
+__aicore__ inline void CopyOutHalfMode(LocalTensor<T> &outTensor, GlobalTensor<T> &gmTensor, const int64_t offset,
+                                       const uint32_t blockCount, const uint32_t blockLen, const int64_t D,
+                                       const int64_t realDim, const uint32_t dSplitCoef)
 {
     DataCopyExtParams copyOutParams;
     copyOutParams.blockCount = blockCount;
@@ -813,10 +806,10 @@ __aicore__ inline void CopyOutHalfMode(
 }
 
 template <typename T>
-__aicore__ inline void CopyInInterleaveMode(
-    LocalTensor<T>& inTensor, GlobalTensor<T>& gmTensor, const int64_t offset,
-    const uint32_t blockCount, const uint32_t blockLen, const DataCopyPadExtParams<T>& padParams,
-    const int64_t D, const int64_t realDim)
+__aicore__ inline void CopyInInterleaveMode(LocalTensor<T> &inTensor, GlobalTensor<T> &gmTensor, const int64_t offset,
+                                            const uint32_t blockCount, const uint32_t blockLen,
+                                            const DataCopyPadExtParams<T> &padParams, const int64_t D,
+                                            const int64_t realDim)
 {
     DataCopyExtParams copyParams;
     copyParams.blockCount = blockCount;
@@ -827,10 +820,9 @@ __aicore__ inline void CopyInInterleaveMode(
 }
 
 template <typename T>
-__aicore__ inline void CopyOutInterleaveMode(
-    LocalTensor<T>& outTensor, GlobalTensor<T>& gmTensor, const int64_t offset,
-    const uint32_t blockCount, const uint32_t blockLen,
-    const int64_t D, const int64_t realDim)
+__aicore__ inline void CopyOutInterleaveMode(LocalTensor<T> &outTensor, GlobalTensor<T> &gmTensor, const int64_t offset,
+                                             const uint32_t blockCount, const uint32_t blockLen, const int64_t D,
+                                             const int64_t realDim)
 {
     DataCopyExtParams copyOutParams;
     copyOutParams.blockCount = blockCount;
@@ -841,10 +833,10 @@ __aicore__ inline void CopyOutInterleaveMode(
 }
 
 template <typename T>
-__aicore__ inline void CopyInQuarterMode(
-    LocalTensor<T>& inTensor, GlobalTensor<T>& gmTensor, const int64_t offset,
-    const uint32_t blockCount, const uint32_t blockLen, const DataCopyPadExtParams<T>& padParams,
-    const int64_t D, const int64_t realDim, const uint32_t dSplitCoef)
+__aicore__ inline void CopyInQuarterMode(LocalTensor<T> &inTensor, GlobalTensor<T> &gmTensor, const int64_t offset,
+                                         const uint32_t blockCount, const uint32_t blockLen,
+                                         const DataCopyPadExtParams<T> &padParams, const int64_t D,
+                                         const int64_t realDim, const uint32_t dSplitCoef)
 {
     DataCopyExtParams copyParams;
     copyParams.blockCount = blockCount;
@@ -853,16 +845,18 @@ __aicore__ inline void CopyInQuarterMode(
     int64_t dstStride = Ops::Base::CeilAlign<int64_t>(realDim / dSplitCoef, BLOCK_TYPE_SIZE / sizeof(T));
     copyParams.dstStride = dstStride * (dSplitCoef - 1) * sizeof(T) / BLOCK_TYPE_SIZE;
     DataCopyPad(inTensor, gmTensor[offset], copyParams, padParams);
-    DataCopyPad(inTensor[dstStride * QUARTER_MODE_PART_1], gmTensor[offset + realDim / dSplitCoef * QUARTER_MODE_PART_1], copyParams, padParams);
-    DataCopyPad(inTensor[dstStride * QUARTER_MODE_PART_2], gmTensor[offset + realDim / dSplitCoef * QUARTER_MODE_PART_2], copyParams, padParams);
-    DataCopyPad(inTensor[dstStride * QUARTER_MODE_PART_3], gmTensor[offset + realDim / dSplitCoef * QUARTER_MODE_PART_3], copyParams, padParams);
+    DataCopyPad(inTensor[dstStride * QUARTER_MODE_PART_1],
+                gmTensor[offset + realDim / dSplitCoef * QUARTER_MODE_PART_1], copyParams, padParams);
+    DataCopyPad(inTensor[dstStride * QUARTER_MODE_PART_2],
+                gmTensor[offset + realDim / dSplitCoef * QUARTER_MODE_PART_2], copyParams, padParams);
+    DataCopyPad(inTensor[dstStride * QUARTER_MODE_PART_3],
+                gmTensor[offset + realDim / dSplitCoef * QUARTER_MODE_PART_3], copyParams, padParams);
 }
 
 template <typename T>
-__aicore__ inline void CopyOutQuarterMode(
-    LocalTensor<T>& outTensor, GlobalTensor<T>& gmTensor, const int64_t offset,
-    const uint32_t blockCount, const uint32_t blockLen,
-    const int64_t D, const int64_t realDim, const uint32_t dSplitCoef)
+__aicore__ inline void CopyOutQuarterMode(LocalTensor<T> &outTensor, GlobalTensor<T> &gmTensor, const int64_t offset,
+                                          const uint32_t blockCount, const uint32_t blockLen, const int64_t D,
+                                          const int64_t realDim, const uint32_t dSplitCoef)
 {
     DataCopyExtParams copyOutParams;
     copyOutParams.blockCount = blockCount;
@@ -871,9 +865,12 @@ __aicore__ inline void CopyOutQuarterMode(
     copyOutParams.srcStride = srcStride * (dSplitCoef - 1) * sizeof(T) / BLOCK_TYPE_SIZE;
     copyOutParams.dstStride = (D - realDim / dSplitCoef) * sizeof(T);
     DataCopyPad(gmTensor[offset], outTensor, copyOutParams);
-    DataCopyPad(gmTensor[offset + realDim / dSplitCoef * QUARTER_MODE_PART_1], outTensor[srcStride * QUARTER_MODE_PART_1], copyOutParams);
-    DataCopyPad(gmTensor[offset + realDim / dSplitCoef * QUARTER_MODE_PART_2], outTensor[srcStride * QUARTER_MODE_PART_2], copyOutParams);
-    DataCopyPad(gmTensor[offset + realDim / dSplitCoef * QUARTER_MODE_PART_3], outTensor[srcStride * QUARTER_MODE_PART_3], copyOutParams);
+    DataCopyPad(gmTensor[offset + realDim / dSplitCoef * QUARTER_MODE_PART_1],
+                outTensor[srcStride * QUARTER_MODE_PART_1], copyOutParams);
+    DataCopyPad(gmTensor[offset + realDim / dSplitCoef * QUARTER_MODE_PART_2],
+                outTensor[srcStride * QUARTER_MODE_PART_2], copyOutParams);
+    DataCopyPad(gmTensor[offset + realDim / dSplitCoef * QUARTER_MODE_PART_3],
+                outTensor[srcStride * QUARTER_MODE_PART_3], copyOutParams);
 }
 
 #endif // APPLY_ROTARY_POS_EMB_COMMON_H

@@ -29,7 +29,8 @@ class InplacePartialRotaryMulGradABAAndBA {
 public:
     __aicore__ inline InplacePartialRotaryMulGradABAAndBA(TPipe *pipe,
                                                           const InplacePartialRotaryMulGradRegbaseTilingData *tiling)
-        : pipe_(pipe), tilingData_(tiling){};
+        : pipe_(pipe),
+          tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR dy, GM_ADDR cos, GM_ADDR sin, GM_ADDR dx);
     __aicore__ inline void Process();
 
@@ -120,9 +121,10 @@ __aicore__ inline void InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCas
 }
 
 template <typename TDY, typename TCOS, bool IsBroadCast>
-__aicore__ inline void
-InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::CopyInCosAndSin(int64_t sStart, int64_t sLength,
-                                                                             int64_t bStart, int64_t bLength)
+__aicore__ inline void InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::CopyInCosAndSin(int64_t sStart,
+                                                                                                    int64_t sLength,
+                                                                                                    int64_t bStart,
+                                                                                                    int64_t bLength)
 {
     LocalTensor<TCOS> cosUb = cosInQue_.AllocTensor<TCOS>();
     LocalTensor<TCOS> sinUb = sinInQue_.AllocTensor<TCOS>();
@@ -149,10 +151,9 @@ InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::CopyInCosAndSin(int
 }
 
 template <typename TDY, typename TCOS, bool IsBroadCast>
-__aicore__ inline void
-InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::CopyInDy(int64_t sStart, int64_t sLength, int64_t bStart,
-                                                                      int64_t bLength, int64_t nStart, int64_t nLength,
-                                                                      int64_t nTotalSize)
+__aicore__ inline void InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::CopyInDy(
+    int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart, int64_t nLength,
+    int64_t nTotalSize)
 {
     LocalTensor<TDY> dyUb = dyInQue_.AllocTensor<TDY>();
 
@@ -179,10 +180,9 @@ InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::CopyInDy(int64_t sS
 }
 
 template <typename TDY, typename TCOS, bool IsBroadCast>
-__aicore__ inline void
-InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::CopyOutDx(int64_t sStart, int64_t sLength, int64_t bStart,
-                                                                       int64_t bLength, int64_t nStart, int64_t nLength,
-                                                                       int64_t nTotalSize)
+__aicore__ inline void InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::CopyOutDx(
+    int64_t sStart, int64_t sLength, int64_t bStart, int64_t bLength, int64_t nStart, int64_t nLength,
+    int64_t nTotalSize)
 {
     LocalTensor<TDY> dxUb = dxOutQue_.DeQue<TDY>();
 
@@ -207,18 +207,16 @@ InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::CopyOutDx(int64_t s
 }
 
 template <typename TDY, typename TCOS, bool IsBroadCast>
-__aicore__ inline void
-InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::Compute(LocalTensor<TCOS> &cosUb, LocalTensor<TCOS> &sinUb,
-                                                                     int64_t sLength, int64_t bLength, int64_t nLength)
+__aicore__ inline void InplacePartialRotaryMulGradABAAndBA<TDY, TCOS, IsBroadCast>::Compute(
+    LocalTensor<TCOS> &cosUb, LocalTensor<TCOS> &sinUb, int64_t sLength, int64_t bLength, int64_t nLength)
 {
     LocalTensor<TDY> inUb = dyInQue_.DeQue<TDY>();
     LocalTensor<TDY> outUb = dxOutQue_.AllocTensor<TDY>();
 
     BatchInterleaveModeGradVF<TDY, TCOS, IsBroadCast>(
-        (__local_mem__ TDY *)inUb.GetPhyAddr(), (__local_mem__ TCOS *)cosUb.GetPhyAddr(),
-        (__local_mem__ TCOS *)sinUb.GetPhyAddr(), (__local_mem__ TDY *)outUb.GetPhyAddr(),
-        static_cast<uint16_t>(sLength), static_cast<uint16_t>(bLength), static_cast<uint16_t>(nLength),
-        tilingData_->sliceLength, dAlignDy_, dAlignCos_, ubFactorS_, ubFactorN_);
+        (__ubuf__ TDY *)inUb.GetPhyAddr(), (__ubuf__ TCOS *)cosUb.GetPhyAddr(), (__ubuf__ TCOS *)sinUb.GetPhyAddr(),
+        (__ubuf__ TDY *)outUb.GetPhyAddr(), static_cast<uint16_t>(sLength), static_cast<uint16_t>(bLength),
+        static_cast<uint16_t>(nLength), tilingData_->sliceLength, dAlignDy_, dAlignCos_, ubFactorS_, ubFactorN_);
 
     dyInQue_.FreeTensor(inUb);
     dxOutQue_.EnQue(outUb);

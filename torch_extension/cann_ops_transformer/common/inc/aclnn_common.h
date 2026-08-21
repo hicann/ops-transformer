@@ -138,16 +138,19 @@ constexpr aclDataType kATenScalarTypeToAclDataTypeTable[] = {
 
 enum class DType {
     UNDEFINED = -1,
-    ENUM_OFFSET(FLOAT, ACL_FLOAT) ENUM_OFFSET(FLOAT16, ACL_FLOAT16) ENUM_OFFSET(INT8, ACL_INT8) ENUM_OFFSET(
-        INT32, ACL_INT32) ENUM_OFFSET(UINT8, ACL_UINT8) ENUM_OFFSET(INT16, ACL_INT16) ENUM_OFFSET(UINT16, ACL_UINT16)
-        ENUM_OFFSET(UINT32, ACL_UINT32) ENUM_OFFSET(INT64, ACL_INT64) ENUM_OFFSET(UINT64, ACL_UINT64)
-            ENUM_OFFSET(DOUBLE, ACL_DOUBLE) ENUM_OFFSET(BOOL, ACL_BOOL) ENUM_OFFSET(STRING, ACL_STRING) ENUM_OFFSET(
-                COMPLEX64, ACL_COMPLEX64) ENUM_OFFSET(COMPLEX128, ACL_COMPLEX128) ENUM_OFFSET(BF16, ACL_BF16)
-                ENUM_OFFSET(INT4, ACL_INT4) ENUM_OFFSET(UINT1, ACL_UINT1) ENUM_OFFSET(COMPLEX32, ACL_COMPLEX32)
-                    ENUM_OFFSET(HIFLOAT8, ACL_HIFLOAT8) ENUM_OFFSET(FLOAT8_E5M2, ACL_FLOAT8_E5M2)
-                        ENUM_OFFSET(FLOAT8_E4M3FN, ACL_FLOAT8_E4M3FN) ENUM_OFFSET(FLOAT8_E8M0, ACL_FLOAT8_E8M0)
-                            ENUM_OFFSET(FLOAT6_E3M2, ACL_FLOAT6_E3M2) ENUM_OFFSET(FLOAT6_E2M3, ACL_FLOAT6_E2M3)
-                                ENUM_OFFSET(FLOAT4_E2M1, ACL_FLOAT4_E2M1) ENUM_OFFSET(FLOAT4_E1M2, ACL_FLOAT4_E1M2)
+    ENUM_OFFSET(FLOAT, ACL_FLOAT)
+    ENUM_OFFSET(FLOAT16, ACL_FLOAT16) ENUM_OFFSET(INT8, ACL_INT8) ENUM_OFFSET(INT32, ACL_INT32)
+        ENUM_OFFSET(UINT8, ACL_UINT8) ENUM_OFFSET(INT16, ACL_INT16) ENUM_OFFSET(UINT16, ACL_UINT16)
+            ENUM_OFFSET(UINT32, ACL_UINT32) ENUM_OFFSET(INT64, ACL_INT64) ENUM_OFFSET(UINT64, ACL_UINT64)
+                ENUM_OFFSET(DOUBLE, ACL_DOUBLE) ENUM_OFFSET(BOOL, ACL_BOOL) ENUM_OFFSET(STRING, ACL_STRING)
+                    ENUM_OFFSET(COMPLEX64, ACL_COMPLEX64) ENUM_OFFSET(COMPLEX128, ACL_COMPLEX128)
+                        ENUM_OFFSET(BF16, ACL_BF16) ENUM_OFFSET(INT4, ACL_INT4) ENUM_OFFSET(UINT1, ACL_UINT1)
+                            ENUM_OFFSET(COMPLEX32, ACL_COMPLEX32) ENUM_OFFSET(HIFLOAT8, ACL_HIFLOAT8)
+                                ENUM_OFFSET(FLOAT8_E5M2, ACL_FLOAT8_E5M2) ENUM_OFFSET(FLOAT8_E4M3FN, ACL_FLOAT8_E4M3FN)
+                                    ENUM_OFFSET(FLOAT8_E8M0, ACL_FLOAT8_E8M0) ENUM_OFFSET(FLOAT6_E3M2, ACL_FLOAT6_E3M2)
+                                        ENUM_OFFSET(FLOAT6_E2M3, ACL_FLOAT6_E2M3)
+                                            ENUM_OFFSET(FLOAT4_E2M1, ACL_FLOAT4_E2M1)
+                                                ENUM_OFFSET(FLOAT4_E1M2, ACL_FLOAT4_E1M2)
 };
 
 namespace op_infer {
@@ -299,7 +302,7 @@ inline void *GetOpApiLibHandler(const char *libName)
 }
 
 static inline void TryLoadCustOpApiFromEnv(const char *envName, const std::string &subDir,
-    std::vector<void *> &handlers, std::set<std::string> &loadedPaths)
+                                           std::vector<void *> &handlers, std::set<std::string> &loadedPaths)
 {
     const char *env = std::getenv(envName);
     if (env == nullptr) {
@@ -1020,6 +1023,9 @@ inline void ApplyDeterministicConfig()
                     #aclnn_api "GetWorkspaceSize", " not in ", GetOpApiLibName(), ", or ", GetOpApiLibName(), ", or ", \
                     GetTransformerOpApiLibName(), "not found."); \
         auto acl_stream = c10_npu::getCurrentNPUStream().stream(false); \
+        if (c10_npu::check_enqueue_need_use(acl_stream)) { \
+            aclrtUseStreamResInCurrentThread(acl_stream); \
+        } \
         uint64_t workspace_size = 0; \
         uint64_t *workspace_size_addr = &workspace_size; \
         aclOpExecutor *executor = nullptr; \
@@ -1045,6 +1051,9 @@ inline void ApplyDeterministicConfig()
             workspace_addr = const_cast<void *>(workspace_tensor.storage().data()); \
         } \
         auto acl_call = [converted_params, workspace_addr, workspace_size, acl_stream, executor]() -> int { \
+            if (c10_npu::check_enqueue_need_use(acl_stream)) { \
+                aclrtUseStreamResInCurrentThread(acl_stream); \
+            } \
             typedef int (*OpApiFunc)(void *, uint64_t, aclOpExecutor *, const aclrtStream); \
             OpApiFunc opApiFunc = reinterpret_cast<OpApiFunc>(opApiFuncAddr); \
             auto api_ret = opApiFunc(workspace_addr, workspace_size, executor, acl_stream); \
