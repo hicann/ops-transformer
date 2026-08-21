@@ -59,7 +59,7 @@ repos:
       - id: codespell
         args: [
             "-L",
-            "CANN,cann,NNAL,nnal,ASCEND,ascend,EnQue,CopyIn,ArchType,AND,ND,tbe,copyin,alog,wIh,dout,indexs,inH,padD",
+            "CANN,cann,NNAL,nnal,ASCEND,ascend,EnQue,CopyIn,ArchType,AND,ND,tbe,copyin,alog,wIh,dout,indexs,inH,padD,outWeight",
             "--skip",
             "*.cc,*.cjs,*.clang-format,*.cmake,*.cpp,*.csv,*.cts,*.gitignore,*.gitkeep,*.gitmodules,*.h,*.hpp,*.in,*.info,*.ini,*.js,*.json,*.log,*.md,*.py,*.sh,*.TAG,*.ts,*.txt,*.xml,*.yaml,*.yml",
           ]
