@@ -51,6 +51,10 @@ static ge::graphStatus InferShapeNsaCompress(gert::InferShapeContext *context)
 
     auto compressStridePtr = attrs->GetAttrPointer<int64_t>(COMPRESSSTRIDE_ATTRS_INDEX);
     uint32_t compressStride = *compressStridePtr;
+    if (compressStride == 0) {
+        OP_LOGE(context, "compressStride should not be zero.");
+        return ge::GRAPH_FAILED;
+    }
 
     int64_t compressKvNum = 0;
     int64_t preSeqLen = 0;
@@ -76,6 +80,5 @@ static ge::graphStatus InferDataTypeNsaCompress(gert::InferDataTypeContext *cont
 }
 
 IMPL_OP_INFERSHAPE(NsaCompress).InferShape(InferShapeNsaCompress).InferDataType(InferDataTypeNsaCompress);
-
 
 } // namespace ops
