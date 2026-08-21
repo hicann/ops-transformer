@@ -375,6 +375,9 @@ aclnnStatus aclnnMhcPreV2(
 - 确定性计算：
   - aclnnMhcPreV2默认确定性实现。
 
+- Batch一致性说明：
+  - 默认非Batch一致性实现，不支持通过aclrtSetSysParamOpt开启Batch一致性。
+
 - 规格约束：
   - n目前支持4、6、8。
   - D支持1~16384范围以内，需满足D为16对齐。
