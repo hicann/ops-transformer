@@ -31,7 +31,7 @@ namespace ge {
  * @li x2_scale: A matrix Tensor. The type support float, float8_e8m0. The format supports ND.
  * @li comm_scale: A matrix Tensor. The type support float. The format supports ND.
  * @li x1_offset: A matrix Tensor. The type support float. The format supports ND.
- * @li x2_offset: A matrix Tensor. The type support float, float16. The format supports ND.
+ * @li x2_offset: A matrix Tensor. The type support float. The format supports ND.
  *
  * @par Outputs:
  * @li y: A matrix Tensor. The type support bfloat16, float16, float. The format supports ND.
