@@ -83,6 +83,18 @@ def _calculate_metadata_size():
     return 4096
 
 
+# 各 layout 期望的 Q/K/V tensor 维度数 (N2TGD 是 descale 专用 layout, 不在此表)
+_LAYOUT_EXPECTED_NDIM = {
+    "TND": 3,
+    "NTD": 3,
+    "BSND": 4,
+    "BNSD": 4,
+    "PA_NZ": 5,
+    "PA_BNBD": 4,
+    "PA_BBND": 4,
+}
+
+
 class QuantFlashAttnOpBuilder(OpBuilder):
     def __init__(self):
         super(QuantFlashAttnOpBuilder, self).__init__("quant_flash_attn")
@@ -174,6 +186,27 @@ class QuantFlashAttnOpBuilder(OpBuilder):
             layout_out: Optional[str] = "BSND",
             return_softmax_lse: Optional[bool] = False,
         ):
+            # 取 shape 前校验 q/v 非空及维度, 避免 None 或维度不足导致 AttributeError/IndexError
+            torch._check(q is not None, lambda: "q must not be None")
+            torch._check(v is not None, lambda: "v must not be None")
+            q_expected = _LAYOUT_EXPECTED_NDIM.get(layout_q)
+            torch._check(
+                q_expected is not None,
+                lambda: f"Unsupported layout_q: {layout_q!r}, expected one of TND/NTD/BSND/BNSD",
+            )
+            torch._check(
+                q.dim() == q_expected,
+                lambda: f"q with layout {layout_q} expects {q_expected} dims, but got {q.dim()} dims",
+            )
+            kv_expected = _LAYOUT_EXPECTED_NDIM.get(layout_kv)
+            torch._check(
+                kv_expected is not None,
+                lambda: f"Unsupported layout_kv: {layout_kv!r}, expected one of TND/BSND/BNSD/PA_NZ/PA_BNBD/PA_BBND",
+            )
+            torch._check(
+                v.dim() == kv_expected,
+                lambda: f"v with layout {layout_kv} expects {kv_expected} dims, but got {v.dim()} dims",
+            )
             if layout_q == "TND":
                 t_size = q.size(0)
                 n_size = q.size(1)

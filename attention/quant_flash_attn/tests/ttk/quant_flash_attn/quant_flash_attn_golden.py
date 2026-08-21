@@ -1688,21 +1688,26 @@ def prepare_npu_inputs(
 
     if ENABLE_PA:
         K_DTYPE = k_fp8.dtype
-        V_DTYPE = v_fp8.dtype
+        V_DTYPE = v_fp8.dtype if v_fp8 is not None else None
         DK_DTYPE = dequant_scale_k.dtype
-        DV_DTYPE = dequant_scale_v.dtype
+        DV_DTYPE = dequant_scale_v.dtype if dequant_scale_v is not None else None
         k_npu = k_fp8.contiguous().view(K_DTYPE).npu()
-        v_npu = v_fp8.contiguous().view(V_DTYPE).npu()
+        v_npu = v_fp8.contiguous().view(V_DTYPE).npu() if v_fp8 is not None else None
         deq_k_npu = dequant_scale_k.view(DK_DTYPE).npu()
-        deq_v_npu = dequant_scale_v.view(DV_DTYPE).npu()
+        deq_v_npu = (
+            dequant_scale_v.view(DV_DTYPE).npu()
+            if dequant_scale_v is not None
+            else None
+        )
 
         if not IS_CONTIGUOUS:
-            kv_cache = torch.stack([k_fp8, v_fp8], dim=2)
-            kv_cache = kv_cache.npu()
-            k_npu = kv_cache[:, :, 0]
-            v_npu = kv_cache[:, :, 1]
+            if v_fp8 is not None:
+                kv_cache = torch.stack([k_fp8, v_fp8], dim=2)
+                kv_cache = kv_cache.npu()
+                k_npu = kv_cache[:, :, 0]
+                v_npu = kv_cache[:, :, 1]
             logger.info(
-                f"[NPU] key is_contiguous={k_npu.is_contiguous()}, value is_contiguous={v_npu.is_contiguous()}"
+                f"[NPU] key is_contiguous={k_npu.is_contiguous()}, value is_contiguous={v_npu.is_contiguous() if v_npu is not None else 'N/A'}"
             )
             fake_kscale_tensor = torch.ones_like(dequant_scale_k)
             double_kscale = torch.stack([dequant_scale_k, fake_kscale_tensor], dim=2)
@@ -1720,7 +1725,11 @@ def prepare_npu_inputs(
             )
 
         logger.info("[NPU PA] kv_layout=%s", KV_CACHE_LAYOUT)
-        logger.info("[NPU PA] k=%s, v=%s", k_npu.shape, v_npu.shape)
+        logger.info(
+            "[NPU PA] k=%s, v=%s",
+            k_npu.shape,
+            v_npu.shape if v_npu is not None else None,
+        )
         logger.info(
             "[NPU PA] deq_k=%s, deq_v=%s",
             deq_k_npu.shape,
@@ -1770,16 +1779,18 @@ def prepare_npu_inputs(
 
     # 非 PA 模式
     K_DTYPE = k_fp8.dtype
-    V_DTYPE = v_fp8.dtype
+    V_DTYPE = v_fp8.dtype if v_fp8 is not None else None
     DK_DTYPE = dequant_scale_k.dtype
     DV_DTYPE = dequant_scale_v.dtype if dequant_scale_v is not None else None
     k_npu = k_fp8.contiguous().view(K_DTYPE).npu()
-    v_npu = v_fp8.contiguous().view(V_DTYPE).npu()
+    v_npu = v_fp8.contiguous().view(V_DTYPE).npu() if v_fp8 is not None else None
     deq_k_npu = dequant_scale_k.view(DK_DTYPE).npu()
     deq_v_npu = (
         dequant_scale_v.view(DV_DTYPE).npu() if dequant_scale_v is not None else None
     )
-    logger.info("[NPU TND] k=%s, v=%s", k_npu.shape, v_npu.shape)
+    logger.info(
+        "[NPU TND] k=%s, v=%s", k_npu.shape, v_npu.shape if v_npu is not None else None
+    )
     logger.info(
         "[NPU TND] deq_k=%s, deq_v=%s",
         deq_k_npu.shape,
