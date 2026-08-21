@@ -58,9 +58,9 @@ def _compressor_forward(
     coff: Optional[int] = 1,
     cache_mode: Optional[int] = 1,
     grad_enabled: Optional[bool] = False,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     op_module = compressor_op_builder.load()
-    cmp_kv, softmax_score, kv = op_module.compressor(
+    return op_module.compressor(
         x,
         wkv,
         wgate,
@@ -75,8 +75,6 @@ def _compressor_forward(
         cache_mode,
         grad_enabled,
     )
-    updated_state_cache = state_cache.detach().clone()
-    return cmp_kv, softmax_score, kv, updated_state_cache
 
 
 @torch.library.register_fake("cann_ops_transformer::_compressor_forward")
@@ -94,7 +92,7 @@ def _compressor_forward_fake(
     coff: Optional[int] = 1,
     cache_mode: Optional[int] = 1,
     grad_enabled: Optional[bool] = False,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     d = wkv.size(0) // coff
     coff_cmp = coff * cmp_ratio
     if x.dim() == 3:
@@ -117,8 +115,7 @@ def _compressor_forward_fake(
         softmax_score_size, dtype=torch.float32, device=x.device
     )
     kv_out = torch.empty(kv_size, dtype=torch.float32, device=x.device)
-    state_cache_out = torch.empty_like(state_cache)
-    return (cmp_kv_out, softmax_score_out, kv_out, state_cache_out)
+    return (cmp_kv_out, softmax_score_out, kv_out)
 
 
 # ===========================================================================
@@ -190,7 +187,7 @@ def setup_context(ctx, inputs, output):
     x, wkv, wgate = inputs[:3]
     cu_seqlens, seqused, start_pos, cmp_ratio, coff = inputs[6:11]
 
-    cmp_kv, softmax_score, kv, _ = output
+    cmp_kv, softmax_score, kv = output
     ctx.save_for_backward(
         x, wkv, wgate, cu_seqlens, seqused, start_pos, softmax_score, kv
     )
@@ -246,7 +243,7 @@ def compressor(
     'PrivateUse1' is the combine key for custom NPU backends.
     """
     grad_enabled = x.requires_grad
-    cmp_kv, softmax_score, kv, new_state_cache = _compressor_forward(
+    cmp_kv, softmax_score, kv = _compressor_forward(
         x,
         wkv,
         wgate,
@@ -261,6 +258,4 @@ def compressor(
         cache_mode,
         grad_enabled,
     )
-    if state_cache is not None:
-        state_cache.copy_(new_state_cache)
     return cmp_kv

@@ -693,7 +693,7 @@ def run_forward_direct_case(case, p, b, totalValid, device, compare_mode=3):
     state_cpu_initial = state_cache_npu.cpu()
 
     # ── 直调正向（不经 autograd）；grad_enabled=True 才会写 softmax_score/kv 中间输出 ──
-    cmp_kv, softmax_score, kv, _ = _compressor_forward(
+    cmp_kv, softmax_score, kv = _compressor_forward(
         b["inputs"]["x"],
         wkvInp,
         wgateInp,
@@ -829,7 +829,7 @@ def run_backward_direct_case(case, p, b, totalValid, device, fwd=None, compare_m
 
     if fwd is None:
         # 先直调一次真实正向拿中间量（不经 autograd）
-        cmp_kv, softmax_score, kv, _ = _compressor_forward(
+        cmp_kv, softmax_score, kv = _compressor_forward(
             inputs["x"],
             wkvInp,
             wgateInp,
