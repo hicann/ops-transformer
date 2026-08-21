@@ -30,15 +30,9 @@ ge::graphStatus MoeFinalizeRoutingTilingV2::GetPlatformInfo()
     return DoGetPlatformInfo();
 }
 
-ge::graphStatus MoeFinalizeRoutingTilingV2::GetShapeAttrsInfo()
-{
-    return DoGetShapeAttrsInfo();
-}
+ge::graphStatus MoeFinalizeRoutingTilingV2::GetShapeAttrsInfo() { return DoGetShapeAttrsInfo(); }
 
-uint64_t MoeFinalizeRoutingTilingV2::GetTilingKey() const
-{
-    return tilingKey_;
-}
+uint64_t MoeFinalizeRoutingTilingV2::GetTilingKey() const { return tilingKey_; }
 
 ge::graphStatus MoeFinalizeRoutingTilingV2::GetWorkspaceSize()
 {
@@ -52,7 +46,7 @@ ge::graphStatus MoeFinalizeRoutingTilingV2::PostTiling()
     uint64_t tilingKey = GetTilingKey();
     context_->SetTilingKey(tilingKey);
     context_->SetBlockDim(usedCoreNum_);
-    size_t* workspaces = context_->GetWorkspaceSizes(1);
+    size_t *workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = workspaceSize_;
     return ge::GRAPH_SUCCESS;
@@ -60,54 +54,51 @@ ge::graphStatus MoeFinalizeRoutingTilingV2::PostTiling()
 
 ge::graphStatus MoeFinalizeRoutingTilingV2::DoOpTiling()
 {
-    OP_CHECK_IF(
-        (CalcOpTiling() != ge::GRAPH_SUCCESS),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "CalcOpTiling()", "GRAPH_FAILED",
-            "CalcOpTiling failed."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF((CalcOpTiling() != ge::GRAPH_SUCCESS),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "CalcOpTiling()", "GRAPH_FAILED",
+                                                      "CalcOpTiling failed."),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(
-        (CalcTilingKey() != ge::GRAPH_SUCCESS),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "CalcTilingKey()", "GRAPH_FAILED",
-            "CalcTilingKey failed."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF((CalcTilingKey() != ge::GRAPH_SUCCESS),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "CalcTilingKey()", "GRAPH_FAILED",
+                                                      "CalcTilingKey failed."),
+                return ge::GRAPH_FAILED);
 
     PrintTilingData();
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeFinalizeRoutingTilingV2::DoLibApiTiling()
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus MoeFinalizeRoutingTilingV2::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
 
-ge::graphStatus TilingForMoeFinalizeRoutingV2(gert::TilingContext* context)
+ge::graphStatus TilingForMoeFinalizeRoutingV2(gert::TilingContext *context)
 {
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingPrepareForMoeFinalizeRoutingV2(gert::TilingParseContext* context)
+ge::graphStatus TilingPrepareForMoeFinalizeRoutingV2(gert::TilingParseContext *context)
 {
-    OP_LOGD(context, "TilingPrepareForMoeFinalizeRountingV2 enter.");
-    
+    OP_LOGD(context, "TilingPrepareForMoeFinalizeRoutingV2 enter.");
+
     auto compileInfo = context->GetCompiledInfo<MoeFinalizeRoutingCompileInfoV2>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);
     auto platformInfo = context->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     compileInfo->aivNum = ascendcPlatform.GetCoreNumAiv();
-    OP_CHECK_IF(
-        (compileInfo->aivNum <= 0),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MoeFinalizeRoutingV2", "compileInfo->aivNum",
-            std::to_string(compileInfo->aivNum).c_str(),
-            "TilingPrepareForMoeFinalizeRountingV2 fail to get core num."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF((compileInfo->aivNum <= 0),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MoeFinalizeRoutingV2", "compileInfo->aivNum",
+                                                      std::to_string(compileInfo->aivNum).c_str(),
+                                                      "TilingPrepareForMoeFinalizeRoutingV2 fail to get core num."),
+                return ge::GRAPH_FAILED);
 
     uint64_t ubSize;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
     compileInfo->ubSize = static_cast<int64_t>(ubSize);
-    OP_CHECK_IF(
-        (compileInfo->ubSize <= 0),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MoeFinalizeRoutingV2", "compileInfo->ubSize",
-            std::to_string(compileInfo->ubSize).c_str(),
-            "TilingPrepareForMoeFinalizeRountingV2 fail to get ub size."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF((compileInfo->ubSize <= 0),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MoeFinalizeRoutingV2", "compileInfo->ubSize",
+                                                      std::to_string(compileInfo->ubSize).c_str(),
+                                                      "TilingPrepareForMoeFinalizeRoutingV2 fail to get ub size."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

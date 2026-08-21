@@ -23,7 +23,7 @@ namespace optiling {
 static const int64_t WORKSPACE_SIZE = static_cast<int64_t>(16 * 1024 * 1024);
 static const int64_t ONE_BLK_SIZE = 32;
 static const size_t TIMES = 2;
-static const size_t TRIPLE_BUFFER = 3;       // 当数据类型为BF16时转为float类型计算，部分输入所需内存为原来的3倍
+static const size_t TRIPLE_BUFFER = 3; // 当数据类型为BF16时转为float类型计算，部分输入所需内存为原来的3倍
 static const size_t DOUBLE_BUFFER = 2;       // 启动double buffer
 static const int64_t H_SIZE_PER_SLICE = 256; // 切H后，每一块的H大小
 static const int64_t INT_NUM_OF_BYTES = 4;
@@ -198,7 +198,7 @@ ge::graphStatus MoeFinalizeRoutingTiling::CheckParamsShape()
 
     OP_CHECK_IF(scalesShape.GetDim(1) != expandedExpertIdxShape.GetDim(1),
                 OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
-                                            "the The 1 of scales and expanded_expert_idx should be same."),
+                                            "the dim 1 of scales and expanded_expert_idx should be same."),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(expandedRowIdxShape.GetDim(0) != expandedXShape.GetDim(0),
@@ -487,7 +487,7 @@ ge::graphStatus MoeFinalizeRoutingTiling::CalcTilingData()
         return ge::GRAPH_SUCCESS;
     }
 
-    OP_LOGI("Tiling4MoeFinalizeRouting", "CalcTilingData load all h fialed, will cut h.");
+    OP_LOGI("Tiling4MoeFinalizeRouting", "CalcTilingData load all h failed, will cut h.");
     // 切分H并计算tilingData
     isCanLoadH_ = false;
     CutH();

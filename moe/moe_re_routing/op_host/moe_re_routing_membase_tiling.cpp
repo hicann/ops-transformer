@@ -49,10 +49,7 @@ constexpr int64_t TILING_KEY_TOKENS_FP16_EXPERTS_INT64_SCALES_FLOAT32 = 100110;
 constexpr int64_t TILING_KEY_TOKENS_BF16_EXPERTS_INT32_SCALES_FLOAT32 = 100200;
 constexpr int64_t TILING_KEY_TOKENS_BF16_EXPERTS_INT64_SCALES_FLOAT32 = 100210;
 
-inline int64_t CeilDiv(int64_t N, int64_t n)
-{
-    return ((((N) + (n)-1) / (n)));
-}
+inline int64_t CeilDiv(int64_t N, int64_t n) { return ((((N) + (n)-1) / (n))); }
 
 static const std::map<std::pair<ge::DataType, ge::DataType>, int64_t> TILING_KEY_MAP = {
     {{ge::DT_INT8, ge::DT_INT32}, TILING_KEY_TOKENS_INT8_EXPERTS_INT32_SCALES_FLOAT32},
@@ -63,27 +60,25 @@ static const std::map<std::pair<ge::DataType, ge::DataType>, int64_t> TILING_KEY
     {{ge::DT_BF16, ge::DT_INT64}, TILING_KEY_TOKENS_BF16_EXPERTS_INT64_SCALES_FLOAT32},
 };
 
-static std::tuple<int64_t, int64_t> GetShapeTuple(const gert::TilingContext* context, const int64_t index = 0)
+static std::tuple<int64_t, int64_t> GetShapeTuple(const gert::TilingContext *context, const int64_t index = 0)
 {
-    const gert::StorageShape* shapePtr = context->GetInputShape(index);
-    OP_CHECK_IF(
-        shapePtr == nullptr, OP_LOGE(context->GetNodeName(), "Shape is nullptr."), return std::make_tuple(0, 0));
+    const gert::StorageShape *shapePtr = context->GetInputShape(index);
+    OP_CHECK_IF(shapePtr == nullptr, OP_LOGE(context->GetNodeName(), "Shape is nullptr."),
+                return std::make_tuple(0, 0));
     // check shape length is DIM_SIZE
-    OP_CHECK_IF(
-        shapePtr->GetStorageShape().GetDimNum() != DIM_SIZE, OP_LOGE(context->GetNodeName(), "Shape must be (A, H)."),
-        return std::make_tuple(0, 0));
-    return std::make_tuple(
-        shapePtr->GetStorageShape().GetDim(SHAPE_IDX_A), shapePtr->GetStorageShape().GetDim(SHAPE_IDX_H));
+    OP_CHECK_IF(shapePtr->GetStorageShape().GetDimNum() != DIM_SIZE,
+                OP_LOGE(context->GetNodeName(), "Shape must be (A, H)."), return std::make_tuple(0, 0));
+    return std::make_tuple(shapePtr->GetStorageShape().GetDim(SHAPE_IDX_A),
+                           shapePtr->GetStorageShape().GetDim(SHAPE_IDX_H));
 }
 
 ge::graphStatus MoeReRoutingTiling::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const MoeReRoutingCompileInfo*>(context_->GetCompileInfo());
-        OP_CHECK_IF(
-            compileInfoPtr == nullptr, OP_LOGE(context_->GetNodeName(), "CompileInfo is nullptr."),
-            return ge::GRAPH_FAILED);
+        auto compileInfoPtr = reinterpret_cast<const MoeReRoutingCompileInfo *>(context_->GetCompileInfo());
+        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_->GetNodeName(), "CompileInfo is nullptr."),
+                    return ge::GRAPH_FAILED);
         coreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
         socVersion_ = compileInfoPtr->socVersion;
@@ -91,7 +86,7 @@ ge::graphStatus MoeReRoutingTiling::GetPlatformInfo()
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
         coreNum_ = ascendcPlatform.GetCoreNumAiv();
         int64_t ubSize = 0;
-        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ((uint64_t&)ubSize));
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ((uint64_t &)ubSize));
         ubSize_ = ubSize;
         socVersion_ = ascendcPlatform.GetSocVersion();
     }
@@ -100,8 +95,8 @@ ge::graphStatus MoeReRoutingTiling::GetPlatformInfo()
 
 ge::graphStatus MoeReRoutingTiling::GetShapeAttrsInfo()
 {
-    OP_CHECK_IF(
-        context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context_ can not be nullptr."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context_ can not be nullptr."),
+                return ge::GRAPH_FAILED);
     auto tokenShapeTuple = GetShapeTuple(context_, TOKENS_INDEX);
     auto expertShapeTuple = GetShapeTuple(context_, EXPERT_TOKEN_NUM_PER_RANK_INDEX);
     int64_t tokenNum = std::get<SHAPE_IDX_A>(tokenShapeTuple);
@@ -121,9 +116,9 @@ ge::graphStatus MoeReRoutingTiling::GetShapeAttrsInfo()
         commonParams_.scaleDtype = ge::DT_FLOAT;
     }
 
-    OP_CHECK_IF(
-        tokenSize > TOKENS_LENGTH_UPPER_BOUND, OP_LOGE(context_->GetNodeName(), "tokenSize should <= 16384."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(tokenSize > TOKENS_LENGTH_UPPER_BOUND,
+                OP_LOGE(context_->GetNodeName(), "tokenSize[%ld] should <= 16384,", tokenSize),
+                return ge::GRAPH_FAILED);
     tilingData_.set_tokensNum(tokenNum);
     tilingData_.set_tokensSize(tokenSize);
     tilingData_.set_rankNum(rankNums);
@@ -134,26 +129,23 @@ ge::graphStatus MoeReRoutingTiling::GetShapeAttrsInfo()
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
     auto expertTokenNumType = attrs->GetInt(EXPERT_TOKEN_NUM_TYPE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expertTokenNumType);
-    OP_CHECK_IF(
-        *expertTokenNumType != EXPERT_TOKEN_NUM_TYPE,
-        OP_LOGE(context_->GetNodeName(), "expertTokenNumType should == 1."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(*expertTokenNumType != EXPERT_TOKEN_NUM_TYPE,
+                OP_LOGE(context_->GetNodeName(), "expertTokenNumType[%ld] should == 1.", *expertTokenNumType),
+                return ge::GRAPH_FAILED);
 
     auto idxType = attrs->GetInt(IDX_TYPE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, idxType);
-    OP_CHECK_IF(
-        *idxType != IDX_TYPE, OP_LOGE(context_->GetNodeName(), "idxType should == 0."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(*idxType != IDX_TYPE, OP_LOGE(context_->GetNodeName(), "idxType[%ld] should == 0.", *idxType),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-bool MoeReRoutingTiling::IsCapable()
-{
-    return true;
-}
+bool MoeReRoutingTiling::IsCapable() { return true; }
 
 ge::graphStatus MoeReRoutingTiling::DoOpTiling()
 {
-    OP_CHECK_IF(
-        context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context_ can not be nullptr."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context_ can not be nullptr."),
+                return ge::GRAPH_FAILED);
     int64_t tokenNum = tilingData_.get_tokensNum();
     int64_t tokenSize = tilingData_.get_tokensSize();
     int64_t rankNums = tilingData_.get_rankNum();
@@ -176,9 +168,8 @@ ge::graphStatus MoeReRoutingTiling::DoOpTiling()
 
     std::pair<ge::DataType, ge::DataType> keyToFind = {commonParams_.tokenDtype, commonParams_.expertDtype};
     auto valueToFind = TILING_KEY_MAP.find(keyToFind);
-    OP_CHECK_IF(
-        valueToFind == TILING_KEY_MAP.end(), OP_LOGE(context_->GetNodeName(), "Failed to find tilingkey."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(valueToFind == TILING_KEY_MAP.end(), OP_LOGE(context_->GetNodeName(), "Failed to find tilingkey."),
+                return ge::GRAPH_FAILED);
     tilingKey_ = valueToFind->second;
 
     int64_t blockDimFactor = CeilDiv(rankNums, coreNum_);
@@ -192,25 +183,16 @@ ge::graphStatus MoeReRoutingTiling::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeReRoutingTiling::DoLibApiTiling()
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus MoeReRoutingTiling::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
 
-ge::graphStatus MoeReRoutingTiling::GetWorkspaceSize()
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus MoeReRoutingTiling::GetWorkspaceSize() { return ge::GRAPH_SUCCESS; }
 
-uint64_t MoeReRoutingTiling::GetTilingKey() const
-{
-    return tilingKey_;
-}
+uint64_t MoeReRoutingTiling::GetTilingKey() const { return tilingKey_; }
 
 ge::graphStatus MoeReRoutingTiling::PostTiling()
 {
     context_->SetTilingKey(GetTilingKey());
-    size_t* workspaces = context_->GetWorkspaceSizes(1);
+    size_t *workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = static_cast<size_t>(32); // 设置工作区大小为32字节
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());

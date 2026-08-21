@@ -37,70 +37,62 @@ using std::string;
 using std::vector;
 
 const int A = 11;
-const int H = 79; 
-const int N = 11; 
-const int E = 1; 
-const int S = 1; 
+const int H = 79;
+const int N = 11;
+const int E = 1;
+const int S = 1;
 
-#define ADD_INPUT(intputIndex, intputName, intputDtype, inputShape)                          \
-    vector<int64_t> placeholder##intputIndex##_shape = inputShape;                           \
+#define ADD_INPUT(intputIndex, intputName, intputDtype, inputShape) \
+    vector<int64_t> placeholder##intputIndex##_shape = inputShape; \
     auto placeholder##intputIndex = op::Data("placeholder" + intputIndex).set_attr_index(0); \
-    TensorDesc placeholder##intputIndex##_desc =                                             \
-        TensorDesc(ge::Shape(placeholder##intputIndex##_shape), FORMAT_ND, intputDtype);     \
-    placeholder##intputIndex##_desc.SetPlacement(ge::kPlacementHost);                        \
-    placeholder##intputIndex##_desc.SetFormat(FORMAT_ND);                                    \
-    Tensor tensor_placeholder##intputIndex;                                                  \
-    ret = GenOnesData(placeholder##intputIndex##_shape,                                      \
-        tensor_placeholder##intputIndex,                                                     \
-        placeholder##intputIndex##_desc,                                                     \
-        intputDtype,                                                                         \
-        2);                                                                                  \
-    if (ret != SUCCESS) {                                                                    \
-        printf("%s - ERROR - [XIR]: Generate input data failed\n", GetTime().c_str());       \
-        return FAILED;                                                                       \
-    }                                                                                        \
-    placeholder##intputIndex.update_input_desc_x(placeholder##intputIndex##_desc);           \
-    input.push_back(tensor_placeholder##intputIndex);                                        \
-    graph.AddOp(placeholder##intputIndex);                                                   \
-    moe_re_routing_op.set_input_##intputName(placeholder##intputIndex);                       \
+    TensorDesc placeholder##intputIndex##_desc = \
+        TensorDesc(ge::Shape(placeholder##intputIndex##_shape), FORMAT_ND, intputDtype); \
+    placeholder##intputIndex##_desc.SetPlacement(ge::kPlacementHost); \
+    placeholder##intputIndex##_desc.SetFormat(FORMAT_ND); \
+    Tensor tensor_placeholder##intputIndex; \
+    ret = GenOnesData(placeholder##intputIndex##_shape, tensor_placeholder##intputIndex, \
+                      placeholder##intputIndex##_desc, intputDtype, 2); \
+    if (ret != SUCCESS) { \
+        printf("%s - ERROR - [XIR]: Generate input data failed\n", GetTime().c_str()); \
+        return FAILED; \
+    } \
+    placeholder##intputIndex.update_input_desc_x(placeholder##intputIndex##_desc); \
+    input.push_back(tensor_placeholder##intputIndex); \
+    graph.AddOp(placeholder##intputIndex); \
+    moe_re_routing_op.set_input_##intputName(placeholder##intputIndex); \
     inputs.push_back(placeholder##intputIndex);
 
-#define ADD_INPUT_ATTR(attrName, attrValue)                                                  \
-    moe_re_routing_op.set_attr_##attrName(attrValue);
+#define ADD_INPUT_ATTR(attrName, attrValue) moe_re_routing_op.set_attr_##attrName(attrValue);
 
-#define ADD_CONST_INPUT(intputIndex, intputName, intputDtype, inputShape)                    \
-    vector<int64_t> placeholder##intputIndex##_shape = inputShape;                           \
-    auto placeholder##intputIndex = op::Const("placeholder" + intputIndex);                  \
-    TensorDesc placeholder##intputIndex##_desc =                                             \
-        TensorDesc(ge::Shape(placeholder##intputIndex##_shape), FORMAT_ND, intputDtype);     \
-    placeholder##intputIndex##_desc.SetPlacement(ge::kPlacementHost);                        \
-    placeholder##intputIndex##_desc.SetFormat(FORMAT_ND);                                    \
-    Tensor tensor_placeholder##intputIndex;                                                  \
-    ret = GenOnesData(placeholder##intputIndex##_shape,                                      \
-        tensor_placeholder##intputIndex,                                                     \
-        placeholder##intputIndex##_desc,                                                     \
-        intputDtype,                                                                         \
-        2);                                                                                  \
-    if (ret != SUCCESS) {                                                                    \
-        printf("%s - ERROR - [XIR]: Generate input data failed\n", GetTime().c_str());       \
-        return FAILED;                                                                       \
-    }                                                                                        \
-    placeholder##intputIndex.SetAttr("value", tensor_placeholder##intputIndex);              \
-    placeholder##intputIndex.update_output_desc_y(placeholder##intputIndex##_desc);          \
-    graph.AddOp(placeholder##intputIndex);                                                   \
-    moe_re_routing_op.set_input_##intputName(placeholder##intputIndex);                       \
-    moe_re_routing_op.update_input_desc_##intputName(placeholder##intputIndex##_desc);        \
+#define ADD_CONST_INPUT(intputIndex, intputName, intputDtype, inputShape) \
+    vector<int64_t> placeholder##intputIndex##_shape = inputShape; \
+    auto placeholder##intputIndex = op::Const("placeholder" + intputIndex); \
+    TensorDesc placeholder##intputIndex##_desc = \
+        TensorDesc(ge::Shape(placeholder##intputIndex##_shape), FORMAT_ND, intputDtype); \
+    placeholder##intputIndex##_desc.SetPlacement(ge::kPlacementHost); \
+    placeholder##intputIndex##_desc.SetFormat(FORMAT_ND); \
+    Tensor tensor_placeholder##intputIndex; \
+    ret = GenOnesData(placeholder##intputIndex##_shape, tensor_placeholder##intputIndex, \
+                      placeholder##intputIndex##_desc, intputDtype, 2); \
+    if (ret != SUCCESS) { \
+        printf("%s - ERROR - [XIR]: Generate input data failed\n", GetTime().c_str()); \
+        return FAILED; \
+    } \
+    placeholder##intputIndex.SetAttr("value", tensor_placeholder##intputIndex); \
+    placeholder##intputIndex.update_output_desc_y(placeholder##intputIndex##_desc); \
+    graph.AddOp(placeholder##intputIndex); \
+    moe_re_routing_op.set_input_##intputName(placeholder##intputIndex); \
+    moe_re_routing_op.update_input_desc_##intputName(placeholder##intputIndex##_desc); \
     inputs.push_back(placeholder##intputIndex);
 
-#define ADD_OUTPUT(outputIndex, outputName, outputDtype, outputShape)                        \
-    TensorDesc outputName##outputIndex##_desc =                                              \
-        TensorDesc(ge::Shape(outputShape), FORMAT_ND, outputDtype);                          \
-    moe_re_routing_op.update_output_desc_##outputName(outputName##outputIndex##_desc);             
+#define ADD_OUTPUT(outputIndex, outputName, outputDtype, outputShape) \
+    TensorDesc outputName##outputIndex##_desc = TensorDesc(ge::Shape(outputShape), FORMAT_ND, outputDtype); \
+    moe_re_routing_op.update_output_desc_##outputName(outputName##outputIndex##_desc);
 
-#define LOG_PRINT(message, ...)     \
-  do {                              \
-    printf(message, ##__VA_ARGS__); \
-  } while (0)
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
+    } while (0)
 
 string GetTime()
 {
@@ -161,8 +153,8 @@ int32_t GenOnesDataFloat32(vector<int64_t> shapes, Tensor &input_tensor, TensorD
     return SUCCESS;
 }
 
-int32_t GenOnesData(
-    vector<int64_t> shapes, Tensor &input_tensor, TensorDesc &input_tensor_desc, DataType data_type, int value)
+int32_t GenOnesData(vector<int64_t> shapes, Tensor &input_tensor, TensorDesc &input_tensor_desc, DataType data_type,
+                    int value)
 {
     input_tensor_desc.SetRealDimCnt(shapes.size());
     size_t size = 1;
@@ -188,12 +180,12 @@ int32_t WriteDataToFile(string bin_file, uint64_t data_size, uint8_t *inputData)
 }
 
 int CreateOppInGraph(DataType inDtype, std::vector<ge::Tensor> &input, std::vector<Operator> &inputs,
-    std::vector<Operator> &outputs, Graph &graph)
+                     std::vector<Operator> &outputs, Graph &graph)
 {
     Status ret = SUCCESS;
     // 自定义代码：添加单算子定义到图中
     auto moe_re_routing_op = op::MoeReRouting("test_geir_moe_re_routing");
-    
+
     // shape定义
     std::vector<int64_t> tokens_shape = {A, H};
     std::vector<int64_t> num_in_shape = {N, E};
@@ -203,13 +195,12 @@ int CreateOppInGraph(DataType inDtype, std::vector<ge::Tensor> &input, std::vect
     std::vector<int64_t> scales_out_shape = {A};
     std::vector<int64_t> idx_out_shape = {A};
     std::vector<int64_t> num_out_shape = {E};
-    
 
     // 添加输入（顺序严格匹配 proto.h）
     ADD_INPUT(1, tokens, DT_FLOAT16, tokens_shape);
     ADD_INPUT(2, expert_token_num_per_rank, inDtype, num_in_shape);
     ADD_INPUT(3, per_token_scales, DT_FLOAT, scales_in_shape);
-    
+
     // 添加输出（顺序严格匹配 proto.h）
     ADD_OUTPUT(1, permute_tokens, DT_FLOAT16, tokens_out_shape);
     ADD_OUTPUT(2, permute_per_token_scales, DT_FLOAT, scales_out_shape);
@@ -231,7 +222,7 @@ int main(int argc, char *argv[])
     std::map<AscendString, AscendString> global_options = {{"ge.exec.deviceId", "0"}, {"ge.graphRunMode", "1"}};
     Status ret = ge::GEInitialize(global_options);
     if (ret != SUCCESS) {
-        printf("%s - INFO - [XIR]: Initialize ge using ge global options failed\n", GetTime().c_str());
+        printf("%s - ERROR - [XIR]: Initialize ge using ge global options failed\n", GetTime().c_str());
         return FAILED;
     }
     printf("%s - INFO - [XIR]: Initialize ge using ge global options success\n", GetTime().c_str());
@@ -282,7 +273,7 @@ int main(int argc, char *argv[])
     std::vector<ge::Tensor> output;
     ret = session->RunGraph(graph_id, input, output);
     if (ret != SUCCESS) {
-        printf("%s - INFO - [XIR]: Run graph failed\n", GetTime().c_str());
+        printf("%s - ERROR - [XIR]: Run graph failed\n", GetTime().c_str());
         delete session;
         GEFinalize();
         return FAILED;
@@ -309,7 +300,7 @@ int main(int argc, char *argv[])
         std::cout << "this is " << i << "th output, output shape size =" << output_shape << std::endl;
         uint32_t data_size = output_shape * GetDataTypeSize(output[i].GetTensorDesc().GetDataType());
         WriteDataToFile((const char *)output_file.c_str(), data_size, output_data_i);
-        int32_t *result = (int32_t*)output_data_i;
+        int32_t *result = (int32_t *)output_data_i;
         for (int64_t j = 0; j < output_shape; j++) {
             LOG_PRINT("result[%ld] is: %d\n", j, result[j]);
         }
@@ -324,7 +315,7 @@ int main(int argc, char *argv[])
     printf("%s - INFO - [XIR]: Start to finalize ir graph session\n", GetTime().c_str());
     ret = ge::GEFinalize();
     if (ret != SUCCESS) {
-        printf("%s - INFO - [XIR]: Finalize ir graph session failed\n", GetTime().c_str());
+        printf("%s - ERROR - [XIR]: Finalize ir graph session failed\n", GetTime().c_str());
         return FAILED;
     }
     printf("%s - INFO - [XIR]: Finalize ir graph session success\n", GetTime().c_str());

@@ -19,10 +19,7 @@ namespace optiling {
 //===================
 // TEMP CODE START
 //===================
-static inline int64_t AlignN(const int64_t x, const int64_t N)
-{
-    return (x + N - 1) & ~(N - 1);
-}
+static inline int64_t AlignN(const int64_t x, const int64_t N) { return (x + N - 1) & ~(N - 1); }
 
 static inline int64_t GetLengthByType(const int32_t dtype)
 {
@@ -45,15 +42,9 @@ static inline int64_t GetLengthByType(const int32_t dtype)
     }
 }
 
-static inline int64_t safeMod(const int64_t a, const int64_t b)
-{
-    return b == 0 ? 0 : a % b;
-}
+static inline int64_t safeMod(const int64_t a, const int64_t b) { return b == 0 ? 0 : a % b; }
 
-static inline int64_t safeDiv(const int64_t a, const int64_t b)
-{
-    return b == 0 ? 0 : a / b;
-}
+static inline int64_t safeDiv(const int64_t a, const int64_t b) { return b == 0 ? 0 : a / b; }
 
 static inline bool isFloatDtype(const int64_t inputDtypeSize)
 {
@@ -74,7 +65,7 @@ static inline int64_t ComputeMaxHiddenSize(MoeTokenUnpermuteParam &param, int64_
     // sorted_indices和probs的预留空间；topK_num为最大值512时，至少需要5120 Btye。
     const int64_t reserveSpace = 5120;
     int64_t maxHiddenSize =
-        safeDiv((param.core.maxCoreMemery - reserveSpace), ComputeUnitHSpace(param.input.tokensDtypeSize, bufferNum));
+        safeDiv((param.core.maxCoreMemory - reserveSpace), ComputeUnitHSpace(param.input.tokensDtypeSize, bufferNum));
 
     return AlignN(maxHiddenSize - ALIGN_512, ALIGN_512);
 }
@@ -103,9 +94,9 @@ static inline void Init(gert::TilingContext *context, const int64_t topK, MoeTok
 {
     auto ascendPlaform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     param.core.maxCoreNum = static_cast<int64_t>(ascendPlaform.GetCoreNumAiv());
-    uint64_t maxCoreMemery;
-    ascendPlaform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, maxCoreMemery);
-    param.core.maxCoreMemery = static_cast<int64_t>(maxCoreMemery);
+    uint64_t maxCoreMemory;
+    ascendPlaform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, maxCoreMemory);
+    param.core.maxCoreMemory = static_cast<int64_t>(maxCoreMemory);
 
     const gert::StorageShape *tokensShape = context->GetInputShape(0);
     const gert::StorageShape *sortedIndicesShape = context->GetInputShape(1);
@@ -130,11 +121,11 @@ static inline void Init(gert::TilingContext *context, const int64_t topK, MoeTok
         param.input.tokensNum = safeDiv(param.input.totalLength, param.input.topK);
     }
     size_t sysWorkspaceSize = ascendPlaform.GetLibApiWorkSpaceSize();
-    size_t* workspaces = context->GetWorkspaceSizes(1);
+    size_t *workspaces = context->GetWorkspaceSizes(1);
 
     size_t UserWorkspaceSize = 0;
 
-    workspaces[0] = sysWorkspaceSize + UserWorkspaceSize;    
+    workspaces[0] = sysWorkspaceSize + UserWorkspaceSize;
 }
 
 static void SetCoreNum(MoeTokenUnpermuteParam &param)
@@ -172,10 +163,10 @@ static inline void SetBufferNum(MoeTokenUnpermuteParam &param)
 
 static inline void ComputeRemainMemerySpace(MoeTokenUnpermuteParam &param)
 {
-    param.core.remainMemerySpace =
-        param.core.maxCoreMemery - AlignN(param.hiddenTiling.length, ALIGN_512) *
+    param.core.remainMemorySpace =
+        param.core.maxCoreMemory - AlignN(param.hiddenTiling.length, ALIGN_512) *
                                        ComputeUnitHSpace(param.input.tokensDtypeSize, param.core.bufferNum);
-    param.core.remainMemerySpace -= ALIGN_256;
+    param.core.remainMemorySpace -= ALIGN_256;
 }
 
 static inline void TilingToken(MoeTokenUnpermuteParam &param)
@@ -194,12 +185,12 @@ static inline void TilingToken(MoeTokenUnpermuteParam &param)
 
     int64_t probIndiceSpace = param.tokenPerCore.length * param.input.topK * unitTokenSpace;
 
-    if (param.core.remainMemerySpace >= probIndiceSpace) {
+    if (param.core.remainMemorySpace >= probIndiceSpace) {
         param.tokenTiling.length = param.tokenPerCore.length;
         param.tokenTiling.remain = 0;
         param.tokenTiling.num = 1;
     } else {
-        int64_t maxTokenSize = safeDiv(param.core.remainMemerySpace, (param.input.topK * unitTokenSpace));
+        int64_t maxTokenSize = safeDiv(param.core.remainMemorySpace, (param.input.topK * unitTokenSpace));
         param.tokenTiling.length = maxTokenSize;
         param.tokenTiling.remain = safeMod(param.tokenPerCore.length, maxTokenSize);
         param.tokenTiling.num = safeDiv(param.tokenPerCore.length, maxTokenSize);
@@ -269,9 +260,9 @@ static inline void DebugPrint(const gert::TilingContext *context, const MoeToken
     auto nodeName = context->GetNodeName();
     OP_LOGD(nodeName, ">>>>>>>>>>>>>>> Start to print MoeTokenUnpermute tiling data <<<<<<<<<<<<<<<<");
     OP_LOGD(nodeName, "coreNum: %ld", param.core.usedCoreNum);
-    OP_LOGD(nodeName, "maxCoreMemery: %ld", param.core.maxCoreMemery);
+    OP_LOGD(nodeName, "maxCoreMemory: %ld", param.core.maxCoreMemory);
     OP_LOGD(nodeName, "maxCoreNum: %ld", param.core.maxCoreNum);
-    OP_LOGD(nodeName, "remainMemerySpace: %ld", param.core.remainMemerySpace);
+    OP_LOGD(nodeName, "remainMemorySpace: %ld", param.core.remainMemorySpace);
     OP_LOGD(nodeName, "bufferNum: %ld", param.core.bufferNum);
 
     OP_LOGD(nodeName, "totalLength: %ld", param.input.totalLength);

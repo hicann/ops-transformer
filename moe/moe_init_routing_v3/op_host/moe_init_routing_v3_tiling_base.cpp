@@ -25,8 +25,8 @@ static ge::graphStatus TilingForMoeInitRoutingV3(gert::TilingContext *context)
 }
 
 static ge::graphStatus TilingPrepareForMoeInitRountingV3(gert::TilingParseContext *context)
-{   
-    OP_LOGD(context, "TilingPrepareForMoeInitRountingV3 enter.");
+{
+    OP_LOGD(context, "TilingPrepareForMoeInitRoutingV3 enter.");
 
     auto compileInfo = context->GetCompiledInfo<MoeInitRoutingV3CompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);
@@ -35,20 +35,18 @@ static ge::graphStatus TilingPrepareForMoeInitRountingV3(gert::TilingParseContex
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     compileInfo->aivNum = ascendcPlatform.GetCoreNumAiv();
     OP_CHECK_IF((compileInfo->aivNum <= 0),
-                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "compileInfo->aivNum",
-                                                        std::to_string(compileInfo->aivNum),
-                                                        "failed to get core num"),
-                 return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "compileInfo->aivNum",
+                                                      std::to_string(compileInfo->aivNum), "failed to get core num"),
+                return ge::GRAPH_FAILED);
 
     uint64_t ubSize;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
     compileInfo->ubSize = static_cast<int64_t>(ubSize);
     compileInfo->socVersion = ascendcPlatform.GetSocVersion();
     OP_CHECK_IF((compileInfo->ubSize <= 0),
-                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "ubSize",
-                                                        std::to_string(compileInfo->ubSize),
-                                                        "failed to get ub size"),
-                 return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "ubSize",
+                                                      std::to_string(compileInfo->ubSize), "failed to get ub size"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -56,4 +54,4 @@ static ge::graphStatus TilingPrepareForMoeInitRountingV3(gert::TilingParseContex
 IMPL_OP_OPTILING(MoeInitRoutingV3)
     .Tiling(TilingForMoeInitRoutingV3)
     .TilingParse<MoeInitRoutingV3CompileInfo>(TilingPrepareForMoeInitRountingV3);
-}  // namespace optiling
+} // namespace optiling

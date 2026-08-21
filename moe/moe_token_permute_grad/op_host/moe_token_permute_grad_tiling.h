@@ -40,10 +40,10 @@ constexpr int64_t TILINGKEY_DROPPAD = 1000;
 constexpr int64_t MAX_HIDDEN_SIZE_310P = 10240;
 constexpr int64_t ALIGN_128 = 128;
 struct CoreParam {
-    int64_t maxCoreMemery = 0;
+    int64_t maxCoreMemory = 0;
     int64_t maxCoreNum = 0;
     int64_t usedCoreNum = 0;
-    int64_t remainMemerySpace = 0;
+    int64_t remainMemorySpace = 0;
     int64_t bufferNum = 0;
     int64_t tilingKey = 0;
 };

@@ -15,7 +15,6 @@
 #ifndef OPS_BUILT_IN_OP_TILING_RUNTIME_MOE_TOKEN_PERMUTE_WITH_EP_GRAD_H_
 #define OPS_BUILT_IN_OP_TILING_RUNTIME_MOE_TOKEN_PERMUTE_WITH_EP_GRAD_H_
 
-
 #include "register/op_def_registry.h"
 #include "register/tilingdata_base.h"
 #include "tiling/platform/platform_ascendc.h"
@@ -37,10 +36,10 @@ constexpr int64_t TILINGKEY_FLOAT16 = 2;
 constexpr int64_t TILINGKEY_BF16 = 3;
 
 struct CoreParam {
-    int64_t maxCoreMemery = 0;
+    int64_t maxCoreMemory = 0;
     int64_t maxCoreNum = 0;
     int64_t usedCoreNum = 0;
-    int64_t remainMemerySpace = 0;
+    int64_t remainMemorySpace = 0;
     int64_t bufferNum = 0;
     int64_t tilingKey = 0;
 };
@@ -75,7 +74,8 @@ struct MoeTokenUnpermuteWithEpParam {
     CoreParam core;
 };
 
-ge::graphStatus PermuteWithEpGradTilingCompute(gert::TilingContext* context, const int64_t topK, const bool isUnpermute);
+ge::graphStatus PermuteWithEpGradTilingCompute(gert::TilingContext *context, const int64_t topK,
+                                               const bool isUnpermute);
 
 BEGIN_TILING_DATA_DEF(MoeTokenPermuteWithEpGradTilingData)
 TILING_DATA_FIELD_DEF(int64_t, hidden_size);
