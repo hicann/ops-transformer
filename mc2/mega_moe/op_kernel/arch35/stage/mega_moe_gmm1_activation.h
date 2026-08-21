@@ -53,11 +53,7 @@ __aicore__ inline void WaitForGmm1InputReady(const GMMAddrInfo &gmmAddrInfo, con
     uint32_t targetValue = (mLoc + config.tileM > config.m) ? (config.m - mLoc) : config.tileM;
     uint64_t flagOffset = static_cast<uint64_t>(waveIdx) * INT_CACHELINE;
     __gm__ int32_t *flagValueAddr = gmmAddrInfo.dispatchToGmm1Flag + flagOffset;
-    while (targetValue != AscendC::ReadGmByPassDCache(flagValueAddr)) {
-        int64_t st = AscendC::GetSystemCycle();
-        while (AscendC::GetSystemCycle() - st < 100) {
-        }
-    }
+    WaitUntilGmFlagEquals(flagValueAddr, static_cast<int32_t>(targetValue));
 }
 
 namespace GmmKernel {
@@ -611,11 +607,7 @@ __aicore__ inline void WaitGmm1TileStatus(const GMMAddrInfo &gmmAddrInfo, uint32
 {
     __gm__ int32_t *statusAddr = gmmAddrInfo.gmm1TileStatus + static_cast<uint64_t>(loopIdx) * INT_CACHELINE;
     int32_t roundTag = static_cast<int32_t>(expertIdx + 1);
-    while (AscendC::ReadGmByPassDCache(statusAddr) != roundTag) {
-        int64_t startCycle = AscendC::GetSystemCycle();
-        while (AscendC::GetSystemCycle() - startCycle < 100) {
-        }
-    }
+    WaitUntilGmFlagEquals(statusAddr, roundTag);
 }
 
 // Prefetch 路径的 AIV0 等待 GM tile 就绪，再执行 SwiGLU/量化。
@@ -785,11 +777,7 @@ __aicore__ inline void Gmm1Aiv1EpilogueA8W4(WorkSet &workSet, const GMMAddrInfo 
         uint32_t mLoc = Get<M_VALUE>(blockCoord);
         uint32_t nLoc = Get<N_VALUE>(blockCoord);
         int32_t expectedReadySequence = gmTileSequence + 1;
-        while (AscendC::ReadGmByPassDCache(gmmAddrInfo.gmmToEpilogueFlag) < expectedReadySequence) {
-            int64_t startCycle = AscendC::GetSystemCycle();
-            while (AscendC::GetSystemCycle() - startCycle < 100) {
-            }
-        }
+        WaitUntilGmFlagAtLeast(gmmAddrInfo.gmmToEpilogueFlag, expectedReadySequence);
         Gmm1Aiv1EpilogueTileA8W4<ElementC, MakeLayoutC, IsWaveFlagGrained>(activationQuantOp, workSet.gmC, gmmAddrInfo,
                                                                            config, actualShape, mLoc, nLoc);
         gmTileSequence = expectedReadySequence;
@@ -1188,11 +1176,7 @@ __aicore__ inline void FinishMoeGmm1ActivationStage(const MoeStageCommonConfig &
                 AscendC::WriteGmByPassDCache(allDoneAddr, allDoneTag);
             }
         } else {
-            while (AscendC::ReadGmByPassDCache(allDoneAddr) != allDoneTag) {
-                int64_t startCycle = AscendC::GetSystemCycle();
-                while (AscendC::GetSystemCycle() - startCycle < 100) {
-                }
-            }
+            WaitUntilGmFlagEquals(allDoneAddr, allDoneTag);
         }
     } else {
         EndSync(runtimeState.vecSetSyncCom);

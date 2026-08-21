@@ -25,6 +25,28 @@ struct QuantProcessConfig {
     uint32_t quantScaleNumAlignPerToken;
 };
 
+/*
+ * 计算量化通信记录的对齐布局（普通与 wave 编排模板共用）。
+ * 记录布局 = Align256(token 数据) + Align32(scale) + prefetch 时附加 Align32(topk 权重)，
+ * 与 host CalcDispatchBufferConfig 的 copyBufferBytes 契约恒相等。
+ */
+template <typename ActivationType, typename QuantScaleOutType, bool TopkWeightsPrefetch, uint32_t AElemsPerByte>
+__aicore__ inline QuantProcessConfig CreateQuantProcessConfig(uint32_t tokenHiddenDim, const Params &params)
+{
+    uint32_t quantScaleNumAlignPerToken = Ops::Base::CeilDiv(tokenHiddenDim, static_cast<uint32_t>(ALIGN_32));
+    uint32_t quantTokenAlignBytes =
+        Ops::Base::CeilAlign(tokenHiddenDim / AElemsPerByte, static_cast<uint32_t>(ALIGN_256)) * sizeof(ActivationType);
+    uint32_t quantScaleAlignBytes = Ops::Base::CeilAlign(
+        quantScaleNumAlignPerToken * static_cast<uint32_t>(sizeof(QuantScaleOutType)), static_cast<uint32_t>(ALIGN_32));
+    uint32_t quantTokenScaleAlignBytes = quantTokenAlignBytes + quantScaleAlignBytes;
+    if constexpr (TopkWeightsPrefetch) {
+        uint32_t weightAlignBytes = Ops::Base::CeilAlign(static_cast<uint32_t>(params.tilingData->topK * sizeof(float)),
+                                                         static_cast<uint32_t>(ALIGN_32));
+        quantTokenScaleAlignBytes += weightAlignBytes;
+    }
+    return {quantTokenAlignBytes, quantScaleAlignBytes, quantTokenScaleAlignBytes, quantScaleNumAlignPerToken};
+}
+
 template <typename ActivationType>
 struct QuantProcessScratch {
     LocalTensor<bfloat16_t> xInTensor0;
@@ -35,34 +57,33 @@ struct QuantProcessScratch {
 };
 
 template <typename TopkWeightsType, typename ActivationType, bool TopkWeightsPrefetch>
-__aicore__ inline void LoadTopkWeightsToUb(const DispatchPrepareConfig &context, const Params &params,
-                                           const QuantProcessConfig &config,
+__aicore__ inline void LoadTopkWeightsToUb(const Params &params, const QuantProcessConfig &config,
                                            QuantProcessScratch<ActivationType> &scratch,
-                                           const LocalTensor<ActivationType> &xOutTensor,
-                                           int32_t tokenIndex, TEventID event)
+                                           const LocalTensor<ActivationType> &xOutTensor, int32_t tokenIndex,
+                                           TEventID event)
 {
     if constexpr (TopkWeightsPrefetch) {
-        uint32_t topK = context.common.topK;
         GlobalTensor<TopkWeightsType> weightGm;
         weightGm.SetGlobalBuffer(reinterpret_cast<__gm__ TopkWeightsType *>(
-            params.probsGmAddr + static_cast<uint64_t>(tokenIndex) * topK * sizeof(TopkWeightsType)));
+            params.probsGmAddr +
+            static_cast<uint64_t>(tokenIndex) * params.tilingData->topK * sizeof(TopkWeightsType)));
         uint32_t weightOffsetInUb = config.quantTokenAlignBytes + config.quantScaleAlignBytes;
         if constexpr (Std::IsSame<TopkWeightsType, bfloat16_t>::value) {
             LocalTensor<TopkWeightsType> weightBf16Tmp =
                 scratch.mxTempTensor.template ReinterpretCast<TopkWeightsType>();
             DataCopyPad(weightBf16Tmp, weightGm,
-                        {1U, static_cast<uint32_t>(topK * sizeof(TopkWeightsType)), 0U, 0U, 0U},
+                        {1U, static_cast<uint32_t>(params.tilingData->topK * sizeof(TopkWeightsType)), 0U, 0U, 0U},
                         {false, 0U, 0U, 0U});
             SetFlag<AscendC::HardEvent::MTE2_V>(event);
             WaitFlag<AscendC::HardEvent::MTE2_V>(event);
             LocalTensor<float> weightFp32Ub = xOutTensor[weightOffsetInUb].template ReinterpretCast<float>();
-            Cast(weightFp32Ub, weightBf16Tmp, AscendC::RoundMode::CAST_NONE, topK);
+            Cast(weightFp32Ub, weightBf16Tmp, AscendC::RoundMode::CAST_NONE, params.tilingData->topK);
             PipeBarrier<PIPE_V>();
         } else {
             LocalTensor<TopkWeightsType> weightUb =
                 xOutTensor[weightOffsetInUb].template ReinterpretCast<TopkWeightsType>();
             DataCopyPad(weightUb, weightGm,
-                        {1U, static_cast<uint32_t>(topK * sizeof(TopkWeightsType)), 0U, 0U, 0U},
+                        {1U, static_cast<uint32_t>(params.tilingData->topK * sizeof(TopkWeightsType)), 0U, 0U, 0U},
                         {false, 0U, 0U, 0U});
             SetFlag<AscendC::HardEvent::MTE2_V>(event);
             WaitFlag<AscendC::HardEvent::MTE2_V>(event);
@@ -73,19 +94,18 @@ __aicore__ inline void LoadTopkWeightsToUb(const DispatchPrepareConfig &context,
 // 原型：MegaMoe::QuantProcessInRank。量化一个逻辑 AIV 任务负责的本卡 token。
 template <int32_t QuantMode, typename QuantOutType, typename ActivationType, typename TopkWeightsType,
           bool TopkWeightsPrefetch>
-__aicore__ inline void QuantizeLocalTokens(const DispatchPrepareConfig &context, const Params &params,
-                                           const QuantProcessConfig &config,
+__aicore__ inline void QuantizeLocalTokens(const AivJobContext &job, const MoeStageCommonConfig &common,
+                                           const Params &params, const QuantProcessConfig &config,
                                            QuantProcessScratch<ActivationType> &scratch)
 {
     if constexpr (g_coreType == AIC) {
         return;
     }
-    const AivJobContext &job = context.job;
-    WorkRange tokenRange = TilingByJobContext(context.common.tokenNum, job.jobIndex, job.totalJobs, 1U);
+    WorkRange tokenRange = TilingByJobContext(common.tokenNum, job.jobIndex, job.totalJobs, 1U);
     if (tokenRange.count == 0U) {
         return;
     }
-    uint32_t hiddenDim = context.common.tokenHiddenDim;
+    uint32_t hiddenDim = common.tokenHiddenDim;
     GlobalTensor<bfloat16_t> srcGlobalTensor;
     GlobalTensor<uint8_t> dstGlobalTensor;
     srcGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(params.aGmAddr) +
@@ -109,16 +129,15 @@ __aicore__ inline void QuantizeLocalTokens(const DispatchPrepareConfig &context,
         WaitFlag<AscendC::HardEvent::MTE3_MTE2>(event);
         DataCopyPad(xInTensor, srcGlobalTensor[static_cast<uint64_t>(index) * hiddenDim], xCopyInParams,
                     xCopyInPadParams);
-        LoadTopkWeightsToUb<TopkWeightsType, ActivationType, TopkWeightsPrefetch>(
-            context, params, config, scratch, xOutTensor, tokenRange.start + index, event);
+        LoadTopkWeightsToUb<TopkWeightsType, ActivationType, TopkWeightsPrefetch>(params, config, scratch, xOutTensor,
+                                                                                  tokenRange.start + index, event);
         if constexpr (!TopkWeightsPrefetch) {
             SetFlag<AscendC::HardEvent::MTE2_V>(event);
             WaitFlag<AscendC::HardEvent::MTE2_V>(event);
         }
         __ubuf__ bfloat16_t *srcAddr = (__ubuf__ bfloat16_t *)xInTensor.GetPhyAddr();
         __ubuf__ int8_t *outDataAddr = (__ubuf__ int8_t *)xOutTensor.GetPhyAddr();
-        __ubuf__ uint16_t *mxScaleAddr =
-            (__ubuf__ uint16_t *)xOutTensor[config.quantTokenAlignBytes].GetPhyAddr();
+        __ubuf__ uint16_t *mxScaleAddr = (__ubuf__ uint16_t *)xOutTensor[config.quantTokenAlignBytes].GetPhyAddr();
 
         if constexpr (QuantMode == E2M1_QUANT) {
             Quant::ComputeMaxExp(srcAddr, maxExpAddr, hiddenDim);
@@ -127,9 +146,8 @@ __aicore__ inline void QuantizeLocalTokens(const DispatchPrepareConfig &context,
             Quant::ComputeFp4Data<bfloat16_t, QuantOutType, AscendC::RoundMode::CAST_TRUNC,
                                   AscendC::RoundMode::CAST_RINT>(srcAddr, halfScaleAddr, outDataAddr, hiddenDim);
         } else {
-            Mxfp8::ComputeFp8Token<bfloat16_t, QuantOutType>(
-                srcAddr, maxExpAddr, mxScaleAddr, halfScaleAddr, outDataAddr, hiddenDim,
-                config.quantScaleNumAlignPerToken);
+            Mxfp8::ComputeFp8Token<bfloat16_t, QuantOutType>(srcAddr, maxExpAddr, mxScaleAddr, halfScaleAddr,
+                                                             outDataAddr, hiddenDim, config.quantScaleNumAlignPerToken);
         }
         SetFlag<AscendC::HardEvent::V_MTE3>(event);
         WaitFlag<AscendC::HardEvent::V_MTE3>(event);

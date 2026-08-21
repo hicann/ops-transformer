@@ -218,43 +218,26 @@ void PrintWorkspaceInfo(const struct WorkspaceInfo *info, const char *nodeName)
 void PrintPeermemInfo(const MegaMoeTilingData *tilingData, const char *nodeName)
 {
     OP_LOGD(nodeName, "========== PeermemInfo ==========");
-    int64_t rankSyncInWorldSize = PEERMEM_DATA_OFFSET;
-    OP_LOGD(nodeName, "rankSyncInWorldSize: {%ld}\n", rankSyncInWorldSize);
-    int64_t sendTotalNum = static_cast<int64_t>(tilingData->numMaxTokensPerRank) * tilingData->topK;
-    int64_t compareCount =
-        ops::CeilAlign(sendTotalNum * (int64_t)sizeof(int32_t), (int64_t)ALIGN_256) / (int64_t)sizeof(int32_t);
-    int64_t maskAlignSize = ops::CeilAlign(compareCount / 8, (int64_t)ALIGN_32);
-    int64_t maskSlotSize = maskAlignSize + (int64_t)ALIGN_32; // mask + 32B count
-    int64_t maskRecvSize = ops::CeilAlign(
-        (int64_t)tilingData->moeExpertPerRank * tilingData->epWorldSize * maskSlotSize, (int64_t)ALIGN_512);
-    OP_LOGD(nodeName, "maskRecvSize: {%ld}\n", maskRecvSize);
-    uint32_t mxScaleNum = ops::CeilDiv(tilingData->h, static_cast<uint32_t>(ALIGN_32));
-    uint32_t dataBytes = ops::CeilAlign(tilingData->h, static_cast<uint32_t>(ALIGN_256)) * sizeof(int8_t);
-    uint32_t scaleAlignBytes =
-        ops::CeilAlign(mxScaleNum * static_cast<uint32_t>(sizeof(int8_t)), static_cast<uint32_t>(ALIGN_32));
-    uint32_t tokenBytes = dataBytes + scaleAlignBytes;
-    if (tilingData->topkWeightsPrefetch == 1) {
-        uint32_t weightBytes =
-            ops::CeilAlign(tilingData->topK * static_cast<uint32_t>(sizeof(float)), static_cast<uint32_t>(ALIGN_32));
-        tokenBytes += weightBytes;
-    }
+    // 各区尺寸取自 kernel 侧同一份布局公式（common/mega_moe_peermem.h）。
+    int64_t maskAlignSize = CalcDispatchMaskAlignSize(tilingData);
+    int64_t maskRecvSize = CalcMaskRecvSize(maskAlignSize, static_cast<int64_t>(tilingData->moeExpertPerRank),
+                                            static_cast<int64_t>(tilingData->epWorldSize));
+    int64_t tokenScaleBytes =
+        CalcQuantTokenScaleBytes(static_cast<int64_t>(tilingData->h), 1U, static_cast<int64_t>(tilingData->topK),
+                                 tilingData->topkWeightsPrefetch == 1);
     int64_t quantTokenScaleSize = ops::CeilAlign(
-        (int64_t)((int64_t)(tilingData->numMaxTokensPerRank) * tokenBytes * sizeof(int8_t)), (int64_t)ALIGN_512);
-    OP_LOGD(nodeName, "quantTokenScaleSize: {%ld}\n", quantTokenScaleSize);
-    // Non-quantized Combine stores one BF16 value (2 bytes) for each hidden-dimension element.
-    int64_t combineTokenBytes = static_cast<int64_t>(tilingData->h) * 2;
-    if (tilingData->combineQuantMode != COMBINE_NO_QUANT) {
-        int64_t tokenStorageBytes =
-            ops::CeilAlign(static_cast<int64_t>(tilingData->h), static_cast<int64_t>(ALIGN_256));
-        int64_t scaleCount =
-            ops::CeilDiv(static_cast<int64_t>(tilingData->h), static_cast<int64_t>(MXFP_SCALE_GROUP_NUM));
-        int64_t storedScaleBytes = ops::CeilAlign(scaleCount, static_cast<int64_t>(MXFP_MULTI_BASE_SIZE));
-        combineTokenBytes = ops::CeilAlign(tokenStorageBytes + storedScaleBytes, static_cast<int64_t>(ALIGN_32));
-    }
+        static_cast<int64_t>(tilingData->numMaxTokensPerRank) * tokenScaleBytes, static_cast<int64_t>(ALIGN_512));
+    // 非量化 combine 每个 hidden 元素存一个 BF16（2 字节）。
+    int64_t combineTokenBytes =
+        CalcCombineTokenBytes(static_cast<int64_t>(tilingData->h), 2, tilingData->combineQuantMode != COMBINE_NO_QUANT);
+    int64_t sendTotalNum = static_cast<int64_t>(tilingData->numMaxTokensPerRank) * tilingData->topK;
     int64_t combineSendSize = ops::CeilAlign(sendTotalNum * combineTokenBytes, static_cast<int64_t>(ALIGN_512));
+    OP_LOGD(nodeName, "rankSyncInWorldSize: {%ld}\n", PEERMEM_DATA_OFFSET);
+    OP_LOGD(nodeName, "maskRecvSize: {%ld}\n", maskRecvSize);
+    OP_LOGD(nodeName, "quantTokenScaleSize: {%ld}\n", quantTokenScaleSize);
     OP_LOGD(nodeName, "combineSendSize: {%ld}\n", combineSendSize);
     OP_LOGD(nodeName, "total PeermemInfo Size: {%ld}\n",
-            rankSyncInWorldSize + maskRecvSize + quantTokenScaleSize + combineSendSize);
+            PEERMEM_DATA_OFFSET + maskRecvSize + quantTokenScaleSize + combineSendSize);
 }
 
 static ge::DataType GetDataTypeByOpQuantMode(const int64_t opQuantMode)
@@ -509,37 +492,18 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, MegaM
                             .c_str()),
                     return ge::GRAPH_FAILED);
 
-    // maskRecv Size
-    int64_t compareCount =
-        ops::CeilAlign((int64_t)(numMaxTokensPerRank * topK * sizeof(int32_t)), (int64_t)(ALIGN_256)) /
-        (int64_t)sizeof(int32_t);
-    int64_t maskAlignSize = ops::CeilAlign(compareCount / 8, (int64_t)ALIGN_32); // 8 = block_32 / sizeof(int32_t)
-    int64_t maskSlotSize = maskAlignSize + ALIGN_32;                             // mask + 32B count
-    int64_t maskRecvSize = ops::CeilAlign(moeExpertPerRank * epWorldSize * maskSlotSize, ALIGN_512);
-    // quantTokenScale Size
-    uint32_t mxScaleNum = ops::CeilDiv(h, static_cast<int64_t>(ALIGN_32));
-    uint32_t dataBytes = ops::CeilAlign(h, static_cast<int64_t>(ALIGN_256)) * sizeof(int8_t);
-    uint32_t scaleAlignBytes =
-        ops::CeilAlign(mxScaleNum * static_cast<uint32_t>(sizeof(int8_t)), static_cast<uint32_t>(ALIGN_32));
-    uint32_t tokenBytes = dataBytes + scaleAlignBytes;
-    if (*attrs->GetAttrPointer<int64_t>((config.attrTopkWeightsTypeIndex)) == 1) {
-        uint32_t weightBytes =
-            ops::CeilAlign(static_cast<uint32_t>(topK * sizeof(float)), static_cast<uint32_t>(ALIGN_32));
-        tokenBytes = ops::CeilAlign(tokenBytes + weightBytes, static_cast<uint32_t>(ALIGN_32));
-    }
-    int64_t quantTokenScaleSize =
-        ops::CeilAlign((int64_t)(numMaxTokensPerRank * tokenBytes * sizeof(int8_t)), (int64_t)ALIGN_512);
-    // 必须与 kernel InitCombineBuffers 的 combine record 布局一致。
-    int64_t combineTokenBytes = h * yDtypeSize;
-    if (GetCombineQuantModeByAttr(context, config) != COMBINE_NO_QUANT) {
-        int64_t tokenStorageBytes = ops::CeilAlign(h, static_cast<int64_t>(ALIGN_256));
-        int64_t scaleCount = ops::CeilDiv(h, static_cast<int64_t>(MXFP_SCALE_GROUP_NUM));
-        int64_t storedScaleBytes = ops::CeilAlign(scaleCount, static_cast<int64_t>(MXFP_MULTI_BASE_SIZE));
-        combineTokenBytes = ops::CeilAlign(tokenStorageBytes + storedScaleBytes, static_cast<int64_t>(ALIGN_32));
-    }
-    int64_t combineSendSize =
-        ops::CeilAlign(numMaxTokensPerRank * topK * combineTokenBytes, static_cast<int64_t>(ALIGN_512));
-    int64_t leastCclBufferSize = PEERMEM_DATA_OFFSET + maskRecvSize + quantTokenScaleSize + combineSendSize;
+    // peermem 窗口尺寸与 kernel 侧布局同源（common/mega_moe_peermem.h），host / device 不再各写一份公式。
+    // 校验期尚未确定激活 dtype，elemsPerByte 取 1（保守上界，与既有校验口径一致）。
+    PeermemSizeParams peermemSizeParams{static_cast<int64_t>(numMaxTokensPerRank),
+                                        static_cast<int64_t>(topK),
+                                        static_cast<int64_t>(h),
+                                        static_cast<int64_t>(moeExpertPerRank),
+                                        static_cast<int64_t>(epWorldSize),
+                                        static_cast<int64_t>(yDtypeSize),
+                                        1U,
+                                        *attrs->GetAttrPointer<int64_t>((config.attrTopkWeightsTypeIndex)) == 1,
+                                        GetCombineQuantModeByAttr(context, config) != COMBINE_NO_QUANT};
+    int64_t leastCclBufferSize = CalcPeermemLeastSize(peermemSizeParams);
     auto cclBufferSizePtr = attrs->GetAttrPointer<int64_t>((config.attrCclBufferSizeIndex));
     int64_t cclBufferSize = static_cast<int64_t>(*cclBufferSizePtr);
     OP_TILING_CHECK(cclBufferSize < leastCclBufferSize,

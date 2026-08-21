@@ -12,16 +12,11 @@
 #define MEGA_MOE_SHARED_EXPERT_INPUT_H
 
 #include "../common/mega_moe_utils.h"
+#include "mega_moe_token_quant.h"
 
 namespace MegaMoeImpl {
 
 using namespace AscendC;
-
-struct SharedExpertPrepareConfig {
-    uint32_t quantTokenAlignBytes;
-    uint32_t quantScaleAlignBytes;
-    uint32_t quantTokenScaleAlignBytes;
-};
 
 template <typename ActivationType>
 struct SharedExpertPrepareScratch {
@@ -30,33 +25,31 @@ struct SharedExpertPrepareScratch {
 };
 
 // 拆分一个逻辑 AIV 任务上的共享专家 token data 和 scale。
+// 通信记录布局直接复用 token quant 的 QuantProcessConfig，不再维护单独的拷贝。
 template <typename ActivationType, typename QuantScaleType, uint32_t ActivationElementsPerByte>
-__aicore__ inline void PrepareSharedExpertInput(const DispatchPrepareConfig &context,
-                                                const Params &params,
-                                                const SharedExpertPrepareConfig &config,
+__aicore__ inline void PrepareSharedExpertInput(const AivJobContext &job, const MoeStageCommonConfig &common,
+                                                const Params &params, const QuantProcessConfig &config,
                                                 SharedExpertPrepareScratch<ActivationType> &scratch)
 {
     if constexpr (g_coreType == AIC) {
         return;
     }
-    const AivJobContext &job = context.job;
     if (job.totalJobs == 0U || job.jobIndex >= job.totalJobs) {
         return;
     }
 
-    WorkRange tokenRange = TilingByJobContext(context.common.tokenNum, job.jobIndex, job.totalJobs, 1U);
+    WorkRange tokenRange = TilingByJobContext(common.tokenNum, job.jobIndex, job.totalJobs, 1U);
 
-    int64_t tokenDataElementCount = context.common.tokenHiddenDim / ActivationElementsPerByte;
-    int64_t tokenScaleElementCount = Ops::Base::CeilDiv(static_cast<int64_t>(context.common.tokenHiddenDim),
-                                                        static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
-                                     MXFP_MULTI_BASE_SIZE;
+    int64_t tokenDataElementCount = common.tokenHiddenDim / ActivationElementsPerByte;
+    int64_t tokenScaleElementCount =
+        Ops::Base::CeilDiv(static_cast<int64_t>(common.tokenHiddenDim), static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
+        MXFP_MULTI_BASE_SIZE;
     uint32_t copyTokenScaleBytes = config.quantTokenAlignBytes + config.quantScaleAlignBytes;
 
     GlobalTensor<ActivationType> srcGlobalTensor;
     GlobalTensor<ActivationType> dataDstGlobalTensor;
     GlobalTensor<QuantScaleType> scaleDstGlobalTensor;
-    srcGlobalTensor.SetGlobalBuffer(
-        reinterpret_cast<__gm__ ActivationType *>(params.peermemInfo.quantTokenScalePtr));
+    srcGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ ActivationType *>(params.peermemInfo.quantTokenScalePtr));
     dataDstGlobalTensor.SetGlobalBuffer(
         reinterpret_cast<__gm__ ActivationType *>(params.workspaceInfo.sharedExpertInputDataPtr));
     scaleDstGlobalTensor.SetGlobalBuffer(
@@ -66,8 +59,7 @@ __aicore__ inline void PrepareSharedExpertInput(const DispatchPrepareConfig &con
     SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
     for (uint32_t index = 0; index < tokenRange.count; ++index) {
         uint32_t tokenIdx = tokenRange.start + index;
-        uint64_t srcOffset =
-            static_cast<uint64_t>(tokenIdx) * static_cast<uint64_t>(config.quantTokenScaleAlignBytes);
+        uint64_t srcOffset = static_cast<uint64_t>(tokenIdx) * static_cast<uint64_t>(config.quantTokenScaleAlignBytes);
         bool useFirstBuffer = index % DOUBLE_BUFFER == 0;
         auto event = useFirstBuffer ? EVENT_ID0 : EVENT_ID1;
         auto copyBuffer = useFirstBuffer ? scratch.copyBuffer0 : scratch.copyBuffer1;

@@ -333,6 +333,50 @@ __aicore__ inline uint32_t GetExpertTokenCountFromWorkspace(GM_ADDR expertTokenC
     return static_cast<uint32_t>(AscendC::ReadGmByPassDCache(expertTokenCountAddr));
 }
 
+// 轮询 GM 中的 int32 flag 直至等于期望值，并在两次读取之间加入短暂退避。
+__aicore__ inline void WaitUntilGmFlagEquals(__gm__ int32_t *flagAddr, int32_t expectedValue)
+{
+    constexpr int64_t pollBackoffCycles = 100;
+    while (AscendC::ReadGmByPassDCache(flagAddr) != expectedValue) {
+        int64_t startCycle = AscendC::GetSystemCycle();
+        while (AscendC::GetSystemCycle() - startCycle < pollBackoffCycles) {
+        }
+    }
+}
+
+// 轮询 GM 中的 int32 计数直至不小于目标值，并在两次读取之间加入短暂退避。
+__aicore__ inline void WaitUntilGmFlagAtLeast(__gm__ int32_t *flagAddr, int32_t targetValue)
+{
+    constexpr int64_t pollBackoffCycles = 100;
+    while (AscendC::ReadGmByPassDCache(flagAddr) < targetValue) {
+        int64_t startCycle = AscendC::GetSystemCycle();
+        while (AscendC::GetSystemCycle() - startCycle < pollBackoffCycles) {
+        }
+    }
+}
+
+// 全卡同步：各 AIV 按任务分工分摊 rank 握手，末尾执行本卡 AIV 同步。
+__aicore__ inline void CrossRankSyncInWorldSize(GM_ADDR rankSyncInWorldPtr, uint32_t rankId, uint32_t worldSize,
+                                                const AivJobContext &aivJob)
+{
+    if constexpr (g_coreType == AIC) {
+        return;
+    }
+    __gm__ int32_t *syncRank = reinterpret_cast<__gm__ int32_t *>(rankSyncInWorldPtr);
+    __gm__ int32_t *syncCount = reinterpret_cast<__gm__ int32_t *>(rankSyncInWorldPtr + 48U * 1024U +
+                                                                   static_cast<uint64_t>(aivJob.jobIndex) * 64U);
+    int32_t count = ReadGmByPassDCache(syncCount) + 1;
+    for (uint32_t rankIdx = aivJob.jobIndex; rankIdx < worldSize; rankIdx += aivJob.totalJobs) {
+        __gm__ int32_t *remoteSyncAddr =
+            reinterpret_cast<__gm__ int32_t *>(winRankAddr_[rankIdx]) + rankId * INT_CACHELINE;
+        WriteGmByPassDCache(remoteSyncAddr, count);
+        GmSignalWaitBarrier(syncRank + rankIdx * INT_CACHELINE, count);
+    }
+    WriteGmByPassDCache(syncCount, count);
+    PipeBarrier<PIPE_ALL>();
+    SyncAll<true>();
+}
+
 template <AscendC::HardEvent event, int32_t eventId>
 __aicore__ inline void SyncFuncStatic()
 {

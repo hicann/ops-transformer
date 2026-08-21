@@ -148,11 +148,6 @@ struct MoeSyncWorkspaceLayout {
     uint64_t combineSyncSlotCountPerExpert;
 };
 
-struct DispatchPrepareConfig {
-    AivJobContext job;
-    MoeStageCommonConfig common;
-};
-
 struct GroupSyncSlotLayout {
     uint32_t baseSlotCountPerGroup;
     uint32_t extraSlotGroupCount;
