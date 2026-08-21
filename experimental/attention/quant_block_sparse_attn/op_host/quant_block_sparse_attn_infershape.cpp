@@ -106,7 +106,7 @@ ge::graphStatus InferDataTypeQuantBlockSparseAttn(gert::InferDataTypeContext *co
     return ge::GRAPH_SUCCESS;
 }
 
-IMPL_OP(QuantBlockSparseAttn)
+IMPL_OP_INFERSHAPE(QuantBlockSparseAttn)
     .InferShape(InferShapeQuantBlockSparseAttn)
     .InferDataType(InferDataTypeQuantBlockSparseAttn);
 } // namespace ops

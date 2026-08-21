@@ -104,18 +104,29 @@ static bool ExecuteCase(QuantBlockSparseAttnTilingUtParam param, TilingInfo &til
                 value.stride_.SetStride(0U, value.stride_.GetStride(0U) + 1U);
             }
         }
-        if (param.provideFp8Metadata && param.metadata.dtype_ == ge::DT_UNDEFINED) {
-            metadata = DefaultMetadata;
-        } else if (!param.provideFp8Metadata) {
-            metadata = param.metadata;
-        }
     }
-
+    if (param.provideFp8Metadata && param.metadata.dtype_ == ge::DT_UNDEFINED) {
+        metadata = DefaultMetadata;
+    } else if (!param.provideFp8Metadata) {
+        metadata = param.metadata;
+    }
     std::vector<TensorDesc> inputTensorDesc({
-        NormalizeTd(param.query), key, value, NormalizeTd(param.qDescale), kDescale, NormalizeTd(param.vDescale),
-        NormalizeTd(param.pScale), NormalizeTd(param.cuSeqlensQ), NormalizeTd(param.cuSeqlensKv),
-        NormalizeTd(param.sequsedQ), NormalizeTd(param.sequsedKv), NormalizeTd(param.sparseIndices),
-        NormalizeTd(param.sparseSeqLen), NormalizeTd(param.blockTable), NormalizeTd(param.attenMask), metadata,
+        NormalizeTd(param.query),
+        key,
+        value,
+        NormalizeTd(param.qDescale),
+        kDescale,
+        NormalizeTd(param.vDescale),
+        NormalizeTd(param.pScale),
+        NormalizeTd(param.cuSeqlensQ),
+        NormalizeTd(param.cuSeqlensKv),
+        NormalizeTd(param.sequsedQ),
+        NormalizeTd(param.sequsedKv),
+        NormalizeTd(param.sparseIndices),
+        NormalizeTd(param.sparseSeqLen),
+        NormalizeTd(param.blockTable),
+        NormalizeTd(param.attenMask),
+        metadata,
     });
 
     std::vector<TensorDesc> outputTensorDesc({
