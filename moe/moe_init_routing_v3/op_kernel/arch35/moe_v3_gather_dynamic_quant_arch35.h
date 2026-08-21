@@ -203,7 +203,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::ComputeInt4SinglePas
         }
         MicroAPI::Abs(absReg, inReg, maskRegInLoop);
         MicroAPI::Max(scaleValueReg, scaleValueReg, absReg, maskRegAll);
-        MicroAPI::Reduce<ReduceType::MAX>(scaleValueReg, scaleValueReg, maskRegAll);
+        Reg::Reduce<Reg::ReduceType::MAX>(scaleValueReg, scaleValueReg, maskRegAll);
         MicroAPI::Duplicate(quantFactorReg, DYNAMIC_QUANT_INT4_SYM_SCALE, maskRegVL1);
         MicroAPI::Div(quantFactorReg, quantFactorReg, scaleValueReg, maskRegVL1);
         MicroAPI::Duplicate(zeroReg, 0.0f, maskRegVL1);
@@ -277,7 +277,7 @@ __aicore__ inline void MoeGatherOutDynamicQuant<T, QuantT>::ComputeMultiPass(Loc
             MicroAPI::Abs(inReg, inReg, maskRegInLoop);
             MicroAPI::Max(scaleValueReg, scaleValueReg, inReg, maskRegAll);
         }
-        MicroAPI::Reduce<ReduceType::MAX>(scaleValueReg, scaleValueReg, maskRegAll);
+        Reg::Reduce<Reg::ReduceType::MAX>(scaleValueReg, scaleValueReg, maskRegAll);
         if constexpr (!IsSameType<QuantT, int4b_t>::value) {
             MicroAPI::Muls(scaleValueReg, scaleValueReg, 1.0f / 127.0f, maskRegVL1);
         }
@@ -448,7 +448,7 @@ __aicore__ inline float MoeGatherOutDynamicQuant<T, QuantT>::ComputeMax(LocalTen
             MicroAPI::Abs(inReg, inReg, maskRegLoop);
             MicroAPI::Max(scaleReg, scaleReg, inReg, maskRegAll);
         }
-        MicroAPI::Reduce<ReduceType::MAX>(scaleReg, scaleReg, maskRegAll);
+        Reg::Reduce<Reg::ReduceType::MAX>(scaleReg, scaleReg, maskRegAll);
         MicroAPI::StoreAlign(scaleUbAddr + 8, scaleReg, maskRegVL2);
     }
 

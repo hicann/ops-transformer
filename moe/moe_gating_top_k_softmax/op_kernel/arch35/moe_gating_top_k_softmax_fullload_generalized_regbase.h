@@ -264,7 +264,7 @@ __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, ne
             }
             remain = expertCount_;
             mask = AscendC::MicroAPI::UpdateMask<int32_t>(remain);
-            AscendC::MicroAPI::Reduce<ReduceType::MAX>(reduceVreg, reduceMidRreg, mask);
+            Reg::Reduce<Reg::ReduceType::MAX>(reduceVreg, reduceMidRreg, mask);
             AscendC::MicroAPI::Duplicate(dupVreg, reduceVreg, mask);
             for (uint16_t j = 0; j < expertCountLoops; j++) {
                 offset = rowLoopsOffset + j * repeatCount;
@@ -341,7 +341,7 @@ __aicore__ inline void MoeGatingTopKSoftmaxFullloadGenerlized<T, hasFinished, ne
                 AscendC::MicroAPI::LoadAlign(valueAndIndexReg, softmaxTensorAddr + i * expertCountAlign_);
                 uint32_t expertCountForMask = uint32ExpertCount_;
                 maskForExpertCount = AscendC::MicroAPI::UpdateMask<uint32_t>(expertCountForMask);
-                AscendC::MicroAPI::Reduce<ReduceType::MAX>(valueAndIndexReg, valueAndIndexReg, maskForExpertCount);
+                Reg::Reduce<Reg::ReduceType::MAX>(valueAndIndexReg, valueAndIndexReg, maskForExpertCount);
                 StoreAlign(sortedTensorAddr + kvExpertCountAlign_ * i, valueAndIndexReg, maskForValueAndIndex);
             }
         }

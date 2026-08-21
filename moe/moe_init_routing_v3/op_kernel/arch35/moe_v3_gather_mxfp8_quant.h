@@ -89,7 +89,7 @@ __simd_vf__ inline void vfComputeAmax(__ubuf__ T *xAddr, __ubuf__ uint16_t *amax
         // 由于mask0和mask1相同或是比mask1多一个元素，使用mask0保证不漏元素
         Max(amax, abs0, abs1, mask0);
         // 再每32B（对于T来说就是每16个元素）取一个最大值，此时amax里放的是每2个元素的最大值，且末尾数据为0，因此用MaskALL
-        ReduceDataBlock<ReduceType::MAX>(amax, amax, maskAllB16);
+        Reg::ReduceDataBlock<Reg::ReduceType::MAX>(amax, amax, maskAllB16);
         // 非对齐搬出，每次写出numVRegBlocks个元素（ReduceMaxWithDataBlock后放在amax头部）
         StoreUnAlign<uint16_t, PostLiteral::POST_MODE_UPDATE>(amaxOutAddr, amax, uReg, numVRegBlocks);
     }

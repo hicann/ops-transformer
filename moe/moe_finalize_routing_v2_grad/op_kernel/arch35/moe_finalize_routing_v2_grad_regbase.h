@@ -65,7 +65,7 @@ __aicore__ inline void BinaryAddVF(__ubuf__ float *ubbinaryAddCache, __ubuf__ fl
         uint32_t sreg2 = binaryAddLastNum;
         MicroAPI::MaskReg pregLoop = MicroAPI::UpdateMask<float>(sreg2);
         LoadAlign(vregXSum, ((__ubuf__ float *)binaryAddTmpAddr));
-        Reduce<ReduceType::SUM>(vregXSum, vregXSum, pregLoop);
+        Reg::Reduce<Reg::ReduceType::SUM>(vregXSum, vregXSum, pregLoop);
         StoreAlign<float, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(ubbinaryAddCache + pos, vregXSum, pregMerge);
     }
 }
@@ -171,7 +171,7 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegbase<T1, T2, T3, IsBiasExist>:
             Mul(vregBiasQ, vregBiasQ, vregGradYQ, pregMain);
             Mul(vregBiasR, vregBiasR, vregGradYR, pregLoop);
             Add(vregBiasQ, vregBiasQ, vregBiasR, pregLoop);
-            Reduce<ReduceType::SUM>(vregSumBias, vregBiasQ, pregLoop);
+            Reg::Reduce<Reg::ReduceType::SUM>(vregSumBias, vregBiasQ, pregLoop);
             StoreAlign<float, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(ubAddSum + i, vregSumBias, pregMerge);
         }
         // step2: the tail (last 64 or less than 64) blocks reduce to 1.
@@ -187,7 +187,7 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegbase<T1, T2, T3, IsBiasExist>:
             Mul(vregBiasR, vregBiasR, vregGradYR, pregLoop);
             Add(tempBias, vregBiasQ, vregBiasR, pregLoop);
             Copy<float, MicroAPI::MaskMergeMode::MERGING>(vregBiasQ, tempBias, pregLoop);
-            Reduce<ReduceType::SUM>(vregSumBias, vregBiasQ, pregMain);
+            Reg::Reduce<Reg::ReduceType::SUM>(vregSumBias, vregBiasQ, pregMain);
             StoreAlign<float, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(ubAddSum + remainderGeneral, vregSumBias,
                                                                            pregMerge);
         }
@@ -196,7 +196,7 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegbase<T1, T2, T3, IsBiasExist>:
             ops::LoadOneTensorForDtypeT<T1>(ubBias, vregBias, pregMain, (i + remainderLoop) * VL_FLOAT32_SIZE);
             ops::LoadOneTensorForDtypeT<T1>(ubGradY, vregGradY, pregMain, (i + remainderLoop) * VL_FLOAT32_SIZE);
             Mul(vregBias, vregBias, vregGradY, pregMain);
-            Reduce<ReduceType::SUM>(vregSumBias, vregBias, pregMain);
+            Reg::Reduce<Reg::ReduceType::SUM>(vregSumBias, vregBias, pregMain);
             StoreAlign<float, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(ubAddSum + remainderLoop + i, vregSumBias,
                                                                            pregMerge);
         }

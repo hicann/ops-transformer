@@ -618,7 +618,7 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegBaseCutH<T1, T2, T3, IsBiasExi
         Add(sum1, x1, x3, pregAll);
         Add(sum2, x2, x4, pregAll);
         Add(sum12, sum1, sum2, pregAll);
-        Reduce<ReduceType::SUM>(vlSum, sum12, pregAll);
+        Reg::Reduce<Reg::ReduceType::SUM>(vlSum, sum12, pregAll);
         MicroAPI::MaskReg pregMerge = MicroAPI::CreateMask<float, MicroAPI::MaskPattern::VL1>();
         StoreAlign<float, MicroAPI::StoreDist::DIST_FIRST_ELEMENT_B32>(dst + idx, vlSum, pregMerge);
     }

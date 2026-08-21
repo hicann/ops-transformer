@@ -368,7 +368,7 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegbaseNotCutH<T1, T2, T3, IsBias
             Mul(gradYReg, expandedXReg, gradYReg, pregLoop);
             Mul(gradYTailReg, expandedXTailReg, gradYTailReg, pregLoopTail);
             Add(gradYReg, gradYReg, gradYTailReg, pregAll);
-            Reduce<ReduceType::SUM>(sumReg, gradYReg, pregAll);
+            Reg::Reduce<Reg::ReduceType::SUM>(sumReg, gradYReg, pregAll);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(binaryAddUb + i, sumReg, pregOne);
         }
         // 处理剩余循环
@@ -383,7 +383,7 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegbaseNotCutH<T1, T2, T3, IsBias
             }
             // 计算
             Mul(gradYReg, expandedXReg, gradYReg, pregLoop);
-            Reduce<ReduceType::SUM>(sumReg, gradYReg, pregLoop);
+            Reg::Reduce<Reg::ReduceType::SUM>(sumReg, gradYReg, pregLoop);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(binaryAddUb + i, sumReg, pregOne);
         }
         LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
@@ -437,7 +437,7 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegbaseNotCutH<T1, T2, T3, IsBias
             Mul(gradYReg, biasReg, gradYReg, pregLoop);
             Mul(gradYTailReg, biasTailReg, gradYTailReg, pregLoopTail);
             Add(gradYReg, gradYReg, gradYTailReg, pregAll);
-            Reduce<ReduceType::SUM>(sumReg, gradYReg, pregAll);
+            Reg::Reduce<Reg::ReduceType::SUM>(sumReg, gradYReg, pregAll);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(binaryAddUb + i, sumReg, pregOne);
         }
         // 处理剩余循环
@@ -448,7 +448,7 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegbaseNotCutH<T1, T2, T3, IsBias
             ops::LoadOneTensorForDtypeT<T1>(biasUb, biasReg, pregLoop, i * VL_FLOAT32_SIZE);
             // 计算
             Mul(gradYReg, biasReg, gradYReg, pregLoop);
-            Reduce<ReduceType::SUM>(sumReg, gradYReg, pregLoop);
+            Reg::Reduce<Reg::ReduceType::SUM>(sumReg, gradYReg, pregLoop);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(binaryAddUb + i, sumReg, pregOne);
         }
         LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
@@ -483,7 +483,7 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegbaseNotCutH<T1, T2, T3, IsBias
             }
             // 计算
             Mul(gradYReg, expandedXReg, gradYReg, pregLoop);
-            Reduce<ReduceType::SUM>(sumReg, gradYReg, pregLoop);
+            Reg::Reduce<Reg::ReduceType::SUM>(sumReg, gradYReg, pregLoop);
             ops::StoreOneTensorForDtypeT<T3>(gradScaleUb, sumReg, pregOne, 0);
         }
     }
@@ -508,7 +508,7 @@ MoeFinalizeRoutingV2GradRegbaseNotCutH<T1, T2, T3, IsBiasExist>::CalcGradScaleFo
         ops::LoadOneTensorForDtypeT<T1>(biasUb, biasReg, pregLoop, 0);
         // 计算
         Mul(gradYReg, biasReg, gradYReg, pregLoop);
-        Reduce<ReduceType::SUM>(sumReg, gradYReg, pregLoop);
+        Reg::Reduce<Reg::ReduceType::SUM>(sumReg, gradYReg, pregLoop);
         // 拷贝出结果
         ops::StoreOneTensorForDtypeT<T3>(gradScaleUb, sumReg, pregOne, 0);
     }
@@ -532,7 +532,7 @@ __aicore__ inline void MoeFinalizeRoutingV2GradRegbaseNotCutH<T1, T2, T3, IsBias
         LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     }
     ops::LoadOneTensorForDtypeT<float>(binaryAddTmpAddr, x1, pregLastLoop, 0);
-    Reduce<ReduceType::SUM>(x2, x1, pregLastLoop);
+    Reg::Reduce<Reg::ReduceType::SUM>(x2, x1, pregLastLoop);
     ops::StoreOneTensorForDtypeT<T3>(gradScaleUb, x2, pregOne, 0);
 }
 } // namespace MoeFinalizeRoutingV2Grad

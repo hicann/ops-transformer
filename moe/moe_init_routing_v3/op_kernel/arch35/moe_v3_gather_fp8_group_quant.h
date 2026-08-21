@@ -76,7 +76,7 @@ __simd_vf__ inline void VfComputeAmax(__ubuf__ T *xAddr, __ubuf__ float *amaxOut
             Abs(absLeftReg, xLeftReg, maskAll);
             Abs(absRightReg, xRightReg, maskAll);
             Max(absLeftReg, absLeftReg, absRightReg, maskAll);
-            Reduce<ReduceType::MAX>(maxReg, absLeftReg, maskAll);
+            Reg::Reduce<Reg::ReduceType::MAX>(maxReg, absLeftReg, maskAll);
             Duplicate(maxReg, maxReg, maskAll);
             if constexpr (CLAMP_AMAX) {
                 Maxs(maxReg, maxReg, 0.0001f, maskAll);
@@ -97,12 +97,12 @@ __simd_vf__ inline void VfComputeAmax(__ubuf__ T *xAddr, __ubuf__ float *amaxOut
                 Abs(absLeftReg, xLeftReg, maskAll);
                 Abs(absRightReg, xRightReg, maskRight);
                 Max<float, MaskMergeMode::MERGING>(absLeftReg, absLeftReg, absRightReg, maskRight);
-                Reduce<ReduceType::MAX>(maxReg, absLeftReg, maskAll);
+                Reg::Reduce<Reg::ReduceType::MAX>(maxReg, absLeftReg, maskAll);
             } else {
                 maskLoop = UpdateMask<float>(tailElemNum);
                 LoadFp8GroupInput<T>(xLeftReg, xAddr + groupOffset, maskLoop, 0);
                 Abs(absLeftReg, xLeftReg, maskLoop);
-                Reduce<ReduceType::MAX>(maxReg, absLeftReg, maskLoop);
+                Reg::Reduce<Reg::ReduceType::MAX>(maxReg, absLeftReg, maskLoop);
             }
             Duplicate(maxReg, maxReg, maskAll);
             if constexpr (CLAMP_AMAX) {

@@ -142,7 +142,7 @@ __aicore__ inline void MoeGatherOutHif8PertokenQuant<T>::Compute()
             MicroAPI::Abs(inReg, inReg, maskRegInLoop);
             MicroAPI::Max(scaleValueReg, scaleValueReg, inReg, maskRegAll); // 求当前块中x的最大值
         }
-        MicroAPI::Reduce<ReduceType::MAX>(scaleValueReg, scaleValueReg, maskRegAll); // 求所有块中的最大值
+        Reg::Reduce<Reg::ReduceType::MAX>(scaleValueReg, scaleValueReg, maskRegAll); // 求所有块中的最大值
         MicroAPI::Muls(scaleValueReg, scaleValueReg, 1.0f / HIFLOAT8_MAX_VALUE, maskRegVL1); // hifloat8最大值 计算scale
         MicroAPI::Duplicate(scaleValueReg, scaleValueReg, maskRegAll); // 将scalevalue按照最低位元素进行进行广播
         MicroAPI::StoreAlign(scaleUbAddr, scaleValueReg, maskRegVL8); // 将scale写回，按照块大小32字节对齐
@@ -235,7 +235,7 @@ __aicore__ inline float MoeGatherOutHif8PertokenQuant<T>::ComputeMax(LocalTensor
             MicroAPI::Abs(inReg, inReg, maskRegLoop);
             MicroAPI::Max(scaleReg, scaleReg, inReg, maskRegAll);
         }
-        MicroAPI::Reduce<ReduceType::MAX>(scaleReg, scaleReg, maskRegAll);
+        Reg::Reduce<Reg::ReduceType::MAX>(scaleReg, scaleReg, maskRegAll);
         MicroAPI::StoreAlign(scaleUbAddr + 8, scaleReg, maskRegVL2);
     }
 

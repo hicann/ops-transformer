@@ -75,7 +75,8 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
             Duplicate(maxReg0, static_cast<T>(0));
             And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg0, (RegTensor<uint16_t> &)vreg2, maskAll);
             Max<T>(maxReg0, maxReg0, vreg3, maskAll);
-            Reduce<ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0, maskAll);
+            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0,
+                                                        maskAll);
             Duplicate(maxReg0, maxReg0, maskAll);
             Cast<float, T, castTrait0>(scaleReg0, maxReg0, maskAll);
             Div<float, &mode>(scaleReg0, scaleReg0, fp8MaxReg, maskAll);
@@ -86,7 +87,8 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
             Duplicate(maxReg1, static_cast<T>(0));
             And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg1, (RegTensor<uint16_t> &)vreg2, maskAll);
             Max<T>(maxReg1, maxReg1, vreg3, maskAll);
-            Reduce<ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg1, (RegTensor<uint16_t> &)maxReg1, maskAll);
+            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg1, (RegTensor<uint16_t> &)maxReg1,
+                                                        maskAll);
             Duplicate(maxReg1, maxReg1, maskAll);
             Cast<float, T, castTrait0>(scaleReg1, maxReg1, maskAll);
             Div<float, &mode>(scaleReg1, scaleReg1, fp8MaxReg, maskAll);
@@ -130,7 +132,8 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
             Duplicate(maxReg0, static_cast<T>(0));
             And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg0, (RegTensor<uint16_t> &)vreg2, maskAll);
             Max<T>(maxReg0, maxReg0, vreg3, maskAll);
-            Reduce<ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0, maskAll);
+            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0,
+                                                        maskAll);
             Duplicate(maxReg0, maxReg0, maskAll);
             Cast<float, T, castTrait0>(scaleReg0, maxReg0, maskAll);
             Div<float, &mode>(scaleReg0, scaleReg0, fp8MaxReg, maskAll);
@@ -143,7 +146,8 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
             Duplicate(maxReg1, static_cast<T>(0));
             And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg1, (RegTensor<uint16_t> &)vreg2, preg0);
             Max<T, MaskMergeMode::MERGING>(maxReg1, maxReg1, vreg3, preg0);
-            Reduce<ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg1, (RegTensor<uint16_t> &)maxReg1, maskAll);
+            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg1, (RegTensor<uint16_t> &)maxReg1,
+                                                        maskAll);
             Duplicate(maxReg1, maxReg1, maskAll);
             Cast<float, T, castTrait0>(scaleReg1, maxReg1, maskAll);
             Div<float, &mode>(scaleReg1, scaleReg1, fp8MaxReg, maskAll);
@@ -191,7 +195,8 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
             LoadAlign(vreg0, xAddr + lastBlockOffset);
             And((RegTensor<uint16_t> &)vreg3, (RegTensor<uint16_t> &)vreg0, (RegTensor<uint16_t> &)vreg2, preg0);
             Max<T, MaskMergeMode::MERGING>(maxReg0, maxReg0, vreg3, preg0);
-            Reduce<ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0, maskAll);
+            Reg::Reduce<Reg::ReduceType::MAX, uint16_t>((RegTensor<uint16_t> &)maxReg0, (RegTensor<uint16_t> &)maxReg0,
+                                                        maskAll);
             Duplicate(maxReg0, maxReg0, maskAll);
             Cast<float, T, castTrait0>(scaleReg0, maxReg0, maskAll);
             Div<float, &mode>(scaleReg0, scaleReg0, fp8MaxReg, maskAll);

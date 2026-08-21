@@ -181,7 +181,7 @@ __aicore__ inline void MoeV3FullLoadDynamicQuant<T, QuantT>::ComputeInt4SinglePa
         }
         MicroAPI::Abs(absReg, inReg, maskRegInLoop);
         MicroAPI::Max(scaleValueReg, scaleValueReg, absReg, maskRegAll);
-        MicroAPI::Reduce<ReduceType::MAX>(scaleValueReg, scaleValueReg, maskRegAll);
+        Reg::Reduce<Reg::ReduceType::MAX>(scaleValueReg, scaleValueReg, maskRegAll);
         MicroAPI::Duplicate(quantFactorReg, DYNAMIC_QUANT_INT4_SYM_SCALE, maskRegVL1);
         MicroAPI::Div(quantFactorReg, quantFactorReg, scaleValueReg, maskRegVL1);
         MicroAPI::Duplicate(zeroReg, 0.0f, maskRegVL1);
@@ -256,7 +256,7 @@ __aicore__ inline void MoeV3FullLoadDynamicQuant<T, QuantT>::ComputeMultiPass(Lo
             MicroAPI::Abs(inReg, inReg, maskRegInLoop);
             MicroAPI::Max(scaleValueReg, scaleValueReg, inReg, maskRegAll);
         }
-        MicroAPI::Reduce<ReduceType::MAX>(scaleValueReg, scaleValueReg, maskRegAll);
+        Reg::Reduce<Reg::ReduceType::MAX>(scaleValueReg, scaleValueReg, maskRegAll);
         if constexpr (!IsSameType<QuantT, int4b_t>::value) {
             MicroAPI::Muls(scaleValueReg, scaleValueReg, 1.0f / 127.0f, maskRegVL1);
         }
