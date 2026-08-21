@@ -894,6 +894,7 @@
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：多机通信域要求交换机组网，不支持双机直连组网。
   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：多机通信域要求在一个超节点内，不支持双机直连组网和跨超节点组网。
   - <term>Ascend 950PR/Ascend 950DT</term>：仅支持UB Memory通信协议。
+  - <term>Ascend 950PR/Ascend 950DT</term>：Torch接口通过`get_symm_buffer_for_mega_moe`自动计算并申请通信buffer，用户无需自行计算或设置`cclBufferSize`。
 - **参数约束**：
   - **<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>**：
     - 场景配套矩阵：
@@ -905,42 +906,41 @@
       | A8W4-INT | BF16 | INT4(INT32) | INT4(INT32) | UINT64 | UINT64 | FP32 | FP32 | BF16 | 2 | 1（INT8） |
 
   - **<term>Ascend 950PR/Ascend 950DT</term>**：
-    - `activation`仅支持"swiglu"。
-    - `activation_params`仅支持[]或[clamp]。
-    - `BS`（`x`.dim0）支持[1, +∞)，实际上限受`cclBufferSize`约束。算子采用分批处理机制，BS不再受UB容量硬限制，dispatch阶段按固定粒度分批处理。
-    - `H`（`x`.dim1）支持1024、2048、3072、4096、5120、6144、7168、8192。
+    - `activation`支持"swiglu"、"swiglustep"、"swigluoai"和"situglu"，各激活的参数配套关系见参数说明。
+    - `BS`为本Rank本次调用的`x`.dim0，支持[1, +∞)，且不得超过创建`sym_buffer`时设置的`numMaxTokensPerRank`。不同Rank的实际`BS`可以不同，同一`sym_buffer`可以复用于多次不同`BS`的调用。
+    - `numMaxTokensPerRank`必须大于等于1且所有Rank配置一致，建议设置为`sym_buffer`复用期间所有Rank可能出现的最大单卡`BS`。设置越大，内部申请的通信内存越多。
+    - `H`（`x`.dim1）范围[1024, 8192]。普通MTE权重格式要求32对齐；FLOAT4_E2M1的FORMAT_FRACTAL_NZ_C0_32格式要求64对齐。
     - `topK`（`topkIds`.dim1）支持[1, 32]。
     - `expertPerRank` 范围 [1, 1024]。
-    - `hiddenDim`（`weight1`.dim1）仅支持1024、2048、3072、4096、7168。
+    - `intermediateHidden`表示SwiGLU激活后的中间特征维度，范围[256, 4096]且128对齐；`weight1`的完整输出宽度为2 × `intermediateHidden`。
     - `epWorldSize`范围 [2, 1024]。
     - `moeExpertNum`范围 [`epWorldSize`, 2048]，且`moeExpertNum` % `epWorldSize` == 0。
-    - `maxRecvTokenNum`范围 [0, `BS` × `epWorldSize` × min(`topK`, `localMoeExpertNum`)]。
+    - `maxRecvTokenNum`范围 [0, `numMaxTokensPerRank` × `epWorldSize` × min(`topK`, `localMoeExpertNum`)]，建议保持默认值0，由接口自动计算接收容量。
     - `dispatchQuantOutDtype`仅支持23（FLOAT8_E5M2）或24（FLOAT8_E4M3FN）或296（FLOAT4_E2M1）。
     - 当前版本仅支持MXFP量化模式（`dispatchQuantMode` = 4），dispatch阶段使用MX逐组量化（group size = 32），量化缩放因子类型为FLOAT8_E8M0。
     - `combineQuantMode`取值为0、3、4，0表示非量化，3表示MXFP float8_e5m2类型，4表示MXFP float8_e4m3类型
     - `commAlg`必须为空字符串""。
     - `y`的数据类型与`x`相同。
-    - `weight1`的dim1（`hiddenDim`）必须等于`weight2`的dim2的二倍，这是因为SwiGLU激活需要将中间维度从`hiddenDim`减半为`hiddenDim`/2。
+    - `weight1`的Linear1输出维必须等于2 × `intermediateHidden`，`weight2`的输入维必须等于`intermediateHidden`。
     - `localMoeExpertNum` = `moeExpertNum` / `epWorldSize`；`sharedExpertNumPerRank` = `sharedWeight1`.dim0（未启用共享专家时为0）；`expertPerRank` = `sharedExpertNumPerRank` + `localMoeExpertNum`。
     - `sharedExpertNumPerRank`范围 [0, 4]。
     - `topoType`由通信域上下文自动推导。0表示MTE拓扑，1表示URMA跨超拓扑。当前暂不支持URMA通信方式。
     - `topkWeightsType`取值为0或1，0表示关闭topkWeights前移，1表示开启。当前暂不支持URMA通信方式。
-    - `numMaxTokensPerRank`为0时自动计算；非0时必须等于`BS`。
-    - `cclBufferSize`需 >= 全卡软同步预留空间（固定60KB） + mask接收空间 + 量化token缩放因子空间 + combine发送空间。
     - `weightScales1`和`weightScales2`为必选输入，数据类型必须为FLOAT8_E8M0。
     - `weight1`和`weight2`的数据类型必须一致，且仅支持FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。
     - `topkWeights`数据类型仅支持BF16或FP32。
     - `xActiveMask`和`scales`当前版本不支持非空输入，需传入空指针。
 
   - **MXFP量化场景约束**：
-      - `weight1` shape为(`localMoeExpertNum`, `hiddenDim`, `H`)，`weight2` shape为(`localMoeExpertNum`, `H`, `hiddenDim`/2)。
-      - `weightScales1` shape为(`localMoeExpertNum`, `hiddenDim`, CeilDiv(`H`, 64), 2)。
-      - `weightScales2` shape为(`localMoeExpertNum`, `H`, CeilDiv(`hiddenDim`/2, 64), 2)。
-      - `sharedWeight1` shape为(`sharedExpertNumPerRank`, `hiddenDim`, `H`)，`sharedWeight2` shape为(`sharedExpertNumPerRank`, `H`, `hiddenDim`/2)。
-      - `sharedWeightScales1` shape为(`sharedExpertNumPerRank`, `hiddenDim`, CeilDiv(`H`, 64), 2)，`sharedWeightScales2` shape为(`sharedExpertNumPerRank`, `H`, CeilDiv(`hiddenDim`/2, 64), 2)。
+      - `weight1` shape为(`localMoeExpertNum`, 2 × `intermediateHidden`, `H`)，`weight2` shape为(`localMoeExpertNum`, `H`, `intermediateHidden`)。
+      - `weightScales1` shape为(`localMoeExpertNum`, 2 × `intermediateHidden`, CeilDiv(`H`, 64), 2)。
+      - `weightScales2` shape为(`localMoeExpertNum`, `H`, CeilDiv(`intermediateHidden`, 64), 2)。
+      - `sharedWeight1` shape为(`sharedExpertNumPerRank`, 2 × `intermediateHidden`, `H`)，`sharedWeight2` shape为(`sharedExpertNumPerRank`, `H`, `intermediateHidden`)。
+      - `sharedWeightScales1` shape为(`sharedExpertNumPerRank`, 2 × `intermediateHidden`, CeilDiv(`H`, 64), 2)，`sharedWeightScales2` shape为(`sharedExpertNumPerRank`, `H`, CeilDiv(`intermediateHidden`, 64), 2)。
       - `weightScales1`的dim3和`weightScales2`的dim3必须等于2。
       - A8W4-FP场景下，FLOAT4_E2M1类型的`weight1`必须使用FORMAT_FRACTAL_NZ_C0_32格式。
-      - MXFP场景下，`dispatchQuantOutDtype`=23时`weight1`和`weight2`必须为FLOAT8_E5M2，`dispatchQuantOutDtype`=24时必须为FLOAT8_E4M3FN，`dispatchQuantOutDtype`=296时必须为FLOAT4_E2M1。
+      - A8W8-FP场景下，`weight1`和`weight2`必须同为FLOAT8_E5M2或同为FLOAT8_E4M3FN。A8W4-FP和A4W4-FP场景下，两层权重均为FLOAT4_E2M1。
+      - 权重支持两种TensorList布局：逐专家布局由`localMoeExpertNum`个二维Tensor组成；堆叠布局仅包含一个三维Tensor，其dim0为`localMoeExpertNum`。两层权重及其scale必须采用同一种布局，共享专家输入也必须采用相同布局。
 
 ## 调用说明
 
