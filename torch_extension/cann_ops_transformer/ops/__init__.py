@@ -54,6 +54,7 @@ from .stem_oam_prep_varlen_q import stem_oam_prep_varlen_q
 from .causal_conv1d_fn import causal_conv1d_fn
 from .causal_conv1d_update import causal_conv1d_update
 from .stem_oam_prep_paged_kv import stem_oam_prep_paged_kv
+from .msa_index_score import msa_index_score
 from .und_gen_qkv_rms_norm_rope_cache import und_gen_qkv_rms_norm_rope_cache
 from .qkv_rms_norm_rope_cache_with_k_scale import (
     qkv_rms_norm_rope_cache_with_k_scale,

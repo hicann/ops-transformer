@@ -425,6 +425,22 @@ attention:
     options:
       - lightning_indexer
 
+  msa_index_score:
+    module: True
+    src:
+      - attention/msa_index_score
+    exclude:
+      - attention/msa_index_score/docs
+      - attention/msa_index_score/README.md
+    ut_cov_exclude:
+      - attention/msa_index_score/examples
+      - attention/msa_index_score/tests
+    test:
+      examples: True
+      ut: False
+    options:
+      - msa_index_score
+
   sparse_flash_attention:
     module: True
     src:
