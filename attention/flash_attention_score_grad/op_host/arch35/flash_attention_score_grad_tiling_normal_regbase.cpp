@@ -45,9 +45,62 @@ struct DeterBandScheduleParams {
     int64_t q = 0;
 };
 
+struct GQADenseScheduleResult {
+    int64_t baseRound = 0;
+    int64_t selectedRound = 0;
+    int64_t basePeriod = 0;
+    int64_t selectedPeriod = 0;
+};
+
 int64_t PositiveCeilDiv(int64_t dividend, int64_t divisor)
 {
     return dividend / divisor + static_cast<int64_t>(dividend % divisor != 0);
+}
+
+int64_t PositiveGcd(int64_t lhs, int64_t rhs)
+{
+    while (rhs > 0) {
+        const int64_t remainder = lhs % rhs;
+        lhs = rhs;
+        rhs = remainder;
+    }
+    return lhs;
+}
+
+GQADenseScheduleResult SelectGQADenseSchedule(int64_t k, int64_t m, int64_t n, int64_t b, int64_t g)
+{
+    GQADenseScheduleResult result;
+    if (k <= 0 || m <= 0 || n <= 0 || b <= 0 || g <= 1) {
+        return result;
+    }
+
+    k = std::min({k, b * g * m, b * n});
+    result.baseRound = std::max({PositiveCeilDiv(b * n * g, k), PositiveCeilDiv(n, m), g});
+    result.selectedRound = result.baseRound;
+    const int64_t batchHeadNum = b * g;
+    result.basePeriod = batchHeadNum / PositiveGcd(batchHeadNum, result.baseRound);
+    result.selectedPeriod = result.basePeriod;
+    if (result.baseRound % g == 0) {
+        return result;
+    }
+
+    const int64_t candidateRound = PositiveCeilDiv(result.baseRound, g) * g;
+    const int64_t candidatePeriod = batchHeadNum / PositiveGcd(batchHeadNum, candidateRound);
+    const int64_t totalId = b * n * g;
+    const int64_t candidateInvalid = k * candidateRound - totalId;
+    // Aligning R to g can shorten the batch/head traversal period. Only accept it when the extra
+    // rounds and invalid IDs are bounded and m has enough row offsets for the new period.
+    const bool roundCostOk = (candidateRound - result.baseRound) * GQA_DENSE_PERCENT_BASE <=
+                             result.baseRound * GQA_DENSE_MAX_ROUND_GROWTH_PERCENT;
+    const bool invalidCostOk =
+        candidateInvalid * GQA_DENSE_PERCENT_BASE <= k * candidateRound * GQA_DENSE_MAX_INVALID_PERCENT;
+    const bool localityBetter = candidatePeriod < result.basePeriod && candidatePeriod < k;
+    const bool rowOffsetEnough = PositiveCeilDiv(k, candidatePeriod) <= m;
+    if (roundCostOk && invalidCostOk && localityBetter && rowOffsetEnough) {
+        result.selectedRound = candidateRound;
+        result.selectedPeriod = candidatePeriod;
+    }
+    return result;
 }
 
 int64_t CalcCausalSingleBatchRound(int64_t k, int64_t causalSize)
@@ -1146,6 +1199,18 @@ void FlashAttentionScoreGradTilingNormalRegbase::CalcleDeterParam()
     } else if (fBaseParams.layoutType != INPUT_FORMAT_TND &&
                fBaseParams.deterSparseType == static_cast<uint32_t>(DeterSparseType::DETER_BAND)) {
         CalcleBandDeterParam(fBaseParams);
+    } else if (fBaseParams.layoutType != INPUT_FORMAT_TND &&
+               fBaseParams.deterSparseType == static_cast<uint32_t>(DeterSparseType::DETER_DENSE) &&
+               fBaseParams.g > 1) {
+        const GQADenseScheduleResult schedule =
+            SelectGQADenseSchedule(static_cast<int64_t>(fBaseParams.aicNum), fBaseParams.s1Outer, fBaseParams.s2Outer,
+                                   fBaseParams.b * fBaseParams.n2, fBaseParams.g);
+        fBaseParams.deterMaxRound = schedule.selectedRound * fBaseParams.s1Outer;
+        OP_LOGI(context_,
+                "Select deterministic GQA DENSE round, baseR=[%ld], selectedR=[%ld], period=[%ld->%ld], "
+                "maxRound=[%ld]",
+                schedule.baseRound, schedule.selectedRound, schedule.basePeriod, schedule.selectedPeriod,
+                fBaseParams.deterMaxRound);
     }
     if (needChangeSplitItemMode1 || needChangeSplitItemMode2) {
         fBaseParams.s1Outer = s1Outer;

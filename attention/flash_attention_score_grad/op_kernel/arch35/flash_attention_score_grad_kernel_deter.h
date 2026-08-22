@@ -461,8 +461,9 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelDeter<CubeBlockType, VecB
                 CalDenseIndex(k, this->constInfo.s1Outer, this->constInfo.s2Outer, b, j, r, coordinateInfo);
             }
         } else {
+            int64_t denseRound = this->tilingData->baseDeterParam.deterMaxRound / this->constInfo.s1Outer;
             CalGQADenseIndex(k, this->constInfo.s1Outer, this->constInfo.s2Outer, b, j, r,
-                             this->constInfo.commonConstInfo.gSize, coordinateInfo);
+                             this->constInfo.commonConstInfo.gSize, coordinateInfo, denseRound);
         }
     }
 
@@ -626,6 +627,9 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelDeter<CubeBlockType, VecB
         if constexpr (BaseClass::IS_N_EQUAL) {
             return Ceil<int64_t>(n * b, Min(k, m * b)) * m;
         } else {
+            if (this->tilingData->baseDeterParam.deterMaxRound > 0) {
+                return this->tilingData->baseDeterParam.deterMaxRound;
+            }
             return Max(Max(Ceil<int64_t>(b * n * this->constInfo.commonConstInfo.gSize,
                                          (Min(Min(k, b * this->constInfo.commonConstInfo.gSize * m), b * n))),
                            Ceil<int64_t>(n, m)),

@@ -239,11 +239,11 @@ __aicore__ inline void CalDenseSwizzleIndex(int64_t k, int64_t m, int64_t n, int
 }
 
 __aicore__ inline void CalGQADenseIndex(int64_t k, int64_t m, int64_t n, int64_t b, int64_t core_id, int64_t round_id,
-                                        int64_t g, CoordinateInfo &coordinate)
+                                        int64_t g, CoordinateInfo &coordinate, int64_t denseRound = 0)
 {
     coordinate.batchId = -1;
     k = Min(Min(k, b * g * m), b * n);
-    int64_t R = Max(Max(Ceil<int64_t>(b * n * g, k), Ceil<int64_t>(n, m)), g);
+    int64_t R = denseRound > 0 ? denseRound : Max(Max(Ceil<int64_t>(b * n * g, k), Ceil<int64_t>(n, m)), g);
     if (core_id < 1 || core_id > k || round_id < 1 || round_id > R * m) {
         return;
     }
