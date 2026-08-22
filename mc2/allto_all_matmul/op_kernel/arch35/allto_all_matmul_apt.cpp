@@ -13,7 +13,11 @@
  * \brief
  */
 #include <cstring>
-#include <kernel_operator.h>
+#if ASC_DEVKIT_MAJOR >= 9
+#include "basic_api/kernel_basic_intf.h"
+#else
+#include "kernel_operator.h"
+#endif
 #include <lib/matmul_intf.h>
 #include "common.h"
 #include "../allto_all_matmul_kernel_base.h"
@@ -131,8 +135,8 @@ __global__ __aicore__ void allto_all_matmul(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias
      ((ORIG_DTYPE_X2 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X2 == DT_FLOAT8_E5M2)))
     if constexpr (USING_APACE_IMPL) {
         GET_TILING_DATA_WITH_STRUCT(hcommAllToAllMatmulTilingData, tilingData, tilingGM);
-        Apace::AllToAllMxQuantMatmulHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_X1,
-                                              hcommAllToAllMatmulTilingData, hcclServerType, false>
+        Apace::AllToAllMxQuantMatmulHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_X1, hcommAllToAllMatmulTilingData,
+                                              hcclServerType, false>
             op(&tilingData);
         op.Init(x1, x2, bias, y, all2all_out, x1_scale, x2_scale, workspaceGM);
         op.Run();
@@ -147,8 +151,8 @@ __global__ __aicore__ void allto_all_matmul(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias
 #elif ((ORIG_DTYPE_X1 == DT_FLOAT4_E2M1) && (ORIG_DTYPE_X2 == DT_FLOAT4_E2M1))
     if constexpr (USING_APACE_IMPL) {
         GET_TILING_DATA_WITH_STRUCT(hcommAllToAllMatmulTilingData, tilingData, tilingGM);
-        Apace::AllToAllMxQuantMatmulHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_X1,
-                                              hcommAllToAllMatmulTilingData, hcclServerType, true>
+        Apace::AllToAllMxQuantMatmulHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, DTYPE_X1, hcommAllToAllMatmulTilingData,
+                                              hcclServerType, true>
             op(&tilingData);
         op.Init(x1, x2, bias, y, all2all_out, x1_scale, x2_scale, workspaceGM);
         op.Run();
