@@ -262,11 +262,118 @@ def generate_sfa_inputs(
     )
 
 
+def generate_sfa_inputs_aclnn_v2(
+    query,
+    key,
+    value,
+    sparseIndices,
+    blockTable=None,
+    actualSeqLengthsQuery=None,
+    actualSeqLengthsKv=None,
+    queryRope=None,
+    keyRope=None,
+    sinks=None,
+    scaleValue=None,
+    sparseBlockSizeOptional=None,
+    layoutQueryOptional=None,
+    layoutKvOptional=None,
+    sparseMode=None,
+    preTokens=None,
+    nextTokens=None,
+    attentionMode=None,
+    returnSoftmaxLse=False,
+    attentionOut=None,
+    softmaxMax=None,
+    softmaxSum=None,  # 输出
+    testcase_name=None,
+    input_ranges=None,
+    **kwargs,
+):
+    # 10 个输入 tensor → 9 个 others → 3 个输出 tensor。
+    return INPUT_ADAPTER.generate(
+        query,
+        key,
+        value,
+        sparseIndices,
+        scaleValue,
+        block_table=blockTable,
+        actual_seq_lengths_query=actualSeqLengthsQuery,
+        actual_seq_lengths_kv=actualSeqLengthsKv,
+        query_rope=queryRope,
+        key_rope=keyRope,
+        sinks=sinks,
+        sparse_block_size=sparseBlockSizeOptional,
+        layout_query=layoutQueryOptional,
+        layout_kv=layoutKvOptional,
+        sparse_mode=sparseMode,
+        attention_mode=attentionMode,
+        return_softmax_lse=returnSoftmaxLse,
+        testcase_name=testcase_name,
+        input_ranges=input_ranges,
+        **kwargs,
+    )
+
+
+def generate_sfa_inputs_aclnn(
+    query,
+    key,
+    value,
+    sparseIndices,
+    blockTable=None,
+    actualSeqLengthsQuery=None,
+    actualSeqLengthsKv=None,
+    queryRope=None,
+    keyRope=None,
+    scaleValue=None,
+    sparseBlockSizeOptional=None,
+    layoutQueryOptional=None,
+    layoutKvOptional=None,
+    sparseMode=None,
+    preTokens=None,
+    nextTokens=None,
+    attentionMode=None,
+    returnSoftmaxLse=False,
+    attentionOut=None,
+    softmaxMax=None,
+    softmaxSum=None,
+    testcase_name=None,
+    input_ranges=None,
+    **kwargs,
+):
+    # V1（aclnnSparseFlashAttention）无 sinks：9 个输入 tensor → 9 个 others → 3 个输出 tensor。
+    return INPUT_ADAPTER.generate(
+        query,
+        key,
+        value,
+        sparseIndices,
+        scaleValue,
+        block_table=blockTable,
+        actual_seq_lengths_query=actualSeqLengthsQuery,
+        actual_seq_lengths_kv=actualSeqLengthsKv,
+        query_rope=queryRope,
+        key_rope=keyRope,
+        sinks=None,
+        sparse_block_size=sparseBlockSizeOptional,
+        layout_query=layoutQueryOptional,
+        layout_kv=layoutKvOptional,
+        sparse_mode=sparseMode,
+        attention_mode=attentionMode,
+        return_softmax_lse=returnSoftmaxLse,
+        testcase_name=testcase_name,
+        input_ranges=input_ranges,
+        **kwargs,
+    )
+
+
 INPUT_ADAPTER = SparseFlashAttentionInputAdapter()
 
 
 __input__ = {
     "e2e": {
         "torch_npu.npu_sparse_flash_attention": "generate_sfa_inputs",
-    }
+    },
+    "aclnn": {
+        "aclnnSparseFlashAttention": "generate_sfa_inputs_aclnn",
+        "aclnnSparseFlashAttentionV2": "generate_sfa_inputs_aclnn_v2",
+    },
 }

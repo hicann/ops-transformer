@@ -58,6 +58,24 @@ class SparseFlashAttentionSpec:
     compare = staticmethod(compare_module.compare)
 
 
+class SparseFlashAttentionAclnnV2Spec:
+    """ACLNN 直调版 spec：golden / input 使用 aclnn C 签名顺序的 wrapper。
+    golden 与 e2e 共用同一份 pytest CPU 参考实现（按 testcase_name 从 CASE_DATA 取回），
+    仅参数布局不同：tensors 在前、9 个 camelCase others 在后，且包含输出 tensors。
+    """
+
+    golden = golden_module.cpu_sparse_flash_attention_aclnn
+    customize_inputs = inputs_module.generate_sfa_inputs_aclnn_v2
+    tolerance = SparseFlashAttentionSpec.tolerance
+    compare = staticmethod(compare_module.compare)
+
+
+class SparseFlashAttentionAclnnSpec(SparseFlashAttentionAclnnV2Spec):
+    customize_inputs = inputs_module.generate_sfa_inputs_aclnn
+
+
 __spec__ = {
     "torch_npu.npu_sparse_flash_attention": "SparseFlashAttentionSpec",
+    "aclnnSparseFlashAttention": "SparseFlashAttentionAclnnSpec",
+    "aclnnSparseFlashAttentionV2": "SparseFlashAttentionAclnnV2Spec",
 }
