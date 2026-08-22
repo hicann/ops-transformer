@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--   Copyright (c) 2025 Huawei Technologies Co., Ltd.
+       This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+       CANN Open Software License Agreement Version 2.0 (the "License").
+       Please refer to the License for details. You may not use this file except in compliance with the License.
+       THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+       INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+       See LICENSE in the root of the software repository for the full text of the License.
+-->
+
 <config name="ops_transformer" copy_type="delivery" src_path="lib/" dst_path="ops_transformer" install_type="all" install_mod="550" install_own="$username:$usergroup">
     <package_info>
         <product_name>cann</product_name>
@@ -25,7 +34,7 @@
         <file value="version.info"/>
     </file_info>
     <file_info value="ops_es_packages_lib" copy_type="delivery" src_path="" dst_path="$(TARGET_ENV)/lib64" install_path="$(TARGET_ENV)/lib64" install_mod="550">
-        <file value="libes_transformer.so" file_type="shared"/>
+        <file value="libes_transformer.so" file_type="shared" optional="true"/>
     </file_info>
     <file_info copy_type="source" src_path="" dst_path="$(TARGET_ENV)/include/es" install_path="$(TARGET_ENV)/include/es" install_type="all">
         <file value="es_transformer" install_mod="550" entity="true"/>

@@ -335,8 +335,7 @@ install_es_whl_package() {
  	  chmod -R "${CUSTOM_PERM}" "${_pythonlocalpath}"/es_transformer 2> /dev/null
  	  chmod -R "${CUSTOM_PERM}" "${_pythonlocalpath}"/es_transformer-*.dist-info 2> /dev/null
  	else
- 	  logandprint "[ERROR]: ERR_NO:0x0080;ERR_DES:install ${_package_name} failed, can not find the matched package for this platform."
- 	  exit 1
+ 	  logandprint "[WARNING]: install ${_package_name} skipped, whl package not found for this platform."
  	fi
 }
 
