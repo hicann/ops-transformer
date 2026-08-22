@@ -116,7 +116,7 @@ aclnnStatus aclnnDistributeBarrierBase(void *workspace, uint64_t workspaceSize, 
     }
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
     if (is950) {
-        OP_LOGD("aclnn_disrtibute_barrier_extend inner start");
+        OP_LOGD("aclnn_distribute_barrier_extend inner start");
         return aclnnInnerDistributeBarrierExtend(workspace, workspaceSize, executor, stream);
     }
 #endif

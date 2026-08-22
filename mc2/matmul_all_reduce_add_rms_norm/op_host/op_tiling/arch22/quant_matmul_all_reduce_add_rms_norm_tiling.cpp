@@ -27,17 +27,13 @@ QuantMMNTilingTransferHelper::QuantMMNTilingTransferHelper(
     : QuantMatmulAllReduceTiling(quantMatmulAllReduceAddRmsNormTiling.context_,
                                  &quantMatmulAllReduceAddRmsNormTiling.mrnCtxInfo_.mmrCtxInfo, &data),
       tilingProcesser_(quantMatmulAllReduceAddRmsNormTiling)
-{
-}
+{}
 ge::graphStatus QuantMMNTilingTransferHelper::GetShapeAttrsInfo()
 {
     return MatmulAllReduceTilingBase::AnalyzeShapeAttr();
 }
 
-bool QuantMatmulAllReduceAddRmsNormTiling::HasTail() const
-{
-    return hasTail_;
-}
+bool QuantMatmulAllReduceAddRmsNormTiling::HasTail() const { return hasTail_; }
 ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::CheckMRNInput(const MRNCtxInfo &mrnCtxInfo)
 {
     // dequantScale数据类型为bf16时, residual为bf16;其他时,residual为fp16
@@ -110,18 +106,9 @@ ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::GetShapeAttrsInfo()
     MC2_CHECK_NOTNULL_RET(context_->GetNodeName(), helper_);
     return helper_->GetShapeAttrsInfo();
 }
-ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::GetPlatformInfo()
-{
-    return helper_->GetPlatformInfo();
-}
-ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::DoLibApiTiling()
-{
-    return helper_->DoLibApiTiling();
-}
-bool QuantMatmulAllReduceAddRmsNormTiling::IsCapable()
-{
-    return helper_->IsCapable();
-}
+ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::GetPlatformInfo() { return helper_->GetPlatformInfo(); }
+ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::DoLibApiTiling() { return helper_->DoLibApiTiling(); }
+bool QuantMatmulAllReduceAddRmsNormTiling::IsCapable() { return helper_->IsCapable(); }
 QuantMatmulAllReduceAddRmsNormTiling::QuantMatmulAllReduceAddRmsNormTiling(gert::TilingContext *context)
     : TilingBaseClass(context)
 {
@@ -142,7 +129,7 @@ ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::GetWorkspaceSize()
     MC2_CHECK_TRUE_RET(context_->GetNodeName(), tilingOutAddRmsNormTile_.workSpaceSize >= SYS_WORKSPACE_SIZE);
     const auto arn_workspace = tilingOutAddRmsNormTile_.workSpaceSize - SYS_WORKSPACE_SIZE;
     const auto my_workspace = mc2_workspace + arn_workspace;
-    OP_LOGI(helper_->opName_, " Workspace %lu with detail: mc2: %lu arn：%u", my_workspace, mc2_workspace,
+    OP_LOGI(helper_->opName_, " Workspace %lu with detail: mc2: %lu arn: %u", my_workspace, mc2_workspace,
             arn_workspace);
     size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
     workspaces[0] = my_workspace;
@@ -187,7 +174,7 @@ uint64_t QuantMatmulAllReduceAddRmsNormTiling::GetTilingKey() const
 {
     const auto mc2_key = helper_->GetTilingKey();
     const auto my_key = mc2_key; // use mc2 key as mrn key
-    OP_LOGI(helper_->opName_, " tilingKey %lu with detail: mc2_key: %lu arn_key tile：%u arn_key tail: %u", my_key,
+    OP_LOGI(helper_->opName_, " tilingKey %lu with detail: mc2_key: %lu arn_key tile: %u arn_key tail: %u", my_key,
             mc2_key, tilingOutAddRmsNormTile_.tilingKey, tilingOutAddRmsNormTail_.tilingKey);
     return my_key;
 }

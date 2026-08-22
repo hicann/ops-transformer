@@ -221,7 +221,7 @@ static ge::graphStatus InferDataTypeMoeDistributeDispatch(gert::InferDataTypeCon
     OPS_CHECK_NULL_WITH_CONTEXT(context, quantMode);
     const auto scalesType = context->GetOptionalInputDataType(DISPATCH_INPUT_SCALES_IDX_INDEX);
     bool quantFlag = (scalesType != ge::DT_UNDEFINED) ? true : false;
-    OP_LOGD(context->GetNodeName(), "quantFlag id %d.", quantFlag);
+    OP_LOGD(context->GetNodeName(), "quantFlag is %d.", quantFlag);
     if (quantFlag || (*quantMode != 0)) {
         context->SetOutputDataType(DISPATCH_OUTPUT_EXPAND_X_INDEX, ge::DT_INT8);
     } else {

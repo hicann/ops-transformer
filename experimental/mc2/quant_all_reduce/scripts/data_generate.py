@@ -108,7 +108,7 @@ class QuantAllReduceGoldenGenerator:
         # 校验数据类型并裁剪范围
         if dtype not in self.DTYPE_RANGE:
             clip_low, clip_high = low, high
-            logging.info(f"未找到{dtype}的预设范围，使用输入范围：{drange}")
+            logging.info(f"no preset range for {dtype}, using input range: {drange}")
         else:
             dtype_low, dtype_high = self.DTYPE_RANGE[dtype]
             clip_low = max(low, dtype_low)
@@ -154,7 +154,7 @@ class QuantAllReduceGoldenGenerator:
         # 转换为torch float32张量（对齐参考代码的x.to(torch.float32)）
         input_tensor = torch.from_numpy(input_np).to(torch.float32).cpu()
         # 仅主rank打印日志
-        logging.info(f"{data_name}数据生成完成！保存路径：{self.output_path}")
+        logging.info(f"{data_name} data generated, path: {self.output_path}")
         return input_tensor
 
     def cpu_dequant(
@@ -184,7 +184,7 @@ class QuantAllReduceGoldenGenerator:
         # 保存为bin文件
         save_file = os.path.join(save_path, file_name)
         save_np.tofile(save_file)
-        logging.info(f"Rank {self.rank}: 结果已保存至 {save_file}")
+        logging.info(f"Rank {self.rank}: results saved to {save_file}")
 
     def get_cpu(self) -> torch.Tensor:
         """
@@ -234,11 +234,11 @@ class QuantAllReduceGoldenGenerator:
         # 4. 执行核心CPU计算逻辑
         output_cpu = self.get_cpu()
         logging.info(f"output_cpu.shape: {output_cpu.shape}")
-        logging.info(f"所有Golden数据生成完成! 保存目录: {self.output_path}")
+        logging.info(f"all golden data generated, save dir: {self.output_path}")
         # 6. 销毁分布式环境（仅主rank执行）
         if self.rank == 0:
             dist.destroy_process_group()
-            logging.info("CPU分布式环境已销毁")
+            logging.info("CPU distributed env destroyed")
         return output_cpu
 
     def _calc_scale_len(self) -> int:
@@ -274,7 +274,7 @@ class QuantAllReduceGoldenGenerator:
                 init_method=f"tcp://{MASTER_ADDR}:{MASTER_PORT}",
             )
         logging.info(
-            f"Rank {self.rank}: 分布式环境初始化完成（总进程数：{self.ranksize}）"
+            f"Rank {self.rank}: distributed env initialized (total processes: {self.ranksize})"
         )
 
 
@@ -307,7 +307,7 @@ def run_worker(rank: int, args: argparse.Namespace):
         generator = QuantAllReduceGoldenGenerator(rank, args)
         generator.run()
     except Exception as e:
-        logging.error(f"Rank {rank}: 执行失败！错误：{e}")
+        logging.error(f"Rank {rank}: execution failed, error: {e}")
         raise
 
 
@@ -333,7 +333,7 @@ if __name__ == "__main__":
         if p.exitcode != 0:
             raise RuntimeError(f"进程 {p.pid} 执行失败，退出码：{p.exitcode}")
     # 5. 最终提示
-    logging.info("\n===== 所有进程执行完成 =====")
+    logging.info("\n===== all processes completed =====")
     logging.info(
-        f"Golden数据保存目录：./golden/quantallreduce_{args.case_name}_{args.bs}_{args.hidden_size}"
+        f"golden data save directory: ./golden/quantallreduce_{args.case_name}_{args.bs}_{args.hidden_size}"
     )

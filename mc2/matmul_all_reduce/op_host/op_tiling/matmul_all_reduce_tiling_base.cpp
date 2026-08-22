@@ -210,7 +210,7 @@ uint8_t MatmulAllReduceTilingBase::CalcBufferTypeByWindowSize()
             std::string envStr(getenv(HCCL_BUFFSIZE));
             defaultWindowSize = std::stoi(envStr);
         } catch (...) {
-            OP_LOGE(opName_, "Unknown Exception encountered when parser env HCCL_BUFFERSIZE.");
+            OP_LOGE(opName_, "Unknown Exception encountered when parsing env HCCL_BUFFSIZE.");
         }
     }
     // 1024 * 1024表示1M
@@ -470,10 +470,7 @@ ge::graphStatus MatmulAllReduceTilingBase::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MatmulAllReduceTilingBase::DoLibApiTiling()
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus MatmulAllReduceTilingBase::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
 
 ge::graphStatus MatmulAllReduceTilingBase::GetWorkspaceSize()
 {
@@ -669,12 +666,12 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckInputBias() const
                         return ge::GRAPH_FAILED);
         int64_t biasNValue = mmrCtxInfo_.bias_shape->GetStorageShape().GetDim(0);
         int64_t nValue = static_cast<int64_t>(GetNValue());
-        OP_TILING_CHECK(biasNValue != nValue,
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                            context_->GetNodeName(), "bias",
-                            Ops::Base::ToString(mmrCtxInfo_.bias_shape->GetStorageShape()).c_str(),
-                            "The n dimension of bias must be the same as that of output"),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            biasNValue != nValue,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context_->GetNodeName(), "bias", Ops::Base::ToString(mmrCtxInfo_.bias_shape->GetStorageShape()).c_str(),
+                "The n dimension of bias must be the same as that of output"),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -690,13 +687,13 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckInput()
         DTYPE_SUPPORT_LIST_Y = {ge::DataType::DT_FLOAT16, ge::DataType::DT_BF16};
     }
 
-    OP_TILING_CHECK(std::find(DTYPE_SUPPORT_LIST_Y.begin(), DTYPE_SUPPORT_LIST_Y.end(),
-                              static_cast<ge::DataType>(mmrCtxInfo_.y->GetDataType())) == DTYPE_SUPPORT_LIST_Y.end(),
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                        context_->GetNodeName(), "y",
-                        std::to_string(static_cast<int32_t>(mmrCtxInfo_.y->GetDataType())).c_str(),
-                        "The dtype of y must be fp16, bf16 or float"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        std::find(DTYPE_SUPPORT_LIST_Y.begin(), DTYPE_SUPPORT_LIST_Y.end(),
+                  static_cast<ge::DataType>(mmrCtxInfo_.y->GetDataType())) == DTYPE_SUPPORT_LIST_Y.end(),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            context_->GetNodeName(), "y", std::to_string(static_cast<int32_t>(mmrCtxInfo_.y->GetDataType())).c_str(),
+            "The dtype of y must be fp16, bf16 or float"),
+        return ge::GRAPH_FAILED);
 
     // x1 shape 为2-3维
     size_t x1DimNum = mmrCtxInfo_.x1_shape->GetStorageShape().GetDimNum();
@@ -750,11 +747,11 @@ bool MatmulAllReduceTilingBase::CheckBiasShape(const uint64_t nValue) const
         OP_TILING_CHECK(isPerBlock_, OP_LOGE_WITH_INVALID_INPUT(opName_, "bias"), return false);
         const auto biasShapeSize = static_cast<size_t>(bias->GetStorageShape().GetShapeSize());
         uint64_t dimNum = bias->GetStorageShape().GetDimNum();
-        OP_TILING_CHECK((dimNum != 1U) || (biasShapeSize != nValue),
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "bias",
-                                                              Ops::Base::ToString(bias->GetStorageShape()).c_str(),
-                                                              "The shape of bias must be [n] or [1, n]"),
-                        return false);
+        OP_TILING_CHECK(
+            (dimNum != 1U) || (biasShapeSize != nValue),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "bias", Ops::Base::ToString(bias->GetStorageShape()).c_str(),
+                                                  "The shape of bias must be [n] or [1, n]"),
+            return false);
     } else {
         OP_LOGD(context_->GetNodeName(), "No Bias.");
     }
@@ -799,9 +796,9 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckA8W8()
 ge::graphStatus MatmulAllReduceTilingBase::CheckEmptyTensor()
 {
     // n为0的时候，框架拦截，走不进tiling逻辑。
-    OP_TILING_CHECK((mmrCtxInfo_.bias_shape != nullptr) &&
-                        (mmrCtxInfo_.bias_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "bias"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (mmrCtxInfo_.bias_shape != nullptr) && (mmrCtxInfo_.bias_shape->GetStorageShape().GetShapeSize() == 0),
+        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "bias"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK((mmrCtxInfo_.x3_shape != nullptr) && (mmrCtxInfo_.x3_shape->GetStorageShape().GetShapeSize() == 0),
                     OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "x3"), return ge::GRAPH_FAILED);
     // 校验过input中的batch，M，N和out中的必须相等，所以这里只校验out是否是空tensor
@@ -813,9 +810,9 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckEmptyTensor()
 
 ge::graphStatus MatmulAllReduceTilingBase::CheckQuantEmptyTensor()
 {
-    OP_TILING_CHECK((mmrCtxInfo_.bias_shape != nullptr) &&
-                        (mmrCtxInfo_.bias_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "bias"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (mmrCtxInfo_.bias_shape != nullptr) && (mmrCtxInfo_.bias_shape->GetStorageShape().GetShapeSize() == 0),
+        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "bias"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK((mmrCtxInfo_.x3_shape != nullptr) && (mmrCtxInfo_.x3_shape->GetStorageShape().GetShapeSize() == 0),
                     OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "x3"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK((mmrCtxInfo_.dequant_scale_shape != nullptr) &&
@@ -841,9 +838,9 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckWeightQuantEmptyTensor()
 {
     OP_TILING_CHECK((mmrCtxInfo_.x3_shape != nullptr) && (mmrCtxInfo_.x3_shape->GetStorageShape().GetShapeSize() == 0),
                     OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "x3"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((mmrCtxInfo_.bias_shape != nullptr) &&
-                        (mmrCtxInfo_.bias_shape->GetStorageShape().GetShapeSize() == 0),
-                    OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "bias"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (mmrCtxInfo_.bias_shape != nullptr) && (mmrCtxInfo_.bias_shape->GetStorageShape().GetShapeSize() == 0),
+        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "bias"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK((mmrCtxInfo_.antiquant_scale_shape != nullptr) &&
                         (mmrCtxInfo_.antiquant_scale_shape->GetStorageShape().GetShapeSize() == 0),
                     OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "antiquantScale"), return ge::GRAPH_FAILED);
@@ -1028,11 +1025,11 @@ bool MatmulAllReduceTilingBase::AnalyzeInputs()
 
     size_t yDimNum = mmrCtxInfo_.y_shape->GetStorageShape().GetDimNum();
     OP_LOGD(context_->GetNodeName(), "Dim of output is %lu.", yDimNum);
-    OP_TILING_CHECK((yDimNum < DIM_NUM_TWO || yDimNum > DIM_NUM_THREE),
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "y",
-                                                             (std::to_string(yDimNum) + "D").c_str(),
-                                                             "The shape dim of y must be 2 or 3"),
-                    return false);
+    OP_TILING_CHECK(
+        (yDimNum < DIM_NUM_TWO || yDimNum > DIM_NUM_THREE),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "y", (std::to_string(yDimNum) + "D").c_str(),
+                                                 "The shape dim of y must be 2 or 3"),
+        return false);
     return SetArgs(aType, bType, cType, biasType, isBias);
 }
 
@@ -1120,10 +1117,7 @@ bool MatmulAllReduceTilingBase::CalL2TilePara(L2TilePara &tileL2, uint64_t mValu
     return false;
 }
 
-bool MatmulAllReduceTilingBase::HasAntiQuantOffset() const
-{
-    return mmrCtxInfo_.antiquant_offset != nullptr;
-}
+bool MatmulAllReduceTilingBase::HasAntiQuantOffset() const { return mmrCtxInfo_.antiquant_offset != nullptr; }
 void MatmulAllReduceTilingBase::GetScaleMNAndKIdx(const gert::StorageShape *scaleShape, bool isPertoken,
                                                   uint64_t scaleDimNum, uint64_t &MN, uint64_t &K) const
 {
@@ -1176,17 +1170,17 @@ bool MatmulAllReduceTilingBase::CheckMXScenarioScaleShape(const uint64_t dimZero
                         "The shape of scale must be [dimZeroValue, ceil(k,64), 2]"),
                     return false);
     if (isMXfp4) {
-        OP_TILING_CHECK((Ops::Base::CeilDiv(kValue, MX_GROUP_SIZE_K) % 2) != 0,
-                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, scaleName.c_str(),
-                                                              ("k=" + std::to_string(kValue)).c_str(),
-                                                              "The value of k of scale ceildivided by 32 must be even"),
-                        return false);
+        OP_TILING_CHECK(
+            (Ops::Base::CeilDiv(kValue, MX_GROUP_SIZE_K) % 2) != 0,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, scaleName.c_str(), ("k=" + std::to_string(kValue)).c_str(),
+                                                  "The value of k of scale ceildivided by 32 must be even"),
+            return false);
     }
-    OP_TILING_CHECK(kOverMaxGroupsize != Ops::Base::CeilDiv(kValue, MX_GROUP_SIZE),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, scaleName.c_str(),
-                                                          std::to_string(kOverMaxGroupsize).c_str(),
-                                                          "The K dimension of scale must match ceil(k, 64)"),
-                    return false);
+    OP_TILING_CHECK(
+        kOverMaxGroupsize != Ops::Base::CeilDiv(kValue, MX_GROUP_SIZE),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, scaleName.c_str(), std::to_string(kOverMaxGroupsize).c_str(),
+                                              "The K dimension of scale must match ceil(k, 64)"),
+        return false);
     return true;
 }
 

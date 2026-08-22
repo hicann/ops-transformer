@@ -19,7 +19,6 @@
 #include "common/op_host/op_tiling/debug_tiling.h"
 #include "platform/platform_infos_def.h"
 
-
 namespace {
 
 constexpr size_t LAST_SECOND_DIM_INDEX = 2;
@@ -85,9 +84,10 @@ const std::map<ge::DataType, std::vector<BasicQuantMode>> X1_QUANT_MODE_MAP = {
 };
 
 Mc2QuantBatchMatmulV3TilingBase::Mc2QuantBatchMatmulV3TilingBase(gert::TilingContext *context, bool isTilingOut)
-    : TilingBaseClass(context), inputParams_(*(g_quantBatchMatmulInfoFactory.Get())), isTilingOut_(isTilingOut)
-{
-}
+    : TilingBaseClass(context),
+      inputParams_(*(g_quantBatchMatmulInfoFactory.Get())),
+      isTilingOut_(isTilingOut)
+{}
 
 ge::graphStatus Mc2QuantBatchMatmulV3TilingBase::GetShapeAttrsInfo()
 {
@@ -263,7 +263,7 @@ int8_t Mc2QuantBatchMatmulV3TilingBase::CheckFusionBatchA(const gert::Shape &x1S
         if (IsMicroScaling()) {
             return 0;
         }
-        OP_LOGD("Mc2QuantBatchMatmulV3", "CheckFusionBatchA success, start fusion batch A to m dimendion.");
+        OP_LOGD("Mc2QuantBatchMatmulV3", "CheckFusionBatchA success, start fusion batch A to m dimension.");
         return OUTPUT_INFER_SUCCESS;
     }
     return 0;
@@ -286,16 +286,16 @@ void Mc2QuantBatchMatmulV3TilingBase::DoBatchFusion(uint64_t fusedDimValue)
 
 bool Mc2QuantBatchMatmulV3TilingBase::CheckShapeInRangeForMandtoryInputs(size_t x1ShapeLen, size_t x2ShapeLen) const
 {
-    OP_TILING_CHECK(x1ShapeLen < MIN_DIM_NUM_ND || x2ShapeLen < MIN_DIM_NUM_ND,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "x1 and x2",
-                                                          std::to_string(x1ShapeLen).c_str(),
-                                                          "The value of x1 and x2 dimension must be greater than 1."),
-                    return false);
-    OP_TILING_CHECK(x1ShapeLen > MAX_DIM_NUM_ND || x2ShapeLen > MAX_DIM_NUM_ND,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "x1 and x2",
-                                                          std::to_string(x1ShapeLen).c_str(),
-                                                          "The value of x1 and x2 dimension must be less than 7."),
-                    return false);
+    OP_TILING_CHECK(
+        x1ShapeLen < MIN_DIM_NUM_ND || x2ShapeLen < MIN_DIM_NUM_ND,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "x1 and x2", std::to_string(x1ShapeLen).c_str(),
+                                              "The value of x1 and x2 dimension must be greater than 1."),
+        return false);
+    OP_TILING_CHECK(
+        x1ShapeLen > MAX_DIM_NUM_ND || x2ShapeLen > MAX_DIM_NUM_ND,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "x1 and x2", std::to_string(x1ShapeLen).c_str(),
+                                              "The value of x1 and x2 dimension must be less than 7."),
+        return false);
 
     if (inputParams_.aDtype == ge::DT_INT4 && !inputParams_.isPertoken) {
         OP_TILING_CHECK(x2ShapeLen != A4W4_X2_LEN,
@@ -307,10 +307,7 @@ bool Mc2QuantBatchMatmulV3TilingBase::CheckShapeInRangeForMandtoryInputs(size_t 
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3TilingBase::IsMicroScaling() const
-{
-    return inputParams_.scaleDtype == ge::DT_FLOAT8_E8M0;
-}
+bool Mc2QuantBatchMatmulV3TilingBase::IsMicroScaling() const { return inputParams_.scaleDtype == ge::DT_FLOAT8_E8M0; }
 
 std::string Mc2QuantBatchMatmulV3TilingBase::QuantModeToString(BasicQuantMode quantMode) const
 {
@@ -401,8 +398,8 @@ bool Mc2QuantBatchMatmulV3TilingBase::SetX1QuantMode(BasicQuantMode &x1QuantMode
     return true;
 }
 
-std::string
-Mc2QuantBatchMatmulV3TilingBase::QuantModeMapToString(const std::vector<BasicQuantMode> &quantModeList) const
+std::string Mc2QuantBatchMatmulV3TilingBase::QuantModeMapToString(
+    const std::vector<BasicQuantMode> &quantModeList) const
 {
     std::stringstream ss;
     ss << "[";
@@ -438,12 +435,12 @@ bool Mc2QuantBatchMatmulV3TilingBase::SetQuantMode(const gert::Shape &scaleShape
     inputParams_.isPertoken = x1QuantMode == BasicQuantMode::PERTOKEN_MODE;
     inputParams_.isMxPerGroup = x1QuantMode == BasicQuantMode::MX_PERGROUP_MODE && x1QuantMode == x2QuantMode;
     inputParams_.isPerBlock = x1QuantMode == BasicQuantMode::PERBLOCK_MODE;
-    OP_TILING_CHECK(!(inputParams_.isPerChannel || inputParams_.isDoubleScale || inputParams_.isPerTensor ||
-                      inputParams_.isPertoken || inputParams_.isMxPerGroup || inputParams_.isPerBlock),
-                    OP_LOGE(inputParams_.opName,
-                            "Unexpected quantification, quantification of x1: %s, quantification of x2: %s",
-                            QuantModeToString(x1QuantMode).c_str(), QuantModeToString(x2QuantMode).c_str()),
-                    return false);
+    OP_TILING_CHECK(
+        !(inputParams_.isPerChannel || inputParams_.isDoubleScale || inputParams_.isPerTensor ||
+          inputParams_.isPertoken || inputParams_.isMxPerGroup || inputParams_.isPerBlock),
+        OP_LOGE(inputParams_.opName, "Unexpected quantification, quantification of x1: %s, quantification of x2: %s",
+                QuantModeToString(x1QuantMode).c_str(), QuantModeToString(x2QuantMode).c_str()),
+        return false);
     return true;
 }
 
@@ -500,11 +497,11 @@ bool Mc2QuantBatchMatmulV3TilingBase::AnalyzeInputs()
                     return false);
     uint64_t fusedDimValue = inputParams_.mSize * inputParams_.batchA;
     int8_t resultCheckFusionBatchA = CheckFusionBatchA(x1Shape, x2Shape, biasShape->GetStorageShape(), fusedDimValue);
-    OP_TILING_CHECK(resultCheckFusionBatchA == OUTPUT_INFER_FAIL,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "M",
-                                                          std::to_string(fusedDimValue).c_str(),
-                                                          "The fused M must not exceed INT32_MAX in a4w4 case."),
-                    return false);
+    OP_TILING_CHECK(
+        resultCheckFusionBatchA == OUTPUT_INFER_FAIL,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "M", std::to_string(fusedDimValue).c_str(),
+                                              "The fused M must not exceed INT32_MAX in a4w4 case."),
+        return false);
     if (resultCheckFusionBatchA == OUTPUT_INFER_SUCCESS) {
         DoBatchFusion(fusedDimValue);
     }
@@ -558,11 +555,11 @@ bool Mc2QuantBatchMatmulV3TilingBase::ReCalcGroupSize(uint64_t &groupSize, uint6
             inputName = "x2";
             scaleName = "scale";
         }
-        OP_TILING_CHECK(scaleSize == 0ULL,
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(inputParams_.opName, "input",
-                                                              std::to_string(scaleSize).c_str(),
-                                                              "The shape dimension of input cannot be 0."),
-                        return false);
+        OP_TILING_CHECK(
+            scaleSize == 0ULL,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(inputParams_.opName, "input", std::to_string(scaleSize).c_str(),
+                                                  "The shape dimension of input cannot be 0."),
+            return false);
         OP_TILING_CHECK(inputSize % scaleSize != 0ULL,
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "input", dimensionName,
                                                               "The group_size in the dimension cannot be inferred."),
@@ -670,10 +667,7 @@ void Mc2QuantBatchMatmulV3TilingBase::SetTransAttr(Mc2QuantBatchMatmulV3Trans &t
     }
 }
 
-bool Mc2QuantBatchMatmulV3TilingBase::IsCapable()
-{
-    return true;
-}
+bool Mc2QuantBatchMatmulV3TilingBase::IsCapable() { return true; }
 
 void Mc2QuantBatchMatmulV3TilingBase::InitCompileInfo()
 {
@@ -728,10 +722,7 @@ bool Mc2QuantBatchMatmulV3TilingBase::SetPlatformInfoForTiling()
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3TilingBase::GetUbDequantExtreSpace()
-{
-    return false;
-}
+bool Mc2QuantBatchMatmulV3TilingBase::GetUbDequantExtreSpace() { return false; }
 
 bool Mc2QuantBatchMatmulV3TilingBase::CheckShape(const std::vector<gert::Shape *> &mandtoryShape,
                                                  const gert::StorageShape *biasShape,
@@ -745,20 +736,11 @@ bool Mc2QuantBatchMatmulV3TilingBase::CheckShape(const std::vector<gert::Shape *
     return false;
 }
 
-bool Mc2QuantBatchMatmulV3TilingBase::CheckDtype() const
-{
-    return false;
-}
+bool Mc2QuantBatchMatmulV3TilingBase::CheckDtype() const { return false; }
 
-ge::graphStatus Mc2QuantBatchMatmulV3TilingBase::CalcUbTiling()
-{
-    return ge::GRAPH_FAILED;
-}
+ge::graphStatus Mc2QuantBatchMatmulV3TilingBase::CalcUbTiling() { return ge::GRAPH_FAILED; }
 
-uint64_t Mc2QuantBatchMatmulInfo::GetMatmulApiMSize() const
-{
-    return mSizePerNpu > 0U ? mSizePerNpu : mSize;
-}
+uint64_t Mc2QuantBatchMatmulInfo::GetMatmulApiMSize() const { return mSizePerNpu > 0U ? mSizePerNpu : mSize; }
 
 uint64_t Mc2QuantBatchMatmulInfo::GetTotalMatmulApiMSize(uint64_t baseM) const
 {

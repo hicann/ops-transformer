@@ -467,7 +467,6 @@ extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, 
 extern "C" void NnopbaseSetUserHandle(void *executor, void *handle);
 extern "C" void *NnopbaseGetUserHandle(void *executor);
 
-
 // 两段式接口
 aclnnStatus aclnnQuantMatmulAlltoAllBaseGetWorkspaceSize(
     const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, const aclTensor *x1Scale,
@@ -537,7 +536,7 @@ aclnnStatus aclnnQuantMatmulAlltoAllBaseGetWorkspaceSize(
         x1, transX2, biasOptional, x1Scale, x2Scale, commScaleOptional, x1OffsetOptional, x2OffsetOptional, str_group,
         worldSize, alltoAllAxesOptional, enumYDtype, x1QuantMode, x2QuantMode, commQuantMode, commQuantDtype,
         transposeX1, transposeX2, groupSize, str_commMode, out, workspaceSize, executor);
-    OP_LOGD("QuantMatmulAlltoAll, aclnnnInnerGetWorkspaceSize ret %d.", ret);
+    OP_LOGD("QuantMatmulAlltoAll, aclnnInnerGetWorkspaceSize ret %d.", ret);
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE_LIBOPAPI_REPORT(
             "aclnnQuantMatmulAlltoAllBaseGetWorkspaceSize",

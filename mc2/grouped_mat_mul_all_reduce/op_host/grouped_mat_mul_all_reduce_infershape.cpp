@@ -56,7 +56,7 @@ static graphStatus CheckDims(const gert::InferShapeContext *context, const gert:
         result = GRAPH_FAILED;
     } else if (splitItem != 0 && dimNumX != 2) { // 2 is minDimNumX
         VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(),
-                                            "When splitItem = 0, only x with dim 2 is supported.");
+                                            "When splitItem != 0, only x with dim 2 is supported.");
         result = GRAPH_FAILED;
     }
     if (dimNumWeight != 2) { // 2 is required dimNumWeight
@@ -201,10 +201,10 @@ static graphStatus InferMAxisShape(gert::InferShapeContext *context)
                       return GRAPH_FAILED);
             idx++;
         }
-        OPS_CHECK(UpdateShapeYGMMAllReduce(context, INDEX_OUT_Y, xShape->GetDim(0), w0Shape->GetDim(1)) !=
-                      GRAPH_SUCCESS,
-                  VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "Failed to update shape of y."),
-                  return GRAPH_FAILED);
+        OPS_CHECK(
+            UpdateShapeYGMMAllReduce(context, INDEX_OUT_Y, xShape->GetDim(0), w0Shape->GetDim(1)) != GRAPH_SUCCESS,
+            VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "Failed to update shape of y."),
+            return GRAPH_FAILED);
     }
     return GRAPH_SUCCESS;
 }

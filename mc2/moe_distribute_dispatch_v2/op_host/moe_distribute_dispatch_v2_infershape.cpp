@@ -387,7 +387,7 @@ static ge::graphStatus InferDataTypeMoeDistributeDispatchV2(gert::InferDataTypeC
         yDtypePtr = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_Y_DTYPE_INDEX);
     }
     bool quantFlag = (scalesType != ge::DT_UNDEFINED) ? true : false;
-    OP_LOGD(context->GetNodeName(), "quantFlag id %d.", quantFlag);
+    OP_LOGD(context->GetNodeName(), "quantFlag is %d.", quantFlag);
     ge::DataType expandXDtype = ge::DT_INT8;
     const bool isNoQuant = static_cast<QuantMode>(*quantMode) == QuantMode::QUANT_MODE_NO_QUANT;
     // A2 packed INT4 is exposed as INT32. Its required per-token scale is

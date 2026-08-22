@@ -123,10 +123,10 @@ class QuantAllReduceAccuracyChecker:
                 if not file_exists:
                     writer.writerow(header)
                 writer.writerow(data_row)
-            logging.info(f"结果已成功写入CSV文件: {csv_path}")
+            logging.info(f"results written to CSV file: {csv_path}")
             return True
         except Exception as e:
-            logging.error(f"写入CSV文件失败: {str(e)}")
+            logging.error(f"failed to write CSV file: {str(e)}")
             return False
 
     def calculate_metrics(
@@ -169,9 +169,9 @@ class QuantAllReduceAccuracyChecker:
         :return: 是否所有Rank都通过校验
         """
         logging.info("=" * 50)
-        logging.info("开始进行精度对比")
+        logging.info("start accuracy comparison")
         logging.info(
-            f"校验用例：{self.case_name} | 输出类型：{self.output_type} | Rank数: {self.ranksize}"
+            f"case: {self.case_name} | output type: {self.output_type} | rank count: {self.ranksize}"
         )
         logging.info("=" * 50)
         # 逐Rank对比NPU数据
@@ -180,7 +180,7 @@ class QuantAllReduceAccuracyChecker:
             mae=0.0, max_ae=0.0, mse=0.0, rmse=0.0, cos_sim=0.0
         )
         for rank in range(self.ranksize):
-            logging.info(f"\n---------- 对比 Rank-{rank} NPU 数据 ----------")
+            logging.info(f"\n---------- compare Rank-{rank} NPU data ----------")
             # 加载数据
             npu_data, load_success = self._load_data(rank, "npu")
             if not load_success:
@@ -193,7 +193,7 @@ class QuantAllReduceAccuracyChecker:
             # 校验数据长度
             if len(cpu_data) != len(npu_data):
                 logging.error(
-                    f"Rank-{rank} 数据长度不匹配 | CPU: {len(cpu_data)} | NPU: {len(npu_data)}"
+                    f"Rank-{rank} data length mismatch | CPU: {len(cpu_data)} | NPU: {len(npu_data)}"
                 )
                 all_pass = False
                 continue
@@ -202,8 +202,10 @@ class QuantAllReduceAccuracyChecker:
             # 记录最后一个有效Rank的指标（用于写入CSV）
             final_metrics = metrics
             # 打印精度指标
-            logging.info(f"Rank-{rank} 精度指标：")
-            logging.info(f"  MAE: {metrics.mae:.6f} (阈值：{self.type_info['mae']})")
+            logging.info(f"Rank-{rank} accuracy metrics:")
+            logging.info(
+                f"  MAE: {metrics.mae:.6f} (threshold: {self.type_info['mae']})"
+            )
             logging.info(f"  MaxAE: {metrics.max_ae:.6f}")
             logging.info(f"  MSE: {metrics.mse:.6f}")
             logging.info(f"  RMSE: {metrics.rmse:.6f}")
@@ -215,16 +217,20 @@ class QuantAllReduceAccuracyChecker:
                 metrics.cos_sim > self.type_info["cos"]
             )
             if rank_pass:
-                logging.info(f"[PASS] Rank-{rank} 精度对比通过！")
+                logging.info(f"[PASS] Rank-{rank} accuracy check passed")
             else:
-                logging.error(f"[FAIL] Rank-{rank} 精度对比失败！")
+                logging.error(f"[FAIL] Rank-{rank} accuracy check failed")
                 all_pass = False
         # 输出最终结果
         logging.info("\n" + "=" * 50)
         if all_pass:
-            logging.info(f"[PASS] 所有Rank (类型: {self.output_type}) 精度对比通过！")
+            logging.info(
+                f"[PASS] all ranks (type: {self.output_type}) accuracy check passed"
+            )
         else:
-            logging.error(f"[FAIL] 部分Rank (类型: {self.output_type}) 精度对比失败！")
+            logging.error(
+                f"[FAIL] some ranks (type: {self.output_type}) accuracy check failed"
+            )
         logging.info("=" * 50)
         # 写入CSV文件（传递封装后的指标对象）
         self.write_to_result_csv(final_metrics, all_pass)
@@ -239,15 +245,15 @@ class QuantAllReduceAccuracyChecker:
         file = os.path.join(self.golden_dir, f"output_{name}_{rank}.bin")
         # 1. 检查文件是否存在
         if not os.path.exists(file):
-            logging.error(f"Rank-{rank} {name}数据文件不存在: {file}")
+            logging.error(f"Rank-{rank} {name} data file not found: {file}")
             return None, False
         # 2. 加载NPU数据（带异常处理）
         try:
             data = np.fromfile(file, dtype=self.target_dtype)
-            logging.info(f"Rank-{rank} {name}数据加载成功 | 长度：{len(data)}")
+            logging.info(f"Rank-{rank} {name} data loaded | length: {len(data)}")
             return data, True
         except Exception as e:
-            logging.error(f"加载Rank-{rank} {name}数据失败: {e}")
+            logging.error(f"failed to load Rank-{rank} {name} data: {e}")
             return None, False
 
     def _get_utc8_timestamp(self) -> datetime:
@@ -283,5 +289,5 @@ if __name__ == "__main__":
         # 退出码：0=通过，1=失败
         exit(0 if result else 1)
     except Exception as e:
-        logging.error(f"程序执行失败：{e}")
+        logging.error(f"program execution failed: {e}")
         exit(1)

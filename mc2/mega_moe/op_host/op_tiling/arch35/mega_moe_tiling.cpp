@@ -1826,7 +1826,7 @@ static ge::graphStatus TilingCheckMegaMoe(const gert::TilingContext *context, Me
                                           const char *nodeName)
 {
     OP_TILING_CHECK(CheckTensorPtrNullptr(context, config, nodeName) == ge::GRAPH_FAILED,
-                    OP_LOGE(nodeName, "params check nulld failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "params check nullptr failed."), return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(CheckTensorDim(context, config, nodeName) == ge::GRAPH_FAILED,
                     OP_LOGE(nodeName, "params shape is invalid."), return ge::GRAPH_FAILED);

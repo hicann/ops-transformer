@@ -31,11 +31,11 @@ bool MatmulAllReduceTilingA5::IsCapable()
 
 ge::graphStatus MatmulAllReduceTilingA5::SetMc2HcommAllReduce(const char *groupName, const uint32_t reduceType)
 {
-    OP_TILING_CHECK(mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geCType) ==
-                        mc2tiling::HcclDataType::HCCL_DATA_TYPE_RESERVED,
-                    OP_LOGE_FOR_INVALID_DTYPE(opName_, "y", Ops::Base::ToString(args_.geCType).c_str(),
-                                              "FLOAT16, BF16, FLOAT or INT8"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geCType) == mc2tiling::HcclDataType::HCCL_DATA_TYPE_RESERVED,
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "y", Ops::Base::ToString(args_.geCType).c_str(),
+                                  "FLOAT16, BF16, FLOAT or INT8"),
+        return ge::GRAPH_FAILED);
     const uint32_t opType = static_cast<uint32_t>(HcclCMDType::HCCL_CMD_ALLREDUCE);
     const uint8_t dataType = static_cast<uint8_t>(mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geCType));
     OP_TILING_CHECK(context_->GetAttrs() == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "comm_mode"),
@@ -231,7 +231,7 @@ ge::graphStatus MatmulAllReduceTilingA5::PostTiling()
 
 ge::graphStatus MatmulAllReduceTilingA5::Do910Tiling()
 {
-    OP_LOGD(opName_, "Start to excute DoMatmulV3Tiling!");
+    OP_LOGD(opName_, "Start to execute DoMatmulV3Tiling!");
     // 获取芯片平台信息
     auto platformInfo = context_->GetPlatformInfo();
     OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(opName_, "Get platform info failed."), return ge::GRAPH_FAILED);
@@ -276,10 +276,7 @@ ge::graphStatus MatmulAllReduceTilingA5::DoMatmulV3Tiling(Mc2MatmulHelper::Mc2Ma
     return ge::GRAPH_SUCCESS;
 }
 
-Mc2Tiling::RCSTiling &MatmulAllReduceTilingA5::MutableRCSTilingData()
-{
-    return matmulAllReduce910TilingData_.param;
-}
+Mc2Tiling::RCSTiling &MatmulAllReduceTilingA5::MutableRCSTilingData() { return matmulAllReduce910TilingData_.param; }
 
 ge::graphStatus MatmulAllReduceTilingA5::CheckAxisSize()
 {
@@ -306,11 +303,11 @@ ge::graphStatus MatmulAllReduceTilingA5::CheckX1X2()
 {
     // x2 shape 为 2 维
     size_t x2DimNum = mmrCtxInfo_.x2_shape->GetStorageShape().GetDimNum();
-    OP_TILING_CHECK(x2DimNum != DIM_NUM_TWO,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "x2",
-                                                             (std::to_string(x2DimNum) + "D").c_str(),
-                                                             "The shape dim of x2 must be 2"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        x2DimNum != DIM_NUM_TWO,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            context_->GetNodeName(), "x2", (std::to_string(x2DimNum) + "D").c_str(), "The shape dim of x2 must be 2"),
+        return ge::GRAPH_FAILED);
     auto x1Type = mmrCtxInfo_.x1->GetDataType();
     //  x1 为fp16 或者bf16
     OP_TILING_CHECK(!((x1Type == ge::DT_FLOAT16) || (x1Type == ge::DT_BF16)),
@@ -354,12 +351,12 @@ ge::graphStatus MatmulAllReduceTilingA5::CheckInput()
         for (size_t i = 0U; i < outputDimNum; i++) {
             auto outputDimValue = mmrCtxInfo_.y_shape->GetStorageShape().GetDim(i);
             auto x3DimValue = mmrCtxInfo_.x3_shape->GetStorageShape().GetDim(i);
-            OP_TILING_CHECK(outputDimValue != x3DimValue,
-                            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                                context_->GetNodeName(), "x3",
-                                Ops::Base::ToString(mmrCtxInfo_.x3_shape->GetStorageShape()).c_str(),
-                                "The shape dim of x3 must be the same as that of output"),
-                            return ge::GRAPH_FAILED);
+            OP_TILING_CHECK(
+                outputDimValue != x3DimValue,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "x3", Ops::Base::ToString(mmrCtxInfo_.x3_shape->GetStorageShape()).c_str(),
+                    "The shape dim of x3 must be the same as that of output"),
+                return ge::GRAPH_FAILED);
         }
     }
 
@@ -367,15 +364,15 @@ ge::graphStatus MatmulAllReduceTilingA5::CheckInput()
 }
 
 MatmulAllReduceTilingA5::MatmulAllReduceTilingA5(gert::TilingContext *context)
-    : MatmulAllReduceTilingBase(context), matmulAllReduce910TilingData_(matmulAllReduce910TilingDataSelf_)
-{
-}
+    : MatmulAllReduceTilingBase(context),
+      matmulAllReduce910TilingData_(matmulAllReduce910TilingDataSelf_)
+{}
 
 MatmulAllReduceTilingA5::MatmulAllReduceTilingA5(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
                                                  MatmulAllReduce910TilingDataA5 *out)
-    : MatmulAllReduceTilingBase(context, mmrCtxInfo), matmulAllReduce910TilingData_(*out)
-{
-}
+    : MatmulAllReduceTilingBase(context, mmrCtxInfo),
+      matmulAllReduce910TilingData_(*out)
+{}
 
 CutResult MatmulAllReduceTilingA5::GetTilingResult()
 {

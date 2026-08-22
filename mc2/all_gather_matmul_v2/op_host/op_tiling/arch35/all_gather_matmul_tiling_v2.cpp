@@ -49,7 +49,7 @@ bool AllGatherMatmulTilingV2::IsCapable()
         return true;
     }
 
-    OP_LOGI(opName_, "Skip AllGatherMatmulTilingV2 tiling when inutDatatype is not fp16 or bf16.");
+    OP_LOGI(opName_, "Skip AllGatherMatmulTilingV2 tiling when input datatype is not fp16 or bf16.");
     return false;
 }
 
@@ -85,8 +85,8 @@ void Mc2PrintMMV3TilingData(const std::string &opName, Mc2MatMulV3TilingData &ti
     OP_LOGD(opName, " tiling.nTailCnt %d", tiling.nTailCnt);
     OP_LOGD(opName, " tiling.kTailCnt %d", tiling.kTailCnt);
     OP_LOGD(opName, " tiling.isHf32 %d", tiling.isHf32);
-    OP_LOGD(opName, " tiling.mBaseTailSpiltCnt %d", tiling.mBaseTailSplitCnt);
-    OP_LOGD(opName, " tiling.nBaseTailSpiltCnt %d", tiling.nBaseTailSplitCnt);
+    OP_LOGD(opName, " tiling.mBaseTailSplitCnt %d", tiling.mBaseTailSplitCnt);
+    OP_LOGD(opName, " tiling.nBaseTailSplitCnt %d", tiling.nBaseTailSplitCnt);
     OP_LOGD(opName, " tiling.mTailMain %d", tiling.mTailMain);
     OP_LOGD(opName, " tiling.nTailMain %d", tiling.nTailMain);
     OP_LOGD(opName, " tiling.aswWindowLen %d", tiling.aswWindowLen);
@@ -235,7 +235,6 @@ ge::graphStatus AllGatherMatmulTilingV2::SetMc2Hcomm(Mc2Tiling::RCSTiling &rcsCf
     return ge::GRAPH_SUCCESS;
 }
 
-
 ge::graphStatus AllGatherMatmulTilingV2::CheckInput()
 {
     auto x1ScaleShape = context_->GetOptionalInputShape(SCALE_INV1);
@@ -254,9 +253,9 @@ ge::graphStatus AllGatherMatmulTilingV2::CheckInput()
 }
 
 AllGatherMatmulTilingV2::AllGatherMatmulTilingV2(gert::TilingContext *context)
-    : AllGatherMatmulTilingBase(context), allGatherMatmulTilingDataV2_(&allGatherMatmulTilingDataV2Self_)
-{
-}
+    : AllGatherMatmulTilingBase(context),
+      allGatherMatmulTilingDataV2_(&allGatherMatmulTilingDataV2Self_)
+{}
 // 注册Tiling类
 REGISTER_TILING_TEMPLATE_WITH_ARCH(AllGatherMatmulV2, AllGatherMatmulTilingV2, static_cast<int32_t>(NpuArch::DAV_3510),
                                    0);

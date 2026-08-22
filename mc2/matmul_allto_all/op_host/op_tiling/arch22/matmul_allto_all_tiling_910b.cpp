@@ -52,7 +52,7 @@ constexpr int32_t MAX_BUFF_BYTES = 200 * 1024 * 1024;
 constexpr int32_t FLAG_BUFF_BYTES = 20 * 1024 * 1024;
 constexpr int32_t MAX_BLOCK_COUNT = 2;
 constexpr int32_t MIN_P_VALUE = 1;
-constexpr int32_t ELEMENT_SIZE = 2;  // 通信时每个元素均占用2字节
+constexpr int32_t ELEMENT_SIZE = 2; // 通信时每个元素均占用2字节
 constexpr int32_t MB_BYTES = 1024 * 1024;
 constexpr int32_t CONDITION_M_ST = 0;
 constexpr int32_t CONDITION_M_END = 1;
@@ -471,12 +471,12 @@ ge::graphStatus MatmulAlltoAllTiling910B::CheckTensorDataType(MatmulAlltoAllInfo
                         OP_LOGE_WITH_INVALID_INPUT(opName_, "scale/bias"), return ge::GRAPH_FAILED);
         ge::DataType x1ScaleDtype = x1ScaleTensorDesc->GetDataType();
         ge::DataType x2ScaleDtype = x2ScaleTensorDesc->GetDataType();
-        OP_TILING_CHECK((x1ScaleDtype != ge::DT_FLOAT || x2ScaleDtype != ge::DT_FLOAT),
-                        OP_LOGE_FOR_INVALID_DTYPE(
-                            opName_, "x1Scale/x2Scale",
-                            (Ops::Base::ToString(x1ScaleDtype) + "/" + Ops::Base::ToString(x2ScaleDtype)).c_str(),
-                            "FLOAT32"),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            (x1ScaleDtype != ge::DT_FLOAT || x2ScaleDtype != ge::DT_FLOAT),
+            OP_LOGE_FOR_INVALID_DTYPE(
+                opName_, "x1Scale/x2Scale",
+                (Ops::Base::ToString(x1ScaleDtype) + "/" + Ops::Base::ToString(x2ScaleDtype)).c_str(), "FLOAT32"),
+            return ge::GRAPH_FAILED);
 
         OP_TILING_CHECK(
             (quantType != SUPPORT_QUANT_MODE),
@@ -677,13 +677,11 @@ ge::graphStatus MatmulAlltoAllTiling910B::CheckShapeInfo(MatmulAlltoAllInfo &inf
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "x2", std::to_string(info.N).c_str(),
                                                           "The value of N of x2 cannot be 0"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(info.N == 0, OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "x2", std::to_string(info.N).c_str(), "The value of N of x2 cannot be 0"), return ge::GRAPH_FAILED);
     // CCL buffer数据区: m0 * pValue * N * sizeof(element) 必须小于 180MB / MAX_BLOCK_COUNT
     int32_t maxN = (MAX_BUFF_BYTES - FLAG_BUFF_BYTES) / MAX_BLOCK_COUNT / ELEMENT_SIZE / DEFAULT_ROW;
     OP_TILING_CHECK(info.N > maxN,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "x2",
-                        std::to_string(info.N),
-                        "The value of N must not exceed " + std::to_string(maxN)),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "x2", std::to_string(info.N),
+                                                          "The value of N must not exceed " + std::to_string(maxN)),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -824,9 +822,9 @@ ge::graphStatus MatmulAlltoAllTiling910B::DoOpTiling()
     auto cclRet = mc2tiling::GetCclBufferSize(group, &hcclBuffSize, opName_);
     if (cclRet == ge::GRAPH_SUCCESS) {
         OP_TILING_CHECK(hcclBuffSize < MAX_BUFF_BYTES,
-            OP_LOGE(opName_, "HCCL_BUFFSIZE (%lu Bytes) too small, min required %lu Bytes (%dMB)",
-                hcclBuffSize, MAX_BUFF_BYTES, MAX_BUFF_BYTES / MB_BYTES),
-            return ge::GRAPH_FAILED);
+                        OP_LOGE(opName_, "HCCL_BUFFSIZE (%lu Bytes) too small, min required %lu Bytes (%dMB)",
+                                hcclBuffSize, MAX_BUFF_BYTES, MAX_BUFF_BYTES / MB_BYTES),
+                        return ge::GRAPH_FAILED);
     } else {
         OP_LOGW(opName_, "Can't get HCCL_BUFFSIZE, skip CCL buffer size validation.");
     }
@@ -854,10 +852,7 @@ void MatmulAlltoAllTiling910B::SetTilingKey()
  *
  * @return uint64_t tilingKey结果
  */
-uint64_t MatmulAlltoAllTiling910B::GetTilingKey() const
-{
-    return tilingKey_;
-}
+uint64_t MatmulAlltoAllTiling910B::GetTilingKey() const { return tilingKey_; }
 
 /**
  * @brief 设置hccl的config,进行hccl对应的通信任务设置
@@ -932,9 +927,9 @@ ge::graphStatus MatmulAlltoAllTiling910B::PostTiling()
  *
  * @param context
  */
-MatmulAlltoAllTiling910B::MatmulAlltoAllTiling910B(gert::TilingContext *context) : MatmulAllToAllTilingBase(context)
-{
-}
+MatmulAlltoAllTiling910B::MatmulAlltoAllTiling910B(gert::TilingContext *context)
+    : MatmulAllToAllTilingBase(context)
+{}
 
 // 注册tiling类
 REGISTER_TILING_TEMPLATE_WITH_SOCVERSION(MatmulAlltoAll, MatmulAlltoAllTiling910B,

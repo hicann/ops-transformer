@@ -49,7 +49,7 @@ bool MatmulReduceScatterV2Tiling::IsCapable()
         return true;
     }
 
-    OP_LOGI(opName_, "skip MatmulReduceScatterV2Tiling tiling when inutDatatype is not fp16 or bf16.");
+    OP_LOGI(opName_, "skip MatmulReduceScatterV2Tiling tiling when input datatype is not fp16 or bf16.");
     return false;
 }
 
@@ -60,8 +60,8 @@ void PrintMMV3TilingData(const std::string &opName, Mc2MatMulV3TilingData &tilin
     OP_LOGD(opName, "tiling.mTailCnt %d", tiling.mTailCnt);
     OP_LOGD(opName, "tiling.nTailCnt %d", tiling.nTailCnt);
     OP_LOGD(opName, "tiling.kTailCnt %d", tiling.kTailCnt);
-    OP_LOGD(opName, "tiling.mBaseTailSpiltCnt %d", tiling.mBaseTailSplitCnt);
-    OP_LOGD(opName, "tiling.nBaseTailSpiltCnt %d", tiling.nBaseTailSplitCnt);
+    OP_LOGD(opName, "tiling.mBaseTailSplitCnt %d", tiling.mBaseTailSplitCnt);
+    OP_LOGD(opName, "tiling.nBaseTailSplitCnt %d", tiling.nBaseTailSplitCnt);
     OP_LOGD(opName, "tiling.mTailMain %d", tiling.mTailMain);
     OP_LOGD(opName, "tiling.nTailMain %d", tiling.nTailMain);
     OP_LOGD(opName, "tiling.aswWindowLen %d", tiling.aswWindowLen);
@@ -129,17 +129,17 @@ ge::graphStatus MatmulReduceScatterV2Tiling::DoMatmulV3Tiling(Mc2MatmulHelper::M
                                                               Mc2MatMulV3TilingData &tilingData)
 {
     tilingCfg.SetRankDim(args_.rankDim);
-    OP_LOGD(opName_, "execte DoMatmulV3Tiling!");
+    OP_LOGD(opName_, "execute DoMatmulV3Tiling!");
     tilingCfg.SetMatMulV3TilingData(tilingData);
-    OP_TILING_CHECK(Mc2MMTilingRegistry::GetInstance().DoTilingImpl(context_, tilingCfg, registerCfg) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName_, "do tiling failed"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        Mc2MMTilingRegistry::GetInstance().DoTilingImpl(context_, tilingCfg, registerCfg) != ge::GRAPH_SUCCESS,
+        OP_LOGE(opName_, "do tiling failed"), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus MatmulReduceScatterV2Tiling::DoAllMatmulTiling()
 {
-    OP_LOGD(opName_, "excute DoAllMatmulTiling!");
+    OP_LOGD(opName_, "execute DoAllMatmulTiling!");
     // 获取芯片平台信息
     auto platformInfo = context_->GetPlatformInfo();
     OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(opName_, "get platform info failed"), return ge::GRAPH_FAILED);

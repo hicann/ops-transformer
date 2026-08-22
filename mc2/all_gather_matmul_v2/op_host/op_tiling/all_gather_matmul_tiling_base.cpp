@@ -399,7 +399,6 @@ ge::graphStatus AllGatherMatmulTilingBase::AnalyzeShapeAttr()
     return ge::GRAPH_SUCCESS;
 }
 
-
 void AllGatherMatmulTilingBase::SetMC2AllGatherDataInfo(Mc2Tiling::RCSTiling &rcsCfg, ::TCubeTiling &mmTiling,
                                                         ::TCubeTiling &tailTiling, uint32_t debugMode)
 {
@@ -469,14 +468,13 @@ void AllGatherMatmulTilingBase::DoAllGatherTiling(Mc2Tiling::RCSTiling &rcsCfg, 
     storageA_ = GetStorageA(rcsCfg);
 }
 
-
 void AllGatherMatmulTilingBase::SetRcsTilingData(Mc2Tiling::RCSTiling &rcsCfg)
 {
     rcsCfg.rankDim = args_.rankDim;
     rcsCfg.isTransposeA = args_.isATrans;
     rcsCfg.isTransposeB = args_.isBTrans;
     rcsCfg.commtype = (static_cast<uint32_t>(args_.cmdType));
-    OP_LOGD(opName_, "AlGaterMatmul SetRcsTilingData, args_.orgMValue=%lu, args_.orgNValue=%lu, args_.orgKValue=%lu.",
+    OP_LOGD(opName_, "AllGatherMatmul SetRcsTilingData, args_.orgMValue=%lu, args_.orgNValue=%lu, args_.orgKValue=%lu.",
             args_.orgMValue, args_.orgNValue, args_.orgKValue);
     rcsCfg.rankM = args_.orgMValue;
     rcsCfg.rankN = args_.orgNValue;
@@ -544,7 +542,7 @@ void AllGatherMatmulTilingBase::DoSplitMTiling(Mc2Tiling::RCSTiling &rcfCfg)
     }
     // cmdType = HCCL_CMD_ALLGATHER, 是允许切K
     if (args_.enableSplitK) { // 只有1份
-        OP_LOGI(opName_, "enabelSplik is True.");
+        OP_LOGI(opName_, "enableSplitK is true.");
         rcfCfg.tileCnt = 1;
         rcfCfg.tailCnt = 0;
         rcfCfg.tailM = 0;
@@ -674,14 +672,8 @@ ge::graphStatus AllGatherMatmulTilingBase::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 };
 
-ge::graphStatus AllGatherMatmulTilingBase::GetShapeAttrsInfo()
-{
-    return AnalyzeShapeAttr();
-};
-ge::graphStatus AllGatherMatmulTilingBase::DoLibApiTiling()
-{
-    return ge::GRAPH_SUCCESS;
-}
+ge::graphStatus AllGatherMatmulTilingBase::GetShapeAttrsInfo() { return AnalyzeShapeAttr(); };
+ge::graphStatus AllGatherMatmulTilingBase::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
 
 uint64_t AllGatherMatmulTilingBase::CalcGatherLen(uint32_t dimA, uint32_t dimB, uint64_t alignAddrLen)
 {

@@ -62,7 +62,7 @@ static graphStatus PrepareOutputTensorListGMMAllReduce(OpExecuteContext *host_ap
     } else if (2 == splitItem || 3 == splitItem) { // Length of tensorListY equals 1 when split_item = 2 / 3
         numGeY = 1;
     } else {
-        std::cout << "Invalid value of split_item: " << splitItem << ", which must be one of 0/1/2/3." << std::endl;
+        OP_LOGE("gmm_all_reduce_fallback", "Invalid value of split_item: %d, which must be one of 0/1/2/3.", splitItem);
         return GRAPH_FAILED;
     }
 

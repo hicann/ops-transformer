@@ -224,7 +224,7 @@ static ge::graphStatus ExecuteQuantGroupedMatMulAlltoAllv(gert::OpExecuteContext
         *attrsData.groupSize, attrsData.group, attrsData.commMode, *attrsData.epWorldSize, actSendCountsSeqArray,
         actRecvCountsSeqArray, *attrsData.transGmmWeight, *attrsData.transMmWeight, y, mmY);
     OPS_ERR_IF(apiRet != ge::GRAPH_SUCCESS,
-               OP_LOGE("QuantGroupedMatMulAlltoAllvarezFallback", "Aclnn api error code %u", apiRet),
+               OP_LOGE("QuantGroupedMatMulAlltoAllvFallback", "Aclnn api error code %u", apiRet),
                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

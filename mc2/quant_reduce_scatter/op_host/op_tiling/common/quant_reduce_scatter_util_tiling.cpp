@@ -212,11 +212,11 @@ static bool CheckXShapeValid(const gert::TilingContext *context, TilingRunInfo &
     }
 
     // 校验x是否为空tensor
-    OP_TILING_CHECK(emptyTensor,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "x",
-                                                          Ops::Base::ToString(xShape->GetStorageShape()).c_str(),
-                                                          "The shape of x must have all dimensions positive (>=1)"),
-                    return false);
+    OP_TILING_CHECK(
+        emptyTensor,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "x", Ops::Base::ToString(xShape->GetStorageShape()).c_str(),
+                                              "The shape of x must have all dimensions positive (>=1)"),
+        return false);
 
     // 校验BS是否被worldSize整除
     const char *dimDesc = (xDimNum == THREE_DIMS) ? "B*S" : "BS"; // 报错信息二维时为BS, 三维时为B*S
@@ -644,8 +644,8 @@ static bool CheckWindowSize(const gert::TilingContext *context, const TilingRunI
     OP_TILING_CHECK(
         HCCL_BUFFSIZE_FACTOR * actualWinSize > maxWinSize,
         OP_LOGE(nodeName,
-                "The HCCL_BUFFERSIZE is too small. The current HCCL_BUFFERSIZE in the environment is [%lu] MB,"
-                "but the NEED HCCL_BUFFERSIZE is [%lu] MB. Please check HCCL_BUFFERSIZE config.",
+                "The HCCL_BUFFSIZE is too small. The current HCCL_BUFFSIZE in the environment is [%lu] MB,"
+                "but the NEED HCCL_BUFFSIZE is [%lu] MB. Please check HCCL_BUFFSIZE config.",
                 ops::CeilDiv(maxWinSize, MB_SIZE), ops::CeilDiv(actualWinSize, MB_SIZE) * HCCL_BUFFSIZE_FACTOR),
         return false);
     return true;

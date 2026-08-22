@@ -23,7 +23,7 @@ namespace ops {
 static ge::graphStatus InferShapeMatmulReduceScatter(gert::InferShapeContext *context)
 {
     OP_LOGE_IF(InferMatmulReduceScatterCommon(context) != GRAPH_SUCCESS, GRAPH_FAILED, context->GetNodeName(),
-               "infer shape excute failed.");
+               "infer shape execute failed.");
     return GRAPH_SUCCESS;
 }
 

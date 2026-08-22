@@ -99,7 +99,7 @@ extern "C" aclnnStatus aclnnMoeDistributeCombineTeardownGetWorkspaceSize(
     int64_t globalBs, int64_t commQuantMode, int64_t commType, const char *commAlg, aclTensor *xOut,
     uint64_t *workspaceSize, aclOpExecutor **executor)
 {
-    OP_LOGD("aclnn_moe_distribute_combine_teardown get_get_workspace_size start");
+    OP_LOGD("aclnn_moe_distribute_combine_teardown get_workspace_size start");
     if (GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
         OP_LOGE_LIBOPAPI_REPORT("aclnnMoeDistributeCombineTeardown", "Unsupported npuArch");
         return ACLNN_ERR_PARAM_INVALID;

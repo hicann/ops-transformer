@@ -351,7 +351,7 @@ uint64_t Mc2TilingUtils::GetMaxWindowSize()
             std::string envStr(getenv(HCCL_BUFFSIZE));
             defaultWindowSize = std::stoi(envStr);
         } catch (...) {
-            OP_LOGE("", "Unknown Exception encountered when parser env HCCL_BUFFERSIZE");
+            OP_LOGE("", "Unknown Exception encountered when parsing env HCCL_BUFFSIZE");
         }
     }
     const uint64_t maxWindowSize = static_cast<uint64_t>(defaultWindowSize) * 1024UL * 1024UL;

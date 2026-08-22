@@ -186,9 +186,8 @@ ge::graphStatus MoeDistributeDispatchSetupTilingBase::GetRequiredAttrAndSetTilin
     return ge::GRAPH_SUCCESS;
 }
 
-const ge::graphStatus
-MoeDistributeDispatchSetupTilingBase::CheckSharedExpertAttrValue(const uint32_t sharedExpertNum,
-                                                                 const uint32_t sharedExpertRankNum)
+const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckSharedExpertAttrValue(
+    const uint32_t sharedExpertNum, const uint32_t sharedExpertRankNum)
 {
     // 共享专家卡数>=共享专家数且可以整除
     if (sharedExpertRankNum == 0) {
@@ -426,11 +425,11 @@ const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckOutputTensorDim
     OP_TILING_CHECK(CheckOneTensorDim("yOut", TensorType::OUTPUT, OUTPUT_Y_INDEX, TWO_DIMS) != ge::GRAPH_SUCCESS,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName_, "yOut", "checkdim failed", "yOut must be 2D"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckOneTensorDim("expandIdxOut", TensorType::OUTPUT, OUTPUT_EXPAND_IDX_INDEX, ONE_DIMS) !=
-                        ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName_, "expandIdxOut", "checkdim failed",
-                                                             "expandIdxOut must be 1D"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckOneTensorDim("expandIdxOut", TensorType::OUTPUT, OUTPUT_EXPAND_IDX_INDEX, ONE_DIMS) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName_, "expandIdxOut", "checkdim failed",
+                                                 "expandIdxOut must be 1D"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckOneTensorDim("commCmdInfoOut", TensorType::OUTPUT, OUTPUT_COMM_CMD_INFO_INDEX, ONE_DIMS) !=
                         ge::GRAPH_SUCCESS,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName_, "commCmdInfoOut", "checkdim failed",
@@ -587,24 +586,24 @@ const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckOutputTensorDat
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName_, "yOut", Ops::Base::ToString(yDesc->GetDataType()).c_str(),
                                               "If quantMode is 0, the dtype of yOut must be the same as that of x"),
         return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((quantMode == STATIC_QUANT) && (yDesc->GetDataType() != ge::DT_HIFLOAT8) &&
-                        (yDesc->GetDataType() != ge::DT_INT8),
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName_, "yOut",
-                                                          Ops::Base::ToString(yDesc->GetDataType()).c_str(),
-                                                          "The dtype of yOut must be int8 or hif8"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((quantMode == PERTOKEN_DYNAMIC_QUANT) && (yDesc->GetDataType() != ge::DT_INT8) &&
-                        (yDesc->GetDataType() != ge::DT_FLOAT8_E4M3FN) && (yDesc->GetDataType() != ge::DT_FLOAT8_E5M2),
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName_, "yOut",
-                                                          Ops::Base::ToString(yDesc->GetDataType()).c_str(),
-                                                          "The dtype of yOut must be int8, fp8_e4m3fn or fp8_e5m2"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(((quantMode == PERGROUP_DYNAMIC_QUANT) || (quantMode == MX_QUANT)) &&
-                        (yDesc->GetDataType() != ge::DT_FLOAT8_E4M3FN) && (yDesc->GetDataType() != ge::DT_FLOAT8_E5M2),
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName_, "yOut",
-                                                          Ops::Base::ToString(yDesc->GetDataType()).c_str(),
-                                                          "The dtype of yOut must be fp8_e4m3fn or fp8_e5m2"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (quantMode == STATIC_QUANT) && (yDesc->GetDataType() != ge::DT_HIFLOAT8) &&
+            (yDesc->GetDataType() != ge::DT_INT8),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName_, "yOut", Ops::Base::ToString(yDesc->GetDataType()).c_str(),
+                                              "The dtype of yOut must be int8 or hif8"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (quantMode == PERTOKEN_DYNAMIC_QUANT) && (yDesc->GetDataType() != ge::DT_INT8) &&
+            (yDesc->GetDataType() != ge::DT_FLOAT8_E4M3FN) && (yDesc->GetDataType() != ge::DT_FLOAT8_E5M2),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName_, "yOut", Ops::Base::ToString(yDesc->GetDataType()).c_str(),
+                                              "The dtype of yOut must be int8, fp8_e4m3fn or fp8_e5m2"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        ((quantMode == PERGROUP_DYNAMIC_QUANT) || (quantMode == MX_QUANT)) &&
+            (yDesc->GetDataType() != ge::DT_FLOAT8_E4M3FN) && (yDesc->GetDataType() != ge::DT_FLOAT8_E5M2),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName_, "yOut", Ops::Base::ToString(yDesc->GetDataType()).c_str(),
+                                              "The dtype of yOut must be fp8_e4m3fn or fp8_e5m2"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -810,7 +809,7 @@ ge::graphStatus MoeDistributeDispatchSetupTilingBase::SetWorkspace()
     size_t *workspace = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspace == nullptr, OP_LOGE(nodeName_, "get workspace failed"), return ge::GRAPH_FAILED);
     workspace[0] = static_cast<size_t>(SYSTEM_NEED_WORKSPACE) + SDMA_NEED_WORKSPACE;
-    OP_LOGD(nodeName_, "workspce[0] size is %lu", workspace[0]);
+    OP_LOGD(nodeName_, "workspace[0] size is %lu", workspace[0]);
     return ge::GRAPH_SUCCESS;
 }
 

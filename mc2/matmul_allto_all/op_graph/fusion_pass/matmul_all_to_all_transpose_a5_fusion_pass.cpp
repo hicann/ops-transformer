@@ -36,7 +36,6 @@ const size_t PERM_SIZE_ONE = 1;
 const size_t PERM_SIZE_TWO = 2;
 const size_t PERM_SIZE_THREE = 3;
 
-
 struct ReplaceGraphInputs {
     ge::es::EsTensorHolder rX1;
     ge::es::EsTensorHolder rX2;
@@ -344,7 +343,7 @@ static ge::fusion::GraphUniqPtr BuildReplaceGraph(const std::vector<ge::fusion::
 
     int64_t worldSize = -1;
     OP_LOGE_IF(mc2Node.GetAttr("world_size", worldSize) != ge::GRAPH_SUCCESS, nullptr, FUSION_PASS_NAME.c_str(),
-               "Get Attr word_size failed.");
+               "Get Attr world_size failed.");
 
     std::vector<int64_t> all2allAxes = {-1, -2};
     OP_LOGE_IF(mc2Node.GetAttr("all2all_axes", all2allAxes) != ge::GRAPH_SUCCESS, nullptr, FUSION_PASS_NAME.c_str(),
@@ -442,8 +441,8 @@ bool MatmulAllToAllTransposeA5FusionPass::MeetRequirements(const std::unique_ptr
     return true;
 }
 
-ge::fusion::GraphUniqPtr
-MatmulAllToAllTransposeA5FusionPass::Replacement(const std::unique_ptr<ge::fusion::MatchResult> &matchResult)
+ge::fusion::GraphUniqPtr MatmulAllToAllTransposeA5FusionPass::Replacement(
+    const std::unique_ptr<ge::fusion::MatchResult> &matchResult)
 {
     OPS_LOG_D(FUSION_PASS_NAME.c_str(), "Enter Replacement for MatmulAllToAllTransposeA5FusionPass");
     std::vector<ge::fusion::SubgraphInput> subgraphInputs;

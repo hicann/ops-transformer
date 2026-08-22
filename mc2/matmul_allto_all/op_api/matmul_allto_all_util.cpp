@@ -39,32 +39,27 @@ bool CheckAlltoAllAxes(const char *opName, const aclIntArray *alltoAllAxesOption
     uint64_t alltoallAxesSize = 0U; // alltoallAxes的大小
     aclGetIntArraySize(alltoAllAxesOptional, &alltoallAxesSize);
     if (alltoallAxesSize != TWO_DIMS) {
-        OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional.size()",
-                                  std::to_string(alltoallAxesSize).c_str(), "2");
+        OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional.size()", std::to_string(alltoallAxesSize).c_str(), "2");
         return false;
     }
     int64_t data1 = (*alltoAllAxesOptional)[0];
     int64_t data2 = (*alltoAllAxesOptional)[1];
     if (isMatmulAlltoAll) {
         OP_API_CHECK((data1 != NEG_ONE), {
-            OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional[0]", std::to_string(data1).c_str(),
-                                      "-1");
+            OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional[0]", std::to_string(data1).c_str(), "-1");
             return false;
         });
         OP_API_CHECK((data2 != NEG_TWO), {
-            OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional[1]", std::to_string(data2).c_str(),
-                                      "-2");
+            OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional[1]", std::to_string(data2).c_str(), "-2");
             return false;
         });
     } else {
         OP_API_CHECK((data1 != NEG_TWO), {
-            OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional[0]", std::to_string(data1).c_str(),
-                                      "-2");
+            OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional[0]", std::to_string(data1).c_str(), "-2");
             return false;
         });
         OP_API_CHECK((data2 != NEG_ONE), {
-            OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional[1]", std::to_string(data2).c_str(),
-                                      "-1");
+            OP_LOGE_FOR_INVALID_VALUE(opName, "alltoAllAxesOptional[1]", std::to_string(data2).c_str(), "-1");
             return false;
         });
     }
@@ -90,8 +85,7 @@ bool CheckGroupLength(const char *opName, const char *group)
     }
     auto len = strnlen(group, MAX_GROUP_LEN);
     if ((len >= MAX_GROUP_LEN) || (len == ZERO)) {
-        OP_LOGE_FOR_INVALID_VALUE(opName, "group.length()", std::to_string(len).c_str(),
-                                  "in range (0, 128)");
+        OP_LOGE_FOR_INVALID_VALUE(opName, "group.length()", std::to_string(len).c_str(), "in range (0, 128)");
         return false;
     }
     return true;
@@ -137,14 +131,13 @@ bool CheckBiasShape(const char *opName, const aclTensor *biasOptional, int64_t n
     if (biasOptional != nullptr) {
         if (biasOptional->GetViewShape().GetDimNum() != ONE_DIM) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                opName, "biasOptional",
-                (std::to_string(biasOptional->GetViewShape().GetDimNum()) + "D").c_str(),
+                opName, "biasOptional", (std::to_string(biasOptional->GetViewShape().GetDimNum()) + "D").c_str(),
                 "The shape of biasOptional must be 1D.");
             return false;
         }
         auto biasDim = biasOptional->GetViewShape().GetDim(0);
         if (biasDim != nVal) {
-            OP_LOGE_FOR_INVALID_VALUE(opName, "group.length()", std::to_string(biasDim).c_str(),
+            OP_LOGE_FOR_INVALID_VALUE(opName, "biasDim", std::to_string(biasDim).c_str(),
                                       ("should equal x2.n-axis " + std::to_string(nVal)).c_str());
             return false;
         }
@@ -167,13 +160,12 @@ bool CheckShapeMMAA(const char *opName, const aclTensor *x1, const aclTensor *x2
             x2->GetViewShape().GetDim(1));
 
     if (kdimX1 != kdimX2) {
-        OP_LOGE_FOR_INVALID_VALUE(opName, "group.length()", std::to_string(kdimX1).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE(opName, "kdimX1", std::to_string(kdimX1).c_str(),
                                   ("should equal x2.dimK " + std::to_string(kdimX2)).c_str());
         return false;
     }
     if (kdimX1 < KVALUE_MIN || kdimX1 > KVALUE_MAX) {
-        OP_LOGE_FOR_INVALID_VALUE(opName, "group.length()", std::to_string(kdimX1).c_str(),
-                                  "in range [1, 65535]");
+        OP_LOGE_FOR_INVALID_VALUE(opName, "kdimX1", std::to_string(kdimX1).c_str(), "in range [1, 65535]");
         return false;
     }
     auto nVal = transposeX2 ? x2->GetViewShape().GetDim(0) : x2->GetViewShape().GetDim(1);

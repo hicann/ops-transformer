@@ -463,9 +463,9 @@ static aclnnStatus CheckAndHandleParams(const aclTensor *x1, const aclTensor *x2
     CHECK_RET(CheckNotEmptyTensor(x1, x2, transposeX2), ACLNN_ERR_PARAM_INVALID);
     // 检查shape
     if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
-        CHECK_RET(CheckShapeAAMM("allto_all_quant_matmul", x1, x2, biasOptional, transposeX2, output,
-                                 alltoAllOutOptional),
-                  ACLNN_ERR_PARAM_INVALID);
+        CHECK_RET(
+            CheckShapeAAMM("allto_all_quant_matmul", x1, x2, biasOptional, transposeX2, output, alltoAllOutOptional),
+            ACLNN_ERR_PARAM_INVALID);
         CHECK_RET(CheckScaleShape(x1, x2, x1ScaleOptional, x2Scale, x1QuantMode, x2QuantMode, transposeX2),
                   ACLNN_ERR_PARAM_INVALID);
     }
@@ -539,7 +539,7 @@ extern "C" aclnnStatus InnerAlltoAllQuantMatmulGetWorkspaceSize(
         str_group, worldSize, alltoAllAxesOptional, yDtype, x1QuantMode, x2QuantMode, commQuantMode, x1QuantDtype,
         commQuantDtype, transposeX1, transposeX2, groupSize, str_commMode, all2AllOutFlag, output, all2AllOutOptional,
         workspaceSize, executor);
-    OP_LOGD("AlltoAllQuantMatmul, aclnnnInnerGetWorkspaceSize ret %d.", ret);
+    OP_LOGD("AlltoAllQuantMatmul, aclnnInnerGetWorkspaceSize ret %d.", ret);
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_INNER,
                 "This is an error in launch aicore, aclnnAlltoAllQuantMatmulGetWorkspaceSize interface call failed.");

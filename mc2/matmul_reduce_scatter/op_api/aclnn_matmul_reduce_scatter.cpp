@@ -50,11 +50,7 @@ typedef struct {
 extern "C" uint64_t NnopbaseMsprofSysTime();
 extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId &dfxId);
 
-
-static inline bool IsAscend910A5(void)
-{
-    return op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
-}
+static inline bool IsAscend910A5(void) { return op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510; }
 
 static uint8_t GetDebugMode()
 {
@@ -232,7 +228,7 @@ aclnnStatus aclnnMatmulReduceScatterGetWorkspaceSize(const aclTensor *x1, const 
     aclnnStatus ret = aclnnInnerMatmulReduceScatterGetWorkspaceSize(
         x1, x2, bias, const_cast<char *>(group), const_cast<char *>(reduce_op), transposeX1, transposeX2, commTurn,
         rankSize, output, workspaceSize, executor);
-    OP_LOGD("MatmulReduceScatter, aclnnnGetWorkspaceSize ret %d.", ret);
+    OP_LOGD("MatmulReduceScatter, aclnnGetWorkspaceSize ret %d.", ret);
     static NnopbaseDfxId dfxId = {0x60000, __func__, false};
     NnopbaseReportApiInfo(timeStamp, dfxId);
     return ret;

@@ -23,7 +23,7 @@ namespace ops {
 static ge::graphStatus InferShapeAllGatherMatmul(gert::InferShapeContext *context)
 {
     OP_LOGE_IF(AllGatherMatmulCommonInferShape(context, GATHER_OUT_V1) != GRAPH_SUCCESS, GRAPH_FAILED,
-               context->GetNodeName(), "infer shape excute failed.");
+               context->GetNodeName(), "infer shape execute failed.");
     return ge::GRAPH_SUCCESS;
 }
 
