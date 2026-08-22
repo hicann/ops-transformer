@@ -569,9 +569,6 @@ template <typename ActivationType, bool ReloadCumsumFromGm>
 __aicore__ inline void ExportExpertTokenCounts(const MoeStageCommonConfig &common,
                                                TokenDispatchScratch<ActivationType> &scratch, const Params &params)
 {
-    if constexpr (g_coreType == AIC) {
-        return;
-    }
     if constexpr (ReloadCumsumFromGm) {
         DataCopyPad(
             scratch.cumsumInfoTensor, scratch.cumsumInfoGlobalTensor,

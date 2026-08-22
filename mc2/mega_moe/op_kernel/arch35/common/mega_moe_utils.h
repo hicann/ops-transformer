@@ -298,6 +298,24 @@ __aicore__ inline void UpdateExpertLoopState(ExpertLoopState &state, uint32_t ex
     Get<M_VALUE>(state.problemShape) = static_cast<int64_t>(expertTokenCount);
 }
 
+// 按当前 Wave 的剩余容量推进专家 token 位置，返回本次推进覆盖的 token 数。
+template <uint32_t TileM>
+__aicore__ inline uint32_t AdvanceExpertTokenPositionInWave(uint32_t expertTokenCount, uint32_t waveMGroupTarget,
+                                                            uint32_t &waveMGroupCount, ExpertTokenPosition &position)
+{
+    uint32_t expertRemainingTokenCount = expertTokenCount - position.tokenIndexInExpert;
+    uint32_t waveRemainingTokenCapacity = (waveMGroupTarget - waveMGroupCount) * TileM;
+    uint32_t sliceTokenCount =
+        expertRemainingTokenCount < waveRemainingTokenCapacity ? expertRemainingTokenCount : waveRemainingTokenCapacity;
+    waveMGroupCount += Ops::Base::CeilDiv(sliceTokenCount, TileM);
+    position.tokenIndexInExpert += sliceTokenCount;
+    if (position.tokenIndexInExpert >= expertTokenCount) {
+        ++position.expertIdx;
+        position.tokenIndexInExpert = 0U;
+    }
+    return sliceTokenCount;
+}
+
 // 轮询 GM 中的 int32 ready flag，并在两次读取之间加入短暂退避。
 __aicore__ inline void WaitUntilGmFlagIsNonZero(__gm__ int32_t *flagAddr)
 {

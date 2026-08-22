@@ -108,11 +108,10 @@ struct WorkspaceInfo {
         workspaceSize += Ops::Base::CeilAlign(tilingData->maxOutputSize * ALIGN_32, ALIGN_512);
 
         // 以下三组 flag 仅由 MoE 专家使用；共享专家路径不使用这些 flag。
-        bool isGenericGmm = tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_GENERAL ||
-                            tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W8_NZ;
-        bool isA8W4 = tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W4;
-        bool useGroupGrainedActivationFlag = tilingData->topoType == TOPO_TYPE_MTE && (isGenericGmm || isA8W4);
-        bool useMteA8W8Wave = tilingData->topoType == TOPO_TYPE_MTE && isGenericGmm;
+        bool useGroupGrainedActivationFlag = tilingData->topoType == TOPO_TYPE_MTE;
+        bool useMteA8W8Wave =
+            tilingData->topoType == TOPO_TYPE_MTE && (tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_GENERAL ||
+                                                      tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W8_NZ);
         bool useGroupSyncCounters = tilingData->topoType == TOPO_TYPE_URMA ||
                                     (tilingData->combineQuantMode != COMBINE_NO_QUANT && !useMteA8W8Wave);
 
@@ -172,19 +171,23 @@ struct WorkspaceInfo {
         // A8W4 / Combine 量化路径的条件 workspace 分配。
         // 以下条件分配与 mega_moe.h 编译期守卫 (ENABLE_A8W4 / ENABLE_A4W4 / CombineQuantMode) 一致，
         // 由 TilingKey 保证同步。
-        // 仅 A8W4 使用：cumsum GM 备份和 GMM1 中间结果。
+        // A8W4 以及 MTE A4W4 Wave 使用 cumsum GM 备份；A8W4/prefetch 使用 GMM1 中间结果。
         cumsumInfoPtr = nullptr;
         gmm1MmadResPtr = nullptr;
         gmm2MmadResPtr = nullptr;
-        if (tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W4 || tilingData->topkWeightsPrefetch == 1) {
+        bool usePersistentDispatchCumsum =
+            tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W4 ||
+            (tilingData->topoType == TOPO_TYPE_MTE && (tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4 ||
+                                                       tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A4W4_NZ));
+        if (usePersistentDispatchCumsum) {
             // cumsumInfo：逐核备份 cumsum 状态，每核 moeExpertPerRank × epWorldSize 个 int32。
-            if (tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W4) {
-                cumsumInfoPtr = base + workspaceSize;
-                workspaceSize += Ops::Base::CeilAlign(static_cast<int64_t>(SIZE_INT_32 * tilingData->moeExpertPerRank *
-                                                                           tilingData->epWorldSize),
-                                                      ALIGN_32) *
-                                 tilingData->aicNum;
-            }
+            cumsumInfoPtr = base + workspaceSize;
+            workspaceSize += Ops::Base::CeilAlign(static_cast<int64_t>(SIZE_INT_32 * tilingData->moeExpertPerRank *
+                                                                       tilingData->epWorldSize),
+                                                  ALIGN_32) *
+                             tilingData->aicNum;
+        }
+        if (tilingData->groupedMatmulMode == GROUPED_MATMUL_MODE_A8W4 || tilingData->topkWeightsPrefetch == 1) {
             // gmm1MmadRes：GMM1 matmul 输出，布局为 maxOutputSize × hiddenDim 个 BF16。
             gmm1MmadResPtr = base + workspaceSize;
             workspaceSize += SIZE_BF_16 * tilingData->maxOutputSize * tilingData->hiddenDim;
