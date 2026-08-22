@@ -152,14 +152,15 @@ DeterBandScheduleResult SelectDeterBandSchedule(int64_t k, int64_t m, int64_t n,
     int64_t bandBlocks = 0;
     if (p + q <= m) {
         l1 = q - 1;
-        l2 = std::min(n - q + 1, m + 2 - p - q);
-        l3 = std::max<int64_t>(0, std::min(p + n - m - 1, p + q - 2));
-        bandBlocks = (2 * p - 2 + q) * l1 / 2 + (p + q - 1) * l2 + (p + q - 2) * l3 - l3 * (l3 - 1) / 2;
+        l2 = std::min(n - q + 1, m + NUM_TWO - p - q);
+        l3 = std::max<int64_t>(0, std::min(p + n - m - 1, p + q - NUM_TWO));
+        bandBlocks = (NUM_TWO * p - NUM_TWO + q) * l1 / NUM_TWO + (p + q - 1) * l2 + (p + q - NUM_TWO) * l3 -
+                     l3 * (l3 - 1) / NUM_TWO;
     } else {
         l1 = m - p;
         l2 = p + q - m;
         l3 = std::min(n - q, m - 1);
-        bandBlocks = (p + m - 1) * l1 / 2 + m * l2 + (2 * m - 1 - l3) * l3 / 2;
+        bandBlocks = (p + m - 1) * l1 / NUM_TWO + m * l2 + (NUM_TWO * m - 1 - l3) * l3 / NUM_TWO;
     }
 
     const int64_t pairCount = std::max<int64_t>(0, std::min(l1, l3 - p + 1));
@@ -188,12 +189,12 @@ DeterBandScheduleResult SelectDeterBandSchedule(int64_t k, int64_t m, int64_t n,
     // because transposing Mode03 would break the fixed-core-per-original-column requirement.
     const int64_t lowerCausalSize = m + q - 1;
     const int64_t upperCausalSize = n + p - 1;
-    const int64_t lowerWaste = lowerCausalSize * (lowerCausalSize + 1) / 2 - bandBlocks;
-    const int64_t upperWaste = upperCausalSize * (upperCausalSize + 1) / 2 - bandBlocks;
+    const int64_t lowerWaste = lowerCausalSize * (lowerCausalSize + 1) / NUM_TWO - bandBlocks;
+    const int64_t upperWaste = upperCausalSize * (upperCausalSize + 1) / NUM_TWO - bandBlocks;
     bool useLowerCausal =
         bandBlocks > 0 && lowerWaste >= 0 && lowerWaste <= upperWaste && lowerWaste <= (bandBlocks - 1) / 10;
     if (useLowerCausal) {
-        const int64_t causalPairCount = b / 2;
+        const int64_t causalPairCount = b / NUM_TWO;
         const int64_t causalK = std::min(k, lowerCausalSize * causalPairCount);
         // CalCausalSwizzleIndex uses the dense swizzle internally, so do not select it when that
         // helper would reduce the active-core count below k.
