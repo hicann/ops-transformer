@@ -8,13 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-/*!
- * \file moe_ep_combine_tiling_key.h
- * \brief
- */
-
-#ifndef MOE_EP_COMBINE_TILING_KEY_H
-#define MOE_EP_COMBINE_TILING_KEY_H
+#ifndef MOE_EP_COMBINE_EPILOGUE_TILING_KEY_H
+#define MOE_EP_COMBINE_EPILOGUE_TILING_KEY_H
 
 #include "ascendc/host_api/tiling/template_argument.h"
 
@@ -22,12 +17,12 @@ namespace Mc2Tiling {
 
 #define TILINGKEY_TPL_A5 2
 
-ASCENDC_TPL_ARGS_DECL(MoeEpCombine, ASCENDC_TPL_BOOL_DECL(TILINGKEY_HAS_TOPK_WEIGHTS, 0, 1),
+ASCENDC_TPL_ARGS_DECL(MoeEpCombineEpilogue, ASCENDC_TPL_BOOL_DECL(TILINGKEY_HAS_TOPK_WEIGHTS, 0, 1),
                       ASCENDC_TPL_UINT_DECL(ARCH_TAG, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, TILINGKEY_TPL_A5));
 
 ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_BOOL_SEL(TILINGKEY_HAS_TOPK_WEIGHTS, 0, 1),
                                      ASCENDC_TPL_UINT_SEL(ARCH_TAG, ASCENDC_TPL_UI_LIST, TILINGKEY_TPL_A5),
-                                     ASCENDC_TPL_TILING_STRUCT_SEL(MoeEpCombineTilingData)));
+                                     ASCENDC_TPL_TILING_STRUCT_SEL(MoeEpCombineEpilogueTilingData)));
 
 } // namespace Mc2Tiling
-#endif // MOE_EP_COMBINE_TILING_KEY_H
+#endif // MOE_EP_COMBINE_EPILOGUE_TILING_KEY_H

@@ -12,9 +12,9 @@
 
 namespace ops {
 
-class MoeEpCombine : public OpDef {
+class MoeEpCombineEpilogue : public OpDef {
 public:
-    explicit MoeEpCombine(const char *name)
+    explicit MoeEpCombineEpilogue(const char *name)
         : OpDef(name)
     {
         this->Input("context")
@@ -22,37 +22,24 @@ public:
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
-        this->Input("x")
-            .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_BF16, ge::DT_FLOAT16})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
         this->Input("topk_idx")
             .ParamType(REQUIRED)
             .DataType({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
-        this->Input("recv_src_metadata")
+
+        this->Output("combined_x")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_INT32})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("num_recv_tokens_per_expert")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_INT64})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("topk_weights")
-            .ParamType(OPTIONAL)
-            .DataType({ge::DT_FLOAT})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
+            .DataTypeList({ge::DT_BF16, ge::DT_FLOAT16})
+            .Format({ge::FORMAT_ND});
+        this->Output("combined_topk_weights").ParamType(OPTIONAL).DataType({ge::DT_FLOAT}).Format({ge::FORMAT_ND});
 
         this->Attr("ep_world_size").AttrType(REQUIRED).Int();
         this->Attr("ep_rank_id").AttrType(REQUIRED).Int();
         this->Attr("num_experts").AttrType(REQUIRED).Int();
         this->Attr("num_max_tokens_per_rank").AttrType(REQUIRED).Int();
         this->Attr("ccl_buffer_size").AttrType(REQUIRED).Int();
+        this->Attr("has_topk_weights").AttrType(OPTIONAL).Bool(true);
         this->Attr("topo_type").AttrType(OPTIONAL).Int(0);
         this->Attr("rank_num_per_server").AttrType(OPTIONAL).Int(1);
 
@@ -71,6 +58,6 @@ public:
         this->AICore().AddConfig("ascend950", aicore_config);
     }
 };
-OP_ADD(MoeEpCombine);
+OP_ADD(MoeEpCombineEpilogue);
 
 } // namespace ops

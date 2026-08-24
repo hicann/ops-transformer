@@ -928,7 +928,17 @@ class ElasticBuffer:
             lambda: ("bias is not supported, please set bias to None."),
         )
 
-        combined_x, combined_topk_weights = self._runtime.moe_ep_combine(
+        num_tokens = handle.topk_idx.shape[0]
+        hidden = x.shape[1]
+        topk = handle.topk_idx.shape[1]
+        combined_x = torch.empty((num_tokens, hidden), dtype=x.dtype, device=x.device)
+        combined_topk_weights = (
+            None
+            if topk_weights is None
+            else torch.empty((num_tokens, topk), dtype=torch.float32, device=x.device)
+        )
+
+        self._runtime.moe_ep_combine(
             x,
             handle.topk_idx,
             handle.recv_src_metadata,
@@ -938,6 +948,17 @@ class ElasticBuffer:
             self._rank_id,
             handle.num_experts,
             handle.num_max_tokens_per_rank,
+        )
+
+        combined_x, combined_topk_weights = self._runtime.moe_ep_combine_epilogue(
+            handle.topk_idx,
+            topk_weights,
+            self._ep_world_size,
+            self._rank_id,
+            handle.num_experts,
+            handle.num_max_tokens_per_rank,
+            combined_x,
+            combined_topk_weights,
         )
         return combined_x, combined_topk_weights
 

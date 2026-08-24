@@ -786,7 +786,7 @@ public:
     using DispatchTensorList = std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>;
     using DispatchEpilogueTensorList =
         std::tuple<at::Tensor, at::Tensor, c10::optional<at::Tensor>, c10::optional<at::Tensor>>;
-    using CombineTensorList = std::tuple<at::Tensor, c10::optional<at::Tensor>>;
+    using CombineEpilogueTensorList = std::tuple<at::Tensor, c10::optional<at::Tensor>>;
 
     DispatchTensorList MoeEpDispatch(const at::Tensor &x, const at::Tensor &topkIdx,
                                      const c10::optional<at::Tensor> &topkWeights,
@@ -802,10 +802,14 @@ public:
         const c10::optional<at::Tensor> &cachedRecvSrcMetadata, int64_t epWorldSize, int64_t epRankId,
         int64_t numExperts, int64_t numMaxTokensPerRank, at::Tensor &recvX, at::Tensor &recvSrcMetadata,
         const c10::optional<at::Tensor> &recvTopkWeightsOpt, const c10::optional<at::Tensor> &recvScalesOpt);
-    CombineTensorList MoeEpCombine(const at::Tensor &x, const at::Tensor &topkIdx, const at::Tensor &recvSrcMetadata,
-                                   const at::Tensor &numRecvTokensPerExpert,
-                                   const c10::optional<at::Tensor> &topkWeights, int64_t epWorldSize, int64_t epRankId,
-                                   int64_t numExperts, int64_t numMaxTokensPerRank);
+    void MoeEpCombine(const at::Tensor &x, const at::Tensor &topkIdx, const at::Tensor &recvSrcMetadata,
+                      const at::Tensor &numRecvTokensPerExpert, const c10::optional<at::Tensor> &topkWeights,
+                      int64_t epWorldSize, int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank);
+    CombineEpilogueTensorList MoeEpCombineEpilogue(const at::Tensor &topkIdx,
+                                                   const c10::optional<at::Tensor> &topkWeights, int64_t epWorldSize,
+                                                   int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank,
+                                                   at::Tensor &combinedX,
+                                                   const c10::optional<at::Tensor> &combinedTopkWeightsOpt);
 
 private:
     void EnsureEngramContext();
@@ -1298,10 +1302,10 @@ Mc2Api::ElasticBuffer::DispatchEpilogueTensorList Mc2Api::ElasticBuffer::MoeEpDi
     return std::make_tuple(recvX, recvSrcMetadata, recvTopkWeightsOutput, recvScalesOutput);
 }
 
-Mc2Api::ElasticBuffer::CombineTensorList Mc2Api::ElasticBuffer::MoeEpCombine(
-    const at::Tensor &x, const at::Tensor &topkIdx, const at::Tensor &recvSrcMetadata,
-    const at::Tensor &numRecvTokensPerExpert, const c10::optional<at::Tensor> &topkWeights, int64_t epWorldSize,
-    int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank)
+void Mc2Api::ElasticBuffer::MoeEpCombine(const at::Tensor &x, const at::Tensor &topkIdx,
+                                         const at::Tensor &recvSrcMetadata, const at::Tensor &numRecvTokensPerExpert,
+                                         const c10::optional<at::Tensor> &topkWeights, int64_t epWorldSize,
+                                         int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank)
 {
     TORCH_CHECK(x.dim() == DIM_TWO, "x dims must be 2, but got ", x.dim());
     TORCH_CHECK(topkIdx.dim() == DIM_TWO, "topk_idx dims must be 2, but got ", topkIdx.dim());
@@ -1309,29 +1313,35 @@ Mc2Api::ElasticBuffer::CombineTensorList Mc2Api::ElasticBuffer::MoeEpCombine(
     int64_t rankNumPerServer = ResolveRankNumPerServer(epWorldSize);
     int64_t topoType = ResolveTopoType(epWorldSize, rankNumPerServer);
 
-    int64_t numTokens = topkIdx.size(0);
-    int64_t hidden = x.size(1);
-    int64_t topK = topkIdx.size(1);
-
-    at::Tensor combinedX = at::empty({numTokens, hidden}, x.options());
-    at::Tensor combinedTopkWeights;
-    if (topkWeights.has_value()) {
-        combinedTopkWeights = at::empty({numTokens, topK}, x.options().dtype(at::kFloat));
-    } else {
-        combinedTopkWeights = at::Tensor();
-    }
-
     c10::optional<at::Tensor> topkWeightsOpt = topkWeights;
 
     ACLNN_CMD(aclnnMoeEpCombine, moeContextTensor_, x, topkIdx, recvSrcMetadata, numRecvTokensPerExpert, topkWeightsOpt,
-              epWorldSize, epRankId, numExperts, numMaxTokensPerRank, moeCclBufferSize_, topoType, rankNumPerServer,
-              combinedX, combinedTopkWeights);
+              epWorldSize, epRankId, numExperts, numMaxTokensPerRank, moeCclBufferSize_, topoType, rankNumPerServer);
+}
 
-    c10::optional<at::Tensor> combinedTopkWeightsOpt;
-    if (topkWeights.has_value()) {
-        combinedTopkWeightsOpt = combinedTopkWeights;
+Mc2Api::ElasticBuffer::CombineEpilogueTensorList Mc2Api::ElasticBuffer::MoeEpCombineEpilogue(
+    const at::Tensor &topkIdx, const c10::optional<at::Tensor> &topkWeights, int64_t epWorldSize, int64_t epRankId,
+    int64_t numExperts, int64_t numMaxTokensPerRank, at::Tensor &combinedX,
+    const c10::optional<at::Tensor> &combinedTopkWeightsOpt)
+{
+    EnsureMoeContext();
+    int64_t rankNumPerServer = ResolveRankNumPerServer(epWorldSize);
+    int64_t topoType = ResolveTopoType(epWorldSize, rankNumPerServer);
+
+    bool hasTopkWeights = topkWeights.has_value();
+    at::Tensor combinedTopkWeightsTensor = combinedTopkWeightsOpt.has_value() ?
+                                               *combinedTopkWeightsOpt :
+                                               at::empty({1}, combinedX.options().dtype(at::kFloat));
+
+    ACLNN_CMD(aclnnMoeEpCombineEpilogue, moeContextTensor_, topkIdx, epWorldSize, epRankId, numExperts,
+              numMaxTokensPerRank, moeCclBufferSize_, hasTopkWeights, topoType, rankNumPerServer, combinedX,
+              combinedTopkWeightsTensor);
+
+    c10::optional<at::Tensor> combinedTopkWeightsOutput;
+    if (hasTopkWeights) {
+        combinedTopkWeightsOutput = *combinedTopkWeightsOpt;
     }
-    return std::make_tuple(combinedX, combinedTopkWeightsOpt);
+    return std::make_tuple(combinedX, combinedTopkWeightsOutput);
 }
 
 // PyBind11 module definition
@@ -1376,6 +1386,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         .def("moe_ep_dispatch", &Mc2Api::ElasticBuffer::MoeEpDispatch)
         .def("moe_ep_dispatch_epilogue", &Mc2Api::ElasticBuffer::MoeEpDispatchEpilogue)
         .def("moe_ep_combine", &Mc2Api::ElasticBuffer::MoeEpCombine)
+        .def("moe_ep_combine_epilogue", &Mc2Api::ElasticBuffer::MoeEpCombineEpilogue)
         .def_static("get_engram_storage_size_hint", &Mc2Api::ElasticBuffer::GetEngramStorageSizeHint,
                     pybind11::arg("numEntries"), pybind11::arg("hiddenSize"), pybind11::arg("dtype") = at::kBFloat16);
 }

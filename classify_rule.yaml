@@ -671,6 +671,10 @@ mc2_moe_advanced@ops-transformer:
                 - ops/ops-transformer/mc2/moe_ep_combine/op_api/
                 - ops/ops-transformer/mc2/moe_ep_combine/op_kernel/
                 - ops/ops-transformer/mc2/moe_ep_combine/CMakeLists.txt
+                - ops/ops-transformer/mc2/moe_ep_combine_epilogue/op_host/
+                - ops/ops-transformer/mc2/moe_ep_combine_epilogue/op_api/
+                - ops/ops-transformer/mc2/moe_ep_combine_epilogue/op_kernel/
+                - ops/ops-transformer/mc2/moe_ep_combine_epilogue/CMakeLists.txt
                 - ops/ops-transformer/mc2/moe_ep_dispatch/op_host/
                 - ops/ops-transformer/mc2/moe_ep_dispatch/op_api/
                 - ops/ops-transformer/mc2/moe_ep_dispatch/op_kernel/
