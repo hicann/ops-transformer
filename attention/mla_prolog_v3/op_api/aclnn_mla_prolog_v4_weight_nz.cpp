@@ -43,9 +43,9 @@ extern aclnnStatus aclnnInnerMlaPrologV3GetWorkspaceSize(
     const aclTensor *actualSeqLenOptional, const aclTensor *kNopeClipAlphaOptional, double rmsnormEpsilonCq,
     double rmsnormEpsilonCkv, char *cacheModeOptional, bool queryNormFlag, int64_t weightQuantMode,
     int64_t kvCacheQuantMode, int64_t queryQuantMode, int64_t ckvkrRepoMode, int64_t quantScaleRepoMode,
-    int64_t tileSize, double qcQrScale, double kcScale, const aclTensor *queryOut, const aclTensor *queryRopeOut,
-    const aclTensor *dequantScaleQNopeOut, const aclTensor *queryNormOut, const aclTensor *dequantScaleQNormOut,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    int64_t tileSize, double qcQrScale, double kcScale, bool doRope, const aclTensor *queryOut,
+    const aclTensor *queryRopeOut, const aclTensor *dequantScaleQNopeOut, const aclTensor *queryNormOut,
+    const aclTensor *dequantScaleQNormOut, uint64_t *workspaceSize, aclOpExecutor **executor);
 
 extern aclnnStatus aclnnInnerMlaPrologV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                          const aclrtStream stream);
@@ -231,8 +231,9 @@ aclnnStatus aclnnMlaPrologV4WeightNzGetWorkspaceSize(
         return ge::GRAPH_FAILED;
     };
 
-    // do_rope开启时 ropeSin/ropeCos 不允许为空（null 或空 tensor）；
-    // 关闭时 ropeSin/ropeCos 必须同时为空，并利用 TensorHolder 将 null 转为空 tensor 传入 inner，
+    // do_rope 作为 attr 透传 inner，tiling 通过 do_rope attr 判断 RoPE 开关；
+    // doRope=true 时 ropeSin/ropeCos 不允许为空（null 或空 tensor）；
+    // doRope=false 时 ropeSin/ropeCos 必须同时为空，并利用 TensorHolder 将 null 转为空 tensor 传入 inner，
     std::unique_ptr<TensorHolder> ropeSinHolder;
     std::unique_ptr<TensorHolder> ropeCosHolder;
     auto IsRopeInputEmpty = [](const aclTensor *rope) {
@@ -308,7 +309,7 @@ aclnnStatus aclnnMlaPrologV4WeightNzGetWorkspaceSize(
         dequantScaleWUqQrOptional, dequantScaleWDkvKrOptional, quantScaleCkvOptional, quantScaleCkrOptional,
         smoothScalesCqOptional, actualSeqLenOptional, kNopeClipAlphaOptional, rmsnormEpsilonCq, rmsnormEpsilonCkv,
         cacheModeOptional, queryNormFlag, weightQuantMode, kvCacheQuantMode, queryQuantMode, ckvkrRepoMode,
-        quantScaleRepoMode, tileSize, qcQrScale, kcScale, queryOut, queryRopeOut, dequantScaleQNopeOutOptional,
+        quantScaleRepoMode, tileSize, qcQrScale, kcScale, doRope, queryOut, queryRopeOut, dequantScaleQNopeOutOptional,
         queryNormOutOptional, dequantScaleQNormOutOptional, workspaceSize, executor);
 }
 

@@ -372,7 +372,7 @@ ge::graphStatus MlaPrologTiling::SetAttrInfo()
         qcQrScale_ = *(context_->qcQrScale);
         kcScale_ = *(context_->kcScale);
     }
-    // rope 开关由 ropeSin/ropeCos 是否为空 tensor 推导（doRope=false 时为空 tensor），默认开启
+    // rope 开关由 do_rope attr 控制（V1/V2 无该 attr，默认开启），缺省视为开启
     enableRope_ = true;
     if (context_->doRope != nullptr) {
         enableRope_ = *(context_->doRope);
@@ -800,11 +800,12 @@ ge::graphStatus MlaPrologTiling::ConvertContext(gert::TilingContext &context, Ml
         mlaPrologContext.tileSize = attrs->GetAttrPointer<int64_t>(TILE_SIZE_ATTR_INDEX);
         mlaPrologContext.qcQrScale = attrs->GetAttrPointer<float>(QC_QR_SCALE_ATTR_INDEX);
         mlaPrologContext.kcScale = attrs->GetAttrPointer<float>(KC_SCALE_ATTR_INDEX);
-        // RoPE 开关：不新增 do_rope 原型参数，通过 ropeSin 是否为空 tensor 判断；
-        // 空 tensor（含 null 由 op_api 转换而来）时视为关闭 RoPE，其余情况默认开启
-        mlaPrologContext.doRopeValue = mlaPrologContext.ropeSin.shape != nullptr &&
-                                       mlaPrologContext.ropeSin.shape->GetStorageShape().GetShapeSize() != 0;
-        mlaPrologContext.doRope = &mlaPrologContext.doRopeValue;
+        // RoPE 开关：由 do_rope attr 控制（aclnnV3 默认 true，aclnnV4 透传用户开关）；默认开启
+        mlaPrologContext.doRope = attrs->GetAttrPointer<bool>(DO_ROPE_ATTR_INDEX);
+        if (mlaPrologContext.doRope == nullptr) {
+            mlaPrologContext.doRopeValue = true;
+            mlaPrologContext.doRope = &mlaPrologContext.doRopeValue;
+        }
     } else {
         mlaPrologContext.queryNormFlag = nullptr;
         mlaPrologContext.weightQuantMode = nullptr;

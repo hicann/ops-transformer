@@ -177,6 +177,7 @@ public:
         this->Attr("tile_size").AttrType(OPTIONAL).Int(128); // 128 : set value of tile size
         this->Attr("qc_qr_scale").AttrType(OPTIONAL).Float(1.0f);
         this->Attr("kc_scale").AttrType(OPTIONAL).Float(1.0f);
+        this->Attr("do_rope").AttrType(OPTIONAL).Bool(true);
         OpAICoreConfig aicore_config;
         aicore_config.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(true)

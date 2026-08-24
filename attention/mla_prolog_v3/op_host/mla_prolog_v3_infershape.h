@@ -34,6 +34,7 @@ constexpr uint32_t DEQUANT_SCALE_Q_NORM_INDEX = 6;
 constexpr uint32_t ATTR_QUERY_NORM_FLAG_INDEX = 3;
 constexpr uint32_t ATTR_WEIGHT_QUANT_MODE_FLAG_INDEX = 4;
 constexpr uint32_t ATTR_KV_QUANT_MODE_FLAG_INDEX = 5;
+constexpr uint32_t ATTR_DO_ROPE_INDEX = 12;
 
 constexpr uint32_t WEIGHT_QUANT_MODE_NO_QUANT = 0;
 constexpr uint32_t WEIGHT_QUANT_MODE_PARTIAL_QUANT = 1;

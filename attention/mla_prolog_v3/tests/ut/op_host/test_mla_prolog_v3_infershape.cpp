@@ -814,7 +814,8 @@ TEST_F(MlaPrologV3Proto, mla_prolog_v3_infershape_rope_empty_placeholder)
          {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
          {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
-         {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)}});
+         {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+         {"do_rope", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
     std::vector<std::vector<int64_t>> expectOutputShape = {
         {8, 1, 32, 512}, {8, 1, 32, 64}, {16, 128, 1, 512}, {16, 128, 1, 64}, {0}, {0}, {0}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
@@ -867,7 +868,8 @@ TEST_F(MlaPrologV3Proto, mla_prolog_v3_infershape_rope_off_kr_empty_from_weight)
          {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
          {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
-         {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)}});
+         {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+         {"do_rope", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
     std::vector<std::vector<int64_t>> expectOutputShape = {
         {8, 1, 32, 512}, {8, 1, 32, 64}, {16, 128, 1, 656}, {0}, {0}, {0}, {0}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);

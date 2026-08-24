@@ -3795,6 +3795,7 @@ TEST_F(MlaPrologV3, MlaPrologV3_tiling_test_do_rope_false_a2)
             {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
             {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
             {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"do_rope", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
         },
         &compileInfo, "Ascend910_B3", MlaPrologV3_tiling_A2SocInfo, 4096);
     int64_t expectTilingKey = 3671329;
@@ -3851,6 +3852,7 @@ TEST_F(MlaPrologV3, MlaPrologV3_tiling_test_do_rope_false)
             {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
             {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
             {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"do_rope", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
         },
         &compileInfo, "Ascend950", MlaPrologV3_tiling_950SocInfo, 4096);
     int64_t expectTilingKey = 3671521;
@@ -3907,6 +3909,7 @@ TEST_F(MlaPrologV3, MlaPrologV3_tiling_test_do_rope_false_combine_kr_empty)
             {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
             {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
             {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"do_rope", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
         },
         &compileInfo, "Ascend910_B3", MlaPrologV3_tiling_A2SocInfo, 4096);
     int64_t expectTilingKey = 3671457;

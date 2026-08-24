@@ -42,9 +42,9 @@ extern aclnnStatus aclnnInnerMlaPrologV3GetWorkspaceSize(
     const aclTensor *actualSeqLenOptional, const aclTensor *kNopeClipAlphaOptional, double rmsnormEpsilonCq,
     double rmsnormEpsilonCkv, char *cacheModeOptional, bool queryNormFlag, int64_t weightQuantMode,
     int64_t kvCacheQuantMode, int64_t queryQuantMode, int64_t ckvkrRepoMode, int64_t quantScaleRepoMode,
-    int64_t tileSize, double qcQrScale, double kcScale, const aclTensor *queryOut, const aclTensor *queryRopeOut,
-    const aclTensor *dequantScaleQNopeOut, const aclTensor *queryNormOut, const aclTensor *dequantScaleQNormOut,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    int64_t tileSize, double qcQrScale, double kcScale, bool doRope, const aclTensor *queryOut,
+    const aclTensor *queryRopeOut, const aclTensor *dequantScaleQNopeOut, const aclTensor *queryNormOut,
+    const aclTensor *dequantScaleQNormOut, uint64_t *workspaceSize, aclOpExecutor **executor);
 
 extern aclnnStatus aclnnInnerMlaPrologV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                          const aclrtStream stream);
@@ -270,7 +270,7 @@ aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
         dequantScaleWUqQrOptional, dequantScaleWDkvKrOptional, quantScaleCkvOptional, quantScaleCkrOptional,
         smoothScalesCqOptional, actualSeqLenOptional, kNopeClipAlphaOptional, rmsnormEpsilonCq, rmsnormEpsilonCkv,
         cacheModeOptional, queryNormFlag, weightQuantMode, kvCacheQuantMode, queryQuantMode, ckvkrRepoMode,
-        quantScaleRepoMode, tileSize, qcQrScale, kcScale, queryOut, queryRopeOut, dequantScaleQNopeOutOptional,
+        quantScaleRepoMode, tileSize, qcQrScale, kcScale, true, queryOut, queryRopeOut, dequantScaleQNopeOutOptional,
         queryNormOutOptional, dequantScaleQNormOutOptional, workspaceSize, executor);
 }
 
