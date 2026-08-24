@@ -142,7 +142,7 @@ bool CheckBiasShape(const aclTensor* biasOptional, int64_t nVal)
         }
         auto biasDim = biasOptional->GetViewShape().GetDim(0);
         if (biasDim != nVal) {
-            OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "group.length()",
+            OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "biasDim",
                                                        std::to_string(biasDim).c_str(),
                                            ("should equal x2.n-axis " + std::to_string(nVal)).c_str());
             return false;
@@ -165,14 +165,14 @@ bool CheckShapeMMAA(const aclTensor* x1, const aclTensor* x2, const aclTensor* b
             transposeX2, x1->GetViewShape().GetDim(0), x1->GetViewShape().GetDim(1), x2->GetViewShape().GetDim(0), x2->GetViewShape().GetDim(1));
 
     if (kdimX1 != kdimX2) {
-        OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "group.length()",
+        OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "x1.dimK",
                                                    std::to_string(kdimX1).c_str(),
                                            ("should equal x2.dimK " + std::to_string(kdimX2)).c_str());
         return false;
     }
     if (kdimX1 < KVALUE_MIN || kdimX1 > KVALUE_MAX) {
-        OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "group.length()",
-                                        std::to_string(kdimX1).c_str(), "in range [1, 65535]");
+        OP_LOGE_FOR_INVALID_VALUE("matmul_allto_all", "K-axis", std::to_string(kdimX1).c_str(),
+            "should be in the range [1, 65535]");
         return false;
     }
     auto nVal = transposeX2 ? x2->GetViewShape().GetDim(0) : x2->GetViewShape().GetDim(1);
