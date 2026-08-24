@@ -43,9 +43,8 @@ public:
 };
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void
-FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::ProcessBn2gs1s2LastVec(FagRunInfo &prevRunInfo,
-                                                                                   bool &needSyncDkMM)
+__aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::ProcessBn2gs1s2LastVec(
+    FagRunInfo &prevRunInfo, bool &needSyncDkMM)
 {
     LocalTensor<CALC_TYPE> mm1ResTensor =
         this->mm1ResBuf[prevRunInfo.commonRunInfo.taskIdMod2].template Get<CALC_TYPE>();
@@ -160,9 +159,8 @@ FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::ProcessBn2gs1s2LastV
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void
-FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::ComputeDqkvBn2gs1s2(FagRunInfo &prevRunInfo,
-                                                                                bool &needSyncDkMM, int64_t taskId)
+__aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::ComputeDqkvBn2gs1s2(
+    FagRunInfo &prevRunInfo, bool &needSyncDkMM, int64_t taskId)
 {
     LocalTensor<CALC_TYPE> mm2ResTensor =
         this->mm2ResBuf[prevRunInfo.commonRunInfo.taskIdMod2].template Get<CALC_TYPE>();
@@ -311,9 +309,8 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void
-FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::ComputeDqkvBn2(FagRunInfo &prevRunInfo, bool &needSyncDkMM,
-                                                                           int64_t taskId)
+__aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::ComputeDqkvBn2(
+    FagRunInfo &prevRunInfo, bool &needSyncDkMM, int64_t taskId)
 {
     LocalTensor<CALC_TYPE> mm1ResTensor =
         this->mm1ResBuf[prevRunInfo.commonRunInfo.taskIdMod2].template Get<CALC_TYPE>();
@@ -605,15 +602,17 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
     if (nextValidBlockInnerIdx == -1) {
         return;
     }
-    
+
     blockInnerIdx = nextValidBlockInnerIdx;
     FagRunInfo prevRunInfo;
     bool needSyncDkDvFixUb = false;
     bool isLastTwoLoop = false;
     uint8_t lastTwoLoopCount = 0;
     while (true) {
-        if (taskId > 0) {
+        if (taskId > 1) {
             prevRunInfo = runInfos[(taskId + 1) % PRELOAD_TIMES];
+        }
+        if (taskId > 0 && lastTwoLoopCount <= 1) {
             if (likely(!this->constInfo.enablePreSfmg)) {
                 this->vecBlock.ProcessVec1(this->constInfo,
                                            runInfos[(taskId + NUM_TWO) % PRELOAD_TIMES]); // v1: softmaxGrad
