@@ -290,7 +290,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
             <li>CacheMode="TND": (T,Nkv,Dtile)</li>
           </ul>
         </td>
-        <td>×</td>
+        <td>仅支持首轴非连续；除首轴外的其余轴必须连续</td>
       </tr>
       <tr>
         <td>krCacheRef</td>
@@ -312,7 +312,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
             <li>当ckvkrRepoMode=1时: 维度应包含0，支持shape为(0)</li>
           </ul>
         </td>
-        <td>×</td>
+        <td>仅支持首轴非连续；除首轴外的其余轴必须连续</td>
       </tr>
       <tr>
         <td>cacheIndexOptional</td>
