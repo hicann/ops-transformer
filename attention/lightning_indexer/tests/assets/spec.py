@@ -57,11 +57,36 @@ class LightningIndexerSpec:
 
     def compare(*outputs, compare_context=None, **kwargs):
         del kwargs
-        testcase_name = None if compare_context is None else compare_context.testcase_name
+        testcase_name = (
+            None if compare_context is None else compare_context.testcase_name
+        )
         data = golden_module.get_compare_data(testcase_name)
         if data is None:
             if compare_context is None:
-                raise RuntimeError("LightningIndexer pytest compare requires compare_context")
+                raise RuntimeError(
+                    "LightningIndexer pytest compare requires compare_context"
+                )
+            data = inputs_module.rebuild_li_compare_data(compare_context)
+            golden_module.set_compare_data(compare_context.testcase_name, data)
+        return compare_module.compare(*outputs, compare_data=data)
+
+
+class LightningIndexerAclnnSpec:
+    golden = golden_module.cpu_lightning_indexer_aclnn
+    customize_inputs = inputs_module.generate_li_inputs_aclnn
+    tolerance = LightningIndexerSpec.tolerance
+
+    def compare(*outputs, compare_context=None, **kwargs):
+        del kwargs
+        testcase_name = (
+            None if compare_context is None else compare_context.testcase_name
+        )
+        data = golden_module.get_compare_data(testcase_name)
+        if data is None:
+            if compare_context is None:
+                raise RuntimeError(
+                    "LightningIndexer pytest compare requires compare_context"
+                )
             data = inputs_module.rebuild_li_compare_data(compare_context)
             golden_module.set_compare_data(compare_context.testcase_name, data)
         return compare_module.compare(*outputs, compare_data=data)
@@ -69,4 +94,5 @@ class LightningIndexerSpec:
 
 __spec__ = {
     "torch_npu.npu_lightning_indexer": "LightningIndexerSpec",
+    "aclnnLightningIndexer": "LightningIndexerAclnnSpec",
 }

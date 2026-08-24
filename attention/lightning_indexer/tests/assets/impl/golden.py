@@ -59,7 +59,14 @@ def set_compare_data(testcase_name, data):
     CASE_DATA.case_data = {str(testcase_name): data}
 
 
-__golden__ = {"e2e": {"torch_npu.npu_lightning_indexer": "cpu_lightning_indexer"}}
+__golden__ = {
+    "e2e": {
+        "torch_npu.npu_lightning_indexer": "cpu_lightning_indexer",
+    },
+    "aclnn": {
+        "aclnnLightningIndexer": "cpu_lightning_indexer_aclnn",
+    },
+}
 
 
 def cpu_lightning_indexer(
@@ -84,6 +91,43 @@ def cpu_lightning_indexer(
     del query, key, weights, actual_seq_lengths_query, actual_seq_lengths_key
     del block_table, layout_query, layout_key, sparse_count, sparse_mode
     del pre_tokens, next_tokens
+    data = CASE_DATA.activate(testcase_name)
+    return_value = bool(return_value or kwargs.get("return_values", False))
+    if return_value:
+        indices = data["cpu_result"]
+        gather_idx = indices.clamp_min(0).to(torch.long)
+        values = torch.gather(data["score_values"], -1, gather_idx)
+        values = values.to(data["value_dtype"])
+        values = torch.where(
+            indices < 0, torch.full_like(values, -float("inf")), values
+        )
+        return data["cpu_result"], values
+    return data["cpu_result"], torch.zeros(0, dtype=data["score_values"].dtype)
+
+
+def cpu_lightning_indexer_aclnn(
+    query,
+    key,
+    weights,
+    actual_seq_lengths_query,
+    actual_seq_lengths_key,
+    block_table,
+    layout_query,
+    layout_key,
+    sparse_count,
+    sparse_mode,
+    pre_tokens,
+    next_tokens,
+    return_value,
+    sparse_indices_out,
+    sparse_values_out,
+    testcase_name=None,
+    **kwargs,
+):
+    """Full aclnn param order. Return the CPU outputs produced while generating this exact pytest case."""
+    del query, key, weights, actual_seq_lengths_query, actual_seq_lengths_key
+    del block_table, layout_query, layout_key, sparse_count, sparse_mode
+    del pre_tokens, next_tokens, sparse_indices_out, sparse_values_out
     data = CASE_DATA.activate(testcase_name)
     return_value = bool(return_value or kwargs.get("return_values", False))
     if return_value:
