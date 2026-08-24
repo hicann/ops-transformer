@@ -13,7 +13,7 @@
 #include <initializer_list>
 
 #include "../../../../op_host/arch22/fia_tiling_nonquant_mla.h"
-#include "../../../../op_host/checkers/paged_attention_checker.h"
+#include "../../../../op_host/checkers/paged_attention_checker_fused_infer.h"
 #include "../../../../op_host/fused_infer_attention_score_tiling_info_parser.h"
 
 namespace FusedInferAttentionScoreUT {
@@ -28,8 +28,7 @@ void SetStride(gert::Stride &stride, std::initializer_list<int64_t> values)
     }
 }
 
-optiling::FiaTilingInfo MakeArch22MlaD512Info(int32_t keyDim = -1, int32_t valueDim = -1,
-                                              int32_t keyRopeDim = -1)
+optiling::FiaTilingInfo MakeArch22MlaD512Info(int32_t keyDim = -1, int32_t valueDim = -1, int32_t keyRopeDim = -1)
 {
     static const char layout[] = "TND";
     optiling::FiaTilingInfo fiaInfo;

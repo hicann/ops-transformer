@@ -209,7 +209,11 @@ template <FiaKernelType>
 struct ConstInfo_t;
 
 template <>
-struct ConstInfo_t<FiaKernelType::NO_QUANT> : CommonConstInfo, PAConstInfo, LseConstInfo {};
+struct ConstInfo_t<FiaKernelType::NO_QUANT> : CommonConstInfo, PAConstInfo, LseConstInfo {
+    bool needInit =
+        false; /* 启动时是否需要预清输出(attentionOut写0/lse写3e+99), 由host下发fiaEmptyTensorParams.needInit */
+    uint8_t l2CacheOffFlag = 0; /* gSize*s1Size<=64 场景关闭K/V的L2 Cache, 由host下发fiaBaseParams.l2CacheOffFlag */
+};
 
 template <>
 struct ConstInfo_t<FiaKernelType::FULL_QUANT> : CommonConstInfo, PAConstInfo, LseConstInfo, TensorListConstInfo {};
