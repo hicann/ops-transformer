@@ -15,7 +15,6 @@
  */
 
 #include "arch35/flash_attn_template_tiling_key.h"
-#include "utils/flash_attn_utils.h"
 #include "utils/flash_attn_common_def.h"
 #if __has_include("../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h")
 #include "../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
@@ -93,11 +92,12 @@ __aicore__ inline constexpr bool EnableSoftmaxDn()
 }
 
 template <uint8_t inOutLayoutType, uint8_t KvLayoutType, bool hasAttenMask, uint8_t config>
-__global__ __aicore__ void
-flash_attn(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *blockTable,
-           __gm__ uint8_t *cuSeqLensQ, __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedKv,
-           __gm__ uint8_t *sinks, __gm__ uint8_t *attnMask, __gm__ uint8_t *metadata, __gm__ uint8_t *attnOut,
-           __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+__global__ __aicore__ void flash_attn(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
+                                      __gm__ uint8_t *blockTable, __gm__ uint8_t *cuSeqLensQ,
+                                      __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedKv,
+                                      __gm__ uint8_t *sinks, __gm__ uint8_t *attnMask, __gm__ uint8_t *metadata,
+                                      __gm__ uint8_t *attnOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
+                                      __gm__ uint8_t *tiling)
 {
     REGISTER_TILING_DEFAULT(optiling::FlashAttnTilingData);
     __gm__ uint8_t *user = GetUserWorkspace(workspace);

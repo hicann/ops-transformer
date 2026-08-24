@@ -23,6 +23,7 @@ constexpr uint32_t FA_AIV_CORE_NUM = 72;
 // AICPU metadata format: 16 fields per core (FA and FD both)
 constexpr uint32_t FLASH_ATTN_METADATA_SIZE = 16;
 constexpr uint32_t FA_FD_METADATA_SIZE = 16;
+static constexpr uint32_t FA_METADATA_HEADER_OFFSET = 16U * sizeof(uint32_t);
 
 // FA Metadata Index Definitions (0-based, matching AICPU flash_attn_metadata.h)
 // No CORE_ENABLE field in AICPU format; inactive cores have all-zero data.
