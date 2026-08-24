@@ -19,7 +19,7 @@ endif()
 # Device 侧使用算子内拷贝的 Catlass 头文件（op_kernel/catlass，来源 v1.3.1-notla），
 # 不再依赖仓库级 3rdparty/catlass 子模块。与 ChunkKdaFwd 的 vendored 方式一致。
 set(MSA_CATLASS_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../op_kernel")
-if(NOT EXISTS "${MSA_CATLASS_INCLUDE_DIR}/catlass/catlass.hpp")
+if(NOT EXISTS "${MSA_CATLASS_INCLUDE_DIR}/catlass/msa_catlass.hpp")
     message(FATAL_ERROR
         "MsaIndexScore requires vendored Catlass headers under op_kernel/catlass.")
 endif()
