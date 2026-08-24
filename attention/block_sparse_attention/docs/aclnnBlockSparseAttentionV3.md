@@ -1,13 +1,23 @@
 ## 产品支持情况
 
-|产品      | 是否支持 |
-|:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas 推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas 训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
@@ -72,61 +82,61 @@
 
 每个算子分为[两段式接口](https://gitcode.com/cann/ops-transformer/blob/master/docs/zh/context/two_phase_api.md)，必须先调用"aclnnBlockSparseAttentionV3GetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnBlockSparseAttentionV3"接口执行计算。
 
-```
-__attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionV3GetWorkspaceSize(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *blockSparseMaskOptional,
-    const aclTensor *attenMaskOptional,
-    const aclIntArray *blockShapeOptional,
-    const aclIntArray *actualSeqLengthsOptional,
-    const aclIntArray *actualSeqLengthsKvOptional,
-    const aclTensor *blockTableOptional,
-    const aclTensor *qDequantScaleOptional,
-    const aclTensor *kDequantScaleOptional,
-    const aclTensor *vDequantScaleOptional,
-	const aclTensor *pQuantScaleOptional,
-    char *qInputLayout,
-    char *kvInputLayout,
-    int64_t numKeyValueHeads,
-    int64_t maskType,
-    double scaleValue,
-    int64_t innerPrecise,
-    int64_t blockSize,
-    int64_t preTokens,
-    int64_t nextTokens,
-    int64_t softmaxLseFlag,
-    int64_t quantMode,
-    double dstTypeMax,
-    aclTensor *attentionOut,
-    aclTensor *softmaxLseOptional,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+```c++
+aclnnStatus aclnnBlockSparseAttentionV3GetWorkspaceSize(
+  const aclTensor   *query,
+  const aclTensor   *key,
+  const aclTensor   *value,
+  const aclTensor   *blockSparseMaskOptional,
+  const aclTensor   *attenMaskOptional,
+  const aclIntArray *blockShapeOptional,
+  const aclIntArray *actualSeqLengthsOptional,
+  const aclIntArray *actualSeqLengthsKvOptional,
+  const aclTensor   *blockTableOptional,
+  const aclTensor   *qDequantScaleOptional,
+  const aclTensor   *kDequantScaleOptional,
+  const aclTensor   *vDequantScaleOptional,
+  const aclTensor   *pQuantScaleOptional,
+  char              *qInputLayout,
+  char              *kvInputLayout,
+  int64_t            numKeyValueHeads,
+  int64_t            maskType,
+  double             scaleValue,
+  int64_t            innerPrecise,
+  int64_t            blockSize,
+  int64_t            preTokens,
+  int64_t            nextTokens,
+  int64_t            softmaxLseFlag,
+  int64_t            quantMode,
+  double             dstTypeMax,
+  aclTensor         *attentionOut,
+  aclTensor         *softmaxLseOptional,
+  uint64_t          *workspaceSize,
+  aclOpExecutor    **executor)
 ```
 
-```
-__attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionV3(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    aclrtStream stream);
+```c++
+aclnnStatus aclnnBlockSparseAttentionV3(
+  void             *workspace,
+  uint64_t          workspaceSize,
+  aclOpExecutor    *executor,
+  aclrtStream       stream)
 ```
 
 ## aclnnBlockSparseAttentionV3GetWorkspaceSize
 
 - **参数说明**
 
-  <table style="undefined;table-layout: fixed; width: 1550px">
+  <table style="undefined;table-layout: fixed; width: 1300px">
   <colgroup>
-  <col style="width: 269px">
-  <col style="width: 132px">
-  <col style="width: 270px">
-  <col style="width: 350px">
-  <col style="width: 185px">
-  <col style="width: 119px">
-  <col style="width: 146px">
-  <col style="width: 145px">
+  <col style="width: 250px">
+  <col style="width: 90px">
+  <col style="width: 200px">
+  <col style="width: 340px">
+  <col style="width: 160px">
+  <col style="width: 80px">
+  <col style="width: 90px">
+  <col style="width: 90px">
   </colgroup>
   <thead>
     <tr>
@@ -228,9 +238,10 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionV3(
         </ul>
         当配置此输入时：必须包含两个元素[blockShapeX, blockShapeY]
         <ul>
-          <li>blockShapeX: Q方向块大小，值必须大于0，MXFP4的量化时只支持64的倍数。</li>
-          <li>blockShapeY: KV方向块大小，值必须大于0；在Ascend 950PR/Ascend 950DT上须为16的倍数，MXFP4的量化时只支持64的倍数，在Atlas A2 训练系列产品/Atlas A2 推理系列产品、Atlas A3 训练系列产品/Atlas A3 推理系列产品上须为128的倍数。</li>
+          <li>blockShapeX: Q方向块大小，值必须大于0。</li>
+          <li>blockShapeY: KV方向块大小，值必须大于0。</li>
         </ul>
+        各产品对blockShapeX/blockShapeY的具体倍数约束，详见<a href="#constraint_rule">约束说明</a>。
       </td>
       <td>INT64</td>
       <td>-</td>
@@ -417,7 +428,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionV3(
       <td>输入</td>
       <td>Softmax计算采取的精度级别。</td>
       <td>
-        控制online softmax阶段以及rescale阶段运算使用的数据类型。当前只支持传0或1或4，其中，<term>Ascend 950PR/Ascend 950DT</term>仅支持配置为4，<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>仅支持配置为0或1
+        控制online softmax阶段以及rescale阶段运算使用的数据类型。当前只支持传0或1或4，各产品支持的取值详见<a href="#constraint_rule">约束说明</a>。
         <ul>
           <li>0：表示online softmax和rescale全部采取fp32数据类型，适合追求计算精度的场景使用。</li>
           <li>1：仅支持输入的query、key、value均为fp16数据类型时配置，表示online softmax和rescale全部采取fp16数据类型，性能更好，但精度较低，且可能发生计算时的数值溢出，使用者需根据值域范围自行判断是否使用。</li>
@@ -651,13 +662,21 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionV3(
 - 当前query、key、value的InputLayout必须保持一致。
 - 输入query、key、value的数据类型必须一致，支持FLOAT16和BFLOAT16。
 - query、key、value的D轴当前仅支持配置为64或128
-- blockShapeOptional如果传入，则必须包含至少两个元素[blockShapeX, blockShapeY]，且值必须大于0，blockShapeY必须为128的倍数。
+- blockShapeOptional如果传入，则必须包含至少两个元素[blockShapeX, blockShapeY]，且值必须大于0。blockShapeX/blockShapeY在不同产品上的倍数约束如下：
+  <!-- npu="950" id7 -->
+  - 在<term>Ascend 950PR/Ascend 950DT</term>上：blockShapeY须为16的倍数；MXFP4量化（quantMode=2/3）时，blockShapeX和blockShapeY均只支持64的倍数。
+  <!-- end id7 -->
+  <!-- npu="910b,A3" id8 -->
+  - 在<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>上：blockShapeY须为128的倍数。
+  <!-- end id8 -->
 - blockSparseMaskOptional当前必须传入，且shape必须为[batch, headNum, ceilDiv(maxQS, blockShapeX), ceilDiv(maxKVS, blockShapeY)]。
 - attentionMaskOptional当前只支持传入nullptr。
 - actualSeqLengthsOptional在qInputLayout为“TND”时必选；actualSeqLengthsKvOptional在kvInputLayout为“TND”时必选。
 - actualSeqLengthsOptional与actualSeqLengthsKvOptional当前必须同时配置或同时不配置，仅配置其中之一的行为将被算子拦截。
 - blockTableOptional当前只支持传入nullptr，表示不开启PagedAttention特性。
-- innerPrecise仅支持配置4，表示混合精度运算，在性能与精度上取得一个折中。
+<!-- npu="950,A3,910b" id9 -->
+- innerPrecise必须为0或1或4，其中，<term>Ascend 950PR/Ascend 950DT</term>仅支持配置为4，<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>仅支持配置为0或1。
+<!-- end id9 -->
 - softmaxLseFlag仅支持配置0或1，分别表示不开启/开启softmaxLse输出。
 - qSeqlen和kvSeqlen不需要被blockShape整除，支持非对齐场景，实际分块数通过向上取整计算。
 - 输入query的headNum为N1，输入key和value的headNum为N2，则N1 >= N2 && N1 % N2 == 0。
@@ -713,7 +732,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionV3(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```
+```c++
 #include <iostream>
 #include <vector>
 #include <cstring>

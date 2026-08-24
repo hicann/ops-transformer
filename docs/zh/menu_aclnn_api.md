@@ -23,6 +23,7 @@
 - [aclnnBlockSparseAttention](../../attention/block_sparse_attention/docs/aclnnBlockSparseAttention.md)
 - [aclnnBlockSparseAttentionGrad](../../attention/block_sparse_attention_grad/docs/aclnnBlockSparseAttentionGrad.md)
 - [aclnnBlockSparseAttentionV2](../../attention/block_sparse_attention/docs/aclnnBlockSparseAttentionV2.md)
+- [aclnnBlockSparseAttentionV3](../../attention/block_sparse_attention/docs/aclnnBlockSparseAttentionV3.md)
 - [aclnnCausalConv1dFn](../../mamba/causal_conv1d/docs/aclnnCausalConv1dFn.md)
 - [aclnnCausalConv1dUpdate](../../mamba/causal_conv1d/docs/aclnnCausalConv1dUpdate.md)
 - [aclnnChunkGatedDeltaRule](../../attention/chunk_gated_delta_rule/docs/aclnnChunkGatedDeltaRule.md)

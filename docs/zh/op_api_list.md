@@ -49,6 +49,7 @@
 |[aclnnBlitzSparseAttention](../../experimental/attention/blitz_sparse_attention/docs/aclnnBlitzSparseAttention.md)|全量推理场景的FlashAttention算子，支持sparse优化、actualSeqLengthsKv优化、int8量化功能、innerPrecise参数（用于支持高精度或者高性能模式选择）。|-|-|
 |[aclnnBlockSparseAttention](../../attention/block_sparse_attention/docs/aclnnBlockSparseAttention.md)|BlockSparseAttention通过BlockSparseMask指定每个Q块选择的KV块，实现高效的稀疏注意力计算。|默认确定性实现|默认确定性实现|
 |[aclnnBlockSparseAttentionV2](../../attention/block_sparse_attention/docs/aclnnBlockSparseAttentionV2.md)|BlockSparseAttention通过BlockSparseMask指定每个Q块选择的KV块，实现高效的稀疏注意力计算。|默认确定性实现|默认确定性实现|
+|[aclnnBlockSparseAttentionV3](../../attention/block_sparse_attention/docs/aclnnBlockSparseAttentionV3.md)|BlockSparseAttention通过BlockSparseMask指定每个Q块选择的KV块，实现高效的稀疏注意力计算，支持MXFP4量化模式。|默认确定性实现|默认确定性实现|
 |[aclnnBlockSparseAttentionGrad](../../attention/block_sparse_attention_grad/docs/aclnnBlockSparseAttentionGrad.md)|BlockSparseAttentionGrad通过BlockSparseMask指定每个Q块选择的KV块，实现高效的稀疏注意力计算。|默认确定性实现| - |
 |[aclnnBSASelectBlockMask](../../attention/bsa_select_block_mask/docs/aclnnBSASelectBlockMask.md)|BSASelectBlockMask是BSA（BlockSparseAttention）的前置算子，根据Query和Key的内容动态生成blockSparseMask，使BSA的调用链从"手动提供掩码"变为"根据Q/K内容自适应选择稀疏模式"。|默认确定性实现| - |
 |[aclnnCausalConv1dFn](../../mamba/causal_conv1d/docs/aclnnCausalConv1dFn.md)|完成因果一维卷积（Causal Conv1d）的前向计算（prefill / chunk-prefill）。算子内部支持SiLU激活、缓存索引（cacheIndices）、初始状态模式（initialStateMode）等特性。| - | 默认确定性实现 |
