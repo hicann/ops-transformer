@@ -288,6 +288,7 @@
 
 - 该接口支持推理场景下使用。
 - 该接口支持aclgraph模式。
+- 该接口支持batch一致性。
 - 该接口当前支持三种计算场景：SWA（Sliding Window Attention）场景仅传入`ori_kv`；CSA（Compressed Sparse Attention）场景传入`ori_kv`、`cmp_kv`及`cmp_sparse_indices`；HCA（Heavily Compressed Attention）场景传入`ori_kv`及`cmp_kv`。
 
 ### 常见字段释义

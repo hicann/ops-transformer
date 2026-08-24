@@ -271,6 +271,7 @@
 
 - 该接口支持训练、推理场景下使用。
 - 该接口支持aclgraph模式。
+- 该接口支持batch一致性。
 - 该接口当前支持四种计算场景：SWA（Sliding Window Attention）场景仅传入`ori_kv`；SWA稀疏ori_kv场景传入`ori_kv`、`ori_sparse_indices`及`ori_topk_length`；CSA（Compressed Sparse Attention）场景传入`ori_kv`、`cmp_kv`及`cmp_sparse_indices`；HCA（Heavily Compressed Attention）场景传入`ori_kv`及`cmp_kv`。
 - 通用规格约束如下：
   - KV\_N仅支持1，D仅支持512。其中，`ori_kv`和`cmp_kv`的D_kv由nope(448)和rope(64)拼接而成。

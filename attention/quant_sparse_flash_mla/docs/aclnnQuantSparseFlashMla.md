@@ -178,7 +178,7 @@ aclnnStatus aclnnQuantSparseFlashMla(
       <td>q（aclTensor*）</td>
       <td>输入</td>
       <td>Query输入张量。</td>
-      <td>不支持空Tensor。N1/N2仅支持1到128；D仅支持512。</td>
+      <td>不支持空Tensor。qN仅支持1到128；D仅支持512。</td>
       <td>HIFLOAT8</td>
       <td>ND</td>
       <td>
@@ -365,7 +365,7 @@ aclnnStatus aclnnQuantSparseFlashMla(
       <td>sequsedCmpKvOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中cmpKv实际参与运算的token数。</td>
-      <td>可选输入。传入时shape必须为(B,)，作为每个batch的cmp逻辑有效长度，优先于cmpKvOptional shape、cuSeqlensCmpKvOptional或PA block table推导；layoutKvOptional为BSND、TND、PA_BBND时均可使用。</td>
+      <td>可选输入。传入时shape必须为(B,)，作为每个batch的cmp逻辑有效长度，优先于cmpKvOptional shape、cuSeqlensCmpKvOptional或PA block table推导。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(b,)</td>
@@ -455,7 +455,7 @@ aclnnStatus aclnnQuantSparseFlashMla(
       <td>cmpRatio（int64_t）</td>
       <td>输入</td>
       <td>cmpKv相对于压缩前KV长度的压缩倍率，用于恢复cmp侧mask使用的压缩前KV长度。</td>
-      <td>cmpRatio支持1到128。在SWA典型场景，仅支持默认值1。</td>
+      <td>cmpRatio支持1到128。在cmpKv未传入时，仅支持默认值1。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -643,7 +643,7 @@ aclnnStatus aclnnQuantSparseFlashMla(
       <td rowspan="1">161002</td>
       <td>输入变量的数据类型、数据格式和属性值不在支持的范围内。</td>
     </tr>
-  
+
   </tbody>
   </table>
 
@@ -734,8 +734,8 @@ aclnnStatus aclnnQuantSparseFlashMla(
 #### 公共参数组
 
 - 入参为空的场景处理：
-    - 空tensor指必选输入、某调用场景下必传输入和输出的shape size为0，即有任意轴为0。
-    - 触发空tensor的用例将全部拦截报错。
+  - 空tensor指必选输入、某调用场景下必传输入和输出的shape size为0，即有任意轴为0。
+  - 触发空tensor的用例将全部拦截报错。
 
 - q、oriKvOptional、cmpKvOptional、qDescaleOptional、oriKvDescaleOptional、cmpKvDescaleOptional、attnOutOut校验
 
@@ -979,8 +979,8 @@ metadataOptional校验
             </td>
             <td>
                 <ul>
-                     <li>只有oriKvOptional稀疏场景下，cmpMaskMode为0和oriMaskMode必须为0</li>
-                     <li>SWA场景下，oriMaskMode为0、3、4</li>
+                     <li>oriKvOptional稀疏场景下，cmpMaskMode为0和oriMaskMode必须为0</li>
+                     <li>oriMaskMode支持0、3、4</li>
                  </ul>
              </td>
          </tr>
@@ -1001,7 +1001,7 @@ metadataOptional校验
              <td>
                 <ul>
                     <li>当oriKvOptional/cmpKvOptional/cmpSparseIndicesOptional/oriSparseIndicesOptional传入时，cmpMaskMode为0和oriMaskMode必须为0</li>
-                    <li>SWA场景下cmpMaskMode必须为0 </li>
+                    <li>cmpKv未传入时，cmpMaskMode必须为0 </li>
                 </ul>
             </td>
         </tr>
@@ -1196,7 +1196,7 @@ metadataOptional校验
             </td>
             <td>无</td>
             <td>
-                在SWA典型场景，仅支持默认值1。
+                cmpKv未传入时，仅支持默认值1。
             </td>
         </tr>
         <tr>

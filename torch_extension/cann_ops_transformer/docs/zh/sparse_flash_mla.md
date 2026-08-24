@@ -158,15 +158,15 @@ cann_ops_transformer.sparse_flash_mla(
 | seqused_ori_kv | Tensor | 可选 | 每个Batch中`ori_kv`实际参与计算的token数。 | int32 | ND | (b,) |
 | seqused_cmp_kv | Tensor | 可选 | 每个Batch中`cmp_kv`实际参与计算的token数。 | int32 | ND | (b,) |
 | cmp_residual_kv | Tensor | 可选 | 每个Batch压缩前kv长度除以`cmp_ratio`的余数，用于恢复cmp侧mask长度。 | int32 | ND | (b,) |
-| ori_topk_length | Tensor | 可选 | 预留字段，当前版本不支持传入。 | int32 | ND | - |
-| cmp_topk_length | Tensor | 可选 | 预留字段，当前版本不支持传入。 | int32 | ND | - |
+| ori_topk_length | Tensor | 可选 |  表示ori_sparse_indices实际参与计算的长度。 | int32 | ND | `BSND`：(b, q_s, kv_n)<br>`TND`：(q_t, kv_n) |
+| cmp_topk_length | Tensor | 可选 |  表示cmp_sparse_indices实际参与计算的长度。 | int32 | ND | `BSND`：(b, q_s, kv_n)<br>`TND`：(q_t, kv_n) |
 | batch_size | int32 | 可选 | Batch大小；BSND场景使用该值，默认值为0。 | int32 | - | - |
 | max_seqlen_q | int32 | 可选 | `q`的最大有效序列长度，TND场景需与实际最大长度一致。默认值为0。 | int32 | - | - |
 | max_seqlen_ori_kv | int32 | 可选 | `ori_kv`的最大有效序列长度，默认值为0。 | int32 | - | - |
 | max_seqlen_cmp_kv | int32 | 可选 | `cmp_kv`的最大有效序列长度，默认值为0。 | int32 | - | - |
-| ori_topk | int32 | 可选 | 原始kv的TopK长度，当前支持传0。 | int32 | - | - |
-| cmp_topk | int32 | 可选 | 压缩kv的TopK长度；CSA场景取值大于0，且应与索引最后一维对应；SWA和HCA场景取值为0。默认值为0。 | int32 | - | - |
-| cmp_ratio | int32 | 可选 | `cmp_kv`相对于压缩前kv的压缩倍率；SWA场景固定为1，CSA和HCA场景取值大于0。默认值为1。 | int32 | - | - |
+| ori_topk | int32 | 可选 | 表示`ori_kv`中筛选出的关键稀疏token的个数。0表示非稀疏场景。默认值为0 。 | int32 | - | - |
+| cmp_topk | int32 | 可选 | 表示`cmp_kv`中筛选出的关键稀疏token的个数。0表示非稀疏场景。默认值为0。 | int32 | - | - |
+| cmp_ratio | int32 | 可选 | `cmp_kv`相对于压缩前kv的压缩倍率；`cmp_kv`不传时，固定为1，`cmp_kv`传入时，取值1-128。默认值为1。 | int32 | - | - |
 | ori_mask_mode | int32 | 可选 | `q`与`ori_kv`的mask模式：0（No Mask）、3（RightDownCausal）或4（Band）。 | int32 | - | - |
 | cmp_mask_mode | int32 | 可选 | `q`与`cmp_kv`的mask模式：0（No Mask）或3（RightDownCausal）。 | int32 | - | - |
 | ori_win_left | int32 | 可选 | `ori_kv`滑动窗口左边界，取值为-1或不小于0；-1表示不限制。 | int32 | - | - |
@@ -200,7 +200,7 @@ cann_ops_transformer.sparse_flash_mla(
 | sinks | Tensor | 可选 | 表示各注意力头设置独立可学习虚拟偏移项，用于维持长文本推理时的稳定性。 | float32 | ND | (q_n,) |
 | metadata | Tensor | 必选 | 由`sparse_flash_mla_metadata`生成的分核信息。 | int32 | ND | (1024,) |
 | softmax_scale | float | 可选 | QK矩阵乘后的缩放系数。默认值为1.0。 | float32 | - | - |
-| cmp_ratio | int32 | 可选 | 压缩倍率；SWA场景固定为1，CSA和HCA场景取值大于0。默认值为1。 | int32 | - | - |
+| cmp_ratio | int32 | 可选 | 压缩倍率，取值范围1-128。；SWA场景固定为1，CSA和HCA场景取值1-128。默认值为1。 | int32 | - | - |
 | ori_mask_mode | int32 | 可选 | `q`与`ori_kv`的mask模式。0：No mask。3：rightDownCausal模式。4：sliding window模式。默认值为4。 | int32 | - | - |
 | cmp_mask_mode | int32 | 可选 | `q`与`cmp_kv`的mask模式。0：No mask。3：rightDownCausal模式。默认值为3。 | int32 | - | - |
 | ori_win_left | int32 | 可选 | `ori_kv`滑动窗口左边界，表示`q`和`ori_kv`计算中`q`对历史token计算的数量，取值为-1或不小于0。-1表示不限制。默认值为-1。 | int32 | - | - |
@@ -231,6 +231,15 @@ cann_ops_transformer.sparse_flash_mla(
 
 - 声明
   - `cu_seqlens_q`、`cu_seqlens_ori_kv`、`cu_seqlens_cmp_kv`、`seqused_q`、`seqused_ori_kv`、`seqused_cmp_kv`、`cmp_residual_kv`、稀疏索引及Block Table均为Tensor。算子在Tiling阶段无法校验其具体值，用户必须保证其合法性；传入非法值可能导致精度异常或非法内存访问。
+  - 当输入为PA_BBND时，`seqused_ori_kv`和`ori_block_table`必须传入；当输入为BSND时，`seqused_ori_kv`可用于表达每个batch的`ori_kv`有效长度；当输入为TND时，`ori_kv`最大长度由`cu_seqlens_ori_kv`表达，若传了`seqused_ori_kv`，则有效长度由`seqused_ori_kv`表达。`cmp_kv`同理。
+  - `cu_seqlens_q`、`cu_seqlens_ori_kv`、`cu_seqlens_cmp_kv`须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。
+  - 当layout_kv为PA_BBND时，`ori_kv`和`cmp_kv`支持0轴非连续。
+  - 当`ori_mask_mode`、`cmp_mask_mode`为0时，`ori_kv_k`、`cmp_kv_k`需要大于等于`ori_topk_length`、`cmp_topk_length`的最大值。
+  - `ori_topk_length`、`cmp_topk_length`表示ori/cmp sparse_indices实际参与计算的长度。其值不能大于sparse_indices的最后一维大小，且当`seqused_q`传入时，topk_length对应有效部分的值需要大于等于0。
+  - `cmp_residual_kv`配合`cmp_ratio`使用，可恢复压缩前KV长度。且每个batch的值需要小于`cmp_ratio`，即`cmp_residual_kv[i]` < `cmp_ratio`。
+  - `attention_out`：tensor类型，公式中的输出，数据类型支持bfloat16和float16。数据格式支持ND。限制：该输出参数的shape与入参q的shape保持一致，dtype与q一致。
+  - `return_softmax_lse`为False时返回shape为[1]且值为0的tensor；`return_softmax_lse`为True时返回float32的log-sum-exp结果。
+  - `cu_seqlens_q`、`cu_seqlens_ori_kv`、`cu_seqlens_cmp_kv`须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。
   - `sparse_flash_mla_metadata`和`sparse_flash_mla`分两段调用。两次调用中参与任务切分的入参必须一致；不一致时可能产生未定义行为。
   - 本接口支持单算子模式和TorchAir图模式调用，可用于训练和推理场景。
 
@@ -266,7 +275,7 @@ cann_ops_transformer.sparse_flash_mla(
 | max_seqlen_cmp_kv | int32；必须大于0。 | `cmp_kv`为TND布局时必传。 | 必须等于`cmp_kv`各Batch实际长度的最大值。 | 与`cu_seqlens_cmp_kv`及cmp_kv_t一致。 |
 | ori_topk | int32；当前仅支持0。 | 可选，默认0。 | 必须与`ori_sparse_indices`和`ori_topk_length`的传入状态一致。 | 当前不支持`ori_sparse_indices`非空，因此必须为0。 |
 | cmp_topk | int32；SWA/HCA场景取值为0，CSA场景取值为压缩kv的TopK长度且大于0。 | CSA场景必传且非0；其他场景为0。 | 必须等于`cmp_sparse_indices`最后一维。 | <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：CSA取非512或1024、或SWA/HCA取非0时拦截；<term>Ascend 950PR/Ascend 950DT</term>：CSA取小于等于0、或SWA/HCA取非0时拦截。 |
-| cmp_ratio | int32；SWA场景取值为1，CSA/HCA场景取值大于0。 | 可选，默认1。 | 必须与主接口、`cmp_residual_kv`和`cmp_kv`压缩关系一致。 | <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：SWA取非1、CSA取非4、HCA取非128时拦截；<term>Ascend 950PR/Ascend 950DT</term>：SWA取非1或CSA/HCA取小于等于0时拦截。 |
+| cmp_ratio | int32；SWA场景取值为1，CSA/HCA场景取值1-128。 | 可选，默认1。 | 必须与主接口、`cmp_residual_kv`和`cmp_kv`压缩关系一致。 | <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：SWA取非1、CSA取非4、HCA取非128时拦截；<term>Ascend 950PR/Ascend 950DT</term>：SWA取非1或CSA/HCA取非1-128时拦截。 |
 | ori_mask_mode | int32；接口定义支持0、3、4。 | 可选。 | 无。 | 当传入4时，与`ori_win_left`、`ori_win_right`组合使用。 |
 | cmp_mask_mode | int32；接口定义支持0、3。 | 可选。 | 无。 | SWA为0；CSA/HCA为3。 |
 | ori_win_left | int32；接口定义为-1或非负数。 | 可选。 | 无。 | <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：取非127时拦截；<term>Ascend 950PR/Ascend 950DT</term>：取值小于-1时拦截。仅作用于`ori_kv`侧。 |
@@ -297,7 +306,7 @@ cann_ops_transformer.sparse_flash_mla(
 - `layout_q`和`layout_kv`仅支持`BSND`/`BSND`、`TND`/`TND`、`BSND`/`PA_BBND`、`TND`/`PA_BBND`组合。非`PA_BBND`场景下，两者必须一致。
 - `layout_q="BSND"`时`q`必须为4维；`layout_q="TND"`时`q`必须为3维，并且必须传入`cu_seqlens_q`。
 - `layout_kv="BSND"`或`layout_kv="PA_BBND"`时，kv必须为4维；`layout_kv="TND"`时，kv必须为3维。`layout_kv="TND"`时必须传入`cu_seqlens_ori_kv`；传入`cmp_kv`时，还必须传入`cu_seqlens_cmp_kv`。
-- `metadata`必须为1024个`int32`元素；`topk_value_mode`仅支持1。`ori_sparse_indices`、`ori_topk_length`和`cmp_topk_length`当前不支持传入非空Tensor。
+- `metadata`必须为1024个`int32`元素；`topk_value_mode`仅支持1。
 - `ori_kv`和`cmp_kv`允许存在行间padding类非连续内存，接口会通过aclNN获取stride信息并传递给底层算子。
 
 | 参数 | 单参数校验 | 存在性拦截 | 一致性拦截 | 特性交叉拦截 |
@@ -334,7 +343,7 @@ layout匹配关系表：
 | cmp_sparse_indices | `int32`、ND；`BSND`为(b, q_s, kv_n, cmp_kv_k)，`TND`为(q_t, kv_n, cmp_kv_k)；值必须为-1或有效的cmp token索引。 | 仅CSA必传；SWA/HCA必须不传。 | b/q_t、kv_n必须与`q`一致，cmp_kv_k必须与`cmp_topk`一致。 | <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：cmp_kv_k取非512或1024时拦截；<term>Ascend 950PR/Ascend 950DT</term>：cmp_kv_k取小于等于0时拦截。无效位置填-1，索引具体取值由用户保证。 |
 | ori_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | `ori_topk_length` 在ori+cmp稀疏时必传。 | 与`ori_sparse_indices=None`和`ori_topk=0`一致。 | CSA/ALL_CSA场景可选，其他场景不能传；传入时，不需要传入`seqused_ori_kv`。 |
 | cmp_topk_length | `int32`、ND、shape为(b, q_s, kv_n)或(q_t, kv_n)。 | `cmp_topk_length` 在ori+cmp稀疏时必传。 | 与`cmp_sparse_indices`和`cmp_topk`的状态一致。 | CSA/ALL_CSA场景可选，其他场景不能传；传入时，不需要传入`seqused_cmp_kv`。 |
-| cmp_ratio | int32；SWA场景取值为1，CSA/HCA场景取值大于0。 | 可选，默认1。 | 必须同时与`metadata`、`cmp_kv`长度和`cmp_residual_kv`一致。 | <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：SWA取非1、CSA取非4、HCA取非128时拦截；<term>Ascend 950PR/Ascend 950DT</term>：SWA取非1或CSA/HCA取小于等于0时拦截。 |
+| cmp_ratio | int32；SWA场景取值为1，CSA/HCA场景取值范围1-128。 | 可选，默认1。 | 必须同时与`metadata`、`cmp_kv`长度和`cmp_residual_kv`一致。 | <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：SWA取非1、CSA取非4、HCA取非128时拦截；<term>Ascend 950PR/Ascend 950DT</term>：SWA取非1或CSA/HCA取非1-128时拦截。 |
 | topk_value_mode | int32；仅支持1。 | 可选，默认1。 | 必须与`cmp_sparse_indices`的索引取值约定一致。 | 不参与`metadata`生成；取非1值应拦截。 |
 
 #### SeqLengths和Mask参数组
