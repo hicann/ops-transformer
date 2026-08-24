@@ -82,9 +82,6 @@ public:
 
     BuffersPolicySingleBuffer<BufferType::L1> l1QBuffers;
 
-    __gm__ uint8_t *keyPtr = nullptr;
-    __gm__ uint8_t *valuePtr = nullptr;
-
     const ConstInfoX &constInfo;
 
     /*============================================================================== */
@@ -133,11 +130,9 @@ public:
         InitQBuffer(constInfo.bSize, constInfo.n2Size, constInfo.gSize, constInfo.s1Size, constInfo.dSize,
                     actualSeqLengthsGmQ, constInfo.actualSeqLenSize, queryGm, query);
 
-        keyPtr = key;
-        valuePtr = value;
-        ListTensorDesc keyListTensorDesc((__gm__ void *)(this->keyPtr));
+        ListTensorDesc keyListTensorDesc((__gm__ void *)(key));
         __gm__ uint8_t *key_ = (__gm__ uint8_t *)keyListTensorDesc.GetDataPtr<__gm__ uint8_t>(0);
-        ListTensorDesc valueListTensorDesc((__gm__ void *)(this->valuePtr));
+        ListTensorDesc valueListTensorDesc((__gm__ void *)(value));
         __gm__ uint8_t *value_ = (__gm__ uint8_t *)valueListTensorDesc.GetDataPtr<__gm__ uint8_t>(0);
 
         InitKVBuffer(constInfo.bSize, constInfo.s2Size, actualSeqLengthsGm, constInfo.actualSeqLenKVSize,
