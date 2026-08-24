@@ -30,6 +30,8 @@ constexpr uint32_t FP32_INV_EXP_SUB = 2U * FP32_BIAS;
 constexpr uint32_t FP8_GROUP_FP8_MAX_MANT = 0x00600000U;
 constexpr uint32_t FP8_GROUP_E4M3_EMAX = 8U;
 constexpr uint32_t FP8_GROUP_E5M2_EMAX = 15U;
+constexpr uint32_t FP8_GROUP_FP32_INF_BITS = 0x7F800000U;
+constexpr uint32_t FP8_GROUP_FP32_NAN_BITS = 0x7FC00000U;
 
 constexpr CastTrait CAST_TRAIT_B16_TO_F32 = {RegLayout::ZERO, SatMode::UNKNOWN, MaskMergeMode::ZEROING,
                                              RoundMode::UNKNOWN};
@@ -139,12 +141,15 @@ __simd_vf__ inline void VfComputeRoundScale(__ubuf__ float *amaxInAddr, __ubuf__
         RegTensor<uint32_t> fp8MantReg;
         RegTensor<uint32_t> fp8EmaxReg;
         RegTensor<uint32_t> threshold254Reg;
+        RegTensor<uint32_t> infThresholdReg;
+        RegTensor<uint32_t> nanIntReg;
 
         MaskReg maskAll = CreateMask<float, MaskPattern::ALL>();
         MaskReg maskAllUint = CreateMask<uint32_t, MaskPattern::ALL>();
         MaskReg maskGroupNum;
         MaskReg maskMantHigh;
         MaskReg maskClamp;
+        MaskReg maskInfNaN;
 
         Duplicate(expMaskReg, FP32_EXPONENT_MASK, maskAllUint);
         Duplicate(mantMaskReg, FP32_MANTISSA_MASK, maskAllUint);
@@ -154,6 +159,8 @@ __simd_vf__ inline void VfComputeRoundScale(__ubuf__ float *amaxInAddr, __ubuf__
         Duplicate(fp8MantReg, FP8_GROUP_FP8_MAX_MANT, maskAllUint);
         Duplicate(fp8EmaxReg, fp8EmaxValue, maskAllUint);
         Duplicate(threshold254Reg, 254U, maskAllUint);
+        Duplicate(infThresholdReg, FP8_GROUP_FP32_INF_BITS, maskAllUint);
+        Duplicate(nanIntReg, FP8_GROUP_FP32_NAN_BITS, maskAllUint);
 
         for (uint16_t i = 0; i < vfLoopNum; i++) {
             uint32_t remaining = static_cast<uint32_t>(groupNum - i * vfLen);
@@ -164,6 +171,7 @@ __simd_vf__ inline void VfComputeRoundScale(__ubuf__ float *amaxInAddr, __ubuf__
             ShiftRights(expBitsReg, (RegTensor<uint32_t> &)maxReg, FP32_EXPONENT_SHIFT, maskAllUint);
             And(expBitsReg, expBitsReg, expMaskReg, maskAllUint);
             And(mantBitsReg, (RegTensor<uint32_t> &)maxReg, mantMaskReg, maskAllUint);
+            Compare<uint32_t, CMPMODE::GE>(maskInfNaN, (RegTensor<uint32_t> &)maxReg, infThresholdReg, maskAllUint);
             Compare<uint32_t, CMPMODE::GT>(maskMantHigh, mantBitsReg, fp8MantReg, maskAllUint);
             Select(mantAddReg, oneIntReg, zeroIntReg, maskMantHigh);
             Sub<uint32_t>(roundedExpBitsReg, expBitsReg, fp8EmaxReg, maskAllUint);
@@ -173,10 +181,14 @@ __simd_vf__ inline void VfComputeRoundScale(__ubuf__ float *amaxInAddr, __ubuf__
             Compare<uint32_t, CMPMODE::GT>(maskClamp, roundedExpBitsReg, threshold254Reg, maskAllUint);
             Select(roundedExpBitsReg, oneIntReg, roundedExpBitsReg, maskClamp);
             ShiftLefts((RegTensor<uint32_t> &)roundScaleReg, roundedExpBitsReg, FP32_EXPONENT_SHIFT, maskAllUint);
+            Select<uint32_t>((RegTensor<uint32_t> &)roundScaleReg, nanIntReg, (RegTensor<uint32_t> &)roundScaleReg,
+                             maskInfNaN);
 
             StoreAlign<float, PostLiteral::POST_MODE_UPDATE>(scaleOutAddr, roundScaleReg, vfLen, maskGroupNum);
             Sub<uint32_t>(invExpBitsReg, invExpSubReg, roundedExpBitsReg, maskAllUint);
             ShiftLefts((RegTensor<uint32_t> &)invScaleReg, invExpBitsReg, FP32_EXPONENT_SHIFT, maskAllUint);
+            Select<uint32_t>((RegTensor<uint32_t> &)invScaleReg, nanIntReg, (RegTensor<uint32_t> &)invScaleReg,
+                             maskInfNaN);
             StoreAlign<float, PostLiteral::POST_MODE_UPDATE>(invScaleOutAddr, invScaleReg, vfLen, maskGroupNum);
         }
     }

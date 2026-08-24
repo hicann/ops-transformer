@@ -27,6 +27,7 @@ constexpr int64_t FP8_PERBLOCK_BLOCK_SIZE = 128;
 constexpr float FP8_E4M3_MAX_VALUE = 448.0f;
 constexpr float FP8_E5M2_MAX_VALUE = 57344.0f;
 constexpr uint32_t FP32_INF_VALUE = 0x7f800000;
+constexpr uint32_t FP32_NAN_VALUE = 0x7fc00000;
 constexpr uint16_t FP16_MAX_VALUE_MASK = 0x7fff;
 
 template <typename T, typename U>
@@ -48,12 +49,15 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
         RegTensor<T> vreg0, vreg1, vreg2, vreg3, maxReg0, maxReg1, yReg1;
         RegTensor<float> scaleReg0, scaleReg1, fp8MaxReg, yReg2, yReg3;
         RegTensor<U> outReg;
+        RegTensor<uint32_t> infThresholdReg, nanIntReg;
 
-        MaskReg preg0, yMaskReg;
+        MaskReg preg0, yMaskReg, nanMask;
         MaskReg maskAll = CreateMask<uint16_t, MaskPattern::ALL>();
 
         Duplicate((RegTensor<uint16_t> &)vreg2, FP16_MAX_VALUE_MASK);
         Duplicate(fp8MaxReg, fp8MaxValue);
+        Duplicate(infThresholdReg, FP32_INF_VALUE);
+        Duplicate(nanIntReg, FP32_NAN_VALUE);
 
         // 检测边界情况（最后一个 block 可能不足 128 元素）
         uint16_t lastBlockElemNum = (totalElemNum > 0) ? ((totalElemNum - 1) % FP8_PERBLOCK_BLOCK_SIZE + 1) : 0;
@@ -79,7 +83,9 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
                                                         maskAll);
             Duplicate(maxReg0, maxReg0, maskAll);
             Cast<float, T, castTrait0>(scaleReg0, maxReg0, maskAll);
+            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t> &)scaleReg0, infThresholdReg, maskAll);
             Div<float, &mode>(scaleReg0, scaleReg0, fp8MaxReg, maskAll);
+            Select<uint32_t>((RegTensor<uint32_t> &)scaleReg0, nanIntReg, (RegTensor<uint32_t> &)scaleReg0, nanMask);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2, scaleReg0, maskAll);
 
             // --- block 1 ---
@@ -91,7 +97,9 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
                                                         maskAll);
             Duplicate(maxReg1, maxReg1, maskAll);
             Cast<float, T, castTrait0>(scaleReg1, maxReg1, maskAll);
+            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t> &)scaleReg1, infThresholdReg, maskAll);
             Div<float, &mode>(scaleReg1, scaleReg1, fp8MaxReg, maskAll);
+            Select<uint32_t>((RegTensor<uint32_t> &)scaleReg1, nanIntReg, (RegTensor<uint32_t> &)scaleReg1, nanMask);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2 + 1, scaleReg1, maskAll);
 
             // --- 量化 block 0 ---
@@ -136,7 +144,9 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
                                                         maskAll);
             Duplicate(maxReg0, maxReg0, maskAll);
             Cast<float, T, castTrait0>(scaleReg0, maxReg0, maskAll);
+            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t> &)scaleReg0, infThresholdReg, maskAll);
             Div<float, &mode>(scaleReg0, scaleReg0, fp8MaxReg, maskAll);
+            Select<uint32_t>((RegTensor<uint32_t> &)scaleReg0, nanIntReg, (RegTensor<uint32_t> &)scaleReg0, nanMask);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2, scaleReg0, maskAll);
 
             // --- block 1（partial，精确掩码）---
@@ -150,7 +160,9 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
                                                         maskAll);
             Duplicate(maxReg1, maxReg1, maskAll);
             Cast<float, T, castTrait0>(scaleReg1, maxReg1, maskAll);
+            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t> &)scaleReg1, infThresholdReg, maskAll);
             Div<float, &mode>(scaleReg1, scaleReg1, fp8MaxReg, maskAll);
+            Select<uint32_t>((RegTensor<uint32_t> &)scaleReg1, nanIntReg, (RegTensor<uint32_t> &)scaleReg1, nanMask);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + pairIdx * 2 + 1, scaleReg1, maskAll);
 
             // --- 量化 block 0（完整）---
@@ -199,7 +211,9 @@ __simd_vf__ inline void ComputeVF(__ubuf__ T *xAddr, __ubuf__ float *scaleAddr, 
                                                         maskAll);
             Duplicate(maxReg0, maxReg0, maskAll);
             Cast<float, T, castTrait0>(scaleReg0, maxReg0, maskAll);
+            Compare<uint32_t, CMPMODE::GE>(nanMask, (RegTensor<uint32_t> &)scaleReg0, infThresholdReg, maskAll);
             Div<float, &mode>(scaleReg0, scaleReg0, fp8MaxReg, maskAll);
+            Select<uint32_t>((RegTensor<uint32_t> &)scaleReg0, nanIntReg, (RegTensor<uint32_t> &)scaleReg0, nanMask);
             StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(scaleAddr + lastBlockIdx, scaleReg0, maskAll);
 
             // 量化（按 blockElemNum 限制有效输出范围）
