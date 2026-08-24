@@ -25,7 +25,9 @@ if (EXISTS ${ASCEND_CANN_PACKAGE_PATH}/tools/tikicpulib/lib/cmake)
 else()
     list(APPEND CMAKE_PREFIX_PATH ${ASCEND_CANN_PACKAGE_PATH}/toolkit/tools/tikicpulib/lib/cmake)
 endif()
-find_package(tikicpulib REQUIRED)
+if(NOT TARGET tikicpulib::${OPS_ADV_UTEST_OPS_TEST_ASCEND_PRODUCT_TYPE})
+    find_package(tikicpulib REQUIRED)
+endif()
 
 # ASAN / UBSAN 场景随编译执行用例场景下, 将相关检查在编译前执行, 避免出现编译完成后又无法执行的情况, 影响使用体验.
 # 仅 GNU 编译器需要设置 LD_PRELOAD
