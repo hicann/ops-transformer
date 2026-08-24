@@ -33,7 +33,7 @@ class KernelScanTokenInfo {
 public:
     __aicore__ inline KernelScanTokenInfo(){};
     __aicore__ inline void Init(GM_ADDR schedule_context, GM_ADDR token_info_gm_addr, GM_ADDR workspace,
-                                ScheduleContextInfo* scheduleContextInfo, TPipe* tPipe);
+                                ScheduleContextInfo *scheduleContextInfo, TPipe *tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -47,7 +47,7 @@ private:
     uint32_t K = 0;
     uint32_t F = 0;
 
-    TPipe* pipe = nullptr;
+    TPipe *pipe = nullptr;
     GlobalTensor<int32_t> tokenInfoGm;
     GlobalTensor<uint64_t> pollIdxGm;
     TQue<QuePosition::VECIN, BUFFER_NUM_ONE> tokenFlagInQueue;
@@ -56,17 +56,18 @@ private:
 
 __aicore__ inline void KernelScanTokenInfo::CopyInFlag()
 {
-	int32_t offset = curMicroBatchID * F;
-	LocalTensor<int32_t> tokenInfoLocalIn = tokenFlagInQueue.AllocTensor<int32_t>();
-	DataCopyExtParams dataCopyParams{static_cast<uint16_t>(this->A), static_cast<uint32_t>(sizeof(int32_t)),
-	    static_cast<uint32_t>((M * F - 1) * sizeof(int32_t)), 0, 0};
-	DataCopyPadExtParams dataCopyPadParams{true, 0, (BLOCK_SIZE - sizeof(int32_t)) / sizeof(int32_t), 0};
-	DataCopyPad(tokenInfoLocalIn, tokenInfoGm[offset], dataCopyParams, dataCopyPadParams);
-	tokenFlagInQueue.EnQue(tokenInfoLocalIn);
+    int32_t offset = curMicroBatchID * F;
+    LocalTensor<int32_t> tokenInfoLocalIn = tokenFlagInQueue.AllocTensor<int32_t>();
+    DataCopyExtParams dataCopyParams{static_cast<uint16_t>(this->A), static_cast<uint32_t>(sizeof(int32_t)),
+                                     static_cast<uint32_t>((M * F - 1) * sizeof(int32_t)), 0, 0};
+    DataCopyPadExtParams dataCopyPadParams{true, 0, (BLOCK_SIZE - sizeof(int32_t)) / sizeof(int32_t), 0};
+    DataCopyPad(tokenInfoLocalIn, tokenInfoGm[offset], dataCopyParams, dataCopyPadParams);
+    tokenFlagInQueue.EnQue(tokenInfoLocalIn);
 }
 
 __aicore__ inline void KernelScanTokenInfo::Init(GM_ADDR schedule_context, GM_ADDR token_info_gm_addr,
-    GM_ADDR workspace, ScheduleContextInfo* scheduleContextInfo, TPipe* tPipe)
+                                                 GM_ADDR workspace, ScheduleContextInfo *scheduleContextInfo,
+                                                 TPipe *tPipe)
 {
     pipe = tPipe;
     A = scheduleContextInfo->A;
@@ -80,9 +81,24 @@ __aicore__ inline void KernelScanTokenInfo::Init(GM_ADDR schedule_context, GM_AD
     rsvdCntGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace), SCAN_BATCHID_GM_OFFSET);
     if (GetBlockIdx() == 0) {
         InitGlobalMemory(rsvdCntGm, SCAN_BATCHID_GM_OFFSET, 0);
+
+        GM_ADDR groupListTmpAddr =
+            workspace + (OFFSET_SORTED_EXPERT_IDS + scheduleContextInfo->sortNumWorkSpace * (NUM_TWO * NUM_FOUR + 1)) *
+                            sizeof(int32_t);
+        GlobalTensor<int32_t> groupListTmpGm;
+        groupListTmpGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(groupListTmpAddr),
+                                       scheduleContextInfo->expertNum);
+        InitGlobalMemory(groupListTmpGm, scheduleContextInfo->expertNum, 0);
+
         SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
+        // core0 清零 rsvdCnt(workspace[0]) 后必须 flush 到 GM 全局可见，再经 SyncAll 放行其他核：
+        // 否则清零可能滞留 core0 cache，其他核 atomic-add 读到未清零的复用脏值(workspace 长跑复用
+        // 脏页)→ 累加到脏基 → actual_token_num 偶发变负/减半(高频非确定)。单核路径(ffn_wb_sort_one_core.h)
+        // 写 rsvdCnt 后同样用 DataCacheCleanAndInvalid 刷，多核清零此前漏了这步。
+        DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_ALL>(
+            rsvdCntGm);
     }
-    // SyncAll(); -- 为sort清理的gm,后面天然有 SyncAll,此处不需要
+    // 为sort清理的gm,后面天然有 SyncAll,此处不需要
 
     tokenInfoGm.SetGlobalBuffer((__gm__ int32_t *)token_info_gm_addr, A * M * F);
     pollIdxGm.SetGlobalBuffer((__gm__ uint64_t *)schedule_context);
@@ -126,5 +142,5 @@ __aicore__ inline void KernelScanTokenInfo::Process()
     DataCacheCleanAndInvalid<uint64_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_ALL>(
         pollIdxGm);
 }
-}  // namespace FfnWbBatching
-#endif  // OP_KERNEL_FFN_WB_SCAN_TOKEN_INFO_H
+} // namespace FfnWbBatching
+#endif // OP_KERNEL_FFN_WB_SCAN_TOKEN_INFO_H

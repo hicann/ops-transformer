@@ -37,7 +37,7 @@ public:
     __aicore__ inline KernelFfnWBGatherOutAll() {}
     __aicore__ inline void Init(GM_ADDR expertid_idx, GM_ADDR y, GM_ADDR session_ids, GM_ADDR micro_batch_ids,
                                 GM_ADDR token_ids, GM_ADDR expert_offsets, GM_ADDR dynamic_scale,
-                                const ScheduleContextInfo* contextInfo, TPipe* pipe, uint32_t usedCoreNum)
+                                const ScheduleContextInfo *contextInfo, TPipe *pipe, uint32_t usedCoreNum)
     {
         contextInfo_ = contextInfo;
         curMicroBatchID = contextInfo_->curMicroBatchID;
@@ -49,11 +49,10 @@ public:
         sessionNumBlockAlign_ = Align(contextInfo_->A, sizeof(int32_t));
         int64_t validGatherIdxLength = contextInfo_->validGatherIdxLength;
 
-        int64_t ubAvailable = contextInfo->ubSize - 
-                            (BUFFER_NUM * PER_LOOP_ROWS * sizeof(int32_t) * VAR_NUM +
-                            BUFFER_NUM * PER_LOOP_ROWS * sizeof(int32_t) +
-                            sessionNumBlockAlign_ * sizeof(int32_t) * BUFFER_NUM +
-                            PER_LOOP_ROWS * BLOCK_SIZE * BUFFER_NUM);
+        int64_t ubAvailable =
+            contextInfo->ubSize -
+            (BUFFER_NUM * PER_LOOP_ROWS * sizeof(int32_t) * VAR_NUM + BUFFER_NUM * PER_LOOP_ROWS * sizeof(int32_t) +
+             sessionNumBlockAlign_ * sizeof(int32_t) * BUFFER_NUM + PER_LOOP_ROWS * BLOCK_SIZE * BUFFER_NUM);
 
         int64_t maxTokenSize = ubAvailable / BUFFER_NUM;
         maxBlockSize_ = maxTokenSize - (contextInfo_->tokenDtype == TOKEN_KIND_TWO ? BLOCK_BYTES : 0);
@@ -79,31 +78,32 @@ public:
         GM_ADDR sessionIdsBufAddr = reinterpret_cast<GM_ADDR>(contextInfo_->bufferPtr.sessionIdsBuf);
         GM_ADDR microBatchIdsBufAddr = reinterpret_cast<GM_ADDR>(contextInfo_->bufferPtr.microBatchIdsBuf);
 
-        tokenDataBufGm_.SetGlobalBuffer((__gm__ int8_t*)tokenDataBufAddr);
+        tokenDataBufGm_.SetGlobalBuffer((__gm__ int8_t *)tokenDataBufAddr);
 
         // 排序的后的  对应gather_index
-        expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertid_idx + blockIdx * perCoreRows);
+        expertIdxGm_.SetGlobalBuffer((__gm__ int32_t *)expertid_idx + blockIdx * perCoreRows);
 
-        sessionIdsInGm_.SetGlobalBuffer((__gm__ int32_t*)sessionIdsBufAddr, contextInfo_->A);
-        microBatchIdsInGm_.SetGlobalBuffer((__gm__ int32_t*)microBatchIdsBufAddr, contextInfo_->A);
+        sessionIdsInGm_.SetGlobalBuffer((__gm__ int32_t *)sessionIdsBufAddr, contextInfo_->A);
+        microBatchIdsInGm_.SetGlobalBuffer((__gm__ int32_t *)microBatchIdsBufAddr, contextInfo_->A);
 
         // 输出空间
-        yOutGm_.SetGlobalBuffer((__gm__ int8_t*)y + blockIdx * SplitY);
+        yOutGm_.SetGlobalBuffer((__gm__ int8_t *)y + blockIdx * SplitY);
 
-        sessionIdsOutGm_.SetGlobalBuffer((__gm__ int32_t*)session_ids + blockIdx * perCoreRows);
-        microBatchIdsOutGm_.SetGlobalBuffer((__gm__ int32_t*)micro_batch_ids + blockIdx * perCoreRows);
-        tokenIdsOutGm_.SetGlobalBuffer((__gm__ int32_t*)token_ids + blockIdx * perCoreRows);
-        expertOffsetsOutGm_.SetGlobalBuffer((__gm__ int32_t*)expert_offsets + blockIdx * perCoreRows);
+        sessionIdsOutGm_.SetGlobalBuffer((__gm__ int32_t *)session_ids + blockIdx * perCoreRows);
+        microBatchIdsOutGm_.SetGlobalBuffer((__gm__ int32_t *)micro_batch_ids + blockIdx * perCoreRows);
+        tokenIdsOutGm_.SetGlobalBuffer((__gm__ int32_t *)token_ids + blockIdx * perCoreRows);
+        expertOffsetsOutGm_.SetGlobalBuffer((__gm__ int32_t *)expert_offsets + blockIdx * perCoreRows);
         if (contextInfo_->tokenDtype == TOKEN_KIND_TWO) {
-            dynamicScaleOutGm_.SetGlobalBuffer((__gm__ float*)dynamic_scale + blockIdx * perCoreRows);
+            dynamicScaleOutGm_.SetGlobalBuffer((__gm__ float *)dynamic_scale + blockIdx * perCoreRows);
         }
 
-        int64_t blockBufferSize = maxBlockSize_ * tokenDtypeSize_ +
-                                (contextInfo_->tokenDtype == TOKEN_KIND_TWO ? BLOCK_BYTES : 0);
+        int64_t blockBufferSize =
+            maxBlockSize_ * tokenDtypeSize_ + (contextInfo_->tokenDtype == TOKEN_KIND_TWO ? BLOCK_BYTES : 0);
         pipe->InitBuffer(inQueueX_, BUFFER_NUM, blockBufferSize);
 
         // PER_LOOP_ROWS 为长度 包含 额外5 + 1个输出;
-        pipe->InitBuffer(outQueALL_, BUFFER_NUM, PER_LOOP_ROWS * sizeof(int32_t) * VAR_NUM + PER_LOOP_ROWS * BLOCK_SIZE);
+        pipe->InitBuffer(outQueALL_, BUFFER_NUM,
+                         PER_LOOP_ROWS * sizeof(int32_t) * VAR_NUM + PER_LOOP_ROWS * BLOCK_SIZE);
 
         // 将gm gather_idx 一段长度 放到 UB 空间的
         pipe->InitBuffer(expertIdxQue_, BUFFER_NUM, PER_LOOP_ROWS * sizeof(int32_t));
@@ -128,7 +128,8 @@ public:
     __aicore__ inline void CopyInExpertIdx(int32_t expertIdxOffset, int32_t curRows)
     {
         LocalTensor<int32_t> expertIdxLocal = expertIdxQue_.AllocTensor<int32_t>();
-        DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(curRows * sizeof(int32_t)), 0, 0, 0};
+        DataCopyExtParams copyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(curRows * sizeof(int32_t)), 0, 0,
+                                     0};
         DataCopyPadExtParams<int32_t> padParams{false, 0, 0, 0};
         DataCopyPad(expertIdxLocal, expertIdxGm_[expertIdxOffset], copyParams, padParams);
         expertIdxQue_.EnQue(expertIdxLocal);
@@ -187,14 +188,13 @@ public:
                 for (int64_t hBlock = 0; hBlock < hBlocks_; hBlock++) {
                     int64_t hStart = hBlock * maxBlockSize_;
                     int64_t hSize = (hBlock == hBlocks_ - 1) ? lastHBlockSize_ : maxBlockSize_;
-                    int64_t globalXOffset = sessionIndices * strideSession + 
-                                        microbatchIndices * strideMicroBatch +
-                                        bsIndices * strideBs + kIndices * strideK + hStart;
+                    int64_t globalXOffset = sessionIndices * strideSession + microbatchIndices * strideMicroBatch +
+                                            bsIndices * strideBs + kIndices * strideK + hStart;
 
                     bool isLastBlock = (hBlock == hBlocks_ - 1);
                     CopyXIn(globalXOffset, hSize, indicesIndex, outAllLocal[PER_LOOP_ROWS * VAR_NUM], isLastBlock);
                     int64_t outputOffset = (indicesIndex + currentOuterStart) * contextInfo_->H * tokenDtypeSize_ +
-                                        hStart * tokenDtypeSize_;
+                                           hStart * tokenDtypeSize_;
                     CopyXOut(outputOffset, hSize);
                 }
             }
@@ -214,15 +214,18 @@ private:
         DataCopyPad(sessionIdsOutGm_[allLocalOffset], outAllLocal, copyParams2);
         DataCopyPad(microBatchIdsOutGm_[allLocalOffset], outAllLocal[PER_LOOP_ROWS * VAR_MICRO_BATCH_IDX], copyParams2);
         DataCopyPad(tokenIdsOutGm_[allLocalOffset], outAllLocal[PER_LOOP_ROWS * VAR_TOKEN_IDX], copyParams2);
-        DataCopyPad(expertOffsetsOutGm_[allLocalOffset], outAllLocal[PER_LOOP_ROWS * VAR_EXPERT_OFFSETS_IDX], copyParams2);
+        DataCopyPad(expertOffsetsOutGm_[allLocalOffset], outAllLocal[PER_LOOP_ROWS * VAR_EXPERT_OFFSETS_IDX],
+                    copyParams2);
 
         if (contextInfo_->tokenDtype == TOKEN_KIND_TWO) {
-            LocalTensor<int32_t> srcOffsetLocal = outAllLocal[PER_LOOP_ROWS * VAR_DYNAMIC_SCALE].template ReinterpretCast<int32_t>();
-            LocalTensor<float> dynamicScaleLocalFp32 = outAllLocal[PER_LOOP_ROWS * VAR_NUM].template ReinterpretCast<float>();
+            LocalTensor<int32_t> srcOffsetLocal =
+                outAllLocal[PER_LOOP_ROWS * VAR_DYNAMIC_SCALE].template ReinterpretCast<int32_t>();
+            LocalTensor<float> dynamicScaleLocalFp32 =
+                outAllLocal[PER_LOOP_ROWS * VAR_NUM].template ReinterpretCast<float>();
             ArithProgression<int32_t>(srcOffsetLocal, 0, BLOCK_SIZE, copyLength);
             PipeBarrier<PIPE_V>();
-            Gather(dynamicScaleLocalFp32, dynamicScaleLocalFp32, srcOffsetLocal.template ReinterpretCast<uint32_t>(),
-                0, copyLength);
+            Gather(dynamicScaleLocalFp32, dynamicScaleLocalFp32, srcOffsetLocal.template ReinterpretCast<uint32_t>(), 0,
+                   copyLength);
             SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
             DataCopyPad(dynamicScaleOutGm_[allLocalOffset], dynamicScaleLocalFp32, copyParams2);
         }
@@ -230,7 +233,7 @@ private:
     }
 
     __aicore__ inline void CopyXIn(int64_t xSrcOffset, int64_t curLoopCols, int64_t indicesIndex,
-                                const LocalTensor<int32_t>& dynamicScaleLocal, bool isLastBlock)
+                                   const LocalTensor<int32_t> &dynamicScaleLocal, bool isLastBlock)
     {
         LocalTensor<int8_t> xLocal = inQueueX_.AllocTensor<int8_t>();
         uint32_t copySize = curLoopCols * tokenDtypeSize_;
@@ -248,23 +251,23 @@ private:
         inQueueX_.EnQue(xLocal);
     }
 
-    __aicore__ inline void CopyXOut(int64_t xDstOffset, int64_t curLoopCols) 
+    __aicore__ inline void CopyXOut(int64_t xDstOffset, int64_t curLoopCols)
     {
         LocalTensor<int8_t> xLocal = inQueueX_.DeQue<int8_t>();
 
         DataCopyExtParams copyParams2{1, static_cast<uint32_t>(curLoopCols * tokenDtypeSize_), 0, 0, 0};
         DataCopyPad(yOutGm_[xDstOffset], xLocal, copyParams2);
-        
+
         inQueueX_.FreeTensor(xLocal);
     }
 
 private:
     static constexpr uint32_t BLOCK_SIZE = 32;
-    static constexpr int32_t BUFFER_NUM = 2;       // tensor num for each queue
-    static constexpr int32_t PER_LOOP_ROWS = 128;  // tensor num for each queue
+    static constexpr int32_t BUFFER_NUM = 2;      // tensor num for each queue
+    static constexpr int32_t PER_LOOP_ROWS = 128; // tensor num for each queue
     static constexpr int64_t TOKEN_KIND_TWO = 2;
 
-    static constexpr int32_t VAR_NUM = 5;  // session_ids, micro_batch_ids, token_ids, expert_offsets
+    static constexpr int32_t VAR_NUM = 5; // session_ids, micro_batch_ids, token_ids, expert_offsets
     static constexpr int32_t VAR_SESSION_IDX = 0;
     static constexpr int32_t VAR_MICRO_BATCH_IDX = 1;
     static constexpr int32_t VAR_TOKEN_IDX = 2;
@@ -290,7 +293,7 @@ private:
     LocalTensor<int32_t> sessionIdsLocal_;
     LocalTensor<int32_t> microBatchIdsLocal_;
 
-    const ScheduleContextInfo* contextInfo_ = nullptr;
+    const ScheduleContextInfo *contextInfo_ = nullptr;
 
     int64_t needCoreNum_ = 0;
     int64_t lastLoopRows_ = 0;
@@ -305,5 +308,5 @@ private:
     int64_t BsKPaddingCount = 0;
 };
 
-}  // namespace FfnWbBatching
-#endif  // OP_KERNEL_FFN_WB_GATHER_OUT_ALL_H
+} // namespace FfnWbBatching
+#endif // OP_KERNEL_FFN_WB_GATHER_OUT_ALL_H
