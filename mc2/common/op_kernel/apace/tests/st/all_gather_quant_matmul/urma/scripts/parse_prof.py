@@ -3,7 +3,7 @@
 
 # ----------------------------------------------------------------------------------------------------------
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
-# This program is free software, you can redistribute it and/or modify it under terms and conditions of
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
@@ -42,6 +42,7 @@ def filter_outliers(durs, factor=OUTLIER_FACTOR):
     threshold = min_val * factor
     return [d for d in durs if d <= threshold]
 
+
 _TS_RE = re.compile(r"PROF_\d+_(\d{17})_")
 
 
@@ -54,8 +55,9 @@ def parse_ts_from_dir(dirname):
 
 def find_csvs(prof_base, prof_dir_name):
     return glob.glob(
-        os.path.join(prof_base, prof_dir_name,
-                     "mindstudio_profiler_output", "op_summary_*.csv")
+        os.path.join(
+            prof_base, prof_dir_name, "mindstudio_profiler_output", "op_summary_*.csv"
+        )
     )
 
 
@@ -87,7 +89,11 @@ def group_cases(prof_dirs):
     current_group = []
     for d in prof_dirs_sorted:
         ts = parse_ts_from_dir(d)
-        if not current_group or (ts - parse_ts_from_dir(current_group[0])).total_seconds() < GROUP_THRESHOLD_S:
+        if (
+            not current_group
+            or (ts - parse_ts_from_dir(current_group[0])).total_seconds()
+            < GROUP_THRESHOLD_S
+        ):
             current_group.append(d)
         else:
             cases.append(current_group)
@@ -176,8 +182,7 @@ def report_case(prof_base, case_dirs, case_idx, mkn_str=None):
     avg = sum(medians) / len(medians)
     print("  " + "-" * 58)
     print(
-        f"    Overall latency (avg of card avgs): "
-        f"{avg:.3f} us  ({len(medians)} cards)"
+        f"    Overall latency (avg of card avgs): {avg:.3f} us  ({len(medians)} cards)"
     )
 
     precision = read_case_precision(prof_base, case_dirs)
@@ -214,22 +219,31 @@ def main():
     parser = argparse.ArgumentParser(description="Parse msprof op_summary CSVs.")
     grp = parser.add_mutually_exclusive_group()
     grp.add_argument("--case", type=int, help="Case index (1-based, sorted by time)")
-    grp.add_argument("--latest", action="store_true", default=True,
-                     help="Analyze the most recent case (default)")
+    grp.add_argument(
+        "--latest",
+        action="store_true",
+        default=True,
+        help="Analyze the most recent case (default)",
+    )
     grp.add_argument("--all", action="store_true", help="Analyze all cases")
-    grp.add_argument("--check-latest-threshold", type=float, default=None,
-                     help="Check latest case's latency against threshold. Print only the latency number. Exit 0 if <= threshold, exit 2 if > threshold.")
-    parser.add_argument("--mkn", type=str, default=None,
-                        help="M K N string, e.g. '1010 4096 2560'")
-    parser.add_argument("--prof-dir", default=_DEFAULT_PROF,
-                        help="prof/ directory (default: auto-detect)")
+    grp.add_argument(
+        "--check-latest-threshold",
+        type=float,
+        default=None,
+        help="Check latest case's latency against threshold. Print only the latency number. Exit 0 if <= threshold, exit 2 if > threshold.",
+    )
+    parser.add_argument(
+        "--mkn", type=str, default=None, help="M K N string, e.g. '1010 4096 2560'"
+    )
+    parser.add_argument(
+        "--prof-dir",
+        default=_DEFAULT_PROF,
+        help="prof/ directory (default: auto-detect)",
+    )
     args = parser.parse_args()
     prof_base = os.path.abspath(args.prof_dir)
 
-    prof_dirs = [
-        d for d in os.listdir(prof_base)
-        if re.match(r"PROF_\d+_\d{17}_", d)
-    ]
+    prof_dirs = [d for d in os.listdir(prof_base) if re.match(r"PROF_\d+_\d{17}_", d)]
     if not prof_dirs:
         print(f"No PROF directories found under {prof_base}", file=sys.stderr)
         return 1
@@ -263,8 +277,7 @@ def main():
                 results.append((i, info, avg, precision))
     elif args.case is not None:
         if args.case < 1 or args.case > len(cases):
-            print(f"--case {args.case} out of range (1..{len(cases)})",
-                  file=sys.stderr)
+            print(f"--case {args.case} out of range (1..{len(cases)})", file=sys.stderr)
             return 1
         ret = report_case(prof_base, cases[args.case - 1], args.case, args.mkn)
         if ret:

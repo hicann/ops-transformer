@@ -10,7 +10,7 @@
 
 /*!
  * \file all_gather_mx_matmul_udma_impl.h
- * \brief AllGatherQuantMatmul 算子实现，基于 FragmentTensor + 通算解耦（UDMA 通信）。
+ * \brief AllGatherQuantMatmul 算子实现，基于 FragmentTensor + 通算解耦（UDMA 通信）
  */
 
 #pragma once
@@ -26,7 +26,7 @@
 #include "apace/tiling/comm_tiling_data.h"
 #include "include/tensor_api/tensor.h"
 
-namespace AllGatherQuantMatmulImpl {
+namespace Apace {
 
 using namespace AscendC;
 using namespace Apace::AivComm;
@@ -40,10 +40,8 @@ template <typename AType, typename BType, typename CType>
 class AllGatherMxMatmulUdmaImpl {
 public:
     __aicore__ inline AllGatherMxMatmulUdmaImpl() {}
-    __aicore__ inline void Init(__gm__ CommContext *hcommCtx,
-                                GM_ADDR aGM, GM_ADDR aScaleGM,
-                                GM_ADDR bGM, GM_ADDR bScaleGM, GM_ADDR cGM,
-                                const AllGatherMxMatmulUdmaTilingData *tilingData);
+    __aicore__ inline void Init(__gm__ CommContext *hcommCtx, GM_ADDR aGM, GM_ADDR aScaleGM, GM_ADDR bGM,
+                                GM_ADDR bScaleGM, GM_ADDR cGM, const AllGatherMxMatmulUdmaTilingData *tilingData);
     __aicore__ inline void Process();
 
     using QuantMatmulKernelImpl = AllGatherQbmmMxKernel<AType, BType, CType>;
@@ -63,12 +61,11 @@ private:
     __aicore__ inline GM_ADDR GetWinScaleRegionBase();
 
     // 通信
-    using AllGatherCommData = Apace::AivComm::CollectiveComm<
-        Apace::AivComm::CommCollectiveOp::AllGather,
-        Apace::AivComm::CommMode::PUT, AType, TeamBarrier>;
-    using AllGatherCommScale = Apace::AivComm::CollectiveComm<
-        Apace::AivComm::CommCollectiveOp::AllGather,
-        Apace::AivComm::CommMode::PUT, AscendC::fp8_e8m0_t, TeamBarrier>;
+    using AllGatherCommData = Apace::AivComm::CollectiveComm<Apace::AivComm::CommCollectiveOp::AllGather,
+                                                             Apace::AivComm::CommMode::PUT, AType, TeamBarrier>;
+    using AllGatherCommScale =
+        Apace::AivComm::CollectiveComm<Apace::AivComm::CommCollectiveOp::AllGather, Apace::AivComm::CommMode::PUT,
+                                       AscendC::fp8_e8m0_t, TeamBarrier>;
     AllGatherCommData allGatherData_;
     AllGatherCommScale allGatherScale_;
     CommTilingData commTilingData_{};
@@ -112,9 +109,7 @@ private:
 
 template <typename AType, typename BType, typename CType>
 __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Init(
-    __gm__ CommContext *hcommCtx,
-    GM_ADDR aGM, GM_ADDR aScaleGM,
-    GM_ADDR bGM, GM_ADDR bScaleGM, GM_ADDR cGM,
+    __gm__ CommContext *hcommCtx, GM_ADDR aGM, GM_ADDR aScaleGM, GM_ADDR bGM, GM_ADDR bScaleGM, GM_ADDR cGM,
     const AllGatherMxMatmulUdmaTilingData *tilingData)
 {
     tilingData_ = tilingData;
@@ -148,8 +143,7 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Init(
     auto commScaleBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);
     ubOffset += COMM_WORKSPACE_SIZE;
     auto barrierBuf = AscendC::Te::MakeMemPtr<AscendC::Te::Location::UB, uint8_t>(ubOffset);
-    teamBarrier_.Init(barrierBuf.Get(), ubmemCtx_, rankSize_,
-                      static_cast<uint32_t>(GetBlockIdx()));
+    teamBarrier_.Init(barrierBuf.Get(), ubmemCtx_, rankSize_, static_cast<uint32_t>(GetBlockIdx()));
 
     commTilingData_.splitAxisTileSize = tileM_;  // 每个 tile 搬 tileM 行
     commTilingData_.splitAxisTileCnt = tileCnt_; // head 段 tile 数量
@@ -163,11 +157,9 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Init(
     commTilingScale_.splitAxisTailCnt = tailCnt_;
     scaleKLen_ = scaleKGroups_ * static_cast<uint64_t>(Blaze::Gemm::MXFP_MULTI_BASE_SIZE);
     commTilingScale_.nonSplitAxisSize = scaleKLen_;
-    allGatherData_.template Init<BARRIER_NONE>(udmaCtx_, teamBarrier_, commTilingData_,
-                                               aGM_, commBuf.Get(), rankSize_,
+    allGatherData_.template Init<BARRIER_NONE>(udmaCtx_, teamBarrier_, commTilingData_, aGM_, commBuf.Get(), rankSize_,
                                                static_cast<uint32_t>(GetBlockIdx()));
-    allGatherScale_.Init(udmaCtx_, teamBarrier_, commTilingScale_,
-                         aScaleGM_, commScaleBuf.Get(), rankSize_,
+    allGatherScale_.Init(udmaCtx_, teamBarrier_, commTilingScale_, aScaleGM_, commScaleBuf.Get(), rankSize_,
                          static_cast<uint32_t>(GetBlockIdx()), dataRegionBytes_);
 }
 
@@ -182,8 +174,7 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::InitBaseP
     tailM_ = static_cast<uint32_t>(ct.splitAxisTailSize);
     k_ = td->mmTile.k;
     n_ = td->mmTile.n;
-    m_ = static_cast<uint32_t>(ct.splitAxisTileSize * ct.splitAxisTileCnt +
-                               ct.splitAxisTailSize * ct.splitAxisTailCnt);
+    m_ = static_cast<uint32_t>(ct.splitAxisTileSize * ct.splitAxisTileCnt + ct.splitAxisTailSize * ct.splitAxisTailCnt);
     commTurn_ = tileCnt_ + tailCnt_;
     paddedTailM_ = (tailM_ > 0) ? ((tailM_ + kPaddingLength - 1) / kPaddingLength * kPaddingLength) : 0U;
     headRows_ = static_cast<uint64_t>(tileCnt_) * tileM_;
@@ -211,11 +202,21 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::MatmulPro
 {
     KernelParams params;
     params.mmTile = &tilingData_->mmTile;
-    params.qbmmParams = {tilingData_->mmTile.baseM, tilingData_->mmTile.baseN,
-                         tilingData_->mmTile.baseK, tilingData_->mmTile.dbL0c};
-    params.fragParams = {tileCnt_, tileM_, tailCnt_, tailM_, paddedTailM_, commTurn_,
-                         headRows_, rankId_, rankSize_, m_,
-                         static_cast<uint64_t>(k_), static_cast<uint64_t>(n_), scaleKLen_};
+    params.qbmmParams = {tilingData_->mmTile.baseM, tilingData_->mmTile.baseN, tilingData_->mmTile.baseK,
+                         tilingData_->mmTile.dbL0c};
+    params.fragParams = {tileCnt_,
+                         tileM_,
+                         tailCnt_,
+                         tailM_,
+                         paddedTailM_,
+                         commTurn_,
+                         headRows_,
+                         rankId_,
+                         rankSize_,
+                         m_,
+                         static_cast<uint64_t>(k_),
+                         static_cast<uint64_t>(n_),
+                         scaleKLen_};
     params.aGM = aGM_;
     params.aScaleGM = aScaleGM_;
     params.bGM = bGM_;
@@ -266,18 +267,14 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::AllGather
          static_cast<uint64_t>(CacheLine::ENTIRE_DATA_CACHE), static_cast<uint64_t>(DcciDst::CACHELINE_OUT));
 }
 
-} // namespace AllGatherQuantMatmulImpl
+} // namespace Apace
 
-__global__ __aicore__ void AllGatherQuantMatmulKernel(
-    __gm__ Apace::AivComm::CommContext *hcommCtx,
-    GM_ADDR aGM, GM_ADDR aScaleGM,
-    GM_ADDR bGM, GM_ADDR bScaleGM, GM_ADDR cGM,
-    AllGatherMxMatmulUdmaTilingData tilingData)
+__global__ __aicore__ void AllGatherQuantMatmulKernel(__gm__ Apace::AivComm::CommContext *hcommCtx, GM_ADDR aGM,
+                                                      GM_ADDR aScaleGM, GM_ADDR bGM, GM_ADDR bScaleGM, GM_ADDR cGM,
+                                                      AllGatherMxMatmulUdmaTilingData tilingData)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
-    AllGatherQuantMatmulImpl::AllGatherMxMatmulUdmaImpl<
-        fp8_e4m3fn_t, fp8_e4m3fn_t, bfloat16_t>
-        impl;
+    Apace::AllGatherMxMatmulUdmaImpl<fp8_e4m3fn_t, fp8_e4m3fn_t, bfloat16_t> impl;
     impl.Init(hcommCtx, aGM, aScaleGM, bGM, bScaleGM, cGM, &tilingData);
     impl.Process();
 }

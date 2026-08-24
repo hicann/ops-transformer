@@ -1,5 +1,14 @@
 #!/bin/bash
-# run.sh — apace AllGatherQuantMatmul Prefill ST
+# -----------------------------------------------------------------------------------------------------------
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# -----------------------------------------------------------------------------------------------------------
+# run.sh — apace AllGatherQuantMatmul ubmem ST
 #
 # 流程: 生成数据 -> 编译 -> 多 rank 运行 -> 精度比对
 #
@@ -15,17 +24,18 @@
 #   bash run.sh --gen-only ...         # 仅生成 CPU golden
 #   bash run.sh --verify-only ...      # 仅精度比对
 #   bash run.sh --perf ...             # 性能模式(msprof采集)
+#   bash run.sh --nz ...              # NZ weight layout (default DN)
 #   环境变量 KERNEL_TIMEOUT=<秒>       # 覆盖默认超时(600s)
 #   perf 模式跑完后: python3 scripts/parse_prof.py --all  解析性能数据
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ST_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ST_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 BUILD_DIR="${ST_DIR}/build"
 PROF_DIR="${SCRIPT_DIR}/prof"
 KERNEL_TIMEOUT=${KERNEL_TIMEOUT:-600}  # 默认600秒(10分钟)，可用环境变量 KERNEL_TIMEOUT 覆盖
 
-SKIP_BUILD=0; GEN_ONLY=0; VERIFY_ONLY=0; CLI_MODE=0; PERF_MODE=0
+SKIP_BUILD=0; GEN_ONLY=0; VERIFY_ONLY=0; CLI_MODE=0; PERF_MODE=0; NZ_MODE=0
 CSV_FILE="${SCRIPT_DIR}/cases.csv"
 
 # ---- 解析参数 ----
@@ -38,6 +48,7 @@ while [ $# -gt 0 ]; do
         --cli)         CLI_MODE=1; shift ;;
         --csv)         CSV_FILE="$2"; shift 2 ;;
         --perf)        PERF_MODE=1; shift ;;
+        --nz)          NZ_MODE=1; shift ;;
         -h|--help)
             sed -n '1,20p' "$0"; exit 0 ;;
         *)
@@ -96,18 +107,22 @@ print_perf_hint() {
 # ---- 单 case 执行函数 ----
 run_single() {
     local M=$1 K=$2 N=$3 RANK_NUM=$4
+    local NZ_FLAG=""
+    [ "$NZ_MODE" -eq 1 ] && NZ_FLAG="--nz"
+    local LAYOUT="DN"
+    [ "$NZ_MODE" -eq 1 ] && LAYOUT="NZ"
     echo ""
     echo "=========================================="
-    echo "apace AllGatherQuantMatmul Prefill ST"
-    echo "  M=$M K=$K N=$N rankNum=$RANK_NUM"
+    echo "apace AllGatherQuantMatmul ubmem ST"
+    echo "  M=$M K=$K N=$N rankNum=$RANK_NUM layout=$LAYOUT"
     echo "=========================================="
 
     cd "$SCRIPT_DIR"
     rm -rf input output
 
     # ---- 1. 生成数据 ----
-    echo "[1/4] Generate CPU golden + input data..."
-    python3 scripts/gen_data.py "$M" "$K" "$N" "$RANK_NUM"
+    echo "[1/4] Generate CPU golden + input data... (layout=$LAYOUT)"
+    python3 scripts/gen_data.py "$M" "$K" "$N" "$RANK_NUM" $NZ_FLAG
 
 
     if [ "$GEN_ONLY" -eq 1 ]; then return 0; fi
@@ -118,15 +133,15 @@ run_single() {
             echo "[2/4] Build..."
             mkdir -p "$BUILD_DIR"
             cmake -S "$ST_DIR" -B "$BUILD_DIR" || { echo "ERROR: cmake failed"; return 1; }
-            cmake --build "$BUILD_DIR" --target apace_ag_qmm_st --parallel 4 || { echo "ERROR: build failed"; return 1; }
+            cmake --build "$BUILD_DIR" --target apace_ag_qmm_ubmem_st --parallel 4 || { echo "ERROR: build failed"; return 1; }
         else
-            [ -x "$BUILD_DIR/all_gather_quant_matmul/apace_ag_qmm_st" ] || { echo "ERROR: --skip-build but binary missing"; return 1; }
+            [ -x "$BUILD_DIR/all_gather_quant_matmul/ubmem/apace_ag_qmm_ubmem_st" ] || { echo "ERROR: --skip-build but binary missing"; return 1; }
             echo "[2/4] Skip build (--skip-build)"
         fi
 
         # ---- 3. 多 rank 运行 ----
         echo "[3/4] NPU run ($RANK_NUM ranks)..."
-        local EXE_PATH="$BUILD_DIR/all_gather_quant_matmul/apace_ag_qmm_st"
+        local EXE_PATH="$BUILD_DIR/all_gather_quant_matmul/ubmem/apace_ag_qmm_ubmem_st"
         local EXE_DIR="$(dirname "$EXE_PATH")"
         rm -rf "$EXE_DIR/input" "$EXE_DIR/output"
         cp -r input "$EXE_DIR/input"
@@ -156,17 +171,17 @@ run_single() {
                 local before_dirs after_dirs new_dirs
                 before_dirs=$(get_prof_dirs)
 
-                echo "  [msprof] Running $EXE_PATH $M $K $N $RANK_NUM $MODE ..."
+                echo "  [msprof] Running $EXE_PATH $M $K $N $RANK_NUM $MODE $NZ_FLAG ..."
                 if command -v timeout >/dev/null 2>&1; then
                     set +e
                     timeout ${KERNEL_TIMEOUT}s msprof --output="$PROF_DIR" \
-                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE" 2>&1
+                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE $NZ_FLAG" 2>&1
                     local MSPROF_RC=$?
                     set -e
                 else
                     set +e
                     msprof --output="$PROF_DIR" \
-                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE" 2>&1
+                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE $NZ_FLAG" 2>&1
                     local MSPROF_RC=$?
                     set -e
                 fi
@@ -245,12 +260,12 @@ run_single() {
                 # ---- precision 模式: 直接调 exe ----
                 if command -v timeout >/dev/null 2>&1; then
                     set +e
-                    KERNEL_OUT=$(timeout ${KERNEL_TIMEOUT}s "$EXE_PATH" $M $K $N $RANK_NUM "$MODE" 2>&1)
+                    KERNEL_OUT=$(timeout ${KERNEL_TIMEOUT}s "$EXE_PATH" $M $K $N $RANK_NUM "$MODE" $NZ_FLAG 2>&1)
                     KERNEL_RC=$?
                     set -e
                 else
                     set +e
-                    KERNEL_OUT=$("$EXE_PATH" $M $K $N $RANK_NUM "$MODE" 2>&1)
+                    KERNEL_OUT=$("$EXE_PATH" $M $K $N $RANK_NUM "$MODE" $NZ_FLAG 2>&1)
                     KERNEL_RC=$?
                     set -e
                 fi
@@ -304,7 +319,7 @@ run_single() {
 
 # ---- 选择参数来源 ----
 if [ "${CLI_MODE:-0}" -eq 1 ]; then
-    M=2048; K=3584; N=4096; RANK_NUM=4
+    M=40; K=5120; N=3072; RANK_NUM=4
     idx=0
     [ $idx -lt ${#ARGS[@]} ] && { M=${ARGS[$idx]}; idx=$((idx+1)); }
     [ $idx -lt ${#ARGS[@]} ] && { K=${ARGS[$idx]}; idx=$((idx+1)); }

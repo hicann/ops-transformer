@@ -3,7 +3,7 @@
 
 # ----------------------------------------------------------------------------------------------------------
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
-# This program is free software, you can redistribute it and/or modify it under terms and conditions of
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
@@ -16,15 +16,15 @@ Generate MXFP8 test data for AllGatherQuantMatmul operator.
 
 Inputs:
   - x1 (A): fp8e4m3fn_t, ND layout, shape [M, K]
-  - x2 (B): fp8e4m3fn_t, DN layout (col-major ND), shape [K, N]
+  - x2 (B): fp8e4m3fn_t, DN layout (col-major ND) or NZ layout, shape [K, N]
   - scale1: fp8e8m0_t scale for A, shape [M, ceil(K/64), 2]
-  - scale2: fp8e8m0_t scale for B, shape [ceil(K/64), 2, N]
+  - scale2: fp8e8m0_t scale for B, shape [ceil(K/64), 2, N] (DN) or [ceil(K/64), N, 2] (NZ)
 
 Output:
   - output: bfloat16_t, ND layout, shape [M, N/rankNum]
 
 Usage:
-  python3 gen_data.py m k n rank_num
+  python3 gen_data.py m k n rank_num [--nz]
 """
 
 import math
@@ -35,7 +35,20 @@ import numpy as np
 import torch
 
 
-def write_artifacts(base_dir, rank_id, a_fp8, b_fp8, a_scale, b_scale, out):
+def to_weight_nz_layout(b_k_n):
+    """[K, N] uint8 -> NZ blocked [Nt, Kt, 16, 32]."""
+    k, n = b_k_n.shape
+    kt = math.ceil(k / 16)
+    nt = math.ceil(n / 32)
+    padded = np.zeros((kt * 16, nt * 32), dtype=b_k_n.dtype)
+    padded[:k, :n] = b_k_n
+    blocked = padded.reshape(kt, 16, nt, 32)
+    return np.ascontiguousarray(blocked.transpose(2, 0, 1, 3))
+
+
+def write_artifacts(
+    base_dir, rank_id, a_fp8, b_fp8, a_scale, b_scale, out, is_nz=False
+):
     """Write test data and golden output to input/output directories."""
     input_dir = os.path.join(base_dir, "input", str(rank_id))
     output_dir = os.path.join(base_dir, "output", str(rank_id))
@@ -44,12 +57,21 @@ def write_artifacts(base_dir, rank_id, a_fp8, b_fp8, a_scale, b_scale, out):
 
     # A: ND layout (row-major), store as-is
     a_fp8.tofile(os.path.join(input_dir, "input_a.bin"))
-    # B: DN layout (col-major), store by transposing first
-    np.ascontiguousarray(b_fp8.T).tofile(os.path.join(input_dir, "input_b.bin"))
+    if is_nz:
+        # B: NZ layout {ceil(N/32), ceil(K/16), 16, 32}
+        b_nz = to_weight_nz_layout(b_fp8)
+        b_nz.tofile(os.path.join(input_dir, "input_b.bin"))
+        # ScaleB: NZ layout {ceil(K/64), N, 2}, store as-is (no transpose)
+        b_scale.tofile(os.path.join(input_dir, "input_scaleB.bin"))
+    else:
+        # B: DN layout (col-major), store by transposing first
+        np.ascontiguousarray(b_fp8.T).tofile(os.path.join(input_dir, "input_b.bin"))
+        # ScaleB: [ceil(K/64), 2, N] -> store as [N, ceil(K/64), 2] for DN layout
+        np.ascontiguousarray(b_scale.transpose(2, 0, 1)).tofile(
+            os.path.join(input_dir, "input_scaleB.bin")
+        )
     # ScaleA: ND layout
     a_scale.tofile(os.path.join(input_dir, "input_scaleA.bin"))
-    # ScaleB: [ceil(K/64), 2, N] -> store as [N, ceil(K/64), 2] for DN layout
-    np.ascontiguousarray(b_scale.transpose(2, 0, 1)).tofile(os.path.join(input_dir, "input_scaleB.bin"))
     # Output: bf16 as uint16
     out.view(torch.uint16).numpy().tofile(os.path.join(output_dir, "cpu_output.bin"))
 
@@ -65,9 +87,11 @@ def float8_e4m3fn_to_float(data_uint8):
     zero_mask = (exp == 0) & (mant == 0)
     fp32[zero_mask] = 0.0
     normal_mask = ~zero_mask
-    fp32[normal_mask] = (1.0 - 2.0 * sign[normal_mask]) * \
-                        np.power(2.0, exp[normal_mask] - 7.0) * \
-                        (1.0 + mant[normal_mask] / 8.0)
+    fp32[normal_mask] = (
+        (1.0 - 2.0 * sign[normal_mask])
+        * np.power(2.0, exp[normal_mask] - 7.0)
+        * (1.0 + mant[normal_mask] / 8.0)
+    )
     return fp32
 
 
@@ -83,11 +107,11 @@ def float_to_fp8_e4m3fn_vec(fp32_arr):
     sign = (fp32 < 0).astype(np.uint8)
     abs_val = np.abs(fp32)
 
-    MAX_NORMAL = 1.875 * 128.0   # 240.0
-    MIN_NORMAL = 2.0 ** (-6)     # 0.015625
+    MAX_NORMAL = 1.875 * 128.0  # 240.0
+    MIN_NORMAL = 2.0 ** (-6)  # 0.015625
 
     log2_val = np.log2(np.clip(abs_val, 1e-30, None))
-    e = np.floor(log2_val).astype(np.int32) + 7    # bias = 7
+    e = np.floor(log2_val).astype(np.int32) + 7  # bias = 7
     e = np.clip(e, 1, 14)
 
     normalized = abs_val / np.power(2.0, (e - 7).astype(np.float32))
@@ -121,15 +145,24 @@ def generate_fp8_e8m0_scale(shape):
 
 def dequantize_mxfp8(data_fp8, scale_fp8, divisor=64, c0=2):
     """
-    MXFP8 dequantization: FP8 E4M3FN × FP8 E8M0 scale → FP32.
+    MXFP8 dequantization: FP8 E4M3FN x FP8 E8M0 scale -> FP32.
     Per-64-element group quantization with c0=2 scales per group.
+
+    Handles both DN and NZ scale layouts:
+      - A scale: (M, ceil(K/64), 2) -> shape[0] == data.shape[0], shape[-1] == c0
+      - B scale DN: (ceil(K/64), 2, N) -> shape[1] == c0
+      - B scale NZ: (ceil(K/64), N, 2) -> shape[-1] == c0, shape[1] != c0
     """
     sub_group = divisor // c0
     fp32_data = float8_e4m3fn_to_float(data_fp8.astype(np.uint8))
     fp32_scale = float8_e8m0_to_float(scale_fp8.astype(np.uint8))
 
-    is_a_scale = (scale_fp8.ndim == 3 and scale_fp8.shape[-1] == c0 and scale_fp8.shape[-2] > c0)
-    is_b_scale = (scale_fp8.ndim == 3 and scale_fp8.shape[1] == c0)
+    is_a_scale = (
+        scale_fp8.ndim == 3
+        and scale_fp8.shape[0] == data_fp8.shape[0]
+        and scale_fp8.shape[-1] == c0
+    )
+    is_b_scale = scale_fp8.ndim == 3 and scale_fp8.shape[0] != data_fp8.shape[0]
 
     k_shape = data_fp8.shape[1] if is_a_scale else data_fp8.shape[0]
     n_groups = (k_shape + divisor - 1) // divisor
@@ -145,9 +178,14 @@ def dequantize_mxfp8(data_fp8, scale_fp8, divisor=64, c0=2):
             for k in range(k_shape):
                 scales[i, k] = fp32_scale[i, group_idx[k], sub_idx[k]]
     elif is_b_scale:
-        N = data_fp8.shape[1]
-        for k in range(k_shape):
-            scales[k, :] = fp32_scale[group_idx[k], sub_idx[k], :]
+        if scale_fp8.shape[1] == c0:
+            # DN: (ceil(K/64), 2, N) -> access [group_idx[k], sub_idx[k], :]
+            for k in range(k_shape):
+                scales[k, :] = fp32_scale[group_idx[k], sub_idx[k], :]
+        else:
+            # NZ: (ceil(K/64), N, 2) -> access [group_idx[k], :, sub_idx[k]]
+            for k in range(k_shape):
+                scales[k, :] = fp32_scale[group_idx[k], :, sub_idx[k]]
     else:
         raise ValueError(f"Unexpected scale shape: {scale_fp8.shape}")
 
@@ -156,14 +194,15 @@ def dequantize_mxfp8(data_fp8, scale_fp8, divisor=64, c0=2):
 
 BASE_SEED = 42
 
-def gen_golden_data_all_gather_matmul(m, k, n, rank_num):
+
+def gen_golden_data_all_gather_matmul(m, k, n, rank_num, is_nz=False):
     """
     Generate golden data for AllGatherQuantMatmul operator.
 
     Each rank i holds independent A_i [M, K], B_i [K, N].
     Data flow:
-      1. AllGather: A_all = concat([A_0, ..., A_{R-1}]) → [rankNum*M, K]
-      2. Matmul:   C_i = A_all × B_i → [rankNum*M, N]
+      1. AllGather: A_all = concat([A_0, ..., A_{R-1}]) -> [rankNum*M, K]
+      2. Matmul:   C_i = A_all x B_i -> [rankNum*M, N]
     Each rank produces DIFFERENT output (different B_i per rank).
     """
     M = m
@@ -171,7 +210,9 @@ def gen_golden_data_all_gather_matmul(m, k, n, rank_num):
     N = n
     M_total = rank_num * M
 
-    print(f"  M_per_rank={M}, K={K}, N={N}, M_total={M_total}")
+    print(
+        f"  M_per_rank={M}, K={K}, N={N}, M_total={M_total}, layout={'NZ' if is_nz else 'DN'}"
+    )
 
     # 每个 rank 的 A / scaleA / B / scaleB 都用独立 seed 生成
     a_fp8_list = []
@@ -183,14 +224,21 @@ def gen_golden_data_all_gather_matmul(m, k, n, rank_num):
         a_fp8, _ = generate_fp8_e4m3fn_data((M, K), 1.0, 8.0)
         a_scale = generate_fp8_e8m0_scale((M, math.ceil(K / 64), 2))
         b_fp8, _ = generate_fp8_e4m3fn_data((K, N), 1.0, 8.0)
-        b_scale = generate_fp8_e8m0_scale((math.ceil(K / 64), 2, N))
+        if is_nz:
+            b_scale = generate_fp8_e8m0_scale((math.ceil(K / 64), N, 2))
+        else:
+            b_scale = generate_fp8_e8m0_scale((math.ceil(K / 64), 2, N))
         a_fp8_list.append(a_fp8)
         a_scale_list.append(a_scale)
         b_fp8_list.append(b_fp8)
         b_scale_list.append(b_scale)
 
-    print(f"  [DIAG] A[0]: fp8.shape={a_fp8_list[0].shape}, scale.shape={a_scale_list[0].shape}")
-    print(f"  [DIAG] B[0]: fp8.shape={b_fp8_list[0].shape}, scale.shape={b_scale_list[0].shape}")
+    print(
+        f"  [DIAG] A[0]: fp8.shape={a_fp8_list[0].shape}, scale.shape={a_scale_list[0].shape}"
+    )
+    print(
+        f"  [DIAG] B[0]: fp8.shape={b_fp8_list[0].shape}, scale.shape={b_scale_list[0].shape}"
+    )
 
     # AllGather: concatenate all A_i → [rankNum*M, K]
     a_deq_parts = []
@@ -210,41 +258,56 @@ def gen_golden_data_all_gather_matmul(m, k, n, rank_num):
         c_bf16 = c_full.to(torch.bfloat16)
 
         if rank_id == 0:
-            print(f"  [DIAG] a_all_deq.mean={a_all_deq.mean():.3f}, b_deq[0].mean={b_deq.mean():.3f}")
-            print(f"  Golden C[0] shape {c_full.shape}, range [{c_full.min():.2f}, {c_full.max():.2f}]")
+            print(
+                f"  [DIAG] a_all_deq.mean={a_all_deq.mean():.3f}, b_deq[0].mean={b_deq.mean():.3f}"
+            )
+            print(
+                f"  Golden C[0] shape {c_full.shape}, range [{c_full.min():.2f}, {c_full.max():.2f}]"
+            )
 
-        write_artifacts(base_dir, rank_id,
-                       a_fp8_list[rank_id], b_fp8_list[rank_id],
-                       a_scale_list[rank_id], b_scale_list[rank_id],
-                       c_bf16)
+        write_artifacts(
+            base_dir,
+            rank_id,
+            a_fp8_list[rank_id],
+            b_fp8_list[rank_id],
+            a_scale_list[rank_id],
+            b_scale_list[rank_id],
+            c_bf16,
+            is_nz=is_nz,
+        )
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        print("Usage: python3 gen_data.py m k n rank_num")
+    if len(sys.argv) < 5:
+        print("Usage: python3 gen_data.py m k n rank_num [--nz]")
         print("  m: matrix A row dimension M")
         print("  k: matrix A column dimension K")
         print("  n: matrix B column dimension N")
         print("  rank_num: number of ranks")
+        print("  --nz: use NZ weight layout (default DN)")
         print("\nExample: python3 gen_data.py 2048 3584 4096 4")
+        print("         python3 gen_data.py 2048 3584 4096 4 --nz")
         sys.exit(1)
 
     m = int(sys.argv[1])
     k = int(sys.argv[2])
     n = int(sys.argv[3])
     rank_num = int(sys.argv[4])
+    is_nz = "--nz" in sys.argv[5:]
 
     if k % 32 != 0:
         print(f"Error: K={k} not divisible by 32")
         sys.exit(1)
 
     if math.ceil(k / 64) % 2 != 0:
-        print(f"Error: ceil(K/64)={math.ceil(k/64)} not even")
+        print(f"Error: ceil(K/64)={math.ceil(k / 64)} not even")
         sys.exit(1)
 
-    print(f"Generating AllGatherQuantMatmul test data:")
-    print(f"  M={m}, K={k}, N={n}, rankSize={rank_num}")
+    print("Generating AllGatherQuantMatmul test data:")
+    print(
+        f"  M={m}, K={k}, N={n}, rankSize={rank_num}, layout={'NZ' if is_nz else 'DN'}"
+    )
 
-    gen_golden_data_all_gather_matmul(m, k, n, rank_num)
+    gen_golden_data_all_gather_matmul(m, k, n, rank_num, is_nz=is_nz)
 
     print("Test data generation completed!")

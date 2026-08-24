@@ -37,9 +37,9 @@
 #include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_udma_impl.h"
 #include "apace/core/aiv_comm/collective_comm_context.h"
 #include "apace/utils/comm_channel_builder.h"
-#include "../../utils/root_info_exchanger.h"
+#include "../../../utils/root_info_exchanger.h"
 
-using namespace AllGatherQuantMatmulImpl;
+using namespace Apace;
 using namespace Apace::AivComm;
 
 using CommContext = Apace::AivComm::CommContext;
@@ -91,14 +91,12 @@ void ParseArgs(int argc, char *argv[], int *m, int *k, int *n, int *rankNum, std
     }
 }
 
-int LaunchKernel(uint32_t usedCoreNum, aclrtStream stream,
-                 CommContext *devContext,
-                 GM_ADDR deviceA, GM_ADDR deviceScaleA,
-                 GM_ADDR deviceB, GM_ADDR deviceScaleB,
-                 GM_ADDR deviceOutput, AllGatherMxMatmulUdmaTilingData &tilingData)
+int LaunchKernel(uint32_t usedCoreNum, aclrtStream stream, CommContext *devContext, GM_ADDR deviceA,
+                 GM_ADDR deviceScaleA, GM_ADDR deviceB, GM_ADDR deviceScaleB, GM_ADDR deviceOutput,
+                 AllGatherMxMatmulUdmaTilingData &tilingData)
 {
-    AllGatherQuantMatmulKernel<<<usedCoreNum, nullptr, stream>>>(
-        devContext, deviceA, deviceScaleA, deviceB, deviceScaleB, deviceOutput, tilingData);
+    AllGatherQuantMatmulKernel<<<usedCoreNum, nullptr, stream>>>(devContext, deviceA, deviceScaleA, deviceB,
+                                                                 deviceScaleB, deviceOutput, tilingData);
     return 0;
 }
 
@@ -118,22 +116,20 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n, const 
     uint32_t tailCnt = (tailM > 0) ? 1 : 0;
 
     uint32_t paddedTailM = (tailM > 0) ? ((tailM + 15U) / 16U * 16U) : 0U;
-    uint32_t totalLogicalM = static_cast<uint32_t>(rankNum) *
-                             (tileCnt * tileM + tailCnt * paddedTailM);
+    uint32_t totalLogicalM = static_cast<uint32_t>(rankNum) * (tileCnt * tileM + tailCnt * paddedTailM);
 
     QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN> tilingEngine;
     tilingEngine.SetOptimizeEnable(false);
     tilingEngine.SetMTailAlignEnable(true);
-    tilingEngine.GetTilingData(totalLogicalM, static_cast<uint32_t>(n),
-                               static_cast<uint32_t>(k), tilingData.mmTile);
+    tilingEngine.GetTilingData(totalLogicalM, static_cast<uint32_t>(n), static_cast<uint32_t>(k), tilingData.mmTile);
     tilingData.commTile.splitAxisTileSize = tileM;
     tilingData.commTile.splitAxisTileCnt = tileCnt;
     tilingData.commTile.splitAxisTailSize = tailM;
     tilingData.commTile.splitAxisTailCnt = tailCnt;
     tilingData.commTile.nonSplitAxisSize = static_cast<uint32_t>(k);
 
-    printf("[Rank %d] Tiling: tileCnt=%u, tileM=%u, tailCnt=%u, tailM=%u, paddedTailM=%u, commTurn=%u\n",
-           rankId, tileCnt, tileM, tailCnt, tailM, paddedTailM, tileCnt + tailCnt);
+    printf("[Rank %d] Tiling: tileCnt=%u, tileM=%u, tailCnt=%u, tailM=%u, paddedTailM=%u, commTurn=%u\n", rankId,
+           tileCnt, tileM, tailCnt, tailM, paddedTailM, tileCnt + tailCnt);
 
     // ---- ACL Init ----
     ACL_CHECK(aclInit(nullptr));
@@ -154,8 +150,8 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n, const 
     HcclCommConfigInit(&config);
     config.hcclWorldRankID = static_cast<uint32_t>(rankId);
     HcclComm comm = nullptr;
-    HCCL_CHECK(HcclCommInitRootInfoConfig(static_cast<uint32_t>(rankNum), &rootInfo,
-                                          static_cast<uint32_t>(rankId), &config, &comm));
+    HCCL_CHECK(HcclCommInitRootInfoConfig(static_cast<uint32_t>(rankNum), &rootInfo, static_cast<uint32_t>(rankId),
+                                          &config, &comm));
     if (comm == nullptr) {
         ERROR_LOG("rank %d HcclCommInitRootInfoConfig failed", rankId);
         return -1;
@@ -168,8 +164,7 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n, const 
     const char *ctxTag = "all_gather_quant_matmul";
 
     CommContext *devContext = reinterpret_cast<CommContext *>(
-        builder.CreateDeviceContext(&hostCtx, sizeof(CommContext), ctxTag,
-                                    &hostCtx.udmaCtx, &hostCtx.ubmemCtx));
+        builder.CreateDeviceContext(&hostCtx, sizeof(CommContext), ctxTag, &hostCtx.udmaCtx, &hostCtx.ubmemCtx));
     if (devContext == nullptr) {
         ERROR_LOG("rank %d CreateDeviceContext failed", rankId);
         return -1;
@@ -236,8 +231,8 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n, const 
     printf("[Rank %d] Launching AllGatherQuantMatmulKernel...\n", rankId);
     fflush(stdout);
 
-    LaunchKernel(tilingData.mmTile.usedCoreNum, stream, devContext,
-                 deviceA, deviceScaleA, deviceB, deviceScaleB, deviceOutput, tilingData);
+    LaunchKernel(tilingData.mmTile.usedCoreNum, stream, devContext, deviceA, deviceScaleA, deviceB, deviceScaleB,
+                 deviceOutput, tilingData);
     ACL_CHECK(aclrtSynchronizeStream(stream));
     size_t outputSize = static_cast<size_t>(rankNum) * m * n * sizeof(uint16_t);
     ACL_CHECK(aclrtMemcpy(hostOutput.data(), outputSize, deviceOutput, outputSize, ACL_MEMCPY_DEVICE_TO_HOST));
@@ -249,8 +244,8 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n, const 
         ACL_CHECK(aclrtCreateEvent(&kernelEndEvent));
         ACL_CHECK(aclrtRecordEvent(kernelStartEvent, stream));
         for (int i = 1; i < iterations; ++i) {
-            LaunchKernel(tilingData.mmTile.usedCoreNum, stream, devContext,
-                         deviceA, deviceScaleA, deviceB, deviceScaleB, deviceOutput, tilingData);
+            LaunchKernel(tilingData.mmTile.usedCoreNum, stream, devContext, deviceA, deviceScaleA, deviceB,
+                         deviceScaleB, deviceOutput, tilingData);
         }
         ACL_CHECK(aclrtRecordEvent(kernelEndEvent, stream));
         ACL_CHECK(aclrtSynchronizeStream(stream));
@@ -258,8 +253,8 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n, const 
         float kernelElapsedMs = 0.0F;
         ACL_CHECK(aclrtEventElapsedTime(&kernelElapsedMs, kernelStartEvent, kernelEndEvent));
         double kernelElapsedUs = static_cast<double>(kernelElapsedMs) * 1000.0;
-        printf("[Rank %d] Kernel completed! Elapsed time: %.3f us (avg over %d iterations)\n",
-               rankId, kernelElapsedUs / (iterations - 1), iterations - 1);
+        printf("[Rank %d] Kernel completed! Elapsed time: %.3f us (avg over %d iterations)\n", rankId,
+               kernelElapsedUs / (iterations - 1), iterations - 1);
         fflush(stdout);
         if (kernelEndEvent)
             aclrtDestroyEvent(kernelEndEvent);
