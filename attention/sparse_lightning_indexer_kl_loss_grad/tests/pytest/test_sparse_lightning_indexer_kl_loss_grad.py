@@ -36,9 +36,6 @@ def find_repo_root():
 
 
 REPO_ROOT = find_repo_root()
-TORCH_EXTENSION_PATH = REPO_ROOT / "torch_extension"
-if TORCH_EXTENSION_PATH.exists():
-    sys.path.insert(0, str(TORCH_EXTENSION_PATH))
 
 MINDSPEED_PATH = REPO_ROOT / "MindSpeed"
 if MINDSPEED_PATH.exists():

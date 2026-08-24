@@ -9,38 +9,44 @@
 开发新增算子api涉及新增与修改以下文件（以算子`${op_api}`为例）：
 
 ```
-├── torch_extension
-    ├── cann_ops_transformer
-        ├── __init__.py                                 # 包根入口，对外导出算子 api 接口（新增 import）
-        ├── op_builder
-        │   ├── builder.py                              # OpBuilder 基类，统一管理 JIT 编译、schema/meta 注册（一般无需修改）
-        ├── common
-        │   ├── inc
-        │   │   ├── aclnn_common.h                      # ACLNN_CMD 宏、类型转换等公共能力（一般无需修改）
-        │   │   ├── hccl_common.h                       # 通信类算子公共能力
-        ├── ops
-        │   ├── csrc
-        │   │   ├── ${op_api}.cpp                       # 算子 api 的 C++ 实现，调用 aclnn 接口
-        │   ├── graph_convert
-        │   │   ├── graph_convert_${op_api}.py          # 算子 api 的 torchair 图模式（GE Converter）实现
-        │   ├── __init__.py                             # 对外导出新增算子 api（新增 import）
-        │   └── ${op_api}.py                            # 算子 api 的 Python 前端实现（OpBuilder、schema、meta、对外函数）
-        ├── docs
-            ├── torch_extension_guidelines.md           # 本开发规范
-            ├── zh
-                ├── ${op_api}.md                        # 算子 api 的中文文档
+ops-transformer/
+├── <category>/<op>/
+│   ├── op_host/                                     # 原有算子实现代码
+│   ├── op_kernel/                                   # 原有 kernel 代码
+│   ├── tests/                                       # 原有测试
+│   └── torch_extension/                             # torch_extension 文件
+│       ├── __init__.py                              # 导出算子接口与 Converter
+│       ├── ${op_api}.py                             # Python 前端
+│       ├── graph_convert_${op_api}.py               # torchair 图模式 Converter（可选）
+│       └── csrc/
+│           └── ${op_api}.cpp                        # C++ 后端
+├── torch_extension/
+│   ├── setup.py                                     # 自动收集分布式算子文件
+│   ├── cann_ops_transformer/
+│   │   ├── __init__.py                              # 包根入口，动态发现 + 命名空间导出
+│   │   ├── op_builder/
+│   │   │   ├── __init__.py                          # 导出 OpBuilder, get_as_library
+│   │   │   └── builder.py                           # OpBuilder 基类（支持 category 参数、延迟初始化）
+│   │   ├── common/
+│   │   │   ├── aclnn_common.h                       # ACLNN_CMD 宏、类型转换等公共能力
+│   │   │   └── hccl_common.h                        # 通信类算子公共能力
+│   │   ├── csrc/
+│   │   │   └── extension.cpp                        # C++ stub
+│   │   ├── ops/
+│   │   │   └── __init__.py                          # 自动发现算子（目录扫描 + entry point）
+│   │   └── docs/                                    # 文档（保持原位）
 ```
 
-新增一个算子api的标准动作清单（以`flash_attn`为例）：
+新增一个算子api的标准动作清单（以`mc2/mega_moe`为例）：
 
-1. 在`ops/csrc/flash_attn.cpp`中实现C++ kernel wrapper，调用`ACLNN_CMD`拉起aclnn接口；
-2. 在`ops/flash_attn.py`中编写`OpBuilder`子类（定义`sources`/`schema`/`register_meta`），注册dispatcher实现，并提供对外的Python函数；
-3. 在`ops/graph_convert/graph_convert_flash_attn.py`中编写图模式Converter（若需支持图模式）；
-4. 在`ops/__init__.py`中导出新增的对外接口；
-5. 在包根`cann_ops_transformer/__init__.py`中import导出对外接口，使用户可直接从包根访问；
-6. 在`docs/zh/flash_attn.md`中补充算子文档。
+1. 在`mc2/mega_moe/torch_extension/csrc/mega_moe.cpp`中实现C++ kernel wrapper，调用`ACLNN_CMD`拉起aclnn接口；
+2. 在`mc2/mega_moe/torch_extension/mega_moe.py`中编写`OpBuilder`子类（定义`sources`/`schema`/`register_meta`），注册dispatcher实现，并提供对外的Python函数；
+3. 在`mc2/mega_moe/torch_extension/graph_convert_mega_moe.py`中编写图模式Converter（若需支持图模式）；
+4. 在`mc2/mega_moe/torch_extension/__init__.py`中定义`__all__`并导出算子接口与Converter；
+5. 算子导入后自动被`ops/__init__.py`的自动发现机制加载，无需手动注册；
+6. 在`docs/zh/mega_moe.md`中补充算子文档。
 
->新增文件请放在`cann_ops_transformer`包下，import路径统一以`cann_ops_transformer`为根。
+>新增文件请放在对应算子的`<category>/<op>/torch_extension/`目录下，import路径统一以`cann_ops_transformer`为根。
 
 ## 2. 命名规范
 
@@ -50,8 +56,8 @@
 
 | 层级 | 命名约定 | 示例 |
 | --- | --- | --- |
-| Library名（DEF域） | 固定为`cann_ops_transformer` | `AS_LIBRARY = Library("cann_ops_transformer", "DEF")` |
-| schema算子名 / aten注册名 | 算子语义的小写蛇形名，不带`npu_`前缀 | `flash_attn` |
+| Library名（DEF域） | 固定为`cann_ops_transformer` | `get_as_library()` 创建的 Library 实例 |
+| import路径 | 从`cann_ops_transformer.op_builder`导入 | `from cann_ops_transformer.op_builder import OpBuilder, get_as_library` |
 | C++ wrapper函数名 | 与schema算子名一致，置于`namespace op_api`内 | `op_api::flash_attn` |
 | `PYBIND11_MODULE`导出名 | 与schema算子名一致 | `m.def("flash_attn", &flash_attn, "flash_attn");` |
 | Meta实现函数名 | schema算子名 + `_meta`后缀 | `flash_attn_meta` |
@@ -72,13 +78,13 @@
 ### 2.2 文件命名
 
 - 统一使用**小写蛇形命名**（snake_case），单词以`_`连接，禁止使用大写、驼峰或连字符。
-- 同一算子的各层文件**主名保持一致**，仅靠目录和前缀区分职责：
-  - Python前端：`ops/${op_api}.py`，如`flash_attn.py`；
-  - C++后端：`ops/csrc/${op_api}.cpp`，主名与Python前端一致，如`flash_attn.cpp`；
-  - 图模式：`ops/graph_convert/graph_convert_${op_api}.py`，统一加`graph_convert_`前缀，如`graph_convert_flash_attn.py`；
-  - 文档：`docs/zh/${op_api}.md`，如`flash_attn.md`。
-- 文件主名应与该文件主要导出的算子语义对应；带版本的算子文件名需带版本后缀（如`flash_attn_v2.cpp`）。
-- 公共头文件放在`common/inc/`下，按能力域命名（如`aclnn_common.h`、`hccl_common.h`）。
+- 同一算子的各层文件**主名保持一致**，放在`<category>/<op>/torch_extension/`下，仅靠目录和前缀区分职责：
+  - Python前端：`<category>/<op>/torch_extension/${op_api}.py`，如`flash_attn.py`；
+  - 算子`__init__.py`：`<category>/<op>/torch_extension/__init__.py`，定义`__all__`并导出算子接口；
+  - C++后端：`<category>/<op>/torch_extension/csrc/${op_api}.cpp`，主名与Python前端一致；
+  - 图模式：`<category>/<op>/torch_extension/graph_convert_${op_api}.py`，统一加`graph_convert_`前缀；
+  - 文档：`docs/zh/${op_api}.md`。
+- 公共头文件放在`torch_extension/cann_ops_transformer/common/`下，按能力域命名（如`aclnn_common.h`、`hccl_common.h`）。
 
 ### 2.3 标识符命名
 
@@ -86,8 +92,8 @@
 
 - **函数/变量/参数**：小写蛇形（snake_case），如`head_num`、`scale_value`、`input_layout`。
 - **类名**：大驼峰（PascalCase），如`OpBuilder`、`FlashAttnOpBuilder`。
-- **模块级常量**：全大写蛇形（UPPER_SNAKE_CASE），如`AS_LIBRARY`、`ASCEND_HOME_PATH`、`TORCH_DTYPE_ENUM_VALUE_TO_SCALAR_TYPE_MAP`。
-- **模块内部私有符号**：以单下划线`_`前缀标识，如`_flash_attn_op_builder`、`_op_module`、`_flash_attn`、`_TORCHAIR_AVAILABLE`。
+- **模块级常量**：全大写蛇形（UPPER_SNAKE_CASE），如`ASCEND_HOME_PATH`、`TORCH_DTYPE_ENUM_VALUE_TO_SCALAR_TYPE_MAP`。
+- **模块内部私有符号**：以单下划线`_`前缀标识，如`_flash_attn_op_builder`、`_flash_attn`。
 - **类型注解**：对外接口与关键内部函数应带类型注解（`from typing import Optional, Tuple, List`），可选参数统一用`Optional[...]`，例如：
   ```python
   def flash_attn(
@@ -131,7 +137,7 @@
 
 ## 3. 各层实现规范
 
-### 3.1 C++ 后端（`ops/csrc/${op_api}.cpp`）
+### 3.1 C++ 后端（`<category>/<op>/torch_extension/csrc/${op_api}.cpp`）
 
 负责把PyTorch张量桥接到aclnn C-API，规范要点：
 
@@ -186,20 +192,20 @@
    }
    ```
 
-### 3.2 Python 前端（`ops/${op_api}.py`）
+### 3.2 Python 前端（`<category>/<op>/torch_extension/${op_api}.py`）
 
 负责JIT编译管理、schema/meta注册与对外接口封装：
 
-1. **OpBuilder子类**：继承`OpBuilder`，在`__init__`中以`super().__init__("<schema算子名>")`传入算子名，并实现三个抽象方法：
-   - `sources()`：返回相对`cann_ops_transformer`包根的C++源文件路径列表，如`['ops/csrc/flash_attn.cpp']`；
-   - `schema()`：返回算子schema字符串（见[2.3 Schema标识符](#schema-标识符算子签名)）；
-   - `register_meta()`：用`@impl(AS_LIBRARY, self.name, "Meta")`注册Meta实现，仅做shape/dtype推导，不触碰真实NPU计算（FakeTensor/图模式必需）。Meta中同样可用`torch._check(...)`做约束校验。
-2. **实例化与编译**：模块加载时实例化builder并`load()`触发编译：
-   ```python
-   _flash_attn_op_builder = _FlashAttnOpBuilder()
-   _op_module = _flash_attn_op_builder.load()
-   ```
-3. **PrivateUse1 dispatcher**：用`@impl(AS_LIBRARY, builder.name, "PrivateUse1")`注册NPU后端实现，函数体透传到编译产物`_op_module.<算子名>(...)`（如`_op_module.flash_attn(...)`）。`PrivateUse1`是PyTorch为自定义NPU后端预留的dispatch key。
+1. **OpBuilder子类**：继承`OpBuilder`，在`__init__`中以`super().__init__("<schema算子名>", category="<category>")`传入算子名和category，并实现三个抽象方法：
+    - `sources()`：返回相对`cann_ops_transformer`包根的C++源文件路径列表，如`['csrc/attention/flash_attn.cpp']`；
+    - `schema()`：返回算子schema字符串（见[2.3 Schema标识符](#schema-标识符算子签名)）；
+    - `register_meta()`：用`@impl(get_as_library(), self.name, "Meta")`注册Meta实现，仅做shape/dtype推导，不触碰真实NPU计算（FakeTensor/图模式必需）。Meta中同样可用`torch._check(...)`做约束校验。
+2. **实例化与编译**：模块加载时实例化builder并调用`_ensure_initialized()`完成延迟初始化，编译由首次`load()`触发：
+    ```python
+    _flash_attn_op_builder = _FlashAttnOpBuilder()
+    _flash_attn_op_builder._ensure_initialized()
+    ```
+3. **PrivateUse1 dispatcher**：用`@impl(get_as_library(), builder.name, "PrivateUse1")`注册NPU后端实现，函数体透传到编译产物`builder.load().<算子名>(...)`。`PrivateUse1`是PyTorch为自定义NPU后端预留的dispatch key。
 4. **对外接口**：提供面向用户的函数`flash_attn(...)`，负责参数整理、默认值处理等，最终调用dispatcher实现。
 5. **对外api必须书写注释（docstring）**：每个对外导出的接口都要有docstring，至少覆盖「功能说明、各参数含义/shape/dtype/取值范围、返回值说明」，必要时给出简短调用示例。docstring内容应与`docs/zh/${op_api}.md`保持一致，便于IDE提示与`help()`查看。例如：
    ```python
@@ -230,7 +236,7 @@
    ```
 6. Meta实现、dispatcher、对外函数三者的参数顺序与默认值必须与schema一致。
 
-### 3.3 图模式 Converter（`ops/graph_convert/graph_convert_${op_api}.py`）
+### 3.3 图模式 Converter（`<category>/<op>/torch_extension/graph_convert_${op_api}.py`）
 
 负责在torchair图模式（GE）下把aten算子转换为GE节点：
 
@@ -239,26 +245,20 @@
 3. **Converter注册**：用`@register_fx_node_ge_converter(torch.ops.cann_ops_transformer.flash_attn.default)`装饰`convert_flash_attn`函数，其参数顺序与schema完全一致，函数体调用上面的GE op函数。
 4. 在`ops/__init__.py`中导出Converter（如`convert_flash_attn`），确保注册逻辑被执行。
 
-### 3.4 对外导出（`ops/__init__.py` 与包根 `__init__.py`）
+### 3.4 对外导出（算子 `__init__.py` 与包根 `__init__.py`）
 
-对外导出分两级，两处都需新增import：
+对外导出分两级，包根已无需手动维护 import 列表：
 
-1. **`ops/__init__.py`（子包层）**：每个新增算子的对外接口与Converter都需在此显式import导出，导入即触发schema/meta/converter注册：
-   ```python
-   from .flash_attn import flash_attn
-   from .graph_convert.graph_convert_flash_attn import convert_flash_attn
-   ```
-   同一算子若导出多个符号，使用括号分组的多行import。
-2. **`cann_ops_transformer/__init__.py`（包根层）**：除已有的`from . import ops`触发注册外，还需把对外接口import到包根命名空间，使用户可直接通过`cann_ops_transformer.<接口名>`访问，而不必写完整的`cann_ops_transformer.ops.<接口名>`路径：
-   ```python
-   from . import ops
-   from .ops import flash_attn
+1. **`<category>/<op>/torch_extension/__init__.py`（算子层）**：每个新增算子的对外接口与Converter都需在`__all__`中声明并显式import导出。导入即触发schema/meta/converter注册：
+    ```python
+    __all__ = ["flash_attn", "convert_flash_attn"]
 
-   __all__ = ["flash_attn"]
-   ```
-   建议在包根维护`__all__`，显式列出对外导出的接口名，便于管理可见接口集合。
-
-完成两级导出后，用户既可`from cann_ops_transformer import flash_attn`，也可`cann_ops_transformer.ops.flash_attn(...)`调用；导入主包即完成schema/meta/converter注册。
+    from .flash_attn import flash_attn
+    from .graph_convert_flash_attn import convert_flash_attn
+    ```
+    若算子有额外的辅助导出（如`flash_attn_metadata`、`get_symm_buffer_for_mega_moe`），也一并加入`__all__`和import。
+2. **`ops/__init__.py`（子包层）**：已改造为自动发现模式（目录扫描 + entry point），无需手动添加import。新增算子只要按规范放置文件并定义`__init__.py`的`__all__`，就会被自动加载。
+3. **`cann_ops_transformer/__init__.py`（包根层）**：通过`from . import ops`触发注册，并通过`__getattr__`和`__dir__`动态导出算子接口，使用户可直接通过`cann_ops_transformer.<接口名>`访问。
 
 ## 4. 文档规范（`docs/zh/${op_api}.md`）
 
@@ -282,5 +282,5 @@
 - **参数校验前置**：Python侧用`torch._check(cond, lambda: f"...{var=}...")`，C++侧用`TORCH_CHECK(cond, msg...)`；错误信息需包含变量实际值，便于定位。
 - **错误码**：Python侧可结合`torch_npu.utils._error_code`的`ErrCode`/`ops_error`输出规范错误码，如`f"... {ops_error(ErrCode.VALUE)}."`。
 - **避免魔数**：维度数、dtype枚举值等以具名常量表达，并在文档/注释中说明枚举含义（如`23 → float8_e5m2`、`24 → float8_e4m3fn`）。
-- **公共能力复用**：类型转换、`ACLNN_CMD`、通信域处理等优先复用`common/inc`下的公共头，不在各算子中重复实现。
+- **公共能力复用**：类型转换、`ACLNN_CMD`、通信域处理等优先复用`common`下的公共头，不在各算子中重复实现。
 - **一致性自检**：提交前确认schema、C++ wrapper、Meta、dispatcher、对外函数、Converter、文档七处的算子名、参数名、参数顺序、默认值保持一致。
