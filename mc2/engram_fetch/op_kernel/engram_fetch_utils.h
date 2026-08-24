@@ -45,7 +45,7 @@ struct EngramCommContext {
     uint32_t rankId;
     uint32_t rankSize;
     uint64_t commBuffer[HCCL_MAX_RANK_SIZE];
-    uint64_t hcommHandle[HCCL_MAX_RANK_SIZE];
+    uint64_t hcommHandle[HCCL_MAX_RANK_SIZE * 2];
     uint32_t channelsPerRank;
 };
 

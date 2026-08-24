@@ -197,8 +197,8 @@ __aicore__ inline void EngramFetchTrainArch35::DrainChecked(uint64_t handle)
 __aicore__ inline void EngramFetchTrainArch35::TimeoutCheck(uint64_t startTime)
 {
     uint64_t nowUs = static_cast<uint64_t>(AscendC::GetSystemCycle()) / ENGRAM_CYCLES_PER_US;
-    ascendc_assert((nowUs - startTime) < ENGRAM_TIMEOUT_US,
-                   "timeout, rankId=%u, aivId=%u, elapsed=%llu us", rankId_, aivId_, nowUs - startTime);
+    ascendc_assert((nowUs - startTime) < ENGRAM_TIMEOUT_US, "timeout, rankId=%u, aivId=%u, elapsed=%llu us", rankId_,
+                   aivId_, nowUs - startTime);
 }
 
 __aicore__ inline GM_ADDR EngramFetchTrainArch35::GetRemoteWinAddr(uint32_t dstRank, uint64_t offset)
@@ -208,7 +208,10 @@ __aicore__ inline GM_ADDR EngramFetchTrainArch35::GetRemoteWinAddr(uint32_t dstR
 
 __aicore__ inline uint64_t EngramFetchTrainArch35::GetCommHandle(uint32_t dstRank)
 {
-    uint32_t channelIdx = isSender_ ? SENDER_CHANNEL_IDX : RECEIVER_CHANNEL_IDX;
+    uint32_t channelIdx = aivId_ / numRanks_ + 1U;
+    if (channelIdx >= channelsPerRank_) {
+        channelIdx = 1U;
+    }
     return ctxPtr_->hcommHandle[dstRank * channelsPerRank_ + channelIdx];
 }
 
@@ -1049,9 +1052,9 @@ __aicore__ inline void EngramFetchTrainArch35::LocalReadTable()
             if (globalIdx < 0) {
                 continue;
             }
-            uint32_t localEntryIdx = static_cast<uint32_t>(
-                static_cast<int64_t>(globalIdx) -
-                static_cast<int64_t>(rankId_) * static_cast<int64_t>(numEntriesPerRank_));
+            uint32_t localEntryIdx =
+                static_cast<uint32_t>(static_cast<int64_t>(globalIdx) -
+                                      static_cast<int64_t>(rankId_) * static_cast<int64_t>(numEntriesPerRank_));
             if (localEntryIdx >= static_cast<uint32_t>(numEntriesPerRank_)) {
                 continue;
             }

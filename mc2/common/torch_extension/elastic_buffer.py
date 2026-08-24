@@ -71,6 +71,10 @@ class ElasticBufferOpBuilder(OpBuilder):
             "int num_max_tokens_per_rank, int comm_buffer_size, int rank_size) "
             "-> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)",
             "engram_fetch_wait(Tensor context, Tensor fetched) -> Tensor",
+            "engram_fetch_grad(Tensor context, Tensor grad_fetched, Tensor perm, Tensor send_counts, "
+            "Tensor recv_counts, Tensor recv_local_entry, Tensor num_recv, int num_entries, "
+            "int comm_buffer_size, int num_max_tokens_per_rank, int rank_size) "
+            "-> (Tensor, Tensor, Tensor)",
         ]
 
     def register_meta(self):
@@ -124,6 +128,34 @@ class ElasticBufferOpBuilder(OpBuilder):
         def engram_fetch_wait_meta(context, fetched):
             return torch.empty_like(fetched, device="meta")
 
+        @impl(get_as_library(), "engram_fetch_grad", "Meta")
+        def engram_fetch_grad_meta(
+            context,
+            grad_fetched,
+            perm,
+            send_counts,
+            recv_counts,
+            recv_local_entry,
+            num_recv,
+            num_entries,
+            comm_buffer_size,
+            num_max_tokens_per_rank,
+            rank_size,
+        ):
+            # Outputs are NOT narrowed; full maxR rows. Caller narrows by num_unique.
+            num_max_tokens_per_rank = (
+                1 if num_max_tokens_per_rank <= 0 else num_max_tokens_per_rank
+            )
+            max_r = num_max_tokens_per_rank * rank_size
+            grad_unique = torch.empty(
+                (max_r, grad_fetched.size(1)),
+                dtype=grad_fetched.dtype,
+                device="meta",
+            )
+            unique_local_entry = torch.empty((max_r,), dtype=torch.int32, device="meta")
+            num_unique = torch.empty((1,), dtype=torch.int32, device="meta")
+            return (grad_unique, unique_local_entry, num_unique)
+
     def extra_ldflags(self):
         """Extra link flags for HCCL and ACL libraries."""
         flags = super().extra_ldflags()
@@ -165,6 +197,36 @@ def engram_fetch_train(*args):
 def engram_fetch_wait(context, fetched):
     op_module = _elastic_buffer_op_builder.load()
     return op_module.ElasticBuffer.engram_fetch_wait(context, fetched)
+
+
+@impl(get_as_library(), "engram_fetch_grad", "PrivateUse1")
+def engram_fetch_grad(
+    context,
+    grad_fetched,
+    perm,
+    send_counts,
+    recv_counts,
+    recv_local_entry,
+    num_recv,
+    num_entries,
+    comm_buffer_size,
+    num_max_tokens_per_rank,
+    rank_size,
+):
+    op_module = _elastic_buffer_op_builder.load()
+    return op_module.ElasticBuffer.engram_fetch_grad_op(
+        context,
+        grad_fetched,
+        perm,
+        send_counts,
+        recv_counts,
+        recv_local_entry,
+        num_recv,
+        num_entries,
+        comm_buffer_size,
+        num_max_tokens_per_rank,
+        rank_size,
+    )
 
 
 def _inline_align(value: int, base: int) -> int:
@@ -745,14 +807,31 @@ class ElasticBuffer:
                 f"fetch_ctx.num_recv length ({fetch_ctx.num_recv.size(0)}) must be 1"
             ),
         )
-        return self._runtime.engram_fetch_grad(
-            grad_fetched,
-            fetch_ctx.perm,
-            fetch_ctx.send_counts,
-            fetch_ctx.recv_counts,
-            fetch_ctx.recv_local_entry,
-            fetch_ctx.num_recv,
+        grad_unique_full, unique_local_entry_full, num_unique = (
+            torch.ops.cann_ops_transformer.engram_fetch_grad(
+                self._engram_context_tensor,
+                grad_fetched,
+                fetch_ctx.perm,
+                fetch_ctx.send_counts,
+                fetch_ctx.recv_counts,
+                fetch_ctx.recv_local_entry,
+                fetch_ctx.num_recv,
+                self._engram_num_entries,
+                self._comm_buffer_size,
+                self._num_max_tokens_per_rank,
+                self._rank_size,
+            )
         )
+        # Narrow to actualK rows outside the graph (.item() syncs; not graph-safe).
+        actual_k = int(num_unique.item())
+        max_r = self._num_max_tokens_per_rank * self._rank_size
+        if actual_k < max_r:
+            grad_unique = grad_unique_full.narrow(0, 0, actual_k)
+            unique_local_entry = unique_local_entry_full.narrow(0, 0, actual_k)
+        else:
+            grad_unique = grad_unique_full
+            unique_local_entry = unique_local_entry_full
+        return grad_unique, unique_local_entry
 
     def dispatch(
         self,
