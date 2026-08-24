@@ -191,6 +191,8 @@ public:
         const auto &fiaWorkspaceParams = this->tilingData_->fiaWorkspaceParams;
         const auto &fiaS1OuterSplitCoreParams = this->tilingData_->fiaS1OuterSplitCoreParams;
         const auto &fiaEmptyTensorParams = this->tilingData_->fiaEmptyTensorParams;
+        // 清零开关: 短kv/空kv/短q 等整行无任务写回场景由 host 置1, vecFaBlock_.ClearOutput() 消费
+        constInfo_.needInit = fiaEmptyTensorParams.needInit;
 
         constInfo_.bSize = fiaBaseParams.bSize;
         constInfo_.t1Size = fiaBaseParams.t1Size;
@@ -205,6 +207,7 @@ public:
         constInfo_.actualSeqLenSize = fiaBaseParams.actualSeqLengthsQSize;
         constInfo_.actualSeqLenKVSize = fiaBaseParams.actualSeqLengthsKVSize;
         constInfo_.scaleValue = fiaBaseParams.scaleValue;
+        constInfo_.l2CacheOffFlag = fiaBaseParams.l2CacheOffFlag;
         constInfo_.coreNum = fiaBaseParams.coreNum;
         constInfo_.outputLayout = static_cast<FIA_LAYOUT>(fiaBaseParams.outputLayout);
 
@@ -275,7 +278,7 @@ public:
     {
         int64_t varlenCycleCoreNums = constInfo_.coreNum * 2;
         int64_t varlenCalcLoops =
-            constInfo_.totalSize / varlenCycleCoreNums;                             // 需要进行计算的循环次数(正序+倒序为一次循环)
+            constInfo_.totalSize / varlenCycleCoreNums; // 需要进行计算的循环次数(正序+倒序为一次循环)
         int64_t varlenCalcLoopsRemain = constInfo_.totalSize % varlenCycleCoreNums; // 一次循环正序+倒序为两倍核数
         varlenCalcTimes_ = varlenCalcLoops * 2;
         if (varlenCalcLoopsRemain >= constInfo_.aicIdx + 1) {

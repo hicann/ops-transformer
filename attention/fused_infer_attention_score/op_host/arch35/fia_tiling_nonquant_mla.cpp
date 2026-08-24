@@ -76,7 +76,8 @@ bool FiaTilingNonQuantMlaArch35::IsCapableFeatureCheckMla()
 
 bool FiaTilingNonQuantMlaArch35::IsCapableSparseLayoutCheckMla()
 {
-    if (fiaInfo_->sparseMode != SPARSE_MODE_NO_MASK && fiaInfo_->sparseMode != SPARSE_MODE_RIGHT_DOWN) {
+    if (fiaInfo_->sparseMode != SPARSE_MODE_NO_MASK && fiaInfo_->sparseMode != SPARSE_MODE_RIGHT_DOWN &&
+        fiaInfo_->sparseMode != SPARSE_MODE_BAND) {
         return false;
     }
     if (fiaInfo_->sparseMode == SPARSE_MODE_NO_MASK && fiaInfo_->attenMaskFlag) {
@@ -95,18 +96,7 @@ bool FiaTilingNonQuantMlaArch35::IsCapableSparseLayoutCheckMla()
     if (fiaInfo_->n1Size < 1 || fiaInfo_->n1Size > NUM_128) {
         return false;
     }
-    // layout 约束: query TND
-    if (fiaInfo_->qLayout != FiaLayout::TND) {
-        return false;
-    }
-    // output NTD
-    if (fiaInfo_->outLayout != FiaLayout::NTD) {
-        return false;
-    }
-    // KV PA_NZ
-    if (fiaInfo_->kvLayout != FiaLayout::NZ) {
-        return false;
-    }
+
     return true;
 }
 
@@ -118,11 +108,6 @@ bool FiaTilingNonQuantMlaArch35::IsCapable()
 
     if (!IsCapableFeatureCheckMla()) {
         return false;
-    }
-
-    if (fiaInfo_->n1Size >= 1 && fiaInfo_->n1Size <= NUM_128 &&
-        (fiaInfo_->n1Size & (fiaInfo_->n1Size - 1)) != 0) {
-        return true;
     }
 
     if (!IsCapableSparseLayoutCheckMla()) {
@@ -378,7 +363,24 @@ void FiaTilingNonQuantMlaArch35::SplitPolicy()
     CalcNumBlocks(result.usedCoreNum);
     flashDecodeFlag_ = (result.fdRes.fdNum > 0);
 
-    fiaInfo_->isExistRowInvalid = IsExistRowInvalid(baseInfo);
+    fiaInfo_->isExistRowInvalid =
+        (fiaInfo_->needInit || IsExistRowInvalid(baseInfo) || IsActualSeqLengthsKVHasZero(baseInfo));
+    // 行无效自动开启(对齐兜底模板FusedInferAttentionScoreTilingImpl): 存在mask行无效,
+    // 或 sparse=0+带mask+padding 时自动开, 与innerPrecise无关
+    isRowInvalidOpenAuto_ =
+        IsExistRowInvalid(baseInfo) || (baseInfo.sparseMode == SPARSE_MODE_NO_MASK && baseInfo.attenMaskFlag &&
+                                        (fiaInfo_->qPaddingSizeFlag || fiaInfo_->kvPaddingSizeFlag));
+}
+
+bool FiaTilingNonQuantMlaArch35::IsActualSeqLengthsKVHasZero(const split_core_v2::BaseInfo &baseInfo)
+{
+    for (uint32_t bIdx = 0; bIdx < baseInfo.bSize; bIdx++) {
+        uint32_t s2Size = split_core_v2::GetS2SeqSize(bIdx, baseInfo);
+        if (s2Size == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool FiaTilingNonQuantMlaArch35::IsExistRowInvalid(const split_core_v2::BaseInfo &baseInfo)
@@ -463,20 +465,11 @@ void FiaTilingNonQuantMlaArch35::UpdateTilingKeyLayout()
     }
 }
 
-void FiaTilingNonQuantMlaArch35::UpdateTilingKeyPseMode()
-{
-    tilingKeyInfo_.pseMode = PSE_MODE_PSE_NONE_TYPE;
-}
+void FiaTilingNonQuantMlaArch35::UpdateTilingKeyPseMode() { tilingKeyInfo_.pseMode = PSE_MODE_PSE_NONE_TYPE; }
 
-void FiaTilingNonQuantMlaArch35::UpdateTilingKeyQuantMode()
-{
-    tilingKeyInfo_.quantMode = NoQuantMode;
-}
+void FiaTilingNonQuantMlaArch35::UpdateTilingKeyQuantMode() { tilingKeyInfo_.quantMode = NoQuantMode; }
 
-void FiaTilingNonQuantMlaArch35::UpdateTilingKeyHasRope()
-{
-    tilingKeyInfo_.hasRope = true;
-}
+void FiaTilingNonQuantMlaArch35::UpdateTilingKeyHasRope() { tilingKeyInfo_.hasRope = true; }
 
 void FiaTilingNonQuantMlaArch35::UpdateTilingKeyInfo()
 {
@@ -626,12 +619,17 @@ void FiaTilingNonQuantMlaArch35::SetFATilingData()
     tilingData_.baseTiling.fiaBaseParams.actualSeqLengthsKVSize = fiaInfo_->actualLenKvDims;
     tilingData_.baseTiling.fiaBaseParams.isKvContinuous = fiaInfo_->kvStorageMode != KvStorageMode::TENSOR_LIST;
     tilingData_.baseTiling.fiaBaseParams.isSoftMaxLseEnable = fiaInfo_->softmaxLseFlag;
+    // gSize*s1Size<=64 的单token场景: K/V数据量远超L2容量, 完全无法复用, 关闭L2 Cache避免无意义的缓存填充/驱逐开销
+    tilingData_.baseTiling.fiaBaseParams.l2CacheOffFlag = (fiaInfo_->gSize * fiaInfo_->s1Size) <= 64 ? 1U : 0U;
+    OP_LOGI(fiaInfo_->opName, "l2CacheOffFlag: %u, gSize: %u, s1Size: %u",
+            tilingData_.baseTiling.fiaBaseParams.l2CacheOffFlag, fiaInfo_->gSize, fiaInfo_->s1Size);
     tilingData_.baseTiling.fiaBaseParams.coreNum = numBlocks_;
     tilingData_.baseTiling.fiaBaseParams.outputLayout = static_cast<uint32_t>(fiaInfo_->outputLayout);
 
     tilingData_.baseTiling.fiaAttenMaskParams.preTokens = fiaInfo_->preToken;
     tilingData_.baseTiling.fiaAttenMaskParams.nextTokens = fiaInfo_->nextToken;
-    tilingData_.baseTiling.fiaAttenMaskParams.isRowInvalidOpen = (fiaInfo_->innerPrecise >> 1) & 1;
+    tilingData_.baseTiling.fiaAttenMaskParams.isRowInvalidOpen =
+        ((fiaInfo_->innerPrecise >> 1) & 1) || isRowInvalidOpenAuto_;
     tilingData_.baseTiling.fiaAttenMaskParams.isExistRowInvalid = fiaInfo_->isExistRowInvalid;
 
     tilingData_.baseTiling.fiaPseParams.pseS1Size = fiaInfo_->pseShiftS1;
