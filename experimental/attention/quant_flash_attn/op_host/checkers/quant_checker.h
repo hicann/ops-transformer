@@ -70,6 +70,7 @@ private:
 
     // --- Feature: MxFP4 场景特殊约束 ---
     ge::graphStatus CheckMxFp4Constraint(const QuantFlashAttnTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckMxFp4QkvDtype(const QuantFlashAttnTilingInfo &qfaInfo) const;
 };
 
 } // namespace quant_flash_attn

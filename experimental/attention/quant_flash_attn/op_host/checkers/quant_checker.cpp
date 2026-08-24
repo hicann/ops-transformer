@@ -35,7 +35,7 @@ using namespace Ops::Base;
 
 ge::graphStatus QuantChecker::CheckSingleParaQuantMode(const QuantFlashAttnTilingInfo &qfaInfo)
 {
-    // data_type 支持 INT32；支持输入范围为 1、2、3
+    // data_type 支持 INT32；当前仅实现 quant_mode=5（MxFP4）
     // quant_mode 为属性, parser 中以 const int64_t* 存储, 此处校验其原始值范围
     if (qfaInfo.opParamInfo.quantMode == nullptr) {
         return ge::GRAPH_SUCCESS; // 存在性校验负责
@@ -46,9 +46,9 @@ ge::graphStatus QuantChecker::CheckSingleParaQuantMode(const QuantFlashAttnTilin
     int64_t quantModeVal = *qfaInfo.opParamInfo.quantMode;
     OP_CHECK_IF(
         std::find(supportedQuantModes.begin(), supportedQuantModes.end(), quantModeVal) == supportedQuantModes.end(),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, QUANT_MODE_NAME.c_str(),
-                                              std::to_string(quantModeVal).c_str(),
-                                              "The value of quant_mode must be in 1~10"),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            qfaInfo.opName, QUANT_MODE_NAME.c_str(), std::to_string(quantModeVal).c_str(),
+            "The value of quant_mode must be A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16 (5)"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -387,6 +387,31 @@ ge::graphStatus QuantChecker::CheckMxFp4Constraint(const QuantFlashAttnTilingInf
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, "axis D of value",
                                               std::to_string(qfaInfo.vHeadDim).c_str(), "MxFP4 only supports D=128"),
         return ge::GRAPH_FAILED);
+
+    if (CheckMxFp4QkvDtype(qfaInfo) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QuantChecker::CheckMxFp4QkvDtype(const QuantFlashAttnTilingInfo &qfaInfo) const
+{
+    const gert::CompileTimeTensorDesc *queryDesc = qfaInfo.opParamInfo.query.desc;
+    const gert::CompileTimeTensorDesc *keyDesc = qfaInfo.opParamInfo.key.desc;
+    const gert::CompileTimeTensorDesc *valueDesc = qfaInfo.opParamInfo.value.desc;
+    OP_CHECK_IF(queryDesc != nullptr && queryDesc->GetDataType() != ge::DT_FLOAT4_E2M1,
+                OP_LOGE_FOR_INVALID_DTYPE(qfaInfo.opName, QUERY_NAME.c_str(),
+                                          DataTypeToSerialStr(queryDesc->GetDataType()).c_str(), "FLOAT4_E2M1"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(keyDesc != nullptr && keyDesc->GetDataType() != ge::DT_FLOAT4_E2M1,
+                OP_LOGE_FOR_INVALID_DTYPE(qfaInfo.opName, KEY_NAME.c_str(),
+                                          DataTypeToSerialStr(keyDesc->GetDataType()).c_str(), "FLOAT4_E2M1"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(valueDesc != nullptr && valueDesc->GetDataType() != ge::DT_FLOAT4_E2M1,
+                OP_LOGE_FOR_INVALID_DTYPE(qfaInfo.opName, VALUE_NAME.c_str(),
+                                          DataTypeToSerialStr(valueDesc->GetDataType()).c_str(), "FLOAT4_E2M1"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
