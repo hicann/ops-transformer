@@ -1,0 +1,3 @@
+testcase_name,api_name,tensor_dtypes,tensor_formats,attributes,tensor_view_shapes,output_tensor_indexes,precision_tolerances,absolute_precision,input_data_ranges
+aclnnMoeTokenUnpermute_16_fp32,aclnnMoeTokenUnpermute,"('float32', 'int32','float32','float32')","('ND',)","{'paddedMode':False, 'restoreShapeOptional':[1]}","((16, 64), (16,), (2, 8), (2, 64))","(3,)","((0.001, 0.001),)",0.0001,"((-2, 2), (0, 1), (-2, 2))"
+aclnnMoeTokenUnpermute_16_fp16,aclnnMoeTokenUnpermute,"('float16', 'int32','float16','float16')","('ND',)","{'paddedMode':False, 'restoreShapeOptional':[1]}","((16, 64), (16,), (2, 8), (2, 64))","(3,)","((0.001, 0.001),)",0.0001,"((-2, 2), (0, 1), (-2, 2))"

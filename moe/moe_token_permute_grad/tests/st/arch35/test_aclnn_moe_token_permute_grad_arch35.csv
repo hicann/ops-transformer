@@ -1,0 +1,5 @@
+testcase_name,api_name,tensor_dtypes,tensor_formats,attributes,tensor_view_shapes,output_tensor_indexes,precision_tolerances,absolute_precision,input_data_ranges
+aclnnMoeTokenPermuteGrad_16_fp32,aclnnMoeTokenPermuteGrad,"('float32', 'int32','float32')","('ND',)","{'numTopk':8, 'paddedMode':False}","((16, 64), (16,), (2, 64))","(2,)","((0.001, 0.001),)",0.0001,"((-0.1, 0.1), (0, 1))"
+aclnnMoeTokenPermuteGrad_16_fp16,aclnnMoeTokenPermuteGrad,"('float16', 'int32','float16')","('ND',)","{'numTopk':8, 'paddedMode':False}","((16, 64), (16,), (2, 64))","(2,)","((0.001, 0.001),)",0.0001,"((-0.1, 0.1), (0, 1))"
+aclnnMoeTokenPermuteGrad_16_active_fp32,aclnnMoeTokenPermuteGrad,"('float32', 'int32','float32')","('ND',)","{'numTopk':8, 'paddedMode':False}","((10, 64), (16,), (2, 64))","(2,)","((0.001, 0.001),)",0.0001,"((-0.1, 0.1), (0, 1))"
+aclnnMoeTokenPermuteGrad_16_active20_fp32,aclnnMoeTokenPermuteGrad,"('float32', 'int32','float32')","('ND',)","{'numTopk':8, 'paddedMode':False}","((20, 64), (16,), (2, 64))","(2,)","((0.001, 0.001),)",0.0001,"((-0.1, 0.1), (0, 1))"
