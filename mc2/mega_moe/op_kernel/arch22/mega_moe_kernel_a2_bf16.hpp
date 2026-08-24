@@ -15,14 +15,14 @@
 
 #include "utils/copy_l0c_to_gm_custom.hpp"
 
-#include "template_linear_algebra_v2/catlass.hpp"
+#include "template_linear_algebra_v2/mega_moe_catlass.hpp"
 #include "template_linear_algebra_v2/arch/tla_v2_cross_core_sync.hpp"
-#include "template_linear_algebra_v2/arch/resource.hpp"
+#include "template_linear_algebra_v2/arch/mega_moe_resource.hpp"
 #include "template_linear_algebra_v2/tla_v2_coord.hpp"
 #include "template_linear_algebra_v2/detail/tla_v2_callback.hpp"
-#include "template_linear_algebra_v2/gemm_coord.hpp"
-#include "template_linear_algebra_v2/matrix_coord.hpp"
-#include "template_linear_algebra_v2/epilogue/tile/tile_copy.hpp"
+#include "template_linear_algebra_v2/mega_moe_gemm_coord.hpp"
+#include "template_linear_algebra_v2/mega_moe_matrix_coord.hpp"
+#include "template_linear_algebra_v2/epilogue/tile/mega_moe_epilogue_tile_copy.hpp"
 
 #include "utilsA2/block_mmad_preload_async_fixpipe_quant_a2.hpp"
 #include "utils/copy_gm_to_l1_custom.hpp"

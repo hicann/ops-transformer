@@ -13,12 +13,12 @@
 
 #include <limits>
 
-#include "../template_linear_algebra_v2/catlass.hpp"
-#include "../template_linear_algebra_v2/arch/resource.hpp"
-#include "../template_linear_algebra_v2/epilogue/dispatch_policy.hpp"
-#include "../template_linear_algebra_v2/gemm_coord.hpp"
-#include "../template_linear_algebra_v2/matrix_coord.hpp"
-#include "../template_linear_algebra_v2/layout/layout.hpp"
+#include "../template_linear_algebra_v2/mega_moe_catlass.hpp"
+#include "../template_linear_algebra_v2/arch/mega_moe_resource.hpp"
+#include "../template_linear_algebra_v2/epilogue/mega_moe_epilogue_dispatch_policy.hpp"
+#include "../template_linear_algebra_v2/mega_moe_gemm_coord.hpp"
+#include "../template_linear_algebra_v2/mega_moe_matrix_coord.hpp"
+#include "../template_linear_algebra_v2/layout/mega_moe_layout.hpp"
 #include "../template_linear_algebra_v2/detail/tla_v2_callback.hpp"
 #include "../utils/gated_activation.hpp"
 

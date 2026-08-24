@@ -16,7 +16,7 @@
 #ifndef SELECT_HELPER_HPP
 #define SELECT_HELPER_HPP
 
-#include "../template_linear_algebra_v2/layout/layout.hpp"
+#include "../template_linear_algebra_v2/layout/mega_moe_layout.hpp"
 using namespace AscendC;
 using namespace Catlass;
 

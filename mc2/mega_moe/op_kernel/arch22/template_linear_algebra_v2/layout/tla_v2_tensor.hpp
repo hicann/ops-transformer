@@ -11,7 +11,7 @@
 #ifndef TLA_V2_TENSOR_H
 #define TLA_V2_TENSOR_H
 
-#include "../../template_linear_algebra_v2/catlass.hpp"
+#include "../../template_linear_algebra_v2/mega_moe_catlass.hpp"
 #include "../../template_linear_algebra_v2/detail/tla_v2_alignment.hpp"
 #include "../../template_linear_algebra_v2/tla_v2_conv_coord.hpp"
 

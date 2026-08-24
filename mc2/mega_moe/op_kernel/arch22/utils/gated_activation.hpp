@@ -14,7 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
-#include "../template_linear_algebra_v2/catlass.hpp"
+#include "../template_linear_algebra_v2/mega_moe_catlass.hpp"
 
 namespace Catlass::Epilogue {
 

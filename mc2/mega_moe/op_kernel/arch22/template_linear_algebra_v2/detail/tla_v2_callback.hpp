@@ -11,7 +11,7 @@
 #ifndef CATLASS_DETAIL_TLA_V2_CALLBACK_HPP
 #define CATLASS_DETAIL_TLA_V2_CALLBACK_HPP
 
-#include "../../template_linear_algebra_v2/detail/macros.hpp"
+#include "../../template_linear_algebra_v2/detail/mega_moe_macros.hpp"
 
 /// @brief Callback is an alternative to std::function<void(void)>, providing a general carrier
 /// of callable structure with no parameters and no return value. Compared with function pointers

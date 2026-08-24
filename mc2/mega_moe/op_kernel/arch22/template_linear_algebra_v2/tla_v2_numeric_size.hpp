@@ -11,7 +11,7 @@
 #ifndef CATLASS_TLA_V2_NUMERIC_SIZE_HPP
 #define CATLASS_TLA_V2_NUMERIC_SIZE_HPP
 
-#include "../template_linear_algebra_v2/catlass.hpp"
+#include "../template_linear_algebra_v2/mega_moe_catlass.hpp"
 
 namespace Catlass {
 

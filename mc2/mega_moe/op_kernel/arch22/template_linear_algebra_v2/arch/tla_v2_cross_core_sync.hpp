@@ -11,7 +11,7 @@
 #ifndef CATLASS_ARCH_TLA_V2_CROSS_CORE_SYNC_HPP
 #define CATLASS_ARCH_TLA_V2_CROSS_CORE_SYNC_HPP
 
-#include "../../template_linear_algebra_v2/catlass.hpp"
+#include "../../template_linear_algebra_v2/mega_moe_catlass.hpp"
 
 namespace Catlass::Arch {
 

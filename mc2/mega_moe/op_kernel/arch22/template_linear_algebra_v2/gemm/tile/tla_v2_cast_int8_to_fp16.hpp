@@ -11,12 +11,12 @@
 #ifndef TLA_V2_CAST_INT8_TO_FP16_H
 #define TLA_V2_CAST_INT8_TO_FP16_H
 
-#include "../../../template_linear_algebra_v2/catlass.hpp"
-#include "../../../template_linear_algebra_v2/arch/resource.hpp"
+#include "../../../template_linear_algebra_v2/mega_moe_catlass.hpp"
+#include "../../../template_linear_algebra_v2/arch/mega_moe_resource.hpp"
 #include "../../../template_linear_algebra_v2/tla_v2_coord.hpp"
-#include "../../../template_linear_algebra_v2/gemm_coord.hpp"
-#include "../../../template_linear_algebra_v2/gemm/dispatch_policy.hpp"
-#include "../../../template_linear_algebra_v2/gemm/helper.hpp"
+#include "../../../template_linear_algebra_v2/mega_moe_gemm_coord.hpp"
+#include "../../../template_linear_algebra_v2/gemm/mega_moe_gemm_dispatch_policy.hpp"
+#include "../../../template_linear_algebra_v2/gemm/mega_moe_gemm_helper.hpp"
 
 namespace Catlass::Gemm::Tile {
 

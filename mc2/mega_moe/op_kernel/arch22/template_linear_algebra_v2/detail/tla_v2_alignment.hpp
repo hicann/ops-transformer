@@ -11,7 +11,7 @@
 #ifndef CATLASS_TLA_V2_ALIGNMENT_HPP
 #define CATLASS_TLA_V2_ALIGNMENT_HPP
 
-#include "../../template_linear_algebra_v2/detail/macros.hpp"
+#include "../../template_linear_algebra_v2/detail/mega_moe_macros.hpp"
 
 template <uint32_t ALIGN, typename T>
 CATLASS_HOST_DEVICE constexpr T RoundUp(const T &val)
