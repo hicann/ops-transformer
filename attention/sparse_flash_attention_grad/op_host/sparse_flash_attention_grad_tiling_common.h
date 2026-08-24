@@ -35,6 +35,8 @@ constexpr size_t DIM_1 = 1;
 constexpr size_t DIM_2 = 2;
 constexpr size_t DIM_3 = 3;
 constexpr size_t DIM_4 = 4;
+// N<=64 有做L1常驻性能优化
+constexpr int64_t SFAG_HEAD_N_L1_RESIDENT = 64;
 
 enum class InputLayout : uint32_t {
     BSH = 0,
@@ -126,7 +128,8 @@ ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext *context, int64_t t1
 ge::graphStatus CheckAttentionInShape(gert::TilingContext *context);
 ge::graphStatus CheckSoftmaxDtype(gert::TilingContext *context);
 ge::graphStatus CheckAttentionInDtype(gert::TilingContext *context);
-ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, int64_t t1, int64_t n1, int64_t d, int64_t d2, int64_t n2);
+ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, int64_t t1, int64_t n1, int64_t d, int64_t d2,
+                                   int64_t n2);
 ge::graphStatus CheckDtypeValid(gert::TilingContext *context);
 bool IsSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape);
 
