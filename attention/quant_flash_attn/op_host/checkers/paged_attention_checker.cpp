@@ -177,6 +177,138 @@ ge::graphStatus PagedAttentionChecker::CheckFeature(const QfaTilingInfo &qfaInfo
     return ge::GRAPH_SUCCESS;
 }
 
+// ============================================================================
+// Feature — 非连续 Tensor 支持校验 (文档"特性交叉校验"列)
+// 规则: 仅 PA 场景(layout_kv ∈ {PA_BNBD, PA_NZ})时，k/v/k_descale/v_descale
+//       仅支持 0 轴和 1 轴非连续，其余轴必须连续；非 PA 场景均不支持非连续。
+// ============================================================================
+
+ge::graphStatus PagedAttentionChecker::CheckNonContiguousSupport(const QfaTilingInfo &qfaInfo) const
+{
+    if (!IsPageAttention(qfaInfo)) {
+        // 非 PA 场景: k/v/k_descale/v_descale 均不支持非连续
+        int32_t dimIndex = 0;
+        OP_CHECK_IF((CheckTensorContiguous(qfaInfo.opParamInfo.key.shape->GetStorageShape().GetDimNum(),
+                                           qfaInfo.opParamInfo.key.shape->GetStorageShape(), qfaInfo.keyStrides,
+                                           dimIndex) != ge::GRAPH_SUCCESS),
+                    OP_LOGE(qfaInfo.opName,
+                            "In non-PA scenarios, key must be contiguous, but dim %d is non-contiguous.", dimIndex),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF((CheckTensorContiguous(qfaInfo.opParamInfo.value.shape->GetStorageShape().GetDimNum(),
+                                           qfaInfo.opParamInfo.value.shape->GetStorageShape(), qfaInfo.valueStrides,
+                                           dimIndex) != ge::GRAPH_SUCCESS),
+                    OP_LOGE(qfaInfo.opName,
+                            "In non-PA scenarios, value must be contiguous, but dim %d is non-contiguous.", dimIndex),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            (CheckTensorContiguous(qfaInfo.opParamInfo.kDescale.shape->GetStorageShape().GetDimNum(),
+                                   qfaInfo.opParamInfo.kDescale.shape->GetStorageShape(), qfaInfo.kDescaleStrides,
+                                   dimIndex) != ge::GRAPH_SUCCESS),
+            OP_LOGE(qfaInfo.opName, "In non-PA scenarios, k_descale must be contiguous, but dim %d is non-contiguous.",
+                    dimIndex),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            (CheckTensorContiguous(qfaInfo.opParamInfo.vDescale.shape->GetStorageShape().GetDimNum(),
+                                   qfaInfo.opParamInfo.vDescale.shape->GetStorageShape(), qfaInfo.vDescaleStrides,
+                                   dimIndex) != ge::GRAPH_SUCCESS),
+            OP_LOGE(qfaInfo.opName, "In non-PA scenarios, v_descale must be contiguous, but dim %d is non-contiguous.",
+                    dimIndex),
+            return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    }
+
+    // PA 场景
+    // (layout_kv ∈ {PA_BBND}): k/v/k_descale/v_descale 仅支持 0 轴非连续
+    // (layout_kv ∈ {PA_BNBD, PA_NZ}): k/v/k_descale/v_descale 仅支持 0/1 轴非连续
+    int32_t dimIndex = 0;
+    if (qfaInfo.kvLayout == QfaLayout::PA_BBND) {
+        OP_CHECK_IF(
+            ((ge::GRAPH_SUCCESS != CheckTensorContiguous(qfaInfo.opParamInfo.key.shape->GetStorageShape().GetDimNum(),
+                                                         qfaInfo.opParamInfo.key.shape->GetStorageShape(),
+                                                         qfaInfo.keyStrides, dimIndex)) &&
+             (dimIndex != 0)),
+            OP_LOGE(qfaInfo.opName,
+                    "In PA BnBsND scenarios, key only supports non-contiguous tensors in dimensions 0, "
+                    "but the first non-contiguous dimension is index %d.",
+                    dimIndex),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            ((ge::GRAPH_SUCCESS != CheckTensorContiguous(qfaInfo.opParamInfo.value.shape->GetStorageShape().GetDimNum(),
+                                                         qfaInfo.opParamInfo.value.shape->GetStorageShape(),
+                                                         qfaInfo.valueStrides, dimIndex)) &&
+             (dimIndex != 0)),
+            OP_LOGE(qfaInfo.opName,
+                    "In PA BnBsND scenarios, value only supports non-contiguous tensors in dimensions 0, "
+                    "but the first non-contiguous dimension is index %d.",
+                    dimIndex),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(((ge::GRAPH_SUCCESS !=
+                      CheckTensorContiguous(qfaInfo.opParamInfo.kDescale.shape->GetStorageShape().GetDimNum(),
+                                            qfaInfo.opParamInfo.kDescale.shape->GetStorageShape(),
+                                            qfaInfo.kDescaleStrides, dimIndex)) &&
+                     (dimIndex != 0)),
+                    OP_LOGE(qfaInfo.opName,
+                            "In PA BnBsND scenarios, k_descale only supports non-contiguous tensors in dimensions 0, "
+                            "but the first non-contiguous dimension is index %d.",
+                            dimIndex),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(((ge::GRAPH_SUCCESS !=
+                      CheckTensorContiguous(qfaInfo.opParamInfo.vDescale.shape->GetStorageShape().GetDimNum(),
+                                            qfaInfo.opParamInfo.vDescale.shape->GetStorageShape(),
+                                            qfaInfo.vDescaleStrides, dimIndex)) &&
+                     (dimIndex != 0)),
+                    OP_LOGE(qfaInfo.opName,
+                            "In PA BnBsND scenarios, v_descale only supports non-contiguous tensors in dimensions 0, "
+                            "but the first non-contiguous dimension is index %d.",
+                            dimIndex),
+                    return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(
+            ((ge::GRAPH_SUCCESS != CheckTensorContiguous(qfaInfo.opParamInfo.key.shape->GetStorageShape().GetDimNum(),
+                                                         qfaInfo.opParamInfo.key.shape->GetStorageShape(),
+                                                         qfaInfo.keyStrides, dimIndex)) &&
+             (dimIndex != 0 && dimIndex != 1)),
+            OP_LOGE(qfaInfo.opName,
+                    "In PA BnNBsD/NZ scenarios, key only supports non-contiguous tensors in dimensions 0 or 1, "
+                    "but the first non-contiguous dimension is index %d.",
+                    dimIndex),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            ((ge::GRAPH_SUCCESS != CheckTensorContiguous(qfaInfo.opParamInfo.value.shape->GetStorageShape().GetDimNum(),
+                                                         qfaInfo.opParamInfo.value.shape->GetStorageShape(),
+                                                         qfaInfo.valueStrides, dimIndex)) &&
+             (dimIndex != 0 && dimIndex != 1)),
+            OP_LOGE(qfaInfo.opName,
+                    "In PA BnNBsD/NZ scenarios, value only supports non-contiguous tensors in dimensions 0 or 1, "
+                    "but the first non-contiguous dimension is index %d.",
+                    dimIndex),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            ((ge::GRAPH_SUCCESS !=
+              CheckTensorContiguous(qfaInfo.opParamInfo.kDescale.shape->GetStorageShape().GetDimNum(),
+                                    qfaInfo.opParamInfo.kDescale.shape->GetStorageShape(), qfaInfo.kDescaleStrides,
+                                    dimIndex)) &&
+             (dimIndex != 0 && dimIndex != 1)),
+            OP_LOGE(qfaInfo.opName,
+                    "In PA BnNBsD/NZ scenarios, k_descale only supports non-contiguous tensors in dimensions 0 or "
+                    "1, but the first non-contiguous dimension is index %d.",
+                    dimIndex),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            ((ge::GRAPH_SUCCESS !=
+              CheckTensorContiguous(qfaInfo.opParamInfo.vDescale.shape->GetStorageShape().GetDimNum(),
+                                    qfaInfo.opParamInfo.vDescale.shape->GetStorageShape(), qfaInfo.vDescaleStrides,
+                                    dimIndex)) &&
+             (dimIndex != 0 && dimIndex != 1)),
+            OP_LOGE(qfaInfo.opName,
+                    "In PA BnNBsD/NZ scenarios, v_descale only supports non-contiguous tensors in dimensions 0 or "
+                    "1, but the first non-contiguous dimension is index %d.",
+                    dimIndex),
+            return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus PagedAttentionChecker::CheckMultiPara(const QfaTilingInfo &qfaInfo)
 {
     // 文档约束(一致性校验列): 无

@@ -35,6 +35,10 @@ public:
 
 private:
     ge::graphStatus CheckSingleParaBlockTable(const QfaTilingInfo &qfaInfo);
+    // --- Feature: 非连续 Tensor 支持校验 ---
+    // 仅 PA 场景(layout_kv 为 PA_BNBD 或 PA_NZ)时，k/v/k_descale/v_descale
+    // 仅支持 0 轴和 1 轴非连续，其余轴必须连续；非 PA 场景均不支持非连续。
+    ge::graphStatus CheckNonContiguousSupport(const QfaTilingInfo &qfaInfo) const;
     // 仅通过 layout_kv 判断是否为 PA 场景 (PA_BBND/PA_BNBD/PA_NZ)
     bool IsPageAttention(const QfaTilingInfo &qfaInfo) const;
     // --- Feature: blockSize 场景化校验 ---

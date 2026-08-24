@@ -88,7 +88,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         enable_lse: bool = False,
         graph_path: int = 0,
         input_layout: str = "TND",
-        is_contiguous: bool = True,
+        uncontiguous_dim: List[int] = None,
         device_id: int = 0,
         softmax_scale: Optional[float] = None,
         data_range_q: float = 1.0,
@@ -147,7 +147,9 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
                 "QUANT_MODE": quant_mode,
                 "QUANT_GROUP_SIZE": 32,
                 "INPUT_LAYOUT": input_layout,
-                "IS_CONTIGUOUS": is_contiguous,
+                "uncontiguous_dim": uncontiguous_dim
+                if uncontiguous_dim is not None
+                else [-1] * 8,
                 "DEVICE_ID": device_id,
                 "GRAPH_PATH": graph_path,
                 "SOFTMAX_SCALE": softmax_scale,

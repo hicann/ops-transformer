@@ -293,6 +293,16 @@ public:
         constInfo_.accumOutSize = qfaWorkspaceParams.accumOutSize;
         constInfo_.logSumExpSize = qfaWorkspaceParams.logSumExpSize;
 
+        // strides
+        constInfo_.keyStrides.bnStride = qfaBaseParams.keyStrides.bnStride;
+        constInfo_.keyStrides.n2Stride = qfaBaseParams.keyStrides.n2Stride;
+        constInfo_.valueStrides.bnStride = qfaBaseParams.valueStrides.bnStride;
+        constInfo_.valueStrides.n2Stride = qfaBaseParams.valueStrides.n2Stride;
+        constInfo_.kDescaleStrides.bnStride = qfaBaseParams.kDescaleStrides.bnStride;
+        constInfo_.kDescaleStrides.n2Stride = qfaBaseParams.kDescaleStrides.n2Stride;
+        constInfo_.vDescaleStrides.bnStride = qfaBaseParams.vDescaleStrides.bnStride;
+        constInfo_.vDescaleStrides.n2Stride = qfaBaseParams.vDescaleStrides.n2Stride;
+
         // pageAttention
         if constexpr (PAGE_ATTENTION) {
             constInfo_.maxBlockNumPerBatch = qfaPageAttentionParams.maxBlockNumPerBatch;

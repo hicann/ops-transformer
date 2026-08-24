@@ -273,7 +273,7 @@ def _apply_golden_globals(attrs, quant_mode=1):
         "q_scale_layout": "Q_SCALE_LAYOUT",
         "enable_lse": "ENABLE_LSE",
         "input_layout": "INPUT_LAYOUT",
-        "is_contiguous": "IS_CONTIGUOUS",
+        "uncontiguous_dim": "UNCONTIGUOUS_DIMS",
         "device_id": "DEVICE_ID",
         "graph_path": "GRAPH_PATH",
         "cu_seqlens_q": "CU_SEQLENS_Q",
@@ -338,7 +338,7 @@ def cpu_qfa_mxfp8(
     enable_lse: bool = False,
     graph_path: int = 0,
     input_layout: str = "TND",
-    is_contiguous: bool = True,
+    uncontiguous_dim: List[int] = None,
     device_id: int = 0,
     softmax_scale: float = None,
     win_left: int = -1,
@@ -406,7 +406,9 @@ def cpu_qfa_mxfp8(
             "q_scale_layout": q_scale_layout,
             "enable_lse": enable_lse,
             "input_layout": input_layout,
-            "is_contiguous": is_contiguous,
+            "uncontiguous_dim": uncontiguous_dim
+            if uncontiguous_dim is not None
+            else [-1] * 8,
             "device_id": device_id,
             "graph_path": graph_path,
             "softmax_scale": softmax_scale,
@@ -674,7 +676,7 @@ def cpu_qfa_gqa_fp8(
     enable_lse: bool = False,
     graph_path: int = 0,
     input_layout: str = "NTD",
-    is_contiguous: bool = True,
+    uncontiguous_dim: List[int] = None,
     device_id: int = 0,
     softmax_scale: float = None,
     win_left: int = -1,
@@ -751,7 +753,9 @@ def cpu_qfa_gqa_fp8(
             "q_scale_layout": q_scale_layout,
             "enable_lse": enable_lse,
             "input_layout": input_layout,
-            "is_contiguous": is_contiguous,
+            "uncontiguous_dim": uncontiguous_dim
+            if uncontiguous_dim is not None
+            else [-1] * 8,
             "device_id": device_id,
             "graph_path": graph_path,
             "softmax_scale": softmax_scale,

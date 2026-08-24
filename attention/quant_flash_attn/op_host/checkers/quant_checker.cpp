@@ -654,106 +654,6 @@ ge::graphStatus QuantChecker::CheckDescaleDtype(const QfaTilingInfo &qfaInfo) co
 }
 
 // ============================================================================
-// Feature — 非连续 Tensor 支持校验 (文档"特性交叉校验"列)
-// 规则: 仅 PA 场景(layout_kv ∈ {PA_BNBD, PA_NZ})时，k/v/k_descale/v_descale
-//       仅支持 0 轴和 1 轴非连续，其余轴必须连续；非 PA 场景均不支持非连续。
-// ============================================================================
-
-ge::graphStatus QuantChecker::CheckNonContiguousSupport(const QfaTilingInfo &qfaInfo) const
-{
-    bool isPaLayout = (qfaInfo.kvLayout == QfaLayout::PA_BBND || qfaInfo.kvLayout == QfaLayout::PA_BNBD ||
-                       qfaInfo.kvLayout == QfaLayout::PA_NZ);
-    if (!isPaLayout) {
-        // 非 PA 场景: k/v/k_descale/v_descale 均不支持非连续
-        int32_t dimIndex = 0;
-        OP_CHECK_IF((CheckTensorContiguous(qfaInfo.opParamInfo.key.shape->GetStorageShape().GetDimNum(),
-                                           qfaInfo.opParamInfo.key.shape->GetStorageShape(), qfaInfo.keyStrides,
-                                           dimIndex) != ge::GRAPH_SUCCESS),
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(qfaInfo.opName, "key",
-                                                             ("In non-PA scenarios, key must be contiguous, but dim " +
-                                                              std::to_string(dimIndex) + " is non-contiguous")
-                                                                 .c_str()),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF(
-            (CheckTensorContiguous(qfaInfo.opParamInfo.value.shape->GetStorageShape().GetDimNum(),
-                                   qfaInfo.opParamInfo.value.shape->GetStorageShape(), qfaInfo.valueStrides,
-                                   dimIndex) != ge::GRAPH_SUCCESS),
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(qfaInfo.opName, "value",
-                                                     ("In non-PA scenarios, value must be contiguous, but dim " +
-                                                      std::to_string(dimIndex) + " is non-contiguous")
-                                                         .c_str()),
-            return ge::GRAPH_FAILED);
-        OP_CHECK_IF(
-            (CheckTensorContiguous(qfaInfo.opParamInfo.kDescale.shape->GetStorageShape().GetDimNum(),
-                                   qfaInfo.opParamInfo.kDescale.shape->GetStorageShape(), qfaInfo.kDescaleStrides,
-                                   dimIndex) != ge::GRAPH_SUCCESS),
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(qfaInfo.opName, "k_descale",
-                                                     ("In non-PA scenarios, k_descale must be contiguous, but dim " +
-                                                      std::to_string(dimIndex) + " is non-contiguous")
-                                                         .c_str()),
-            return ge::GRAPH_FAILED);
-        OP_CHECK_IF(
-            (CheckTensorContiguous(qfaInfo.opParamInfo.vDescale.shape->GetStorageShape().GetDimNum(),
-                                   qfaInfo.opParamInfo.vDescale.shape->GetStorageShape(), qfaInfo.vDescaleStrides,
-                                   dimIndex) != ge::GRAPH_SUCCESS),
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(qfaInfo.opName, "v_descale",
-                                                     ("In non-PA scenarios, v_descale must be contiguous, but dim " +
-                                                      std::to_string(dimIndex) + " is non-contiguous")
-                                                         .c_str()),
-            return ge::GRAPH_FAILED);
-        return ge::GRAPH_SUCCESS;
-    }
-
-    // PA 场景(layout_kv ∈ {PA_BNBD, PA_NZ}): k/v/k_descale/v_descale 仅支持 0/1 轴非连续
-    int32_t dimIndex = 0;
-    OP_CHECK_IF(
-        ((ge::GRAPH_SUCCESS != CheckTensorContiguous(qfaInfo.opParamInfo.key.shape->GetStorageShape().GetDimNum(),
-                                                     qfaInfo.opParamInfo.key.shape->GetStorageShape(),
-                                                     qfaInfo.keyStrides, dimIndex)) &&
-         (dimIndex != 0 && dimIndex != 1)),
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-            qfaInfo.opName, "key",
-            ("In PA BnNBsD/NZ scenario, only 0th and 1st axis of key can be non-contiguous, the " +
-             std::to_string(dimIndex) + "th axis of key must be contiguous")
-                .c_str()),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        ((ge::GRAPH_SUCCESS != CheckTensorContiguous(qfaInfo.opParamInfo.value.shape->GetStorageShape().GetDimNum(),
-                                                     qfaInfo.opParamInfo.value.shape->GetStorageShape(),
-                                                     qfaInfo.valueStrides, dimIndex)) &&
-         (dimIndex != 0 && dimIndex != 1)),
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-            qfaInfo.opName, "value",
-            ("In PA BnNBsD/NZ scenario, only 0th and 1st axis of value can be non-contiguous, the " +
-             std::to_string(dimIndex) + "th axis of value must be contiguous")
-                .c_str()),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        ((ge::GRAPH_SUCCESS != CheckTensorContiguous(qfaInfo.opParamInfo.kDescale.shape->GetStorageShape().GetDimNum(),
-                                                     qfaInfo.opParamInfo.kDescale.shape->GetStorageShape(),
-                                                     qfaInfo.kDescaleStrides, dimIndex)) &&
-         (dimIndex != 0 && dimIndex != 1)),
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-            qfaInfo.opName, "k_descale",
-            ("In PA BnNBsD/NZ scenario, only 0th and 1st axis of k_descale can be non-contiguous, the " +
-             std::to_string(dimIndex) + "th axis of k_descale must be contiguous")
-                .c_str()),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        ((ge::GRAPH_SUCCESS != CheckTensorContiguous(qfaInfo.opParamInfo.vDescale.shape->GetStorageShape().GetDimNum(),
-                                                     qfaInfo.opParamInfo.vDescale.shape->GetStorageShape(),
-                                                     qfaInfo.vDescaleStrides, dimIndex)) &&
-         (dimIndex != 0 && dimIndex != 1)),
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-            qfaInfo.opName, "v_descale",
-            ("In PA BnNBsD/NZ scenario, only 0th and 1st axis of v_descale can be non-contiguous, the " +
-             std::to_string(dimIndex) + "th axis of v_descale must be contiguous")
-                .c_str()),
-        return ge::GRAPH_FAILED);
-    return ge::GRAPH_SUCCESS;
-}
-
-// ============================================================================
 // Feature — Layout 匹配关系校验 (文档: layout匹配关系表)
 // MxFP8: layout_q=TND, layout_kv∈{TND,PA_BNBD,PA_NZ}, layout_out=TND
 // ============================================================================
@@ -900,12 +800,8 @@ ge::graphStatus QuantChecker::CheckShapeMatch(const QfaTilingInfo &qfaInfo)
 ge::graphStatus QuantChecker::CheckFeature(const QfaTilingInfo &qfaInfo)
 {
     // 文档"特性交叉校验"列(rowspan=5)包含三项:
-    //   1. 非连续 Tensor 支持
-    //   2. Layout 校验(layout 匹配关系表, 含 layout_q_descale)
-    //   3. q/k/v/attn_out shape 校验(shape 匹配关系表)
-    if (CheckNonContiguousSupport(qfaInfo) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
+    //   1. Layout 校验(layout 匹配关系表, 含 layout_q_descale)
+    //   2. q/k/v/attn_out shape 校验(shape 匹配关系表)
     if (CheckLayoutConstraint(qfaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }

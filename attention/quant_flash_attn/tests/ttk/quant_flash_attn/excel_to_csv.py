@@ -161,6 +161,7 @@ COL = {
         ("CB_num_heads_q", "CB"),
         ("CC_num_heads_kv", "CC"),
         ("CD_head_dim", "CD"),
+        ("CE_uncontiguous_dim", "CE"),
     ]
 }
 
@@ -235,6 +236,7 @@ COL_NAME = {
     "CB_num_heads_q": "num_heads_q",
     "CC_num_heads_kv": "num_heads_kv",
     "CD_head_dim": "head_dim",
+    "CE_uncontiguous_dim": "uncontiguous_dim",
 }
 
 
@@ -309,6 +311,23 @@ def _str_to_int_list(s):
     if not s:
         return None
     parts = [p.strip() for p in s.split(",") if p.strip() != ""]
+    return [int(float(p)) for p in parts]
+
+
+def _str_to_uncontiguous_dim(s):
+    """'-1,-1,0,-1,-1,-1,-1,-1' → [-1,-1,0,-1,-1,-1,-1,-1]。
+    必须 8 维，分别对应 q, k, v, q_descale, k_descale, v_descale, block_table, attn_mask。
+    空 → 8 个 -1 (全连续)。"""
+    if s is None:
+        return [-1] * 8
+    s = s.strip()
+    if not s:
+        return [-1] * 8
+    parts = [p.strip() for p in s.split(",") if p.strip() != ""]
+    if len(parts) != 8:
+        raise ValueError(
+            f"uncontiguous_dim must have 8 values, got {len(parts)}: {s!r}"
+        )
     return [int(float(p)) for p in parts]
 
 
@@ -485,6 +504,13 @@ def _build_attributes(row, col_by_name):
     _set("N_q", _str_to_int(row.get(col_by_name["CB_num_heads_q"])))
     _set("N_kv", _str_to_int(row.get(col_by_name["CC_num_heads_kv"])))
     _set("D", _str_to_int(row.get(col_by_name["CD_head_dim"])))
+    # uncontiguous_dim: Excel CE 列，8 维列表，空值默认全 -1 (全连续)
+    # 顺序: [q, k, v, q_descale, k_descale, v_descale, block_table, attn_mask]
+    # -1=连续, 0=0轴非连续, 1=0,1轴非连续, 以此类推
+    _set_force(
+        "uncontiguous_dim",
+        _str_to_uncontiguous_dim(row.get(COL["CE_uncontiguous_dim"])),
+    )
 
     # --- wrapper 接口适配参数（不是 op 参数推导，是 wrapper 签名必选参数） ---
     layout_kv = _strip_or_none(row.get(col_by_name["BX_layout_kv"]))
@@ -516,6 +542,8 @@ def _build_attributes(row, col_by_name):
         if k_shape is not None:
             if layout_kv == "PA_NZ":
                 bs_idx = 3
+            elif layout_kv == "PA_BBND":
+                bs_idx = 1
             else:
                 bs_idx = 2
             raw_bs = k_shape[bs_idx] if len(k_shape) > bs_idx else 0

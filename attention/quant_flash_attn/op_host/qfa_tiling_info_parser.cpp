@@ -213,10 +213,13 @@ void QfaInfoParser::GetInputParaInfo()
     opParamInfo_.vDescale.shape = context_->GetInputShape(V_DESCALE_INDEX);
 
     // 获取 k/v/k_descale/v_descale 的 stride，用于非连续 Tensor 校验
-    keyStrides_ = context_->GetInputStride(KEY_INDEX);
-    valueStrides_ = context_->GetInputStride(VALUE_INDEX);
-    kDescaleStrides_ = context_->GetInputStride(K_DESCALE_INDEX);
-    vDescaleStrides_ = context_->GetInputStride(V_DESCALE_INDEX);
+    if (context_->InputIsView(KEY_INDEX) == true) {
+        hasStride_ = true;
+        keyStrides_ = context_->GetInputStride(KEY_INDEX);
+        valueStrides_ = context_->GetInputStride(VALUE_INDEX);
+        kDescaleStrides_ = context_->GetInputStride(K_DESCALE_INDEX);
+        vDescaleStrides_ = context_->GetInputStride(V_DESCALE_INDEX);
+    }
 
     GetOptionalInputParaInfo();
 }
@@ -519,7 +522,10 @@ ge::graphStatus QfaInfoParser::GetGSize()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QfaInfoParser::GetActualSeqInfo() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus QfaInfoParser::GetActualSeqInfo()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 void QfaInfoParser::GenerateFeatureInfo(QfaTilingInfo &qfaInfo)
 {
@@ -549,7 +555,10 @@ void QfaInfoParser::GenerateLayoutInfo(QfaTilingInfo &qfaInfo)
     qfaInfo.layoutQDescale = layoutQDescale_;
 }
 
-void QfaInfoParser::GenerateQuantInfo(QfaTilingInfo &qfaInfo) { qfaInfo.quantMode = quantMode_; }
+void QfaInfoParser::GenerateQuantInfo(QfaTilingInfo &qfaInfo)
+{
+    qfaInfo.quantMode = quantMode_;
+}
 
 void QfaInfoParser::GenerateAxisInfo(QfaTilingInfo &qfaInfo)
 {
@@ -580,6 +589,7 @@ void QfaInfoParser::GenerateInfo(QfaTilingInfo &qfaInfo)
     qfaInfo.opName = opName_;
     qfaInfo.platformInfo = platformInfo_;
     qfaInfo.opParamInfo = opParamInfo_;
+    qfaInfo.hasStride = hasStride_;
     qfaInfo.keyStrides = keyStrides_;
     qfaInfo.valueStrides = valueStrides_;
     qfaInfo.kDescaleStrides = kDescaleStrides_;
