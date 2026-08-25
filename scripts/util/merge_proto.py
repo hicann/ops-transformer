@@ -16,16 +16,24 @@ import re
 import argparse
 
 
+OP_DEF_PATTERN = re.compile(
+    r"(?P<comment>[ \t]*/\*\*?(?:[^*]|\*(?!/))*?\*/[ \t]*\n\s*)?"
+    r"(?P<guard>[ \t]*#\s*ifndef\s+\w+[^\n]*\n"
+    r"[ \t]*#\s*define\s+\w+[^\n]*\n\s*)?"
+    r"^\s*REG_OP\((?P<opname>.+?)\)"
+    r".*?OP_END_FACTORY_REG\((?P=opname)\)"
+    r"(?(guard)[^\n]*\n[ \t]*#\s*endif[^\n]*)",
+    re.DOTALL | re.MULTILINE,
+)
+
+
 def match_op_proto(file_path):
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     op_defs = []
-    op_def_pattern = re.compile(
-        r"REG_OP\((\w+)\).*?OP_END_FACTORY_REG\(\1\)", re.DOTALL
-    )
-    for match in op_def_pattern.finditer(content):
-        op_name = match.group(1)
+    for match in OP_DEF_PATTERN.finditer(content):
+        op_name = match.group("opname")
         op_def = match.group(0)
         op_defs.append((op_name, op_def))
 
@@ -77,6 +85,6 @@ def parse_args(argv):
 if __name__ == "__main__":
     args = parse_args(sys.argv)
 
-    protos_path = args.protos[1:]
+    protos_path = list(dict.fromkeys(args.protos[1:]))
     output_file = args.output_file[0]
     merge_op_proto(protos_path, output_file)
