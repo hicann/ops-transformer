@@ -421,7 +421,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
     #include <acl/acl.h>
     #include <hccl/hccl.h>
     #include "aclnn/opdev/fp16_t.h"
-    #include "aclnnop/aclnn_allto_all_matmul.h"
+    #include "aclnnop/aclnn_allto_all_matmul_v2.h"
 
     int ndev = 2;
 
@@ -643,7 +643,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
     #include <acl/acl.h>
     #include <hccl/hccl.h>
     #include "aclnn/opdev/fp16_t.h"
-    #include "aclnnop/aclnn_allto_all_matmul.h"
+    #include "aclnnop/aclnn_allto_all_matmul_v2.h"
 
     int ndev = 2;
 
@@ -864,7 +864,7 @@ aclnnStatus aclnnAlltoAllMatmulV2(
     #include <vector>
     #include <acl/acl.h>
     #include <hccl/hccl.h>
-    #include "aclnnop/aclnn_allto_all_matmul.h"
+    #include "aclnnop/aclnn_allto_all_matmul_v2.h"
 
     int ndev = 2;
 
