@@ -610,18 +610,23 @@ function build_example()
         echo "Currently $ASCEND_SOC_UNITS is not supported, please input a valid soc."
         return 1
     fi
+    # 非 experimental 模式下排除 experimental 目录,避免 built-in 算子修改误触发 experimental 算子的 example
+    local exclude_experimental=()
+    if [[ "$ENABLE_EXPERIMENTAL" != "TRUE" ]]; then
+        exclude_experimental=(-not -path "*/experimental/*")
+    fi
     # Obtain the example file corresponding to the input soc unit.
     if [[ "$ASCEND_SOC_UNITS" == "ascend950" ]]; then
         # 1. ascend950/ascend950 example is independent of other soc units.
-        files=($(find ../ -path "*/${EXAMPLE_NAME}/examples/arch35/${pattern}*.cpp"))
+        files=($(find ../ -path "*/${EXAMPLE_NAME}/examples/arch35/${pattern}*.cpp" "${exclude_experimental[@]}"))
         if [[ -z "$files" ]]; then
             # 2. Example is shared with other soc units, or the current operator only supports ascend950/ascend950.
-            files=($(find ../ -path "*/${EXAMPLE_NAME}/examples/${pattern}*.cpp"))
+            files=($(find ../ -path "*/${EXAMPLE_NAME}/examples/${pattern}*.cpp" "${exclude_experimental[@]}"))
         fi
     else
         # Except for ascend950/ascend950, the examples of other soc units are temporarily shared.
         # If you need to add independent examples, you can refer to the method of adding a directory for isolation.
-        files=($(find ../ -path "*/${EXAMPLE_NAME}/examples/${pattern}*.cpp"))
+        files=($(find ../ -path "*/${EXAMPLE_NAME}/examples/${pattern}*.cpp" "${exclude_experimental[@]}"))
     fi
     # Compile and Execute
     if [[ "${EXAMPLE_MODE}" == "eager" ]]; then
