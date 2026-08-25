@@ -504,6 +504,8 @@ ge::graphStatus MQSMLAInfoParser::GetKvstride()
         if (kvLayout_ == MQSMLALayout::PA_BBND) {
             oriKvStride_ = oriKvStrides->GetStride(0);
         }
+    } else if (kvLayout_ == MQSMLALayout::PA_BBND) {
+        oriKvStride_ = oriBlockSize_ * n2Size_ * dSizeKV_;
     }
     if (cmpKvStrides != nullptr && cmpKvStrides->GetDimNum() > 0) {
         for (size_t i = 0; i < cmpKvStrides->GetDimNum(); i++) {
@@ -512,6 +514,8 @@ ge::graphStatus MQSMLAInfoParser::GetKvstride()
         if (kvLayout_ == MQSMLALayout::PA_BBND) {
             cmpKvStride_ = cmpKvStrides->GetStride(0);
         }
+    } else if (kvLayout_ == MQSMLALayout::PA_BBND) {
+        cmpKvStride_ = cmpBlockSize_ * n2Size_ * dSizeKV_;
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -600,7 +604,7 @@ ge::graphStatus MQSMLAInfoParser::Parse(MQSMLATilingInfo &qsmlaInfo)
         ge::GRAPH_SUCCESS != GetBatchSize() || ge::GRAPH_SUCCESS != GetQTSize() || ge::GRAPH_SUCCESS != GetS1Size() ||
         ge::GRAPH_SUCCESS != GetS2Size() || ge::GRAPH_SUCCESS != GetQkHeadDim() ||
         ge::GRAPH_SUCCESS != GetSparseBlockCount() || ge::GRAPH_SUCCESS != GetDSizeQ() ||
-        ge::GRAPH_SUCCESS != GetKvstride() || ge::GRAPH_SUCCESS != GetDSizeKV()) {
+        ge::GRAPH_SUCCESS != GetDSizeKV() || ge::GRAPH_SUCCESS != GetKvstride()) {
         return ge::GRAPH_FAILED;
     }
 

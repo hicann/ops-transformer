@@ -512,6 +512,7 @@ public:
     uint64_t GetOptionalInputStride0(uint32_t inputIndex) const;
     void GenerateInfo(SMLATilingInfo &smlaInfo);
     ge::graphStatus Parse(SMLATilingInfo &smlaInfo);
+    std::vector<uint64_t> GetKvstride(const gert::Shape &shape, const SMLALayout &layout) const;
     ge::graphStatus CheckContiguous() const; // A5
 
     gert::TilingContext *context_ = nullptr;

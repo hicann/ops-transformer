@@ -86,7 +86,10 @@ static bool IsPowerOfTwoInRange(uint32_t value, uint32_t minValue, uint32_t maxV
     return value >= minValue && value <= maxValue && (value & (value - 1U)) == 0U;
 }
 
-static bool IsA5Arch(NpuArch npuArch) { return npuArch == NpuArch::DAV_3510; }
+static bool IsA5Arch(NpuArch npuArch)
+{
+    return npuArch == NpuArch::DAV_3510;
+}
 
 static bool IsPaBlockSizeSupport(NpuArch npuArch, int32_t blockSize)
 {
@@ -341,7 +344,10 @@ ge::graphStatus SMLAInfoParser::CheckRequiredInOutExistence() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SMLAInfoParser::CheckRequiredAttrExistence() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus SMLAInfoParser::CheckRequiredAttrExistence() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus SMLAInfoParser::CheckRequiredParaExistence() const
 {
@@ -352,7 +358,10 @@ ge::graphStatus SMLAInfoParser::CheckRequiredParaExistence() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SMLAInfoParser::CheckUnrequiredParaExistence() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus SMLAInfoParser::CheckUnrequiredParaExistence() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus SMLAInfoParser::GetOpName()
 {
@@ -675,6 +684,23 @@ void SMLAInfoParser::SetSMLAShape()
     }
 }
 
+// 根据layout计算期望的连续stride
+std::vector<uint64_t> SMLAInfoParser::GetKvstride(const gert::Shape &shape, const SMLALayout &layout) const
+{
+    std::vector<uint64_t> expectedStrides;
+    if (layout == SMLALayout::BSND || layout == SMLALayout::PA_BBND) {
+        uint64_t dim1 = static_cast<uint64_t>(shape.GetDim(1));
+        uint64_t dim2 = static_cast<uint64_t>(shape.GetDim(2));
+        uint64_t dim3 = static_cast<uint64_t>(shape.GetDim(3));
+        expectedStrides = {dim1 * dim2 * dim3, dim2 * dim3, dim3, 1};
+    } else if (layout == SMLALayout::TND) {
+        uint64_t dim1 = static_cast<uint64_t>(shape.GetDim(1));
+        uint64_t dim2 = static_cast<uint64_t>(shape.GetDim(2));
+        expectedStrides = {dim1 * dim2, dim2, 1};
+    }
+    return expectedStrides;
+}
+
 // 非连续校验：通过shape计算expected stride进行校验
 // PA_BBND时，只允许0轴非连续，其余轴必须连续
 // 非PA_BBND时，所有轴都必须连续
@@ -685,17 +711,7 @@ ge::graphStatus SMLAInfoParser::CheckContiguous() const
     size_t checkStartIdx = (kvLayout_ == SMLALayout::PA_BBND) ? 1 : 0;
     if (opParamInfo_.oriKv.tensor != nullptr && !oriKeyStridesVec_.empty() &&
         opParamInfo_.oriKv.tensor->GetShapeSize() > 0) {
-        std::vector<uint64_t> oriExpectedStrides;
-        if (kvLayout_ == SMLALayout::BSND || kvLayout_ == SMLALayout::PA_BBND) {
-            uint64_t dim1 = static_cast<uint64_t>(oriKvShape_.GetDim(1));
-            uint64_t dim2 = static_cast<uint64_t>(oriKvShape_.GetDim(2));
-            uint64_t dim3 = static_cast<uint64_t>(oriKvShape_.GetDim(3));
-            oriExpectedStrides = {dim1 * dim2 * dim3, dim2 * dim3, dim3, 1};
-        } else if (kvLayout_ == SMLALayout::TND) {
-            uint64_t dim1 = static_cast<uint64_t>(oriKvShape_.GetDim(1));
-            uint64_t dim2 = static_cast<uint64_t>(oriKvShape_.GetDim(2));
-            oriExpectedStrides = {dim1 * dim2, dim2, 1};
-        }
+        std::vector<uint64_t> oriExpectedStrides = GetKvstride(oriKvShape_, kvLayout_);
         OP_CHECK_IF(oriKeyStridesVec_.size() != oriExpectedStrides.size(),
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                         opName_, "ori_kv",
@@ -707,17 +723,7 @@ ge::graphStatus SMLAInfoParser::CheckContiguous() const
     }
     if (opParamInfo_.cmpKv.tensor != nullptr && !cmpKeyStridesVec_.empty() &&
         opParamInfo_.cmpKv.tensor->GetShapeSize() > 0) {
-        std::vector<uint64_t> cmpExpectedStrides;
-        if (kvLayout_ == SMLALayout::BSND || kvLayout_ == SMLALayout::PA_BBND) {
-            uint64_t dim1 = static_cast<uint64_t>(cmpKvShape_.GetDim(1));
-            uint64_t dim2 = static_cast<uint64_t>(cmpKvShape_.GetDim(2));
-            uint64_t dim3 = static_cast<uint64_t>(cmpKvShape_.GetDim(3));
-            cmpExpectedStrides = {dim1 * dim2 * dim3, dim2 * dim3, dim3, 1};
-        } else if (kvLayout_ == SMLALayout::TND) {
-            uint64_t dim1 = static_cast<uint64_t>(cmpKvShape_.GetDim(1));
-            uint64_t dim2 = static_cast<uint64_t>(cmpKvShape_.GetDim(2));
-            cmpExpectedStrides = {dim1 * dim2, dim2, 1};
-        }
+        std::vector<uint64_t> cmpExpectedStrides = GetKvstride(cmpKvShape_, kvLayout_);
         OP_CHECK_IF(cmpKeyStridesVec_.size() != cmpExpectedStrides.size(),
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                         opName_, "cmp_kv",
@@ -1120,8 +1126,22 @@ void SMLAInfoParser::GenerateInfo(SMLATilingInfo &smlaInfo)
     smlaInfo.actualLenDimsCmpKV = actualLenDimsCmpKV_;
     smlaInfo.cmpResidualKVSize = cmpResidualKVSize_;
 
-    smlaInfo.oriKeyStride0 = !oriKeyStridesVec_.empty() ? static_cast<uint32_t>(oriKeyStridesVec_[0]) : 0;
-    smlaInfo.cmpKeyStride0 = !cmpKeyStridesVec_.empty() ? static_cast<uint32_t>(cmpKeyStridesVec_[0]) : 0;
+    if (!IsA5Arch(npuArch_)) {
+        smlaInfo.oriKeyStride0 = 0;
+        smlaInfo.cmpKeyStride0 = 0;
+    } else {
+        if (!oriKeyStridesVec_.empty()) {
+            smlaInfo.oriKeyStride0 = static_cast<uint32_t>(oriKeyStridesVec_[0]);
+        } else {
+            smlaInfo.oriKeyStride0 = GetKvstride(oriKvShape_, kvLayout_)[0];
+        }
+
+        if (!cmpKeyStridesVec_.empty()) {
+            smlaInfo.cmpKeyStride0 = static_cast<uint32_t>(cmpKeyStridesVec_[0]);
+        } else {
+            smlaInfo.cmpKeyStride0 = GetKvstride(cmpKvShape_, kvLayout_)[0];
+        }
+    }
 }
 
 ge::graphStatus SMLAInfoParser::Parse(SMLATilingInfo &smlaInfo)
@@ -1428,9 +1448,15 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCuSeqLensCmpKv() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SMLATilingCheck::CheckSingleParaNumHeads() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus SMLATilingCheck::CheckSingleParaNumHeads() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
-ge::graphStatus SMLATilingCheck::CheckSingleParaKvHeadNums() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus SMLATilingCheck::CheckSingleParaKvHeadNums() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus SMLATilingCheck::CheckSingleParaOriSparseIndices() const
 {
@@ -1647,9 +1673,15 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaCmpRatio() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SMLATilingCheck::CheckSingleParaOriMaskMode() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus SMLATilingCheck::CheckSingleParaOriMaskMode() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
-ge::graphStatus SMLATilingCheck::CheckSingleParaCmpMaskMode() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus SMLATilingCheck::CheckSingleParaCmpMaskMode() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus SMLATilingCheck::CheckSingleParaOriWinLeft() const
 {
@@ -2096,7 +2128,10 @@ ge::graphStatus SMLATilingCheck::CheckFeatureDtype() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SMLATilingCheck::CheckFeaturePa() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus SMLATilingCheck::CheckFeaturePa() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus SMLATilingCheck::CheckFeature() const
 {
@@ -2221,7 +2256,10 @@ ge::graphStatus SMLATilingCheck::CheckActualSeqLens() const
     }
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus SMLATilingCheck::CheckBlockTable() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus SMLATilingCheck::CheckBlockTable() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus SMLATilingCheck::CheckMultiParaConsistency()
 {

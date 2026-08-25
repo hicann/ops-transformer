@@ -54,7 +54,10 @@ ge::graphStatus QSMLAInfoParser::CheckRequiredInOutExistence() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QSMLAInfoParser::CheckRequiredAttrExistence() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus QSMLAInfoParser::CheckRequiredAttrExistence() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus QSMLAInfoParser::CheckRequiredParaExistence() const
 {
@@ -103,18 +106,14 @@ void QSMLAInfoParser::GetOptionalInputParaInfo()
     sparse_mla_checker::PopulateOptionalTensorParam(context_, Q_DESCALE, opParamInfo_.qDescale);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_KV_DESCALE, opParamInfo_.oriKvDescale);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_KV_DESCALE, opParamInfo_.cmpKvDescale);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_SPARSE_INDICES_INDEX,
-                                                    opParamInfo_.oriSparseIndices);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_SPARSE_INDICES_INDEX,
-                                                    opParamInfo_.cmpSparseIndices);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_SPARSE_INDICES_INDEX, opParamInfo_.oriSparseIndices);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_SPARSE_INDICES_INDEX, opParamInfo_.cmpSparseIndices);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_BLOCK_TABLE_INDEX, opParamInfo_.oriBlockTable);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_BLOCK_TABLE_INDEX, opParamInfo_.cmpBlockTable);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, SINKS_INDEX, opParamInfo_.sinks);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_Q_INDEX, opParamInfo_.cuSeqLensQ);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_ORI_KV_INDEX,
-                                                    opParamInfo_.cuSeqLensOriKv);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_CMP_KV_INDEX,
-                                                    opParamInfo_.cuSeqLensCmpKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_ORI_KV_INDEX, opParamInfo_.cuSeqLensOriKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_CMP_KV_INDEX, opParamInfo_.cuSeqLensCmpKv);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_Q_INDEX, opParamInfo_.seqUsedQ);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_ORI_KV_INDEX, opParamInfo_.sequsedOriKv);
     sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_CMP_KV_INDEX, opParamInfo_.sequsedCmpKv);
@@ -495,6 +494,8 @@ ge::graphStatus QSMLAInfoParser::GetKvstride()
         if (kvLayout_ == QSMLALayout::PA_BBND) {
             oriKvStride_ = oriKvStrides->GetStride(0);
         }
+    } else if (kvLayout_ == QSMLALayout::PA_BBND) {
+        oriKvStride_ = oriBlockSize_ * n2Size_ * dSizeKV_;
     }
     if (cmpKvStrides != nullptr && cmpKvStrides->GetDimNum() > 0) {
         for (size_t i = 0; i < cmpKvStrides->GetDimNum(); i++) {
@@ -503,6 +504,8 @@ ge::graphStatus QSMLAInfoParser::GetKvstride()
         if (kvLayout_ == QSMLALayout::PA_BBND) {
             cmpKvStride_ = cmpKvStrides->GetStride(0);
         }
+    } else if (kvLayout_ == QSMLALayout::PA_BBND) {
+        cmpKvStride_ = cmpBlockSize_ * n2Size_ * dSizeKV_;
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -589,7 +592,7 @@ ge::graphStatus QSMLAInfoParser::Parse(QSMLATilingInfo &qsmlaInfo)
         ge::GRAPH_SUCCESS != GetBatchSize() || ge::GRAPH_SUCCESS != GetQTSize() || ge::GRAPH_SUCCESS != GetS1Size() ||
         ge::GRAPH_SUCCESS != GetS2Size() || ge::GRAPH_SUCCESS != GetQkHeadDim() ||
         ge::GRAPH_SUCCESS != GetSparseBlockCount() || ge::GRAPH_SUCCESS != GetDSizeQ() ||
-        ge::GRAPH_SUCCESS != GetKvstride() || ge::GRAPH_SUCCESS != GetDSizeKV()) {
+        ge::GRAPH_SUCCESS != GetDSizeKV() || ge::GRAPH_SUCCESS != GetKvstride()) {
         return ge::GRAPH_FAILED;
     }
 
