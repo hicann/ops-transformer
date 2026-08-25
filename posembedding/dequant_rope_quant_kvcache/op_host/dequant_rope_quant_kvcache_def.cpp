@@ -16,15 +16,15 @@
 
 namespace ops {
 
-static const std::vector<ge::DataType> XDtypeList = {
-    {ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32,
-     ge::DT_INT32, ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32,
-     ge::DT_INT32}};
+static const std::vector<ge::DataType> XDtypeList = {{ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                                                      ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32,
+                                                      ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_INT32,
+                                                      ge::DT_INT32, ge::DT_INT32, ge::DT_INT32}};
 
-static const std::vector<ge::DataType> cosDtypeList = {
-    {ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
-     ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_BF16,
-     ge::DT_BF16}};
+static const std::vector<ge::DataType> cosDtypeList = {{ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                                                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                                                        ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_BF16,
+                                                        ge::DT_BF16, ge::DT_BF16, ge::DT_BF16}};
 
 static const std::vector<ge::DataType> biasDtypeList = {
     {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT32, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_INT32, ge::DT_FLOAT,
@@ -42,10 +42,10 @@ static const std::vector<ge::DataType> indicesDtypeList = {
     {ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32,
      ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32}};
 
-static const std::vector<ge::Format> formatList = {
-    {ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
-     ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
-     ge::FORMAT_ND, ge::FORMAT_ND}};
+static const std::vector<ge::Format> formatList = {{ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
+                                                    ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
+                                                    ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
+                                                    ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND}};
 
 static const std::vector<ge::DataType> XDtypeListKirin = {
     {ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32}};
@@ -70,7 +70,8 @@ static const std::vector<ge::Format> formatListKirin = {
 
 class DequantRopeQuantKvcache : public OpDef {
 public:
-    explicit DequantRopeQuantKvcache(const char* name) : OpDef(name)
+    explicit DequantRopeQuantKvcache(const char *name)
+        : OpDef(name)
     {
         this->Input("x")
             .ParamType(REQUIRED)
@@ -170,6 +171,7 @@ public:
         this->Attr("cache_mode").AttrType(OPTIONAL).String("contiguous");
         this->AICore().AddConfig("ascend910b");
         this->AICore().AddConfig("ascend910_93");
+        this->AICore().AddConfig("ascend950");
 
         OpAICoreConfig config_kirin = GetKirinCoreConfig();
         this->AICore().AddConfig("kirinx90", config_kirin);

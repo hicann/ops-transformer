@@ -4,7 +4,7 @@
 
 |产品             |  是否支持  |
 |:-------------------------|:----------:|
-|  <term>Ascend 950PR/Ascend 950DT</term>   |     ×    |
+|  <term>Ascend 950PR/Ascend 950DT</term>   |     √    |
 |  <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>   |     √    |
 |  <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>     |     √    |
 |  <term>Atlas 200I/500 A2 推理产品</term>    |     ×    |
@@ -18,51 +18,51 @@
 - 算子功能：对输入张量（x）进行dequant（可选）后，按`sizeSplits`（为切分的长度）对尾轴进行切分，划分为q、k、vOut，对q、k进行旋转位置编码，生成qOut和kOut，之后对kOut和vOut进行量化并按照`indices`更新到kCacheRef和vCacheRef上。
 
 - 计算公式：
-  
+
   $$
   dequantX = Dequant(x,weightScaleOptional,activationScaleOptional,biasOptional)
   $$
-  
+
   $$
   q,k,vOut = SplitTensor(dequantX,dim=-1,`sizeSplits`)
   $$
-  
+
   $$
   qOut,kOut = ApplyRotaryPosEmb(q,k,cos,sin)
   $$
-  
+
   $$
   quantK = Quant(kOut,scaleK,offsetKOptional)
   $$
-  
+
   $$
   quantV = Quant(vOut,scaleV,offsetVOptional)
   $$
-  
+
   如果cacheModeOptional为contiguous则：
-  
+
   $$
   kCacheRef[i][indices[i]]=quantK[i]
   $$
-  
+
   $$
   vCacheRef[i][indices[i]]=quantV[i]
   $$
-  
+
   如果cacheModeOptional为page则：
-  
+
   $$
   kCacheRefView=kCacheRef.view(-1,kCacheRef[-2],kCacheRef[-1])
   $$
-  
+
   $$
   vCacheRefView=vCacheRef.view(-1,vCacheRef[-2],vCacheRef[-1])
   $$
-  
+
   $$
   kCacheRefView[indices[i]]=quantK[i]
   $$
-  
+
   $$
   vCacheRefView[indices[i]]=quantV[i]
   $$
