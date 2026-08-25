@@ -24,7 +24,7 @@ def convert_npu_stem_indexer_metadata(
     *,
     causal: bool = True,
     stem_block_size: int = 128,
-    dim_qkflat: int = 128,
+    dim_qkflat: int = 2048,
     window_size: int = 4,
     meta_outputs: List[TensorSpec] = None,
 ):

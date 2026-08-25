@@ -163,7 +163,7 @@
   </tr>
   <tr>
     <td>stem_indexer</td>
-    <td><a href="./stem_indexer/docs/stemIndexer.md">文档</a></td>
+    <td><a href="./stem_indexer/docs/StemIndexer.md">文档</a></td>
     <td>√</td>
     <td>√</td>
     <td>√</td>
