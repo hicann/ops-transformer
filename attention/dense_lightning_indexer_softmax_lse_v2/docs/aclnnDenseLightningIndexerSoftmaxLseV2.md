@@ -441,7 +441,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
     - 当 maskMode=3 且 cmpRatio>1 时，必须传入 cmpResidualK，且 cmpResidualK 的每个值必须小于 cmpRatio。
     - seqUsedQ 的每个值不大于各 Batch 的实际 seqlen_q。
     - seqUsedK 的每个值不大于各 Batch 的实际 seqlen_k。
-    - metadataOptional 为前置算子 aclnnDenseLightningIndexerSoftmaxLseV2Metadata 的输出，建议传入以优化性能。
+    - metadataOptional 为前置算子 aclnnDenseLightningIndexerSoftmaxLseV2Metadata 的输出，必须传入以执行相关负载均衡策略。
 
 ## 调用示例
 
@@ -456,6 +456,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
 #include "securec.h"
 #include "acl/acl.h"
 #include "aclnnop/aclnn_dense_lightning_indexer_softmax_lse_v2.h"
+#include "aclnnop/aclnn_dense_lightning_indexer_softmax_lse_v2_metadata.h"
 
 #define CHECK_RET(cond, return_expr) \
   do {                               \
@@ -592,8 +593,32 @@ int main() {
   int64_t maskMode = 0;
   int64_t cmpRatio = 1;
 
+  // 1. 调用 metadata 前置算子，生成分核负载均衡信息
+  uint64_t metadataWorkspaceSize = 0;
+  aclOpExecutor* metadataExecutor = nullptr;
+  ret = aclnnDenseLightningIndexerSoftmaxLseV2MetadataGetWorkspaceSize(
+      nullptr, nullptr, nullptr, nullptr, nullptr, B, S1, S2, N1, N2, D, layoutQ, layoutK, maskMode, cmpRatio,
+      metadata, &metadataWorkspaceSize, &metadataExecutor);
+  CHECK_RET(ret == ACL_SUCCESS,
+            LOG_PRINT("aclnnDenseLightningIndexerSoftmaxLseV2MetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
+            return ret);
+
+  void* metadataWorkspaceAddr = nullptr;
+  if (metadataWorkspaceSize > 0) {
+    ret = aclrtMalloc(&metadataWorkspaceAddr, metadataWorkspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate metadata workspace failed. ERROR: %d\n", ret); return ret);
+  }
+
+  ret = aclnnDenseLightningIndexerSoftmaxLseV2Metadata(metadataWorkspaceAddr, metadataWorkspaceSize,
+                                                        metadataExecutor, stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnDenseLightningIndexerSoftmaxLseV2Metadata failed. ERROR: %d\n", ret);
+            return ret);
+  ret = aclrtSynchronizeStream(stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+  // 2. 调用主算子
   uint64_t workspaceSize = 0;
-  aclOpExecutor* executor;
+  aclOpExecutor* executor = nullptr;
 
   ret = aclnnDenseLightningIndexerSoftmaxLseV2GetWorkspaceSize(
             qIndex, kIndex, weight,
@@ -635,6 +660,9 @@ int main() {
 
   if (workspaceSize > 0) {
     aclrtFree(workspaceAddr);
+  }
+  if (metadataWorkspaceSize > 0) {
+    aclrtFree(metadataWorkspaceAddr);
   }
   aclrtDestroyStream(stream);
   aclrtDestroyContext(context);

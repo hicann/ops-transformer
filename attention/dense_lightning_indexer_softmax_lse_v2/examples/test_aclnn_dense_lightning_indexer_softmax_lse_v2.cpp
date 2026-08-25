@@ -21,6 +21,7 @@
 #include "securec.h"
 #include "acl/acl.h"
 #include "aclnnop/aclnn_dense_lightning_indexer_softmax_lse_v2.h"
+#include "aclnnop/aclnn_dense_lightning_indexer_softmax_lse_v2_metadata.h"
 
 #define CHECK_RET(cond, return_expr) \
     do { \
@@ -173,9 +174,32 @@ int main()
     int64_t maskMode = 0;
     int64_t cmpRatio = 1;
 
-    // 3. 调用CANN算子库API，需要修改为具体的Api名称
+    // 3. 调用 metadata 前置算子，生成分核负载均衡信息
+    uint64_t metadataWorkspaceSize = 0;
+    aclOpExecutor *metadataExecutor = nullptr;
+    ret = aclnnDenseLightningIndexerSoftmaxLseV2MetadataGetWorkspaceSize(
+        nullptr, nullptr, nullptr, nullptr, nullptr, B, S1, S2, N1, N2, D, layoutQ, layoutK, maskMode, cmpRatio,
+        metadata, &metadataWorkspaceSize, &metadataExecutor);
+    CHECK_RET(ret == ACL_SUCCESS,
+              LOG_PRINT("aclnnDenseLightningIndexerSoftmaxLseV2MetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
+              return ret);
+
+    void *metadataWorkspaceAddr = nullptr;
+    if (metadataWorkspaceSize > 0) {
+        ret = aclrtMalloc(&metadataWorkspaceAddr, metadataWorkspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate metadata workspace failed. ERROR: %d\n", ret); return ret);
+    }
+
+    ret = aclnnDenseLightningIndexerSoftmaxLseV2Metadata(metadataWorkspaceAddr, metadataWorkspaceSize, metadataExecutor,
+                                                         stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnDenseLightningIndexerSoftmaxLseV2Metadata failed. ERROR: %d\n", ret);
+              return ret);
+    ret = aclrtSynchronizeStream(stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+    // 4. 调用主算子
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor *executor = nullptr;
 
     // 调用aclnnDenseLightningIndexerSoftmaxLseV2GetWorkspaceSize第一段接口
     ret = aclnnDenseLightningIndexerSoftmaxLseV2GetWorkspaceSize(qIndex, kIndex, weight, nullptr, nullptr, nullptr,
@@ -197,22 +221,22 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnDenseLightningIndexerSoftmaxLseV2 failed. ERROR: %d\n", ret);
               return ret);
 
-    // 4. （固定写法）同步等待任务执行结束
+    // 5. （固定写法）同步等待任务执行结束
     ret = aclrtSynchronizeStream(stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
-    // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
+    // 6. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
     PrintOutResult(softmaxLseShape, &softmaxLseDeviceAddr);
     LOG_PRINT("pass\n");
 
-    // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
+    // 7. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
     aclDestroyTensor(qIndex);
     aclDestroyTensor(kIndex);
     aclDestroyTensor(weight);
     aclDestroyTensor(softmaxLse);
     aclDestroyTensor(metadata);
 
-    // 7. 释放device资源
+    // 8. 释放device资源
     aclrtFree(qIndexDeviceAddr);
     aclrtFree(kIndexDeviceAddr);
     aclrtFree(weightDeviceAddr);
@@ -221,6 +245,9 @@ int main()
 
     if (workspaceSize > 0) {
         aclrtFree(workspaceAddr);
+    }
+    if (metadataWorkspaceSize > 0) {
+        aclrtFree(metadataWorkspaceAddr);
     }
     aclrtDestroyStream(stream);
     aclrtDestroyContext(context);

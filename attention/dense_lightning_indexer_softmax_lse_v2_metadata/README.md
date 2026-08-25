@@ -162,6 +162,10 @@
 - layout_q必须为BSND或TND，layout_k必须与layout_q保持一致。
 - num_heads_q取值范围为[1, 128]，必须能被num_heads_k整除，num_heads_k当前仅支持1，head_dim当前仅支持128。
 
+## 问题定位说明
+
+- 关于AI CPU算子Kernel常见执行问题或异常错误，问题定位方法请参考《故障处理》中“[故障案例集>算子执行问题>AI CPU算子Kernel执行报错](https://www.hiascend.com/document/detail/zh/canncommercial/latest/maintenref/troubleshooting/troubleshooting_0151.html)”。
+
 ## 调用说明
 
 | 调用方式  | 样例代码                                                     | 说明                                                         |

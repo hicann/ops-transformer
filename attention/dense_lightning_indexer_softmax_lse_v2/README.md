@@ -103,7 +103,7 @@ lse作为输出传递给算子DenseLightningIndexerGradKlLoss作为输入计算S
      </tr>
      <tr>
       <td>metadataOptional</td>
-      <td>可选输入</td>
+      <td>输入</td>
       <td>前置AICPU算子输出的分核负载均衡信息。由aclnnDenseLightningIndexerSoftmaxLseV2Metadata算子输出。支持空Tensor。</td>
       <td>INT32</td>
       <td>ND</td>

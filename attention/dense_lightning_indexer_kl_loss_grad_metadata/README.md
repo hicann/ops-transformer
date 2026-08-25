@@ -158,6 +158,10 @@
 - 参数cmp_residual_k需满足cmp_residual_k[i] < cmp_ratio。
 - mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../docs/zh/context/sparse_mode_introduction.md)。
 
+## 问题定位说明
+
+- 关于AI CPU算子Kernel常见执行问题或异常错误，问题定位方法请参考《故障处理》中“[故障案例集>算子执行问题>AI CPU算子Kernel执行报错](https://www.hiascend.com/document/detail/zh/canncommercial/latest/maintenref/troubleshooting/troubleshooting_0151.html)”。
+
 ## 调用说明
 
 | 调用方式  | 样例代码                                                     | 说明                                                         |

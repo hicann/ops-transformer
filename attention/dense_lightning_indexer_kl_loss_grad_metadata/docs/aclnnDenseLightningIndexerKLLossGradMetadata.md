@@ -24,7 +24,7 @@
 
 ## 功能说明
 
-- 算子功能：该算子为AICPU算子，是aclnnDenseLightningIndexerKLLossGrad算子的前置算子。根据aclnnDenseLightningIndexerKLLossGrad算子的输入shape、layout、mask和压缩比例信息，计算并输出分核切分metadata。输出结果可作为aclnnDenseLightningIndexerKLLossGrad算子的metadataOptional输入，减少主算子tiling阶段对host array的访问。
+- 接口功能：该算子为AICPU算子，是aclnnDenseLightningIndexerKLLossGrad算子的前置算子。根据aclnnDenseLightningIndexerKLLossGrad算子的输入shape、layout、mask和压缩比例信息，计算并输出分核切分metadata。输出结果可作为aclnnDenseLightningIndexerKLLossGrad算子的metadataOptional输入，减少主算子tiling阶段对host array的访问。
 
   **该算子不建议单独使用，建议与aclnnDenseLightningIndexerKLLossGrad算子配合使用，形成完整的工作流。**
     1. 接收主算子的shape信息，包括batchSize、maxSeqLenQ、maxSeqLenK、numHeadsQ、numHeadsK、headDim、layout和mask信息。
@@ -35,51 +35,49 @@
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize"获取workspace大小，再调用"aclnnDenseLightningIndexerKLLossGradMetadata"执行计算。
 
-``` cpp
+```cpp
 aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
-    const aclTensor *cuSeqLensQOptional,
-    const aclTensor *cuSeqLensKOptional,
-    const aclTensor *seqUsedQOptional,
-    const aclTensor *seqUsedKOptional,
-    const aclTensor *cmpResidualKOptional,
-    int64_t batchSize,
-    int64_t maxSeqLenQ,
-    int64_t maxSeqLenK,
-    int64_t numHeadsQ,
-    int64_t numHeadsK,
-    int64_t headDim,
-    char *layoutQ,
-    char *layoutK,
-    int64_t maskMode,
-    int64_t cmpRatio,
-    const aclTensor *metadata,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensor   *cuSeqLensQOptional,
+    const aclTensor   *cuSeqLensKOptional,
+    const aclTensor   *seqUsedQOptional,
+    const aclTensor   *seqUsedKOptional,
+    const aclTensor   *cmpResidualKOptional,
+    int64_t            batchSize,
+    int64_t            maxSeqLenQ,
+    int64_t            maxSeqLenK,
+    int64_t            numHeadsQ,
+    int64_t            numHeadsK,
+    int64_t            headDim,
+    char              *layoutQ,
+    char              *layoutK,
+    int64_t            maskMode,
+    int64_t            cmpRatio,
+    const aclTensor   *metadata,
+    uint64_t          *workspaceSize,
+    aclOpExecutor    **executor)
 ```
 
-``` cpp
+```cpp
 aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    aclrtStream stream);
+    void           *workspace,
+    uint64_t        workspaceSize,
+    aclOpExecutor  *executor,
+    aclrtStream     stream)
 ```
 
 ## aclnnDenseLightningIndexerKLLossGradMetadataGetWorkspaceSize
 
-## 参数说明
-
 - **参数说明**
 
-  <table style="undefined;table-layout: fixed; width: 1600px"><colgroup>
-  <col style="width: 150px">
-  <col style="width: 100px">
+  <table style="undefined;table-layout: fixed; width: 1500px"><colgroup>
+  <col style="width: 180px">
+  <col style="width: 120px">
+  <col style="width: 300px">
   <col style="width: 350px">
-  <col style="width: 150px">
-  <col style="width: 70px">
-  <col style="width: 70px">
-  <col style="width: 190px">
-  <col style="width: 80px">
+  <col style="width: 250px">
+  <col style="width: 100px">
+  <col style="width: 100px">
+  <col style="width: 100px">
   </colgroup>
   <thead>
     <tr>
@@ -94,57 +92,57 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
     </tr></thead>
   <tbody>
     <tr>
-      <td>cuSeqLensQOptional</td>
+      <td>cuSeqLensQOptional（const aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中query的累积sequence length。</td>
       <td><ul><li>支持空Tensor</li><li>TND场景下必传，并可通过该入参shape推导batch。</li><li>第一个值固定为0。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B+1,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
-      <td>cuSeqLensKOptional</td>
+      <td>cuSeqLensKOptional（const aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中key的累积sequence length。</td>
       <td><ul><li>支持空Tensor</li><li>TND场景下必传。</li><li>第一个值固定为0。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B+1,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
-      <td>seqUsedQOptional</td>
+      <td>seqUsedQOptional（const aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中query实际参与运算的sequence length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
-      <td>seqUsedKOptional</td>
+      <td>seqUsedKOptional（const aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中key实际参与运算的sequence length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
-      <td>cmpResidualKOptional</td>
+      <td>cmpResidualKOptional（const aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中key的sequence length与cmpRatio相关的残差。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
-      <td>batchSize</td>
+      <td>batchSize（int64_t）</td>
       <td>输入</td>
       <td>表示batch数量。</td>
       <td><ul><li>支持非负数。TND场景可填0，并通过cuSeqLensQOptional推导。</li><li>建议值为0。</li></ul></td>
@@ -154,7 +152,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>maxSeqLenQ</td>
+      <td>maxSeqLenQ（int64_t）</td>
       <td>输入</td>
       <td>表示query的最大sequence length。</td>
       <td><ul><li>支持非负数。BSND场景必须为正数。</li><li>建议值为0。</li></ul></td>
@@ -164,7 +162,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>maxSeqLenK</td>
+      <td>maxSeqLenK（int64_t）</td>
       <td>输入</td>
       <td>表示key的最大sequence length。</td>
       <td><ul><li>支持非负数。BSND场景必须为正数。</li><li>建议值为0。</li></ul></td>
@@ -174,7 +172,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>numHeadsQ</td>
+      <td>numHeadsQ（int64_t）</td>
       <td>输入</td>
       <td>表示query的head个数。</td>
       <td>必须为正数，并且能被numHeadsK整除，当前支持[1, 128]。</td>
@@ -184,7 +182,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>numHeadsK</td>
+      <td>numHeadsK（int64_t）</td>
       <td>输入</td>
       <td>表示key的head个数。</td>
       <td>必须为正数，当前仅支持1。</td>
@@ -194,7 +192,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>headDim</td>
+      <td>headDim（int64_t）</td>
       <td>输入</td>
       <td>表示q/k的head dimension。</td>
       <td>必须为正数，当前仅支持128。</td>
@@ -204,7 +202,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>layoutQ</td>
+      <td>layoutQ（char*）</td>
       <td>输入</td>
       <td>表示query侧的排列格式。</td>
       <td><ul><li>支持 BSND、TND。</li><li>建议值为BSND。</li></ul></td>
@@ -214,7 +212,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>layoutK</td>
+      <td>layoutK（char*）</td>
       <td>输入</td>
       <td>表示key侧的排列格式。</td>
       <td><ul><li>支持 BSND、TND。</li><li>建议值为BSND。</li></ul></td>
@@ -224,7 +222,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>maskMode</td>
+      <td>maskMode（int64_t）</td>
       <td>输入</td>
       <td>表示mask模式。</td>
       <td><ul><li>0: No mask。</li><li>3: rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。</li><li>建议值为0。</li></ul></td>
@@ -234,7 +232,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>cmpRatio</td>
+      <td>cmpRatio（int64_t）</td>
       <td>输入</td>
       <td>表示key的压缩率。</td>
       <td><ul><li>取值范围[1，128]</li><li>建议值1，表示无压缩。</li></ul></td>
@@ -244,27 +242,27 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>metadata</td>
+      <td>metadata（const aclTensor*）</td>
       <td>输出</td>
       <td>表示负载均衡结果输出。</td>
       <td>输出结果作为aclnnDenseLightningIndexerKLLossGrad的metadataOptional输入。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape固定为(64,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
-      <td>workspaceSize</td>
+      <td>workspaceSize（uint64_t*）</td>
       <td>输出</td>
       <td>返回需要在Device侧申请的workspace大小。</td>
-      <td>当前实现返回0。</td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
-      <td>executor</td>
+      <td>executor（aclOpExecutor**）</td>
       <td>输出</td>
       <td>返回op执行器，包含了算子计算流程。</td>
       <td>-</td>
@@ -276,18 +274,63 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
   </tbody>
   </table>
 
-- **返回值：**
+- **返回值**
 
-    返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+    aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+
+    第一段接口完成入参校验，出现以下场景时报错：
+
+    <table style="undefined;table-layout: fixed; width: 1000px"><colgroup>
+    <col style="width: 300px">
+    <col style="width: 150px">
+    <col style="width: 550px">
+    </colgroup>
+    <thead>
+      <tr>
+      <th>返回值</th>
+      <th>错误码</th>
+      <th>描述</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td>ACLNN_ERR_INNER_NULLPTR</td>
+      <td>561103</td>
+      <td>workspaceSize或executor为空指针。</td>
+    </tr>
+    <tr>
+      <td rowspan="7">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="7">161002</td>
+      <td>cuSeqLensQOptional、cuSeqLensKOptional、seqUsedQOptional、seqUsedKOptional或cmpResidualKOptional的数据类型或维度不在支持范围内。</td>
+    </tr>
+    <tr>
+      <td>metadata为空指针，或其数据类型、维度或shape不在支持范围内。</td>
+    </tr>
+    <tr>
+      <td>numHeadsQ、numHeadsK或headDim不在支持范围内。</td>
+    </tr>
+    <tr>
+      <td>layoutQ或layoutK为空指针，或不在支持范围内。</td>
+    </tr>
+    <tr>
+      <td>batchSize、maxSeqLenQ、maxSeqLenK、maskMode或cmpRatio不满足取值约束。</td>
+    </tr>
+    <tr>
+      <td>TND场景下未传入对应的cuSeqLensQOptional或cuSeqLensKOptional，或maskMode=3且cmpRatio不为1时未传入cmpResidualKOptional。</td>
+    </tr>
+    <tr>
+      <td>从query、key或cmpResidualKOptional推导出的batch数量不一致。</td>
+    </tr>
+    </tbody></table>
 
 ## aclnnDenseLightningIndexerKLLossGradMetadata
 
-- **参数说明：**
+- **参数说明**
 
-    <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
-    <col style="width: 168px">
-    <col style="width: 128px">
-    <col style="width: 854px">
+    <table style="undefined;table-layout: fixed; width: 1000px"><colgroup>
+    <col style="width: 180px">
+    <col style="width: 120px">
+    <col style="width: 700px">
     </colgroup>
     <thead>
         <tr>
@@ -319,21 +362,18 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
     </tbody>
     </table>
 
-- **返回值：**
+- **返回值**
 
-    返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+  aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
 
-- 确定性计算：
-  - aclnnDenseLightningIndexerKLLossGradMetadata默认确定性实现。
-
-- 公共约束：
-  - BSND场景
-    - 必传batchSize、maxSeqLenQ和maxSeqLenK参数，以获取shape信息。
-  - TND场景
-    - 必传cuSeqLensQOptional、cuSeqLensKOptional参数，以获取正确shape信息。
-    - 当batchSize为0时，通过cuSeqLensQOptional的shape推导batch。
+- 确定性说明：aclnnDenseLightningIndexerKLLossGradMetadata默认确定性实现。
+- BSND场景
+  - 必传batchSize、maxSeqLenQ和maxSeqLenK参数，以获取shape信息。
+- TND场景
+  - 必传cuSeqLensQOptional、cuSeqLensKOptional参数，以获取正确shape信息。
+  - 当batchSize为0时，通过cuSeqLensQOptional的shape推导batch。
 
 <details>
 <summary><a id="Mask"></a>Mask</summary>
@@ -448,7 +488,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
 
 示例代码如下，仅供参考，具体编译和执行过程请参见[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-``` cpp
+```cpp
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
@@ -712,8 +752,6 @@ int main() {
 }
 ```
 
-## 调用说明
+## 问题定位说明
 
-| 调用方式  | 样例代码 | 说明 |
-| ----------- | -------- | ---- |
-| aclnn接口 | [调用示例](#调用示例) | 通过`aclnnDenseLightningIndexerKLLossGradMetadata`接口方式调用，输出metadata供`aclnnDenseLightningIndexerKLLossGrad`使用。 |
+- 关于AI CPU算子Kernel常见执行问题或异常错误，问题定位方法请参考《故障处理》中“[故障案例集>算子执行问题>AI CPU算子Kernel执行报错](https://www.hiascend.com/document/detail/zh/canncommercial/latest/maintenref/troubleshooting/troubleshooting_0151.html)”。
