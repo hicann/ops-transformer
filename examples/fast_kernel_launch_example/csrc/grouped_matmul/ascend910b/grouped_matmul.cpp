@@ -120,7 +120,6 @@ void groupedmatmul_api(const TypeCombo &matchedCombo, int comboIndex, aclrtStrea
     }
 }
 
-
 torch::Tensor grouped_matmul_npu(
     const torch::TensorList &x, const torch::TensorList &weight, const c10::optional<torch::TensorList> &bias,
     const c10::optional<torch::TensorList> &scale, const c10::optional<torch::TensorList> &offset,
@@ -164,20 +163,69 @@ torch::Tensor grouped_matmul_npu(
                                  .layout(x[0].layout()) // 对齐x[0]的内存布局
     );
 
+    // RunOpApi enqueues acl_call asynchronously. TensorList and IntArrayRef are
+    // non-owning views, so materialize their contents before creating the callback.
+    const auto materialize_tensor_list = [](const at::TensorList &tensor_list) {
+        return std::vector<at::Tensor>(tensor_list.begin(), tensor_list.end());
+    };
+    const auto materialize_optional_tensor_list =
+        [&materialize_tensor_list](const c10::optional<at::TensorList> &tensor_list) {
+            c10::optional<std::vector<at::Tensor>> result = c10::nullopt;
+            if (tensor_list.has_value()) {
+                result = materialize_tensor_list(tensor_list.value());
+            }
+            return result;
+        };
+    const auto x_vec = materialize_tensor_list(x);
+    const auto weight_vec = materialize_tensor_list(weight);
+    const auto bias_vec = materialize_optional_tensor_list(bias);
+    const auto scale_vec = materialize_optional_tensor_list(scale);
+    const auto offset_vec = materialize_optional_tensor_list(offset);
+    const auto antiquant_scale_vec = materialize_optional_tensor_list(antiquantScale);
+    const auto antiquant_offset_vec = materialize_optional_tensor_list(antiquantOffset);
+    const auto per_token_scale_vec = materialize_optional_tensor_list(perTokenScale);
+    const auto y_vec = std::vector<at::Tensor>{y};
+
+    c10::optional<std::vector<int64_t>> tuning_config_vec = c10::nullopt;
+    if (tuningConfigOptional.has_value()) {
+        tuning_config_vec = std::vector<int64_t>(tuningConfigOptional->begin(), tuningConfigOptional->end());
+    }
+
     auto stream = c10_npu::getCurrentNPUStream().stream(false);
 
     auto acl_call = [=, &matched_combo]() -> int {
-        vector<int64_t> tuning_config_vec;
-        vector<int64_t> *tuning_config_ptr = nullptr;
-
-        if (tuningConfigOptional.has_value()) {
-            tuning_config_vec =
-                vector<int64_t>(tuningConfigOptional.value().begin(), tuningConfigOptional.value().end());
-            tuning_config_ptr = &tuning_config_vec;
+        const at::TensorList x_ref(x_vec);
+        const at::TensorList weight_ref(weight_vec);
+        const at::TensorList y_ref(y_vec);
+        c10::optional<at::TensorList> bias_ref = c10::nullopt;
+        c10::optional<at::TensorList> scale_ref = c10::nullopt;
+        c10::optional<at::TensorList> offset_ref = c10::nullopt;
+        c10::optional<at::TensorList> antiquant_scale_ref = c10::nullopt;
+        c10::optional<at::TensorList> antiquant_offset_ref = c10::nullopt;
+        c10::optional<at::TensorList> per_token_scale_ref = c10::nullopt;
+        if (bias_vec.has_value()) {
+            bias_ref = at::TensorList(*bias_vec);
         }
-        groupedmatmul_api(matched_combo, matched_index, stream, x, weight, bias, scale, offset, antiquantScale,
-                          antiquantOffset, groupList, perTokenScale, y, splitItem, groupType, groupListType, actType,
-                          tuning_config_ptr);
+        if (scale_vec.has_value()) {
+            scale_ref = at::TensorList(*scale_vec);
+        }
+        if (offset_vec.has_value()) {
+            offset_ref = at::TensorList(*offset_vec);
+        }
+        if (antiquant_scale_vec.has_value()) {
+            antiquant_scale_ref = at::TensorList(*antiquant_scale_vec);
+        }
+        if (antiquant_offset_vec.has_value()) {
+            antiquant_offset_ref = at::TensorList(*antiquant_offset_vec);
+        }
+        if (per_token_scale_vec.has_value()) {
+            per_token_scale_ref = at::TensorList(*per_token_scale_vec);
+        }
+        const std::vector<int64_t> *tuning_config_ptr =
+            tuning_config_vec.has_value() ? &tuning_config_vec.value() : nullptr;
+        groupedmatmul_api(matched_combo, matched_index, stream, x_ref, weight_ref, bias_ref, scale_ref, offset_ref,
+                          antiquant_scale_ref, antiquant_offset_ref, groupList, per_token_scale_ref, y_ref, splitItem,
+                          groupType, groupListType, actType, tuning_config_ptr);
         return 0;
     };
     at_npu::native::OpCommand::RunOpApi("GroupedMatmul", acl_call);
@@ -185,10 +233,7 @@ torch::Tensor grouped_matmul_npu(
 }
 
 // Register the NPU implementation
-TORCH_LIBRARY_IMPL(EXTENSION_MODULE_NAME, PrivateUse1, m)
-{
-    m.impl("grouped_matmul", grouped_matmul_npu);
-}
+TORCH_LIBRARY_IMPL(EXTENSION_MODULE_NAME, PrivateUse1, m) { m.impl("grouped_matmul", grouped_matmul_npu); }
 
 } // namespace GroupedMatmul
 } // namespace ascend_ops
