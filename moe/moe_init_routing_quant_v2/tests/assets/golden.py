@@ -300,14 +300,14 @@ class MoeInitRoutingQuantV2TestSpec:
         ]
 
     @staticmethod
-    def customize_inputs(x, expert_idx, *args, **kwargs):
+    def customize_inputs(x, expert_idx, scale=None, offset=None, *args, **kwargs):
         expert_num = kwargs.get("expert_num", 0)
         if not expert_num or expert_num <= 0:
             expert_num = 100
         expert_idx = numpy.random.randint(
             0, expert_num, size=expert_idx.size, dtype=numpy.int32
         ).reshape(expert_idx.shape)
-        return (x, expert_idx)
+        return (x, expert_idx, scale, offset)
 
     tolerance = {
         "float32": {"standard": "stat_rel_err"},

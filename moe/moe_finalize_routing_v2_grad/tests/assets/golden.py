@@ -223,9 +223,13 @@ class MoeFinalizeRoutingV2GradTestSpec:
             grad_scales = numpy.zeros((BSK, 1), dtype=ori_dtype)
             return [grad_expanded_x.astype(ori_dtype), grad_scales]
         else:
-            scales_np = scales.reshape(BSK).astype(numpy.float32)
+            topK = 1
+            if scales.ndim >= 2:
+                topK = scales.shape[1]
+            N = BSK // topK
+            scales_np = scales.reshape(N, topK).astype(numpy.float32)
             grad_expanded_x = numpy.zeros((out_rows, H), dtype=numpy.float32)
-            grad_scales = numpy.zeros((BSK,), dtype=numpy.float32)
+            grad_scales = numpy.zeros((N, topK), dtype=numpy.float32)
 
             expanded_x_np = (
                 expanded_x.astype(numpy.float32) if expanded_x is not None else None
@@ -234,12 +238,17 @@ class MoeFinalizeRoutingV2GradTestSpec:
                 expanded_x_np = expanded_x_np.reshape(-1, H)
             for i in range(BSK):
                 src_row = int(expanded_row_idx[i])
+                k_idx = i % topK
+                grad_row_idx = i // topK
                 if 0 <= src_row < out_rows:
-                    grad_expanded_x[src_row] = grad_y[i] * scales_np[i]
+                    scale_val = scales_np[grad_row_idx, k_idx]
+                    grad_expanded_x[src_row] = grad_y[grad_row_idx] * scale_val
                     if expanded_x_np is not None:
-                        grad_scales[i] = numpy.sum(expanded_x_np[src_row] * grad_y[i])
+                        grad_scales[grad_row_idx, k_idx] = numpy.sum(
+                            expanded_x_np[src_row] * grad_y[grad_row_idx]
+                        )
                     else:
-                        grad_scales[i] = numpy.sum(grad_y[i] * scales_np[i])
+                        grad_scales[grad_row_idx, k_idx] = 0.0
             grad_expanded_x = grad_expanded_x.reshape(out_shape)
             return [
                 grad_expanded_x.astype(ori_dtype),
