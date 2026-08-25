@@ -60,8 +60,8 @@ public:
     __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
                                 __gm__ uint8_t *sparseIndices, __gm__ uint8_t *keyScale, __gm__ uint8_t *valueScale,
                                 __gm__ uint8_t *blockTable, __gm__ uint8_t *actualSeqLengthsQ,
-                                __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *sinks,
-                                __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
+                                __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *sinks, __gm__ uint8_t *attentionOut,
+                                __gm__ uint8_t *workspace,
                                 const KvQuantSparseFlashAttentionTilingDataMla *__restrict tiling, TPipe *tPipe);
     __aicore__ inline void Process();
 
@@ -74,6 +74,8 @@ private:
                                             const KvQuantSparseFlashAttentionTilingDataMla *__restrict tiling,
                                             TPipe *tPipe);
     __aicore__ inline void InitLocalBuffer();
+    __aicore__ inline void InitMMResBufUb();
+    __aicore__ inline void InitMMResBufGm(__gm__ uint8_t *workspace);
     __aicore__ inline void ComputeConstexpr();
     __aicore__ inline void InitMMResBuf(__gm__ uint8_t *workspace);
     __aicore__ inline void SetRunInfo(RunInfo &runInfo, RunParamStr &runParam, int64_t taskId, int64_t s2LoopCount,
@@ -176,6 +178,24 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<CubeBlockType, VecBlockTyp
     this->InitGlobalBuffer(query, key, value, sparseIndices, blockTable, actualSeqLengthsQ, actualSeqLengths, sinks,
                            workspace, tiling, tPipe); // gm设置
     this->InitCalcParamsEach();
+    if ASCEND_IS_AIV {
+        if constexpr (IS_VEC_S2PHYADDR) {
+            uint32_t hasLoad = (aicIdx < usedCoreNum) ? 1U : 0U;
+            // 适配分核左闭右开（与 ProcessMainLoop 中 gS1End/bN2End 的转换保持一致）
+            uint32_t bN2EndIdx = constInfo.bN2End + 1;
+            uint32_t nextGs1Idx = 0;
+            uint32_t gS1EndBIdx = constInfo.bN2End / constInfo.n2Size;
+            uint32_t gS1max = GetBalanceActualSeqLengths(actualSeqLengthsQGm, gS1EndBIdx);
+            if (constInfo.gS1End + 1 < gS1max) {
+                nextGs1Idx = constInfo.gS1End + 1;
+            }
+            this->vecBlock.GetKVPhyAddr(hasLoad, constInfo.bN2Start, bN2EndIdx, constInfo.gS1Start, nextGs1Idx,
+                                        workspace, constInfo);
+        }
+    }
+    /* UB buffer 在 GetKVPhyAddr（含 tPipe->Reset）之后初始化，避免 buffer 池被重置导致重叠 */
+    this->InitMMResBufUb();
+    this->InitMMResBufGm(workspace);
     this->InitLocalBuffer();
 }
 
@@ -319,8 +339,8 @@ template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void KvQuantSparseFlashAttentionMla<CubeBlockType, VecBlockType>::InitGlobalBuffer(
     __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *sparseIndices,
     __gm__ uint8_t *blockTable, __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
-    __gm__ uint8_t *sinks, __gm__ uint8_t *workspace,
-    const KvQuantSparseFlashAttentionTilingDataMla *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t *sinks, __gm__ uint8_t *workspace, const KvQuantSparseFlashAttentionTilingDataMla *__restrict tiling,
+    TPipe *tPipe)
 {
     if (actualSeqLengthsQ != nullptr) {
         actualSeqQlenAddr = (__gm__ int32_t *)actualSeqLengthsQ;
@@ -353,6 +373,11 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<CubeBlockType, VecBlockTyp
         l1RightBuffers.Get().SetCrossCore();
         l1RightBuffers.Get().SetCrossCore();
     }
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void KvQuantSparseFlashAttentionMla<CubeBlockType, VecBlockType>::InitMMResBufUb()
+{
     uint32_t mm1ResultSize = constInfo.s1BaseSize / CV_RATIO * constInfo.s2BaseSize * sizeof(T);
     uint32_t mm2ResultSize = constInfo.s1BaseSize / CV_RATIO * 512 * sizeof(T);
     ubBufferManager.Init(pipe, mm1ResultSize * 2 + mm2ResultSize);
@@ -374,7 +399,12 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<CubeBlockType, VecBlockTyp
     if ASCEND_IS_AIV {
         bmm2Buffers.Get().SetCrossCore();
     }
+}
 
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void KvQuantSparseFlashAttentionMla<CubeBlockType, VecBlockType>::InitMMResBufGm(
+    __gm__ uint8_t *workspace)
+{
     if constexpr (IS_SPLIT_G) {
         uint32_t v0ResSize = constInfo.s2BaseSize * 576U * sizeof(Q_T);
         int64_t totalOffset = v0ResSize * 3 * (aicIdx >> 1U);
@@ -480,6 +510,7 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<CubeBlockType, VecBlockTyp
         SyncAll<false>();
     }
 
+    ICachePreLoad(6);
     ProcessMainLoop();
 }
 

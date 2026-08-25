@@ -66,7 +66,11 @@ constexpr uint32_t BYTE_BLOCK = 32;
 const uint32_t QSFA_MAX_AIC_CORE_NUM = 26; // 25 + 1 保证数组8字节对齐
 
 // ------------------公共定义--------------------------
-enum class QSFALayout : uint32_t { BSND = 0, TND = 1, PA_BSND = 2 };
+enum class QSFALayout : uint32_t {
+    BSND = 0,
+    TND = 1,
+    PA_BSND = 2
+};
 
 struct QSFATilingShapeCompareParam {
     int64_t B = 1;
@@ -79,9 +83,15 @@ struct QSFATilingShapeCompareParam {
     int64_t Bn = 1;
 };
 
-enum class KvStorageMode : uint32_t { BATCH_CONTINUOUS = 0, PAGE_ATTENTION = 1 };
+enum class KvStorageMode : uint32_t {
+    BATCH_CONTINUOUS = 0,
+    PAGE_ATTENTION = 1
+};
 
-enum class QSFAPerfMode : uint32_t { C_TEMPLATE_MODE = 0, V_TEMPLATE_MODE };
+enum class QSFAPerfMode : uint32_t {
+    C_TEMPLATE_MODE = 0,
+    V_TEMPLATE_MODE
+};
 
 enum class QSFAAxis : uint32_t {
     B = 0,
@@ -288,7 +298,9 @@ struct QSFATilingInfo {
 // ---------------算子Tiling类---------------
 class QSFAMlaTiling {
 public:
-    explicit QSFAMlaTiling(gert::TilingContext *context) : context_(context) {}
+    explicit QSFAMlaTiling(gert::TilingContext *context)
+        : context_(context)
+    {}
     ge::graphStatus DoOpTiling(QSFATilingInfo *qsfaInfo);
 
 private:
@@ -298,6 +310,7 @@ private:
     ge::graphStatus SetTilingData(TilingDef &tilingData) const;
     gert::TilingContext *context_ = nullptr;
     ge::graphStatus GetPlatformInfo();
+    void CalcVectorizeFlag();
     void GenTilingKey();
     bool DealSameSeqEachBatch();
 
@@ -331,6 +344,7 @@ private:
 
     bool balanceModeFlag_ = false;
     bool splitKVFlag_ = false;
+    uint32_t vectorizeFlag_ = 0;
 
     uint32_t coreNum_ = 0;
     QSFAPerfMode perfMode_ = QSFAPerfMode::V_TEMPLATE_MODE;
@@ -367,7 +381,8 @@ private:
 // -----------算子Tiling入参信息解析及Check类---------------
 class QSFATilingCheck {
 public:
-    explicit QSFATilingCheck(const QSFATilingInfo &qsfaInfo) : qsfaInfo_(qsfaInfo) {};
+    explicit QSFATilingCheck(const QSFATilingInfo &qsfaInfo)
+        : qsfaInfo_(qsfaInfo) {};
     ~QSFATilingCheck() = default;
     ge::graphStatus Process();
 
@@ -502,7 +517,9 @@ private:
 
 class QSFAInfoParser {
 public:
-    explicit QSFAInfoParser(const gert::TilingContext *context) : context_(context) {}
+    explicit QSFAInfoParser(const gert::TilingContext *context)
+        : context_(context)
+    {}
     ~QSFAInfoParser() = default;
 
     ge::graphStatus CheckRequiredInOutExistence() const;

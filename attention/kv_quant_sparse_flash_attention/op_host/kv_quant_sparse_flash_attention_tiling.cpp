@@ -278,6 +278,35 @@ ge::graphStatus QSFAMlaTiling::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
+void QSFAMlaTiling::CalcVectorizeFlag()
+{
+    // 稀疏kv物理地址向量化：仅950（DAV_3510/arch35）平台kernel支持该模板参数，
+    // 910b（arch22）不支持，vectorizeFlag_保持为0。
+    // UB 计算与 kernel 侧 GetKVPhyAddr 的 InitBuffer 保持一致：
+    // blkTableBuf 对齐 512B，sparseIdxBuf / kvPhyAddrBuf 对齐 32B。
+    vectorizeFlag_ = 0U;
+    if (!qsfaInfo_->isA5) {
+        return;
+    }
+    if (qsfaInfo_->kvLayout == QSFALayout::PA_BSND) {
+        constexpr uint32_t S2_NUM_PER_LOOP = 128U;
+        int64_t blockSize = qsfaInfo_->blockSize;
+        uint32_t blocksizeFlag = static_cast<uint32_t>((blockSize & (blockSize - 1)) == 0);
+        uint32_t sparseBlockCountFlag =
+            static_cast<uint32_t>((static_cast<uint32_t>(qsfaInfo_->sparseBlockCount) & (S2_NUM_PER_LOOP - 1U)) == 0U);
+        uint32_t sparseModeFlag = static_cast<uint32_t>(qsfaInfo_->sparseMode == 3U);
+        constexpr uint32_t UB_SIZE = 248 * 1024; // UB共256KB，预留8KB
+        uint32_t alignedSparseBlockCount = (static_cast<uint32_t>(qsfaInfo_->sparseBlockCount) + S2_NUM_PER_LOOP - 1U) /
+                                           S2_NUM_PER_LOOP * S2_NUM_PER_LOOP;
+        uint32_t vectorizeUbSize =
+            Align<uint32_t>(qsfaInfo_->maxBlockNumPerBatch * sizeof(int32_t), 512U) +
+            Align<uint32_t>(static_cast<uint32_t>(qsfaInfo_->sparseBlockCount) * sizeof(int32_t), BYTE_BLOCK) +
+            alignedSparseBlockCount * sizeof(int64_t);
+        vectorizeFlag_ = static_cast<uint32_t>(vectorizeUbSize <= UB_SIZE && blocksizeFlag && sparseBlockCountFlag &&
+                                               sparseModeFlag);
+    }
+}
+
 void QSFAMlaTiling::GenTilingKey()
 {
     uint32_t layoutQuery = static_cast<uint32_t>(qsfaInfo_->qLayout);
@@ -289,8 +318,7 @@ void QSFAMlaTiling::GenTilingKey()
 
     tilingKey_ =
         GET_TPL_TILING_KEY(0U, pageAttention, layoutQuery, layoutKV, perfMode_ == QSFAPerfMode::V_TEMPLATE_MODE,
-                           static_cast<uint32_t>(qsfaInfo_->gSize > 64)); // G大于64时核间切G
-
+                           static_cast<uint32_t>(qsfaInfo_->gSize > 64), vectorizeFlag_); // G大于64时核间切G
     OP_LOGI(qsfaInfo_->opName, "QSFA tilingKey_: %lu.", tilingKey_);
 }
 
@@ -328,7 +356,10 @@ void QSFAMlaTiling::CalcUbBmm()
     qPreSizeMla_ = qsfaInfo_->gSize * (headDimAlign_ + 64U) * qsfaInfo_->s1Size;
 }
 
-void QSFAMlaTiling::CheckUbSpace() { CalcUbBmm(); }
+void QSFAMlaTiling::CheckUbSpace()
+{
+    CalcUbBmm();
+}
 
 void QSFAMlaTiling::CalcInnerSize(uint32_t qsfaS2Size)
 {
@@ -364,7 +395,10 @@ void QSFAMlaTiling::SplitBalanced()
     usedCoreNum_ = aicNum_;
 }
 
-void QSFAMlaTiling::Split() { SplitBalanced(); }
+void QSFAMlaTiling::Split()
+{
+    SplitBalanced();
+}
 
 void QSFAMlaTiling::FillTilingBaseParamsMla()
 {
@@ -402,7 +436,10 @@ void QSFAMlaTiling::FillTilingSplitKVMla()
     }
 }
 
-void QSFAMlaTiling::FillTilingSingleCoreParamsMla() { tilingData_.singleCoreParams.set_usedCoreNum(usedCoreNum_); }
+void QSFAMlaTiling::FillTilingSingleCoreParamsMla()
+{
+    tilingData_.singleCoreParams.set_usedCoreNum(usedCoreNum_);
+}
 
 void QSFAMlaTiling::FillTilingSingleCoreTensorSizeMla()
 {
@@ -439,7 +476,10 @@ void QSFAMlaTiling::NormalCalcFDWorkSpace(const uint32_t actCoreNum)
     }
 }
 
-void QSFAMlaTiling::CalcFDWorkSpace(const uint32_t actCoreNum) { NormalCalcFDWorkSpace(actCoreNum); }
+void QSFAMlaTiling::CalcFDWorkSpace(const uint32_t actCoreNum)
+{
+    NormalCalcFDWorkSpace(actCoreNum);
+}
 
 void QSFAMlaTiling::GetWorkspaceSize()
 {
@@ -454,6 +494,12 @@ void QSFAMlaTiling::GetWorkspaceSize()
         if (qsfaInfo_->gSize > 64) { // G大于64时核间切G，V0结果出核，需申请GM空间
             workspaceSize_ +=
                 (S2_BASE_SIZE * D_SIZE * GetTypeSize(qsfaInfo_->inputQType) * TRIPLE_BUFFER_NUM * (aicNum >> 1));
+        }
+        // 稀疏kv物理地址向量化：仅向量化开启时预计算物理地址表（挂在V0结果区之后）
+        if (vectorizeFlag_) {
+            uint32_t totalBS1 =
+                (qsfaInfo_->qLayout == QSFALayout::TND) ? qsfaInfo_->s1Size : (qsfaInfo_->bSize * qsfaInfo_->s1Size);
+            workspaceSize_ += totalBS1 * static_cast<uint32_t>(qsfaInfo_->sparseBlockCount) * sizeof(int64_t);
         }
     } else {
         uint32_t mmResElemSize = 4;       // 4:fp32
@@ -509,6 +555,7 @@ ge::graphStatus QSFAMlaTiling::DoOpTiling(QSFATilingInfo *qsfaInfo)
     Split();
     FillTiling();
     CalcBlockDim();
+    CalcVectorizeFlag();
     GetWorkspaceSize();
     GenTilingKey();
 
@@ -726,9 +773,15 @@ ge::graphStatus QSFATilingCheck::CheckSingleParaKey() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QSFATilingCheck::CheckSingleParaNumHeads() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus QSFATilingCheck::CheckSingleParaNumHeads() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
-ge::graphStatus QSFATilingCheck::CheckSingleParaKvHeadNums() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus QSFATilingCheck::CheckSingleParaKvHeadNums() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus QSFATilingCheck::CheckSingleParaSparseMode() const
 {
@@ -866,7 +919,10 @@ ge::graphStatus QSFATilingCheck::CheckParaExistenceMlaAntiquant() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QSFATilingCheck::CheckParaExistenceMla() const { return CheckParaExistenceMlaAntiquant(); }
+ge::graphStatus QSFATilingCheck::CheckParaExistenceMla() const
+{
+    return CheckParaExistenceMlaAntiquant();
+}
 
 ge::graphStatus QSFATilingCheck::CheckParaExistence()
 {
@@ -1381,9 +1437,15 @@ ge::graphStatus QSFATilingCheck::CheckFeatureMlaAntiquant() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QSFATilingCheck::CheckFeatureMla() const { return CheckFeatureMlaAntiquant(); }
+ge::graphStatus QSFATilingCheck::CheckFeatureMla() const
+{
+    return CheckFeatureMlaAntiquant();
+}
 
-ge::graphStatus QSFATilingCheck::CheckFeature() const { return CheckFeatureMla(); }
+ge::graphStatus QSFATilingCheck::CheckFeature() const
+{
+    return CheckFeatureMla();
+}
 
 void QSFATilingCheck::Init()
 {
