@@ -119,6 +119,8 @@ __aicore__ inline void QuantizeLocalTokens(const AivJobContext &job, const MoeSt
     __ubuf__ uint16_t *halfScaleAddr = reinterpret_cast<__ubuf__ uint16_t *>(
         scratch.mxTempTensor[Ops::Base::CeilAlign(config.quantScaleNumAlignPerToken, static_cast<uint32_t>(ALIGN_32))]
             .GetPhyAddr());
+    // 量化 scratch（mxTemp/xOut0/xOut1/xIn0/xIn1）的跨 launch 残留清零由各编排的
+    // SendAndQuantBuffInit 在分配处一次性完成（span 清零，与布局同源），见其注释。
     SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
     SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
     for (uint32_t index = 0; index < tokenRange.count; ++index) {
