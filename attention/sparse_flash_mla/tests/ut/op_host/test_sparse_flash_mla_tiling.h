@@ -20,7 +20,7 @@
 #include <cstring>
 
 #include "../../../op_host/sparse_flash_mla_tiling.h"
-#include "../../../op_kernel/arch22/sparse_flash_mla_metadata.h"
+#include "../../../op_kernel/arch22/sparse_flash_mla_arch22_metadata.h"
 
 namespace smla_ut {
 

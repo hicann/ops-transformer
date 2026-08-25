@@ -23,8 +23,8 @@
 #include "catlass/arch/kda_resource.hpp"
 #include "catlass/kda_catlass.hpp"
 #include "catlass/gemm/block/kda_block_mmad.hpp"
-#include "catlass/gemm/dispatch_policy.hpp"
-#include "catlass/gemm/tile/tile_copy.hpp"
+#include "catlass/gemm/kda_gemm_dispatch_policy.hpp"
+#include "catlass/gemm/tile/kda_gemm_tile_copy.hpp"
 #include "catlass/kda_gemm_coord.hpp"
 #include "../kernel_utils/block/block_mmad_pingpong_tla_multi.hpp"
 #include "../kernel_utils/tile/copy_l0c_to_ub.hpp"
@@ -37,7 +37,7 @@
 #include "../kernel_utils/vector/regbase.hpp"
 #endif
 #endif
-#include "tla/layout.hpp"
+#include "tla/kda_tla_layout.hpp"
 #include "tla/kda_tensor.hpp"
 #include "chunk_kda_fwd_post_wu_arch35.h"
 

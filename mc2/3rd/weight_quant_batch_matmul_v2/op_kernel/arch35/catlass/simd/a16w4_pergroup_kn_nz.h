@@ -10,7 +10,7 @@
 #ifndef ARCH35_CATLASS_SIMD_A16W4_PERGROUP_KN_NZ_H
 #define ARCH35_CATLASS_SIMD_A16W4_PERGROUP_KN_NZ_H
 
-#include "../utils/device_utils.h"
+#include "../utils/wq_device_utils.h"
 #include "../utils/math_utils.h"
 
 using AscendC::IsSameType;

@@ -10,11 +10,11 @@
 #ifndef ARCH35_CATLASS_PIPELINE_PIPELINE_STAGE_SINGLECORE_H
 #define ARCH35_CATLASS_PIPELINE_PIPELINE_STAGE_SINGLECORE_H
 
-#include "../utils/device_utils.h"
+#include "../utils/wq_device_utils.h"
 #include "../utils/math_utils.h"
 #include "kernel_operator.h"
 #include "pipeline_stage_singlecore_base.h"
-#include "utils.h"
+#include "wq_pipeline_utils.h"
 
 #if defined(__CCE_KT_TEST__)
 #include <set>

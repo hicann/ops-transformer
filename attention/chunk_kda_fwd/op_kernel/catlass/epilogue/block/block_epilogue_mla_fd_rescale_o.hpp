@@ -14,7 +14,7 @@
 #include "catlass/kda_catlass.hpp"
 #include "catlass/arch/kda_resource.hpp"
 #include "catlass/epilogue/kda_dispatch_policy.hpp"
-#include "catlass/epilogue/tile/tile_copy.hpp"
+#include "catlass/epilogue/tile/kda_epilogue_tile_copy.hpp"
 #include "catlass/kda_gemm_coord.hpp"
 #include "catlass/kda_matrix_coord.hpp"
 

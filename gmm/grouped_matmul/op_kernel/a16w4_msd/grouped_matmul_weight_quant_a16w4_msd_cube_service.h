@@ -18,8 +18,8 @@
 #include "grouped_matmul_weight_quant_a16w4_msd_basic_block_config.h"
 #include "kernel_operator.h"
 #include "kernel_operator_intf.h"
-#include "static_diag_constant.h"
-#include "tool.h"
+#include "gmm_static_diag_constant.h"
+#include "gmm_a16w4_tool.h"
 
 namespace GROUPED_MATMUL::A16W4Msd {
 #define GMM_WQ_A16W4_MSD_CUBE_SERVICE_TEMPLATE_PARAM template <typename mm1InputType, typename mm1OutputType>

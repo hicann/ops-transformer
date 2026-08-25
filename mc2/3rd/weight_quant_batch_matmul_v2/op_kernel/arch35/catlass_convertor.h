@@ -12,7 +12,7 @@
 #define ARCH35_CATLASS_CONVERTOR_H
 #include "catlass/block/david_ub_antiquant_scmc_load_in_advance_aic_tail_resplit.h"
 #include "catlass/block/david_ub_antiquant_scmc_load_in_advance_aiv_tail_resplit.h"
-#include "catlass/dispatch_policy.h"
+#include "catlass/wq_dispatch_policy.h"
 #include "catlass/kernel/david_wqbmm_load_in_advance.h"
 #include "catlass/scheduler/tile_scheduler_tail_resplit.h"
 #include "catlass/utils/constant.h"

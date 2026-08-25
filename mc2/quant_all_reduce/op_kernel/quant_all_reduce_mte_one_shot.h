@@ -23,7 +23,7 @@
 #endif
 #include "kernel_tiling/kernel_tiling.h"
 #include "quant_all_reduce_tiling_data.h"
-#include "../../quant_reduce_scatter/op_kernel/utils.h"
+#include "../../quant_reduce_scatter/op_kernel/quant_reduce_scatter_utils.h"
 #include "../../quant_reduce_scatter/op_kernel/mte_comm.h"
 #include "../../quant_reduce_scatter/op_kernel/vec_comp.h"
 

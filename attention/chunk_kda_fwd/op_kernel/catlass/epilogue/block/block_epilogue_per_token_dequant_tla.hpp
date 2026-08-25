@@ -19,7 +19,7 @@
 #include "catlass/kda_matrix_coord.hpp"
 #include "catlass/layout/kda_layout.hpp"
 #include "catlass/detail/kda_callback.hpp"
-#include "tla/layout.hpp"
+#include "tla/kda_tla_layout.hpp"
 #include "tla/kda_tensor.hpp"
 
 namespace Catlass::Epilogue::Block {

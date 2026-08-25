@@ -14,7 +14,7 @@
 #include "catlass/kda_catlass.hpp"
 #include "catlass/arch/kda_arch.hpp"
 #include "tla/kda_tensor.hpp"
-#include "tla/layout.hpp"
+#include "tla/kda_tla_layout.hpp"
 
 namespace Catlass::Epilogue::Tile {
 

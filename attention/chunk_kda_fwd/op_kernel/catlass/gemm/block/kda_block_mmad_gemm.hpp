@@ -13,10 +13,10 @@
 
 #include "catlass/kda_catlass.hpp"
 #include "catlass/gemm/kda_gemm_helper.hpp"
-#include "catlass/gemm/tile/tile_copy.hpp"
+#include "catlass/gemm/tile/kda_gemm_tile_copy.hpp"
 #include "catlass/gemm/tile/kda_tile_mmad.hpp"
 #include "catlass/kda_gemm_coord.hpp"
-#include "catlass/gemm/dispatch_policy.hpp"
+#include "catlass/gemm/kda_gemm_dispatch_policy.hpp"
 #include "catlass/arch/kda_resource.hpp"
 
 namespace Catlass::Gemm::Block {

@@ -15,7 +15,7 @@
 #include "catlass/arch/kda_resource.hpp"
 #include "catlass/kda_coord.hpp"
 #include "catlass/kda_gemm_coord.hpp"
-#include "catlass/gemm/dispatch_policy.hpp"
+#include "catlass/gemm/kda_gemm_dispatch_policy.hpp"
 #include "catlass/gemm/kda_gemm_helper.hpp"
 
 namespace Catlass::Gemm::Tile {

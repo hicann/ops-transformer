@@ -14,7 +14,7 @@
  */
 #ifndef MC2_ADD_RMS_NORM_SINGLE_N_H
 #define MC2_ADD_RMS_NORM_SINGLE_N_H
-#include "rms_norm_base.h"
+#include "mararn_rms_norm_base.h"
 
 using namespace AscendC;
 

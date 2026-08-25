@@ -26,7 +26,7 @@
 #include "adv_api/pad/broadcast.h"
 #include "kernel_tiling/kernel_tiling.h"
 #include "quant_reduce_scatter_tiling_data.h"
-#include "utils.h"
+#include "quant_reduce_scatter_utils.h"
 #include "mte_comm.h"
 #include "vec_comp.h"
 

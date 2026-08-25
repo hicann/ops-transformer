@@ -32,7 +32,7 @@
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/gemm_type.hpp"
 #include "matmul_reduce_scatter_aiv_mode_block_epilogue_dequant.h"
 #include "matmul_reduce_scatter_aiv_mode_util.h"
-#include "tile_broadcast_add.hpp"
+#include "mrs_v2_tile_broadcast_add.hpp"
 
 using namespace matmulReduceScatterV2_util;
 namespace dequant {

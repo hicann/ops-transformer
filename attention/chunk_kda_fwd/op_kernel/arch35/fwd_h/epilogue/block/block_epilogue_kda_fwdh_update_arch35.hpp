@@ -15,7 +15,7 @@
 #include "../kda_fwd_h_epilogue_policies.hpp"
 #include "catlass/kda_gemm_coord.hpp"
 #include "catlass/kda_matrix_coord.hpp"
-#include "catlass/epilogue/tile/tile_copy.hpp"
+#include "catlass/epilogue/tile/kda_epilogue_tile_copy.hpp"
 #include "block_epilogue_kda_fwdh_regbase.hpp"
 
 namespace Catlass::Epilogue::Block {

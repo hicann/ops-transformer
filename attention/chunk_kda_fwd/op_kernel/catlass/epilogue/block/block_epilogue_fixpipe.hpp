@@ -16,7 +16,7 @@
 #include "catlass/epilogue/kda_dispatch_policy.hpp"
 #include "catlass/kda_gemm_coord.hpp"
 #include "catlass/kda_matrix_coord.hpp"
-#include "catlass/epilogue/tile/tile_copy.hpp"
+#include "catlass/epilogue/tile/kda_epilogue_tile_copy.hpp"
 #include "catlass/gemm/kda_gemm_helper.hpp"
 #include "catlass/epilogue/tile/kda_copy_ub_to_gm_tla.hpp"
 

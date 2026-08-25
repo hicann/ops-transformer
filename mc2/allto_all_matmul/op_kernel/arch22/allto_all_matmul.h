@@ -23,8 +23,8 @@
 #endif
 #include "allto_all_matmul_tiling.h"
 #include "allto_all_matmul_util.h"
-#include "block_epilogue_dequant.hpp"
-#include "tile_broadcast_add.hpp"
+#include "allto_all_matmul_block_epilogue_dequant.hpp"
+#include "allto_all_matmul_tile_broadcast_add.hpp"
 
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/catlass.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/arch/arch.hpp"

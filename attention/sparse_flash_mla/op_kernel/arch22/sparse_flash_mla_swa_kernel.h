@@ -24,7 +24,7 @@
 #include "sparse_flash_mla_common_arch22.h"
 #include "sparse_flash_mla_swa_block_cube.h"
 #include "sparse_flash_mla_swa_block_vector.h"
-#include "sparse_flash_mla_metadata.h"
+#include "sparse_flash_mla_arch22_metadata.h"
 
 namespace SMLAKernel {
 using namespace matmul;

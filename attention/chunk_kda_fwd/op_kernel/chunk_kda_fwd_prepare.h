@@ -19,14 +19,14 @@
 #include "catlass/arch/kda_resource.hpp"
 #include "catlass/kda_catlass.hpp"
 #include "catlass/gemm/block/kda_block_mmad.hpp"
-#include "catlass/gemm/dispatch_policy.hpp"
-#include "catlass/gemm/tile/tile_copy.hpp"
+#include "catlass/gemm/kda_gemm_dispatch_policy.hpp"
+#include "catlass/gemm/tile/kda_gemm_tile_copy.hpp"
 #include "catlass/kda_gemm_coord.hpp"
 #include "kernel_utils/block/block_mmad_pingpong_tla_multi.hpp"
 #include "catlass/layout/kda_layout.hpp"
 #include "kernel_operator.h"
 #include "chunk_kda_fwd_varlen.h"
-#include "tla/layout.hpp"
+#include "tla/kda_tla_layout.hpp"
 #include "tla/kda_tensor.hpp"
 
 using namespace AscendC;

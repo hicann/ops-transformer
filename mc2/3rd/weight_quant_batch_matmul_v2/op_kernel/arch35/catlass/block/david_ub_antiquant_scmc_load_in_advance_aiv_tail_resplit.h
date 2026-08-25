@@ -20,7 +20,7 @@
 #include "../tile/mc2_3rd_copy_gm_to_ub.h"
 #include "../tile/copy_ub_to_l1.h"
 #include "../utils/constant.h"
-#include "../utils/device_utils.h"
+#include "../utils/wq_device_utils.h"
 #include "../utils/math_utils.h"
 #include "block_decl.h"
 #include "constant.h"

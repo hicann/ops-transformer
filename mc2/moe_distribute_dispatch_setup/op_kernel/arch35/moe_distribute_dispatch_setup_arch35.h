@@ -19,7 +19,7 @@
 #include "adv_api/reduce/sum.h"
 #include "kernel_tiling/kernel_tiling.h"
 #include "../moe_distribute_dispatch_setup_tiling.h"
-#include "../moe_distribute_base.h"
+#include "../moe_distribute_dispatch_setup_base.h"
 #if __has_include("../../common/mc2_kernel_utils.h")
 #include "../../moe_distribute_dispatch_v2/quantize_functions.h"
 #include "../../common/mc2_kernel_utils.h"

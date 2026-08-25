@@ -16,7 +16,7 @@
 #include "catlass/kda_numeric_size.hpp"
 #include "catlass/layout/kda_layout.hpp"
 #include "catlass/gemm/kda_gemm_type.hpp"
-#include "tla/layout.hpp"
+#include "tla/kda_tla_layout.hpp"
 
 namespace Catlass::Gemm::helper {
 

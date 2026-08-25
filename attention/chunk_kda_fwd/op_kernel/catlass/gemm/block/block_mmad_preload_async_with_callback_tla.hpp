@@ -14,10 +14,10 @@
 #include "catlass/kda_catlass.hpp"
 #include "catlass/kda_coord.hpp"
 #include "catlass/detail/kda_callback.hpp"
-#include "catlass/gemm/dispatch_policy.hpp"
+#include "catlass/gemm/kda_gemm_dispatch_policy.hpp"
 #include "catlass/gemm/kda_gemm_helper.hpp"
 #include "catlass/kda_gemm_coord.hpp"
-#include "tla/layout.hpp"
+#include "tla/kda_tla_layout.hpp"
 #include "tla/kda_tensor.hpp"
 
 namespace Catlass::Gemm::Block {

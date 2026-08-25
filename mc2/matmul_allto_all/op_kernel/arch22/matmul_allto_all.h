@@ -37,15 +37,15 @@ using namespace AscendC;
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/gemm_type.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm_coord.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/tile/copy_gm_to_ub.hpp"
-#include "block_epilogue_dequant.hpp"
+#include "matmul_allto_all_block_epilogue_dequant.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/dispatch_policy.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/tile/tile_broadcast_mul.hpp"
-#include "tile_broadcast_add.hpp"
+#include "matmul_allto_all_tile_broadcast_add.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/tile/tile_broadcast_one_blk.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/tile/tile_swizzle.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/tile/tile_copy.hpp"
 
-#include "quant_matmul.hpp"
+#include "matmul_allto_all_quant_matmul.hpp"
 #include "matmul.hpp"
 
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/status.hpp"

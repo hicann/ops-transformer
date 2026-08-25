@@ -12,7 +12,7 @@
 #define CATLASS_KDA_TAG_TO_LAYOUT_HPP
 
 #include "catlass/layout/kda_layout.hpp"
-#include "tla/layout.hpp"
+#include "tla/kda_tla_layout.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

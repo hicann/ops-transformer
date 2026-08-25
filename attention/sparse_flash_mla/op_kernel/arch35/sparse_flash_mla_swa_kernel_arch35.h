@@ -20,7 +20,7 @@
 #include "sparse_flash_mla_csa_block_cube_arch35.h"
 #include "sparse_flash_mla_csa_block_vector_arch35.h"
 #include "kernel_operator.h"
-#include "../sparse_flash_mla_metadata.h"
+#include "../sparse_flash_mla_kernel_metadata.h"
 
 #if __has_include("../../common/op_kernel/matmul.h")
 #include "../../common/op_kernel/matmul.h"

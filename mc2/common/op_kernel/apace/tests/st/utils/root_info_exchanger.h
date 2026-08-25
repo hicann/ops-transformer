@@ -26,7 +26,7 @@
 
 #include "hccl/hccl.h"
 #include "hccl/hccl_types.h"
-#include "utils.h"
+#include "apace_st_utils.h"
 
 class RootInfoExchanger {
 public:

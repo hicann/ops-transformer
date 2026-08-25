@@ -15,7 +15,7 @@
 #ifndef BLOCK_MMAD_PRELOAD_FIXPIPE_H
 #define BLOCK_MMAD_PRELOAD_FIXPIPE_H
 
-#include "copy_gm_to_l1.h"
+#include "agm_v2_copy_gm_to_l1.h"
 #include "copy_l0c_to_gm.h"
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/catlass.hpp"
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/arch/resource.hpp"

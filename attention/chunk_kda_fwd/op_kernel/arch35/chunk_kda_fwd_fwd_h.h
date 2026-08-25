@@ -13,7 +13,7 @@
 
 #include "kernel_operator.h"
 #include "catlass/arch/kda_resource.hpp"
-#include "catlass/gemm/tile/tile_copy.hpp"
+#include "catlass/gemm/tile/kda_gemm_tile_copy.hpp"
 #include "catlass/gemm/tile/kda_tile_mmad.hpp"
 #include "../kernel_utils/tile/copy_l0c_to_ub.hpp"
 

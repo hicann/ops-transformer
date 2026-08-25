@@ -17,7 +17,7 @@
 
 #include "mat_mul_nd2nz_util.h"
 #include "mat_mul_nd2nz_kernel.h"
-#include "batch_mat_mul_nd2nz.h"
+#include "../../batch_mat_mul_v3/op_kernel/batch_mat_mul_nd2nz.h"
 
 using namespace AscendC;
 using namespace matmul;

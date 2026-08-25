@@ -19,7 +19,7 @@
 #include "moe_sort_one_core_with_routing_map.h"
 #include "moe_index_copy_with_routing_map.h"
 #include "moe_index_copy_split_d.h"
-#include "masked_select_v3.h"
+#include "moe_token_permute_masked_select_v3.h"
 #include "moe_permute_prob.h"
 
 #include "moe_routing_rank_multi_core.h"

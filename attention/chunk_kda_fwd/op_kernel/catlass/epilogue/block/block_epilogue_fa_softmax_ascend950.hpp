@@ -18,7 +18,7 @@
 #include "catlass/kda_gemm_coord.hpp"
 #include "catlass/kda_matrix_coord.hpp"
 #include "tla/kda_tensor.hpp"
-#include "tla/layout.hpp"
+#include "tla/kda_tla_layout.hpp"
 
 namespace Catlass::Epilogue::Block {
 

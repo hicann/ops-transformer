@@ -10,11 +10,11 @@
 #ifndef ARCH35_CATLASS_PIPELINE_PIPELINE_STAGE_MIXCORE_H
 #define ARCH35_CATLASS_PIPELINE_PIPELINE_STAGE_MIXCORE_H
 
-#include "../utils/device_utils.h"
+#include "../utils/wq_device_utils.h"
 #include "../utils/math_utils.h"
 #include "kernel_operator.h"
 #include "pipeline_state.h"
-#include "utils.h"
+#include "wq_pipeline_utils.h"
 
 using AscendC::CrossCoreSetFlag;
 using AscendC::CrossCoreWaitFlag;

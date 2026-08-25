@@ -13,7 +13,7 @@
 #include "../utils/math_utils.h"
 #include "pipeline_stage_singlecore_base.h"
 #include "pipeline_state.h"
-#include "utils.h"
+#include "wq_pipeline_utils.h"
 
 using AscendC::HardEvent;
 using AscendC::Hardware;

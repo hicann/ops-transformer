@@ -28,7 +28,7 @@
 #include "hccl/hccl_types.h"
 #include "hccl/hccl_rank_graph.h"
 #include <cstdlib>
-#include "utils.h"
+#include "apace_st_utils.h"
 #include "apace/utils/comm_channel_builder.h"
 #include "../../utils/root_info_exchanger.h"
 #include "apace/tiling/quant_matmul_tiling_swat.h"

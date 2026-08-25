@@ -12,7 +12,7 @@
 #define CATLASS_KDA_BLOCK_MMAD_HPP
 
 #include "catlass/kda_catlass.hpp"
-#include "catlass/gemm/tile/tile_copy.hpp"
+#include "catlass/gemm/tile/kda_gemm_tile_copy.hpp"
 #include "catlass/gemm/tile/kda_tile_mmad.hpp"
 
 namespace Catlass::Gemm::Block {

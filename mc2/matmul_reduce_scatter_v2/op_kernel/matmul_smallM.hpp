@@ -27,7 +27,7 @@
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/kernel/padding_matmul.hpp"
 #include "matmul_reduce_scatter_aiv_mode_util.h"
 #include "matmul_reduce_scatter_v2_aiv_mode_tiling.h"
-#include "block_mmad_preload_fixpipe.h"
+#include "mrs_v2_block_mmad_preload_fixpipe.h"
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tile/tile_copy.hpp"
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tile/tile_mmad.hpp"
 

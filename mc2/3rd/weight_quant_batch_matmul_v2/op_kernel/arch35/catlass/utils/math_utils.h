@@ -10,7 +10,7 @@
 #ifndef ARCH35_CATLASS_UTILS_MATH_UTILS_H
 #define ARCH35_CATLASS_UTILS_MATH_UTILS_H
 
-#include "device_utils.h"
+#include "wq_device_utils.h"
 
 namespace Mc2WeightQuantBatchMatmulV2::Arch35::Catlass {
 template <typename T>

@@ -18,7 +18,7 @@
 #include "lib/matmul_intf.h"
 #include "../../common/op_kernel/mc2_nd_to_nz.h"
 #include "../../common/op_kernel/mc2_matmul_compute.h"
-#include "all_gather_matmul_tiling.h"
+#include "all_gather_matmul_op_tiling.h"
 
 namespace AscendC {
 constexpr uint8_t MC2_DEBUG_ONLY_CUBE = 1;  // 只计算不通信

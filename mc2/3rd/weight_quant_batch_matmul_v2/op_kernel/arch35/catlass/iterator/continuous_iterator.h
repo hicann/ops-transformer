@@ -10,7 +10,7 @@
 #ifndef ARCH35_CATLASS_ITERATOR_CONTINUOUS_ITERATOR_H
 #define ARCH35_CATLASS_ITERATOR_CONTINUOUS_ITERATOR_H
 
-#include "../utils/device_utils.h"
+#include "../utils/wq_device_utils.h"
 
 namespace Mc2WeightQuantBatchMatmulV2::Arch35::Catlass {
 /*

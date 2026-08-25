@@ -18,7 +18,7 @@
 #include "kernel_operator.h"
 #endif
 #include "lib/matmul_intf.h"
-#include "all_gather_matmul_tiling.h"
+#include "all_gather_matmul_op_tiling.h"
 #include "all_gather_matmul_tiling_key.h"
 #if __CCE_AICORE__ == 310
 #else

@@ -23,7 +23,7 @@
 #include "register/op_def_registry.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "../../op_kernel/all_gather_matmul_tiling_key.h"
-#include "../../op_kernel/all_gather_matmul_tiling.h"
+#include "../../op_kernel/all_gather_matmul_op_tiling.h"
 
 namespace optiling {
 

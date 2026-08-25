@@ -10,7 +10,7 @@
 #ifndef ARCH35_CATLASS_BLOCK_BLOCK_UTILS_H
 #define ARCH35_CATLASS_BLOCK_BLOCK_UTILS_H
 
-#include "../utils/device_utils.h"
+#include "../utils/wq_device_utils.h"
 namespace Mc2WeightQuantBatchMatmulV2::Arch35::Catlass {
 template <size_t I, class Tuple>
 struct deduce_optional_input {

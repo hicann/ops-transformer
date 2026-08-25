@@ -17,7 +17,7 @@
 #include "opdev/format_utils.h"
 #include "opdev/data_type_utils.h"
 #include "opdev/tensor_view_utils.h"
-#include "../../sparse_flash_mla/op_kernel/sparse_flash_mla_metadata.h"
+#include "../../sparse_flash_mla/op_kernel/sparse_flash_mla_kernel_metadata.h"
 #include <cstring>
 #include <string>
 

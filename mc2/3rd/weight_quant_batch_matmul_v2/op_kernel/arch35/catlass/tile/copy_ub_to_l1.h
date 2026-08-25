@@ -10,7 +10,7 @@
 #ifndef ARCH35_CATLASS_TILE_COPY_UB_TO_L1_H
 #define ARCH35_CATLASS_TILE_COPY_UB_TO_L1_H
 
-#include "../utils/device_utils.h"
+#include "../utils/wq_device_utils.h"
 
 namespace Mc2WeightQuantBatchMatmulV2::Arch35::Catlass {
 using AscendC::DataCopyParams;

@@ -15,7 +15,7 @@
 
 #ifndef ADD_RMS_NORM_KERNEL_H
 #define ADD_RMS_NORM_KERNEL_H
-#include "rms_norm_base.h"
+#include "mararn_rms_norm_base.h"
 #include "add_rms_norm.h"
 #include "add_rms_norm_split_d.h"
 #include "add_rms_norm_multi_n.h"

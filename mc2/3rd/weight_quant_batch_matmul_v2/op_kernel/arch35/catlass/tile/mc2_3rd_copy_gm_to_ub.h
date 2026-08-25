@@ -10,7 +10,7 @@
 #ifndef MC2_3RD_COPY_GM_TO_UB_H
 #define MC2_3RD_COPY_GM_TO_UB_H
 
-#include "../utils/device_utils.h"
+#include "../utils/wq_device_utils.h"
 
 namespace Mc2WeightQuantBatchMatmulV2::Arch35::Catlass {
 using AscendC::DataCopyExtParams;

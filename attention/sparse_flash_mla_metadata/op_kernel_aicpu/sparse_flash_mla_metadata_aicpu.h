@@ -22,7 +22,7 @@
 #include "cpu_context.h"
 #include "cpu_kernel.h"
 #include "cpu_tensor.h"
-#include "../../sparse_flash_mla/op_kernel/sparse_flash_mla_metadata.h"
+#include "../../sparse_flash_mla/op_kernel/sparse_flash_mla_kernel_metadata.h"
 #include "../../common/op_kernel/aicpu_common.h"
 
 namespace aicpu {

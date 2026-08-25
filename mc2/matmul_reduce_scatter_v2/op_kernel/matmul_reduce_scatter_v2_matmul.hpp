@@ -29,7 +29,7 @@
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tile/tile_mmad.hpp"
 #include "matmul_reduce_scatter_aiv_mode_util.h"
 #include "matmul_reduce_scatter_v2_aiv_mode_tiling.h"
-#include "block_mmad_preload_fixpipe.h"
+#include "mrs_v2_block_mmad_preload_fixpipe.h"
 
 using namespace AscendC;
 using namespace matmulReduceScatterV2_aivmode_tiling;
