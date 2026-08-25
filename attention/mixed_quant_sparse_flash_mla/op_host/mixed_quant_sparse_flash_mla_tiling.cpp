@@ -659,7 +659,7 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo *til
     constexpr uint32_t D_SIZE = 512;
     constexpr uint32_t VEC_RES_ELEM_SIZE = 2; // 2: fp16/bf16字节数
     constexpr uint32_t TOPK_MAX_SIZE = 2048;  // TopK选取个数
-    constexpr uint32_t UB_SIZE = 248 * 1024;
+    constexpr uint32_t UB_SIZE = 184 * 1024;
     constexpr uint32_t SPARSE_BLOCK_ALIGN_NUM = 128;
     constexpr int64_t QUANT_CONTIGUOUS_MODE = 1;
     constexpr uint32_t MAX_S2_SPLIT_NUM = 2;      // 每核最多S2切分次数

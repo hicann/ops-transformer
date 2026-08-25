@@ -17,6 +17,11 @@
 #include <type_traits>
 #include "kernel_tiling/kernel_tiling.h"
 #include "../mixed_quant_sparse_flash_mla_common.h"
+#if __has_include("../../../sparse_flash_mla/op_kernel/arch35/common/static_buffer.h")
+#include "../../../sparse_flash_mla/op_kernel/arch35/common/static_buffer.h"
+#else
+#include "../../sparse_flash_mla/arch35/common/static_buffer.h"
+#endif
 
 constexpr uint64_t BLOCK_BYTE = 32;
 constexpr uint32_t NEGATIVE_MIN_VALUE_FP32 = 0xFF7FFFFF;
@@ -32,6 +37,65 @@ constexpr uint32_t BUFFER_SIZE_256K = 262144; // 262144表示256 * 1024
 constexpr uint32_t CV_RATIO = 2;
 constexpr uint64_t SYNC_MODE = 4;
 constexpr uint32_t BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM = 33U; // 同token最大规约块数
+
+// ===== C 侧 buffer 元素个数 (用于 tensor 偏移及地址递增) =====
+constexpr uint32_t L1Q_ELEM_PER_BUF = 16384;        // Q_T 元素, 每个 L1Q buffer (与 BUFFER_SIZE_16K 对齐)
+constexpr uint32_t L1_RIGHT_ELEM_PER_BLOCK = 65536; // Q_T 元素, 每个 L1Right 块 (= s2BaseSize * dBaseSize)
+constexpr uint32_t L0A_ELEM_PER_BUF = 8192;         // Q_T 元素, 每个 L0A buffer (16KB)
+constexpr uint32_t L0B_ELEM_PER_BUF = 16384;        // Q_T 元素, 每个 L0B buffer (32KB)
+constexpr uint32_t L0C_ELEM_PER_BUF = 32768;        // T   元素, 每个 L0C buffer
+
+// ===== C 侧核内 flag id (HardEvent 各自独立命名空间) =====
+#define INNERCORE_L0AB(s) (s)       // 0,1: L0A+L0B 共用, M_MTE1 / MTE1_M
+#define INNERCORE_L0C(s) (s)        // 0,1: L0C, FIX_M / M_FIX
+#define INNERCORE_L1Q(s) (s)        // 0,1,2: L1Q, MTE2_MTE1 / MTE1_MTE2
+#define INNERCORE_L1KV(s) (3 + (s)) // 3,4,5: L1Right, MTE2_MTE1 / MTE1_MTE2
+
+// ===== V 侧主流程 buffer slot id (MTE2_V/V_MTE2/MTE3_V/V_MTE3 各自独立) =====
+#define INNERCORE_STAGE0_IN(s) (s)        // 0,1: stage0In, MTE2_V / V_MTE2
+#define INNERCORE_STAGE0_OUT(s) (2 + (s)) // 2,3: stage0Out, MTE3_V / V_MTE3
+#define INNERCORE_STAGE1(s) (4 + (s))     // 4,5: stage1, MTE3_V / V_MTE3
+#define INNERCORE_STAGE2 (6)              // 6:   stage2, MTE3_V / V_MTE3
+#define INNERCORE_SINKS_SYNC (7)          // 7:   sinks,  MTE2_V / V_MTE2
+
+// ===== GetKVPhyAddr 独立阶段, 保留原 flag 值 =====
+#define INNERCORE_PHYADDR_BLKTABLE_FREE (3)   // V_MTE2, blkTable 空闲
+#define INNERCORE_PHYADDR_BLKTABLE_READY (8)  // MTE2_V, blkTable 就绪
+#define INNERCORE_PHYADDR_SPARSEIDX_FREE (4)  // V_MTE2, sparseIdx 空闲
+#define INNERCORE_PHYADDR_SPARSEIDX_READY (6) // MTE2_V, sparseIdx 就绪
+#define INNERCORE_PHYADDR_KVADDR_READY (5)    // V_MTE3, kvPhyAddr 就绪
+#define INNERCORE_PHYADDR_KVADDR_FREE (7)     // MTE3_V, kvPhyAddr 空闲
+
+// ===== V 侧其余核内 flag id (FD / batch-consistency / LSE / init) =====
+// 各 HardEvent 命名空间独立; 主流程 stage 槽位 id 已占 0~6/7, 其余事件在其命名空间内取不冲突值。
+// V_MTE2: STAGE0_IN 0,1
+#define INNERCORE_REDUCE_MAXSUM_V_MTE2 (2) // batch-consistency reduce max/sum
+#define INNERCORE_INTRAPARTIALO_V_MTE2 (3) // batch-consistency partial O
+#define INNERCORE_FD_V_MTE2(s) (4 + (s))   // 4,5: flash decode
+
+// MTE2_V: STAGE0_IN 0,1; SINKS 7
+#define INNERCORE_REDUCE_MTE2_V (2) // batch-consistency reduce
+#define INNERCORE_FD_MTE2_V (3)     // flash decode
+
+// V_MTE3: STAGE0_OUT 2,3; STAGE1 4,5; STAGE2 6
+#define INNERCORE_LSE_V_MTE3 (1) // LSE out (条件阶段)
+
+// MTE3_V: STAGE0_OUT 2,3; STAGE1 4,5; STAGE2 6
+#define INNERCORE_STAGE_FD_MTE3_V (7) // FD/BC staging (StageVec1Lse)
+#define INNERCORE_LSE_MTE3_V (0)      // LSE out (条件阶段)
+#define INNERCORE_FD_MTE3_V (1)       // FD mte3ToV (SyncAll 之后阶段)
+#define INNERCORE_INITOUT_MTE3_V (0)  // init 阶段 (CleanOutput)
+
+// MTE3_MTE2 (batch consistency + fd)
+#define INNERCORE_INTRALSE_MTE3_MTE2(s) (s)        // 0,1
+#define INNERCORE_INTRAATTN_MTE3_MTE2(s) (2 + (s)) // 2,3
+#define INNERCORE_FD_MTE3_MTE2 (4)
+
+// ===== 跨核 flag id (mode 4, 保留现有数值分配) =====
+#define CROSSCORE_L1P(s) (s) // 0,1
+#define CROSSCORE_BMM2 (2)
+#define CROSSCORE_BMM1(s) (3 + (s))  // 3,4
+#define CROSSCORE_V0RES(s) (5 + (s)) // 5,6,7 (GM backward)
 
 namespace BaseApi {
 __aicore__ constexpr uint64_t Align2Func(uint64_t data)
