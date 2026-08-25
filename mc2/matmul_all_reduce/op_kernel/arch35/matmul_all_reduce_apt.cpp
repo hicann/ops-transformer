@@ -19,7 +19,7 @@
 #include "kernel_operator.h"
 #endif
 #include "lib/matmul_intf.h"
-#include "../common.h"
+#include "../matmul_all_reduce_common.h"
 #include "matmul_all_reduce_empty_tensor_k_general_arch35.h"
 #include "matmul_all_reduce_apt_tiling_key.h"
 

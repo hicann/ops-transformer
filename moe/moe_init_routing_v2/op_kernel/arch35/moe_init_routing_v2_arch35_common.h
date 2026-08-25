@@ -9,28 +9,28 @@
  */
 
 /* !
- * \file moe_v2_common.h
+ * \file moe_init_routing_v2_arch35_common.h
  * \brief
  */
-#ifndef MOE_V2_QUANT_COMMON_H
-#define MOE_V2_QUANT_COMMON_H
+#ifndef MOE_INIT_ROUTING_V2_ARCH35_COMMON_H
+#define MOE_INIT_ROUTING_V2_ARCH35_COMMON_H
 
 #include "kernel_operator.h"
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
 #define THREAD_NUM 2048
 #endif
-
-namespace MoeInitRoutingQuantV2 {
+namespace MoeInitRoutingV2 {
 using namespace AscendC;
 constexpr int64_t SPLIT_N = 0;
 constexpr int64_t SPLIT_K = 1;
-constexpr float MIN_FP32 = -3.4e38f;
-constexpr float MAX_INT8 = 127.0f;
-constexpr uint32_t INF = 0xFF7FFFFF;
+constexpr float MIN_FP32 = -3.4e38;
 constexpr int64_t ONE_REPEAT_SORT_NUM = 32;
 constexpr int64_t BLOCK_BYTES = 32;
 constexpr int64_t INT32_ONE_BLOCK_NUM = 8;
+
+constexpr int64_t ASSIST_NUM = 256;
+constexpr int64_t ASSIST_INDEX_NUM = 32;
 
 constexpr int64_t MERGE_LIST_TWO = 2;
 constexpr int64_t MERGE_LIST_THREE = 3;
@@ -38,9 +38,6 @@ constexpr int64_t MERGE_LIST_FOUR = 4;
 
 constexpr int64_t MERGE_LIST_IDX_TWO = 2;
 constexpr int64_t MERGE_LIST_IDX_THREE = 3;
-
-constexpr int64_t ASSIST_NUM = 256;
-constexpr int64_t ASSIST_INDEX_NUM = 32;
 
 constexpr int64_t MAX_EXPERT_NUM = 5120;
 constexpr int64_t DROPLESS_MODE = 0;
@@ -71,9 +68,12 @@ const __gm__ int32_t assist[256] = {
     24, 0, 0, 0, 0, 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 27, 0, 0, 0, 0, 0, 0, 0,
     28, 0, 0, 0, 0, 0, 0, 0, 29, 0, 0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0};
 
-__aicore__ inline int64_t AlignBytes(int64_t elementNum, int64_t bytes)
+__aicore__ inline int64_t Ceil(int64_t a, int64_t b)
 {
-    return (elementNum * bytes + BLOCK_BYTES - 1) / BLOCK_BYTES * BLOCK_BYTES;
+    if (b == 0) {
+        return 0;
+    }
+    return (a + b - 1) / b;
 }
 
 __aicore__ inline int64_t Align(int64_t elementNum, int64_t bytes)
@@ -84,24 +84,21 @@ __aicore__ inline int64_t Align(int64_t elementNum, int64_t bytes)
     return (elementNum * bytes + BLOCK_BYTES - 1) / BLOCK_BYTES * BLOCK_BYTES / bytes;
 }
 
-__aicore__ inline int64_t Ceil(int64_t a, int64_t b)
+__aicore__ inline int64_t AlignBytes(int64_t elementNum, int64_t bytes)
 {
-    if (b == 0) {
-        return 0;
-    }
-    return (a + b - 1) / b;
-}
-
-template <typename T>
-__aicore__ inline T Max(T a, T b)
-{
-    return a < b ? b : a;
+    return (elementNum * bytes + BLOCK_BYTES - 1) / BLOCK_BYTES * BLOCK_BYTES;
 }
 
 template <typename T>
 __aicore__ inline T Min(T a, T b)
 {
     return a > b ? b : a;
+}
+
+template <typename T>
+__aicore__ inline T Max(T a, T b)
+{
+    return a < b ? b : a;
 }
 
 template <HardEvent event>
@@ -112,8 +109,13 @@ __aicore__ inline void SetWaitFlag(HardEvent evt)
     WaitFlag<event>(eventId);
 }
 
-__aicore__ inline void ArithProgressionPerf(
-    const LocalTensor<int32_t>& dst, const int32_t firstValue, const int32_t diffValue, int32_t countAlign)
+__aicore__ inline constexpr uint32_t GetVRegSize()
+{
+    return 256U;
+}
+
+__aicore__ inline void ArithProgressionPerf(const LocalTensor<int32_t> &dst, const int32_t firstValue,
+                                            const int32_t diffValue, int32_t countAlign)
 {
     // countAlign must be eight aligned
     countAlign = (countAlign + CONSTANT_SEVEN) / BLOCK_B32_SIZE * BLOCK_B32_SIZE;
@@ -150,5 +152,25 @@ __aicore__ inline void ArithProgressionPerf(
         }
     }
 }
-} // namespace MoeInitRoutingQuantV2
-#endif // MOE_V2_QUANT_COMMON_H
+
+template <typename T>
+__aicore__ inline void InitGmValue(GlobalTensor<T> gm, LocalTensor<T> tensor, int64_t count, T value)
+{
+    int64_t ubSize = tensor.GetSize();
+    int64_t loops = Ceil(count, ubSize);
+    int64_t perLoopCount = Ceil(count, loops);
+    int64_t lastLoopCount = count - (loops - 1) * perLoopCount;
+    Duplicate(tensor, value, perLoopCount);
+    auto eventID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
+    SetFlag<HardEvent::V_MTE3>(eventID);
+    WaitFlag<HardEvent::V_MTE3>(eventID);
+    DataCopyExtParams intriParams{1, static_cast<uint32_t>(perLoopCount * sizeof(T)), 0, 0, 0};
+    for (int64_t loop = 0; loop < loops - 1; loop++) {
+        DataCopyPad(gm[loop * perLoopCount], tensor, intriParams);
+    }
+    intriParams.blockLen = static_cast<uint32_t>(lastLoopCount * sizeof(T));
+    DataCopyPad(gm[(loops - 1) * perLoopCount], tensor, intriParams);
+}
+
+} // namespace MoeInitRoutingV2
+#endif // MOE_INIT_ROUTING_V2_ARCH35_COMMON_H

@@ -15,7 +15,7 @@
 #ifndef MOE_GATING_TOP_K_E_K_FULLLOAD_H
 #define MOE_GATING_TOP_K_E_K_FULLLOAD_H
 #include "kernel_operator.h"
-#include "common.h"
+#include "moe_gating_top_k_common.h"
 namespace MoeGatingTopK {
 using namespace AscendC;
 

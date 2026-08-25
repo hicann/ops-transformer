@@ -15,7 +15,7 @@
 #ifndef MOE_SRC_TO_DST_SIMT_H
 #define MOE_SRC_TO_DST_SIMT_H
 
-#include "moe_common.h"
+#include "moe_init_routing_arch35_common.h"
 #include "simt_api/asc_simt.h"
 
 #define THREAD_NUM 2048

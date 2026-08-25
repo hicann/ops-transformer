@@ -27,7 +27,6 @@
 #include "../../../moe_distribute_dispatch_v2/op_kernel/quantize_functions.h"
 #include "../../../common/op_kernel/mc2_kernel_utils.h"
 #endif
-#include "common.h"
 
 #define FLOAT_OVERFLOW_MODE_CTRL 60
 namespace Mc2Kernel {

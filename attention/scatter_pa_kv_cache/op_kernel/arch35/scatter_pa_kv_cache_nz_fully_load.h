@@ -17,7 +17,7 @@
 
 
 #include "kernel_operator.h"
-#include "common.h"
+#include "scatter_pa_kv_cache_arch35_common.h"
 namespace ScatterPaKvCache {
 
 using namespace AscendC;

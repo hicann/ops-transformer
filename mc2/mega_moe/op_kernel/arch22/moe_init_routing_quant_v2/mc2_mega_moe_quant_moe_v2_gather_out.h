@@ -16,7 +16,7 @@
 #ifndef MC2_MOE_V2_QUANT_GATHER_OUT_H
 #define MC2_MOE_V2_QUANT_GATHER_OUT_H
 
-#include "moe_v2_common.h"
+#include "mega_moe_quant_moe_v2_common.h"
 #include "kernel_operator.h"
 
 namespace MoeInitRoutingQuantV2 {

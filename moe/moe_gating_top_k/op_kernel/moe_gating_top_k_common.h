@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -9,28 +9,27 @@
  */
 
 /*!
- * \file moe_v2_common.h
+ * \file moe_gating_top_k_common.h
  * \brief
  */
-
-#ifndef MC2_MOE_V2_QUANT_COMMON_H
-#define MC2_MOE_V2_QUANT_COMMON_H
+#ifndef MOE_GATING_TOP_K_COMMON_H
+#define MOE_GATING_TOP_K_COMMON_H
 
 #include "kernel_operator.h"
 
-namespace MoeInitRoutingQuantV2 {
+namespace MoeGatingTopK {
 using namespace AscendC;
-using namespace Mc2Tiling;
-
-constexpr int64_t SPLIT_N = 0;
-constexpr int64_t SPLIT_K = 1;
-constexpr float MIN_FP32 = -3.4e38;
+const float MIN_FP32 = *(float *)(&F32_NEG_INF);
+constexpr int32_t FLOAT32_NEG_INF = 0xFF800000; // -inf -2139095040
 constexpr int64_t ONE_REPEAT_SORT_NUM = 32;
 constexpr int64_t BLOCK_BYTES = 32;
-constexpr int64_t INT32_ONE_BLOCK_NUM = 8;
+constexpr int64_t REPEAT_BYTES = 256;
+constexpr int64_t REPEAT_BLOCKS = 8;
 
-constexpr int64_t ASSIST_NUM = 256;
-constexpr int64_t ASSIST_INDEX_NUM = 32;
+constexpr int32_t CONSTANT_TWO = 2;
+constexpr int32_t CONSTANT_THREE = 3;
+constexpr int32_t CONSTANT_FOUR = 4;
+constexpr int32_t CONSTANT_EIGHT = 8;
 
 constexpr int64_t MERGE_LIST_TWO = 2;
 constexpr int64_t MERGE_LIST_THREE = 3;
@@ -39,25 +38,8 @@ constexpr int64_t MERGE_LIST_FOUR = 4;
 constexpr int64_t MERGE_LIST_IDX_TWO = 2;
 constexpr int64_t MERGE_LIST_IDX_THREE = 3;
 
-constexpr int64_t MAX_EXPERT_NUM = 5120;
-constexpr int64_t DROPLESS_MODE = 0;
-constexpr int64_t DROP_PAD_MODE = 1;
-constexpr int64_t EXERPT_TOKENS_COUNT = 2;
-constexpr int64_t EXERPT_TOKENS_CUMSUM = 1;
-constexpr int64_t EXERPT_TOKENS_NONE = 0;
-constexpr int64_t EXERPT_TOKENS_BEFORE_CAPACITY = 1;
-constexpr int64_t ALIGN_512 = 512;
-constexpr int64_t MOE_ALIGN_128 = 128;
-
-const __gm__ int32_t assist[256] = {
-    0,  0, 0, 0, 0, 0, 0, 0, 1,  0, 0, 0, 0, 0, 0, 0, 2,  0, 0, 0, 0, 0, 0, 0, 3,  0, 0, 0, 0, 0, 0, 0,
-    4,  0, 0, 0, 0, 0, 0, 0, 5,  0, 0, 0, 0, 0, 0, 0, 6,  0, 0, 0, 0, 0, 0, 0, 7,  0, 0, 0, 0, 0, 0, 0,
-    8,  0, 0, 0, 0, 0, 0, 0, 9,  0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0,
-    12, 0, 0, 0, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 14, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0,
-    16, 0, 0, 0, 0, 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0,
-    20, 0, 0, 0, 0, 0, 0, 0, 21, 0, 0, 0, 0, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0,
-    24, 0, 0, 0, 0, 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 27, 0, 0, 0, 0, 0, 0, 0,
-    28, 0, 0, 0, 0, 0, 0, 0, 29, 0, 0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0};
+constexpr int64_t NORM_TYPE_SOFTMAX = 0;
+constexpr int64_t NORM_TYPE_SIGMOID = 1;
 
 __aicore__ inline int64_t Ceil(int64_t a, int64_t b)
 {
@@ -92,6 +74,17 @@ __aicore__ inline T Max(T a, T b)
     return a < b ? b : a;
 }
 
+template <typename T1, typename T2>
+__aicore__ inline T1 CeilDiv(T1 x, T2 y)
+{
+    if (y != 0 && x != 0) {
+        const T1 quotient = x / y;
+        return (x % y != 0 && ((x ^ y) >= 0)) ? (quotient + 1) : quotient;
+    }
+
+    return x;
+}
+
 template <HardEvent event>
 __aicore__ inline void SetWaitFlag(HardEvent evt)
 {
@@ -100,5 +93,5 @@ __aicore__ inline void SetWaitFlag(HardEvent evt)
     WaitFlag<event>(eventId);
 }
 
-} // namespace MoeInitRoutingQuantV2
-#endif // MC2_MOE_V2_QUANT_COMMON_H
+} // namespace MoeGatingTopK
+#endif // MOE_GATING_TOP_K_COMMON_H

@@ -15,7 +15,7 @@
 #ifndef INNER_MOE_V2_SRC_TO_DST_WITH_CAPACITY_H
 #define INNER_MOE_V2_SRC_TO_DST_WITH_CAPACITY_H
 
-#include "moe_v2_common.h"
+#include "moe_init_routing_quant_v2_pkg_inner_common.h"
 
 namespace MoeInitRoutingQuantV2 {
 using namespace AscendC;

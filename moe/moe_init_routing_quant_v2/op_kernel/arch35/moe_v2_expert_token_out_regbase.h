@@ -16,7 +16,7 @@
 #define MOE_V2_QUANT_EXPERT_TOKEN_OUT_REGBASE_H
 
 #include "op_kernel/platform_util.h"
-#include "moe_v2_common.h"
+#include "moe_init_routing_quant_v2_arch35_common.h"
 
 namespace MoeInitRoutingQuantV2 {
 using namespace AscendC;

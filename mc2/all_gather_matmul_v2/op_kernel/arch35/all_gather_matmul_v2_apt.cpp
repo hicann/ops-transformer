@@ -14,7 +14,7 @@
  */
 
 #include "lib/matmul_intf.h"
-#include "../common.h"
+#include "../agm_v2_common.h"
 #include "../all_gather_matmul_v2_apt_tiling_key.h"
 
 #if ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && ((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16)))

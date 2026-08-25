@@ -9,15 +9,15 @@
  */
 
 /*!
- * \file common.h
+ * \file scatter_pa_kv_cache_arch35_common.h
  * \brief
  */
 
 #include "op_kernel/math_util.h"
 #include "op_kernel/platform_util.h"
 
-#ifndef COMMON_H_
-#define COMMON_H_
+#ifndef SCATTER_PA_KV_CACHE_ARCH35_COMMON_H
+#define SCATTER_PA_KV_CACHE_ARCH35_COMMON_H
 namespace ScatterPaKvCache {
     constexpr int32_t B8 = 1;
     constexpr int32_t B16 = 2;
@@ -26,4 +26,4 @@ namespace ScatterPaKvCache {
     constexpr int64_t DOUBLE_BUFFER = 2;
     static constexpr uint32_t BLOCK_SIZE = Ops::Base::GetUbBlockSize();
 }
-#endif
+#endif // SCATTER_PA_KV_CACHE_ARCH35_COMMON_H

@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file common.h
+ * \file matmul_all_reduce_common.h
  * \brief
  */
-#ifndef MC2_ALLREDUCE_COMM_H
-#define MC2_ALLREDUCE_COMM_H
+#ifndef MATMUL_ALL_REDUCE_COMMON_H
+#define MATMUL_ALL_REDUCE_COMMON_H
 
 #include "lib/hccl/hccl.h"
 #ifdef __CCE_KT_TEST__
@@ -353,4 +353,4 @@ __aicore__ inline void Mc2SyncAll()
 
 #endif
 } // namespace AscendC
-#endif // MC2_ALLREDUCE_COMM_H
+#endif // MATMUL_ALL_REDUCE_COMMON_H

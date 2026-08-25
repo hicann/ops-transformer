@@ -21,7 +21,7 @@
 #include "kernel_operator.h"
 #endif
 #include "lib/matmul_intf.h"
-#include "../../matmul_all_reduce/op_kernel/common.h"
+#include "../../matmul_all_reduce/op_kernel/matmul_all_reduce_common.h"
 #include "../../matmul_all_reduce/op_kernel/arch22/matmul_all_reduce_910_general.h"
 #include "add_rms_norm_kernel.h"
 #include "matmul_all_reduce_add_rms_norm_tiling_data.h"

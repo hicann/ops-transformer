@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file common.h
+ * \file agm_v2_common.h
  * \brief
  */
-#ifndef MC2_GATHER_V2_COMM_H
-#define MC2_GATHER_V2_COMM_H
+#ifndef AGM_V2_COMMON_H
+#define AGM_V2_COMMON_H
 
 #if defined(__CCE_KT_TEST__)
 #define SET_G_CORE_TYPE_IS_AIV thread_local int g_coreType = 2;
@@ -107,4 +107,4 @@ __aicore__ inline void Mc2SyncAll()
 }
 
 } // namespace AscendC
-#endif // MC2_GATHER_COMM_H
+#endif // AGM_V2_COMMON_H

@@ -14,7 +14,7 @@
 #ifndef MOE_MRGSORT_WITH_ROUTING_MAP_H
 #define MOE_MRGSORT_WITH_ROUTING_MAP_H
 
-#include "moe_common.h"
+#include "moe_token_permute_with_routing_map_common.h"
 #include "kernel_operator.h"
 
 namespace MoeTokenPermute {

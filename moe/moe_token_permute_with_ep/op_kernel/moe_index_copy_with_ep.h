@@ -15,7 +15,7 @@
 #ifndef MOE_INDEX_COPY_WITH_EP_H
 #define MOE_INDEX_COPY_WITH_EP_H
 
-#include "moe_common.h"
+#include "moe_token_permute_with_ep_common.h"
 
 namespace MoeTokenPermuteWithEp {
 using namespace AscendC;

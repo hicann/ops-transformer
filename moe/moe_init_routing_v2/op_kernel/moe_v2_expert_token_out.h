@@ -15,7 +15,7 @@
 #ifndef MOE_V2_EXPERT_TOKEN_OUT_H
 #define MOE_V2_EXPERT_TOKEN_OUT_H
 
-#include "moe_v2_common.h"
+#include "moe_init_routing_v2_common.h"
 
 namespace MoeInitRoutingV2 {
 using namespace AscendC;

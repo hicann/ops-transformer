@@ -15,7 +15,7 @@
 #ifndef MOE_MRGSORT_WITH_EP_H
 #define MOE_MRGSORT_WITH_EP_H
 
-#include "moe_common.h"
+#include "moe_token_permute_with_ep_common.h"
 #include "kernel_operator.h"
 
 namespace MoeTokenPermuteWithEp {

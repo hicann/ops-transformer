@@ -9,15 +9,15 @@
  */
 
 /*!
- * \file moe_common.h
+ * \file moe_init_routing_common.h
  * \brief
  */
-#ifndef MOE_COMMON_H
-#define MOE_COMMON_H
+#ifndef MOE_INIT_ROUTING_COMMON_H
+#define MOE_INIT_ROUTING_COMMON_H
 
 #include "kernel_operator.h"
 
-namespace MoeTokenPermuteWithEp {
+namespace MoeInitRouting {
 using namespace AscendC;
 constexpr int64_t SPLIT_N = 0;
 constexpr int64_t SPLIT_K = 1;
@@ -35,6 +35,16 @@ constexpr int64_t MERGE_LIST_FOUR = 4;
 
 constexpr int64_t MERGE_LIST_IDX_TWO = 2;
 constexpr int64_t MERGE_LIST_IDX_THREE = 3;
+
+const __gm__ int32_t assist[256] = {
+    0,  0, 0, 0, 0, 0, 0, 0, 1,  0, 0, 0, 0, 0, 0, 0, 2,  0, 0, 0, 0, 0, 0, 0, 3,  0, 0, 0, 0, 0, 0, 0,
+    4,  0, 0, 0, 0, 0, 0, 0, 5,  0, 0, 0, 0, 0, 0, 0, 6,  0, 0, 0, 0, 0, 0, 0, 7,  0, 0, 0, 0, 0, 0, 0,
+    8,  0, 0, 0, 0, 0, 0, 0, 9,  0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0,
+    12, 0, 0, 0, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 14, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0,
+    16, 0, 0, 0, 0, 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0,
+    20, 0, 0, 0, 0, 0, 0, 0, 21, 0, 0, 0, 0, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0,
+    24, 0, 0, 0, 0, 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 27, 0, 0, 0, 0, 0, 0, 0,
+    28, 0, 0, 0, 0, 0, 0, 0, 29, 0, 0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0};
 
 __aicore__ inline int64_t Ceil(int64_t a, int64_t b)
 {
@@ -69,5 +79,5 @@ __aicore__ inline T Max(T a, T b)
     return a < b ? b : a;
 }
 
-} // namespace MoeTokenPermuteWithEp
-#endif // MOE_COMMON_H
+} // namespace MoeInitRouting
+#endif // MOE_INIT_ROUTING_COMMON_H

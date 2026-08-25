@@ -16,7 +16,7 @@
 #define MOE_GATING_TOP_K_BACKWARD_H
 
 #include <cmath>
-#include "common.h"
+#include "moe_gating_top_k_backward_arch35_common.h"
 #include "kernel_operator.h"
 #include "op_kernel/load_store_utils.h"
 #include "moe_gating_top_k_backward_struct.h"

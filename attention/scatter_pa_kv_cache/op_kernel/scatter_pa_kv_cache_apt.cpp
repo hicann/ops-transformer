@@ -25,7 +25,7 @@
 #include "arch35/scatter_pa_kv_cache_nz_not_fully_load.h"
 #include "arch35/scatter_pa_kv_cache_norm_non_contiguous.h"
 #include "arch35/scatter_pa_kv_cache_nz_non_contiguous.h"
-#include "arch35/common.h"
+#include "arch35/scatter_pa_kv_cache_arch35_common.h"
 
 #define NORMAL_INT32_FULLY_LOAD 141
 #define NORMAL_INT32_NOT_FULLY_LOAD 140

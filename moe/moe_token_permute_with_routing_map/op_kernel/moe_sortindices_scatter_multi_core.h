@@ -16,7 +16,7 @@
 #define MOE_SORTINDICES_SCATTER_MULTI_CORE_H
 
 #include "kernel_tiling/kernel_tiling.h"
-#include "moe_common.h"
+#include "moe_token_permute_with_routing_map_common.h"
 
 namespace MoeTokenPermute {
 using namespace AscendC;

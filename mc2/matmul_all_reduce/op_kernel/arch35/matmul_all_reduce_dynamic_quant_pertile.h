@@ -22,7 +22,7 @@
 #include "kernel_operator.h"
 #endif
 #include "matmul_all_reduce_dynamic_quant_pertile_utils.h"
-#include "../common.h"
+#include "../matmul_all_reduce_common.h"
 
 namespace MatmulAllReduceDynamicQuantPertileImpl {
 using namespace AscendC;

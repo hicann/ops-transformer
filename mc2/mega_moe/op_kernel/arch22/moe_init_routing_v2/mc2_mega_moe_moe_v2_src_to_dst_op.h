@@ -16,7 +16,7 @@
 #ifndef MOE_V2_SRC_TO_DST_MC2_H
 #define MOE_V2_SRC_TO_DST_MC2_H
 
-#include "moe_v2_common.h"
+#include "mega_moe_moe_v2_common.h"
 
 namespace MoeInitRoutingV2 {
 using namespace AscendC;

@@ -22,7 +22,7 @@
 #include "../../../3rd/mat_mul_v3/op_kernel/mat_mul_v3_common.h"
 #include "../../../3rd/mat_mul_v3/op_kernel/arch35/mat_mul_asw_kernel.h"
 #include "../all_gather_matmul_tiling_data.h"
-#include "../common.h"
+#include "../agm_v2_common.h"
 
 namespace AllGatherMatmulImpl {
 using namespace AscendC;

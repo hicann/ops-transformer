@@ -19,7 +19,11 @@
 #include "kernel_operator.h"
 #endif
 #include "lib/matmul_intf.h"
-#if __has_include("../../moe_distribute_combine_v2/arch22/moe_distribute_combine_v2.h")
+#if __has_include("../../moe_distribute_combine_v2/op_kernel/arch22/moe_distribute_combine_v2.h")
+#include "../../moe_distribute_combine_v2/op_kernel/arch22/moe_distribute_combine_v2.h"
+#include "../../moe_distribute_combine_v2/op_kernel/arch22/moe_distribute_combine_v2_tiling_key.h"
+#include "../../moe_distribute_combine_v2/op_kernel/moe_distribute_combine_tiling.h"
+#elif __has_include("../../moe_distribute_combine_v2/arch22/moe_distribute_combine_v2.h")
 #include "../../moe_distribute_combine_v2/arch22/moe_distribute_combine_v2.h"
 #include "../../moe_distribute_combine_v2/arch22/moe_distribute_combine_v2_tiling_key.h"
 #include "../../moe_distribute_combine_v2/moe_distribute_combine_tiling.h"

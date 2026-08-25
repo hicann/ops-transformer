@@ -16,7 +16,7 @@
 #ifndef MOE_V2_SCATTER_OUT_BATCH_ROW_H
 #define MOE_V2_SCATTER_OUT_BATCH_ROW_H
 
-#include "moe_v2_common.h"
+#include "moe_init_routing_v2_arch35_common.h"
 #include "kernel_operator.h"
 
 constexpr int64_t BUFFER_NUM_BATCH = 2;

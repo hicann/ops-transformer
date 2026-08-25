@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -9,14 +9,13 @@
  */
 
 /*!
- * \file common.h
+ * \file fkle_mdd_v2_common.h
  * \brief
  */
 
-#ifndef MC2_MOE_DISPATCH_COMM_H
-#define MC2_MOE_DISPATCH_COMM_H
+#ifndef FKLE_MDD_V2_COMMON_H
+#define FKLE_MDD_V2_COMMON_H
 
-namespace Mc2Kernel {
 constexpr uint32_t NEED_ONE_HUNDRED_AND_TWENTY_SEVEN = 127;
 constexpr uint32_t RIGHT_SHIFT_BIT_SEVEN = 7;
 constexpr uint32_t NEED_THIRTY_FIRST = 31;
@@ -29,7 +28,6 @@ constexpr uint32_t ALIGN_UP_TO_512_MASK = 511;
 constexpr uint32_t RIGHT_SHIFT_BIT_FIVE = 5;
 constexpr uint32_t FIVE_HUNDRED_AND_ELEVEN = 511;
 constexpr uint32_t RIGHT_SHIFT_BIT_NINE = 9;
-} // namespace Mc2Kernel
 
 namespace AscendC {
 template <typename T1, typename T2>
@@ -41,19 +39,19 @@ __aicore__ inline T2 Ceil(T1 x, T1 y)
 template <typename T>
 __aicore__ inline T Ceil32(T x)
 {
-    return (x + Mc2Kernel::NEED_THIRTY_FIRST) >> Mc2Kernel::RIGHT_SHIFT_BIT_FIVE;
+    return (x + NEED_THIRTY_FIRST) >> RIGHT_SHIFT_BIT_FIVE;
 }
 
 template <typename T>
 __aicore__ inline T Ceil128(T x)
 {
-    return (x + Mc2Kernel::NEED_ONE_HUNDRED_AND_TWENTY_SEVEN) >> Mc2Kernel::RIGHT_SHIFT_BIT_SEVEN;
+    return (x + NEED_ONE_HUNDRED_AND_TWENTY_SEVEN) >> RIGHT_SHIFT_BIT_SEVEN;
 }
 
 template <typename T>
 __aicore__ inline T Ceil512(T x)
 {
-    return (x + Mc2Kernel::FIVE_HUNDRED_AND_ELEVEN) >> Mc2Kernel::RIGHT_SHIFT_BIT_NINE;
+    return (x + FIVE_HUNDRED_AND_ELEVEN) >> RIGHT_SHIFT_BIT_NINE;
 }
 
 template <typename T1, typename T2>
@@ -65,37 +63,37 @@ __aicore__ inline T2 Align(T1 x, T1 y)
 template <typename T>
 __aicore__ inline T Align2(T x)
 {
-    return (x + Mc2Kernel::ALIGN_UP_TO_2_MASK) & (~Mc2Kernel::ALIGN_UP_TO_2_MASK);
+    return (x + ALIGN_UP_TO_2_MASK) & (~ALIGN_UP_TO_2_MASK);
 }
 
 template <typename T>
 __aicore__ inline T Align32(T x)
 {
-    return (x + Mc2Kernel::ALIGN_UP_TO_32_MASK) & (~Mc2Kernel::ALIGN_UP_TO_32_MASK);
+    return (x + ALIGN_UP_TO_32_MASK) & (~ALIGN_UP_TO_32_MASK);
 }
 
 template <typename T>
 __aicore__ inline T Align64(T x)
 {
-    return (x + Mc2Kernel::ALIGN_UP_TO_64_MASK) & (~Mc2Kernel::ALIGN_UP_TO_64_MASK);
+    return (x + ALIGN_UP_TO_64_MASK) & (~ALIGN_UP_TO_64_MASK);
 }
 
 template <typename T>
 __aicore__ inline T Align128(T x)
 {
-    return (x + Mc2Kernel::ALIGN_UP_TO_128_MASK) & (~Mc2Kernel::ALIGN_UP_TO_128_MASK);
+    return (x + ALIGN_UP_TO_128_MASK) & (~ALIGN_UP_TO_128_MASK);
 }
 
 template <typename T>
 __aicore__ inline T Align256(T x)
 {
-    return (x + Mc2Kernel::ALIGN_UP_TO_256_MASK) & (~Mc2Kernel::ALIGN_UP_TO_256_MASK);
+    return (x + ALIGN_UP_TO_256_MASK) & (~ALIGN_UP_TO_256_MASK);
 }
 
 template <typename T>
 __aicore__ inline T Align512(T x)
 {
-    return (x + Mc2Kernel::ALIGN_UP_TO_512_MASK) & (~Mc2Kernel::ALIGN_UP_TO_512_MASK);
+    return (x + ALIGN_UP_TO_512_MASK) & (~ALIGN_UP_TO_512_MASK);
 }
 
 template <MicroAPI::HistogramsType htype, typename T, typename U>
@@ -182,4 +180,4 @@ __aicore__ inline void GetReduceSum(LocalTensor<int32_t> &dstLocal, LocalTensor<
 
 } // namespace AscendC
 
-#endif
+#endif // FKLE_MDD_V2_COMMON_H

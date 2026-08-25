@@ -25,7 +25,7 @@
 #endif
 using DTYPE_Y = DTYPE_RESIDUAL;
 
-#include "../../../matmul_all_reduce/op_kernel/common.h"
+#include "../../../matmul_all_reduce/op_kernel/matmul_all_reduce_common.h"
 #if defined(MC2_QUANT)
 #include "../../../matmul_all_reduce_add_rms_norm/op_kernel/matmul_all_reduce_add_rms_norm_tiling_data.h"
 #include "../../../matmul_all_reduce_add_rms_norm/op_kernel/mm_allreduce_add_rms_norm_quant.h"

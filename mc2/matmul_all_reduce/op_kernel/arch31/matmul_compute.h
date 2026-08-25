@@ -15,7 +15,7 @@
 #ifndef MC2_MATMUL_COMPUTE_H
 #define MC2_MATMUL_COMPUTE_H
 
-#include "../common.h"
+#include "../matmul_all_reduce_common.h"
 #include "matmul_block_l2cache.h"
 namespace AscendC {
 enum class IsPerTensor {

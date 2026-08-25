@@ -9,15 +9,15 @@
  */
 
 /*!
- * \file moe_common.h
+ * \file moe_init_routing_quant_v2_inner_common.h
  * \brief
  */
-#ifndef MOE_COMMON_H
-#define MOE_COMMON_H
+#ifndef MOE_INIT_ROUTING_QUANT_V2_INNER_COMMON_H
+#define MOE_INIT_ROUTING_QUANT_V2_INNER_COMMON_H
 
 #include "kernel_operator.h"
 
-namespace MoeInitRouting {
+namespace MoeInitRoutingQuantV2 {
 using namespace AscendC;
 constexpr int64_t SPLIT_N = 0;
 constexpr int64_t SPLIT_K = 1;
@@ -25,6 +25,8 @@ constexpr float MIN_FP32 = -3.4e38f;
 constexpr int64_t ONE_REPEAT_SORT_NUM = 32;
 constexpr int64_t BLOCK_BYTES = 32;
 constexpr int64_t INT32_ONE_BLOCK_NUM = 8;
+constexpr float DYNAMIC_QUANT_INT4_SYM_SCALE = 7.0;
+constexpr uint32_t MAX_VALUE_NUM = 8;
 
 constexpr int64_t ASSIST_NUM = 256;
 constexpr int64_t ASSIST_INDEX_NUM = 32;
@@ -35,6 +37,14 @@ constexpr int64_t MERGE_LIST_FOUR = 4;
 
 constexpr int64_t MERGE_LIST_IDX_TWO = 2;
 constexpr int64_t MERGE_LIST_IDX_THREE = 3;
+
+constexpr int64_t MAX_EXPERT_NUM = 5120;
+constexpr int64_t DROPLESS_MODE = 0;
+constexpr int64_t DROP_PAD_MODE = 1;
+constexpr int64_t EXERPT_TOKENS_COUNT = 2;
+constexpr int64_t EXERPT_TOKENS_CUMSUM = 1;
+constexpr int64_t EXERPT_TOKENS_NONE = 0;
+constexpr int64_t EXERPT_TOKENS_BEFORE_CAPACITY = 1;
 
 const __gm__ int32_t assist[256] = {
     0,  0, 0, 0, 0, 0, 0, 0, 1,  0, 0, 0, 0, 0, 0, 0, 2,  0, 0, 0, 0, 0, 0, 0, 3,  0, 0, 0, 0, 0, 0, 0,
@@ -79,5 +89,13 @@ __aicore__ inline T Max(T a, T b)
     return a < b ? b : a;
 }
 
-} // namespace MoeInitRouting
-#endif // MOE_COMMON_H
+template <HardEvent event>
+__aicore__ inline void SetWaitFlag(HardEvent evt)
+{
+    event_t eventId = static_cast<event_t>(GetTPipePtr()->FetchEventID(evt));
+    SetFlag<event>(eventId);
+    WaitFlag<event>(eventId);
+}
+
+} // namespace MoeInitRoutingQuantV2
+#endif // MOE_INIT_ROUTING_QUANT_V2_INNER_COMMON_H

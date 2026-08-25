@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file common.h
+ * \file moe_gating_top_k_backward_common.h
  * \brief
  */
 #ifndef MOE_GATING_TOP_K_BACKWARD_COMMON_H

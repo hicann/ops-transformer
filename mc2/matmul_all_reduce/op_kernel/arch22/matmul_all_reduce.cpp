@@ -19,7 +19,7 @@
 #include "kernel_operator.h"
 #endif
 #include "lib/matmul_intf.h"
-#include "../common.h"
+#include "../matmul_all_reduce_common.h"
 #include "../matmul_all_reduce_tiling_key.h"
 
 #ifdef MC2_QUANT

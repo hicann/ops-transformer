@@ -26,7 +26,7 @@
 #else
 #include "lib/hccl/hccl.h"
 #endif
-#include "../common.h"
+#include "../matmul_all_reduce_common.h"
 #include "../../../3rd/quant_batch_matmul_v3/op_kernel/quant_batch_matmul_v3_pertoken.h"
 #include "matmul_all_reduce_add_x3.h"
 #include "matmul_all_reduce_quant_perchannel.h"

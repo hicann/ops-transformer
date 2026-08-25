@@ -13,7 +13,7 @@
  */
 #ifndef CAST_SOFTMAX_GRAD__SFMG
 #define CAST_SOFTMAX_GRAD__SFMG
-#include "../common.h"
+#include "../sparse_flash_mla_grad_arch35_common.h"
 #include "./vf_softmax_grad_front_cast_sfmg.h"
 
 using namespace commondef;

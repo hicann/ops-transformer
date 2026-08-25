@@ -16,7 +16,7 @@
 #ifndef SPARSE_FLASH_MLA_GRAD_ENTRY_REGBASE_H_
 #define SPARSE_FLASH_MLA_GRAD_ENTRY_REGBASE_H_
 
-#include "common.h"
+#include "sparse_flash_mla_grad_arch35_common.h"
 
 #include "sparse_flash_mla_grad_post_regbase.h"
 #include "sparse_flash_mla_grad_pre_regbase.h"

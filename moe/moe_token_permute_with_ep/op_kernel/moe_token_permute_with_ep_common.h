@@ -9,27 +9,25 @@
  */
 
 /*!
- * \file common.h
+ * \file moe_token_permute_with_ep_common.h
  * \brief
  */
-#ifndef MOE_GATING_TOP_K_COMMON_H
-#define MOE_GATING_TOP_K_COMMON_H
+#ifndef MOE_TOKEN_PERMUTE_WITH_EP_COMMON_H
+#define MOE_TOKEN_PERMUTE_WITH_EP_COMMON_H
 
 #include "kernel_operator.h"
 
-namespace MoeGatingTopK {
+namespace MoeTokenPermuteWithEp {
 using namespace AscendC;
-const float MIN_FP32 = *(float *)(&F32_NEG_INF);
-constexpr int32_t FLOAT32_NEG_INF = 0xFF800000; // -inf -2139095040
+constexpr int64_t SPLIT_N = 0;
+constexpr int64_t SPLIT_K = 1;
+constexpr float MIN_FP32 = -3.4e38f;
 constexpr int64_t ONE_REPEAT_SORT_NUM = 32;
 constexpr int64_t BLOCK_BYTES = 32;
-constexpr int64_t REPEAT_BYTES = 256;
-constexpr int64_t REPEAT_BLOCKS = 8;
+constexpr int64_t INT32_ONE_BLOCK_NUM = 8;
 
-constexpr int32_t CONSTANT_TWO = 2;
-constexpr int32_t CONSTANT_THREE = 3;
-constexpr int32_t CONSTANT_FOUR = 4;
-constexpr int32_t CONSTANT_EIGHT = 8;
+constexpr int64_t ASSIST_NUM = 256;
+constexpr int64_t ASSIST_INDEX_NUM = 32;
 
 constexpr int64_t MERGE_LIST_TWO = 2;
 constexpr int64_t MERGE_LIST_THREE = 3;
@@ -37,9 +35,6 @@ constexpr int64_t MERGE_LIST_FOUR = 4;
 
 constexpr int64_t MERGE_LIST_IDX_TWO = 2;
 constexpr int64_t MERGE_LIST_IDX_THREE = 3;
-
-constexpr int64_t NORM_TYPE_SOFTMAX = 0;
-constexpr int64_t NORM_TYPE_SIGMOID = 1;
 
 __aicore__ inline int64_t Ceil(int64_t a, int64_t b)
 {
@@ -74,24 +69,5 @@ __aicore__ inline T Max(T a, T b)
     return a < b ? b : a;
 }
 
-template <typename T1, typename T2>
-__aicore__ inline T1 CeilDiv(T1 x, T2 y)
-{
-    if (y != 0 && x != 0) {
-        const T1 quotient = x / y;
-        return (x % y != 0 && ((x ^ y) >= 0)) ? (quotient + 1) : quotient;
-    }
-
-    return x;
-}
-
-template <HardEvent event>
-__aicore__ inline void SetWaitFlag(HardEvent evt)
-{
-    event_t eventId = static_cast<event_t>(GetTPipePtr()->FetchEventID(evt));
-    SetFlag<event>(eventId);
-    WaitFlag<event>(eventId);
-}
-
-} // namespace MoeGatingTopK
-#endif // MOE_GATING_TOP_K_COMMON_H
+} // namespace MoeTokenPermuteWithEp
+#endif // MOE_TOKEN_PERMUTE_WITH_EP_COMMON_H

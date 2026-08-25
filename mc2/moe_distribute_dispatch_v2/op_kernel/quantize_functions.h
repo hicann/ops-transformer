@@ -16,7 +16,7 @@
 #ifndef QUANTIZE_FUNCTIONS_H
 #define QUANTIZE_FUNCTIONS_H
 
-#include "common.h"
+#include "moe_distribute_dispatch_v2_common.h"
 
 namespace Quant {
 

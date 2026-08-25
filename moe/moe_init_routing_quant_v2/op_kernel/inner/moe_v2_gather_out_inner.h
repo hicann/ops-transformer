@@ -15,7 +15,7 @@
 #ifndef INNER_MOE_V2_GATHER_OUT_H
 #define INNER_MOE_V2_GATHER_OUT_H
 
-#include "moe_v2_common.h"
+#include "moe_init_routing_quant_v2_inner_common.h"
 #include "kernel_operator.h"
 
 namespace MoeInitRoutingQuantV2 {

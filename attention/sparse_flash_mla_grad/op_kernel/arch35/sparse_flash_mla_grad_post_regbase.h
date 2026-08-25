@@ -15,7 +15,7 @@
 #ifndef SPARSE_FLASH_MLA_GRAD_POST_KERNEL_REGBASE_H_
 #define SPARSE_FLASH_MLA_GRAD_POST_KERNEL_REGBASE_H_
 #include "kernel_operator.h"
-#include "common.h"
+#include "sparse_flash_mla_grad_arch35_common.h"
 
 using namespace AscendC;
 

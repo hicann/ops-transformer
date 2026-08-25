@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file common.h
+ * \file sparse_flash_mla_grad_arch35_common.h
  * \brief
  */
 

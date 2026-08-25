@@ -9,19 +9,19 @@
  */
 
 /*!
- * \file common.h
+ * \file moe_distribute_dispatch_v2_common.h
  * \brief
  */
 
-#ifndef MC2_MOE_DISPATCH_COMM_H
-#define MC2_MOE_DISPATCH_COMM_H
+#ifndef MOE_DISTRIBUTE_DISPATCH_V2_COMMON_H
+#define MOE_DISTRIBUTE_DISPATCH_V2_COMMON_H
 
 constexpr uint32_t NEED_ONE_HUNDRED_AND_TWENTY_SEVEN = 127;
 constexpr uint32_t RIGHT_SHIFT_BIT_SEVEN = 7;
 constexpr uint32_t NEED_THIRTY_FIRST = 31;
 constexpr uint32_t ALIGN_UP_TO_2_MASK = 1;
 constexpr uint32_t ALIGN_UP_TO_32_MASK = 31;
-constexpr uint32_t ALIGN_UP_TO_64_MASK = 64;
+constexpr uint32_t ALIGN_UP_TO_64_MASK = 63;
 constexpr uint32_t ALIGN_UP_TO_128_MASK = 127;
 constexpr uint32_t ALIGN_UP_TO_256_MASK = 255;
 constexpr uint32_t ALIGN_UP_TO_512_MASK = 511;
@@ -180,4 +180,4 @@ __aicore__ inline void GetReduceSum(LocalTensor<int32_t> &dstLocal, LocalTensor<
 
 } // namespace AscendC
 
-#endif
+#endif // MOE_DISTRIBUTE_DISPATCH_V2_COMMON_H

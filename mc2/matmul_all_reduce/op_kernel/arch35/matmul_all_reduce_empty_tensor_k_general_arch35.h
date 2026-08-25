@@ -20,7 +20,7 @@
 #else
 #include "kernel_operator.h"
 #endif
-#include "../common.h"
+#include "../matmul_all_reduce_common.h"
 #include "matmul_all_reduce_add_x3_arch35.h"
 #include "matmul_all_reduce_tiling_struct_ar35.h"
 

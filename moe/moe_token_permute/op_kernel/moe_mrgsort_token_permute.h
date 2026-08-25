@@ -15,7 +15,7 @@
 #ifndef MOE_MRGSORT_TOKEN_PERMUTE_H
 #define MOE_MRGSORT_TOKEN_PERMUTE_H
 
-#include "moe_common.h"
+#include "moe_token_permute_common.h"
 #include "kernel_operator.h"
 
 namespace MoeTokenPermute {

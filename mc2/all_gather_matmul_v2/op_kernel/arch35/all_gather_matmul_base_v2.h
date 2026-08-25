@@ -22,7 +22,7 @@
 #include "kernel_operator.h"
 #endif
 #include "lib/matmul_intf.h"
-#include "common.h"
+#include "../agm_v2_common.h"
 #include "lib/hccl/hccl.h"
 #include "../all_gather_matmul_tiling_data.h"
 

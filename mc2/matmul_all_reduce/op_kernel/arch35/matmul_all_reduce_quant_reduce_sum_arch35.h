@@ -15,7 +15,7 @@
 #ifndef MATMUL_ALL_REDUCE_QUANT_REDUCE_SUM_ARCH35_H
 #define MATMUL_ALL_REDUCE_QUANT_REDUCE_SUM_ARCH35_H
 
-#include "../common.h"
+#include "../matmul_all_reduce_common.h"
 
 namespace Mc2Kernel {
 using namespace AscendC;

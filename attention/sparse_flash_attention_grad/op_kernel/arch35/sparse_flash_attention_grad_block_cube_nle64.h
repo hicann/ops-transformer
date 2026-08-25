@@ -20,7 +20,7 @@
 #include "../../../common/op_kernel/FixpipeOut.h"
 #include "../../../common/op_kernel/arch35/util_regbase.h"
 #include "sparse_flash_attention_grad_common.h"
-#include "common.h"
+#include "sparse_flash_attention_grad_arch35_common.h"
 
 using namespace commondef;
 

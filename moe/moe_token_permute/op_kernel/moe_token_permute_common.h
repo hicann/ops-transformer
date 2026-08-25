@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file moe_common.h
+ * \file moe_token_permute_common.h
  * \brief
  */
-#ifndef MOE_COMMON_H
-#define MOE_COMMON_H
+#ifndef MOE_TOKEN_PERMUTE_COMMON_H
+#define MOE_TOKEN_PERMUTE_COMMON_H
 
 #include "kernel_operator.h"
 
@@ -70,4 +70,4 @@ __aicore__ inline T Max(T a, T b)
 }
 
 } // namespace MoeTokenPermute
-#endif // MOE_COMMON_H
+#endif // MOE_TOKEN_PERMUTE_COMMON_H

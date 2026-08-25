@@ -15,7 +15,7 @@
 #ifndef INNER_MOE_V2_EXPERT_TOKEN_OUT_H
 #define INNER_MOE_V2_EXPERT_TOKEN_OUT_H
 
-#include "moe_v2_common.h"
+#include "moe_init_routing_quant_v2_inner_common.h"
 
 namespace MoeInitRoutingQuantV2 {
 using namespace AscendC;

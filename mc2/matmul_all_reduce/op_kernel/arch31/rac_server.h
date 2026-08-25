@@ -20,7 +20,7 @@
 #else
 #include "kernel_operator.h"
 #endif
-#include "../common.h"
+#include "../matmul_all_reduce_common.h"
 
 namespace AscendC {
 constexpr uint32_t AC_MSG_VALID_MASK = 0x5CDF123A;

@@ -15,7 +15,7 @@
 #ifndef MOE_PERMUTE_PROB_H
 #define MOE_PERMUTE_PROB_H
 
-#include "moe_common.h"
+#include "moe_token_permute_with_routing_map_common.h"
 
 namespace MoeTokenPermute {
 using namespace AscendC;

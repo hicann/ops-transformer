@@ -17,7 +17,7 @@
 #define MOE_DISTRIBUTE_DISPATCH_A5_H
 
 #include "lib/hccl/hccl.h"
-#include "common.h"
+#include "../moe_distribute_dispatch_v2_common.h"
 #include "../quantize_functions.h"
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"

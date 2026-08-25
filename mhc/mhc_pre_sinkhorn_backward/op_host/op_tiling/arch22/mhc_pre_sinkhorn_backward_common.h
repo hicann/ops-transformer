@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file common.h
+ * \file mhc_pre_sinkhorn_backward_common.h
  * \brief
  */
-#ifndef MHC_PRE_SINKHORN_BACKWARD_OP_HOST_OP_TILING_ARCH32_COMMON_H
-#define MHC_PRE_SINKHORN_BACKWARD_OP_HOST_OP_TILING_ARCH32_COMMON_H
+#ifndef MHC_PRE_SINKHORN_BACKWARD_COMMON_H
+#define MHC_PRE_SINKHORN_BACKWARD_COMMON_H
 
 #include "register/op_def_registry.h"
 #include "tiling/platform/platform_ascendc.h"
@@ -68,4 +68,4 @@ inline T FloorAlign(T a, T b)
     return b == 0 ? 0 : a / b * b;
 }
 
-#endif // MHC_PRE_SINKHORN_BACKWARD_OP_HOST_OP_TILING_ARCH32_COMMON_H
+#endif // MHC_PRE_SINKHORN_BACKWARD_COMMON_H

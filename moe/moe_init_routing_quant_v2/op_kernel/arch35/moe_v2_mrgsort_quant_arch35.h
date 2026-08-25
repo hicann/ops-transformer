@@ -15,7 +15,7 @@
 #ifndef MOE_V2_QUANT_MRGSORT_ARCH35_H
 #define MOE_V2_QUANT_MRGSORT_ARCH35_H
 
-#include "moe_v2_common.h"
+#include "moe_init_routing_quant_v2_arch35_common.h"
 #include "kernel_operator.h"
 
 namespace MoeInitRoutingQuantV2 {

@@ -18,7 +18,7 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "kernel_operator.h"
 #include "moe_sort_base_with_routing_map.h"
-#include "moe_common.h"
+#include "moe_token_permute_with_routing_map_common.h"
 using namespace AscendC;
 #define IS_1_BYTES_TYPE is_same<T, int8_t>::value || is_same<T, uint8_t>::value
 #define IS_2_BYTES_TYPE                                                                     \

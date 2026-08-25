@@ -15,7 +15,7 @@
 #ifndef MOE_SRC_TO_DST_H
 #define MOE_SRC_TO_DST_H
 
-#include "moe_common.h"
+#include "moe_init_routing_common.h"
 
 namespace MoeInitRouting {
 using namespace AscendC;

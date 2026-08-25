@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file common.h
+ * \file moe_gating_top_k_arch35_common.h
  * \brief
  */
-#ifndef MOE_GATING_TOP_K_COMMON_H_V35
-#define MOE_GATING_TOP_K_COMMON_H_V35
+#ifndef MOE_GATING_TOP_K_ARCH35_COMMON_H
+#define MOE_GATING_TOP_K_ARCH35_COMMON_H
 
 #include "kernel_operator.h"
 
@@ -92,4 +92,4 @@ __aicore__ inline void SetWaitFlag(HardEvent evt)
 }
 
 } // namespace MoeGatingTopK
-#endif // MOE_GATING_TOP_K_COMMON_H_V35
+#endif // MOE_GATING_TOP_K_ARCH35_COMMON_H

@@ -618,4 +618,4 @@ __aicore__ inline void UpdateIsFirstInComm(GM_ADDR hcclContext, uint32_t curRank
         piCiGlobalTensor);
 }
 
-#endif // MOE_DISTRIBUTE_BASE_H
+#endif // MOE_DISTRIBUTE_DISPATCH_SETUP_BASE_H

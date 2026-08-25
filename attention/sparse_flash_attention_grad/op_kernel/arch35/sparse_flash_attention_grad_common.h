@@ -16,7 +16,7 @@
 #ifndef SPARSE_FLASH_ATTENTION_GRAD_COMMON_H
 #define SPARSE_FLASH_ATTENTION_GRAD_COMMON_H
 
-#include "common.h"
+#include "sparse_flash_attention_grad_arch35_common.h"
 #include "../../../common/op_kernel/buffers_policy.h"
 using namespace fa_base_matmul;
 using namespace commondef;

@@ -19,7 +19,7 @@
 #include "kernel_operator.h"
 #endif
 #include "lib/matmul_intf.h"
-#include "../../../matmul_all_reduce/op_kernel/common.h"
+#include "../../../matmul_all_reduce/op_kernel/matmul_all_reduce_common.h"
 
 #include "../matmul_all_reduce_add_rms_norm_tiling_data.h"
 

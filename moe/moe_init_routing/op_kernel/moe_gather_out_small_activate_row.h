@@ -15,7 +15,7 @@
 #ifndef MOE_GATHER_OUT_SMALL_ACTIVATE_ROW_H
 #define MOE_GATHER_OUT_SMALL_ACTIVATE_ROW_H
 
-#include "moe_common.h"
+#include "moe_init_routing_common.h"
 #include "kernel_operator.h"
 
 namespace MoeInitRouting {

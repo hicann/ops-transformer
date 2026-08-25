@@ -15,7 +15,7 @@
 #ifndef MOE_INDEX_COPY_SPILT_DH
 #define MOE_INDEX_COPY_SPILT_DH
 
-#include "moe_common.h"
+#include "moe_token_permute_common.h"
 
 namespace MoeTokenPermute {
 using namespace AscendC;
