@@ -50,14 +50,15 @@ const std::map<QfaQuantMode, std::pair<ge::DataType, std::string>> DESCALE_DTYPE
 
 ge::graphStatus QuantChecker::CheckSingleParaQuantMode(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: data_type 支持 INT32；当前仅支持 quant_mode = 1、6
+    // 文档约束: data_type 支持 INT32；当前仅支持 quant_mode = 1
     // quantMode 为属性，QfaTilingInfo 中存储为 QfaQuantMode 枚举
-    const std::vector<uint32_t> supportedQuantModes = {1, 6};
+    const std::vector<uint32_t> supportedQuantModes = {1};
     uint32_t quantModeVal = static_cast<uint32_t>(qfaInfo.quantMode);
     OP_CHECK_IF(
         std::find(supportedQuantModes.begin(), supportedQuantModes.end(), quantModeVal) == supportedQuantModes.end(),
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, "quant_mode", std::to_string(quantModeVal).c_str(),
-                                              "The value of quant_mode must be 1 or 6"),
+                                              "The value of quant_mode must be 1 "
+                                              "(A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32)"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
