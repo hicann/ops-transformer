@@ -199,7 +199,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td><ul><li>值必须大于0。</li><li>加上偏移后，topK index不能超过int32最大值</li></ul></td>
     <td>INT32</td>
     <td>ND</td>
-    <td>(B,)</td>
+    <td><ul><li>layoutQ为"BSND"时输出shape为[B, S1, N2]。</li><li>layoutQ为"TND"时输出shape为[T1, N2]。</li></ul></td>
     <td>x</td>
     </tr>
     <tr>
