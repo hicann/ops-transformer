@@ -571,6 +571,165 @@ def _moe_init_routing(
     )
 
 
+def _has_value(t):
+    if t is None:
+        return False
+    if isinstance(t, torch.Tensor):
+        return t.numel() > 0
+    return True
+
+
+_NUM_FORWARD_INPUTS = 15
+
+
+def _check_backward_supported(ctx):
+    """Raise NotImplementedError if V4-specific features that V2Grad cannot handle are used."""
+    if ctx.has_v4_extras:
+        raise NotImplementedError(
+            "moe_init_routing autograd is not supported when V4-specific "
+            "inputs (scale, offset, topk_weight) are provided or quant_mode "
+            "is not -1 (no quantization), row_idx_type is not 0, or x_dtype "
+            "is set. The aclnnMoeInitRoutingV2Grad op only handles the "
+            "unquantized routing case."
+        )
+    if ctx.drop_pad_mode not in (0, 1):
+        raise NotImplementedError(
+            "moe_init_routing autograd is only supported for drop_pad_mode "
+            "0 or 1. The backward op (aclnnMoeInitRoutingV2Grad) does not "
+            f"support drop_pad_mode {ctx.drop_pad_mode}."
+        )
+
+
+class MoeInitRoutingFn(torch.autograd.Function):
+    """Autograd binding: forward -> aclnnMoeInitRoutingV4,
+    backward -> aclnnMoeInitRoutingV2Grad.
+
+    The V2Grad op only handles the unquantized routing case.  Autograd is
+    therefore only supported when V4 reduces to V2 — i.e. none of the
+    V4-specific inputs (``scale``, ``offset``, ``topk_weight``) are provided,
+    ``quant_mode`` is -1 (no quantization), ``row_idx_type`` is 0, and
+    ``x_dtype`` is None.  ``active_expert_range`` does not affect the backward
+    (the V2Grad op does not consume it) and is therefore not treated as a
+    V4-specific feature.  When V4-specific features are used, backward raises
+    ``NotImplementedError``.
+
+    Only ``expanded_x`` is differentiable (it is a permuted copy of ``x``).
+    ``expanded_row_idx`` and the other integer/token-count outputs have no
+    gradient.  ``expert_idx`` is an integer index tensor with no gradient.
+
+    The grad op computes ``grad_x`` by scattering ``grad_expanded_x`` back to
+    the original rows of ``x`` according to ``expanded_row_idx`` and ``topK``.
+    """
+
+    @staticmethod
+    def forward(
+        ctx,
+        x,
+        expert_idx,
+        scale,
+        offset,
+        topk_weight,
+        active_num,
+        expert_capacity,
+        expert_num,
+        drop_pad_mode,
+        expert_tokens_num_type,
+        expert_tokens_num_flag,
+        quant_mode,
+        active_expert_range,
+        row_idx_type,
+        x_dtype,
+    ):
+        ctx.drop_pad_mode = drop_pad_mode if drop_pad_mode is not None else 0
+        ctx.k = expert_idx.size(1)
+        ctx.active_num = active_num if active_num is not None else -1
+        ctx.has_v4_extras = (
+            _has_value(scale)
+            or _has_value(offset)
+            or _has_value(topk_weight)
+            or quant_mode != -1
+            or row_idx_type != 0
+            or x_dtype is not None
+        )
+        (
+            expanded_x,
+            expanded_row_idx,
+            expert_tokens_count_or_cumsum,
+            expanded_scale,
+            expanded_topk_weight,
+        ) = torch.ops.cann_ops_transformer.moe_init_routing(
+            x,
+            expert_idx,
+            scale=scale,
+            offset=offset,
+            topk_weight=topk_weight,
+            active_num=active_num,
+            expert_capacity=expert_capacity,
+            expert_num=expert_num,
+            drop_pad_mode=drop_pad_mode,
+            expert_tokens_num_type=expert_tokens_num_type,
+            expert_tokens_num_flag=expert_tokens_num_flag,
+            quant_mode=quant_mode,
+            active_expert_range=active_expert_range,
+            row_idx_type=row_idx_type,
+            x_dtype=x_dtype,
+        )
+        ctx.save_for_backward(expanded_row_idx)
+        return (
+            expanded_x,
+            expanded_row_idx,
+            expert_tokens_count_or_cumsum,
+            expanded_scale,
+            expanded_topk_weight,
+        )
+
+    @staticmethod
+    def backward(
+        ctx,
+        grad_expanded_x,
+        grad_expanded_row_idx,
+        grad_expert_tokens_count_or_cumsum,
+        grad_expanded_scale,
+        grad_expanded_topk_weight,
+    ):
+        _check_backward_supported(ctx)
+        needs = ctx.needs_input_grad
+        if grad_expanded_x is None or not needs[0]:
+            return (None,) * _NUM_FORWARD_INPUTS
+
+        (expanded_row_idx,) = ctx.saved_tensors
+        grad_expanded_x = grad_expanded_x.contiguous()
+        active_num = ctx.active_num
+        if isinstance(active_num, torch.SymInt):
+            try:
+                active_num = int(active_num)
+            except Exception:
+                active_num = 0
+        if active_num < 0:
+            active_num = 0
+        grad_x = torch.ops.cann_ops_transformer.moe_init_routing_grad(
+            grad_expanded_x, expanded_row_idx, ctx.k, ctx.drop_pad_mode, active_num
+        )
+        grad_x = grad_x if needs[0] else None
+        return (
+            grad_x,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+
+
 def moe_init_routing(
     x: torch.Tensor,
     expert_idx: torch.Tensor,
@@ -592,6 +751,13 @@ def moe_init_routing(
 
     Performs MoE (Mixture of Experts) init routing, expanding tokens to their
     assigned experts and producing routing indices.
+
+    Supports automatic differentiation for ``x``: when ``x.requires_grad`` is
+    True and V4-specific features (quantization, scale, offset, topk_weight,
+    etc.) are not used, the backward pass calls
+    :func:`moe_init_routing_grad` (wrapping ``aclnnMoeInitRoutingV2Grad``) to
+    scatter ``grad_expanded_x`` back to ``grad_x``.  When V4-specific features
+    are used, backward raises ``NotImplementedError``.
 
     Args:
         x (Tensor): Input tensor of shape (n, cols), dtype supports float16/bfloat16/float32/int8/float8.
@@ -626,7 +792,8 @@ def moe_init_routing(
             13: int4_dynamic; 14: fp8_group_amax_e5m2; 15: fp8_group_amax_e4m3fn;
             16: mxfp8_roundscale_amax_e5m2; 17: mxfp8_roundscale_amax_e4m3fn.
         active_expert_range (list[int], optional): Range of active experts [start, end].
-            start >= 0, end <= 10240, end > start. Default: None (means [0, expert_num]).
+            start >= 0, end <= 10240, end > start. When None, defaults to
+            ``[0, expert_num]`` (all experts active). Default: None.
         row_idx_type (int): Row index type. 0=gather, 1=scatter. Default: 0.
         x_dtype (int, optional): Override for actual data type of x when x is stored as uint8
             but represents a different type. Use torch_npu.float4_e2m1fn_x2,
@@ -649,6 +816,27 @@ def moe_init_routing(
                 - topk_weight provided: shape (active_num, 1) or (expert_num*expert_capacity, 1), dtype float32.
                 - topk_weight not provided: shape (0,), dtype float32.
     """
+    needs_grad = x.requires_grad
+    if active_expert_range is None:
+        active_expert_range = [0, expert_num]
+    if needs_grad:
+        return MoeInitRoutingFn.apply(
+            x,
+            expert_idx,
+            scale,
+            offset,
+            topk_weight,
+            active_num,
+            expert_capacity,
+            expert_num,
+            drop_pad_mode,
+            expert_tokens_num_type,
+            expert_tokens_num_flag,
+            quant_mode,
+            active_expert_range,
+            row_idx_type,
+            x_dtype,
+        )
     return torch.ops.cann_ops_transformer.moe_init_routing(
         x,
         expert_idx,

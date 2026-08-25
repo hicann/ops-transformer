@@ -242,7 +242,7 @@ cann_ops_transformer.moe_init_routing(
 
 ## 约束说明
 
-- 该接口支持推理场景下使用。
+- 该接口支持推理场景和训练场景下使用。训练场景下，当`x.requires_grad`为True时支持自动反向，反向算子为[moe\_init\_routing\_grad](./moe_init_routing_grad.md)（封装`aclnnMoeInitRoutingV2Grad`）。
 - 该接口支持单算子模式和TorchAir图模式调用。
 - `topk_weight`不受`quant_mode`影响，`expanded_topk_weight`数据类型始终为`float32`。
 - `expert_num`必须大于0。
@@ -251,6 +251,8 @@ cann_ops_transformer.moe_init_routing(
 - `active_num`仅支持值等于NUM_ROWS*K。
 - quantMode为13的INT4动态量化场景，需同时满足：`x`数据类型为`float32`或`bfloat16`；H为偶数。
 - 空tensor处理：当输入的x首个维度的值为0时，DropPadMode必须为0，expanded_x、expanded_row_idx和expanded_scale为空tensor，expert_token_cumsum_or_count返回全0的tensor。
+- **自动反向（autograd）约束**：自动反向仅在正向退化为aclnnMoeInitRoutingV2场景时支持，即不使用aclnnMoeInitRoutingV4特有特性。具体要求：`scale`不传入、`offset`不传入、`topk_weight`不传入、`quant_mode=-1`（非量化）、`row_idx_type=0`（gather索引）、`x_dtype`为None、`drop_pad_mode`为0或1。当使用了aclnnMoeInitRoutingV4特有特性（量化、`scale`、`offset`、`topk_weight`、`x_dtype`、`row_idx_type`非0等）时，调用自动反向会抛出`NotImplementedError`。`active_expert_range`不影响反向，不视为aclnnMoeInitRoutingV4特有特性。
+- 自动反向仅对`x`求梯度，`expert_idx`为整数索引张量无梯度，`expanded_row_idx`及其他整数/统计输出无梯度。
 
 ## 确定性计算
 
@@ -358,4 +360,35 @@ cann_ops_transformer.moe_init_routing(
 
   if __name__ == '__main__':
       main()
+  ```
+
+- 自动反向调用（训练场景，非量化）：
+
+  ```python
+  import torch
+  import torch_npu
+  from cann_ops_transformer.ops import moe_init_routing
+
+  torch_npu.npu.set_device(0)
+
+  n = 4
+  h = 8
+  k = 2
+  expert_num = 8
+
+  # x.requires_grad=True 时自动启用autograd
+  x = torch.randn((n, h), dtype=torch.float32, device="npu", requires_grad=True)
+  expert_idx = torch.randint(0, expert_num, (n, k), dtype=torch.int32, device="npu")
+
+  # 正向：非量化场景，不传入scale/offset/topk_weight，row_idx_type=0
+  expanded_x, expanded_row_idx, expert_tokens_count, expanded_scale, expanded_topk_weight = \
+      moe_init_routing(x, expert_idx, active_num=-1, expert_capacity=-1,
+                       expert_num=expert_num, drop_pad_mode=0,
+                       expert_tokens_num_type=1, expert_tokens_num_flag=True,
+                       quant_mode=-1, active_expert_range=[0, 4], row_idx_type=0)
+
+  # 反向自动触发 moe_init_routing_grad
+  loss = expanded_x.sum()
+  loss.backward()
+  print(x.grad.shape)  # torch.Size([4, 8])
   ```
