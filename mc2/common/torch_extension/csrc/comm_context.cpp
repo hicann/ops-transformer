@@ -108,10 +108,13 @@ static void CopyContextToTensor(const CommContext &context, at::Tensor &tensor)
 // ======================== KFC Mode ========================
 class KfcContextBuilder {
 public:
-    void Build(const std::string &group, int64_t worldSize, int64_t &cclBufferSize, at::Tensor &contextTensor)
+    void Build(const std::string &group, int64_t worldSize, int64_t &cclBufferSize, at::Tensor &contextTensor,
+               void **localDeviceBuffer)
     {
         CommContext mc2ContextHost;
         GetMc2Context(mc2ContextHost, worldSize, cclBufferSize, group.c_str());
+        TORCH_CHECK(mc2ContextHost.epRankId < HCCL_MAX_RANK_SIZE, "Invalid local rank id: ", mc2ContextHost.epRankId);
+        *localDeviceBuffer = reinterpret_cast<void *>(mc2ContextHost.epHcclBuffer_[mc2ContextHost.epRankId]);
 
         CopyContextToTensor(mc2ContextHost, contextTensor);
     }
@@ -603,8 +606,14 @@ public:
                     static_cast<int>(protocol));
     }
 
-    TopoType GetTopoType() const { return topoType_; }
-    int64_t GetRankNumPerServer() const { return rankNumPerServer_; }
+    TopoType GetTopoType() const
+    {
+        return topoType_;
+    }
+    int64_t GetRankNumPerServer() const
+    {
+        return rankNumPerServer_;
+    }
 
     // 记录本卡与其他卡的通信层数，key为其他卡的rankId，value为通信层数
     std::unordered_map<uint32_t, uint32_t> layerMap_;
@@ -677,14 +686,45 @@ public:
             TORCH_CHECK(aclRet == ACL_SUCCESS, "aclrtFree(customDeviceBuffer_) failed, ret=", aclRet);
             customDeviceBuffer_ = nullptr;
         }
+        localDeviceBuffer_ = nullptr;
     }
 
-    int64_t CclBufferSize() const { return cclBufferSize_; }
-    int64_t GetTopoType() const { return static_cast<int64_t>(topoType_); }
-    int64_t GetRankNumPerServer() const { return static_cast<int64_t>(rankNumPerServer_); }
+    int64_t CclBufferSize() const
+    {
+        return cclBufferSize_;
+    }
+    int64_t GetTopoType() const
+    {
+        return static_cast<int64_t>(topoType_);
+    }
+    int64_t GetRankNumPerServer() const
+    {
+        return static_cast<int64_t>(rankNumPerServer_);
+    }
+
+    at::Tensor GetLocalBufferTensor(const py::object &dtype, int64_t offset) const
+    {
+        TORCH_CHECK(localDeviceBuffer_ != nullptr, "Local CCL buffer is not initialized.");
+        TORCH_CHECK(offset >= 0, "offset must be non-negative, got ", offset, ".");
+        torch::ScalarType scalarType = torch::python::detail::py_object_to_dtype(dtype);
+        int64_t elementBytes = static_cast<int64_t>(c10::elementSize(scalarType));
+        TORCH_CHECK(elementBytes > 0, "Invalid element size for requested dtype.");
+        int64_t totalElements = cclBufferSize_ / elementBytes;
+        TORCH_CHECK(offset <= totalElements, "offset must be in [0, ", totalElements, "], got ", offset, ".");
+
+        void *data = static_cast<void *>(static_cast<uint8_t *>(localDeviceBuffer_) + offset * elementBytes);
+        auto options = at::TensorOptions()
+                           .dtype(scalarType)
+                           .device(c10::DeviceType::PrivateUse1)
+                           .memory_format(c10::MemoryFormat::Contiguous);
+        return at::from_blob(data, {totalElements - offset}, options);
+    }
 
 private:
-    static int64_t ContextTensorSize() { return (sizeof(CommContext) + sizeof(int32_t) - 1) / sizeof(int32_t); }
+    static int64_t ContextTensorSize()
+    {
+        return (sizeof(CommContext) + sizeof(int32_t) - 1) / sizeof(int32_t);
+    }
 
     void EnsureResolved()
     {
@@ -698,13 +738,14 @@ private:
         switch (mode_) {
             case BackendMode::KFC: {
                 KfcContextBuilder builder;
-                builder.Build(group_, worldSize_, cclBufferSize_, tensor);
+                builder.Build(group_, worldSize_, cclBufferSize_, tensor, &localDeviceBuffer_);
                 return;
             }
             case BackendMode::CHANNEL: {
                 HcclChannelContextBuilder builder;
                 builder.Build(group_, worldSize_, cclBufferSize_, tensor, commAlg_, opName_, customCclBufferSize_,
                               &customDeviceBuffer_, &customMemHandle_);
+                localDeviceBuffer_ = customDeviceBuffer_;
                 topoType_ = builder.GetTopoType();
                 rankNumPerServer_ = builder.GetRankNumPerServer();
                 return;
@@ -725,6 +766,7 @@ private:
     int64_t rankNumPerServer_ = DEFAULT_RANK_NUM_PER_SERVER;
     int64_t customCclBufferSize_ = 0;
     void *customDeviceBuffer_ = nullptr;
+    void *localDeviceBuffer_ = nullptr;
     HcclMemHandle customMemHandle_ = nullptr;
 };
 
@@ -740,6 +782,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         .def("create_context", &CommContextManager::CreateContext)
         .def("update_group", &CommContextManager::UpdateGroup, py::arg("group"), py::arg("contextTensor").noconvert())
         .def("destroy", &CommContextManager::Destroy)
+        .def("get_local_buffer_tensor", &CommContextManager::GetLocalBufferTensor, py::arg("dtype"),
+             py::arg("offset") = 0)
         .def_property_readonly("ccl_buffer_size", &CommContextManager::CclBufferSize)
         .def_property_readonly("topo_type", &CommContextManager::GetTopoType)
         .def_property_readonly("rank_num_per_server", &CommContextManager::GetRankNumPerServer);

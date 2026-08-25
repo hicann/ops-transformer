@@ -21,7 +21,6 @@
 #ifndef HCCL_SHMEM_HPP
 #define HCCL_SHMEM_HPP
 
-
 #include "kernel_operator.h"
 #include "const_args.hpp"
 #include "mc2_moe_context.h"
@@ -198,9 +197,7 @@ public:
     std::conditional_t<IS_A2, __gm__ HcclA2CombineOpParam *, __gm__ HcclOpResParam *> WinContext_{nullptr};
     AscendC::LocalTensor<int32_t> ub;
     FORCE_INLINE_AICORE
-    HcclShmem()
-    {
-    }
+    HcclShmem() {}
     FORCE_INLINE_AICORE
     void initShmem(__gm__ Mc2Aclnn::Mc2MoeContext *mc2Context)
     {
@@ -370,9 +367,7 @@ public:
     }
 
     FORCE_INLINE_AICORE
-    ~HcclShmem()
-    {
-    }
+    ~HcclShmem() {}
 
     FORCE_INLINE_AICORE
     void CrossRankSync()
@@ -391,6 +386,35 @@ public:
             gm_signal_wait_until_eq_for_barrier(sync_check, count);
         }
 
+        AscendC::SyncAll<true>();
+        gm_store(sync_base, count);
+    }
+
+    FORCE_INLINE_AICORE
+    void CrossRankSyncWithMask(AscendC::LocalTensor<int32_t> rankMask)
+    {
+        uint64_t flag_offset = (m_segmentSize - m_tailReservedSize) / sizeof(int64_t);
+        __gm__ int64_t *sync_counter = (__gm__ int64_t *)(*this)() + flag_offset;
+        __gm__ int64_t *sync_base = (__gm__ int64_t *)(*this)() + flag_offset + m_rankSize * 8;
+        int64_t count = gm_load(sync_base) + 1;
+        int vec_id = AscendC::GetBlockIdx();
+        int vec_size = AscendC::GetBlockNum() * AscendC::GetTaskRation();
+        // 完成所有发送，再进入等待，不要因为一个rank没有等待到阻塞后续发送
+        for (int i = vec_id; i < m_rankSize; i += vec_size) {
+            if (rankMask.GetValue(i) != 0) { // masked rank不再等待
+                continue;
+            }
+            __gm__ int64_t *sync_remote = (__gm__ int64_t *)((*this)(i)) + flag_offset + m_rank * 8;
+            gm_store(sync_remote, count);
+            gm_dcci((__gm__ uint8_t *)sync_remote);
+        }
+        for (int i = vec_id; i < m_rankSize; i += vec_size) {
+            if (rankMask.GetValue(i) != 0) { // masked rank不再等待
+                continue;
+            }
+            auto sync_check = sync_counter + i * 8;
+            gm_signal_wait_until_eq_for_barrier(sync_check, count);
+        }
         AscendC::SyncAll<true>();
         gm_store(sync_base, count);
     }
@@ -559,6 +583,30 @@ public:
     }
 
     FORCE_INLINE_AICORE
+    void CrossRankSyncV2SetWithMask(AscendC::LocalTensor<int32_t> ctrBuffer, AscendC::LocalTensor<int32_t> rankMask)
+    {
+        uint64_t flag_offset = (m_segmentSize - m_tailReservedSize) + m_rank * STATE_OFFSET;
+        int vec_size = get_block_num();
+        int vec_id = get_block_idx();
+        AscendC::CrossCoreSetFlag<0x0, PIPE_MTE3>(RECV_SYNC_EVENT_ID);
+        AscendC::CrossCoreSetFlag<0x0, PIPE_MTE3>(SEND_SYNC_EVENT_ID);
+        AscendC::CrossCoreWaitFlag(SEND_SYNC_EVENT_ID);
+        pipe_barrier(PIPE_ALL);
+        ctrBuffer.SetValue(0, epStateValue_);
+        AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID0);
+        AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID0);
+        for (uint32_t dstEpIdx = vec_id; dstEpIdx < m_rankSize; dstEpIdx += vec_size) {
+            if (rankMask.GetValue(dstEpIdx) != 0) {
+                continue;
+            }
+            AscendC::GlobalTensor<int32_t> gmDstStates;
+            gmDstStates.SetGlobalBuffer((__gm__ int32_t *)((*this)(flag_offset, dstEpIdx)));
+            AscendC::DataCopy(gmDstStates, ctrBuffer, 8);
+        }
+        AscendC::CrossCoreWaitFlag(RECV_SYNC_EVENT_ID);
+    }
+
+    FORCE_INLINE_AICORE
     void CrossRankSyncV2Wait(AscendC::LocalTensor<float> statusTensor, AscendC::LocalTensor<float> gatherMaskOutTensor,
                              AscendC::LocalTensor<uint32_t> gatherTmpTensor,
                              AscendC::LocalTensor<float> statusSumOutTensor)
@@ -619,6 +667,27 @@ public:
         AscendC::CrossCoreWaitFlag(RECV_SYNC_EVENT_ID);
 
         // unpermute
+        AscendC::CrossCoreWaitFlag(SEND_SYNC_EVENT_ID);
+    }
+
+    FORCE_INLINE_AICORE
+    void CrossRankSyncV2WaitWithMask(AscendC::LocalTensor<int32_t> rankMask)
+    {
+        uint64_t flag_offset = m_segmentSize - m_tailReservedSize;
+        int vec_size = get_block_num();
+        int vec_id = get_block_idx();
+        AscendC::CrossCoreSetFlag<0x0, PIPE_MTE3>(SEND_SYNC_EVENT_ID);
+        for (int rank = vec_id; rank < m_rankSize; rank += vec_size) {
+            if (rankMask.GetValue(rank) != 0) {
+                continue;
+            }
+            __gm__ int32_t *status = reinterpret_cast<__gm__ int32_t *>((*this)() + flag_offset + rank * STATE_OFFSET);
+            do {
+                gm_dcci(reinterpret_cast<__gm__ uint8_t *>(status));
+            } while (gm_load(status) != epStateValue_);
+        }
+        AscendC::CrossCoreSetFlag<0x0, PIPE_MTE3>(RECV_SYNC_EVENT_ID);
+        AscendC::CrossCoreWaitFlag(RECV_SYNC_EVENT_ID);
         AscendC::CrossCoreWaitFlag(SEND_SYNC_EVENT_ID);
     }
 

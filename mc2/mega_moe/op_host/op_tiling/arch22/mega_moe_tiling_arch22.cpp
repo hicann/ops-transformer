@@ -78,6 +78,7 @@ constexpr uint32_t BIAS1_INDEX = 8;          // GMM1 的 bias（OPTIONAL）
 constexpr uint32_t BIAS2_INDEX = 9;          // GMM2 的 bias（OPTIONAL）
 constexpr uint32_t X_ACTIVE_MASK_INDEX = 10; // token 活跃掩码（OPTIONAL）
 constexpr uint32_t SCALES_INDEX = 11;        // 额外 scale（OPTIONAL）
+constexpr uint32_t MASK_BUFFER_INDEX = 18;   // rank 通信掩码（OPTIONAL）
 
 // 输出 tensor 索引
 constexpr uint32_t OUTPUT_Y_INDEX = 0;                 // 输出 y，shape = [M, K]
@@ -306,11 +307,20 @@ static ge::graphStatus CheckActivationAttr(const char *ptr, uint32_t &activation
     return ge::GRAPH_SUCCESS;
 }
 
-static bool IsValidActivationClamp(float value) { return value >= 0.0f && !std::isnan(value); }
+static bool IsValidActivationClamp(float value)
+{
+    return value >= 0.0f && !std::isnan(value);
+}
 
-static bool IsFiniteActivationParam(float value) { return std::isfinite(value); }
+static bool IsFiniteActivationParam(float value)
+{
+    return std::isfinite(value);
+}
 
-static bool IsValidSituScale(float value) { return std::isfinite(value) && value != 0.0f; }
+static bool IsValidSituScale(float value)
+{
+    return std::isfinite(value) && value != 0.0f;
+}
 
 static ge::graphStatus CheckActivationParamCount(uint32_t activationCode, size_t actualCount, size_t minCount,
                                                  size_t maxCount)
@@ -518,6 +528,22 @@ static ge::graphStatus MegaMoeA2A3CheckAttrAndSetTiling(gert::TilingContext *con
                     OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckNumMaxTokensPerRankAttr failed."), return GRAPH_FAILED);
     info.numMaxTokensPerRank = static_cast<uint32_t>(*numMaxTokensPerRankPtr);
 
+    // Rank mask is an A3-only capability.
+    std::string socVersion = mc2tiling::GetSocVersion(context);
+    auto maskBuffer = context->GetOptionalInputTensor(MASK_BUFFER_INDEX);
+    OP_TILING_CHECK(socVersion != "Ascend910_93" && maskBuffer != nullptr,
+                    OP_LOGE(K_INNER_DEBUG, "mask_buffer is supported on A3 only."), return GRAPH_FAILED);
+    if (maskBuffer != nullptr) {
+        auto maskShape = context->GetOptionalInputShape(MASK_BUFFER_INDEX);
+        auto maskDesc = context->GetOptionalInputDesc(MASK_BUFFER_INDEX);
+        OP_TILING_CHECK(maskShape == nullptr || maskDesc == nullptr,
+                        OP_LOGE(K_INNER_DEBUG, "mask_buffer shape/desc is null."), return GRAPH_FAILED);
+        OP_TILING_CHECK(maskShape->GetStorageShape().GetDimNum() != ONE_DIM ||
+                            maskShape->GetStorageShape().GetDim(0) != static_cast<int64_t>(info.epWorldSize),
+                        OP_LOGE(K_INNER_DEBUG, "mask_buffer shape must be [ep_world_size]."), return GRAPH_FAILED);
+        OP_TILING_CHECK(maskDesc->GetDataType() != ge::DT_INT32,
+                        OP_LOGE(K_INNER_DEBUG, "mask_buffer dtype must be int32."), return GRAPH_FAILED);
+    }
     // 9. activation
     OP_TILING_CHECK(CheckActivationAttr(activationPtr, info.activationCode) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckActivationAttr failed."), return GRAPH_FAILED);
