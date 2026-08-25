@@ -30,7 +30,7 @@ public:
     __aicore__ inline void Init(GM_ADDR query, GM_ADDR key, GM_ADDR queryIndex, GM_ADDR keyIndex, GM_ADDR weight,
                                 GM_ADDR sparseIndices, GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR queryRope,
                                 GM_ADDR keyRope, GM_ADDR actualSeqLengthsQuery, GM_ADDR actualSeqLengthsKey,
-                                GM_ADDR dQueryIndex, GM_ADDR dKeyIndex, GM_ADDR dWeight, GM_ADDR loss,
+                                GM_ADDR sinks, GM_ADDR dQueryIndex, GM_ADDR dKeyIndex, GM_ADDR dWeight, GM_ADDR loss,
                                 GM_ADDR workspace,
                                 const optiling::SparseLightningIndexerGradKLLossRegBaseTilingData *__restrict tiling,
                                 TPipe *tPipe);
@@ -73,10 +73,12 @@ public:
     // input gm
     GlobalTensor<int64_t> actualSeqLengthsQueryGm;
     GlobalTensor<int64_t> actualSeqLengthsKeyGm;
+    GlobalTensor<T> sinksGm;
 
     // workspace
     GlobalTensor<T> reduceSumRes;
     GlobalTensor<T> reluRes;
+    GlobalTensor<T> psinkSyncGm;
     GlobalTensor<INPUT_T> gatherSYRes;
     GlobalTensor<T> scatterAddResGm;
     GlobalTensor<T> scatterAddResPong;
@@ -106,7 +108,7 @@ template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseLightningIndexerGradKLLossKernelBase<CubeBlockType, VecBlockType>::Init(
     GM_ADDR query, GM_ADDR key, GM_ADDR queryIndex, GM_ADDR keyIndex, GM_ADDR weight, GM_ADDR sparseIndices,
     GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR queryRope, GM_ADDR keyRope, GM_ADDR actualSeqLengthsQuery,
-    GM_ADDR actualSeqLengthsKey, GM_ADDR dQueryIndex, GM_ADDR dKeyIndex, GM_ADDR dWeight, GM_ADDR loss,
+    GM_ADDR actualSeqLengthsKey, GM_ADDR sinks, GM_ADDR dQueryIndex, GM_ADDR dKeyIndex, GM_ADDR dWeight, GM_ADDR loss,
     GM_ADDR workspace, const optiling::SparseLightningIndexerGradKLLossRegBaseTilingData *__restrict tiling,
     TPipe *tPipe)
 {
@@ -123,6 +125,9 @@ __aicore__ inline void SparseLightningIndexerGradKLLossKernelBase<CubeBlockType,
         actualSeqLengthsKeyGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKey, constInfo.bSize);
     } else {
         actualSeqLengthsKeyGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqLengthsKey, 0);
+    }
+    if (sinks != nullptr) {
+        sinksGm.SetGlobalBuffer((__gm__ T *)sinks);
     }
 
     // 对padding区域的输出梯度清零
@@ -185,8 +190,9 @@ __aicore__ inline void SparseLightningIndexerGradKLLossKernelBase<CubeBlockType,
         // InitVecOP
         vecBlock.InitParams(constInfo, tilingData);
         vecBlock.InitGlobalBuffer(key, keyIndex, weight, sparseIndices, softmaxMax, softmaxSum, keyRope, dKeyIndex,
-                                  dWeight, loss, gatherSYRes, reluRes, reduceSumRes, scatterAddResGm, scatterAddResPong,
-                                  bmm3Res, actualSeqLengthsQueryGm, actualSeqLengthsKeyGm, lossRes);
+                                  dWeight, loss, sinks, psinkSyncGm, gatherSYRes, reluRes, reduceSumRes,
+                                  scatterAddResGm, scatterAddResPong, bmm3Res, actualSeqLengthsQueryGm,
+                                  actualSeqLengthsKeyGm, lossRes);
         vecBlock.InitBuffers(pipe);
     } else if ASCEND_IS_AIC {
         // initCubeOP
@@ -250,6 +256,9 @@ __aicore__ inline void SparseLightningIndexerGradKLLossKernelBase<CubeBlockType,
     bool isFixOut = false;
     if ASCEND_IS_AIV {
         vecBlock.CopyInMaxSum(runInfo);
+        if constexpr (HAS_SINK) {
+            vecBlock.ProcessVectorSink(runInfo);
+        }
     }
     for (int32_t s2TaskId = 0; s2TaskId < runInfo.s2LoopTimes + 2; ++s2TaskId) {
         SLIGradKLLossKRunInfo &kRunInfoNeg0 = kRunInfos[s2TaskId % MODE_NUM_3];
@@ -575,6 +584,7 @@ __aicore__ inline void SparseLightningIndexerGradKLLossKernelBase<CubeBlockType,
     runInfo.s2TailSize = (runInfo.s2RealSize % constInfo.pKBaseSize == 0) ? constInfo.pKBaseSize :
                                                                             (runInfo.s2RealSize % constInfo.pKBaseSize);
     runInfo.s2BaseSize = VEC_P_BASESIZE;
+    runInfo.pScaler = 1.0f / static_cast<float>(constInfo.gSizeQuery);
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -721,9 +731,10 @@ __aicore__ inline void SparseLightningIndexerGradKLLossKernelBase<CubeBlockType,
     int64_t reduceSumOffset = 2 * constInfo.kSize * sizeof(float); // * 2
     int64_t reluOffset = constInfo.gSizeQueryIndex * constInfo.kSize * sizeof(float);
     int64_t gatherSYOffset = constInfo.kSize * constInfo.dSizeQueryIndex * sizeof(INPUT_T);
+    constexpr int64_t psinkSyncSize = HAS_SINK ? 2 * sizeof(float) : 0;
 
-    int64_t coreTotalOffset = constInfo.aicIdx * (reduceSumOffset + reluOffset + gatherSYOffset);
-    int64_t totalOffset = aicNum * (reduceSumOffset + reluOffset + gatherSYOffset);
+    int64_t coreTotalOffset = constInfo.aicIdx * (reduceSumOffset + reluOffset + gatherSYOffset + psinkSyncSize);
+    int64_t totalOffset = aicNum * (reduceSumOffset + reluOffset + gatherSYOffset + psinkSyncSize);
     uint64_t offset = 0;
     reduceSumRes.SetGlobalBuffer((__gm__ T *)(workspace + offset + coreTotalOffset));
     offset += reduceSumOffset;
@@ -731,6 +742,9 @@ __aicore__ inline void SparseLightningIndexerGradKLLossKernelBase<CubeBlockType,
     offset += reluOffset;
     gatherSYRes.SetGlobalBuffer((__gm__ INPUT_T *)(workspace + offset + coreTotalOffset));
     offset += gatherSYOffset;
+    if constexpr (HAS_SINK) {
+        psinkSyncGm.SetGlobalBuffer((__gm__ T *)(workspace + offset + coreTotalOffset), 2);
+    }
     scatterAddResGm.SetGlobalBuffer((__gm__ T *)(workspace + totalOffset));
     if constexpr (LAYOUT_Q == SLILayout::TND) {
         constInfo.totalCost = actualSeqLengthsKeyGm.GetValue(constInfo.bSize - 1);

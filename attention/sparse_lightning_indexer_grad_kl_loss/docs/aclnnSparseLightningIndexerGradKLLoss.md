@@ -343,6 +343,21 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
         <td>-</td>
         </tr>
         <tr>
+        <td>sinks</td>
+        <td>可选输入</td>
+        <td>用于修正target distribution（p）归一化因子的附加softmax项，仅Ascend 950支持，仅aclnnSparseLightningIndexerGradKLLossV2接口接收。</td>
+        <td>
+              <ul>
+                <li>需为1维且长度等于query的N维度。</li>
+                <li>该参数可选，不传入时与aclnnSparseLightningIndexerGradKLLoss接口行为一致。</li>
+              </ul>
+        </td>
+        <td>FLOAT32</td>
+        <td>ND</td>
+        <td>(N1,)</td>
+        <td>√</td>
+        </tr>
+        <tr>
         <td>deterministic</td>
             <td>输入</td>
             <td>确定性计算。</td>

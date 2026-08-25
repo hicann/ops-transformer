@@ -10,7 +10,7 @@
 add_op_to_compiled_list()
 
 if (BUILD_OPEN_PROJECT)
-    target_sources(op_host_aclnn PRIVATE
+    target_sources(op_host_aclnnInner PRIVATE
         sparse_lightning_indexer_grad_kl_loss_def.cpp
     )
 endif()
@@ -41,8 +41,8 @@ else()
                     -Werror
     )
     add_modules_sources(
-        OPTYPE sparse_lightning_indexer_grad_kl_loss 
-        ACLNNTYPE aclnn
+        OPTYPE sparse_lightning_indexer_grad_kl_loss
+        ACLNNTYPE aclnn_inner
     )
 endif()
 

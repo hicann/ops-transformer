@@ -36,7 +36,8 @@ enum InputIdx {
     queryRopeEnum,
     keyRopeEnum,
     actualSeqLengthsQueryEnum,
-    actualSeqLengthsKvEnum
+    actualSeqLengthsKvEnum,
+    sinkEnum
 };
 
 enum OutputIdx {
@@ -49,7 +50,7 @@ enum OutputIdx {
 ge::graphStatus InferShapeSparseLightningIndexerGradKLLoss(gert::InferShapeContext *context)
 {
     OP_LOGI(context, "Start enter ShapeSparseLightningIndexerGradKLLoss runtime infershape impl.");
-    if (context == nullptr){
+    if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
     const gert::Shape *queryShape = context->GetInputShape(queryEnum);
@@ -75,7 +76,7 @@ ge::graphStatus InferShapeSparseLightningIndexerGradKLLoss(gert::InferShapeConte
     }
     if (inputLayoutSlig != "BSND" && inputLayoutSlig != "TND") {
         OP_LOGE(context, "The SparseLightningIndexerGradKLLoss inputLayout should be BSND/TND, but got %s.",
-                  inputLayoutSlig.c_str());
+                inputLayoutSlig.c_str());
         return GRAPH_FAILED;
     }
 
@@ -88,18 +89,18 @@ ge::graphStatus InferShapeSparseLightningIndexerGradKLLoss(gert::InferShapeConte
     gert::Shape *dKIndexShape = context->GetOutputShape(dKeyIndexEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, dKIndexShape);
 
-    lossShape->SetDimNum(SIZE_1); // 设置维度为1
+    lossShape->SetDimNum(SIZE_1);         // 设置维度为1
     lossShape->SetDim(DIM_NUM_0, SIZE_1); // 设置第0维数值为1
     *dWeightShape = *weightShape;
     *dQIndexShape = *queryIndexShape;
     *dKIndexShape = *keyIndexShape;
 
-    if (lossShape->GetShapeSize() != 1){
+    if (lossShape->GetShapeSize() != 1) {
         OP_LOGE(context, "The Shape Len of Loss should be 1, but got %ld.", lossShape->GetShapeSize());
         return GRAPH_FAILED;
     } else if (lossShape->GetDim(DIM_NUM_0) != 1) {
         OP_LOGE(context, "The Shape data of Loss should be 1, but got %ld.", lossShape->GetDim(DIM_NUM_0));
-        return GRAPH_FAILED;     
+        return GRAPH_FAILED;
     }
 
     return GRAPH_SUCCESS;
@@ -108,9 +109,9 @@ ge::graphStatus InferShapeSparseLightningIndexerGradKLLoss(gert::InferShapeConte
 ge::graphStatus InferDataTypeSparseLightningIndexerGradKLLoss(gert::InferDataTypeContext *context)
 {
     OP_LOGI(context, "Start enter ShapeSparseLightningIndexerGradKLLoss runtime infershape impl.");
-    if (context == nullptr){
+    if (context == nullptr) {
         return ge::GRAPH_FAILED;
-    } 
+    }
     const auto inputDataType = context->GetInputDataType(queryEnum);
     const auto inputWeightDataType = context->GetInputDataType(weightEnum);
     context->SetOutputDataType(dQueryIndexEnum, inputDataType);
@@ -120,5 +121,7 @@ ge::graphStatus InferDataTypeSparseLightningIndexerGradKLLoss(gert::InferDataTyp
     return ge::GRAPH_SUCCESS;
 }
 
-IMPL_OP_INFERSHAPE(SparseLightningIndexerGradKLLoss).InferShape(InferShapeSparseLightningIndexerGradKLLoss).InferDataType(InferDataTypeSparseLightningIndexerGradKLLoss);
+IMPL_OP_INFERSHAPE(SparseLightningIndexerGradKLLoss)
+    .InferShape(InferShapeSparseLightningIndexerGradKLLoss)
+    .InferDataType(InferDataTypeSparseLightningIndexerGradKLLoss);
 } // namespace ops

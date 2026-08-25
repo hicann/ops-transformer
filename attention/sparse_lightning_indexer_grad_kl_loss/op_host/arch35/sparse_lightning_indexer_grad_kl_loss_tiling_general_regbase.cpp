@@ -505,6 +505,19 @@ bool SparseLightningIndexerGradKLLossTilingBaseRegbase::CrossShapeVerify(const g
     auto sparseIndicesShape = context_->GetInputShape(SPARSE_INDICES_INPUT_INDEX)->GetStorageShape();
     auto softmaxMaxShape = context_->GetInputShape(SOFTMAX_MAX_INPUT_INDEX)->GetStorageShape();
     auto softmaxSumShape = context_->GetInputShape(SOFTMAX_SUM_INPUT_INDEX)->GetStorageShape();
+    // 校验sinks：若存在，须为1维且dim[0]=N1（query的N维度）
+    auto sinksShape = context_->GetOptionalInputShape(SINKS_INPUT_INDEX);
+    if (sinksShape != nullptr && sinksShape->GetStorageShape().GetDimNum() != 0) {
+        auto &sinksStorageShape = sinksShape->GetStorageShape();
+        int64_t n1Len = (inputLayout[0] == 'T' && inputLayout[1] == 'N' && inputLayout[2] == 'D') ?
+                            queryShape.GetDim(DIM_NUM_1) :
+                            queryShape.GetDim(DIM_NUM_2);
+        OP_CHECK_IF(sinksStorageShape.GetDimNum() != DIM_NUM_1 || sinksStorageShape.GetDim(DIM_NUM_0) != n1Len,
+                    OPS_REPORT_VECTOR_INNER_ERR(
+                        opName, "sinks dim[0] must equal N1(%ld), but got shape with dimNum(%lu) dim[0](%ld).", n1Len,
+                        sinksStorageShape.GetDimNum(), sinksStorageShape.GetDim(DIM_NUM_0)),
+                    return false);
+    }
     // 下面数字对应shape输入位置
     if (inputLayout[0] == 'T' && inputLayout[1] == 'N' && inputLayout[2] == 'D') {
         int64_t t1Len = queryShape[0];
@@ -911,6 +924,9 @@ bool SparseLightningIndexerGradKLLossTilingBaseRegbase::AnalyzeLayout()
     OP_CHECK_IF(gSizeQuery == 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "gSizeQuery is zero"), return false);
     OP_CHECK_IF(n2Size == 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "n2Size is zero"), return false);
     OP_CHECK_IF(dSizeQuery <= 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "dSizeQuery  is not support <= 0"), return false);
+
+    auto sinksShape = context_->GetOptionalInputShape(SINKS_INPUT_INDEX);
+    hasSink = (sinksShape != nullptr && sinksShape->GetStorageShape().GetDimNum() != 0);
     return true;
 }
 
@@ -1279,15 +1295,22 @@ ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseRegbase::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseRegbase::PostTiling() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseRegbase::PostTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
-ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseRegbase::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseRegbase::DoLibApiTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 uint64_t SparseLightningIndexerGradKLLossTilingBaseRegbase::GetTilingKey() const
 {
     return GET_TPL_TILING_KEY(static_cast<uint8_t>(hasRope), static_cast<uint8_t>(topKRange),
                               static_cast<uint8_t>(tilingKeyLayout), static_cast<uint8_t>(tilingKeyLayout),
-                              static_cast<uint8_t>(sparseMode), static_cast<uint8_t>(deterministic));
+                              static_cast<uint8_t>(sparseMode), static_cast<uint8_t>(deterministic),
+                              static_cast<uint8_t>(hasSink));
 }
 
 ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseRegbase::GetWorkspaceSize()
@@ -1307,6 +1330,9 @@ ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseRegbase::GetWorkspaceS
 
     int64_t usedCoreNum = static_cast<int64_t>(sliGradkllossMultiCoreParams_->get_coreNum());
     int64_t singlecoreTotalSize = PING_PONG_VALUE * reduceSumOffset + reluOffset + gatherSYOffset;
+    if (hasSink) {
+        singlecoreTotalSize += 2 * sizeof(float); // psinkSync: one float per subBlock
+    }
     int64_t multicoreTotalsize = 0;
     if (deterministic) {
         multicoreTotalsize =
