@@ -58,6 +58,7 @@ constexpr uint32_t CMP_RATIO_ATTR_INDEX = 0;
 constexpr uint32_t COFF_ATTR_INDEX = 1;
 constexpr uint32_t CACHE_MODE_ATTR_INDEX = 2;
 constexpr uint32_t STATE_CACHE_STRIDE_DIM0_ATTR_INDEX = 3;
+constexpr uint32_t GRAD_ENABLED_ATTR_INDEX = 4;
 
 // OUTPUT
 constexpr uint32_t CMP_KV_OUTPUT_INDEX = 0;
@@ -92,6 +93,7 @@ static const std::string START_POS_NAME = "start_pos";
 static const std::string CMP_RATIO_NAME = "cmp_ratio";
 static const std::string COFF_NAME = "coff";
 static const std::string CACHE_MODE_NAME = "cache_mode";
+static const std::string GRAD_ENABLED_NAME = "grad_enabled";
 static const std::string CMP_KV_NAME = "cmp_kv";
 
 static std::string DataTypeToSerialString(ge::DataType type);
@@ -207,6 +209,7 @@ const std::vector<int> CMP_RATIO{4, 128};
 const std::vector<int> CMP_RATIO{2, 4, 8, 16, 32, 64, 128};
 #endif
 const std::vector<uint32_t> HEAD_DIM{128, 512};
+// A3 only supports the linear state-cache buffer mode.
 const std::vector<int> CACHE_MODE{1};
 
 enum class CACHE_MODE : uint8_t {
@@ -234,6 +237,7 @@ struct CompressorContext {
     const int *cmpRatio;
     const int *cacheMode;
     const int *stateCacheStrideDim0;
+    const bool *gradEnabled;
     TemplateId templateId;
 
     ge::DataType dtype = ge::DT_BF16;
@@ -299,6 +303,7 @@ private:
     ge::graphStatus CheckSingleParaCmpRatio() const;
     ge::graphStatus CheckSingleParaCoff() const;
     ge::graphStatus CheckSingleParaCacheMode() const;
+    ge::graphStatus CheckSingleParaGradEnabled() const;
     ge::graphStatus CheckRequiredParaExistence() const;
     ge::graphStatus CheckRequiredInOutExistence() const;
     ge::graphStatus CheckRequiredAttrExistence() const;

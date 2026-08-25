@@ -87,6 +87,7 @@ ge::graphStatus CompressorTiling::ConvertContext(gert::TilingContext &context, C
     compressorContext.cmpRatio = attrs->GetAttrPointer<int>(CMP_RATIO_ATTR_INDEX);
     compressorContext.cacheMode = attrs->GetAttrPointer<int>(CACHE_MODE_ATTR_INDEX);
     compressorContext.stateCacheStrideDim0 = attrs->GetAttrPointer<int>(STATE_CACHE_STRIDE_DIM0_ATTR_INDEX);
+    compressorContext.gradEnabled = attrs->GetAttrPointer<bool>(GRAD_ENABLED_ATTR_INDEX);
 
     OP_CHECK_IF(
         context.GetWorkspaceSizes(1) == nullptr,
@@ -198,7 +199,10 @@ ge::graphStatus CompressorTiling::SetWorkSpaceInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CompressorTiling::SetScenarioInfo() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus CompressorTiling::SetScenarioInfo()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus CompressorTiling::SetTemplateId()
 {
@@ -403,7 +407,7 @@ ge::graphStatus CompressorTiling::CheckSinglePara() const
         ge::GRAPH_SUCCESS != CheckSingleParaCuSeqlens() || ge::GRAPH_SUCCESS != CheckSingleParaSeqused() ||
         ge::GRAPH_SUCCESS != CheckSingleParaStartPos() || ge::GRAPH_SUCCESS != CheckSingleParaCmpKv() ||
         ge::GRAPH_SUCCESS != CheckSingleParaCmpRatio() || ge::GRAPH_SUCCESS != CheckSingleParaCoff() ||
-        ge::GRAPH_SUCCESS != CheckSingleParaCacheMode()) {
+        ge::GRAPH_SUCCESS != CheckSingleParaCacheMode() || ge::GRAPH_SUCCESS != CheckSingleParaGradEnabled()) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -720,9 +724,20 @@ ge::graphStatus CompressorTiling::CheckSingleParaCoff() const
 
 ge::graphStatus CompressorTiling::CheckSingleParaCacheMode() const
 {
+    // A3 does not support the ring buffer mode (cache_mode=2).
     if (ge::GRAPH_SUCCESS != CheckAttrValueSupport(context_->cacheMode, CACHE_MODE, CACHE_MODE_NAME)) {
         return ge::GRAPH_FAILED;
     }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus CompressorTiling::CheckSingleParaGradEnabled() const
+{
+    // A3 only supports grad_enabled=false because arch22 has no backward-output path.
+    OP_CHECK_IF(context_->gradEnabled != nullptr && *context_->gradEnabled,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->opName, GRAD_ENABLED_NAME, "true",
+                                                      "grad_enabled only supports false"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -808,7 +823,10 @@ ge::graphStatus CompressorTiling::CheckRequiredAttrExistence() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CompressorTiling::CheckFeature() const { return ge::GRAPH_SUCCESS; }
+ge::graphStatus CompressorTiling::CheckFeature() const
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus CompressorTiling::LogErrorShapeConsistency(const std::string &name, const gert::StorageShape *shape,
                                                            const uint32_t &dimNum, const std::string &subName,
