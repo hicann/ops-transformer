@@ -639,6 +639,7 @@ aclnnStatus aclnnBlockSparseAttentionV2(
 #include <cstring>
 #include <cmath>
 #include <cstdint>
+#include <string>
 #include "acl/acl.h"
 #include "aclnn/opdev/fp16_t.h"
 #include "aclnnop/aclnn_block_sparse_attention.h"
@@ -799,6 +800,11 @@ int main() {
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
     // 2. 设置参数
+    const char *socName = aclrtGetSocName();
+    std::string socVersion = (socName != nullptr) ? std::string(socName) : std::string();
+    bool isArch22 = socVersion.find("Ascend910") != std::string::npos;
+    int64_t innerPrecise = isArch22 ? 0 : 4;
+
     int32_t batch = 1;
     int32_t qSeqlen = 128;
     int32_t kvSeqlen = 128;
@@ -813,9 +819,6 @@ int main() {
     int64_t totalKvTokens = batch * kvSeqlen;
     int32_t qBlockNum = (qSeqlen + blockShapeX - 1) / blockShapeX;  // Q块的X维度数量
     int32_t kvBlockNum = (kvSeqlen + blockShapeY - 1) / blockShapeY;  // KV块的Y维度数量
-    // totalQBlocks = qBlockNum * numHeads (每个Q块对应一个head)
-    int32_t totalQBlocks = qBlockNum * numHeads;
-    int32_t maxKvBlockNum = kvBlockNum;
 
     aclTensor *queryTensor = nullptr;
     aclTensor *keyTensor = nullptr;
@@ -843,7 +846,7 @@ int main() {
 
     // 3. 创建Query tensor (TND format: [totalQTokens, numHeads, headDim])
     std::vector<int64_t> queryShape = {totalQTokens, numHeads, headDim};
-    std::vector<op::fp16_t> queryHostData(totalQTokens * numHeads * headDim, 1.0f);
+    std::vector<op::fp16_t> queryHostData(GetShapeSize(queryShape), 1.0f);
     ret = CreateAclTensor(queryHostData, queryShape, &queryDeviceAddr, aclDataType::ACL_FLOAT16, &queryTensor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create query tensor\n");
               FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
@@ -854,8 +857,8 @@ int main() {
 
     // 4. 创建Key/Value tensor (TND format: [totalKvTokens, numKvHeads, headDim])
     std::vector<int64_t> kvShape = {totalKvTokens, numKvHeads, headDim};
-    std::vector<op::fp16_t> keyHostData(totalKvTokens * numKvHeads * headDim, 1.0f);
-    std::vector<op::fp16_t> valueHostData(totalKvTokens * numKvHeads * headDim, 1.0f);
+    std::vector<op::fp16_t> keyHostData(GetShapeSize(kvShape), 1.0f);
+    std::vector<op::fp16_t> valueHostData(GetShapeSize(kvShape), 1.0f);
     ret = CreateAclTensor(keyHostData, kvShape, &keyDeviceAddr, aclDataType::ACL_FLOAT16, &keyTensor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create key tensor\n");
               FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
@@ -872,9 +875,8 @@ int main() {
               return ret);
 
     // 5. 创建blockSparseMask tensor ([batch, numHeads, qBlockNum, kvBlockNum])
-    std::vector<int8_t> blockSparseMaskHostData(totalQBlocks * numHeads, 0);
-    blockSparseMaskHostData[0] = static_cast<int8_t>(1);
     std::vector<int64_t> blockSparseMaskShape = {batch, numHeads, qBlockNum, kvBlockNum};
+    std::vector<int8_t> blockSparseMaskHostData(GetShapeSize(blockSparseMaskShape), 1);
     ret = CreateAclTensor(blockSparseMaskHostData, blockSparseMaskShape, &blockSparseMaskDeviceAddr, aclDataType::ACL_INT8, &blockSparseMaskTensor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create block sparse mask tensor\n");
               FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
@@ -885,8 +887,7 @@ int main() {
 
     // 6. 创建输出tensor
     std::vector<int64_t> attentionOutShape = {totalQTokens, numHeads, headDim};
-    int64_t attentionOutElementCount = totalQTokens * numHeads * headDim;
-    std::vector<op::fp16_t> attentionOutHostData(attentionOutElementCount, 0.0f);
+    std::vector<op::fp16_t> attentionOutHostData(GetShapeSize(attentionOutShape), 0.0f);
     ret = CreateAclTensor(attentionOutHostData, attentionOutShape, &attentionOutDeviceAddr, aclDataType::ACL_FLOAT16, &attentionOutTensor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Failed to create attentionOut tensor\n");
               FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
@@ -987,7 +988,7 @@ int main() {
         numKvHeads,               // numKeyValueHeads
         0,                        // maskType
         scaleValue,               // scaleValue
-        4,                        // innerPrecise
+        innerPrecise,             // innerPrecise（随芯片型号自动选择）
         0,                        // blockSize
         2147483647,               // preTokens
         2147483647,               // nextTokens
