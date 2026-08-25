@@ -121,7 +121,7 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
                     op;
                 op.Init(context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2,
                         scales, sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
-                        expertTokenNumsOut, workspaceGM, &tilingData);
+                        expertTokenNumsOut, workspaceGM, &tilingData, tilingGM);
                 op.Process();
             }
         }

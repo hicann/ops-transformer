@@ -149,6 +149,10 @@ constexpr int64_t MB_SIZE = 1024LL * 1024LL;
 constexpr int64_t RESERVED_SPACE_SIZE = 10LL * 1024 * 1024;
 constexpr int64_t MAX_EXPERTS_PER_RANK_A2A3 = 128LL;
 constexpr int64_t SYNC_STATE_RESERVED_SIZE = 512LL * 1024;
+// 异常 Dump 区
+constexpr int64_t EXCEPTION_DUMP_REGION_SIZE = 60LL * 1024LL;
+// rankSyncInWorld 同步区
+constexpr int64_t PEERMEM_DATA_OFFSET = 60LL * 1024LL;
 
 int64_t CeilAlign(int64_t val, int64_t align)
 {
@@ -219,9 +223,6 @@ int64_t CalcHalfBufferSizeMBA5(int64_t epWorldSize, int64_t moeExpertNum, int64_
 {
     int64_t expertPerRank = moeExpertNum / epWorldSize;
 
-    // 全卡软同步使用 60KB
-    int64_t peermemDataOffset = 60LL * 1024LL;
-
     // mask_recv_size
     int64_t compareCount = CeilAlign(numMaxTokensPerRank * numTopk * 4, 256) / 4;
     int64_t maskAlignSize = CeilAlign(compareCount / 8, 32);
@@ -241,7 +242,8 @@ int64_t CalcHalfBufferSizeMBA5(int64_t epWorldSize, int64_t moeExpertNum, int64_
     // combine_send_size
     int64_t combineOut = CeilAlign(numMaxTokensPerRank * hidden * numTopk * 2, 512);
 
-    int64_t totalBytes = peermemDataOffset + maskRecvSize + quantTokenScaleSize + combineOut;
+    int64_t totalBytes =
+        EXCEPTION_DUMP_REGION_SIZE + PEERMEM_DATA_OFFSET + maskRecvSize + quantTokenScaleSize + combineOut;
 
     return totalBytes;
 }

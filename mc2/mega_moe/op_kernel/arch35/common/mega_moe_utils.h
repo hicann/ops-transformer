@@ -241,11 +241,11 @@ __aicore__ inline uint64_t GetUrmaCommHandle(__gm__ Mc2MoeContext *mc2Context, u
     return mc2Context->hcommHandle[index];
 }
 
-inline GM_ADDR winRankAddr_[HCCL_MAX_RANK_SIZE];
+inline GM_ADDR g_winRankAddr_[HCCL_MAX_RANK_SIZE];
 
 __aicore__ inline GM_ADDR GetRankWinAddrWithOffset(uint32_t rankId, uint64_t offset)
 {
-    return (GM_ADDR)(winRankAddr_[rankId] + offset);
+    return (GM_ADDR)(g_winRankAddr_[rankId] + offset);
 }
 
 __aicore__ inline GM_ADDR GetTensorAddr(uint16_t index, GM_ADDR tensorPtr)
@@ -386,7 +386,7 @@ __aicore__ inline void CrossRankSyncInWorldSize(GM_ADDR rankSyncInWorldPtr, uint
     int32_t count = ReadGmByPassDCache(syncCount) + 1;
     for (uint32_t rankIdx = aivJob.jobIndex; rankIdx < worldSize; rankIdx += aivJob.totalJobs) {
         __gm__ int32_t *remoteSyncAddr =
-            reinterpret_cast<__gm__ int32_t *>(winRankAddr_[rankIdx]) + rankId * INT_CACHELINE;
+            reinterpret_cast<__gm__ int32_t *>(g_winRankAddr_[rankIdx]) + rankId * INT_CACHELINE;
         WriteGmByPassDCache(remoteSyncAddr, count);
         GmSignalWaitBarrier(syncRank + rankIdx * INT_CACHELINE, count);
     }

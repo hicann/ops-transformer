@@ -100,11 +100,11 @@ public:
         dumpParams_ = reinterpret_cast<__gm__ DumpParams *>(baseAddr + DUMP_HEADER_REGION_SIZE +
                                                             DUMP_TILING_REGION_SIZE + DUMP_BLOCK_STAGE_REGION_SIZE);
         dumpParamsEnd_ = dumpParams_ + MAX_DUMP_ENTRIES;
+        headerGlobal_.SetGlobalBuffer(reinterpret_cast<GM_ADDR>(header_));
         blockStageGlobal_.SetGlobalBuffer(reinterpret_cast<GM_ADDR>(blockStage_));
 
         if (aivId_ == 0) {
             DumpTilingData(baseAddr + DUMP_HEADER_REGION_SIZE, tilingAddr, sizeof(TilingDataT));
-            header_->headerMagic = HEADER_MAGIC;
             header_->majorVersion = ASC_DEVKIT_MAJOR;
             header_->minorVersion = ASC_DEVKIT_MINOR;
             header_->patchVersion = ASC_DEVKIT_PATCH;
@@ -114,6 +114,8 @@ public:
             header_->numBlocks = GetBlockNum() * GetSubBlockNum();
             header_->dumpCount = 0;
             header_->execTimes[static_cast<size_t>(Policy::OP_TYPE)]++;
+            header_->headerMagic = HEADER_MAGIC;
+            DataCacheCleanAndInvalid<uint8_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(headerGlobal_);
         }
     }
 
@@ -153,6 +155,7 @@ public:
         DataCacheCleanAndInvalid<uint8_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(dumpParamsGlobal);
         dumpParams_++;
         header_->dumpCount++;
+        DataCacheCleanAndInvalid<uint8_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(headerGlobal_);
     }
 
     __aicore__ inline void Dump(GM_ADDR dumpAddr, size_t blockCount, size_t blockLen, size_t srcStride)
@@ -175,6 +178,7 @@ public:
         DataCacheCleanAndInvalid<uint8_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(dumpParamsGlobal);
         dumpParams_++;
         header_->dumpCount++;
+        DataCacheCleanAndInvalid<uint8_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(headerGlobal_);
     }
 
 private:
@@ -207,6 +211,7 @@ private:
     __gm__ BlockStage *blockStage_{nullptr};
     __gm__ DumpParams *dumpParams_{nullptr};
     __gm__ DumpParams *dumpParamsEnd_{nullptr};
+    GlobalTensor<uint8_t> headerGlobal_;
     GlobalTensor<uint8_t> blockStageGlobal_;
 };
 #endif
