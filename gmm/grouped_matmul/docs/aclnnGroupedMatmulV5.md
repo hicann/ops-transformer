@@ -193,7 +193,7 @@ aclnnStatus aclnnGroupedMatmulV5(
 
   | 参数名 | 输入/输出 | 描述 | 使用说明 | 数据类型 | 数据格式 | 维度(shape) | 非连续Tensor |
   |--------|:---:|------|------|----------|:---:|:---|:---:|
-  | x（aclTensorList *） | 输入 | 公式中的输入 $x$ | TensorList长度 [1,128] 或 [1,1024] | FLOAT、FLOAT16、INT16<span title="Ascend 950PR/950DT 不支持"><sup>1</sup></span>、INT8、INT4<span title="Ascend 950PR/950DT 不支持"><sup>1</sup></span>、BFLOAT16、FLOAT8_E5M2<span title="Atlas A3/A2 不支持"><sup>2</sup></span>、FLOAT8_E4M3FN<span title="Atlas A3/A2 不支持"><sup>2</sup></span>、HIFLOAT8<span title="Atlas A3/A2 不支持"><sup>2</sup></span>、FLOAT4_E2M1<span title="Atlas A3/A2 不支持"><sup>2</sup></span> | <abbr title="常规连续排布">ND</abbr> | 2~6 | √ |
+  | x（aclTensorList *） | 输入 | 公式中的输入 $x$ | TensorList长度 [1,128] 或 [1,1024] | FLOAT、FLOAT16、INT16<span title="Ascend 950PR/950DT 不支持"><sup>1</sup></span>、INT8、INT4、BFLOAT16、FLOAT8_E5M2<span title="Atlas A3/A2 不支持"><sup>2</sup></span>、FLOAT8_E4M3FN<span title="Atlas A3/A2 不支持"><sup>2</sup></span>、HIFLOAT8<span title="Atlas A3/A2 不支持"><sup>2</sup></span>、FLOAT4_E2M1<span title="Atlas A3/A2 不支持"><sup>2</sup></span> | <abbr title="常规连续排布">ND</abbr> | 2~6 | √ |
   | weight（aclTensorList *） | 输入 | 公式中的 $weight$ | TensorList长度 [1,128] 或 [1,1024] | FLOAT、FLOAT16、INT16<span title="Ascend 950PR/950DT 不支持"><sup>1</sup></span>、INT8、INT4、BFLOAT16、FLOAT8_E5M2<span title="Atlas A3/A2 不支持"><sup>2</sup></span>、FLOAT8_E4M3FN<span title="Atlas A3/A2 不支持"><sup>2</sup></span>、HIFLOAT8<span title="Atlas A3/A2 不支持"><sup>2</sup></span>、FLOAT4_E2M1<span title="Atlas A3/A2 不支持"><sup>2</sup></span> | ND/<abbr title="FRACTAL_NZ格式（亲和排布）">NZ</abbr> | 2~3 | √ |
   | biasOptional（aclTensorList *） | 可选输入 | 公式中的 $bias$ | 长度与weight相同 | FLOAT、FLOAT16、INT32、BFLOAT16<span title="Atlas A3/A2 不支持"><sup>2</sup></span> | ND | 1~2 | √ |
   | scaleOptional（aclTensorList *） | 可选输入 | 公式中的 $scale$，代表量化参数中的缩放因子 | 一般情况下，长度与weight相同。综合约束请参见 [约束说明](#7-约束说明) | FLOAT、UINT64、BFLOAT16、FLOAT8_E8M0<span title="Atlas A3/A2 不支持"><sup>2</sup></span>、INT64<span title="Atlas A3/A2 不支持"><sup>2</sup></span> | ND | 1~4 | √ |
@@ -219,7 +219,7 @@ aclnnStatus aclnnGroupedMatmulV5(
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：
     - 上表数据类型列中的角标 <span title="Ascend 950PR/950DT 不支持"><sup>1</sup></span> 代表该系列不支持的数据类型
-    - 输入参数 x、weight均不支持INT16 类型，且 x不支持INT4 类型
+    - 输入参数 x、weight均不支持INT16 类型
   <!-- end id8 -->
   <!-- npu="A3,910b" id11 -->
   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
@@ -509,26 +509,20 @@ aclnnGroupedMatmulV5默认确定性实现。
 <details>
 <summary>S4S4 场景约束</summary>
 
-**数据类型要求：**
+- weight仅支持非转置的ND格式，并且N 须为 8 的整数倍
+- 以下入参为空：biasOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional
+- 不为空的参数支持的数据类型组合要满足下表：
 
-| x | weight | bias | scale | perTokenScale | out |
-|:---|:---|:---|:---|:---|:---|
-| INT4 | INT4 (ND/NZ) | null | UINT64 | FLOAT/null | FLOAT16/BFLOAT16 |
+| groupType | x | weight | scaleOptional | perTokenScaleOptional | out |
+|:---:|:---:|:---:|:---|:---|:---|
+| 0 | INT4 | INT4 | UINT64 | FLOAT/null | FLOAT16/BFLOAT16 |
 
-> 以下参数须传空：offset、antiquantScale、antiquantOffset、activationInput、activationQuantScale、activationQuantOffset。
+- **scaleOptional shape**（$g$=分组数）：
 
-- **约束说明**
-
-  除平台约束外，S4S4场景其余约束如下：
-  - 仅支持groupType=0（M轴分组），actType=0，groupListType=0/1/2
-  - 当前仅支持x、weight、out均为长度为1的TensorList
-  - x不支持转置，weight为NZ格式时，支持转置。ND格式仅支持非转置。
-  - x仅支持2维Tensor，Shape为（M，K）
-  - weight仅支持3维Tensor，Shape为（E，K，N）
-  - weight的数据格式为ND时，要求n为8的整数倍。
-  - 支持perchannel和pergroup量化。perchannel场景的scale的shape需为 $[E, N]$，pergroup场景需为 $[E, G, N]$。
-  - pergroup场景下，$G$必须要能整除$K$，且$k/G$需为偶数。
-  - 开启右矩阵NZ转置后，$K/G$必须按照64对齐， K按照64对齐， N按照16对齐。
+| groupType | 子场景 | shape | 约束 |
+|:---:|:---|:---|:---|
+| 0 | <abbr title="简称C量化，量化对象是右矩阵，每个channel分别使用独立的量化参数">perchannel</abbr> | `[E, N]` | |
+| 0 | <abbr title="简称G量化，在reduce轴上对数据分组，每组使用独立的量化参数">pergroup</abbr> | `[E, G, N]` | $G$须能整除$K$，且$K/G$需为偶数 |
 
 </details>
 
@@ -541,30 +535,43 @@ aclnnGroupedMatmulV5默认确定性实现。
 
 **S8S4场景：**
 
-**数据类型要求：**
+- 以下入参为空：antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional
+- 不为空的参数支持的数据类型组合要满足下表：
 
-| x | weight | bias | scale | offset | antiquantScale | antiquantOffset | perTokenScale | groupList | activationInput | activationQuantScale | activationQuantOffset | out |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| INT8 | INT4 (ND/NZ) | FLOAT | UINT64 | null | null | null | FLOAT | INT64 | null | null | null | BFLOAT16 |
-| INT8 | INT4 (ND/NZ) | FLOAT | UINT64 | FLOAT/null | null | null | FLOAT | INT64 | null | null | null | FLOAT16 |
+| groupType | x | weight | biasOptional | scaleOptional | offsetOptional | perTokenScaleOptional | groupListOptional | out |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| 0 | INT8 | INT4 | FLOAT | UINT64 | null | FLOAT | INT64 | BFLOAT16 |
+| 0 | INT8 | INT4 | FLOAT | UINT64 | FLOAT/null | FLOAT | INT64 | FLOAT16 |
 
-**约束说明：**
+- **scaleOptional 与 offsetOptional shape**（$E$=组数）：
 
-除平台约束外，S8S4场景其余约束如下：
+| offsetOptional | 子场景 | scaleOptional shape | offsetOptional shape |
+|:---:|:---|:---|:---|
+| null | per-group 与 per-channel 离线融合 | `[E, K/256, N]` | - |
+| 非空 | <abbr title="简称C量化，量化对象是右矩阵，每个channel分别使用独立的量化参数">perchannel</abbr> | `[E, 1, N]` | `[E, 1, N]`（FLOAT32） |
 
-- 仅支持groupType=0（M轴分组）、splitItem=2/3、actType=0，groupListType仅支持1（count）。
-- 当前仅支持x、weight、biasOptional、scaleOptional、offsetOptional、perTokenScaleOptional和out均为长度1的TensorList。
-- x和weight均不支持转置；x仅支持2维Tensor，shape为`[M,K]`；weight默认支持3维Tensor，shape为`[E,K,N]`。
-- perTokenScaleOptional的shape为`[M]`。
-- biasOptional为必选输入，shape为`[E,N]`。该输入是INT4权重离线转换的校正量，按`8 × weight × scale`沿K轴规约得到。
-- 当weight传入数据类型为INT32时，会将每个INT32视为8个INT4。
-- offsetOptional为空时：
-  - K不大于18432且必须是256的整数倍。
-  - scaleOptional为per-group与per-channel离线融合后的结果，shape为`[E,K/256,N]`。
-- offsetOptional不为空时：
-  - 仅支持per-channel，scaleOptional的shape为`[E,1,N]`。
-  - offsetOptional为非对称量化离线计算的辅助结果，即`antiquantOffset × scale`，shape为`[E,1,N]`，数据类型为FLOAT32。
-- S8S4 offsetOptional不为空的per-channel场景下，tuningConfigOptional数组第二个元素可置1。此时weight需按`[E,N,K]`排布并转换为NZ，仅支持长度为1的weight TensorList。
+- **约束说明**：
+
+  除平台约束外，S8S4场景其余约束如下：
+
+  | groupType | splitItem | actType | groupListType |
+  |:---:|:---:|:---:|:---|
+  | 0（M轴分组） | 2/3 | 0 | 1（count） |
+
+  - 当前仅支持x、weight、biasOptional、scaleOptional、offsetOptional、perTokenScaleOptional和out均为长度1的TensorList（下表中省略该要求）。
+
+  | 输入输出 | 子场景 | shape限制 |
+  |:---:|:---|:---|
+  | x | 单Tensor | 2维，shape为`[M,K]`，不支持转置 |
+  | weight | 单Tensor | 3维，shape为`[E,K,N]`，不支持转置 |
+  | biasOptional | 必选输入 | 2维，shape为`[E,N]` |
+  | perTokenScaleOptional | 单Tensor | 1维，shape为`[M]` |
+  | out | 单Tensor | - |
+
+  - biasOptional为必选输入，是INT4权重离线转换的校正量，按`8 × weight × scale`沿K轴规约得到。
+  - 当weight传入数据类型为INT32时，会将每个INT32视为8个INT4。
+  - offsetOptional为空时，K不大于18432且必须是256的整数倍。
+  - S8S4 offsetOptional不为空的per-channel场景下，tuningConfigOptional数组第二个元素可置1。此时weight需按`[E,N,K]`排布并转换为NZ，仅支持长度为1的weight TensorList。
 
 **其他伪量化场景：**
 

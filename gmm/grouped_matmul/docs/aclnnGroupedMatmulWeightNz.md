@@ -195,7 +195,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
     <td>输入</td>
     <td>公式中的输入<code>x</code>。</td>
     <td>tensorList长度支持[1, 128]或者[1, 1024]。</td>
-    <td>FLOAT16、BFLOAT16、INT8、INT4<sup>1</sup>、INT32<sup>1</sup>、FLOAT8_E4M3FN<sup>2</sup>、FLOAT4_E2M1<sup>2</sup>、FLOAT4_E1M2<sup>2</sup></td>
+    <td>FLOAT16、BFLOAT16、INT8、INT4、INT32<sup>1</sup>、FLOAT8_E4M3FN<sup>2</sup>、FLOAT4_E2M1<sup>2</sup>、FLOAT4_E1M2<sup>2</sup></td>
     <td>ND</td>
     <td>-</td>
     <td>-</td>
@@ -628,24 +628,40 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 
     **S8S4场景：**
 
-      **数据类型要求：**
+    - 以下入参为空：antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
+    - 不为空的参数支持的数据类型组合要满足下表：
 
-      | x | weight | bias | scale | offset | antiquantScale | antiquantOffset | perTokenScale | groupList | activationInput | activationQuantScale | activationQuantOffset | out |
-      |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-      | INT8 | INT4 (NZ) | FLOAT | UINT64 | null | null | null | FLOAT | INT64 | null | null | null | BFLOAT16 |
-      | INT8 | INT4 (NZ) | FLOAT | UINT64 | FLOAT/null | null | null | FLOAT | INT64 | null | null | null | FLOAT16 |
+      |groupType| x | weight | biasOptional | scaleOptional | offsetOptional | perTokenScaleOptional | groupListOptional | out |
+      |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+      |0|INT8|INT4|FLOAT|UINT64|null|FLOAT|INT64|BFLOAT16|
+      |0|INT8|INT4|FLOAT|UINT64|FLOAT/null|FLOAT|INT64|FLOAT16|
 
-      **约束说明：**
+    - scaleOptional与offsetOptional要满足下表（其中E为分组数）：
+
+      | 子场景 | offsetOptional | scaleOptional shape | offsetOptional shape | quantGroupSize | out |
+      |:---:|:---:|:---:|:---:|:---:|:---:|
+      | 对称per-group | null | `[E, K/256, N]` | - | 256 | FLOAT16/BFLOAT16 |
+      | 非对称per-channel | FLOAT32 | `[E, 1, N]` | `[E, 1, N]` | 0 | FLOAT16 |
+
+    - 约束说明：
 
       除公共约束外，S8S4场景其余约束如下：
 
-      - 仅支持groupType=0、splitItem=2/3、actType=0，groupListType仅支持1（count）。
-      - x、weight、scaleOptional、biasOptional、perTokenScaleOptional和out均为长度1的TensorList；x和weight均不支持转置。
-      - x仅支持2维Tensor，shape为`[M,K]`；weight默认支持3维Tensor，shape为`[E,K,N]`；perTokenScaleOptional的shape为`[M]`。
-      - biasOptional为必选输入，数据类型为FLOAT32，shape为`[E,N]`。该输入是INT4权重离线转换的校正量，按`8 × weight × scale`沿K轴规约得到。
-      - 对称per-group场景：offsetOptional为空，scaleOptional为UINT64且shape为`[E,K/256,N]`，quantGroupSize填256，K不大于18432且必须是256的整数倍，out支持FLOAT16或BFLOAT16。
-      - 非对称per-channel场景：offsetOptional为FLOAT32且shape为`[E,1,N]`，scaleOptional为UINT64且shape为`[E,1,N]`，quantGroupSize填0，out仅支持FLOAT16。
-      - antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional和activationFeatureOutOptional必须为空。
+      |groupType| splitItem | actType | groupListType |
+      |:---:|:---:|:---:|:---|
+      |0|2/3|0|1（count）|
+
+      | 输入输出 | 子场景 | shape限制 |
+      |:---:|:---|:---|
+      | x | 单Tensor | 2维，shape为`[M,K]`，不支持转置 |
+      | weight | 单Tensor | 3维，shape为`[E,K,N]`，不支持转置 |
+      | biasOptional | 必选输入 | 2维，shape为`[E,N]`，数据类型FLOAT32 |
+      | perTokenScaleOptional | 单Tensor | 1维，shape为`[M]` |
+      | out | 单Tensor | - |
+
+      - x、weight、scaleOptional、biasOptional、perTokenScaleOptional和out均为长度1的TensorList。
+      - biasOptional为必选输入，是INT4权重离线转换的校正量，按`8 × weight × scale`沿K轴规约得到。
+      - 对称per-group场景下，K不大于18432且必须是256的整数倍。
       - S8S4 offsetOptional不为空的per-channel场景下，tuningConfigOptional数组第二个元素可置1。此时weight需按`[E,N,K]`排布并转换为NZ，仅支持长度为1的weight TensorList。
 
     **其他伪量化场景：**
@@ -741,12 +757,24 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
         |0|x单tensor|每个tensor 3维，shape为（M, ceil(K / 64), 2）|
 
   - S4S4（全量化INT4×INT4）场景支持的输入类型为：
-    - 仅支持groupType=0、actType=0，groupListType=0/1/2。
-    - 仅支持x、weight、out均为长度为1的TensorList。
-    - x为INT4、weight为INT4、biasOptional为空、scaleOptional为UINT64、offsetOptional为空、antiquantScaleOptional为空、antiquantOffsetOptional为空、perTokenScaleOptional为空或为FLOAT32、activationInputOptional为空、out为FLOAT16或BFLOAT16。
-    - x不支持转置；weight支持NZ转置输入，即输入为[E,N,K]，但view shape为[E,K,N]以保证算子识别转置状态，转置输入下，$k/G$要求按照64对齐，K按照64对齐，N按照16对齐，ND不支持转置输入。
-    - 支持perchannel和pergroup量化。perchannel场景的scale的shape需为$[E, N]$，pergroup场景需为$[E, G, N]$。
-    - pergroup场景下，$G$必须要能整除$K$，且$k/G$需为偶数。
+    - 以下入参为空：biasOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
+    - 不为空的参数支持的数据类型组合要满足下表：
+
+      |groupType| x | weight | scaleOptional | perTokenScaleOptional | out |
+      |:---:|:---:|:---:|:---:|:---:|:---:|
+      |0|INT4|INT4|UINT64|FLOAT32/null|FLOAT16/BFLOAT16|
+
+    - scaleOptional要满足下表：
+
+      |groupType| 使用场景 | shape限制 | 其他限制 |
+      |:---:|:---:|:---:| :------ |
+      |0|perchannel|每个tensor 2维，shape为（E, N）| |
+      |0|pergroup|每个tensor 3维，shape为（E, G, N）| $G$必须要能整除$K$，且$k/G$需为偶数 |
+
+    - 约束说明：
+
+      - 仅支持x、weight、out均为长度为1的TensorList。
+      - weight支持NZ转置输入，即输入为[E,N,K]，但view shape为[E,K,N]以保证算子识别转置状态，转置输入下，$k/G$要求按照64对齐，K按照64对齐，N按照16对齐，ND不支持转置输入。
 
   - 不同groupType支持场景:
 
