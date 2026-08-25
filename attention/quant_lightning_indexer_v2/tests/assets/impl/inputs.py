@@ -470,6 +470,9 @@ class QuantLightningIndexerV2InputAdapter:
         attributes = dict(compare_context.attributes)
         aliases = {
             "topk": "sparse_count",
+            "mask_mode": "sparse_mode",
+            "layout_q": "layout_query",
+            "layout_k": "layout_key",
             "quantMode": "quant_mode",
             "maxSeqlenQ": "max_seqlen_q",
             "layoutQOptional": "layout_query",
