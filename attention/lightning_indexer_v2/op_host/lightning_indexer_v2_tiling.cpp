@@ -312,6 +312,13 @@ ge::graphStatus LIV2InfoParser::GetAndCheckAttrParaInfo()
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "topk", std::to_string(*opParamInfo_.topk),
                                                       "Topk must > 0 and <= 8192"),
                 return ge::GRAPH_FAILED);
+    if (npuArch_ == NpuArch::DAV_2201) {
+        OP_CHECK_IF(*opParamInfo_.topk > SPARSE_2K && *opParamInfo_.topk % TOPK_MULTIPLE != 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "topk", std::to_string(*opParamInfo_.topk),
+                        "input attr topk > 2048 must be an integer multiple of 1024 on 910B/C"),
+                    return ge::GRAPH_FAILED);
+    }
     OP_CHECK_IF(!((*opParamInfo_.maskMode == 0) || (*opParamInfo_.maskMode == SPARSE_MODE_LOWER)),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "mask_mode", std::to_string(*opParamInfo_.maskMode),
                                                       "Mask_mode only supported 0 or 3"),

@@ -37,7 +37,11 @@ struct TilingOptionalParaInfo {
     const gert::Tensor *tensor;
 };
 
-enum class DataLayout : uint32_t { BSND = 0, TND = 1, PA_BBND = 2 };
+enum class DataLayout : uint32_t {
+    BSND = 0,
+    TND = 1,
+    PA_BBND = 2
+};
 
 // ------------------算子原型索引常量定义----------------
 // Inputs Index
@@ -74,9 +78,10 @@ constexpr uint32_t DIM_NUM_THREE = 3;
 constexpr uint32_t DIM_NUM_FOUR = 4;
 // 入参限制常量
 constexpr uint32_t HEAD_DIM_LIMIT = 128;
-constexpr uint32_t SPARSE_LIMIT = 2048;
+constexpr uint32_t SPARSE_2K = 2048;
 constexpr uint32_t SPARSE_MODE_LOWER = 3;
 constexpr uint32_t TOPK_MAX = 8192;
+constexpr uint32_t TOPK_MULTIPLE = 1024;
 constexpr uint32_t G_SIZE_LIMIT = 64;
 constexpr uint32_t METADATA_LIMIT = 1024;
 
@@ -177,7 +182,9 @@ public:
 // -----------算子Tiling入参信息解析及Check类---------------
 class LIV2InfoParser {
 public:
-    explicit LIV2InfoParser(gert::TilingContext *context) : context_(context) {}
+    explicit LIV2InfoParser(gert::TilingContext *context)
+        : context_(context)
+    {}
     ~LIV2InfoParser() = default;
 
     ge::graphStatus CheckRequiredInOutExistence() const;
@@ -252,7 +259,8 @@ public:
 // ---------------算子Tiling类---------------
 class LightningIndexerV2Tiling {
 public:
-    explicit LightningIndexerV2Tiling(gert::TilingContext *context) : context_(context) {};
+    explicit LightningIndexerV2Tiling(gert::TilingContext *context)
+        : context_(context) {};
     ge::graphStatus DoTiling(LIV2TilingInfo *tilingInfo);
 
 private:
