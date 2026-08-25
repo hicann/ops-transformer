@@ -365,8 +365,8 @@ __global__ __aicore__ void BsaInferInterfaceMXFP4FullQuant(
                                           kDequantScale,
                                           vDequantScale,
                                           attentionOut,
-                                          lse,
                                           workspace,
+                                          lse,
                                           tiling};
     BsaMXFP4FullQuantKernelArch35 bsaMXFP4FullQuantKernelArch35;
     bsaMXFP4FullQuantKernelArch35(params);
