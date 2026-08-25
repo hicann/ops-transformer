@@ -160,14 +160,14 @@
       <td>outIndex</td>
       <td>输出</td>
       <td>对应公式中的`outIndex`。</td>
-      <td>FLOAT16、BFLOAT16、FLOAT32</td>
+      <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>permuteTokenId</td>
       <td>输出</td>
       <td>对应公式中的`permuteTokenId`。</td>
-      <td>FLOAT16、BFLOAT16、FLOAT32</td>
+      <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
