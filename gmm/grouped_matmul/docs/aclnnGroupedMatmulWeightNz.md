@@ -774,7 +774,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
     - 约束说明：
 
       - 仅支持x、weight、out均为长度为1的TensorList。
-      - weight支持NZ转置输入，即输入为[E,N,K]，但view shape为[E,K,N]以保证算子识别转置状态，转置输入下，$k/G$要求按照64对齐，K按照64对齐，N按照16对齐，ND不支持转置输入。
+      - weight支持NZ转置输入，即输入为[E,N,K]，但view shape为[E,K,N]以保证算子识别转置状态，转置输入下，$k/G$要求按照64对齐，K按照64对齐，N按照16对齐。
 
   - 不同groupType支持场景:
 
