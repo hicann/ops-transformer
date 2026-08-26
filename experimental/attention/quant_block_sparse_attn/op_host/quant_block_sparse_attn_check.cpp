@@ -523,12 +523,15 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckShapeConsistency() const
                                               "Must be <= " + std::to_string(QBSA_MAX_BATCH_SIZE));
         return ge::GRAPH_FAILED;
     }
-    if (tilingInfo_.quantModeVal == QBSA_QUANT_MODE_MXFP8_FULL_QUANT) {
-        if (tilingInfo_.n2Size > QBSA_MAX_N2_SIZE) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "n2Size", std::to_string(tilingInfo_.n2Size),
-                                                  "Must be <= " + std::to_string(QBSA_MAX_N2_SIZE));
-            return ge::GRAPH_FAILED;
-        }
+    if (tilingInfo_.gSize > QBSA_MAX_G_SIZE) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "gSize", std::to_string(tilingInfo_.gSize),
+                                              "Must be <= " + std::to_string(QBSA_MAX_G_SIZE));
+        return ge::GRAPH_FAILED;
+    }
+    if (tilingInfo_.n2Size > QBSA_MAX_N2_SIZE) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "n2Size", std::to_string(tilingInfo_.n2Size),
+                                              "Must be <= " + std::to_string(QBSA_MAX_N2_SIZE));
+        return ge::GRAPH_FAILED;
     }
     if (tilingInfo_.n1Size % tilingInfo_.n2Size != 0U) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(

@@ -600,7 +600,7 @@ QuantBlockSparseAttn 算子约束分为 4 个档位，按约束复杂程度递�
 
 - 一致性约束
 
-  - `quant_mode=1` 时，`BatchSize` 的取值范围必须为 `(0, 65536]`，`N1` 的取值范围必须为 `(0, 128]`；`N2`、`G` 均必须大于 0。
+  - `quant_mode=1` 时，`BatchSize` 的取值范围必须为 `(0, 65536]`，`N1` 的取值范围必须为 `(0, 128]`；`N2`、`G` 均必须大于 0，且 `N2` <= `8`，`G` <= `16`。
   - `N1` 必须能被 `N2` 整除。
   - `sparse_indices` 必须按 `(BatchSize, N1, max_Qb, max_Kb)` 传入，`sparse_seq_len` 必须按 `(BatchSize, N1, max_Qb)` 传入；当前主算子默认这两个 Tensor 的 shape 正确，不在 host 中对max_Qb和max_Kb进行拦截校验。
   - `block_table` 必须按 `(BatchSize, max_block_num_per_batch)` 传入。主算子使用 `sparse_indices.shape[2]` 作为 `max_Qb`，使用 `block_table.shape[1]` 作为 `max_block_num_per_batch`，二者均必须大于 0。

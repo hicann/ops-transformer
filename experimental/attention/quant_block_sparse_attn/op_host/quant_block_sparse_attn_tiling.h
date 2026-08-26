@@ -47,6 +47,7 @@ constexpr uint32_t QBSA_MXFP8_PER_TOKEN_GROUP_MODE = 6U;
 constexpr uint32_t QBSA_MXFP8_PER_CHANNEL_GROUP_MODE = 8U;
 constexpr uint32_t QBSA_MAX_BATCH_SIZE = 65536U;
 constexpr uint32_t QBSA_MAX_N2_SIZE = 8U;
+constexpr uint32_t QBSA_MAX_G_SIZE = 16U;
 
 inline uint32_t QBSACeilDiv(uint32_t value, uint32_t divisor)
 {
