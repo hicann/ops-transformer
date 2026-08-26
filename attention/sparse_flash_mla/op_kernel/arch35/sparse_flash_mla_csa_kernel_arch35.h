@@ -455,15 +455,28 @@ __aicore__ inline void SparseFlashMlaCsaKernel<CubeBlockType, VecBlockType>::Ini
         v0ResGmBuffers.Get().SetCrossCoreID(INVALID_CROSS_CORE_EVENT_ID, crossCoreSyncBufId);
         crossCoreSyncBufId++;
     }
-    int64_t fdStagingOffset = 0U;
+    int64_t fdStagingOffset = 0LL;
     if constexpr (IS_SPLIT_G || TEMPLATE_MODE == SMLATemplateMode::CSA_TEMPLATE_MODE ||
                   TEMPLATE_MODE == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
                   TEMPLATE_MODE == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-        constexpr uint32_t TRIPLE_BUFFER_NUM = 3U;
-        uint32_t v0ResSize = constInfo.s2BaseSize * constInfo.dSize * sizeof(Q_T);
+        constexpr int64_t TRIPLE_BUFFER_NUM = 3LL;
+        int64_t v0ResSize = static_cast<int64_t>(constInfo.s2BaseSize) * constInfo.dSize * sizeof(Q_T);
         uint32_t v0LogicalSlotCount = IS_SPLIT_G ? (GetBlockNum() >> 1U) : GetBlockNum();
         fdStagingOffset = v0ResSize * TRIPLE_BUFFER_NUM * v0LogicalSlotCount;
         fdStagingOffset += TRIPLE_BUFFER_NUM * constInfo.s2BaseSize * sizeof(int32_t) * GetBlockNum();
+        if constexpr (IS_VEC_S2PHYADDR) {
+            int64_t totalBS1 = (LAYOUT_T == SMLA_LAYOUT::TND) ?
+                                   static_cast<int64_t>(constInfo.s1Size) :
+                                   static_cast<int64_t>(constInfo.bSize) * constInfo.s1Size;
+            if constexpr (TEMPLATE_MODE == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+                          TEMPLATE_MODE == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
+                fdStagingOffset += totalBS1 * constInfo.alignedOriSparseBlockCount * sizeof(int64_t);
+            }
+            if constexpr (TEMPLATE_MODE == SMLATemplateMode::CSA_TEMPLATE_MODE ||
+                          TEMPLATE_MODE == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
+                fdStagingOffset += totalBS1 * constInfo.alignedCmpSparseBlockCount * sizeof(int64_t);
+            }
+        }
     }
     fdStagingBufferManager.Init(workspace + fdStagingOffset);
     constexpr uint32_t FD_MAX_SUM_REGION_NUM = 2U;
