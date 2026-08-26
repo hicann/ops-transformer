@@ -10,65 +10,83 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ----------------------------------------------------------------------------
 __input__ = {
-    "kernel": {
-        "scatter_kv_cache_with_k_scale": "scatter_kv_cache_with_k_scale_input"
-    }
+    "kernel": {"scatter_kv_cache_with_k_scale": "scatter_kv_cache_with_k_scale_input"},
     "aclnn": {
         "aclnnScatterPaKvCacheWithKScale": "aclnnScatterPaKvCacheWithKScaleInput"
-    }
+    },
 }
 
 import numpy as np
 import torch
 
-def scatter_kv_cache_with_k_scale_input(
- 	     key,
- 	     value,
- 	     key_cache,
- 	     value_cache,
- 	     slot_mapping,
- 	     key_scale,
- 	     key_scale_cache,
- 	     *,
- 	     cache_layout="BNBD",
- 	     **kwargs
- 	 ):
- 	"""
- 	input for scatter_kv_cache_with_k_scale.
 
- 	"""
- 	num_blocks = key_cache.shape[0]
- 	block_size = key_cache.shape[2]
+def scatter_kv_cache_with_k_scale_input(
+    key,
+    value,
+    key_cache,
+    value_cache,
+    slot_mapping,
+    key_scale,
+    key_scale_cache,
+    *,
+    cache_layout="BNBD",
+    **kwargs,
+):
+    """
+    input for scatter_kv_cache_with_k_scale.
+
+    """
+    num_blocks = key_cache.shape[0]
+    block_size = key_cache.shape[2]
     gen_num = key.shape[0]
     max_token = num_blocks * block_size
     if gen_num > max_token:
         raise ValueError("cann not gen input max_token over numBlocks * blockSize")
-    slot_mapping = np.random.choice(max_token, gen_num, replace=False).astype(slot_mapping.dtype)
-    
-    return[key, value, key_cache, value_cache, slot_mapping, key_scale, key_scale_cache]
+    slot_mapping = np.random.choice(max_token, gen_num, replace=False).astype(
+        slot_mapping.dtype
+    )
+
+    return [
+        key,
+        value,
+        key_cache,
+        value_cache,
+        slot_mapping,
+        key_scale,
+        key_scale_cache,
+    ]
+
 
 def aclnnScatterPaKvCacheWithKScaleInput(
- 	     key,
- 	     value,
- 	     key_cache,
- 	     value_cache,
- 	     slot_mapping,
- 	     key_scale,
- 	     key_scale_cache,
- 	     cache_layout="BNBD",
- 	     **kwargs
- 	 ):
- 	"""
- 	input for aclnnScatterPaKvCacheWithKScale.
+    key,
+    value,
+    key_cache,
+    value_cache,
+    slot_mapping,
+    key_scale,
+    key_scale_cache,
+    cache_layout="BNBD",
+    **kwargs,
+):
+    """
+    input for aclnnScatterPaKvCacheWithKScale.
 
- 	"""
- 	num_blocks = key_cache.shape[0]
- 	block_size = key_cache.shape[2]
+    """
+    num_blocks = key_cache.shape[0]
+    block_size = key_cache.shape[2]
     gen_num = key.shape[0]
     max_token = num_blocks * block_size
     if gen_num > max_token:
         raise ValueError("cann not gen input max_token over numBlocks * blockSize")
     np_type = torch.tensor([], dtype=slot_mapping.dtype).numpy().dtype
     slot_mapping = np.random.choice(max_token, gen_num, replace=False).astype(np_type)
-    
-    return[key, value, key_cache, value_cache, slot_mapping, key_scale, key_scale_cache]
+
+    return [
+        key,
+        value,
+        key_cache,
+        value_cache,
+        slot_mapping,
+        key_scale,
+        key_scale_cache,
+    ]
