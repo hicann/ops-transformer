@@ -35,7 +35,7 @@ extern aclnnStatus aclnnInnerSparseLightningIndexerGradKLLossGetWorkspaceSize(
     const aclTensor *query, const aclTensor *key, const aclTensor *queryIndex, const aclTensor *keyIndex,
     const aclTensor *weight, const aclTensor *sparseIndices, const aclTensor *softmaxMax, const aclTensor *softmaxSum,
     const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
-    const aclTensor *actualSeqLengthsQueryOptional, const aclTensor *actualSeqLengthsKeyOptional,
+    const aclIntArray *actualSeqLengthsQueryOptional, const aclIntArray *actualSeqLengthsKeyOptional,
     const aclTensor *sinksOptional, double scaleValue, char *layout, int64_t sparseMode, int64_t preTokens,
     int64_t nextTokens, bool deterministic, const aclTensor *dQueryIndex, const aclTensor *dKeyIndex,
     const aclTensor *dWeight, const aclTensor *loss, uint64_t *workspaceSize, aclOpExecutor **executor);
@@ -47,7 +47,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossGetWorkspaceSize(
     const aclTensor *query, const aclTensor *key, const aclTensor *queryIndex, const aclTensor *keyIndex,
     const aclTensor *weight, const aclTensor *sparseIndices, const aclTensor *softmaxMax, const aclTensor *softmaxSum,
     const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
-    const aclTensor *actualSeqLengthsQueryOptional, const aclTensor *actualSeqLengthsKeyOptional, double scaleValue,
+    const aclIntArray *actualSeqLengthsQueryOptional, const aclIntArray *actualSeqLengthsKeyOptional, double scaleValue,
     char *layout, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, bool deterministic,
     const aclTensor *dQueryIndex, const aclTensor *dKeyIndex, const aclTensor *dWeight, const aclTensor *loss,
     uint64_t *workspaceSize, aclOpExecutor **executor)
