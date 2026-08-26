@@ -114,7 +114,7 @@ struct RunParamStr<true> { // 分核与切块需要使用到参数
     int64_t s1LoopTimes;
     int64_t gS1Idx;
     // BN循环生产的数据
-    int64_t s2InCurrentBatch;                         // Tensorlist场景，不同batch的S2长度，后续用计算KvStride
+    int64_t s2InCurrentBatch; // Tensorlist场景，不同batch的S2长度，后续用计算KvStride
     int64_t preTokensPerBatch = MAX_PRE_NEXT_TOKENS;  // 左上顶点的pretoken
     int64_t nextTokensPerBatch = MAX_PRE_NEXT_TOKENS; // 左上顶点的nexttoken
 
@@ -159,18 +159,20 @@ struct RunParamStr<true> { // 分核与切块需要使用到参数
     int32_t s1RealSize; \
     int32_t s1RealSizeAlign32; \
     int32_t s1RealSizeAlign64; \
-    int32_t halfS1RealSize;      /* vector侧实际的s1基本块大小，如果Cube基本块=128，那么halfS1RealSize=64 */ \
-    int32_t firstHalfS1RealSize; /* 当s1RealSize不是2的整数倍时，v0比v1少计算一行，计算subblock偏移的时候需要使用v0的s1 \
-                                    size */ \
-    int32_t s2RealSize;          /* s2方向基本块的真实长度 */ \
-    int64_t s2AlignedSize;       /* s2方向基本块对齐到16之后的长度 */ \
-    int32_t vec2S1BaseSize;      /* vector2侧开循环之后，经过切分的S1大小，例如把64切分成两份32 */ \
-    int32_t vec2S1RealSize;      /* vector2侧开循环之后，经过切分的S1的尾块大小，例如把63切分成两份32和31，第二份的实际大小是31 \
-                                  */ \
-    int64_t vecCoreOffset;       /* vec核基于cube核起始处s1方向偏移 */ \
-    int64_t queryOffset;         /* mm1 Query的offset*/ \
-    int64_t keyOffset;           /* mm1 Key的offset */ \
-    int64_t valueOffset;         /* mm2 Value的offset*/ \
+    int32_t halfS1RealSize; /* vector侧实际的s1基本块大小，如果Cube基本块=128，那么halfS1RealSize=64 */ \
+    int32_t \
+        firstHalfS1RealSize; /* 当s1RealSize不是2的整数倍时，v0比v1少计算一行，计算subblock偏移的时候需要使用v0的s1 \
+                                size */ \
+    int32_t s2RealSize;     /* s2方向基本块的真实长度 */ \
+    int64_t s2AlignedSize;  /* s2方向基本块对齐到16之后的长度 */ \
+    int32_t vec2S1BaseSize; /* vector2侧开循环之后，经过切分的S1大小，例如把64切分成两份32 */ \
+    int32_t \
+        vec2S1RealSize; /* vector2侧开循环之后，经过切分的S1的尾块大小，例如把63切分成两份32和31，第二份的实际大小是31 \
+                         */ \
+    int64_t vecCoreOffset; /* vec核基于cube核起始处s1方向偏移 */ \
+    int64_t queryOffset;   /* mm1 Query的offset*/ \
+    int64_t keyOffset;     /* mm1 Key的offset */ \
+    int64_t valueOffset;   /* mm2 Value的offset*/ \
     int64_t qRopeOffset; \
     int64_t kRopeOffset; \
 \
@@ -191,8 +193,8 @@ struct RunParamStr<true> { // 分核与切块需要使用到参数
     int64_t b1SSOffset;         /* 非TND = boIdx * s1 * s2; TND = 前面boIdx个batch的s1*S2之和 */ \
     /* 训练场景下等于b1SSOffset，推理场景下非TND mask支持大于s1 * s2；TND场景推理的mask是补过pad的 */ \
     int64_t b1SSAttenMaskOffset; \
-    int64_t b1SSOffsetAlign;             /* TND场景s2 16对齐之后，前面batch的s1*s2之和 */ \
-    int64_t deScaleKvOffset;             /* KV的反量化scale内容在Gm中的偏移 原始shape为 [B, N2, 1, Ceil(S2, 128), 1] */ \
+    int64_t b1SSOffsetAlign; /* TND场景s2 16对齐之后，前面batch的s1*s2之和 */ \
+    int64_t deScaleKvOffset; /* KV的反量化scale内容在Gm中的偏移 原始shape为 [B, N2, 1, Ceil(S2, 128), 1] */ \
     int64_t nextTokensOfMlaPerBatch = 0; /* 在mla场景下左上顶点的nexttoken，用于计算BNSD的行无效 */ \
     int64_t preTokensOfMlaPerBatch = 0;  /* 在mla场景下左上顶点的nexttoken，用于计算BNSD的行无效 */ \
     uint8_t taskIdMod2; \
@@ -306,7 +308,7 @@ struct RunInfo<false> {
     bool softMaxCheckRes; \
     float keepProb; \
     float scaleValue; \
-    int64_t matmulMSize;            /* 在matmul运算中，左矩阵的M轴大小需要区分GS1合轴与不合轴的情况 */ \
+    int64_t matmulMSize; /* 在matmul运算中，左矩阵的M轴大小需要区分GS1合轴与不合轴的情况 */ \
     bool learnableSinkFlag = false; /* attentionsink */ \
     float pScale; \
     float sinkValue = SINK_MIN_INF; \
@@ -361,6 +363,7 @@ struct RunInfo<false> {
     uint32_t blockTableDim2; \
     uint32_t blockSize; \
     uint32_t paLayoutType; \
+    uint32_t kvCacheNzD0; \
     uint32_t paBlockNumSum; \
     uint32_t transposeLayout; \
     /* GS1合轴场景，外层循环是B、N2，内层循环G、S1，headNumRatio = 1 */ \

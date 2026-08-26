@@ -16,7 +16,6 @@
 #ifndef FLASH_ATTENTION_SCORE_GRAD_TILING_REGBASE_H__ARCH35
 #define FLASH_ATTENTION_SCORE_GRAD_TILING_REGBASE_H__ARCH35
 
-
 namespace optiling {
 class FlashAttentionScoreEmptyInputTilingDataRegbase {
 public:
@@ -123,7 +122,6 @@ public:
     }
 };
 
-
 class StridesParams {
 public:
     uint64_t bnStride = 0;
@@ -220,6 +218,7 @@ public:
     uint32_t accumOutSize;
     uint32_t logSumExpSize;
     uint8_t paLayoutType = 0; // 重构前tiling无赋值，需赋默认值
+    uint8_t kvCacheNzD0 = 0;  // NZ布局KV Cache的D0值
     uint8_t isRowInvalid;
     uint8_t isPostQuantPerChnl;
     uint8_t isPostQuantBF16;
@@ -744,6 +743,14 @@ public:
     void set_paLayoutType(uint8_t paLayoutTypeParam)
     {
         this->paLayoutType = paLayoutTypeParam;
+    }
+    uint8_t get_kvCacheNzD0() const
+    {
+        return kvCacheNzD0;
+    }
+    void set_kvCacheNzD0(uint8_t kvCacheNzD0Param)
+    {
+        this->kvCacheNzD0 = kvCacheNzD0Param;
     }
     uint32_t get_attenMaskS1Size() const
     {

@@ -2193,7 +2193,8 @@ ge::graphStatus DequantChecker::CheckFeatureForAntiquant(const FiaTilingInfo &fi
     if (ge::GRAPH_SUCCESS != CheckFeatureLayoutForAntiquant(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckFeatureQuerySForAntiquant(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckFeaturePAForAntiquant(fiaInfo) ||
-        ge::GRAPH_SUCCESS != CheckFeatureRopeForAntiquant(fiaInfo)) {
+        ge::GRAPH_SUCCESS != CheckFeatureRopeForAntiquant(fiaInfo) ||
+        ge::GRAPH_SUCCESS != CheckFeatureD032ForAntiquant(fiaInfo)) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -2266,10 +2267,20 @@ ge::graphStatus DequantChecker::CheckFeatureQuerySForAntiquant(const FiaTilingIn
         }
 
         if ((keyAntiquantMode == PER_CHANNEL_MODE || keyAntiquantMode == PER_TOKEN_MODE) &&
-            fiaInfo.inputKvType == ge::DT_INT8 && !fiaInfo.batchContinuousFlag) {
+            fiaInfo.inputKvType == ge::DT_INT8 && fiaInfo.kvStorageMode == KvStorageMode::TENSOR_LIST) {
             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                 fiaInfo.opName, "key and value",
-                "When the dtype of key/value is INT8 and keyAntiquantMode is 0 or 1, tensorlist is not supported");
+                "key and value do not support tensorlist storage mode when the dtype is INT8 and "
+                "keyAntiquantMode is 0 or 1");
+            return ge::GRAPH_FAILED;
+        }
+
+        if ((keyAntiquantMode == PER_CHANNEL_MODE || keyAntiquantMode == PER_TOKEN_MODE) &&
+            fiaInfo.inputKvType == ge::DT_INT8 && (!fiaInfo.batchContinuousFlag && fiaInfo.kvCacheNzD0 != NUM_32)) {
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                fiaInfo.opName, "key and value",
+                "key and value do not support non-batch-continuous page attention storage mode when the dtype is INT8 "
+                "and keyAntiquantMode is 0 or 1 in D0=16 PA_NZ antiquant scenario");
             return ge::GRAPH_FAILED;
         }
         if (fiaInfo.inputKvType == ge::DT_INT4 || fiaInfo.inputKvType == ge::DT_INT32) {
@@ -2376,6 +2387,147 @@ ge::graphStatus DequantChecker::CheckFeatureRopeForAntiquant(const FiaTilingInfo
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(fiaInfo.opName, "rope_mode", "ROPE_COMBINE",
                                                       "Antiquant scenario does not support combined rope"),
                 return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus DequantChecker::CheckFeatureD032ForAntiquant(const FiaTilingInfo &fiaInfo) const
+{
+    if (fiaInfo.kvCacheNzD0 != NUM_32) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    int64_t keyAntiquantMode = 0;
+    if (fiaInfo.opParamInfo.keyAntiquantMode != nullptr) {
+        keyAntiquantMode = *fiaInfo.opParamInfo.keyAntiquantMode;
+    }
+    int64_t valueAntiquantMode = 0;
+    if (fiaInfo.opParamInfo.valueAntiquantMode != nullptr) {
+        valueAntiquantMode = *fiaInfo.opParamInfo.valueAntiquantMode;
+    }
+    OP_CHECK_IF(keyAntiquantMode != PER_CHANNEL_MODE && keyAntiquantMode != PER_TOKEN_MODE,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    fiaInfo.opName, "key_antiquant_mode", std::to_string(keyAntiquantMode).c_str(),
+                    "key_antiquant_mode only supports 0 (per-channel) or 1 (per-token) "
+                    "when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(valueAntiquantMode != PER_CHANNEL_MODE && valueAntiquantMode != PER_TOKEN_MODE,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    fiaInfo.opName, "value_antiquant_mode", std::to_string(valueAntiquantMode).c_str(),
+                    "value_antiquant_mode only supports 0 (per-channel) or 1 (per-token) "
+                    "when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
+
+    const std::string &inputLayout = fiaInfo.opParamInfo.layOut;
+    OP_CHECK_IF(inputLayout != "BSH" && inputLayout != "BSND" && inputLayout != "BNSD",
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    fiaInfo.opName, "input_layout", inputLayout.c_str(),
+                    "input_layout only supports BSH, BSND or BNSD when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(fiaInfo.kvStorageMode != KvStorageMode::PAGE_ATTENTION,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    fiaInfo.opName, "kv_storage_mode",
+                    "kv_storage_mode must be PAGE_ATTENTION when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(
+        fiaInfo.inputKvType != ge::DT_INT8,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(fiaInfo.opName, "key and value", ToString(fiaInfo.inputKvType).c_str(),
+                                              "key and value must be INT8 when PA_NZ D0=32 antiquant is enabled"),
+        return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(fiaInfo.blockSize != 128 && fiaInfo.blockSize != 512,
+                OP_LOGE_WITH_INVALID_ATTR(fiaInfo.opName, "block_size", std::to_string(fiaInfo.blockSize).c_str(),
+                                          "128 or 512"),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(fiaInfo.inputQType != ge::DT_BF16,
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(fiaInfo.opName, "query", ToString(fiaInfo.inputQType).c_str(),
+                                                      "query must be BFLOAT16 when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(
+        fiaInfo.outputType != ge::DT_BF16,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(fiaInfo.opName, "attention_out", ToString(fiaInfo.outputType).c_str(),
+                                              "attention_out must be BFLOAT16 when PA_NZ D0=32 antiquant is enabled"),
+        return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(fiaInfo.qkHeadDim != NUM_128,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    fiaInfo.opName, "query", ("dim -1=" + std::to_string(fiaInfo.qkHeadDim)).c_str(),
+                    "query headDim must be 128 when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(fiaInfo.vHeadDim != NUM_128,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    fiaInfo.opName, "value", ("dim -1=" + std::to_string(fiaInfo.vHeadDim)).c_str(),
+                    "value headDim must be 128 when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(fiaInfo.s1Size < 1 || fiaInfo.s1Size > NUM_16,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    fiaInfo.opName, "query", ("dim 1=" + std::to_string(fiaInfo.s1Size)).c_str(),
+                    "query S axis must be in range [1, 16] when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(
+        fiaInfo.innerPrecise != 1,
+        OP_LOGE_WITH_INVALID_ATTR(fiaInfo.opName, "inner_precise", std::to_string(fiaInfo.innerPrecise).c_str(), "1"),
+        return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(
+        fiaInfo.ropeMode != RopeMode::NO_ROPE,
+        OP_LOGE_WITH_INVALID_ATTR(fiaInfo.opName, "rope_mode",
+                                  std::to_string(static_cast<int32_t>(fiaInfo.ropeMode)).c_str(), "0 (NO_ROPE)"),
+        return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(
+        fiaInfo.opParamInfo.keyAntiquantOffset.tensor != nullptr ||
+            fiaInfo.opParamInfo.valueAntiquantOffset.tensor != nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            fiaInfo.opName, "key_antiquant_offset and value_antiquant_offset",
+            "key_antiquant_offset and value_antiquant_offset are not supported when PA_NZ D0=32 antiquant is enabled"),
+        return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(fiaInfo.pseShiftFlag,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    fiaInfo.opName, "pse_shift", "pse_shift is not supported when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(
+        fiaInfo.sysPrefixFlag,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            fiaInfo.opName, "shared_prefix", "shared_prefix is not supported when PA_NZ D0=32 antiquant is enabled"),
+        return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(fiaInfo.qPaddingSizeFlag || fiaInfo.kvPaddingSizeFlag,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    fiaInfo.opName, "query_padding_size and kv_padding_size",
+                    "query_padding_size and kv_padding_size are not supported when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(fiaInfo.isOutQuantEnable,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    fiaInfo.opName, "post_quant", "post_quant is not supported when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
+
+    if (fiaInfo.s1Size == 1) {
+        OP_CHECK_IF(fiaInfo.sparseMode != SPARSE_MODE_NO_MASK,
+                    OP_LOGE_WITH_INVALID_ATTR(fiaInfo.opName, "sparse_mode", std::to_string(fiaInfo.sparseMode).c_str(),
+                                              "0 (SPARSE_MODE_NO_MASK)"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(fiaInfo.opParamInfo.attenMask.tensor != nullptr,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        fiaInfo.opName, "atten_mask",
+                        "atten_mask must be nullptr when PA_NZ D0=32 antiquant is enabled and Q_S=1"),
+                    return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(fiaInfo.sparseMode != SPARSE_MODE_RIGHT_DOWN,
+                    OP_LOGE_WITH_INVALID_ATTR(fiaInfo.opName, "sparse_mode", std::to_string(fiaInfo.sparseMode).c_str(),
+                                              "3 (SPARSE_MODE_RIGHT_DOWN)"),
+                    return ge::GRAPH_FAILED);
+    }
+
     return ge::GRAPH_SUCCESS;
 }
 

@@ -73,7 +73,6 @@ constexpr int32_t SPARSE_MODE_RIGHT_DOWN = 3;
 constexpr int32_t SPARSE_MODE_BAND = 4;
 constexpr int32_t SPARSE_MODE_TREE = 9;
 
-
 enum class FiaQuantMode : uint32_t {
     NO_QUANT = 0,
     ANTI_QUANT,
@@ -347,6 +346,9 @@ public:
     FiaLayout qLayout = FiaLayout::BSND;
     FiaLayout outLayout = FiaLayout::BSND;
     FiaLayout kvLayout = FiaLayout::BSND;
+
+    // NZ layout D0 from KV shape last dim (16 for fp16/bf16/fp8, 32 for int8)
+    uint32_t kvCacheNzD0 = 0;
 };
 } // namespace optiling
 #endif // FIA_TILING_INFO_H

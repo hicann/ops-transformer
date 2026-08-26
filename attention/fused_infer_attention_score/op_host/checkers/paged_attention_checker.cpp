@@ -378,28 +378,13 @@ ge::graphStatus PagedAttentionChecker::CheckPACacheShapeNZAntiquant(const FiaTil
                                                                     const std::string &shapeStr, uint32_t compareD,
                                                                     int64_t tempD0, int64_t tempD1) const
 {
-    uint32_t d0Size = NUM_16;
-    if (fiaInfo.inputKvType == ge::DT_INT4) {
-        if (tempD0 != d0Size) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                fiaInfo.opName, inputName.c_str(), shapeStr.c_str(),
-                ("When PA_NZ is enabled, if input kv dataType is INT32, the last dim of " + inputName + " must be " +
-                 std::to_string(d0Size / NUM8) + "; if input kv dataType is INT4, the last dim of " + inputName +
-                 " must be " + std::to_string(d0Size))
-                    .c_str());
-            return ge::GRAPH_FAILED;
-        }
-    } else {
-        if (tempD0 != d0Size) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                fiaInfo.opName, inputName.c_str(), shapeStr.c_str(),
-                ("When PA_NZ is enabled, if input kv dataType is INT32, the last dim of " + inputName + " must be " +
-                 std::to_string(d0Size / NUM8) + "; if input kv dataType is INT4, the last dim of " + inputName +
-                 " must be " + std::to_string(d0Size))
-                    .c_str());
-            return ge::GRAPH_FAILED;
-        }
+    if (tempD0 != NUM_16 && !(tempD0 == NUM_32 && fiaInfo.inputKvType == ge::DT_INT8)) {
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            fiaInfo.opName, inputName.c_str(), shapeStr.c_str(),
+            (inputName + " last dim must be 16, or 32 when kv dtype is INT8, when PA_NZ is enabled").c_str());
+        return ge::GRAPH_FAILED;
     }
+    uint32_t d0Size = static_cast<uint32_t>(tempD0);
     if (tempD1 != compareD / d0Size) {
         std::string reasonMsg = "When PA_NZ is enabled, in " + std::string(QuantModeToSerialString(fiaInfo.quantMode)) +
                                 " " + std::string(SituationToSerialString(fiaInfo.ropeMode)) +
@@ -916,7 +901,8 @@ ge::graphStatus PagedAttentionChecker::CheckKVLayout(const FiaTilingInfo &fiaInf
 ge::graphStatus PagedAttentionChecker::CheckFeatureQueryS(const FiaTilingInfo &fiaInfo) const
 {
     // When antiquantMode is 0 or 1 and data type of key/value is int8 scenario, page attention is not supported.
-    if (fiaInfo.s1Size > 1) {
+    // D0=32 (INT8 PA_NZ) antiquant path supports s1>1, skip this check.
+    if (fiaInfo.s1Size > 1 && fiaInfo.kvCacheNzD0 != NUM_32) {
         int64_t keyAntiquantMode = 0;
         if (fiaInfo.opParamInfo.keyAntiquantMode != nullptr) {
             keyAntiquantMode = *fiaInfo.opParamInfo.keyAntiquantMode;

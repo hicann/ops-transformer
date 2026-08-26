@@ -1724,6 +1724,8 @@ void FusedInferAttentionScoreTilingImpl::SetPaLayoutTilingData(const FiaTilingIn
 
     auto &inputParams = faRunTilingAdapter_.inputParamsRegbase;
 
+    inputParams.set_kvCacheNzD0(static_cast<uint8_t>(fiaInfo.kvCacheNzD0));
+
     if (fiaInfo.antiQuantFlag) {
         uint32_t dimNum = fiaInfo.opParamInfo.key.shape->GetStorageShape().GetDimNum();
         uint8_t paType = (dimNum == 3) ? 0 : (dimNum == 4) ? 1 : (dimNum == 5) ? 2 : 0;
@@ -2013,6 +2015,7 @@ void FusedInferAttentionScoreTilingImpl::PrintInputParams(const FiaTilingInfo &f
     OP_LOGD(fiaInfo.opName, "blockTableDim2:%d", faRunTilingAdapter_.inputParamsRegbase.get_blockTableDim2());
     OP_LOGD(fiaInfo.opName, "paBlockNumSum:%d", faRunTilingAdapter_.inputParamsRegbase.get_paBlockNumSum());
     OP_LOGD(fiaInfo.opName, "paLayoutType:%d", faRunTilingAdapter_.inputParamsRegbase.get_paLayoutType());
+    OP_LOGD(fiaInfo.opName, "kvCacheNzD0:%d", faRunTilingAdapter_.inputParamsRegbase.get_kvCacheNzD0());
     OP_LOGD(fiaInfo.opName, "attenMaskS1Size:%d", faRunTilingAdapter_.inputParamsRegbase.get_attenMaskS1Size());
     OP_LOGD(fiaInfo.opName, "isRowInvalid:%d", faRunTilingAdapter_.inputParamsRegbase.get_isRowInvalid());
     OP_LOGD(fiaInfo.opName, "kvSplitPart:%d", faRunTilingAdapter_.inputParamsRegbase.get_kvSplitPart());

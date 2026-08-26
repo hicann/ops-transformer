@@ -23,8 +23,9 @@
 namespace optiling {
 class DequantChecker : public BaseChecker {
 public:
-    DequantChecker(bool enableNonQuant, bool enableFullQuant, bool enableAntiQuant) :
-        BaseChecker(enableNonQuant, enableFullQuant, enableAntiQuant) {}
+    DequantChecker(bool enableNonQuant, bool enableFullQuant, bool enableAntiQuant)
+        : BaseChecker(enableNonQuant, enableFullQuant, enableAntiQuant)
+    {}
     ~DequantChecker() override = default;
 
     ge::graphStatus CheckSinglePara(const FiaTilingInfo &fiaInfo) override;
@@ -50,9 +51,9 @@ private:
     ge::graphStatus CheckDequantModeFullquant(const FiaTilingInfo &fiaInfo);
 
     ge::graphStatus CheckTensorExistFullquant(const FiaTilingInfo &fiaInfo, const gert::Tensor *tensor,
-        const std::string &quantModeName, const std::string &inputName) const;
+                                              const std::string &quantModeName, const std::string &inputName) const;
     ge::graphStatus CheckTensorNotExistFullquant(const FiaTilingInfo &fiaInfo, const gert::Tensor *tensor,
-        const std::string &quantModeName, const std::string &inputName) const;
+                                                 const std::string &quantModeName, const std::string &inputName) const;
     ge::graphStatus CheckExistencePertensorFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckExistenceMLAFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckExistenceMXFP8Fullquant(const FiaTilingInfo &fiaInfo);
@@ -92,24 +93,17 @@ private:
     // SinglePara
     ge::graphStatus CheckSingleParaForAntiquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckAntiquantModeForAntiquant(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckInputKVTypeForAntiquantPerChannel(const FiaTilingInfo &fiaInfo,
-        ge::DataType inputKvType, const gert::Tensor *keyAntiquantScaleTensor);
-    ge::graphStatus CheckInputKVTypeForAntiquantPerToken(const FiaTilingInfo &fiaInfo,
-        ge::DataType inputKvType);
-    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenPA(const FiaTilingInfo &fiaInfo,
-        ge::DataType inputKvType);
-    ge::graphStatus CheckInputKVTypeForAntiquantPerTensorHead(const FiaTilingInfo &fiaInfo,
-        ge::DataType inputKvType);
-    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenHead(const FiaTilingInfo &fiaInfo,
-        ge::DataType inputKvType);
-    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenHeadPA(const FiaTilingInfo &fiaInfo,
-        ge::DataType inputKvType);
-    ge::graphStatus CheckInputKVTypeForAntiquantMixed(const FiaTilingInfo &fiaInfo,
-        ge::DataType inputKvType);
-    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenGroup(const FiaTilingInfo &fiaInfo,
-        ge::DataType inputKvType);
+    ge::graphStatus CheckInputKVTypeForAntiquantPerChannel(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType,
+                                                           const gert::Tensor *keyAntiquantScaleTensor);
+    ge::graphStatus CheckInputKVTypeForAntiquantPerToken(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
+    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenPA(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
+    ge::graphStatus CheckInputKVTypeForAntiquantPerTensorHead(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
+    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenHead(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
+    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenHeadPA(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
+    ge::graphStatus CheckInputKVTypeForAntiquantMixed(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
+    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenGroup(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
     ge::graphStatus CheckInputKVTypeForAntiquant(const FiaTilingInfo &fiaInfo);
-    
+
     // Existence
     ge::graphStatus CheckExistenceForAntiquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckScaleExistenceForAntiquant(const FiaTilingInfo &fiaInfo) const;
@@ -122,6 +116,7 @@ private:
     ge::graphStatus CheckFeatureQuerySForAntiquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckFeaturePAForAntiquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckFeatureRopeForAntiquant(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckFeatureD032ForAntiquant(const FiaTilingInfo &fiaInfo) const;
 
     // MultiPara
     ge::graphStatus CheckMultiParaForAntiquant(const FiaTilingInfo &fiaInfo);
