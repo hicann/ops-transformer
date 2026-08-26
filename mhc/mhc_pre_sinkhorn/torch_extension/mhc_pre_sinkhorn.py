@@ -84,33 +84,56 @@ class MhcPreSinkhornOpBuilder(OpBuilder):
         def mhc_pre_sinkhorn_meta(
             x, phi, alpha, bias, hc_mult, num_iters, hc_eps, norm_eps, out_flag
         ):
-            b = x.size(0)
-            s = x.size(1)
-            n = x.size(2)
-            c = x.size(3)
-
-            hin = torch.empty(b, s, c, dtype=x.dtype, device="meta")
-            h_post = torch.empty(b, s, n, dtype=phi.dtype, device="meta")
-            h_res = torch.empty(b, s, n * n, dtype=phi.dtype, device="meta")
-
-            if out_flag:
-                h_pre = torch.empty(b, s, n, dtype=phi.dtype, device="meta")
-                hc_before_norm = torch.empty(
-                    b, s, n * n + 2 * n, dtype=phi.dtype, device="meta"
-                )
-                inv_rms = torch.empty(b, s, 1, dtype=phi.dtype, device="meta")
-                sum_out = torch.empty(
-                    2 * num_iters, b, s, n, dtype=phi.dtype, device="meta"
-                )
-                norm_out = torch.empty(
-                    2 * num_iters, b, s, n, n, dtype=phi.dtype, device="meta"
-                )
+            n = hc_mult
+            if x.dim() == 3:
+                t = x.size(0)
+                c = x.size(2)
+                hin = torch.empty(t, c, dtype=x.dtype, device="meta")
+                h_post = torch.empty(t, n, dtype=phi.dtype, device="meta")
+                h_res = torch.empty(t, n * n, dtype=phi.dtype, device="meta")
+                if out_flag:
+                    h_pre = torch.empty(t, n, dtype=phi.dtype, device="meta")
+                    hc_before_norm = torch.empty(
+                        t, n * n + 2 * n, dtype=phi.dtype, device="meta"
+                    )
+                    inv_rms = torch.empty(t, 1, dtype=phi.dtype, device="meta")
+                    sum_out = torch.empty(
+                        2 * num_iters, t, n, dtype=phi.dtype, device="meta"
+                    )
+                    norm_out = torch.empty(
+                        2 * num_iters, t, n, n, dtype=phi.dtype, device="meta"
+                    )
+                else:
+                    h_pre = torch.empty(0, dtype=phi.dtype, device="meta")
+                    hc_before_norm = torch.empty(0, dtype=phi.dtype, device="meta")
+                    inv_rms = torch.empty(0, dtype=phi.dtype, device="meta")
+                    sum_out = torch.empty(0, dtype=phi.dtype, device="meta")
+                    norm_out = torch.empty(0, dtype=phi.dtype, device="meta")
             else:
-                h_pre = torch.empty(0, dtype=phi.dtype, device="meta")
-                hc_before_norm = torch.empty(0, dtype=phi.dtype, device="meta")
-                inv_rms = torch.empty(0, dtype=phi.dtype, device="meta")
-                sum_out = torch.empty(0, dtype=phi.dtype, device="meta")
-                norm_out = torch.empty(0, dtype=phi.dtype, device="meta")
+                b = x.size(0)
+                s = x.size(1)
+                c = x.size(3)
+                hin = torch.empty(b, s, c, dtype=x.dtype, device="meta")
+                h_post = torch.empty(b, s, n, dtype=phi.dtype, device="meta")
+                h_res = torch.empty(b, s, n * n, dtype=phi.dtype, device="meta")
+                if out_flag:
+                    h_pre = torch.empty(b, s, n, dtype=phi.dtype, device="meta")
+                    hc_before_norm = torch.empty(
+                        b, s, n * n + 2 * n, dtype=phi.dtype, device="meta"
+                    )
+                    inv_rms = torch.empty(b, s, 1, dtype=phi.dtype, device="meta")
+                    sum_out = torch.empty(
+                        2 * num_iters, b, s, n, dtype=phi.dtype, device="meta"
+                    )
+                    norm_out = torch.empty(
+                        2 * num_iters, b, s, n, n, dtype=phi.dtype, device="meta"
+                    )
+                else:
+                    h_pre = torch.empty(0, dtype=phi.dtype, device="meta")
+                    hc_before_norm = torch.empty(0, dtype=phi.dtype, device="meta")
+                    inv_rms = torch.empty(0, dtype=phi.dtype, device="meta")
+                    sum_out = torch.empty(0, dtype=phi.dtype, device="meta")
+                    norm_out = torch.empty(0, dtype=phi.dtype, device="meta")
 
             return (
                 hin,

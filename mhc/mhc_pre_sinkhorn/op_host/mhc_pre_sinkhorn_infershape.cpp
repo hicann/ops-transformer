@@ -63,10 +63,12 @@ static ge::graphStatus InferShapeForMhcPreSinkhorn(gert::InferShapeContext *cont
     int64_t seqLen = 0;
     int64_t hcMult = 0;
     int64_t hiddenDim = 0;
+    bool isTnd = false;
     if (xDimNum == DIM_THREE) {
         seqLen = xShape->GetDim(0);
         hcMult = xShape->GetDim(1);
         hiddenDim = xShape->GetDim(2);
+        isTnd = true;
     } else {
         batch = xShape->GetDim(0);
         seqLen = xShape->GetDim(1);
@@ -99,22 +101,40 @@ static ge::graphStatus InferShapeForMhcPreSinkhorn(gert::InferShapeContext *cont
     OP_CHECK_NULL_WITH_CONTEXT(context, sumOutShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, normOutShape);
 
-    SetShape(hinShape, {batch, seqLen, hiddenDim});
-    SetShape(hPostShape, {batch, seqLen, hcMult});
-    SetShape(hResShape, {batch, seqLen, hcMult * hcMult});
-
-    if (needBackward) {
-        SetShape(hPreShape, {batch, seqLen, hcMult});
-        SetShape(hcBeforeNormShape, {batch, seqLen, hcMix});
-        SetShape(invRmsShape, {batch, seqLen, 1});
-        SetShape(sumOutShape, {numIters * 2, batch, seqLen, hcMult});
-        SetShape(normOutShape, {numIters * 2, batch, seqLen, hcMult, hcMult});
+    if (isTnd) {
+        SetShape(hinShape, {seqLen, hiddenDim});
+        SetShape(hPostShape, {seqLen, hcMult});
+        SetShape(hResShape, {seqLen, hcMult * hcMult});
+        if (needBackward) {
+            SetShape(hPreShape, {seqLen, hcMult});
+            SetShape(hcBeforeNormShape, {seqLen, hcMix});
+            SetShape(invRmsShape, {seqLen, 1});
+            SetShape(sumOutShape, {numIters * 2, seqLen, hcMult});
+            SetShape(normOutShape, {numIters * 2, seqLen, hcMult, hcMult});
+        } else {
+            SetShape(hPreShape, {EMPTY_DIM});
+            SetShape(hcBeforeNormShape, {EMPTY_DIM});
+            SetShape(invRmsShape, {EMPTY_DIM});
+            SetShape(sumOutShape, {EMPTY_DIM});
+            SetShape(normOutShape, {EMPTY_DIM});
+        }
     } else {
-        SetShape(hPreShape, {EMPTY_DIM});
-        SetShape(hcBeforeNormShape, {EMPTY_DIM});
-        SetShape(invRmsShape, {EMPTY_DIM});
-        SetShape(sumOutShape, {EMPTY_DIM});
-        SetShape(normOutShape, {EMPTY_DIM});
+        SetShape(hinShape, {batch, seqLen, hiddenDim});
+        SetShape(hPostShape, {batch, seqLen, hcMult});
+        SetShape(hResShape, {batch, seqLen, hcMult * hcMult});
+        if (needBackward) {
+            SetShape(hPreShape, {batch, seqLen, hcMult});
+            SetShape(hcBeforeNormShape, {batch, seqLen, hcMix});
+            SetShape(invRmsShape, {batch, seqLen, 1});
+            SetShape(sumOutShape, {numIters * 2, batch, seqLen, hcMult});
+            SetShape(normOutShape, {numIters * 2, batch, seqLen, hcMult, hcMult});
+        } else {
+            SetShape(hPreShape, {EMPTY_DIM});
+            SetShape(hcBeforeNormShape, {EMPTY_DIM});
+            SetShape(invRmsShape, {EMPTY_DIM});
+            SetShape(sumOutShape, {EMPTY_DIM});
+            SetShape(normOutShape, {EMPTY_DIM});
+        }
     }
 
     OP_LOGD(context->GetNodeName(), "End to do MhcPreSinkhorn infershape.");

@@ -22,15 +22,12 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
 MhcPreSinkhorn(const at::Tensor &x, const at::Tensor &phi, const at::Tensor &alpha, const at::Tensor &bias,
                int64_t hcMult, int64_t numIters, double hcEps, double normEps, bool outFlag)
 {
-    int64_t b = x.size(0);
-    int64_t s = x.size(1);
-    int64_t n = x.size(2);
-    int64_t c = x.size(3);
+    TORCH_CHECK(x.dim() == 3 || x.dim() == 4, "x dim must be 3 (t, n, d) or 4 (b, s, n, d), but got ", x.dim());
+    bool isTnd = (x.dim() == 3);
 
-    at::Tensor hin = at::empty({b, s, c}, x.options());
-    at::Tensor hPost = at::empty({b, s, n}, phi.options());
-    at::Tensor hRes = at::empty({b, s, n * n}, phi.options());
-
+    at::Tensor hin;
+    at::Tensor hPost;
+    at::Tensor hRes;
     at::Tensor hPre;
     at::Tensor hcBeforeNorm;
     at::Tensor invRms;
@@ -38,19 +35,47 @@ MhcPreSinkhorn(const at::Tensor &x, const at::Tensor &phi, const at::Tensor &alp
     at::Tensor normOut;
 
     int64_t skIterCount = numIters;
+    int64_t n = hcMult;
 
-    if (outFlag) {
-        hPre = at::empty({b, s, n}, phi.options());
-        hcBeforeNorm = at::empty({b, s, n * n + 2 * n}, phi.options());
-        invRms = at::empty({b, s, 1}, phi.options());
-        sumOut = at::empty({2 * skIterCount, b, s, n}, phi.options());
-        normOut = at::empty({2 * skIterCount, b, s, n, n}, phi.options());
+    if (isTnd) {
+        int64_t t = x.size(0);
+        int64_t c = x.size(2);
+        hin = at::empty({t, c}, x.options());
+        hPost = at::empty({t, n}, phi.options());
+        hRes = at::empty({t, n * n}, phi.options());
+        if (outFlag) {
+            hPre = at::empty({t, n}, phi.options());
+            hcBeforeNorm = at::empty({t, n * n + 2 * n}, phi.options());
+            invRms = at::empty({t, 1}, phi.options());
+            sumOut = at::empty({2 * skIterCount, t, n}, phi.options());
+            normOut = at::empty({2 * skIterCount, t, n, n}, phi.options());
+        } else {
+            hPre = at::empty({0}, phi.options());
+            hcBeforeNorm = at::empty({0}, phi.options());
+            invRms = at::empty({0}, phi.options());
+            sumOut = at::empty({0}, phi.options());
+            normOut = at::empty({0}, phi.options());
+        }
     } else {
-        hPre = at::empty({0}, phi.options());
-        hcBeforeNorm = at::empty({0}, phi.options());
-        invRms = at::empty({0}, phi.options());
-        sumOut = at::empty({0}, phi.options());
-        normOut = at::empty({0}, phi.options());
+        int64_t b = x.size(0);
+        int64_t s = x.size(1);
+        int64_t c = x.size(3);
+        hin = at::empty({b, s, c}, x.options());
+        hPost = at::empty({b, s, n}, phi.options());
+        hRes = at::empty({b, s, n * n}, phi.options());
+        if (outFlag) {
+            hPre = at::empty({b, s, n}, phi.options());
+            hcBeforeNorm = at::empty({b, s, n * n + 2 * n}, phi.options());
+            invRms = at::empty({b, s, 1}, phi.options());
+            sumOut = at::empty({2 * skIterCount, b, s, n}, phi.options());
+            normOut = at::empty({2 * skIterCount, b, s, n, n}, phi.options());
+        } else {
+            hPre = at::empty({0}, phi.options());
+            hcBeforeNorm = at::empty({0}, phi.options());
+            invRms = at::empty({0}, phi.options());
+            sumOut = at::empty({0}, phi.options());
+            normOut = at::empty({0}, phi.options());
+        }
     }
 
     ACLNN_CMD(aclnnMhcPreSinkhorn, x, phi, alpha, bias, hcMult, numIters, hcEps, normEps, outFlag, hin, hPost, hRes,
@@ -60,6 +85,9 @@ MhcPreSinkhorn(const at::Tensor &x, const at::Tensor &phi, const at::Tensor &alp
         hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut);
 }
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) { m.def("mhc_pre_sinkhorn", &MhcPreSinkhorn, "mhc_pre_sinkhorn"); }
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
+{
+    m.def("mhc_pre_sinkhorn", &MhcPreSinkhorn, "mhc_pre_sinkhorn");
+}
 
 } // namespace op_api
