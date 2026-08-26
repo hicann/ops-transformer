@@ -21,6 +21,40 @@ import torch
 
 OPERATOR = "mixed_quant_sparse_flash_mla"
 METADATA_INDEX = 17
+ACLNN_PARAMETER_NAMES = (
+    "q",
+    "ori_kv",
+    "cmp_kv",
+    "ori_sparse_indices",
+    "cmp_sparse_indices",
+    "ori_block_table",
+    "cmp_block_table",
+    "cu_seqlens_q",
+    "cu_seqlens_ori_kv",
+    "cu_seqlens_cmp_kv",
+    "seqused_q",
+    "seqused_ori_kv",
+    "seqused_cmp_kv",
+    "cmp_residual_kv",
+    "ori_topk_length",
+    "cmp_topk_length",
+    "sinks",
+    "metadata",
+    "quant_mode",
+    "rope_head_dim",
+    "softmax_scale",
+    "cmp_ratio",
+    "ori_mask_mode",
+    "cmp_mask_mode",
+    "ori_win_left",
+    "ori_win_right",
+    "layout_q",
+    "layout_kv",
+    "topk_value_mode",
+    "return_softmax_lse",
+    "attn_out",
+    "softmax_lse_out",
+)
 
 
 def load_metadata_protocol():
@@ -81,6 +115,12 @@ def build_metadata_arguments(q, ori_kv, cmp_kv, quant_mode, kwargs):
     seq_q = kwargs.get("seqused_q")
     seq_ori = kwargs.get("seqused_ori_kv")
     seq_cmp = kwargs.get("seqused_cmp_kv")
+    cu_q_values = get_values(kwargs, "cu_seqlens_q")
+    cu_ori_values = get_values(kwargs, "cu_seqlens_ori_kv")
+    cu_cmp_values = get_values(kwargs, "cu_seqlens_cmp_kv")
+    seq_q_values = get_values(kwargs, "seqused_q")
+    seq_ori_values = get_values(kwargs, "seqused_ori_kv")
+    seq_cmp_values = get_values(kwargs, "seqused_cmp_kv")
 
     num_heads_q = q_shape[2] if layout_q == "BSND" else q_shape[1]
     if ori_kv is None:
@@ -105,16 +145,14 @@ def build_metadata_arguments(q, ori_kv, cmp_kv, quant_mode, kwargs):
 
     batch_size = get_attribute(kwargs, "batch_size")
     if batch_size is None:
-        seq_q_values = get_values(kwargs, "seqused_q")
-        cu_q_values = get_values(kwargs, "cu_seqlens_q")
         if seq_q_values is not None:
             batch_size = len(seq_q_values)
         elif cu_q_values is not None:
             batch_size = len(cu_q_values) - 1
         elif seq_q is not None:
-            batch_size = int(seq_q.numel())
+            batch_size = int(torch.as_tensor(seq_q).numel())
         elif cu_q is not None:
-            batch_size = int(cu_q.numel()) - 1
+            batch_size = int(torch.as_tensor(cu_q).numel()) - 1
         else:
             batch_size = q_shape[0] if layout_q == "BSND" else 0
 
@@ -126,19 +164,19 @@ def build_metadata_arguments(q, ori_kv, cmp_kv, quant_mode, kwargs):
     max_q = get_attribute(kwargs, "max_seqlen_q")
     if max_q is None:
         max_q = max_sequence(
-            get_values(kwargs, "cu_seqlens_q") or cu_q,
-            get_values(kwargs, "seqused_q") or seq_q,
+            cu_q_values if cu_q_values is not None else cu_q,
+            seq_q_values if seq_q_values is not None else seq_q,
             q_fallback,
             cumulative=layout_q == "TND",
         )
     max_ori = max_sequence(
-        get_values(kwargs, "cu_seqlens_ori_kv") or cu_ori,
-        get_values(kwargs, "seqused_ori_kv") or seq_ori,
+        cu_ori_values if cu_ori_values is not None else cu_ori,
+        seq_ori_values if seq_ori_values is not None else seq_ori,
         ori_fallback,
     )
     max_cmp = max_sequence(
-        get_values(kwargs, "cu_seqlens_cmp_kv") or cu_cmp,
-        get_values(kwargs, "seqused_cmp_kv") or seq_cmp,
+        cu_cmp_values if cu_cmp_values is not None else cu_cmp,
+        seq_cmp_values if seq_cmp_values is not None else seq_cmp,
         cmp_fallback,
     )
     return {
@@ -193,6 +231,8 @@ def move_to_device(value, target, empty_if_none=False):
 
 
 def run_metadata(arguments, metadata):
+    import cann_ops_transformer
+
     return torch.ops.cann_ops_transformer.mixed_quant_sparse_flash_mla_metadata(
         int(arguments["num_heads_q"]),
         int(arguments["num_heads_kv"]),
@@ -261,3 +301,25 @@ def run(q, *, ori_kv=None, cmp_kv=None, metadata=None, quant_mode=None, **kwargs
     if rewritten is not None:
         logging.info("[%s] rewrote MQSMLA metadata input: %s", testcase_name, rewritten)
     return None
+
+
+def run_aclnn(*args, **kwargs):
+    """Adapt the ACLNN main API order to the shared Torch metadata hook."""
+    if len(args) != len(ACLNN_PARAMETER_NAMES):
+        raise ValueError(
+            f"MixedQuantSparseFlashMla ACLNN hook expects {len(ACLNN_PARAMETER_NAMES)} arguments, got {len(args)}"
+        )
+    values = dict(zip(ACLNN_PARAMETER_NAMES, args))
+    host_metadata = values["metadata"]
+    metadata = move_to_device(host_metadata, torch.empty(0, device="npu"))
+    values["metadata"] = metadata
+    q = values.pop("q")
+    result = run(q, **values, **kwargs)
+    if torch.is_tensor(host_metadata):
+        if host_metadata.device != metadata.device:
+            host_metadata.copy_(
+                metadata.to(dtype=host_metadata.dtype, device=host_metadata.device)
+            )
+    else:
+        host_metadata[...] = metadata.detach().cpu().numpy()
+    return result

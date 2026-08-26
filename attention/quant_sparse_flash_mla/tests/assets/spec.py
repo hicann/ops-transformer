@@ -63,7 +63,7 @@ class QuantSparseFlashMlaSpec:
 class AclnnQuantSparseFlashMlaSpec(QuantSparseFlashMlaSpec):
     golden = golden_module.cpu_aclnn_quant_sparse_flash_mla
     customize_inputs = inputs_module.generate_aclnn_quant_sparse_flash_mla_inputs
-    npu_preprocess = None
+    npu_preprocess = npu_preprocess_module.run_aclnn
 
 
 class QuantSparseFlashMlaMetadataSpec:

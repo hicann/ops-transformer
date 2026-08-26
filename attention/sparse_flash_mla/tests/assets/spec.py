@@ -63,7 +63,7 @@ class SparseFlashMlaSpec:
 class AclnnSparseFlashMlaSpec(SparseFlashMlaSpec):
     golden = golden_module.cpu_aclnn_sparse_flash_mla
     customize_inputs = inputs_module.generate_aclnn_sparse_flash_mla_inputs
-    npu_preprocess = None
+    npu_preprocess = npu_preprocess_module.run_aclnn
 
 
 class SparseFlashMlaMetadataSpec:

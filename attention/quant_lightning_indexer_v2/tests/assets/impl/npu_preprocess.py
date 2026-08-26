@@ -23,6 +23,31 @@ OPERATOR = "quant_lightning_indexer_v2"
 METADATA_INDEX = 12
 QUANT_MODE_MXFP8 = 3
 QUANT_MODE_MXFP4 = 5
+ACLNN_PARAMETER_NAMES = (
+    "query",
+    "key",
+    "weights",
+    "query_dequant_scale",
+    "key_dequant_scale",
+    "cu_seqlens_q",
+    "cu_seqlens_k",
+    "seqused_q",
+    "seqused_k",
+    "cmp_residual_k",
+    "block_table",
+    "output_idx_offset",
+    "metadata",
+    "topk",
+    "quant_mode",
+    "max_seqlen_q",
+    "layout_q",
+    "layout_k",
+    "mask_mode",
+    "cmp_ratio",
+    "return_value",
+    "sparse_indices_out",
+    "sparse_values_out",
+)
 
 
 def load_metadata_protocol():
@@ -91,6 +116,8 @@ def restore_mx_dtypes(query, key, query_scale, key_scale, quant_mode):
         ("query_dequant_scale", query_scale, scale_dtype),
         ("key_dequant_scale", key_scale, scale_dtype),
     ):
+        if not torch.is_tensor(tensor):
+            continue
         if tensor.dtype == dtype:
             continue
         if tensor.dtype != torch.uint8:
@@ -182,6 +209,8 @@ def move_to_device(value, target):
 
 
 def run_metadata(arguments, metadata):
+    import cann_ops_transformer
+
     return torch.ops.cann_ops_transformer.quant_lightning_indexer_metadata(
         int(arguments["num_heads_q"]),
         int(arguments["num_heads_k"]),
@@ -274,3 +303,34 @@ def run(
     if rewritten is not None:
         logging.info("[%s] rewrote QLI_V2 metadata input: %s", testcase_name, rewritten)
     return None
+
+
+def run_aclnn(*args, **kwargs):
+    """Adapt the ACLNN main API order to the shared Torch metadata hook."""
+    if len(args) != len(ACLNN_PARAMETER_NAMES):
+        raise ValueError(
+            f"QuantLightningIndexerV2 ACLNN hook expects {len(ACLNN_PARAMETER_NAMES)} arguments, got {len(args)}"
+        )
+    values = dict(zip(ACLNN_PARAMETER_NAMES, args))
+    host_metadata = values["metadata"]
+    metadata = move_to_device(host_metadata, torch.empty(0, device="npu"))
+    values["metadata"] = metadata
+    result = run(
+        values.pop("query"),
+        values.pop("key"),
+        values.pop("weights"),
+        values.pop("query_dequant_scale"),
+        values.pop("key_dequant_scale"),
+        values.pop("topk"),
+        values.pop("quant_mode"),
+        **values,
+        **kwargs,
+    )
+    if torch.is_tensor(host_metadata):
+        if host_metadata.device != metadata.device:
+            host_metadata.copy_(
+                metadata.to(dtype=host_metadata.dtype, device=host_metadata.device)
+            )
+    else:
+        host_metadata[...] = metadata.detach().cpu().numpy()
+    return result

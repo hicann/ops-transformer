@@ -80,7 +80,7 @@ class QuantLightningIndexerV2Spec:
 class AclnnQuantLightningIndexerV2Spec(QuantLightningIndexerV2Spec):
     golden = golden_module.cpu_aclnn_qli_v2
     customize_inputs = inputs_module.generate_aclnn_qli_v2_inputs
-    npu_preprocess = None
+    npu_preprocess = npu_preprocess_module.run_aclnn
 
 
 class QuantLightningIndexerMetadataSpec:
