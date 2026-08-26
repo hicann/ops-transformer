@@ -17,6 +17,22 @@
 
 namespace QuantFlashAttnUT {
 
+inline gert::Stride MakeContiguousStride(const gert::StorageShape &shape)
+{
+    gert::Stride stride;
+    const auto &storageShape = shape.GetStorageShape();
+    const auto dimNum = storageShape.GetDimNum();
+    if (dimNum == 0) {
+        return stride;
+    }
+    int64_t acc = 1;
+    for (int32_t i = static_cast<int32_t>(dimNum) - 1; i >= 0; i--) {
+        stride.SetStride(static_cast<size_t>(i), acc);
+        acc *= storageShape.GetDim(static_cast<size_t>(i));
+    }
+    return stride;
+}
+
 struct QuantFlashAttnHostUtParamBase : public HostUtParamBase {
     int64_t quant_compute_mode;
     float softmax_scale;
@@ -101,13 +117,40 @@ struct QuantFlashAttnTilingUtParam : public QuantFlashAttnHostUtParamBase {
         // 输入顺序与 quant_flash_attn_def.cpp 中 Input() 注册顺序保持一致
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "q_shape", "q_dtype", "q_format", this->q));
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "k_shape", "k_dtype", "k_format", this->k));
+        ApplyStrideFromCsv(csvMap, "key_stride", this->k);
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "v_shape", "v_dtype", "v_format", this->v));
+        ApplyStrideFromCsv(csvMap, "value_stride", this->v);
         this->inputInstance.emplace_back(
             GetTensorGE(csvMap, "q_descale_shape", "q_descale_dtype", "q_descale_format", this->q_descale));
         this->inputInstance.emplace_back(
             GetTensorGE(csvMap, "k_descale_shape", "k_descale_dtype", "k_descale_format", this->k_descale));
+        ApplyStrideFromCsv(csvMap, "k_descale_stride", this->k_descale);
         this->inputInstance.emplace_back(
             GetTensorGE(csvMap, "v_descale_shape", "v_descale_dtype", "v_descale_format", this->v_descale));
+        ApplyStrideFromCsv(csvMap, "v_descale_stride", this->v_descale);
+        // parser checks InputIsView(KEY_INDEX) first, then reads all four strides.
+        // If any stride is set, all four must be TensorV2 (hasStride_=true) so that
+        // GetInputStride returns non-null for each. Key must always have hasStride_=true
+        // to trigger the stride parsing path. For tensors without explicit stride in CSV,
+        // compute contiguous stride from shape to avoid tiling failures from empty stride.
+        if (this->k.hasStride_ || this->v.hasStride_ || this->k_descale.hasStride_ || this->v_descale.hasStride_) {
+            if (!this->k.hasStride_) {
+                this->k.stride_ = MakeContiguousStride(this->k.shape_);
+            }
+            if (!this->v.hasStride_) {
+                this->v.stride_ = MakeContiguousStride(this->v.shape_);
+            }
+            if (!this->k_descale.hasStride_) {
+                this->k_descale.stride_ = MakeContiguousStride(this->k_descale.shape_);
+            }
+            if (!this->v_descale.hasStride_) {
+                this->v_descale.stride_ = MakeContiguousStride(this->v_descale.shape_);
+            }
+            this->k.hasStride_ = true;
+            this->v.hasStride_ = true;
+            this->k_descale.hasStride_ = true;
+            this->v_descale.hasStride_ = true;
+        }
         this->inputInstance.emplace_back(
             GetTensorGE(csvMap, "block_table_shape", "block_table_dtype", "block_table_format", this->block_table));
         this->inputInstance.emplace_back(
