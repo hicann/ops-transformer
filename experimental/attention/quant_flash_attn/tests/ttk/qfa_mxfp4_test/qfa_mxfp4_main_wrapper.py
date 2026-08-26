@@ -101,7 +101,7 @@ def _build_fallback_data_dict(
     # 这样 CSV 配的异常 shape (如 p_scale_shape=[2,3]) 也能传到算子被 checker 拦截
     block_table_t = (
         block_table
-        if block_table is not None
+        if block_table is not None and block_table.numel() > 0
         else golden_mod._gen_opt_tensor(
             golden_mod.BLOCK_TABLE_SHAPE,
             golden_mod.BLOCK_TABLE_DTYPE or "int32",

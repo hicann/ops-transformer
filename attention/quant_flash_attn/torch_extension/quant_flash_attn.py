@@ -289,8 +289,9 @@ def quant_flash_attn_metadata(
     'PrivateUse1' is dispatch key for custom NPU backends.
     """
     torch._check(
-        quant_mode == 1,
-        lambda: f"The quant_mode of quant_flash_attn_metadata only supports 1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32), but got {quant_mode}",
+        quant_mode in (1, 5),
+        lambda: f"quant_mode of quant_flash_attn_metadata only supports 1 or 5, but got "
+        f"{quant_mode}",
     )
     if layout_q == "TND":
         torch._check(
@@ -418,11 +419,27 @@ def quant_flash_attn(
     'PrivateUse1' is the combine key for custom NPU backends.
     """
     torch._check(
-        quant_mode == 1,
-        lambda: f"The quant_mode of quant_flash_attn only supports 1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32), but got {quant_mode}",
+        quant_mode in (1, 5),
+        lambda: f"quant_mode of quant_flash_attn only supports 1 or 5, but got "
+        f"{quant_mode}",
     )
     quant_mode = _resolve_quant_mode(quant_mode)
     mask_mode = _resolve_mask_mode(mask_mode)
+
+    if quant_mode == int(QuantMode.A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16):
+        if q.dtype != torch.uint8:
+            raise ValueError(
+                f"In MxFP4 mode (quant_mode=5), q must be uint8, but got {q.dtype}"
+            )
+        if k.dtype != torch.uint8:
+            raise ValueError(
+                f"In MxFP4 mode (quant_mode=5), k must be uint8, but got {k.dtype}"
+            )
+        if v.dtype != torch.uint8:
+            raise ValueError(
+                f"In MxFP4 mode (quant_mode=5), v must be uint8, but got {v.dtype}"
+            )
+
     op_module = quant_flash_attn_op_builder.load()
     return op_module.quant_flash_attn(
         q,

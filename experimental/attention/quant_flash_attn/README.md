@@ -213,9 +213,9 @@ cann_ops_transformer.quant_flash_attn(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 | 非连续Tensor |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| q | Tensor | 必选 | 公式中的Q | float4_e2m1（MxFP4场景） | ND | (B, Q_N, Q_S, D) | × |
-| k | Tensor | 必选 | 公式中的K | float4_e2m1（MxFP4场景） | ND | (B, KV_N, KV_S, D) | × |
-| v | Tensor | 必选 | 公式中的V | float4_e2m1（MxFP4场景） | ND | (B, KV_N, KV_S, D) | × |
+| q | Tensor | 必选 | 公式中的Q | uint8（MxFP4场景，实际为float4_e2m1，以uint8伪装传入） | ND | (B, Q_N, Q_S, D/2) | × |
+| k | Tensor | 必选 | 公式中的K | uint8（MxFP4场景，实际为float4_e2m1，以uint8伪装传入） | ND | (B, KV_N, KV_S, D/2) | × |
+| v | Tensor | 必选 | 公式中的V | uint8（MxFP4场景，实际为float4_e2m1，以uint8伪装传入） | ND | (B, KV_N, KV_S, D/2) | × |
 | q_descale | Tensor | 必选 | q的反量化scale | float8_e8m0 | ND | (B, Q_N, Q_S, D/64, 2) | × |
 | k_descale | Tensor | 必选 | k的反量化scale | float8_e8m0 | ND | (B, KV_N, KV_S, D/64, 2) | × |
 | v_descale | Tensor | 必选 | v的反量化scale | float8_e8m0 | ND | - | × |
@@ -669,8 +669,8 @@ cann_ops_transformer.quant_flash_attn(
             </tr>
             <tr>
                 <td>q/k/v dtype</td>
-                <td>仅支持 float4_e2m1</td>
-                <td>MxFP4 仅支持 Q/K/V 的 dtype 为 float4_e2m1</td>
+                <td>仅支持 uint8（伪装类型）</td>
+                <td>MxFP4 场景下 Q/K/V 实际量化类型为 float4_e2m1，由于 PyTorch 不原生支持 float4_e2m1，需以 uint8 伪装传入（每两个 float4_e2m1 元素打包为 1 byte uint8），D 维大小为原 D 的 1/2</td>
             </tr>
             <tr>
                 <td>D</td>

@@ -631,6 +631,34 @@ void QuantFlashAttnTilingInfoParser::GetSoftmaxScale()
     }
 }
 
+ge::graphStatus QuantFlashAttnTilingInfoParser::GetEmptyTensorFlag()
+{
+    auto checkEmptyTensor = [this](const gert::StorageShape *shape, const std::string &name) -> bool {
+        if (shape == nullptr) {
+            return false;
+        }
+        for (size_t i = 0; i < shape->GetStorageShape().GetDimNum(); i++) {
+            if (shape->GetStorageShape().GetDim(i) == 0) {
+                OP_LOGE(tilingInfo_.opName,
+                        "Tensor %s has empty dimension at axis %zu, size is 0, which is not supported", name.c_str(),
+                        i);
+                return true;
+            }
+        }
+        return false;
+    };
+    if (checkEmptyTensor(tilingInfo_.opParamInfo.query.shape, QUERY_NAME) ||
+        checkEmptyTensor(tilingInfo_.opParamInfo.key.shape, KEY_NAME) ||
+        checkEmptyTensor(tilingInfo_.opParamInfo.value.shape, VALUE_NAME) ||
+        checkEmptyTensor(tilingInfo_.opParamInfo.qDescale.shape, Q_DESCALE_NAME) ||
+        checkEmptyTensor(tilingInfo_.opParamInfo.kDescale.shape, K_DESCALE_NAME) ||
+        checkEmptyTensor(tilingInfo_.opParamInfo.vDescale.shape, V_DESCALE_NAME) ||
+        checkEmptyTensor(tilingInfo_.opParamInfo.attnOut.shape, ATTEN_OUT_NAME)) {
+        emptyTensorFlag_ = true;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus QuantFlashAttnTilingInfoParser::ParseAxisInfo()
 {
     if (ge::GRAPH_SUCCESS != GetSeqUsedQDims() || ge::GRAPH_SUCCESS != GetSeqUsedKvDims() ||
@@ -682,7 +710,7 @@ ge::graphStatus QuantFlashAttnTilingInfoParser::Parse()
     }
 
     if (ge::GRAPH_SUCCESS != GetOpName() || ge::GRAPH_SUCCESS != GetNpuInfo() || ge::GRAPH_SUCCESS != GetOpParaInfo() ||
-        ge::GRAPH_SUCCESS != CheckRequiredParaExistence()) {
+        ge::GRAPH_SUCCESS != CheckRequiredParaExistence() || ge::GRAPH_SUCCESS != GetEmptyTensorFlag()) {
         return ge::GRAPH_FAILED;
     }
 
@@ -691,6 +719,12 @@ ge::graphStatus QuantFlashAttnTilingInfoParser::Parse()
     }
     SetFaShape();
     GetKvStorageMode();
+
+    if (emptyTensorFlag_) {
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(tilingInfo_.opName, "input tensor", "",
+                                              "Empty tensor (containing a dimension of size 0) is not supported");
+        return ge::GRAPH_FAILED;
+    }
 
     if (ge::GRAPH_SUCCESS != ParseAxisInfo()) {
         return ge::GRAPH_FAILED;
