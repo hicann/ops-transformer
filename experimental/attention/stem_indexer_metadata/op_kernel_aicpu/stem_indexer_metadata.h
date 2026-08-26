@@ -33,19 +33,18 @@ constexpr uint32_t AIV_RESERVED_METADATA_STRIDE = 16U;
 constexpr uint64_t GetMetadataRequiredElems(uint32_t sectionNum)
 {
     return static_cast<uint64_t>(HEAD_METADATA_STRIDE) +
-           static_cast<uint64_t>(sectionNum) *
-               (static_cast<uint64_t>(AIC_CORE_NUM) * FA_METADATA_STRIDE +
-                static_cast<uint64_t>(AIV_CORE_NUM) * AIV_RESERVED_METADATA_STRIDE);
+           static_cast<uint64_t>(sectionNum) * (static_cast<uint64_t>(AIC_CORE_NUM) * FA_METADATA_STRIDE +
+                                                static_cast<uint64_t>(AIV_CORE_NUM) * AIV_RESERVED_METADATA_STRIDE);
 }
 
 // Head Metadata Index Definitions
 constexpr uint32_t HEAD_SECTION_NUM_INDEX = 0U;
 
 // Section-based FA Metadata Index (0-based, matching AICPU flash_attn_metadata format)
-constexpr uint32_t SLI_SEC_BN2_START_INDEX = 0U;
+constexpr uint32_t SLI_SEC_BN_START_INDEX = 0U;
 constexpr uint32_t SLI_SEC_M_START_INDEX = 1U;
 constexpr uint32_t SLI_SEC_S2_START_INDEX = 2U;
-constexpr uint32_t SLI_SEC_BN2_END_INDEX = 3U;
+constexpr uint32_t SLI_SEC_BN_END_INDEX = 3U;
 constexpr uint32_t SLI_SEC_M_END_INDEX = 4U;
 constexpr uint32_t SLI_SEC_S2_END_INDEX = 5U;
 
@@ -54,7 +53,7 @@ struct SliMetadata {
     uint32_t sectionNum;
     SLI_METADATA_T *metadata;
     SLI_METADATA_T *headMetadata; // [HEAD_METADATA_STRIDE];
-    SLI_METADATA_T *faMetadata; // [sectionNum][AIC_CORE_NUM][FA_METADATA_STRIDE];
+    SLI_METADATA_T *faMetadata;   // [sectionNum][AIC_CORE_NUM][FA_METADATA_STRIDE];
     SliMetadata(void *metadataPtr, uint32_t sectionNum)
         : sectionNum(sectionNum),
           metadata(static_cast<SLI_METADATA_T *>(metadataPtr)),

@@ -48,16 +48,16 @@ inline uint32_t SectionStreamK::Compute(const DeviceInfo &deviceInfo, const IBas
     for (size_t i = 0; i < result.sectionNum; ++i) {
         SectionStreamKFaResult tmpFa(deviceInfo.aicCoreMaxNum);
         tmpFa.usedCoreNum = implResult[i].usedCoreNum;
-        tmpFa.bN2End = implResult[i].bN2End;
-        tmpFa.gS1End = implResult[i].gS1End;
+        tmpFa.bNEnd = implResult[i].bNEnd;
+        tmpFa.mEnd = implResult[i].mEnd;
         tmpFa.s2End = implResult[i].s2End;
         tmpFa.firstFdDataWorkspaceIdx = implResult[i].firstFdDataWorkspaceIdx;
         result.sectionFaResult.emplace_back(tmpFa);
 
         SectionStreamKFdResult tmpFd(deviceInfo.aicCoreMaxNum, deviceInfo.aivCoreMaxNum);
         tmpFd.usedVecNum = implResult[i].usedVecNum;
-        tmpFd.bN2Idx = implResult[i].bN2Idx;
-        tmpFd.gS1Idx = implResult[i].mIdx;
+        tmpFd.bNIdx = implResult[i].bNIdx;
+        tmpFd.mIdx = implResult[i].mIdx;
         tmpFd.workspaceIdx = implResult[i].workspaceIdx;
         tmpFd.s2SplitNum = implResult[i].s2SplitNum;
         tmpFd.taskIdx = implResult[i].taskIdx;

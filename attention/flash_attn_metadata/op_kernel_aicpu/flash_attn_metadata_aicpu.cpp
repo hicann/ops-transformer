@@ -57,12 +57,10 @@ bool FlashAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
 
     KERNEL_CHECK_FALSE((metadata_ != nullptr && metadata_->GetData() != nullptr), false, "metadata is empty");
 
-    bool requiredAttrs = GetAttrValue(ctx, "num_heads_q", numHeadsQ_) &&
-                         GetAttrValue(ctx, "num_heads_kv", numHeadsKv_) &&
-                         GetAttrValue(ctx, "head_dim", headDim_) &&
-                         GetAttrValue(ctx, "soc_version", socVersion_) &&
-                         GetAttrValue(ctx, "aic_core_num", aicCoreNum_) &&
-                         GetAttrValue(ctx, "aiv_core_num", aivCoreNum_);
+    bool requiredAttrs =
+        GetAttrValue(ctx, "num_heads_q", numHeadsQ_) && GetAttrValue(ctx, "num_heads_kv", numHeadsKv_) &&
+        GetAttrValue(ctx, "head_dim", headDim_) && GetAttrValue(ctx, "soc_version", socVersion_) &&
+        GetAttrValue(ctx, "aic_core_num", aicCoreNum_) && GetAttrValue(ctx, "aiv_core_num", aivCoreNum_);
     KERNEL_CHECK_FALSE(requiredAttrs, false, "Missing Required attrs missing!");
 
     // attributes optional
@@ -122,8 +120,8 @@ bool FlashAttnMetadataCpuKernel::CheckActualQuerySeq()
     for (size_t i = 1; i < cuSeqlensQ.size(); ++i) {
         if (cuSeqlensQ[i] < cuSeqlensQ[i - 1]) {
             KERNEL_LOG_ERROR(
-                "The %zuth element of cuSeqlensQ must not be less than the %zuth element, but got %ld and %ld",
-                i, i - 1, cuSeqlensQ[i], cuSeqlensQ[i - 1]);
+                "The %zuth element of cuSeqlensQ must not be less than the %zuth element, but got %ld and %ld", i,
+                i - 1, cuSeqlensQ[i], cuSeqlensQ[i - 1]);
             return false;
         }
     }
@@ -151,8 +149,8 @@ bool FlashAttnMetadataCpuKernel::CheckActualKvSeq()
 
     for (size_t i = 0; i < sequsedKv.size(); ++i) {
         if (sequsedKv[i] < 0) {
-            KERNEL_LOG_ERROR("The elements of sequsedKv must be non-negative, but %zuth element is %ld",
-                             i, sequsedKv[i]);
+            KERNEL_LOG_ERROR("The elements of sequsedKv must be non-negative, but %zuth element is %ld", i,
+                             sequsedKv[i]);
             return false;
         }
     }
@@ -167,8 +165,8 @@ bool FlashAttnMetadataCpuKernel::CheckActualKvSeq()
     for (size_t i = 1; i < cuSeqlensKv.size(); ++i) {
         if (cuSeqlensKv[i] < cuSeqlensKv[i - 1]) {
             KERNEL_LOG_ERROR(
-                "The %zuth element of cuSeqlensKv must not be less than the %zuth element, but got %ld and %ld",
-                i, i - 1, cuSeqlensKv[i], cuSeqlensKv[i - 1]);
+                "The %zuth element of cuSeqlensKv must not be less than the %zuth element, but got %ld and %ld", i,
+                i - 1, cuSeqlensKv[i], cuSeqlensKv[i - 1]);
             return false;
         }
     }
@@ -200,10 +198,9 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
     } else if (baseInfo.layoutQuery == load_balance::Layout::TND) {
         qlayout = optiling::flash_attn::fa_tiling_util::LAYOUT_TND;
     }
-    optiling::flash_attn::fa_tiling_util::AdjustSinnerAndSouter(baseInfo.headDim, maxSeqlenQ_,
-                                                                maxSeqlenKv_, baseInfo.sparseMode, baseInfo.preToken,
-                                                                baseInfo.nextToken, qlayout,
-                                                                mBaseSize_, s2BaseSize_);
+    optiling::flash_attn::fa_tiling_util::AdjustSinnerAndSouter(baseInfo.headDimQk, maxSeqlenQ_, maxSeqlenKv_,
+                                                                baseInfo.sparseMode, baseInfo.preToken,
+                                                                baseInfo.nextToken, qlayout, mBaseSize_, s2BaseSize_);
     mBaseSize_ *= (aivCoreNum_ / aicCoreNum_);
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
@@ -211,6 +208,7 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
     param.fdTolerance = 10;             // 10: tolerance block
     param.fdLeastBlock = 3;             // 3: least block
     param.fdOn = true;
+    param.outputLayout = load_balance::OutputLayout::BN2_S1G;
 }
 
 void FlashAttnMetadataCpuKernel::InitBaseInfo()
@@ -220,7 +218,8 @@ void FlashAttnMetadataCpuKernel::InitBaseInfo()
     baseInfo.queryHeadNum = numHeadsQ_;
     baseInfo.kvSeqSize = maxSeqlenKv_;
     baseInfo.kvHeadNum = numHeadsKv_;
-    baseInfo.headDim = headDim_;
+    baseInfo.headDimQk = headDim_;
+    baseInfo.headDimV = headDim_;
     load_balance::SparseMode maskMode = load_balance::SparseMode::BUTT;
     if (maskMode_ != 0) {
         maskMode = static_cast<load_balance::SparseMode>(maskMode_);
@@ -263,15 +262,15 @@ bool FlashAttnMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult 
         for (uint32_t aicIdx = 0; aicIdx < faRes.usedCoreNum; ++aicIdx) {
             auto &prevFaRes = (secIdx == 0U) ? dummyHead : splitRes.sectionFaResult[secIdx - 1U];
             auto prevLastCore = (secIdx == 0U) ? 0U : prevFaRes.usedCoreNum - 1U;
-            FA_METADATA_T bn2Start = (aicIdx == 0) ? prevFaRes.bN2End[prevLastCore] : faRes.bN2End[aicIdx - 1U];
-            FA_METADATA_T mStart = (aicIdx == 0) ? prevFaRes.gS1End[prevLastCore] : faRes.gS1End[aicIdx - 1U];
+            FA_METADATA_T bnStart = (aicIdx == 0) ? prevFaRes.bNEnd[prevLastCore] : faRes.bNEnd[aicIdx - 1U];
+            FA_METADATA_T mStart = (aicIdx == 0) ? prevFaRes.mEnd[prevLastCore] : faRes.mEnd[aicIdx - 1U];
             FA_METADATA_T s2Start = (aicIdx == 0) ? prevFaRes.s2End[prevLastCore] : faRes.s2End[aicIdx - 1U];
 
-            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_BN2_START_INDEX, bn2Start);
+            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_BN_START_INDEX, bnStart);
             faMetadata.SetFaMetadata(secIdx, aicIdx, FA_M_START_INDEX, mStart);
             faMetadata.SetFaMetadata(secIdx, aicIdx, FA_S2_START_INDEX, s2Start);
-            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_BN2_END_INDEX, faRes.bN2End[aicIdx]);
-            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_M_END_INDEX, faRes.gS1End[aicIdx]);
+            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_BN_END_INDEX, faRes.bNEnd[aicIdx]);
+            faMetadata.SetFaMetadata(secIdx, aicIdx, FA_M_END_INDEX, faRes.mEnd[aicIdx]);
             faMetadata.SetFaMetadata(secIdx, aicIdx, FA_S2_END_INDEX, faRes.s2End[aicIdx]);
             faMetadata.SetFaMetadata(secIdx, aicIdx, FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX,
                                      faRes.firstFdDataWorkspaceIdx[aicIdx]);
@@ -280,8 +279,8 @@ bool FlashAttnMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult 
         auto &fdRes = splitRes.sectionFdResult[secIdx];
         for (uint32_t aivIdx = 0; aivIdx < fdRes.usedVecNum; ++aivIdx) {
             uint32_t t = fdRes.taskIdx[aivIdx];
-            faMetadata.SetFdMetadata(secIdx, aivIdx, FD_BN2_IDX_INDEX, fdRes.bN2Idx[t]);
-            faMetadata.SetFdMetadata(secIdx, aivIdx, FD_M_IDX_INDEX, fdRes.gS1Idx[t]);
+            faMetadata.SetFdMetadata(secIdx, aivIdx, FD_BN_IDX_INDEX, fdRes.bNIdx[t]);
+            faMetadata.SetFdMetadata(secIdx, aivIdx, FD_M_IDX_INDEX, fdRes.mIdx[t]);
             faMetadata.SetFdMetadata(secIdx, aivIdx, FD_WORKSPACE_IDX_INDEX, fdRes.workspaceIdx[t]);
             faMetadata.SetFdMetadata(secIdx, aivIdx, FD_WORKSPACE_NUM_INDEX, fdRes.s2SplitNum[t]);
             faMetadata.SetFdMetadata(secIdx, aivIdx, FD_M_START_INDEX, fdRes.mStart[aivIdx]);

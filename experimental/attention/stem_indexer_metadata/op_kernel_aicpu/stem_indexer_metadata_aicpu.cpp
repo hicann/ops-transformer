@@ -162,7 +162,8 @@ bool StemIndexerMetadataCpuKernel::GenerateBaseInfo(StemIndexerBaseInfo &baseInf
     baseInfo.querySeqSize = 0;
     baseInfo.kvHeadNum = numHeadsKv_;
     baseInfo.kvSeqSize = 0;
-    baseInfo.headDim = headDim_;
+    baseInfo.headDimQk = headDim_;
+    baseInfo.headDimV = headDim_;
     baseInfo.attenMaskFlag = causal_;
     baseInfo.sparseMode = (causal_) ? static_cast<uint32_t>(load_balance::SparseMode::RIGHT_DOWN_CAUSAL) :
                                       static_cast<uint32_t>(load_balance::SparseMode::BUTT);
@@ -192,6 +193,7 @@ bool StemIndexerMetadataCpuKernel::GenerateSectionStreamKParam(load_balance::Sec
     param.mBaseSize = STEM_M_BASE_SIZE;
     param.s2BaseSize = STEM_S2_BASE_SIZE;
     param.fdOn = false;
+    param.outputLayout = load_balance::OutputLayout::BN2_S1G;
     return true;
 }
 
@@ -219,15 +221,15 @@ bool StemIndexerMetadataCpuKernel::GenMetadata(SectionStreamKResult &result)
         for (uint32_t aicIdx = 0; aicIdx < faRes.usedCoreNum; ++aicIdx) {
             auto &prevFaRes = (secIdx == 0U) ? dummyHead : result.sectionFaResult[secIdx - 1U];
             auto prevLastCore = (secIdx == 0U) ? 0U : prevFaRes.usedCoreNum - 1U;
-            SLI_METADATA_T bn2Start = (aicIdx == 0) ? prevFaRes.bN2End[prevLastCore] : faRes.bN2End[aicIdx - 1U];
-            SLI_METADATA_T mStart = (aicIdx == 0) ? prevFaRes.gS1End[prevLastCore] : faRes.gS1End[aicIdx - 1U];
+            SLI_METADATA_T bn2Start = (aicIdx == 0) ? prevFaRes.bNEnd[prevLastCore] : faRes.bNEnd[aicIdx - 1U];
+            SLI_METADATA_T mStart = (aicIdx == 0) ? prevFaRes.mEnd[prevLastCore] : faRes.mEnd[aicIdx - 1U];
             SLI_METADATA_T s2Start = (aicIdx == 0) ? prevFaRes.s2End[prevLastCore] : faRes.s2End[aicIdx - 1U];
 
-            sliMetadata.SetFaMetadata(secIdx, aicIdx, optiling::SLI_SEC_BN2_START_INDEX, bn2Start);
+            sliMetadata.SetFaMetadata(secIdx, aicIdx, optiling::SLI_SEC_BN_START_INDEX, bn2Start);
             sliMetadata.SetFaMetadata(secIdx, aicIdx, optiling::SLI_SEC_M_START_INDEX, mStart);
             sliMetadata.SetFaMetadata(secIdx, aicIdx, optiling::SLI_SEC_S2_START_INDEX, s2Start);
-            sliMetadata.SetFaMetadata(secIdx, aicIdx, optiling::SLI_SEC_BN2_END_INDEX, faRes.bN2End[aicIdx]);
-            sliMetadata.SetFaMetadata(secIdx, aicIdx, optiling::SLI_SEC_M_END_INDEX, faRes.gS1End[aicIdx]);
+            sliMetadata.SetFaMetadata(secIdx, aicIdx, optiling::SLI_SEC_BN_END_INDEX, faRes.bNEnd[aicIdx]);
+            sliMetadata.SetFaMetadata(secIdx, aicIdx, optiling::SLI_SEC_M_END_INDEX, faRes.mEnd[aicIdx]);
             sliMetadata.SetFaMetadata(secIdx, aicIdx, optiling::SLI_SEC_S2_END_INDEX, faRes.s2End[aicIdx]);
         }
     }

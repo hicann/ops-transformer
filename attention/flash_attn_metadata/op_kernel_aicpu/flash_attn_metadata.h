@@ -38,16 +38,16 @@ constexpr uint32_t HEAD_M_BASE_SIZE_INDEX = 2U;
 constexpr uint32_t HEAD_S2_BASE_SIZE_INDEX = 3U;
 
 // FA Metadata Index Definitions
-constexpr uint32_t FA_BN2_START_INDEX = 0U;
+constexpr uint32_t FA_BN_START_INDEX = 0U;
 constexpr uint32_t FA_M_START_INDEX = 1U;
 constexpr uint32_t FA_S2_START_INDEX = 2U;
-constexpr uint32_t FA_BN2_END_INDEX = 3U;
+constexpr uint32_t FA_BN_END_INDEX = 3U;
 constexpr uint32_t FA_M_END_INDEX = 4U;
 constexpr uint32_t FA_S2_END_INDEX = 5U;
 constexpr uint32_t FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX = 6U;
 
 // FD Metadata Index Definitions
-constexpr uint32_t FD_BN2_IDX_INDEX = 0U;
+constexpr uint32_t FD_BN_IDX_INDEX = 0U;
 constexpr uint32_t FD_M_IDX_INDEX = 1U;
 constexpr uint32_t FD_WORKSPACE_IDX_INDEX = 2U;
 constexpr uint32_t FD_WORKSPACE_NUM_INDEX = 3U;
@@ -58,13 +58,13 @@ namespace detail {
 struct FaMetadata {
     uint32_t sectionNum;
     FA_METADATA_T *headMetadata; // [HEAD_METADATA_STRIDE];
-    FA_METADATA_T *faMetadata; // [sectionNum][AIC_CORE_NUM][FA_METADATA_STRIDE];
-    FA_METADATA_T *fdMetadata; // [sectionNum][AIV_CORE_NUM][FD_METADATA_STRIDE];
+    FA_METADATA_T *faMetadata;   // [sectionNum][AIC_CORE_NUM][FA_METADATA_STRIDE];
+    FA_METADATA_T *fdMetadata;   // [sectionNum][AIV_CORE_NUM][FD_METADATA_STRIDE];
     FaMetadata(void *metadataPtr, uint32_t sectionNum)
-        :sectionNum(sectionNum),
-        headMetadata(static_cast<FA_METADATA_T*>(metadataPtr)),
-        faMetadata(headMetadata + HEAD_METADATA_STRIDE),
-        fdMetadata(faMetadata + sectionNum * AIC_CORE_NUM * FA_METADATA_STRIDE)
+        : sectionNum(sectionNum),
+          headMetadata(static_cast<FA_METADATA_T *>(metadataPtr)),
+          faMetadata(headMetadata + HEAD_METADATA_STRIDE),
+          fdMetadata(faMetadata + sectionNum * AIC_CORE_NUM * FA_METADATA_STRIDE)
     {
         headMetadata[0] = sectionNum;
     }

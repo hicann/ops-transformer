@@ -6,8 +6,8 @@
  * this file except in compliance with the License. THIS SOFTWARE IS PROVIDED ON
  * AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS
- * FOR A PARTICULAR PURPOSE. See LICENSE in the software repository for the full
- * text of the License.
+ * FOR A PARTICULAR PURPOSE. See LICENSE in the root of the software repository
+ * for the full text of the License.
  */
 
 #include <iostream>
@@ -22,14 +22,15 @@
 using namespace std;
 using namespace optiling;
 
-#define CHECK_RET(cond) ((cond) ? true :(false))
+#define CHECK_RET(cond) ((cond) ? true : (false))
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape) {
+int64_t GetShapeSize(const std::vector<int64_t> &shape)
+{
     int64_t shapeSize = 1;
     for (auto i : shape) {
         shapeSize *= i;
@@ -37,46 +38,49 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape) {
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream) {
+int Init(int32_t deviceId, aclrtStream *stream)
+{
     auto ret = aclInit(nullptr);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
-        LOG_PRINT("aclInit failed. ERROR: %d\n", ret); 
+        LOG_PRINT("aclInit failed. ERROR: %d\n", ret);
         return ret;
     }
     ret = aclrtSetDevice(deviceId);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
-        LOG_PRINT("aclrtSetDevice failed. ERROR: %d\n", ret); 
+        LOG_PRINT("aclrtSetDevice failed. ERROR: %d\n", ret);
         return ret;
     }
     ret = aclrtCreateStream(stream);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
-        LOG_PRINT("aclrtCreateStream failed. ERROR: %d\n", ret); 
+        LOG_PRINT("aclrtCreateStream failed. ERROR: %d\n", ret);
         return ret;
     }
     return 0;
 }
 
-static void DumpMeta(void* data) {
-    int32_t sectionNum = static_cast<int32_t>(((int32_t*)data)[0]);
+static void DumpMeta(void *data)
+{
+    int32_t sectionNum = static_cast<int32_t>(((int32_t *)data)[0]);
     optiling::detail::FaMetaData faMetadata(data, sectionNum);
     printf("sectionNum:%d\n", faMetadata.GetHeadMedata(optiling::HEAD_SECTION_NUM_INDEX));
     printf("isFd:%d\n", faMetadata.GetHeadMedata(optiling::HEAD_IS_FD_INDEX));
     printf("mBaseSize:%d\n", faMetadata.GetHeadMedata(optiling::HEAD_M_BASE_SIZE_INDEX));
     printf("s2BaseSize:%d\n", faMetadata.GetHeadMedata(optiling::HEAD_S2_BASE_SIZE_INDEX));
     for (uint32_t sectionId = 0; sectionId < sectionNum; ++sectionId) {
-        printf("sectionIdx:%d\n",sectionId);
+        printf("sectionIdx:%d\n", sectionId);
         for (size_t i = 0; i < AIC_CORE_NUM; ++i) {
-            printf("bn2 start: %d\n", faMetadata.GetFaMetadata(sectionId, i, optiling::FA_BN2_START_INDEX));
+            printf("bn2 start: %d\n", faMetadata.GetFaMetadata(sectionId, i, optiling::FA_BN_START_INDEX));
             printf("m start: %d\n", faMetadata.GetFaMetadata(sectionId, i, optiling::FA_M_START_INDEX));
             printf("s2 start: %d\n", faMetadata.GetFaMetadata(sectionId, i, optiling::FA_S2_START_INDEX));
-            printf("bn2 end: %d\n", faMetadata.GetFaMetadata(sectionId, i, optiling::FA_BN2_END_INDEX));
+            printf("bn2 end: %d\n", faMetadata.GetFaMetadata(sectionId, i, optiling::FA_BN_END_INDEX));
             printf("m end: %d\n", faMetadata.GetFaMetadata(sectionId, i, optiling::FA_M_END_INDEX));
             printf("s2 end: %d\n", faMetadata.GetFaMetadata(sectionId, i, optiling::FA_S2_END_INDEX));
-            printf("first fd data ws idx: %d\n",faMetadata.GetFaMetadata(sectionId, i, optiling::FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX));
+            printf("first fd data ws idx: %d\n",
+                   faMetadata.GetFaMetadata(sectionId, i, optiling::FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX));
         }
 
         for (size_t i = 0; i < AIV_CORE_NUM; ++i) {
-            printf("bn2 idx: %d\n", faMetadata.GetFdMetadata(sectionId, i, optiling::FD_BN2_IDX_INDEX));
+            printf("bn2 idx: %d\n", faMetadata.GetFdMetadata(sectionId, i, optiling::FD_BN_IDX_INDEX));
             printf("m idx: %d\n", faMetadata.GetFdMetadata(sectionId, i, optiling::FD_M_IDX_INDEX));
             printf("fd workspace idx: %d\n", faMetadata.GetFdMetadata(sectionId, i, optiling::FD_WORKSPACE_IDX_INDEX));
             printf("fd workspace num: %d\n", faMetadata.GetFdMetadata(sectionId, i, optiling::FD_WORKSPACE_NUM_INDEX));
@@ -88,16 +92,17 @@ static void DumpMeta(void* data) {
 
 template <typename T>
 int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor) {
+                    aclDataType dataType, aclTensor **tensor)
+{
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
-    if (!CHECK_RET(ret == ACL_SUCCESS)) { 
-        LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); 
+    if (!CHECK_RET(ret == ACL_SUCCESS)) {
+        LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret);
         return ret;
     }
     ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
-        LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); 
+        LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret);
         return ret;
     }
 
@@ -111,12 +116,13 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-int main() {
+int main()
+{
     int32_t deviceId = 0;
     aclrtStream stream;
     auto ret = Init(deviceId, &stream);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
-        LOG_PRINT("Init acl failed. ERROR: %d\n", ret); 
+        LOG_PRINT("Init acl failed. ERROR: %d\n", ret);
         return ret;
     }
 
@@ -147,9 +153,9 @@ int main() {
     void *actualSeqLengthsQueryDeviceAddr = nullptr;
     void *actualSeqLengthsKvDeviceAddr = nullptr;
     void *metadataDeviceAddr = nullptr;
-    aclTensor* actualSeqLengthsQueryTensor = nullptr;
-    aclTensor* actualSeqLengthsKvTensor = nullptr;
-    aclTensor* metadataTensor = nullptr;
+    aclTensor *actualSeqLengthsQueryTensor = nullptr;
+    aclTensor *actualSeqLengthsKvTensor = nullptr;
+    aclTensor *metadataTensor = nullptr;
     int64_t actualSeqLengthsQueryShapeSize = GetShapeSize(actualSeqLengthsQueryShape);
     int64_t actualSeqLengthsKvShapeSize = GetShapeSize(actualSeqLengthsKvShape);
     int64_t metadataShapeSize = GetShapeSize(metadataShape);
@@ -157,34 +163,30 @@ int main() {
     std::vector<int32_t> actualSeqLengthsKvHostData(actualSeqLengthsKvShapeSize, kvS);
     std::vector<int32_t> metadataHostData(metadataShapeSize, 0);
 
-    ret = CreateAclTensor(actualSeqLengthsQueryHostData, actualSeqLengthsQueryShape, &actualSeqLengthsQueryDeviceAddr, aclDataType::ACL_INT32, &actualSeqLengthsQueryTensor);
+    ret = CreateAclTensor(actualSeqLengthsQueryHostData, actualSeqLengthsQueryShape, &actualSeqLengthsQueryDeviceAddr,
+                          aclDataType::ACL_INT32, &actualSeqLengthsQueryTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
-    ret = CreateAclTensor(actualSeqLengthsKvHostData, actualSeqLengthsKvShape, &actualSeqLengthsKvDeviceAddr, aclDataType::ACL_INT32, &actualSeqLengthsKvTensor);
+    ret = CreateAclTensor(actualSeqLengthsKvHostData, actualSeqLengthsKvShape, &actualSeqLengthsKvDeviceAddr,
+                          aclDataType::ACL_INT32, &actualSeqLengthsKvTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
-    ret = CreateAclTensor(metadataHostData, metadataShape, &metadataDeviceAddr, aclDataType::ACL_INT32, &metadataTensor);
+    ret =
+        CreateAclTensor(metadataHostData, metadataShape, &metadataDeviceAddr, aclDataType::ACL_INT32, &metadataTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
 
-    aclOpExecutor* executor = nullptr;
+    aclOpExecutor *executor = nullptr;
     uint64_t workspaceSize = 0;
-    void* workspaceAddr = nullptr;
+    void *workspaceAddr = nullptr;
 
     printf("start aclnnQuantFlashAttnMetadata\n");
     ret = aclnnQuantFlashAttnMetadataGetWorkspaceSize(
-        nullptr, nullptr,
-        nullptr, nullptr,
-        nullptr,
-        batchSize, qS, kvS,
-        numHeads, numKeyValueHeads,
-        headDim, quantMode, sparseMode, preTokens, nextTokens,
-        "BSND", "BSND", "BSND", "BSND",
-        metadataTensor,
-        &workspaceSize, &executor);
+        nullptr, nullptr, nullptr, nullptr, nullptr, batchSize, qS, kvS, numHeads, numKeyValueHeads, headDim, quantMode,
+        sparseMode, preTokens, nextTokens, "BSND", "BSND", "BSND", "BSND", metadataTensor, &workspaceSize, &executor);
     if (ret != ACL_SUCCESS) {
         printf("aclnnQuantFlashAttnMetadataGetWorkspaceSize %d\n", ret);
         return -1;
@@ -202,15 +204,13 @@ int main() {
         return -1;
     }
 
-    ret = aclrtMemcpy(metadataHostData.data(),
-                        metadataHostData.size() * sizeof(metadataHostData[0]), metadataDeviceAddr,
-                        metadataShapeSize,
-                        ACL_MEMCPY_DEVICE_TO_HOST);
+    ret = aclrtMemcpy(metadataHostData.data(), metadataHostData.size() * sizeof(metadataHostData[0]),
+                      metadataDeviceAddr, metadataShapeSize, ACL_MEMCPY_DEVICE_TO_HOST);
     if (ret != ACL_SUCCESS) {
         printf("aclrtMemcpy %d\n", ret);
         return -1;
     }
-    
+
     DumpMeta(&metadataHostData[0]);
 
     aclDestroyTensor(metadataTensor);

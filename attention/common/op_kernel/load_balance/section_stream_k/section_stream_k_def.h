@@ -35,22 +35,24 @@ struct SectionStreamKParam : GeneralBalanceParam {
 
 struct SectionStreamKFaResult {
     uint32_t usedCoreNum{0U};                        // FA中使用的AIC数量
-    std::vector<uint32_t> bN2End{};                  // 每个核处理数据的BN2结束点
-    std::vector<uint32_t> gS1End{};                  // 每个核处理数据的GS1结束点
+    std::vector<uint32_t> bNEnd{};                   // 每个核处理数据的BN结束点
+    std::vector<uint32_t> mEnd{};                    // 每个核处理数据的M结束点
     std::vector<uint32_t> s2End{};                   // 每个核处理数据的S2结束点
     std::vector<uint32_t> firstFdDataWorkspaceIdx{}; // FD块在workspace中的位置
 
     explicit SectionStreamKFaResult(uint32_t aicNum)
-        : bN2End(aicNum), gS1End(aicNum), s2End(aicNum), firstFdDataWorkspaceIdx(aicNum)
-    {
-    }
+        : bNEnd(aicNum),
+          mEnd(aicNum),
+          s2End(aicNum),
+          firstFdDataWorkspaceIdx(aicNum)
+    {}
 };
 
 struct SectionStreamKFdResult {
     uint32_t usedVecNum{0U}; // 归约过程中使用的AIV数量
     // 1、归约任务的索引信息
-    std::vector<uint32_t> bN2Idx{}; // 每个归约任务的BN2索引，脚标为归约任务的序号，最大为核数-1
-    std::vector<uint32_t> gS1Idx{};       // 每个归约任务的GS1索引，脚标为归约任务的序号
+    std::vector<uint32_t> bNIdx{}; // 每个归约任务的BN索引，脚标为归约任务的序号，最大为核数-1
+    std::vector<uint32_t> mIdx{};  // 每个归约任务的m索引，脚标为归约任务的序号
     std::vector<uint32_t> workspaceIdx{}; // 每个归约任务在workspace中的存放位置
     std::vector<uint32_t> s2SplitNum{};   // 每个归约任务的S2核间切分份数，脚标为归约任务的序号
     // 2、FD kernel阶段，归约任务的分核信息
@@ -59,10 +61,14 @@ struct SectionStreamKFdResult {
     std::vector<uint32_t> mLen{};    // 每个AIV处理的归约任务的M轴行数
 
     explicit SectionStreamKFdResult(uint32_t aicNum, uint32_t aivNum)
-        : bN2Idx(aicNum), gS1Idx(aicNum), workspaceIdx(aicNum), s2SplitNum(aicNum), taskIdx(aivNum), mStart(aivNum),
+        : bNIdx(aicNum),
+          mIdx(aicNum),
+          workspaceIdx(aicNum),
+          s2SplitNum(aicNum),
+          taskIdx(aivNum),
+          mStart(aivNum),
           mLen(aivNum)
-    {
-    }
+    {}
 };
 
 struct SectionStreamKResult {

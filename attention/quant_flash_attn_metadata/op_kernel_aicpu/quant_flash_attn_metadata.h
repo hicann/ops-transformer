@@ -35,15 +35,15 @@ constexpr uint32_t HEAD_IS_FD_INDEX = 1U;
 constexpr uint32_t HEAD_M_BASE_SIZE_INDEX = 2U;
 constexpr uint32_t HEAD_S2_BASE_SIZE_INDEX = 3U;
 
-constexpr uint32_t FA_BN2_START_INDEX = 0U;
+constexpr uint32_t FA_BN_START_INDEX = 0U;
 constexpr uint32_t FA_M_START_INDEX = 1U;
 constexpr uint32_t FA_S2_START_INDEX = 2U;
-constexpr uint32_t FA_BN2_END_INDEX = 3U;
+constexpr uint32_t FA_BN_END_INDEX = 3U;
 constexpr uint32_t FA_M_END_INDEX = 4U;
 constexpr uint32_t FA_S2_END_INDEX = 5U;
 constexpr uint32_t FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX = 6U;
 
-constexpr uint32_t FD_BN2_IDX_INDEX = 0U;
+constexpr uint32_t FD_BN_IDX_INDEX = 0U;
 constexpr uint32_t FD_M_IDX_INDEX = 1U;
 constexpr uint32_t FD_WORKSPACE_IDX_INDEX = 2U;
 constexpr uint32_t FD_WORKSPACE_NUM_INDEX = 3U;
@@ -57,12 +57,12 @@ struct FaMetaData {
     uint32_t *faMetadata;
     uint32_t *fdMetadata;
     FaMetaData(void *metadataPtr, uint32_t sectionNum)
-        :sectionNum(sectionNum),
-        headMedata(static_cast<uint32_t*>(metadataPtr)),
-        faMetadata(headMedata + HEAD_METADATA_SIZE),
-        fdMetadata(faMetadata + sectionNum * AIC_CORE_NUM * FA_METADATA_SIZE)
+        : sectionNum(sectionNum),
+          headMedata(static_cast<uint32_t *>(metadataPtr)),
+          faMetadata(headMedata + HEAD_METADATA_SIZE),
+          fdMetadata(faMetadata + sectionNum * AIC_CORE_NUM * FA_METADATA_SIZE)
     {
-            headMedata[0] = sectionNum;
+        headMedata[0] = sectionNum;
     }
 
     void SetHeadMedata(uint32_t metaIdx, uint32_t val)
