@@ -77,9 +77,9 @@ __aicore__ inline void EngramFetchWaitArch35::Init(GM_ADDR commContext, GM_ADDR 
     ctxPtr_ = (__gm__ EngramCommContext *)commContext;
     rankId_ = ctxPtr_->rankId;
     numRanks_ = ctxPtr_->rankSize;
-    channelsPerRank_ = ctxPtr_->channelsPerRank;
-    if (channelsPerRank_ == 0) {
-        channelsPerRank_ = 1;
+    channelsPerRank_ = (Mc2Kernel::HANDLE_ARRAY_SIZE + numRanks_ - 1U) / numRanks_;
+    if (channelsPerRank_ == 0U) {
+        channelsPerRank_ = 1U;
     }
 
     tpipe_->InitBuffer(hcommBuf_, Mc2Kernel::HCOMM_INIT_SIZE);
