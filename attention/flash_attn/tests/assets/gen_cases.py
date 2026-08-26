@@ -422,12 +422,32 @@ def _contiguous_stride(shape):
     return tuple(strides)
 
 
+def _fa_metadata_size(batch, kv_heads):
+    """metadata 槽位的 int32 占位元素数, 逐字镜像 op 公式。
+
+    Mirrors torch_extension/flash_attn.py _calculate_metadata_size:
+        metadata_size = ((36 + 72) * batch * kv_heads + 1) * 16
+        再向上 4096 对齐(元素个数, 非字节数)。
+    """
+    metadata_size = ((36 + 72) * int(batch) * int(kv_heads) + 1) * 16
+    return ((metadata_size + 4095) // 4096) * 4096
+
+
 def _build_row(case_name, p):
     q_shape, k_shape, v_shape = _qkv_shapes(p)
     bt_shape, cu_q_shape, cu_kv_shape, sq_shape, skv_shape = _aux_shapes(p)
+    attrs = _build_attrs(p)
 
     mask_mode = int(p.get("mask_mode", 0))
     attn_mask_shape = (2048, 2048) if mask_mode in (3, 4) else None
+
+    # metadata 槽位(索引10) int32 占位 shape, 大小镜像 op 公式。batch 复用
+    # _build_attrs 已写入的 batch_size attr 语义(非 TND=B, TND=len(cu_q)-1),
+    # 严禁直接取 p["B"] —— TND 下 normalize_params 会把裸 B 强制为 1。
+    # kv_heads 用 N2(非 N1)。
+    batch = int(attrs["batch_size"])
+    kv_heads = int(p.get("N2", p["N1"]))
+    metadata_shape = (_fa_metadata_size(batch, kv_heads),)
 
     shapes = [
         q_shape,
@@ -440,7 +460,7 @@ def _build_row(case_name, p):
         skv_shape,
         None,
         attn_mask_shape,
-        None,
+        metadata_shape,
     ]
     dtype_str = DTYPE_MAP.get(p.get("Dtype", "fp16"), "float16")
 
@@ -453,9 +473,10 @@ def _build_row(case_name, p):
         else:
             dtypes.append(INT_DTYPE)
 
-    data_ranges = _data_ranges(p, len(shapes))
+    data_ranges = list(_data_ranges(p, len(shapes)))
+    data_ranges[10] = (0, 0)  # metadata 占位: TTK 按 range 填充 0 即可
+    data_ranges = tuple(data_ranges)
 
-    attrs = _build_attrs(p)
     prec = _precision(p)
 
     # kv 0 轴非连续声明列(仅套件含 nc_kv_dims 用例时输出)。

@@ -12,7 +12,11 @@
 
 """TTK graph adapter for the installed FlashAttn API."""
 
+import logging
+
 import torch
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _resolve_max_seqlen(explicit):
@@ -120,24 +124,27 @@ class FlashAttnAclGraph(torch.nn.Module):
         attn_mask=None,
         metadata=None,
     ):
-        if metadata is None:
-            metadata = _build_metadata(
-                q,
-                k,
-                cu_seqlens_q=cu_seqlens_q,
-                cu_seqlens_kv=cu_seqlens_kv,
-                seqused_q=seqused_q,
-                seqused_kv=seqused_kv,
-                batch_size=self.batch_size,
-                mask_mode=self.mask_mode,
-                win_left=self.win_left,
-                win_right=self.win_right,
-                max_seqlen_q=self.max_seqlen_q,
-                max_seqlen_kv=self.max_seqlen_kv,
-                layout_q=self.layout_q,
-                layout_kv=self.layout_kv,
-                layout_out=self.layout_out,
+        if metadata is not None:
+            _LOGGER.warning(
+                "graph ignores externally provided metadata; rebuilding from attrs/tensors"
             )
+        metadata = _build_metadata(
+            q,
+            k,
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_kv=cu_seqlens_kv,
+            seqused_q=seqused_q,
+            seqused_kv=seqused_kv,
+            batch_size=self.batch_size,
+            mask_mode=self.mask_mode,
+            win_left=self.win_left,
+            win_right=self.win_right,
+            max_seqlen_q=self.max_seqlen_q,
+            max_seqlen_kv=self.max_seqlen_kv,
+            layout_q=self.layout_q,
+            layout_kv=self.layout_kv,
+            layout_out=self.layout_out,
+        )
 
         return torch.ops.cann_ops_transformer.flash_attn(
             q,

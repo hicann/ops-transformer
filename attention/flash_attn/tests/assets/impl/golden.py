@@ -277,10 +277,6 @@ class FlashAttnGolden:
             if is_tnd_out:
                 q_start = cu_q[b]
             if sq <= 0 or skv <= 0:
-                if is_tnd_out:
-                    lse_tnd[:, q_start : q_start + sq] = 0.0
-                else:
-                    lse[b, :, :sq] = 0.0
                 continue
 
             q_b, k_b, v_b = self._extract_batch_bnsd_f32(
@@ -348,6 +344,22 @@ class FlashAttnGolden:
                         lse[b, qh, :sq] = l
 
             del q_b, k_b, v_b
+
+        # 无效行对齐算子: 有效行之后未计算的行(/空序列) LSE 刷 +inf
+        # (整行被 mask 的行已在 _compute_*_single 中置 +inf; 此处只覆盖
+        #  seqused_q < S1 的 padding 行与 sq<=0 的空序列行)
+        if is_tnd_out:
+            for b in range(B):
+                sq = q_lens[b]
+                seg_start = cu_q[b]
+                seg_end = cu_q[b + 1]
+                if sq < seg_end - seg_start:
+                    lse_tnd[:, seg_start + sq : seg_end] = float("inf")
+        else:
+            for b in range(B):
+                sq = q_lens[b]
+                if sq < max_sq:
+                    lse[b, :, sq:] = float("inf")
 
         if is_tnd_out:
             return out_tnd, lse_tnd

@@ -61,7 +61,21 @@ class FlashAttnSpec:
 
     torch_graph = _load_impl_module("graph").FlashAttnAclGraph
 
+    npu_preprocess = _load_impl_module("npu_preprocess").run
+
+
+class FlashAttnMetadataSpec:
+    """TestSpec for the FlashAttn metadata generator.
+
+    Only customized inputs are provided; there is no standalone test suite.
+    """
+
+    customize_inputs = _load_impl_module(
+        "metadata_inputs"
+    ).generate_flash_attn_metadata_inputs
+
 
 __spec__ = {
     "flash_attn_ttk_ops.flash_attn_ttk": "FlashAttnSpec",
+    "torch.ops.cann_ops_transformer.flash_attn_metadata": "FlashAttnMetadataSpec",
 }

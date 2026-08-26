@@ -71,6 +71,15 @@ def _fill_attn_mask(attn_mask, mask_mode, win_left=-1, win_right=-1):
     attn_mask.copy_(mask.to(dtype=attn_mask.dtype, device=attn_mask.device))
 
 
+def zero_metadata(metadata):
+    if metadata is None:
+        return
+    if torch.is_tensor(metadata):
+        metadata.zero_()
+    else:
+        metadata[...] = 0
+
+
 def customize_inputs(
     q,
     k,
@@ -123,3 +132,5 @@ def customize_inputs(
 
     if mask_mode in (3, 4):
         _fill_attn_mask(attn_mask, mask_mode, win_left, win_right)
+
+    zero_metadata(metadata)
