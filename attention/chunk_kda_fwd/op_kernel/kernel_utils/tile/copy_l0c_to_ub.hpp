@@ -11,13 +11,13 @@
 #ifndef COMMON_TILE_ASCEND950_COPY_L0C_TO_UB_950_HPP
 #define COMMON_TILE_ASCEND950_COPY_L0C_TO_UB_950_HPP
 
-#include "catlass/arch/kda_arch.hpp"
-#include "catlass/kda_catlass.hpp"
+#include "catlass/arch/arch.hpp"
+#include "catlass/catlass.hpp"
 #if defined(CATLASS_ARCH) && CATLASS_ARCH == 3510
-#include "catlass/gemm/tile/ascend950/kda_ascend950_copy_l0c_to_dst.hpp"
+#include "catlass/gemm/tile/ascend950/copy_l0c_to_dst.hpp"
 #endif
-#include "tla/kda_tensor.hpp"
-#include "catlass/detail/kda_tag_to_layout.hpp"
+#include "tla/tensor.hpp"
+#include "catlass/detail/tag_to_layout.hpp"
 
 namespace Common::Tile {
 

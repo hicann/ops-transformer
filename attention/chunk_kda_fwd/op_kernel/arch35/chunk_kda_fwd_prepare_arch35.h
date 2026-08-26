@@ -18,17 +18,17 @@
 #endif
 #endif
 
-#include "catlass/arch/kda_arch.hpp"
-#include "catlass/arch/kda_cross_core_sync.hpp"
-#include "catlass/arch/kda_resource.hpp"
-#include "catlass/kda_catlass.hpp"
-#include "catlass/gemm/block/kda_block_mmad.hpp"
-#include "catlass/gemm/kda_gemm_dispatch_policy.hpp"
-#include "catlass/gemm/tile/kda_gemm_tile_copy.hpp"
-#include "catlass/kda_gemm_coord.hpp"
+#include "catlass/arch/arch.hpp"
+#include "catlass/arch/cross_core_sync.hpp"
+#include "catlass/arch/resource.hpp"
+#include "catlass/catlass.hpp"
+#include "catlass/gemm/block/block_mmad.hpp"
+#include "catlass/gemm/dispatch_policy.hpp"
+#include "catlass/gemm/tile/tile_copy.hpp"
+#include "catlass/gemm_coord.hpp"
 #include "../kernel_utils/block/block_mmad_pingpong_tla_multi.hpp"
 #include "../kernel_utils/tile/copy_l0c_to_ub.hpp"
-#include "catlass/layout/kda_layout.hpp"
+#include "catlass/layout/layout.hpp"
 #include "kernel_operator.h"
 #include "../chunk_kda_fwd_varlen.h"
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
@@ -37,8 +37,8 @@
 #include "../kernel_utils/vector/regbase.hpp"
 #endif
 #endif
-#include "tla/kda_tla_layout.hpp"
-#include "tla/kda_tensor.hpp"
+#include "tla/layout.hpp"
+#include "tla/tensor.hpp"
 #include "chunk_kda_fwd_post_wu_arch35.h"
 
 using namespace AscendC;
@@ -891,7 +891,10 @@ public:
         ReleaseVectorEvents();
     }
 
-    __aicore__ inline void ProcessAic() { ProcessPreAic(); }
+    __aicore__ inline void ProcessAic()
+    {
+        ProcessPreAic();
+    }
 
     template <typename PostWuOp>
     __aicore__ inline void ProcessAicFused(PostWuOp &postWu)
@@ -960,7 +963,10 @@ private:
         return ((b * HV_ + hv) * T_ + t) * dim + d;
     }
 
-    __aicore__ inline uint64_t BetaOffset(uint64_t b, uint64_t hv, uint64_t t) const { return (b * HV_ + hv) * T_ + t; }
+    __aicore__ inline uint64_t BetaOffset(uint64_t b, uint64_t hv, uint64_t t) const
+    {
+        return (b * HV_ + hv) * T_ + t;
+    }
 
     __aicore__ inline uint64_t AOffset(uint64_t b, uint64_t hv, uint64_t t, uint64_t j) const
     {
@@ -1134,7 +1140,10 @@ private:
         return vecBuf_.Get<float>()[slot * EXP2_UB_ELEMENTS];
     }
 
-    __aicore__ inline uint64_t GateStageElems() const { return GatePipelineRows() * K_; }
+    __aicore__ inline uint64_t GateStageElems() const
+    {
+        return GatePipelineRows() * K_;
+    }
 
     __aicore__ inline uint64_t GatePipelineRows() const
     {
@@ -1359,9 +1368,15 @@ private:
         return vecBuf_.Get<T>()[slot * 3 * GateStageElems()];
     }
 
-    __aicore__ inline LocalTensor<T> GateDirectW(uint64_t slot) { return GateDirectQ(slot)[GateStageElems()]; }
+    __aicore__ inline LocalTensor<T> GateDirectW(uint64_t slot)
+    {
+        return GateDirectQ(slot)[GateStageElems()];
+    }
 
-    __aicore__ inline LocalTensor<T> GateDirectV(uint64_t slot) { return GateDirectQ(slot)[2 * GateStageElems()]; }
+    __aicore__ inline LocalTensor<T> GateDirectV(uint64_t slot)
+    {
+        return GateDirectQ(slot)[2 * GateStageElems()];
+    }
 
     __aicore__ inline LocalTensor<float> GateBetaFloat(uint64_t slot)
     {
@@ -1396,14 +1411,20 @@ private:
         SetFlag<HardEvent::MTE2_V>(mte2ToVEvent_);
     }
 
-    __aicore__ inline void WaitGateInputReady() { WaitFlag<HardEvent::MTE2_V>(mte2ToVEvent_); }
+    __aicore__ inline void WaitGateInputReady()
+    {
+        WaitFlag<HardEvent::MTE2_V>(mte2ToVEvent_);
+    }
 
     __aicore__ inline void WaitGateOutputForMte2(uint64_t slot = 0)
     {
         WaitFlag<HardEvent::MTE3_MTE2>(mte3ToMte2Events_[slot]);
     }
 
-    __aicore__ inline void WaitGateOutputForVector() { WaitFlag<HardEvent::MTE3_V>(mte3ToVEvent_); }
+    __aicore__ inline void WaitGateOutputForVector()
+    {
+        WaitFlag<HardEvent::MTE3_V>(mte3ToVEvent_);
+    }
 
     __aicore__ inline void SignalGateOutputDone()
     {

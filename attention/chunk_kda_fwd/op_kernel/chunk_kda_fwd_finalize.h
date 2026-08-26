@@ -14,20 +14,20 @@
 #define CATLASS_ARCH 2201
 #endif
 
-#include "catlass/arch/kda_arch.hpp"
-#include "catlass/arch/kda_cross_core_sync.hpp"
-#include "catlass/arch/kda_resource.hpp"
-#include "catlass/kda_catlass.hpp"
-#include "catlass/gemm/block/kda_block_mmad.hpp"
-#include "catlass/gemm/kda_gemm_dispatch_policy.hpp"
-#include "catlass/gemm/tile/kda_gemm_tile_copy.hpp"
-#include "catlass/kda_gemm_coord.hpp"
+#include "catlass/arch/arch.hpp"
+#include "catlass/arch/cross_core_sync.hpp"
+#include "catlass/arch/resource.hpp"
+#include "catlass/catlass.hpp"
+#include "catlass/gemm/block/block_mmad.hpp"
+#include "catlass/gemm/dispatch_policy.hpp"
+#include "catlass/gemm/tile/tile_copy.hpp"
+#include "catlass/gemm_coord.hpp"
 #include "kernel_utils/block/block_mmad_pingpong_tla_multi.hpp"
-#include "catlass/layout/kda_layout.hpp"
+#include "catlass/layout/layout.hpp"
 #include "kernel_operator.h"
 #include "chunk_kda_fwd_varlen.h"
-#include "tla/kda_tla_layout.hpp"
-#include "tla/kda_tensor.hpp"
+#include "tla/layout.hpp"
+#include "tla/tensor.hpp"
 
 using namespace AscendC;
 
@@ -230,7 +230,10 @@ public:
         ReleaseVectorEvents();
     }
 
-    __aicore__ inline void ProcessAic() { ProcessOutAic(); }
+    __aicore__ inline void ProcessAic()
+    {
+        ProcessOutAic();
+    }
 
 private:
     __aicore__ inline void AllocVectorEvents()
@@ -273,7 +276,10 @@ private:
         return ((b * T_ + t) * HV_ + hv) * V_ + d;
     }
 
-    __aicore__ inline uint64_t BetaOffset(uint64_t b, uint64_t hv, uint64_t t) const { return (b * HV_ + hv) * T_ + t; }
+    __aicore__ inline uint64_t BetaOffset(uint64_t b, uint64_t hv, uint64_t t) const
+    {
+        return (b * HV_ + hv) * T_ + t;
+    }
 
     __aicore__ inline uint64_t AOffset(uint64_t b, uint64_t hv, uint64_t t, uint64_t j) const
     {
@@ -304,7 +310,10 @@ private:
         return (((solveCoreIdx_ * KDA_SCORE_QUEUE_DEPTH + slot) * KDA_SCORE_SCRATCH_PLANES + plane) * BT_ + t) * K_ + d;
     }
 
-    __aicore__ inline uint64_t ScoreRefBlockSize() const { return KDA_SCORE_REF_BC; }
+    __aicore__ inline uint64_t ScoreRefBlockSize() const
+    {
+        return KDA_SCORE_REF_BC;
+    }
 
     __aicore__ inline uint64_t ScoreRowBlockCount(uint64_t curT, uint64_t rowBegin) const
     {

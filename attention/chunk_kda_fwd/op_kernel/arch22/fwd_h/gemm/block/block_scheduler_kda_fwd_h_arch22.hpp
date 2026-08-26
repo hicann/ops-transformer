@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "catlass/kda_gemm_coord.hpp"
+#include "catlass/gemm_coord.hpp"
 #include "../../../../chunk_kda_fwd_h_runtime_tiling.h"
 using namespace Catlass;
 
@@ -236,7 +236,10 @@ struct BlockSchedulerKdaFwdH {
     }
 
     CATLASS_DEVICE
-    uint32_t GetTaskWaveCount() const { return CeilDiv(taskNum, cubeCoreNum); }
+    uint32_t GetTaskWaveCount() const
+    {
+        return CeilDiv(taskNum, cubeCoreNum);
+    }
 
     CATLASS_DEVICE
     void ResolveVarlenSequence(uint32_t compactBatchIdx, KdaFwdHStream &stream)
@@ -385,19 +388,34 @@ struct BlockSchedulerKdaFwdH {
     }
 
     CATLASS_DEVICE
-    const KdaFwdHStream &GetStream(uint32_t i) const { return runningQ.streams[i]; }
+    const KdaFwdHStream &GetStream(uint32_t i) const
+    {
+        return runningQ.streams[i];
+    }
 
     CATLASS_DEVICE
-    uint32_t GetStreamId(uint32_t i) const { return i; }
+    uint32_t GetStreamId(uint32_t i) const
+    {
+        return i;
+    }
 
     CATLASS_DEVICE
-    const KdaFwdHOffsets &GetCurTaskOffsets(const KdaFwdHStream &stream) const { return stream.offset; }
+    const KdaFwdHOffsets &GetCurTaskOffsets(const KdaFwdHStream &stream) const
+    {
+        return stream.offset;
+    }
 
     CATLASS_DEVICE
-    bool StreamIsDone(const KdaFwdHStream &stream) const { return !stream.active; }
+    bool StreamIsDone(const KdaFwdHStream &stream) const
+    {
+        return !stream.active;
+    }
 
     CATLASS_DEVICE
-    bool NeedProcessStage2(const KdaFwdHStream &stream) { return storeFinalState || !stream.offset.isFinalState; }
+    bool NeedProcessStage2(const KdaFwdHStream &stream)
+    {
+        return storeFinalState || !stream.offset.isFinalState;
+    }
 };
 
 struct BlockSchedulerKdaFwdHCube : public BlockSchedulerKdaFwdH {

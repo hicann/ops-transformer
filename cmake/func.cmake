@@ -559,6 +559,7 @@ function(add_ops_src_copy)
                 ${OPS_ADV_UTILS_KERNEL_INC}/*
                 ${OPS_CGMCT}/*
                 ${OPS_GMM_COMMON_KERNEL_INC}/*
+                ${CATLASS}/include/*
                 ${BLAZE}/*
                 ${TENSOR_API}/impl/tensor_api/*
                 ${TENSOR_API}/include/tensor_api/*
@@ -571,6 +572,7 @@ function(add_ops_src_copy)
                 COMMAND ${CMAKE_COMMAND} -E copy_directory ${OPS_ADV_UTILS_KERNEL_INC} ${OPS_UTILS_INC_KERNEL_DIR}
                 COMMAND ${CMAKE_COMMAND} -E copy_directory ${OPS_CGMCT} ${OPS_UTILS_INC_KERNEL_DIR}/cgmct
                 COMMAND ${CMAKE_COMMAND} -E copy_directory ${OPS_GMM_COMMON_KERNEL_INC} ${OPS_UTILS_INC_KERNEL_DIR}
+                COMMAND ${CMAKE_COMMAND} -E copy_directory ${CATLASS}/include ${OPS_UTILS_INC_KERNEL_DIR}/catlass/include
                 COMMAND ${CMAKE_COMMAND} -E copy_directory ${BLAZE} ${OPS_UTILS_INC_KERNEL_DIR}/blaze
                 COMMAND ${CMAKE_COMMAND} -E copy_directory ${TENSOR_API}/impl/tensor_api ${OPS_UTILS_INC_KERNEL_DIR}/tensor_api/impl/tensor_api
                 COMMAND ${CMAKE_COMMAND} -E copy_directory ${TENSOR_API}/include/tensor_api ${OPS_UTILS_INC_KERNEL_DIR}/tensor_api/include/tensor_api

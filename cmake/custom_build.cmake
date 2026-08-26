@@ -1037,6 +1037,9 @@ if (NOT ENABLE_AICPU_KERNEL)
     install(DIRECTORY ${OPS_ADV_DIR}/gmm/common/cgmct
             DESTINATION ${IMPL_INSTALL_DIR}/ascendc/common
     )
+    install(DIRECTORY ${CATLASS_DIR}/include
+            DESTINATION ${IMPL_INSTALL_DIR}/ascendc/common/catlass/include
+    )
     install(DIRECTORY ${BLAZE}
             DESTINATION ${IMPL_INSTALL_DIR}/ascendc/common
     )
