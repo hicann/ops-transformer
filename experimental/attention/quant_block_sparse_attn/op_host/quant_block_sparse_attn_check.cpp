@@ -105,8 +105,7 @@ ge::graphStatus CheckMXFP8FullQuantScaleInputs(const QuantBlockSparseAttnParaInf
 {
     if (opParamInfo.kDescale.shape == nullptr || opParamInfo.vDescale.shape == nullptr ||
         opParamInfo.qDescale.shape == nullptr) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "keyAntiquantScale/valueAntiquantScale/dequantScaleQuery",
-                                              "nullptr",
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(kOpName, "k_descale/v_descale/q_descale", "nullptr",
                                               "All must be passed in quant_mode=2 MXFP8 full-quant scenario");
         return ge::GRAPH_FAILED;
     }
@@ -331,11 +330,11 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckScaleDtype() const
             return ge::GRAPH_FAILED;
         }
     } else if (tilingInfo_.quantModeVal == QBSA_QUANT_MODE_MXFP8_FULL_QUANT) {
-        if (CheckInputDtype(opParamInfo.qDescale, "dequantScaleQuery", ge::DT_FLOAT8_E8M0, "FLOAT8_E8M0") !=
+        if (CheckInputDtype(opParamInfo.qDescale, "q_descale", ge::DT_FLOAT8_E8M0, "FLOAT8_E8M0") !=
                 ge::GRAPH_SUCCESS ||
-            CheckInputDtype(opParamInfo.kDescale, "keyAntiquantScale", ge::DT_FLOAT8_E8M0, "FLOAT8_E8M0") !=
+            CheckInputDtype(opParamInfo.kDescale, "k_descale", ge::DT_FLOAT8_E8M0, "FLOAT8_E8M0") !=
                 ge::GRAPH_SUCCESS ||
-            CheckInputDtype(opParamInfo.vDescale, "valueAntiquantScale", ge::DT_FLOAT8_E8M0, "FLOAT8_E8M0") !=
+            CheckInputDtype(opParamInfo.vDescale, "v_descale", ge::DT_FLOAT8_E8M0, "FLOAT8_E8M0") !=
                 ge::GRAPH_SUCCESS ||
             (opParamInfo.pScale.desc != nullptr &&
              CheckInputDtype(opParamInfo.pScale, "quantScale1", ge::DT_FLOAT8_E8M0, "FLOAT8_E8M0") !=
@@ -854,11 +853,11 @@ ge::graphStatus QuantBlockSparseAttnCheck::CheckMXFP8FullQuantShape() const
         static_cast<int64_t>(tilingInfo_.dSizeV), QBSA_MXFP8_SCALE_LAST_DIM};
 
     if (CheckInputShape(opParamInfo.query, "query", queryShapeExpect) != ge::GRAPH_SUCCESS ||
-        CheckInputShape(opParamInfo.qDescale, "dequantScaleQuery", queryAntiquantScaleShape) != ge::GRAPH_SUCCESS ||
+        CheckInputShape(opParamInfo.qDescale, "q_descale", queryAntiquantScaleShape) != ge::GRAPH_SUCCESS ||
         CheckInputShape(opParamInfo.key, "key", keyShapeExpect) != ge::GRAPH_SUCCESS ||
         CheckInputShape(opParamInfo.value, "value", valueShapeExpect) != ge::GRAPH_SUCCESS ||
-        CheckInputShape(opParamInfo.kDescale, "keyAntiquantScale", keyAntiquantScaleShape) != ge::GRAPH_SUCCESS ||
-        CheckInputShape(opParamInfo.vDescale, "valueAntiquantScale", valueAntiquantScaleShape) != ge::GRAPH_SUCCESS) {
+        CheckInputShape(opParamInfo.kDescale, "k_descale", keyAntiquantScaleShape) != ge::GRAPH_SUCCESS ||
+        CheckInputShape(opParamInfo.vDescale, "v_descale", valueAntiquantScaleShape) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     // pScale may be an empty tensor (shape size 0) to indicate default scale 1.0
