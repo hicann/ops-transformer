@@ -27,10 +27,17 @@ using namespace AscendC;
 namespace optiling {
 namespace {
 
-void CompressorTiling::ConvertRequiredParams(gert::TilingContext &context, CompressorContext &compressorContext)
+ge::graphStatus CompressorTiling::ConvertRequiredParams(gert::TilingContext &context,
+                                                        CompressorContext &compressorContext)
 {
     compressorContext.x.desc = context.GetRequiredInputDesc(TOKEN_X_INPUT_INDEX);
     compressorContext.x.shape = context.GetRequiredInputShape(TOKEN_X_INPUT_INDEX);
+    OP_CHECK_IF(compressorContext.x.shape == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(compressorContext.opName, X_NAME, "shape is nullptr"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(compressorContext.x.desc == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(compressorContext.opName, X_NAME, "desc is nullptr"),
+                return ge::GRAPH_FAILED);
     compressorContext.wkv.desc = context.GetRequiredInputDesc(WEIGHT_KV_INPUT_INDEX);
     compressorContext.wkv.shape = context.GetRequiredInputShape(WEIGHT_KV_INPUT_INDEX);
     compressorContext.wgate.desc = context.GetRequiredInputDesc(WEIGHT_WGATE_INPUT_INDEX);
@@ -49,7 +56,12 @@ void CompressorTiling::ConvertRequiredParams(gert::TilingContext &context, Compr
         compressorContext.layout = LayoutType::LAYOUT_BSH;
     } else if (xDimNum == COMPRESSOR_DIM_NUM_2) {
         compressorContext.layout = LayoutType::LAYOUT_TH;
+    } else {
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(compressorContext.opName, X_NAME, std::to_string(xDimNum),
+                                                 "x dimension should be 2 or 3");
+        return ge::GRAPH_FAILED;
     }
+    return ge::GRAPH_SUCCESS;
 }
 
 void CompressorTiling::ConvertOptionalParams(gert::TilingContext &context, CompressorContext &compressorContext)
@@ -76,7 +88,7 @@ ge::graphStatus CompressorTiling::ConvertContext(gert::TilingContext &context, C
     compressorContext.opName = context.GetNodeName();
     compressorContext.opType = context.GetNodeType();
     compressorContext.platformInfo = context.GetPlatformInfo();
-    ConvertRequiredParams(context, compressorContext);
+    OP_CHECK_IF(ConvertRequiredParams(context, compressorContext) != ge::GRAPH_SUCCESS, , return ge::GRAPH_FAILED);
     ConvertOptionalParams(context, compressorContext);
 
     auto attrs = context.GetAttrs();
@@ -401,13 +413,13 @@ ge::graphStatus CompressorTiling::GenTilingKey() const
 
 ge::graphStatus CompressorTiling::CheckSinglePara() const
 {
-    if (ge::GRAPH_SUCCESS != CheckSingleParaX() || ge::GRAPH_SUCCESS != CheckSingleParaWkv() ||
-        ge::GRAPH_SUCCESS != CheckSingleParaWgate() || ge::GRAPH_SUCCESS != CheckSingleParaStateCache() ||
-        ge::GRAPH_SUCCESS != CheckSingleParaApe() || ge::GRAPH_SUCCESS != CheckSingleParaStateBlockTable() ||
-        ge::GRAPH_SUCCESS != CheckSingleParaCuSeqlens() || ge::GRAPH_SUCCESS != CheckSingleParaSeqused() ||
-        ge::GRAPH_SUCCESS != CheckSingleParaStartPos() || ge::GRAPH_SUCCESS != CheckSingleParaCmpKv() ||
-        ge::GRAPH_SUCCESS != CheckSingleParaCmpRatio() || ge::GRAPH_SUCCESS != CheckSingleParaCoff() ||
-        ge::GRAPH_SUCCESS != CheckSingleParaCacheMode() || ge::GRAPH_SUCCESS != CheckSingleParaGradEnabled()) {
+    if (ge::GRAPH_SUCCESS != CheckSingleParaCmpRatio() || ge::GRAPH_SUCCESS != CheckSingleParaCoff() ||
+        ge::GRAPH_SUCCESS != CheckSingleParaCacheMode() || ge::GRAPH_SUCCESS != CheckSingleParaX() ||
+        ge::GRAPH_SUCCESS != CheckSingleParaWkv() || ge::GRAPH_SUCCESS != CheckSingleParaWgate() ||
+        ge::GRAPH_SUCCESS != CheckSingleParaStateCache() || ge::GRAPH_SUCCESS != CheckSingleParaApe() ||
+        ge::GRAPH_SUCCESS != CheckSingleParaStateBlockTable() || ge::GRAPH_SUCCESS != CheckSingleParaCuSeqlens() ||
+        ge::GRAPH_SUCCESS != CheckSingleParaSeqused() || ge::GRAPH_SUCCESS != CheckSingleParaStartPos() ||
+        ge::GRAPH_SUCCESS != CheckSingleParaCmpKv() || ge::GRAPH_SUCCESS != CheckSingleParaGradEnabled()) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -583,8 +595,9 @@ ge::graphStatus CompressorTiling::CheckSingleParaX() const
                     "dim " + std::to_string(context_->x.shape->GetStorageShape().GetDimNum() - 1) + "=" +
                         std::to_string(context_->x.shape->GetStorageShape().GetDim(
                             context_->x.shape->GetStorageShape().GetDimNum() - 1)),
-                    "x should be within [" + std::to_string(MIN_HIDDEN_SIZE) + ", " + std::to_string(MAX_HIDDEN_SIZE) +
-                        "] and be 512-aligned"),
+                    "hiddenSize (x dim" + std::to_string(context_->x.shape->GetStorageShape().GetDimNum() - 1) +
+                        ") should be within [" + std::to_string(MIN_HIDDEN_SIZE) + ", " +
+                        std::to_string(MAX_HIDDEN_SIZE) + "] and be 512-aligned"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -597,9 +610,14 @@ ge::graphStatus CompressorTiling::CheckSingleParaWkv() const
     }
     uint32_t coffVal = static_cast<uint32_t>(*context_->coff);
     uint32_t headDim = context_->wkv.shape->GetStorageShape().GetDim(COMPRESSOR_DIM_INDEX_0) / coffVal;
-    if (ge::GRAPH_SUCCESS != CheckFeatureValueSupport(&headDim, HEAD_DIM, WKV_NAME)) {
-        return ge::GRAPH_FAILED;
-    }
+    OP_CHECK_IF(std::find(HEAD_DIM.begin(), HEAD_DIM.end(), headDim) == HEAD_DIM.end(),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->opName, WKV_NAME,
+                    "dim " + std::to_string(COMPRESSOR_DIM_INDEX_0) + "=" +
+                        std::to_string(context_->wkv.shape->GetStorageShape().GetDim(COMPRESSOR_DIM_INDEX_0)),
+                    "headDim (wkv dim0 / coff) should be " + std::to_string(HEAD_DIM[0]) + " or " +
+                        std::to_string(HEAD_DIM[1])),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -850,35 +868,39 @@ ge::graphStatus CompressorTiling::CheckShapeConsistency() const
 {
     auto coffD = coff * baseParams_->headDim;
     uint32_t stateNum = 2;
-    if (ge::GRAPH_SUCCESS != LogErrorShapeConsistency("stateBlockTable", context_->stateBlockTable.shape,
+    if (ge::GRAPH_SUCCESS != LogErrorShapeConsistency(STATE_BLOCK_TABLE_NAME, context_->stateBlockTable.shape,
                                                       COMPRESSOR_DIM_INDEX_0, "batchSize", baseParams_->batchSize) ||
-        ge::GRAPH_SUCCESS != LogErrorShapeConsistency("cuSeqlens", context_->cuSeqlens.shape, COMPRESSOR_DIM_INDEX_0,
-                                                      "batchSize+1", baseParams_->batchSize + 1) ||
-        ge::GRAPH_SUCCESS != LogErrorShapeConsistency("seqUsed", context_->seqUsed.shape, COMPRESSOR_DIM_INDEX_0,
+        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(CU_SEQLENS_NAME, context_->cuSeqlens.shape,
+                                                      COMPRESSOR_DIM_INDEX_0, "batchSize+1",
+                                                      baseParams_->batchSize + 1) ||
+        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(SEQUSED_NAME, context_->seqUsed.shape, COMPRESSOR_DIM_INDEX_0,
                                                       "batchSize", baseParams_->batchSize) ||
-        ge::GRAPH_SUCCESS != LogErrorShapeConsistency("startPos", context_->startPos.shape, COMPRESSOR_DIM_INDEX_0,
+        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(START_POS_NAME, context_->startPos.shape, COMPRESSOR_DIM_INDEX_0,
                                                       "batchSize", baseParams_->batchSize) ||
-        ge::GRAPH_SUCCESS != LogErrorShapeConsistency("wkv", context_->wkv.shape, COMPRESSOR_DIM_INDEX_1, "x",
+        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(WKV_NAME, context_->wkv.shape, COMPRESSOR_DIM_INDEX_1, "x",
                                                       baseParams_->hiddenSize) ||
-        ge::GRAPH_SUCCESS != LogErrorShapeConsistency("wgate", context_->wgate.shape, COMPRESSOR_DIM_INDEX_1, "x",
+        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(WGATE_NAME, context_->wgate.shape, COMPRESSOR_DIM_INDEX_1, "x",
                                                       baseParams_->hiddenSize) ||
-        ge::GRAPH_SUCCESS != LogErrorShapeConsistency("wkv", context_->wkv.shape, COMPRESSOR_DIM_INDEX_0,
+        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(WKV_NAME, context_->wkv.shape, COMPRESSOR_DIM_INDEX_0,
                                                       "coff*headDim", static_cast<uint32_t>(coffD)) ||
-        ge::GRAPH_SUCCESS != LogErrorShapeConsistency("wgate", context_->wgate.shape, COMPRESSOR_DIM_INDEX_0,
+        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(WGATE_NAME, context_->wgate.shape, COMPRESSOR_DIM_INDEX_0,
                                                       "coff*headDim", static_cast<uint32_t>(coffD)) ||
-        ge::GRAPH_SUCCESS != LogErrorShapeConsistency("stateCache", context_->stateCache.shape, COMPRESSOR_DIM_INDEX_2,
-                                                      "2*coff*headDim", stateNum * static_cast<uint32_t>(coffD)) ||
-        ge::GRAPH_SUCCESS != LogErrorShapeConsistency("ape", context_->ape.shape, COMPRESSOR_DIM_INDEX_1,
+        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(STATE_CACHE_NAME, context_->stateCache.shape,
+                                                      COMPRESSOR_DIM_INDEX_2, "2*coff*headDim",
+                                                      stateNum * static_cast<uint32_t>(coffD)) ||
+        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(APE_NAME, context_->ape.shape, COMPRESSOR_DIM_INDEX_1,
                                                       "coff*headDim", static_cast<uint32_t>(coffD)) ||
-        ge::GRAPH_SUCCESS != LogErrorShapeConsistency("ape", context_->ape.shape, COMPRESSOR_DIM_INDEX_0, "cmpRatio",
-                                                      baseParams_->cmpRatio)) {
+        ge::GRAPH_SUCCESS != LogErrorShapeConsistency(APE_NAME, context_->ape.shape, COMPRESSOR_DIM_INDEX_0,
+                                                      CMP_RATIO_NAME, baseParams_->cmpRatio)) {
         return ge::GRAPH_FAILED;
     }
     if (static_cast<uint8_t>(*context_->cacheMode) == static_cast<uint8_t>(CACHE_MODE::LINEAR_BUFFER) &&
-        (ge::GRAPH_SUCCESS != LogErrorShapeConsistency("stateCache", context_->stateCache.shape, COMPRESSOR_DIM_INDEX_0,
-                                                       "blockNum", pageAttentionParams_->blockNum) ||
-         ge::GRAPH_SUCCESS != LogErrorShapeConsistency("stateCache", context_->stateCache.shape, COMPRESSOR_DIM_INDEX_1,
-                                                       "blockSize", pageAttentionParams_->blockSize))) {
+        (ge::GRAPH_SUCCESS != LogErrorShapeConsistency(STATE_CACHE_NAME, context_->stateCache.shape,
+                                                       COMPRESSOR_DIM_INDEX_0, "blockNum",
+                                                       pageAttentionParams_->blockNum) ||
+         ge::GRAPH_SUCCESS != LogErrorShapeConsistency(STATE_CACHE_NAME, context_->stateCache.shape,
+                                                       COMPRESSOR_DIM_INDEX_1, "blockSize",
+                                                       pageAttentionParams_->blockSize))) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;

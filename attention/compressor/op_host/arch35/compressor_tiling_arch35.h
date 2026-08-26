@@ -264,7 +264,7 @@ public:
     ge::graphStatus RunBigKernelTiling(CompressorTilingData *tilingData);
 
 private:
-    static void ConvertRequiredParams(gert::TilingContext &context, CompressorContext &compressorContext);
+    static ge::graphStatus ConvertRequiredParams(gert::TilingContext &context, CompressorContext &compressorContext);
 
     static void ConvertOptionalParams(gert::TilingContext &context, CompressorContext &compressorContext);
     ge::graphStatus GetNpuInfo();

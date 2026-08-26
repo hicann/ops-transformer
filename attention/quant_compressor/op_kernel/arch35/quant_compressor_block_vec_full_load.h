@@ -23,6 +23,7 @@
 #include "vf/vf_mul_quant_compressor.h"
 #include "vf/vf_dequant_quant_compressor.h"
 #include <cstdint>
+#include <limits>
 
 using namespace AscendC;
 
@@ -35,7 +36,7 @@ class QuantCompressorBlockVectorFullLoad {
 public:
     static constexpr bool X_DTYPE = COMP::xDtype == X_DTYPE::HIFP8;
     static constexpr float FLOAT_ZERO = 0;
-    static constexpr float SOFTMAX_MIN_NUM = -2e38;
+    static constexpr float SOFTMAX_MIN_NUM = -std::numeric_limits<float>::infinity();
     // =================================类型定义区=================================
     // 中间计算数据类型为float，高精度模式
     using T = float;
