@@ -102,7 +102,7 @@ struct GroupedMatmulParamsBase {
     bool isSingleWeight = false;
     GMMApiVersion apiVersion = GMMApiVersion::V1;
     int64_t groupType = -1L;
-    aclIntArray *tuningConfigOptional = nullptr;
+    const aclIntArray *tuningConfigOptional = nullptr;
     const T *y = nullptr;
     const aclTensorList *activationFeatureOutOptional = nullptr;
     const aclTensorList *dynQuantScaleOutOptional = nullptr;

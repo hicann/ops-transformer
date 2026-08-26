@@ -169,7 +169,6 @@ static inline uint32_t FindBestSingleNA8W4(uint32_t baseM_, uint32_t baseN_, uin
     return baseN_;
 }
 
-
 ge::graphStatus GMMTiling::CheckWeightNZShape(const gert::TilingContext *context, int64_t numInOneBlk) const
 {
     OP_CHECK_IF(numInOneBlk <= 0,
@@ -887,7 +886,6 @@ void GMMTiling::FindBestUsedCoreNumOneGroup(const uint32_t aicNum)
     }
 }
 
-
 ge::graphStatus GMMTiling::SetWorkspscesPerTokenQuant(const uint32_t aicNum, size_t *workspaces)
 {
     if (aicNum == 0U) { // invaild value
@@ -1335,12 +1333,12 @@ ge::graphStatus GMMTiling::GMMGetAttrs(const gert::TilingContext *context)
     if (((compileInfoPtr->socVersion == platform_ascendc::SocVersion::ASCEND910B ||
           compileInfoPtr->socVersion == platform_ascendc::SocVersion::ASCEND910_93)) &&
         isA4W4_) {
-        OP_CHECK_IF(!((wFormat0 == ge::FORMAT_FRACTAL_NZ) || (wFormat0 != FORMAT_FRACTAL_NZ && transposeWeight_ == 0)),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        context->GetNodeName(),
-                        "A4W4 GMM currently supports only weight tensor nz transpose/untranspose input \
+        OP_CHECK_IF(
+            !((wFormat0 == ge::FORMAT_FRACTAL_NZ) || (wFormat0 != FORMAT_FRACTAL_NZ && transposeWeight_ == 0)),
+            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
+                                        "A4W4 GMM currently supports only weight tensor nz transpose/untranspose input \
 or nd format untranspose input."),
-                    return ge::GRAPH_FAILED);
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -1554,7 +1552,6 @@ ge::graphStatus GMMTiling::GMMSetMMTiling(const gert::TilingContext *context, co
                     OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "matmul getTiling failed."),
                     return ge::GRAPH_FAILED);
     }
-
 
     uint32_t mmStepKa = 1;
     uint32_t mmStepKb = 1;
@@ -2044,19 +2041,18 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext *context, const GMMCom
             tilingDataA8W4.hpTilingData.set_output_type(1);
         }
 
-        size_t workspaceSize = static_cast<size_t>(M) * static_cast<size_t>(N) * sizeof(int16_t) +
-                               (static_cast<size_t>(SixteenAlign(M, true)) * static_cast<size_t>(K) / TWO *
-                                sizeof(uint8_t));
+        size_t workspaceSize =
+            static_cast<size_t>(M) * static_cast<size_t>(N) * sizeof(int16_t) +
+            (static_cast<size_t>(SixteenAlign(M, true)) * static_cast<size_t>(K) / TWO * sizeof(uint8_t));
         context->SetScheduleMode(1); // set as batchmod for template using SyncAll
-        context->SetTilingKey(GET_TPL_TILING_KEY(GMM_TPL_INT8, GMM_TPL_INT4, yDtype, 0, 0,
-                                                  GROUPED_MATMUL_GROUP_LIST_TYPE_COUNT, 0,
-                                                 GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_AUTOTILING,
-                                                 GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_NONE,
-                                                 GROUPED_MATMUL_AIV_AIC_RATIO_2, 0));
+        context->SetTilingKey(
+            GET_TPL_TILING_KEY(GMM_TPL_INT8, GMM_TPL_INT4, yDtype, 0, 0, GROUPED_MATMUL_GROUP_LIST_TYPE_COUNT, 0,
+                               GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_AUTOTILING,
+                               GROUPED_MATMUL_A16W8_KERNEL_TEMPLATE_NONE, GROUPED_MATMUL_AIV_AIC_RATIO_2, 0));
 
         size_t *workspaces = context->GetWorkspaceSizes(1); // get second variable
         OP_CHECK_NULL_WITH_CONTEXT(context, workspaces);
-        workspaces[0] = SYS_WORKSPACE_SIZE;                 // default size
+        workspaces[0] = SYS_WORKSPACE_SIZE; // default size
         workspaces[0] += workspaceSize;
 
         auto rawTilingData = context->GetRawTilingData();
@@ -2335,7 +2331,7 @@ ge::graphStatus GMMTiling::A8W4Tiling(gert::TilingContext *context, const GMMCom
             // --------------nz前处理优化------------
             if (a8w4KernelTemplate == GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_MSD_API_DEQUANT ||
                 a8w4KernelTemplate == GROUPED_MATMUL_A8W4_KERNEL_TEMPLATE_MSD_VECTOR_DEQUANT) {
-                uint64_t preProcessWorkspaceSize = (uint64_t)AlignUp(m, WS_ALIGN_8) * k * sizeof(int8_t);
+                uint64_t preProcessWorkspaceSize = static_cast<uint64_t>(AlignUp(m, WS_ALIGN_8)) * k * sizeof(int8_t);
 
                 tuningConfigWorkspace_ =
                     (tuningConfigPtr != nullptr && tuningConfigPtr->GetSize() > TUNING_CONFIG_ALLOW_WORKSPACE_INDEX) ?
@@ -2383,7 +2379,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingGMM(gert::TilingContext *context)
                        (xDType == ge::DT_FLOAT4_E2M1 || xDType == ge::DT_INT4 || xDType == ge::DT_FLOAT4_E1M2 ||
                         (ge::GetSizeByDataType(xDType) == 1 && ge::GetSizeByDataType(weightDtype) == 1));
         if (isQuant) {
-            if (xDType == ge::DT_INT4 && weightDtype == ge::DT_INT4) {  // S4S4 (INT4×INT4) mix-core
+            if (xDType == ge::DT_INT4 && weightDtype == ge::DT_INT4) { // S4S4 (INT4×INT4) mix-core
                 GroupedS4S4IntQuantTiling s4s4Tiling(context);
                 ge::graphStatus s4s4Ret = s4s4Tiling.DoTiling();
                 OP_CHECK_IF(s4s4Ret != ge::GRAPH_SUCCESS,
