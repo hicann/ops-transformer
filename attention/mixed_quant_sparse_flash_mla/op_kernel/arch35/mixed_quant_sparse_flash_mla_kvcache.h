@@ -32,7 +32,7 @@ using namespace AscendC::Impl::Detail;
 
 TEMPLATE_INTF
 __aicore__ inline void GetSingleCoreParam(
-    RunParamStr &runParam, const ConstInfo &constInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
+    RunParamStr<HIGH_PERF> &runParam, const ConstInfo<HIGH_PERF> &constInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
     GlobalTensor<int32_t> &cuSeqlensOriKvGm, GlobalTensor<int32_t> &cuSeqlensCmpKvGm,
     GlobalTensor<int32_t> &actualSeqQlenGm, GlobalTensor<int32_t> &actualSeqOriKvlenGm,
     GlobalTensor<int32_t> &actualSeqCmpKvlenGm, GlobalTensor<int32_t> &cmpResidualKvGm, bool hasCuSeqlensOriKv,
@@ -103,7 +103,7 @@ __aicore__ inline void GetSingleCoreParam(
 
 TEMPLATE_INTF
 __aicore__ inline void ComputeParamBatch(
-    RunParamStr &runParam, const ConstInfo &constInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
+    RunParamStr<HIGH_PERF> &runParam, const ConstInfo<HIGH_PERF> &constInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
     GlobalTensor<int32_t> &cuSeqlensOriKvGm, GlobalTensor<int32_t> &cuSeqlensCmpKvGm,
     GlobalTensor<int32_t> &actualSeqQlenGm, GlobalTensor<int32_t> &actualSeqOriKvlenGm,
     GlobalTensor<int32_t> &actualSeqCmpKvlenGm, GlobalTensor<int32_t> &cmpResidualKvGm, bool hasCuSeqlensOriKv,
@@ -116,8 +116,8 @@ __aicore__ inline void ComputeParamBatch(
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeS1LoopInfo(RunParamStr &runParam, const ConstInfo &constInfo, bool lastBN,
-                                         int64_t nextGs1Idx, int64_t gS1StartIdx, int64_t s2EndIdx)
+__aicore__ inline void ComputeS1LoopInfo(RunParamStr<HIGH_PERF> &runParam, const ConstInfo<HIGH_PERF> &constInfo,
+                                         bool lastBN, int64_t nextGs1Idx, int64_t gS1StartIdx, int64_t s2EndIdx)
 {
     // 计算每个基本块可以拷贝多少行s
     runParam.qSNumInOneBlock = 1;
@@ -169,7 +169,8 @@ __aicore__ inline void ComputeS1LoopInfo(RunParamStr &runParam, const ConstInfo 
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeSouterParam(RunParamStr &runParam, const ConstInfo &constInfo, uint32_t sOuterLoopIdx)
+__aicore__ inline void ComputeSouterParam(RunParamStr<HIGH_PERF> &runParam, const ConstInfo<HIGH_PERF> &constInfo,
+                                          uint32_t sOuterLoopIdx)
 {
     int64_t cubeSOuterOffset = sOuterLoopIdx * runParam.qSNumInOneBlock;
     if (runParam.actualS1Size == 0) {
@@ -205,8 +206,8 @@ __aicore__ inline void ComputeSouterParam(RunParamStr &runParam, const ConstInfo
 }
 
 TEMPLATE_INTF
-__aicore__ inline void LoopSOuterOffsetInit(RunParamStr &runParam, const ConstInfo &constInfo, int32_t sIdx,
-                                            GlobalTensor<int32_t> &cuSeqlensQGm)
+__aicore__ inline void LoopSOuterOffsetInit(RunParamStr<HIGH_PERF> &runParam, const ConstInfo<HIGH_PERF> &constInfo,
+                                            int32_t sIdx, GlobalTensor<int32_t> &cuSeqlensQGm)
 {
     if ASCEND_IS_AIV {
         int64_t seqOffset = 0;
@@ -224,33 +225,35 @@ __aicore__ inline void LoopSOuterOffsetInit(RunParamStr &runParam, const ConstIn
         if (constInfo.subBlockIdx == 1) {
             runParam.attentionOutOffset += runParam.firstHalfMRealSize * constInfo.dSizeV;
         }
-        if (constInfo.isSoftmaxLseEnable) {
-            if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
-                // [N2, T, G] (TND)
-                runParam.softmaxLseOffset = runParam.n2oIdx * constInfo.s1Size * constInfo.gSize +
-                                            (seqOffset + runParam.sOuterOffset) * constInfo.gSize;
-            } else {
-                // [B, N2, S1, G] (BSND)
-                runParam.softmaxLseOffset = sIdx * constInfo.n2Size * constInfo.s1Size * constInfo.gSize +
-                                            runParam.n2oIdx * constInfo.s1Size * constInfo.gSize +
-                                            runParam.sOuterOffset * constInfo.gSize;
-            }
-            if constexpr (IS_SPLIT_G) {
-                uint32_t aicIdxLocal = constInfo.aivIdx >> 1U;
-                if (aicIdxLocal % 2U != 0) {
-                    runParam.softmaxLseOffset += runParam.goIdx;
+        if constexpr (!HIGH_PERF) {
+            if (constInfo.isSoftmaxLseEnable) {
+                if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
+                    // [N2, T, G] (TND)
+                    runParam.softmaxLseOffset = runParam.n2oIdx * constInfo.s1Size * constInfo.gSize +
+                                                (seqOffset + runParam.sOuterOffset) * constInfo.gSize;
+                } else {
+                    // [B, N2, S1, G] (BSND)
+                    runParam.softmaxLseOffset = sIdx * constInfo.n2Size * constInfo.s1Size * constInfo.gSize +
+                                                runParam.n2oIdx * constInfo.s1Size * constInfo.gSize +
+                                                runParam.sOuterOffset * constInfo.gSize;
                 }
-            }
-            if (constInfo.subBlockIdx == 1) {
-                runParam.softmaxLseOffset += runParam.firstHalfMRealSize;
+                if constexpr (IS_SPLIT_G) {
+                    uint32_t aicIdxLocal = constInfo.aivIdx >> 1U;
+                    if (aicIdxLocal % 2U != 0) {
+                        runParam.softmaxLseOffset += runParam.goIdx;
+                    }
+                }
+                if (constInfo.subBlockIdx == 1) {
+                    runParam.softmaxLseOffset += runParam.firstHalfMRealSize;
+                }
             }
         }
     }
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeParamS1(RunParamStr &runParam, const ConstInfo &constInfo, uint32_t sOuterLoopIdx,
-                                      GlobalTensor<int32_t> &cuSeqlensQGm)
+__aicore__ inline bool ComputeParamS1(RunParamStr<HIGH_PERF> &runParam, const ConstInfo<HIGH_PERF> &constInfo,
+                                      uint32_t sOuterLoopIdx, GlobalTensor<int32_t> &cuSeqlensQGm)
 {
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
@@ -282,7 +285,7 @@ __aicore__ inline bool ComputeParamS1(RunParamStr &runParam, const ConstInfo &co
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeLastBN(RunParamStr &runParam, GlobalTensor<int32_t> &cuSeqlensQGm)
+__aicore__ inline bool ComputeLastBN(RunParamStr<HIGH_PERF> &runParam, GlobalTensor<int32_t> &cuSeqlensQGm)
 {
     if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
         if (runParam.boIdx > 0 &&
@@ -304,7 +307,7 @@ __aicore__ inline int64_t ClipSInnerTokenCube(int64_t sInnerToken, int64_t minVa
 TEMPLATE_INTF
 __aicore__ inline bool ComputeS2LoopInfo(int64_t bnIndex, int64_t gS1Index, GlobalTensor<int32_t> &cuSeqlensQGm,
                                          GlobalTensor<int32_t> &oriTopkLengthGm, GlobalTensor<int32_t> &cmpTopkLengthGm,
-                                         RunParamStr &runParam, const ConstInfo &constInfo)
+                                         RunParamStr<HIGH_PERF> &runParam, const ConstInfo<HIGH_PERF> &constInfo)
 {
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
@@ -318,31 +321,35 @@ __aicore__ inline bool ComputeS2LoopInfo(int64_t bnIndex, int64_t gS1Index, Glob
     }
     uint32_t s2BaseSize = constInfo.s2BaseSize;
 
-    if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
-        uint64_t actualSeqQPrefixSum = cuSeqlensQGm.GetValue(runParam.boIdx);
-        runParam.oriSparseBlockCount =
-            constInfo.hasOriTopkLength ?
-                Min(oriTopkLengthGm.GetValue(actualSeqQPrefixSum + runParam.s1oIdx), constInfo.oriSparseBlockCount) :
-                constInfo.oriSparseBlockCount;
-        runParam.cmpSparseBlockCount =
-            constInfo.hasCmpTopkLength ?
-                Min(cmpTopkLengthGm.GetValue(actualSeqQPrefixSum + runParam.s1oIdx), constInfo.cmpSparseBlockCount) :
-                constInfo.cmpSparseBlockCount;
-    } else {
-        uint64_t bsndTopkIdx = runParam.boIdx * constInfo.s1Size + runParam.s1oIdx;
-        runParam.oriSparseBlockCount = constInfo.hasOriTopkLength ?
-                                           Min(oriTopkLengthGm.GetValue(bsndTopkIdx), constInfo.oriSparseBlockCount) :
-                                           constInfo.oriSparseBlockCount;
-        runParam.cmpSparseBlockCount = constInfo.hasCmpTopkLength ?
-                                           Min(cmpTopkLengthGm.GetValue(bsndTopkIdx), constInfo.cmpSparseBlockCount) :
-                                           constInfo.cmpSparseBlockCount;
+    uint32_t oriSparseBlockCount = constInfo.oriSparseBlockCount;
+    uint32_t cmpSparseBlockCount = constInfo.cmpSparseBlockCount;
+    if constexpr (!HIGH_PERF) {
+        if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
+            uint64_t actualSeqQPrefixSum = cuSeqlensQGm.GetValue(runParam.boIdx);
+            oriSparseBlockCount = constInfo.hasOriTopkLength ?
+                                      Min(oriTopkLengthGm.GetValue(actualSeqQPrefixSum + runParam.s1oIdx),
+                                          constInfo.oriSparseBlockCount) :
+                                      constInfo.oriSparseBlockCount;
+            cmpSparseBlockCount = constInfo.hasCmpTopkLength ?
+                                      Min(cmpTopkLengthGm.GetValue(actualSeqQPrefixSum + runParam.s1oIdx),
+                                          constInfo.cmpSparseBlockCount) :
+                                      constInfo.cmpSparseBlockCount;
+        } else {
+            uint64_t bsndTopkIdx = runParam.boIdx * constInfo.s1Size + runParam.s1oIdx;
+            oriSparseBlockCount = constInfo.hasOriTopkLength ?
+                                      Min(oriTopkLengthGm.GetValue(bsndTopkIdx), constInfo.oriSparseBlockCount) :
+                                      constInfo.oriSparseBlockCount;
+            cmpSparseBlockCount = constInfo.hasCmpTopkLength ?
+                                      Min(cmpTopkLengthGm.GetValue(bsndTopkIdx), constInfo.cmpSparseBlockCount) :
+                                      constInfo.cmpSparseBlockCount;
+        }
     }
 
     // orikv
     if constexpr (TEMPLATE_MODE == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
                   TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         runParam.s2LineStartIdx = 0;
-        runParam.s2LineOriEndIdx = runParam.oriSparseBlockCount;
+        runParam.s2LineOriEndIdx = oriSparseBlockCount;
     } else {
         runParam.s2LineStartIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
             runParam.cubeSOuterOffset - runParam.preTokensPerBatch, 0, runParam.actualS2OriSize);
@@ -370,12 +377,12 @@ __aicore__ inline bool ComputeS2LoopInfo(int64_t bnIndex, int64_t gS1Index, Glob
         runParam.s2LineCmpEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
             (runParam.cubeSOuterOffset + runParam.s1RealSize + runParam.nextTokensPerBatchCmp) / constInfo.cmpRatio, 0,
             runParam.actualS2CmpSize);
-        runParam.s2CmpLineEndIdx = Min(runParam.s2LineCmpEndIdx, runParam.cmpSparseBlockCount);
+        runParam.s2CmpLineEndIdx = Min(runParam.s2LineCmpEndIdx, cmpSparseBlockCount);
         runParam.s2CmpLineEndIdx = Min(runParam.s2CmpLineEndIdx, runParam.actualS2CmpSize);
         runParam.cmpKvLoopEndIdx = (runParam.s2CmpLineEndIdx + s2BaseSize - 1) / s2BaseSize;
     } else {
         runParam.s2CmpLineStartIdx = 0;
-        runParam.s2CmpLineEndIdx = runParam.cmpSparseBlockCount;
+        runParam.s2CmpLineEndIdx = cmpSparseBlockCount;
         runParam.cmpKvLoopEndIdx = (runParam.s2CmpLineEndIdx + s2BaseSize - 1) / s2BaseSize;
     }
 
@@ -384,7 +391,7 @@ __aicore__ inline bool ComputeS2LoopInfo(int64_t bnIndex, int64_t gS1Index, Glob
 }
 
 TEMPLATE_INTF
-__aicore__ inline void InitTaskParamByRun(const RunParamStr &runParam, RunInfo &runInfo)
+__aicore__ inline void InitTaskParamByRun(const RunParamStr<HIGH_PERF> &runParam, RunInfo<HIGH_PERF> &runInfo)
 {
     runInfo.boIdx = runParam.boIdx;
     runInfo.preTokensPerBatch = runParam.preTokensPerBatch;
@@ -396,12 +403,12 @@ __aicore__ inline void InitTaskParamByRun(const RunParamStr &runParam, RunInfo &
         runInfo.cmpResidual = runParam.cmpResidual;
         runInfo.cmpKvLoopEndIdx = runParam.cmpKvLoopEndIdx;
     }
-    runInfo.softmaxLseOffset = runParam.softmaxLseOffset;
+    if constexpr (!HIGH_PERF) {
+        runInfo.softmaxLseOffset = runParam.softmaxLseOffset;
+    }
     runInfo.qSNumInOneBlock = runParam.qSNumInOneBlock;
     runInfo.oriKvLoopEndIdx = runParam.oriKvLoopEndIdx;
     runInfo.isCmp = runInfo.s2LoopCount >= runInfo.oriKvLoopEndIdx;
-    runInfo.oriSparseBlockCount = runParam.oriSparseBlockCount;
-    runInfo.cmpSparseBlockCount = runParam.cmpSparseBlockCount;
 }
 
 #endif // MIXED_QUANT_SPARSE_FLASH_MLA_KVCACHE_H

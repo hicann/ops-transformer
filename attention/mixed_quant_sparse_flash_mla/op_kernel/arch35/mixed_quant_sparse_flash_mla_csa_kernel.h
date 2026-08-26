@@ -90,18 +90,20 @@ private:
     __aicore__ inline void InitLocalBuffer();
     __aicore__ inline void InitMMResBuf(__gm__ uint8_t *workspace);
     __aicore__ inline void ComputeConstexpr();
-    __aicore__ inline void SetRunInfo(RunInfo &runInfo, RunParamStr &runParam, int64_t taskId, int64_t s2LoopCount,
-                                      int64_t s2LoopLimit, int64_t multiCoreInnerIdx);
-    __aicore__ inline void ComputeBmm1Tail(RunInfo &runInfo, RunParamStr &runParam);
+    __aicore__ inline void SetRunInfo(RunInfo<HIGH_PERF> &runInfo, RunParamStr<HIGH_PERF> &runParam, int64_t taskId,
+                                      int64_t s2LoopCount, int64_t s2LoopLimit, int64_t multiCoreInnerIdx);
+    __aicore__ inline void ComputeBmm1Tail(RunInfo<HIGH_PERF> &runInfo, RunParamStr<HIGH_PERF> &runParam);
     __aicore__ inline void InitUniqueConstInfo();
     __aicore__ inline void FreeEvent();
-    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr &runParam);
-    __aicore__ inline void InitUniqueRunInfo(const RunParamStr &runParam, RunInfo &runInfo);
+    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index,
+                                                    RunParamStr<HIGH_PERF> &runParam);
+    __aicore__ inline void InitUniqueRunInfo(const RunParamStr<HIGH_PERF> &runParam, RunInfo<HIGH_PERF> &runInfo);
     __aicore__ inline void ParseFdRunInfo(FdRunInfo &fdRunInfo);
-    __aicore__ inline int64_t ConvertS2MetadataBlockToToken(const RunParamStr &runParam, const ConstInfo &constInfo,
-                                                            uint32_t s2BlockIdx);
-    __aicore__ inline bool ApplyS2MetadataRange(RunParamStr &runParam, ConstInfo &constInfo, int64_t s2StartPoint,
-                                                int64_t s2EndPoint, bool isFirstS2RangeTask, bool isLastS2RangeTask);
+    __aicore__ inline int64_t ConvertS2MetadataBlockToToken(const RunParamStr<HIGH_PERF> &runParam,
+                                                            const ConstInfo<HIGH_PERF> &constInfo, uint32_t s2BlockIdx);
+    __aicore__ inline bool ApplyS2MetadataRange(RunParamStr<HIGH_PERF> &runParam, ConstInfo<HIGH_PERF> &constInfo,
+                                                int64_t s2StartPoint, int64_t s2EndPoint, bool isFirstS2RangeTask,
+                                                bool isLastS2RangeTask);
 
     const MixedQuantSparseFlashMlaTilingData *__restrict tilingData;
     static constexpr uint32_t PRELOAD_NUM = 3;
@@ -151,7 +153,7 @@ private:
     uint32_t hasLoad;
 
     /* 初始化后不变的信息 */
-    ConstInfo constInfo;
+    ConstInfo<HIGH_PERF> constInfo;
 
     /* 模板库Block */
     CubeBlockType cubeBlock;
@@ -282,7 +284,9 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     constInfo.dSizeV = constInfo.dSize;
     constInfo.dSizeVInput = mixedQuantSparseFlashMlaBaseParams.dSizeVInput;
     constInfo.dSizeNope = constInfo.dSize - constInfo.dSizeRope;
-    constInfo.isSoftmaxLseEnable = mixedQuantSparseFlashMlaBaseParams.returnSoftmaxLse;
+    if constexpr (!HIGH_PERF) {
+        constInfo.isSoftmaxLseEnable = mixedQuantSparseFlashMlaBaseParams.returnSoftmaxLse;
+    }
     constInfo.sparseBlockSize = 1;
     constInfo.actualSeqLenSize = constInfo.bSize + 1;
 
@@ -366,17 +370,19 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     vecBlock.InitGlobalBuffer(oriKV, cmpKV, oriSparseIndices, cmpSparseIndices, oriBlockTable, cmpBlockTable, sequsedQ,
                               sinks, sequsedOriKv, sequsedCmpKv, cmpResidualKv);
     cubeBlock.InitGlobalBuffer(query, cuSeqlensQ, sequsedQ, constInfo);
-    if (oriTopkLength != nullptr) {
-        constInfo.hasOriTopkLength = true;
-        oriTopkLengthGm.SetGlobalBuffer((__gm__ int32_t *)oriTopkLength);
-    } else {
-        constInfo.hasOriTopkLength = false;
-    }
-    if (cmpTopkLength != nullptr) {
-        constInfo.hasCmpTopkLength = true;
-        cmpTopkLengthGm.SetGlobalBuffer((__gm__ int32_t *)cmpTopkLength);
-    } else {
-        constInfo.hasCmpTopkLength = false;
+    if constexpr (!HIGH_PERF) {
+        if (oriTopkLength != nullptr) {
+            constInfo.hasOriTopkLength = true;
+            oriTopkLengthGm.SetGlobalBuffer((__gm__ int32_t *)oriTopkLength);
+        } else {
+            constInfo.hasOriTopkLength = false;
+        }
+        if (cmpTopkLength != nullptr) {
+            constInfo.hasCmpTopkLength = true;
+            cmpTopkLengthGm.SetGlobalBuffer((__gm__ int32_t *)cmpTopkLength);
+        } else {
+            constInfo.hasCmpTopkLength = false;
+        }
     }
 }
 
@@ -551,8 +557,8 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     bool isFirstLoop = true;
     bool notLast = true;
     bool notLastTwoLoop = true;
-    RunInfo runInfo[4];
-    RunParamStr runParam;
+    RunInfo<HIGH_PERF> runInfo[4];
+    RunParamStr<HIGH_PERF> runParam;
     runParam.firstFdDataWorkspaceIdx = firstFdDataWorkspaceIdx;
     int64_t multiCoreInnerIdx = 1;
     int64_t s2SplitIdxCounter = 0;
@@ -632,12 +638,12 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
                     runParam.s2SplitIdx = s2SplitIdxCounter++;
                 }
                 if (notLastThreeLoop) {
-                    RunInfo &runInfo1 = runInfo[taskId % 4];
+                    RunInfo<HIGH_PERF> &runInfo1 = runInfo[taskId % 4];
                     this->SetRunInfo(runInfo1, runParam, taskId, s2LoopCount, s2LoopLimit, multiCoreInnerIdx);
                 }
                 if ASCEND_IS_AIV {
                     if (notLastThreeLoop) {
-                        RunInfo &runInfo1 = runInfo[taskId % 4];
+                        RunInfo<HIGH_PERF> &runInfo1 = runInfo[taskId % 4];
                         this->vecBlock.ProcessVec0(v0ResGmBuffers.Get(runInfo1.taskIdMod3), runInfo1, this->constInfo);
                     }
                     if (taskId > 1 && notLast) {
@@ -650,12 +656,12 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
                                                    this->constInfo);
                     }
                     if (taskId > 2) {
-                        RunInfo &runInfo3 = runInfo[(taskId + 1) % 4];
+                        RunInfo<HIGH_PERF> &runInfo3 = runInfo[(taskId + 1) % 4];
                         this->vecBlock.ProcessVec2(this->bmm2Buffers, runInfo3, this->constInfo);
                     }
                 } else {
                     if (taskId > 0 && notLastTwoLoop) {
-                        RunInfo &runInfo1 = runInfo[(taskId + 3) % 4];
+                        RunInfo<HIGH_PERF> &runInfo1 = runInfo[(taskId + 3) % 4];
                         this->cubeBlock.IterateLoadQK(v0ResGmBuffers.Get(runInfo1.taskIdMod3), runInfo1,
                                                       this->constInfo, isFirstLoop);
                         isFirstLoop = false;
@@ -671,8 +677,8 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
                     if (taskId > 1 && notLast) {
                         uint32_t bmm1Slot = bmm1GetFlag;
                         bmm1GetFlag ^= 1;
-                        RunInfo &runInfo2 = runInfo[(taskId + 2) % 4];
-                        RunInfo &runInfoNext = runInfo[(taskId + 3) % 4];
+                        RunInfo<HIGH_PERF> &runInfo2 = runInfo[(taskId + 2) % 4];
+                        RunInfo<HIGH_PERF> &runInfoNext = runInfo[(taskId + 3) % 4];
                         this->cubeBlock.IterateBmm1(this->bmm1Buffers[bmm1Slot],
                                                     v0ResGmBuffers.Get(runInfo2.taskIdMod3), notLastTwoLoop,
                                                     runInfoNext, runInfo2, this->constInfo);
@@ -680,7 +686,7 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
                     if (taskId > 2) {
                         uint32_t l1PSlot = l1PGetFlag;
                         l1PGetFlag ^= 1;
-                        RunInfo &runInfo3 = runInfo[(taskId + 1) % 4];
+                        RunInfo<HIGH_PERF> &runInfo3 = runInfo[(taskId + 1) % 4];
                         this->cubeBlock.IterateBmm2(this->bmm2Buffers, this->l1PBuffers[l1PSlot], runInfo3,
                                                     this->constInfo);
                     }
@@ -703,7 +709,7 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ConvertS2MetadataBlockToToken(
-    const RunParamStr &runParam, const ConstInfo &constInfo, uint32_t s2BlockIdx)
+    const RunParamStr<HIGH_PERF> &runParam, const ConstInfo<HIGH_PERF> &constInfo, uint32_t s2BlockIdx)
 {
     int64_t s2BaseSize = static_cast<int64_t>(constInfo.s2BaseSize);
     int64_t oriLen = runParam.s2LineOriEndIdx - runParam.s2LineStartIdx;
@@ -722,8 +728,8 @@ __aicore__ inline int64_t MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockTyp
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline bool MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ApplyS2MetadataRange(
-    RunParamStr &runParam, ConstInfo &constInfo, int64_t s2StartPoint, int64_t s2EndPoint, bool isFirstS2RangeTask,
-    bool isLastS2RangeTask)
+    RunParamStr<HIGH_PERF> &runParam, ConstInfo<HIGH_PERF> &constInfo, int64_t s2StartPoint, int64_t s2EndPoint,
+    bool isFirstS2RangeTask, bool isLastS2RangeTask)
 {
     int64_t oriStart = runParam.s2LineStartIdx;
     int64_t oriEnd = runParam.s2LineOriEndIdx;
@@ -793,7 +799,7 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ComputeAxisIdxByBnAndGs1(
-    int64_t bnIndex, int64_t gS1Index, RunParamStr &runParam)
+    int64_t bnIndex, int64_t gS1Index, RunParamStr<HIGH_PERF> &runParam)
 {
     // GS1合轴, 不切G, 只切S1
     runParam.s1oIdx = gS1Index * runParam.qSNumInOneBlock;
@@ -809,8 +815,8 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::SetRunInfo(
-    RunInfo &runInfo, RunParamStr &runParam, int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit,
-    int64_t multiCoreInnerIdx)
+    RunInfo<HIGH_PERF> &runInfo, RunParamStr<HIGH_PERF> &runParam, int64_t taskId, int64_t s2LoopCount,
+    int64_t s2LoopLimit, int64_t multiCoreInnerIdx)
 {
     if (s2LoopCount < runParam.oriKvLoopEndIdx) {
         runInfo.s2StartIdx = runParam.s2LineStartIdx;
@@ -855,7 +861,7 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::InitUniqueRunInfo(
-    const RunParamStr &runParam, RunInfo &runInfo)
+    const RunParamStr<HIGH_PERF> &runParam, RunInfo<HIGH_PERF> &runInfo)
 {
     InitTaskParamByRun<TEMPLATE_INTF_ARGS>(runParam, runInfo);
 }
@@ -877,8 +883,8 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ComputeBmm1Tail(RunInfo &runInfo,
-                                                                                                 RunParamStr &runParam)
+__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ComputeBmm1Tail(
+    RunInfo<HIGH_PERF> &runInfo, RunParamStr<HIGH_PERF> &runParam)
 {
     // ------------------------S1 Base Related---------------------------
     runInfo.s1RealSize = runParam.s1RealSize;
