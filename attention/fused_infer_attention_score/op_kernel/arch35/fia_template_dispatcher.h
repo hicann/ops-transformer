@@ -20,6 +20,7 @@
 #include "fia_kernel_noquant_mla.h"
 #include "fia_kernel_fullquant_mx.h"
 #include "fia_kernel_fullquant_gqa.h"
+#include "fia_kernel_fullquant_mla.h"
 
 template <typename INPUT_T, typename OUT_T, uint8_t inOutLayoutType, uint16_t config, bool hasAttenMask,
           uint8_t KvLayoutType, bool isFd, bool emptyTensor, bool enableS1OutSplit>
@@ -267,6 +268,73 @@ inline __aicore__ void run_fia_fullquant_gqa_kernel(__gm__ uint8_t *query, __gm_
     op.Init(query, key, value, pseShift, actualSeqLengths, actualSeqLengthsKV, blockTable, dequantScaleQuery,
             dequantScaleKey, dequantScaleValue, pScale, queryRope, keyRope, softmaxLse, attentionOut, workspace,
             fiaMetaData, tilingData, &tPipe);
+    op.Process();
+}
+
+template <typename INPUT_T, typename OUT_T, uint8_t inOutLayoutType, uint16_t config, uint8_t pseMode,
+          uint8_t quantMode, bool hasAttenMask, bool hasRope, uint8_t KvLayoutType, bool isFd, bool emptyTensor,
+          bool enableKVPrefix, bool enableS1OutSplit>
+inline __aicore__ void run_fia_fullquant_mla_kernel(
+    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
+    __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
+    __gm__ uint8_t *blockTable, __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *dequantScaleKey,
+    __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *pScale, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
+    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+{
+    PARSE_PARAMS_FullQuant(inOutLayoutType, config, pseMode, ...);
+    fa_base_matmul::idCounterNum = 0;
+
+    // MLA 全量化: 不合轴, bmm2 写 UB
+    constexpr bool useDn = false;
+    constexpr bool bmm2Write2Ub = true;
+    constexpr bool splitD = false;
+
+    // CubBlockType
+    using CubBlockNormal = BaseApi::FAFullQuantMlaBlockCube<INPUT_T, float, inputLayoutType, s1TemplateType,
+                                                            s2TemplateType, dTemplateType, dVTemplateType, hasRope,
+                                                            KvLayoutType, enableKVPrefix, useDn, bmm2Write2Ub, splitD>;
+    using CubBlockDummy =
+        BaseApi::FAFullQuantMlaBlockCubeDummy<INPUT_T, float, inputLayoutType, s1TemplateType, s2TemplateType,
+                                              dTemplateType, dVTemplateType, hasRope, KvLayoutType, enableKVPrefix,
+                                              useDn, bmm2Write2Ub, splitD>;
+    using CubBlock = typename std::conditional<g_coreType == AscendC::AIC, CubBlockNormal, CubBlockDummy>::type;
+
+    // VecFaBlockType - MLA decode场景开启FD
+    using VecFaBlockNormal =
+        BaseApi::FAFullQuantMlaBlockVec<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType, s1TemplateType,
+                                        s2TemplateType, dTemplateType, dVTemplateType,
+                                        static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope, KvLayoutType,
+                                        isFd, enableKVPrefix, useDn, bmm2Write2Ub, splitD>;
+    using VecFaBlockDummy =
+        BaseApi::FAFullQuantMlaBlockVecDummy<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType, s1TemplateType,
+                                             s2TemplateType, dTemplateType, dVTemplateType,
+                                             static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope,
+                                             KvLayoutType, isFd, enableKVPrefix, useDn, bmm2Write2Ub, splitD>;
+    using VecFaBlock = typename std::conditional<g_coreType == AscendC::AIV, VecFaBlockNormal, VecFaBlockDummy>::type;
+
+    // VecFdBlockType - MLA 复用 MXFP8/GQA 的 FiaBlockVecFlashDecodeFullQuant
+    using VecFdBlockNormal =
+        BaseApi::FiaBlockVecFlashDecodeFullQuant<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
+                                                 s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
+                                                 static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope,
+                                                 KvLayoutType, enableKVPrefix, useDn, bmm2Write2Ub, splitD>;
+    using VecFdBlockDummy =
+        BaseApi::FiaBlockVecFlashDecodeFullQuantDummy<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
+                                                      s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
+                                                      static_cast<PseTypeEnum>(pseMode), hasAttenMask, false, hasRope,
+                                                      KvLayoutType, enableKVPrefix, useDn, bmm2Write2Ub, splitD>;
+    using VecFdBlock = typename std::conditional<g_coreType == AscendC::AIV, VecFdBlockNormal, VecFdBlockDummy>::type;
+
+    // KernelType - MLA decode场景开启FD
+    using Kernel = FlashAttentionFullQuantMlaKernel<CubBlock, VecFaBlock, VecFdBlock>;
+    GET_TILING_DATA_MEMBER(FusedInferAttentionScoreFullQuantTilingData, baseTiling, baseTilingIn, tiling);
+    const FullQuantTiling *__restrict tilingData = &baseTilingIn;
+    __gm__ uint8_t *fiaMetaData = tiling + offsetof(FusedInferAttentionScoreFullQuantTilingData, fiaMetaData);
+    TPipe tPipe;
+    Kernel op;
+    op.Init(query, key, value, attenMask, actualSeqLengths, actualSeqLengthsKV, blockTable, dequantScaleQuery,
+            dequantScaleKey, dequantScaleValue, queryRope, keyRope, softmaxLse, attentionOut, workspace, fiaMetaData,
+            tilingData, &tPipe);
     op.Process();
 }
 #endif

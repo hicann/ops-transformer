@@ -637,7 +637,11 @@ ge::graphStatus CommonChecker::CheckAxis(const FiaTilingInfo &fiaInfo)
         }
         static const std::set<uint32_t> SUPPORT_G_IN_IFAMLA = {1U,  2U,  4U,  8U,
                                                                16U, 32U, 64U, 128U}; // ifa mla场景g轴支持范围
+        static const std::set<uint32_t> SUPPORT_G_IN_IFAMLA_FP8_TND = {
+            1U, 2U, 4U, 6U, 8U, 12U, 16U, 24U, 32U, 48U, 64U, 96U, 128U}; // ifa mlaTND场景g轴支持范围
         bool isArch35NonQuant = (enableNonQuant_ && fiaInfo.npuArch == NpuArch::DAV_3510);
+        const string inputLayout = fiaInfo.opParamInfo.layOut;
+        const bool isMLAFullQuantNewTemplate = (inputLayout == "TND" && fiaInfo.inputQType == ge::DT_FLOAT8_E4M3FN);
         if (isArch35NonQuant) {
             if (fiaInfo.gSize < 1U || fiaInfo.gSize > 128U) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -655,11 +659,19 @@ ge::graphStatus CommonChecker::CheckAxis(const FiaTilingInfo &fiaInfo)
                 return ge::GRAPH_FAILED;
             }
         } else {
-            if (SUPPORT_G_IN_IFAMLA.find(fiaInfo.gSize) == SUPPORT_G_IN_IFAMLA.end()) {
+            if (isMLAFullQuantNewTemplate &&
+                SUPPORT_G_IN_IFAMLA_FP8_TND.find(fiaInfo.gSize) == SUPPORT_G_IN_IFAMLA_FP8_TND.end()) {
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    fiaInfo.opName, "axis G", std::to_string(fiaInfo.n1Size / fiaInfo.n2Size).c_str(),
+                    "The value of axis G must be in the range of {1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128} "
+                    "in the Decode MLA TND scenario");
+                return ge::GRAPH_FAILED;
+            }
+            if (!isMLAFullQuantNewTemplate && SUPPORT_G_IN_IFAMLA.find(fiaInfo.gSize) == SUPPORT_G_IN_IFAMLA.end()) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     fiaInfo.opName, "axis G", std::to_string(fiaInfo.n1Size / fiaInfo.n2Size).c_str(),
                     "The value of axis G must be in the range of {1, 2, 4, 8, 16, 32, 64, 128} "
-                    "in the Decode MLA scenario");
+                    "in the Decode MLA non-TND scenario");
                 return ge::GRAPH_FAILED;
             }
         }
@@ -1114,7 +1126,11 @@ ge::graphStatus CommonChecker::CheckHeadNum(const FiaTilingInfo &fiaInfo)
     if (fiaInfo.mlaMode == MlaMode::ROPE_SPLIT_D512) { // ifamla
         static const std::set<uint32_t> SUPPORT_NUM_HEAD_IN_IFAMLA = {1U,  2U,  4U,  8U,
                                                                       16U, 32U, 64U, 128U}; // ifa mla场景qN支持范围
+        static const std::set<uint32_t> SUPPORT_NUM_HEAD_IN_IFAMLA_FP8_TND = {
+            1U, 2U, 4U, 6U, 8U, 12U, 16U, 24U, 32U, 48U, 64U, 96U, 128U}; // ifa mla场景qN支持范围
         bool isArch35NonQuant = (enableNonQuant_ && fiaInfo.npuArch == NpuArch::DAV_3510);
+        const string inputLayout = fiaInfo.opParamInfo.layOut;
+        const bool isMLAFullQuantNewTemplate = (inputLayout == "TND" && fiaInfo.inputQType == ge::DT_FLOAT8_E4M3FN);
         if (isArch35NonQuant) {
             if (fiaInfo.n1Size < 1U || fiaInfo.n1Size > 128U) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -1123,11 +1139,20 @@ ge::graphStatus CommonChecker::CheckHeadNum(const FiaTilingInfo &fiaInfo)
                 return ge::GRAPH_FAILED;
             }
         } else {
-            if (SUPPORT_NUM_HEAD_IN_IFAMLA.find(fiaInfo.n1Size) == SUPPORT_NUM_HEAD_IN_IFAMLA.end()) {
+            if (isMLAFullQuantNewTemplate &&
+                SUPPORT_NUM_HEAD_IN_IFAMLA_FP8_TND.find(fiaInfo.n1Size) == SUPPORT_NUM_HEAD_IN_IFAMLA_FP8_TND.end()) {
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    fiaInfo.opName, "num_heads", std::to_string(fiaInfo.n1Size).c_str(),
+                    "The value of num_heads must be in the range of {1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128} "
+                    "in the Decode MLA TND scenario");
+                return ge::GRAPH_FAILED;
+            }
+            if (!isMLAFullQuantNewTemplate &&
+                SUPPORT_NUM_HEAD_IN_IFAMLA.find(fiaInfo.n1Size) == SUPPORT_NUM_HEAD_IN_IFAMLA.end()) {
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     fiaInfo.opName, "num_heads", std::to_string(fiaInfo.n1Size).c_str(),
                     "The value of num_heads must be in the range of {1, 2, 4, 8, 16, 32, 64, 128} "
-                    "in the Decode MLA scenario");
+                    "in the Decode MLA non-TND scenario");
                 return ge::GRAPH_FAILED;
             }
         }
@@ -1437,7 +1462,10 @@ ge::graphStatus CommonChecker::CheckParaExistence(const FiaTilingInfo &fiaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckCrossFeature(const FiaTilingInfo &fiaInfo) { return ge::GRAPH_SUCCESS; }
+ge::graphStatus CommonChecker::CheckCrossFeature(const FiaTilingInfo &fiaInfo)
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus CommonChecker::CheckKVStorageConsistency(const FiaTilingInfo &fiaInfo)
 {

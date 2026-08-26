@@ -68,6 +68,7 @@ struct RunInfoX {
     uint32_t gIdx = 0;
     uint32_t s1Idx = 0;
     uint32_t s2Idx = 0;
+    uint32_t s2LocalIdx = 0; // 每核本地 S2 索引，从0开始累加，用于判断本核内 S2 的第几个 base 块
     uint32_t realN2Idx = 0;   // GS1合轴时为n2Idx，不合轴时为n1Idx
     uint64_t actS1Size = 1;   // 当前处理head的S1轴实际大小
     uint64_t actS2Size = 1;   // 当前处理head的S2轴实际大小

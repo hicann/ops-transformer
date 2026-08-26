@@ -721,7 +721,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <td>
         <ul>
             <li>用户不特意指定时建议传入0，表示key/value和query的head个数相等。</li>
-            <li>需要满足numHeads整除numKeyValueHeads，GQA非量化场景和Prefill MLA场景下，numHeads与numKeyValueHeads的比值无限制; Decode MLA场景下，非量化场景numHeads与numKeyValueHeads的比值无限制，全量化场景仅支持numHeads与numKeyValueHeads的比值为1、2、4、8、16、32、64、128。</li>
+            <li>需要满足numHeads整除numKeyValueHeads，GQA非量化场景和Prefill MLA场景下，numHeads与numKeyValueHeads的比值无限制; Decode MLA场景下，非量化场景numHeads与numKeyValueHeads的比值无限制，全量化场景当query/key/value的类型为FLOAT8_E4M3FN且inputLayout为TND时仅支持numHeads与numKeyValueHeads的比值为1、2、4、6、8、12、16、24、32、48、64、96、128，其他全量化场景numHeads与numKeyValueHeads的比值仅支持1、2、4、8、16、32、64、128。</li>
             <li>在BNSD、BSND、BNSD_BSND、BSND_BNSD、BNSD_NBSD、BSND_NBSD、TND、NTD、NTD_TND、TND_NTD场景下，还需要与shape中的key/value的N轴shape值相同，否则执行异常</li>
         </ul>
         </td>
@@ -1448,7 +1448,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
             <tr>
                 <td>Decode MLA</td>
                 <td>query/key/value/attentionOut的HeadDim需保持一致</td>
-                <td>非量化场景，numHeads需可整除numKeyValueHeads，numHeads与numKeyValueHeads的比值无限制；全量化场景，numHeads仅支持1、2、4、8、16、32、64、128；numKeyValueHeads为1。</td>
+                <td>非量化场景，numHeads需可整除numKeyValueHeads，numHeads与numKeyValueHeads的比值无限制；全量化场景，当query/key/value的类型为FLOAT8_E4M3FN且inputLayout为TND时，numHeads仅支持1、2、4、6、8、12、16、24、32、48、64、96、128，其他全量化场景numHeads仅支持1、2、4、8、16、32、64、128；numKeyValueHeads为1。</td>
             </tr>
         </tbody>
     </table>
@@ -1751,7 +1751,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
       - attenOut的dtype为BFLOAT16
       - queryRope、keyRope的dtype为BFLOAT16
       - 当query/key/value是FLOAT8_E4M3FN/HIFLOAT8时， inputLayout仅支持BSH、BSND、BNSD、TND、BSH_NBSD、BSND_NBSD、BNSD_NBSD、TND_NTD；当query/key/value类型为INT8时, inputLayout仅支持BSH、BSND、TND、BSH_NBSD、BSND_NBSD、TND_NTD
-      - Q_N支持1、2、4、8、16、32、64、128
+      - 当query/key/value的类型为FLOAT8_E4M3FN且inputLayout为TND时，Q_N支持1、2、4、6、8、12、16、24、32、48、64、96、128，其他全量化场景Q_N支持1、2、4、8、16、32、64、128
       - KV_N必须为1；G支持 [1, 128]；Q_S支持[1,16]
       - 当query的inputLayout为BSH时，dequantScaleQuery的shape应该为（B, Q_S, Q_N）；当query的inputLayout为BSND、BNSD、TND时，dequantScaleQuery的shape相比query仅少一个维度D，且每一维需要和query的对应维度保持一致
       - 不支持公共前缀场景、不支持pse场景、不支持alibi场景、不支持左padding场景
@@ -1923,7 +1923,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
     - 不支持伪量化场景
   - Decode MLA
     - Layout仅支持BNSD、BSND、BSH、TND、BNSD_NBSD、BSND_NBSD、BSH_NBSD、TND_NTD
-    - 非量化场景，Q_N无限制；全量化场景，Q_N仅支持1/2/4/8/16/32/64/128；KV_N仅支持1
+    - 非量化场景，Q_N无限制；全量化场景，当query/key/value的类型为FLOAT8_E4M3FN且inputLayout为TND时，Q_N仅支持1/2/4/6/8/12/16/24/32/48/64/96/128，其他全量化场景Q_N仅支持1/2/4/8/16/32/64/128；KV_N仅支持1
     - 非量化场景，Q_S无限制；全量化场景，Q_S支持 [1,16]
     - 不支持左padding场景、不支持tensorlist场景
   - Prefill MLA

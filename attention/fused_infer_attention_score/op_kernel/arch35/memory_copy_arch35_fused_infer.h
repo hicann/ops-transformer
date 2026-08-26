@@ -63,12 +63,15 @@ __aicore__ inline constexpr GmFormat GetQueryGmFormat()
     }
 }
 
-template <LayOutTypeEnum LAYOUT, bool useDn = false, bool isPerTokenHead = false>
+template <LayOutTypeEnum LAYOUT, bool useDn = false, bool isPerTokenHead = false, bool isMlaFullQuant = false>
 __aicore__ inline constexpr GmFormat GetQueryScaleGmFormat()
 {
     if constexpr (LAYOUT == LayOutTypeEnum::LAYOUT_BSH || LAYOUT == LayOutTypeEnum::LAYOUT_BNSD) {
         return GmFormat::BNGSD;
     } else if constexpr (LAYOUT == LayOutTypeEnum::LAYOUT_TND || LAYOUT == LayOutTypeEnum::LAYOUT_NTD) {
+        if constexpr (isMlaFullQuant) {
+            return GmFormat::TNG;
+        }
         if constexpr (isPerTokenHead) {
             return GmFormat::NGT;
         }
