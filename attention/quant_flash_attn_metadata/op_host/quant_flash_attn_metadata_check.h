@@ -155,6 +155,11 @@ inline aclnnStatus QuantFlashAttnMetadataCheck::CheckBaseAttr(int64_t batchSize,
                ACLNN_ERR_RUNTIME_ERROR, "When quantMode is %ld (MxFP8), layoutOut only supports TND, but got %s",
                quantMode, layoutOut);
 
+    // 一致性校验: MxFP8 (quantMode=1) 场景下 layout_q 仅支持 TND
+    CHECK_COND(!(quantMode == A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 && strcmp(layoutQ, "TND") != 0),
+               ACLNN_ERR_RUNTIME_ERROR, "When quantMode is %ld (MxFP8), layoutQ only supports TND, but got %s",
+               quantMode, layoutQ);
+
     return ACLNN_SUCCESS;
 }
 
