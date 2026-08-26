@@ -49,7 +49,7 @@ __global__ __aicore__ void moe_ep_combine(GM_ADDR context, GM_ADDR x, GM_ADDR to
     GET_TILING_DATA_WITH_STRUCT(MoeEpCombineTilingData, tilingData, tilingGM);
 #if defined(ENABLE_MOE_EP_COMBINE_KERNEL)
     MoeEpCombine<DTYPE_X, HasTopkWeight> op;
-    op.Init(context, x, topkIdx, recvSrcMetadata, numRecvPerExpert, topkWeights, tilingGM, &pipe,
+    op.Init(context, x, topkIdx, recvSrcMetadata, numRecvPerExpert, topkWeights, workspace, tilingGM, &pipe,
             &tilingData.moeEpCombineInfo);
     op.Process();
 #endif
