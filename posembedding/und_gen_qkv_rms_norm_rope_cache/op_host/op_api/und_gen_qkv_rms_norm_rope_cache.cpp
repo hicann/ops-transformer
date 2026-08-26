@@ -22,28 +22,25 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(UndGenQkvRmsNormRopeCache);
 
-aclnnStatus UndGenQkvRmsNormRopeCache(
-    const aclTensor* undQkv, const aclTensor* undWeightsQ, const aclTensor* undWeightsK,
-    const aclTensor* cosSinCache, aclTensor* kCacheRef, aclTensor* vCacheRef, const aclTensor* slotMapping,
-    const aclTensor* positions, const aclTensor* genQkv, const aclTensor* genWeightsQ, const aclTensor* genWeightsK,
-    const aclTensor* catIndices, int64_t numHeadsQ, int64_t numHeadsK, int64_t numHeadsV, double normEps,
-    const aclIntArray* mropeSection, aclTensor* qOut, aclOpExecutor* executor)
+aclnnStatus UndGenQkvRmsNormRopeCache(const aclTensor *undQkv, const aclTensor *undWeightsQ,
+                                      const aclTensor *undWeightsK, const aclTensor *cosSinCache, aclTensor *kCacheRef,
+                                      aclTensor *vCacheRef, const aclTensor *slotMapping, const aclTensor *positions,
+                                      const aclTensor *genQkv, const aclTensor *genWeightsQ,
+                                      const aclTensor *genWeightsK, const aclTensor *catIndices, int64_t numHeadsQ,
+                                      int64_t numHeadsK, int64_t numHeadsV, double normEps,
+                                      const aclIntArray *mropeSection, aclTensor *qOut, aclOpExecutor *executor)
 {
     L0_DFX(UndGenQkvRmsNormRopeCache, undQkv, undWeightsQ, undWeightsK, cosSinCache, kCacheRef, vCacheRef, slotMapping,
            positions, genQkv, genWeightsQ, genWeightsK, catIndices, numHeadsQ, numHeadsK, numHeadsV, normEps,
            mropeSection);
 
     // k_cache/v_cache 原地更新：同一个 tensor 既作为输入也作为输出下发，与仓内其他原地算子保持一致
-    auto ret = INFER_SHAPE(
-        UndGenQkvRmsNormRopeCache,
-        OP_INPUT(undQkv, undWeightsQ, undWeightsK, cosSinCache, kCacheRef, vCacheRef, slotMapping, positions, genQkv,
-                 genWeightsQ, genWeightsK, catIndices),
-        OP_OUTPUT(qOut, kCacheRef, vCacheRef),
-        OP_ATTR(numHeadsQ, numHeadsK, numHeadsV, static_cast<float>(normEps), mropeSection));
-    if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "UndGenQkvRmsNormRopeCache InferShape failed.");
-        return ret;
-    }
+    auto ret = INFER_SHAPE(UndGenQkvRmsNormRopeCache,
+                           OP_INPUT(undQkv, undWeightsQ, undWeightsK, cosSinCache, kCacheRef, vCacheRef, slotMapping,
+                                    positions, genQkv, genWeightsQ, genWeightsK, catIndices),
+                           OP_OUTPUT(qOut, kCacheRef, vCacheRef),
+                           OP_ATTR(numHeadsQ, numHeadsK, numHeadsV, static_cast<float>(normEps), mropeSection));
+    OP_CHECK_INFERSHAPE(ret != ACLNN_SUCCESS, return ret, "UndGenQkvRmsNormRopeCache InferShape failed.");
 
     ret = ADD_TO_LAUNCHER_LIST_AICORE(
         UndGenQkvRmsNormRopeCache,
@@ -51,10 +48,8 @@ aclnnStatus UndGenQkvRmsNormRopeCache(
                  genWeightsQ, genWeightsK, catIndices),
         OP_OUTPUT(qOut, kCacheRef, vCacheRef),
         OP_ATTR(numHeadsQ, numHeadsK, numHeadsV, static_cast<float>(normEps), mropeSection));
-    if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "UndGenQkvRmsNormRopeCache ADD_TO_LAUNCHER_LIST_AICORE failed.");
-        return ret;
-    }
+    OP_CHECK_ADD_TO_LAUNCHER_LIST_AICORE(ret != ACLNN_SUCCESS, return ret,
+                                         "UndGenQkvRmsNormRopeCache ADD_TO_LAUNCHER_LIST_AICORE failed.");
 
     return ACLNN_SUCCESS;
 }

@@ -29,7 +29,7 @@ if _TORCHAIR_AVAILABLE:
     @register_fx_node_ge_converter(
         torch.ops.cann_ops_transformer.und_gen_qkv_rms_norm_rope_cache.default
     )
-    def converter_und_gen_qkv_rms_norm_rope_cache(
+    def convert_und_gen_qkv_rms_norm_rope_cache(
         und_qkv: Tensor,
         und_weights_q: Tensor,
         und_weights_k: Tensor,
@@ -71,7 +71,7 @@ if _TORCHAIR_AVAILABLE:
         )
 else:
 
-    def converter_und_gen_qkv_rms_norm_rope_cache(*args, **kwargs):
+    def convert_und_gen_qkv_rms_norm_rope_cache(*args, **kwargs):
         raise RuntimeError(
             "GE converter requires torchair, but torchair is not available."
         )

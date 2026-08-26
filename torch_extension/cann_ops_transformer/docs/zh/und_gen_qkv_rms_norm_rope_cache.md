@@ -47,6 +47,7 @@ cann_ops_transformer.und_gen_qkv_rms_norm_rope_cache(
     gen_weights_q=None,
     gen_weights_k=None,
     cat_indices=None,
+    *,
     num_heads_q=8,
     num_heads_k=1,
     num_heads_v=1,
