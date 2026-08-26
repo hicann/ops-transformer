@@ -116,7 +116,7 @@ def display_output_np_isclose(
 
 
 def print_log(data=None, level="INFO"):
-    print(
+    logger.info(
         "[%s] [%s]-%s:%s - %s"
         % (
             datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
@@ -194,7 +194,7 @@ def check_result(expect, result, data_type, pct_thd=0.005):
 
     if total == 0 and expect_flat.numel() == 0:
         print_log(
-            'The npu_output is [],and it is same as bm_output, the result of data_compare is "Pass"'
+            'The npu_output is [], and it is same as bm_output, the result of data_compare is "Pass"'
         )
         return 100.0, "Pass"
     start = 0
@@ -434,8 +434,8 @@ def cpu_recurrent_gated_delta_rule(
     output_golden = output
     state_golden = initial_state
 
-    print(f"output_golden.shape: {output_golden.shape}")
-    print(f"state_golden.shape: {state_golden.shape}")
+    logger.info(f"output_golden.shape: {output_golden.shape}")
+    logger.info(f"state_golden.shape: {state_golden.shape}")
     output_golden = torch.tensor(output_golden).to(q.dtype)
     return output_golden, state_golden
 
@@ -501,38 +501,38 @@ def run_recurrent_gated_delta_rule_eager(
     # ======================== set input params finish ========================
     # ======================== check input params start ========================
     if len(actual_seq_lengths) != B:
-        print(
+        logger.error(
             f"Error: the len of seqused is {len(actual_seq_lengths)}, it should be B({B})"
         )
         return
     if has_num_accepted_tokens == True and len(num_accepted_tokens) != B:
-        print(
+        logger.error(
             f"Error: the len of num_accepted_tokens is {len(num_accepted_tokens)}, it should be B({B})"
         )
         return
     for i in range(B):
         act_seq = actual_seq_lengths[i]
         if act_seq <= 0 or act_seq > mtp:
-            print(
-                f"Error: actual_seq_lengths[{i}] is {act_seq}, it should > 0 and <= mtp({mtp})"
+            logger.error(
+                f"Error: actual_seq_lengths[{i}] is {act_seq}, it should be > 0 and <= mtp({mtp})"
             )
             return
         if has_num_accepted_tokens == True:
             accepted_token = num_accepted_tokens[i]
             if accepted_token < 1 or accepted_token > act_seq:
-                print(
+                logger.error(
                     f"Error: num_accepted_tokens[{i}] is {accepted_token}, it should >= 1 and <= actual_seq_lengths[{i}]({act_seq})"
                 )
                 return
     if len(ssm_state_indices) != T:
-        print(
+        logger.error(
             f"Error: the len of ssm_state_indices is {len(ssm_state_indices)}, it should be T({T})"
         )
         return
     for i in range(T):
         idx = ssm_state_indices[i]
         if idx < 0 or idx > block_num:
-            print(
+            logger.error(
                 f"Error: ssm_state_indices[{i}] is {idx}, it should >= 0 and < block_num({block_num})"
             )
             return
@@ -596,7 +596,7 @@ def run_recurrent_gated_delta_rule_eager(
         )
         padded_state[:, :, :dv, :] = state
         state = padded_state[:, :, :dv, :]
-        print(
+        logger.info(
             f"state non-contiguous: shape={state.shape}, strides={state.stride()}, "
             f"is_contiguous={state.is_contiguous()}"
         )
@@ -632,13 +632,15 @@ def run_recurrent_gated_delta_rule_eager(
         gk=gk,
     )
     npu_state_out = init_state
-    print(f"query: shape {query.shape}, dtype: {query.dtype}")
-    print(f"key: shape {key.shape}, dtype: {key.dtype}")
-    print(f"value: shape {value.shape}, dtype: {value.dtype}")
-    print(f"state: shape {state.shape}, dtype: {state.dtype}")
-    print(f"beta: shape {beta.shape}, dtype: {beta.dtype}")
-    print(f"act_seq_len: shape {act_seq_len.shape[0]}, dtype: {act_seq_len.dtype}")
-    print(
+    logger.info(f"query: shape {query.shape}, dtype: {query.dtype}")
+    logger.info(f"key: shape {key.shape}, dtype: {key.dtype}")
+    logger.info(f"value: shape {value.shape}, dtype: {value.dtype}")
+    logger.info(f"state: shape {state.shape}, dtype: {state.dtype}")
+    logger.info(f"beta: shape {beta.shape}, dtype: {beta.dtype}")
+    logger.info(
+        f"act_seq_len: shape {act_seq_len.shape[0]}, dtype: {act_seq_len.dtype}"
+    )
+    logger.info(
         f"ssm_state_indices: shape {ssm_state_indices.shape[0]}, dtype: {ssm_state_indices.dtype}"
     )
 
@@ -652,12 +654,12 @@ def run_recurrent_gated_delta_rule_eager(
         del padded_state, init_padded
     torch.npu.empty_cache()
 
-    print(
+    logger.info(
         "--------------------------------------------------------------check result-------------------------------------------------------------"
     )
     out_pct, out_result = check_result(cpu_out, npu_out, out_data_type)
-    print(
-        "--------------------------------------------------------------check state ouput-------------------------------------------------------------"
+    logger.info(
+        "--------------------------------------------------------------check state output-------------------------------------------------------------"
     )
     state_pct, state_result = check_result(
         cpu_state_ouput,

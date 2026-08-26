@@ -17,6 +17,9 @@ Pass/fail mirrors pytest compare_cv: NPU error ratios relative to benchmark
 error must stay within thresholds (mare/mere/rmse + small-value error ratio).
 """
 
+import logging
+
+logger = logging.getLogger(__name__)
 import datetime
 import os
 import sys
@@ -38,7 +41,7 @@ _OUTPUT_NAMES = ["out", "finalState"]
 
 
 def _print_log(data):
-    print(
+    logger.info(
         "[%s] [INFO]-%s:%s - %s"
         % (
             datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"),

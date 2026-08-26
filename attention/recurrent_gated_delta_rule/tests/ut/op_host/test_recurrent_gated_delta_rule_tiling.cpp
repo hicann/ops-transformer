@@ -29,12 +29,12 @@ class RecurrentGatedDeltaRuleTilingTest : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        std::cout << "RecurrentGatedDeltaRuleTilingTest SetUp" << std::endl;
+        // std::cout << "RecurrentGatedDeltaRuleTilingTest SetUp" << std::endl;
     }
 
     static void TearDownTestCase()
     {
-        std::cout << "RecurrentGatedDeltaRuleTilingTest TearDown" << std::endl;
+        // std::cout << "RecurrentGatedDeltaRuleTilingTest TearDown" << std::endl;
     }
 };
 

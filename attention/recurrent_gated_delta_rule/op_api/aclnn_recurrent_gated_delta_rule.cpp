@@ -119,7 +119,7 @@ static aclnnStatus CheckParams(RecurrentGatedDeltaRuleParams &params)
     // 检查输入参数是否在支持的数据类型范围内
     CHECK_RET(CheckDtypeVaild(params), ACLNN_ERR_PARAM_INVALID);
 
-    OP_LOGD("RecurrentGatedDeltaRule check params sucess.");
+    OP_LOGD("RecurrentGatedDeltaRule check params success.");
 
     return ACLNN_SUCCESS;
 }

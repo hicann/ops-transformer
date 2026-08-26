@@ -21,6 +21,9 @@ generates:
   - aclnn_chunk_gated_delta_rule_rdv.csv (aclnn mode)
 """
 
+import logging
+
+logger = logging.getLogger(__name__)
 import argparse
 import importlib.util
 import sys
@@ -261,7 +264,7 @@ def main():
 
     rdv_path = Path(args.rdv_file).resolve()
     if not rdv_path.exists():
-        print(f"ERROR: rdv file not found: {rdv_path}")
+        logger.error(f"ERROR: rdv file not found: {rdv_path}")
         sys.exit(1)
 
     mod = _load_rdv_module(rdv_path)
@@ -308,9 +311,9 @@ def main():
     e2e_csv.write_text("\n".join(e2e_lines) + "\n", encoding="utf-8")
     aclnn_csv.write_text("\n".join(aclnn_lines) + "\n", encoding="utf-8")
 
-    print(f"Generated {len(cases)} cases:")
-    print(f"  e2e:   {e2e_csv}")
-    print(f"  aclnn: {aclnn_csv}")
+    logger.info(f"Generated {len(cases)} cases:")
+    logger.info(f"  e2e:   {e2e_csv}")
+    logger.info(f"  aclnn: {aclnn_csv}")
 
 
 if __name__ == "__main__":

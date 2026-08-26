@@ -45,10 +45,12 @@ struct alignas(8) RecurrentGatedDeltaRuleTilingData {
     uint32_t hasAcceptedTokens;
 };
 
-extern "C" __global__ __aicore__ void
-recurrent_gated_delta_rule(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR beta, GM_ADDR state, GM_ADDR cuSeqlens,
-                           GM_ADDR ssmStateIndices, GM_ADDR g, GM_ADDR gk, GM_ADDR numAcceptedTokens, GM_ADDR out,
-                           GM_ADDR stateOut, GM_ADDR workspaceGM, GM_ADDR tilingGM);
+extern "C" __global__ __aicore__ void recurrent_gated_delta_rule(GM_ADDR query, GM_ADDR key, GM_ADDR value,
+                                                                 GM_ADDR beta, GM_ADDR state, GM_ADDR cuSeqlens,
+                                                                 GM_ADDR ssmStateIndices, GM_ADDR g, GM_ADDR gk,
+                                                                 GM_ADDR numAcceptedTokens, GM_ADDR out,
+                                                                 GM_ADDR stateOut, GM_ADDR workspaceGM,
+                                                                 GM_ADDR tilingGM);
 
 template <typename T>
 T *GmAllocWrapper(size_t size)
@@ -76,7 +78,6 @@ void InitTilingData(RecurrentGatedDeltaRuleTilingData *tilingData, uint32_t b, u
     tilingData->hasGama = hasGama;
     tilingData->hasAcceptedTokens = hasAcceptedTokens;
 }
-
 
 void InitInputData(uint8_t *stateGm, size_t shapeState, uint8_t *queryGm, size_t shapeQ, uint8_t *keyGm, size_t shapeK,
                    uint8_t *valueGm, size_t shapeV, uint8_t *betaGm, size_t shapeBeta, uint8_t *gamaGm,
@@ -187,7 +188,6 @@ protected:
     }
 };
 
-
 INSTANTIATE_TEST_SUITE_P(GeneralTests, RecurrentGatedDeltaRuleTest,
                          testing::Values(RGDRTestParams{1, 1}, // general_test_01: 有Gama，有AcceptedTokens
                                          RGDRTestParams{0, 1}, // general_test_02: 无Gama，有AcceptedTokens
@@ -197,7 +197,7 @@ INSTANTIATE_TEST_SUITE_P(GeneralTests, RecurrentGatedDeltaRuleTest,
 TEST_P(RecurrentGatedDeltaRuleTest, RunTest)
 {
     auto params = GetParam();
-    std::cout << "tets config: hasGama=" << params.hasGama << ", hasAcceptedTokens=" << params.hasAcceptedTokens
+    std::cout << "test config: hasGama=" << params.hasGama << ", hasAcceptedTokens=" << params.hasAcceptedTokens
               << std::endl;
 
     uint32_t blockDim = 8;

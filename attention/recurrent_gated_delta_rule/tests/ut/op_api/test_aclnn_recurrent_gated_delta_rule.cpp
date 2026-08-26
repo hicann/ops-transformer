@@ -27,12 +27,12 @@ class aclnnRecurrentGatedDeltaRule_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        cout << "aclnnRecurrentGatedDeltaRule_test SetUp" << endl;
+        // cout << "aclnnRecurrentGatedDeltaRule_test SetUp" << endl;
     }
 
     static void TearDownTestCase()
     {
-        cout << "aclnnRecurrentGatedDeltaRule_test TearDown" << endl;
+        // cout << "aclnnRecurrentGatedDeltaRule_test TearDown" << endl;
     }
 };
 

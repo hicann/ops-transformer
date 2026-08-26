@@ -1,24 +1,27 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------------------------------------
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
 # This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
-# THIS PROGRAM IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
 """将 test_recurrent_gated_delta_rule_paramset_rdv.py 的全部用例转换为 TTK CSV。
 
-生成 E2E + ACLNN 两份 CSV，覆盖 RDV 全部用例（含 fp32 state、非连续 state）。
+生成 E2E + ACLNN 两份 CSV，覆盖 RDV 全部用例（含 fp32 state、non-contiguous state）。
 
 用法:
     cd attention/recurrent_gated_delta_rule/tests/assets
     python3 convert_rdv_to_csv.py [--rdv-file PATH] [--output-dir DIR]
 """
 
+import logging
+
+logger = logging.getLogger(__name__)
 import argparse
 import csv
 import importlib.util
@@ -105,7 +108,7 @@ def contiguous_stride(shape):
 
 
 def non_contig_fields(tensor_count, state_idx, state_shape, block_num, nv, dv, dk):
-    """构造非连续 state 的 storage/stride/offset 字段。
+    """构造non-contiguous state 的 storage/stride/offset 字段。
 
     非 state 张量填连续值（storage=view shape, stride=contiguous, offset=0），
     state 张量填 pad+1 storage（dv 维 +1）+ 对应 stride，与 pytest pad+1 方式一致。
@@ -345,7 +348,7 @@ def main():
 
     rdv_path = Path(args.rdv_file).resolve()
     if not rdv_path.exists():
-        print(f"ERROR: rdv file not found: {rdv_path}")
+        logger.error(f"ERROR: rdv file not found: {rdv_path}")
         sys.exit(1)
 
     mod = _load_rdv_module(rdv_path)
@@ -365,10 +368,10 @@ def main():
     total = len(e2e_rows)
     nc_count = sum(1 for r in e2e_rows if "tensor_storage_shapes" in r)
     fp32_count = sum(1 for r in e2e_rows if "_sfloat32" in r["testcase_name"])
-    print(f"E2E  CSV: {e2e_path} ({total} cases)")
-    print(f"ACLNN CSV: {aclnn_path} ({total} cases)")
-    print(f"  非连续 state: {nc_count} cases")
-    print(f"  fp32 state:   {fp32_count} cases")
+    logger.info(f"E2E  CSV: {e2e_path} ({total} cases)")
+    logger.info(f"ACLNN CSV: {aclnn_path} ({total} cases)")
+    logger.info(f"  non-contiguous state: {nc_count} cases")
+    logger.info(f"  fp32 state:   {fp32_count} cases")
 
 
 if __name__ == "__main__":

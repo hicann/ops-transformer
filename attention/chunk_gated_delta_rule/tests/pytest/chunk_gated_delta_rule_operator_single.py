@@ -9,6 +9,10 @@
 # -----------------------------------------------------------------------------------------------------------
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from chunk_gated_delta_rule_main import run_chunk_gated_delta_rule_eager
 
 
@@ -27,7 +31,7 @@ def run_precision_test(params, pt_path=""):
         has_g,
         is_contiguous,
     ) = params
-    print(f"params = {params}")
+    logger.info(f"params = {params}")
     ret = run_chunk_gated_delta_rule_eager(
         B,
         seqlen,

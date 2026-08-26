@@ -28,12 +28,12 @@ class aclnnChunkGatedDeltaRule_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        cout << "aclnnChunkGatedDeltaRule_test SetUp" << endl;
+        // cout << "aclnnChunkGatedDeltaRule_test SetUp" << endl;
     }
 
     static void TearDownTestCase()
     {
-        cout << "aclnnChunkGatedDeltaRule_test TearDown" << endl;
+        // cout << "aclnnChunkGatedDeltaRule_test TearDown" << endl;
     }
 };
 

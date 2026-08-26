@@ -24,12 +24,12 @@ class ChunkGatedDeltaRuleTest : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        std::cout << "ChunkGatedDeltaRuleTest Proto SetUp" << std::endl;
+        // std::cout << "ChunkGatedDeltaRuleTest Proto SetUp" << std::endl;
     }
 
     static void TearDownTestCase()
     {
-        std::cout << "ChunkGatedDeltaRuleTest Proto TearDown" << std::endl;
+        // std::cout << "ChunkGatedDeltaRuleTest Proto TearDown" << std::endl;
     }
 };
 
