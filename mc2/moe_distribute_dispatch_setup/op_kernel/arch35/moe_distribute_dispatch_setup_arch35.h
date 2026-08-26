@@ -21,12 +21,13 @@
 #include "../moe_distribute_dispatch_setup_tiling.h"
 #include "../moe_distribute_dispatch_setup_base.h"
 #if __has_include("../../common/mc2_kernel_utils.h")
-#include "../../moe_distribute_dispatch_v2/quantize_functions.h"
+#include "../../common/quantize_functions.h"
 #include "../../common/mc2_kernel_utils.h"
 #else
-#include "../../../moe_distribute_dispatch_v2/op_kernel/quantize_functions.h"
+#include "../../../common/op_kernel/quantize_functions.h"
 #include "../../../common/op_kernel/mc2_kernel_utils.h"
 #endif
+#include "../moe_distribute_dispatch_setup_common.h"
 
 #define FLOAT_OVERFLOW_MODE_CTRL 60
 namespace Mc2Kernel {
@@ -506,10 +507,9 @@ __aicore__ inline void MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::CalToken
 }
 
 template <TemplateMC2TypeClass>
-__aicore__ inline void
-MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum,
-                                                             uint32_t &startTokenId, uint32_t &endTokenId,
-                                                             uint32_t &sendTokenNum, bool isFront)
+__aicore__ inline void MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::SplitToCore(
+    uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startTokenId, uint32_t &endTokenId, uint32_t &sendTokenNum,
+    bool isFront)
 {
     uint32_t remainderTokenNum = curSendCnt % curUseAivNum; // 余数
     sendTokenNum = curSendCnt / curUseAivNum;               // 每个aiv需要发送的token数
@@ -660,8 +660,8 @@ __aicore__ inline void MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::SetStatu
 }
 
 template <TemplateMC2TypeClass>
-__aicore__ inline void
-MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::ReduceMaxInplace(const LocalTensor<float> &srcLocal, uint32_t count)
+__aicore__ inline void MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::ReduceMaxInplace(
+    const LocalTensor<float> &srcLocal, uint32_t count)
 {
     uint64_t repsFp32 = count >> 6;       // 6 is count / elemPerRefFp32
     uint64_t offsetsFp32 = repsFp32 << 6; // 6 is repsFp32 * elemPerRefFp32
@@ -732,9 +732,8 @@ __aicore__ inline void MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::QuantSta
 }
 
 template <TemplateMC2TypeClass>
-__aicore__ inline void
-MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::QuantDynamicPerToken(LocalTensor<YOutType> &outLocal,
-                                                                      LocalTensor<XType> &inLocal, uint32_t expertIndex)
+__aicore__ inline void MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::QuantDynamicPerToken(
+    LocalTensor<YOutType> &outLocal, LocalTensor<XType> &inLocal, uint32_t expertIndex)
 {
     float dynamicScale = 0.0;
     float maxVal = INT8_MAX_VALUE; // 获取输出类型的最大值（AscendC未提供相关接口）
@@ -779,9 +778,8 @@ MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::QuantDynamicPerToken(LocalTenso
 }
 
 template <TemplateMC2TypeClass>
-__aicore__ inline void
-MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::QuantDynamicPerGroup(LocalTensor<YOutType> &outLocal,
-                                                                      LocalTensor<XType> &inLocal, uint32_t expertIndex)
+__aicore__ inline void MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::QuantDynamicPerGroup(
+    LocalTensor<YOutType> &outLocal, LocalTensor<XType> &inLocal, uint32_t expertIndex)
 {
     if constexpr (Std::IsSame<YOutType, fp8_e4m3fn_t>::value || Std::IsSame<YOutType, fp8_e5m2_t>::value) {
         if constexpr (IsSmoothScaleExist) { // 平滑系数
@@ -800,9 +798,8 @@ MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::QuantDynamicPerGroup(LocalTenso
 }
 
 template <TemplateMC2TypeClass>
-__aicore__ inline void
-MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::QuantDynamicMxFp8(LocalTensor<YOutType> &outLocal,
-                                                                   LocalTensor<XType> &inLocal)
+__aicore__ inline void MoeDistributeDispatchSetup<TemplateMC2TypeFunc>::QuantDynamicMxFp8(
+    LocalTensor<YOutType> &outLocal, LocalTensor<XType> &inLocal)
 {
     if constexpr (Std::IsSame<YOutType, fp8_e4m3fn_t>::value || Std::IsSame<YOutType, fp8_e5m2_t>::value) {
         uint32_t mxScaleNum = Align2(Ceil32(axisH_));

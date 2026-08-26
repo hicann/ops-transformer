@@ -238,7 +238,7 @@ __aicore__ inline void GmSignalWaitBarrier(__gm__ int32_t *sigAddr, int32_t comp
 __aicore__ inline uint64_t GetUrmaCommHandle(__gm__ Mc2MoeContext *mc2Context, uint32_t rankId, uint32_t epRankId)
 {
     uint32_t index = rankId > epRankId ? rankId - 1U : rankId;
-    return mc2Context->hcommHandle[index];
+    return mc2Context->hcommHandle_[index];
 }
 
 inline GM_ADDR g_winRankAddr_[HCCL_MAX_RANK_SIZE];

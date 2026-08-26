@@ -41,10 +41,10 @@
 #include "stage/mega_moe_gmm1_activation.h"
 #include "stage/mega_moe_gmm2_combine.h"
 #include "common/mega_moe_mxfp8_utils.h"
-#if __has_include("../../moe_distribute_dispatch_v2/quantize_functions.h")
-#include "../../moe_distribute_dispatch_v2/quantize_functions.h"
+#if __has_include("../../common/quantize_functions.h")
+#include "../../common/quantize_functions.h"
 #else
-#include "../../../moe_distribute_dispatch_v2/op_kernel/quantize_functions.h"
+#include "../../../common/op_kernel/quantize_functions.h"
 #endif
 
 namespace MegaMoeImpl {
@@ -347,7 +347,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Init(
     serverId_ = rankId_ / rankPerServer_;
     rankIdInServer_ = rankId_ % rankPerServer_;
     for (int i = 0; i < worldSize_; i++) {
-        g_winRankAddr_[i] = (GM_ADDR)mc2Context_->epHcclBuffer[i];
+        g_winRankAddr_[i] = (GM_ADDR)mc2Context_->epHcclBuffer_[i];
     }
     params_.aGmAddr = x;
     params_.expertIdxGmAddr = topkIds;

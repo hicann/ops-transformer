@@ -28,10 +28,10 @@
 #include "../common/mega_moe_mxfp8_utils.h"
 #if __has_include("../../../common/mc2_kernel_utils.h")
 #include "../../../common/mc2_kernel_utils.h"
-#include "../../../moe_distribute_dispatch_v2/quantize_functions.h"
+#include "../../../common/quantize_functions.h"
 #else
 #include "../../../../common/op_kernel/mc2_kernel_utils.h"
-#include "../../../../moe_distribute_dispatch_v2/op_kernel/quantize_functions.h"
+#include "../../../../common/op_kernel/quantize_functions.h"
 #endif
 
 namespace MegaMoeImpl {
@@ -191,9 +191,9 @@ __aicore__ inline void CombineTokenGroup(uint32_t tokenStart, uint32_t tokenCoun
     offset += ubTensorSize * sizeof(T);
 
     uint32_t nScale = Ops::Base::CeilDiv(n, uint32_t(MXFP_SCALE_GROUP_NUM));
-    uint32_t mxScaleNum = Align2(nScale);
+    uint32_t mxScaleNum = Ops::Base::CeilAlign(nScale, 2U);
     uint32_t nAlign32 = Ops::Base::CeilAlign(n, static_cast<uint32_t>(ALIGN_32));
-    uint32_t floatTempSize = Align32(mxScaleNum) + mxScaleNum / 2;
+    uint32_t floatTempSize = Ops::Base::CeilAlign(mxScaleNum, static_cast<uint32_t>(ALIGN_32)) + mxScaleNum / 2;
     LocalTensor<float> floatTemp = LocalTensor<float>(TPosition::VECIN, offset, floatTempSize);
 
     GlobalTensor<T> gmm2OutGm;

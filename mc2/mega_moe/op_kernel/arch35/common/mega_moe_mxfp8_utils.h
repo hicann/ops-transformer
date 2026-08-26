@@ -12,11 +12,12 @@
 #define MEGA_MOE_MXFP8_UTILS_H
 
 #include "kernel_operator.h"
+#include "op_kernel/math_util.h"
 #include "mega_moe_constants.h"
-#if __has_include("../../../moe_distribute_dispatch_v2/quantize_functions.h")
-#include "../../../moe_distribute_dispatch_v2/quantize_functions.h"
+#if __has_include("../../../common/quantize_functions.h")
+#include "../../../common/quantize_functions.h"
 #else
-#include "../../../../moe_distribute_dispatch_v2/op_kernel/quantize_functions.h"
+#include "../../../../common/op_kernel/quantize_functions.h"
 #endif
 
 namespace MegaMoeImpl {
@@ -32,8 +33,7 @@ __aicore__ inline void ComputeFp8Token(__ubuf__ InputType *srcAddr, __ubuf__ uin
 {
     Quant::ComputeMaxExp(srcAddr, maxExpAddr, processLen);
     Quant::ComputeScale<Fp8Type>(maxExpAddr, mxScaleAddr, halfScaleAddr, scaleNum);
-    Quant::ComputeFp8Data<InputType, Fp8Type, AscendC::RoundMode::CAST_TRUNC,
-                          AscendC::RoundMode::CAST_RINT>(
+    Quant::ComputeFp8Data<InputType, Fp8Type, AscendC::RoundMode::CAST_TRUNC, AscendC::RoundMode::CAST_RINT>(
         srcAddr, halfScaleAddr, outDataAddr, processLen);
 }
 
@@ -43,18 +43,21 @@ __aicore__ inline void QuantMxFp8(LocalTensor<ExpandXType> &outLocal, LocalTenso
                                   LocalTensor<float> &floatTemp, int32_t processLen)
 {
     PipeBarrier<PIPE_V>();
-    uint32_t mxScaleNum = Align2(Ceil32(processLen));
+    uint32_t mxScaleNum = Ops::Base::CeilAlign(
+        Ops::Base::CeilDiv(static_cast<uint32_t>(processLen), static_cast<uint32_t>(ALIGN_32)), 2U);
     using Fp8Type = typename std::conditional<QuantMode == MXFP8_E4M3_COMM_QUANT, fp8_e4m3fn_t, fp8_e5m2_t>::type;
     LocalTensor<Fp8Type> castFp8LocalTensor = outLocal.template ReinterpretCast<Fp8Type>();
     __ubuf__ ExpandXType *srcAddr = (__ubuf__ ExpandXType *)inLocal.GetPhyAddr();
     __ubuf__ uint16_t *maxExpAddr = (__ubuf__ uint16_t *)floatTemp.GetPhyAddr();
-    __ubuf__ uint16_t *halfScaleLocalAddr = (__ubuf__ uint16_t *)floatTemp[Align32(mxScaleNum)].GetPhyAddr();
+    __ubuf__ uint16_t *halfScaleLocalAddr =
+        (__ubuf__ uint16_t *)floatTemp[Ops::Base::CeilAlign(mxScaleNum, static_cast<uint32_t>(ALIGN_32))].GetPhyAddr();
     __ubuf__ int8_t *outLocalAddr = (__ubuf__ int8_t *)castFp8LocalTensor.GetPhyAddr();
-    uint32_t tokenStorageElementCount = Align256<uint32_t>(static_cast<uint32_t>(processLen));
+    uint32_t tokenStorageElementCount =
+        Ops::Base::CeilAlign(static_cast<uint32_t>(processLen), static_cast<uint32_t>(ALIGN_256));
     __ubuf__ uint16_t *mxScaleLocalAddr =
         (__ubuf__ uint16_t *)castFp8LocalTensor[tokenStorageElementCount].GetPhyAddr();
-    ComputeFp8Token<ExpandXType, Fp8Type>(srcAddr, maxExpAddr, mxScaleLocalAddr, halfScaleLocalAddr,
-                                          outLocalAddr, static_cast<uint32_t>(processLen), mxScaleNum);
+    ComputeFp8Token<ExpandXType, Fp8Type>(srcAddr, maxExpAddr, mxScaleLocalAddr, halfScaleLocalAddr, outLocalAddr,
+                                          static_cast<uint32_t>(processLen), mxScaleNum);
 }
 
 // 将一条 MXFP8 token 记录反量化为 FP32，供 Unpermute 累加。
@@ -65,7 +68,8 @@ __aicore__ inline void DeQuantMxFp8(LocalTensor<XType> &inLocal, LocalTensor<flo
 {
     LocalTensor<T> castFp8LocalTensor_ = inLocal.template ReinterpretCast<T>();
     LocalTensor<fp8_e8m0_t> scaleDivFp8Tensor_ =
-        inLocal[Align256<uint32_t>(tokenLen) / 2].template ReinterpretCast<fp8_e8m0_t>();
+        inLocal[Ops::Base::CeilAlign(tokenLen, static_cast<uint32_t>(ALIGN_256)) / 2]
+            .template ReinterpretCast<fp8_e8m0_t>();
     __ubuf__ bfloat16_t *dyScaleBf16Ptr = (__ubuf__ bfloat16_t *)scaleBf16Tensor.GetPhyAddr();
     __ubuf__ float *dyScaleFp32Ptr = (__ubuf__ float *)scaleFP32Tensor.GetPhyAddr();
     __ubuf__ fp8_e8m0_t *srcPtr0 = (__ubuf__ fp8_e8m0_t *)scaleDivFp8Tensor_.GetPhyAddr();
@@ -73,9 +77,9 @@ __aicore__ inline void DeQuantMxFp8(LocalTensor<XType> &inLocal, LocalTensor<flo
     __ubuf__ float *sumDstPtr = (__ubuf__ float *)sumTensor.GetPhyAddr();
     uint32_t bf16RepeatSize = Quant::GetVRegSizeDispatch() / sizeof(bfloat16_t);
     uint32_t fp32RepeatSize = Quant::GetVRegSizeDispatch() / sizeof(float);
-    uint16_t repeatTimes = Ceil(scaleLen, bf16RepeatSize);
-    uint16_t fp32RepeatTimes = Ceil(tokenLen, fp32RepeatSize);
-    uint16_t repeatTimes2 = Ceil(scaleLen * 2, fp32RepeatSize);
+    uint16_t repeatTimes = Ops::Base::CeilDiv(scaleLen, bf16RepeatSize);
+    uint16_t fp32RepeatTimes = Ops::Base::CeilDiv(tokenLen, fp32RepeatSize);
+    uint16_t repeatTimes2 = Ops::Base::CeilDiv(scaleLen * 2, fp32RepeatSize);
     uint32_t quantCount2 = scaleLen * 2;
     __VEC_SCOPE__
     {

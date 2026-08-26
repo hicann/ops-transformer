@@ -37,10 +37,10 @@
 #include "stage/mega_moe_gmm1_activation.h"
 #include "stage/mega_moe_gmm2_combine.h"
 #include "stage/mega_moe_unpermute.h"
-#if __has_include("../../moe_distribute_dispatch_v2/quantize_functions.h")
-#include "../../moe_distribute_dispatch_v2/quantize_functions.h"
+#if __has_include("../../common/quantize_functions.h")
+#include "../../common/quantize_functions.h"
 #else
-#include "../../../moe_distribute_dispatch_v2/op_kernel/quantize_functions.h"
+#include "../../../common/op_kernel/quantize_functions.h"
 #endif
 
 namespace MegaMoeImpl {
@@ -239,10 +239,10 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Init(
     gmm2PingPongIdx_ = 0;
     mc2Context_ = reinterpret_cast<__gm__ Mc2MoeContext *>(context);
     rankId_ = mc2Context_->epRankId;
-    GM_ADDR dumpBase = reinterpret_cast<GM_ADDR>(mc2Context_->epHcclBuffer[rankId_]);
+    GM_ADDR dumpBase = reinterpret_cast<GM_ADDR>(mc2Context_->epHcclBuffer_[rankId_]);
     for (int i = 0; i < worldSize_; i++) {
         // g_winRankAddr_从win区地址偏移60K开始用，前面60K是异常dump区
-        g_winRankAddr_[i] = reinterpret_cast<GM_ADDR>(mc2Context_->epHcclBuffer[i]) + EXCEPTION_DUMP_REGION_SIZE;
+        g_winRankAddr_[i] = reinterpret_cast<GM_ADDR>(mc2Context_->epHcclBuffer_[i]) + EXCEPTION_DUMP_REGION_SIZE;
     }
     params_.aGmAddr = x;
     params_.expertIdxGmAddr = topkIds;

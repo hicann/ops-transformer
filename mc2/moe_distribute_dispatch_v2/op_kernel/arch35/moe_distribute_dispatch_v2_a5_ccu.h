@@ -18,7 +18,11 @@
 
 #include "lib/hccl/hccl.h"
 #include "../moe_distribute_dispatch_v2_common.h"
-#include "../quantize_functions.h"
+#if __has_include("../../common/quantize_functions.h")
+#include "../../common/quantize_functions.h"
+#else
+#include "../../../common/op_kernel/quantize_functions.h"
+#endif
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"
 #else
@@ -56,8 +60,7 @@ constexpr uint32_t PERTOKEN_DYNAMIC_QUANT = 2;
 constexpr uint32_t PERGROUP_DYNAMIC_QUANT = 3;
 constexpr uint32_t MX_QUANT = 4;
 
-
-#define TemplateMoeDistributeDispatchA5TypeClass                                                                       \
+#define TemplateMoeDistributeDispatchA5TypeClass \
     typename XType, typename ExpandXOutType, int32_t QuantMode, bool IsSmoothScaleExist
 #define TemplateMoeDistributeDispatchA5TypeFunc XType, ExpandXOutType, QuantMode, IsSmoothScaleExist
 
@@ -579,8 +582,8 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 }
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
-__aicore__ inline uint32_t
-MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::CalcToSharedRankId(uint32_t sendCnt)
+__aicore__ inline uint32_t MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::CalcToSharedRankId(
+    uint32_t sendCnt)
 {
     uint32_t toSharedExpertIdx = sendCnt / activeBs_;
     uint32_t sharedExpertRankIdInGroup = epRankId_ % rankNumPerSharedExpert_;
@@ -893,8 +896,8 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 }
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
-__aicore__ inline void
-MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::TokenGatherInit(uint32_t localExpertNum)
+__aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::TokenGatherInit(
+    uint32_t localExpertNum)
 {
     TBuf<> recvCntBuf;
     uint32_t alignSize = Align32<uint32_t>(epWorldSize_ * sizeof(int32_t));
@@ -990,9 +993,8 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 }
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
-__aicore__ inline void
-MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::MoeGatherPrepare(uint32_t localExpertNum,
-                                                                                   uint32_t endRankIdx)
+__aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::MoeGatherPrepare(
+    uint32_t localExpertNum, uint32_t endRankIdx)
 {
     uint32_t alignSize = Align32<uint32_t>(epWorldSize_ * sizeof(int32_t));
     uint32_t alignCnt = alignSize / sizeof(int32_t);
@@ -1062,9 +1064,8 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 }
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
-__aicore__ inline void
-MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::TokenGatherProcess(int32_t sharedExpertRankNum,
-                                                                                     int32_t localExpertNum)
+__aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::TokenGatherProcess(
+    int32_t sharedExpertRankNum, int32_t localExpertNum)
 {
     // Same as Moe gather
     uint32_t startRank, endRank, rankPerAiv;

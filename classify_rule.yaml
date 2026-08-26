@@ -1191,7 +1191,7 @@ mc2_infer@ops-transformer:
                 - ops/ops-transformer/mc2/moe_distribute_dispatch_v2/op_kernel/moe_distribute_elastic.h
                 - ops/ops-transformer/mc2/moe_distribute_dispatch_v2/op_kernel/moe_distribute_v2_base.h
                 - ops/ops-transformer/mc2/moe_distribute_dispatch_v2/op_kernel/moe_distribute_v2_constant.h
-                - ops/ops-transformer/mc2/moe_distribute_dispatch_v2/op_kernel/quantize_functions.h
+                - ops/ops-transformer/mc2/common/op_kernel/quantize_functions.h
                 - ops/ops-transformer/mc2/moe_distribute_dispatch_v2/op_host/op_tiling/arch22/
                 - ops/ops-transformer/mc2/moe_distribute_dispatch_v2/op_host/op_tiling/moe_distribute_check_win_size.h
                 - ops/ops-transformer/mc2/moe_distribute_dispatch_v2/op_host/op_tiling/moe_distribute_dispatch_tiling_helper.cpp

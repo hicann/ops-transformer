@@ -24,10 +24,15 @@
 #include "../../moe_distribute_dispatch_v2/op_kernel/moe_distribute_v2_base.h"
 #endif
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
-#if __has_include("../moe_distribute_dispatch_v2/quantize_functions.h")
-#include "../moe_distribute_dispatch_v2/quantize_functions.h"
+#if __has_include("../moe_distribute_dispatch_v2/moe_distribute_dispatch_v2_common.h")
+#include "../moe_distribute_dispatch_v2/moe_distribute_dispatch_v2_common.h"
 #else
-#include "../../moe_distribute_dispatch_v2/op_kernel/quantize_functions.h"
+#include "../../moe_distribute_dispatch_v2/op_kernel/moe_distribute_dispatch_v2_common.h"
+#endif
+#if __has_include("../common/quantize_functions.h")
+#include "../common/quantize_functions.h"
+#else
+#include "../../common/op_kernel/quantize_functions.h"
 #endif
 #endif
 
@@ -399,8 +404,9 @@ public:
 #endif
     }
 
-    __aicore__ inline void DeQuantProcessWithoutExpertScale(LocalTensor<XType>& inLocal,
-        LocalTensor<XType>& outLocal, LocalTensor<float>& sumTensor, LocalTensor<float>& sumFinalTensor)
+    __aicore__ inline void DeQuantProcessWithoutExpertScale(LocalTensor<XType> &inLocal, LocalTensor<XType> &outLocal,
+                                                            LocalTensor<float> &sumTensor,
+                                                            LocalTensor<float> &sumFinalTensor)
     {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         if constexpr (QuantMode == INT8_COMM_QUANT) {
