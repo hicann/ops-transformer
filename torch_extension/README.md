@@ -28,22 +28,15 @@
     cd <repo_root>
     # 整包编译（含所有算子）
     bash build.sh --torch_extension
-
-    # 单算子编译（需指定算子名和 vendor）
-    bash build.sh --torch_extension --ops=flash_attn --vendor_name=custom
-
-    # 多算子编译（逗号分隔）
-    bash build.sh --torch_extension --ops=flash_attn,moe_finalize_routing --vendor_name=custom
     ```
 
     编译产物位于 `build_out/` 目录下：
     - 整包：`cann_ops_transformer-1.0.0-*.whl`
-    - 单/多算子包：`cann_ops_transformer_custom-1.0.0-*.whl`
 
 3. Install Package:
 
     ```sh
-    python3 -m pip install dist/*.whl --force-reinstall --no-deps
+    python3 -m pip install build_out/*.whl --force-reinstall --no-deps
     ```
 
 ## Quick Start
