@@ -440,8 +440,7 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelDeter<CubeBlockType, VecB
                 this->actualSeqQlenAddr, this->actualSeqKvlenAddr,
                 this->tilingData->tndSwizzleParam.tndS2BlockPrefixSum, this->constInfo.bSize, this->constInfo.n2Size,
                 this->constInfo.commonConstInfo.gSize, j,
-                static_cast<int64_t>(this->tilingData->s1s2BNGS1S2BaseParams.coreNum / NUM_TWO), r, this->deltaCnt,
-                coordinateInfo);
+                static_cast<int64_t>(this->tilingData->s1s2BNGS1S2BaseParams.coreNum / NUM_TWO), r, coordinateInfo);
         } else {
             int64_t b = this->constInfo.bSize;
             CalTNDDenseIndex<BaseClass::CUBE_BASEM, BaseClass::CUBE_BASEN, BaseClass::DETER_SPARSE_TYPE,

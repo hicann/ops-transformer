@@ -136,9 +136,19 @@ constexpr int64_t LARGE_INVALID_NUM = 3072;
 constexpr uint32_t CORE_LIST_NUM = 36;
 constexpr uint32_t ARRAY_LENGTH = 3;
 constexpr uint32_t DETER_LENGTH = 4;
+// deter swizzle threshold settings
 constexpr int64_t GQA_DENSE_MAX_ROUND_GROWTH_PERCENT = 3;
 constexpr int64_t GQA_DENSE_MAX_INVALID_PERCENT = 4;
 constexpr int64_t GQA_DENSE_PERCENT_BASE = 100;
+
+constexpr int64_t TND_DETER_SWIZZLE_MIN_SLOT_UTILIZATION_PERCENT = 90;
+constexpr int64_t TND_DETER_SWIZZLE_MAX_ROUND_GROWTH_PERCENT = 3;
+constexpr int64_t TND_DETER_SWIZZLE_PERCENT_BASE = 100;
+
+constexpr int64_t DETER_BAND_SWIZZLE_MIN_SLOT_UTILIZATION_PERCENT = 90;
+constexpr int64_t DETER_BAND_SWIZZLE_MAX_ROUND_GROWTH_PERCENT = 3;
+constexpr int64_t DETER_BAND_SWIZZLE_PERCENT_BASE = 100;
+
 constexpr uint32_t NZ_OUT_MIN_S_SIZE = 2048;
 constexpr uint32_t FP16_C0_SIZE = 16;
 constexpr uint32_t TND_SWIZZLE_MIN_S1_SIZE = 2048;
