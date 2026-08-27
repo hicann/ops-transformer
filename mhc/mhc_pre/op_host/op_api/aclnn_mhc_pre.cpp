@@ -51,15 +51,27 @@ constexpr int64_t DIM_IDX_2 = 2;
 constexpr int64_t DIM_IDX_3 = 3;
 
 constexpr int64_t N_VALID_VALUES[] = {4, 6, 8};
+constexpr int64_t N_VALID_VALUE_A2 = 4;
 constexpr int64_t D_ALIGNMENT = 16;
+constexpr int64_t D_ALIGNMENT_A2 = 128;
 constexpr int64_t ALPHA_DIM_SIZE_3 = 3;
 constexpr int64_t ALPHA_DIM_SIZE_2 = 2;
 constexpr int64_t PHI_DIM_OFFSET = 2;
 constexpr int64_t MHC_PRE_USE_FP32 = 0;
 constexpr int64_t MHC_PRE_USE_HF32 = 1;
 
+static int64_t Factorial(int64_t n)
+{
+    int64_t r = 1;
+    for (int64_t i = 2; i <= n; ++i) {
+        r *= i;
+    }
+    return r;
+}
+
 static bool CheckAlphaShape(const aclTensor *alphaTensor);
 static bool ValidateNDParams(int64_t n, int64_t d);
+static bool ValidateNDParamsA2(int64_t n, int64_t d);
 static bool CheckTensorShape(const aclTensor *tensor, std::initializer_list<int64_t> expectedShape, const char *name);
 
 static std::string TensorShapeToString(const aclTensor *tensor)
@@ -230,11 +242,13 @@ static bool CheckEmptyTensor(const MhcParamsBase &params)
 
 static bool CheckInputDims(const MhcParamsBase &params)
 {
+    // x dims must be 3 or 4
     auto xDimNum = params.x->GetViewShape().GetDimNum();
     if (xDimNum != DIM_NUM_3 && xDimNum != DIM_NUM_4) {
         OP_LOGE_FOR_INVALID_SHAPEDIM(ACLNN_OP_NAME, "x", std::to_string(xDimNum).c_str(), "3 or 4");
         return false;
     }
+    // phi dims must be 2,  alpha dims must be 1, bias dims must be 1,
     if (!CheckTensorRank(params.phi, "phi", DIM_NUM_2) || !CheckTensorRank(params.alpha, "alpha", DIM_NUM_1) ||
         !CheckTensorRank(params.bias, "bias", DIM_NUM_1)) {
         return false;
@@ -242,16 +256,76 @@ static bool CheckInputDims(const MhcParamsBase &params)
     return params.gammaOptional == nullptr || CheckTensorRank(params.gammaOptional, "gammaOptional", DIM_NUM_2);
 }
 
+static bool CheckInputDimsA2(const MhcParamsBase &params)
+{
+    // x dims must be 3 or 4
+    auto xDimNum = params.x->GetViewShape().GetDimNum();
+    if (xDimNum != DIM_NUM_3 && xDimNum != DIM_NUM_4) {
+        OP_LOGE_FOR_INVALID_SHAPEDIM(ACLNN_OP_NAME, "x", std::to_string(xDimNum).c_str(), "3 or 4");
+        return false;
+    }
+
+    if (!CheckTensorRank(params.phi, "phi", DIM_NUM_2)) {
+        return false;
+    }
+
+    if (!CheckTensorRank(params.alpha, "alpha", DIM_NUM_1)) {
+        return false;
+    }
+
+    if (!CheckTensorRank(params.bias, "bias", DIM_NUM_1)) {
+        return false;
+    }
+    // 如果gamma非空时，dim必须为2
+    if (params.gammaOptional != nullptr && !CheckTensorRank(params.gammaOptional, "gammaOptional", DIM_NUM_2)) {
+        return false;
+    }
+    return true;
+}
+
 static bool CheckOutputDims(const MhcParamsBase &params)
 {
     auto xDimNum = params.x->GetViewShape().GetDimNum();
     size_t outputDimNum = xDimNum == DIM_NUM_4 ? DIM_NUM_3 : DIM_NUM_2;
-    if (!CheckTensorRank(params.hIn, "hIn", outputDimNum) ||
-        !CheckTensorRank(params.hPost, "hPost", outputDimNum)) {
+    if (!CheckTensorRank(params.hIn, "hIn", outputDimNum) || !CheckTensorRank(params.hPost, "hPost", outputDimNum)) {
         return false;
     }
     int64_t alphaSize = params.alpha->GetViewShape().GetDim(0);
     return alphaSize != ALPHA_DIM_SIZE_3 || CheckTensorRank(params.hRes, "hRes", xDimNum);
+}
+
+static bool CheckOutputDimsA2(const MhcParamsBase &params)
+{
+    auto xShape = params.x->GetViewShape();
+    auto phiShape = params.phi->GetViewShape();
+    auto xDimNum = xShape.GetDimNum();
+    int64_t n = 0;
+    if (xDimNum == DIM_NUM_4) {
+        n = xShape.GetDim(2);
+    } else if (xDimNum == DIM_NUM_3) {
+        n = xShape.GetDim(1);
+    }
+
+    size_t outputDimNum = xDimNum == DIM_NUM_4 ? DIM_NUM_3 : DIM_NUM_2;
+    if (!CheckTensorRank(params.hIn, "hIn", outputDimNum)) {
+        return false;
+    }
+
+    if (!CheckTensorRank(params.hPost, "hPost", outputDimNum)) {
+        return false;
+    }
+
+    int64_t alphaSize = params.alpha->GetViewShape().GetDim(0);
+    int64_t expectedPhiRows_factorial = Factorial(n) + 2 * n;
+    int64_t expectedPhiRows_pow = n * n + 2 * n;
+    // alpha is 3, hRes not null,
+    // hres shape should be [b,s,n,n] [t,n,n] [b,s, n!] [t, n!]
+    if (alphaSize == ALPHA_DIM_SIZE_3 && phiShape.GetDim(0) == expectedPhiRows_factorial) {
+        return CheckTensorRank(params.hRes, "hRes", (xDimNum - 1));
+    } else if (alphaSize == ALPHA_DIM_SIZE_3 && phiShape.GetDim(0) == expectedPhiRows_pow) {
+        return CheckTensorRank(params.hRes, "hRes", xDimNum);
+    }
+    return true;
 }
 
 static bool CheckOptionalOutputGroup(const MhcParamsBase &params)
@@ -262,10 +336,9 @@ static bool CheckOptionalOutputGroup(const MhcParamsBase &params)
         params.invRmsOptional != nullptr && params.hMixOptional != nullptr && params.hPreOptional != nullptr;
     if (hasAnyOptional && !hasAllOptional) {
         const std::string pointerStates =
-            std::string("invRmsOptional=") +
-            (params.invRmsOptional == nullptr ? "nullptr" : "non-null") + ", hMixOptional=" +
-            (params.hMixOptional == nullptr ? "nullptr" : "non-null") + ", hPreOptional=" +
-            (params.hPreOptional == nullptr ? "nullptr" : "non-null");
+            std::string("invRmsOptional=") + (params.invRmsOptional == nullptr ? "nullptr" : "non-null") +
+            ", hMixOptional=" + (params.hMixOptional == nullptr ? "nullptr" : "non-null") +
+            ", hPreOptional=" + (params.hPreOptional == nullptr ? "nullptr" : "non-null");
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(ACLNN_OP_NAME, "invRmsOptional, hMixOptional, hPreOptional",
                                                pointerStates.c_str(),
                                                "all optional outputs must be nullptr or all must be non-null");
@@ -287,6 +360,26 @@ static bool CheckOptionalOutputDims(const MhcParamsBase &params)
            CheckTensorRank(params.hPreOptional, "hPreOptional", outputDimNum);
 }
 
+static bool CheckOptionalOutputDimsA2(const MhcParamsBase &params)
+{
+    if (params.invRmsOptional == nullptr) {
+        return true;
+    }
+    auto xDimNum = params.x->GetViewShape().GetDimNum();
+    size_t outputDimNum = xDimNum == DIM_NUM_4 ? DIM_NUM_3 : DIM_NUM_2;
+    size_t invRmsDimNum = xDimNum == DIM_NUM_4 ? DIM_NUM_2 : DIM_NUM_1;
+    if (!CheckTensorRank(params.invRmsOptional, "invRmsOptional", invRmsDimNum)) {
+        return false;
+    }
+    if (!CheckTensorRank(params.hMixOptional, "hMixOptional", outputDimNum)) {
+        return false;
+    }
+    if (!CheckTensorRank(params.hPreOptional, "hPreOptional", outputDimNum)) {
+        return false;
+    }
+    return true;
+}
+
 static bool CheckOutputAndOptionalDims(const MhcParamsBase &params)
 {
     return CheckOutputDims(params) && CheckOptionalOutputGroup(params) && CheckOptionalOutputDims(params);
@@ -301,14 +394,57 @@ static void GetXShapeInfo(const MhcParamsBase &params, int64_t &n, int64_t &d, i
     nD = n * d;
 }
 
-static bool CheckParamShapes(const MhcParamsBase &params, int64_t n, int64_t d, int64_t nD,
-                             int64_t expectedParamRows)
+static bool CheckParamShapes(const MhcParamsBase &params, int64_t n, int64_t d, int64_t nD, int64_t expectedParamRows)
 {
     if (!ValidateNDParams(n, d) || !CheckTensorShape(params.phi, {expectedParamRows, nD}, "phi") ||
         !CheckTensorShape(params.bias, {expectedParamRows}, "bias")) {
         return false;
     }
     return params.gammaOptional == nullptr || CheckTensorShape(params.gammaOptional, {n, d}, "gammaOptional");
+}
+
+static bool CheckParamShapesA2(const MhcParamsBase &params, int64_t n, int64_t d, int64_t nD, int64_t alphaSize,
+                               int64_t expectedPhiRows_factorial, int64_t expectedPhiRows_pow, int64_t phiShape_dim0)
+{
+    // n,d must bigger than 0  || n must be 4,6,8 ||  d must align to 16/128
+    if (!ValidateNDParamsA2(n, d)) {
+        return false;
+    }
+    auto biasShape = params.bias->GetViewShape();
+    auto phiShape = params.phi->GetViewShape();
+    if (alphaSize == ALPHA_DIM_SIZE_2) {
+        int64_t expectedPhiRows = 2 * n;
+        if (phiShape_dim0 != expectedPhiRows) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Phi tensor first dim must be %ld, but got %ld", expectedPhiRows,
+                    phiShape_dim0);
+            return false;
+        }
+        if (biasShape.GetDim(0) != expectedPhiRows) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Bias tensor dim must be %ld, but got %ld", expectedPhiRows,
+                    biasShape.GetDim(0));
+            return false;
+        }
+    } else {
+        if (phiShape_dim0 != expectedPhiRows_pow && phiShape_dim0 != expectedPhiRows_factorial) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Phi tensor first dim must be %ld or %ld, but got %ld",
+                    expectedPhiRows_pow, expectedPhiRows_factorial, phiShape_dim0);
+            return false;
+        }
+        if (biasShape.GetDim(0) != expectedPhiRows_pow && biasShape.GetDim(0) != expectedPhiRows_factorial) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Bias tensor dim must be %ld or %ld, but got %ld", expectedPhiRows_pow,
+                    expectedPhiRows_factorial, biasShape.GetDim(0));
+            return false;
+        }
+    }
+    if (phiShape.GetDim(1) != nD) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Phi tensor second dim must be nD=%ld, but got %ld", nD, phiShape.GetDim(1));
+        return false;
+    }
+
+    if (params.gammaOptional != nullptr && !CheckTensorShape(params.gammaOptional, {n, d}, "gammaOptional")) {
+        return false;
+    }
+    return true;
 }
 
 static bool CheckOutputShape4D(const MhcParamsBase &params, int64_t n, int64_t d, int64_t expectedPhiRows)
@@ -331,6 +467,44 @@ static bool CheckOutputShape4D(const MhcParamsBase &params, int64_t n, int64_t d
            CheckTensorShape(params.hPreOptional, {b, s, n}, "hPreOptional");
 }
 
+static bool CheckOutputShape4DA2(const MhcParamsBase &params, int64_t b, int64_t s, int64_t n, int64_t d,
+                                 int64_t alphaSize, int64_t expectedPhiRows_factorial, int64_t expectedPhiRows_pow,
+                                 int64_t phiShape_dim0)
+{
+    if (!CheckTensorShape(params.hIn, {b, s, d}, "hIn")) {
+        return false;
+    }
+    if (!CheckTensorShape(params.hPost, {b, s, n}, "hPost")) {
+        return false;
+    }
+    if (alphaSize == ALPHA_DIM_SIZE_3 && phiShape_dim0 == expectedPhiRows_pow &&
+        !CheckTensorShape(params.hRes, {b, s, n, n}, "hRes")) {
+        return false;
+    }
+    if (alphaSize == ALPHA_DIM_SIZE_3 && phiShape_dim0 == expectedPhiRows_factorial &&
+        !CheckTensorShape(params.hRes, {b, s, Factorial(n)}, "hRes")) {
+        return false;
+    }
+    if (alphaSize == ALPHA_DIM_SIZE_3 && phiShape_dim0 == expectedPhiRows_pow &&
+        !CheckTensorShape(params.hMixOptional, {b, s, expectedPhiRows_pow}, "hMixOptional")) {
+        return false;
+    }
+    if (alphaSize == ALPHA_DIM_SIZE_3 && phiShape_dim0 == expectedPhiRows_factorial &&
+        !CheckTensorShape(params.hMixOptional, {b, s, expectedPhiRows_factorial}, "hMixOptional")) {
+        return false;
+    }
+    if (params.invRmsOptional == nullptr) {
+        return true;
+    }
+    if (!CheckTensorShape(params.invRmsOptional, {b, s}, "invRmsOptional")) {
+        return false;
+    }
+    if (!CheckTensorShape(params.hPreOptional, {b, s, n}, "hPreOptional")) {
+        return false;
+    }
+    return true;
+}
+
 static bool CheckOutputShape3D(const MhcParamsBase &params, int64_t n, int64_t d, int64_t expectedPhiRows)
 {
     auto xShape = params.x->GetViewShape();
@@ -350,6 +524,49 @@ static bool CheckOutputShape3D(const MhcParamsBase &params, int64_t n, int64_t d
            CheckTensorShape(params.hPreOptional, {t, n}, "hPreOptional");
 }
 
+static bool CheckOutputShape3DA2(const MhcParamsBase &params, int64_t t, int64_t n, int64_t d, int64_t alphaSize,
+                                 int64_t expectedPhiRows_factorial, int64_t expectedPhiRows_pow, int64_t phiShape_dim0)
+{
+    if (!CheckTensorShape(params.hIn, {t, d}, "hIn")) {
+        return false;
+    }
+    if (!CheckTensorShape(params.hPost, {t, n}, "hPost")) {
+        return false;
+    }
+    if (alphaSize == ALPHA_DIM_SIZE_3 && phiShape_dim0 == expectedPhiRows_pow &&
+        !CheckTensorShape(params.hRes, {t, n, n}, "hRes")) {
+        return false;
+    }
+    if (alphaSize == ALPHA_DIM_SIZE_3 && phiShape_dim0 == expectedPhiRows_factorial &&
+        !CheckTensorShape(params.hRes, {t, Factorial(n)}, "hRes")) {
+        return false;
+    }
+
+    if (alphaSize == ALPHA_DIM_SIZE_3 && phiShape_dim0 == expectedPhiRows_pow &&
+        !CheckTensorShape(params.hMixOptional, {t, expectedPhiRows_pow}, "hMixOptional")) {
+        return false;
+    }
+    if (alphaSize == ALPHA_DIM_SIZE_3 && phiShape_dim0 == expectedPhiRows_factorial &&
+        !CheckTensorShape(params.hMixOptional, {t, expectedPhiRows_factorial}, "hMixOptional")) {
+        return false;
+    }
+    if (alphaSize == ALPHA_DIM_SIZE_2 && !CheckTensorShape(params.hMixOptional, {t, 2 * n}, "hMixOptional")) {
+        return false;
+    }
+    if (params.invRmsOptional == nullptr) {
+        return true;
+    }
+
+    if (!CheckTensorShape(params.invRmsOptional, {t}, "invRmsOptional")) {
+        return false;
+    }
+
+    if (!CheckTensorShape(params.hPreOptional, {t, n}, "hPreOptional")) {
+        return false;
+    }
+    return true;
+}
+
 static bool CheckInputOutShape(const MhcParamsBase &params)
 {
     int64_t n = 0;
@@ -365,6 +582,38 @@ static bool CheckInputOutShape(const MhcParamsBase &params)
         return CheckOutputShape4D(params, n, d, expectedParamRows);
     }
     return CheckOutputShape3D(params, n, d, expectedParamRows);
+}
+
+static bool CheckInputOutShapeA2(const MhcParamsBase &params)
+{
+    int64_t n = 0;
+    int64_t d = 0;
+    int64_t nD = 0;
+    GetXShapeInfo(params, n, d, nD);
+    const int64_t alphaSize = params.alpha->GetViewShape().GetDim(DIM_IDX_0);
+    auto xShape = params.x->GetViewShape();
+    int64_t b = xShape.GetDim(DIM_IDX_0);
+    int64_t s = xShape.GetDim(DIM_IDX_1);
+
+    auto phiShape = params.phi->GetViewShape();
+    int64_t expectedPhiRows_factorial = Factorial(n) + 2 * n;
+    int64_t expectedPhiRows_pow = n * n + 2 * n;
+    int64_t phiShape_dim0 = phiShape.GetDim(0);
+    if (!CheckParamShapesA2(params, n, d, nD, alphaSize, expectedPhiRows_factorial, expectedPhiRows_pow,
+                            phiShape_dim0)) {
+        return false;
+    }
+    if (xShape.GetDimNum() == DIM_NUM_4) {
+        return CheckOutputShape4DA2(params, b, s, n, d, alphaSize, expectedPhiRows_factorial, expectedPhiRows_pow,
+                                    phiShape_dim0);
+    }
+
+    if (xShape.GetDimNum() == DIM_NUM_3) {
+        int64_t t = xShape.GetDim(DIM_IDX_0);
+        return CheckOutputShape3DA2(params, t, n, d, alphaSize, expectedPhiRows_factorial, expectedPhiRows_pow,
+                                    phiShape_dim0);
+    }
+    return true;
 }
 
 static bool CheckTensorShape(const aclTensor *tensor, std::initializer_list<int64_t> expectedShape, const char *name)
@@ -394,8 +643,7 @@ static bool CheckAlphaShape(const aclTensor *alphaTensor)
     int64_t alphaSize = alphaShape.GetDim(0);
     if (alphaSize != ALPHA_DIM_SIZE_2 && alphaSize != ALPHA_DIM_SIZE_3) {
         const std::string actualShape = TensorShapeToString(alphaTensor);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(ACLNN_OP_NAME, "alpha", actualShape.c_str(),
-                                              "shape must be [2] or [3]");
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(ACLNN_OP_NAME, "alpha", actualShape.c_str(), "shape must be [2] or [3]");
         return false;
     }
     return true;
@@ -433,6 +681,32 @@ static bool ValidateNDParams(int64_t n, int64_t d)
     return true;
 }
 
+static bool ValidateNDParamsA2(int64_t n, int64_t d)
+{
+    if (n <= 0) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "n", std::to_string(n).c_str(),
+                                              "n in x shape must be positive");
+        return false;
+    }
+    if (d <= 0) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "D", std::to_string(d).c_str(),
+                                              "D in x shape must be positive");
+        return false;
+    }
+    // 910 only support n = 4
+    if (n != N_VALID_VALUE_A2) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "n", std::to_string(n).c_str(), "n in x shape must be 4");
+        return false;
+    }
+
+    if (d % D_ALIGNMENT_A2 != 0) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "D", std::to_string(d).c_str(),
+                                              "D in x shape must be aligned to 128 elements");
+        return false;
+    }
+    return true;
+}
+
 static bool CheckInputDtype(const MhcParamsBase &params)
 {
     const std::initializer_list<DataType> X_SUPPORT_DTYPE_LIST = {DataType::DT_BF16, DataType::DT_FLOAT16};
@@ -448,18 +722,34 @@ static bool CheckInputDtype(const MhcParamsBase &params)
         OP_LOGE_FOR_INVALID_DTYPE(ACLNN_OP_NAME, "x", op::ToString(xDtype).GetString(), "BFLOAT16 or FLOAT16");
         return false;
     }
-    return CheckTensorDtype(params.phi, "phi", DataType::DT_FLOAT) &&
-           CheckTensorDtype(params.alpha, "alpha", DataType::DT_FLOAT) &&
-           CheckTensorDtype(params.bias, "bias", DataType::DT_FLOAT) &&
-           (params.gammaOptional == nullptr ||
-            CheckTensorDtype(params.gammaOptional, "gammaOptional", DataType::DT_FLOAT));
+    if (!CheckTensorDtype(params.phi, "phi", DataType::DT_FLOAT)) {
+        return false;
+    }
+    if (!CheckTensorDtype(params.alpha, "alpha", DataType::DT_FLOAT)) {
+        return false;
+    }
+    if (!CheckTensorDtype(params.bias, "bias", DataType::DT_FLOAT)) {
+        return false;
+    }
+    if (params.gammaOptional != nullptr &&
+        !CheckTensorDtype(params.gammaOptional, "gammaOptional", DataType::DT_FLOAT)) {
+        return false;
+    }
+    return true;
 }
 
 static bool CheckOutputDtype(const MhcParamsBase &params)
 {
-    return CheckTensorDtype(params.hIn, "hIn", params.x->GetDataType()) &&
-           CheckTensorDtype(params.hPost, "hPost", DataType::DT_FLOAT) &&
-           (params.hRes == nullptr || CheckTensorDtype(params.hRes, "hRes", DataType::DT_FLOAT));
+    if (!CheckTensorDtype(params.hIn, "hIn", params.x->GetDataType())) {
+        return false;
+    }
+    if (!CheckTensorDtype(params.hPost, "hPost", DataType::DT_FLOAT)) {
+        return false;
+    }
+    if (params.hRes != nullptr && !CheckTensorDtype(params.hRes, "hRes", DataType::DT_FLOAT)) {
+        return false;
+    }
+    return true;
 }
 
 static bool CheckOptionalOutputDtype(const MhcParamsBase &params)
@@ -467,9 +757,16 @@ static bool CheckOptionalOutputDtype(const MhcParamsBase &params)
     if (params.invRmsOptional == nullptr) {
         return true;
     }
-    return CheckTensorDtype(params.invRmsOptional, "invRmsOptional", DataType::DT_FLOAT) &&
-           CheckTensorDtype(params.hMixOptional, "hMixOptional", DataType::DT_FLOAT) &&
-           CheckTensorDtype(params.hPreOptional, "hPreOptional", DataType::DT_FLOAT);
+    if (!CheckTensorDtype(params.invRmsOptional, "invRmsOptional", DataType::DT_FLOAT)) {
+        return false;
+    }
+    if (!CheckTensorDtype(params.hMixOptional, "hMixOptional", DataType::DT_FLOAT)) {
+        return false;
+    }
+    if (!CheckTensorDtype(params.hPreOptional, "hPreOptional", DataType::DT_FLOAT)) {
+        return false;
+    }
+    return true;
 }
 
 static bool CheckDtypeValid(const MhcParamsBase &params)
@@ -490,8 +787,7 @@ static bool IsPrivateFormat(ge::Format format)
 static bool CheckTensorFormat(const aclTensor *tensor, const char *name)
 {
     if (IsPrivateFormat(tensor->GetViewFormat())) {
-        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(ACLNN_OP_NAME, name,
-                                               op::ToString(tensor->GetViewFormat()).GetString(),
+        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(ACLNN_OP_NAME, name, op::ToString(tensor->GetViewFormat()).GetString(),
                                                "private format is not supported");
         return false;
     }
@@ -500,19 +796,36 @@ static bool CheckTensorFormat(const aclTensor *tensor, const char *name)
 
 static bool CheckInputFormat(const MhcParamsBase &params)
 {
-    if (!CheckTensorFormat(params.x, "x") || !CheckTensorFormat(params.phi, "phi") ||
-        !CheckTensorFormat(params.alpha, "alpha") || !CheckTensorFormat(params.bias, "bias")) {
+    if (!CheckTensorFormat(params.x, "x")) {
         return false;
     }
-    return params.gammaOptional == nullptr || CheckTensorFormat(params.gammaOptional, "gammaOptional");
+    if (!CheckTensorFormat(params.phi, "phi")) {
+        return false;
+    }
+    if (!CheckTensorFormat(params.alpha, "alpha")) {
+        return false;
+    }
+    if (!CheckTensorFormat(params.bias, "bias")) {
+        return false;
+    }
+    if (params.gammaOptional != nullptr && !CheckTensorFormat(params.gammaOptional, "gammaOptional")) {
+        return false;
+    }
+    return true;
 }
 
 static bool CheckOutputFormat(const MhcParamsBase &params)
 {
-    if (!CheckTensorFormat(params.hIn, "hIn") || !CheckTensorFormat(params.hPost, "hPost")) {
+    if (!CheckTensorFormat(params.hIn, "hIn")) {
         return false;
     }
-    return params.hRes == nullptr || CheckTensorFormat(params.hRes, "hRes");
+    if (!CheckTensorFormat(params.hPost, "hPost")) {
+        return false;
+    }
+    if (params.hRes != nullptr && !CheckTensorFormat(params.hRes, "hRes")) {
+        return false;
+    }
+    return true;
 }
 
 static bool CheckOptionalOutputFormat(const MhcParamsBase &params)
@@ -520,9 +833,16 @@ static bool CheckOptionalOutputFormat(const MhcParamsBase &params)
     if (params.invRmsOptional == nullptr) {
         return true;
     }
-    return CheckTensorFormat(params.invRmsOptional, "invRmsOptional") &&
-           CheckTensorFormat(params.hMixOptional, "hMixOptional") &&
-           CheckTensorFormat(params.hPreOptional, "hPreOptional");
+    if (!CheckTensorFormat(params.invRmsOptional, "invRmsOptional")) {
+        return false;
+    }
+    if (!CheckTensorFormat(params.hMixOptional, "hMixOptional")) {
+        return false;
+    }
+    if (!CheckTensorFormat(params.hPreOptional, "hPreOptional")) {
+        return false;
+    }
+    return true;
 }
 
 static bool CheckFormat(const MhcParamsBase &params)
@@ -533,8 +853,7 @@ static bool CheckFormat(const MhcParamsBase &params)
 static bool CheckOpImplMode(const MhcParamsBase &params)
 {
     if (params.opImplMode != MHC_PRE_USE_FP32 && params.opImplMode != MHC_PRE_USE_HF32) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "opImplMode",
-                                              std::to_string(params.opImplMode).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "opImplMode", std::to_string(params.opImplMode).c_str(),
                                               "must be 0 (MHC_PRE_USE_FP32) or 1 (MHC_PRE_USE_HF32)");
         return false;
     }
@@ -545,11 +864,22 @@ static aclnnStatus CheckParams(const MhcParamsBase &params)
 {
     CHECK_RET(CheckNotNull(params), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckEmptyTensor(params), ACLNN_ERR_PARAM_INVALID);
-    CHECK_RET(CheckInputDims(params), ACLNN_ERR_PARAM_INVALID);
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+        CHECK_RET(CheckInputDimsA2(params), ACLNN_ERR_PARAM_INVALID);
+    } else {
+        CHECK_RET(CheckInputDims(params), ACLNN_ERR_PARAM_INVALID);
+    }
     CHECK_RET(CheckAlphaShape(params.alpha), ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckRequiredHRes(params), ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(CheckOutputAndOptionalDims(params), ACLNN_ERR_PARAM_INVALID);
-    CHECK_RET(CheckInputOutShape(params), ACLNN_ERR_PARAM_INVALID);
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+        CHECK_RET(CheckOutputDimsA2(params), ACLNN_ERR_PARAM_INVALID);
+        CHECK_RET(CheckOptionalOutputGroup(params), ACLNN_ERR_PARAM_INVALID);
+        CHECK_RET(CheckOptionalOutputDimsA2(params), ACLNN_ERR_PARAM_INVALID);
+        CHECK_RET(CheckInputOutShapeA2(params), ACLNN_ERR_PARAM_INVALID);
+    } else {
+        CHECK_RET(CheckOutputAndOptionalDims(params), ACLNN_ERR_PARAM_INVALID);
+        CHECK_RET(CheckInputOutShape(params), ACLNN_ERR_PARAM_INVALID);
+    }
     CHECK_RET(CheckDtypeValid(params), ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckFormat(params), ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckOpImplMode(params), ACLNN_ERR_PARAM_INVALID);
@@ -618,10 +948,9 @@ static aclnnStatus mHCPreCommonProcess(MhcParamsBase &params, aclOpExecutor *exe
     int64_t alphaSize = params.alphaContiguous->GetViewShape().GetDim(0);
     params.hasResi = (alphaSize == ALPHA_DIM_SIZE_3);
     int64_t outFlag = params.invRmsOptional != nullptr ? 1 : 0;
-    auto outParams =
-        l0op::MhcPre(params.xContiguous, params.phiContiguous, params.alphaContiguous, params.biasContiguous,
-                     params.gammaOptionalContiguous, outFlag, params.normEps, params.hcEps, params.opImplMode,
-                     executor);
+    auto outParams = l0op::MhcPre(params.xContiguous, params.phiContiguous, params.alphaContiguous,
+                                  params.biasContiguous, params.gammaOptionalContiguous, outFlag, params.normEps,
+                                  params.hcEps, params.opImplMode, executor);
     CHECK_RET(outParams != std::tuple(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr), ACLNN_ERR_INNER_NULLPTR);
     ret = CopyRequiredOutputs(std::get<0>(outParams), std::get<1>(outParams), std::get<2>(outParams), params, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -629,11 +958,12 @@ static aclnnStatus mHCPreCommonProcess(MhcParamsBase &params, aclOpExecutor *exe
                                executor);
 }
 
-static aclnnStatus MhcPreGetWorkspaceSizeCommon(
-    const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias,
-    const aclTensor *gammaOptional, double normEps, double hcEps, int64_t opImplMode, aclTensor *hIn,
-    aclTensor *hPost, aclTensor *hRes, aclTensor *invRmsOptional, aclTensor *hMixOptional, aclTensor *hPreOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+static aclnnStatus MhcPreGetWorkspaceSizeCommon(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha,
+                                                const aclTensor *bias, const aclTensor *gammaOptional, double normEps,
+                                                double hcEps, int64_t opImplMode, aclTensor *hIn, aclTensor *hPost,
+                                                aclTensor *hRes, aclTensor *invRmsOptional, aclTensor *hMixOptional,
+                                                aclTensor *hPreOptional, uint64_t *workspaceSize,
+                                                aclOpExecutor **executor)
 {
     if (workspaceSize == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "workspaceSize", "nullptr",
@@ -675,11 +1005,11 @@ aclnnStatus aclnnMhcPreGetWorkspaceSize(const aclTensor *x, const aclTensor *phi
                                         executor);
 }
 
-aclnnStatus aclnnMhcPreV2GetWorkspaceSize(
-    const aclTensor *x, const aclTensor *phi, const aclTensor *alpha, const aclTensor *bias,
-    const aclTensor *gammaOptional, double normEps, double hcEps, int64_t opImplMode, aclTensor *hIn,
-    aclTensor *hPost, aclTensor *hRes, aclTensor *invRmsOptional, aclTensor *hMixOptional, aclTensor *hPreOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnMhcPreV2GetWorkspaceSize(const aclTensor *x, const aclTensor *phi, const aclTensor *alpha,
+                                          const aclTensor *bias, const aclTensor *gammaOptional, double normEps,
+                                          double hcEps, int64_t opImplMode, aclTensor *hIn, aclTensor *hPost,
+                                          aclTensor *hRes, aclTensor *invRmsOptional, aclTensor *hMixOptional,
+                                          aclTensor *hPreOptional, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     L2_DFX_PHASE_1(aclnnMhcPreV2, DFX_IN(x, phi, alpha, bias, gammaOptional, normEps, hcEps, opImplMode),
                    DFX_OUT(hIn, hPost, hRes, invRmsOptional, hMixOptional, hPreOptional));

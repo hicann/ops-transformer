@@ -665,8 +665,8 @@ ge::graphStatus MhcPreBaseTiling::CalculateBsTiling()
     tilingData_.set_kL1Size(BASIC_API_K_L1_SIZE);
     tilingData_.set_fusionAlign(fusionAlign);
 
-    chunkTSize_ = (((totalLength_ + blockDim_ - 1U) / blockDim_) + CHUNK_T_CALC_FACTOR - 1U) /
-                  CHUNK_T_CALC_FACTOR * CHUNK_T_CALC_FACTOR;
+    chunkTSize_ = (((totalLength_ + blockDim_ - 1U) / blockDim_) + CHUNK_T_CALC_FACTOR - 1U) / CHUNK_T_CALC_FACTOR *
+                  CHUNK_T_CALC_FACTOR;
     chunkTSize_ = std::min(chunkTSize_, CHUNK_T_MAX);
     v1ChunkDSize_ = V1_CHUNK_D_SIZE;
 
@@ -676,8 +676,7 @@ ge::graphStatus MhcPreBaseTiling::CalculateBsTiling()
     // SYSTEM_WORKSPACE follows the user workspace and is reserved for the runtime.
     size_t xStageWorkspaceSize = static_cast<size_t>(chunkTSize_) * BASIC_API_K_UB_SIZE *
                                  BASIC_API_X_STAGE_BUFFER_COUNT * sizeof(float) * blockDim_;
-    size_t hMixWorkspaceSize =
-        outFlag_ ? 0U : static_cast<size_t>(matM_) * static_cast<size_t>(matN_) * sizeof(float);
+    size_t hMixWorkspaceSize = outFlag_ ? 0U : static_cast<size_t>(matM_) * static_cast<size_t>(matN_) * sizeof(float);
     workspaceSize_ = xStageWorkspaceSize + hMixWorkspaceSize + SYSTEM_WORKSPACE;
     return CheckUbBufferSize();
 }
@@ -755,8 +754,8 @@ ge::graphStatus MhcPreBaseTiling::CalculateMkTiling()
     v1ChunkDSize_ = V1_CHUNK_D_SIZE;
     size_t xStageBytes = mkStage == M_K_USE_L1_STAGE ?
                              0U :
-                             static_cast<size_t>(mDim) * actualKBlockNum * BASIC_API_X_STAGE_BUFFER_COUNT *
-                                 mL1Size * kL1Size * sizeof(float);
+                             static_cast<size_t>(mDim) * actualKBlockNum * BASIC_API_X_STAGE_BUFFER_COUNT * mL1Size *
+                                 kL1Size * sizeof(float);
     workspaceSize_ = finalOffset + xStageBytes + SYSTEM_WORKSPACE;
     return CheckUbBufferSize();
 }
@@ -778,8 +777,8 @@ ge::graphStatus MhcPreBaseTiling::CalculateNdTiling()
         (xFloatWorkspaceSizeRaw + DECODE_WORKSPACE_ALIGN - 1U) / DECODE_WORKSPACE_ALIGN * DECODE_WORKSPACE_ALIGN;
     uint64_t chunkNd = (matK_ + blockDim_ - 1U) / blockDim_;
     uint64_t mmResBlockNum = (matK_ + chunkNd - 1U) / chunkNd;
-    size_t mmResWorkspaceSize = static_cast<size_t>(mmResBlockNum) * static_cast<size_t>(matM_) *
-                                static_cast<size_t>(matN_) * sizeof(float);
+    size_t mmResWorkspaceSize =
+        static_cast<size_t>(mmResBlockNum) * static_cast<size_t>(matM_) * static_cast<size_t>(matN_) * sizeof(float);
     workspaceSize_ = xFloatWorkspaceSize + mmResWorkspaceSize + SYSTEM_WORKSPACE;
     return CheckUbBufferSize();
 }
@@ -932,43 +931,4 @@ ge::graphStatus MhcPreBaseTiling::PostTiling()
     workspaces[0] = workspaceSize_;
     return ge::GRAPH_SUCCESS;
 }
-
-static ge::graphStatus TilingFunc4mHCPre(gert::TilingContext *context)
-{
-    OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("[mHCPreTilingTilingFunc]", "Context is null"),
-                return ge::GRAPH_FAILED);
-
-    return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
-}
-
-static ge::graphStatus TilingPrepare4mHCPre(gert::TilingParseContext *context)
-{
-    OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("[TilingPrepare4mHC]", "Context is null"),
-                return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfo == nullptr, OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "PlatformInfoPtr is null"),
-                return ge::GRAPH_FAILED);
-
-    auto compileInfoPtr = context->GetCompiledInfo<MhcPreCompileInfo>();
-    OP_CHECK_IF(compileInfoPtr == nullptr, OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "CompileInfoPtr is null"),
-                return ge::GRAPH_FAILED);
-
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-
-    compileInfoPtr->aicNum = ascendcPlatform.GetCoreNumAic();
-    compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
-
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfoPtr->ubSize);
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, compileInfoPtr->l1Size);
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, compileInfoPtr->l2Size);
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, compileInfoPtr->l0ASize);
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_B, compileInfoPtr->l0BSize);
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, compileInfoPtr->l0CSize);
-
-    OP_LOGI(context->GetNodeName(), "ParseCompileInfo success, L1Size: %lu, L2Size: %lu, CoreNum: %lu",
-            compileInfoPtr->l1Size, compileInfoPtr->l2Size, compileInfoPtr->aicNum);
-    return ge::GRAPH_SUCCESS;
-}
-
-IMPL_OP_OPTILING(MhcPre).Tiling(TilingFunc4mHCPre).TilingParse<MhcPreCompileInfo>(TilingPrepare4mHCPre);
 } // namespace optiling
