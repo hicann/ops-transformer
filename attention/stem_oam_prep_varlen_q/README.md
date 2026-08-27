@@ -64,7 +64,7 @@
   <tr>
     <td>q</td>
     <td>输入</td>
-    <td>Device侧的aclTensor，变长Q tensor，所有batch的token拼接存储。shape为[total_tokens, H_q, D]，其中D必须等于stemBlockSize（推荐默认128）。</td>
+    <td>Device侧的aclTensor，变长Q tensor，所有batch的token拼接存储。shape为[total_tokens, H_q, D]，其中D必须等于128。</td>
     <td>FLOAT8_E4M3FN</td>
     <td>ND</td>
   </tr>
@@ -92,14 +92,14 @@
   <tr>
     <td>stemBlockSize</td>
     <td>属性</td>
-    <td>stem block大小，控制每个stem block的token数量，决定Q Processing的分组粒度。推荐默认值128。必须是32的倍数，最大值为256，必须满足stemStride≤stemBlockSize。</td>
+    <td>stem block大小，控制每个stem block的token数量，决定Q Processing的分组粒度。默认值128。当前仅支持128。</td>
     <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>
     <td>stemStride</td>
     <td>属性</td>
-    <td>stem stride大小，控制stem block内stride group的token数量，决定qFlat的维度粒度。推荐默认值16。必须是16的倍数，最大值为64，必须满足stemStride≤stemBlockSize。</td>
+    <td>stem stride大小，控制stem block内stride group的token数量，决定qFlat的维度粒度。默认值16。当前仅支持16。</td>
     <td>INT64</td>
     <td>-</td>
   </tr>
@@ -118,9 +118,9 @@
 - **shape格式字段含义及约束**
     - total_tokens：total_tokens表示所有batch的token总数
     - H_q：H_q表示Q多头数，取值范围：1~128
-    - stemBlockSize：stem block大小，取值范围：32~256，为32的倍数
-    - stemStride：stem stride大小，取值范围：16~64，为16的倍数，stemBlockSize/stemStride结果必须为整数
-    - D：Q矩阵最后一维，必须等于stemBlockSize（推荐默认128）
+    - stemBlockSize：stem block大小，当前仅支持128
+    - stemStride：stem stride大小，当前仅支持16
+    - D：Q矩阵最后一维，必须等于128
     - max_Qb：最大Q block数，max_Qb=ceil(max(qSeqLens)/stemBlockSize)
     - kflat_dim：qFlat输出维度，kflat_dim=stemStride×D（默认16×128=2048）
 - **stride维度约束**：Q侧stride维度为自然顺序（g ∈ [0, S-1]），不翻转（与K侧处理不同）

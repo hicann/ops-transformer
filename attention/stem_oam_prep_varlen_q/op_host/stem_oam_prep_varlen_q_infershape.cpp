@@ -18,6 +18,8 @@ namespace ops {
 static constexpr int64_t DIM_QK = 128;
 static constexpr int64_t Q_DIM_NUM = 3;
 static constexpr int64_t Q_SEQ_LENS_DIM_NUM = 1;
+static constexpr int64_t Q_HEAD_DIM_INDEX = 1;
+static constexpr int64_t Q_LAST_DIM_INDEX = 2;
 static constexpr int64_t INPUT_Q = 0;
 static constexpr int64_t INPUT_Q_SEQ_LENS = 1;
 static constexpr int64_t OUTPUT_Q_FLAT = 0;
@@ -25,6 +27,8 @@ static constexpr int64_t ATTR_STEM_BLOCK_SIZE = 0;
 static constexpr int64_t ATTR_STEM_STRIDE = 1;
 static constexpr int64_t UNKNOWN_DIM_VALUE = -1LL;
 static constexpr int64_t UNKNOWN_RANK_DIM_VALUE = -2LL;
+static constexpr int64_t SUPPORTED_STEM_BLOCK_SIZE = 128;
+static constexpr int64_t SUPPORTED_STEM_STRIDE = 16;
 
 static bool IsUnknownRank(const gert::Shape &shape)
 {
@@ -65,34 +69,46 @@ static ge::graphStatus InferShapeForStemOamPrepVarlenQ(gert::InferShapeContext *
     }
 
     if (qShape->GetDimNum() != Q_DIM_NUM) {
-        OP_LOGE(context, "q shape dim num must be %ld, but got %zu.", Q_DIM_NUM,
-                qShape->GetDimNum());
+        OP_LOGE(context, "q shape dim num must be %ld, but got %zu.", Q_DIM_NUM, qShape->GetDimNum());
+        return ge::GRAPH_FAILED;
+    }
+    int64_t dimD = qShape->GetDim(Q_LAST_DIM_INDEX);
+    if (dimD != UNKNOWN_DIM_VALUE && dimD != DIM_QK) {
+        OP_LOGE(context, "q last dim must be %ld, but got %ld.", DIM_QK, dimD);
         return ge::GRAPH_FAILED;
     }
     if (qSeqLensShape->GetDimNum() != Q_SEQ_LENS_DIM_NUM) {
-        OP_LOGE(context, "qSeqLens shape dim num must be %ld, but got %zu.",
-                Q_SEQ_LENS_DIM_NUM, qSeqLensShape->GetDimNum());
+        OP_LOGE(context, "qSeqLens shape dim num must be %ld, but got %zu.", Q_SEQ_LENS_DIM_NUM,
+                qSeqLensShape->GetDimNum());
         return ge::GRAPH_FAILED;
     }
 
-    int64_t H_q = qShape->GetDim(1);
+    int64_t hQ = qShape->GetDim(Q_HEAD_DIM_INDEX);
     int64_t batch = qSeqLensShape->GetDim(0);
 
     const gert::RuntimeAttrs *attrs = context->GetAttrs();
     auto stemBlockSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_STEM_BLOCK_SIZE);
     OP_CHECK_NULL_WITH_CONTEXT(context, stemBlockSizePtr);
     int64_t stemBlockSize = *stemBlockSizePtr;
+    if (stemBlockSize != SUPPORTED_STEM_BLOCK_SIZE) {
+        OP_LOGE(context, "stemBlockSize only supports %ld, but got %ld.", SUPPORTED_STEM_BLOCK_SIZE, stemBlockSize);
+        return ge::GRAPH_FAILED;
+    }
 
     auto stemStridePtr = attrs->GetAttrPointer<int64_t>(ATTR_STEM_STRIDE);
     OP_CHECK_NULL_WITH_CONTEXT(context, stemStridePtr);
     int64_t stemStride = *stemStridePtr;
+    if (stemStride != SUPPORTED_STEM_STRIDE) {
+        OP_LOGE(context, "stemStride only supports %ld, but got %ld.", SUPPORTED_STEM_STRIDE, stemStride);
+        return ge::GRAPH_FAILED;
+    }
     int64_t kflat_dim = stemStride * DIM_QK;
 
     bool hasUnknownDim = IsUnknownShape(*qShape) || IsUnknownShape(*qSeqLensShape);
     if (hasUnknownDim) {
         qFlatShape->SetDimNum(4);
         qFlatShape->SetDim(0, batch);
-        qFlatShape->SetDim(1, H_q);
+        qFlatShape->SetDim(1, hQ);
         qFlatShape->SetDim(2, UNKNOWN_DIM_VALUE);
         qFlatShape->SetDim(3, kflat_dim);
         OP_LOGD(context, "StemOamPrepVarlenQ infershape handles unknown dim.");
@@ -113,7 +129,7 @@ static ge::graphStatus InferShapeForStemOamPrepVarlenQ(gert::InferShapeContext *
     int64_t maxQPadded = ((maxQLen + stemBlockSize - 1) / stemBlockSize) * stemBlockSize;
     int64_t maxQb = maxQPadded / stemBlockSize;
 
-    *qFlatShape = gert::Shape({batch, H_q, maxQb, kflat_dim});
+    *qFlatShape = gert::Shape({batch, hQ, maxQb, kflat_dim});
 
     return ge::GRAPH_SUCCESS;
 }
