@@ -25,16 +25,13 @@
 
 using namespace AscendC;
 using namespace AscendC::Impl::Detail;
-using namespace regbaseutil;
 
-namespace BaseApi {
+namespace FlashAttnKernel {
 
 template <FA_LAYOUT LAYOUT_T>
 __aicore__ inline constexpr GmFormat GetQueryGmFormat()
 {
-    static_assert((LAYOUT_T == FA_LAYOUT::BSND) ||
-                      (LAYOUT_T == FA_LAYOUT::BNSD) ||
-                      (LAYOUT_T == FA_LAYOUT::TND),
+    static_assert((LAYOUT_T == FA_LAYOUT::BSND) || (LAYOUT_T == FA_LAYOUT::BNSD) || (LAYOUT_T == FA_LAYOUT::TND),
                   "Get Query GmFormat fail, LAYOUT_T is incorrect");
     if constexpr (LAYOUT_T == FA_LAYOUT::BSND) {
         return GmFormat::BSNGD;
@@ -49,9 +46,7 @@ template <FA_LAYOUT LAYOUT_KV, bool PAGE_ATTENTION>
 __aicore__ inline constexpr GmFormat GetKVGmFormat()
 {
     if constexpr (PAGE_ATTENTION) {
-        static_assert((LAYOUT_KV == FA_LAYOUT::BSND) ||
-                          (LAYOUT_KV == FA_LAYOUT::BNSD) ||
-                          (LAYOUT_KV == FA_LAYOUT::NZ),
+        static_assert((LAYOUT_KV == FA_LAYOUT::BSND) || (LAYOUT_KV == FA_LAYOUT::BNSD) || (LAYOUT_KV == FA_LAYOUT::NZ),
                       "Get Key or Value GmFormat fail, LAYOUT_KV is incorrect when PageAttention");
         if constexpr (LAYOUT_KV == FA_LAYOUT::BSND) {
             return GmFormat::PA_BnBsND;
@@ -61,9 +56,7 @@ __aicore__ inline constexpr GmFormat GetKVGmFormat()
             return GmFormat::PA_NZ;
         }
     } else {
-        static_assert((LAYOUT_KV == FA_LAYOUT::BSND) ||
-                          (LAYOUT_KV == FA_LAYOUT::BNSD) ||
-                          (LAYOUT_KV == FA_LAYOUT::TND),
+        static_assert((LAYOUT_KV == FA_LAYOUT::BSND) || (LAYOUT_KV == FA_LAYOUT::BNSD) || (LAYOUT_KV == FA_LAYOUT::TND),
                       "Get Key or Value GmFormat fail, LAYOUT_KV is incorrect when KV Continuous");
         if constexpr (LAYOUT_KV == FA_LAYOUT::BSND) {
             return GmFormat::BSND;
@@ -84,9 +77,7 @@ __aicore__ inline constexpr bool IS_TND()
 template <FA_LAYOUT LAYOUT_OUT>
 __aicore__ inline constexpr GmFormat GetAttentionOutGmFormat()
 {
-    static_assert((LAYOUT_OUT == FA_LAYOUT::BSND) ||
-                      (LAYOUT_OUT == FA_LAYOUT::BNSD) ||
-                      (LAYOUT_OUT == FA_LAYOUT::TND),
+    static_assert((LAYOUT_OUT == FA_LAYOUT::BSND) || (LAYOUT_OUT == FA_LAYOUT::BNSD) || (LAYOUT_OUT == FA_LAYOUT::TND),
                   "Get OUT GmFormat fail, LAYOUT_OUT is incorrect");
     if constexpr (LAYOUT_OUT == FA_LAYOUT::BSND) {
         return GmFormat::BSNGD;
@@ -100,8 +91,7 @@ __aicore__ inline constexpr GmFormat GetAttentionOutGmFormat()
 template <FA_LAYOUT LAYOUT_OUT>
 __aicore__ inline constexpr UbFormat GetOutUbFormat()
 {
-    static_assert((LAYOUT_OUT == FA_LAYOUT::BNSD) || (LAYOUT_OUT == FA_LAYOUT::BSND) ||
-                      (LAYOUT_OUT == FA_LAYOUT::TND),
+    static_assert((LAYOUT_OUT == FA_LAYOUT::BNSD) || (LAYOUT_OUT == FA_LAYOUT::BSND) || (LAYOUT_OUT == FA_LAYOUT::TND),
                   "Get OutAttention UB GmFormat fail, LAYOUT_OUT is incorrect");
     if constexpr (LAYOUT_OUT == FA_LAYOUT::BSND || LAYOUT_OUT == FA_LAYOUT::TND) {
         return UbFormat::S1G;
@@ -110,13 +100,12 @@ __aicore__ inline constexpr UbFormat GetOutUbFormat()
     }
 }
 
-template <typename INPUT_T, typename OUTPUT_T, bool PAGE_ATTENTION,
-          FA_LAYOUT LAYOUT_T, FA_LAYOUT LAYOUT_KV, FA_LAYOUT LAYOUT_OUT,
-          S1TemplateType s1TemplateType = S1TemplateType::Aligned128,
-          S2TemplateType s2TemplateType = S2TemplateType::Aligned128,
-          DTemplateType dTemplateType = DTemplateType::Aligned128,
-          DTemplateType dVTemplateType = DTemplateType::Aligned128,
-          bool HAS_MASK = false, typename... Args>
+template <typename INPUT_T, typename OUTPUT_T, bool PAGE_ATTENTION, FA_LAYOUT LAYOUT_T, FA_LAYOUT LAYOUT_KV,
+          FA_LAYOUT LAYOUT_OUT, regbaseutil::S1TemplateType s1TemplateType = regbaseutil::S1TemplateType::Aligned128,
+          regbaseutil::S2TemplateType s2TemplateType = regbaseutil::S2TemplateType::Aligned128,
+          regbaseutil::DTemplateType dTemplateType = regbaseutil::DTemplateType::Aligned128,
+          regbaseutil::DTemplateType dVTemplateType = regbaseutil::DTemplateType::Aligned128, bool HAS_MASK = false,
+          typename... Args>
 struct FAType {
     using inputType = INPUT_T;
     using outputType = OUTPUT_T;
@@ -124,10 +113,10 @@ struct FAType {
     static constexpr FA_LAYOUT qLayout = LAYOUT_T;
     static constexpr FA_LAYOUT kvLayout = LAYOUT_KV;
     static constexpr FA_LAYOUT attnOutLayout = LAYOUT_OUT;
-    static constexpr S1TemplateType mBaseSize = s1TemplateType;
-    static constexpr S2TemplateType s2BaseSize = s2TemplateType;
-    static constexpr DTemplateType dBaseSize = dTemplateType;
-    static constexpr DTemplateType dVBaseSize = dVTemplateType;
+    static constexpr regbaseutil::S1TemplateType mBaseSize = s1TemplateType;
+    static constexpr regbaseutil::S2TemplateType s2BaseSize = s2TemplateType;
+    static constexpr regbaseutil::DTemplateType dBaseSize = dTemplateType;
+    static constexpr regbaseutil::DTemplateType dVBaseSize = dVTemplateType;
     static constexpr bool hasMask = HAS_MASK;
 };
 
@@ -137,8 +126,8 @@ public:
     ActualSeqLensParser<ActualSeqLensMode::ACCUM, SEQLEN_T, true> cuSeqLensParser;
     ActualSeqLensParser<ActualSeqLensMode::BY_BATCH, SEQLEN_T, false> seqUsedParser;
 
-    __aicore__ inline void Init(__gm__ uint8_t *cuSeqLensGmAddr, uint32_t cuSeqLensDims,
-                                __gm__ uint8_t *seqUsedGmAddr, uint32_t seqUsedDims, uint64_t defaultSeqUsedVal)
+    __aicore__ inline void Init(__gm__ uint8_t *cuSeqLensGmAddr, uint32_t cuSeqLensDims, __gm__ uint8_t *seqUsedGmAddr,
+                                uint32_t seqUsedDims, uint64_t defaultSeqUsedVal)
     {
         cuSeqLensParser.Init(cuSeqLensGmAddr, cuSeqLensDims, seqUsedGmAddr, seqUsedDims);
         seqUsedParser.Init(seqUsedGmAddr, seqUsedDims, defaultSeqUsedVal);
@@ -161,6 +150,6 @@ __aicore__ inline int64_t ClipSInnerToken(int64_t sInnerToken, int64_t minValue,
     return sInnerToken;
 }
 
-} // namespace BaseApi
+} // namespace FlashAttnKernel
 
 #endif // FLASH_ATTN_TYPE_H_

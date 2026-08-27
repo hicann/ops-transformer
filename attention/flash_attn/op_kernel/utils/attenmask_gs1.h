@@ -141,11 +141,11 @@ __aicore__ inline void MergeMask(LocalTensor<T> &maskNext, LocalTensor<T> &maskP
     uint64_t maskNextUb = maskNext.GetPhyAddr();
     uint16_t rowNumEachLoop;
     uint64_t rowNumTimesEachLoop;
-    if (s2BaseSize > regBytes) {
+    if (s2BaseSize > regbaseutil::regBytes) {
         rowNumEachLoop = 1;
-        rowNumTimesEachLoop = static_cast<uint16_t>(s2BaseSize) / regBytes;
+        rowNumTimesEachLoop = static_cast<uint16_t>(s2BaseSize) / regbaseutil::regBytes;
     } else {
-        rowNumEachLoop = regBytes / static_cast<uint16_t>(s2BaseSize);
+        rowNumEachLoop = regbaseutil::regBytes / static_cast<uint16_t>(s2BaseSize);
         rowNumTimesEachLoop = 1;
     }
     uint16_t halfS1RealSizeLoop = static_cast<uint16_t>(halfS1RealSize);
