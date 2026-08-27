@@ -55,7 +55,6 @@ enum class NnopbaseHcclServerType : uint32_t {
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
 
-
 extern "C" uint64_t NnopbaseMsprofSysTime();
 extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId &dfxId);
 extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
@@ -290,9 +289,8 @@ static aclnnStatus CheckParams(const aclTensor *x1, const aclTensor *x2, const a
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckParamsAndShapeForAIVMode(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                                 const aclTensor *output, const aclTensor *gatherOut, bool isTransA,
-                                                 bool isViewTransB, int64_t streamMode)
+static aclnnStatus CheckParamsForAIVMode(const aclTensor *x1, const aclTensor *x2, const aclTensor *output,
+                                         int64_t streamMode)
 {
     CHECK_RET(CheckNotNull(x1, x2, output), ACLNN_ERR_PARAM_NULLPTR);
 
@@ -300,6 +298,13 @@ static aclnnStatus CheckParamsAndShapeForAIVMode(const aclTensor *x1, const aclT
 
     CHECK_RET(CheckAttr(streamMode), ACLNN_ERR_PARAM_INVALID);
 
+    return ACLNN_SUCCESS;
+}
+
+static aclnnStatus CheckShapeForAIVMode(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
+                                        const aclTensor *output, const aclTensor *gatherOut, bool isTransA,
+                                        bool isViewTransB)
+{
     if (x1->GetViewShape().GetDimNum() != TWO_DIMS) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("aclnnAllGatherMatmulV2", "x1",
                                                  (std::to_string(x1->GetViewShape().GetDimNum()) + "D").c_str(),
@@ -609,6 +614,9 @@ aclnnStatus allGatherMatmulV2GetWorkspaceSizeAIVMode(const aclTensor *x1, const 
                                                      aclOpExecutor **executor)
 {
     OP_LOGD("allGatherMatmulV2GetWorkspaceSizeAIVMode start");
+    // 先检查参数
+    auto retParam = CheckParamsForAIVMode(x1, x2, output, streamMode);
+    CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
     // 校验comm_mode取值
     if (std::strncmp(commMode, "aiv", CMP_MAX_LEN) != 0) {
         OP_LOGE_WITH_INVALID_ATTR("aclnnAllGatherMatmulV2", "commMode", commMode, "'aiv'");
@@ -621,8 +629,7 @@ aclnnStatus allGatherMatmulV2GetWorkspaceSizeAIVMode(const aclTensor *x1, const 
     bool isAmaxOut = false;
     bool isGatherOut = IsGatherOut(gatherOut);
     uint64_t yDtype = static_cast<uint64_t>(output->GetDataType());
-    auto retParam =
-        CheckParamsAndShapeForAIVMode(x1, x2, bias, output, gatherOut, transposeX1, viewTransposeX2, streamMode);
+    retParam = CheckShapeForAIVMode(x1, x2, bias, output, gatherOut, transposeX1, viewTransposeX2);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
     // 【A2、A3】校验非连续入参合法性
     if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201) {

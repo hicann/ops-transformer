@@ -1374,4 +1374,60 @@ TEST_F(AllGatherMatmulV2AclnnTest, TestMxfp4MNZeroEmpty)
     EXPECT_EQ(aclRet, ACLNN_SUCCESS);
 }
 
+TEST_F(AllGatherMatmulV2AclnnAIVTest, TestAIVX1Nullptr)
+{
+    TensorDesc x2 = TensorDesc({256, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
+    TensorDesc output = TensorDesc({8, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
+    TensorDesc gatherOut = TensorDesc({8, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
+
+    uint64_t workspaceSize = 0;
+    aclOpExecutor *executor = nullptr;
+
+    aclnnStatus aclRet = aclnnAllGatherMatmulV2GetWorkspaceSize(nullptr, // x1：本用例只让它为空
+                                                                x2.ToAclTypeRawPtr(),
+                                                                nullptr, // bias：A2 本来就允许/要求为空
+                                                                nullptr, // x1Scale
+                                                                nullptr, // x2Scale
+                                                                nullptr, // quantScale
+                                                                0,       // blockSize
+                                                                "test_all_gather_group",
+                                                                0,     // gatherIndex
+                                                                8,     // commTurn
+                                                                1,     // streamMode，必须使用合法值
+                                                                0,     // groupSize
+                                                                "aiv", // 保证进入 A2/AIV 分支
+                                                                output.ToAclTypeRawPtr(), gatherOut.ToAclTypeRawPtr(),
+                                                                nullptr, // amaxOut
+                                                                &workspaceSize, &executor);
+
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
+}
+
+TEST_F(AllGatherMatmulV2AclnnAIVTest, TestAIVRequiredTensorsAllNullptr)
+{
+    uint64_t workspaceSize = 0;
+    aclOpExecutor *executor = nullptr;
+
+    aclnnStatus ret = aclnnAllGatherMatmulV2GetWorkspaceSize(nullptr,                 // x1
+                                                             nullptr,                 // x2
+                                                             nullptr,                 // bias，可选
+                                                             nullptr,                 // x1Scale，可选
+                                                             nullptr,                 // x2Scale，可选
+                                                             nullptr,                 // quantScale，可选
+                                                             0,                       // blockSize
+                                                             "test_all_gather_group", // 不能是nullptr
+                                                             0,                       // gatherIndex
+                                                             8,                       // 沿用已有UT合法值
+                                                             1,                       // streamMode不能为0
+                                                             0,                       // groupSize
+                                                             "aiv",          // 不能是nullptr，否则不会进入A2
+                                                             nullptr,        // output
+                                                             nullptr,        // gatherOut，可选
+                                                             nullptr,        // amaxOut，可选
+                                                             &workspaceSize, // 必须是有效地址
+                                                             &executor);     // 必须是有效地址
+
+    EXPECT_EQ(ret, ACLNN_ERR_PARAM_NULLPTR);
+}
+
 } // namespace
