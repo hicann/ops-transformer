@@ -9,11 +9,11 @@
 # -----------------------------------------------------------------------------------------------------------
 import os
 import warnings
-from typing import Optional, List
+from typing import List, Optional
 
 import torch
-from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
+from torch.library import impl
 
 
 class _MoeFinalizeRoutingOpBuilder(OpBuilder):
@@ -89,7 +89,6 @@ class _MoeFinalizeRoutingOpBuilder(OpBuilder):
 
 _moe_finalize_routing_builder = _MoeFinalizeRoutingOpBuilder()
 _moe_finalize_routing_builder._ensure_initialized()
-_op_module = _moe_finalize_routing_builder.load()
 
 
 @impl(get_as_library(), _moe_finalize_routing_builder.name, "PrivateUse1")

@@ -7,12 +7,13 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
-from typing import Optional, Union
 from enum import IntEnum
+from typing import Optional, Union
+
 import torch
 import torch_npu
-from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
+from torch.library import impl
 
 QFA_METADATA_OP_NAME = "quant_flash_attn_metadata"
 
@@ -259,7 +260,6 @@ class QuantFlashAttnOpBuilder(OpBuilder):
 # Instantiate the builder
 quant_flash_attn_op_builder = QuantFlashAttnOpBuilder()
 quant_flash_attn_op_builder._ensure_initialized()
-op_module = quant_flash_attn_op_builder.load()
 
 
 @impl(get_as_library(), QFA_METADATA_OP_NAME, "PrivateUse1")
