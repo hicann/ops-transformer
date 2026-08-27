@@ -20,8 +20,10 @@ namespace op_api {
 const int64_t DIM_THREE = 3;
 const int64_t MAX_DIM_SIZE = 8;
 const int64_t QUANT_MODE_MXFP4 = 5;
+const int64_t QUANT_MODE_HIF8 = 0;
 const int64_t FLOAT4_E2M1 = 296;
 const int64_t FLOAT8_E8M0 = 293;
+const int64_t HIFLOAT8 = 34;
 
 inline int64_t GetQkvDtypeRatio(int64_t quant_mode)
 {
@@ -42,6 +44,8 @@ TensorWrapper make_wrapper(const at::Tensor &tensor, const int64_t real_dtype)
             wrapper.dtype = ACL_FLOAT4_E2M1;
         } else if (real_dtype == FLOAT8_E8M0) {
             wrapper.dtype = ACL_FLOAT8_E8M0;
+        } else if (real_dtype == HIFLOAT8) {
+            wrapper.dtype = ACL_HIFLOAT8;
         }
     } else {
         wrapper.dtype = kATenScalarTypeToAclDataTypeTable[static_cast<int64_t>(tensor.scalar_type())];
@@ -142,6 +146,14 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_attn(
                   attn_mask, metadata, quant_mode, softmax_scale, mask_mode, win_left, win_right, max_seqlen_q,
                   max_seqlen_kv, layout_q_ptr, layout_q_descale_ptr, layout_kv_ptr, layout_out_ptr, return_softmax_lse,
                   attentionOutput, softmaxLse);
+    } else if (quant_mode == QUANT_MODE_HIF8) {
+        TensorWrapper q_wrapper = make_wrapper(q, HIFLOAT8);
+        TensorWrapper k_wrapper = make_wrapper(k, HIFLOAT8);
+        TensorWrapper v_wrapper = make_wrapper(v, HIFLOAT8);
+        ACLNN_CMD(aclnnQuantFlashAttn, q_wrapper, k_wrapper, v_wrapper, q_descale, k_descale, v_descale, block_table,
+                  p_scale, cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, sinks, attn_mask, metadata, quant_mode,
+                  softmax_scale, mask_mode, win_left, win_right, max_seqlen_q, max_seqlen_kv, layout_q_ptr,
+                  layout_q_descale_ptr, layout_kv_ptr, layout_out_ptr, return_softmax_lse, attentionOutput, softmaxLse);
     } else {
         ACLNN_CMD(aclnnQuantFlashAttn, q, k, v, q_descale, k_descale, v_descale, block_table, p_scale, cu_seqlens_q,
                   cu_seqlens_kv, seqused_q, seqused_kv, sinks, attn_mask, metadata, quant_mode, softmax_scale,

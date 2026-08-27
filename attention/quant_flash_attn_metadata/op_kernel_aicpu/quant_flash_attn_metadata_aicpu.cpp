@@ -203,7 +203,7 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     baseInfo.nextToken = winRight_ == -1 ? std::numeric_limits<uint32_t>::max() : winRight_;
     baseInfo.layoutQuery = ConvertToLayout(layoutQ_);
     baseInfo.layoutKv = ConvertToLayout(layoutKv_);
-    if (quantMode_ == 1 || quantMode_ == 6) {
+    if (quantMode_ == 1 || quantMode_ == 6 || quantMode_ == 0) {
         baseInfo.queryType = load_balance::DataType::INT8;
         baseInfo.kvType = load_balance::DataType::INT8;
     }
@@ -218,6 +218,9 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     } else if (quantMode_ == 6) { // GQA FP8 fullquant: s2BaseSize=256
         mBaseSize_ = 64U;
         s2BaseSize_ = 256U;
+    } else if (quantMode_ == 0) { // HIF8: s2BaseSize=256
+        mBaseSize_ = 64U;
+        s2BaseSize_ = 256U;
     }
     mBaseSize_ = mBaseSize_ * (aivCoreNum_ / aicCoreNum_);
     param.mBaseSize = mBaseSize_;
@@ -227,6 +230,10 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     param.fdOn = 0;
     param.outputLayout = load_balance::OutputLayout::BN2_S1G;
 
+    // HIF8 (quantMode=0): v_descale 为 per-tensor 标量, 跳过校验
+    if (quantMode_ == 0) {
+        return true;
+    }
     // 校验 v_descale: quantMode=1(MxFp8) 且 TND layout 下, dim0 应等于 sum(ceil(seqused_kv[i] / 64))
     if (quantMode_ == 1 && vDescale_ != nullptr && vDescale_->GetTensorShape() != nullptr) {
         const int64_t V_DESCALE_GROUP_SIZE = 64;

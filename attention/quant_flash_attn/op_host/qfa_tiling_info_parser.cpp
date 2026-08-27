@@ -272,13 +272,15 @@ ge::graphStatus QfaInfoParser::GetQuantMode()
     if (quantModeVal != static_cast<int64_t>(QM::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) &&
         quantModeVal !=
             static_cast<int64_t>(
-                QM::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32)) {
+                QM::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) &&
+        quantModeVal != static_cast<int64_t>(QM::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
                                               "quant_mode must be 1 "
                                               "(A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) or "
                                               "6 (A8C8_QK_FP8_"
                                               "E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_"
-                                              "P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32)");
+                                              "P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) or "
+                                              "0 (A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32)");
         return ge::GRAPH_FAILED;
     }
     quantMode_ = static_cast<QfaQuantMode>(quantModeVal);
@@ -630,6 +632,11 @@ ge::graphStatus QfaInfoParser::ParseAxisInfo()
 
     if (ge::GRAPH_SUCCESS != GetGSize() || ge::GRAPH_SUCCESS != GetS2Size()) {
         return ge::GRAPH_FAILED;
+    }
+
+    // HIF8 per-tensor: q_descale is 1D with shape (1,), skip MXFP8 dim check
+    if (quantMode_ == QfaQuantMode::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32) {
+        return ge::GRAPH_SUCCESS;
     }
 
     uint32_t qDescaleDimNum = opParamInfo_.qDescale.shape->GetStorageShape().GetDimNum();

@@ -24,6 +24,7 @@ if _TESTS_DIR not in sys.path:
 import result_compare_method
 import quant_flash_attn_golden as mxfp8_golden_mod
 import quant_flash_attn_fp8_golden as fp8_golden_mod
+import quant_flash_attn_hif8_golden as hif8_golden_mod
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +47,12 @@ def _resolve_csv_tolerance(idx):
                           如 ((0.0078125, 0.0001, 0.005, 0.005, 10),)
     5-tuple 的后三位 None → check_result 用默认值 (0.005/0.005/10)
     """
-    # 优先检查 fp8_golden_mod (quant_mode=6 路径), 再检查 mxfp8_golden_mod
+    # 优先检查 fp8_golden_mod (quant_mode=6 路径), 再检查 hif8_golden_mod, 再检查 mxfp8_golden_mod
     pt = getattr(fp8_golden_mod, "_csv_precision_tolerances", None)
     ap = getattr(fp8_golden_mod, "_csv_absolute_precision", None)
+    if pt is None and ap is None:
+        pt = getattr(hif8_golden_mod, "_csv_precision_tolerances", None)
+        ap = getattr(hif8_golden_mod, "_csv_absolute_precision", None)
     if pt is None and ap is None:
         pt = getattr(mxfp8_golden_mod, "_csv_precision_tolerances", None)
         ap = getattr(mxfp8_golden_mod, "_csv_absolute_precision", None)

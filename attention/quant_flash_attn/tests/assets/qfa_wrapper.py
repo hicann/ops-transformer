@@ -22,6 +22,7 @@ if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
 import quant_flash_attn_golden as mxfp8_golden_mod
 import quant_flash_attn_fp8_golden as fp8_golden_mod
+import quant_flash_attn_hif8_golden as hif8_golden_mod
 
 
 logger = logging.getLogger(__name__)
@@ -31,9 +32,15 @@ def _apply_golden_globals(params, quant_mode=1):
     """把 case 参数注入 golden 模块全局变量 (按 quant_mode 选择目标模块).
 
     quant_mode=6 → fp8_golden_mod (GQA FP8 全量化路径)
+    quant_mode=0 → hif8_golden_mod (HIF8 per-tensor 量化路径)
     其他 → mxfp8_golden_mod (MXFP8 路径)
     """
-    target = fp8_golden_mod if quant_mode == 6 else mxfp8_golden_mod
+    if quant_mode == 6:
+        target = fp8_golden_mod
+    elif quant_mode == 0:
+        target = hif8_golden_mod
+    else:
+        target = mxfp8_golden_mod
     for k, v in params.items():
         setattr(target, k, v)
 
@@ -173,6 +180,29 @@ def npu_qfa(
     try:
         if quant_mode == 6:
             atten_out, lse_out = fp8_golden_mod.npu_gqa_fp8_fa(
+                q,
+                k,
+                v,
+                dequant_scale_q,
+                dequant_scale_k,
+                dequant_scale_v,
+                p_scale,
+                cu_seqlens_q_list,
+                cu_seqlens_kv_list,
+                seqused_q_list,
+                seqused_kv_list,
+                max_seqlen_q,
+                max_seqlen_kv,
+                block_table
+                if isinstance(block_table, torch.Tensor) and enable_pa
+                else None,
+                cu_seqlens_q_t=cu_seqlens_q_t,
+                cu_seqlens_kv_t=cu_seqlens_kv_t,
+                seqused_q_t=seqused_q_t,
+                seqused_kv_t=seqused_kv_t,
+            )
+        elif quant_mode == 0:
+            atten_out, lse_out = hif8_golden_mod.npu_hif8_fa(
                 q,
                 k,
                 v,

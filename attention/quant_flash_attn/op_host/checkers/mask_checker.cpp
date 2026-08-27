@@ -174,10 +174,11 @@ ge::graphStatus MaskChecker::CheckMultiPara(const QfaTilingInfo &qfaInfo)
 
 ge::graphStatus MaskChecker::CheckMaskModeQuantMode(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: MxFP8/GQA_FP8_FULLQUANT 仅支持 mask_mode 取 0 和 3 (不支持 SLIDING_WINDOW=4)
+    // 文档约束: MxFP8/GQA_FP8_FULLQUANT/HIF8 均仅支持 mask_mode 取 0 和 3 (不支持 SLIDING_WINDOW=4)
     if (qfaInfo.quantMode == QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 ||
         qfaInfo.quantMode ==
-            QfaQuantMode::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
+            QfaQuantMode::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 ||
+        qfaInfo.quantMode == QfaQuantMode::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32) {
         OP_CHECK_IF(qfaInfo.maskMode == static_cast<int64_t>(MaskMode::SLIDING_WINDOW),
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, MASK_MODE_NAME.c_str(),
                                                           std::to_string(qfaInfo.maskMode).c_str(),
