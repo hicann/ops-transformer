@@ -120,6 +120,7 @@ ge::graphStatus MatmulAllReduceTilingA5::DoOpTiling()
     MC2_CHECK_LOG_RET(opName_, CheckA16W16());
     MC2_CHECK_LOG_RET(opName_, CheckInput());
     MC2_CHECK_LOG_RET(opName_, SetMc2Hcomm());
+    biasOnVec_ = args_.isBias; // arch35 非量化且有 bias 时，bias 移至 vec epilogue
     DoRCSTiling();
     DoSplitMTiling();
     if (!isKZero_) {
@@ -128,6 +129,9 @@ ge::graphStatus MatmulAllReduceTilingA5::DoOpTiling()
         DoEmptyTensorTiling();
     }
     DoAllReduceTiling(true);
+    // 将 bias 相关字段写入算子 tiling struct（biasUbCnt 在 DoRCSTiling→CalcUbTiling 中计算）
+    matmulAllReduce910TilingData_.extTiling.isVecBias = args_.isBias ? 1U : 0U;
+    matmulAllReduce910TilingData_.extTiling.biasUbCnt = biasUbCnt_;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -140,7 +144,7 @@ uint64_t MatmulAllReduceTilingA5::GetTilingKey() const
         return tilingKey;
     }
     bool matmulWithAdd = true;
-    if (!matmulAllReduce910TilingData_.param.isAdd) {
+    if (!matmulAllReduce910TilingData_.param.isAdd && !args_.isBias) {
         matmulWithAdd = false;
     }
     bool isUseA2APath = mc2tiling::IsUseA2APath(args_.rankDim, npuArch_);
@@ -245,6 +249,7 @@ ge::graphStatus MatmulAllReduceTilingA5::Do910Tiling()
                     OP_LOGE(opName_, "Get mmv3 priority policy failed."), return ge::GRAPH_FAILED);
     Mc2MMRegisterCfg registerCfg{"Mc2MatMulV3", npuArch_, priorities};
     mc2tiling::NewUpdateMatmulV3Args(mmV3Args_, args_, opName_);
+    mmV3Args_.hasBias = false; // bias 移至 vec epilogue 累加，关闭 matmul bias（不改第三方代码）
 
     // 获取tileTiling
     mmV3Args_.mValue = tileMValue_;
@@ -276,7 +281,10 @@ ge::graphStatus MatmulAllReduceTilingA5::DoMatmulV3Tiling(Mc2MatmulHelper::Mc2Ma
     return ge::GRAPH_SUCCESS;
 }
 
-Mc2Tiling::RCSTiling &MatmulAllReduceTilingA5::MutableRCSTilingData() { return matmulAllReduce910TilingData_.param; }
+Mc2Tiling::RCSTiling &MatmulAllReduceTilingA5::MutableRCSTilingData()
+{
+    return matmulAllReduce910TilingData_.param;
+}
 
 ge::graphStatus MatmulAllReduceTilingA5::CheckAxisSize()
 {

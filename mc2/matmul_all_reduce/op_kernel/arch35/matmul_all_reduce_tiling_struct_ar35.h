@@ -61,6 +61,12 @@ struct alignas(STRUCT_ALIGNAS_EIGHT) QuantMatmulAllReduceTilingDataA5 {
 };
 #pragma pack(pop)
 
+// bias 移至 vec epilogue 累加的扩展 tiling 字段（统一收纳，便于后续扩展）
+struct MatmulAllReduceExtTiling {
+    uint32_t isVecBias; // bias 是否移至 vec epilogue（1=是，0=否）
+    uint32_t biasUbCnt; // bias epilogue 的 N 方向 UB 切分粒度
+};
+
 #pragma pack(push, 8)
 struct alignas(STRUCT_ALIGNAS_EIGHT) MatmulAllReduce910TilingDataA5 {
     Mc2InitTiling mc2InitTiling;
@@ -69,6 +75,7 @@ struct alignas(STRUCT_ALIGNAS_EIGHT) MatmulAllReduce910TilingDataA5 {
     Mc2Tiling::RCSTiling param;
     Mc2MatMulV3TilingData mC2Mmv3TileTilingData;
     Mc2MatMulV3TilingData mC2Mmv3TailTilingData;
+    MatmulAllReduceExtTiling extTiling;
 };
 #pragma pack(pop)
 

@@ -112,6 +112,8 @@ void MatmulAllReduceTilingBase::Reset()
     isA16W8_ = false;
     isA16W4_ = false;
     isPerBlock_ = false;
+    biasOnVec_ = false;
+    biasUbCnt_ = 0U;
 }
 
 void MatmulAllReduceTilingBase::CalcAllReduceSendRecvParams()
@@ -271,7 +273,7 @@ void MatmulAllReduceTilingBase::DoRCSTiling()
     MutableRCSTilingData().rankN = args_.orgNValue;
     MutableRCSTilingData().rankK = args_.orgKValue;
     MutableRCSTilingData().aicCoreNum = args_.aicCoreNum;
-    if (MutableRCSTilingData().isAdd) {
+    if (MutableRCSTilingData().isAdd || biasOnVec_) {
         CalcUbTiling();
     }
     SetCommQuantScale();
@@ -470,7 +472,10 @@ ge::graphStatus MatmulAllReduceTilingBase::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MatmulAllReduceTilingBase::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus MatmulAllReduceTilingBase::DoLibApiTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus MatmulAllReduceTilingBase::GetWorkspaceSize()
 {
@@ -1117,7 +1122,10 @@ bool MatmulAllReduceTilingBase::CalL2TilePara(L2TilePara &tileL2, uint64_t mValu
     return false;
 }
 
-bool MatmulAllReduceTilingBase::HasAntiQuantOffset() const { return mmrCtxInfo_.antiquant_offset != nullptr; }
+bool MatmulAllReduceTilingBase::HasAntiQuantOffset() const
+{
+    return mmrCtxInfo_.antiquant_offset != nullptr;
+}
 void MatmulAllReduceTilingBase::GetScaleMNAndKIdx(const gert::StorageShape *scaleShape, bool isPertoken,
                                                   uint64_t scaleDimNum, uint64_t &MN, uint64_t &K) const
 {
@@ -1515,6 +1523,32 @@ void MatmulAllReduceTilingBase::CalcUbTiling()
     OP_LOGD(context_->GetNodeName(), "The addX3UbCnt=%u, aicoreParams_ubSize=%lu, addX3UbBufFac=%u.", addX3UbCnt,
             aicoreParams_.ubSize, addX3UbBufFac);
     MutableRCSTilingData().addX3UbCnt = addX3UbCnt;
+
+    // biasUbCnt 计算（bias 移至 vec epilogue 累加）
+    // bufFactor 取决于实际 UB buffer 分配数量（kernel 侧 InitBuffer）：
+    //   仅有 bias: inQueueX(double-buffer=2) + biasBuf(1) + outQueueZ(double-buffer=2) = 5
+    //   bias + x3: 上述 + inQueueY(double-buffer=2) = 7
+    // bias 走 TBuf（每个 N-chunk 搬入一次，多行复用），arch35 原生 FP16/BF16 Add，不走 fp32 cast
+    if (biasOnVec_) {
+        constexpr uint32_t DOUBLE_BUFFER_CNT = 2;
+        constexpr uint32_t BIAS_BUF_CNT = 1;
+        uint32_t biasBufFactor = DOUBLE_BUFFER_CNT + BIAS_BUF_CNT + DOUBLE_BUFFER_CNT; // inX + bias + outZ
+        if (MutableRCSTilingData().isAdd) {
+            biasBufFactor += DOUBLE_BUFFER_CNT; // inY for x3
+        }
+        uint32_t biasDtypeSize = D_MTYPE_SIZE_MAP.at(args_.cType);
+        biasBufFactor *= biasDtypeSize;
+        biasUbCnt_ =
+            mc2tiling::AlignDown(static_cast<uint32_t>((aicoreParams_.ubSize) / biasBufFactor), ALIGN_DATA_SIZE);
+        // DataCopyParams.blockLen 为 uint16_t，biasUbCnt * sizeof(T) 不可超过 65535
+        constexpr uint32_t DATACOPY_BLOCKLEN_MAX = 65535;
+        uint32_t maxUbCntByBlockLen = DATACOPY_BLOCKLEN_MAX / biasDtypeSize;
+        if (biasUbCnt_ > maxUbCntByBlockLen) {
+            biasUbCnt_ = mc2tiling::AlignDown(maxUbCntByBlockLen, ALIGN_DATA_SIZE);
+        }
+        OP_LOGD(context_->GetNodeName(), "The biasUbCnt=%u, aicoreParams_ubSize=%lu, biasBufFactor=%u.", biasUbCnt_,
+                aicoreParams_.ubSize, biasBufFactor);
+    }
 }
 ge::graphStatus MatmulAllReduceTilingBase::AnalyzeShapeAttr()
 {

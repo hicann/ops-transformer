@@ -21,7 +21,11 @@ class MatmulAllReduceBase<XType, YType, CoreType, false, commMode> {
 public:
     __aicore__ inline MatmulAllReduceBase(MC2GmAddrs *addrs, QuantGmAddrs *quantAddrs, ArnGmAddrs *arnAddrs,
                                           MC2TilingHeader *tilingData, TPipe *tPipe)
-        : addrs_(addrs), quantAddrs_(quantAddrs), arnAddrs_(arnAddrs), tilingData_(tilingData), tPipe_(tPipe)
+        : addrs_(addrs),
+          quantAddrs_(quantAddrs),
+          arnAddrs_(arnAddrs),
+          tilingData_(tilingData),
+          tPipe_(tPipe)
     {
         if constexpr (CoreType == Mc2CoreType::ON_CUBE) {
             notifyFlag_ = (GetBlockIdx() == 0);
@@ -29,6 +33,8 @@ public:
             notifyFlag_ = (g_coreType == AscendC::AIV && GetBlockIdx() == 0);
         }
         paramInTiling_ = &tilingData->param;
+        biasUbCnt_ = 0U; // 默认无 bias，由非量子类构造时覆盖
+        hasBias_ = false;
     }
 
     __aicore__ inline void Init()
@@ -102,9 +108,27 @@ protected:
 #endif
 
     __aicore__ inline void PostProcEachTurn(AscendC::HcclHandle handleId, uint64_t aOffset, uint64_t cOffset,
-                                            uint64_t index = 0)
+                                            uint64_t index = 0, uint64_t mTileValue = 0)
     {
-        if (addFlag_ && addrs_->cGM != addrs_->addGM) {
+        if (hasBias_) {
+            // 有 bias：走新的二维 epilogue（bias + 可选 x3）
+            // 用 cOffset / sizeof(YType) / rankN 精确计算实际 M 行数（rankN 必然 > 0）
+            uint64_t actualM = cOffset / sizeof(YType) / paramInTiling_->rankN;
+            Mc2SyncAll<CoreType>();
+            MatmulAllReduceEpilogueKernel<YType>(addrs_->cGM,    // mmOutput (in/out)
+                                                 addrs_->biasGM, // bias (不前移)
+                                                 addrs_->addGM,  // x3 (前移，无 x3 时 hasAdd=false 不访问)
+                                                 actualM,        // 本 tile 的 M 行数（精确计算）
+                                                 paramInTiling_->rankN, // N 值
+                                                 biasUbCnt_,            // bias UB 切分（基类成员）
+                                                 addFlag_,              // 是否有 x3
+                                                 tPipe_);
+            if (addFlag_) {
+                addrs_->addGM += cOffset;
+            }
+            // biasGM 不前移
+        } else if (addFlag_ && addrs_->cGM != addrs_->addGM) {
+            // 无 bias 有 x3：保留当前一维 add_x3 路径不变
             Mc2SyncAll<CoreType>();
             MatmulAllReduceAddX3Kernel<YType>(addrs_->cGM, addrs_->addGM, cOffset / sizeof(YType),
                                               paramInTiling_->addX3UbCnt, tPipe_);
@@ -153,6 +177,8 @@ protected:
     bool addFlag_;
     bool tailFlag_;
     bool isOneTileFlag_;
+    uint32_t biasUbCnt_; // bias epilogue 的 N 方向 UB 切分粒度（子类构造时从 tiling struct 读取）
+    bool hasBias_;       // bias 是否存在（子类构造时从 tiling struct 读取）
 };
 } // namespace MatmulAllReduceImpl
 #endif // MATMUL_ALL_REDUCE_BASED_ALL_REDUCE_H
