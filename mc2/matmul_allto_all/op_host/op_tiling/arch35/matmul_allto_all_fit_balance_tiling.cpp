@@ -30,6 +30,7 @@ constexpr static uint64_t NUM_EIGHT = 8;
 constexpr static double AICPU_NO_CUT_TIME_THRESHOLD_US = 80.0;
 constexpr static uint64_t AICPU_MN_RATIO_THRESHOLD = 10U;
 constexpr static uint64_t AICPU_MN_RATIO_MAX_TILE_CNT = 3U;
+constexpr static uint64_t AICPU_UPCAST_MAX_TILE_CNT = 4U;
 
 void MatmulAlltoAllFitBalanceTiling::EstimateMMCommTime()
 {
@@ -72,6 +73,9 @@ void MatmulAlltoAllFitBalanceTiling::SetShortTileLen()
             tilingM_.cutRes.shortTileLen = tilingM_.totalLen;
             tilingM_.cutRes.numShortTile = 1U;
             return;
+        }
+        if (isAicpuMode_ && (mmInfo_.inMatrixADtypeSize == 0U) && (mmInfo_.outMatrixCDtypeSize == 4U)) {
+            tilingM_.SetMaxTileCnt(AICPU_UPCAST_MAX_TILE_CNT);
         }
         // m/n超过阈值倍，最多切分3份
         if (mmInfo_.mValue > AICPU_MN_RATIO_THRESHOLD * mmInfo_.nValue) {
@@ -116,9 +120,10 @@ void MatmulAlltoAllFitBalanceTiling::SetLongTileLen()
     OP_LOGD("MatmulAlltoAllFitBalanceTiling", "longTileLen %lu", tilingM_.cutRes.longTileLen);
 }
 
-void MatmulAlltoAllFitBalanceTiling::AdjustLongShortTileLenWhenCalcBound()
+void MatmulAlltoAllFitBalanceTiling::AlignLongTileLen()
 {
-    if (ratioCalcComm_ > CALC_COMM_RATIO_THRESHOLD) {
+    if (ratioCalcComm_ > CALC_COMM_RATIO_THRESHOLD ||
+        (isAicpuMode_ && (mmInfo_.inMatrixADtypeSize == 0U) && (mmInfo_.outMatrixCDtypeSize == 4U))) {
         if (tilingM_.cutRes.longTileLen % LONG_TILE_ALIGN_LEN != 0) {
             uint64_t alignedLongLen = (tilingM_.cutRes.longTileLen / LONG_TILE_ALIGN_LEN) * LONG_TILE_ALIGN_LEN;
             if (alignedLongLen == 0) {
@@ -152,7 +157,7 @@ void MatmulAlltoAllFitBalanceTiling::AdjustLongShortTileLen()
 {
     bool goodLinearityShape = (mmInfo_.kValue * mmInfo_.nValue >= LARGE_NK_BAR_BASE * ONE_MBYTE);
     tilingM_.FitTileLengthDiscrete(false, goodLinearityShape);
-    AdjustLongShortTileLenWhenCalcBound();
+    AlignLongTileLen();
 
     // When the long and short tiles are equal, the long and short pieces become one.
     if (tilingM_.cutRes.shortTileLen == tilingM_.cutRes.longTileLen) {

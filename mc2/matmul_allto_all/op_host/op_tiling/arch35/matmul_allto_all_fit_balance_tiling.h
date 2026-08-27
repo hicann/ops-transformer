@@ -24,7 +24,7 @@
 namespace MC2Tiling {
 
 // AICPU通信场景下，受限于通信展开开销，需要限制切分上限
-constexpr uint64_t AICPU_MAX_TILE_CNT = 6U;
+constexpr uint64_t AICPU_MAX_TILE_CNT = 8U;
 
 class MatmulAlltoAllFitBalanceTiling : public Mc2FitBasedBalanceTiling {
 public:
@@ -33,15 +33,17 @@ public:
                                             SocVersion socVersion = SocVersion::SOC950,
                                             QuantMode quantMode = QuantMode::NON_QUANT,
                                             uint8_t commMode = Mc2Comm::COMM_MODE_CCU)
-        : Mc2FitBasedBalanceTiling(args, kernelType, topoType, socVersion), quantMode_(quantMode)
+        : Mc2FitBasedBalanceTiling(args, kernelType, topoType, socVersion),
+          quantMode_(quantMode)
     {
         commPerf_.SetCommShapeLen(args.nValue);
         commPerf_.SetCommDTypeSize(mmInfo_.outMatrixCDtypeSize);
         tilingM_.SetMinLenByMax(matmulPerf_.GetBaseM());
         tilingM_.SetAlignLength(matmulPerf_.GetBaseM());
         isQuantMatmul_ = (mmInfo_.inMatrixADtypeSize == 1) && (mmInfo_.inMatrixBDtypeSize == 1);
-        // AICPU通信场景下，受限于通信资源，最大切分轮次限制为6
-        if (commMode == Mc2Comm::COMM_MODE_AICPU) {
+        // AICPU通信场景下，受限于通信资源，最大切分轮次限制为8
+        isAicpuMode_ = (commMode == Mc2Comm::COMM_MODE_AICPU);
+        if (isAicpuMode_) {
             tilingM_.SetMaxTileCnt(AICPU_MAX_TILE_CNT);
         }
     }
@@ -52,10 +54,11 @@ public:
     void AdjustLongShortTileLen() override;
 
 private:
-    void AdjustLongShortTileLenWhenCalcBound();
+    void AlignLongTileLen();
 
     bool isLargerThanL2Cache_ = false;
     bool isQuantMatmul_ = false;
+    bool isAicpuMode_ = false;
     QuantMode quantMode_;
 };
 
