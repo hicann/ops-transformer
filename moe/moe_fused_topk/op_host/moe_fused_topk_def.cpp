@@ -18,7 +18,8 @@
 namespace ops {
 class MoeFusedTopk : public OpDef {
 public:
-    explicit MoeFusedTopk(const char *name) : OpDef(name)
+    explicit MoeFusedTopk(const char *name)
+        : OpDef(name)
     {
         this->Input("x")
             .ParamType(REQUIRED)
@@ -66,8 +67,15 @@ public:
 
         this->AICore().AddConfig("ascend910b");
         this->AICore().AddConfig("ascend910_93");
+
+        OpAICoreConfig ascend950Cfg;
+        ascend950Cfg.DynamicCompileStaticFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .ExtendCfgInfo("opFile.value", "moe_fused_topk_apt");
+        this->AICore().AddConfig("ascend950", ascend950Cfg);
     }
 };
 
 OP_ADD(MoeFusedTopk);
-}  // namespace ops
+} // namespace ops

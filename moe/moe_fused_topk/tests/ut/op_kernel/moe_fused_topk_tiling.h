@@ -42,21 +42,19 @@ struct MoeFusedTopkTilingData {
     uint32_t reserved = 0;
     uint64_t workspacePerCore = 0;
     TopkTiling topkTilingData;
-
 };
 #pragma pack()
 
-inline void InitMoeFusedTopkTilingData(uint8_t* tiling, MoeFusedTopkTilingData* const_data)
+inline void InitMoeFusedTopkTilingData(uint8_t *tiling, MoeFusedTopkTilingData *const_data)
 {
     uint32_t *src = (uint32_t *)tiling;
     uint32_t *dst = (uint32_t *)const_data;
-    for (auto i = 0; i < sizeof(MoeFusedTopkTilingData) / 4; i++) *(dst + i) = *(src + i);
+    for (auto i = 0; i < sizeof(MoeFusedTopkTilingData) / 4; i++)
+        *(dst + i) = *(src + i);
 }
 
 #define GET_TILING_DATA(tiling_data, tiling_arg) \
-MoeFusedTopkTilingData tiling_data; \
-InitMoeFusedTopkTilingData(tiling_arg, &tiling_data)
+    MoeFusedTopkTilingData tiling_data; \
+    InitMoeFusedTopkTilingData(tiling_arg, &tiling_data)
 
 #endif // __TEST_MOE_FUSED_ADD_TOPK_TILING_H__
-
-

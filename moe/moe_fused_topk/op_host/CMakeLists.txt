@@ -13,7 +13,7 @@ if (BUILD_OPEN_PROJECT)
     moe_fused_topk_def.cpp
     )
     add_ops_compile_options(
-            OP_NAME MoeTokenUnpermute
+            OP_NAME MoeFusedTopk
             OPTIONS --cce-auto-sync=on
                     -Wno-deprecated-declarations
                     -Werror
