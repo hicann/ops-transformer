@@ -12,8 +12,17 @@
 
 import itertools
 import importlib
+import logging
+import sys
 import torch
 from typing import Dict, List
+
+logger = logging.getLogger(__name__)
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(logging.Formatter("%(message)s"))
+logger.addHandler(_handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
 
 
 def load_case_modules(module_names: List[str]) -> Dict[str, dict]:
@@ -54,12 +63,22 @@ def normalize_params(raw: dict) -> dict:
             c.pop(key, None)
 
     if layout_q == "TND":
-        c.setdefault("seqused_q", [c["cu_seqlens_q"][i + 1] - c["cu_seqlens_q"][i]
-                                   for i in range(len(c["cu_seqlens_q"]) - 1)])
+        c.setdefault(
+            "seqused_q",
+            [
+                c["cu_seqlens_q"][i + 1] - c["cu_seqlens_q"][i]
+                for i in range(len(c["cu_seqlens_q"]) - 1)
+            ],
+        )
         if c.get("layout_kv", layout_q) not in ("PA_BBND", "PA_BNBD", "PA_NZ"):
             c.setdefault("cu_seqlens_kv", list(c["cu_seqlens_q"]))
-            c.setdefault("seqused_kv", [c["cu_seqlens_kv"][i + 1] - c["cu_seqlens_kv"][i]
-                                        for i in range(len(c["cu_seqlens_kv"]) - 1)])
+            c.setdefault(
+                "seqused_kv",
+                [
+                    c["cu_seqlens_kv"][i + 1] - c["cu_seqlens_kv"][i]
+                    for i in range(len(c["cu_seqlens_kv"]) - 1)
+                ],
+            )
         c["B"] = 1
 
     layout_kv_val = c.get("layout_kv", layout_q)
@@ -118,13 +137,17 @@ def resolve_case_ids(case_id_arg: str, all_cases: Dict) -> List[str]:
     result = []
     missing = []
     for cid in ids:
-        matches = [k for k in all_cases
-                   if k.endswith(f"/{cid}") or k == cid
-                   or k.rsplit("/", 1)[-1].startswith(f"{cid}_")]
+        matches = [
+            k
+            for k in all_cases
+            if k.endswith(f"/{cid}")
+            or k == cid
+            or k.rsplit("/", 1)[-1].startswith(f"{cid}_")
+        ]
         if matches:
             result.extend(matches)
         else:
             missing.append(cid)
     if missing:
-        print(f"[WARN] 以下 case 不存在: {missing}")
+        logger.info(f"[WARN] cases not found: {missing}")
     return result

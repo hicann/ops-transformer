@@ -12,8 +12,8 @@
 import sys
 import os
 import gc
+import logging
 import argparse
-import torch
 from pathlib import Path
 
 # ── 新架构 modules ──
@@ -22,53 +22,95 @@ from core.case_loader import load_case_modules, normalize_params, resolve_case_i
 from core.orchestrator import run_case, run_case_load
 from core.reporter import Reporter
 
-_DEFAULT_CASE_FILES = [os.path.splitext(f)[0] for f in os.listdir(
-    os.path.join(os.path.dirname(__file__), "test_cases"))
-    if f.endswith(".py") and not f.startswith("_")]
+logger = logging.getLogger(__name__)
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(logging.Formatter("%(message)s"))
+logger.addHandler(_handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
+
+_DEFAULT_CASE_FILES = [
+    os.path.splitext(f)[0]
+    for f in os.listdir(os.path.join(os.path.dirname(__file__), "test_cases"))
+    if f.endswith(".py") and not f.startswith("_")
+]
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="FlashAttn 精度测试（新架构）")
+    parser = argparse.ArgumentParser(
+        description="FlashAttn precision test (new architecture)"
+    )
     parser.add_argument("--case_files", type=str, default=",".join(_DEFAULT_CASE_FILES))
-    parser.add_argument("--case_id",    type=str,  default="all")
-    parser.add_argument("--device_id",  type=int,  default=0)
-    parser.add_argument("--use_gpu",    action="store_true")
-    parser.add_argument("--gpu_device", type=int,  default=0)
-    parser.add_argument("--verbose_diff", action="store_true",
-                        help="精度不达标时打印全部失败元素（默认只打前10个）")
-    parser.add_argument("--visualize",  action="store_true",
-                        help="精度不达标时生成热力图 PNG")
-    parser.add_argument("--viz_dir",    type=str,  default="./viz_output",
-                        help="热力图/分析报告保存目录")
-    parser.add_argument("--fail_analysis", action="store_true",
-                        help="精度不达标时输出多维度失败分布分析报告")
-    parser.add_argument("--save_golden", type=str, default=None,
-                        help="正常对比流程 + 将 inputs/golden 落盘到指定目录")
-    parser.add_argument("--load_golden", type=str, default=None,
-                        help="从指定目录加载 golden，只跑 NPU/GPU 对比")
+    parser.add_argument("--case_id", type=str, default="all")
+    parser.add_argument("--device_id", type=int, default=0)
+    parser.add_argument("--use_gpu", action="store_true")
+    parser.add_argument("--gpu_device", type=int, default=0)
+    parser.add_argument(
+        "--verbose_diff",
+        action="store_true",
+        help="Print all failed elements when precision fails (default: first 10 only)",
+    )
+    parser.add_argument(
+        "--visualize",
+        action="store_true",
+        help="Generate heatmap PNG when precision fails",
+    )
+    parser.add_argument(
+        "--viz_dir",
+        type=str,
+        default="./viz_output",
+        help="heatmap/analysis report output directory",
+    )
+    parser.add_argument(
+        "--fail_analysis",
+        action="store_true",
+        help="Output multi-dimension fail distribution analysis report when precision fails",
+    )
+    parser.add_argument(
+        "--save_golden",
+        type=str,
+        default=None,
+        help="Normal comparison flow + save inputs/golden to specified directory",
+    )
+    parser.add_argument(
+        "--load_golden",
+        type=str,
+        default=None,
+        help="Load golden from specified directory, run NPU/GPU comparison only",
+    )
 
-    parser.add_argument("--meta_only",  action="store_true")
+    parser.add_argument("--meta_only", action="store_true")
     parser.add_argument("--load_gpu_dump", type=str, default=None)
     parser.add_argument("--load_npu_dump", type=str, default=None)
     parser.add_argument("--compare_mode", action="store_true")
     parser.add_argument("--graph_mode", action="store_true")
     parser.add_argument("--report_interval", type=int, default=20)
-    parser.add_argument("--perf_mode",   action="store_true")
-    parser.add_argument("--perf_runs",   type=int,  default=5)
+    parser.add_argument("--perf_mode", action="store_true")
+    parser.add_argument("--perf_runs", type=int, default=5)
     parser.add_argument("--perf_cold_thr", type=int, default=16)
-    parser.add_argument("--perf_output", type=str,  default="./perf_output")
+    parser.add_argument("--perf_output", type=str, default="./perf_output")
     parser.add_argument("--skip_accuracy", action="store_true")
-    parser.add_argument("--result_csv", type=str, default="attention/flash_attn/tests/pytests/result.csv",
-                        help="精度结果 CSV 输出路径")
-    parser.add_argument("--one_by_one", action="store_true", help="逐个 case 执行，每个完成后暂停")
+    parser.add_argument(
+        "--result_csv",
+        type=str,
+        default="attention/flash_attn/tests/pytests/result.csv",
+        help="precision result CSV output path",
+    )
+    parser.add_argument(
+        "--one_by_one",
+        action="store_true",
+        help="run cases one by one, pause after each",
+    )
     args = parser.parse_args()
 
     if args.save_golden and args.load_golden:
-        print("[ERROR] --save_golden 和 --load_golden 不能同时使用")
+        logger.error("[ERROR] --save_golden and --load_golden cannot be used together")
         sys.exit(1)
 
     if args.compare_mode and not args.load_golden:
-        print("[ERROR] --compare_mode 必须搭配 --load_golden 指定 GPU 结果目录")
+        logger.error(
+            "[ERROR] --compare_mode requires --load_golden to specify GPU result directory"
+        )
         sys.exit(1)
 
     # ── 加载用例 ──
@@ -76,7 +118,8 @@ if __name__ == "__main__":
     all_cases = load_case_modules(module_names)
     run_cases = resolve_case_ids(args.case_id, all_cases)
     if not run_cases:
-        print("[ERROR] 没有可运行的 case。"); sys.exit(1)
+        logger.error("[ERROR] No runnable cases.")
+        sys.exit(1)
 
     # ── 性能测试分支 ──
     if args.perf_mode:
@@ -87,39 +130,72 @@ if __name__ == "__main__":
 
         if args.one_by_one:
             from utils.perf_runner import run_all_perf
-            csv_path = run_all_perf(cases_list, args.perf_runs, args.perf_cold_thr,
-                                    out, case_names=run_cases, one_by_one=True)
+
+            csv_path = run_all_perf(
+                cases_list,
+                args.perf_runs,
+                args.perf_cold_thr,
+                out,
+                case_names=run_cases,
+                one_by_one=True,
+            )
         else:
             from utils.perf_runner import build_batch_script, run_batch_msprof
-            script = build_batch_script(cases_list, args.perf_runs, args.perf_cold_thr,
-                                        case_names=run_cases, output_dir=str(out.resolve()))
+
+            script = build_batch_script(
+                cases_list,
+                args.perf_runs,
+                args.perf_cold_thr,
+                case_names=run_cases,
+                output_dir=str(out.resolve()),
+            )
             csv_path = run_batch_msprof(script, out)
 
         if csv_path is None or not csv_path.exists():
-            print("[ERROR] msprof 采集失败")
+            logger.error("[ERROR] msprof collection failed")
             sys.exit(1)
 
         from utils.perf_parser import _read_perf_log
         import csv as csv_mod
+
         with open(str(csv_path)) as f:
             all_rows = list(csv_mod.DictReader(f))
         flash_rows = [r for r in all_rows if r.get("OP Type") == "FlashAttn"]
-        fieldnames = list(all_rows[0].keys()) if all_rows else ["Task Start Time(us)", "Task Duration(us)"]
+        fieldnames = (
+            list(all_rows[0].keys())
+            if all_rows
+            else ["Task Start Time(us)", "Task Duration(us)"]
+        )
 
         with open(str(csv_path), "w", newline="") as f:
-            w = csv_mod.DictWriter(f, fieldnames); w.writeheader()
+            w = csv_mod.DictWriter(f, fieldnames)
+            w.writeheader()
             for row in flash_rows:
                 w.writerow(row)
 
         perf_log = _read_perf_log(str(out))
         log_path = out / "_perf_log.jsonl"
-        print(f"  [perf] log: {log_path} exists={log_path.exists()} entries={len(perf_log)}")
+        logger.info(
+            f"  [perf] log: {log_path} exists={log_path.exists()} entries={len(perf_log)}"
+        )
 
-        hot_idxs = [i for i, c in enumerate(cases_list) if c.get("S1", 9999) > args.perf_cold_thr]
-        cold_idxs = [i for i, c in enumerate(cases_list) if c.get("S1", 9999) <= args.perf_cold_thr]
+        hot_idxs = [
+            i
+            for i, c in enumerate(cases_list)
+            if c.get("S1", 9999) > args.perf_cold_thr
+        ]
+        cold_idxs = [
+            i
+            for i, c in enumerate(cases_list)
+            if c.get("S1", 9999) <= args.perf_cold_thr
+        ]
         ordered = [(i, "hot") for i in hot_idxs] + [(i, "cold") for i in cold_idxs]
 
-        fieldnames = list(all_rows[0].keys()) if all_rows else ["Task Start Time(us)", "Task Duration(us)"]
+        fieldnames = (
+            list(all_rows[0].keys())
+            if all_rows
+            else ["Task Start Time(us)", "Task Duration(us)"]
+        )
         pos = 0
         for idx_ord, (case_idx, mode) in enumerate(ordered):
             tag = f"{mode}{idx_ord}"
@@ -129,63 +205,79 @@ if __name__ == "__main__":
             sub_csv = case_dir / "op_summary.csv"
 
             if pos + args.perf_runs <= len(flash_rows) and info.get("ok", False):
-                chunk = flash_rows[pos:pos + args.perf_runs]
+                chunk = flash_rows[pos : pos + args.perf_runs]
                 pos += args.perf_runs
                 with open(sub_csv, "w", newline="") as f:
-                    w = csv_mod.DictWriter(f, fieldnames); w.writeheader()
+                    w = csv_mod.DictWriter(f, fieldnames)
+                    w.writeheader()
                     for row in chunk:
                         w.writerow(row)
             else:
                 with open(case_dir / "ERROR", "w") as ef:
                     ef.write(info.get("error", "case crashed or missing entries"))
                 with open(sub_csv, "w", newline="") as f:
-                    w = csv_mod.DictWriter(f, fieldnames); w.writeheader()
+                    w = csv_mod.DictWriter(f, fieldnames)
+                    w.writeheader()
 
         entries = parse_op_summary(str(csv_path))
-        stats, crashed = compute_stats(entries, cases_list, args.perf_runs,
-                                        args.perf_cold_thr, log_dir=str(out))
+        stats, crashed = compute_stats(
+            entries, cases_list, args.perf_runs, args.perf_cold_thr, log_dir=str(out)
+        )
 
         SEP = "─" * 110
         max_name = max((len(n) for n in run_cases if n), default=55)
-        print(f"\n┌{SEP}┐")
-        print(f"│  性能测试  ({len(stats)} cases, {len(crashed)} crashed)")
-        print(f"├{SEP}┤")
-        print(f"│  {'Case':<{max_name}}  {'Avg(us)':>9}  {'Min(us)':>9}  {'Max(us)':>9}  {'Mode':>6}  │")
-        print(f"├{SEP}┤")
+        logger.info(f"\n┌{SEP}┐")
+        logger.info(f"│  perf test  ({len(stats)} cases, {len(crashed)} crashed)")
+        logger.info(f"├{SEP}┤")
+        logger.info(
+            f"│  {'Case':<{max_name}}  {'Avg(us)':>9}  {'Min(us)':>9}  {'Max(us)':>9}  {'Mode':>6}  │"
+        )
+        logger.info(f"├{SEP}┤")
         for idx, name in enumerate(run_cases):
             if idx >= len(stats):
                 continue
             s = stats[idx]
             is_crash = s["mode"] == "CRASH"
             if is_crash:
-                print(f"│  {name:<{max_name}}  {'-':>9}  {'-':>9}  {'-':>9}  {'CRASH':>6}  │")
+                logger.info(
+                    f"│  {name:<{max_name}}  {'-':>9}  {'-':>9}  {'-':>9}  {'CRASH':>6}  │"
+                )
             else:
-                print(f"│  {name:<{max_name}}  {s['avg_us']:>9.2f}  {s['min_us']:>9.2f}  "
-                      f"{s['max_us']:>9.2f}  {s['mode']:>6}  │")
-        print(f"└{SEP}┘")
+                logger.info(
+                    f"│  {name:<{max_name}}  {s['avg_us']:>9.2f}  {s['min_us']:>9.2f}  "
+                    f"{s['max_us']:>9.2f}  {s['mode']:>6}  │"
+                )
+        logger.info(f"└{SEP}┘")
 
         if not args.one_by_one:
             perf_csv = out / "perf.csv"
             with open(perf_csv, "w", newline="") as f:
-                w = csv_mod.DictWriter(f, ["#","case","dir","avg_us","mode","error"])
+                w = csv_mod.DictWriter(
+                    f, ["#", "case", "dir", "avg_us", "mode", "error"]
+                )
                 w.writeheader()
                 for idx, name in enumerate(run_cases):
                     if idx >= len(stats):
                         continue
                     s = stats[idx]
                     is_crash = s["mode"] == "CRASH"
-                    w.writerow(dict(
-                        **{"#": idx + 1}, case=name, dir=f"case_{idx:04d}",
-                        avg_us="" if is_crash else s["avg_us"],
-                        mode=s["mode"],
-                        error=s.get("error", "") if is_crash else ""))
+                    w.writerow(
+                        dict(
+                            **{"#": idx + 1},
+                            case=name,
+                            dir=f"case_{idx:04d}",
+                            avg_us="" if is_crash else s["avg_us"],
+                            mode=s["mode"],
+                            error=s.get("error", "") if is_crash else "",
+                        )
+                    )
 
-        print(f"[perf] {out / 'perf.csv'}")
+        logger.info(f"[perf] {out / 'perf.csv'}")
         if crashed:
-            print(f"\n[perf] {len(crashed)} cases crashed:")
+            logger.info(f"\n[perf] {len(crashed)} cases crashed:")
             for idx in crashed:
                 if idx < len(run_cases):
-                    print(f"  case_{idx:04d}  {run_cases[idx]}")
+                    logger.info(f"  case_{idx:04d}  {run_cases[idx]}")
 
         sys.exit(0)
 
@@ -197,18 +289,23 @@ if __name__ == "__main__":
         if args.use_gpu:
             try:
                 from core.backends.gpu import GPUBackend
+
                 primary = GPUBackend(args.gpu_device)
             except ImportError:
-                print("[ERROR] GPU backend 不可用"); sys.exit(1)
+                logger.error("[ERROR] GPU backend unavailable")
+                sys.exit(1)
         else:
             try:
                 from core.backends.npu import NPUBackend
+
                 primary = NPUBackend(args.device_id, graph_mode=args.graph_mode)
             except ImportError:
-                print("[ERROR] NPU backend 不可用"); sys.exit(1)
+                logger.error("[ERROR] NPU backend unavailable")
+                sys.exit(1)
 
         if not primary.is_available():
-            print(f"[ERROR] primary backend ({primary.name}) 不可用"); sys.exit(1)
+            logger.error(f"[ERROR] primary backend ({primary.name}) unavailable")
+            sys.exit(1)
 
         reporter = Reporter()
         if args.result_csv:
@@ -219,9 +316,9 @@ if __name__ == "__main__":
         for i, name in enumerate(run_cases):
             case_params = normalize_params(all_cases[name]) if name in all_cases else {}
             dtype = case_params.get("Dtype", "fp16")
-            print(f"\n{'='*66}")
-            print(f"  [load] Case: {name}  dtype={dtype}")
-            print(f"{'='*66}")
+            logger.info(f"\n{'=' * 66}")
+            logger.info(f"  [load] Case: {name}  dtype={dtype}")
+            logger.info(f"{'=' * 66}")
 
             try:
                 result = run_case_load(
@@ -236,46 +333,68 @@ if __name__ == "__main__":
                 )
                 err = None
             except FileNotFoundError:
-                print(f"  [warn] golden 数据不存在，跳过: {name}")
+                logger.info(f"  [warn] golden data not found, skipping: {name}")
                 continue
             except Exception as e:
                 import traceback
+
                 err = f"{e}\n{traceback.format_exc()}"
-                print(f"[ERROR] {name} 运行异常: {e}")
-                result = {"attn": {"passed": False, "max_abs": float('nan'),
-                                   "mean_abs": float('nan'), "fail_cnt": -1,
-                                   "total": -1, "fail_ratio": float('nan')},
-                          "lse":  {"passed": False, "max_abs": float('nan'),
-                                   "mean_abs": float('nan'), "fail_cnt": -1,
-                                   "total": -1, "fail_ratio": float('nan')}}
+                logger.error(f"[ERROR] {name} runtime error: {e}")
+                result = {
+                    "attn": {
+                        "passed": False,
+                        "max_abs": float("nan"),
+                        "mean_abs": float("nan"),
+                        "fail_cnt": -1,
+                        "total": -1,
+                        "fail_ratio": float("nan"),
+                    },
+                    "lse": {
+                        "passed": False,
+                        "max_abs": float("nan"),
+                        "mean_abs": float("nan"),
+                        "fail_cnt": -1,
+                        "total": -1,
+                        "fail_ratio": float("nan"),
+                    },
+                }
 
             reporter.record(name, result, error=err, dtype=dtype)
 
-            if args.report_interval > 0 and (i + 1) % args.report_interval == 0 \
-                    and (i + 1) < len(run_cases):
+            if (
+                args.report_interval > 0
+                and (i + 1) % args.report_interval == 0
+                and (i + 1) < len(run_cases)
+            ):
                 reporter.print_interim(len(run_cases))
 
         fail_cnt = reporter.print_final()
         if args.result_csv:
-            print(f"[result] {args.result_csv}")
+            logger.info(f"[result] {args.result_csv}")
         sys.exit(0 if fail_cnt == 0 else 1)
 
     # ── 选择后端（默认/save 模式）──
     if args.use_gpu:
         try:
             from core.backends.gpu import GPUBackend
+
             primary = GPUBackend(args.gpu_device)
         except ImportError:
-            print("[ERROR] GPU backend 不可用"); sys.exit(1)
+            logger.error("[ERROR] GPU backend unavailable")
+            sys.exit(1)
     else:
         try:
             from core.backends.npu import NPUBackend
-            primary = NPUBackend(args.device_id, meta_only=args.meta_only,
-                                 graph_mode=args.graph_mode)
+
+            primary = NPUBackend(
+                args.device_id, meta_only=args.meta_only, graph_mode=args.graph_mode
+            )
         except ImportError:
-            print("[ERROR] NPU backend 不可用"); sys.exit(1)
+            logger.error("[ERROR] NPU backend unavailable")
+            sys.exit(1)
 
     from core.backends.cpu import CPUBackend
+
     golden = CPUBackend()
     comparators = []
 
@@ -290,40 +409,84 @@ if __name__ == "__main__":
         layout = params.get("input_layout", "BNSD")
         dtype = params.get("Dtype", "fp16")
 
-        print(f"\n{'='*66}")
-        print(f"  Case: {name}  "
-              f"B={params.get('B')} N1={params['N1']} N2={params.get('N2')} "
-              f"S1={params.get('S1')} S2={params.get('S2')} D={params['D']} "
-              f"layout={layout} dtype={dtype}")
-        print(f"{'='*66}")
+        logger.info(f"\n{'=' * 66}")
+        logger.info(
+            f"  Case: {name}  "
+            f"B={params.get('B')} N1={params['N1']} N2={params.get('N2')} "
+            f"S1={params.get('S1')} S2={params.get('S2')} D={params['D']} "
+            f"layout={layout} dtype={dtype}"
+        )
+        logger.info(f"{'=' * 66}")
 
         primary_available = primary.is_available()
 
         n1 = params.get("N1", 1)
         n2 = params.get("N2", n1)
         if not (n1 >= n2 and n1 % n2 == 0):
-            print(f"  跳过: N1={n1}, N2={n2} 不满足 N1>=N2 且 N1%N2==0")
-            reporter.record(name, {"attn": {"passed": False, "max_abs": 0.0, "mean_abs": 0.0,
-                                            "fail_cnt": 0, "total": 0, "fail_ratio": 0.0},
-                                   "lse":  {"passed": True, "max_abs": 0.0, "mean_abs": 0.0,
-                                            "fail_cnt": 0, "total": 0, "fail_ratio": 0.0}},
-                            error="skipped: N1<N2 or N1%N2!=0", dtype=dtype)
-            if args.report_interval > 0 and (i + 1) % args.report_interval == 0 \
-                    and (i + 1) < len(run_cases):
+            logger.info(
+                f"  skip: N1={n1}, N2={n2} does not satisfy N1>=N2 and N1%N2==0"
+            )
+            reporter.record(
+                name,
+                {
+                    "attn": {
+                        "passed": False,
+                        "max_abs": 0.0,
+                        "mean_abs": 0.0,
+                        "fail_cnt": 0,
+                        "total": 0,
+                        "fail_ratio": 0.0,
+                    },
+                    "lse": {
+                        "passed": True,
+                        "max_abs": 0.0,
+                        "mean_abs": 0.0,
+                        "fail_cnt": 0,
+                        "total": 0,
+                        "fail_ratio": 0.0,
+                    },
+                },
+                error="skipped: N1<N2 or N1%N2!=0",
+                dtype=dtype,
+            )
+            if (
+                args.report_interval > 0
+                and (i + 1) % args.report_interval == 0
+                and (i + 1) < len(run_cases)
+            ):
                 reporter.print_interim(len(run_cases))
             continue
         if not primary_available:
-            print("[ERROR] primary backend 不可用")
+            logger.error("[ERROR] primary backend unavailable")
             err = "primary backend not available"
-            reporter.record(name, {"attn": {"passed": False, "max_abs": float('nan'),
-                                            "mean_abs": float('nan'), "fail_cnt": -1,
-                                            "total": -1, "fail_ratio": float('nan')},
-                                   "lse":  {"passed": False, "max_abs": float('nan'),
-                                            "mean_abs": float('nan'), "fail_cnt": -1,
-                                            "total": -1, "fail_ratio": float('nan')}},
-                             error=err, dtype=dtype)
-            if args.report_interval > 0 and (i + 1) % args.report_interval == 0 \
-                    and (i + 1) < len(run_cases):
+            reporter.record(
+                name,
+                {
+                    "attn": {
+                        "passed": False,
+                        "max_abs": float("nan"),
+                        "mean_abs": float("nan"),
+                        "fail_cnt": -1,
+                        "total": -1,
+                        "fail_ratio": float("nan"),
+                    },
+                    "lse": {
+                        "passed": False,
+                        "max_abs": float("nan"),
+                        "mean_abs": float("nan"),
+                        "fail_cnt": -1,
+                        "total": -1,
+                        "fail_ratio": float("nan"),
+                    },
+                },
+                error=err,
+                dtype=dtype,
+            )
+            if (
+                args.report_interval > 0
+                and (i + 1) % args.report_interval == 0
+                and (i + 1) < len(run_cases)
+            ):
                 reporter.print_interim(len(run_cases))
             continue
 
@@ -345,15 +508,28 @@ if __name__ == "__main__":
             err = None
         except Exception as e:
             import traceback
+
             err = f"{e}\n{traceback.format_exc()}"
-            print(f"[ERROR] {name} 运行异常: {e}")
+            logger.error(f"[ERROR] {name} runtime error: {e}")
             traceback.print_exc()
-            result = {"attn": {"passed": False, "max_abs": float('nan'),
-                               "mean_abs": float('nan'), "fail_cnt": -1,
-                               "total": -1, "fail_ratio": float('nan')},
-                      "lse":  {"passed": False, "max_abs": float('nan'),
-                               "mean_abs": float('nan'), "fail_cnt": -1,
-                               "total": -1, "fail_ratio": float('nan')}}
+            result = {
+                "attn": {
+                    "passed": False,
+                    "max_abs": float("nan"),
+                    "mean_abs": float("nan"),
+                    "fail_cnt": -1,
+                    "total": -1,
+                    "fail_ratio": float("nan"),
+                },
+                "lse": {
+                    "passed": False,
+                    "max_abs": float("nan"),
+                    "mean_abs": float("nan"),
+                    "fail_cnt": -1,
+                    "total": -1,
+                    "fail_ratio": float("nan"),
+                },
+            }
 
         reporter.record(name, result, error=err, dtype=dtype)
 
@@ -361,11 +537,14 @@ if __name__ == "__main__":
         gc.collect()
         primary.clear_cache()
 
-        if args.report_interval > 0 and (i + 1) % args.report_interval == 0 \
-                and (i + 1) < len(run_cases):
+        if (
+            args.report_interval > 0
+            and (i + 1) % args.report_interval == 0
+            and (i + 1) < len(run_cases)
+        ):
             reporter.print_interim(len(run_cases))
 
     fail_cnt = reporter.print_final()
     if args.result_csv:
-        print(f"[result] {args.result_csv}")
+        logger.info(f"[result] {args.result_csv}")
     sys.exit(0 if fail_cnt == 0 else 1)

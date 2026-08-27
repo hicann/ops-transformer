@@ -12,13 +12,23 @@
 
 import json
 import csv
-from collections import OrderedDict, defaultdict
+import logging
+import sys
+from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+logger = logging.getLogger(__name__)
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(logging.Formatter("%(message)s"))
+logger.addHandler(_handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
 
-def parse_op_summary(csv_path: str,
-                     operator_name: str = "FlashAttn") -> List[Tuple[float, float]]:
+
+def parse_op_summary(
+    csv_path: str, operator_name: str = "FlashAttn"
+) -> List[Tuple[float, float]]:
     """Return [(start_time_us, duration_us), ...] sorted by start time."""
     with open(csv_path) as f:
         rows = list(csv.DictReader(f))
@@ -50,11 +60,13 @@ def _read_perf_log(log_dir: str) -> dict:
     return result
 
 
-def compute_stats(entries: List[Tuple[float, float]],
-                  cases: List[Dict],
-                  runs: int,
-                  cold_thr: int,
-                  log_dir: str = None) -> Tuple[List[Dict], List[int]]:
+def compute_stats(
+    entries: List[Tuple[float, float]],
+    cases: List[Dict],
+    runs: int,
+    cold_thr: int,
+    log_dir: str = None,
+) -> Tuple[List[Dict], List[int]]:
     """Group entries by case and compute statistics.
 
     Returns:
@@ -75,8 +87,9 @@ def compute_stats(entries: List[Tuple[float, float]],
     perf_log = _read_perf_log(log_dir) if log_dir else {}
 
     # Determine crashed case indices
-    crashed_tags = {tag: info for tag, info in perf_log.items()
-                    if not info.get("ok", False)}
+    crashed_tags = {
+        tag: info for tag, info in perf_log.items() if not info.get("ok", False)
+    }
     crashed_idxs = set()
     for orig_idx, tag in idx_to_tag.items():
         if tag in crashed_tags:
@@ -98,7 +111,9 @@ def compute_stats(entries: List[Tuple[float, float]],
     if len(entries) > len(expected) and expected:
         ratio = len(entries) // len(expected)
         if ratio > 1:
-            print(f"[perf] entries={len(entries)} expected={len(expected)} ratio={ratio}")
+            logger.info(
+                f"[perf] entries={len(entries)} expected={len(expected)} ratio={ratio}"
+            )
             entries = [entries[i * ratio] for i in range(len(expected))]
 
     n = min(len(entries), len(expected))
@@ -117,10 +132,15 @@ def compute_stats(entries: List[Tuple[float, float]],
             tag = idx_to_tag.get(orig_idx, "")
             info = crashed_tags.get(tag, {})
             error_msg = info.get("error", "").replace('"', "'")
-            results.append({
-                "avg_us": 0.0, "min_us": 0.0, "max_us": 0.0,
-                "mode": "CRASH", "error": error_msg,
-            })
+            results.append(
+                {
+                    "avg_us": 0.0,
+                    "min_us": 0.0,
+                    "max_us": 0.0,
+                    "mode": "CRASH",
+                    "error": error_msg,
+                }
+            )
             crashed.append(orig_idx)
             continue
 
@@ -136,16 +156,26 @@ def compute_stats(entries: List[Tuple[float, float]],
             mode = "cold"
             all_durs = d["cold"]
         else:
-            results.append({"avg_us": 0.0, "min_us": 0.0, "max_us": 0.0,
-                            "mode": "CRASH", "error": ""})
+            results.append(
+                {
+                    "avg_us": 0.0,
+                    "min_us": 0.0,
+                    "max_us": 0.0,
+                    "mode": "CRASH",
+                    "error": "",
+                }
+            )
             crashed.append(orig_idx)
             continue
 
-        results.append({
-            "avg_us": round(avg, 2),
-            "min_us": round(min(all_durs), 2) if all_durs else 0.0,
-            "max_us": round(max(all_durs), 2) if all_durs else 0.0,
-            "mode": mode, "error": "",
-        })
+        results.append(
+            {
+                "avg_us": round(avg, 2),
+                "min_us": round(min(all_durs), 2) if all_durs else 0.0,
+                "max_us": round(max(all_durs), 2) if all_durs else 0.0,
+                "mode": mode,
+                "error": "",
+            }
+        )
 
     return results, crashed
