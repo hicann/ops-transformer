@@ -44,7 +44,6 @@ constexpr size_t DIM_3 = 3;
 
 constexpr int64_t ASCENDC_TOOLS_WORKSPACE = 0;
 
-
 ge::graphStatus MhcSinkhornBackwardTiling::GetShapeAttrsInfo()
 {
     opName_ = context_->GetNodeName();
@@ -96,20 +95,20 @@ ge::graphStatus MhcSinkhornBackwardTiling::CheckDtype()
     auto normDesc = context_->GetInputDesc(NORM_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, normDesc);
     auto normDtype = normDesc->GetDataType();
-    OP_CHECK_IF((normDtype != ge::DataType::DT_FLOAT),
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "norm",
-                                                      ge::TypeUtils::DataTypeToSerialString(normDtype).c_str(),
-                                                      "the dtype of norm must be float32"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (normDtype != ge::DataType::DT_FLOAT),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "norm", ge::TypeUtils::DataTypeToSerialString(normDtype).c_str(),
+                                              "the dtype of norm must be float32"),
+        return ge::GRAPH_FAILED);
 
     auto sumDesc = context_->GetInputDesc(SUM_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, sumDesc);
     auto sumDtype = sumDesc->GetDataType();
-    OP_CHECK_IF((sumDtype != ge::DataType::DT_FLOAT),
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "sum",
-                                                      ge::TypeUtils::DataTypeToSerialString(sumDtype).c_str(),
-                                                      "the dtype of sum must be float32"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (sumDtype != ge::DataType::DT_FLOAT),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "sum", ge::TypeUtils::DataTypeToSerialString(sumDtype).c_str(),
+                                              "the dtype of sum must be float32"),
+        return ge::GRAPH_FAILED);
 
     // 验证输出数据类型
     auto gradInputDesc = context_->GetOutputDesc(GRAD_INPUT_OUTPUT_INDEX);
@@ -212,16 +211,16 @@ ge::graphStatus MhcSinkhornBackwardTiling::CheckGradInputShape()
 
         if (gradInputShape_->GetDim(DIM_0) != bSize_ || gradInputShape_->GetDim(DIM_1) != sSize_ ||
             gradInputShape_->GetDim(DIM_2) != nSize_ || gradInputShape_->GetDim(DIM_3) != nSize_) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "grad_input",
-                                                  ("{" + std::to_string(gradInputShape_->GetDim(DIM_0)) + ", " +
-                                                   std::to_string(gradInputShape_->GetDim(DIM_1)) + ", " +
-                                                   std::to_string(gradInputShape_->GetDim(DIM_2)) + ", " +
-                                                   std::to_string(gradInputShape_->GetDim(DIM_3)) + "}")
-                                                      .c_str(),
-                                                  ("should be {" + std::to_string(bSize_) + ", " +
-                                                   std::to_string(sSize_) + ", " + std::to_string(nSize_) + ", " +
-                                                   std::to_string(nSize_) + "}")
-                                                      .c_str());
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName_, "grad_input",
+                ("{" + std::to_string(gradInputShape_->GetDim(DIM_0)) + ", " +
+                 std::to_string(gradInputShape_->GetDim(DIM_1)) + ", " +
+                 std::to_string(gradInputShape_->GetDim(DIM_2)) + ", " +
+                 std::to_string(gradInputShape_->GetDim(DIM_3)) + "}")
+                    .c_str(),
+                ("should be {" + std::to_string(bSize_) + ", " + std::to_string(sSize_) + ", " +
+                 std::to_string(nSize_) + ", " + std::to_string(nSize_) + "}")
+                    .c_str());
             return ge::GRAPH_FAILED;
         }
     }
@@ -233,7 +232,7 @@ ge::graphStatus MhcSinkhornBackwardTiling::CheckShape()
     OP_CHECK_IF(gradYShape_ == nullptr, OP_LOGE(opName_, "grad_y shape is null"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(normShape_ == nullptr, OP_LOGE(opName_, "norm shape is null"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(sumShape_ == nullptr, OP_LOGE(opName_, "sum shape is null"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(gradInputShape_ == nullptr, OP_LOGE(opName_, "grad_intput shape is null"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(gradInputShape_ == nullptr, OP_LOGE(opName_, "grad_input shape is null"), return ge::GRAPH_FAILED);
 
     if (normShape_->GetDimNum() != NORM_INPUT_DIMNUM) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "norm", std::to_string(normShape_->GetDimNum()).c_str(),
