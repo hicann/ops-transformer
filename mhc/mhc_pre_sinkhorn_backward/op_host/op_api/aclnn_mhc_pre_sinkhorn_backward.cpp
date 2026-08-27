@@ -24,6 +24,7 @@
 #include "aclnn_kernels/transpose.h"
 #include "aclnn_kernels/contiguous.h"
 #include "aclnn_kernels/reshape.h"
+#include "aclnn_kernels/aclnn_platform.h"
 
 using namespace op;
 
@@ -126,7 +127,10 @@ public:
         return *this;
     }
 
-    AclnnMhcPreSinkhornBackwardParams Build() const { return obj_; }
+    AclnnMhcPreSinkhornBackwardParams Build() const
+    {
+        return obj_;
+    }
 
 private:
     AclnnMhcPreSinkhornBackwardParams obj_;
@@ -139,6 +143,28 @@ static bool CheckInputNotNullImpl(const aclTensor *tensor, const char *name)
         return false;
     }
     return true;
+}
+
+static bool CheckTensorFormat(const aclTensor *tensor, const char *name)
+{
+    if (tensor->GetStorageFormat() != op::Format::FORMAT_ND) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s tensor format must be ND, but got %s", name,
+                op::ToString(tensor->GetStorageFormat()).GetString());
+        return false;
+    }
+    return true;
+}
+
+static bool CheckFormat(const AclnnMhcPreSinkhornBackwardParams &params)
+{
+    return CheckTensorFormat(params.gradHin, "gradHin") && CheckTensorFormat(params.gradHPost, "gradHPost") &&
+           CheckTensorFormat(params.gradHRes, "gradHRes") && CheckTensorFormat(params.x, "x") &&
+           CheckTensorFormat(params.phi, "phi") && CheckTensorFormat(params.alpha, "alpha") &&
+           CheckTensorFormat(params.bias, "bias") && CheckTensorFormat(params.hPre, "hPre") &&
+           CheckTensorFormat(params.hcBeforeNorm, "hcBeforeNorm") && CheckTensorFormat(params.invRms, "invRms") &&
+           CheckTensorFormat(params.sumOut, "sumOut") && CheckTensorFormat(params.normOut, "normOut") &&
+           CheckTensorFormat(params.gradX, "gradX") && CheckTensorFormat(params.gradPhi, "gradPhi") &&
+           CheckTensorFormat(params.gradAlpha, "gradAlpha") && CheckTensorFormat(params.gradBias, "gradBias");
 }
 
 static bool CheckNotNull(const AclnnMhcPreSinkhornBackwardParams &params)
@@ -173,6 +199,10 @@ static bool CheckInputDims(const AclnnMhcPreSinkhornBackwardParams &params)
 {
     bool is3D = params.x->GetViewShape().GetDimNum() == DIM_NUM_3D;
     if (is3D) {
+        if (!Ops::Transformer::AclnnUtil::IsRegbase()) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "3D (TND) input format is only supported on Ascend 950");
+            return false;
+        }
         return CheckDimNum(params.gradHin, DIM_NUM_2D, "gradHin") &&
                CheckDimNum(params.gradHPost, DIM_NUM_2D, "gradHPost") &&
                CheckDimNum(params.gradHRes, DIM_NUM_3D, "gradHRes", true, DIM_NUM_2D) &&
@@ -180,22 +210,27 @@ static bool CheckInputDims(const AclnnMhcPreSinkhornBackwardParams &params)
                CheckDimNum(params.alpha, DIM_NUM_1D, "alpha") && CheckDimNum(params.bias, DIM_NUM_1D, "bias") &&
                CheckDimNum(params.hPre, DIM_NUM_2D, "hPre") &&
                CheckDimNum(params.hcBeforeNorm, DIM_NUM_2D, "hcBeforeNorm") &&
-               CheckDimNum(params.invRms, DIM_NUM_2D, "invRms") &&
-               CheckDimNum(params.sumOut, DIM_NUM_3D, "sumOut") && CheckDimNum(params.normOut, DIM_NUM_4D, "normOut");
+               CheckDimNum(params.invRms, DIM_NUM_2D, "invRms") && CheckDimNum(params.sumOut, DIM_NUM_3D, "sumOut") &&
+               CheckDimNum(params.normOut, DIM_NUM_4D, "normOut");
     }
-    return CheckDimNum(params.gradHin, DIM_NUM_3D, "gradHin") && CheckDimNum(params.gradHPost, DIM_NUM_3D, "gradHPost") &&
+    return CheckDimNum(params.gradHin, DIM_NUM_3D, "gradHin") &&
+           CheckDimNum(params.gradHPost, DIM_NUM_3D, "gradHPost") &&
            CheckDimNum(params.gradHRes, DIM_NUM_4D, "gradHRes", true, DIM_NUM_3D) &&
            CheckDimNum(params.x, DIM_NUM_4D, "x") && CheckDimNum(params.phi, DIM_NUM_2D, "phi") &&
            CheckDimNum(params.alpha, DIM_NUM_1D, "alpha") && CheckDimNum(params.bias, DIM_NUM_1D, "bias") &&
            CheckDimNum(params.hPre, DIM_NUM_3D, "hPre") &&
            CheckDimNum(params.hcBeforeNorm, DIM_NUM_3D, "hcBeforeNorm") &&
-           CheckDimNum(params.invRms, DIM_NUM_3D, "invRms") &&
-           CheckDimNum(params.sumOut, DIM_NUM_4D, "sumOut") && CheckDimNum(params.normOut, DIM_NUM_5D, "normOut");
+           CheckDimNum(params.invRms, DIM_NUM_3D, "invRms") && CheckDimNum(params.sumOut, DIM_NUM_4D, "sumOut") &&
+           CheckDimNum(params.normOut, DIM_NUM_5D, "normOut");
 }
 
 static bool CheckOutputDims(const AclnnMhcPreSinkhornBackwardParams &params)
 {
     bool is3D = params.x->GetViewShape().GetDimNum() == DIM_NUM_3D;
+    if (is3D && !Ops::Transformer::AclnnUtil::IsRegbase()) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "3D (TND) input format is only supported on Ascend 950");
+        return false;
+    }
     size_t gradXExpected = is3D ? DIM_NUM_3D : DIM_NUM_4D;
     return CheckDimNum(params.gradX, gradXExpected, "gradX") && CheckDimNum(params.gradPhi, DIM_NUM_2D, "gradPhi") &&
            CheckDimNum(params.gradAlpha, DIM_NUM_1D, "gradAlpha") &&
@@ -330,6 +365,10 @@ static bool CheckShape(const AclnnMhcPreSinkhornBackwardParams &params)
 {
     auto &xShape = params.x->GetViewShape();
     if (xShape.GetDimNum() == 3) {
+        if (!Ops::Transformer::AclnnUtil::IsRegbase()) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "3D (TND) input format is only supported on Ascend 950");
+            return false;
+        }
         return CheckShape3D(params);
     }
 
@@ -507,18 +546,27 @@ static aclnnStatus CheckParams(const AclnnMhcPreSinkhornBackwardParams &params)
     // 4. 检查输入的数据类型是否在支持的数据类型范围之内
     CHECK_RET(CheckDtypeValid(params), ACLNN_ERR_PARAM_INVALID);
 
-    // 5. 校验N、C取值范围（需在IsEmpty检查之前，避免C=0/N=0被误判为空tensor）
+    // 5. 校验format：仅支持ND格式，不支持私有格式
+    CHECK_RET(CheckFormat(params), ACLNN_ERR_PARAM_INVALID);
+
+    // 6. 校验N、C取值范围
     auto &xShape = params.x->GetViewShape();
     bool is3D = xShape.GetDimNum() == 3;
     int64_t nVal = is3D ? xShape.GetDim(1) : xShape.GetDim(2);
     int64_t cVal = is3D ? xShape.GetDim(2) : xShape.GetDim(3);
-    if (nVal <= 0 || nVal > 8) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "N must be > 0 and <= 8, but got %ld", nVal);
-        return ACLNN_ERR_PARAM_INVALID;
+    if (Ops::Transformer::AclnnUtil::IsRegbase()) {
+        if (nVal <= 0 || nVal > 8) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "N must be > 0 and <= 8, but got %ld", nVal);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    } else {
+        if (nVal != 4) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "N must be 4, but got %ld", nVal);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     if (cVal <= 0 || cVal >= 100000 || cVal % 128 != 0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "C must be > 0, < 100000 and divisible by 128, but got %ld", cVal);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "C must be > 0, < 100000 and divisible by 128, but got %ld", cVal);
         return ACLNN_ERR_PARAM_INVALID;
     }
 
@@ -568,10 +616,7 @@ static bool CopyOutput(const aclTensor *out, const aclTensor *dst, aclOpExecutor
 static aclnnStatus mhcPreSinkhornBackwardCommonProcess(AclnnMhcPreSinkhornBackwardParams &params,
                                                        aclOpExecutor *executor)
 {
-    auto ret = CheckParams(params);
-    CHECK_RET(ret == ACLNN_SUCCESS, ret);
-
-    ret = MhcSinkhornGradCovertDataContiguous(params, executor);
+    auto ret = MhcSinkhornGradCovertDataContiguous(params, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     auto outParams = l0op::MhcPreSinkhornBackward(
@@ -610,18 +655,19 @@ aclnnStatus aclnnMhcPreSinkhornBackwardGetWorkspaceSize(
                                                    .SetOutput(gradX, gradPhi, gradAlpha, gradBias)
                                                    .Build();
 
-    auto ret = CheckParams(params);
+    auto ret = CheckNotNull(params) ? ACLNN_SUCCESS : ACLNN_ERR_PARAM_NULLPTR;
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    // Check if input tensors are empty
-    if (gradHin->IsEmpty() || gradHPost->IsEmpty() || gradHRes->IsEmpty() || x->IsEmpty() ||
-        hPre->IsEmpty() || hcBeforeNorm->IsEmpty() || invRms->IsEmpty() || sumOut->IsEmpty() ||
-        normOut->IsEmpty()) {
+    if (gradHin->IsEmpty() || gradHPost->IsEmpty() || gradHRes->IsEmpty() || x->IsEmpty() || hPre->IsEmpty() ||
+        hcBeforeNorm->IsEmpty() || invRms->IsEmpty() || sumOut->IsEmpty() || normOut->IsEmpty()) {
         OP_LOGW("[aclnnMhcPreSinkhornBackward] Input tensor is empty, skip computation and return success.");
         *workspaceSize = 0;
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;
     }
+
+    ret = CheckParams(params);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     ret = mhcPreSinkhornBackwardCommonProcess(params, uniqueExecutor.get());
     CHECK_RET(ret == ACLNN_SUCCESS, ret);

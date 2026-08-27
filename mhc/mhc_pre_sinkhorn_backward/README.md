@@ -164,27 +164,34 @@
 
 ## 约束说明
 
-输入支持两种维度格式：BSND（4维）和TND（3维）。其中T = B × S，表示所有Batch序列长度的累加和。各输入/输出在两种格式下的shape对应关系如下：
+- **维度格式约束**
 
-| 参数 | BSND（4维） | TND（3维） |
-| :--- | :--- | :--- |
-| gradHin | (B,S,C) | (T,C) |
-| gradHPost | (B,S,N) | (T,N) |
-| gradHRes | (B,S,N*N) | (T,N*N) |
-| x | (B,S,N,C) | (T,N,C) |
-| hPre | (B,S,N) | (T,N) |
-| hcBeforeNorm | (B,S,N*N+2*N) | (T,N*N+2*N) |
-| invRms | (B,S,1) | (T,1) |
-| sumOut | (2*sk_iter_count,B,S,N) | (2*sk_iter_count,T,N) |
-| normOut | (2*sk_iter_count,B,S,N,N) | (2*sk_iter_count,T,N,N) |
-| gradX | (B,S,N,C) | (T,N,C) |
+  - <term>Ascend 950PR/Ascend 950DT</term>：输入支持两种维度格式：BSND（4维）和TND（3维）。其中T = B × S，表示所有Batch序列长度的累加和。所有带B/S维度的输入需保持维度格式一致（同为4维BSND或同为3维TND）。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：输入仅支持BSND（4维）格式。
 
-phi和gradPhi的shape记为（2N+N^2，N*C），不受维度格式影响。
+  各输入/输出在两种格式下的shape对应关系如下：
 
-- `sk_iter_count`当前仅支持`20`。
-- `N`当前支持大于0且不超过`8`。
-- `C`大于0、小于100000且可以被128整除。
-- 所有带B/S维度的输入需保持维度格式一致（同为4维BSND或同为3维TND）。
+  | 参数 | BSND（4维） | TND（3维） |
+  | :--- | :--- | :--- |
+  | gradHin | (B,S,C) | (T,C) |
+  | gradHPost | (B,S,N) | (T,N) |
+  | gradHRes | (B,S,N*N)或(B,S,N,N) | (T,N*N)或(T,N,N) |
+  | x | (B,S,N,C) | (T,N,C) |
+  | hPre | (B,S,N) | (T,N) |
+  | hcBeforeNorm | (B,S,N*N+2*N) | (T,N*N+2*N) |
+  | invRms | (B,S,1) | (T,1) |
+  | sumOut | (2*sk_iter_count,B,S,N) | (2*sk_iter_count,T,N) |
+  | normOut | (2*sk_iter_count,B,S,N,N) | (2*sk_iter_count,T,N,N) |
+  | gradX | (B,S,N,C) | (T,N,C) |
+
+  phi和gradPhi的shape记为（2N+N^2，N*C），不受维度格式影响。
+
+- **规格约束**
+
+  - N（针对Ascend 950PR/Ascend 950DT）：N维度支持大于0且不超过8。
+  - N（针对<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>）：N维度仅支持4。
+  - C：大于0、小于100000且可以被128整除。
+  - sk_iter_count：Sinkhorn迭代次数当前仅支持20。
 
 ## 调用说明
 

@@ -87,7 +87,8 @@ def mhc_pre_sinkhorn_backward_input(
     bias.copy_(torch.randn(hm, dtype=torch.float32, device=x.device))
 
     x_fp32 = x.float()
-    x_flat = x_fp32.reshape(*x_fp32.shape[:-2], -1)
+    prod_nd = n * c
+    x_flat = x_fp32.reshape(*x_fp32.shape[:-2], prod_nd)
 
     hcbn = torch.nn.functional.linear(x_flat, phi) + bias
     inv_rms_val = torch.rsqrt(x_flat.square().mean(-1, keepdim=True) + hc_eps_val)
@@ -160,7 +161,9 @@ def mhc_pre_sinkhorn_backward_input(
 
     gzp4 = _sigmoid_grad(zp4, g_hpre, is_pre=True, hc_eps=hc_eps_val)
     gzpost4 = 2 * _sigmoid_grad(zpost4, gp4, is_pre=False, hc_eps=hc_eps_val)
-    skg4 = _sinkhorn_grad(ghres4, suma, norm4)
+    # ghres4可能为(B,S,N*N)或(B,S,N,N), 统一reshape为(B,S,N,N)供_sinkhorn_grad处理
+    ghres4_4d = ghres4.reshape(B4, S4, n4, n4) if ghres4.dim() == 3 else ghres4
+    skg4 = _sinkhorn_grad(ghres4_4d, suma, norm4)
     gzres4 = _exp_grad(zres4, skg4).flatten(2)
 
     gold_bias = torch.cat([gzp4.sum((0, 1)), gzpost4.sum((0, 1)), gzres4.sum((0, 1))])
@@ -180,7 +183,7 @@ def mhc_pre_sinkhorn_backward_input(
     gold_x = grad_x_hin + gx_rms4.view(x4.shape) + gx_mm4.view(x4.shape)
 
     if is_3d:
-        gold_x = gold_x.view(-1, n4, d4)
+        gold_x = gold_x.view(x.shape[0], n4, d4)
 
     grad_x_out.copy_(gold_x.to(x.dtype))
     grad_phi_out.copy_(gold_phi)
