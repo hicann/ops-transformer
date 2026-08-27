@@ -18,21 +18,41 @@
 
 namespace op_api {
 
+constexpr int64_t DIMS_THREE = 3;
+constexpr int64_t DIMS_FOUR = 4;
+constexpr size_t SECOND_TO_LAST_OFFSET = 2;
+
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> MhcPostBackward(const at::Tensor &gradOutput,
-                                                                           const at::Tensor &x, const at::Tensor &hRes,
+                                                                           const at::Tensor &x,
+                                                                           const c10::optional<at::Tensor> &hRes,
                                                                            const at::Tensor &hOut,
                                                                            const at::Tensor &hPost)
 {
+    const c10::OptionalDeviceGuard deviceGuard(x.device());
+    bool hasHRes = hRes.has_value() && hRes.value().numel() > 0;
     at::Tensor gradX = at::empty_like(x);
-    at::Tensor gradHres = at::empty_like(hRes);
+    at::Tensor gradHres;
+    if (hasHRes) {
+        gradHres = at::empty_like(hRes.value());
+    } else {
+        TORCH_CHECK(x.dim() == DIMS_THREE || x.dim() == DIMS_FOUR,
+                    "x must be 3D (TND) or 4D (BSND) when h_res is None or empty, but got ", x.dim(), "D");
+        auto sizes = x.sizes().vec();
+        sizes.back() = sizes[sizes.size() - SECOND_TO_LAST_OFFSET];
+        gradHres = at::empty(sizes, x.options().dtype(at::kFloat));
+    }
     at::Tensor gradHout = at::empty_like(hOut);
     at::Tensor gradHpost = at::empty_like(hPost);
 
-    ACLNN_CMD(aclnnMhcPostBackward, gradOutput, x, hRes, hOut, hPost, gradX, gradHres, gradHout, gradHpost);
+    c10::optional<at::Tensor> hResArg = hasHRes ? c10::optional<at::Tensor>(hRes.value()) : c10::nullopt;
+    ACLNN_CMD(aclnnMhcPostBackward, gradOutput, x, hResArg, hOut, hPost, gradX, gradHres, gradHout, gradHpost);
 
     return std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor>(gradX, gradHres, gradHout, gradHpost);
 }
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) { m.def("mhc_post_backward", &MhcPostBackward, "mhc_post_backward"); }
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
+{
+    m.def("mhc_post_backward", &MhcPostBackward, "mhc_post_backward");
+}
 
 } // namespace op_api

@@ -23,7 +23,7 @@ class MhcPostBackwardOpBuilder(OpBuilder):
 
     def schema(self) -> str:
         return (
-            "mhc_post_backward(Tensor gradOutput, Tensor x, Tensor hRes, Tensor hOut, Tensor hPost) -> "
+            "mhc_post_backward(Tensor gradOutput, Tensor x, Tensor? hRes, Tensor hOut, Tensor hPost) -> "
             "(Tensor, Tensor, Tensor, Tensor)"
         )
 
@@ -31,7 +31,12 @@ class MhcPostBackwardOpBuilder(OpBuilder):
         @impl(get_as_library(), self.name, "Meta")
         def mhc_post_backward_meta(grad_output, x, h_res, h_out, h_post):
             grad_x = torch.empty_like(x)
-            grad_h_res = torch.empty_like(h_res)
+            if h_res is None or h_res.numel() == 0:
+                grad_h_res = torch.empty(
+                    *x.shape[:-1], x.shape[-2], dtype=torch.float32, device=x.device
+                )
+            else:
+                grad_h_res = torch.empty_like(h_res)
             grad_h_out = torch.empty_like(h_out)
             grad_h_post = torch.empty_like(h_post)
             return (grad_x, grad_h_res, grad_h_out, grad_h_post)
@@ -42,6 +47,14 @@ mhc_post_backward_op_builder._ensure_initialized()
 
 
 @impl(get_as_library(), mhc_post_backward_op_builder.name, "PrivateUse1")
-def mhc_post_backward(grad_output, x, h_res, h_out, h_post):
+def _mhc_post_backward_dispatch(grad_output, x, h_res, h_out, h_post):
     op_module = mhc_post_backward_op_builder.load()
     return op_module.mhc_post_backward(grad_output, x, h_res, h_out, h_post)
+
+
+def mhc_post_backward(grad_output, x, h_res, h_out, h_post):
+    if h_res is None:
+        h_res = torch.empty(0, dtype=torch.float32, device=grad_output.device)
+    return torch.ops.cann_ops_transformer.mhc_post_backward(
+        grad_output, x, h_res, h_out, h_post
+    )
