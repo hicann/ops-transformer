@@ -106,8 +106,13 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>Tensor</td>
         <td>必选</td>
         <td>MHC层的输入数据。对应公式中x。</td>
-        <td>bfloat16</td>
-        <td>(B, S, N, C)</td>
+        <td>float16、bfloat16</td>
+        <td>
+            <ul>
+                <li>(B, S, N, C)</li>
+                <li>(T, N, C)</li>
+            </ul>
+        </td>
     </tr>
     <tr>
         <td>phi</td>
@@ -194,8 +199,13 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>Tensor</td>
         <td>必选</td>
         <td>输出的h_in，作为Attention/MLP层的输入。对应公式中h<sub>in</sub>。</td>
-        <td>bfloat16</td>
-        <td>(B, S, C)</td>
+        <td>float16、bfloat16</td>
+        <td>
+            <ul>
+                <li>(B, S, C)</li>
+                <li>(T, C)</li>
+            </ul>
+        </td>
     </tr>
     <tr>
         <td>hPost</td>
@@ -203,7 +213,12 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>必选</td>
         <td>输出的MHC的h_post变换矩阵。对应公式中H<sup>post</sup>。</td>
         <td>float32</td>
-        <td>(B, S, N)</td>
+        <td>
+            <ul>
+                <li>(B, S, N)</li>
+                <li>(T, N)</li>
+            </ul>
+        </td>
     </tr>
     <tr>
         <td>hRes</td>
@@ -211,10 +226,17 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>必选</td>
         <td>输出的MHC的h_res变换矩阵（Sinkhorn归一化后的双随机矩阵）。对应公式中H<sup>res</sup>。</td>
         <td>float32</td>
-        <td>(B, S, N*N)</td>
+        <td>
+            <ul>
+                <li>(B, S, N*N)</li>
+                <li>(T, N*N)</li>
+            </ul>
+        </td>
     </tr>
 </tbody>
 </table>
+
+> 说明：4维输入为BSND格式，3维输入为TND格式。其中B表示Batch大小，S表示单Batch序列长度，T表示所有Batch序列长度的累加和，N表示残差流数量，C表示尾轴隐藏维度大小。
 
 ## 约束说明
 
@@ -222,19 +244,35 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
 - 该接口支持单算子模式和图模式调用。
 - 参数约束：x、phi、alpha、bias不支持空Tensor。
 - 规格约束：
-  - numIters：表示迭代次数，要求不超过20，若超出该范围会返回参数无效错误。
+  - numIters：表示迭代次数，目前仅支持20。
   - N：目前仅支持4。
-  - C：
-    <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：要求尾轴C 128对齐，取值[1, 100000]。
-    <!-- end id7 -->
-    <!-- npu="950" id8 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：尾轴C仅支持4096、7168。
-    <!-- end id8 -->
+  <!-- npu="A3,910b" id7 -->
+  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+    - 输入x仅支持4维BSND格式，shape为(B, S, N, C)。
+    - 尾轴C要求128对齐，取值范围为[1, 100000]。
+  <!-- end id7 -->
+  <!-- npu="950" id8 -->
+  - <term>Ascend 950PR/Ascend 950DT</term>：
+    - 输入x支持4维BSND格式和3维TND格式，shape分别为(B, S, N, C)和(T, N, C)。
+    - TND格式下，T表示所有Batch序列长度的累加和；对应输出shape按参数说明中的T轴展开。
+    - 尾轴C仅支持4096、7168。
+    - 输入phi的数据范围限定在$\pm \frac{1}{\sqrt{NC}}$范围内，eps限定在1e-6，此范围内具有较好的数值稳定性。
+  <!-- end id8 -->
 
-## 确定性计算
+## 确定性/Batch一致性
 
-默认支持确定性计算。
+- 确定性计算：
+    - 默认支持确定性计算。
+
+- Batch一致性：
+    <!-- npu="A3,910b" id9 -->
+    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+        - 默认不支持Batch一致性。
+    <!-- end id9 -->
+    <!-- npu="950" id10 -->
+    - <term>Ascend 950PR/Ascend 950DT</term>：
+        - 默认不支持Batch一致性，可通过Pytorch开关（[《TorchNPU自定义API》](https://www.hiascend.com/document/detail/zh/Pytorch/latest/apiref/customapi/docs/zh/custom_APIs/overview.md)中torch_npu.npu.set_deterministic_level）支持。开启Batch一致性后性能可能会有一定程度的劣化。
+    <!-- end id10 -->
 
 ## 调用说明
 

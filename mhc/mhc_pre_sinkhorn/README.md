@@ -201,10 +201,15 @@
 
 - n目前支持4。
 - numIters目前仅支持20。
-- 输入x的最后一维c的取值约束：
-    - <term>Ascend 950PR/Ascend 950DT</term>：c仅支持4096、7168。
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：c需满足128对齐，且取值范围为[1, 100000]。
-- 在<term>Ascend 950PR/Ascend 950DT</term>使用场景下，输入phi的数据范围建议在$\pm \frac{1}{\sqrt{nc}}$范围内，此范围内具有较好的数值稳定性。
+
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+  - 输入x仅支持4维BSND格式，shape为(bs, seq_len, n, c)。
+  - 输入x的最后一维c需满足128对齐，且取值范围为[1, 100000]。
+- <term>Ascend 950PR/Ascend 950DT</term>：
+  - 输入x支持4维BSND格式和3维TND格式，shape分别为(bs, seq_len, n, c)和(t, n, c)。
+  - TND格式下，t表示所有Batch序列长度的累加和。
+  - 输入x的最后一维c仅支持4096、7168。
+  - 输入phi的数据范围限定在$\pm \frac{1}{\sqrt{nc}}$范围内，eps限定在1e-6，此范围内具有较好的数值稳定性。
 
 ## 调用说明
 
