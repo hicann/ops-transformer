@@ -10,9 +10,10 @@
 
 /*
  * 将图中的 MoeDistributeDispatchV2 节点 1:1 替换为 MoeDistributeDispatchV3（仅 A5，comm_alg != "ccu"）。
- * V3 相比 V2：头部新增 context 输入（Mc2MoeContext 序列化数据，Const 节点承载），
- * 属性删除 group_ep/group_tp，新增 ccl_buffer_size。与 Combine 侧 pass 共用 Mc2MoeGraphContext，
- * 同一 groupEp 得到的 context 内容一致，保证 dispatch/combine 收发同一块 HCCL window buffer。
+ * V3 相比 V2：头部新增 context 输入（Mc2MoeContext 序列化数据，ConstPlaceHolder 节点承载，
+ * 引用 HCCL 持有的 ctx 地址），属性删除 group_ep/group_tp，新增 ccl_buffer_size。与 Combine 侧
+ * pass 共用 Mc2MoeGraphContext，同一 groupEp 得到的 context 内容一致，保证 dispatch/combine 收发同一块 HCCL window
+ * buffer。
  *
  * 输入/输出按原型索引 1:1 映射（V2 port i → V3 port i+1），可选输入槽位按
  * GetInDataNodesAndPortIndexs 是否有生产者判定连边，未连接槽位只保留 desc 占位——
@@ -45,9 +46,9 @@ const std::vector<std::string> V2_IR_INPUT_NAMES = {
 
 const std::vector<std::string> REQUIRED_INT_ATTRS = {"ep_world_size", "ep_rank_id", "moe_expert_num"};
 const std::vector<std::string> OPTIONAL_INT_ATTRS = {
-    "tp_world_size", "tp_rank_id", "expert_shard_type", "shared_expert_num",
-    "shared_expert_rank_num", "quant_mode", "global_bs", "expert_token_nums_type",
-    "zero_expert_num", "copy_expert_num", "const_expert_num", "y_dtype"};
+    "tp_world_size",          "tp_rank_id",      "expert_shard_type", "shared_expert_num",
+    "shared_expert_rank_num", "quant_mode",      "global_bs",         "expert_token_nums_type",
+    "zero_expert_num",        "copy_expert_num", "const_expert_num",  "y_dtype"};
 const std::vector<std::string> OPTIONAL_STR_ATTRS = {"comm_alg"};
 
 // 运行时按 ge_compiler 版本决定注册 stage：9.0.0 之前的老 toolkit 没有 kCompatibleInherited 枚举，
@@ -184,7 +185,7 @@ ge::graphStatus MoeDistributeDispatchV2FusionPass::AddEdge(ge::Graph &graph, ge:
             return ge::GRAPH_FAILED;
         }
     }
-    // context 边：Const 节点 → V3 port 0
+    // context 边：ConstPlaceHolder 节点 → V3 port 0
     if (graph.AddDataEdge(contextNode, 0, fusionNode, 0) != ge::GRAPH_SUCCESS) {
         OPS_LOG_E(FUSION_PASS_NAME.c_str(), "add context edge failed.");
         return ge::GRAPH_FAILED;
@@ -270,6 +271,10 @@ ge::graphStatus MoeDistributeDispatchV2FusionPass::Run(ge::GraphPtr &graph, ge::
     if (graph == nullptr) {
         return ge::GRAPH_FAILED;
     }
+    ge::AscendString graphName;
+    (void)graph->GetName(graphName);
+    OPS_LOG_I(FUSION_PASS_NAME.c_str(), "Enter fusion pass %s, graph %s", FUSION_PASS_NAME.c_str(),
+              graphName.GetString());
     // 9.0.0 版本前运行降级空跑
     int32_t geCompilerVersion = 0;
     aclsysGetVersionNum("ge_compiler", &geCompilerVersion);
@@ -282,7 +287,7 @@ ge::graphStatus MoeDistributeDispatchV2FusionPass::Run(ge::GraphPtr &graph, ge::
         OPS_LOG_D(FUSION_PASS_NAME.c_str(), "target platform is not A5, skip.");
         return ge::GRAPH_SUCCESS;
     }
-    // 按 groupEp 缓存 context Const 节点与 buffer 大小，同图同通信域的多个 V2 节点复用
+    // 按 groupEp 缓存 context ConstPlaceHolder 节点与 buffer 大小，同图同通信域的多个 V2 节点复用
     std::map<std::string, std::pair<ge::GNode, int64_t>> contextNodes;
     for (auto &gNode : graph->GetDirectNode()) {
         ge::AscendString nodeType;
@@ -316,12 +321,20 @@ ge::graphStatus MoeDistributeDispatchV2FusionPass::Run(ge::GraphPtr &graph, ge::
                 OPS_LOG_E(FUSION_PASS_NAME.c_str(), "get mc2 context data failed, V2 node kept as-is.");
                 continue;
             }
-            // 先按名查重：另一个 pass（dispatch/combine 互为对端）可能已为本通信域创建过 context Const
-            ge::GNode contextNode = ops::Mc2MoeGraphContext::FindContextConstNode(*graph, groupEpStr);
+            // 与单算子路径共用 HCCL engine-ctx 注册表（tag = groupEp + "moe_distribute_v2"）：
+            // 复用 HCCL 持有的固定 device buffer，避免每图拷贝一份 context 进 weight 池
+            void *ctxAddr = nullptr;
+            uint64_t ctxSize = 0;
+            if (!ops::Mc2MoeGraphContext::GetContextDeviceAddr(groupEpStr, "moe_distribute_v2", ctxAddr, ctxSize)) {
+                OPS_LOG_E(FUSION_PASS_NAME.c_str(), "get mc2 context device addr failed, V2 node kept as-is.");
+                continue;
+            }
+            // 先按名查重：另一个 pass（dispatch/combine 互为对端）可能已为本通信域创建过 context 节点
+            ge::GNode contextNode = ops::Mc2MoeGraphContext::FindContextPlaceHolderNode(*graph, groupEpStr);
             ge::AscendString tmpType;
             if (contextNode.GetType(tmpType) != ge::GRAPH_SUCCESS) {
-                if (ops::Mc2MoeGraphContext::CreateContextConstNode(*graph, groupEpStr, contextData, contextNode) !=
-                    ge::GRAPH_SUCCESS) {
+                if (ops::Mc2MoeGraphContext::CreateContextPlaceHolderNode(*graph, groupEpStr, ctxAddr, ctxSize,
+                                                                          contextNode) != ge::GRAPH_SUCCESS) {
                     continue;
                 }
             }

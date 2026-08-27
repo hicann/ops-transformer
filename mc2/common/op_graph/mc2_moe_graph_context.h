@@ -35,18 +35,19 @@
 namespace ops {
 class Mc2MoeGraphContext {
 public:
-    // 按 groupEp 获取（首次构建并缓存）Mc2MoeContext 序列化数据与 HCCL buffer 大小。
-    // 与单算子路径语义一致：同一通信域查询出的 window buffer 地址相同，
-    // dispatch/combine 两个 fusion pass 调用本接口得到的 context 内容一致。
+    // 按 groupEp 获取 Mc2MoeContext 序列化数据与 HCCL buffer 大小
     static bool GetContextData(const std::string &groupEp, std::vector<int32_t> &contextData, int64_t &hcclBuffSize);
 
-    // 在图中创建承载 context 数据的 Const 节点（1D int32，与 aclnn 侧 context tensor 同构）。
-    // 节点名按 groupEp 唯一（mc2_moe_context_<groupEp>），避免多 pass 创建同名节点导致拓扑遍历冲突
-    static ge::graphStatus CreateContextConstNode(ge::Graph &graph, const std::string &groupEp,
-                                                  const std::vector<int32_t> &contextData, ge::GNode &constNode);
+    // 与单算子路径一致（tag = groupEp + opName）：获取或创建 HCCL 持有的 ctx 地址
+    static bool GetContextDeviceAddr(const std::string &groupEp, const std::string &opName, void *&ctx,
+                                     uint64_t &ctxSize);
 
-    // 按 groupEp 在图中查找已存在的 context Const 节点（dispatch/combine 两个 pass 共享同一个）
-    static ge::GNode FindContextConstNode(ge::Graph &graph, const std::string &groupEp);
+    // 创建引用 HCCL ctx 的 ConstPlaceHolder 节点（GE 零拷贝引用，不分配不拷贝）
+    static ge::graphStatus CreateContextPlaceHolderNode(ge::Graph &graph, const std::string &groupEp, void *ctxAddr,
+                                                        uint64_t ctxSize, ge::GNode &placeholderNode);
+
+    // 按 groupEp 查找已存在的 ConstPlaceHolder 节点
+    static ge::GNode FindContextPlaceHolderNode(ge::Graph &graph, const std::string &groupEp);
 
 private:
     static constexpr const char *kContextConstNamePrefix = "mc2_moe_context_";
@@ -89,6 +90,9 @@ private:
     HcclResult (*HcclGetRankId)(HcclComm, uint32_t *) = nullptr;
     HcclResult (*HcclGetRankSize)(HcclComm, uint32_t *) = nullptr;
     HcclResult (*HcclRankGraphGetRanksByLayer)(HcclComm, uint32_t, uint32_t **, uint32_t *) = nullptr;
+    HcclResult (*HcclEngineCtxCreate)(HcclComm, const char *, CommEngine, uint64_t, void **) = nullptr;
+    HcclResult (*HcclEngineCtxGet)(HcclComm, const char *, CommEngine, void **, uint64_t *) = nullptr;
+    HcclResult (*HcclEngineCtxCopy)(HcclComm, CommEngine, const char *, void *, uint64_t, uint64_t) = nullptr;
 
     std::unordered_map<std::string, std::pair<std::vector<int32_t>, int64_t>> contextCache_;
 };

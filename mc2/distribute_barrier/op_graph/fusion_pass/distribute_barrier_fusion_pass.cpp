@@ -10,9 +10,9 @@
 
 /*
  * 将图中的 DistributeBarrier 节点 1:1 替换为 DistributeBarrierExtend（仅 A5）。
- * Extend 相比原算子：头部新增 context 输入（Mc2MoeContext 序列化数据，Const 节点承载），
- * 属性（group/world_size）不变。与 D&C 的 V2->V3 pass 共用 Mc2MoeGraphContext，
- * 同一通信域共享同一个 context Const 节点（mc2_moe_context_<group>）。
+ * Extend 相比原算子：头部新增 context 输入（Mc2MoeContext 序列化数据，ConstPlaceHolder 节点承载，
+ * 引用 HCCL 持有的 ctx 地址），属性（group/world_size）不变。与 D&C 的 V2->V3 pass 共用 Mc2MoeGraphContext，
+ * 同一通信域共享同一个 context ConstPlaceHolder 节点（mc2_moe_context_<group>）。
  *
  * 输入按原型名解析本地索引（兼容全槽位与 compact 两种构图），V2 port i → Extend port i+1；
  * 未连接槽位只保留占位 desc、不连边。控制边迁移到 Extend 并先摘除原节点输出/控制边，
@@ -97,13 +97,12 @@ ge::graphStatus DistributeBarrierFusionPass::AddAttr(ge::GNode &barrierNode, ge:
 }
 
 ge::graphStatus DistributeBarrierFusionPass::CreateFusionNode(ge::Graph &graph, ge::GNode &barrierNode,
-                                                              const ge::TensorDesc &contextDesc,
-                                                              ge::GNode &fusionNode)
+                                                              const ge::TensorDesc &contextDesc, ge::GNode &fusionNode)
 {
     ge::AscendString nameStr;
     barrierNode.GetName(nameStr);
-    auto fusionOp = ge::OperatorFactory::CreateOperator(std::string(nameStr.GetString()) + "_Extend",
-                                                        FUSED_OP_TYPE_EXTEND);
+    auto fusionOp =
+        ge::OperatorFactory::CreateOperator(std::string(nameStr.GetString()) + "_Extend", FUSED_OP_TYPE_EXTEND);
     if (fusionOp.IsEmpty()) {
         OPS_LOG_E(FUSION_PASS_NAME.c_str(), "node %s: %s op not found in factory.", nameStr.GetString(),
                   FUSED_OP_TYPE_EXTEND.c_str());
@@ -159,7 +158,7 @@ ge::graphStatus DistributeBarrierFusionPass::AddEdge(ge::Graph &graph, ge::GNode
             return ge::GRAPH_FAILED;
         }
     }
-    // context 边：Const 节点 → Extend port 0
+    // context 边：ConstPlaceHolder 节点 → Extend port 0
     if (graph.AddDataEdge(contextNode, 0, fusionNode, 0) != ge::GRAPH_SUCCESS) {
         OPS_LOG_E(FUSION_PASS_NAME.c_str(), "add context edge failed.");
         return ge::GRAPH_FAILED;
@@ -232,6 +231,10 @@ ge::graphStatus DistributeBarrierFusionPass::Run(ge::GraphPtr &graph, ge::Custom
     if (graph == nullptr) {
         return ge::GRAPH_FAILED;
     }
+    ge::AscendString graphName;
+    (void)graph->GetName(graphName);
+    OPS_LOG_I(FUSION_PASS_NAME.c_str(), "Enter fusion pass %s, graph %s", FUSION_PASS_NAME.c_str(),
+              graphName.GetString());
     // 9.0.0 版本前运行降级空跑
     int32_t geCompilerVersion = 0;
     aclsysGetVersionNum("ge_compiler", &geCompilerVersion);
@@ -244,7 +247,7 @@ ge::graphStatus DistributeBarrierFusionPass::Run(ge::GraphPtr &graph, ge::Custom
         OPS_LOG_D(FUSION_PASS_NAME.c_str(), "target platform is not A5, skip.");
         return ge::GRAPH_SUCCESS;
     }
-    // 按 group 缓存 context Const 节点，同图同通信域的多个 barrier 节点复用
+    // 按 group 缓存 context ConstPlaceHolder 节点，同图同通信域的多个 barrier 节点复用
     std::map<std::string, ge::GNode> contextNodes;
     for (auto &gNode : graph->GetDirectNode()) {
         ge::AscendString nodeType;
@@ -264,12 +267,21 @@ ge::graphStatus DistributeBarrierFusionPass::Run(ge::GraphPtr &graph, ge::Custom
                 OPS_LOG_E(FUSION_PASS_NAME.c_str(), "get mc2 context data failed, barrier node kept as-is.");
                 continue;
             }
-            // 先按名查重：D&C 的 pass 可能已为本通信域创建过 context Const
-            ge::GNode contextNode = ops::Mc2MoeGraphContext::FindContextConstNode(*graph, groupStr);
+            // 与单算子路径共用 HCCL engine-ctx 注册表（tag = groupEp + "distribute_barrier_extend"）：
+            // 复用 HCCL 持有的固定 device buffer，避免每图拷贝一份 context 进 weight 池
+            void *ctxAddr = nullptr;
+            uint64_t ctxSize = 0;
+            if (!ops::Mc2MoeGraphContext::GetContextDeviceAddr(groupStr, "distribute_barrier_extend", ctxAddr,
+                                                               ctxSize)) {
+                OPS_LOG_E(FUSION_PASS_NAME.c_str(), "get mc2 context device addr failed, barrier node kept as-is.");
+                continue;
+            }
+            // 先按名查重：D&C 的 pass 可能已为本通信域创建过 context 节点
+            ge::GNode contextNode = ops::Mc2MoeGraphContext::FindContextPlaceHolderNode(*graph, groupStr);
             ge::AscendString tmpType;
             if (contextNode.GetType(tmpType) != ge::GRAPH_SUCCESS) {
-                if (ops::Mc2MoeGraphContext::CreateContextConstNode(*graph, groupStr, contextData, contextNode) !=
-                    ge::GRAPH_SUCCESS) {
+                if (ops::Mc2MoeGraphContext::CreateContextPlaceHolderNode(*graph, groupStr, ctxAddr, ctxSize,
+                                                                          contextNode) != ge::GRAPH_SUCCESS) {
                     continue;
                 }
             }
