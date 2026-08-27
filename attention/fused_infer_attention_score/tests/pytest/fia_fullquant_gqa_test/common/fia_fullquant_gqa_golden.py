@@ -801,7 +801,7 @@ def fia_gqa_torch_npu(
     out_dtype,
 ):
     if GRAPH_PATH == 0:
-        logger.info("[NPU] GRAPH_PATH == 0, 单算子模式...")
+        logger.info("[NPU] GRAPH_PATH == 0, single operator mode...")
         return call_npu_fa_op(
             q,
             k,
@@ -849,7 +849,7 @@ def fia_gqa_torch_npu(
         )
 
         if GRAPH_PATH == 5:
-            logger.info("[NPU] GRAPH_PATH == 5, 动态图...")
+            logger.info("[NPU] GRAPH_PATH == 5, dynamic graph...")
             torch._dynamo.reset()
             npu_mode = torch.compile(
                 npu_mode, fullgraph=True, backend=npu_backend, dynamic=True
@@ -1107,7 +1107,7 @@ def npu_fp8_full_quant(
 
 
 def npu_fp8_full_quant_external(ext):
-    """使用外部 NPU 排布数据直接调用 NPU 算子"""
+    """Use external NPU-layout data to call the NPU operator directly"""
     logger.info("Using external NPU data")
     softmax_scale = 1.0 / math.sqrt(D)
     T = sum(ACTUAL_SEQ_Q)
@@ -1248,7 +1248,7 @@ if __name__ == "__main__":
     logger.info("FIA FullQuant GQA Golden  [mode=%s, case=%s]", mode, case_name)
     logger.info("=" * 60)
     logger.info(
-        "场景: %s, INPUT_LAYOUT=%s, OUTPUT_LAYOUT=%s",
+        "Scene: %s, INPUT_LAYOUT=%s, OUTPUT_LAYOUT=%s",
         "PA" if ENABLE_PA else "noPA",
         INPUT_LAYOUT,
         OUTPUT_LAYOUT,
@@ -1299,7 +1299,7 @@ if __name__ == "__main__":
             cache_dir=cdir,
         )
     else:
-        logger.info("[Step 1] 加载已保存的输入数据")
+        logger.info("[Step 1] Load saved input data")
         (
             q_fp8,
             k_fp8,
@@ -1316,7 +1316,7 @@ if __name__ == "__main__":
         KV_CACHE_LAYOUT = kv_layout_loaded
 
     if "gen" in mode and not (mode & {"cpu", "npu", "compare"}):
-        logger.info("[Done] 数据已保存，退出")
+        logger.info("[Done] Data saved, exit")
         exit(0)
 
     if "cpu" in mode:
@@ -1337,12 +1337,12 @@ if __name__ == "__main__":
         cpu_out, cpu_lse = golden_cache.load_cpu_output(case_name, cache_dir=cdir)
 
     if "cpu" in mode and not (mode & {"npu", "compare"}):
-        logger.info("[Done] CPU 输出已保存，退出")
+        logger.info("[Done] CPU output saved, exit")
         exit(0)
 
     cache_info = None
     if "npu" in mode:
-        logger.info("\n[Step 3] NPU 调用")
+        logger.info("\n[Step 3] NPU call")
         output, cache_info = npu_fp8_full_quant(
             q_fp8,
             k_fp8,
@@ -1361,14 +1361,14 @@ if __name__ == "__main__":
         atten_out, lse_out = golden_cache.load_npu_output(case_name, cache_dir=cdir)
 
     if "npu" in mode and "compare" not in mode:
-        logger.info("[Done] NPU 输出已保存，退出")
+        logger.info("[Done] NPU output saved, exit")
         exit(0)
 
-    logger.info("\n[Step 4] Atten OUT 精度对比")
+    logger.info("\n[Step 4] Atten OUT precision comparison")
     cpu_tnd_torch = convert_q_bnsd_to_layout(cpu_out, ACTUAL_SEQ_Q, OUTPUT_LAYOUT)
     result_compare_method.check_result(cpu_tnd_torch, atten_out)
 
     if ENABLE_LSE:
-        logger.info("\n[Step 5] LSE 精度对比")
+        logger.info("\n[Step 5] LSE precision comparison")
         cpu_lse_tnd_torch = convert_q_bnsd_to_layout(cpu_lse, ACTUAL_SEQ_Q, "TND")
         result_compare_method.check_result(cpu_lse_tnd_torch, lse_out)

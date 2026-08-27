@@ -12,20 +12,31 @@
 
 import math
 import random
-import logging 
+import logging
 import torch
 
-logging.basicConfig(level=logging.INFO, format='%(message)s', force=True)
+logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
 logger = logging.getLogger(__name__)
 
 
 def validate_config(params):
-    batch_size, q_head_num, kv_head_num, q_seq, kv_seq, head_dim, dtype, in_layout, rope = params
+    (
+        batch_size,
+        q_head_num,
+        kv_head_num,
+        q_seq,
+        kv_seq,
+        head_dim,
+        dtype,
+        in_layout,
+        rope,
+    ) = params
     # 校验
     if dtype not in [torch.bfloat16, torch.float16]:
         raise ValueError("dtype should be: float16/bfloat16")
     if in_layout not in ["BSND", "BNSD"]:
         raise ValueError("input_layout should be: BSND/BNSD")
+
 
 def check_result(expect, result):
     attn_out_diff = result.reshape(-1) - expect.reshape(-1)
@@ -34,8 +45,8 @@ def check_result(expect, result):
     values = attn_out_diff[abs(attn_out_diff) > thres]
 
     if idx.numel() > 0:
-        logger.info(f"diff大于{thres}的元素索引: {idx}")
-        logger.info(f"diff大于{thres}的元素值: {values}")
+        logger.info(f"element indices where diff > {thres}: {idx}")
+        logger.info(f"element values where diff > {thres}: {values}")
 
     pass_num = torch.sum(abs(attn_out_diff.squeeze()) <= thres)
     total_num = attn_out_diff.numel()

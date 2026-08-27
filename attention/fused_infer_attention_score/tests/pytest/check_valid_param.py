@@ -12,15 +12,17 @@
 
 import math
 import random
-import logging 
+import logging
 import torch
 
-logging.basicConfig(level=logging.INFO, format='%(message)s', force=True)
+logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
 logger = logging.getLogger(__name__)
 
 
 def validate_config(params):
-    batch_size, q_head_num, kv_head_num, q_seq, kv_seq, head_dim, dtype, in_layout = params
+    batch_size, q_head_num, kv_head_num, q_seq, kv_seq, head_dim, dtype, in_layout = (
+        params
+    )
     # 校验
     if batch_size > 65536:
         raise ValueError("batch_size must <= 65536")
@@ -43,7 +45,9 @@ def create_random_block_table(batch_size, act_seq_len_kv, block_size):
     max_kv_seq_length = max(act_seq_len_kv)
 
     # 计算每个序列实际需要的block数量
-    valid_block_num = [math.ceil(act_seq_len_kv[i] / block_size) for i in range(batch_size)]
+    valid_block_num = [
+        math.ceil(act_seq_len_kv[i] / block_size) for i in range(batch_size)
+    ]
     valid_block_num_sum = sum(valid_block_num)
 
     # 计算最大block数量
@@ -57,8 +61,8 @@ def create_random_block_table(batch_size, act_seq_len_kv, block_size):
 
     for i in range(batch_size):
         block_table[i][: valid_block_num[i]] = torch.tensor(
-            block_idx[block_idx_start: block_idx_start + valid_block_num[i]],
-            dtype=torch.int32
+            block_idx[block_idx_start : block_idx_start + valid_block_num[i]],
+            dtype=torch.int32,
         )
         block_idx_start += valid_block_num[i]
 
@@ -74,12 +78,14 @@ def check_result(expect, result):
     values = attn_out_diff[abs(attn_out_diff) > thres]
 
     if idx.numel() > 0:
-        logger.info(f"diff大于{thres}的元素索引: {idx}")
-        logger.info(f"diff大于{thres}的元素值: {values}")
+        logger.info(f"element indices where diff > {thres}: {idx}")
+        logger.info(f"element values where diff > {thres}: {values}")
 
     pass_num = torch.sum(abs(attn_out_diff.squeeze()) <= thres)
     total_num = attn_out_diff.numel()
     accuracy = pass_num / total_num
     logger.info(f"pass num: {pass_num}, total num: {total_num}, accuracy: {accuracy}")
 
-    assert torch.allclose(result_cpu.flatten(), expect_cpu.flatten(), rtol=0.05, atol=0.05)
+    assert torch.allclose(
+        result_cpu.flatten(), expect_cpu.flatten(), rtol=0.05, atol=0.05
+    )

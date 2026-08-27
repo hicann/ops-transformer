@@ -313,7 +313,7 @@ def _run_one(cfg, expect_pass):
                 mask_npu,
                 sparse_mode,
             )
-        logger.info(f"  [{cfg['id']}] ERROR: {ei.value}")
+        logger.error(f"  [{cfg['id']}] ERROR: {ei.value}")
         return
     out = _run(
         q_npu,
@@ -744,8 +744,8 @@ def test_normal(cfg):
 
 if __name__ == "__main__":
     logger.info(
-        f"普通路径={len(NEW_NORMAL) + len(OLD_NORMAL)} "
-        f"兼容回退={len(NEW_COMPAT_FALLBACK) + len(COMPAT_FALLBACK)}"
+        f"normal_path={len(NEW_NORMAL) + len(OLD_NORMAL)} "
+        f"compat_fallback={len(NEW_COMPAT_FALLBACK) + len(COMPAT_FALLBACK)}"
     )
     ok = True
     for c in ALL_NORMAL:
@@ -753,6 +753,6 @@ if __name__ == "__main__":
             _run_one(c, True)
             logger.info("  PASS")
         except Exception as e:
-            logger.info(f"  FAIL: {e}")
+            logger.error(f"  FAIL: {e}")
             ok = False
-    logger.info("\n全部通过!" if ok else "\n存在失败!")
+    logger.info("\nAll passed!" if ok else "\nFailures exist!")

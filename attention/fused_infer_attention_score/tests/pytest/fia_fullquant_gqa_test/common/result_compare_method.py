@@ -108,7 +108,7 @@ def display_output_torch(real_data, expect_data, start, end, expect_fp32_data=No
 
 
 def display_error_output_torch(real_data, expect_data, err_idx, relative_diff):
-    logger.info(
+    logger.error(
         "Error Line-----------------------------------------------------------------------------"
     )
     logger.info("Loop \t ExpectOut \t RealOut \t FpDiff \t RateDiff")
@@ -187,7 +187,7 @@ def check_result(expect, npu_result):
         return "Pass", 100.0, 0
 
     if real_data.numel() != expect_data.numel():
-        logger.info(
+        logger.error(
             "Error,the size of npu output[%s] and benchmark[%s] is not equal.",
             real_data.numel(),
             expect_data.numel(),

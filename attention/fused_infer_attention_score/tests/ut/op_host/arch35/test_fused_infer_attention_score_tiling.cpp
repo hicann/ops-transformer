@@ -1,7 +1,7 @@
 /**
  * Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
@@ -17,15 +17,9 @@ namespace FusedInferAttentionScoreUT {
 
 class FusedInferAttentionScoreArch35TilingTest : public testing::TestWithParam<FusedInferAttentionTilingUtParam> {
 protected:
-    static void SetUpTestCase()
-    {
-        std::cout << "FusedInferAttentionScore Arch35 TilingTest SetUp" << std::endl;
-    }
+    static void SetUpTestCase() {}
 
-    static void TearDownTestCase()
-    {
-        std::cout << "FusedInferAttentionScore Arch35 TilingTest TearDown" << std::endl;
-    }
+    static void TearDownTestCase() {}
 };
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(FusedInferAttentionScoreArch35TilingTest);
@@ -58,15 +52,37 @@ TEST_P(FusedInferAttentionScoreArch35TilingTest, param)
     if (!param.isTensorList) {
         gert::TilingContextPara tilingContextPara(
             "FusedInferAttentionScore",
-            {param.query, param.key, param.value, param.pse_shift, param.atten_mask,
-             param.actual_seq_lengths, param.actual_seq_lengths_kv, param.dequant_scale1,
-             param.quant_scale1, param.dequant_scale2, param.quant_scale2, param.quant_offset2,
-             param.antiquant_scale, param.antiquant_offset, param.block_table,
-             param.query_padding_size, param.kv_padding_size, param.key_antiquant_scale,
-             param.key_antiquant_offset, param.value_antiquant_scale, param.value_antiquant_offset,
-             param.key_shared_prefix, param.value_shared_prefix, param.actual_shared_prefix_len,
-             param.query_rope, param.key_rope, param.key_rope_antiquant_scale,
-             param.dequant_scale_query, param.learnable_sink, param.q_start_idx, param.kv_start_idx},
+            {param.query,
+             param.key,
+             param.value,
+             param.pse_shift,
+             param.atten_mask,
+             param.actual_seq_lengths,
+             param.actual_seq_lengths_kv,
+             param.dequant_scale1,
+             param.quant_scale1,
+             param.dequant_scale2,
+             param.quant_scale2,
+             param.quant_offset2,
+             param.antiquant_scale,
+             param.antiquant_offset,
+             param.block_table,
+             param.query_padding_size,
+             param.kv_padding_size,
+             param.key_antiquant_scale,
+             param.key_antiquant_offset,
+             param.value_antiquant_scale,
+             param.value_antiquant_offset,
+             param.key_shared_prefix,
+             param.value_shared_prefix,
+             param.actual_shared_prefix_len,
+             param.query_rope,
+             param.key_rope,
+             param.key_rope_antiquant_scale,
+             param.dequant_scale_query,
+             param.learnable_sink,
+             param.q_start_idx,
+             param.kv_start_idx},
             {param.attention_out, param.softmax_lse},
             {
                 {"num_heads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.num_heads)},
@@ -87,29 +103,52 @@ TEST_P(FusedInferAttentionScoreArch35TilingTest, param)
                 {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.out_dtype)},
             },
             &compileInfo, "Ascend950", 64, 196608, 16384, A5SocInfo);
-        ExecuteTestCase(tilingContextPara, param.expectResult, param.expectTilingKey, param.expectTilingDataHash,
-            {}, 0, true);
+        ExecuteTestCase(tilingContextPara, param.expectResult, param.expectTilingKey, param.expectTilingDataHash, {}, 0,
+                        true);
         return;
     }
 
-    std::vector<gert::TilingContextPara::TensorDescription> allInputs = {
-        param.query, param.key, param.value, param.pse_shift, param.atten_mask,
-        param.actual_seq_lengths, param.actual_seq_lengths_kv, param.dequant_scale1,
-        param.quant_scale1, param.dequant_scale2, param.quant_scale2, param.quant_offset2,
-        param.antiquant_scale, param.antiquant_offset, param.block_table,
-        param.query_padding_size, param.kv_padding_size, param.key_antiquant_scale,
-        param.key_antiquant_offset, param.value_antiquant_scale, param.value_antiquant_offset,
-        param.key_shared_prefix, param.value_shared_prefix, param.actual_shared_prefix_len,
-        param.query_rope, param.key_rope, param.key_rope_antiquant_scale,
-        param.dequant_scale_query, param.learnable_sink, param.q_start_idx, param.kv_start_idx};
+    std::vector<gert::TilingContextPara::TensorDescription> allInputs = {param.query,
+                                                                         param.key,
+                                                                         param.value,
+                                                                         param.pse_shift,
+                                                                         param.atten_mask,
+                                                                         param.actual_seq_lengths,
+                                                                         param.actual_seq_lengths_kv,
+                                                                         param.dequant_scale1,
+                                                                         param.quant_scale1,
+                                                                         param.dequant_scale2,
+                                                                         param.quant_scale2,
+                                                                         param.quant_offset2,
+                                                                         param.antiquant_scale,
+                                                                         param.antiquant_offset,
+                                                                         param.block_table,
+                                                                         param.query_padding_size,
+                                                                         param.kv_padding_size,
+                                                                         param.key_antiquant_scale,
+                                                                         param.key_antiquant_offset,
+                                                                         param.value_antiquant_scale,
+                                                                         param.value_antiquant_offset,
+                                                                         param.key_shared_prefix,
+                                                                         param.value_shared_prefix,
+                                                                         param.actual_shared_prefix_len,
+                                                                         param.query_rope,
+                                                                         param.key_rope,
+                                                                         param.key_rope_antiquant_scale,
+                                                                         param.dequant_scale_query,
+                                                                         param.learnable_sink,
+                                                                         param.q_start_idx,
+                                                                         param.kv_start_idx};
 
     std::vector<gert::TilingContextPara::TensorDescription> inputTensors;
     std::vector<uint32_t> inputInstanceNum;
     inputTensors.emplace_back(allInputs[0]);
     inputInstanceNum.emplace_back(1);
-    for (auto& t : param.keyList) inputTensors.emplace_back(t);
+    for (auto &t : param.keyList)
+        inputTensors.emplace_back(t);
     inputInstanceNum.emplace_back(static_cast<uint32_t>(param.keyList.size()));
-    for (auto& t : param.valueList) inputTensors.emplace_back(t);
+    for (auto &t : param.valueList)
+        inputTensors.emplace_back(t);
     inputInstanceNum.emplace_back(static_cast<uint32_t>(param.valueList.size()));
     for (size_t i = 3; i < allInputs.size(); i++) {
         if (param.inputInstance[i] != 0) {
@@ -120,9 +159,7 @@ TEST_P(FusedInferAttentionScoreArch35TilingTest, param)
     std::vector<uint32_t> outputInstanceNum = param.outputInstance;
 
     gert::TilingContextPara tilingContextPara(
-        "FusedInferAttentionScore",
-        inputTensors,
-        {param.attention_out, param.softmax_lse},
+        "FusedInferAttentionScore", inputTensors, {param.attention_out, param.softmax_lse},
         {
             {"num_heads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.num_heads)},
             {"scale", Ops::Transformer::AnyValue::CreateFrom<float>(param.scale)},
@@ -141,8 +178,7 @@ TEST_P(FusedInferAttentionScoreArch35TilingTest, param)
             {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.pse_type)},
             {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.out_dtype)},
         },
-        inputInstanceNum, outputInstanceNum,
-        &compileInfo, "Ascend950", 64, 196608, 16384, A5SocInfo);
+        inputInstanceNum, outputInstanceNum, &compileInfo, "Ascend950", 64, 196608, 16384, A5SocInfo);
 
     ExecuteTestCase(tilingContextPara, param.expectResult, param.expectTilingKey, param.expectTilingDataHash, {}, 0,
                     true);

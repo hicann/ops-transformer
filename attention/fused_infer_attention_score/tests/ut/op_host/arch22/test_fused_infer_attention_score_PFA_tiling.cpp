@@ -17,26 +17,25 @@
 namespace FusedInferAttentionScoreUT {
 namespace {
 
-const char *A2_SOC_INFO =
-    "{\n"
-    "  \"hardware_info\": {\n"
-    "    \"BT_SIZE\": 0,\n"
-    "    \"load3d_constraints\": \"1\",\n"
-    "    \"Intrinsic_fix_pipe_l0c2out\": false,\n"
-    "    \"Intrinsic_data_move_l12ub\": true,\n"
-    "    \"Intrinsic_data_move_l0c2ub\": true,\n"
-    "    \"Intrinsic_data_move_out2l1_nd2nz\": false,\n"
-    "    \"UB_SIZE\": 196608,\n"
-    "    \"L2_SIZE\": 201326592,\n"
-    "    \"L1_SIZE\": 524288,\n"
-    "    \"L0A_SIZE\": 65536,\n"
-    "    \"L0B_SIZE\": 65536,\n"
-    "    \"L0C_SIZE\": 131072,\n"
-    "    \"vector_core_cnt\": 40,\n"
-    "    \"cube_core_cnt\": 20,\n"
-    "    \"socVersion\": \"Ascend910_B3\"\n"
-    "  }\n"
-    "}";
+const char *A2_SOC_INFO = "{\n"
+                          "  \"hardware_info\": {\n"
+                          "    \"BT_SIZE\": 0,\n"
+                          "    \"load3d_constraints\": \"1\",\n"
+                          "    \"Intrinsic_fix_pipe_l0c2out\": false,\n"
+                          "    \"Intrinsic_data_move_l12ub\": true,\n"
+                          "    \"Intrinsic_data_move_l0c2ub\": true,\n"
+                          "    \"Intrinsic_data_move_out2l1_nd2nz\": false,\n"
+                          "    \"UB_SIZE\": 196608,\n"
+                          "    \"L2_SIZE\": 201326592,\n"
+                          "    \"L1_SIZE\": 524288,\n"
+                          "    \"L0A_SIZE\": 65536,\n"
+                          "    \"L0B_SIZE\": 65536,\n"
+                          "    \"L0C_SIZE\": 131072,\n"
+                          "    \"vector_core_cnt\": 40,\n"
+                          "    \"cube_core_cnt\": 20,\n"
+                          "    \"socVersion\": \"Ascend910_B3\"\n"
+                          "  }\n"
+                          "}";
 
 struct EmptyCompileInfo {};
 static EmptyCompileInfo g_compileInfo;
@@ -45,13 +44,11 @@ class FusedInferAttentionScorePfaTiling : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        std::cout << "FusedInferAttentionScorePfa Arch22 TilingTest SetUp" << std::endl;
         SoftmaxTilingMocker::GetInstance().SetSocVersion("Ascend910B");
     }
 
     static void TearDownTestCase()
     {
-        std::cout << "FusedInferAttentionScorePfa Arch22 TilingTest TearDown" << std::endl;
         SoftmaxTilingMocker::GetInstance().Reset();
     }
 };
@@ -543,38 +540,38 @@ TEST_F(FusedInferAttentionScorePfaTiling, FusedInferAttentionScore_PFA_tiling_5)
 TEST_F(FusedInferAttentionScorePfaTiling, FusedInferAttentionScore_PFA_tiling_6)
 {
     std::vector<uint32_t> inputInstanceNum = {
-        1,  // 0: query
-        2,  // 1: key tensorlist
-        2,  // 2: value tensorlist
-        0,  // 3: pse_shift
-        0,  // 4: atten_mask
-        0,  // 5: actual_seq_lengths_q
-        0,  // 6: actual_seq_lengths_kv
-        0,  // 7: dequant_scale1
-        0,  // 8: quant_scale1
-        0,  // 9: dequant_scale2
-        0,  // 10: quant_scale2
-        0,  // 11: quant_offset2
-        0,  // 12: antiquant_scale
-        0,  // 13: antiquant_offset
-        0,  // 14: block_table
-        0,  // 15: query_padding_size
-        0,  // 16: kv_padding_size
-        0,  // 17: key_antiquant_scale
-        0,  // 18: key_antiquant_offset
-        0,  // 19: value_antiquant_scale
-        0,  // 20: value_antiquant_offset
-        0,  // 21: key_shared_prefix
-        0,  // 22: value_shared_prefix
-        0,  // 23: actual_shared_prefix_len
-        0,  // 24: query_rope
-        0,  // 25: key_rope
-        0,  // 26: latent_cache
-        0,  // 27: block_table_offset
-        0,  // 28: query_padding_size_as
-        0,  // 29: kv_padding_size_as
-        0,  // 30: query_rope_offset
-        0,  // 31: key_rope_offset
+        1, // 0: query
+        2, // 1: key tensorlist
+        2, // 2: value tensorlist
+        0, // 3: pse_shift
+        0, // 4: atten_mask
+        0, // 5: actual_seq_lengths_q
+        0, // 6: actual_seq_lengths_kv
+        0, // 7: dequant_scale1
+        0, // 8: quant_scale1
+        0, // 9: dequant_scale2
+        0, // 10: quant_scale2
+        0, // 11: quant_offset2
+        0, // 12: antiquant_scale
+        0, // 13: antiquant_offset
+        0, // 14: block_table
+        0, // 15: query_padding_size
+        0, // 16: kv_padding_size
+        0, // 17: key_antiquant_scale
+        0, // 18: key_antiquant_offset
+        0, // 19: value_antiquant_scale
+        0, // 20: value_antiquant_offset
+        0, // 21: key_shared_prefix
+        0, // 22: value_shared_prefix
+        0, // 23: actual_shared_prefix_len
+        0, // 24: query_rope
+        0, // 25: key_rope
+        0, // 26: latent_cache
+        0, // 27: block_table_offset
+        0, // 28: query_padding_size_as
+        0, // 29: kv_padding_size_as
+        0, // 30: query_rope_offset
+        0, // 31: key_rope_offset
     };
     std::vector<uint32_t> outputInstanceNum = {1, 0};
     gert::TilingContextPara tilingContextPara(
@@ -611,9 +608,7 @@ TEST_F(FusedInferAttentionScorePfaTiling, FusedInferAttentionScore_PFA_tiling_6)
             {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         },
-        inputInstanceNum,
-        outputInstanceNum,
-        &g_compileInfo, "Ascend910B", 40, 196608, 4096, A2_SOC_INFO);
+        inputInstanceNum, outputInstanceNum, &g_compileInfo, "Ascend910B", 40, 196608, 4096, A2_SOC_INFO);
 
     TilingInfo tilingInfo;
     EXPECT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
@@ -622,38 +617,38 @@ TEST_F(FusedInferAttentionScorePfaTiling, FusedInferAttentionScore_PFA_tiling_6)
 TEST_F(FusedInferAttentionScorePfaTiling, FusedInferAttentionScore_PFA_tiling_7)
 {
     std::vector<uint32_t> inputInstanceNum = {
-        1,  // 0: query
-        2,  // 1: key tensorlist
-        2,  // 2: value tensorlist
-        0,  // 3: pse_shift
-        0,  // 4: atten_mask
-        0,  // 5: actual_seq_lengths_q
-        0,  // 6: actual_seq_lengths_kv
-        0,  // 7: dequant_scale1
-        0,  // 8: quant_scale1
-        0,  // 9: dequant_scale2
-        0,  // 10: quant_scale2
-        0,  // 11: quant_offset2
-        0,  // 12: antiquant_scale
-        0,  // 13: antiquant_offset
-        0,  // 14: block_table
-        0,  // 15: query_padding_size
-        0,  // 16: kv_padding_size
-        0,  // 17: key_antiquant_scale
-        0,  // 18: key_antiquant_offset
-        0,  // 19: value_antiquant_scale
-        0,  // 20: value_antiquant_offset
-        0,  // 21: key_shared_prefix
-        0,  // 22: value_shared_prefix
-        0,  // 23: actual_shared_prefix_len
-        0,  // 24: query_rope
-        0,  // 25: key_rope
-        0,  // 26: latent_cache
-        0,  // 27: block_table_offset
-        0,  // 28: query_padding_size_as
-        0,  // 29: kv_padding_size_as
-        0,  // 30: query_rope_offset
-        0,  // 31: key_rope_offset
+        1, // 0: query
+        2, // 1: key tensorlist
+        2, // 2: value tensorlist
+        0, // 3: pse_shift
+        0, // 4: atten_mask
+        0, // 5: actual_seq_lengths_q
+        0, // 6: actual_seq_lengths_kv
+        0, // 7: dequant_scale1
+        0, // 8: quant_scale1
+        0, // 9: dequant_scale2
+        0, // 10: quant_scale2
+        0, // 11: quant_offset2
+        0, // 12: antiquant_scale
+        0, // 13: antiquant_offset
+        0, // 14: block_table
+        0, // 15: query_padding_size
+        0, // 16: kv_padding_size
+        0, // 17: key_antiquant_scale
+        0, // 18: key_antiquant_offset
+        0, // 19: value_antiquant_scale
+        0, // 20: value_antiquant_offset
+        0, // 21: key_shared_prefix
+        0, // 22: value_shared_prefix
+        0, // 23: actual_shared_prefix_len
+        0, // 24: query_rope
+        0, // 25: key_rope
+        0, // 26: latent_cache
+        0, // 27: block_table_offset
+        0, // 28: query_padding_size_as
+        0, // 29: kv_padding_size_as
+        0, // 30: query_rope_offset
+        0, // 31: key_rope_offset
     };
     std::vector<uint32_t> outputInstanceNum = {1, 0};
     gert::TilingContextPara tilingContextPara(
@@ -690,9 +685,7 @@ TEST_F(FusedInferAttentionScorePfaTiling, FusedInferAttentionScore_PFA_tiling_7)
             {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         },
-        inputInstanceNum,
-        outputInstanceNum,
-        &g_compileInfo, "Ascend910B", 40, 196608, 4096, A2_SOC_INFO);
+        inputInstanceNum, outputInstanceNum, &g_compileInfo, "Ascend910B", 40, 196608, 4096, A2_SOC_INFO);
 
     TilingInfo tilingInfo;
     EXPECT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
@@ -865,7 +858,8 @@ TEST_F(FusedInferAttentionScorePfaTiling, FusedInferAttentionScore_PFA_tiling_10
             {{{2, 128, 1024}, {2, 128, 1024}}, ge::DT_INT8, ge::FORMAT_ND},
             // 3: pse_shift, use a fully valid 4D shape so the case can reach old-PFA's "not support PSE" branch.
             {{{1, 8, 128, 256}, {1, 8, 128, 256}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            // 4: atten_mask, keep a valid sparse_mode=3 mask so the case is not intercepted by earlier mask-null checks.
+            // 4: atten_mask, keep a valid sparse_mode=3 mask so the case is not intercepted by earlier mask-null
+            // checks.
             {{{1, 1, 2048, 2048}, {1, 1, 2048, 2048}}, ge::DT_BOOL, ge::FORMAT_ND},
             // 5: actual_seq_lengths
             TD_DEFAULT,
@@ -970,7 +964,8 @@ TEST_F(FusedInferAttentionScorePfaTiling, FusedInferAttentionScore_PFA_tiling_11
             TD_DEFAULT,
             // 17: key_antiquant_scale, valid BNSD per-channel antiquant shape.
             {{{1, 8, 1, 128}, {1, 8, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},
-            // 18: key_antiquant_offset, keep it non-null so old PFA can safely print dim nums in the fallback error branch
+            // 18: key_antiquant_offset, keep it non-null so old PFA can safely print dim nums in the fallback error
+            // branch
             {{{1, 8, 1, 128}, {1, 8, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},
             // 19: value_antiquant_scale
             {{{1, 8, 1, 128}, {1, 8, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},
@@ -1184,7 +1179,8 @@ TEST_F(FusedInferAttentionScorePfaTiling, FusedInferAttentionScore_PFA_tiling_14
     gert::TilingContextPara tilingContextPara(
         "FusedInferAttentionScore",
         {
-            // 0: query, keep FP16 + INT8 KV and small S so old PFA stays in MSD mode instead of switching back to kv antiquant.
+            // 0: query, keep FP16 + INT8 KV and small S so old PFA stays in MSD mode instead of switching back to kv
+            // antiquant.
             {{{2, 16, 1024}, {2, 16, 1024}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             // 1: key
             {{{2, 16, 1024}, {2, 16, 1024}}, ge::DT_INT8, ge::FORMAT_ND},
