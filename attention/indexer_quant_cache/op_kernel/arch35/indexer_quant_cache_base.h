@@ -63,7 +63,10 @@ __aicore__ inline int64_t PagedSlotOffset(int64_t slot, int64_t blockSize, int64
     return block * blockStride + pos * rowStride;
 }
 
-__aicore__ inline int32_t CeilAlign(int32_t a, int b) { return CeilDiv(a, b) * b; }
+__aicore__ inline int32_t CeilAlign(int32_t a, int b)
+{
+    return CeilDiv(a, b) * b;
+}
 
 template <typename T>
 __aicore__ inline int32_t RoundUp(int32_t num)
@@ -197,11 +200,14 @@ __simd_vf__ inline void VFProcessMxFp8InvScaleVF(__ubuf__ float *yLocalAddr, __u
         RegTensor<uint32_t> cAndMan;
         RegTensor<uint32_t> c127;
         RegTensor<int32_t> c127Int;
+        RegTensor<int32_t> c255Int;
+        RegTensor<int32_t> fp32Nan;
         RegTensor<uint8_t> tmp5;
         UnalignRegForStore uReg;
         MaskReg pregMain0 = CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
         MaskReg pregMain1 = CreateMask<TX, AscendC::Reg::MaskPattern::ALL>();
         MaskReg compareMask0;
+        MaskReg specialDataMask;
         uint32_t sregMerge = static_cast<uint32_t>(vlLen) / MXB;         // 4
         uint32_t sregMerge1 = 4U * (static_cast<uint32_t>(vlLen) / MXB); // 16
         MaskReg pregMerge = UpdateMask<float>(sregMerge);
@@ -212,6 +218,8 @@ __simd_vf__ inline void VFProcessMxFp8InvScaleVF(__ubuf__ float *yLocalAddr, __u
         Duplicate(cAndMan, FAST_LOG_AND_VALUE2, pregMain0);
         Duplicate(c127, static_cast<uint32_t>(127), pregMain0);
         Duplicate(c127Int, static_cast<int32_t>(127), pregMain0);
+        Duplicate(c255Int, static_cast<int32_t>(255), pregMain0);
+        Duplicate(fp32Nan, static_cast<int32_t>(0x7FC00000), pregMain0);
         for (uint16_t i = 0; i < curRowNum; i++) {
             __ubuf__ uint8_t *scaleRowAddr = scaleOriginAddr + i * scaleColNumAlign; // 本行 32B 对齐基址
             uint32_t eCnt = curColNum; // y 存储尾块的 running counter (UpdateMask 饱和到 0)
@@ -236,17 +244,21 @@ __simd_vf__ inline void VFProcessMxFp8InvScaleVF(__ubuf__ float *yLocalAddr, __u
                 Muls(scale, clampScale, coeff, pregMerge);                    // sf = amax / fp8max
                 // round 成 e8m0 = exp + (mantissa != 0); 存储 scale = 2^(exp_scale); invScale = 2^(-exp_scale)
                 ShiftRights(scale2, (RegTensor<uint32_t> &)scale, static_cast<int16_t>(FAST_LOG_SHIFT_BITS), pregMerge);
-                And(scale2, scale2, cAndExp, pregMerge);                       // exp
-                And(scale3, (RegTensor<uint32_t> &)scale, cAndMan, pregMerge); // man_bits
+                And(scale2, scale2, cAndExp, pregMerge);                                              // exp
+                And(scale3, (RegTensor<uint32_t> &)scale, cAndMan, pregMerge);                        // man_bits
+                Compare<uint32_t, AscendC::CMPMODE::EQ>(specialDataMask, scale2, cAndExp, pregMerge); // INF/NAN
                 Compare<uint32_t, AscendC::CMPMODE::NE>(compareMask0, scale3, zeroUint32, pregMerge);
                 Select(scaleSel, oneUint32, zeroUint32, compareMask0);                                // man_bits != 0
                 Sub(scale3, scale2, c127, pregMerge);                                                 // exp - 127
                 Add((RegTensor<uint32_t> &)scale4, scale3, scaleSel, pregMerge);                      // exp_scale
                 Adds(scale5, scale4, 127, pregMerge);                                                 // exp_scale + 127
+                Select<int32_t>(scale5, c255Int, scale5, specialDataMask);                            // E8M0 NAN
                 ShiftLefts((RegTensor<int32_t> &)scale, scale5, static_cast<int16_t>(23), pregMerge); // 存储 scale
                 Sub(scale5, c127Int, scale4, pregMerge);                                              // 127 - exp_scale
                 // 2^(-exp_scale)
                 ShiftLefts((RegTensor<int32_t> &)invScale, scale5, static_cast<int16_t>(23), pregMerge);
+                Select<int32_t>((RegTensor<int32_t> &)invScale, fp32Nan, (RegTensor<int32_t> &)invScale,
+                                specialDataMask);
                 // e8m0 字节存储: 每 128-chunk 固定 4 字节 (越界块入本行 32B scratch padding, CopyOut 只取 scaleCol)
                 ShiftRights(scale2, (RegTensor<uint32_t> &)scale, static_cast<int16_t>(FAST_LOG_SHIFT_BITS), pregMerge);
                 Cast<uint8_t, int32_t, castTraitU32toU8Even>(tmp5, (RegTensor<int32_t> &)scale2, pregMerge);
