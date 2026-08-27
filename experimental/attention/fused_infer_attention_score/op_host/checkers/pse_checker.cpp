@@ -128,7 +128,7 @@ ge::graphStatus PSEChecker::CheckPseShiftShape(const FiaTilingInfo &fiaInfo)
         OP_CHECK_IF(pseShiftDimNum != DIM_NUM_4,
                     OP_LOGE(fiaInfo.opName,
                             "The dimension number of pseShift must be 4 when pseType is 0, but "
-                            "the current dimensioin number of pseShift is %u.",
+                            "the current dimension number of pseShift is %u.",
                             pseShiftDimNum),
                     return ge::GRAPH_FAILED);
         uint32_t pseShiftBatch = pseShiftShape.GetDim(DIM_NUM_0);
@@ -218,7 +218,7 @@ ge::graphStatus PSEChecker::CheckerFeatureCrossover(const FiaTilingInfo &fiaInfo
         // 使能alibi时，MLA不支持pse
         OP_CHECK_IF(fiaInfo.mlaMode == MlaMode::ROPE_COMBINE_D128 || fiaInfo.mlaMode == MlaMode::ROPE_SPLIT_D128 ||
                         fiaInfo.mlaMode == MlaMode::ROPE_SPLIT_D512,
-                    OP_LOGE(fiaInfo.opName, "MLA do not support pseShift."), return ge::GRAPH_FAILED);
+                    OP_LOGE(fiaInfo.opName, "MLA does not support pseShift."), return ge::GRAPH_FAILED);
     } else if (fiaInfo.pseShiftFlag) {
         if (fiaInfo.isMaxWorkspace) {
             return ge::GRAPH_SUCCESS;
@@ -226,7 +226,7 @@ ge::graphStatus PSEChecker::CheckerFeatureCrossover(const FiaTilingInfo &fiaInfo
         // 非alibi时，MLA，不支持pse
         OP_CHECK_IF(fiaInfo.mlaMode == MlaMode::ROPE_COMBINE_D128 || fiaInfo.mlaMode == MlaMode::ROPE_SPLIT_D128 ||
                         fiaInfo.mlaMode == MlaMode::ROPE_SPLIT_D512,
-                    OP_LOGE(fiaInfo.opName, "MLA do not support pseShift."), return ge::GRAPH_FAILED);
+                    OP_LOGE(fiaInfo.opName, "MLA does not support pseShift."), return ge::GRAPH_FAILED);
         // D不等长时，不支持pse
         OP_CHECK_IF(fiaInfo.isQKVDDifferent,
                     OP_LOGE(fiaInfo.opName,
@@ -305,8 +305,7 @@ ge::graphStatus PSEChecker::CheckParaExistence(const FiaTilingInfo &fiaInfo)
 
 ge::graphStatus PSEChecker::CheckCrossFeature(const FiaTilingInfo &fiaInfo)
 {
-    if (ge::GRAPH_SUCCESS != CheckFeaturePA(fiaInfo) ||
-        ge::GRAPH_SUCCESS != CheckerFeatureCrossover(fiaInfo)) {
+    if (ge::GRAPH_SUCCESS != CheckFeaturePA(fiaInfo) || ge::GRAPH_SUCCESS != CheckerFeatureCrossover(fiaInfo)) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;

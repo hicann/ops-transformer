@@ -107,21 +107,23 @@ struct FusedInferHostTensorParams {
 static graphStatus FiaFillTensorParams(const OpExecuteContext *host_api_ctx, FusedInferHostTensorParams &fiaTensors)
 {
     fiaTensors.query = host_api_ctx->GetInputTensor(QUERY_INDEX);
-    OP_CHECK_IF(fiaTensors.query == nullptr, OP_LOGE(host_api_ctx->GetNodeName(),
-               "query is null"), return GRAPH_FAILED);
-    
+    OP_CHECK_IF(fiaTensors.query == nullptr, OP_LOGE(host_api_ctx->GetNodeName(), "query is null"),
+                return GRAPH_FAILED);
+
     fiaTensors.key = host_api_ctx->GetDynamicInputTensor(KEY_INDEX, 0);
     OP_CHECK_IF(fiaTensors.key == nullptr, OP_LOGE(host_api_ctx->GetNodeName(), "key is null"), return GRAPH_FAILED);
-    
+
     fiaTensors.value = host_api_ctx->GetDynamicInputTensor(VALUE_INDEX, 0);
-    OP_CHECK_IF(fiaTensors.value == nullptr, OP_LOGE(host_api_ctx->GetNodeName(), "value is null"), return GRAPH_FAILED);
-    
+    OP_CHECK_IF(fiaTensors.value == nullptr, OP_LOGE(host_api_ctx->GetNodeName(), "value is null"),
+                return GRAPH_FAILED);
+
     fiaTensors.output = host_api_ctx->GetOutputTensor(ATTENTION_OUT_INDEX);
-    OP_CHECK_IF(fiaTensors.output == nullptr, OP_LOGE(host_api_ctx->GetNodeName(), "output is null"), return GRAPH_FAILED);
-    
+    OP_CHECK_IF(fiaTensors.output == nullptr, OP_LOGE(host_api_ctx->GetNodeName(), "output is null"),
+                return GRAPH_FAILED);
+
     fiaTensors.softmaxLse = host_api_ctx->GetOutputTensor(SOFTMAX_LSE_INDEX);
-    OP_CHECK_IF(fiaTensors.softmaxLse == nullptr, OP_LOGE(host_api_ctx->GetNodeName(),
-               "softmaxLse is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(fiaTensors.softmaxLse == nullptr, OP_LOGE(host_api_ctx->GetNodeName(), "softmaxLse is null"),
+                return GRAPH_FAILED);
 
     fiaTensors.pseShiftGe = host_api_ctx->GetOptionalInputTensor(PSE_SHIFT_INDEX);
     fiaTensors.attenMaskGe = host_api_ctx->GetOptionalInputTensor(ATTEN_MASK_INDEX);
@@ -149,7 +151,7 @@ static graphStatus FiaFillTensorParams(const OpExecuteContext *host_api_ctx, Fus
     fiaTensors.keyRopeAntiquantScaleGe = host_api_ctx->GetOptionalInputTensor(KEY_ROPE_ANTIQUANT_SCALE_INDEX);
     fiaTensors.dequantScaleQueryGe = host_api_ctx->GetOptionalInputTensor(DEQUANT_SCALE_QUERY_INDEX);
     fiaTensors.learnableSinkGe = host_api_ctx->GetOptionalInputTensor(LEARNABLE_SINK_INDEX);
-    
+
     return GRAPH_SUCCESS;
 }
 
@@ -238,7 +240,8 @@ struct FusedInferHostScalarParams {
     int64_t queryQuantMode = 0;
 };
 
-static void GetFusedInferHostScalarParams(const FusedInferHostAttrPtrs &attrPointers, FusedInferHostScalarParams &params)
+static void GetFusedInferHostScalarParams(const FusedInferHostAttrPtrs &attrPointers,
+                                          FusedInferHostScalarParams &params)
 {
     params.numHeads = *(attrPointers.getNumHeads);
     params.dScaleValue = *(attrPointers.scaleValue);
@@ -279,22 +282,26 @@ static graphStatus FusedInferHostExecuteFunc(OpExecuteContext *host_api_ctx)
     FusedInferHostScalarParams sclarParams{};
     GetFusedInferHostScalarParams(attrPointers, sclarParams);
 
-    if (sclarParams.innerPrecise < 0 || sclarParams.innerPrecise > 3) { // innerPrecise=2,3 corresponds to rows with invalid high precision and high performance
-        OP_LOGE(host_api_ctx->GetNodeName(), "invalid innerPrecise(%ld). Only support 0~3 now.", sclarParams.innerPrecise);
+    if (sclarParams.innerPrecise < 0 ||
+        sclarParams.innerPrecise >
+            3) { // innerPrecise=2,3 corresponds to rows with invalid high precision and high performance
+        OP_LOGE(host_api_ctx->GetNodeName(), "invalid innerPrecise(%ld). Only support 0~3 now.",
+                sclarParams.innerPrecise);
         return GRAPH_FAILED;
     }
     OP_LOGD(host_api_ctx->GetNodeName(), "FusedInferAttentionScore fallback begin, numHeads = %ld, dScaleValue = %lf",
-              sclarParams.numHeads, sclarParams.dScaleValue);
+            sclarParams.numHeads, sclarParams.dScaleValue);
     OP_LOGD(host_api_ctx->GetNodeName(),
-              "preTokens = %ld, nextTokens = %ld, kvHeadNum = %ld, sparseMode = %ld, innerPrecise = %ld", sclarParams.preTokens,
-              sclarParams.nextTokens, sclarParams.kvHeadNum, sclarParams.sparseMode, sclarParams.innerPrecise);
+            "preTokens = %ld, nextTokens = %ld, kvHeadNum = %ld, sparseMode = %ld, innerPrecise = %ld",
+            sclarParams.preTokens, sclarParams.nextTokens, sclarParams.kvHeadNum, sclarParams.sparseMode,
+            sclarParams.innerPrecise);
 
     if (sclarParams.sparseMode >= 10 && sclarParams.sparseMode <= 14) { // 10: min  14: max
         sclarParams.innerPrecise = 0;
         sclarParams.sparseMode -= 10; // subtract 10 to modify sparseMode
         OP_LOGD(host_api_ctx->GetNodeName(),
-                  "because sparseMode in range [10, 14], after modification, sparseMode = %ld, innerPrecise = %ld.",
-                  sclarParams.sparseMode, sclarParams.innerPrecise);
+                "because sparseMode in range [10, 14], after modification, sparseMode = %ld, innerPrecise = %ld.",
+                sclarParams.sparseMode, sclarParams.innerPrecise);
     }
 
     apiRet = EXEC_OPAPI_CMD(
@@ -305,13 +312,14 @@ static graphStatus FusedInferHostExecuteFunc(OpExecuteContext *host_api_ctx)
         fiaTensors.kvPaddingGe, fiaTensors.keyAntiquantScaleGe, fiaTensors.keyAntiquantOffsetGe,
         fiaTensors.valueAntiquantScaleGe, fiaTensors.valueAntiquantOffsetGe, fiaTensors.keySharedPrefixGe,
         fiaTensors.valueSharedPrefixGe, actualSeqInfo.actSeqSharedPrefix, fiaTensors.queryRopeGe, fiaTensors.keyRopeGe,
-        fiaTensors.keyRopeAntiquantScaleGe, fiaTensors.dequantScaleQueryGe, fiaTensors.learnableSinkGe, sclarParams.numHeads,
-        sclarParams.dScaleValue, sclarParams.preTokens, sclarParams.nextTokens, attrPointers.layout, sclarParams.kvHeadNum,
-        sclarParams.sparseMode, sclarParams.innerPrecise, sclarParams.blockSize, sclarParams.antiquantMode,
-        sclarParams.softmaxLseFlag, sclarParams.keyAntiquantMode, sclarParams.valueAntiquantMode,
-        sclarParams.queryQuantMode, fiaTensors.output, fiaTensors.softmaxLse);
+        fiaTensors.keyRopeAntiquantScaleGe, fiaTensors.dequantScaleQueryGe, fiaTensors.learnableSinkGe,
+        sclarParams.numHeads, sclarParams.dScaleValue, sclarParams.preTokens, sclarParams.nextTokens,
+        attrPointers.layout, sclarParams.kvHeadNum, sclarParams.sparseMode, sclarParams.innerPrecise,
+        sclarParams.blockSize, sclarParams.antiquantMode, sclarParams.softmaxLseFlag, sclarParams.keyAntiquantMode,
+        sclarParams.valueAntiquantMode, sclarParams.queryQuantMode, fiaTensors.output, fiaTensors.softmaxLse);
 
-    OP_CHECK_IF(apiRet != GRAPH_SUCCESS, OP_LOGE(host_api_ctx->GetNodeName(), "apiRet faild:%u", apiRet), return GRAPH_FAILED);
+    OP_CHECK_IF(apiRet != GRAPH_SUCCESS, OP_LOGE(host_api_ctx->GetNodeName(), "apiRet failed:%u", apiRet),
+                return GRAPH_FAILED);
 
     return GRAPH_SUCCESS;
 }
