@@ -465,11 +465,20 @@ void FiaTilingNonQuantMlaArch35::UpdateTilingKeyLayout()
     }
 }
 
-void FiaTilingNonQuantMlaArch35::UpdateTilingKeyPseMode() { tilingKeyInfo_.pseMode = PSE_MODE_PSE_NONE_TYPE; }
+void FiaTilingNonQuantMlaArch35::UpdateTilingKeyPseMode()
+{
+    tilingKeyInfo_.pseMode = PSE_MODE_PSE_NONE_TYPE;
+}
 
-void FiaTilingNonQuantMlaArch35::UpdateTilingKeyQuantMode() { tilingKeyInfo_.quantMode = NoQuantMode; }
+void FiaTilingNonQuantMlaArch35::UpdateTilingKeyQuantMode()
+{
+    tilingKeyInfo_.quantMode = NoQuantMode;
+}
 
-void FiaTilingNonQuantMlaArch35::UpdateTilingKeyHasRope() { tilingKeyInfo_.hasRope = true; }
+void FiaTilingNonQuantMlaArch35::UpdateTilingKeyHasRope()
+{
+    tilingKeyInfo_.hasRope = true;
+}
 
 void FiaTilingNonQuantMlaArch35::UpdateTilingKeyInfo()
 {
@@ -769,7 +778,7 @@ void FiaTilingNonQuantMlaArch35::PrintAllTilingData()
     }
 
     int64_t cap = context_->GetRawTilingData()->GetCapacity();
-    OP_LOGD(fiaInfo_->opName, "Tiling Data context_ GetCapacity: %lld.", cap);
+    OP_LOGD(fiaInfo_->opName, "Tiling Data context GetCapacity: %lld.", cap);
 }
 
 // 值越小表示优先级越高. 对于FIA, 使用3位数表示优先级, 优先级编码含义为:

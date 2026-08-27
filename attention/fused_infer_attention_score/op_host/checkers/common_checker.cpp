@@ -68,7 +68,8 @@ ge::graphStatus CommonChecker::CheckDtypeCommon(const gert::CompileTimeTensorDes
 {
     if (desc != nullptr) {
         const auto &it = dataMap.find(name);
-        OP_CHECK_IF(it == dataMap.end(), OP_LOGE("FIA", "%s dtype support list should be specify in map", name.c_str()),
+        OP_CHECK_IF(it == dataMap.end(),
+                    OP_LOGE("FIA", "%s dtype support list should be specified in map", name.c_str()),
                     return ge::GRAPH_FAILED);
         auto &expectDtypeList = it->second;
         OP_CHECK_IF(
@@ -1180,7 +1181,7 @@ ge::graphStatus CommonChecker::ValidateNoRopeLayoutDim(const FiaTilingInfo &fiaI
                         noRopeLayoutSupportListA.end(),
                     OP_LOGE(fiaInfo.opName,
                             "In %s %s situation, when Qs>1 and input_layout is %s, headDim of query|key|value "
-                            "should be align to 16.",
+                            "should be aligned to 16.",
                             QuantModeToSerialString(fiaInfo.quantMode).c_str(),
                             SituationToSerialString(fiaInfo.ropeMode).c_str(), inputLayout.c_str()),
                     return ge::GRAPH_FAILED);
@@ -1189,7 +1190,7 @@ ge::graphStatus CommonChecker::ValidateNoRopeLayoutDim(const FiaTilingInfo &fiaI
                         noRopeLayoutSupportListB.end(),
                     OP_LOGE(fiaInfo.opName,
                             "In %s %s situation, when Qs>1 and input_layout is %s, headDim of query|key|value "
-                            "should be align to 16.",
+                            "should be aligned to 16.",
                             QuantModeToSerialString(fiaInfo.quantMode).c_str(),
                             SituationToSerialString(fiaInfo.ropeMode).c_str(), inputLayout.c_str()),
                     return ge::GRAPH_FAILED);

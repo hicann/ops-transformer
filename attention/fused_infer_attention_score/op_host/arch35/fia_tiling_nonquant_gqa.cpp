@@ -392,7 +392,7 @@ void FiaTilingNonQuantArch35::SplitOutSeq()
         }
         totalSize += outerBlockNums;
         OP_LOGD(fiaInfo_->opName,
-                "bIdx:%u, sOuterSize:%u, sactualSeqLengthsQ_[bIdx]:%lld, actualSeqLengthsKV_[bIdx]:%lld, "
+                "bIdx:%u, sOuterSize:%u, actualSeqLengthsQ_[bIdx]:%lld, actualSeqLengthsKV_[bIdx]:%lld, "
                 "outerBlockNums:%lld, totalSize:%lld\n",
                 bIdx, sOuterSize, actualSeqLengthsQ_[bIdx], actualSeqLengthsKV_[bIdx], outerBlockNums, totalSize);
     }
@@ -984,7 +984,7 @@ void FiaTilingNonQuantArch35::PrintAllTilingData()
     }
 
     int64_t cap = context_->GetRawTilingData()->GetCapacity();
-    OP_LOGD(fiaInfo_->opName, "Tiling Data context_ GetCapacity: %lld.", cap);
+    OP_LOGD(fiaInfo_->opName, "Tiling Data context GetCapacity: %lld.", cap);
 }
 
 // 值越小表示优先级越高. 对于FIA, 使用3位数表示优先级, 优先级编码含义为:
@@ -992,6 +992,5 @@ void FiaTilingNonQuantArch35::PrintAllTilingData()
 // 2. 十位表示gqa、mla、泛化，即: x0x-mla, x1x-gpa, x2x-泛化
 // 3. 个位代表特化模板到泛化模板的优先级排序
 REGISTER_TILING_TEMPLATE_FIA(FusedInferAttentionScore, FiaTilingNonQuantArch35,
-                             std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510)}),
-                             28);
+                             std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510)}), 28);
 } // namespace optiling
