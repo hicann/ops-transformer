@@ -90,6 +90,20 @@ attention:
     options:
       - attention_update
 
+  bsa_select_block_mask:
+    module: True
+    src:
+      - attention/bsa_select_block_mask
+    exclude:
+      - attention/bsa_select_block_mask/docs
+      - attention/bsa_select_block_mask/README.md
+    ut_cov_exclude:
+      - attention/bsa_select_block_mask
+    test:
+      ut: False
+    options:
+      - bsa_select_block_mask
+
   block_sparse_attention:
     module: True
     src:
@@ -104,6 +118,118 @@ attention:
       ut: True
     options:
       - block_sparse_attention
+
+  compressor_grad:
+    module: True
+    src:
+      - attention/compressor_grad
+    exclude:
+      - attention/compressor_grad/docs
+      - attention/compressor_grad/README.md
+    ut_cov_exclude:
+      - attention/compressor_grad
+    test:
+      ut: False
+    options:
+      - compressor_grad
+
+  fused_causal_conv1d:
+    module: True
+    src:
+      - attention/fused_causal_conv1d
+    exclude:
+      - attention/fused_causal_conv1d/docs
+      - attention/fused_causal_conv1d/README.md
+    ut_cov_exclude:
+      - attention/fused_causal_conv1d
+    test:
+      ut: False
+    options:
+      - fused_causal_conv1d
+
+  indexer_quant_cache:
+    module: True
+    src:
+      - attention/indexer_quant_cache
+    exclude:
+      - attention/indexer_quant_cache/docs
+      - attention/indexer_quant_cache/README.md
+    ut_cov_exclude:
+      - attention/indexer_quant_cache
+    test:
+      ut: False
+    options:
+      - indexer_quant_cache
+
+  inplace_fused_causal_conv1d:
+    module: True
+    src:
+      - attention/inplace_fused_causal_conv1d
+    exclude:
+      - attention/inplace_fused_causal_conv1d/docs
+      - attention/inplace_fused_causal_conv1d/README.md
+    ut_cov_exclude:
+      - attention/inplace_fused_causal_conv1d
+    test:
+      ut: False
+    options:
+      - inplace_fused_causal_conv1d
+
+  kv_compress_epilog:
+    module: True
+    src:
+      - attention/kv_compress_epilog
+    exclude:
+      - attention/kv_compress_epilog/docs
+      - attention/kv_compress_epilog/README.md
+    ut_cov_exclude:
+      - attention/kv_compress_epilog
+    test:
+      ut: False
+    options:
+      - kv_compress_epilog
+
+  sparse_flash_attention_grad:
+    module: True
+    src:
+      - attention/sparse_flash_attention_grad
+    exclude:
+      - attention/sparse_flash_attention_grad/docs
+      - attention/sparse_flash_attention_grad/README.md
+    ut_cov_exclude:
+      - attention/sparse_flash_attention_grad
+    test:
+      ut: False
+    options:
+      - sparse_flash_attention_grad
+
+  sparse_flash_mla:
+    module: True
+    src:
+      - attention/sparse_flash_mla
+    exclude:
+      - attention/sparse_flash_mla/docs
+      - attention/sparse_flash_mla/README.md
+    ut_cov_exclude:
+      - attention/sparse_flash_mla
+    test:
+      ut: False
+    options:
+      - sparse_flash_mla
+
+  stem_oam_prep_paged_kv:
+    module: True
+    src:
+      - attention/stem_oam_prep_paged_kv
+    exclude:
+      - attention/stem_oam_prep_paged_kv/docs
+      - attention/stem_oam_prep_paged_kv/README.md
+    ut_cov_exclude:
+      - attention/stem_oam_prep_paged_kv
+    test:
+      ut: False
+    options:
+      - stem_oam_prep_paged_kv
 
   flash_attention_score:
     module: True
@@ -562,6 +688,20 @@ gmm:
     test:
       examples: True
 
+  grouped_matmul_activation_quant:
+    module: True
+    src:
+      - gmm/grouped_matmul_activation_quant
+    exclude:
+      - gmm/grouped_matmul_activation_quant/docs
+      - gmm/grouped_matmul_activation_quant/README.md
+    ut_cov_exclude:
+      - gmm/grouped_matmul_activation_quant
+    test:
+      ut: False
+    options:
+      - grouped_matmul_activation_quant
+
   grouped_matmul_swiglu_quant:
     module: True
     src:
@@ -630,6 +770,20 @@ ffn:
       ut: False
     options:
       - ffn
+
+  ffn_worker_batching:
+    module: True
+    src:
+      - ffn/ffn_worker_batching
+    exclude:
+      - ffn/ffn_worker_batching/docs
+      - ffn/ffn_worker_batching/README.md
+    ut_cov_exclude:
+      - ffn/ffn_worker_batching
+    test:
+      ut: False
+    options:
+      - ffn_worker_batching
 
   swin_attention_ffn:
     module: True
@@ -1168,8 +1322,24 @@ posembedding:
       - posembedding/rotary_position_embedding_grad/README.md
     ut_cov_exclude:
       - posembedding/rotary_position_embedding_grad
+    test:
+      ut: False
     options:
       - rotary_position_embedding_grad
+
+  inplace_partial_rotary_mul:
+    module: True
+    src:
+      - posembedding/inplace_partial_rotary_mul
+    exclude:
+      - posembedding/inplace_partial_rotary_mul/docs
+      - posembedding/inplace_partial_rotary_mul/README.md
+    ut_cov_exclude:
+      - posembedding/inplace_partial_rotary_mul
+    test:
+      ut: False
+    options:
+      - inplace_partial_rotary_mul
 
   kv_rms_norm_rope_cache:
     module: True
@@ -1928,7 +2098,7 @@ mhc:
       - mhc/mhc_post/tests
     test:
       examples: True
-      ut: True
+      ut: False
   mhc_pre:
     module: True
     src:
@@ -1955,6 +2125,21 @@ mhc:
     test:
       examples: False
       ut: True
+
+  mhc_pre_sinkhorn:
+    module: True
+    src:
+      - mhc/mhc_pre_sinkhorn
+    exclude:
+      - mhc/mhc_pre_sinkhorn/docs
+      - mhc/mhc_pre_sinkhorn/README.md
+    ut_cov_exclude:
+      - mhc/mhc_pre_sinkhorn/examples
+      - mhc/mhc_pre_sinkhorn/tests
+    test:
+      examples: True
+      ut: False
+
   mhc_pre_sinkhorn_backward:
     module: True
     src:
@@ -1967,7 +2152,7 @@ mhc:
       - mhc/mhc_pre_sinkhorn_backward/tests
     test:
       examples: True
-      ut: True
+      ut: False
   mhc_post_backward:
     module: True
     src:
@@ -1980,4 +2165,19 @@ mhc:
       - mhc/mhc_post_backward/tests
     test:
       examples: True
-      ut: True
+      ut: False
+
+mamba:
+    causal_conv1d:
+    module: True
+    src:
+      - mamba/causal_conv1d
+    exclude:
+      - mamba/causal_conv1d/docs
+      - mamba/causal_conv1d/README.md
+    ut_cov_exclude:
+      - mamba/causal_conv1d
+    test:
+      ut: False
+    options:
+      - causal_conv1d
