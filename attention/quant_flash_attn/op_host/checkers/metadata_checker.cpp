@@ -10,7 +10,7 @@
 
 /*!
  * \file metadata_checker.cpp
- * \brief Checker for metadata parameter (文档约束: 公共参数组 - metadata)
+ * \brief Checker for metadata parameter ( 公共参数组 - metadata)
  */
 
 #include <map>
@@ -76,7 +76,7 @@ ge::graphStatus MetadataChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
 
 ge::graphStatus MetadataChecker::CheckParaExistence(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束：当前不支持不传入 metadata，未传入将发出拦截报警
+    // 当前不支持不传入 metadata，未传入将发出拦截报警
     OP_CHECK_IF(qfaInfo.opParamInfo.metadata.tensor == nullptr || qfaInfo.opParamInfo.metadata.desc == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, METADATA_NAME.c_str()), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;

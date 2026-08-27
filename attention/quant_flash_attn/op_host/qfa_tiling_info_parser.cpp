@@ -634,14 +634,17 @@ ge::graphStatus QfaInfoParser::ParseAxisInfo()
         return ge::GRAPH_FAILED;
     }
 
-    // HIF8 per-tensor: q_descale is 1D with shape (1,), skip MXFP8 dim check
-    if (quantMode_ == QfaQuantMode::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32) {
-        return ge::GRAPH_SUCCESS;
-    }
-
     uint32_t qDescaleDimNum = opParamInfo_.qDescale.shape->GetStorageShape().GetDimNum();
     using QM = QfaQuantMode;
-    if (quantMode_ == QM::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
+    if (quantMode_ == QM::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32) {
+        if (qDescaleDimNum != 1) {
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, Q_DESCALE_NAME.c_str(),
+                                                     (std::to_string(qDescaleDimNum) + "D").c_str(),
+                                                     "In HIF8 scenario, the shape dim of q_descale must be 1D");
+            return ge::GRAPH_FAILED;
+        }
+    } else if (quantMode_ ==
+               QM::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
         if (qDescaleDimNum != 2) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
                 opName_, Q_DESCALE_NAME.c_str(), (std::to_string(qDescaleDimNum) + "D").c_str(),

@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <cmath>
 #include "quant_flash_attn_metadata_aicpu.h"
+#include "../../quant_flash_attn/op_host/qfa_adjust_sinner_souter.h"
 
 #define KERNEL_STATUS_OK 0
 #define KERNEL_STATUS_PARAM_INVALID 1
@@ -207,21 +208,15 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
         baseInfo.queryType = load_balance::DataType::INT8;
         baseInfo.kvType = load_balance::DataType::INT8;
     }
-    if (quantMode_ == 1) { // TODO：用adjust函数代替
-        if (baseInfo.headDimQk == 256) {
-            mBaseSize_ = 64U;
-            s2BaseSize_ = 256U;
-        } else {
-            mBaseSize_ = 64U;
-            s2BaseSize_ = 512U;
-        }
-    } else if (quantMode_ == 6) { // GQA FP8 fullquant: s2BaseSize=256
-        mBaseSize_ = 64U;
-        s2BaseSize_ = 256U;
-    } else if (quantMode_ == 0) { // HIF8: s2BaseSize=256
-        mBaseSize_ = 64U;
-        s2BaseSize_ = 256U;
-    }
+    uint32_t sOuterFactor = 0;
+    uint32_t sInnerFactor = 0;
+    optiling::quant_flash_attn::qfa_tiling_util::AdjustSinnerAndSouter(
+        static_cast<uint32_t>(headDim_), static_cast<int64_t>(maxSeqlenQ_), static_cast<int64_t>(maxSeqlenKv_),
+        maskMode_, static_cast<int64_t>(winLeft_), static_cast<int64_t>(winRight_),
+        optiling::quant_flash_attn::qfa_tiling_util::LAYOUT_BSND, static_cast<uint32_t>(quantMode_), sOuterFactor,
+        sInnerFactor);
+    mBaseSize_ = sOuterFactor;
+    s2BaseSize_ = sInnerFactor;
     mBaseSize_ = mBaseSize_ * (aivCoreNum_ / aicCoreNum_);
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
@@ -230,11 +225,8 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     param.fdOn = 0;
     param.outputLayout = load_balance::OutputLayout::BN2_S1G;
 
-    // HIF8 (quantMode=0): v_descale 为 per-tensor 标量, 跳过校验
-    if (quantMode_ == 0) {
-        return true;
-    }
     // 校验 v_descale: quantMode=1(MxFp8) 且 TND layout 下, dim0 应等于 sum(ceil(seqused_kv[i] / 64))
+    // HIF8 (quantMode=0): v_descale 为 per-tensor 标量, 不需要校验
     if (quantMode_ == 1 && vDescale_ != nullptr && vDescale_->GetTensorShape() != nullptr) {
         const int64_t V_DESCALE_GROUP_SIZE = 64;
         bool isTndLayout = (layoutKv_ == "TND");

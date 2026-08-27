@@ -10,7 +10,7 @@
 
 /*!
  * \file metadata_checker_quant_flash_attn.h
- * \brief Checker for metadata parameter (文档约束: 公共参数组 - metadata)
+ * \brief Checker for metadata parameter ( 公共参数组 - metadata)
  */
 
 #ifndef METADATA_CHECKER_QUANT_FLASH_ATTN_H

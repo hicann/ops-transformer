@@ -248,7 +248,7 @@ public:
             kvGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, headDim, blockTableGm_,
                                              constInfo_.maxBlockNumPerBatch);
         } else if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_NZ) {
-            uint32_t d0 = 32 / sizeof(KV_T);
+            constexpr uint32_t d0 = 32 / sizeof(KV_T);
             uint32_t d1 = headDim / d0;
             kvGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, d1, d0, blockTableGm_,
                                              constInfo_.maxBlockNumPerBatch);
@@ -339,25 +339,6 @@ public:
     __aicore__ inline void CopyValueTile(const LocalTensor<KV_T> &dstTensor, RunInfoX &runInfo)
     {
         CopyValueSlice(dstTensor, runInfo.s2Idx, runInfo.actSingleLoopS2Size, 0, constInfo_.dSizeV, runInfo);
-    }
-
-    __aicore__ inline void UpdateKey(uint32_t bIdx)
-    {
-        ListTensorDesc keyListTensorDesc((__gm__ void *)(this->keyPtr_));
-        __gm__ uint8_t *key_ = (__gm__ uint8_t *)keyListTensorDesc.GetDataPtr<__gm__ uint8_t>(bIdx);
-
-        uint64_t s2Size = SeqLenFromTensorList<LAYOUT>(this->keyPtr_, bIdx);
-        keyGm_.gmTensor.SetGlobalBuffer((__gm__ KV_T *)key_);
-        keyGm_.offsetCalculator.Init(0, constInfo_.n2Size, s2Size, constInfo_.dSize, *this->kvSeqParserPtr_);
-    }
-
-    __aicore__ inline void UpdateValue(uint32_t bIdx)
-    {
-        ListTensorDesc valueListTensorDesc((__gm__ void *)(this->valuePtr_));
-        __gm__ uint8_t *value_ = (__gm__ uint8_t *)valueListTensorDesc.GetDataPtr<__gm__ uint8_t>(bIdx);
-        uint64_t s2Size = SeqLenFromTensorList<LAYOUT>(valuePtr_, bIdx);
-        valueGm_.gmTensor.SetGlobalBuffer((__gm__ KV_T *)value_);
-        valueGm_.offsetCalculator.Init(0, constInfo_.n2Size, s2Size, constInfo_.dSizeV, *this->kvSeqParserPtr_);
     }
 
     __aicore__ inline void IterateBmm1(MM1_DBUF_T &outputBuf, RunInfoX &runInfo)

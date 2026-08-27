@@ -10,7 +10,7 @@
 
 /*!
  * \file paged_attention_checker.cpp
- * \brief Checker for block_table (文档约束: Paged Attention参数组)
+ * \brief Checker for block_table ( Paged Attention参数组)
  */
 
 #include <map>
@@ -40,7 +40,7 @@ bool PagedAttentionChecker::IsPageAttention(const QfaTilingInfo &qfaInfo) const
 
 ge::graphStatus PagedAttentionChecker::CheckSingleParaBlockTable(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束(单参数校验列):
+    // 约束(单参数校验列):
     //   - tensor_type 仅支持 INT32
     //   - tensor_shape 为 (B, Bn)
     //   - 值只能为正整数 (属于值约束, tiling 阶段无法获取 tensor 数值, 不校验)
@@ -97,7 +97,7 @@ ge::graphStatus PagedAttentionChecker::CheckSingleParaBlockTable(const QfaTiling
 
 ge::graphStatus PagedAttentionChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束(单参数校验列): block_table 的 dtype/shape
+    // 约束(单参数校验列): block_table 的 dtype/shape
     // 仅 PA 场景下校验 block_table, 通过 layout_kv 判断
     if (!IsPageAttention(qfaInfo)) {
         return ge::GRAPH_SUCCESS;
@@ -141,7 +141,7 @@ ge::graphStatus PagedAttentionChecker::CheckBlockSizeGqaFp8(const QfaTilingInfo 
 
 ge::graphStatus PagedAttentionChecker::CheckFeature(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束(特性交叉校验列):
+    // 约束(特性交叉校验列):
     //   - PagedAttention 开启情况下, block_table 必须不为空
     //   - PagedAttention 开启情况下, 必须传入 seqused_kv
     //   - MxFP8 仅支持 Bs 为 64、128、256、512或1024
@@ -331,7 +331,7 @@ ge::graphStatus PagedAttentionChecker::CheckNonContiguousSupport(const QfaTiling
 
 ge::graphStatus PagedAttentionChecker::CheckMultiPara(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束(一致性校验列): 无
+    // 约束(一致性校验列): 无
     // block_table shape (B, Bn) 的校验已在 CheckSingleParaBlockTable 中完成
     (void)qfaInfo;
     return ge::GRAPH_SUCCESS;

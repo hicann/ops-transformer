@@ -10,7 +10,7 @@
 
 /*!
  * \file sinks_checker.cpp
- * \brief Checker for sinks parameter (文档约束: Sinks参数组)
+ * \brief Checker for sinks parameter ( Sinks参数组)
  */
 
 #include <map>
@@ -33,7 +33,7 @@ using namespace arch35QFA;
 
 ge::graphStatus SinksChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束(单参数校验列): 暂不支持
+    // 约束(单参数校验列): 暂不支持
     // 传入 sinks 时直接报错
     if (qfaInfo.sinksFlag) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, "sinks", "provided", "sinks is currently not supported");

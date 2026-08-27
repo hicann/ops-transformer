@@ -10,7 +10,7 @@
 
 /*!
  * \file mask_checker.cpp
- * \brief Checker for mask_mode, attn_mask, win_left, win_right (文档约束: Mask参数组)
+ * \brief Checker for mask_mode, attn_mask, win_left, win_right ( Mask参数组)
  */
 
 #include <map>
@@ -34,7 +34,7 @@ using namespace arch35QFA;
 
 ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: data_type 支持 INT32；支持输入为 0/3/4
+    //  data_type 支持 INT32；支持输入为 0/3/4
     // qfaInfo.maskMode 为已解析的 int64_t（默认 0）
     const std::vector<int64_t> supportedMaskModes = {static_cast<int64_t>(MaskMode::NO_MASK),
                                                      static_cast<int64_t>(MaskMode::CAUSAL),
@@ -50,7 +50,7 @@ ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const QfaTilingInfo &qfaInf
 
 ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: tensor_type 支持 INT8；tensor_shape 为 (2048, 2048)
+    //  tensor_type 支持 INT8；tensor_shape 为 (2048, 2048)
     // attn_mask 为可选输入，未传入时跳过（存在性校验负责）
     const gert::Tensor *attnMaskTensor = qfaInfo.opParamInfo.attnMask.tensor;
     const gert::CompileTimeTensorDesc *attnMaskDesc = qfaInfo.opParamInfo.attnMask.desc;
@@ -85,7 +85,7 @@ ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const QfaTilingInfo &qfaInf
 
 ge::graphStatus MaskChecker::CheckSingleParaWindowParams(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: data_type 支持 INT32；值需要 >= -1
+    //  data_type 支持 INT32；值需要 >= -1
     // win_left / win_right 为可选属性，默认值为 -1（表示无穷）
     OP_CHECK_IF(qfaInfo.winLeft < -1,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, WIN_LEFT_NAME.c_str(),
@@ -112,7 +112,7 @@ ge::graphStatus MaskChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
 
 ge::graphStatus MaskChecker::CheckParaExistence(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束(存在性校验列):
+    // 约束(存在性校验列):
     //   - mask_mode: 可选属性，默认值为 0
     //   - attn_mask: 可选输入
     //   - win_left / win_right: 可选属性，默认值为 -1
@@ -128,7 +128,7 @@ ge::graphStatus MaskChecker::CheckParaExistence(const QfaTilingInfo &qfaInfo)
 
 ge::graphStatus MaskChecker::CheckMaskModeAttnMaskConsistency(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束:
+    //
     //   - mask_mode=0 (NO_MASK): 不支持传入 attn_mask
     //   - mask_mode=3 (CAUSAL):  必须传入 attn_mask 矩阵
     //   - mask_mode=4 (SLIDING_WINDOW):  必须传入 attn_mask 矩阵
@@ -174,7 +174,7 @@ ge::graphStatus MaskChecker::CheckMultiPara(const QfaTilingInfo &qfaInfo)
 
 ge::graphStatus MaskChecker::CheckMaskModeQuantMode(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: MxFP8/GQA_FP8_FULLQUANT/HIF8 均仅支持 mask_mode 取 0 和 3 (不支持 SLIDING_WINDOW=4)
+    //  MxFP8/GQA_FP8_FULLQUANT/HIF8 均仅支持 mask_mode 取 0 和 3 (不支持 SLIDING_WINDOW=4)
     if (qfaInfo.quantMode == QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 ||
         qfaInfo.quantMode ==
             QfaQuantMode::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 ||

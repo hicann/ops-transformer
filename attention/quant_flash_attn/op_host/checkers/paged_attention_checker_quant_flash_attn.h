@@ -10,7 +10,7 @@
 
 /*!
  * \file paged_attention_checker_quant_flash_attn.h
- * \brief Checker for block_table (文档约束: Paged Attention参数组)
+ * \brief Checker for block_table ( Paged Attention参数组)
  */
 
 #ifndef PAGED_ATTENTION_CHECKER_QUANT_FLASH_ATTN_H

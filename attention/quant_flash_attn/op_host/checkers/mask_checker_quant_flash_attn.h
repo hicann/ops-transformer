@@ -10,7 +10,7 @@
 
 /*!
  * \file mask_checker_quant_flash_attn.h
- * \brief Checker for mask_mode, attn_mask, win_left, win_right (文档约束: Mask参数组)
+ * \brief Checker for mask_mode, attn_mask, win_left, win_right ( Mask参数组)
  */
 
 #ifndef MASK_CHECKER_QUANT_FLASH_ATTN_H

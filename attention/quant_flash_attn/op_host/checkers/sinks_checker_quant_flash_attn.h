@@ -10,7 +10,7 @@
 
 /*!
  * \file sinks_checker_quant_flash_attn.h
- * \brief Checker for sinks parameter (文档约束: Sinks参数组)
+ * \brief Checker for sinks parameter ( Sinks参数组)
  */
 
 #ifndef SINKS_CHECKER_QUANT_FLASH_ATTN_H

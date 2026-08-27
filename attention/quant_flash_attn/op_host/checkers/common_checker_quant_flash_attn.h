@@ -10,7 +10,7 @@
 
 /*!
  * \file common_checker_quant_flash_attn.h
- * \brief Common checker for layout, shape, dtype parameters (文档约束: 公共参数组)
+ * \brief Common checker for layout, shape, dtype parameters ( 公共参数组)
  */
 
 #ifndef COMMON_CHECKER_QUANT_FLASH_ATTN_H

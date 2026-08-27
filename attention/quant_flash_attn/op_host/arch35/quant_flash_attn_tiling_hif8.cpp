@@ -15,6 +15,7 @@
 
 #include "quant_flash_attn_tiling_hif8.h"
 #include "../quant_flash_attn_tiling.h"
+#include "../qfa_adjust_sinner_souter.h"
 #include <vector>
 #include <graph/utils/type_utils.h>
 #include "log/log.h"
@@ -115,10 +116,11 @@ void QuantFlashAttnTilingHif8Impl::InitImplParam()
 
 void QuantFlashAttnTilingHif8Impl::SplitPolicy()
 {
-    sOuterFactor_ = SOUTER_64;
-    sInnerFactor_ = SINNER_256;
+    qfa_tiling_util::AdjustSinnerAndSouter(qfaInfo_->vHeadDim, qfaInfo_->maxSeqQ, qfaInfo_->maxSeqKv,
+                                           static_cast<int32_t>(qfaInfo_->maskMode), qfaInfo_->winLeft,
+                                           qfaInfo_->winRight, static_cast<uint32_t>(qfaInfo_->qLayout),
+                                           static_cast<uint32_t>(qfaInfo_->quantMode), sOuterFactor_, sInnerFactor_);
     CalcNumBlocks(platformInfo_.aicNum);
-    flashDecodeFlag_ = false;
 }
 
 void QuantFlashAttnTilingHif8Impl::UpdateTilingKeyConfig()
@@ -149,7 +151,7 @@ void QuantFlashAttnTilingHif8Impl::UpdateTilingKeyInfo()
     UpdateTilingKeyQuantMode();
     tilingKeyInfo_.hasAttenMask = (qfaInfo_->maskMode != static_cast<int64_t>(MaskMode::NO_MASK));
     UpdateTilingKeyKvLayout();
-    tilingKeyInfo_.isFd = flashDecodeFlag_;
+    tilingKeyInfo_.isFd = false;
 }
 
 void QuantFlashAttnTilingHif8Impl::UpdateTilingKeyQuantMode()
@@ -182,12 +184,7 @@ void QuantFlashAttnTilingHif8Impl::CalcNumBlocks(uint32_t aicNum)
 
 void QuantFlashAttnTilingHif8Impl::CalcWorkspaceSize()
 {
-    size_t sysWorkspaceSize = platformInfo_.defaultSysWorkspaceSize;
-    uint32_t mSize = sOuterFactor_ * platformInfo_.cvRatio;
-    uint32_t dSize = qfaInfo_->vHeadDim;
-    (void)mSize;
-    (void)dSize;
-    workspaceSize_ = sysWorkspaceSize;
+    workspaceSize_ = platformInfo_.defaultSysWorkspaceSize;
 
     OP_LOGI(qfaInfo_->opName, "HIF8 Workspaces: %lu", workspaceSize_);
 }
@@ -225,9 +222,9 @@ void QuantFlashAttnTilingHif8Impl::SetQFATilingData()
     tilingData_.baseTiling.quantFlashAttnBaseParams.dSizeV = qfaInfo_->vHeadDim;
     tilingData_.baseTiling.quantFlashAttnBaseParams.scaleValue = qfaInfo_->softmaxScale;
     tilingData_.baseTiling.quantFlashAttnBaseParams.cuSeqLensQSize =
-        (qfaInfo_->qLayout == QfaLayout::TND && cuSeqLenQFlag_) ? qfaInfo_->bSize : 0;
+        (qfaInfo_->qLayout == QfaLayout::TND && cuSeqLenQFlag_) ? qfaInfo_->bSize + 1 : 0;
     tilingData_.baseTiling.quantFlashAttnBaseParams.cuSeqLensKVSize =
-        (qfaInfo_->kvLayout == QfaLayout::TND && cuSeqLenKVFlag_) ? qfaInfo_->bSize : 0;
+        (qfaInfo_->kvLayout == QfaLayout::TND && cuSeqLenKVFlag_) ? qfaInfo_->bSize + 1 : 0;
     tilingData_.baseTiling.quantFlashAttnBaseParams.seqUsedQSize = seqUsedQFlag_ ? qfaInfo_->bSize : 0;
     tilingData_.baseTiling.quantFlashAttnBaseParams.seqUsedKvSize = seqUsedKvFlag_ ? qfaInfo_->bSize : 0;
     tilingData_.baseTiling.quantFlashAttnBaseParams.isKvContinuous = true;

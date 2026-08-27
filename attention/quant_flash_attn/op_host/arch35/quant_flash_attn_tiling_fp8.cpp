@@ -16,6 +16,7 @@
 #include <vector>
 #include "quant_flash_attn_tiling_fp8.h"
 #include "../quant_flash_attn_tiling.h"
+#include "../qfa_adjust_sinner_souter.h"
 #include <graph/utils/type_utils.h>
 #include "log/log.h"
 #include "../quant_flash_attn_tiling_utils.h"
@@ -120,8 +121,10 @@ void QuantFlashAttnTilingFp8Impl::InitImplParam()
 
 void QuantFlashAttnTilingFp8Impl::SplitPolicy()
 {
-    sOuterFactor_ = SOUTER_64;
-    sInnerFactor_ = GQA_SINNER_256;
+    qfa_tiling_util::AdjustSinnerAndSouter(qfaInfo_->vHeadDim, qfaInfo_->maxSeqQ, qfaInfo_->maxSeqKv,
+                                           static_cast<int32_t>(qfaInfo_->maskMode), qfaInfo_->winLeft,
+                                           qfaInfo_->winRight, static_cast<uint32_t>(qfaInfo_->qLayout),
+                                           static_cast<uint32_t>(qfaInfo_->quantMode), sOuterFactor_, sInnerFactor_);
     CalcNumBlocks(platformInfo_.aicNum);
     flashDecodeFlag_ = false;
 }
@@ -162,16 +165,15 @@ void QuantFlashAttnTilingFp8Impl::UpdateTilingKeyQuantMode()
 void QuantFlashAttnTilingFp8Impl::GenTilingKey()
 {
     UpdateTilingKeyInfo();
-    tilingKey_ = GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.config,
-                                    tilingKeyInfo_.quantMode, tilingKeyInfo_.hasAttenMask,
-                                    tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd);
+    tilingKey_ = GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.config, tilingKeyInfo_.quantMode,
+                                    tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd);
 
     OP_LOGI(qfaInfo_->opName, "GQA The tilingkey is %llu.", tilingKey_);
     OP_LOGI(qfaInfo_->opName,
             "GQA The tilingkey param is inOutLayoutType: %llu, config: %llu, quantMode: %llu, "
             "hasAttenMask: %u, kvLayoutType: %llu, isFd: %u.",
-            tilingKeyInfo_.inputLayout, tilingKeyInfo_.config, tilingKeyInfo_.quantMode,
-            tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd);
+            tilingKeyInfo_.inputLayout, tilingKeyInfo_.config, tilingKeyInfo_.quantMode, tilingKeyInfo_.hasAttenMask,
+            tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd);
 }
 
 void QuantFlashAttnTilingFp8Impl::CalcNumBlocks(uint32_t aicNum)

@@ -162,7 +162,7 @@ def run_main(
             "ENABLE_LSE": enable_lse,
             "FP8_DTYPE": torch.float8_e4m3fn,
             "QUANT_GROUP_SIZE": 32,
-            "INPUT_LAYOUT": input_layout,
+            "INPUT_LAYOUT": layout_q,
             "IS_CONTIGUOUS": is_contiguous,
             "DEVICE_ID": device_id,
             "GRAPH_PATH": graph_path,

@@ -10,7 +10,7 @@
 
 /*!
  * \file quant_checker.h
- * \brief Checker for quant_mode, q_descale, k_descale, v_descale, p_scale (文档约束: 全量化参数组)
+ * \brief Checker for quant_mode, q_descale, k_descale, v_descale, p_scale ( 全量化参数组)
  */
 
 #ifndef QUANT_FLASH_ATTN_QUANT_CHECKER_H
@@ -46,10 +46,13 @@ private:
     // --- SinglePara: descale shape dim 校验 (按量化场景分发) ---
     ge::graphStatus CheckQDescaleDimMxFp8(const QfaTilingInfo &qfaInfo) const;
     ge::graphStatus CheckQDescaleDimGqaFp8(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckQDescaleDimHif8(const QfaTilingInfo &qfaInfo) const;
     ge::graphStatus CheckKDescaleDimMxFp8(const QfaTilingInfo &qfaInfo) const;
     ge::graphStatus CheckKDescaleDimGqaFp8(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckKDescaleDimHif8(const QfaTilingInfo &qfaInfo) const;
     ge::graphStatus CheckVDescaleDimMxFp8(const QfaTilingInfo &qfaInfo) const;
     ge::graphStatus CheckVDescaleDimGqaFp8(const QfaTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckVDescaleDimHif8(const QfaTilingInfo &qfaInfo) const;
 
     // --- ParaExistence: 场景化必选参数 ---
     ge::graphStatus CheckParaExistenceGqaFp8(const QfaTilingInfo &qfaInfo) const;

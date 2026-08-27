@@ -161,13 +161,13 @@ public:
         valuePtr_ = value;
 
         if constexpr (LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND) {
-            cuSeqLensGmQ_.SetGlobalBuffer((__gm__ int32_t *)cuSeqLensQ, constInfo_.cuSeqLensQSize + 1);
+            cuSeqLensGmQ_.SetGlobalBuffer((__gm__ int32_t *)cuSeqLensQ, constInfo_.cuSeqLensQSize);
             seqUsedGmQ_.SetGlobalBuffer((__gm__ int32_t *)sequsedQ, constInfo_.seqUsedQSize);
         } else {
             seqUsedGmQ_.SetGlobalBuffer((__gm__ int32_t *)sequsedQ, constInfo_.seqUsedQSize);
         }
         if constexpr (LAYOUT_KV == LayOutTypeEnum::LAYOUT_TND) {
-            cuSeqLensGmKv_.SetGlobalBuffer((__gm__ int32_t *)cuSeqLensKv, constInfo_.cuSeqLensKVSize + 1);
+            cuSeqLensGmKv_.SetGlobalBuffer((__gm__ int32_t *)cuSeqLensKv, constInfo_.cuSeqLensKVSize);
             seqUsedGmKv_.SetGlobalBuffer((__gm__ int32_t *)sequsedKv, constInfo_.seqUsedKvSize);
         } else {
             seqUsedGmKv_.SetGlobalBuffer((__gm__ int32_t *)sequsedKv, constInfo_.seqUsedKvSize);
@@ -306,7 +306,7 @@ public:
     __aicore__ inline void InitQCuSeqLensParser(__gm__ uint8_t *cuSeqLensQPtr, __gm__ uint8_t *sequsedQPtr)
     {
         if constexpr (LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND) {
-            qCuSeqLensParser_.Init(cuSeqLensQPtr, constInfo_.cuSeqLensQSize + 1, sequsedQPtr, constInfo_.seqUsedQSize);
+            qCuSeqLensParser_.Init(cuSeqLensQPtr, constInfo_.cuSeqLensQSize, sequsedQPtr, constInfo_.seqUsedQSize);
         } else {
             qSeqUsedParser_.Init(seqUsedGmQ_, constInfo_.seqUsedQSize, constInfo_.s1Size);
         }
@@ -315,8 +315,7 @@ public:
     __aicore__ inline void InitKvCuSeqLensParser(__gm__ uint8_t *cuSeqLensKvPtr, __gm__ uint8_t *sequsedKvPtr)
     {
         if constexpr (!PAGE_ATTENTION && LAYOUT_KV == LayOutTypeEnum::LAYOUT_TND) {
-            kvCuSeqLensParser_.Init(cuSeqLensKvPtr, constInfo_.cuSeqLensKVSize + 1, sequsedKvPtr,
-                                    constInfo_.seqUsedKvSize);
+            kvCuSeqLensParser_.Init(cuSeqLensKvPtr, constInfo_.cuSeqLensKVSize, sequsedKvPtr, constInfo_.seqUsedKvSize);
         } else if constexpr (PAGE_ATTENTION && LAYOUT_KV == LayOutTypeEnum::LAYOUT_TND) {
             kvCuSeqLensParser_.Init(sequsedKvPtr, constInfo_.seqUsedKvSize, constInfo_.s2Size);
         } else {

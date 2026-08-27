@@ -10,7 +10,7 @@
 
 /*!
  * \file quant_checker.cpp
- * \brief Checker for quant_mode, q_descale, k_descale, v_descale, p_scale (文档约束: 全量化参数组)
+ * \brief Checker for quant_mode, q_descale, k_descale, v_descale, p_scale ( 全量化参数组)
  */
 
 #include <algorithm>
@@ -51,7 +51,7 @@ const std::map<QfaQuantMode, std::pair<ge::DataType, std::string>> DESCALE_DTYPE
 
 ge::graphStatus QuantChecker::CheckSingleParaQuantMode(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: data_type 支持 INT32；当前支持 quant_mode = 1、0
+    //  data_type 支持 INT32；当前支持 quant_mode = 1、0
     // quantMode 为属性，QfaTilingInfo 中存储为 QfaQuantMode 枚举
     const std::vector<uint32_t> supportedQuantModes = {1, 0};
     uint32_t quantModeVal = static_cast<uint32_t>(qfaInfo.quantMode);
@@ -96,9 +96,24 @@ ge::graphStatus QuantChecker::CheckQDescaleDimGqaFp8(const QfaTilingInfo &qfaInf
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus QuantChecker::CheckQDescaleDimHif8(const QfaTilingInfo &qfaInfo) const
+{
+    if (qfaInfo.quantMode != QfaQuantMode::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32) {
+        return ge::GRAPH_SUCCESS;
+    }
+    const gert::StorageShape *shape = qfaInfo.opParamInfo.qDescale.shape;
+    uint32_t dimNum = shape->GetStorageShape().GetDimNum();
+    OP_CHECK_IF(dimNum != DIM_NUM_1,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(qfaInfo.opName, Q_DESCALE_NAME.c_str(),
+                                                         (std::to_string(dimNum) + "D").c_str(),
+                                                         "In HIF8 scenario, the shape dim of q_descale must be 1D"),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus QuantChecker::CheckSingleParaQDescale(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: tensor_type 支持 FLOAT8_E8M0、FLOAT32；shape dim 按场景区分
+    //  tensor_type 支持 FLOAT8_E8M0、FLOAT32；shape dim 按场景区分
     const gert::CompileTimeTensorDesc *desc = qfaInfo.opParamInfo.qDescale.desc;
     const gert::StorageShape *shape = qfaInfo.opParamInfo.qDescale.shape;
     if (desc == nullptr || shape == nullptr) {
@@ -115,8 +130,9 @@ ge::graphStatus QuantChecker::CheckSingleParaQDescale(const QfaTilingInfo &qfaIn
         return ge::GRAPH_FAILED;
     }
 
-    // 场景: shape dim 校验 (MxFP8/FP8)
-    if (CheckQDescaleDimMxFp8(qfaInfo) != ge::GRAPH_SUCCESS || CheckQDescaleDimGqaFp8(qfaInfo) != ge::GRAPH_SUCCESS) {
+    // 场景: shape dim 校验 (MxFP8/FP8/HIF8)
+    if (CheckQDescaleDimMxFp8(qfaInfo) != ge::GRAPH_SUCCESS || CheckQDescaleDimGqaFp8(qfaInfo) != ge::GRAPH_SUCCESS ||
+        CheckQDescaleDimHif8(qfaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -155,9 +171,24 @@ ge::graphStatus QuantChecker::CheckKDescaleDimGqaFp8(const QfaTilingInfo &qfaInf
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus QuantChecker::CheckKDescaleDimHif8(const QfaTilingInfo &qfaInfo) const
+{
+    if (qfaInfo.quantMode != QfaQuantMode::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32) {
+        return ge::GRAPH_SUCCESS;
+    }
+    const gert::StorageShape *shape = qfaInfo.opParamInfo.kDescale.shape;
+    uint32_t dimNum = shape->GetStorageShape().GetDimNum();
+    OP_CHECK_IF(dimNum != DIM_NUM_1,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(qfaInfo.opName, K_DESCALE_NAME.c_str(),
+                                                         (std::to_string(dimNum) + "D").c_str(),
+                                                         "In HIF8 scenario, the shape dim of k_descale must be 1D"),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus QuantChecker::CheckSingleParaKDescale(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: tensor_type 支持 FLOAT8_E8M0、FLOAT32；shape dim 按场景区分
+    //  tensor_type 支持 FLOAT8_E8M0、FLOAT32；shape dim 按场景区分
     const gert::CompileTimeTensorDesc *desc = qfaInfo.opParamInfo.kDescale.desc;
     const gert::StorageShape *shape = qfaInfo.opParamInfo.kDescale.shape;
     if (desc == nullptr || shape == nullptr) {
@@ -174,8 +205,9 @@ ge::graphStatus QuantChecker::CheckSingleParaKDescale(const QfaTilingInfo &qfaIn
         return ge::GRAPH_FAILED;
     }
 
-    // 场景: shape dim 校验 (MxFP8/FP8)
-    if (CheckKDescaleDimMxFp8(qfaInfo) != ge::GRAPH_SUCCESS || CheckKDescaleDimGqaFp8(qfaInfo) != ge::GRAPH_SUCCESS) {
+    // 场景: shape dim 校验 (MxFP8/FP8/HIF8)
+    if (CheckKDescaleDimMxFp8(qfaInfo) != ge::GRAPH_SUCCESS || CheckKDescaleDimGqaFp8(qfaInfo) != ge::GRAPH_SUCCESS ||
+        CheckKDescaleDimHif8(qfaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -214,9 +246,24 @@ ge::graphStatus QuantChecker::CheckVDescaleDimGqaFp8(const QfaTilingInfo &qfaInf
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus QuantChecker::CheckVDescaleDimHif8(const QfaTilingInfo &qfaInfo) const
+{
+    if (qfaInfo.quantMode != QfaQuantMode::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32) {
+        return ge::GRAPH_SUCCESS;
+    }
+    const gert::StorageShape *shape = qfaInfo.opParamInfo.vDescale.shape;
+    uint32_t dimNum = shape->GetStorageShape().GetDimNum();
+    OP_CHECK_IF(dimNum != DIM_NUM_1,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(qfaInfo.opName, V_DESCALE_NAME.c_str(),
+                                                         (std::to_string(dimNum) + "D").c_str(),
+                                                         "In HIF8 scenario, the shape dim of v_descale must be 1D"),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus QuantChecker::CheckSingleParaVDescale(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: tensor_type 支持 FLOAT8_E8M0、FLOAT32；shape dim 按场景区分
+    //  tensor_type 支持 FLOAT8_E8M0、FLOAT32；shape dim 按场景区分
     const gert::CompileTimeTensorDesc *desc = qfaInfo.opParamInfo.vDescale.desc;
     const gert::StorageShape *shape = qfaInfo.opParamInfo.vDescale.shape;
     if (desc == nullptr || shape == nullptr) {
@@ -233,8 +280,9 @@ ge::graphStatus QuantChecker::CheckSingleParaVDescale(const QfaTilingInfo &qfaIn
         return ge::GRAPH_FAILED;
     }
 
-    // 场景: shape dim 校验 (MxFP8/FP8)
-    if (CheckVDescaleDimMxFp8(qfaInfo) != ge::GRAPH_SUCCESS || CheckVDescaleDimGqaFp8(qfaInfo) != ge::GRAPH_SUCCESS) {
+    // 场景: shape dim 校验 (MxFP8/FP8/HIF8)
+    if (CheckVDescaleDimMxFp8(qfaInfo) != ge::GRAPH_SUCCESS || CheckVDescaleDimGqaFp8(qfaInfo) != ge::GRAPH_SUCCESS ||
+        CheckVDescaleDimHif8(qfaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -242,7 +290,7 @@ ge::graphStatus QuantChecker::CheckSingleParaVDescale(const QfaTilingInfo &qfaIn
 
 ge::graphStatus QuantChecker::CheckSingleParaPScale(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: tensor_type 仅支持 FLOAT32；shape 仅支持 (1,)
+    //  tensor_type 仅支持 FLOAT32；shape 仅支持 (1,)
     // p_scale 为可选参数，未传入时跳过
     const gert::CompileTimeTensorDesc *desc = qfaInfo.opParamInfo.pScale.desc;
     const gert::Tensor *tensor = qfaInfo.opParamInfo.pScale.tensor;
@@ -621,7 +669,7 @@ ge::graphStatus QuantChecker::CheckMultiPara(const QfaTilingInfo &qfaInfo)
 
 ge::graphStatus QuantChecker::CheckDescaleDtype(const QfaTilingInfo &qfaInfo) const
 {
-    // 文档约束(一致性校验):
+    // 约束(一致性校验):
     //   MxFP8 场景下, q/k/v descale 的 tensor_type 仅支持 FLOAT8_E8M0
     //   GQA_FP8_FULLQUANT 场景下, q/k/v descale 的 tensor_type 仅支持 FLOAT32
     //   HIF8 场景下, q/k/v descale 的 tensor_type 仅支持 FLOAT32

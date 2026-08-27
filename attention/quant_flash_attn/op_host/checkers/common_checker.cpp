@@ -10,7 +10,7 @@
 
 /*!
  * \file common_checker.cpp
- * \brief Common checker for layout, shape, dtype parameters (文档约束: 公共参数组)
+ * \brief Common checker for layout, shape, dtype parameters ( 公共参数组)
  */
 
 #include <map>
@@ -181,7 +181,7 @@ ge::graphStatus CommonChecker::CheckSingleParaShapeDim(const QfaTilingInfo &qfaI
 
 ge::graphStatus CommonChecker::CheckSingleParaSoftmaxScale(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: softmax_scale 必须大于 0
+    //  softmax_scale 必须大于 0
     OP_CHECK_IF(qfaInfo.softmaxScale <= 0.0f,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, SOFTMAX_SCALE_NAME.c_str(),
                                                       std::to_string(qfaInfo.softmaxScale).c_str(),
@@ -209,7 +209,7 @@ ge::graphStatus CommonChecker::CheckQuantDataType(const QfaTilingInfo &qfaInfo)
 
 ge::graphStatus CommonChecker::CheckDtypeConsistency(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: q、k、v 的数据类型必须相同
+    //  q、k、v 的数据类型必须相同
     const gert::CompileTimeTensorDesc *queryDesc = qfaInfo.opParamInfo.query.desc;
     const gert::CompileTimeTensorDesc *keyDesc = qfaInfo.opParamInfo.key.desc;
     const gert::CompileTimeTensorDesc *valueDesc = qfaInfo.opParamInfo.value.desc;
@@ -240,7 +240,7 @@ ge::graphStatus CommonChecker::CheckDtypeConsistency(const QfaTilingInfo &qfaInf
 
 ge::graphStatus CommonChecker::CheckHeadNum(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束: Q_N % KV_N == 0 且 Q_N / KV_N > 0
+    //  Q_N % KV_N == 0 且 Q_N / KV_N > 0
     OP_CHECK_IF(
         qfaInfo.n1Size <= 0 || qfaInfo.n2Size <= 0,
         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(qfaInfo.opName, "query and key",
@@ -274,7 +274,7 @@ ge::graphStatus CommonChecker::CheckHeadNum(const QfaTilingInfo &qfaInfo)
 
 ge::graphStatus CommonChecker::CheckAxis(const QfaTilingInfo &qfaInfo)
 {
-    // 文档约束(特性交叉校验):
+    // 约束(特性交叉校验):
     //   65536 > B > 0；Q_S ≥ 0；KV_S ≥ 0；Q_T ≥ 0、KV_T ≥ 0；D 仅支持 64 或 128
     if (qfaInfo.bSize >= B_LIMIT || qfaInfo.bSize <= 0) {
         std::string reason = "The value of B must be within the range (0, " + std::to_string(B_LIMIT) + ")";

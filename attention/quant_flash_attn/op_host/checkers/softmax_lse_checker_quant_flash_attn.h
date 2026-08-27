@@ -10,7 +10,7 @@
 
 /*!
  * \file softmax_lse_checker_quant_flash_attn.h
- * \brief Checker for return_softmax_lse, softmax_lse (文档约束: SoftmaxLSE参数组)
+ * \brief Checker for return_softmax_lse, softmax_lse ( SoftmaxLSE参数组)
  */
 
 #ifndef SOFTMAX_LSE_CHECKER_QUANT_FLASH_ATTN_H

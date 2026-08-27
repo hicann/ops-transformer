@@ -62,7 +62,6 @@ private:
     QfaPlatFormInfo platformInfo_;
     uint32_t sOuterFactor_ = 0;
     uint32_t sInnerFactor_ = 0;
-    bool flashDecodeFlag_ = false;
     bool cuSeqLenQFlag_ = false;
     bool cuSeqLenKVFlag_ = false;
     bool seqUsedQFlag_ = false;
