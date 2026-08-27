@@ -434,11 +434,120 @@ TEST_F(MhcPreBackwardProto, Ut_Check_Case08_TND_T8192_n4_D2048_FP16)
 }
 
 /*
+ * TND格式测试用例3：T=1024, n=4，D=512, x数据类型bf16
+ * gradHRes为TN!格式 [T, N!] (2D)
+ * 预期结果：成功
+ */
+TEST_F(MhcPreBackwardProto, Ut_Check_Case09_TND_T1024_n4_D512_BF16_TNFact)
+{
+    float alpha[3] = {0.3f, 0.3f, 0.3f};
+    uint32_t T = 1024;
+    uint32_t n = 4;
+    uint32_t D = 512;
+    uint32_t nD = n * D; // 2048
+    uint32_t factN = 1;  // N! = 24 for n=4
+    for (uint32_t i = 2; i <= n; i++) {
+        factN *= i;
+    } // Factorial(4) = 24
+    uint32_t fusionSize = factN + 2 * n; // N!+2N = 32
+    float hcEps = 0.000001f;
+
+    gert::InfershapeContextPara infershapeContextPara(
+        "MhcPreBackward",
+        {
+            {{{T, n, D}, {T, n, D}}, ge::DT_BF16, ge::FORMAT_ND},                // x (TND format)
+            {{{fusionSize, nD}, {fusionSize, nD}}, ge::DT_FLOAT, ge::FORMAT_ND}, // phi
+            {{{3}, {3}}, ge::DT_FLOAT, ge::FORMAT_ND},                           // alpha
+            {{{T, D}, {T, D}}, ge::DT_BF16, ge::FORMAT_ND},                      // gradHIn (TD format)
+            {{{T, n}, {T, n}}, ge::DT_FLOAT, ge::FORMAT_ND},                     // gradHPost (TN format)
+            {{{T, factN}, {T, factN}}, ge::DT_FLOAT, ge::FORMAT_ND},             // gradHRes (TN! format, 2D)
+            {{{T}, {T}}, ge::DT_FLOAT, ge::FORMAT_ND},                           // invRms (T format)
+            {{{T, fusionSize}, {T, fusionSize}}, ge::DT_FLOAT, ge::FORMAT_ND},   // hMix
+            {{{T, n}, {T, n}}, ge::DT_FLOAT, ge::FORMAT_ND},                     // hPre
+            {{{T, n}, {T, n}}, ge::DT_FLOAT, ge::FORMAT_ND},                     // hPost
+            {{{nD}, {nD}}, ge::DT_FLOAT, ge::FORMAT_ND}                          // gamma (optional)
+        },
+        {
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},  // gradX
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // gradPhi
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // gradAlpha
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // gradBias
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}  // gradGamma (optional)
+        },
+        {{"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(hcEps)}});
+
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {T, n, D},        // gradX: [T, n, D]
+        {fusionSize, nD}, // gradPhi: [fusionSize, nD]
+        {3},              // gradAlpha: [3]
+        {fusionSize},     // gradBias: [fusionSize]
+        {n, D}            // gradGamma: [n, D]
+    };
+
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
+/*
+ * BSND格式测试用例4：B=2, S=4096, n=4，D=1536, x数据类型bf16
+ * gradHRes为BSN!格式 [B, S, N!] (3D)
+ * 预期结果：成功
+ */
+TEST_F(MhcPreBackwardProto, Ut_Check_Case10_B2_S4096_n4_D1536_BF16_BSNFact)
+{
+    float alpha[3] = {0.25f, 0.25f, 0.25f};
+    uint32_t B = 2;
+    uint32_t S = 4096;
+    uint32_t n = 4;
+    uint32_t D = 1536;
+    uint32_t nD = n * D; // 6144
+    uint32_t factN = 1;  // N! = 24 for n=4
+    for (uint32_t i = 2; i <= n; i++) {
+        factN *= i;
+    } // Factorial(4) = 24
+    uint32_t fusionSize = factN + 2 * n; // N!+2N = 32
+    float hcEps = 0.000001f;
+
+    gert::InfershapeContextPara infershapeContextPara(
+        "MhcPreBackward",
+        {
+            {{{B, S, n, D}, {B, S, n, D}}, ge::DT_BF16, ge::FORMAT_ND},              // x
+            {{{fusionSize, nD}, {fusionSize, nD}}, ge::DT_FLOAT, ge::FORMAT_ND},     // phi
+            {{{3}, {3}}, ge::DT_FLOAT, ge::FORMAT_ND},                               // alpha
+            {{{B, S, D}, {B, S, D}}, ge::DT_BF16, ge::FORMAT_ND},                    // gradHIn
+            {{{B, S, n}, {B, S, n}}, ge::DT_FLOAT, ge::FORMAT_ND},                   // gradHPost
+            {{{B, S, factN}, {B, S, factN}}, ge::DT_FLOAT, ge::FORMAT_ND},           // gradHRes (BSN! format, 3D)
+            {{{B, S}, {B, S}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // invRms
+            {{{B, S, fusionSize}, {B, S, fusionSize}}, ge::DT_FLOAT, ge::FORMAT_ND}, // hMix
+            {{{B, S, n}, {B, S, n}}, ge::DT_FLOAT, ge::FORMAT_ND},                   // hPre
+            {{{B, S, n}, {B, S, n}}, ge::DT_FLOAT, ge::FORMAT_ND},                   // hPost
+            {{{nD}, {nD}}, ge::DT_FLOAT, ge::FORMAT_ND}                              // gamma (optional)
+        },
+        {
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},  // gradX
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // gradPhi
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // gradAlpha
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // gradBias
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}  // gradGamma (optional)
+        },
+        {{"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(hcEps)}});
+
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {B, S, n, D},     // gradX: [B, S, n, D]
+        {fusionSize, nD}, // gradPhi: [fusionSize, nD]
+        {3},              // gradAlpha: [3]
+        {fusionSize},     // gradBias: [fusionSize]
+        {n, D}            // gradGamma: [n, D]
+    };
+
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
+/*
  * 边界测试用例1：B=1, S=1, n=4，D=64, x数据类型bf16
  * 最小尺寸测试
  * 预期结果：成功
  */
-TEST_F(MhcPreBackwardProto, Ut_Check_Case09_B1_S1_n4_D1_BF16_Boundary)
+TEST_F(MhcPreBackwardProto, Ut_Check_Case11_B1_S1_n4_D1_BF16_Boundary)
 {
     float alpha[3] = {0.1f, 0.1f, 0.1f}; // alpha = [0.1, 0.1, 0.1]
     uint32_t B = 1;

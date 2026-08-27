@@ -21,6 +21,7 @@
 #include "err/ops_err.h"
 #include "platform/platform_infos_def.h"
 #include "../../../op_kernel/arch35/mhc_pre_backward_tiling_key.h"
+#include "../mhc_pre_backward_tiling.h"
 
 namespace optiling {
 
@@ -38,17 +39,6 @@ TILING_DATA_FIELD_DEF(float, hcEps);
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MhcPreBackward, MhcPreBackwardTilingData);
-
-struct MhcPreBackwardCompileInfo {
-    uint64_t aicNum{0UL};
-    uint64_t aivNum{0UL};
-    uint64_t ubSize{0UL};
-    uint64_t l1Size{0UL};
-    uint64_t l2Size{0UL};
-    uint64_t l0CSize{0UL};
-    uint64_t l0ASize{0UL};
-    uint64_t l0BSize{0UL};
-};
 
 class MhcPreBackwardTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
@@ -91,7 +81,7 @@ protected:
 
     ge::graphStatus GetInputShape();
     ge::graphStatus GetInputTensors(const gert::Tensor *&gradHInTensor, const gert::Tensor *&gradHPostTensor,
-                                   const gert::Tensor *&gradHResTensor);
+                                    const gert::Tensor *&gradHResTensor);
     ge::graphStatus ValidateInputDims(int64_t gradHInDims, int64_t gradHPostDims, int64_t gradHResDims);
     ge::graphStatus ParseBSDFormat(const gert::Tensor *gradHInTensor, const gert::Tensor *gradHPostTensor,
                                    const gert::Tensor *gradHResTensor);

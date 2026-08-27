@@ -93,8 +93,8 @@ ge::graphStatus MhcPreBackwardTiling::ValidateInputDims(int64_t gradHInDims, int
     }
     if (gradHInDims != gradHPostDims) {
         OP_LOGE(context_->GetNodeName(),
-                "grad_h_in and grad_h_post must have the same dim num, gradHInDims=%ld, gradHPostDims=%ld",
-                gradHInDims, gradHPostDims);
+                "grad_h_in and grad_h_post must have the same dim num, gradHInDims=%ld, gradHPostDims=%ld", gradHInDims,
+                gradHPostDims);
         return ge::GRAPH_FAILED;
     }
     if ((gradHInDims == BSD_DIM_NUM && gradHResDims != BSNN_DIM_NUM) ||
@@ -126,8 +126,7 @@ ge::graphStatus MhcPreBackwardTiling::ParseBSDFormat(const gert::Tensor *gradHIn
         return ge::GRAPH_FAILED;
     }
     if (gradHResTensor->GetStorageShape().GetDim(0) != batch ||
-        gradHResTensor->GetStorageShape().GetDim(1) != sequence ||
-        gradHResTensor->GetStorageShape().GetDim(2) != N_ ||
+        gradHResTensor->GetStorageShape().GetDim(1) != sequence || gradHResTensor->GetStorageShape().GetDim(2) != N_ ||
         gradHResTensor->GetStorageShape().GetDim(3) != N_) {
         OP_LOGE(context_->GetNodeName(),
                 "grad_h_res shape must be [B, S, N, N], actual=[%ld,%ld,%ld,%ld], expected=[%lu,%lu,%lu,%lu]",
@@ -154,8 +153,7 @@ ge::graphStatus MhcPreBackwardTiling::ParseTNDFormat(const gert::Tensor *gradHIn
                 gradHPostTensor->GetStorageShape().GetDim(INDEX_T), t);
         return ge::GRAPH_FAILED;
     }
-    if (gradHResTensor->GetStorageShape().GetDim(0) != t ||
-        gradHResTensor->GetStorageShape().GetDim(1) != N_ ||
+    if (gradHResTensor->GetStorageShape().GetDim(0) != t || gradHResTensor->GetStorageShape().GetDim(1) != N_ ||
         gradHResTensor->GetStorageShape().GetDim(2) != N_) {
         OP_LOGE(context_->GetNodeName(),
                 "grad_h_res shape must be [T, N, N], actual=[%ld,%ld,%ld], expected=[%lu,%lu,%lu]",
@@ -249,7 +247,6 @@ ge::graphStatus MhcPreBackwardTiling::ParseInputAndAttr()
     return ge::GRAPH_SUCCESS;
 }
 
-
 void MhcPreBackwardTiling::SetC0TilingParams()
 {
     tilingData_.matmulTilingC0.set_dbL0C(C0_SET_VALUE);
@@ -297,15 +294,14 @@ void MhcPreBackwardTiling::FillTilingData()
 uint64_t MhcPreBackwardTiling::CalculateWorkspaceSize(uint64_t totalLength, uint64_t fusionSize, uint64_t cubeCoreNum,
                                                       uint64_t vecCoreNum, uint64_t elementSize)
 {
-    uint64_t v1Elements = totalLength * fusionSize +          // h_mix_grad
+    uint64_t v1Elements = totalLength * fusionSize +            // h_mix_grad
                           ALPHA_GRAD_CORE_FACTOR * vecCoreNum + // alpha_grad
                           vecCoreNum * fusionSize +             // bias_grad
-                          totalLength;                         // inv_rms_grad
+                          totalLength;                          // inv_rms_grad
 
-    uint64_t v2Elements =
-        C0_SET_SHAPE_M * C0_SET_SHAPE_N * cubeCoreNum * BUFFER_NUM + // x_rs_grad_mm
-        C0_SET_SHAPE_M * C0_SET_SHAPE_N * cubeCoreNum * BUFFER_NUM + // x_rs
-        EXTRA_BUFFER_SIZE;
+    uint64_t v2Elements = C0_SET_SHAPE_M * C0_SET_SHAPE_N * cubeCoreNum * BUFFER_NUM + // x_rs_grad_mm
+                          C0_SET_SHAPE_M * C0_SET_SHAPE_N * cubeCoreNum * BUFFER_NUM + // x_rs
+                          EXTRA_BUFFER_SIZE;
     uint64_t totalElements =
         ((v1Elements + WORKSPACE_ALIGN_SIZE - 1) / WORKSPACE_ALIGN_SIZE * WORKSPACE_ALIGN_SIZE) + v2Elements;
     return totalElements * elementSize;
@@ -342,8 +338,7 @@ ge::graphStatus MhcPreBackwardTiling::GetMatmulTiling(matmul_tiling::MatmulApiTi
     }
     if (mm.GetTiling(isC0 ? tilingData_.matmulTilingC0 : tilingData_.matmulTilingC1) == -1) {
         OP_LOGE(context_->GetNodeName(), "ProcessC%d Get Tiling Failed!, m = %lu, n = %lu, k = %lu", isC0 ? 0 : 1,
-                isC0 ? totalLength_ : N_ * N_ + 2 * N_, N_ * D_,
-                isC0 ? N_ * N_ + 2 * N_ : totalLength_);
+                isC0 ? totalLength_ : N_ * N_ + 2 * N_, N_ * D_, isC0 ? N_ * N_ + 2 * N_ : totalLength_);
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -377,7 +372,6 @@ ge::graphStatus MhcPreBackwardTiling::TilingProcess()
     workspaceSize_ = userWorkspaceSize + systemWorkspaceSize;
     return ge::GRAPH_SUCCESS;
 }
-
 
 ge::graphStatus MhcPreBackwardTiling::DoOpTiling()
 {
@@ -436,44 +430,4 @@ ge::graphStatus MhcPreBackwardTiling::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingFunc4mHCPreGrad(gert::TilingContext *context)
-{
-    OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("[mHCPreBackwardTilingFunc]", " context is null"),
-                return ge::GRAPH_FAILED);
-
-    return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
-}
-
-
-static ge::graphStatus TilingPrepare4mHCPreGrad(gert::TilingParseContext *context)
-{
-    OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("[TilingPrepare4mHC]", "context is null"),
-                return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfo == nullptr, OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null"),
-                return ge::GRAPH_FAILED);
-
-    auto compileInfoPtr = context->GetCompiledInfo<MhcPreBackwardCompileInfo>();
-    OP_CHECK_IF(compileInfoPtr == nullptr, OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "compileInfoPtr is null"),
-                return ge::GRAPH_FAILED);
-
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-    compileInfoPtr->aicNum = ascendcPlatform.GetCoreNumAic();
-    compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
-
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfoPtr->ubSize);
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, compileInfoPtr->l1Size);
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, compileInfoPtr->l2Size);
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, compileInfoPtr->l0ASize);
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_B, compileInfoPtr->l0BSize);
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, compileInfoPtr->l0CSize);
-
-    OP_LOGI(context->GetNodeName(), "parse compile info success l1Size:%lu, l2Size:%lu, coreNum:%lu",
-            compileInfoPtr->l1Size, compileInfoPtr->l2Size, compileInfoPtr->aicNum);
-    return ge::GRAPH_SUCCESS;
-}
-
-IMPL_OP_OPTILING(MhcPreBackward)
-    .Tiling(TilingFunc4mHCPreGrad)
-    .TilingParse<MhcPreBackwardCompileInfo>(TilingPrepare4mHCPreGrad);
 } // namespace optiling
