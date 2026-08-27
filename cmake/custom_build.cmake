@@ -530,7 +530,13 @@ if (NOT generate_aclnn_srcs AND NOT generate_aclnn_inner_srcs AND NOT generate_e
             message(STATUS "  - ${_cann_skipped_op}")
         endforeach()
     endif()
-    file(WRITE "${CMAKE_BINARY_DIR}/no_ops.flag" "all requested ops skipped by CANN version check\n")
+    # 只有确实被 CANN 版本检查跳过时才写 no_ops.flag；
+    # 纯 AICPU 算子（如 metadata 类）没有 _def.cpp，aclnn 列表为空是正常的，不应被误判为跳过
+    if (_cann_skipped_ops)
+        file(WRITE "${CMAKE_BINARY_DIR}/no_ops.flag" "all requested ops skipped by CANN version check\n")
+    else()
+        file(REMOVE "${CMAKE_BINARY_DIR}/no_ops.flag")
+    endif()
 else()
     file(REMOVE "${CMAKE_BINARY_DIR}/no_ops.flag")
 endif()
