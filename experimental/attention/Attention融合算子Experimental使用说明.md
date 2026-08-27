@@ -162,6 +162,17 @@
     <td>算子具体使用方法见<a href="https://gitcode.com/cann/ops-transformer/blob/master/experimental/attention/typhoon_mla/README.md">README文档</a>。</td>
   </tr>
   <tr>
+    <td>fused_gdn_decode</td>
+    <td><a href="./fused_gdn_decode/README.md">文档</a></td>
+    <td>√</td>
+    <td>√</td>
+    <td>√</td>
+    <td>×</td>
+    <td>√</td>
+    <td>AI Core</td>
+    <td>该算子融合GDN单token解码中的QKV拆分、Q/K归一化、门控计算、循环状态更新和输出投影。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://gitcode.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
+  </tr>
+  <tr>
     <td>stem_indexer</td>
     <td><a href="./stem_indexer/docs/StemIndexer.md">文档</a></td>
     <td>√</td>
