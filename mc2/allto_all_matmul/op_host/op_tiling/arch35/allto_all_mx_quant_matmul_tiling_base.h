@@ -84,7 +84,7 @@ protected:
 
 private:
     AlltoAllQuantMatmulTilingData localTilingData_;
-    hcommAllToAllMatmulTilingData hcommTilingData_;
+    Apace::hcommAllToAllMatmulTilingData hcommTilingData_;
     bool isMxFp4_ = false;
     bool usingApaceImpl_ = false;
     uint64_t mmMvalueLen_ = 0;

@@ -34,6 +34,7 @@ struct CommContext {
 };
 
 // Hcomm通信MX量化tiling结构体
+namespace Apace {
 struct hcommAllToAllMatmulTilingData {
     Mc2InitTiling mc2InitTiling;
     Mc2CcTiling mc2CcTiling;
@@ -41,3 +42,4 @@ struct hcommAllToAllMatmulTilingData {
     QuantMatmulTilingData tileQbmmTilingData;
     uint32_t localMatmul{0};
 };
+} // namespace Apace
