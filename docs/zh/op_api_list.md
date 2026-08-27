@@ -162,7 +162,7 @@
 |[aclnnMoeFinalizeRoutingV2](../../moe/moe_finalize_routing_v2/docs/aclnnMoeFinalizeRoutingV2.md)|MoE计算中，最后处理合并MoE FFN的输出结果，支持配置dropPadMode。|默认确定性实现| 默认确定性实现 |
 |[aclnnMoeFinalizeRoutingV2Grad](../../moe/moe_finalize_routing_v2_grad/docs/aclnnMoeFinalizeRoutingV2Grad.md)|aclnnMoeFinalizeRoutingV2的反向传播。|默认确定性实现| 默认确定性实现 |
 |[aclnnMoeFinalizeRoutingV3](../../moe/moe_finalize_routing_v2/docs/aclnnMoeFinalizeRoutingV3.md)| MoE计算中，最后处理合并MoE FFN的输出结果。|默认确定性实现| 默认确定性实现 |
-|[aclnnMoeFusedTopk](../../moe/moe_fused_topk/docs/aclnnMoeFusedTopk.md)|MoE计算中，对输入x做Sigmoid计算，对计算结果分组进行排序，最后根据分组排序的结果选取前k个专家。|默认确定性实现| - |
+|[aclnnMoeFusedTopk](../../moe/moe_fused_topk/docs/aclnnMoeFusedTopk.md)|MoE计算中，对输入x做Sigmoid计算，对计算结果分组进行排序，最后根据分组排序的结果选取前k个专家。|默认确定性实现| 默认确定性实现 |
 | [aclnnMoeGatingTopK](../../moe/moe_gating_top_k/docs/aclnnMoeGatingTopK.md)|MoE计算中，对输入x做Sigmoid、SoftMax或者SqrtSoftplus计算，对计算结果分组进行排序，最后根据分组排序的结果选取前k个专家。|默认确定性实现| 默认确定性实现 |
 | [aclnnMoeGatingTopKV2](../../moe/moe_gating_top_k/docs/aclnnMoeGatingTopKV2.md)|MoE计算中，对输入x做Sigmoid、SoftMax或者SqrtSoftplus计算，对计算结果分组进行排序，最后根据分组排序的结果选取前k个专家，支持两种模式。|默认确定性实现| 默认确定性实现 |
 |[aclnnMoeGatingTopKBackward](../../moe/moe_gating_top_k_backward/docs/aclnnMoeGatingTopKBackward.md)|aclnnMoeGatingTopK的反向算子。|默认确定性实现| 默认确定性实现 |
