@@ -284,6 +284,7 @@ transformer-3@ops-transformer:
                 - ops/ops-transformer/attention/mla_prolog_v2/op_kernel/
                 - ops/ops-transformer/attention/mla_prolog_v2/op_graph/
                 - ops/ops-transformer/attention/mla_prolog/op_host/
+                - ops/ops-transformer/attention/mla_prolog/op_api/
                 - ops/ops-transformer/attention/mla_prolog/CMakeLists.txt
                 - ops/ops-transformer/attention/mla_prolog/op_kernel/
                 - ops/ops-transformer/attention/mla_prolog/op_graph/
@@ -291,30 +292,97 @@ transformer-3@ops-transformer:
                 - ops/ops-transformer/attention/common/op_host/split_core.h
                 - ops/ops-transformer/attention/common/op_host/split_core_v2.cpp
                 - ops/ops-transformer/attention/common/op_host/split_core_v2.h
+                - ops/ops-transformer/attention/common/op_host/CMakeLists.txt
+                - ops/ops-transformer/attention/common/op_host/fia_tiling_base.h
+                - ops/ops-transformer/attention/common/op_host/fia_tiling_shape.cpp
+                - ops/ops-transformer/attention/common/op_host/fia_tiling_shape.h
+                - ops/ops-transformer/attention/common/op_host/fia_tiling_templates_registry.h
                 - ops/ops-transformer/attention/common/op_kernel/aicpu_common.h
-                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/arch22
-                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/arch35
-                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/op_api
+                - ops/ops-transformer/attention/common/op_kernel/arch35/flash_attention_score_common_regbase.h
+                - ops/ops-transformer/attention/common/op_kernel/arch35/flash_attention_score_tiling_regbase.h
+                - ops/ops-transformer/attention/common/op_kernel/arch35/infer_flash_attention_comm.h
+                - ops/ops-transformer/attention/common/op_kernel/arch35/vf/vf_antiquant_w4.h
+                - ops/ops-transformer/attention/common/op_kernel/arch35/vf/vf_antiquant_w8.h
+                - ops/ops-transformer/attention/common/op_kernel/const_def.h
+                - ops/ops-transformer/attention/common/op_kernel/vector_common.h
+                - ops/ops-transformer/attention/common/op_kernel/load_balance/
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_api/aclnn_fused_infer_attention_score.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_api/aclnn_fused_infer_attention_score.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_api/aclnn_fused_infer_attention_score_inner.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_api/aclnn_fused_infer_attention_score_v2.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_api/aclnn_fused_infer_attention_score_v2.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_api/aclnn_fused_infer_attention_score_v3.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_api/aclnn_fused_infer_attention_score_v3.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_api/aclnn_fused_infer_attention_score_v4.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_api/aclnn_fused_infer_attention_score_v4.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_api/aclnn_fused_infer_attention_score_v5.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_api/aclnn_fused_infer_attention_score_v5.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_api/fused_infer_attention_score_inner.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_graph/CMakeLists.txt
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_graph/fallback_fused_infer_attention_score.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_impl.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_impl.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_v4.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_v4.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_arch38.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/arch35/fused_infer_attention_score_tiling_arch38.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_host/CMakeLists.txt
-                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fallback_fused_infer_attention_score.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/flash_attention_infer_tiling.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_def.cpp
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_infershape.cpp
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling.cpp
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_compile_info.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_constants.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_index.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_info_parser.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_info_parser.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_register.cpp
-                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch22
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fused_infer_attention_score_tiling_utils.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fia_tiling_info.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fia_tiling_info.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/fused_infer_attention_score.cpp
-                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/fused_infer_attention_score_v3.cpp
-                - ops/ops-transformer/attention/fused_infer_attention_score/CMakeLists.txt
-                - ops/ops-transformer/attention/common/op_kernel/arch35/flash_attention_score_antiquant_block_cube.h
-                - ops/ops-transformer/attention/common/op_kernel/arch35/flash_attention_score_antiquant_block_vec.h
-                - ops/ops-transformer/attention/common/op_kernel/arch35/flash_attention_score_antiquant_kernel.h
-                - ops/ops-transformer/attention/common/op_kernel/arch35/flash_attention_score_antiquant_processor.h
-                - ops/ops-transformer/attention/common/op_kernel/arch35/vf/vf_antiquant_w4.h
-                - ops/ops-transformer/attention/common/op_kernel/arch35/vf/vf_antiquant_w8.h
-                - ops/ops-transformer/attention/common/op_kernel/load_balance/
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/fused_infer_attention_score_apt.cpp
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/fused_infer_attention_score_template_tiling_key.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/fia_block_vec_flashdecode.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/fia_public_define_arch35.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/fia_template_dispatcher.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/flash_attention_score_antiquant_block_cube.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/flash_attention_score_antiquant_block_vec.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/flash_attention_score_antiquant_kernel.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/flash_attention_score_antiquant_processor.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/fia_arch35_antiquant.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/infer_flash_attention_kvcache.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/infer_flash_attention_sparse.h
+                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/fia_tiling_data_public.h
+                - ops/ops-transformer/attention/compressor/CMakeLists.txt
+                - ops/ops-transformer/attention/compressor/op_host/arch35/compressor_tiling.cpp
+                - ops/ops-transformer/attention/compressor/op_host/arch35/compressor_tiling.h
+                - ops/ops-transformer/attention/compressor/op_host/CMakeLists.txt
+                - ops/ops-transformer/attention/compressor/op_host/compressor_def.cpp
+                - ops/ops-transformer/attention/compressor/op_host/compressor_infershape.cpp
+                - ops/ops-transformer/attention/compressor/op_host/compressor_tiling_register.cpp
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/compressor_block_cube_full_load.h
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/compressor_block_cube.h
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/compressor_block_vec_full_load.h
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/compressor_block_vec.h
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/compressor_comm.h
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/compressor_kernel_full_load.h
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/compressor_kernel.h
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/compressor_template_tiling_key.h
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/compressor_tiling_data.h
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/compressor_tools.h
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/vf/vf_add.h
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/vf/vf_mul.h
+                - ops/ops-transformer/attention/compressor/op_kernel/arch35/vf/vf_softmax.h
+                - ops/ops-transformer/attention/compressor/op_kernel/compressor.cpp
+                - ops/ops-transformer/attention/compressor_grad/CMakeLists.txt
+                - ops/ops-transformer/attention/compressor_grad/op_host/CMakeLists.txt
+                - ops/ops-transformer/attention/compressor_grad/op_host/compressor_grad_def.cpp
+                - ops/ops-transformer/attention/compressor_grad/op_host/compressor_grad_infershape.cpp
+                - ops/ops-transformer/attention/compressor_grad/op_host/compressor_grad_tiling.cpp
+                - ops/ops-transformer/attention/compressor_grad/op_host/compressor_grad_tiling.h
+                - ops/ops-transformer/attention/compressor_grad/op_kernel/compressor_grad.py
             opensource_style: null
             kernel_style: null
         unrelease:
@@ -331,10 +399,56 @@ transformer-3@ops-transformer:
                 - ops/ops-transformer/attention/mla_prolog/examples/
                 - ops/ops-transformer/attention/mla_prolog/README.md
                 - ops/ops-transformer/attention/mla_prolog/docs/
-                - ops/ops-transformer/attention/fused_infer_attention_score/tests/
-                - ops/ops-transformer/attention/fused_infer_attention_score/README.md
-                - ops/ops-transformer/attention/fused_infer_attention_score/examples/
                 - ops/ops-transformer/attention/fused_infer_attention_score/docs/
+                - ops/ops-transformer/attention/compressor/docs
+                - ops/ops-transformer/attention/compressor/examples
+                - ops/ops-transformer/attention/compressor/README.md
+                - ops/ops-transformer/attention/compressor/tests
+                - ops/ops-transformer/attention/compressor_grad/docs
+                - ops/ops-transformer/attention/compressor_grad/examples
+                - ops/ops-transformer/attention/compressor_grad/README.md
+                - ops/ops-transformer/attention/compressor_grad/tests
+            non_delivery: null
+            open_source: null
+    llt:
+        ut_filter:
+            - ops/ops-transformer/attention/*/op_kernel/
+            - ops/ops-transformer/attention/*/op_api/
+            - ops/ops-transformer/attention/*/op_graph/
+
+transformer-quant@ops-transformer:
+    src:
+        release:
+            huawei_style:
+                - ops/ops-transformer/attention/quant_compressor/CMakeLists.txt
+                - ops/ops-transformer/attention/quant_compressor/op_host/arch35/quant_compressor_tiling.cpp
+                - ops/ops-transformer/attention/quant_compressor/op_host/arch35/quant_compressor_tiling.h
+                - ops/ops-transformer/attention/quant_compressor/op_host/CMakeLists.txt
+                - ops/ops-transformer/attention/quant_compressor/op_host/quant_compressor_def.cpp
+                - ops/ops-transformer/attention/quant_compressor/op_host/quant_compressor_infershape.cpp
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/quant_compressor_block_cube_full_load.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/quant_compressor_block_cube.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/quant_compressor_block_vec_full_load.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/quant_compressor_block_vec.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/quant_compressor_comm.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/quant_compressor_kernel_full_load.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/quant_compressor_kernel.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/quant_compressor_template_tiling_key.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/quant_compressor_tiling_data.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/quant_compressor_tools.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/vf/vf_add_quant_compressor.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/vf/vf_mul_quant_compressor.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/vf/vf_softmax_quant_compressor.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/arch35/vf/vf_dequant_quant_compressor.h
+                - ops/ops-transformer/attention/quant_compressor/op_kernel/quant_compressor.cpp
+            opensource_style: null
+            kernel_style: null
+        unrelease:
+            test_code:
+                - ops/ops-transformer/attention/quant_compressor/docs
+                - ops/ops-transformer/attention/quant_compressor/examples
+                - ops/ops-transformer/attention/quant_compressor/README.md
+                - ops/ops-transformer/attention/quant_compressor/tests
             non_delivery: null
             open_source: null
     llt:
