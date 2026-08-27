@@ -277,8 +277,13 @@ def _mxfp8_normalize_data_range(data_range):
                 f"data_range must be a scalar or [min, max], got: {data_range}"
             )
         low, high = float(data_range[0]), float(data_range[1])
-        if not math.isfinite(low) or not math.isfinite(high):
-            raise ValueError(f"data_range bounds must be finite, got: [{low}, {high}]")
+        if math.isnan(low) or math.isnan(high):
+            if not (math.isnan(low) and math.isnan(high)):
+                raise ValueError(
+                    "nan data_range bounds must describe a constant nan value, "
+                    f"got: [{low}, {high}]"
+                )
+            return [low, high]
         if low > high:
             raise ValueError(
                 f"data_range min must not exceed max, got: [{low}, {high}]"
@@ -286,7 +291,9 @@ def _mxfp8_normalize_data_range(data_range):
         return [low, high]
 
     radius = float(data_range)
-    if not math.isfinite(radius) or radius < 0:
+    if not math.isfinite(radius):
+        return radius
+    if radius < 0:
         raise ValueError(
             f"scalar data_range must be finite and non-negative, got: {radius}"
         )
@@ -460,9 +467,15 @@ def _mxfp8_customize_inputs(
     _inplace_copy(k_descale, module.fp32_to_e8m0fnu_safe(k_scale_pa, "K descale"))
     _inplace_copy(v_descale, module.fp32_to_e8m0fnu_safe(v_scale_pa, "V descale"))
     if p_scale is not None and _numel(p_scale) > 0:
+        # TTK keeps a one-element placeholder for this optional input.  When
+        # p_scale_value is omitted, materialize the operator's default scale
+        # so that the placeholder is initialized and remains equivalent to 1.
+        p_scale_source = data["p_scale"]
+        if p_scale_source is None:
+            p_scale_source = torch.ones((1,), dtype=torch.float32)
         _inplace_copy(
             p_scale,
-            module.fp32_to_e8m0fnu_safe(data["p_scale"], "P scale"),
+            module.fp32_to_e8m0fnu_safe(p_scale_source, "P scale"),
         )
     _inplace_copy(sparse_indices, data["sparse_indices"])
     _inplace_copy(sparse_seq_len, data["sparse_seq_len"])

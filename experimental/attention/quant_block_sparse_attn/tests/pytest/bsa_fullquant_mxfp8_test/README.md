@@ -2,6 +2,23 @@
 
 本目录用于运行 QuantBlockSparseAttn 的 MXFP8 full-quant golden/NPU 对比用例。
 
+Golden 模拟 master kernel 的 softmax 状态，不再使用额外的 `has_valid_position` 判断：在线 max 从
+`-FLT_MAX` 开始；OUT 以 `max == -FLT_MAX` 判断空行，LSE 还会将 `sum == 0` 映射为
+`EMPTY_LSE`。若某行的所有合法 QK score 均为 `-Inf`，则与 kernel 一致保留
+`attention_out=0`、`lse=EMPTY_LSE`；由 `NaN` 或 `+Inf`
+触发的有效 softmax 行仍传播 `NaN`。为了兼容旧版算子和已生成的 golden，MXFP8 的
+`EMPTY_LSE` 使用 FP32 `-FLT_MAX`（`-3.4028235e+38`）；该语义同时适用于单 tile
+和多 tile 的最终归一化。
+
+非有限输入按 CUDA SDPA 语义保持：Q/K 产生 `NaN` 或 `+Inf` score 时，
+`attention_out` 和 LSE 传播 `NaN`；Q/K 使所有 score 为 `-Inf` 时输出
+`0 / -FLT_MAX`；V 中的 `NaN/±Inf` 只传播到 `attention_out`，LSE 仍由 Q/K 决定。
+
+STC 的 Q/K/V 数据范围支持标量 `inf`、`-inf`、`nan` 以及区间 `[-inf, inf]`。
+无界区间会在相邻 D 向量的不同 MX group 中分别放入两个无穷端点；`±Inf` 使用 E4M3FN 的 `±448`
+与最大有限 E8M0 descale `2^127` 配对，使 FP32 反量化得到同符号 Inf。`NaN` 保留在
+E4M3FN payload 中，并使用该组的合法有限 descale（全 NaN 组使用 1）。
+
 ## 文件结构
 
 - `qbsa_mxfp8_golden.py`：执行入口，负责生成输入、CPU golden、NPU 调用和精度对比。

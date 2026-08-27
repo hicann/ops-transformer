@@ -12,7 +12,30 @@
 
 """NumPy precision comparison for quant_block_sparse_attn TTK adapters."""
 
+import logging
+import math
+
 import numpy as np
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# TTK can register more than one root handler for the same captured output.
+# Dispatch this asset's verbose comparison table through one primary handler
+# so every row is printed exactly once.
+if logging.getLogger().handlers:
+    root_handlers = logging.getLogger().handlers
+    primary_handler = next(
+        (
+            handler
+            for handler in root_handlers
+            if not isinstance(handler, logging.FileHandler)
+        ),
+        root_handlers[0],
+    )
+    logger.handlers.clear()
+    logger.addHandler(primary_handler)
+    logger.propagate = False
 
 _FP32_RTOL = 0.005
 _FP32_ATOL = 0.000025
@@ -22,6 +45,133 @@ _FAIL_RATIO_LIMIT = 0.005
 _MAX_NORMALIZED_ERROR = 10.0
 _NORMALIZATION_EPSILON = 1e-10
 _NORMALIZATION_FLOOR = (1.0 / (1 << 14)) / _FP32_RTOL
+_TABLE_WIDTH = 102
+_DISPLAY_EDGE_COUNT = 10
+
+
+def _format_float(value):
+    value = float(value)
+    return str(value) if not math.isfinite(value) else f"{value:.7e}"
+
+
+def _display_offsets(total_count):
+    if total_count <= _DISPLAY_EDGE_COUNT * 2:
+        return list(range(total_count))
+    return (
+        list(range(_DISPLAY_EDGE_COUNT))
+        + [None]
+        + list(range(total_count - _DISPLAY_EDGE_COUNT, total_count))
+    )
+
+
+def _relative_diff(real_value, golden_value):
+    with np.errstate(invalid="ignore", divide="ignore", over="ignore"):
+        return abs(float(real_value) - float(golden_value)) / (
+            abs(float(golden_value)) + _NORMALIZATION_EPSILON
+        )
+
+
+def _log_table_header(title):
+    logger.info("%s%s", title, "-" * max(_TABLE_WIDTH - len(title), 1))
+    logger.info(
+        "%10s %18s %18s %18s %18s %14s",
+        "Index",
+        "GoldenOut",
+        "NpuOut",
+        "AbsDiff",
+        "RateDiff",
+        "Close",
+    )
+    logger.info("-" * _TABLE_WIDTH)
+
+
+def _log_output_preview(npu, golden, close_mask, output_name):
+    """Print the same first/last element view used by the pytest comparator."""
+    _log_table_header(f"{output_name} Output ")
+    for offset in _display_offsets(int(golden.size)):
+        if offset is None:
+            logger.info(
+                "%10s %18s %18s %18s %18s %14s",
+                "...",
+                "...",
+                "...",
+                "...",
+                "...",
+                "...",
+            )
+            continue
+        npu_value = float(npu[offset])
+        golden_value = float(golden[offset])
+        with np.errstate(invalid="ignore", over="ignore"):
+            abs_diff = abs(golden_value - npu_value)
+        logger.info(
+            "%10d %18s %18s %18s %18s %14s",
+            offset,
+            _format_float(golden_value),
+            _format_float(npu_value),
+            _format_float(abs_diff),
+            _format_float(_relative_diff(npu_value, golden_value)),
+            "PASS" if bool(close_mask[offset]) else "FAIL",
+        )
+
+
+def _log_error_elements(npu, golden, mismatch, normalized_error, output_name):
+    """Print failing elements when the tensor-level precision check fails."""
+    mismatch_indices = np.flatnonzero(mismatch)
+    _log_table_header(f"{output_name} Error Line ")
+    for offset in _display_offsets(int(mismatch_indices.size)):
+        if offset is None:
+            logger.info(
+                "%10s %18s %18s %18s %18s %14s",
+                "...",
+                "...",
+                "...",
+                "...",
+                "...",
+                "...",
+            )
+            continue
+        index = int(mismatch_indices[offset])
+        npu_value = float(npu[index])
+        golden_value = float(golden[index])
+        with np.errstate(invalid="ignore", over="ignore"):
+            abs_diff = abs(golden_value - npu_value)
+        if math.isfinite(npu_value) and math.isfinite(golden_value):
+            denominator = (
+                max(abs(npu_value), abs(golden_value), _NORMALIZATION_FLOOR)
+                + _NORMALIZATION_EPSILON
+            )
+            row_normalized_error = abs_diff / denominator
+        else:
+            row_normalized_error = float("nan")
+        logger.info(
+            "%10d %18s %18s %18s %18s %14s",
+            index,
+            _format_float(golden_value),
+            _format_float(npu_value),
+            _format_float(abs_diff),
+            _format_float(row_normalized_error),
+            "FAIL",
+        )
+
+    finite_indices = mismatch_indices[
+        np.isfinite(npu[mismatch_indices]) & np.isfinite(golden[mismatch_indices])
+    ]
+    if finite_indices.size:
+        max_error = float(np.max(normalized_error))
+        max_indices = finite_indices[normalized_error == max_error][:3]
+        logger.info("Max-RE line:%s", "-" * (_TABLE_WIDTH - len("Max-RE line:")))
+        for index in max_indices.tolist():
+            logger.info(
+                "%10d %18s %18s %18s %18s %14s",
+                index,
+                _format_float(golden[index]),
+                _format_float(npu[index]),
+                _format_float(abs(float(golden[index]) - float(npu[index]))),
+                _format_float(max_error),
+                "FAIL",
+            )
+    logger.info("-" * _TABLE_WIDTH)
 
 
 def _as_numpy(value):
@@ -56,6 +206,12 @@ def _numpy_compare(npu_out, golden_out, output_name):
     golden = _as_numpy(golden_out)
 
     if npu.shape != golden.shape:
+        logger.info(
+            "[%s] shape mismatch: npu_shape=%s, golden_shape=%s",
+            output_name,
+            tuple(npu.shape),
+            tuple(golden.shape),
+        )
         return {
             "pass": False,
             "precision": "shape_mismatch",
@@ -67,6 +223,7 @@ def _numpy_compare(npu_out, golden_out, output_name):
         }
 
     if npu.size == 0:
+        logger.info("[%s] both outputs are empty: PASS", output_name)
         return {"pass": True, "precision": 100.0}
 
     rtol, atol = _compare_tolerance(npu_out, golden_out)
@@ -118,6 +275,45 @@ def _numpy_compare(npu_out, golden_out, output_name):
     if max_normalized_error >= _MAX_NORMALIZED_ERROR:
         passed = False
 
+    precision = (element_count - diff_count) / element_count * 100.0
+    _log_output_preview(npu_f32, golden_f32, close_mask, output_name)
+    logger.info("-" * _TABLE_WIDTH)
+    logger.info(
+        "%10s %12s %12s %14s %10s",
+        "Rtol",
+        "Atol",
+        "PctThd",
+        "PctRlt",
+        "Result",
+    )
+    logger.info("-" * _TABLE_WIDTH)
+    logger.info(
+        "%10.4f %12.6f %11.2f%% %13.6f%% %10s",
+        rtol,
+        atol,
+        (1.0 - _FAIL_RATIO_LIMIT) * 100.0,
+        precision,
+        "Pass" if passed else "Failed",
+    )
+    logger.info(
+        "[%s] elements=%d, mismatches=%d, max_abs_diff=%s, "
+        "max_normalized_error=%s (threshold=%s)",
+        output_name,
+        element_count,
+        diff_count,
+        _format_float(max_abs_diff),
+        _format_float(max_normalized_error),
+        _format_float(_MAX_NORMALIZED_ERROR),
+    )
+    if not passed and diff_count:
+        _log_error_elements(
+            npu_f32,
+            golden_f32,
+            mismatch,
+            normalized_error,
+            output_name,
+        )
+
     error_info = None
     if not passed:
         error_info = (
@@ -131,7 +327,7 @@ def _numpy_compare(npu_out, golden_out, output_name):
 
     return {
         "pass": passed,
-        "precision": (element_count - diff_count) / element_count * 100.0,
+        "precision": precision,
         "diff_indices": np.flatnonzero(mismatch)[:1000].tolist(),
         "error_info": error_info,
         "metrics": {

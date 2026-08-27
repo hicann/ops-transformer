@@ -15,12 +15,6 @@ import math
 import os
 import torch
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(asctime)s] [%(levelname)s]-%(filename)s:%(lineno)04d - %(message)s",
-    datefmt="%Y/%m/%d %H:%M:%S",
-    force=True,
-)
 logger = logging.getLogger(__name__)
 
 _EPS = 1e-10

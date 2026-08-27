@@ -238,12 +238,14 @@ class QuantBlockSparseAttnGraph(torch.nn.Module):
         layout_out: str = "TND",
         layout_sparse_indices: str = "B_N_Qb_Kb",
         return_softmax_lse: bool = False,
+        quant_matmul: bool = False,
         batch_size: int = 0,
         num_heads_q: int = 0,
         num_heads_kv: int = 0,
         head_dim: int = 0,
     ):
         super().__init__()
+        del quant_matmul  # MXFP8 golden-only switch; never forward it to the operator.
         _ensure_cann_ops()
         _synchronize_npu(query)
         key, value, k_descale, p_scale, metadata = _prepare_operator_inputs(
@@ -363,12 +365,14 @@ def quant_block_sparse_attn(
     layout_out: str = "TND",
     layout_sparse_indices: str = "B_N_Qb_Kb",
     return_softmax_lse: bool = False,
+    quant_matmul: bool = False,
     batch_size: int = 0,
     num_heads_q: int = 0,
     num_heads_kv: int = 0,
     head_dim: int = 0,
 ):
     """Adapt the shared CSV inputs and call the installed QBSA operator."""
+    del quant_matmul  # MXFP8 golden-only switch; never forward it to the operator.
     _ensure_cann_ops()
     key, value, k_descale, p_scale, metadata = _prepare_operator_inputs(
         query,

@@ -212,8 +212,13 @@ def _mxfp8_normalize_data_range(data_range):
                 f"data_range must be a scalar or [min, max], got: {data_range}"
             )
         low, high = float(data_range[0]), float(data_range[1])
-        if not math.isfinite(low) or not math.isfinite(high):
-            raise ValueError(f"data_range bounds must be finite, got: [{low}, {high}]")
+        if math.isnan(low) or math.isnan(high):
+            if not (math.isnan(low) and math.isnan(high)):
+                raise ValueError(
+                    "nan data_range bounds must describe a constant nan value, "
+                    f"got: [{low}, {high}]"
+                )
+            return [low, high]
         if low > high:
             raise ValueError(
                 f"data_range min must not exceed max, got: [{low}, {high}]"
@@ -221,7 +226,9 @@ def _mxfp8_normalize_data_range(data_range):
         return [low, high]
 
     radius = float(data_range)
-    if not math.isfinite(radius) or radius < 0:
+    if not math.isfinite(radius):
+        return radius
+    if radius < 0:
         raise ValueError(
             f"scalar data_range must be finite and non-negative, got: {radius}"
         )

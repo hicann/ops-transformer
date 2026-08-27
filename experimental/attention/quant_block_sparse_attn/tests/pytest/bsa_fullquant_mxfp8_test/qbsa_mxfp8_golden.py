@@ -43,8 +43,28 @@ except ImportError:
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import result_compare_method
 
-logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
+
+# TTK installs multiple root handlers that target the same captured stream.
+# A propagated record is consequently printed once by every handler.  The
+# asset loader imports this module under the private name below; bind that
+# instance to one primary handler while leaving standalone pytest/debug
+# logging untouched.
+if __name__ == "_qbsa_mxfp8_pytest_golden" and logging.getLogger().handlers:
+    root_handlers = logging.getLogger().handlers
+    primary_handler = next(
+        (
+            handler
+            for handler in root_handlers
+            if not isinstance(handler, logging.FileHandler)
+        ),
+        root_handlers[0],
+    )
+    logger.handlers.clear()
+    logger.addHandler(primary_handler)
+    logger.propagate = False
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 QBSA_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../../.."))
@@ -220,11 +240,16 @@ def _parse_case_field(field_name, value):
     if field_name in _CASE_INT_FIELDS:
         return int(value)
     if field_name in _CASE_RANGE_FIELDS:
-        parsed = (
-            json.loads(value)
-            if isinstance(value, str) and value.startswith("[")
-            else value
-        )
+        parsed = value
+        if isinstance(value, str) and value.startswith("["):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                if not value.endswith("]"):
+                    raise
+                # JSON 不接受 inf、nan 等 IEEE 拼写。这里是 MXFP8 测试数据
+                # 的取值范围，因此用 float() 解析这些值，普通范围仍按 JSON 解析。
+                parsed = [item.strip() for item in value[1:-1].split(",")]
         if isinstance(parsed, (list, tuple)):
             if len(parsed) != 2:
                 raise ValueError(
@@ -529,6 +554,7 @@ set_active_case(CASE)
 # e8m0fnu 最小正数: 2^(-127)，用于替换 descale 中的数值 0 和非有限值。
 # e8m0fnu 没有数值 0；字节 0x00 表示 2^(-127)，0xFF 才表示 NaN。
 E8M0_MIN_POSITIVE = 2 ** (-127)
+E8M0_MAX_FINITE = float(2**127)
 _EMAX_MAP = {
     torch.float8_e4m3fn: 8,
 }
@@ -560,15 +586,25 @@ def _normalize_data_range(data_range):
             )
         low, high = float(data_range[0]), float(data_range[1])
         explicit_bounds = True
+        if math.isnan(low) or math.isnan(high):
+            if not (math.isnan(low) and math.isnan(high)):
+                raise ValueError(
+                    "nan data_range bounds must describe a constant nan value, "
+                    f"got: [{low}, {high}]"
+                )
+            return low, high, explicit_bounds
     else:
         radius = float(data_range)
+        if not math.isfinite(radius):
+            # A non-finite scalar is a requested constant payload, not a
+            # symmetric random radius.  This keeps CSV forms such as ``inf``,
+            # ``-inf`` and ``nan`` unambiguous.
+            return radius, radius, True
         if radius < 0:
             raise ValueError(f"scalar data_range must be non-negative, got: {radius}")
         low, high = -radius, radius
         explicit_bounds = False
 
-    if not math.isfinite(low) or not math.isfinite(high):
-        raise ValueError(f"data_range bounds must be finite, got: [{low}, {high}]")
     if low > high:
         raise ValueError(f"data_range min must not exceed max, got: [{low}, {high}]")
     return low, high, explicit_bounds
@@ -576,13 +612,49 @@ def _normalize_data_range(data_range):
 
 def _rand_float(shape, generator, data_range=1.0):
     low, high, explicit_bounds = _normalize_data_range(data_range)
-    if low == high:
+    if low == high or (math.isnan(low) and math.isnan(high)):
         return torch.full(shape, low, dtype=torch.float32)
 
+    random_low, random_high = low, high
+    if not math.isfinite(low) or not math.isfinite(high):
+        # An unbounded interval has no uniform distribution.  Generate finite
+        # interior samples and pin the endpoints below so ranges such as
+        # [-inf, inf] contain both requested infinities deterministically.
+        if math.isinf(low):
+            random_low = min(high, 0.0) - 1.0 if math.isfinite(high) else -1.0
+        if math.isinf(high):
+            random_high = max(low, 0.0) + 1.0 if math.isfinite(low) else 1.0
+
     result = (
-        torch.rand(shape, dtype=torch.float32, generator=generator) * (high - low) + low
+        torch.rand(shape, dtype=torch.float32, generator=generator)
+        * (random_high - random_low)
+        + random_low
     )
     if explicit_bounds and result.numel() > 0:
+        if low == float("-inf") and high == float("inf"):
+            # Q/K/V all use D as their last dimension.  Put the two endpoints
+            # in adjacent D vectors instead of the same vector: a single QK
+            # dot product containing both -Inf and +Inf has order-dependent
+            # MX group accumulation, while CUDA dequantization yields NaN.
+            # Alternating vectors preserves both endpoints without introducing
+            # that ambiguity.  Use different D groups for V so its two signs
+            # also propagate to different output channels.
+            vectors = result.reshape(-1, result.shape[-1])
+            vectors[0::2, 0] = low
+            if vectors.shape[0] > 1:
+                high_index = (
+                    QUANT_GROUP_SIZE
+                    if result.shape[-1] > QUANT_GROUP_SIZE
+                    else result.shape[-1] - 1
+                )
+                vectors[1::2, high_index] = high
+            elif result.shape[-1] > QUANT_GROUP_SIZE:
+                vectors[0, QUANT_GROUP_SIZE] = high
+            elif result.shape[-1] > 1:
+                vectors[0, 1] = high
+            else:
+                result.reshape(-1)[-1] = high
+            return result
         # 显式 [a, b] 表示闭区间，固定首尾元素以确保两个端点都被覆盖。
         flattened = result.view(-1)
         flattened[0] = low
@@ -638,16 +710,28 @@ def quantize_mxfp8_qk(tensor_fp32, fp8_dtype, group_size=32):
         tensor_fp32 = torch.nn.functional.pad(tensor_fp32, (0, pad_size))
 
     grouped = tensor_fp32.reshape(*tensor_fp32.shape[:-1], num_groups, group_size)
-    all_zero_mask = torch.all(grouped == 0, dim=-1)
-    max_vals = torch.max(torch.abs(grouped), dim=-1)[0].clamp(min=1e-12)
+    finite_values = torch.where(
+        torch.isfinite(grouped), torch.abs(grouped), torch.zeros_like(grouped)
+    )
+    max_vals = torch.max(finite_values, dim=-1)[0]
     # Choose the smallest power-of-two descale that keeps the whole group in
     # the finite E4M3 range.  floor(log2(max)) - emax only accounts for the
     # exponent bits and can still overflow values between 256 and 448.
     fp8_max = torch.finfo(fp8_dtype).max
-    shared_exp = torch.ceil(torch.log2(max_vals / fp8_max))
-    descale = torch.where(all_zero_mask, torch.ones_like(shared_exp), 2**shared_exp).to(
-        torch.float32
+    shared_exp = torch.ceil(torch.log2(max_vals.clamp(min=1e-12) / fp8_max))
+    finite_descale = torch.where(
+        max_vals == 0, torch.ones_like(shared_exp), 2**shared_exp
     )
+    # E4M3FN has signed finite extrema but no infinity encoding.  Pair an
+    # infinite source value with +/-448 and the largest finite E8M0 scale so
+    # FP32 dequantization overflows to the requested signed infinity.  NaNs
+    # remain in the FP8 payload and are deliberately ignored for group scale.
+    has_inf = torch.any(torch.isinf(grouped), dim=-1)
+    descale = torch.where(
+        has_inf,
+        torch.full_like(finite_descale, E8M0_MAX_FINITE),
+        finite_descale,
+    ).to(torch.float32)
 
     descale_expanded = descale.repeat_interleave(group_size, dim=-1)[..., :last_dim]
     quantized = (
@@ -674,13 +758,21 @@ def quantize_mxfp8_v(tensor_fp32, fp8_dtype, group_size=32):
         tensor_fp32 = torch.nn.functional.pad(tensor_fp32, (0, 0, 0, 0, 0, pad_size))
 
     grouped = tensor_fp32.reshape(batch, num_groups, group_size, num_heads, head_dim)
-    all_zero_mask = torch.all(grouped == 0, dim=2)
-    max_vals = torch.max(torch.abs(grouped), dim=2)[0].clamp(min=1e-12)
-    fp8_max = torch.finfo(fp8_dtype).max
-    shared_exp = torch.ceil(torch.log2(max_vals / fp8_max))
-    descale = torch.where(all_zero_mask, torch.ones_like(shared_exp), 2**shared_exp).to(
-        torch.float32
+    finite_values = torch.where(
+        torch.isfinite(grouped), torch.abs(grouped), torch.zeros_like(grouped)
     )
+    max_vals = torch.max(finite_values, dim=2)[0]
+    fp8_max = torch.finfo(fp8_dtype).max
+    shared_exp = torch.ceil(torch.log2(max_vals.clamp(min=1e-12) / fp8_max))
+    finite_descale = torch.where(
+        max_vals == 0, torch.ones_like(shared_exp), 2**shared_exp
+    )
+    has_inf = torch.any(torch.isinf(grouped), dim=2)
+    descale = torch.where(
+        has_inf,
+        torch.full_like(finite_descale, E8M0_MAX_FINITE),
+        finite_descale,
+    ).to(torch.float32)
 
     descale_expanded = descale.repeat_interleave(group_size, dim=1)[:, :seq_len, :, :]
     quantized = (
@@ -1422,11 +1514,114 @@ def _align_up_to_ln2(value, use_quant_matmul):
     return result.cpu() if use_quant_matmul else result
 
 
+def _accumulate_mxfp8_groups_cpu(group_dot, q_scale, k_scale):
+    """Accumulate MXFP8 D-groups without materializing each scaled group.
+
+    MX Cube keeps the E8M0 exponent separate while adding consecutive D-group
+    dot products.  An intermediate becomes sticky +/-Inf only when the merged
+    accumulator, not an individual ``group_dot * group_scale``, exceeds FP32.
+    Keeping a finite mantissa plus a shared power-of-two exponent reproduces
+    that behavior with CPU FP32 operations and avoids an FP64 fallback.
+    """
+    q_mantissa, q_exponent = torch.frexp(q_scale.to(torch.float32))
+    k_mantissa, k_exponent = torch.frexp(k_scale.to(torch.float32))
+    group_mantissa = (
+        group_dot
+        * q_mantissa.view(-1, 1, group_dot.shape[-1])
+        * k_mantissa.view(1, -1, group_dot.shape[-1])
+    )
+    group_exponent = q_exponent.view(-1, 1, group_dot.shape[-1]) + k_exponent.view(
+        1, -1, group_dot.shape[-1]
+    )
+
+    accumulator = group_mantissa[..., 0]
+    accumulator_exponent = group_exponent[..., 0]
+    accumulator_value = torch.ldexp(accumulator, accumulator_exponent)
+    sticky_overflow = torch.isinf(accumulator_value)
+    sticky_value = torch.where(
+        sticky_overflow, accumulator_value, torch.zeros_like(accumulator_value)
+    )
+
+    for group_idx in range(1, group_dot.shape[-1]):
+        merged_exponent = torch.maximum(
+            accumulator_exponent, group_exponent[..., group_idx]
+        )
+        merged_mantissa = torch.ldexp(
+            accumulator, accumulator_exponent - merged_exponent
+        ) + torch.ldexp(
+            group_mantissa[..., group_idx],
+            group_exponent[..., group_idx] - merged_exponent,
+        )
+        merged_value = torch.ldexp(merged_mantissa, merged_exponent)
+        overflow_now = ~sticky_overflow & torch.isinf(merged_value)
+        sticky_value = torch.where(overflow_now, merged_value, sticky_value)
+        sticky_overflow |= overflow_now
+        accumulator = torch.where(sticky_overflow, accumulator, merged_mantissa)
+        accumulator_exponent = torch.where(
+            sticky_overflow, accumulator_exponent, merged_exponent
+        )
+
+    finite_value = torch.ldexp(accumulator, accumulator_exponent)
+    return torch.where(sticky_overflow, sticky_value, finite_value)
+
+
 def _qk_matmul_cpu(q_block, q_scale_block, k_mat, k_scale_mat, head_dim, softmax_scale):
     """CPU torch.matmul path: FP32 dequant + matmul."""
     q_dequant = q_block * _expand_d_group_scale(q_scale_block, head_dim)
     k_dequant = k_mat * _expand_d_group_scale(k_scale_mat, head_dim)
-    return torch.matmul(q_dequant, k_dequant.transpose(0, 1)) * softmax_scale
+    scores = torch.matmul(q_dequant, k_dequant.transpose(0, 1)) * softmax_scale
+
+    # Applying the descales before matmul can introduce a non-finite score that
+    # does not exist in MXFP8 cube arithmetic.  For example, a finite E4M3
+    # payload paired with a large E8M0 descale may overflow while materializing
+    # Q as FP32.  The subsequent CPU matmul then produces +/-Inf (or Inf * 0 =
+    # NaN), even when applying the Q/K group scales after the payload dot would
+    # produce a finite score.  Cube follows the latter order: it accumulates
+    # finite FP8 payloads in each 32-element group and applies the group
+    # descales afterwards.
+    #
+    # Keep the established dequant + torch.matmul path for normal values and
+    # repair only its artificial non-finite results.  NaNs present in either
+    # FP8 payload are deliberately excluded from repair and therefore continue
+    # to propagate.  A genuine Cube overflow remains non-finite after the
+    # grouped recomputation, so replacing it is also semantics-preserving.
+    repair_mask = ~torch.isfinite(scores)
+    if not bool(repair_mask.any()):
+        return scores
+
+    payload_has_nan = torch.isnan(q_block).any(dim=-1).view(-1, 1) | torch.isnan(
+        k_mat
+    ).any(dim=-1).view(1, -1)
+    repair_mask &= ~payload_has_nan
+    if not bool(repair_mask.any()):
+        return scores
+
+    group_count = math.ceil(head_dim / QUANT_GROUP_SIZE)
+    aligned_head_dim = group_count * QUANT_GROUP_SIZE
+    q_payload = q_block[..., :head_dim]
+    k_payload = k_mat[..., :head_dim]
+    if aligned_head_dim != head_dim:
+        pad_size = aligned_head_dim - head_dim
+        q_payload = torch.nn.functional.pad(q_payload, (0, pad_size))
+        k_payload = torch.nn.functional.pad(k_payload, (0, pad_size))
+
+    q_grouped = q_payload.reshape(-1, group_count, QUANT_GROUP_SIZE)
+    k_grouped = k_payload.reshape(-1, group_count, QUANT_GROUP_SIZE)
+    group_dot = torch.matmul(
+        q_grouped.permute(1, 0, 2),
+        k_grouped.permute(1, 2, 0),
+    ).permute(1, 2, 0)
+    # MxMatmulFull carries each E8M0 exponent alongside the finite group dot.
+    # Applying q_scale*k_scale to every group first can overflow too early and
+    # lose a cancellation that Cube performs before converting its accumulator
+    # to FP32.  Reproduce the exponent-aligned, sticky-overflow accumulation.
+    cube_order_scores = _accumulate_mxfp8_groups_cpu(
+        group_dot,
+        q_scale_block[..., :group_count],
+        k_scale_mat[..., :group_count],
+    )
+    cube_order_scores = cube_order_scores * softmax_scale
+    return torch.where(repair_mask, cube_order_scores, scores)
 
 
 def _npu_mxfp8_qk_matmul_impl(q_fp8, k_fp8, q_scale, k_scale, score_scale):
@@ -1523,6 +1718,16 @@ def _exp_sub(lhs, rhs, use_quant_matmul):
     return torch.exp(lhs_fp32 - rhs_fp32)
 
 
+def _softmax_row_is_active(local_max):
+    """Match the VF's finite-sentinel softmax state transition.
+
+    The VF reduces each row from the finite ``-FLT_MAX`` sentinel.  Therefore
+    that exact max value means the row has never started. NaN is deliberately
+    active because ``NaN != -FLT_MAX`` in the kernel and must keep propagating.
+    """
+    return local_max != EMPTY_LSE
+
+
 def _npu_mxfp8_pv_matmul_impl(p_fp8, v_fp8, p_scale, v_scale):
     """C2 PV matmul via npu_quant_matmul."""
 
@@ -1611,8 +1816,52 @@ def _pv_matmul_cpu(
         v_scale_mat = v_scale[spb, n2_idx, v_group_idx, :, v_group_pair].to(
             torch.float32
         )
+        p_scaled = p_quant_subloop * subloop_rescale.view(nq, 1)
         v_dequant = v_mat * v_scale_mat
-        pv += torch.matmul(p_quant_subloop * subloop_rescale.view(nq, 1), v_dequant)
+        pv_subloop = torch.matmul(p_scaled, v_dequant)
+
+        # Dequantizing V before the payload dot can create an artificial Inf.
+        # A masked or underflowed FP8 probability then evaluates as 0 * Inf in
+        # torch.matmul and contaminates the result with NaN.  MXFP8 cube uses
+        # the opposite order: it accumulates finite P/V payloads in each
+        # 32-element group and applies the group descales afterwards.
+        #
+        # Preserve the established fast path and repair only non-finite values
+        # introduced by its operation order.  NaNs already present in the P or
+        # V payload must keep propagating and are deliberately not repaired.
+        repair_mask = ~torch.isfinite(pv_subloop)
+        if bool(repair_mask.any()):
+            payload_has_nan = torch.isnan(p_quant_subloop).any(dim=-1).view(
+                nq, 1
+            ) | torch.isnan(v_mat).any(dim=0).view(1, head_dim)
+            repair_mask &= ~payload_has_nan
+
+            if bool(repair_mask.any()):
+                subloop_k = p_quant_subloop.shape[1]
+                group_count = math.ceil(subloop_k / QUANT_GROUP_SIZE)
+                aligned_k = group_count * QUANT_GROUP_SIZE
+                p_payload = p_quant_subloop
+                v_payload = v_mat
+                if aligned_k != subloop_k:
+                    pad_k = aligned_k - subloop_k
+                    p_payload = torch.nn.functional.pad(p_payload, (0, pad_k))
+                    v_payload = torch.nn.functional.pad(v_payload, (0, 0, 0, pad_k))
+
+                p_grouped = p_payload.reshape(nq, group_count, QUANT_GROUP_SIZE)
+                v_grouped = v_payload.reshape(group_count, QUANT_GROUP_SIZE, head_dim)
+                group_dot = torch.matmul(p_grouped.unsqueeze(-2), v_grouped).squeeze(-2)
+                group_scale = subloop_rescale.view(nq, 1, 1) * v_scale_mat[
+                    ::QUANT_GROUP_SIZE
+                ].view(1, group_count, head_dim)
+                scaled_group_dot = torch.where(
+                    group_dot == 0,
+                    torch.zeros_like(group_dot),
+                    group_dot * group_scale,
+                )
+                cube_order_pv = scaled_group_dot.sum(dim=1)
+                pv_subloop = torch.where(repair_mask, cube_order_pv, pv_subloop)
+
+        pv += pv_subloop
         round_sum += p_subloop.sum(dim=-1) * subloop_rescale
     return pv, round_sum
 
@@ -1819,7 +2068,7 @@ def cpu_mxfp8_golden(
     sparse_indices,
     sparse_seq_len,
     block_table_torch,
-    use_quant_matmul=True,
+    use_quant_matmul=False,
 ):
     """Reference-style CPU golden for MXFP8 block sparse attention."""
     layout_q = "TND"
@@ -1856,8 +2105,6 @@ def cpu_mxfp8_golden(
     softmax_lse = torch.full((total_q, n1), EMPTY_LSE, dtype=torch.float32)
 
     qb_max = math.ceil(max(q_lengths) / SPARSE_BLOCK_SIZE)
-    neg_inf = float("-inf")
-
     logger.info(
         "[CPU Golden] reference sparse flow: layout_q=%s, OUT=TND, LSE=TN", layout_q
     )
@@ -1904,10 +2151,10 @@ def cpu_mxfp8_golden(
                     head_idx,
                 )
 
-                m_run = torch.full((nq,), neg_inf, dtype=torch.float32)
+                # Use the same finite sentinel as the kernel's online max state.
+                m_run = torch.full((nq,), EMPTY_LSE, dtype=torch.float32)
                 l_run = torch.zeros((nq,), dtype=torch.float32)
                 acc = torch.zeros((nq, head_dim), dtype=torch.float32)
-                any_valid = torch.zeros((nq,), dtype=torch.bool)
 
                 for task_chunks in all_task_chunks:
                     positions = [pos for chunk in task_chunks for pos in chunk]
@@ -1936,7 +2183,6 @@ def cpu_mxfp8_golden(
                     valid_mask = _valid_mask_for_positions(
                         q_indices, positions, q_len, kv_len
                     )
-                    any_valid |= valid_mask.any(dim=-1)
                     scores = _qk_matmul(
                         q_block,
                         q_scale_block,
@@ -1964,31 +2210,44 @@ def cpu_mxfp8_golden(
                         # subtracted only from the value consumed by
                         # FusedExpSub; it is not part of the online max state.
                         m_subloop = m_run
-                        round_has = torch.zeros((nq,), dtype=torch.bool)
+                        round_active = torch.zeros((nq,), dtype=torch.bool)
                         round_end_idx = min(round_idx + 2, len(chunk_offsets))
                         for subloop_idx in range(round_idx, round_end_idx):
                             subloop_start, subloop_end = chunk_offsets[subloop_idx]
                             s_subloop = scores[:, subloop_start:subloop_end]
                             vm_subloop = valid_mask[:, subloop_start:subloop_end]
-                            subloop_has = vm_subloop.any(dim=-1)
-                            round_has |= subloop_has
 
                             masked_scores = torch.where(
                                 vm_subloop,
                                 s_subloop,
-                                torch.full_like(s_subloop, neg_inf),
+                                torch.full_like(s_subloop, EMPTY_LSE),
                             )
                             # VF order: score max -> softmax scale -> ceil to
                             # an ln2 multiple -> merge with the online max.
                             local_max = masked_scores.max(dim=-1).values
+                            # Kernel max reduction starts from -FLT_MAX, so
+                            # valid -Inf and exact -FLT_MAX cannot start a row.
+                            local_max = torch.maximum(
+                                local_max,
+                                torch.full_like(local_max, EMPTY_LSE),
+                            )
+                            subloop_active = _softmax_row_is_active(local_max)
                             local_max = _align_up_to_ln2(local_max, use_quant_matmul)
-                            subloop_started = m_subloop != neg_inf
+                            # CUDA fused attention treats a finite negative score
+                            # whose ln2-aligned max overflows to -Inf like an empty
+                            # softmax contribution.  Positive overflow remains
+                            # active and propagates NaN through sum=0/max=+Inf.
+                            subloop_active &= ~torch.isneginf(local_max)
+                            round_active |= subloop_active
+                            subloop_started = _softmax_row_is_active(m_subloop)
                             m_candidate = torch.where(
                                 subloop_started,
                                 torch.maximum(m_subloop, local_max),
                                 local_max,
                             )
-                            m_subloop = torch.where(subloop_has, m_candidate, m_subloop)
+                            m_subloop = torch.where(
+                                subloop_active, m_candidate, m_subloop
+                            )
 
                             # VF subtracts ln(pScale) from the aligned max
                             # immediately before FusedExpSub. Therefore the
@@ -2000,7 +2259,7 @@ def cpu_mxfp8_golden(
                                 use_quant_matmul,
                             )
                             p_subloop = torch.where(
-                                vm_subloop & subloop_has.view(nq, 1),
+                                vm_subloop & subloop_active.view(nq, 1),
                                 p_subloop,
                                 torch.zeros_like(p_subloop),
                             )
@@ -2016,7 +2275,7 @@ def cpu_mxfp8_golden(
                             )
 
                         m_new = m_subloop
-                        run_started = m_before_round != neg_inf
+                        run_started = _softmax_row_is_active(m_before_round)
                         history_rescale = _exp_sub(
                             m_before_round, m_new, use_quant_matmul
                         )
@@ -2047,24 +2306,33 @@ def cpu_mxfp8_golden(
 
                         acc = acc * history_rescale.view(nq, 1) + pv
                         l_run = l_run * history_rescale + round_sum
-                        m_run = torch.where(round_has, m_new, m_run)
+                        m_run = torch.where(round_active, m_new, m_run)
 
-                # Only empty rows use the neutral denominator.  A valid row
-                # with NaN must remain NaN: VF propagates it into LSE, while
-                # the old ``l_run > 0`` guard replaced it by 1 and turned the
-                # 00011 golden LSE into +inf instead of NaN.
-                safe_l = torch.where(any_valid, l_run, torch.ones_like(l_run))
+                # Match the master kernel's final guards. LastDivNewVF writes
+                # zero when sum == 0, RowInvalidUpdateVF writes zero when max
+                # is the -FLT_MAX sentinel, and ComputeLseOutputVF maps either
+                # condition to the same sentinel.
+                row_active = _softmax_row_is_active(m_run)
+                sum_nonzero = l_run != 0
+                output_active = row_active & sum_nonzero
+                lse_active = output_active
+                safe_l = torch.where(sum_nonzero, l_run, torch.ones_like(l_run))
                 attn = acc / safe_l.view(nq, 1)
+                attn = torch.where(
+                    output_active.view(nq, 1),
+                    attn,
+                    torch.zeros_like(attn),
+                )
                 lse = torch.log(safe_l) + m_run
 
                 for local_idx in range(nq):
-                    if not bool(any_valid[local_idx].item()):
-                        continue
                     out_idx = q_base + q_start + local_idx
-                    attention_out[out_idx, head_idx] = attn[local_idx].to(
-                        torch.bfloat16
-                    )
-                    softmax_lse[out_idx, head_idx] = lse[local_idx]
+                    if bool(output_active[local_idx].item()):
+                        attention_out[out_idx, head_idx] = attn[local_idx].to(
+                            torch.bfloat16
+                        )
+                    if bool(lse_active[local_idx].item()):
+                        softmax_lse[out_idx, head_idx] = lse[local_idx]
 
     logger.info(
         "[CPU Golden] output(TND)=%s, lse(TN)=%s",
@@ -2770,19 +3038,22 @@ def _cache_case_name(case_id, case_name_arg, total_case_num):
     return f"{case_name_arg}_{safe_case_id}"
 
 
-def _cpu_golden_cache_name(case_name, p_scale):
-    """Key CPU golden by the effective E8M0 P-scale byte.
+def _cpu_golden_cache_name(case_name, p_scale, use_quant_matmul):
+    """Key CPU golden by matmul backend and the effective E8M0 P-scale byte.
 
-    This intentionally avoids pre-fix CPU cache files whose golden may have
-    consumed the original FP32 P scale.
+    Including the backend prevents CPU torch.matmul and npu_quant_matmul
+    golden outputs from reusing each other's cache. It also intentionally
+    avoids pre-fix cache files whose key did not encode the backend.
     """
+    backend = "npu_quant_matmul" if use_quant_matmul else "torch_matmul"
+    cache_prefix = f"{case_name}_{backend}_p_scale_e8m0"
     if p_scale is None or p_scale.numel() == 0:
-        return f"{case_name}__pse8_default"
+        return f"{cache_prefix}_default"
     p_scale_e8m0 = fp32_to_e8m0fnu_safe(p_scale, "CPU cache P scale")
     raw = p_scale_e8m0.contiguous().view(torch.uint8).reshape(-1)
     if raw.numel() != 1:
         raise ValueError(f"P scale must contain one E8M0 value, got {raw.numel()}")
-    return f"{case_name}__pse8_{int(raw.item()):02x}"
+    return f"{cache_prefix}_{int(raw.item()):02x}"
 
 
 def _safe_debug_case_name(case_name):
@@ -2937,7 +3208,7 @@ def run_one_case(
     rdv_cache_dir=None,
     debug=False,
     graph=False,
-    use_quant_matmul=True,
+    use_quant_matmul=False,
 ):
     start_time = time.time()
     golden_cache = _load_golden_cache()
@@ -3042,7 +3313,7 @@ def run_one_case(
     # and NPU receive the exact same E8M0 P-scale tensor.
     if p_scale is not None and p_scale.numel() > 0:
         p_scale = fp32_to_e8m0fnu_safe(p_scale, "Shared P scale")
-    cpu_cache_name = _cpu_golden_cache_name(case_name, p_scale)
+    cpu_cache_name = _cpu_golden_cache_name(case_name, p_scale, use_quant_matmul)
     logger.info("[CACHE] CPU golden key=%s", cpu_cache_name)
 
     _, mfu_time = _log_attention_compute_stats(
@@ -3245,16 +3516,16 @@ if __name__ == "__main__":
         "例如 --case_range 100:200 跑第100到200行(含)的用例",
     )
     parser.add_argument(
-        "--matmul",
+        "--quant_matmul",
         action="store_true",
-        help="使用 CPU torch.matmul 而非 npu_quant_matmul 做 QK/PV 计算",
+        help="使用 npu_quant_matmul 而非默认的 CPU torch.matmul 做 QK/PV 计算",
     )
     args = parser.parse_args()
 
-    use_quant_matmul = not args.matmul
+    use_quant_matmul = args.quant_matmul
     logger.info(
         "[Config] matmul backend: %s",
-        "torch.matmul (CPU)" if args.matmul else "npu_quant_matmul",
+        "npu_quant_matmul" if args.quant_matmul else "torch.matmul (CPU)",
     )
 
     raw_parts = {m.strip() for m in args.mode.split(",") if m.strip()}
