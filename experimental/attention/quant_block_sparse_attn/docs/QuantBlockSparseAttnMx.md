@@ -606,7 +606,7 @@ QuantBlockSparseAttnMx 算子约束分为 4 个档位，按约束复杂程度递
   - `N1` 必须是 `N2` 的整数倍。
   - `sparse_indices` 必须按 `(BatchSize, N1, max_Qb, max_Kb)` 传入，`sparse_seq_len` 必须按 `(BatchSize, N1, max_Qb)` 传入；当前主算子默认这两个 Tensor 的 shape 正确，不在 host 中对 max_Qb 和 max_Kb 进行拦截校验。
   - `block_table` 必须按 `(BatchSize, max_block_num_per_batch)` 传入。主算子使用 `sparse_indices.shape[2]` 作为 `max_Qb`，使用 `block_table.shape[1]` 作为 `max_block_num_per_batch`，二者均必须大于 0。
-  - `BatchSize`、`N1`、`N2`、`G` 均必须大于 0。`BatchSize`<= `65536`，`N2` <= `8`，`G` <= `16`。
+  - `BatchSize`、`N1`、`N2`、`G` 均必须大于 0。`BatchSize`<= `65536`，`N1` <= `128`，`N2` <= `8`，`G` <= `16`。
   - `S1`、`S2` 均小于 `20M` ，不拦截。
   - `D` 和 `D_v` 必须均为 128。
 
