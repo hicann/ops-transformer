@@ -149,6 +149,8 @@ _legacy_map = {
     "stem_oam_prep_paged_kv": "attention.stem_oam_prep_paged_kv",
     "stem_oam_prep_varlen_q": "attention.stem_oam_prep_varlen_q",
     "und_gen_qkv_rms_norm_rope_cache": "posembedding.und_gen_qkv_rms_norm_rope_cache",
+    "fused_causal_conv1d": "attention.fused_causal_conv1d",
+    "fused_causal_conv1d_": "attention.inplace_fused_causal_conv1d",
 }
 
 if __name__ == "cann_ops_transformer.ops":
