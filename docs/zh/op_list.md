@@ -118,6 +118,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/flash_attn/README.md">flash_attn</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>基于FlashAttention算法实现self-attention（自注意力）的计算，训练推理归一化，仅支持非量化场景。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/flash_attention_score/README.md">flash_attention_score</a></td>
     <td>✓</td>
     <td>✓</td>
