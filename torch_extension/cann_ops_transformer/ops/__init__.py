@@ -151,6 +151,7 @@ _legacy_map = {
     "und_gen_qkv_rms_norm_rope_cache": "posembedding.und_gen_qkv_rms_norm_rope_cache",
     "fused_causal_conv1d": "attention.fused_causal_conv1d",
     "fused_causal_conv1d_": "attention.inplace_fused_causal_conv1d",
+    "block_sparse_attention": "attention.block_sparse_attention",
 }
 
 if __name__ == "cann_ops_transformer.ops":
