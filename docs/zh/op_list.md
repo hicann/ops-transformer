@@ -68,6 +68,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/block_attn_res_update/README.md">block_attn_res_update</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>BlockAttnRes第二阶段更新算子，用于更新partial block并计算在线Softmax状态对应的注意力输出。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/block_sparse_attention_grad/README.md">block_sparse_attention_grad</a></td>
     <td>✓</td>
     <td>✓</td>

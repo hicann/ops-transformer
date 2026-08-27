@@ -1,0 +1,8 @@
+socVersion,caseName,enable,prefix,runShape,runDtype,partialRefPresent,hPresent,partialShape,partialDtype,expectSuccess,expectPartialShape,expectHShape,expectPartialDtype,expectHDtype
+Ascend950,static_shape_and_dtype,true,static_shape_and_dtype,true,true,true,true,3:63,FLOAT,true,3:63,3:63,FLOAT,BF16
+Ascend950,max_d_shape,true,max_d_shape,true,false,true,true,2:8192,FLOAT,true,2:8192,2:8192,,
+Ascend950,dynamic_t_shape,true,dynamic_t_shape,true,false,true,true,-1:128,FLOAT,true,-1:128,-1:128,,
+Ascend950,unknown_rank_shape,true,unknown_rank_shape,true,false,true,true,-2,FLOAT,true,-2,-2,,
+Ascend950,rank_one_shape,true,rank_one_shape,true,false,true,true,8192,FLOAT,true,8192,8192,,
+Ascend950,missing_partial_output,true,missing_partial_output,true,false,false,true,3:63,FLOAT,false,,,,
+Ascend950,missing_h_output,true,missing_h_output,true,false,true,false,3:63,FLOAT,false,,,,

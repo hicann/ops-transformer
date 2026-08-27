@@ -1,0 +1,10 @@
+socVersion,caseName,kernelUtTarget,prefix,coreNum,t,d,seed,result,numBlocks,tilingKey,tilingData,comment
+Ascend950,single_tile_key,BLOCK_ATTN_RES_UPDATE_FLOW,kernel,,1,63,9,TRUE,1,1,63 1 1 1 8 897988541 1015154721 1,single-tile scheduling selects tiling key 1
+Ascend950,one_vreg_tail_pingpong,BLOCK_ATTN_RES_UPDATE_FLOW,kernel,,3,63,1,TRUE,1,0,63 3 3 2 8 897988541 1015154721 1,one VREG D tail and ping-pong tail tile
+Ascend950,one_vreg_aligned_multicore,BLOCK_ATTN_RES_UPDATE_FLOW,kernel,,4,64,2,TRUE,2,0,64 2 2 1 8 925353388 1015021568 2,one VREG aligned D and multi-core partition
+Ascend950,two_vreg_tail_uneven_core,BLOCK_ATTN_RES_UPDATE_FLOW,kernel,,5,65,3,TRUE,2,0,65 3 2 2 8 897988541 1014763457 2,two VREG D tail and uneven last core
+Ascend950,two_vreg_aligned_pingpong,BLOCK_ATTN_RES_UPDATE_FLOW,kernel,,3,128,4,TRUE,1,0,128 3 3 2 8 925353388 1006632960 1,two VREG aligned D and ping-pong tail tile
+Ascend950,generic_tail_only,BLOCK_ATTN_RES_UPDATE_FLOW,kernel,,3,129,5,TRUE,1,0,129 3 3 2 8 897988541 1006502904 1,generic even full vectors plus D tail
+Ascend950,generic_odd_full_only,BLOCK_ATTN_RES_UPDATE_FLOW,kernel,,2,192,6,TRUE,1,0,192 2 2 1 8 925353388 1001040555 1,generic odd full vector without D tail
+Ascend950,generic_mixed_pair_uneven_core,BLOCK_ATTN_RES_UPDATE_FLOW,kernel,,5,193,7,TRUE,2,0,193 3 2 2 8 897988541 1000982602 2,generic odd full vector paired with D tail
+Ascend950,generic_aligned_pairs,BLOCK_ATTN_RES_UPDATE_FLOW,kernel,,2,256,8,TRUE,1,0,256 2 2 1 8 925353388 998244352 1,generic aligned vector pairs
