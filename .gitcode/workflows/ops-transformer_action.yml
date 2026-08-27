@@ -212,7 +212,7 @@ stages:
           ge_st_rt2: 'kirinx90'
           image_version: ${{ jobs.JOB_image.outputs.Compile_Ascend_X86_mobile_station }}
           arch: 'x64'
-          package_name: 'cann-ops-transformer-kirix90_linux-x86_64.run'
+          package_name: 'cann-ops-transformer-kirinx90_linux-x86_64.run'
       JOB_mobile_station_compile_ubuntu24:
         name: Compile_kirinx90_ubuntu24
         uses: .gitcode/workflows/compile_action.yml
@@ -221,7 +221,7 @@ stages:
           ge_st_rt2: 'kirinx90'
           image_version: ${{ jobs.JOB_image.outputs.Compile_Ascend_X86_mobile_station_ubuntu24 }}
           arch: 'x64'
-          package_name: 'cann-ops-transformer-kirix90_linux-x86_64_ubuntu24.run'
+          package_name: 'cann-ops-transformer-kirinx90_linux-x86_64_ubuntu24.run'
       JOB_mobile_station_compile_9030_ubuntu24:
         name: Compile_kirin9030_ubuntu24
         uses: .gitcode/workflows/compile_action.yml
