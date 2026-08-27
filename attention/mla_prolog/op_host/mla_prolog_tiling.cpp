@@ -801,7 +801,10 @@ ge::graphStatus MlaPrologTiling::ConvertContext(gert::TilingContext &context, Ml
         mlaPrologContext.qcQrScale = attrs->GetAttrPointer<float>(QC_QR_SCALE_ATTR_INDEX);
         mlaPrologContext.kcScale = attrs->GetAttrPointer<float>(KC_SCALE_ATTR_INDEX);
         // RoPE 开关：由 do_rope attr 控制（aclnnV3 默认 true，aclnnV4 透传用户开关）；默认开启
-        mlaPrologContext.doRope = attrs->GetAttrPointer<bool>(DO_ROPE_ATTR_INDEX);
+        // 入图场景下旧图不携带 do_rope，attr 数组可能不足 13 个，先判越界再取值，避免 GetAttrPointer 越界报错
+        if (attrs->GetAttrNum() > DO_ROPE_ATTR_INDEX) {
+            mlaPrologContext.doRope = attrs->GetAttrPointer<bool>(DO_ROPE_ATTR_INDEX);
+        }
         if (mlaPrologContext.doRope == nullptr) {
             mlaPrologContext.doRopeValue = true;
             mlaPrologContext.doRope = &mlaPrologContext.doRopeValue;

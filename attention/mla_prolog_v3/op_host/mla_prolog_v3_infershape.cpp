@@ -42,8 +42,14 @@ ge::graphStatus GetMlaPrologV3ShapeDim(const gert::InferShapeContext *context, M
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
     // RoPE 开关由 do_rope attr 控制（aclnnV3 默认 true，aclnnV4 透传用户开关），缺省视为开启
-    const bool *doRopePtr = attrs->GetAttrPointer<bool>(ATTR_DO_ROPE_INDEX);
-    const bool doRope = (doRopePtr == nullptr) ? true : *doRopePtr;
+    // 入图场景下旧图不携带 do_rope，attr 数组可能不足 13 个，先判越界再取值，避免 GetAttrPointer 越界报错
+    bool doRope = true;
+    if (attrs->GetAttrNum() > ATTR_DO_ROPE_INDEX) {
+        const bool *doRopePtr = attrs->GetAttrPointer<bool>(ATTR_DO_ROPE_INDEX);
+        if (doRopePtr != nullptr) {
+            doRope = *doRopePtr;
+        }
+    }
     const bool ropeSinEmpty = (ropeSinShape->GetShapeSize() == 0);
     // do_rope=false 且 rope 为空 tensor 时跳过 ropeSin 常规维度校验
     OP_CHECK_IF(doRope && ((ropeSinShape->GetDimNum() != DIM_NUM_2) && (ropeSinShape->GetDimNum() != DIM_NUM_3)),
