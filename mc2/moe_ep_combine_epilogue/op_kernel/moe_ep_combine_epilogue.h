@@ -99,7 +99,6 @@ private:
 
     uint32_t rankId_{0};
     uint32_t epWorldSize_{0};
-    uint32_t channelsPerRank_{1};
     uint32_t numMaxTokensPerRank_{0};
     uint32_t numTokens_{0};
     uint32_t topK_{0};
@@ -150,10 +149,6 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
 
     mc2Context_ = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext *>(context);
     rankId_ = mc2Context_->epRankId;
-    channelsPerRank_ = mc2Context_->channelsPerRank;
-    if (channelsPerRank_ == 0 || (epWorldSize_ > 0 && channelsPerRank_ > Mc2Aclnn::HCCL_MAX_RANK_SIZE / epWorldSize_)) {
-        channelsPerRank_ = 1;
-    }
     for (uint32_t i = 0; i < epWorldSize_; ++i) {
         winRankAddr_[i] = (GM_ADDR)mc2Context_->epHcclBuffer[i];
     }
@@ -274,14 +269,7 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
 template <TemplateMoeEpCombineEpilogueTypeClass>
 __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc>::RecvPhaseReduce()
 {
-    uint32_t activeAivNum = aivNum_;
-    uint32_t maxChannelAivNum = epWorldSize_ * channelsPerRank_;
-    uint32_t completionChannelCount = 1U;
-    if (activeAivNum > maxChannelAivNum) {
-        completionChannelCount = channelsPerRank_;
-    } else if (activeAivNum >= epWorldSize_) {
-        completionChannelCount = activeAivNum / epWorldSize_ + (rankId_ < activeAivNum % epWorldSize_ ? 1U : 0U);
-    }
+    constexpr uint32_t completionChannelCount = 1U;
     uint32_t completionFlagCount = epWorldSize_ * completionChannelCount;
     uint32_t flagBufferBytes = completionFlagCount * STATE_OFFSET;
     tpipe_->InitBuffer(stateBuf_, flagBufferBytes);
