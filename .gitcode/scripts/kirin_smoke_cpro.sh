@@ -17,7 +17,7 @@ echo "#########################下载kirin_cann_test代码仓###################
 git clone https://gitcode.com/funna2000/kirin_cann_test.git
 cd kirin_cann_test/harmony-infer-chs
 cp ../entry-default-signed.hap ./
-bash rdv_kirin9030_gitcode.sh $(hdc list targets) transformer.json Kirin9030 ${repo_name} ${MERGE_ID} ${obs_path}
+bash rdv_kirinx90_gitcode.sh $(hdc list targets) transformer.json KirinX90 ${repo_name} ${MERGE_ID} ${obs_path}
 echo "#########################查看用例执行结果#########################"
 cat result.txt
 echo "#########################打印SN号#########################"
