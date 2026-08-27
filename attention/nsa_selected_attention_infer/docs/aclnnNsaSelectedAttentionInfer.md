@@ -336,7 +336,7 @@ aclnnStatus aclnnNsaSelectedAttentionInfer(
         <tr>
           <td style="white-space: nowrap;">workspaceSize</td>
           <td>输出</td>
-          <td>返回用户需要在DevicenumHeads申请的workspace大小。</td>
+          <td>返回用户需要在Device侧申请的workspace大小。</td>
           <td>-</td>
           <td>-</td>
           <td>-</td>

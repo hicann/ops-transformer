@@ -117,7 +117,7 @@ aclnnStatus aclnnQuantAllReduce(
           <td>group</td>
           <td>属性</td>
           <td>通信域标识。</td>
-          <td><ul><li>Host侧标识列组的字符串，通信域名称。</li><li>通过Hccl提供的接口"extern HcclResult HcclGetCommName(HcclComm comm, char* commName);"获取，其中commName即为group。</li></ul></td>
+          <td><ul><li>Host侧标识通信组的字符串，通信域名称。</li><li>通过Hccl提供的接口"extern HcclResult HcclGetCommName(HcclComm comm, char* commName);"获取，其中commName即为group。</li></ul></td>
           <td>Char*、String</td>
           <td>-</td>
           <td>-</td>

@@ -369,7 +369,7 @@ aclnnStatus aclnnMlaPreprocess(
       <td>kvCacheRope</td>
       <td>输入</td>
       <td>与输出的krCacheOut为同一tensor。</td>
-      <td>可选参数，支出传入空指针，输入格式随cacheMode变化：<ul>
+      <td>可选参数，支持传入空指针，输入格式随cacheMode变化：<ul>
         <li>cacheMode为0：不传入。</li>
         <li>cacheMode为1：shape为[blockNum,blockSize,1,64]，dtype与input保持一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为2或3：shape为[blockNum,4,blockSize,16]，dtype与input保持一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为NZ。</li>

@@ -381,7 +381,7 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
 ## 约束说明
 
 - 该接口不支持确定性。
-- 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配
+- 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 - 关于数据shape的约束，其中：
   - B：取值范围为1\~2K。
   - H：取值范围为1\~256。

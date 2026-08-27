@@ -88,12 +88,12 @@ aclnnStatus aclnnFFNV2(
 ## aclnnFFNV2GetWorkspaceSize
 
 参数说明中涉及到的公共变量说明：
-M表示token个数，对应transform中的BS（B：Batch，表示输入样本批量大小。
+M表示token个数，对应transformer中的BS（B：Batch，表示输入样本批量大小。
 S：Seq-Length，表示输入样本序列长度）。
-K1表示第一个matmul的输入通道数，对应transform中的H（Head-Size，表示隐藏层的大小）。
+K1表示第一个matmul的输入通道数，对应transformer中的H（Head-Size，表示隐藏层的大小）。
 N1表示第一个matmul的输出通道数。
 K2表示第二个matmul的输入通道数。
-N2表示第二个matmul的输出通道数，对应transform中的H。
+N2表示第二个matmul的输出通道数，对应transformer中的H。
 <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：E表示有专家场景的专家数；G表示伪量化per-group场景下，antiquantOffset、antiquantScale的组数。
 
 - **参数说明**

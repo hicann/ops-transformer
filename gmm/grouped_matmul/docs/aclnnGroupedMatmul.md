@@ -369,7 +369,7 @@ aclnnStatus aclnnGroupedMatmul(
   - 伪量化场景支持的输入类型为：
     - x为FLOAT16、weight为INT8、biasOptional为FLOAT16、scaleOptional为空，  offsetOptional为空，antiquantScaleOptional为FLOAT16、 antiquantOffsetOptional为FLOAT16、y为FLOAT16；
     - x为BFLOAT16、weight为INT8、biasOptional为FLOAT32、scaleOptional为空，offsetOptional为空，antiquantScaleOptional为BFLOAT16、 antiquantOffsetOptional为BFLOAT16、y为BFLOAT16；
-  - 如果传入groupListOptional，groupListOptional必须为非负递增数列，groupListOptional长度不能为1。
+  - 如果传入groupListOptional，groupListOptional必须为非负单调非递减数列，groupListOptional长度不能为1。
   - 当前支持的场景：
       支持场景中单表示单tensor，多表示多tensor，表示顺序为x，weight，y，例，单多单表示支持x为单tensor，weight多tensor，y单tensor的场景。
 
@@ -392,7 +392,7 @@ aclnnStatus aclnnGroupedMatmul(
       <a id="非量化场景约束"></a>
 
     - 非量化场景支持的数据类型为：
-      - 如果传入groupListOptional，groupListOptional必须为非负递增数列，groupListOptional长度不能为1
+      - 如果传入groupListOptional，groupListOptional必须为非负单调非递减数列，groupListOptional长度不能为1
       - 以下入参为空：scaleOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional
       - 不为空的参数支持的数据类型组合要满足下表：
 

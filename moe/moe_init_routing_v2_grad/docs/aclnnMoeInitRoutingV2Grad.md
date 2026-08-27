@@ -95,7 +95,7 @@ aclnnStatus aclnnMoeInitRoutingV2Grad(
     <tr>
       <td>expandedRowIdx</td>
       <td>输入</td>
-      <td>表示token按照专家序排序索引。</td>
+      <td>表示token按照专家序排序的索引。</td>
       <td><ul><li>支持空tensor。</li><li>要求是一个1D的Tensor，shape为[B*S*K]。</li><li>元素值在Drop/Pad场景下范围为[-1, E*C)，其他场景范围为[0, B*S*K)，且值除-1外唯一不重复。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>

@@ -137,7 +137,7 @@ aclnnStatus aclnnInplaceQuantMatmulAllReduceAddRmsNorm(
         <tr>
           <td>dequantScale（aclTensor）</td>
           <td>输入</td>
-          <td>MatMul计算后的全量化系数，即计算公式中的dequantScale。</td>
+          <td>MatMul计算后的反量化系数，即计算公式中的dequantScale。</td>
           <td>shape在pertensor场景为(1)，perchannel场景为(n)或(1, n)。</td>
           <td>UINT64、INT64、BFLOAT16</td>
           <td>ND</td>

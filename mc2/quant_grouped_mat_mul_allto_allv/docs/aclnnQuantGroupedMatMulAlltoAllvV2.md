@@ -545,7 +545,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
 - mmX是共享专家的左矩阵，shape为(BS, H2)，H2的取值范围(0, 12288]；
 - mmWeight是共享专家的右矩阵，shape为(H2， N2)，N2的取值范围(0, 65536)；
 - sendCounts为发送到其他卡的token数，数组大小为e * epWorldSize;
-- recvCounts从其他卡的token数，数组大小为e * epWorldSize;
+- recvCounts为从其他卡接收到的token数，数组大小为e * epWorldSize;
 - 路由专家和共享专家量化Scale、Mode等均为必选；
 - 低比特通信Mode为必选参数，DType和Scale为可选，当Mode为非0时需要提供DType和Scale；
 - 参数说明里shape使用的变量：

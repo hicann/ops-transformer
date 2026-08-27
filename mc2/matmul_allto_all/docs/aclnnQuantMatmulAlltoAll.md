@@ -214,7 +214,7 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
     <tr>
     <td>group</td>
     <td>输入</td>
-    <td>标识列组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
+    <td>标识通信组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
     <td>字符串长度要求(0, 128)。</td>
     <td>-</td>
     <td>-</td>

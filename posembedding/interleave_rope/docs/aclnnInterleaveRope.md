@@ -37,7 +37,7 @@
   q_{\text{embed}} = q \cdot \text{cos} + \text{RotateHalf}(q) \cdot \sin
   $$
 
-  其中：RotateHalf(q)表示将q的D维后半部分元素移至前半部分并乘以 -1，后半部分用前半部分的值。
+  其中：RotateHalf(q)表示将q的D维后半部分元素移至前半部分并乘以 -1，后半部分用前半部分的值替换。
 
   $$
   \text{RotateHalf}(q)_{\text{i}} =
