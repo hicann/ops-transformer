@@ -32,22 +32,22 @@
 #define ASCENDC_EXTERN_C
 #endif
 
-
 using namespace ge;
 using namespace AscendC;
 
 namespace optiling {
 
 static const int64_t MAX_VAR_LEN_SEQ_LEN = 4096L;
+static constexpr int64_t MAX_SEQ_LENGTH = 1024L * 1024L;
 static const int64_t PING_PONG_VALUE = 2L;
 static const int64_t GM_ALIGN = 512;
 static const int32_t FRACTAL_NUM = 16L;
 static constexpr size_t WORK_SPACE_RESERVE_SIZE = 16 * 1024 * 1024;
 
-static constexpr uint32_t NQUERY_SIZE_32  = 32;
-static constexpr uint32_t NQUERY_SIZE_64  = 64;
+static constexpr uint32_t NQUERY_SIZE_32 = 32;
+static constexpr uint32_t NQUERY_SIZE_64 = 64;
 static constexpr uint32_t NQUERY_SIZE_128 = 128;
-static constexpr uint32_t NQUERYINDEX_SIZE_8  = 8;
+static constexpr uint32_t NQUERYINDEX_SIZE_8 = 8;
 static constexpr uint32_t NQUERYINDEX_SIZE_16 = 16;
 static constexpr uint32_t NQUERYINDEX_SIZE_32 = 32;
 static constexpr uint32_t NQUERYINDEX_SIZE_64 = 64;
@@ -83,7 +83,8 @@ inline auto Max(T a, T b) -> T
 
 class TilingBaseClass {
 public:
-    explicit TilingBaseClass(gert::TilingContext* context) : context_(context)
+    explicit TilingBaseClass(gert::TilingContext *context)
+        : context_(context)
     {}
 
     virtual ~TilingBaseClass() = default;
@@ -119,7 +120,7 @@ public:
     }
 
     // 更新 context
-    virtual void Reset(gert::TilingContext* context)
+    virtual void Reset(gert::TilingContext *context)
     {
         context_ = context;
     }
@@ -143,11 +144,11 @@ protected:
     // 8、Dump Tiling数据
     virtual void DumpTilingInfo()
     {
-        int32_t enable = 1; 
+        int32_t enable = 1;
         if (enable != 1) {
             return;
         }
-        auto buf = (uint32_t*)context_->GetRawTilingData()->GetData();
+        auto buf = (uint32_t *)context_->GetRawTilingData()->GetData();
         auto bufLen = context_->GetRawTilingData()->GetDataSize();
         std::ostringstream oss;
         oss << "Start to dump tiling info. tilingkey:" << context_->GetTilingKey() << ", tiling data size:" << bufLen
@@ -173,7 +174,7 @@ protected:
     }
 
     template <typename T>
-    [[nodiscard]] std::string GetShapeDebugStr(const T& shape) const
+    [[nodiscard]] std::string GetShapeDebugStr(const T &shape) const
     {
         std::ostringstream oss;
         oss << "[";
@@ -187,8 +188,8 @@ protected:
         return oss.str();
     }
 
-    [[nodiscard]] std::string GetTensorDebugStr(
-        const gert::StorageShape* shape, const gert::CompileTimeTensorDesc* tensor)
+    [[nodiscard]] std::string GetTensorDebugStr(const gert::StorageShape *shape,
+                                                const gert::CompileTimeTensorDesc *tensor)
     {
         if (shape == nullptr || tensor == nullptr) {
             return "nil ";
@@ -224,7 +225,7 @@ protected:
     {
         auto rawTilingData = context_->GetRawTilingData();
         auto rawTilingDataSize = rawTilingData->GetDataSize();
-        auto data = reinterpret_cast<const int32_t*>(rawTilingData->GetData());
+        auto data = reinterpret_cast<const int32_t *>(rawTilingData->GetData());
         size_t len = rawTilingDataSize / sizeof(int32_t);
         std::ostringstream oss;
         for (size_t i = 0; i < len; i++) {
@@ -234,7 +235,7 @@ protected:
     }
 
 protected:
-    gert::TilingContext* context_ = nullptr;
+    gert::TilingContext *context_ = nullptr;
     std::unique_ptr<platform_ascendc::PlatformAscendC> ascendcPlatform_{nullptr};
     uint32_t blockDim_{0};
     uint64_t workspaceSize_{0};
@@ -242,7 +243,5 @@ protected:
     AiCoreParams aicoreParams_;
 };
 
-
-
-} // optiling
+} // namespace optiling
 #endif
