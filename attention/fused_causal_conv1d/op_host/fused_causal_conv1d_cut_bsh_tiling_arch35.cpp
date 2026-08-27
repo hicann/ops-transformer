@@ -41,6 +41,7 @@ constexpr int32_t ATTR_MAX_QUERY_LEN_INDEX = 3;
 constexpr int32_t ATTR_RESIDUAL_CONNECTION_INDEX = 4;
 constexpr int32_t ATTR_BLOCK_SIZE_INDEX = 5;
 constexpr int32_t ATTR_CONV_MODE_INDEX = 6;
+constexpr int32_t ATTR_MAX_DRAFT_TOKENS_INDEX = 7;
 
 constexpr uint64_t OUTPUT_CONV_STATES_INDEX = 0;
 constexpr uint64_t OUTPUT_Y_INDEX = 1;
@@ -94,7 +95,10 @@ bool FusedCausalConv1dCutBSHTiling::IsCapable()
     return true;
 }
 
-ge::graphStatus FusedCausalConv1dCutBSHTiling::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus FusedCausalConv1dCutBSHTiling::DoLibApiTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 ge::graphStatus FusedCausalConv1dCutBSHTiling::GetPlatformInfo()
 {
@@ -303,9 +307,9 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::CheckCacheIndicesDim()
         } else {
             reasonMsg = "The shape dim of cache_indices must be 1";
         }
+
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "cache_indices",
-                                                 std::to_string(cacheIndicesDimNum).c_str(),
-                                                 reasonMsg.c_str());
+                                                 std::to_string(cacheIndicesDimNum).c_str(), reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -320,7 +324,7 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::CheckCacheIndicesDim()
 }
 
 // 属性合法性校验：activation_mode / pad_slot_id / run_mode / residual_connection /
-//                 block_size / max_query_len / conv_mode
+//                 block_size / max_query_len / conv_mode / max_draft_tokens
 // BSH 模板仅处理 2D 输入，max_query_len 不允许为 -1
 ge::graphStatus FusedCausalConv1dCutBSHTiling::CheckAttrs()
 {
@@ -357,7 +361,8 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::CheckAttrs()
         return ge::GRAPH_FAILED;
     }
 
-    // block_size ∈ {0} ∪ [2, INT64_MAX]（属性类型 int64，读入 uint64_t；负值会被 reinterpret 为大于 INT64_MAX 的 uint64 而被拦截）
+    // block_size ∈ {0} ∪ [2, INT64_MAX]（属性类型 int64，读入 uint64_t；负值会被 reinterpret 为大于 INT64_MAX 的 uint64
+    // 而被拦截）
     constexpr uint64_t blockSizeUpper = static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
     if (blockSize_ != 0UL && (blockSize_ < 2UL || blockSize_ > blockSizeUpper)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "block_size", std::to_string(blockSize_).c_str(),
@@ -386,6 +391,14 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::CheckAttrs()
     if (convMode_ != 0UL && convMode_ != 1UL) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "conv_mode", std::to_string(convMode_).c_str(),
                                               "The value of conv_mode must be 0 or 1");
+        return ge::GRAPH_FAILED;
+    }
+
+    // max_draft_tokens ∈ [0, 16]
+    if (maxDraftTokens_ < 0 || maxDraftTokens_ > 16) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "max_draft_tokens",
+                                              std::to_string(maxDraftTokens_).c_str(),
+                                              "The value of max_draft_tokens must be between 0 and 16");
         return ge::GRAPH_FAILED;
     }
 
@@ -593,36 +606,31 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::GetShapeAttrsInfo()
     if (context_->GetOptionalInputShape(INPUT_BLOCK_IDX_FIRST_INDEX) != nullptr) {
         apcEnabled_ = 1;
         if (context_->GetOptionalInputShape(INPUT_BLOCK_IDX_LAST_INDEX) == nullptr) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                context_->GetNodeName(), "block_idx_last_scheduled_token", "nullptr",
-                "block_idx_last_scheduled_token cannot be nullptr when APC");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "block_idx_last_scheduled_token", "nullptr",
+                                                  "block_idx_last_scheduled_token cannot be nullptr when APC");
             return ge::GRAPH_FAILED;
         }
         if (context_->GetOptionalInputShape(INPUT_INITIAL_STATE_IDX_INDEX) == nullptr) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                context_->GetNodeName(), "initial_state_idx", "nullptr",
-                "initial_state_idx cannot be nullptr when APC");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "initial_state_idx", "nullptr",
+                                                  "initial_state_idx cannot be nullptr when APC");
             return ge::GRAPH_FAILED;
         }
         auto cacheIndicesStorage = context_->GetOptionalInputShape(INPUT_CACHE_INDICES_INDEX);
         if (cacheIndicesStorage == nullptr) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                context_->GetNodeName(), "cache_indices", "nullptr",
-                "cache_indices cannot be nullptr when APC is enabled");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "cache_indices", "nullptr",
+                                                  "cache_indices cannot be nullptr when APC is enabled");
             return ge::GRAPH_FAILED;
         }
         auto cacheIndicesShape = cacheIndicesStorage->GetOriginShape();
         if (cacheIndicesShape.GetDimNum() != DIM_2) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                context_->GetNodeName(), "cache_indices",
-                std::to_string(cacheIndicesShape.GetDimNum()).c_str(),
-                "The shape dim of cache_indices must be 2 when APC is enabled");
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "cache_indices",
+                                                     std::to_string(cacheIndicesShape.GetDimNum()).c_str(),
+                                                     "The shape dim of cache_indices must be 2 when APC is enabled");
             return ge::GRAPH_FAILED;
         }
         if (blockSize_ == 0) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                context_->GetNodeName(), "block_size", "0",
-                "The value of block_size must not be 0 when APC is enabled");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "block_size", "0",
+                                                  "The value of block_size must not be 0 when APC is enabled");
             return ge::GRAPH_FAILED;
         }
         maxNumBlocks_ = static_cast<uint64_t>(cacheIndicesShape.GetDim(DIM_1));

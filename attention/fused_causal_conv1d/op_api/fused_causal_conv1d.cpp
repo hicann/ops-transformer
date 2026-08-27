@@ -30,19 +30,21 @@ bool FusedCausalConv1d(const aclTensor *x, const aclTensor *weight, aclTensor *c
                        const aclTensor *blockIdxFirstScheduledToken, const aclTensor *blockIdxLastScheduledToken,
                        const aclTensor *initialStateIdx, int64_t activationMode, int64_t padSlotId, int64_t runMode,
                        int64_t maxQueryLen, int64_t residualConnection, int64_t blockSize, int64_t convMode,
-                       aclTensor *y, aclOpExecutor *executor)
+                       int64_t maxDraftTokens, aclTensor *y, aclOpExecutor *executor)
 {
     L0_DFX(FusedCausalConv1d, x, weight, convStates, queryStartLoc, cacheIndices, initialStateMode, bias,
            numAcceptedTokens, numComputedTokens, blockIdxFirstScheduledToken, blockIdxLastScheduledToken,
            initialStateIdx, activationMode, padSlotId, runMode, maxQueryLen, residualConnection, blockSize, convMode,
-           y);
+           maxDraftTokens, y);
 
     auto ret = ADD_TO_LAUNCHER_LIST_AICORE(
         FusedCausalConv1d,
         OP_INPUT(x, weight, convStates, queryStartLoc, cacheIndices, initialStateMode, bias, numAcceptedTokens,
                  numComputedTokens, blockIdxFirstScheduledToken, blockIdxLastScheduledToken, initialStateIdx),
         OP_OUTPUT(convStates, y),
-        OP_ATTR(activationMode, padSlotId, runMode, maxQueryLen, residualConnection, blockSize, convMode));
+        OP_ATTR(activationMode, padSlotId, runMode, maxQueryLen, residualConnection, blockSize, convMode,
+                maxDraftTokens));
+
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "FusedCausalConv1d ADD_TO_LAUNCHER_LIST_AICORE failed.");
         return false;

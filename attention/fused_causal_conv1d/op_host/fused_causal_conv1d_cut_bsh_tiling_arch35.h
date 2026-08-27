@@ -149,10 +149,11 @@ private:
     ge::DataType xType_;
     ge::DataType weightType_;
 
-    uint64_t apcEnabled_ = 0;           // APC 开关：block_idx_first_scheduled_token 存在即初判开启，缺其余必要条件立即报错
-    uint64_t blockSize_ = 0;            // APC block 大小（0 表示未启用）
-    uint64_t maxNumBlocks_ = 0;         // cache_indices 第二维大小（APC 模式下 > 0）
-    uint64_t convMode_ = 0;             // 0=Qwen3-Next, 1=Pangu v2 输出零填充
+    uint64_t apcEnabled_ = 0; // APC 开关：block_idx_first_scheduled_token 存在即初判开启，缺其余必要条件立即报错
+    uint64_t blockSize_ = 0;    // APC block 大小（0 表示未启用）
+    uint64_t maxNumBlocks_ = 0; // cache_indices 第二维大小（APC 模式下 > 0）
+    uint64_t convMode_ = 0;     // 0=Qwen3-Next, 1=Pangu v2 输出零填充
+    uint64_t maxDraftTokens_ = 0;
     uint64_t inplace_ = 0;              // 是否原地更新（y 复用 x 的 GM）（由 isInplace_ 决定）
     bool isInplace_ = false;            // 构造时传入，替代 attr 读取
     uint64_t hasAcceptTokenNum_ = 0;    // 是否提供 num_accepted_tokens（MTP）

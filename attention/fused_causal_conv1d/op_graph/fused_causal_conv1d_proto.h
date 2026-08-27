@@ -49,6 +49,7 @@ namespace ge {
  * @li residual_connection: A optional int. Whether to use residual connection: 0 (no), 1 (yes).
  * @li block_size: A optional int. APC block size, supports 128/256.
  * @li conv_mode: A optional int. Convolution mode: 0 (Qwen3-Next), 1 (Pangu v2).
+ * @li max_draft_tokens: A optional int. Maximum speculative tokens, supports 0~16.
  *
  * @par Outputs:
  * @li conv_states: Updated cache state tensor. Same shape and type as input conv_states.
@@ -74,10 +75,10 @@ REG_OP(FusedCausalConv1d)
     .ATTR(residual_connection, Int, 1)
     .ATTR(block_size, Int, 128)
     .ATTR(conv_mode, Int, 0)
+    .ATTR(max_draft_tokens, Int, 7)
     .OUTPUT(conv_states, TensorType({DT_BF16, DT_FLOAT16}))
     .OUTPUT(y, TensorType({DT_BF16, DT_FLOAT16}))
     .OP_END_FACTORY_REG(FusedCausalConv1d)
-
 } // namespace ge
 
 #endif // OPS_BUILT_IN_OP_PROTO_INC_FUSED_CAUSAL_CONV1D_H_

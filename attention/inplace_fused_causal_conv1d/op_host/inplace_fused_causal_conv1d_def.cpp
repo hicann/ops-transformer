@@ -18,7 +18,8 @@
 namespace ops {
 class InplaceFusedCausalConv1d : public OpDef {
 public:
-    explicit InplaceFusedCausalConv1d(const char *name) : OpDef(name)
+    explicit InplaceFusedCausalConv1d(const char *name)
+        : OpDef(name)
     {
         this->Input("x").ParamType(REQUIRED).DataType({ge::DT_FLOAT16, ge::DT_BF16}).FormatList({ge::FORMAT_ND});
         this->Input("weight").ParamType(REQUIRED).DataType({ge::DT_FLOAT16, ge::DT_BF16}).FormatList({ge::FORMAT_ND});
@@ -53,6 +54,7 @@ public:
         this->Attr("residual_connection").AttrType(REQUIRED).Int(); // 0: no residual  1: with residual
         this->Attr("block_size").AttrType(REQUIRED).Int();          // when APC enabled, it can not be set to 0
         this->Attr("conv_mode").AttrType(REQUIRED).Int();           // 0: for Qwen and Pangu7B  1: for Pangu
+        this->Attr("max_draft_tokens").AttrType(OPTIONAL).Int(7);
         OpAICoreConfig config_950;
         config_950.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(false)

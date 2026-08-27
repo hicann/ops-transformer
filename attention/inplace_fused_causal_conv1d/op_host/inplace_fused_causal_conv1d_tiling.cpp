@@ -47,7 +47,13 @@ static ge::graphStatus TilingInplaceFusedCausalConv1d(gert::TilingContext *conte
         maxQueryLen = *(context->GetAttrs()->GetInt(INPLACE_ATTR_MAX_QUERY_LEN_INDEX));
     }
 
-    bool useBH = (xDimNum == 3) || (xDimNum == 2 && maxQueryLen <= INPLACE_MAX_BH_SEQ_LEN);
+    bool useBH = false;
+    if (context->GetAttrs() != nullptr && context->GetAttrs()->GetInt(ATTR_MAX_DRAFT_TOKENS_INDEX) != nullptr) {
+        int64_t maxDraftTokens = *(context->GetAttrs()->GetInt(ATTR_MAX_DRAFT_TOKENS_INDEX));
+        useBH = (xDimNum == 3) || (xDimNum == 2 && maxQueryLen <= maxDraftTokens + 1);
+    } else {
+        useBH = (xDimNum == 3) || (xDimNum == 2 && maxQueryLen <= INPLACE_MAX_BH_SEQ_LEN);
+    }
 
     OP_LOGD(context->GetNodeName(), "InplaceFusedCausalConv1d xDimNum=%ld maxQueryLen=%ld useBH=%d", xDimNum,
             maxQueryLen, static_cast<int>(useBH));
