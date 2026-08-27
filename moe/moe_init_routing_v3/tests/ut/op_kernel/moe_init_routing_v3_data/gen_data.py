@@ -13,6 +13,7 @@
 import sys
 import numpy as np
 
+
 def adapter_capacity(sorted_row_idx, sorted_expert_idx, capacity):
     count = 0
     last = sorted_expert_idx[0]
@@ -26,9 +27,22 @@ def adapter_capacity(sorted_row_idx, sorted_expert_idx, capacity):
                 sorted_expert_idx[i] = -1
                 sorted_row_idx[i] = -1
 
-def gen_golden(x, expert_idx, scale, offset, active_num, expert_capacity,
-                expert_num, drop_pad_mode, expert_tokens_num_type, expert_tokens_num_flag, 
-                quant_mode, active_expert_range, row_idx_type):
+
+def gen_golden(
+    x,
+    expert_idx,
+    scale,
+    offset,
+    active_num,
+    expert_capacity,
+    expert_num,
+    drop_pad_mode,
+    expert_tokens_num_type,
+    expert_tokens_num_flag,
+    quant_mode,
+    active_expert_range,
+    row_idx_type,
+):
     if drop_pad_mode == 1:
         if expert_num <= 0:
             print("expert num can not be 0")
@@ -39,7 +53,9 @@ def gen_golden(x, expert_idx, scale, offset, active_num, expert_capacity,
     h = x.shape[1]
     k = expert_idx.shape[-1]
     expert_idx_in = expert_idx.copy().reshape(-1)
-    actual_expert_total_num = np.sum((expert_idx_in >= expert_start) & (expert_idx_in < expert_end))
+    actual_expert_total_num = np.sum(
+        (expert_idx_in >= expert_start) & (expert_idx_in < expert_end)
+    )
 
     expert_idx_in[(expert_idx_in < expert_start)] = np.int32(np.iinfo(np.int32).max)
     sorted_expert_indices = np.argsort(expert_idx_in, axis=-1, kind="stable")
@@ -57,27 +73,58 @@ def gen_golden(x, expert_idx, scale, offset, active_num, expert_capacity,
         if drop_pad_mode == 0:
             if expert_tokens_num_type == 1:
                 expert_tokens_count = np.bincount(
-                    sorted_expert_idx[:actual_expert_total_num] - expert_start)
+                    sorted_expert_idx[:actual_expert_total_num] - expert_start
+                )
                 expert_tokens_count = np.concatenate(
-                    [expert_tokens_count, np.zeros((expert_end - expert_start) - len(expert_tokens_count)).astype(np.int64)])
+                    [
+                        expert_tokens_count,
+                        np.zeros(
+                            (expert_end - expert_start) - len(expert_tokens_count)
+                        ).astype(np.int64),
+                    ]
+                )
             elif expert_tokens_num_type == 0:
                 expert_tokens_count = np.bincount(
-                    sorted_expert_idx[:actual_expert_total_num] - expert_start)
+                    sorted_expert_idx[:actual_expert_total_num] - expert_start
+                )
                 expert_tokens_count = np.concatenate(
-                    [expert_tokens_count, np.zeros((expert_end - expert_start) - len(expert_tokens_count)).astype(np.int64)])
+                    [
+                        expert_tokens_count,
+                        np.zeros(
+                            (expert_end - expert_start) - len(expert_tokens_count)
+                        ).astype(np.int64),
+                    ]
+                )
                 expert_tokens_count = np.cumsum(expert_tokens_count)
             elif expert_tokens_num_type == 2:
-                expert_id, counts = np.unique(sorted_expert_idx[:actual_expert_total_num], return_counts=True)
+                expert_id, counts = np.unique(
+                    sorted_expert_idx[:actual_expert_total_num], return_counts=True
+                )
                 expert_tokens_count = np.column_stack((expert_id, counts))
                 if expert_tokens_count.shape[0] < expert_num:
-                    expert_tokens_count = np.concatenate((expert_tokens_count, [[0,0],]), axis=0)
+                    expert_tokens_count = np.concatenate(
+                        (
+                            expert_tokens_count,
+                            [
+                                [0, 0],
+                            ],
+                        ),
+                        axis=0,
+                    )
         else:
             expert_tokens_count = np.bincount(
-                    sorted_expert_idx[:actual_expert_total_num] - expert_start)
+                sorted_expert_idx[:actual_expert_total_num] - expert_start
+            )
             expert_tokens_count = np.concatenate(
-                [expert_tokens_count, np.zeros((expert_end - expert_start) - len(expert_tokens_count)).astype(np.int64)])
+                [
+                    expert_tokens_count,
+                    np.zeros(
+                        (expert_end - expert_start) - len(expert_tokens_count)
+                    ).astype(np.int64),
+                ]
+            )
         expert_tokens_count = expert_tokens_count.astype(np.int64)
-    
+
     if drop_pad_mode == 0:
         if active_num == 0:
             active_num = actual_expert_total_num
@@ -98,9 +145,11 @@ def gen_golden(x, expert_idx, scale, offset, active_num, expert_capacity,
                 if lastExpertId != sorted_expert_idx[i]:
                     offset_tmp = 0
                     lastExpertId = sorted_expert_idx[i]
-                sort_row_tmp[sorted_expert_idx[i] * expert_capacity + offset_tmp] = sorted_expert_indices[i]
+                sort_row_tmp[sorted_expert_idx[i] * expert_capacity + offset_tmp] = (
+                    sorted_expert_indices[i]
+                )
                 offset_tmp = offset_tmp + 1
-        
+
         expanded_row_idx = np.full(sorted_expert_indices.shape, -1)
         for i, val in enumerate(sort_row_tmp):
             if val != -1:
@@ -112,12 +161,14 @@ def gen_golden(x, expert_idx, scale, offset, active_num, expert_capacity,
             if val != -1:
                 expanded_x[i] = x[val // k]
                 expanded_x_mask[i] = np.full((h,), 0, dtype=int)
-    
+
     if quant_mode == -1:
         expanded_x = expanded_x
         expanded_row_idx = expanded_row_idx
         if scale is not None and drop_pad_mode == 1:
-            expanded_scale = np.full((expert_num * expert_capacity,), 0, dtype=scale.dtype)
+            expanded_scale = np.full(
+                (expert_num * expert_capacity,), 0, dtype=scale.dtype
+            )
             for i, val in enumerate(sort_row_tmp):
                 if val != -1:
                     expanded_scale[i] = scale[val // k]
@@ -148,7 +199,9 @@ def gen_golden(x, expert_idx, scale, offset, active_num, expert_capacity,
                 x_final = x_final * scale
             else:
                 if drop_pad_mode == 0:
-                    x_final = x_final * scale[sorted_expert_idx[:active_num] - expert_start]
+                    x_final = (
+                        x_final * scale[sorted_expert_idx[:active_num] - expert_start]
+                    )
 
                 else:
                     for i, val in enumerate(sort_row_tmp):
@@ -164,46 +217,73 @@ def gen_golden(x, expert_idx, scale, offset, active_num, expert_capacity,
     if drop_pad_mode == 1:
         expanded_x = np.ma.array(expanded_x, mask=expanded_x_mask).filled(0)
         expanded_x = expanded_x.reshape(expert_num, expert_capacity, h)
-    
+
     return expanded_x, expanded_row_idx, expert_tokens_count, expanded_scale
 
 
-
-def gen_golden_data_simple(N, H, k, E, dtype, quant_mode, active_num, expert_capacity, 
-                            expert_num, drop_pad, expert_token_num_type, 
-                            expert_tokens_num_flag, active_range, row_idx_type):
+def gen_golden_data_simple(
+    N,
+    H,
+    k,
+    E,
+    dtype,
+    quant_mode,
+    active_num,
+    expert_capacity,
+    expert_num,
+    drop_pad,
+    expert_token_num_type,
+    expert_tokens_num_flag,
+    active_range,
+    row_idx_type,
+    invalid_ratio=0.0,
+):
     N = int(N)
     H = int(H)
     k = int(k)
     E = int(E)
     expert_num = int(expert_num)
     quant_mode = int(quant_mode)
-    active_num  = int(active_num)
+    active_num = int(active_num)
     expert_capacity = int(expert_capacity)
     drop_pad = int(drop_pad)
     expert_token_num_type = int(expert_token_num_type)
     expert_tokens_num_flag = int(expert_tokens_num_flag)
     active_range = eval(active_range)
     row_idx_type = int(row_idx_type)
+    invalid_ratio = float(invalid_ratio)
 
     input_x = np.random.uniform(-2, 2, [N, H]).astype(dtype)
     input_expertIdx = np.random.randint(0, E, size=(N, k)).astype("int32")
+    if invalid_ratio > 0.0:
+        mask = np.random.random(size=(N, k)) < invalid_ratio
+        input_expertIdx[mask] = -1
     scale = np.random.uniform(-2, 2, [N]).astype(np.float32)
     offset = None
     if quant_mode == 0:
         offset = np.random.uniform(-2, 2, [1]).astype(np.float32)
         scale = np.random.uniform(-2, 2, [1]).astype(np.float32)
 
-
     input_x.tofile("./input_x.bin")
     input_expertIdx.tofile("./input_expertIdx.bin")
     scale.tofile("./scale.bin")
     if quant_mode == 0:
         offset.tofile("./offset.bin")
-    expanded_x, expanded_row_idx, expert_tokens_count, expanded_scale = gen_golden(input_x, input_expertIdx, scale,
-                                                                                    offset, active_num, expert_capacity,
-                                                                                    expert_num, drop_pad, expert_token_num_type, expert_tokens_num_flag,
-                                                                                    quant_mode, active_range, row_idx_type)
+    expanded_x, expanded_row_idx, expert_tokens_count, expanded_scale = gen_golden(
+        input_x,
+        input_expertIdx,
+        scale,
+        offset,
+        active_num,
+        expert_capacity,
+        expert_num,
+        drop_pad,
+        expert_token_num_type,
+        expert_tokens_num_flag,
+        quant_mode,
+        active_range,
+        row_idx_type,
+    )
     if quant_mode == -1:
         expanded_x.astype(dtype).tofile("./expanded_x.bin")
     else:
@@ -214,7 +294,23 @@ def gen_golden_data_simple(N, H, k, E, dtype, quant_mode, active_num, expert_cap
     if expanded_scale is not None:
         expanded_scale.tofile("./expanded_scale.bin")
 
+
 if __name__ == "__main__":
-    gen_golden_data_simple(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5],
-                            sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9], sys.argv[10], sys.argv[11],
-                            sys.argv[12], sys.argv[13], sys.argv[14])
+    invalid_ratio = sys.argv[15] if len(sys.argv) > 15 else "0.0"
+    gen_golden_data_simple(
+        sys.argv[1],
+        sys.argv[2],
+        sys.argv[3],
+        sys.argv[4],
+        sys.argv[5],
+        sys.argv[6],
+        sys.argv[7],
+        sys.argv[8],
+        sys.argv[9],
+        sys.argv[10],
+        sys.argv[11],
+        sys.argv[12],
+        sys.argv[13],
+        sys.argv[14],
+        invalid_ratio,
+    )

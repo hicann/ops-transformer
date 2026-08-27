@@ -150,7 +150,7 @@
       expandedXOut[gatherRowIdx[i]]=quantResult[i // K]
       $$
 
-  6.expandedRowIdxOut的有效元素数量availableIdxNum，计算方式为expertIdx中activeExpertRangeOptional范围内的元素的个数
+  6.expandedRowIdxOut的有效元素数量availableIdxNum，计算方式为expertIdx中activeExpertRangeOptional范围内的元素的个数，-1也不在该范围内，表示无效专家，不参与路由计算：
 
     $$
     availableIdxNum = |\{x\in expertIdx| expert\_start \le x<expert\_end \ \}|
@@ -231,7 +231,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
     <tr>
       <td>expertIdx（aclTensor）</td>
       <td>输入</td>
-      <td>每一行特征对应的K个处理专家，里面元素专家id不能超过专家数</td>
+      <td>每一行特征对应的K个处理专家，里面元素专家id不能超过专家数，-1表示无效专家（该位置不参与路由，会被过滤）</td>
       <td>shape为(NUM_ROWS, K)</td>
       <td>INT32</td>
       <td>ND</td>

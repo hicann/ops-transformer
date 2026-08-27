@@ -27,6 +27,9 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadCompute
 {
     for (auto i = static_cast<int32_t>(threadIdx.x); i < elementNum; i += static_cast<int32_t>(blockDim.x)) {
         auto currExpertId = sortedExpertIdLocalAddr[i];
+        if (currExpertId < expertStart) {
+            continue;
+        }
         if (currExpertId >= expertEnd) {
             break;
         }
@@ -43,6 +46,9 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadCompute
 {
     for (auto i = static_cast<int32_t>(threadIdx.x); i < elementNum; i += static_cast<int32_t>(blockDim.x)) {
         auto currExpertId = sortedExpertIdLocalAddr[i];
+        if (currExpertId < expertStart) {
+            continue;
+        }
         if (currExpertId >= expertEnd) {
             break;
         }
@@ -470,6 +476,10 @@ __aicore__ inline void MoeV3FullLoadBase<T>::CopyOutRowIdx()
             expandedRowIdxQueue_.FreeTensor(expandedRowIdx);
         } else {
             LocalTensor<int32_t> expandedRowIdx = expandedRowIdxQueue_.DeQue<int32_t>();
+            for (int64_t i = actualExpertIdxNum_; i < totalLength_; i++) {
+                int32_t invalidRouteIdx = sortedRowIdx.GetValue(i);
+                expandedRowIdx.SetValue(invalidRouteIdx, -1);
+            }
             DataCopyExtParams copyParams{static_cast<uint16_t>(1),
                                          static_cast<uint32_t>(totalLength_ * sizeof(int32_t)), 0, 0, 0};
             DataCopyPad(expandedRowIdxGm_, expandedRowIdx, copyParams);

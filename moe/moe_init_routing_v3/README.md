@@ -68,7 +68,7 @@
     expandedXOut[i]=quantResult[sortedRowIdx[i]\%NUM\_ROWS]
     $$
 
-  6.expandedRowIdxOut的有效元素数量availableIdxNum计算方式为，expertIdx中activeExpertRangeOptional范围内的元素的个数
+  6.expandedRowIdxOut的有效元素数量availableIdxNum计算方式为，expertIdx中activeExpertRangeOptional范围内的元素的个数，-1也不在该范围内，表示无效专家，不参与路由计算：
     $$
     availableIdxNum = |\{x\in expertIdx| expert\_start \le x<expert\_end \ \}|
     $$
@@ -101,7 +101,7 @@
       <tr>
         <td>expertIdx</td>
         <td>输入</td>
-        <td>每一行特征对应的K个处理专家，里面元素专家id不能超过专家数。对应公式中expertIdx。</td>
+        <td>每一行特征对应的K个处理专家，里面元素专家id不能超过专家数，-1表示无效专家（该位置不参与路由，会被过滤）。对应公式中expertIdx。</td>
         <td>INT32</td>
         <td>ND</td>
       </tr>

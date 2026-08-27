@@ -86,6 +86,9 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void ComputeExpertFi
 {
     for (auto i = static_cast<int32_t>(threadIdx.x); i < elementNum; i += static_cast<int32_t>(blockDim.x)) {
         auto currExpertId = sortedExpertIdGmAddr[i];
+        if (currExpertId < expertStart) {
+            continue;
+        }
         if (currExpertId >= expertEnd) {
             break;
         }
@@ -102,6 +105,9 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void ComputeExpertCo
 {
     for (auto i = static_cast<int32_t>(threadIdx.x); i < elementNum; i += static_cast<int32_t>(blockDim.x)) {
         auto currExpertId = sortedExpertIdGmAddr[i];
+        if (currExpertId < expertStart) {
+            continue;
+        }
         if (currExpertId >= expertEnd) {
             break;
         }
