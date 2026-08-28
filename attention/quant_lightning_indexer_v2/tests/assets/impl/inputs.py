@@ -22,6 +22,7 @@ import torch
 
 QUANT_MODE_MXFP4 = 5
 QUANT_MODE_MXFP8 = 3
+QUANT_MODE_HIF4 = 6
 
 
 def restore_mx_input_dtypes(query, key, query_scale, key_scale, quant_mode):
@@ -61,6 +62,28 @@ class QuantLightningIndexerV2InputAdapter:
     def __init__(self):
         self.pytest_golden = None
         self.pytest_normalizer = None
+        self.batch_consistency = None
+
+    def load_batch_consistency(self):
+        if self.batch_consistency is not None:
+            return self.batch_consistency
+        name = "qli_v2_ttk_batch_consistency"
+        path = Path(__file__).with_name("batch_consistency.py")
+        try:
+            if name in sys.modules:
+                module = sys.modules[name]
+            else:
+                spec = importlib.util.spec_from_file_location(name, path)
+                if spec is None or spec.loader is None:
+                    raise ImportError(f"cannot create import spec for {path}")
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[name] = module
+                spec.loader.exec_module(module)
+            self.batch_consistency = module
+            return module
+        except Exception as exc:
+            sys.modules.pop(name, None)
+            raise self.module_load_error("assets batch consistency", path, exc) from exc
 
     @staticmethod
     def load_golden_store():
@@ -205,6 +228,8 @@ class QuantLightningIndexerV2InputAdapter:
             return "FLOAT8_E4M3FN"
         if quant_mode == QUANT_MODE_MXFP4:
             return "FLOAT4_E2M1FN_X2"
+        if quant_mode == QUANT_MODE_HIF4:
+            return "HIF4"
         dtype = QuantLightningIndexerV2InputAdapter.tensor_dtype(tensor)
         dtype_name = str(tensor.dtype)
         if dtype == torch.int8:
@@ -267,7 +292,7 @@ class QuantLightningIndexerV2InputAdapter:
             raise ValueError(f"unsupported QLI_V2 query layout: {layout_query}")
 
         is_aclnn_float4 = isinstance(query, np.ndarray) and "float4" in str(query.dtype)
-        if quant_mode == QUANT_MODE_MXFP4 and not is_aclnn_float4:
+        if quant_mode in (QUANT_MODE_MXFP4, QUANT_MODE_HIF4) and not is_aclnn_float4:
             head_dim *= 2
 
         if layout_key == "BSND":
@@ -781,7 +806,10 @@ class QuantLightningIndexerV2InputAdapter:
             kwargs,
             include_weight_dtype=self.pytest_uses_weight_dtype(pytest_golden),
         )
-        data = pytest_golden.generate_qliv2_test_data(params, generate_golden=False)
+        batch_module = self.load_batch_consistency()
+        with batch_module.CaseRandomContext(kwargs):
+            data = pytest_golden.generate_qliv2_test_data(params, generate_golden=False)
+        batch_module.normalize_indexer_inputs(data, kwargs, "QLI_V2", quantized=True)
         for name, dst, src_name in (
             ("query", query, "query"),
             ("key", key, "key"),

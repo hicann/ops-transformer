@@ -33,6 +33,28 @@ class LightningIndexerV2InputAdapter:
     def __init__(self):
         self.pytest_golden = None
         self.pytest_normalizer = None
+        self.batch_consistency = None
+
+    def load_batch_consistency(self):
+        if self.batch_consistency is not None:
+            return self.batch_consistency
+        name = "indexer_ttk_batch_consistency"
+        path = Path(__file__).with_name("batch_consistency.py")
+        try:
+            if name in sys.modules:
+                module = sys.modules[name]
+            else:
+                spec = importlib.util.spec_from_file_location(name, path)
+                if spec is None or spec.loader is None:
+                    raise ImportError(f"cannot create import spec for {path}")
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[name] = module
+                spec.loader.exec_module(module)
+            self.batch_consistency = module
+            return module
+        except Exception as exc:
+            sys.modules.pop(name, None)
+            raise self.module_load_error("assets batch consistency", path, exc) from exc
 
     @staticmethod
     def load_golden_store():
@@ -453,9 +475,12 @@ class LightningIndexerV2InputAdapter:
         params = self.build_case_params(q, k, layout_q, layout_k, kwargs)
         golden_store = self.load_golden_store().CASE_DATA
         golden_store.clear()
-        data = self.load_pytest_golden().generate_liv2_test_data(
-            params, generate_golden=False
-        )
+        batch_module = self.load_batch_consistency()
+        with batch_module.CaseRandomContext(kwargs):
+            data = self.load_pytest_golden().generate_liv2_test_data(
+                params, generate_golden=False
+            )
+        batch_module.normalize_indexer_inputs(data, kwargs, "LI_V2")
         for name, dst, src_name in (
             ("q", q, "query"),
             ("k", k, "key"),

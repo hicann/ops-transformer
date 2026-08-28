@@ -23,6 +23,7 @@ OPERATOR = "quant_lightning_indexer_v2"
 METADATA_INDEX = 12
 QUANT_MODE_MXFP8 = 3
 QUANT_MODE_MXFP4 = 5
+QUANT_MODE_HIF4 = 6
 ACLNN_PARAMETER_NAMES = (
     "query",
     "key",
@@ -134,7 +135,9 @@ def build_metadata_arguments(
     k_shape = tuple(int(value) for value in key.shape)
     num_heads_q = q_shape[2] if layout_q == "BSND" else q_shape[1]
     num_heads_k = k_shape[1] if layout_k == "TND" else k_shape[2]
-    head_dim = q_shape[-1] * (2 if int(quant_mode) == QUANT_MODE_MXFP4 else 1)
+    head_dim = q_shape[-1] * (
+        2 if int(quant_mode) in (QUANT_MODE_MXFP4, QUANT_MODE_HIF4) else 1
+    )
     cu_q = kwargs.get("cu_seqlens_q")
     cu_k = kwargs.get("cu_seqlens_k")
     seq_q = kwargs.get("seqused_q")
@@ -270,7 +273,8 @@ def run(
     )
     protocol = load_metadata_protocol()
     testcase_name = kwargs.get("testcase_name")
-    if protocol.metadata_is_materialized(metadata):
+    force_metadata_refresh = bool(get_attribute(kwargs, "metadata_refresh", False))
+    if protocol.metadata_is_materialized(metadata) and not force_metadata_refresh:
         logging.info("[%s] reuse nonzero QLI_V2 metadata input", testcase_name)
         return None
     arguments = protocol.load_metadata_inputs(OPERATOR, testcase_name)
@@ -289,7 +293,12 @@ def run(
             arguments_kwargs,
         )
         source = "main API fallback (sidecar unavailable)"
-    logging.info("[%s] build QLI_V2 metadata from %s", testcase_name, source)
+    logging.info(
+        "[%s] build QLI_V2 metadata from %s; forced=%s",
+        testcase_name,
+        source,
+        force_metadata_refresh,
+    )
     generated = run_metadata(arguments, metadata)
     if tuple(metadata.shape) != tuple(generated.shape):
         raise ValueError(

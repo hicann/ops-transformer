@@ -58,7 +58,6 @@ class LightningIndexerV2Spec:
     }
 
     def compare(*outputs, compare_context=None, **kwargs):
-        del kwargs
         testcase_name = (
             None if compare_context is None else compare_context.testcase_name
         )
@@ -71,7 +70,12 @@ class LightningIndexerV2Spec:
             data = inputs_module.rebuild_li_v2_compare_data(compare_context)
             golden_module.set_compare_data(compare_context.testcase_name, data)
         try:
-            return compare_module.compare(*outputs, compare_data=data)
+            return compare_module.compare(
+                *outputs,
+                compare_data=data,
+                compare_context=compare_context,
+                **kwargs,
+            )
         finally:
             golden_module.discard_compare_data(data)
 

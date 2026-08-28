@@ -232,7 +232,8 @@ def run(
     )
     protocol = load_metadata_protocol()
     testcase_name = kwargs.get("testcase_name")
-    if protocol.metadata_is_materialized(metadata):
+    force_metadata_refresh = bool(get_attribute(kwargs, "metadata_refresh", False))
+    if protocol.metadata_is_materialized(metadata) and not force_metadata_refresh:
         logging.info("[%s] reuse nonzero LI_V2 metadata input", testcase_name)
         return None
     arguments = protocol.load_metadata_inputs(OPERATOR, testcase_name)
@@ -251,7 +252,12 @@ def run(
             arguments_kwargs,
         )
         source = "main API fallback (sidecar unavailable)"
-    logging.info("[%s] build LI_V2 metadata from %s", testcase_name, source)
+    logging.info(
+        "[%s] build LI_V2 metadata from %s; forced=%s",
+        testcase_name,
+        source,
+        force_metadata_refresh,
+    )
     generated = run_metadata(arguments, metadata)
     if tuple(metadata.shape) != tuple(generated.shape):
         raise ValueError(
