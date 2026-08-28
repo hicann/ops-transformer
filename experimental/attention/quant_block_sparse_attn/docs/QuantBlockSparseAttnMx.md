@@ -19,7 +19,7 @@
 
 QuantBlockSparseAttnMx 是 QuantBlockSparseAttn 的 MXFP8 全量化路径（`quant_mode=2`），用于 FP8 量化场景下的分块稀疏注意力计算。算子根据 `sparse_indices` 和 `sparse_seq_len` 指定的稀疏块索引，只对每个 Query block 选中的 KV block 执行注意力计算，并支持 PagedAttention 形式的 KV Cache 存储。
 
-与 `quant_mode=1`（FP8）路径相比，MXFP8 全量化路径 Query/Key 采用 **per-token-group** 的量化模式，Value 采用 **per-channel-group** 的量化模式：Q/K 按 D 轴每 32 个元素共享一个 e8m0 scale，V 按 S 轴每 32 个元素共享一个 e8m0 scale，P scale 同样为 e8m0 格式。所有反量化/再量化缩放因子统一使用 e8m0 数据类型，在 Cube/Vector 计算过程中随路完成反量化和再量化，无需额外 FP32 scale 传输。
+与 `quant_mode=1`（FP8）路径相比，MXFP8 全量化路径 Query/Key 采用 **per-token-group** 的量化模式，Value 采用 **per-channel-group** 的量化模式：Q/K 按 D 轴每 32 个元素共享一个 `FLOAT8_E8M0` scale，V 按 S 轴每 32 个元素共享一个 `FLOAT8_E8M0` scale。P scale 支持 `FLOAT8_E8M0` 和 `FLOAT32` 两种数据类型。
 
 计算语义如下：
 
@@ -31,7 +31,7 @@ $$
 O = (quant(P \times p\_scale)\times (V \times v\_descale)) / p\_scale
 $$
 
-其中 `K`、`V` 由 `block_table` 和 `sparse_indices` 从 PageAttention KV Cache 中按块寻址获得。`q_descale`、`k_descale`、`v_descale`、`p_scale` 均为 `FLOAT8_E8M0` 格式，每 32 个数据元素对应一个 scale 值（Q/K 沿 D 轴分组，V 沿 S 轴分组，P 为 per-tensor）。`mask_mode=0` 表示不加 mask，`mask_mode=3` 表示 causal mask。
+其中 `K`、`V` 由 `block_table` 和 `sparse_indices` 从 PageAttention KV Cache 中按块寻址获得。`q_descale`、`k_descale`、`v_descale` 均为 `FLOAT8_E8M0` 格式，每 32 个数据元素对应一个 scale 值（Q/K 沿 D 轴分组，V 沿 S 轴分组）。`p_scale` 为 per-tensor，支持 `FLOAT8_E8M0` 或 `FLOAT32` 数据类型。`mask_mode=0` 表示不加 mask，`mask_mode=3` 表示 causal mask。
 
 ## 接口说明
 
@@ -173,8 +173,8 @@ torch.ops.custom.npu_quant_block_sparse_attn(
       <td>p_scale</td>
       <td>输入</td>
       <td>softmax 概率 FP8 量化缩放因子，per-tensor。</td>
-      <td>允许传空（None 或 shape size == 0），传空时 kernel 侧使用默认值 1.0 进行量化计算；非空传入时 shape 必须为 (1)，数据类型为 FLOAT8_E8M0。</td>
-      <td>FLOAT8_E8M0</td>
+      <td>允许传空（None 或 shape size == 0），传空时 kernel 侧使用默认值 1.0 进行量化计算；非空传入时 shape 必须为 (1)，数据类型支持 FLOAT8_E8M0 或 FLOAT32。</td>
+      <td>FLOAT8_E8M0 或 FLOAT32</td>
       <td>ND</td>
       <td>(1) 或空</td>
     </tr>
@@ -557,7 +557,7 @@ QuantBlockSparseAttnMx 算子约束分为 4 个档位，按约束复杂程度递
 
 | 命名 | 含义 |
 | :---: | :--- |
-| MXFP8全量化 | `query`、`key`、`value` 为 `FLOAT8_E4M3FN`，`q_descale`、`k_descale`、`v_descale`、`p_scale` 为 `FLOAT8_E8M0` |
+| MXFP8全量化 | `query`、`key`、`value` 为 `FLOAT8_E4M3FN`，`q_descale`、`k_descale`、`v_descale` 为 `FLOAT8_E8M0`，`p_scale` 为 `FLOAT8_E8M0` 或 `FLOAT32` |
 | PA_BNBD | Paged Attention KV Cache 排布，逻辑形态为 `[block_num, N2, pa_block_size, D或D_v]`。 |
 | 4D PA | 当前支持的 KV Cache 存储形态；接口传入 4D `key`、4D `value` 和 5D `k_descale`、5D `v_descale` 视图。 |
 | BatchSize | Batch 数，对应 `sparse_indices`、`sparse_seq_len`、`block_table` 的第 1 维。 |
@@ -619,11 +619,12 @@ QuantBlockSparseAttnMx 算子约束分为 4 个档位，按约束复杂程度递
 
 - 单参数约束
 
-  - `q_descale`、`k_descale`、`v_descale`、`p_scale` 数据类型仅支持 `FLOAT8_E8M0`，数据格式仅支持 ND。
+  - `q_descale`、`k_descale`、`v_descale` 数据类型仅支持 `FLOAT8_E8M0`，数据格式仅支持 ND。
+  - `p_scale` 数据类型支持 `FLOAT8_E8M0` 或 `FLOAT32`，数据格式仅支持 ND。
   - `q_descale` 表示 Query per-token-group 反量化缩放，shape 为 4D `(QueryTokenNum, N1, D/64, 2)`，其中末维 2 表示相邻两个 32-group scale 打包，`D/64` 为 D 轴 scale group 对数。
   - `k_descale` 表示 Key per-token-group 反量化缩放，需与 PA KV Cache 的物理 block、KV head、block 内 token 和 D-group 对应，shape 为 5D `(block_num, N2, pa_block_size, D/64, 2)`。
   - `v_descale` 表示 Value per-channel-group 反量化缩放，沿 S 轴每 32 个 token 分一组，shape 为 5D `(block_num, N2, pa_block_size/64, D_v, 2)`。
-  - `p_scale` 表示 softmax 概率 per-tensor 静态量化缩放，允许传空，传空时使用默认值 1.0 进行量化计算；非空传入时 shape 必须为 `(1)`，数据类型为 `FLOAT8_E8M0`。
+  - `p_scale` 表示 softmax 概率 per-tensor 静态量化缩放，允许传空，传空时使用默认值 1.0 进行量化计算；非空传入时 shape 必须为 `(1)`，数据类型为 `FLOAT8_E8M0` 或 `FLOAT32`。
 
 - 存在性约束
 
@@ -634,12 +635,12 @@ QuantBlockSparseAttnMx 算子约束分为 4 个档位，按约束复杂程度递
   - `q_descale` 的 token/head/D-group 维度必须与 `query` 的 `QueryTokenNum`、`N1`、`D` 对齐。
   - `k_descale` 的 PA block、KV head、block 内 token、D-group 维度必须与 `key`、`block_table`、`pa_block_size`、`D` 对齐。
   - `v_descale` 的 PA block、KV head、S-group、D_v 维度必须与 `value`、`block_table`、`pa_block_size`、`D_v` 对齐。
-  - `p_scale` 非空时数值应大于 0；Tiling 阶段无法读取 Tensor 数值，该数值合法性由调用者保证。
+  - `p_scale` 非空时数值应大于 0，且是有限正数；Tiling 阶段无法读取 Tensor 数值，该数值合法性由调用者保证。
 
 
 - 特性交叉约束
 
-  - `quant_mode=2` 时，`q_descale`、`k_descale`、`v_descale` 、`p_scale`数据类型为 `FLOAT8_E8M0`。
+  - `quant_mode=2` 时，`q_descale`、`k_descale`、`v_descale` 数据类型为 `FLOAT8_E8M0`；`p_scale` 数据类型为 `FLOAT8_E8M0` 或 `FLOAT32`。
 
 #### 稀疏索引参数组
 

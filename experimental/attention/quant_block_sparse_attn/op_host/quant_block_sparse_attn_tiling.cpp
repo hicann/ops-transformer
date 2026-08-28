@@ -67,7 +67,9 @@ QuantBlockSparseAttnMxStrideParams MakePaBnbdStride(uint32_t n2Size, uint32_t bl
 
 } // namespace
 
-QuantBlockSparseAttnTiling::QuantBlockSparseAttnTiling(gert::TilingContext *context) : context_(context) {}
+QuantBlockSparseAttnTiling::QuantBlockSparseAttnTiling(gert::TilingContext *context)
+    : context_(context)
+{}
 
 void QuantBlockSparseAttnTiling::FillPaParams()
 {
@@ -244,11 +246,18 @@ void QuantBlockSparseAttnTiling::FillMxTilingData()
     scaleParams.valueScaleBlockSize = valueScaleBlockSize;
     scaleParams.valueScaleDSize = valueScaleDSize;
     uint32_t pScaleShapeSize = 0U;
+    uint8_t pScaleDtype = MX_PSCALE_DTYPE_E8M0;
     if (info.opParamInfo.pScale.shape != nullptr) {
         const int64_t shapeSize = info.opParamInfo.pScale.shape->GetStorageShape().GetShapeSize();
         pScaleShapeSize = (shapeSize > 0) ? static_cast<uint32_t>(shapeSize) : 0U;
+        if (pScaleShapeSize > 0U && info.opParamInfo.pScale.desc != nullptr) {
+            if (info.opParamInfo.pScale.desc->GetDataType() == ge::DT_FLOAT) {
+                pScaleDtype = MX_PSCALE_DTYPE_FP32;
+            }
+        }
     }
     scaleParams.pScaleShapeSize = pScaleShapeSize;
+    scaleParams.pScaleDtype = pScaleDtype;
     scaleParams.queryQuantMode = QBSA_MXFP8_PER_TOKEN_GROUP_MODE;
     scaleParams.keyAntiquantMode = QBSA_MXFP8_PER_TOKEN_GROUP_MODE;
     scaleParams.valueAntiquantMode = QBSA_MXFP8_PER_CHANNEL_GROUP_MODE;
@@ -275,7 +284,10 @@ void QuantBlockSparseAttnTiling::CalcTilingKey()
     }
 }
 
-void QuantBlockSparseAttnTiling::CalcWorkspaceSize() { workspaceSize_ = 0; }
+void QuantBlockSparseAttnTiling::CalcWorkspaceSize()
+{
+    workspaceSize_ = 0;
+}
 
 void QuantBlockSparseAttnTiling::PrintAllTilingData()
 {

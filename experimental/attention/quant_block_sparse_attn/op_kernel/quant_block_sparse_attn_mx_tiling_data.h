@@ -19,6 +19,8 @@
 
 namespace optiling {
 // MX 使用独立 struct tiling data，与 FP8 路径隔离。
+constexpr uint8_t MX_PSCALE_DTYPE_E8M0 = 0U;
+constexpr uint8_t MX_PSCALE_DTYPE_FP32 = 1U;
 struct QuantBlockSparseAttnMxStrideParams {
     uint64_t bnStride = 0;
     uint64_t n2Stride = 0;
@@ -105,6 +107,8 @@ struct QuantBlockSparseAttnMxScaleParams {
     uint32_t valueScaleBlockSize = 0;
     uint32_t valueScaleDSize = 0;
     uint32_t pScaleShapeSize = 0;
+    uint8_t pScaleDtype = 0; // 0=E8M0, 1=FP32
+    uint8_t reserve[3] = {0, 0, 0};
     uint32_t queryQuantMode = 0;
     uint32_t keyAntiquantMode = 0;
     uint32_t valueAntiquantMode = 0;

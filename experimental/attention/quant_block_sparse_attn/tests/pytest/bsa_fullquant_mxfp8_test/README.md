@@ -304,4 +304,5 @@ python experimental/attention/quant_block_sparse_attn/tests/pytest/bsa_fullquant
 - `s2_base_size` 是 golden 划分 C1 子块的必需运行字段，当前 MXFP8 模板固定为 `512`。
 - `sparse_q_block_size` 必须等于 `sparse_kv_block_size`；`block_size`（PA 物理块大小）必须是 `sparse_kv_block_size` 的正整数倍（支持 `block_size = m * sparse_kv_block_size`）。
 - `s1_base_size` 仅作为覆盖场景说明保留，不参与 pytest 计算或校验。
+- `p_scale_type` 仅支持 `float8_e8m0fnu` 或 `float32` 的输入，传入其他值或不传会默认为 `float8_e8m0fnu`。
 - CSV 可直接扩展到多行；case 名称在一个或多个输入文件之间都不能重复。

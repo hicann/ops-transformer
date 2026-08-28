@@ -1408,11 +1408,9 @@ def generate_mxfp8_inputs(case=None, max_block_per_batch=None, atten_mask_shape=
         max_block_per_batch=case.get("max_block_per_batch"),
     )
     p_scale_value = case.get("p_scale_value")
+    p_scale_type = case.get("p_scale_type", "float8_e8m0fnu")
     p_scale = None
     if p_scale_value is not None:
-        # P scale has the same single source of truth as Q/K/V descale: encode
-        # once to E8M0 here.  CPU golden decodes these exact bytes to FP32;
-        # NPU consumes the bytes directly, so arbitrary inputs cannot diverge.
         p_scale_fp32 = torch.tensor([float(p_scale_value)], dtype=torch.float32)
         if not bool(torch.isfinite(p_scale_fp32).all()) or bool(
             (p_scale_fp32 <= 0).any()
@@ -1420,10 +1418,13 @@ def generate_mxfp8_inputs(case=None, max_block_per_batch=None, atten_mask_shape=
             raise ValueError(
                 "P scale input must be positive and finite after FP32 conversion"
             )
-        p_scale = fp32_to_e8m0fnu_safe(
-            p_scale_fp32,
-            "P scale input",
-        )
+        if p_scale_type == "float32":
+            p_scale = p_scale_fp32
+        else:
+            p_scale = fp32_to_e8m0fnu_safe(
+                p_scale_fp32,
+                "P scale input",
+            )
     atten_mask = _build_causal_mask(atten_mask_shape)
 
     return {
@@ -2097,8 +2098,11 @@ def cpu_mxfp8_golden(
     softmax_scale = float(CASE["softmax_scale"])
     p_scale_value = 1.0
     if p_scale is not None and p_scale.numel() > 0:
-        p_scale_fp32 = e8m0fnu_to_fp32(p_scale, "CPU P scale")
-        p_scale_value = float(p_scale_fp32.reshape(-1)[0].item())
+        if p_scale.dtype == torch.float32:
+            p_scale_value = float(p_scale.reshape(-1)[0].item())
+        else:
+            p_scale_fp32 = e8m0fnu_to_fp32(p_scale, "CPU P scale")
+            p_scale_value = float(p_scale_fp32.reshape(-1)[0].item())
     ln_p_scale = 0.0 if p_scale_value == 1.0 else math.log(p_scale_value)
 
     attention_out = torch.zeros((total_q, n1, head_dim), dtype=torch.float32)
@@ -2898,11 +2902,17 @@ def npu_mxfp8_fa(
         p_scale_npu = torch.empty((0,), dtype=torch.uint8).view(SCALE_DTYPE).npu()
         logger.info("[NPU] P scale=empty tensor (shape size 0, default 1.0)")
     else:
-        p_scale_e8m0 = fp32_to_e8m0fnu_safe(p_scale, "P scale")
-        p_scale_npu = p_scale_e8m0.npu()
-        logger.info(
-            "[NPU] P scale dtype=%s, shape=%s", p_scale_e8m0.dtype, p_scale_e8m0.shape
-        )
+        if p_scale.dtype == torch.float32:
+            p_scale_npu = p_scale.npu()
+            logger.info("[NPU] P scale dtype=float32, shape=%s", p_scale_npu.shape)
+        else:
+            p_scale_e8m0 = fp32_to_e8m0fnu_safe(p_scale, "P scale")
+            p_scale_npu = p_scale_e8m0.npu()
+            logger.info(
+                "[NPU] P scale dtype=%s, shape=%s",
+                p_scale_e8m0.dtype,
+                p_scale_e8m0.shape,
+            )
     mask_arg = None if atten_mask is None else atten_mask.npu()
 
     if block_table_torch is None:
@@ -3039,16 +3049,19 @@ def _cache_case_name(case_id, case_name_arg, total_case_num):
 
 
 def _cpu_golden_cache_name(case_name, p_scale, use_quant_matmul):
-    """Key CPU golden by matmul backend and the effective E8M0 P-scale byte.
+    """Key CPU golden by matmul backend and the effective P-scale value.
 
     Including the backend prevents CPU torch.matmul and npu_quant_matmul
     golden outputs from reusing each other's cache. It also intentionally
     avoids pre-fix cache files whose key did not encode the backend.
     """
     backend = "npu_quant_matmul" if use_quant_matmul else "torch_matmul"
-    cache_prefix = f"{case_name}_{backend}_p_scale_e8m0"
+    cache_prefix = f"{case_name}_{backend}_p_scale"
     if p_scale is None or p_scale.numel() == 0:
         return f"{cache_prefix}_default"
+    if p_scale.dtype == torch.float32:
+        p_scale_fp32_val = float(p_scale.reshape(-1)[0].item())
+        return f"{cache_prefix}_fp32_{p_scale_fp32_val}"
     p_scale_e8m0 = fp32_to_e8m0fnu_safe(p_scale, "CPU cache P scale")
     raw = p_scale_e8m0.contiguous().view(torch.uint8).reshape(-1)
     if raw.numel() != 1:
@@ -3309,9 +3322,9 @@ def run_one_case(
                 q_lengths, kv_lengths
             )
 
-    # Normalize legacy FP32 input caches as well. From this point onward CPU
-    # and NPU receive the exact same E8M0 P-scale tensor.
-    if p_scale is not None and p_scale.numel() > 0:
+    # Normalize E8M0 P-scale input to ensure CPU and NPU receive the same tensor.
+    # FP32 P-scale is passed through as-is.
+    if p_scale is not None and p_scale.numel() > 0 and p_scale.dtype != torch.float32:
         p_scale = fp32_to_e8m0fnu_safe(p_scale, "Shared P scale")
     cpu_cache_name = _cpu_golden_cache_name(case_name, p_scale, use_quant_matmul)
     logger.info("[CACHE] CPU golden key=%s", cpu_cache_name)
