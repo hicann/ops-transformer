@@ -19,20 +19,21 @@
 #include <vector>
 #include <acl/acl.h>
 #include <hccl/hccl.h>
+#include "aclnn/opdev/fp16_t.h"
 #include "aclnnop/aclnn_matmul_allto_all.h"
 
-int ndev = 2;
+constexpr int g_ndev = 2;
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
@@ -78,7 +79,7 @@ int launchOneThreadMatmulAlltoAll(Args &args)
     int ret;
     ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetCurrentContext failed. ERROR: %d\n", ret); return ret);
-    char hcom_name[128];
+    char hcom_name[128] = {0};
     ret = HcclGetCommName(args.hcclComm, hcom_name);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetCommName failed. ret = %d \n", ret); return -1);
     LOG_PRINT("[INFO] rank %d hcom: %s stream: %p, context : %p\n", args.rankId, hcom_name, args.stream, args.context);
@@ -86,7 +87,7 @@ int launchOneThreadMatmulAlltoAll(Args &args)
     std::vector<int64_t> x1Shape = {32, 64};
     std::vector<int64_t> x2Shape = {64, 128};
     std::vector<int64_t> biasShape = {128};
-    std::vector<int64_t> outShape = {32 * ndev, 128 / ndev};
+    std::vector<int64_t> outShape = {32 * g_ndev, 128 / g_ndev};
     void *x1DeviceAddr = nullptr;
     void *x2DeviceAddr = nullptr;
     void *biasDeviceAddr = nullptr;
@@ -106,10 +107,10 @@ int launchOneThreadMatmulAlltoAll(Args &args)
     long long x2ShapeSize = GetShapeSize(x2Shape);
     long long biasShapeSize = GetShapeSize(biasShape);
     long long outShapeSize = GetShapeSize(outShape);
-    std::vector<int16_t> x1HostData(x1ShapeSize, 1);
-    std::vector<int16_t> x2HostData(x2ShapeSize, 1);
-    std::vector<int16_t> biasHostData(biasShapeSize, 1);
-    std::vector<int16_t> outHostData(outShapeSize, 0);
+    std::vector<op::fp16_t> x1HostData(x1ShapeSize, 1);
+    std::vector<op::fp16_t> x2HostData(x2ShapeSize, 1);
+    std::vector<op::fp16_t> biasHostData(biasShapeSize, 1);
+    std::vector<op::fp16_t> outHostData(outShapeSize, 0);
     // 创建 tensor
     ret = CreateAclTensor(x1HostData, x1Shape, &x1DeviceAddr, aclDataType::ACL_FLOAT16, &x1);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -177,24 +178,24 @@ int main(int argc, char *argv[])
 {
     // 本样例基于Atlas A5实现，必须在Atlas A5上运行
     int ret;
-    int32_t devices[ndev];
-    for (int i = 0; i < ndev; i++) {
+    int32_t devices[g_ndev];
+    for (int i = 0; i < g_ndev; i++) {
         devices[i] = i;
     }
     HcclComm comms[128];
     ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
     // 初始化集合通信域
-    for (int i = 0; i < ndev; i++) {
+    for (int i = 0; i < g_ndev; i++) {
         ret = aclrtSetDevice(devices[i]);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetDevice failed. ERROR: %d\n", ret); return ret);
     }
-    ret = HcclCommInitAll(ndev, devices, comms);
+    ret = HcclCommInitAll(g_ndev, devices, comms);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("HcclCommInitAll failed. ERROR: %d\n", ret); return ret);
-    Args args[ndev];
-    aclrtStream stream[ndev];
-    aclrtContext context[ndev];
-    for (uint32_t rankId = 0; rankId < ndev; rankId++) {
+    Args args[g_ndev];
+    aclrtStream stream[g_ndev];
+    aclrtContext context[g_ndev];
+    for (uint32_t rankId = 0; rankId < g_ndev; rankId++) {
         ret = aclrtSetDevice(rankId);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetDevice failed. ERROR: %d\n", ret); return ret);
         ret = aclrtCreateContext(&context[rankId], rankId);
@@ -203,15 +204,15 @@ int main(int argc, char *argv[])
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtCreateStream failed. ERROR: %d\n", ret); return ret);
     }
     // 启动多线程
-    std::vector<std::unique_ptr<std::thread>> threads(ndev);
-    for (uint32_t rankId = 0; rankId < ndev; rankId++) {
+    std::vector<std::unique_ptr<std::thread>> threads(g_ndev);
+    for (uint32_t rankId = 0; rankId < g_ndev; rankId++) {
         args[rankId].rankId = rankId;
         args[rankId].hcclComm = comms[rankId];
         args[rankId].stream = stream[rankId];
         args[rankId].context = context[rankId];
         threads[rankId].reset(new (std::nothrow) std::thread(&launchOneThreadMatmulAlltoAll, std::ref(args[rankId])));
     }
-    for (uint32_t rankId = 0; rankId < ndev; rankId++) {
+    for (uint32_t rankId = 0; rankId < g_ndev; rankId++) {
         threads[rankId]->join();
     }
     aclFinalize();

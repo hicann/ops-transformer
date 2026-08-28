@@ -1,13 +1,12 @@
 /**
- * This program is free software, you can redistribute it and/or modify.
- * Copyright (c) Huawei Technologies Co., Ltd. 2025-2026. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING
-BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file test_aclnn_allto_all_quant_matmul.cpp
@@ -20,20 +19,21 @@ BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULA
 #include <vector>
 #include <acl/acl.h>
 #include <hccl/hccl.h>
+#include "aclnn/opdev/fp16_t.h"
 #include "aclnnop/aclnn_allto_all_quant_matmul.h"
 
-int ndev = 2;
+constexpr int g_ndev = 2;
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
@@ -85,11 +85,11 @@ int launchOneThreadAlltoAllQuantMatmul(Args &args)
     LOG_PRINT("[INFO] rank %d hcom: %s stream: %p, context : %p\n", args.rankId, hcom_name, args.stream, args.context);
 
     std::vector<int64_t> x1Shape = {32, 64};
-    std::vector<int64_t> x2Shape = {64 * ndev, 128};
+    std::vector<int64_t> x2Shape = {64 * g_ndev, 128};
     std::vector<int64_t> biasShape = {128};
     std::vector<int64_t> x2ScaleShape = {128};
-    std::vector<int64_t> outShape = {32 / ndev, 128};
-    std::vector<int64_t> allToAllOutShape = {32 / ndev, 64 * ndev};
+    std::vector<int64_t> outShape = {32 / g_ndev, 128};
+    std::vector<int64_t> allToAllOutShape = {32 / g_ndev, 64 * g_ndev};
     void *x1DeviceAddr = nullptr;
     void *x2DeviceAddr = nullptr;
     void *biasDeviceAddr = nullptr;
@@ -125,12 +125,12 @@ int launchOneThreadAlltoAllQuantMatmul(Args &args)
     long long x2ScaleShapeSize = GetShapeSize(x2ScaleShape);
     long long outShapeSize = GetShapeSize(outShape);
     long long allToAllOutShapeSize = GetShapeSize(allToAllOutShape);
-    std::vector<int16_t> x1HostData(x1ShapeSize, 1);
-    std::vector<int16_t> x2HostData(x2ShapeSize, 1);
-    std::vector<int16_t> biasHostData(biasShapeSize, 1);
-    std::vector<int16_t> x2ScaleHostData(x2ScaleShapeSize, 1);
-    std::vector<int16_t> outHostData(outShapeSize, 0);
-    std::vector<int16_t> allToAllOutHostData(allToAllOutShapeSize, 0);
+    std::vector<op::fp16_t> x1HostData(x1ShapeSize, 1);
+    std::vector<int8_t> x2HostData(x2ShapeSize, 1);
+    std::vector<float> biasHostData(biasShapeSize, 1);
+    std::vector<float> x2ScaleHostData(x2ScaleShapeSize, 1);
+    std::vector<float> outHostData(outShapeSize, 0);
+    std::vector<op::fp16_t> allToAllOutHostData(allToAllOutShapeSize, 0);
     // 创建 tensor
     ret = CreateAclTensor(x1HostData, x1Shape, &x1DeviceAddr, aclDataType::ACL_FLOAT16, &x1);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -192,8 +192,14 @@ int launchOneThreadAlltoAllQuantMatmul(Args &args)
     if (biasDeviceAddr != nullptr) {
         aclrtFree(biasDeviceAddr);
     }
+    if (x2ScaleDeviceAddr != nullptr) {
+        aclrtFree(x2ScaleDeviceAddr);
+    }
     if (outDeviceAddr != nullptr) {
         aclrtFree(outDeviceAddr);
+    }
+    if (allToAllOutDeviceAddr != nullptr) {
+        aclrtFree(allToAllOutDeviceAddr);
     }
     if (workspaceSize > 0) {
         aclrtFree(workspaceAddr);
@@ -209,23 +215,23 @@ int main(int argc, char *argv[])
 {
     // 本样例基于Ascend 950PR/Ascend 950DT实现，必须在Ascend 950PR/Ascend 950DT上运行
     int ret = aclInit(nullptr);
-    int32_t devices[ndev];
-    for (int i = 0; i < ndev; i++) {
+    int32_t devices[g_ndev];
+    for (int i = 0; i < g_ndev; i++) {
         devices[i] = i;
     }
     HcclComm comms[128];
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
     // 初始化集合通信域
-    for (int i = 0; i < ndev; i++) {
+    for (int i = 0; i < g_ndev; i++) {
         ret = aclrtSetDevice(devices[i]);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetDevice failed. ERROR: %d\n", ret); return ret);
     }
-    ret = HcclCommInitAll(ndev, devices, comms);
+    ret = HcclCommInitAll(g_ndev, devices, comms);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("HcclCommInitAll failed. ERROR: %d\n", ret); return ret);
-    Args args[ndev];
-    aclrtStream stream[ndev];
-    aclrtContext context[ndev];
-    for (uint32_t rankId = 0; rankId < ndev; rankId++) {
+    Args args[g_ndev];
+    aclrtStream stream[g_ndev];
+    aclrtContext context[g_ndev];
+    for (uint32_t rankId = 0; rankId < g_ndev; rankId++) {
         ret = aclrtSetDevice(rankId);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetDevice failed. ERROR: %d\n", ret); return ret);
         ret = aclrtCreateContext(&context[rankId], rankId);
@@ -234,8 +240,8 @@ int main(int argc, char *argv[])
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtCreateStream failed. ERROR: %d\n", ret); return ret);
     }
     // 启动多线程
-    std::vector<std::unique_ptr<std::thread>> threads(ndev);
-    for (uint32_t rankId = 0; rankId < ndev; rankId++) {
+    std::vector<std::unique_ptr<std::thread>> threads(g_ndev);
+    for (uint32_t rankId = 0; rankId < g_ndev; rankId++) {
         args[rankId].rankId = rankId;
         args[rankId].hcclComm = comms[rankId];
         args[rankId].stream = stream[rankId];
@@ -243,7 +249,7 @@ int main(int argc, char *argv[])
         threads[rankId].reset(new (std::nothrow)
                                   std::thread(&launchOneThreadAlltoAllQuantMatmul, std::ref(args[rankId])));
     }
-    for (uint32_t rankId = 0; rankId < ndev; rankId++) {
+    for (uint32_t rankId = 0; rankId < g_ndev; rankId++) {
         threads[rankId]->join();
     }
     aclFinalize();
