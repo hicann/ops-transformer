@@ -35,7 +35,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAB::DoOpTiling()
     }
     int64_t typeSize = ge::GetSizeByDataType(dtype_);
     if (typeSize == 0) {
-        OP_LOGI("InplacePartialRopeRegBaseTilingClassAB DoOpTiling error, typeSize == 0");
+        OP_LOGE(context_->GetNodeName(), "InplacePartialRopeRegBaseTilingClassAB DoOpTiling error, typeSize == 0");
         return ge::GRAPH_FAILED;
     }
     dAlign_ = CeilAlign(sliceLength_ / dSplitCoef_, blockSize_ / typeSize) * dSplitCoef_;
@@ -44,7 +44,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAB::DoOpTiling()
     bool isMixedPrecision = (dtype_ == ge::DT_BF16 || dtype_ == ge::DT_FLOAT16) && cosDtype == ge::DT_FLOAT;
     int64_t cosTypeSize = ge::GetSizeByDataType(cosDtype);
     if (cosTypeSize == 0) {
-        OP_LOGI("InplacePartialRopeRegBaseTilingClassAB DoOpTiling error, cosTypeSize == 0");
+        OP_LOGE(context_->GetNodeName(), "InplacePartialRopeRegBaseTilingClassAB DoOpTiling error, cosTypeSize == 0");
         return ge::GRAPH_FAILED;
     }
     int64_t dAlignCosSin = CeilAlign(sliceLength_ / dSplitCoef_, blockSize_ / cosTypeSize) * dSplitCoef_;
@@ -55,7 +55,8 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAB::DoOpTiling()
 
     if (bs <= int64_t(aicoreParams_.blockDim) / CONST_TWO) {
         if (blockNumBS_ == 0) {
-            OP_LOGI("InplacePartialRopeRegBaseTilingClassAB ComputeUbFactor error, blockNumBS_ == 0");
+            OP_LOGE(context_->GetNodeName(),
+                    "InplacePartialRopeRegBaseTilingClassAB ComputeUbFactor error, blockNumBS_ == 0");
             return ge::GRAPH_FAILED;
         }
         blockNumN_ = aicoreParams_.blockDim / blockNumBS_;
@@ -93,8 +94,7 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAB::DoOpTiling()
         int64_t baseBufferSize = dSizeX;
         baseBlockInUb =
             FloorAlign(static_cast<int64_t>(aicoreParams_.ubSize / CONST_TWO / DB_FLAG), blockSize_) / baseBufferSize;
-        OP_CHECK_IF(baseBlockInUb < 1,
-                    OP_LOGI(context_->GetNodeName(), "ubSize can't load 8 d size, d = %ld.", d_),
+        OP_CHECK_IF(baseBlockInUb < 1, OP_LOGI(context_->GetNodeName(), "ubSize can't load 8 d size, d = %ld.", d_),
                     return ge::GRAPH_FAILED);
 
         ubFactorN_ = std::min(blockFactorN_, baseBlockInUb - 1);
@@ -136,31 +136,18 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAB::PostTiling()
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
 
-    OP_LOGI(context_->GetNodeName(),
-            "InplacePartialRopeRegBaseTilingClassAB tilingData is B: %ld, CosB: %ld, S: %ld, D: %ld, N: %ld, kAlign: %ld, "
-            "dSplitCoef: %ld, BlockNumBS: %ld, BlockFactorBS: %ld, BlockTailBS: %ld, BlockNumN: %ld, "
-            "BlockFactorN: %ld, BlockTailN: %ld, UBFactorBS: %ld, UBFactorN: %ld, RotaryMode: %ld, TilingKey: %ld, "
-            "sliceStart is %ld, sliceEnd is %ld, sliceLength is %ld",
-            tilingData_.get_B(),
-            tilingData_.get_CosB(),
-            tilingData_.get_S(),
-            tilingData_.get_D(),
-            tilingData_.get_N(),
-            tilingData_.get_dAlign(),
-            tilingData_.get_dSplitCoef(),
-            tilingData_.get_blockNumBS(),
-            tilingData_.get_blockFactorBS(),
-            tilingData_.get_blockTailBS(),
-            tilingData_.get_blockNumN(),
-            tilingData_.get_blockFactorN(),
-            tilingData_.get_blockTailN(),
-            tilingData_.get_ubFactorBS(),
-            tilingData_.get_ubFactorN(),
-            tilingData_.get_rotaryMode(),
-            GetTilingKey(),
-            tilingData_.get_sliceStart(),
-            tilingData_.get_sliceEnd(),
-            tilingData_.get_sliceLength());
+    OP_LOGI(
+        context_->GetNodeName(),
+        "InplacePartialRopeRegBaseTilingClassAB tilingData is B: %ld, CosB: %ld, S: %ld, D: %ld, N: %ld, kAlign: %ld, "
+        "dSplitCoef: %ld, BlockNumBS: %ld, BlockFactorBS: %ld, BlockTailBS: %ld, BlockNumN: %ld, "
+        "BlockFactorN: %ld, BlockTailN: %ld, UBFactorBS: %ld, UBFactorN: %ld, RotaryMode: %ld, TilingKey: %ld, "
+        "sliceStart is %ld, sliceEnd is %ld, sliceLength is %ld",
+        tilingData_.get_B(), tilingData_.get_CosB(), tilingData_.get_S(), tilingData_.get_D(), tilingData_.get_N(),
+        tilingData_.get_dAlign(), tilingData_.get_dSplitCoef(), tilingData_.get_blockNumBS(),
+        tilingData_.get_blockFactorBS(), tilingData_.get_blockTailBS(), tilingData_.get_blockNumN(),
+        tilingData_.get_blockFactorN(), tilingData_.get_blockTailN(), tilingData_.get_ubFactorBS(),
+        tilingData_.get_ubFactorN(), tilingData_.get_rotaryMode(), GetTilingKey(), tilingData_.get_sliceStart(),
+        tilingData_.get_sliceEnd(), tilingData_.get_sliceLength());
 
     return ge::GRAPH_SUCCESS;
 }

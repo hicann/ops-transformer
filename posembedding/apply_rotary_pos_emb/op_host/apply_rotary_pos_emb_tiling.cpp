@@ -115,12 +115,13 @@ struct ApplyRotaryPosEmbParams {
     int64_t mask = 0;
     int64_t tilingKey = 0;
     int64_t blockMoveQ = 0;
-    platform_ascendc::SocVersion  socVersion = platform_ascendc::SocVersion::ASCEND910B;
+    platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND910B;
 };
 
 class ApplyRotaryPosEmbTiling {
 public:
-    explicit ApplyRotaryPosEmbTiling(gert::TilingContext *context) : context_(context) {};
+    explicit ApplyRotaryPosEmbTiling(gert::TilingContext *context)
+        : context_(context) {};
     ge::graphStatus GetInputParams(gert::TilingContext *context, ApplyRotaryPosEmbParams &params);
     ge::graphStatus CheckParams(gert::TilingContext *context, ApplyRotaryPosEmbParams &params);
     ge::graphStatus ComputeAB(gert::TilingContext *context, ApplyRotaryPosEmbParams &params);
@@ -142,22 +143,22 @@ ge::graphStatus ApplyRotaryPosEmbTiling::GetInputParams(gert::TilingContext *con
     params.qDims = qShape.GetDimNum();
     if (params.qDims != DIM_4 && params.qDims != DIM_3) {
         std::string dimStr = std::to_string(params.qDims) + "D";
-        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "query",
-            dimStr.c_str(), "3D or 4D");
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "query", dimStr.c_str(), "3D or 4D");
         return ge::GRAPH_FAILED;
     }
-    params.qDim0 = params.qDims == DIM_4 ? qShape.GetDim(DIM_0) : 1;//BSND格式下代表B维度的大小，TND格式下为1;
-    params.qDim1 = params.qDims == DIM_4 ? qShape.GetDim(DIM_1) : qShape.GetDim(DIM_0);// BSND格式下代表S维度的大小,TND格式下代表T维度的大小;
-    params.qcNum = params.qDims == DIM_4 ? qShape.GetDim(DIM_2) : qShape.GetDim(DIM_1);// N;
-    params.qDim3 = params.qDims == DIM_4 ? qShape.GetDim(DIM_3) : qShape.GetDim(DIM_2);// D;
+    params.qDim0 = params.qDims == DIM_4 ? qShape.GetDim(DIM_0) : 1; // BSND格式下代表B维度的大小，TND格式下为1;
+    params.qDim1 = params.qDims == DIM_4 ? qShape.GetDim(DIM_1) :
+                                           qShape.GetDim(DIM_0); // BSND格式下代表S维度的大小,TND格式下代表T维度的大小;
+    params.qcNum = params.qDims == DIM_4 ? qShape.GetDim(DIM_2) : qShape.GetDim(DIM_1); // N;
+    params.qDim3 = params.qDims == DIM_4 ? qShape.GetDim(DIM_3) : qShape.GetDim(DIM_2); // D;
     auto k = context->GetInputTensor(INPUT1);
     OP_CHECK_NULL_WITH_CONTEXT(context, k);
     gert::Shape kShape = k->GetStorageShape();
     int64_t kDims = kShape.GetDimNum();
     if (kDims != params.qDims) {
         std::string dimMsg = std::to_string(kDims) + " and " + std::to_string(params.qDims);
-        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context->GetNodeName(), "key and query",
-            dimMsg.c_str(), "The shape dims of input key and input query should be the same");
+        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context->GetNodeName(), "key and query", dimMsg.c_str(),
+                                                  "The shape dims of input key and input query should be the same");
         return ge::GRAPH_FAILED;
     }
     params.kDim0 = kDims == DIM_4 ? kShape.GetDim(DIM_0) : 1;
@@ -170,8 +171,8 @@ ge::graphStatus ApplyRotaryPosEmbTiling::GetInputParams(gert::TilingContext *con
     int64_t cosDims = cosShape.GetDimNum();
     if (cosDims != params.qDims) {
         std::string dimMsg = std::to_string(cosDims) + " and " + std::to_string(params.qDims);
-        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context->GetNodeName(), "cos and query",
-            dimMsg.c_str(), "The shape dims of input cos and input query should be the same");
+        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context->GetNodeName(), "cos and query", dimMsg.c_str(),
+                                                  "The shape dims of input cos and input query should be the same");
         return ge::GRAPH_FAILED;
     }
     params.cosDim0 = cosDims == DIM_4 ? cosShape.GetDim(DIM_0) : 1;
@@ -184,23 +185,22 @@ ge::graphStatus ApplyRotaryPosEmbTiling::GetInputParams(gert::TilingContext *con
     int64_t sinDims = sinShape.GetDimNum();
     if (sinDims != DIM_4 && sinDims != DIM_3) {
         std::string dimStr = std::to_string(sinDims) + "D";
-        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "sin",
-            dimStr.c_str(), "3D or 4D");
+        OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "sin", dimStr.c_str(), "3D or 4D");
         return ge::GRAPH_FAILED;
     }
     if (cosShape != sinShape) {
         std::string shapeMsg = ToString(cosShape) + " and " + ToString(sinShape);
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "cos and sin",
-            shapeMsg.c_str(), "The shapes of input cos and input sin should be the same");
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "cos and sin", shapeMsg.c_str(),
+                                               "The shapes of input cos and input sin should be the same");
         return ge::GRAPH_FAILED;
     }
     if (qShape.GetShapeSize() == 0 || kShape.GetShapeSize() == 0 || cosShape.GetShapeSize() == 0 ||
         sinShape.GetShapeSize() == 0) {
-        std::string shapeSizeMsg = 
-            std::to_string(qShape.GetShapeSize()) + ", " + std::to_string(kShape.GetShapeSize()) + 
-            ", " + std::to_string(cosShape.GetShapeSize()) + " and " + std::to_string(sinShape.GetShapeSize());
+        std::string shapeSizeMsg =
+            std::to_string(qShape.GetShapeSize()) + ", " + std::to_string(kShape.GetShapeSize()) + ", " +
+            std::to_string(cosShape.GetShapeSize()) + " and " + std::to_string(sinShape.GetShapeSize());
         OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(context->GetNodeName(), "query, key, cos and sin",
-            shapeSizeMsg.c_str(), "All inputs must be non-empty tensors");
+                                                   shapeSizeMsg.c_str(), "All inputs must be non-empty tensors");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -217,21 +217,20 @@ ge::graphStatus ApplyRotaryPosEmbTiling::CheckParams(gert::TilingContext *contex
     ApplyRotaryPosEmbLayout layout = static_cast<ApplyRotaryPosEmbLayout>(*layoutAttr);
     if (layout != ApplyRotaryPosEmbLayout::BSND && layout != ApplyRotaryPosEmbLayout::TND) {
         std::string layoutStr = std::to_string(static_cast<int64_t>(layout));
-        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "layout",
-            layoutStr.c_str(), "1 or 4");
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "layout", layoutStr.c_str(), "1 or 4");
         return ge::GRAPH_FAILED;
     }
     if (layout == ApplyRotaryPosEmbLayout::BSND && params.qDims != DIM_4) {
         std::string dimStr = std::to_string(params.qDims) + "D";
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query",
-            dimStr.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            context->GetNodeName(), "query", dimStr.c_str(),
             "The shape dims of input query must be 4 when the attr layout is 1 (BSND)");
         return ge::GRAPH_FAILED;
     }
     if (layout == ApplyRotaryPosEmbLayout::TND && params.qDims != DIM_3) {
         std::string dimStr = std::to_string(params.qDims) + "D";
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query",
-            dimStr.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            context->GetNodeName(), "query", dimStr.c_str(),
             "The shape dims of input query must be 3 when the attr layout is 4 (TND)");
         return ge::GRAPH_FAILED;
     }
@@ -246,13 +245,14 @@ ge::graphStatus ApplyRotaryPosEmbTiling::CheckParams(gert::TilingContext *contex
     auto cos = context->GetInputTensor(INPUT2);
     OP_CHECK_NULL_WITH_CONTEXT(context, cos);
     gert::Shape cosShape = cos->GetStorageShape();
-    
+
     if ((params.kDim0 != params.qDim0) || (params.cosDim0 != params.kDim0)) {
         std::string shapeMsg = ToString(qShape) + ", " + ToString(kShape) + " and " + ToString(cosShape);
-        std::string reasonMsg = "The batches of input query, key and cos should be equal, "
+        std::string reasonMsg =
+            "The batches of input query, key and cos should be equal, "
             "where batch is 1 when the attr layout is 4 (TND), otherwise is the 0th dim of its shape";
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "query, key and cos",
-            shapeMsg.c_str(), reasonMsg.c_str());
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "query, key and cos", shapeMsg.c_str(),
+                                               reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
     if ((params.kDim1 != params.qDim1) || (params.cosDim1 != params.kDim1)) {
@@ -260,37 +260,35 @@ ge::graphStatus ApplyRotaryPosEmbTiling::CheckParams(gert::TilingContext *contex
         std::string reasonMsg =
             "The 1st dims of input query, key and cos should be equal when the attr layout is 1 (BSND), "
             "and the 0th dims of input query, key and cos should be equal when the attr layout is 4 (TND)";
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "query, key and cos",
-            shapeMsg.c_str(), reasonMsg.c_str());
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "query, key and cos", shapeMsg.c_str(),
+                                               reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
     if (params.cosDim3 != LASTDIM_64 && params.cosDim3 != LASTDIM_128) {
         std::string shapeStr = ToString(cosShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "cos",
-            shapeStr.c_str(), "The last dim of input cos should be 64 or 128");
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "cos", shapeStr.c_str(),
+                                              "The last dim of input cos should be 64 or 128");
         return ge::GRAPH_FAILED;
     }
     if (params.qDim3 < params.cosDim3) {
         std::string shapeMsg = ToString(qShape) + " and " + ToString(cosShape);
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "query and cos",
-            shapeMsg.c_str(),
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            context->GetNodeName(), "query and cos", shapeMsg.c_str(),
             "The last dim of input query should be greater than or equal to the last dim of input cos");
         return ge::GRAPH_FAILED;
     }
     if (params.qDim3 != LASTDIM_128 && params.qDim3 != LASTDIM_64) {
         std::string shapeStr = ToString(qShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "query",
-            shapeStr.c_str(), "The last dim of input query should be 64 or 128");
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "query", shapeStr.c_str(),
+                                              "The last dim of input query should be 64 or 128");
         return ge::GRAPH_FAILED;
     }
     if (params.coscNum != 1) {
-        std::string reasonMsg =
-            "The N axis of input cos should be 1, "
-            "where N refers to the 2nd dim when the attr layout is 1 (BSND), "
-            "or the 1st dim when the attr layout is 4 (TND)";
+        std::string reasonMsg = "The N axis of input cos should be 1, "
+                                "where N refers to the 2nd dim when the attr layout is 1 (BSND), "
+                                "or the 1st dim when the attr layout is 4 (TND)";
         std::string shapeStr = ToString(cosShape);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "cos",
-            shapeStr.c_str(), reasonMsg.c_str());
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "cos", shapeStr.c_str(), reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(context->GetInputDesc(INPUT0) == nullptr, OP_LOGE(context->GetNodeName(), "input 0 get desc failed"),
@@ -298,8 +296,7 @@ ge::graphStatus ApplyRotaryPosEmbTiling::CheckParams(gert::TilingContext *contex
     ge::DataType qDtype = context->GetInputDesc(INPUT0)->GetDataType();
     if (qDtype != ge::DT_BF16 && qDtype != ge::DT_FLOAT && qDtype != ge::DT_FLOAT16) {
         std::string dtypeStr = ToString(qDtype);
-        OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "query",
-            dtypeStr.c_str(), "BF16, FLOAT or FLOAT16");
+        OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "query", dtypeStr.c_str(), "BF16, FLOAT or FLOAT16");
         return ge::GRAPH_FAILED;
     }
     for (int32_t i = 1; i < DIM_4; i++) {
@@ -311,8 +308,8 @@ ge::graphStatus ApplyRotaryPosEmbTiling::CheckParams(gert::TilingContext *contex
             std::string paramMsg = inputNames[i] + " and query";
             std::string dtypeMsg = ToString(inputDtype) + " and " + ToString(qDtype);
             std::string reasonMsg = "The dtypes of input " + inputNames[i] + " and input query should be the same";
-            OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context->GetNodeName(), paramMsg.c_str(),
-                dtypeMsg.c_str(), reasonMsg.c_str());
+            OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context->GetNodeName(), paramMsg.c_str(), dtypeMsg.c_str(),
+                                                   reasonMsg.c_str());
             return ge::GRAPH_FAILED;
         }
     }
@@ -329,7 +326,7 @@ ge::graphStatus ApplyRotaryPosEmbTiling::ComputeAB(gert::TilingContext *context,
                       static_cast<int64_t>(params.isCast) * (params.sin1UbSize * 2);
     OP_LOGD(context->GetNodeName(), "oneLoop ub size %ld", oneLoop);
     OP_CHECK_IF(oneLoop > params.totalUbSize || oneLoop <= 0,
-                OP_LOGE(context->GetNodeName(), "oneLoop is too large or small than 0"), return ge::GRAPH_FAILED);
+                OP_LOGE(context->GetNodeName(), "oneLoop is too large or less than 0"), return ge::GRAPH_FAILED);
     int64_t times = params.totalUbSize / oneLoop; // ub一次可以计算的batch数量
     int64_t shengUb = params.totalUbSize % oneLoop;
     // shengMte：如果有剩余ub空间，再计算几个单batch后一起搬出，减少mte3次数
@@ -344,12 +341,12 @@ ge::graphStatus ApplyRotaryPosEmbTiling::ComputeAB(gert::TilingContext *context,
     } else { // 存在多次mte2搬入，计算，一次mte3搬出的场景
         params.tilingKey = static_cast<int64_t>(ApplyRotaryPosEmbTilingKey::TILINGKEY_AB);
     }
-    OP_LOGD(context->GetNodeName(), "times is %ld, shengMte %ld", times, shengMte);
+    OP_LOGD(context->GetNodeName(), "times is %ld, remainingMte %ld", times, shengMte);
 
     // ub外循环次数计算
-    params.preCBatchB = times + shengMte;                                               // 大核内ub一次计算的batch数
-    params.preCLTimes = ComputeTimes(params.preCoreBatch, params.preCBatchB);           // 大核的ub loop times
-    params.preCBatchL = params.preCoreBatch - params.preCBatchB * params.preCLTimes;    // 大核内最后一次计算的batch数
+    params.preCBatchB = times + shengMte;                                     // 大核内ub一次计算的batch数
+    params.preCLTimes = ComputeTimes(params.preCoreBatch, params.preCBatchB); // 大核的ub loop times
+    params.preCBatchL = params.preCoreBatch - params.preCBatchB * params.preCLTimes; // 大核内最后一次计算的batch数
     params.lastCLTimes = ComputeTimes(params.lastCoreBatch, params.preCBatchB);         // 尾核的ub loop times
     params.lastCBatchL = params.lastCoreBatch - params.preCBatchB * params.lastCLTimes; // 尾核最后一次计算的batch数
 
@@ -371,8 +368,8 @@ ge::graphStatus ApplyRotaryPosEmbTiling::ComputeAB(gert::TilingContext *context,
     params.comBatchLLL = params.lastCBatchL - params.preCLLTimes * params.comBatchBB;
 
     params.blockLenQ = params.qcdNum / params.oneBlock;  // Q_ND block数，搬运
-    params.srcStrideK = params.kcdNum / params.oneBlock;  // K_ND blcok数，搬入Q时为K预留的拼接空间
-    
+    params.srcStrideK = params.kcdNum / params.oneBlock; // K_ND blcok数，搬入Q时为K预留的拼接空间
+
     params.dstRepSBr = params.lastDim / params.oneBlockFp32;
     params.blockLenq2q1 = params.halfNum / params.oneBlockFp32;
     params.mulNum = params.mulNum * DIM_2 / params.oneBlockFp32;
@@ -384,7 +381,7 @@ ge::graphStatus ApplyRotaryPosEmbTiling::Compute(gert::TilingContext *context, A
 {
     OP_LOGD(context->GetNodeName(), "ApplyRotaryPosEmb compute start");
     params.castDtypeSize = params.isCast ? DIM_4 : params.dtypeSize;
-    params.oneBlock = BLOCK_SIZE / params.dtypeSize;                       // 搬运，一个block可以存放的输入数据
+    params.oneBlock = BLOCK_SIZE / params.dtypeSize; // 搬运，一个block可以存放的输入数据
     params.oneBlockFp32 = params.isCast ? ONE_BLOCK_NUM : params.oneBlock; // 计算，一个block存放的计算数据量
     OP_LOGD(context->GetNodeName(), "isCast is %d, dtypeSize is %d, isFp32 is %d", params.isCast, params.dtypeSize,
             params.isFp32);
@@ -400,11 +397,11 @@ ge::graphStatus ApplyRotaryPosEmbTiling::Compute(gert::TilingContext *context, A
     params.mask = (params.isCast || params.isFp32) ? REPEAT_FP32 : REPEAT_FP16;
     params.mask = (params.cosDim3 <= params.mask) ? params.cosDim3 : params.mask;
     params.lastDim = params.cosDim3;
-    params.blockMoveQ = params.lastDim / params.oneBlock;  // 部分维度旋转搬运block数
+    params.blockMoveQ = params.lastDim / params.oneBlock; // 部分维度旋转搬运block数
     params.halfNum = params.lastDim / DIM_2;
 
-    params.qcdNum = params.qcNum * params.lastDim;       // Q_n * lastDim ：这里指的是搬运的q的元素数据量
-    params.kcdNum = params.kcNum * params.lastDim;       // K_n * lastDim ：这里指的是搬运的k的元素数据量
+    params.qcdNum = params.qcNum * params.lastDim;     // Q_n * lastDim ：这里指的是搬运的q的元素数据量
+    params.kcdNum = params.kcNum * params.lastDim;     // K_n * lastDim ：这里指的是搬运的k的元素数据量
     params.coscdNum = params.coscNum * params.cosDim3; // coscNum = 1 --> 1 * D
     params.qkcNum = params.qcNum + params.kcNum;       // (Q_n + K_n), Q、K在N轴上进行拼接
     // kernel侧Mul()中repeatTimes参数为uint8_t类型，避免使用qkcNum传参计算时超出范围
@@ -412,11 +409,10 @@ ge::graphStatus ApplyRotaryPosEmbTiling::Compute(gert::TilingContext *context, A
         gert::Shape qShape = context->GetInputTensor(INPUT0)->GetStorageShape();
         gert::Shape kShape = context->GetInputTensor(INPUT1)->GetStorageShape();
         std::string shapeMsg = ToString(qShape) + " and " + ToString(kShape);
-        std::string reasonMsg =
-            "The sum of the N axis of input query and the N axis of input key must not exceed "
-            + std::to_string(UINT8_MAX) + ", where N is the second-to-last dimension";
-        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "query and key",
-            shapeMsg.c_str(), reasonMsg.c_str());
+        std::string reasonMsg = "The sum of the N axis of input query and the N axis of input key must not exceed " +
+                                std::to_string(UINT8_MAX) + ", where N is the second-to-last dimension";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context->GetNodeName(), "query and key", shapeMsg.c_str(),
+                                               reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -427,9 +423,11 @@ ge::graphStatus ApplyRotaryPosEmbTiling::Compute(gert::TilingContext *context, A
     params.kCoreOffset = params.preCoreBatch * params.kcNum * params.kDim3;
     params.cosCoreOffset = params.preCoreBatch * params.coscdNum;
     // ub size
-    params.qPart1Ub = params.qkcNum * params.lastDim * params.castDtypeSize; // 搬运 (Q_n + K_n) * D * 4(fp32)/2(fp16/bf16)
+    params.qPart1Ub =
+        params.qkcNum * params.lastDim * params.castDtypeSize; // 搬运 (Q_n + K_n) * D * 4(fp32)/2(fp16/bf16)
     params.cosPart1Ub = params.coscNum * params.lastDim * params.dtypeSize; // 搬运 1 * D * 4(fp32)/2(fp16/bf16)
-    params.q2q1Part1Ub = params.qkcNum * params.lastDim * params.castDtypeSize; // 计算 (Q_n + K_n) * D * 4(bf16/fp32)/2(fp16)
+    params.q2q1Part1Ub =
+        params.qkcNum * params.lastDim * params.castDtypeSize; // 计算 (Q_n + K_n) * D * 4(bf16/fp32)/2(fp16)
     params.sin1UbSize = params.coscNum * params.lastDim * params.castDtypeSize; // 计算 1 * D * 4， 为BF16 cast使用
     int64_t speUb = params.qPart1Ub * 2 + params.cosPart1Ub * 2 + params.q2q1Part1Ub * 2 +
                     static_cast<int64_t>(params.isCast) * (params.sin1UbSize * 2);
@@ -462,7 +460,8 @@ void ApplyRotaryPosEmbTiling::PrintTilingData(gert::TilingContext *context, Appl
             "preCLLTimes is %ld, qCoreOffset is %ld, kCoreOffset is %ld, cosCoreOffset is %ld,"
             "qcNum is %ld, kcNum is %ld, coscNum is %ld, qcdNum is %ld, kcdNum is %ld,"
             "coscdNum is %ld, qkcNum is %ld, mulNum is %ld, qcdHalfNum is %ld, dstRepSBr is %ld,"
-            "blockLenQ is %ld, srcStrideK is %ld, blockLenq2q1 is %ld,  mask is %ld, tilingKey is %ld, qDim3 is %ld, kDim3 is %ld, blockMoveQ is %ld",
+            "blockLenQ is %ld, srcStrideK is %ld, blockLenq2q1 is %ld,  mask is %ld, tilingKey is %ld, qDim3 is %ld, "
+            "kDim3 is %ld, blockMoveQ is %ld",
             tiling.get_useCoreNum(), tiling.get_lastDim(), tiling.get_halfNum(), tiling.get_preCBatchB(),
             tiling.get_preCBatchL(), tiling.get_lastCBatchL(), tiling.get_comBatchBB(), tiling.get_comBatchBBL(),
             tiling.get_comBatchBLL(), tiling.get_comBatchLLL(), tiling.get_qPart1Ub(), tiling.get_q2q1Part1Ub(),
@@ -471,7 +470,8 @@ void ApplyRotaryPosEmbTiling::PrintTilingData(gert::TilingContext *context, Appl
             tiling.get_kCoreOffset(), tiling.get_cosCoreOffset(), params.qcNum, params.kcNum, params.coscNum,
             tiling.get_qcdNum(), tiling.get_kcdNum(), tiling.get_coscdNum(), tiling.get_qkcNum(), tiling.get_mulNum(),
             tiling.get_qcdHalfNum(), tiling.get_dstRepSBr(), tiling.get_blockLenQ(), tiling.get_srcStrideK(),
-            tiling.get_blockLenq2q1(), tiling.get_mask(), params.tilingKey, tiling.get_qDim3(), tiling.get_kDim3(), tiling.get_blockMoveQ());
+            tiling.get_blockLenq2q1(), tiling.get_mask(), params.tilingKey, tiling.get_qDim3(), tiling.get_kDim3(),
+            tiling.get_blockMoveQ());
 }
 
 void ApplyRotaryPosEmbTiling::SetTilingData(gert::TilingContext *context, ApplyRotaryPosEmbTilingData &tiling,
@@ -530,9 +530,9 @@ static std::unique_ptr<ApplyRotaryPosEmbCompileInfo> aropeCompileInfo = nullptr;
 
 class ApplyRotaryPosMembaseEmbTilingClass : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit ApplyRotaryPosMembaseEmbTilingClass(gert::TilingContext *context) : TilingBaseClass(context)
-    {
-    }
+    explicit ApplyRotaryPosMembaseEmbTilingClass(gert::TilingContext *context)
+        : TilingBaseClass(context)
+    {}
 
     void Reset(gert::TilingContext *context) override
     {
@@ -558,8 +558,8 @@ protected:
             int64_t sysWorkspaceSize = static_cast<int64_t>(ascendcPlatform.GetLibApiWorkSpaceSize());
             params.sysWorkspaceSize = sysWorkspaceSize > WORK_SPACE_SIZE ? sysWorkspaceSize : WORK_SPACE_SIZE;
 
-            aropeCompileInfo = std::make_unique<ApplyRotaryPosEmbCompileInfo>(
-            ApplyRotaryPosEmbCompileInfo{params.totalCoreNum, platformUbSize, params.sysWorkspaceSize, params.socVersion});
+            aropeCompileInfo = std::make_unique<ApplyRotaryPosEmbCompileInfo>(ApplyRotaryPosEmbCompileInfo{
+                params.totalCoreNum, platformUbSize, params.sysWorkspaceSize, params.socVersion});
         } else {
             OP_LOGD(context_->GetNodeName(), "get platform information from compile info.");
             params.totalCoreNum = aropeCompileInfo->numBlocks;
@@ -625,7 +625,7 @@ protected:
     {
         return context_->GetTilingKey();
     }
-    
+
 private:
     ApplyRotaryPosEmbParams params;
 };

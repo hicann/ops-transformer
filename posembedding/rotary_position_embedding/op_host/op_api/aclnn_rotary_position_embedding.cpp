@@ -61,7 +61,8 @@ static aclnnStatus RotaryPositionEmbeddingCommonProcess(const aclTensor *x, cons
     auto ret = PreProcess(xProcessed, cosProcessed, sinProcessed, rotateProcessed, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    auto result = l0op::RotaryPositionEmbedding(xProcessed, cosProcessed, sinProcessed, rotateProcessed, mode, executor);
+    auto result =
+        l0op::RotaryPositionEmbedding(xProcessed, cosProcessed, sinProcessed, rotateProcessed, mode, executor);
     CHECK_RET(result != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     auto outContiguous = l0op::Contiguous(out, executor);
@@ -80,9 +81,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingGetWorkspaceSize(const aclTensor *x, con
                                                          int64_t mode, aclTensor *out, uint64_t *workspaceSize,
                                                          aclOpExecutor **executor)
 {
-    L2_DFX_PHASE_1(aclnnRotaryPositionEmbedding,
-                   DFX_IN(x, cos, sin, mode),
-                   DFX_OUT(out));
+    L2_DFX_PHASE_1(aclnnRotaryPositionEmbedding, DFX_IN(x, cos, sin, mode), DFX_OUT(out));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -112,17 +111,15 @@ aclnnStatus aclnnRotaryPositionEmbedding(void *workspace, uint64_t workspaceSize
 
 /* v2 interface - supports rotate parameter */
 aclnnStatus aclnnRotaryPositionEmbeddingV2GetWorkspaceSize(const aclTensor *x, const aclTensor *cos,
-                                                           const aclTensor *sin, int64_t mode,
-                                                           const aclTensor *rotate, aclTensor *out,
-                                                           uint64_t *workspaceSize, aclOpExecutor **executor)
+                                                           const aclTensor *sin, int64_t mode, const aclTensor *rotate,
+                                                           aclTensor *out, uint64_t *workspaceSize,
+                                                           aclOpExecutor **executor)
 {
-    L2_DFX_PHASE_1(aclnnRotaryPositionEmbeddingV2,
-                   DFX_IN(x, cos, sin, mode, rotate),
-                   DFX_OUT(out));
+    L2_DFX_PHASE_1(aclnnRotaryPositionEmbeddingV2, DFX_IN(x, cos, sin, mode, rotate), DFX_OUT(out));
 
     if (rotate != nullptr) {
-        CHECK_COND(op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201,
-                   ACLNN_ERR_PARAM_INVALID, "the soc verison is not support");
+        CHECK_COND(op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201, ACLNN_ERR_PARAM_INVALID,
+                   "the soc version is not supported");
     }
 
     auto uniqueExecutor = CREATE_EXECUTOR();

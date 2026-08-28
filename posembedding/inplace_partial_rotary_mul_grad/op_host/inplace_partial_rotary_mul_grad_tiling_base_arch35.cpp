@@ -45,7 +45,7 @@ using namespace Ops::Base;
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
-    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context_, "platformInfo cann't be nullptr."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context_, "platformInfo cannot be nullptr."), return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     aicoreParams_.numBlocks = ascendcPlatform.GetCoreNumAiv();
     uint64_t ubSizePlatForm;
@@ -471,6 +471,9 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::GetShapeAttrsInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-uint64_t InplacePartialRotaryMulGradRegbaseTiling::GetTilingKey() const { return tilingKey_; }
+uint64_t InplacePartialRotaryMulGradRegbaseTiling::GetTilingKey() const
+{
+    return tilingKey_;
+}
 
 } // namespace optiling

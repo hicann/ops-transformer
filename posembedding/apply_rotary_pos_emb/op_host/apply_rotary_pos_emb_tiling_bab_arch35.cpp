@@ -1,12 +1,12 @@
- /**	 
-  * Copyright (c) 2025 Huawei Technologies Co., Ltd.	 
-  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of	 
-  * CANN Open Software License Agreement Version 2.0 (the "License").	 
-  * Please refer to the License for details. You may not use this file except in compliance with the License.	 
-  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,	 
-  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.	 
-  * See LICENSE in the root of the software repository for the full text of the License.	 
-  */
+/**
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file apply_rotary_pos_emb_regbase_tiling_bab.cpp
@@ -26,9 +26,9 @@ constexpr int64_t TILING_KEY_BAB = 20020;
 
 class ApplyRotaryPosEmbTilingBAB : public ApplyRotaryPosEmbRegbaseTilingBaseClass {
 public:
-    explicit ApplyRotaryPosEmbTilingBAB(gert::TilingContext *context) : ApplyRotaryPosEmbRegbaseTilingBaseClass(context)
-    {
-    }
+    explicit ApplyRotaryPosEmbTilingBAB(gert::TilingContext *context)
+        : ApplyRotaryPosEmbRegbaseTilingBaseClass(context)
+    {}
     ~ApplyRotaryPosEmbTilingBAB() override = default;
 
     void Reset(gert::TilingContext *context) override
@@ -95,7 +95,7 @@ ge::graphStatus ApplyRotaryPosEmbTilingBAB::DoOpTiling()
     }
     SplitCore();
     if (blockNumB_ * blockNumS_ > coreNum_) {
-        OP_LOGE(context_->GetNodeName(), "split coreNum [%ld] large than coreNum[%ld]", blockNumB_ * blockNumS_,
+        OP_LOGE(context_->GetNodeName(), "split coreNum [%ld] larger than coreNum[%ld]", blockNumB_ * blockNumS_,
                 coreNum_);
         return ge::GRAPH_FAILED;
     }

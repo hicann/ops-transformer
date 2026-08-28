@@ -26,9 +26,9 @@ constexpr int64_t TILING_KEY_BAB = 20020;
 
 class RopeRegBaseTilingClassBAB : public RopeRegBaseTilingClass {
 public:
-    explicit RopeRegBaseTilingClassBAB(gert::TilingContext *context_) : RopeRegBaseTilingClass(context_)
-    {
-    }
+    explicit RopeRegBaseTilingClassBAB(gert::TilingContext *context_)
+        : RopeRegBaseTilingClass(context_)
+    {}
     ~RopeRegBaseTilingClassBAB() override = default;
     void Reset(gert::TilingContext *context_) override
     {
@@ -93,7 +93,7 @@ ge::graphStatus RopeRegBaseTilingClassBAB::DoOpTiling()
         return ge::GRAPH_FAILED;
     }
     if (blockNumB_ * blockNumS_ > coreNum_) {
-        OP_LOGE(context_->GetNodeName(), "split coreNum [%ld] large than coreNum[%ld]", blockNumB_ * blockNumS_,
+        OP_LOGE(context_->GetNodeName(), "split coreNum [%ld] larger than coreNum[%ld]", blockNumB_ * blockNumS_,
                 coreNum_);
         return ge::GRAPH_FAILED;
     }

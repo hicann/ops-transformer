@@ -20,13 +20,13 @@ constexpr uint64_t ROPE_GRAD_BAB_TILING_PRIORITY = 20000;
 constexpr uint32_t MIN_UB_LOAD_D_NUM = 4; // x, y或in, cos输入开doubleBuffer
 constexpr uint32_t DOUBLE_BUFFER = 2;
 
-class RopeGradRegBaseTilingClassBAB : public RopeGradRegBaseTilingClass
-{
+class RopeGradRegBaseTilingClassBAB : public RopeGradRegBaseTilingClass {
 public:
-    explicit RopeGradRegBaseTilingClassBAB(gert::TilingContext* context_) : RopeGradRegBaseTilingClass(context_)
+    explicit RopeGradRegBaseTilingClassBAB(gert::TilingContext *context_)
+        : RopeGradRegBaseTilingClass(context_)
     {}
     ~RopeGradRegBaseTilingClassBAB() override = default;
-    void Reset(gert::TilingContext* context_) override
+    void Reset(gert::TilingContext *context_) override
     {
         RopeGradRegBaseTilingClass::Reset(context_);
     }
@@ -76,16 +76,14 @@ ge::graphStatus RopeGradRegBaseTilingClassBAB::DoOpTiling()
     }
     SplitCore();
     if (blockNumB_ * blockNumS_ > coreNum_) {
-        OP_LOGE(
-            context_->GetNodeName(), "split coreNum [%ld] large than coreNum[%ld]", blockNumB_ * blockNumS_, coreNum_);
+        OP_LOGE(context_->GetNodeName(), "split coreNum [%ld] larger than coreNum[%ld]", blockNumB_ * blockNumS_,
+                coreNum_);
         return ge::GRAPH_FAILED;
     }
-    OP_CHECK_IF(
-        InitTilingData() != ge::GRAPH_SUCCESS,
-        OP_LOGE(context_->GetNodeName(), "InitTilingData failed."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        TilingReduce() != ge::GRAPH_SUCCESS,
-        OP_LOGE(context_->GetNodeName(), "TilingReduce failed."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(InitTilingData() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "InitTilingData failed."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(TilingReduce() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "TilingReduce failed."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -149,18 +147,18 @@ ge::graphStatus RopeGradRegBaseTilingClassBAB::SplitUb()
 
 void RopeGradRegBaseTilingClassBAB::PrintTilingData()
 {
-    OP_LOGI(
-        context_->GetNodeName(),
-        "RopeGradRegBaseTilingBAB tilingData: useCoreNum is %ld,"
-        "B is %ld, S is %ld, D is %ld, N is %ld, blockNumB %ld,"
-        "blockFactorB_ is %ld, blockNumS %ld, blockFactorS is %ld, ubFactorS is %ld, ubFactorB is %ld,"
-        "ubLoopNumN is %ld, ubFactorN is %ld, ubTailFactorN is %ld, rotaryMode is %ld, tilingKey is %ld",
-        usedCoreNum_, tilingData_->ropeGradParams.b, tilingData_->ropeGradParams.s, tilingData_->ropeGradParams.d,
-        tilingData_->ropeGradParams.n, tilingData_->ropeGradParams.blockNumB, tilingData_->ropeGradParams.blockFactorB,
-        tilingData_->ropeGradParams.blockNumS, tilingData_->ropeGradParams.blockFactorS,
-        tilingData_->ropeGradParams.ubFactorS, tilingData_->ropeGradParams.ubFactorB,
-        tilingData_->ropeGradParams.ubLoopNumN, tilingData_->ropeGradParams.ubFactorN,
-        tilingData_->ropeGradParams.ubTailFactorN, tilingData_->ropeGradParams.rotaryMode, tilingKey_);
+    OP_LOGI(context_->GetNodeName(),
+            "RopeGradRegBaseTilingBAB tilingData: useCoreNum is %ld,"
+            "B is %ld, S is %ld, D is %ld, N is %ld, blockNumB %ld,"
+            "blockFactorB_ is %ld, blockNumS %ld, blockFactorS is %ld, ubFactorS is %ld, ubFactorB is %ld,"
+            "ubLoopNumN is %ld, ubFactorN is %ld, ubTailFactorN is %ld, rotaryMode is %ld, tilingKey is %ld",
+            usedCoreNum_, tilingData_->ropeGradParams.b, tilingData_->ropeGradParams.s, tilingData_->ropeGradParams.d,
+            tilingData_->ropeGradParams.n, tilingData_->ropeGradParams.blockNumB,
+            tilingData_->ropeGradParams.blockFactorB, tilingData_->ropeGradParams.blockNumS,
+            tilingData_->ropeGradParams.blockFactorS, tilingData_->ropeGradParams.ubFactorS,
+            tilingData_->ropeGradParams.ubFactorB, tilingData_->ropeGradParams.ubLoopNumN,
+            tilingData_->ropeGradParams.ubFactorN, tilingData_->ropeGradParams.ubTailFactorN,
+            tilingData_->ropeGradParams.rotaryMode, tilingKey_);
     return;
 }
 

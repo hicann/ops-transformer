@@ -16,7 +16,7 @@ import torch
 dtype_map = {
     "bfloat16": torch.bfloat16,
     "float16": torch.float16,
-    "float32": torch.float32
+    "float32": torch.float32,
 }
 
 
@@ -37,7 +37,9 @@ def get_half_matrix(n, dtype_q):
 
 
 def gen_data_and_golden(a, b, c, d, dtype_q):
-    data_x = torch.FloatTensor(int(a), int(b), int(c), int(d)).uniform_(-2, 2).to(dtype_q)
+    data_x = (
+        torch.FloatTensor(int(a), int(b), int(c), int(d)).uniform_(-2, 2).to(dtype_q)
+    )
     data_cos = torch.FloatTensor(1, 1, int(c), int(d)).uniform_(-3, 4).to(dtype_q)
     data_sin = torch.FloatTensor(1, 1, int(c), int(d)).uniform_(-4, 5).to(dtype_q)
     data_rotate_half = get_half_matrix(int(d), dtype_q)
@@ -49,10 +51,13 @@ def gen_data_and_golden(a, b, c, d, dtype_q):
     torch.save(data_sin, "./rotate_half.pt")
     torch.save(data_sin, "./rotate_inter.pt")
 
+
 if __name__ == "__main__":
     os.system("rm -rf *.bin")
     if sys.argv[5] not in dtype_map:
-        raise ValueError(f"不支持的 dtype：{sys.argv[5]}，支持的类型：{list(dtype_map.keys())}")
+        raise ValueError(
+            f"Unsupported dtype: {sys.argv[5]}, supported types: {list(dtype_map.keys())}"
+        )
     dtype_q = dtype_map[sys.argv[5]]
     gen_data_and_golden(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], dtype_q)
     exit(0)
