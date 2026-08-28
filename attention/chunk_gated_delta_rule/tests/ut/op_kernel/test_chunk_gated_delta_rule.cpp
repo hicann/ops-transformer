@@ -370,12 +370,12 @@ TEST_P(ChunkGatedDeltaRuleTest, RunTest)
     // std::cout << "Test: " << params.description << std::endl;
     // std::cout << "Config: " << params.ToString() << std::endl;
     // std::cout << "Seqlens: [";
-    for (size_t i = 0; i < params.seqlens.size(); ++i) {
-        if (i > 0)
-            std::cout << ", ";
-        std::cout << params.seqlens[i];
-    }
-    std::cout << "]" << std::endl;
+    // for (size_t i = 0; i < params.seqlens.size(); ++i) {
+    //     if (i > 0)
+    //         std::cout << ", ";
+    //     std::cout << params.seqlens[i];
+    // }
+    // std::cout << "]" << std::endl;
 
     uint32_t blockDim = 8;
     ICPU_SET_TILING_KEY(0);

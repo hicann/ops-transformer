@@ -107,7 +107,8 @@ cd $TTK_DIR
 python3 -m ttk e2e \
   -i $CSV_E2E \
   --plugin $ASSETS \
-  --warmup false --run 1
+  --warmup false --run 1 \
+  --pc 1
 ```
 
 ### E2E 静态图（const graph）
@@ -119,6 +120,7 @@ python3 -m ttk e2e \
   --plugin $ASSETS \
   --warmup false --run 1 \
   -c \
+  --pc 1 \
   -o /tmp/rgdr_perf.csv
 ```
 
@@ -129,8 +131,71 @@ cd $TTK_DIR
 python3 -m ttk aclnn \
   -i $CSV_ACLNN \
   --plugin $ASSETS \
+  --pc 1 \
   -o /tmp/rgdr_aclnn_result.csv
 ```
+
+### 离线数据存bin与指定bin回放（两阶段执行）
+
+将输入生成/CPU golden生成与设备执行拆为两步：prepare 阶段只生成并保存 input/golden 到 bin 文件（不跑设备），replay 阶段从 bin 恢复数据后跑设备 + compare。适用于准备机与执行机分离、或需复用固定输入复跑的场景。
+
+```bash
+MANUAL_DIR=/tmp/rgdr_manual   # bin 数据存放根目录
+OUT=<结果输出CSV路径>
+```
+
+#### 1. prepare（存 bin）
+
+完整数据（input + golden）：
+
+```bash
+# E2E
+cd $TTK_DIR
+python3 -m ttk e2e \
+  -i $CSV_E2E --plugin $ASSETS \
+  --no-prof --dump in,golden --dump-format bin \
+  --manual-data-dirs $MANUAL_DIR --pc 1 \
+  -o $OUT
+
+# ACLNN
+python3 -m ttk aclnn \
+  -i $CSV_ACLNN --plugin $ASSETS \
+  --no-prof --dump in,golden --dump-format bin \
+  --manual-data-dirs $MANUAL_DIR --pc 1 \
+  -o $OUT
+```
+
+仅准备 input（replay 时再现算 golden）：
+
+```bash
+python3 -m ttk e2e \
+  -i $CSV_E2E --plugin $ASSETS \
+  --no-prof --dump in --dump-format bin \
+  --manual-data-dirs $MANUAL_DIR --pc 1 \
+  -o $OUT
+```
+
+#### 2. replay（指定 bin 跑）
+
+```bash
+# E2E
+python3 -m ttk e2e \
+  -i $CSV_E2E --plugin $ASSETS \
+  --manual-data-dirs $MANUAL_DIR --pc 1 \
+  -o $OUT
+
+# ACLNN
+python3 -m ttk aclnn \
+  -i $CSV_ACLNN --plugin $ASSETS \
+  --manual-data-dirs $MANUAL_DIR --pc 1 \
+  -o $OUT
+```
+
+- prepare 成功状态为 `MANUAL_DATA_PREPARED`，replay 命中后跳过随机输入生成，从 bin 恢复 input（及 golden），日志可见 `OnLoadManualData: loaded prepared input/scalar data from $MANUAL_DIR/...`。
+- `--pc 1` 单进程串行执行，in-place state 用例建议单进程。
+- 两个阶段须使用同一份 CSV 与 assets；修改 input shape/view 或 attributes 后需重新 prepare。
+- **`--plugin` 必传**：两阶段都依赖 spec.py 提供 golden/inputs 适配器，漏传会报 `cannot save golden[0] sentinel 'UNSUPPORTED'`（`Golden Shapes: ()` 为空）。
+- **`--no-prof` 是双横杠**：写成 `-no-prof` 会报 `unrecognized arguments: -no-prof`。
 
 ### 关键参数
 
@@ -140,6 +205,9 @@ python3 -m ttk aclnn \
 | `--warmup` | profiling前warmup | E2E必须false（in-place约束）；ACLNN默认true |
 | `-o FILE` | 输出结果CSV（含耗时列） | profiling时建议带上 |
 | `-c` | E2E额外测静态图模式耗时 | 可选 |
+| `--pc N` | 并发进程数 | 本算子建议 `--pc 1`（in-place state 用例） |
+| `--no-prof --dump in[,golden]` | prepare 阶段存 bin，不跑设备 | 详见"离线数据存bin"小节 |
+| `--manual-data-dirs DIR` | replay 从 DIR 恢复 bin 数据 | 与 prepare 的 DIR 保持一致 |
 
 ### 仅校验CSV格式
 
