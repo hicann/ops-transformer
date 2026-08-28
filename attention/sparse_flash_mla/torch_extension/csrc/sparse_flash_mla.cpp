@@ -121,7 +121,7 @@ std::tuple<at::Tensor, at::Tensor> MakeSparseFlashMlaOutputs(const at::Tensor &q
     at::Tensor attenOut = at::empty_like(q);
     at::Tensor softmaxLse;
     if (!returnSoftmaxLse) {
-        softmaxLse = at::empty({}, q.options().dtype(torch::kFloat32));
+        softmaxLse = at::empty({0}, q.options().dtype(torch::kFloat32));
         return {attenOut, softmaxLse};
     }
 
