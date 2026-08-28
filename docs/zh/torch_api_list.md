@@ -64,6 +64,7 @@
 |[quant_flash_attn](../../torch_extension/cann_ops_transformer/docs/zh/quant_flash_attn.md)| 调用`QuantFlashAttn`算子完成MxFP8/HiF8/MxFP4量化场景下的全量化注意力计算，训练推理归一化。|默认支持确定性计算。|
 |[quant_lightning_indexer](../../torch_extension/cann_ops_transformer/docs/zh/quant_lightning_indexer.md)| 基于一系列操作得到每一个token对应的top-k个位置。|默认支持确定性计算。|
 |[quant_sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/quant_sparse_flash_mla.md)|调用`QuantSparseFlashMla`算子完成共享KV（Key和Value使用同一份输入）的稀疏注意力计算。|默认支持确定性计算。|
+|[recurrent_kda](../../torch_extension/cann_ops_transformer/docs/zh/recurrent_kda.md)|完成KDA（Kimi Delta Attention）的递归前向计算，面向decode和MTP短序列场景。|默认确定性实现|默认确定性实现|
 |[scatter_pa_kv_cache_with_k_scale](../../torch_extension/cann_ops_transformer/docs/zh/scatter_pa_kv_cache_with_k_scale.md)|训练场景下，更新KvCache中指定位置的key和value，同时更新key的scale值。|-|默认支持确定性计算|
 |[sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/sparse_flash_mla.md)|基于共享KV完成SparseFlashMla稀疏注意力计算。需与`sparse_flash_mla_metadata`配套使用。 |默认确定性实现|默认确定性实现|
 |[sparse_flash_mla_grad](../../torch_extension/cann_ops_transformer/docs/zh/sparse_flash_mla_grad.md)|计算`SparseFlashMla`训练场景下注意力的反向输出，支持Sliding Window Attention、Compressed Attention以及Sparse Compressed Attention。需与`sparse_flash_mla_grad_metadata`配套使用。 |-|默认确定性实现|

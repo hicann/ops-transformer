@@ -548,6 +548,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/recurrent_kda/README.md">recurrent_kda</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>完成KDA（Kimi Delta Attention）的递归前向计算，面向decode和MTP短序列场景。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/ring_attention_update/README.md">ring_attention_update</a></td>
     <td>✓</td>
     <td>✓</td>

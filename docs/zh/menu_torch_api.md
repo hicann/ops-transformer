@@ -29,6 +29,7 @@
 - [quant_flash_attn](../../torch_extension/cann_ops_transformer/docs/zh/quant_flash_attn.md)
 - [quant_lightning_indexer](../../torch_extension/cann_ops_transformer/docs/zh/quant_lightning_indexer.md)
 - [quant_sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/quant_sparse_flash_mla.md)
+- [recurrent_kda](../../torch_extension/cann_ops_transformer/docs/zh/recurrent_kda.md)
 - [scatter_pa_kv_cache_with_k_scale](../../torch_extension/cann_ops_transformer/docs/zh/scatter_pa_kv_cache_with_k_scale.md)
 - [stem_oam_prep_varlen_q](../../torch_extension/cann_ops_transformer/docs/zh/stem_oam_prep_varlen_q.md)
 - [sparse_flash_mla](../../torch_extension/cann_ops_transformer/docs/zh/sparse_flash_mla.md)

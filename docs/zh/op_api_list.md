@@ -228,6 +228,7 @@
 |[aclnnQuantReduceScatter](../../mc2/quant_reduce_scatter/docs/aclnnQuantReduceScatter.md)|实现quant + reduceScatter融合计算。|默认确定性实现| 默认确定性实现 |
 |[aclnnRainFusionAttention](../../attention/rain_fusion_attention/docs/aclnnRainFusionAttention.md)|RainFusionAttention稀疏注意力计算，支持灵活的块级稀疏模式，通过selectIdx指定每个Q块选择的KV块，实现高效的稀疏注意力计算。|默认确定性实现| - |
 |[aclnnRecurrentGatedDeltaRule](../../attention/recurrent_gated_delta_rule/docs/aclnnRecurrentGatedDeltaRule.md)|完成变步长的Recurrent Gated Delta Rule计算。|默认确定性实现| 默认确定性实现 |
+|[aclnnRecurrentKda](../../attention/recurrent_kda/docs/aclnnRecurrentKda.md)|完成KDA（Kimi Delta Attention）的递归前向计算，面向decode和MTP短序列场景。|默认确定性实现| 默认确定性实现 |
 |[aclnnRingAttentionUpdate](../../attention/ring_attention_update/docs/aclnnRingAttentionUpdate.md)|将两次FlashAttention的输出根据其不同的softmax的max和sum更新。|默认确定性实现| 默认确定性实现 |
 |[aclnnRingAttentionUpdateV2](../../attention/ring_attention_update/docs/aclnnRingAttentionUpdateV2.md)|指定softmax的输入排布，将两次FlashAttention的输出根据其不同的softmax的max和sum更新。|默认确定性实现| 默认确定性实现 |
 |[aclnnRopeWithSinCosCache](../../posembedding/rope_with_sin_cos_cache/docs/aclnnRopeWithSinCosCache.md)|推理网络为了提升性能，将sin和cos输入通过cache传入，执行旋转位置编码计算。|默认确定性实现| 默认确定性实现 |

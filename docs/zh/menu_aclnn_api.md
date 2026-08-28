@@ -223,6 +223,7 @@
 - [aclnnQuantReduceScatter](../../mc2/quant_reduce_scatter/docs/aclnnQuantReduceScatter.md)
 - [aclnnRainFusionAttention](../../attention/rain_fusion_attention/docs/aclnnRainFusionAttention.md)
 - [aclnnRecurrentGatedDeltaRule](../../attention/recurrent_gated_delta_rule/docs/aclnnRecurrentGatedDeltaRule.md)
+- [aclnnRecurrentKda](../../attention/recurrent_kda/docs/aclnnRecurrentKda.md)
 - [aclnnRingAttentionUpdate](../../attention/ring_attention_update/docs/aclnnRingAttentionUpdate.md)
 - [aclnnRingAttentionUpdateV2](../../attention/ring_attention_update/docs/aclnnRingAttentionUpdateV2.md)
 - [aclnnRopeWithSinCosCache](../../posembedding/rope_with_sin_cos_cache/docs/aclnnRopeWithSinCosCache.md)
