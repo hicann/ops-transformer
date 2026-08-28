@@ -69,9 +69,7 @@ enum class BSASparseMode {
     BottomK = 1
 };
 
-template <typename InputT, typename OutputT,
-          BSALayout LayoutQ = BSALayout::BNSD,
-          BSALayout LayoutKV = BSALayout::BNSD,
+template <typename InputT, typename OutputT, BSALayout LayoutQ = BSALayout::BNSD, BSALayout LayoutKV = BSALayout::BNSD,
           typename... Args>
 struct BSAType {
     using inputT = InputT;
@@ -133,6 +131,13 @@ struct BSAConstInfo {
     uint64_t attnScoreOffset;
     uint64_t softmaxTmpOffset;
     uint64_t topkWorkspaceOffset;
+    uint64_t pooledScoreOffset;
+
+    uint8_t usePostBlockShape;
+    uint16_t postBlockShapeX;
+    uint16_t postBlockShapeY;
+    uint32_t postXBlocks;
+    uint32_t postYBlocks;
 };
 
 struct BSARunInfo {

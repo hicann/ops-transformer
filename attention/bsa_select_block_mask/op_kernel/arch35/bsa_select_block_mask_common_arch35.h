@@ -20,17 +20,9 @@
 
 using namespace AscendC;
 
-#ifndef BSA_ENABLE_SOFTMAX_SECOND_PASS_VF
-#define BSA_ENABLE_SOFTMAX_SECOND_PASS_VF 1
-#endif
-#ifndef BSA_ENABLE_SOFTMAX_FIRST_PASS_VF
-#define BSA_ENABLE_SOFTMAX_FIRST_PASS_VF 1
-#endif
 constexpr uint8_t SYNC_V1_TO_C1_FLAG[2] = {0, 1};
 constexpr uint8_t SYNC_C1_TO_V1_FLAG[9] = {2, 3, 4, 5, 6, 7, 8, 9, 10};
 constexpr uint32_t SYNC_C1_TO_V1_FLAG_NUMS = 9;
-// Keep the softmax UB layout within 192KB:
-// fixed temporaries (10752B) + score (64 * 128 * ratio * 4B) + reduce temp (24KB).
 constexpr uint32_t CV_EXEC_RATIO = 4;
 constexpr uint8_t SYNC_MODE = 2;
 constexpr uint32_t BSA_FIXPIPE_SYNC_ANCHOR_M = 16;
@@ -77,9 +69,7 @@ enum class BSASparseMode {
     BottomK = 1
 };
 
-template <typename InputT, typename OutputT,
-          BSALayout LayoutQ = BSALayout::BNSD,
-          BSALayout LayoutKV = BSALayout::BNSD,
+template <typename InputT, typename OutputT, BSALayout LayoutQ = BSALayout::BNSD, BSALayout LayoutKV = BSALayout::BNSD,
           typename... Args>
 struct BSAType {
     using inputT = InputT;
@@ -141,6 +131,13 @@ struct BSAConstInfo {
     uint64_t attnScoreOffset;
     uint64_t softmaxTmpOffset;
     uint64_t topkWorkspaceOffset;
+    uint64_t pooledScoreOffset;
+
+    uint8_t usePostBlockShape;
+    uint16_t postBlockShapeX;
+    uint16_t postBlockShapeY;
+    uint32_t postXBlocks;
+    uint32_t postYBlocks;
 };
 
 struct BSARunInfo {

@@ -87,7 +87,11 @@ public:
     uint8_t useActualSeqLenK;
     uint16_t qChunkSize;
     uint16_t kChunkSize;
-    uint8_t rsvd3;
+    uint8_t usePostBlockShape;
+    uint16_t postBlockShapeX;
+    uint16_t postBlockShapeY;
+    uint32_t postXBlocks;
+    uint32_t postYBlocks;
 
     uint32_t get_batchSize() const
     {
@@ -257,6 +261,46 @@ public:
     {
         this->kChunkSize = v;
     }
+    uint8_t get_usePostBlockShape() const
+    {
+        return usePostBlockShape;
+    }
+    void set_usePostBlockShape(uint8_t v)
+    {
+        this->usePostBlockShape = v;
+    }
+    uint16_t get_postBlockShapeX() const
+    {
+        return postBlockShapeX;
+    }
+    void set_postBlockShapeX(uint16_t v)
+    {
+        this->postBlockShapeX = v;
+    }
+    uint16_t get_postBlockShapeY() const
+    {
+        return postBlockShapeY;
+    }
+    void set_postBlockShapeY(uint16_t v)
+    {
+        this->postBlockShapeY = v;
+    }
+    uint32_t get_postXBlocks() const
+    {
+        return postXBlocks;
+    }
+    void set_postXBlocks(uint32_t v)
+    {
+        this->postXBlocks = v;
+    }
+    uint32_t get_postYBlocks() const
+    {
+        return postYBlocks;
+    }
+    void set_postYBlocks(uint32_t v)
+    {
+        this->postYBlocks = v;
+    }
 };
 
 class BSAMultiCoreParams {
@@ -345,6 +389,8 @@ public:
     uint64_t topkWorkspaceSize;
     uint64_t softmaxTmpSize;
     uint64_t totalWorkspaceSize;
+    uint64_t pooledScoreSize;
+    uint64_t pooledScoreOffset;
 
     uint64_t get_qCmpSize() const
     {
@@ -393,6 +439,22 @@ public:
     void set_totalWorkspaceSize(uint64_t v)
     {
         this->totalWorkspaceSize = v;
+    }
+    uint64_t get_pooledScoreSize() const
+    {
+        return pooledScoreSize;
+    }
+    void set_pooledScoreSize(uint64_t v)
+    {
+        this->pooledScoreSize = v;
+    }
+    uint64_t get_pooledScoreOffset() const
+    {
+        return pooledScoreOffset;
+    }
+    void set_pooledScoreOffset(uint64_t v)
+    {
+        this->pooledScoreOffset = v;
     }
 };
 

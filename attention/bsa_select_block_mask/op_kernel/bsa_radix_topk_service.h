@@ -132,6 +132,8 @@ private:
     uint64_t totalDefinitelyInTopK_;
     uint64_t remainK_;
     uint64_t blockOffset_;
+    uint64_t headScoreOffset_;
+    uint64_t maskOutRowStride_;
     uint64_t globalHistSum_[RADIX_NUM_BINS];
 
     uint64_t tileLen_;
@@ -169,9 +171,8 @@ private:
 };
 
 template <typename BSAT>
-__aicore__ inline void
-BSARadixTopKService<BSAT>::InitParams(const BSAConstInfo &constInfo,
-                                      const optiling::BSASelectBlockMaskTilingData *__restrict tilingData)
+__aicore__ inline void BSARadixTopKService<BSAT>::InitParams(
+    const BSAConstInfo &constInfo, const optiling::BSASelectBlockMaskTilingData *__restrict tilingData)
 {
     this->constInfo = constInfo;
     this->tilingData = tilingData;
@@ -179,12 +180,21 @@ BSARadixTopKService<BSAT>::InitParams(const BSAConstInfo &constInfo,
     this->bitsPerRound_ = RADIX_BITS_PER_ROUND;
     this->numValue_ = RADIX_NUM_BINS;
     this->round_ = RADIX_ROUNDS_FP16;
-    this->validXBlocks_ = constInfo.xBlocks;
-    this->validYBlocks_ = constInfo.yBlocks;
-    this->useCompactTopKMapping_ =
-        tilingData->baseParams.useActualSeqLenQ && tilingData->baseParams.useActualSeqLenK;
+    if (constInfo.usePostBlockShape) {
+        this->validXBlocks_ = constInfo.postXBlocks;
+        this->validYBlocks_ = constInfo.postYBlocks;
+        // post 模式直接输出粗粒度 mask：行跨距用 postYBlocks（输出布局 [B,N,postX,postY]）
+        this->maskOutRowStride_ = constInfo.postYBlocks;
+    } else {
+        this->validXBlocks_ = constInfo.xBlocks;
+        this->validYBlocks_ = constInfo.yBlocks;
+        this->maskOutRowStride_ = constInfo.yBlocks;
+    }
+    this->useCompactTopKMapping_ = tilingData->baseParams.useActualSeqLenQ && tilingData->baseParams.useActualSeqLenK;
 
-    uint64_t maxSortLen = static_cast<uint64_t>(constInfo.xBlocks) * constInfo.yBlocks;
+    uint64_t maxSortLen = constInfo.usePostBlockShape ?
+                              static_cast<uint64_t>(constInfo.postXBlocks) * constInfo.postYBlocks :
+                              static_cast<uint64_t>(constInfo.xBlocks) * constInfo.yBlocks;
     ConfigureTopKParams(maxSortLen, constInfo.topKValue);
     this->maxTileLen_ = tileLen_;
     this->maxTileLenScoreAlign_ = tileLenScoreAlign_;
@@ -233,9 +243,18 @@ __aicore__ inline void BSARadixTopKService<BSAT>::ConfigureTopKParams(uint64_t s
 template <typename BSAT>
 __aicore__ inline void BSARadixTopKService<BSAT>::UpdateRuntimeParams(uint32_t validXBlocks, uint32_t validYBlocks)
 {
-    this->validXBlocks_ = validXBlocks;
-    this->validYBlocks_ = validYBlocks;
-    uint64_t sortLen = static_cast<uint64_t>(validXBlocks) * validYBlocks;
+    uint64_t sortLen;
+    if (constInfo.usePostBlockShape) {
+        uint32_t validPostXBlocks = BSACeilDiv(validXBlocks, static_cast<uint32_t>(constInfo.postBlockShapeX));
+        uint32_t validPostYBlocks = BSACeilDiv(validYBlocks, static_cast<uint32_t>(constInfo.postBlockShapeY));
+        this->validXBlocks_ = validPostXBlocks;
+        this->validYBlocks_ = validPostYBlocks;
+        sortLen = static_cast<uint64_t>(validPostXBlocks) * validPostYBlocks;
+    } else {
+        this->validXBlocks_ = validXBlocks;
+        this->validYBlocks_ = validYBlocks;
+        sortLen = static_cast<uint64_t>(validXBlocks) * validYBlocks;
+    }
     float ratio = (constInfo.sparsityMode == BSASparseMode::TopK) ? constInfo.sparsity : (1.0f - constInfo.sparsity);
     int64_t signedSortLen = static_cast<int64_t>(sortLen);
     float selectedCount = ratio * static_cast<float>(signedSortLen);
@@ -316,6 +335,13 @@ __aicore__ inline void BSARadixTopKService<BSAT>::ProcessRadixTopKAndWriteMask(u
         return;
     }
     // 1. Calculate blockOffset
+    if (constInfo.usePostBlockShape) {
+        // pooledScore 按最大粗粒度网格 (postXBlocks * postYBlocks) 逐 head 布局（与写入侧一致）
+        this->headScoreOffset_ = (static_cast<uint64_t>(batchIdx) * constInfo.numHeads + headIdx) *
+                                 constInfo.postXBlocks * constInfo.postYBlocks;
+    } else {
+        this->headScoreOffset_ = 0;
+    }
     this->blockOffset_ = tileStartId_ * tileLen_;
 
     // 3. ClearTileTopKInWs() — batch zero tileTopK in WS
@@ -639,7 +665,7 @@ __aicore__ inline void BSARadixTopKService<BSAT>::CopyIn(TBuf<TPosition::VECIN> 
     DataCopyExtParams xCopyParams{static_cast<uint16_t>(1), static_cast<uint32_t>(sizeof(SCORE_T) * dataNum), 0, 0, 0};
     DataCopyPadExtParams<SCORE_T> xPadParams{true, 0, xPadNum, 0};
     GlobalTensor<SCORE_T> attnScoreTileGm;
-    attnScoreTileGm.SetGlobalBuffer((__gm__ SCORE_T *)(attnScoreGmLocal.GetPhyAddr() + xOffset));
+    attnScoreTileGm.SetGlobalBuffer((__gm__ SCORE_T *)(attnScoreGmLocal.GetPhyAddr() + headScoreOffset_ + xOffset));
     DataCopyPad(xLocal[ubOffset], attnScoreTileGm[0], xCopyParams, xPadParams);
 }
 
@@ -1057,14 +1083,14 @@ __aicore__ inline void BSARadixTopKService<BSAT>::HandleLastRoundBoundary(LocalT
 
                 if (static_cast<uint64_t>(curTileBoundaryNum) < remainCoreBoundaryNum) {
                     remainCoreBoundaryNum -= static_cast<uint32_t>(curTileBoundaryNum);
-                    tileTopK.SetValue(tileId - static_cast<int32_t>(startTileId),
-                                      tileTopK.GetValue(tileId - static_cast<int32_t>(startTileId)) +
-                                          curTileBoundaryNum);
+                    tileTopK.SetValue(
+                        tileId - static_cast<int32_t>(startTileId),
+                        tileTopK.GetValue(tileId - static_cast<int32_t>(startTileId)) + curTileBoundaryNum);
                 } else {
                     int32_t remainTileBoundaryNum = static_cast<int32_t>(remainCoreBoundaryNum);
-                    tileTopK.SetValue(tileId - static_cast<int32_t>(startTileId),
-                                      tileTopK.GetValue(tileId - static_cast<int32_t>(startTileId)) +
-                                          remainTileBoundaryNum);
+                    tileTopK.SetValue(
+                        tileId - static_cast<int32_t>(startTileId),
+                        tileTopK.GetValue(tileId - static_cast<int32_t>(startTileId)) + remainTileBoundaryNum);
                     remainCoreBoundaryNum = 0;
                     break;
                 }
@@ -1335,7 +1361,7 @@ __aicore__ inline void BSARadixTopKService<BSAT>::SubTopKAndWriteMaskGTTnd(Local
             }
         }
 
-        uint64_t outputOffset = outputHeadOffset + static_cast<uint64_t>(row) * constInfo.yBlocks + col;
+        uint64_t outputOffset = outputHeadOffset + static_cast<uint64_t>(row) * maskOutRowStride_ + col;
         GlobalTensor<uint8_t> maskOutSegmentGm;
         maskOutSegmentGm.SetGlobalBuffer((__gm__ uint8_t *)(maskOutGmU8Local.GetPhyAddr() + outputOffset));
         SToMTE3Sync();
@@ -1365,7 +1391,7 @@ __aicore__ inline void BSARadixTopKService<BSAT>::SubTopKAndWriteMaskEQTnd(Local
         uint32_t col = static_cast<uint32_t>(compactIndex % validYBlocks_);
         uint32_t segmentLen =
             static_cast<uint32_t>(BSAMin(curTileLen - processed, static_cast<uint64_t>(validYBlocks_ - col)));
-        uint64_t outputOffset = outputHeadOffset + static_cast<uint64_t>(row) * constInfo.yBlocks + col;
+        uint64_t outputOffset = outputHeadOffset + static_cast<uint64_t>(row) * maskOutRowStride_ + col;
         GlobalTensor<uint8_t> maskOutSegmentGm;
         maskOutSegmentGm.SetGlobalBuffer((__gm__ uint8_t *)(maskOutGmU8Local.GetPhyAddr() + outputOffset));
         DataCopyPad(maskLocal, maskOutSegmentGm[0], DataCopyExtParams(1, segmentLen * sizeof(uint8_t), 0, 0, 0),
@@ -1395,7 +1421,9 @@ __aicore__ inline void BSARadixTopKService<BSAT>::ProcessSingleElementMask(uint3
     if (GetBlockIdx() != 0) {
         return;
     }
-    uint64_t maxSortLen = static_cast<uint64_t>(constInfo.xBlocks) * constInfo.yBlocks;
+    uint64_t maxSortLen = constInfo.usePostBlockShape ?
+                              static_cast<uint64_t>(constInfo.postXBlocks) * constInfo.postYBlocks :
+                              static_cast<uint64_t>(constInfo.xBlocks) * constInfo.yBlocks;
     uint64_t outputOffset = (static_cast<uint64_t>(batchIdx) * constInfo.numHeads + headIdx) * maxSortLen;
     LocalTensor<uint8_t> maskLocal = maskLocalBuf_.Get<uint8_t>();
     maskLocal.SetValue(0, 1);
@@ -1410,7 +1438,12 @@ template <typename BSAT>
 __aicore__ inline void BSARadixTopKService<BSAT>::TileTopK(uint32_t batchIdx, uint32_t headIdx)
 {
     LocalTensor<int32_t> tileTopK = tileHistAndTopKBuf_.Get<int32_t>();
-    uint64_t outputStride = static_cast<uint64_t>(constInfo.xBlocks) * constInfo.yBlocks;
+    uint64_t outputStride;
+    if (constInfo.usePostBlockShape) {
+        outputStride = static_cast<uint64_t>(constInfo.postXBlocks) * constInfo.postYBlocks;
+    } else {
+        outputStride = static_cast<uint64_t>(constInfo.xBlocks) * constInfo.yBlocks;
+    }
     uint64_t outputOffset = (static_cast<uint64_t>(batchIdx) * constInfo.numHeads + headIdx) * outputStride;
 
     // Restore boundary value (twiddle inverse transform)

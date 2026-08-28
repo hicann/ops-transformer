@@ -109,10 +109,10 @@ bool BSASelectBlockMaskTilingBase::AnalyzeAttrs()
         }
     }
 
-    OP_CHECK_IF(
-        blockShapeX % BLOCK_SHAPE_ALIGN != 0 || blockShapeY % BLOCK_SHAPE_ALIGN != 0,
-        OP_LOGE(opName, "blockShapeX[%lu] and blockShapeY[%lu] must be multiples of 64.", blockShapeX, blockShapeY),
-        return false);
+    OP_CHECK_IF(blockShapeX % BLOCK_SHAPE_ALIGN != 0 || blockShapeY % BLOCK_SHAPE_ALIGN != 0,
+                OP_LOGE(opName, "blockShapeX[%lu] and blockShapeY[%lu] must be multiples of %u.", blockShapeX,
+                        blockShapeY, BLOCK_SHAPE_ALIGN),
+                return false);
 
     auto actualBlockLenQTensor = context_->GetOptionalInputTensor(ACTUAL_BLOCK_LEN_Q_INPUT_INDEX);
     useActualBlockLenQ =
@@ -124,6 +124,28 @@ bool BSASelectBlockMaskTilingBase::AnalyzeAttrs()
         (actualBlockLenKVTensor != nullptr && actualBlockLenKVTensor->GetShape().GetStorageShape().GetDimNum() != 0) ?
             1 :
             0;
+
+    auto postBlockShapeTensor = context_->GetOptionalInputTensor(POST_BLOCK_SHAPE_INPUT_INDEX);
+    OP_LOGD(opName, "postBlockShapeTensor ptr=%p", postBlockShapeTensor);
+    if (postBlockShapeTensor != nullptr && postBlockShapeTensor->GetShape().GetStorageShape().GetDimNum() != 0) {
+        const int64_t *postBlockShapeData = postBlockShapeTensor->GetData<int64_t>();
+        OP_LOGD(opName, "postBlockShapeData ptr=%p", postBlockShapeData);
+        if (postBlockShapeData != nullptr) {
+            postBlockShapeX = static_cast<uint16_t>(postBlockShapeData[0]);
+            postBlockShapeY = static_cast<uint16_t>(postBlockShapeData[1]);
+            usePostBlockShape = 1;
+            OP_LOGI(opName, "post_block_shape=[%u, %u] usePostBlockShape=%u", postBlockShapeX, postBlockShapeY,
+                    usePostBlockShape);
+            OP_CHECK_IF(postBlockShapeX == 0 || postBlockShapeY == 0,
+                        OP_LOGE(opName, "postBlockShapeX[%u] and postBlockShapeY[%u] must be positive.",
+                                postBlockShapeX, postBlockShapeY),
+                        return false);
+            OP_CHECK_IF(postBlockShapeX % BLOCK_SHAPE_ALIGN != 0 || postBlockShapeY % BLOCK_SHAPE_ALIGN != 0,
+                        OP_LOGE(opName, "postBlockShapeX[%u] and postBlockShapeY[%u] must be multiples of %u.",
+                                postBlockShapeX, postBlockShapeY, BLOCK_SHAPE_ALIGN),
+                        return false);
+        }
+    }
 
     auto actualSeqLenQTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_LENS_Q_INPUT_INDEX);
     useActualSeqLenQ =
@@ -227,13 +249,22 @@ bool BSASelectBlockMaskTilingBase::AnalyzeLayout()
     xBlocks = BSACeilDivision(maxQSeqlen, static_cast<uint32_t>(blockShapeX));
     yBlocks = BSACeilDivision(maxKvSeqlen, static_cast<uint32_t>(blockShapeY));
 
-    uint64_t totalXY = static_cast<uint64_t>(xBlocks) * yBlocks;
+    if (usePostBlockShape) {
+        postXBlocks = BSACeilDivision(xBlocks, static_cast<uint32_t>(postBlockShapeX));
+        postYBlocks = BSACeilDivision(yBlocks, static_cast<uint32_t>(postBlockShapeY));
+    } else {
+        postXBlocks = xBlocks;
+        postYBlocks = yBlocks;
+    }
+
+    uint64_t totalXY = static_cast<uint64_t>(postXBlocks) * postYBlocks;
     bool isTnd = tilingKeyLayoutQ == LayoutType::LAYOUT_TND || tilingKeyLayoutKV == LayoutType::LAYOUT_TND;
-    OP_CHECK_IF(totalXY == 0 || (totalXY == 1 && !isTnd),
-                OP_LOGE(opName,
-                        "xBlocks[%u] * yBlocks[%u] must be positive, and greater than 1 for BNSD TopK selection.",
-                        xBlocks, yBlocks),
-                return false);
+    OP_CHECK_IF(
+        totalXY == 0 || (totalXY == 1 && !isTnd),
+        OP_LOGE(opName,
+                "postXBlocks[%u] * postYBlocks[%u] must be positive, and greater than 1 for BNSD TopK selection.",
+                postXBlocks, postYBlocks),
+        return false);
 
     if (sparsityMode == static_cast<uint8_t>(SparsityMode::TOP_K)) {
         topKValue = static_cast<uint64_t>(std::round(sparsity * totalXY));
@@ -300,9 +331,15 @@ void BSASelectBlockMaskTilingBase::CalcOutputParams()
     uint64_t qCmpSize = static_cast<uint64_t>(xBlocks) * dSize * (sizeof(float) / 2);
     uint64_t kCmpSize = static_cast<uint64_t>(yBlocks) * dSize * (sizeof(float) / 2);
     uint64_t attnScoreFp16Size = static_cast<uint64_t>(xBlocks) * yBlocks * (sizeof(float) / 2);
+
+    uint64_t pooledScoreSize = usePostBlockShape ? static_cast<uint64_t>(batchSize) * numHeads * postXBlocks *
+                                                       postYBlocks * (sizeof(float) / 2) :
+                                                   0;
+
     uint64_t scoreFp32Size = Q_CHUNK_SIZE * aicNum * yBlocks * sizeof(float);
 
-    uint64_t sortLen = static_cast<uint64_t>(xBlocks) * yBlocks;
+    uint64_t sortLen =
+        usePostBlockShape ? static_cast<uint64_t>(postXBlocks) * postYBlocks : static_cast<uint64_t>(xBlocks) * yBlocks;
     uint64_t tileLen = std::min(static_cast<uint64_t>(7168), std::max(static_cast<uint64_t>(128), sortLen));
     uint64_t totalTileNum = (sortLen + tileLen - 1) / tileLen;
     uint32_t launchAivNum = IsA5Platform() ? CalcLaunchAivNum(multiCoreParams_->get_activeCoreNum()) : aivNum;
@@ -311,12 +348,21 @@ void BSASelectBlockMaskTilingBase::CalcOutputParams()
     uint64_t topkTileDataSize = totalTileNum * (1 + RADIX_NUM_BINS) * sizeof(int32_t);
     uint64_t topkWorkspaceSize = topkHeaderSize + topkTileDataSize;
 
+    uint64_t totalWorkspaceSize = qCmpSize + kCmpSize + attnScoreFp16Size + scoreFp32Size + topkWorkspaceSize;
+    uint64_t pooledScoreOffset = 0;
+    if (usePostBlockShape) {
+        pooledScoreOffset = attnScoreFp16Size;
+        totalWorkspaceSize += pooledScoreSize;
+    }
+
     outputParams_->set_qCmpSize(qCmpSize);
     outputParams_->set_kCmpSize(kCmpSize);
     outputParams_->set_attnScoreSize(attnScoreFp16Size);
     outputParams_->set_softmaxTmpSize(scoreFp32Size);
     outputParams_->set_topkWorkspaceSize(topkWorkspaceSize);
-    outputParams_->set_totalWorkspaceSize(qCmpSize + kCmpSize + attnScoreFp16Size + scoreFp32Size + topkWorkspaceSize);
+    outputParams_->set_pooledScoreSize(pooledScoreSize);
+    outputParams_->set_pooledScoreOffset(pooledScoreOffset);
+    outputParams_->set_totalWorkspaceSize(totalWorkspaceSize);
 }
 
 ge::graphStatus BSASelectBlockMaskTilingBase::GetShapeAttrsInfo()
@@ -356,6 +402,11 @@ ge::graphStatus BSASelectBlockMaskTilingBase::GetShapeAttrsInfo()
     baseParams_->set_useActualSeqLenK(useActualSeqLenK);
     baseParams_->set_qChunkSize(Q_CHUNK_SIZE);
     baseParams_->set_kChunkSize(K_CHUNK_SIZE);
+    baseParams_->set_usePostBlockShape(usePostBlockShape);
+    baseParams_->set_postBlockShapeX(postBlockShapeX);
+    baseParams_->set_postBlockShapeY(postBlockShapeY);
+    baseParams_->set_postXBlocks(postXBlocks);
+    baseParams_->set_postYBlocks(postYBlocks);
 
     OP_LOGD(opName,
             "INPUTPARAM batchSize:[%u], numHeads:[%u], maxQSeqlen:[%u], maxKvSeqlen:[%u], "

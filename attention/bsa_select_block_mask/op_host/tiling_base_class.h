@@ -38,7 +38,7 @@ static const int64_t GM_ALIGN = 512;
 static constexpr size_t WORK_SPACE_RESERVE_SIZE = 16 * 1024 * 1024;
 
 static constexpr uint32_t D_SIZE_128 = 128;
-static constexpr uint32_t BLOCK_SHAPE_ALIGN = 64;
+static constexpr uint32_t BLOCK_SHAPE_ALIGN = 8;
 static constexpr float SPARSITY_MIN = 0.0f;
 static constexpr float SPARSITY_MAX = 1.0f;
 static constexpr uint32_t HEAD_NUM_MIN = 1;
@@ -64,7 +64,8 @@ inline auto BSAMax(T a, T b) -> T
 
 class TilingBaseClass {
 public:
-    explicit TilingBaseClass(gert::TilingContext* context) : context_(context)
+    explicit TilingBaseClass(gert::TilingContext *context)
+        : context_(context)
     {}
 
     virtual ~TilingBaseClass() = default;
@@ -95,7 +96,7 @@ public:
         return ge::GRAPH_SUCCESS;
     }
 
-    virtual void Reset(gert::TilingContext* context)
+    virtual void Reset(gert::TilingContext *context)
     {
         context_ = context;
     }
@@ -113,7 +114,7 @@ protected:
         if (enable != 1) {
             return;
         }
-        auto buf = (uint32_t*)context_->GetRawTilingData()->GetData();
+        auto buf = (uint32_t *)context_->GetRawTilingData()->GetData();
         auto bufLen = context_->GetRawTilingData()->GetDataSize();
         std::ostringstream oss;
         oss << "Start to dump tiling info. tilingkey:" << context_->GetTilingKey() << ", tiling data size:" << bufLen
@@ -129,12 +130,12 @@ protected:
     }
 
 protected:
-    gert::TilingContext* context_ = nullptr;
+    gert::TilingContext *context_ = nullptr;
     std::unique_ptr<platform_ascendc::PlatformAscendC> ascendcPlatform_{nullptr};
     uint32_t blockDim_{0};
     uint64_t workspaceSize_{0};
     uint64_t tilingKey_{0};
 };
 
-} // optiling
+} // namespace optiling
 #endif
