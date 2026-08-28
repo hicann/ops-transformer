@@ -85,7 +85,7 @@ TestCases = {
         "dtype": torch.bfloat16,
         "sparse_mode": 3,
         "pse_type": 2,
-        "pse_layout": "bn"  # for generate golden data
+        "pse_layout": "bn",  # for generate golden data
     },
     "ALIBI_05": {
         "B": 4,
@@ -96,7 +96,7 @@ TestCases = {
         "dtype": torch.float16,
         "sparse_mode": 3,
         "pse_type": 3,  # special alibi
-        "pse_layout": "n"  # for generate golden data
+        "pse_layout": "n",  # for generate golden data
     },
     "SPARSE_06": {
         "B": 4,
@@ -109,7 +109,7 @@ TestCases = {
         "pre_tokens": 128,
         "next_tokens": 128,
         "pse_type": 3,  # special alibi
-        "pse_layout": "n"  # for generate golden data
+        "pse_layout": "n",  # for generate golden data
     },
     "SPARSE_07": {
         "B": 4,
@@ -122,7 +122,7 @@ TestCases = {
         "pre_tokens": 128,
         "next_tokens": 128,
         "pse_type": 3,  # special alibi
-        "pse_layout": "n"  # for generate golden data
+        "pse_layout": "n",  # for generate golden data
     },
     "SPARSE_08": {
         "B": 4,
@@ -134,7 +134,7 @@ TestCases = {
         "sparse_mode": 5,
         "prefix": [100, 128, 130, 150],
         "pse_type": 3,  # special alibi
-        "pse_layout": "n"  # for generate golden data
+        "pse_layout": "n",  # for generate golden data
     },
     "DROPOUT_09": {
         "B": 4,
@@ -167,7 +167,7 @@ TestCases = {
         "input_layout": "TND",
         "dtype": torch.bfloat16,
         "sparse_mode": 6,
-        "prefix": [1568]
+        "prefix": [1568],
     },
     "TND_03": {
         "N1": 8,
@@ -195,5 +195,21 @@ TestCases = {
         "q_start_idx": 64,
         "kv_start_idx": 32,
         "keep_prob": 0.9,  # keep_prob = 1 - dropout_p
-    }
+    },
+    "DYN_OPT_BNSD": {
+        "B": 1,
+        "N1": 1,
+        "Sq": 30000,
+        "D": 128,
+        "input_layout": "BNSD",
+        "dtype": torch.bfloat16,
+    },
+    "DYN_OPT_BSND": {
+        "B": 1,
+        "N1": 24,
+        "Sq": 576,
+        "D": 128,
+        "input_layout": "BSND",
+        "dtype": torch.bfloat16,
+    },
 }
