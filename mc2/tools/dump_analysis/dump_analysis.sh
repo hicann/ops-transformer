@@ -36,6 +36,7 @@ function help {
     echo "PLOG_PATH(选填,分析错误日志必填):plog日志存放的路径,不填不进行plog日志分析"
     echo "GRAPH_PATH(选填,分析graph图文件必填):graph图文件存放的路径,不填不进行graph图文件分析"
     echo "START_A2_CLUSTER(选填,分析A2集群数据必填):是否分析A2集群数据,0:不分析,1:分析,不填默认为0"
+    echo "IS_MOE_EP(选填):是否使用moe_ep分析脚本,1:使用dump_analysis_moe_ep.py,0:使用原流程,仅SOC_VERSION=950时生效,不填默认为0"
     exit 0
 }
 #获取sh脚本的文件路径
@@ -82,7 +83,10 @@ for arg in "$@"; do
     if [[ "$arg" == START_A2_CLUSTER=* ]]; then
         START_A2_CLUSTER="${arg#*=}"
     fi
-    if ! [[ "$arg" =~ ^(-h|-help|TARGET_DIR=|TOOL_PATH=|SP_MOE_NUM=|TP_WORLDSIZE=|SOC_VERSION=|SHARE_EXPERT_CARD_COUNT=|SHARE_EXPERT_NUM=|PROFILING_PATH=|PLOG_PATH=|GRAPH_PATH=|START_A2_CLUSTER=) ]]; then
+    if [[ "$arg" == IS_MOE_EP=* ]]; then
+        IS_MOE_EP="${arg#*=}"
+    fi
+    if ! [[ "$arg" =~ ^(-h|-help|TARGET_DIR=|TOOL_PATH=|SP_MOE_NUM=|TP_WORLDSIZE=|SOC_VERSION=|SHARE_EXPERT_CARD_COUNT=|SHARE_EXPERT_NUM=|PROFILING_PATH=|PLOG_PATH=|GRAPH_PATH=|START_A2_CLUSTER=|IS_MOE_EP=) ]]; then
         echo "warning:未知参数 $arg ,使用 -h or -help 查看帮助"
     fi
 done
@@ -146,6 +150,18 @@ if [ "$SHARE_EXPERT_NUM" -lt 0 ]; then
     echo "error:SHARE_EXPERT_NUM:$SHARE_EXPERT_NUM should > 0"
     judge=1
 fi
+if [ ! -n "$IS_MOE_EP" ]; then
+    IS_MOE_EP=0
+    echo "warning:IS_MOE_EP 参数未输入,使用默认值 IS_MOE_EP = 0"
+fi
+if [ "$IS_MOE_EP" != "0" ] && [ "$IS_MOE_EP" != "1" ]; then
+    echo "error:IS_MOE_EP:$IS_MOE_EP 为非法输入,仅支持 0 或 1"
+    judge=1
+fi
+if [ "$IS_MOE_EP" = "1" ] && [ "$SOC_VERSION" != "$SOC_VERSION_950" ]; then
+    echo "warning:IS_MOE_EP 仅在 SOC_VERSION=950 时生效,当前 SOC_VERSION=$SOC_VERSION,忽略该参数"
+    IS_MOE_EP=0
+fi
 #判断profiling路径
 if [ ! -n "$PROFILING_PATH" ]; then
     PROFILING_PATH=$TARGET_DIR
@@ -183,6 +199,7 @@ echo "SHARE_EXPERT_NUM = $SHARE_EXPERT_NUM"
 echo "PROFILING_PATH = $PROFILING_PATH"
 echo "PLOG_PATH = $PLOG_PATH"
 echo "GRAPH_PATH = $GRAPH_PATH"
+echo "IS_MOE_EP = $IS_MOE_EP"
 echo "-----------------------------"
 echo "-----------------------------"
 
@@ -273,73 +290,112 @@ if [ "$SOC_VERSION" = "$SOC_VERSION_910_93" ]; then
     fi
 elif [ "$SOC_VERSION" = "$SOC_VERSION_950" ]; then
     echo "进入 A5 处理流程"
-    if ls "$TARGET_DIR/exception_info"* >/dev/null 2>&1; then
-        echo "开始解析:单卡dump数据"
-        if ls "$TARGET_DIR/exception_info."*.workspace.* >/dev/null 2>&1; then
-            python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM 1 0 $TARGET_DIR $SOC_VERSION
-            echo "单卡数据解析完成"
-            echo "--------------------------------------------"
-        else
-            for file_dump in $TARGET_DIR/exception_info.*;
-            do
-                if [[ -f "$file_dump" ]]; then
-                    python3 $TOOL_PATH/tools/msaicerr/msaicerr.py -d "$file_dump"
-                    python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM 1 0 $TARGET_DIR $SOC_VERSION
-                    echo "单卡数据解析完成"
-                    echo "--------------------------------------------"
-                else
-                    echo "error:路径 $TARGET_DIR 下没有dump数据"
-                    echo "--------------------------------------------"
+    if [ "$IS_MOE_EP" = "1" ]; then
+        if ls "$TARGET_DIR/exception_info"* >/dev/null 2>&1; then
+            echo "开始解析:单卡dump数据"
+            if ! ls "$TARGET_DIR/exception_info."*.workspace.* >/dev/null 2>&1; then
+                for file_dump in $TARGET_DIR/exception_info.*; do
+                    if [[ -f "$file_dump" ]]; then
+                        python3 $TOOL_PATH/tools/msaicerr/msaicerr.py -d "$file_dump"
+                    fi
+                done
+            fi
+            python3 $SCRIPT_DIR/dump_analysis_moe_ep.py $TARGET_DIR 1 0
+        elif ls "$TARGET_DIR/1/exception_info"* >/dev/null 2>&1; then
+            echo "开始解析多卡dump数据"
+            for ((i = 0; i < file_num; i++)); do
+                if ! ls "$TARGET_DIR$i/exception_info."*.workspace.* >/dev/null 2>&1; then
+                    for file_dump in $TARGET_DIR$i/exception_info.*; do
+                        if [[ -f "$file_dump" ]]; then
+                            echo "开始预处理 $i 卡数据"
+                            python3 $TOOL_PATH/tools/msaicerr/msaicerr.py -d "$file_dump"
+                        fi
+                    done
                 fi
             done
+            python3 $SCRIPT_DIR/dump_analysis_moe_ep.py $TARGET_DIR $file_num 1
+        elif ls "$TARGET_DIR/0/exception_info"* >/dev/null 2>&1; then
+            echo "开始解析:单卡dump数据"
+            if ! ls "$TARGET_DIR/0/exception_info."*.workspace.* >/dev/null 2>&1; then
+                for file_dump in $TARGET_DIR/0/exception_info.*; do
+                    if [[ -f "$file_dump" ]]; then
+                        python3 $TOOL_PATH/tools/msaicerr/msaicerr.py -d "$file_dump"
+                    fi
+                done
+            fi
+            python3 $SCRIPT_DIR/dump_analysis_moe_ep.py $TARGET_DIR/0/ 1 0
+        else
+            echo "error:路径 $TARGET_DIR 下没有以exception_info开头的dump数据"
         fi
-    elif ls "$TARGET_DIR/1/exception_info"* >/dev/null 2>&1; then
-        echo "开始解析多卡dump数据"
-        for ((i = 0; i < file_num; i++))
-        do
-            if ls "$TARGET_DIR$i/exception_info."*.workspace.* >/dev/null 2>&1; then
-                echo "开始解析 $i 卡数据"
-                python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM $file_num $i $TARGET_DIR$i/ $SOC_VERSION
-                echo "$i 卡数据解析完成"
+    else
+        if ls "$TARGET_DIR/exception_info"* >/dev/null 2>&1; then
+            echo "开始解析:单卡dump数据"
+            if ls "$TARGET_DIR/exception_info."*.workspace.* >/dev/null 2>&1; then
+                python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM 1 0 $TARGET_DIR $SOC_VERSION
+                echo "单卡数据解析完成"
                 echo "--------------------------------------------"
             else
-                for file_dump in $TARGET_DIR$i/exception_info.*;
+                for file_dump in $TARGET_DIR/exception_info.*;
                 do
                     if [[ -f "$file_dump" ]]; then
-                        echo "开始解析 $i 卡数据"
                         python3 $TOOL_PATH/tools/msaicerr/msaicerr.py -d "$file_dump"
-                        python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM $file_num $i $TARGET_DIR$i/ $SOC_VERSION
-                        echo "$i 卡数据解析完成"
+                        python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM 1 0 $TARGET_DIR $SOC_VERSION
+                        echo "单卡数据解析完成"
                         echo "--------------------------------------------"
                     else
-                        echo "error:路径 $TARGET_DIR$i/ 下没有dump数据"
+                        echo "error:路径 $TARGET_DIR 下没有dump数据"
                         echo "--------------------------------------------"
                     fi
                 done
             fi
-        done
-    elif ls "$TARGET_DIR/0/exception_info"* >/dev/null 2>&1; then
-        echo "开始解析:单卡dump数据"
-        if ls "$TARGET_DIR/0/exception_info."*.workspace.* >/dev/null 2>&1; then
-            python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM 1 0 $TARGET_DIR/0/ $SOC_VERSION
-            echo "单卡数据解析完成"
-            echo "--------------------------------------------"
-        else
-            for file_dump in $TARGET_DIR/0/exception_info.*;
+        elif ls "$TARGET_DIR/1/exception_info"* >/dev/null 2>&1; then
+            echo "开始解析多卡dump数据"
+            for ((i = 0; i < file_num; i++))
             do
-                if [[ -f "$file_dump" ]]; then
-                    python3 $TOOL_PATH/tools/msaicerr/msaicerr.py -d "$file_dump"
-                    python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM 1 0 $TARGET_DIR/0/ $SOC_VERSION
-                    echo "单卡数据解析完成"
+                if ls "$TARGET_DIR$i/exception_info."*.workspace.* >/dev/null 2>&1; then
+                    echo "开始解析 $i 卡数据"
+                    python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM $file_num $i $TARGET_DIR$i/ $SOC_VERSION
+                    echo "$i 卡数据解析完成"
                     echo "--------------------------------------------"
                 else
-                    echo "error:路径 $TARGET_DIR/0/ 下没有dump数据"
-                    echo "--------------------------------------------"
+                    for file_dump in $TARGET_DIR$i/exception_info.*;
+                    do
+                        if [[ -f "$file_dump" ]]; then
+                            echo "开始解析 $i 卡数据"
+                            python3 $TOOL_PATH/tools/msaicerr/msaicerr.py -d "$file_dump"
+                            python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM $file_num $i $TARGET_DIR$i/ $SOC_VERSION
+                            echo "$i 卡数据解析完成"
+                            echo "--------------------------------------------"
+                        else
+                            echo "error:路径 $TARGET_DIR$i/ 下没有dump数据"
+                            echo "--------------------------------------------"
+                        fi
+                    done
                 fi
             done
+        elif ls "$TARGET_DIR/0/exception_info"* >/dev/null 2>&1; then
+            echo "开始解析:单卡dump数据"
+            if ls "$TARGET_DIR/0/exception_info."*.workspace.* >/dev/null 2>&1; then
+                python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM 1 0 $TARGET_DIR/0/ $SOC_VERSION
+                echo "单卡数据解析完成"
+                echo "--------------------------------------------"
+            else
+                for file_dump in $TARGET_DIR/0/exception_info.*;
+                do
+                    if [[ -f "$file_dump" ]]; then
+                        python3 $TOOL_PATH/tools/msaicerr/msaicerr.py -d "$file_dump"
+                        python3 $SCRIPT_DIR/dump_analysis.py $SP_MOE_NUM $TP_WORLDSIZE $SHARE_EXPERT_CARD_COUNT $SHARE_EXPERT_NUM 1 0 $TARGET_DIR/0/ $SOC_VERSION
+                        echo "单卡数据解析完成"
+                        echo "--------------------------------------------"
+                    else
+                        echo "error:路径 $TARGET_DIR/0/ 下没有dump数据"
+                        echo "--------------------------------------------"
+                    fi
+                done
+            fi
+        else
+            echo "error:路径 $TARGET_DIR 下没有以exception_info开头的dump数据"
         fi
-    else
-        echo "error:路径 $TARGET_DIR 下没有以exception_info开头的dump数据"
     fi
 elif [ "$SOC_VERSION" = "$SOC_VERSION_910B" ]; then
     echo "进入 A2 处理流程"
