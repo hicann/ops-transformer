@@ -225,7 +225,13 @@ def normalize_pytest_outputs(outputs, query, return_softmax_lse):
         raise RuntimeError(
             "SparseFlashAttention pytest compute_cpu returned an invalid output tuple"
         )
-    attn_out = outputs[0].detach().cpu().to(dtype=query.dtype)
+    # 对齐算子Cast(CAST_ROUND)语义:仅"有限值"超出目标dtype表示范围时钳到上下界，±inf/NaN 原样保留
+    attn_fp32 = outputs[0].detach().cpu().float()
+    attn_out = torch.where(
+        torch.isfinite(attn_fp32),
+        attn_fp32.clamp(-torch.finfo(query.dtype).max, torch.finfo(query.dtype).max),
+        attn_fp32,
+    ).to(dtype=query.dtype)
     if not bool(return_softmax_lse):
         empty = torch.zeros(0, dtype=torch.float32)
         return attn_out, empty, empty

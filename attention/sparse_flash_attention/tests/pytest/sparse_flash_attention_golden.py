@@ -664,6 +664,26 @@ def softmax(x, sinks=None):
     return ans, x_max, x_sum
 
 
+def bmm1(q_curr, k_sparse, calc_dtype):
+    # 极值输入（如 key_rope=BF16 上界）下 bmm1 真值可能超出 fp32 表示范围，
+    # 此时采用 NPU matmul 结果
+    # 其他场景保持 CPU matmul
+    cpu_matmul = torch.matmul(q_curr.float(), k_sparse.float().T)
+    if calc_dtype is not torch.bfloat16:
+        return cpu_matmul
+    try:
+        if not (hasattr(torch, "npu") and torch.npu.is_available()):
+            return cpu_matmul
+        device = torch.device("npu")
+        q_dev = q_curr.to(device=device, dtype=torch.bfloat16)
+        k_dev = k_sparse.to(device=device, dtype=torch.bfloat16)
+        npu_matmul = torch.matmul(q_dev, k_dev.T).float().cpu()
+        keep = torch.isfinite(npu_matmul) & torch.isfinite(cpu_matmul)
+        return torch.where(keep, cpu_matmul, npu_matmul)
+    except Exception:
+        return cpu_matmul
+
+
 def _t_increattention_bnsd(fa_param):
     batch_size = fa_param["b"]
     numheads = fa_param["numHeads"]
@@ -744,19 +764,24 @@ def _t_increattention_bnsd(fa_param):
                             torch.ones_like(cur_sinks),
                         )
                     continue
-                bmm1Res = torch.matmul(q_curr.float(), k_sparse.float().T)
+                bmm1Res = bmm1(
+                    q_curr,
+                    k_sparse,
+                    torch.bfloat16
+                    if fa_param["q_dtype"] == "bfloat16"
+                    else torch.float16,
+                )
                 scaleRes = bmm1Res * scaleValue
-                softmax_res, x_max, x_sum = softmax(scaleRes, cur_sinks)
+                _, x_max, x_sum = softmax(scaleRes, cur_sinks)
+                # 与算子softmax的数值链对齐: 未归一化 exp(x-max) 先量化为 P 的计算精度,bmm2 用 fp32 累加,最后除以fp32的sum
+                exp_unnorm = torch.exp(scaleRes - x_max)
                 if fa_param["q_dtype"] == "float16":
-                    bmm2Res = torch.matmul(
-                        softmax_res.to(torch.float16).float(), v_sparse.float()
-                    )
+                    exp_quantized = exp_unnorm.to(torch.float16).float()
                 elif fa_param["q_dtype"] == "bfloat16":
-                    bmm2Res = torch.matmul(
-                        softmax_res.to(torch.bfloat16).float(), v_sparse.float()
-                    )
+                    exp_quantized = exp_unnorm.to(torch.bfloat16).float()
                 else:
-                    bmm2Res = torch.matmul(softmax_res.float(), v_sparse.float())
+                    exp_quantized = exp_unnorm
+                bmm2Res = torch.matmul(exp_quantized, v_sparse.float()) / x_sum
                 y[batch, n2Idx * g : (n2Idx + 1) * g, s1Idx, :] = bmm2Res
                 set_softmax_lse(
                     batch, n2Idx, s1Idx, qLastPrefill, x_max[:, 0], x_sum[:, 0]
