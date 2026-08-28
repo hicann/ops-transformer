@@ -40,9 +40,8 @@ public:
     static constexpr uint32_t dVBaseSize = CubeBlockType::dVBaseSize;
 
     static constexpr bool HAS_MASK = VecFaBlockType::HAS_MASK;
-    // todo zhj mla老模板使用preload 1，新模板是preload 2，需要看下为什么不使用2，能否切到2
-    static constexpr uint32_t PRELOAD_N = 1; // C1 C1 C2
-    static constexpr uint32_t PRELOAD_TASK_CACHE_SIZE = PRELOAD_N + 1;
+
+    static constexpr uint32_t PRELOAD_N = 2; // C1 C1 C2
 
     static constexpr bool PAGE_ATTENTION = CubeBlockType::PAGE_ATTENTION;
     static constexpr bool FLASH_DECODE = VecFaBlockType::FLASH_DECODE;
@@ -290,7 +289,7 @@ public:
             return;
         }
 
-        RunInfoX taskRunInfo[PRELOAD_TASK_CACHE_SIZE] = {};
+        RunInfoX taskRunInfo[PRELOAD_N] = {};
         uint32_t bN2Cur = constInfo_.bN2Start;
         uint32_t gS1Cur = constInfo_.gS1OStart;
         uint32_t s2Cur = constInfo_.s2OStart;
@@ -342,7 +341,7 @@ public:
         return s2Cur < constInfo_.s2OEnd;
     }
 
-    __aicore__ inline bool ShouldExecuteTask(RunInfoX taskRunInfo[PRELOAD_TASK_CACHE_SIZE])
+    __aicore__ inline bool ShouldExecuteTask(RunInfoX taskRunInfo[PRELOAD_N])
     {
         return validTaskNum_ > 0;
     }
@@ -491,10 +490,10 @@ public:
         return;
     }
 
-    __aicore__ inline void ExecuteTask(uint64_t loop, RunInfoX taskRunInfo[PRELOAD_TASK_CACHE_SIZE])
+    __aicore__ inline void ExecuteTask(uint64_t loop, RunInfoX taskRunInfo[PRELOAD_N])
     {
-        RunInfoX &runInfo0 = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE];                  // 本轮任务
-        RunInfoX &runInfoNegN = taskRunInfo[(loop - PRELOAD_N) % PRELOAD_TASK_CACHE_SIZE]; // 上PRELOAD_N轮任务
+        RunInfoX &runInfo0 = taskRunInfo[loop % PRELOAD_N];                        // 本轮任务
+        RunInfoX &runInfoNegN = taskRunInfo[(loop - (PRELOAD_N - 1)) % PRELOAD_N]; // 上PRELOAD_N轮任务
         if (runInfo0.isValid) {
             if ASCEND_IS_AIC {
                 ComputeMm1(runInfo0);
@@ -503,7 +502,7 @@ public:
             }
         }
 
-        if (loop >= PRELOAD_N) {
+        if (loop >= (PRELOAD_N - 1)) {
             if (runInfoNegN.isValid) {
                 if ASCEND_IS_AIC {
                     ComputeMm2(runInfoNegN);
@@ -549,9 +548,9 @@ public:
     }
 
     __aicore__ inline void CreateTask(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur,
-                                      RunInfoX taskRunInfo[PRELOAD_TASK_CACHE_SIZE])
+                                      RunInfoX taskRunInfo[PRELOAD_N])
     {
-        RunInfoX &runInfo = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE]; // 本轮任务
+        RunInfoX &runInfo = taskRunInfo[loop % PRELOAD_N]; // 本轮任务
         CalcParams(loop, bN2Cur, gS1Cur, s2Cur, runInfo);
         EnableTask(runInfo);
     }
