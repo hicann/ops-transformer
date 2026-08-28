@@ -43,13 +43,13 @@ def check_valid_param(params):
     cmp_mask_mode = params.get("cmp_mask_mode")
 
     if template_run_mode in ("ORI_SPARSE", "ORI_CMP_SPARSE"):
-        if ori_mask_mode != 0:
+        if ori_mask_mode != 0 and ori_mask_mode != 3 and ori_mask_mode != 4:
             raise ValueError(
-                f"ORI_SPARSE/ORI_CMP_SPARSE模式下ori_mask_mode仅支持0, 当前为{ori_mask_mode}"
+                f"ORI_SPARSE/ORI_CMP_SPARSE模式下ori_mask_mode仅支持0/3/4, 当前为{ori_mask_mode}"
             )
-        if cmp_mask_mode != 0:
+        if cmp_mask_mode != 0 and cmp_mask_mode != 3:
             raise ValueError(
-                f"ORI_SPARSE/ORI_CMP_SPARSE模式下cmp_mask_mode仅支持0, 当前为{cmp_mask_mode}"
+                f"ORI_SPARSE/ORI_CMP_SPARSE模式下cmp_mask_mode仅支持0/3, 当前为{cmp_mask_mode}"
             )
 
     B = params.get("B")
