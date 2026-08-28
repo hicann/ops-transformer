@@ -41,39 +41,43 @@ struct MinimaxSaSplitKvKernelParamsArch35 {
     GM_ADDR actualQseqlen;
     GM_ADDR actualKvseqlen;
     GM_ADDR o;
+    GM_ADDR softmaxLse;
     GM_ADDR workSpace;
     GM_ADDR tiling;
 
-    __aicore__ inline
-    MinimaxSaSplitKvKernelParamsArch35() {}
+    __aicore__ inline MinimaxSaSplitKvKernelParamsArch35() {}
 
-    __aicore__ inline
-    MinimaxSaSplitKvKernelParamsArch35(
-        GM_ADDR q_, GM_ADDR k_, GM_ADDR v_,
-        GM_ADDR blockTable_, GM_ADDR k2qRowPtr_,
-        GM_ADDR k2qQIndices_, GM_ADDR k2qSlotIndices_,
-        GM_ADDR actualQseqlen_, GM_ADDR actualKvseqlen_,
-        GM_ADDR o_, GM_ADDR workSpace_, GM_ADDR tiling_)
-        : q(q_), k(k_), v(v_), blockTable(blockTable_),
-          k2qRowPtr(k2qRowPtr_), k2qQIndices(k2qQIndices_),
+    __aicore__ inline MinimaxSaSplitKvKernelParamsArch35(GM_ADDR q_, GM_ADDR k_, GM_ADDR v_, GM_ADDR blockTable_,
+                                                         GM_ADDR k2qRowPtr_, GM_ADDR k2qQIndices_,
+                                                         GM_ADDR k2qSlotIndices_, GM_ADDR actualQseqlen_,
+                                                         GM_ADDR actualKvseqlen_, GM_ADDR o_, GM_ADDR softmaxLse_,
+                                                         GM_ADDR workSpace_, GM_ADDR tiling_)
+        : q(q_),
+          k(k_),
+          v(v_),
+          blockTable(blockTable_),
+          k2qRowPtr(k2qRowPtr_),
+          k2qQIndices(k2qQIndices_),
           k2qSlotIndices(k2qSlotIndices_),
           actualQseqlen(actualQseqlen_),
-          actualKvseqlen(actualKvseqlen_), o(o_), workSpace(workSpace_),
-          tiling(tiling_) {}
+          actualKvseqlen(actualKvseqlen_),
+          o(o_),
+          softmaxLse(softmaxLse_),
+          workSpace(workSpace_),
+          tiling(tiling_)
+    {}
 };
 
-__aicore__ inline
-uint32_t CeilDiv(uint32_t a, uint32_t b)
+__aicore__ inline uint32_t CeilDiv(uint32_t a, uint32_t b)
 {
     return (a + b - 1) / b;
 }
 
-__aicore__ inline
-uint32_t RoundUp(uint32_t a, uint32_t b)
+__aicore__ inline uint32_t RoundUp(uint32_t a, uint32_t b)
 {
     return CeilDiv(a, b) * b;
 }
 
-}  // namespace MinimaxSaSplitKvKernelArch35
+} // namespace MinimaxSaSplitKvKernelArch35
 
-#endif  // MINIMAX_SA_SPLIT_KV_ARCH35_KERNEL_UTILS
+#endif // MINIMAX_SA_SPLIT_KV_ARCH35_KERNEL_UTILS

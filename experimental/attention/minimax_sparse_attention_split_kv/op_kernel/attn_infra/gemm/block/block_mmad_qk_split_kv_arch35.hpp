@@ -12,6 +12,7 @@
 #ifndef GEMM_BLOCK_MMAD_QK_SPLIT_KV_ARCH35_HPP
 #define GEMM_BLOCK_MMAD_QK_SPLIT_KV_ARCH35_HPP
 
+#include <type_traits>
 #include "../../../attn_infra/base_defs.hpp"
 #include "../../../attn_infra/arch/resource.hpp"
 #include "../../../attn_infra/arch/cross_core_sync.hpp"
@@ -38,9 +39,8 @@ struct BlockMmadQKSplitKvArch35 {
     using LayoutTagK = layout::ColumnMajor;
     using LayoutTagS = layout::RowMajor;
 
-    using TileCopy = Gemm::Tile::PackedTileCopyTlaToUB<
-        ArchTag, ElementQ, LayoutTagQ, ElementK, LayoutTagK,
-        ElementS, LayoutTagS, void, Gemm::Tile::CopyL0CToUBMode::NO_SPLIT>;
+    using TileCopy = Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementQ, LayoutTagQ, ElementK, LayoutTagK, ElementS,
+                                                       LayoutTagS, void, Gemm::Tile::CopyL0CToUBMode::NO_SPLIT>;
 
     using CopyL1ToL0A = typename TileCopy::CopyL1ToL0A;
     using CopyL1ToL0B = typename TileCopy::CopyL1ToL0B;
@@ -76,12 +76,10 @@ struct BlockMmadQKSplitKvArch35 {
 
     uint32_t l1KBufBytes_;
 
-    __aicore__ inline
-    BlockMmadQKSplitKvArch35() {}
+    __aicore__ inline BlockMmadQKSplitKvArch35() {}
 
     template <uint32_t MODE, pipe_t PIPE>
-    __aicore__ inline
-    void SetCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
+    __aicore__ inline void SetCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
     {
         if constexpr (MODE == 4U) {
             uint16_t flagIdV0 = crossCoreFlag.id;
@@ -93,8 +91,7 @@ struct BlockMmadQKSplitKvArch35 {
     }
 
     template <uint32_t MODE, pipe_t PIPE>
-    __aicore__ inline
-    void WaitCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
+    __aicore__ inline void WaitCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
     {
         if constexpr (MODE == 4U) {
             uint16_t flagIdV0 = crossCoreFlag.id;
@@ -105,8 +102,7 @@ struct BlockMmadQKSplitKvArch35 {
         }
     }
 
-    __aicore__ inline
-    void Init(Arch::Resource<ArchTag> &resource, uint32_t blockSize, uint32_t D)
+    __aicore__ inline void Init(Arch::Resource<ArchTag> &resource, uint32_t blockSize, uint32_t D)
     {
         uint32_t kBufBytes = blockSize * D * sizeof(ElementK);
         uint32_t qBufBytes = L0_TILE_M * D * sizeof(ElementQ);
@@ -114,8 +110,7 @@ struct BlockMmadQKSplitKvArch35 {
 
         l1KTensor_ = resource.l1Buf.template GetBufferByByte<ElementK>(0);
         for (uint32_t i = 0; i < L1_Q_STAGES; i++) {
-            l1QTensor_[i] = resource.l1Buf.template GetBufferByByte<ElementQ>(
-                kBufBytes + qBufBytes * i);
+            l1QTensor_[i] = resource.l1Buf.template GetBufferByByte<ElementQ>(kBufBytes + qBufBytes * i);
         }
         for (uint32_t i = 0; i < L0_STAGES; i++) {
             l0ATensor_[i] = resource.l0ABuf.template GetBufferByByte<ElementQ>(L0A_BUF_SIZE * i);
@@ -125,18 +120,15 @@ struct BlockMmadQKSplitKvArch35 {
     }
 
     template <class TensorK>
-    __aicore__ inline
-    void LoadKResident(TensorK &gmKTensor, uint32_t validSize, uint32_t D)
+    __aicore__ inline void LoadKResident(TensorK &gmKTensor, uint32_t validSize, uint32_t D)
     {
         using CopyGmToL1K = typename TileCopy::template CopyGmToL1B<TensorK>;
         CopyGmToL1K copyGmToL1K;
 
         auto l1KLayout = tla::MakeLayout<ElementK, LayoutTagL1B>(D, validSize);
         auto l1KTensorTla = tla::MakeTensor(l1KTensor_, l1KLayout, Arch::PositionL1{});
-        auto l1KTile = GetTile(l1KTensorTla,
-            tla::MakeCoord(0, 0), tla::MakeShape(D, validSize));
-        auto gmKTile = GetTile(gmKTensor,
-            tla::MakeCoord(0, 0), tla::MakeShape(D, validSize));
+        auto l1KTile = GetTile(l1KTensorTla, tla::MakeCoord(0, 0), tla::MakeShape(D, validSize));
+        auto gmKTile = GetTile(gmKTensor, tla::MakeCoord(0, 0), tla::MakeShape(D, validSize));
 
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(EVENT_ID0);
         copyGmToL1K(l1KTile, gmKTile);
@@ -156,27 +148,21 @@ struct BlockMmadQKSplitKvArch35 {
     }
 
     // Batched QK: M = groupCount * groupRows (up to 128 = 8 groups). groupCount scattered
-    // gmQ slabs [groupRows, K] are gathered into contiguous L1 Q rows [g*groupRows] (same total
-    // MTE2 volume as the old per-qToken path, now feeding one M=128 matmul instead of 8 M=16
-    // matmuls). qBase is computed on demand from qToken (== qToken*qHeads*embed + qHeadStart*embed
-    // = qToken*perQTokenStrideQ + qHeadStartBase); the kernel precomputes perQTokenStrideQ
-    // (=qHeads*embed) and qHeadStartBase (=qHeadStart*embed), constant within a kvHead. The
-    // matmul/fixpipe below are unchanged and already tile M via mL0Num.
+    // gmQ slabs [groupRows, K] are gathered into contiguous L1 Q rows [g*groupRows].
+    // qBases[g] is the GM offset of query[qToken, qHeadStart, :] (TND or BNSD).
+    // qGmRowStride is the GM distance between consecutive Q heads of the same token:
+    // TND/PA/BSND = D, BNSD = S * D. Layout shape uses that stride so Nd2Nz srcDValue gathers
+    // the GQA group in one copy.
     template <class TensorQ, class TensorS>
-    __aicore__ inline
-    void operator()(TensorQ &gQ, const uint32_t *qTokens,
-                    uint32_t groupCount, uint32_t groupRows,
-                    TensorS &ubSTensor,
-                    uint32_t validSize, uint32_t D,
-                    uint64_t perQTokenStrideQ, uint64_t qHeadStartBase,
-                    uint32_t numBatches, uint32_t bi,
-                    Arch::CrossCoreFlag &mm1ToSmFlag)
+    __aicore__ inline void operator()(TensorQ &gQ, const uint64_t *qBases, uint32_t groupCount, uint32_t groupRows,
+                                      TensorS &ubSTensor, uint32_t validSize, uint32_t D, uint32_t qGmRowStride,
+                                      uint32_t numBatches, uint32_t bi, Arch::CrossCoreFlag &mm1ToSmFlag)
     {
         uint32_t M = groupCount * groupRows;
         uint32_t N = validSize;
         uint32_t K = D;
 
-        auto gmQLayout = tla::MakeLayout<ElementQ, LayoutTagQ>(groupRows, K);
+        auto gmQLayout = tla::MakeLayout<ElementQ, LayoutTagQ>(groupRows, qGmRowStride);
         auto gmQEx = tla::MakeTensor(gQ, gmQLayout, Arch::PositionGM{});
         using CopyGmToL1Q = typename TileCopy::template CopyGmToL1A<decltype(gmQEx)>;
         CopyGmToL1Q copyGmToL1Q;
@@ -192,27 +178,25 @@ struct BlockMmadQKSplitKvArch35 {
 
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(EVENT_ID1);
         for (uint32_t g = 0; g < groupCount; g += COPY_GRANULARITY) {
-            uint64_t qBase = static_cast<uint64_t>(qTokens[g]) * perQTokenStrideQ + qHeadStartBase;
+            uint64_t qBase = qBases[g];
             uint64_t srcNdMatrixStride = 0;
             uint64_t dstNzMatrixStride = 0;
             uint32_t ndNum = 1;
             if (g + 1 < groupCount) {
-                uint32_t nextQ = qTokens[g + 1];
+                uint64_t qBaseNext = qBases[g + 1];
                 // 950平台，srcNdMatrixStride不限制小于65536
-                if (nextQ > qTokens[g]) {
-                    srcNdMatrixStride = static_cast<uint64_t>(nextQ - qTokens[g]) * perQTokenStrideQ;
+                if (qBaseNext > qBase) {
+                    srcNdMatrixStride = qBaseNext - qBase;
                 } else {
-                    srcNdMatrixStride = static_cast<uint64_t>(qTokens[g] - nextQ) * perQTokenStrideQ;
-                    qBase = static_cast<uint64_t>(nextQ) * perQTokenStrideQ + qHeadStartBase;
+                    srcNdMatrixStride = qBase - qBaseNext;
+                    qBase = qBaseNext;
                 }
                 dstNzMatrixStride = groupRows * C0_SIZE;
                 ndNum = COPY_GRANULARITY;
             }
             auto gmQTensor = tla::MakeTensor(gQ[qBase], gmQLayout, Arch::PositionGM{});
-            auto gmQTile = GetTile(gmQTensor,
-                tla::MakeCoord(0, 0), tla::MakeShape(groupRows, K));
-            auto l1QTile = GetTile(l1QTensorTla,
-                tla::MakeCoord(g * groupRows, 0), tla::MakeShape(groupRows, K));
+            auto gmQTile = GetTile(gmQTensor, tla::MakeCoord(0, 0), tla::MakeShape(groupRows, K));
+            auto l1QTile = GetTile(l1QTensorTla, tla::MakeCoord(g * groupRows, 0), tla::MakeShape(groupRows, K));
             copyGmToL1Q(l1QTile, gmQTile, ndNum, srcNdMatrixStride, dstNzMatrixStride);
         }
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID1);
@@ -242,8 +226,7 @@ struct BlockMmadQKSplitKvArch35 {
 
             for (uint32_t mL0Itr = 0; mL0Itr < mL0Num; mL0Itr++) {
                 uint32_t mAct = (mL0Itr == mL0Num - 1) ? (M - mL0Itr * L0_TILE_M) : L0_TILE_M;
-                auto l0CTile = GetTile(l0CTensorTla,
-                    tla::MakeCoord(mL0Itr * L0_TILE_M, 0), tla::MakeShape(mAct, nAct));
+                auto l0CTile = GetTile(l0CTensorTla, tla::MakeCoord(mL0Itr * L0_TILE_M, 0), tla::MakeShape(mAct, nAct));
 
                 for (uint32_t kL0Itr = 0; kL0Itr < kL0Num; kL0Itr++) {
                     uint32_t kAct = (kL0Itr == kL0Num - 1) ? (K - kL0Itr * L0_TILE_K) : L0_TILE_K;
@@ -252,9 +235,8 @@ struct BlockMmadQKSplitKvArch35 {
                     uint32_t l0AEventId = l0ABufId;
                     uint32_t l0BEventId = l0BBufId + 2;
 
-                    auto l1QSubTile = GetTile(l1QTensorTla,
-                        tla::MakeCoord(mL0Itr * L0_TILE_M, kL0Itr * L0_TILE_K),
-                        tla::MakeShape(mAct, kAct));
+                    auto l1QSubTile = GetTile(l1QTensorTla, tla::MakeCoord(mL0Itr * L0_TILE_M, kL0Itr * L0_TILE_K),
+                                              tla::MakeShape(mAct, kAct));
                     auto l0ALayout = tla::MakeLayout<ElementQ, LayoutTagL0A>(mAct, kAct);
                     auto l0ATensorTla = tla::MakeTensor(l0ATensor_[l0ABufId], l0ALayout, Arch::PositionL0A{});
 
@@ -284,8 +266,7 @@ struct BlockMmadQKSplitKvArch35 {
                     if (mL0Itr == 0 && kL0Itr == 0) {
                         AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(l0CEventId);
                     }
-                    tileMmad(l0CTile, l0ATensorTla, l0BTensorTla,
-                             mAligned, nAct, kAct, initMmad);
+                    tileMmad(l0CTile, l0ATensorTla, l0BTensorTla, mAligned, nAct, kAct, initMmad);
                     AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0AEventId);
                     if (lastQKBatch) {
                         AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0BEventId);
@@ -306,17 +287,28 @@ struct BlockMmadQKSplitKvArch35 {
             uint32_t gSplit = CeilDiv(groupCount, 2U);
             uint32_t mSub0 = gSplit * groupRows;
             uint32_t mSub1 = (groupCount - gSplit) * groupRows;
-            auto ubSTileSub0 = GetTile(ubSTensor,
-                tla::MakeCoord(0, nL0Itr * L0_TILE_N), tla::MakeShape(mSub0, nFixPAligned16));
-            auto l0CTileSub0 = GetTile(l0CTensorTla,
-                tla::MakeCoord(0, 0), tla::MakeShape(mSub0, nAct));
-            copyL0CToDstSub0(ubSTileSub0, l0CTileSub0, false);
-            if (mSub1 > 0U) {
-                auto ubSTileSub1 = GetTile(ubSTensor,
-                    tla::MakeCoord(0, nL0Itr * L0_TILE_N), tla::MakeShape(mSub1, nFixPAligned16));
-                auto l0CTileSub1 = GetTile(l0CTensorTla,
-                    tla::MakeCoord(mSub0, 0), tla::MakeShape(mSub1, nAct));
-                copyL0CToDstSub1(ubSTileSub1, l0CTileSub1, true);
+            if constexpr (std::is_same<ElementS, float>::value) {
+                // A5 NoQuant L0C→UB: dualDstCtl=1 deadlocks with CrossCore (Fixpipe waits
+                // for both AIVs while they wait for mm1ToSmFlag after Fixpipe). Sequential
+                // subBlockId=1 is the original 20003 MTE exception. Write the full S tile
+                // to AIV0 only; high-prec softmax / ScatterBatchStats are AIV0-only.
+                auto ubSTile =
+                    GetTile(ubSTensor, tla::MakeCoord(0, nL0Itr * L0_TILE_N), tla::MakeShape(M, nFixPAligned16));
+                auto l0CTile = GetTile(l0CTensorTla, tla::MakeCoord(0, 0), tla::MakeShape(M, nAct));
+                copyL0CToDstSub0(ubSTile, l0CTile, false);
+                (void)mSub0;
+                (void)mSub1;
+            } else {
+                auto ubSTileSub0 =
+                    GetTile(ubSTensor, tla::MakeCoord(0, nL0Itr * L0_TILE_N), tla::MakeShape(mSub0, nFixPAligned16));
+                auto l0CTileSub0 = GetTile(l0CTensorTla, tla::MakeCoord(0, 0), tla::MakeShape(mSub0, nAct));
+                copyL0CToDstSub0(ubSTileSub0, l0CTileSub0, false);
+                if (mSub1 > 0U) {
+                    auto ubSTileSub1 = GetTile(ubSTensor, tla::MakeCoord(0, nL0Itr * L0_TILE_N),
+                                               tla::MakeShape(mSub1, nFixPAligned16));
+                    auto l0CTileSub1 = GetTile(l0CTensorTla, tla::MakeCoord(mSub0, 0), tla::MakeShape(mSub1, nAct));
+                    copyL0CToDstSub1(ubSTileSub1, l0CTileSub1, true);
+                }
             }
             AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0CEventId);
         }
@@ -325,6 +317,6 @@ struct BlockMmadQKSplitKvArch35 {
     }
 };
 
-}  // namespace NpuArch::Gemm::Block
+} // namespace NpuArch::Gemm::Block
 
-#endif  // GEMM_BLOCK_MMAD_QK_SPLIT_KV_ARCH35_HPP
+#endif // GEMM_BLOCK_MMAD_QK_SPLIT_KV_ARCH35_HPP

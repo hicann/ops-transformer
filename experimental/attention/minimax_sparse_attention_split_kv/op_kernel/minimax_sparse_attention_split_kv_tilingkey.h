@@ -15,9 +15,13 @@
 
 #define MINIMAX_SA_SPLIT_KV_BASE_TILING 20000
 
+// innerPrecise==4 (default): bf16 softmax S + fp32 O_partial.
 #define MINIMAX_SA_SPLIT_KV_BF16_D128_TILING 20001
 
-// innerPrecise==1: O_partial stored as bf16 (PV fixpipe F322BF16 + Phase2 regbase cast).
+// innerPrecise==1: bf16 softmax S + bf16 O_partial (PV fixpipe F322BF16 + Phase2 regbase cast).
 #define MINIMAX_SA_SPLIT_KV_BF16_D128_INNER_LOW_TILING 20002
 
-#endif  // MINIMAX_SPARSE_ATTENTION_SPLIT_KV_TILINGKEY_H
+// innerPrecise==0: fp32 softmax S (QK NoQuant) + fp32 O_partial.
+#define MINIMAX_SA_SPLIT_KV_BF16_D128_INNER_HIGH_TILING 20003
+
+#endif // MINIMAX_SPARSE_ATTENTION_SPLIT_KV_TILINGKEY_H

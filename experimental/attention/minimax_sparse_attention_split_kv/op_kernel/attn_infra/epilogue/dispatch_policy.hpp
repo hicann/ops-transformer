@@ -16,7 +16,7 @@
 
 namespace NpuArch::Epilogue {
 
-// Prefill Phase1 online softmax (bf16 S path)
+// Prefill Phase1 online softmax (bf16 S / fp32 S specializations)
 struct EpilogueOnlineSoftmaxBsa {
     using ArchTag = Arch::AtlasA5;
 };
@@ -26,6 +26,6 @@ struct EpilogueRescaleOSplitKvArch35 {
     using ArchTag = Arch::AtlasA5;
 };
 
-}  // namespace NpuArch::Epilogue
+} // namespace NpuArch::Epilogue
 
-#endif  // EPILOGUE_DISPATCH_POLICY_HPP
+#endif // EPILOGUE_DISPATCH_POLICY_HPP
