@@ -84,10 +84,9 @@ at::Tensor MixedQuantSparseFlashMlaMetadata(
     return output;
 }
 
-std::tuple<at::Tensor, at::Tensor>
-ConstructMixedQuantSparseFlashMlaAttenOutTensor(const at::Tensor &q, const at::Tensor &oriKv, std::string layoutQStr,
-                                                std::string layoutKvStr, const uint64_t &ropeHeadDim,
-                                                bool returnSoftmaxLse)
+std::tuple<at::Tensor, at::Tensor> ConstructMixedQuantSparseFlashMlaAttenOutTensor(
+    const at::Tensor &q, const at::Tensor &oriKv, std::string layoutQStr, std::string layoutKvStr,
+    const uint64_t &ropeHeadDim, bool returnSoftmaxLse)
 {
     TORCH_CHECK(layoutQStr == "BSND" || layoutQStr == "TND", "The layout of query only support BSND and TND, but got ",
                 layoutQStr);
@@ -135,8 +134,8 @@ ConstructMixedQuantSparseFlashMlaAttenOutTensor(const at::Tensor &q, const at::T
             }
         }
     } else {
-        // 不返回时tensor传空
-        softmaxLseSize = {};
+        // 不返回时tensor传0
+        softmaxLseSize = {0};
     }
     at::Tensor softmaxLse = at::empty(softmaxLseSize, q.options().dtype(torch::kFloat32));
 
