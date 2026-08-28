@@ -92,31 +92,35 @@ graphStatus IncreHostExecuteFunc(OpExecutePrepareContext *host_api_ctx)
     const char *layout = attrs->GetAttrPointer<char>(LAYOUT_INDEX);
     const uint32_t *kvHeadNum = attrs->GetAttrPointer<uint32_t>(KV_HEAD_NUM_INDEX);
     const uint32_t *blockSize = attrs->GetAttrPointer<uint32_t>(BLOCK_SIZE_INDEX);
-    OP_CHECK_IF(blockSize == nullptr,  
-        OP_LOGE(host_api_ctx->GetNodeName(),  
-            "In block-wise attention computation, blockSize is a required parameter (controls matrix block dimension), must not be null, but a null was actually passed."), 
-        return GRAPH_FAILED);
+    OP_CHECK_IF(blockSize == nullptr,
+                OP_LOGE(host_api_ctx->GetNodeName(),
+                        "In block-wise attention computation, blockSize is a required parameter (controls matrix block "
+                        "dimension), must not be null, but a null was actually passed."),
+                return GRAPH_FAILED);
 
     const uint32_t *innerPrecise = attrs->GetAttrPointer<uint32_t>(INNER_PRECISE_INDEX);
-    OP_CHECK_IF(innerPrecise == nullptr, 
-        OP_LOGE(host_api_ctx->GetNodeName(), 
-            "In internal operations (e.g., attention matrix multiplication, softmax), innerPrecise is a required parameter (specifies precision), must not be null, but a null was actually passed."), 
-        return GRAPH_FAILED);
+    OP_CHECK_IF(innerPrecise == nullptr,
+                OP_LOGE(host_api_ctx->GetNodeName(),
+                        "In internal operations (e.g., attention matrix multiplication, softmax), innerPrecise is a "
+                        "required parameter (specifies precision), must not be null, but a null was actually passed."),
+                return GRAPH_FAILED);
 
-    OP_CHECK_IF(scaleValue == nullptr,  
-        OP_LOGE(host_api_ctx->GetNodeName(),  
-            "When computing attention weights, scaleValue is a required parameter (normalizes QK^T to prevent softmax gradient vanishing), must not be null, but a null was actually passed."), 
-        return GRAPH_FAILED);
+    OP_CHECK_IF(scaleValue == nullptr,
+                OP_LOGE(host_api_ctx->GetNodeName(),
+                        "When computing attention weights, scaleValue is a required parameter (normalizes QK^T to "
+                        "prevent softmax gradient vanishing), must not be null, but a null was actually passed."),
+                return GRAPH_FAILED);
 
     double dScaleValue = *scaleValue;
 
     // execute opapi
     auto api_ret =
-        EXEC_OPAPI_PREPARE_CMD(aclnnIncreFlashAttentionV4, query, ge_tenserListKey, ge_tenserListValue, pseShiftGe, attenMaskGe,
-                       actSeqArray, dequantScale1Ge, quantScale1Ge, dequantScale2Ge, quantScale2Ge, quantOffset2Ge,
-                       antiquantScaleGe, antiquantOffsetGe, blocktableGe, kvPaddingSizeGe, *num_heads, dScaleValue,
-                       layout, *kvHeadNum, *blockSize, *innerPrecise, output);
-    OP_CHECK_IF(api_ret != GRAPH_SUCCESS, OP_LOGE(host_api_ctx->GetNodeName(), "api_ret faild:%u", api_ret), return GRAPH_FAILED);
+        EXEC_OPAPI_PREPARE_CMD(aclnnIncreFlashAttentionV4, query, ge_tenserListKey, ge_tenserListValue, pseShiftGe,
+                               attenMaskGe, actSeqArray, dequantScale1Ge, quantScale1Ge, dequantScale2Ge, quantScale2Ge,
+                               quantOffset2Ge, antiquantScaleGe, antiquantOffsetGe, blocktableGe, kvPaddingSizeGe,
+                               *num_heads, dScaleValue, layout, *kvHeadNum, *blockSize, *innerPrecise, output);
+    OP_CHECK_IF(api_ret != GRAPH_SUCCESS, OP_LOGE(host_api_ctx->GetNodeName(), "api_ret failed:%u", api_ret),
+                return GRAPH_FAILED);
 
     return GRAPH_SUCCESS;
 }
