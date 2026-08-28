@@ -8,10 +8,10 @@
 - <term>Ascend 950PR/Ascend 950DT</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
@@ -25,120 +25,162 @@
 
 ## 功能说明
 
-- 接口功能：MhcPreBackward是MhcPre的反向算子，MhcPre算子基于一系列计算得到mHC（Manifold-Constrained Hyper-Connections）架构中的$H^{res}$和$H^{post}$投影矩阵以及Atten或MLP层的输入矩阵$h^{in}$
+- 接口功能：MhcPreBackward是MhcPre的反向算子，MhcPre算子基于一系列计算得到mHC（Manifold-Constrained Hyper-Connections）架构中的$H^{res}$和$H^{post}$投影矩阵以及Atten或MLP层的输入矩阵$h^{in}$。
 
 - 计算公式：
 
-    - 输出组合梯度计算
+  - 输出组合梯度计算：
 
-        - 正向公式：
-            $$H\_in = \sum_{i=1}^{N} x[{B,S,i,:}] · H\_pre_n[B,S,i]$$
-        - 反向计算：
-            $$
-            \begin{aligned}
-            H\_pre\_grad &= \text{Reduce}\left(H\_in\_grad.\text{unsqueeze}(-2) \odot x, \text{dim}=-1\right) \quad ([B,S,N]) \\
-            x\_grad\_vec3 &= H\_in\_grad \times H\_pre \quad ([B,S,N,D])
-            \end{aligned}
-            $$
+    - 正向公式：
 
-    - Sigmoid门控反向（H_pre）
-        - 正向公式：
-        $$H\_pre = \text{Sigmoid}(\alpha\_pre * H\_pre\_1 + bias\_pre) + hc\_eps$$
-        - 反向计算：
-            $$
-            \begin{aligned}
-            s &= H\_pre - hc\_eps \\
-            H\_pre\_2\_grad &= H\_pre\_grad \odot s \odot (1 - s) \\
-            H\_pre\_1\_grad &= H\_pre\_2\_grad \cdot \alpha\_pre \\
-            \alpha\_pre\_grad &= \sum_{b,s,n}^{B,S,N} \left(H\_pre\_2\_grad \cdot H\_pre\_1\right) \\
-            bias\_pre\_grad &= \sum_{b,s}^{B,S} H\_pre\_2\_grad \quad ([N])
-            \end{aligned}
-            $$
+      $$
+      H\_in = \sum_{i=1}^{N} x[{B,S,i,:}] · H\_pre_n[B,S,i]
+      $$
 
-    - Sigmoid门控反向（H_post）
-        - 正向公式：
-        $$H\_post = \text{Sigmoid}(\alpha\_post * H\_post\_1 + bias\_post) * 2$$
-        - 反向计算：
-            $$
-            \begin{aligned}
-            H\_post\_2\_grad &= H\_post\_grad \odot \left(H\_post \cdot \left(1 - \frac{H\_post}{2}\right)\right) \\
-            H\_post\_1\_grad &= H\_post\_2\_grad \cdot \alpha_{post} \\
-            \alpha_{post\_grad} &= \sum_{b,s,n}^{B,S,N} \left(H\_post\_2\_grad \cdot H_{post\_1}\right) \\
-            bias\_post\_grad &= \sum_{b,s}^{B,S} H\_post\_2\_grad \quad ([N])
-            \end{aligned}
-            $$
+    - 反向计算：
 
-    - 残差连接反向（H_res）
-        - 正向公式：
-        $$H\_res = \alpha\_res * H\_res\_1 + bias\_res$$
-        - 反向计算：
-            $$
-            \begin{aligned}
-            H\_res\_2\_grad &= H\_res\_grad \cdot \alpha_{res} \quad ([B,S,N,N]) \\
-            \alpha\_res\_grad &= \sum_{b,s,i,j}^{B,S,N,N} \left(H\_res\_grad \cdot H\_res\_2\right) \\
-            bias\_res\_grad &= \sum_{b,s}^{B,S} H\_res\_grad \quad ([N,N]) \\
-            H\_res\_1\_grad &= \text{Reshape}(H\_res\_2\_grad) \quad ([B,S,N^2])
-            \end{aligned}
-            $$
+      $$
+      \begin{aligned}
+      H\_pre\_grad &= \text{Reduce}\left(H\_in\_grad.\text{unsqueeze}(-2) \odot x, \text{dim}=-1\right) \quad ([B,S,N]) \\
+      x\_grad\_vec3 &= H\_in\_grad \times H\_pre \quad ([B,S,N,D])
+      \end{aligned}
+      $$
 
-    - RMSNorm Fusion反向
-        - 正向公式：
-        $$H\_mix\_tmp = H\_mix * inv\_rms$$
-        - 反向计算：
-            $$
-            \begin{aligned}
-            H\_mix\_tmp\_grad &= \text{Concat}(H\_pre\_1\_grad, H\_post\_1\_grad, H\_res\_1\_grad) \quad ([B,S,2N+N^2]) \\
-            H\_mix\_grad &= H\_mix\_tmp\_grad \cdot inv\_rms \\
-            inv\_rms_{grad} &= \sum_{\text{last\_dim}} \left(H\_mix\_tmp\_grad \cdot H\_mix\right) \quad ([B,S,1])
-            \end{aligned}
-            $$
+  - Sigmoid门控反向（H_pre）：
+    - 正向公式：
 
-    - 矩阵乘法反向
-        - 正向公式：
-        $$H\_mix = x\_rs @ phi^T$$
-        $$x\_rs = x * gamma$$
-        - 反向计算：
-            $$
-            \begin{aligned}
-            x\_rs\_grad &= H\_mix\_grad @ phi \quad ([B,S,ND]) \\
-            X &= \text{Reshape}(x\_rs, [B\cdot S, ND]) \\
-            G &= \text{Reshape}(H\_mix\_grad, [B\cdot S, 2N+N^2]) \\
-            phi_{grad} &= G^T @ X \quad ([2N+N^2, ND])
-            \end{aligned}
-            $$
+      $$
+      H\_pre = \text{Sigmoid}(\alpha\_pre * H\_pre\_1 + bias\_pre) + hc\_eps
+      $$
 
-    - 特征缩放反向
-        - 正向公式：
-        $$x\_rs = x * gamma$$
-        - 反向计算：
-            $$
-            \begin{aligned}
-            x\_grad\_mm &= x\_rs\_grad * gamma \\
-            gamma\_grad &= \sum_{b=1}^{B}\sum_{s=1}^{S} (x * x\_rs\_grad)\quad ([N,D])
-            \end{aligned}
-            $$
+    - 反向计算：
 
-    - RMS归一化梯度计算
-        - 正向公式：
-            $$
-            inv\_rms = \frac{1}{\sqrt{\frac{1}{n}\sum_{i=1}^{n}x_i^2 + eps}}, \quad其中\ n = N * D
-            $$
-        - 反向计算：
-            $$
-            \begin{aligned}
-            x\_rs\_grad\_inv &= - \left(\frac{inv\_rms\_grad \cdot {inv\_rms}^3}{N*D}\right) \cdot x\_rs \\
-            x\_rs\_grad &= x\_grad\_mm + x\_rs\_grad\_inv \\
-            x\_grad\_vec1 &= \text{Reshape}(x\_rs\_grad, [B,S,N,D]) \\
-            x\_grad &= x\_grad\_vec3 + x\_grad\_vec1
-            \end{aligned}
-            $$
+      $$
+      \begin{aligned}
+      s &= H\_pre - hc\_eps \\
+      H\_pre\_2\_grad &= H\_pre\_grad \odot s \odot (1 - s) \\
+      H\_pre\_1\_grad &= H\_pre\_2\_grad \cdot \alpha\_pre \\
+      \alpha\_pre\_grad &= \sum_{b,s,n}^{B,S,N} \left(H\_pre\_2\_grad \cdot H\_pre\_1\right) \\
+      bias\_pre\_grad &= \sum_{b,s}^{B,S} H\_pre\_2\_grad \quad ([N])
+      \end{aligned}
+      $$
 
-    - 融合mhc_post的grad_x相加操作
-        $$
-        \begin{aligned}
-        x\_grad &= x\_grad + grad\_x\_post
-        \end{aligned}
-        $$
+  - Sigmoid门控反向（H_post）：
+    - 正向公式：
+
+      $$
+      H\_post = \text{Sigmoid}(\alpha\_post * H\_post\_1 + bias\_post) * 2
+      $$
+
+    - 反向计算：
+
+      $$
+      \begin{aligned}
+      H\_post\_2\_grad &= H\_post\_grad \odot \left(H\_post \cdot \left(1 - \frac{H\_post}{2}\right)\right) \\
+      H\_post\_1\_grad &= H\_post\_2\_grad \cdot \alpha_{post} \\
+      \alpha_{post\_grad} &= \sum_{b,s,n}^{B,S,N} \left(H\_post\_2\_grad \cdot H_{post\_1}\right) \\
+      bias\_post\_grad &= \sum_{b,s}^{B,S} H\_post\_2\_grad \quad ([N])
+      \end{aligned}
+      $$
+
+  - 残差连接反向（H_res）：
+    - 正向公式：
+
+      $$
+      H\_res = \alpha\_res * H\_res\_1 + bias\_res
+      $$
+
+    - 反向计算：
+
+      $$
+      \begin{aligned}
+      H\_res\_2\_grad &= H\_res\_grad \cdot \alpha_{res} \quad ([B,S,N,N]) \\
+      \alpha\_res\_grad &= \sum_{b,s,i,j}^{B,S,N,N} \left(H\_res\_grad \cdot H\_res\_2\right) \\
+      bias\_res\_grad &= \sum_{b,s}^{B,S} H\_res\_grad \quad ([N,N]) \\
+      H\_res\_1\_grad &= \text{Reshape}(H\_res\_2\_grad) \quad ([B,S,N^2])
+      \end{aligned}
+      $$
+
+  - RMSNorm Fusion反向：
+    - 正向公式：
+
+      $$
+      H\_mix\_tmp = H\_mix * inv\_rms
+      $$
+
+    - 反向计算：
+
+      $$
+      \begin{aligned}
+      H\_mix\_tmp\_grad &= \text{Concat}(H\_pre\_1\_grad, H\_post\_1\_grad, H\_res\_1\_grad) \quad ([B,S,2N+N^2]) \\
+      H\_mix\_grad &= H\_mix\_tmp\_grad \cdot inv\_rms \\
+      inv\_rms_{grad} &= \sum_{\text{last\_dim}} \left(H\_mix\_tmp\_grad \cdot H\_mix\right) \quad ([B,S,1])
+      \end{aligned}
+      $$
+
+  - 矩阵乘法反向：
+    - 正向公式：
+
+      $$
+      H\_mix = x\_rs @ phi^T
+      $$
+
+      $$
+      x\_rs = x * gamma
+      $$
+
+    - 反向计算：
+
+      $$
+      \begin{aligned}
+      x\_rs\_grad &= H\_mix\_grad @ phi \quad ([B,S,ND]) \\
+      X &= \text{Reshape}(x\_rs, [B\cdot S, ND]) \\
+      G &= \text{Reshape}(H\_mix\_grad, [B\cdot S, 2N+N^2]) \\
+      phi_{grad} &= G^T @ X \quad ([2N+N^2, ND])
+      \end{aligned}
+      $$
+
+  - 特征缩放反向：
+    - 正向公式：
+
+      $$
+      x\_rs = x * gamma
+      $$
+
+    - 反向计算：
+
+      $$
+      \begin{aligned}
+      x\_grad\_mm &= x\_rs\_grad * gamma \\
+      gamma\_grad &= \sum_{b=1}^{B}\sum_{s=1}^{S} (x * x\_rs\_grad)\quad ([N,D])
+      \end{aligned}
+      $$
+
+  - RMS归一化梯度计算：
+    - 正向公式：
+
+      $$
+      inv\_rms = \frac{1}{\sqrt{\frac{1}{n}\sum_{i=1}^{n}x_i^2 + eps}}, \quad其中\ n = N * D
+      $$
+
+    - 反向计算：
+
+      $$
+      \begin{aligned}
+      x\_rs\_grad\_inv &= - \left(\frac{inv\_rms\_grad \cdot {inv\_rms}^3}{N*D}\right) \cdot x\_rs \\
+      x\_rs\_grad &= x\_grad\_mm + x\_rs\_grad\_inv \\
+      x\_grad\_vec1 &= \text{Reshape}(x\_rs\_grad, [B,S,N,D]) \\
+      x\_grad &= x\_grad\_vec3 + x\_grad\_vec1
+      \end{aligned}
+      $$
+
+  - 融合mhc_post的grad_x相加操作：
+
+    $$
+    \begin{aligned}
+    x\_grad &= x\_grad + grad\_x\_post
+    \end{aligned}
+    $$
 
 ## 函数原型
 
@@ -204,167 +246,127 @@ aclnnStatus aclnnMhcPreBackward(
         </tr></thead>
         <tbody>
         <tr>
-            <td>x</td>
+            <td>x（aclTensor*）</td>
             <td>输入</td>
             <td>待计算数据，表示网络中mHC层的输入数据。</td>
-            <td><li>不支持空Tensor。</li></td>
+            <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, N, D)、(T, N, D)。其中，B：支持泛化；S：支持泛化；T=B*S。</li></ul></td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
-            <td>(B,S,N,D)、(T,N,D)<br>
-            B：支持泛化；S：支持泛化；T：B*S。
-            </td>
+            <td>3-4</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>phi</td>
+            <td>phi（aclTensor*）</td>
             <td>输入</td>
             <td>mHC的参数矩阵。</td>
-            <td><li>不支持空Tensor。</li></td>
+            <td><ul><li>不支持空Tensor。</li><li>shape为(2N+N*N, N*D)或者(2N+N!, N*D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
-            <td>(2N+N*N,N*D)<br>
-            N:与x的N保持一致；D:与x的D保持一致
-            </td>
+            <td>2</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>alpha</td>
+            <td>alpha（aclTensor*）</td>
             <td>输入</td>
             <td>mHC的缩放参数alpha。</td>
-            <td><li>不支持空Tensor。</li></td>
+            <td><ul><li>不支持空Tensor。</li><li>shape为(3)。</li></ul></td>
             <td>FLOAT32</td>
-            <td>-</td>
-            <td>(3)</td>
-            <td>-</td>
+            <td>ND</td>
+            <td>1</td>
+            <td>√</td>
         </tr>
         <tr>
-            <td>gradHIn</td>
+            <td>gradHIn（aclTensor*）</td>
             <td>输入</td>
             <td>hIn作为Atten/MLP层的输入。正向输出hIn对应的梯度。</td>
-            <td>
-            <li>不支持空Tensor。</li>
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, D)、(T, D)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；D与`x`的D保持一致。</li></ul></td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
-            <td>(B,S,D)、(T,D)<br>
-            B：与x的B保持一致；S:与x的S保持一致；T：B*S；D:与x的D保持一致。
-            </td>
+            <td>2-3</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>gradHPost</td>
+            <td>gradHPost（aclTensor*）</td>
             <td>输入</td>
             <td>正向输出hPost对应的梯度。</td>
-            <td>
-            <li>不支持空Tensor。</li>
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>shape为(B,S,N)、(T,N)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
-            <td>(B,S,N)、(T,N)<br>
-            B：与x的B保持一致；S:与x的S保持一致；T：B*S；N:与x的N保持一致。
-            </td>
+            <td>2-3</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>gradHRes</td>
+            <td>gradHRes（aclTensor*）</td>
             <td>输入</td>
             <td>正向输出hRes对应的梯度。</td>
-            <td>
-            <li>不支持空Tensor。</li>
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, N, N)、(T, N, N)、(B, S, N!)或(T, N!)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致。N!表示N的阶乘排列数（如N=4时，N!=24）。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
-            <td>(B,S,N,N)、(T,N,N)<br>
-            B：与x的B保持一致；S:与x的S保持一致；T：B*S；N:与x的N保持一致。
-            </td>
+            <td>2-4</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>invRms</td>
+            <td>invRms（aclTensor*）</td>
             <td>输入</td>
             <td>正向RmsNorm计算的invRms。</td>
-            <td>
-            <li>不支持空Tensor。</li>
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>shape为(B, S)、(T)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
-            <td>(B,S)、(T)<br>
-            B：与x的B保持一致；S:与x的S保持一致；T：B*S。
-            </td>
+            <td>1-2</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>hMix</td>
+            <td>hMix（aclTensor*）</td>
             <td>输入</td>
             <td>正向计算流x@phi的结果</td>
-            <td>
-            <li>不支持空Tensor。</li>
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, 2N+N*N)、(B, S, 2N+N!)、(T, 2N+N*N)、(T, 2N+N!)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致。最后一维需与`phi`的第0维（fusionSize）保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
-            <td>(B,S,2N+N*N)、(T,2N+N*N)<br>
-            B：与x的B保持一致；S:与x的S保持一致；T：B*S；N:与x的N保持一致。
-            </td>
+            <td>2-3</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>hPre</td>
+            <td>hPre（aclTensor*）</td>
             <td>输入</td>
             <td>正向sigmoid计算之后的hPre矩阵</td>
-            <td>
-            <li>不支持空Tensor。</li>
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, N)、(T, N)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
-            <td>(B,S,N)、(T,N)<br>
-            B：与x的B保持一致；S:与x的S保持一致；T：B*S；N:与x的N保持一致。
-            </td>
+            <td>2-3</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>hPost</td>
+            <td>hPost（aclTensor*）</td>
             <td>输入</td>
             <td>正向的hPost输出</td>
-            <td>
-            <li>不支持空Tensor。</li>
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, N)、(T, N)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
-            <td>(B,S,N)、(T,N)<br>
-            B：与x的B保持一致；S:与x的S保持一致；T：B*S；N:与x的N保持一致。
-            </td>
+            <td>2-3</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>gamma</td>
+            <td>gamma（aclTensor*）</td>
             <td>可选输入</td>
             <td>RmsNorm的缩放系数gamma</td>
-            <td>
-            <li>不支持空Tensor。</li><li>如果传入nullptr，则表示全1的tensor。</li>
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>如果传入nullptr，则表示全1的tensor。</li><li>shape为(N ,D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
-            <td>(N,D)<br>
-            N:与x的N保持一致；D:与x的D保持一致。
-            </td>
+            <td>2</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>gradXPostOptional</td>
+            <td>gradXPostOptional（aclTensor*）</td>
             <td>可选输入</td>
             <td>post反向输出的gradX</td>
-            <td>
-            <li>不支持空Tensor。</li><li>如果传入nullptr，则表示全0的tensor。</li>
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>如果传入nullptr，则表示全0的tensor。</li><li>shape为(B, S, N, D)、(T, N, D)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
-            <td>(B,S,N,D)、(T,N,D)<br>
-            B：与x的B保持一致；S:与x的S保持一致；T：B*S；N:与x的N保持一致；D：与x的D保持一致。
-            </td>
+            <td>3-4</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>hcEps</td>
+            <td>hcEps（float）</td>
             <td>可选输入</td>
             <td>HPre的sigmoid后的eps参数</td>
             <td>
@@ -376,76 +378,57 @@ aclnnStatus aclnnMhcPreBackward(
             <td>-</td>
         </tr>
         <tr>
-            <td>gradX</td>
+            <td>gradX（aclTensor*）</td>
             <td>输出</td>
             <td>x对应的梯度。</td>
-            <td>
-            <li>与输入x的维度、数据类型保持一致</li>
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>与输入x的维度、数据类型保持一致</li><li>shape为(B, S, N, D)、(T, N, D)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
-            <td>(B,S,N,D)、(T,N,D)<br>
-            B：与x的B保持一致；S:与x的S保持一致；T：B*S；N:与x的N保持一致；D：与x的D保持一致。
-            </td>
+            <td>3-4</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>gradPhi</td>
+            <td>gradPhi（aclTensor*）</td>
             <td>输出</td>
             <td>phi对应的梯度。</td>
-            <td>
-            <li>与输入phi的维度保持一致</li>
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>与输入phi的维度保持一致</li><li>shape为(2N+N*N, N*D)或(2N+N!, N*D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。与`phi`的shape保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
-            <td>(2N+N*N,N*D)<br>
-            N:与x的N保持一致；D：与x的D保持一致。
-            </td>
+            <td>2</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>gradAlpha</td>
+            <td>gradAlpha（aclTensor*）</td>
             <td>输出</td>
             <td>alpha对应的梯度。</td>
-            <td>
-            <li>与输入alpha维度保持一致。</li>
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>与输入alpha维度保持一致。</li><li>shape为(3)。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
-            <td>(3)</td>
-            <td>-</td>
+            <td>1</td>
+            <td>√</td>
         </tr>
           <tr>
-            <td>gradBias</td>
+            <td>gradBias（aclTensor*）</td>
             <td>输出</td>
             <td>bias对应的梯度。</td>
-            <td>
-            -
-            </td>
+            <td><ul><li>不支持空Tensor。</li><li>shape为(2N+N*N)或(2N+N!)。与`phi`的第0维（fusionSize）保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
-            <td>(2N+N*N)<br>
-            N:与x的N保持一致。
-            </td>
-            <td>-</td>
-        </tr>
-        <tr>
-            <td>gradGamma</td>
-            <td>可选输出</td>
-            <td>gamma对应的梯度。</td>
-            <td>
-                <li>当输入gamma不为nullptr时，此变量才会输出。</li>
-                <li>与输入gamma的Shape维度保持一致。</li>
-            </td>
-            <td>FLOAT32</td>
-            <td>ND</td>
-            <td>(N,D)<br>
-            N:与x的N保持一致；D:与x的D保持一致。
-            </td>
+            <td>1</td>
             <td>√</td>
         </tr>
         <tr>
-            <td>workspaceSize</td>
+            <td>gradGamma（aclTensor*）</td>
+            <td>可选输出</td>
+            <td>gamma对应的梯度。</td>
+            <td><ul><li>不支持空Tensor。</li><li>当输入gamma不为nullptr时，此变量才会输出。</li><li>与输入gamma的Shape维度保持一致。</li><li>shape为(N, D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
+            <td>FLOAT32</td>
+            <td>ND</td>
+            <td>2</td>
+            <td>√</td>
+        </tr>
+        <tr>
+            <td>workspaceSize（uint64_t*）</td>
             <td>输出</td>
             <td>返回需要在Device侧申请的workspace大小。</td>
             <td>-</td>
@@ -455,7 +438,7 @@ aclnnStatus aclnnMhcPreBackward(
             <td>-</td>
         </tr>
         <tr>
-            <td>executor</td>
+            <td>executor（aclOpExecutor**）</td>
             <td>输出</td>
             <td>返回op执行器，包含了算子计算流程。</td>
             <td>-</td>
@@ -466,6 +449,15 @@ aclnnStatus aclnnMhcPreBackward(
         </tr>
         </tbody>
     </table>
+
+  <!-- npu="950" id7 -->
+  - <term>Ascend 950PR/Ascend 950DT</term>：
+    - 参数`phi`的shape仅支持(2N+N\*N, N\*D)。
+    - 参数`gradHRes`的shape仅支持(B, S, N, N)、(T, N, N)。
+    - 参数`hMix`的shape仅支持(B, S, 2N+N\*N)、(T, 2N+N\*N)。
+    - 参数`gradPhi`的shape仅支持(2N+N\*N, N\*D)。
+    - 参数`gradBias`的shape仅支持(2N+N\*N)。
+  <!-- end id7 -->
 
 - **返回值**
 
@@ -551,6 +543,91 @@ aclnnStatus aclnnMhcPreBackward(
   - aclnnMhcPreBackward默认采用确定性实现。
 
 - 规格约束
+  <!-- npu="950" id7 -->
+  - <term>Ascend 950PR/Ascend 950DT</term>：
+    <table style="undefined;table-layout: fixed; width: 600px"><colgroup>
+        <col style="width: 100px">
+        <col style="width: 500px">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>格式</th>
+                <th>gradHRes shape</th>
+            </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>BSNN</td>
+            <td>(B, S, N, N)</td>
+        </tr>
+        <tr>
+            <td>TNN</td>
+            <td>(T, N, N)</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <table style="undefined;table-layout: fixed; width: 600px"><colgroup>
+        <col style="width: 100px">
+        <col style="width: 500px">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>规格项</th>
+                <th>规格说明</th>
+            </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>N</td>
+            <td>N值目前支持4、6、8。</td>
+        </tr>
+        <tr>
+            <td>D</td>
+            <td>D支持1~16384范围以内，要求64元素对齐。</td>
+        </tr>
+        <tr>
+            <td>fusionSize</td>
+            <td>仅支持N*N+2N。</td>
+        </tr>
+        </tbody>
+    </table>
+  <!-- end id7 -->
+
+  <!-- npu="A3,910b" id8 -->
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+
+    <table style="undefined;table-layout: fixed; width: 942px"><colgroup>
+        <col style="width: 100px">
+        <col style="width: 300px">
+        <col style="width: 360px">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>格式</th>
+                <th>gradHRes shape</th>
+            </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>BSNN</td>
+            <td>(B, S, N, N)</td>
+        </tr>
+        <tr>
+            <td>BSN!</td>
+            <td>(B, S, N!)</td>
+        </tr>
+        <tr>
+            <td>TNN</td>
+            <td>(T, N, N)</td>
+        </tr>
+        <tr>
+            <td>TN!</td>
+            <td>(T, N!)</td>
+        </tr>
+        </tbody>
+    </table>
+
     <table style="undefined;table-layout: fixed; width: 942px"><colgroup>
         <col style="width: 100px">
         <col style="width: 300px">
@@ -559,23 +636,25 @@ aclnnStatus aclnnMhcPreBackward(
         <thead>
             <tr>
                 <th>规格项</th>
-                <th>规格</th>
                 <th>规格说明</th>
             </tr>
         </thead>
         <tbody>
         <tr>
-            <td>n</td>
-            <td>4、 6、8</td>
-            <td>n值目前支持4、 6、 8</td>
+            <td>N</td>
+            <td>N值目前仅支持4。</td>
         </tr>
         <tr>
             <td>D</td>
-            <td>1~16384</td>
-            <td>D支持1~16384范围以内且64元素对齐</td>
+            <td>D支持1~16384范围以内，要求128元素对齐。</td>
+        </tr>
+        <tr>
+            <td>fusionSize</td>
+            <td>支持N!+2N和N*N+2N两种fusionSize。</td>
         </tr>
         </tbody>
     </table>
+  <!-- end id8 -->
 
 ## 调用示例
 

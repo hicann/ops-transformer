@@ -5,8 +5,8 @@
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
 | <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    ×     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×     |
+| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |
+| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
 | <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
 | <term>Atlas 推理系列产品</term>                             |    ×     |
 | <term>Atlas 训练系列产品</term>                              |    ×     |
@@ -172,8 +172,16 @@
 
 ## 约束说明
 
-- `N`当前仅支持`4`、`6`、`8`三种取值。
-- `D`支持`1~16384`，且需满足`64`元素对齐。
+<!-- npu="950" id2 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：
+  - N目前支持4、6、8。
+  - D支持1~16384，需满足64元素对齐。
+<!-- end id2 -->
+<!-- npu="A3,910b" id1 -->
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - N目前支持4。
+  - D支持1~16384，需满足128元素对齐。
+<!-- end id1 -->
 
 ## 调用说明
 

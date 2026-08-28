@@ -5,8 +5,8 @@
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
 | <term>Ascend 950PR/Ascend 950DT</term>                      |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    ×     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>     |    ×     |
+| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |
+| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>     |    √     |
 | <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
 | <term>Atlas 推理系列产品</term>                               |    ×     |
 | <term>Atlas 训练系列产品</term>                               |    ×     |
@@ -17,33 +17,33 @@
 
 - **计算公式**：
 
-其中，xFlat表示将x的最后两维n和D视作长度为nD的向量，gammaFlat表示将gamma视作长度为nD的向量，@表示矩阵乘法，$\odot$表示逐元素乘法。
+  其中，xFlat表示将x的最后两维n和D视作长度为nD的向量，gammaFlat表示将gamma视作长度为nD的向量，@表示矩阵乘法，$\odot$表示逐元素乘法。
 
-$$
-\begin{aligned}
-invRms &= \left(mean(xFlat^{2}) + normEps\right)^{-\frac{1}{2}}\\
-xGamma &= \begin{cases}
-    xFlat \odot gammaFlat, & gamma \ne null \\
-    xFlat, & gamma = null
-\end{cases}\\
-hMix &= xGamma @ phi^{T}\\
-w &= hMix \odot invRms\\
-[pPre, pPost, pRes] &= \begin{cases}
-    split(w, [n, n, n^{2}]), & alpha.shape=[3] \\
-    [split(w, [n, n]), 0], & alpha.shape=[2]
-\end{cases}\\
-hPre &= \sigma(pPre \odot alpha0 + bias0) + hcEps\\
-hPost &= \begin{cases}
-    2\sigma(pPost \odot alpha1 + bias1), & alpha.shape=[3] \\
-    2\sigma(pPost \odot alpha1 + bias1) + hcEps, & alpha.shape=[2]
-\end{cases}\\
-hRes &= \begin{cases}
-    pRes \odot alpha2 + bias2, & alpha.shape=[3] \\
-    0, & alpha.shape=[2]
-\end{cases}\\
-hIn_{d} &= \sum_{i=0}^{n-1} hPre_{i} x_{i,d}
-\end{aligned}
-$$
+  $$
+  \begin{aligned}
+  invRms &= \left(mean(xFlat^{2}) + normEps\right)^{-\frac{1}{2}}\\
+  xGamma &= \begin{cases}
+      xFlat \odot gammaFlat, & gamma \ne null \\
+      xFlat, & gamma = null
+  \end{cases}\\
+  hMix &= xGamma @ phi^{T}\\
+  w &= hMix \odot invRms\\
+  (pPre, pPost, pRes) &= \begin{cases}
+      split(w, (n, n, n^{2})), & alpha.shape=(3) \\
+      (split(w, (n, n)), 0), & alpha.shape=(2)
+  \end{cases}\\
+  hPre &= \sigma(pPre \odot alpha0 + bias0) + hcEps\\
+  hPost &= \begin{cases}
+      2\sigma(pPost \odot alpha1 + bias1), & alpha.shape=(3) \\
+      2\sigma(pPost \odot alpha1 + bias1) + hcEps, & alpha.shape=(2)
+  \end{cases}\\
+  hRes &= \begin{cases}
+      pRes \odot alpha2 + bias2, & alpha.shape=(3) \\
+      0, & alpha.shape=(2)
+  \end{cases}\\
+  hIn_{d} &= \sum_{i=0}^{n-1} hPre_{i} x_{i,d}
+  \end{aligned}
+  $$
 
 ## 参数说明
 
@@ -110,7 +110,7 @@ $$
       <tr>
         <td>hc_eps</td>
         <td>可选输入</td>
-        <td>h_pre的sigmoid后的eps参数，以及当alpha.shape=[2]时h_post的sigmoid后的eps参数，对应公式中的hcEps。</td>
+        <td>h_pre的sigmoid后的eps参数，以及当alpha.shape=(2)时h_post的sigmoid后的eps参数，对应公式中的hcEps。</td>
         <td>FLOAT</td>
         <td>-</td>
       </tr>
@@ -168,8 +168,17 @@ $$
 
 ## 约束说明
 
-- n目前支持4、6、8。
-- D支持1~16384范围以内，需满足D为16对齐。
+<!-- npu="950" id2 -->
+- <term>Ascend 950PR/Ascend 950DT</term>：
+  - n目前支持4、6、8。
+  - D支持1~16384范围以内，需满足D为16对齐。
+<!-- end id2 -->
+<!-- npu="A3,910b" id1 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - 参数`op_impl_mode`仅支持配置为0。
+  - n目前支持4。
+  - D支持100000范围以内，需满足D为128对齐。
+<!-- end id1 -->
 
 ## 调用说明
 
