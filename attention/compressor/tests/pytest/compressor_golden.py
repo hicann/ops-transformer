@@ -343,7 +343,10 @@ def softmax_columns(z):
     # 2. 计算指数
     exp_z = np.exp(z_stable)
 
-    # 3. 按列求和（axis=0），并进行归一化
+    # 3.对齐NPU exp 硬件行为：FP32 denorm flush-to-zero
+    exp_z[exp_z < np.finfo(np.float32).tiny] = 0.0
+
+    # 4. 按列求和（axis=0），并进行归一化
     return exp_z / np.sum(exp_z, axis=0, keepdims=True)
 
 
@@ -1385,9 +1388,9 @@ def run_compressor_eager(
             state_cache = torch.zeros(
                 (kv_state.shape[0], kv_state.shape[1], 2 * kv_state.shape[2])
             )
-            state_cache = state_cache.to("npu:%s" % DEVICE_ID)
             state_cache[:, :, : state_cache.shape[2] // 2] = kv_state.clone()
             state_cache[:, :, state_cache.shape[2] // 2 :] = score_state.clone()
+            state_cache = state_cache.to("npu:%s" % DEVICE_ID)
         else:
             layer_stride = random.randint(1, 10)
             print(f"layer_stride: {layer_stride}")
@@ -1399,7 +1402,6 @@ def run_compressor_eager(
                 )
             )
             print(f"state_cache_pad: shape {state_cache_pad.shape}")
-            state_cache_pad = state_cache_pad.to("npu:%s" % DEVICE_ID)
             # 使用 as_strided 创建非连续视图
             # stride(0) = (b + stride) * c, stride(1) = c, stride(2) = 1
             state_cache = torch.as_strided(
@@ -1414,6 +1416,7 @@ def run_compressor_eager(
             # 填充数据
             state_cache[:, :, : kv_state.shape[2]] = kv_state.clone()
             state_cache[:, :, kv_state.shape[2] :] = score_state.clone()
+            state_cache_pad = state_cache_pad.to("npu:%s" % DEVICE_ID)
             print(
                 f"state_cache: shape {state_cache.shape}, dtype: {state_cache.dtype}, is_contiguous: {state_cache.is_contiguous()}, stride: {state_cache.stride()}"
             )
@@ -1426,15 +1429,14 @@ def run_compressor_eager(
             (kv_state.shape[0], kv_state.shape[1] * kv_state.shape[2] * 2 + layer_pad)
         )
         print(f"state_cache_pad: shape {state_cache_pad.shape}")
-        state_cache_pad = state_cache_pad.to("npu:%s" % DEVICE_ID)
         state_cache = state_cache_pad[
             :,
             layer_start_idx : layer_start_idx
             + kv_state.shape[1] * kv_state.shape[2] * 2,
         ].view(-1, kv_state.shape[1], kv_state.shape[2] * 2)
-        state_cache = state_cache.to("npu:%s" % DEVICE_ID)
         state_cache[:, :, : state_cache.shape[2] // 2] = kv_state.clone()
         state_cache[:, :, state_cache.shape[2] // 2 :] = score_state.clone()
+        state_cache_pad = state_cache_pad.to("npu:%s" % DEVICE_ID)
         print(
             f"state_cache: shape {state_cache.shape}, dtype: {state_cache.dtype}, is_contiguous: {state_cache.is_contiguous()}, stride0: {state_cache.stride(0)}"
         )
@@ -1473,7 +1475,9 @@ def run_compressor_eager(
 
     # 结果精度对比
     check_succeed = True
-    data_type = str(npu_out.dtype)
+    data_type = str(npu_out.dtype).replace("torch.", "")
+    # 提前将 state_cache 搬到 CPU, 后续 slice/indexing/dtype 全在 CPU 完成, 避免 NPU 上不必要的切片操作
+    state_cache_cpu = state_cache.cpu()
     results = {}
     print(
         "--------------------------------------------------------------check result-------------------------------------------------------------"
@@ -1488,9 +1492,7 @@ def run_compressor_eager(
     )
     _, results["kv_state_update"] = check_result(
         cpu_kv_state[update_kv].to(torch.float32),
-        state_cache[:, :, : state_cache.shape[2] // 2]
-        .cpu()[update_kv]
-        .to(torch.float32),
+        state_cache_cpu[:, :, : state_cache.shape[2] // 2][update_kv].to(torch.float32),
         data_type,
     )
     print(
@@ -1498,9 +1500,9 @@ def run_compressor_eager(
     )
     _, results["score_state_update"] = check_result(
         cpu_score_state[update_score].to(torch.float32),
-        state_cache[:, :, state_cache.shape[2] // 2 :]
-        .cpu()[update_score]
-        .to(torch.float32),
+        state_cache_cpu[:, :, state_cache.shape[2] // 2 :][update_score].to(
+            torch.float32
+        ),
         data_type,
     )
     print(
@@ -1508,9 +1510,9 @@ def run_compressor_eager(
     )
     _, results["kv_state_origin"] = check_result(
         cpu_kv_state[~update_kv].to(torch.float32),
-        state_cache[:, :, : state_cache.shape[2] // 2]
-        .cpu()[~update_kv]
-        .to(torch.float32),
+        state_cache_cpu[:, :, : state_cache.shape[2] // 2][~update_kv].to(
+            torch.float32
+        ),
         data_type,
         0.0,
     )
@@ -1519,9 +1521,9 @@ def run_compressor_eager(
     )
     _, results["score_state_origin"] = check_result(
         cpu_score_state[~update_score].to(torch.float32),
-        state_cache[:, :, state_cache.shape[2] // 2 :]
-        .cpu()[~update_score]
-        .to(torch.float32),
+        state_cache_cpu[:, :, state_cache.shape[2] // 2 :][~update_score].to(
+            torch.float32
+        ),
         data_type,
         0.0,
     )
