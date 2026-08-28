@@ -138,14 +138,12 @@ macro(add_modules_sources)
     target_sources(${OPGRAPH_NAME}_fallback_obj PRIVATE ${FALLBACK_SRCS})
   endif()
 
-  if (MODULE_OP_MC2_ENABLE)
-    file(GLOB GENTASK_SRCS
-        ${SOURCE_DIR}/../op_graph/*_gen_task*.cpp
-    )
-    if(GENTASK_SRCS)
-      add_gentask_modules()
-      target_sources(${OPGRAPH_NAME}_gentask_obj PRIVATE ${GENTASK_SRCS})
-    endif()
+  file(GLOB GENTASK_SRCS
+      ${SOURCE_DIR}/../op_graph/*_gen_task*.cpp
+  )
+  if(GENTASK_SRCS)
+    add_gentask_modules()
+    target_sources(${OPGRAPH_NAME}_gentask_obj PRIVATE ${GENTASK_SRCS})
   endif()
 
   if (MODULE_OPTYPE)
@@ -327,14 +325,12 @@ macro(add_modules_sources_with_soc)
     target_sources(${OPGRAPH_NAME}_fallback_obj PRIVATE ${FALLBACK_SRCS})
   endif()
 
-  if (MODULE_OP_MC2_ENABLE)
-    file(GLOB GENTASK_SRCS
-        ${SOURCE_DIR}/../op_graph/*_gen_task*.cpp
-    )
-    if(GENTASK_SRCS)
-      add_gentask_modules()
-      target_sources(${OPGRAPH_NAME}_gentask_obj PRIVATE ${GENTASK_SRCS})
-    endif()
+  file(GLOB GENTASK_SRCS
+      ${SOURCE_DIR}/../op_graph/*_gen_task*.cpp
+  )
+  if(GENTASK_SRCS)
+    add_gentask_modules()
+    target_sources(${OPGRAPH_NAME}_gentask_obj PRIVATE ${GENTASK_SRCS})
   endif()
 
   file(GLOB AICPU_SRCS ${SOURCE_DIR}/*_aicpu*.cpp)
