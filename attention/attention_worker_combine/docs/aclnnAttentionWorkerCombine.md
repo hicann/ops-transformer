@@ -31,18 +31,18 @@
 
     1. 接收FFN侧回传的数据。该数据以ScheduleContext结构体内存排布方式存储。其具体定义参见[调用示例](#调用示例)。该结构体包含CommonArea、ControlArea、AttentionArea、FfnArea域。本接口从AttentionArea的token_data_buf中读取token数据。
 
-    2. 结合expert_scales对token数据进行加权融合，输出最终注意力结果y。
+    2. 结合expertScales对token数据进行加权融合，输出最终注意力结果y。
 
-    3. 根据输入layer_id计算并输出next_layer_id，指示下一个要处理的层ID。
+    3. 根据输入layerId计算并输出nextLayerId，指示下一个要处理的层ID。
 
 - 计算公式：
 
   $$
-  y[i] = \sum_{k=0}^{K-1} \text{expert\_scales}[i][k] \times \text{token\_data}[i][k]
+  y[i] = \sum_{k=0}^{K-1} \text{expertScales}[i][k] \times \text{token\_data}[i][k]
   $$
 
   $$
-  \text{next\_layer\_id} = \text{layer\_id} + 1
+  \text{nextLayerId} = \text{layerId} + 1
   $$
 
 ## 函数原型
@@ -100,7 +100,7 @@ aclnnStatus aclnnAttentionWorkerCombine(
     <tr>
       <td>scheduleContext</td>
       <td>输入</td>
-      <td>Attention侧接收的调度上下文，内含CommonArea、ControlArea、AttentionArea、FfnArea。算子从AttentionArea的token_data_buf中读取token数据。详细结构参见调用示例。</td>
+      <td>Attention侧接收的调度上下文，内含CommonArea、ControlArea、AttentionArea、FfnArea。算子从AttentionArea的token_data_buf中读取token数据。</td>
       <td>不支持空tensor。</td>
       <td>INT8</td>
       <td>ND</td>
@@ -140,7 +140,7 @@ aclnnStatus aclnnAttentionWorkerCombine(
     <tr>
       <td>tokenDtype</td>
       <td>输入</td>
-      <td>指定schedule_context中token数据的原始精度类型。0表示FLOAT16；1表示BFLOAT16。</td>
+      <td>指定scheduleContext中token数据的原始精度类型。0表示FLOAT16；1表示BFLOAT16。</td>
       <td>取值为0或1。</td>
       <td>INT64</td>
       <td>-</td>
@@ -275,10 +275,7 @@ aclnnStatus aclnnAttentionWorkerCombine(
 
 ## 约束说明
 
-- schedule_context为1D的Tensor，shape固定为(1024)。
-- expert_scales为2D的Tensor，shape为(BS, K)，其中K ≤ 64。
-- y为2D的Tensor，shape为(BS, hiddenSize)，即第二维由参数hiddenSize确定。
-- layer_id和next_layer_id为1D的Tensor，shape为(1)。
+- expertScales的第二维K ≤ 64。
 - 确定性计算：
   - aclnnAttentionWorkerCombine默认确定性实现。
 
