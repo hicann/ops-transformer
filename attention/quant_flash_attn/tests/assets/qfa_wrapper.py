@@ -122,9 +122,15 @@ def npu_qfa(
     # batch_size: CSV 原始值 (可为 -1), 透传给 metadata 的 batch_size;
     # B: 从 cu_seqlens_q 推导的正整数, 供 inputs/golden 生成 BNSD 张量。
     B = (
-        max(1, len(cu_seqlens_q_list) - 1)
-        if cu_seqlens_q_list and len(cu_seqlens_q_list) >= 2
-        else 1
+        batch_size
+        if batch_size is not None and batch_size > 0
+        else (
+            max(1, len(cu_seqlens_q_list) - 1)
+            if cu_seqlens_q_list and len(cu_seqlens_q_list) >= 2
+            else len(list(seqused_q_list))
+            if seqused_q_list is not None and len(list(seqused_q_list)) > 0
+            else 1
+        )
     )
 
     attn_mask_shape = tuple(attn_mask_t.shape)
@@ -254,5 +260,11 @@ def npu_qfa(
     if not enable_lse:
         lse_out = None
     else:
-        lse_out = lse_out[:, : atten_out.shape[0]].contiguous()
+        layout_out_up = str(layout_out).upper() if layout_out else str(layout_q).upper()
+        if layout_out_up == "TND":
+            lse_out = lse_out[:, : atten_out.shape[0]].contiguous()
+        elif layout_out_up == "BNSD":
+            lse_out = lse_out[:, :, : atten_out.shape[2]].contiguous()
+        else:
+            lse_out = lse_out[:, :, : atten_out.shape[1]].contiguous()
     return atten_out, lse_out
