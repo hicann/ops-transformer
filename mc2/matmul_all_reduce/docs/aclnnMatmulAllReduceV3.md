@@ -338,7 +338,7 @@ aclnnStatus aclnnMatmulAllReduceV3(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="950,910b" id14 -->
 - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：
@@ -349,7 +349,7 @@ aclnnStatus aclnnMatmulAllReduceV3(
     #include <thread>
     #include "hccl/hccl.h"
     #include "aclnn/opdev/fp16_t.h"
-    #include "aclnnop/aclnn_matmul_all_reduce_v2.h"
+    #include "aclnnop/aclnn_matmul_all_reduce_v3.h"
 
     int ndev = 2;
 
@@ -454,7 +454,7 @@ aclnnStatus aclnnMatmulAllReduceV3(
         CHECK_RET(ret == ACL_SUCCESS, return ret);
         ret = CreateAclTensor(outHostData, outShape, &outDeviceAddr, aclDataType::ACL_FLOAT16, &out);
         CHECK_RET(ret == ACL_SUCCESS, return ret);
-        // 调用第一段接口， x3位置传入out
+        // 调用第一段接口
         ret = aclnnMatmulAllReduceV3GetWorkspaceSize(x1, x2, bias, x3, hcom_name, "sum", "", commTurn, streamMode, out, &workspaceSize, &executor);
 
         CHECK_RET(ret == ACL_SUCCESS,

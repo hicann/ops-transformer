@@ -153,7 +153,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV3(
           <td>x3Optional</td>
           <td>输入</td>
           <td>MatMul计算后的add计算，即计算公式中的x3Optional。</td>
-          <td><ul><li>维度与output一致。</li><li>目前仅支持输出为BFLOAT16场景，且仅支持非空输入。</li></ul></td>
+          <td>要求数据类型、维度和output一致。</td>
           <td>FLOAT16、BFLOAT16</td>
           <td>ND</td>
           <td>2</td>
