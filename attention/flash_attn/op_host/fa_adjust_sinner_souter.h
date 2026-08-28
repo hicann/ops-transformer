@@ -37,6 +37,7 @@ constexpr uint32_t DSIZE_256 = 256;
  * @brief 根据算子参数决定 sOuter / sInner 切块大小，纯函数，不依赖任何类。
  *
  * @param vHeadDim   V 的 head dim
+ * @param gSize      GQA 的 group 数（n1/n2）
  * @param maxSeqQ    Q 的 max sequence length，-1 表示未知（按极大值处理）
  * @param maxSeqKv   KV 的 max sequence length，-1 表示未知（按极大值处理）
  * @param maskMode   mask 模式（0/2/4 等）
@@ -46,9 +47,9 @@ constexpr uint32_t DSIZE_256 = 256;
  * @param sOuterFactor [out] sOuter 切块大小
  * @param sInnerFactor [out] sInner 切块大小
  */
-inline void AdjustSinnerAndSouter(uint32_t vHeadDim, int64_t maxSeqQ, int64_t maxSeqKv, int32_t maskMode,
-                                  int64_t winLeft, int64_t winRight, uint32_t qLayout, uint32_t &sOuterFactor,
-                                  uint32_t &sInnerFactor)
+inline void AdjustSinnerAndSouter(uint32_t vHeadDim, uint32_t gSize, int64_t maxSeqQ, int64_t maxSeqKv,
+                                  int32_t maskMode, int64_t winLeft, int64_t winRight, uint32_t qLayout,
+                                  uint32_t &sOuterFactor, uint32_t &sInnerFactor)
 {
     if (maxSeqQ == -1) {
         maxSeqQ = MAX_SEQ_LEN_DEFAULT;
@@ -76,8 +77,13 @@ inline void AdjustSinnerAndSouter(uint32_t vHeadDim, int64_t maxSeqQ, int64_t ma
         }
     }
     if (vHeadDim == DSIZE_256) {
-        sOuterFactor = SOUTER_32;
-        sInnerFactor = SINNER_256;
+        if (gSize * maxSeqQ < SOUTER_64) {
+            sOuterFactor = SOUTER_32;
+            sInnerFactor = SINNER_256;
+        } else {
+            sOuterFactor = SOUTER_64;
+            sInnerFactor = SINNER_128;
+        }
     }
 }
 

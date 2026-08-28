@@ -72,10 +72,10 @@ public:
 
     // 核间同步ID
     static constexpr uint64_t CROSS_CORE_SYNC_MODE = 4;
-    static constexpr uint32_t CC_BMM1_0 = 0U;
-    static constexpr uint32_t CC_BMM1_1 = 1U;
-    static constexpr uint32_t CC_BMM2_0 = 2U;
-    static constexpr uint32_t CC_BMM2_1 = 3U;
+    static constexpr uint32_t CC_MM_0 = 0U;
+    static constexpr uint32_t CC_MM_1 = 1U;
+    static constexpr uint32_t CC_MM_2 = 2U;
+    static constexpr uint32_t CC_MM_3 = 3U;
     static constexpr uint32_t CC_L1P_0 = 5U;
     static constexpr uint32_t CC_L1P_1 = 6U;
     static constexpr uint32_t CC_L1P_2 = 7U;
@@ -94,18 +94,17 @@ public:
     LocalTensor<uint8_t> l1PBuffers_;
 
     // UB
-    static constexpr uint32_t UB_MM2_RES_BUFCNT = 2U;
-    static constexpr uint32_t UB_MM2_RES_BUF_BYTES = mBaseSize / CV_RATIO * dVBaseSize * sizeof(T);
-    LocalTensor<uint8_t> ubMm2ResBuffers_;
+    static constexpr uint32_t UB_MM_RES_BUFCNT = (dBaseSize > 128) ? 2U : 4U;
+    static constexpr uint32_t UB_MM_RES_BUF_BYTES =
+        mBaseSize / CV_RATIO * (s2BaseSize > dVBaseSize ? s2BaseSize : dVBaseSize) * sizeof(T);
+    LocalTensor<uint8_t> ubMmResBuffers_;
+    uint32_t mmResBufId_ = 0;
 
-    static constexpr uint32_t UB_MM1_RES_BUFCNT = 2U;
-    static constexpr uint32_t UB_MM1_RES_BUF_BYTES = mBaseSize / CV_RATIO * s2BaseSize * sizeof(T);
-    LocalTensor<uint8_t> ubMm1ResBuffers_;
-
+    static constexpr uint32_t UB_VEC2_RES_BUF_BYTES = mBaseSize / CV_RATIO * dTemplateAlign64 * sizeof(T);
     LocalTensor<T> ubVec2Res_; // 存放vec2阶段VEC的中间处理结果, 并且作为attn_out的输出buffer, 需配对的MTE3和V的同步ID
 
     static constexpr uint32_t UB_VEC1_RES_BUFCNT = 2U;
-    static constexpr uint32_t UB_VEC1_RES_BUF_BYTES = 33024U;
+    static constexpr uint32_t UB_VEC1_RES_BUF_BYTES = (mBaseSize / CV_RATIO + 1U) * s2BaseSize * sizeof(INPUT_T);
     LocalTensor<uint8_t> ubVec1ResBuffers_;
     uint32_t vec1ResUbBufId_ = 0;
 
@@ -182,15 +181,12 @@ public:
 
         /*--------------------------------------------UB--------------------------------------------*/
         uint32_t addrUb = 0;
-        ubMm2ResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb,
-                                                UB_MM2_RES_BUFCNT * UB_MM2_RES_BUF_BYTES); // 2 * 32K = 64K, CV通信BUF
-        addrUb = UB_MM2_RES_BUFCNT * UB_MM2_RES_BUF_BYTES;
-        ubMm1ResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb,
-                                                UB_MM1_RES_BUFCNT * UB_MM1_RES_BUF_BYTES); // 2 * 32K = 64K, CV通信BUF
-        addrUb += UB_MM1_RES_BUFCNT * UB_MM1_RES_BUF_BYTES;
-        ubVec2Res_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, 32768U)
-                         .template ReinterpretCast<T>(); // 32K, 输出BUF: attn_out拷出
-        addrUb += 32768U;
+        ubMmResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb,
+                                               UB_MM_RES_BUFCNT * UB_MM_RES_BUF_BYTES); // CV通信BUF
+        addrUb = UB_MM_RES_BUFCNT * UB_MM_RES_BUF_BYTES;
+        ubVec2Res_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, UB_VEC2_RES_BUF_BYTES)
+                         .template ReinterpretCast<T>(); // 输出BUF: attn_out拷出
+        addrUb += UB_VEC2_RES_BUF_BYTES;
         ubVec1ResBuffers_ = LocalTensor<uint8_t>(
             TPosition::VECIN, addrUb,
             UB_VEC1_RES_BUFCNT * UB_VEC1_RES_BUF_BYTES); // 2 * 32.25K = 64.5K, 输出BUF: softmax结果拷贝至L1
@@ -228,10 +224,12 @@ public:
 
     __aicore__ inline void InitCrossCoreSync()
     {
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_BMM2_0);
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_BMM2_1);
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_BMM1_0);
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_BMM1_1);
+        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_MM_0);
+        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_MM_1);
+        if constexpr (dBaseSize <= 128) {
+            CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_MM_2);
+            CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_MM_3);
+        }
     }
 
     __aicore__ inline void UnInitCrossCoreSync() {}
@@ -242,22 +240,22 @@ public:
 
     __aicore__ inline void ProcessVec1(RunInfo runInfo)
     {
-        uint32_t mm1ResUbBufId = runInfo.loop % UB_MM1_RES_BUFCNT;
+        uint32_t mmResUbBufId = mmResBufId_;
+        mmResBufId_ = (mmResBufId_ + 1) % UB_MM_RES_BUFCNT;
         uint32_t pL1BufId = runInfo.loop % L1_P_BUFCNT;
-        uint32_t c1v1CrossCoreSyncIdx = CC_BMM1_0 + mm1ResUbBufId;
+        uint32_t mmSyncIdx = CC_MM_0 + mmResUbBufId;
         uint32_t v1c2CrossCoreSyncIdx = CC_L1P_0 + pL1BufId;
         LocalTensor<INPUT_T> pL1Tensor = l1PBuffers_[pL1BufId * L1_P_BUF_BYTES].template ReinterpretCast<INPUT_T>();
-        auto mm1ResUbTensor = ubMm1ResBuffers_[mm1ResUbBufId * UB_MM1_RES_BUF_BYTES].template ReinterpretCast<T>();
+        auto mm1ResUbTensor = ubMmResBuffers_[mmResUbBufId * UB_MM_RES_BUF_BYTES].template ReinterpretCast<T>();
 
         if (unlikely(runInfo.isFirstS2Loop)) {
             ResetSoftmaxBuffer(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT);
             AscendC::PipeBarrier<PIPE_V>();
         }
 
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(c1v1CrossCoreSyncIdx);
+        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx);
         ProcessVec1Dn(pL1Tensor, mm1ResUbTensor, runInfo);
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(
-            c1v1CrossCoreSyncIdx); // C1与V1的反向同步, C1收到后可以启动FIXPIPE向UB的写
+        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx); // 通知BMM2: Vec1已读完mmRes, 可覆写
         CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(v1c2CrossCoreSyncIdx);
         Vec1PostProcess(runInfo);
     }
@@ -494,19 +492,20 @@ public:
 
     __aicore__ inline void ProcessVec2(RunInfo runInfo)
     {
-        uint32_t mm2ResUbBufId = runInfo.loop % UB_MM2_RES_BUFCNT;
-        uint32_t c2v2CrossCoreSyncIdx = CC_BMM2_0 + mm2ResUbBufId;
+        uint32_t mmResUbBufId = mmResBufId_;
+        mmResBufId_ = (mmResBufId_ + 1) % UB_MM_RES_BUFCNT;
+        uint32_t mmSyncIdx = CC_MM_0 + mmResUbBufId;
         if (unlikely(runInfo.actVecMSize == 0)) {
-            CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(c2v2CrossCoreSyncIdx);
-            CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(c2v2CrossCoreSyncIdx);
+            CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx);
+            CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx);
             return;
         }
 
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(c2v2CrossCoreSyncIdx);
+        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx);
         {
             Mutex::Lock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
             LocalTensor<T> mm2ResUbTensor =
-                ubMm2ResBuffers_[mm2ResUbBufId * UB_MM2_RES_BUF_BYTES].template ReinterpretCast<T>();
+                ubMmResBuffers_[mmResUbBufId * UB_MM_RES_BUF_BYTES].template ReinterpretCast<T>();
             if (unlikely(runInfo.isFirstS2Loop)) {
                 uint32_t vec2CalcSize = runInfo.actVecMSize * dTemplateAlign64;
                 DataCopy(ubVec2Res_, mm2ResUbTensor, vec2CalcSize);
@@ -530,8 +529,7 @@ public:
             }
             Mutex::Unlock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
         }
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(
-            c2v2CrossCoreSyncIdx); // mmRes在之后不能使用, 否则与C2的FIXPIPE读写数据冲突
+        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx); // 通知下个BMM1: Vec2已读完mmRes, slot空闲
 
         if (runInfo.isLastS2Loop) {
             if (unlikely(runInfo.isFirstS2Loop)) {

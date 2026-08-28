@@ -198,7 +198,8 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
     } else if (baseInfo.layoutQuery == load_balance::Layout::TND) {
         qlayout = optiling::flash_attn::fa_tiling_util::LAYOUT_TND;
     }
-    optiling::flash_attn::fa_tiling_util::AdjustSinnerAndSouter(baseInfo.headDimQk, maxSeqlenQ_, maxSeqlenKv_,
+    uint32_t gSize = static_cast<uint32_t>(numHeadsQ_ / numHeadsKv_);
+    optiling::flash_attn::fa_tiling_util::AdjustSinnerAndSouter(baseInfo.headDimQk, gSize, maxSeqlenQ_, maxSeqlenKv_,
                                                                 baseInfo.sparseMode, baseInfo.preToken,
                                                                 baseInfo.nextToken, qlayout, mBaseSize_, s2BaseSize_);
     mBaseSize_ *= (aivCoreNum_ / aicCoreNum_);

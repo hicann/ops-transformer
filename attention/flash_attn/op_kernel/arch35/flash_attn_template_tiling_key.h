@@ -62,15 +62,16 @@ ASCENDC_TPL_ARGS_DECL(FlashAttn,
                       //    config=1: sOuter=32, sInner=256 → D=64,  DV=64
                       //    config=2: sOuter=64, sInner=128 → D=128, DV=128
                       //    config=3: sOuter=32, sInner=256 → D=128, DV=128
-                      //    config=4: sOuter=32, sInner=256 → D=256, DV=256
-                      ASCENDC_TPL_UINT_DECL(Config, ASCENDC_TPL_3_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 4),);
+                      //    config=4: sOuter=64, sInner=128 → D=256, DV=256
+                      //    config=5: sOuter=32, sInner=256 → D=256, DV=256
+                      ASCENDC_TPL_UINT_DECL(Config, ASCENDC_TPL_3_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 5), );
 
 ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
                                                           InOutLayoutType_BNSD, InOutLayoutType_TND,
                                                           InOutLayoutType_BNSD_BSND),
                                      ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
                                      ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
-                                     ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4),
+                                     ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4, 5),
                                      ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)), );
 
 #endif // TEMPLATE_TILING_KEY_FLASH_ATTN_H_

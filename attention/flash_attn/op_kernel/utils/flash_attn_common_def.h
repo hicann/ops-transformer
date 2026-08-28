@@ -138,9 +138,13 @@ struct ConfigParams {
     inferDTemplateType dv;
 };
 
-// config, D=128 fixed
-//   config=0: sOuter=64,sInner=128 → S1=128,S2=128
-//   config=1: sOuter=32,sInner=256 → S1=64,S2=256
+// config:
+//   config=0: sOuter=64, sInner=128 → S1=128, S2=128, D=64
+//   config=1: sOuter=32, sInner=256 → S1=64,  S2=256, D=64
+//   config=2: sOuter=64, sInner=128 → S1=128, S2=128, D=128
+//   config=3: sOuter=32, sInner=256 → S1=64,  S2=256, D=128
+//   config=4: sOuter=64, sInner=128 → S1=128, S2=128, D=256
+//   config=5: sOuter=32, sInner=256 → S1=64,  S2=256, D=256
 static constexpr ConfigParams ConfigValue[] = {
     // D=64 configurations
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned64,
@@ -155,9 +159,34 @@ static constexpr ConfigParams ConfigValue[] = {
      inferDTemplateType::Aligned128}, // config=3
 
     // D=256 configurations
-    {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned256,
+    {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned256,
      inferDTemplateType::Aligned256}, // config=4
+    {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned256,
+     inferDTemplateType::Aligned256}, // config=5
 };
+
+// Config macro definitions for D=64
+#define Config_S1Aligned128_S2Aligned128_DAligned64_DVAligned64 0
+#define Config_S1Aligned64_S2Aligned256_DAligned64_DVAligned64 1
+
+// Config macro definitions for D=128
+#define Config_S1Aligned128_S2Aligned128_DAligned128_DVAligned128 2
+#define Config_S1Aligned64_S2Aligned256_DAligned128_DVAligned128 3
+
+// Config macro definitions for D=256
+#define Config_S1Aligned128_S2Aligned128_DAligned256_DVAligned256 4
+#define Config_S1Aligned64_S2Aligned256_DAligned256_DVAligned256 5
+
+// PseMode
+#define PSE_MODE_PSE_OUTER_MUL_ADD_TYPE 0
+#define PSE_MODE_PSE_OUTER_ADD_MUL_TYPE 1
+#define PSE_MODE_PSE_INNER_MUL_ADD_TYPE 2
+#define PSE_MODE_PSE_INNER_MUL_ADD_SQRT_TYPE 3
+#define PSE_MODE_PSE_INVALID_TYPE 4
+#define PSE_MODE_PSE_NONE_TYPE 9
+
+// QuantModeEnum
+#define NoQuantMode 31
 
 // bool
 #define false 0
