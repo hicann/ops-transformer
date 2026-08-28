@@ -11,6 +11,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 import logging
+import math
 import os
 import sys
 from typing import List, Optional
@@ -33,6 +34,17 @@ logger = logging.getLogger(__name__)
 #       在 CSV 里配异常 shape + 设 QFA_PASS_THROUGH=1 即可, 框架按 CSV shape 随机生成 tensor
 #       原样透传, 不进 golden。
 _PASS_THROUGH = os.environ.get("QFA_PASS_THROUGH", "").lower() in ("1", "true", "yes")
+
+
+def _csv_list(v):
+    """表格值转 list 注入 golden 全局变量.
+
+    PASS_THROUGH 下表格未提供 (None/空) 保留 None, golden 侧据此传 None 给算子;
+    非 PASS_THROUGH 模式维持原语义: 转成 [] 走 golden 默认值.
+    """
+    if v:
+        return list(v)
+    return None if _PASS_THROUGH else []
 
 
 def _apply_golden_globals(attrs):
@@ -76,11 +88,13 @@ def _build_fallback_data_dict(
       - CSV 没传 act 但 max>=0 -> 用 max * B
       - CSV act=[] 且 max<0 -> 保持空 list, 让算子拦截 "seq 完全未指定"
     """
-    import math
-
-    qk_d = D
     s1_phys = q.shape[2] if q.ndim >= 3 and q.shape[0] == B else None
     s2_phys = k.shape[2] if k.ndim >= 3 and k.shape[0] == B else None
+
+    # PASS_THROUGH: 表格未提供 softmax_scale -> None 原样透传;
+    # 非 PASS_THROUGH (generate_data 失败的回退路径): 维持默认 1/sqrt(D)
+    if softmax_scale is None and not _PASS_THROUGH:
+        softmax_scale = 1.0 / math.sqrt(D)
 
     # Q seq: act 优先, 否则用 max (>=0), 都没给则留空让算子拦截
     if act_seq_lens_q:
@@ -162,9 +176,7 @@ def _build_fallback_data_dict(
         attn_out_layout=layout_out,
         num_heads=N_q,
         num_key_value_heads=N_kv,
-        softmax_scale=softmax_scale
-        if softmax_scale is not None
-        else 1.0 / math.sqrt(qk_d),
+        softmax_scale=softmax_scale,
         fp32_bnsd=None,
     )
 
@@ -285,22 +297,22 @@ def run_main(
             "DATA_RANGE_Q": data_range_q,
             "DATA_RANGE_K": data_range_k,
             "DATA_RANGE_V": data_range_v,
-            "ACT_SEQ_LENS_Q": list(act_seq_lens_q) if act_seq_lens_q else [],
-            "ACT_SEQ_LENS_KV": list(act_seq_lens_kv) if act_seq_lens_kv else [],
+            "ACT_SEQ_LENS_Q": _csv_list(act_seq_lens_q),
+            "ACT_SEQ_LENS_KV": _csv_list(act_seq_lens_kv),
             "MAX_SEQLEN_Q": max_seqlen_q,
             "MAX_SEQLEN_KV": max_seqlen_kv,
-            "CU_SEQLENS_Q": list(cu_seqlens_q) if cu_seqlens_q else [],
-            "CU_SEQLENS_KV": list(cu_seqlens_kv) if cu_seqlens_kv else [],
-            "BLOCK_TABLE_SHAPE": list(block_table_shape) if block_table_shape else [],
+            "CU_SEQLENS_Q": _csv_list(cu_seqlens_q),
+            "CU_SEQLENS_KV": _csv_list(cu_seqlens_kv),
+            "BLOCK_TABLE_SHAPE": _csv_list(block_table_shape),
             "BLOCK_TABLE_DTYPE": block_table_dtype,
             "P_SCALE_VALUE": p_scale_value,
-            "P_SCALE_SHAPE": list(p_scale_shape) if p_scale_shape else [],
+            "P_SCALE_SHAPE": _csv_list(p_scale_shape),
             "P_SCALE_DTYPE": p_scale_dtype,
             "P_SCALE_DATARANGE": p_scale_datarange,
-            "SINKS_SHAPE": list(sinks_shape) if sinks_shape else [],
+            "SINKS_SHAPE": _csv_list(sinks_shape),
             "SINKS_DTYPE": sinks_dtype,
             "SINKS_DATARANGE": sinks_datarange,
-            "ATTN_MASK_SHAPE": list(attn_mask_shape) if attn_mask_shape else [],
+            "ATTN_MASK_SHAPE": _csv_list(attn_mask_shape),
             "ATTN_MASK_DTYPE": attn_mask_dtype,
             "ATTN_MASK_DATARANGE": attn_mask_datarange,
             "Q_DESCALE_DTYPE": q_descale_dtype,
@@ -311,7 +323,7 @@ def run_main(
             "CU_SEQLENS_Q_DTYPE": cu_seqlens_q_dtype,
             "CU_SEQLENS_KV_DTYPE": cu_seqlens_kv_dtype,
             "SOFTMAX_LSE_DTYPE": softmax_lse_dtype,
-            "METADATA_SHAPE": list(metadata_shape) if metadata_shape else [],
+            "METADATA_SHAPE": _csv_list(metadata_shape),
             "METADATA_DTYPE": metadata_dtype,
         }
     )

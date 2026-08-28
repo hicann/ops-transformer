@@ -1419,13 +1419,17 @@ def call_npu_main(data_dict):
     torch_npu.npu.set_device(int(DEVICE_ID))
     torch.npu.synchronize()
 
-    logger.info("[NPU_MAIN] 重建 metadata (按表格 metadata_shape/metadata_dtype 构造)")
-    metadata_shape = tuple(METADATA_SHAPE) if METADATA_SHAPE else (4096,)
-    metadata = torch.ones(
-        metadata_shape,
-        dtype=get_dtype(METADATA_DTYPE) or torch.int32,
-        device="npu",
-    )
+    if METADATA_SHAPE is None:
+        # 表格显式未提供 (PASS_THROUGH 下 wrapper 注入 None) -> metadata 传 None
+        metadata = None
+        logger.info("[NPU_MAIN] 表格未提供 metadata_shape, metadata 传 None")
+    else:
+        metadata_shape = tuple(METADATA_SHAPE) if METADATA_SHAPE else (4096,)
+        metadata = torch.ones(
+            metadata_shape,
+            dtype=get_dtype(METADATA_DTYPE) or torch.int32,
+            device="npu",
+        )
 
     main_kwargs = dict(
         q=q,
