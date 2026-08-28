@@ -21,15 +21,9 @@ using namespace NpuArch;
 using namespace KernelCommon;
 
 namespace SplitFuse {
-template <
-    class BlockMmadQK,
-    class BlockMmadPV,
-    class EpilogueOnlineSoftmax,
-    class EpilogueRescaleO,
-    class EpilogueInitOut,
-    bool PAGED_CACHE_FLAG,
-    FaiKernel::MaskType MASK_TYPE = FaiKernel::MaskType::NO_MASK,
-    FaiKernel::inputLayout INPUT_LAYOUT = FaiKernel::inputLayout::BSND>
+template <class BlockMmadQK, class BlockMmadPV, class EpilogueOnlineSoftmax, class EpilogueRescaleO,
+          class EpilogueInitOut, bool PAGED_CACHE_FLAG, FaiKernel::MaskType MASK_TYPE = FaiKernel::MaskType::NO_MASK,
+          FaiKernel::inputLayout INPUT_LAYOUT = FaiKernel::inputLayout::BSND>
 class FAInferKernelDecoding {
 public:
     using ArchTag = typename BlockMmadQK::ArchTag;
@@ -44,6 +38,7 @@ public:
     using LayoutP = typename BlockMmadPV::LayoutA;
     using ElementV = typename BlockMmadPV::ElementB;
     using LayoutV = typename BlockMmadPV::LayoutB;
+    static constexpr bool BNBD_FLAG = BlockMmadQK::BNBD_FLAG;
     using L1TileShape = typename BlockMmadQK::L1TileShape;
 
     using ElementMask = typename EpilogueOnlineSoftmax::ElementMask;
@@ -124,8 +119,7 @@ public:
         AscendC::GlobalTensor<ElementOTmp> gOTmp;
         gOTmp.SetGlobalBuffer((__gm__ ElementOTmp *)(params.workSpace + mm1OutSize + smOnlineOutSize));
         AscendC::GlobalTensor<ElementOTmp> gOUpdate;
-        gOUpdate.SetGlobalBuffer((__gm__ ElementOTmp *)(params.workSpace +
-                                                        mm1OutSize + smOnlineOutSize + mm2OutSize));
+        gOUpdate.SetGlobalBuffer((__gm__ ElementOTmp *)(params.workSpace + mm1OutSize + smOnlineOutSize + mm2OutSize));
         AscendC::GlobalTensor<bfloat16_t> gSink;
         gSink.SetGlobalBuffer((__gm__ bfloat16_t *)(params.sink));
 
@@ -159,9 +153,7 @@ public:
             ((maxQKPL1Size - maxQL1Size) / kDynNum / sizeof(ElementV) / DOUBLE_BUFFER) / NUM_32 * NUM_32;
 
         uint32_t nDynNum = maxNDynNum < L1_MAX_N_NUM ? maxNDynNum : L1_MAX_N_NUM;
-        nDynNum = L1_MAX_N_NUM % nDynNum != 0 ?
-                      NpuArch::Detail::Alignment::RoundDown((nDynNum - 1), NUM_32) :
-                      nDynNum;
+        nDynNum = L1_MAX_N_NUM % nDynNum != 0 ? NpuArch::Detail::Alignment::RoundDown((nDynNum - 1), NUM_32) : nDynNum;
 
         uint32_t L1_QK_SIZE = BlockMmadQK::L1TileShape::M * kDynNum * sizeof(ElementQ);
         blockMmadQK.init(resource, nDynNum, kDynNum);
@@ -216,9 +208,8 @@ public:
             uint32_t kvSeqlen = static_cast<uint32_t>(gActualKvseqlen.GetValue(curBatch));
             if constexpr (INPUT_LAYOUT == FaiKernel::inputLayout::TND) {
                 if constexpr (!PAGED_CACHE_FLAG) {
-                    uint32_t prevKvSeqlenSum = (curBatch == 0) ?
-                                                   0 :
-                                                   static_cast<uint32_t>(gActualKvseqlen.GetValue(curBatch - 1));
+                    uint32_t prevKvSeqlenSum =
+                        (curBatch == 0) ? 0 : static_cast<uint32_t>(gActualKvseqlen.GetValue(curBatch - 1));
                     kvSeqlen = kvSeqlen - prevKvSeqlenSum;
                 }
             }
@@ -232,9 +223,8 @@ public:
             if constexpr (PAGED_CACHE_FLAG) {
                 blockBOffset = static_cast<uint64_t>(curBatch) * maxNumBlocksPerBatch;
             } else {
-                uint64_t cumKvSeqlen = (curBatch > 0) ?
-                                           static_cast<uint64_t>(gActualKvseqlen.GetValue(curBatch - 1)) :
-                                           0;
+                uint64_t cumKvSeqlen =
+                    (curBatch > 0) ? static_cast<uint64_t>(gActualKvseqlen.GetValue(curBatch - 1)) : 0;
                 kBOffset = cumKvSeqlen * strideK;
                 vBOffset = cumKvSeqlen * strideV;
             }
@@ -244,9 +234,8 @@ public:
 
             uint32_t qSBlockSize = 1;
             uint32_t gBlockSize = groupSize;
-            uint32_t kvNBlockSize = (kvNBlockIdx == (curKvNBlockNum - 1U)) ?
-                                        (kvHeads - kvNBlockIdx * curKvNBlockTile) :
-                                        curKvNBlockTile;
+            uint32_t kvNBlockSize =
+                (kvNBlockIdx == (curKvNBlockNum - 1U)) ? (kvHeads - kvNBlockIdx * curKvNBlockTile) : curKvNBlockTile;
             uint32_t rowNum = rowNumConst;
             uint32_t rowNumRound = rowNumRoundConst;
 
@@ -257,6 +246,11 @@ public:
             uint64_t oSOffset = 0;
             uint64_t oNStartOffset = static_cast<uint64_t>(qNStartIdx) * embedV;
             uint64_t lseTokenOffset = 0;
+            if constexpr (PAGED_CACHE_FLAG && BNBD_FLAG) {
+                // BNBD: head stride within a block is pagedBlockSize * embed
+                kNStartOffset = static_cast<uint64_t>(kvNStartIdx) * pagedBlockSize * embed;
+                vNStartOffset = static_cast<uint64_t>(kvNStartIdx) * pagedBlockSize * embedV;
+            }
 
             uint32_t noSkipKvS = kvSeqlen;
             uint32_t kvSLoopNumTotal = NpuArch::Detail::Alignment::CeilDiv(noSkipKvS, pagedBlockSize);
@@ -270,6 +264,11 @@ public:
             LayoutQ layoutQTemp(rowNum, embed);
             LayoutK layoutKTemp(strideK, blockStackNum * pagedBlockSize);
             LayoutV layoutVTemp(blockStackNum * pagedBlockSize, strideV);
+            if constexpr (PAGED_CACHE_FLAG && BNBD_FLAG) {
+                // BNBD: token stride within a block is embed (head selected via gmOffsetK)
+                layoutKTemp = LayoutK(embed, blockStackNum * pagedBlockSize);
+                layoutVTemp = LayoutV(blockStackNum * pagedBlockSize, embedV);
+            }
 #endif
             for (uint32_t kvSIdx = 0; kvSIdx < kvSLoopNumTotal + preKVNum; kvSIdx += blockStackNum) {
                 if (kvSIdx < kvSLoopNumTotal) {
@@ -286,40 +285,30 @@ public:
                         uint32_t taskRowNum = rowNum * kvNBlockSize;
                         LayoutQ layoutQL1(taskRowNum, embed);
                         uint32_t taskColNum = gBlockSize * kvNBlockSize;
-                        blockMmadQK.loadQGM(gQ[gmOffsetQGmtoL1], layoutQL1, taskRowNum,
-                                            taskColNum, qHeads, kvNBlockSize);
+                        blockMmadQK.loadQGM(gQ[gmOffsetQGmtoL1], layoutQL1, taskRowNum, taskColNum, qHeads,
+                                            kvNBlockSize);
                     }
 #endif
 
                     for (uint32_t kvNIncreIdx = 0; kvNIncreIdx < kvNBlockSize; kvNIncreIdx++) {
                         uint64_t gmOffsetQ = qBOffset + qSOffset + qNStartOffset +
                                              static_cast<uint64_t>(kvNIncreIdx * groupSize * embed);
-                        uint64_t gmOffsetK = kBOffset + kNStartOffset +
-                                             static_cast<uint64_t>(kvNIncreIdx * embed);
-                        uint64_t sWorkspaceIncreOffset =
-                            static_cast<uint64_t>(kvNIncreIdx) * rowNum * MAX_KV_STACK_LEN;
+                        uint64_t gmOffsetK = kBOffset + kNStartOffset + static_cast<uint64_t>(kvNIncreIdx * embed);
+                        if constexpr (PAGED_CACHE_FLAG && BNBD_FLAG) {
+                            // BNBD: head offset = kvNIdx * blockSize * D
+                            gmOffsetK =
+                                kBOffset + kNStartOffset + static_cast<uint64_t>(kvNIncreIdx * pagedBlockSize * embed);
+                        }
+                        uint64_t sWorkspaceIncreOffset = static_cast<uint64_t>(kvNIncreIdx) * rowNum * MAX_KV_STACK_LEN;
                         uint64_t gmOffsetS =
                             static_cast<uint64_t>(coreIdx) * WORKSPACE_BLOCK_SIZE_DB * (PRE_LAUNCH + 1U) +
-                            static_cast<uint64_t>(curStackTileMod) * WORKSPACE_BLOCK_SIZE_DB +
-                            sWorkspaceIncreOffset;
+                            static_cast<uint64_t>(curStackTileMod) * WORKSPACE_BLOCK_SIZE_DB + sWorkspaceIncreOffset;
                         GemmCoord actualBlockShapeQK{rowNum, stackSeqTile, embed};
                         LayoutS layOutS(rowNum, stackSeqTile, stackSeqTilePad);
 #ifdef __DAV_C220_CUBE__
-                        blockMmadQK(
-                            gQ[gmOffsetQ],
-                            gK[gmOffsetK],
-                            gS[gmOffsetS],
-                            gBlockTable[blockBOffset],
-                            layoutQTemp,
-                            layoutKTemp,
-                            layOutS,
-                            actualBlockShapeQK,
-                            kvSIdx,
-                            kvSLoopNumTotal,
-                            pagedBlockSize,
-                            strideK,
-                            kvNIncreIdx,
-                            keyBnStride);
+                        blockMmadQK(gQ[gmOffsetQ], gK[gmOffsetK], gS[gmOffsetS], gBlockTable[blockBOffset], layoutQTemp,
+                                    layoutKTemp, layOutS, actualBlockShapeQK, kvSIdx, kvSLoopNumTotal, pagedBlockSize,
+                                    strideK, kvNIncreIdx, keyBnStride);
                         if (kvNIncreIdx == kvNBlockSize - 1) {
                             Arch::CrossCoreSetFlag<0x2, PIPE_FIX>(qkReady);
                         }
@@ -336,22 +325,9 @@ public:
 
                     GemmCoord actualBlockShapeQK{rowNum * kvNBlockSize, stackSeqTile, embed};
 
-                    epilogueOnlineSoftmax(
-                        gP[gmOffsetPBase],
-                        gS[gmOffsetSBase],
-                        layOutP,
-                        layOutS,
-                        actualBlockShapeQK,
-                        (stackSeqCount == 0),
-                        0,
-                        qSBlockSize,
-                        gBlockSize,
-                        curStackTileMod,
-                        kvNBlockSize,
-                        gmOffsetSBase,
-                        gmOffsetPBase,
-                        qkReady,
-                        softmaxReady);
+                    epilogueOnlineSoftmax(gP[gmOffsetPBase], gS[gmOffsetSBase], layOutP, layOutS, actualBlockShapeQK,
+                                          (stackSeqCount == 0), 0, qSBlockSize, gBlockSize, curStackTileMod,
+                                          kvNBlockSize, gmOffsetSBase, gmOffsetPBase, qkReady, softmaxReady);
                     Arch::CrossCoreSetFlag<0x2, PIPE_MTE3>(softmaxReady);
 #endif
                 }
@@ -365,47 +341,33 @@ public:
                     uint32_t curStackTileMod = (stackSeqCount - PRE_LAUNCH) % (PRE_LAUNCH + 1U);
 
                     for (uint32_t kvNIncreIdx = 0; kvNIncreIdx < kvNBlockSize; kvNIncreIdx++) {
-                        uint64_t gmOffsetV = vBOffset + vNStartOffset +
-                                             static_cast<uint64_t>(kvNIncreIdx * embedV);
+                        uint64_t gmOffsetV = vBOffset + vNStartOffset + static_cast<uint64_t>(kvNIncreIdx * embedV);
+                        if constexpr (PAGED_CACHE_FLAG && BNBD_FLAG) {
+                            gmOffsetV =
+                                vBOffset + vNStartOffset + static_cast<uint64_t>(kvNIncreIdx * pagedBlockSize * embedV);
+                        }
                         uint64_t gmOffsetO = oBOffset + oSOffset + oNStartOffset +
                                              static_cast<uint64_t>(kvNIncreIdx * groupSize * embed);
-                        uint64_t gmOffsetLse = lseBOffset + lseTokenOffset + qNStartIdx +
-                                               static_cast<uint64_t>(kvNIncreIdx * groupSize);
+                        uint64_t gmOffsetLse =
+                            lseBOffset + lseTokenOffset + qNStartIdx + static_cast<uint64_t>(kvNIncreIdx * groupSize);
 
                         uint64_t oWorkspaceIncreOffset = static_cast<uint64_t>(kvNIncreIdx) * rowNum * embedRoundV;
                         uint64_t gmOffsetOTmp =
                             static_cast<uint64_t>(coreIdx) * WORKSPACE_BLOCK_SIZE_DB * (PRE_LAUNCH + 1U) +
-                            static_cast<uint64_t>(curStackTileMod) * WORKSPACE_BLOCK_SIZE_DB +
-                            oWorkspaceIncreOffset;
+                            static_cast<uint64_t>(curStackTileMod) * WORKSPACE_BLOCK_SIZE_DB + oWorkspaceIncreOffset;
                         GemmCoord actualBlockShapePV{rowNum, embedV, stackSeqTile};
                         LayoutOTmp layoutOTmp(rowNum, embedV, embedRoundV);
 #ifdef __DAV_C220_CUBE__
 
-                        uint64_t pWorkspaceIncreOffset =
-                            static_cast<uint64_t>(kvNIncreIdx) * rowNum * stackSeqTilePad;
+                        uint64_t pWorkspaceIncreOffset = static_cast<uint64_t>(kvNIncreIdx) * rowNum * stackSeqTilePad;
                         uint64_t gmOffsetP =
                             static_cast<uint64_t>(coreIdx) * WORKSPACE_BLOCK_SIZE_DB * (PRE_LAUNCH + 1) +
-                            static_cast<uint64_t>(curStackTileMod) * WORKSPACE_BLOCK_SIZE_DB +
-                            pWorkspaceIncreOffset;
+                            static_cast<uint64_t>(curStackTileMod) * WORKSPACE_BLOCK_SIZE_DB + pWorkspaceIncreOffset;
                         LayoutP layoutPTemp(rowNum, stackSeqTile, stackSeqTilePad);
-                        blockMmadPV(
-                            gP[gmOffsetP],
-                            gV[gmOffsetV],
-                            gOTmp[gmOffsetOTmp],
-                            gBlockTable[blockBOffset],
-                            layoutPTemp,
-                            layoutVTemp,
-                            layoutOTmp,
-                            actualBlockShapePV,
-                            nowkvSIdx,
-                            kvSLoopNumTotal,
-                            pagedBlockSize,
-                            noSkipKvS,
-                            strideV,
-                            blockStackNum,
-                            softmaxReady,
-                            (kvNIncreIdx == 0),
-                            valueBnStride);
+                        blockMmadPV(gP[gmOffsetP], gV[gmOffsetV], gOTmp[gmOffsetOTmp], gBlockTable[blockBOffset],
+                                    layoutPTemp, layoutVTemp, layoutOTmp, actualBlockShapePV, nowkvSIdx,
+                                    kvSLoopNumTotal, pagedBlockSize, noSkipKvS, strideV, blockStackNum, softmaxReady,
+                                    (kvNIncreIdx == 0), valueBnStride);
                         if (kvNIncreIdx == kvNBlockSize - 1) {
                             Arch::CrossCoreSetFlag<0x2, PIPE_FIX>(pvReady);
                         }
@@ -428,23 +390,10 @@ public:
                         static_cast<uint64_t>(curStackTileMod) * WORKSPACE_BLOCK_SIZE_DB;
                     uint64_t gmOffsetLse = lseBOffset + lseTokenOffset + qNStartIdx;
 
-                    epilogueRescaleO(
-                        gO[gmOffsetO],
-                        gOTmp[gmOffsetOTmp],
-                        gOUpdate[gmOffsetUpdate],
-                        gLse[gmOffsetLse],
-                        layoutO,
-                        layoutOTmp,
-                        layoutUpdate,
-                        layoutLse,
-                        actualBlockShapePV,
-                        qSBlockSize,
-                        gBlockSize,
-                        kvNBlockSize,
-                        (stackSeqCount - PRE_LAUNCH == 0),
-                        nowkvSIdx + blockStackNum >= kvSLoopNumTotal,
-                        curStackTileMod,
-                        1U);
+                    epilogueRescaleO(gO[gmOffsetO], gOTmp[gmOffsetOTmp], gOUpdate[gmOffsetUpdate], gLse[gmOffsetLse],
+                                     layoutO, layoutOTmp, layoutUpdate, layoutLse, actualBlockShapePV, qSBlockSize,
+                                     gBlockSize, kvNBlockSize, (stackSeqCount - PRE_LAUNCH == 0),
+                                     nowkvSIdx + blockStackNum >= kvSLoopNumTotal, curStackTileMod, 1U);
 #endif
                 }
                 stackSeqCount++;
@@ -453,8 +402,7 @@ public:
         if (tailKvNBlockTile > 0 && tailLoopTaskNum > 0) {
             uint32_t tailFirstBatchTasks = kvHeads - tailStartN2;
 
-            for (uint32_t tailTaskIdx = coreIdx; tailTaskIdx < tailLoopTaskNum;
-                 tailTaskIdx += uint32_t(coreNum)) {
+            for (uint32_t tailTaskIdx = coreIdx; tailTaskIdx < tailLoopTaskNum; tailTaskIdx += uint32_t(coreNum)) {
                 uint32_t tailCurBatch;
                 uint32_t tailKvNBlockIdx;
                 uint32_t tailCurKvNStartOffset;
@@ -474,9 +422,8 @@ public:
                 uint32_t tailKvSeqlen = static_cast<uint32_t>(gActualKvseqlen.GetValue(tailCurBatch));
                 if constexpr (INPUT_LAYOUT == FaiKernel::inputLayout::TND) {
                     if constexpr (!PAGED_CACHE_FLAG) {
-                        uint32_t prevKvSum = (tailCurBatch == 0) ?
-                                                 0 :
-                                                 static_cast<uint32_t>(gActualKvseqlen.GetValue(tailCurBatch - 1));
+                        uint32_t prevKvSum =
+                            (tailCurBatch == 0) ? 0 : static_cast<uint32_t>(gActualKvseqlen.GetValue(tailCurBatch - 1));
                         tailKvSeqlen = tailKvSeqlen - prevKvSum;
                     }
                 }
@@ -490,9 +437,8 @@ public:
                 if constexpr (PAGED_CACHE_FLAG) {
                     tailBlockBOffset = static_cast<uint64_t>(tailCurBatch) * maxNumBlocksPerBatch;
                 } else {
-                    uint64_t cumKvSeqlen = (tailCurBatch > 0) ?
-                                               static_cast<uint64_t>(gActualKvseqlen.GetValue(tailCurBatch - 1)) :
-                                               0;
+                    uint64_t cumKvSeqlen =
+                        (tailCurBatch > 0) ? static_cast<uint64_t>(gActualKvseqlen.GetValue(tailCurBatch - 1)) : 0;
                     tailKBOffset = cumKvSeqlen * strideK;
                     tailVBOffset = cumKvSeqlen * strideV;
                 }
@@ -513,6 +459,11 @@ public:
                 uint64_t oSOffset = 0;
                 uint64_t oNStartOffset = static_cast<uint64_t>(tailQNStartIdx) * embedV;
                 uint64_t lseTokenOffset = 0;
+                if constexpr (PAGED_CACHE_FLAG && BNBD_FLAG) {
+                    // BNBD: head stride within a block is pagedBlockSize * embed
+                    kNStartOffset = static_cast<uint64_t>(tailKvNStartIdx) * pagedBlockSize * embed;
+                    vNStartOffset = static_cast<uint64_t>(tailKvNStartIdx) * pagedBlockSize * embedV;
+                }
 
                 uint32_t noSkipKvS = tailKvSeqlen;
                 uint32_t kvSLoopNumTotal = NpuArch::Detail::Alignment::CeilDiv(noSkipKvS, pagedBlockSize);
@@ -527,6 +478,11 @@ public:
                 LayoutQ layoutQTemp(rowNum, embed);
                 LayoutK layoutKTemp(strideK, blockStackNum * pagedBlockSize);
                 LayoutV layoutVTemp(blockStackNum * pagedBlockSize, strideV);
+                if constexpr (PAGED_CACHE_FLAG && BNBD_FLAG) {
+                    // BNBD: token stride within a block is embed (head selected via gmOffsetK)
+                    layoutKTemp = LayoutK(embed, blockStackNum * pagedBlockSize);
+                    layoutVTemp = LayoutV(blockStackNum * pagedBlockSize, embedV);
+                }
 #endif
                 for (uint32_t kvSIdx = 0; kvSIdx < kvSLoopNumTotal + preKVNum; kvSIdx += blockStackNum) {
                     if (kvSIdx < kvSLoopNumTotal) {
@@ -542,16 +498,21 @@ public:
                             uint32_t taskRowNum = rowNum * tailKvNBlockSize;
                             LayoutQ layoutQL1(taskRowNum, embed);
                             uint32_t taskColNum = tailGBlockSize * tailKvNBlockSize;
-                            blockMmadQK.loadQGM(gQ[gmOffsetQGmtoL1], layoutQL1, taskRowNum,
-                                                taskColNum, qHeads, tailKvNBlockSize);
+                            blockMmadQK.loadQGM(gQ[gmOffsetQGmtoL1], layoutQL1, taskRowNum, taskColNum, qHeads,
+                                                tailKvNBlockSize);
                         }
 #endif
 
                         for (uint32_t kvNIncreIdx = 0; kvNIncreIdx < tailKvNBlockSize; kvNIncreIdx++) {
                             uint64_t gmOffsetQ = tailQBOffset + qSOffset + qNStartOffset +
                                                  static_cast<uint64_t>(kvNIncreIdx * groupSize * embed);
-                            uint64_t gmOffsetK = tailKBOffset + kNStartOffset +
-                                                 static_cast<uint64_t>(kvNIncreIdx * embed);
+                            uint64_t gmOffsetK =
+                                tailKBOffset + kNStartOffset + static_cast<uint64_t>(kvNIncreIdx * embed);
+                            if constexpr (PAGED_CACHE_FLAG && BNBD_FLAG) {
+                                // BNBD: head offset = kvNIdx * blockSize * D
+                                gmOffsetK = tailKBOffset + kNStartOffset +
+                                            static_cast<uint64_t>(kvNIncreIdx * pagedBlockSize * embed);
+                            }
                             uint64_t sWorkspaceIncreOffset =
                                 static_cast<uint64_t>(kvNIncreIdx) * rowNum * MAX_KV_STACK_LEN;
                             uint64_t gmOffsetS =
@@ -562,21 +523,9 @@ public:
                             LayoutS layOutS(rowNum, stackSeqTileTemp, stackSeqTilePad);
 #ifdef __DAV_C220_CUBE__
                             if constexpr (PAGED_CACHE_FLAG) {
-                                blockMmadQK(
-                                    gQ[gmOffsetQ],
-                                    gK[gmOffsetK],
-                                    gS[gmOffsetS],
-                                    gBlockTable[tailBlockBOffset],
-                                    layoutQTemp,
-                                    layoutKTemp,
-                                    layOutS,
-                                    actualBlockShapeQK,
-                                    kvSIdx,
-                                    kvSLoopNumTotal,
-                                    pagedBlockSize,
-                                    strideK,
-                                    kvNIncreIdx,
-                                    keyBnStride);
+                                blockMmadQK(gQ[gmOffsetQ], gK[gmOffsetK], gS[gmOffsetS], gBlockTable[tailBlockBOffset],
+                                            layoutQTemp, layoutKTemp, layOutS, actualBlockShapeQK, kvSIdx,
+                                            kvSLoopNumTotal, pagedBlockSize, strideK, kvNIncreIdx, keyBnStride);
                             }
 
                             if (kvNIncreIdx == tailKvNBlockSize - 1) {
@@ -593,22 +542,10 @@ public:
                         LayoutS layOutS(rowNum * tailKvNBlockSize, stackSeqTileTemp, stackSeqTilePad);
                         GemmCoord actualBlockShapeQK{rowNum * tailKvNBlockSize, stackSeqTileTemp, embed};
 
-                        epilogueOnlineSoftmax(
-                            gP[gmOffsetPBase],
-                            gS[gmOffsetSBase],
-                            layOutP,
-                            layOutS,
-                            actualBlockShapeQK,
-                            (stackSeqCount == 0),
-                            0,
-                            tailQSBlockSize,
-                            tailGBlockSize,
-                            curStackTileMod,
-                            tailKvNBlockSize,
-                            gmOffsetSBase,
-                            gmOffsetPBase,
-                            qkReady,
-                            softmaxReady);
+                        epilogueOnlineSoftmax(gP[gmOffsetPBase], gS[gmOffsetSBase], layOutP, layOutS,
+                                              actualBlockShapeQK, (stackSeqCount == 0), 0, tailQSBlockSize,
+                                              tailGBlockSize, curStackTileMod, tailKvNBlockSize, gmOffsetSBase,
+                                              gmOffsetPBase, qkReady, softmaxReady);
                         Arch::CrossCoreSetFlag<0x2, PIPE_MTE3>(softmaxReady);
 #endif
                     }
@@ -622,14 +559,17 @@ public:
                         uint32_t curStackTileMod = (stackSeqCount - PRE_LAUNCH) % (PRE_LAUNCH + 1U);
 
                         for (uint32_t kvNIncreIdx = 0; kvNIncreIdx < tailKvNBlockSize; kvNIncreIdx++) {
-                            uint64_t gmOffsetV = tailVBOffset + vNStartOffset +
-                                                 static_cast<uint64_t>(kvNIncreIdx * embedV);
+                            uint64_t gmOffsetV =
+                                tailVBOffset + vNStartOffset + static_cast<uint64_t>(kvNIncreIdx * embedV);
+                            if constexpr (PAGED_CACHE_FLAG && BNBD_FLAG) {
+                                gmOffsetV = tailVBOffset + vNStartOffset +
+                                            static_cast<uint64_t>(kvNIncreIdx * pagedBlockSize * embedV);
+                            }
                             uint64_t gmOffsetO = tailOBOffset + oSOffset + oNStartOffset +
                                                  static_cast<uint64_t>(kvNIncreIdx * groupSize * embed);
                             uint64_t gmOffsetLse = tailLseBOffset + lseTokenOffset + tailQNStartIdx +
                                                    static_cast<uint64_t>(kvNIncreIdx * groupSize);
-                            uint64_t oWorkspaceIncreOffset =
-                                static_cast<uint64_t>(kvNIncreIdx) * rowNum * embedRoundV;
+                            uint64_t oWorkspaceIncreOffset = static_cast<uint64_t>(kvNIncreIdx) * rowNum * embedRoundV;
                             uint64_t gmOffsetOTmp =
                                 static_cast<uint64_t>(coreIdx) * WORKSPACE_BLOCK_SIZE_DB * (PRE_LAUNCH + 1U) +
                                 static_cast<uint64_t>(curStackTileMod) * WORKSPACE_BLOCK_SIZE_DB +
@@ -645,24 +585,10 @@ public:
                                 pWorkspaceIncreOffset;
                             LayoutP layoutPTemp(rowNum, stackSeqTileTemp, stackSeqTilePad);
 
-                            blockMmadPV(
-                                gP[gmOffsetP],
-                                gV[gmOffsetV],
-                                gOTmp[gmOffsetOTmp],
-                                gBlockTable[tailBlockBOffset],
-                                layoutPTemp,
-                                layoutVTemp,
-                                layoutOTmp,
-                                actualBlockShapePV,
-                                nowkvSIdx,
-                                kvSLoopNumTotal,
-                                pagedBlockSize,
-                                noSkipKvS,
-                                strideV,
-                                blockStackNum,
-                                softmaxReady,
-                                (kvNIncreIdx == 0),
-                                valueBnStride);
+                            blockMmadPV(gP[gmOffsetP], gV[gmOffsetV], gOTmp[gmOffsetOTmp],
+                                        gBlockTable[tailBlockBOffset], layoutPTemp, layoutVTemp, layoutOTmp,
+                                        actualBlockShapePV, nowkvSIdx, kvSLoopNumTotal, pagedBlockSize, noSkipKvS,
+                                        strideV, blockStackNum, softmaxReady, (kvNIncreIdx == 0), valueBnStride);
                             if (kvNIncreIdx == tailKvNBlockSize - 1) {
                                 Arch::CrossCoreSetFlag<0x2, PIPE_FIX>(pvReady);
                             }
@@ -684,23 +610,11 @@ public:
                             static_cast<uint64_t>(curStackTileMod) * WORKSPACE_BLOCK_SIZE_DB;
                         uint64_t gmOffsetLse = tailLseBOffset + lseTokenOffset + tailQNStartIdx;
 
-                        epilogueRescaleO(
-                            gO[gmOffsetO],
-                            gOTmp[gmOffsetOTmp],
-                            gOUpdate[gmOffsetUpdate],
-                            gLse[gmOffsetLse],
-                            layoutO,
-                            layoutOTmp,
-                            layoutUpdate,
-                            layoutLse,
-                            actualBlockShapePV,
-                            tailQSBlockSize,
-                            tailGBlockSize,
-                            tailKvNBlockSize,
-                            (stackSeqCount - PRE_LAUNCH == 0),
-                            nowkvSIdx + blockStackNum >= kvSLoopNumTotal,
-                            curStackTileMod,
-                            1U);
+                        epilogueRescaleO(gO[gmOffsetO], gOTmp[gmOffsetOTmp], gOUpdate[gmOffsetUpdate],
+                                         gLse[gmOffsetLse], layoutO, layoutOTmp, layoutUpdate, layoutLse,
+                                         actualBlockShapePV, tailQSBlockSize, tailGBlockSize, tailKvNBlockSize,
+                                         (stackSeqCount - PRE_LAUNCH == 0),
+                                         nowkvSIdx + blockStackNum >= kvSLoopNumTotal, curStackTileMod, 1U);
 #endif
                     }
                     stackSeqCount++;

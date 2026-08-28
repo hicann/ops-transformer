@@ -160,6 +160,7 @@ struct FAInferContext {
     bool flashDecodeFlag = false;
     bool decodingFlag = false;
     bool kvcacheNzFlag = false;
+    bool kvcacheBnbdFlag = false;
     string layout;
     uint64_t keyBnStride = 0;
     uint64_t valueBnStride = 0;
@@ -195,19 +196,17 @@ private:
     void fillCoreInfoForFlashDecode(FAInferTilingData &faTilingData, uint32_t groupSize, uint64_t perCoreTaskNum);
     void fillSplitInfoForFlashDecode(FAInferTilingData &faTilingData, uint32_t groupSize);
     void InitCoreInfoArrays(FAInferTilingData &faTilingData);
-    void ConsumeS2BlocksFD(uint32_t groupSize, int64_t &resTaskNum,
-                           uint32_t &nowBIdx, uint32_t &nowS1Idx, uint32_t &nowS2Idx);
-    void ConsumeRemainingBatchesFD(uint32_t groupSize, int64_t &resTaskNum,
-                                   uint32_t &nowBIdx, uint32_t &nowN1Idx, uint32_t &nowS1Idx, uint32_t &nowS2Idx);
-    void ConsumeRemainingN1GroupsFD(int64_t &resTaskNum, const BatchParams &p,
-                                    uint32_t &nowN1Idx, uint32_t &nowS1Idx, uint32_t &nowS2Idx);
-    void ConsumeRemainingS1GroupsFD(int64_t &resTaskNum, const BatchParams &p,
-                                    uint32_t &nowS1Idx, uint32_t &nowS2Idx);
+    void ConsumeS2BlocksFD(uint32_t groupSize, int64_t &resTaskNum, uint32_t &nowBIdx, uint32_t &nowS1Idx,
+                           uint32_t &nowS2Idx);
+    void ConsumeRemainingBatchesFD(uint32_t groupSize, int64_t &resTaskNum, uint32_t &nowBIdx, uint32_t &nowN1Idx,
+                                   uint32_t &nowS1Idx, uint32_t &nowS2Idx);
+    void ConsumeRemainingN1GroupsFD(int64_t &resTaskNum, const BatchParams &p, uint32_t &nowN1Idx, uint32_t &nowS1Idx,
+                                    uint32_t &nowS2Idx);
+    void ConsumeRemainingS1GroupsFD(int64_t &resTaskNum, const BatchParams &p, uint32_t &nowS1Idx, uint32_t &nowS2Idx);
     void InitSplitInfoArrays(FAInferTilingData &faTilingData);
-    void ProcessCoreSplitInfo(FAInferTilingData &faTilingData, uint32_t groupSize,
-                              uint32_t coreIdx, int32_t &splitIdx, int32_t &prevBIdx,
-                              int32_t &prevN1Idx, int32_t &prevS1Idx,
-                              int64_t &currentLseTaskOffset, int64_t &currentOTaskOffset);
+    void ProcessCoreSplitInfo(FAInferTilingData &faTilingData, uint32_t groupSize, uint32_t coreIdx, int32_t &splitIdx,
+                              int32_t &prevBIdx, int32_t &prevN1Idx, int32_t &prevS1Idx, int64_t &currentLseTaskOffset,
+                              int64_t &currentOTaskOffset);
 
 private:
     FAInferContext faInfo_;
@@ -221,9 +220,7 @@ FAInferTiling::FAInferTiling(const FAInferContext &faInfo)
 uint32_t FAInferTiling::GetQNBlockTile(uint32_t qSeqlen, uint32_t groupSize)
 {
     uint32_t qRowNumCeil = Q_TILE_CEIL;
-    uint32_t qNBlockTile = (qSeqlen != 0) ?
-                               (qRowNumCeil / qSeqlen) / N_SPLIT_HELPER * N_SPLIT_HELPER :
-                               Q_TILE_CEIL;
+    uint32_t qNBlockTile = (qSeqlen != 0) ? (qRowNumCeil / qSeqlen) / N_SPLIT_HELPER * N_SPLIT_HELPER : Q_TILE_CEIL;
     qNBlockTile = std::min(qNBlockTile, groupSize);
     qNBlockTile = std::max(qNBlockTile, static_cast<uint32_t>(1));
     return qNBlockTile;
@@ -291,6 +288,7 @@ uint64_t FAInferTiling::GetTilingKey()
     constexpr uint64_t COMP_SWA_MASK_KEY = 5;
     constexpr uint64_t FULL_MASK_KEY = 6;
     constexpr uint64_t KVCACHE_NZ_KEY = 10;
+    constexpr uint64_t KVCACHE_BNBD_KEY = 20;
     constexpr uint64_t LAYOUTQ_TND_KEY = 200000;
     constexpr uint64_t DTYPE_FP16_KEY = 100;
     constexpr uint64_t DTYPE_BF16_KEY = 200;
@@ -316,6 +314,9 @@ uint64_t FAInferTiling::GetTilingKey()
     if (faInfo_.kvcacheNzFlag) {
         tilingKey += static_cast<uint64_t>(KVCACHE_NZ_KEY);
     }
+    if (faInfo_.kvcacheBnbdFlag) {
+        tilingKey += static_cast<uint64_t>(KVCACHE_BNBD_KEY);
+    }
     if (faInfo_.dataType == DataType::FP16) {
         tilingKey += static_cast<uint64_t>(DTYPE_FP16_KEY);
     } else if (faInfo_.dataType == DataType::BF16) {
@@ -330,11 +331,8 @@ uint64_t FAInferTiling::GetTilingKey()
     if (faInfo_.innerPrecise == 1) {
         tilingKey += static_cast<uint64_t>(INNER_LOW_PREC_KEY);
     }
-    if ((faInfo_.pagedCacheFlag) &&
-        !(faInfo_.maskType == MaskType::SWA_MASK) &&
-        !faInfo_.learnableSinkFlag &&
-        !(faInfo_.innerPrecise == 1) &&
-        faInfo_.flashDecodeFlag) {
+    if ((faInfo_.pagedCacheFlag) && !(faInfo_.maskType == MaskType::SWA_MASK) && !faInfo_.learnableSinkFlag &&
+        !(faInfo_.innerPrecise == 1) && faInfo_.flashDecodeFlag) {
         tilingKey += static_cast<uint64_t>(FLASH_DECODE_KEY);
     } else if (faInfo_.decodingFlag) {
         tilingKey += static_cast<uint64_t>(DECODING_KEY);
@@ -344,20 +342,18 @@ uint64_t FAInferTiling::GetTilingKey()
 
 void FAInferTiling::FillWorkSpaceTilingData(FAInferTilingData &faTilingData)
 {
-    uint64_t mm1OutSize = static_cast<uint64_t>(blockNum_) * WORKSPACE_BLOCK_SIZE_DB *
-                          SIZE_OF_32BIT * PRELANCH_NUM;
-    uint64_t smOnlineOutSize = static_cast<uint64_t>(blockNum_) * WORKSPACE_BLOCK_SIZE_DB *
-                               SIZE_OF_16BIT * PRELANCH_NUM;
-    uint64_t mm2OutSize = static_cast<uint64_t>(blockNum_) * WORKSPACE_BLOCK_SIZE_DB *
-                          SIZE_OF_32BIT * PRELANCH_NUM;
-    uint64_t UpdateSize = static_cast<uint64_t>(blockNum_) * WORKSPACE_BLOCK_SIZE_DB *
-                          SIZE_OF_32BIT * PRELANCH_NUM;
+    uint64_t mm1OutSize = static_cast<uint64_t>(blockNum_) * WORKSPACE_BLOCK_SIZE_DB * SIZE_OF_32BIT * PRELANCH_NUM;
+    uint64_t smOnlineOutSize =
+        static_cast<uint64_t>(blockNum_) * WORKSPACE_BLOCK_SIZE_DB * SIZE_OF_16BIT * PRELANCH_NUM;
+    uint64_t mm2OutSize = static_cast<uint64_t>(blockNum_) * WORKSPACE_BLOCK_SIZE_DB * SIZE_OF_32BIT * PRELANCH_NUM;
+    uint64_t UpdateSize = static_cast<uint64_t>(blockNum_) * WORKSPACE_BLOCK_SIZE_DB * SIZE_OF_32BIT * PRELANCH_NUM;
     uint64_t splitLseTotalSize = 0;
     uint64_t splitOTotalSize = 0;
     if (faInfo_.isTilingSink) {
         splitLseTotalSize = 2 * static_cast<uint64_t>(blockNum_) * Q_TILE_CEIL * SIZE_OF_32BIT * faInfo_.numHeads;
         uint32_t embeddingSizeV = static_cast<uint32_t>(faInfo_.embeddingSizeV);
-        splitOTotalSize = 2 * static_cast<uint64_t>(blockNum_) * Q_TILE_CEIL * embeddingSizeV * SIZE_OF_32BIT * faInfo_.numHeads;
+        splitOTotalSize =
+            2 * static_cast<uint64_t>(blockNum_) * Q_TILE_CEIL * embeddingSizeV * SIZE_OF_32BIT * faInfo_.numHeads;
         faTilingData.set_splitLseTotalSize(splitLseTotalSize);
         faTilingData.set_splitOTotalSize(splitOTotalSize);
         faTilingData.set_needCoreNum(blockNum_);
@@ -365,7 +361,8 @@ void FAInferTiling::FillWorkSpaceTilingData(FAInferTilingData &faTilingData)
         splitLseTotalSize = faTilingData.get_splitLseTotalSize();
         splitOTotalSize = faTilingData.get_splitOTotalSize();
     }
-    uint64_t workSpaceSize = mm1OutSize + smOnlineOutSize + mm2OutSize + UpdateSize + splitLseTotalSize + splitOTotalSize;
+    uint64_t workSpaceSize =
+        mm1OutSize + smOnlineOutSize + mm2OutSize + UpdateSize + splitLseTotalSize + splitOTotalSize;
     faTilingData.set_mm1OutSize(mm1OutSize);
     faTilingData.set_smOnlineOutSize(smOnlineOutSize);
     faTilingData.set_mm2OutSize(mm2OutSize);
@@ -439,28 +436,29 @@ void FAInferTiling::InitCoreInfoArrays(FAInferTilingData &faTilingData)
     }
 }
 
-void FAInferTiling::ConsumeS2BlocksFD(uint32_t groupSize, int64_t &resTaskNum,
-                                      uint32_t &nowBIdx, uint32_t &nowS1Idx, uint32_t &nowS2Idx)
+void FAInferTiling::ConsumeS2BlocksFD(uint32_t groupSize, int64_t &resTaskNum, uint32_t &nowBIdx, uint32_t &nowS1Idx,
+                                      uint32_t &nowS2Idx)
 {
     while (nowS2Idx < getBatchParams(nowBIdx, groupSize).curKSBlockNum && resTaskNum > 0) {
         BatchParams p = getBatchParams(nowBIdx, groupSize);
-        uint32_t remainingQ = (nowS1Idx < p.curQSBlockNum - 1) ? p.curQSBlockTile :
-                                                                 (p.qSeqlen - nowS1Idx * p.curQSBlockTile) * p.curQNBlockTile;
-        uint32_t remainingKV = (nowS2Idx < p.curKSBlockNum - 1) ? p.curKSBlockTile :
-                                                                  (p.kvSeqlen - nowS2Idx * p.curKSBlockTile);
+        uint32_t remainingQ = (nowS1Idx < p.curQSBlockNum - 1) ?
+                                  p.curQSBlockTile :
+                                  (p.qSeqlen - nowS1Idx * p.curQSBlockTile) * p.curQNBlockTile;
+        uint32_t remainingKV =
+            (nowS2Idx < p.curKSBlockNum - 1) ? p.curKSBlockTile : (p.kvSeqlen - nowS2Idx * p.curKSBlockTile);
         uint64_t singleS2Task = remainingQ * remainingKV;
         resTaskNum -= singleS2Task;
         nowS2Idx += 1;
     }
 }
 
-void FAInferTiling::ConsumeRemainingBatchesFD(uint32_t groupSize, int64_t &resTaskNum,
-                                              uint32_t &nowBIdx, uint32_t &nowN1Idx, uint32_t &nowS1Idx, uint32_t &nowS2Idx)
+void FAInferTiling::ConsumeRemainingBatchesFD(uint32_t groupSize, int64_t &resTaskNum, uint32_t &nowBIdx,
+                                              uint32_t &nowN1Idx, uint32_t &nowS1Idx, uint32_t &nowS2Idx)
 {
     while (nowBIdx < static_cast<uint32_t>(faInfo_.batch) && resTaskNum > 0) {
         BatchParams p = getBatchParams(nowBIdx, groupSize);
-        uint32_t remainingQ = p.qSeqlen * (faInfo_.numHeads - p.curQNBlockTile * nowN1Idx) -
-                              nowS1Idx * p.curQSBlockTile;
+        uint32_t remainingQ =
+            p.qSeqlen * (faInfo_.numHeads - p.curQNBlockTile * nowN1Idx) - nowS1Idx * p.curQSBlockTile;
         uint32_t remainingKV = p.kvSeqlen;
         uint32_t remainingInBatch = remainingQ * remainingKV;
         if (resTaskNum >= static_cast<int64_t>(remainingInBatch)) {
@@ -475,8 +473,8 @@ void FAInferTiling::ConsumeRemainingBatchesFD(uint32_t groupSize, int64_t &resTa
     }
 }
 
-void FAInferTiling::ConsumeRemainingN1GroupsFD(int64_t &resTaskNum, const BatchParams &p,
-                                               uint32_t &nowN1Idx, uint32_t &nowS1Idx, uint32_t &nowS2Idx)
+void FAInferTiling::ConsumeRemainingN1GroupsFD(int64_t &resTaskNum, const BatchParams &p, uint32_t &nowN1Idx,
+                                               uint32_t &nowS1Idx, uint32_t &nowS2Idx)
 {
     while (nowN1Idx < p.curQNBlockNum && resTaskNum > 0) {
         uint32_t remainingQ = p.qSeqlen * p.curQNBlockTile - nowS1Idx * p.curQSBlockTile;
@@ -492,8 +490,8 @@ void FAInferTiling::ConsumeRemainingN1GroupsFD(int64_t &resTaskNum, const BatchP
     }
 }
 
-void FAInferTiling::ConsumeRemainingS1GroupsFD(int64_t &resTaskNum, const BatchParams &p,
-                                               uint32_t &nowS1Idx, uint32_t &nowS2Idx)
+void FAInferTiling::ConsumeRemainingS1GroupsFD(int64_t &resTaskNum, const BatchParams &p, uint32_t &nowS1Idx,
+                                               uint32_t &nowS2Idx)
 {
     while (nowS1Idx < p.curQSBlockNum && resTaskNum > 0) {
         uint32_t remainingQ = (nowS1Idx < p.curQSBlockNum - 1) ?
@@ -510,7 +508,8 @@ void FAInferTiling::ConsumeRemainingS1GroupsFD(int64_t &resTaskNum, const BatchP
     }
 }
 
-void FAInferTiling::fillCoreInfoForFlashDecode(FAInferTilingData &faTilingData, uint32_t groupSize, uint64_t perCoreTaskNum)
+void FAInferTiling::fillCoreInfoForFlashDecode(FAInferTilingData &faTilingData, uint32_t groupSize,
+                                               uint64_t perCoreTaskNum)
 {
     uint32_t nowBIdx = 0;
     uint32_t nowN1Idx = 0;
@@ -623,9 +622,8 @@ void FAInferTiling::InitSplitInfoArrays(FAInferTilingData &faTilingData)
     }
 }
 
-void FAInferTiling::ProcessCoreSplitInfo(FAInferTilingData &faTilingData, uint32_t groupSize,
-                                         uint32_t coreIdx, int32_t &splitIdx, int32_t &prevBIdx,
-                                         int32_t &prevN1Idx, int32_t &prevS1Idx,
+void FAInferTiling::ProcessCoreSplitInfo(FAInferTilingData &faTilingData, uint32_t groupSize, uint32_t coreIdx,
+                                         int32_t &splitIdx, int32_t &prevBIdx, int32_t &prevN1Idx, int32_t &prevS1Idx,
                                          int64_t &currentLseTaskOffset, int64_t &currentOTaskOffset)
 {
     int32_t startBIdx = faTilingData.coreInfo.get_startBIdx()[coreIdx];
@@ -647,19 +645,13 @@ void FAInferTiling::ProcessCoreSplitInfo(FAInferTilingData &faTilingData, uint32
         int32_t curEndN1 = (BIdx == endBIdx) ? endN1Idx : p.curQNBlockNum - 1;
 
         for (int32_t N1Idx = curStartN1; N1Idx <= curEndN1; N1Idx++) {
-            int32_t curStartS1 =
-                (BIdx == startBIdx && N1Idx == startN1Idx) ? startS1Idx : 0;
-            int32_t curEndS1 = (BIdx == endBIdx && N1Idx == endN1Idx) ?
-                                   endS1Idx :
-                                   p.curQSBlockNum - 1;
+            int32_t curStartS1 = (BIdx == startBIdx && N1Idx == startN1Idx) ? startS1Idx : 0;
+            int32_t curEndS1 = (BIdx == endBIdx && N1Idx == endN1Idx) ? endS1Idx : p.curQSBlockNum - 1;
 
             for (int32_t S1Idx = curStartS1; S1Idx <= curEndS1; S1Idx++) {
-                int32_t curStartS2 = (BIdx == startBIdx && N1Idx == startN1Idx && S1Idx == startS1Idx) ?
-                                         startS2Idx :
-                                         0;
-                int32_t curEndS2 = (BIdx == endBIdx && N1Idx == endN1Idx && S1Idx == endS1Idx) ?
-                                       endS2Idx :
-                                       p.curKSBlockNum;
+                int32_t curStartS2 = (BIdx == startBIdx && N1Idx == startN1Idx && S1Idx == startS1Idx) ? startS2Idx : 0;
+                int32_t curEndS2 =
+                    (BIdx == endBIdx && N1Idx == endN1Idx && S1Idx == endS1Idx) ? endS2Idx : p.curKSBlockNum;
 
                 uint32_t coveredS2 = curEndS2 - curStartS2;
                 bool isSplitKV = (coveredS2 > 0 && coveredS2 < p.curKSBlockNum);
@@ -672,8 +664,7 @@ void FAInferTiling::ProcessCoreSplitInfo(FAInferTilingData &faTilingData, uint32
                 uint32_t N1IdxPerGroup = N1Idx % p.qNBlockNumPerGroup;
                 uint32_t kvHeadIdx = N1Idx / p.qNBlockNumPerGroup;
                 uint32_t currentHeadStart = kvHeadIdx * groupSize + N1IdxPerGroup * p.curQNBlockTile;
-                uint32_t currentHeadEnd =
-                    std::min(currentHeadStart + p.curQNBlockTile, (kvHeadIdx + 1) * groupSize);
+                uint32_t currentHeadEnd = std::min(currentHeadStart + p.curQNBlockTile, (kvHeadIdx + 1) * groupSize);
                 uint32_t currentQStart = S1Idx * p.curQSBlockTile;
                 uint32_t currentQEnd = std::min(currentQStart + p.curQSBlockTile, p.qSeqlen);
                 uint32_t headLen = currentHeadEnd - currentHeadStart;
@@ -722,8 +713,7 @@ void FAInferTiling::fillSplitInfoForFlashDecode(FAInferTilingData &faTilingData,
     int32_t prevS1Idx = -1;
 
     for (uint32_t coreIdx = 0; coreIdx < blockNum_; coreIdx++) {
-        ProcessCoreSplitInfo(faTilingData, groupSize, coreIdx,
-                             splitIdx, prevBIdx, prevN1Idx, prevS1Idx,
+        ProcessCoreSplitInfo(faTilingData, groupSize, coreIdx, splitIdx, prevBIdx, prevN1Idx, prevS1Idx,
                              currentLseTaskOffset, currentOTaskOffset);
     }
 

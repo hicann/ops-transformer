@@ -26,30 +26,14 @@
 namespace NpuArch::Gemm::Block {
 ////////////////////////////////////////////////////////////////////
 
-template <
-    bool PAGED_CACHE_FLAG_,
-    bool ENABLE_UNIT_FLAG_,
-    class L1TileShape_,
-    class L0TileShape_,
-    class AType_,
-    class BType_,
-    class CType_,
-    class BiasType_,
-    class TileCopy_,
-    class TileMmad_>
-struct BlockMmad<
-    MmadAtlasA2FAIPVDecode<PAGED_CACHE_FLAG_, ENABLE_UNIT_FLAG_>,
-    L1TileShape_,
-    L0TileShape_,
-    AType_,
-    BType_,
-    CType_,
-    BiasType_,
-    TileCopy_,
-    TileMmad_> {
+template <bool PAGED_CACHE_FLAG_, bool ENABLE_UNIT_FLAG_, bool BNBD_FLAG_, class L1TileShape_, class L0TileShape_,
+          class AType_, class BType_, class CType_, class BiasType_, class TileCopy_, class TileMmad_>
+struct BlockMmad<MmadAtlasA2FAIPVDecode<PAGED_CACHE_FLAG_, ENABLE_UNIT_FLAG_, BNBD_FLAG_>, L1TileShape_, L0TileShape_,
+                 AType_, BType_, CType_, BiasType_, TileCopy_, TileMmad_> {
 public:
     // Type Aliases
-    using DispatchPolicy = MmadAtlasA2FAIPVDecode<PAGED_CACHE_FLAG_, ENABLE_UNIT_FLAG_>;
+    using DispatchPolicy = MmadAtlasA2FAIPVDecode<PAGED_CACHE_FLAG_, ENABLE_UNIT_FLAG_, BNBD_FLAG_>;
+    static constexpr bool BNBD_FLAG = DispatchPolicy::BNBD_FLAG;
     using ArchTag = typename DispatchPolicy::ArchTag;
     using L0TileShape = L0TileShape_;
     using L1TileShape = L1TileShape_;
@@ -101,14 +85,15 @@ public:
     /// Construct
     __aicore__ inline BlockMmad() {}
 
-    __aicore__ inline void init(Arch::Resource<ArchTag> &resource, uint32_t nDynamic, uint32_t kDynamic, uint32_t l1BufAddrStart = 0)
+    __aicore__ inline void init(Arch::Resource<ArchTag> &resource, uint32_t nDynamic, uint32_t kDynamic,
+                                uint32_t l1BufAddrStart = 0)
     {
         // Allocate L1 memory space
-        l1BTensor = resource.l1Buf.template GetBufferByByte<ElementB>(l1BufAddrStart +
-                                                                      L1TileShape::M * kDynamic * sizeof(ElementA) * STAGES);
+        l1BTensor = resource.l1Buf.template GetBufferByByte<ElementB>(l1BufAddrStart + L1TileShape::M * kDynamic *
+                                                                                           sizeof(ElementA) * STAGES);
         for (uint32_t i = 0; i < STAGES; i++) {
-            l1ATensor[i] = resource.l1Buf.template GetBufferByByte<ElementA>(l1BufAddrStart +
-                                                                             L1TileShape::M * kDynamic * sizeof(ElementA) * i);
+            l1ATensor[i] = resource.l1Buf.template GetBufferByByte<ElementA>(
+                l1BufAddrStart + L1TileShape::M * kDynamic * sizeof(ElementA) * i);
             l0ATensor[i] = resource.l0ABuf.template GetBufferByByte<ElementA>(L0A_PINGPONG_BUF_SIZE * i);
             l0BTensor[i] = resource.l0BBuf.template GetBufferByByte<ElementB>(L0B_PINGPONG_BUF_SIZE * i);
             l0CTensor[i] = resource.l0CBuf.template GetBufferByByte<ElementAccumulator>(L0C_PINGPONG_BUF_SIZE * i);
@@ -120,8 +105,8 @@ public:
     /// Destructor
     __aicore__ inline ~BlockMmad() {}
 
-    __aicore__ inline void getBlockShape(
-        GemmCoord &actualShape, uint32_t &nowNIdx, uint32_t &nLoop, uint32_t &kvSeqlen, uint32_t &blockSize)
+    __aicore__ inline void getBlockShape(GemmCoord &actualShape, uint32_t &nowNIdx, uint32_t &nLoop, uint32_t &kvSeqlen,
+                                         uint32_t &blockSize)
     {
         uint32_t nSplitSize = blockSize;
         if (nowNIdx == nLoop - 1U) {
@@ -130,8 +115,9 @@ public:
         actualShape[COORD_DIM2] = nSplitSize;
     }
 
-    __aicore__ inline void getKVOffset(AscendC::GlobalTensor<int32_t> &gBlockTable, uint64_t &kOffset, uint32_t &nowNIdx,
-                                       uint32_t &strideKV, uint32_t &blockSize, uint64_t valueBnStride)
+    __aicore__ inline void getKVOffset(AscendC::GlobalTensor<int32_t> &gBlockTable, uint64_t &kOffset,
+                                       uint32_t &nowNIdx, uint32_t &strideKV, uint32_t &blockSize,
+                                       uint64_t valueBnStride)
     {
         if constexpr (PAGED_CACHE_FLAG_) {
             uint32_t blockTableId = gBlockTable.GetValue(nowNIdx);
@@ -145,14 +131,12 @@ public:
         }
     }
 
-    __aicore__ inline void operator()(
-        AscendC::GlobalTensor<ElementA> gA,
-        AscendC::GlobalTensor<ElementB> gB,
-        AscendC::GlobalTensor<ElementC> gC,
-        AscendC::GlobalTensor<int32_t> gBlockTable,
-        LayoutA layoutA, LayoutB layoutB, LayoutC layoutC, GemmCoord actualOriShape,
-        uint32_t &nIdx, uint32_t &nLoop, uint32_t &blockSize, uint32_t kvSeqlen, uint32_t strideKV,
-        uint32_t blockStackNum, Arch::CrossCoreFlag softmaxFlag, uint32_t crossCoreSyncTrigger, uint64_t valueBnStride)
+    __aicore__ inline void operator()(AscendC::GlobalTensor<ElementA> gA, AscendC::GlobalTensor<ElementB> gB,
+                                      AscendC::GlobalTensor<ElementC> gC, AscendC::GlobalTensor<int32_t> gBlockTable,
+                                      LayoutA layoutA, LayoutB layoutB, LayoutC layoutC, GemmCoord actualOriShape,
+                                      uint32_t &nIdx, uint32_t &nLoop, uint32_t &blockSize, uint32_t kvSeqlen,
+                                      uint32_t strideKV, uint32_t blockStackNum, Arch::CrossCoreFlag softmaxFlag,
+                                      uint32_t crossCoreSyncTrigger, uint64_t valueBnStride)
     {
         uint32_t rowNum = actualOriShape[COORD_DIM0];
         uint32_t embed = actualOriShape[COORD_DIM1];
@@ -215,7 +199,8 @@ public:
                         }
 
                         LayoutBInL0 layoutBInL0 = LayoutBInL0::template MakeLayout<ElementB>(kL0Actual, nL1Actual);
-                        MatrixCoord l1BTileCoord{kL1Idx * l1KDynamic + kL0Idx * L0TileShape::K, L0TileShape::N * nL1Idx};
+                        MatrixCoord l1BTileCoord{kL1Idx * l1KDynamic + kL0Idx * L0TileShape::K,
+                                                 L0TileShape::N * nL1Idx};
                         auto l1BTileTensor = l1BTensor[layoutBInL1.GetOffset(l1BTileCoord)];
 
                         AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag + 2U);
@@ -225,13 +210,8 @@ public:
                         AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
                         bool initMmad = (kL1Idx == 0U) && (kL0Idx == 0U);
                         uint32_t mL0AlignUp = (mL1ActualTemp + BLOCK_SIZE - 1U) / BLOCK_SIZE * BLOCK_SIZE;
-                        tileMmad(l0CTensor[l0CPingPongFlag],
-                                 l0ATensor[l0ABPingPongFlag],
-                                 l0BTensor[l0ABPingPongFlag],
-                                 mL0AlignUp,
-                                 nL1Actual,
-                                 kL0Actual,
-                                 initMmad);
+                        tileMmad(l0CTensor[l0CPingPongFlag], l0ATensor[l0ABPingPongFlag], l0BTensor[l0ABPingPongFlag],
+                                 mL0AlignUp, nL1Actual, kL0Actual, initMmad);
                         AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag);
                         AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag + 2U);
                         l0ABPingPongFlag = 1U - l0ABPingPongFlag;
