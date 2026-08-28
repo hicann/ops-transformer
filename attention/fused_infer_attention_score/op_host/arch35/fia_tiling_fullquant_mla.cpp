@@ -60,6 +60,23 @@ void FiaTilingFullQuantMlaArch35::CalcScheduleMode()
     OP_LOGI(fiaInfo_->opName, "FIA MLA schedule mode: %u.", static_cast<uint32_t>(scheduleMode_));
 }
 
+void FiaTilingFullQuantMlaArch35::CalcMaxWorkspaceSize()
+{
+    constexpr int32_t mSize = 64;
+    constexpr int32_t dVSize = 512;
+
+    size_t sysWorkspaceSize = platformInfo_.defaultSysWorkspaceSize;
+    workspaceSize_ = sysWorkspaceSize;
+    workspaceSize_ += platformInfo_.coreNum * PRE_LOAD_NUM_MLA_ARCH35 * (mSize * dVSize) * sizeof(float);
+
+    // 2 bmm, db, ensure alignment of each structure 64B, dcci cacheline needs
+    workspaceSize_ += static_cast<uint64_t>(platformInfo_.coreNum) * 2 * 2 * 64;
+
+    uint32_t faTmpAttenGmSize = platformInfo_.coreNum * 2 * mSize * dVSize; // 每个核最多有2次写到workspace
+    uint32_t fatmpResLseGmSize = platformInfo_.coreNum * 2 * mSize * 8;
+    workspaceSize_ += (faTmpAttenGmSize + 2 * fatmpResLseGmSize) * sizeof(float); // ResLse有2份，sum和max
+}
+
 ge::graphStatus FiaTilingFullQuantMlaArch35::DoOpTiling()
 {
     OP_CHECK_IF(SetPlatMemoryInfo() != ge::GRAPH_SUCCESS, OP_LOGE(fiaInfo_->opName, "Set plat memory info fail."),
@@ -92,6 +109,20 @@ ge::graphStatus FiaTilingFullQuantMlaArch35::DoOpTiling()
         if ((SetNumBlocks(numBlocks_) != ge::GRAPH_SUCCESS) || (SetTilingKey(tilingKey_) != ge::GRAPH_SUCCESS) ||
             (SetWorkspaceSize(workspaceSize_) != ge::GRAPH_SUCCESS) ||
             (SetTilingData(tilingData_) != ge::GRAPH_SUCCESS)) {
+            return ge::GRAPH_FAILED;
+        }
+        return ge::GRAPH_SUCCESS;
+    }
+
+    if (fiaInfo_->isMaxWorkspace) {
+        // tiling下沉场景，无法获取到actual_seq，分核结果未知，workspace设置成最大
+        CalcMaxWorkspaceSize();
+        GenTilingKey();
+        CalcNumBlocks(platformInfo_.aicNum);
+
+        if ((SetNumBlocks(numBlocks_) != ge::GRAPH_SUCCESS) || (SetTilingKey(tilingKey_) != ge::GRAPH_SUCCESS) ||
+            (SetWorkspaceSize(workspaceSize_) != ge::GRAPH_SUCCESS) ||
+            (SetScheduleMode(scheduleMode_) != ge::GRAPH_SUCCESS)) {
             return ge::GRAPH_FAILED;
         }
         return ge::GRAPH_SUCCESS;

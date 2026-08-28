@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 # ==============================================================================
 # 配置区
 # ==============================================================================
-# GRAPH_PATH: 0=单算子, 5=动态图, 7=aclgraph
+# GRAPH_PATH: 0=单算子, 3=静态图, 5=动态图, 6=tiling下沉, 7=aclgraph
 GRAPH_PATH = 0
 DEVICE_ID = 0
 
@@ -465,12 +465,20 @@ def _pa_layout_to_bnbd(kv_pa, kv_layout, n_kv=None):
 
 
 def pa_cache_to_bnsd(
-    k_pa, v_pa, block_table, actual_seq_kv, block_size, kv_layout="BnNBsD", n_kv=None
+    k_pa,
+    v_pa,
+    block_table,
+    actual_seq_kv,
+    block_size,
+    kv_layout="BnNBsD",
+    n_kv=None,
+    k_rope_pa=None,
 ):
     """从 PA cache 还原 BNSD 格式的 K/V (纯数据 block), 用于 NUM_BLOCKS 非默认时做 CPU Golden 对比
 
     MLA K/V per-tensor: deq_k/deq_v 是独立标量, 不在 cache 中
-    返回 (k_bnsd, v_bnsd)
+    k_rope_pa: 可选的 rope PA cache (bf16), 同样受物理块复用影响, 需还原
+    返回 (k_bnsd, v_bnsd, kr_bnsd)  kr_bnsd 为 None 表示无 rope
     """
     k_bnbd = _pa_layout_to_bnbd(k_pa, kv_layout, n_kv=n_kv)
     v_bnbd = _pa_layout_to_bnbd(v_pa, kv_layout, n_kv=n_kv)
@@ -480,7 +488,13 @@ def pa_cache_to_bnsd(
     k_bnsd = _bnbd_to_bnsd(k_data, block_table, actual_seq_kv, block_size)
     v_bnsd = _bnbd_to_bnsd(v_data, block_table, actual_seq_kv, block_size)
 
-    return k_bnsd, v_bnsd
+    kr_bnsd = None
+    if k_rope_pa is not None:
+        kr_bnbd = _pa_layout_to_bnbd(k_rope_pa, kv_layout, n_kv=n_kv)
+        kr_data = kr_bnbd[:, :, :block_size, :].contiguous().float()
+        kr_bnsd = _bnbd_to_bnsd(kr_data, block_table, actual_seq_kv, block_size)
+
+    return k_bnsd, v_bnsd, kr_bnsd
 
 
 # ==============================================================================
@@ -977,17 +991,29 @@ def fia_mla_torch_npu(
             out_dtype,
         )
 
-        if GRAPH_PATH == 5:
+        if GRAPH_PATH == 3:
+            logger.info("[NPU] GRAPH_PATH == 3, 静态图...")
+            torch._dynamo.reset()
+            npu_mode = torch.compile(
+                npu_mode, fullgraph=True, backend=npu_backend, dynamic=False
+            )
+            atten_out, lse_out = npu_mode(*fa_args)
+        elif GRAPH_PATH == 5:
             logger.info("[NPU] GRAPH_PATH == 5, 动态图...")
             torch._dynamo.reset()
             npu_mode = torch.compile(
                 npu_mode, fullgraph=True, backend=npu_backend, dynamic=True
             )
             atten_out, lse_out = npu_mode(*fa_args)
-        elif GRAPH_PATH == 7:
-            logger.info("[NPU] GRAPH_PATH == 7, aclgraph...")
-            config.debug.aclgraph.disable_reinplace_inplaceable_ops_pass = True
-            config.mode = "reduce-overhead"
+        elif GRAPH_PATH in (6, 7):
+            # tiling 下沉 / aclgraph: 需要标记静态 shape
+            if GRAPH_PATH == 7:
+                logger.info("[NPU] GRAPH_PATH == 7, aclgraph...")
+                config.debug.aclgraph.disable_reinplace_inplaceable_ops_pass = True
+                config.mode = "reduce-overhead"
+            else:
+                logger.info("[NPU] GRAPH_PATH == 6, tiling下沉...")
+                config.experimental_config.tiling_schedule_optimize = True
             npu_mode = torch.compile(
                 npu_mode, fullgraph=True, backend=npu_backend, dynamic=True
             )
@@ -1009,7 +1035,7 @@ def fia_mla_torch_npu(
             atten_out, lse_out = npu_mode(*fa_args)
         else:
             raise ValueError(
-                f"Unsupported GRAPH_PATH: {GRAPH_PATH}, only support 0/5/7"
+                f"Unsupported GRAPH_PATH: {GRAPH_PATH}, only support 0/3/5/6/7"
             )
 
         atten_out = atten_out.cpu().detach()
@@ -1253,7 +1279,13 @@ def npu_fp8_full_quant_mla(
             k_pa_for_golden = k_pa.clone()
             v_pa_for_golden = v_pa.clone()
             block_table_for_golden = block_table.copy()
-            cache_info = (k_pa_for_golden, v_pa_for_golden, block_table_for_golden)
+            k_rope_pa_for_golden = k_rope_pa.clone() if k_rope_pa is not None else None
+            cache_info = (
+                k_pa_for_golden,
+                v_pa_for_golden,
+                block_table_for_golden,
+                k_rope_pa_for_golden,
+            )
 
         # MLA K per-tensor: deq_k 是标量, 独立传入 (不与 key 共享内存)
         deq_k_npu = dequant_scale_k.float().contiguous()
@@ -1520,8 +1552,8 @@ if __name__ == "__main__":
 
     # NUM_BLOCKS != 0 时重建 CPU golden
     if cache_info is not None and ("cpu" in mode or "compare" in mode):
-        k_pa_cache, v_pa_cache, bt_cache = cache_info
-        k_bnsd_recon, v_bnsd_recon = pa_cache_to_bnsd(
+        k_pa_cache, v_pa_cache, bt_cache, k_rope_pa_cache = cache_info
+        k_bnsd_recon, v_bnsd_recon, kr_bnsd_recon = pa_cache_to_bnsd(
             k_pa_cache,
             v_pa_cache,
             bt_cache,
@@ -1529,6 +1561,10 @@ if __name__ == "__main__":
             BLOCK_SIZE,
             kv_layout=KV_CACHE_LAYOUT,
             n_kv=N_kv,
+            k_rope_pa=k_rope_pa_cache,
+        )
+        kr_bf16_recon = (
+            kr_bnsd_recon.to(torch.bfloat16) if kr_bnsd_recon is not None else kr_bf16
         )
         cpu_out, cpu_lse = cpu_fp8_fullquant_mla_golden(
             q_fp8,
@@ -1541,7 +1577,7 @@ if __name__ == "__main__":
             ACTUAL_SEQ_Q,
             ACTUAL_SEQ_KV,
             qr_bf16,
-            kr_bf16,
+            kr_bf16_recon,
         )
         if "cpu" in mode:
             golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)

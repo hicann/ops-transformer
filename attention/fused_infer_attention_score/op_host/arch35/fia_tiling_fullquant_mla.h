@@ -95,6 +95,7 @@ private:
                          int64_t &safePreToken, int64_t &safeNextToken);
     bool CheckQKVActualSeqLengthsRight();
     void PrintAllTilingData();
+    void CalcMaxWorkspaceSize();
     void CalcScheduleMode();
     void CreateSplitInput(split_core_v2::BaseInfo &baseInfo, split_core_v2::SplitParam &splitParam);
     void SetSplitOutput(const split_core_v2::FAMetaData &splitRes);
