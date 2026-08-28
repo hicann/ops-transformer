@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
   pull_request_comment:
     types: [created]
-    branches: [ '*' ]
+    branches: [ '**' ]
     comments: [ '^(?:\/)?compile*' ]
   pr_comment:
     types: [ created ]

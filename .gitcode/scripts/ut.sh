@@ -20,10 +20,6 @@ if [ -z "${ASCEND_3RD_LIB_PATH}" ]; then
     export ASCEND_3RD_LIB_PATH=/home/jenkins/opensource
 fi
 
-whoami
-ls -ld /home/jenkins/Ascend/cann-9.0.0
-su - jenkins -c "sh /home/jenkins/Ascend/cann/share/info/ops_transformer/script/uninstall.sh"
-
 if [ -f /home/jenkins/Ascend/cann/bin/setenv.bash ]; then
     source /home/jenkins/Ascend/cann/bin/setenv.bash
 fi

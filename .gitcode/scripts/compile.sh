@@ -32,12 +32,6 @@ if [ -z "${OS_TYPE}" ]; then
     OS_TYPE=$(uname -m)
 fi
 
-if [ "${GE_ST_RT2}X" != "kirinx90X" ];then
-    whoami
-    ls -ld /home/jenkins/Ascend/cann-9.0.0
-    su - jenkins -c "sh /home/jenkins/Ascend/cann/share/info/ops_transformer/script/uninstall.sh"
-fi
-
 if [ -f /home/jenkins/Ascend/cann/bin/setenv.bash ]; then
     source /home/jenkins/Ascend/cann/bin/setenv.bash
 fi
@@ -118,6 +112,10 @@ else
         fi
     elif [ "${GE_ST_RT2}X" == "kirin9030X" ];then
         if [ "${GIT_TARGET_BRANCH}" = "master" ];then
+            wget -nv https://ascend-ci.obs.cn-north-4.myhuaweicloud.com/asc-devkit/package/5396/cann-asc-devkit_linux-x86_64_ubuntu24.run
+            chmod +x *.run
+            sudo chmod 777 /home/jenkins/Ascend
+            yes "y" | sudo bash cann-asc-devkit_linux-x86_64_ubuntu24.run --full --install-path=/home/jenkins/Ascend
             LOG_DO bash build.sh --pkg --soc=kirin9030 --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
             DP_ASSERT_EQUAL "$?" "0" "Build ${REPOSITORY_NAME}"
         else
