@@ -52,15 +52,15 @@ def npu_qfa(
     dequant_scale_q: torch.Tensor,
     dequant_scale_k: torch.Tensor,
     dequant_scale_v: torch.Tensor,
-    p_scale: torch.Tensor,
-    block_table: torch.Tensor,
-    cu_seqlens_q_t: torch.Tensor,
-    cu_seqlens_kv_t: torch.Tensor,
-    seqused_q_t: torch.Tensor,
-    seqused_kv_t: torch.Tensor,
-    sinks_t: torch.Tensor,
-    attn_mask_t: torch.Tensor,
-    metadata_t: torch.Tensor,
+    p_scale: torch.Tensor = None,
+    block_table: torch.Tensor = None,
+    cu_seqlens_q_t: torch.Tensor = None,
+    cu_seqlens_kv_t: torch.Tensor = None,
+    seqused_q_t: torch.Tensor = None,
+    seqused_kv_t: torch.Tensor = None,
+    sinks_t: torch.Tensor = None,
+    attn_mask_t: torch.Tensor = None,
+    metadata_t: torch.Tensor = None,
     *,
     batch_size: int,
     N_q: int,
@@ -133,7 +133,7 @@ def npu_qfa(
         )
     )
 
-    attn_mask_shape = tuple(attn_mask_t.shape)
+    attn_mask_shape = tuple(attn_mask_t.shape) if attn_mask_t is not None else None
 
     _apply_golden_globals(
         {

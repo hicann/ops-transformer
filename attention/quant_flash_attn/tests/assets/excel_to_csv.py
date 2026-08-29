@@ -496,6 +496,7 @@ def _build_attributes(row, cols):
     _set_force("q_scale_layout", layout_q_descale)
     # block_size: Excel 无此列，PA 模式从 KV shape 第三维提取（算子要求 512 或 1024）
     #   PA_BNBD: [Bn, N, Bs, D]        → shape[2]
+    #   PA_BBND: [Bn, Bs, N, D]        → shape[2]
     #   PA_NZ:   [Bn, N, D//32, Bs, 32] → shape[3]
     # 非 PA 模式 block_size=0
     # GQA FP8 (quant_mode=6): K cache 第三维含 K_SCALE_ROWS=4 行 FP32 scale,
@@ -507,6 +508,8 @@ def _build_attributes(row, cols):
         if k_shape is not None:
             if layout_kv == "PA_NZ":
                 bs_idx = 3
+            elif layout_kv == "PA_BBND":
+                bs_idx = 1
             else:
                 bs_idx = 2
             raw_bs = k_shape[bs_idx] if len(k_shape) > bs_idx else 0

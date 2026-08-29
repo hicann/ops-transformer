@@ -1695,34 +1695,22 @@ def prepare_npu_inputs(
         V_DTYPE = v_fp8.dtype
         DK_DTYPE = dequant_scale_k.dtype
         DV_DTYPE = dequant_scale_v.dtype
-        k_npu = k_fp8.contiguous().view(K_DTYPE).npu()
-        v_npu = v_fp8.contiguous().view(V_DTYPE).npu()
+        k_npu = k_fp8.view(K_DTYPE).npu()
+        v_npu = v_fp8.view(V_DTYPE).npu()
         deq_k_npu = dequant_scale_k.view(DK_DTYPE).npu()
         deq_v_npu = dequant_scale_v.view(DV_DTYPE).npu()
 
-        if not IS_CONTIGUOUS:
-            kv_cache = torch.stack([k_fp8, v_fp8], dim=2)
-            kv_cache = kv_cache.npu()
-            k_npu = kv_cache[:, :, 0]
-            v_npu = kv_cache[:, :, 1]
-            logger.info(
-                f"[NPU] key is_contiguous={k_npu.is_contiguous()}, value is_contiguous={v_npu.is_contiguous()}"
-            )
-            fake_kscale_tensor = torch.ones_like(dequant_scale_k)
-            fake_vscale_tensor = torch.ones_like(dequant_scale_v)
-            double_kscale = torch.stack([dequant_scale_k, fake_kscale_tensor], dim=2)
-            double_vscale = torch.stack([dequant_scale_v, fake_vscale_tensor], dim=2)
-            double_kscale = double_kscale.npu()
-            double_vscale = double_vscale.npu()
-            deq_k_npu = double_kscale[:, :, 0]
-            deq_v_npu = double_vscale[:, :, 0]
-            logger.info(
-                f"[NPU] deq_k_scale is_contiguous={deq_k_npu.is_contiguous()}, deq_v_scale is_contiguous={deq_v_npu.is_contiguous()}"
-            )
-
         logger.info("[NPU PA] kv_layout=%s", KV_CACHE_LAYOUT)
         logger.info("[NPU PA] k=%s, v=%s", k_npu.shape, v_npu.shape)
+        logger.info(
+            "[NPU PA] k stride=%s, v stride=%s", k_npu.stride(), v_npu.shape.stride()
+        )
         logger.info("[NPU PA] deq_k=%s, deq_v=%s", deq_k_npu.shape, deq_v_npu.shape)
+        logger.info(
+            "[NPU PA] deq_k stride=%s, deq_v stride=%s",
+            deq_k_npu.stride(),
+            deq_v_npu.stride(),
+        )
 
         block_table_npu = (
             block_table_torch.npu()
@@ -1774,12 +1762,22 @@ def prepare_npu_inputs(
     V_DTYPE = v_fp8.dtype
     DK_DTYPE = dequant_scale_k.dtype
     DV_DTYPE = dequant_scale_v.dtype
-    k_npu = k_fp8.contiguous().view(K_DTYPE).npu()
-    v_npu = v_fp8.contiguous().view(V_DTYPE).npu()
+    k_npu = k_fp8.view(K_DTYPE).npu()
+    v_npu = v_fp8.view(V_DTYPE).npu()
     deq_k_npu = dequant_scale_k.view(DK_DTYPE).npu()
     deq_v_npu = dequant_scale_v.view(DV_DTYPE).npu()
     logger.info("[NPU TND] k=%s, v=%s", k_npu.shape, v_npu.shape)
     logger.info("[NPU TND] deq_k=%s, deq_v=%s", deq_k_npu.shape, deq_v_npu.shape)
+    logger.info(
+        "[NPU TND] k is_contiguous=%s, v is_contiguous=%s",
+        k_npu.is_contiguous(),
+        v_npu.is_contiguous(),
+    )
+    logger.info(
+        "[NPU TND] deq_k is_contiguous=%s, deq_v is_contiguous=%s",
+        deq_k_npu.is_contiguous(),
+        deq_v_npu.is_contiguous(),
+    )
 
     logger.info("[NPU] prepare non-PA inputs done.")
     return dict(

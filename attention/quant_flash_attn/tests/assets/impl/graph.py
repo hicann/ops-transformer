@@ -154,7 +154,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
             )
         )
 
-        attn_mask_shape = tuple(attn_mask_t.shape)
+        attn_mask_shape = tuple(attn_mask_t.shape) if attn_mask_t is not None else None
 
         # ---- 2. 注入 golden 全局变量 (prepare_npu_inputs 依赖) ----
         _apply_golden_globals(
@@ -197,22 +197,14 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         )
 
         # ---- 3. 透传 ----
-
-        def _to_cpu(t):
-            return (
-                t.detach().cpu()
-                if isinstance(t, torch.Tensor) and t.device.type == "npu"
-                else t
-            )
-
-        q_fp8 = _to_cpu(q)
-        k_fp8 = _to_cpu(k)
-        v_fp8 = _to_cpu(v)
-        dequant_scale_q_cpu = _to_cpu(dequant_scale_q)
-        dequant_scale_k_cpu = _to_cpu(dequant_scale_k)
-        dequant_scale_v_cpu = _to_cpu(dequant_scale_v)
-        p_scale_cpu = _to_cpu(p_scale)
-        block_table_cpu = _to_cpu(block_table)
+        q_fp8 = q
+        k_fp8 = k
+        v_fp8 = v
+        dequant_scale_q_cpu = dequant_scale_q
+        dequant_scale_k_cpu = dequant_scale_k
+        dequant_scale_v_cpu = dequant_scale_v
+        p_scale_cpu = p_scale
+        block_table_cpu = block_table
 
         logger.info(
             "[GRAPH] 透传 fp8+e8m0 (q=%s, k=%s, v=%s, dq=%s, dk=%s, dv=%s, enable_pa=%s)",
