@@ -819,8 +819,11 @@ __simd_vf__ inline void ProcessVec1DnUpdateVF(
     Add(vreg_x_sum2, vreg_x_sum2, vreg_x_sum3, preg_134);
     Add(vreg_x_sum0, vreg_x_sum0, vreg_x_sum2, preg_134);
     RegTensor<float> vreg_l0;
+    MaskReg preg_previous_sum_zero;
     LoadAlign(vreg_l0, new_global_sum);
+    Compare<float, CMPMODE::EQ>(preg_previous_sum_zero, vreg_l0, vreg_zero, preg_134);
     Mul(vreg_l0, vreg_x_max_f32_b, vreg_l0, preg_134);
+    Select(vreg_l0, vreg_zero, vreg_l0, preg_previous_sum_zero);
     Add(vreg_l0, vreg_l0, vreg_x_sum0, preg_134);
     StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
 }
@@ -1074,8 +1077,11 @@ __simd_vf__ inline void ProcessVec1DnUpdateAttenTailVF(
     Add(vreg_x_sum2, vreg_x_sum2, vreg_x_sum3, preg_134);
     Add(vreg_x_sum0, vreg_x_sum0, vreg_x_sum2, preg_134);
     RegTensor<float> vreg_l0;
+    MaskReg preg_previous_sum_zero;
     LoadAlign(vreg_l0, new_global_sum);
+    Compare<float, CMPMODE::EQ>(preg_previous_sum_zero, vreg_l0, vreg_zero, preg_134);
     Mul(vreg_l0, vreg_x_max_f32_b, vreg_l0, preg_134);
+    Select(vreg_l0, vreg_zero, vreg_l0, preg_previous_sum_zero);
     Add(vreg_l0, vreg_l0, vreg_x_sum0, preg_134);
     StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
 }
@@ -1924,8 +1930,11 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadVF(
     Add(vreg_x_sum2, vreg_x_sum2, vreg_x_sum3, preg_134);
     Add(vreg_x_sum0, vreg_x_sum0, vreg_x_sum2, preg_134);
     RegTensor<float> vreg_l0;
+    MaskReg preg_previous_sum_zero;
     LoadAlign(vreg_l0, new_global_sum);
+    Compare<float, CMPMODE::EQ>(preg_previous_sum_zero, vreg_l0, vreg_zero, preg_134);
     Mul(vreg_l0, vreg_x_max_f32_b, vreg_l0, preg_134);
+    Select(vreg_l0, vreg_zero, vreg_l0, preg_previous_sum_zero);
     Add(vreg_l0, vreg_l0, vreg_x_sum0, preg_134);
     StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
 }
@@ -2175,8 +2184,11 @@ __simd_vf__ inline void ProcessVec1DnUpdatePerTokenHeadAttenTailVF(
     Add(vreg_x_sum2, vreg_x_sum2, vreg_x_sum3, preg_134);
     Add(vreg_x_sum0, vreg_x_sum0, vreg_x_sum2, preg_134);
     RegTensor<float> vreg_l0;
+    MaskReg preg_previous_sum_zero;
     LoadAlign(vreg_l0, new_global_sum);
+    Compare<float, CMPMODE::EQ>(preg_previous_sum_zero, vreg_l0, vreg_zero, preg_134);
     Mul(vreg_l0, vreg_x_max_f32_b, vreg_l0, preg_134);
+    Select(vreg_l0, vreg_zero, vreg_l0, preg_previous_sum_zero);
     Add(vreg_l0, vreg_l0, vreg_x_sum0, preg_134);
     StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)new_global_sum, vreg_l0, preg_134);
 }

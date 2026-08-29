@@ -30,6 +30,7 @@ DATA_RANGE_RIGHT = 1000
 FP8_E4M3_MAX = 448.0
 SCALE_EPSILON = 1e-8
 EMPTY_LSE = -3.4028234663852886e38
+SOFTMAX_MAX_SENTINEL = EMPTY_LSE
 MASK_VALUE = -10000.0
 
 
@@ -297,6 +298,15 @@ def _make_source(
         raise ValueError(
             f"{key} datarange should satisfy low <= high, got ({low}, {high})"
         )
+    if not math.isfinite(low) or not math.isfinite(high):
+        if low == high or (math.isnan(low) and math.isnan(high)):
+            return torch.full(shape, low, dtype=torch.float32), FP8_E4M3_MAX
+        finite_low = min(high, 0.0) - 1.0 if math.isinf(low) else low
+        finite_high = max(low, 0.0) + 1.0 if math.isinf(high) else high
+        source = _rand_value_range(shape, finite_low, finite_high, generator)
+        flattened = source.reshape(-1)
+        flattened[0], flattened[-1] = low, high
+        return source, FP8_E4M3_MAX
     source = _rand_value_range(shape, low, high, generator)
     return source, max(abs(low), abs(high))
 
@@ -324,31 +334,65 @@ def _rand_fullquant_source(shape, amp_low, amp_high, generator, amp_shape=None):
 
 def _quant_fp32_to_fp8(tensor, quant_scale):
     quantized = tensor.to(torch.float32) * quant_scale
+    quantized = torch.where(torch.isposinf(tensor), FP8_E4M3_MAX, quantized)
+    quantized = torch.where(torch.isneginf(tensor), -FP8_E4M3_MAX, quantized)
     quantized = torch.clamp(quantized, -FP8_E4M3_MAX, FP8_E4M3_MAX)
     return quantized.to(_fp8_dtype()).contiguous()
 
 
 def _quantize_per_token_head(tensor, max_abs=FP8_E4M3_MAX):
     max_abs = min(float(max_abs), FP8_E4M3_MAX)
-    row_max = torch.abs(tensor).amax(dim=-1, keepdim=True)
+    finite_abs = torch.where(torch.isfinite(tensor), torch.abs(tensor), 0.0)
+    row_max = finite_abs.amax(dim=-1, keepdim=True)
     row_max = torch.maximum(
         row_max, torch.tensor(SCALE_EPSILON, dtype=torch.float32, device=tensor.device)
     )
     quant_scale = max_abs / row_max
-    return _quant_fp32_to_fp8(tensor, quant_scale), (1.0 / quant_scale).squeeze(
-        -1
-    ).contiguous()
+    descale = 1.0 / quant_scale
+    descale = torch.where(
+        torch.isinf(tensor).any(dim=-1, keepdim=True), float("inf"), descale
+    )
+    return _quant_fp32_to_fp8(tensor, quant_scale), descale.squeeze(-1).contiguous()
 
 
 def _quantize_value_per_head(tensor, max_abs=FP8_E4M3_MAX):
     max_abs = min(float(max_abs), FP8_E4M3_MAX)
-    head_max = torch.abs(tensor).amax(dim=(0, 1, 3), keepdim=True)
+    finite_abs = torch.where(torch.isfinite(tensor), torch.abs(tensor), 0.0)
+    head_max = finite_abs.amax(dim=(0, 1, 3), keepdim=True)
     head_max = torch.maximum(
         head_max, torch.tensor(SCALE_EPSILON, dtype=torch.float32, device=tensor.device)
     )
     quant_scale = max_abs / head_max
     value = _quant_fp32_to_fp8(tensor, quant_scale)
-    return value, (1.0 / quant_scale).reshape(tensor.shape[2]).contiguous()
+    descale = 1.0 / quant_scale
+    has_inf = torch.isinf(tensor).any(dim=(0, 1, 3), keepdim=True)
+    descale = torch.where(has_inf, float("inf"), descale)
+    return value, descale.reshape(tensor.shape[2]).contiguous()
+
+
+def _finalize_fp8_attention_rows(
+    acc,
+    softmax_sum,
+    softmax_max,
+    softmax_max_offset,
+    v_scale,
+    single_chunk,
+):
+    """Match the kernel's final zero-sum and invalid-row guards."""
+    active = (softmax_max != SOFTMAX_MAX_SENTINEL) & (softmax_sum != 0)
+    safe_sum = torch.where(active, softmax_sum, torch.ones_like(softmax_sum))
+    numerator = acc * v_scale if single_chunk else acc
+    attention_out = numerator / safe_sum.view(-1, 1)
+    attention_out = torch.where(
+        active.view(-1, 1), attention_out, torch.zeros_like(attention_out)
+    )
+    softmax_lse = torch.log(safe_sum) + softmax_max_offset
+    softmax_lse = torch.where(
+        active,
+        softmax_lse,
+        torch.full_like(softmax_lse, SOFTMAX_MAX_SENTINEL),
+    )
+    return attention_out, softmax_lse
 
 
 def _make_block_table(
@@ -804,15 +848,9 @@ def _reference_attention(
     fp8_dtype = _fp8_dtype()
     softmax_scale = float(case["softmax_scale"])
     p_scale_value = 1.0 if p_scale is None else float(p_scale[0].item())
-    ln_p_scale = (
-        torch.log(torch.tensor(p_scale_value, dtype=torch.float32)).item()
-        if p_scale_value > 0
-        else 0.0
-    )
+    ln_p_scale = torch.log(torch.tensor(p_scale_value, dtype=torch.float32)).item()
     sparse_q_block_size = case["sparse_q_block_size"]
     sparse_kv_block_size = case["sparse_kv_block_size"]
-    neg_inf = float("-inf")
-
     total_q = int(cu_seqlens_q[-1].item())
     attention_out = torch.zeros((total_q, n1, head_dim), dtype=output_dtype)
     softmax_lse = torch.full((n1, total_q), EMPTY_LSE, dtype=torch.float32)
@@ -910,8 +948,10 @@ def _reference_attention(
                 #   chunk 1 (isUpdatePre=true): acc = acc * rescale * v_scale + pv_raw * v_scale
                 #   chunk >1 (isUpdatePre=false): acc = acc * rescale + pv_raw * v_scale
                 #   单 chunk 最后除法 (LastDivNew): output = pv_raw * v_scale / sum
-                m_run = torch.full((nq,), neg_inf, dtype=torch.float32)
-                m_run_offset = torch.full((nq,), neg_inf, dtype=torch.float32)
+                m_run = torch.full((nq,), SOFTMAX_MAX_SENTINEL, dtype=torch.float32)
+                m_run_offset = torch.full(
+                    (nq,), SOFTMAX_MAX_SENTINEL, dtype=torch.float32
+                )
                 l_run = torch.zeros((nq,), dtype=torch.float32)
                 acc = torch.zeros((nq, head_dim), dtype=torch.float32)
                 offset = 0
@@ -923,14 +963,20 @@ def _reference_attention(
                     offset = c1
                     s_c = scores[:, c0:c1]
                     vm_c = valid_mask[:, c0:c1]
-                    # 每行的局部 max（在该 chunk 内的有效位置上）；行内无有效位置时记为 -inf
+                    # 每行的局部 max；无有效位置时保留 kernel 使用的有限哨兵。
                     masked_scores = torch.where(
-                        vm_c, s_c, torch.full_like(s_c, neg_inf)
+                        vm_c,
+                        s_c,
+                        torch.full_like(s_c, SOFTMAX_MAX_SENTINEL),
                     )
                     chunk_max = masked_scores.max(dim=-1).values  # (nq,)
-                    chunk_has = vm_c.any(dim=-1)  # (nq,)
-                    run_started = m_run != neg_inf
-                    # m_new：未开始的行取 chunk_max（若该 chunk 无有效则保持 -inf）；已开始的行取 max
+                    chunk_max = torch.maximum(
+                        chunk_max,
+                        torch.full_like(chunk_max, SOFTMAX_MAX_SENTINEL),
+                    )
+                    chunk_has = chunk_max != SOFTMAX_MAX_SENTINEL
+                    run_started = m_run != SOFTMAX_MAX_SENTINEL
+                    # m_new：未开始的行取 chunk_max；已开始的行取历史与当前 max。
                     m_new = torch.where(
                         run_started, torch.maximum(m_run, chunk_max), chunk_max
                     )
@@ -986,29 +1032,16 @@ def _reference_attention(
                     m_run_offset = torch.where(chunk_has, m_new_offset, m_run_offset)
                     chunk_idx += 1
 
-                # any_valid 行：写回 attn=acc/l_run；空行保持 0 / EMPTY_LSE
-                any_valid = valid_mask.any(dim=-1)  # (nq,)
-                safe_l = torch.where(l_run > 0, l_run, torch.ones_like(l_run))
-                if chunk_count <= 1:
-                    # 单 chunk：acc 不含 v_scale，与 kernel LastDivNew 对齐
-                    # output = pv_raw * v_scale / sum
-                    attn = acc * v_scale_value / safe_l.view(nq, 1)
-                else:
-                    # 多 chunk：acc 在第二个 chunk 已乘入 v_scale（isUpdatePre）
-                    attn = acc / safe_l.view(nq, 1)
-                # 与 kernel 对齐 lse 计算路径：lse = log(sum) + max
-                # kernel 中 sum 含 pScale 因子（exp(score - (actual_max - ln(pScale))) 之和），
-                # max 存储的是 actual_max - ln(pScale)。
-                # golden 中 l_run 含 pScale 因子，m_run_offset = actual_max - ln(pScale)，
-                # 故 lse = log(l_run) + m_run_offset 与 kernel 的 log(sum)+max 浮点路径一致，
-                # 避免与 torch.logsumexp 的不同浮点路径产生 1-2 ULP 差异导致量化边界问题。
-                # 注意：l_run 不做非有限掩码，使全 inf 分数时 log(NaN)+inf = NaN，
-                # 与 kernel 的 log(sum)+max 一致（掩码会把 NaN 换成 1 导致 inf 不一致）。
-                lse = torch.log(l_run) + m_run_offset  # (nq,)
+                attn, lse = _finalize_fp8_attention_rows(
+                    acc,
+                    l_run,
+                    m_run,
+                    m_run_offset,
+                    v_scale_value,
+                    chunk_count <= 1,
+                )
 
                 for li, q_idx in enumerate(q_indices):
-                    if not bool(any_valid[li].item()):
-                        continue
                     _set_output(
                         attention_out,
                         cu_seqlens_q,
