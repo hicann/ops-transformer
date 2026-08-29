@@ -33,8 +33,8 @@
 #include "apace/utils/apace_constant.h"
 #include "apace/utils/apace_common_utils.h"
 #include "apace/tiling/quant_matmul_tiling_swat.h"
-#include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_udma_tiling_data.h"
-#include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_udma_impl.h"
+#include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_urma_tiling_data.h"
+#include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_urma_impl.h"
 #include "apace/core/aiv_comm/collective_comm_context.h"
 #include "apace/utils/comm_channel_builder.h"
 #include "../../../utils/root_info_exchanger.h"
@@ -93,10 +93,10 @@ void ParseArgs(int argc, char *argv[], int *m, int *k, int *n, int *rankNum, std
 
 int LaunchKernel(uint32_t usedCoreNum, aclrtStream stream, CommContext *devContext, GM_ADDR deviceA,
                  GM_ADDR deviceScaleA, GM_ADDR deviceB, GM_ADDR deviceScaleB, GM_ADDR deviceOutput,
-                 AllGatherMxMatmulUdmaTilingData &tilingData)
+                 AllGatherMxMatmulUrmaTilingData &tilingData)
 {
     AllGatherQuantMatmulKernel<<<usedCoreNum, nullptr, stream>>>(devContext, deviceA, deviceScaleA, deviceB,
-                                                                 deviceScaleB, deviceOutput, tilingData);
+                                                                 deviceScaleB, deviceOutput, nullptr, tilingData);
     return 0;
 }
 
@@ -105,7 +105,7 @@ int RunAllGatherQuantMatmul(int rankNum, int rankId, int m, int k, int n, const 
     const char *ipport = "tcp://127.0.0.1:8998";
     INFO_LOG("rankNum=%d, rankId=%d", rankNum, rankId);
 
-    AllGatherMxMatmulUdmaTilingData tilingData;
+    AllGatherMxMatmulUrmaTilingData tilingData;
 
     uint32_t tileM = TILE_M;
     if (m < static_cast<int>(tileM)) {

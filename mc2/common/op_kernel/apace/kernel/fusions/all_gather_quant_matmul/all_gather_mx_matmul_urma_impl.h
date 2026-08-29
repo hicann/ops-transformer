@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file all_gather_mx_matmul_udma_impl.h
+ * \file all_gather_mx_matmul_urma_impl.h
  * \brief AllGatherQuantMatmul 算子实现，基于 FragmentTensor + 通算解耦（UDMA 通信）
  */
 
@@ -17,7 +17,7 @@
 
 #include "kernel_basic_intf.h"
 #include "kernel_tiling/kernel_tiling.h"
-#include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_udma_tiling_data.h"
+#include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_urma_tiling_data.h"
 #include "apace/kernel/matmul/quant_batch_matmul/all_gather_qbmm_mx_kernel.h"
 #include "adv_api/hcomm/hcomm.h"
 #include "apace/core/aiv_comm/collective_comm_context.h"
@@ -37,11 +37,12 @@ using LayoutC = AscendC::Te::NDExtLayoutPtn;
 using ProblemShape = AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>;
 
 template <typename AType, typename BType, typename CType>
-class AllGatherMxMatmulUdmaImpl {
+class AllGatherMxMatmulUrmaImpl {
 public:
-    __aicore__ inline AllGatherMxMatmulUdmaImpl() {}
+    __aicore__ inline AllGatherMxMatmulUrmaImpl() {}
     __aicore__ inline void Init(__gm__ CommContext *hcommCtx, GM_ADDR aGM, GM_ADDR aScaleGM, GM_ADDR bGM,
-                                GM_ADDR bScaleGM, GM_ADDR cGM, const AllGatherMxMatmulUdmaTilingData *tilingData);
+                                GM_ADDR bScaleGM, GM_ADDR cGM, GM_ADDR biasGM,
+                                const AllGatherMxMatmulUrmaTilingData *tilingData);
     __aicore__ inline void Process();
 
     using QuantMatmulKernelImpl = AllGatherQbmmMxKernel<AType, BType, CType>;
@@ -52,7 +53,7 @@ public:
     QuantMatmulKernelImpl quantMatmulKernelImpl_;
 
 private:
-    __aicore__ inline void InitBaseParams(const AllGatherMxMatmulUdmaTilingData *td);
+    __aicore__ inline void InitBaseParams(const AllGatherMxMatmulUrmaTilingData *td);
 
     __aicore__ inline void AllGatherProcess();
     __aicore__ inline void MatmulProcess();
@@ -83,6 +84,7 @@ private:
     GM_ADDR bGM_{};
     GM_ADDR bScaleGM_{};
     GM_ADDR cGM_{};
+    GM_ADDR biasGM_{};
 
     uint32_t rankId_{};
     uint32_t rankSize_{};
@@ -104,13 +106,13 @@ private:
     uint64_t dataRegionBytes_{};
     uint64_t scaleRegionBytes_{};
 
-    const AllGatherMxMatmulUdmaTilingData *tilingData_{};
+    const AllGatherMxMatmulUrmaTilingData *tilingData_{};
 };
 
 template <typename AType, typename BType, typename CType>
-__aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Init(
+__aicore__ inline void AllGatherMxMatmulUrmaImpl<AType, BType, CType>::Init(
     __gm__ CommContext *hcommCtx, GM_ADDR aGM, GM_ADDR aScaleGM, GM_ADDR bGM, GM_ADDR bScaleGM, GM_ADDR cGM,
-    const AllGatherMxMatmulUdmaTilingData *tilingData)
+    GM_ADDR biasGM, const AllGatherMxMatmulUrmaTilingData *tilingData)
 {
     tilingData_ = tilingData;
     hcommCtx_ = hcommCtx;
@@ -119,6 +121,7 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Init(
     bGM_ = bGM;
     bScaleGM_ = bScaleGM;
     cGM_ = cGM;
+    biasGM_ = biasGM;
 
     InitBaseParams(tilingData);
 
@@ -149,7 +152,8 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Init(
     commTilingData_.splitAxisTileCnt = tileCnt_; // head 段 tile 数量
     commTilingData_.splitAxisTailSize = tailM_;  // tail 行数
     commTilingData_.splitAxisTailCnt = tailCnt_;
-    commTilingData_.nonSplitAxisSize = k_; // 非切分轴k
+    // 通信按 Dtype 元素个数计：FP4(fp4x2) 每元素 2 个逻辑值，故按字节行宽折算
+    commTilingData_.nonSplitAxisSize = dataBytesPerMRow_ / sizeof(AType); // 非切分轴k
 
     commTilingScale_.splitAxisTileSize = tileM_;
     commTilingScale_.splitAxisTileCnt = tileCnt_;
@@ -164,8 +168,8 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Init(
 }
 
 template <typename AType, typename BType, typename CType>
-__aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::InitBaseParams(
-    const AllGatherMxMatmulUdmaTilingData *td)
+__aicore__ inline void AllGatherMxMatmulUrmaImpl<AType, BType, CType>::InitBaseParams(
+    const AllGatherMxMatmulUrmaTilingData *td)
 {
     const auto &ct = td->commTile;
     tileCnt_ = static_cast<uint32_t>(ct.splitAxisTileCnt);
@@ -180,14 +184,16 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::InitBaseP
     headRows_ = static_cast<uint64_t>(tileCnt_) * tileM_;
 
     scaleKGroups_ = Blaze::Gemm::CeilDiv(static_cast<uint64_t>(k_), Blaze::Gemm::MXFP_DIVISOR_SIZE);
-    dataBytesPerMRow_ = static_cast<uint64_t>(k_) * sizeof(AType);
+    // FP4 (fp4x2) 1 字节装 2 个元素：每行字节数 = k/2；FP8 等 = k * sizeof(AType)
+    dataBytesPerMRow_ =
+        Blaze::Gemm::IsFp4<AType>() ? (static_cast<uint64_t>(k_) >> 1) : static_cast<uint64_t>(k_) * sizeof(AType);
     scaleBytesPerMRow_ =
         scaleKGroups_ * static_cast<uint64_t>(Blaze::Gemm::MXFP_MULTI_BASE_SIZE) * sizeof(AscendC::fp8_e8m0_t);
     cBytesPerM_ = static_cast<uint64_t>(n_) * sizeof(CType);
 }
 
 template <typename AType, typename BType, typename CType>
-__aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Process()
+__aicore__ inline void AllGatherMxMatmulUrmaImpl<AType, BType, CType>::Process()
 {
     if ASCEND_IS_AIV {
         AllGatherProcess();
@@ -198,7 +204,7 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::Process()
 }
 
 template <typename AType, typename BType, typename CType>
-__aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::MatmulProcess()
+__aicore__ inline void AllGatherMxMatmulUrmaImpl<AType, BType, CType>::MatmulProcess()
 {
     KernelParams params;
     params.mmTile = &tilingData_->mmTile;
@@ -222,6 +228,8 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::MatmulPro
     params.bGM = bGM_;
     params.bScaleGM = bScaleGM_;
     params.cGM = cGM_;
+    params.biasGM = biasGM_;
+    params.isBias = (tilingData_->isBias != 0);
     params.winDataBase = GetWinDataRegionBase();
     params.winScaleBase = GetWinScaleRegionBase();
     params.dataBytesPerMRow = dataBytesPerMRow_;
@@ -231,19 +239,19 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::MatmulPro
 }
 
 template <typename AType, typename BType, typename CType>
-__aicore__ inline GM_ADDR AllGatherMxMatmulUdmaImpl<AType, BType, CType>::GetWinDataRegionBase()
+__aicore__ inline GM_ADDR AllGatherMxMatmulUrmaImpl<AType, BType, CType>::GetWinDataRegionBase()
 {
     return reinterpret_cast<GM_ADDR>(udmaCtx_->commBufferAddrs[rankId_]);
 }
 
 template <typename AType, typename BType, typename CType>
-__aicore__ inline GM_ADDR AllGatherMxMatmulUdmaImpl<AType, BType, CType>::GetWinScaleRegionBase()
+__aicore__ inline GM_ADDR AllGatherMxMatmulUrmaImpl<AType, BType, CType>::GetWinScaleRegionBase()
 {
     return GetWinDataRegionBase() + dataRegionBytes_;
 }
 
 template <typename AType, typename BType, typename CType>
-__aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::AllGatherProcess()
+__aicore__ inline void AllGatherMxMatmulUrmaImpl<AType, BType, CType>::AllGatherProcess()
 {
     // 预触发 dependTileIdx=0：自身数据始终就绪，AIC 可直接消费。
     CrossCoreSetFlag<0x2, PIPE_MTE3>(0);
@@ -271,10 +279,10 @@ __aicore__ inline void AllGatherMxMatmulUdmaImpl<AType, BType, CType>::AllGather
 
 __global__ __aicore__ void AllGatherQuantMatmulKernel(__gm__ Apace::AivComm::CommContext *hcommCtx, GM_ADDR aGM,
                                                       GM_ADDR aScaleGM, GM_ADDR bGM, GM_ADDR bScaleGM, GM_ADDR cGM,
-                                                      AllGatherMxMatmulUdmaTilingData tilingData)
+                                                      GM_ADDR biasGM, AllGatherMxMatmulUrmaTilingData tilingData)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
-    Apace::AllGatherMxMatmulUdmaImpl<fp8_e4m3fn_t, fp8_e4m3fn_t, bfloat16_t> impl;
-    impl.Init(hcommCtx, aGM, aScaleGM, bGM, bScaleGM, cGM, &tilingData);
+    Apace::AllGatherMxMatmulUrmaImpl<fp8_e4m3fn_t, fp8_e4m3fn_t, bfloat16_t> impl;
+    impl.Init(hcommCtx, aGM, aScaleGM, bGM, bScaleGM, cGM, biasGM, &tilingData);
     impl.Process();
 }
