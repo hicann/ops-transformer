@@ -1361,7 +1361,7 @@ def run_backward_case(case, device, compare_mode=3):
         dape_ws_size=groupNum * cmpSize * coffCoef,
         d_x_ws_size=2 * cubeCoreNum * 256 * H,
         d_w_weight_ws_size=groupNum * totalHeadDim * H,
-        x_ws_size=2 * groupNum * groupRowStride * H,
+        x_ws_size=2 * groupNum * groupRowStride * H * groupSize,
         d_x_cache_ws_size=2 * cr * H,
     )
 
