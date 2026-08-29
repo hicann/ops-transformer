@@ -187,8 +187,8 @@ $$
 <tbody>
   <tr>
     <td>aclnn调用</td>
-    <td>-</td>
-    <td>接口预留，当前版本尚未提供aclnnBlockAttnResUpdate接口及调用样例。</td>
+    <td><a href="examples/arch35/test_aclnn_block_attn_res_update.cpp">test_aclnn_block_attn_res_update.cpp</a></td>
+    <td>通过aclnnBlockAttnResUpdate接口调用，详细说明参见<a href="docs/aclnnBlockAttnResUpdate.md">接口文档</a>。</td>
   </tr>
 </tbody>
 </table>

@@ -9,12 +9,16 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ----------------------------------------------------------------------------
-"""Kernel TestSpec for BlockAttnResUpdate."""
+"""Kernel, ACLNN and E2E TestSpecs for BlockAttnResUpdate."""
 
 import numpy
 
 
-__spec__ = {"block_attn_res_update": "BlockAttnResUpdateTestSpec"}
+__spec__ = {
+    "block_attn_res_update": "BlockAttnResUpdateTestSpec",
+    "aclnnBlockAttnResUpdate": "BlockAttnResUpdateAclnnTestSpec",
+    "cann_ops_transformer.ops.block_attn_res_update": "BlockAttnResUpdateE2ETestSpec",
+}
 
 
 def _round_to_bfloat16_float32(value):
@@ -33,6 +37,46 @@ def _round_to_bfloat16_float32(value):
         rounded_bits,
     ).astype(numpy.uint32, copy=False)
     return rounded_bits.view(numpy.float32)
+
+
+def _torch_golden(
+    partial_block,
+    delta,
+    pseudo_query,
+    numerator,
+    logit_max,
+    exp_sum,
+    eps,
+):
+    """Return ``(updated_partial_block, h)`` as CPU torch tensors."""
+    import torch
+
+    partial = partial_block.to(dtype=torch.float32)
+    delta_fp32 = delta.to(dtype=torch.float32)
+    pseudo_query_fp32 = pseudo_query.to(dtype=torch.float32)
+    numerator_fp32 = numerator.to(dtype=torch.float32)
+    logit_max_fp32 = logit_max.to(dtype=torch.float32)
+    exp_sum_fp32 = exp_sum.to(dtype=torch.float32)
+
+    # Keep the golden functional: the real API updates partial_block in place,
+    # but mutating TTK's CPU input here would affect later input reuse.
+    partial_out = partial + delta_fp32
+    if partial_out.numel() == 0:
+        return partial_out, torch.empty_like(delta)
+
+    square_sum = torch.sum(partial_out * partial_out, dim=-1)
+    rms = torch.sqrt(square_sum / partial_out.shape[-1] + float(eps))
+    score = torch.sum(partial_out * pseudo_query_fp32, dim=-1) / rms
+
+    current_max = torch.maximum(logit_max_fp32, score)
+    alpha = torch.exp(logit_max_fp32 - current_max)
+    beta = torch.exp(score - current_max)
+    denominator = exp_sum_fp32 * alpha + beta
+    h_fp32 = (
+        numerator_fp32 * (alpha / denominator)[:, None]
+        + partial_out * (beta / denominator)[:, None]
+    )
+    return partial_out, h_fp32.to(dtype=torch.bfloat16)
 
 
 class BlockAttnResUpdateTestSpec:
@@ -77,3 +121,61 @@ class BlockAttnResUpdateTestSpec:
         h_fp32 = numerator * alpha[:, None] + partial_out * beta[:, None]
         h = _round_to_bfloat16_float32(h_fp32)
         return [partial_out, h]
+
+
+class BlockAttnResUpdateAclnnTestSpec:
+    """TestSpec registered by the exact ACLNN API name."""
+
+    @staticmethod
+    def golden(
+        partialBlockRef,
+        delta,
+        pseudoQuery,
+        numerator,
+        logitMax,
+        expSum,
+        eps=1e-6,
+        h=None,
+        **kwargs,
+    ):
+        del h, kwargs
+        partial_out, h_golden = _torch_golden(
+            partialBlockRef,
+            delta,
+            pseudoQuery,
+            numerator,
+            logitMax,
+            expSum,
+            eps,
+        )
+        # ACLNN CSV output_tensor_indexes=(0, 6): inplace partialBlockRef, then h.
+        return [partial_out, h_golden]
+
+
+class BlockAttnResUpdateE2ETestSpec:
+    """TestSpec registered by the explicit Python wrapper API name."""
+
+    @staticmethod
+    def golden(
+        partial_block,
+        delta,
+        pseudo_query,
+        numerator,
+        logit_max,
+        exp_sum,
+        *,
+        eps=1e-6,
+        **kwargs,
+    ):
+        del kwargs
+        partial_out, h_golden = _torch_golden(
+            partial_block,
+            delta,
+            pseudo_query,
+            numerator,
+            logit_max,
+            exp_sum,
+            eps,
+        )
+        # E2E records the API return first, then inplace_input_indexes=(0,).
+        return [h_golden, partial_out]

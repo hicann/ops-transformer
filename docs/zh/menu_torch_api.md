@@ -1,6 +1,7 @@
 # Transformer类接口
 
 - [Transformer类torch接口列表](torch_api_list.md)
+- [block_attn_res_update](../../torch_extension/cann_ops_transformer/docs/zh/block_attn_res_update.md)
 - [causal_conv1d_fn](../../torch_extension/cann_ops_transformer/docs/zh/causal_conv1d_fn.md)
 - [causal_conv1d_update](../../torch_extension/cann_ops_transformer/docs/zh/causal_conv1d_update.md)
 - [compressor](../../torch_extension/cann_ops_transformer/docs/zh/compressor.md)
