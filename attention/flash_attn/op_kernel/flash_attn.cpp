@@ -116,7 +116,7 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t *query, __gm__ uint8_t *key
 #endif
 
 #if (ORIG_DTYPE_Q == DT_BF16) || (ORIG_DTYPE_Q == DT_FLOAT16)
-    fa_base_matmul::idCounterNum = 0;
+    fa_base_matmul::ResetIdCounter();
 
     constexpr FA_LAYOUT qLayout = GetQueryLayout<inOutLayoutType>();
     constexpr FA_LAYOUT outLayout = GetOutLayout<inOutLayoutType>();

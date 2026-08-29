@@ -33,7 +33,7 @@ inline __aicore__ void run_fia_noquant_gqa_kernel(__gm__ uint8_t *query, __gm__ 
 {
     PARSE_PARAMS_NoQuant(inOutLayoutType, config, 9, ...); // 9: None
 
-    fa_base_matmul::idCounterNum = 0;
+    fa_base_matmul::ResetIdCounter();
     // CubBlockType
     using CubBlockNormal = BaseApi::FANoQuantGqaBlockCube<INPUT_T, float, inputLayoutType, s1TemplateType,
                                                           s2TemplateType, dTemplateType, dVTemplateType, KvLayoutType>;
@@ -84,7 +84,7 @@ inline __aicore__ void run_fia_noquant_mla_kernel(__gm__ uint8_t *query, __gm__ 
 {
     PARSE_PARAMS_NoQuant(inOutLayoutType, config, 9, ...); // 9: None
 
-    fa_base_matmul::idCounterNum = 0;
+    fa_base_matmul::ResetIdCounter();
     // CubBlockType
     using CubBlockNormal = BaseApi::FANoQuantMlaBlockCube<INPUT_T, float, inputLayoutType, s1TemplateType,
                                                           s2TemplateType, dTemplateType, dVTemplateType, KvLayoutType>;
@@ -136,7 +136,7 @@ inline __aicore__ void run_fia_fullquant_mx_kernel(
     __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
 {
     PARSE_PARAMS_FullQuant(inOutLayoutType, config, pseMode, ...);
-    fa_base_matmul::idCounterNum = 0;
+    fa_base_matmul::ResetIdCounter();
 
     constexpr TPosition bmm2OutPos =
         GetC2Position(dVTemplateType,
@@ -210,7 +210,7 @@ inline __aicore__ void run_fia_fullquant_gqa_kernel(__gm__ uint8_t *query, __gm_
                                                     __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
 {
     PARSE_PARAMS_FullQuant(inOutLayoutType, config, pseMode, ...);
-    fa_base_matmul::idCounterNum = 0;
+    fa_base_matmul::ResetIdCounter();
 
     constexpr TPosition bmm2OutPos =
         GetC2Position(dVTemplateType,
@@ -282,7 +282,7 @@ inline __aicore__ void run_fia_fullquant_mla_kernel(
     __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
 {
     PARSE_PARAMS_FullQuant(inOutLayoutType, config, pseMode, ...);
-    fa_base_matmul::idCounterNum = 0;
+    fa_base_matmul::ResetIdCounter();
 
     // MLA 全量化: 不合轴, bmm2 写 UB
     constexpr bool useDn = false;
