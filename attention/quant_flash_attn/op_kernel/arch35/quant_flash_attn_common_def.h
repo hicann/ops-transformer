@@ -32,6 +32,7 @@ static constexpr float FLOAT_MAX = 3.402823466e+38F;
 static constexpr float FLOAT_INF = 3e+99;
 
 static constexpr uint32_t FA_METADATA_HEADER_OFFSET = 16U * sizeof(uint32_t);
+static constexpr uint32_t QFA_HEAD_NEED_INIT_OUTPUT_INDEX = 15U;
 
 #define ASCENDC_TPL_5_BW 5
 #define ASCENDC_TPL_10_BW 10
