@@ -36,7 +36,9 @@ constexpr int64_t WEIGHT_SCALE_N_DIM_INDEX = DIM_2;
 constexpr int64_t MX_GROUP_SIZE = 64L;
 constexpr int64_t MX_SCALE_PAIR = 2L;
 constexpr int64_t NZ_C0_DIM = 16L;
-constexpr int64_t NZ_LAST_DIM = 32L;
+constexpr int64_t NZ_LAST_DIM_FP8 = 32L;
+constexpr int64_t NZ_LAST_DIM_FP4 = 64L;
+constexpr int64_t MXFP4_PACK_FACTOR = 2L;
 } // namespace gmaq
 
 #endif // OP_API_GROUPED_MATMUL_ACTIVATION_QUANT_COMMON_H_

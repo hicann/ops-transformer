@@ -45,8 +45,8 @@ constexpr size_t INPUT_TENSOR_COUNT = 6U;
 constexpr size_t OUTPUT_TENSOR_COUNT = 2U;
 constexpr size_t TENSOR_FIELD_COUNT = 4U;
 constexpr size_t SCALAR_FIELD_COUNT = 19U;
-constexpr size_t CSV_COLUMN_COUNT = SCALAR_FIELD_COUNT + (INPUT_TENSOR_COUNT + OUTPUT_TENSOR_COUNT) *
-                                                           TENSOR_FIELD_COUNT;
+constexpr size_t CSV_COLUMN_COUNT =
+    SCALAR_FIELD_COUNT + (INPUT_TENSOR_COUNT + OUTPUT_TENSOR_COUNT) * TENSOR_FIELD_COUNT;
 constexpr uint32_t DEFAULT_L1_SIZE = 512288U;
 constexpr uint32_t DEFAULT_L2_SIZE = 134217728U;
 constexpr uint32_t DEFAULT_L0C_SIZE = 262144U;
@@ -55,6 +55,8 @@ constexpr uint32_t DEFAULT_L0B_SIZE = 65536U;
 constexpr uint32_t DEFAULT_AIC_NUM = 32U;
 constexpr uint32_t DEFAULT_AIV_NUM = 64U;
 constexpr uint64_t DEFAULT_UB_SIZE = 262144UL;
+constexpr uint64_t MX_EPILOGUE_MAX_ELEMENTS_PER_AIV = 128UL * 256UL;
+constexpr uint64_t MX_EPILOGUE_AIV_COUNT = 2UL;
 
 struct GroupedMatmulActivationQuantTilingCase {
     void Run() const
@@ -90,6 +92,16 @@ struct GroupedMatmulActivationQuantTilingCase {
         TilingInfo tilingInfo;
         ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo)) << "prefix=" << prefix;
         EXPECT_EQ(tilingInfo.tilingKey, expectTilingKey) << "prefix=" << prefix;
+        ASSERT_GE(tilingInfo.tilingDataSize, sizeof(GroupedMatmulActivationQuant::GMMActivationQuantTilingDataParams));
+        const auto *tilingData =
+            reinterpret_cast<const GroupedMatmulActivationQuant::GMMActivationQuantTilingDataParams *>(
+                tilingInfo.tilingData.get());
+        ASSERT_NE(tilingData, nullptr);
+        EXPECT_LE(((static_cast<uint64_t>(tilingData->mmTilingData.baseM) + MX_EPILOGUE_AIV_COUNT - 1) /
+                   MX_EPILOGUE_AIV_COUNT) *
+                      tilingData->mmTilingData.baseN,
+                  MX_EPILOGUE_MAX_ELEMENTS_PER_AIV)
+            << "prefix=" << prefix;
     }
 
     string socVersion;
@@ -230,9 +242,8 @@ const vector<GroupedMatmulActivationQuantTilingCase> &GetAscend950Cases()
     return cases;
 }
 
-class TestGroupedMatmulActivationQuantTiling950 :
-    public testing::TestWithParam<GroupedMatmulActivationQuantTilingCase> {
-};
+class TestGroupedMatmulActivationQuantTiling950
+    : public testing::TestWithParam<GroupedMatmulActivationQuantTilingCase> {};
 
 TEST_P(TestGroupedMatmulActivationQuantTiling950, csvDrivenCase)
 {

@@ -13,13 +13,13 @@
 
 ## 功能说明
 
-- 算子功能：融合GroupedMatmul、activation和quant计算。当前版本仅支持WeightNz路径下的MXFP8量化场景，激活函数仅支持gelu_tanh。
+- 算子功能：融合GroupedMatmul、activation和quant计算。当前版本支持WeightNz路径下的MXFP8和MXFP4输入场景，激活函数仅支持gelu_tanh，量化输出支持FP8和FP4。
 
 - 计算公式：
   - <term>Ascend 950PR/Ascend 950DT</term>：
 
     <details>
-    <summary>MXFP8量化场景：</summary>
+    <summary>MX量化场景：</summary>
 
     - 定义：
       - $E$ 表示专家数，$M$ 表示总token数，$K$ 表示输入特征维度，$N$ 表示输出特征维度。
@@ -55,28 +55,30 @@
 
 | 参数名 | 输入/输出/属性 | 描述 | 数据类型 | 数据格式 | 维度(shape) |
 | ------ | -------------- | ---- | -------- | -------- | ----------- |
-| x | 输入 | 左矩阵，对应公式中的$X$。 | FLOAT8_E4M3FN、FLOAT8_E5M2 | ND | 2维，形如`(M, K)` |
+| x | 输入 | 左矩阵，对应公式中的$X$。 | FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1、FLOAT4_E1M2 | ND | 2维，形如`(M, K)` |
 | group_list | 输入 | 分组信息，对应公式中的`group_list`。 | INT64 | ND | 1维，形如`(E,)` |
-| weight | 动态输入 | 右矩阵dynamic tensorList。当前MXFP8场景tensorList长度仅支持1。 | FLOAT8_E4M3FN | FRACTAL_NZ | viewShape为3维，storageShape为5维 |
-| weight_scale | 动态输入 | `weight`的MX量化因子，dynamic tensorList。当前MXFP8场景tensorList长度仅支持1。 | FLOAT8_E8M0 | ND | 4维 |
-| bias | 动态输入 | bias dynamic tensorList。当前MXFP8场景必须为空。 | FLOAT | ND | - |
-| x_scale | 可选输入 | `x`的MX量化因子。当前MXFP8场景必须传入。 | FLOAT8_E8M0 | ND | 3维，形如`(M, ceil(K / 64), 2)` |
-| y | 输出 | 激活并量化后的输出矩阵。 | FLOAT8_E4M3FN、FLOAT8_E5M2 | ND | 2维，形如`(M, N)` |
+| weight | 动态输入 | 右矩阵dynamic tensorList，长度仅支持1。MXFP8时为FLOAT8_E4M3FN；MXFP4时可为任一FLOAT4类型，且x与weight必须同为FLOAT4。 | FLOAT8_E4M3FN、FLOAT4_E2M1、FLOAT4_E1M2 | FRACTAL_NZ | viewShape为3维，storageShape为5维 |
+| weight_scale | 动态输入 | `weight`的MX量化因子，dynamic tensorList，长度仅支持1。 | FLOAT8_E8M0 | ND | 4维 |
+| bias | 动态输入 | bias dynamic tensorList。当前MX场景必须为空。 | FLOAT | ND | - |
+| x_scale | 可选输入 | `x`的MX量化因子。当前MX场景必须传入。 | FLOAT8_E8M0 | ND | 3维，形如`(M, ceil(K / 64), 2)` |
+| y | 输出 | 激活并量化后的输出矩阵。FP4输出仅支持MXFP4输入场景。 | FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1、FLOAT4_E1M2 | ND | 2维，形如`(M, N)` |
 | y_scale | 输出 | 输出`y`的MX量化因子。 | FLOAT8_E8M0 | ND | 3维，形如`(M, ceil(N / 64), 2)` |
 | activation_type | 必选属性 | 激活函数类型，当前仅支持`"gelu_tanh"`。 | STRING | - | - |
 | transpose_weight | 可选属性 | 表示`weight`是否转置，默认false。 | BOOL | - | - |
 | group_list_type | 可选属性 | 表示`group_list`输入的分组方式，支持0和1，默认0。 | INT64 | - | - |
 | tuning_config | 可选属性 | 预留调优参数，默认`[0]`，当前暂不使用。 | LIST_INT | - | - |
 | quant_mode | 可选属性 | 量化模式，当前仅支持`"mx"`。 | STRING | - | - |
-| y_dtype | 可选属性 | 输出`y`的数据类型，默认0；当前支持0、35、36，其中35表示FLOAT8_E5M2，36表示FLOAT8_E4M3FN。 | INT64 | - | - |
+| y_dtype | 可选属性 | 输出`y`的数据类型，默认DT_UNDEFINED，此时输出类型跟随`x`；支持35（FLOAT8_E5M2）、36（FLOAT8_E4M3FN）、40（FLOAT4_E2M1）、41（FLOAT4_E1M2）。 | INT64 | - | - |
 | round_mode | 可选属性 | 量化舍入模式，默认`"rint"`，当前仅支持`"rint"`。 | STRING | - | - |
-| scale_alg | 可选属性 | MX量化scale算法，默认0；支持0或1，其中0表示OCP实现，1表示cuBLAS实现。 | INT64 | - | - |
-| dst_type_max | 可选属性 | 表示maxType的取值，对应公式中的Amax(DType)，默认0.0。当前MXFP8场景仅支持0.0。 | FLOAT | - | - |
+| scale_alg | 可选属性 | MX量化scale算法，默认0；支持0、1、2。0支持全部输出类型；1仅支持FP8输出；2仅支持FLOAT4_E2M1输出。 | INT64 | - | - |
+| dst_type_max | 可选属性 | 表示maxType的取值，对应公式中的Amax(DType)，默认0.0。scale_alg为2时支持0.0或[6.0, 12.0]；其他scale_alg仅支持0.0。 | FLOAT | - | - |
 
 ## 约束说明
 
 - `x`仅支持非转置输入；`weight`支持非转置和转置输入，`weight_scale`转置属性需要与`weight`保持一致。
 - `N`必须为64的整数倍，`group_list`第一维取值范围为[1, 1024]。
+- MXFP4场景下`K`必须为偶数且不能为2，weight的NZ storageShape尾维为64；MXFP8场景尾维为32。
+- `scale_alg=1`仅支持FLOAT8输出；`scale_alg=2`仅支持FLOAT4_E2M1输出；FLOAT4_E1M2输出仅支持`scale_alg=0`。
 - `bias`为空时，支持nullptr、空tensorList或长度为1且元素shape为(0)的空tensorList。
 
 ## 调用说明

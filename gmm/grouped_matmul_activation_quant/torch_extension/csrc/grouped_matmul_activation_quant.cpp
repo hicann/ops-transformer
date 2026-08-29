@@ -24,6 +24,8 @@ constexpr int64_t GE_DTYPE_FLOAT = 0L;
 constexpr int64_t GE_DTYPE_FLOAT8_E5M2 = 35L;
 constexpr int64_t GE_DTYPE_FLOAT8_E4M3FN = 36L;
 constexpr int64_t GE_DTYPE_FLOAT8_E8M0 = 37L;
+constexpr int64_t GE_DTYPE_FLOAT4_E2M1 = 40L;
+constexpr int64_t GE_DTYPE_FLOAT4_E1M2 = 41L;
 constexpr int64_t ACL_DTYPE_OFFSET = 256L;
 constexpr int64_t DIM_0 = 0L;
 constexpr int64_t DIM_2 = 2L;
@@ -32,7 +34,7 @@ constexpr int64_t MX_GROUP_SIZE = 64L;
 bool IsKnownGeDtype(int64_t dtype)
 {
     return dtype == GE_DTYPE_FLOAT || dtype == GE_DTYPE_FLOAT8_E5M2 || dtype == GE_DTYPE_FLOAT8_E4M3FN ||
-           dtype == GE_DTYPE_FLOAT8_E8M0;
+           dtype == GE_DTYPE_FLOAT8_E8M0 || dtype == GE_DTYPE_FLOAT4_E2M1 || dtype == GE_DTYPE_FLOAT4_E1M2;
 }
 
 int64_t NormalizeGeDtype(int64_t dtype)
@@ -52,9 +54,6 @@ int64_t NormalizeGeDtype(int64_t dtype)
     if (dtype == static_cast<int64_t>(at::ScalarType::Float8_e4m3fn)) {
         return GE_DTYPE_FLOAT8_E4M3FN;
     }
-    if (dtype == static_cast<int64_t>(at::ScalarType::Float8_e8m0fnu)) {
-        return GE_DTYPE_FLOAT8_E8M0;
-    }
     return dtype;
 }
 
@@ -69,9 +68,9 @@ const char *GetDtypeName(int64_t dtype)
             return "FLOAT8_E4M3FN";
         case GE_DTYPE_FLOAT8_E8M0:
             return "FLOAT8_E8M0";
-        case ACL_FLOAT4_E2M1:
+        case GE_DTYPE_FLOAT4_E2M1:
             return "FLOAT4_E2M1";
-        case ACL_FLOAT4_E1M2:
+        case GE_DTYPE_FLOAT4_E1M2:
             return "FLOAT4_E1M2";
         default:
             return "UNKNOWN";
@@ -81,6 +80,12 @@ const char *GetDtypeName(int64_t dtype)
 aclDataType GetAclDataTypeFromValue(int64_t dtype)
 {
     int64_t geDtype = NormalizeGeDtype(dtype);
+    if (geDtype == GE_DTYPE_FLOAT4_E2M1) {
+        return ACL_FLOAT4_E2M1;
+    }
+    if (geDtype == GE_DTYPE_FLOAT4_E1M2) {
+        return ACL_FLOAT4_E1M2;
+    }
     if (IsKnownGeDtype(geDtype)) {
         return static_cast<aclDataType>(geDtype);
     }
@@ -104,7 +109,18 @@ at::ScalarType GetYScalarType(int64_t yDtype)
     if (geDtype == GE_DTYPE_FLOAT8_E5M2) {
         return at::ScalarType::Float8_e5m2;
     }
-    TORCH_CHECK(false, "y_dtype only supports FLOAT8_E4M3FN or FLOAT8_E5M2, but got ", GetDtypeName(yDtype), ".");
+    if (geDtype == GE_DTYPE_FLOAT4_E2M1 || geDtype == GE_DTYPE_FLOAT4_E1M2) {
+        // Torch exposes the packed FP4 result as uint8; TensorWrapper restores the logical FP4 descriptor.
+        return at::ScalarType::Byte;
+    }
+    TORCH_CHECK(false, "y_dtype only supports FLOAT8_E4M3FN, FLOAT8_E5M2, FLOAT4_E2M1 or FLOAT4_E1M2, but got ",
+                GetDtypeName(yDtype), ".");
+}
+
+bool IsFp4GeDtype(int64_t dtype)
+{
+    const int64_t geDtype = NormalizeGeDtype(dtype);
+    return geDtype == GE_DTYPE_FLOAT4_E2M1 || geDtype == GE_DTYPE_FLOAT4_E1M2;
 }
 
 int64_t ResolveYGeDtype(const c10::optional<int64_t> &yDtype, aclDataType xAclDtype)
@@ -118,15 +134,21 @@ int64_t ResolveYGeDtype(const c10::optional<int64_t> &yDtype, aclDataType xAclDt
     if (xAclDtype == ACL_FLOAT8_E5M2) {
         return GE_DTYPE_FLOAT8_E5M2;
     }
-    TORCH_CHECK(false, "y_dtype is None only supports inferring from FP8 x dtype.");
+    if (xAclDtype == ACL_FLOAT4_E2M1 || xAclDtype == ACL_FLOAT4_E1M2) {
+        return xAclDtype == ACL_FLOAT4_E2M1 ? GE_DTYPE_FLOAT4_E2M1 : GE_DTYPE_FLOAT4_E1M2;
+    }
+    TORCH_CHECK(false, "y_dtype is None only supports inferring from FP8 or FP4 x dtype.");
 }
 
-int64_t CeilDiv(int64_t value, int64_t factor) { return (value + factor - 1) / factor; }
+int64_t CeilDiv(int64_t value, int64_t factor)
+{
+    return (value + factor - 1) / factor;
+}
 
 int64_t InferNzLogicalN(const at::Tensor &weightScaleTensor)
 {
-    // Runtime callers normalize MX weight to the non-transposed logical layout before this op.
-    // Thus 4D MX weightScale is [E, ceil(K / 64), N, 2], and logical N is dim2.
+    // Both the non-transposed scale and the view produced by
+    // scaleSource.transpose(-3, -2) are [E, ceil(K / 64), N, 2].
     return weightScaleTensor.size(DIM_2);
 }
 
@@ -174,7 +196,8 @@ std::tuple<at::Tensor, at::Tensor> grouped_matmul_activation_quant(
     {
         auto localDevice = c10::Device(x.device());
         const c10::OptionalDeviceGuard deviceGuard(localDevice);
-        y = at::empty({m, n}, x.options().dtype(GetYScalarType(yDtypeValue)));
+        const int64_t physicalN = IsFp4GeDtype(yDtypeValue) ? CeilDiv(n, 2L) : n;
+        y = at::empty({m, physicalN}, x.options().dtype(GetYScalarType(yDtypeValue)));
         yScale = at::empty({m, CeilDiv(n, MX_GROUP_SIZE), 2}, x.options().dtype(at::ScalarType::Float8_e8m0fnu));
     }
 

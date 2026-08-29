@@ -37,6 +37,7 @@ constexpr size_t WEIGHT_SCALE_DIM_NUM = 4UL;
 constexpr size_t ATTR_INDEX_TRANSPOSE_WEIGHT = 1UL;
 constexpr size_t ATTR_INDEX_Y_DTYPE = 5UL;
 constexpr int64_t DYNAMIC_DIM = -1L;
+
 } // namespace
 
 static ge::graphStatus InferShape4GroupedMatmulActivationQuant(gert::InferShapeContext *context)
@@ -51,8 +52,7 @@ static ge::graphStatus InferShape4GroupedMatmulActivationQuant(gert::InferShapeC
     bool transposeWeight = transposeWeightPtr != nullptr ? *transposeWeightPtr : false;
 
     OP_CHECK_IF(xShape->GetDimNum() < MIN_X_DIM_NUM,
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x",
-                                                      std::to_string(xShape->GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", std::to_string(xShape->GetDimNum()),
                                                       "x dim num must be greater than or equal to 1"),
                 return GRAPH_FAILED);
     OP_CHECK_IF(weightScaleShape->GetDimNum() != WEIGHT_SCALE_DIM_NUM,
@@ -61,9 +61,8 @@ static ge::graphStatus InferShape4GroupedMatmulActivationQuant(gert::InferShapeC
                                                       "weightScale dim num must be 4"),
                 return GRAPH_FAILED);
     int64_t m = xShape->GetDim(M_DIM_INDEX);
-    int64_t n =
-        transposeWeight ? weightScaleShape->GetDim(WEIGHT_SCALE_TRANS_N_DIM_INDEX) :
-                          weightScaleShape->GetDim(WEIGHT_SCALE_N_DIM_INDEX);
+    int64_t n = transposeWeight ? weightScaleShape->GetDim(WEIGHT_SCALE_TRANS_N_DIM_INDEX) :
+                                  weightScaleShape->GetDim(WEIGHT_SCALE_N_DIM_INDEX);
 
     auto outShape = context->GetOutputShape(OUT_Y_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, outShape);
@@ -99,9 +98,9 @@ static graphStatus InferDataType4GroupedMatmulActivationQuant(gert::InferDataTyp
     if (outputDtype == ge::DT_UNDEFINED) {
         outputDtype = context->GetInputDataType(X_INDEX);
     }
-    context->SetOutputDataType(OUT_Y_INDEX, outputDtype);
-    context->SetOutputDataType(OUT_Y_SCALE_INDEX, ge::DT_FLOAT8_E8M0);
-    return GRAPH_SUCCESS;
+    OP_CHECK_IF(context->SetOutputDataType(OUT_Y_INDEX, outputDtype) != GRAPH_SUCCESS,
+                OP_LOGE(context->GetNodeName(), "failed to set y dtype"), return GRAPH_FAILED);
+    return context->SetOutputDataType(OUT_Y_SCALE_INDEX, ge::DT_FLOAT8_E8M0);
 }
 
 IMPL_OP_INFERSHAPE(GroupedMatmulActivationQuant)
