@@ -316,7 +316,6 @@ void QuantFlashAttnTilingImpl::SetQFATilingData()
         !(cuSeqLenKVFlag_ && qfaInfo_->kvLayout == QfaLayout::TND);
     tilingData_.baseTiling.quantFlashAttnBaseParams.coreNum = numBlocks_;
     tilingData_.baseTiling.quantFlashAttnBaseParams.outputLayout = static_cast<uint32_t>(qfaInfo_->outLayout);
-    tilingData_.baseTiling.quantFlashAttnBaseParams.needInitOutput = CheckNeedInitOutput();
 
     tilingData_.baseTiling.quantFlashAttnAttenMaskParams.winLefts = qfaInfo_->winLeft;
     tilingData_.baseTiling.quantFlashAttnAttenMaskParams.winRights = qfaInfo_->winRight;
@@ -347,29 +346,6 @@ void QuantFlashAttnTilingImpl::SetQFATilingData()
         tilingData_.baseTiling.quantFlashAttnBaseParams.vDescaleStrides.n2Stride =
             qfaInfo_->vDescaleStrides->GetStride(1);
     }
-}
-
-bool QuantFlashAttnTilingImpl::CheckNeedInitOutput() const
-{
-    if (seqUsedQFlag_ || seqUsedKvFlag_) {
-        return true;
-    }
-    if (qfaInfo_->qLayout == QfaLayout::TND && qfaInfo_->kvLayout == QfaLayout::TND) {
-        return qfaInfo_->maskMode != static_cast<int64_t>(MaskMode::NO_MASK);
-    }
-    if (qfaInfo_->maskMode == static_cast<int64_t>(MaskMode::NO_MASK)) {
-        return false;
-    }
-    if (qfaInfo_->maskMode == static_cast<int64_t>(MaskMode::CAUSAL)) {
-        return qfaInfo_->s1Size > qfaInfo_->s2Size;
-    }
-    if (qfaInfo_->maskMode == static_cast<int64_t>(MaskMode::SLIDING_WINDOW)) {
-        if (qfaInfo_->winRight == -1) {
-            return false;
-        }
-        return (qfaInfo_->s1Size - qfaInfo_->s2Size) > qfaInfo_->winRight;
-    }
-    return false;
 }
 
 ge::graphStatus QuantFlashAttnTilingImpl::SetTilingData(QuantFlashAttnTilingData &tilingData)
@@ -408,7 +384,6 @@ void QuantFlashAttnTilingImpl::PrintAllTilingData()
     OP_LOGD(qfaInfo_->opName, "isSoftMaxLseEnable:%d", params.isSoftMaxLseEnable);
     OP_LOGD(qfaInfo_->opName, "coreNum:%d", params.coreNum);
     OP_LOGD(qfaInfo_->opName, "outputLayout:%d", params.outputLayout);
-    OP_LOGD(qfaInfo_->opName, "needInitOutput:%d", params.needInitOutput);
 
     OP_LOGD(qfaInfo_->opName, "maskMode:%d", maskParams.sparseMode);
     OP_LOGD(qfaInfo_->opName, "winLefts:%d", maskParams.winLefts);

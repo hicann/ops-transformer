@@ -34,6 +34,7 @@ constexpr uint32_t HEAD_SECTION_NUM_INDEX = 0U;
 constexpr uint32_t HEAD_IS_FD_INDEX = 1U;
 constexpr uint32_t HEAD_M_BASE_SIZE_INDEX = 2U;
 constexpr uint32_t HEAD_S2_BASE_SIZE_INDEX = 3U;
+constexpr uint32_t HEAD_NEED_INIT_OUTPUT_INDEX = 15U;
 
 constexpr uint32_t FA_BN_START_INDEX = 0U;
 constexpr uint32_t FA_M_START_INDEX = 1U;

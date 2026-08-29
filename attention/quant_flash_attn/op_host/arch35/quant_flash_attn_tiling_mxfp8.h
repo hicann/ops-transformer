@@ -55,7 +55,6 @@ private:
     void CalcNumBlocks(uint32_t aicNum);
     void FillTiling();
     ge::graphStatus SetTilingData(QuantFlashAttnTilingData &tilingData);
-    bool CheckNeedInitOutput() const;
 
     QuantFlashAttnTilingData tilingData_;
     QfaTilingKeyInfo tilingKeyInfo_;
