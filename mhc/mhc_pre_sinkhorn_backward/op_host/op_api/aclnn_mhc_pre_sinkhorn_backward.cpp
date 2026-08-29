@@ -147,8 +147,8 @@ static bool CheckInputNotNullImpl(const aclTensor *tensor, const char *name)
 
 static bool CheckTensorFormat(const aclTensor *tensor, const char *name)
 {
-    if (tensor->GetStorageFormat() != op::Format::FORMAT_ND) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s tensor format must be ND, but got %s", name,
+    if (tensor != nullptr && op::IsPrivateFormat(tensor->GetStorageFormat())) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s's format should be ND, but got %s.", name,
                 op::ToString(tensor->GetStorageFormat()).GetString());
         return false;
     }
