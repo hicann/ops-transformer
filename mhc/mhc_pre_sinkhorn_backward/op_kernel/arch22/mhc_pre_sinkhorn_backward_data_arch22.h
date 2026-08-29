@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file mhc_pre_sinkhorn_backward_data_arch32.h
+ * \file mhc_pre_sinkhorn_backward_data_arch22.h
  * \brief tiling data struct
  */
 
