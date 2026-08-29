@@ -71,12 +71,12 @@ enum class STemplateType {
     DTemplateBottom
 };
 
-#define CHECK_ZERO(num)                                                                                                \
-    do {                                                                                                               \
-        if ((num) == 0) {                                                                                              \
-            OP_LOGW("template 3.1 number[%s] is zero.", #num);                                                       \
-            return ge::GRAPH_PARAM_INVALID;                                                                            \
-        }                                                                                                              \
+#define CHECK_ZERO(num) \
+    do { \
+        if ((num) == 0) { \
+            OP_LOGW("template 3.1 number[%s] is zero.", #num); \
+            return ge::GRAPH_PARAM_INVALID; \
+        } \
     } while (0)
 
 /* 这里的基本块和矩阵乘法的基本块定义有所区别（这里表示单次搬运和vector计算一次使用的数据量,
@@ -103,10 +103,12 @@ struct TempParamsUngs1s2Bbn {
 
 class FlashAttentionScoreGradUngs1s2BbnTiling : public TilingBaseClass {
 public:
-    FlashAttentionScoreGradTilingDataUngs1s2Bbn *td_ = context_->GetTilingData<FlashAttentionScoreGradTilingDataUngs1s2Bbn>();
+    FlashAttentionScoreGradTilingDataUngs1s2Bbn *td_ =
+        context_->GetTilingData<FlashAttentionScoreGradTilingDataUngs1s2Bbn>();
     TempParamsUngs1s2Bbn basicParams;
 
-    explicit FlashAttentionScoreGradUngs1s2BbnTiling(gert::TilingContext *context) : TilingBaseClass(context)
+    explicit FlashAttentionScoreGradUngs1s2BbnTiling(gert::TilingContext *context)
+        : TilingBaseClass(context)
     {
         td_->reset();
     };
@@ -151,10 +153,13 @@ public:
 
         if (basicParams.layout == static_cast<uint32_t>(InputLayout::SBH) &&
             basicParams.b * basicParams.n * basicParams.d > static_cast<int64_t>(MM_MAX_STRIDE_LIMIT)) {
-            tilingKey = GET_TPL_TILING_KEY(static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(AxisEnum::N2), 0, static_cast<uint8_t>(dtype),
-                static_cast<uint8_t>(layout), static_cast<uint8_t>(SparseEnum::ALL), static_cast<uint8_t>(MatmulConfig::NORMAL_CONFIG), static_cast<uint8_t>(mmPreIsNZOut),
-                static_cast<uint8_t>(mmNextIsNZOut), static_cast<uint8_t>(0), static_cast<uint8_t>(0),
-                0, 0, 0, static_cast<uint8_t>(s1TemplateType), static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType), 0, 0);
+            tilingKey = GET_TPL_TILING_KEY(
+                static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(AxisEnum::NONE),
+                static_cast<uint8_t>(AxisEnum::N2), 0, static_cast<uint8_t>(dtype), static_cast<uint8_t>(layout),
+                static_cast<uint8_t>(SparseEnum::ALL), static_cast<uint8_t>(MatmulConfig::NORMAL_CONFIG),
+                static_cast<uint8_t>(mmPreIsNZOut), static_cast<uint8_t>(mmNextIsNZOut), static_cast<uint8_t>(0),
+                static_cast<uint8_t>(0), 0, 0, 0, static_cast<uint8_t>(s1TemplateType),
+                static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType), 0, 0);
             OP_LOGD(context_, "Ungs1s2Bbn tilingKey is %lu.", tilingKey);
             return tilingKey;
         } else {
@@ -189,10 +194,13 @@ public:
                     s2TemplateType = STemplateType::Aligned32;
                 }
             }
-            tilingKey = GET_TPL_TILING_KEY(static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(AxisEnum::N2), 0, static_cast<uint8_t>(dtype),
-                static_cast<uint8_t>(layout), static_cast<uint8_t>(SparseEnum::ALL), static_cast<uint8_t>(unique), static_cast<uint8_t>(mmPreIsNZOut),
-                static_cast<uint8_t>(mmNextIsNZOut), static_cast<uint8_t>(0), static_cast<uint8_t>(0),
-                0, 0, 0, static_cast<uint8_t>(s1TemplateType), static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType), 0, 0);
+            tilingKey = GET_TPL_TILING_KEY(
+                static_cast<uint8_t>(AxisEnum::NONE), static_cast<uint8_t>(AxisEnum::NONE),
+                static_cast<uint8_t>(AxisEnum::N2), 0, static_cast<uint8_t>(dtype), static_cast<uint8_t>(layout),
+                static_cast<uint8_t>(SparseEnum::ALL), static_cast<uint8_t>(unique), static_cast<uint8_t>(mmPreIsNZOut),
+                static_cast<uint8_t>(mmNextIsNZOut), static_cast<uint8_t>(0), static_cast<uint8_t>(0), 0, 0, 0,
+                static_cast<uint8_t>(s1TemplateType), static_cast<uint8_t>(s2TemplateType),
+                static_cast<uint8_t>(dTemplateType), 0, 0);
             OP_LOGD(context_, "Ungs1s2Bbn tilingKey is %lu.", tilingKey);
             return tilingKey;
         }
@@ -201,26 +209,26 @@ public:
     bool IsCapable() override
     {
         auto sinkShape = context_->GetOptionalInputShape(SINK_IN);
-        if (sinkShape != nullptr && sinkShape->GetStorageShape().GetDimNum() == 1 ) {
+        if (sinkShape != nullptr && sinkShape->GetStorageShape().GetDimNum() == 1) {
             return false;
         }
-        const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ? context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) : "";
+        const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
+                                       context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) :
+                                       "";
         if (strcmp(tndSoftmaxIn, "") != 0) {
             return false;
         }
 
-        if (basicParams.dataType == ge::DT_FLOAT){
+        if (basicParams.dataType == ge::DT_FLOAT) {
             OP_LOGD(context_, "Ungs1s2Bbn is not support fp32");
             return false;
         }
 
-        OP_CHECK_IF(context_->GetAttrs() == nullptr,
-                   OP_LOGW(context_, "GetAttrs is nullptr."),
-                   return false);
+        OP_CHECK_IF(context_->GetAttrs() == nullptr, OP_LOGW(context_, "GetAttrs is nullptr."), return false);
 
         if (context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(PSETYPE)) {
             auto psetype = *context_->GetAttrs()->GetAttrPointer<int>(PSETYPE); // 8
-            if (psetype != 1) { // 不支持非默认的psetype
+            if (psetype != 1) {                                                 // 不支持非默认的psetype
                 return false;
             }
         }
@@ -229,13 +237,14 @@ public:
         int64_t gSqSkvSize = td_->opInfo.get_g() * td_->opInfo.get_sQ() * td_->opInfo.get_sKVAlignSizeVec();
         /* 计算g * sQ * sKVAlign的大小是否小于当前 */
         if (gSqSkvSize == 0 || td_->opInfo.get_g() != 1 || td_->opInfo.get_sKVAlignSizeVec() > MAX_KV_SEQLEN) {
-          return false;
+            return false;
         }
 
         // Key Value D不等长情况不能处理
-        OP_CHECK_IF(((context_->GetInputShape(VALUE) == nullptr) || (context_->GetInputShape(KEY) == nullptr)),
-            OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [InputShape of value or key is null]"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(context_->GetInputShape(VALUE) == nullptr,
+                    OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "value"), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(context_->GetInputShape(KEY) == nullptr,
+                    OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "keyIn"), return ge::GRAPH_FAILED);
         const gert::StorageShape *valueShape = context_->GetInputShape(VALUE);
         const gert::StorageShape *keyShape = context_->GetInputShape(KEY);
         if (!IsSameShape(keyShape, valueShape) && IsSameShapeButValueDLeEqD(keyShape, valueShape)) {
@@ -258,8 +267,11 @@ public:
         if (platformInfoPtr == nullptr) {
             auto compileInfoPtr =
                 reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context_->GetCompileInfo());
-            OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
-                       return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                compileInfoPtr == nullptr,
+                OP_LOGE(context_,
+                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
+                return ge::GRAPH_FAILED);
 
             aicoreParams_.numBlocks = compileInfoPtr->aivNum;
             aicoreParams_.aicNum = compileInfoPtr->aicNum;
@@ -279,13 +291,17 @@ public:
             ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, aicoreParams_.l0cSize);
         }
         OP_CHECK_IF((aicoreParams_.numBlocks == 0) || (aicoreParams_.aicNum == 0),
-                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of coreNum(aivNum) is %lu, num of aicNum is %lu.]",
-                    aicoreParams_.numBlocks, aicoreParams_.aicNum),
+                    OP_LOGE(context_,
+                            "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of "
+                            "coreNum(aivNum) is %lu, num of aicNum is %lu.]",
+                            aicoreParams_.numBlocks, aicoreParams_.aicNum),
                     return ge::GRAPH_FAILED);
 
-        OP_CHECK_IF(aicoreParams_.ubSize <= 0,
-                   OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [ubSize is invalid.]"),
-                   return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            aicoreParams_.ubSize <= 0,
+            OP_LOGE(context_,
+                    "The op [FlashAttentionScoreGrad] received bad params, the reason is: [ubSize is invalid.]"),
+            return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
 
@@ -338,13 +354,12 @@ public:
         auto attenMaskDesc = context_->GetOptionalInputDesc(ATTEN_MASK);
         if (attenMaskDesc != nullptr) {
             auto attenMaskDtype = attenMaskDesc->GetDataType();
-            OP_CHECK_IF(
-                (attenMaskDtype != ge::DT_BOOL && attenMaskDtype != ge::DT_UINT8), OP_LOGW(context_, "AttenMaskDtype(%d) is not bool or uint8.", attenMaskDtype),
+            OP_CHECK_IF((attenMaskDtype != ge::DT_BOOL && attenMaskDtype != ge::DT_UINT8),
+                        OP_LOGW(context_, "AttenMaskDtype(%d) is not bool or uint8.", attenMaskDtype),
                         return ge::GRAPH_PARAM_INVALID);
         }
         auto ret = MakeAttenMaskShapeDims();
-        OP_CHECK_IF(ret != ge::GRAPH_SUCCESS,
-                    OP_LOGW(context_, "MakeAttenMaskShapeDims fail."),
+        OP_CHECK_IF(ret != ge::GRAPH_SUCCESS, OP_LOGW(context_, "MakeAttenMaskShapeDims fail."),
                     return ge::GRAPH_PARAM_INVALID);
         td_->opInfo.set_attenMaskS2Size(basicParams.attenMaskS2Size);
         td_->opInfo.set_attenMaskCompressMode(basicParams.attenMaskCompressMode);
@@ -357,13 +372,11 @@ public:
         td_->opInfo.set_scaleValue(*context_->GetAttrs()->GetAttrPointer<float>(SCALE_VALUE));
         td_->opInfo.set_keepProb(*context_->GetAttrs()->GetAttrPointer<float>(KEEP_PROB));
         OP_CHECK_IF((td_->opInfo.get_keepProb() <= 0 || td_->opInfo.get_keepProb() > 1),
-                    OP_LOGW(context_, "keepProb is illegal."),
-                    return ge::GRAPH_PARAM_INVALID);
+                    OP_LOGW(context_, "keepProb is illegal."), return ge::GRAPH_PARAM_INVALID);
         td_->opInfo.set_preTokens(*context_->GetAttrs()->GetAttrPointer<uint32_t>(PRE_TOKENS));
         td_->opInfo.set_nextTokens(*context_->GetAttrs()->GetAttrPointer<uint32_t>(NEXT_TOKENS));
         td_->opInfo.set_headNum(*context_->GetAttrs()->GetAttrPointer<uint32_t>(HEAD_NUM));
-        OP_CHECK_IF(td_->opInfo.get_headNum() == 0, OP_LOGW(context_, "headNum is 0."),
-                   return ge::GRAPH_PARAM_INVALID);
+        OP_CHECK_IF(td_->opInfo.get_headNum() == 0, OP_LOGW(context_, "headNum is 0."), return ge::GRAPH_PARAM_INVALID);
         const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
         if (strcmp(inputLayout, BSH_STR) == 0) {
             td_->opInfo.set_inputLayout(static_cast<uint32_t>(InputLayout::BSH));
@@ -381,16 +394,16 @@ public:
 
     ge::graphStatus GetShapeInfo()
     {
-        OP_CHECK_IF(((context_->GetInputShape(QUERY) == nullptr) || (context_->GetInputShape(KEY) == nullptr)),
-                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [InputShape of query or key is null]"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(context_->GetInputShape(QUERY) == nullptr,
+                    OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "query"), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(context_->GetInputShape(KEY) == nullptr,
+                    OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "keyIn"), return ge::GRAPH_FAILED);
         const gert::Shape &queryShape = context_->GetInputShape(QUERY)->GetStorageShape();
         const gert::Shape &keyShape = context_->GetInputShape(KEY)->GetStorageShape();
         if (td_->opInfo.get_inputLayout() == static_cast<uint32_t>(InputLayout::BNSD) ||
             td_->opInfo.get_inputLayout() == static_cast<uint32_t>(InputLayout::BSND)) {
             OP_CHECK_IF((queryShape.GetDimNum() != BNSD_DIM_NUM || keyShape.GetDimNum() != BNSD_DIM_NUM),
-                      OP_LOGW(context_, "the dim of query or key is not 4."),
-                      return ge::GRAPH_PARAM_INVALID);
+                        OP_LOGW(context_, "the dim of query or key is not 4."), return ge::GRAPH_PARAM_INVALID);
             OP_LOGD(context_, "Ungs1s2Bbn get input dim success.");
             size_t layoutIdx = static_cast<size_t>(td_->opInfo.get_inputLayout());
             td_->opInfo.set_b(queryShape.GetDim(LAYOUT_TO_AXIS[layoutIdx][B]));
@@ -405,8 +418,7 @@ public:
             td_->opInfo.set_n(td_->opInfo.get_headNum() / td_->opInfo.get_g());
         } else {
             OP_CHECK_IF((queryShape.GetDimNum() != BSH_SBH_DIM_NUM || keyShape.GetDimNum() != BSH_SBH_DIM_NUM),
-                      OP_LOGW(context_, "the dim of query or key is not 3."),
-                      return ge::GRAPH_PARAM_INVALID);
+                        OP_LOGW(context_, "the dim of query or key is not 3."), return ge::GRAPH_PARAM_INVALID);
             OP_LOGD(context_, "Ungs1s2Bbn get input dim success.");
             size_t layoutIdx = static_cast<size_t>(td_->opInfo.get_inputLayout());
             td_->opInfo.set_b(queryShape.GetDim(LAYOUT_TO_AXIS[layoutIdx][B]));
@@ -433,17 +445,14 @@ public:
     ge::graphStatus GetDataTypeInfo()
     {
         auto ret = CheckDtypeValid(context_);
-        OP_CHECK_IF(ret != ge::GRAPH_SUCCESS,
-                   OP_LOGW(context_, "dtype is invalid."),
-                   return ret);
+        OP_CHECK_IF(ret != ge::GRAPH_SUCCESS, OP_LOGW(context_, "dtype is invalid."), return ret);
         td_->opInfo.set_inputDType(static_cast<uint32_t>(context_->GetInputDesc(QUERY)->GetDataType()));
         basicParams.dataType = td_->opInfo.get_inputDType();
 
         int64_t inputDTypeSize =
             static_cast<int64_t>(GetSizeByDataType(static_cast<ge::DataType>(td_->opInfo.get_inputDType())));
         OP_CHECK_IF(inputDTypeSize >= ge::kDataTypeSizeBitOffset,
-                   OP_LOGW(context_, "input data dtype size is invalid."),
-                   return ge::GRAPH_PARAM_INVALID);
+                    OP_LOGW(context_, "input data dtype size is invalid."), return ge::GRAPH_PARAM_INVALID);
 
         OP_LOGD(context_, "Ungs1s2Bbn get inputDTypeSize success.");
         // bf16 场景下使用fp32(4 bytes)来进行vector的数据计算。
@@ -484,8 +493,8 @@ public:
                 bool isBNS = (dim0 == td_->opInfo.get_b()) && (dim1 == shapeN1) && (dim3 == td_->opInfo.get_sKV());
                 bool isBNSS = isBNS && (dim2 == td_->opInfo.get_sQ());
                 bool isBN1S = isBNS && (dim2 == 1);
-                bool is1NSS =
-                    (dim0 == 1) && (dim1 == shapeN1) && (dim2 == td_->opInfo.get_sQ()) && (dim3 == td_->opInfo.get_sKV());
+                bool is1NSS = (dim0 == 1) && (dim1 == shapeN1) && (dim2 == td_->opInfo.get_sQ()) &&
+                              (dim3 == td_->opInfo.get_sKV());
                 td_->opInfo.set_pseSq(dim2);
                 // 设置shape类型
                 if (is1NSS) {
@@ -508,19 +517,19 @@ public:
 
     ge::graphStatus GetShapeAttrsInfo() override
     {
-        OP_CHECK_IF(context_ == nullptr,
-                OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
-                return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            context_ == nullptr,
+            OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
+            return ge::GRAPH_FAILED);
         OP_CHECK_IF(context_->GetAttrs() == nullptr,
-                OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [GetAttrs is null]"),
-                return ge::GRAPH_FAILED);
+                    OP_LOGE(context_,
+                            "The op [FlashAttentionScoreGrad] received bad params, the reason is: [GetAttrs is null]"),
+                    return ge::GRAPH_FAILED);
         OP_LOGD(context_, "Ungs1s2Bbn get shape attrsInfo.");
 
         // 1. 获取属性信息
         auto ret = GetAttrsInfo();
-        OP_CHECK_IF((ret != ge::GRAPH_SUCCESS),
-                OP_LOGW(context_, "get AttrsInfo fail."),
-                return ret);
+        OP_CHECK_IF((ret != ge::GRAPH_SUCCESS), OP_LOGW(context_, "get AttrsInfo fail."), return ret);
         OP_LOGD(context_, "Ungs1s2Bbn get input layout success.");
 
         basicParams.layout = td_->opInfo.get_inputLayout();
@@ -530,15 +539,11 @@ public:
 
         // 2. 获取shape和轴信息
         ret = GetShapeInfo();
-        OP_CHECK_IF((ret != ge::GRAPH_SUCCESS),
-                OP_LOGW(context_, "get ShapeInfo fail."),
-                return ret);
+        OP_CHECK_IF((ret != ge::GRAPH_SUCCESS), OP_LOGW(context_, "get ShapeInfo fail."), return ret);
 
         // 3. 获取data type信息
         ret = GetDataTypeInfo();
-        OP_CHECK_IF((ret != ge::GRAPH_SUCCESS),
-                OP_LOGW(context_, "get DataTypeInfo fail."),
-                return ret);
+        OP_CHECK_IF((ret != ge::GRAPH_SUCCESS), OP_LOGW(context_, "get DataTypeInfo fail."), return ret);
         uint32_t vecCalcDTypeSize = td_->opInfo.get_vecCalcDTypeSize();
         int64_t inputDTypeSize = td_->opInfo.get_inputDTypeSize();
 
@@ -550,7 +555,8 @@ public:
         CHECK_ZERO(dMax);
         CHECK_ZERO(static_cast<int32_t>(vecCalcDTypeSize));
         int64_t sKvAlign = AlignSize(td_->opInfo.get_sKV(), 16);
-        int64_t nIn = BEST_BASIC_BLOCK_SIZE / (td_->opInfo.get_g() * td_->opInfo.get_sQ() * sKvAlign * vecCalcDTypeSize);
+        int64_t nIn =
+            BEST_BASIC_BLOCK_SIZE / (td_->opInfo.get_g() * td_->opInfo.get_sQ() * sKvAlign * vecCalcDTypeSize);
         if (nIn > td_->opInfo.get_n()) {
             nIn = td_->opInfo.get_n();
         }
@@ -565,9 +571,7 @@ public:
 
         /* 4. 获取其他输入shape信息 */
         ret = GetPseInfo();
-        OP_CHECK_IF((ret != ge::GRAPH_SUCCESS),
-                OP_LOGW(context_, "get PseInfo fail."),
-                return ret);
+        OP_CHECK_IF((ret != ge::GRAPH_SUCCESS), OP_LOGW(context_, "get PseInfo fail."), return ret);
         ret = SetAttenMaskTilingInfo();
         if (ret != ge::GRAPH_SUCCESS) {
             return ret;
@@ -634,7 +638,7 @@ public:
         }
 
         // 如果是nz，对于s2每一个分形需要多8个数据
-        if(basicParams.mmPreIsNZOut) {
+        if (basicParams.mmPreIsNZOut) {
             vecClc1Size += nInTimesG * sKVAlign / 16 * 32;
         }
         int64_t vecClc2Size = vecClc1Size;
@@ -692,8 +696,8 @@ public:
             uint32_t inputBufferLen = 4 * 1024;
             int64_t singleUBProcessNum = static_cast<int64_t>(castBufferLen) / 2LL;
 
-            int64_t dropMaskSize = td_->opInfo.get_b() * td_->opInfo.get_n() * td_->opInfo.get_g() * td_->opInfo.get_sQ() *
-                                   td_->opInfo.get_sKV();
+            int64_t dropMaskSize = td_->opInfo.get_b() * td_->opInfo.get_n() * td_->opInfo.get_g() *
+                                   td_->opInfo.get_sQ() * td_->opInfo.get_sKV();
 
             int64_t maskSize = AlignTo(dropMaskSize, static_cast<int64_t>(BOOL_BLOCK_NUMS));
             int64_t singleCoreNum =
@@ -750,9 +754,9 @@ public:
     void PrintShapeInfo()
     {
         OP_LOGI(context_,
-                  "FAG ngs1s2_bn with shape b[%ld] n2[%ld] g[%ld] s1[%ld] s2[%ld] d[%ld] preToken[%ld] nextToken[%ld]!",
-                  td_->opInfo.get_b(), td_->opInfo.get_n(), td_->opInfo.get_g(), td_->opInfo.get_sQ(), td_->opInfo.get_sKV(),
-                  td_->opInfo.get_d(), td_->opInfo.get_preTokens(), td_->opInfo.get_nextTokens());
+                "FAG ngs1s2_bn with shape b[%ld] n2[%ld] g[%ld] s1[%ld] s2[%ld] d[%ld] preToken[%ld] nextToken[%ld]!",
+                td_->opInfo.get_b(), td_->opInfo.get_n(), td_->opInfo.get_g(), td_->opInfo.get_sQ(),
+                td_->opInfo.get_sKV(), td_->opInfo.get_d(), td_->opInfo.get_preTokens(), td_->opInfo.get_nextTokens());
     }
 
     ge::graphStatus DoOpTiling() override
@@ -823,15 +827,11 @@ public:
     {
         OP_LOGD(context_, "Do op core split tiling.");
         int64_t gSqSkvAlign = td_->opInfo.get_g() * td_->opInfo.get_sQ() * td_->opInfo.get_sKVAlign();
-        OP_CHECK_IF(gSqSkvAlign == 0,
-                   OP_LOGW(context_, "gSqSkvAlign is 0."),
-                   return ge::GRAPH_PARAM_INVALID);
+        OP_CHECK_IF(gSqSkvAlign == 0, OP_LOGW(context_, "gSqSkvAlign is 0."), return ge::GRAPH_PARAM_INVALID);
 
         int64_t nIn = td_->singleCoreParams.get_nIn();
         bool ret = CheckArgsLegal(nIn);
-        OP_CHECK_IF(!ret,
-                   OP_LOGW(context_, "check args fail."),
-                   return ge::GRAPH_PARAM_INVALID);
+        OP_CHECK_IF(!ret, OP_LOGW(context_, "check args fail."), return ge::GRAPH_PARAM_INVALID);
 
         /* CV 配比*/
         int64_t nCvRatio = CV_RATIO;
@@ -856,12 +856,12 @@ public:
             CeilCommon(td_->splitCoreParams.get_totalBatch(), aicoreParams_.numBlocks));
         CHECK_ZERO(td_->singleCoreParams.get_singleCoreBatchRange());
         td_->singleCoreParams.set_singleCoreBatchRangeTail(td_->splitCoreParams.get_totalBatch() %
-                                                          td_->singleCoreParams.get_singleCoreBatchRange());
+                                                           td_->singleCoreParams.get_singleCoreBatchRange());
 
         td_->splitCoreParams.set_usedCoreNum(
             CeilCommon(td_->splitCoreParams.get_totalBatch(), td_->singleCoreParams.get_singleCoreBatchRange()));
         td_->splitCoreParams.set_mm1ResSize(td_->opInfo.get_sQ() * td_->opInfo.get_sKVAlign() *
-                                           td_->opInfo.get_vecCalcDTypeSize());
+                                            td_->opInfo.get_vecCalcDTypeSize());
         return ge::GRAPH_SUCCESS;
     }
 
@@ -871,13 +871,12 @@ public:
     ge::graphStatus DoInCoreTiling()
     {
         OP_LOGD(context_, "Do op in core split tiling.");
-        OP_CHECK_IF(td_->opInfo.get_vecCalcDTypeSize() == 0,
-                   OP_LOGW(context_, "vecCalcDTypeSize is 0."),
-                   return ge::GRAPH_PARAM_INVALID);
+        OP_CHECK_IF(td_->opInfo.get_vecCalcDTypeSize() == 0, OP_LOGW(context_, "vecCalcDTypeSize is 0."),
+                    return ge::GRAPH_PARAM_INVALID);
         td_->singleCoreParams.set_subRange(CeilCommon(td_->opInfo.get_sQ(), PER_SUB_RANGE));
         td_->singleCoreParams.set_subMask(SINGLE_VEC_INST_DATASIZE / td_->opInfo.get_vecCalcDTypeSize());
         td_->singleCoreParams.set_subMaskTail((td_->opInfo.get_sQ() % PER_SUB_RANGE) *
-                                             (BYTE_PER_BLOCK / td_->opInfo.get_vecCalcDTypeSize()));
+                                              (BYTE_PER_BLOCK / td_->opInfo.get_vecCalcDTypeSize()));
         td_->singleCoreParams.set_sKVAlignBlockNumVec(td_->opInfo.get_sKVAlignSizeVec() / BYTE_PER_BLOCK);
         return ge::GRAPH_SUCCESS;
     }
@@ -890,13 +889,12 @@ public:
             td_->opInfo.get_b() * td_->opInfo.get_n() * td_->opInfo.get_g() * td_->opInfo.get_sQ() * dAlign;
         uint64_t allNumKv = td_->opInfo.get_b() * td_->opInfo.get_n() * td_->opInfo.get_sKV() * dAlign;
         int64_t usedCoreNum = td_->splitCoreParams.get_usedCoreNum();
-        OP_CHECK_IF(usedCoreNum == 0,
-                   OP_LOGW(context_, "usedCoreNum is 0."),
-                   return ge::GRAPH_PARAM_INVALID);
+        OP_CHECK_IF(usedCoreNum == 0, OP_LOGW(context_, "usedCoreNum is 0."), return ge::GRAPH_PARAM_INVALID);
 
-        basicParams.mmNextIsNZOut = (td_->opInfo.get_sQ() >= NZ_S_MIN
-                              && td_->opInfo.get_inputLayout() == static_cast<uint32_t>(InputLayout::BNSD))
-                              ? true : false;
+        basicParams.mmNextIsNZOut = (td_->opInfo.get_sQ() >= NZ_S_MIN &&
+                                     td_->opInfo.get_inputLayout() == static_cast<uint32_t>(InputLayout::BNSD)) ?
+                                        true :
+                                        false;
         uint32_t postUbBaseSize = 0;
         uint32_t qPostBaseNum = 0;
         uint32_t nzReservedSize = 0;
@@ -913,9 +911,7 @@ public:
             qPostBaseNum = postUbBaseSize / FP16_BYTES_NUM / dAlign * td_->opInfo.get_d();
         }
 
-        OP_CHECK_IF(qPostBaseNum == 0,
-                   OP_LOGW(context_, "qPostBaseNum is 0."),
-                   return ge::GRAPH_PARAM_INVALID);
+        OP_CHECK_IF(qPostBaseNum == 0, OP_LOGW(context_, "qPostBaseNum is 0."), return ge::GRAPH_PARAM_INVALID);
         uint64_t qPostBlockTotal = allNumQuery / dAlign * td_->opInfo.get_d();
         uint64_t qSizeAlign =
             (qPostBlockTotal + BASE_LEN_256 - 1) / WORKSPACE_ALIGN_SIZE * WORKSPACE_ALIGN_SIZE * FP16_BYTES_NUM;
@@ -925,9 +921,7 @@ public:
         int64_t qPostBlockFactor = (qPostBlockOuterTotal + usedCoreNum - 1) / usedCoreNum;
 
         int64_t kvPostBaseNum = static_cast<int64_t>(qPostBaseNum);
-        OP_CHECK_IF(kvPostBaseNum == 0,
-                   OP_LOGW(context_, "kvPostBaseNum is 0."),
-                   return ge::GRAPH_PARAM_INVALID);
+        OP_CHECK_IF(kvPostBaseNum == 0, OP_LOGW(context_, "kvPostBaseNum is 0."), return ge::GRAPH_PARAM_INVALID);
         uint64_t kvPostBlockTotal = allNumKv / dAlign * td_->opInfo.get_d();
         uint64_t kvSizeAlign = (kvPostBlockTotal + WORKSPACE_ALIGN_SIZE - 1U) / WORKSPACE_ALIGN_SIZE *
                                WORKSPACE_ALIGN_SIZE * static_cast<uint64_t>(FP16_BYTES_NUM);
@@ -960,9 +954,9 @@ public:
         td_->postTilingData.set_d(td_->opInfo.get_d());
 
         td_->opInfo.set_dqWorkspaceLen(CeilCommon(allNumQuery * FP32_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
-                                      WORKSPACE_ALIGN_SIZE);
+                                       WORKSPACE_ALIGN_SIZE);
         td_->opInfo.set_dkWorkspaceLen(CeilCommon(allNumKv * FP32_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
-                                      WORKSPACE_ALIGN_SIZE);
+                                       WORKSPACE_ALIGN_SIZE);
 
         uint64_t allNumDropGm = td_->opInfo.get_b() * td_->opInfo.get_n() * td_->opInfo.get_g() * td_->opInfo.get_sQ() *
                                 td_->opInfo.get_sKVAlign();
@@ -971,9 +965,9 @@ public:
 
         // CV并行实现，需要申请双倍的bmm345的输入空间
         td_->opInfo.set_dropGmWorkspaceLen(2 * CeilCommon(allNumDropGm * FP16_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
-                                          WORKSPACE_ALIGN_SIZE);
+                                           WORKSPACE_ALIGN_SIZE);
         td_->opInfo.set_mulGmWorkspaceLen(2 * CeilCommon(allNumMulGm * FP16_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
-                                         WORKSPACE_ALIGN_SIZE);
+                                          WORKSPACE_ALIGN_SIZE);
 
         return ge::GRAPH_SUCCESS;
     }
@@ -983,24 +977,24 @@ public:
         if (basicParams.attenMaskCompressMode == NO_COMPRESS_MODE) {
             bool invalid =
                 td_->opInfo.get_hasAttenMask() != 0 && (basicParams.attenMaskS1Size * basicParams.attenMaskS2Size <
-                                                       td_->opInfo.get_sQ() * td_->opInfo.get_sKV());
+                                                        td_->opInfo.get_sQ() * td_->opInfo.get_sKV());
             OP_CHECK_IF(invalid,
-                    OP_LOGW(context_, "atten mask shape [%ld,%ld] is invalid.", basicParams.attenMaskS1Size,
-                              basicParams.attenMaskS2Size),
-                    return ge::GRAPH_PARAM_INVALID);
+                        OP_LOGW(context_, "atten mask shape [%ld,%ld] is invalid.", basicParams.attenMaskS1Size,
+                                basicParams.attenMaskS2Size),
+                        return ge::GRAPH_PARAM_INVALID);
         } else {
             OP_CHECK_IF((basicParams.attenMaskS1Size != basicParams.attenMaskS2Size),
-                    OP_LOGW(context_, "atten mask shape is not square."),
-                    return ge::GRAPH_PARAM_INVALID);
-            OP_CHECK_IF((basicParams.attenMaskS2Size < std::max(td_->opInfo.get_sQ(), td_->opInfo.get_sKV()) * MULT_BASE),
-                       OP_LOGW(context_, "atten mask shape is small, try setting it to [2048, 2048]."),
-                       return ge::GRAPH_PARAM_INVALID);
+                        OP_LOGW(context_, "atten mask shape is not square."), return ge::GRAPH_PARAM_INVALID);
+            OP_CHECK_IF(
+                (basicParams.attenMaskS2Size < std::max(td_->opInfo.get_sQ(), td_->opInfo.get_sKV()) * MULT_BASE),
+                OP_LOGW(context_, "atten mask shape is small, try setting it to [2048, 2048]."),
+                return ge::GRAPH_PARAM_INVALID);
         }
         return ge::GRAPH_SUCCESS;
     }
 
     ge::graphStatus SetMm1AndMm2Tiling(matmul_tiling::MatmulApiTiling &mm1AndMm2, int64_t nCvInner,
-                                       AscendC::tiling::TCubeTiling* mm1AndMm2Tiling)
+                                       AscendC::tiling::TCubeTiling *mm1AndMm2Tiling)
     {
         mm1AndMm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
                            matmul_tiling::DataType::DT_FLOAT16, false);
@@ -1018,9 +1012,11 @@ public:
         mm1AndMm2.SetBatchNum(nCvInner * td_->opInfo.get_g());
         uint32_t layout = td_->opInfo.get_inputLayout();
         if (layout == static_cast<uint32_t>(InputLayout::BSH) || layout == static_cast<uint32_t>(InputLayout::BSND)) {
-            mm1AndMm2.SetOrgShape(td_->opInfo.get_sQ(), td_->opInfo.get_sKV(), td_->opInfo.get_hQ(), td_->opInfo.get_hKV());
+            mm1AndMm2.SetOrgShape(td_->opInfo.get_sQ(), td_->opInfo.get_sKV(), td_->opInfo.get_hQ(),
+                                  td_->opInfo.get_hKV());
         } else if (layout == static_cast<uint32_t>(InputLayout::SBH)) {
-            mm1AndMm2.SetOrgShape(td_->opInfo.get_sQ(), td_->opInfo.get_sKV(), td_->opInfo.get_b() * td_->opInfo.get_hQ(),
+            mm1AndMm2.SetOrgShape(td_->opInfo.get_sQ(), td_->opInfo.get_sKV(),
+                                  td_->opInfo.get_b() * td_->opInfo.get_hQ(),
                                   td_->opInfo.get_b() * td_->opInfo.get_hKV());
         } else if (layout == static_cast<uint32_t>(InputLayout::BNSD)) {
             mm1AndMm2.SetOrgShape(td_->opInfo.get_sQ(), td_->opInfo.get_sKV(), td_->opInfo.get_d());
@@ -1028,13 +1024,13 @@ public:
             return ge::GRAPH_PARAM_INVALID;
         }
 
-        OP_CHECK_IF((mm1AndMm2.GetTiling(*mm1AndMm2Tiling) != 0),
-                   OP_LOGW(context_, "Failed to do mm1 and mm2 tiling."),
-                   return ge::GRAPH_PARAM_INVALID);
+        OP_CHECK_IF((mm1AndMm2.GetTiling(*mm1AndMm2Tiling) != 0), OP_LOGW(context_, "Failed to do mm1 and mm2 tiling."),
+                    return ge::GRAPH_PARAM_INVALID);
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus SetMm31Tiling(matmul_tiling::MatmulApiTiling &mm31, int64_t nCvInner, AscendC::tiling::TCubeTiling* mm31Tiling)
+    ge::graphStatus SetMm31Tiling(matmul_tiling::MatmulApiTiling &mm31, int64_t nCvInner,
+                                  AscendC::tiling::TCubeTiling *mm31Tiling)
     {
         mm31.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT16,
                       false);
@@ -1051,14 +1047,13 @@ public:
         mm31.SetOrgShape(td_->opInfo.get_sQ(), td_->opInfo.get_d(), td_->opInfo.get_sKV());
         mm31.SetBatchNum(nCvInner * td_->opInfo.get_g());
 
-        OP_CHECK_IF((mm31.GetTiling(*mm31Tiling) != 0),
-                   OP_LOGW(context_, "Failed to do mm31 tiling."),
-                   return ge::GRAPH_PARAM_INVALID);
+        OP_CHECK_IF((mm31.GetTiling(*mm31Tiling) != 0), OP_LOGW(context_, "Failed to do mm31 tiling."),
+                    return ge::GRAPH_PARAM_INVALID);
         return ge::GRAPH_SUCCESS;
     }
 
     ge::graphStatus SetMm32AndMm4Tiling(matmul_tiling::MatmulApiTiling &mm32AndMm4, int64_t nCvInner,
-                                        AscendC::tiling::TCubeTiling* mm32AndMm4Tiling)
+                                        AscendC::tiling::TCubeTiling *mm32AndMm4Tiling)
     {
         mm32AndMm4.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
                             matmul_tiling::DataType::DT_FLOAT16, true);
@@ -1077,8 +1072,7 @@ public:
         mm32AndMm4.SetBatchNum(nCvInner * td_->opInfo.get_g());
 
         OP_CHECK_IF((mm32AndMm4.GetTiling(*mm32AndMm4Tiling) != 0),
-                   OP_LOGW(context_, "Failed to do mm32AndMm4Tiling tiling."),
-                   return ge::GRAPH_PARAM_INVALID);
+                    OP_LOGW(context_, "Failed to do mm32AndMm4Tiling tiling."), return ge::GRAPH_PARAM_INVALID);
         return ge::GRAPH_SUCCESS;
     }
 
@@ -1155,7 +1149,7 @@ public:
                          dkWorkspaceLen + dropGmWorkspaceLen + mulGmWorkspaceLen;
 
         OP_LOGD(context_, "Calc workspace size: workspaceSize is %lu, mm1WorkspaceLen is %lu.", workspaceSize_,
-                  mm1WorkspaceLen);
+                mm1WorkspaceLen);
         td_->opInfo.set_mm1WorkspaceLen(mm1WorkspaceLen);
         td_->opInfo.set_mm2WorkspaceLen(mm2WorkspaceLen);
         return ge::GRAPH_SUCCESS;
@@ -1168,10 +1162,9 @@ public:
         auto blockdim =
             CalcTschBlockDim(td_->splitCoreParams.get_usedCoreNum(), aicoreParams_.aicNum, aicoreParams_.numBlocks);
         OP_CHECK_IF(blockdim == 0,
-                   OP_LOGW(context_,
-                             "blockdim is 0, aicNum is %lu, aivNum is %lu.", aicoreParams_.aicNum,
-                             aicoreParams_.numBlocks),
-                   return ge::GRAPH_PARAM_INVALID);
+                    OP_LOGW(context_, "blockdim is 0, aicNum is %lu, aivNum is %lu.", aicoreParams_.aicNum,
+                            aicoreParams_.numBlocks),
+                    return ge::GRAPH_PARAM_INVALID);
         context_->SetBlockDim(blockdim);
         context_->SetScheduleMode(1);
 
@@ -1182,7 +1175,6 @@ public:
 };
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGradUngs1s2BbnTiling,
-                                         std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}),
-                                         11000);
+                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 11000);
 
 } // namespace optiling

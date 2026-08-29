@@ -112,7 +112,7 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::IsCapable()
         return false;
     }
     auto sinkShape = context_->GetOptionalInputShape(SINK_IN);
-    if (sinkShape != nullptr && sinkShape->GetStorageShape().GetDimNum() == 1 ) {
+    if (sinkShape != nullptr && sinkShape->GetStorageShape().GetDimNum() == 1) {
         return true;
     }
     if (fBaseParams.queryType == ge::DT_FLOAT) {
@@ -130,8 +130,8 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::IsCapable()
             auto dropMask = context_->GetOptionalInputDesc(DROP_MASK);
             if ((fBaseParams.d == SPECIAL_HEADDIM_128) && (fBaseParams.b >= B_1) && (fBaseParams.b <= B_16) &&
                 (fBaseParams.g >= G_4) && (fBaseParams.t1 == fBaseParams.t2) &&
-                (fBaseParams.sparseMode == SPARSE_MODE_3 || fBaseParams.sparseMode == 0) && (1.0f - keep_prob < epsilon) &&
-                (fBaseParams.pseOptional == EMPTY_TENSOR) && (dropMask == nullptr)) {
+                (fBaseParams.sparseMode == SPARSE_MODE_3 || fBaseParams.sparseMode == 0) &&
+                (1.0f - keep_prob < epsilon) && (fBaseParams.pseOptional == EMPTY_TENSOR) && (dropMask == nullptr)) {
                 auto actualSeqQlenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_Q_LEN);
                 auto &actualSeqQLenShape = actualSeqQlenTensor->GetShape().GetStorageShape();
                 const int64_t *actQValue = actualSeqQlenTensor->GetData<int64_t>();
@@ -178,19 +178,19 @@ bool FlashAttentionScoreGradTilingSameABDeterministic::IsCapable()
     if (context_->GetDeterministic() != 1) {
         return false;
     }
-    
+
     auto sinkShape = context_->GetOptionalInputShape(SINK_IN);
-    if (sinkShape != nullptr && sinkShape->GetStorageShape().GetDimNum() == 1 ) {
+    if (sinkShape != nullptr && sinkShape->GetStorageShape().GetDimNum() == 1) {
         return true;
     }
-    
+
     if (context_->GetOptionalInputShape(QUERY_ROPE) != nullptr) {
         return false;
     }
 
     // fp32不支持
     OP_CHECK_IF(context_->GetInputDesc(QUERY) == nullptr,
-               OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [InputDesc of query is null]"), return false);
+                OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "query"), return false);
     if (context_->GetInputDesc(QUERY)->GetDataType() == ge::DT_FLOAT) {
         OP_LOGI(context_, "FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb not support fp32.");
         return false;
@@ -252,13 +252,13 @@ uint64_t FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetTilingKey() const
         }
     }
     auto hasRope = fBaseParams.rope_d ? OptionEnum::ENABLE : OptionEnum::DISABLE;
-    uint64_t tilingKey = 
-        GET_TPL_TILING_KEY(static_cast<uint8_t>(AxisEnum::S2), static_cast<uint8_t>(AxisEnum::S1), static_cast<uint8_t>(AxisEnum::S2),static_cast<uint8_t>(isSameAb),
-            static_cast<uint8_t>(dtypeValue), static_cast<uint8_t>(inputLayout), static_cast<uint8_t>(SparseEnum::ALL),
-            0, static_cast<uint8_t>(mm1IsNZOut), static_cast<uint8_t>(mm2IsNZOut), static_cast<uint8_t>(dropValue), static_cast<uint8_t>(pseValue),
-            static_cast<uint8_t>(attenMaskCfg), 0, 0, 
-            static_cast<uint8_t>(s1TemplateType), static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType),
-            static_cast<uint8_t>(isDeterministic), static_cast<uint8_t>(hasRope));
+    uint64_t tilingKey = GET_TPL_TILING_KEY(
+        static_cast<uint8_t>(AxisEnum::S2), static_cast<uint8_t>(AxisEnum::S1), static_cast<uint8_t>(AxisEnum::S2),
+        static_cast<uint8_t>(isSameAb), static_cast<uint8_t>(dtypeValue), static_cast<uint8_t>(inputLayout),
+        static_cast<uint8_t>(SparseEnum::ALL), 0, static_cast<uint8_t>(mm1IsNZOut), static_cast<uint8_t>(mm2IsNZOut),
+        static_cast<uint8_t>(dropValue), static_cast<uint8_t>(pseValue), static_cast<uint8_t>(attenMaskCfg), 0, 0,
+        static_cast<uint8_t>(s1TemplateType), static_cast<uint8_t>(s2TemplateType), static_cast<uint8_t>(dTemplateType),
+        static_cast<uint8_t>(isDeterministic), static_cast<uint8_t>(hasRope));
 
     OP_LOGI(context_, "FAGTiling sameAB DoTiling success, tiling is %lu.", tilingKey);
     return tilingKey;
@@ -273,8 +273,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetPlatformInfo
     if (platformInfoPtr == nullptr) {
         auto compileInfoPtr = reinterpret_cast<const Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo *>(
             context_->GetCompileInfo());
-        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
-                   return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            compileInfoPtr == nullptr,
+            OP_LOGE(context_,
+                    "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
+            return ge::GRAPH_FAILED);
 
         fBaseParams.coreNum = compileInfoPtr->aivNum;
         fBaseParams.aicNum = compileInfoPtr->aicNum;
@@ -294,13 +297,17 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetPlatformInfo
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, fBaseParams.l0cSize);
     }
     OP_CHECK_IF((fBaseParams.coreNum == 0) || (fBaseParams.aicNum == 0),
-               OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of coreNum(aivNum) is %ld, num of aicNum is %ld.]",
-                                           fBaseParams.coreNum, fBaseParams.aicNum),
-               return ge::GRAPH_FAILED);
+                OP_LOGE(context_,
+                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of coreNum(aivNum) "
+                        "is %ld, num of aicNum is %ld.]",
+                        fBaseParams.coreNum, fBaseParams.aicNum),
+                return ge::GRAPH_FAILED);
 
     fBaseParams.ubSize -= MATMUL_SIZE;
-    OP_CHECK_IF(fBaseParams.ubSize <= 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [ubSize is invalid.]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        fBaseParams.ubSize <= 0,
+        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [ubSize is invalid.]"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -320,7 +327,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetQKVStartIdx()
     auto &qStartIdxShape = qStartIdxTensor->GetShape().GetStorageShape();
     if (qStartIdxShape.GetDimNum() != 1 || qStartIdxShape.GetDim(0) <= 0) {
         OP_LOGW(context_, "[%s]qStartIdxShape is invalid %lu %ld", TEMPLATE_NAME_SAME_AB, qStartIdxShape.GetDimNum(),
-                  qStartIdxShape.GetDim(0));
+                qStartIdxShape.GetDim(0));
         return;
     }
     /* Get Data from tensor. */
@@ -338,8 +345,8 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetQKVStartIdx()
     }
     auto &kvStartIdxShape = kvStartIdxTensor->GetShape().GetStorageShape();
     if (kvStartIdxShape.GetDimNum() != 1 || kvStartIdxShape.GetDim(0) <= 0) {
-        OP_LOGW(context_, "[%s]kvStartIdxShape is invalid %lu %ld", TEMPLATE_NAME_SAME_AB,
-                  kvStartIdxShape.GetDimNum(), kvStartIdxShape.GetDim(0));
+        OP_LOGW(context_, "[%s]kvStartIdxShape is invalid %lu %ld", TEMPLATE_NAME_SAME_AB, kvStartIdxShape.GetDimNum(),
+                kvStartIdxShape.GetDim(0));
         return;
     }
     /* Get Data from tensor. */
@@ -353,7 +360,6 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetQKVStartIdx()
     tilingData->s1s2BNGS1S2BaseParams.set_qStartIdx(fBaseParams.qStartIdx);
     tilingData->s1s2BNGS1S2BaseParams.set_kvStartIdx(fBaseParams.kvStartIdx);
 }
-
 
 bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetSparseParams()
 {
@@ -370,7 +376,7 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetSparseParams()
         auto &prefixShape = prefixNTensor->GetShape().GetStorageShape();
         if (prefixShape.GetDimNum() != 1 || prefixShape.GetDim(0) != fBaseParams.b) {
             OP_LOGW(context_, "FAG sameAB sparseMode is prefix, but prefixshape size[%zu] or value is invalid!",
-                      prefixShape.GetDimNum());
+                    prefixShape.GetDimNum());
             return false;
         }
 
@@ -388,7 +394,7 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetSparseParams()
             return true;
         } else {
             OP_LOGW(context_, "FAG sameAB sparseMode is prefix, but prefixN size[%zu] or value is invalid!",
-                      fBaseParams.prefixN.size());
+                    fBaseParams.prefixN.size());
             return false;
         }
     }
@@ -433,12 +439,13 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetSparseParams()
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseNormal(const char *inputLayout)
 {
     auto pseShape = context_->GetOptionalInputShape(PSE_SHIFT);
-    OP_CHECK_IF(pseShape == nullptr, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [pseShape is null]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(pseShape == nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "pseShiftOptional"),
+                return ge::GRAPH_FAILED);
     auto pseShapeDim = pseShape->GetStorageShape().GetDimNum();
     OP_CHECK_IF((pseShapeDim != PSE_NORMAL_SHAPE_DIM),
-               OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the shape of [pse] is not supported, got [%lu]. Constraint:[4 dimensions]", pseShapeDim),
-               return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM("FlashAttentionScoreGrad", "pseShiftOptional",
+                                             std::to_string(pseShapeDim).c_str(), "4"),
+                return ge::GRAPH_FAILED);
 
     auto dim0 = pseShape->GetStorageShape().GetDim(DIM_0);
     auto dim1 = pseShape->GetStorageShape().GetDim(DIM_1);
@@ -473,8 +480,12 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseNorma
     } else if (isAlibiBNHS) {
         fBaseParams.pseShapeType = PSE_SHAPE_TYPE_BNHS;
     } else {
-        OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the shape of [pse] is not supported, got [%ld,%ld,%ld,%ld]. Constraint:[token %ld,%ld casual]", dim0, dim1,
-                  dim2, dim3, fBaseParams.s1Token, fBaseParams.s2Token);
+        std::string reasonMsg = "The shape of pseShiftOptional is unsupported when preTokens is " +
+                                std::to_string(fBaseParams.s1Token) + " and nextTokens is " +
+                                std::to_string(fBaseParams.s2Token);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "pseShiftOptional",
+                                              Ops::Base::ToString(pseShape->GetStorageShape()).c_str(),
+                                              reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -485,45 +496,50 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseInfo(
     if (context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(PSETYPE)) {
         fBaseParams.pseType = *(context_->GetAttrs()->GetAttrPointer<int64_t>(PSETYPE)); // 8
         if (fBaseParams.pseType < 0 || fBaseParams.pseType >= PSE_INVALID_TYPE) {
-            OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [pseType %ld is invalid]", fBaseParams.pseType);
+            OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "pseType", std::to_string(fBaseParams.pseType).c_str(),
+                                      "a value in the supported enumeration range");
             return ge::GRAPH_FAILED;
         }
     }
 
     auto pseShape = context_->GetOptionalInputShape(PSE_SHIFT);
-    if (pseShape == nullptr || pseShape->GetStorageShape().GetDimNum() == 0 ) {
-        if(fBaseParams.pseType == PSE_OUTER_ADD_MUL_TYPE){
+    if (pseShape == nullptr || pseShape->GetStorageShape().GetDimNum() == 0) {
+        if (fBaseParams.pseType == PSE_OUTER_ADD_MUL_TYPE) {
             fBaseParams.pseOptional = EMPTY_TENSOR;
             return ge::GRAPH_SUCCESS;
-        }else{
+        } else {
             /*
-            * 1. pseType非默认值
-            * 2. 未传入PSE
-            * FA正向对这种情况进行了兼容，能够得到正确的计算结果。
-            * FA反向未兼容，因此统一拦截异常输入。
-            */
-            OP_LOGE(context_,
-                     "The op [FlashAttentionScoreGrad] received bad params, the reason is: "
-                     "[pseShape is null or empty, pseType is not default=%u, now pseType=%ld].",
-                     PSE_OUTER_ADD_MUL_TYPE, fBaseParams.pseType);
+             * 1. pseType非默认值
+             * 2. 未传入PSE
+             * FA正向对这种情况进行了兼容，能够得到正确的计算结果。
+             * FA反向未兼容，因此统一拦截异常输入。
+             */
+            std::string valuesMsg = "{empty, " + std::to_string(fBaseParams.pseType) + "}";
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                "FlashAttentionScoreGrad", "pseShiftOptional, pseType", valuesMsg.c_str(),
+                "pseShiftOptional must be provided when pseType is not the default value");
             return ge::GRAPH_FAILED;
         }
     }
 
     fBaseParams.pseOptional = NORMAL_TENSOR;
     auto pse = context_->GetOptionalInputDesc(PSE_SHIFT);
-    OP_CHECK_IF(pse == nullptr, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [InputDesc of pse is null]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(pse == nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "pseShiftOptional"),
+                return ge::GRAPH_FAILED);
     if (fBaseParams.pseType == PSE_OUTER_MUL_ADD_TYPE || fBaseParams.pseType == PSE_OUTER_ADD_MUL_TYPE) {
         OP_CHECK_IF(pse->GetDataType() != context_->GetInputDesc(QUERY)->GetDataType(),
-                   OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the data types of [pse, query] are mismatched, the reason is: [pse dtype=%s does not match query dtype]",
-                                               ge::TypeUtils::DataTypeToSerialString(pse->GetDataType()).c_str()),
-                   return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                        "FlashAttentionScoreGrad", "pseShiftOptional, query",
+                        std::string("{") + ge::TypeUtils::DataTypeToSerialString(pse->GetDataType()) + ", " +
+                            ge::TypeUtils::DataTypeToSerialString(context_->GetInputDesc(QUERY)->GetDataType()) + "}",
+                        "The dtypes of pseShiftOptional and query must be the same"),
+                    return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(pse->GetDataType() != ge::DT_FLOAT,
-                   OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the data type of [pse] is not supported, got [%s], expected float32",
-                                               ge::TypeUtils::DataTypeToSerialString(pse->GetDataType()).c_str()),
-                   return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            pse->GetDataType() != ge::DT_FLOAT,
+            OP_LOGE_FOR_INVALID_DTYPE("FlashAttentionScoreGrad", "pseShiftOptional",
+                                      ge::TypeUtils::DataTypeToSerialString(pse->GetDataType()).c_str(), "FLOAT32"),
+            return ge::GRAPH_FAILED);
     }
 
     auto pseShapeDim = pseShape->GetStorageShape().GetDimNum();
@@ -533,21 +549,26 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseInfo(
         if (pseShapeDim == PSE_DIM_NUM_1) {
             auto dim0 = pseShape->GetStorageShape().GetDim(DIM_0);
             OP_CHECK_IF(dim0 != fBaseParams.n1,
-                       OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the shape of [pse] is not supported, got [%ld]. Constraint:[should be same with n1 %ld]",
-                                                   dim0, fBaseParams.n1),
-                       return ge::GRAPH_FAILED);
+                        OP_LOGE_FOR_INVALID_SHAPE("FlashAttentionScoreGrad", "pseShiftOptional",
+                                                  Ops::Base::ToString(pseShape->GetStorageShape()).c_str(),
+                                                  ("[" + std::to_string(fBaseParams.n1) + "]").c_str()),
+                        return ge::GRAPH_FAILED);
             fBaseParams.pseShapeType = PSE_1_N2_G_SLOPE;
         } else if (pseShapeDim == PSE_DIM_NUM_2) {
             auto dim0 = pseShape->GetStorageShape().GetDim(DIM_0);
             auto dim1 = pseShape->GetStorageShape().GetDim(DIM_1);
-            OP_CHECK_IF(dim0 != fBaseParams.b || dim1 != fBaseParams.n1,
-                       OP_LOGE(
-                           context_, "In op [FlashAttentionScoreGrad], the shape of [pse] is not supported, got [%ld, %ld]. Constraint:[should be same with b n1 %ld, %ld]", dim0,
-                           dim1, fBaseParams.b, fBaseParams.n1),
-                       return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                dim0 != fBaseParams.b || dim1 != fBaseParams.n1,
+                OP_LOGE_FOR_INVALID_SHAPE(
+                    "FlashAttentionScoreGrad", "pseShiftOptional",
+                    Ops::Base::ToString(pseShape->GetStorageShape()).c_str(),
+                    ("[" + std::to_string(fBaseParams.b) + ", " + std::to_string(fBaseParams.n1) + "]").c_str()),
+                return ge::GRAPH_FAILED);
             fBaseParams.pseShapeType = PSE_B_N2_G_SLOPE;
         } else {
-            OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the shape of [pse] is not supported. Constraint:[1D or 2D for inner mode]");
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                "FlashAttentionScoreGrad", "pseShiftOptional", std::to_string(pseShapeDim).c_str(),
+                "The shape dimension of pseShiftOptional must be 1 or 2 in inner mode");
             return ge::GRAPH_FAILED;
         }
     } else if (pseShapeDim == PSE_DIM_NUM_1 && isTnd) {
@@ -563,7 +584,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseInfo(
         } else if (isTndPseBNSS) {
             fBaseParams.pseShapeType = PSE_SHAPE_TYPE_BNSS;
         } else {
-            OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the shape of [pse] is not supported. Constraint:[outer mode, tnd]");
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                "FlashAttentionScoreGrad", "pseShiftOptional", Ops::Base::ToString(pseShape->GetStorageShape()).c_str(),
+                "The shape of pseShiftOptional is unsupported for outer mode with TND layout");
             return ge::GRAPH_FAILED;
         }
     } else {
@@ -575,8 +598,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseInfo(
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::CheckAttenMaskShape()
 {
     auto attenMaskShape = context_->GetOptionalInputShape(ATTEN_MASK);
-    OP_CHECK_IF(attenMaskShape == nullptr, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [atten_mask shape is null]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(attenMaskShape == nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "attenMaskOptional"),
+                return ge::GRAPH_FAILED);
     auto storageShape = attenMaskShape->GetStorageShape();
     size_t dimNum = storageShape.GetDimNum();
 
@@ -592,11 +615,15 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::CheckAttenMaskS
         } else if ((dim0 == 1) && (dim1 == 1)) {
             fBaseParams.attenMaskShapeType = ATTEN_MASK_SHAPE_TYPE_SS;
         } else {
-            OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [dim value error, dim0 = %ld, dim1 = %ld]", dim0, dim1);
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                "FlashAttentionScoreGrad", "attenMaskOptional", Ops::Base::ToString(storageShape).c_str(),
+                "For a 4D attention mask, the first two axes must be [B, N1], [B, 1] or [1, 1]");
             return ge::GRAPH_FAILED;
         }
     } else {
-        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [dim num error, dimNum = %lu]", dimNum);
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("FlashAttentionScoreGrad", "attenMaskOptional",
+                                                 std::to_string(dimNum).c_str(),
+                                                 "The shape dimension of attenMaskOptional must be 2 or 4");
         return ge::GRAPH_FAILED;
     }
     fBaseParams.attenMaskS2Size = storageShape.GetDim(dimNum - LAST_AXIS_IDX);
@@ -607,8 +634,12 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::CheckAttenMaskS
         bool invalid = fBaseParams.attenMaskOptional != EMPTY_TENSOR &&
                        (fBaseParams.attenMaskS1Size != fBaseParams.s1 || fBaseParams.attenMaskS2Size != fBaseParams.s2);
         if (invalid) {
-            OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the shape of [atten_mask] is not supported, got [%ld,%ld]. Constraint:[matching s1 s2]", fBaseParams.attenMaskS1Size,
-                      fBaseParams.attenMaskS2Size);
+            std::string shapeMsg = "[" + std::to_string(fBaseParams.attenMaskS1Size) + ", " +
+                                   std::to_string(fBaseParams.attenMaskS2Size) + "]";
+            std::string expectedMsg =
+                "[" + std::to_string(fBaseParams.s1) + ", " + std::to_string(fBaseParams.s2) + "]";
+            OP_LOGE_FOR_INVALID_SHAPE("FlashAttentionScoreGrad", "attenMaskOptional", shapeMsg.c_str(),
+                                      expectedMsg.c_str());
             return ge::GRAPH_FAILED;
         }
         return ge::GRAPH_SUCCESS;
@@ -617,22 +648,26 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::CheckAttenMaskS
     if (fBaseParams.attenMaskCompressMode == PREFIX_COMPRESS_MODE) {
         if (fBaseParams.attenMaskS1Size != PREFIX_COMPRESS_S1_SIZE ||
             fBaseParams.attenMaskS2Size != ATTEN_MASK_COMPRESS_LIMIT) {
-            OP_LOGE(context_,
-                      "In op [FlashAttentionScoreGrad], the shape of [atten_mask] is not supported, "
-                      "got [%ld,%ld]. Constraint:[prefix compress mode, try [3072, 2048]]",
-                      fBaseParams.attenMaskS1Size, fBaseParams.attenMaskS2Size);
+            std::string shapeMsg = "[" + std::to_string(fBaseParams.attenMaskS1Size) + ", " +
+                                   std::to_string(fBaseParams.attenMaskS2Size) + "]";
+            OP_LOGE_FOR_INVALID_SHAPE("FlashAttentionScoreGrad", "attenMaskOptional", shapeMsg.c_str(), "[3072, 2048]");
             return ge::GRAPH_FAILED;
         }
         return ge::GRAPH_SUCCESS;
     }
 
     if (fBaseParams.attenMaskS1Size != fBaseParams.attenMaskS2Size) {
-        OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the shape of [atten_mask] is not supported, got [%ld, %ld]. Constraint:[must be square]", fBaseParams.attenMaskS1Size, fBaseParams.attenMaskS2Size);
+        std::string shapeMsg = "[" + std::to_string(fBaseParams.attenMaskS1Size) + ", " +
+                               std::to_string(fBaseParams.attenMaskS2Size) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "attenMaskOptional", shapeMsg.c_str(),
+                                              "The last two axes of attenMaskOptional must form a square");
         return ge::GRAPH_FAILED;
     }
 
     if (fBaseParams.attenMaskS2Size != ATTEN_MASK_COMPRESS_LIMIT) {
-        OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the shape of [atten_mask] is not supported, got [%ld]. Constraint:[try [2048, 2048]]", fBaseParams.attenMaskS2Size);
+        std::string shapeMsg = "[" + std::to_string(fBaseParams.attenMaskS1Size) + ", " +
+                               std::to_string(fBaseParams.attenMaskS2Size) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE("FlashAttentionScoreGrad", "attenMaskOptional", shapeMsg.c_str(), "[2048, 2048]");
         return ge::GRAPH_FAILED;
     }
 
@@ -647,14 +682,18 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessSparseMo
     if (attrs->GetAttrNum() > static_cast<size_t>(SPARSE_MODE)) {
         fBaseParams.sparseMode = *(attrs->GetAttrPointer<int>(SPARSE_MODE)); // 7
         if (fBaseParams.sparseMode > BAND_LEFT_UP_CASUAL) {
-            OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [sparseMode [%u] is invalid]", fBaseParams.sparseMode);
+            OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "sparseMode",
+                                      std::to_string(fBaseParams.sparseMode).c_str(), "a value from 0 to 8");
             return ge::GRAPH_FAILED;
         }
     }
 
     if ((fBaseParams.layoutType != INPUT_FORMAT_TND) &&
         (fBaseParams.sparseMode == RIGHT_DOWN_CASUAL_BAND || fBaseParams.sparseMode == BAND_LEFT_UP_CASUAL)) {
-        OP_LOGE(context_, "In op [FlashAttentionScoreGrad], [sparsemode in layout] is not supported, got [%u, %u]", fBaseParams.layoutType, fBaseParams.sparseMode);
+        const char *inputLayout = attrs->GetAttrPointer<char>(INPUT_LAYOUT);
+        std::string valuesMsg = "{" + std::string(inputLayout) + ", " + std::to_string(fBaseParams.sparseMode) + "}";
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad", "inputLayout, sparseMode", valuesMsg.c_str(),
+                                               "RIGHT_DOWN_CASUAL_BAND and BAND_LEFT_UP_CASUAL require TND layout");
         return ge::GRAPH_FAILED;
     }
 
@@ -684,10 +723,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessSparseMo
     auto attenMask = context_->GetOptionalInputDesc(ATTEN_MASK);
     if (attenMask != nullptr) {
         auto attenMaskType = attenMask->GetDataType();
-        OP_CHECK_IF(attenMaskType != ge::DT_BOOL && attenMaskType != ge::DT_UINT8,
-                   OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the data type of [atten_mask] is not supported, got [%s], expected bool or uint8",
-                                               ge::TypeUtils::DataTypeToSerialString(attenMaskType).c_str()),
-                   return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            attenMaskType != ge::DT_BOOL && attenMaskType != ge::DT_UINT8,
+            OP_LOGE_FOR_INVALID_DTYPE("FlashAttentionScoreGrad", "attenMaskOptional",
+                                      ge::TypeUtils::DataTypeToSerialString(attenMaskType).c_str(), "BOOL or UINT8"),
+            return ge::GRAPH_FAILED);
         fBaseParams.attenMaskDtype = ATTEN_MASK_TYPE_U8_BOOL;
     }
 
@@ -703,9 +743,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessSparseMo
 void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::PrintShapeInfo()
 {
     OP_LOGI(context_,
-              "FAG s1s2_bn2gs1s2 with shape b[%ld] n2[%ld] g[%ld] s1[%ld] s2[%ld] d[%ld] preToken[%ld] nextToken[%ld]!",
-              fBaseParams.b, fBaseParams.n2, fBaseParams.g, fBaseParams.s1, fBaseParams.s2, fBaseParams.d,
-              fBaseParams.s1Token, fBaseParams.s2Token);
+            "FAG s1s2_bn2gs1s2 with shape b[%ld] n2[%ld] g[%ld] s1[%ld] s2[%ld] d[%ld] preToken[%ld] nextToken[%ld]!",
+            fBaseParams.b, fBaseParams.n2, fBaseParams.g, fBaseParams.s1, fBaseParams.s2, fBaseParams.d,
+            fBaseParams.s1Token, fBaseParams.s2Token);
 }
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetBaseShapeInfo()
@@ -721,35 +761,54 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetBaseShapeInf
     int64_t headNum = *context_->GetAttrs()->GetAttrPointer<int>(HEAD_NUM);
     const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
 
-    OP_CHECK_IF(headNum == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [headNum is 0.]"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(headNum == 0,
+                OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "headNum", std::to_string(headNum).c_str(),
+                                          "a value greater than 0"),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(queryShape == nullptr, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [queryShape is null]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(queryShape == nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "query"),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(keyShape == nullptr, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [keyShape is null]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(keyShape == nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "keyIn"),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(keyRopeShape == nullptr && queryRopeShape != nullptr,
-               OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [key_rope is null]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        keyRopeShape == nullptr && queryRopeShape != nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "keyRopeOptional",
+                                                 "keyRopeOptional must be provided when queryRopeOptional is provided"),
+        return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(keyRopeShape != nullptr && queryRopeShape == nullptr,
-               OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [query_rope is null]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        keyRopeShape != nullptr && queryRopeShape == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "queryRopeOptional",
+                                                 "queryRopeOptional must be provided when keyRopeOptional is provided"),
+        return ge::GRAPH_FAILED);
 
     uint32_t dimSize = queryShape->GetStorageShape().GetDimNum();
     OP_CHECK_IF(static_cast<size_t>(dimSize) != strlen(inputLayout),
-               OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [layout dims is not inputLayout's length.]"),
-               return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    "FlashAttentionScoreGrad", "query", std::to_string(dimSize).c_str(),
+                    "The shape dimension of query must match the number of axes in inputLayout"),
+                return ge::GRAPH_FAILED);
 
     if (strcmp(inputLayout, "SBH") == 0) {
         OP_LOGD(context_, "inputLayout == SBH queryShape");
         fBaseParams.layoutType = INPUT_FORMAT_S2BN2GD;
         fBaseParams.b = queryShape->GetStorageShape().GetDim(DIM_1);
         OP_CHECK_IF(keyShape->GetStorageShape().GetDim(DIM_2) == 0,
-                   OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [dim N2 is 0.]"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "keyIn",
+                                                          Ops::Base::ToString(keyShape->GetStorageShape()).c_str(),
+                                                          "The N2 axis of keyIn cannot be 0"),
+                    return ge::GRAPH_FAILED);
         fBaseParams.g = queryShape->GetStorageShape().GetDim(DIM_2) / keyShape->GetStorageShape().GetDim(DIM_2);
-        OP_CHECK_IF(fBaseParams.g == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [g is 0]"), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            fBaseParams.g == 0,
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query, keyIn",
+                                                   ("{" + Ops::Base::ToString(queryShape->GetStorageShape()) + ", " +
+                                                    Ops::Base::ToString(keyShape->GetStorageShape()) + "}")
+                                                       .c_str(),
+                                                   "The ratio of query heads to keyIn heads must be greater than 0"),
+            return ge::GRAPH_FAILED);
         fBaseParams.n2 = headNum / fBaseParams.g; // 跟se和mde讨论  按 headNum=n1 计算
         fBaseParams.s1 = queryShape->GetStorageShape().GetDim(DIM_0);
         fBaseParams.d = queryShape->GetStorageShape().GetDim(DIM_2) / headNum; // H=N*D
@@ -761,9 +820,19 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetBaseShapeInf
         fBaseParams.layoutType = INPUT_FORMAT_BS2N2GD;
         fBaseParams.b = queryShape->GetStorageShape().GetDim(DIM_0);
         OP_CHECK_IF(keyShape->GetStorageShape().GetDim(DIM_2) == 0,
-                   OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [dim N2 is 0.]"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "keyIn",
+                                                          Ops::Base::ToString(keyShape->GetStorageShape()).c_str(),
+                                                          "The N2 axis of keyIn cannot be 0"),
+                    return ge::GRAPH_FAILED);
         fBaseParams.g = queryShape->GetStorageShape().GetDim(DIM_2) / keyShape->GetStorageShape().GetDim(DIM_2);
-        OP_CHECK_IF(fBaseParams.g == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [g is 0]"), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            fBaseParams.g == 0,
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query, keyIn",
+                                                   ("{" + Ops::Base::ToString(queryShape->GetStorageShape()) + ", " +
+                                                    Ops::Base::ToString(keyShape->GetStorageShape()) + "}")
+                                                       .c_str(),
+                                                   "The ratio of query heads to keyIn heads must be greater than 0"),
+            return ge::GRAPH_FAILED);
         fBaseParams.n2 = headNum / fBaseParams.g;
         fBaseParams.s1 = queryShape->GetStorageShape().GetDim(DIM_1);
         fBaseParams.d = queryShape->GetStorageShape().GetDim(DIM_2) / headNum; // H=N*D
@@ -777,41 +846,56 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetBaseShapeInf
         fBaseParams.b = queryShape->GetStorageShape().GetDim(DIM_0);
         fBaseParams.n2 = keyShape->GetStorageShape().GetDim(DIM_1);
         OP_CHECK_IF(keyShape->GetStorageShape().GetDim(DIM_1) == 0,
-                   OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [dim N2 is 0.]"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "keyIn",
+                                                          Ops::Base::ToString(keyShape->GetStorageShape()).c_str(),
+                                                          "The N2 axis of keyIn cannot be 0"),
+                    return ge::GRAPH_FAILED);
         fBaseParams.g = queryShape->GetStorageShape().GetDim(DIM_1) / keyShape->GetStorageShape().GetDim(DIM_1);
-        OP_CHECK_IF(fBaseParams.g == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [g is 0]"), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            fBaseParams.g == 0,
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query, keyIn",
+                                                   ("{" + Ops::Base::ToString(queryShape->GetStorageShape()) + ", " +
+                                                    Ops::Base::ToString(keyShape->GetStorageShape()) + "}")
+                                                       .c_str(),
+                                                   "The ratio of query heads to keyIn heads must be greater than 0"),
+            return ge::GRAPH_FAILED);
         fBaseParams.s1 = queryShape->GetStorageShape().GetDim(DIM_2);
         fBaseParams.d = queryShape->GetStorageShape().GetDim(DIM_3);
         fBaseParams.rope_d = queryRopeShape == nullptr ? 0 : queryRopeShape->GetStorageShape().GetDim(DIM_3);
         fBaseParams.value_d = valueShape->GetStorageShape().GetDim(DIM_3);
         fBaseParams.s2 = keyShape->GetStorageShape().GetDim(DIM_2);
         OP_LOGD(context_, "inputLayout == BNSD queryShape %ld, %ld, %ld, %ld,",
-                  queryShape->GetStorageShape().GetDim(DIM_0), queryShape->GetStorageShape().GetDim(DIM_1),
-                  queryShape->GetStorageShape().GetDim(DIM_2), queryShape->GetStorageShape().GetDim(DIM_3));
+                queryShape->GetStorageShape().GetDim(DIM_0), queryShape->GetStorageShape().GetDim(DIM_1),
+                queryShape->GetStorageShape().GetDim(DIM_2), queryShape->GetStorageShape().GetDim(DIM_3));
     } else if (strcmp(inputLayout, "TND") == 0) {
         OP_LOGD(context_, "inputLayout is TND");
         fBaseParams.layoutType = INPUT_FORMAT_TND;
         auto actualSeqQlenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_Q_LEN);
         auto actualSeqKvlenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_KV_LEN);
-        if (actualSeqQlenTensor == nullptr || actualSeqKvlenTensor == nullptr) {
-            OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [actual_seq_qlen or actual_seq_kvlen is null]");
+        if (actualSeqQlenTensor == nullptr) {
+            OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "actualSeqQLenOptional");
+            return ge::GRAPH_FAILED;
+        }
+        if (actualSeqKvlenTensor == nullptr) {
+            OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "actualSeqKvLenOptional");
             return ge::GRAPH_FAILED;
         }
         const size_t seqQShapeSize = static_cast<size_t>(actualSeqQlenTensor->GetShapeSize());
         const size_t kvSeqShapeSize = static_cast<size_t>(actualSeqKvlenTensor->GetShapeSize());
-        OP_CHECK_IF(
-            (seqQShapeSize != kvSeqShapeSize),
-            OP_LOGE(context_,
-                    "In op [FlashAttentionScoreGrad], the tensor shapes of [actual_seq_qlen, actual_seq_kvlen] are mismatched, "
-                    "the reason is: [actual_seq_qlen shape size and actual_seq_kvlen shape size should be same, "
-                    "actual_seq_qlen shape size=%zu, actual_seq_kvlen shape size=%zu]",
-                    seqQShapeSize, kvSeqShapeSize),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF((seqQShapeSize != kvSeqShapeSize),
+                    OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                        "FlashAttentionScoreGrad", "actualSeqQLenOptional, actualSeqKvLenOptional",
+                        ("{" + std::to_string(seqQShapeSize) + ", " + std::to_string(kvSeqShapeSize) + "}").c_str(),
+                        "The shape sizes of actualSeqQLenOptional and actualSeqKvLenOptional must be the same"),
+                    return ge::GRAPH_FAILED);
         if (!isMaxWorkspace_) {
             const int64_t *qValue = actualSeqQlenTensor->GetData<int64_t>();
             const int64_t *kvValue = actualSeqKvlenTensor->GetData<int64_t>();
             OP_CHECK_IF((qValue == nullptr || kvValue == nullptr),
-                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [actual_seq_qlen data or actual_seq_kvlen data is null]"), return ge::GRAPH_FAILED);
+                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                            "FlashAttentionScoreGrad", "actualSeqQLenOptional or actualSeqKvLenOptional",
+                            "The data of actualSeqQLenOptional and actualSeqKvLenOptional must be available"),
+                        return ge::GRAPH_FAILED);
             // EOD场景: 累加和尾部连续为0的batch为无效数据，需跳过
             size_t realBSize = seqQShapeSize;
             while (realBSize > 0 && qValue[realBSize - 1] == 0 && kvValue[realBSize - 1] == 0) {
@@ -839,15 +923,25 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetBaseShapeInf
             fBaseParams.s1 = queryShape->GetStorageShape().GetDim(DIM_0);
             fBaseParams.s2 = keyShape->GetStorageShape().GetDim(DIM_0);
             fBaseParams.effectiveT1 = fBaseParams.s1;
- 	        fBaseParams.effectiveT2 = fBaseParams.s2;
+            fBaseParams.effectiveT2 = fBaseParams.s2;
         }
         fBaseParams.t1 = queryShape->GetStorageShape().GetDim(DIM_0);
         fBaseParams.t2 = keyShape->GetStorageShape().GetDim(DIM_0);
         fBaseParams.n2 = keyShape->GetStorageShape().GetDim(DIM_1);
         OP_CHECK_IF(keyShape->GetStorageShape().GetDim(DIM_1) == 0,
-                   OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [dim N2 is 0.]"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "keyIn",
+                                                          Ops::Base::ToString(keyShape->GetStorageShape()).c_str(),
+                                                          "The N2 axis of keyIn cannot be 0"),
+                    return ge::GRAPH_FAILED);
         fBaseParams.g = queryShape->GetStorageShape().GetDim(DIM_1) / keyShape->GetStorageShape().GetDim(DIM_1);
-        OP_CHECK_IF(fBaseParams.g == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [g is 0]"), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            fBaseParams.g == 0,
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query, keyIn",
+                                                   ("{" + Ops::Base::ToString(queryShape->GetStorageShape()) + ", " +
+                                                    Ops::Base::ToString(keyShape->GetStorageShape()) + "}")
+                                                       .c_str(),
+                                                   "The ratio of query heads to keyIn heads must be greater than 0"),
+            return ge::GRAPH_FAILED);
         fBaseParams.d = queryShape->GetStorageShape().GetDim(DIM_2);
         fBaseParams.rope_d = queryRopeShape == nullptr ? 0 : queryRopeShape->GetStorageShape().GetDim(DIM_2);
         fBaseParams.value_d = valueShape->GetStorageShape().GetDim(DIM_2);
@@ -858,40 +952,53 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetBaseShapeInf
         fBaseParams.b = queryShape->GetStorageShape().GetDim(DIM_0);
         fBaseParams.n2 = keyShape->GetStorageShape().GetDim(DIM_2);
         OP_CHECK_IF(keyShape->GetStorageShape().GetDim(DIM_2) == 0,
-                   OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [dim N2 is 0.]"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "keyIn",
+                                                          Ops::Base::ToString(keyShape->GetStorageShape()).c_str(),
+                                                          "The N2 axis of keyIn cannot be 0"),
+                    return ge::GRAPH_FAILED);
         fBaseParams.g = queryShape->GetStorageShape().GetDim(DIM_2) / keyShape->GetStorageShape().GetDim(DIM_2);
-        OP_CHECK_IF(fBaseParams.g == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [g is 0]"), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            fBaseParams.g == 0,
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON("FlashAttentionScoreGrad", "query, keyIn",
+                                                   ("{" + Ops::Base::ToString(queryShape->GetStorageShape()) + ", " +
+                                                    Ops::Base::ToString(keyShape->GetStorageShape()) + "}")
+                                                       .c_str(),
+                                                   "The ratio of query heads to keyIn heads must be greater than 0"),
+            return ge::GRAPH_FAILED);
         fBaseParams.s1 = queryShape->GetStorageShape().GetDim(DIM_1);
         fBaseParams.d = queryShape->GetStorageShape().GetDim(DIM_3);
         fBaseParams.rope_d = queryRopeShape == nullptr ? 0 : queryRopeShape->GetStorageShape().GetDim(DIM_3);
         fBaseParams.value_d = valueShape->GetStorageShape().GetDim(DIM_3);
         fBaseParams.s2 = keyShape->GetStorageShape().GetDim(DIM_1);
     } else {
-        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [inputLayout is invalid]");
+        OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout,
+                                   "SBH, BSH, BNSD, TND or BSND");
         return ge::GRAPH_FAILED;
     }
-    OP_CHECK_IF(fBaseParams.n2 == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [n2 is 0.]"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(fBaseParams.n2 == 0,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("FlashAttentionScoreGrad", "keyIn",
+                                                      Ops::Base::ToString(keyShape->GetStorageShape()).c_str(),
+                                                      "The N2 axis of keyIn cannot be 0"),
+                return ge::GRAPH_FAILED);
 
     auto ret = IsSameShapeButValueDLeEqD(queryShape, dyShape);
     OP_CHECK_IF(!ret,
-               OP_LOGE(context_,
-                       "In op [FlashAttentionScoreGrad], the tensor shapes of [query, dy] are mismatched, "
-                       "the reason is: [query shape and dy shape should be same except dy head dim should be less than or equal to query head dim, "
-                       "query dim num=%u, dy dim num=%u, query shape size=%ld, dy shape size=%ld]",
-                       static_cast<uint32_t>(queryShape->GetStorageShape().GetDimNum()),
-                       static_cast<uint32_t>(dyShape->GetStorageShape().GetDimNum()),
-                       queryShape->GetStorageShape().GetShapeSize(), dyShape->GetStorageShape().GetShapeSize()),
-               return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    "FlashAttentionScoreGrad", "query, dy",
+                    ("{" + Ops::Base::ToString(queryShape->GetStorageShape()) + ", " +
+                     Ops::Base::ToString(dyShape->GetStorageShape()) + "}")
+                        .c_str(),
+                    "The shapes of query and dy must be the same except that the last axis of dy may be smaller"),
+                return ge::GRAPH_FAILED);
     ret = IsSameShapeButValueDLeEqD(keyShape, valueShape);
     OP_CHECK_IF(!ret,
-               OP_LOGE(context_,
-                       "In op [FlashAttentionScoreGrad], the tensor shapes of [key, value] are mismatched, "
-                       "the reason is: [key shape and value shape should be same except value head dim should be less than or equal to key head dim, "
-                       "key dim num=%u, value dim num=%u, key shape size=%ld, value shape size=%ld]",
-                       static_cast<uint32_t>(keyShape->GetStorageShape().GetDimNum()),
-                       static_cast<uint32_t>(valueShape->GetStorageShape().GetDimNum()),
-                       keyShape->GetStorageShape().GetShapeSize(), valueShape->GetStorageShape().GetShapeSize()),
-               return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    "FlashAttentionScoreGrad", "keyIn, value",
+                    ("{" + Ops::Base::ToString(keyShape->GetStorageShape()) + ", " +
+                     Ops::Base::ToString(valueShape->GetStorageShape()) + "}")
+                        .c_str(),
+                    "The shapes of keyIn and value must be the same except that the last axis of value may be smaller"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -901,20 +1008,22 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessDropInfo
     auto dropMask = context_->GetOptionalInputDesc(DROP_MASK);
     OP_CHECK_IF(
         dropMask == nullptr,
-        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [dropMask is nullptr when keepProb is %f]", fBaseParams.keepProb),
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "dropMaskOptional",
+                                                 "dropMaskOptional must be provided when keepProb is less than 1"),
         return ge::GRAPH_FAILED);
 
     auto dropMaskType = dropMask->GetDataType();
     OP_CHECK_IF(dropMaskType != ge::DT_UINT8,
-               OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the data type of [drop_mask] is not supported, got [%s], expected uint8",
-                                           ge::TypeUtils::DataTypeToSerialString(dropMaskType).c_str()),
-               return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_DTYPE("FlashAttentionScoreGrad", "dropMaskOptional",
+                                          ge::TypeUtils::DataTypeToSerialString(dropMaskType).c_str(), "UINT8"),
+                return ge::GRAPH_FAILED);
 
     auto dropMaskShape = context_->GetOptionalInputShape(DROP_MASK);
     OP_CHECK_IF(dropMaskShape == nullptr,
-               OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [dropMaskShape is nullptr when keepProb is %f]",
-                                           fBaseParams.keepProb),
-               return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    "FlashAttentionScoreGrad", "dropMaskOptional",
+                    "The shape of dropMaskOptional must be available when keepProb is less than 1"),
+                return ge::GRAPH_FAILED);
 
     int64_t dropMaskDim = dropMaskShape->GetStorageShape().GetDimNum();
     int64_t dropMaskShapeSize = 1;
@@ -925,8 +1034,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessDropInfo
 
     auto shapeSize = AlignUp(fBaseParams.dropMaskSize, static_cast<int64_t>(BIT_NUMS)) / BIT_NUMS;
     if (dropMaskShapeSize < shapeSize) {
-        OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the shape of [drop_mask] is not supported, got [%ld]. Constraint:[should not be less than %ld]",
-                  dropMaskShapeSize, shapeSize);
+        OP_LOGE_FOR_INVALID_SHAPESIZE("FlashAttentionScoreGrad", "dropMaskOptional",
+                                      std::to_string(dropMaskShapeSize).c_str(),
+                                      ("greater than or equal to " + std::to_string(shapeSize)).c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -951,10 +1061,14 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessDropInfo
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetShapeAttrsInfo()
 {
-    OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
-               return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->GetAttrs() == nullptr, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [attrs is null]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        context_ == nullptr,
+        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        context_->GetAttrs() == nullptr,
+        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [attrs is null]"),
+        return ge::GRAPH_FAILED);
     if (ge::GRAPH_SUCCESS != GetMaxWorkspaceFlag()) {
         return ge::GRAPH_FAILED;
     }
@@ -996,7 +1110,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetShapeAttrsIn
 
     // mBaseParams is used for matmal tiling module
     OP_CHECK_IF(context_->GetInputDesc(QUERY) == nullptr,
-               OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [InputDesc of query is null]"), return ge::GRAPH_FAILED);
+                OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "query"), return ge::GRAPH_FAILED);
     auto queryType = context_->GetInputDesc(QUERY)->GetDataType();
     fBaseParams.queryType = queryType;
     fBaseParams.isBf16 = queryType == ge::DT_BF16 ? true : false;
@@ -1052,10 +1166,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetShapeAttrsIn
     fBaseParams.scaleValue = *(context_->GetAttrs()->GetAttrPointer<float>(SCALE_VALUE));
     fBaseParams.keepProb = *(context_->GetAttrs()->GetAttrPointer<float>(KEEP_PROB));
     OP_CHECK_IF((fBaseParams.keepProb <= 0 || fBaseParams.keepProb > 1),
-               OP_LOGE(context_,
-                       "The op [FlashAttentionScoreGrad] received bad params, "
-                       "the reason is: [keepProb should be greater than 0 and less than or equal to 1, keepProb=%f]",
-                       fBaseParams.keepProb), return ge::GRAPH_FAILED);
+                OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "keepProb",
+                                          std::to_string(fBaseParams.keepProb).c_str(), "a value in the range (0, 1]"),
+                return ge::GRAPH_FAILED);
 
     fBaseParams.dropoutIsDivisibleBy8 = 1;
 
@@ -1089,7 +1202,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetShapeAttrsIn
         return ret;
     }
 
-    const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ? context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) : "";
+    const char *tndSoftmaxIn = context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(TND_SOFTMAX_IN) ?
+                                   context_->GetAttrs()->GetAttrPointer<char>(TND_SOFTMAX_IN) :
+                                   "";
     if (strcmp(tndSoftmaxIn, "same_as_input") == 0) {
         fBaseParams.tndSoftmaxIn = true;
     } else {
@@ -1097,12 +1212,13 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetShapeAttrsIn
     }
 
     ret = CheckDtypeValid(context_);
-    OP_CHECK_IF(ret != ge::GRAPH_SUCCESS, OP_LOGE(context_, "In op [FlashAttentionScoreGrad], the data type of [input] is not supported"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ret != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT("FlashAttentionScoreGrad", "Input dtype validation failed."),
+                return ge::GRAPH_FAILED);
 
     fBaseParams.isSparse = SetSparseParams();
     OP_LOGD(context_, "FAG sameAB sparse mode = %u, sparse %s.", fBaseParams.sparseMode,
-              fBaseParams.isSparse ? "enable" : "disable");
+            fBaseParams.isSparse ? "enable" : "disable");
 
     ret = fBaseParams.layoutType == INPUT_FORMAT_TND ?
               CheckTndShapeValid(context_, fBaseParams.t1, fBaseParams.n1, fBaseParams.d) :
@@ -1164,7 +1280,6 @@ float FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::CalculateMaskRatio()
         return 1.0f;
     }
 }
-
 
 void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::AdjustCvInner()
 {
@@ -1264,7 +1379,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ChooseL1Custom()
             }
         }
         OP_LOGD(context_, "FAGTiling sameAB enable L1 custom is %d, mm1IsNZOut is %d, mm2IsNZOut is %d.",
-                  fBaseParams.enableL1Custom, fBaseParams.mm1IsNZOut, fBaseParams.mm2IsNZOut);
+                fBaseParams.enableL1Custom, fBaseParams.mm1IsNZOut, fBaseParams.mm2IsNZOut);
     }
 
     // update nz out, update q/kvSizeAlign
@@ -1294,7 +1409,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoSplit()
     ChooseL1Custom();
 
     OP_LOGD(context_, "FAGTiling sameAB s1CvInner is %u s2CvInner is %u.", fBaseParams.s1CvInner,
-              fBaseParams.s2CvInner);
+            fBaseParams.s2CvInner);
 
     uint32_t s1Inner = INITIAL_S1_SPLIT_NUM;
     uint32_t s2Inner = INITIAL_S2_SPLIT_NUM;
@@ -1308,8 +1423,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoSplit()
     fBaseParams.tmpBufferSize = tmpBufferSize;
 
     uint32_t s1CvInner = fBaseParams.s1CvInner;
-    OP_CHECK_IF(s1CvInner == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor s1CvInner is 0.]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        s1CvInner == 0,
+        OP_LOGE(context_,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor s1CvInner is 0.]"),
+        return ge::GRAPH_FAILED);
     int64_t s1Outer = (fBaseParams.s1 + s1CvInner - 1) / s1CvInner;
     uint32_t s1TailTmp = fBaseParams.s1 % s1Inner;
     uint32_t s1CvTailTmp = fBaseParams.s1 % s1CvInner;
@@ -1319,8 +1437,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoSplit()
     fBaseParams.s1Outer = s1Outer;
 
     uint32_t cvS2Inner = fBaseParams.s2CvInner;
-    OP_CHECK_IF(cvS2Inner == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor cvS2Inner is 0.]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        cvS2Inner == 0,
+        OP_LOGE(context_,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor cvS2Inner is 0.]"),
+        return ge::GRAPH_FAILED);
     int64_t s2Outer = (fBaseParams.s2 + cvS2Inner - 1) / cvS2Inner;
     uint32_t s2TailTmp = fBaseParams.s2 % s2Inner;
     uint32_t s2CvTailTmp = fBaseParams.s2 % cvS2Inner;
@@ -1332,7 +1453,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoSplit()
     fBaseParams.baseMN = s1Inner * s2Inner;
 
     OP_CHECK_IF((fBaseParams.baseMN == 0 || fBaseParams.s2Outer == 0 || fBaseParams.s1Outer == 0),
-               OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [baseMN or s2Outer or s1Outer is 0.]"), return ge::GRAPH_FAILED);
+                OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [baseMN or "
+                                  "s2Outer or s1Outer is 0.]"),
+                return ge::GRAPH_FAILED);
 
     int64_t fusedOuter = fBaseParams.b * fBaseParams.n2 * fBaseParams.g * fBaseParams.s1Outer * fBaseParams.s2Outer;
     int64_t blockFactor = (fusedOuter + fBaseParams.coreNum - 1) / fBaseParams.coreNum;
@@ -1382,8 +1505,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoLibApiTiling(
     if (fBaseParams.enableL1Custom) {
         mm1.SetFixSplit(baseM, baseN, -1);
         OP_CHECK_IF(mm1.GetTiling(tilingData->mm1TilingData) != 0,
-                   OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [l1 custom matmul1 tilingData get fail.]"),
-                   return ge::GRAPH_FAILED);
+                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [l1 custom "
+                                      "matmul1 tilingData get fail.]"),
+                    return ge::GRAPH_FAILED);
         if (fBaseParams.d > SPECIAL_HEADDIM_128 && fBaseParams.d <= SPECIAL_HEADDIM_256) {
             int64_t baseK = (fBaseParams.d / 2 + INPUT_ALIGN - 1) / INPUT_ALIGN * INPUT_ALIGN;
             tilingData->mm1TilingData.baseK = baseK;
@@ -1394,8 +1518,12 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoLibApiTiling(
     } else {
         baseN = std::min(fBaseParams.s2CvInner, baseN);
         mm1.SetFixSplit(baseM, baseN, -1);
-        OP_CHECK_IF(mm1.GetTiling(tilingData->mm1TilingData) != 0,
-                   OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [matmul1 tilingData get fail.]"), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            mm1.GetTiling(tilingData->mm1TilingData) != 0,
+            OP_LOGE(
+                context_,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [matmul1 tilingData get fail.]"),
+            return ge::GRAPH_FAILED);
     }
     SetMatmulTilingBufferInfo(&tilingData->mm1TilingData);
     if (fBaseParams.enableL1Custom && fBaseParams.d > SPECIAL_HEADDIM_128 && fBaseParams.d <= SPECIAL_HEADDIM_256) {
@@ -1426,8 +1554,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoLibApiTiling(
         mm2BaseN = std::min(static_cast<uint32_t>(128), static_cast<uint32_t>((fBaseParams.d + 15) / 16 * 16));
         mm2.SetFixSplit(baseM, mm2BaseN, -1);
         OP_CHECK_IF(mm2.GetTiling(tilingData->mm2TilingData) != 0,
-                   OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [l1 custom matmul2 tilingData get fail.]"),
-                   return ge::GRAPH_FAILED);
+                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [l1 custom "
+                                      "matmul2 tilingData get fail.]"),
+                    return ge::GRAPH_FAILED);
         if (fBaseParams.d == 192) {
             tilingData->mm2TilingData.stepM = 1;
             tilingData->mm2TilingData.stepN = 1;
@@ -1436,8 +1565,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoLibApiTiling(
     } else {
         mm2.SetFixSplit(-1, mm2BaseN, -1);
         OP_CHECK_IF(mm2.GetTiling(tilingData->mm2TilingData) != 0,
-                   OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [l1 custom matmul2 tilingData get fail.]"),
-                   return ge::GRAPH_FAILED);
+                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [l1 custom "
+                                      "matmul2 tilingData get fail.]"),
+                    return ge::GRAPH_FAILED);
     }
     SetMatmulTilingBufferInfo(&tilingData->mm2TilingData);
     if (fBaseParams.enableL1Custom) {
@@ -1462,8 +1592,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoLibApiTiling(
     mm3.SetBias(false);
     uint32_t mm3BaseN = std::min(baseBlockSize, static_cast<uint32_t>((fBaseParams.d + 15) / 16 * 16));
     mm3.SetFixSplit(baseM, mm3BaseN, -1);
-    OP_CHECK_IF(mm3.GetTiling(tilingData->mm3TilingData) != 0,
-               OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [matmul3 tilingData get fail.]"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        mm3.GetTiling(tilingData->mm3TilingData) != 0,
+        OP_LOGE(context_,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [matmul3 tilingData get fail.]"),
+        return ge::GRAPH_FAILED);
     if (fBaseParams.enableL1Custom && fBaseParams.d == 192) {
         tilingData->mm3TilingData.stepM = 1;
         tilingData->mm3TilingData.stepN = 1;
@@ -1487,7 +1620,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoLibApiTiling(
     return ge::GRAPH_SUCCESS;
 }
 
-void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetMatmulTilingBufferInfo(AscendC::tiling::TCubeTiling* mmTiling)
+void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetMatmulTilingBufferInfo(AscendC::tiling::TCubeTiling *mmTiling)
 {
     mmTiling->shareMode = 0;
     mmTiling->shareL1Size = fBaseParams.l1Size;
@@ -1497,9 +1630,12 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SetMatmulTilingBufferInfo(
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetWorkspaceSize()
 {
     size_t *workspaces = context_->GetWorkspaceSizes(1);
-    OP_CHECK_IF(workspaces == nullptr, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [workspace_sizes is null]"),
-               return ge::GRAPH_FAILED);
-    
+    OP_CHECK_IF(
+        workspaces == nullptr,
+        OP_LOGE(context_,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [workspace_sizes is null]"),
+        return ge::GRAPH_FAILED);
+
     // begin position
     size_t workspaceSize = MUL_CORE_SYNC_BUFFER;
     uint32_t s1Inner = std::min(INITIAL_S1_SPLIT_NUM, fBaseParams.s1Align);
@@ -1527,8 +1663,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetWorkspaceSiz
         (workspaceSize + static_cast<size_t>(fBaseParams.vSizeAlign) * FP32_BYTES + GM_ALIGN) / GM_ALIGN * GM_ALIGN;
 
     if (fBaseParams.sink == 1) {
-        workspaceSize =
-            (workspaceSize + fBaseParams.coreNum * fBaseParams.n2 * fBaseParams.g * FP32_BYTES + GM_ALIGN) / GM_ALIGN * GM_ALIGN;
+        workspaceSize = (workspaceSize + fBaseParams.coreNum * fBaseParams.n2 * fBaseParams.g * FP32_BYTES + GM_ALIGN) /
+                        GM_ALIGN * GM_ALIGN;
     }
 
     // mask bool workspace size
@@ -1537,8 +1673,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetWorkspaceSiz
             (workspaceSize + static_cast<size_t>(fBaseParams.dropMaskSize) + GM_ALIGN) / GM_ALIGN * GM_ALIGN;
     }
     // sfmg workspace
-    workspaceSize = workspaceSize + static_cast<size_t>(AlignTo(
-        fBaseParams.sfmgNormalAxisSize * SOFTMAX_REDUCE_SIZE * FP32_BYTES, static_cast<int64_t>(GM_ALIGN)));
+    workspaceSize =
+        workspaceSize + static_cast<size_t>(AlignTo(fBaseParams.sfmgNormalAxisSize * SOFTMAX_REDUCE_SIZE * FP32_BYTES,
+                                                    static_cast<int64_t>(GM_ALIGN)));
 
     // matmal1/matmal2 workspace size
     size_t vectorCoreNum = fBaseParams.coreNum;
@@ -1579,8 +1716,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetWorkspaceSiz
         int64_t value_dAlign = (fBaseParams.value_d + FP16_BLOCK_NUMS - 1) / FP16_BLOCK_NUMS * FP16_BLOCK_NUMS;
         int64_t dRopeAlign = (fBaseParams.rope_d + FP16_BLOCK_NUMS - 1) / FP16_BLOCK_NUMS * FP16_BLOCK_NUMS;
         int64_t cvS2Inner = fBaseParams.s2CvInner;
-        workspaces[0] +=
-            AlignUp(fBaseParams.s1CvInner * dAlign * FP32_BYTES * fBaseParams.aicNum * DB_NUM, GM_ALIGN);
+        workspaces[0] += AlignUp(fBaseParams.s1CvInner * dAlign * FP32_BYTES * fBaseParams.aicNum * DB_NUM, GM_ALIGN);
         if (fBaseParams.rope_d > 0) {
             workspaces[0] +=
                 AlignUp(fBaseParams.s1CvInner * dRopeAlign * FP32_BYTES * fBaseParams.aicNum * DB_NUM, GM_ALIGN);
@@ -1601,9 +1737,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::PostTiling()
 
     auto blockdim = CalcTschBlockDim(fBaseParams.coreNum, fBaseParams.aicNum, fBaseParams.coreNum);
     OP_CHECK_IF(blockdim == 0,
-               OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [blockdim is 0, aicNum is %ld, aivNum is %ld.]", fBaseParams.aicNum,
-                                           fBaseParams.coreNum),
-               return ge::GRAPH_FAILED);
+                OP_LOGE(context_,
+                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [blockdim is 0, aicNum "
+                        "is %ld, aivNum is %ld.]",
+                        fBaseParams.aicNum, fBaseParams.coreNum),
+                return ge::GRAPH_FAILED);
     context_->SetBlockDim(blockdim);
     context_->SetScheduleMode(1);
 
@@ -1659,7 +1797,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SaveToTilingDat
     tilingData->s1s2BNGS1S2SplitCoreParams.set_bandIdx(fBaseParams.bandIdx);
     tilingData->s1s2BNGS1S2SplitCoreParams.set_blockOuter(fBaseParams.blockOuter);
     tilingData->postTilingData.set_baseMN(fBaseParams.baseMN);
-    fBaseParams.tndSoftmaxIn ? tilingData->s1s2BNGS1S2BaseParams.set_tndSoftmaxIn(1) : tilingData->s1s2BNGS1S2BaseParams.set_tndSoftmaxIn(0);
+    fBaseParams.tndSoftmaxIn ? tilingData->s1s2BNGS1S2BaseParams.set_tndSoftmaxIn(1) :
+                               tilingData->s1s2BNGS1S2BaseParams.set_tndSoftmaxIn(0);
     if (fBaseParams.pseType == PSE_INNER_MUL_ADD_TYPE || fBaseParams.pseType == PSE_INNER_MUL_ADD_SQRT_TYPE) {
         tilingData->s1s2BNGS1S2BaseParams.set_pseAlibiBaseS1(fBaseParams.pseAlibiBaseS1);
         tilingData->s1s2BNGS1S2BaseParams.set_pseAlibiBaseS2(fBaseParams.pseAlibiBaseS2);
@@ -1671,7 +1810,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::SaveToTilingDat
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessTokensInfo()
 {
     OP_LOGD(context_, "Before correction ,the value of s1Token = %ld and the value of s2Token %ld.",
-              fBaseParams.s1Token, fBaseParams.s2Token);
+            fBaseParams.s1Token, fBaseParams.s2Token);
 
     // 自动校正left和right causal的token值，token信息仅用于sparse分核计算
     if (fBaseParams.sparseMode == LEFT_UP_CAUSAL || fBaseParams.sparseMode == RIGHT_DOWN_CAUSAL ||
@@ -1707,9 +1846,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessTokensIn
     if (fBaseParams.layoutType != INPUT_FORMAT_TND &&
         (-fBaseParams.s1Token > fBaseParams.s2 || -fBaseParams.s2Token > fBaseParams.s1 ||
          (fBaseParams.s1Token + fBaseParams.s2Token) < 0)) {
-        OP_LOGE(context_,
-                  "The op [FlashAttentionScoreGrad] received bad params, the reason is: [pre_token and next_token is invalid in the pad scene, got s1 %ld, s2 %ld, pre_token %ld, next_token %ld]",
-                  fBaseParams.s1, fBaseParams.s2, fBaseParams.s1Token, fBaseParams.s2Token);
+        std::string valuesMsg = "{" + std::to_string(fBaseParams.s1) + ", " + std::to_string(fBaseParams.s2) + ", " +
+                                std::to_string(fBaseParams.s1Token) + ", " + std::to_string(fBaseParams.s2Token) + "}";
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad", "S1, S2, preTokens, nextTokens",
+                                               valuesMsg.c_str(),
+                                               "The preTokens and nextTokens ranges are invalid for the padded input");
         return ge::GRAPH_FAILED;
     }
 
@@ -1725,10 +1866,13 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessTokensIn
             int64_t actualS2Len = fBaseParams.actualSeqKvlen[fBaseParams.bandIdx];
             if (-fBaseParams.s1Token > actualS1Len || -fBaseParams.s2Token > actualS2Len ||
                 (fBaseParams.s1Token + fBaseParams.s2Token) <= 0) {
-                OP_LOGE(context_,
-                          "The op [FlashAttentionScoreGrad] received bad params, the reason is: [pre_token and next_token is invalid in the unpad scene, got b %ld, s1 %ld, s2 %ld, pre_token %ld, next_token %ld, sparse_mode %u]",
-                          fBaseParams.bandIdx, actualS1Len, actualS2Len, fBaseParams.s1Token, fBaseParams.s2Token,
-                          fBaseParams.sparseMode);
+                std::string valuesMsg =
+                    "{" + std::to_string(fBaseParams.bandIdx) + ", " + std::to_string(actualS1Len) + ", " +
+                    std::to_string(actualS2Len) + ", " + std::to_string(fBaseParams.s1Token) + ", " +
+                    std::to_string(fBaseParams.s2Token) + ", " + std::to_string(fBaseParams.sparseMode) + "}";
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    "FlashAttentionScoreGrad", "batch, S1, S2, preTokens, nextTokens, sparseMode", valuesMsg.c_str(),
+                    "The preTokens and nextTokens ranges are invalid for the unpadded input");
                 return ge::GRAPH_FAILED;
             }
             return ge::GRAPH_SUCCESS;
@@ -1741,20 +1885,26 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessTokensIn
             if (fBaseParams.sparseMode == NO_MASK) {
                 if (-fBaseParams.s1Token > actualS2Len || -fBaseParams.s2Token > actualS1Len ||
                     (fBaseParams.s1Token + fBaseParams.s2Token) <= 0) {
-                    OP_LOGE(context_,
-                              "The op [FlashAttentionScoreGrad] received bad params, the reason is: [pre_token and next_token is invalid in the unpad scene, got b %ld, s1 %ld, s2 %ld, pre_token %ld, next_token %ld, sparse_mode %u]",
-                              i, actualS1Len, actualS2Len, fBaseParams.s1Token, fBaseParams.s2Token,
-                              fBaseParams.sparseMode);
+                    std::string valuesMsg = "{" + std::to_string(i) + ", " + std::to_string(actualS1Len) + ", " +
+                                            std::to_string(actualS2Len) + ", " + std::to_string(fBaseParams.s1Token) +
+                                            ", " + std::to_string(fBaseParams.s2Token) + ", " +
+                                            std::to_string(fBaseParams.sparseMode) + "}";
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        "FlashAttentionScoreGrad", "batch, S1, S2, preTokens, nextTokens, sparseMode",
+                        valuesMsg.c_str(), "The preTokens and nextTokens ranges are invalid for the unpadded input");
                     return ge::GRAPH_FAILED;
                 }
             }
             if (fBaseParams.sparseMode == BAND) {
                 if (-fBaseParams.s1Token > actualS1Len || -fBaseParams.s2Token > actualS2Len ||
                     (fBaseParams.s1Token + fBaseParams.s2Token) <= 0) {
-                    OP_LOGE(context_,
-                              "The op [FlashAttentionScoreGrad] received bad params, the reason is: [pre_token and next_token is invalid in the unpad scene, got b %ld, s1 %ld, s2 %ld, pre_token %ld, next_token %ld, sparse_mode %u]",
-                              i, actualS1Len, actualS2Len, fBaseParams.s1Token, fBaseParams.s2Token,
-                              fBaseParams.sparseMode);
+                    std::string valuesMsg = "{" + std::to_string(i) + ", " + std::to_string(actualS1Len) + ", " +
+                                            std::to_string(actualS2Len) + ", " + std::to_string(fBaseParams.s1Token) +
+                                            ", " + std::to_string(fBaseParams.s2Token) + ", " +
+                                            std::to_string(fBaseParams.sparseMode) + "}";
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        "FlashAttentionScoreGrad", "batch, S1, S2, preTokens, nextTokens, sparseMode",
+                        valuesMsg.c_str(), "The preTokens and nextTokens ranges are invalid for the unpadded input");
                     return ge::GRAPH_FAILED;
                 }
             }
@@ -1764,13 +1914,14 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessTokensIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessSinkInfo() {
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessSinkInfo()
+{
     OP_LOGD(context_, "FlashAttentionScoreGrad: Before correction, the value of sink %ld.", fBaseParams.sink);
     auto sinkShape = context_->GetOptionalInputShape(SINK_IN);
     if (sinkShape != nullptr) {
         OP_CHECK_IF(sinkShape->GetStorageShape().GetDimNum() != 1,
-                    OP_LOGE(context_, "FlashAttentionScoreGrad: Sink shape dimNum=%d is not 1, which is invalid.",
-                            sinkShape->GetStorageShape().GetDimNum()),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM("FlashAttentionScoreGrad", "sinkInOptional",
+                                                 std::to_string(sinkShape->GetStorageShape().GetDimNum()).c_str(), "1"),
                     return ge::GRAPH_FAILED);
         fBaseParams.sink = 1;
         OP_LOGD(context_, "FlashAttentionScoreGrad: Sink is in use, the value of sink now sink=%ld.", fBaseParams.sink);
@@ -1834,11 +1985,17 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoPreTiling()
     tilingData->preTilingData.set_maskTailCoreLoop(tailCoreUBLoop);
     tilingData->preTilingData.set_maskTailCoreLastLoopNum(tailCoreUBLastLoopNum);
 
-    OP_CHECK_IF(maskUsedCoreNum == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor maskUsedCoreNum is 0.]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        maskUsedCoreNum == 0,
+        OP_LOGE(context_,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor maskUsedCoreNum is 0.]"),
+        return ge::GRAPH_FAILED);
     int64_t qPreBlockFactor = (fBaseParams.qSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
-    OP_CHECK_IF(qPreBlockFactor == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor qPreBlockFactor is 0.]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        qPreBlockFactor == 0,
+        OP_LOGE(context_,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor qPreBlockFactor is 0.]"),
+        return ge::GRAPH_FAILED);
     int64_t qPreBlockTotal = (fBaseParams.qSizeAlign + qPreBlockFactor - 1) / qPreBlockFactor;
     int64_t qPreTailNumTmp = fBaseParams.qSizeAlign % qPreBlockFactor;
     int64_t qPreTailNum = qPreTailNumTmp == 0 ? qPreBlockFactor : qPreTailNumTmp;
@@ -1850,16 +2007,22 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoPreTiling()
 
     if (fBaseParams.rope_d > 0) {
         qRopePreBlockFactor = (fBaseParams.qRopeSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
-        OP_CHECK_IF(qRopePreBlockFactor == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor qRopePreBlockFactor is 0.]"),
-                   return ge::GRAPH_FAILED);
+        OP_CHECK_IF(qRopePreBlockFactor == 0,
+                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor "
+                                      "qRopePreBlockFactor is 0.]"),
+                    return ge::GRAPH_FAILED);
         qRopePreBlockTotal = (fBaseParams.qRopeSizeAlign + qRopePreBlockFactor - 1) / qRopePreBlockFactor;
         qRopePreTailNumTmp = fBaseParams.qRopeSizeAlign % qRopePreBlockFactor;
         qRopePreTailNum = qRopePreTailNumTmp == 0 ? qRopePreBlockFactor : qRopePreTailNumTmp;
     }
 
     int64_t kvPreBlockFactor = (fBaseParams.kvSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
-    OP_CHECK_IF(kvPreBlockFactor == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor kvPreBlockFactor is 0.]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        kvPreBlockFactor == 0,
+        OP_LOGE(
+            context_,
+            "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor kvPreBlockFactor is 0.]"),
+        return ge::GRAPH_FAILED);
     int64_t kvPreBlockTotal = (fBaseParams.kvSizeAlign + kvPreBlockFactor - 1) / kvPreBlockFactor;
     int64_t kvPreTailNumTmp = fBaseParams.kvSizeAlign % kvPreBlockFactor;
     int64_t kvPreTailNum = kvPreTailNumTmp == 0 ? kvPreBlockFactor : kvPreTailNumTmp;
@@ -1871,16 +2034,21 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoPreTiling()
 
     if (fBaseParams.kRopeSizeAlign > 0) {
         kRopePreBlockFactor = (fBaseParams.kRopeSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
-        OP_CHECK_IF(kRopePreBlockFactor == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor kRopePreBlockFactor is 0.]"),
-                   return ge::GRAPH_FAILED);
+        OP_CHECK_IF(kRopePreBlockFactor == 0,
+                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor "
+                                      "kRopePreBlockFactor is 0.]"),
+                    return ge::GRAPH_FAILED);
         kRopePreBlockTotal = (fBaseParams.kRopeSizeAlign + kRopePreBlockFactor - 1) / kRopePreBlockFactor;
         kRopePreTailNumTmp = fBaseParams.kRopeSizeAlign % kRopePreBlockFactor;
         kRopePreTailNum = kRopePreTailNumTmp == 0 ? kRopePreBlockFactor : kRopePreTailNumTmp;
     }
 
     int64_t vPreBlockFactor = (fBaseParams.vSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
-    OP_CHECK_IF(vPreBlockFactor == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor vPreBlockFactor is 0.]"),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        vPreBlockFactor == 0,
+        OP_LOGE(context_,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor vPreBlockFactor is 0.]"),
+        return ge::GRAPH_FAILED);
     int64_t vPreBlockTotal = (fBaseParams.vSizeAlign + vPreBlockFactor - 1) / vPreBlockFactor;
     int64_t vPreTailNumTmp = fBaseParams.vSizeAlign % vPreBlockFactor;
     int64_t vPreTailNum = vPreTailNumTmp == 0 ? vPreBlockFactor : vPreTailNumTmp;
@@ -1930,7 +2098,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoPreTiling()
 
     // sink offset
     if (fBaseParams.sink == 1) {
-        dropBeginAddr = (dropBeginAddr + fBaseParams.coreNum * fBaseParams.n2 * fBaseParams.g * FP32_BYTES + GM_ALIGN) / GM_ALIGN * GM_ALIGN;
+        dropBeginAddr = (dropBeginAddr + fBaseParams.coreNum * fBaseParams.n2 * fBaseParams.g * FP32_BYTES + GM_ALIGN) /
+                        GM_ALIGN * GM_ALIGN;
     }
     tilingData->preTilingData.set_dropBeginAddr(dropBeginAddr);
     return ge::GRAPH_SUCCESS;
@@ -1946,19 +2115,27 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoPostTiling()
                              WORKSPACE_NUM_ALIGN * WORKSPACE_NUM_ALIGN;
 
     // NZ+TND布局下Post阶段, 若存在EOD padding, t1/t2会大于有效token数, 需用effectiveT1/effectiveT2重算PostBlockTotal
-    bool nzPostNeedEffectiveT = fBaseParams.mm2IsNZOut && fBaseParams.layoutType == INPUT_FORMAT_TND &&
-                                (fBaseParams.effectiveT1 != fBaseParams.t1 || fBaseParams.effectiveT2 != fBaseParams.t2);
+    bool nzPostNeedEffectiveT =
+        fBaseParams.mm2IsNZOut && fBaseParams.layoutType == INPUT_FORMAT_TND &&
+        (fBaseParams.effectiveT1 != fBaseParams.t1 || fBaseParams.effectiveT2 != fBaseParams.t2);
 
     int64_t qPostBaseNum = fBaseParams.mm2IsNZOut ?
                                (postUbBaseSize / fBaseParams.dataTypeSize / dAlign * fBaseParams.d) :
                                (postUbBaseSize / fBaseParams.dataTypeSize);
-    OP_CHECK_IF(qPostBaseNum == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor qPostBaseNum is 0.]"),
-               return ge::GRAPH_FAILED);
-    OP_CHECK_IF(fBaseParams.blockOuter == 0,
-               OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor blockOuter is 0.]"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        qPostBaseNum == 0,
+        OP_LOGE(context_,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor qPostBaseNum is 0.]"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        fBaseParams.blockOuter == 0,
+        OP_LOGE(context_,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor blockOuter is 0.]"),
+        return ge::GRAPH_FAILED);
 
-    int64_t qPostBlockTotal = nzPostNeedEffectiveT ? fBaseParams.effectiveT1 * fBaseParams.n2 * fBaseParams.g * fBaseParams.d
-                                            : fBaseParams.qSize;
+    int64_t qPostBlockTotal = nzPostNeedEffectiveT ?
+                                  fBaseParams.effectiveT1 * fBaseParams.n2 * fBaseParams.g * fBaseParams.d :
+                                  fBaseParams.qSize;
     int64_t qPostTailNumTmp = qPostBlockTotal % qPostBaseNum;
     int64_t qPostTailNum = qPostTailNumTmp == 0 ? qPostBaseNum : qPostTailNumTmp;
     int64_t qPostBlockOuterTotal = (qPostBlockTotal + qPostBaseNum - 1) / qPostBaseNum;
@@ -1975,13 +2152,18 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoPostTiling()
         qRopePostBaseNum = fBaseParams.mm2IsNZOut ?
                                (postUbBaseSize / fBaseParams.dataTypeSize / dRopeAlign * fBaseParams.rope_d) :
                                (postUbBaseSize / fBaseParams.dataTypeSize);
-        OP_CHECK_IF(qRopePostBaseNum == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor qRopePostBaseNum is 0.]"),
-                   return ge::GRAPH_FAILED);
-        OP_CHECK_IF(fBaseParams.blockOuter == 0,
-                   OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor blockOuter is 0.]"),
-                   return ge::GRAPH_FAILED);
-        qRopePostBlockTotal = nzPostNeedEffectiveT ? fBaseParams.effectiveT1 * fBaseParams.n2 * fBaseParams.g * fBaseParams.rope_d
-                                            : fBaseParams.qRopeSize;
+        OP_CHECK_IF(qRopePostBaseNum == 0,
+                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor "
+                                      "qRopePostBaseNum is 0.]"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            fBaseParams.blockOuter == 0,
+            OP_LOGE(context_,
+                    "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor blockOuter is 0.]"),
+            return ge::GRAPH_FAILED);
+        qRopePostBlockTotal = nzPostNeedEffectiveT ?
+                                  fBaseParams.effectiveT1 * fBaseParams.n2 * fBaseParams.g * fBaseParams.rope_d :
+                                  fBaseParams.qRopeSize;
         qRopePostTailNumTmp = qRopePostBlockTotal % qRopePostBaseNum;
         qRopePostTailNum = qRopePostTailNumTmp == 0 ? qRopePostBaseNum : qRopePostTailNumTmp;
         qRopePostBlockOuterTotal = (qRopePostBlockTotal + qRopePostBaseNum - 1) / qRopePostBaseNum;
@@ -1989,10 +2171,13 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoPostTiling()
     }
 
     int64_t kvPostBaseNum = qPostBaseNum;
-    OP_CHECK_IF(kvPostBaseNum == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor kvPostBaseNum is 0.]"),
-               return ge::GRAPH_FAILED);
-    int64_t kvPostBlockTotal = nzPostNeedEffectiveT ? fBaseParams.effectiveT2 * fBaseParams.n2 * fBaseParams.d
-                                            : fBaseParams.kvSize;
+    OP_CHECK_IF(
+        kvPostBaseNum == 0,
+        OP_LOGE(context_,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor kvPostBaseNum is 0.]"),
+        return ge::GRAPH_FAILED);
+    int64_t kvPostBlockTotal =
+        nzPostNeedEffectiveT ? fBaseParams.effectiveT2 * fBaseParams.n2 * fBaseParams.d : fBaseParams.kvSize;
     int64_t kvPostTailNumTmp = kvPostBlockTotal % kvPostBaseNum;
     int64_t kvPostTailNum = kvPostTailNumTmp == 0 ? kvPostBaseNum : kvPostTailNumTmp;
     int64_t kvPostBlockOuterTotal = (kvPostBlockTotal + kvPostBaseNum - 1) / kvPostBaseNum;
@@ -2008,10 +2193,12 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoPostTiling()
 
     if (fBaseParams.rope_d > 0) {
         kRopePostBaseNum = qRopePostBaseNum;
-        OP_CHECK_IF(kRopePostBaseNum == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor kRopePostBaseNum is 0.]"),
-                   return ge::GRAPH_FAILED);
-        kRopePostBlockTotal = nzPostNeedEffectiveT ? fBaseParams.effectiveT2 * fBaseParams.n2 * fBaseParams.rope_d
-                                            : fBaseParams.kRopeSize;
+        OP_CHECK_IF(kRopePostBaseNum == 0,
+                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor "
+                                      "kRopePostBaseNum is 0.]"),
+                    return ge::GRAPH_FAILED);
+        kRopePostBlockTotal = nzPostNeedEffectiveT ? fBaseParams.effectiveT2 * fBaseParams.n2 * fBaseParams.rope_d :
+                                                     fBaseParams.kRopeSize;
         kRopePostTailNumTmp = kRopePostBlockTotal % kRopePostBaseNum;
         kRopePostTailNum = kRopePostTailNumTmp == 0 ? kRopePostBaseNum : kRopePostTailNumTmp;
         kRopePostBlockOuterTotal = (kRopePostBlockTotal + kRopePostBaseNum - 1) / kRopePostBaseNum;
@@ -2019,10 +2206,13 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoPostTiling()
     }
 
     int64_t vPostBaseNum = qPostBaseNum;
-    OP_CHECK_IF(vPostBaseNum == 0, OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor vPostBaseNum is 0.]"),
-               return ge::GRAPH_FAILED);
-    int64_t vPostBlockTotal = nzPostNeedEffectiveT ? fBaseParams.effectiveT2 * fBaseParams.n2 * fBaseParams.value_d
-                                            : fBaseParams.vSize;
+    OP_CHECK_IF(
+        vPostBaseNum == 0,
+        OP_LOGE(context_,
+                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor vPostBaseNum is 0.]"),
+        return ge::GRAPH_FAILED);
+    int64_t vPostBlockTotal =
+        nzPostNeedEffectiveT ? fBaseParams.effectiveT2 * fBaseParams.n2 * fBaseParams.value_d : fBaseParams.vSize;
     int64_t vPostTailNumTmp = vPostBlockTotal % vPostBaseNum;
     int64_t vPostTailNum = vPostTailNumTmp == 0 ? vPostBaseNum : vPostTailNumTmp;
     int64_t vPostBlockOuterTotal = (vPostBlockTotal + vPostBaseNum - 1) / vPostBaseNum;
@@ -2089,8 +2279,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoPostTiling()
     if (fBaseParams.sink == 1) {
         tilingData->postTilingData.set_dsinksumWorkSpaceOffset(workspaceOffsets);
         workspaceOffsets =
-            (workspaceOffsets + fBaseParams.coreNum * fBaseParams.n2 * fBaseParams.g * FP32_BYTES +
-             GM_ALIGN) / GM_ALIGN * GM_ALIGN;
+            (workspaceOffsets + fBaseParams.coreNum * fBaseParams.n2 * fBaseParams.g * FP32_BYTES + GM_ALIGN) /
+            GM_ALIGN * GM_ALIGN;
     }
 
     // mask bool workspace size
@@ -2099,14 +2289,15 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoPostTiling()
             (workspaceOffsets + static_cast<size_t>(fBaseParams.dropMaskSize) + GM_ALIGN) / GM_ALIGN * GM_ALIGN;
     }
     // sfmg workspace
-    workspaceOffsets = workspaceOffsets + static_cast<size_t>(AlignTo(
-        fBaseParams.sfmgNormalAxisSize * SOFTMAX_REDUCE_SIZE * FP32_BYTES, static_cast<int64_t>(GM_ALIGN)));
+    workspaceOffsets = workspaceOffsets +
+                       static_cast<size_t>(AlignTo(fBaseParams.sfmgNormalAxisSize * SOFTMAX_REDUCE_SIZE * FP32_BYTES,
+                                                   static_cast<int64_t>(GM_ALIGN)));
 
     // matmal1/matmal2 workspace size
     size_t vectorCoreNum = fBaseParams.coreNum;
     workspaceOffsets =
-        (workspaceOffsets + vectorCoreNum * fBaseParams.s1CvInner * fBaseParams.s2CvInner * FP32_BYTES * MATMUL_INPUT_NUM +
-         GM_ALIGN) /
+        (workspaceOffsets +
+         vectorCoreNum * fBaseParams.s1CvInner * fBaseParams.s2CvInner * FP32_BYTES * MATMUL_INPUT_NUM + GM_ALIGN) /
         GM_ALIGN * GM_ALIGN;
 
     tilingData->postTilingData.set_b(fBaseParams.b);
@@ -2197,13 +2388,9 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DetermineMode()
     }
 }
 
-REGISTER_TILING_TEMPLATE_WITH_ARCH(
-    FlashAttentionScoreGrad, FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb,
-    std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}),
-    15500);
-REGISTER_TILING_TEMPLATE_WITH_ARCH(
-    FlashAttentionScoreGrad, FlashAttentionScoreGradTilingSameABDeterministic,
-    std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}),
-    1100);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb,
+                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 15500);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(FlashAttentionScoreGrad, FlashAttentionScoreGradTilingSameABDeterministic,
+                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_2201)}), 1100);
 
 } // namespace optiling
