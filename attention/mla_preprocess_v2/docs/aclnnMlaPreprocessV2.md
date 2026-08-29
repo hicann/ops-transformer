@@ -226,7 +226,7 @@ aclnnStatus aclnnMlaPreprocessV2(
       <td>输入</td>
       <td>输入首次做矩阵乘的降维矩阵中的系数。</td>
       <td>input输入dtype为FLOAT16支持INT64，输入BFLOAT16时支持FLOAT。</td>
-      <td>INT32、FLOAT</td>
+      <td>INT64、FLOAT</td>
       <td>ND</td>
       <td>[qLoraDim + keyTotalDim]</td>
       <td>-</td>
@@ -715,7 +715,7 @@ aclnnStatus aclnnMlaPreprocessV2(
     <tr>
       <td>workspaceSize</td>
       <td>输入</td>
-      <td>在Device侧申请的workspace大小，由第一段接口aclnnBatchMatMulGetWorkspaceSize获取。</td>
+      <td>在Device侧申请的workspace大小，由第一段接口aclnnMlaPreprocessV2GetWorkspaceSize获取。</td>
     </tr>
     <tr>
       <td>executor</td>
@@ -807,7 +807,7 @@ bool ReadFile(const std::string &filePath, std::vector<int64_t> shape, std::vect
     std::ifstream file(filePath, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "无法打开文件" << std::endl;
-        return 1;
+        return false;
     }
     // 获取文件大小
     file.seekg(0, std::ios::end);
@@ -816,7 +816,7 @@ bool ReadFile(const std::string &filePath, std::vector<int64_t> shape, std::vect
     if (file.read(reinterpret_cast<char*>(hostData.data()), fileSize * sizeof(T))) {
     } else {
         std::cerr << "读取文件失败" << std::endl;
-        return 1;
+        return false;
     }
     file.close();
     return true;
@@ -976,9 +976,9 @@ int main() {
   int64_t blockNum = 192;
   int64_t blockSize = 128;
 
-  int64_t wdqDim = 128;
-  int64_t qRopeDim = 0;
-  int64_t kRopeDim = 0;
+  int64_t wdqDim = 1536;
+  int64_t qRopeDim = 64;
+  int64_t kRopeDim = 64;
   double epsilon = 1e-05;
   int64_t qRotaryCoeff = 2;
   int64_t kRotaryCoeff = 2;
@@ -1015,7 +1015,7 @@ int main() {
   std::vector<int64_t> kvCacheRopeShape = {blockNum, blockSize, 1, 64};
   std::vector<int64_t> slotmappingShape = {tokenNum};
   std::vector<int64_t> ctkvScaleShape = {1};
-  std::vector<int64_t> qNopeScaleShape = {headNum};
+  std::vector<int64_t> qNopeScaleShape = {1};
 
   std::vector<int64_t> qOutShape = {tokenNum, headNum, 576};
   std::vector<int64_t>  kvCacheOutShape = {blockNum, blockSize, 1, 576};
@@ -1186,7 +1186,7 @@ int main() {
   uint64_t workspaceSize = 0;
   aclOpExecutor *executor;
 
-  // 调用acaclnnMlaPreprocess第一段接口
+  // 调用aclnnMlaPreprocessV2第一段接口
   ret = aclnnMlaPreprocessV2GetWorkspaceSize(
       input, gamma0, beta0, quantScale0, quantOffset0, wdqkv, deScale0, bias0, gamma1, beta1, quantScale1, quantOffset1,
       wuq, deScale1, bias1, gamma2, cos, sin, wuk, kvCache, kvCacheRope,
@@ -1195,7 +1195,7 @@ int main() {
       qRopeOut, krCacheOut, qDownOut, &workspaceSize, &executor);
   CHECK_RET(
       ret == ACL_SUCCESS,
-      LOG_PRINT("acaclnnMlaPreprocessV2GetWorkspaceSize failed. ERROR: %d\n", ret);
+      LOG_PRINT("aclnnMlaPreprocessV2GetWorkspaceSize failed. ERROR: %d\n", ret);
       return ret);
 
   // 根据第一段接口计算出的workspaceSize申请device内存
@@ -1207,10 +1207,10 @@ int main() {
               return ret);
   }
 
-  // 调用acaclnnMlaPreprocess第二段接口
+  // 调用aclnnMlaPreprocessV2第二段接口
   ret = aclnnMlaPreprocessV2(workspaceAddr, workspaceSize, executor, stream);
   CHECK_RET(ret == ACL_SUCCESS,
-            LOG_PRINT("acaclnnMlaPreprocessV2 failed. ERROR: %d\n", ret);
+            LOG_PRINT("aclnnMlaPreprocessV2 failed. ERROR: %d\n", ret);
             return ret);
 
   // 4. （固定写法）同步等待任务执行结束
