@@ -304,7 +304,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
     <td>输出</td>
     <td>根据expertIds进行扩展过的token特征。</td>
     <td>要求为2D Tensor。</td>
-    <td>FLOAT16、BFLOAT16、INT8</td>
+    <td>INT8、FLOAT16、BFLOAT16</td>
     <td>ND</td>
     <td>-</td>
     <td>-</td>
@@ -686,7 +686,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
     #define LOG_PRINT(message, ...)         \
         do {                                \
             printf(message, ##__VA_ARGS__); \
-        } while(0)
+        } while (0)
 
     struct Args {
         uint32_t rankId;
@@ -913,7 +913,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
         // 调用dispatch算子第二阶段接口
         ret = aclnnMoeDistributeDispatch(dispatchWorkspaceAddr, dispatchWorkspaceSize, dispatchExecutor, args.dispatchStream);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclnnMoeDistributeDispatch failed. ret = %d\n", ret); return ret);
-        //（固定写法）同步等待任务执行结束
+        // （固定写法）同步等待任务执行结束
         ret = aclrtSynchronizeStreamWithTimeout(args.dispatchStream, 10000);
         CHECK_RET(
             ret == ACL_SUCCESS,
@@ -938,7 +938,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
         // 调用combine算子第二阶段接口
         ret = aclnnMoeDistributeCombine(combineWorkspaceAddr, combineWorkspaceSize, combineExecutor, args.combineStream);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclnnMoeDistributeCombine failed. ret = %d\n", ret); return ret);
-        //（固定写法）同步等待任务执行结束
+        // （固定写法）同步等待任务执行结束
         ret = aclrtSynchronizeStreamWithTimeout(args.combineStream, 10000);
         CHECK_RET(
             ret == ACL_SUCCESS,
@@ -1112,7 +1112,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
             args[rankId].dispatchStream = dispatchStream[rankId];
             args[rankId].combineStream = combineStream[rankId];
             args[rankId].context = context[rankId];
-            threads[rankId].reset(new(std::nothrow) std::thread(&launchOneThreadDispatchAndCombine, std::ref(args[rankId])));
+            threads[rankId].reset(new (std::nothrow) std::thread(&launchOneThreadDispatchAndCombine, std::ref(args[rankId])));
         }
         for (uint32_t rankId = 0; rankId < DEV_NUM; rankId++) {
             threads[rankId]->join();

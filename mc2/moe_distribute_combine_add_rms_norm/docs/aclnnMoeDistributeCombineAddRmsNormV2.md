@@ -171,7 +171,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
     <td>assistInfoForCombine</td>
     <td>输入</td>
     <td>对应<code>aclnnMoeDistributeDispatchV3</code>的<code>assistInfoForCombineOut</code>输出。</td>
-    <td>Device侧1D Tensor，shape为(A * 128, )。</td>
+    <td>Device侧1D Tensor，shape为(A * 128,)。</td>
     <td>INT32</td>
     <td>ND</td>
     <td>1</td>
@@ -181,7 +181,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
     <td>epSendCounts</td>
     <td>输入</td>
     <td>对应<code>aclnnMoeDistributeDispatchV3</code>的<code>epRecvCounts</code>输出。</td>
-    <td>Device侧1D Tensor，shape为(epWorldSize * localExpertNum, )。</td>
+    <td>Device侧1D Tensor，shape为(epWorldSize * localExpertNum,)。</td>
     <td>INT32</td>
     <td>ND</td>
     <td>1</td>
@@ -211,7 +211,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
     <td>gamma</td>
     <td>输入</td>
     <td>RmsNorm中的gamma参数。</td>
-    <td>Device侧1D Tensor，shape为(H, )。</td>
+    <td>Device侧1D Tensor，shape为(H,)。</td>
     <td>BFLOAT16</td>
     <td>ND</td>
     <td>1</td>
@@ -231,7 +231,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
     <td>xActiveMaskOptional</td>
     <td>输入</td>
     <td>标识token是否参与通信。</td>
-    <td><ul><li>可传有效数据或空指针，默认所有token参与通信，1D时shape为(BS, )，2D时shape为(BS, K)。</li><li>各卡BS不一致时所有token需有效。</li></ul></td>
+    <td><ul><li>可传有效数据或空指针，默认所有token参与通信，1D时shape为(BS,)，2D时shape为(BS, K)。</li><li>各卡BS不一致时所有token需有效。</li></ul></td>
     <td>BOOL</td>
     <td>ND</td>
     <td>-</td>
@@ -770,7 +770,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
     #define LOG_PRINT(message, ...)         \
         do {                                \
             printf(message, ##__VA_ARGS__); \
-        } while(0)
+        } while (0)
 
     struct Args {
         uint32_t rankId;
@@ -1045,7 +1045,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
         /**************************************** 调用dispatch warm up********************************************/
         ret = aclnnMoeDistributeDispatchV3GetWorkspaceSize(x, expertIds, (quantMode > 0 ? scales : nullptr), nullptr,
                 expertScales, nullptr, hcomEpName, EP_WORLD_SIZE, args.epRankId, moeExpertNum, "", 0,
-                0, expertShardType, sharedExpertNum,sharedExpertRankNum, quantMode, globalBS,
+                0, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBS,
                 expertTokenNumsType, nullptr, zeroExpertNum, copyExpertNum, constExpertNum, expandX, dynamicScales, expandIdx, expertTokenNums, epRecvCounts,
                 tpRecvCounts, expandScales, &dispatchWorkspaceSize, &dispatchExecutor);
 
@@ -1069,7 +1069,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
         // 调用第一阶段接口
         ret = aclnnMoeDistributeDispatchV3GetWorkspaceSize(x, expertIds, (quantMode > 0 ? scales : nullptr), nullptr,
                 expertScales, elasticInfo, hcomEpName, EP_WORLD_SIZE, args.epRankId, moeExpertNum, "", 0,
-                0, expertShardType, sharedExpertNum,sharedExpertRankNum, quantMode, globalBS,
+                0, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBS,
                 expertTokenNumsType, nullptr, zeroExpertNum, copyExpertNum, constExpertNum, expandX, dynamicScales, expandIdx, expertTokenNums, epRecvCounts,
                 tpRecvCounts, expandScales, &dispatchWorkspaceSize, &dispatchExecutor);
 
@@ -1111,7 +1111,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
         ret = aclnnMoeDistributeCombineAddRmsNormV2(combineWorkspaceAddr, combineAddRmsNormWorkspaceSize, combineAddRmsNormExecutor, args.combineStream);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclnnMoeDistributeCombineAddRmsNormV2 failed. ret = %d \n", ret);
             return ret);
-        //（固定写法）同步等待任务执行结束
+        // （固定写法）同步等待任务执行结束
         ret = aclrtSynchronizeStreamWithTimeout(args.combineStream, 10000);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSynchronizeStreamWithTimeout failed. ret = %d \n", ret);
             return ret);
@@ -1312,7 +1312,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
             args[rankId].dispatchStream = dispatchStream[rankId];
             args[rankId].combineStream = combineStream[rankId];
             args[rankId].context = context[rankId];
-            threads[rankId].reset(new(std::nothrow) std::thread(&LaunchOneProcessDispatchAndCombine, std::ref(args[rankId])));
+            threads[rankId].reset(new (std::nothrow) std::thread(&LaunchOneProcessDispatchAndCombine, std::ref(args[rankId])));
         }
 
         for (uint32_t rankId = 0; rankId < DEV_NUM; rankId++) {

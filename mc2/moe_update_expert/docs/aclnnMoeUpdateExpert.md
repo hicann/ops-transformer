@@ -128,7 +128,7 @@ aclnnStatus aclnnMoeUpdateExpert(
     <td>eplbTable(aclTensor*)</td>
     <td>输入</td>
     <td>逻辑专家到物理专家的映射表（外部需保证值正确）。</td>
-    <td><ul><li>共world_size * place_per_rank个专家实例。</li><li>每行第一列为对应逻辑专家的部署实例数（取值[1, world_size]），后[1, count]列为实例编号（取值[0, world_size*place_per_rank)，且不重复）。</li><li>要求为2D Tensor，shape为(moeExperNum, F)。</li></ul></td>
+    <td><ul><li>共world_size * place_per_rank个专家实例。</li><li>每行第一列为对应逻辑专家的部署实例数（取值[1, world_size]），后[1, count]列为实例编号（取值[0, world_size*place_per_rank)，且不重复）。</li><li>要求为2D Tensor，shape为(moeExpertNum, F)。</li></ul></td>
     <td>INT32</td>
     <td>ND</td>
     <td>2</td>
@@ -375,7 +375,7 @@ aclnnStatus aclnnMoeUpdateExpert(
     #define LOG_PRINT(message, ...)         \
         do {                                \
             printf(message, ##__VA_ARGS__); \
-        } while(0)
+        } while (0)
 
     struct Args {
         uint32_t rankId;
@@ -647,7 +647,7 @@ aclnnStatus aclnnMoeUpdateExpert(
 
         ret = aclnnMoeDistributeDispatchV2GetWorkspaceSize(x, balancedExpertIds, (quantMode > 0 ? scales : nullptr), nullptr,
                 expertScales, hcomEpName, EP_WORLD_SIZE, args.epRankId, moeExpertNum, hcomTpName, TP_WORLD_SIZE,
-                args.tpRankId, expertShardType, sharedExpertNum,sharedExpertRankNum, quantMode, globalBS,
+                args.tpRankId, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBS,
                 expertTokenNumsType, nullptr, expandX, dynamicScales, expandIdx, expertTokenNums, epRecvCounts,
                 tpRecvCounts, expandScales, &dispatchWorkspaceSize, &dispatchExecutor);
 
@@ -667,7 +667,7 @@ aclnnStatus aclnnMoeUpdateExpert(
 
         /**************************************** 调用combine ********************************************/
 
-        //调用combine算子第一阶段接口
+        // 调用combine算子第一阶段接口
         ret = aclnnMoeDistributeCombineV2GetWorkspaceSize(expandX, expertIds, expandIdx, epRecvCounts, expertScales,
             tpRecvCounts, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
             hcomEpName, EP_WORLD_SIZE, args.epRankId, moeExpertNum, hcomTpName, TP_WORLD_SIZE, args.tpRankId,
@@ -896,7 +896,7 @@ aclnnStatus aclnnMoeUpdateExpert(
             args[rankId].dispatchStream = dispatchStream[rankId];
             args[rankId].combineStream = combineStream[rankId];
             args[rankId].context = context[rankId];
-            threads[rankId].reset(new(std::nothrow) std::thread(&LaunchOneProcessUpdateExpertAndDispatchAndCombine, std::ref(args[rankId])));
+            threads[rankId].reset(new (std::nothrow) std::thread(&LaunchOneProcessUpdateExpertAndDispatchAndCombine, std::ref(args[rankId])));
         }
 
         for (uint32_t rankId = 0; rankId < DEV_NUM; rankId++) {
