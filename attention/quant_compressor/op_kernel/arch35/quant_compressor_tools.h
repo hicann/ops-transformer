@@ -116,7 +116,9 @@ __aicore__ inline uint32_t QuantCompressorTools<COMP>::GetTIdxByBatch(uint32_t b
 // iterator
 struct SliceInfo {
     __aicore__ inline SliceInfo(){};
-    __aicore__ inline SliceInfo(uint32_t bIdx, uint32_t sIdx) : bIdx(bIdx), sIdx(sIdx){};
+    __aicore__ inline SliceInfo(uint32_t bIdx, uint32_t sIdx)
+        : bIdx(bIdx),
+          sIdx(sIdx){};
 
     uint32_t bIdx = 0U;
     uint32_t sIdx = 0U;
@@ -135,7 +137,9 @@ struct SliceInfo {
 template <typename COMP>
 class QuantCompressorSliceIterator {
 public:
-    __aicore__ inline QuantCompressorSliceIterator(QuantCompressorTools<COMP> &tools) : tools_(tools) {}
+    __aicore__ inline QuantCompressorSliceIterator(QuantCompressorTools<COMP> &tools)
+        : tools_(tools)
+    {}
 
     __aicore__ inline void Reset(uint32_t bIdx, uint32_t sIdx);
     __aicore__ inline void SetMaxBatchSize(uint32_t batch_size);
@@ -298,7 +302,8 @@ __aicore__ inline SliceInfo &QuantCompressorSliceIterator<COMP>::GetSlice()
 
 struct SplitCoreSliceInfo : public SliceInfo {
     __aicore__ inline SplitCoreSliceInfo(){};
-    __aicore__ inline SplitCoreSliceInfo(uint32_t bIdx, uint32_t sIdx) : SliceInfo(bIdx, sIdx){};
+    __aicore__ inline SplitCoreSliceInfo(uint32_t bIdx, uint32_t sIdx)
+        : SliceInfo(bIdx, sIdx){};
 
     uint32_t preFirstSeqCnt = 0U; // 左边每次迭代基本块的第一个seqCnt大小
 };
@@ -306,7 +311,9 @@ struct SplitCoreSliceInfo : public SliceInfo {
 template <typename COMP>
 class QuantCompressorSplitCoreSliceIterator {
 public:
-    __aicore__ inline QuantCompressorSplitCoreSliceIterator(QuantCompressorTools<COMP> &tools) : tools_(tools) {}
+    __aicore__ inline QuantCompressorSplitCoreSliceIterator(QuantCompressorTools<COMP> &tools)
+        : tools_(tools)
+    {}
 
     __aicore__ inline void Reset(uint32_t bIdx, uint32_t sIdx);
     __aicore__ inline void SetMaxBatchSize(uint32_t batch_size);
@@ -518,9 +525,11 @@ __aicore__ inline SplitCoreSliceInfo &QuantCompressorSplitCoreSliceIterator<COMP
 
 struct Vec1SliceInfo : public SliceInfo {
     __aicore__ inline Vec1SliceInfo(){};
-    __aicore__ inline Vec1SliceInfo(uint32_t bIdx, uint32_t sIdx) : SliceInfo(bIdx, sIdx){};
+    __aicore__ inline Vec1SliceInfo(uint32_t bIdx, uint32_t sIdx)
+        : SliceInfo(bIdx, sIdx){};
     __aicore__ inline Vec1SliceInfo(uint32_t bIdx, uint32_t sIdx, uint32_t dealedSeqCnt)
-        : SliceInfo(bIdx, sIdx), dealedSeqCnt(dealedSeqCnt){};
+        : SliceInfo(bIdx, sIdx),
+          dealedSeqCnt(dealedSeqCnt){};
 
     uint32_t dealedSeqCnt = 0U;
     uint32_t dealedTcCnt = 0U;
@@ -533,7 +542,9 @@ struct Vec1SliceInfo : public SliceInfo {
 struct StatisticInfo {
     __aicore__ inline StatisticInfo(){};
     __aicore__ inline StatisticInfo(uint32_t actualTcCnt, uint32_t dealSeqCnt, uint32_t compressorScCnt)
-        : actualTcCnt(actualTcCnt), dealSeqCnt(dealSeqCnt), compressorScCnt(compressorScCnt){};
+        : actualTcCnt(actualTcCnt),
+          dealSeqCnt(dealSeqCnt),
+          compressorScCnt(compressorScCnt){};
 
     uint32_t actualTcCnt = 0U;
     uint32_t dealSeqCnt = 0U;
@@ -543,7 +554,9 @@ struct StatisticInfo {
 template <typename COMP>
 class QuantCompressorVec1SliceIterator {
 public:
-    __aicore__ inline QuantCompressorVec1SliceIterator(QuantCompressorTools<COMP> &tools) : tools_(tools) {}
+    __aicore__ inline QuantCompressorVec1SliceIterator(QuantCompressorTools<COMP> &tools)
+        : tools_(tools)
+    {}
 
     __aicore__ inline void Reset(uint32_t bIdx, uint32_t sIdx);
     __aicore__ inline void Reset(uint32_t bIdx, uint32_t sIdx, uint32_t dealedSeqCnt, uint32_t compressoredScCnt);
@@ -643,50 +656,91 @@ __aicore__ inline void QuantCompressorVec1SliceIterator<COMP>::IteratorSlice()
     if (sliceInfo_.sIdx >= sliceInfo_.bSeqUsed) {
         bool isFirstDoWhileIter = true;
         do {
-            uint32_t seqLength = tools_.GetSeqLength(sliceInfo_.bIdx);
-            if (sliceInfo_.sIdx < seqLength && sliceInfo_.bSeqUsed < seqLength) {
-                uint32_t nextAlignSIdx = Align(sliceInfo_.bStartPos + sliceInfo_.sIdx, cmpRatio) - sliceInfo_.bStartPos;
-                // 对齐点可能超出batch范围(当sIdx靠近batch末尾且bStartPos未对齐时)
-                // 此时本batch剩余序列为seqLength - sIdx, 不需要按对齐点推进
-                uint32_t advSeqCnt = min(nextAlignSIdx, seqLength);
-                sliceInfo_.dealedSeqCnt += advSeqCnt - sliceInfo_.sIdx;
-                uint32_t tcGap = 0;
-                if (nextAlignSIdx < seqLength) {
-                    tcGap = CeilDivT(static_cast<int32_t>(seqLength - nextAlignSIdx), static_cast<int32_t>(cmpRatio));
+            const uint32_t seqLength = tools_.GetSeqLength(sliceInfo_.bIdx);
+            if (sliceInfo_.bSeqUsed < seqLength) {
+                // ── (A) tailH 行推进（不消耗任务量）──
+                // slice 处理到 su 为止，su 到下一个压缩块分界点（全局 cr 对齐的"切分点"）
+                // 之间的行是 slice 尾部 padding（tailH）。这些行在任务量上已由 slice 的
+                // dealTcSize 消耗，但 workspace 行号（dealedSeqCnt）尚未推进——必须在此
+                // 推进，否则核起点落在非切分点，后续 slice 从错位位置读数据。
+                //
+                // ★特殊1：仅 sIdx > 0（slice 确实处理过）时才推进 tailH。
+                //   sIdx == 0 表示 seqused == 0 的无效 batch（无 slice），其行全部属于
+                //   空洞（块任务量未消耗）；此时按 tailH 推进会"行超前于任务量"
+                //   （b=53: 全局对齐量 62 行，但 x 行仅 1 行）→ workspace 偏移虚增越界。
+                //
+                // ★特殊2：对齐量 clamp 到空洞内。对齐量（< cmpRatio）可能超过本 batch
+                //   的 x 行剩余（seqLength - sIdx，如无效 batch 的 x 行很短），
+                //   超出的行属于下一个 batch 或窗口外，不得推进。
+                if (sliceInfo_.sIdx > 0) {
+                    uint64_t nextAlignSIdx =
+                        Align(sliceInfo_.bStartPos + sliceInfo_.sIdx, (cmpRatio)) - sliceInfo_.bStartPos;
+                    uint32_t align =
+                        min(static_cast<uint32_t>(nextAlignSIdx - sliceInfo_.sIdx), seqLength - sliceInfo_.sIdx);
+                    sliceInfo_.dealedSeqCnt += align;
+                    sliceInfo_.sIdx += align;
                 }
-                if (sliceInfo_.bSeqUsed == 0 && nextAlignSIdx > sliceInfo_.sIdx) {
-                    // 此时bseqused所在压缩块未被纳入计算
-                    // 首轮do-while的batch已由GetSlice处理过首个Tc块，needDealTcSize_已减1，不能再加
-                    if (!isFirstDoWhileIter) {
-                        tcGap++;
-                    }
+
+                // ── 空洞（tailH 之后）对应的压缩块数 tcGap（需消耗的任务量）──
+                // 空洞 = [sIdx, seqLength) 的 x 行，全局位置 [bStartPos+sIdx, bStartPos+seqLength)。
+                // 块数 = 空洞覆盖的全局 cr 块数。
+                //
+                // ★特殊3：sIdx == 0（seqused == 0）时起点块（含头部 padding 的块）
+                //   未被 slice 消耗，块数从 floor(bStartPos/cr) 起算（= tcNum 公式，起点块计入）；
+                //   sIdx > 0（tailH 已推进到切分点）时从 ceil((bStartPos+sIdx)/cr) 起算
+                //   （起点块已由 slice 的 dealTcSize 消耗）。
+                const uint32_t gapRows = seqLength - sliceInfo_.sIdx;
+                uint32_t tcGap;
+                if (sliceInfo_.sIdx == 0) {
+                    tcGap = static_cast<uint32_t>(CeilDivT(sliceInfo_.bStartPos + seqLength, (cmpRatio)) -
+                                                  sliceInfo_.bStartPos / (cmpRatio));
+                } else {
+                    tcGap = static_cast<uint32_t>(CeilDivT(sliceInfo_.bStartPos + seqLength, (cmpRatio)) -
+                                                  CeilDivT(sliceInfo_.bStartPos + sliceInfo_.sIdx, (cmpRatio)));
                 }
-                // sIdx不能超过seqLength, 否则下一轮do-while会下溢
-                sliceInfo_.sIdx = min(nextAlignSIdx, seqLength);
+
                 if (needDealTcSize_ < tcGap) {
-                    // 需要消耗的seq不能超过batch范围
-                    uint32_t maxRemainSeq = (sliceInfo_.sIdx < seqLength) ? (seqLength - sliceInfo_.sIdx) : 0;
-                    uint32_t remainSeq = min(needDealTcSize_ * cmpRatio, maxRemainSeq);
-                    sliceInfo_.dealedSeqCnt += remainSeq;
-                    sliceInfo_.sIdx += remainSeq;
+                    // ── (B) 部分跳过：任务量不足以跳过整个空洞 ──
+                    // 只推进任务量对应的行（needTc 个块 = needTc*cmpRatio 行），clamp 到空洞内。
+                    //
+                    // ★特殊4：needTc == 0 时不推进任何行——行推进必须与任务量消耗严格
+                    //   对应；否则核起点"行已推进、块未消耗"，后续核分到无行的块
+                    //   （读窗口外数据 / 输出丢失）。
+                    //
+                    // ★特殊5：needTc*cmpRatio 可能超过空洞行数（尾部块凑不齐一块），
+                    //   clamp 后停在空洞末尾，不越界（"凑不齐也算一块"的任务量不变）。
+                    uint32_t skip = needDealTcSize_ * cmpRatio;
+                    if (sliceInfo_.sIdx == 0 && needDealTcSize_ > 0) {
+                        skip -= static_cast<uint32_t>(sliceInfo_.bStartPos % cmpRatio);
+                    }
+                    sliceInfo_.dealedSeqCnt += skip;
+                    sliceInfo_.sIdx += skip;
                     needDealTcSize_ = 0;
-                    break;
+                    break; // 任务量耗尽：迭代终止
                 }
-                if (sliceInfo_.sIdx < seqLength) {
-                    sliceInfo_.dealedSeqCnt += seqLength - sliceInfo_.sIdx;
-                }
+                // ── (C) 完整跳过：推进整个空洞，消耗 tcGap 个 Tc ──
+                // 空洞全部行在本 batch 内，推进后 sIdx 到达 seqLength（batch 末尾），
+                // 随后换到下一个 batch。
+                sliceInfo_.dealedSeqCnt += gapRows;
+                sliceInfo_.sIdx += gapRows;
                 needDealTcSize_ -= tcGap;
             }
             sliceInfo_.bIdx++;
             if (sliceInfo_.bIdx == batch_size_) {
-                sliceInfo_.bIdx = 0;
+                // 终止而非回绕（防死循环；正常遍历不会触发）
+                sliceInfo_.bIdx = batch_size_ - 1;
+                sliceInfo_.sIdx = 0;
+                sliceInfo_.bSeqUsed = 0;
+                sliceInfo_.bStartPos = tools_.GetStartPos(sliceInfo_.bIdx);
+                sliceInfo_.bSeqLength = tools_.GetSeqLength(sliceInfo_.bIdx);
+                needDealTcSize_ = 0;
+                break;
             }
             sliceInfo_.sIdx = 0;
             sliceInfo_.bSeqUsed = tools_.GetSeqUsed(sliceInfo_.bIdx);
-            isFirstDoWhileIter = false;
+            sliceInfo_.bStartPos = tools_.GetStartPos(sliceInfo_.bIdx);
+            sliceInfo_.bSeqLength = tools_.GetSeqLength(sliceInfo_.bIdx);
         } while (sliceInfo_.bSeqUsed == 0);
-        sliceInfo_.bSeqLength = tools_.GetSeqLength(sliceInfo_.bIdx);
-        sliceInfo_.bStartPos = tools_.GetStartPos(sliceInfo_.bIdx);
     }
     if (isFirst_) {
         isFirst_ = false;
@@ -709,7 +763,7 @@ template <typename COMP>
 __aicore__ inline Vec1SliceInfo &QuantCompressorVec1SliceIterator<COMP>::GetSlice()
 {
     uint32_t cmpRatio = tools_.toolParams_.cmpRatio;
-    if (sliceInfo_.bSeqUsed < sliceInfo_.sIdx) {
+    if (sliceInfo_.bSeqUsed <= sliceInfo_.sIdx) {
         sliceInfo_.headHolderSeqCnt = 0;
         sliceInfo_.validSeqCnt = 0;
         sliceInfo_.tailHolderSeqCnt = 0;

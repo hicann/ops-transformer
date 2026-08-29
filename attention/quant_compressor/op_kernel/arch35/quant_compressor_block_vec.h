@@ -22,6 +22,7 @@
 #include "vf/vf_add_quant_compressor.h"
 #include "vf/vf_mul_quant_compressor.h"
 #include "vf/vf_dequant_quant_compressor.h"
+#include <limits>
 
 using namespace AscendC;
 
@@ -36,7 +37,7 @@ public:
     static constexpr uint64_t BLOCK_VEC_BASE_BUFFER_SIZE = 32 * 1024; // 32k
     static constexpr uint32_t DATABLOCK_BYTES = 32;
     static constexpr float FLOAT_ZERO = 0;
-    float SOFTMAX_MIN_NUM = static_cast<float>(-1.0 / 0.0);
+    static constexpr float SOFTMAX_MIN_NUM = -std::numeric_limits<float>::infinity();
     // =================================类型定义区=================================
     // 中间计算数据类型为float，高精度模式
     using T = float;
@@ -939,7 +940,7 @@ template <typename COMP>
 __aicore__ inline void QuantCompressorBlockVector<COMP>::SoftmaxDN(const LocalTensor<T> &scoreLocal,
                                                                    uint32_t tcDealSize, uint32_t dDealSize)
 {
-    float minValue = -2e38;
+    float minValue = SOFTMAX_MIN_NUM;
     uint32_t ReduceSize = coff_ * cmpRatio_;
     FaVectorApi::SoftmaxDnVF<T>(scoreLocal, scoreLocal, dDealSize, ReduceSize, tcDealSize, minValue, dDealSize);
 }
@@ -1082,6 +1083,13 @@ __aicore__ inline void QuantCompressorBlockVector<COMP>::CalcGroupInfo(const Vec
 {
     uint32_t aiCoreNum = constInfo_.usedCoreNum * 2;
     splitInfo.dBaseSize = constInfo_.headDim / min(FloorPow2(aiCoreNum), CeilPow2(CeilDivT(aiCoreNum, info.dealTcNum)));
+    // 32B(8个FP32)对齐的UB列窗口上限。dBaseSize 超过它时 CalcTilingStrategy 会走
+    // dSplitSize = dBaseSize/dLoopCount 整数除法拆分，切出的列窗口非32B对齐
+    // （DataCopy 的 blockLen/srcGap 整数除法错位 → 行间源偏移错误 → 数据错乱）。
+    // clamp 到“不超过 maxDealColNum 的最大2的幂”后，dSplitSize 恒等于 dBaseSize
+    // （2的幂，天然8元素对齐），不再进入拆分分支。
+    uint32_t maxDealColNum = BUFFER_SIZE_BYTE_32K / (cmpRatio_ * coff_ * sizeof(T));
+    splitInfo.dBaseSize = min(splitInfo.dBaseSize, FloorPow2(Trunc(maxDealColNum, BlockElementNum<T>())));
     if (constInfo_.kBaseNum > 1) {
         splitInfo.dBaseSize = max(splitInfo.dBaseSize, FP32_REPEAT_ELEMENT_NUM);
     }

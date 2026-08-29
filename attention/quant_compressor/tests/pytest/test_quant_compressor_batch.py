@@ -91,7 +91,7 @@ def compressor(testcase_files):  # 初始化参数和tensor
         cpu_kv_state_origin = cpu_kv_state[~mask_cpu_kv_state]
         cpu_score_state_update = cpu_score_state[mask_cpu_score_state]
         cpu_score_state_origin = cpu_score_state[~mask_cpu_score_state]
-        data_type = str(npu_result.dtype)
+        data_type = str(npu_result.dtype).replace("torch.", "")
         print(
             "--------------------------------------------------------------check result-------------------------------------------------------------"
         )

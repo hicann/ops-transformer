@@ -84,14 +84,14 @@ constexpr uint32_t MIN_CMPRATIO_SIZE = 2;
 
 constexpr uint32_t BATCH_MODE_SCHEDULE = 1;
 
-static const std::string X_NAME = "query";
+static const std::string X_NAME = "x";
 static const std::string WKV_NAME = "wkv";
 static const std::string WGATE_NAME = "wgate";
 static const std::string STATE_CACHE_NAME = "state_cache";
 static const std::string APE_NAME = "ape";
 static const std::string STATE_BLOCK_TABLE_NAME = "state_block_table";
 static const std::string CU_SEQLENS_NAME = "cu_seqlens";
-static const std::string SEQUSED_NAME = "seq_used";
+static const std::string SEQUSED_NAME = "seqused";
 static const std::string START_POS_NAME = "start_pos";
 static const std::string CMP_RATIO_NAME = "cmp_ratio";
 static const std::string COFF_NAME = "coff";
@@ -103,34 +103,32 @@ static const std::string KV_NAME = "kv";
 static std::string DataTypeToSerialString(ge::DataType type);
 
 const std::map<std::string, std::vector<ge::DataType>> DTYPE_SUPPORT_MAP = {
-    {X_NAME,                  {ge::DT_BF16, ge::DT_FLOAT16}},
-    {WKV_NAME,                {ge::DT_BF16, ge::DT_FLOAT16}},
-    {WGATE_NAME,              {ge::DT_BF16, ge::DT_FLOAT16}},
-    {STATE_CACHE_NAME,        {ge::DT_FLOAT}},
-    {APE_NAME,                {ge::DT_FLOAT}},
-    {STATE_BLOCK_TABLE_NAME,  {ge::DT_INT32}},
-    {CU_SEQLENS_NAME,         {ge::DT_INT32}},
-    {SEQUSED_NAME,            {ge::DT_INT32}},
-    {START_POS_NAME,          {ge::DT_INT32}},
-    {CMP_KV_NAME,             {ge::DT_BF16, ge::DT_FLOAT16}},
-    {SOFTMAX_SCORE_NAME,       {ge::DT_FLOAT}},
-    {KV_NAME,                  {ge::DT_FLOAT}}
-};
+    {X_NAME, {ge::DT_BF16, ge::DT_FLOAT16}},
+    {WKV_NAME, {ge::DT_BF16, ge::DT_FLOAT16}},
+    {WGATE_NAME, {ge::DT_BF16, ge::DT_FLOAT16}},
+    {STATE_CACHE_NAME, {ge::DT_FLOAT}},
+    {APE_NAME, {ge::DT_FLOAT}},
+    {STATE_BLOCK_TABLE_NAME, {ge::DT_INT32}},
+    {CU_SEQLENS_NAME, {ge::DT_INT32}},
+    {SEQUSED_NAME, {ge::DT_INT32}},
+    {START_POS_NAME, {ge::DT_INT32}},
+    {CMP_KV_NAME, {ge::DT_BF16, ge::DT_FLOAT16}},
+    {SOFTMAX_SCORE_NAME, {ge::DT_FLOAT}},
+    {KV_NAME, {ge::DT_FLOAT}}};
 
 const std::map<std::string, std::vector<uint32_t>> DIM_NUM_MAP = {
-    {X_NAME,                  {COMPRESSOR_DIM_NUM_2, COMPRESSOR_DIM_NUM_3}},
-    {WKV_NAME,                {COMPRESSOR_DIM_NUM_2}},
-    {WGATE_NAME,              {COMPRESSOR_DIM_NUM_2}},
-    {STATE_CACHE_NAME,        {COMPRESSOR_DIM_NUM_3}},
-    {APE_NAME,                {COMPRESSOR_DIM_NUM_2}},
-    {STATE_BLOCK_TABLE_NAME,  {COMPRESSOR_DIM_NUM_2, COMPRESSOR_DIM_NUM_1}},
-    {CU_SEQLENS_NAME,         {COMPRESSOR_DIM_NUM_1}},
-    {SEQUSED_NAME,            {COMPRESSOR_DIM_NUM_1}},
-    {START_POS_NAME,          {COMPRESSOR_DIM_NUM_1}},
-    {CMP_KV_NAME,             {COMPRESSOR_DIM_NUM_2, COMPRESSOR_DIM_NUM_3}},
-    {SOFTMAX_SCORE_NAME,       {COMPRESSOR_DIM_NUM_3, COMPRESSOR_DIM_NUM_4}},
-    {KV_NAME,                  {COMPRESSOR_DIM_NUM_3, COMPRESSOR_DIM_NUM_4}}
-};
+    {X_NAME, {COMPRESSOR_DIM_NUM_2, COMPRESSOR_DIM_NUM_3}},
+    {WKV_NAME, {COMPRESSOR_DIM_NUM_2}},
+    {WGATE_NAME, {COMPRESSOR_DIM_NUM_2}},
+    {STATE_CACHE_NAME, {COMPRESSOR_DIM_NUM_3}},
+    {APE_NAME, {COMPRESSOR_DIM_NUM_2}},
+    {STATE_BLOCK_TABLE_NAME, {COMPRESSOR_DIM_NUM_2, COMPRESSOR_DIM_NUM_1}},
+    {CU_SEQLENS_NAME, {COMPRESSOR_DIM_NUM_1}},
+    {SEQUSED_NAME, {COMPRESSOR_DIM_NUM_1}},
+    {START_POS_NAME, {COMPRESSOR_DIM_NUM_1}},
+    {CMP_KV_NAME, {COMPRESSOR_DIM_NUM_2, COMPRESSOR_DIM_NUM_3}},
+    {SOFTMAX_SCORE_NAME, {COMPRESSOR_DIM_NUM_3, COMPRESSOR_DIM_NUM_4}},
+    {KV_NAME, {COMPRESSOR_DIM_NUM_3, COMPRESSOR_DIM_NUM_4}}};
 
 static const std::map<std::string, uint32_t> LAYOUT_DIM_MAP = {
     {"BSH", COMPRESSOR_DIM_NUM_3},
@@ -188,9 +186,16 @@ struct OptionalParaInfo {
     const gert::Tensor *tensor;
 };
 
-enum class LayoutType { LAYOUT_BSH, LAYOUT_TH };
+enum class LayoutType {
+    LAYOUT_BSH,
+    LAYOUT_TH
+};
 
-enum class TemplateId : uint8_t { NORMAL = 0, EMPTY_X = 1, FULL_LOAD = 2 };
+enum class TemplateId : uint8_t {
+    EMPTY_X = 0,
+    NORMAL = 1,
+    FULL_LOAD = 2
+};
 
 struct CompressorBaseShapeInfo {
     uint32_t bSize = 0;    // B
@@ -209,7 +214,10 @@ const std::vector<int> COFF{1, 2};
 const std::vector<uint32_t> HEAD_DIM{128, 512};
 const std::vector<int> CACHE_MODE{1, 2};
 
-enum class CACHE_MODE : uint8_t { LINEAR_BUFFER = 1, RING_BUFFER = 2 };
+enum class CACHE_MODE : uint8_t {
+    LINEAR_BUFFER = 1,
+    RING_BUFFER = 2
+};
 
 struct CompressorContext {
     const char *opName;
@@ -247,14 +255,16 @@ struct CompressorContext {
 
 class CompressorTiling {
 public:
-    explicit CompressorTiling(CompressorContext *context) : context_(context) {}
+    explicit CompressorTiling(CompressorContext *context)
+        : context_(context)
+    {}
     ~CompressorTiling() = default;
 
     static ge::graphStatus ConvertContext(gert::TilingContext &context, CompressorContext &compressorContext);
     ge::graphStatus RunBigKernelTiling(CompressorTilingData *tilingData);
 
 private:
-    static void ConvertRequiredParams(gert::TilingContext &context, CompressorContext &compressorContext);
+    static ge::graphStatus ConvertRequiredParams(gert::TilingContext &context, CompressorContext &compressorContext);
 
     static void ConvertOptionalParams(gert::TilingContext &context, CompressorContext &compressorContext);
     ge::graphStatus GetNpuInfo();
@@ -335,7 +345,7 @@ private:
     CompressorWorkspaceParams *workspaceParams_ = nullptr;
 };
 
-} // namespace anonymous
+} // namespace
 
 CMP_EXTERN_C ge::graphStatus TilingCompressorArch35(gert::TilingContext *context);
 } // namespace optiling

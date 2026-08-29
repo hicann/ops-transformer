@@ -75,11 +75,20 @@ __aicore__ inline T CeilPow2(T num)
     return num;
 }
 
-enum class X_LAYOUT : std::uint8_t { BSH = static_cast<std::uint8_t>(0), TH = static_cast<std::uint8_t>(1) };
+enum class X_LAYOUT : std::uint8_t {
+    BSH = static_cast<std::uint8_t>(0),
+    TH = static_cast<std::uint8_t>(1)
+};
 
-enum class X_DTYPE : std::uint8_t { BF16 = static_cast<std::uint8_t>(0), FP16 = static_cast<std::uint8_t>(1) };
+enum class X_DTYPE : std::uint8_t {
+    BF16 = static_cast<std::uint8_t>(0),
+    FP16 = static_cast<std::uint8_t>(1)
+};
 
-enum class COFF : std::uint8_t { DISABLE = static_cast<std::uint8_t>(1), OVERLAP = static_cast<std::uint8_t>(2) };
+enum class COFF : std::uint8_t {
+    DISABLE = static_cast<std::uint8_t>(1),
+    OVERLAP = static_cast<std::uint8_t>(2)
+};
 
 enum class CACHE_MODE : std::uint8_t {
     LINEAR_BUFFER = static_cast<std::uint8_t>(1),
@@ -88,9 +97,13 @@ enum class CACHE_MODE : std::uint8_t {
 
 enum class GRAD_ENABLED : std::uint8_t {
     DISABLE = static_cast<std::uint8_t>(0),
-    ENABLE  = static_cast<std::uint8_t>(1)
+    ENABLE = static_cast<std::uint8_t>(1)
 };
-enum class TEMPLATE_ID : uint8_t { NORMAL = 0, EMPTY_X = 1, FULL_LOAD = 2 };
+enum class TEMPLATE_ID : uint8_t {
+    EMPTY_X = 0,
+    NORMAL = 1,
+    FULL_LOAD = 2
+};
 
 template <X_LAYOUT X_L, X_DTYPE X_T, COFF C, CACHE_MODE Cache_Mode, GRAD_ENABLED G, typename... Args>
 struct COMPType {
@@ -104,7 +117,9 @@ struct COMPType {
 struct CmpBlockInfo {
     __aicore__ inline CmpBlockInfo(){};
     __aicore__ inline CmpBlockInfo(uint32_t bIdx, uint32_t sIdx, bool needReset = false)
-        : bIdx(bIdx), sIdx(sIdx), needReset(needReset){};
+        : bIdx(bIdx),
+          sIdx(sIdx),
+          needReset(needReset){};
 
     uint32_t bIdx = 0U;
     uint32_t sIdx = 0U;
@@ -261,7 +276,9 @@ struct MSplitInfo {
 
 struct BlockInfo {
     __aicore__ inline BlockInfo(uint32_t bIdx, uint32_t sIdx, uint32_t dealSeqSize)
-        : bIdx(bIdx), sIdx(sIdx), dealSeqSize(dealSeqSize){};
+        : bIdx(bIdx),
+          sIdx(sIdx),
+          dealSeqSize(dealSeqSize){};
     uint32_t bIdx = 0U;
     uint32_t sIdx = 0U;
     uint32_t dealSeqSize = 0;

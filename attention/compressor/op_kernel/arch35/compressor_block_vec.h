@@ -21,6 +21,7 @@
 #include "vf/vf_softmax.h"
 #include "vf/vf_add.h"
 #include "vf/vf_mul.h"
+#include "limits"
 
 using namespace AscendC;
 
@@ -35,7 +36,7 @@ public:
     static constexpr uint64_t BLOCK_VEC_BASE_BUFFER_SIZE = BUFFER_SIZE_BYTE_32K; // 32k
     static constexpr uint32_t DATABLOCK_BYTES = 32;
     static constexpr float FLOAT_ZERO = 0;
-    static constexpr float SOFTMAX_MIN_NUM = -2e38;
+    static constexpr float SOFTMAX_MIN_NUM = -std::numeric_limits<float>::infinity();
     // =================================类型定义区=================================
     // 中间计算数据类型为float，高精度模式
     using T = float;
@@ -138,8 +139,8 @@ private:
                                           uint32_t dStartIdx, uint32_t dDealSize, uint32_t dBaseSize,
                                           uint32_t needDealTcSize);
     __aicore__ inline void CopyOutMidResToOutput(const LocalTensor<T> &kvLocal, const LocalTensor<T> &scoreLocal,
-                                                 const Vec1SliceInfo &sliceInfo,
-                                                 uint32_t compressTcSize, uint32_t dStartIdx, uint32_t dDealSize);
+                                                 const Vec1SliceInfo &sliceInfo, uint32_t compressTcSize,
+                                                 uint32_t dStartIdx, uint32_t dDealSize);
     __aicore__ inline void CopyOutVec1ResToOutput(const LocalTensor<T> &comperssoredUb, const Vec1SliceInfo &sliceInfo,
                                                   uint32_t compressTcSize, uint32_t dStartIdx, uint32_t dDealSize);
     __aicore__ inline void CalcGroupInfo(const Vec1RunInfo &info, Vec1SplitInfo &splitInfo);
@@ -209,8 +210,8 @@ __aicore__ inline void CompressorBlockVector<COMP>::Init(__gm__ uint8_t *x, __gm
                                                          __gm__ uint8_t *stateCache, __gm__ uint8_t *ape,
                                                          __gm__ uint8_t *stateBlockTable, __gm__ uint8_t *cuSeqlens,
                                                          __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos,
-                                                         __gm__ uint8_t *cmpKvOut,
-                                                         __gm__ uint8_t *softmaxScoreOut, __gm__ uint8_t *kvOut)
+                                                         __gm__ uint8_t *cmpKvOut, __gm__ uint8_t *softmaxScoreOut,
+                                                         __gm__ uint8_t *kvOut)
 {
     stateBlockTableGm_.SetGlobalBuffer((__gm__ int32_t *)stateBlockTable);
     stateCacheGm_.SetGlobalBuffer((__gm__ T *)stateCache);
@@ -904,7 +905,7 @@ template <typename COMP>
 __aicore__ inline void CompressorBlockVector<COMP>::SoftmaxDN(const LocalTensor<T> &scoreLocal, uint32_t tcDealSize,
                                                               uint32_t dDealSize)
 {
-    float minValue = SOFTMAX_MIN_VALUE;
+    float minValue = SOFTMAX_MIN_NUM;
     uint32_t ReduceSize = coff_ * cmpRatio_;
     FaVectorApi::SoftmaxDnVF<T>(scoreLocal, scoreLocal, dDealSize, ReduceSize, tcDealSize, minValue, dDealSize);
 }
@@ -918,12 +919,12 @@ __aicore__ inline void CompressorBlockVector<COMP>::KvMulReduceScore(const Local
     MulReduceSumbaseVF(kvLocal, scoreLocal, dstLocal, coff_, cmpRatio_, dDealSize, tcDealSize);
 }
 
-
 template <typename COMP>
-__aicore__ inline void
-CompressorBlockVector<COMP>::CopyOutMidResToOutput(const LocalTensor<T> &kvLocal, const LocalTensor<T> &scoreLocal,
-                                                   const Vec1SliceInfo &sliceInfo, uint32_t compressTcSize,
-                                                   uint32_t dStartIdx, uint32_t dDealSize)
+__aicore__ inline void CompressorBlockVector<COMP>::CopyOutMidResToOutput(const LocalTensor<T> &kvLocal,
+                                                                          const LocalTensor<T> &scoreLocal,
+                                                                          const Vec1SliceInfo &sliceInfo,
+                                                                          uint32_t compressTcSize, uint32_t dStartIdx,
+                                                                          uint32_t dDealSize)
 {
     if constexpr (COMP::xLayout == X_LAYOUT::BSH) {
         uint32_t bOutputScLen = CeilDivT(GetSeqLength(sliceInfo.bIdx), cmpRatio_);
@@ -956,11 +957,10 @@ CompressorBlockVector<COMP>::CopyOutMidResToOutput(const LocalTensor<T> &kvLocal
         }
     } else {
         uint64_t outGmOffset = compressedCnt_ * coff_ * cmpRatio_ * constInfo_.headDim + dStartIdx;
-        DataCopyWithOutputQue(softmaxScoreOutGm_[outGmOffset], scoreLocal,
-                              compressTcSize * coff_ * cmpRatio_, dDealSize, dDealSize,
+        DataCopyWithOutputQue(softmaxScoreOutGm_[outGmOffset], scoreLocal, compressTcSize * coff_ * cmpRatio_,
+                              dDealSize, dDealSize, constInfo_.headDim);
+        DataCopyWithOutputQue(kvOutGm_[outGmOffset], kvLocal, compressTcSize * coff_ * cmpRatio_, dDealSize, dDealSize,
                               constInfo_.headDim);
-        DataCopyWithOutputQue(kvOutGm_[outGmOffset], kvLocal, compressTcSize * coff_ * cmpRatio_, dDealSize,
-                              dDealSize, constInfo_.headDim);
     }
 }
 

@@ -19,26 +19,25 @@
 using namespace std;
 
 // 构造版本
-std::string Compressor_tiling_A3SocInfo =
-    "{\n"
-    "  \"hardware_info\": {\n"
-    "    \"BT_SIZE\": 0,\n"
-    "    \"load3d_constraints\": \"1\",\n"
-    "    \"Intrinsic_fix_pipe_l0c2out\": false,\n"
-    "    \"Intrinsic_data_move_l12ub\": true,\n"
-    "    \"Intrinsic_data_move_l0c2ub\": true,\n"
-    "    \"Intrinsic_data_move_out2l1_nd2nz\": false,\n"
-    "    \"4096\": 196608,\n"
-    "    \"L2_SIZE\": 201326592,\n"
-    "    \"L1_SIZE\": 524288,\n"
-    "    \"L0A_SIZE\": 65536,\n"
-    "    \"L0B_SIZE\": 65536,\n"
-    "    \"L0C_SIZE\": 131072,\n"
-    "    \"vector_core_cnt\": 40,\n"
-    "    \"cube_core_cnt\": 20,\n"
-    "    \"socVersion\": \"Ascend910_93\"\n"
-    "  }\n"
-    "}";
+std::string Compressor_tiling_A3SocInfo = "{\n"
+                                          "  \"hardware_info\": {\n"
+                                          "    \"BT_SIZE\": 0,\n"
+                                          "    \"load3d_constraints\": \"1\",\n"
+                                          "    \"Intrinsic_fix_pipe_l0c2out\": false,\n"
+                                          "    \"Intrinsic_data_move_l12ub\": true,\n"
+                                          "    \"Intrinsic_data_move_l0c2ub\": true,\n"
+                                          "    \"Intrinsic_data_move_out2l1_nd2nz\": false,\n"
+                                          "    \"4096\": 196608,\n"
+                                          "    \"L2_SIZE\": 201326592,\n"
+                                          "    \"L1_SIZE\": 524288,\n"
+                                          "    \"L0A_SIZE\": 65536,\n"
+                                          "    \"L0B_SIZE\": 65536,\n"
+                                          "    \"L0C_SIZE\": 131072,\n"
+                                          "    \"vector_core_cnt\": 40,\n"
+                                          "    \"cube_core_cnt\": 20,\n"
+                                          "    \"socVersion\": \"Ascend910_93\"\n"
+                                          "  }\n"
+                                          "}";
 
 // ====================================================================
 // BSH Layout Tiling Tests
@@ -46,14 +45,8 @@ std::string Compressor_tiling_A3SocInfo =
 
 class CompressorTilingArch22 : public testing::Test {
 protected:
-    static void SetUpTestCase()
-    {
-        std::cout << "CompressorTilingArch22 SetUp" << std::endl;
-    }
-    static void TearDownTestCase()
-    {
-        std::cout << "CompressorTilingArch22 TearDown" << std::endl;
-    }
+    static void SetUpTestCase() { std::cout << "CompressorTilingArch22 SetUp" << std::endl; }
+    static void TearDownTestCase() { std::cout << "CompressorTilingArch22 TearDown" << std::endl; }
 };
 
 // C4A bf16: B=2, S=8, H=4096, D=512, coff=2, cmp_ratio=4
@@ -82,6 +75,7 @@ TEST_F(CompressorTilingArch22, test1)
             {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
             {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
             {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+            {"grad_enabled", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
         },
         &compileInfo, "Ascend910_93", Compressor_tiling_A3SocInfo, 4096);
     int64_t expectTilingKey = 32;
@@ -356,6 +350,69 @@ TEST_F(CompressorTilingArch22, test6)
 // ====================================================================
 // Error Cases — expected FAIL
 // ====================================================================
+
+// A3 does not support cache_mode=2 (ring buffer).
+TEST_F(CompressorTilingArch22, test_cache_mode_ring_buffer_unsupported)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend910_93", Compressor_tiling_A3SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// A3 only supports grad_enabled=false.
+TEST_F(CompressorTilingArch22, test_grad_enabled_unsupported)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+            {"grad_enabled", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+        },
+        &compileInfo, "Ascend910_93", Compressor_tiling_A3SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
 
 // Unsupported cmp_ratio=3
 TEST_F(CompressorTilingArch22, test7)
