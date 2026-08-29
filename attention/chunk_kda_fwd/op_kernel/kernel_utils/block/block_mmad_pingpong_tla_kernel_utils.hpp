@@ -19,7 +19,7 @@
 #include "catlass/gemm/helper.hpp"
 #include "catlass/gemm/tile/tile_copy.hpp"
 #include "catlass/gemm/tile/tile_mmad.hpp"
-#include "../tile/copy_l0c_to_ub.hpp"
+#include "../tile/ckda_copy_l0c_to_ub.hpp"
 #include "tla/layout.hpp"
 #include "tla/tensor.hpp"
 

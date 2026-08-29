@@ -16,7 +16,7 @@
 #include "../../../gmm_infra/arch/gmm_arch.hpp"
 #include "../../../gmm_infra/layout/gmm_layout.hpp"
 #include "../../../gmm_infra/gemm/gmm_gemm_type.hpp"
-#include "../../../gmm_infra/gemm/tile/tile_copy_tla.hpp"
+#include "../../../gmm_infra/gemm/tile/gmm_gemm_tile_copy_tla.hpp"
 
 namespace Catlass::Gemm::Tile {
 

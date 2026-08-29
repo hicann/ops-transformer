@@ -284,7 +284,7 @@ attention:
       - attention/fused_infer_attention_score/tests
       - attention/fused_infer_attention_score/op_host/arch22
     test:
-      ut: False
+      ut: True
       examples: False
     options:
       - incre_flash_attention
@@ -440,7 +440,7 @@ attention:
       - attention/prompt_flash_attention/op_host/prompt_flash_attention_tiling_arch38.cpp
     test:
       examples: True
-      ut: False
+      ut: True
     options:
       - fused_infer_attention_score
       - prompt_flash_attention

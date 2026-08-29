@@ -11,7 +11,7 @@
 #ifndef CATLASS_GEMM_TILE_TILE_COPY_HPP
 #define CATLASS_GEMM_TILE_TILE_COPY_HPP
 
-#include "../../catlass.hpp"
+#include "../../tla_catlass.hpp"
 namespace Catlass::Gemm::Tile {
 
 template <class ArchTag, class TensorSrc, class TensorDst, class Enable = void>
@@ -28,11 +28,11 @@ struct TileCopyTlaExt {
 
 } // namespace Catlass::Gemm::Tile
 
-#include "copy_gm_to_l1.hpp"
-#include "copy_l0c_to_gm.hpp"
-#include "copy_l1_to_l0a.hpp"
-#include "copy_l1_to_l0b.hpp"
-#include "copy_l1_to_bt.hpp"
+#include "tla_gemm_copy_gm_to_l1.hpp"
+#include "tla_gemm_copy_l0c_to_gm.hpp"
+#include "tla_gemm_copy_l1_to_l0a.hpp"
+#include "tla_gemm_copy_l1_to_l0b.hpp"
+#include "tla_gemm_copy_l1_to_bt.hpp"
 #include "../tla_gemm_helper.hpp"
 
 

@@ -211,4 +211,5 @@ ge::graphStatus DeviceDoOpTilingFusedInferAttentionScore(gert::TilingContext *co
 ge::graphStatus TilingFusedInferAttentionScore(gert::TilingContext *context);
 FIA_EXTERN_C ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context);
 } // namespace optiling
+
 #endif // AIR_CXX_RUNTIME_V2_OP_IMPL_FUSEDINFERATTENTIONSCORE_H_

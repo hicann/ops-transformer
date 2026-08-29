@@ -16,7 +16,7 @@
 #ifndef MRS_V2_COPY_L0C_TO_GM_H
 #define MRS_V2_COPY_L0C_TO_GM_H
 
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tile/copy_l0c_to_gm.hpp"
+#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tile/tla_gemm_copy_l0c_to_gm.hpp"
 
 namespace Catlass::Gemm::Tile {
 constexpr uint32_t PARAM_INDEX_0 = 0;

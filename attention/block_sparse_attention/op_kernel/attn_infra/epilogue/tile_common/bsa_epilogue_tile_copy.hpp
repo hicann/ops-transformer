@@ -13,11 +13,11 @@
 
 #include "../../../attn_infra/bsa_base_defs.hpp"
 #include "../../../attn_infra/arch/bsa_arch.hpp"
-#include "../../../attn_infra/detail/tag_to_layout.hpp"
+#include "../../../attn_infra/detail/bsa_tag_to_layout.hpp"
 #include "../../../attn_infra/epilogue/tile_common/bsa_epilogue_copy_gm_to_ub.hpp"
 #include "../../../attn_infra/epilogue/tile_common/bsa_epilogue_copy_ub_to_gm.hpp"
-#include "../../../attn_infra/epilogue/tile_common/copy_gm_to_ub_tla.hpp"
-#include "../../../attn_infra/epilogue/tile_common/copy_ub_to_gm_tla.hpp"
+#include "../../../attn_infra/epilogue/tile_common/bsa_copy_gm_to_ub_tla.hpp"
+#include "../../../attn_infra/epilogue/tile_common/bsa_copy_ub_to_gm_tla.hpp"
 #include "../../../tla/tensor_bsa.hpp"
 
 namespace NpuArch::Epilogue::Tile 

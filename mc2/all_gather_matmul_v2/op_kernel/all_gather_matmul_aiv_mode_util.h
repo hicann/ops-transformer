@@ -17,7 +17,7 @@
 #define __ALL_GATHER_MATMUL_AIV_MODE_UTIL_H__
 
 #pragma once
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/numeric_size.hpp"
+#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_numeric_size.hpp"
 
 using namespace AscendC;
 

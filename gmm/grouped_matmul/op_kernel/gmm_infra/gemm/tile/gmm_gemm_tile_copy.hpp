@@ -14,16 +14,16 @@
 #include <type_traits>
 #include "../../../gmm_infra/base_defs.hpp"
 #include "../../../gmm_infra/gemm/tile/gmm_copy_gm_to_l1.hpp"
-#include "../../../gmm_infra/gemm/tile/copy_l1_to_fp.hpp"
+#include "../../../gmm_infra/gemm/tile/gmm_gemm_copy_l1_to_fp.hpp"
 #include "../../../gmm_infra/gemm/tile/gmm_copy_l0c_to_gm.hpp"
 #include "../../../gmm_infra/gemm/tile/gmm_copy_l1_to_l0a.hpp"
 #include "../../../gmm_infra/gemm/tile/gmm_copy_l1_to_l0b.hpp"
 #include "../../../gmm_infra/gemm/tile/gmm_copy_l1_to_bt.hpp"
 #include "../../../gmm_infra/gemm/tile/gmm_gemm_copy_gm_to_ub.hpp"
 #include "../../../gmm_infra/gemm/tile/gmm_gemm_copy_ub_to_gm.hpp"
-#include "../../../gmm_infra/gemm/tile/cast_int4_to_int8.hpp"
-#include "../../../gmm_infra/gemm/tile/cast_int8_to_fp16.hpp"
-#include "../../../gmm_infra/gemm/tile/cast_fp8_to_fp16.hpp"
+#include "../../../gmm_infra/gemm/tile/gmm_gemm_cast_int4_to_int8.hpp"
+#include "../../../gmm_infra/gemm/tile/gmm_gemm_cast_int8_to_fp16.hpp"
+#include "../../../gmm_infra/gemm/tile/gmm_gemm_cast_fp8_to_fp16.hpp"
 #include "../../../gmm_infra/gemm/gmm_helper.hpp"
 
 

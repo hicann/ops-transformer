@@ -16,7 +16,7 @@
 #ifndef CATLASS_GEMM_TILE_COPY_L0C_TO_GM_EXPAND_H
 #define CATLASS_GEMM_TILE_COPY_L0C_TO_GM_EXPAND_H
 
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tile/copy_l0c_to_gm.hpp"
+#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tile/tla_gemm_copy_l0c_to_gm.hpp"
 
 namespace Catlass::Gemm::Tile {
 

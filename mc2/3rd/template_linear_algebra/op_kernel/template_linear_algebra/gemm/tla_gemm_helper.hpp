@@ -11,9 +11,9 @@
 #ifndef CATLASS_GEMM_HELPER_HPP
 #define CATLASS_GEMM_HELPER_HPP
 
-#include "../catlass.hpp"
-#include "../layout/layout.hpp"
-#include "../numeric_size.hpp"
+#include "../tla_catlass.hpp"
+#include "../layout/tla_layout_layout.hpp"
+#include "../tla_numeric_size.hpp"
 
 namespace Catlass::Gemm::helper {
 

@@ -11,7 +11,7 @@
 #ifndef CATLASS_GEMM_DISPATCH_POLICY_HPP
 #define CATLASS_GEMM_DISPATCH_POLICY_HPP
 
-#include "../catlass.hpp"
+#include "../tla_catlass.hpp"
 
 namespace Catlass::Gemm {
 

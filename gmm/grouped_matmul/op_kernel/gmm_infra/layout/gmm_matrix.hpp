@@ -16,7 +16,7 @@
 #include "../../gmm_infra/gmm_numeric_size.hpp"
 #include "../../gmm_infra/detail/gmm_alignment.hpp"
 #include "../../gmm_infra/gmm_matrix_coord.hpp"
-#include "../../gmm_infra/conv_coord.hpp"
+#include "../../gmm_infra/gmm_conv_coord.hpp"
 
 namespace Catlass::layout {
 
