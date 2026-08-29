@@ -641,13 +641,18 @@ __aicore__ inline uint32_t CSABlockVec<TEMPLATE_ARGS>::CopyInKvSparse(LocalTenso
                 scalePadParams.rightPadding = 0;
                 scalePadParams.paddingValue = 0;
 
+                // feature搬运从较小地址开始，当keyOffset0 > keyOffset1时
+                // feature顺序被交换(token1→row0, token0→row1)，scale需同步交换
+                bool swapOrder = (keyOffset0 > -1 && keyOffset1 > -1 && keyOffset0 > keyOffset1);
                 if (scaleOffset0 >= 0) {
-                    DataCopyPad(kvInUb[startRow * combineDimAlign + dCombineBytes], keyGm[scaleOffset0], scaleParams,
+                    uint32_t dstRow = swapOrder ? (startRow + 1) : startRow;
+                    DataCopyPad(kvInUb[dstRow * combineDimAlign + dCombineBytes], keyGm[scaleOffset0], scaleParams,
                                 scalePadParams);
                 }
                 if (scaleOffset1 >= 0) {
-                    DataCopyPad(kvInUb[(startRow + 1) * combineDimAlign + dCombineBytes], keyGm[scaleOffset1],
-                                scaleParams, scalePadParams);
+                    uint32_t dstRow = swapOrder ? startRow : (startRow + 1);
+                    DataCopyPad(kvInUb[dstRow * combineDimAlign + dCombineBytes], keyGm[scaleOffset1], scaleParams,
+                                scalePadParams);
                 }
             }
         }
