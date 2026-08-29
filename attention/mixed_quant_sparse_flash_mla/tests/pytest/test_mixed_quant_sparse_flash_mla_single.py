@@ -100,7 +100,9 @@ def mqsmla(param_combinations):
     if Testcase_Name is None:
         ops_mode = "prefill" if params["S1"] > 4 else "decode"
         q_type_str = "BF16" if params["q_type"] == torch.bfloat16 else "FP16"
-        kv_type_str = "HIF8" if params["ori_kv_type"] == torch.uint8 else "FP8_E4M3FN"
+        kv_type_str = (
+            "FP8_AS_UINT8" if params["ori_kv_type"] == torch.uint8 else "FP8_E4M3FN"
+        )
         prefix_part = (
             f"{param_combinations['tc_prefix']}_"
             if param_combinations.get("tc_prefix", "")
@@ -179,7 +181,9 @@ def _gen_testcase_id(params, idx):
         return name
     ops_mode = "prefill" if params["S1"] > 4 else "decode"
     q_type_str = "BF16" if params["q_type"] == torch.bfloat16 else "FP16"
-    kv_type_str = "HIF8" if params["ori_kv_type"] == torch.uint8 else "FP8_E4M3FN"
+    kv_type_str = (
+        "FP8_AS_UINT8" if params["ori_kv_type"] == torch.uint8 else "FP8_E4M3FN"
+    )
     return f"{params['template_run_mode']}_{ops_mode}_{params['layout_q']}_{q_type_str}_{params['layout_kv']}_{kv_type_str}_B{params['B']}_S1{params['S1']}_S2{params['S2']}_D{params['D']}_K{params['K']}_{idx:06d}"
 
 

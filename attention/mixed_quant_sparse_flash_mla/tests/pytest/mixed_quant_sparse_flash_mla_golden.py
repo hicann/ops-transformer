@@ -28,6 +28,18 @@ FP8_DATA_RANGE_LEFT = -5
 FP8_DATA_RANGE_RIGHT = 5
 
 
+def get_kv_compute_dtype(kv_type):
+    """Use FP8 semantics when the operator input is stored as disguised uint8."""
+    return torch.float8_e4m3fn if kv_type == torch.uint8 else kv_type
+
+
+def reinterpret_kv_for_operator(kv_tensor, kv_type):
+    """Expose FP8 bytes as uint8 without changing their storage."""
+    if kv_tensor is not None and kv_type == torch.uint8:
+        return kv_tensor.view(torch.uint8)
+    return kv_tensor
+
+
 def resolve_input_data_ranges(q_datarange, ori_kv_datarange, cmp_kv_datarange):
     """Apply the canonical MQSMLA data range defaults."""
     default_range = [DATA_RANGE_LEFT, DATA_RANGE_RIGHT]
@@ -2195,6 +2207,8 @@ def generate_and_save_testdata(
     q_type = params["q_type"]
     ori_kv_type = params["ori_kv_type"]
     cmp_kv_type = params["cmp_kv_type"]
+    ori_kv_compute_type = get_kv_compute_dtype(ori_kv_type)
+    cmp_kv_compute_type = get_kv_compute_dtype(cmp_kv_type)
     B = params["B"]
     S1 = params["S1"]
     T1 = params["T1"]
@@ -2345,7 +2359,7 @@ def generate_and_save_testdata(
             ori_topk_length,
         ) = gen_ori_kv(
             q_type,
-            ori_kv_type,
+            ori_kv_compute_type,
             B,
             S1,
             T1,
@@ -2389,7 +2403,7 @@ def generate_and_save_testdata(
             ori_topk_length,
         ) = gen_ori_kv_quant_2_pa(
             q_type,
-            ori_kv_type,
+            ori_kv_compute_type,
             B,
             S1,
             T1,
@@ -2434,7 +2448,7 @@ def generate_and_save_testdata(
             ) = gen_cmp_kv(
                 q_type,
                 layout_q,
-                cmp_kv_type,
+                cmp_kv_compute_type,
                 B,
                 S1,
                 T1,
@@ -2478,7 +2492,7 @@ def generate_and_save_testdata(
                 cmp_topk_length,
             ) = gen_cmp_kv_quant_2_pa(
                 q_type,
-                cmp_kv_type,
+                cmp_kv_compute_type,
                 B,
                 S1,
                 T1,
@@ -2516,6 +2530,11 @@ def generate_and_save_testdata(
         cmp_k_bnsd = None
         cmp_topk_length = None
 
+    # Golden tensors above retain FP8 semantics. Only the tensors crossing the
+    # operator/save boundary are reinterpreted as uint8 when requested.
+    ori_k_in_pa_shape = reinterpret_kv_for_operator(ori_k_in_pa_shape, ori_kv_type)
+    cmp_k_in_pa_shape = reinterpret_kv_for_operator(cmp_k_in_pa_shape, cmp_kv_type)
+
     # 0轴非连续
     # if layout_kv == "PA_BBND" and (template_run_mode == "HCA" or template_run_mode == "CSA"):
     #     total_block = block_size1 + block_size2
@@ -2540,8 +2559,8 @@ def generate_and_save_testdata(
         "layout_q": layout_q,
         "layout_kv": layout_kv,
         "q_type": q_type,
-        "ori_kv_type": ori_kv_type,
-        "cmp_kv_type": cmp_kv_type,
+        "ori_kv_type": ori_kv_compute_type,
+        "cmp_kv_type": cmp_kv_compute_type,
         "B": B,
         "S1": S1,
         "T1": T1,

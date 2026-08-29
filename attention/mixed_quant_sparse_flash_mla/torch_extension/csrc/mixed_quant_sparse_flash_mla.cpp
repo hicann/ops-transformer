@@ -27,6 +27,11 @@ const int DIM_4 = 4;
 
 constexpr int64_t MQSMLA_METADATA_SIZE = 1024;
 
+inline TensorWrapper MqsmlaMakeWrapper(const at::Tensor &tensor, aclDataType tensorAcltype)
+{
+    return {tensor, tensorAcltype};
+}
+
 at::Tensor MixedQuantSparseFlashMlaMetadata(
     int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, int64_t quantMode,
     const c10::optional<at::Tensor> &cuSeqlensQ, const c10::optional<at::Tensor> &cuSeqlensOriKv,
@@ -172,11 +177,16 @@ std::tuple<at::Tensor, at::Tensor> MixedQuantSparseFlashMla(
     at::Tensor attenOut = std::get<0>(mixedQuantSparseFlashMlaAttenOut);
     at::Tensor softmaxLse = std::get<1>(mixedQuantSparseFlashMlaAttenOut);
 
-    ACLNN_CMD(aclnnMixedQuantSparseFlashMla, q, oriKv, cmpKv, oriSparseIndices, cmpSparseIndices, oriBlockTable,
-              cmpBlockTable, cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, sequsedQ, sequsedOriKv, sequsedCmpKv,
-              cmpResidualKv, oriTopkLength, cmpTopkLength, sinks, metadata, quantMode, ropeHeadDim, softmaxScale,
-              cmpRatio, oriMaskMode, cmpMaskMode, oriWinLeft, oriWinRight, layoutQPtr, layoutKvPtr, topkValueMode,
-              returnSoftmaxLse, attenOut, softmaxLse);
+    at::Tensor nullTensor;
+    auto oriKvValue = oriKv.has_value() ? oriKv.value() : nullTensor;
+    auto cmpKvValue = cmpKv.has_value() ? cmpKv.value() : nullTensor;
+    TensorWrapper oriKvWrapper = MqsmlaMakeWrapper(oriKvValue, ACL_FLOAT8_E4M3FN);
+    TensorWrapper cmpKvWrapper = MqsmlaMakeWrapper(cmpKvValue, ACL_FLOAT8_E4M3FN);
+    ACLNN_CMD(aclnnMixedQuantSparseFlashMla, q, oriKvWrapper, cmpKvWrapper, oriSparseIndices, cmpSparseIndices,
+              oriBlockTable, cmpBlockTable, cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, sequsedQ, sequsedOriKv,
+              sequsedCmpKv, cmpResidualKv, oriTopkLength, cmpTopkLength, sinks, metadata, quantMode, ropeHeadDim,
+              softmaxScale, cmpRatio, oriMaskMode, cmpMaskMode, oriWinLeft, oriWinRight, layoutQPtr, layoutKvPtr,
+              topkValueMode, returnSoftmaxLse, attenOut, softmaxLse);
     return std::tuple<at::Tensor, at::Tensor>(attenOut, softmaxLse);
 }
 

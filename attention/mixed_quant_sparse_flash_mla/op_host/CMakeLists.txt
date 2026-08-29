@@ -12,7 +12,7 @@ add_op_to_compiled_list()
 
 if (BUILD_OPEN_PROJECT)
     set(mixed_quant_sparse_flash_mla_depends attention/common attention/sparse_flash_mla CACHE INTERNAL "Dependencies for mixed_quant_sparse_flash_mla")
-    target_sources(op_host_aclnn PRIVATE
+    target_sources(op_host_aclnnInner PRIVATE
         mixed_quant_sparse_flash_mla_def.cpp
     )
 endif()
@@ -26,7 +26,12 @@ add_ops_compile_options(
             -mllvm -cce-aicore-hoist-movemask=false
 )
 
-add_modules_sources(OPTYPE mixed_quant_sparse_flash_mla ACLNNTYPE aclnn)
+add_modules_sources(
+    OP_API_INDEPENDENT ON
+    OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
+    OPTYPE mixed_quant_sparse_flash_mla
+    ACLNNTYPE aclnn_inner
+)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../sparse_flash_mla/op_host/checkers/checker_sources.cmake)
 set(MIXED_QUANT_SPARSE_MLA_CHECKER_SRC_FILES
