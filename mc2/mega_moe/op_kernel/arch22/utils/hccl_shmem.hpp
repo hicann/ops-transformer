@@ -549,7 +549,8 @@ public:
         AscendC::CrossCoreWaitFlag(SEND_SYNC_EVENT_ID);
         pipe_barrier(PIPE_ALL);
 
-        ctrBuffer.SetValue(0, epStateValue_);
+        int64_t epStateValue64 = static_cast<int64_t>(static_cast<uint32_t>(epStateValue_));
+        ctrBuffer.template ReinterpretCast<int64_t>().SetValue(0, epStateValue64);
         AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID0);
         AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID0);
         AscendC::LocalTensor<uint64_t> rdmaUbLocal;
@@ -592,7 +593,8 @@ public:
         AscendC::CrossCoreSetFlag<0x0, PIPE_MTE3>(SEND_SYNC_EVENT_ID);
         AscendC::CrossCoreWaitFlag(SEND_SYNC_EVENT_ID);
         pipe_barrier(PIPE_ALL);
-        ctrBuffer.SetValue(0, epStateValue_);
+        int64_t epStateValue64 = static_cast<int64_t>(static_cast<uint32_t>(epStateValue_));
+        ctrBuffer.template ReinterpretCast<int64_t>().SetValue(0, epStateValue64);
         AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID0);
         AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID0);
         for (uint32_t dstEpIdx = vec_id; dstEpIdx < m_rankSize; dstEpIdx += vec_size) {
