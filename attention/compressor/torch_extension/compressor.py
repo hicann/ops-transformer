@@ -138,11 +138,6 @@ def _compressor_backward(
     coff: Optional[int] = 1,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     op_module = compressor_op_builder.load()
-    d_x = torch.empty_like(x)
-    d_wkv = torch.empty_like(wkv)
-    d_wgate = torch.empty_like(wgate)
-    d_ape_size = (cmp_ratio, wkv.size(0))
-    d_ape = torch.empty(d_ape_size, dtype=torch.float32, device=x.device)
     return op_module.compressor_backward(
         d_cmp_kv,
         x,
@@ -184,6 +179,7 @@ def _compressor_backward_fake(
 # Register AutoGrad
 # ===========================================================================
 def setup_context(ctx, inputs, output):
+    ctx.set_materialize_grads(False)
     x, wkv, wgate = inputs[:3]
     cu_seqlens, seqused, start_pos, cmp_ratio, coff = inputs[6:11]
 
