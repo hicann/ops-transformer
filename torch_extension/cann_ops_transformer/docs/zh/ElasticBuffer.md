@@ -349,7 +349,7 @@ ElasticBuffer.dispatch(
     num_max_tokens_per_rank=None,
     expert_alignment=None,
     do_cpu_sync=None,
-) -> (Tensor, Tensor, Tensor, EPHandle)
+) -> (Tensor | Tuple[Tensor, Tensor], Tensor | None, Tensor | None, EPHandle)
 ```
 
 **输入参数**：
@@ -359,10 +359,10 @@ ElasticBuffer.dispatch(
 - **topk_idx** (`Tensor`)：可选参数，表示每个token的topK个专家索引，决定每个token要发给哪些专家。要求为2 维张量，shape为 `(BS, K)`，数据类型支持 `int32`，数据格式为 $ND$。张量里value取值范围为 `[0, num_experts)`。非cached模式下为必选参数，cached模式下必须为 `None`。
 - **topk_weights** (`Tensor`)：可选参数，表示每个token对应的topK专家权重。要求为2 维张量，shape为 `(BS, K)`，数据类型支持 `float32`，数据格式为 $ND$。非cached模式下为可选参数，cached模式下必须为 `None`。
 - **handle** (`EPHandle`)：可选参数，表示上一次dispatch返回的handle对象，用于cached模式。传入handle时，`topk_idx` 和 `topk_weights` 必须为 `None`，`do_cpu_sync` 必须为 `False`。默认为 `None`，即非cached模式。
-- **num_experts** (`int`)：可选参数，MoE专家总数量。取值范围 `[2, 2048]`，且满足 `num_experts % ep_world_size = 0`。非cached模式下为必选参数；cached模式下必须为 `None`。
-- **num_max_tokens_per_rank** (`int`)：可选参数，表示每张卡上的最大token数量上限，传入时覆盖ElasticBuffer初始化的值。默认使用初始化时传入的值。
-- **expert_alignment** (`int`)：可选参数，表示专家对齐数。非cached模式默认值为1；cached模式使用 `handle` 中的值。
-- **do_cpu_sync** (`bool`)：可选参数，表示是否进行CPU同步等待。非cached模式默认为 `True`，cached模式必须为 `False`。
+- **num_experts** (`int`)：可选参数，MoE专家总数量。取值范围 `[2, 2048]`，且满足 `num_experts % ep_world_size = 0`。非cached模式下为必选参数；cached模式下使用 `handle` 中的值，传入参数被忽略。
+- **num_max_tokens_per_rank** (`int`)：可选参数，表示每张卡上的最大token数量上限，传入时覆盖ElasticBuffer初始化的值。默认使用初始化时传入的值。cached模式下使用 `handle` 中的值，传入参数被忽略。
+- **expert_alignment** (`int`)：可选参数，表示专家对齐数。当前仅支持取值1；cached模式使用 `handle` 中的值。
+- **do_cpu_sync** (`bool`)：可选参数，表示是否进行CPU同步等待。非cached模式默认为 `True`，cached模式下不能为 `True`。
 
 **输出说明**：
 
@@ -404,7 +404,7 @@ ElasticBuffer.combine(x, handle, *, topk_weights=None, bias=None) -> (Tensor, Te
 
 **输入参数**：
 
-- **x** (`Tensor`)：必选参数，表示经过专家计算后的token数据，即 [dispatch](#dispatch) 输出的 `recv_x` 经过专家网络处理后的结果。要求为2 维张量，shape为 `(A, H)`，数据类型仅支持 `bfloat16`，数据格式为 $ND$。
+- **x** (`Tensor`)：必选参数，表示经过专家计算后的token数据，即 [dispatch](#dispatch) 输出的 `recv_x` 经过专家网络处理后的结果。要求为2 维张量，shape为 `(A, H)`，数据类型支持 `bfloat16`、`float16`，数据格式为 $ND$。
 - **handle** (`EPHandle`)：必选参数，表示 [dispatch](#dispatch) 返回的handle对象，包含slot索引、接收元数据等信息。handle的属性参见 [dispatch](#dispatch) 输出说明。
 - <strong>*</strong>：其之前的变量是位置相关的；之后的变量是可选参数，需要使用键值对赋值，不赋值会使用默认值。
 - **topk_weights** (`Tensor`)：可选参数，表示每个token对应的topK专家权重，用于加权聚合。要求为1 维张量，shape为 `(A,)`，数据类型支持 `float32`，数据格式为 $ND$，对应 [dispatch](#dispatch) 的 `recv_topk_weights` 输出。若不提供，则进行纯累加combine，输出 `combined_topk_weights` 为 `None`。
@@ -412,7 +412,7 @@ ElasticBuffer.combine(x, handle, *, topk_weights=None, bias=None) -> (Tensor, Te
 
 **输出说明**：
 
-- **combined_x** (`Tensor`)：表示combine后的token数据，还原为原始序列顺序。要求为2 维张量，shape为 `(BS, H)`，数据类型为 `bfloat16`，数据格式为 $ND$，不支持非连续的Tensor。
+- **combined_x** (`Tensor`)：表示combine后的token数据，还原为原始序列顺序。要求为2 维张量，shape为 `(BS, H)`，数据类型与 `x` 一致（`bfloat16` 或 `float16`），数据格式为 $ND$，不支持非连续的Tensor。
 - **combined_topk_weights** (`Tensor | None`)：表示combine后的topK专家权重。当 `topk_weights` 输入不为 `None` 时，要求为2 维张量，shape为 `(BS, K)`，数据类型为 `float32`，数据格式为 $ND$；当 `topk_weights` 输入为 `None` 时，返回 `None`。
 
 ### get_moe_ep_ccl_buffer_size（静态方法）
@@ -427,9 +427,9 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
 
 **输入参数**：
 
-- **world_size** (`int`)：必选参数，表示EP通信域的大小（即参与EP通信的卡数）。取值范围 `[2, 768]`。
+- **world_size** (`int`)：必选参数，表示EP通信域的大小（即参与EP通信的卡数）。取值范围 `[2, 1024]`。
 - **num_max_tokens_per_rank** (`int`)：必选参数，表示每张卡上的最大token数量上限。
-- **hidden** (`int`)：必选参数，表示hidden size隐藏层大小。取值范围 `[1024, 8192]`。
+- **hidden** (`int`)：必选参数，表示hidden size隐藏层大小。取值范围 `(0, 8192]`。
 - **num_experts** (`int`)：必选参数，MoE专家总数量，取值范围 `[2, 2048]`，且满足 `num_experts % ep_world_size = 0`。
 - **topk** (`int`)：必选参数，表示选取topK个专家，取值范围 `[1, 32]`。
 
@@ -441,35 +441,52 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
 
 ```text
 local_experts_num = num_experts // world_size
-state_buffer_size =
-    world_size * Align512(local_experts_num * 4)
-    + 2 * world_size * 512
-    + num_max_tokens_per_rank * topk * 512
-    + world_size * 512
+
+dispatch_count_size = world_size * Align512(local_experts_num * 4)
+dispatch_notify_count = Align15000(num_max_tokens_per_rank) // 15000
+dispatch_notify_size = world_size * 512 * (1 + dispatch_notify_count)
+combine_state_size = num_max_tokens_per_rank * topk * 512 + world_size * 512
+state_buffer_size = dispatch_count_size + dispatch_notify_size + combine_state_size
 
 metadata_bytes = Align32(topk * 4)
 hidden_align = Align32(hidden * 2)
 dispatch_per_slot_bytes = Align512(hidden_align + metadata_bytes * 2 + 32)
 combine_per_slot_bytes = Align512(hidden_align + 32)
 
-dispatch_recv_buffer_size =
-    world_size * num_max_tokens_per_rank * dispatch_per_slot_bytes
-combine_recv_buffer_size =
-    num_max_tokens_per_rank * topk * combine_per_slot_bytes
+dispatch_recv_buffer_size = world_size * num_max_tokens_per_rank * dispatch_per_slot_bytes
+combine_recv_buffer_size = num_max_tokens_per_rank * topk * combine_per_slot_bytes
 dispatch_send_buffer_size = dispatch_recv_buffer_size
-
-minimum_buffer_size =
+direct_minimum_buffer_size =
     state_buffer_size
     + dispatch_recv_buffer_size
     + combine_recv_buffer_size
     + dispatch_send_buffer_size
+
+combine_buffer_size = num_max_tokens_per_rank * topk * combine_per_slot_bytes
+对 world_size 的每个因子 rnps（1 ≤ rnps ≤ world_size 且 world_size % rnps == 0）：
+    scaleout_rank_count = world_size // rnps
+    scaleout_per_slot_bytes = Align512(dispatch_per_slot_bytes + topk * 4)
+    scaleout_recv_data_size = scaleout_rank_count * num_max_tokens_per_rank * scaleout_per_slot_bytes
+    scaleout_recv_status_size = scaleout_rank_count * num_max_tokens_per_rank * 512
+    payload_stash_size = num_max_tokens_per_rank * scaleout_per_slot_bytes
+    dispatch_buffer_size(rnps) =
+        scaleout_recv_data_size
+        + dispatch_recv_buffer_size
+        + scaleout_recv_status_size
+        + payload_stash_size
+hybrid_minimum_buffer_size =
+    state_buffer_size
+    + max(dispatch_buffer_size(rnps))
+    + combine_buffer_size
+
+minimum_buffer_size = max(direct_minimum_buffer_size, hybrid_minimum_buffer_size)
 
 ccl_buffer_size = Align2(Align1MB(minimum_buffer_size) / 1MB) / 2
 ```
 
 其中 `AlignX(value) = ((value + X - 1) / X) * X`，公式中的 `/` 表示整除。
 
-通信窗口依次存放状态区、Dispatch接收区、Combine接收区和Dispatch发送区。Dispatch发送区与接收区均按
+由于运行时无法获知实际 scaleout 拓扑，hybrid 路径对 `world_size` 的所有合法因子 `rnps`（即 `rank_num_per_server`）枚举取最大值，按最大合法布局预留内存。通信窗口在 direct 拓扑下依次存放状态区、Dispatch接收区、Combine接收区和Dispatch发送区；hybrid 拓扑下布局为状态区、Scaleout Dispatch区、Combine区。Dispatch发送区与接收区均按
 `dispatch_per_slot_bytes` 的最大2字节hidden规格预留；kernel实际读写和通信仍使用当前数据类型对应的
 `per_slot_bytes`。Combine发送数据在Combine算子的workspace中暂存，不计入HCCL通信窗口大小。
 
@@ -528,11 +545,11 @@ ccl_buffer_size = Align2(Align1MB(minimum_buffer_size) / 1MB) / 2
   - `A`：表示本卡接收的最大token数量，`A = ep_world_size * num_max_tokens_per_rank * MIN(K, num_local_experts)`。
   - `H`：表示hidden size隐藏层大小。取值范围为 `(0, 8192]`。
   - `BS`：表示batch sequence size，即本卡的token数量。
-  - `K`：表示选取topK个专家，取值范围为 `1 ≤ K ≤ 32`。
-  - `num_local_experts`：表示本卡专家数量，`num_local_experts = num_experts / ep_world_size`，应满足 `0 < num_local_experts * ep_world_size ≤ 2048`。
+  - `K`：表示选取topK个专家，取值范围为 `1 ≤ K ≤ min(32, num_experts)`。
+  - `num_local_experts`：表示本卡专家数量，`num_local_experts = num_experts / ep_world_size`，其中 `num_experts` 取值范围为 `[2, 2048]` 且须被 `ep_world_size` 整除，即满足 `0 < num_local_experts * ep_world_size ≤ 2048`。
 
 - **HCCL通信域缓存区大小**：
-  - 调用 [dispatch](#dispatch) 或 [combine](#combine) 前需检查 `HCCL_BUFFSIZE` 环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。
+  - 调用 [dispatch](#dispatch) 或 [combine](#combine) 前需检查 `HCCL_BUFFSIZE` 环境变量取值是否合理，该环境变量配置单个通信域的 buffer 大小（单位MB，实际物理分配为 2 倍），不配置时默认为200MB。
   - 通信域缓存区大小可通过调用 [get_moe_ep_ccl_buffer_size](#get_moe_ep_ccl_buffer_size静态方法) 计算。
   - 计算得到的 `ccl_buffer_size` 需通过环境变量 `HCCL_BUFFSIZE` 设置，每个通信域独占一组 `2 * HCCL_BUFFSIZE` 大小的内存。
 
