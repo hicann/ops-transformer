@@ -38,12 +38,12 @@ public:
     __aicore__ inline void ProcessUnDeter();
 
 private:
-    __aicore__ inline void ProcessGather(FagRunInfo &runInfo);
+    __aicore__ inline void ProcessGather(FagRunInfo &runInfo, bool fusion = false);
     __aicore__ inline void ProcessMm12(FagRunInfo &runInfo);
     __aicore__ inline void ProcessSoftmax(FagRunInfo &runInfo);
     __aicore__ inline void ProcessMm345(FagRunInfo &runInfo);
     __aicore__ inline void ProcessScatter(FagRunInfo &runInfo);
-    __aicore__ inline void DrainUnDeter(FagRunInfo runInfos[3], int64_t taskId);
+    __aicore__ inline void DrainUnDeter(FagRunInfo runInfos[3], int64_t taskId, int64_t pipeStart);
     __aicore__ inline void FlushPendingDeter(FagRunInfo &runInfo);
     __aicore__ inline void InitFirstDeterEpoch();
     __aicore__ inline void LaunchDeterScatter(FagRunInfo &scatterRunInfo);
@@ -59,16 +59,29 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
 {}
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::ProcessGather(FagRunInfo &runInfo)
+__aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::ProcessGather(FagRunInfo &runInfo,
+                                                                                                 bool fusion)
 {
     if ASCEND_IS_AIV {
         CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE3>(SYNC_C3_TO_V0_FLAG[runInfo.commonRunInfo.taskIdMod2]);
+        bool gather_scatter_fusion = false;
+        if (this->constInfo.isHeadNLe64 && fusion) {
+            gather_scatter_fusion = true;
+        }
+        if (gather_scatter_fusion == false) {
+            SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+            SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
+        }
     }
     this->vecBlock.GatherKV(this->selectedKWorkSpaceGm, this->constInfo, runInfo);
     if ASCEND_IS_AIV {
         CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SYNC_V0_TO_C1_FLAG[runInfo.commonRunInfo.taskIdMod2]);
     }
     this->vecBlock.CopyMaxSum(this->constInfo, runInfo, runInfo.commonRunInfo.taskId);
+    if ASCEND_IS_AIV {
+        WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+        WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
+    }
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -175,16 +188,24 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
             }
             return;
         }
-        // Use the opposite mm1/mm2 ping-pong slot so scatter does not clobber
-        // the current task's mm12 result that softmax still needs.
-        uint8_t scatterBufIdx = (runInfo.commonRunInfo.taskIdMod2 + 1) & 1;
-        LocalTensor<CALC_TYPE> dkInTensor = this->mm1ResBuf[scatterBufIdx].template Get<CALC_TYPE>();
-        LocalTensor<CALC_TYPE> dvInTensor = this->mm2ResBuf[scatterBufIdx].template Get<CALC_TYPE>();
+        // NLe64: ScatterAddHead64 uses dSOutQue/pOutQue, not mm1/mm2.
+        // N>64 2-stage: Scatter(t-1) overlaps Mm12(t) -> this task's own mm1/mm2 slot
+        // (softmax just finished with it; opposite slot is the live mm12).
         if ASCEND_IS_AIV {
             CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE2>(SYNC_C5_TO_V5_FLAG[runInfo.commonRunInfo.taskIdMod2]);
         }
-        this->vecBlock.ScatterAdd(this->mm4ResWorkSpaceGm, this->mm5ResWorkSpaceGm, this->dkWorkSpaceGm,
-                                  this->dvWorkSpaceGm, dkInTensor, dvInTensor, this->constInfo, runInfo);
+        if (!IS_DETER && this->constInfo.isHeadNLe64) {
+            SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
+            SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
+            this->vecBlock.ScatterAddHead64(this->mm4ResWorkSpaceGm, this->mm5ResWorkSpaceGm, this->dkWorkSpaceGm,
+                                            this->dvWorkSpaceGm, this->constInfo, runInfo);
+        } else {
+            uint8_t scatterBufIdx = runInfo.commonRunInfo.taskIdMod2;
+            LocalTensor<CALC_TYPE> dkInTensor = this->mm1ResBuf[scatterBufIdx].template Get<CALC_TYPE>();
+            LocalTensor<CALC_TYPE> dvInTensor = this->mm2ResBuf[scatterBufIdx].template Get<CALC_TYPE>();
+            this->vecBlock.ScatterAdd(this->mm4ResWorkSpaceGm, this->mm5ResWorkSpaceGm, this->dkWorkSpaceGm,
+                                      this->dvWorkSpaceGm, dkInTensor, dvInTensor, this->constInfo, runInfo);
+        }
         if ASCEND_IS_AIV {
             CrossCoreSetFlag<SYNC_MODE, PIPE_MTE2>(SYNC_V5_TO_C4_FLAG[runInfo.commonRunInfo.taskIdMod2]);
         }
@@ -305,23 +326,44 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::DrainUnDeter(FagRunInfo runInfos[3],
-                                                                                                int64_t taskId)
+                                                                                                int64_t taskId,
+                                                                                                int64_t pipeStart)
 {
-    if (taskId <= 0) {
+    int64_t n = taskId - pipeStart;
+    if (n <= 0) {
         return;
     }
-    if (taskId == 1) {
-        ProcessSoftmax(runInfos[0]);
-        ProcessMm345(runInfos[0]);
-        ProcessScatter(runInfos[0]);
+    // Match the original ProcessUnDeter pre-drain wait: in-loop ScatterAddHead64
+    // SetFlag MTE3_MTE2 without waiting; softmax of the last task needs MTE2.
+    if (n > 2) {
+        if ASCEND_IS_AIV {
+            WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
+            WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
+        }
+    }
+    if (n == 1) {
+        ProcessSoftmax(runInfos[pipeStart % 3]);
+        ProcessMm345(runInfos[pipeStart % 3]);
+        ProcessScatter(runInfos[pipeStart % 3]);
+        if ASCEND_IS_AIV {
+            WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
+            WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
+        }
         return;
     }
-    // taskId >= 2: remaining mm345/softmax/scatter of the last two tasks
-    ProcessMm345(runInfos[(taskId - 2) % 3]);
+    // n >= 2: remaining mm345/softmax/scatter of the last two tasks in this pipeline
     ProcessSoftmax(runInfos[(taskId - 1) % 3]);
-    ProcessScatter(runInfos[(taskId - 2) % 3]);
     ProcessMm345(runInfos[(taskId - 1) % 3]);
+    ProcessScatter(runInfos[(taskId - 2) % 3]);
+    if ASCEND_IS_AIV {
+        WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
+        WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
+    }
     ProcessScatter(runInfos[(taskId - 1) % 3]);
+    if ASCEND_IS_AIV {
+        WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
+        WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
+    }
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -329,7 +371,8 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
 {
     this->AllocEventID();
     int64_t taskId = 0;
-    FagRunInfo runInfos[3];
+    int64_t pipeStart = 0;
+    FagRunInfo runInfos[4];
     for (int32_t i = 0; i < this->processBS1ByCore; i++) {
         this->t1Index = this->cBlockIdx + this->usedCoreNum * i;
         if (!this->IsValidTndT1Index(this->t1Index)) {
@@ -342,25 +385,54 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
                  this->blkCntOffset += this->constInfo.selectedCountOffset) {
                 FagRunInfo &cur = runInfos[taskId % 3];
                 this->SetRunInfo(cur, taskId, i, 0);
-                if (unlikely(taskId == 0)) {
-                    ProcessGather(cur);
-                    ProcessMm12(cur);
-                } else if (unlikely(taskId == 1)) {
-                    ProcessGather(cur);
-                    ProcessMm12(cur);
-                    ProcessSoftmax(runInfos[0]);
+                if (this->constInfo.isHeadNLe64) {
+                    // NLe64: keep 3-stage within the same S1. When S1 changes, drain
+                    // so Scatter(t-2) never overlaps a new S1's Gather/Mm12.
+                    if (!cur.isS1IdxNoChange && taskId > pipeStart) {
+                        DrainUnDeter(runInfos, taskId, pipeStart);
+                        pipeStart = taskId;
+                    }
+                    int64_t relId = taskId - pipeStart;
+                    if (unlikely(relId == 0)) {
+                        ProcessGather(cur);
+                        ProcessMm12(cur);
+                    } else if (unlikely(relId == 1)) {
+                        ProcessGather(cur);
+                        ProcessMm12(cur);
+                        ProcessSoftmax(runInfos[(taskId - 1) % 3]);
+                        ProcessMm345(runInfos[(taskId - 1) % 3]);
+                    } else {
+                        ProcessGather(cur, relId > 2);
+                        ProcessMm12(cur);
+                        ProcessSoftmax(runInfos[(taskId - 1) % 3]);
+                        ProcessMm345(runInfos[(taskId - 1) % 3]);
+                        ProcessScatter(runInfos[(taskId - 2) % 3]);
+                    }
                 } else {
-                    ProcessMm345(runInfos[(taskId - 2) % 3]);
+                    // N>64: 2-stage only. mm3 still reads selectedK GM so C3_TO_V0 is
+                    // posted after mm3, and that flag id is shared with V5_TO_C4 {7,9}.
+                    // 3-stage Gather(t)/Scatter(t-2) would Wait+Set the same id in one
+                    // AIV beat while cube Set+Wait it in Mm345, which deadlocks.
                     ProcessGather(cur);
                     ProcessMm12(cur);
-                    ProcessSoftmax(runInfos[(taskId - 1) % 3]);
-                    ProcessScatter(runInfos[(taskId - 2) % 3]);
+                    if (taskId > 0) {
+                        ProcessSoftmax(runInfos[(taskId - 1) % 3]);
+                        ProcessMm345(runInfos[(taskId - 1) % 3]);
+                        ProcessScatter(runInfos[(taskId - 1) % 3]);
+                    }
                 }
                 taskId++;
             }
         }
     }
-    DrainUnDeter(runInfos, taskId);
+
+    if (this->constInfo.isHeadNLe64) {
+        DrainUnDeter(runInfos, taskId, pipeStart);
+    } else if (taskId > 0) {
+        ProcessSoftmax(runInfos[(taskId - 1) % 3]);
+        ProcessMm345(runInfos[(taskId - 1) % 3]);
+        ProcessScatter(runInfos[(taskId - 1) % 3]);
+    }
     this->FreeEventID();
 }
 } // namespace SfagBaseApi

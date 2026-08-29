@@ -31,7 +31,7 @@ constexpr uint32_t L0C_MAX_SIZE = 256 * 1024;
 
 constexpr uint32_t L0_MAX_SIZE = 64 * 1024;
 constexpr uint32_t L1_MAX_SIZE = 512 * 1024;
-// BSND 的 N（kernel 里为 gSize）<= 该阈值时：gather 64、K 双槽、Q/Dy 单槽 + common 中转
+// BSND 的 N（kernel 里为 gSize）<= 该阈值时：gather 64、K/Q/Dy 双槽常驻，无 common scratch
 constexpr int64_t SFAG_HEAD_N_L1_RESIDENT = 64;
 constexpr uint32_t SFAG_GATHER_S2_HEAD_N = 64;
 constexpr uint32_t SFAG_L1_DS_P_EACH = 64 * 1024;
@@ -173,7 +173,7 @@ struct FagConstInfo {
     int64_t selectedBlockCount = 2048;
     int64_t selectedBlockSize = 1;
     int64_t selectedCountOffset = 0;
-    // true: host tiling 判定 gSize <= SFAG_HEAD_N_L1_RESIDENT，gather 64 + K 双槽常驻
+    // true: host tiling 判定 gSize <= SFAG_HEAD_N_L1_RESIDENT，gather 64 + K/Q/Dy 双槽常驻
     bool isHeadNLe64 = false;
 };
 
@@ -201,7 +201,7 @@ struct FagRunInfo {
     int32_t halfS2RealSize; // vector侧实际的s2基本块大小，如果Cube基本块=128，那么halfS2RealSize=64
     int32_t
         firstHalfS2RealSize; // 当s2RealSize不是2的整数倍时，v0比v1少计算一行，计算subblock偏移的时候需要使用v0的s2 size
-    uint8_t qDxPingPongIdx;
+    uint8_t qDxPingPongIdx;      // N<=64：Q/Dy L1 槽位，切 S1 时翻转
     uint8_t isS2IdxNoChange;     // s2Idx是否变化
     uint8_t isNextS2IdxNoChange; // 下一个基本块的s2Idx是否变化（是否切换了列）
     // BN2模板使用

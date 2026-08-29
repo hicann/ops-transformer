@@ -169,6 +169,7 @@ protected:
     int64_t t1Index = 0;
     int64_t n2Index = 0;
     int64_t lastT1Index = -1;
+    uint8_t qDxPingPongSeq = 0; // N<=64 Q/Dy L1 ping-pong，随 S1 翻转
     int64_t usedCoreNum = 0;
     int64_t processBS1ByCore = 0;
 };
@@ -326,8 +327,15 @@ template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::InitCVCommonBuffer()
 {
     l1BufferManager.Init(pipe, L1_MAX_SIZE);
-    dSL1Buf.Init(l1BufferManager, CUBE_BASEM * CUBE_BASEN * sizeof(INPUT_TYPE));
-    pL1Buf.Init(l1BufferManager, CUBE_BASEM * CUBE_BASEN * sizeof(INPUT_TYPE));
+    if (constInfo.isHeadNLe64) {
+        // gather 64×g：每槽 8KB（g=64 bf16），dS/P 双缓冲合计 32KB
+        uint32_t dsPSize = AlignTo16(constInfo.commonConstInfo.gSize) * SFAG_GATHER_S2_HEAD_N * sizeof(INPUT_TYPE);
+        dSL1Buf.Init(l1BufferManager, dsPSize);
+        pL1Buf.Init(l1BufferManager, dsPSize);
+    } else {
+        dSL1Buf.Init(l1BufferManager, CUBE_BASEM * CUBE_BASEN * sizeof(INPUT_TYPE));
+        pL1Buf.Init(l1BufferManager, CUBE_BASEM * CUBE_BASEN * sizeof(INPUT_TYPE));
+    }
 
     pipe->InitBuffer(mm1ResBuf[0], VECTOR_BASEM * VECTOR_BASEN * sizeof(CALC_TYPE));
     pipe->InitBuffer(mm1ResBuf[1], VECTOR_BASEM * VECTOR_BASEN * sizeof(CALC_TYPE));
@@ -494,6 +502,10 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
     // 当前S1内执行了一次task后，isS1IdxNoChange置为true
     runInfo.isS1IdxNoChange = t1Index == lastT1Index;
     runInfo.isNextS1IdxNoChange = blkCntOffset + constInfo.selectedCountOffset < actualSelectedBlockCount;
+    if (!runInfo.isS1IdxNoChange && lastT1Index >= 0) {
+        qDxPingPongSeq ^= 1;
+    }
+    runInfo.qDxPingPongIdx = qDxPingPongSeq;
     lastT1Index = t1Index;
 
     GetDerived()->SetUniqueRunInfo(runInfo);
