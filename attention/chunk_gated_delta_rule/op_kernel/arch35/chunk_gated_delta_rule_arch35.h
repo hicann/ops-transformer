@@ -16,7 +16,6 @@
 #define CHUNK_GATED_DELTA_RULE_ARCH35_H
 
 #include "kernel_operator.h"
-#include "lib/matmul_intf.h"
 #include "kernel_tiling/kernel_tiling.h"
 #include "../chunk_gated_delta_rule_tiling_data.h"
 #include "chunk_gated_delta_rule_stage1_arch35.h"
@@ -40,36 +39,16 @@ struct CGDRInitParams {
     GM_ADDR finalState;
 };
 
-
 template <typename lowType, typename highType, typename stateType = lowType, bool gOptional = false>
 class CGDR {
 public:
     static constexpr bool kStateIsFp32 = std::is_same_v<stateType, float>;
     using vInnerType = std::conditional_t<kStateIsFp32, float, lowType>;
-    using StageOneMmVInner = StageOneMTT<vInnerType>;
     __aicore__ inline CGDR(TPipe *pipe, const ChunkGatedDeltaRuleTilingData *tilingData)
-        : stageOneOp_(stage1MmBf16_, stage1MmVInner_)
     {
         pipe_ = pipe;
         tiling_ = tilingData;
     };
-
-    __aicore__ inline void InitMatmul()
-    {
-        if ASCEND_IS_AIC {
-            stage1MmBf16_.Init(&tiling_->matmulTilingFp32, pipe_);
-            if constexpr (kStateIsFp32) {
-                stage1MmVInner_.Init(&tiling_->matmulTilingFp32C, pipe_);
-            } else {
-                stage1MmVInner_.Init(&tiling_->matmulTilingFp32, pipe_);
-            }
-            stage2MmBf16_.Init(&tiling_->matmulTilingFp32, pipe_);
-            if constexpr (kStateIsFp32) {
-                stage2MmFp32_.Init(&tiling_->matmulTilingFp32C, pipe_);
-            }
-            stage3Mm_.Init(&tiling_->matmulTilingFp32, pipe_);
-        }
-    }
 
     __aicore__ inline void InitMask()
     {
@@ -168,7 +147,6 @@ public:
 
         stageWsAddr_ = user + offset;
 
-        InitMatmul();
         InitMask();
     }
 
@@ -234,8 +212,6 @@ private:
         initStageTwoParams.kg = kg_;
         initStageTwoParams.out = out_[cg.startPos * tiling_->nv * tiling_->dv];
         initStageTwoParams.ws = stageWsAddr_;
-        initStageTwoParams.mm1Bf16 = &stage2MmBf16_;
-        initStageTwoParams.mm1Fp32 = &stage2MmFp32_;
         initStageTwoParams.pipe = pipe_;
         initStageTwoParams.cg = &cg;
         initStageTwoParams.Nv = tiling_->nv;
@@ -259,9 +235,6 @@ private:
 
     __aicore__ inline void RunStage3(ChunkGroup &cg)
     {
-        if ASCEND_IS_AIC {
-            stage3Mm_.Init(&tiling_->matmulTilingFp32, pipe_);
-        }
         GlobalTensor<lowType> vInnerBf16;
         if constexpr (kStateIsFp32) {
             vInnerBf16 = vInnerBf16_;
@@ -270,13 +243,13 @@ private:
         }
         Stage3<gOptional> stageThreeOp;
         StageThreeParams initStageThreeParams{
-            qkt_,         gCum_,
-            vInnerBf16,   stageThreeMask_[int(GetBlockIdx() / 2) * tiling_->chunkSize * tiling_->chunkSize],
-            stageWsAddr_, out_[cg.startPos * tiling_->nv * tiling_->dv],
-            &stage3Mm_,   pipe_,
-            &cg,          tiling_->scale,
-            tiling_->nv,  tiling_->nk,
-            tiling_->dv,  tiling_->dk};
+            qkt_,           gCum_,
+            vInnerBf16,     stageThreeMask_[int(GetBlockIdx() / 2) * tiling_->chunkSize * tiling_->chunkSize],
+            stageWsAddr_,   out_[cg.startPos * tiling_->nv * tiling_->dv],
+            pipe_,          &cg,
+            tiling_->scale, tiling_->nv,
+            tiling_->nk,    tiling_->dv,
+            tiling_->dk};
         stageThreeOp.Init(&initStageThreeParams, tiling_->aiCoreNum);
         stageThreeOp.Process();
         pipe_->Reset();
@@ -312,13 +285,6 @@ private:
     GM_ADDR stageWsAddr_;                   // temporary space addr for stages
 
     TBuf<TPosition::VECCALC> tmpBuff_; // 构造mask矩阵
-
-    // Matmul objects
-    StageOneMTT<bfloat16_t> stage1MmBf16_;
-    StageOneMmVInner stage1MmVInner_;
-    StageTwoMT stage2MmBf16_;
-    StageTwoMTFp32C stage2MmFp32_;
-    StageThreeMT stage3Mm_;
 
     // Stage operators
     Stage1<kStateIsFp32, gOptional> stageOneOp_;

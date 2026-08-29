@@ -19,15 +19,10 @@
 #include "chunk_gated_delta_rule_utils.h"
 #include "../chunk_gated_delta_rule_tiling_data.h"
 #include "vf/chunk_gated_delta_rule_stage1_vf.h"
+#include "chunk_gated_delta_rule_matmul_basic.h"
 
 namespace ChunkGatedDeltaRule {
 using namespace AscendC;
-using namespace matmul;
-
-using aT1 = MatmulType<TPosition::GM, CubeFormat::ND, bfloat16_t>;
-using bT1 = MatmulType<TPosition::GM, CubeFormat::ND, bfloat16_t>;
-template <typename cType>
-using StageOneMTT = matmul::MatmulImpl<aT1, bT1, MatmulType<TPosition::GM, CubeFormat::ND, cType>>;
 
 constexpr uint64_t UB_REST_BYTES = 140 * 1024; // 140KB
 constexpr uint64_t INVERSE_SHAPE = 32;         // 对角块边长
@@ -35,16 +30,6 @@ constexpr uint64_t INVERSE_COUNT = 5;          // 求逆所需空间
 constexpr uint32_t ALIGN_SIZE = 16;
 constexpr uint32_t MAX_PARALLEL_NUM = 6;
 constexpr uint32_t HALF_TWO = 2;
-
-// Matmul 形状参数结构体
-struct MatmulShapeParams {
-    uint64_t m;  // 原始 M 维度
-    uint64_t n;  // 原始 N 维度
-    uint64_t k;  // 原始 K 维度
-    uint64_t sm; // 单次计算 M 维度
-    uint64_t sn; // 单次计算 N 维度
-    uint64_t sk; // 单次计算 K 维度
-};
 
 template <typename vInnerType>
 struct GDRStageOneInitParams {
@@ -71,11 +56,7 @@ template <bool kStateIsFp32 = false, bool gOptional = false>
 class Stage1 {
 public:
     using vInnerType = std::conditional_t<kStateIsFp32, float, bfloat16_t>;
-    using MMBf16 = StageOneMTT<bfloat16_t>;
-    using MMVInner = StageOneMTT<vInnerType>;
-    __aicore__ inline Stage1(MMBf16 &mmBf16, MMVInner &mmVInner) : mmBf16_(mmBf16), mmVInner_(mmVInner)
-    {
-    }
+    __aicore__ inline Stage1() {}
     __aicore__ inline void SetGlobalTensors(const GDRStageOneInitParams<vInnerType> &initParams)
     {
         queryGm_ = initParams.query;
@@ -224,6 +205,9 @@ public:
             InitLocalBuffers();
             InitGatherBuffer();
         }
+        if ASCEND_IS_AIC {
+            mmBasic_.Init();
+        }
         SetGlobalTensors(initParams);
     }
 
@@ -253,6 +237,9 @@ public:
                 SetChunkOffset(i, curNId, curCgId);
             }
             ProcessParaChunk(curParaNum);
+        }
+        if ASCEND_IS_AIC {
+            mmBasic_.End();
         }
     }
 
@@ -298,16 +285,17 @@ private:
         // key @ key.transpose(-1,-2)
         for (uint32_t i = 0; i < curParaNum; ++i) {
             AscendC::CrossCoreWaitFlag(0x9); // 同步0
-            AICProcess(mmBf16_, keyConGm_[i * ckOffset_], keyConGm_[i * ckOffset_], kkWsGm_[i * ccOffset_],
-                       {chunkSize_, chunkSize_, dk_, chunkSize_, chunkSize_, dk_}, true);
+            mmBasic_.Execute<false, true, false, bfloat16_t, BSource::SameAsA>(
+                keyConGm_[i * ckOffset_], keyConGm_[i * ckOffset_], kkWsGm_[i * ccOffset_], chunkSize_, chunkSize_,
+                dk_);
             AscendC::CrossCoreSetFlag<0x2, PIPE_FIX>(0x8); // 同步1
         }
 
         // query @ key.transpose(-1,-2)   stage1 out
         for (uint32_t i = 0; i < curParaNum; ++i) {
-            AICProcess(mmBf16_, queryConGm_[i * ckOffset_], keyConGm_[i * ckOffset_],
-                       outQkGm_[chunkRowBase_[i] * chunkSize_],
-                       {validLenBatch_[i], validLenBatch_[i], dk_, validLenBatch_[i], validLenBatch_[i], dk_}, true);
+            mmBasic_.Execute<false, true, false, bfloat16_t>(queryConGm_[i * ckOffset_], keyConGm_[i * ckOffset_],
+                                                             outQkGm_[chunkRowBase_[i] * chunkSize_], validLenBatch_[i],
+                                                             validLenBatch_[i], dk_);
         }
         AscendC::CrossCoreSetFlag<0x2, PIPE_FIX>(0xA); // 同步5
 
@@ -320,17 +308,17 @@ private:
         // attn @ k_cumdecay
         for (uint32_t i = 0; i < curParaNum; ++i) {
             AscendC::CrossCoreWaitFlag(0x6); // 同步3
-            AICProcess(mmBf16_, attnWsGm_[i * ccOffset_], gBKWsGm_[i * ckOffset_],
-                       outKCumdecayGm_[chunkRowBase_[i] * dk_],
-                       {chunkSize_, dk_, chunkSize_, chunkSize_, dk_, chunkSize_});
+            mmBasic_.Execute<false, false, false, bfloat16_t>(attnWsGm_[i * ccOffset_], gBKWsGm_[i * ckOffset_],
+                                                              outKCumdecayGm_[chunkRowBase_[i] * dk_], chunkSize_, dk_,
+                                                              chunkSize_);
         }
 
         // attn @ v_beta    stage1 out
         for (uint32_t i = 0; i < curParaNum; ++i) {
             AscendC::CrossCoreWaitFlag(0x5); // 同步4
-            AICProcess(mmVInner_, attnWsGm_[i * ccOffset_], vBetaWsGm_[i * cvOffset_],
-                       outVInnerGm_[chunkRowBase_[i] * dv_],
-                       {chunkSize_, dv_, chunkSize_, chunkSize_, dv_, chunkSize_});
+            mmBasic_.Execute<false, false, false, vInnerType>(attnWsGm_[i * ccOffset_], vBetaWsGm_[i * cvOffset_],
+                                                              outVInnerGm_[chunkRowBase_[i] * dv_], chunkSize_, dv_,
+                                                              chunkSize_);
         }
     }
 
@@ -756,34 +744,23 @@ private:
         uint64_t leftDown = offset + chunkSize_ * INVERSE_SHAPE;
         uint64_t rightDown = leftDown + INVERSE_SHAPE;
         // 右矩阵左下角 @ 右矩阵左上角 -> 右矩阵左下角
-        AICProcess(mmBf16_, attnWsGm_[leftDown], attnWsGm_[offset], attnWsGm_[leftDown],
-                   {chunkSize_, chunkSize_, chunkSize_, INVERSE_SHAPE, INVERSE_SHAPE, INVERSE_SHAPE});
+        mmBasic_.Execute<false, false, false, bfloat16_t>(attnWsGm_[leftDown], attnWsGm_[offset], attnWsGm_[leftDown],
+                                                          INVERSE_SHAPE, INVERSE_SHAPE, INVERSE_SHAPE, chunkSize_,
+                                                          chunkSize_, chunkSize_);
         int32_t eventID = static_cast<int32_t>(pipe_->FetchEventID(HardEvent::FIX_MTE2));
         SetFlag<HardEvent::FIX_MTE2>(eventID);
         WaitFlag<HardEvent::FIX_MTE2>(eventID);
         // 右矩阵右下角 @ 右矩阵左下角 -> 右矩阵左下角
-        AICProcess(mmBf16_, attnWsGm_[rightDown], attnWsGm_[leftDown], attnWsGm_[leftDown],
-                   {chunkSize_, chunkSize_, chunkSize_, INVERSE_SHAPE, INVERSE_SHAPE, INVERSE_SHAPE});
+        mmBasic_.Execute<false, false, false, bfloat16_t>(attnWsGm_[rightDown], attnWsGm_[leftDown],
+                                                          attnWsGm_[leftDown], INVERSE_SHAPE, INVERSE_SHAPE,
+                                                          INVERSE_SHAPE, chunkSize_, chunkSize_, chunkSize_);
         eventID = static_cast<int32_t>(pipe_->FetchEventID(HardEvent::FIX_MTE2));
         SetFlag<HardEvent::FIX_MTE2>(eventID);
         WaitFlag<HardEvent::FIX_MTE2>(eventID);
     }
 
-    template <typename MMType, typename CType>
-    __aicore__ inline void AICProcess(MMType &mmRef, GlobalTensor<bfloat16_t> x, GlobalTensor<bfloat16_t> y,
-                                      GlobalTensor<CType> z, const MatmulShapeParams &shape, bool transB = false)
-    {
-        mmRef.SetOrgShape(shape.m, shape.n, shape.k);
-        mmRef.SetSingleShape(shape.sm, shape.sn, shape.sk);
-        mmRef.SetTensorA(x);
-        mmRef.SetTensorB(y, transB);
-        mmRef.IterateAll(z);
-        mmRef.End();
-    }
-
     TPipe *pipe_;
-    MMBf16 &mmBf16_;
-    MMVInner &mmVInner_;
+    CGDRMatmulBasic mmBasic_;
     const ChunkGatedDeltaRuleTilingData *tiling_;
     ChunkGroup cg_;
     uint32_t nk_;

@@ -18,15 +18,10 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "chunk_gated_delta_rule_utils.h"
 #include "../chunk_gated_delta_rule_tiling_data.h"
+#include "chunk_gated_delta_rule_matmul_basic.h"
 
 namespace ChunkGatedDeltaRule {
 using namespace AscendC;
-using namespace matmul;
-
-using aT3 = MatmulType<TPosition::GM, CubeFormat::ND, bfloat16_t, true>;
-using bT3 = MatmulType<TPosition::GM, CubeFormat::ND, bfloat16_t, true>;
-using cT3 = MatmulType<TPosition::GM, CubeFormat::ND, bfloat16_t>;
-using StageThreeMT = matmul::MatmulImpl<aT3, bT3, cT3>;
 
 struct StageThreeParams {
     GlobalTensor<bfloat16_t> qkt; // (Nv, Sp, Dk)
@@ -35,7 +30,6 @@ struct StageThreeParams {
     GlobalTensor<float> maskTensor;
     GM_ADDR ws;
     GlobalTensor<bfloat16_t> attnOut;
-    StageThreeMT *mm3;
     TPipe *pipe;
     ChunkGroup *cg;
     float scale;
@@ -67,6 +61,7 @@ public:
         tmpGM_.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(
             initParams->ws + workSpaceOffset + coreNum_ * chunkSize_ * chunkSize_ * sizeof(float)));
         if ASCEND_IS_AIC {
+            mmBasic_.Init();
             return;
         }
         coreId_ /= AIC_AIV_1_1;
@@ -120,10 +115,15 @@ public:
 
             if ASCEND_IS_AIC {
                 CrossCoreWaitFlag(0x4);
-                AICProcess(tmpGM_[coreId_ * chunkSize_ * chunkSize_], sTP_->vInner[nvId * Sp_ * Dv_ + chunkPos * Dv_],
-                           sTP_->attnOut[nvId * Dv_ + chunkPos * Nv_ * Dv_]);
+                mmBasic_.Execute<false, false, true, bfloat16_t>(tmpGM_[coreId_ * chunkSize_ * chunkSize_],
+                                                                 sTP_->vInner[nvId * Sp_ * Dv_ + chunkPos * Dv_],
+                                                                 sTP_->attnOut[nvId * Dv_ + chunkPos * Nv_ * Dv_],
+                                                                 curChunkSize_, Dv_, curChunkSize_, 0, 0, Nv_ * Dv_);
                 CrossCoreSetFlag<0x2, PIPE_FIX>(0x3);
             }
+        }
+        if ASCEND_IS_AIC {
+            mmBasic_.End();
         }
     }
 
@@ -166,18 +166,6 @@ public:
         inQueue_.FreeTensor(qkt);
     }
 
-    __aicore__ inline void AICProcess(GlobalTensor<bfloat16_t> tmpGM, GlobalTensor<bfloat16_t> vInner,
-                                      GlobalTensor<bfloat16_t> attnInter)
-    {
-        // masked_qkt @ v_inner
-        sTP_->mm3->SetOrgShape(curChunkSize_, Dv_, curChunkSize_, curChunkSize_, Nv_ * Dv_); // MNK
-        sTP_->mm3->SetSingleShape(curChunkSize_, Dv_, curChunkSize_);                        // SingleCoreMNK
-        sTP_->mm3->SetTensorA(tmpGM);
-        sTP_->mm3->SetTensorB(vInner);
-        sTP_->mm3->IterateAll(attnInter, 1);
-        sTP_->mm3->End();
-    }
-
     template <typename inType>
     __aicore__ inline void AlignedCopyIn(GlobalTensor<inType> tmpGM, int32_t row, int32_t col)
     {
@@ -209,6 +197,7 @@ public:
 private:
     StageThreeParams *sTP_;
     TPipe *pipe_;
+    CGDRMatmulBasic mmBasic_;
     TQue<QuePosition::VECIN, BUFFER_NUM_ONE> inQueue_;
     TQue<QuePosition::VECOUT, BUFFER_NUM_ONE> outQueue_;
     TBuf<TPosition::VECCALC> tmpBuff_;

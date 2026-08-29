@@ -18,7 +18,6 @@
 #include "chunk_gated_delta_rule_tiling_key.h"
 
 using namespace AscendC;
-using namespace matmul;
 using namespace ChunkGatedDeltaRule;
 
 extern "C" __global__ __aicore__ void chunk_gated_delta_rule(GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR beta,
