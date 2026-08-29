@@ -228,6 +228,11 @@ inline aclnnStatus QuantFlashAttnMetadataCheck::CheckSingleParaVDescaleMxFp8(int
                        "When quantMode is 1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) "
                        "and layoutKv is PA_BNBD, vDescale must be 5D, but got %ldD",
                        dimNum);
+        } else if (strcmp(layoutKv, "PA_BBND") == 0) {
+            CHECK_COND(dimNum == 5, ACLNN_ERR_RUNTIME_ERROR,
+                       "When quantMode is 1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) "
+                       "and layoutKv is PA_BBND, vDescale must be 5D, but got %ldD",
+                       dimNum);
         } else if (strcmp(layoutKv, "PA_NZ") == 0) {
             CHECK_COND(dimNum == 6, ACLNN_ERR_RUNTIME_ERROR,
                        "When quantMode is 1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) "
