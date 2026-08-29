@@ -42,13 +42,14 @@ struct TempParams {
     int64_t dvWorkspaceLen;
     uint32_t layout;
     uint32_t selected_block_count;
-    uint32_t selected_block_size;
+    uint32_t selected_block_size = 1;
     bool attenEnable = false;
     uint32_t singleM;
     uint32_t singleN;
     int64_t ropeDim;
     bool ropeEnable = false;
     bool deterministic = false;
+    bool kvMerge = false;
 };
 
 struct AiCoreParams {
@@ -63,8 +64,10 @@ struct AiCoreParams {
 
 class SparseFlashAttentionGradBs1Regbase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit SparseFlashAttentionGradBs1Regbase(gert::TilingContext *context) : TilingBaseClass(context) {};
-    SparseFlashAttentionGradTilingDataRegbase *tilingData = context_->GetTilingData<SparseFlashAttentionGradTilingDataRegbase>();
+    explicit SparseFlashAttentionGradBs1Regbase(gert::TilingContext *context)
+        : TilingBaseClass(context) {};
+    SparseFlashAttentionGradTilingDataRegbase *tilingData =
+        context_->GetTilingData<SparseFlashAttentionGradTilingDataRegbase>();
     SparseFlashAttentionGradBaseParamsRegbase *baseParams_ = &tilingData->baseParams;
     PreParamsRegbase *preTilingData_ = &tilingData->preTilingData;
     PostParamsRegbase *postTilingData_ = &tilingData->postTilingData;
@@ -80,8 +83,8 @@ protected:
     uint64_t GetTilingKey() const override;
 
 private:
-    ge::graphStatus CheckOutShapeInfo(const gert::Shape &inputshape, const char *inputName, 
-                    const gert::Shape &outputshape, const char *inputLayout);
+    ge::graphStatus CheckOutShapeInfo(const gert::Shape &inputshape, const char *inputName,
+                                      const gert::Shape &outputshape, const char *inputLayout);
     ge::graphStatus GetBaseShapeInfo();
     ge::graphStatus DoSftTiling();
     ge::graphStatus DoBlockTiling();

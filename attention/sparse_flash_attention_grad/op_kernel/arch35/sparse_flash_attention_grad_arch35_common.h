@@ -240,9 +240,11 @@ struct FagRunInfo {
     int64_t mm5ResWsAddr = 0;
     int64_t halfGRealSize = 0;
     int64_t firstHalfGRealSize = 0;
-    // Deter 使用
+    // Deter 使用：sTaskId = Q-wave ordinal；deterTaskId = scatter protocol epoch
     int64_t sTaskId = 0;
     int64_t sTaskIdMod2 = 0;
+    int64_t deterTaskId = 0;
+    int64_t deterTaskIdMod2 = 0;
 
     bool isS1IdxNoChange;     // s1Idx是否变化
     bool isNextS1IdxNoChange; // 下一个基本块的s1Idx是否变化（是否切换了行）

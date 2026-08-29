@@ -34,7 +34,9 @@ constexpr uint8_t SYNC_C5_TO_V4_FLAG = 10;
 constexpr uint8_t SCATTER_CUBE_SYNC_FLAG = 11;
 constexpr uint8_t SCATTER_VEC_SYNC_FLAG = 12;
 constexpr uint8_t SCATTER_SYNC_FLAG = 13;
-
+// deter 专用：AIV scatter completion → AIC 下一 epoch。物理 ID 与 C5_TO_V5[1] 相同，
+// 但 C5_TO_V5 只在 !IS_DETER 路径使用，同一 kernel 实例不会同时占用。
+constexpr uint8_t SCATTER_TO_FIX_SYNC_FLAG = 14;
 // MM_IDX
 constexpr uint8_t DQ_IDX = 0;
 constexpr uint8_t DK_IDX = 1;
@@ -63,6 +65,7 @@ struct DqkvResPos {
     X(IS_TND, bool, false) \
     X(IS_ROPE, bool, false) \
     X(IS_DETER, bool, false) \
+    X(KV_MERGE, bool, false) \
     X(s2TemplateType, S2TemplateType, S2TemplateType::Aligned128) \
     X(dTemplateType, DTemplateType, DTemplateType::Aligned128)
 
@@ -100,5 +103,4 @@ struct DqkvResPos {
 /* 6. 生成BASE的BaseArgs, BASE带ChildClass */
 #define TEMPLATE_BASE_ARGS \
     ChildClass, CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARG_NAME) CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARG_NAME) end
-
 #endif // SPARSE_FLASH_ATTENTION_GRAD_COMMON_H

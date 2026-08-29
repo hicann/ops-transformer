@@ -44,6 +44,9 @@ private:
     __aicore__ inline void ProcessMm345(FagRunInfo &runInfo);
     __aicore__ inline void ProcessScatter(FagRunInfo &runInfo);
     __aicore__ inline void DrainUnDeter(FagRunInfo runInfos[3], int64_t taskId);
+    __aicore__ inline void FlushPendingDeter(FagRunInfo &runInfo);
+    __aicore__ inline void InitFirstDeterEpoch();
+    __aicore__ inline void LaunchDeterScatter(FagRunInfo &scatterRunInfo);
 };
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -200,89 +203,102 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
 }
 
 template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::FlushPendingDeter(
+    FagRunInfo &runInfo)
+{
+    // 幂等：ProcessSoftmax / ProcessMm345 内部已按 TASK_C1C2 短路。
+    ProcessSoftmax(runInfo);
+    ProcessMm345(runInfo);
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::InitFirstDeterEpoch()
+{
+    // 第一笔 deter epoch：只建立 flag13 launch 许可，不消费 flag14，不打 flag11。
+    if ASCEND_IS_AIC {
+        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SCATTER_SYNC_FLAG);
+        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SCATTER_SYNC_FLAG);
+    } else {
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE2>(SCATTER_SYNC_FLAG);
+    }
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::LaunchDeterScatter(
+    FagRunInfo &scatterRunInfo)
+{
+    // 正常/flush/补偿共用：先收上一 epoch 的 flag14，再开 flag11/13。
+    // Wait 在 launch scatter 前，不在 compute 入口，compute(N+1) 仍可与 scatter(N) overlap。
+    if ASCEND_IS_AIC {
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(SCATTER_TO_FIX_SYNC_FLAG);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(16 + SCATTER_TO_FIX_SYNC_FLAG);
+        CrossCoreSetFlag<0, PIPE_FIX>(SCATTER_CUBE_SYNC_FLAG);
+        CrossCoreWaitFlag<0, PIPE_FIX>(SCATTER_CUBE_SYNC_FLAG);
+        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SCATTER_SYNC_FLAG);
+        CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SCATTER_SYNC_FLAG);
+    } else {
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE2>(SCATTER_SYNC_FLAG);
+        this->vecBlock.ScatterAddDeter(this->mm4ResWorkSpaceGm, this->mm5ResWorkSpaceGm, this->dkWorkSpaceGm,
+                                       this->dvWorkSpaceGm, this->constInfo, scatterRunInfo);
+        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE3>(SCATTER_TO_FIX_SYNC_FLAG);
+    }
+}
+
+template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType>::ProcessDeter()
 {
     this->AllocEventID();
     int64_t taskId = 0;
     int64_t sTaskId = 0;
-    FagRunInfo runInfos[2]; // for cv ping pong
+    int64_t deterTaskId = 0;
+    FagRunInfo runInfos[2];
     FagRunInfo deterRunInfos[2];
-    for (int32_t i = 0; i < this->processBS1ByCore; i++) {
+    const int64_t maxEpochs = this->GetMaxDeterEpochs();
+
+    // 所有核走同一条 deter epoch 序列。没有 token / sel=0 / TND padding 只跳过 compute，不删除 epoch。
+    for (int32_t i = 0; i < maxEpochs; i++) {
+        const int64_t taskIdBeforeEpoch = taskId;
         this->t1Index = this->cBlockIdx + this->usedCoreNum * i;
-        this->GetTndSeqLen(this->t1Index, this->bIndex);
-        this->SetDeterRunInfo(deterRunInfos[sTaskId & 1], sTaskId);
-        for (this->n2Index = 0; this->n2Index < this->tilingData->baseParams.n2; this->n2Index++) {
-            this->GetActualSelCount(this->t1Index, this->n2Index, this->actualSelectedBlockCount);
-            for (this->blkCntOffset = 0; this->blkCntOffset < this->actualSelectedBlockCount;
-                 this->blkCntOffset += this->constInfo.selectedCountOffset) {
-                if (taskId >= 0) {
-                    this->SetRunInfo(runInfos[taskId & 1], taskId, sTaskId);
+        const bool hasCompute = (this->cBlockIdx < this->usedCoreNum) && (this->t1Index < this->GetValidTndT1Size());
+        if (hasCompute) {
+            this->GetTndSeqLen(this->t1Index, this->bIndex);
+            for (this->n2Index = 0; this->n2Index < this->tilingData->baseParams.n2; this->n2Index++) {
+                this->GetActualSelCount(this->t1Index, this->n2Index, this->actualSelectedBlockCount);
+                for (this->blkCntOffset = 0; this->blkCntOffset < this->actualSelectedBlockCount;
+                     this->blkCntOffset += this->constInfo.selectedCountOffset) {
+                    this->SetRunInfo(runInfos[taskId & 1], taskId, sTaskId, deterTaskId);
                     ProcessGather(runInfos[taskId & 1]);
                     ProcessMm12(runInfos[taskId & 1]);
+                    if (taskId > 0) {
+                        FlushPendingDeter(runInfos[(taskId + 1) & 1]);
+                    }
+                    taskId++;
                 }
-
-                if (taskId > 0) {
-                    ProcessSoftmax(runInfos[(taskId + 1) & 1]);
-                    ProcessMm345(runInfos[(taskId + 1) & 1]);
-                    ProcessScatter(runInfos[(taskId + 1) & 1]);
-                }
-                taskId++;
             }
         }
 
-        if (sTaskId == 0) {
-            if ASCEND_IS_AIC {
-                CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SCATTER_SYNC_FLAG);
-                CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SCATTER_SYNC_FLAG);
-            } else {
-                CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE2>(SCATTER_SYNC_FLAG);
-            }
+        // 本 epoch 没有产生新 task 时，pipeline 不会靠下一次 Gather/Mm12 自然推进。
+        // 下面的 scatter 消费的是上一 epoch 的 mm4/mm5，必须先把 pending C3/C4/C5 补齐。
+        if (taskId == taskIdBeforeEpoch) {
+            FlushPendingDeter(runInfos[(taskId + 1) & 1]);
         }
 
-        if (sTaskId > 0) {
-            if ASCEND_IS_AIC {
-                CrossCoreSetFlag<0, PIPE_FIX>(SCATTER_CUBE_SYNC_FLAG);
-                CrossCoreWaitFlag<0, PIPE_FIX>(SCATTER_CUBE_SYNC_FLAG);
-                CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SCATTER_SYNC_FLAG);
-                CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SCATTER_SYNC_FLAG);
-            } else {
-                CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE2>(SCATTER_SYNC_FLAG);
-                this->vecBlock.ScatterAddDeter(this->mm4ResWorkSpaceGm, this->mm5ResWorkSpaceGm, this->dkWorkSpaceGm,
-                                               this->dvWorkSpaceGm, this->constInfo, deterRunInfos[(sTaskId + 1) & 1]);
-            }
+        this->SetDeterRunInfo(deterRunInfos[deterTaskId & 1], sTaskId, deterTaskId);
+        if (deterTaskId == 0) {
+            InitFirstDeterEpoch();
+        } else {
+            LaunchDeterScatter(deterRunInfos[(deterTaskId + 1) & 1]);
         }
+        deterTaskId++;
         sTaskId++;
     }
 
     if (runInfos[(taskId + 1) & 1].taskStep == TASK_C1C2) {
-        ProcessSoftmax(runInfos[(taskId + 1) & 1]);
-        ProcessMm345(runInfos[(taskId + 1) & 1]);
-        ProcessScatter(runInfos[(taskId + 1) & 1]);
-        if ASCEND_IS_AIC {
-            CrossCoreSetFlag<0, PIPE_FIX>(SCATTER_CUBE_SYNC_FLAG);
-            CrossCoreWaitFlag<0, PIPE_FIX>(SCATTER_CUBE_SYNC_FLAG);
-            CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SCATTER_SYNC_FLAG);
-            CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SCATTER_SYNC_FLAG);
-        } else {
-            CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE2>(SCATTER_SYNC_FLAG);
-            this->vecBlock.ScatterAddDeter(this->mm4ResWorkSpaceGm, this->mm5ResWorkSpaceGm, this->dkWorkSpaceGm,
-                                           this->dvWorkSpaceGm, this->constInfo, deterRunInfos[(sTaskId + 1) & 1]);
-        }
+        FlushPendingDeter(runInfos[(taskId + 1) & 1]);
     }
-
-    // 分核不均匀时部分核会少一个C核的全核同步
-    if (this->processBS1ByCore < this->tilingData->baseParams.formerCoreProcessNNum) {
-        if ASCEND_IS_AIC {
-            CrossCoreSetFlag<0, PIPE_FIX>(SCATTER_CUBE_SYNC_FLAG);
-            CrossCoreWaitFlag<0, PIPE_FIX>(SCATTER_CUBE_SYNC_FLAG);
-            CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(SCATTER_SYNC_FLAG);
-            CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(16 + SCATTER_SYNC_FLAG);
-        } else {
-            CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE2>(SCATTER_SYNC_FLAG);
-            this->SetDeterRunInfo(deterRunInfos[sTaskId & 1], sTaskId);
-            this->vecBlock.ScatterAddDeter(this->mm4ResWorkSpaceGm, this->mm5ResWorkSpaceGm, this->dkWorkSpaceGm,
-                                           this->dvWorkSpaceGm, this->constInfo, deterRunInfos[sTaskId & 1]);
-        }
+    if (maxEpochs > 0) {
+        LaunchDeterScatter(deterRunInfos[(deterTaskId + 1) & 1]);
+        deterTaskId++;
     }
     this->FreeEventID();
 }
@@ -316,13 +332,16 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
     FagRunInfo runInfos[3];
     for (int32_t i = 0; i < this->processBS1ByCore; i++) {
         this->t1Index = this->cBlockIdx + this->usedCoreNum * i;
+        if (!this->IsValidTndT1Index(this->t1Index)) {
+            break;
+        }
         this->GetTndSeqLen(this->t1Index, this->bIndex);
         for (this->n2Index = 0; this->n2Index < this->tilingData->baseParams.n2; this->n2Index++) {
             this->GetActualSelCount(this->t1Index, this->n2Index, this->actualSelectedBlockCount);
             for (this->blkCntOffset = 0; this->blkCntOffset < this->actualSelectedBlockCount;
                  this->blkCntOffset += this->constInfo.selectedCountOffset) {
                 FagRunInfo &cur = runInfos[taskId % 3];
-                this->SetRunInfo(cur, taskId, i);
+                this->SetRunInfo(cur, taskId, i, 0);
                 if (unlikely(taskId == 0)) {
                     ProcessGather(cur);
                     ProcessMm12(cur);
@@ -345,5 +364,4 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
     this->FreeEventID();
 }
 } // namespace SfagBaseApi
-
 #endif
