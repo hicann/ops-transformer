@@ -18,12 +18,12 @@ class FlashAttentionScoreProto : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        std::cout << "FlashAttentionScoreProto SetUp" << std::endl;
+        // std::cout << "FlashAttentionScoreProto SetUp" << std::endl;
     }
 
     static void TearDownTestCase()
     {
-        std::cout << "FlashAttentionScoreProto TearDown" << std::endl;
+        // std::cout << "FlashAttentionScoreProto TearDown" << std::endl;
     }
 };
 
@@ -33,7 +33,7 @@ TEST_F(FlashAttentionScoreProto, flash_attention_score_infershape_0)
         "FlashAttentionScore",
         // 输入Tensor
         {
-        // q
+            // q
             {{{256, 1, 128}, {256, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND},
             // k: S2=256, B=1, H2=128
             {{{256, 1, 128}, {256, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND},
@@ -69,34 +69,34 @@ TEST_F(FlashAttentionScoreProto, flash_attention_score_infershape_0)
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {// 输出Tensor
-        // softmaxMax: B=1, N1=1, S1=256, 8
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        // softmaxSum: B=1, N1=1, S1=256, 8
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        // softmaxOut
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        // attentionOut
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+         // softmaxMax: B=1, N1=1, S1=256, 8
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         // softmaxSum: B=1, N1=1, S1=256, 8
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         // softmaxOut
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         // attentionOut
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
         {// 属性
-        {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
-        {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
-        {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
-        {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
-        {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-        {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
-        {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-        {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-        {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-        {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-        {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-        {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-        {"softmax_out_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("same_as_input")}});
+         {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
+         {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+         {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+         {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+         {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
+         {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"softmax_out_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("same_as_input")}});
 
     std::vector<std::vector<int64_t>> expectOutputShape = {
-        {1, 1, 256, 8},  // softmaxMax
-        {1, 1, 256, 8},  // softmaxSum
-        {0, 0, 0, 0},    // softmaxOut
-        {256, 1, 128},   // attentionOut
+        {1, 1, 256, 8}, // softmaxMax
+        {1, 1, 256, 8}, // softmaxSum
+        {0, 0, 0, 0},   // softmaxOut
+        {256, 1, 128},  // attentionOut
     };
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }

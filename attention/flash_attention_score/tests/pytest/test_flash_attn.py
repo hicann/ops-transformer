@@ -13,20 +13,30 @@ import torch
 import torch_npu
 import math
 import numpy as np
+import logging
 import pytest
 from test_case import TestCases
-from test_utils import generate_qkv, generate_pse, generate_npu_mask, trans_bnsd_to_layout, get_seqlen_list
+from test_utils import (
+    generate_qkv,
+    generate_pse,
+    generate_npu_mask,
+    trans_bnsd_to_layout,
+    get_seqlen_list,
+)
 from cpu_impl import tforward
 from npu_impl import fa_npu
 
+logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
+logger = logging.getLogger(__name__)
+
 
 def check_result(expect, result, test_name):
-    print(f"开始比对{test_name}的精度.")
+    logger.info(f"Start comparing precision of {test_name}.")
     ratio_threshold = 0.005
     threshold_diff = 0.005
     if expect.shape == result.shape:
         if torch.all(torch.eq(expect, result)):
-            print(f"{test_name} 计算结果完全一致.")
+            logger.info(f"{test_name} results are fully consistent.")
             ratio_diff = 0
             diff = 0
             return 1, 0, 0
@@ -40,18 +50,26 @@ def check_result(expect, result, test_name):
             num_diff = torch.sum(mask)
             ratio_diff = num_diff / torch.numel(expect)
             if ratio_diff > threshold_diff:
-                print(f"warning: {test_name} 计算结果有{num_diff}个元素的偏差超过阈值{ratio_threshold:.2%},占比为{ratio_diff:.2%}!")
+                logger.warning(
+                    f"warning: {test_name} results have {num_diff} elements exceeding threshold "
+                    f"{ratio_threshold:.2%}, ratio is {ratio_diff:.2%}!"
+                )
             else:
-                print(f"info: {test_name} 计算结果有{num_diff}个元素的偏差超过阈值{ratio_threshold:.2%},占比为{ratio_diff:.2%}.")
+                logger.info(
+                    f"info: {test_name} results have {num_diff} elements exceeding threshold "
+                    f"{ratio_threshold:.2%}, ratio is {ratio_diff:.2%}."
+                )
             ratio = (1 - ratio_diff).cpu().detach().numpy()
             max = torch.max(diff).cpu().detach().numpy()
-            print(f"{test_name} diff_max: {max:.8f}")
+            logger.info(f"{test_name} diff_max: {max:.8f}")
             sum = torch.sum(diff).cpu().detach().numpy()
-            print(f"{test_name} diff_sum: {sum:.8f}")
+            logger.info(f"{test_name} diff_sum: {sum:.8f}")
     else:
-        print(f"error: {test_name} 计算结果错误,shape与标杆不匹配!")
-        print(f"error: expect shape: {expect.shape}")
-        print(f"error: result shape: {result.shape}")
+        logger.error(
+            f"error: {test_name} results are wrong, shape does not match expected!"
+        )
+        logger.error(f"error: expect shape: {expect.shape}")
+        logger.error(f"error: result shape: {result.shape}")
         ratio = 0
         max = 999999
         sum = 999999
@@ -68,7 +86,7 @@ def call_flash_attn(test_name, **kwargs):
     d_v = kwargs.get("DV", d)
     d_rope = kwargs.get("DRope", 0)
     input_layout = kwargs.get("input_layout")
-    scale = kwargs.get("scale", 1 / (d ** 0.5))
+    scale = kwargs.get("scale", 1 / (d**0.5))
     pse_type = kwargs.get("pse_type", 1)
     pse_layout = kwargs.get("pse_layout", "none").lower()
     keep_prob = kwargs.get("keep_prob", 1)
@@ -97,12 +115,28 @@ def call_flash_attn(test_name, **kwargs):
         if pse_layout in ["bnhs", "1nhs"]:
             pse_s1 = max(1024, pse_s1)
 
-    pse_cpu, pse_npu = generate_pse(pse_b, n1, pse_s1, pse_s2, pse_type, pse_layout, dtype, q_start_idx, kv_start_idx)
-    q, k, v, q_rope, k_rope, qf, kf = generate_qkv(b, n1, n2, sq, skv, d, d_v, d_rope, input_layout, dtype)
+    pse_cpu, pse_npu = generate_pse(
+        pse_b,
+        n1,
+        pse_s1,
+        pse_s2,
+        pse_type,
+        pse_layout,
+        dtype,
+        q_start_idx,
+        kv_start_idx,
+    )
+    q, k, v, q_rope, k_rope, qf, kf = generate_qkv(
+        b, n1, n2, sq, skv, d, d_v, d_rope, input_layout, dtype
+    )
     out, x_max, x_sum = tforward(qf, kf, v, pse_cpu, **kwargs)
 
-    atten_mask = generate_npu_mask(b, sq, skv, sparse_mode, pre_tokens, next_tokens, prefix)
-    npu_out, npu_max, npu_sum = fa_npu(q, k, v, q_rope, k_rope, atten_mask, pse_npu, **kwargs)
+    atten_mask = generate_npu_mask(
+        b, sq, skv, sparse_mode, pre_tokens, next_tokens, prefix
+    )
+    npu_out, npu_max, npu_sum = fa_npu(
+        q, k, v, q_rope, k_rope, atten_mask, pse_npu, **kwargs
+    )
 
     out = trans_bnsd_to_layout(out, input_layout)
     check_result(out.float(), npu_out.float(), "out")
@@ -112,6 +146,6 @@ def call_flash_attn(test_name, **kwargs):
 
 def test_npu_flash_attn():
     for test_name, test_data in TestCases.items():
-        print(f"================Run test case: {test_name} begin===============")
+        logger.info(f"================Run test case: {test_name} begin===============")
         call_flash_attn(test_name, **test_data)
-        print(f"================Run test case: {test_name} end=================")
+        logger.info(f"================Run test case: {test_name} end=================")
