@@ -42,6 +42,7 @@
 |[aclnnAlltoAllvQuantGroupedMatMul](../../mc2/allto_allv_quant_grouped_mat_mul/docs/aclnnAlltoAllvQuantGroupedMatMul.md)|完成路由专家AlltoAllv、Permute、量化GroupedMatMul计算融合并实现与共享专家量化MatMul并行融合。| - | 默认确定性实现 |
 |[aclnnAlltoAllvQuantGroupedMatMulV2](../../mc2/allto_allv_quant_grouped_mat_mul/docs/aclnnAlltoAllvQuantGroupedMatMulV2.md)|兼容[aclnnAlltoAllvQuantGroupedMatMul](../../mc2/allto_allv_quant_grouped_mat_mul/docs/aclnnAlltoAllvQuantGroupedMatMul.md)支持的功能，在此基础上新增commMode参数，供用户指定通信引擎参数。| - | 默认确定性实现 |
 |[aclnnApplyRotaryPosEmb](../../posembedding/apply_rotary_pos_emb/docs/aclnnApplyRotaryPosEmb.md)|将query和key两路算子融合成一路。执行旋转位置编码计算，计算结果执行原地更新。|默认确定性实现| 默认确定性实现 |
+|[aclnnApplyRotaryPosEmbGrad](../../posembedding/apply_rotary_pos_emb_grad/docs/aclnnApplyRotaryPosEmbGrad.md)|执行双路旋转位置编码aclnnApplyRotaryPosEmb的反向计算，同时计算query和key的rope反向梯度，融合为一次kernel调用。| - | 默认确定性实现 |
 |[aclnnApplyRotaryPosEmbV2](../../posembedding/apply_rotary_pos_emb/docs/aclnnApplyRotaryPosEmbV2.md)|将query和key两路算子融合成一路。执行旋转位置编码计算，计算结果执行原地更新。|默认确定性实现| 默认确定性实现 |
 |[aclnnAttentionUpdate](../../attention/attention_update/docs/aclnnAttentionUpdate.md)|将各SP域PA算子的输出的中间结果lse，localOut两个局部变量结果更新成全局结果。|默认确定性实现| 默认确定性实现 |
 |[aclnnAttentionWorkerCombine](../../attention/attention_worker_combine/docs/aclnnAttentionWorkerCombine.md)|Attention和FFN分离部署场景下，Attention侧数据融合算子，将多个计算单元处理的注意力token数据进行融合，结合专家权重对结果进行加权，输出最终的注意力融合结果，并更新层ID。|默认确定性实现| - |

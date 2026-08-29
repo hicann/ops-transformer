@@ -14,6 +14,7 @@
 - [aclnnAlltoAllvQuantGroupedMatMul](../../mc2/allto_allv_quant_grouped_mat_mul/docs/aclnnAlltoAllvQuantGroupedMatMul.md)
 - [aclnnAlltoAllvQuantGroupedMatMulV2](../../mc2/allto_allv_quant_grouped_mat_mul/docs/aclnnAlltoAllvQuantGroupedMatMulV2.md)
 - [aclnnApplyRotaryPosEmb](../../posembedding/apply_rotary_pos_emb/docs/aclnnApplyRotaryPosEmb.md)
+- [aclnnApplyRotaryPosEmbGrad](../../posembedding/apply_rotary_pos_emb_grad/docs/aclnnApplyRotaryPosEmbGrad.md)
 - [aclnnApplyRotaryPosEmbV2](../../posembedding/apply_rotary_pos_emb/docs/aclnnApplyRotaryPosEmbV2.md)
 - [aclnnAttentionToFFN](../../mc2/attention_to_ffn/docs/aclnnAttentionToFFN.md)
 - [aclnnAttentionUpdate](../../attention/attention_update/docs/aclnnAttentionUpdate.md)

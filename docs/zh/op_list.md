@@ -1518,6 +1518,16 @@
   </tr>
   <tr>
     <td>posembedding</td>
+    <td><a href="../../posembedding/apply_rotary_pos_emb_grad/README.md">apply_rotary_pos_emb_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>执行双路旋转位置编码ApplyRotaryPosEmb的反向计算，同时计算query和key的rope反向梯度，融合为一次kernel调用。</td>
+  </tr>
+  <tr>
+    <td>posembedding</td>
     <td><a href="../../posembedding/dequant_rope_quant_kvcache/README.md">dequant_rope_quant_kvcache</a></td>
     <td>✓</td>
     <td>✓</td>
