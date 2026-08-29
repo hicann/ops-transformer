@@ -27,9 +27,10 @@ class StemOamPrepPagedKvOpBuilder(OpBuilder):
     def schema(self) -> str:
         return [
             "stem_oam_prep_paged_kv(Tensor k_cache, Tensor v_cache, Tensor kv_indices, "
-            "int[] kv_seq_lens, Tensor? k_scale_cache, Tensor? v_scale, "
-            "float lambda_mag, str kv_layout, "
-            "int stem_block_size, int stem_stride) -> (Tensor, Tensor)"
+            "SymInt[] kv_seq_lens, *, "
+            "Tensor? k_scale_cache=None, Tensor? v_scale=None, "
+            'float lambda_mag=0.3, str kv_layout="BNBD", '
+            "int stem_block_size=128, int stem_stride=16) -> (Tensor, Tensor)"
         ]
 
     def register_meta(self):
@@ -39,12 +40,13 @@ class StemOamPrepPagedKvOpBuilder(OpBuilder):
             v_cache,
             kv_indices,
             kv_seq_lens,
-            k_scale_cache,
-            v_scale,
-            lambda_mag,
-            kv_layout,
-            stem_block_size,
-            stem_stride,
+            *,
+            k_scale_cache=None,
+            v_scale=None,
+            lambda_mag=0.3,
+            kv_layout="BNBD",
+            stem_block_size=128,
+            stem_stride=16,
         ):
             batch = kv_indices.shape[0]
             num_heads = k_cache.shape[2] if kv_layout == "BBND" else k_cache.shape[1]
@@ -74,6 +76,7 @@ def stem_oam_prep_paged_kv(
     v_cache,
     kv_indices,
     kv_seq_lens,
+    *,
     k_scale_cache=None,
     v_scale=None,
     lambda_mag=0.3,

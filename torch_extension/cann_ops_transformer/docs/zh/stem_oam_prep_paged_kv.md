@@ -143,8 +143,8 @@ cann_ops_transformer.stem_oam_prep_paged_kv(
         v_cache,
         kv_indices,
         kv_seq_lens,
-        k_scale_cache,
-        v_scale,
+        k_scale_cache=k_scale_cache,
+        v_scale=v_scale,
         lambda_mag=0.3,
         kv_layout=kv_layout,
         stem_block_size=stem_block_size,
@@ -202,8 +202,10 @@ cann_ops_transformer.stem_oam_prep_paged_kv(
                     kv_seq_lens, lambda_mag, kv_layout,
                     stem_block_size, stem_stride):
             return torch.ops.cann_ops_transformer.stem_oam_prep_paged_kv(
-                k_cache, v_cache, kv_indices, kv_seq_lens, k_scale_cache, v_scale,
-                lambda_mag, kv_layout, stem_block_size, stem_stride)
+                k_cache, v_cache, kv_indices, kv_seq_lens,
+                k_scale_cache=k_scale_cache, v_scale=v_scale,
+                lambda_mag=lambda_mag, kv_layout=kv_layout,
+                stem_block_size=stem_block_size, stem_stride=stem_stride)
 
     config = CompilerConfig()
     config.mode = "reduce-overhead"
