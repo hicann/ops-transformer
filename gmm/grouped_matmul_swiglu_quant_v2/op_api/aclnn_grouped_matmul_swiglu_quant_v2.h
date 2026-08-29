@@ -19,7 +19,8 @@ extern "C" {
  * @brief aclnnGroupedMatmulSwigluQuantV2 的第一段接口，根据具体的计算流程，计算workspace大小。
  * @domain aclnn_ops_infer
  *
- * @param [in] x: 表示公式中的x，数据类型支持INT8、INT4、INT32、FLOAT4_E2M1、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8数据类型，数据格式支持ND。
+ * @param [in] x:
+ * 表示公式中的x，数据类型支持INT8、INT4、INT32、FLOAT4_E2M1、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8数据类型，数据格式支持ND。
  * @param [in] weight:
  * 表示公式中的weight，数据类型支持INT8、INT4、INT32、FLOAT4_E2M1、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8数据类型，数据格式支持ND。
  * @param [in] weightScale:
@@ -38,21 +39,19 @@ extern "C" {
  * @param [in] quantMode: 表示量化计算类型，用于确定swiglu结果的量化模式。
  * @param [in] groupListType: 表示指定分组的解释方式，用于确定groupList的语义。
  * @param [in] tuningConfig: 用于算子预估m/e的大小，走不同的算子模板，以适配不不同场景性能要求。
- * @param [out] quantOutput: 表示公式中的out，数据类型支持INT8、FLOAT4_E2M1、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8数据类型，数据格式支持ND。
+ * @param [out] quantOutput:
+ * 表示公式中的out，数据类型支持INT8、FLOAT4_E2M1、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8数据类型，数据格式支持ND。
  * @param [out] quantScaleOutput: 表示公式中的outQuantScale，数据类型支持FLOAT32、FLOAT8_E8M0数据类型。
  * @param [out] workspaceSize: 返回用户需要在npu device侧申请的workspace大小。
  * @param [out] executor: 返回op执行器，包含算子计算流程。
  * @return aclnnStatus: 返回状态码。
  */
-aclnnStatus aclnnGroupedMatmulSwigluQuantV2GetWorkspaceSize(const aclTensor *x,
-        const aclTensorList *weight, const aclTensorList *weightScale,
-        const aclTensorList *weightAssistMatrix, const aclTensor *bias,
-        const aclTensor *xScale, const aclTensor *smoothScale,
-        const aclTensor *groupList,  int64_t dequantMode, 
-        int64_t dequantDtype, int64_t quantMode, int64_t groupListType,
-        const aclIntArray *tuningConfigOptional, 
-        aclTensor *output, aclTensor *outputScale,
-        uint64_t *workspaceSize, aclOpExecutor **executor);
+aclnnStatus aclnnGroupedMatmulSwigluQuantV2GetWorkspaceSize(
+    const aclTensor *x, const aclTensorList *weight, const aclTensorList *weightScale,
+    const aclTensorList *weightAssistMatrix, const aclTensor *bias, const aclTensor *xScale,
+    const aclTensor *smoothScale, const aclTensor *groupList, int64_t dequantMode, int64_t dequantDtype,
+    int64_t quantMode, int64_t groupListType, const aclIntArray *tuningConfigOptional, aclTensor *output,
+    aclTensor *outputScale, uint64_t *workspaceSize, aclOpExecutor **executor);
 
 /**
  * @brief aclnnGroupedMatmulSwigluQuantV2的第二段接口，用于执行计算。

@@ -29,7 +29,8 @@ namespace optiling {
 using namespace Ops::Transformer::OpTiling;
 class GroupedMatmulSwigluQuantV2Tiling950 : public GroupedQmmTiling {
 public:
-    explicit GroupedMatmulSwigluQuantV2Tiling950(gert::TilingContext *context) : GroupedQmmTiling(context)
+    explicit GroupedMatmulSwigluQuantV2Tiling950(gert::TilingContext *context)
+        : GroupedQmmTiling(context)
     {
         Reset();
     }
@@ -89,6 +90,7 @@ private:
     bool IsB8(ge::DataType dtype);
     bool CheckDtypePertoken();
     bool AnalyzeInputsPertoken();
+    bool CheckPertokenWeightNzShape(const gert::Shape &wShape, const gert::Shape &wStorageShape) const;
     ge::graphStatus DoOpTilingPertoken();
     int64_t LogPertokenQuantParams();
     bool CheckCoreNum() const override;
