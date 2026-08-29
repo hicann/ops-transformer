@@ -56,6 +56,15 @@ __aicore__ inline void EngramFetchGradSyncFunc()
 constexpr uint32_t ENGRAM_GRAD_TIMEOUT_US = 5U * 1000U * 1000U;
 constexpr uint32_t ENGRAM_GRAD_CYCLES_PER_US = 1000U;
 constexpr uint32_t MAX_BLOCK_BYTES = 65535U;
+constexpr uint32_t COMM_RETRY_COUNT = 3U;
+
+#define RUNTIME_ABORT(fmt, ...) \
+    do { \
+        ascendc_assert(false, fmt, ##__VA_ARGS__); \
+        while (true) { \
+            (void)AscendC::GetSystemCycle(); \
+        } \
+    } while (0)
 
 class EngramFetchGradArch35 {
 public:
@@ -174,19 +183,38 @@ private:
 __aicore__ inline void EngramFetchGradArch35::WriteNbiChecked(uint64_t handle, GM_ADDR dst, GM_ADDR src, uint64_t len)
 {
     int32_t ret = hcomm_.WriteNbi(handle, dst, src, len);
-    ascendc_assert(ret == 0, "WriteNbi failed, ret=%d, rankId=%u, aivId=%u", ret, rankId_, aivId_);
+    if (ret != 0) {
+        for (uint32_t i = 0; i < COMM_RETRY_COUNT; i++) {
+            ret = hcomm_.WriteNbi(handle, dst, src, len);
+            if (ret == 0) {
+                return;
+            }
+        }
+        RUNTIME_ABORT("WriteNbi failed after %u retries, ret=%d, rankId=%u, aivId=%u", COMM_RETRY_COUNT, ret, rankId_,
+                      aivId_);
+    }
 }
 
 __aicore__ inline void EngramFetchGradArch35::DrainChecked(uint64_t handle)
 {
     int32_t ret = hcomm_.Drain(handle);
+    if (ret != 0) {
+        for (uint32_t i = 0; i < COMM_RETRY_COUNT; i++) {
+            ret = hcomm_.Drain(handle);
+            if (ret == 0) {
+                return;
+            }
+        }
+        RUNTIME_ABORT("DrainChecked failed after %u retries, ret=%d, handle=%llu", COMM_RETRY_COUNT, ret, handle);
+    }
 }
 
 __aicore__ inline void EngramFetchGradArch35::TimeoutCheck(uint64_t startTime)
 {
     uint64_t nowUs = static_cast<uint64_t>(AscendC::GetSystemCycle()) / ENGRAM_GRAD_CYCLES_PER_US;
-    ascendc_assert((nowUs - startTime) < ENGRAM_GRAD_TIMEOUT_US, "timeout, rankId=%u, aivId=%u, elapsed=%llu us",
-                   rankId_, aivId_, nowUs - startTime);
+    if ((nowUs - startTime) >= ENGRAM_GRAD_TIMEOUT_US) {
+        RUNTIME_ABORT("timeout, rankId=%u, aivId=%u, elapsed=%llu us", rankId_, aivId_, nowUs - startTime);
+    }
 }
 
 __aicore__ inline GM_ADDR EngramFetchGradArch35::GetRemoteWinAddr(uint32_t dstRank, uint64_t offset)
@@ -237,6 +265,7 @@ __aicore__ inline void EngramFetchGradArch35::WriteRemoteCounter(uint32_t dstRan
     GM_ADDR remoteCounterAddr = GetRemoteWinAddr(dstRank, counterOffset) +
                                 (static_cast<uint64_t>(rankId_) * sendersPerRank_ + senderIdx) * STATE_OFFSET;
     WriteNbiChecked(handle, remoteCounterAddr, srcAddr, sizeof(int32_t));
+    DrainChecked(handle);
 }
 
 __aicore__ inline void EngramFetchGradArch35::WaitAllStatusFlags(GM_ADDR statusWinBase, uint32_t expectCount)
@@ -791,8 +820,20 @@ __aicore__ inline void EngramFetchGradArch35::SendGradRemote(uint32_t dstRank, u
                                     (static_cast<uint64_t>(rankId_) * sendersPerRank_ + senderIdx) * STATE_OFFSET;
         int32_t ret = hcomm_.WriteWithNotifyNbi(handle, remoteSlotAddr, srcAddr, dataBytes, remoteCounterAddr,
                                                 static_cast<uint64_t>(localWriteCnt + 1));
-        ascendc_assert(ret == 0, "WriteWithNotifyNbi failed, ret=%d, tag=ExTok_data, rankId=%u, dstRank=%u", ret,
-                       rankId_, dstRank);
+        if (ret != 0) {
+            for (uint32_t i = 0; i < COMM_RETRY_COUNT; i++) {
+                ret = hcomm_.WriteWithNotifyNbi(handle, remoteSlotAddr, srcAddr, dataBytes, remoteCounterAddr,
+                                                static_cast<uint64_t>(localWriteCnt + 1));
+                if (ret == 0) {
+                    break;
+                }
+            }
+            if (ret != 0) {
+                RUNTIME_ABORT(
+                    "WriteWithNotifyNbi failed after %u retries, ret=%d, tag=ExTok_data, rankId=%u, dstRank=%u",
+                    COMM_RETRY_COUNT, ret, rankId_, dstRank);
+            }
+        }
 
         localWriteCnt++;
         totalSent += chunkLen;
