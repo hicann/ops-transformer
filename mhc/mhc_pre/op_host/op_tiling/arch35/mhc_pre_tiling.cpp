@@ -66,6 +66,7 @@ const constexpr size_t SYSTEM_WORKSPACE = 20 * 1024 * 1024;
 
 // Runtime scheduling configuration.
 const constexpr uint32_t SCHEDULE_MODE = 1;
+const constexpr uint32_t AIV_AIC_RATIO = 2U;
 
 // Attributes and their accepted values.
 const constexpr float DEFAULT_NORM_EPS = 1e-6f;
@@ -559,19 +560,23 @@ ge::graphStatus MhcPreBaseTiling::ParseInputAndAttr()
 }
 ge::graphStatus MhcPreBaseTiling::InitPlatformMemory()
 {
-    uint64_t ubSize;
-
     auto platformInfo = context_->GetPlatformInfo();
-    if (platformInfo == nullptr) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "platformInfo", "nullptr",
-                                              "platform info must not be nullptr");
-        return ge::GRAPH_FAILED;
-    }
+    OP_CHECK_IF(platformInfo == nullptr,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "platformInfo", "nullptr",
+                                                      "platform info must not be nullptr"),
+                return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
+    uint64_t ubSize;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
-    blockDim_ = ascendcPlatform.GetCoreNumAic();
-    aivBlockDim_ = ascendcPlatform.GetCoreNumAiv();
+    blockDim_ = static_cast<uint32_t>(ascendcPlatform.GetCoreNumAic());
+    aivBlockDim_ = static_cast<uint32_t>(ascendcPlatform.GetCoreNumAiv());
+
+    OP_CHECK_IF(
+        aivBlockDim_ != blockDim_ * AIV_AIC_RATIO,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "aivNum", std::to_string(aivBlockDim_).c_str(),
+                                              "MhcPre only support aivNum == aicNum * 2"),
+        return ge::GRAPH_FAILED);
 
     ubSize_ = ubSize; // Save UB size for later validation
 
