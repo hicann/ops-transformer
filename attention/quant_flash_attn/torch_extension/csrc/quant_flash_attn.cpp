@@ -59,11 +59,11 @@ at::Tensor quant_flash_attn_metadata(
     const c10::optional<at::Tensor> &v_descale, int64_t batch_size, int64_t max_seqlen_q, int64_t max_seqlen_kv,
     int64_t num_heads_q, int64_t num_heads_kv, int64_t head_dim, int64_t quant_mode, int64_t mask_mode,
     int64_t win_left, int64_t win_right, std::string layout_q, std::string layout_q_descale, std::string layout_kv,
-    std::string layout_out, const at::Tensor &output)
+    std::string layout_out, bool is_grad_enabled, const at::Tensor &output)
 {
     ACLNN_CMD(aclnnQuantFlashAttnMetadata, cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, v_descale, batch_size,
               max_seqlen_q, max_seqlen_kv, num_heads_q, num_heads_kv, head_dim, quant_mode, mask_mode, win_left,
-              win_right, layout_q, layout_q_descale, layout_kv, layout_out, output);
+              win_right, layout_q, layout_q_descale, layout_kv, layout_out, is_grad_enabled, output);
     return output;
 }
 

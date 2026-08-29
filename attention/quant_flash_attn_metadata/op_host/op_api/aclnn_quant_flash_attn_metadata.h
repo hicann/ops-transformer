@@ -22,10 +22,10 @@ __attribute__((visibility("default"))) aclnnStatus aclnnQuantFlashAttnMetadataGe
     const aclTensor *sequsedKvOptional, const aclTensor *vDescaleOptional, int64_t batchSize, int64_t maxSeqlenQ,
     int64_t maxSeqlenKv, int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, int64_t quantMode, int64_t maskMode,
     int64_t winLeft, int64_t winRight, const char *layoutQ, const char *layoutQDescale, const char *layoutKv,
-    const char *layoutOut, const aclTensor *metaData, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const char *layoutOut, bool isGradEnabled, const aclTensor *metaData, uint64_t *workspaceSize,
+    aclOpExecutor **executor);
 
-__attribute__((visibility("default"))) aclnnStatus aclnnQuantFlashAttnMetadata(void *workspace,
-                                                                               uint64_t workspaceSize,
+__attribute__((visibility("default"))) aclnnStatus aclnnQuantFlashAttnMetadata(void *workspace, uint64_t workspaceSize,
                                                                                aclOpExecutor *executor,
                                                                                aclrtStream stream);
 

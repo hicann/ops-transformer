@@ -79,7 +79,7 @@ def _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q):
     return 0
 
 
-def _calculate_metadata_size():
+def _calculate_max_schedule_size():
     return 4096
 
 
@@ -114,7 +114,8 @@ class QuantFlashAttnOpBuilder(OpBuilder):
             "int? batch_size=None, int? max_seqlen_q=-1, int? max_seqlen_kv=-1, "
             "int? mask_mode=0, int? win_left=-1, int? win_right=-1, "
             'str? layout_q="BSND", str? layout_q_descale="BSND", '
-            'str? layout_kv="BSND", str? layout_out="BSND") -> Tensor',
+            'str? layout_kv="BSND", str? layout_out="BSND", '
+            "bool is_grad_enabled=False) -> Tensor",
             "quant_flash_attn(Tensor q, Tensor k, Tensor v, "
             "Tensor q_descale, Tensor k_descale, Tensor v_descale, int quant_mode, "
             "Tensor? block_table=None, Tensor? p_scale=None, "
@@ -154,9 +155,10 @@ class QuantFlashAttnOpBuilder(OpBuilder):
             layout_q_descale: Optional[str] = "BSND",
             layout_kv: Optional[str] = "BSND",
             layout_out: Optional[str] = "BSND",
+            is_grad_enabled: Optional[bool] = False,
         ):
-            metadata_size = _calculate_metadata_size()
-            return torch.empty((metadata_size,), dtype=torch.int32, device="npu")
+            max_schedule_size = _calculate_max_schedule_size()
+            return torch.empty((2, max_schedule_size), dtype=torch.int32, device="npu")
 
         @impl(get_as_library(), self.name, "Meta")
         def quant_flash_attn_meta(
@@ -283,6 +285,7 @@ def quant_flash_attn_metadata(
     layout_q_descale: Optional[str] = "BSND",
     layout_kv: Optional[str] = "BSND",
     layout_out: Optional[str] = "BSND",
+    is_grad_enabled: Optional[bool] = False,
 ):
     """
     Dispatcher implementation: NPU.
@@ -299,6 +302,10 @@ def quant_flash_attn_metadata(
             batch_size == None,
             lambda: f"When the layout of query is TND, the attribute batch_size of quant_flash_attn_metadata must be None, but got {batch_size}.",
         )
+    torch._check(
+        is_grad_enabled is not True or quant_mode == 0,
+        lambda: f"When is_grad_enabled is True, quant_mode must be 0, but got quant_mode={quant_mode}",
+    )
     batch_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
     max_seqlen_q = -1 if max_seqlen_q is None else max_seqlen_q
     max_seqlen_kv = -1 if max_seqlen_kv is None else max_seqlen_kv
@@ -311,8 +318,8 @@ def quant_flash_attn_metadata(
     layout_kv = "BSND" if layout_kv is None else layout_kv
     layout_out = "BSND" if layout_out is None else layout_out
 
-    metadata_size = _calculate_metadata_size()
-    output = torch.empty((metadata_size,), dtype=torch.int32, device="npu")
+    max_schedule_size = _calculate_max_schedule_size()
+    output = torch.empty((2, max_schedule_size), dtype=torch.int32, device="npu")
 
     op_module = quant_flash_attn_op_builder.load()
     return op_module.quant_flash_attn_metadata(
@@ -335,6 +342,7 @@ def quant_flash_attn_metadata(
         layout_q_descale,
         layout_kv,
         layout_out,
+        is_grad_enabled,
         output,
     )
 
@@ -360,6 +368,7 @@ def quant_flash_attn_metadata_fallback(
     layout_q_descale: Optional[str] = "BSND",
     layout_kv: Optional[str] = "BSND",
     layout_out: Optional[str] = "BSND",
+    is_grad_enabled: Optional[bool] = False,
 ):
     # 处理所有 tensor 都为 None 的情况
     return quant_flash_attn_metadata(
@@ -382,6 +391,7 @@ def quant_flash_attn_metadata_fallback(
         layout_q_descale,
         layout_kv,
         layout_out,
+        is_grad_enabled,
     )
 
 

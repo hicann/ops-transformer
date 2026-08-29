@@ -56,6 +56,9 @@ private:
     bool ParamsInit();
     bool CheckNeedInitOutput();
     std::vector<int64_t> GetTensorDataAsInt64(Tensor *tensor, size_t size);
+    uint32_t GetS1SeqSize(uint32_t bIdx);
+    uint32_t GetS2SeqSize(uint32_t bIdx);
+    int64_t CalDeterMaxRound();
 
 private:
     CpuKernelContext *context_ = nullptr;
@@ -83,6 +86,9 @@ private:
     std::string socVersion_ = "";
     int32_t aicCoreNum_ = 36U;
     int32_t aivCoreNum_ = 72U;
+    uint32_t s1Size_ = 0;
+    uint32_t s2Size_ = 0;
+    bool isGradEnabled_ = false;
 
     uint32_t groupSize_ = 0;
     uint32_t mBaseSize_ = NUM_64;

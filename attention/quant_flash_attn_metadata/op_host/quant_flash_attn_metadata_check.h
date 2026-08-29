@@ -32,7 +32,7 @@ public:
                                           int64_t maxSeqlenKv, int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim,
                                           int64_t quantMode, int64_t maskMode, int64_t winLeft, int64_t winRight,
                                           const char *layoutQ, const char *layoutQDescale, const char *layoutKv,
-                                          const char *layoutOut, const aclTensor *metadata);
+                                          const char *layoutOut, bool isGradEnabled, const aclTensor *metadata);
 
 private:
     static inline bool IsTensorExist(const aclTensor *tensor);
@@ -44,8 +44,7 @@ private:
     static inline aclnnStatus CheckBaseAttr(int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv,
                                             int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, int64_t quantMode,
                                             const char *layoutQ, const char *layoutQDescale, const char *layoutKv,
-                                            const char *layoutOut);
-
+                                            const char *layoutOut, bool isGradEnabled);
     // 校验 mask 参数组: maskMode 支持 0/3/4, winLeft/winRight >= -1
     static inline aclnnStatus CheckMask(int64_t maskMode, int64_t winLeft, int64_t winRight);
 
@@ -76,10 +75,10 @@ inline aclnnStatus QuantFlashAttnMetadataCheck::ParamsCheck(
     const aclTensor *sequsedKvOptional, const aclTensor *vDescaleOptional, int64_t batchSize, int64_t maxSeqlenQ,
     int64_t maxSeqlenKv, int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, int64_t quantMode, int64_t maskMode,
     int64_t winLeft, int64_t winRight, const char *layoutQ, const char *layoutQDescale, const char *layoutKv,
-    const char *layoutOut, const aclTensor *metadata)
+    const char *layoutOut, bool isGradEnabled, const aclTensor *metadata)
 {
     auto ret = CheckBaseAttr(batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, quantMode, layoutQ,
-                             layoutQDescale, layoutKv, layoutOut);
+                             layoutQDescale, layoutKv, layoutOut, isGradEnabled);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     ret = CheckMask(maskMode, winLeft, winRight);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -104,7 +103,8 @@ inline aclnnStatus QuantFlashAttnMetadataCheck::CheckBaseAttr(int64_t batchSize,
                                                               int64_t maxSeqlenKv, int64_t numHeadsQ,
                                                               int64_t numHeadsKv, int64_t headDim, int64_t quantMode,
                                                               const char *layoutQ, const char *layoutQDescale,
-                                                              const char *layoutKv, const char *layoutOut)
+                                                              const char *layoutKv, const char *layoutOut,
+                                                              bool isGradEnabled)
 {
     CHECK_COND((batchSize == -1 || batchSize > 0), ACLNN_ERR_RUNTIME_ERROR,
                "batchSize must be -1 or greater than 0, but got %ld", batchSize);

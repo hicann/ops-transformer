@@ -101,7 +101,8 @@ cann_ops_transformer.quant_flash_attn_metadata(
     layout_q="BSND",
     layout_q_descale="BSND",
     layout_kv="BSND",
-    layout_out="BSND"
+    layout_out="BSND",
+    is_grad_enabled=False
 ) -> Tensor
 ```
 
@@ -203,6 +204,7 @@ cann_ops_transformer.quant_flash_attn(
 | layout_q_descale | string | 可选 | 定义输入q_descale张量的布局格式 | string | - | - | - |
 | layout_kv | string | 可选 | 定义输入k和v张量的布局格式 | string | - | - | - |
 | layout_out | string | 可选 | 定义输出张量的布局格式 | string | - | - | - |
+| is_grad_enabled | bool | 可选 | 是否启用反向梯度场景的metadata生成。默认值为False。当为True时，metadata用于配套的反向算子quant_flash_attn_grad | BOOL | - | - | - |
 
 ### quant_flash_attn
 
@@ -1225,6 +1227,7 @@ mask_mode参数解释
         layout_q_descale="TND",
         layout_kv="TND",
         layout_out="TND",
+        is_grad_enabled=False,
     )
 
     attn_out, softmax_lse = cann_ops_transformer.ops.quant_flash_attn(
@@ -1313,6 +1316,7 @@ mask_mode参数解释
         layout_q_descale="TND",
         layout_kv="PA_BNBD",
         layout_out="TND",
+        is_grad_enabled=False,
     )
 
     attn_out, softmax_lse = cann_ops_transformer.ops.quant_flash_attn(
