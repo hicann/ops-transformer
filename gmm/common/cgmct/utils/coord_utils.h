@@ -16,7 +16,7 @@
 #ifndef UTILS_COORD_UTILS_H
 #define UTILS_COORD_UTILS_H
 
-#include "common_utils.h"
+#include "cgmct_common_utils.h"
 #include "grouped_matmul_constant.h"
 namespace Cgmct {
 namespace Gemm {

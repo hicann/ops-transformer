@@ -19,7 +19,7 @@
 #include "acl/acl_base.h"
 #include "acl/acl_rt.h"
 #include "acl/acl_dump.h"
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 
 extern "C" {
 aclError aclrtMalloc(void **devPtr, size_t size, aclrtMemMallocPolicy policy)

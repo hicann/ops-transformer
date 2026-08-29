@@ -14,7 +14,7 @@
  */
 
 #include <utility>
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 #include "aclnn_ffn.h"
 #include "aclnn_ffn_v2.h"
 #include "aclnn_ffn_v3.h"

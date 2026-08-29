@@ -24,7 +24,7 @@
 #else
 #include "kernel_operator.h"
 #endif
-#include "layout.h"
+#include "op_kernel_layout.h"
 #include "mem.h"
 
 /////////////////////////////////////////////////////

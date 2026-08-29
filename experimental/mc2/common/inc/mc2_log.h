@@ -32,7 +32,7 @@
 #else
 #include "err_mgr.h"
 #endif
-#include "quant_batch_matmul_v3/op_kernel/arch35/quant_batch_matmul_v3_tiling_data.h"
+#include "quant_batch_matmul_v3/op_kernel/arch35/qbmv3_arch35_tiling_data.h"
 #include "mat_mul_v3/op_kernel/arch35/mat_mul_tiling_data.h"
 
 template <typename T>

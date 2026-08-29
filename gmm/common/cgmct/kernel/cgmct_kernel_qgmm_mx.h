@@ -16,11 +16,11 @@
 #ifndef MATMUL_KERNEL_KERNEL_QGMM_MX_H
 #define MATMUL_KERNEL_KERNEL_QGMM_MX_H
 #include "kernel_basic_intf.h"
-#include "../utils/common_utils.h"
+#include "../utils/cgmct_common_utils.h"
 #include "../utils/coord_utils.h"
 #include "../utils/fill_utils.h"
 #include "../utils/grouped_matmul_constant.h"
-#include "../utils/layout_utils.h"
+#include "../utils/cgmct_layout_utils.h"
 #include "../utils/tensor_utils.h"
 #include "../utils/tuple_utils.h"
 

@@ -16,7 +16,7 @@
 #include "tests/utils/tensor_intf.h"
 #include <sstream>
 #include "tests/utils/io.h"
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 
 using namespace ops::adv::tests::utils;
 

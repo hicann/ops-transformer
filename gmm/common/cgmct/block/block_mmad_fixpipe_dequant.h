@@ -15,9 +15,9 @@
 
 #ifndef BLOCK_MMAD_FIXPIPE_DEQUANT_H
 #define BLOCK_MMAD_FIXPIPE_DEQUANT_H
-#include "../policy/dispatch_policy.h"
-#include "../utils/common_utils.h"
-#include "../utils/layout_utils.h"
+#include "../policy/cgmct_dispatch_policy.h"
+#include "../utils/cgmct_common_utils.h"
+#include "../utils/cgmct_layout_utils.h"
 #include "../utils/tuple_utils.h"
 
 namespace Cgmct {

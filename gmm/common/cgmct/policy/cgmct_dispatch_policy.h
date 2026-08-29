@@ -16,7 +16,7 @@
 #define MATMUL_POLICY_DISPATCH_POLICY_H
 
 #include "../utils/integral_constant.h"
-#include "../utils/arch.h"
+#include "../utils/cgmct_arch.h"
 
 namespace Cgmct {
 namespace Gemm {

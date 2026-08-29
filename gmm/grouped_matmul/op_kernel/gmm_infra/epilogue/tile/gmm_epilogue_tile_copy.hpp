@@ -13,8 +13,8 @@
 
 #include "../../../gmm_infra/base_defs.hpp"
 #include "../../../gmm_infra/arch/gmm_arch.hpp"
-#include "../../../gmm_infra/epilogue/tile/gmm_copy_gm_to_ub.hpp"
-#include "../../../gmm_infra/epilogue/tile/gmm_copy_ub_to_gm.hpp"
+#include "../../../gmm_infra/epilogue/tile/gmm_epilogue_copy_gm_to_ub.hpp"
+#include "../../../gmm_infra/epilogue/tile/gmm_epilogue_copy_ub_to_gm.hpp"
 
 namespace Catlass::Epilogue::Tile {
 

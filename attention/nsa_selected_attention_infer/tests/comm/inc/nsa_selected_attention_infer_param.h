@@ -19,7 +19,7 @@
 #include <cstdint>
 #include <vector>
 #include "graph/types.h"
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 #include "tests/utils/tensor.h"
 
 namespace ops::adv::tests::NsaSelectedAttentionInfer {

@@ -12,11 +12,11 @@
 #define CATLASS_EPILOGUE_BLOCK_EPILOGUE_GEMM_HPP
 
 #include "../../catlass.hpp"
-#include "../../epilogue/dispatch_policy.hpp"
+#include "../../epilogue/tla_epilogue_dispatch_policy.hpp"
 #include "../../gemm_coord.hpp"
 #include "../../matrix_coord.hpp"
-#include "../../epilogue/tile/tile_copy.hpp"
-#include "../../gemm/helper.hpp"
+#include "../../epilogue/tile/tla_epilogue_tile_copy.hpp"
+#include "../../gemm/tla_gemm_helper.hpp"
 
 namespace Catlass::Epilogue::Block {
 template <class CType_, class XType_, class DType_, class TileElemWiseEpilogueAdd_, class TileElemWiseEpilogueMuls_,

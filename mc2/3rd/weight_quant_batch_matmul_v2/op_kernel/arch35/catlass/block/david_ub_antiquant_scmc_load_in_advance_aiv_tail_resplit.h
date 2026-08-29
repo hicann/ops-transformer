@@ -10,7 +10,7 @@
 #ifndef ARCH35_CATLASS_BLOCK_DAVID_UB_ANTIQUANT_SCMC_LOAD_IN_ADVANCE_AIV_TAIL_RESPLIT_H
 #define ARCH35_CATLASS_BLOCK_DAVID_UB_ANTIQUANT_SCMC_LOAD_IN_ADVANCE_AIV_TAIL_RESPLIT_H
 
-#include "../constant.h"
+#include "../wq_catlass_constant.h"
 #include "../iterator/continuous_iterator.h"
 #include "../pipeline/pipeline_stage_mixcore.h"
 #include "../pipeline/pipeline_stage_singlecore.h"
@@ -19,11 +19,11 @@
 #include "../simd/a16w4_pergroup_kn_nz.h"
 #include "../tile/mc2_3rd_copy_gm_to_ub.h"
 #include "../tile/copy_ub_to_l1.h"
-#include "../utils/constant.h"
+#include "../utils/wq_utils_constant.h"
 #include "../utils/wq_device_utils.h"
 #include "../utils/math_utils.h"
 #include "block_decl.h"
-#include "constant.h"
+#include "wq_block_constant.h"
 #include "david_ub_antiquant_scmc.h"
 
 using AscendC::DataCopyParams;

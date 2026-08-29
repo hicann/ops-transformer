@@ -20,9 +20,9 @@
 #else
 #include "kernel_operator.h"
 #endif
-#include "../utils/common_utils.h"
+#include "../utils/cgmct_common_utils.h"
 #include "../utils/grouped_matmul_constant.h"
-#include "../utils/layout_utils.h"
+#include "../utils/cgmct_layout_utils.h"
 #include "../utils/tensor_utils.h"
 
 namespace Cgmct {

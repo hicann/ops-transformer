@@ -14,7 +14,7 @@
  */
 
 #include "nsa_compress_with_cache_param.h"
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 
 using Tensor = ops::adv::tests::utils::Tensor;
 

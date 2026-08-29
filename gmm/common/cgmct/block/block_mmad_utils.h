@@ -16,7 +16,7 @@
 #define MATMUL_BLOCK_BLOCK_MMAD_UTILS_H
 
 #include <type_traits>
-#include "../utils/common_utils.h"
+#include "../utils/cgmct_common_utils.h"
 #include "../utils/integral_constant.h"
 #include "../utils/tuple_utils.h"
 

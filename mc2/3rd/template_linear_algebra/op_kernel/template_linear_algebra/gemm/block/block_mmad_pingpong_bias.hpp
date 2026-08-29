@@ -15,9 +15,9 @@
 #include "../../arch/resource.hpp"
 #include "../../coord.hpp"
 #include "../../gemm_coord.hpp"
-#include "../../gemm/dispatch_policy.hpp"
-#include "../../gemm/helper.hpp"
-#include "../../gemm/tile/tile_copy.hpp"
+#include "../../gemm/tla_gemm_dispatch_policy.hpp"
+#include "../../gemm/tla_gemm_helper.hpp"
+#include "../../gemm/tile/tla_gemm_tile_copy.hpp"
 #include "../../gemm/tile/tile_mmad.hpp"
 
 namespace Catlass::Gemm::Block {

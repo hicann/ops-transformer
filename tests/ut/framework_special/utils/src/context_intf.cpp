@@ -16,7 +16,7 @@
 #include "tests/utils/context_intf.h"
 #include <algorithm>
 #include "tests/utils/case.h"
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 
 using namespace ops::adv::tests::utils;
 

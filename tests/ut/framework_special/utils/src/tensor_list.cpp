@@ -15,7 +15,7 @@
 
 #include "tests/utils/tensor_list.h"
 #include <tikicpulib.h>
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 
 using namespace ops::adv::tests::utils;
 

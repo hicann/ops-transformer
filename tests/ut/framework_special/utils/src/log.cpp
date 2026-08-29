@@ -13,7 +13,7 @@
  * \brief
  */
 
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 
 namespace {
 uint32_t g_LogErrCnt = 0;

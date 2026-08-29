@@ -14,7 +14,7 @@
  */
 
 #include <utility>
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 #include "aclnn_quant_grouped_matmul_inplace_add.h"
 #include "aclnn_quant_grouped_matmul_inplace_add_case.h"
 

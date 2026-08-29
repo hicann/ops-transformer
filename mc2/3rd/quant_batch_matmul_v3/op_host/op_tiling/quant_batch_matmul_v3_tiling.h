@@ -20,7 +20,7 @@
 #define MC2_QUANT_BATCH_MATMUL_V3_TILING_H
 
 #include "quant_batch_matmul_v3_tiling_base.h"
-#include "../../op_kernel/quant_batch_matmul_v3_tiling_data.h"
+#include "../../op_kernel/qbmv3_tiling_data.h"
 
 namespace optiling {
 

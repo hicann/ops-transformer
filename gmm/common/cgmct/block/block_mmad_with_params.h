@@ -16,7 +16,7 @@
 #define MATMUL_BLOCK_BLOCK_MMAD_WITH_PARAMS_H
 
 #include <type_traits>
-#include "./block_mmad.h"
+#include "./cgmct_block_mmad.h"
 
 namespace Cgmct {
 namespace Gemm {

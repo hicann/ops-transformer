@@ -15,7 +15,7 @@
 #ifndef MC2_QBMM_ASW_BLOCK_H
 #define MC2_QBMM_ASW_BLOCK_H
 
-#include "quant_batch_matmul_v3_tiling_data.h"
+#include "qbmv3_arch35_tiling_data.h"
 #include "../quant_batch_matmul_v3_base.h"
 
 namespace Mc2QuantBatchMatmulV3 {

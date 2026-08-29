@@ -17,7 +17,7 @@
 #include <map>
 #include <graph/utils/type_utils.h>
 #include <acl/acl.h>
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 #include "tests/utils/io.h"
 
 namespace {

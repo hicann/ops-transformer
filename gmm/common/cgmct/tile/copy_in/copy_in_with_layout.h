@@ -16,7 +16,7 @@
 #define MATMUL_TILE_COPY_IN_COPY_IN_WITH_LAYOUT_H
 
 #include "../tile_copy_policy.h"
-#include "../../utils/layout_utils.h"
+#include "../../utils/cgmct_layout_utils.h"
 #include "../../utils/tensor_utils.h"
 #if ASC_DEVKIT_MAJOR >= 9
 #include "std/algorithm.h"

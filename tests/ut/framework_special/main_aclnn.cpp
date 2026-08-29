@@ -16,7 +16,7 @@
 #include <gtest/gtest.h>
 #include <aclnn/aclnn_base.h>
 #include "tests/utils/platform.h"
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 
 using Platform = ops::adv::tests::utils::Platform;
 

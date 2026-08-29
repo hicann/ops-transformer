@@ -16,7 +16,7 @@
 #include "matmul_v3_asw_basic_tiling.h"
 #include "matmul_v3_tiling_strategy.h"
 #include "./matmul_tiling_registry.h"
-#include "common/op_host/math_util.h"
+#include "common/op_host/mc2_3rd_math_util.h"
 
 using Ops::Transformer::MathUtil;
 namespace optiling {

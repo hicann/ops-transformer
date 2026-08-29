@@ -23,8 +23,8 @@
 #include "../../gemm/tile/copy_l1_to_l0a.hpp"
 #include "../../gemm/tile/copy_l1_to_l0b.hpp"
 
-#include "../../gemm/helper.hpp"
-#include "../../gemv/helper.hpp"
+#include "../../gemm/tla_gemm_helper.hpp"
+#include "../../gemv/tla_gemv_helper.hpp"
 #include "../../gemm/gemm_type.hpp"
 
 namespace Catlass::Gemv::Tile {

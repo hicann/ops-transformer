@@ -17,7 +17,7 @@
 #define EPILOGUE_BLOCK_EPILOGUE_DEQUANT_SWIGLU_H
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
 #include "kernel_operator.h"
-#include "../utils/common_utils.h"
+#include "../utils/cgmct_common_utils.h"
 #include "../utils/device_utils.h"
 #include "../utils/status_utils.h"
 #include "../utils/tensor_utils.h"

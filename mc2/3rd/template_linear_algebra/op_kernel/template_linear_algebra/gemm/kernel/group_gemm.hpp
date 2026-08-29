@@ -17,7 +17,7 @@
 #include "../../matrix_coord.hpp"
 #include "../../epilogue/tile/copy_gm_to_ub.hpp"
 #include "../../epilogue/tile/copy_ub_to_gm.hpp"
-#include "../../gemm/helper.hpp"
+#include "../../gemm/tla_gemm_helper.hpp"
 
 namespace Catlass::Gemm::Kernel {
 

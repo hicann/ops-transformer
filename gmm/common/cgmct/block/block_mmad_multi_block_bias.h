@@ -19,7 +19,7 @@
 #include "lib/matmul/tiling.h"
 #include "lib/matmul/constant_tiling.h"
 
-#include "../policy/dispatch_policy.h"
+#include "../policy/cgmct_dispatch_policy.h"
 #include "./matmul_impl_traits.h"
 #include "./block_mmad_with_params.h"
 

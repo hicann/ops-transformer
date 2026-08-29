@@ -22,7 +22,7 @@
 #include "../../3rd/quant_batch_matmul_v3/op_kernel/arch35/qbmm_mix_perblock.h"
 #include "../../3rd/quant_batch_matmul_v3/op_kernel/arch35/qbmm_api_utils.h"
 #include "../../3rd/quant_batch_matmul_v3/op_kernel/arch35/qbmm_perblock_api_utils.h"
-#include "../../3rd/quant_batch_matmul_v3/op_kernel/arch35/quant_batch_matmul_v3_tiling_data.h"
+#include "../../3rd/quant_batch_matmul_v3/op_kernel/arch35/qbmv3_arch35_tiling_data.h"
 
 namespace Mc2QuantBatchMatmulV3 {
 constexpr uint32_t MAX_RANK_DIM = 64;

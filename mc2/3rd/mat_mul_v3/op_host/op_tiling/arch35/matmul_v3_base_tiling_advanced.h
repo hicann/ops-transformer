@@ -16,7 +16,7 @@
 #ifndef __OP_HOST_MATMUL_V3_BASE_TILING_ADVANCED_H__
 #define __OP_HOST_MATMUL_V3_BASE_TILING_ADVANCED_H__
 
-#include "common/op_host/math_util.h"
+#include "common/op_host/mc2_3rd_math_util.h"
 #include "matmul_base_tiling.h"
 #include "matmul_v3_common_advanced.h"
 #include "matmul_v3_compile_info_advanced.h"

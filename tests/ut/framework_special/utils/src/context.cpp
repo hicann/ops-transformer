@@ -18,7 +18,7 @@
 #include <iostream>
 #include <fstream>
 #include <tikicpulib.h>
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 #include "tests/utils/platform.h"
 
 extern "C" int OpTilingForCompile(const char *opType, const char *compileInfo, const char *compileInfoHash,

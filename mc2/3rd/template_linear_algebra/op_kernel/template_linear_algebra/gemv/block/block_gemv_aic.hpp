@@ -14,12 +14,12 @@
 #include "../../catlass.hpp"
 #include "../../arch/resource.hpp"
 #include "../../coord.hpp"
-#include "../../gemm/dispatch_policy.hpp"
-#include "../../gemm/tile/tile_copy.hpp"
+#include "../../gemm/tla_gemm_dispatch_policy.hpp"
+#include "../../gemm/tile/tla_gemm_tile_copy.hpp"
 #include "../../gemm/tile/tile_mmad.hpp"
 #include "../../gemv_coord.hpp"
 
-#include "../../gemv/helper.hpp"
+#include "../../gemv/tla_gemv_helper.hpp"
 
 namespace Catlass::Gemv::Block {
 

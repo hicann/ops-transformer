@@ -20,9 +20,9 @@
 #include "lib/matmul/tiling.h"
 
 #include "../utils/grouped_matmul_constant.h"
-#include "../utils/layout_utils.h"
+#include "../utils/cgmct_layout_utils.h"
 #include "../utils/tuple_utils.h"
-#include "../policy/dispatch_policy.h"
+#include "../policy/cgmct_dispatch_policy.h"
 #include "../tile/tile_copy.h"
 #include "block_mmad_pertile_param.h"
 

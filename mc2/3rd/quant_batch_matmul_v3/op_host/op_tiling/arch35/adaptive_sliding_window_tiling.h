@@ -16,7 +16,7 @@
 #define MC2_ADAPTIVE_SLIDING_WINDOW_TILING_H
 #include "util/math_util.h"
 #include "../quant_batch_matmul_v3_tiling_base.h"
-#include "../../../op_kernel/arch35/quant_batch_matmul_v3_tiling_data.h"
+#include "../../../op_kernel/arch35/qbmv3_arch35_tiling_data.h"
 
 namespace optiling {
 

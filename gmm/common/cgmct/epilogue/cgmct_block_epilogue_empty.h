@@ -20,8 +20,8 @@
 #else
 #include "kernel_operator.h"
 #endif
-#include "fusion/default_fusion_op.h"
-#include "../utils/common_utils.h"
+#include "fusion/cgmct_default_fusion_op.h"
+#include "../utils/cgmct_common_utils.h"
 #include "../utils/device_utils.h"
 #include "../utils/status_utils.h"
 

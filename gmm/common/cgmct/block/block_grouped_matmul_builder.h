@@ -24,13 +24,13 @@
 #endif
 #include "block_mmad_multi_block_bias.h"
 
-#include "../utils/common_utils.h"
-#include "../utils/layout_utils.h"
+#include "../utils/cgmct_common_utils.h"
+#include "../utils/cgmct_layout_utils.h"
 #include "../utils/status_utils.h"
 #include "../utils/tuple_utils.h"
 
-#include "../block/block_mmad.h"
-#include "../policy/dispatch_policy.h"
+#include "../block/cgmct_block_mmad.h"
+#include "../policy/cgmct_dispatch_policy.h"
 
 namespace Cgmct {
 namespace Gemm {

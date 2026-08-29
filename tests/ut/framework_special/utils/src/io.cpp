@@ -19,7 +19,7 @@
 #include <fcntl.h>
 #include <iostream>
 #include <unistd.h>
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 
 [[maybe_unused]] bool ops::adv::tests::utils::FileExist(const std::string &filePath)
 {

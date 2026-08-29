@@ -16,7 +16,7 @@
 #define MATMUL_BLOCK_BLOCK_MMAD_H
 
 #include <type_traits>
-#include "../utils/arch.h"
+#include "../utils/cgmct_arch.h"
 #include "../utils/integral_constant.h"
 #include "../utils/matmul_layout_type.h"
 #include "./block_mmad_utils.h"

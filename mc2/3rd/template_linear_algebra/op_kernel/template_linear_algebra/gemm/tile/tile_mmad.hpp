@@ -12,7 +12,7 @@
 #define CATLASS_GEMM_TILE_TILE_MMAD_HPP
 
 #include "../../catlass.hpp"
-#include "../../gemm/helper.hpp"
+#include "../../gemm/tla_gemm_helper.hpp"
 namespace Catlass::Gemm::Tile {
 
 ///////////////////////////////////////////////////////////

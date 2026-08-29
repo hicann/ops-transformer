@@ -18,7 +18,7 @@
 #include <array>
 
 #include "register/op_impl_registry.h"
-#include "common/op_host/math_util.h"
+#include "common/op_host/mc2_3rd_math_util.h"
 
 using namespace platform_ascendc;
 

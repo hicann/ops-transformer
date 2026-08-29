@@ -18,7 +18,7 @@
 #include <tikicpulib.h>
 #include <register/op_impl_registry.h>
 #include <graph/utils/type_utils.h>
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 #include "tests/utils/io.h"
 #include "tests/utils/platform.h"
 #include "tiling/qgmmia/tiling_data.h"

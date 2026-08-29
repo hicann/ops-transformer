@@ -15,7 +15,7 @@
 
 #include "tests/utils/op_info.h"
 #include "tests/utils/platform.h"
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 
 using namespace ops::adv::tests::utils;
 

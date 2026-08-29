@@ -24,9 +24,9 @@
 #include "kernel_operator_list_tensor_intf.h"
 #include "lib/matmul_intf.h"
 
-#include "../utils/common_utils.h"
+#include "../utils/cgmct_common_utils.h"
 #include "../utils/grouped_matmul_constant.h"
-#include "../utils/layout_utils.h"
+#include "../utils/cgmct_layout_utils.h"
 #include "../utils/tuple_utils.h"
 #include "../utils/coord_utils.h"
 #include "../utils/tensor_utils.h"
@@ -34,7 +34,7 @@
 
 #include "./semaphore.h"
 #include "../block/block_quant_matmul_builder.h"
-#include "../epilogue/block_epilogue_empty.h"
+#include "../epilogue/cgmct_block_epilogue_empty.h"
 #include "../block/block_scheduler_utils.h"
 #include "../block/block_scheduler_gmm_aswt_with_tail_split.h"
 

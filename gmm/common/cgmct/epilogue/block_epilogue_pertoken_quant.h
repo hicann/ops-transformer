@@ -16,7 +16,7 @@
 #define EPILOGUE_BLOCK_EPILOGUE_PERTOKEN_QUANT_H
 
 #include "kernel_operator.h"
-#include "../utils/common_utils.h"
+#include "../utils/cgmct_common_utils.h"
 #include "../utils/device_utils.h"
 #include "../utils/status_utils.h"
 #include "../utils/tensor_utils.h"

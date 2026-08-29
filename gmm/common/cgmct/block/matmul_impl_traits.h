@@ -16,7 +16,7 @@
 #ifndef MATMUL_BLOCK_MATMUL_IMPL_TRAITS_H
 #define MATMUL_BLOCK_MATMUL_IMPL_TRAITS_H
 
-#include "../utils/common_utils.h"
+#include "../utils/cgmct_common_utils.h"
 #include "../utils/tuple_utils.h"
 #include "../tile/tile_copy.h"
 

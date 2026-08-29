@@ -33,7 +33,7 @@ struct TileCopyTlaExt {
 #include "copy_l1_to_l0a.hpp"
 #include "copy_l1_to_l0b.hpp"
 #include "copy_l1_to_bt.hpp"
-#include "../helper.hpp"
+#include "../tla_gemm_helper.hpp"
 
 
 namespace Catlass::Gemm::Tile {

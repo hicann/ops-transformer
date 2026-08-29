@@ -16,7 +16,7 @@
 #include "weight_quant_batch_matmul_v2_adaptive_sliding_window_tiling.h"
 
 #include "../weight_quant_batch_matmul_v2_tiling_key.h"
-#include "common/op_host/math_util.h"
+#include "common/op_host/mc2_3rd_math_util.h"
 
 using namespace platform_ascendc;
 

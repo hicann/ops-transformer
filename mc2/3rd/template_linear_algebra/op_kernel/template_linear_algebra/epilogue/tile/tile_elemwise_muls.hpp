@@ -11,7 +11,7 @@
 #ifndef CATLASS_EPILOGUE_TILE_TILE_ELEMWISE_MULS_HPP
 #define CATLASS_EPILOGUE_TILE_TILE_ELEMWISE_MULS_HPP
 
-#include "../../gemm/helper.hpp"
+#include "../../gemm/tla_gemm_helper.hpp"
 
 namespace Catlass::Epilogue::Tile {
 template <class ArchTag_, class ComputeType_, uint32_t COMPUTE_LENGTH_>

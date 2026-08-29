@@ -14,10 +14,10 @@
 #include "../../catlass.hpp"
 #include "../../arch/cross_core_sync.hpp"
 #include "../../arch/resource.hpp"
-#include "../../epilogue/dispatch_policy.hpp"
+#include "../../epilogue/tla_epilogue_dispatch_policy.hpp"
 #include "../../gemm_coord.hpp"
 #include "../../matrix_coord.hpp"
-#include "../../epilogue/tile/tile_copy.hpp"
+#include "../../epilogue/tile/tla_epilogue_tile_copy.hpp"
 
 namespace Catlass::Epilogue::Block {
 

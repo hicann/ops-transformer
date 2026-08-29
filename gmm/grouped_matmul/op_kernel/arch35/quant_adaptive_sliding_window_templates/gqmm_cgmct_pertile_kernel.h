@@ -20,7 +20,7 @@
 #include "cgmct/block/block_scheduler_gmm_aswt_with_tail_split.h"
 #include "cgmct/block/block_scheduler_policy.h"
 #include "cgmct/kernel/kernel_qgmm_pertile.h"
-#include "cgmct/policy/dispatch_policy.h"
+#include "cgmct/policy/cgmct_dispatch_policy.h"
 #include "../../grouped_matmul_utils.h"
 #include "../grouped_matmul_tiling_data_apt.h"
 #include "quant_utils.h"

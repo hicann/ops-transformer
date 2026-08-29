@@ -21,7 +21,7 @@
 #else
 #include "kernel_operator.h"
 #endif
-#include "../utils/common_utils.h"
+#include "../utils/cgmct_common_utils.h"
 #include "../utils/device_utils.h"
 #include "../utils/status_utils.h"
 #include "../utils/tensor_utils.h"

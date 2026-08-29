@@ -17,7 +17,7 @@
 #define UTILS_MATMUL_LAYOUT_TYPE_H
 
 #include "./integral_constant.h"
-#include "./layout_utils.h"
+#include "./cgmct_layout_utils.h"
 
 namespace Cgmct {
 namespace Gemm {

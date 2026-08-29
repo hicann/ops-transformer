@@ -13,7 +13,7 @@
 #include "../wq_dispatch_policy.h"
 #include "block_decl.h"
 #include "block_utils.h"
-#include "../utils/constant.h"
+#include "../utils/wq_utils_constant.h"
 
 namespace Mc2WeightQuantBatchMatmulV2::Arch35::Catlass {
 

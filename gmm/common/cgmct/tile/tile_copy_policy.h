@@ -15,7 +15,7 @@
 #ifndef MATMUL_TILE_TILE_COPY_POLICY_H
 #define MATMUL_TILE_TILE_COPY_POLICY_H
 
-#include "../utils/arch.h"
+#include "../utils/cgmct_arch.h"
 
 namespace Cgmct {
 namespace Gemm {

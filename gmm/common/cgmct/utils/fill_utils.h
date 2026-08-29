@@ -15,7 +15,7 @@
 
 #ifndef UTILS_FILL_UTILS_H
 #define UTILS_FILL_UTILS_H
-#include "common_utils.h"
+#include "cgmct_common_utils.h"
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
 #else

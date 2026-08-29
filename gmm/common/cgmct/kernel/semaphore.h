@@ -24,9 +24,9 @@
 #endif
 #include "lib/matmul_intf.h"
 
-#include "../utils/common_utils.h"
+#include "../utils/cgmct_common_utils.h"
 #include "../utils/tuple_utils.h"
-#include "../epilogue/block_epilogue_empty.h"
+#include "../epilogue/cgmct_block_epilogue_empty.h"
 
 namespace Cgmct {
 namespace Gemm {

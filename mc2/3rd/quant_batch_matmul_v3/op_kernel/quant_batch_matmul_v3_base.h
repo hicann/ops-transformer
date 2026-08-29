@@ -24,7 +24,7 @@
 #include "adv_api/quantization/ascend_dequant.h"
 #include "kernel_type.h"
 #include "lib/matmul_intf.h"
-#include "quant_batch_matmul_v3_tiling_data.h"
+#include "qbmv3_tiling_data.h"
 
 #define TemplateBasicType                                                                                              \
     typename x1Type, typename x2Type, typename scaleType, typename yType, int x1Format, int x2Format, bool aTrans,     \

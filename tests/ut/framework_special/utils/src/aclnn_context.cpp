@@ -15,7 +15,7 @@
 
 #include "tests/utils/aclnn_context.h"
 #include <acl/acl.h>
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 #include "tests/utils/case.h"
 #include "tests/utils/case_with_socversion.h"
 

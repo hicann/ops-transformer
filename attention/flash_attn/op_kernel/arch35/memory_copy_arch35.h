@@ -15,12 +15,12 @@
 #if __has_include("../../../common/op_kernel/vector_common.h")
 #include "../../../common/op_kernel/vector_common.h"
 #include "../../../common/op_kernel/memcopy/fa_gm_tensor.h"
-#include "../../../common/op_kernel/memcopy/copy_gm_to_l1.h"
+#include "../../../common/op_kernel/memcopy/attn_copy_gm_to_l1.h"
 #include "../../../common/op_kernel/memcopy/copy_ub_to_gm.h"
 #else
 #include "../../common/vector_common.h"
 #include "../../common/memcopy/fa_gm_tensor.h"
-#include "../../common/memcopy/copy_gm_to_l1.h"
+#include "../../common/memcopy/attn_copy_gm_to_l1.h"
 #include "../../common/memcopy/copy_ub_to_gm.h"
 #endif
 

@@ -15,7 +15,7 @@
 
 #include "tests/utils/platform.h"
 #include <map>
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 
 namespace {
 ops::adv::tests::utils::Platform *g_PlatformPtr = nullptr;

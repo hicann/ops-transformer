@@ -15,7 +15,7 @@
 
 #include "tests/utils/case.h"
 #include <utility>
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 
 using namespace ops::adv::tests::utils;
 

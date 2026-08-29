@@ -16,7 +16,7 @@
 #pragma once
 
 #include <gtest/gtest.h>
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 #include "tests/utils/case.h"
 #include "tests/utils/tensor.h"
 #include "tests/utils/op_info.h"

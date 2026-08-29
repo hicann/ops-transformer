@@ -13,8 +13,8 @@
 
 #include "../../catlass.hpp"
 #include "../../arch/resource.hpp"
-#include "../../epilogue/dispatch_policy.hpp"
-#include "../../gemv/helper.hpp"
+#include "../../epilogue/tla_epilogue_dispatch_policy.hpp"
+#include "../../gemv/tla_gemv_helper.hpp"
 #include "../../gemv_coord.hpp"
 #include "../../layout/layout.hpp"
 #include "../../matrix_coord.hpp"

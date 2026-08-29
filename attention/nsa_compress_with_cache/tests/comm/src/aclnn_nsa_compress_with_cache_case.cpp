@@ -15,7 +15,7 @@
 
 #include "aclnn_nsa_compress_with_cache_case.h"
 #include <utility>
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 #include "aclnn_nsa_compress_with_cache.h"
 
 using namespace ops::adv::tests::NsaCompressWithCache;

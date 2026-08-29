@@ -15,7 +15,7 @@
 #include "weight_quant_batch_matmul_v2_weight_nz_tiling.h"
 
 #include "ops_legacy/op_tiling/op_cache_tiling.h"
-#include "common/op_host/math_util.h"
+#include "common/op_host/mc2_3rd_math_util.h"
 #include "common/op_host/op_tiling/debug_tiling.h"
 #include "op_host/tiling_key.h"
 #include "platform/platform_infos_def.h"

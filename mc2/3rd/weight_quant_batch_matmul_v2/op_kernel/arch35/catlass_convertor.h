@@ -15,7 +15,7 @@
 #include "catlass/wq_dispatch_policy.h"
 #include "catlass/kernel/david_wqbmm_load_in_advance.h"
 #include "catlass/scheduler/tile_scheduler_tail_resplit.h"
-#include "catlass/utils/constant.h"
+#include "catlass/utils/wq_utils_constant.h"
 #include "catlass/utils/math_utils.h"
 
 using AscendC::int4b_t;

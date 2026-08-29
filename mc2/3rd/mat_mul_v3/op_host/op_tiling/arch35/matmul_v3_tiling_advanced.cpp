@@ -16,7 +16,7 @@
 #include "matmul_v3_tiling_advanced.h"
 
 #include "register/op_def_registry.h"
-#include "common/op_host/math_util.h"
+#include "common/op_host/mc2_3rd_math_util.h"
 #include "common/op_host/op_tiling/debug_tiling.h"
 #include "./matmul_tiling_registry.h"
 #include "./matmul_tiling_cfg.h"

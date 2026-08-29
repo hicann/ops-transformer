@@ -20,7 +20,7 @@
 #include <fstream>
 #include <tikicpulib.h>
 #include "kernel_operator.h"
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 #include "tests/utils/platform.h"
 
 namespace ops::adv::tests::utils {

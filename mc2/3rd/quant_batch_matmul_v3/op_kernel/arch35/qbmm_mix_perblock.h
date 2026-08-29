@@ -18,7 +18,7 @@
 
 #include "qbmm_api_utils.h"
 #include "qbmm_perblock_api_utils.h"
-#include "quant_batch_matmul_v3_tiling_data.h"
+#include "qbmv3_arch35_tiling_data.h"
 namespace Mc2QuantBatchMatmulV3 {
 
 template <typename x1Type, typename x2Type, typename biasType, typename yType, CubeFormat formatX1, CubeFormat formatX2,

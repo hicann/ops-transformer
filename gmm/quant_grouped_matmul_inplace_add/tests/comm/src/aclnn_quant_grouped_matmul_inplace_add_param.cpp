@@ -17,7 +17,7 @@
 #include <utility>
 #include "tests/utils/case.h"
 #include "tests/utils/io.h"
-#include "tests/utils/log.h"
+#include "tests/utils/tests_utils_log.h"
 
 using ops::adv::tests::utils::ReadFile;
 using ops::adv::tests::utils::WriteFile;

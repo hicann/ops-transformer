@@ -13,7 +13,7 @@
 
 #include "../../catlass.hpp"
 #include "../../arch/resource.hpp"
-#include "../../epilogue/dispatch_policy.hpp"
+#include "../../epilogue/tla_epilogue_dispatch_policy.hpp"
 #include "../../gemm_coord.hpp"
 #include "../../matrix_coord.hpp"
 #include "../../layout/layout.hpp"

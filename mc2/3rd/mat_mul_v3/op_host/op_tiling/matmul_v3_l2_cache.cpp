@@ -14,7 +14,7 @@
  */
 #include "matmul_v3_l2_cache.h"
 #include "op_host/tiling_key.h"
-#include "common/op_host/math_util.h"
+#include "common/op_host/mc2_3rd_math_util.h"
 
 using namespace optiling::mc2_matmul_v3;
 using Ops::Transformer::MathUtil;

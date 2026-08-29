@@ -18,7 +18,7 @@
 #if (__NPU_ARCH__ == 5102)
 #include "buffer_mix_core.h"
 #else
-#include "buffer.h"
+#include "attn_buffer.h"
 #endif
 
 // L1  TPosition::A1
