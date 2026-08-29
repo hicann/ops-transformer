@@ -19,6 +19,7 @@
 #include "chunk_gated_delta_rule_utils.h"
 #include "../chunk_gated_delta_rule_tiling_data.h"
 #include "chunk_gated_delta_rule_matmul_basic.h"
+#include "vf/chunk_gated_delta_rule_stage3_vf.h"
 
 namespace ChunkGatedDeltaRule {
 using namespace AscendC;
@@ -129,38 +130,32 @@ public:
 
     __aicore__ inline void CalMaskedQKT(GlobalTensor<bfloat16_t> outGM, int nvId, int chunkPos)
     {
-        // chunkSize 大小进行自动补齐
+        // gated 路径先将长度为 curChunkSize_ 的 g 向量搬入独立 TBuf；随后 qkt 的 MTE2
+        // 搬运与 DeQue 保证此前的 g 搬运也已完成，使两个输入可由同一次 VF_CALL 读取。
         if constexpr (gOptional) {
-            AlignedCopyIn(sTP_->gCumExp[nvId * Sp_ + chunkPos], 1, curChunkSize_); // 自动补齐
-            auto g_cum = inQueue_.DeQue<float>();
-            const uint32_t srcShape1[] = {static_cast<uint32_t>(chunkSize_), static_cast<uint32_t>(1)};
-            const uint32_t srcShape2[] = {static_cast<uint32_t>(1), static_cast<uint32_t>(chunkSize_)};
-            const uint32_t dstShape[] = {static_cast<uint32_t>(chunkSize_), static_cast<uint32_t>(chunkSize_)};
-            Broadcast<float, BROADCAST_AXIS, 1>(tmpBuffer1_, g_cum, dstShape, srcShape1);
-            Broadcast<float, BROADCAST_AXIS, 0>(tmpBuffer2_, g_cum, dstShape, srcShape2);
-            PipeBarrier<PIPE_V>();
-            Sub(tmpBuffer1_, tmpBuffer1_, tmpBuffer2_, curChunkSize_ * chunkSize_);
-            PipeBarrier<PIPE_V>();
-            Mul(tmpBuffer1_, tmpBuffer1_, maskBuffer_, curChunkSize_ * chunkSize_);
-            PipeBarrier<PIPE_V>();
-            Exp<float, 0, true>(tmpBuffer1_, tmpBuffer1_, curChunkSize_ * chunkSize_);
-            PipeBarrier<PIPE_V>();
-            inQueue_.FreeTensor(g_cum);
-        } else {
-            Duplicate(tmpBuffer1_, static_cast<float>(1.0f), curChunkSize_ * chunkSize_);
-            PipeBarrier<PIPE_V>();
+            DataCopyExtParams gInParams{static_cast<uint16_t>(1), static_cast<uint32_t>(curChunkSize_ * sizeof(float)),
+                                        0, 0, 0};
+            DataCopyPadExtParams<float> gPadParams{false, 0, 0, 0};
+            DataCopyPad(tmpBuffer1_, sTP_->gCumExp[nvId * Sp_ + chunkPos], gInParams, gPadParams);
         }
 
         // qkt
         AlignedCopyIn(sTP_->qkt[nvId * Sp_ * chunkSize_ + chunkPos * chunkSize_], curChunkSize_, curChunkSize_);
         auto qkt = inQueue_.DeQue<bfloat16_t>();
         auto scale_qkt = outQueue_.AllocTensor<bfloat16_t>();
-        Cast(tmpBuffer2_, qkt, RoundMode::CAST_NONE, curChunkSize_ * chunkSize_);
-        Muls(tmpBuffer2_, tmpBuffer2_, sTP_->scale, curChunkSize_ * chunkSize_);
-        Mul(tmpBuffer2_, tmpBuffer2_, tmpBuffer1_, curChunkSize_ * chunkSize_);
-        // mask
-        Mul(tmpBuffer2_, tmpBuffer2_, maskBuffer_, curChunkSize_ * chunkSize_);
-        Cast(scale_qkt, tmpBuffer2_, RoundMode::CAST_RINT, curChunkSize_ * chunkSize_);
+        auto maskAddr = reinterpret_cast<__ubuf__ float *>(maskBuffer_.GetPhyAddr());
+        auto qktAddr = reinterpret_cast<__ubuf__ bfloat16_t *>(qkt.GetPhyAddr());
+        auto scaleQktAddr = reinterpret_cast<__ubuf__ bfloat16_t *>(scale_qkt.GetPhyAddr());
+        if constexpr (gOptional) {
+            auto gAddr = reinterpret_cast<__ubuf__ float *>(tmpBuffer1_.GetPhyAddr());
+            AscendC::VF_CALL<ComputeMaskedQktGatedVF>(scaleQktAddr, qktAddr, gAddr, maskAddr, sTP_->scale,
+                                                      static_cast<uint16_t>(curChunkSize_),
+                                                      static_cast<uint16_t>(chunkSize_));
+        } else {
+            AscendC::VF_CALL<ComputeMaskedQktNoGateVF>(scaleQktAddr, qktAddr, maskAddr, sTP_->scale,
+                                                       static_cast<uint16_t>(curChunkSize_),
+                                                       static_cast<uint16_t>(chunkSize_));
+        }
         outQueue_.EnQue(scale_qkt);
         AlignedCopyOut(outGM, curChunkSize_, curChunkSize_);
         inQueue_.FreeTensor(qkt);

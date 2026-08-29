@@ -336,12 +336,11 @@ private:
         }
         if constexpr (gOptional) {
             for (uint32_t i = 0; i < curParaNum; ++i) {
-                // g_cum_exp = g.cumsum(dim=-1).exp()
-                GCumExpCompute(gGm_[bgOffsetBatch_[i]], outGCumExpGm_[chunkRowBase_[i]],
-                               gCumSumUbFloat_[i * chunkSize_], gCumExpUbFloat_[i * chunkSize_], validLenBatch_[i]);
-                // attn_1 = (g_cum_exp[:None] / g_cum_exp[None,:]) * mask
+                // 同一次 VF 中计算 g_cum、g_cum_exp 和 Gamma。
                 uint64_t gUbOffset = i * chunkSize_ * maxLen_;
-                GammaCompute(gBroadUbFloat_[gUbOffset], gammaUbFloat_[gUbOffset], gCumSumUbFloat_[i * chunkSize_]);
+                GCumExpCompute(gGm_[bgOffsetBatch_[i]], outGCumExpGm_[chunkRowBase_[i]],
+                               gCumSumUbFloat_[i * chunkSize_], gCumExpUbFloat_[i * chunkSize_],
+                               gammaUbFloat_[gUbOffset], validLenBatch_[i]);
             }
         }
 
@@ -423,18 +422,16 @@ private:
 
     __aicore__ inline void GCumExpCompute(const GlobalTensor<float> src, const GlobalTensor<float> dst,
                                           LocalTensor<float> gCumSumUbFloat, LocalTensor<float> gCumExpUbFloat,
-                                          uint32_t validLen)
+                                          LocalTensor<float> gammaUbFloat, uint32_t validLen)
     {
         // Copy g
         GCopyInWithStride(src, validLen);
-        // CumSum计算
-        uint32_t outer = 1;
-        uint32_t inner = chunkSize_;
-        CumSumInfo cumSumInfo{outer, inner};
-        CumSum<float>(gCumSumUbFloat, gCumUbFloat_, gCumUbFloat_, cumSumInfo);
-        PipeBarrier<PIPE_V>();
-        // Exp计算
-        Exp<float, 0, true>(gCumExpUbFloat, gCumSumUbFloat, chunkSize_);
+        // CumSum、Exp 和 Gamma 在同一次 VF 中计算，chunkSize_ 按参数传入。
+        auto gAddr = reinterpret_cast<__ubuf__ float *>(gCumUbFloat_.GetPhyAddr());
+        auto gCumAddr = reinterpret_cast<__ubuf__ float *>(gCumSumUbFloat.GetPhyAddr());
+        auto gCumExpAddr = reinterpret_cast<__ubuf__ float *>(gCumExpUbFloat.GetPhyAddr());
+        auto gammaAddr = reinterpret_cast<__ubuf__ float *>(gammaUbFloat.GetPhyAddr());
+        AscendC::VF_CALL<CumSumExpVF>(gAddr, gCumAddr, gCumExpAddr, gammaAddr, static_cast<uint32_t>(chunkSize_));
         PipeBarrier<PIPE_V>();
 
         if (subBlockIdx_ == 0) {
@@ -447,35 +444,6 @@ private:
             DataCopyPad(dst, tmpOut, params);
             gOutQueue_.FreeTensor(tmpOut);
         }
-        PipeBarrier<PIPE_V>();
-    }
-
-    __aicore__ inline void GammaCompute(const LocalTensor<float> gBroadUbFloat, LocalTensor<float> gammaUbFloat,
-                                        LocalTensor<float> gCumSumUbFloat)
-    {
-        // BroadCast
-        uint32_t divShape[2] = {chunkSize_, chunkSize_};
-        uint32_t gShape[2] = {chunkSize_, 1};
-        uint32_t gTransShape[2] = {1, chunkSize_};
-        Broadcast<float, BROADCAST_AXIS, 1>(gBroadUbFloat, gCumSumUbFloat, divShape, gShape);
-        Broadcast<float, BROADCAST_AXIS, 0>(gTransBroadUbFloat_, gCumSumUbFloat, divShape, gTransShape);
-        PipeBarrier<PIPE_V>();
-        // div
-        Sub(gammaUbFloat, gBroadUbFloat, gTransBroadUbFloat_, ccOffset_);
-        PipeBarrier<PIPE_V>();
-        // mask  1
-        DataCopyInFp32(ccOffset_, stageOneMask_[GetBlockIdx() * ccOffset_]);
-        auto maskLocal = inQueue_.DeQue<float>();
-        Mul(gammaUbFloat, gammaUbFloat, maskLocal, ccOffset_);
-        PipeBarrier<PIPE_V>();
-        // exp
-        Exp<float, 0, true>(gammaUbFloat, gammaUbFloat, ccOffset_);
-        PipeBarrier<PIPE_V>();
-        // mask  2
-        Mul(gammaUbFloat, gammaUbFloat, maskLocal, ccOffset_);
-        PipeBarrier<PIPE_V>();
-
-        inQueue_.FreeTensor(maskLocal);
         PipeBarrier<PIPE_V>();
     }
 

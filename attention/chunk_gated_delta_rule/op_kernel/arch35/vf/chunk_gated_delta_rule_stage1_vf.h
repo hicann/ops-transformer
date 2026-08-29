@@ -17,6 +17,65 @@ namespace ChunkGatedDeltaRule {
 using namespace AscendC;
 using namespace MicroAPI;
 
+/*
+ * 按传入的 chunkSize 计算 FP32 inclusive cumsum、exp 和 Gamma：
+ *   gCum[i] = sum(g[0:i + 1])
+ *   gCumExp[i] = exp(gCum[i])
+ *   gamma[i, j] = j < i ? exp(gCum[i] - gCum[j]) : 0
+ * gCum 计算完后保留在寄存器中直接生成 Gamma，避免再次从 UB 加载以及两次 Broadcast。
+ */
+__simd_vf__ inline void CumSumExpVF(__ubuf__ float *gAddr, __ubuf__ float *gCumAddr, __ubuf__ float *gCumExpAddr,
+                                    __ubuf__ float *gammaAddr, uint32_t chunkSize)
+{
+    // chunkSize <= 单个 FP32 Vector 寄存器的元素数，因此一个寄存器可保存整个 chunk 的 g/gCum
+    RegTensor<float> gCumReg;
+    RegTensor<float> shiftedReg;
+    RegTensor<float> gCumExpReg;
+    RegTensor<int32_t> laneIndexReg;
+    RegTensor<int32_t> gatherIndexReg;
+    // validMask 只使能当前 chunk 的有效 lane，避免寄存器尾部数据参与计算和写回
+    MaskReg allMask = CreateMask<int32_t, MaskPattern::ALL>();
+    uint32_t validCount = chunkSize;
+    MaskReg validMask = UpdateMask<float>(validCount);
+    MaskReg addMask;
+    MaskReg gammaMask;
+
+    // gCumReg 初始为原始 g；laneIndexReg 保存 [0, 1, ..., chunkSize - 1]，用于构造移位索引
+    LoadAlign<float, LoadDist::DIST_NORM>(gCumReg, gAddr);
+    Arange(laneIndexReg, static_cast<int32_t>(0));
+
+    // 使用 Hillis-Steele inclusive scan 计算前缀和。每轮 stride 翻倍，分别合并相邻的
+    // 1、2、4、... 个元素，经过 ceil(log2(chunkSize)) 轮后得到：
+    //   gCumReg[i] = g[0] + g[1] + ... + g[i]。
+    for (int32_t stride = 1; stride < static_cast<int32_t>(chunkSize); stride <<= 1) {
+        // shiftedReg[i] 读取上一轮的 gCumReg[i - stride]。索引小于 0 的 lane 保持为0
+        // 再通过 addMask 屏蔽，因此这些 lane 保持原值，不会重复累加 gCumReg[0]
+        Adds<int32_t>(gatherIndexReg, laneIndexReg, -stride, allMask);
+        Maxs<int32_t>(gatherIndexReg, gatherIndexReg, static_cast<int32_t>(0), allMask);
+        Gather<float, uint32_t>(shiftedReg, gCumReg, reinterpret_cast<RegTensor<uint32_t> &>(gatherIndexReg));
+        Compares<int32_t, CMPMODE::GE>(addMask, laneIndexReg, stride, validMask);
+        Add<float, MaskMergeMode::MERGING>(gCumReg, gCumReg, shiftedReg, addMask);
+    }
+
+    Exp<float, MaskMergeMode::ZEROING>(gCumExpReg, gCumReg, validMask);
+    StoreAlign<float, StoreDist::DIST_NORM>(gCumAddr, gCumReg, validMask);
+    StoreAlign<float, StoreDist::DIST_NORM>(gCumExpAddr, gCumExpReg, validMask);
+
+    // stageOneMask 是严格下三角矩阵。直接用 laneIndexReg < row 生成行 mask，
+    // 在 Gamma 矩阵中写出对角线及上三角为 0，不再从 GM 搬运 mask 或执行两次 Mul。
+    Duplicate(gCumExpReg, static_cast<float>(0.0));
+    StoreAlign<float, StoreDist::DIST_NORM_B32>(gammaAddr, gCumExpReg, validMask);
+    for (uint16_t row = 1; row < static_cast<uint16_t>(chunkSize); ++row) {
+        uint32_t rowOffset = static_cast<uint32_t>(row) * chunkSize;
+        Duplicate(reinterpret_cast<RegTensor<uint32_t> &>(gatherIndexReg), static_cast<uint32_t>(row));
+        Gather<float, uint32_t>(shiftedReg, gCumReg, reinterpret_cast<RegTensor<uint32_t> &>(gatherIndexReg));
+        Compares<int32_t, CMPMODE::LT>(gammaMask, laneIndexReg, static_cast<int32_t>(row), validMask);
+        Sub<float, MaskMergeMode::ZEROING>(gCumExpReg, shiftedReg, gCumReg, gammaMask);
+        Exp<float, MaskMergeMode::ZEROING>(gCumExpReg, gCumExpReg, gammaMask);
+        StoreAlign<float, StoreDist::DIST_NORM_B32>(gammaAddr + rowOffset, gCumExpReg, validMask);
+    }
+}
+
 /*!
  * InverseAIVVF: forward-substitution inverse of the N x N lower-triangular (unit-diagonal) attn block.
  *   inv[0] = e_0; for i=1..N-1: inv[i] = e_i - sum_{j<i} attn[i,j] * inv[j]
@@ -26,8 +85,8 @@ using namespace MicroAPI;
  *   eiUb must be pre-filled by the caller (unit-diagonal identity in the first N rows).
  */
 template <uint32_t N>
-__simd_vf__ inline void InverseAIVVFImpl(__ubuf__ float *attnUb, __ubuf__ float *invResUb,
-                                         __ubuf__ float *eiUb, uint32_t offset, uint32_t chunkSize)
+__simd_vf__ inline void InverseAIVVFImpl(__ubuf__ float *attnUb, __ubuf__ float *invResUb, __ubuf__ float *eiUb,
+                                         uint32_t offset, uint32_t chunkSize)
 {
     // N<=64, 单寄存器容纳一行; UpdateMask 生成前 N 个 lane 有效的掩码
     uint32_t maskLen = N;
