@@ -52,11 +52,12 @@ ge::graphStatus MetadataChecker::CheckSinglePara(const QfaTilingInfo &qfaInfo)
         return ge::GRAPH_FAILED;
     }
 
-    // shape dim 必须为 1
+    // shape dim 支持 1 或 2: 1D 为 (max_schedule_size,), 仅正向 FA 调度数据;
+    // 2D 为 (2, max_schedule_size), 第一维存正向 FA 调度数据, 第二维存反向 FAG 调度数据
     uint32_t dimNum = metadataTensor->GetStorageShape().GetDimNum();
-    OP_CHECK_IF(dimNum != DIM_NUM_1,
+    OP_CHECK_IF(dimNum != DIM_NUM_1 && dimNum != DIM_NUM_2,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, METADATA_NAME.c_str(),
-                                             (std::to_string(dimNum) + "D").c_str(), "1D"),
+                                             (std::to_string(dimNum) + "D").c_str(), "1D or 2D"),
                 return ge::GRAPH_FAILED);
 
     // shape dim0 必须 > 0（shape 由 quant_flash_attn_metadata 动态计算，不应为空）

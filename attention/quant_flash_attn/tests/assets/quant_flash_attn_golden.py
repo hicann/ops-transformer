@@ -1702,9 +1702,7 @@ def prepare_npu_inputs(
 
         logger.info("[NPU PA] kv_layout=%s", KV_CACHE_LAYOUT)
         logger.info("[NPU PA] k=%s, v=%s", k_npu.shape, v_npu.shape)
-        logger.info(
-            "[NPU PA] k stride=%s, v stride=%s", k_npu.stride(), v_npu.shape.stride()
-        )
+        logger.info("[NPU PA] k stride=%s, v stride=%s", k_npu.stride(), v_npu.stride())
         logger.info("[NPU PA] deq_k=%s, deq_v=%s", deq_k_npu.shape, deq_v_npu.shape)
         logger.info(
             "[NPU PA] deq_k stride=%s, deq_v stride=%s",
