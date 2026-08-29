@@ -657,14 +657,17 @@ class Network(nn.Module):
         out_dtype,
         max_seqlen_q,
         max_seqlen_kv,
+        batch_size,
     ):
+        is_tnd_q = layout_q == "TND"
+        is_tnd_kv = layout_kv == "TND"
         metadata = quant_flash_attn_metadata(
             num_heads_q=q_n,
             num_heads_kv=kv_n,
             head_dim=q.shape[-1],
             quant_mode=0,
-            cu_seqlens_q=cu_seqlens_q,
-            cu_seqlens_kv=cu_seqlens_kv,
+            cu_seqlens_q=cu_seqlens_q if is_tnd_q else None,
+            cu_seqlens_kv=cu_seqlens_kv if is_tnd_kv else None,
             seqused_q=seqused_q,
             seqused_kv=seqused_kv,
             v_descale=dequant_scale_v,
@@ -675,6 +678,7 @@ class Network(nn.Module):
             layout_out=layout_out,
             max_seqlen_q=max_seqlen_q,
             max_seqlen_kv=max_seqlen_kv,
+            batch_size=batch_size if not is_tnd_q else None,
         )
         main_kwargs = {
             "q": q,
@@ -686,8 +690,8 @@ class Network(nn.Module):
             "quant_mode": 0,
             "block_table": block_table,
             "p_scale": p_scale,
-            "cu_seqlens_q": cu_seqlens_q,
-            "cu_seqlens_kv": cu_seqlens_kv,
+            "cu_seqlens_q": cu_seqlens_q if is_tnd_q else None,
+            "cu_seqlens_kv": cu_seqlens_kv if is_tnd_kv else None,
             "seqused_q": seqused_q,
             "seqused_kv": seqused_kv,
             "attn_mask": mask,
@@ -1077,6 +1081,7 @@ def hif8_fa_torch_npu(
             out_dtype,
             max_seqlen_q,
             max_seqlen_kv,
+            q.shape[0] if layout_q != "TND" else None,
         )
 
         # aclgraph: 直接使用 npugraph_ex backend
