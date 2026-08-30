@@ -1503,34 +1503,38 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ReduceIntraBlockAndStage(RunI
         maxUb = this->softmaxFinalMaxBufs[runInfo.taskIdMod2].tensor;
         sumUb = this->softmaxFinalSumBufs[runInfo.taskIdMod2].tensor;
     }
+    bool copyOutMergedLse = false;
     if constexpr (!HIGH_PERF) {
-        bool copyOutMergedLse = constInfo.isSoftmaxLseEnable && this->isSoftmaxLseGmValid &&
-                                !runInfo.isCrossCoreSplit && runInfo.s2LoopCount == runInfo.s2LoopLimit;
-
-        WaitFlag<HardEvent::MTE3_MTE2>(INNERCORE_INTRALSE_MTE3_MTE2(runInfo.multiCoreIdxMod2));
-        WaitFlag<HardEvent::MTE3_MTE2>(INNERCORE_INTRAATTN_MTE3_MTE2(runInfo.multiCoreIdxMod2));
-        LocalTensor<T> sinkUb;
-        int64_t startRow = 0;
-        while (startRow < runInfo.vec2MRealSize) {
-            int64_t dealRowCount = intraLayout.chunkRows;
-            if (startRow + dealRowCount > runInfo.vec2MRealSize) {
-                dealRowCount = runInfo.vec2MRealSize - startRow;
-            }
-            LocalTensor<T> chunkCurrent = vec2ResUb[startRow * dTemplateAlign64];
-            LocalTensor<float> chunkMaxUb = maxUb[startRow];
-            LocalTensor<float> chunkSumUb = sumUb[startRow];
+        copyOutMergedLse = constInfo.isSoftmaxLseEnable && this->isSoftmaxLseGmValid && !runInfo.isCrossCoreSplit &&
+                           runInfo.s2LoopCount == runInfo.s2LoopLimit;
+    }
+    WaitFlag<HardEvent::MTE3_MTE2>(INNERCORE_INTRALSE_MTE3_MTE2(runInfo.multiCoreIdxMod2));
+    WaitFlag<HardEvent::MTE3_MTE2>(INNERCORE_INTRAATTN_MTE3_MTE2(runInfo.multiCoreIdxMod2));
+    LocalTensor<T> sinkUb;
+    int64_t startRow = 0;
+    while (startRow < runInfo.vec2MRealSize) {
+        int64_t dealRowCount = intraLayout.chunkRows;
+        if (startRow + dealRowCount > runInfo.vec2MRealSize) {
+            dealRowCount = runInfo.vec2MRealSize - startRow;
+        }
+        LocalTensor<T> chunkCurrent = vec2ResUb[startRow * dTemplateAlign64];
+        LocalTensor<float> chunkMaxUb = maxUb[startRow];
+        LocalTensor<float> chunkSumUb = sumUb[startRow];
+        if constexpr (!HIGH_PERF) {
             if (copyOutMergedLse) {
                 WaitFlag<HardEvent::MTE3_V>(INNERCORE_LSE_MTE3_V);
             }
-            AttentionCommon::MergeStagedAndCurrentChunk<T, dTemplateAlign64>(
-                intraLayout, intraCoreCombineBase, intraWorkspaceIdx, stagingMOffset + startRow, dealRowCount,
-                static_cast<int64_t>(constInfo.dSizeV), chunkMaxUb, chunkSumUb, chunkCurrent, blockMaxUb, blockSumUb,
-                partialTmpUb, lseBroadcastUb, sumBroadcastUb, sinkUb, INNERCORE_REDUCE_MAXSUM_V_MTE2,
-                INNERCORE_INTRAPARTIALO_V_MTE2, INNERCORE_REDUCE_MTE2_V);
+        }
+        AttentionCommon::MergeStagedAndCurrentChunk<T, dTemplateAlign64>(
+            intraLayout, intraCoreCombineBase, intraWorkspaceIdx, stagingMOffset + startRow, dealRowCount,
+            static_cast<int64_t>(constInfo.dSizeV), chunkMaxUb, chunkSumUb, chunkCurrent, blockMaxUb, blockSumUb,
+            partialTmpUb, lseBroadcastUb, sumBroadcastUb, sinkUb, INNERCORE_REDUCE_MAXSUM_V_MTE2,
+            INNERCORE_INTRAPARTIALO_V_MTE2, INNERCORE_REDUCE_MTE2_V);
 
-            AttentionCommon::StageBroadcastMaxSum(intraLayout, intraCoreCombineBase, intraWorkspaceIdx,
-                                                  stagingMOffset + startRow, dealRowCount, lseBroadcastUb,
-                                                  sumBroadcastUb, INNERCORE_STAGE2, INNERCORE_STAGE_FD_MTE3_V);
+        AttentionCommon::StageBroadcastMaxSum(intraLayout, intraCoreCombineBase, intraWorkspaceIdx,
+                                              stagingMOffset + startRow, dealRowCount, lseBroadcastUb, sumBroadcastUb,
+                                              INNERCORE_STAGE2, INNERCORE_STAGE_FD_MTE3_V);
+        if constexpr (!HIGH_PERF) {
             if (copyOutMergedLse) {
                 DataCopyExtParams lseParams;
                 lseParams.blockCount = static_cast<uint16_t>(dealRowCount);
@@ -1542,13 +1546,13 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ReduceIntraBlockAndStage(RunI
                 DataCopyPad(this->softmaxLseGm[runInfo.softmaxLseOffset + startRow], lseBroadcastUb, lseParams);
                 SetFlag<HardEvent::MTE3_V>(INNERCORE_LSE_MTE3_V);
             }
-            if (runInfo.isCrossCoreSplit && runInfo.s2LoopCount == runInfo.s2LoopLimit) {
-                AttentionCommon::StageBroadcastMaxSum(crossLayout, crossCoreCombineBase, crossWorkspaceIdx,
-                                                      stagingMOffset + startRow, dealRowCount, lseBroadcastUb,
-                                                      sumBroadcastUb, INNERCORE_STAGE2, INNERCORE_STAGE_FD_MTE3_V);
-            }
-            startRow += intraLayout.chunkRows;
         }
+        if (runInfo.isCrossCoreSplit && runInfo.s2LoopCount == runInfo.s2LoopLimit) {
+            AttentionCommon::StageBroadcastMaxSum(crossLayout, crossCoreCombineBase, crossWorkspaceIdx,
+                                                  stagingMOffset + startRow, dealRowCount, lseBroadcastUb,
+                                                  sumBroadcastUb, INNERCORE_STAGE2, INNERCORE_STAGE_FD_MTE3_V);
+        }
+        startRow += intraLayout.chunkRows;
     }
 
     AttentionCommon::StageVec2PartialOAndWait<T>(intraLayout, intraCoreCombineGm, intraWorkspaceIdx, stagingMOffset,
